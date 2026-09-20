@@ -26,6 +26,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Health no longer offers buttons that a read-only member is not allowed to press.** Where your
+  access to the module is "read", the largest module in the app still carried every writing control
+  across all of its tabs, and each of them ended in an error message once the form was filled in:
+  booking or skipping a dose, the as-needed dose, correcting an entry in the medication log,
+  deleting a single measurement, editing a medication, a lab report, an activity or a vaccination,
+  and on the cycle tab starting or ending a period, tapping a day in the calendar, editing an entry
+  in the history, the import and the settings. The rule is the one Tasks, Calendar, Notes and
+  Contacts already follow: something that shows a state stays, as a sign that names the state rather
+  than as a greyed-out button that promises a touch doing nothing, and something that only acts
+  disappears. A due dose therefore keeps saying that it is still pending, a card keeps its stock
+  level, the cycle calendar keeps its colours and your own marks, and the line that says your period
+  is due today stays - without the button beside it. What you can read stays complete: measurements
+  and charts, the medication log, lab results and their reference ranges, the activity log,
+  vaccination records, the cycle history, and the CSV exports, which only read. The fasting tab
+  already asked about this right and is unchanged. Recording for someone you care for is unaffected
+  as long as your access to Health is "write" - the module right is now asked first, so a
+  caregiving permission no longer offers a button the server would refuse. (#1265)
+
 - **A nightly recurring appointment that crosses midnight no longer covers the entry it should be
   sharing its column with.** On a day that carries two occurrences of the same series - last
   night's tail and tonight's start - the second took the first one's place in the layout, so the

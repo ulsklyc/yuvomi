@@ -314,15 +314,15 @@ test('PMS-Fenster wird EINMAL (own-gated) in renderCycleShell berechnet und an B
   assert.ok(shellFn, 'renderCycleShell() nicht gefunden');
   assert.match(shellFn, /const pms = own\s*\?\s*pmsWindow\(cycle\.logs,\s*cycle\.periods,\s*cycleSettings\(\),\s*todayKey\(\)\)\s*:\s*null;/,
     'pms muss genau einmal, own-gated berechnet werden');
-  assert.match(shellFn, /cycleBubbleMarkup\(prediction,\s*pms\)/, 'die Bubble muss das vorberechnete pms erhalten');
-  assert.match(shellFn, /cycleCalendarMarkup\(own,\s*pms\)/, 'der Kalender muss das vorberechnete pms erhalten');
+  assert.match(shellFn, /cycleBubbleMarkup\(prediction,\s*pms[,)]/, 'die Bubble muss das vorberechnete pms erhalten');
+  assert.match(shellFn, /cycleCalendarMarkup\(own,\s*pms[,)]/, 'der Kalender muss das vorberechnete pms erhalten');
 
   const fn = functionSource('cycleCalendarMarkup');
   assert.ok(fn, 'cycleCalendarMarkup() nicht gefunden');
   // Nur der tatsächliche Funktionsaufruf ist verboten - der Dokblock darf
   // "pmsWindow()" weiterhin als Prosa-Verweis erwähnen.
   assert.ok(!/pmsWindow\(cycle\.logs/.test(fn), 'cycleCalendarMarkup() darf pmsWindow() nicht mehr selbst aufrufen');
-  assert.match(fn, /function cycleCalendarMarkup\(own,\s*pms\)/, 'pms muss Parameter sein');
+  assert.match(fn, /function cycleCalendarMarkup\(own,\s*pms[,)]/, 'pms muss Parameter sein');
   assert.match(fn, /!c\.phase[\s\S]{0,20}inPmsWindow/, 'PMS-Shading darf nur auf Zellen ohne eigene Phase greifen');
   assert.match(fn, /pmsVisibleInMonth/, 'Sichtbarkeits-Flag fuer die Legende fehlt');
   const legendFn = functionSource('cycleLegendMarkup');
@@ -351,7 +351,7 @@ test('Bubble bietet "Periode starten" NICHT an, solange eine Periode noch offen 
   const fn = functionSource('cycleBubbleMarkup');
   assert.ok(fn, 'cycleBubbleMarkup() nicht gefunden');
   assert.match(fn, /const openPeriod = cycleOpenPeriod\(\);/, 'muss cycleOpenPeriod() bei faelliger/ueberfaelliger Vorhersage abfragen');
-  assert.match(fn, /if \(openPeriod\)[\s\S]{0,300}cycle-bubble-end-period/,
+  assert.match(fn, /if \(openPeriod\)[\s\S]{0,500}cycle-bubble-end-period/,
     'bei offener Periode muss die Bubble den Beenden-Knopf (eigener data-action) zeigen');
   assert.match(fn, /health\.cycle\.bubble\.periodStillOpen/, 'die "laeuft die noch?"-Zeile fehlt');
   // Die "Periode starten"-CTA darf danach (else-Zweig) weiterhin stehen -

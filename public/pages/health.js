@@ -53,7 +53,7 @@ import {
   CERVIX_MUCUS_TYPES, TEST_RESULT_VALUES, INTIMACY_TYPES, CONTRACEPTION_TYPES,
 } from '/utils/health-cycle.js';
 import { HEALTH_ROUTES, renderHealthTabsBar } from '/utils/health-tabs.js';
-import { canUseFasting } from '/permissions.js';
+import { canUseFasting, isNavModuleReadOnly } from '/permissions.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
 import { intervalMonthsToInput, intervalInputToMonths } from '/utils/health-prevention.js';
 
@@ -149,15 +149,136 @@ async function loadCareGrants() {
 }
 
 /**
+ * Steht das Gesundheitsmodul fuer diesen Nutzer auf „Nur lesen"? (#1265, P2)
+ *
+ * Die VERBINDLICHE Sperre liegt am Server - das zentrale Gate an /api/v1
+ * beantwortet jedes POST/PUT/PATCH/DELETE unter /health mit 403, sobald das
+ * Modul auf `read` steht. Diese Abfrage ist die ehrliche UI-Entsprechung dazu:
+ * ohne sie trug die groesste Seite der App acht Tabs voll bedienbar - Dosen
+ * buchen, Messungen loeschen, Befunde bearbeiten, Perioden starten -, und
+ * JEDER dieser Wege endete erst im ausgefuellten Formular an einem 403.
+ *
+ * `health` ist ein ECHTER Rechte-Schluessel (server/permissions.js, und
+ * `NAV_TO_MODULE` in /permissions.js fuehrt alle acht Health-Routen darauf
+ * zurueck). Die Frage nach einem Modulnamen, den es nicht gibt, faellt still
+ * auf `write` durch - deshalb steht sie hier einmal und nicht an 40 Knoepfen.
+ *
+ * Als Funktion und nicht als Konstante, weil ein Rechtewechsel (Admin passt
+ * Modulrechte an) ohne Reload ankommt und jedes Re-Render neu fragen soll.
+ * Vorbild: `waste.js`, `notes.js`.
+ *
+ * DREI LINIEN, weil diese Seite ihre Knoepfe einzeln verdrahtet:
+ *   1. das Markup nimmt die Affordanz (`canEditFor()`, `cycleCanEdit()`),
+ *   2. `readOnlyLatch()` nimmt dem uebrig gebliebenen Knoten die Wirkung -
+ *      Positivliste, siehe `READ_SAFE_ACTIONS`,
+ *   3. die Verdrahtung haengt gar nicht erst (`if (readOnly()) return` in den
+ *      `wire*`-Funktionen) und jeder Einstieg (Dialog, Dosis, Loeschweg) fragt
+ *      selbst noch einmal.
+ */
+function readOnly() {
+  return isNavModuleReadOnly('health');
+}
+
+/**
  * Darf in der Ansicht dieser Person geschrieben werden - eigene Daten oder die
  * einer betreuten Person? Ersetzt die fünf gleichlautenden `isOwn*View()`, die
  * jeder Tab für sich trug; geblieben ist `isOwnCycleView()`, denn dort stellt
  * sich weiterhin die andere Frage ("bin ich das selbst?") - der Zyklus-Tab ist
  * von der Betreuung bewusst ausgenommen.
+ *
+ * DAS MODULRECHT STEHT VOR DER BETREUUNG (#1265). Beide beantworten dieselbe
+ * Frage - „darf hier geschrieben werden?" -, und sie ist erst mit Ja zu
+ * beantworten, wenn beide Ja sagen: eine Betreuungs-Freigabe fuer das Kind
+ * hilft nichts, wenn der Haushalt das ganze Modul auf `read` gestellt hat.
+ * Deshalb steht das Recht hier IN der Funktion und nicht als zweite Abfrage an
+ * jedem der rund vierzig Aufrufer - eine vergessene waere ein Knopf, der ins
+ * 403 fuehrt. Die Trennung, die dabei bleibt: dies regelt die OBERFLAECHE beim
+ * Modulrecht, nicht die Sichtbarkeit einzelner Zeilen (`visibility`,
+ * `resolveOwner()` am Server) - was eine fremde Zeile preisgibt, entscheidet
+ * weiterhin allein der Server.
  */
 function canEditFor(personId, meId) {
+  if (readOnly()) return false;
   if (personId == null) return false;
   return personId === meId || careFor.includes(personId);
+}
+
+/**
+ * Darf im Zyklus-Tab geschrieben werden?
+ *
+ * BEWUSST NICHT IN `isOwnCycleView()` HINEIN: das beantwortet „bin ich das
+ * selbst?" und steuert damit auch LESENDES - den Intimitaets-Marker im
+ * Kalender, das PMS-Fenster, die Formulierung der Statistik-Herkunft. Wer das
+ * Recht dort einbaut, nimmt einem Nur-lesen-Mitglied genau die Auskunft ueber
+ * die EIGENEN Daten, die es lesen darf (zwei Bedeutungen unter einem Namen,
+ * siehe Regel 6 im Kopf von utils/module-access.js). Also eine zweite,
+ * benannte Frage - und die Renderer bekommen beide Antworten getrennt.
+ */
+function cycleCanEdit() {
+  return isOwnCycleView() && !readOnly();
+}
+
+/**
+ * Jede benannte Aktion (`data-action`) dieser Seite, die NICHT schreibt.
+ *
+ * Eine Positivliste, damit eine morgen ergaenzte Schreib-Aktion standardmaessig
+ * gesperrt ist statt standardmaessig offen - eine Ausschlussliste sagt zu jedem
+ * unbekannten Namen Ja, und an dieser Seite kommen laufend Namen dazu. Die
+ * Markup-Unterdrueckung (`canEditFor()`/`cycleCanEdit()` in den Renderern) ist
+ * die erste Verteidigungslinie, der Riegel in `readOnlyLatch()` die zweite: ein
+ * Knopf aus einem aelteren Render oder aus den Devtools findet denselben
+ * Riegel. Muster wie `READ_SAFE_ACTIONS` in waste.js/schedule.js/tasks.js.
+ *
+ * `cancel` schliesst nur einen Dialog; `ov-go-meds`/`ov-go-cycle` wechseln nur
+ * den Tab. Alles andere schreibt.
+ */
+const READ_SAFE_ACTIONS = new Set(['cancel', 'ov-go-meds', 'ov-go-cycle']);
+
+/**
+ * Die schreibenden Bedienhaken OHNE `data-action`.
+ *
+ * Diese Seite verdrahtet ihre Knoepfe einzeln (`querySelectorAll`) statt ueber
+ * einen `data-action`-Verteiler, deshalb tragen die meisten Schreibwege einen
+ * eigenen `data-`Haken. Der Riegel muss sie am Knoten wiedererkennen; der Guard
+ * in test/test-module-readonly-ui.js haelt die Liste gegen den Quelltext, damit
+ * ein morgen ergaenzter Haken nicht still daran vorbeilaeuft.
+ */
+const WRITE_HOOKS = [
+  '[data-med-edit]', '[data-medlog-edit]', '[data-dose-take]', '[data-dose-skip]',
+  '[data-ov-dose-take]', '[data-ov-dose-skip]', '[data-prn-take]',
+  '[data-activity-edit]', '[data-prevention-edit]', '[data-delete-vital]',
+  '[data-cycle-day]', '[data-cycle-edit]',
+].join(', ');
+
+/**
+ * Der eine Riegel fuer alle Bedienelemente der Panels (Erfassungsphase).
+ *
+ * WARUM CAPTURE: die Listener haengen an den Knoepfen selbst, nicht an einem
+ * gemeinsamen Verteiler - ein Riegel in der Blasenphase kaeme zu spaet, der
+ * Dialog stuende dann schon.
+ *
+ * WARUM NICHT UEBER DEM FASTEN-PANEL: `/health/fasting` ist ein eigenes
+ * Seitenmodul (pages/health-fasting.js), das seit jeher selbst fragt
+ * (`moduleAccess('health') === 'write'`, `requireFastingWrite()`) und im
+ * Nur-lesen-Fall eine vollstaendige Leseansicht mit Verlauf, Filtern, Export
+ * und Statistik zeigt. Ein zweiter, grober Riegel darueber wuerde genau die
+ * lesenden Knoepfe dort erschlagen.
+ */
+function readOnlyLatch(event) {
+  if (!readOnly()) return;
+  const target = event.target;
+  if (typeof target?.closest !== 'function') return;
+  if (target.closest('[data-fasting-root]')) return;
+  const named = target.closest('[data-action]');
+  if (named && !READ_SAFE_ACTIONS.has(named.dataset.action)) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
+  if (target.closest(WRITE_HOOKS)) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
 }
 
 /**
@@ -352,13 +473,13 @@ function updateHealthFab(activeRoute) {
   if (!_fab) return;
   // Gating spiegelt die früheren Inline-„Hinzufügen"-Buttons: Erstellen in der
   // eigenen Ansicht und in der einer betreuten Person (#584), in allen übrigen
-  // (read-only) Ansichten kein FAB. Der Zyklus-Tab bleibt bei isOwnCycleView() -
-  // er ist von der Betreuung ausgenommen.
+  // (read-only) Ansichten kein FAB. Der Zyklus-Tab fragt cycleCanEdit() - er ist
+  // von der Betreuung ausgenommen, das Modulrecht gilt aber auch dort (#1265).
   switch (activeRoute) {
     case '/health/vitals':
       setPageFabAction(_fab, { hidden: !canEditFor(vitals.personId, vitals.meId), label: t('health.vitals.add'), onClick: () => openVitalModal() }); break;
     case '/health/cycle':
-      setPageFabAction(_fab, { hidden: !isOwnCycleView(), label: t('health.cycle.add'), onClick: () => openPeriodModal(null) }); break;
+      setPageFabAction(_fab, { hidden: !cycleCanEdit(), label: t('health.cycle.add'), onClick: () => openPeriodModal(null) }); break;
     case '/health/meds':
       setPageFabAction(_fab, { hidden: !canEditFor(meds.personId, meds.meId), label: t('health.meds.add'), onClick: () => openMedModal(null) }); break;
     case '/health/prevention':
@@ -420,8 +541,17 @@ export async function render(container, ctx = {}) {
     </div>
   `);
 
+  // Der Riegel EINMAL je Seitenaufbau, am Seiten-Root: die Panels darunter
+  // werden bei jedem Personen-/Tabwechsel neu gebaut, dieser Knoten nicht.
+  // Nicht am FAB: den hebt der Router aus dem Container in die Shell
+  // (adoptPageFab, #634) - dort greifen `setPageFabAction({hidden})` oben, die
+  // CSS-Regel an `html[data-module-readonly]` und `triggerPageFab()` fuer den
+  // `n`-Kurzbefehl.
+  const page = container.querySelector('.health-page');
+  page.addEventListener('click', readOnlyLatch, true);
+
   _fab = createPageFab({ id: 'health-fab' });
-  container.querySelector('.health-page').appendChild(_fab);
+  page.appendChild(_fab);
 
   if (window.lucide) window.lucide.createIcons({ el: container });
   renderHealthTabsBar(container, activeRoute, { cycleEnabled, fastingEnabled });
@@ -880,6 +1010,10 @@ function renderDetail() {
       renderVitalsShell();
     }));
 
+  // Der Riegel vor dem einen schreibenden Weg dieser Ansicht (#1265): der
+  // Zeitraum-Stepper darueber liest, das Loeschen darunter nicht.
+  if (readOnly()) return;
+
   // Korrekturpfad (Audit R2, A2-08): Einzelmessungen sind lösch-, damit
   // korrigierbar (löschen + neu erfassen). Undo-Toast statt Confirm (Hausmuster).
   host.querySelectorAll('[data-delete-vital]').forEach((btn) =>
@@ -1130,6 +1264,7 @@ function valueFieldsMarkup(type) {
 }
 
 function openVitalModal(opts = {}) {
+  if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const now = new Date();
   const typeOptions = VITAL_METRICS.map((m) =>
     `<option value="${esc(m.type)}"${m.type === vitals.selectedType ? ' selected' : ''}>${esc(t(m.labelKey))}</option>`).join('');
@@ -1759,6 +1894,7 @@ function doseButtonsFor(medId) {
 
 /** Eine Bedarfsdosis buchen. */
 async function handlePrnDose(btn) {
+  if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const scope = btn.dataset.prnScope;
   const s = prnScope(scope);
   const medId = Number(btn.dataset.medId);
@@ -1994,6 +2130,7 @@ function findMedLog(logId) {
  * Erfolg und wäre eine Rückkehr auf Raten. Der Server weist es entsprechend ab.
  */
 function openMedLogModal(logId) {
+  if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const entry = findMedLog(logId);
   if (!entry) return;
 
@@ -2141,6 +2278,10 @@ function wireMeds() {
   installPopoverMenus(meds.root);
   wirePersonSwitcher(meds, switchMedsPerson);
 
+  // Der Riegel vor der ersten schreibenden Verdrahtung (#1265): Tastatur,
+  // Menues und Personenwechsel darueber lesen, alles darunter bucht oder
+  // oeffnet einen Dialog.
+  if (readOnly()) return;
 
   meds.root.querySelectorAll('[data-med-edit]').forEach((card) =>
     card.addEventListener('click', () => {
@@ -2184,6 +2325,7 @@ async function reloadMeds() {
 }
 
 async function handleDose(btn, action) {
+  if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const medId = Number(btn.dataset.medId);
   // Dieselbe Sperre wie bei der Bedarfsdosis: bei einem Medikament mit Plan UND
   // Bedarf stehen beide Knoepfe nebeneinander, und zwei angestossene Buchungen
@@ -2237,6 +2379,7 @@ async function handleDose(btn, action) {
 // --------------------------------------------------------
 
 function openMedModal(med) {
+  if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const isEdit = Boolean(med && med.id);
   const val = (v) => (v == null ? '' : String(v));
 
@@ -2890,11 +3033,17 @@ function wireLabs() {
       renderLabsShell();
     }));
 
-  labs.root.querySelector('[data-action="lab-edit"]')?.addEventListener('click', (e) => {
-    const id = Number(e.currentTarget.dataset.reportId);
-    const report = labs.reports.find((r) => r.id === id);
-    if (report) openLabModal(report);
-  });
+  // Kein `return` als Riegel: die Analyt-Auswahl darunter LIEST nur, und eine
+  // Seite, die dem Nur-lesen-Mitglied den Trend-Umschalter nimmt, hat die Regel
+  // falsch herum angewandt (#1265). Deshalb steht hier der eine schreibende
+  // Zweig in einer Bedingung.
+  if (!readOnly()) {
+    labs.root.querySelector('[data-action="lab-edit"]')?.addEventListener('click', (e) => {
+      const id = Number(e.currentTarget.dataset.reportId);
+      const report = labs.reports.find((r) => r.id === id);
+      if (report) openLabModal(report);
+    });
+  }
 
   labs.root.querySelector('#health-lab-trend-analyte')?.addEventListener('change', (e) => {
     labs.trendAnalyte = e.target.value;
@@ -2909,11 +3058,13 @@ function wireLabs() {
 
 // Verdrahtet nur die Detail-internen Steuerelemente neu (nach Trend-Wechsel).
 function wireLabsDetail() {
-  labs.root.querySelector('[data-action="lab-edit"]')?.addEventListener('click', (e) => {
-    const id = Number(e.currentTarget.dataset.reportId);
-    const report = labs.reports.find((r) => r.id === id);
-    if (report) openLabModal(report);
-  });
+  if (!readOnly()) {
+    labs.root.querySelector('[data-action="lab-edit"]')?.addEventListener('click', (e) => {
+      const id = Number(e.currentTarget.dataset.reportId);
+      const report = labs.reports.find((r) => r.id === id);
+      if (report) openLabModal(report);
+    });
+  }
   labs.root.querySelector('#health-lab-trend-analyte')?.addEventListener('change', (e) => {
     labs.trendAnalyte = e.target.value;
     const host = labs.root.querySelector('#health-labs-detail');
@@ -2930,6 +3081,7 @@ function wireLabsDetail() {
 // --------------------------------------------------------
 
 function openLabModal(report) {
+  if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const isEdit = Boolean(report && report.id);
   const val = (v) => (v == null ? '' : String(v));
   const dateValue = isEdit
@@ -3447,6 +3599,8 @@ function wireActivity() {
       renderActivityShell();
     }));
 
+  // Der Riegel vor der einen schreibenden Verdrahtung dieses Tabs (#1265).
+  if (readOnly()) return;
 
   activity.root.querySelectorAll('[data-activity-edit]').forEach((btn) =>
     btn.addEventListener('click', () => {
@@ -3474,6 +3628,7 @@ function activityTypeSelectMarkup(current) {
 }
 
 function openActivityModal(row, opts = {}) {
+  if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const isEdit = Boolean(row && row.id);
   const val = (v) => (v == null ? '' : String(v));
   const isPreset = row && ACTIVITY_TYPES.some((a) => a.value === row.type);
@@ -3842,6 +3997,9 @@ function wirePrevention() {
   installPopoverMenus(prevention.root);
   wirePersonSwitcher(prevention, switchPreventionPerson);
 
+  // Der Riegel vor der einen schreibenden Verdrahtung dieses Tabs (#1265).
+  if (readOnly()) return;
+
   prevention.root.querySelectorAll('[data-prevention-edit]').forEach((btn) =>
     btn.addEventListener('click', () => {
       const id = Number(btn.dataset.preventionEdit);
@@ -3873,6 +4031,7 @@ function preventionIntervalUnitOptions(selectedUnit) {
 }
 
 function openPreventionModal(row) {
+  if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const isEdit = Boolean(row && row.id);
   const val = (v) => (v == null ? '' : String(v));
   const advancedOpen = isEdit && (row.interval_months != null || row.next_due_on || row.reminder_offset_days != null);
@@ -4375,6 +4534,7 @@ function overviewDueRowMarkup(dose, med, log, own) {
 }
 
 async function handleOverviewDose(btn, action) {
+  if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const medId = Number(btn.dataset.medId);
   if (doseInFlight.has(medId)) return;
   const logId = btn.dataset.logId ? Number(btn.dataset.logId) : null;
@@ -4601,12 +4761,18 @@ function wireOverview() {
   installPopoverMenus(overview.root);
   wirePersonSwitcher(overview, switchOverviewPerson);
 
-  overview.root.querySelectorAll('[data-ov-dose-take]').forEach((btn) =>
-    btn.addEventListener('click', () => handleOverviewDose(btn, 'take')));
-  overview.root.querySelectorAll('[data-ov-dose-skip]').forEach((btn) =>
-    btn.addEventListener('click', () => handleOverviewDose(btn, 'skip')));
+  // Kein `return` als Riegel: dieser Tab mischt lesende und schreibende
+  // Verdrahtungen (Kachel-Navigation, Tabwechsel und die Export-Zeitraeume
+  // lesen), deshalb stehen die drei schreibenden Bloecke je in einer Bedingung
+  // (#1265).
+  if (!readOnly()) {
+    overview.root.querySelectorAll('[data-ov-dose-take]').forEach((btn) =>
+      btn.addEventListener('click', () => handleOverviewDose(btn, 'take')));
+    overview.root.querySelectorAll('[data-ov-dose-skip]').forEach((btn) =>
+      btn.addEventListener('click', () => handleOverviewDose(btn, 'skip')));
 
-  wirePrn(overview.root);
+    wirePrn(overview.root);
+  }
 
   overview.root.querySelectorAll('[data-vital-nav]').forEach((card) =>
     card.addEventListener('click', () => {
@@ -4614,10 +4780,12 @@ function wireOverview() {
       window.yuvomi?.navigate('/health/vitals');
     }));
 
-  overview.root.querySelector('[data-action="ov-add-vital"]')
-    ?.addEventListener('click', () => openVitalModal({ onSaved: () => reloadOverview() }));
-  overview.root.querySelector('[data-action="ov-add-activity"]')
-    ?.addEventListener('click', () => openActivityModal(null, { onSaved: () => reloadOverview() }));
+  if (!readOnly()) {
+    overview.root.querySelector('[data-action="ov-add-vital"]')
+      ?.addEventListener('click', () => openVitalModal({ onSaved: () => reloadOverview() }));
+    overview.root.querySelector('[data-action="ov-add-activity"]')
+      ?.addEventListener('click', () => openActivityModal(null, { onSaved: () => reloadOverview() }));
+  }
   overview.root.querySelector('[data-action="ov-go-meds"]')
     ?.addEventListener('click', () => window.yuvomi?.navigate('/health/meds'));
   overview.root.querySelector('[data-action="ov-go-cycle"]')
@@ -4784,6 +4952,11 @@ function renderCycleShell() {
   }
 
   const own = isOwnCycleView();
+  // ZWEI FRAGEN, GETRENNT GEHALTEN (#1265): `own` entscheidet, was diese Person
+  // SEHEN darf (Intimitaets-Marker, PMS-Fenster, Schwangerschafts-Hero), `darf`
+  // zusaetzlich, ob sie hier schreiben darf. Bei `health: read` bleibt die
+  // eigene Ansicht also vollstaendig lesbar, nur die Handlungen fallen weg.
+  const darf = cycleCanEdit();
   // dayLogs mitgeben: Phase 3, ein bestätigter Temperaturanstieg im laufenden
   // Zyklus ersetzt das kalendarische Eisprungdatum (siehe predictCycle()-Doku).
   const prediction = predictCycle(cycle.periods, cycleSettings(), todayKey(), cycle.logs);
@@ -4811,13 +4984,13 @@ function renderCycleShell() {
   if (prediction.isPregnant) {
     cycle.root.insertAdjacentHTML('beforeend', `
       ${persons}
-      ${own ? cycleBubbleMarkup(prediction, pms) : ''}
-      ${cyclePregnancyMarkup(prediction, own)}
-      ${own ? cycleTodayActionsMarkup(true) : ''}
-      ${cycleCalendarMarkup(own, pms)}
+      ${own ? cycleBubbleMarkup(prediction, pms, darf) : ''}
+      ${cyclePregnancyMarkup(prediction, darf)}
+      ${darf ? cycleTodayActionsMarkup(true) : ''}
+      ${cycleCalendarMarkup(own, pms, darf)}
       ${prediction.hasData ? cycleTrendsMarkup() : ''}
-      ${prediction.hasData ? cycleHistoryMarkup(own) : ''}
-      ${cycleFooterMarkup(own)}
+      ${prediction.hasData ? cycleHistoryMarkup(darf) : ''}
+      ${cycleFooterMarkup(darf)}
     `);
     if (window.lucide) window.lucide.createIcons({ el: cycle.root });
     wireCycle();
@@ -4832,9 +5005,9 @@ function renderCycleShell() {
     icon: 'droplet',
     title: t('health.cycle.emptyTitle'),
     description: t('health.cycle.emptyDesc'),
-    // Ohne eigenen Zyklus gibt es hier nichts einzutragen: der CTA entfaellt,
-    // die Aussage bleibt.
-    action: own
+    // Ohne eigenen Zyklus - und ohne Schreibrecht auf das Modul - gibt es hier
+    // nichts einzutragen: der CTA entfaellt, die Aussage bleibt.
+    action: darf
       ? { label: t('health.cycle.emptyCta'), icon: 'plus', attrs: { 'data-action': 'cycle-first' } }
       : undefined,
   })}`);
@@ -4846,7 +5019,7 @@ function renderCycleShell() {
 
   cycle.root.insertAdjacentHTML('beforeend', `
     ${persons}
-    ${own ? cycleBubbleMarkup(prediction, pms) : ''}
+    ${own ? cycleBubbleMarkup(prediction, pms, darf) : ''}
     <div class="cycle-hero">
       ${cycleRingMarkup(prediction)}
       <div class="cycle-hero__side">
@@ -4855,11 +5028,11 @@ function renderCycleShell() {
       </div>
     </div>
     ${cycleRingLegendMarkup(prediction)}
-    ${own ? cycleTodayActionsMarkup() : ''}
-    ${cycleCalendarMarkup(own, pms)}
+    ${darf ? cycleTodayActionsMarkup() : ''}
+    ${cycleCalendarMarkup(own, pms, darf)}
     ${cycleTrendsMarkup()}
-    ${cycleHistoryMarkup(own)}
-    ${cycleFooterMarkup(own)}
+    ${cycleHistoryMarkup(darf)}
+    ${cycleFooterMarkup(darf)}
   `);
   if (window.lucide) window.lucide.createIcons({ el: cycle.root });
   wireCycle();
@@ -4905,7 +5078,18 @@ function cycleBubbleShell(line1Text, line2Html, icon = 'sparkles') {
 // `pms` (Fix 3): vorab in renderCycleShell() EINMAL berechnet (own-gated,
 // siehe dortiger Dokblock) und hier nur noch gelesen - kein zweiter
 // pmsWindow()-Aufruf mehr.
-function cycleBubbleMarkup(prediction, pms) {
+/**
+ * @param {boolean} canEdit Darf hier geschrieben werden? (#1265)
+ *
+ * DIE AUSSAGE BLEIBT, DIE HANDLUNG GEHT. Drei der sieben Prioritaeten tragen
+ * einen Knopf - „Periode starten/beenden" und das Antippen zum Tages-Log. Bei
+ * `health: read` faellt der Knopf weg und der Satz bleibt als Zeile stehen:
+ * „deine Periode ist heute faellig" ist eine Auskunft, kein Bedienelement, und
+ * sie gehoert zum Lesbaren. Ein `disabled`-Knopf waere hier das Falsche - er
+ * truege Trefferflaeche und Hover weiter und verspraeche eine Buchung, die
+ * nicht stattfindet (dieselbe Begruendung wie am Statushaken, #1209).
+ */
+function cycleBubbleMarkup(prediction, pms, canEdit = true) {
   const today = todayKey();
 
   // Schwangerschaft: Zeile 1 ist die SSW-Zeile (cyclePregnancyWeekText(), s.o.)
@@ -4938,6 +5122,7 @@ function cycleBubbleMarkup(prediction, pms) {
     // starten"-CTA erscheint nur, wenn KEINE Periode offen ist.
     const openPeriod = cycleOpenPeriod();
     if (openPeriod) {
+      if (!canEdit) return cycleBubbleShell(line1, `<p class="cycle-bubble__line2">${esc(t('health.cycle.bubble.periodStillOpen'))}</p>`);
       return cycleBubbleShell(line1, `
         <div class="cycle-bubble__line2 cycle-bubble__line2--row">
           <span>${esc(t('health.cycle.bubble.periodStillOpen'))}</span>
@@ -4947,6 +5132,7 @@ function cycleBubbleMarkup(prediction, pms) {
     const line2Text = prediction.daysUntilNext === 0
       ? t('health.cycle.bubble.periodToday')
       : t('health.cycle.bubble.periodOverdue', { count: Math.abs(prediction.daysUntilNext) });
+    if (!canEdit) return cycleBubbleShell(line1, `<p class="cycle-bubble__line2">${esc(line2Text)}</p>`);
     return cycleBubbleShell(line1, `
       <div class="cycle-bubble__line2 cycle-bubble__line2--row">
         <span>${esc(line2Text)}</span>
@@ -4966,9 +5152,11 @@ function cycleBubbleMarkup(prediction, pms) {
   const peakPain = peakPainDay(cycle.logs, cycle.periods, settings);
   if (peakPain && peakPain.cycleDay === prediction.cycleDay) {
     const symptomLabel = t(symptomType(peakPain.symptomKey).labelKey);
+    const text = t('health.cycle.bubble.peakPainDay', { symptom: symptomLabel });
+    if (!canEdit) return cycleBubbleShell(line1, `<p class="cycle-bubble__line2">${esc(text)}</p>`);
     return cycleBubbleShell(line1, `
       <button type="button" class="cycle-bubble__line2 cycle-bubble__line2--action" data-action="cycle-bubble-log-today">
-        <span>${esc(t('health.cycle.bubble.peakPainDay', { symptom: symptomLabel }))}</span>
+        <span>${esc(text)}</span>
         <i data-lucide="chevron-right" aria-hidden="true"></i>
       </button>`);
   }
@@ -4992,9 +5180,11 @@ function cycleBubbleMarkup(prediction, pms) {
   const likelyToday = likelihoods.filter((l) => l.result.isLikelyToday).slice(0, 3);
   if (likelyToday.length) {
     const names = likelyToday.map((l) => t(l.symptom.labelKey)).join(', ');
+    const text = t('health.cycle.bubble.likelySymptomsToday', { symptoms: names });
+    if (!canEdit) return cycleBubbleShell(line1, `<p class="cycle-bubble__line2">${esc(text)}</p>`);
     return cycleBubbleShell(line1, `
       <button type="button" class="cycle-bubble__line2 cycle-bubble__line2--action" data-action="cycle-bubble-log-today">
-        <span>${esc(t('health.cycle.bubble.likelySymptomsToday', { symptoms: names }))}</span>
+        <span>${esc(text)}</span>
         <i data-lucide="chevron-right" aria-hidden="true"></i>
       </button>`);
   }
@@ -5038,7 +5228,8 @@ function cycleBubbleMarkup(prediction, pms) {
 // Hero: Schwangerschaft (Vorhersage pausiert)
 // --------------------------------------------------------
 
-function cyclePregnancyMarkup(prediction, own) {
+/** @param {boolean} canEdit Der Einstellungsknopf ist der einzige Schreibweg hier (#1265). */
+function cyclePregnancyMarkup(prediction, canEdit) {
   const p = prediction.pregnancy || {};
   const pct = Math.round((p.progress || 0) * 100);
 
@@ -5069,7 +5260,7 @@ function cyclePregnancyMarkup(prediction, own) {
         <span class="cycle-preg__title">${esc(t('health.cycle.pregnancy.title'))}</span>
         ${detail}
         <p class="cycle-preg__paused">${esc(t('health.cycle.pregnancy.paused'))}</p>
-        ${own ? `<button class="btn btn--ghost btn--sm cycle-preg__edit" data-action="cycle-settings"><i data-lucide="settings-2" aria-hidden="true"></i>${esc(t('health.cycle.settings.open'))}</button>` : ''}
+        ${canEdit ? `<button class="btn btn--ghost btn--sm cycle-preg__edit" data-action="cycle-settings"><i data-lucide="settings-2" aria-hidden="true"></i>${esc(t('health.cycle.settings.open'))}</button>` : ''}
       </div>
     </div>`;
 }
@@ -5327,6 +5518,7 @@ function cycleTodayActionsMarkup(pregnant = false) {
 }
 
 async function cycleStartPeriodToday() {
+  if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const today = todayKey();
   try {
     await api.post('/health/cycle/periods', { start_date: today });
@@ -5340,6 +5532,7 @@ async function cycleStartPeriodToday() {
 }
 
 async function cycleEndPeriodToday() {
+  if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const open = cycleOpenPeriod();
   if (!open) { window.yuvomi?.showToast(t('health.cycle.today.noOpenPeriod'), 'info'); return; }
   try {
@@ -5365,7 +5558,16 @@ function cycleMonthLabel(anchorKey) {
   }
 }
 
-function cycleCalendarMarkup(own, pms) {
+/**
+ * @param {boolean} own     Sieht diese Person ihre EIGENEN Daten? Steuert das
+ *                          Lesbare (Intimitaets-Marker, PMS-Schattierung).
+ * @param {boolean} canEdit Darf sie hier schreiben? Steuert allein, ob eine
+ *                          Tageszelle ein Knopf ist - bei `health: read` bleibt
+ *                          der Kalender vollstaendig stehen, nur antippbar ist
+ *                          er nicht mehr (#1265). Dieselbe Form, die eine
+ *                          fremde Ansicht schon immer bekommt.
+ */
+function cycleCalendarMarkup(own, pms, canEdit = own) {
   const cal = buildCycleCalendar(cycle.anchor, {
     periods: cycle.periods, logs: cycle.logs, settings: cycleSettings(), weekStartsOn: 1,
   });
@@ -5440,8 +5642,8 @@ function cycleCalendarMarkup(own, pms) {
       if (c.inMonth) pmsVisibleInMonth = true;
     }
     const flowAttr = c.flow ? ` data-flow="${esc(c.flow)}"` : '';
-    const tag = own ? 'button' : 'div';
-    const attrs = own
+    const tag = canEdit ? 'button' : 'div';
+    const attrs = canEdit
       ? `type="button" data-cycle-day="${esc(c.dateKey)}" aria-label="${esc(formatDate(c.dateKey))}"`
       : 'aria-hidden="true"';
     const heart = intimacyDates?.has(c.dateKey)
@@ -6187,7 +6389,8 @@ function cycleTrendsMarkup() {
 // Perioden-Verlauf
 // --------------------------------------------------------
 
-function cycleHistoryMarkup(own) {
+/** @param {boolean} canEdit Die Zeile bleibt ganz, nur ihr Bearbeiten-Knopf haengt daran (#1265). */
+function cycleHistoryMarkup(canEdit) {
   const asc = [...cycle.periods].sort((a, b) => (a.start_date < b.start_date ? -1 : 1));
   const nextStartById = new Map();
   for (let i = 0; i < asc.length - 1; i += 1) nextStartById.set(asc[i].id, asc[i + 1].start_date);
@@ -6221,7 +6424,7 @@ function cycleHistoryMarkup(own) {
           const level = flowLevel(flowSummary.heaviest);
           meta.push(t('health.cycle.history.flowHeaviest', { value: level ? t(level.labelKey) : flowSummary.heaviest }));
         }
-        const editBtn = own
+        const editBtn = canEdit
           ? `<button type="button" class="btn btn--icon btn--sm" data-cycle-edit="${esc(p.id)}" aria-label="${esc(t('health.cycle.period.edit'))}"><i data-lucide="pencil" aria-hidden="true"></i></button>`
           : '';
         return `
@@ -6237,17 +6440,23 @@ function cycleHistoryMarkup(own) {
     </section>`;
 }
 
-function cycleFooterMarkup(own) {
+/**
+ * @param {boolean} canEdit Der CSV-Export bleibt IMMER - er liest nur (GET, und
+ *   der Server misst ihn als Lesezugriff). Einfuhr, Einstellungen und der
+ *   Entdeck-Hinweis (er erklaert das Antippen einer Kalenderzelle, die es bei
+ *   `read` nicht mehr gibt) haengen am Schreibrecht (#1265).
+ */
+function cycleFooterMarkup(canEdit) {
   const q = cycle.personId ? `?user_id=${encodeURIComponent(cycle.personId)}` : '';
   return `
     <div class="cycle-footer">
       <a class="btn btn--ghost btn--sm" href="/api/v1/health/export/cycle${q}" download>
         <i data-lucide="download" aria-hidden="true"></i>${esc(t('health.cycle.export.csv'))}
       </a>
-      ${own ? `<button class="btn btn--ghost btn--sm" data-action="cycle-import"><i data-lucide="upload" aria-hidden="true"></i>${esc(t('health.cycle.import.button'))}</button>` : ''}
-      ${own ? `<button class="btn btn--ghost btn--sm" data-action="cycle-settings"><i data-lucide="settings-2" aria-hidden="true"></i>${esc(t('health.cycle.settings.open'))}</button>` : ''}
+      ${canEdit ? `<button class="btn btn--ghost btn--sm" data-action="cycle-import"><i data-lucide="upload" aria-hidden="true"></i>${esc(t('health.cycle.import.button'))}</button>` : ''}
+      ${canEdit ? `<button class="btn btn--ghost btn--sm" data-action="cycle-settings"><i data-lucide="settings-2" aria-hidden="true"></i>${esc(t('health.cycle.settings.open'))}</button>` : ''}
     </div>
-    ${own ? `<p class="cycle-hint cycle-discovery-hint">${t('health.cycle.discoveryHint')}</p>` : ''}
+    ${canEdit ? `<p class="cycle-hint cycle-discovery-hint">${t('health.cycle.discoveryHint')}</p>` : ''}
     ${disclaimerMarkup()}`;
 }
 
@@ -6262,6 +6471,25 @@ function wireCycle() {
 
   cycle.root.querySelectorAll('[data-cycle-month]').forEach((btn) =>
     btn.addEventListener('click', () => { stepCycleMonth(Number(btn.dataset.cycleMonth)); renderCycleShell(); }));
+
+  // Symptom-Wahrscheinlichkeits-Chip (Phase 4e): erneutes Antippen des schon
+  // gewaehlten Chips waehlt ab (Overlay aus) - dieselbe Toggle-Geste wie ein
+  // aktiver Filter, kein Extra-"Zuruecksetzen"-Knopf noetig. Reine Anzeige,
+  // deshalb steht er VOR dem Riegel: auch ein Nur-lesen-Mitglied darf sein
+  // Muster ein- und ausblenden.
+  cycle.root.querySelectorAll('[data-likelihood-symptom]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.likelihoodSymptom;
+      cycle.likelihoodSymptom = cycle.likelihoodSymptom === key ? null : key;
+      renderCycleShell();
+    }));
+
+  // DER RIEGEL VOR DER ERSTEN SCHREIBENDEN VERDRAHTUNG (#1265). Alles darueber
+  // liest (Monatswechsel, Personenwechsel, Tastatur); alles darunter oeffnet
+  // einen Dialog oder bucht. Bei `health: read` haengt daran gar kein Listener
+  // mehr - das Markup traegt die Knoepfe ohnehin nicht, und ein Knoten aus
+  // einem aelteren Render faende zusaetzlich readOnlyLatch().
+  if (readOnly()) return;
 
   cycle.root.querySelectorAll('[data-cycle-day]').forEach((btn) =>
     btn.addEventListener('click', () => openDayLogModal(btn.dataset.cycleDay)));
@@ -6289,15 +6517,6 @@ function wireCycle() {
   cycle.root.querySelector('[data-action="cycle-bubble-end-period"]')?.addEventListener('click', () => cycleEndPeriodToday());
   cycle.root.querySelector('[data-action="cycle-bubble-log-today"]')?.addEventListener('click', () => openDayLogModal(todayKey()));
 
-  // Symptom-Wahrscheinlichkeits-Chip (Phase 4e): erneutes Antippen des schon
-  // gewaehlten Chips waehlt ab (Overlay aus) - dieselbe Toggle-Geste wie ein
-  // aktiver Filter, kein Extra-"Zuruecksetzen"-Knopf noetig.
-  cycle.root.querySelectorAll('[data-likelihood-symptom]').forEach((btn) =>
-    btn.addEventListener('click', () => {
-      const key = btn.dataset.likelihoodSymptom;
-      cycle.likelihoodSymptom = cycle.likelihoodSymptom === key ? null : key;
-      renderCycleShell();
-    }));
 }
 
 // Sichtbarkeit für ein Zyklus-Event vorauswählen: bestehender Wert gewinnt,
@@ -6328,6 +6547,7 @@ function periodOverlapsExisting(start, end, periods, excludeId) {
 }
 
 function openPeriodModal(period) {
+  if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const isEdit = Boolean(period && period.id);
   const startVal = isEdit ? String(period.start_date).slice(0, 10) : todayKey();
   const endVal = isEdit && period.end_date ? String(period.end_date).slice(0, 10) : '';
@@ -6443,6 +6663,7 @@ async function deletePeriod(period) {
 // --------------------------------------------------------
 
 function openCycleImportModal() {
+  if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   openModal({
     title: t('health.cycle.import.title'),
     size: 'sm',
@@ -6575,6 +6796,7 @@ function symptomIntensityDotsHTML(level) {
 }
 
 function openDayLogModal(dateKey) {
+  if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const key = String(dateKey).slice(0, 10);
   const existing = cycle.logs.find((l) => String(l.log_date).slice(0, 10) === key) || null;
   // Intensitaet je Symptom-Wert (0 = nicht ausgewaehlt, sonst 1-3) - die
@@ -6830,6 +7052,7 @@ async function deleteDayLog(log) {
 const PARTNER_REMIND_DAYS = Object.freeze([0, 1, 2, 3, 5, 7]);
 
 function openCycleSettingsModal() {
+  if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const s = cycle.settings || {};
   // Vom Server vorgefiltert (GET /cycle/settings), nicht mehr aus cycle.members
   // gebaut: derselbe Praedikat wie der Erinnerungs-Sync selbst
@@ -7056,6 +7279,42 @@ export const __test = {
   canEditFor,
   loadHealthMembers,
   personSwitcherMarkup,
+  // #1265 P2: Nur-lesen-Oberflaeche. Die beiden Fragen und die Positivliste
+  // des Riegels, damit die Suite sie messen kann statt sie abzuschreiben.
+  readOnly,
+  cycleCanEdit,
+  READ_SAFE_ACTIONS,
+  WRITE_HOOKS,
+  // Die Renderer der Tabs. Reine Funktionen ueber dem Modulzustand - was sie
+  // brauchen, setzt `setViewStateForTest()`.
+  recentMeasurementsMarkup,
+  dueRowMarkup,
+  prnRowMarkup,
+  medCardMarkup,
+  medLogHistoryMarkup,
+  labDetailMarkup,
+  activityRowMarkup,
+  preventionRowMarkup,
+  overviewDueRowMarkup,
+  quickCaptureMarkup,
+  cycleBubbleMarkup,
+  cyclePregnancyMarkup,
+  cycleTodayActionsMarkup,
+  cycleCalendarMarkup,
+  cycleHistoryMarkup,
+  cycleFooterMarkup,
+  /**
+   * Testseam fuer die Tab-Zustaende: EIN benannter View, EIN Patch. Die Views
+   * selbst bleiben drinnen - ein Test kann Felder setzen, nicht die Objekte
+   * tauschen. Wer ihn benutzt, raeumt hinterher auf; die Views sind
+   * Modul-Singletons und ueberleben den einzelnen Test.
+   */
+  setViewStateForTest(name, patch) {
+    const views = { vitals, meds, labs, activity, prevention, overview, cycle };
+    const view = views[name];
+    if (!view) throw new Error(`unbekannter View: ${name}`);
+    Object.assign(view, patch);
+  },
   // Testseam fuer #1031: setzt `careFor` fuer die drei Berechtigungsfaelle
   // (eigene Daten, betreute Person, unbeteiligtes Mitglied), ohne das Array
   // selbst nach aussen zu geben - Tests koennen die Betreuungsliste nur ganz

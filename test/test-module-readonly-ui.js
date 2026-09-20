@@ -83,6 +83,8 @@ const { __test: calendar } = await import('../public/pages/calendar.js');
 const { __test: notes } = await import('../public/pages/notes.js');
 const { __test: contacts } = await import('../public/pages/contacts.js');
 const { __test: birthdays } = await import('../public/pages/birthdays.js');
+// #1265 P2: Gesundheit (acht Tabs).
+const { __test: health } = await import('../public/pages/health.js');
 
 /** Ein Modul auf 'read' stellen und danach wieder aufräumen. */
 function withAccess(modules, fn) {
@@ -1740,5 +1742,521 @@ test('Leere Geburtstagsliste mit `calendar: read`: kein Anlegen-CTA', () => {
   } finally { birthdays.state.query = vorher; }
 });
 
+
+// =========================================================================
+// #1265 P2: Gesundheit
+//
+// Die groesste Seite der App: acht Tabs, 38 schreibende API-Aufrufe in
+// `pages/health.js` und sieben weitere im Fasten-Zweig. Gemessen wird wie in
+// P1 am ERZEUGTEN MARKUP und immer im Paar - „bei read weg" UND „bei write
+// da" -, denn eine Zusicherung, die nur ein fehlendes Element prueft, ist auch
+// gruen, wenn gar nichts gerendert wurde. Jeder Nur-lesen-Fall prueft deshalb
+// zusaetzlich einen INHALT, den der Renderer nur ausgeben kann, wenn er wirklich
+// gelaufen ist.
+//
+// DIE ZWEI FRAGEN, DIE HIER AUSEINANDERGEHALTEN WERDEN. Das Gesundheitsmodul
+// kennt eine eigene Schreibfreigabe je PERSON (Betreuung, #584:
+// `canEditFor()`), und der Zyklus-Tab kennt zusaetzlich „bin ich das selbst?"
+// (`isOwnCycleView()`). Keine davon ist das MODULRECHT. Dieses Paket regelt
+// allein Letzteres: was bei `health: read` an der Oberflaeche verschwindet.
+// Was eine fremde ZEILE preisgibt (`visibility`, `resolveOwner()`), entscheidet
+// weiterhin der Server - hier steht dazu nichts.
+//
+// Und die Gegenrichtung, die der Zyklus-Tab braucht: bei `health: read` bleibt
+// die EIGENE Ansicht vollstaendig lesbar - Intimitaets-Marker, PMS-Fenster,
+// Historie, Export. Waere das Recht in `isOwnCycleView()` gewandert, haette es
+// genau diese Auskunft mitgenommen.
+// =========================================================================
+
+/** Die sieben Tab-Zustaende sind Modul-Singletons: setzen, messen, aufraeumen. */
+function mitView(name, patch, fn) {
+  const { __reset: zurueck, ...felder } = patch;
+  health.setViewStateForTest(name, felder);
+  try { return fn(); } finally { health.setViewStateForTest(name, zurueck || {}); }
+}
+
+const HEALTH_SRC = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+// Kommentarfrei messen: sonst haelt ausgerechnet die Begruendung den Test gruen
+// (dieselbe Regel wie bei CAL_CODE oben).
+const HEALTH_CODE = HEALTH_SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+function healthFn(name) {
+  const start = HEALTH_CODE.indexOf(`function ${name}(`);
+  assert.ok(start >= 0, `${name}() nicht gefunden`);
+  const rest = HEALTH_CODE.slice(start);
+  const ende = rest.indexOf('\n}\n');
+  return rest.slice(0, ende + 2);
+}
+
+// -------------------------------------------------------------------------
+// Die Frage selbst - und der Name, der sie traegt
+// -------------------------------------------------------------------------
+
+test('health.readOnly() folgt dem Rechte-Store - und `health` ist ein Modulname, den es gibt', () => {
+  // DIE FALLE AUS P1, HIER GEGENGEPRUEFT. `birthdays.js` fragte nach einem
+  // Modul, das die Rechte gar nicht fuehren, und `moduleAccess()` faellt fuer
+  // einen unbekannten Schluessel still auf `write` durch - die Frage waere
+  // nie „ja, nur lesen" geworden. Genau deshalb steht sie hier im Paar: ginge
+  // der Name ins Leere, bliebe readOnly() auch bei `read` false.
+  withAccess({ health: 'read' }, () => assert.equal(health.readOnly(), true));
+  withAccess({ health: 'write' }, () => assert.equal(health.readOnly(), false));
+  // `none` ist kein „nur lesen": die Seite ist dann gar nicht erreichbar
+  // (canAccessNavModule), und isNavModuleReadOnly prueft ausdruecklich `read`.
+  withAccess({ health: 'none' }, () => assert.equal(health.readOnly(), false));
+  // Ohne geladene Rechte gilt Vollzugriff (fail-open wie permissions.js).
+  assert.equal(health.readOnly(), false);
+});
+
+test('canEditFor(): das Modulrecht steht VOR der Betreuungs-Freigabe', () => {
+  health.setViewStateForTest('vitals', {});
+  const vorher = [3];
+  health.setCareForForTest(vorher);
+  try {
+    withAccess({ health: 'write' }, () => {
+      assert.equal(health.canEditFor(1, 1), true, 'eigene Daten');
+      assert.equal(health.canEditFor(3, 1), true, 'betreute Person (#584)');
+      assert.equal(health.canEditFor(9, 1), false, 'unbeteiligtes Mitglied');
+    });
+    withAccess({ health: 'read' }, () => {
+      assert.equal(health.canEditFor(1, 1), false, 'auch die eigenen Daten nicht');
+      assert.equal(health.canEditFor(3, 1), false,
+        'eine Betreuungs-Freigabe hilft nicht, wenn das ganze Modul auf read steht');
+      assert.equal(health.canEditFor(9, 1), false);
+    });
+  } finally { health.setCareForForTest([]); }
+});
+
+// -------------------------------------------------------------------------
+// Vitalwerte
+// -------------------------------------------------------------------------
+
+const messung = (over = {}) => ({ id: 41, type: 'weight', value_num: 72.4, unit: 'kg', measured_at: '2026-06-15T08:00', ...over });
+const gewicht = () => ({ type: 'weight', labelKey: 'health.vitals.metric.weight', units: ['kg'], icon: 'scale', channels: null, decimals: 1 });
+
+test('Vitalwerte-Historie mit `health: read`: die Messung bleibt, ihr Loeschweg geht', () => {
+  mitView('vitals', { meId: 1, personId: 1, rows: [messung()], range: 'month', __reset: { rows: [] } }, () => {
+    withAccess({ health: 'write' }, () => {
+      const html = health.recentMeasurementsMarkup(gewicht());
+      assert.match(html, /data-delete-vital="41"/);
+      assert.match(html, /health\.vitals\.deleteMeasurement/);
+    });
+    withAccess({ health: 'read' }, () => {
+      const html = health.recentMeasurementsMarkup(gewicht());
+      assert.doesNotMatch(html, /data-delete-vital/);
+      assert.doesNotMatch(html, /<button/);
+      // Der Inhalt, den nur ein wirklich gelaufener Renderer ausgeben kann:
+      assert.match(html, /health\.vitals\.recentMeasurements/);
+      assert.match(html, /72[.,]4/);
+    });
+  });
+});
+
+// -------------------------------------------------------------------------
+// Medikamente
+// -------------------------------------------------------------------------
+
+const medikament = (over = {}) => ({
+  id: 8, name: 'Ibuprofen', dosage_text: '400 mg', form: 'Tablette', active: 1,
+  prn: 0, stock_qty: 12, stock_unit: 'Stk', refill_threshold: 5, ...over,
+});
+const dosis = (over = {}) => ({ medicationId: 8, scheduleId: 2, scheduledAt: '2026-06-15T08:00', time: '08:00', dose_qty: 1, ...over });
+
+test('Faellige Dosis mit `health: read`: kein Buchungsknopf, aber die Ansage „steht aus"', () => {
+  mitView('meds', { meId: 1, personId: 1, list: [medikament()], logsByMed: {}, __reset: { list: [], logsByMed: {} } }, () => {
+    withAccess({ health: 'write' }, () => {
+      const html = health.dueRowMarkup(dosis(), medikament(), null);
+      assert.match(html, /data-dose-take/);
+      assert.match(html, /data-dose-skip/);
+    });
+    withAccess({ health: 'read' }, () => {
+      const html = health.dueRowMarkup(dosis(), medikament(), null);
+      assert.doesNotMatch(html, /data-dose-take|data-dose-skip/);
+      assert.doesNotMatch(html, /<button/);
+      // ZUSTAND BLEIBT ALS ZEICHEN: die Zeile sagt weiter, woran sie ist.
+      assert.match(html, /<span class="health-dose__status">health\.meds\.status\.pending<\/span>/);
+      assert.match(html, /Ibuprofen/);
+      assert.match(html, /08:00/);
+    });
+    // Eine bereits gebuchte Dosis traegt ihr Zeichen in beiden Faellen - der
+    // Riegel darf die Auskunft nicht mitnehmen.
+    for (const stufe of ['read', 'write']) {
+      withAccess({ health: stufe }, () => {
+        const html = health.dueRowMarkup(dosis(), medikament(), { id: 5, status: 'taken' });
+        assert.match(html, /health-dose__status--taken/);
+        assert.match(html, /health\.meds\.status\.taken/);
+      });
+    }
+  });
+});
+
+test('Medikamentenkarte mit `health: read`: aus dem Knopf wird ein Kasten, der Bestand bleibt', () => {
+  mitView('meds', { meId: 1, personId: 1, list: [medikament()], logsByMed: {}, __reset: { list: [], logsByMed: {} } }, () => {
+    withAccess({ health: 'write' }, () => {
+      const html = health.medCardMarkup(medikament());
+      assert.match(html, /<button class="health-med-card[^"]*" type="button" data-med-edit="8"/);
+    });
+    withAccess({ health: 'read' }, () => {
+      const html = health.medCardMarkup(medikament());
+      assert.doesNotMatch(html, /data-med-edit/);
+      assert.doesNotMatch(html, /<button/);
+      assert.match(html, /<div class="health-med-card/);
+      assert.match(html, /Ibuprofen/);
+      assert.match(html, /health\.meds\.stock\.label/, 'der Bestand ist Auskunft, keine Handlung');
+    });
+  });
+});
+
+test('Einnahmeprotokoll mit `health: read`: die Zeilen bleiben, die Korrektur faellt weg', () => {
+  const zustand = {
+    meId: 1, personId: 1, list: [medikament()],
+    logsByMed: { 8: [{ id: 77, schedule_id: 2, status: 'taken', taken_at: '2026-06-15T08:05' }] },
+    __reset: { list: [], logsByMed: {} },
+  };
+  mitView('meds', zustand, () => {
+    withAccess({ health: 'write' }, () => {
+      assert.match(health.medLogHistoryMarkup(), /data-medlog-edit="77"/);
+    });
+    withAccess({ health: 'read' }, () => {
+      const html = health.medLogHistoryMarkup();
+      assert.doesNotMatch(html, /data-medlog-edit/);
+      assert.doesNotMatch(html, /<button/);
+      assert.match(html, /health\.meds\.logTitle/);
+      assert.match(html, /health\.meds\.status\.taken/);
+      assert.match(html, /Ibuprofen/);
+    });
+  });
+});
+
+test('Bedarfsdosis: der Knopf haengt an `own`, und `own` kommt aus canEditFor()', () => {
+  const zustand = { id: 9, name: 'Novalgin', prn: 1, prn_dose_qty: 1, prn_min_interval_hours: 6, dosage_text: '500 mg' };
+  mitView('meds', { meId: 1, personId: 1, list: [zustand], logsByMed: { 9: [] }, __reset: { list: [], logsByMed: {} } }, () => {
+    assert.match(health.prnRowMarkup(zustand, 'meds', true), /data-prn-take/);
+    const html = health.prnRowMarkup(zustand, 'meds', false);
+    assert.doesNotMatch(html, /data-prn-take/);
+    assert.match(html, /Novalgin/);
+  });
+  // Und die Verdrahtung dieses `own`: prnScope() fragt canEditFor(), also
+  // faellt der Knopf bei `health: read` mit derselben Antwort weg.
+  assert.match(healthFn('prnScope'), /own: canEditFor\(/);
+});
+
+// -------------------------------------------------------------------------
+// Laborwerte
+// -------------------------------------------------------------------------
+
+const befund = (over = {}) => ({
+  id: 14, report_date: '2026-05-04', lab_name: 'Labor Nord', note: 'Routine',
+  results: [{ id: 3, analyte: 'Ferritin', value_num: 88, unit: 'ng/ml', ref_low: 30, ref_high: 300, flag: 'normal' }],
+  ...over,
+});
+
+test('Befund-Detail mit `health: read`: kein Bearbeiten, die Tabelle steht vollstaendig', () => {
+  mitView('labs', { meId: 1, personId: 1, reports: [befund()], selectedReportId: 14, trendAnalyte: null, __reset: { reports: [], selectedReportId: null } }, () => {
+    withAccess({ health: 'write' }, () => {
+      assert.match(health.labDetailMarkup(), /data-action="lab-edit" data-report-id="14"/);
+    });
+    withAccess({ health: 'read' }, () => {
+      const html = health.labDetailMarkup();
+      assert.doesNotMatch(html, /data-action="lab-edit"/);
+      assert.match(html, /Ferritin/);
+      assert.match(html, /Labor Nord/);
+      assert.match(html, /health\.labs\.col\.reference/);
+    });
+  });
+});
+
+// -------------------------------------------------------------------------
+// Aktivitaet und Vorsorge
+// -------------------------------------------------------------------------
+
+test('Aktivitaetszeile: Bearbeiten weg, Strecke und Dauer bleiben', () => {
+  const zeile = { id: 21, type: 'run', performed_at: '2026-06-14', duration_min: 45, distance_km: 8.2, calories: 510, note: 'Waldweg' };
+  assert.match(health.activityRowMarkup(zeile, true), /data-activity-edit="21"/);
+  const html = health.activityRowMarkup(zeile, false);
+  assert.doesNotMatch(html, /data-activity-edit/);
+  assert.doesNotMatch(html, /<button/);
+  assert.match(html, /Waldweg/);
+  assert.match(html, /health\.activity\.unit\.km/);
+});
+
+test('Vorsorge-Zeile: Bearbeiten weg, Datum und Charge bleiben', () => {
+  const zeile = { id: 33, given_on: '2026-03-02', dose_number: 2, provider: 'Dr. Meier', batch: 'X-42', note: 'gut vertragen' };
+  assert.match(health.preventionRowMarkup(zeile, true), /data-prevention-edit="33"/);
+  const html = health.preventionRowMarkup(zeile, false);
+  assert.doesNotMatch(html, /data-prevention-edit/);
+  assert.doesNotMatch(html, /<button/);
+  assert.match(html, /X-42/);
+  assert.match(html, /gut vertragen/);
+});
+
+// -------------------------------------------------------------------------
+// Uebersicht
+// -------------------------------------------------------------------------
+
+test('Schnellerfassung der Uebersicht faellt bei `health: read` ganz weg', () => {
+  mitView('overview', { meId: 1, personId: 1, __reset: {} }, () => {
+    withAccess({ health: 'write' }, () => {
+      const html = health.quickCaptureMarkup();
+      assert.match(html, /data-action="ov-add-vital"/);
+      assert.match(html, /data-action="ov-add-activity"/);
+      assert.match(html, /data-action="ov-go-meds"/);
+    });
+    withAccess({ health: 'read' }, () => {
+      assert.equal(health.quickCaptureMarkup(), '',
+        'drei Knoepfe, die nur anlegen - es bleibt nichts zu zeigen');
+    });
+  });
+});
+
+test('Faellige Dosis der Uebersicht traegt dieselbe Form wie im Medikamente-Tab', () => {
+  mitView('overview', { meId: 1, personId: 1, meds: [medikament()], logsByMed: {}, __reset: { meds: [] } }, () => {
+    assert.match(health.overviewDueRowMarkup(dosis(), medikament(), null, true), /data-ov-dose-take/);
+    const html = health.overviewDueRowMarkup(dosis(), medikament(), null, false);
+    assert.doesNotMatch(html, /data-ov-dose-take|data-ov-dose-skip/);
+    assert.match(html, /<span class="health-dose__status">health\.meds\.status\.pending<\/span>/);
+    assert.match(html, /Ibuprofen/);
+  });
+  // Und das `own`, das diese Zeile bekommt, ist dieselbe Frage.
+  assert.match(healthFn('overviewDueMarkup'), /const own = canEditFor\(overview\.personId, overview\.meId\);/);
+});
+
+// -------------------------------------------------------------------------
+// Zyklus - die zweite Frage
+// -------------------------------------------------------------------------
+
+const periode = (over = {}) => ({ id: 55, start_date: '2026-06-01', end_date: '2026-06-05', ...over });
+
+test('cycleCanEdit(): eigene Ansicht UND Schreibrecht, nicht eines von beiden', () => {
+  mitView('cycle', { meId: 1, personId: 1, __reset: {} }, () => {
+    withAccess({ health: 'write' }, () => assert.equal(health.cycleCanEdit(), true));
+    withAccess({ health: 'read' }, () => assert.equal(health.cycleCanEdit(), false));
+  });
+  mitView('cycle', { meId: 1, personId: 4, __reset: { personId: null } }, () => {
+    withAccess({ health: 'write' }, () => assert.equal(health.cycleCanEdit(), false, 'fremde Ansicht'));
+  });
+});
+
+test('Das Recht steckt NICHT in isOwnCycleView() - sonst verschwaende auch Lesbares', () => {
+  // `own` traegt im Zyklus-Tab den Intimitaets-Marker, das PMS-Fenster und die
+  // Formulierung der Statistik-Herkunft. Waere das Modulrecht dort eingebaut,
+  // haette ein Nur-lesen-Mitglied seine eigenen Marker verloren.
+  const fn = healthFn('isOwnCycleView');
+  assert.doesNotMatch(fn, /readOnly\(\)/);
+  assert.match(fn, /cycle\.personId === cycle\.meId/);
+  assert.match(healthFn('cycleCanEdit'), /isOwnCycleView\(\) && !readOnly\(\)/);
+});
+
+test('Zyklus-Kalender: die Zelle verliert ihren Knopf, der Herz-Marker bleibt', () => {
+  const zustand = {
+    meId: 1, personId: 1, anchor: '2026-06-15', periods: [periode()],
+    logs: [{ id: 2, log_date: '2026-06-03', intimacy: 'protected', symptoms: null }],
+    settings: {}, likelihoodSymptom: null, __reset: { periods: [], logs: [] },
+  };
+  mitView('cycle', zustand, () => {
+    const schreibend = health.cycleCalendarMarkup(true, null, true);
+    assert.match(schreibend, /data-cycle-day="2026-06-03"/);
+    assert.match(schreibend, /cycle-cal__intimacy-icon/);
+
+    const lesend = health.cycleCalendarMarkup(true, null, false);
+    assert.doesNotMatch(lesend, /data-cycle-day/);
+    assert.doesNotMatch(lesend, /<button class="cycle-cal__day/);
+    // DIE LESENDE HAELFTE - sie ist der Grund fuer den zweiten Parameter:
+    assert.match(lesend, /cycle-cal__intimacy-icon/,
+      'der eigene Marker gehoert zum Lesbaren und darf mit dem Recht nicht fallen');
+    assert.match(lesend, /class="cycle-cal__day is-menstruation"/,
+      'die Phasenfarbe ist Auskunft und bleibt an der Zelle');
+    assert.match(lesend, /<span class="cycle-cal__num">3<\/span>/);
+    assert.match(lesend, /health\.cycle\.calendar\.title/);
+  });
+});
+
+test('Zyklus-Historie und -Fuss: Bearbeiten, Einfuhr und Einstellungen weg, der Export bleibt', () => {
+  mitView('cycle', { meId: 1, personId: 1, periods: [periode()], logs: [], settings: {}, __reset: { periods: [], logs: [] } }, () => {
+    assert.match(health.cycleHistoryMarkup(true), /data-cycle-edit="55"/);
+    const historie = health.cycleHistoryMarkup(false);
+    assert.doesNotMatch(historie, /data-cycle-edit/);
+    assert.doesNotMatch(historie, /<button/);
+    assert.match(historie, /health\.cycle\.history\.title/);
+
+    const fussSchreibend = health.cycleFooterMarkup(true);
+    assert.match(fussSchreibend, /data-action="cycle-import"/);
+    assert.match(fussSchreibend, /data-action="cycle-settings"/);
+    assert.match(fussSchreibend, /cycle-discovery-hint/);
+
+    const fuss = health.cycleFooterMarkup(false);
+    assert.doesNotMatch(fuss, /data-action="cycle-import"|data-action="cycle-settings"/);
+    assert.doesNotMatch(fuss, /cycle-discovery-hint/,
+      'der Hinweis erklaert das Antippen einer Zelle, die es jetzt nicht mehr gibt');
+    assert.match(fuss, /health\/export\/cycle/, 'der CSV-Export liest nur - er bleibt');
+  });
+});
+
+test('„Heute"-Einblendung: bei `read` bleibt der Satz, der Knopf geht', () => {
+  const vorhersage = { isPregnant: false, phase: 'luteal', cycleDay: 29, daysUntilNext: 0, hasData: true };
+  mitView('cycle', { meId: 1, personId: 1, periods: [periode()], logs: [], settings: {}, __reset: { periods: [], logs: [] } }, () => {
+    const schreibend = health.cycleBubbleMarkup(vorhersage, null, true);
+    assert.match(schreibend, /data-action="cycle-bubble-start-period"/);
+    assert.match(schreibend, /health\.cycle\.bubble\.periodToday/);
+
+    const lesend = health.cycleBubbleMarkup(vorhersage, null, false);
+    assert.doesNotMatch(lesend, /<button/);
+    assert.doesNotMatch(lesend, /cycle-bubble-start-period/);
+    assert.match(lesend, /<p class="cycle-bubble__line2">health\.cycle\.bubble\.periodToday<\/p>/,
+      'die Auskunft bleibt als Zeile stehen, nicht als toter Knopf');
+    assert.match(lesend, /health\.cycle\.bubble\.line1/);
+  });
+  // Und mit noch offener Periode derselbe Schnitt.
+  mitView('cycle', { meId: 1, personId: 1, periods: [periode({ end_date: null, start_date: '2026-06-01' })], logs: [], settings: {}, __reset: { periods: [], logs: [] } }, () => {
+    assert.match(health.cycleBubbleMarkup(vorhersage, null, true), /data-action="cycle-bubble-end-period"/);
+    const lesend = health.cycleBubbleMarkup(vorhersage, null, false);
+    assert.doesNotMatch(lesend, /<button/);
+    assert.match(lesend, /health\.cycle\.bubble\.periodStillOpen/);
+  });
+});
+
+test('Schwangerschafts-Hero: der Einstellungsknopf haengt am Recht, die SSW nicht', () => {
+  const vorhersage = { isPregnant: true, pregnancy: { hasDue: true, week: 24, day: 3, trimester: 2, daysUntilDue: 112, progress: 0.6, dueDate: '2026-10-05', overdue: false } };
+  assert.match(health.cyclePregnancyMarkup(vorhersage, true), /data-action="cycle-settings"/);
+  const lesend = health.cyclePregnancyMarkup(vorhersage, false);
+  assert.doesNotMatch(lesend, /data-action="cycle-settings"/);
+  assert.doesNotMatch(lesend, /<button/);
+  assert.match(lesend, /health\.cycle\.pregnancy\.trimester/);
+  assert.match(lesend, /health\.cycle\.pregnancy\.paused/);
+});
+
+test('renderCycleShell() reicht beide Antworten getrennt weiter', () => {
+  const fn = healthFn('renderCycleShell');
+  assert.match(fn, /const own = isOwnCycleView\(\);/);
+  assert.match(fn, /const darf = cycleCanEdit\(\);/);
+  // Der Kalender bekommt beide: `own` fuer das Lesbare, `darf` fuer den Knopf.
+  assert.match(fn, /cycleCalendarMarkup\(own, pms, darf\)/);
+  // Alles, was nur handelt, haengt an `darf`.
+  assert.match(fn, /\$\{darf \? cycleTodayActionsMarkup\(\) : ''\}/);
+  assert.match(fn, /cycleHistoryMarkup\(darf\)/);
+  assert.match(fn, /cycleFooterMarkup\(darf\)/);
+  assert.match(fn, /cyclePregnancyMarkup\(prediction, darf\)/);
+  assert.match(fn, /action: darf/, 'auch der Leerzustands-CTA');
+  assert.ok(!/cycleHistoryMarkup\(own\)|cycleFooterMarkup\(own\)|cycleTodayActionsMarkup\(own\)/.test(fn),
+    'kein Rest, der noch die alte Frage stellt');
+});
+
+// -------------------------------------------------------------------------
+// Die zweite und dritte Verteidigungslinie
+// -------------------------------------------------------------------------
+
+test('READ_SAFE_ACTIONS ist eine Positivliste und enthaelt nur lesende Aktionen', () => {
+  const erlaubt = [...health.READ_SAFE_ACTIONS].sort();
+  assert.deepEqual(erlaubt, ['cancel', 'ov-go-cycle', 'ov-go-meds'],
+    'Dialog schliessen und zwei Tabwechsel - alles andere dieser Seite schreibt');
+
+  // Und die Gegenprobe gegen den Quelltext: JEDE andere `data-action` der Seite
+  // ist damit gesperrt. Kaeme morgen eine dazu, waere sie es auch - das ist der
+  // ganze Sinn der Positivliste.
+  const alle = new Set([...HEALTH_CODE.matchAll(/data-action="([a-z0-9-]+)"/g)].map((m) => m[1]));
+  assert.ok(alle.size >= 20, `nur ${alle.size} Aktionen gefunden - der Scanner misst nichts`);
+  const schreibend = [...alle].filter((a) => !health.READ_SAFE_ACTIONS.has(a));
+  assert.ok(schreibend.includes('cycle-start-period'));
+  assert.ok(schreibend.includes('med-delete'));
+  assert.ok(schreibend.includes('res-add'));
+  assert.ok(schreibend.includes('sched-add'));
+  for (const name of erlaubt) assert.ok(alle.has(name), `${name} steht in der Liste, aber nicht im Markup`);
+});
+
+test('WRITE_HOOKS nennt jeden schreibenden Bedienhaken ohne `data-action`', () => {
+  const genannt = new Set(health.WRITE_HOOKS.split(',').map((s) => s.trim().replace(/^\[|\]$/g, '')));
+  // Die Haken, die `health.js` wirklich an eine Schreibfunktion bindet. Kaeme
+  // einer dazu, ohne dass er hier steht, faende ihn der Riegel nicht - deshalb
+  // steht die Liste zweimal und wird verglichen.
+  const erwartet = [
+    'data-med-edit', 'data-medlog-edit', 'data-dose-take', 'data-dose-skip',
+    'data-ov-dose-take', 'data-ov-dose-skip', 'data-prn-take',
+    'data-activity-edit', 'data-prevention-edit', 'data-delete-vital',
+    'data-cycle-day', 'data-cycle-edit',
+  ];
+  assert.deepEqual([...genannt].sort(), [...erwartet].sort());
+  for (const hook of erwartet) {
+    assert.ok(HEALTH_CODE.includes(hook), `${hook} steht im Riegel, aber nicht mehr im Markup`);
+  }
+  // Und die lesenden Haken stehen ausdruecklich NICHT drin - ein Riegel, der
+  // sie mitnaehme, sperrte den Berechtigten aus.
+  for (const lesend of ['data-range', 'data-step', 'data-person-id', 'data-vital-nav',
+    'data-cycle-month', 'data-likelihood-symptom', 'data-export-area']) {
+    assert.ok(!genannt.has(lesend), `${lesend} liest nur und gehoert nicht in den Riegel`);
+  }
+});
+
+test('readOnlyLatch(): Erfassungsphase, Positivliste, und das Fasten-Panel bleibt aussen vor', () => {
+  const fn = healthFn('readOnlyLatch');
+  assert.match(fn, /if \(!readOnly\(\)\) return;/);
+  assert.match(fn, /data-fasting-root/,
+    'pages/health-fasting.js fragt selbst und zeigt bei read eine vollstaendige Leseansicht');
+  assert.match(fn, /READ_SAFE_ACTIONS\.has/);
+  assert.match(fn, /closest\(WRITE_HOOKS\)/);
+  // Erfassungsphase: ein Riegel in der Blasenphase kaeme nach dem Listener am
+  // Knopf selbst - der Dialog stuende dann schon.
+  assert.match(HEALTH_CODE, /addEventListener\('click', readOnlyLatch, true\)/);
+});
+
+test('der Riegel steht in jeder Verdrahtung VOR der ersten Schreib-Aktion', () => {
+  const faelle = [
+    ['wireCycle', 'data-cycle-day'],
+    ['wireMeds', 'data-med-edit'],
+    ['wireActivity', 'data-activity-edit'],
+    ['wirePrevention', 'data-prevention-edit'],
+    ['renderDetail', 'data-delete-vital'],
+  ];
+  for (const [name, ersteAktion] of faelle) {
+    const fn = healthFn(name);
+    const riegel = fn.indexOf('if (readOnly()) return;');
+    const aktion = fn.indexOf(ersteAktion);
+    assert.ok(riegel > 0, `${name}() hat keinen Riegel`);
+    assert.ok(aktion > 0, `${name}() verdrahtet ${ersteAktion} nicht mehr`);
+    assert.ok(riegel < aktion, `${name}(): der Riegel steht hinter ${ersteAktion}`);
+  }
+  // Zwei Tabs mischen lesende und schreibende Verdrahtungen - dort waere ein
+  // `return` das falsche Werkzeug (er naehme den Trend-Umschalter und die
+  // Kachel-Navigation mit), deshalb je eine Bedingung.
+  for (const name of ['wireLabs', 'wireOverview', 'wireLabsDetail']) {
+    assert.match(healthFn(name), /if \(!readOnly\(\)\) \{/, `${name}() riegelt seine Schreibzweige nicht ab`);
+  }
+  assert.ok(!/function wireLabs\(\)[\s\S]*?if \(readOnly\(\)\) return;/.test(healthFn('wireLabs')),
+    'ein `return` wuerde hier den lesenden Analyt-Umschalter mit abschneiden');
+});
+
+test('jeder Einstieg in einen Schreibweg fragt selbst noch einmal', () => {
+  // Die dritte Linie: ein Aufruf, der gar nicht ueber einen Knopf kommt (FAB,
+  // Deep-Link, ein Aufrufer, den es morgen gibt), findet denselben Riegel.
+  for (const name of [
+    'openVitalModal', 'openMedModal', 'openMedLogModal', 'openLabModal',
+    'openActivityModal', 'openPreventionModal', 'openPeriodModal', 'openDayLogModal',
+    'openCycleSettingsModal', 'openCycleImportModal',
+    'handleDose', 'handleOverviewDose', 'handlePrnDose',
+    'cycleStartPeriodToday', 'cycleEndPeriodToday',
+  ]) {
+    const fn = healthFn(name);
+    const riegel = fn.indexOf('if (readOnly()) return;');
+    assert.ok(riegel >= 0 && riegel < 120, `${name}() fragt nicht (oder zu spaet) nach dem Recht`);
+  }
+});
+
+test('der Fasten-Tab fragte schon immer selbst - und tut es weiter', () => {
+  // Er ist der einzige Teil des Moduls, der die Regel vor #1265 erfuellte:
+  // `writable` verlangt ausdruecklich das Schreibrecht auf `health`, und jeder
+  // Schreibweg geht zusaetzlich durch requireFastingWrite(). Deshalb nimmt ihn
+  // readOnlyLatch() aus - und deshalb steht hier die Zusicherung, dass die
+  // Grundlage dafuer noch da ist.
+  const seite = readFileSync(new URL('../public/pages/health-fasting.js', import.meta.url), 'utf8');
+  assert.match(seite, /const writable = [^\n]*moduleAccess\('health'\) === 'write'/);
+  const controls = readFileSync(new URL('../public/components/fasting-controls.js', import.meta.url), 'utf8');
+  assert.match(controls, /moduleAccess\('health'\) !== 'write'\) throw new Error\('FASTING_READ_ONLY'\)/);
+});
+
+test('Gesundheit hat keine Display-Ausnahme - der Server gibt keine her', () => {
+  const display = readFileSync(new URL('../server/display-scopes.js', import.meta.url), 'utf8');
+  const routen = display.slice(display.indexOf('DISPLAY_WRITE_ROUTES = Object.freeze(['));
+  const liste = routen.slice(0, routen.indexOf(']);'));
+  assert.ok(!/health/.test(liste),
+    'gaebe es hier eine Route, brauchte die betroffene Stelle ein actingAsDisplay() VOR der Modulregel');
+});
 
 test.after(() => miniDomAbraeumen());
