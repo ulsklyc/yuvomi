@@ -11,6 +11,7 @@ import { str, num, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../midd
 import { normalizeRecipeMealTypes } from '../../public/utils/recipe-meal-types.js';
 import { getAdapter } from '../services/recipe-providers/index.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
+import { mayWriteModule } from '../permissions.js';
 
 const log = createLogger('Recipes');
 const router = express.Router();
@@ -363,6 +364,15 @@ router.get('/:id/provider-thumbnail', async (req, res) => {
  */
 router.post('/:id/to-shopping-list', (req, res) => {
   try {
+    // Dieselbe Regel wie im Essensplan (#1290, ausfuehrlich in
+    // routes/meals.js): `/recipes` gehoert dem Scope-Modul `meals`, angelegt
+    // werden `shopping_items`. Wer in den Einkauf schreibt, braucht dessen
+    // Schreibrecht - als Mitglied wie als Token. Vor den 404ern, damit die
+    // Antwort keine Rezept- und Listen-IDs bestaetigt.
+    if (!mayWriteModule(req, 'shopping')) {
+      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403 });
+    }
+
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid recipe ID.', code: 400 });
 

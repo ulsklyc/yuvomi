@@ -306,5 +306,33 @@ test('expandRRULE: TZID-Serie hält Ortszeit über die DST-Grenze (kein Winter-D
   assert(summer.length === 1 && hm(summer[0].dtstart) === '07:25', `Sommer 07:25: ${summer[0] && hm(summer[0].dtstart)}`);
 });
 
+// #1269: Beim Schnitt "dieser und alle folgenden" endet die alte Serie EINE
+// SEKUNDE VOR ihrem Start am Schnitttag (Open-Xchange), nicht am Vortag. Nur
+// den Datumsteil zu lesen laesst den Schnitttag eingeschlossen - und die neue
+// Serie beginnt an ihm. Dieselben zwei Zeilen fahren die ICS-Abonnements
+// (ics-subscription.js: normalizeRecurrenceOverrides -> expandRRULE), sie lesen
+// dieselben fremden Kalender wie der CalDAV-Sync.
+test('expandRRULE: UNTIL mit Uhrzeit schneidet den Schnitttag ab (#1269)', () => {
+  const ics = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:ox-split@x\r\nSUMMARY:My Appointment\r\n'
+    + 'DTSTART;TZID=Europe/Berlin:20260814T170000\r\nDTEND;TZID=Europe/Berlin:20260814T183000\r\n'
+    + 'RRULE:FREQ=WEEKLY;WKST=MO;UNTIL=20260918T145959Z;BYDAY=FR\r\nEND:VEVENT\r\nEND:VCALENDAR';
+  const [ev] = parseICS(ics);
+  // 17:00 Europe/Berlin = 15:00Z, das UNTIL also 14:59:59Z am 18.09. selbst.
+  const occ = expandRRULE(ev, '2026-09-01', '2026-09-30').map((o) => o.dtstart);
+  assert(!occ.includes('2026-09-18T15:00:00Z'), `18.09. liegt hinter UNTIL: ${occ.join()}`);
+  assert(occ.join() === '2026-09-04T15:00:00Z,2026-09-11T15:00:00Z',
+    `nur die beiden Freitage davor: ${occ.join()}`);
+});
+
+test('expandRRULE: UNTIL als reines Datum schliesst den ganzen Tag ein (#1269)', () => {
+  const ics = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:ox-until-date@x\r\nSUMMARY:Ferien\r\n'
+    + 'DTSTART;VALUE=DATE:20260901\r\nDTEND;VALUE=DATE:20260902\r\n'
+    + 'RRULE:FREQ=DAILY;UNTIL=20260903\r\nEND:VEVENT\r\nEND:VCALENDAR';
+  const [ev] = parseICS(ics);
+  const occ = expandRRULE(ev, '2026-09-01', '2026-09-30').map((o) => o.dtstart);
+  assert(occ.join() === '2026-09-01,2026-09-02,2026-09-03',
+    `der UNTIL-Tag zaehlt noch dazu: ${occ.join()}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

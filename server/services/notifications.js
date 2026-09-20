@@ -19,7 +19,7 @@ import { syncAllPantryExpiryReminders } from './pantry-reminders.js';
 import { syncAllCycleReminders } from './cycle-reminders.js';
 import { syncAllScheduleReminders } from './schedule-reminders.js';
 import { syncAllWasteReminders } from './waste-reminders.js';
-import { withoutSwitchedOffModules } from './reminder-origins.js';
+import { withoutModulesDeniedToRecipient, withoutSwitchedOffModules } from './reminder-origins.js';
 import { syncAllPreventionReminders } from './prevention-reminders.js';
 import { syncAllFastingReminders } from './fasting-reminders.js';
 
@@ -581,7 +581,17 @@ export async function processDueNotifications({
   // bleibt ausstehend (pushed_at bleibt leer) und geht nach dem Wiedereinschalten
   // raus - siehe withoutSwitchedOffModules() fuer den Grund. Synchron direkt
   // nach dem Lesen, vor dem ersten `await` der Schleife.
-  const due = withoutSwitchedOffModules(activeDb, dueRows).filter((row) => !fastingSyncFailed
+  //
+  // UND EIN ENTZOGENES MODUL MELDET SICH AUCH NICHT (#1289). Zweite Achse,
+  // gleiche Stelle: `GET /reminders/pending` fragte die Rechte des Mitglieds
+  // laengst, Push und Kanaele nicht - wer `tasks`/`budget`/`documents` verloren
+  // hatte, sah den Toast nicht mehr und bekam Titel, Betrag und Datum trotzdem
+  // aufs Telefon. Beide Filter synchron hintereinander, damit zwischen Lesen
+  // und Urteil kein Yield-Punkt liegt.
+  const due = withoutModulesDeniedToRecipient(
+    activeDb,
+    withoutSwitchedOffModules(activeDb, dueRows),
+  ).filter((row) => !fastingSyncFailed
     || (row.entity_type !== 'fasting_goal' && row.entity_type !== 'fasting_next_start'));
 
   const counters = { due: due.length, attempted: 0, sent: 0, failed: 0, skipped: 0 };

@@ -10,6 +10,7 @@ import * as db from '../db.js';
 import { str, oneOf, date, num, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT, DATE_RE } from '../middleware/validate.js';
 import { addDays, mealWeekday, datesForTemplateInRange } from '../services/meal-recurrence.js';
 import { todayKey } from '../utils/timezone.js';
+import { mayWriteModule } from '../permissions.js';
 
 const log = createLogger('Meals');
 
@@ -742,6 +743,24 @@ router.delete('/ingredients/:ingId', (req, res) => {
  */
 router.post('/:id/to-shopping-list', (req, res) => {
   try {
+    // WER IN DEN EINKAUF SCHREIBT, BRAUCHT DAS EINKAUFS-RECHT (#1290).
+    //
+    // Die beiden Riegel in server/index.js urteilen am ERSTEN PFADSEGMENT
+    // (`moduleForPath`): dieser Aufruf laeuft unter `/meals` und wird deshalb
+    // als `meals` gemessen - angelegt werden aber `shopping_items`. Ein
+    // Mitglied mit `meals: write` und `shopping: none` fuellte so eine Liste,
+    // die es nicht einmal oeffnen darf, und ein Token mit `meals:write` ohne
+    // jeden Einkaufs-Scope genauso. Die Zuordnung am Pfad ist dafuer die
+    // falsche Frage: was ein Aufruf SCHREIBT, weiss nur die Route selbst.
+    // `mayWriteModule()` prueft beide Achsen (Mitgliedsrecht und Token-Scope)
+    // in einem Aufruf.
+    //
+    // VOR DEN 404ern, nicht danach: sonst verriete die Antwort einem
+    // Gesperrten noch, welche Mahlzeit und welche Liste es gibt.
+    if (!mayWriteModule(req, 'shopping')) {
+      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403 });
+    }
+
     const mealId = parseInt(req.params.id, 10);
     const meal   = db.get().prepare('SELECT id, recipe_id FROM meals WHERE id = ?').get(mealId);
     if (!meal) return res.status(404).json({ error: 'Mahlzeit nicht gefunden', code: 404 });
@@ -823,6 +842,12 @@ router.post('/:id/to-shopping-list', (req, res) => {
  */
 router.post('/week-to-shopping-list', (req, res) => {
   try {
+    // Derselbe Grund wie beim Einzel-Transfer darueber (#1290): der Pfad sagt
+    // `meals`, geschrieben wird in den Einkauf.
+    if (!mayWriteModule(req, 'shopping')) {
+      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403 });
+    }
+
     const { listId, week } = req.body;
 
     if (!listId)
