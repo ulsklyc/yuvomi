@@ -1177,6 +1177,92 @@ export function updateHeaderAction(panel, { label, onClick, hidden = false } = {
 }
 
 // --------------------------------------------------------
+// Totzeit gegen den Doppeltipp (#1284)
+// --------------------------------------------------------
+
+/**
+ * Wie lange ein frisch geöffneter Dialog keine Zeiger-Betätigung annimmt.
+ *
+ * DER DIALOG FÄHRT IN DIE HAND, DIE GERADE GETIPPT HAT. Auf Handybreite ist
+ * das Modal ein Sheet, und `modal-sheet-in` (layout.css) schiebt es 280 ms
+ * lang von unten nach oben - quer durch die Stelle, an der eben noch
+ * „Speichern" stand. Gemessen in headless Chrome: ein zweiter Tipp 40-70 ms
+ * nach dem Öffnen der Serien-Rückfrage wählte eine Reichweite aus, ohne dass
+ * die Frage je gelesen wurde; auf dem Desktop legte das Löschen aus dem
+ * Popover „Nur diesen Termin" unter den zweiten Klick eines Doppelklicks.
+ * Beides trifft jeden Dialog des geteilten Systems, nicht nur den neuen: die
+ * Löschfrage geht denselben Weg durch `confirmModal` → `openModal`.
+ *
+ * 350 ms deckt die Einfahrt (280 ms) samt Rest ab und liegt unter der
+ * Schwelle, ab der ein GEWOLLTER zweiter Klick sich verschluckt anfühlt.
+ */
+const POINTER_DEAD_TIME_MS = 350;
+
+/**
+ * Genau die Ereignisse, mit denen ein Zeiger etwas auslöst.
+ *
+ * Die Touch-Ereignisse stehen bewusst NICHT dabei: `touchstart`/`touchmove`
+ * tragen das Scrollen des Inhalts und die Wischgeste des Sheets
+ * (`_wireSheetSwipe`), und sie abzufangen hieße, eine Geste mittendrin
+ * abzuschneiden. Der Tipp selbst kommt ohnehin hier vorbei - als `click` mit
+ * `pointerType: 'touch'`.
+ */
+const POINTER_ACTIVATION_EVENTS = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'];
+
+/**
+ * Kommt dieses Ereignis von einem Zeiger - oder von Tastatur bzw. Screenreader?
+ *
+ * DIE TOTZEIT UNTERSCHEIDET DIE EREIGNISART, NICHT NUR DIE ZEIT. Eine Sperre,
+ * die auch `Enter`/`Space` schluckt, wäre kein Schutz, sondern ein Rückschritt
+ * in der Bedienbarkeit: wer mit Tastatur bedient, tabbt in den Dialog und
+ * drückt - dazwischen liegen keine 350 ms Nachdenkzeit, die man ihm abziehen
+ * dürfte, und er hat auch nie „danebengetippt", weil kein Sheet unter seinen
+ * Finger gefahren ist.
+ *
+ * Zwei Merkmale, und EINES genügt, weil keines für sich vollständig ist:
+ * Chrome liefert einen per Tastatur ausgelösten Klick als PointerEvent mit
+ * leerem `pointerType` und `detail === 0` - dasselbe gilt für `element.click()`
+ * und für die Betätigung durch einen Screenreader. Ein Tipp trägt
+ * `pointerType: 'touch'`, ein älterer MouseEvent ohne `pointerType` immerhin
+ * `detail >= 1`. Nur auf `pointerType` zu hören ließe den Tipp durch, sobald
+ * ein Browser den Kompatibilitätsklick ohne Zeigerart schickt; nur auf
+ * `detail` zu hören ließe `pointerdown` durch, das kein `detail` führt.
+ */
+function _isPointerActivation(event) {
+  if (typeof event?.pointerType === 'string' && event.pointerType !== '') return true;
+  return typeof event?.detail === 'number' && event.detail > 0;
+}
+
+/**
+ * Hängt die Totzeit an ein frisch geöffnetes Overlay.
+ *
+ * CAPTURE AUF DER WURZEL UND ALS ERSTER LISTENER. Capture, damit das Ereignis
+ * fällt, bevor irgendein Handler im Dialog es sieht; als erster, weil ein
+ * Klick auf das Overlay SELBST (der Schließweg über den Hintergrund) im
+ * AT_TARGET-Fall landet - dort laufen Capture- und Bubble-Listener desselben
+ * Knotens in Registrierungsreihenfolge, und `stopImmediatePropagation` wirkt
+ * nur auf das, was noch kommt.
+ *
+ * `now` und `duration` sind für die Sonden da: eine Totzeit belegt man, indem
+ * man die Zeit vorstellt, nicht indem man die Konstante im Quelltext sucht.
+ *
+ * @param {EventTarget} root
+ * @param {{now?: () => number, duration?: number}} [opts]
+ * @returns {(event: Event) => void} der angehängte Handler (für Sonden)
+ */
+export function armPointerDeadTime(root, { now = () => performance.now(), duration = POINTER_DEAD_TIME_MS } = {}) {
+  const openedAt = now();
+  const swallow = (event) => {
+    if (now() - openedAt >= duration) return;
+    if (!_isPointerActivation(event)) return;
+    event.preventDefault?.();
+    event.stopImmediatePropagation?.();
+  };
+  for (const type of POINTER_ACTIVATION_EVENTS) root.addEventListener(type, swallow, true);
+  return swallow;
+}
+
+// --------------------------------------------------------
 // openModal
 // --------------------------------------------------------
 
@@ -1247,6 +1333,11 @@ export function openModal({
   document.body.insertAdjacentHTML('beforeend', html);
   activeOverlay = document.getElementById('shared-modal-overlay');
   activeOverlay._onCloseCallback = onClose;
+
+  // VOR JEDEM ANDEREN LISTENER AUF DIESEM KNOTEN: die Totzeit schluckt einen
+  // Zeigerklick, der noch zum Öffnen gehört, und ihre Reihenfolge entscheidet
+  // mit - siehe armPointerDeadTime.
+  armPointerDeadTime(activeOverlay);
 
   // Lucide-Icons rendern
   if (window.lucide) window.lucide.createIcons({ el: activeOverlay });

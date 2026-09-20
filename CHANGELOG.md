@@ -94,7 +94,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   event, and a series that belongs to a synced or subscribed calendar, save as before, without the
   question. Deleting an event of a series asks the same question with the same three buttons,
   instead of a drop-down. A series that already has a person on one event only can be put right by
-  opening one of the events without them, picking the person and choosing "Whole series". (#1284)
+  opening one of the events without them, picking the person and choosing "Whole series". A dialog
+  that has just opened also ignores taps and clicks for a third of a second, so a quick second tap
+  on Save - or the second click of a double-click on Delete - can no longer answer a question that
+  nobody has read yet; on a phone the dialog slides up into that very spot. The keyboard and screen
+  readers are not affected: Enter, Space, Tab and Escape work from the first moment. (#1284)
 
 - **An empty database file no longer starts Yuvomi as an empty instance.** If the database file
   existed but had a size of zero, Yuvomi took it for a new database, set it up from scratch and came
