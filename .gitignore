@@ -115,6 +115,15 @@ seed-english-demo*.js
 
 # Database backup files
 *.db.backup-*
+# Working copies that server/db.js leaves next to the database: the one it builds a
+# new database in (<DB_PATH>.creating), the one the encryption pass writes
+# (<DB_PATH>.encrypting) and the plaintext copy it keeps afterwards
+# (<DB_PATH>.plaintext-backup, timestamped when an older one is already there).
+# None of them match *.db - that pattern needs the name to end in .db.
+*.db.creating
+*.db.encrypting
+*.db.plaintext-backup
+*.db.plaintext-backup-*
 
 # Duplicate GitHub Pages staging folder
 docs/github-pages/

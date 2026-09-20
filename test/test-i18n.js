@@ -295,3 +295,31 @@ test('der Beleg-Ordner heisst wie das Modul, dessen Belege er traegt', () => {
   assert.deepEqual(drift, [],
     `Der Beleg-Ordner traegt einen anderen Namen als das Modul:\n  ${drift.join('\n  ')}`);
 });
+
+// Zwei Listen, eine Wahrheit. Das Frontend traegt SUPPORTED_LOCALES als Literal
+// (public/i18n.js:13), der Server leitet seine Liste aus den DATEINAMEN ab
+// (server/utils/i18n.js, LOCALE_FILE_RE). Bis 20.09.2026 forderte sein Muster
+// genau zwei Kleinbuchstaben, waehrend `fil.json` drei hat: die Serverliste war
+// 23 statt 24 lang, `isSupportedLocale('fil')` war false, das Auswahlmenue
+// "Sprache gespeicherter Eintraege" bot Filipino trotzdem an (es baut seine
+// Optionen aus der FRONTEND-Liste), und das Speichern antwortete mit
+// "400 Ungueltige Sprache".
+//
+// Kein bestehender Guard sah das: der Test darueber vergleicht die Dateien mit
+// der Frontend-Liste, und die beiden stimmten ueberein. Gemessen wurde nur eine
+// Seite der Naht. Drei Zeilen unter dem Muster steht `{2,3}` fuer den
+// Sprachteil eines Regionscodes - die Erweiterung hat die Dateiliste damals
+// nicht mitgenommen.
+test('Server und Frontend kennen dieselben Sprachen', async () => {
+  const { getSupportedLocales, isSupportedLocale } = await import('../server/utils/i18n.js');
+  const frontend = [...LOCALES].sort();
+  const server = [...getSupportedLocales()].sort();
+  assert.deepEqual(server, frontend,
+    'Die Serverliste weicht von SUPPORTED_LOCALES ab. Eine Sprache, die die '
+    + 'Oberflaeche anbietet, der Server aber nicht kennt, wird beim Speichern '
+    + 'mit 400 abgewiesen.');
+
+  const abgewiesen = frontend.filter((locale) => !isSupportedLocale(locale));
+  assert.deepEqual(abgewiesen, [],
+    `isSupportedLocale() weist Sprachen ab, die die Oberflaeche anbietet: ${abgewiesen.join(', ')}`);
+});
