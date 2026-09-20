@@ -21,6 +21,7 @@ import { syncAllScheduleReminders } from './schedule-reminders.js';
 import { syncAllWasteReminders } from './waste-reminders.js';
 import { withoutSwitchedOffModules } from './reminder-origins.js';
 import { syncAllPreventionReminders } from './prevention-reminders.js';
+import { syncAllFastingReminders } from './fasting-reminders.js';
 
 const log = createLogger('Notifications');
 const APP_NAME = 'Yuvomi';
@@ -127,6 +128,8 @@ const REMINDER_ORIGINS = {
   waste_pickup:           { titleKey: 'nav.waste',              url: '/waste' },
   document_expiry:        { titleKey: 'nav.documents',          url: '/documents' },
   health_prevention_due:  { titleKey: 'health.tabs.prevention', url: '/health/prevention' },
+  fasting_goal:           { titleKey: 'health.fasting.title',   url: '/health/fasting' },
+  fasting_next_start:     { titleKey: 'health.fasting.title',   url: '/health/fasting' },
 };
 
 /**
@@ -243,6 +246,12 @@ function preventionDueBody(reminder) {
   return reminder.entity_title;
 }
 
+function fastingBody(reminder, locale) {
+  return translate(locale, reminder.entity_type === 'fasting_goal'
+    ? 'health.fasting.goalReached'
+    : 'health.fasting.remindNext');
+}
+
 function reminderPayload(reminder, locale, dateFormat) {
   const title = reminder.entity_title || FALLBACK_BODY;
   const origin = REMINDER_ORIGINS[reminder.entity_type];
@@ -265,6 +274,8 @@ function reminderPayload(reminder, locale, dateFormat) {
     body = documentExpiryBody(reminder);
   } else if (reminder.entity_type === 'health_prevention_due' && reminder.entity_title) {
     body = preventionDueBody(reminder);
+  } else if (reminder.entity_type === 'fasting_goal' || reminder.entity_type === 'fasting_next_start') {
+    body = fastingBody(reminder, locale);
   }
   // Waste is the one entity_type with a real per-occurrence deep link
   // (?type=<id>&date=<date_key>, the same contract every other Waste
@@ -414,6 +425,17 @@ export async function processDueNotifications({
     }
   }
 
+  // Fasting permission revocation is a delivery boundary. A failed
+  // reconciliation must fail closed for fasting without silencing unrelated
+  // reminders in the same household.
+  let fastingSyncFailed = false;
+  try {
+    syncAllFastingReminders(activeDb, now);
+  } catch (err) {
+    fastingSyncFailed = true;
+    log.error('Fasting reminder sync failed:', err?.message || err);
+  }
+
   // DER BESTAND ZIEHT HIER NACH, nicht erst beim naechsten Anfassen. Der
   // Router legt die Erinnerung eines Artikels beim Speichern an - aber ein
   // Vorrat, der schon vor diesem Feature im Regal stand, ist nie gespeichert
@@ -559,7 +581,8 @@ export async function processDueNotifications({
   // bleibt ausstehend (pushed_at bleibt leer) und geht nach dem Wiedereinschalten
   // raus - siehe withoutSwitchedOffModules() fuer den Grund. Synchron direkt
   // nach dem Lesen, vor dem ersten `await` der Schleife.
-  const due = withoutSwitchedOffModules(activeDb, dueRows);
+  const due = withoutSwitchedOffModules(activeDb, dueRows).filter((row) => !fastingSyncFailed
+    || (row.entity_type !== 'fasting_goal' && row.entity_type !== 'fasting_next_start'));
 
   const counters = { due: due.length, attempted: 0, sent: 0, failed: 0, skipped: 0 };
   const markPushed = activeDb.prepare('UPDATE reminders SET pushed_at = ? WHERE id = ?');

@@ -6,23 +6,24 @@ Testinfrastruktur: echtes SQLite (`--experimental-sqlite`), im Speicher oder als
 
 Neue Suite - drei Schritte, alle drei Pflicht: (1) `test/test-[module].js` anlegen, (2) `test:[module]`-Skript in `package.json` eintragen, (3) das Skript in die `test`-Kette (`package.json`, Script `test`) einhängen - sonst läuft die Suite weder unter `npm test` noch in CI. Genau so sind fünf Suiten monatelang CI-blind geblieben. Ausnahme: eine Suite, die `puppeteer` oder `test/document-guards-harness.js` importiert, hängt in Schritt 3 statt an `test` am Script `test:document-guards` - `npm run test:suite-chain` weist sie in der `test`-Kette ab. Imports von App-Code (`server/`, `public/`, `tools/`) und Root-Dateien via `../`.
 
-## Fasten: Journal und Auswertung
+## Fasten: Journal, Auswertung und Erinnerungen
 
 ```bash
 npm run test:health-fasting        # Journal: Ziele, Timer, Navigation, Schema, Service und HTTP-Lebenszyklus
 npm run test:health-fasting-stats  # Kalenderfenster, erfasste Zeitzonen, Intervall-Streaks und Wochenwerte
-npm run test:display-timezone     # Explizite Zone, doppelte DST-Stunde und nicht existierende Ortszeit
-npm run test:fasting-browser      # Echte Journal-/Auswertungs-Interaktionen
+npm run test:fasting-reminders     # Opt-in-Regeln, Migration, Transaktionen, API, Browser-Payload und Verfuegbarkeit
+npm run test:display-timezone      # Explizite Zone, doppelte DST-Stunde und nicht existierende Ortszeit
+npm run test:fasting-browser       # Echte Journal-/Auswertungs-/Erinnerungs-Interaktionen
 ```
 
-Die zwei fachlichen Node-Suiten sind jeweils einmal in `npm test` registriert.
+Die drei fachlichen Node-Suiten sind jeweils einmal in `npm test` registriert.
 Die bestehende Fasting-HTTP-Suite startet ihren Express-Router in-process auf einem
 isolierten Loopback-Port und einer temporaeren Testdatenbank; sie benoetigt keinen
 externen Dienst. Die Browser-Suiten nutzen den vorhandenen Puppeteer-Harness mit
 isoliertem Seed/Reset und laufen unter `test:document-guards`, ausserhalb von
-`npm test`. Die drei Browserdateien laufen bewusst nacheinander, damit nicht mehrere
-Chromium-Instanzen um dieselben Maschinenressourcen konkurrieren. Journal und
-Auswertung haben getrennte Browserdateien;
+`npm test`. Die vier Browserdateien laufen bewusst nacheinander, damit nicht mehrere
+Chromium-Instanzen um dieselben Maschinenressourcen konkurrieren. Journal,
+Auswertung und Erinnerungen haben getrennte Browserdateien;
 die gemeinsame Akzeptanzsuite sichert die Journal-Steuerelemente gegen Regressionen.
 Abgedeckt werden mobile/Desktop-Ansichten, Datum/DST, Familien-Lesezugriff,
 Undo/Revisionen, Offline-Resume und die geteilten Steuerelemente. Screenshots lassen

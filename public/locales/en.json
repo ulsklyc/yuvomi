@@ -4016,6 +4016,7 @@
                 "ketosis": "Later phase"
             },
             "custom": "Custom",
+            "notifications": "Notifications",
             "startDate": "Start date",
             "endDate": "End date",
             "note": "Note",
@@ -4028,6 +4029,10 @@
             "clockRemaining": "Remaining",
             "loadMore": "Load 10 more",
             "goalNextHint": "Changing the goal updates the current fast and the default for future fasts.",
+            "remindNext": "Ready for your next fast",
+            "remindGoalToggle": "Notify me when I reach my goal",
+            "remindNextToggle": "Remind me when it is time for the next fast",
+            "reminderHint": "After finishing, a reminder follows after the rest of the 24-hour cycle. No reminder for goals of 24 hours or more, or without a goal.",
             "safetyTitle": "Before you begin",
             "conflict": "This record has changed. Reload the page and try again.",
             "finishedTitle": "Fast finished",

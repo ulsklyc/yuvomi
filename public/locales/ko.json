@@ -4016,6 +4016,7 @@
                 "ketosis": "후기 단계"
             },
             "custom": "사용자 지정",
+            "notifications": "알림",
             "startDate": "시작일",
             "endDate": "종료일",
             "note": "메모",
@@ -4028,6 +4029,10 @@
             "clockRemaining": "남음",
             "loadMore": "10개 더 불러오기",
             "goalNextHint": "목표를 변경하면 현재 단식과 향후 단식의 기본 목표가 업데이트됩니다.",
+            "remindNext": "다음 단식을 시작할 시간입니다",
+            "remindGoalToggle": "목표에 도달하면 알림",
+            "remindNextToggle": "다음 단식 시간이 되면 알림",
+            "reminderHint": "종료 후 24시간 주기의 남은 시간이 지나면 알립니다. 목표가 없거나 24시간 이상이면 알림을 만들지 않습니다.",
             "safetyTitle": "시작하기 전에",
             "conflict": "기록이 변경되었습니다. 페이지를 새로 고침하고 다시 시도하세요.",
             "finishedTitle": "단식 종료됨",

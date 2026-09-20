@@ -4016,6 +4016,7 @@
                 "ketosis": "Późna faza"
             },
             "custom": "Niestandardowy",
+            "notifications": "Powiadomienia",
             "startDate": "Data rozpoczęcia",
             "endDate": "Data zakończenia",
             "note": "Notatka",
@@ -4028,6 +4029,10 @@
             "clockRemaining": "Pozostało",
             "loadMore": "Wczytaj kolejne 10",
             "goalNextHint": "Zmiana celu aktualizuje bieżący post i domyślny cel przyszłych postów.",
+            "remindNext": "Czas rozpocząć kolejny post",
+            "remindGoalToggle": "Powiadom mnie, gdy osiągnę cel",
+            "remindNextToggle": "Przypomnij mi, gdy nadejdzie czas kolejnego postu",
+            "reminderHint": "Po zakończeniu przypomnienie nastąpi po reszcie 24-godzinnego cyklu. Bez przypomnienia przy braku celu lub celu od 24 godzin.",
             "safetyTitle": "Zanim zaczniesz",
             "conflict": "Wpis został zmieniony. Odśwież stronę i spróbuj ponownie.",
             "finishedTitle": "Post zakończony",

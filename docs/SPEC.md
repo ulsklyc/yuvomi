@@ -1693,11 +1693,11 @@ Planned/estimated budget (Budget → Plan). A **steady monthly plan**: one amoun
 
 ### Reminders
 
-Per-user reminders attached to tasks, calendar events, subscriptions, inventory items, inventory tracked dates, pantry items, predicted cycle periods and daily cycle-log nudges, upcoming schedule shifts and extra shifts, or upcoming Waste pickups.
+Per-user reminders attached to tasks, calendar events, subscriptions, inventory items, inventory tracked dates, pantry items, predicted cycle periods and daily cycle-log nudges, upcoming schedule shifts and extra shifts, upcoming Waste pickups, expiring documents, or fasting milestones.
 
 | Column | Type | Constraint |
 |--------|------|-----------|
-| entity_type | TEXT | `task`, `event`, `subscription`, `inventory_item`, `inventory_tracked_date`, `pantry_item` (migration v162), `cycle_period` and `cycle_log_nudge` (migration v177), `schedule_entry` (migration v184), `schedule_extra_entry` (migration v187), or `waste_pickup` (migration v203, #1063 Phase 8), NOT NULL. Each widening rebuilds the table because SQLite cannot extend a CHECK in place |
+| entity_type | TEXT | `task`, `event`, `subscription`, `inventory_item`, `inventory_tracked_date`, `pantry_item` (migration v162), `cycle_period` and `cycle_log_nudge` (migration v177), `schedule_entry` (migration v184), `schedule_extra_entry` (migration v187), `waste_pickup` (migration v203, #1063 Phase 8), `document_expiry` (migration v218), `health_prevention_due` (migration v219), or `fasting_goal` and `fasting_next_start` (migration v220), NOT NULL. Each widening rebuilds the table because SQLite cannot extend a CHECK in place |
 | entity_id | INTEGER | Entity identifier, NOT NULL |
 | remind_at | TEXT | ISO 8601 datetime, NOT NULL |
 | dismissed | INTEGER | 0/1, default 0 |
@@ -1710,15 +1710,18 @@ deleted through `POST`/`PUT`/`DELETE /api/v1/reminders` (`SETTABLE_ENTITY_TYPES`
 `server/routes/reminders.js`). Three of those are **derived** - their module recreates the reminder
 whenever the underlying object is written (renewal date, warranty end, inventory deadline) - but a
 hand-set date survives until the next change to their object, which is a half-life you can work with,
-and closing them would break a published `/api/v1` surface for no reason. The other six
+and closing them would break a published `/api/v1` surface for no reason. The other nine
 (`DERIVED_ENTITY_TYPES`: `pantry_item`, `cycle_period`, `cycle_log_nudge`, `schedule_entry`,
-`schedule_extra_entry`, `waste_pickup`) are rebuilt on **every notification run**
+`schedule_extra_entry`, `waste_pickup`, `document_expiry`, `fasting_goal`,
+`fasting_next_start`) are maintained by their owning modules. Pantry, cycle, schedule,
+Waste and fasting also receive periodic repair
 (`syncAllPantryExpiryReminders()`, `syncAllCycleReminders()`, `syncAllScheduleReminders()`,
-`syncAllWasteReminders()`, all called from `server/services/notifications.js`). A hand-set reminder of
-any of these is therefore gone within a minute and a deleted one is back, so all four write paths
+`syncAllWasteReminders()`, `syncAllFastingReminders()`, all called from
+`server/services/notifications.js`); document reminders reconcile on document writes, archive and
+delete. A hand-set reminder of any derived type is therefore replaced by the owner, so all four write paths
 (`POST`, `PUT`, `DELETE /:id`, `DELETE` by filter) answer 400 for them.
 
-Four of the six additionally have no user-supplyable `entity_id`: a pattern-derived shift, a predicted
+Four of the nine additionally have no user-supplyable `entity_id`: a pattern-derived shift, a predicted
 period, "not logged today" and a Waste occurrence are computed on read and have no stored row of their
 own, so `entity_id` points at an anchor row the sync maintains - `schedule_reminder_entries`
 (migration v184, UNIQUE on `(user_id, date_key, COALESCE(pattern_day_id, 0))`, so one anchor per
@@ -1728,7 +1731,11 @@ None of them is something a caller could construct even if the type were settabl
 `schedule_extra_entry` points directly at its `schedule_extra_shifts` row, and `pantry_item` at its
 pantry item.
 
-Reading and **dismissing** (`PATCH /:id/dismiss`) stay open for all eleven types - the reminder toast
+`document_expiry` points directly at its `family_documents` row. `fasting_goal` and
+`fasting_next_start` point directly at the owner's `health_fasts` row; only that owner receives or
+dismisses them, and deleting the fast removes all of its reminder delivery states atomically.
+
+Reading and **dismissing** (`PATCH /:id/dismiss`) stay open for all fourteen types - the reminder toast
 has to show a derived notification and let the user wave it away, and dismissing holds precisely
 because the row stays.
 
@@ -2997,7 +3004,7 @@ tables (schedules, logs, results) inherit visibility from their parent record. H
 `DB_ENCRYPTION_KEY` (SQLCipher) is strongly recommended. Yuvomi is **not** a medical device and
 makes **no diagnostic claims**; reference ranges and flags are neutral, user-supplied values.
 
-#### Fasting journal (migration 209)
+#### Fasting journal (migrations 209 and 220)
 
 `/health/fasting` requires `health_use_fasting` and Health module access. The MVP
 provides own-person controls and a family read selector. Other-person views are
@@ -3028,14 +3035,16 @@ bulk-apply mutations; hiding the fasting page is never the only enforcement.
 | created_at, updated_at | TEXT | UTC audit timestamps |
 
 `idx_health_fasts_one_active` is a partial unique index per owner. Service-owned
-immediate transactions validate overlap/revision and perform writes atomically.
+immediate transactions validate overlap/revision and perform writes and reminder
+reconciliation atomically.
 End must follow start; neither may be in the future.
 Actual duration is unbounded and uses UTC elapsed time across DST. Ordinary edits
 retain the captured zone and unchanged timestamp precision. Repeated local hours
 retain the original offset; missing spring-forward times are rejected.
 
 `health_fasting_settings` (migration 209) is keyed by user_id with cascading owner
-deletion. It holds nullable default_goal_minutes, zone_mode (`timer`/`educational`),
+deletion. Migration 220 adds `remind_goal` and `remind_next_start`, both off by
+default. It holds nullable default_goal_minutes, zone_mode (`timer`/`educational`),
 safety_acknowledged_at, nullable safety_acknowledged_by (actor deletion sets null),
 and timestamps. clock_mode (`auto`/`elapsed`/`remaining`) lives in sync_config under
 `fasting_clock_mode:user:<id>`. Missing settings mean no goal, timer mode and no
@@ -3084,6 +3093,19 @@ per-day allocation. Current streak ends today/yesterday; longest is historical.
 Weekly buckets contain date,count,totalMinutes,nullable summed goalMinutes,
 goalCount,hasRecord. Missing days differ from completed sub-minute records; the
 chart shows actual/captured-goal values and partial goal coverage.
+
+Notifications are owner-only with independent retained preferences. Goal reached
+targets `start_at + goal`. Eligible completed fasts with a goal below 24 hours
+schedule next start at `end_at + (24 hours - goal)`; actual duration of 24 hours
+or more is excluded. A later fast cancels the prior next-start prompt. Missing
+reminders are created only for future targets; persisted due reminders retain
+delivery retries. Lifecycle, settings and permission changes reconcile
+immediately. This includes role/family-role changes and disabling Health for the
+household; the permission write and reminder cleanup share one transaction. Polling
+also filters fasting reminders while Health is globally disabled. Periodic repair preserves
+unchanged delivery state and only considers the latest fast plus pending rows.
+Polling renders text in the device locale; push and external channels use the household
+locale. Both use the `/health/fasting` deep link.
 
 **`health_vitals`** — one row per measurement.
 

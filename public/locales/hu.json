@@ -4016,6 +4016,7 @@
                 "ketosis": "Késői szakasz"
             },
             "custom": "Egyéni",
+            "notifications": "Értesítések",
             "startDate": "Kezdő dátum",
             "endDate": "Befejező dátum",
             "note": "Megjegyzés",
@@ -4028,6 +4029,10 @@
             "clockRemaining": "Fennmaradó",
             "loadMore": "További 10 betöltése",
             "goalNextHint": "A cél módosítása frissíti az aktuális böjtöt és a jövőbeli böjtök alapértelmezett célját.",
+            "remindNext": "Ideje elkezdeni a következő böjtöt",
+            "remindGoalToggle": "Értesítsen, amikor elérem a célomat",
+            "remindNextToggle": "Emlékeztessen, amikor eljön a következő böjt ideje",
+            "reminderHint": "Befejezés után az emlékeztető a 24 órás ciklus hátralévő részét követi. Cél nélkül vagy legalább 24 órás célnál nincs emlékeztető.",
             "safetyTitle": "Mielőtt elkezded",
             "conflict": "A bejegyzés megváltozott. Frissítsd az oldalt, és próbáld újra.",
             "finishedTitle": "Böjt befejezve",

@@ -51,6 +51,22 @@ function makeDb() {
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       type_id INTEGER REFERENCES health_prevention_types(id) ON DELETE SET NULL,
       name TEXT);
+    -- Periodic notification delivery reconciles fasting reminders before it
+    -- selects due rows. Keep this minimal scheduler fixture on the same
+    -- service boundary even though these tests do not seed a fast.
+    CREATE TABLE health_fasting_settings (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      default_goal_minutes INTEGER,
+      remind_goal INTEGER NOT NULL DEFAULT 0,
+      remind_next_start INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE health_fasts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      start_at TEXT NOT NULL,
+      end_at TEXT,
+      goal_minutes INTEGER
+    );
     -- Minimal, wie inventory_items/pantry_items daneben - nur genug fuer die
     -- CASE-Zweige in processDueNotifications() und den Schichtplan-Sync.
     CREATE TABLE schedule_shift_types (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
@@ -75,7 +91,7 @@ function makeDb() {
     );
     CREATE TABLE reminders (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      entity_type TEXT NOT NULL CHECK(entity_type IN ('task','event','subscription','inventory_item','inventory_tracked_date','pantry_item','cycle_period','cycle_log_nudge','schedule_entry','schedule_extra_entry')),
+      entity_type TEXT NOT NULL CHECK(entity_type IN ('task','event','subscription','inventory_item','inventory_tracked_date','pantry_item','cycle_period','cycle_log_nudge','schedule_entry','schedule_extra_entry','waste_pickup','document_expiry','fasting_goal','fasting_next_start')),
       entity_id INTEGER NOT NULL,
       remind_at TEXT NOT NULL,
       dismissed INTEGER NOT NULL DEFAULT 0,

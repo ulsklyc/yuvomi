@@ -20,6 +20,7 @@ import {
   displayMayRead, displayTokenFromRequest, isDisplayAccount, markDisplayCookieRefreshed,
 } from './services/display-accounts.js';
 import { deleteBirthdayArtifacts, syncBirthdayArtifacts } from './services/birthdays.js';
+import { syncFastingRemindersForUser } from './services/fasting-reminders.js';
 import * as oidcClient from 'openid-client';
 import {
   isOidcEnabled,
@@ -2973,6 +2974,9 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
         avatarData: avatarData ?? null,
         actorUserId: req.authUserId,
       });
+      if (nextRole !== existing.role || familyRole !== existing.family_role) {
+        syncFastingRemindersForUser(db.get(), userId);
+      }
     });
 
     if (newPasswordHash) {
