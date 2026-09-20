@@ -19,7 +19,7 @@ const router = express.Router();
 
 // Exportiert fuer den Guard in test/test-disabled-module-reminders.js: jeder
 // Wert muss in ORIGIN_MODULE stehen, sonst faellt er still aus `/pending`.
-export const VALID_ENTITY_TYPES = ['task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup', 'document_expiry'];
+export const VALID_ENTITY_TYPES = ['task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup', 'document_expiry', 'health_prevention_due', 'fasting_goal', 'fasting_next_start'];
 
 /**
  * Nach jedem Schreibvorgang an den Erinnerungen eines Termins: die Zugewiesenen
@@ -94,10 +94,15 @@ function syncEventFanout(entityType, entityId, userId) {
  * Mitglied koennte `entity_id`s fremder, privater Dokumente erraten und ihre
  * Namen ueber `GET /reminders/pending` zurücklesen.
  *
+ * `health_prevention_due` gehört ebenfalls dazu: server/services/prevention-reminders.js
+ * stellt sie bei jedem periodischen Lauf, nach jedem Schreiben eines Eintrags
+ * und nach jeder Betreuungs-Änderung neu her - ein von Hand gesetzter Termin
+ * wäre binnen einer Minute weg, wie bei `pantry_item`.
+ *
  * Die LESEWEGE (GET) kennen alle Typen weiter: der Erinnerungs-Toast muss eine
  * abgeleitete Meldung anzeigen und wegwischen können.
  */
-const DERIVED_ENTITY_TYPES = ['pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup', 'document_expiry'];
+const DERIVED_ENTITY_TYPES = ['pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup', 'document_expiry', 'health_prevention_due', 'fasting_goal', 'fasting_next_start'];
 
 /* DIESER ROUTER IST EINE MISCHSTELLE, UND SEIN PFAD SAGT DAS NICHT.
  *
@@ -214,6 +219,11 @@ router.get('/pending', (req, res) => {
             WHERE e.id = r.entity_id
           )
           WHEN 'document_expiry' THEN (SELECT name FROM family_documents WHERE id = r.entity_id)
+          WHEN 'health_prevention_due' THEN (
+            SELECT COALESCE(t.name, pr.name) FROM health_prevention_records pr
+            LEFT JOIN health_prevention_types t ON t.id = pr.type_id
+            WHERE pr.id = r.entity_id
+          )
         END AS entity_title,
         -- Unterscheidet die eigene Perioden-Erinnerung von einer an eine
         -- Partnerperson weitergereichten (gleicher entity_type 'cycle_period',
@@ -275,6 +285,18 @@ router.get('/pending', (req, res) => {
     for (const row of rows) {
       if (row.cycle_anchor_kind === 'partner_period') {
         row.cycle_owner_name = cycleOwnerName(row.entity_id);
+      }
+      // Gleiche Lage wie oben, fuer D6: nur die geerbte Zeile (assigned_from
+      // gesetzt) nennt die betreute Person - server/services/notifications.js
+      // #preventionDueBody haelt denselben Riegel fuer die Push-Benachrichtigung,
+      // hier fuer den In-App-Toast (Review #1256: die eine Stelle folgte der
+      // anderen nicht).
+      if (row.entity_type === 'health_prevention_due' && row.assigned_from != null) {
+        row.prevention_subject_name = db.get().prepare(`
+          SELECT u.display_name FROM health_prevention_records pr
+          JOIN users u ON u.id = pr.user_id
+          WHERE pr.id = ?
+        `).get(row.entity_id)?.display_name;
       }
     }
 
