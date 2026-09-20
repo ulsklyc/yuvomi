@@ -1832,7 +1832,13 @@ function ersterStart(dbPath, key, logLevel) {
   // (#1312). Verworfen kostete jeder rote CI-Lauf einen Rerun und sagte nichts
   // Neues - der Exit-Code allein nennt keine der moeglichen Ursachen.
   kind.stderr.on('data', (stueck) => { fehler += stueck; });
-  const ende = new Promise((fertig) => kind.on('exit', (code) => fertig(code)));
+  // `close`, nicht `exit`: `exit` feuert, sobald der Prozess endet, und kann den
+  // gepufferten `data`-Ereignissen der Pipes zuvorkommen - `close` kommt erst,
+  // wenn beide stdio-Stroeme zu sind. Mit `exit` haette `startBericht()` genau
+  // im Fall eines abrupten Absturzes unter Last abgeschnittene oder leere
+  // Ausgabe gelesen, also in dem Fall, fuer den dieser Bericht gebaut ist.
+  // Den Exit-Code reicht `close` als erstes Argument genauso durch.
+  const ende = new Promise((fertig) => kind.on('close', (code) => fertig(code)));
   return { kind, ende, ausgabe: () => ausgabe, fehler: () => fehler };
 }
 
