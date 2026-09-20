@@ -84,6 +84,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An installation that is interrupted during its very first start comes back up on its own.**
+  An empty database file stops Yuvomi from starting, which is right for every way such a file
+  comes about but one: with `DB_ENCRYPTION_KEY` set, creating the database file and writing
+  its first page lie about 150 milliseconds apart, because the key is derived in between, and a
+  first start that was killed in that window left exactly one empty file behind. The next start
+  then refused, and somebody had to delete that file by hand before the installation could finish -
+  no data was lost, but an install interrupted at the wrong moment did not come back up by itself.
+  A new database is now created beside its final place, as `<DB_PATH>.creating`, and moved into
+  place only once it is a database. An interrupted first start therefore leaves only that working
+  file, which the next start picks up again, and the database file itself is either absent or
+  complete, never empty. (#1287)
+
 - **An empty database file no longer starts Yuvomi as an empty instance.** If the database file
   existed but had a size of zero, Yuvomi took it for a new database, set it up from scratch and came
   up empty, without a word - usually in the very moment somebody was moving data, where that looks
