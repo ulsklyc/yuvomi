@@ -195,6 +195,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keeps working, and a write-ahead log next to that file is no longer deleted but kept next to the
   pre-restore copy, where the helper tells you. (#1282)
 
+- **Notes, Contacts and Birthdays no longer offer buttons that a read-only member is not allowed to
+  press.** Where your access to a module is "read", these three pages still carried every writing
+  control, and each of them ended in an error message once the form was filled in: on the pinboard
+  the pin, the delete button, the tappable checklist and the editor inside the note dialog; in
+  Contacts the category manager, the selection mode, the vCard import, the delete entry in each row,
+  the delete and edit actions of the detail view and the "n" shortcut; on Birthdays the two buttons
+  in each row, the swipe gesture behind them and the import from Contacts. The rule is the one Tasks,
+  Calendar and Rewards already follow: something that shows a state stays, as a sign that names the
+  state rather than as a greyed-out button that promises a touch doing nothing, and something that
+  only acts disappears. A pinned note therefore keeps its pin as a sign, a checklist keeps its ticks
+  as readable state, and a note still opens - in a reading view, without an editor. What you can read
+  stays complete: phone numbers, mail addresses, the map link and the vCard export in Contacts, and
+  name, date, age, countdown, name day and note on a birthday. Birthdays follow your access to the
+  Calendar, which is the module they belong to. The import button on that page now asks about both
+  modules it touches, because it reads contacts and writes birthdays: it needs you to see Contacts,
+  as before, and now also to be allowed to edit the Calendar. (#1265)
+
 - **The "n" shortcut no longer opens a create dialog on a page you may only read.** Where your
   access to a module is "read", the create button is hidden, but the keyboard shortcut still pressed
   it: the dialog for a new entry opened anyway, and saving it ended in an error. The shortcut now

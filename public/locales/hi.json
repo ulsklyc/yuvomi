@@ -1053,7 +1053,10 @@
         "filterCreatorLabel": "द्वारा बनाया गया",
         "noResultsCreatorDescription": "{{name}} का कोई नोट नहीं।",
         "checklistToggle": "आइटम पर निशान लगाएं",
-        "checkConflict": "नोट इस बीच बदल गया है। इसे फिर से लोड किया जाएगा।"
+        "checkConflict": "नोट इस बीच बदल गया है। इसे फिर से लोड किया जाएगा।",
+        "pinnedState": "पिन किया गया",
+        "checklistDone": "पूर्ण",
+        "checklistOpen": "खुला"
     },
     "markdown": {
         "bold": "बोल्ड (Ctrl+B)",

@@ -20,6 +20,7 @@ import { getPhoneFormatter, createAsYouType, countryFromRegion } from '/utils/ph
 import { emptyStateHTML } from '/utils/empty-state.js';
 import '/components/category-manager.js';
 import { findPageFab } from '/utils/fab.js';
+import { isNavModuleReadOnly } from '/permissions.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -116,6 +117,58 @@ function contactAvatar(c) {
 }
 
 // --------------------------------------------------------
+// Nur-lesen (#467, #1265 P1)
+// --------------------------------------------------------
+
+/**
+ * Darf dieser Nutzer in den Kontakten schreiben?
+ *
+ * Die VERBINDLICHE Sperre liegt am Server; dies ist die ehrliche
+ * UI-Entsprechung. Ohne sie trug die Seite fuenf Schreibwege voll bedienbar -
+ * anlegen, aendern, einzeln loeschen, im Sammelmodus loeschen, vCards
+ * importieren - und dazu drei Wege ohne eigenen API-Aufruf, die keine
+ * CSS-Regel erreicht: den Kategorie-Verwalter im Kopf, den Auswahlmodus, der
+ * ausschliesslich zum Loeschen da ist, und das Tastenkuerzel „n".
+ *
+ * Als Funktion, nicht als Konstante: ein Rechtewechsel kommt ohne Reload an.
+ * Vorbild: `waste.js`.
+ */
+function readOnly() {
+  return isNavModuleReadOnly('contacts');
+}
+
+/**
+ * Die Kopf-Aktionen der Seite - als eigene Funktion, damit sich messen laesst,
+ * WAS bei `contacts: read` uebrig bleibt.
+ *
+ * DREI VON VIER SCHREIBEN NUR, UND KEINE DAVON HING AN EINER CSS-REGEL. Der
+ * Kategorie-Verwalter legt an und loescht, der Auswahlmodus hat als einzige
+ * Aktion „Loeschen" (seine Pille zeigt sonst nur „Alle auswaehlen"), und der
+ * Import legt Kontakte an. Nur der Primaerknopf traegt `.toolbar-new-btn`, und
+ * genau der ist der einzige, den `html[data-module-readonly]` schon erfasst hat
+ * (layout.css) - er bleibt deshalb im Markup stehen.
+ */
+function toolbarActionsHtml() {
+  return `${readOnly() ? '' : `
+          <button class="btn btn--icon btn--ghost" id="contacts-manage-cats" aria-label="${t('contacts.manageCategories')}" title="${t('contacts.manageCategories')}">
+            <i data-lucide="tags" class="icon-md" aria-hidden="true"></i>
+          </button>
+          <button class="btn btn--secondary" id="contacts-select-btn" aria-pressed="false">
+            <i data-lucide="list-checks" class="icon-md" aria-hidden="true"></i>
+            ${t('contacts.selectButton')}
+          </button>
+          <label class="btn btn--secondary" title="${t('contacts.importTooltip')}" aria-label="${t('contacts.importLabel')}">
+            <i data-lucide="upload" class="icon-md" aria-hidden="true"></i>
+            ${t('contacts.importButton')}
+            <input type="file" id="contacts-import-input" accept=".vcf,text/vcard" style="display:none">
+          </label>`}
+          <button class="btn btn--primary toolbar-new-btn" id="contacts-add-btn" aria-label="${t('contacts.newContactLabel')}">
+            <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
+            <span class="toolbar-new-btn__label">${t('newLabel.contacts')}</span>
+          </button>`;
+}
+
+// --------------------------------------------------------
 // State
 // --------------------------------------------------------
 
@@ -148,24 +201,7 @@ export async function render(container, { user }) {
       <div class="page-toolbar page-toolbar--wrap page-toolbar--narrow contacts-toolbar">
         <h1 class="page-toolbar__title">${t('contacts.title')}</h1>
         ${renderPageSearch({ id: 'contacts-search', label: t('contacts.searchPlaceholder'), placeholder: t('contacts.searchPlaceholder'), value: state.searchQuery, clearLabel: t('common.searchClear'), className: 'contacts-toolbar__search page-toolbar__center' })}
-        <div class="page-toolbar__actions">
-          <button class="btn btn--icon btn--ghost" id="contacts-manage-cats" aria-label="${t('contacts.manageCategories')}" title="${t('contacts.manageCategories')}">
-            <i data-lucide="tags" class="icon-md" aria-hidden="true"></i>
-          </button>
-          <button class="btn btn--secondary" id="contacts-select-btn" aria-pressed="false">
-            <i data-lucide="list-checks" class="icon-md" aria-hidden="true"></i>
-            ${t('contacts.selectButton')}
-          </button>
-          <label class="btn btn--secondary" title="${t('contacts.importTooltip')}" aria-label="${t('contacts.importLabel')}">
-            <i data-lucide="upload" class="icon-md" aria-hidden="true"></i>
-            ${t('contacts.importButton')}
-            <input type="file" id="contacts-import-input" accept=".vcf,text/vcard" style="display:none">
-          </label>
-          <button class="btn btn--primary toolbar-new-btn" id="contacts-add-btn" aria-label="${t('contacts.newContactLabel')}">
-            <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
-            <span class="toolbar-new-btn__label">${t('newLabel.contacts')}</span>
-          </button>
-        </div>
+        <div class="page-toolbar__actions">${toolbarActionsHtml()}</div>
       </div>
       <div class="contacts-filters" id="contacts-filters" role="group" aria-label="${t('contacts.filterAll')}"></div>
       <div id="contacts-status" class="sr-only" role="status" aria-live="polite"></div>
@@ -182,6 +218,11 @@ export async function render(container, { user }) {
   // über alle renderList()-Aufrufe hinweg bestehen; nur seine Kinder werden ersetzt).
   const listEl = _container.querySelector('#contacts-list');
   listEl.addEventListener('click', async (e) => {
+    // EIN RIEGEL VOR DEN SCHREIB-ZWEIGEN. Das Markup nimmt die Affordanz, das
+    // hier nimmt auch dem uebrig gebliebenen Knoten die Wirkung - ein Menue aus
+    // einem aelteren Render findet denselben Riegel.
+    if (readOnly() && e.target.closest('[data-action="delete"], [data-action="empty-cta"]')) return;
+
     const del = e.target.closest('[data-action="delete"]');
     if (del) { await deleteContact(parseInt(del.dataset.id, 10)); return; }
     if (e.target.closest('[data-action="empty-cta"]')) {
@@ -244,7 +285,7 @@ export async function render(container, { user }) {
   renderList({ animate: true });
 
   _container.querySelector('#contacts-manage-cats')
-    ?.addEventListener('click', openContactCategoryManager);
+    ?.addEventListener('click', () => { if (!readOnly()) openContactCategoryManager(); });
 
   // Deep-Link: ?open=<id> öffnet die Detailansicht. Aus der globalen Suche
   // kommend will man den Treffer zuerst sehen, nicht bearbeiten - derselbe
@@ -281,18 +322,22 @@ export async function render(container, { user }) {
   });
 
   // Neu
-  const addHandler = () => openContactModal({ mode: 'create' });
+  // Beide Anlegewege blendet CSS aus (html[data-module-readonly]); der Handler
+  // bleibt trotzdem gesperrt - ausgeblendet ist nicht unerreichbar.
+  const addHandler = () => { if (!readOnly()) openContactModal({ mode: 'create' }); };
   _container.querySelector('#contacts-add-btn').addEventListener('click', addHandler);
   findPageFab('fab-new-contact').addEventListener('click', addHandler);
 
   // Auswahl-Modus (opt-in): Toggle in der Toolbar + Aktionen in der Auswahl-Leiste.
-  _container.querySelector('#contacts-select-btn').addEventListener('click', () => {
+  _container.querySelector('#contacts-select-btn')?.addEventListener('click', () => {
+    if (readOnly()) return;
     if (state.selectMode) exitSelectMode(); else enterSelectMode();
   });
 
   // vCard-Import: parsen, dann eine Auswahl-Vorstufe zeigen (nichts wird
   // ungefragt angelegt). Die eigentliche Anlage passiert in openImportSelectionModal.
-  _container.querySelector('#contacts-import-input').addEventListener('change', async (e) => {
+  _container.querySelector('#contacts-import-input')?.addEventListener('change', async (e) => {
+    if (readOnly()) return;
     const file = e.target.files[0];
     if (!file) return;
     e.target.value = '';
@@ -331,6 +376,9 @@ export async function render(container, { user }) {
       e.preventDefault();
       pageRoot.querySelector('#contacts-search')?.focus();
     } else if (e.key === 'n' || e.key === 'N') {
+      // EIN WEG OHNE MARKUP, und deshalb der, den jede CSS-Regel auslaesst:
+      // „n" legte auch dann an, wenn Kopfknopf und FAB schon weg waren.
+      if (readOnly()) return;
       e.preventDefault();
       openContactModal({ mode: 'create' });
     }
@@ -429,6 +477,44 @@ function filterContacts() {
   return list;
 }
 
+/**
+ * Die zwei Leerzustaende der Liste - als eigene Funktion, weil ihre Aktion eine
+ * Rechtefrage traegt und `renderList()` sich nicht messen laesst (sie schreibt
+ * in den Seitencontainer).
+ *
+ * „Keine Treffer" (Suche/Filter aktiv) und „Noch keine Kontakte" (null
+ * Kontakte) sind zwei Botschaften mit zwei Aktionen. „Zuruecksetzen" bleibt bei
+ * `contacts: read` stehen - das ist ein Filter, kein Schreibweg. Der
+ * Anlegen-CTA geht: er klickt den FAB, und `.click()` erreicht auch ein
+ * Element, das CSS auf `display: none` gesetzt hat.
+ */
+function contactsEmptyStateHtml(filtered) {
+  if (filtered) {
+    return emptyStateHTML({
+      variant: 'no-results',
+      icon: 'search',
+      title: t('contacts.noResultsTitle'),
+      description: t('contacts.noResultsDescription'),
+      action: {
+        label: t('contacts.resetSearch'),
+        icon: 'x',
+        attrs: { 'data-action': 'reset-filters' },
+      },
+    });
+  }
+  return emptyStateHTML({
+    icon: 'users',
+    title: t('contacts.emptyTitle'),
+    description: t('contacts.emptyDescription'),
+    hint: t('emptyHint.contacts'),
+    action: readOnly() ? null : {
+      label: t('contacts.emptyAction'),
+      icon: 'plus',
+      attrs: { 'data-action': 'empty-cta' },
+    },
+  });
+}
+
 function renderList({ animate = false } = {}) {
   const container = _container.querySelector('#contacts-list');
   if (!container) return;
@@ -447,35 +533,9 @@ function renderList({ animate = false } = {}) {
   }
 
   if (!contacts.length) {
-    // „Keine Treffer" (Suche/Filter aktiv) vom „Noch keine Kontakte"-Zustand
-    // (0 Gesamtkontakte) trennen — unterschiedliche Botschaft und Aktion.
     const filtered = Boolean(state.searchQuery || state.activeCategory);
     container.replaceChildren();
-    if (filtered) {
-      container.insertAdjacentHTML('beforeend', emptyStateHTML({
-        variant: 'no-results',
-        icon: 'search',
-        title: t('contacts.noResultsTitle'),
-        description: t('contacts.noResultsDescription'),
-        action: {
-          label: t('contacts.resetSearch'),
-          icon: 'x',
-          attrs: { 'data-action': 'reset-filters' },
-        },
-      }));
-    } else {
-      container.insertAdjacentHTML('beforeend', emptyStateHTML({
-        icon: 'users',
-        title: t('contacts.emptyTitle'),
-        description: t('contacts.emptyDescription'),
-        hint: t('emptyHint.contacts'),
-        action: {
-          label: t('contacts.emptyAction'),
-          icon: 'plus',
-          attrs: { 'data-action': 'empty-cta' },
-        },
-      }));
-    }
+    container.insertAdjacentHTML('beforeend', contactsEmptyStateHtml(filtered));
     if (window.lucide) lucide.createIcons({ el: container });
     return;
   }
@@ -654,7 +714,11 @@ function renderContactItem(c) {
     `<a href="/api/v1/contacts/${c.id}/vcard" download="${esc(c.name)}.vcf" class="contact-menu-item" role="menuitem">
         <i data-lucide="download" class="contact-menu-item__icon" aria-hidden="true"></i><span>${t('contacts.exportLabel')}</span>
       </a>`,
-    !c.family_user_id ? `<button type="button" class="contact-menu-item contact-menu-item--danger" data-action="delete" data-id="${c.id}" role="menuitem">
+    // Der EINE schreibende Eintrag dieses Menues. Die vier anderen - anrufen,
+    // mailen, Karte, Export - sind reines Lesen und bleiben; das Menue ist
+    // deshalb auch bei `contacts: read` nie leer, und ein Knopf ohne Inhalt
+    // entsteht hier nicht (anders als an der Abholzeile in waste.js).
+    (!c.family_user_id && !readOnly()) ? `<button type="button" class="contact-menu-item contact-menu-item--danger" data-action="delete" data-id="${c.id}" role="menuitem">
         <i data-lucide="trash-2" class="contact-menu-item__icon" aria-hidden="true"></i><span>${t('common.delete')}</span>
       </button>` : '',
   ].join('');
@@ -881,8 +945,11 @@ function openContactDetail(contact) {
   }];
 
   // Verknüpfte Familienmitglieder werden über die Familie verwaltet, nicht hier
-  // - die Liste blendet ihren Löschen-Eintrag aus demselben Grund aus.
-  if (!contact.family_user_id) {
+  // - die Liste blendet ihren Löschen-Eintrag aus demselben Grund aus. Und bei
+  // `contacts: read` faellt er ueberall weg: die Ansicht bleibt als LESEWEG
+  // vollstaendig (Nummern, Mail, Adresse, Export), sie bietet nur nichts mehr
+  // an, was der Server abweisen wuerde.
+  if (!contact.family_user_id && !readOnly()) {
     actions.unshift({
       id: 'contact-detail-delete',
       label: t('common.delete'),
@@ -908,7 +975,11 @@ function openContactDetail(contact) {
     size: 'md',
     sections: renderContactDetail(full),
     actions,
-    edit: {
+    // OHNE SCHREIBRECHT KEIN „BEARBEITEN" IM KOPF. `openDetailView` setzt die
+    // Kopf-Aktion genau dann, wenn dieser Schluessel steht (detail-view.js) -
+    // weglassen ist hier also die ganze Antwort, und die Leseansicht bleibt
+    // unveraendert stehen.
+    edit: readOnly() ? null : {
       label: t('common.edit'),
       title: t('contacts.editContact'),
       ready,
@@ -955,6 +1026,7 @@ async function fetchFullContact(contact) {
 }
 
 async function openContactModal({ mode, contact = null }) {
+  if (readOnly()) return;
   if (mode === 'edit') contact = await fetchFullContact(contact);
   const form = buildContactForm({ mode, contact });
   openSharedModal({ title: form.title, content: form.content, size: 'md', onSave: form.wire });
@@ -1157,6 +1229,7 @@ function buildContactForm({ mode, contact = null }) {
       });
 
       panel.querySelector('#cm-save').addEventListener('click', async () => {
+        if (readOnly()) return;
         const saveBtn  = panel.querySelector('#cm-save');
         const firstName = panel.querySelector('#cm-first-name').value.trim();
         const lastName  = panel.querySelector('#cm-last-name').value.trim();
@@ -1309,6 +1382,7 @@ function toggleSelectAll() {
 }
 
 async function deleteSelected() {
+  if (readOnly()) return;
   const ids = [...state.selected];
   if (!ids.length) return;
   const idSet   = new Set(ids);
@@ -1329,6 +1403,7 @@ async function deleteSelected() {
 }
 
 async function deleteContact(id) {
+  if (readOnly()) return;
   const contact = state.contacts.find((c) => c.id === id);
   state.contacts = state.contacts.filter((c) => c.id !== id);
   renderList();
@@ -1489,6 +1564,7 @@ function openBirthdayImport() {
  * gezielt erneut versucht werden; sonst führt die Aktion ins Geburtstagsmodul.
  */
 async function importParsedContacts(list) {
+  if (readOnly()) return;
   let imported = 0;
   let withBirthday = 0;
   let lastName = null;
@@ -1546,3 +1622,16 @@ async function importParsedContacts(list) {
   }
   window.yuvomi?.showToast(message, type, action ? 6000 : 3000, action);
 }
+
+/**
+ * Messflaeche: reine Markup-Funktionen und der Rechte-Helfer. Die
+ * Nur-lesen-Regel (#1265 P1) ist eine Aussage ueber genau dieses Markup;
+ * `state` steht mit darin, weil eine Liste ohne Kontakte und Kategorien sich
+ * nicht stellen liesse. `openContactDetail` kommt mit, weil ihre Aussage KEIN
+ * Markup ist: welche Aktionen die Detailansicht bekommt, sieht nur der, der
+ * `openDetailView` die Optionen abnimmt.
+ */
+export const __test = {
+  renderContactItem, contactsEmptyStateHtml, toolbarActionsHtml,
+  openContactDetail, readOnly, state,
+};

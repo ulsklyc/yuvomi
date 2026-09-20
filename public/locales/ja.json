@@ -1053,7 +1053,10 @@
         "filterCreatorLabel": "作成者",
         "noResultsCreatorDescription": "{{name}} のメモはありません。",
         "checklistToggle": "項目にチェックを入れる",
-        "checkConflict": "メモはその間に変更されました。再読み込みします。"
+        "checkConflict": "メモはその間に変更されました。再読み込みします。",
+        "pinnedState": "ピン留め済み",
+        "checklistDone": "完了",
+        "checklistOpen": "未完了"
     },
     "markdown": {
         "bold": "太字 (Ctrl+B)",

@@ -1053,7 +1053,10 @@
         "filterCreatorLabel": "Автор",
         "noResultsCreatorDescription": "Нет заметок от {{name}}.",
         "checklistToggle": "Отметить пункт",
-        "checkConflict": "Заметка была изменена. Она будет загружена заново."
+        "checkConflict": "Заметка была изменена. Она будет загружена заново.",
+        "pinnedState": "Закреплена",
+        "checklistDone": "Выполнено",
+        "checklistOpen": "Открыто"
     },
     "markdown": {
         "bold": "Жирный (Ctrl+B)",

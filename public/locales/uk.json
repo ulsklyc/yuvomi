@@ -1053,7 +1053,10 @@
         "filterCreatorLabel": "Автор",
         "noResultsCreatorDescription": "Немає нотаток від {{name}}.",
         "checklistToggle": "Позначити пункт",
-        "checkConflict": "Нотатку тим часом змінено. Її буде завантажено знову."
+        "checkConflict": "Нотатку тим часом змінено. Її буде завантажено знову.",
+        "pinnedState": "Закріплена",
+        "checklistDone": "Виконано",
+        "checklistOpen": "Відкрито"
     },
     "markdown": {
         "bold": "Жирний (Ctrl+B)",

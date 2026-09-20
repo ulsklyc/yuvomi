@@ -1053,7 +1053,10 @@
         "filterCreatorLabel": "Gemaakt door",
         "noResultsCreatorDescription": "Geen notities van {{name}}.",
         "checklistToggle": "Item afvinken",
-        "checkConflict": "De notitie is intussen gewijzigd. Deze wordt opnieuw geladen."
+        "checkConflict": "De notitie is intussen gewijzigd. Deze wordt opnieuw geladen.",
+        "pinnedState": "Vastgezet",
+        "checklistDone": "Klaar",
+        "checklistOpen": "Open"
     },
     "markdown": {
         "bold": "Vet (Ctrl+B)",

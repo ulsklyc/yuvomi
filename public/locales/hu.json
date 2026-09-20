@@ -1053,7 +1053,10 @@
         "filterCreatorLabel": "Létrehozta",
         "noResultsCreatorDescription": "Nincs jegyzet {{name}} felhasználótól.",
         "checklistToggle": "Elem kipipálása",
-        "checkConflict": "A jegyzet időközben megváltozott. Újratöltjük."
+        "checkConflict": "A jegyzet időközben megváltozott. Újratöltjük.",
+        "pinnedState": "Kitűzve",
+        "checklistDone": "Kész",
+        "checklistOpen": "Nyitott"
     },
     "markdown": {
         "bold": "Félkövér (Ctrl+B)",

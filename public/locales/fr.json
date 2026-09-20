@@ -1053,7 +1053,10 @@
         "filterCreatorLabel": "Créé par",
         "noResultsCreatorDescription": "Aucune note de {{name}}.",
         "checklistToggle": "Cocher l’élément",
-        "checkConflict": "La note a été modifiée entre-temps. Elle va être rechargée."
+        "checkConflict": "La note a été modifiée entre-temps. Elle va être rechargée.",
+        "pinnedState": "Épinglée",
+        "checklistDone": "Terminé",
+        "checklistOpen": "Ouvert"
     },
     "markdown": {
         "bold": "Gras (Ctrl+B)",

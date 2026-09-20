@@ -1065,7 +1065,10 @@
         "filterCreatorLabel": "ایجادشده توسط",
         "noResultsCreatorDescription": "هیچ یادداشتی از {{name}} نیست.",
         "checklistToggle": "علامت‌زدن مورد",
-        "checkConflict": "یادداشت در این میان تغییر کرده است. دوباره بارگذاری می‌شود."
+        "checkConflict": "یادداشت در این میان تغییر کرده است. دوباره بارگذاری می‌شود.",
+        "pinnedState": "سنجاق‌شده",
+        "checklistDone": "انجام‌شده",
+        "checklistOpen": "باز"
     },
     "markdown": {
         "bold": "توپر (Ctrl+B)",

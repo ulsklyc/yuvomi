@@ -79,6 +79,10 @@ const { renderMarkdownLight } = await import('../public/utils/html.js');
 const { __test: tasks } = await import('../public/pages/tasks.js');
 const { __test: rewards } = await import('../public/pages/rewards.js');
 const { __test: calendar } = await import('../public/pages/calendar.js');
+// #1265 P1: Pinnwand, Kontakte, Geburtstage.
+const { __test: notes } = await import('../public/pages/notes.js');
+const { __test: contacts } = await import('../public/pages/contacts.js');
+const { __test: birthdays } = await import('../public/pages/birthdays.js');
 
 /** Ein Modul auf 'read' stellen und danach wieder aufräumen. */
 function withAccess(modules, fn) {
@@ -1271,6 +1275,469 @@ test('das Markup traegt die Faelligkeit, die der Riegel im Speichern liest', asy
     dueDateWhenOpened: ausDemMarkup,
   });
   assert.equal(error, 'tasks.reminderLockedNeedsDueDate', 'und der Handler erkennt daran das Leerraeumen');
+});
+
+// =========================================================================
+// #1265 P1: Pinnwand, Kontakte, Geburtstage
+//
+// Drei Seiten, die ihre Schreibwege bei `read` weiter voll bedienbar trugen.
+// Gemessen wird am ERZEUGTEN MARKUP, nicht am Quelltext: jede Zusicherung
+// kommt im Paar - „bei read weg" UND „bei write da" -, denn ein Test, der nur
+// ein fehlendes Element prueft, ist auch gruen, wenn gar nichts gerendert
+// wurde. Jeder Nur-lesen-Fall prueft deshalb zusaetzlich einen INHALT, den der
+// Renderer nur ausgeben kann, wenn er wirklich gelaufen ist.
+//
+// Was hier NICHT steht, weil es diese drei Seiten nicht betrifft: eine
+// Display-Ausnahme. `DISPLAY_WRITE_ROUTES` (server/display-scopes.js) fuehrt
+// genau zwei Routen, `/tasks/:id/status` und `/rewards/redemptions` - fuer
+// Notizen, Kontakte und Geburtstage gibt es keine. Ein Tablett traegt auf
+// `calendar` (und damit auf den Geburtstagen) `read` und darf dort nichts;
+// `notes` und `contacts` stehen gar nicht in seiner Scope-Liste. Die Modulregel
+// nimmt einem Display hier also nichts weg, was der Server ihm gaebe - der
+// Test unten haelt genau das fest.
+// =========================================================================
+
+test('keine der drei Seiten hat eine Display-Ausnahme - der Server gibt keine her', () => {
+  const display = readFileSync(new URL('../server/display-scopes.js', import.meta.url), 'utf8');
+  const routen = display.slice(display.indexOf('DISPLAY_WRITE_ROUTES = Object.freeze(['));
+  const liste = routen.slice(0, routen.indexOf(']);'));
+  assert.ok(!/notes|contacts|birthdays/.test(liste),
+    'gaebe es hier eine Route, brauchte die betroffene Seite ein actingAsDisplay() VOR der Modulregel');
+  // Und die Gegenrichtung: die zwei, die es gibt, stehen noch da. Verschwaenden
+  // sie, waere der Satz oben trivial wahr.
+  assert.match(liste, /\/tasks\\\/\\d\+\\\/status/);
+  assert.match(liste, /\/rewards\\\/redemptions/);
+});
+
+// -------------------------------------------------------------------------
+// Pinnwand (Notizen)
+// -------------------------------------------------------------------------
+
+const notiz = (over = {}) => ({
+  id: 12, title: 'Einkauf', content: '- [x] Milch\n- [ ] Brot',
+  color: '#EFE3BE', pinned: 0, creator_name: 'Ada', creator_color: '#4455AA',
+  categories: [], ...over,
+});
+
+/**
+ * Die Notizen holen `renderMarkdownLight` ueber `/utils/html.js`, und das ist
+ * im Loader ein Stub, der den Text nur durchreicht. Fuer diese Tests tritt der
+ * ECHTE Renderer an seine Stelle (er ist oben schon relativ importiert) - sonst
+ * stuende im Kartenmarkup gar kein Kaestchen, und „kein Bedienelement" waere
+ * trivial wahr.
+ */
+function mitEchtemMarkdown(fn) {
+  const vorher = globalThis.__renderMarkdownLight;
+  globalThis.__renderMarkdownLight = renderMarkdownLight;
+  try { return fn(); } finally {
+    if (vorher === undefined) delete globalThis.__renderMarkdownLight;
+    else globalThis.__renderMarkdownLight = vorher;
+  }
+}
+
+test('Notizkarte mit Schreibrecht: Nadel, Loeschen und das antippbare Kaestchen', () => {
+  mitEchtemMarkdown(() => withAccess({ notes: 'write' }, () => {
+    const html = notes.renderNoteCard(notiz());
+    assert.match(html, /data-action="pin"/);
+    assert.match(html, /data-action="delete"/);
+    assert.match(html, /data-action="open"/);
+    assert.match(html, /<button type="button" class="note-md-box" role="checkbox"/,
+      'die Checkliste ist bedienbar (#704)');
+    assert.doesNotMatch(html, /note-card__pin--static/);
+  }));
+});
+
+test('Notizkarte mit `notes: read`: das Kaestchen wird zum Zustandszeichen', () => {
+  mitEchtemMarkdown(() => withAccess({ notes: 'read' }, () => {
+    const html = notes.renderNoteCard(notiz());
+
+    // Zustand ANZEIGEN: das Kaestchen bleibt - als span mit role="img", dessen
+    // Beschriftung den Zustand nennt, nicht als gesperrter Knopf.
+    assert.match(html, /<span class="note-md-box" role="img" aria-label="Milch: notes\.checklistDone"/,
+      'der Haken ist die Auskunft der Zeile und darf nicht verschwinden');
+    assert.match(html, /<span class="note-md-box" role="img" aria-label="Brot: notes\.checklistOpen"/);
+    assert.doesNotMatch(html, /role="checkbox"/,
+      'aber kein Bedienelement mehr: ein toter Knopf verspricht eine Beruehrung, die nichts tut');
+    assert.doesNotMatch(html, /data-md-line/,
+      'ohne Zeilennummer findet auch der delegierte Handler nichts zum Umschalten');
+    assert.doesNotMatch(html, /aria-hidden="true"><\/span>/,
+      'und ausdruecklich nicht die dekorative Form - die verschwiege den Zustand');
+
+    // Reine HANDLUNG: verschwindet.
+    assert.doesNotMatch(html, /data-action="pin"/);
+    assert.doesNotMatch(html, /data-action="delete"/);
+
+    // Der Leseweg bleibt, und der Inhalt steht wirklich noch da - sonst maesse
+    // dieser Test einen Renderer, der nie gelaufen ist.
+    assert.match(html, /data-action="open"/);
+    assert.match(html, /Einkauf/);
+    assert.match(html, /Milch/);
+    assert.match(html, /Brot/);
+    assert.match(html, /is-checked/, 'der erledigte Punkt ist auch sichtbar erledigt');
+  }));
+});
+
+test('Nadel bei `notes: read`: gesetzt bleibt als Zeichen, nicht gesetzt faellt weg', () => {
+  withAccess({ notes: 'read' }, () => {
+    const angepinnt = notes.pinMarkup(notiz({ pinned: 1 }));
+    assert.match(angepinnt, /<span class="note-card__pin note-card__pin--static" role="img"/);
+    assert.match(angepinnt, /aria-label="notes\.pinnedState"/,
+      'die Beschriftung nennt den ZUSTAND, nicht „Anpinnen aufheben"');
+    assert.doesNotMatch(angepinnt, /notes\.unpinAction/);
+    assert.doesNotMatch(angepinnt, /<button/);
+
+    assert.equal(notes.pinMarkup(notiz({ pinned: 0 })), '',
+      'ein leerer Schalter ist kein Zustand, den man anzeigen koennte');
+  });
+  // Und mit Schreibrecht ist beides ein Knopf.
+  withAccess({ notes: 'write' }, () => {
+    assert.match(notes.pinMarkup(notiz({ pinned: 1 })), /<button class="note-card__pin" data-action="pin"/);
+    assert.match(notes.pinMarkup(notiz({ pinned: 0 })), /<button class="note-card__pin" data-action="pin"/);
+  });
+});
+
+test('CHECKLIST_OPTS: bedienbar oder Zeichen, nie beides', () => {
+  withAccess({ notes: 'write' }, () => {
+    const opts = notes.CHECKLIST_OPTS().checklist;
+    assert.equal(opts.interactive, true);
+    assert.equal(opts.stateLabels, undefined);
+  });
+  withAccess({ notes: 'read' }, () => {
+    const opts = notes.CHECKLIST_OPTS().checklist;
+    assert.notEqual(opts.interactive, true);
+    assert.deepEqual(opts.stateLabels, { checked: 'notes.checklistDone', unchecked: 'notes.checklistOpen' });
+  });
+});
+
+test('Leere Pinnwand mit `notes: read`: kein Anlegen-CTA, der den FAB klickt', () => {
+  const vorher = { ...notes.state };
+  Object.assign(notes.state, { notes: [], filterQuery: '', filterCreator: '', filterCategoryIds: [] });
+  try {
+    withAccess({ notes: 'write' }, () => {
+      assert.match(notes.notesEmptyStateHtml(false), /id="empty-cta-notes"/);
+    });
+    withAccess({ notes: 'read' }, () => {
+      const html = notes.notesEmptyStateHtml(false);
+      assert.doesNotMatch(html, /empty-cta-notes/,
+        'der CTA klickt den FAB, und .click() erreicht auch ein display:none-Element');
+      assert.match(html, /notes\.emptyTitle/, 'der Leerzustand selbst bleibt - er erklaert ja etwas');
+    });
+  } finally { Object.assign(notes.state, vorher); }
+});
+
+/** Faengt die Optionen ab, mit denen eine Seite `openModal` ruft. */
+function modalOptionen(fn) {
+  const vorher = globalThis.__openModal;
+  let letzte = null;
+  globalThis.__openModal = (opts) => { letzte = opts; };
+  try { fn(); } finally {
+    if (vorher === undefined) delete globalThis.__openModal;
+    else globalThis.__openModal = vorher;
+  }
+  return letzte;
+}
+
+test('Notiz-Dialog mit `notes: read`: Leseansicht, kein Editor, keine Fusszeile', () => {
+  const offen = mitEchtemMarkdown(() => withAccess({ notes: 'read' }, () => (
+    modalOptionen(() => notes.openNoteModal({ mode: 'edit', note: notiz({ pinned: 1 }) }))
+  )));
+  assert.ok(offen, 'der Zettel geht auf - Lesen ist erlaubt');
+  assert.match(offen.content, /note-read-view/);
+  assert.match(offen.content, /Milch/, 'und er zeigt wirklich den Inhalt');
+  assert.doesNotMatch(offen.content, /note-mode-switch/,
+    'kein Reiter „Bearbeiten" - er fuehrte auf ein 403');
+  assert.doesNotMatch(offen.content, /note-modal-save/);
+  assert.doesNotMatch(offen.content, /note-modal-delete/);
+  assert.doesNotMatch(offen.content, /note-category-search/, 'und kein Weg, eine Kategorie anzulegen');
+  assert.match(offen.content, /note-md-box" role="img"/, 'die Kaestchen sind hier Zeichen');
+
+  // Der Anlegeweg fuehrt gar nirgends hin.
+  const angelegt = withAccess({ notes: 'read' }, () => (
+    modalOptionen(() => notes.openNoteModal({ mode: 'create' }))
+  ));
+  assert.equal(angelegt, null, 'ein Dialog zum Anlegen ginge bei `read` nur ins 403');
+
+  // Und mit Schreibrecht steht der ganze Dialog da.
+  const schreibend = mitEchtemMarkdown(() => withAccess({ notes: 'write' }, () => (
+    modalOptionen(() => notes.openNoteModal({ mode: 'edit', note: notiz() }))
+  )));
+  assert.match(schreibend.content, /note-mode-switch/);
+  assert.match(schreibend.content, /note-modal-save/);
+  assert.match(schreibend.content, /note-modal-delete/);
+});
+
+// -------------------------------------------------------------------------
+// Kontakte
+// -------------------------------------------------------------------------
+
+const kontakt = (over = {}) => ({
+  id: 4, name: 'Dr. Meier', category: 'misc', phone: '+4930123456',
+  email: 'praxis@example.org', address: 'Hauptstr. 1', family_user_id: null,
+  ...over,
+});
+
+test('Kontaktzeile mit Schreibrecht: das Menue fuehrt auch Loeschen', () => {
+  withAccess({ contacts: 'write' }, () => {
+    const html = contacts.renderContactItem(kontakt());
+    assert.match(html, /data-action="delete"/);
+  });
+});
+
+test('Kontaktzeile mit `contacts: read`: Loeschen weg, jeder Leseweg bleibt', () => {
+  withAccess({ contacts: 'read' }, () => {
+    const html = contacts.renderContactItem(kontakt());
+    assert.doesNotMatch(html, /data-action="delete"/,
+      'der eine schreibende Eintrag des Menues');
+
+    // Die vier lesenden bleiben - und das Menue ist damit nie leer, es entsteht
+    // hier also kein Knopf ohne Inhalt (der Befund aus waste.js).
+    assert.match(html, /href="tel:/);
+    assert.match(html, /href="mailto:/);
+    assert.match(html, /openstreetmap\.org/);
+    assert.match(html, /\/api\/v1\/contacts\/4\/vcard/);
+    assert.match(html, /contact-more-menu__panel/);
+    // Und die Zeile fuehrt weiter in die Detailansicht, mit ihrem Inhalt.
+    assert.match(html, /data-open="4"/);
+    assert.match(html, /Dr\. Meier/);
+  });
+});
+
+test('Kontakte-Kopf mit `contacts: read`: Kategorien, Auswahl und Import fallen weg', () => {
+  withAccess({ contacts: 'write' }, () => {
+    const html = contacts.toolbarActionsHtml();
+    assert.match(html, /id="contacts-manage-cats"/);
+    assert.match(html, /id="contacts-select-btn"/);
+    assert.match(html, /id="contacts-import-input"/);
+  });
+  withAccess({ contacts: 'read' }, () => {
+    const html = contacts.toolbarActionsHtml();
+    assert.doesNotMatch(html, /contacts-manage-cats/,
+      'der Kategorie-Verwalter legt an und loescht - keine CSS-Regel hat ihn je erfasst');
+    assert.doesNotMatch(html, /contacts-select-btn/,
+      'der Auswahlmodus hat als einzige Aktion „Loeschen"');
+    assert.doesNotMatch(html, /contacts-import-input/,
+      'und der Import legt Kontakte an');
+    // Der Primaerknopf bleibt im Markup: ihn blendet `html[data-module-readonly]`
+    // schon per `.toolbar-new-btn` aus (layout.css). Waere er hier weg, prueften
+    // die drei Zeilen darueber eine leere Zeichenkette.
+    assert.match(html, /toolbar-new-btn/);
+  });
+});
+
+test('Leere Kontaktliste mit `contacts: read`: kein Anlegen-CTA, Filter-Reset bleibt', () => {
+  withAccess({ contacts: 'write' }, () => {
+    assert.match(contacts.contactsEmptyStateHtml(false), /data-action="empty-cta"/);
+  });
+  withAccess({ contacts: 'read' }, () => {
+    const leer = contacts.contactsEmptyStateHtml(false);
+    assert.doesNotMatch(leer, /empty-cta/);
+    assert.match(leer, /contacts\.emptyTitle/);
+    // „Zuruecksetzen" ist ein Filter, kein Schreibweg - und bleibt.
+    assert.match(contacts.contactsEmptyStateHtml(true), /data-action="reset-filters"/);
+  });
+});
+
+/** Faengt die Optionen ab, mit denen eine Seite `openDetailView` ruft. */
+function detailOptionen(fn) {
+  const vorher = globalThis.__openDetailView;
+  let letzte = null;
+  globalThis.__openDetailView = (opts) => { letzte = opts; };
+  try { fn(); } finally {
+    if (vorher === undefined) delete globalThis.__openDetailView;
+    else globalThis.__openDetailView = vorher;
+  }
+  return letzte;
+}
+
+test('Kontakt-Detailansicht mit `contacts: read`: kein Bearbeiten, kein Loeschen, alles Lesen', () => {
+  const ids = (opts) => opts.actions.map((a) => a.id);
+
+  const schreibend = withAccess({ contacts: 'write' }, () => (
+    detailOptionen(() => contacts.openContactDetail(kontakt()))
+  ));
+  assert.ok(schreibend.edit, 'mit Schreibrecht traegt der Kopf „Bearbeiten"');
+  assert.ok(ids(schreibend).includes('contact-detail-delete'));
+
+  const lesend = withAccess({ contacts: 'read' }, () => (
+    detailOptionen(() => contacts.openContactDetail(kontakt()))
+  ));
+  assert.ok(!lesend.edit,
+    '`openDetailView` setzt die Kopf-Aktion genau dann, wenn dieser Schluessel steht');
+  assert.ok(!ids(lesend).includes('contact-detail-delete'));
+  // Und die Ansicht ist wirklich eine: Export bleibt, die Abschnitte stehen.
+  assert.ok(ids(lesend).includes('contact-detail-export'));
+  assert.equal(lesend.title, 'Dr. Meier');
+  assert.ok(lesend.sections.length > 0);
+});
+
+// -------------------------------------------------------------------------
+// Geburtstage - die Seite, deren Modul `calendar` heisst
+// -------------------------------------------------------------------------
+
+const geburtstag = (over = {}) => ({
+  id: 9, name: 'Oma Erna', birth_date: '1950-04-03', next_birthday: '2027-04-03',
+  next_age: 77, days_until: 12, notes: 'Mag Kuchen', next_name_day: null,
+  name_day_days_until: null, photo_data: null, family_user_id: null, ...over,
+});
+
+test('Geburtstage fragen `calendar`, nicht `birthdays` - sonst faellt die Frage fail-open aus', () => {
+  withAccess({ calendar: 'read' }, () => {
+    assert.equal(birthdays.readOnly(), true,
+      'server/scopes.js fuehrt calendar, reminders und birthdays unter EINEM Schluessel');
+  });
+  withAccess({ birthdays: 'read' }, () => {
+    assert.equal(birthdays.readOnly(), false,
+      'ein Modul dieses Namens gibt es in den Rechten nicht - die Antwort waere still `write`');
+  });
+  withAccess({ calendar: 'write' }, () => {
+    assert.equal(birthdays.readOnly(), false);
+  });
+});
+
+test('Geburtstagszeile mit Schreibrecht: zwei Knoepfe und zwei Wischflaechen', () => {
+  withAccess({ calendar: 'write' }, () => {
+    const html = birthdays.birthdayItemHtml(geburtstag());
+    assert.match(html, /data-action="edit"/);
+    assert.match(html, /data-action="delete"/);
+    assert.match(html, /swipe-reveal--edit/);
+    assert.match(html, /swipe-reveal--delete/);
+  });
+});
+
+test('Geburtstagszeile mit `calendar: read`: beide Handlungen weg, die Auskunft bleibt', () => {
+  withAccess({ calendar: 'read' }, () => {
+    const html = birthdays.birthdayItemHtml(geburtstag());
+    assert.doesNotMatch(html, /data-action="edit"/);
+    assert.doesNotMatch(html, /data-action="delete"/);
+    assert.doesNotMatch(html, /swipe-reveal/,
+      'eine Reveal-Flaeche ohne Geste kuendigt eine Bedienung an, die es nicht gibt');
+    assert.doesNotMatch(html, /row-actions/);
+
+    // Nichts davon war ein Zustand, der ohne die Knoepfe unlesbar wuerde - die
+    // Zeile traegt ihre Auskunft selbst, und sie ist wirklich gerendert.
+    assert.match(html, /Oma Erna/);
+    assert.match(html, /birthdays\.inDays/);
+    assert.match(html, /birthdays\.turnsAge/);
+    assert.match(html, /Mag Kuchen/);
+    assert.match(html, /data-id="9"/);
+  });
+});
+
+test('Wischgeste der Geburtstage: bei `calendar: read` wird keine Seite verdrahtet', () => {
+  // GEMESSEN AN DEN VERDRAHTETEN SEITEN. Die Geste hat kein Markup, das sich
+  // pruefen liesse (dieselbe Begruendung wie bei `wireSwipeGestures` in
+  // tasks.js). Anders als dort bleibt hier keine Lese-Seite uebrig: beide
+  // Richtungen schreiben.
+  const host = { querySelectorAll: () => [], querySelector: () => null, addEventListener() {} };
+  // DER NUDGE-HINWEIS HAENGT AN DERSELBEN BEDINGUNG und laeuft im
+  // Schreibrecht-Fall deshalb wirklich mit - er braucht `window.innerWidth` und
+  // `location`, die es in Node nicht gibt (nachgemessen: „location is not
+  // defined"). Eine Breite jenseits von 1024px laesst ihn in seiner ersten
+  // Zeile zurueckkehren; gemessen wird hier die Verdrahtung, nicht der Hinweis.
+  const vorherBreite = globalThis.window.innerWidth;
+  globalThis.window.innerWidth = 1280;
+  try {
+    const schreibend = withAccess({ calendar: 'write' }, () => birthdays.wireBirthdaySwipe(host));
+    assert.ok(schreibend.leading, 'mit Schreibrecht oeffnet der Wisch nach vorn das Formular');
+    assert.ok(schreibend.trailing, 'und der nach hinten loescht');
+
+    const lesend = withAccess({ calendar: 'read' }, () => birthdays.wireBirthdaySwipe(host));
+    assert.equal(lesend.leading, null);
+    assert.equal(lesend.trailing, null);
+  } finally {
+    if (vorherBreite === undefined) delete globalThis.window.innerWidth;
+    else globalThis.window.innerWidth = vorherBreite;
+  }
+});
+
+test('Import-Knopf der Geburtstage: er braucht BEIDE Rechte', () => {
+  // Er schreibt Geburtstage (`calendar`) und liest Kontakte (`contacts`) -
+  // server/routes/birthdays.js prueft beides, also fragt der Knopf beides.
+  withAccess({ calendar: 'write', contacts: 'read' }, () => {
+    assert.match(birthdays.importActionHtml(), /id="birthdays-import-btn"/,
+      'Kontakte LESEN reicht fuer die Quelle');
+  });
+  withAccess({ calendar: 'write', contacts: 'none' }, () => {
+    assert.equal(birthdays.importActionHtml(), '',
+      'ohne Sicht auf Kontakte hat der Import keine Quelle (#1241)');
+  });
+  withAccess({ calendar: 'read', contacts: 'write' }, () => {
+    assert.equal(birthdays.importActionHtml(), '',
+      'und ohne Schreibrecht auf das eigene Modul kein Ziel - das war der halbe Befund dieser Seite');
+  });
+});
+
+// -------------------------------------------------------------------------
+// Und die Darstellung der neuen Nadel - ein Guard, weil CSS still versagt
+//
+// Das Zeichen sieht aus wie der Knopf, den es ersetzt; was es davon
+// unterscheidet, steht ausschliesslich im Stylesheet. Geprueft wird mit
+// demselben Kaskadenloeser wie oben bei den Aufgaben, also das, was am Ende
+// WIRKLICH gilt - nicht der Text der Regel.
+// -------------------------------------------------------------------------
+
+const NOTES_CSS = readFileSync(new URL('../public/styles/notes.css', import.meta.url), 'utf8');
+
+test('die Nadel als Zeichen traegt keinen Zeiger, keine Trefferflaeche und keine Hover-Quittung', () => {
+  const zeichen = ['note-card__pin', 'note-card__pin--static'];
+  const knopf = ['note-card__pin'];
+
+  assert.equal(effektiverWert(NOTES_CSS, zeichen, 'cursor'), 'default',
+    'ein Zeigefinger verspricht eine Handlung');
+  assert.equal(effektiverWert(NOTES_CSS, knopf, 'cursor'), 'pointer',
+    'der bedienbare Knopf behaelt ihn - sonst maesse die Zeile darueber nichts');
+
+  assert.equal(effektiverWert(NOTES_CSS, zeichen, 'content', '::before'), 'none',
+    'die Trefferflaeche des ::before gehoert zum Bedienelement, nicht zum Zeichen');
+  assert.notEqual(effektiverWert(NOTES_CSS, knopf, 'content', '::before'), 'none');
+
+  assert.equal(effektiverWert(NOTES_CSS, zeichen, 'background', ':hover'), null,
+    'keine Hover-Regel darf das Zeichen treffen - sie nimmt es per :not() aus, statt dagegen anzuschreiben');
+  assert.match(effektiverWert(NOTES_CSS, knopf, 'background', ':hover') ?? '', /note-action-bg-hover/,
+    'und der Knopf reagiert weiter');
+});
+
+test('und das Zeichen faengt die Klicks nicht ab, mit denen die Karte aufgeht', () => {
+  // DER KASKADENLOESER OBEN SIEHT DIESE REGELN NICHT: sie tragen einen
+  // Kombinator (`.note-card--pinned .note-card__pin`), und er ueberspringt
+  // alles, was nicht eine einzelne Klassenkette ist. Gemessen wird deshalb
+  // direkt, was hier entscheidet - Spezifitaet gleich, also Quellreihenfolge.
+  let knopfRegel = -1;
+  let zeichenRegel = -1;
+  let nummer = 0;
+  let wert = null;
+  for (const { selector, body, at } of eachRule(NOTES_CSS)) {
+    nummer += 1;
+    if (at.length) continue;
+    for (const teil of selector.split(',')) {
+      const sel = teil.trim();
+      if (sel === '.note-card--pinned .note-card__pin') knopfRegel = nummer;
+      if (sel === '.note-card--pinned .note-card__pin--static') {
+        zeichenRegel = nummer;
+        wert = /(?:^|;)\s*pointer-events\s*:([^;]*)/.exec(body)?.[1].trim() ?? null;
+      }
+    }
+  }
+  assert.ok(knopfRegel > 0, 'die Regel, die hier ueberschrieben werden muss, steht noch da');
+  assert.ok(zeichenRegel > knopfRegel,
+    'gleiche Spezifitaet: die Ausnahme muss DANACH stehen, sonst gilt pointer-events: auto weiter');
+  assert.equal(wert, 'none',
+    'sonst faengt das Zeichen den Klick ab, mit dem die Karte sich oeffnet');
+});
+
+test('Leere Geburtstagsliste mit `calendar: read`: kein Anlegen-CTA', () => {
+  const vorher = birthdays.state.query;
+  birthdays.state.query = '';
+  try {
+    withAccess({ calendar: 'write' }, () => {
+      assert.match(birthdays.emptyStateHtml(), /id="birthdays-empty-cta"/);
+    });
+    withAccess({ calendar: 'read' }, () => {
+      const html = birthdays.emptyStateHtml();
+      assert.doesNotMatch(html, /birthdays-empty-cta/);
+      assert.match(html, /birthdays\.emptyTitle/);
+    });
+  } finally { birthdays.state.query = vorher; }
 });
 
 

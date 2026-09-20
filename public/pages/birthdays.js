@@ -8,7 +8,7 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 import { todayKey } from '/utils/date.js';
 import { setNavBadge, BIRTHDAY_BADGE_DAYS } from '/utils/nav-badges.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
-import { moduleAccess } from '/permissions.js';
+import { moduleAccess, isNavModuleReadOnly } from '/permissions.js';
 import { findPageFab } from '/utils/fab.js';
 // Alias: dieses Modul fuehrt selbst eine `emptyStateHtml()`, die den Renderer
 // mit den Geburtstags-Texten fuellt. Zwei Namen, die sich nur in der
@@ -31,6 +31,26 @@ let state = {
   loading: true,
 };
 let _container = null;
+
+/**
+ * Darf dieser Nutzer Geburtstage schreiben?
+ *
+ * DAS MODUL HEISST `calendar`, NICHT `birthdays` - `server/scopes.js` fuehrt
+ * `calendar`, `reminders` und `birthdays` unter einem Schluessel, und
+ * `NAV_TO_MODULE` in permissions.js bildet das ab. Wer vom Seitennamen auf das
+ * Recht schliesst, fragt ein Modul, das es nicht gibt (fail-open: die Antwort
+ * waere immer `write`). `isNavModuleReadOnly('birthdays')` und
+ * `!mayWritePath('/birthdays')` sind hier dasselbe Urteil.
+ *
+ * DIESE SEITE WAR HALB ERFASST: `moduleAccess('contacts')` stand schon am
+ * Import-Knopf (#1241) - eine Frage nach dem FREMDEN Modul, aus dem er liest.
+ * Nach dem EIGENEN fragte sie nirgends, also blieben vier Schreibwege offen
+ * (anlegen, aendern, loeschen, importieren) und dazu die Wischgeste, die kein
+ * Markup hat, an dem man es gesehen haette.
+ */
+function readOnly() {
+  return isNavModuleReadOnly('birthdays');
+}
 
 // Inline-SVG (Lucide-Stil) – das self-hostete Icon-Subset lässt sich nicht
 // grep-verifizieren, darum die Torte als eingebettetes SVG für den „Heute"-Höhepunkt.
@@ -247,8 +267,16 @@ export function birthdayItemHtml(birthday) {
   // Richtungen, was bis dahin zwei Icon-Knoepfe in jeder Zeile trugen - in
   // einer Grouped-Liste die lauteste Stelle des Bildschirms. Auf
   // Zeigergeraeten bleiben die Knoepfe, dort gibt es keine Geste.
+  // Bei `calendar: read` faellt BEIDES weg: die zwei Reveal-Flaechen unter der
+  // Zeile und die zwei Knoepfe daran. Sie tragen dieselben zwei Handlungen -
+  // bearbeiten und loeschen -, und keine davon ist ein Zustand, der ohne sie
+  // unlesbar wuerde: Name, Datum, Alter, Countdown, Namenstag und Notiz stehen
+  // in der Zeile selbst. Eine Reveal-Flaeche ohne Geste waere ausserdem eine
+  // Ankuendigung fuer eine Bedienung, die es nicht gibt.
+  const ro = readOnly();
   return `
     <div class="swipe-row" data-swipe-id="${birthday.id}">
+      ${ro ? '' : `
       <div class="swipe-reveal swipe-reveal--edit swipe-reveal--leading" aria-hidden="true">
         <i data-lucide="pencil" class="icon-md"></i>
         <span>${t('common.edit')}</span>
@@ -256,7 +284,7 @@ export function birthdayItemHtml(birthday) {
       <div class="swipe-reveal swipe-reveal--delete swipe-reveal--trailing" aria-hidden="true">
         <i data-lucide="trash-2" class="icon-md"></i>
         <span>${t('common.delete')}</span>
-      </div>
+      </div>`}
     <article class="list-row birthday-item ${isToday ? 'birthday-item--today' : ''}" data-id="${birthday.id}">
       <div class="birthday-item__media">${photoAvatar(birthday)}</div>
       <div class="list-row__main">
@@ -270,6 +298,7 @@ export function birthdayItemHtml(birthday) {
           ${birthday.notes ? `<span class="birthday-item__notes">${esc(birthday.notes)}</span>` : ''}
         </div>
       </div>
+      ${ro ? '' : `
       <div class="row-actions birthday-item__actions">
         <button class="row-action" type="button" data-action="edit" data-id="${birthday.id}" aria-label="${t('common.edit')}">
           <i data-lucide="pencil" aria-hidden="true"></i>
@@ -277,7 +306,7 @@ export function birthdayItemHtml(birthday) {
         <button class="row-action row-action--danger" type="button" data-action="delete" data-id="${birthday.id}" aria-label="${t('common.delete')}">
           <i data-lucide="trash-2" aria-hidden="true"></i>
         </button>
-      </div>
+      </div>`}
     </article>
     </div>`;
 }
@@ -298,7 +327,7 @@ function emptyStateHtml() {
     title: t('birthdays.emptyTitle'),
     description: t('birthdays.emptyDescription'),
     hint: t('emptyHint.birthdays'),
-    action: { label: t('birthdays.addButton'), attrs: { id: 'birthdays-empty-cta' } },
+    action: readOnly() ? null : { label: t('birthdays.addButton'), attrs: { id: 'birthdays-empty-cta' } },
   });
 }
 
@@ -326,8 +355,11 @@ function renderList() {
 
   if (window.lucide) window.lucide.createIcons({ el: host });
   stagger(host.querySelectorAll('.birthday-item'));
+  // Der Nudge-Hinweis gehoert zur GESTE und steht deshalb in deren Verdrahtung:
+  // bei `calendar: read` gibt es keine Geste, und der Hinweis wuerde eine
+  // Bedienung ankuendigen, die es nicht gibt - dazu einen der drei Hinweis-
+  // Kredite aus dem localStorage verbrauchen (SWIPE_HINT_MAX in swipe-row.js).
   wireBirthdaySwipe(host);
-  maybeShowSwipeHint(host);
 }
 
 /**
@@ -341,20 +373,59 @@ function renderList() {
  * eine hinausgeflogene Karte hätte behauptet, die Sache sei erledigt.
  */
 function wireBirthdaySwipe(host) {
-  wireSwipeRows(host, {
+  // BEI `calendar: read` BLEIBT DIE VERDRAHTUNG AUS. Die Geste hat kein
+  // Markup, das man wegnehmen koennte, und ein Riegel erst im Ende-Handler
+  // waere zu spaet - die Zeile ist dann schon weggewischt. Beide Seiten dieser
+  // Liste schreiben (der Wisch zum Zeilenanfang oeffnet das Formular, der zum
+  // Zeilenende loescht), es bleibt also keine Lese-Seite uebrig wie in
+  // tasks.js - deshalb faellt der Aufruf ganz weg.
+  //
+  // DER RUECKGABEWERT IST FUER DIE MESSUNG DA und kostet nichts: kein Aufrufer
+  // liest ihn. Dass eine Seite der Geste verdrahtet wurde, ist sonst nirgends
+  // sichtbar (dieselbe Bauart wie `wireSwipeGestures` in tasks.js).
+  const ro = readOnly();
+  const optionen = {
     card: '.birthday-item',
-    trailing: {
+    trailing: ro ? null : {
       reveal: '.swipe-reveal--delete',
       run: (row) => deleteBirthday(Number(row.dataset.swipeId)),
     },
-    leading: {
+    leading: ro ? null : {
       reveal: '.swipe-reveal--edit',
       run: (row) => {
         const birthday = state.birthdays.find((item) => item.id === Number(row.dataset.swipeId));
         if (birthday) openBirthdayModal({ mode: 'edit', birthday });
       },
     },
-  });
+  };
+  if (!ro) {
+    wireSwipeRows(host, optionen);
+    maybeShowSwipeHint(host);
+  }
+  return optionen;
+}
+
+/**
+ * Der Import-Knopf im Kopf - als eigene Funktion, weil er ZWEI Rechtefragen
+ * traegt und nur eine davon bisher gestellt wurde.
+ *
+ * `POST /birthdays/import` LEGT GEBURTSTAGE AN UND LIEST KONTAKTE. Der
+ * Pfad-Guard des Servers misst den Pfad als `calendar`
+ * (`moduleForPath('/birthdays/import')`), die Route selbst verlangt zusaetzlich
+ * Sicht auf `contacts` (`contactsHidden` in server/routes/birthdays.js). Beide
+ * Fragen stehen deshalb hier: die FREMDE fuer das Lesen, die EIGENE fuer das
+ * Schreiben.
+ *
+ * Die fremde stand seit #1241 da, die eigene fehlte: bei `calendar: read` blieb
+ * ein voll bedienbarer Knopf stehen, dessen Auswahl-Dialog am 403 endete - und
+ * das war der halbe Befund dieser Seite in #1265.
+ */
+function importActionHtml() {
+  if (readOnly() || moduleAccess('contacts') === 'none') return '';
+  return `
+          <button class="btn btn--secondary birthdays-toolbar__import" id="birthdays-import-btn" type="button" aria-label="${t('birthdays.importButton')}">
+            <i data-lucide="download" aria-hidden="true"></i><span>${t('birthdays.importButton')}</span>
+          </button>`;
 }
 
 function renderPage() {
@@ -379,15 +450,9 @@ function renderPage() {
         className: 'birthdays-toolbar__search page-toolbar__center',
       }),
       // Actions slot: Import + desktop-docked primary (dockFabIntoToolbar).
-      // DER KNOPF LIEST AUS KONTAKTEN, NICHT AUS GEBURTSTAGEN. Wer `contacts`
-      // nicht sehen darf, bekommt seit #1241 vom Server ein 403 - ohne diese
-      // Zeile bliebe ein Knopf stehen, der nur noch eine Fehlermeldung
-      // aufmacht. Die Durchsetzung bleibt serverseitig, das hier ist die
-      // Anzeige dazu.
-      actions: renderPageActions(moduleAccess('contacts') === 'none' ? '' : `
-          <button class="btn btn--secondary birthdays-toolbar__import" id="birthdays-import-btn" type="button" aria-label="${t('birthdays.importButton')}">
-            <i data-lucide="download" aria-hidden="true"></i><span>${t('birthdays.importButton')}</span>
-          </button>`),
+      // Welche zwei Rechte der Import-Knopf braucht, steht an
+      // `importActionHtml()`; die Durchsetzung bleibt serverseitig.
+      actions: renderPageActions(importActionHtml()),
     }),
     body: renderPageBody({
       content: [
@@ -412,8 +477,12 @@ function renderPage() {
 }
 
 function bindEvents() {
+  // Den FAB blendet CSS aus (html[data-module-readonly]); der Handler bleibt
+  // trotzdem gesperrt - ausgeblendet ist nicht unerreichbar.
   findPageFab('fab-new-birthday').addEventListener('click', () => openBirthdayModal({ mode: 'create' }));
-  _container.querySelector('#birthdays-import-btn')?.addEventListener('click', () => openImportModal());
+  _container.querySelector('#birthdays-import-btn')?.addEventListener('click', () => {
+    if (!readOnly()) openImportModal();
+  });
 
   // Deep-Link aus dem Kontakt-Import („Zu Geburtstagen"): Kandidaten-Modal direkt
   // öffnen, statt den Nutzer den Import-Button selbst suchen zu lassen.
@@ -422,7 +491,7 @@ function bindEvents() {
       sessionStorage.removeItem('yuvomi:birthdays:autoImport');
       // Dieselbe Bedingung wie am Knopf: ein stehen gebliebenes Flag oeffnete
       // sonst ein Modal, das nur noch einen 403-Toast zeigen kann.
-      if (moduleAccess('contacts') !== 'none') openImportModal();
+      if (!readOnly() && moduleAccess('contacts') !== 'none') openImportModal();
     }
   } catch { /* sessionStorage evtl. nicht verfügbar */ }
 
@@ -438,6 +507,9 @@ function bindEvents() {
   _container.querySelector('#birthdays-list').addEventListener('click', async (e) => {
     const action = e.target.closest('[data-action]');
     if (!action) return;
+    // Beide `data-action` dieser Liste schreiben; eine Positivliste haette
+    // nichts aufzunehmen. Das Markup nimmt die Affordanz, das hier die Wirkung.
+    if (readOnly()) return;
     const id = Number(action.dataset.id);
     const birthday = state.birthdays.find((item) => item.id === id);
     if (!birthday) return;
@@ -457,6 +529,7 @@ function birthdayPreviewHtml(name, photoData) {
 }
 
 function openBirthdayModal({ mode, birthday = null }) {
+  if (readOnly()) return;
   const isEdit = mode === 'edit';
   let photoData = birthday?.photo_data || null;
   const today = todayKey();
@@ -655,6 +728,7 @@ function importCandidateRowHtml(c) {
 }
 
 async function openImportModal() {
+  if (readOnly()) return;
   let candidates;
   try {
     const res = await api.get('/birthdays/import/candidates');
@@ -749,6 +823,7 @@ async function openImportModal() {
 // Undo nur den lokalen State wieder her — der Eintrag war serverseitig weg und
 // verschwand beim nächsten Reload still.
 function deleteBirthday(id) {
+  if (readOnly()) return;
   const index = state.birthdays.findIndex((b) => b.id === id);
   if (index === -1) return;
   const birthday = state.birthdays[index];
@@ -785,3 +860,14 @@ export async function render(container) {
   state.loading = false;
   renderList();
 }
+
+/**
+ * Messflaeche der Nur-lesen-Regel (#1265 P1). `birthdayItemHtml` ist schon
+ * benannt exportiert (die Lokalisierungs-Suiten nutzen sie); hier stehen die
+ * Stellen dazu, deren Aussage KEIN Markup ist: welche Seiten der Wischgeste
+ * verdrahtet werden, und was der Leerzustand anbietet.
+ */
+export const __test = {
+  birthdayItemHtml, emptyStateHtml, importActionHtml, wireBirthdaySwipe,
+  readOnly, state,
+};

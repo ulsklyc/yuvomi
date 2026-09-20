@@ -1053,7 +1053,10 @@
         "filterCreatorLabel": "Δημιουργήθηκε από",
         "noResultsCreatorDescription": "Καμία σημείωση από {{name}}.",
         "checklistToggle": "Σημείωση στοιχείου",
-        "checkConflict": "Η σημείωση άλλαξε στο μεταξύ. Θα φορτωθεί ξανά."
+        "checkConflict": "Η σημείωση άλλαξε στο μεταξύ. Θα φορτωθεί ξανά.",
+        "pinnedState": "Καρφιτσωμένη",
+        "checklistDone": "Ολοκληρώθηκε",
+        "checklistOpen": "Ανοιχτό"
     },
     "markdown": {
         "bold": "Έντονο (Ctrl+B)",

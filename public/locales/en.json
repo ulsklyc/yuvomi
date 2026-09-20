@@ -1053,7 +1053,10 @@
         "filterCreatorLabel": "Created by",
         "noResultsCreatorDescription": "No notes from {{name}}.",
         "checklistToggle": "Tick item",
-        "checkConflict": "The note has changed in the meantime. It will be reloaded."
+        "checkConflict": "The note has changed in the meantime. It will be reloaded.",
+        "pinnedState": "Pinned",
+        "checklistDone": "Done",
+        "checklistOpen": "Open"
     },
     "markdown": {
         "bold": "Bold (Ctrl+B)",

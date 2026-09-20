@@ -1053,7 +1053,10 @@
         "filterCreatorLabel": "Skapad av",
         "noResultsCreatorDescription": "Inga anteckningar från {{name}}.",
         "checklistToggle": "Bocka av post",
-        "checkConflict": "Anteckningen har ändrats under tiden. Den laddas om."
+        "checkConflict": "Anteckningen har ändrats under tiden. Den laddas om.",
+        "pinnedState": "Fäst",
+        "checklistDone": "Klart",
+        "checklistOpen": "Öppet"
     },
     "markdown": {
         "bold": "Fet (Ctrl+B)",

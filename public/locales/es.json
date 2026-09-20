@@ -1053,7 +1053,10 @@
         "filterCreatorLabel": "Creado por",
         "noResultsCreatorDescription": "No hay notas de {{name}}.",
         "checklistToggle": "Marcar elemento",
-        "checkConflict": "La nota ha cambiado mientras tanto. Se volverá a cargar."
+        "checkConflict": "La nota ha cambiado mientras tanto. Se volverá a cargar.",
+        "pinnedState": "Fijada",
+        "checklistDone": "Completado",
+        "checklistOpen": "Abierto"
     },
     "markdown": {
         "bold": "Negrita (Ctrl+B)",

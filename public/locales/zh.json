@@ -1053,7 +1053,10 @@
         "filterCreatorLabel": "创建者",
         "noResultsCreatorDescription": "没有来自 {{name}} 的便签。",
         "checklistToggle": "勾选条目",
-        "checkConflict": "便签已被修改，将重新加载。"
+        "checkConflict": "便签已被修改，将重新加载。",
+        "pinnedState": "已置顶",
+        "checklistDone": "已完成",
+        "checklistOpen": "待处理"
     },
     "markdown": {
         "bold": "加粗 (Ctrl+B)",

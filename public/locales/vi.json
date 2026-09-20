@@ -1053,7 +1053,10 @@
         "filterCreatorLabel": "Người tạo",
         "noResultsCreatorDescription": "Không có ghi chú từ {{name}}.",
         "checklistToggle": "Đánh dấu mục",
-        "checkConflict": "Ghi chú đã thay đổi trong lúc này. Ghi chú sẽ được tải lại."
+        "checkConflict": "Ghi chú đã thay đổi trong lúc này. Ghi chú sẽ được tải lại.",
+        "pinnedState": "Đã ghim",
+        "checklistDone": "Hoàn thành",
+        "checklistOpen": "Mở"
     },
     "markdown": {
         "bold": "In đậm (Ctrl+B)",

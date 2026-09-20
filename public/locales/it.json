@@ -1053,7 +1053,10 @@
         "filterCreatorLabel": "Creato da",
         "noResultsCreatorDescription": "Nessuna nota di {{name}}.",
         "checklistToggle": "Spunta elemento",
-        "checkConflict": "La nota è stata modificata nel frattempo. Verrà ricaricata."
+        "checkConflict": "La nota è stata modificata nel frattempo. Verrà ricaricata.",
+        "pinnedState": "Fissata",
+        "checklistDone": "Completato",
+        "checklistOpen": "Aperto"
     },
     "markdown": {
         "bold": "Grassetto (Ctrl+B)",

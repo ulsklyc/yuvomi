@@ -1053,7 +1053,10 @@
         "filterCreatorLabel": "Oluşturan",
         "noResultsCreatorDescription": "{{name}} tarafından not yok.",
         "checklistToggle": "Öğeyi işaretle",
-        "checkConflict": "Not bu arada değişti. Yeniden yüklenecek."
+        "checkConflict": "Not bu arada değişti. Yeniden yüklenecek.",
+        "pinnedState": "Sabitlenmiş",
+        "checklistDone": "Tamamlandı",
+        "checklistOpen": "Açık"
     },
     "markdown": {
         "bold": "Kalın (Ctrl+B)",

@@ -1065,7 +1065,10 @@
         "filterCreatorLabel": "Utworzone przez",
         "noResultsCreatorDescription": "Brak notatek od {{name}}.",
         "checklistToggle": "Odhacz pozycję",
-        "checkConflict": "Notatka została w międzyczasie zmieniona. Zostanie ponownie wczytana."
+        "checkConflict": "Notatka została w międzyczasie zmieniona. Zostanie ponownie wczytana.",
+        "pinnedState": "Przypięta",
+        "checklistDone": "Zrobione",
+        "checklistOpen": "Otwarte"
     },
     "markdown": {
         "bold": "Pogrubienie (Ctrl+B)",

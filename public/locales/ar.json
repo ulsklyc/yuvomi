@@ -1053,7 +1053,10 @@
         "filterCreatorLabel": "أنشأها",
         "noResultsCreatorDescription": "لا توجد ملاحظات من {{name}}.",
         "checklistToggle": "شطب العنصر",
-        "checkConflict": "تم تغيير الملاحظة في هذه الأثناء. سيتم إعادة تحميلها."
+        "checkConflict": "تم تغيير الملاحظة في هذه الأثناء. سيتم إعادة تحميلها.",
+        "pinnedState": "مثبتة",
+        "checklistDone": "منجز",
+        "checklistOpen": "مفتوح"
     },
     "markdown": {
         "bold": "عريض (Ctrl+B)",

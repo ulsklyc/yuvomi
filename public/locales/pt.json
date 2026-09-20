@@ -1053,7 +1053,10 @@
         "filterCreatorLabel": "Criado por",
         "noResultsCreatorDescription": "Nenhuma nota de {{name}}.",
         "checklistToggle": "Marcar item",
-        "checkConflict": "A nota foi alterada entretanto. Ela será recarregada."
+        "checkConflict": "A nota foi alterada entretanto. Ela será recarregada.",
+        "pinnedState": "Fixada",
+        "checklistDone": "Concluído",
+        "checklistOpen": "Aberto"
     },
     "markdown": {
         "bold": "Negrito (Ctrl+B)",

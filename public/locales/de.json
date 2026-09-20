@@ -1065,7 +1065,10 @@
         "filterCreatorLabel": "Erstellt von",
         "noResultsCreatorDescription": "Keine Notiz von {{name}}.",
         "checklistToggle": "Eintrag abhaken",
-        "checkConflict": "Die Notiz wurde inzwischen geändert. Sie wird neu geladen."
+        "checkConflict": "Die Notiz wurde inzwischen geändert. Sie wird neu geladen.",
+        "pinnedState": "Angepinnt",
+        "checklistDone": "Erledigt",
+        "checklistOpen": "Offen"
     },
     "markdown": {
         "bold": "Fett (Strg+B)",

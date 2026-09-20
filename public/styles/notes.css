@@ -279,11 +279,37 @@
   pointer-events: auto;
 }
 
-.note-card__pin:hover,
-.note-card__pin:focus-visible {
+.note-card__pin:not(.note-card__pin--static):hover,
+.note-card__pin:not(.note-card__pin--static):focus-visible {
   opacity: 1;
   pointer-events: auto;
   background: var(--note-action-bg-hover);
+}
+
+/* ZUSTANDSZEICHEN STATT KNOPF (#1265 P1, dieselbe Bauart wie
+ * `.task-status-btn--static` in tasks.css). Bei `notes: read` bleibt die Nadel
+ * einer angepinnten Notiz stehen - sie traegt eine Auskunft, die sonst nur noch
+ * aus einer Gruppenueberschrift zu erschliessen waere, und die erscheint erst,
+ * wenn es beide Gruppen gibt. Sie ist dann ein `span role="img"`, und diese
+ * Regel nimmt ihr, was ein Bedienelement ausmacht: den Zeiger, die
+ * Trefferflaeche des `::before` und die Hover-Quittung (per `:not()` oben, wie
+ * in tasks.css - eine Gegenregel `--static:hover { background: none }` haette
+ * nur gewirkt, solange keine Farbe dazwischenkommt).
+ *
+ * ZWEI SELEKTOREN, WEIL DIE KASKADE ES VERLANGT. `.note-card--pinned
+ * .note-card__pin` (zwei Klassen) und der @media-Block (pointer: coarse) weiter
+ * unten setzen `pointer-events: auto`; eine einzelne Klasse verliert gegen die
+ * eine und gegen die andere durch Quellreihenfolge. Die zweite Zeile hat
+ * dieselbe Spezifitaet wie die Ueberschreibung und steht DANACH - ohne sie
+ * finge das Zeichen die Klicks ab, mit denen die Karte sich oeffnet. */
+.note-card__pin--static,
+.note-card--pinned .note-card__pin--static {
+  cursor: default;
+  pointer-events: none;
+}
+
+.note-card__pin--static::before {
+  content: none;
 }
 
 .note-card__title {

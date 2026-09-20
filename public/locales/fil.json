@@ -1065,7 +1065,10 @@
         "filterCreatorLabel": "Ginawa ni",
         "noResultsCreatorDescription": "Walang tala mula kay {{name}}.",
         "checklistToggle": "Markahan ang item",
-        "checkConflict": "Nabago ang tala samantala. Iri-reload ito."
+        "checkConflict": "Nabago ang tala samantala. Iri-reload ito.",
+        "pinnedState": "Naka-pin",
+        "checklistDone": "Tapos",
+        "checklistOpen": "Bukas"
     },
     "markdown": {
         "bold": "Bold (Ctrl+B)",

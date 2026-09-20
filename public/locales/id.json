@@ -1065,7 +1065,10 @@
         "filterCreatorLabel": "Dibuat oleh",
         "noResultsCreatorDescription": "Tidak ada catatan dari {{name}}.",
         "checklistToggle": "Centang item",
-        "checkConflict": "Catatan telah berubah sementara itu. Catatan akan dimuat ulang."
+        "checkConflict": "Catatan telah berubah sementara itu. Catatan akan dimuat ulang.",
+        "pinnedState": "Disematkan",
+        "checklistDone": "Selesai",
+        "checklistOpen": "Terbuka"
     },
     "markdown": {
         "bold": "Tebal (Ctrl+B)",

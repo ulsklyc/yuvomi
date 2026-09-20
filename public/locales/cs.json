@@ -1053,7 +1053,10 @@
         "filterCreatorLabel": "Vytvořil(a)",
         "noResultsCreatorDescription": "Žádné poznámky od {{name}}.",
         "checklistToggle": "Odškrtnout položku",
-        "checkConflict": "Poznámka byla mezitím změněna. Bude znovu načtena."
+        "checkConflict": "Poznámka byla mezitím změněna. Bude znovu načtena.",
+        "pinnedState": "Připnuto",
+        "checklistDone": "Hotovo",
+        "checklistOpen": "Otevřeno"
     },
     "markdown": {
         "bold": "Tučné (Ctrl+B)",

@@ -1065,7 +1065,10 @@
         "filterCreatorLabel": "작성자",
         "noResultsCreatorDescription": "{{name}}의 메모가 없습니다.",
         "checklistToggle": "항목 체크",
-        "checkConflict": "그 사이에 메모가 변경되었습니다. 다시 불러옵니다."
+        "checkConflict": "그 사이에 메모가 변경되었습니다. 다시 불러옵니다.",
+        "pinnedState": "고정됨",
+        "checklistDone": "완료",
+        "checklistOpen": "미완료"
     },
     "markdown": {
         "bold": "굵게 (Ctrl+B)",
