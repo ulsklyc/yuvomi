@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Filipino was offered as the language for stored entries and then refused when you saved it.**
+  The setting listed all 24 languages, but the server built its own list from the locale file names
+  with a pattern that required exactly two letters - and Filipino's file is `fil.json`, with three.
+  Picking it came back as "invalid language". Every other language was unaffected, which is why this
+  went unnoticed.
+
 ## [2.68.0] - 2026-09-20
 
 ### Added

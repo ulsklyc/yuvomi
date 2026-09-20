@@ -35,7 +35,14 @@ const REFERENCE_LOCALE = 'de';
 // ("Birthday: <Name>") - ein Bestandshaushalt erlebt so keinen stillen Wechsel.
 const DEFAULT_LOCALE = 'en';
 
-const LOCALE_FILE_RE = /^([a-z]{2})\.json$/;
+// `{2,3}`, nicht `{2}`: Filipino traegt den ISO-639-2-Code `fil`, und die
+// Datei heisst danach. Mit `{2}` fiel `fil.json` aus der Liste, ohne dass
+// irgendwo ein Fehler entstand - das Auswahlmenue baut seine Optionen aus
+// SUPPORTED_LOCALES im Frontend und bot Filipino weiter an, waehrend
+// `isSupportedLocale('fil')` false war und das Speichern mit 400 antwortete.
+// Dieselbe Erweiterung steht seit laengerem am Sprachteil des Regionscodes
+// (`/^([a-z]{2,3})-[A-Z]{2}$/` weiter unten); hier war sie vergessen worden.
+const LOCALE_FILE_RE = /^([a-z]{2,3})\.json$/;
 
 let supportedLocales = null;
 const localeCache = new Map();
