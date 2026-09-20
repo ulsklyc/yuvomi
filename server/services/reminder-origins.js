@@ -29,6 +29,7 @@ export const ORIGIN_MODULE = Object.freeze({
   pantry_item:            'pantry',
   cycle_period:           'health',
   cycle_log_nudge:        'health',
+  health_prevention_due:  'health',
   schedule_entry:         'schedule',
   schedule_extra_entry:   'schedule',
   waste_pickup:           'waste',
