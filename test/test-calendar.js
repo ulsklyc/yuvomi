@@ -2313,6 +2313,50 @@ test('renderDayView: der Nacht-Block kostet den Vormittag keine Spalte (#1313)',
   });
 });
 
+// Zwei Vorkommen DERSELBEN Serie treffen sich an einem Tag. Vor #1313 konnte das
+// nicht passieren: jeder Termin ueber Mitternacht ging in die Ganztags-Zeile und
+// erreichte layoutOverlaps() nie. Seit der Fix nur noch Termine ab 24 h dort
+// laesst, kommt eine TAEGLICHE Nachtschicht ins Raster - und dann liegen am
+// 15. zwei Vorkommen: der geklammerte Schwanz vom 14. (00:00-01:30) und der Kopf
+// vom 15. (22:00-24:00).
+//
+// `expandRecurringEvents()` gibt keinem Vorkommen eine eigene id
+// (server/services/calendar-events.js: `{ ...event, start_datetime, end_datetime }`,
+// kein id-Ueberschreiben), also tragen beide die id der Serie. Mit `ev.id` als
+// Schluessel schreibt der zweite Platz den ersten still tot.
+//
+// Der Schichtplan drei Funktionen weiter hatte dieses Problem schon und hat es
+// anders geloest: `layoutScheduleBlocks()` nimmt das Eintrags-OBJEKT als
+// Schluessel (#1043, Muster + Extra-Schicht). Genau das gilt jetzt auch hier.
+test('layoutOverlaps: zwei Vorkommen derselben Serie an einem Tag bekommen eigene Plaetze (#1323)', () => {
+  const nachtschicht = (start, end) => ({
+    id: 4200, title: 'Nachtschicht', all_day: 0, assigned_users: [],
+    start_datetime: start, end_datetime: end,
+  });
+  const schwanz = nachtschicht('2026-06-14T22:00', '2026-06-15T01:30');
+  const kopf    = nachtschicht('2026-06-15T22:00', '2026-06-16T01:30');
+  const anruf = {
+    id: 4201, title: 'Anruf', all_day: 0, assigned_users: [],
+    start_datetime: '2026-06-15T01:00', end_datetime: '2026-06-15T02:00',
+  };
+
+  const layout = calendarHelpers.layoutOverlaps([schwanz, anruf, kopf], '2026-06-15');
+
+  assert(layout.size === 3,
+    'drei sichtbare Bloecke brauchen drei Plaetze - mit der Serien-id als Schluessel '
+    + `tragen Schwanz und Kopf denselben, und der spaetere gewinnt: ${layout.size}`);
+
+  assert(layout.get(schwanz)?.totalCols === 2 && layout.get(anruf)?.totalCols === 2,
+    'der Schwanz (00:00-01:30) ueberlappt den Anruf (01:00-02:00), beide teilen sich die Breite: '
+    + `${JSON.stringify([layout.get(schwanz), layout.get(anruf)])}`);
+  assert(layout.get(schwanz).colIndex !== layout.get(anruf).colIndex,
+    'zwei ueberlappende Bloecke duerfen nicht deckungsgleich uebereinander liegen');
+
+  assert(layout.get(kopf)?.totalCols === 1,
+    'der Kopf (22:00-24:00) ueberlappt nichts und bleibt volle Breite - genau dieser Wert '
+    + `hat vorher den des Schwanzes ueberschrieben und ihn ueber den Anruf gelegt: ${JSON.stringify(layout.get(kopf))}`);
+});
+
 test('layoutOverlaps: am Starttag reicht der Nacht-Termin bis Mitternacht und teilt sich die Spalte mit 23:00 (#1313)', () => {
   const nacht = overnightEvent();
   const anruf = {
@@ -2320,11 +2364,11 @@ test('layoutOverlaps: am Starttag reicht der Nacht-Termin bis Mitternacht und te
     start_datetime: '2026-06-14T23:00', end_datetime: '2026-06-14T23:30',
   };
   const layout = calendarHelpers.layoutOverlaps([nacht, anruf], '2026-06-14');
-  assert(layout.get(nacht.id)?.totalCols === 2 && layout.get(anruf.id)?.totalCols === 2,
+  assert(layout.get(nacht)?.totalCols === 2 && layout.get(anruf)?.totalCols === 2,
     '22:00-24:00 und 23:00-23:30 ueberlappen sich: ohne Klammerung auf den Tag bleibt die Spanne des '
     + `Nacht-Termins 22:00-22:30 und die beiden wissen nichts voneinander: `
-    + `${JSON.stringify([layout.get(nacht.id), layout.get(anruf.id)])}`);
-  assert(layout.get(nacht.id).colIndex !== layout.get(anruf.id).colIndex,
+    + `${JSON.stringify([layout.get(nacht), layout.get(anruf)])}`);
+  assert(layout.get(nacht).colIndex !== layout.get(anruf).colIndex,
     'zwei ueberlappende Bloecke duerfen nicht deckungsgleich uebereinander liegen');
 });
 

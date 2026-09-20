@@ -2891,7 +2891,7 @@ function renderWeekView(container) {
                   <div class="week-view__hour-line" style="top:${hourOffset(h * 60)};"></div>
                 `).join('')}
                 ${scheduleBlocks[i].map((entry) => renderScheduleTimeBlock(entry, 'week-event', scheduleLayouts[i].get(entry))).join('')}
-                ${timedEvs[i].map((ev) => renderWeekEvent(ev, layouts[i].get(ev.id), d)).join('')}
+                ${timedEvs[i].map((ev) => renderWeekEvent(ev, layouts[i].get(ev), d)).join('')}
                 ${d === state.today ? `<div class="week-view__now-line" id="now-line" style="top:${hourOffset(nowMinutes())};"></div>` : ''}
               </div>
             `).join('')}
@@ -3167,8 +3167,16 @@ function assignLanes(items, rangeFn, keyFn) {
 // `dayStr` reicht den gerenderten Tag bis in die Spanne durch: ein Termin über
 // Mitternacht belegt in jeder Spalte nur seinen Anteil und zieht die
 // Überlappungs-Gruppe des Nachbartags nicht auf (#1313).
+// Schluessel ist das Termin-OBJEKT, nicht `ev.id`: zwei Vorkommen derselben Serie
+// koennen an EINEM Tag liegen, seit ein kurzer Termin ueber Mitternacht ins Raster
+// kommt (#1313). Bei einer taeglichen Nachtschicht 22:00-01:30 traegt der 15. den
+// geklammerten Schwanz des 14. UND den Kopf des 15., und `expandRecurringEvents()`
+// gibt keinem Vorkommen eine eigene id - beide tragen die der Serie. Mit `ev.id`
+// schrieb der zweite Platz den ersten still tot, und der Schwanz wurde in voller
+// Breite ueber den Termin gelegt, mit dem er sich die Spalte teilen muesste.
+// Dieselbe Loesung wie in layoutScheduleBlocks() unten (#1043).
 function layoutOverlaps(events, dayStr = null) {
-  return assignLanes(events, (ev) => timeRangeForEvent(ev, dayStr), (ev) => ev.id);
+  return assignLanes(events, (ev) => timeRangeForEvent(ev, dayStr), (ev) => ev);
 }
 
 // Schichtplan-Gegenstueck zu layoutOverlaps(): gleiche Spalten-Arithmetik, aber
@@ -3231,7 +3239,7 @@ function renderDayView(container) {
               <div class="week-view__hour-line" style="top:${hourOffset(h * 60)};"></div>
             `).join('')}
             ${scheduleBlocks.map((entry) => renderScheduleTimeBlock(entry, 'day-event', scheduleLayout.get(entry))).join('')}
-            ${timed.map((ev) => renderDayEvent(ev, layout.get(ev.id), state.cursor)).join('')}
+            ${timed.map((ev) => renderDayEvent(ev, layout.get(ev), state.cursor)).join('')}
             ${dayEvs.length === 0 && schedule.length === 0 ? `<div class="day-view__empty-hint" style="top:calc(${hourOffset(state.cursor === state.today ? nowMinutes() : 9 * 60)} + 16px)">${t('calendar.dayEmptyHint')}</div>` : ''}
           </div>
           ${state.cursor === state.today ? `
