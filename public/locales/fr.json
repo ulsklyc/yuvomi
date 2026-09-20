@@ -2922,7 +2922,16 @@
         "imageChoose": "Choisir une image",
         "imageRemove": "Supprimer l'image",
         "imageHint": "Une image par recette. Elle apparaît dans le planificateur de repas et sur la tuile d'aperçu.",
-        "imageTooLarge": "L'image reste trop volumineuse après réduction."
+        "imageTooLarge": "L'image reste trop volumineuse après réduction.",
+        "ingredientMatchNone": "Non associé",
+        "ingredientMatchAction": "Associer {{name}} à une ligne de la réserve",
+        "ingredientMatchTitle": "Associer {{name}}",
+        "ingredientMatchLabel": "Ligne de la réserve",
+        "ingredientMatchHint": "Choisis la ligne de ta réserve que désigne cet ingrédient. Yuvomi ne devine rien - seul ce que tu confirmes ici compte.",
+        "ingredientMatchEmpty": "La réserve est encore vide.",
+        "ingredientMatchSaved": "Association enregistrée.",
+        "ingredientMatchCleared": "Association supprimée.",
+        "ingredientMatchLoadError": "La réserve n’a pas pu être chargée."
     },
     "search": {
         "emptyHint": "Saisis au moins 2 caractères pour chercher dans les tâches, rendez-vous, notes, contacts, courses et santé.",

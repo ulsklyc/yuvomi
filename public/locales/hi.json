@@ -2922,7 +2922,16 @@
         "imageChoose": "छवि चुनें",
         "imageRemove": "छवि हटाएं",
         "imageHint": "हर रेसिपी के लिए एक छवि। यह भोजन योजना और अवलोकन टाइल में दिखती है।",
-        "imageTooLarge": "छवि छोटा करने के बाद भी बहुत बड़ी है।"
+        "imageTooLarge": "छवि छोटा करने के बाद भी बहुत बड़ी है।",
+        "ingredientMatchNone": "असंबद्ध",
+        "ingredientMatchAction": "{{name}} को भंडार की एक पंक्ति से जोड़ें",
+        "ingredientMatchTitle": "{{name}} को जोड़ें",
+        "ingredientMatchLabel": "भंडार की पंक्ति",
+        "ingredientMatchHint": "अपने भंडार की वह पंक्ति चुनें जिसका मतलब यह सामग्री है। Yuvomi कुछ भी अनुमान नहीं लगाता - केवल वही मान्य है जिसकी पुष्टि आप यहाँ करते हैं।",
+        "ingredientMatchEmpty": "भंडार अभी खाली है।",
+        "ingredientMatchSaved": "संबंध सहेजा गया।",
+        "ingredientMatchCleared": "संबंध हटाया गया।",
+        "ingredientMatchLoadError": "भंडार लोड नहीं हो सका।"
     },
     "search": {
         "emptyHint": "कार्य, ईवेंट, नोट्स, संपर्क, खरीदारी और स्वास्थ्य में खोजने के लिए कम से कम 2 अक्षर लिखें।",

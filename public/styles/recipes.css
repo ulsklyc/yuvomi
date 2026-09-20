@@ -344,6 +344,44 @@
   font-size: var(--type-body);
   color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
+  /* Zutat links, Vorrats-Zuordnung rechts, und bei 320px untereinander statt
+   * abgeschnitten: ein Vorratsname ist so lang, wie der Haushalt ihn getippt
+   * hat. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-2);
+}
+
+/* Die bestaetigte Zuordnung zu einer Vorratszeile (#1314). Als Knopf, wenn das
+ * Konto den Vorrat schreiben darf, sonst als stiller Text - derselbe Platz,
+ * dieselbe Groesse, damit der Zustand nicht springt. */
+.recipe-detail__ingredient-match {
+  font-size: var(--type-caption);
+  color: var(--color-text-tertiary);
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: right;
+  font-family: inherit;
+}
+
+button.recipe-detail__ingredient-match {
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+button.recipe-detail__ingredient-match:hover {
+  color: var(--color-text-secondary);
+}
+
+/* Nicht zugeordnet ist ein ZUSTAND, kein Mangel: dieselbe stille Farbe wie eine
+ * gesetzte Zuordnung, nur kursiv. Ein Warnton haette aus „unbekannt" ein
+ * „fehlt" gemacht, und genau diesen Unterschied haelt #1314 fest. */
+.recipe-detail__ingredient-match--unset {
+  font-style: italic;
 }
 
 .recipe-detail__notes {

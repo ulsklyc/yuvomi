@@ -44,6 +44,13 @@ const SHARED_ISOMORPHIC = new Set([
   // genau dem Wert, den jemand sucht, der sie auseinanderlaufen sehen will.
   'public/utils/quick-link-url.js',
   'public/utils/recipe-meal-types.js',
+  // #1314: Der Anker einer bestaetigten Zutaten-Zuordnung. Der Server schreibt
+  // den Schluessel und liest ihn beim Zusammenfuehren wieder, die Oberflaeche
+  // zeigt das Ergebnis an derselben Zutat an. Zwei Fassungen liefen nicht bei
+  // einem Randfall auseinander, sondern bei jedem Namen, den nur eine Seite
+  // anders zusammenzieht - und die Zuordnung waere dann einfach weg, ohne
+  // Fehler. Rein: trim, Leerraum, toLowerCase, kein DOM und kein Node.
+  'public/utils/ingredient-match-key.js',
   'public/utils/contact-name.js',
   'public/utils/pantry-units.js',
   // #1074: Ziffern fremder Systeme nach ASCII. Client und Server lesen dieselben

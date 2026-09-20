@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   start or finish it there, using the same safety confirmation and timer controls as the journal.
   Existing dashboards keep it hidden until you add it from the dashboard editor. (#1180)
 
+- **A recipe ingredient can now be told which row of your pantry it means.** Open a recipe, unfold
+  it, and each ingredient offers to be matched to one row of your stock - "400 g tin of tomatoes"
+  in the recipe, the tin that actually stands in your cupboard. Yuvomi never guesses this, not even
+  when the two are spelled identically: a match exists only where somebody confirmed it, and no
+  import, no recipe save and no name similarity ever writes one. An ingredient without a match reads
+  "not matched", never "missing" - it is unknown, and saying otherwise would turn half an answer
+  into a confident one. The match survives editing the recipe, because it hangs on the ingredient
+  and not on its row in the database. Deleting the stock row removes the match and leaves the recipe
+  untouched. Changing a match needs permission to write the pantry, not just the recipes; members
+  who may only look at the pantry see the match and cannot change it. (#1314)
+
 ### Fixed
 
 - **Filipino was offered as the language for stored entries and then refused when you saved it.**

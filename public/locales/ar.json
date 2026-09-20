@@ -2922,7 +2922,16 @@
         "imageChoose": "اختيار صورة",
         "imageRemove": "إزالة الصورة",
         "imageHint": "صورة واحدة لكل وصفة. تظهر في خطة الوجبات وفي بطاقة النظرة العامة.",
-        "imageTooLarge": "الصورة ما زالت كبيرة جدًا بعد التصغير."
+        "imageTooLarge": "الصورة ما زالت كبيرة جدًا بعد التصغير.",
+        "ingredientMatchNone": "غير مرتبط",
+        "ingredientMatchAction": "اربط {{name}} بصف من المؤن",
+        "ingredientMatchTitle": "ربط {{name}}",
+        "ingredientMatchLabel": "الصف في المؤن",
+        "ingredientMatchHint": "اختر الصف في مؤنك الذي يقصده هذا المكوّن. لا يخمّن يوفومي شيئًا - لا يُعتد إلا بما تؤكده هنا.",
+        "ingredientMatchEmpty": "المؤن فارغة حتى الآن.",
+        "ingredientMatchSaved": "تم حفظ الربط.",
+        "ingredientMatchCleared": "تم إلغاء الربط.",
+        "ingredientMatchLoadError": "تعذّر تحميل المؤن."
     },
     "search": {
         "emptyHint": "اكتب حرفين على الأقل للبحث في المهام والمواعيد والملاحظات وجهات الاتصال والتسوق والصحة.",

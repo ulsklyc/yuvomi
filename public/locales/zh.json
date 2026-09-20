@@ -2922,7 +2922,16 @@
         "imageChoose": "选择图片",
         "imageRemove": "移除图片",
         "imageHint": "每个食谱一张图片。会显示在饮食计划和概览卡片上。",
-        "imageTooLarge": "缩小后图片仍然过大。"
+        "imageTooLarge": "缩小后图片仍然过大。",
+        "ingredientMatchNone": "未关联",
+        "ingredientMatchAction": "将 {{name}} 关联到某条库存",
+        "ingredientMatchTitle": "关联 {{name}}",
+        "ingredientMatchLabel": "库存条目",
+        "ingredientMatchHint": "选择这份材料所指的库存条目。Yuvomi 不做任何猜测 - 只有你在这里确认的才算数。",
+        "ingredientMatchEmpty": "库存还是空的。",
+        "ingredientMatchSaved": "已保存关联。",
+        "ingredientMatchCleared": "已取消关联。",
+        "ingredientMatchLoadError": "无法加载库存。"
     },
     "search": {
         "emptyHint": "输入至少 2 个字符即可搜索任务、日程、便签、联系人、购物和健康。",

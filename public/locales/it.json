@@ -2922,7 +2922,16 @@
         "imageChoose": "Scegli immagine",
         "imageRemove": "Rimuovi immagine",
         "imageHint": "Un'immagine per ricetta. Appare nel piano pasti e nel riquadro panoramica.",
-        "imageTooLarge": "L'immagine è ancora troppo grande dopo il ridimensionamento."
+        "imageTooLarge": "L'immagine è ancora troppo grande dopo il ridimensionamento.",
+        "ingredientMatchNone": "Non associato",
+        "ingredientMatchAction": "Associa {{name}} a una riga della dispensa",
+        "ingredientMatchTitle": "Associa {{name}}",
+        "ingredientMatchLabel": "Riga della dispensa",
+        "ingredientMatchHint": "Scegli la riga della tua dispensa a cui si riferisce questo ingrediente. Yuvomi non indovina nulla - vale solo ciò che confermi qui.",
+        "ingredientMatchEmpty": "La dispensa è ancora vuota.",
+        "ingredientMatchSaved": "Associazione salvata.",
+        "ingredientMatchCleared": "Associazione rimossa.",
+        "ingredientMatchLoadError": "Non è stato possibile caricare la dispensa."
     },
     "search": {
         "emptyHint": "Digita almeno 2 caratteri per cercare tra attività, appuntamenti, note, contatti, spesa e salute.",

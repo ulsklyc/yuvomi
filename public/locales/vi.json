@@ -3019,7 +3019,16 @@
         "imageChoose": "Chọn hình ảnh",
         "imageRemove": "Xóa hình ảnh",
         "imageHint": "Một hình cho mỗi công thức. Hình hiện trong kế hoạch bữa ăn và trên ô tổng quan.",
-        "imageTooLarge": "Hình vẫn quá lớn sau khi thu nhỏ."
+        "imageTooLarge": "Hình vẫn quá lớn sau khi thu nhỏ.",
+        "ingredientMatchNone": "Chưa gán",
+        "ingredientMatchAction": "Gán {{name}} với một dòng trong kho dự trữ",
+        "ingredientMatchTitle": "Gán {{name}}",
+        "ingredientMatchLabel": "Dòng trong kho dự trữ",
+        "ingredientMatchHint": "Chọn dòng trong kho dự trữ mà nguyên liệu này muốn nói đến. Yuvomi không đoán gì cả - chỉ những gì bạn xác nhận ở đây mới có hiệu lực.",
+        "ingredientMatchEmpty": "Kho dự trữ vẫn còn trống.",
+        "ingredientMatchSaved": "Đã lưu liên kết.",
+        "ingredientMatchCleared": "Đã bỏ liên kết.",
+        "ingredientMatchLoadError": "Không tải được kho dự trữ."
     },
     "search": {
         "emptyHint": "Nhập ít nhất 2 ký tự để tìm trong công việc, sự kiện, ghi chú, danh bạ, mua sắm và sức khỏe.",

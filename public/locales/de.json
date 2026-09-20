@@ -3031,7 +3031,16 @@
         "imageChoose": "Bild wählen",
         "imageRemove": "Bild entfernen",
         "imageHint": "Ein Bild je Rezept. Es erscheint im Essensplan und auf der Übersichtskachel.",
-        "imageTooLarge": "Das Bild ist nach dem Verkleinern noch zu groß."
+        "imageTooLarge": "Das Bild ist nach dem Verkleinern noch zu groß.",
+        "ingredientMatchNone": "Nicht zugeordnet",
+        "ingredientMatchAction": "{{name}} einer Vorratszeile zuordnen",
+        "ingredientMatchTitle": "{{name}} zuordnen",
+        "ingredientMatchLabel": "Zeile im Vorrat",
+        "ingredientMatchHint": "Wähle die Zeile aus deinem Vorrat, die diese Zutat meint. Yuvomi rät nichts - es gilt nur, was du hier bestätigst.",
+        "ingredientMatchEmpty": "Dein Vorrat ist noch leer.",
+        "ingredientMatchSaved": "Zuordnung gespeichert.",
+        "ingredientMatchCleared": "Zuordnung aufgehoben.",
+        "ingredientMatchLoadError": "Der Vorrat konnte nicht geladen werden."
     },
     "onboarding": {
         "step1Title": "Willkommen bei {{name}}",

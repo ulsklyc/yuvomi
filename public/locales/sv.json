@@ -2922,7 +2922,16 @@
         "imageChoose": "Välj bild",
         "imageRemove": "Ta bort bild",
         "imageHint": "En bild per recept. Den visas i måltidsplaneraren och på översiktsrutan.",
-        "imageTooLarge": "Bilden är fortfarande för stor efter förminskning."
+        "imageTooLarge": "Bilden är fortfarande för stor efter förminskning.",
+        "ingredientMatchNone": "Inte kopplad",
+        "ingredientMatchAction": "Koppla {{name}} till en rad i skafferiet",
+        "ingredientMatchTitle": "Koppla {{name}}",
+        "ingredientMatchLabel": "Rad i skafferiet",
+        "ingredientMatchHint": "Välj raden i ditt skafferi som den här ingrediensen avser. Yuvomi gissar ingenting - bara det du bekräftar här gäller.",
+        "ingredientMatchEmpty": "Skafferiet är fortfarande tomt.",
+        "ingredientMatchSaved": "Kopplingen sparades.",
+        "ingredientMatchCleared": "Kopplingen togs bort.",
+        "ingredientMatchLoadError": "Skafferiet kunde inte läsas in."
     },
     "search": {
         "emptyHint": "Skriv minst 2 tecken för att söka bland uppgifter, händelser, anteckningar, kontakter, inköp och hälsa.",

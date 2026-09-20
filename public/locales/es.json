@@ -2922,7 +2922,16 @@
         "imageChoose": "Elegir imagen",
         "imageRemove": "Quitar imagen",
         "imageHint": "Una imagen por receta. Aparece en el plan de comidas y en el mosaico de resumen.",
-        "imageTooLarge": "La imagen sigue siendo demasiado grande tras reducirla."
+        "imageTooLarge": "La imagen sigue siendo demasiado grande tras reducirla.",
+        "ingredientMatchNone": "Sin asignar",
+        "ingredientMatchAction": "Asignar {{name}} a una línea de la despensa",
+        "ingredientMatchTitle": "Asignar {{name}}",
+        "ingredientMatchLabel": "Línea de la despensa",
+        "ingredientMatchHint": "Elige la línea de tu despensa a la que se refiere este ingrediente. Yuvomi no adivina nada - solo cuenta lo que confirmes aquí.",
+        "ingredientMatchEmpty": "La despensa aún está vacía.",
+        "ingredientMatchSaved": "Asignación guardada.",
+        "ingredientMatchCleared": "Asignación eliminada.",
+        "ingredientMatchLoadError": "No se pudo cargar la despensa."
     },
     "search": {
         "emptyHint": "Escribe al menos 2 caracteres para buscar en tareas, citas, notas, contactos, compras y salud.",

@@ -22,6 +22,7 @@ import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { mealTypeList, ensureMealTypeNames } from '/utils/meal-types.js';
 import { recipeThumbEl } from '/utils/recipe-thumb.js';
+import { navModuleAccess } from '/permissions.js';
 
 let _container = null;
 /** Handle des geteilten Suchfelds (setValue/clear), gesetzt in render(). */
@@ -329,6 +330,11 @@ export async function render(container) {
 
     if (actionBtn.dataset.action === 'edit') {
       openRecipeModal('edit', recipe);
+      return;
+    }
+
+    if (actionBtn.dataset.action === 'match-ingredient') {
+      await openPantryMatchModal(recipe, actionBtn.dataset.ingredient, actionBtn);
       return;
     }
 
@@ -709,7 +715,11 @@ function renderRecipeList() {
         for (const ing of ingredients) {
           const item = document.createElement('li');
           item.className = 'recipe-detail__ingredient';
-          item.textContent = ing.quantity ? `${ing.quantity} · ${ing.name}` : ing.name;
+          const label = document.createElement('span');
+          label.className = 'recipe-detail__ingredient-name';
+          label.textContent = ing.quantity ? `${ing.quantity} · ${ing.name}` : ing.name;
+          item.appendChild(label);
+          item.appendChild(pantryMatchEl(recipe, ing));
           ul.appendChild(item);
         }
         detail.appendChild(ul);
@@ -774,6 +784,146 @@ function renderRecipeList() {
   list.appendChild(rows);
 
   if (window.lucide) window.lucide.createIcons({ el: list });
+}
+
+/* DIE BESTAETIGTE ZUORDNUNG ZU EINER VORRATSZEILE (#1314, Stufe 1).
+ *
+ * Sie steht im Rezeptdetail, neben der Zutat, und nirgends sonst: eine eigene
+ * Zuordnungsseite oeffnet niemand ein zweites Mal (#1314, Punkt 2). Yuvomi
+ * schlaegt dabei NICHTS vor - auch dann nicht, wenn eine Vorratszeile genauso
+ * heisst. Ein geratener Treffer waere der gepflegte Katalog, eine Ableitung
+ * nach der anderen (docs/DECISIONS.md Abschnitt 7).
+ *
+ * UND DAS WORT ZAEHLT. Eine Zutat ohne Zuordnung heisst „nicht zugeordnet",
+ * niemals „fehlt": Stufe 1 weiss nur, worauf der Haushalt gezeigt hat, und
+ * nichts ueber den Bestand. Ein „fehlt" waere eine vollstaendige Auskunft auf
+ * halber Datenlage - genau das, was der Abschnitt unter „What counts as undoing
+ * it" nennt.
+ */
+
+/** 'none' | 'read' | 'write' - was dieses Konto mit dem Vorrat darf. */
+function pantryAccess() {
+  if (window.yuvomi?.isModuleDisabled?.('pantry')) return 'none';
+  return navModuleAccess('pantry');
+}
+
+/**
+ * Der Zuordnungs-Zustand einer Zutat als Element.
+ *
+ * Bei `read` bleibt der ZUSTAND stehen und nur die HANDLUNG geht (die Regel aus
+ * #467): ein Mitglied, das den Vorrat nur ansehen darf, sieht die Zuordnung,
+ * kann sie aber nicht aendern. Bei `none` steht hier gar nichts - wer den
+ * Vorrat nicht sehen darf, erfaehrt auch nicht, dass es dort eine Zeile gibt.
+ */
+function pantryMatchEl(recipe, ing) {
+  const access = pantryAccess();
+  if (access === 'none') return document.createDocumentFragment();
+
+  const matched = Boolean(ing.pantry_item_id);
+  const text = matched ? ing.pantry_item_name : t('recipes.ingredientMatchNone');
+
+  if (access !== 'write') {
+    const span = document.createElement('span');
+    span.className = `recipe-detail__ingredient-match${matched ? '' : ' recipe-detail__ingredient-match--unset'}`;
+    span.textContent = text;
+    return span;
+  }
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = `recipe-detail__ingredient-match${matched ? '' : ' recipe-detail__ingredient-match--unset'}`;
+  btn.dataset.action = 'match-ingredient';
+  btn.dataset.id = String(recipe.id);
+  btn.dataset.ingredient = ing.name;
+  btn.textContent = text;
+  // Der sichtbare Text ist der Zustand, nicht die Handlung - deshalb sagt das
+  // Zugaengliche-Name-Feld, was der Knopf TUT, und nennt die Zutat dazu: in
+  // einer Liste aus acht Zutaten waere „Zuordnen" achtmal derselbe Name.
+  btn.setAttribute('aria-label', t('recipes.ingredientMatchAction', { name: ing.name }));
+  return btn;
+}
+
+/** Eine Vorratszeile im Auswahlfeld: Name, Ort und MHD unterscheiden Chargen. */
+function pantryOptionLabel(item) {
+  const teile = [item.name];
+  if (item.location_name) teile.push(item.location_name);
+  if (item.expires_on) teile.push(formatDate(item.expires_on));
+  return teile.join(' · ');
+}
+
+async function openPantryMatchModal(recipe, ingredientName, trigger) {
+  const ing = (recipe.ingredients ?? []).find((i) => i.name === ingredientName);
+  if (!ing) return;
+
+  let items = [];
+  try {
+    const res = await api.get('/pantry');
+    items = res.data ?? [];
+  } catch (err) {
+    window.yuvomi?.showToast(err.data?.error ?? t('recipes.ingredientMatchLoadError'), 'danger');
+    return;
+  }
+
+  const options = items.map((item) => `<option value="${esc(String(item.id))}"${
+    item.id === ing.pantry_item_id ? ' selected' : ''
+  }>${esc(pantryOptionLabel(item))}</option>`).join('');
+
+  openSharedModal({
+    title: t('recipes.ingredientMatchTitle', { name: ingredientName }),
+    size: 'sm',
+    content: `
+      <p class="form-hint">${t('recipes.ingredientMatchHint')}</p>
+      ${items.length ? `
+        <div class="form-group">
+          <label class="form-label" for="pantry-match-select">${t('recipes.ingredientMatchLabel')}</label>
+          <select id="pantry-match-select" class="form-input">
+            <option value="">${t('recipes.ingredientMatchNone')}</option>
+            ${options}
+          </select>
+        </div>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button class="btn btn--secondary" id="pantry-match-cancel" type="button">${t('common.cancel')}</button>
+          <button class="btn btn--primary" id="pantry-match-save" type="button">${t('common.save')}</button>
+        </div>
+      ` : `
+        <p class="form-hint">${t('recipes.ingredientMatchEmpty')}</p>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button class="btn btn--secondary" id="pantry-match-cancel" type="button">${t('common.close')}</button>
+        </div>
+      `}
+    `,
+    onSave(panel) {
+      panel.querySelector('#pantry-match-cancel')?.addEventListener('click', () => closeSharedModal());
+      panel.querySelector('#pantry-match-save')?.addEventListener('click', async () => {
+        const raw = panel.querySelector('#pantry-match-select')?.value ?? '';
+        const pantryItemId = raw === '' ? null : Number(raw);
+        try {
+          const res = await api.put(`/recipes/${recipe.id}/ingredient-match`, {
+            name: ingredientName,
+            pantryItemId,
+          });
+          // Den geladenen Stand nachziehen statt neu zu holen: die Antwort
+          // traegt genau die beiden Felder, die sich geaendert haben.
+          ing.pantry_item_id = res.data.pantry_item_id;
+          ing.pantry_item_name = res.data.pantry_item_name;
+          // force: der Schreibvorgang ist durch, eine Verwerfen-Frage waere
+          // eine Frage nach etwas, das schon gespeichert ist.
+          closeSharedModal({ force: true });
+          // NUR DIESE EINE STELLE NEU BAUEN, kein renderRecipeList(): das
+          // Zutaten-Detail ist gerade aufgeklappt, und ein Neuaufbau der Liste
+          // klappte es zu - der Nutzer stuende nach dem Speichern vor der
+          // geschlossenen Zeile, aus der er kam.
+          trigger?.replaceWith(pantryMatchEl(recipe, ing));
+          window.yuvomi?.showToast(
+            pantryItemId === null ? t('recipes.ingredientMatchCleared') : t('recipes.ingredientMatchSaved'),
+            'success',
+          );
+        } catch (err) {
+          window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+        }
+      });
+    },
+  });
 }
 
 /* ENTFERNT: openRecipeReadModal (Nur-Lese-Modal fürs Kochen, Audit A1-21).

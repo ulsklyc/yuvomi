@@ -2922,7 +2922,16 @@
         "imageChoose": "画像を選ぶ",
         "imageRemove": "画像を削除",
         "imageHint": "レシピごとに1枚。食事計画と概要タイルに表示されます。",
-        "imageTooLarge": "縮小してもまだ大きすぎます。"
+        "imageTooLarge": "縮小してもまだ大きすぎます。",
+        "ingredientMatchNone": "未対応づけ",
+        "ingredientMatchAction": "{{name}} を在庫の行に対応づける",
+        "ingredientMatchTitle": "{{name}} の対応づけ",
+        "ingredientMatchLabel": "在庫の行",
+        "ingredientMatchHint": "この材料が指す在庫の行を選んでください。Yuvomi は何も推測しません - ここで確認したものだけが有効です。",
+        "ingredientMatchEmpty": "在庫はまだ空です。",
+        "ingredientMatchSaved": "対応づけを保存しました。",
+        "ingredientMatchCleared": "対応づけを解除しました。",
+        "ingredientMatchLoadError": "在庫を読み込めませんでした。"
     },
     "search": {
         "emptyHint": "2文字以上入力すると、タスク・予定・メモ・連絡先・買い物・健康を検索できます。",
