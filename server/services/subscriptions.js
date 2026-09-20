@@ -1,48 +1,22 @@
 import { reminderDateBefore } from '../utils/reminder-schedule.js';
+import { dateKey, parseDateKey, addMonthsClamped, addYearsClamped } from '../utils/interval-date.js';
 
 const BILLING_CYCLES = ['daily', 'weekly', 'monthly', 'yearly'];
 const CURRENCY_RE = /^[A-Z]{3}$/;
 
-function dateKey(date) {
-  return [
-    date.getUTCFullYear(),
-    String(date.getUTCMonth() + 1).padStart(2, '0'),
-    String(date.getUTCDate()).padStart(2, '0'),
-  ].join('-');
-}
-
-function parseDateKey(value) {
-  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) throw new Error('Date must be in YYYY-MM-DD format.');
-  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
-  if (dateKey(date) !== value) throw new Error('Date is invalid.');
-  return date;
-}
-
+// monthly/yearly sind duenne Fassaden ueber server/utils/interval-date.js -
+// dort steht, warum die Rechnung geteilt ist.
 function addBillingCycle(value, cycle, interval = 1) {
   if (!BILLING_CYCLES.includes(cycle)) throw new Error('Unsupported billing cycle.');
   const count = Number(interval);
   if (!Number.isInteger(count) || count < 1 || count > 365) throw new Error('Cycle interval is invalid.');
-  const date = parseDateKey(value);
 
+  if (cycle === 'monthly') return addMonthsClamped(value, count);
+  if (cycle === 'yearly') return addYearsClamped(value, count);
+
+  const date = parseDateKey(value);
   if (cycle === 'daily') date.setUTCDate(date.getUTCDate() + count);
   if (cycle === 'weekly') date.setUTCDate(date.getUTCDate() + (count * 7));
-  if (cycle === 'monthly') {
-    const day = date.getUTCDate();
-    date.setUTCDate(1);
-    date.setUTCMonth(date.getUTCMonth() + count);
-    const lastDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
-    date.setUTCDate(Math.min(day, lastDay));
-  }
-  if (cycle === 'yearly') {
-    const month = date.getUTCMonth();
-    const day = date.getUTCDate();
-    date.setUTCDate(1);
-    date.setUTCFullYear(date.getUTCFullYear() + count);
-    date.setUTCMonth(month);
-    const lastDay = new Date(Date.UTC(date.getUTCFullYear(), month + 1, 0)).getUTCDate();
-    date.setUTCDate(Math.min(day, lastDay));
-  }
   return dateKey(date);
 }
 

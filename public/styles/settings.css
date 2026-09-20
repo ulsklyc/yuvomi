@@ -3321,3 +3321,13 @@
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
 }
+
+/* Ein Knopf, der ein Icon neben seinem eigenen Icon+Label zeigt (z.B. den
+ * Icon-Picker-Trigger) - war inline style="", Tokens waren richtig, nur nicht
+ * am richtigen Ort (Review #1256, modules-health.js). */
+.settings-icon-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: fit-content;
+}
