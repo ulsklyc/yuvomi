@@ -34,6 +34,7 @@ const FLAT_SCOPES = Object.freeze({
   labs:       { table: 'health_lab_reports', column: 'user_id' },
   activities: { table: 'health_activities',  column: 'user_id' },
   fasting:    { table: 'health_fasts',       column: 'user_id' },
+  prevention: { table: 'health_prevention_records', column: 'user_id' },
 });
 
 // Vitalwerte tragen ihre Voreinstellung JE METRIK: wer den Blutdruck teilen

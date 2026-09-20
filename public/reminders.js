@@ -65,12 +65,20 @@ async function requestPermission() {
  *
  * @param {string} title
  * @param {string} body
+ * @param {string|null} targetUrl
  */
-function showBrowserNotification(title, body) {
+function showBrowserNotification(title, body, targetUrl = null) {
   if (isPushSubscribed()) return; // Web Push übernimmt die System-Benachrichtigung
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   try {
     const n = new Notification(title, { body, icon: '/icons/icon-192.png' });
+    if (typeof targetUrl === 'string' && targetUrl.startsWith('/') && !targetUrl.startsWith('//')) {
+      n.onclick = () => {
+        window.focus?.();
+        window.yuvomi?.navigate(targetUrl);
+        n.close();
+      };
+    }
     setTimeout(() => n.close(), 8000);
   } catch {
     // Notification-API kann in bestimmten Kontexten fehlschlagen
@@ -175,7 +183,15 @@ const REMINDER_ORIGINS = {
   schedule_extra_entry:   { accent: 'var(--module-schedule)',  icon: 'calendar-clock', labelKey: 'nav.schedule' },
   waste_pickup:           { accent: 'var(--module-waste)',     icon: 'trash-2',      labelKey: 'nav.waste' },
   document_expiry:        { accent: 'var(--module-documents)', icon: 'calendar-clock', labelKey: 'nav.documents' },
+  health_prevention_due:  { accent: 'var(--module-health)',    icon: 'syringe',      labelKey: 'health.tabs.prevention' },
+  fasting_goal:            { accent: 'var(--module-health)',    icon: 'timer',         labelKey: 'health.fasting.title', url: '/health/fasting' },
+  fasting_next_start:      { accent: 'var(--module-health)',    icon: 'timer',         labelKey: 'health.fasting.title', url: '/health/fasting' },
 };
+
+function reminderTargetUrl(reminder) {
+  const target = reminder.target_url || REMINDER_ORIGINS[reminder.entity_type]?.url;
+  return typeof target === 'string' && target.startsWith('/') && !target.startsWith('//') ? target : null;
+}
 
 function createOriginSeal(entityType) {
   const origin = REMINDER_ORIGINS[entityType];
@@ -219,7 +235,8 @@ function processReminders(reminders) {
     const labelKey = REMINDER_ORIGINS[reminder.entity_type]?.labelKey;
     showBrowserNotification(
       labelKey ? t(labelKey) : t('reminders.toastTitle'),
-      reminder.entity_title || ''
+      reminderBody(reminder),
+      reminderTargetUrl(reminder),
     );
   });
 
@@ -270,7 +287,25 @@ function cycleReminderBody(reminder) {
     }
     return `${t('health.cycle.status.nextPeriod')} - ${reminder.entity_title}`;
   }
+  // Nur die geerbte Zeile (assigned_from gesetzt) nennt die betreute Person -
+  // server/services/notifications.js#preventionDueBody haelt denselben Riegel
+  // fuer die Push-Benachrichtigung; ohne dieses Gegenstueck hier saehe der
+  // In-App-Toast bei zwei betreuten Personen nur den Typnamen, ohne zu sagen,
+  // fuer wen (Review #1256).
+  if (reminder.entity_type === 'health_prevention_due' && reminder.assigned_from != null && reminder.prevention_subject_name) {
+    return `${reminder.entity_title} - ${reminder.prevention_subject_name}`;
+  }
   return null;
+}
+
+function fastingReminderBody(reminder) {
+  if (reminder.entity_type === 'fasting_goal') return t('health.fasting.goalReached');
+  if (reminder.entity_type === 'fasting_next_start') return t('health.fasting.remindNext');
+  return null;
+}
+
+function reminderBody(reminder) {
+  return fastingReminderBody(reminder) ?? cycleReminderBody(reminder) ?? reminder.entity_title ?? '';
 }
 
 /**
@@ -295,14 +330,16 @@ function showReminderToast(reminder) {
 
   const seal = createOriginSeal(reminder.entity_type);
 
-  const textSpan = document.createElement('span');
-  textSpan.className = 'toast__reminder-text';
+  const targetUrl = reminderTargetUrl(reminder);
+  const textBlock = document.createElement('button');
+  textBlock.className = 'toast__reminder-text';
+  textBlock.setAttribute('type', 'button');
 
   const titleEl = document.createElement('strong');
   titleEl.textContent = t('reminders.toastTitle');
 
   const bodyEl = document.createElement('span');
-  bodyEl.textContent = cycleReminderBody(reminder) ?? reminder.entity_title ?? '';
+  bodyEl.textContent = reminderBody(reminder);
 
   // KEIN DOPPELPUNKT MEHR ZWISCHEN BEIDEN. Er stammt aus einer einzeiligen
   // Fassung („Erinnerung: Zahnarzttermin"); der Textblock ist längst eine
@@ -310,8 +347,8 @@ function showReminderToast(reminder) {
   // ein eigenes Flex-Item - der Doppelpunkt stand als eigene Zeile zwischen
   // Versal-Label und Titel. Ein Versal-Mikro-Label über seinem Wert braucht
   // ihn ohnehin nicht; die Zeile darunter IST der Wert.
-  textSpan.appendChild(titleEl);
-  textSpan.appendChild(bodyEl);
+  textBlock.appendChild(titleEl);
+  textBlock.appendChild(bodyEl);
 
   const dismissBtn = document.createElement('button');
   dismissBtn.className = 'toast__undo';
@@ -322,7 +359,7 @@ function showReminderToast(reminder) {
   });
 
   toast.appendChild(seal);
-  toast.appendChild(textSpan);
+  toast.appendChild(textBlock);
   toast.appendChild(dismissBtn);
   container.appendChild(toast);
 
@@ -332,11 +369,11 @@ function showReminderToast(reminder) {
     toast.addEventListener('animationend', () => toast.remove(), { once: true });
   }, 30_000);
 
-  toast.addEventListener('click', (e) => {
-    if (e.target === dismissBtn) return;
+  textBlock.addEventListener('click', () => {
     clearTimeout(dismissTimer);
     dismissReminder(reminder.id);
     toast.remove();
+    if (targetUrl) window.yuvomi?.navigate(targetUrl);
   });
 
   return true;
@@ -408,4 +445,6 @@ function refresh() {
   poll();
 }
 
-export { init, stop, refresh, requestPermission, notificationStatus };
+export {
+  init, stop, refresh, requestPermission, notificationStatus,
+};

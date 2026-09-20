@@ -80,6 +80,11 @@ export function fastingClockModel(active, lastCompleted = null, now = Date.now()
   };
 }
 
+export function fastingNotificationAvailability(goalMinutes) {
+  const goal = Number(goalMinutes) > 0;
+  return { goal, next: goal && Number(goalMinutes) < 1440 };
+}
+
 export function fastingDisplayModel(active, lastCompleted = null, preference = 'auto', now = Date.now()) {
   const clock = fastingClockModel(active, lastCompleted, now);
   const mode = clock.remaining !== null && preference !== 'elapsed' ? 'remaining' : 'elapsed';

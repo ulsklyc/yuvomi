@@ -95,6 +95,8 @@ router.put('/fasting/settings', (req, res) => {
     const data = updateFastingSettings(database, { id: viewerId(req) }, definedInput([
         ['defaultGoalMinutes', req.body?.default_goal_minutes],
         ['zoneMode', req.body?.zone_mode],
+        ['remindGoal', req.body?.remind_goal],
+        ['remindNextStart', req.body?.remind_next_start],
         ['acknowledgeSafety', req.body?.acknowledge_safety],
         ['clockMode', req.body?.clock_mode],
         ['activeId', req.body?.active_id],

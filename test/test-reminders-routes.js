@@ -88,6 +88,19 @@ function insertReminder(owner, entityType, entityId, remindAt, dismissed = 0) {
     `INSERT INTO reminders (entity_type, entity_id, remind_at, created_by, dismissed) VALUES (?, ?, ?, ?, ?)`,
   ).run(entityType, entityId, remindAt, owner, dismissed).lastInsertRowid;
 }
+
+function readDisabledModulesConfig() {
+  return db.prepare("SELECT value FROM sync_config WHERE key = 'disabled_modules'").get()?.value ?? null;
+}
+
+function writeDisabledModulesConfig(value) {
+  if (value == null) {
+    db.prepare("DELETE FROM sync_config WHERE key = 'disabled_modules'").run();
+    return;
+  }
+  db.prepare(`INSERT INTO sync_config (key, value) VALUES ('disabled_modules', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(value);
+}
 // Anker direkt einfügen (umgeht server/services/cycle-reminders.js) - `kind`
 // entscheidet, ob GET /pending nachher 'period_predicted' oder
 // 'partner_period' ausliefert (Befund 2).
@@ -142,24 +155,34 @@ test('GET /pending liefert fällige Erinnerungen mit entity_title über alle vie
   const owner = freshUser();
   currentUid = owner;
 
-  const taskId = makeTask(owner, 'Steuererklärung');
-  const eventId = makeEvent(owner, 'Zahnarzttermin');
-  const subId = makeSubscription(owner, 'Spotify');
-  const itemId = makeInventoryItem(owner, 'Kühlschrank');
-  insertReminder(owner, 'task', taskId, PAST);
-  insertReminder(owner, 'event', eventId, PAST);
-  insertReminder(owner, 'subscription', subId, PAST);
-  insertReminder(owner, 'inventory_item', itemId, PAST);
+  // Inventory is disabled by default in a fully migrated database. This test
+  // deliberately exercises all four title joins, so enable every module only
+  // for this request and restore the household setting afterwards.
+  const disabledModulesBefore = readDisabledModulesConfig();
+  writeDisabledModulesConfig('[]');
 
-  const res = await call('GET', '/pending');
-  assert.equal(res.status, 200);
-  // Nur die vier fälligen dieses Nutzers (Isolation via created_by).
-  assert.equal(res.body.data.length, 4);
-  const byType = Object.fromEntries(res.body.data.map((r) => [r.entity_type, r.entity_title]));
-  assert.equal(byType.task, 'Steuererklärung');
-  assert.equal(byType.event, 'Zahnarzttermin');
-  assert.equal(byType.subscription, 'Spotify');
-  assert.equal(byType.inventory_item, 'Kühlschrank');
+  try {
+    const taskId = makeTask(owner, 'Steuererklärung');
+    const eventId = makeEvent(owner, 'Zahnarzttermin');
+    const subId = makeSubscription(owner, 'Spotify');
+    const itemId = makeInventoryItem(owner, 'Kühlschrank');
+    insertReminder(owner, 'task', taskId, PAST);
+    insertReminder(owner, 'event', eventId, PAST);
+    insertReminder(owner, 'subscription', subId, PAST);
+    insertReminder(owner, 'inventory_item', itemId, PAST);
+
+    const res = await call('GET', '/pending');
+    assert.equal(res.status, 200);
+    // Nur die vier fälligen dieses Nutzers (Isolation via created_by).
+    assert.equal(res.body.data.length, 4);
+    const byType = Object.fromEntries(res.body.data.map((r) => [r.entity_type, r.entity_title]));
+    assert.equal(byType.task, 'Steuererklärung');
+    assert.equal(byType.event, 'Zahnarzttermin');
+    assert.equal(byType.subscription, 'Spotify');
+    assert.equal(byType.inventory_item, 'Kühlschrank');
+  } finally {
+    writeDisabledModulesConfig(disabledModulesBefore);
+  }
 });
 
 test('GET /pending schließt zukünftige und verworfene Erinnerungen aus', async () => {
@@ -198,6 +221,40 @@ test('GET /pending ist je Nutzer isoliert (kein Fremdzugriff)', async () => {
   const res = await call('GET', '/pending');
   assert.equal(res.status, 200);
   assert.equal(res.body.data.length, 0, 'Bob sieht Annas fällige Erinnerungen nicht');
+});
+
+test('GET /pending leaves fasting copy to the device locale', async () => {
+  const owner = freshUser();
+  currentUid = owner;
+  const fastId = db.prepare(`INSERT INTO health_fasts (user_id, start_at, end_at, start_tzid, goal_minutes)
+    VALUES (?, '2026-01-01T00:00:00.000Z', NULL, 'UTC', 60)`).run(owner).lastInsertRowid;
+  insertReminder(owner, 'fasting_goal', fastId, PAST);
+  insertReminder(owner, 'fasting_next_start', fastId, PAST);
+  const response = await call('GET', '/pending');
+  const fasting = response.body.data.filter((row) => row.entity_type.startsWith('fasting_'));
+  assert.deepEqual(fasting.map((row) => row.entity_type), ['fasting_goal', 'fasting_next_start']);
+  for (const row of fasting) {
+    assert.equal('notification_title' in row, false);
+    assert.equal('notification_body' in row, false);
+    assert.equal('target_url' in row, false);
+  }
+});
+
+test('GET /pending hides stale fasting rows while Health is disabled household-wide', async () => {
+  const owner = freshUser();
+  currentUid = owner;
+  const fastId = db.prepare(`INSERT INTO health_fasts (user_id, start_at, end_at, start_tzid, goal_minutes)
+    VALUES (?, '2026-01-01T00:00:00.000Z', NULL, 'UTC', 60)`).run(owner).lastInsertRowid;
+  insertReminder(owner, 'fasting_goal', fastId, PAST);
+  const disabledModulesBefore = readDisabledModulesConfig();
+  writeDisabledModulesConfig('["health"]');
+  try {
+    const response = await call('GET', '/pending');
+    assert.equal(response.status, 200);
+    assert.equal(response.body.data.some((row) => row.entity_type === 'fasting_goal'), false);
+  } finally {
+    writeDisabledModulesConfig(disabledModulesBefore);
+  }
 });
 
 test('GET /pending materialisiert Geburtstags-Artefakte (Seiteneffekt)', async () => {

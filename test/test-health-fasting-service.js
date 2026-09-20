@@ -4,6 +4,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
+import { applyMigration, buildMigratedDatabase } from './helpers/migrated-database.js';
 import {
   createFast, finishFast, updateFast, deleteFast, getFastingState,
   acknowledgeSafety, updateFastingSettings, FastingError,
@@ -11,20 +12,28 @@ import {
 
 process.env.DB_PATH = ':memory:';
 const { MIGRATIONS } = await import('../server/db.js');
+const REMINDER_MIGRATION_VERSION = 220;
 
 function setup(path = join(mkdtempSync(join(tmpdir(), 'yuvomi-fasting-service-')), 'db.sqlite')) {
-  const database = new Database(path);
-  database.exec(`
-    CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT, role TEXT NOT NULL DEFAULT 'member', family_role TEXT NOT NULL DEFAULT 'other');
-    CREATE TABLE access_permissions (subject_type TEXT NOT NULL, subject_id TEXT NOT NULL, resource_type TEXT NOT NULL, resource_key TEXT NOT NULL, access TEXT NOT NULL, updated_at TEXT);
-    CREATE TABLE health_care_grants (subject_id INTEGER NOT NULL, caregiver_id INTEGER NOT NULL, PRIMARY KEY(subject_id, caregiver_id));
-    CREATE TABLE sync_config (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT);
-  `);
-  database.exec(MIGRATIONS.find((item) => item.version === 209).up);
-  database.exec("INSERT INTO users VALUES (1, 'owner', 'member', 'parent'), (2, 'caregiver', 'member', 'parent'), (3, 'admin', 'admin', 'parent'), (4, 'disabled', 'member', 'other')");
-  database.prepare("INSERT INTO access_permissions VALUES ('user', ?, 'capability', 'health_use_fasting', 'allow', NULL)").run('1');
-  database.prepare("INSERT INTO access_permissions VALUES ('user', ?, 'capability', 'health_use_fasting', 'allow', NULL)").run('2');
-  database.prepare("INSERT INTO access_permissions VALUES ('user', ?, 'capability', 'health_use_fasting', 'none', NULL)").run('4');
+  const database = buildMigratedDatabase(
+    Database,
+    MIGRATIONS.filter((migration) => migration.version < REMINDER_MIGRATION_VERSION),
+    path,
+  );
+  applyMigration(database, MIGRATIONS.find((migration) => migration.version === REMINDER_MIGRATION_VERSION));
+  const insertUser = database.prepare(`INSERT INTO users
+    (id, username, display_name, password_hash, role, family_role)
+    VALUES (?, ?, ?, 'hash', ?, ?)`);
+  insertUser.run(1, 'owner', 'Owner', 'member', 'parent');
+  insertUser.run(2, 'caregiver', 'Caregiver', 'member', 'parent');
+  insertUser.run(3, 'admin', 'Admin', 'admin', 'parent');
+  insertUser.run(4, 'disabled', 'Disabled', 'member', 'other');
+  const setFasting = database.prepare(`INSERT INTO access_permissions
+    (subject_type, subject_id, resource_type, resource_key, access)
+    VALUES ('user', ?, 'capability', 'health_use_fasting', ?)`);
+  setFasting.run('1', 'allow');
+  setFasting.run('2', 'allow');
+  setFasting.run('4', 'none');
   return database;
 }
 
@@ -66,6 +75,23 @@ test('create canonicalizes offset timestamp, then finish and optimistic edit wor
   database.close();
 });
 
+test('deleting a fast removes pending, delivered and dismissed reminders atomically', () => {
+  const database = setup();
+  acknowledgeSafety(database, actor(1), 1);
+  const created = createFast(database, actor(1), base({ acknowledgeSafety: false }));
+  const insert = database.prepare(`INSERT INTO reminders
+    (entity_type, entity_id, remind_at, created_by, dismissed, pushed_at)
+    VALUES (?, ?, ?, 1, ?, ?)`);
+  insert.run('fasting_goal', created.id, '2026-09-13T22:00:00.000Z', 0, '2026-09-13T22:00:01.000Z');
+  insert.run('fasting_next_start', created.id, '2026-09-14T06:00:00.000Z', 1, null);
+
+  deleteFast(database, actor(1), created.id, { expectedRevision: created.revision });
+
+  assert.equal(database.prepare(`SELECT count(*) AS count FROM reminders
+    WHERE entity_type IN ('fasting_goal', 'fasting_next_start') AND entity_id = ?`).get(created.id).count, 0);
+  database.close();
+});
+
 test('future, malformed, overlap and bounds are rejected', () => {
   const database = setup();
   acknowledgeSafety(database, actor(1), 1);
@@ -83,7 +109,7 @@ test('caregiver requires grant and capabilities on both sides; private ids stay 
   const database = setup();
   acknowledgeSafety(database, actor(1), 1);
   assert.throws(() => createFast(database, actor(2), base({ acknowledgeSafety: false })), (error) => error.reason === 'FASTING_SUBJECT_FORBIDDEN');
-  database.prepare('INSERT INTO health_care_grants VALUES (1, 2)').run();
+  database.prepare('INSERT INTO health_care_grants (subject_id, caregiver_id) VALUES (1, 2)').run();
   const created = createFast(database, actor(2), base({ acknowledgeSafety: false }));
   assert.equal(created.user_id, 1);
   database.prepare("UPDATE access_permissions SET access = 'none' WHERE subject_id = '1' AND resource_key = 'health_use_fasting'").run();
@@ -107,7 +133,7 @@ test('admin cannot bypass the caregiver grant for a reachable subject write', ()
 
 test('only the fasting person can acknowledge safety', () => {
   const database = setup();
-  database.prepare('INSERT INTO health_care_grants VALUES (1, 2)').run();
+  database.prepare('INSERT INTO health_care_grants (subject_id, caregiver_id) VALUES (1, 2)').run();
   assert.throws(
     () => createFast(database, actor(2), base({ acknowledgeSafety: true })),
     (error) => error.reason === 'FASTING_ACK_REQUIRED',
