@@ -5,9 +5,11 @@
  * Abhängigkeiten: server/services/recurrence.js
  */
 
-import { nextOccurrence, matchesRRuleByday, rruleLine } from './recurrence.js';
+import {
+  nextOccurrence, matchesRRuleByday, rruleLine, parseRRule, untilInstantMs,
+} from './recurrence.js';
 import { resolveIcalColor } from '../utils/ical-color.js';
-import { localToUTC, utcToWall } from '../utils/timezone.js';
+import { hasExplicitZone, localToUTC, utcToWall } from '../utils/timezone.js';
 
 function unfoldLines(ics) {
   return ics.replace(/\r?\n[ \t]/g, '');
@@ -370,6 +372,11 @@ function expandRRULE(vevent, windowStart, windowEnd) {
   const wall = vevent.tzid ? utcToWall(vevent.dtstart, vevent.tzid) : null;
   const tzAware = wall && wall.date === startDate;
   const zonenUnsicher = !!vevent.tzid && !tzAware;
+  // UNTIL ALS ZEITPUNKT, WO ES EINER IST (#1269) - dieselbe Unterscheidung wie
+  // in services/calendar-events.js und aus demselben Grund: ein Serienende
+  // mitten am Schnitttag darf dessen Vorkommen nicht mehr durchlassen. Der
+  // Abonnement-Pfad liest dieselben fremden Kalender wie der CalDAV-Sync.
+  const untilMs = untilInstantMs(parseRRule(vevent.rrule), { tzid: vevent.tzid, toUTC: localToUTC });
   let current = startDate, iterations = 0;
   const MAX_ITER = 1500;
   let occurrence = 0;
@@ -389,11 +396,20 @@ function expandRRULE(vevent, windowStart, windowEnd) {
       continue;
     }
 
+    // Vorkommen hinter UNTIL sind keine und zaehlen auch nicht gegen COUNT -
+    // deshalb vor dem Zaehler. Nur mit eigener Zone ist ein Zeitpunkt zu
+    // vergleichen; ganztaegig oder zonenlos bleibt es beim Tag (#1269).
+    const occStartAt = untilMs === null
+      ? null
+      : (tzAware ? localToUTC(`${current}T${wall.time}`, vevent.tzid) : current + timeSuffix);
+    if (occStartAt !== null && hasExplicitZone(occStartAt) && Date.parse(occStartAt) > untilMs) break;
+
     if (maxCount !== null && occurrence >= maxCount) break;
     occurrence++;
 
     if (current >= windowStart && !exdateSet.has(current)) {
-      const occStart = tzAware ? localToUTC(`${current}T${wall.time}`, vevent.tzid) : current + timeSuffix;
+      const occStart = occStartAt
+        ?? (tzAware ? localToUTC(`${current}T${wall.time}`, vevent.tzid) : current + timeSuffix);
       let occEnd = null;
       if (durationMs !== null) {
         if (vevent.allDay) {

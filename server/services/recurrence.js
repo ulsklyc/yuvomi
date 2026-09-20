@@ -26,7 +26,7 @@ const ORDINAL_BYDAY_VALUES = new Set([-1, 1, 2, 3, 4]);
  * Parsed einen RRULE-String in ein Objekt.
  * Beispiel: "FREQ=WEEKLY;BYDAY=MO,TH;INTERVAL=1;COUNT=10"
  * @param {string} rule
- * @returns {{ freq, interval, byday, until, count, bymonthday, bydayOrdinal }|null}
+ * @returns {{ freq, interval, byday, until, untilSpec, count, bymonthday, bydayOrdinal }|null}
  */
 function parseRRule(rule) {
   if (!rule) return null;
@@ -66,7 +66,12 @@ function parseRRule(rule) {
     && ORDINAL_BYDAY_VALUES.has(byDayEntries[0].ordinal)) {
     bydayOrdinal = { ordinal: byDayEntries[0].ordinal, weekday: byDayEntries[0].weekday };
   }
-  const until    = parts.UNTIL ? parseUntilDate(parts.UNTIL) : null;
+  // `until` bleibt die TAGESGRENZE (unveraendert): sie ist das grobe Gatter,
+  // das `nextOccurrence` auf Tagesschluesseln zieht. `untilSpec` traegt
+  // daneben den Zeitpunkt, wo der Wert einen nennt - den werten die
+  // Expansionen aus, die den Zeitpunkt eines Vorkommens kennen (#1269).
+  const untilSpec = parts.UNTIL ? parseUntilSpec(parts.UNTIL) : null;
+  const until     = untilSpec ? untilSpec.day : null;
   // COUNT begrenzt die Serie auf N Vorkommen (DTSTART = Vorkommen 1). Der
   // stateless nextOccurrence() kann COUNT nicht selbst durchsetzen – das
   // übernimmt die Expansion (expandRecurringEvents), die von DTSTART zählt.
@@ -90,7 +95,7 @@ function parseRRule(rule) {
 
   if (!['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'].includes(freq)) return null;
 
-  return { freq, interval, byday, until, count, bymonthday, bydayOrdinal };
+  return { freq, interval, byday, until, untilSpec, count, bymonthday, bydayOrdinal };
 }
 
 /**
@@ -144,6 +149,82 @@ function parseUntilDate(str) {
   const m = parseInt(clean.slice(4, 6), 10) - 1;
   const d = parseInt(clean.slice(6, 8), 10);
   return new Date(Date.UTC(y, m, d));
+}
+
+// UNTIL IST EIN TAG ODER EIN ZEITPUNKT - JE NACHDEM, WIE ES GESCHRIEBEN IST.
+//
+// RFC 5545 kennt drei Schreibweisen, und nur die erste meint einen ganzen Tag:
+//   YYYYMMDD          - ein Datum. Die Serie endet mit diesem Tag, und zwar
+//                       ganz. So schreiben Ganztagsserien ihr Ende, und so
+//                       schreibt es auch Yuvomis eigener Serienschnitt
+//                       (calendar-occurrence-overrides.js: der Vortag).
+//   YYYYMMDDTHHMMSSZ  - ein ZEITPUNKT in UTC.
+//   YYYYMMDDTHHMMSS   - eine Ortszeit ohne Zone. RFC 5545 verlangt bei einem
+//                       DTSTART mit TZID eigentlich die UTC-Form; Server halten
+//                       sich nicht daran, also wird sie in der Zone des Termins
+//                       gelesen - und ohne bekannte Zone bleibt es beim Tag.
+//
+// An dieser Unterscheidung hing #1269. Open-Xchange (mailbox.org) setzt beim
+// Schnitt "dieser und alle folgenden" das Ende der alten Serie auf EINE SEKUNDE
+// VOR DEN START AM SCHNITTTAG - `UNTIL=20260918T145959Z` bei 17:00
+// Europe/Berlin -, nicht auf den Vortag. Wer davon nur den Datumsteil liest,
+// laesst den Schnitttag eingeschlossen; weil die neue Serie an genau diesem Tag
+// beginnt, stand der Termin dort zweimal. Jeder andere Tag war richtig, und
+// Yuvomis eigene Serien fielen nie darauf, weil sie den Vortag schreiben.
+const UNTIL_RE = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?$/;
+
+/**
+ * Zerlegt einen UNTIL-Wert in Tagesgrenze (wie bisher) und - wo vorhanden -
+ * seinen Zeitpunkt.
+ *
+ * Ein Wert, den `UNTIL_RE` nicht liest, faellt auf die alte, tolerante
+ * Datumslesung zurueck: unveraendertes Verhalten fuer alles Krumme, statt eine
+ * Serie wegen eines unbekannten Formats unbegrenzt laufen zu lassen.
+ *
+ * @param {string} raw
+ * @returns {{ day: Date, kind: 'date'|'utc'|'floating', instantMs: number|null, wall: string|null }}
+ */
+function parseUntilSpec(raw) {
+  const value = String(raw ?? '').trim();
+  const m = UNTIL_RE.exec(value);
+  if (!m) return { day: parseUntilDate(value), kind: 'date', instantMs: null, wall: null };
+  const [, y, mo, d, hh, mi, ss, zulu] = m;
+  const day = new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d)));
+  if (hh === undefined) return { day, kind: 'date', instantMs: null, wall: null };
+  const wall = `${y}-${mo}-${d}T${hh}:${mi}:${ss}`;
+  if (zulu) {
+    const instantMs = Date.parse(`${wall}Z`);
+    return { day, kind: 'utc', instantMs: Number.isFinite(instantMs) ? instantMs : null, wall };
+  }
+  return { day, kind: 'floating', instantMs: null, wall };
+}
+
+/**
+ * Der UNTIL-Zeitpunkt einer Regel in Millisekunden - oder null.
+ *
+ * Null heisst hier NICHT "unbegrenzt", sondern "auf Zeitpunkte ist hier nichts
+ * zu vergleichen": die Regel traegt kein UNTIL, nennt es nur als Tag, oder sie
+ * nennt eine Ortszeit ohne Zone, in der sie zu lesen waere. In allen drei
+ * Faellen bleibt es bei der Tagesgrenze, die `nextOccurrence` ohnehin zieht -
+ * und eine Ganztagsserie behaelt damit ihren letzten Tag.
+ *
+ * `toUTC` wird hereingereicht, statt hier `server/utils/timezone.js` zu
+ * importieren: dieses Modul ist bewusst abhaengigkeitsfrei, und beide Aufrufer
+ * (Kalender-Expansion und ICS-Parser) haben die Funktion schon zur Hand.
+ *
+ * @param {object|null} parsed  Ergebnis von `parseRRule`
+ * @param {{tzid?: string|null, toUTC?: ((local: string, tzid: string) => string)|null}} [opts]
+ * @returns {number|null} ms seit Epoch
+ */
+function untilInstantMs(parsed, { tzid = null, toUTC = null } = {}) {
+  const spec = parsed?.untilSpec ?? null;
+  if (!spec) return null;
+  if (spec.kind === 'utc') return spec.instantMs;
+  if (spec.kind === 'floating' && spec.wall && tzid && typeof toUTC === 'function') {
+    const ms = Date.parse(toUTC(spec.wall, tzid));
+    return Number.isFinite(ms) ? ms : null;
+  }
+  return null;
 }
 
 /**
@@ -731,5 +812,5 @@ function seriesStartFor(dateKey, rrule, { utcDiffersFromLocal = false } = {}) {
 
 export {
   parseRRule, nextOccurrence, nextOccurrenceAfter, nextDueAfterCompletion, matchesRRuleByday,
-  seriesStartFor, hasAnyOccurrence,
+  seriesStartFor, hasAnyOccurrence, untilInstantMs,
 };
