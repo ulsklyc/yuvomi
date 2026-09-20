@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **An appointment that crosses midnight but is shorter than a day is back in the time grid, on both
+  days.** Until now the calendar asked one question about such an entry - does it touch two calendar
+  days? - and every entry that did was drawn as a chip without times in the all-day row above the
+  grid. So an evening from 22:00 to 01:30 looked like two whole days, and the ninety minutes after
+  midnight were nowhere to be found at the hour somebody would look for them. The week and day views
+  now also ask how long it lasts: under 24 hours it is a block in the grid of both days, cut at the
+  day boundary - the first day from its start time to midnight, the second from midnight to its end
+  time - which is the same arithmetic a night shift in the duty roster has had for a while. Because
+  the block stops at midnight, it costs the next morning nothing: an appointment at 09:00 keeps the
+  full width of the column. Entries of 24 hours or more stay in the all-day row on purpose; a bar
+  across the days says more than a block that runs from top to bottom in every column. The agenda is
+  unchanged and still reads "from 22:00" on the first day and "until 01:30" on the second, and an
+  appointment that ends at exactly 00:00 still counts as a single day. (#1313)
+
 ## [2.68.0] - 2026-09-20
 
 ### Added
