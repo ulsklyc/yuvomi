@@ -440,7 +440,8 @@ arithmetic over ingredients would be the catalogue. Entry 8 records where that p
 
 **Nutrition enters Yuvomi as a figure a person states about their own recipe or their own meal.
 Values per portion on a recipe, a daily target per person and a logged intake are the household's
-own data, and they are built. What stays declined is the step in between: turning "200 g flour"
+own data, and they are agreed and ticketed, not yet built. What stays declined is the step in
+between: turning "200 g flour"
 into grams of carbohydrate, which needs a table of facts about products that somebody would have
 to keep correct forever.**
 
@@ -492,9 +493,13 @@ what follows is what the rule requires of them, not a description of the schema:
 - Nutrition will live on `recipes` as a fixed set of nullable per-portion columns beside a servings
   count, never on `recipe_ingredients`. NULL means "not stated" and must render as nothing, never
   as a zero, so a recipe nobody filled in does not claim to contain no fat.
-- The intake log and the daily target belong in Health as rows per person, under the `health` API scope
-  (`server/scopes.js`), with the `private` / `family` pair and the `private` default that entry 5
-  makes canonical for a new module. None of them carries a column named `calories`:
+- The intake log and the daily target belong in Health as rows per person, under the `health` API
+  scope (`server/scopes.js`), and they take **the canonical set from entry 5** - `private`, a named
+  set, `all` - with `private` as the default. Not the `private` / `family` pair Health stores today:
+  entry 5 names that pair among the vocabularies it exists to normalize, and it records the failure
+  case by name, a new health tab that arrived with its own `visibility` column in that pair
+  (PR #1019). "New modules take the canonical set from the start" is the sentence this has to obey,
+  and nutrition is a new module's worth of rows. None of them carries a column named `calories`:
   `health_activities.calories` is energy **burnt**, and one word for both directions would be a
   bug waiting in the vocabulary.
 
