@@ -428,9 +428,81 @@ or as a download. Importing such a list from an outside service and keeping it. 
 unmatched ingredient as missing rather than unknown, which makes an answer built on partial data
 read as complete.
 
-### What this does not decide
+### Where the criterion was applied next
 
-#1293 asks for nutrition values on recipes and daily targets per person. The same line runs through
-it - values a family types for its own recipe are its own data, a daily intake tracker is a
-different question about scope, not about tending - and the thread has not been answered yet. This
-entry gives the criterion, not the answer.
+#1293 asked for nutrition values on recipes and daily targets per person, and was answered with
+this criterion in hand: the values a family types about its own recipe are its own data, the
+arithmetic over ingredients would be the catalogue. Entry 8 records where that put the line.
+
+---
+
+## 8. A number somebody typed, not a number somebody looked up
+
+**Nutrition enters Yuvomi as a figure a person states about their own recipe or their own meal.
+Values per portion on a recipe, a daily target per person and a logged intake are the household's
+own data, and they are built. What stays declined is the step in between: turning "200 g flour"
+into grams of carbohydrate, which needs a table of facts about products that somebody would have
+to keep correct forever.**
+
+#1293 asked for macros and nutrition across Health and Recipes - nutrients on a recipe, a daily
+target per person, a log at dinnertime and the progress on the dashboard. The answer is yes to all
+four, and the thread also asked the right question: whether this is the product database #714 was
+refused for. It is not, and the difference is worth writing down, because the two look identical
+on the screen where they meet.
+
+The criterion is entry 7's: a field earns its place when it stays true without anybody tending it.
+"This pot serves four and one portion is about 650 kcal" passes that test the way a price passes
+it. It is a statement about one household's own recipe, made once, wrong only if they typed it
+wrong, and an old value is a usable old value. "200 g of flour contains 152 g of carbohydrate"
+fails it: that is a fact about a product, manufacturers change recipes and package sizes, and it
+is only useful while every row of it is accurate.
+
+**The line is already drawn in the schema, and this entry only names it.** Migration 13 made
+`recipe_ingredients.quantity` a TEXT column and nothing has altered it since; the comment above
+`pantry_items.quantity` says why the pantry is the exception - it is the one kitchen table that
+has to do arithmetic. A recipe ingredient has always been prose, because nothing was ever meant to
+compute over it. Per-portion nutrition sits on the prose side: typed and stored, never derived.
+Per-ingredient nutrition sits on the other side and would need the catalogue first. So the
+boundary is not a compromise reached for this thread; it is where the kitchen module has kept it
+from the beginning.
+
+Two consequences follow from the same reasoning rather than from taste:
+
+- **Eight named columns, fixed, and the same eight everywhere.** Energy in kilocalories, fat,
+  saturates, carbohydrate, sugars, protein, salt and fibre. Those are the seven the EU requires on
+  a package plus fibre - the set a person is reading off the packet in front of them, rather than
+  a number picked here. Fixed matters twice over: a ninth column later is a migration every
+  install has to take, and a `nutrient_key` / `value` pair instead would say the answer is
+  "whatever anybody types", which is the shape a catalogue grows in one row at a time. Eight
+  columns say the answer is macros and stays macros.
+- **A logged intake stores numbers, not a reference.** Editing a recipe next month must not
+  rewrite what somebody ate last week. Same reason migration 193 stores a paid price on the
+  shopping item rather than pointing at a product.
+
+### Where the rule lives
+
+Not in one function, for the same reason as entry 7: it is a rule about which columns get written
+at all. The visible consequences:
+
+- `recipe_ingredients.quantity` stays TEXT (`server/db.js`, migration 13), and no code path parses
+  it into a number and a unit. `server/services/recipe-providers/mealie.js`
+  (`flattenIngredient()`) deliberately flattens the provider's structured quantity, unit and food
+  into that text, and the comment there says so.
+- Nutrition lives on `recipes` as a fixed set of nullable per-portion columns beside a servings
+  count, never on `recipe_ingredients`. NULL means "not stated" and renders as nothing, never as a
+  zero, so a recipe nobody filled in does not claim to contain no fat.
+- The intake log and the daily target are Health rows per person, under the `health` API scope
+  (`server/scopes.js`), with the `private` / `family` pair and the `private` default that entry 5
+  makes canonical for a new module. None of them carries a column named `calories`:
+  `health_activities.calories` is energy **burnt**, and one word for both directions would be a
+  bug waiting in the vocabulary.
+
+### What counts as undoing it
+
+A nutrition value on an ingredient row, whether typed, imported or inferred. Parsing
+`recipe_ingredients.quantity` into a number and a unit in order to total something up - that is
+the catalogue's first half arriving on its own. A shipped or downloaded list of foods, products or
+nutrition values, including a barcode lookup against an outside database, which is entry 7's
+refusal wearing a scanner. A key/value nutrient table, or a ninth nutrient added without asking
+what the eight were for. And a logged intake that points at a recipe for its numbers instead of
+copying them, which makes an edit today change what somebody ate last month.
