@@ -35,14 +35,66 @@ const REFERENCE_LOCALE = 'de';
 // ("Birthday: <Name>") - ein Bestandshaushalt erlebt so keinen stillen Wechsel.
 const DEFAULT_LOCALE = 'en';
 
-// `{2,3}`, nicht `{2}`: Filipino traegt den ISO-639-2-Code `fil`, und die
-// Datei heisst danach. Mit `{2}` fiel `fil.json` aus der Liste, ohne dass
-// irgendwo ein Fehler entstand - das Auswahlmenue baut seine Optionen aus
-// SUPPORTED_LOCALES im Frontend und bot Filipino weiter an, waehrend
-// `isSupportedLocale('fil')` false war und das Speichern mit 400 antwortete.
-// Dieselbe Erweiterung steht seit laengerem am Sprachteil des Regionscodes
-// (`/^([a-z]{2,3})-[A-Z]{2}$/` weiter unten); hier war sie vergessen worden.
-const LOCALE_FILE_RE = /^([a-z]{2,3})\.json$/;
+// Die Form, die BCP-47 fuer einen Locale-Dateinamen zulaesst: Sprache, optional
+// Schrift, optional Region - `de`, `fil`, `pt-BR`, `zh-Hant`, `sr-Latn-RS`.
+//
+// Dieselbe Naht ist hier zweimal gerissen, beide Male an einer Laengenangabe,
+// die genau den Bestand beschrieb statt die Regel. Erst forderte der
+// Regionscode in preferences.js `{2}` und wies `fil-PH` ab; dann forderte
+// dieses Muster `{2}` und verlor `fil.json` (#1322), waehrend das Auswahlmenue
+// Filipino weiter anbot, weil es seine Optionen aus SUPPORTED_LOCALES im
+// Frontend baut - `isSupportedLocale('fil')` war false und das Speichern
+// antwortete mit 400. Nach `{2,3}` waere `zh-Hant.json` das dritte Mal gewesen.
+//
+// Die Erweiterung kostet nichts, solange sie eine Form beschreibt und keine
+// beliebige Datei durchlaesst: `README.json` oder ein `de-de.json` mit
+// kleingeschriebener Region bleiben draussen, sonst gaebe die Liste einem
+// Nicht-Locale den Rang einer Sprache. Der Test dazu nagelt beide Richtungen
+// fest, weil der Bestand selbst keine einzige dieser Formen traegt.
+const LOCALE_FILE_RE = /^([a-z]{2,3}(?:-[A-Z][a-z]{3})?(?:-[A-Z]{2})?)\.json$/;
+
+/**
+ * Der Locale-Code eines Dateinamens, oder null. Exportiert, weil der Bestand
+ * die Erweiterung nicht misst: alle 24 Dateien heissen `xx.json` oder
+ * `xxx.json`, ein Test ueber getSupportedLocales() liefe an jeder Subtag-Form
+ * vorbei. getSupportedLocales() ruft genau diese Funktion, es gibt also keinen
+ * zweiten Pfad, der auseinanderlaufen koennte.
+ */
+export function localeFromFileName(file) {
+  return file.match(LOCALE_FILE_RE)?.[1] ?? null;
+}
+
+// Die gespeicherte Region des Haushalts, in derselben BCP-47-Form: Sprache,
+// optional Schrift, dann die Region. Die Region ist hier NICHT optional - ein
+// blosser Sprachcode ist keine Region, und `region` soll genau die Frage
+// beantworten, wo der Haushalt lebt.
+//
+// Ein Muster und nicht vier: dieselbe Form stand bis 20.09.2026 an vier Stellen
+// im Server (Schreibpruefung in preferences.js, Sprachableitung, Zahlenformat,
+// Regionsabfrage), jede mit einem eigenen Literal. Ein solcher Satz Kopien
+// wandert nie vollstaendig - als `fil-PH` die Erweiterung auf `{2,3}` erzwang,
+// blieb die Locale-Dateiliste zurueck, und genau daraus wurde #1322.
+const REGION_RE = /^([a-z]{2,3})(?:-[A-Z][a-z]{3})?-[A-Z]{2}$/;
+
+/** Ist `region` ein vollstaendiger Regions-Tag? `custom` zaehlt hier NICHT. */
+export function isRegionTag(region) {
+  return typeof region === 'string' && REGION_RE.test(region);
+}
+
+/**
+ * Der Sprachteil eines Regions-Tags, oder null: `fil-PH` -> `fil`,
+ * `zh-Hant-TW` -> `zh`.
+ *
+ * Ohne den Schrift-Subtag, weil die Locale-Dateien reine Sprachcodes tragen -
+ * `zh.json`, nicht `zh-Hant.json`. Faende `resolveHouseholdLocale` hier
+ * `zh-Hant`, liefe es an `isSupportedLocale` vorbei und fiele auf Englisch
+ * zurueck, obwohl der Haushalt eine chinesische Region gewaehlt hat. Traegt der
+ * Ordner eines Tages `zh-Hant.json`, gehoert hier eine Kette hin, die erst den
+ * vollen Sprachteil und dann den blossen Sprachcode versucht.
+ */
+export function regionLanguage(region) {
+  return typeof region === 'string' ? (REGION_RE.exec(region)?.[1] ?? null) : null;
+}
 
 let supportedLocales = null;
 const localeCache = new Map();
@@ -57,7 +109,7 @@ export function getSupportedLocales() {
   if (supportedLocales) return supportedLocales;
   try {
     supportedLocales = readdirSync(LOCALES_DIR)
-      .map((file) => file.match(LOCALE_FILE_RE)?.[1])
+      .map(localeFromFileName)
       .filter(Boolean)
       .sort();
   } catch {
@@ -215,8 +267,8 @@ export function resolveHouseholdLocale(database, { ignoreExplicit = false } = {}
     if (isSupportedLocale(explicit)) return explicit;
   }
 
-  const regionLanguage = /^([a-z]{2,3})-[A-Z]{2}$/.exec(cfgValue(database, 'region') ?? '')?.[1];
-  if (isSupportedLocale(regionLanguage)) return regionLanguage;
+  const ausDerRegion = regionLanguage(cfgValue(database, 'region'));
+  if (isSupportedLocale(ausDerRegion)) return ausDerRegion;
 
   return DEFAULT_LOCALE;
 }
@@ -252,7 +304,7 @@ export function resolveHouseholdFormats(database) {
  * @returns {string}
  */
 export function formatMoney(amount, { locale, currency, region = null }) {
-  const numberLocale = /^[a-z]{2,3}-[A-Z]{2}$/.test(region ?? '') ? region : locale;
+  const numberLocale = isRegionTag(region) ? region : locale;
   try {
     return new Intl.NumberFormat(numberLocale, { style: 'currency', currency }).format(amount);
   } catch {
@@ -263,7 +315,7 @@ export function formatMoney(amount, { locale, currency, region = null }) {
 /** Gespeicherte Region des Haushalts (voller BCP-47-Tag) oder null. */
 export function householdRegion(database) {
   const region = cfgValue(database, 'region');
-  return /^[a-z]{2,3}-[A-Z]{2}$/.test(region ?? '') ? region : null;
+  return isRegionTag(region) ? region : null;
 }
 
 export { DEFAULT_LOCALE, REFERENCE_LOCALE };

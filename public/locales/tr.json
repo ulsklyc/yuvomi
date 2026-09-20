@@ -2922,7 +2922,16 @@
         "imageChoose": "Görsel seç",
         "imageRemove": "Görseli kaldır",
         "imageHint": "Tarif başına bir görsel. Yemek planında ve genel bakış kutusunda görünür.",
-        "imageTooLarge": "Görsel küçültüldükten sonra hâlâ çok büyük."
+        "imageTooLarge": "Görsel küçültüldükten sonra hâlâ çok büyük.",
+        "ingredientMatchNone": "Eşleştirilmedi",
+        "ingredientMatchAction": "{{name}} malzemesini bir kiler satırıyla eşleştir",
+        "ingredientMatchTitle": "{{name}} eşleştir",
+        "ingredientMatchLabel": "Kilerdeki satır",
+        "ingredientMatchHint": "Bu malzemenin karşılığı olan kiler satırını seç. Yuvomi hiçbir şey tahmin etmez - yalnızca burada onayladığın geçerlidir.",
+        "ingredientMatchEmpty": "Kiler henüz boş.",
+        "ingredientMatchSaved": "Eşleştirme kaydedildi.",
+        "ingredientMatchCleared": "Eşleştirme kaldırıldı.",
+        "ingredientMatchLoadError": "Kiler yüklenemedi."
     },
     "search": {
         "emptyHint": "Görevler, etkinlikler, notlar, kişiler, alışveriş ve sağlıkta aramak için en az 2 karakter yaz.",

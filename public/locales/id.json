@@ -3031,7 +3031,16 @@
         "imageChoose": "Pilih gambar",
         "imageRemove": "Hapus gambar",
         "imageHint": "Satu gambar per resep. Tampil di rencana makan dan di kartu ringkasan.",
-        "imageTooLarge": "Gambar masih terlalu besar setelah diperkecil."
+        "imageTooLarge": "Gambar masih terlalu besar setelah diperkecil.",
+        "ingredientMatchNone": "Belum dicocokkan",
+        "ingredientMatchAction": "Cocokkan {{name}} dengan baris persediaan",
+        "ingredientMatchTitle": "Cocokkan {{name}}",
+        "ingredientMatchLabel": "Baris di persediaan",
+        "ingredientMatchHint": "Pilih baris di persediaanmu yang dimaksud bahan ini. Yuvomi tidak menebak apa pun - hanya yang kamu konfirmasi di sini yang berlaku.",
+        "ingredientMatchEmpty": "Persediaan masih kosong.",
+        "ingredientMatchSaved": "Pencocokan disimpan.",
+        "ingredientMatchCleared": "Pencocokan dihapus.",
+        "ingredientMatchLoadError": "Persediaan tidak dapat dimuat."
     },
     "onboarding": {
         "step1Title": "Selamat datang di {{name}}",

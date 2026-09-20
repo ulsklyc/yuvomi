@@ -1373,6 +1373,24 @@ const MIGRATIONS_SQL = {
     ALTER TABLE health_fasting_settings ADD COLUMN remind_goal INTEGER NOT NULL DEFAULT 0 CHECK(remind_goal IN (0, 1));
     ALTER TABLE health_fasting_settings ADD COLUMN remind_next_start INTEGER NOT NULL DEFAULT 0 CHECK(remind_next_start IN (0, 1));
   `,
+
+  // Bestaetigte Zuordnung Rezeptzutat -> Vorratszeile (#1314). Der Anker ist
+  // (recipe_id, ingredient_key), NICHT recipe_ingredients.id: die Zutatenzeilen
+  // werden beim Speichern eines Rezepts komplett neu geschrieben. Begruendung
+  // samt Loeschverhalten steht bei Migration 222 in server/db.js.
+  222: `
+    CREATE TABLE IF NOT EXISTS recipe_ingredient_pantry_matches (
+      recipe_id      INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+      ingredient_key TEXT    NOT NULL,
+      pantry_item_id INTEGER NOT NULL REFERENCES pantry_items(id) ON DELETE CASCADE,
+      confirmed_by   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      updated_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      PRIMARY KEY (recipe_id, ingredient_key)
+    );
+    CREATE INDEX IF NOT EXISTS idx_ripm_pantry_item
+      ON recipe_ingredient_pantry_matches(pantry_item_id);
+  `,
 };
 
 export { MIGRATIONS_SQL };

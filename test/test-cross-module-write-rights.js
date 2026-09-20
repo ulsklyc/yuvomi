@@ -7,6 +7,8 @@
  *          POST /meals/:id/to-shopping-list   -> legt shopping_items an
  *          POST /meals/week-to-shopping-list  -> dasselbe fuer eine Woche
  *          POST /recipes/:id/to-shopping-list -> dasselbe (`/recipes` = meals)
+ *          PUT  /recipes/:id/ingredient-match -> haengt eine Zeile des VORRATS
+ *               dauerhaft in ein Rezept ein (#1314)
  *          POST /shopping/:listId/import-meal-plan -> setzt
  *               meal_ingredients.on_shopping_list, also Essensplan-Daten
  *
@@ -237,6 +239,62 @@ test('Token mit beiden Scopes kommt durch', async () => {
   const res = await call('POST', `/meals/${mealId}/to-shopping-list`, { listId: LIST });
   assert.equal(res.status, 200);
   assert.equal(res.body.data.transferred, 1);
+});
+
+// =========================================================================
+// 1b. Das Rezept haengt eine Vorratszeile ein (#1314)
+// =========================================================================
+
+// DIESELBE FRAGE, DAS DRITTE MODUL. `/recipes` gehoert dem Scope-Modul `meals`,
+// benannt und dauerhaft eingehaengt wird aber eine Zeile des VORRATS. Der
+// Pfad-Guard in server/index.js sieht davon nichts, genau wie beim
+// Einkaufs-Uebertrag darueber.
+function seedPantryItem(name) {
+  return Number(db.prepare(
+    "INSERT INTO pantry_items (name, quantity, unit, created_by) VALUES (?, 1, 'pcs', ?)",
+  ).run(name, U).lastInsertRowid);
+}
+const matchCount = () => db.prepare('SELECT COUNT(*) AS c FROM recipe_ingredient_pantry_matches').get().c;
+
+test('Vorbedingung: mit vollem Recht laesst sich eine Zutat dem Vorrat zuordnen', async () => {
+  asMember({});
+  const recipeId = seedRecipe(['Mehl-zuordnung']);
+  const item = seedPantryItem('Mehl im Schrank');
+  const res = await call('PUT', `/recipes/${recipeId}/ingredient-match`, {
+    name: 'Mehl-zuordnung', pantryItemId: item,
+  });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.data.pantry_item_id, item);
+});
+
+for (const stufe of ['none', 'read']) {
+  test(`Mitglied mit pantry: ${stufe} haengt keine Vorratszeile in ein Rezept`, async () => {
+    asMember({});
+    const recipeId = seedRecipe([`Zutat-${stufe}`]);
+    const item = seedPantryItem(`Glas-${stufe}`);
+    const vorher = matchCount();
+
+    asMember({ pantry: stufe });
+    const res = await call('PUT', `/recipes/${recipeId}/ingredient-match`, {
+      name: `Zutat-${stufe}`, pantryItemId: item,
+    });
+    assertDeniedShape(res, `pantry: ${stufe} darf keine Vorratszeile einhaengen`);
+    assert.equal(matchCount(), vorher, 'keine Zuordnung angelegt');
+  });
+}
+
+test('Token mit meals:write, aber ohne Vorrats-Scope, ordnet nichts zu', async () => {
+  asMember({});
+  const recipeId = seedRecipe(['Zutat-Token']);
+  const item = seedPantryItem('Dose-Token');
+  const vorher = matchCount();
+
+  asToken(['meals:write']);
+  const res = await call('PUT', `/recipes/${recipeId}/ingredient-match`, {
+    name: 'Zutat-Token', pantryItemId: item,
+  });
+  assertDeniedShape(res, 'der Pfad sagt /recipes, benannt wird eine Zeile des Vorrats');
+  assert.equal(matchCount(), vorher);
 });
 
 // =========================================================================

@@ -3019,7 +3019,16 @@
         "imageChoose": "Kép választása",
         "imageRemove": "Kép eltávolítása",
         "imageHint": "Receptenként egy kép. Megjelenik az étkezési tervben és az áttekintő csempén.",
-        "imageTooLarge": "A kép kicsinyítés után is túl nagy."
+        "imageTooLarge": "A kép kicsinyítés után is túl nagy.",
+        "ingredientMatchNone": "Nincs hozzárendelve",
+        "ingredientMatchAction": "{{name}} hozzárendelése egy készletsorhoz",
+        "ingredientMatchTitle": "{{name}} hozzárendelése",
+        "ingredientMatchLabel": "Sor a készletben",
+        "ingredientMatchHint": "Válaszd ki a készleted azon sorát, amelyre ez a hozzávaló vonatkozik. A Yuvomi semmit sem találgat - csak az számít, amit itt megerősítesz.",
+        "ingredientMatchEmpty": "A készlet még üres.",
+        "ingredientMatchSaved": "Hozzárendelés mentve.",
+        "ingredientMatchCleared": "Hozzárendelés megszüntetve.",
+        "ingredientMatchLoadError": "A készletet nem sikerült betölteni."
     },
     "search": {
         "emptyHint": "Írj be legalább 2 karaktert a feladatok, események, jegyzetek, névjegyek, bevásárlás és egészség kereséséhez.",

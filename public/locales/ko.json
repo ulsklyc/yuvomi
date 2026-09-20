@@ -3031,7 +3031,16 @@
         "imageChoose": "이미지 선택",
         "imageRemove": "이미지 삭제",
         "imageHint": "레시피당 한 장. 식단표와 개요 타일에 표시됩니다.",
-        "imageTooLarge": "축소한 뒤에도 이미지가 너무 큽니다."
+        "imageTooLarge": "축소한 뒤에도 이미지가 너무 큽니다.",
+        "ingredientMatchNone": "연결 안 됨",
+        "ingredientMatchAction": "{{name}}을(를) 재고 항목에 연결",
+        "ingredientMatchTitle": "{{name}} 연결",
+        "ingredientMatchLabel": "재고 항목",
+        "ingredientMatchHint": "이 재료가 가리키는 재고 항목을 고르세요. Yuvomi는 아무것도 추측하지 않습니다 - 여기서 확인한 것만 적용됩니다.",
+        "ingredientMatchEmpty": "재고가 아직 비어 있습니다.",
+        "ingredientMatchSaved": "연결을 저장했습니다.",
+        "ingredientMatchCleared": "연결을 해제했습니다.",
+        "ingredientMatchLoadError": "재고를 불러오지 못했습니다."
     },
     "onboarding": {
         "step1Title": "{{name}}에 오신 것을 환영합니다",

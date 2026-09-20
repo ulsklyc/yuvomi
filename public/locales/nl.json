@@ -3019,7 +3019,16 @@
         "imageChoose": "Afbeelding kiezen",
         "imageRemove": "Afbeelding verwijderen",
         "imageHint": "Eén afbeelding per recept. Hij verschijnt in de maaltijdplanner en op de overzichtstegel.",
-        "imageTooLarge": "De afbeelding is na verkleinen nog te groot."
+        "imageTooLarge": "De afbeelding is na verkleinen nog te groot.",
+        "ingredientMatchNone": "Niet gekoppeld",
+        "ingredientMatchAction": "{{name}} aan een voorraadregel koppelen",
+        "ingredientMatchTitle": "{{name}} koppelen",
+        "ingredientMatchLabel": "Regel in de voorraad",
+        "ingredientMatchHint": "Kies de regel in je voorraad die dit ingrediënt bedoelt. Yuvomi raadt niets - alleen wat je hier bevestigt telt.",
+        "ingredientMatchEmpty": "De voorraad is nog leeg.",
+        "ingredientMatchSaved": "Koppeling opgeslagen.",
+        "ingredientMatchCleared": "Koppeling verwijderd.",
+        "ingredientMatchLoadError": "De voorraad kon niet worden geladen."
     },
     "search": {
         "emptyHint": "Typ minstens 2 tekens om te zoeken in taken, afspraken, notities, contacten, boodschappen en gezondheid.",

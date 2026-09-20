@@ -9,9 +9,10 @@ import express from 'express';
 import * as db from '../db.js';
 import { str, num, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
 import { normalizeRecipeMealTypes } from '../../public/utils/recipe-meal-types.js';
+import { ingredientMatchKey } from '../../public/utils/ingredient-match-key.js';
 import { getAdapter } from '../services/recipe-providers/index.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
-import { mayWriteModule } from '../permissions.js';
+import { hiddenModulesFor, mayWriteModule } from '../permissions.js';
 
 const log = createLogger('Recipes');
 const router = express.Router();
@@ -41,7 +42,62 @@ function withSource(recipe) {
   };
 }
 
-function loadRecipeWithIngredients(id) {
+/* DIE BESTAETIGTE ZUORDNUNG ZU EINER VORRATSZEILE (#1314, Stufe 1).
+ *
+ * Sie haengt NICHT an `recipe_ingredients.id`, und das ist keine Vorsicht,
+ * sondern eine Messung: PUT /:id weiter unten loescht alle Zutaten eines
+ * Rezepts und legt sie neu an, der Provider-Sync ebenso. Eine ID-Verbindung
+ * waere nach dem naechsten Speichern still verschwunden. Gespeichert ist
+ * deshalb (recipe_id, normalisierter Name) - siehe Migration 222.
+ *
+ * WAS HIER NICHT PASSIERT: nichts wird geraten. Eine Zutat ohne Zeile in
+ * `recipe_ingredient_pantry_matches` bekommt `pantry_item_id: null` und sonst
+ * gar nichts - kein "fehlt", kein "vorhanden". Stufe 1 weiss nur, worauf der
+ * Haushalt gezeigt hat; unbekannt ist nicht fehlend (docs/DECISIONS.md
+ * Abschnitt 7).
+ */
+function attachPantryMatches(req, ingredients) {
+  if (!ingredients.length) return ingredients;
+
+  // DAS RECHT AM LESEWEG, spiegelbildlich zum Schreibweg weiter unten. Der Pfad
+  // haengt unter /recipes und gehoert dem Scope-Modul `meals`; der globale
+  // Riegel in server/index.js urteilt am ersten Pfadsegment und fragt deshalb
+  // nie nach `pantry`. Benannt wird hier aber eine Zeile des VORRATS, mit
+  // ihrem Namen. Dieselbe Mischstelle wie die Import-Kandidaten in
+  // server/routes/birthdays.js (Pfad `calendar`, Inhalt aus `contacts`), und
+  // derselbe Aufruf schliesst sie: `hiddenModulesFor` prueft beide Achsen,
+  // Mitgliedsrecht UND Token-Scope.
+  //
+  // Dass `pantryMatchEl()` in public/pages/recipes.js bei `access === 'none'`
+  // nichts zeichnet, ist KEIN Ersatz: das ist eine Darstellungsentscheidung,
+  // und GET /api/v1/recipes beantwortet die Frage am Browser vorbei.
+  //
+  // Was zurueckbleibt, ist `null` und nicht das Weglassen der Felder: die Zutat
+  // ist fuer diesen Betrachter unzugeordnet, und die Antwort behaelt ihre Form.
+  if (hiddenModulesFor(req, ['pantry']).has('pantry')) {
+    return ingredients.map((ing) => ({ ...ing, pantry_item_id: null, pantry_item_name: null }));
+  }
+  const recipeIds = [...new Set(ingredients.map((i) => i.recipe_id))];
+  const placeholders = recipeIds.map(() => '?').join(',');
+  const rows = db.get().prepare(`
+    SELECT m.recipe_id, m.ingredient_key, m.pantry_item_id, p.name AS pantry_item_name
+    FROM recipe_ingredient_pantry_matches m
+    JOIN pantry_items p ON p.id = m.pantry_item_id
+    WHERE m.recipe_id IN (${placeholders})
+  `).all(...recipeIds);
+
+  const byKey = new Map(rows.map((r) => [`${r.recipe_id}\x00${r.ingredient_key}`, r]));
+  return ingredients.map((ing) => {
+    const hit = byKey.get(`${ing.recipe_id}\x00${ingredientMatchKey(ing.name)}`);
+    return {
+      ...ing,
+      pantry_item_id: hit ? hit.pantry_item_id : null,
+      pantry_item_name: hit ? hit.pantry_item_name : null,
+    };
+  });
+}
+
+function loadRecipeWithIngredients(req, id) {
   const recipe = db.get().prepare(`
     SELECT r.*, u.display_name AS creator_name, u.avatar_color AS creator_color,
            p.name AS provider_account_name, p.provider AS provider_type
@@ -53,16 +109,16 @@ function loadRecipeWithIngredients(id) {
 
   if (!recipe) return null;
 
-  const ingredients = db.get().prepare(`
+  const ingredients = attachPantryMatches(req, db.get().prepare(`
     SELECT * FROM recipe_ingredients
     WHERE recipe_id = ?
     ORDER BY id ASC
-  `).all(id);
+  `).all(id));
 
   return withSource({ ...recipe, meal_types: normalizeRecipeMealTypes(recipe.meal_types), ingredients });
 }
 
-router.get('/', (_req, res) => {
+router.get('/', (req, res) => {
   try {
     const recipes = db.get().prepare(`
       SELECT r.*, u.display_name AS creator_name, u.avatar_color AS creator_color,
@@ -78,11 +134,11 @@ router.get('/', (_req, res) => {
 
     if (ids.length > 0) {
       const placeholders = ids.map(() => '?').join(',');
-      const ingredients = db.get().prepare(`
+      const ingredients = attachPantryMatches(req, db.get().prepare(`
         SELECT * FROM recipe_ingredients
         WHERE recipe_id IN (${placeholders})
         ORDER BY id ASC
-      `).all(...ids);
+      `).all(...ids));
 
       for (const ing of ingredients) {
         if (!ingredientMap[ing.recipe_id]) ingredientMap[ing.recipe_id] = [];
@@ -162,7 +218,7 @@ router.post('/', (req, res) => {
       return rid;
     });
 
-    const created = loadRecipeWithIngredients(recipeId);
+    const created = loadRecipeWithIngredients(req, recipeId);
     res.status(201).json({ data: created });
   } catch (err) {
     log.error('POST / error:', err);
@@ -226,9 +282,46 @@ router.put('/:id', (req, res) => {
         const category = String(ing.category || '').trim().slice(0, MAX_SHORT) || 'Sonstiges';
         if (name) insertIng.run(id, name, quantity, category);
       }
+
+      // VERWAISTE ZUORDNUNGEN ABRAEUMEN, IN DERSELBEN TRANSAKTION (#1314).
+      //
+      // Die Zuordnung haengt am normalisierten Namen, nicht an
+      // `recipe_ingredients.id` - sonst waere sie nach genau diesem DELETE weg.
+      // Der Preis dafuer steht hier: wird eine Zutat umbenannt, zeigt ihre
+      // Zuordnung auf einen Namen, den dieses Rezept nicht mehr traegt. Kein FK
+      // und kein Trigger fassen das, weil die Zutatenzeile als Bezug nie
+      // existiert hat.
+      //
+      // Unsichtbar waere sie damit, aber nicht weg: taucht dieselbe Schreibweise
+      // spaeter wieder auf, haengt `attachPantryMatches` die alte Vorratszeile
+      // wieder an - eine Zuordnung, die in dieser Form nie jemand bestaetigt hat,
+      // und damit genau die geratene Aussage, die docs/DECISIONS.md Abschnitt 7
+      // ausschliesst. Der Bestaetigungsweg unten lehnt aus demselben Grund eine
+      // Zutat ab, die es im Rezept nicht gibt; hier ist die Rueckseite davon.
+      //
+      // GEMESSEN WIRD AN DER TABELLE, NICHT AM REQUEST: die Namen kommen aus dem,
+      // was gerade wirklich eingefuegt wurde (`if (name)` laesst leere aus).
+      // Geloescht wird zeilenweise ueber die wenigen vorhandenen Zuordnungen
+      // statt mit einem NOT IN ueber alle Zutaten - eine Zutatenliste ist
+      // unbegrenzt, die Zahl der Bindungen einer Anweisung nicht.
+      const vorhandeneZuordnungen = db.get().prepare(
+        'SELECT ingredient_key FROM recipe_ingredient_pantry_matches WHERE recipe_id = ?',
+      ).all(id);
+      if (vorhandeneZuordnungen.length) {
+        const gueltigeKeys = new Set(
+          db.get().prepare('SELECT name FROM recipe_ingredients WHERE recipe_id = ?').all(id)
+            .map((r) => ingredientMatchKey(r.name)),
+        );
+        const loeseZuordnung = db.get().prepare(
+          'DELETE FROM recipe_ingredient_pantry_matches WHERE recipe_id = ? AND ingredient_key = ?',
+        );
+        for (const row of vorhandeneZuordnungen) {
+          if (!gueltigeKeys.has(row.ingredient_key)) loeseZuordnung.run(id, row.ingredient_key);
+        }
+      }
     });
 
-    const updated = loadRecipeWithIngredients(id);
+    const updated = loadRecipeWithIngredients(req, id);
     res.json({ data: updated });
   } catch (err) {
     log.error('PUT /:id error:', err);
@@ -417,6 +510,99 @@ router.post('/:id/to-shopping-list', (req, res) => {
     res.json({ data: result });
   } catch (err) {
     log.error('POST /:id/to-shopping-list error:', err);
+    res.status(500).json({ error: 'Internal error', code: 500 });
+  }
+});
+
+// --------------------------------------------------------
+// Integration: Rezeptzutat → Vorratszeile (#1314, Stufe 1)
+// --------------------------------------------------------
+
+/**
+ * PUT /api/v1/recipes/:id/ingredient-match
+ * Die bestaetigte Zuordnung einer Rezeptzutat zu einer Zeile im Vorrat setzen
+ * oder loesen.
+ * Body: { name: string, pantryItemId: number|null }
+ * Response: { data: { name, ingredient_key, pantry_item_id, pantry_item_name } }
+ *
+ * NUR AUF BESTAETIGUNG, UND DESHALB ALS EIGENER WEG. Die Zuordnung haette auch
+ * ein Feld im Rezept-PUT sein koennen - dann haette jeder Speichervorgang,
+ * jedes Formular und jeder Client sie mitgeschrieben, und ein Client, der das
+ * Feld nicht kennt, haette sie geloescht. Ein eigener Aufruf ist die einzige
+ * Form, in der "ein Mensch hat das bestaetigt" auch technisch stimmt: es gibt
+ * keinen anderen Weg, auf dem eine Zuordnung entsteht (docs/DECISIONS.md
+ * Abschnitt 7 - eine geratene Zuordnung ist der gepflegte Katalog, eine
+ * Ableitung nach der anderen).
+ *
+ * `pantryItemId: null` loest die Zuordnung. Derselbe Weg, dasselbe Recht: das
+ * Loesen ist derselbe Schreibvorgang, nur rueckwaerts.
+ *
+ * DAS RECHT. Wie bei /recipes/:id/to-shopping-list nebenan: der Pfad haengt
+ * unter `/recipes` und gehoert damit dem Scope-Modul `meals` - der globale
+ * Riegel in server/index.js urteilt am ersten Pfadsegment und fragt nur danach.
+ * Benannt wird hier aber eine Zeile des VORRATS, und sie wird dauerhaft in ein
+ * anderes Modul eingehaengt. Wer das tut, braucht das Schreibrecht des Vorrats,
+ * auf beiden Achsen (Mitgliedsrecht und Token-Scope). Der Riegel steht vor den
+ * 404ern, damit die Antwort keine Rezept- und Vorrats-IDs bestaetigt.
+ */
+router.put('/:id/ingredient-match', (req, res) => {
+  try {
+    if (!mayWriteModule(req, 'pantry')) {
+      return res.status(403).json({ error: 'Write access to the pantry is required.', code: 403 });
+    }
+
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid recipe ID.', code: 400 });
+
+    const vName = str(req.body.name, 'Zutat', { max: MAX_TITLE });
+    const errors = collectErrors([vName]);
+    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+
+    const key = ingredientMatchKey(vName.value);
+    if (!key) return res.status(400).json({ error: 'Zutat darf nicht leer sein.', code: 400 });
+
+    const recipe = db.get().prepare('SELECT id FROM recipes WHERE id = ?').get(id);
+    if (!recipe) return res.status(404).json({ error: 'Recipe not found.', code: 404 });
+
+    // DIE ZUTAT MUSS ES GEBEN. Sonst stuende eine Aussage ueber etwas in der
+    // Tabelle, das in diesem Rezept nicht vorkommt - und sie bliebe dort
+    // liegen, bis zufaellig jemand eine Zutat genau so nennt.
+    const ingredients = db.get().prepare('SELECT name FROM recipe_ingredients WHERE recipe_id = ?').all(id);
+    const treffer = ingredients.find((i) => ingredientMatchKey(i.name) === key);
+    if (!treffer) return res.status(404).json({ error: 'Ingredient not found in this recipe.', code: 404 });
+
+    const raw = req.body.pantryItemId;
+    if (raw === null || raw === undefined || raw === '') {
+      db.get().prepare(
+        'DELETE FROM recipe_ingredient_pantry_matches WHERE recipe_id = ? AND ingredient_key = ?',
+      ).run(id, key);
+      return res.json({
+        data: { name: treffer.name, ingredient_key: key, pantry_item_id: null, pantry_item_name: null },
+      });
+    }
+
+    const vItem = num(raw, 'Vorrats-ID', { required: true });
+    const itemErrors = collectErrors([vItem]);
+    if (itemErrors.length) return res.status(400).json({ error: itemErrors.join(' '), code: 400 });
+
+    const item = db.get().prepare('SELECT id, name FROM pantry_items WHERE id = ?').get(vItem.value);
+    if (!item) return res.status(404).json({ error: 'Pantry item not found.', code: 404 });
+
+    // Ein erneutes Bestaetigen ERSETZT die alte Aussage (Primaerschluessel
+    // recipe_id + ingredient_key), statt eine zweite danebenzulegen.
+    db.get().prepare(`
+      INSERT INTO recipe_ingredient_pantry_matches (recipe_id, ingredient_key, pantry_item_id, confirmed_by)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(recipe_id, ingredient_key) DO UPDATE SET
+        pantry_item_id = excluded.pantry_item_id,
+        confirmed_by   = excluded.confirmed_by
+    `).run(id, key, item.id, req.authUserId || req.session.userId);
+
+    res.json({
+      data: { name: treffer.name, ingredient_key: key, pantry_item_id: item.id, pantry_item_name: item.name },
+    });
+  } catch (err) {
+    log.error('PUT /:id/ingredient-match error:', err);
     res.status(500).json({ error: 'Internal error', code: 500 });
   }
 });

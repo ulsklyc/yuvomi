@@ -12,6 +12,14 @@ import { zonedFields } from './utils/timezone.js';
 
 const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'it', 'sv', 'el', 'ru', 'tr', 'zh', 'ja', 'ar', 'hi', 'pt', 'uk', 'pl', 'nl', 'cs', 'vi', 'hu', 'ko', 'id', 'fa', 'fil'];
 const RTL_LOCALES = new Set(['ar', 'fa']);
+// Form eines Regions-Tags: Sprache, optional Schrift, dann die Region -
+// `de-DE`, `fil-PH`, `zh-Hant-TW`. Eigene Konstante und kein Import aus
+// server/: die Schichtgrenze aus test/test-layer-boundary.js laesst keinen
+// Modulweg zwischen public/ und server/ zu. Das Gegenstueck heisst dort
+// `REGION_RE` (server/utils/i18n.js), und test:region-presets haelt beide auf
+// derselben Form - eine Region, die nur eine der beiden Seiten kennt, wuerde
+// entweder beim Speichern abgewiesen oder gespeichert und nie gelesen.
+export const REGION_TAG = /^[a-z]{2,3}(?:-[A-Z][a-z]{3})?-[A-Z]{2}$/;
 const DEFAULT_LOCALE = 'de';
 const STORAGE_KEY = 'yuvomi-locale';
 const DATE_FORMAT_KEY = 'yuvomi-date-format';
@@ -325,7 +333,7 @@ export function getFormatLocale() {
   } catch {
     stored = null;
   }
-  return stored && /^[a-z]{2,3}-[A-Z]{2}$/.test(stored) ? stored : currentLocale;
+  return stored && REGION_TAG.test(stored) ? stored : currentLocale;
 }
 
 // Gecachte Intl.NumberFormat-Instanzen je (Format-Locale × Options). Die

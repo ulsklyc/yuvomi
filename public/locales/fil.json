@@ -3031,7 +3031,16 @@
         "imageChoose": "Pumili ng larawan",
         "imageRemove": "Alisin ang larawan",
         "imageHint": "Isang larawan bawat resipe. Lumalabas ito sa tagaplano ng pagkain at sa overview tile.",
-        "imageTooLarge": "Masyado pa ring malaki ang larawan pagkatapos paliitin."
+        "imageTooLarge": "Masyado pa ring malaki ang larawan pagkatapos paliitin.",
+        "ingredientMatchNone": "Hindi pa naitutugma",
+        "ingredientMatchAction": "Itugma ang {{name}} sa isang linya sa paminggalan",
+        "ingredientMatchTitle": "Itugma ang {{name}}",
+        "ingredientMatchLabel": "Linya sa paminggalan",
+        "ingredientMatchHint": "Piliin ang linya sa iyong paminggalan na tinutukoy ng sangkap na ito. Walang hinuhulaan ang Yuvomi - ang kinukumpirma mo lang dito ang binibilang.",
+        "ingredientMatchEmpty": "Wala pa ring laman ang iyong paminggalan.",
+        "ingredientMatchSaved": "Na-save ang pagtutugma.",
+        "ingredientMatchCleared": "Inalis ang pagtutugma.",
+        "ingredientMatchLoadError": "Hindi ma-load ang paminggalan."
     },
     "onboarding": {
         "step1Title": "Maligayang pagdating sa {{name}}",

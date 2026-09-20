@@ -19,6 +19,7 @@ import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { getAdapter } from './recipe-providers/index.js';
 import { withPrivateNetworkHint } from './recipe-providers/private-network.js';
+import { ingredientMatchKey } from '../../public/utils/ingredient-match-key.js';
 
 const log = createLogger('RecipeProviderSync');
 
@@ -132,6 +133,34 @@ async function syncAccount(account) {
   `);
   const delRecipe = conn.prepare('DELETE FROM recipes WHERE id = ?');
 
+  // VERWAISTE VORRATS-ZUORDNUNGEN, DERSELBE FALL WIE IN PUT /recipes/:id (#1314).
+  //
+  // Ein Spiegel-Lauf schreibt die Zutaten eines Rezepts neu. Die bestaetigte
+  // Zuordnung Zutat -> Vorratszeile haengt am normalisierten Namen (genau damit
+  // sie das Neuschreiben ueberlebt), also bleibt sie liegen, wenn der Provider
+  // eine Zutat umbenennt: unsichtbar, aber wiederbelebbar, sobald derselbe Name
+  // wieder auftaucht. Dann haengt die Leseseite eine Vorratszeile an eine Zutat,
+  // fuer die das niemand bestaetigt hat - die geratene Aussage aus
+  // docs/DECISIONS.md Abschnitt 7, hier sogar ohne Zutun des Haushalts, weil
+  // der Provider ueber den Namen entscheidet.
+  //
+  // GESCHRIEBEN WIRD HIER NIE. Der Import setzt keine Zuordnung, auch nicht bei
+  // gleichem Namen; DELETE ist die einzige Richtung, die dieser Weg kennt, und
+  // test/test-recipe-ingredient-pantry-match.js haelt genau das fest.
+  const selMatchKeys = conn.prepare('SELECT ingredient_key FROM recipe_ingredient_pantry_matches WHERE recipe_id = ?');
+  const delMatch = conn.prepare('DELETE FROM recipe_ingredient_pantry_matches WHERE recipe_id = ? AND ingredient_key = ?');
+  const ingredientNamesOf = conn.prepare('SELECT name FROM recipe_ingredients WHERE recipe_id = ?');
+  function pruneOrphanedMatches(recipeId) {
+    const vorhanden = selMatchKeys.all(recipeId);
+    if (!vorhanden.length) return;
+    // Gemessen an der Tabelle, nicht am Adapter-Ergebnis: eingefuegt wurde
+    // gerade genau das hier.
+    const gueltig = new Set(ingredientNamesOf.all(recipeId).map((r) => ingredientMatchKey(r.name)));
+    for (const row of vorhanden) {
+      if (!gueltig.has(row.ingredient_key)) delMatch.run(recipeId, row.ingredient_key);
+    }
+  }
+
   let imported = 0;
   let updated = 0;
 
@@ -153,6 +182,7 @@ async function syncAccount(account) {
       }
       delIngredients.run(id);
       for (const ing of detail.ingredients) insIngredient.run(id, ing.name, ing.quantity, ing.category);
+      pruneOrphanedMatches(id);
     }
     for (const r of urlRefresh) updUrl.run(r.recipeUrl, r.id);
     for (const r of stale) delRecipe.run(r.id);

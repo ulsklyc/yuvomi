@@ -3031,7 +3031,16 @@
         "imageChoose": "انتخاب تصویر",
         "imageRemove": "حذف تصویر",
         "imageHint": "یک تصویر برای هر دستور پخت. در برنامه غذایی و کاشی نمای کلی دیده می‌شود.",
-        "imageTooLarge": "تصویر پس از کوچک‌سازی هنوز بزرگ است."
+        "imageTooLarge": "تصویر پس از کوچک‌سازی هنوز بزرگ است.",
+        "ingredientMatchNone": "اختصاص‌نیافته",
+        "ingredientMatchAction": "اختصاص {{name}} به یک ردیف انبار",
+        "ingredientMatchTitle": "اختصاص {{name}}",
+        "ingredientMatchLabel": "ردیف در انبار",
+        "ingredientMatchHint": "ردیفی از انبار خود را انتخاب کن که این ماده به آن اشاره دارد. یوومی چیزی را حدس نمی‌زند - فقط آنچه اینجا تأیید کنی معتبر است.",
+        "ingredientMatchEmpty": "انبار هنوز خالی است.",
+        "ingredientMatchSaved": "اختصاص ذخیره شد.",
+        "ingredientMatchCleared": "اختصاص برداشته شد.",
+        "ingredientMatchLoadError": "انبار بارگذاری نشد."
     },
     "onboarding": {
         "step1Title": "به {{name}} خوش آمدید",

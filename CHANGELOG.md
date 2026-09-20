@@ -24,6 +24,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with the reason on it, and the reserved points go straight back. Two children asking for the last
   unit at the same moment cannot both get it. (#1310)
 
+- **A recipe ingredient can now be told which row of your pantry it means.** Open a recipe, unfold
+  it, and each ingredient offers to be matched to one row of your stock - "400 g tin of tomatoes"
+  in the recipe, the tin that actually stands in your cupboard. Yuvomi never guesses this, not even
+  when the two are spelled identically: a match exists only where somebody confirmed it, and no
+  import, no recipe save and no name similarity ever writes one. An ingredient without a match reads
+  "not matched", never "missing" - it is unknown, and saying otherwise would turn half an answer
+  into a confident one. The match survives editing the recipe, because it hangs on the ingredient
+  and not on its row in the database; rename that ingredient and the match is gone for good rather
+  than lying in wait for the old spelling to come back, and the same holds for recipes mirrored from
+  Mealie or Tandoor when the provider does the renaming. Deleting the stock row removes the match and
+  leaves the recipe untouched. Changing a match needs permission to write the pantry, not just the
+  recipes; members who may only look at the pantry see the match and cannot change it, and members
+  who may not see the pantry at all are not told which row it is - not in the page and not in the
+  API's answer either. (#1314)
+
 ### Fixed
 
 - **Health no longer offers buttons that a read-only member is not allowed to press.** Where your

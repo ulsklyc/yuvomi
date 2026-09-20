@@ -14,12 +14,31 @@ const LOCALES_DIR = new URL('../public/locales/', import.meta.url);
 const I18N_PATH = new URL('../public/i18n.js', import.meta.url);
 const REFERENCE = 'de';
 
-/** SUPPORTED_LOCALES aus i18n.js lesen, statt die Liste hier zu doppeln. */
-function supportedLocales() {
-  const src = readFileSync(I18N_PATH, 'utf8');
+/**
+ * SUPPORTED_LOCALES aus dem Quelltext von i18n.js lesen, statt die Liste hier zu
+ * doppeln. Als reine Funktion, damit der Test darunter sie mit einer Eingabe
+ * füttern kann, die im Repository (noch) nicht vorkommt.
+ *
+ * Der Leser greift jeden quotierten String ab, nicht eine Zeichenklasse. Bis
+ * 20.09.2026 stand hier `/'([a-z-]+)'/g` - nur Kleinbuchstaben. Ein Code mit
+ * Großbuchstaben, wie ihn BCP-47 für Schrift- und Regions-Subtags vorsieht
+ * (`zh-Hant`, `pt-BR`), fiel damit still aus LOCALES heraus, und LOCALES ist die
+ * Schleifenquelle jeder Schlüssel-, Platzhalter- und Pluralprüfung in dieser
+ * Datei: die Locale wäre nicht etwa falsch geprüft worden, sondern gar nicht.
+ *
+ * Eine Zeichenklasse, die aufzählt, was erlaubt ist, sagt zu allem Unbekannten
+ * stillschweigend nein. `[^']*` kann nichts verschlucken - was im Literal steht,
+ * kommt auch an. Steht dort einmal etwas, das keine Locale ist, wird die Suite
+ * laut falsch statt leise unvollständig, und das ist die bessere Richtung.
+ */
+function parseSupportedLocales(src) {
   const match = src.match(/const SUPPORTED_LOCALES = \[([^\]]+)\]/);
   assert.ok(match, 'SUPPORTED_LOCALES nicht in public/i18n.js gefunden');
-  return match[1].match(/'([a-z-]+)'/g).map(s => s.slice(1, -1));
+  return match[1].match(/'([^']*)'/g).map(s => s.slice(1, -1));
+}
+
+function supportedLocales() {
+  return parseSupportedLocales(readFileSync(I18N_PATH, 'utf8'));
 }
 
 function readLocale(locale) {
@@ -48,9 +67,14 @@ const LOCALES = supportedLocales();
 const reference = flatten(JSON.parse(readLocale(REFERENCE)));
 const referenceKeys = [...reference.keys()];
 
+// Beide Seiten werden als DATEINAME sortiert, nicht die eine als Code und die
+// andere als Dateiname: '-' (45) steht vor '.' (46), also sortiert 'zh-Hant'
+// nach 'zh', 'zh-Hant.json' aber vor 'zh.json'. Ein Subtag-Locale hätte diesen
+// Vergleich mit identischem Inhalt rot gemacht - ein deepEqual-Diff, der wie
+// eine fehlende Datei aussieht, obwohl nur zwei Sortierungen aufeinandertreffen.
 test('für jede unterstützte Locale existiert genau eine Locale-Datei', () => {
   const files = readdirSync(LOCALES_DIR).filter(f => f.endsWith('.json')).sort();
-  assert.deepEqual(files, [...LOCALES].sort().map(l => `${l}.json`));
+  assert.deepEqual(files, LOCALES.map(l => `${l}.json`).sort());
 });
 
 test('die Referenz-Locale trägt Schlüssel', () => {
@@ -322,4 +346,104 @@ test('Server und Frontend kennen dieselben Sprachen', async () => {
   const abgewiesen = frontend.filter((locale) => !isSupportedLocale(locale));
   assert.deepEqual(abgewiesen, [],
     `isSupportedLocale() weist Sprachen ab, die die Oberflaeche anbietet: ${abgewiesen.join(', ')}`);
+});
+
+// Der Leser dieser Datei ist ihr eigener blinder Fleck. LOCALES speist jede
+// Schleife hier - fehlt ein Code in LOCALES, wird seine Datei nicht falsch
+// geprüft, sondern übersprungen, und die Suite meldet trotzdem grün. Die
+// bisherige Zeichenklasse `[a-z-]+` hätte genau das getan, sobald ein Code einen
+// Großbuchstaben trägt.
+//
+// Gemessen am 20.09.2026 gegen die alte Fassung, mit 'zh-Hant' in
+// SUPPORTED_LOCALES: stand die Datei zh-Hant.json daneben, wurde nur der
+// Dateilisten-Vergleich rot - mit einem Diff über Dateinamen, der auf die Datei
+// zeigt statt auf den Leser, und ohne dass eine einzige Schlüsselprüfung für
+// zh-Hant gelaufen wäre. Fehlte die Datei, war die volle Suite grün: die
+// Oberfläche hätte die Sprache angeboten, `isSupportedLocale` hätte sie
+// abgewiesen, und das Speichern wäre mit 400 gescheitert - derselbe Ausgang wie
+// bei `fil` in #1322, nur dass diesmal auch der Guard dafür nichts gesehen
+// hätte, weil er seine Frontend-Seite durch denselben Leser bezieht.
+//
+// Deshalb prüft dieser Test den Leser als Funktion, mit Eingaben, die im
+// Repository nicht vorkommen. Ein Test, der ihn nur auf den echten Bestand
+// anwendet, misst nichts: dort tragen alle 24 Codes Kleinbuchstaben.
+test('der Leser von SUPPORTED_LOCALES verschluckt keinen Code', () => {
+  const quelle = "const SUPPORTED_LOCALES = ['de', 'fil', 'zh-Hant', 'pt-BR', 'sr-Latn-RS'];";
+  assert.deepEqual(parseSupportedLocales(quelle),
+    ['de', 'fil', 'zh-Hant', 'pt-BR', 'sr-Latn-RS'],
+    'Ein Code mit Grossbuchstaben faellt aus der Liste, die jede Pruefung hier '
+    + 'durchlaeuft. Seine Locale-Datei wuerde dann ungeprueft bleiben.');
+
+  // Die echte Liste geht durch denselben Leser - unverändert und vollzählig.
+  assert.equal(LOCALES.length, new Set(LOCALES).size, 'doppelter Code in SUPPORTED_LOCALES');
+  assert.ok(LOCALES.includes('fil'), 'fil fehlt - der Code aus #1322');
+});
+
+// Die Serverliste entsteht aus DATEINAMEN, und das Muster dahinter hat dieselbe
+// Naht schon zweimal aufgerissen - beide Male, weil es den Bestand beschrieb
+// statt die Regel. `{2}` wies erst `fil-PH` als Region ab, dann verlor es
+// `fil.json` (#1322). Seit 20.09.2026 beschreibt es die BCP-47-Form: Sprache,
+// optional Schrift, optional Region.
+//
+// Geprueft wird hier `localeFromFileName`, nicht `getSupportedLocales()`: der
+// Bestand traegt 24 Dateien der Form `xx.json`/`xxx.json` und keine einzige mit
+// Subtag, ein Test ueber die fertige Liste liefe also an der Erweiterung vorbei
+// und waere gruen, egal was das Muster erlaubt. Der Test darunter haengt die
+// Funktion an ihren Aufrufer, damit dieser Zugriff keine zweite Wahrheit wird.
+test('ein Locale-Dateiname darf Schrift- und Regions-Subtags tragen', async () => {
+  const { localeFromFileName } = await import('../server/utils/i18n.js');
+
+  for (const [datei, code] of [
+    ['de.json', 'de'],
+    ['fil.json', 'fil'],
+    ['pt-BR.json', 'pt-BR'],
+    ['zh-Hant.json', 'zh-Hant'],
+    ['sr-Latn-RS.json', 'sr-Latn-RS'],
+  ]) {
+    assert.equal(localeFromFileName(datei), code,
+      `${datei} faellt aus der Serverliste. Die Oberflaeche wuerde die Sprache `
+      + 'anbieten und das Speichern mit 400 antworten - der Ausgang von #1322.');
+  }
+
+  // Die Gegenrichtung gehoert dazu: ein Muster, das alles durchlaesst, gaebe
+  // einer beliebigen Datei im Ordner den Rang einer Sprache. `de-de` steht
+  // hier fuer die Schreibweise - BCP-47 schreibt die Region gross, und zwei
+  // Schreibweisen derselben Sprache waeren zwei Eintraege in der Liste.
+  for (const datei of ['README.json', 'de.txt', 'de-de.json', 'zh-HANT.json',
+    'a.json', 'abcd.json', 'de-.json', '.json']) {
+    assert.equal(localeFromFileName(datei), null,
+      `${datei} wird als Sprache gezaehlt, obwohl es keine ist.`);
+  }
+});
+
+// Der Test darueber misst eine Funktion; dieser haelt sie an ihren Aufrufer.
+//
+// Gemessen wird der QUELLTEXT, und das ist hier nicht die bequeme, sondern die
+// einzige ehrliche Wahl. Die erste Fassung verglich getSupportedLocales() mit
+// dem, was localeFromFileName ueber denselben Ordner ergibt - und war gruen,
+// als getSupportedLocales() zur Gegenprobe ein eigenes, enges Muster bekam:
+// solange keine einzige Datei im Bestand einen Subtag traegt, liefern ein
+// weites und ein enges Muster dieselben 24 Codes. Der Vergleich konnte die
+// Frage gar nicht beantworten, die er stellte.
+//
+// Die Frage ist selbst eine Quelltextfrage: gibt es ZWEI Muster fuer einen
+// Locale-Dateinamen. Geprueft wird deshalb die Regel, nicht die Schreibweise
+// eines Aufrufs - ein escaptes `\.json` steht ausschliesslich in einem Regex,
+// der Dateinamen liest, waehrend die gewoehnliche Pfadbildung
+// (`${locale}.json`) ohne Backslash auskommt.
+test('es gibt nur EIN Muster fuer Locale-Dateinamen', () => {
+  const quelle = readFileSync(new URL('../server/utils/i18n.js', import.meta.url), 'utf8');
+  const muster = quelle.match(/\\\.json/g) ?? [];
+  assert.equal(muster.length, 1,
+    `server/utils/i18n.js traegt ${muster.length} Dateinamen-Muster statt einem. `
+    + 'Ein zweites laeuft an localeFromFileName vorbei und damit an dessen Test.');
+});
+
+// Der Realitaetsanker dazu: die Liste, die der Server wirklich ausliefert.
+test('die Serverliste traegt jede Locale-Datei des Ordners', async () => {
+  const { getSupportedLocales } = await import('../server/utils/i18n.js');
+  const dateien = readdirSync(LOCALES_DIR).filter(f => f.endsWith('.json')).length;
+  assert.equal(getSupportedLocales().length, dateien,
+    'Die Serverliste ist kuerzer als der Ordner - eine Datei faellt aus dem Muster.');
+  assert.ok(getSupportedLocales().includes('fil'), 'fil fehlt - der Code aus #1322');
 });
