@@ -11,10 +11,14 @@ import {
   numberLocaleFor,
 } from '../public/settings/region-presets.js';
 import { CURRENCY_CODES } from '../public/utils/currency-codes.js';
+import { REGION_TAG } from '../public/i18n.js';
+import { isRegionTag, regionLanguage } from '../server/utils/i18n.js';
 
-// Spiegelt die Formprüfung aus getFormatLocale() in public/i18n.js. Zwei- oder
-// dreibuchstabiger Sprachcode, damit fil-PH (Filipino) durchkommt.
-const BCP47_TAG = /^[a-z]{2,3}-[A-Z]{2}$/;
+// Die Formprüfung aus getFormatLocale() wird IMPORTIERT, nicht gespiegelt. Bis
+// 20.09.2026 stand hier eine Kopie des Musters, und eine Kopie belegt nur, dass
+// jemand sie einmal abgeschrieben hat: wandert das Original, bleibt der Test
+// grün und misst die alte Form weiter.
+const BCP47_TAG = REGION_TAG;
 
 async function backendList(name) {
   const src = await readFile(
@@ -146,24 +150,54 @@ test('numberLocaleFor derives the tag even without a stored region, and empties 
   }
 });
 
-// Die Tag-Form wird an fünf Stellen geprüft (getFormatLocale, VALID_REGION,
-// resolveHouseholdLocale, formatMoney, householdRegion). Eine Region mit
-// dreibuchstabigem Sprachcode wie fil-PH fiel durch jede Stelle, die noch auf
-// {2} stand - deshalb liest der Guard die Regexe aus dem Code, statt sie zu
-// doppeln, und schlägt an, sobald eine davon zurückfällt.
-test('jede Tag-Formprüfung akzeptiert zwei- UND dreibuchstabige Sprachcodes', async () => {
-  const sources = [
-    ['public/i18n.js', 'getFormatLocale'],
-    ['server/routes/preferences.js', 'VALID_REGION'],
-    ['server/utils/i18n.js', 'resolveHouseholdLocale/formatMoney/householdRegion'],
-  ];
-  for (const [file, label] of sources) {
+// Die Tag-Form wurde an fünf Stellen einzeln geprüft (getFormatLocale,
+// VALID_REGION, resolveHouseholdLocale, formatMoney, householdRegion), jede mit
+// einem eigenen Literal. Eine Region mit dreibuchstabigem Sprachcode wie fil-PH
+// fiel durch jede Stelle, die noch auf {2} stand. Seit 20.09.2026 sind es zwei
+// Quellen - eine je Schicht, weil die Schichtgrenze keinen Import zulässt - und
+// der Test darüber hält sie aneinander.
+//
+// Geblieben ist der Schutz, den der alte Quelltext-Scan geleistet hat: es darf
+// keine DRITTE Formprüfung dazukommen. Eine neue Kopie irgendwo im Produktivcode
+// wandert bei der nächsten Erweiterung nicht mit, und genau so ist #1322
+// entstanden. Gesucht wird die Form des Literals, nicht sein Name, denn eine
+// Kopie trägt selten denselben.
+//
+// Gesucht wird ein Regex-Literal, das auf eine VERPFLICHTENDE Region endet
+// (`-[A-Z]{2}$`). Das unterscheidet eine Regionsprüfung von LOCALE_FILE_RE in
+// derselben Datei, wo die Region optional ist und ein Dateiname folgt - die
+// erste Fassung dieses Guards zählte das Dateinamen-Muster mit und stand rot,
+// ohne dass eine Kopie existierte.
+//
+// Die ZWEITE Fassung verlangte `{2}` und `$` unmittelbar nacheinander und war
+// damit blind für die naheliegendste Kopie überhaupt: `/^(custom|[a-z]{2,3}-
+// [A-Z]{2})$/`, mit einer schliessenden Klammer dazwischen. Gemessen als
+// Gegenprobe - Kopie eingezogen, Suite exit 0. Schliessende Klammern gehören
+// also dazwischen erlaubt. Ein Guard, den man enger macht, wird still blind,
+// und das ist hier innerhalb einer Viertelstunde zweimal passiert.
+test('es gibt nur ZWEI Formprüfungen für einen Regions-Tag', async () => {
+  const dateien = ['public/i18n.js', 'server/routes/preferences.js', 'server/utils/i18n.js'];
+  const gefunden = [];
+  for (const file of dateien) {
     const src = await readFile(new URL(`../${file}`, import.meta.url), 'utf8');
-    const tagChecks = [...src.matchAll(/\[a-z\]\{([^}]+)\}-\[A-Z\]\{2\}/g)].map((m) => m[1]);
-    assert.ok(tagChecks.length > 0, `${file}: keine BCP-47-Formprüfung gefunden (${label})`);
-    for (const quantifier of tagChecks) {
-      assert.equal(quantifier, '2,3', `${file}: Formprüfung auf {${quantifier}} weist fil-PH ab (${label})`);
+    for (const treffer of src.matchAll(/\[a-z\]\{[^}]+\}[^\n]{0,24}-\[A-Z\]\{2\}\)*\$/g)) {
+      gefunden.push(`${file}: ${treffer[0]}`);
     }
+  }
+  assert.equal(gefunden.length, 2,
+    `Erwartet: REGION_TAG (public/i18n.js) und REGION_RE (server/utils/i18n.js). `
+    + `Gefunden sind ${gefunden.length}:\n  ${gefunden.join('\n  ')}\n`
+    + 'Eine weitere Kopie wandert bei der nächsten Erweiterung nicht mit.');
+});
+
+// Und der Verhaltensbeleg dazu: was die beiden Quellen mit einem
+// dreibuchstabigen Sprachcode tun. Der alte Guard las dafür den QUANTOR aus dem
+// Quelltext ({2,3}) - eine Schreibweise, die nichts darüber sagt, ob der
+// Ausdruck fil-PH am Ende durchlässt.
+test('beide Formprüfungen nehmen zwei- UND dreibuchstabige Sprachcodes', () => {
+  for (const code of ['de-DE', 'fil-PH', 'zh-Hant-TW']) {
+    assert.ok(REGION_TAG.test(code), `${code} faellt durch die Client-Formprüfung`);
+    assert.ok(isRegionTag(code), `${code} faellt durch die Server-Formprüfung`);
   }
 });
 
@@ -202,21 +236,36 @@ test('i18n.js exports getFormatLocale + gecachten getNumberFormat als Zahl-Forma
   assert.match(src, /NUMBER_LOCALE_KEY\s*=\s*'yuvomi-number-locale'/, 'localStorage-Schlüssel gepinnt');
 });
 
+// Die Route prüft die Region nicht mehr mit einem eigenen Literal, sondern mit
+// isRegionTag() aus utils/i18n.js plus 'custom'. Der Test misst deshalb diese
+// Regel statt ein Muster aus dem Quelltext zu schneiden - was er vorher tat, und
+// was nur solange funktioniert, wie die Prüfung als ein Literal mit genau
+// diesem Namen dasteht.
+//
+// 'custom' gehört bewusst NUR hierher: es ist kein Regions-Tag, sondern die
+// Abwesenheit einer Region. Die drei Leser (Sprachableitung, Zahlenformat,
+// Regionsabfrage) dürfen es nicht als Tag nehmen, sonst ginge ein
+// Anzeige-Hinweis als Locale an Intl.
 test('preferences route validates the region field shape', async () => {
+  const akzeptiert = (value) => value === 'custom' || isRegionTag(value);
+
+  for (const code of REGION_CODES) {
+    assert.ok(akzeptiert(code), `${code} must pass the region check`);
+  }
+  assert.ok(akzeptiert('custom'));
+  assert.ok(akzeptiert('fil-PH'), 'fil-PH - der Fall, der die {2,3}-Erweiterung erzwang');
+  assert.ok(!akzeptiert('french'));
+  assert.ok(!akzeptiert('fr_FR'));
+  assert.ok(!akzeptiert(''));
+  assert.ok(!isRegionTag('custom'), "'custom' ist kein Tag - kein Leser darf es als Locale nehmen");
+
+  // Und die Route greift wirklich danach, statt ein eigenes Muster zu tragen.
   const src = await readFile(
     new URL('../server/routes/preferences.js', import.meta.url),
     'utf8',
   );
-  const match = src.match(/const VALID_REGION = (\/.*\/);/);
-  assert.ok(match, 'preferences route must declare VALID_REGION');
-  const pattern = new RegExp(match[1].slice(1, -1));
-  for (const code of REGION_CODES) {
-    assert.ok(pattern.test(code), `${code} must pass VALID_REGION`);
-  }
-  assert.ok(pattern.test('custom'));
-  assert.ok(!pattern.test('french'));
-  assert.ok(!pattern.test('fr_FR'));
-  assert.ok(!pattern.test(''));
+  assert.match(src, /isRegionTag/,
+    'Die Route prüft die Region nicht mehr über isRegionTag - es gibt einen zweiten Pfad.');
 });
 
 // --------------------------------------------------------------------------
@@ -253,4 +302,49 @@ test('jede ausgelieferte Sprache hat mindestens ein Region-Preset (#297)', async
     'Ohne Region landet diese Sprache zwangslaeufig auf "Benutzerdefiniert" und muss '
     + `Waehrung, Datum und Zeit einzeln raten: ${orphans.join(', ')}`,
   );
+});
+
+// Die Form eines Regions-Tags lebt zwangsläufig zweimal: `REGION_TAG` in
+// public/i18n.js und `REGION_RE` in server/utils/i18n.js. Ein Import über die
+// Grenze gibt es nicht - test/test-layer-boundary.js lässt keinen Modulweg
+// zwischen public/ und server/ zu, und das ist so gewollt.
+//
+// Also muss ein Test halten, was kein Import halten kann. Er prüft die beiden
+// gegen dieselben Proben, statt eine Schreibweise zu vergleichen: zwei Regexe
+// können gleich aussehen und verschieden greifen, und genau die Frage ist hier
+// zu beantworten. Läuft eine Seite weiter als die andere, ist die Folge kein
+// Absturz, sondern Stille - eine Region, die der Client anbietet und der Server
+// mit 400 abweist, oder eine, die gespeichert wird und die kein Leser danach
+// wiedererkennt.
+test('client and server agree on the shape of a region tag', () => {
+  const proben = [
+    'de-DE', 'fil-PH', 'pt-BR', 'zh-Hant-TW', 'sr-Latn-RS', 'zh-TW', 'en-US',
+    'custom', 'de', 'de-de', 'DE-DE', 'zh-hant-TW', 'de-DEU', 'a-DE', 'de-D', '',
+  ];
+  const drift = proben.filter((p) => REGION_TAG.test(p) !== isRegionTag(p));
+  assert.deepEqual(drift, [],
+    `Client und Server beurteilen dieselbe Region verschieden: ${drift.join(', ')}. `
+    + 'Sie wird entweder beim Speichern abgewiesen oder gespeichert und nie gelesen.');
+});
+
+// Die Presets sind die einzigen Regionen, die die Oberfläche tatsächlich
+// anbietet - der Realitätsanker unter der Formprüfung.
+test('every region preset passes both shape checks', () => {
+  const abgewiesen = Object.keys(REGION_PRESETS)
+    .filter((r) => !REGION_TAG.test(r) || !isRegionTag(r));
+  assert.deepEqual(abgewiesen, [],
+    `Diese Presets stehen im Dropdown, werden aber als Region abgewiesen: ${abgewiesen.join(', ')}`);
+});
+
+// Der Sprachteil ist das, was aus einer Region eine Datensprache macht
+// (resolveHouseholdLocale). Er trägt den Schrift-Subtag NICHT, weil die
+// Locale-Dateien reine Sprachcodes heissen: aus `zh-Hant-TW` muss `zh` werden,
+// sonst fiele ein chinesischer Haushalt auf Englisch zurück.
+test('the language part of a region drops the script subtag', () => {
+  assert.equal(regionLanguage('fil-PH'), 'fil');
+  assert.equal(regionLanguage('de-DE'), 'de');
+  assert.equal(regionLanguage('zh-Hant-TW'), 'zh');
+  assert.equal(regionLanguage('sr-Latn-RS'), 'sr');
+  assert.equal(regionLanguage('custom'), null);
+  assert.equal(regionLanguage(null), null);
 });

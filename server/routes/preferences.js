@@ -11,7 +11,7 @@ import * as db from '../db.js';
 import * as holidays from '../services/holidays.js';
 import { str, MAX_SHORT } from '../middleware/validate.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
-import { getSupportedLocales, isSupportedLocale, resolveHouseholdLocale } from '../utils/i18n.js';
+import { getSupportedLocales, isRegionTag, isSupportedLocale, resolveHouseholdLocale } from '../utils/i18n.js';
 import { householdTimeZone, isValidTimeZone } from '../utils/timezone.js';
 import { retitleBirthdayEvents } from '../services/birthdays.js';
 import { DEFAULT_OVERDUE_GRACE_DAYS } from '../services/countdowns.js';
@@ -99,10 +99,15 @@ const VALID_LANGUAGES = getSupportedLocales();
 // Der Client fällt bei unbekanntem Wert ohnehin auf detectRegion() zurück, daher
 // genügt eine Formprüfung statt einer festen Liste.
 //
-// Der Sprachteil darf zwei oder drei Buchstaben haben: BCP-47 kennt beides und
-// "fil-PH" (Filipino) wäre mit der alten {2}-Prüfung als ungültige Region
-// abgewiesen worden, obwohl der Client sie anbietet.
-const VALID_REGION = /^(custom|[a-z]{2,3}-[A-Z]{2})$/;
+// Die Form kommt aus `isRegionTag` in utils/i18n.js und steht nicht mehr als
+// eigenes Literal hier: dieselbe Form wird beim Ableiten der Datensprache, beim
+// Zahlenformat und bei der Regionsabfrage GELESEN. Ein Muster, das nur hier
+// weiter wird, lässt einen Wert in die Datenbank, den keiner dieser Leser
+// wiedererkennt - er wäre gespeichert und zugleich wirkungslos.
+//
+// `custom` steht daneben und nicht darin: es ist kein Regions-Tag, sondern die
+// Abwesenheit einer Region, und genau deshalb liest es keiner der drei Leser.
+const isValidRegionValue = (value) => value === 'custom' || isRegionTag(value);
 const DEFAULT_TIME_FORMAT = '24h';
 
 // Zeitzone des Haushalts (#829, haushaltweit). Bis hierher war die einzige
@@ -773,7 +778,7 @@ router.put('/', (req, res) => {
       if (!isAdminRequest(req)) {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
-      if (region !== null && (typeof region !== 'string' || !VALID_REGION.test(region))) {
+      if (region !== null && !isValidRegionValue(region)) {
         return res.status(400).json({ error: 'Ungültige Region.', code: 400 });
       }
       cfgSet('region', region ?? '');

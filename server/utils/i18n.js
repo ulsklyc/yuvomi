@@ -64,6 +64,38 @@ export function localeFromFileName(file) {
   return file.match(LOCALE_FILE_RE)?.[1] ?? null;
 }
 
+// Die gespeicherte Region des Haushalts, in derselben BCP-47-Form: Sprache,
+// optional Schrift, dann die Region. Die Region ist hier NICHT optional - ein
+// blosser Sprachcode ist keine Region, und `region` soll genau die Frage
+// beantworten, wo der Haushalt lebt.
+//
+// Ein Muster und nicht vier: dieselbe Form stand bis 20.09.2026 an vier Stellen
+// im Server (Schreibpruefung in preferences.js, Sprachableitung, Zahlenformat,
+// Regionsabfrage), jede mit einem eigenen Literal. Ein solcher Satz Kopien
+// wandert nie vollstaendig - als `fil-PH` die Erweiterung auf `{2,3}` erzwang,
+// blieb die Locale-Dateiliste zurueck, und genau daraus wurde #1322.
+const REGION_RE = /^([a-z]{2,3})(?:-[A-Z][a-z]{3})?-[A-Z]{2}$/;
+
+/** Ist `region` ein vollstaendiger Regions-Tag? `custom` zaehlt hier NICHT. */
+export function isRegionTag(region) {
+  return typeof region === 'string' && REGION_RE.test(region);
+}
+
+/**
+ * Der Sprachteil eines Regions-Tags, oder null: `fil-PH` -> `fil`,
+ * `zh-Hant-TW` -> `zh`.
+ *
+ * Ohne den Schrift-Subtag, weil die Locale-Dateien reine Sprachcodes tragen -
+ * `zh.json`, nicht `zh-Hant.json`. Faende `resolveHouseholdLocale` hier
+ * `zh-Hant`, liefe es an `isSupportedLocale` vorbei und fiele auf Englisch
+ * zurueck, obwohl der Haushalt eine chinesische Region gewaehlt hat. Traegt der
+ * Ordner eines Tages `zh-Hant.json`, gehoert hier eine Kette hin, die erst den
+ * vollen Sprachteil und dann den blossen Sprachcode versucht.
+ */
+export function regionLanguage(region) {
+  return typeof region === 'string' ? (REGION_RE.exec(region)?.[1] ?? null) : null;
+}
+
 let supportedLocales = null;
 const localeCache = new Map();
 
@@ -235,8 +267,8 @@ export function resolveHouseholdLocale(database, { ignoreExplicit = false } = {}
     if (isSupportedLocale(explicit)) return explicit;
   }
 
-  const regionLanguage = /^([a-z]{2,3})-[A-Z]{2}$/.exec(cfgValue(database, 'region') ?? '')?.[1];
-  if (isSupportedLocale(regionLanguage)) return regionLanguage;
+  const ausDerRegion = regionLanguage(cfgValue(database, 'region'));
+  if (isSupportedLocale(ausDerRegion)) return ausDerRegion;
 
   return DEFAULT_LOCALE;
 }
@@ -272,7 +304,7 @@ export function resolveHouseholdFormats(database) {
  * @returns {string}
  */
 export function formatMoney(amount, { locale, currency, region = null }) {
-  const numberLocale = /^[a-z]{2,3}-[A-Z]{2}$/.test(region ?? '') ? region : locale;
+  const numberLocale = isRegionTag(region) ? region : locale;
   try {
     return new Intl.NumberFormat(numberLocale, { style: 'currency', currency }).format(amount);
   } catch {
@@ -283,7 +315,7 @@ export function formatMoney(amount, { locale, currency, region = null }) {
 /** Gespeicherte Region des Haushalts (voller BCP-47-Tag) oder null. */
 export function householdRegion(database) {
   const region = cfgValue(database, 'region');
-  return /^[a-z]{2,3}-[A-Z]{2}$/.test(region ?? '') ? region : null;
+  return isRegionTag(region) ? region : null;
 }
 
 export { DEFAULT_LOCALE, REFERENCE_LOCALE };

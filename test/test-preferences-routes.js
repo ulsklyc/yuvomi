@@ -176,9 +176,24 @@ test('PUT time_format: ungültig -> 400, gültig -> persist', async () => {
   assert.equal((await put({ time_format: '48h' })).status, 400);
   assert.equal((await put({ time_format: '12h' })).body.data.time_format, '12h');
 });
+// Die Formen stehen hier als ECHTE Requests, nicht als Musterprüfung: die
+// Formprüfung selbst liegt in utils/i18n.js und wird dort gemessen, aber ob die
+// Route sie auch anlegt, beantwortet nur ein Request. `fil-PH` ist der Fall, der
+// die Erweiterung auf dreibuchstabige Sprachcodes erzwang (#1322 kam aus
+// derselben Naht), `zh-Hant-TW` der mit Schrift-Subtag.
 test('PUT region: ungültig -> 400, gültig -> persist, null -> leer', async () => {
   assert.equal((await put({ region: 'x' })).status, 400);
+  // Nicht-Strings: die frühere Prüfung führte `typeof region !== 'string'` als
+  // eigenen Zweig, die heutige steckt ihn in isRegionTag(). Gleiches Ergebnis,
+  // und das gehört festgenagelt statt angenommen.
+  assert.equal((await put({ region: 42 })).status, 400);
+  assert.equal((await put({ region: {} })).status, 400);
+  assert.equal((await put({ region: 'de_DE' })).status, 400);
+  assert.equal((await put({ region: 'de-de' })).status, 400);
   assert.equal((await put({ region: 'de-DE' })).body.data.region, 'de-DE');
+  assert.equal((await put({ region: 'fil-PH' })).body.data.region, 'fil-PH');
+  assert.equal((await put({ region: 'zh-Hant-TW' })).body.data.region, 'zh-Hant-TW');
+  assert.equal((await put({ region: 'custom' })).body.data.region, 'custom');
   assert.equal((await put({ region: null })).body.data.region, null);
 });
 test('PUT timezone: Mitglied -> 403, ungültig -> 400, gültig -> persist, null -> Rückfall', async () => {
