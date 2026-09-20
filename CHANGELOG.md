@@ -440,6 +440,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   changes in what the page shows. If you use an API token scoped to `rewards:read` for an integration
   that reads the whole household's requests, it will now see only those of the member it acts as.
   (#1241)
+- **An appointment moved to another calendar now belongs to that calendar's person.** A calendar you
+  subscribe to can have a household member set as its default, and everything arriving from it is
+  assigned to that person. Moving an appointment from one such calendar to another sent it back with
+  the same identity, so Yuvomi recognised it and updated the row it already had: the detail view then
+  named the new calendar, but the assignment stayed with the person of the old one - and with it the
+  colour the appointment is drawn in, which comes from whoever it is assigned to. The assignment now
+  moves along, for Google, iCloud and CalDAV alike. Only an untouched one does: if you had assigned
+  the appointment to somebody else by hand, added a second person, or taken the assignment away, it
+  stays exactly as you left it, and a calendar without a default person takes nothing away. Reminders
+  follow the assignment as they always have, except that one whose time has already passed is not
+  delivered again to the new person. An appointment that carries a colour of its own still shows that
+  colour. (#1270)
 
 ## [2.67.0] - 2026-09-16
 

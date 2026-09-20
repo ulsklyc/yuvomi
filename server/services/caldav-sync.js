@@ -9,7 +9,7 @@ const log = createLogger('CalDAV');
 
 import * as db from '../db.js';
 import { upsertExternalCalendar } from './external-calendars.js';
-import { assignDefaultToEvent } from './sync-assignment.js';
+import { assignDefaultToEvent, reassignDefaultOnCalendarMove } from './sync-assignment.js';
 import { pruneDeletedEvents, countMirroredEvents, deleteMirroredEvents } from './calendar-prune.js';
 import * as outbound from './calendar-outbound.js';
 import { processPendingDeletions, processPendingUpdates, flushAccount } from './caldav-outbound.js';
@@ -506,7 +506,7 @@ async function runSync({ createClient } = {}) {
   // großen Kalendern spürbar Zeit und verkürzt damit das synchrone Verarbeitungsfenster.
   const conn = db.get();
   const selExistingEvent = conn.prepare(
-    `SELECT id, outbound_dirty FROM calendar_events WHERE external_calendar_id = ? AND external_source = 'caldav'`
+    `SELECT id, outbound_dirty, calendar_ref_id FROM calendar_events WHERE external_calendar_id = ? AND external_source = 'caldav'`
   );
   // Offene Löschungen einmal je Lauf, nicht je eingehendem Termin.
   const pendingDeletionUids = outbound.pendingDeletionUids('caldav');
@@ -711,6 +711,13 @@ async function runSync({ createClient } = {}) {
                 ];
                 changed = updEvent.run(...values, existing.id, ...values).changes > 0;
                 eventId = existing.id;
+                // Von einem Kalender in einen anderen verschoben (#1270): die
+                // unangetastete Standard-Zuweisung zieht mit um.
+                reassignDefaultOnCalendarMove(db.get(), eventId, {
+                  fromCalRefId: existing.calendar_ref_id,
+                  toCalRefId: calRefId,
+                  toDefaultUserId: calDefaultAssignee,
+                });
               } else {
                 // Insert
                 const inserted = insEvent.run(
