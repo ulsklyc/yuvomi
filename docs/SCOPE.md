@@ -189,8 +189,9 @@ deletions cannot be learned at all. Tracked as #1002.
   **What this does not decline, since #1293:** nutrition itself. A figure a household types
   about its own recipe - this pot serves four, one portion is roughly this much - is a
   statement about their own thing and not a fact about a product, and so are a daily target
-  per person and a meal somebody logs. Those are built, with a fixed set of eight values:
-  the seven the EU requires on a package, plus fibre. What stays declined is the step
+  per person and a meal somebody logs. Those are agreed and ticketed (#1326 to #1329), not
+  yet built, and they carry a fixed set of eight values: the seven the EU requires on a
+  package, plus fibre. What stays declined is the step
   between them, deriving a total from what the ingredients *are*, which is the catalogue
   again and nothing else. The line and its reasons are entry 8 in
   [DECISIONS.md](DECISIONS.md).

@@ -482,16 +482,17 @@ Two consequences follow from the same reasoning rather than from taste:
 ### Where the rule lives
 
 Not in one function, for the same reason as entry 7: it is a rule about which columns get written
-at all. The visible consequences:
+at all. None of it exists yet - the decision came first and the tickets are #1326 to #1329 - so
+what follows is what the rule requires of them, not a description of the schema:
 
 - `recipe_ingredients.quantity` stays TEXT (`server/db.js`, migration 13), and no code path parses
   it into a number and a unit. `server/services/recipe-providers/mealie.js`
   (`flattenIngredient()`) deliberately flattens the provider's structured quantity, unit and food
   into that text, and the comment there says so.
-- Nutrition lives on `recipes` as a fixed set of nullable per-portion columns beside a servings
-  count, never on `recipe_ingredients`. NULL means "not stated" and renders as nothing, never as a
-  zero, so a recipe nobody filled in does not claim to contain no fat.
-- The intake log and the daily target are Health rows per person, under the `health` API scope
+- Nutrition will live on `recipes` as a fixed set of nullable per-portion columns beside a servings
+  count, never on `recipe_ingredients`. NULL means "not stated" and must render as nothing, never
+  as a zero, so a recipe nobody filled in does not claim to contain no fat.
+- The intake log and the daily target belong in Health as rows per person, under the `health` API scope
   (`server/scopes.js`), with the `private` / `family` pair and the `private` default that entry 5
   makes canonical for a new module. None of them carries a column named `calories`:
   `health_activities.calories` is energy **burnt**, and one word for both directions would be a
