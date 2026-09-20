@@ -2281,6 +2281,15 @@ function wireMeds() {
   // Der Riegel vor der ersten schreibenden Verdrahtung (#1265): Tastatur,
   // Menues und Personenwechsel darueber lesen, alles darunter bucht oder
   // oeffnet einen Dialog.
+  // VOR dem Riegel, und das ist kein Versehen: wirePrn() haengt nicht nur den
+  // Bedarfsknopf an, es startet ueber ensurePrnTicker() auch das Intervall, das
+  // den Countdown nachfuehrt und die Zeile auf "bereit" umschaltet. Der
+  // Countdown selbst wird fuer JEDEN gerendert (prnRowMarkup gated nur den
+  // Knopf ueber `own`) - hinter dem Riegel bekaeme ein Nur-lesen-Mitglied
+  // einen eingefrorenen Zaehler statt einer Auskunft. Der Aufruf ist gefahrlos:
+  // ohne Knopf findet `[data-prn-take]` nichts zu verdrahten.
+  wirePrn(meds.root);
+
   if (readOnly()) return;
 
   meds.root.querySelectorAll('[data-med-edit]').forEach((card) =>
@@ -2298,8 +2307,6 @@ function wireMeds() {
     btn.addEventListener('click', () => handleDose(btn, 'take')));
   meds.root.querySelectorAll('[data-dose-skip]').forEach((btn) =>
     btn.addEventListener('click', () => handleDose(btn, 'skip')));
-
-  wirePrn(meds.root);
 }
 
 async function switchMedsPerson() {
@@ -4765,13 +4772,15 @@ function wireOverview() {
   // Verdrahtungen (Kachel-Navigation, Tabwechsel und die Export-Zeitraeume
   // lesen), deshalb stehen die drei schreibenden Bloecke je in einer Bedingung
   // (#1265).
+  // Ausserhalb der Bedingung, aus demselben Grund wie in wireMeds(): der
+  // Bedarfs-Countdown ist Auskunft und braucht seinen Ticker auch ohne Recht.
+  wirePrn(overview.root);
+
   if (!readOnly()) {
     overview.root.querySelectorAll('[data-ov-dose-take]').forEach((btn) =>
       btn.addEventListener('click', () => handleOverviewDose(btn, 'take')));
     overview.root.querySelectorAll('[data-ov-dose-skip]').forEach((btn) =>
       btn.addEventListener('click', () => handleOverviewDose(btn, 'skip')));
-
-    wirePrn(overview.root);
   }
 
   overview.root.querySelectorAll('[data-vital-nav]').forEach((card) =>

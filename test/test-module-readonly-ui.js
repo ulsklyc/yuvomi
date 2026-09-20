@@ -2247,6 +2247,40 @@ test('der Riegel steht in jeder Verdrahtung VOR der ersten Schreib-Aktion', () =
     'ein `return` wuerde hier den lesenden Analyt-Umschalter mit abschneiden');
 });
 
+// Der Bedarfs-Countdown ist Auskunft, kein Knopf. `wirePrn()` haengt nicht nur
+// den Klick an, sondern startet ueber `ensurePrnTicker()` auch das Intervall,
+// das `[data-prn-countdown]` jede Minute nachfuehrt und die Zeile umschaltet,
+// sobald die Sperrfrist abgelaufen ist.
+//
+// `prnRowMarkup()` rendert diesen Countdown fuer JEDEN - nur der Knopf haengt
+// an `own`. Steht `wirePrn()` hinter dem Riegel, sieht ein Nur-lesen-Mitglied
+// also "noch 20 Minuten" und dann fuer immer weiter "noch 20 Minuten": der
+// Zaehler friert auf dem Wert des ersten Rendervorgangs ein und springt auch
+// nicht auf "bereit", wenn die Frist wirklich ablaeuft.
+test('der Bedarfs-Ticker laeuft auch ohne Schreibrecht weiter (#1265 P2)', () => {
+  const meds = healthFn('wireMeds');
+  const riegel = meds.indexOf('if (readOnly()) return;');
+  const ticker = meds.indexOf('wirePrn(');
+  assert.ok(riegel > 0 && ticker > 0, 'wireMeds(): Riegel oder wirePrn-Aufruf nicht gefunden');
+  assert.ok(ticker < riegel,
+    'wireMeds(): wirePrn() startet den Countdown-Ticker und steht hinter dem Riegel - '
+    + 'ein Nur-lesen-Mitglied bekommt damit einen eingefrorenen Zaehler statt einer Auskunft');
+
+  // Derselbe Aufruf in wireOverview darf nicht im Schreibzweig liegen.
+  const ov = healthFn('wireOverview');
+  const ovTicker = ov.indexOf('wirePrn(');
+  const ovZweig = ov.indexOf('if (!readOnly()) {');
+  assert.ok(ovTicker > 0, 'wireOverview(): wirePrn-Aufruf nicht gefunden');
+  assert.ok(ovZweig < 0 || ovTicker < ovZweig,
+    'wireOverview(): wirePrn() liegt im Schreibzweig und friert den Countdown der Uebersicht ein');
+
+  // Und der Grund, warum das gefahrlos ist: ohne Knopf findet die Verdrahtung
+  // schlicht nichts. Faellt diese Zusicherung, ist der Aufruf nicht mehr sicher
+  // unbedingt zu machen und die beiden oben muessten neu gedacht werden.
+  assert.match(healthFn('wirePrn'), /querySelectorAll\('\[data-prn-take\]'\)/,
+    'wirePrn() muss seine Knoepfe suchen statt sie vorauszusetzen');
+});
+
 test('jeder Einstieg in einen Schreibweg fragt selbst noch einmal', () => {
   // Die dritte Linie: ein Aufruf, der gar nicht ueber einen Knopf kommt (FAB,
   // Deep-Link, ein Aufrufer, den es morgen gibt), findet denselben Riegel.
