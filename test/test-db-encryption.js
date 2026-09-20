@@ -23,7 +23,7 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, existsSync, readFileSync, readdirSync, copyFileSync, writeFileSync, chmodSync, rmSync, renameSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -1772,4 +1772,241 @@ test('CLI-Restore mit falschem Schluessel: „Restore failed" statt Stacktrace, 
   assert.ok(!/^\s+at /m.test(run.stderr), `kein Stacktrace: ${run.stderr}`);
   assert.equal(sha256(ziel), vorher, 'die Datenbank bleibt unberuehrt');
   assert.deepEqual(readdirSync(dir).filter((name) => name.includes('pre-restore')), [], 'kein Restore hat begonnen');
+});
+
+/**
+ * ---------------------------------------------------------------------------
+ * #1287 - ein abgebrochener Erststart hinterlaesst keine leere Datenbankdatei
+ *
+ * Folgefall von #1282: dort wird eine 0-Byte-Datei unter `DB_PATH` abgewiesen,
+ * und das ist fuer jede Herkunft richtig - ausser fuer eine. Mit gesetztem
+ * `DB_ENCRYPTION_KEY` legt `new Database()` die Datei sofort an, beschrieben
+ * wird sie aber erst nach der Schluesselableitung; gemessen liegen 147 ms
+ * dazwischen. Ein Erststart, der in diesem Fenster stirbt, hinterlaesst genau
+ * eine leere `DB_PATH` ohne Nebendatei - vor #1282 lief der naechste Start
+ * darauf einfach frisch an, seither verweigert er, und eine an dieser Stelle
+ * unterbrochene Installation kommt nicht mehr von allein hoch.
+ *
+ * Die Datenbank entsteht deshalb unter `<DB_PATH>.creating` NEBEN `DB_PATH`
+ * (nicht in /tmp - nur im selben Verzeichnis ist der letzte Zug unteilbar) und
+ * wird erst fertig dorthin gehaengt.
+ *
+ * Der erste Test faehrt den echten Startweg: ein eigener Prozess importiert
+ * `server/db.js` wie der Server (Auto-Init beim Import) und bekommt SIGKILL,
+ * sobald die erste Datei im Datenverzeichnis auftaucht - derselbe Abbruch, den
+ * das Ticket gemessen hat. Danach zaehlt nur, was liegen bleibt und ob der
+ * naechste Start hochkommt.
+ * ---------------------------------------------------------------------------
+ */
+
+/** Der Erststart, wie der Server ihn faehrt: Auto-Init beim Import von db.js. */
+const ERSTSTART_QUELLE = `
+  const mod = await import(${JSON.stringify(new URL('../server/db.js', import.meta.url).href)});
+  process.stdout.write('started v' + mod.currentVersion() + '\\n');
+  mod.get().close();
+`;
+
+/** Env eines Erststarts in einem eigenen Prozess. */
+function startEnv(dbPath, key) {
+  const env = { ...process.env, DB_PATH: dbPath, LOG_LEVEL: 'error' };
+  if (key) env.DB_ENCRYPTION_KEY = key;
+  else delete env.DB_ENCRYPTION_KEY;
+  return env;
+}
+
+/** Erststart als eigener Prozess; aufgeloest mit Exit-Code und Ausgabe. */
+function ersterStart(dbPath, key) {
+  const kind = spawn(process.execPath, ['--input-type=module', '-e', ERSTSTART_QUELLE], {
+    cwd: tmpDir(), env: startEnv(dbPath, key), stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let ausgabe = '';
+  kind.stdout.on('data', (stueck) => { ausgabe += stueck; });
+  kind.stderr.resume();
+  const ende = new Promise((fertig) => kind.on('exit', (code) => fertig(code)));
+  return { kind, ende, ausgabe: () => ausgabe };
+}
+
+/**
+ * Einen Erststart toeten, sobald er die erste Datei anlegt - also im Fenster
+ * zwischen dem Anlegen und der ersten beschriebenen Seite. `true`, wenn der
+ * Abbruch traf (der Prozess hat nie „started" gemeldet).
+ */
+async function erststartImFensterToeten(dir, dbPath, key) {
+  const lauf = ersterStart(dbPath, key);
+  const frist = Date.now() + 20000;
+  while (!lauf.ausgabe() && Date.now() < frist) {
+    if (readdirSync(dir).length > 0) {
+      lauf.kind.kill('SIGKILL');
+      break;
+    }
+    await new Promise((weiter) => setImmediate(weiter));
+  }
+  await lauf.ende;
+  return lauf.ausgabe() === '';
+}
+
+test('#1287 ein im Fenster getoeteter Erststart hinterlaesst keine leere Datenbankdatei, der naechste Start kommt hoch', async () => {
+  // Nur mit Schluessel: ohne ihn liegt gemessen weniger als 1 ms zwischen dem
+  // Anlegen der Datei und ihrer ersten Seite, und das Ticket hat den Abbruch
+  // dort in 136 Versuchen nie getroffen. Mit Schluessel sind es 147 ms.
+  let dir = tmpDir();
+  let dbPath = join(dir, 'yuvomi.db');
+  let getroffen = await erststartImFensterToeten(dir, dbPath, KEY);
+  // Der Abbruch kommt von aussen: verpasst er das Fenster einmal, misst der
+  // Lauf nichts - dann noch einmal auf frischem Verzeichnis, nicht auf einem
+  // halb angelegten.
+  for (let versuch = 1; versuch < 5 && !getroffen; versuch++) {
+    dir = tmpDir();
+    dbPath = join(dir, 'yuvomi.db');
+    getroffen = await erststartImFensterToeten(dir, dbPath, KEY);
+  }
+  assert.ok(getroffen, 'der Abbruch muss im Fenster gelandet sein, sonst misst der Test nichts');
+
+  const liegengeblieben = readdirSync(dir).sort();
+  assert.ok(liegengeblieben.length > 0, 'Vorbedingung: der Abbruch hat ueberhaupt etwas hinterlassen');
+
+  // Zuerst das, was #1287 meldet: der naechste Start muss von allein
+  // hochkommen, ohne dass jemand eine Datei von Hand loescht.
+  const mod = await bootDb(dbPath, KEY);
+  istFrischeInstanz(mod, dbPath, KEY, 'nach dem Abbruch');
+  mod.get().close();
+  assert.deepEqual(
+    readdirSync(dir).filter((name) => name.includes('.creating')), [],
+    'und die Arbeitsdatei ist danach weg'
+  );
+
+  // Und der Grund dafuer: der Abbruch hat DB_PATH gar nicht erst angelegt.
+  assert.deepEqual(
+    liegengeblieben.filter((name) => !name.startsWith('yuvomi.db.creating')), [],
+    `nur die Arbeitsdatei darf liegen bleiben, gefunden: ${liegengeblieben.join(', ')}`
+  );
+});
+
+/**
+ * Eine liegengebliebene Arbeitsdatei in den Zustaenden, die ein Abbruch
+ * wirklich hinterlaesst: 0 Byte (das gemessene Fenster), eine fertige Seite 1
+ * (der Abbruch traf zwischen Schreiben und Umhaengen) - dazu zwei, die es
+ * nicht sein koennen und die der Start trotzdem aushalten muss: kein SQLite
+ * und mit einem anderen Schluessel geschrieben.
+ */
+function arbeitsdateiAnlegen(art, dbPath, key) {
+  const pfad = `${dbPath}.creating`;
+  if (art === 'leer') {
+    writeFileSync(pfad, '');
+    return pfad;
+  }
+  if (art === 'kein SQLite') {
+    writeFileSync(pfad, 'das ist keine Datenbank');
+    return pfad;
+  }
+  const handle = new Database(pfad);
+  const schluessel = art === 'fremder Schluessel' ? 'ein-voellig-anderer-schluessel' : key;
+  if (schluessel) {
+    handle.pragma("cipher = 'sqlcipher'");
+    handle.pragma(`key="x'${Buffer.from(schluessel, 'utf8').toString('hex')}'"`);
+  }
+  handle.pragma('user_version = 0');
+  handle.close();
+  return pfad;
+}
+
+for (const [fall, key] of SCHLUESSEL_FAELLE) {
+  for (const art of ['leer', 'Seite 1', 'kein SQLite', 'fremder Schluessel']) {
+    if (art === 'fremder Schluessel' && key === null) continue;
+    test(`#1287 liegengebliebene Arbeitsdatei (${art}, ${fall}): der naechste Start kommt hoch und raeumt sie weg`, async () => {
+      const dir = tmpDir();
+      const dbPath = join(dir, 'yuvomi.db');
+      const arbeitsdatei = arbeitsdateiAnlegen(art, dbPath, key);
+      // Nebendateien, wie ein Abbruch sie hinterlassen kann.
+      writeFileSync(`${arbeitsdatei}-wal`, 'x');
+      writeFileSync(`${arbeitsdatei}-shm`, 'x');
+
+      const mod = await bootDb(dbPath, key);
+      istFrischeInstanz(mod, dbPath, key, `nach der Arbeitsdatei (${art})`);
+      mod.get().close();
+
+      assert.deepEqual(
+        readdirSync(dir).filter((name) => name.includes('.creating')), [],
+        'die Arbeitsdatei und ihre Nebendateien duerfen nicht liegen bleiben'
+      );
+    });
+  }
+
+  test(`#1287 ein vollstaendiger Erststart (${fall}) laesst keine Arbeitsdatei zurueck`, async () => {
+    const dir = tmpDir();
+    const dbPath = join(dir, 'yuvomi.db');
+
+    const mod = await bootDb(dbPath, key);
+    istFrischeInstanz(mod, dbPath, key, 'nach dem Erststart');
+    // Vor dem Schliessen: close() raeumt -wal und -shm weg.
+    const danach = readdirSync(dir).sort();
+    mod.get().close();
+
+    assert.deepEqual(
+      danach, ['yuvomi.db', 'yuvomi.db-shm', 'yuvomi.db-wal'],
+      'neben der Datenbank und ihrem Journal darf nichts uebrig bleiben'
+    );
+  });
+}
+
+test('#1287 die Arbeitsdatei entsteht NEBEN DB_PATH, nicht im Temp-Verzeichnis', async () => {
+  // Nur im Verzeichnis von DB_PATH ist der letzte Zug ein Umhaengen innerhalb
+  // eines Dateisystems. Aus /tmp waere er ein Kopieren ueber die Grenze - und
+  // damit wieder teilbar, also genau das, was #1287 abstellt.
+  const dir = tmpDir();
+  const dbPath = join(dir, 'yuvomi.db');
+  let getroffen = await erststartImFensterToeten(dir, dbPath, KEY);
+  let verzeichnis = dir;
+  for (let versuch = 1; versuch < 5 && !getroffen; versuch++) {
+    verzeichnis = tmpDir();
+    getroffen = await erststartImFensterToeten(verzeichnis, join(verzeichnis, 'yuvomi.db'), KEY);
+  }
+  assert.ok(getroffen, 'der Abbruch muss im Fenster gelandet sein');
+
+  assert.deepEqual(
+    readdirSync(verzeichnis), ['yuvomi.db.creating'],
+    'die Arbeitsdatei liegt im Verzeichnis von DB_PATH und traegt dessen Namen'
+  );
+});
+
+test('#1287 DB_PATH=:memory: legt keine Arbeitsdatei an', async () => {
+  // `${DB_PATH}.creating` waere hier die Datei „:memory:.creating" im
+  // Arbeitsverzeichnis. Mehrere Suiten fahren mit DB_PATH=:memory:, alle ohne
+  // Schluessel - eine In-Memory-Datenbank nimmt gar keinen an
+  // („Setting key not supported for in-memory or temporary databases").
+  const dir = tmpDir();
+  const lauf = spawnSync(process.execPath, ['--input-type=module', '-e', ERSTSTART_QUELLE], {
+    cwd: dir, env: startEnv(':memory:', null), encoding: 'utf8',
+  });
+  assert.equal(lauf.status, 0, `der Start muss gelingen: ${lauf.stderr}`);
+  assert.match(lauf.stdout, /^started v\d+$/m, 'und eine migrierte Instanz melden');
+  assert.deepEqual(readdirSync(dir), [], 'im Arbeitsverzeichnis darf nichts entstanden sein');
+});
+
+test('#1287 zwei Erststarts gleichzeitig: DB_PATH ist danach eine Datenbank, nie eine leere Datei', async () => {
+  // Zwei Instanzen auf einem Volume sind kein unterstuetzter Betrieb, aber sie
+  // duerfen keine leere Datei hinterlassen. Gemessen (20 Laeufe): einer kommt
+  // hoch, DB_PATH traegt danach dessen Datenbank. Der letzte Zug ist deshalb
+  // `link()`: mit `rename()` ueberschrieb der Verlierer in 1 von 10 Laeufen die
+  // schon migrierte Datenbank des Gewinners.
+  const dir = tmpDir();
+  const dbPath = join(dir, 'yuvomi.db');
+
+  const laeufe = [ersterStart(dbPath, KEY), ersterStart(dbPath, KEY)];
+  const codes = await Promise.all(laeufe.map((lauf) => lauf.ende));
+
+  assert.ok(codes.includes(0), `mindestens ein Start muss hochkommen: ${codes.join(', ')}`);
+  assert.ok(groesse(dbPath) > 0, 'DB_PATH darf danach keine leere Datei sein');
+  assert.deepEqual(
+    readdirSync(dir).filter((name) => name.includes('.creating')), [],
+    'keine Arbeitsdatei darf liegen bleiben'
+  );
+
+  // Die Datenbank des Gewinners, nicht eine frisch drueber gelegte Huelle.
+  const mod = await bootDb(dbPath, KEY);
+  assert.equal(
+    mod.currentVersion(), Math.max(...mod.MIGRATIONS.map((m) => m.version)),
+    'DB_PATH traegt die migrierte Datenbank'
+  );
+  mod.get().close();
 });
