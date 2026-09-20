@@ -5,10 +5,13 @@
 .fasting-clock-switch { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); padding: var(--space-1); border-radius: var(--radius-sm); background: var(--color-surface-3); }
 .fasting-clock-switch .btn { flex: 1; color: var(--color-text-secondary); }
 .fasting-clock-switch .btn[aria-pressed="true"] { background: var(--seg-active-bg); box-shadow: var(--seg-active-shadow); color: color-mix(in srgb, var(--module-health) var(--tint-ink), var(--color-text-primary)); }
+.fasting-notifications .form-check:has(input:disabled) { color: var(--color-text-secondary); cursor: not-allowed; }
 .fasting-preferences { display: grid; gap: var(--space-5); }
 .fasting-presets { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-block: var(--space-3); }
 .fasting-custom { margin-block-start: var(--space-4); }
 .fasting-custom[hidden] { display: none; }
+.fasting-notifications { border-top: 1px solid var(--color-border-subtle); padding-block-start: var(--space-4); }
+.fasting-notifications .form-check { display: flex; margin-block: var(--space-3); }
 .fasting-preferences .form-hint, [data-fasting-edit-form] .form-hint { font-size: var(--text-sm); color: var(--color-text-secondary); }
 [data-fasting-edit-error], [data-fasting-error] { font-size: var(--text-sm); color: var(--color-danger-ink); }
 .fasting-editor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }

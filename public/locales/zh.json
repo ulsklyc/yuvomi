@@ -4016,6 +4016,7 @@
                 "ketosis": "后期阶段"
             },
             "custom": "自定义",
+            "notifications": "通知",
             "startDate": "开始日期",
             "endDate": "结束日期",
             "note": "备注",
@@ -4028,6 +4029,10 @@
             "clockRemaining": "剩余",
             "loadMore": "再加载10条",
             "goalNextHint": "更改目标会更新当前断食及今后断食的默认目标。",
+            "remindNext": "该开始下一次断食了",
+            "remindGoalToggle": "达到目标时通知我",
+            "remindNextToggle": "到下一次断食时间时提醒我",
+            "reminderHint": "结束后，经过24小时周期的剩余时间再提醒。无目标或目标为24小时及以上时不创建提醒。",
             "safetyTitle": "开始之前",
             "conflict": "记录已更改。请刷新页面后重试。",
             "finishedTitle": "断食已结束",

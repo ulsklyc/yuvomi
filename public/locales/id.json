@@ -4016,6 +4016,7 @@
                 "ketosis": "Fase akhir"
             },
             "custom": "Kustom",
+            "notifications": "Notifikasi",
             "startDate": "Tanggal mulai",
             "endDate": "Tanggal selesai",
             "note": "Catatan",
@@ -4028,6 +4029,10 @@
             "clockRemaining": "Sisa",
             "loadMore": "Muat 10 lagi",
             "goalNextHint": "Mengubah target memperbarui puasa saat ini dan target bawaan untuk puasa berikutnya.",
+            "remindNext": "Saatnya memulai puasa berikutnya",
+            "remindGoalToggle": "Beri tahu saya saat target tercapai",
+            "remindNextToggle": "Ingatkan saya saat waktunya puasa berikutnya",
+            "reminderHint": "Setelah selesai, pengingat mengikuti sisa siklus 24 jam. Tidak ada pengingat tanpa target atau untuk target 24 jam atau lebih.",
             "safetyTitle": "Sebelum memulai",
             "conflict": "Catatan berubah. Muat ulang halaman dan coba lagi.",
             "finishedTitle": "Puasa selesai",

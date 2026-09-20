@@ -4016,6 +4016,7 @@
                 "ketosis": "後期段階"
             },
             "custom": "カスタム",
+            "notifications": "通知",
             "startDate": "開始日",
             "endDate": "終了日",
             "note": "メモ",
@@ -4028,6 +4029,10 @@
             "clockRemaining": "残り",
             "loadMore": "さらに10件読み込む",
             "goalNextHint": "目標を変更すると、現在の断食と今後の断食の既定の目標が更新されます。",
+            "remindNext": "次の断食を始める時間です",
+            "remindGoalToggle": "目標を達成したら通知する",
+            "remindNextToggle": "次の断食の時間になったら通知する",
+            "reminderHint": "終了後、24時間周期の残り時間を経て通知します。目標なし、または24時間以上の目標では通知しません。",
             "safetyTitle": "始める前に",
             "conflict": "記録が変更されました。ページを再読み込みしてやり直してください。",
             "finishedTitle": "断食を終了しました",

@@ -3,7 +3,7 @@ import { api } from '/api.js';
 import { t, formatDate, formatTime } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { openModal, closeModal, confirmModal, refocusAfterRender, captureModalContext, isModalContextCurrent } from '/components/modal.js';
-import { FASTING_PRESETS, normalizeGoalHours, fastingDisplayModel, fastingServerDate, fastingServerClock, formatFastingClock } from '/utils/health-fasting.js';
+import { FASTING_PRESETS, normalizeGoalHours, fastingDisplayModel, fastingNotificationAvailability, fastingServerDate, fastingServerClock, formatFastingClock } from '/utils/health-fasting.js';
 import { wallTimeValue, wallTimeInstant, wallTimeCandidates } from '/utils/timezone.js';
 import { moduleAccess } from '/permissions.js';
 import { fastingDialMarkup } from '/components/fasting-dial.js';
@@ -32,6 +32,7 @@ export function requireFastingWrite() {
 export function fastingPreferencesHtml(settings = {}) {
   const hours = settings.default_goal_minutes ? settings.default_goal_minutes / 60 : null;
   const custom = hours !== null && !FASTING_PRESETS.includes(hours);
+  const available = fastingNotificationAvailability(settings.default_goal_minutes);
   const choice = (value, label, selected) => `<button type="button" class="btn ${selected ? 'btn--primary' : 'btn--secondary'} btn--sm" data-fasting-preset="${value}" aria-pressed="${selected}">${esc(label)}</button>`;
   return `<div class="fasting-preferences">
     <section><h3 class="u-section-title fasting-help-heading">${esc(t('health.fasting.goalTitle'))}${fastingHelpHtml(t('health.fasting.goalTitle'), [t('health.fasting.goalHint'), t('health.fasting.goalNextHint')])}</h3>
@@ -44,6 +45,10 @@ export function fastingPreferencesHtml(settings = {}) {
         <label class="form-label" for="fasting-goal-hours">${esc(t('health.fasting.goalHours'))}</label>
         <input class="form-input" id="fasting-goal-hours" type="number" min="1" max="336" step="1" value="${custom ? hours : ''}" data-fasting-goal>
       </div>
+    </section>
+    <section class="fasting-notifications"><h3 class="u-section-title fasting-help-heading">${esc(t('health.fasting.notifications'))}${fastingHelpHtml(t('health.fasting.notifications'), [t('health.fasting.reminderHint')])}</h3>
+      <label class="form-check"><input type="checkbox" data-fasting-remind-goal ${settings.remind_goal ? 'checked' : ''} ${available.goal ? '' : 'disabled'}>${esc(t('health.fasting.remindGoalToggle'))}</label>
+      <label class="form-check"><input type="checkbox" data-fasting-remind-next ${settings.remind_next_start ? 'checked' : ''} ${available.next ? '' : 'disabled'}>${esc(t('health.fasting.remindNextToggle'))}</label>
     </section>
     <section class="form-group"><label class="form-label" for="fasting-clock-default">${esc(t('health.fasting.clockDefault'))}</label>
       <select class="form-input" id="fasting-clock-default" data-fasting-clock-default>${['auto', 'elapsed', 'remaining'].map((mode) => `<option value="${mode}" ${(settings.clock_mode || 'auto') === mode ? 'selected' : ''}>${esc(t(`health.fasting.clock${mode[0].toUpperCase() + mode.slice(1)}`))}</option>`).join('')}</select>
@@ -59,7 +64,7 @@ export function wireFastingPreferences(root, initial, onSaved = () => {}, active
     if (pending) return;
     const focused = document.activeElement;
     const context = captureModalContext();
-    const focusSelector = focused?.id ? `#${CSS.escape(focused.id)}` : focused?.hasAttribute('data-fasting-preset') ? `[data-fasting-preset="${CSS.escape(focused.dataset.fastingPreset)}"]` : null;
+    const focusSelector = focused?.id ? `#${CSS.escape(focused.id)}` : focused?.hasAttribute('data-fasting-preset') ? `[data-fasting-preset="${CSS.escape(focused.dataset.fastingPreset)}"]` : focused?.hasAttribute('data-fasting-remind-goal') ? '[data-fasting-remind-goal]' : focused?.hasAttribute('data-fasting-remind-next') ? '[data-fasting-remind-next]' : null;
     pending = true;
     root.querySelectorAll('input, button, select').forEach((el) => { el.disabled = true; });
     try {
@@ -78,7 +83,12 @@ export function wireFastingPreferences(root, initial, onSaved = () => {}, active
     } finally {
       pending = false;
       root.querySelectorAll('input, button, select').forEach((el) => { el.disabled = false; });
+      const available = fastingNotificationAvailability(settings.default_goal_minutes);
+      root.querySelector('[data-fasting-remind-goal]').disabled = !available.goal;
+      root.querySelector('[data-fasting-remind-next]').disabled = !available.next;
       root.querySelector('[data-fasting-clock-default]').value = settings.clock_mode || 'auto';
+      root.querySelector('[data-fasting-remind-goal]').checked = !!settings.remind_goal;
+      root.querySelector('[data-fasting-remind-next]').checked = !!settings.remind_next_start;
       const hours = settings.default_goal_minutes ? settings.default_goal_minutes / 60 : null;
       const selected = hours === null ? '' : FASTING_PRESETS.includes(hours) ? String(hours) : 'custom';
       root.querySelectorAll('[data-fasting-preset]').forEach((button) => {
@@ -109,6 +119,8 @@ export function wireFastingPreferences(root, initial, onSaved = () => {}, active
     if (!event.target.value || !event.target.reportValidity()) return;
     void save({ default_goal_minutes: normalizeGoalHours(event.target.value) });
   });
+  root.querySelector('[data-fasting-remind-goal]').addEventListener('change', (event) => void save({ remind_goal: event.target.checked }));
+  root.querySelector('[data-fasting-remind-next]').addEventListener('change', (event) => void save({ remind_next_start: event.target.checked }));
   root.querySelector('[data-fasting-clock-default]').addEventListener('change', (event) => void save({ clock_mode: event.target.value }));
   root.querySelector('[data-fasting-zone-mode]').addEventListener('change', (event) => void save({ zone_mode: event.target.value }));
 }

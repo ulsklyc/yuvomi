@@ -4016,6 +4016,7 @@
                 "ketosis": "Fase posterior"
             },
             "custom": "Personalizado",
+            "notifications": "Notificaciones",
             "startDate": "Fecha de inicio",
             "endDate": "Fecha de fin",
             "note": "Nota",
@@ -4028,6 +4029,10 @@
             "clockRemaining": "Restante",
             "loadMore": "Cargar 10 más",
             "goalNextHint": "Cambiar el objetivo actualiza el ayuno actual y el objetivo predeterminado para futuros ayunos.",
+            "remindNext": "Es hora de tu próximo ayuno",
+            "remindGoalToggle": "Avísame cuando alcance mi objetivo",
+            "remindNextToggle": "Recuérdame cuándo es hora del próximo ayuno",
+            "reminderHint": "Tras finalizar, se recuerda al terminar el resto del ciclo de 24 horas. Sin recordatorio si no hay objetivo o si es de 24 horas o más.",
             "safetyTitle": "Antes de empezar",
             "conflict": "El registro ha cambiado. Recarga la página e inténtalo de nuevo.",
             "finishedTitle": "Ayuno finalizado",

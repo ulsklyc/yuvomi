@@ -4016,6 +4016,7 @@
                 "ketosis": "Sen fas"
             },
             "custom": "Anpassad",
+            "notifications": "Aviseringar",
             "startDate": "Startdatum",
             "endDate": "Slutdatum",
             "note": "Anteckning",
@@ -4028,6 +4029,10 @@
             "clockRemaining": "Kvar",
             "loadMore": "Ladda 10 till",
             "goalNextHint": "När du ändrar målet uppdateras den pågående fastan och standardmålet för framtida fastor.",
+            "remindNext": "Dags för din nästa fasta",
+            "remindGoalToggle": "Meddela mig när jag når mitt mål",
+            "remindNextToggle": "Påminn mig när det är dags för nästa fasta",
+            "reminderHint": "Efter avslut kommer påminnelsen efter resten av 24-timmarscykeln. Ingen påminnelse utan mål eller vid mål på minst 24 timmar.",
             "safetyTitle": "Innan du börjar",
             "conflict": "Posten har ändrats. Ladda om sidan och försök igen.",
             "finishedTitle": "Fastan avslutad",

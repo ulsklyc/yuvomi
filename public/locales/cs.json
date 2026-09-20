@@ -4016,6 +4016,7 @@
                 "ketosis": "Pozdní fáze"
             },
             "custom": "Vlastní",
+            "notifications": "Oznámení",
             "startDate": "Datum zahájení",
             "endDate": "Datum ukončení",
             "note": "Poznámka",
@@ -4028,6 +4029,10 @@
             "clockRemaining": "Zbývá",
             "loadMore": "Načíst dalších 10",
             "goalNextHint": "Změna cíle upraví aktuální půst i výchozí cíl pro budoucí půsty.",
+            "remindNext": "Je čas na další půst",
+            "remindGoalToggle": "Upozornit při dosažení cíle",
+            "remindNextToggle": "Připomenout čas dalšího půstu",
+            "reminderHint": "Po ukončení připomeneme další půst za zbývající část 24hodinového cyklu. Bez cíle a u cílů od 24 hodin se připomínka nevytváří.",
             "safetyTitle": "Než začnete",
             "conflict": "Záznam se změnil. Obnovte stránku a zkuste to znovu.",
             "finishedTitle": "Půst byl ukončen",

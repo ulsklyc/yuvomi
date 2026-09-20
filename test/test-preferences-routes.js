@@ -399,6 +399,47 @@ test('PUT disabled_modules: Mitglied -> 403, Admin validiert + persist', async (
   const ok = await put({ disabled_modules: ['tasks', 'budget', 'tasks', 'nonsense'] }, { role: 'admin' });
   assert.deepEqual(ok.body.data.disabled_modules.sort(), ['budget', 'tasks']);
 });
+test('PUT disabled_modules changes Health and fasting cleanup atomically', async () => {
+  cfgSet('disabled_modules', '[]');
+  const userId = db.prepare(`INSERT INTO users
+    (username, display_name, password_hash, role, family_role)
+    VALUES ('preferences-fasting', 'Preferences fasting', 'x', 'member', 'parent')`).run().lastInsertRowid;
+  db.prepare(`INSERT INTO health_fasting_settings
+    (user_id, default_goal_minutes, remind_goal, remind_next_start)
+    VALUES (?, 960, 1, 0)`).run(userId);
+  const fastId = db.prepare(`INSERT INTO health_fasts
+    (user_id, start_at, end_at, start_tzid, goal_minutes)
+    VALUES (?, '2026-09-18T06:00:00.000Z', NULL, 'UTC', 960)`).run(userId).lastInsertRowid;
+  db.prepare(`INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+    VALUES ('fasting_goal', ?, '2026-09-18T22:00:00.000Z', ?)`).run(fastId, userId);
+  db.prepare(`INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+    VALUES ('fasting_next_start', ?, '2026-09-19T06:00:00.000Z', ?)`).run(fastId, userId);
+  db.exec(`CREATE TRIGGER test_fail_preferences_fasting_delete
+    BEFORE DELETE ON reminders
+    WHEN OLD.entity_type IN ('fasting_goal', 'fasting_next_start')
+    BEGIN
+      SELECT RAISE(ABORT, 'forced preferences fasting cleanup failure');
+    END`);
+  try {
+    const unrelated = await put({ disabled_modules: ['tasks'] }, { role: 'admin' });
+    assert.equal(unrelated.status, 200);
+    assert.deepEqual(JSON.parse(db.prepare("SELECT value FROM sync_config WHERE key = 'disabled_modules'").get().value), ['tasks']);
+    assert.equal(db.prepare("SELECT count(*) AS count FROM reminders WHERE entity_type IN ('fasting_goal', 'fasting_next_start') AND created_by = ?").get(userId).count, 2);
+
+    const failed = await put({ disabled_modules: ['tasks', 'health'] }, { role: 'admin' });
+    assert.equal(failed.status, 500);
+    assert.deepEqual(JSON.parse(db.prepare("SELECT value FROM sync_config WHERE key = 'disabled_modules'").get().value), ['tasks']);
+    assert.equal(db.prepare("SELECT count(*) AS count FROM reminders WHERE entity_type IN ('fasting_goal', 'fasting_next_start') AND created_by = ?").get(userId).count, 2);
+  } finally {
+    db.exec('DROP TRIGGER IF EXISTS test_fail_preferences_fasting_delete');
+  }
+
+  const disabled = await put({ disabled_modules: ['tasks', 'health'] }, { role: 'admin' });
+  assert.equal(disabled.status, 200);
+  assert.equal(db.prepare("SELECT count(*) AS count FROM reminders WHERE entity_type = 'fasting_goal' AND created_by = ?").get(userId).count, 0);
+  db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+  cfgSet('disabled_modules', '[]');
+});
 test('PUT health_cycle_enabled: Mitglied -> 403, Admin non-boolean 400, false persist', async () => {
   assert.equal((await put({ health_cycle_enabled: false }, { role: 'member' })).status, 403);
   assert.equal((await put({ health_cycle_enabled: 'no' }, { role: 'admin' })).status, 400);
