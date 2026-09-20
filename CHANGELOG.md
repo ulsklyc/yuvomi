@@ -84,6 +84,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A reminder set for a single occurrence of a repeating event now arrives at the time it says.**
+  Changing the reminder of one occurrence ("Only this event" or "This and following") stored the
+  time as if the household clock were UTC. East of UTC the reminder came that many hours late - in a
+  household two hours ahead of UTC, "one hour before" a 09:00 occurrence ended up an hour after it
+  had started; west of UTC it came early by the same amount. Only households whose clock is UTC were
+  unaffected, which is why it went unnoticed for so long. The reminder of a whole event and every
+  other reminder in Yuvomi were never affected. Occurrence reminders written before this fix keep
+  their wrong time: they cannot be corrected for you, because nothing in the stored row says which
+  time zone and which lead time it was written from, and moving somebody's reminder on a guess is
+  worse than leaving it. The edit dialog names such a time honestly instead of hiding it (#1260), and
+  saving the reminder again writes it correctly. (#1291)
+
 - **An empty database file no longer starts Yuvomi as an empty instance.** If the database file
   existed but had a size of zero, Yuvomi took it for a new database, set it up from scratch and came
   up empty, without a word - usually in the very moment somebody was moving data, where that looks

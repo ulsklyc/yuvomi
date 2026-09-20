@@ -12,7 +12,9 @@ import {
 import {
   dropInheritedEventReminders, eventAuthorId, fanOutEventReminders,
 } from './event-reminder-fanout.js';
-import { utcToWall, shiftDateKey } from '../utils/timezone.js';
+import {
+  householdTimeZone, shiftDateKey, storedToInstantMs, utcToWall,
+} from '../utils/timezone.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('CalendarOccurrenceOverrides');
@@ -802,11 +804,39 @@ function syncOwnedAttachmentAccess(database, documentId, visibility, userIds) {
   for (const userId of userIds) insert.run(documentId, userId);
 }
 
+/**
+ * Ein Termin-Zeitwert auf der WANDUHR-Achse: die zonenlose Ortszeit wird als
+ * UTC gelesen, damit sich zwei Wanduhrzeiten voneinander abziehen lassen, ohne
+ * dass eine DST-Grenze dazwischen die Rechnung verbiegt.
+ *
+ * Das ist genau das Richtige fuer start_datetime/end_datetime (Reihenfolge
+ * pruefen, eine Serie um ganze Tage verschieben) und genau das FALSCHE fuer
+ * alles, was einen Zeitpunkt meint. `reminders.remind_at` ist ein Zeitpunkt -
+ * dafuer gibt es `reminderAnchorInstantMs()` darunter (#1291).
+ */
 function wallTimeMs(value) {
   const raw = String(value ?? '');
   const normalized = raw.includes('T') ? raw : `${raw}T09:00:00`;
   const zoned = /(?:Z|[+-]\d{2}:?\d{2})$/.test(normalized);
   return Date.parse(zoned ? normalized : `${normalized}Z`);
+}
+
+/**
+ * Derselbe Terminbeginn auf der ZEITPUNKT-Achse: die Wanduhrzeit des Haushalts
+ * in echte Millisekunden seit Epoch, DST des jeweiligen Tages eingerechnet.
+ *
+ * Ein reines Datum (ganztaegig) zaehlt als 09:00 Ortszeit - dieselbe Annahme,
+ * die `reminderStartValue()` in public/pages/calendar.js trifft, damit Server
+ * und Dialog denselben Anker haben.
+ *
+ * @param {string} anchorStart  start_datetime des Vorkommens (Wanduhrzeit)
+ * @param {string} tz           IANA-Zone aus householdTimeZone()
+ * @returns {number} ms seit Epoch, oder NaN bei unlesbarem Wert
+ */
+function reminderAnchorInstantMs(anchorStart, tz) {
+  const raw = String(anchorStart ?? '');
+  const normalized = raw.includes('T') ? raw : `${raw}T09:00:00`;
+  return storedToInstantMs(normalized, tz) ?? NaN;
 }
 
 function shiftedDateTimeLike(value, shiftMs) {
@@ -861,8 +891,21 @@ function sameReminderState(left, right) {
   });
 }
 
-function remindAtForOffset(anchorStart, offset) {
-  const anchor = wallTimeMs(anchorStart);
+/**
+ * Der Erinnerungszeitpunkt fuer einen Vorlauf, als naiv-UTC - dieselbe Form,
+ * die der Dialog fuer den ganzen Termin schreibt (`reminderTimesFromOffsets()`
+ * in public/pages/calendar.js) und die die Zustellung gegen die aktuelle
+ * UTC-Zeit haelt (`remind_at <= now`, server/services/notifications.js).
+ *
+ * DER ANKER IST EIN ZEITPUNKT, KEINE WANDUHRZEIT (#1291). Bis hierher lief der
+ * Beginn durch `wallTimeMs()`, das die zonenlose Ortszeit als UTC liest: in
+ * einem Haushalt auf UTC+2 wurde aus "09:00 minus 60 Minuten" die Zeile
+ * `08:00:00`, gelesen als 08:00 UTC und damit 10:00 Ortszeit - eine Stunde NACH
+ * dem Beginn. Westlich von UTC kam die Erinnerung um den Offset zu frueh, in
+ * einem UTC-Haushalt stimmte sie, weshalb es lange nicht aufgefallen ist.
+ */
+function remindAtForOffset(anchorStart, offset, tz) {
+  const anchor = reminderAnchorInstantMs(anchorStart, tz);
   const result = new Date(anchor - offset * 60000).toISOString();
   return /Z$/.test(String(anchorStart)) ? result : result.slice(0, 19);
 }
@@ -889,8 +932,9 @@ function replaceReminders(database, eventId, actorId, anchorStart, offsets) {
     INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
     VALUES ('event', ?, ?, ?)
   `);
+  const tz = householdTimeZone(database);
   for (const offset of offsets) {
-    insert.run(eventId, remindAtForOffset(anchorStart, offset), actorId);
+    insert.run(eventId, remindAtForOffset(anchorStart, offset, tz), actorId);
   }
 }
 

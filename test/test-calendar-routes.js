@@ -2109,7 +2109,24 @@ test('following rejects an empty successor before attachment persistence', async
   }
 });
 
-test('occurrence PUT owns changed assignments reminders and attachment', async () => {
+test('occurrence PUT owns changed assignments reminders and attachment', async (t) => {
+  // DIE ZONE GEHOERT IN DEN TEST, nicht an die Maschine: seit #1291 schreibt der
+  // Vorkommens-Pfad `remind_at` als UTC-Zeitpunkt, und ohne gesetzte Zone
+  // entscheidet `TZ` oder die Systemzone ueber die erwartete Zeile. Ein Offset
+  // von 0 wuerde den Fehler ausserdem verstecken, den sie belegt.
+  const previousZone = db.prepare('SELECT value FROM sync_config WHERE key = ?')
+    .get('household_timezone')?.value;
+  db.prepare(`
+    INSERT OR REPLACE INTO sync_config (key, value)
+    VALUES ('household_timezone', 'Europe/Berlin')
+  `).run();
+  t.after(() => {
+    db.prepare("DELETE FROM sync_config WHERE key = 'household_timezone'").run();
+    if (previousZone !== undefined) {
+      db.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?)')
+        .run('household_timezone', previousZone);
+    }
+  });
   const seriesId = insertEvent({
     title: 'Owned route fields',
     start_datetime: '2046-04-01T09:00:00',
@@ -2120,7 +2137,7 @@ test('occurrence PUT owns changed assignments reminders and attachment', async (
   assignEvent(seriesId, MARIA.id);
   db.prepare(`
     INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
-    VALUES ('event', ?, '2046-03-31T09:00:00', ?)
+    VALUES ('event', ?, '2046-03-31T07:00:00', ?)
   `).run(seriesId, MARIA.id);
   const dataUrl = `data:text/plain;base64,${Buffer.from('occurrence file').toString('base64')}`;
 
@@ -2155,8 +2172,9 @@ test('occurrence PUT owns changed assignments reminders and attachment', async (
     SELECT remind_at, created_by FROM reminders
     WHERE entity_type = 'event' AND entity_id = ? ORDER BY created_by
   `).all(childId), [
-    { remind_at: '2046-04-02T08:00:00', created_by: MARIA.id },
-    { remind_at: '2046-04-02T08:00:00', created_by: TOM.id },
+    // 09:00 Europe/Berlin (Sommerzeit) = 07:00 UTC, eine Stunde Vorlauf = 06:00 UTC.
+    { remind_at: '2046-04-02T06:00:00', created_by: MARIA.id },
+    { remind_at: '2046-04-02T06:00:00', created_by: TOM.id },
   ]);
 });
 
