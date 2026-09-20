@@ -310,9 +310,20 @@ async function renderCurrentTab(container) {
 // Tab: Übersicht
 // --------------------------------------------------------
 
+/*
+ * VERGRIFFEN IST SO GUT WIE NICHT DA - fuer alles, was auf eine Einloesung
+ * zulaeuft (#1310). `remaining` kommt vom Server: `null` heisst unbegrenzt, `0`
+ * heisst, jede Einheit ist vergeben. Eine Praemie mit 0 bleibt im Katalog
+ * sichtbar, damit der Haushalt sieht, dass es sie gibt - aber sie taugt weder
+ * als Ziel eines Fortschrittsbalkens noch als Angebot im Einloese-Dialog.
+ */
+function isRedeemable(c) {
+  return c.is_active !== 0 && c.remaining !== 0;
+}
+
 function nextRewardHint(balance) {
-  // Günstigste noch nicht erreichbare aktive Prämie → Fortschritt dorthin.
-  const active = (state.catalog || []).filter((c) => c.is_active !== 0);
+  // Günstigste noch nicht erreichbare einlösbare Prämie → Fortschritt dorthin.
+  const active = (state.catalog || []).filter(isRedeemable);
   const reachableCheapestUnaffordable = active
     .filter((c) => c.cost > balance)
     .sort((a, b) => a.cost - b.cost)[0];
@@ -345,7 +356,7 @@ function redeemVerb() {
 // Einloese-Knopf in der Punktestandzeile beantworten muss - `affordabilityFor`
 // beantwortet sie fuer eine EINZELNE Praemie im Katalog.
 function canAffordAny(balance) {
-  return (state.catalog || []).some((c) => c.is_active !== 0 && c.cost <= balance);
+  return (state.catalog || []).some((c) => isRedeemable(c) && c.cost <= balance);
 }
 
 function renderStandingRow(member) {
@@ -543,16 +554,22 @@ function renderRewardCard(item) {
   // `readOnly()` daneben schliesst denselben Knopf aus einem anderen Grund aus:
   // ein MENSCH mit `rewards: read` darf gar nicht einloesen. Zwei Gruende, eine
   // Wirkung - deshalb stehen sie als getrennte Bedingungen und nicht als eine.
+  // Vergriffen schliesst den Knopf aus demselben Grund aus wie „inaktiv": es
+  // gibt nichts mehr herzugeben. Der Zustand bleibt als Etikett stehen.
+  const soldOut = item.remaining === 0;
   const canRedeemBtn = !actingAsDisplay() && !readOnly()
-    && !inactive && (isAdmin() || aff.canRedeem !== false) && (isAdmin() || balances().some((b) => b.id === state.overview?.me));
+    && !inactive && !soldOut && (isAdmin() || aff.canRedeem !== false) && (isAdmin() || balances().some((b) => b.id === state.overview?.me));
   const shortHint = !isAdmin() && aff.short != null && aff.short > 0
     ? `<span class="rw-reward-card__short">${esc(t('rewards.pointsShort', { points: fmtPoints(aff.short) }))}</span>` : '';
+  const unitsLine = item.remaining > 0
+    ? `<p class="rw-reward-card__units">${esc(t('rewards.unitsLeft', { n: fmtPoints(item.remaining) }))}</p>` : '';
   return `
     <article class="rw-reward-card${inactive ? ' rw-reward-card--inactive' : ''}">
       <div class="rw-reward-card__icon" aria-hidden="true">${item.icon ? esc(item.icon) : '<i data-lucide=\"gift\"></i>'}</div>
       <div class="rw-reward-card__body">
-        <p class="rw-reward-card__name">${esc(item.name)}${inactive ? ` <span class="rw-tag">${esc(t('rewards.inactive'))}</span>` : ''}</p>
+        <p class="rw-reward-card__name">${esc(item.name)}${inactive ? ` <span class="rw-tag">${esc(t('rewards.inactive'))}</span>` : ''}${soldOut ? ` <span class="rw-tag">${esc(t('rewards.soldOut'))}</span>` : ''}</p>
         ${item.description ? `<p class="rw-reward-card__desc">${esc(item.description)}</p>` : ''}
+        ${unitsLine}
       </div>
       <div class="rw-reward-card__foot">
         <span class="rw-cost"><i data-lucide="coins" aria-hidden="true"></i>${esc(pointsLabel(item.cost))}</span>
@@ -671,7 +688,7 @@ async function openRedeemModal(memberId, presetItemId = null) {
   const members = enrolledMembers();
   const me = state.overview?.me;
   const defaultMember = memberId ?? (members.some((m) => m.id === me) ? me : members[0]?.id) ?? null;
-  const affordable = (state.overview?.catalog || []).filter((c) => c.is_active !== 0);
+  const affordable = (state.overview?.catalog || []).filter(isRedeemable);
   if (!affordable.length) { await confirmModal(t('rewards.emptyCatalogMember'), { confirmLabel: t('rewards.gotIt') }); return; }
 
   const memberSelect = (isAdmin() && members.length > 1)
@@ -753,7 +770,12 @@ async function openRedeemModal(memberId, presetItemId = null) {
           await refreshActiveTab();
           refocusAfterRender();
         } catch (err) {
-          errEl.textContent = err?.message || t('rewards.redeemError');
+          // Zwischen Dialog-Aufbau und Absenden kann die letzte Einheit weg
+          // sein - ein anderes Kind war schneller. Der Server sagt das mit
+          // einem Code, nicht mit einem uebersetzten Satz.
+          errEl.textContent = err?.data?.reason === 'out_of_stock'
+            ? t('rewards.soldOutHint')
+            : (err?.message || t('rewards.redeemError'));
           errEl.hidden = false;
           submit.disabled = false;
         }
@@ -792,7 +814,18 @@ async function decideRedemption(id, action, btn) {
     if (gefragt) refocusAfterRender();
   } catch (err) {
     if (btn) btn.disabled = false;
-    await confirmModal(err?.message || t('common.error'), { confirmLabel: t('rewards.gotIt') });
+    // VERGRIFFEN IST KEIN FEHLSCHLAG, SONDERN EINE ENTSCHIEDENE ANFRAGE (#1310).
+    // Der Server hat sie abgelehnt und die Punkte zurueckgebucht; die Antwort
+    // traegt den Grund als Code, weil sie die Sprache dieses Browsers nicht
+    // kennt. Die Liste muss danach neu geladen werden - sonst stuende die
+    // Anfrage hier weiter als offen, obwohl sie es nicht mehr ist.
+    const vergriffen = err?.data?.reason === 'out_of_stock';
+    await confirmModal(vergriffen ? t('rewards.outOfStock') : (err?.message || t('common.error')),
+      { confirmLabel: t('rewards.gotIt') });
+    if (vergriffen) {
+      await refreshActiveTab();
+      refocusAfterRender();
+    }
   }
 }
 
@@ -874,6 +907,11 @@ function openRewardModal(item) {
           <input class="input" id="rw-reward-cost" type="number" inputmode="numeric" min="1" step="1" required value="${esc(item?.cost ?? '')}" placeholder="100">
         </div>
         <div class="form-group">
+          <label class="label" for="rw-reward-quantity">${esc(t('rewards.quantityLabel'))}</label>
+          <input class="input" id="rw-reward-quantity" type="number" inputmode="numeric" min="1" step="1" value="${esc(item?.quantity ?? '')}">
+          <p class="rw-hint">${esc(t('rewards.quantityHint'))}</p>
+        </div>
+        <div class="form-group">
           <label class="label" for="rw-reward-desc">${esc(t('rewards.descLabel'))}</label>
           <textarea class="input" id="rw-reward-desc" rows="2" maxlength="500" placeholder="${esc(t('rewards.descPlaceholder'))}">${esc(item?.description ?? '')}</textarea>
         </div>
@@ -908,9 +946,18 @@ function openRewardModal(item) {
         const cost = Math.trunc(Number(panel.querySelector('#rw-reward-cost').value));
         if (!name) { errEl.textContent = t('rewards.nameRequired'); errEl.hidden = false; return; }
         if (!Number.isFinite(cost) || cost < 1) { errEl.textContent = t('rewards.costRequired'); errEl.hidden = false; return; }
+        // Leeres Feld heisst „unbegrenzt" und geht als `null` hinaus - dieselbe
+        // Lesart, die der Server fuer Icon und Beschreibung fuehrt: das
+        // Formular schickt immer alle Felder, und `null` ist dort das Leeren.
+        const quantityRaw = panel.querySelector('#rw-reward-quantity').value.trim();
+        const quantity = quantityRaw === '' ? null : Math.trunc(Number(quantityRaw));
+        if (quantity !== null && (!Number.isFinite(quantity) || quantity < 1)) {
+          errEl.textContent = t('rewards.quantityInvalid'); errEl.hidden = false; return;
+        }
         const body = {
           name,
           cost,
+          quantity,
           icon: panel.querySelector('#rw-reward-icon').value.trim() || null,
           description: panel.querySelector('#rw-reward-desc').value.trim() || null,
         };

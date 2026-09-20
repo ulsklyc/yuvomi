@@ -426,3 +426,154 @@ test('GET /overview — Ränge, Katalog und pendingCount nach Aktivität', async
   for (let i = 1; i < bal.length; i++) assert.ok(bal[i - 1].balance >= bal[i].balance, 'balances absteigend');
   assert.equal(bal[0].rank, 1, 'Spitzenreiter hat Rang 1');
 });
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Stueckzahl je Praemie (#1310)
+//
+// Der Katalog ist haushaltsweit und kannte bis hierher keine Menge: ein
+// physischer Gegenstand stand JEDEM Kind gleichzeitig offen und liess sich
+// beliebig oft einloesen. `quantity` begrenzt ihn fuer den GANZEN Haushalt,
+// NULL bleibt unbegrenzt.
+//
+// VERBRAUCHT IST EINE EINHEIT, WENN EINE EINLOESUNG ERFUELLT IST. Eine offene
+// Anfrage reserviert die Punkte, aber keine Einheit - deshalb duerfen mehr
+// Anfragen offen stehen als es Einheiten gibt, und die uebrig gebliebene wird
+// bei der Entscheidung mit Grund abgelehnt, statt sie vorher zu verbieten: die
+// Punkte sind bei der Anfrage schon reserviert, die Ablehnung nutzt die
+// bestehende Gegenbuchung und braucht nichts Neues.
+// ════════════════════════════════════════════════════════════════════════════════
+
+const zaehleErfuellt = (catalogId) => db.prepare(
+  "SELECT COUNT(*) AS n FROM reward_redemptions WHERE catalog_id = ? AND status = 'fulfilled'",
+).get(catalogId).n;
+
+// Ohne Eltern-Freigabe erfuellt sich jede Anfrage sofort - so misst ein Test das
+// Einloesen selbst, ohne den Umweg ueber eine zweite Entscheidung.
+async function ohneFreigabe(fn) {
+  db.prepare("INSERT INTO sync_config (key, value) VALUES ('rewards_require_approval','0') ON CONFLICT(key) DO UPDATE SET value='0'").run();
+  try {
+    return await fn();
+  } finally {
+    db.prepare("DELETE FROM sync_config WHERE key='rewards_require_approval'").run();
+  }
+}
+
+test('POST /redemptions - ohne Stueckzahl bleibt eine Praemie beliebig oft einloesbar', async () => {
+  // DIE GEGENRICHTUNG, und sie muss VOR dem Fix gruen sein: sie belegt, dass die
+  // Wiederholbarkeit heute das Verhalten ist und nicht ein Zufall des Aufbaus.
+  // Bleibt sie danach gruen, hat die Stueckzahl nur die begrenzten Praemien
+  // angefasst - das Bestandsverhalten haengt daran.
+  await ohneFreigabe(async () => {
+    const frei = (await call('POST', '/catalog', { body: { name: 'Extra-Spielzeit', cost: 10 } })).body.data.id;
+    const kid = freshKid(100);
+    const erste = await call('POST', '/redemptions', { actor: kid, body: { catalog_id: frei } });
+    const zweite = await call('POST', '/redemptions', { actor: kid, body: { catalog_id: frei } });
+    assert.equal(erste.status, 201);
+    assert.equal(zweite.status, 201, 'unbegrenzt heisst unbegrenzt');
+    assert.equal(zaehleErfuellt(frei), 2, 'beide Einloesungen stehen');
+    assert.equal(getBalance(db, kid.id), 80, 'und beide sind abgebucht');
+  });
+});
+
+test('POST /redemptions - begrenzte Praemie: die zweite Einloesung wird abgelehnt', async () => {
+  await ohneFreigabe(async () => {
+    const ding = (await call('POST', '/catalog', { body: { name: 'Holzeisenbahn', cost: 10, quantity: 1 } })).body.data.id;
+    const kid = freshKid(100);
+    assert.equal((await call('POST', '/redemptions', { actor: kid, body: { catalog_id: ding } })).status, 201);
+    const zweite = await call('POST', '/redemptions', { actor: kid, body: { catalog_id: ding } });
+    assert.equal(zweite.status, 409, 'die einzige Einheit ist vergeben');
+    assert.equal(zaehleErfuellt(ding), 1, 'und sie ist nur einmal vergeben');
+    assert.equal(getBalance(db, kid.id), 90, 'die abgewiesene Anfrage kostet nichts');
+  });
+});
+
+test('POST/PATCH /catalog - Stueckzahl wird gespeichert, als Rest ausgewiesen und laesst sich aufheben', async () => {
+  const id = (await call('POST', '/catalog', { body: { name: 'Kinokarten', cost: 5, quantity: 3 } })).body.data.id;
+  const angelegt = (await call('GET', '/catalog', { actor: ADMIN })).body.data.find((c) => c.id === id);
+  assert.equal(angelegt.quantity, 3);
+  assert.equal(angelegt.remaining, 3, 'noch nichts vergeben');
+  assert.equal((await call('POST', '/catalog', { body: { name: 'Kaputt', cost: 5, quantity: 0 } })).status, 400, '0 ist keine Stueckzahl');
+  assert.equal((await call('POST', '/catalog', { body: { name: 'Kaputt', cost: 5, quantity: 'viele' } })).status, 400, 'Text ist keine Stueckzahl');
+  assert.equal((await call('PATCH', `/catalog/${id}`, { body: { quantity: null } })).status, 200);
+  const ohne = (await call('GET', '/catalog', { actor: ADMIN })).body.data.find((c) => c.id === id);
+  assert.equal(ohne.quantity, null, 'null hebt die Grenze wieder auf');
+  assert.equal(ohne.remaining, null, 'und dann gibt es keinen Rest zu zaehlen');
+});
+
+test('PATCH /redemptions/:id - zwei Kinder, eine Einheit: das zweite wird mit Grund abgelehnt', async () => {
+  const ding = (await call('POST', '/catalog', { body: { name: 'Roller', cost: 10, quantity: 1 } })).body.data.id;
+  const a = freshKid(100);
+  const b = freshKid(100);
+  const ra = await call('POST', '/redemptions', { actor: a, body: { catalog_id: ding } });
+  const rb = await call('POST', '/redemptions', { actor: b, body: { catalog_id: ding } });
+  assert.equal(ra.status, 201);
+  assert.equal(rb.status, 201, 'solange nichts erfuellt ist, duerfen beide fragen');
+  assert.equal(getBalance(db, b.id), 90, 'die Punkte sind bei der Anfrage reserviert');
+
+  assert.equal((await call('PATCH', `/redemptions/${ra.body.data.id}`, { actor: ADMIN, body: { action: 'fulfill' } })).status, 200);
+
+  const zweite = await call('PATCH', `/redemptions/${rb.body.data.id}`, { actor: ADMIN, body: { action: 'fulfill' } });
+  assert.equal(zweite.status, 409, 'die Einheit ist weg');
+  assert.equal(zweite.body.reason, 'out_of_stock', 'mit Grund, nicht nur mit Nein');
+  const zeile = db.prepare('SELECT status, decision_reason FROM reward_redemptions WHERE id = ?').get(rb.body.data.id);
+  assert.equal(zeile.status, 'rejected', 'die Anfrage bleibt nicht offen stehen');
+  assert.equal(zeile.decision_reason, 'out_of_stock', 'der Grund steht in der Zeile, nicht nur in der Antwort');
+  // NICHT NUR DIE ANTWORT: die reservierten Punkte muessen ueber die bestehende
+  // Gegenbuchung zurueck sein, sonst haelt die Ablehnung sie fest.
+  assert.equal(getBalance(db, b.id), 100, 'reversal gebucht');
+  assert.equal(zaehleErfuellt(ding), 1, 'und die Einheit bleibt einmal vergeben');
+});
+
+test('PATCH /catalog/:id - Stueckzahl gesenkt: der offene Antrag ohne Einheit wird bei der Entscheidung abgelehnt', async () => {
+  const ding = (await call('POST', '/catalog', { body: { name: 'Bastelset', cost: 10, quantity: 2 } })).body.data.id;
+  const a = freshKid(100);
+  const b = freshKid(100);
+  const ra = await call('POST', '/redemptions', { actor: a, body: { catalog_id: ding } });
+  const rb = await call('POST', '/redemptions', { actor: b, body: { catalog_id: ding } });
+  assert.equal((await call('PATCH', `/redemptions/${ra.body.data.id}`, { actor: ADMIN, body: { action: 'fulfill' } })).status, 200);
+  // Eines der beiden Sets ist zerbrochen: der Haushalt hat nur noch eins, und
+  // das ist vergeben. Die offene Anfrage kann also nicht mehr erfuellt werden.
+  assert.equal((await call('PATCH', `/catalog/${ding}`, { body: { quantity: 1 } })).status, 200);
+  const zweite = await call('PATCH', `/redemptions/${rb.body.data.id}`, { actor: ADMIN, body: { action: 'fulfill' } });
+  assert.equal(zweite.status, 409, 'die letzte Einheit ist zwischenzeitlich weg');
+  assert.equal(db.prepare('SELECT status FROM reward_redemptions WHERE id = ?').get(rb.body.data.id).status, 'rejected');
+  assert.equal(getBalance(db, b.id), 100, 'Punkte zurueck');
+});
+
+test('PATCH /redemptions/:id - vergriffen heisst nicht unentscheidbar: ablehnen und stornieren gehen weiter', async () => {
+  const ding = (await call('POST', '/catalog', { body: { name: 'Malbuch', cost: 10, quantity: 1 } })).body.data.id;
+  const a = freshKid(100);
+  const b = freshKid(100);
+  const ra = await call('POST', '/redemptions', { actor: a, body: { catalog_id: ding } });
+  const rb = await call('POST', '/redemptions', { actor: b, body: { catalog_id: ding } });
+  await call('PATCH', `/redemptions/${ra.body.data.id}`, { actor: ADMIN, body: { action: 'fulfill' } });
+  const abgelehnt = await call('PATCH', `/redemptions/${rb.body.data.id}`, { actor: ADMIN, body: { action: 'reject' } });
+  assert.equal(abgelehnt.status, 200, 'die Handablehnung bleibt eine gewoehnliche Entscheidung');
+  assert.equal(abgelehnt.body.data.status, 'rejected');
+  assert.equal(abgelehnt.body.data.decision_reason, null, 'von Hand abgelehnt traegt keinen Automatengrund');
+  assert.equal(getBalance(db, b.id), 100);
+});
+
+test('POST /redemptions - zwei gleichzeitige Anfragen auf die letzte Einheit: nur eine geht durch', async () => {
+  // DER SCHREIBPFAD DARF ZWISCHEN PRUEFEN UND SCHREIBEN NICHT AUSSETZEN. Der
+  // Treiber ist synchron; ein `await` vor einem DB-Call waere ein Yield-Punkt,
+  // an dem die zweite Anfrage genau zwischen "noch eine da" und "eingeloest"
+  // kaeme - und beide gingen durch. Beide fetches starten hier im selben
+  // Durchlauf der Ereignisschleife.
+  //
+  // BEIDE LAUFEN ALS ADMIN STELLVERTRETEND: der Pruefstand setzt `actor` vor
+  // dem fetch, zwei verschiedene Akteure ueberschrieben einander hier also
+  // gegenseitig. Stellvertretend eingeloest bleibt der Schreibpfad derselbe.
+  await ohneFreigabe(async () => {
+    const letztes = (await call('POST', '/catalog', { body: { name: 'Letztes Ticket', cost: 10, quantity: 1 } })).body.data.id;
+    const a = freshKid(100);
+    const b = freshKid(100);
+    const [ra, rb] = await Promise.all([
+      call('POST', '/redemptions', { actor: ADMIN, body: { catalog_id: letztes, user_id: a.id } }),
+      call('POST', '/redemptions', { actor: ADMIN, body: { catalog_id: letztes, user_id: b.id } }),
+    ]);
+    assert.deepEqual([ra.status, rb.status].sort(), [201, 409], 'genau eine Anfrage kommt durch');
+    assert.equal(zaehleErfuellt(letztes), 1, 'und genau eine Einheit ist vergeben');
+    assert.equal(getBalance(db, a.id) + getBalance(db, b.id), 190, 'nur einmal abgebucht');
+  });
+});

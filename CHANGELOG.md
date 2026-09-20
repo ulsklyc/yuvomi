@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A reward can now say how many of it there are.** The catalog is shared by the whole household and
+  had no idea of quantity, so a cinema evening and a wooden train were the same thing to it: both
+  stayed open to every child at once, again and again, as long as the points lasted. A reward now
+  carries a number of units for the household; leaving the field empty keeps it unlimited, which is
+  what every reward you already have stays. A card says how many are left and gets a "Sold out" tag
+  once they are gone - it stays in the catalog, so everyone can see it exists, but it is no longer
+  offered. Asking for something that is gone is refused before any points are taken. A request that
+  was already waiting when the last unit went is not left hanging: approving it turns into a refusal
+  with the reason on it, and the reserved points go straight back. Two children asking for the last
+  unit at the same moment cannot both get it. (#1310)
+
 ### Fixed
 
 - **Filipino was offered as the language for stored entries and then refused when you saved it.**

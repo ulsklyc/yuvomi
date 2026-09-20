@@ -19,6 +19,7 @@ const router = express.Router();
 
 const MAX_COST = 1_000_000;
 const MAX_BONUS = 1_000_000;
+const MAX_QUANTITY = 1_000_000;
 
 function requireAdmin(req, res, next) {
   if (!isAdminRequest(req)) {
@@ -72,12 +73,51 @@ function balancesOfEnrolled(d) {
   return withRanks(rows);
 }
 
+/*
+ * STUECKZAHL JE PRAEMIE, UND VERBRAUCHT IST SIE BEI DER ERFUELLUNG (#1310).
+ *
+ * `quantity` gehoert dem HAUSHALT, nicht einem Kind: der Katalog ist
+ * haushaltsweit und kennt keine Zuordnung Praemie-zu-Kind. NULL heisst
+ * unbegrenzt, und das ist der Stand jeder Praemie von vor dieser Aenderung.
+ *
+ * GEZAEHLT WERDEN ERFUELLTE EINLOESUNGEN, KEINE OFFENEN ANFRAGEN. Eine Anfrage
+ * reserviert die Punkte (die `redeem`-Buchung faellt beim Stellen), aber keine
+ * Einheit - sonst waere die zuerst gestellte Anfrage schon die Entscheidung,
+ * und die Eltern haetten keine mehr zu treffen. Die Folge ist gewollt: es
+ * duerfen mehr Anfragen offen stehen als es Einheiten gibt, und die uebrig
+ * gebliebene wird bei der Entscheidung mit Grund abgelehnt (PATCH weiter
+ * unten), wobei die bestehende Gegenbuchung die Punkte zurueckgibt.
+ *
+ * `remaining` ist deshalb abgeleitet und nirgends gespeichert - wie der
+ * Punktestand, den auch niemand fuehrt. Eine zurueckgezogene oder abgelehnte
+ * Einloesung gibt ihre Einheit damit von selbst wieder frei.
+ */
+const CATALOG_SELECT = `
+  SELECT c.id, c.name, c.cost, c.icon, c.description, c.is_active, c.sort_order, c.quantity,
+         CASE WHEN c.quantity IS NULL THEN NULL
+              ELSE MAX(0, c.quantity - (SELECT COUNT(*) FROM reward_redemptions r
+                                         WHERE r.catalog_id = c.id AND r.status = 'fulfilled'))
+         END AS remaining
+  FROM reward_catalog c`;
+
+function catalogRow(d, id) {
+  return d.prepare(`${CATALOG_SELECT} WHERE c.id = ?`).get(id);
+}
+
+/** Ist die Praemie vergriffen? Ohne `quantity` gibt es nichts zu zaehlen. */
+function soldOut(d, item) {
+  if (item?.quantity == null) return false;
+  const used = d.prepare(
+    "SELECT COUNT(*) AS n FROM reward_redemptions WHERE catalog_id = ? AND status = 'fulfilled'",
+  ).get(item.id).n;
+  return used >= item.quantity;
+}
+
 function activeCatalog(d) {
   return d.prepare(`
-    SELECT id, name, cost, icon, description, is_active, sort_order
-    FROM reward_catalog
-    WHERE is_active = 1
-    ORDER BY sort_order ASC, cost ASC, name COLLATE NOCASE ASC
+    ${CATALOG_SELECT}
+    WHERE c.is_active = 1
+    ORDER BY c.sort_order ASC, c.cost ASC, c.name COLLATE NOCASE ASC
   `).all();
 }
 
@@ -166,10 +206,9 @@ router.get('/catalog', (req, res) => {
   try {
     const all = isAdminRequest(req) && req.query.all === '1';
     const rows = db.get().prepare(`
-      SELECT id, name, cost, icon, description, is_active, sort_order
-      FROM reward_catalog
-      ${all ? '' : 'WHERE is_active = 1'}
-      ORDER BY is_active DESC, sort_order ASC, cost ASC, name COLLATE NOCASE ASC
+      ${CATALOG_SELECT}
+      ${all ? '' : 'WHERE c.is_active = 1'}
+      ORDER BY c.is_active DESC, c.sort_order ASC, c.cost ASC, c.name COLLATE NOCASE ASC
     `).all();
     res.json({ data: rows });
   } catch (err) {
@@ -187,6 +226,20 @@ function readCatalogInput(body) {
   return { name, cost, icon, description, sort_order };
 }
 
+/**
+ * Stueckzahl lesen: nichts, `null` oder ein leeres Feld heissen "keine Grenze",
+ * sonst eine ganze Zahl ab 1. 0 IST BEWUSST UNGUELTIG - "null Stueck" waere
+ * eine Praemie, die niemand je bekommen kann, und dafuer steht `is_active` da.
+ */
+function readQuantity(raw) {
+  if (raw === undefined || raw === null || raw === '') return { value: null };
+  const n = toInt(raw);
+  if (!Number.isFinite(n) || n < 1 || n > MAX_QUANTITY) return { error: true, value: null };
+  return { value: n };
+}
+
+const QUANTITY_ERROR = { error: 'quantity must be a positive number or null.', code: 400 };
+
 // --------------------------------------------------------
 // POST /catalog — Prämie anlegen (Admin).
 // --------------------------------------------------------
@@ -196,14 +249,14 @@ router.post('/catalog', requireAdmin, (req, res) => {
     if (!name) return res.status(400).json({ error: 'name is required.', code: 400 });
     if (!Number.isFinite(cost) || cost < 1 || cost > MAX_COST)
       return res.status(400).json({ error: 'cost must be a positive number.', code: 400 });
+    const quantity = readQuantity(req.body?.quantity);
+    if (quantity.error) return res.status(400).json(QUANTITY_ERROR);
 
     const result = db.get().prepare(`
-      INSERT INTO reward_catalog (name, cost, icon, description, sort_order, created_by)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(name, cost, icon, description, sort_order, actingUser(req));
-    const row = db.get().prepare('SELECT id, name, cost, icon, description, is_active, sort_order FROM reward_catalog WHERE id = ?')
-      .get(result.lastInsertRowid);
-    res.status(201).json({ data: row });
+      INSERT INTO reward_catalog (name, cost, icon, description, sort_order, quantity, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(name, cost, icon, description, sort_order, quantity.value, actingUser(req));
+    res.status(201).json({ data: catalogRow(db.get(), result.lastInsertRowid) });
   } catch (err) {
     log.error('POST /catalog error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -240,14 +293,25 @@ router.patch('/catalog/:id', requireAdmin, (req, res) => {
       ? toInt(req.body.sort_order) : existing.sort_order;
     const is_active = req.body?.is_active !== undefined
       ? (req.body.is_active === true || req.body.is_active === 1 ? 1 : 0) : existing.is_active;
+    // Die Stueckzahl folgt demselben Vokabular wie Icon und Beschreibung: Feld
+    // fehlt = unveraendert, `null` = Grenze aufheben. EINE GESENKTE ZAHL UNTER
+    // DAS BEREITS VERGEBENE IST ERLAUBT - ein Haushalt kann einen Gegenstand
+    // verlieren, und `remaining` klemmt bei 0. Die dann nicht mehr erfuellbaren
+    // offenen Anfragen laufen in die Ablehnung mit Grund, nicht in eine 500.
+    let quantity = existing.quantity;
+    if (req.body?.quantity !== undefined) {
+      const gelesen = readQuantity(req.body.quantity);
+      if (gelesen.error) return res.status(400).json(QUANTITY_ERROR);
+      quantity = gelesen.value;
+    }
 
     db.get().prepare(`
       UPDATE reward_catalog SET name = ?, cost = ?, icon = ?, description = ?,
-        sort_order = ?, is_active = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+        sort_order = ?, is_active = ?, quantity = ?,
+        updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
       WHERE id = ?
-    `).run(name, cost, icon, description, sort_order, is_active, id);
-    const row = db.get().prepare('SELECT id, name, cost, icon, description, is_active, sort_order FROM reward_catalog WHERE id = ?').get(id);
-    res.json({ data: row });
+    `).run(name, cost, icon, description, sort_order, is_active, quantity, id);
+    res.json({ data: catalogRow(db.get(), id) });
   } catch (err) {
     log.error('PATCH /catalog/:id error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -384,7 +448,15 @@ router.post('/redemptions', (req, res) => {
     // gutgeschrieben; die reservierten Punkte bleiben abgezogen (keine Rückbuchung).
     const autoFulfill = !requiresApproval(d);
 
-    const redemptionId = d.transaction(() => {
+    // PRUEFEN UND SCHREIBEN SIND EIN SCHRITT, UND ZWAR EIN SYNCHRONER (#1310).
+    // Zwischen "es ist noch eine Einheit da" und der geschriebenen Einloesung
+    // darf dieser Handler nicht aussetzen, sonst kaeme die zweite Anfrage auf
+    // die letzte Einheit genau dazwischen und beide gingen durch. Der Treiber
+    // ist synchron; jedes `await` vor einem DB-Aufruf waere genau dieser
+    // Aussetzer - deshalb steht in diesem Handler keines, und die Stueckzahl
+    // wird IN der Transaktion gezaehlt statt davor.
+    const ausgang = d.transaction(() => {
+      if (soldOut(d, item)) return { soldOut: true };
       const r = autoFulfill
         ? d.prepare(`
             INSERT INTO reward_redemptions (user_id, catalog_id, reward_name, reward_icon, cost, note, requested_by, status, decided_by, decided_at)
@@ -399,10 +471,16 @@ router.post('/redemptions', (req, res) => {
         userId: targetId, delta: -item.cost, type: 'redeem',
         reason: item.name, redemptionId: r.lastInsertRowid, createdBy: me,
       });
-      return r.lastInsertRowid;
+      return { id: r.lastInsertRowid };
     })();
 
-    const row = d.prepare('SELECT * FROM reward_redemptions WHERE id = ?').get(redemptionId);
+    if (ausgang.soldOut) {
+      return res.status(409).json({
+        error: 'No units of this reward are left.', code: 409, reason: 'out_of_stock',
+      });
+    }
+
+    const row = d.prepare('SELECT * FROM reward_redemptions WHERE id = ?').get(ausgang.id);
     res.status(201).json({ data: row });
   } catch (err) {
     log.error('POST /redemptions error:', err);
@@ -435,8 +513,26 @@ router.patch('/redemptions/:id', (req, res) => {
 
     const nextStatus = action === 'fulfill' ? 'fulfilled' : action === 'reject' ? 'rejected' : 'cancelled';
 
-    d.transaction(() => {
-      if (action !== 'fulfill') {
+    // IST DIE LETZTE EINHEIT WEG, WIRD DIE ANFRAGE ABGELEHNT - NICHT NUR
+    // ABGEWIESEN (#1310). Sie steht seit dem Stellen mit reservierten Punkten
+    // da; ein blosses "geht nicht" liesse sie offen und die Punkte gebunden.
+    // Die Ablehnung ist der Weg, den es schon gibt: sie bucht ueber `reversal`
+    // zurueck und braucht dafuer nichts Neues. Der Grund steht maschinenlesbar
+    // in der Zeile, weil der Server die Sprache des Lesers nicht kennt; die
+    // Oberflaeche uebersetzt ihn ueber t().
+    //
+    // ABLEHNEN UND ZURUECKZIEHEN BLEIBEN UNBERUEHRT: vergriffen heisst nicht
+    // unentscheidbar, es heisst nur, dass "erfuellen" keine Einheit mehr
+    // findet. Gezaehlt wird wieder IN der Transaktion - zwei Eltern, die
+    // gleichzeitig zwei Anfragen auf dieselbe letzte Einheit freigeben, duerfen
+    // nicht beide durchkommen.
+    const vergriffen = d.transaction(() => {
+      const item = row.catalog_id != null
+        ? d.prepare('SELECT id, quantity FROM reward_catalog WHERE id = ?').get(row.catalog_id)
+        : null;
+      const leer = action === 'fulfill' && soldOut(d, item);
+      const status = leer ? 'rejected' : nextStatus;
+      if (status !== 'fulfilled') {
         // Reservierte Punkte zurückgeben.
         postLedger(d, {
           userId: row.user_id, delta: row.cost, type: 'reversal',
@@ -444,14 +540,21 @@ router.patch('/redemptions/:id', (req, res) => {
         });
       }
       d.prepare(`
-        UPDATE reward_redemptions SET status = ?, decided_by = ?,
+        UPDATE reward_redemptions SET status = ?, decision_reason = ?, decided_by = ?,
           decided_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'),
           updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
         WHERE id = ?
-      `).run(nextStatus, me, row.id);
+      `).run(status, leer ? 'out_of_stock' : null, me, row.id);
+      return leer;
     })();
 
     const updated = d.prepare('SELECT * FROM reward_redemptions WHERE id = ?').get(row.id);
+    if (vergriffen) {
+      return res.status(409).json({
+        error: 'No units of this reward are left; the request was rejected and the points returned.',
+        code: 409, reason: 'out_of_stock', data: updated,
+      });
+    }
     res.json({ data: updated });
   } catch (err) {
     log.error('PATCH /redemptions/:id error:', err);
