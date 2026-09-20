@@ -98,6 +98,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An installation that is interrupted during its very first start comes back up on its own.**
+  An empty database file stops Yuvomi from starting, which is right for every way such a file
+  comes about but one: with `DB_ENCRYPTION_KEY` set, creating the database file and writing
+  its first page lie about 150 milliseconds apart, because the key is derived in between, and a
+  first start that was killed in that window left exactly one empty file behind. The next start
+  then refused, and somebody had to delete that file by hand before the installation could finish -
+  no data was lost, but an install interrupted at the wrong moment did not come back up by itself.
+  A new database is now created beside its final place, as `<DB_PATH>.creating`, and moved into
+  place only once it is a database. An interrupted first start therefore leaves only that working
+  file, which the next start picks up again, and the database file itself is either absent or
+  complete, never empty. (#1287)
+- **Moving things into the shopping list now needs shopping rights, in both directions.** Sending a
+  meal or a recipe to a shopping list writes into the shopping module, but it was judged by the
+  module the button sits in: a member with meal-plan access and no shopping access could fill a
+  list they cannot even open, and an API token scoped to the meal plan could do the same. The other
+  direction had the same gap - importing the meal plan into a shopping list marks those ingredients
+  as transferred, which is meal-plan data, so read-only access to the meal plan was enough to
+  change it. Each of these now asks for write access to the module it writes into, whichever page
+  or token the request comes through, and answers a missing right the same way the rest of the app
+  does. Undoing a transfer follows the same rule, but only where it touches the meal plan: taking
+  back a pantry or recipe transfer still works with shopping rights alone. Anybody who has both
+  rights notices no difference. The buttons themselves are still offered for now; hiding them comes
+  with the read-only work on the kitchen pages. (#1290)
 - **A recurring appointment moved "from this date on" in another calendar no longer appears twice on
   that day.** When a series is split that way, the other calendar ends the old series and starts the
   new one at the split - and Open-Xchange (mailbox.org), for one, ends the old series one second

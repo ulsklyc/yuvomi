@@ -50,10 +50,16 @@ export function shoppingPaths() {
     '/api/v1/shopping/items/undo-transfer': {
       post: op({
         summary: 'Undo a kitchen transfer to a shopping list',
-        description: 'Removes the items created by one transfer (the `added_ids` of the response) and clears the `on_shopping_list` flag on the meal ingredients they came from. Unknown ids are skipped; `removed` reports what actually went back.',
+        description: 'Removes the items created by one transfer (the `added_ids` of the response) and clears the `on_shopping_list` flag on the meal ingredients they came from. Unknown ids are skipped; `removed` reports what actually went back. Clearing that flag writes meal-plan data, so as soon as one of the named items came from a meal, write access to the `meals` module is required as well and a credential without it is refused with 403. A transfer from the pantry or from a recipe carries no meal, and taking it back needs `shopping` alone.',
         tag: 'Shopping',
         stateChanging: true,
         requestBody: jsonBody(null),
+        responses: {
+          200: { description: 'Successful response' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
       }),
     },
     '/api/v1/shopping/items/{itemId}': {
@@ -140,7 +146,20 @@ export function shoppingPaths() {
       patch: op({ summary: 'Reorder the items of one category', tag: 'Shopping', stateChanging: true, params: [idParam('listId', 'Shopping list ID')], requestBody: jsonBody(null), description: 'Per category rather than across the whole list: the category order is already its own handle and models the route through the shop; a second, list-wide rank beside it would make two statements about the same order. The request must name EVERY item of the category - a subset would let the ranks of the omitted ones collide with the newly assigned ones, and creation time would decide again.' }),
     },
     '/api/v1/shopping/{listId}/import-meal-plan': {
-      post: op({ summary: 'Import ingredients from the meal plan into a list', tag: 'Shopping', stateChanging: true, params: [idParam('listId', 'Shopping list ID')], requestBody: jsonBody(null), description: 'Body: { from, to, preview? }. With `preview: true` nothing is written - it only counts, for the "X ingredients from Y meals" line in the import dialog.' }),
+      post: op({
+        summary: 'Import ingredients from the meal plan into a list',
+        tag: 'Shopping',
+        stateChanging: true,
+        params: [idParam('listId', 'Shopping list ID')],
+        requestBody: jsonBody(null),
+        description: 'Body: { from, to, preview? }. With `preview: true` nothing is written - it only counts, for the "X ingredients from Y meals" line in the import dialog. Marks the imported ingredients as transferred, which is meal-plan data, so it requires write access to the `meals` module in addition to `shopping` - a credential scoped to the shopping list alone is refused with 403, for the preview as well.',
+        responses: {
+          200: { description: 'Successful response' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
     },
   };
 }
