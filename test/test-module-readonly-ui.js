@@ -2070,6 +2070,30 @@ test('Zyklus-Kalender: die Zelle verliert ihren Knopf, der Herz-Marker bleibt', 
   });
 });
 
+// Der dritte Fall, den es vor P2 nicht gab. `canEdit` war per Default `own`,
+// also hiess "nicht bedienbar" immer "fremde Ansicht" - und die versteckt ihre
+// Zellen per `aria-hidden`, was dort stimmt. Ein Nur-lesen-Mitglied bringt die
+// EIGENE Ansicht ohne Recht, und faellt die auf denselben Zweig, ist der eigene
+// Kalender fuer einen Screenreader stumm: keine Tageszahl, kein Datum, nichts.
+// Die Nur-lesen-Regel nimmt die Handlung, nicht die Auskunft.
+test('Zyklus-Kalender: die eigene Zelle bleibt ansagbar, die fremde bleibt versteckt (#1265 P2)', () => {
+  const zustand = {
+    meId: 1, personId: 1, anchor: '2026-06-15', periods: [periode()],
+    logs: [], settings: {}, likelihoodSymptom: null, __reset: { periods: [], logs: [] },
+  };
+  mitView('cycle', zustand, () => {
+    const eigenLesend = health.cycleCalendarMarkup(true, null, false);
+    assert.doesNotMatch(eigenLesend, /aria-hidden="true"[^>]*>\s*<span class="cycle-cal__num">/,
+      'die eigene Zelle darf nicht per aria-hidden verschwinden - sie ist lesbar, nur nicht bedienbar');
+    assert.match(eigenLesend, /aria-label="[^"]+"[^>]*>\s*<span class="cycle-cal__num">3</,
+      'ohne Datums-Label nennt die Zelle einem Screenreader gar nichts');
+
+    const fremd = health.cycleCalendarMarkup(false, null, false);
+    assert.match(fremd, /aria-hidden="true"/,
+      'die fremde Ansicht versteckt ihre Zellen weiter - Bestand, und hier richtig');
+  });
+});
+
 test('Zyklus-Historie und -Fuss: Bearbeiten, Einfuhr und Einstellungen weg, der Export bleibt', () => {
   mitView('cycle', { meId: 1, personId: 1, periods: [periode()], logs: [], settings: {}, __reset: { periods: [], logs: [] } }, () => {
     assert.match(health.cycleHistoryMarkup(true), /data-cycle-edit="55"/);

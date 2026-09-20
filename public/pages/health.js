@@ -5643,9 +5643,17 @@ function cycleCalendarMarkup(own, pms, canEdit = own) {
     }
     const flowAttr = c.flow ? ` data-flow="${esc(c.flow)}"` : '';
     const tag = canEdit ? 'button' : 'div';
+    // Drei Faelle, nicht zwei. `aria-hidden` gehoert der FREMDEN Ansicht, wo
+    // der Kalender ohnehin nur Umriss ist. Die eigene Ansicht eines
+    // Nur-lesen-Mitglieds (seit #1265 P2: own, aber kein Schreibrecht) behaelt
+    // ihr Datums-Label - die Sperre nimmt die Handlung, nicht die Auskunft.
+    // Ohne diese Stufe waere der eigene Kalender fuer einen Screenreader stumm,
+    // obwohl die Person ihre eigenen Daten sehen darf.
     const attrs = canEdit
       ? `type="button" data-cycle-day="${esc(c.dateKey)}" aria-label="${esc(formatDate(c.dateKey))}"`
-      : 'aria-hidden="true"';
+      : own
+        ? `role="img" aria-label="${esc(formatDate(c.dateKey))}"`
+        : 'aria-hidden="true"';
     const heart = intimacyDates?.has(c.dateKey)
       ? '<i data-lucide="heart" class="cycle-cal__intimacy-icon icon-sm" aria-hidden="true"></i>'
       : '';
