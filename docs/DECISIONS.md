@@ -382,3 +382,55 @@ renders schedule entries as a layer, it does not host them. A person-first view 
 calendar's own events is a different question, asked in #670 and still open. A second model
 for recurring household work next to tasks, whether as a module of its own or by giving the
 Housekeeping decay tasks people, points or a history of their own.
+
+---
+
+## 7. Data the household owns, not data we tend
+
+**A field or a row earns its place when it stays true without anybody tending it.** A fact the
+household states about its own things is that kind of data, and Yuvomi stores it. A catalogue of
+facts about the world, which somebody here would have to keep correct forever, is not, and Yuvomi
+declines it even when the same screen would benefit from both.
+
+The rule was written down first as a refusal, in [SCOPE.md](SCOPE.md) against #714: a product
+database with nutrition values and package sizes. The reason recorded there matters more than the
+refusal, because the first reason given was the wrong one. It was not privacy - the reporter
+correctly pointed out that you can type nutrition off the packaging with no outside server
+involved. It is that such a table is only useful while it is accurate, and nothing in a
+self-hosted household planner keeps it accurate.
+
+It was reached again, independently, in #1298: "what can I cook from what I have". The matching
+between a recipe ingredient and a stock row looks like the same product-identity problem, and a
+shipped catalogue of canonical ingredient names would indeed be that tended table. But a match the
+household confirms itself, between two rows it created itself, is the other kind of data entirely:
+it is a statement about their own recipe and their own shelf, and it keeps being true with nobody
+tending it. So the answer split along the line rather than along the feature, and stage one became
+reachable (#1314) while the catalogue stayed declined.
+
+That is what the rule is for. Both threads asked "may Yuvomi know what this ingredient is", and the
+answer is that Yuvomi may know what *you* said it is.
+
+### Where the rule lives
+
+Not in one function, because it is a rule about which columns get written at all. The visible
+consequences: `recipe_ingredients` keeps a quantity as free text and `pantry_items` keeps a number
+plus a unit, and the comment above `pantry_items.quantity` (`server/db.js`) says why - a stepper and
+a minimum need a number. Bridging the two is a household statement, not a computation over a
+catalogue. `pantry_item_id` does not exist anywhere yet, and when it does, it is written on
+confirmation only.
+
+### What counts as undoing it
+
+Guessing an identity from a name and storing the guess: that is the tended table again, one
+inference at a time, and it is wrong exactly where a household's own wording differs from ours.
+Shipping a seed list of canonical ingredients, products or nutrition values, whether in a migration
+or as a download. Importing such a list from an outside service and keeping it. And presenting an
+unmatched ingredient as missing rather than unknown, which makes an answer built on partial data
+read as complete.
+
+### What this does not decide
+
+#1293 asks for nutrition values on recipes and daily targets per person. The same line runs through
+it - values a family types for its own recipe are its own data, a daily intake tracker is a
+different question about scope, not about tending - and the thread has not been answered yet. This
+entry gives the criterion, not the answer.
