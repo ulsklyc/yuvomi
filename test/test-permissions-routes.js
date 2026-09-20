@@ -203,6 +203,81 @@ test('PUT /user: Capability kann erlaubt und explizit gesperrt werden', async ()
   assert.equal(blocked.body.data.capabilities[CAPABILITY_KEY], 'none');
 });
 
+function seedPendingFastingReminder(userId) {
+  db.prepare(`INSERT INTO health_fasting_settings
+    (user_id, default_goal_minutes, remind_goal, remind_next_start)
+    VALUES (?, 960, 1, 1)`).run(userId);
+  const fastId = db.prepare(`INSERT INTO health_fasts
+    (user_id, start_at, end_at, start_tzid, goal_minutes)
+    VALUES (?, '2026-09-18T06:00:00.000Z', NULL, 'UTC', 960)`).run(userId).lastInsertRowid;
+  db.prepare(`INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+    VALUES ('fasting_goal', ?, '2026-09-18T22:00:00.000Z', ?)`).run(fastId, userId);
+}
+
+function installFailingReminderDeleteTrigger() {
+  db.exec(`CREATE TRIGGER test_fail_fasting_reminder_delete
+    BEFORE DELETE ON reminders
+    WHEN OLD.entity_type IN ('fasting_goal', 'fasting_next_start')
+    BEGIN
+      SELECT RAISE(ABORT, 'forced fasting reminder cleanup failure');
+    END`);
+}
+
+function removeFailingReminderDeleteTrigger() {
+  db.exec('DROP TRIGGER IF EXISTS test_fail_fasting_reminder_delete');
+}
+
+test('PUT /user rolls permission revocation back when fasting cleanup fails', async () => {
+  const userId = mkUser('fasting-user-failure', 'member', 'child');
+  db.prepare(`INSERT INTO access_permissions
+    (subject_type, subject_id, resource_type, resource_key, access)
+    VALUES ('user', ?, 'capability', 'health_use_fasting', 'allow')`).run(String(userId));
+  seedPendingFastingReminder(userId);
+  installFailingReminderDeleteTrigger();
+  try {
+    const response = await call('PUT', `/user/${userId}`, {
+      actor: ADM,
+      body: { capabilities: { health_use_fasting: 'none' } },
+    });
+    assert.equal(response.status, 500);
+    assert.equal(db.prepare(`SELECT access FROM access_permissions
+      WHERE subject_type = 'user' AND subject_id = ?
+        AND resource_type = 'capability' AND resource_key = 'health_use_fasting'`).get(String(userId)).access, 'allow');
+    assert.equal(db.prepare(`SELECT count(*) AS count FROM reminders
+      WHERE created_by = ? AND entity_type = 'fasting_goal'`).get(userId).count, 1);
+  } finally {
+    removeFailingReminderDeleteTrigger();
+    db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+  }
+});
+
+test('PUT /role rolls permission revocation back when fasting cleanup fails', async () => {
+  const familyRole = 'relative';
+  db.prepare(`DELETE FROM access_permissions WHERE subject_type = 'role' AND subject_id = ?`).run(familyRole);
+  db.prepare(`INSERT INTO access_permissions
+    (subject_type, subject_id, resource_type, resource_key, access)
+    VALUES ('role', ?, 'capability', 'health_use_fasting', 'allow')`).run(familyRole);
+  const userId = mkUser('fasting-role-failure', 'member', familyRole);
+  seedPendingFastingReminder(userId);
+  installFailingReminderDeleteTrigger();
+  try {
+    const response = await call('PUT', `/role/${familyRole}`, {
+      actor: ADM,
+      body: { capabilities: { health_use_fasting: 'none' } },
+    });
+    assert.equal(response.status, 500);
+    assert.equal(db.prepare(`SELECT access FROM access_permissions
+      WHERE subject_type = 'role' AND subject_id = ?
+        AND resource_type = 'capability' AND resource_key = 'health_use_fasting'`).get(familyRole).access, 'allow');
+    assert.equal(db.prepare(`SELECT count(*) AS count FROM reminders
+      WHERE created_by = ? AND entity_type = 'fasting_goal'`).get(userId).count, 1);
+  } finally {
+    removeFailingReminderDeleteTrigger();
+    db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+    db.prepare(`DELETE FROM access_permissions WHERE subject_type = 'role' AND subject_id = ?`).run(familyRole);
+  }
+});
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });

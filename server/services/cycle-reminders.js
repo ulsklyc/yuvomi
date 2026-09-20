@@ -62,8 +62,13 @@ function cycleTabEnabled(database, userId) {
   return healthCycleViews(userId).health_cycle_effective;
 }
 
-/** Fehlt diesem Nutzer der Zugriff auf das Health-Modul überhaupt? */
-function lacksHealth(database, userId) {
+/**
+ * Fehlt diesem Nutzer der Zugriff auf das Health-Modul überhaupt?
+ * Exportiert, weil server/services/prevention-reminders.js dieselbe Frage
+ * stellt (Betreuungs-Fan-out, D6) - eine zweite Abschrift dieser Regel wäre
+ * eine zweite Wahrheit (DECISIONS #2).
+ */
+export function lacksHealth(database, userId) {
   const user = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(userId);
   if (!user) return true;
   return resolvePermissions(database, user).modules.health === 'none';

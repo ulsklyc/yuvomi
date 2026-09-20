@@ -113,10 +113,10 @@ test('eine ausdrueckliche Angabe im Body gewinnt gegen die Voreinstellung', asyn
   assert.equal((await postVital('bp', { visibility: 'private' })).visibility, 'private');
 });
 
-test('die drei uebrigen Bereiche haben je eine Voreinstellung', async () => {
+test('die vier uebrigen Bereiche haben je eine Voreinstellung', async () => {
   asA();
   await call('PUT', '/visibility-defaults', {
-    defaults: { meds: 'family', labs: 'family', activities: 'family' },
+    defaults: { meds: 'family', labs: 'family', activities: 'family', prevention: 'family' },
   });
   const meds = await call('POST', '/medications', { name: 'Aspirin' });
   assert.equal(meds.body.data.visibility, 'family');
@@ -124,6 +124,11 @@ test('die drei uebrigen Bereiche haben je eine Voreinstellung', async () => {
   assert.equal(labs.body.data.visibility, 'family');
   const act = await call('POST', '/activities', { type: 'walk', performed_at: '2026-06-01T08:00' });
   assert.equal(act.body.data.visibility, 'family');
+  // Deckt genau die Luecke ab, die 'prevention' in FLAT_SCOPES ohne einen
+  // Eintrag im Settings-Blatt unerreichbar liess: ohne Test haette niemand
+  // gemerkt, dass die Person nie speichern konnte, was hier gesetzt wird.
+  const prevention = await call('POST', '/prevention/records', { given_on: '2026-06-01', name: 'Reisemedizinische Beratung' });
+  assert.equal(prevention.body.data.visibility, 'family');
 });
 
 // ── Sparse ──────────────────────────────────────────────────────────────────
@@ -140,6 +145,30 @@ test('auf privat zurueck loescht die Zeile, statt sie zu schreiben', async () =>
   // Und die Wirkung ist wieder die ausgelieferte.
   const meds = await call('POST', '/medications', { name: 'Paracetamol' });
   assert.equal(meds.body.data.visibility, 'private');
+});
+
+// Der Server kennt einen Bereich (FLAT_SCOPES), sobald er hier registriert
+// ist - aber ohne eine Zeile im Settings-Blatt kann ihn niemand je auf
+// 'family' stellen, und defaultVisibilityFor() bliebe fuer immer 'private'
+// (genau die Luecke, die 'prevention' hier eine Weile hatte). Ein Fund gegen
+// den Quelltext statt gegen den Server, weil das Blatt ein Browser-Modul ist.
+test('jeder FLAT_SCOPES-Schluessel hat eine Zeile im Settings-Blatt', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const root = fileURLToPath(new URL('..', import.meta.url));
+  const serverSrc = readFileSync(`${root}server/routes/health/visibility-defaults.js`, 'utf8');
+  const clientSrc = readFileSync(`${root}public/settings/pages/personal-health.js`, 'utf8');
+
+  const flatScopesBlock = serverSrc.match(/const FLAT_SCOPES = Object\.freeze\(\{([\s\S]*?)\}\);/)[1];
+  const serverKeys = [...flatScopesBlock.matchAll(/^\s*(\w+):/gm)].map((m) => m[1]).sort();
+
+  // Nur der visibilityScopes()-Block zaehlt - ein `key: '...'` anderswo im
+  // Modul (z.B. ein kuenftiges, unverwandtes Feature) soll kein falscher Fund werden.
+  const scopesBlock = clientSrc.match(/function visibilityScopes\(\) \{([\s\S]*?)\n\}/)[1];
+  const clientKeys = [...scopesBlock.matchAll(/key: '(\w+)'/g)].map((m) => m[1]).sort();
+
+  const missing = serverKeys.filter((k) => !clientKeys.includes(k));
+  assert.deepEqual(missing, [], `Settings-Blatt fehlen Zeilen fuer: ${missing.join(', ')}`);
 });
 
 test('unbekannte Bereiche und Werte werden abgewiesen', async () => {

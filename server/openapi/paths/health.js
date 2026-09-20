@@ -16,6 +16,7 @@ export function healthPaths() {
     409: { description: 'Numeric code: 409; reason: FASTING_REVISION_CONFLICT, FASTING_ACTIVE_EXISTS, FASTING_OVERLAP, FASTING_ALREADY_FINISHED or FASTING_ACK_REQUIRED. Revision/overlap conflicts may include current record.', content: { 'application/json': { schema: { type: 'object', properties: { error: { type: 'string' }, code: { type: 'integer', enum: [409] }, reason: { type: 'string' }, current: { type: 'object' } } } } } },
     500: { $ref: '#/components/responses/InternalServerError' },
   });
+  const booleanPreference = { oneOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }, { type: 'string', enum: ['0', '1'] }] };
   return {
     '/api/v1/health/vitals': {
       get: op({ summary: 'List vital measurements', tag: 'Health', description: 'Scoped to the viewer; `?user_id=` filters to a family member (only their `family`-visible rows). Optional `type`, `from`, `to` filters.' }),
@@ -118,7 +119,7 @@ export function healthPaths() {
     },
     '/api/v1/health/fasting/settings': {
       get: op({ summary: 'Get fasting settings', tag: 'Health', params: [userParam], responses: fastingResponses(), description: 'Settings or null for an ungranted family reader.' }),
-      put: op({ summary: 'Update fasting settings', tag: 'Health', params: [userParam], responses: fastingResponses(), description: 'Personal settings are owner-only, including safety acknowledgement. clock_mode is stored per user in sync_config. Supplying active_id (null if none) with a default_goal_minutes change also changes that active goal atomically; a matching active row requires expected_revision. Without active_id only the default changes. Completed records remain unchanged.', stateChanging: true, requestBody: fastingBody({ user_id: revision, default_goal_minutes: goal, zone_mode: { type: 'string', enum: ['timer', 'educational'] }, clock_mode: { type: 'string', enum: ['auto', 'elapsed', 'remaining'] }, acknowledge_safety: { type: 'boolean' }, active_id: { ...revision, nullable: true }, expected_revision: revision }) }),
+      put: op({ summary: 'Update fasting settings', tag: 'Health', params: [userParam], responses: fastingResponses(), description: 'Personal settings are owner-only, including safety acknowledgement. clock_mode is stored per user in sync_config. Supplying active_id (null if none) with a default_goal_minutes change also changes that active goal atomically; a matching active row requires expected_revision. Without active_id only the default changes. Completed records remain unchanged. Notification preferences are retained when unavailable; reconciliation is transactional.', stateChanging: true, requestBody: fastingBody({ user_id: revision, default_goal_minutes: goal, zone_mode: { type: 'string', enum: ['timer', 'educational'] }, clock_mode: { type: 'string', enum: ['auto', 'elapsed', 'remaining'] }, acknowledge_safety: { type: 'boolean' }, active_id: { ...revision, nullable: true }, expected_revision: revision, remind_goal: booleanPreference, remind_next_start: booleanPreference }) }),
     },
     '/api/v1/health/fasting/acknowledge-safety': {
       post: op({ summary: 'Acknowledge fasting safety information', tag: 'Health', params: [userParam], stateChanging: true, responses: fastingResponses(), description: 'Records first-use acknowledgement for the authenticated owner only. A caregiver cannot acknowledge for another person.', requestBody: fastingBody({ user_id: revision }, [], false) }),
@@ -209,6 +210,25 @@ export function healthPaths() {
     },
     '/api/v1/health/visibility-defaults/apply': {
       patch: op({ summary: 'Move existing entries of one area to a visibility', tag: 'Health', stateChanging: true, requestBody: jsonBody(null), description: 'Body `{ scope, visibility }`. Touches the CALLER\'s own rows only, and only in the named area - a caregiver may tend individual entries but not relabel somebody else\'s history in one move. The target comes from the request rather than from the stored default, because `private` is not stored at all.' }),
+    },
+    '/api/v1/health/prevention/types': {
+      get: op({ summary: 'List the household\'s preventive-care type registry', tag: 'Health', description: 'Open to every member. Nothing is seeded - the household names its own vaccination/checkup types.' }),
+      post: op({ summary: 'Add a preventive-care type', tag: 'Health', admin: true, stateChanging: true, requestBody: jsonBody(null), description: 'Body: { name, kind: "vaccination"|"checkup", default_interval_months?, icon?, sort_order? }. `default_interval_months` omitted/null means one-off (no recurrence).' }),
+    },
+    '/api/v1/health/prevention/types/{id}': {
+      patch: op({ summary: 'Update a preventive-care type', tag: 'Health', admin: true, params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      delete: op({ summary: 'Delete a preventive-care type', tag: 'Health', admin: true, params: [idParam()], stateChanging: true, description: 'Its records are kept (type_id set to NULL) with a name snapshot taken at delete time, so their history stays readable.' }),
+    },
+    '/api/v1/health/prevention/records': {
+      get: op({ summary: 'List preventive-care records (vaccinations/check-ups given)', tag: 'Health', description: 'Scoped to the viewer; `?user_id=` filters to a family member (their `family`-visible rows, or all of them if the viewer is a caregiver for that person). Optional `type_id`, `from`, `to` filters.' }),
+      post: op({ summary: 'Log a preventive-care record', tag: 'Health', stateChanging: true, requestBody: jsonBody(null), description: 'Body: { type_id? or name, given_on, dose_number?, batch?, provider?, note?, interval_months?, next_due_on?, reminder_offset_days?, visibility?, user_id? }. `user_id` lets a caregiver log for the person they care for (#584); the row\'s visibility then follows that person\'s own default, not the caller\'s.' }),
+    },
+    '/api/v1/health/prevention/records/{id}': {
+      patch: op({ summary: 'Update a preventive-care record', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      delete: op({ summary: 'Delete a preventive-care record', tag: 'Health', params: [idParam()], stateChanging: true }),
+    },
+    '/api/v1/health/prevention/due': {
+      get: op({ summary: 'List preventive-care items due or overdue', tag: 'Health', description: 'Scoped to the viewer; `?user_id=` computes the list for a family member instead (subject to the same visibility rule as the records list). Derived from each type\'s most recent record plus its interval - the same computation the reminder sync uses, never duplicated.' }),
     },
   };
 }

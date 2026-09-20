@@ -2,6 +2,7 @@ import { resolvePermissions } from '../permissions.js';
 import { summarizeFastingRows, fastingStreaks, weeklyFastingSeries } from './fasting-stats.js';
 import { fastingDateKeyFactory, parseFastingDateRange, rowMatchesFastingDateRange } from './fasting-dates.js';
 import { householdTimeZone, shiftDateKey, todayKey } from '../utils/timezone.js';
+import { syncFastingRemindersForUser } from './fasting-reminders.js';
 
 export class FastingError extends Error {
   constructor(status, reason, message, current = undefined) {
@@ -111,6 +112,13 @@ function ratingValue(value) {
   const n = Number(value);
   if (!Number.isInteger(n) || n < 1 || n > 5) fail(400, 'FASTING_RATING_INVALID', 'rating must be an integer from 1 to 5.');
   return n;
+}
+
+function booleanSetting(value, field) {
+  if (value === undefined) return undefined;
+  if (value === true || value === 1 || value === '1') return 1;
+  if (value === false || value === 0 || value === '0') return 0;
+  fail(400, 'FASTING_SETTING_INVALID', `${field} must be a boolean.`);
 }
 
 function visibilityValue(value, fallback = 'private') {
@@ -325,7 +333,11 @@ function createFastInTransaction(database, actor, input = {}) {
 }
 
 export function createFast(database, actor, input = {}) {
-  return immediate(database, () => createFastInTransaction(database, actor, input));
+  return immediate(database, () => {
+    const row = createFastInTransaction(database, actor, input);
+    syncFastingRemindersForUser(database, row.user_id);
+    return row;
+  });
 }
 
 function loadWritable(database, actorId, id) {
@@ -362,7 +374,11 @@ function finishFastInTransaction(database, actor, id, input = {}) {
 }
 
 export function finishFast(database, actor, id, input = {}) {
-  return immediate(database, () => finishFastInTransaction(database, actor, id, input));
+  return immediate(database, () => {
+    const row = finishFastInTransaction(database, actor, id, input);
+    syncFastingRemindersForUser(database, row.user_id);
+    return row;
+  });
 }
 
 function updateFastInTransaction(database, actor, id, input = {}) {
@@ -387,7 +403,11 @@ function updateFastInTransaction(database, actor, id, input = {}) {
 }
 
 export function updateFast(database, actor, id, input = {}) {
-  return immediate(database, () => updateFastInTransaction(database, actor, id, input));
+  return immediate(database, () => {
+    const row = updateFastInTransaction(database, actor, id, input);
+    syncFastingRemindersForUser(database, row.user_id);
+    return row;
+  });
 }
 
 function deleteFastInTransaction(database, actor, id, input = {}) {
@@ -397,15 +417,25 @@ function deleteFastInTransaction(database, actor, id, input = {}) {
   if (row.revision !== revision) fail(409, 'FASTING_REVISION_CONFLICT', 'The fasting record changed. Reload and try again.', row);
   const changed = database.prepare('DELETE FROM health_fasts WHERE id = ? AND revision = ?').run(row.id, revision);
   if (!changed.changes) fail(409, 'FASTING_REVISION_CONFLICT', 'The fasting record changed. Reload and try again.', row);
+  database.prepare(`DELETE FROM reminders
+    WHERE entity_id = ? AND entity_type IN ('fasting_goal', 'fasting_next_start')`).run(row.id);
   return row;
 }
 
 export function deleteFast(database, actor, id, input = {}) {
-  return immediate(database, () => deleteFastInTransaction(database, actor, id, input));
+  return immediate(database, () => {
+    const row = deleteFastInTransaction(database, actor, id, input);
+    syncFastingRemindersForUser(database, row.user_id);
+    return row;
+  });
 }
 
 export function updateFastingSettings(database, actor, input = {}, subjectId = Number(actor?.id)) {
-  return immediate(database, () => updateSettings(database, actor, input, subjectId));
+  return immediate(database, () => {
+    const settings = updateSettings(database, actor, input, subjectId);
+    syncFastingRemindersForUser(database, Number(subjectId));
+    return settings;
+  });
 }
 
 function updateSettings(database, actor, input, subjectId) {
@@ -420,6 +450,8 @@ function updateSettings(database, actor, input, subjectId) {
   }
   const goal = input.defaultGoalMinutes === undefined ? undefined : goalMinutes(input.defaultGoalMinutes, 'default_goal_minutes');
   const zone = input.zoneMode === undefined ? undefined : input.zoneMode;
+  const remindGoal = booleanSetting(input.remindGoal, 'remind_goal');
+  const remindNextStart = booleanSetting(input.remindNextStart, 'remind_next_start');
   if (input.clockMode !== undefined && !['auto', 'elapsed', 'remaining'].includes(input.clockMode)) fail(400, 'FASTING_CLOCK_MODE_INVALID', 'Invalid clock mode.');
   if (zone !== undefined && zone !== 'timer' && zone !== 'educational') fail(400, 'FASTING_ZONE_MODE_INVALID', 'zone_mode must be timer or educational.');
   if (goal !== undefined && input.activeId !== undefined) {
@@ -432,18 +464,22 @@ function updateSettings(database, actor, input, subjectId) {
     .run(`fasting_clock_mode:user:${subject}`, input.clockMode);
   if (input.acknowledgeSafety === true) acknowledgeSafetyFor(database, actorId, subject);
   const current = database.prepare('SELECT * FROM health_fasting_settings WHERE user_id = ?').get(subject);
-  if (goal === undefined && zone === undefined) return {
-    ...(current || { user_id: subject, default_goal_minutes: null, zone_mode: 'timer' }),
+  if (goal === undefined && zone === undefined && remindGoal === undefined && remindNextStart === undefined) return {
+    ...(current || { user_id: subject, default_goal_minutes: null, zone_mode: 'timer', remind_goal: 0, remind_next_start: 0 }),
     clock_mode: getFastingClockMode(database, subject),
   };
   const nextGoal = goal === undefined ? (current?.default_goal_minutes ?? null) : goal;
   const nextZone = zone === undefined ? (current?.zone_mode || 'timer') : zone;
-  database.prepare(`INSERT INTO health_fasting_settings (user_id, default_goal_minutes, zone_mode)
-    VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET
+  const nextRemindGoal = remindGoal === undefined ? (current?.remind_goal || 0) : remindGoal;
+  const nextRemindNextStart = remindNextStart === undefined ? (current?.remind_next_start || 0) : remindNextStart;
+  database.prepare(`INSERT INTO health_fasting_settings (user_id, default_goal_minutes, zone_mode, remind_goal, remind_next_start)
+    VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET
     default_goal_minutes = excluded.default_goal_minutes,
     zone_mode = excluded.zone_mode,
+    remind_goal = excluded.remind_goal,
+    remind_next_start = excluded.remind_next_start,
     updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')`)
-    .run(subject, nextGoal, nextZone);
+    .run(subject, nextGoal, nextZone, nextRemindGoal, nextRemindNextStart);
   return {
     ...database.prepare('SELECT * FROM health_fasting_settings WHERE user_id = ?').get(subject),
     clock_mode: getFastingClockMode(database, subject),

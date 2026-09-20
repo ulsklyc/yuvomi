@@ -56,11 +56,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   household display time zone consistently. Calculations remain bounded for very long intervals.
   (#1178)
 
+- **Health has a new Prevention tab for vaccinations and check-ups.** Define your household's own
+  types (a tetanus booster, a dentist check-up, anything) with an optional recurring interval -
+  there is no shipped catalog, since regional vaccination schedules go stale. Log what happened and
+  when, and the tab shows a "due / overdue" list computed from your most recent entry per type. A
+  caregiver logging for the person they care for follows that person's own visibility default, not
+  their own. Caregivers also receive the due reminder themselves, subject to the owner's opt-in - it
+  names the person it is about, so it stays useful to someone caring for more than one family
+  member - and revoking a caregiver's access removes that reminder immediately. The type registry is
+  admin-editable under Settings → Modules → Health.
+
 - **Family documents can now carry an optional expiry date and reminder lead time.** Set an expiry
   (e.g. a passport or a residence permit) and how many days ahead to be reminded - an expiring or
   overdue document shows a status chip, and a matching "expiring soon" filter chip sits next to the
   category chips. Archiving a document (or deleting it) clears its reminder, so an archived scan
   never keeps nagging.
+
+- **Fasting can now remind you when you reach your goal and when it is time to start again.**
+  Each reminder can be enabled independently. Changing a fast, its goal or its permissions removes
+  notifications that no longer apply without erasing the saved preference. (#1179)
 
 ### Changed
 

@@ -20,6 +20,8 @@ import { syncAllCycleReminders } from './cycle-reminders.js';
 import { syncAllScheduleReminders } from './schedule-reminders.js';
 import { syncAllWasteReminders } from './waste-reminders.js';
 import { withoutSwitchedOffModules } from './reminder-origins.js';
+import { syncAllPreventionReminders } from './prevention-reminders.js';
+import { syncAllFastingReminders } from './fasting-reminders.js';
 
 const log = createLogger('Notifications');
 const APP_NAME = 'Yuvomi';
@@ -125,6 +127,9 @@ const REMINDER_ORIGINS = {
   // contract every other Waste projection already uses.
   waste_pickup:           { titleKey: 'nav.waste',              url: '/waste' },
   document_expiry:        { titleKey: 'nav.documents',          url: '/documents' },
+  health_prevention_due:  { titleKey: 'health.tabs.prevention', url: '/health/prevention' },
+  fasting_goal:           { titleKey: 'health.fasting.title',   url: '/health/fasting' },
+  fasting_next_start:     { titleKey: 'health.fasting.title',   url: '/health/fasting' },
 };
 
 /**
@@ -227,6 +232,26 @@ function documentExpiryBody(reminder) {
   return `${reminder.entity_title} - ${reminder.doc_expires_at}`;
 }
 
+/**
+ * Body of a preventive-care reminder: the type/record name, PLUS the subject's
+ * name - but only on an INHERITED row (`assigned_from IS NOT NULL`, a
+ * caregiver's copy). D6: without the name a caregiver of two people cannot
+ * tell which one it is about; on the owner's own row it would just be noise
+ * ("Tetanus booster due - Mara" sent to Mara herself says nothing new).
+ */
+function preventionDueBody(reminder) {
+  if (reminder.assigned_from && reminder.prevention_subject_name) {
+    return `${reminder.entity_title} - ${reminder.prevention_subject_name}`;
+  }
+  return reminder.entity_title;
+}
+
+function fastingBody(reminder, locale) {
+  return translate(locale, reminder.entity_type === 'fasting_goal'
+    ? 'health.fasting.goalReached'
+    : 'health.fasting.remindNext');
+}
+
 function reminderPayload(reminder, locale, dateFormat) {
   const title = reminder.entity_title || FALLBACK_BODY;
   const origin = REMINDER_ORIGINS[reminder.entity_type];
@@ -247,6 +272,10 @@ function reminderPayload(reminder, locale, dateFormat) {
     body = wastePickupBody(reminder);
   } else if (reminder.entity_type === 'document_expiry' && reminder.entity_title) {
     body = documentExpiryBody(reminder);
+  } else if (reminder.entity_type === 'health_prevention_due' && reminder.entity_title) {
+    body = preventionDueBody(reminder);
+  } else if (reminder.entity_type === 'fasting_goal' || reminder.entity_type === 'fasting_next_start') {
+    body = fastingBody(reminder, locale);
   }
   // Waste is the one entity_type with a real per-occurrence deep link
   // (?type=<id>&date=<date_key>, the same contract every other Waste
@@ -396,6 +425,17 @@ export async function processDueNotifications({
     }
   }
 
+  // Fasting permission revocation is a delivery boundary. A failed
+  // reconciliation must fail closed for fasting without silencing unrelated
+  // reminders in the same household.
+  let fastingSyncFailed = false;
+  try {
+    syncAllFastingReminders(activeDb, now);
+  } catch (err) {
+    fastingSyncFailed = true;
+    log.error('Fasting reminder sync failed:', err?.message || err);
+  }
+
   // DER BESTAND ZIEHT HIER NACH, nicht erst beim naechsten Anfassen. Der
   // Router legt die Erinnerung eines Artikels beim Speichern an - aber ein
   // Vorrat, der schon vor diesem Feature im Regal stand, ist nie gespeichert
@@ -429,9 +469,16 @@ export async function processDueNotifications({
   } catch (err) {
     log.error('Waste reminder sync failed:', err?.message || err);
   }
+  // Same spot, same shape: household-wide is wrong here too - the anchor is a
+  // per-subject record, and the D6 caregiver fan-out is per-subject as well.
+  try {
+    syncAllPreventionReminders(activeDb, now);
+  } catch (err) {
+    log.error('Prevention reminder sync failed:', err?.message || err);
+  }
 
   const dueRows = activeDb.prepare(`
-    SELECT r.id, r.created_by, r.entity_type, r.entity_id,
+    SELECT r.id, r.created_by, r.entity_type, r.entity_id, r.assigned_from,
       CASE r.entity_type
         WHEN 'task'  THEN (SELECT title FROM tasks           WHERE id = r.entity_id)
         WHEN 'event' THEN (SELECT title FROM calendar_events WHERE id = r.entity_id)
@@ -458,6 +505,11 @@ export async function processDueNotifications({
           WHERE e.id = r.entity_id
         )
         WHEN 'document_expiry' THEN (SELECT name FROM family_documents WHERE id = r.entity_id)
+        WHEN 'health_prevention_due' THEN (
+          SELECT COALESCE(t.name, pr.name) FROM health_prevention_records pr
+          LEFT JOIN health_prevention_types t ON t.id = pr.type_id
+          WHERE pr.id = r.entity_id
+        )
       END AS entity_title,
       -- Unterscheidet die eigene Perioden-Erinnerung von der an eine
       -- Partnerperson weitergereichten (gleicher entity_type, siehe
@@ -500,7 +552,14 @@ export async function processDueNotifications({
         THEN (SELECT next_payment_date FROM budget_subscriptions WHERE id = r.entity_id)
         END AS sub_next_payment_date,
       CASE WHEN r.entity_type = 'document_expiry'
-        THEN (SELECT expires_at FROM family_documents WHERE id = r.entity_id) END AS doc_expires_at
+        THEN (SELECT expires_at FROM family_documents WHERE id = r.entity_id) END AS doc_expires_at,
+      -- NUR fuer den Subjekt-Namen (D6) gebraucht - reminderPayload() zeigt ihn
+      -- ausschliesslich, wenn assigned_from gesetzt ist (geerbte Zeile).
+      CASE WHEN r.entity_type = 'health_prevention_due' THEN (
+        SELECT u.display_name FROM health_prevention_records pr
+        JOIN users u ON u.id = pr.user_id
+        WHERE pr.id = r.entity_id
+      ) END AS prevention_subject_name
     FROM reminders r
     WHERE r.dismissed = 0 AND r.pushed_at IS NULL AND r.remind_at <= ?
       -- Kein Push an eine Aufgabe/einen Termin, den es nicht mehr gibt. Seit
@@ -522,7 +581,8 @@ export async function processDueNotifications({
   // bleibt ausstehend (pushed_at bleibt leer) und geht nach dem Wiedereinschalten
   // raus - siehe withoutSwitchedOffModules() fuer den Grund. Synchron direkt
   // nach dem Lesen, vor dem ersten `await` der Schleife.
-  const due = withoutSwitchedOffModules(activeDb, dueRows);
+  const due = withoutSwitchedOffModules(activeDb, dueRows).filter((row) => !fastingSyncFailed
+    || (row.entity_type !== 'fasting_goal' && row.entity_type !== 'fasting_next_start'));
 
   const counters = { due: due.length, attempted: 0, sent: 0, failed: 0, skipped: 0 };
   const markPushed = activeDb.prepare('UPDATE reminders SET pushed_at = ? WHERE id = ?');
