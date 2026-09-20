@@ -211,5 +211,24 @@ export function healthPaths() {
     '/api/v1/health/visibility-defaults/apply': {
       patch: op({ summary: 'Move existing entries of one area to a visibility', tag: 'Health', stateChanging: true, requestBody: jsonBody(null), description: 'Body `{ scope, visibility }`. Touches the CALLER\'s own rows only, and only in the named area - a caregiver may tend individual entries but not relabel somebody else\'s history in one move. The target comes from the request rather than from the stored default, because `private` is not stored at all.' }),
     },
+    '/api/v1/health/prevention/types': {
+      get: op({ summary: 'List the household\'s preventive-care type registry', tag: 'Health', description: 'Open to every member. Nothing is seeded - the household names its own vaccination/checkup types.' }),
+      post: op({ summary: 'Add a preventive-care type', tag: 'Health', admin: true, stateChanging: true, requestBody: jsonBody(null), description: 'Body: { name, kind: "vaccination"|"checkup", default_interval_months?, icon?, sort_order? }. `default_interval_months` omitted/null means one-off (no recurrence).' }),
+    },
+    '/api/v1/health/prevention/types/{id}': {
+      patch: op({ summary: 'Update a preventive-care type', tag: 'Health', admin: true, params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      delete: op({ summary: 'Delete a preventive-care type', tag: 'Health', admin: true, params: [idParam()], stateChanging: true, description: 'Its records are kept (type_id set to NULL) with a name snapshot taken at delete time, so their history stays readable.' }),
+    },
+    '/api/v1/health/prevention/records': {
+      get: op({ summary: 'List preventive-care records (vaccinations/check-ups given)', tag: 'Health', description: 'Scoped to the viewer; `?user_id=` filters to a family member (their `family`-visible rows, or all of them if the viewer is a caregiver for that person). Optional `type_id`, `from`, `to` filters.' }),
+      post: op({ summary: 'Log a preventive-care record', tag: 'Health', stateChanging: true, requestBody: jsonBody(null), description: 'Body: { type_id? or name, given_on, dose_number?, batch?, provider?, note?, interval_months?, next_due_on?, reminder_offset_days?, visibility?, user_id? }. `user_id` lets a caregiver log for the person they care for (#584); the row\'s visibility then follows that person\'s own default, not the caller\'s.' }),
+    },
+    '/api/v1/health/prevention/records/{id}': {
+      patch: op({ summary: 'Update a preventive-care record', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      delete: op({ summary: 'Delete a preventive-care record', tag: 'Health', params: [idParam()], stateChanging: true }),
+    },
+    '/api/v1/health/prevention/due': {
+      get: op({ summary: 'List preventive-care items due or overdue', tag: 'Health', description: 'Scoped to the viewer; `?user_id=` computes the list for a family member instead (subject to the same visibility rule as the records list). Derived from each type\'s most recent record plus its interval - the same computation the reminder sync uses, never duplicated.' }),
+    },
   };
 }

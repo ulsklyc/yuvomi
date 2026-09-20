@@ -12,7 +12,7 @@ import {
 
 process.env.DB_PATH = ':memory:';
 const { MIGRATIONS } = await import('../server/db.js');
-const REMINDER_MIGRATION_VERSION = 219;
+const REMINDER_MIGRATION_VERSION = 220;
 
 function setup(path = join(mkdtempSync(join(tmpdir(), 'yuvomi-fasting-service-')), 'db.sqlite')) {
   const database = buildMigratedDatabase(

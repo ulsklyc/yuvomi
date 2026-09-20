@@ -218,6 +218,20 @@ export const SETTINGS_LEAVES = freezeEntries([
     loader: () => import('/settings/pages/modules-rewards.js'),
   },
   {
+    // Der Vorsorge-Typregister ist ein Haushaltskatalog (D2, docs/SCOPE.md
+    // schliesst mitgelieferte Kataloge aus, die veralten) - der Admin legt die
+    // Arten selbst an, es gibt keine Voreinstellung.
+    id: 'modules-health',
+    domainId: 'modules',
+    path: '/settings/modules/health',
+    labelKey: 'settings.pageHealthModule',
+    descriptionKey: 'settings.pageHealthModuleDescription',
+    icon: 'syringe',
+    module: 'health',
+    adminOnly: true,
+    loader: () => import('/settings/pages/modules-health.js'),
+  },
+  {
     // Nicht an ein einzelnes Modul gebunden (die Kachel sammelt aus Kalender
     // UND Aufgaben, #647) - deshalb kein `module:`, wie modules-options.js.
     id: 'modules-countdowns',
@@ -412,9 +426,11 @@ const RENAMED_SETTINGS_PATHS = Object.freeze({
   // `modules-dashboard` aufgelöst: der Anwendungsname sitzt jetzt bei den
   // Systemangaben, der Haushalts-Standardstandort in einem eigenen Blatt.
   '/settings/modules/dashboard': '/settings/admin/weather',
-  // Drei Blätter für drei Checkboxen zu einem zusammengelegt.
+  // Zwei Blätter für zwei Checkboxen zu einem zusammengelegt. `/settings/modules/health`
+  // gehörte einst dazu (dritte Checkbox) - der Pfad trägt jetzt wieder eigenen
+  // Inhalt (das Vorsorge-Typregister), also kein Alias mehr auf
+  // `modules-options`. Der Haushalts-Schalter für das Modul selbst bleibt dort.
   '/settings/modules/budget': '/settings/modules/options',
-  '/settings/modules/health': '/settings/modules/options',
   '/settings/modules/housekeeping': '/settings/modules/options',
 });
 

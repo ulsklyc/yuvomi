@@ -32,7 +32,7 @@ import {
 import { getReadableTextColor } from '/utils/color.js';
 import { resolveEventColor } from '/utils/event-color.js';
 import { refresh as refreshReminders } from '/reminders.js';
-import { parseRemindAtAsUtc } from '/utils/reminder-offset.js';
+import { parseRemindAtAsUtc, naiveUtc } from '/utils/reminder-offset.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
 import { withChosenPeople } from '/utils/people-picker.js';
 import { othersCanRead } from '/utils/household.js';
@@ -4046,6 +4046,13 @@ export const __test = {
   canonicalReminderOffsets,
   reminderOffsetFromEvent,
   reminderOwnerId,
+  // Die Erinnerung nach dem Terminbeginn (#1260): der Abschnitt, der sie
+  // benennt, die Regel, die sie nach einer Verschiebung neu bewertet, und die
+  // Leseansicht, die denselben Zeitpunkt nennen muss. Gemessen wird am
+  // AUFRUFER - die Verdrahtung ueber `wireEventForm`, das Ergebnis an dem, was
+  // `saveEvent` wirklich sendet -, nicht an den Helfern dazwischen.
+  renderCalendarReminderSection, afterStartResolution, reminderSummary,
+  wireEventForm, saveEvent,
   EVENT_COLORS,
   renderScheduleChip,
   scheduleEntryTitle,
@@ -4191,9 +4198,11 @@ function reminderSummary(ev, reminders) {
       const value = reminderOffsetFromEvent(ev, r);
       const match = labels.find((o) => o.value === value && o.value !== '');
       // „Benutzerdefiniert…" ist als Auswahl-Label gedacht, nicht als Aussage -
-      // in der Leseansicht steht stattdessen der tatsächliche Zeitpunkt.
+      // in der Leseansicht steht stattdessen der tatsächliche Zeitpunkt. Das
+      // gilt auch für eine Erinnerung nach dem Terminbeginn (#1260): sie hat
+      // kein Label, das sie beschreibt, nur ihren Zeitpunkt.
       return value === 'custom' || !match
-        ? formatDateTime(parseRemindAtAsUtc(r.remind_at))
+        ? reminderWhenText(r)
         : match.label;
     })
     .filter(Boolean)
@@ -4436,28 +4445,88 @@ const REMINDER_OFFSETS = () => [
   { value: 'custom', label: t('reminders.offsetCustom') },
 ];
 
+/**
+ * Der Wert der Auswahl fuer eine Erinnerung, die NACH dem Terminbeginn liegt.
+ *
+ * `remind_at` ist ein absoluter Zeitpunkt, die Auswahl kennt nur Vorlaeufe.
+ * Verschiebt jemand den Beginn eines Termins hinter eine bestehende
+ * Erinnerung - per Ziehen im Raster, ueber einen Sync, ueber die API -, liegt
+ * die Erinnerung danach, und kein Vorlauf beschreibt sie. Vorher fiel dieser
+ * Fall auf „Benutzerdefiniert, 1 Minute" zurueck, und das naechste Speichern
+ * rechnete aus dieser Notluege einen neuen Zeitpunkt: die Erinnerung wanderte
+ * Tage nach vorn, ohne dass jemand die Zeile angefasst hatte (#1260).
+ *
+ * Der Zustand bekommt deshalb einen eigenen Namen, wie im Aufgaben-Dialog
+ * (`offset_after_due`, #1261). Man waehlt ihn nicht aus, man ist darin.
+ */
+const REMINDER_AFTER_START = 'after_start';
+
+const REMINDER_PRESET_MINUTES = [0, 15, 60, 1440, 2880, 10080, 20160];
+
+/** Der Zeitpunkt, an dem sich die Erinnerungen dieses Termins ausrichten. */
+function reminderAnchorStart(event) {
+  return event?.reminder_anchor_start ?? event?.start_datetime;
+}
+
+/** Ein Termin-Start als Millisekunden; ein reines Datum gilt als 09:00. */
+function reminderStartMs(startDatetime) {
+  return new Date(reminderStartValue(startDatetime)).getTime();
+}
+
+/** Vorlauf in ganzen Minuten - positiv heisst „vor dem Beginn". */
+function reminderLeadMinutes(anchorMs, remindAt) {
+  return Math.round((anchorMs - parseRemindAtAsUtc(remindAt).getTime()) / 60000);
+}
+
+/**
+ * Die Zeile, die einen Vorlauf von `diffMin` Minuten beschreibt.
+ *
+ * EIN VORLAUF KANN NEGATIV SEIN, und dann beschreibt ihn kein Preset. Unter
+ * einer Minute bleibt es in BEIDE Richtungen bei „Zum Startzeitpunkt" - sonst
+ * hinge an ein paar Sekunden Rundung eine Warnung (dieselbe Grenze wie
+ * `resolveReminderPreset`). Die Custom-Felder eines Nachlaufs stehen auf dem
+ * Vorgabewert einer neuen Zeile, 1 Tag, statt auf der „1 Minute", die frueher
+ * aus dem weggeklemmten negativen Wert entstand.
+ */
+function reminderRowForLead(diffMin) {
+  if (diffMin < 0) return { offset: REMINDER_AFTER_START, amount: 1, unit: 'days' };
+  const preset = REMINDER_PRESET_MINUTES.find((o) => o === diffMin);
+  let custom;
+  if (diffMin % 10080 === 0 && diffMin >= 10080) custom = { amount: diffMin / 10080, unit: 'weeks' };
+  else if (diffMin % 1440 === 0 && diffMin >= 1440) custom = { amount: diffMin / 1440, unit: 'days' };
+  else if (diffMin % 60 === 0 && diffMin >= 60) custom = { amount: diffMin / 60, unit: 'hours' };
+  else custom = { amount: Math.max(diffMin, 1), unit: 'minutes' };
+  return { offset: preset !== undefined ? String(preset) : 'custom', ...custom };
+}
+
 function reminderOffsetFromEvent(event, reminder) {
-  const anchor = event?.reminder_anchor_start ?? event?.start_datetime;
+  const anchor = reminderAnchorStart(event);
   if (!reminder || !anchor) return '';
-  const remindMs = parseRemindAtAsUtc(reminder.remind_at).getTime();
-  const startMs  = new Date(reminderStartValue(anchor)).getTime();
-  const diffMin  = Math.round((startMs - remindMs) / 60000);
-  const opts = [0, 15, 60, 1440, 2880, 10080, 20160];
-  const match = opts.find((o) => o === diffMin);
-  return match !== undefined ? String(match) : 'custom';
+  return reminderRowForLead(reminderLeadMinutes(reminderStartMs(anchor), reminder.remind_at)).offset;
 }
 
 function customReminderFromEvent(event, reminder) {
   const fallback = { amount: 1, unit: 'days' };
-  const anchor = event?.reminder_anchor_start ?? event?.start_datetime;
+  const anchor = reminderAnchorStart(event);
   if (!reminder || !anchor) return fallback;
-  const diffMin = Math.max(0, Math.round(
-    (new Date(reminderStartValue(anchor)).getTime() - parseRemindAtAsUtc(reminder.remind_at).getTime()) / 60000
-  ));
-  if (diffMin % 10080 === 0 && diffMin >= 10080) return { amount: diffMin / 10080, unit: 'weeks' };
-  if (diffMin % 1440 === 0 && diffMin >= 1440) return { amount: diffMin / 1440, unit: 'days' };
-  if (diffMin % 60 === 0 && diffMin >= 60) return { amount: diffMin / 60, unit: 'hours' };
-  return { amount: Math.max(diffMin, 1), unit: 'minutes' };
+  const { amount, unit } = reminderRowForLead(reminderLeadMinutes(reminderStartMs(anchor), reminder.remind_at));
+  return { amount, unit };
+}
+
+/**
+ * Der Zeitpunkt einer Erinnerung als lesbarer Text in der Anzeigezone.
+ *
+ * Aus einem Date, nicht aus dem String: `remind_at` ist naiv-UTC, und als
+ * String gelesen hielte die Formatierung ihn fuer Wanduhrzeit. Und bewusst
+ * NICHT ueber `formatDateTime` - das erkennt die Uhrzeit an der Laenge eines
+ * Strings, bekommt hier aber ein Date und liess sie deshalb weg. Die
+ * Leseansicht nannte so nur den Tag einer Erinnerung, nie die Uhrzeit.
+ */
+function reminderWhenText(reminder) {
+  if (!reminder?.remind_at) return '';
+  const at = parseRemindAtAsUtc(reminder.remind_at);
+  if (Number.isNaN(at.getTime())) return '';
+  return `${formatPreferredDate(at)} ${formatTime(at)} ${timeSuffix()}`.trimEnd();
 }
 
 function customReminderMinutes(amount, unit) {
@@ -4487,33 +4556,190 @@ function canonicalReminderOffsets(rows, enabled = true) {
   return offsets;
 }
 
-function reminderOffsetsFromForm(overlay) {
+/** Die Erinnerungen, die der Dialog bekommt - eine, mehrere oder keine. */
+function reminderList(reminders) {
+  return Array.isArray(reminders) ? reminders : (reminders ? [reminders] : []);
+}
+
+/**
+ * Die Zeile, mit der eine gespeicherte Erinnerung im Dialog steht.
+ *
+ * Nur eine Zeile NACH dem Beginn traegt ihren gespeicherten Zeitpunkt mit: sie
+ * ist die einzige, deren Zeitpunkt sich aus der Zeile nicht zurueckrechnen
+ * laesst. Alle anderen bleiben Vorlaeufe und wandern mit dem Beginn wie bisher.
+ */
+function reminderRowFromReminder(event, reminder) {
+  const offset = reminderOffsetFromEvent(event, reminder) || '0';
+  const row = { offset, ...customReminderFromEvent(event, reminder) };
+  if (offset === REMINDER_AFTER_START) {
+    row.storedAt = reminder.remind_at;
+    row.when = reminderWhenText(reminder);
+  }
+  return row;
+}
+
+/**
+ * Die Zeilen, wie das Formular sie gerade zeigt.
+ *
+ * `kept` heisst: die Zeile steht noch fuer ihren gespeicherten Zeitpunkt. Das
+ * setzt der Renderer bei einer Zeile nach dem Beginn, und nur eine Hand nimmt
+ * es wieder weg (siehe wireReminderRows).
+ */
+function reminderRowsFromForm(overlay) {
   const enabled = overlay.querySelector('#modal-reminder-toggle')?.checked === true;
   const rows = [...(overlay.querySelector('#modal-reminder-rows')
     ?.querySelectorAll('[data-reminder-row]') ?? [])].map((row) => ({
     offset: row.querySelector('.js-reminder-offset')?.value,
     amount: row.querySelector('.js-reminder-custom-amount')?.value,
     unit: row.querySelector('.js-reminder-custom-unit')?.value,
+    storedAt: row.dataset?.reminderStoredAt || null,
+    kept: row.dataset?.reminderKept !== undefined,
+    select: row.querySelector('.js-reminder-offset'),
   }));
-  return canonicalReminderOffsets(rows, enabled);
+  return { enabled, rows };
+}
+
+/** Reicht diese Zeile ihren gespeicherten Zeitpunkt durch, statt zu rechnen? */
+function keepsStoredInstant(row) {
+  return row.kept === true && Boolean(row.storedAt);
 }
 
 function reminderTimesFromOffsets(offsets, anchorStart) {
-  const startMs = new Date(reminderStartValue(anchorStart)).getTime();
+  const startMs = reminderStartMs(anchorStart);
   return offsets.map((offset) =>
     new Date(startMs - offset * 60000).toISOString().slice(0, 19));
 }
 
 /**
+ * Die Zeitpunkte, die das Speichern ueber `PUT /reminders` schreibt - je Zeile
+ * einer, in Formularreihenfolge, ohne Doppelte, hoechstens fuenf.
+ *
+ * DIE ENTSCHEIDUNG FAELLT JE ZEILE, NICHT JE DIALOG. Eine Zeile, die noch fuer
+ * ihren gespeicherten Zeitpunkt steht, RECHNET NICHT: fuer sie gibt es keinen
+ * Vorlauf, aus dem sich etwas rechnen liesse, und gerechnet wuerde hier stets
+ * das Falsche. Sie reicht den gespeicherten Zeitpunkt durch - auch dann, wenn
+ * der Beginn im Dialog verschoben wurde; die Anzeige der Zeile folgt dem neuen
+ * Beginn, der Zeitpunkt bleibt. Jede andere Zeile rechnet wie bisher vom Beginn
+ * aus. Doppelte fallen am ZEITPUNKT heraus, nicht am Vorlauf: eine
+ * durchgereichte Zeile und eine gerechnete koennen denselben treffen.
+ */
+function reminderTimesFromRows(rows, anchorStart, enabled = true) {
+  if (!enabled) return [];
+  const times = [];
+  for (const row of rows) {
+    let at = null;
+    if (keepsStoredInstant(row)) {
+      at = naiveUtc(row.storedAt);
+    } else {
+      const [offset] = canonicalReminderOffsets([row]);
+      if (offset === undefined) continue;
+      [at] = reminderTimesFromOffsets([offset], anchorStart);
+    }
+    if (!at || times.includes(at)) continue;
+    times.push(at);
+    if (times.length === MAX_CALENDAR_REMINDERS) break;
+  }
+  return times;
+}
+
+/**
+ * Die Vorlaeufe fuer die Vorkommens-Endpunkte („nur dieser", „dieser und alle
+ * folgenden") - oder null, wenn eine Zeile keinen Vorlauf HAT.
+ *
+ * Diese Endpunkte nehmen nur Vorlaeufe ab 0 an und rechnen sie serverseitig
+ * gegen den Beginn des Vorkommens. Eine Zeile nach dem Beginn hat keinen, und
+ * ihn als „1 Minute vorher" zu schicken, waere derselbe Fehler auf einem
+ * anderen Weg. Das null entscheidet der Aufrufer (saveEvent).
+ *
+ * Es zaehlt dieselbe Frage wie in reminderTimesFromRows: reicht die Zeile noch
+ * durch? Nicht, was sie anzeigt - nach einer Verschiebung des Beginns zeigt
+ * sie den Vorlauf, der nun gilt, und der gegen den NEUEN Beginn des Vorkommens
+ * gerechnet verschoebe den gespeicherten Zeitpunkt.
+ */
+function occurrenceReminderOffsets(rows, enabled = true) {
+  if (!enabled) return [];
+  if (rows.some(keepsStoredInstant)) return null;
+  return canonicalReminderOffsets(rows, true);
+}
+
+/**
+ * Steht der Erinnerungs-Abschnitt noch so da, wie er geoeffnet wurde?
+ *
+ * Verglichen wird, was gespeichert wuerde, nicht was angezeigt wird: eine
+ * Zeile nach dem Beginn zaehlt als unveraendert, solange sie ihren Zeitpunkt
+ * noch durchreicht, jede andere, solange ihr Vorlauf derselbe ist.
+ */
+function reminderRowsUnchanged({ enabled, rows }, loadedRows) {
+  if (enabled !== loadedRows.length > 0) return false;
+  if (!enabled) return true;
+  if (rows.length !== loadedRows.length) return false;
+  return rows.every((row, i) => {
+    const before = loadedRows[i];
+    if (before.storedAt) return keepsStoredInstant(row) && row.storedAt === before.storedAt;
+    if (keepsStoredInstant(row)) return false;
+    return canonicalReminderOffsets([row])[0] === canonicalReminderOffsets([before])[0];
+  });
+}
+
+/**
+ * Der Beginn, den das Formular gerade traegt - dieselbe Zusammensetzung, mit
+ * der saveEvent ihn speichert. Leer, solange er nicht vollstaendig ist.
+ */
+function eventStartFromForm(root) {
+  if (root.querySelector('#modal-allday')?.checked) {
+    return readDateInput(root, '#modal-allday-start') || readDateInput(root, '#modal-start-date');
+  }
+  const sd = readDateInput(root, '#modal-start-date');
+  const st = parseTimeInput(root.querySelector('#modal-start-time')?.value || '');
+  return st ? `${sd}T${st}` : sd;
+}
+
+/**
+ * Wie eine Zeile nach dem Beginn heissen muss, wenn der Beginn im Dialog
+ * verschoben wurde.
+ *
+ * „Nach dem Beginn" ist keine Eigenschaft der Erinnerung, sondern das
+ * VERHAELTNIS zweier Zeitpunkte. Der gespeicherte Zeitpunkt bleibt, der Beginn
+ * wandert - also wird die Zeile gegen den NEUEN Beginn neu bewertet. Liegt sie
+ * jetzt davor, zeigt sie den Vorlauf, der nun gilt; sonst bleibt sie beim
+ * Zustand nach dem Beginn.
+ *
+ * Der neue Anker ist der alte plus die Verschiebung im Formular, nicht das
+ * Formular selbst: bei einem Serientermin richten sich die Erinnerungen am
+ * Beginn der Serie aus (`reminder_anchor_start`), nicht an dem des Vorkommens,
+ * das gerade offen ist.
+ *
+ * @returns {{offset: string, amount: number, unit: string}|null} null, solange
+ *          der Beginn nicht lesbar ist (halb getippt) oder etwas fehlt
+ */
+function afterStartResolution(storedAt, { anchorStart, openedAt, currentStart } = {}) {
+  if (!storedAt || !anchorStart || !openedAt || !currentStart) return null;
+  const anchorMs = reminderStartMs(anchorStart) + (reminderStartMs(currentStart) - reminderStartMs(openedAt));
+  const remindMs = parseRemindAtAsUtc(storedAt).getTime();
+  if (!Number.isFinite(anchorMs) || !Number.isFinite(remindMs)) return null;
+  return reminderRowForLead(reminderLeadMinutes(anchorMs, storedAt));
+}
+
+/**
  * Rendert eine einzelne Erinnerungs-Zeile (Offset-Select + Custom-Felder +
  * Entfernen-Button). Ohne Argument entsteht eine leere Standardzeile (#436).
+ *
+ * Eine Zeile nach dem Beginn bekommt dazu den Eintrag, der ihren Zustand
+ * nennt, einen Warnton mit dem tatsaechlichen Zeitpunkt und den gespeicherten
+ * Zeitpunkt als Attribut. Der Eintrag bleibt im DOM, auch wenn jemand die
+ * Zeile umstellt - die Wahl ist innerhalb des Dialogs umkehrbar.
  */
-function reminderRowHtml({ offset = '0', amount = 1, unit = 'days' } = {}) {
+function reminderRowHtml({ offset = '0', amount = 1, unit = 'days', storedAt = null, when = '' } = {}) {
   const isCustom = offset === 'custom';
+  const afterStart = offset === REMINDER_AFTER_START && Boolean(storedAt);
+  const keptAttrs = afterStart
+    ? ` data-reminder-stored-at="${esc(storedAt)}" data-reminder-kept="true"`
+    : '';
   return `
-    <div class="reminder-row" data-reminder-row>
+    <div class="reminder-row" data-reminder-row${keptAttrs}>
       <div class="reminder-row__main">
         <select class="form-input js-reminder-offset" aria-label="${esc(t('reminders.offsetLabel'))}">
+          ${afterStart ? `<option value="${REMINDER_AFTER_START}" selected>${esc(t('reminders.offsetAfterStart'))}</option>` : ''}
           ${REMINDER_OFFSETS().filter((o) => o.value !== '').map((o) =>
             `<option value="${o.value}" ${offset === o.value ? 'selected' : ''}>${esc(o.label)}</option>`
           ).join('')}
@@ -4522,6 +4748,7 @@ function reminderRowHtml({ offset = '0', amount = 1, unit = 'days' } = {}) {
           <i data-lucide="x" class="icon-md" aria-hidden="true"></i>
         </button>
       </div>
+      ${afterStart ? `<p class="form-hint field-hint--warn js-reminder-after-start-hint" role="status"><i data-lucide="alert-triangle" aria-hidden="true"></i><span>${t('reminders.afterStartHint', { when: esc(when) })}</span></p>` : ''}
       <div class="modal-grid modal-grid--2 reminder-custom js-reminder-custom" ${isCustom ? '' : 'hidden'}>
         <div class="form-group" style="margin:0">
           <label class="form-label">${t('reminders.customAmountLabel')}</label>
@@ -4541,11 +4768,8 @@ function reminderRowHtml({ offset = '0', amount = 1, unit = 'days' } = {}) {
 }
 
 function renderCalendarReminderSection(reminders = [], event = null, defaultOffsets = []) {
-  const list = Array.isArray(reminders) ? reminders : (reminders ? [reminders] : []);
-  let rows = list.map((rem) => ({
-    offset: reminderOffsetFromEvent(event, rem) || '0',
-    ...customReminderFromEvent(event, rem),
-  }));
+  const list = reminderList(reminders);
+  let rows = list.map((rem) => reminderRowFromReminder(event, rem));
   // Neue Termine ohne bestehende Erinnerung: Standard-Erinnerungen vorbelegen (#497).
   // Die Default-Offsets decken sich mit den Preset-Werten des Offset-Selects.
   if (rows.length === 0 && Array.isArray(defaultOffsets) && defaultOffsets.length) {
@@ -4583,10 +4807,58 @@ function renderCalendarReminderSection(reminders = [], event = null, defaultOffs
 }
 
 /**
+ * Haelt jede Zeile nach dem Beginn an ihrem ZUSTAND, nicht am Ladezeitpunkt.
+ *
+ * Zwei Wege fuehren hierher: wer die Auswahl einer Zeile umstellt, soll den
+ * Warnton nicht mehr sehen (wer zurueckgeht, wieder); und wer den Beginn
+ * verschiebt, aendert das Verhaeltnis, aus dem der Zustand ueberhaupt
+ * entsteht. Beide enden in derselben Regel, damit sie nicht auseinanderlaufen.
+ *
+ * Umgestellt wird nur eine Zeile, die noch fuer ihren Zeitpunkt steht - wer
+ * selbst einen Vorlauf gewaehlt hat, hat entschieden. Der Eintrag „Nach dem
+ * Terminbeginn" ist nur waehlbar, solange er stimmt.
+ */
+function syncReminderAfterStart(panel, { anchorStart = null, openedAt = '' } = {}) {
+  const rows = panel.querySelector('#modal-reminder-rows')?.querySelectorAll('[data-reminder-row]') ?? [];
+  const currentStart = eventStartFromForm(panel);
+  for (const row of rows) {
+    const storedAt = row.dataset?.reminderStoredAt;
+    const select = row.querySelector('.js-reminder-offset');
+    if (!storedAt || !select) continue;
+    const next = afterStartResolution(storedAt, { anchorStart, openedAt, currentStart });
+    if (next) {
+      const applies = next.offset === REMINDER_AFTER_START;
+      const kept = row.dataset.reminderKept !== undefined;
+      // Nur schreiben, was die Auswahl auch fuehrt - sonst setzte der Browser
+      // sie stillschweigend auf den ersten Eintrag.
+      if (kept && [...select.options].some((o) => o.value === next.offset)) {
+        select.value = next.offset;
+        const amount = row.querySelector('.js-reminder-custom-amount');
+        const unit   = row.querySelector('.js-reminder-custom-unit');
+        const custom = row.querySelector('.js-reminder-custom');
+        if (amount) amount.value = String(next.amount);
+        if (unit) unit.value = next.unit;
+        // Ein programmatisch gesetzter Wert loest KEIN `change` aus, der
+        // Listener in wireReminderRows blendet die Felder also nicht ein.
+        if (custom) custom.hidden = next.offset !== 'custom';
+      }
+      const option = [...select.options].find((o) => o.value === REMINDER_AFTER_START);
+      if (option) { option.disabled = !applies; option.hidden = !applies; }
+    }
+    const hint = row.querySelector('.js-reminder-after-start-hint');
+    if (hint) hint.hidden = select.value !== REMINDER_AFTER_START;
+  }
+}
+
+/**
  * Verdrahtet die Mehrfach-Erinnerungs-Liste im Event-Modal (#436):
  * Toggle, „Hinzufügen"/„Entfernen" und die Custom-Feld-Umschaltung je Zeile.
+ *
+ * Dazu die Zeilen nach dem Beginn (#1260): welche Hand eine Zeile anfasst,
+ * nimmt ihr das Durchreichen weg, und eine Verschiebung des Beginns bewertet
+ * sie neu.
  */
-function wireReminderRows(panel) {
+function wireReminderRows(panel, { event = null } = {}) {
   const toggle = panel.querySelector('#modal-reminder-toggle');
   const fields = panel.querySelector('#modal-reminder-fields');
   const rowsEl = panel.querySelector('#modal-reminder-rows');
@@ -4605,13 +4877,38 @@ function wireReminderRows(panel) {
     syncAddState();
   };
 
+  // Der Beginn, MIT DEM der Dialog aufging, und der Anker der Erinnerungen -
+  // aus beiden rechnet die Neubewertung den Anker nach einer Verschiebung.
+  const afterStartContext = { anchorStart: reminderAnchorStart(event) ?? null, openedAt: eventStartFromForm(panel) };
+  const syncAfterStart = () => syncReminderAfterStart(panel, afterStartContext);
+
   // Custom-Felder je Zeile ein-/ausblenden.
   rowsEl.addEventListener('change', (e) => {
     const sel = e.target.closest('.js-reminder-offset');
     if (!sel) return;
-    const custom = sel.closest('[data-reminder-row]')?.querySelector('.js-reminder-custom');
+    const row = sel.closest('[data-reminder-row]');
+    const custom = row?.querySelector('.js-reminder-custom');
     if (custom) custom.hidden = sel.value !== 'custom';
+    // WER DIE ZEILE SELBST UMSTELLT, ENTSCHEIDET. Ein Vorlauf rechnet ab jetzt
+    // wie jede andere Zeile; wer zurueck auf „Nach dem Terminbeginn" geht,
+    // bekommt den gespeicherten Zeitpunkt wieder.
+    if (row?.dataset.reminderStoredAt) {
+      if (sel.value === REMINDER_AFTER_START) row.dataset.reminderKept = 'true';
+      else delete row.dataset.reminderKept;
+    }
+    syncAfterStart();
   });
+
+  // Ein neuer Betrag oder eine neue Einheit ist ebenfalls eine Hand an der
+  // Zeile - auch nach einer Neubewertung, die sie auf „Benutzerdefiniert"
+  // gestellt hat. `input` mit, damit ein Tippen direkt vor „Speichern" zaehlt.
+  const releaseKept = (e) => {
+    const lead = e.target.closest('.js-reminder-custom-amount') ?? e.target.closest('.js-reminder-custom-unit');
+    const row = lead?.closest('[data-reminder-row]');
+    if (row?.dataset.reminderKept !== undefined) delete row.dataset.reminderKept;
+  };
+  rowsEl.addEventListener('change', releaseKept);
+  rowsEl.addEventListener('input', releaseKept);
 
   // Zeile entfernen.
   rowsEl.addEventListener('click', (e) => {
@@ -4631,6 +4928,17 @@ function wireReminderRows(panel) {
     if (fields) fields.style.display = on ? '' : 'none';
     if (on && rowCount() === 0) appendRow();
   });
+
+  // Der Beginn aendert das Verhaeltnis, aus dem „nach dem Beginn" entsteht.
+  // `change` wie `input`, sonst haengt die Anzeige je nach Bedienweg
+  // (Kalenderblatt vs. Tastatur) hinterher; dazu der Ganztags-Schalter, der
+  // das Feld wechselt, aus dem der Beginn gelesen wird.
+  for (const sel of ['#modal-start-date', '#modal-start-time', '#modal-allday-start']) {
+    const field = panel.querySelector(sel);
+    field?.addEventListener('change', syncAfterStart);
+    field?.addEventListener('input', syncAfterStart);
+  }
+  panel.querySelector('#modal-allday')?.addEventListener('change', syncAfterStart);
 
   syncAddState();
 }
@@ -4994,8 +5302,10 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
   syncSelectedAttachment();
 
   // Erinnerungen: Toggle blendet die Zeilenliste ein/aus; „Hinzufügen" und
-  // „Entfernen" verwalten mehrere Erinnerungen je Termin (#436).
-  wireReminderRows(panel);
+  // „Entfernen" verwalten mehrere Erinnerungen je Termin (#436). Der Termin
+  // reist mit, weil eine Zeile nach dem Beginn gegen dessen Anker neu bewertet
+  // wird, sobald jemand den Beginn verschiebt (#1260).
+  wireReminderRows(panel, { event });
 
   // Load unified sync targets (Google + CalDAV)
   const syncTargetSelect = panel.querySelector('#event-sync-target');
@@ -5460,13 +5770,11 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
   let start_datetime, end_datetime;
 
   if (allday) {
-    start_datetime = readDateInput(overlay, '#modal-allday-start')
-                   || readDateInput(overlay, '#modal-start-date');
+    start_datetime = eventStartFromForm(overlay);
     end_datetime   = readDateInput(overlay, '#modal-allday-end')
                    || readDateInput(overlay, '#modal-end-date');
     end_datetime   = end_datetime || null;
   } else {
-    const sd = readDateInput(overlay, '#modal-start-date');
     const stRaw = overlay.querySelector('#modal-start-time').value;
     const st = parseTimeInput(stRaw);
     const ed = readDateInput(overlay, '#modal-end-date');
@@ -5479,7 +5787,9 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
       );
       return;
     }
-    start_datetime = st ? `${sd}T${st}` : sd;
+    // Dieselbe Zusammensetzung, mit der die Erinnerungszeilen den Beginn im
+    // Dialog verfolgen - zwei Schreibweisen koennten auseinanderlaufen.
+    start_datetime = eventStartFromForm(overlay);
     end_datetime   = ed ? (et ? `${ed}T${et}` : ed) : null;
   }
 
@@ -5585,7 +5895,10 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
       body.remove_attachment = true;
     }
 
-    const reminderOffsets = reminderOffsetsFromForm(overlay);
+    // Die Zeilen, nicht schon die Vorlaeufe: eine Zeile nach dem Beginn hat
+    // keinen Vorlauf, sondern einen gespeicherten Zeitpunkt (#1260). Was
+    // daraus wird, haengt am Schreibweg weiter unten.
+    const reminderForm = reminderRowsFromForm(overlay);
     let savedEventId = eventId;
     let remindersHandledAtomically = false;
     // Start, an dem die Erinnerungs-Offsets ausgerichtet werden. Für „ganze Serie"
@@ -5608,6 +5921,25 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
       if (!canOverrideOccurrence && scope === 'following' && followingMeansWholeSeries(event)) scope = 'series';
       if (localRecurring && canEditCalendarOccurrence(event) && (scope === 'this' || scope === 'following')) {
         const target = calendarOccurrenceMutationTarget(event, scope);
+        // DIESE ENDPUNKTE KENNEN NUR VORLAEUFE (#1260). Eine Zeile nach dem
+        // Beginn hat keinen, und der Server nimmt keinen negativen an. Steht der
+        // Abschnitt noch so da, wie er aufging, schickt das Speichern gar keine
+        // Vorlaeufe mit (null): der Server laesst die Erinnerungen dann, wie
+        // sie sind - eine geerbte bleibt beim Serienbeginn, eine eigene zieht
+        // mit dem Vorkommen mit wie seit #975. Hat jemand daneben etwas
+        // geaendert, liesse sich das nur speichern, indem die Zeile nach dem
+        // Beginn verschoben oder verworfen wird; das entscheidet niemand fuer
+        // ihn. Er bekommt die Meldung an der Zeile.
+        const reminderOffsets = occurrenceReminderOffsets(reminderForm.rows, reminderForm.enabled);
+        if (reminderOffsets === null && canOverrideOccurrence && target.carriesReminderOffsets
+            && !reminderRowsUnchanged(reminderForm, reminderList(existingReminder)
+              .map((rem) => reminderRowFromReminder(event, rem)))) {
+          const blocked = reminderForm.rows.find(keepsStoredInstant);
+          reportFieldError(blocked?.select, t('reminders.afterStartNeedsLeadTime'));
+          saveBtn.disabled = false;
+          saveBtn.textContent = t('common.save');
+          return;
+        }
         const res = await requestCalendarOccurrenceMutation({
           api,
           event,
@@ -5662,7 +5994,7 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
     // Occurrence- und Split-Endpunkte schreiben die Offsets in derselben
     // Transaktion wie Ersatzzeile, EXDATE und Reparenting.
     if (savedEventId && !remindersHandledAtomically) {
-      const remindAts = reminderTimesFromOffsets(reminderOffsets, reminderBaseStart);
+      const remindAts = reminderTimesFromRows(reminderForm.rows, reminderBaseStart, reminderForm.enabled);
       if (remindAts.length) {
         await api.put(`/reminders?entity_type=event&entity_id=${savedEventId}`, { remind_ats: remindAts });
       } else {

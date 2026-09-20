@@ -20,7 +20,7 @@
 import Database from 'better-sqlite3-multiple-ciphers';
 import path from 'path';
 import fs from 'node:fs/promises';
-import { mkdirSync, existsSync, renameSync, rmSync, copyFileSync, openSync, readSync, closeSync } from 'node:fs';
+import { mkdirSync, existsSync, renameSync, rmSync, copyFileSync, openSync, readSync, closeSync, statSync } from 'node:fs';
 import { createLogger } from './logger.js';
 import { decodeHtmlEntities } from './utils/html-entities.js';
 import { toE164, defaultCountryFromConfig } from './utils/phone.js';
@@ -272,6 +272,131 @@ function unreadableAtStartError(err) {
   return lines.join(' ');
 }
 
+/** Größe einer regulären Datei, `null` wenn sie fehlt oder keine ist. */
+function regularFileSize(filePath) {
+  try {
+    const stat = statSync(filePath);
+    return stat.isFile() ? stat.size : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Die Datei, die `init()` gleich öffnen wird: `DB_PATH`, oder im „managed"
+ * Layout die Legacy-Datei, solange es `DB_PATH` noch nicht gibt - die öffnet
+ * `migrateLegacyDbFile()` als Erstes. `null` heißt: frische Installation.
+ */
+function databaseFileAboutToOpen() {
+  if (DB_PATH === ':memory:') return null;
+  if (existsSync(DB_PATH)) return DB_PATH;
+  if (LEGACY_DB_PATH && existsSync(LEGACY_DB_PATH)) return LEGACY_DB_PATH;
+  return null;
+}
+
+/**
+ * Meldung für eine vorhandene, aber leere Datenbankdatei (#1282).
+ *
+ * SQLite nimmt eine Datei mit 0 Byte als neue Datenbank, die Migrationen
+ * laufen von vorn, und Yuvomi steht als leere Instanz da - genau in dem
+ * Moment, in dem jemand gerade Daten bewegt. Gemessen mit diesem Treiber:
+ * eine frische Installation hat gar keine Datei, und `journal_mode = WAL`
+ * schreibt Seite 1 (4096 Byte) in die Hauptdatei, bevor es überhaupt ein
+ * `-wal` gibt. Eine leere Datei kommt also von außen (abgebrochene Kopie,
+ * `cp` auf eine volle Platte, falscher Quellpfad) oder aus einem Erststart,
+ * der vor dieser ersten Seite abgebrochen wurde: mit Key liegen zwischen dem
+ * Anlegen der Datei und Seite 1 rund 150 ms Schlüsselableitung, und ein
+ * SIGKILL dort hinterlässt genau diese Datei ohne jede Nebendatei. Beide
+ * Fälle stehen deshalb in der Meldung, jeder mit dem Schritt, der ihn löst.
+ *
+ * Das `-wal` ist KEINE Ausnahme von der Verweigerung, sondern ihr zweiter
+ * Grund. Gemessen: liegt neben einer 0-Byte-Hauptdatei ein `-wal` mit Daten,
+ * löscht SQLite es beim ersten Lesen und startet leer - `init()` hat so ein
+ * Journal bisher stumm vernichtet, und `migrateLegacyDbFile()` tat es bei einer
+ * leeren `oikos.db` schon vor dem Umbenennen. Zu der leeren Datei kann es nicht
+ * gehören (siehe oben), es stammt von der Datenbank, die vorher hier lag, und
+ * ohne Key trug es in der Messung deren kompletten Inhalt. Wer die Datei wie
+ * geraten neu kopiert und das Journal liegen lässt, bekommt ohne Key still die
+ * ALTEN Daten statt des Originals, mit Key den Abbruch „Wrong encryption key"
+ * aus #1267. Deshalb: beiseitelegen, vor beiden Schritten.
+ *
+ * Der Absatz zur Legacy-Datei steht nur da, wenn sie Daten hat: dann führt
+ * „leere Datei löschen" nicht zu einer neuen Instanz, sondern zu `oikos.db`,
+ * die der nächste Start umbenennt.
+ * @param {string} filePath die leere Datei
+ * @returns {string}
+ */
+function emptyDatabaseFileError(filePath) {
+  const lines = [
+    `[DB] ${filePath} exists but is empty (0 bytes). Yuvomi refuses to start on it: SQLite would `
+    + 'take an empty file for a new database, and Yuvomi would come up as a fresh, empty instance '
+    + 'as if your data were gone. Nothing has been written to the file.',
+    'A new installation has no database file at all, and Yuvomi never empties its own. An empty '
+    + 'file is left behind by a copy or restore that failed or stopped short - an interrupted '
+    + 'transfer, cp onto a full disk, a wrong source path - or by a very first start that was '
+    + 'stopped before it had written anything.',
+    'If you copied or restored a database to this path, copy it again from the original and '
+    + `compare the size and sha256sum of ${filePath} with the original before starting Yuvomi.`,
+    'If you want a new, empty instance - you created the file on purpose, or the first start of a '
+    + `new installation was interrupted - delete ${filePath} and start again: Yuvomi then creates `
+    + 'the database itself.',
+  ];
+  if (filePath === DB_PATH && LEGACY_DB_PATH && regularFileSize(LEGACY_DB_PATH) > 0) {
+    lines.push(
+      `An older database file from before the rename lies next to it (${LEGACY_DB_PATH}). `
+      + `Deleting the empty ${path.basename(DB_PATH)} does not give you a new instance then: on the `
+      + `next start Yuvomi moves ${path.basename(LEGACY_DB_PATH)} to ${path.basename(DB_PATH)} and `
+      + 'starts with the data in it. Move it aside first if that is not what you want.'
+    );
+  }
+  const wal = `${filePath}-wal`;
+  if (regularFileSize(wal) > 0) {
+    lines.push(
+      `A write-ahead log with data lies next to it (${wal}). It does not belong to the empty file - `
+      + 'SQLite writes the first page of a database into the main file before it ever creates the '
+      + 'log - so it is left over from the database that was at this path before, and it can hold '
+      + 'changes that exist nowhere else. Starting on the empty file would delete it, and a database '
+      + 'copied back in next to it would be read together with a log that belongs to another file. '
+      + `Before either step above, move ${wal} and ${filePath}-shm aside and keep them - do not `
+      + 'delete them.'
+    );
+  }
+  return lines.join(' ');
+}
+
+/**
+ * `code` des Fehlers aus `assertDatabaseFileNotEmpty()`: daran erkennen der
+ * Auto-Init am Dateiende und der Rollback in `restoreFromFile()` den Leer-Fall,
+ * ohne die Meldung zu lesen.
+ */
+const EMPTY_DATABASE_FILE = 'YUVOMI_EMPTY_DATABASE_FILE';
+
+/**
+ * Handschlag des Restore-CLI (`scripts/restore-backup.js`), gesetzt VOR dem
+ * Import dieses Moduls. Das CLI ist der eine Aufrufer, für den eine leere
+ * `DB_PATH` kein Grund zum Abbruch ist: es ersetzt genau diese Datei - der Rat
+ * der Meldung („copy it again") führt dorthin. Ein Symbol auf `globalThis`
+ * statt einer Env-Variable, weil es kein Schalter für Betreiber ist: der Server
+ * darf den Leer-Fall nie überspringen, und eine Variable in der Umgebung würde
+ * er erben.
+ */
+const RESTORE_TARGET_HANDSHAKE = Symbol.for('yuvomi.db.restoreTarget');
+
+/**
+ * Bricht den Start ab, wenn die Datei, die gleich geöffnet wird, existiert und
+ * leer ist. Läuft VOR allem, was die Datei anfasst - auch vor
+ * `migrateLegacyDbFile()`, die eine leere `oikos.db` samt Journal sonst schon
+ * öffnet und umbenennt. Eine fehlende Datei ist die frische Installation und
+ * bleibt, wie sie war.
+ */
+function assertDatabaseFileNotEmpty() {
+  const filePath = databaseFileAboutToOpen();
+  if (!filePath || regularFileSize(filePath) !== 0) return;
+  const err = new Error(emptyDatabaseFileError(filePath));
+  err.code = EMPTY_DATABASE_FILE;
+  throw err;
+}
+
 /**
  * Datenbankverbindung öffnen, SQLCipher-Key setzen, Migrations ausführen.
  * Einmalig beim Serverstart aufrufen.
@@ -290,6 +415,9 @@ function init({ plaintextBackup = true } = {}) {
       `Data will be lost on container restart. Use an absolute path, e.g. DB_PATH=/data/yuvomi.db`
     );
   }
+  // Vor allem anderen: eine leere Datei würde ab hier still zur frischen
+  // Instanz, und ein Journal daneben ginge dabei verloren (#1282).
+  assertDatabaseFileNotEmpty();
   mkdirSync(path.dirname(DB_PATH), { recursive: true });
   migrateLegacyDbFile();
 
@@ -8836,9 +8964,123 @@ const MIGRATIONS = [
   },
   {
     version: 219,
+    description: 'Health: preventive care & vaccinations log (household type registry + per-person records)',
+    foreignKeysOff: true,
+    up: `
+      -- reminders.entity_type erneut erweitern (Muster wie v137/v140/v141):
+      -- SQLite kann einen Spalten-CHECK nicht per ALTER erweitern, daher
+      -- Tabelle neu erstellen. foreignKeysOff bleibt Pflicht - gleicher Grund
+      -- wie dort: notification_deliveries.reminder_id ... ON DELETE CASCADE
+      -- wuerde sonst beim DROP TABLE auf jeder bestehenden Installation
+      -- mitgeloescht. 'health_prevention_due' ist der einzige neue Wert hier -
+      -- v218 (Dokumente) hat 'document_expiry' bereits eigenstaendig
+      -- nachgezogen, statt beide Werte in einem Schritt zu buendeln
+      -- (Review-Feedback #1255/#1256: ein Wert ohne Schreiber waere unter der
+      -- Anhaenge-Regel dauerhaft im CHECK fest gewesen, ohne Issue und ohne
+      -- SCOPE-/DECISIONS-Eintrag).
+      --
+      -- ERST DIE ZWEI TRIGGER AUS V217 ABRAEUMEN, aus demselben Grund wie
+      -- bereits in v218 dokumentiert: ihr Koerper nennt "reminders" beim
+      -- Namen, und SQLites ALTER TABLE ... RENAME TO reminders reparst dabei
+      -- die ganze Schema, was mitten in diesem Umbau auf ein momentan
+      -- fehlendes "reminders" trifft ("no such table: main.reminders").
+      -- Abraeumen vor dem Umbau und am Ende neu anlegen umgeht das. IF EXISTS
+      -- wie in v218 (Review #1255 nice-to-have): kostet hier nichts, haelt
+      -- aber eine Installation nicht auf 218 stecken, falls diese Annahme je
+      -- nicht mehr gilt.
+      DROP TRIGGER IF EXISTS trg_reminders_tasks_ad;
+      DROP TRIGGER IF EXISTS trg_reminders_events_ad;
+
+      CREATE TABLE reminders_new (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        entity_type TEXT    NOT NULL CHECK(entity_type IN ('task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup', 'document_expiry', 'health_prevention_due')),
+        entity_id   INTEGER NOT NULL,
+        remind_at   TEXT    NOT NULL,
+        dismissed   INTEGER NOT NULL DEFAULT 0,
+        created_by  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        pushed_at   TEXT,
+        assigned_from INTEGER REFERENCES users(id) ON DELETE SET NULL
+      );
+      INSERT INTO reminders_new (id, entity_type, entity_id, remind_at, dismissed, created_by, created_at, pushed_at, assigned_from)
+        SELECT id, entity_type, entity_id, remind_at, dismissed, created_by, created_at, pushed_at, assigned_from FROM reminders;
+      DROP TABLE reminders;
+      ALTER TABLE reminders_new RENAME TO reminders;
+      CREATE INDEX idx_reminders_entity ON reminders(entity_type, entity_id);
+      CREATE INDEX idx_reminders_remind ON reminders(remind_at);
+      CREATE INDEX idx_reminders_user ON reminders(created_by);
+      CREATE INDEX idx_reminders_assigned_from ON reminders(assigned_from);
+
+      CREATE TRIGGER trg_reminders_tasks_ad
+      AFTER DELETE ON tasks BEGIN
+        DELETE FROM reminders WHERE entity_type = 'task' AND entity_id = OLD.id;
+      END;
+
+      CREATE TRIGGER trg_reminders_events_ad
+      AFTER DELETE ON calendar_events BEGIN
+        DELETE FROM reminders WHERE entity_type = 'event' AND entity_id = OLD.id;
+      END;
+
+      -- Haushalts-Register der Vorsorge-Arten (D2) - NICHTS VORBEFUELLT.
+      -- docs/SCOPE.md schliesst mitgelieferte Kataloge aus, die veralten
+      -- (deutsche U-Untersuchungen etc.); der Haushalt legt seine eigenen an.
+      CREATE TABLE health_prevention_types (
+        id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+        name                    TEXT    NOT NULL,
+        kind                    TEXT    NOT NULL CHECK (kind IN ('vaccination', 'checkup')),
+        default_interval_months INTEGER CHECK (default_interval_months IS NULL OR (default_interval_months BETWEEN 1 AND 600)),
+        icon                    TEXT    NOT NULL DEFAULT 'syringe',
+        sort_order              INTEGER NOT NULL DEFAULT 0,
+        created_at              TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at              TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
+      CREATE TRIGGER trg_health_prevention_types_updated_at AFTER UPDATE ON health_prevention_types FOR EACH ROW BEGIN
+        UPDATE health_prevention_types SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
+
+      -- Das eine Modell fuer Impfung UND Vorsorgeuntersuchung (D1) - eine
+      -- Tetanus-Auffrischung alle 10 Jahre und ein Zahnarzttermin alle 6 Monate
+      -- sind dieselbe Zeile: Person + Art + wann es war + Intervall zum
+      -- naechsten Mal. Zwei Tabellen wuerden docs/DECISIONS.md #6 ("ein
+      -- Modell, nicht zwei") erneut aufmachen.
+      CREATE TABLE health_prevention_records (
+        id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id              INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        type_id              INTEGER REFERENCES health_prevention_types(id) ON DELETE SET NULL,
+        -- Momentaufnahme/Ausweich-Name: bleibt lesbar, wenn der Typ umbenannt
+        -- oder geloescht wird (SET NULL oben) - Loeschen eines Typs darf seine
+        -- Historie nicht mitreissen.
+        name                 TEXT,
+        given_on             TEXT    NOT NULL,
+        dose_number          INTEGER,
+        batch                TEXT,
+        provider             TEXT,
+        note                 TEXT,
+        -- NULL = der Typ-Standard gilt; ein Wert hier ueberschreibt ihn nur
+        -- fuer DIESEN Datensatz.
+        interval_months      INTEGER CHECK (interval_months IS NULL OR (interval_months BETWEEN 1 AND 600)),
+        -- Explizite Faelligkeit; NULL = aus given_on + Intervall abgeleitet
+        -- (server/services/prevention-due.js, die einzige Stelle, die das rechnet).
+        next_due_on          TEXT,
+        -- NULL = Modul-Standard (30 Tage, DEFAULT_REMINDER_OFFSET_DAYS).
+        reminder_offset_days INTEGER CHECK (reminder_offset_days IS NULL OR (reminder_offset_days BETWEEN 0 AND 365)),
+        visibility           TEXT    NOT NULL CHECK (visibility IN ('private', 'family')),
+        created_by           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at           TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at           TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
+      CREATE TRIGGER trg_health_prevention_records_updated_at AFTER UPDATE ON health_prevention_records FOR EACH ROW BEGIN
+        UPDATE health_prevention_records SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
+      CREATE INDEX idx_health_prevention_records_user_date ON health_prevention_records(user_id, given_on);
+    `,
+  },
+  {
+    version: 220,
     description: 'Health: configurable fasting reminders and reminder entity types',
     foreignKeysOff: true,
     up: `
+      -- Carries v219's 'health_prevention_due' forward: this rebuild replaces
+      -- the table v219 just created, so every value it allowed has to be listed
+      -- here again or an existing preventive-care reminder stops inserting.
       -- Reminders are polymorphic; SQLite requires a table rebuild to widen
       -- the CHECK constraint while preserving all delivery state columns.
       -- Migration 217 added triggers on tasks/events that reference reminders;
@@ -8848,7 +9090,7 @@ const MIGRATIONS = [
       DROP TRIGGER IF EXISTS trg_reminders_events_ad;
       CREATE TABLE reminders_new (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        entity_type TEXT    NOT NULL CHECK(entity_type IN ('task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup', 'document_expiry', 'fasting_goal', 'fasting_next_start')),
+        entity_type TEXT    NOT NULL CHECK(entity_type IN ('task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup', 'document_expiry', 'health_prevention_due', 'fasting_goal', 'fasting_next_start')),
         entity_id   INTEGER NOT NULL,
         remind_at   TEXT    NOT NULL,
         dismissed   INTEGER NOT NULL DEFAULT 0,
@@ -9095,11 +9337,11 @@ async function backupToFile(destinationPath) {
  * nicht mehr erreichbar. Deshalb steht der Rat nur noch im `!DB_KEY`-Zweig; der
  * andere verweist auf den Weg ueber die Kommandozeile, der Datei und Key
  * zusammen umstellt (#1267).
+ *
+ * Beide Texte gelten nur fuer `SQLITE_NOTADB` - die Weiche davor steht in
+ * `unreadableBackupError()` (#1283).
  */
-function unreadableBackupError(encrypted, cause) {
-  if (!encrypted) {
-    return new Error('Backup file is not a valid Yuvomi database.', { cause });
-  }
+function undecryptableBackupError(cause) {
   if (!DB_KEY) {
     return new Error(
       'Backup file could not be read: it has no plain SQLite header, so it is likely encrypted - '
@@ -9121,6 +9363,72 @@ function unreadableBackupError(encrypted, cause) {
     + 'have the same key, the file is not a Yuvomi database.',
     { cause }
   );
+}
+
+/**
+ * Meldung für eine Backup-Datei, an der das Öffnen oder das erste Lesen
+ * scheitert - getrennt nach dem, was SQLite tatsächlich sagt (#1283).
+ *
+ * Vor #1283 wurde jeder Fehler an dieser Stelle zur Schlüssel-Meldung, ohne
+ * auf `err.code` zu sehen - dieselbe Lücke, die #1281 am Startpfad geschlossen
+ * hat. Gemessen über die echte Restore-Route und das CLI-Skript:
+ *   - `SQLITE_NOTADB`: fremder Key, eine Instanz ohne Key vor einem
+ *     verschlüsselten Backup, und ebenso eine Datei, die schon innerhalb der
+ *     ersten Seite abreißt (100 B, 2 KiB) - von einem falschen Key ist das von
+ *     hier aus nicht zu unterscheiden, deshalb nennen beide Key-Texte die
+ *     zweite Möglichkeit mit.
+ *   - `SQLITE_CORRUPT`: das EIGENE Backup, abgeschnitten nach 4 KiB, 8 KiB,
+ *     der Hälfte, allen Seiten bis auf eine, einem Byte zu wenig. Das gibt es
+ *     nur mit dem richtigen Key: dieselbe Datei liefert mit falschem Key
+ *     `SQLITE_NOTADB`, weil Seite 1 erst entschlüsselt werden und ihre
+ *     HMAC-Prüfung bestehen muss. Die Schlüssel-Meldung schickte diesen Admin
+ *     zur Übernahme eines fremden Backups über die Kommandozeile, die ihm
+ *     nichts nützt. Ohne Key kann ein Backup ohne Klartext-Kopf gar nicht
+ *     `SQLITE_CORRUPT` liefern (SQLite scheitert schon am Kopf, gemessen:
+ *     `SQLITE_NOTADB`), und der Satz „der Key öffnet sie" wäre dort falsch -
+ *     deshalb hängt der Zweig an `DB_KEY`.
+ *   - alles andere: Code und SQLite-Text, kein Wort über den Key. Gemessen ist
+ *     `SQLITE_CANTOPEN` für eine Datei ohne Leserecht (CLI-Restore einer als
+ *     root kopierten Datei). Der Kopf ist dann gar nicht lesbar, `encrypted`
+ *     steht deshalb auf true, und ohne diese Weiche sagte die Meldung mit Key
+ *     „falscher Schlüssel" und ohne Key „wahrscheinlich verschlüsselt, setz
+ *     DB_ENCRYPTION_KEY" - beides über eine Klartextdatei, die nur nicht
+ *     lesbar war.
+ * Eine Upload-Übertragung, die abreißt, kommt hier nie an: `express.raw()`
+ * verwirft den Request mit `request.aborted`, bevor die Route läuft. Eine
+ * unvollständige Datei ist also schon unvollständig hochgeladen worden -
+ * meist ein Download oder eine Kopie, die zu früh aufgehört hat.
+ *
+ * Die Klartext-Auskunft bleibt ohne Weiche: sie sagt nichts über den Key.
+ * @param {boolean} encrypted  Datei hat keinen Klartext-SQLite-Kopf
+ * @param {unknown} cause      Fehler beim Öffnen oder ersten Lesen
+ * @returns {Error}
+ */
+function unreadableBackupError(encrypted, cause) {
+  if (!encrypted) {
+    return new Error('Backup file is not a valid Yuvomi database.', { cause });
+  }
+  const code = typeof cause?.code === 'string' ? cause.code : '';
+  if (code === 'SQLITE_NOTADB') return undecryptableBackupError(cause);
+
+  const detail = `${code || 'no SQLite error code'}: ${cause?.message ?? String(cause)}`;
+  if (DB_KEY && code.startsWith('SQLITE_CORRUPT')) {
+    return new Error(
+      `Backup file is damaged or incomplete (${detail}). DB_ENCRYPTION_KEY is not the problem: it `
+      + 'does open this file - its first page decrypted and passed the integrity check, which a '
+      + 'wrong key never does. Most likely the file was cut short before it got here, by a download '
+      + 'or copy that stopped early. Nothing on this instance was changed. Get the backup again from '
+      + 'where it is stored - download or copy it once more - and check that its size and sha256sum '
+      + 'match the stored original, then restore that copy.',
+      { cause }
+    );
+  }
+
+  const lines = [`Backup file could not be read (${detail}).`];
+  if (code.startsWith('SQLITE_CANTOPEN')) {
+    lines.push('Check that the file is there and that the user this restore runs as may read it.');
+  }
+  return new Error(lines.join(' '), { cause });
 }
 
 function validateBackupFile(sourcePath) {
@@ -9176,11 +9484,37 @@ async function unlinkIfExists(filePath) {
   }
 }
 
+/** Datei umbenennen; `false`, wenn es sie nicht gibt. */
+async function renameIfExists(from, to) {
+  try {
+    await fs.rename(from, to);
+    return true;
+  } catch (err) {
+    if (err?.code !== 'ENOENT') throw err;
+    return false;
+  }
+}
+
+/**
+ * Wohin `restoreFromFile()` das Journal einer leeren Datei legt: neben die
+ * Rollback-Kopie, aber unter einem Namen, den SQLite nicht von selbst aufgreift
+ * (`<kopie>.wal-kept`, nicht `<kopie>-wal`).
+ */
+function keptJournalName(rollbackPath, kind) {
+  return `${rollbackPath}.${kind}-kept`;
+}
+
 async function restoreFromFile(sourcePath) {
   const backupVersion = validateBackupFile(sourcePath);
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const rollbackPath = `${DB_PATH}.pre-restore-${timestamp}`;
   let rollbackCreated = false;
+  // Offen ist die Verbindung, außer im Leer-Fall des Restore-CLI (#1282, siehe
+  // Auto-Init am Dateiende). Nur eine offene Verbindung wird unten per
+  // TRUNCATE gecheckpointet; danach trägt die Rollback-Kopie alles, und ein
+  // Rest-Journal zu löschen verliert nichts.
+  const wasOpen = Boolean(db);
+  let keptJournalPath = null;
 
   try {
     if (db) {
@@ -9197,6 +9531,21 @@ async function restoreFromFile(sourcePath) {
       if (err?.code !== 'ENOENT') throw err;
     }
 
+    // Ohne offene Verbindung hat niemand das Journal gecheckpointet. Ein `-wal`
+    // mit Daten neben der leeren Datei gehört zur Datenbank, die vorher hier
+    // lag, und kann Änderungen tragen, die nirgends sonst stehen - die Meldung
+    // aus `emptyDatabaseFileError()` sagt „keep them". Also nicht löschen,
+    // sondern neben die Rollback-Kopie legen, wohin es als Vorgänger gehört.
+    //
+    // NICHT unter `-wal`: die Rollback-Kopie ist hier selbst die leere Datei,
+    // und SQLite verwirft ein `-wal` neben einer leeren Hauptdatei beim ersten
+    // Lesen. Wer die Kopie ansieht (`sqlite3 <kopie>`, der naheliegende
+    // nächste Schritt), vernichtete sonst genau das, was hier bewahrt wird.
+    if (!wasOpen && regularFileSize(`${DB_PATH}-wal`) > 0) {
+      await fs.rename(`${DB_PATH}-wal`, keptJournalName(rollbackPath, 'wal'));
+      keptJournalPath = keptJournalName(rollbackPath, 'wal');
+      await renameIfExists(`${DB_PATH}-shm`, keptJournalName(rollbackPath, 'shm'));
+    }
     await unlinkIfExists(`${DB_PATH}-wal`);
     await unlinkIfExists(`${DB_PATH}-shm`);
     await fs.copyFile(sourcePath, DB_PATH);
@@ -9213,6 +9562,7 @@ async function restoreFromFile(sourcePath) {
     return {
       schemaVersion: currentVersion(),
       rollbackPath: rollbackCreated ? rollbackPath : null,
+      keptJournalPath,
     };
   } catch (err) {
     if (rollbackCreated) {
@@ -9224,7 +9574,19 @@ async function restoreFromFile(sourcePath) {
         await unlinkIfExists(`${DB_PATH}-wal`);
         await unlinkIfExists(`${DB_PATH}-shm`);
         await fs.copyFile(rollbackPath, DB_PATH);
-        init({ plaintextBackup: false });
+        if (keptJournalPath) {
+          // Der Rollback stellt den Stand vor dem Restore her: das Journal
+          // gehört wieder neben die (leere) Datei, an der die Meldung es nennt.
+          await renameIfExists(keptJournalName(rollbackPath, 'wal'), `${DB_PATH}-wal`);
+          await renameIfExists(keptJournalName(rollbackPath, 'shm'), `${DB_PATH}-shm`);
+        }
+        try {
+          init({ plaintextBackup: false });
+        } catch (reopenErr) {
+          // Die leere Datei verweigert init() wie vor dem Restore - das ist der
+          // alte Stand, kein gescheiterter Rollback.
+          if (reopenErr?.code !== EMPTY_DATABASE_FILE) throw reopenErr;
+        }
       } catch (rollbackErr) {
         log.error('Rollback after failed restore also failed:', rollbackErr);
       }
@@ -9279,6 +9641,20 @@ function _resetTestDatabase() {
   }
 }
 
-init();   // auto-initialise when module is first imported
+// Auto-Init beim ersten Import. Eine Ausnahme: das Restore-CLI setzt vorher den
+// Handschlag (RESTORE_TARGET_HANDSHAKE), und nur für GENAU den Leer-Fall bleibt
+// `db` dann `null` - `restoreFromFile()` ersetzt die leere Datei ohnehin, und
+// ohne diese Ausnahme endete der Rat der Meldung („copy it again") per CLI in
+// einer ungefangenen Ausnahme (#1282). Alles andere wirft weiter, auch im CLI.
+// Eine gesunde Datenbank öffnet das CLI bewusst wie bisher: nur eine offene
+// Verbindung checkpointet `restoreFromFile()` vor der Rollback-Kopie, ein
+// pauschal aufgeschobenes init() kürzte die Kopie um nicht gecheckpointete
+// Transaktionen und löschte danach das `-wal`. Ohne Handschlag (Server, Tests,
+// andere Skripte) bricht der Leer-Fall ab wie zuvor.
+try {
+  init();
+} catch (err) {
+  if (!(err?.code === EMPTY_DATABASE_FILE && globalThis[RESTORE_TARGET_HANDSHAKE] === true)) throw err;
+}
 
 export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, unknownMigrationVersions, MIGRATIONS, reconcileCriticalSchema, _setTestDatabase, _resetTestDatabase };

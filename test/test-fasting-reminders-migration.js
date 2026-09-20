@@ -9,7 +9,7 @@ import { applyMigration, buildMigratedDatabase } from './helpers/migrated-databa
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 process.env.DB_PATH = join(mkdtempSync(join(tmpdir(), 'yuvomi-fasting-migration-')), 'unused.db');
 const { MIGRATIONS } = await import('../server/db.js');
-const REMINDER_MIGRATION_VERSION = 219;
+const REMINDER_MIGRATION_VERSION = 220;
 const reminderMigration = MIGRATIONS.find((item) => item.version === REMINDER_MIGRATION_VERSION);
 
 function reminderTypes(database) {
@@ -40,7 +40,7 @@ function migratedWithReminderWidening() {
   return { database, predecessorTypes };
 }
 
-test('v219 preserves v218 document reminders, widens reminder entities, and adds opt-in switches', () => {
+test('v220 preserves v218 document reminders, widens reminder entities, and adds opt-in switches', () => {
   const { database, predecessorTypes } = migratedWithReminderWidening();
   const columns = database.prepare('PRAGMA table_info(health_fasting_settings)').all().map((row) => row.name);
   assert.deepEqual(columns.slice(-2), ['remind_goal', 'remind_next_start']);

@@ -19,12 +19,14 @@
  *   (bzw. npm run test:db-encryption)
  */
 
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, existsSync, readFileSync, readdirSync, copyFileSync, writeFileSync, chmodSync } from 'node:fs';
+import { mkdtempSync, existsSync, readFileSync, readdirSync, copyFileSync, writeFileSync, chmodSync, rmSync, renameSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3-multiple-ciphers';
 
 const KEY = 'test-encryption-key-0123456789';
@@ -1044,3 +1046,730 @@ test(
     }
   }
 );
+
+/*
+ * ---------------------------------------------------------------------------
+ * #1283: der Restore-Dialog nennt die Ursache, nicht immer den Schluessel.
+ *
+ * `validateBackupFile()` hat jeden Fehler beim Oeffnen oder ersten Lesen einer
+ * hochgeladenen Datei zur Schluessel-Meldung gemacht - dieselbe Luecke, die
+ * #1281 am Startpfad geschlossen hat. Wer sein EIGENES Backup einspielt, das
+ * unterwegs abgeschnitten wurde, las „a backup from another installation
+ * cannot be read here" und wurde zur Uebernahme ueber die Kommandozeile
+ * geschickt, die ihm nichts nuetzt.
+ *
+ * Diese Faelle laufen durch die ECHTE Route (`server/routes/backup.js`): das
+ * Backup kommt aus `GET /database`, der Restore geht ueber `POST /restore`,
+ * und die Meldung ist der Text, den der Dialog wortgleich anzeigt
+ * (`admin-backup.js` setzt `err.message` als textContent). Die Route bindet an
+ * die ungebuste `server/db.js`, also gibt es in diesem Prozess GENAU EINE
+ * Instanz dahinter, mit `ROUTE_KEY`. Die Rechte-Faelle koennen ueber die Route
+ * nicht entstehen - sie schreibt die Datei selbst -, sie laufen deshalb ueber
+ * das CLI-Skript `scripts/restore-backup.js`, den zweiten Aufrufer.
+ * ---------------------------------------------------------------------------
+ */
+
+const ROUTE_KEY = 'schluessel-dieser-instanz-0123456789';
+let routeInstance = null;
+
+/** Die echte Backup-Route auf einer Instanz mit `ROUTE_KEY`, einmal pro Prozess. */
+async function restoreRoute() {
+  if (routeInstance) return routeInstance;
+  process.env.DB_PATH = join(tmpDir(), 'yuvomi.db');
+  process.env.DB_ENCRYPTION_KEY = ROUTE_KEY;
+  if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.startsWith('REPLACE_WITH_')) {
+    process.env.SESSION_SECRET = 'test-secret-restore-route';
+  }
+  const db = await import('../server/db.js');
+  const { default: router } = await import('../server/routes/backup.js');
+  const { default: express } = await import('express');
+  const app = express();
+  app.use((req, _res, next) => {
+    req.authUserId = 1;
+    req.authRole = 'admin';
+    req.session = { userId: 1, role: 'admin' };
+    next();
+  });
+  app.use('/', router);
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.on('listening', resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  routeInstance = {
+    db,
+    server,
+    async download() {
+      const res = await fetch(`${base}/database`);
+      assert.equal(res.status, 200, 'Vorbedingung: der Backup-Download laeuft');
+      return Buffer.from(await res.arrayBuffer());
+    },
+    async restore(buf) {
+      const res = await fetch(`${base}/restore`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: buf,
+      });
+      return { status: res.status, body: await res.json() };
+    },
+  };
+  return routeInstance;
+}
+
+after(() => routeInstance?.server.close());
+
+/**
+ * SQLite-Code so, wie `validateBackupFile()` die Datei oeffnet und zuerst
+ * liest (readonly, Key nur, wenn einer gegeben ist) - `null`, wenn es gelingt.
+ * Anders als `sqliteCodeOnFirstRead()` zaehlt der Konstruktor mit: eine Datei
+ * ohne Leserecht scheitert schon dort.
+ */
+function sqliteCodeBeimPruefen(filePath, key) {
+  let handle;
+  try {
+    handle = new Database(filePath, { readonly: true, fileMustExist: true });
+    if (key) {
+      handle.pragma("cipher = 'sqlcipher'");
+      handle.pragma(`key="x'${Buffer.from(key, 'utf8').toString('hex')}'"`);
+    }
+    handle.prepare('SELECT count(*) FROM sqlite_master').get();
+    return null;
+  } catch (err) {
+    return err.code;
+  } finally {
+    handle?.close();
+  }
+}
+
+/** Was nur die Schluessel-Meldung sagt - nichts davon passt, wenn der Key stimmt. */
+const SCHLUESSEL_SAETZE = /another installation|could not be decrypted|Do NOT just set|CLI \/ Docker Compose restore|restart Yuvomi/;
+
+test('Restore-Dialog: ein Backup mit fremdem Schluessel behaelt die Schluessel-Meldung', async () => {
+  const backupPath = await backupFromInstance('schluessel-der-alten-instanz-0123');
+  const route = await restoreRoute();
+  assert.equal(
+    sqliteCodeBeimPruefen(backupPath, ROUTE_KEY),
+    'SQLITE_NOTADB',
+    'Vorbedingung: mit dem Key dieser Instanz meldet SQLite NOTADB'
+  );
+
+  const res = await route.restore(readFileSync(backupPath));
+  assert.equal(res.status, 400);
+  nenntSchluesselUndAlternative({ message: res.body.error }, 'fremder Schluessel ueber die Route');
+  assert.match(res.body.error, /could not be decrypted with this instance's DB_ENCRYPTION_KEY/);
+  assert.match(res.body.error, /Do NOT just set DB_ENCRYPTION_KEY/, 'die Warnung vor dem Schluesseltausch bleibt');
+  assert.match(res.body.error, /CLI \/ Docker Compose restore/, 'und der Weg, der fuer ein fremdes Backup traegt');
+});
+
+test('Restore-Dialog: ein abgeschnittenes eigenes Backup heisst beschaedigt, nicht fremde Installation', async () => {
+  const route = await restoreRoute();
+  const live = () => route.db.get();
+  live().exec('CREATE TABLE IF NOT EXISTS restore_probe (note TEXT)');
+  live().exec('DELETE FROM restore_probe');
+  live().prepare('INSERT INTO restore_probe (note) VALUES (?)').run('aus dem Backup');
+  const original = await route.download();
+  live().prepare('UPDATE restore_probe SET note = ?').run('nach dem Backup');
+
+  // Der Download bzw. die Kopie hat nach der Haelfte aufgehoert.
+  const dir = tmpDir();
+  const abgeschnitten = join(dir, 'yuvomi-backup.db');
+  writeFileSync(abgeschnitten, original.subarray(0, Math.floor(original.length / 2)));
+  assert.equal(
+    sqliteCodeBeimPruefen(abgeschnitten, ROUTE_KEY),
+    'SQLITE_CORRUPT',
+    'Vorbedingung: mit dem Key dieser Instanz meldet SQLite CORRUPT'
+  );
+  assert.equal(
+    sqliteCodeBeimPruefen(abgeschnitten, 'ein-ganz-anderer-schluessel-0123'),
+    'SQLITE_NOTADB',
+    'Vorbedingung: mit falschem Key meldet dieselbe Datei NOTADB - erst das belegt, dass CORRUPT den Key bestaetigt'
+  );
+
+  const res = await route.restore(readFileSync(abgeschnitten));
+  assert.equal(res.status, 400);
+  const message = res.body.error;
+  assert.match(message, /^Backup file is damaged or incomplete \(SQLITE_CORRUPT: /, 'Befund und Code gehoeren in die Meldung');
+  assert.ok(!SCHLUESSEL_SAETZE.test(message), `der Key stimmt - kein Satz aus der Schluessel-Meldung: ${message}`);
+  assert.match(message, /DB_ENCRYPTION_KEY is not the problem: it does open this file/, 'sie muss sagen, dass der Key traegt');
+  assert.match(message, /Nothing on this instance was changed/, 'und dass nichts kaputt gegangen ist');
+  assert.equal(
+    live().prepare('SELECT note FROM restore_probe').get().note,
+    'nach dem Backup',
+    'die Zusage haelt: der abgelehnte Restore hat die laufende Datenbank nicht angefasst'
+  );
+  assert.match(
+    message,
+    /Get the backup again from where it is stored - download or copy it once more - and check that its size and sha256sum match the stored original, then restore that copy\./,
+    'und den Weg nennen, der traegt'
+  );
+
+  // Den Rat befolgen: die Datei vollstaendig neu holen, Groesse und Pruefsumme
+  // gegen das Original, dann einspielen.
+  writeFileSync(abgeschnitten, original);
+  assert.equal(readFileSync(abgeschnitten).length, original.length, 'die neue Kopie hat die Groesse des Originals');
+  assert.equal(
+    sha256(abgeschnitten),
+    createHash('sha256').update(original).digest('hex'),
+    'und seine Pruefsumme'
+  );
+  const wieder = await route.restore(readFileSync(abgeschnitten));
+  assert.equal(wieder.status, 200, `mit der vollstaendigen Datei muss der Restore gelingen: ${JSON.stringify(wieder.body)}`);
+  assert.equal(
+    live().prepare('SELECT note FROM restore_probe').get().note,
+    'aus dem Backup',
+    'und die Daten des Backups sind wieder da'
+  );
+});
+
+const RESTORE_CLI = fileURLToPath(new URL('../scripts/restore-backup.js', import.meta.url));
+
+/**
+ * Das CLI-Skript als eigener Prozess - so, wie ein Admin es startet. `cwd` ist
+ * ein leeres Verzeichnis, damit `dotenv/config` keine `.env` des Arbeitsbaums
+ * einliest.
+ */
+function cliRestore(backupPath, { dbPath, key }) {
+  const env = { ...process.env, DB_PATH: dbPath, LOG_LEVEL: 'error' };
+  if (key) env.DB_ENCRYPTION_KEY = key;
+  else delete env.DB_ENCRYPTION_KEY;
+  const run = spawnSync(process.execPath, [RESTORE_CLI, backupPath], { cwd: tmpDir(), env, encoding: 'utf8' });
+  const failure = (run.stderr ?? '').split('\n').find((line) => line.startsWith('Restore failed: '));
+  return {
+    status: run.status,
+    failure: failure?.slice('Restore failed: '.length) ?? null,
+    stdout: run.stdout,
+    stderr: run.stderr ?? '',
+  };
+}
+
+for (const [fall, key] of [['mit Schluessel', KEY], ['ohne Schluessel', null]]) {
+  test(
+    `CLI-Restore ${fall}: eine Backup-Datei ohne Leserecht nennt den Code und behauptet nichts ueber den Schluessel`,
+    { skip: ALS_ROOT && 'root ignoriert Dateirechte - der Fall ist so nicht herstellbar' },
+    async () => {
+      const backupPath = await backupFromInstance(key);
+      assert.equal(isPlaintext(backupPath), key === null, 'Vorbedingung: das Backup ist so verschluesselt wie seine Instanz');
+      // Etwa als root kopiert, mit 0600 - fuer den Dienstbenutzer unlesbar.
+      chmodSync(backupPath, 0o000);
+      try {
+        assert.equal(sqliteCodeBeimPruefen(backupPath, key), 'SQLITE_CANTOPEN', 'Vorbedingung: SQLite kann die Datei nicht oeffnen');
+        const dbPath = join(tmpDir(), 'yuvomi.db');
+
+        const run = cliRestore(backupPath, { dbPath, key });
+        assert.equal(run.status, 1, 'der Restore muss scheitern');
+        assert.match(run.failure ?? '', /^Backup file could not be read \(SQLITE_CANTOPEN: /, 'Code und SQLite-Text gehoeren in die Meldung');
+        assert.ok(
+          !/DB_ENCRYPTION_KEY|encrypt|decrypt|key/i.test(run.failure),
+          `kein Wort ueber den Key - die Datei war nur nicht lesbar: ${run.failure}`
+        );
+        assert.match(run.failure, /may read it/, 'der Rat muss das Leserecht nennen');
+
+        // Den Rat befolgen: Leserecht geben, derselbe Aufruf spielt das Backup ein.
+        chmodSync(backupPath, 0o644);
+        const wieder = cliRestore(backupPath, { dbPath, key });
+        assert.equal(wieder.status, 0, `mit Leserecht muss der Restore gelingen: ${wieder.failure}`);
+        assert.match(wieder.stdout, /^Restored /m);
+      } finally {
+        chmodSync(backupPath, 0o644);
+      }
+    }
+  );
+}
+
+/*
+ * ---------------------------------------------------------------------------
+ * #1282: eine vorhandene, LEERE Datenbankdatei ist ein Startabbruch.
+ *
+ * SQLite nimmt eine 0-Byte-Datei als neue Datenbank; `init()` hat daraus still
+ * eine frische Instanz gemacht - gemessen mit und ohne Key. Eine frische
+ * Installation hat aber gar keine Datei, und `journal_mode = WAL` schreibt
+ * Seite 1 in die Hauptdatei, bevor es ein `-wal` gibt. Leer ist die Datei nach
+ * einer abgebrochenen Kopie oder nach einem Erststart, der vor Seite 1 getoetet
+ * wurde (mit Key ~150 ms Schluesselableitung; gemessen bleibt dann genau eine
+ * 0-Byte-Datei ohne Nebendatei zurueck - derselbe Zustand wie hier gebaut).
+ *
+ * Das `-wal` neben einer leeren Datei ist KEINE Ausnahme: gemessen loescht
+ * SQLite es beim ersten Lesen und startet leer. Die Verweigerung schuetzt es
+ * also mit, und der Rat muss es beiseitelegen lassen - neu kopiert und mit dem
+ * alten Journal daneben startete die Instanz ohne Key still mit den ALTEN
+ * Daten, mit Key mit „Wrong encryption key" (#1267).
+ *
+ * Jeder Rat der Meldung wird auf demselben Stand befolgt; erst der Start danach
+ * zeigt, ob er traegt. Beide Richtungen laufen mit und ohne Key.
+ * ---------------------------------------------------------------------------
+ */
+
+const SCHLUESSEL_FAELLE = [['ohne Schluessel', null], ['mit Schluessel', KEY]];
+
+/** Groesse in Byte, `null` wenn die Datei fehlt. */
+function groesse(filePath) {
+  return existsSync(filePath) ? statSync(filePath).size : null;
+}
+
+/** Das „Original", das kopiert wird: ein echtes Backup einer Instanz, mit Marker. */
+async function originalMitMarker(key, note) {
+  const dir = tmpDir();
+  const mod = await bootDb(join(dir, 'quelle.db'), key);
+  mod.get().exec('CREATE TABLE marker_1282 (note TEXT)');
+  mod.get().prepare('INSERT INTO marker_1282 VALUES (?)').run(note);
+  const original = join(dir, 'original.db');
+  await mod.backupToFile(original);
+  mod.get().close();
+  return original;
+}
+
+/** Marker der Datenbank, `null` wenn es die Tabelle nicht gibt (frische Instanz). */
+function marker(mod) {
+  const hatTabelle = mod.get()
+    .prepare("SELECT count(*) AS c FROM sqlite_master WHERE name = 'marker_1282'").get().c;
+  return hatTabelle ? mod.get().prepare('SELECT note FROM marker_1282').get()?.note : null;
+}
+
+function istFrischeInstanz(mod, dbPath, key, fall) {
+  const neueste = Math.max(...mod.MIGRATIONS.map((m) => m.version));
+  assert.equal(mod.currentVersion(), neueste, `${fall}: alle Migrationen muessen gelaufen sein`);
+  assert.equal(marker(mod), null, `${fall}: eine frische Instanz hat keine Bestandsdaten`);
+  assert.ok(groesse(dbPath) > 0, `${fall}: die Datei muss jetzt beschrieben sein`);
+  assert.equal(isPlaintext(dbPath), key === null, `${fall}: verschluesselt genau dann, wenn ein Key gesetzt ist`);
+}
+
+/**
+ * Journal einer Datenbank, die vorher an `zielPfad` lief und nicht sauber
+ * gestoppt wurde - `-wal` und `-shm`, Byte fuer Byte wie sie liegen bleiben.
+ */
+async function journalDerVorherigen(zielPfad, key) {
+  const dir = tmpDir();
+  const vorher = await bootDb(join(dir, 'vorher.db'), key);
+  vorher.get().exec('CREATE TABLE marker_1282 (note TEXT)');
+  vorher.get().prepare('INSERT INTO marker_1282 VALUES (?)').run('vorherige-datenbank');
+  // Bewusst waehrend die Verbindung offen ist: close() checkpointet und raeumt das Journal weg.
+  copyFileSync(join(dir, 'vorher.db-wal'), `${zielPfad}-wal`);
+  copyFileSync(join(dir, 'vorher.db-shm'), `${zielPfad}-shm`);
+  vorher.get().close();
+  assert.ok(groesse(`${zielPfad}-wal`) > 0, 'Vorbedingung: das Journal traegt Daten');
+}
+
+/** Rat befolgen: `-wal` und `-shm` beiseitelegen, nicht loeschen. */
+function journalBeiseite(dbPath) {
+  const ablage = tmpDir();
+  for (const suffix of ['-wal', '-shm']) {
+    if (existsSync(`${dbPath}${suffix}`)) renameSync(`${dbPath}${suffix}`, join(ablage, `beiseite${suffix}`));
+  }
+  return join(ablage, 'beiseite-wal');
+}
+
+for (const [fall, key] of SCHLUESSEL_FAELLE) {
+  test(`#1282 leere Datei ohne Journal (${fall}): der Start bricht ab und schreibt nichts hinein`, async () => {
+    const dir = tmpDir();
+    const leer = join(dir, 'yuvomi.db');
+    writeFileSync(leer, '');
+
+    await assert.rejects(
+      () => bootDb(leer, key),
+      (err) => {
+        assert.ok(
+          err.message.startsWith(`[DB] ${leer} exists but is empty (0 bytes).`),
+          'die Meldung muss die Datei und den Befund nennen'
+        );
+        assert.ok(
+          err.message.includes(`copy it again from the original and compare the size and sha256sum of ${leer} with the original`),
+          'Fall a: Kopie oder Restore abgebrochen - neu kopieren und gegen das Original pruefen'
+        );
+        assert.ok(err.message.includes(`delete ${leer} and start again`), 'Fall b: bewusst frisch - die leere Datei loeschen');
+        assert.match(
+          err.message,
+          /the first start of a new installation was interrupted/,
+          'der abgebrochene Erststart hinterlaesst dieselbe Datei und gehoert in Fall b'
+        );
+        assert.ok(!/write-ahead log/.test(err.message), 'ohne Journal darf die Meldung keines erfinden');
+        assert.ok(!/before the rename/.test(err.message), 'ohne Legacy-Datei kein Absatz dazu');
+        assert.ok(!/[\u2013\u2014]/.test(err.message), 'kein Em- oder En-Dash');
+        return true;
+      },
+      'eine leere Datei darf nicht still zur frischen Instanz werden'
+    );
+
+    assert.equal(groesse(leer), 0, 'die Datei muss danach unveraendert 0 Byte haben');
+    assert.deepEqual(readdirSync(dir), ['yuvomi.db'], 'und es darf keine Nebendatei entstanden sein');
+  });
+
+  test(`#1282 Rat „neu kopieren" befolgt (${fall}): der Start gelingt mit den Daten des Originals`, async () => {
+    const original = await originalMitMarker(key, 'original');
+    const ziel = join(tmpDir(), 'yuvomi.db');
+    writeFileSync(ziel, ''); // `cp` auf eine volle Platte
+    await assert.rejects(() => bootDb(ziel, key), /exists but is empty/, 'Vorbedingung: die leere Kopie wird abgewiesen');
+
+    copyFileSync(original, ziel);
+    assert.equal(sha256(ziel), sha256(original), 'die Probe aus der Meldung: Pruefsumme wie das Original');
+    const mod = await bootDb(ziel, key);
+    assert.equal(marker(mod), 'original', 'nach dem erneuten Kopieren muss die Instanz mit den Daten starten');
+  });
+
+  test(`#1282 Rat „leere Datei loeschen" befolgt (${fall}): der Start gelingt als frische Instanz`, async () => {
+    const leer = join(tmpDir(), 'yuvomi.db');
+    writeFileSync(leer, '');
+    await assert.rejects(() => bootDb(leer, key), /exists but is empty/, 'Vorbedingung: die leere Datei wird abgewiesen');
+
+    rmSync(leer);
+    const mod = await bootDb(leer, key);
+    istFrischeInstanz(mod, leer, key, 'nach dem Loeschen');
+  });
+
+  test(`#1282 leere Datei MIT Journal (${fall}): der Start bricht ab, das Journal bleibt Byte fuer Byte liegen`, async () => {
+    const original = await originalMitMarker(key, 'original');
+    const ziel = join(tmpDir(), 'yuvomi.db');
+    await journalDerVorherigen(ziel, key);
+    writeFileSync(ziel, '');
+    const journalVorher = sha256(`${ziel}-wal`);
+
+    await assert.rejects(
+      () => bootDb(ziel, key),
+      (err) => {
+        assert.match(err.message, /exists but is empty \(0 bytes\)/, 'derselbe Abbruch wie ohne Journal');
+        assert.ok(
+          err.message.includes(`A write-ahead log with data lies next to it (${ziel}-wal)`),
+          'das Journal muss genannt werden - es ist nur hier zu sehen'
+        );
+        assert.ok(
+          err.message.includes(`move ${ziel}-wal and ${ziel}-shm aside and keep them - do not delete them`),
+          'der Rat muss es beiseitelegen lassen, nicht loeschen'
+        );
+        assert.match(err.message, /Before either step above/, 'und zwar vor BEIDEN Schritten');
+        return true;
+      },
+      'ein Journal neben einer leeren Datei ist keine Ausnahme von der Verweigerung'
+    );
+
+    assert.equal(groesse(ziel), 0, 'die Hauptdatei bleibt 0 Byte');
+    assert.equal(
+      sha256(`${ziel}-wal`),
+      journalVorher,
+      'das Journal muss unveraendert liegen bleiben - SQLite loescht es beim Oeffnen einer leeren Datei'
+    );
+
+    // Den Rat befolgen: Journal beiseite, Original neu kopieren, pruefen, starten.
+    const beiseite = journalBeiseite(ziel);
+    copyFileSync(original, ziel);
+    assert.equal(sha256(ziel), sha256(original), 'die neue Kopie stimmt mit dem Original ueberein');
+    const mod = await bootDb(ziel, key);
+    assert.equal(
+      marker(mod),
+      'original',
+      'die Instanz muss mit den Daten des Originals starten, nicht mit denen aus dem fremden Journal'
+    );
+    assert.equal(sha256(beiseite), journalVorher, 'das beiseitegelegte Journal bleibt unversehrt');
+  });
+
+  test(`#1282 leere Datei MIT Journal, Rat „frisch starten" befolgt (${fall}): frische Instanz, Journal aufgehoben`, async () => {
+    const leer = join(tmpDir(), 'yuvomi.db');
+    await journalDerVorherigen(leer, key);
+    writeFileSync(leer, '');
+    const journalVorher = sha256(`${leer}-wal`);
+    await assert.rejects(() => bootDb(leer, key), /A write-ahead log with data lies next to it/, 'Vorbedingung');
+
+    const beiseite = journalBeiseite(leer);
+    rmSync(leer);
+    const mod = await bootDb(leer, key);
+    istFrischeInstanz(mod, leer, key, 'nach Beiseitelegen und Loeschen');
+    assert.equal(sha256(beiseite), journalVorher, 'das Journal ist aufgehoben, nicht verloren');
+  });
+
+  test(`#1282 fehlende Datei (${fall}): die frische Installation startet wie bisher`, async () => {
+    const dbPath = join(tmpDir(), 'yuvomi.db');
+    assert.ok(!existsSync(dbPath), 'Vorbedingung: keine Datei');
+    const mod = await bootDb(dbPath, key);
+    istFrischeInstanz(mod, dbPath, key, 'Neuinstallation');
+  });
+
+  test(`#1282 leere Legacy-oikos.db (${fall}): Abbruch, bevor die Umbenennung sie oder ihr Journal anfasst`, async () => {
+    const dir = tmpDir();
+    const legacy = join(dir, 'oikos.db');
+    const neu = join(dir, 'yuvomi.db');
+    await journalDerVorherigen(legacy, key);
+    writeFileSync(legacy, '');
+    const journalVorher = sha256(`${legacy}-wal`);
+
+    await assert.rejects(
+      () => bootDb(legacy, key),
+      (err) => {
+        assert.ok(
+          err.message.startsWith(`[DB] ${legacy} exists but is empty (0 bytes).`),
+          'die Meldung muss die Datei nennen, die wirklich leer ist - nicht den neuen Namen'
+        );
+        assert.ok(err.message.includes(`delete ${legacy} and start again`), 'der Rat gilt fuer diese Datei');
+        assert.ok(err.message.includes(`(${legacy}-wal)`), 'und ihr Journal');
+        return true;
+      },
+      'die Legacy-Migration darf eine leere oikos.db nicht still uebernehmen'
+    );
+
+    assert.equal(groesse(legacy), 0, 'oikos.db bleibt, wie sie war');
+    assert.ok(!existsSync(neu), 'und wird nicht umbenannt');
+    assert.equal(sha256(`${legacy}-wal`), journalVorher, 'ihr Journal ist unberuehrt');
+
+    // Den Rat befolgen: Journal beiseite, leere Datei loeschen - eine frische Instanz entsteht.
+    journalBeiseite(legacy);
+    rmSync(legacy);
+    const mod = await bootDb(legacy, key);
+    istFrischeInstanz(mod, neu, key, 'nach dem Loeschen der leeren oikos.db');
+  });
+
+  test(`#1282 leere yuvomi.db neben voller oikos.db (${fall}): die Meldung sagt, wohin „loeschen" fuehrt`, async () => {
+    const dir = tmpDir();
+    const legacy = join(dir, 'oikos.db');
+    const neu = join(dir, 'yuvomi.db');
+    copyFileSync(await originalMitMarker(key, 'aus-oikos'), legacy);
+    writeFileSync(neu, '');
+    const legacyVorher = sha256(legacy);
+
+    await assert.rejects(
+      () => bootDb(legacy, key),
+      (err) => {
+        assert.ok(err.message.startsWith(`[DB] ${neu} exists but is empty (0 bytes).`), 'die leere Datei ist yuvomi.db');
+        assert.ok(
+          err.message.includes(`An older database file from before the rename lies next to it (${legacy})`),
+          'die Legacy-Datei muss genannt werden, wenn sie Daten hat'
+        );
+        assert.match(
+          err.message,
+          /Deleting the empty yuvomi\.db does not give you a new instance then/,
+          'sonst verspraeche „loeschen" eine frische Instanz und lieferte die alten Daten'
+        );
+        return true;
+      },
+      'bisher startete Yuvomi hier leer auf yuvomi.db und liess oikos.db liegen'
+    );
+    assert.equal(groesse(neu), 0, 'yuvomi.db bleibt 0 Byte');
+    assert.equal(sha256(legacy), legacyVorher, 'oikos.db ist unberuehrt');
+
+    // Den Rat befolgen: die leere yuvomi.db loeschen - der naechste Start zieht oikos.db um.
+    rmSync(neu);
+    const mod = await bootDb(legacy, key);
+    assert.equal(marker(mod), 'aus-oikos', 'wie angekuendigt: die Daten aus oikos.db');
+    assert.ok(!existsSync(legacy), 'oikos.db ist nach yuvomi.db umgezogen');
+  });
+}
+
+/*
+ * ---------------------------------------------------------------------------
+ * #1282, Review-Runde auf #1288: das Restore-CLI auf eine LEERE `DB_PATH`.
+ *
+ * `init()` laeuft beim Import von db.js, und `scripts/restore-backup.js`
+ * importierte es statisch vor seinem `try`. Seit der Leer-Fall abbricht, endete
+ * genau der Rat der Meldung - neu kopieren, auch per Restore - in einer
+ * ungefangenen Ausnahme mit Stacktrace, und `restoreFromFile()` kam nie zum Zug.
+ *
+ * Das CLI setzt jetzt vor dem Import einen Handschlag
+ * (`Symbol.for('yuvomi.db.restoreTarget')`) und importiert dynamisch im `try`.
+ * Zurueckgestellt wird NUR der Leer-Fall (Fehlercode, nicht Meldungstext), und
+ * nur mit Handschlag: der Server und jeder andere Import brechen weiter ab. Eine
+ * gesunde Datenbank oeffnet das CLI wie bisher, damit der TRUNCATE-Checkpoint
+ * vor der Rollback-Kopie laeuft. Ein Journal mit Daten neben der leeren Datei
+ * wird nicht geloescht, sondern neben die Rollback-Kopie gelegt, und ein
+ * gescheiterter Restore legt es zurueck.
+ * ---------------------------------------------------------------------------
+ */
+
+const LEER_CODE = 'YUVOMI_EMPTY_DATABASE_FILE';
+const RESTORE_HANDSCHLAG = Symbol.for('yuvomi.db.restoreTarget');
+
+/** Die Rollback-Kopie, die das CLI nennt. */
+function rollbackAusAusgabe(stdout) {
+  const treffer = /^Previous database copy saved at (.+)\.$/m.exec(stdout);
+  assert.ok(treffer, `das CLI muss die Rollback-Kopie nennen: ${stdout}`);
+  return treffer[1];
+}
+
+/** Der Ort, an dem das CLI das aufbewahrte Journal nennt. */
+function journalAusAusgabe(stdout) {
+  const treffer = /it is kept at (\S+) \(/.exec(stdout);
+  assert.ok(treffer, `das CLI muss den Ort des Journals nennen: ${stdout}`);
+  return treffer[1];
+}
+
+/**
+ * Ein Backup, das `validateBackupFile()` besteht (Tabelle `schema_migrations`,
+ * nur bekannte Versionen) und erst nach dem Kopieren scheitert: die Migrationen
+ * ab v2 finden die Tabellen von v1 nicht.
+ */
+function backupDasNachDemKopierenScheitert() {
+  const pfad = join(tmpDir(), 'scheitert.db');
+  const handle = new Database(pfad);
+  handle.exec(`CREATE TABLE schema_migrations (
+    version INTEGER PRIMARY KEY, description TEXT NOT NULL, applied_at TEXT NOT NULL DEFAULT ''
+  )`);
+  handle.prepare('INSERT INTO schema_migrations (version, description) VALUES (1, ?)').run('nur die Tabelle');
+  handle.close();
+  return pfad;
+}
+
+for (const [fall, key] of SCHLUESSEL_FAELLE) {
+  test(`#1282 ohne Handschlag (${fall}): schon der Import von db.js bricht auf der leeren Datei ab`, async () => {
+    // Der Server ruft init() nicht selbst auf, er verlaesst sich auf den
+    // Auto-Init beim Import. `bootDb()` ruft init() danach noch einmal und
+    // saehe es deshalb nicht, wenn der Import den Leer-Fall schluckte.
+    const leer = join(tmpDir(), 'yuvomi.db');
+    writeFileSync(leer, '');
+    process.env.DB_PATH = leer;
+    if (key === null) delete process.env.DB_ENCRYPTION_KEY;
+    else process.env.DB_ENCRYPTION_KEY = key;
+    assert.equal(globalThis[RESTORE_HANDSCHLAG], undefined, 'Vorbedingung: der Testprozess ist nicht das CLI');
+
+    await assert.rejects(
+      () => import(`../server/db.js?ohne-handschlag=${++scenarioCounter}`),
+      (err) => {
+        assert.equal(err.code, LEER_CODE, 'der Leer-Fall traegt seinen eigenen Code');
+        assert.match(err.message, /exists but is empty \(0 bytes\)/, 'und dieselbe Meldung wie bisher');
+        return true;
+      },
+      'ohne Handschlag darf der Import den Leer-Fall nicht zurueckstellen'
+    );
+    assert.equal(groesse(leer), 0, 'die Datei bleibt 0 Byte');
+  });
+
+  test(`#1282 CLI-Restore auf die leere Datei (${fall}): gelingt, die Instanz startet mit den Daten des Backups`, async () => {
+    const backup = await originalMitMarker(key, 'aus-dem-backup');
+    const ziel = join(tmpDir(), 'yuvomi.db');
+    writeFileSync(ziel, ''); // Kopie oder Restore abgebrochen
+    await assert.rejects(() => bootDb(ziel, key), /exists but is empty/, 'Vorbedingung: der Server verweigert die Datei');
+
+    const run = cliRestore(backup, { dbPath: ziel, key });
+    assert.equal(run.status, 0, `der Restore muss gelingen: ${run.stderr}`);
+    assert.match(run.stdout, /^Restored .+ into .+yuvomi\.db\. Schema v\d+\.$/m);
+    assert.ok(!/write-ahead log/.test(run.stdout), 'ohne Journal nennt das CLI keines');
+    assert.equal(groesse(rollbackAusAusgabe(run.stdout)), 0, 'die Rollback-Kopie ist die leere Datei von vorher');
+
+    const mod = await bootDb(ziel, key);
+    assert.equal(marker(mod), 'aus-dem-backup', 'die Instanz startet mit den Daten des Backups');
+    assert.equal(mod.currentVersion(), Math.max(...mod.MIGRATIONS.map((m) => m.version)), 'mit vollem Schema');
+    assert.equal(isPlaintext(ziel), key === null, 'verschluesselt genau dann, wenn ein Key gesetzt ist');
+  });
+
+  test(`#1282 CLI-Restore auf die leere Datei MIT Journal (${fall}): das Journal liegt Byte fuer Byte neben der Rollback-Kopie`, async () => {
+    const backup = await originalMitMarker(key, 'aus-dem-backup');
+    const dir = tmpDir();
+    const ziel = join(dir, 'yuvomi.db');
+    await journalDerVorherigen(ziel, key);
+    writeFileSync(ziel, '');
+    const walVorher = sha256(`${ziel}-wal`);
+    const shmVorher = sha256(`${ziel}-shm`);
+
+    const run = cliRestore(backup, { dbPath: ziel, key });
+    assert.equal(run.status, 0, `der Restore muss gelingen: ${run.stderr}`);
+    const rollback = rollbackAusAusgabe(run.stdout);
+    const journal = journalAusAusgabe(run.stdout);
+    assert.equal(
+      existsSync(journal) && sha256(journal),
+      walVorher,
+      'das Journal der vorherigen Datenbank darf nicht geloescht werden - es liegt dort, wo das CLI es nennt'
+    );
+    assert.equal(groesse(rollback), 0, 'Vorbedingung: die Rollback-Kopie daneben ist die leere Datei');
+
+    // Der naheliegende naechste Schritt: die Rollback-Kopie ansehen, wie ein
+    // Betreiber es mit `sqlite3 <kopie>` taete. SQLite verwirft ein `-wal`
+    // neben einer leeren Hauptdatei beim ersten Lesen (siehe oben) - unter
+    // seinem ueblichen Namen daneben waere das aufbewahrte Journal damit weg.
+    const ansehen = new Database(rollback);
+    ansehen.prepare('SELECT count(*) AS n FROM sqlite_master').get();
+    ansehen.close();
+    assert.equal(
+      existsSync(journal) && sha256(journal),
+      walVorher,
+      'die Rollback-Kopie zu oeffnen darf das aufbewahrte Journal nicht verwerfen'
+    );
+    const shm = readdirSync(dir).filter((name) => name.includes('pre-restore') && name.includes('shm'));
+    assert.equal(shm.length, 1, `samt -shm daneben: ${shm}`);
+    assert.equal(sha256(join(dir, shm[0])), shmVorher, 'das -shm Byte fuer Byte');
+
+    const mod = await bootDb(ziel, key);
+    assert.equal(
+      marker(mod),
+      'aus-dem-backup',
+      'die Instanz startet mit dem Backup, nicht mit dem Journal der vorherigen Datenbank'
+    );
+  });
+
+  test(`#1282 gescheiterter CLI-Restore auf die leere Datei MIT Journal (${fall}): der Rollback stellt Datei und Journal zurueck`, async () => {
+    const dir = tmpDir();
+    const ziel = join(dir, 'yuvomi.db');
+    await journalDerVorherigen(ziel, key);
+    writeFileSync(ziel, '');
+    const walVorher = sha256(`${ziel}-wal`);
+    const shmVorher = sha256(`${ziel}-shm`);
+
+    const run = cliRestore(backupDasNachDemKopierenScheitert(), { dbPath: ziel, key });
+    assert.equal(run.status, 1, 'der Restore muss scheitern');
+    assert.ok(run.failure, `als „Restore failed: ...": ${run.stderr}`);
+    const rollbacks = readdirSync(dir).filter((name) => /\.pre-restore-[^.]+$/.test(name) && !/-(wal|shm)$/.test(name));
+    assert.equal(rollbacks.length, 1, 'Vorbedingung: gescheitert ist er erst nach dem Kopieren, die Rollback-Kopie steht');
+    assert.ok(
+      !/Rollback after failed restore also failed/.test(run.stderr),
+      `die leere Datei wieder zu verweigern ist der alte Stand, kein gescheiterter Rollback: ${run.stderr}`
+    );
+
+    assert.equal(groesse(ziel), 0, 'die Datei ist wieder die leere von vorher');
+    assert.equal(
+      existsSync(`${ziel}-wal`) && sha256(`${ziel}-wal`),
+      walVorher,
+      'das Journal liegt wieder dort, wo die Meldung es nennt'
+    );
+    assert.equal(existsSync(`${ziel}-shm`) && sha256(`${ziel}-shm`), shmVorher, 'samt -shm');
+    assert.deepEqual(
+      readdirSync(dir).filter((name) => name.startsWith(rollbacks[0]) && name !== rollbacks[0]),
+      [],
+      'und nichts mehr neben der Rollback-Kopie, unter keinem Namen'
+    );
+    await assert.rejects(
+      () => bootDb(ziel, key),
+      /A write-ahead log with data lies next to it/,
+      'der Start bricht ab wie vor dem Restore, mit dem Journal in der Meldung'
+    );
+  });
+
+  test(`CLI-Restore auf eine gesunde Datenbank (${fall}): die Rollback-Kopie traegt allein auch, was nur im Journal stand`, async () => {
+    // Stand nach einem unsauberen Stopp: die letzte Aenderung steht nur im -wal.
+    const laufend = join(tmpDir(), 'laufend.db');
+    const ziel = join(tmpDir(), 'yuvomi.db');
+    const mod = await bootDb(laufend, key);
+    mod.get().exec('CREATE TABLE marker_1282 (note TEXT)');
+    mod.get().prepare('INSERT INTO marker_1282 VALUES (?)').run('vor-dem-restore');
+    for (const suffix of ['', '-wal', '-shm']) copyFileSync(`${laufend}${suffix}`, `${ziel}${suffix}`);
+    mod.get().close();
+    const nurHauptdatei = join(tmpDir(), 'nur-hauptdatei.db');
+    copyFileSync(ziel, nurHauptdatei);
+    assert.equal(
+      marker(await bootDb(nurHauptdatei, key)),
+      null,
+      'Vorbedingung: ohne das Journal fehlt die Aenderung - die Probe misst also den Checkpoint'
+    );
+
+    const run = cliRestore(await originalMitMarker(key, 'aus-dem-backup'), { dbPath: ziel, key });
+    assert.equal(run.status, 0, `der Restore muss gelingen: ${run.stderr}`);
+    const rollback = rollbackAusAusgabe(run.stdout);
+    assert.ok(!/write-ahead log/.test(run.stdout), 'eine offene Datenbank ist gecheckpointet, ihr Journal nicht aufbewahrt');
+    assert.ok(!existsSync(`${rollback}-wal`) && !existsSync(`${rollback}.wal-kept`), 'die Rollback-Kopie steht ohne Journal da');
+    assert.equal(
+      marker(await bootDb(rollback, key)),
+      'vor-dem-restore',
+      'und traegt trotzdem die Aenderung, die vorher nur im Journal stand'
+    );
+    assert.equal(marker(await bootDb(ziel, key)), 'aus-dem-backup', 'die Instanz traegt das Backup');
+  });
+}
+
+test('CLI-Restore mit falschem Schluessel: „Restore failed" statt Stacktrace, die Datenbank bleibt unberuehrt', async () => {
+  const dir = tmpDir();
+  const ziel = join(dir, 'yuvomi.db');
+  (await bootDb(ziel, KEY)).get().close();
+  const vorher = sha256(ziel);
+  // Das Backup passt zum Schluessel des Aufrufs - nur die Datenbank unter
+  // DB_PATH nicht. Scheitern darf der Aufruf also nur am Oeffnen von DB_PATH.
+  const ANDERER = 'ein-anderer-schluessel-0123456789';
+  const backup = await backupFromInstance(ANDERER);
+
+  const run = cliRestore(backup, { dbPath: ziel, key: ANDERER });
+  assert.equal(run.status, 1, 'der Restore muss scheitern');
+  assert.ok(run.failure, `der Abbruch muss als „Restore failed: ..." kommen: ${run.stderr}`);
+  assert.ok(run.failure.includes(ziel), `die Meldung nennt die Datenbank unter DB_PATH, nicht das Backup: ${run.failure}`);
+  assert.ok(!/^\s+at /m.test(run.stderr), `kein Stacktrace: ${run.stderr}`);
+  assert.equal(sha256(ziel), vorher, 'die Datenbank bleibt unberuehrt');
+  assert.deepEqual(readdirSync(dir).filter((name) => name.includes('pre-restore')), [], 'kein Restore hat begonnen');
+});

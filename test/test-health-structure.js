@@ -2,8 +2,10 @@
  * Health structure guard.
  *
  * Sichert die modulare Aufteilung von server/routes/health.js: der Orchestrator
- * muss dieselbe {Methode, Pfad}-Routentabelle wie vor dem Split ergeben (45
- * Routen: 42 aus dem Split, dazu die drei Betreuungs-Routen aus #584), und die Tab-Cluster-Router müssen zusammen exakt diese Routen ergeben
+ * muss dieselbe {Methode, Pfad}-Routentabelle ergeben (EXPECTED weiter unten,
+ * inklusive der neun Vorsorge-Routen aus prevention.js - keine feste Zahl
+ * hier, main waechst an anderer Stelle weiter), und die
+ * Tab-Cluster-Router müssen zusammen exakt diese Routen ergeben
  * (keine verlorene/doppelte Route). Fängt ab, dass ein Cluster-Router still nicht
  * gemountet wird oder eine Route beim Umbau verloren geht/umbenannt wird.
  *
@@ -37,6 +39,7 @@ import cycleFeedRouter from '../server/routes/health/cycle-feed.js';
 import caregiversRouter from '../server/routes/health/caregivers.js';
 import visibilityDefaultsRouter from '../server/routes/health/visibility-defaults.js';
 import fastingRouter from '../server/routes/health/fasting.js';
+import preventionRouter from '../server/routes/health/prevention.js';
 
 /** Sammelt rekursiv alle {METHOD path}-Paare eines Express-Routers (inkl. gemounteter Sub-Router). */
 function collectRoutes(router) {
@@ -138,18 +141,33 @@ const EXPECTED = [
   'DELETE /fasting/:id',
   'POST /fasting/:id/finish',
   'GET /export/fasting',
+  // Vorsorge & Impfungen
+  'GET /prevention/records',
+  'POST /prevention/records',
+  'PATCH /prevention/records/:id',
+  'DELETE /prevention/records/:id',
+  'GET /prevention/types',
+  'POST /prevention/types',
+  'PATCH /prevention/types/:id',
+  'DELETE /prevention/types/:id',
+  'GET /prevention/due',
 ];
 
 test('Orchestrator ergibt exakt die erwartete Routentabelle', () => {
   const actual = collectRoutes(healthRouter).sort();
   assert.deepEqual(actual, [...EXPECTED].sort());
+  // EXPECTED.length statt einer hartcodierten Zahl (Review-Runde 2 an #1256):
+  // main waechst an anderer Stelle weiter, ein fester Literal-Wert hier faellt
+  // dem zum Opfer, ohne dass diese Datei etwas damit zu tun haette. Das
+  // deepEqual oben pinnt die Tabelle ohnehin exakt - die abgeleitete Form
+  // ueberlebt main, das feste Literal nicht.
   assert.equal(actual.length, EXPECTED.length);
 });
 
 test('die Cluster-Router zusammen ergeben genau die Orchestrator-Routen (keine verlorene/doppelte Route)', () => {
   const perModule = [
     vitalsRouter, medicationsRouter, labsRouter, activitiesRouter, exportRouter, cycleRouter,
-    cycleFeedRouter, caregiversRouter, visibilityDefaultsRouter, fastingRouter,
+    cycleFeedRouter, caregiversRouter, visibilityDefaultsRouter, fastingRouter, preventionRouter,
   ].flatMap(collectRoutes);
   // keine Route kommt in mehr als einem Cluster-Router vor
   const seen = new Set();

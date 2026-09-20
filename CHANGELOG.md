@@ -56,6 +56,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   household display time zone consistently. Calculations remain bounded for very long intervals.
   (#1178)
 
+- **Health has a new Prevention tab for vaccinations and check-ups.** Define your household's own
+  types (a tetanus booster, a dentist check-up, anything) with an optional recurring interval -
+  there is no shipped catalog, since regional vaccination schedules go stale. Log what happened and
+  when, and the tab shows a "due / overdue" list computed from your most recent entry per type. A
+  caregiver logging for the person they care for follows that person's own visibility default, not
+  their own. Caregivers also receive the due reminder themselves, subject to the owner's opt-in - it
+  names the person it is about, so it stays useful to someone caring for more than one family
+  member - and revoking a caregiver's access removes that reminder immediately. The type registry is
+  admin-editable under Settings → Modules → Health.
+
 - **Family documents can now carry an optional expiry date and reminder lead time.** Set an expiry
   (e.g. a passport or a residence permit) and how many days ahead to be reminded - an expiring or
   overdue document shows a status chip, and a matching "expiring soon" filter chip sits next to the
@@ -87,6 +97,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arrows already use; the word survives only on `aria-label`/`title`, not visually.
 
 ### Fixed
+
+- **An empty database file no longer starts Yuvomi as an empty instance.** If the database file
+  existed but had a size of zero, Yuvomi took it for a new database, set it up from scratch and came
+  up empty, without a word - usually in the very moment somebody was moving data, where that looks
+  as if everything is gone. A new installation has no database file at all, so an empty one is left
+  behind by a copy or restore that failed or stopped short, or by a very first start that was
+  stopped before it had written anything. Yuvomi now refuses to start, leaves the file as it is and
+  says what to do in either case: copy the database again and compare its size and checksum with
+  the original, or delete the empty file for a fresh start. A write-ahead log (`-wal`) lying next to
+  an empty file used to be deleted by that start as well; it is now left alone, and the message asks
+  you to move it aside before either step, because it belongs to the database that was there before
+  and would otherwise be read together with the file you copy back in. The same check covers the
+  old file name `oikos.db`. A missing database file still means a fresh installation, as before.
+  Restoring a backup onto an empty file with the command-line helper (`scripts/restore-backup.js`)
+  keeps working, and a write-ahead log next to that file is no longer deleted but kept next to the
+  pre-restore copy, where the helper tells you. (#1282)
+
+- **The "n" shortcut no longer opens a create dialog on a page you may only read.** Where your
+  access to a module is "read", the create button is hidden, but the keyboard shortcut still pressed
+  it: the dialog for a new entry opened anyway, and saving it ended in an error. The shortcut now
+  does exactly what the visible button would do, so where there is no button, nothing happens.
+  (#1265)
+
+- **The attachment field no longer offers an upload you are not allowed to make.** Tasks, budget
+  entries, shared expenses and inventory items share one field for attaching documents, and an
+  uploaded file is stored in Documents - so whether it works depends on your access to Documents,
+  not on the page you are on. Somebody allowed to edit tasks but only to read documents saw the
+  upload button, and saving the task ended in an error. With read access to Documents the upload
+  button, dropping a file onto the field and the size hint are gone; attachments that are already
+  there stay visible and open as before, and linking an existing document still works, because the
+  link is saved with the task or entry itself. Without any access to Documents the field is not
+  shown, and saving leaves existing attachments untouched. (#1265)
+
+- **Undo after moving ingredients to the shopping list is only offered where it can work.** Moving
+  the ingredients of a meal or a recipe to the shopping list also works for a member who may only
+  read the shopping list, but the undo button next to the message then ended in an error, and the
+  "create new list" button that appears when there is no list yet led to a list that could not be
+  created. Both change the shopping list, so they now appear only for members who may edit it; the
+  message itself still says what happened. (#1265)
 
 - **A module switched off for the whole household no longer sends its reminders.** Switching a
   module off under Settings means the household does not have it: it leaves the navigation, and its
@@ -148,6 +197,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   original, and if those match, the exact characters of the key, because an environment file is
   parsed rather than copied - systemd, for one, drops backslashes from an unquoted value, reads a
   quote right after "=" as quoting and trims spaces at both ends. (#1267)
+
+- **Restoring a backup that is damaged or incomplete no longer blames the encryption key.** On an
+  instance with `DB_ENCRYPTION_KEY`, every backup the restore dialog could not read was reported as
+  one from another installation that this instance's key cannot decrypt, followed by advice about
+  taking over such a backup on the command line. A backup of this very instance that was cut short -
+  by a download or a copy that stopped early - got the same message, although its key is right. It
+  is now reported as damaged or incomplete, with the note that the key does open it, that nothing on
+  the instance was changed, and the advice to fetch the backup again and compare its size and
+  checksum with the stored original. Any other error names SQLite's own error code and says nothing
+  about the key; a file the restore is not allowed to read - for example a backup copied by another
+  user and restored with the command-line script - is no longer called encrypted, and the message
+  says to check its read permission. A backup written with a different key gets the same message as
+  before. (#1283)
 
 - **The task board shows all four of its columns, and each one can be folded away.** The board
   draws four columns - open, in progress, done and archived - but the layout only ever placed
@@ -257,6 +319,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lead time moves it as it always did. Move the due date back past the reminder - the obvious way to
   fix it - and the dialog notices while you are still in it: the entry and the warning give way to the
   lead time that now applies, rather than going on claiming a situation that has passed.
+
+- **A calendar reminder that had ended up after the event's start no longer moves when you save.**
+  The calendar has the same problem as the task dialog, in its own code. Move an event - by dragging
+  it, through a sync, or from another app - past a reminder that was already set, and the edit dialog
+  showed that reminder as "Custom, 1 minute" before the start. Saving believed it and moved the
+  reminder there, even if you had only changed the title: a reminder set for a week after the event
+  jumped to a minute before it. The row now says the reminder is after the event starts, a warning
+  beside it spells out when it actually goes off, and saving leaves it exactly where it is, row by
+  row, next to any other reminders on the event. Picking a lead time moves it as it always did. Move
+  the start in the dialog and the row follows along: once the reminder is before the new start again,
+  it shows the lead time that applies, and the reminder itself still stays where it was. For a single
+  occurrence of a repeating event, where reminders can only be saved as a lead time, the reminder is
+  left untouched as long as you do not change the reminders; if you do, the dialog asks you to pick a
+  lead time for it or remove it instead of moving it for you. The event details now also give the
+  time of a reminder that has no preset lead time, not just the day. (#1260)
 
 ### Security
 

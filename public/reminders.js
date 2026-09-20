@@ -183,6 +183,7 @@ const REMINDER_ORIGINS = {
   schedule_extra_entry:   { accent: 'var(--module-schedule)',  icon: 'calendar-clock', labelKey: 'nav.schedule' },
   waste_pickup:           { accent: 'var(--module-waste)',     icon: 'trash-2',      labelKey: 'nav.waste' },
   document_expiry:        { accent: 'var(--module-documents)', icon: 'calendar-clock', labelKey: 'nav.documents' },
+  health_prevention_due:  { accent: 'var(--module-health)',    icon: 'syringe',      labelKey: 'health.tabs.prevention' },
   fasting_goal:            { accent: 'var(--module-health)',    icon: 'timer',         labelKey: 'health.fasting.title', url: '/health/fasting' },
   fasting_next_start:      { accent: 'var(--module-health)',    icon: 'timer',         labelKey: 'health.fasting.title', url: '/health/fasting' },
 };
@@ -285,6 +286,14 @@ function cycleReminderBody(reminder) {
       return `${t('health.cycle.status.partnerNextPeriodNeutral')} - ${reminder.entity_title}`;
     }
     return `${t('health.cycle.status.nextPeriod')} - ${reminder.entity_title}`;
+  }
+  // Nur die geerbte Zeile (assigned_from gesetzt) nennt die betreute Person -
+  // server/services/notifications.js#preventionDueBody haelt denselben Riegel
+  // fuer die Push-Benachrichtigung; ohne dieses Gegenstueck hier saehe der
+  // In-App-Toast bei zwei betreuten Personen nur den Typnamen, ohne zu sagen,
+  // fuer wen (Review #1256).
+  if (reminder.entity_type === 'health_prevention_due' && reminder.assigned_from != null && reminder.prevention_subject_name) {
+    return `${reminder.entity_title} - ${reminder.prevention_subject_name}`;
   }
   return null;
 }

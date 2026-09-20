@@ -97,7 +97,10 @@ const STUBS = {
   `,
   '/rrule-ui.js': `
     export const renderRRuleFields = () => '';
-    export const bindRRuleEvents = () => {};
+    // Dieselbe Form wie das Original, das immer { refreshMonthdayHint }
+    // zurueckgibt: der Kalender-Dialog haengt es an sein Startdatum, und ein
+    // leerer Rueckgabewert liess jede Suite sterben, die wireEventForm FAEHRT.
+    export const bindRRuleEvents = () => ({ refreshMonthdayHint: () => {} });
     // Das leere Objekt ist fuer jede Suite richtig, die nur das MARKUP prueft -
     // aber es hat kein 'valid_until', und jeder Formular-Handler, der die
     // Wiederholung mitliest, bricht damit sofort mit "invalidDate" ab. Suiten,
@@ -116,7 +119,13 @@ const STUBS = {
     export const selectModal = async () => null;
     export const advancedSection = (inner = '') => String(inner);
     export const wireBlurValidation = () => {};
-    export const reportFieldError = () => false;
+    // Suiten, die pruefen wollen, WO ein Handler einen Fehler meldet (statt zu
+    // speichern), setzen globalThis.__reportFieldError - dasselbe Muster wie
+    // __apiStub in /api.js. Ohne das bleibt es beim stummen false.
+    export const reportFieldError = (...args) => {
+      globalThis.__reportFieldError?.(...args);
+      return false;
+    };
     export const mountFooter = () => null;
     export const refreshDirtySnapshot = () => {};
     export const captureModalContext = () => globalThis.__modalContextId?.() ?? 'test-modal-context';

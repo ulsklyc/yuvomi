@@ -1340,12 +1340,12 @@ const MIGRATIONS_SQL = {
       created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
     );
   `,
-  219: `
+  220: `
     DROP TRIGGER IF EXISTS trg_reminders_tasks_ad;
     DROP TRIGGER IF EXISTS trg_reminders_events_ad;
     CREATE TABLE reminders_new (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      entity_type TEXT NOT NULL CHECK(entity_type IN ('task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup', 'document_expiry', 'fasting_goal', 'fasting_next_start')),
+      entity_type TEXT NOT NULL CHECK(entity_type IN ('task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup', 'document_expiry', 'health_prevention_due', 'fasting_goal', 'fasting_next_start')),
       entity_id INTEGER NOT NULL,
       remind_at TEXT NOT NULL,
       dismissed INTEGER NOT NULL DEFAULT 0,

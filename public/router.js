@@ -28,6 +28,7 @@ import { SCHEDULE_ROUTES } from '/utils/schedule-tabs.js';
 import { activityType } from '/utils/health-activity.js';
 import { buildHelpRows } from '/utils/help.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
+import { triggerPageFab } from '/utils/fab.js';
 import {
   handleBackNavigation, closeAllOverlays, consumeOverlayMarker,
   pushOverlay, dropOverlay, attachOverlay,
@@ -2440,7 +2441,9 @@ const SHORTCUTS = [
   // Ein Selektor reicht: der Schnellaktionen-FAB des Dashboards war der einzige
   // Grund für den früheren Zweitweg über `#fab-main` (Audit A1-12), und er ist
   // seit dem Folgevorgang zu #634 selbst ein `.page-fab`.
-  { key: 'n',   description: () => t('shortcuts.new'),     action: () => document.querySelector('.page-fab')?.click() },
+  // Nur einen FAB, den die Seite anbietet: bei Nur-lesen ist er per CSS weg,
+  // ein `.click()` erreichte ihn trotzdem (#1265, siehe triggerPageFab).
+  { key: 'n',   description: () => t('shortcuts.new'),     action: () => triggerPageFab() },
   { key: 'f',   description: () => t('shortcuts.searchCalendar'), action: async () => {
     // Ausserhalb des Kalenders war `f` ein stiller No-Op (Critique 2026-08-31,
     // Alex-Persona): erst hinwechseln, dann suchen - ein Griff, ein Ziel.

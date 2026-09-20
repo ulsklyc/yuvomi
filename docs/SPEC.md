@@ -1697,7 +1697,7 @@ Per-user reminders attached to tasks, calendar events, subscriptions, inventory 
 
 | Column | Type | Constraint |
 |--------|------|-----------|
-| entity_type | TEXT | `task`, `event`, `subscription`, `inventory_item`, `inventory_tracked_date`, `pantry_item` (migration v162), `cycle_period` and `cycle_log_nudge` (migration v177), `schedule_entry` (migration v184), `schedule_extra_entry` (migration v187), `waste_pickup` (migration v203, #1063 Phase 8), `document_expiry` (migration v218), or `fasting_goal` and `fasting_next_start` (migration v219), NOT NULL. Each widening rebuilds the table because SQLite cannot extend a CHECK in place |
+| entity_type | TEXT | `task`, `event`, `subscription`, `inventory_item`, `inventory_tracked_date`, `pantry_item` (migration v162), `cycle_period` and `cycle_log_nudge` (migration v177), `schedule_entry` (migration v184), `schedule_extra_entry` (migration v187), `waste_pickup` (migration v203, #1063 Phase 8), `document_expiry` (migration v218), `health_prevention_due` (migration v219), or `fasting_goal` and `fasting_next_start` (migration v220), NOT NULL. Each widening rebuilds the table because SQLite cannot extend a CHECK in place |
 | entity_id | INTEGER | Entity identifier, NOT NULL |
 | remind_at | TEXT | ISO 8601 datetime, NOT NULL |
 | dismissed | INTEGER | 0/1, default 0 |
@@ -3004,7 +3004,7 @@ tables (schedules, logs, results) inherit visibility from their parent record. H
 `DB_ENCRYPTION_KEY` (SQLCipher) is strongly recommended. Yuvomi is **not** a medical device and
 makes **no diagnostic claims**; reference ranges and flags are neutral, user-supplied values.
 
-#### Fasting journal (migrations 209 and 219)
+#### Fasting journal (migrations 209 and 220)
 
 `/health/fasting` requires `health_use_fasting` and Health module access. The MVP
 provides own-person controls and a family read selector. Other-person views are
@@ -3043,7 +3043,7 @@ retain the captured zone and unchanged timestamp precision. Repeated local hours
 retain the original offset; missing spring-forward times are rejected.
 
 `health_fasting_settings` (migration 209) is keyed by user_id with cascading owner
-deletion. Migration 219 adds `remind_goal` and `remind_next_start`, both off by
+deletion. Migration 220 adds `remind_goal` and `remind_next_start`, both off by
 default. It holds nullable default_goal_minutes, zone_mode (`timer`/`educational`),
 safety_acknowledged_at, nullable safety_acknowledged_by (actor deletion sets null),
 and timestamps. clock_mode (`auto`/`elapsed`/`remaining`) lives in sync_config under
@@ -3617,6 +3617,61 @@ a caregiver's copy carries the person's display name in front of the medication,
 own copy does not. Medications (`name`, `dosage_text`) and activities
 (`type`, `note`) are indexed in the FTS5 `search_index` (migration 66) with the same
 owner-or-`family` visibility scoping applied at query time.
+
+**Preventive care & vaccinations (migration 219):** one model for both a
+vaccination and a checkup — a tetanus booster every ten years and a dentist visit every six months
+are the same row (person + type + when it happened + interval to the next), avoiding the parallel-
+tables trap docs/DECISIONS.md #6 warns about. `health_prevention_types` is a **household-owned
+registry with nothing seeded** (`name`, `kind` — `vaccination`/`checkup`, an optional
+`default_interval_months`, an icon, a sort position); docs/SCOPE.md rules out a shipped catalog
+that would go stale (e.g. German U-Untersuchungen), so the household names its own types under
+Settings → Modules → Health (admin-only to write; every member reads). `health_prevention_records`
+is the log: `user_id`, an optional `type_id` (`ON DELETE SET NULL` — deleting a type keeps its
+records, falling back to a `name` snapshot taken at delete time), `given_on`, optional
+`dose_number`/`batch`/`provider`/`note`, a per-record `interval_months` override, an explicit
+`next_due_on` override, a per-record `reminder_offset_days` (NULL = the module default of 30 days),
+and the usual `private`/`family` visibility. Scoping and caregiving follow the exact vitals/meds/
+labs/activities pattern (`careAwareClause()`/`writableClause()`/`resolveOwner()` in
+`server/routes/health/helpers.js`) — a parent logging a child's shots is the archetypal caregiver
+case; the cycle tab remains the only area excluded from caregiving.
+
+`GET /health/prevention/due?user_id=` is the **single computation** of "what's next" (last
+`given_on` + interval, or the explicit override, via the shared `addMonthsClamped()` —
+`server/utils/interval-date.js`, also a thin facade under `subscriptions.js#addBillingCycle` and
+`inventory-deadlines.js#warrantyEndDate`, extracted once a third caller needed the same month-
+addition-with-day-clamping math); both the Prevention tab and the reminder sync
+(`server/services/prevention-reminders.js`) read it — the due maths is never written twice. The
+derived reminder (`entity_type = 'health_prevention_due'`, `entity_id` = the record id — no separate
+anchor table, unlike the cycle's predicted-period anchors, because the record it derives from
+already exists) is recomputed on every record write, after `PUT /caregivers/:subjectId`, and in the
+60-second `processDueNotifications()` pass.
+
+**The caregiver fan-out (D6) is the one genuinely new privacy rule in this feature — and it is
+opt-in.** A care grant (`health_care_grants`) governs read/write access to the data; it does not by
+itself decide whether a push naming the subject and the overdue item lands on someone else's
+device. That second question is `health_prevention_notify_caregivers` (`server/routes/preferences.js`,
+per owner, **default off** — the same shape as `cycle_settings.notify_partner_user_id`): without the
+owner's opt-in, a caregiver gets no inherited row at all, even with a standing care grant. Turning
+the opt-in off removes any already-inherited row **immediately**, the same "a change takes effect at
+once" guarantee described below for a revoked grant.
+
+Built against the only existing precedent for "more than one person gets a reminder off the same
+source", `server/services/event-reminder-fanout.js` (#921): one `reminders` row **per recipient** —
+the subject's own row carries `assigned_from = NULL`, a caregiver's row carries
+`created_by = <caregiver>, assigned_from = <subject>`, so each side's `pushed_at`/`dismissed` is
+independent. A caregiver's own self-set row (`assigned_from IS NULL`) is never overwritten by the
+sync. Revoking a caregiver grant removes their inherited row **immediately** — `PUT
+/caregivers/:subjectId` calls the sync for that subject synchronously, the same "a change takes
+effect at once" guarantee the cycle-settings write already gives; the periodic sync would otherwise
+only self-heal within the next minute. A caregiver whose Health module access is `none` gets no row
+at all, checked the same way the cycle sync gates on it. **The push body names the subject only on
+the inherited row** (`assigned_from IS NOT NULL`) — "Tetanus booster due - Mara": a caregiver caring
+for more than one person cannot tell whose reminder it is without the name, while the subject's own
+copy would just be noise about themselves. This exposes nothing a caregiver could not already read
+via a standing care grant (`careAwareClause()` already shows them a subject's `private` rows) — the
+opt-in above is what keeps that fact off a second person's lock screen unless the owner asks for it.
+Admin governs the type registry only; **it never gains read access to another person's records**
+(docs/DECISIONS.md #1 — privacy beats admin convenience).
 
 ### Schedule (migration 165, #786)
 
@@ -4634,7 +4689,7 @@ resolution: see [Waste Types](#waste-types-migration-v197-1063) and the sections
 
 ### Health (`/health`)
 
-One page module with six deep-link routes (pattern like Settings, not like the Kitchen cluster), sharing a sub-tab bar: Overview (`/health`), Vitals (`/health/vitals`), Cycle (`/health/cycle`), Medications (`/health/meds`), Labs (`/health/labs`), Activity (`/health/activity`). Toggleable like any module; disabled → router redirects to the dashboard. Health data is sensitive — enable `DB_ENCRYPTION_KEY` (SQLCipher). **Not a medical device; no diagnostic claims.**
+One page module with eight deep-link routes (pattern like Settings, not like the Kitchen cluster), sharing a sub-tab bar: Overview (`/health`), Vitals (`/health/vitals`), Cycle (`/health/cycle`), Fasting (`/health/fasting`), Medications (`/health/meds`), Prevention (`/health/prevention`), Labs (`/health/labs`), Activity (`/health/activity`). Toggleable like any module; disabled → router redirects to the dashboard. Health data is sensitive — enable `DB_ENCRYPTION_KEY` (SQLCipher). **Not a medical device; no diagnostic claims.**
 
 - **Per-member scoping:** a person switcher filters to one family member. Since v2.58.0 it is a single button carrying the active person, opening the shared popover menu with `menuitemradio` entries - the same vocabulary and single-select check mark as the recipe source filter. It replaced a permanent 48px pill row that stood above all six views, where a household of four met ten choices before the first piece of content. A household with only one visible person gets no switcher at all. Each row is `private` (owner only) or `family` (all members). Editing is limited to the owner's own view; foreign members show family-visible rows read-only.
 - **Recording for someone else:** a parent can record for a child (fever, medication) once an admin
@@ -4645,11 +4700,12 @@ One page module with six deep-link routes (pattern like Settings, not like the K
 - **Medications:** medication list (name, dose, form, active/PRN), schedule editor (time slots + weekday mask + dose), "due today" view with take/skip, 7-day adherence bar, and stock/refill warnings. Reminders are delivered through the existing push/notification-channel layer (`server/services/medication-scheduler.js`) — no separate reminder table.
 - **Labs:** reports with multiple analytes (value, unit, reference low/high); `low`/`normal`/`high` flag derived from value + range and colour-coded via tokens; per-analyte trend chart with a reference band; neutral medical disclaimer.
 - **Activity:** training log (preset or custom type, duration, optional distance/intensity/calories, note); weekly summary cards and a native SVG bar chart per weekday.
+- **Prevention:** a household-defined vaccination/checkup log (migration 219 — full data-model detail above). The tab shows a "due / overdue" section (`GET /prevention/due`) whose chip tone reuses `DATE_STATUS_ALERT_DAYS` (`public/utils/date-status.js`, the same threshold Documents' expiry chip uses) against the server-computed `days_left`, then records grouped by type with add/edit/delete. Types are managed under Settings → Modules → Health, not on this tab. A caregiver logging for someone they care for gets that record scoped and defaulted through the same `resolveOwner()`/`defaultVisibilityFor()` path as vitals — the visibility follows the **owner's** choice, not the caregiver's. Caregivers also receive the due reminder itself (see the data-model section above for the fan-out rules).
 - **Cycle:** menstrual cycle tracking. Period episodes (start/end + flow), per-day logs (flow intensity, a curated 20-symptom picker with an optional 1–3 severity each, mood), and calendar-method predictions of the next period, ovulation, and fertile window (luteal length, cycle/period averages derived from history or overridden in settings). A native **SVG cycle-ring** shows the current phase, cycle day, and countdown; a month calendar colour-codes logged and predicted periods, the fertile window, and ovulation; plus prediction stat cards, a period history, and CSV export. A **pregnancy mode** (migration 82) in the cycle settings pauses all predictions (next period, ovulation, fertile window, ring, and calendar projection); with an optional estimated due date it instead shows the gestational week (Naegele rule, 280 days), trimester, countdown, and a progress bar, while daily logging stays available. Cycle data defaults to `private`; a per-member **default-visibility** setting (migration 96) can pre-select `family` for newly logged periods and day logs instead, and an **"apply to all"** action in the cycle settings bulk-updates every existing entry to the chosen visibility (`PATCH /health/cycle/visibility`, strictly own-scoped). The visibility of any single period or day log stays overridable in its own modal. The fertile window carries a clear disclaimer that it is not contraception and no substitute for medical advice. Cycle data is deliberately kept out of global search; the only dashboard surface is an **opt-in, owner-only tile** (v0.98.0) that shows the signed-in user's own next-period countdown and current phase — it is never added to the shared dashboard payload. The calendar distinguishes phases with **non-colour cues** (solid fill, diagonal hatch, ringed day, outline) as well as colour, so it stays legible with colour-vision deficiency. **Today carries the app accent, not the module tone (v2.24.1):** its ring used the Health colour, which is the tone in that grid closest to the period colour — and today is frequently a logged day, so both rings met on the same cell. Measured (CIEDE2000, JND 2.3) the distance to `--cycle-period` rose from 17.23 light / 14.33 dark to 31.50 / 25.97, and the grid's smallest pairwise distance from 17.23 / 14.33 to 26.60 / 25.97. It is also the mark the calendar and the datepicker already use for the current day; the 2 px ring width stays, because 1.5 px already belongs to a predicted period.
 - **Overview:** aggregated landing view — due-today medications with inline take/skip, latest vitals cards (deep-link to the Vitals tab), adherence rate + streak, quick-capture buttons, upcoming reminders, and a **CSV export** bar (one download per area — vitals, activities, labs, medication logs — with optional date range).
 - **Search & shortcuts:** medications and activities appear in global search (FTS5) with the same visibility scoping and deep-link to the Meds/Activity tab; the `g h` keyboard shortcut jumps to the last-visited Health tab.
 - **Accessibility:** the sub-tab bar and the range chip row expose `role="tablist"`/`tab` with arrow-key navigation and roving tabindex; the person menu carries the menu keyboard behaviour from the shared `popover-menu` (focus moves onto the active choice on open, arrows wrap, Home/End, Tab leaves) and hands focus back to the freshly rendered trigger after a switch; SVG charts carry `role="img"` + `aria-label`; take/skip/save actions announce via the polite/assertive live regions; modals trap focus and restore it on close.
-- **API:** `GET/POST/PATCH/DELETE /api/v1/health/{vitals,medications,labs,activities}` (+ nested `…/medications/:id/schedules|logs`, `…/logs/:id/take|skip`, lab results), cycle endpoints `…/cycle/periods`, `…/cycle/logs` (upsert per day), `GET/PUT …/cycle/settings`, and `GET /api/v1/health/export/{vitals,activities,labs,meds-logs,cycle}` (text/csv). All handlers apply `user_id` scoping and `visibility` filtering.
+- **API:** `GET/POST/PATCH/DELETE /api/v1/health/{vitals,medications,labs,activities}` (+ nested `…/medications/:id/schedules|logs`, `…/logs/:id/take|skip`, lab results), cycle endpoints `…/cycle/periods`, `…/cycle/logs` (upsert per day), `GET/PUT …/cycle/settings`, `GET/POST/PATCH/DELETE /api/v1/health/prevention/{records,types}` (types: admin-only writes) and `GET /api/v1/health/prevention/due?user_id=`, and `GET /api/v1/health/export/{vitals,activities,labs,meds-logs,cycle}` (text/csv). All handlers apply `user_id` scoping and `visibility` filtering.
 
 ### Schedule (`/schedule`)
 

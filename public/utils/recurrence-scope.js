@@ -195,7 +195,11 @@ export async function requestCalendarOccurrenceMutation({
       ]) delete payload[seriesOwnedField];
       delete payload.recurrence_rule;
     }
-    payload.reminder_offsets = reminderOffsets;
+    // `null` heisst: die Erinnerungen NICHT anfassen. Der Server laesst sie
+    // dann, wie sie sind, statt sie aus Vorlaeufen neu zu schreiben - der Weg
+    // fuer eine Erinnerung nach dem Terminbeginn, die sich als Vorlauf nicht
+    // ausdruecken laesst (#1260). Ein leeres Array bleibt „alle entfernen".
+    if (reminderOffsets !== null) payload.reminder_offsets = reminderOffsets;
   }
   return withCalendarOrphanConfirmation(
     (confirmedCount) => api.put(target.path, confirmedCount === undefined

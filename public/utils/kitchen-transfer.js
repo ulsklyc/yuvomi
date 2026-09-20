@@ -27,6 +27,17 @@
  * aufrufenden Module; jetzt gehört er der Gruppe, und alle drei nutzen ihn
  * gleichberechtigt.
  *
+ * DIE ZIELLISTE GEHOERT EINEM FREMDEN MODUL (#1265). Zwei Antworten dieses
+ * Bausteins schreiben selbst in den Einkauf, egal von welchem Tab aus: der
+ * Ausweg „Neue Liste erstellen" (`POST /shopping`) und die Ruecknahme
+ * (`POST /shopping/items/undo-transfer`). Beide fragen deshalb das
+ * Einkaufs-Recht ueber `mayWritePath()` und entfallen ohne es - eine Ruecknahme,
+ * die im 403 endet, ist schlechter als keine, und ein Ausweg auf eine Seite,
+ * auf der man nichts anlegen darf, ist eine Sackgasse. Den Transfer SELBST
+ * urteilt der Server je nach Weg verschieden (Vorrat als `shopping`, Mahlzeit
+ * und Rezept als `meals`); ob die zweite Zuordnung so bleibt, ist offen,
+ * deshalb fragt `resolveShoppingTarget()` hier bewusst nichts.
+ *
  * `selectModal` kommt aus `components/`, obwohl diese Datei in `utils/` liegt.
  * Die Alternative wäre, die Listenauswahl beim Aufrufer zu lassen - dann kapselt
  * der Helfer wieder nur den Text, und die Vorprüfung stünde erneut dreimal da.
@@ -38,6 +49,7 @@ import { t } from '/i18n.js';
 import { api } from '/api.js';
 import { selectModal } from '/components/modal.js';
 import { refreshKitchenBadges } from '/utils/kitchen-tabs.js';
+import { mayWritePath } from '/utils/module-access.js';
 
 /**
  * Standzeit der Transfer-Toasts.
@@ -49,9 +61,13 @@ import { refreshKitchenBadges } from '/utils/kitchen-tabs.js';
  */
 export const TRANSFER_TOAST_MS = 5000;
 
-/** Ist der Einkaufs-Tab überhaupt erreichbar? */
+/**
+ * Fuehrt der Ausweg irgendwohin? Der Einkaufs-Tab muss erreichbar sein UND
+ * dieser Nutzer muss dort eine Liste anlegen duerfen (`POST /shopping`) - mit
+ * `shopping: read` landete er auf einer Seite, deren Anlegeweg ausgeblendet ist.
+ */
 function shoppingReachable() {
-  return !window.yuvomi?.isModuleDisabled?.('shopping');
+  return !window.yuvomi?.isModuleDisabled?.('shopping') && mayWritePath('/shopping');
 }
 
 /**
@@ -164,7 +180,10 @@ export function mountMissingShoppingList(target, opts) {
  * `on_shopping_list`-Flag der Zutaten zurücksetzt.
  *
  * Ohne IDs (ältere Serverantwort) erscheint der Toast bewusst OHNE Aktion,
- * statt einen Knopf zu zeigen, der nichts zurücknehmen kann.
+ * statt einen Knopf zu zeigen, der nichts zurücknehmen kann. Dasselbe ohne
+ * Schreibrecht auf den Einkauf: der Transfer aus Mahlzeit oder Rezept gelingt
+ * dann trotzdem (der Server urteilt ihn als `meals`), die Rücknahme ist aber
+ * ein Einkaufs-Pfad und endete im 403 (#1265).
  *
  * `refreshKitchenBadges()` läuft hier statt an den drei Aufrufstellen: die Zahl
  * des Einkaufs-Tabs ändert sich in beide Richtungen, und beide Male genau hier.
@@ -181,7 +200,8 @@ export function announceTransfer({ message, addedIds = [], onUndone } = {}) {
   refreshKitchenBadges();
 
   const ids = Array.isArray(addedIds) ? addedIds.filter((id) => Number.isFinite(Number(id))) : [];
-  const undo = ids.length
+  const canUndo = mayWritePath('/shopping/items/undo-transfer');
+  const undo = canUndo && ids.length
     ? async () => {
         try {
           await api.post('/shopping/items/undo-transfer', { ids });

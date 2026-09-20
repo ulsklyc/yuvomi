@@ -9,7 +9,7 @@ import { applyMigration, buildMigratedDatabase } from './helpers/migrated-databa
 
 process.env.DB_PATH = ':memory:';
 const { MIGRATIONS } = await import('../server/db.js');
-const REMINDER_MIGRATION_VERSION = 219;
+const REMINDER_MIGRATION_VERSION = 220;
 
 function setup() {
   const database = buildMigratedDatabase(
