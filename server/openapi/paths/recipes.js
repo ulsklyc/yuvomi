@@ -3,7 +3,7 @@ import { op, jsonBody, idParam } from '../helpers.js';
 export function recipesPaths() {
   return {
     '/api/v1/recipes': {
-      get: op({ summary: 'List recipes', tag: 'Recipes' }),
+      get: op({ summary: 'List recipes', tag: 'Recipes', description: 'Every ingredient carries `pantry_item_id` and `pantry_item_name`, the household\'s own confirmed match to one row of its pantry, both `null` when there is none. They name a row of the `pantry` module although this path belongs to `meals`, so they are also `null` for a member whose pantry access is `none` and for a token that carries no pantry scope - the ingredient itself stays, simply unmatched.' }),
       post: op({ summary: 'Create recipe', tag: 'Recipes', stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/recipes/{id}': {

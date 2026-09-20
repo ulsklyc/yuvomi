@@ -33,7 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   into a confident one. The match survives editing the recipe, because it hangs on the ingredient
   and not on its row in the database. Deleting the stock row removes the match and leaves the recipe
   untouched. Changing a match needs permission to write the pantry, not just the recipes; members
-  who may only look at the pantry see the match and cannot change it. (#1314)
+  who may only look at the pantry see the match and cannot change it, and members who may not see
+  the pantry at all are not told which row it is - not in the page and not in the API's answer
+  either. (#1314)
 
 ### Fixed
 

@@ -12,7 +12,7 @@ import { normalizeRecipeMealTypes } from '../../public/utils/recipe-meal-types.j
 import { ingredientMatchKey } from '../../public/utils/ingredient-match-key.js';
 import { getAdapter } from '../services/recipe-providers/index.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
-import { mayWriteModule } from '../permissions.js';
+import { hiddenModulesFor, mayWriteModule } from '../permissions.js';
 
 const log = createLogger('Recipes');
 const router = express.Router();
@@ -56,8 +56,27 @@ function withSource(recipe) {
  * Haushalt gezeigt hat; unbekannt ist nicht fehlend (docs/DECISIONS.md
  * Abschnitt 7).
  */
-function attachPantryMatches(ingredients) {
+function attachPantryMatches(req, ingredients) {
   if (!ingredients.length) return ingredients;
+
+  // DAS RECHT AM LESEWEG, spiegelbildlich zum Schreibweg weiter unten. Der Pfad
+  // haengt unter /recipes und gehoert dem Scope-Modul `meals`; der globale
+  // Riegel in server/index.js urteilt am ersten Pfadsegment und fragt deshalb
+  // nie nach `pantry`. Benannt wird hier aber eine Zeile des VORRATS, mit
+  // ihrem Namen. Dieselbe Mischstelle wie die Import-Kandidaten in
+  // server/routes/birthdays.js (Pfad `calendar`, Inhalt aus `contacts`), und
+  // derselbe Aufruf schliesst sie: `hiddenModulesFor` prueft beide Achsen,
+  // Mitgliedsrecht UND Token-Scope.
+  //
+  // Dass `pantryMatchEl()` in public/pages/recipes.js bei `access === 'none'`
+  // nichts zeichnet, ist KEIN Ersatz: das ist eine Darstellungsentscheidung,
+  // und GET /api/v1/recipes beantwortet die Frage am Browser vorbei.
+  //
+  // Was zurueckbleibt, ist `null` und nicht das Weglassen der Felder: die Zutat
+  // ist fuer diesen Betrachter unzugeordnet, und die Antwort behaelt ihre Form.
+  if (hiddenModulesFor(req, ['pantry']).has('pantry')) {
+    return ingredients.map((ing) => ({ ...ing, pantry_item_id: null, pantry_item_name: null }));
+  }
   const recipeIds = [...new Set(ingredients.map((i) => i.recipe_id))];
   const placeholders = recipeIds.map(() => '?').join(',');
   const rows = db.get().prepare(`
@@ -78,7 +97,7 @@ function attachPantryMatches(ingredients) {
   });
 }
 
-function loadRecipeWithIngredients(id) {
+function loadRecipeWithIngredients(req, id) {
   const recipe = db.get().prepare(`
     SELECT r.*, u.display_name AS creator_name, u.avatar_color AS creator_color,
            p.name AS provider_account_name, p.provider AS provider_type
@@ -90,7 +109,7 @@ function loadRecipeWithIngredients(id) {
 
   if (!recipe) return null;
 
-  const ingredients = attachPantryMatches(db.get().prepare(`
+  const ingredients = attachPantryMatches(req, db.get().prepare(`
     SELECT * FROM recipe_ingredients
     WHERE recipe_id = ?
     ORDER BY id ASC
@@ -99,7 +118,7 @@ function loadRecipeWithIngredients(id) {
   return withSource({ ...recipe, meal_types: normalizeRecipeMealTypes(recipe.meal_types), ingredients });
 }
 
-router.get('/', (_req, res) => {
+router.get('/', (req, res) => {
   try {
     const recipes = db.get().prepare(`
       SELECT r.*, u.display_name AS creator_name, u.avatar_color AS creator_color,
@@ -115,7 +134,7 @@ router.get('/', (_req, res) => {
 
     if (ids.length > 0) {
       const placeholders = ids.map(() => '?').join(',');
-      const ingredients = attachPantryMatches(db.get().prepare(`
+      const ingredients = attachPantryMatches(req, db.get().prepare(`
         SELECT * FROM recipe_ingredients
         WHERE recipe_id IN (${placeholders})
         ORDER BY id ASC
@@ -199,7 +218,7 @@ router.post('/', (req, res) => {
       return rid;
     });
 
-    const created = loadRecipeWithIngredients(recipeId);
+    const created = loadRecipeWithIngredients(req, recipeId);
     res.status(201).json({ data: created });
   } catch (err) {
     log.error('POST / error:', err);
@@ -265,7 +284,7 @@ router.put('/:id', (req, res) => {
       }
     });
 
-    const updated = loadRecipeWithIngredients(id);
+    const updated = loadRecipeWithIngredients(req, id);
     res.json({ data: updated });
   } catch (err) {
     log.error('PUT /:id error:', err);

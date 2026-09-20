@@ -330,6 +330,102 @@ test('das Loesen einer Zuordnung braucht dasselbe Recht wie das Setzen', async (
 });
 
 // =========================================================================
+// 4b. Der LESEWEG traegt dasselbe Recht wie der Schreibweg
+// =========================================================================
+
+/*
+ * DERSELBE BEFUND WIE BEI DEN GEBURTSTAGEN (server/routes/birthdays.js): der
+ * Pfad sagt `/recipes` und loest auf das Scope-Modul `meals` auf, der Inhalt
+ * nennt eine Zeile des VORRATS. Der Riegel in server/index.js urteilt am ersten
+ * Pfadsegment und fragt nie nach `pantry` - wer die Zutat lesen darf, bekam
+ * `pantry_item_name` mitgeliefert, egal was seine Vorratsrechte sagen. Das
+ * Verstecken in `pantryMatchEl()` (public/pages/recipes.js) ist eine
+ * Darstellungsentscheidung, keine Zugriffskontrolle: GET /api/v1/recipes
+ * beantwortet die Frage direkt.
+ *
+ * DIE PROBE LAEUFT GEGEN DIE ROUTE, NICHT GEGEN `attachPantryMatches`. Der
+ * Helfer liesse sich einzeln richtigstellen und die Verdrahtung trotzdem
+ * vergessen - beide Aufrufer bekamen `req` bisher gar nicht zu sehen
+ * (`router.get('/', (_req, res) => ...)`). Und sie braucht BEIDE Achsen:
+ * Mitgliedsrecht UND Token-Scope. Ein ungeprueft gebliebener Token-Weg ist
+ * genau die Luecke aus #1290.
+ */
+
+/** Setzt eine Zuordnung mit vollem Recht und gibt Rezept-ID und Vorratszeile zurueck. */
+async function seedMatch(titel, zutat, vorrat) {
+  asMember({});
+  const recipeId = seedRecipe(titel, [zutat, 'Salz']);
+  const itemId = seedPantry(vorrat);
+  const res = await call('PUT', `/recipes/${recipeId}/ingredient-match`, { name: zutat, pantryItemId: itemId });
+  assert.equal(res.status, 200, 'Vorbedingung: die Zuordnung steht');
+  return { recipeId, itemId };
+}
+
+test('Mitglied mit pantry: read sieht die Zuordnung weiter', async () => {
+  // OHNE DIESEN TEST SAGT JEDES `null` WEITER UNTEN NICHTS: ein Filter, der
+  // die Zuordnung IMMER leert, saehe an der gesperrten Stelle genauso aus.
+  // Und nur `none` ist eine Sperre - wer lesen darf, darf lesen.
+  const { recipeId, itemId } = await seedMatch('Bruschetta', 'Tomaten', 'Dosentomaten');
+
+  asMember({ pantry: 'read' });
+  const gelesen = await readRecipe(recipeId);
+  assert.equal(ingredientOf(gelesen.body, 'Tomaten').pantry_item_id, itemId);
+  assert.equal(ingredientOf(gelesen.body, 'Tomaten').pantry_item_name, 'Dosentomaten');
+});
+
+test('Mitglied mit pantry: none bekommt die Zuordnung aus GET /recipes nicht', async () => {
+  const { recipeId } = await seedMatch('Chili', 'Bohnen', 'Kidneybohnen 400g');
+
+  asMember({ pantry: 'none' });
+  const gelesen = await readRecipe(recipeId);
+  const bohnen = ingredientOf(gelesen.body, 'Bohnen');
+  assert.equal(bohnen.pantry_item_id, null, 'die ID benennt eine Vorratszeile, die dieses Mitglied nicht sehen darf');
+  assert.equal(bohnen.pantry_item_name, null, 'und der Name ist der Inhalt dieser Zeile');
+  // Die Zutat selbst gehoert zum Rezept und bleibt.
+  assert.equal(bohnen.name, 'Bohnen', 'das Rezept selbst bleibt lesbar - gesperrt ist der Vorrat, nicht das Essen');
+});
+
+test('Mitglied mit pantry: none bekommt die Zuordnung auch aus der Antwort auf PUT /recipes/:id nicht', async () => {
+  // Der zweite Aufrufer von `attachPantryMatches`: `loadRecipeWithIngredients`
+  // beantwortet POST und PUT. Ein Mitglied mit `pantry: none` darf Rezepte
+  // speichern (das ist `meals`) und bekaeme die Zuordnung in der Antwort
+  // zurueck - derselbe Inhalt, anderer Weg.
+  const { recipeId } = await seedMatch('Gulasch', 'Paprika', 'Paprikapulver edelsuess');
+
+  asMember({ pantry: 'none' });
+  const gespeichert = await call('PUT', `/recipes/${recipeId}`, {
+    title: 'Gulasch',
+    ingredients: [{ name: 'Paprika' }, { name: 'Salz' }],
+  });
+  assert.equal(gespeichert.status, 200, 'Vorbedingung: das Speichern selbst ist erlaubt');
+  assert.equal(ingredientOf(gespeichert.body, 'Paprika').pantry_item_id, null);
+  assert.equal(ingredientOf(gespeichert.body, 'Paprika').pantry_item_name, null);
+});
+
+test('Token mit meals:read und pantry:read sieht die Zuordnung', async () => {
+  // Die Vorbedingung der Token-Achse, aus demselben Grund wie oben.
+  const { recipeId, itemId } = await seedMatch('Pizza', 'Mozzarella', 'Mozzarella 125g');
+
+  asToken(['meals:read', 'pantry:read']);
+  const gelesen = await readRecipe(recipeId);
+  assert.equal(ingredientOf(gelesen.body, 'Mozzarella').pantry_item_id, itemId);
+  assert.equal(ingredientOf(gelesen.body, 'Mozzarella').pantry_item_name, 'Mozzarella 125g');
+});
+
+test('Token mit meals:read, aber ohne Vorrats-Scope, bekommt die Zuordnung nicht', async () => {
+  const { recipeId } = await seedMatch('Lasagne', 'Bechamel', 'Bechamelsauce Glas');
+
+  asToken(['meals:read']);
+  const gelesen = await readRecipe(recipeId);
+  const bechamel = ingredientOf(gelesen.body, 'Bechamel');
+  assert.equal(bechamel.pantry_item_id, null,
+    'ein Token mit meals:read nennt den Vorrat nicht - es kommt am Pfad-Riegel vorbei, nicht an dieser Frage');
+  assert.equal(bechamel.pantry_item_name, null);
+  assert.equal(bechamel.name, 'Bechamel', 'das Rezept selbst darf es lesen');
+});
+
+
+// =========================================================================
 // 5. Unbekannt, nicht fehlend
 // =========================================================================
 
