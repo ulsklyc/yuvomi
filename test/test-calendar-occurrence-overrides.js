@@ -1530,6 +1530,109 @@ test('an occurrence reminder anchors on the household instant, east and west of 
   })));
 });
 
+/**
+ * #1291, die LESENDE Seite: `reminderState()` vergleicht Vorlaeufe.
+ *
+ * Seit der Anker dieses PRs ein Zeitpunkt ist, darf ihn der Vergleich nicht
+ * mehr als Wanduhrzeit lesen. Tat er es, stand in `offsetMs` nicht der Vorlauf,
+ * sondern `Vorlauf + Zonenoffset` - und der Zonenoffset wechselt an der
+ * DST-Grenze. Zwei Vorkommen beidseits des 25.10.2026 heben den Unterschied
+ * damit genau auf: 60 Minuten Vorlauf in der Sommerzeit und 120 Minuten in der
+ * Winterzeit ergeben beide 180.
+ *
+ * `sameReminderState()` meldet die beiden dann als gleich, und der Aufrufer
+ * nimmt das woertlich: er loescht die Erinnerungen des Kindes, streicht
+ * `reminders` aus `overridden_fields` und raeumt, wenn nichts uebrig bleibt,
+ * das Kind-Ereignis samt Ausnahmezeile ab. Die abweichende Erinnerung des
+ * Nutzers verschwindet still.
+ *
+ * BEIDE RICHTUNGEN IN EINEM VERGLEICH. Ein Test nur auf „bleibt erhalten" waere
+ * auch von einem Vergleich gruen, der nie wieder etwas gleich findet; die
+ * zweite Lage haelt fest, dass ein wirklich gleicher Vorlauf weiterhin auf die
+ * Serie zurueckfaellt. Gemessen wird der Datenbankzustand nach dem Schreiben,
+ * nicht der Rueckgabewert allein.
+ */
+test('an occurrence reminder lead survives the DST boundary its zone offset would cancel', () => {
+  const fixtures = [
+    {
+      label: 'abweichender Vorlauf (120 statt 60) bleibt ein Override',
+      occurrenceOffset: 120,
+      // 2026-11-02 09:00 Europe/Berlin ist Winterzeit (UTC+1) = 08:00 UTC,
+      // 120 Minuten Vorlauf = 06:00 UTC. Die Serie steht auf 06:00 UTC mit 60
+      // Minuten Vorlauf aus der Sommerzeit - DIESELBE Uhrzeit, ein anderer
+      // Vorlauf. Auf der Wanduhr-Achse gelesen sind beide 180 Minuten.
+      expected: {
+        restored: false,
+        childReminders: ['2026-11-02T06:00:00'],
+        overriddenFields: '["reminders"]',
+        exceptionRows: 1,
+      },
+    },
+    {
+      label: 'gleicher Vorlauf (60) faellt weiterhin auf die Serie zurueck',
+      occurrenceOffset: 60,
+      // 08:00 UTC minus 60 Minuten = 07:00 UTC. Derselbe Vorlauf wie die Serie,
+      // also kein Override - das Kind-Ereignis und seine Ausnahmezeile gehen.
+      expected: {
+        restored: true,
+        childReminders: [],
+        overriddenFields: null,
+        exceptionRows: 0,
+      },
+    },
+  ];
+  const observed = fixtures.map((fixture) => {
+    const database = createDatabase();
+    setHouseholdTimeZone(database, 'Europe/Berlin');
+    const seriesId = Number(insertSeries(database, {
+      title: 'Reminder lead across the DST boundary',
+      start_datetime: '2026-10-01T09:00:00',
+      recurrence_rule: 'FREQ=DAILY',
+    }));
+    // Die Erinnerung der Serie, so wie der Dialog sie schreibt: naiv-UTC.
+    // 2026-10-01 09:00 Europe/Berlin ist Sommerzeit (UTC+2) = 07:00 UTC,
+    // 60 Minuten Vorlauf = 06:00 UTC.
+    database.prepare(`
+      INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+      VALUES ('event', ?, '2026-10-01T06:00:00', 1)
+    `).run(seriesId);
+
+    const result = upsertOccurrenceOverride(database, {
+      seriesId,
+      recurrenceId: '2026-11-02',
+      actorId: 1,
+      reminderOffsets: [fixture.occurrenceOffset],
+    });
+    const child = database.prepare(`
+      SELECT id, overridden_fields FROM calendar_events
+      WHERE recurrence_parent_id = ? AND recurrence_id = ?
+    `).get(seriesId, '2026-11-02');
+    return {
+      label: fixture.label,
+      restored: result.restored === true,
+      childReminders: child ? database.prepare(`
+        SELECT remind_at FROM reminders WHERE entity_type = 'event' AND entity_id = ?
+        ORDER BY remind_at
+      `).all(child.id).map((row) => row.remind_at) : [],
+      overriddenFields: child ? child.overridden_fields : null,
+      exceptionRows: database.prepare(`
+        SELECT COUNT(*) AS count FROM calendar_event_exceptions
+        WHERE event_id = ? AND exception_date = ?
+      `).get(seriesId, '2026-11-02').count,
+      // Die Erinnerung der Serie bleibt in beiden Lagen unangetastet.
+      seriesReminders: database.prepare(`
+        SELECT remind_at FROM reminders WHERE entity_type = 'event' AND entity_id = ?
+      `).all(seriesId).map((row) => row.remind_at),
+    };
+  });
+
+  assert.deepEqual(observed, fixtures.map((fixture) => ({
+    label: fixture.label,
+    ...fixture.expected,
+    seriesReminders: ['2026-10-01T06:00:00'],
+  })));
+});
+
 test('restoring the actor reminder keeps every other owner state reachable', () => {
   const database = createDatabase();
   const seriesId = Number(insertSeries(database, {

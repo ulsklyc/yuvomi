@@ -13,7 +13,7 @@ import {
   dropInheritedEventReminders, eventAuthorId, fanOutEventReminders,
 } from './event-reminder-fanout.js';
 import {
-  householdTimeZone, shiftDateKey, storedToInstantMs, utcToWall,
+  hasExplicitZone, householdTimeZone, shiftDateKey, storedToInstantMs, utcToWall,
 } from '../utils/timezone.js';
 import { createLogger } from '../logger.js';
 
@@ -811,8 +811,9 @@ function syncOwnedAttachmentAccess(database, documentId, visibility, userIds) {
  *
  * Das ist genau das Richtige fuer start_datetime/end_datetime (Reihenfolge
  * pruefen, eine Serie um ganze Tage verschieben) und genau das FALSCHE fuer
- * alles, was einen Zeitpunkt meint. `reminders.remind_at` ist ein Zeitpunkt -
- * dafuer gibt es `reminderAnchorInstantMs()` darunter (#1291).
+ * alles, was einen Zeitpunkt meint. Der Erinnerungs-Vergleich laeuft deshalb
+ * auf der anderen Achse: der Anker durch `reminderAnchorInstantMs()`, die
+ * Zeile durch `remindAtInstantMs()` (#1291).
  */
 function wallTimeMs(value) {
   const raw = String(value ?? '');
@@ -837,6 +838,29 @@ function reminderAnchorInstantMs(anchorStart, tz) {
   const raw = String(anchorStart ?? '');
   const normalized = raw.includes('T') ? raw : `${raw}T09:00:00`;
   return storedToInstantMs(normalized, tz) ?? NaN;
+}
+
+/**
+ * Die andere Seite desselben Vergleichs: `reminders.remind_at` als Zeitpunkt.
+ *
+ * Die Spalte ist naiv-UTC - ein zonenloser Wert IST die UTC-Zeit, ein Wert mit
+ * eigener Zone (ueber `PUT /api/v1/reminders` moeglich, der Validator laesst
+ * `Z` und Offset durch) ist der Zeitpunkt, der er ist. Dieselbe Regel wie
+ * `parseRemindAtAsUtc()` in public/utils/reminder-offset.js.
+ *
+ * Die Rechnung ist dieselbe wie in `wallTimeMs()`, die Bedeutung nicht: dort
+ * ist das angehaengte "Z" eine Notluege, damit sich zwei Wanduhrzeiten abziehen
+ * lassen, hier benennt es die Zone, in der die Zeile wirklich steht. Genau
+ * diese zwei Bedeutungen unter einem Namen waren #1291 - darum bekommt die
+ * Erinnerungs-Seite einen eigenen.
+ *
+ * @param {string} value  Wert aus reminders.remind_at
+ * @returns {number} ms seit Epoch, oder NaN bei unlesbarem Wert
+ */
+function remindAtInstantMs(value) {
+  const raw = String(value ?? '');
+  const normalized = raw.includes('T') ? raw : `${raw}T09:00:00`;
+  return Date.parse(hasExplicitZone(normalized) ? normalized : `${normalized}Z`);
 }
 
 function shiftedDateTimeLike(value, shiftMs) {
@@ -865,8 +889,27 @@ function firstSlotSeriesChanges(master, selected, changes) {
   return normalized;
 }
 
-function reminderState(database, eventId, anchorStart) {
-  const anchor = wallTimeMs(anchorStart);
+/**
+ * Der Erinnerungszustand eines Termins als Vorlaeufe - die Form, in der sich
+ * ein Vorkommen und seine Serie vergleichen lassen.
+ *
+ * BEIDE SEITEN LIEGEN AUF DER ZEITPUNKT-ACHSE (#1291). Der Anker ist eine
+ * Wanduhrzeit und muss dafuer umgerechnet werden, `remind_at` ist bereits ein
+ * Zeitpunkt. Lief der Anker durch `wallTimeMs()`, stand in `offsetMs` nicht der
+ * Vorlauf, sondern `Vorlauf + Zonenoffset`, und der Zonenoffset wechselt an der
+ * DST-Grenze: 60 Minuten Vorlauf in der Sommerzeit und 120 in der Winterzeit
+ * ergaben in Europe/Berlin beide 180. `sameReminderState()` meldete sie als
+ * gleich, und der Aufrufer loescht bei "gleich" die Erinnerungen des Kindes -
+ * die abweichende Erinnerung verschwand still.
+ *
+ * @param {object} database
+ * @param {number} eventId
+ * @param {string} anchorStart  start_datetime, Wanduhrzeit in der Haushaltszone
+ * @param {string} tz  IANA-Zone; der Aufrufer loest sie EINMAL mit
+ *        `householdTimeZone(database)` auf, statt sie hier je Aufruf zu holen
+ */
+function reminderState(database, eventId, anchorStart, tz) {
+  const anchor = reminderAnchorInstantMs(anchorStart, tz);
   if (!Number.isFinite(anchor)) return [];
   return database.prepare(`
     SELECT remind_at, dismissed, created_by, assigned_from
@@ -874,7 +917,7 @@ function reminderState(database, eventId, anchorStart) {
     WHERE entity_type = 'event' AND entity_id = ?
     ORDER BY created_by, assigned_from, remind_at, dismissed
   `).all(eventId).map((row) => ({
-    offsetMs: anchor - wallTimeMs(row.remind_at),
+    offsetMs: anchor - remindAtInstantMs(row.remind_at),
     dismissed: Number(row.dismissed),
     createdBy: Number(row.created_by),
     assignedFrom: row.assigned_from === null ? null : Number(row.assigned_from),
@@ -1161,9 +1204,10 @@ export function upsertOccurrenceOverride(database, {
     }
     if (remindersMayDiffer) fanOutEventReminders(database, childId, master.created_by, { dropDerivedWhenOwn: true });
 
+    const reminderZone = remindersMayDiffer ? householdTimeZone(database) : null;
     if (remindersMayDiffer && sameReminderState(
-      reminderState(database, childId, materialized.start_datetime),
-      reminderState(database, master.id, master.start_datetime),
+      reminderState(database, childId, materialized.start_datetime, reminderZone),
+      reminderState(database, master.id, master.start_datetime, reminderZone),
     )) {
       deleteEventReminders(database, [childId]);
       fields = fields.filter((field) => field !== 'reminders');
@@ -1404,8 +1448,9 @@ function refreshReparentedChild(database, child, oldResolved, successor, success
     : attachmentValues(successor);
   if (!sameAttachment(effectiveAttachment, attachmentValues(successor))) fields.push('attachment');
   if (oldFields.includes('reminders')) {
-    const childState = reminderState(database, child.id, oldResolved.start_datetime);
-    const seriesState = reminderState(database, successor.id, successor.start_datetime);
+    const tz = householdTimeZone(database);
+    const childState = reminderState(database, child.id, oldResolved.start_datetime, tz);
+    const seriesState = reminderState(database, successor.id, successor.start_datetime, tz);
     if (!sameReminderState(childState, seriesState)) {
       fields.push('reminders');
       shiftOwnedReminders(database, child.id, oldResolved.start_datetime, values.start_datetime);
