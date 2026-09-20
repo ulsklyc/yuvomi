@@ -2052,6 +2052,24 @@ test('renderDayView: zwei ueberlappende Schichten am selben Tag bekommen untersc
 // durch - deshalb nagelt "test:calendar" die Zone auf Europe/Berlin fest.
 // --------------------------------------------------------
 
+// Die Anzeigezone gehoert an den TEST, nicht an den Prozess (PR #1323,
+// Befund 2). `setDisplayTimeZone()` ist der Weg, den ein Haushalt wirklich
+// geht - dieselbe API, die die Seite selbst befragt, und ueber DENSELBEN
+// Spezifizierer importiert wie calendar.js: ueber den Repo-Pfad waere es eine
+// zweite Modulinstanz mit eigenem Zonen-Cache, und der Test liefe an seinem
+// Gegenstand vorbei (Hausmuster: test-meals.js, test-dashboard.js).
+//
+// Vorher nagelte das npm-Skript `TZ=Europe/Berlin` fuer die GANZE Suite fest.
+// Der Pin trug den einen Fall, der ihn braucht, deckte aber jede kuenftige
+// Zonenabhaengigkeit der uebrigen Tests dieser Datei mit zu.
+const { setDisplayTimeZone, displayTimeZone } = await import('/utils/timezone.js');
+
+function withDisplayTimeZone(zone, fn) {
+  const zuvor = displayTimeZone();
+  try { setDisplayTimeZone(zone); fn(); }
+  finally { setDisplayTimeZone(zuvor); }
+}
+
 const shortOvernight = { start_datetime: '2026-06-14T22:00', end_datetime: '2026-06-15T01:30', all_day: 0 };
 
 test('isAllDayLike: 22:00 bis 01:30 am Folgetag bleibt im Zeitraster (#1313)', () => {
@@ -2092,15 +2110,51 @@ test('isAllDayLike: 22:00 bis exakt 00:00 bleibt eintaegig (#804 regressiert nic
 });
 
 test('isAllDayLike: ein Nacht-Termin mit EINEM UTC-Tag und ZWEI Anzeigetagen (#1313)', () => {
-  // Europe/Berlin im Sommer (+02:00): 2026-06-14T20:00Z ist lokal der 14. um
-  // 22:00, 2026-06-14T23:30Z ist lokal der 15. um 01:30. Beide Zeitpunkte
+  // Haushalt auf Europe/Berlin, im Sommer (+02:00): 2026-06-14T20:00Z ist dort
+  // der 14. um 22:00, 2026-06-14T23:30Z der 15. um 01:30. Beide Zeitpunkte
   // liegen im UTC-Tag 2026-06-14 - wer den Tag aus toISOString().slice(0, 10)
   // nimmt, sieht hier EINEN Tag und stellt die Laengenfrage nie.
+  //
+  // Die Zone steht am Test, nicht an der Prozessumgebung: so faellt dieser Fall
+  // durch, egal wo der Testlaeufer steht.
+  withDisplayTimeZone('Europe/Berlin', () => {
+    const ev = { start_datetime: '2026-06-14T20:00:00Z', end_datetime: '2026-06-14T23:30:00Z', all_day: 0 };
+    assert(new Date(ev.start_datetime).toISOString().slice(0, 10) === new Date(ev.end_datetime).toISOString().slice(0, 10),
+      'Vorbedingung dieses Falls: beide Zeitpunkte liegen im selben UTC-Tag');
+    assert(isMultiDayEvent(ev) === true, 'in der Anzeigezone sind es zwei Kalendertage');
+    assert(isAllDayLike(ev) === false, 'und trotzdem nur dreieinhalb Stunden - also Zeitraster');
+  });
+});
+
+test('die Tagesgrenze folgt der ANZEIGEZONE und verschiebt sich mit ihr (PR #1323, Befund 2)', () => {
+  // Eine feste Zone allein belegt nichts: ohne einen Fall, in dem der Tag mit
+  // der Zone WANDERT, waere die Suite in einer Zone gruen und wuerde den Fehler
+  // in jeder anderen verstecken. Dieselben zwei Zeitpunkte, drei Haushalte:
+  //   Europe/Berlin (+02:00): 14. 22:00 bis 15. 01:30 - ZWEI Kalendertage
+  //   UTC:                    14. 20:00 bis 14. 23:30 - EIN Kalendertag
+  //   Pacific/Kiritimati (+14:00): 15. 10:00 bis 15. 13:30 - EIN Kalendertag,
+  //                           und zwar ein anderer als in UTC
   const ev = { start_datetime: '2026-06-14T20:00:00Z', end_datetime: '2026-06-14T23:30:00Z', all_day: 0 };
-  assert(new Date(ev.start_datetime).toISOString().slice(0, 10) === new Date(ev.end_datetime).toISOString().slice(0, 10),
-    'Vorbedingung dieses Falls: beide Zeitpunkte liegen im selben UTC-Tag');
-  assert(isMultiDayEvent(ev) === true, 'in der Anzeigezone sind es zwei Kalendertage');
-  assert(isAllDayLike(ev) === false, 'und trotzdem nur dreieinhalb Stunden - also Zeitraster');
+  const { eventEndDate } = calendarHelpers;
+
+  withDisplayTimeZone('Europe/Berlin', () => {
+    assert(eventEndDate(ev) === '2026-06-15', `Berlin: Endtag der 15., erhalten ${eventEndDate(ev)}`);
+    assert(isMultiDayEvent(ev) === true, 'Berlin: zwei Kalendertage');
+    assert(isAllDayLike(ev) === false, 'Berlin: dreieinhalb Stunden gehoeren ins Zeitraster');
+    assert(agendaSegmentKind(ev, '2026-06-15') === 'end', 'Berlin: der 15. ist der Endtag');
+  });
+
+  withDisplayTimeZone('UTC', () => {
+    assert(eventEndDate(ev) === '2026-06-14', `UTC: Endtag der 14., erhalten ${eventEndDate(ev)}`);
+    assert(isMultiDayEvent(ev) === false, 'UTC: EIN Kalendertag - die Tagesgrenze ist mitgewandert');
+    assert(agendaSegmentKind(ev, '2026-06-14') === 'single', 'UTC: ein gewoehnlicher Termin des 14.');
+  });
+
+  withDisplayTimeZone('Pacific/Kiritimati', () => {
+    assert(eventEndDate(ev) === '2026-06-15', `Kiritimati: Endtag der 15., erhalten ${eventEndDate(ev)}`);
+    assert(isMultiDayEvent(ev) === false, 'Kiritimati: EIN Kalendertag, naemlich der 15.');
+    assert(agendaSegmentKind(ev, '2026-06-15') === 'single', 'Kiritimati: ein gewoehnlicher Termin des 15.');
+  });
 });
 
 test('agendaSegmentKind: der kurze Nacht-Termin gibt unveraendert start/end aus (#1313)', () => {
@@ -2225,7 +2279,7 @@ test('renderDayView: am Starttag laeuft der Nacht-Termin von 22:00 bis Mitternac
   });
 });
 
-test('renderDayView: am zweiten Tag endet der Nacht-Termin um 01:30 und kostet 09:00 keine Spalte (#1313)', () => {
+test('renderDayView: am zweiten Tag endet der Nacht-Termin um 01:30 (#1313)', () => {
   withOvernightState({ cursor: '2026-06-15', events: [overnightEvent(), morningEvent()] }, () => {
     const container = fakeContainer();
     calendarHelpers.renderDayView(container);
@@ -2237,6 +2291,20 @@ test('renderDayView: am zweiten Tag endet der Nacht-Termin um 01:30 und kostet 0
     assert(nacht.top === hourOffset(0), `der Nacht-Termin beginnt um Mitternacht: ${nacht.top}`);
     assert(nacht.height === `calc(${hourOffset(90)} - 4px)`,
       `er endet um 01:30, nicht irgendwo im Abend: ${nacht.height}`);
+  });
+});
+
+// Eigener Test statt fuenfte Zusicherung im vorigen (PR #1323): dort warf die
+// Hoehen-Zusicherung darueber immer zuerst, die Spaltenkosten kamen nie an die
+// Reihe. Was nicht rot werden kann, belegt nichts.
+test('renderDayView: der Nacht-Block kostet den Vormittag keine Spalte (#1313)', () => {
+  withOvernightState({ cursor: '2026-06-15', events: [overnightEvent(), morningEvent()] }, () => {
+    const container = fakeContainer();
+    calendarHelpers.renderDayView(container);
+    const bloecke = timedBlocks(container.html);
+    const nacht = bloecke.find((b) => b.id === 4131);
+    const morgen = bloecke.find((b) => b.id === 4132);
+    assert(nacht && morgen, `Vorbedingung: beide Termine muessen gerendert sein: ${JSON.stringify(bloecke)}`);
     // Die Spaltenkosten sind das ganze Argument der Entscheidung: weil der
     // Block um Mitternacht endet, ueberlappt er den Vormittag nicht - beide
     // Termine behalten die volle Breite (totalCols === 1).
@@ -2258,6 +2326,116 @@ test('layoutOverlaps: am Starttag reicht der Nacht-Termin bis Mitternacht und te
     + `${JSON.stringify([layout.get(nacht.id), layout.get(anruf.id)])}`);
   assert(layout.get(nacht.id).colIndex !== layout.get(anruf.id).colIndex,
     'zwei ueberlappende Bloecke duerfen nicht deckungsgleich uebereinander liegen');
+});
+
+// --------------------------------------------------------
+// PR #1323 Review, Befund 1: der Zeit-Text am Block meint den TAG, auf dem er
+// steht.
+//
+// Solange beide Spalten "22:00-01:30" trugen, stand in der zweiten etwas
+// Falsches ueber diesen Tag: der Block liegt dort an Mitternacht und ist um
+// 01:30 vorbei - der Text nannte trotzdem einen Abend, den dieser Tag nicht
+// hat.
+//
+// Die Form ist abgelesen, nicht erfunden. renderAgendaEvent() fragt
+// agendaSegmentKind() und waehlt danach:
+//   'start'  -> calendar.spanFrom  mit der START zeit
+//   'end'    -> calendar.spanUntil mit der END zeit
+//   'single' -> der volle Bereich Start bis Ende
+// ('all-day'/'middle' erreichen das Raster nicht: was dort landet, ist kuerzer
+// als 24 Stunden und beruehrt darum hoechstens zwei Tage.) Das Raster ahmt
+// genau das nach - der letzte Test hier vergleicht deshalb Raster und Agenda
+// fuer DENSELBEN Tag, Zeichen fuer Zeichen.
+// --------------------------------------------------------
+
+const { t: tStub, formatTime: formatTimeStub } = await import('/i18n.js');
+const { esc: escStub } = await import('/utils/html.js');
+
+// Der Text der Zeit-Zeile eines Zeitblocks, je Spalte/Ansicht.
+function weekEventTimeTexts(html) {
+  return [...html.matchAll(/class="week-event__time">([^<]*)</g)].map((m) => m[1].trim());
+}
+
+function dayEventTimeText(html, id) {
+  const from = html.indexOf(`data-id="${id}"`);
+  if (from === -1) return '';
+  const meta = html.indexOf('class="day-event__meta"', from);
+  if (meta === -1) return '';
+  return (/>([^<]*)</.exec(html.slice(meta)) ?? ['', ''])[1].trim();
+}
+
+// Die Zeit-Zelle EINER Agenda-Zeile, ueber id UND Tag - derselbe Termin steht
+// mit derselben id an beiden Tagen.
+function agendaTimeText(html, id, dayStr) {
+  const from = html.indexOf(`data-id="${id}" data-date="${dayStr}"`);
+  if (from === -1) return '';
+  const cell = html.indexOf('calendar-meta-item--time', from);
+  if (cell === -1) return '';
+  return (/<span>([^<]*)<\/span>/.exec(html.slice(cell)) ?? ['', ''])[1].trim();
+}
+
+test('renderWeekView: der Zeit-Text nennt in jeder Spalte den Anteil DIESES Tages (PR #1323, Befund 1)', () => {
+  const nacht = overnightEvent();
+  const abTagEins  = tStub('calendar.spanFrom',  { time: formatTimeStub(nacht.start_datetime) });
+  const bisTagZwei = tStub('calendar.spanUntil', { time: formatTimeStub(nacht.end_datetime) });
+
+  withOvernightState({ events: [overnightEvent()] }, () => {
+    const container = fakeContainer();
+    calendarHelpers.renderWeekView(container);
+    const tagEins = weekEventTimeTexts(weekColumnHtml(container.html, '2026-06-14'));
+    const tagZwei = weekEventTimeTexts(weekColumnHtml(container.html, '2026-06-15'));
+    assert(tagEins.length === 1 && tagZwei.length === 1,
+      `Vorbedingung: je ein Zeitblock pro Spalte: ${JSON.stringify([tagEins, tagZwei])}`);
+    assert(tagZwei[0] === bisTagZwei,
+      `am 15. liegt der Block an Mitternacht und ist um 01:30 vorbei - der Text muss "${bisTagZwei}" `
+      + `sagen und nicht den ganzen Termin: ${tagZwei[0]}`);
+    assert(tagEins[0] === abTagEins,
+      `am 14. beginnt der Termin und endet nicht - wie in der Agenda "${abTagEins}": ${tagEins[0]}`);
+  });
+});
+
+test('renderDayView: der Zeit-Text am zweiten Tag sagt "bis", ein eintaegiger Termin behaelt den Bereich (PR #1323, Befund 1)', () => {
+  const nacht  = overnightEvent();
+  const morgen = morningEvent();
+  const bisTagZwei = tStub('calendar.spanUntil', { time: formatTimeStub(nacht.end_datetime) });
+
+  withOvernightState({ cursor: '2026-06-15', events: [overnightEvent(), morningEvent()] }, () => {
+    const container = fakeContainer();
+    calendarHelpers.renderDayView(container);
+    const nachtText  = dayEventTimeText(container.html, nacht.id);
+    const morgenText = dayEventTimeText(container.html, morgen.id);
+    assert(nachtText === bisTagZwei,
+      `die Tagesansicht des 15. muss "${bisTagZwei}" zeigen: ${nachtText}`);
+    // Und der Fall, der sich NICHT aendern darf: ein Termin ganz innerhalb
+    // eines Tages nennt weiter Start und Ende.
+    assert(!morgenText.startsWith('calendar.span')
+      && morgenText.includes(formatTimeStub(morgen.start_datetime))
+      && morgenText.includes(formatTimeStub(morgen.end_datetime)),
+      `ein eintaegiger Termin behaelt den vollen Bereich: ${morgenText}`);
+  });
+});
+
+// Die Agenda staggert ihre Zeilen und braucht dafuer querySelectorAll - die
+// eine DOM-Oberflaeche mehr als das Zeitraster.
+function fakeAgendaContainer() {
+  const container = fakeContainer();
+  return { ...container, querySelectorAll: () => [], get html() { return container.html; } };
+}
+
+test('Zeitraster und Agenda sagen fuer denselben Tag denselben Zeit-Text (PR #1323, Befund 1)', () => {
+  withOvernightState({ cursor: '2026-06-15', events: [overnightEvent()] }, () => {
+    const raster = fakeContainer();
+    calendarHelpers.renderDayView(raster);
+    const agenda = fakeAgendaContainer();
+    calendarHelpers.renderAgendaView(agenda);
+
+    const rasterText = dayEventTimeText(raster.html, 4131);
+    const agendaText = agendaTimeText(agenda.html, 4131, '2026-06-15');
+    assert(agendaText !== '', 'Vorbedingung: die Agenda muss den Nacht-Termin am 15. auffuehren');
+    assert(escStub(rasterText) === agendaText,
+      `beide Ansichten beantworten dieselbe Frage ueber denselben Tag und muessen dasselbe sagen - `
+      + `Raster: ${rasterText} / Agenda: ${agendaText}`);
+  });
 });
 
 test('eventMapUrl: eine Kartensuche nur, wo ein Ortstext uebrig bleibt (#1110)', () => {

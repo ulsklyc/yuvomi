@@ -19,8 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   time - which is the same arithmetic a night shift in the duty roster has had for a while. Because
   the block stops at midnight, it costs the next morning nothing: an appointment at 09:00 keeps the
   full width of the column. Entries of 24 hours or more stay in the all-day row on purpose; a bar
-  across the days says more than a block that runs from top to bottom in every column. The agenda is
-  unchanged and still reads "from 22:00" on the first day and "until 01:30" on the second, and an
+  across the days says more than a block that runs from top to bottom in every column. Each block
+  also says what it is doing on the day it stands on - "from 22:00" on the first day, "until 01:30"
+  on the second - instead of repeating the whole appointment in both columns, where the second one
+  named an evening that day does not have. That is the wording the agenda has used for those days
+  all along, so both views now answer the same question about the same day the same way. An
   appointment that ends at exactly 00:00 still counts as a single day. (#1313)
 
 ## [2.68.0] - 2026-09-20

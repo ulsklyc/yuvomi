@@ -1272,7 +1272,9 @@ function isMultiDayEvent(ev) {
  * 25 Stunden lang, und die Division durch einen Tag macht daraus 0,96 bzw.
  * 1,04. Dieselbe Rechnung wie `daysBetweenDateKeys()` in utils/countdown.js,
  * das dort seinen Anlass hatte; ein gemeinsamer Ort in utils/date.js beträfe
- * vier Aufrufer und gehört in eine eigene Runde.
+ * fünf Aufrufer und gehört in eine eigene Runde - einer davon steht in DIESER
+ * Datei: wireDurationMemory() hält ein eigenes, lokales daysBetween(), das
+ * dieses hier beschattet.
  */
 function daysBetween(aKey, bKey) {
   const utcMidnight = (key) => {
@@ -2981,6 +2983,33 @@ function scrollToHour(scroll, body) {
   scroll.scrollTop = Math.max(0, nowFields().hour * hourHeight - 80);
 }
 
+/**
+ * Der Zeit-Text eines Blocks im Zeitraster - fuer den Tag, auf dem er steht.
+ *
+ * Dieselbe Frage, die renderAgendaEvent() laengst beantwortet, und deshalb
+ * dieselbe Antwort: agendaSegmentKind() sagt, ob dieser Tag der Anfang, das
+ * Ende oder der ganze Termin ist. 'start' bekommt `calendar.spanFrom` mit der
+ * START zeit, 'end' `calendar.spanUntil` mit der END zeit, alles andere den
+ * vollen Bereich.
+ *
+ * Ohne das trug ein Nacht-Termin in BEIDEN Spalten "22:00-01:30", obwohl er in
+ * der zweiten um Mitternacht beginnt und um 01:30 vorbei ist - der Text nannte
+ * dort einen Abend, den dieser Tag nicht hat (#1313, aus dem PR-Review).
+ * Raster und Agenda beantworten damit dieselbe Frage ueber denselben Tag
+ * gleich.
+ *
+ * 'all-day' und 'middle' erreichen das Raster nicht: was hier landet, dauert
+ * weniger als 24 Stunden (isAllDayLike()) und beruehrt darum hoechstens zwei
+ * Kalendertage. Sie fallen wie 'single' auf den vollen Bereich zurueck -
+ * dasselbe, was ohne `dayStr` gilt.
+ */
+function gridTimeText(ev, dayStr) {
+  const kind = dayStr ? agendaSegmentKind(ev, dayStr) : 'single';
+  if (kind === 'start') return t('calendar.spanFrom',  { time: formatTime(ev.start_datetime) });
+  if (kind === 'end')   return t('calendar.spanUntil', { time: formatTime(ev.end_datetime) });
+  return `${formatTime(ev.start_datetime)}${ev.end_datetime ? '–' + formatTime(ev.end_datetime) : ''}`;
+}
+
 function renderWeekEvent(ev, layout = null, dayStr = null) {
   const { start, end } = timeRangeForEvent(ev, dayStr);
   const duration = Math.max(end - start, 30);
@@ -2995,7 +3024,7 @@ function renderWeekEvent(ev, layout = null, dayStr = null) {
          style="top:${top};height:${height};left:${left};width:${width};${eventSurfaceStyle(ev)}"
          title="${esc(ev.title)}${chipAssigneeTitleSuffix(ev)}">
       <div class="week-event__title">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}${calendarRepeatIconHtml(ev)}<span>${esc(ev.title)}</span>${chipAssigneeStack(ev, { size: 14, maxVisible: 2 })}</div>
-      <div class="week-event__time">${formatTime(ev.start_datetime)}${ev.end_datetime ? '–' + formatTime(ev.end_datetime) : ''}</div>
+      <div class="week-event__time">${gridTimeText(ev, dayStr)}</div>
     </div>
   `;
 }
@@ -3300,7 +3329,7 @@ function renderDayEvent(ev, layout = null, dayStr = null) {
   const width = `calc(${100 / cols}% - 14px)`;
 
   const place = ev.location ? ` · ${esc(fmtLocation(ev.location))}` : '';
-  const timeText = `${formatTime(ev.start_datetime)}${ev.end_datetime ? '–' + formatTime(ev.end_datetime) : ''}`;
+  const timeText = gridTimeText(ev, dayStr);
 
   return `
     <div class="day-event${roomy ? '' : ' day-event--tight'}" data-id="${ev.id}"
