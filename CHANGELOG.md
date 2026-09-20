@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A nightly recurring appointment that crosses midnight no longer covers the entry it should be
+  sharing its column with.** On a day that carries two occurrences of the same series - last
+  night's tail and tonight's start - the second took the first one's place in the layout, so the
+  tail was drawn at full width over anything it overlapped. Only reachable since short overnight
+  entries started appearing in the time grid at all.
+
 - **An appointment that crosses midnight but is shorter than a day is back in the time grid, on both
   days.** Until now the calendar asked one question about such an entry - does it touch two calendar
   days? - and every entry that did was drawn as a chip without times in the all-day row above the
