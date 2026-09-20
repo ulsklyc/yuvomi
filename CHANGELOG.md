@@ -142,6 +142,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hears from their reminders, and an administrator is unaffected. The reminders are held back rather
   than deleted, because a permission can be given back - once it is, the ones that fell due in the
   meantime arrive, as they would after the server had been down for a while. (#1289)
+- **A reminder set for a single occurrence of a repeating event now arrives at the time it says.**
+  Changing the reminder of one occurrence ("Only this event" or "This and following") stored the
+  time as if the household clock were UTC. East of UTC the reminder came that many hours late - in a
+  household two hours ahead of UTC, "one hour before" a 09:00 occurrence ended up an hour after it
+  had started; west of UTC it came early by the same amount. Only households whose clock is UTC were
+  unaffected, which is why it went unnoticed for so long. The reminder of a whole event and every
+  other reminder in Yuvomi were never affected. The same misreading could also make an occurrence
+  reminder vanish: an occurrence whose reminder matches the series' is folded back into the series,
+  and across a daylight-saving boundary two different lead times looked alike - an hour before a
+  summer-time occurrence and two hours before a winter-time one both came out as three. The reminder
+  you had set for that one date was deleted without a word and the series default took over. Both
+  sides of that comparison now read the same clock. Occurrence reminders written before this fix keep
+  their wrong time: they cannot be corrected for you, because nothing in the stored row says which
+  time zone and which lead time it was written from, and moving somebody's reminder on a guess is
+  worse than leaving it. The edit dialog names such a time honestly instead of hiding it (#1260), and
+  saving the reminder again writes it correctly. (#1291)
 - **Saving a change to one event of a repeating series now asks which events it is for.** Editing an
   event of a series - adding a person, for example - used to change that one event only, unless you
   had spotted the "Applies to" field below the repeat settings, which started on "Only this event".

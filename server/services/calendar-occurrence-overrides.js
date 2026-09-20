@@ -12,7 +12,9 @@ import {
 import {
   dropInheritedEventReminders, eventAuthorId, fanOutEventReminders,
 } from './event-reminder-fanout.js';
-import { utcToWall, shiftDateKey } from '../utils/timezone.js';
+import {
+  hasExplicitZone, householdTimeZone, shiftDateKey, storedToInstantMs, utcToWall,
+} from '../utils/timezone.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('CalendarOccurrenceOverrides');
@@ -802,11 +804,63 @@ function syncOwnedAttachmentAccess(database, documentId, visibility, userIds) {
   for (const userId of userIds) insert.run(documentId, userId);
 }
 
+/**
+ * Ein Termin-Zeitwert auf der WANDUHR-Achse: die zonenlose Ortszeit wird als
+ * UTC gelesen, damit sich zwei Wanduhrzeiten voneinander abziehen lassen, ohne
+ * dass eine DST-Grenze dazwischen die Rechnung verbiegt.
+ *
+ * Das ist genau das Richtige fuer start_datetime/end_datetime (Reihenfolge
+ * pruefen, eine Serie um ganze Tage verschieben) und genau das FALSCHE fuer
+ * alles, was einen Zeitpunkt meint. Der Erinnerungs-Vergleich laeuft deshalb
+ * auf der anderen Achse: der Anker durch `reminderAnchorInstantMs()`, die
+ * Zeile durch `remindAtInstantMs()` (#1291).
+ */
 function wallTimeMs(value) {
   const raw = String(value ?? '');
   const normalized = raw.includes('T') ? raw : `${raw}T09:00:00`;
   const zoned = /(?:Z|[+-]\d{2}:?\d{2})$/.test(normalized);
   return Date.parse(zoned ? normalized : `${normalized}Z`);
+}
+
+/**
+ * Derselbe Terminbeginn auf der ZEITPUNKT-Achse: die Wanduhrzeit des Haushalts
+ * in echte Millisekunden seit Epoch, DST des jeweiligen Tages eingerechnet.
+ *
+ * Ein reines Datum (ganztaegig) zaehlt als 09:00 Ortszeit - dieselbe Annahme,
+ * die `reminderStartValue()` in public/pages/calendar.js trifft, damit Server
+ * und Dialog denselben Anker haben.
+ *
+ * @param {string} anchorStart  start_datetime des Vorkommens (Wanduhrzeit)
+ * @param {string} tz           IANA-Zone aus householdTimeZone()
+ * @returns {number} ms seit Epoch, oder NaN bei unlesbarem Wert
+ */
+function reminderAnchorInstantMs(anchorStart, tz) {
+  const raw = String(anchorStart ?? '');
+  const normalized = raw.includes('T') ? raw : `${raw}T09:00:00`;
+  return storedToInstantMs(normalized, tz) ?? NaN;
+}
+
+/**
+ * Die andere Seite desselben Vergleichs: `reminders.remind_at` als Zeitpunkt.
+ *
+ * Die Spalte ist naiv-UTC - ein zonenloser Wert IST die UTC-Zeit, ein Wert mit
+ * eigener Zone (ueber `PUT /api/v1/reminders` moeglich, der Validator laesst
+ * `Z` und Offset durch) ist der Zeitpunkt, der er ist. Dieselbe Regel wie
+ * `parseRemindAtAsUtc()` in public/utils/reminder-offset.js.
+ *
+ * Die Rechnung ist dieselbe wie in `wallTimeMs()`, die Bedeutung nicht: dort
+ * ist das angehaengte "Z" eine Notluege, damit sich zwei Wanduhrzeiten abziehen
+ * lassen, hier benennt es die Zone, in der die Zeile wirklich steht. Genau
+ * diese zwei Bedeutungen unter einem Namen waren #1291 - darum bekommt die
+ * Erinnerungs-Seite einen eigenen.
+ *
+ * @param {string} value  Wert aus reminders.remind_at
+ * @returns {number} ms seit Epoch, oder NaN bei unlesbarem Wert
+ */
+function remindAtInstantMs(value) {
+  const raw = String(value ?? '');
+  const normalized = raw.includes('T') ? raw : `${raw}T09:00:00`;
+  return Date.parse(hasExplicitZone(normalized) ? normalized : `${normalized}Z`);
 }
 
 function shiftedDateTimeLike(value, shiftMs) {
@@ -835,8 +889,27 @@ function firstSlotSeriesChanges(master, selected, changes) {
   return normalized;
 }
 
-function reminderState(database, eventId, anchorStart) {
-  const anchor = wallTimeMs(anchorStart);
+/**
+ * Der Erinnerungszustand eines Termins als Vorlaeufe - die Form, in der sich
+ * ein Vorkommen und seine Serie vergleichen lassen.
+ *
+ * BEIDE SEITEN LIEGEN AUF DER ZEITPUNKT-ACHSE (#1291). Der Anker ist eine
+ * Wanduhrzeit und muss dafuer umgerechnet werden, `remind_at` ist bereits ein
+ * Zeitpunkt. Lief der Anker durch `wallTimeMs()`, stand in `offsetMs` nicht der
+ * Vorlauf, sondern `Vorlauf + Zonenoffset`, und der Zonenoffset wechselt an der
+ * DST-Grenze: 60 Minuten Vorlauf in der Sommerzeit und 120 in der Winterzeit
+ * ergaben in Europe/Berlin beide 180. `sameReminderState()` meldete sie als
+ * gleich, und der Aufrufer loescht bei "gleich" die Erinnerungen des Kindes -
+ * die abweichende Erinnerung verschwand still.
+ *
+ * @param {object} database
+ * @param {number} eventId
+ * @param {string} anchorStart  start_datetime, Wanduhrzeit in der Haushaltszone
+ * @param {string} tz  IANA-Zone; der Aufrufer loest sie EINMAL mit
+ *        `householdTimeZone(database)` auf, statt sie hier je Aufruf zu holen
+ */
+function reminderState(database, eventId, anchorStart, tz) {
+  const anchor = reminderAnchorInstantMs(anchorStart, tz);
   if (!Number.isFinite(anchor)) return [];
   return database.prepare(`
     SELECT remind_at, dismissed, created_by, assigned_from
@@ -844,7 +917,7 @@ function reminderState(database, eventId, anchorStart) {
     WHERE entity_type = 'event' AND entity_id = ?
     ORDER BY created_by, assigned_from, remind_at, dismissed
   `).all(eventId).map((row) => ({
-    offsetMs: anchor - wallTimeMs(row.remind_at),
+    offsetMs: anchor - remindAtInstantMs(row.remind_at),
     dismissed: Number(row.dismissed),
     createdBy: Number(row.created_by),
     assignedFrom: row.assigned_from === null ? null : Number(row.assigned_from),
@@ -861,8 +934,21 @@ function sameReminderState(left, right) {
   });
 }
 
-function remindAtForOffset(anchorStart, offset) {
-  const anchor = wallTimeMs(anchorStart);
+/**
+ * Der Erinnerungszeitpunkt fuer einen Vorlauf, als naiv-UTC - dieselbe Form,
+ * die der Dialog fuer den ganzen Termin schreibt (`reminderTimesFromOffsets()`
+ * in public/pages/calendar.js) und die die Zustellung gegen die aktuelle
+ * UTC-Zeit haelt (`remind_at <= now`, server/services/notifications.js).
+ *
+ * DER ANKER IST EIN ZEITPUNKT, KEINE WANDUHRZEIT (#1291). Bis hierher lief der
+ * Beginn durch `wallTimeMs()`, das die zonenlose Ortszeit als UTC liest: in
+ * einem Haushalt auf UTC+2 wurde aus "09:00 minus 60 Minuten" die Zeile
+ * `08:00:00`, gelesen als 08:00 UTC und damit 10:00 Ortszeit - eine Stunde NACH
+ * dem Beginn. Westlich von UTC kam die Erinnerung um den Offset zu frueh, in
+ * einem UTC-Haushalt stimmte sie, weshalb es lange nicht aufgefallen ist.
+ */
+function remindAtForOffset(anchorStart, offset, tz) {
+  const anchor = reminderAnchorInstantMs(anchorStart, tz);
   const result = new Date(anchor - offset * 60000).toISOString();
   return /Z$/.test(String(anchorStart)) ? result : result.slice(0, 19);
 }
@@ -889,8 +975,9 @@ function replaceReminders(database, eventId, actorId, anchorStart, offsets) {
     INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
     VALUES ('event', ?, ?, ?)
   `);
+  const tz = householdTimeZone(database);
   for (const offset of offsets) {
-    insert.run(eventId, remindAtForOffset(anchorStart, offset), actorId);
+    insert.run(eventId, remindAtForOffset(anchorStart, offset, tz), actorId);
   }
 }
 
@@ -1117,9 +1204,10 @@ export function upsertOccurrenceOverride(database, {
     }
     if (remindersMayDiffer) fanOutEventReminders(database, childId, master.created_by, { dropDerivedWhenOwn: true });
 
+    const reminderZone = remindersMayDiffer ? householdTimeZone(database) : null;
     if (remindersMayDiffer && sameReminderState(
-      reminderState(database, childId, materialized.start_datetime),
-      reminderState(database, master.id, master.start_datetime),
+      reminderState(database, childId, materialized.start_datetime, reminderZone),
+      reminderState(database, master.id, master.start_datetime, reminderZone),
     )) {
       deleteEventReminders(database, [childId]);
       fields = fields.filter((field) => field !== 'reminders');
@@ -1360,8 +1448,9 @@ function refreshReparentedChild(database, child, oldResolved, successor, success
     : attachmentValues(successor);
   if (!sameAttachment(effectiveAttachment, attachmentValues(successor))) fields.push('attachment');
   if (oldFields.includes('reminders')) {
-    const childState = reminderState(database, child.id, oldResolved.start_datetime);
-    const seriesState = reminderState(database, successor.id, successor.start_datetime);
+    const tz = householdTimeZone(database);
+    const childState = reminderState(database, child.id, oldResolved.start_datetime, tz);
+    const seriesState = reminderState(database, successor.id, successor.start_datetime, tz);
     if (!sameReminderState(childState, seriesState)) {
       fields.push('reminders');
       shiftOwnedReminders(database, child.id, oldResolved.start_datetime, values.start_datetime);
