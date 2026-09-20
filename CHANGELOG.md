@@ -172,10 +172,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dialogs say which event they are about, above the three buttons: its title and the date of the
   occurrence you opened, on the household's clock. That line is what tells you where "This and
   following" would cut the series, and it matters most when deleting - by then the list or the form
-  has already closed, and the question is the only thing on screen. A dialog
-  that has just opened also ignores taps and clicks for a third of a second, so a quick second tap
+  has already closed, and the question is the only thing on screen. A question
+  that has just opened ignores taps and clicks for a third of a second, so a quick second tap
   on Save - or the second click of a double-click on Delete - can no longer answer a question that
-  nobody has read yet; on a phone the dialog slides up into that very spot. The keyboard and screen
+  nobody has read yet; on a phone the dialog slides up into that very spot. Forms and sheets you
+  opened yourself are unaffected and take your first tap as they always did. The keyboard and screen
   readers are not affected: Enter, Space, Tab and Escape work from the first moment. (#1284)
 
 - **An empty database file no longer starts Yuvomi as an empty instance.** If the database file

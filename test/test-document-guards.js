@@ -35,6 +35,7 @@ import {
   composite,
   contrastRatio,
   toHex,
+  clickPastDeadTime,
 } from './document-guards-harness.js';
 import { eachRule } from './css-rules.js';
 
@@ -325,7 +326,7 @@ test('save confirmations preserve the same editor across repeated gates and keep
         const state = window.saveGateTest;
         state.pending = state.modal.confirmOverModal('Continue saving?', { closeOnConfirm: false });
       });
-      await page.click(confirmed ? '#confirm-modal-ok' : '#confirm-modal-cancel');
+      await clickPastDeadTime(page, confirmed ? '#confirm-modal-ok' : '#confirm-modal-cancel');
       const state = await page.evaluate(async () => {
         const state = window.saveGateTest;
         const confirmed = await state.pending;
@@ -359,7 +360,7 @@ test('save confirmations preserve the same editor across repeated gates and keep
     // Resuming a save gate must preserve the editor's original dirty baseline.
     await page.evaluate(() => { window.saveGateTest.pending = window.saveGateTest.modal.closeModal(); });
     await page.waitForSelector('#confirm-modal-cancel');
-    await page.click('#confirm-modal-cancel');
+    await clickPastDeadTime(page, '#confirm-modal-cancel');
     assert.equal(await page.evaluate(async () => {
       await window.saveGateTest.pending;
       return document.getElementById('shared-modal-overlay') === window.saveGateTest.editor;
@@ -369,7 +370,7 @@ test('save confirmations preserve the same editor across repeated gates and keep
     await page.evaluate(() => {
       window.saveGateTest.pending = window.saveGateTest.modal.confirmOverModal('Delete this event?');
     });
-    await page.click('#confirm-modal-ok');
+    await clickPastDeadTime(page, '#confirm-modal-ok');
     assert.deepEqual(await page.evaluate(async () => {
       const confirmed = await window.saveGateTest.pending;
       return { confirmed, closeCount: window.saveGateTest.closeCount(), editorConnected: window.saveGateTest.editor.isConnected };
@@ -408,7 +409,7 @@ test('der verspaetete Erstfokus nimmt dem fortgesetzten Speichern-Tor den Fokus 
       document.getElementById('slow-save').focus();
       window.slowGate.pending = window.slowGate.modal.confirmOverModal('Continue saving?', { closeOnConfirm: false });
     });
-    await page.click('#confirm-modal-cancel');
+    await clickPastDeadTime(page, '#confirm-modal-cancel');
     assert.deepEqual(await page.evaluate(async () => {
       const confirmed = await window.slowGate.pending;
       await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -573,10 +574,10 @@ test('calendar save gates retain unsaved fields after orphan confirmation, serve
     // Seit #1284 fragt das Speichern, wofuer die Aenderung gilt.
     await page.click('#modal-save');
     await page.waitForSelector('[data-scope="series"]');
-    await page.click('[data-scope="series"]');
+    await clickPastDeadTime(page, '[data-scope="series"]');
     await page.waitForSelector('#confirm-modal-ok');
     assert.equal(attempts.length, 1, 'the real server must reject the rule that orphans its linked child');
-    await page.click('#confirm-modal-ok');
+    await clickPastDeadTime(page, '#confirm-modal-ok');
     await page.waitForFunction(() => [...document.querySelectorAll('[role="alert"], .toast')]
       .some((element) => element.textContent.includes('Save gate test server failure')));
     await assertCalendarSaveGateEditor(page);
@@ -588,9 +589,9 @@ test('calendar save gates retain unsaved fields after orphan confirmation, serve
       .some((element) => element.textContent.includes('Save gate test server failure')));
     await page.click('#modal-save');
     await page.waitForSelector('[data-scope="series"]');
-    await page.click('[data-scope="series"]');
+    await clickPastDeadTime(page, '[data-scope="series"]');
     await page.waitForSelector('#confirm-modal-cancel');
-    await page.click('#confirm-modal-cancel');
+    await clickPastDeadTime(page, '#confirm-modal-cancel');
     await page.waitForFunction(() => !document.getElementById('confirm-modal-cancel')
       && document.getElementById('modal-save')?.disabled === false);
     await assertCalendarSaveGateEditor(page);
@@ -624,7 +625,7 @@ test('calendar whole-series save confirmation leaves invalid UNTIL editable', as
     await page.click('#modal-save');
     await page.waitForSelector('#confirm-modal-ok');
     assert.equal(await page.$('[data-scope]'), null, 'no scope question where only the whole series can be edited');
-    await page.click('#confirm-modal-ok');
+    await clickPastDeadTime(page, '#confirm-modal-ok');
     await page.waitForFunction(() => document.getElementById('event-rrule-until')?.getAttribute('aria-invalid') === 'true');
     await assertCalendarSaveGateEditor(page);
     assert.equal(await page.$eval('#event-rrule-until', (input) => input.value), '31.02.2048');
@@ -4385,7 +4386,7 @@ async function openExistingNoteEditor(page, noteId) {
 async function discardOpenNoteEditor(page) {
   await page.keyboard.press('Escape');
   await page.waitForSelector('#confirm-modal-ok');
-  await page.click('#confirm-modal-ok');
+  await clickPastDeadTime(page, '#confirm-modal-ok');
   await page.waitForFunction(() => !document.querySelector('.note-modal'));
 }
 
@@ -4596,7 +4597,7 @@ test('Sonde 21 - Notiz-Kategorien behalten Fokus, Gruppenrolle und Reader-Icons'
     })), { listHidden: true, editorConnected: true, focus: 'note-category-search' });
     await page.keyboard.press('Escape');
     await page.waitForSelector('#confirm-modal-cancel', { timeout: 1000 });
-    await page.click('#confirm-modal-cancel');
+    await clickPastDeadTime(page, '#confirm-modal-cancel');
   } catch (err) {
     probeError = err;
   } finally {
@@ -5025,7 +5026,7 @@ test('Sonde 23 - spaete Notizantworten respektieren Ersatz- und Bestaetigungsdia
       originalConnected: document.querySelector('.note-modal')?.isConnected ?? false,
       originalInert: document.querySelector('.note-modal')?.closest('.modal-overlay')?.inert ?? false,
     })), { confirmationOpen: true, originalConnected: true, originalInert: true });
-    await page.click('#confirm-modal-cancel');
+    await clickPastDeadTime(page, '#confirm-modal-cancel');
     await page.waitForFunction(() => !document.querySelector('.note-modal'));
     const confirmationSave = await page.evaluate(async (title) => {
       const { api } = await import('/api.js');
@@ -5115,7 +5116,7 @@ test('Sonde 24 - spaeter Umbenennungskonflikt ersetzt keinen neuen Notizeditor',
       pathname: `/api/v1/notes/categories/${categoryIds[0]}`,
       label: 'note category rename PUT',
     });
-    await page.click('#prompt-modal-ok');
+    await clickPastDeadTime(page, '#prompt-modal-ok');
     await heldRequest.seen;
 
     await openReadyNoteModal(page);

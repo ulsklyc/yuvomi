@@ -38,7 +38,7 @@
 
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -645,4 +645,50 @@ export function composite([r, g, b, a], base) {
 export function toHex([r, g, b]) {
   const h = (v) => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0');
   return `#${h(r)}${h(g)}${h(b)}`.toUpperCase();
+}
+
+// --------------------------------------------------------
+// Totzeit frisch geoeffneter Dialoge (#1284)
+// --------------------------------------------------------
+
+/**
+ * Wie lange `armPointerDeadTime` (public/components/modal.js) einen frisch
+ * geoeffneten Dialog taub stellt - gelesen aus der Quelle, damit ein dort
+ * geaenderter Wert hier nicht stillschweigend danebenliegt.
+ *
+ * Gelesen wird der Text, nicht das Modul: modal.js importiert ueber absolute
+ * Browser-Pfade (`/i18n.js`) und laesst sich in Node nicht laden. Trifft das
+ * Muster nicht mehr, faellt das hier laut aus - ein Vorgabewert waere still
+ * falsch, und still falsch heisst hier: drei Minuten Timeout ohne Hinweis.
+ */
+const POINTER_DEAD_TIME_MS = (() => {
+  const quelle = readFileSync(join(REPO, 'public/components/modal.js'), 'utf8');
+  const treffer = /^const POINTER_DEAD_TIME_MS = (\d+);$/m.exec(quelle);
+  if (!treffer) {
+    throw new Error(
+      'POINTER_DEAD_TIME_MS ist in public/components/modal.js nicht mehr zu finden. '
+      + 'Ohne die Dauer klicken die Sonden in die Totzeit und laufen ins Timeout.',
+    );
+  }
+  return Number(treffer[1]);
+})();
+
+/**
+ * Klickt erst, nachdem die Totzeit des frisch geoeffneten Dialogs abgelaufen ist.
+ *
+ * `armPointerDeadTime` schluckt jede Zeiger-Betaetigung in den ersten
+ * Millisekunden nach dem Oeffnen, damit der Dialog nicht in die Hand faehrt, die
+ * gerade getippt hat. Ein Finger wartet das ab, Puppeteer nicht:
+ * `waitForSelector` kehrt zurueck, sobald der Knopf im DOM steht, und der Klick
+ * faellt mitten in die Totzeit. Der Dialog bleibt offen, sein Promise loest nie
+ * auf, der Test laeuft ins Timeout - gemessen 189 s statt 8,7 s, und der
+ * sterbende Browser riss die restlichen 47 Faelle in unter 1 ms mit.
+ *
+ * Gewartet wird ab dem Moment, in dem der Knopf steht. Die Totzeit lief da schon
+ * an, die volle Dauer deckt den Rest also immer ab - ohne einen Zuschlag zu raten.
+ */
+export async function clickPastDeadTime(page, selector, options = {}) {
+  await page.waitForSelector(selector, options);
+  await new Promise((resolve) => { setTimeout(resolve, POINTER_DEAD_TIME_MS); });
+  await page.click(selector);
 }

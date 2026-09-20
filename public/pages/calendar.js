@@ -6218,6 +6218,7 @@ function recurringScopeChoice({ action, event }) {
       resolve(value);
     };
     openSharedModal({
+      pointerDeadTime: true,
       title: action === 'delete' ? t('calendar.deleteRecurringTitle') : t('calendar.saveRecurringTitle'),
       size: 'sm',
       content: renderRecurringScopeChoices(action, event),

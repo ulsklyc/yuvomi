@@ -1181,7 +1181,7 @@ export function updateHeaderAction(panel, { label, onClick, hidden = false } = {
 // --------------------------------------------------------
 
 /**
- * Wie lange ein frisch geöffneter Dialog keine Zeiger-Betätigung annimmt.
+ * Wie lange eine frisch geöffnete RÜCKFRAGE keine Zeiger-Betätigung annimmt.
  *
  * DER DIALOG FÄHRT IN DIE HAND, DIE GERADE GETIPPT HAT. Auf Handybreite ist
  * das Modal ein Sheet, und `modal-sheet-in` (layout.css) schiebt es 280 ms
@@ -1190,8 +1190,16 @@ export function updateHeaderAction(panel, { label, onClick, hidden = false } = {
  * nach dem Öffnen der Serien-Rückfrage wählte eine Reichweite aus, ohne dass
  * die Frage je gelesen wurde; auf dem Desktop legte das Löschen aus dem
  * Popover „Nur diesen Termin" unter den zweiten Klick eines Doppelklicks.
- * Beides trifft jeden Dialog des geteilten Systems, nicht nur den neuen: die
- * Löschfrage geht denselben Weg durch `confirmModal` → `openModal`.
+ * Beides trifft jede Rückfrage des geteilten Systems, nicht nur den neuen
+ * Dialog: die Löschfrage geht denselben Weg durch `confirmModal` → `openModal`.
+ *
+ * NUR RÜCKFRAGEN, und das ist der Unterschied, der zählt. Die Sperre hing
+ * zuerst an `openModal` selbst und traf damit jedes Overlay - 62 Aufrufe in
+ * 20 Dateien, Formulare und Ansichtsblätter darunter. Dort ist der erste
+ * Zeigerklick Absicht: jemand hat das Blatt aufgemacht und tippt hinein. Im
+ * Notizblatt fiel so der Moduswechsel weg, und eine Sonde wartete 42 s auf
+ * eine Vorschlagsliste, die nie kam. Scharf gestellt wird deshalb einzeln,
+ * über `pointerDeadTime: true` - siehe openModal.
  *
  * 350 ms deckt die Einfahrt (280 ms) samt Rest ab und liegt unter der
  * Schwelle, ab der ein GEWOLLTER zweiter Klick sich verschluckt anfühlt.
@@ -1281,10 +1289,16 @@ export function armPointerDeadTime(root, { now = () => performance.now(), durati
  * @param {boolean} [opts.dirtyGuard=true] - `false` für Ansichtsblätter, deren
  *   Felder sofort wirken und nichts zu speichern haben (siehe _dirtyGuardEnabled).
  *   Für alles mit einem Speichern-Knopf bleibt es an.
+ * @param {boolean} [opts.pointerDeadTime=false] - `true` NUR für Rückfragen, also
+ *   Dialoge, deren Knöpfe eine Frage beantworten. Sie nehmen dann 350 ms lang
+ *   keinen Zeigerklick an, damit ein Tipp, der noch zum Öffnen gehörte, nicht
+ *   ungelesen antwortet (siehe POINTER_DEAD_TIME_MS). Ein Formular, das jemand
+ *   selbst aufgemacht hat, bekommt das NICHT: dort ist der erste Klick Absicht.
  */
 export function openModal({
   title, content, onSave, onDelete, onClose, size = 'md',
   initialFocus = 'first-field', headerAction = null, dirtyGuard = true,
+  pointerDeadTime = false,
 } = {}) {
   // Vorheriges Modal schließen (kein Stacking).
   if (activeOverlay) {
@@ -1337,7 +1351,14 @@ export function openModal({
   // VOR JEDEM ANDEREN LISTENER AUF DIESEM KNOTEN: die Totzeit schluckt einen
   // Zeigerklick, der noch zum Öffnen gehört, und ihre Reihenfolge entscheidet
   // mit - siehe armPointerDeadTime.
-  armPointerDeadTime(activeOverlay);
+  //
+  // NUR FÜR RÜCKFRAGEN. Sie schluckt jeden Zeigerklick auf dem Overlay, also
+  // auch den auf ein Feld oder einen Umschalter. In einer Rückfrage ist der
+  // verfrühte Klick eine ANTWORT auf eine ungelesene Frage; in einem Formular,
+  // das jemand selbst aufgemacht hat, ist er Absicht, und ihn zu schlucken ist
+  // der Fehler. Gemessen: der Moduswechsel im Notizblatt fiel weg, und die
+  // Sonde wartete 42 s auf eine Vorschlagsliste, die nie kam.
+  if (pointerDeadTime) armPointerDeadTime(activeOverlay);
 
   // Lucide-Icons rendern
   if (window.lucide) window.lucide.createIcons({ el: activeOverlay });
@@ -1542,6 +1563,7 @@ export function promptModal(label, defaultValue = '') {
     }
 
     openModal({
+      pointerDeadTime: true,
       title: label,
       size: 'sm',
       content: `
@@ -1598,6 +1620,7 @@ export function selectModal(label, options) {
       .join('');
 
     openModal({
+      pointerDeadTime: true,
       title: label,
       size: 'sm',
       content: `
@@ -1656,6 +1679,7 @@ export function confirmModal(message, { confirmLabel, cancelLabel, danger = fals
     }
 
     openModal({
+      pointerDeadTime: true,
       title: message,
       size: 'sm',
       content: `

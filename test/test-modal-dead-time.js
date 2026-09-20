@@ -29,6 +29,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 // --------------------------------------------------------
 // Uhr: modal.js liest performance.now(), also steht sie hier.
@@ -264,12 +266,13 @@ function installDocument() {
  * Oeffnet einen Dialog mit einem Knopf darin - so wie die Serien-Rueckfrage:
  * `onSave` bekommt das Panel und verdrahtet die Wahl.
  */
-function openDialog({ openedAt = 0 } = {}) {
+function openDialog({ openedAt = 0, pointerDeadTime = true } = {}) {
   at(openedAt);
   let chosen = null;
   let closed = false;
   const button = makeNode('button[data-scope="this"]');
   openModal({
+    pointerDeadTime,
     title: 'Serientermin speichern',
     content: '<button data-scope="this">Nur diesen Termin</button>',
     onClose: () => { closed = true; },
@@ -351,4 +354,68 @@ test('jeder Dialog bringt seine eigene Totzeit mit', async () => {
   zweiter.tap(1500);
   assert.equal(zweiter.chosen, 'this');
   await closeModal({ force: true });
+});
+
+// --------------------------------------------------------
+// Die Browser-Sonden muessen die Totzeit abwarten
+// --------------------------------------------------------
+
+/**
+ * Warum dieser Textguard hier steht, obwohl der Kopf dieser Datei Textsuchen
+ * misstraut: Er misst nicht die Totzeit - das tun die Sonden darueber - sondern
+ * eine Regel ueber den Sondencode selbst, und die IST Text.
+ *
+ * Der Anlass ist gemessen. Puppeteer klickt, sobald `waitForSelector`
+ * zurueckkehrt; das ist weit innerhalb der Totzeit, der Klick faellt weg, das
+ * Promise des Dialogs loest nie auf. Als das in test-document-guards.js an elf
+ * Stellen passierte, lief der erste Test 189 s ins Timeout, riss den Browser
+ * mit und faerbte die restlichen 47 Faelle in unter 1 ms rot - ein Bild, das
+ * nach kaputter Umgebung aussieht und nicht nach einem Klick zu frueh.
+ *
+ * Ein Lauf deckt das also auf, aber erst nach drei Minuten und mit irrefuehrender
+ * Spur. Hier kostet es Millisekunden und nennt die Stelle.
+ */
+test('keine Browser-Sonde klickt an der Totzeit vorbei', () => {
+  const pfad = fileURLToPath(new URL('./test-document-guards.js', import.meta.url));
+
+  // Nur die ARMIERTEN Dialoge, und die sind im Quelltext abzaehlbar: promptModal,
+  // selectModal und confirmModal setzen `pointerDeadTime: true` hier in modal.js,
+  // recurringScopeChoice tut es in calendar.js. Ein Editor bekommt keine Totzeit,
+  // sein Knopf braucht die Wartezeit also nicht - fuenf ueberfluessige davon
+  // rissen in Sonde 23 ein Fenster von 5 s, in dem ein PUT ankommen musste.
+  //
+  // Nicht nach `page.click('#confirm-modal-ok')` suchen, sondern nach einem
+  // page.click, in dessen Zeile ueberhaupt so ein Knopf vorkommt. Die erste
+  // Fassung fragte nach der Literalform und war blind fuer
+  //   await page.click(confirmed ? '#confirm-modal-ok' : '#confirm-modal-cancel');
+  // - genau die Zeile, an der die Suite 189 s lang haengenblieb.
+  const ARMIERT = /#(?:confirm|prompt|select)-modal-|\[data-scope/;
+
+  const direkt = readFileSync(pfad, 'utf8')
+    .split('\n')
+    .map((zeile, i) => [i + 1, zeile])
+    .filter(([, zeile]) => /\bpage\.click\(/.test(zeile) && ARMIERT.test(zeile));
+
+  assert.deepEqual(
+    direkt.map(([nr, zeile]) => `${nr}: ${zeile.trim()}`),
+    [],
+    'diese Stellen muessen ueber clickPastDeadTime() gehen, sonst schluckt die Totzeit den Klick',
+  );
+});
+
+test('ohne pointerDeadTime bleibt ein Overlay vom ersten Moment an bedienbar', () => {
+  // DIE ANDERE RICHTUNG, und sie ist der teurere Fehler. Die Totzeit haengt an
+  // openModal, also traf sie zuerst JEDES Overlay: 62 Aufrufe in 20 Dateien,
+  // Formulare und Ansichtsblaetter darunter. Dort ist der erste Zeigerklick
+  // Absicht - jemand hat das Blatt selbst aufgemacht und tippt hinein. Gemessen
+  // fiel so der Moduswechsel im Notizblatt weg, und eine Sonde wartete 42 s auf
+  // eine Vorschlagsliste, die nie kam.
+  //
+  // Ohne diesen Test waere die Suite nur noch fuer die armierte Haelfte wach:
+  // ein `pointerDeadTime` das versehentlich wieder pauschal armiert, bliebe
+  // gruen, weil jeder andere Test hier ihn ohnehin setzt.
+  installDocument();
+  const blatt = openDialog({ openedAt: 0, pointerDeadTime: false });
+  blatt.tap(40);
+  assert.equal(blatt.chosen, 'this', 'ein Formular schluckt den ersten Klick nicht');
 });
