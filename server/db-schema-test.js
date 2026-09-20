@@ -1377,8 +1377,8 @@ const MIGRATIONS_SQL = {
   // Bestaetigte Zuordnung Rezeptzutat -> Vorratszeile (#1314). Der Anker ist
   // (recipe_id, ingredient_key), NICHT recipe_ingredients.id: die Zutatenzeilen
   // werden beim Speichern eines Rezepts komplett neu geschrieben. Begruendung
-  // samt Loeschverhalten steht bei Migration 221 in server/db.js.
-  221: `
+  // samt Loeschverhalten steht bei Migration 222 in server/db.js.
+  222: `
     CREATE TABLE IF NOT EXISTS recipe_ingredient_pantry_matches (
       recipe_id      INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
       ingredient_key TEXT    NOT NULL,
