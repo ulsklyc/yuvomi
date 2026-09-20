@@ -34,9 +34,11 @@
  * Einkaufs-Recht ueber `mayWritePath()` und entfallen ohne es - eine Ruecknahme,
  * die im 403 endet, ist schlechter als keine, und ein Ausweg auf eine Seite,
  * auf der man nichts anlegen darf, ist eine Sackgasse. Den Transfer SELBST
- * urteilt der Server je nach Weg verschieden (Vorrat als `shopping`, Mahlzeit
- * und Rezept als `meals`); ob die zweite Zuordnung so bleibt, ist offen,
- * deshalb fragt `resolveShoppingTarget()` hier bewusst nichts.
+ * misst der Pfad-Guard je nach Weg verschieden (Vorrat als `shopping`,
+ * Mahlzeit und Rezept als `meals`); seit #1290 verlangt die Route in jedem
+ * Fall das Einkaufs-Recht. Die Oberflaeche fragt es fuer den Transfer-Knopf
+ * erst mit P3/P4 - bis dahin prueft `resolveShoppingTarget()` hier bewusst
+ * nichts.
  *
  * `selectModal` kommt aus `components/`, obwohl diese Datei in `utils/` liegt.
  * Die Alternative wäre, die Listenauswahl beim Aufrufer zu lassen - dann kapselt

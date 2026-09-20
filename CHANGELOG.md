@@ -84,6 +84,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Moving things into the shopping list now needs shopping rights, in both directions.** Sending a
+  meal or a recipe to a shopping list writes into the shopping module, but it was judged by the
+  module the button sits in: a member with meal-plan access and no shopping access could fill a
+  list they cannot even open, and an API token scoped to the meal plan could do the same. The other
+  direction had the same gap - importing the meal plan into a shopping list marks those ingredients
+  as transferred, which is meal-plan data, so read-only access to the meal plan was enough to
+  change it. Each of these now asks for write access to the module it writes into, whichever page
+  or token the request comes through, and answers a missing right the same way the rest of the app
+  does. Undoing a transfer follows the same rule, but only where it touches the meal plan: taking
+  back a pantry or recipe transfer still works with shopping rights alone. Anybody who has both
+  rights notices no difference. The buttons themselves are still offered for now; hiding them comes
+  with the read-only work on the kitchen pages. (#1290)
+
 - **An empty database file no longer starts Yuvomi as an empty instance.** If the database file
   existed but had a size of zero, Yuvomi took it for a new database, set it up from scratch and came
   up empty, without a word - usually in the very moment somebody was moving data, where that looks
