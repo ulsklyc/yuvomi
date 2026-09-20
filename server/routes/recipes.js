@@ -48,7 +48,7 @@ function withSource(recipe) {
  * sondern eine Messung: PUT /:id weiter unten loescht alle Zutaten eines
  * Rezepts und legt sie neu an, der Provider-Sync ebenso. Eine ID-Verbindung
  * waere nach dem naechsten Speichern still verschwunden. Gespeichert ist
- * deshalb (recipe_id, normalisierter Name) - siehe Migration 221.
+ * deshalb (recipe_id, normalisierter Name) - siehe Migration 222.
  *
  * WAS HIER NICHT PASSIERT: nichts wird geraten. Eine Zutat ohne Zeile in
  * `recipe_ingredient_pantry_matches` bekommt `pantry_item_id: null` und sonst
@@ -281,6 +281,43 @@ router.put('/:id', (req, res) => {
         const quantity = String(ing.quantity || '').trim().slice(0, MAX_SHORT) || null;
         const category = String(ing.category || '').trim().slice(0, MAX_SHORT) || 'Sonstiges';
         if (name) insertIng.run(id, name, quantity, category);
+      }
+
+      // VERWAISTE ZUORDNUNGEN ABRAEUMEN, IN DERSELBEN TRANSAKTION (#1314).
+      //
+      // Die Zuordnung haengt am normalisierten Namen, nicht an
+      // `recipe_ingredients.id` - sonst waere sie nach genau diesem DELETE weg.
+      // Der Preis dafuer steht hier: wird eine Zutat umbenannt, zeigt ihre
+      // Zuordnung auf einen Namen, den dieses Rezept nicht mehr traegt. Kein FK
+      // und kein Trigger fassen das, weil die Zutatenzeile als Bezug nie
+      // existiert hat.
+      //
+      // Unsichtbar waere sie damit, aber nicht weg: taucht dieselbe Schreibweise
+      // spaeter wieder auf, haengt `attachPantryMatches` die alte Vorratszeile
+      // wieder an - eine Zuordnung, die in dieser Form nie jemand bestaetigt hat,
+      // und damit genau die geratene Aussage, die docs/DECISIONS.md Abschnitt 7
+      // ausschliesst. Der Bestaetigungsweg unten lehnt aus demselben Grund eine
+      // Zutat ab, die es im Rezept nicht gibt; hier ist die Rueckseite davon.
+      //
+      // GEMESSEN WIRD AN DER TABELLE, NICHT AM REQUEST: die Namen kommen aus dem,
+      // was gerade wirklich eingefuegt wurde (`if (name)` laesst leere aus).
+      // Geloescht wird zeilenweise ueber die wenigen vorhandenen Zuordnungen
+      // statt mit einem NOT IN ueber alle Zutaten - eine Zutatenliste ist
+      // unbegrenzt, die Zahl der Bindungen einer Anweisung nicht.
+      const vorhandeneZuordnungen = db.get().prepare(
+        'SELECT ingredient_key FROM recipe_ingredient_pantry_matches WHERE recipe_id = ?',
+      ).all(id);
+      if (vorhandeneZuordnungen.length) {
+        const gueltigeKeys = new Set(
+          db.get().prepare('SELECT name FROM recipe_ingredients WHERE recipe_id = ?').all(id)
+            .map((r) => ingredientMatchKey(r.name)),
+        );
+        const loeseZuordnung = db.get().prepare(
+          'DELETE FROM recipe_ingredient_pantry_matches WHERE recipe_id = ? AND ingredient_key = ?',
+        );
+        for (const row of vorhandeneZuordnungen) {
+          if (!gueltigeKeys.has(row.ingredient_key)) loeseZuordnung.run(id, row.ingredient_key);
+        }
       }
     });
 

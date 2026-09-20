@@ -235,16 +235,151 @@ test('ein Rezept aktualisieren setzt nie eine Zuordnung', async () => {
   assert.equal(ingredientOf(res.body, 'Salz').pantry_item_id, null);
 });
 
-test('der Provider-Sync schreibt die Zuordnungstabelle nirgends an', () => {
-  // Ein Spiegel-Lauf schreibt Zutaten genauso neu wie PUT /recipes/:id. Er darf
-  // sie anfassen - aber die Zuordnungstabelle nie, in keiner Richtung ausser
-  // dem Loeschen, das der FK ohnehin erledigt.
-  const quelle = readFileSync(new URL('../server/services/recipe-provider-sync.js', import.meta.url), 'utf8');
+/*
+ * UND DIE RUECKSEITE DAVON: was beim Speichern WEGFAELLT, muss auch wirklich
+ * wegfallen.
+ *
+ * `PUT /recipes/:id` loescht alle Zutaten und legt sie neu an. Eine Zuordnung
+ * haengt am normalisierten Namen, nicht an der Zeile - wird die Zutat
+ * umbenannt, zeigt ihre Zuordnung auf einen Namen, den dieses Rezept nicht mehr
+ * traegt. Sichtbar ist sie dann nicht mehr, gestorben aber auch nicht: taucht
+ * derselbe Name spaeter wieder auf (Tippfehler und zurueck, oder die Zutat wird
+ * schlicht neu angelegt), haengt `attachPantryMatches` die alte Vorratszeile
+ * wieder an - ohne dass jemand DIESE Zuordnung bestaetigt haette. Genau das
+ * verbietet docs/DECISIONS.md Abschnitt 7, und genau davor schuetzt sich der
+ * Bestaetigungsweg weiter unten mit seinem "die Zutat muss es geben".
+ *
+ * docs/SPEC.md sagt dazu "Renaming an ingredient therefore drops its match" -
+ * also faellt sie, statt versteckt weiterzuleben.
+ */
+test('eine Zutat umzubenennen loescht ihre Zuordnung, statt sie liegen zu lassen', async () => {
+  asMember({});
+  const recipeId = seedRecipe('Waffeln', ['Mehl', 'Zucker']);
+  const mehlTuete = seedPantry('Weizenmehl Type 550');
+  await call('PUT', `/recipes/${recipeId}/ingredient-match`, { name: 'Mehl', pantryItemId: mehlTuete });
   assert.equal(
-    /recipe_ingredient_pantry_matches/.test(quelle), false,
-    'server/services/recipe-provider-sync.js nennt die Zuordnungstabelle - ein Import darf sie nie setzen '
-    + '(docs/DECISIONS.md Abschnitt 7)',
+    db.prepare('SELECT COUNT(*) AS c FROM recipe_ingredient_pantry_matches WHERE recipe_id = ? AND ingredient_key = ?')
+      .get(recipeId, 'mehl').c,
+    1, 'Vorbedingung: die Zuordnung steht auf "mehl"',
   );
+
+  const res = await call('PUT', `/recipes/${recipeId}`, {
+    title: 'Waffeln',
+    ingredients: [{ name: 'Dinkelmehl' }, { name: 'Zucker' }],
+  });
+  assert.equal(res.status, 200);
+
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS c FROM recipe_ingredient_pantry_matches WHERE recipe_id = ? AND ingredient_key = ?')
+      .get(recipeId, 'mehl').c,
+    0, 'die Aussage galt einer Zutat, die dieses Rezept nicht mehr hat - sie bleibt nicht als Blindgaenger liegen',
+  );
+  assert.equal(ingredientOf(res.body, 'Dinkelmehl').pantry_item_id, null,
+    'und die umbenannte Zutat erbt sie nicht: Dinkelmehl ist eine andere Zutat');
+});
+
+test('ein spaeter wieder auftauchender Name bekommt keine alte Zuordnung zurueck', async () => {
+  asMember({});
+  const recipeId = seedRecipe('Zwieback', ['Mehl']);
+  const mehlTuete = seedPantry('Mehl im Glas');
+  await call('PUT', `/recipes/${recipeId}/ingredient-match`, { name: 'Mehl', pantryItemId: mehlTuete });
+
+  // Schritt 1: umbenennen. Die Zutat "mehl" gibt es in diesem Rezept nicht mehr.
+  await call('PUT', `/recipes/${recipeId}`, { title: 'Zwieback', ingredients: [{ name: 'Dinkelmehl' }] });
+  // Schritt 2: dieselbe Schreibweise kommt zurueck - der Tippfehler wird
+  // korrigiert, oder jemand legt die Zutat einfach wieder an.
+  const zurueck = await call('PUT', `/recipes/${recipeId}`, { title: 'Zwieback', ingredients: [{ name: 'Mehl' }] });
+  assert.equal(zurueck.status, 200);
+
+  assert.equal(ingredientOf(zurueck.body, 'Mehl').pantry_item_id, null,
+    'niemand hat DIESE Zuordnung bestaetigt - eine auferstandene ist eine geratene');
+  assert.equal(ingredientOf(zurueck.body, 'Mehl').pantry_item_name, null);
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS c FROM recipe_ingredient_pantry_matches WHERE recipe_id = ?').get(recipeId).c,
+    0, 'und in der Tabelle steht nichts mehr, was sie wiederbeleben koennte',
+  );
+});
+
+test('das Aufraeumen trifft nur dieses Rezept, nicht denselben Namen anderswo', async () => {
+  // Der Anker ist (recipe_id, ingredient_key). Ein Aufraeumen, das nur nach dem
+  // Namen loescht, naehme dem Nachbarrezept seine bestaetigte Zuordnung mit.
+  asMember({});
+  const eigen = seedRecipe('Pizzateig', ['Mehl']);
+  const fremd = seedRecipe('Brötchen', ['Mehl']);
+  const tuete = seedPantry('Mehl fuer beide');
+  await call('PUT', `/recipes/${eigen}/ingredient-match`, { name: 'Mehl', pantryItemId: tuete });
+  await call('PUT', `/recipes/${fremd}/ingredient-match`, { name: 'Mehl', pantryItemId: tuete });
+
+  await call('PUT', `/recipes/${eigen}`, { title: 'Pizzateig', ingredients: [{ name: 'Hartweizengriess' }] });
+
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS c FROM recipe_ingredient_pantry_matches WHERE recipe_id = ? AND ingredient_key = ?')
+      .get(fremd, 'mehl').c,
+    1, 'das andere Rezept hat seine Zutat noch und seine Bestaetigung damit auch',
+  );
+  const nachbar = await readRecipe(fremd);
+  assert.equal(ingredientOf(nachbar.body, 'Mehl').pantry_item_id, tuete);
+});
+
+test('ein Mitglied ohne Vorratsrechte kann ein Rezept trotzdem speichern', async () => {
+  // Das Aufraeumen ist kein Eingriff in den Vorrat: es loescht eine Aussage
+  // ueber eine Zutat, die es nicht mehr gibt, und benennt keine Vorratszeile.
+  // Haette es das Schreibrecht des Vorrats verlangt, koennte ein Mitglied mit
+  // `pantry: none` sein eigenes Rezept nicht mehr speichern - der Fix haette
+  // sich die naechste Luecke gebaut.
+  asMember({});
+  const recipeId = seedRecipe('Haferkekse', ['Haferflocken']);
+  const glas = seedPantry('Haferflocken zart');
+  await call('PUT', `/recipes/${recipeId}/ingredient-match`, { name: 'Haferflocken', pantryItemId: glas });
+
+  asMember({ pantry: 'none' });
+  const res = await call('PUT', `/recipes/${recipeId}`, { title: 'Haferkekse', ingredients: [{ name: 'Dinkelflocken' }] });
+  assert.equal(res.status, 200, 'das Rezept gehoert dem Modul meals, nicht dem Vorrat');
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS c FROM recipe_ingredient_pantry_matches WHERE recipe_id = ?').get(recipeId).c,
+    0, 'und die verwaiste Zuordnung ist trotzdem weg',
+  );
+});
+
+
+test('der Provider-Sync schreibt die Zuordnungstabelle nur LESEND und LOESCHEND an', () => {
+  /*
+   * Bis zum Abraeumen der verwaisten Zuordnungen stand hier "die Datei nennt die
+   * Tabelle ueberhaupt nicht". Das geht nicht mehr: der Spiegel-Lauf loescht
+   * jetzt, was zu einer Zutat gehoert, die der Provider umbenannt hat. Ein
+   * Guard, der die neue Schreibweise einfach abnickt, misst danach nichts mehr -
+   * also misst dieser die RICHTUNG statt die Erwaehnung.
+   *
+   * ALLOWLIST, KEINE DENYLIST: geprueft wird, welcher Verb-Anfang vor jedem
+   * Vorkommen steht, und erlaubt sind genau SELECT und DELETE FROM. Eine Liste
+   * verbotener Verben sagte zu jeder Schreibweise, an die niemand gedacht hat,
+   * stillschweigend ja (INSERT OR REPLACE, UPSERT, ein Zeilenumbruch nach
+   * INSERT INTO).
+   *
+   * Die eigentliche Zusage misst nicht dieser Test, sondern ein Lauf:
+   * test/test-recipe-provider-sync.js fuehrt sync() aus und prueft, dass auch
+   * ein identischer Name keine Zuordnung anlegt. Ein Textguard allein laesst
+   * offen, ob ueberhaupt jemand die Datei als Programm ausfuehrt.
+   */
+  const quelle = readFileSync(new URL('../server/services/recipe-provider-sync.js', import.meta.url), 'utf8');
+  const TABELLE = 'recipe_ingredient_pantry_matches';
+  const erlaubt = [/DELETE FROM $/, /SELECT [\w\s,*]+ FROM $/];
+
+  const stellen = [];
+  for (let i = quelle.indexOf(TABELLE); i !== -1; i = quelle.indexOf(TABELLE, i + 1)) stellen.push(i);
+  assert.ok(stellen.length > 0,
+    'server/services/recipe-provider-sync.js nennt die Tabelle gar nicht mehr - dann raeumt der Spiegel-Weg '
+    + 'seine verwaisten Zuordnungen nicht mehr ab (#1314)');
+
+  for (const i of stellen) {
+    const davor = quelle.slice(Math.max(0, i - 60), i);
+    assert.ok(
+      erlaubt.some((re) => re.test(davor)),
+      `server/services/recipe-provider-sync.js fasst ${TABELLE} anders als lesend oder loeschend an: `
+      + `"...${davor.trimStart()}${TABELLE}" - ein Import darf nie eine Zuordnung setzen `
+      + '(docs/DECISIONS.md Abschnitt 7)',
+    );
+  }
 });
 
 // =========================================================================

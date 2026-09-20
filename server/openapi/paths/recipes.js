@@ -7,7 +7,14 @@ export function recipesPaths() {
       post: op({ summary: 'Create recipe', tag: 'Recipes', stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/recipes/{id}': {
-      put: op({ summary: 'Update recipe', tag: 'Recipes', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      put: op({
+        summary: 'Update recipe',
+        tag: 'Recipes',
+        description: 'Replaces the recipe including its whole ingredient list - the ingredient rows are deleted and reinserted, so their ids change on every save. Confirmed pantry matches are keyed by the ingredient name and survive that; a match whose ingredient is no longer in the recipe is deleted in the same transaction rather than left behind, so renaming an ingredient really drops its match instead of hiding one that could come back. The response follows the same pantry-access rule as the list.',
+        params: [idParam()],
+        stateChanging: true,
+        requestBody: jsonBody(null),
+      }),
       delete: op({ summary: 'Delete recipe', tag: 'Recipes', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/recipes/{id}/to-shopping-list': {

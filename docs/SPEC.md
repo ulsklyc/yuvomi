@@ -640,7 +640,7 @@ provider sync delete all of a recipe's ingredient rows and insert them again, so
 is not stable across a save. Anything that wants to remember something about an ingredient has to
 anchor on `(recipe_id, name)` - see Recipe Ingredient Pantry Matches below.
 
-### Recipe Ingredient Pantry Matches (migration v221, #1314)
+### Recipe Ingredient Pantry Matches (migration v222, #1314)
 The household's own confirmed statement that one ingredient of one recipe means one row of its
 pantry. Stage 1 of #1314; it stores the match and nothing else - no quantity arithmetic, no "what
 can I cook" reading.
@@ -651,6 +651,18 @@ row here, not even when a stock row is spelled exactly like the ingredient. That
 true with nobody tending it, while a catalogue of ingredient identities would have to be kept
 correct here forever (#714). An ingredient without a row is **unknown, not missing** - the API
 reports `pantry_item_id: null` and carries no stock verdict at all.
+
+**Dropped when its ingredient goes.** A save rewrites `recipe_ingredients` wholesale, which is why the
+match hangs on the normalised name and not on a row id - but it also means a renamed ingredient
+leaves its match behind, pointing at a name this recipe no longer carries. Invisible is not gone: the
+moment an ingredient normalising to the same key reappears, the read side would reattach that pantry
+row, a match nobody confirmed for it. Both writers therefore reconcile the table **inside the same
+transaction** that rewrites the ingredients - `PUT /api/v1/recipes/:id` and the provider mirror
+(`server/services/recipe-provider-sync.js`) delete this recipe's rows whose `ingredient_key` is no
+longer among its ingredients. Deleting is the only direction the mirror knows: an import never writes
+a match. Reconciling needs no pantry right, because it removes a statement about an ingredient that no
+longer exists rather than naming a pantry row; demanding one would stop a member with `pantry: none`
+from saving their own recipe.
 
 **Who may read it.** `pantry_item_id` and `pantry_item_name` name a row of the **pantry**, while the
 path `/recipes` belongs to the scope module `meals` - the global gate in `server/index.js` judges by
@@ -665,7 +677,7 @@ rendering choice, not the boundary.
 | Column | Type | Constraint |
 |--------|------|-----------|
 | recipe_id | INTEGER | FK → Recipes (CASCADE delete), NOT NULL, part of the primary key |
-| ingredient_key | TEXT | NOT NULL, part of the primary key - the ingredient name trimmed, whitespace-collapsed and lowercased (`public/utils/ingredient-match-key.js`, shared by server and client). **Not** a foreign key to `recipe_ingredients.id`: that id does not survive the next save. Renaming an ingredient therefore drops its match, which is correct - it is a different ingredient now |
+| ingredient_key | TEXT | NOT NULL, part of the primary key - the ingredient name trimmed, whitespace-collapsed and lowercased (`public/utils/ingredient-match-key.js`, shared by server and client). **Not** a foreign key to `recipe_ingredients.id`: that id does not survive the next save. Renaming an ingredient therefore drops its match, which is correct - it is a different ingredient now, and the row is deleted rather than orphaned (see above) |
 | pantry_item_id | INTEGER | FK → Pantry Items (**CASCADE delete**), NOT NULL |
 | confirmed_by | INTEGER | nullable, FK → Users (SET NULL) - provenance only, same reasoning as `pantry_items.created_by` after v109 |
 | created_at / updated_at | TEXT | NOT NULL, ISO 8601 |
