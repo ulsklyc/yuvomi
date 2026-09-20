@@ -19,7 +19,7 @@ import { syncAllPantryExpiryReminders } from './pantry-reminders.js';
 import { syncAllCycleReminders } from './cycle-reminders.js';
 import { syncAllScheduleReminders } from './schedule-reminders.js';
 import { syncAllWasteReminders } from './waste-reminders.js';
-import { withoutSwitchedOffModules } from './reminder-origins.js';
+import { withoutModulesDeniedToRecipient, withoutSwitchedOffModules } from './reminder-origins.js';
 
 const log = createLogger('Notifications');
 const APP_NAME = 'Yuvomi';
@@ -522,7 +522,14 @@ export async function processDueNotifications({
   // bleibt ausstehend (pushed_at bleibt leer) und geht nach dem Wiedereinschalten
   // raus - siehe withoutSwitchedOffModules() fuer den Grund. Synchron direkt
   // nach dem Lesen, vor dem ersten `await` der Schleife.
-  const due = withoutSwitchedOffModules(activeDb, dueRows);
+  //
+  // UND EIN ENTZOGENES MODUL MELDET SICH AUCH NICHT (#1289). Zweite Achse,
+  // gleiche Stelle: `GET /reminders/pending` fragte die Rechte des Mitglieds
+  // laengst, Push und Kanaele nicht - wer `tasks`/`budget`/`documents` verloren
+  // hatte, sah den Toast nicht mehr und bekam Titel, Betrag und Datum trotzdem
+  // aufs Telefon. Beide Filter synchron hintereinander, damit zwischen Lesen
+  // und Urteil kein Yield-Punkt liegt.
+  const due = withoutModulesDeniedToRecipient(activeDb, withoutSwitchedOffModules(activeDb, dueRows));
 
   const counters = { due: due.length, attempted: 0, sent: 0, failed: 0, skipped: 0 };
   const markPushed = activeDb.prepare('UPDATE reminders SET pushed_at = ? WHERE id = ?');
