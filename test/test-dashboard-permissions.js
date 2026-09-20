@@ -406,6 +406,14 @@ const NONEMPTY_ERLAUBT = new Set([
   'users',
   // Der beschriftete Zeitraum, keine Budgetzahl.
   'budget.month',
+  // Zwei feste Darstellungsvorgaben (`clock_mode: 'auto'`, `zone_mode: 'timer'`),
+  // wörtlich aus `emptyFastingWidget()` und für jeden Betrachter dieselben - kein
+  // gelesener Wert, keine Gesundheitsangabe. Sie stehen hier und nicht auf `null`,
+  // weil die leere FORM Absicht ist: `fasting: null` hat die Oberfläche brechen
+  // lassen, deshalb liefert die Sperre die Form mit leeren Feldern (#1180).
+  // `fasting.active` und `fasting.lastCompleted` sind bewusst NICHT erlaubt - dort
+  // stünden echte Daten, und dort muss der Guard weiter anschlagen.
+  'fasting.settings',
 ]);
 
 /** Trägt dieser Wert etwas? Zahlen, Strings, Listen, verschachtelte Objekte. */
