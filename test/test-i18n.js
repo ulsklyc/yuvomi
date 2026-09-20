@@ -14,12 +14,31 @@ const LOCALES_DIR = new URL('../public/locales/', import.meta.url);
 const I18N_PATH = new URL('../public/i18n.js', import.meta.url);
 const REFERENCE = 'de';
 
-/** SUPPORTED_LOCALES aus i18n.js lesen, statt die Liste hier zu doppeln. */
-function supportedLocales() {
-  const src = readFileSync(I18N_PATH, 'utf8');
+/**
+ * SUPPORTED_LOCALES aus dem Quelltext von i18n.js lesen, statt die Liste hier zu
+ * doppeln. Als reine Funktion, damit der Test darunter sie mit einer Eingabe
+ * füttern kann, die im Repository (noch) nicht vorkommt.
+ *
+ * Der Leser greift jeden quotierten String ab, nicht eine Zeichenklasse. Bis
+ * 20.09.2026 stand hier `/'([a-z-]+)'/g` - nur Kleinbuchstaben. Ein Code mit
+ * Großbuchstaben, wie ihn BCP-47 für Schrift- und Regions-Subtags vorsieht
+ * (`zh-Hant`, `pt-BR`), fiel damit still aus LOCALES heraus, und LOCALES ist die
+ * Schleifenquelle jeder Schlüssel-, Platzhalter- und Pluralprüfung in dieser
+ * Datei: die Locale wäre nicht etwa falsch geprüft worden, sondern gar nicht.
+ *
+ * Eine Zeichenklasse, die aufzählt, was erlaubt ist, sagt zu allem Unbekannten
+ * stillschweigend nein. `[^']*` kann nichts verschlucken - was im Literal steht,
+ * kommt auch an. Steht dort einmal etwas, das keine Locale ist, wird die Suite
+ * laut falsch statt leise unvollständig, und das ist die bessere Richtung.
+ */
+function parseSupportedLocales(src) {
   const match = src.match(/const SUPPORTED_LOCALES = \[([^\]]+)\]/);
   assert.ok(match, 'SUPPORTED_LOCALES nicht in public/i18n.js gefunden');
-  return match[1].match(/'([a-z-]+)'/g).map(s => s.slice(1, -1));
+  return match[1].match(/'([^']*)'/g).map(s => s.slice(1, -1));
+}
+
+function supportedLocales() {
+  return parseSupportedLocales(readFileSync(I18N_PATH, 'utf8'));
 }
 
 function readLocale(locale) {
@@ -48,9 +67,14 @@ const LOCALES = supportedLocales();
 const reference = flatten(JSON.parse(readLocale(REFERENCE)));
 const referenceKeys = [...reference.keys()];
 
+// Beide Seiten werden als DATEINAME sortiert, nicht die eine als Code und die
+// andere als Dateiname: '-' (45) steht vor '.' (46), also sortiert 'zh-Hant'
+// nach 'zh', 'zh-Hant.json' aber vor 'zh.json'. Ein Subtag-Locale hätte diesen
+// Vergleich mit identischem Inhalt rot gemacht - ein deepEqual-Diff, der wie
+// eine fehlende Datei aussieht, obwohl nur zwei Sortierungen aufeinandertreffen.
 test('für jede unterstützte Locale existiert genau eine Locale-Datei', () => {
   const files = readdirSync(LOCALES_DIR).filter(f => f.endsWith('.json')).sort();
-  assert.deepEqual(files, [...LOCALES].sort().map(l => `${l}.json`));
+  assert.deepEqual(files, LOCALES.map(l => `${l}.json`).sort());
 });
 
 test('die Referenz-Locale trägt Schlüssel', () => {
@@ -322,4 +346,35 @@ test('Server und Frontend kennen dieselben Sprachen', async () => {
   const abgewiesen = frontend.filter((locale) => !isSupportedLocale(locale));
   assert.deepEqual(abgewiesen, [],
     `isSupportedLocale() weist Sprachen ab, die die Oberflaeche anbietet: ${abgewiesen.join(', ')}`);
+});
+
+// Der Leser dieser Datei ist ihr eigener blinder Fleck. LOCALES speist jede
+// Schleife hier - fehlt ein Code in LOCALES, wird seine Datei nicht falsch
+// geprüft, sondern übersprungen, und die Suite meldet trotzdem grün. Die
+// bisherige Zeichenklasse `[a-z-]+` hätte genau das getan, sobald ein Code einen
+// Großbuchstaben trägt.
+//
+// Gemessen am 20.09.2026 gegen die alte Fassung, mit 'zh-Hant' in
+// SUPPORTED_LOCALES: stand die Datei zh-Hant.json daneben, wurde nur der
+// Dateilisten-Vergleich rot - mit einem Diff über Dateinamen, der auf die Datei
+// zeigt statt auf den Leser, und ohne dass eine einzige Schlüsselprüfung für
+// zh-Hant gelaufen wäre. Fehlte die Datei, war die volle Suite grün: die
+// Oberfläche hätte die Sprache angeboten, `isSupportedLocale` hätte sie
+// abgewiesen, und das Speichern wäre mit 400 gescheitert - derselbe Ausgang wie
+// bei `fil` in #1322, nur dass diesmal auch der Guard dafür nichts gesehen
+// hätte, weil er seine Frontend-Seite durch denselben Leser bezieht.
+//
+// Deshalb prüft dieser Test den Leser als Funktion, mit Eingaben, die im
+// Repository nicht vorkommen. Ein Test, der ihn nur auf den echten Bestand
+// anwendet, misst nichts: dort tragen alle 24 Codes Kleinbuchstaben.
+test('der Leser von SUPPORTED_LOCALES verschluckt keinen Code', () => {
+  const quelle = "const SUPPORTED_LOCALES = ['de', 'fil', 'zh-Hant', 'pt-BR', 'sr-Latn-RS'];";
+  assert.deepEqual(parseSupportedLocales(quelle),
+    ['de', 'fil', 'zh-Hant', 'pt-BR', 'sr-Latn-RS'],
+    'Ein Code mit Grossbuchstaben faellt aus der Liste, die jede Pruefung hier '
+    + 'durchlaeuft. Seine Locale-Datei wuerde dann ungeprueft bleiben.');
+
+  // Die echte Liste geht durch denselben Leser - unverändert und vollzählig.
+  assert.equal(LOCALES.length, new Set(LOCALES).size, 'doppelter Code in SUPPORTED_LOCALES');
+  assert.ok(LOCALES.includes('fil'), 'fil fehlt - der Code aus #1322');
 });
