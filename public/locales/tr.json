@@ -942,6 +942,7 @@
         "recurringScopeThis": "Yalnızca bu etkinlik",
         "recurringScopeFollowing": "Bu ve sonrakiler",
         "recurringScopeSeries": "Tüm seri",
+        "recurringScopeOccurrence": "{{date}} tarihli \"{{title}}\"",
         "overrideOrphanConfirmTitle": "Düzenlenen {{count}} tekrar korunsun mu?",
         "overrideOrphanConfirmTitle_one": "Düzenlenen {{count}} tekrar korunsun mu?",
         "overrideOrphanConfirmDetail": "Bu tekrarlar değiştirilen seriye artık uymuyor ve bağımsız etkinlikler olarak korunacak.",

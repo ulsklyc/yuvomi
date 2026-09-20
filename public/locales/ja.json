@@ -942,6 +942,7 @@
         "recurringScopeThis": "この予定だけ",
         "recurringScopeFollowing": "これ以降のすべて",
         "recurringScopeSeries": "シリーズ全体",
+        "recurringScopeOccurrence": "{{date}} の「{{title}}」",
         "overrideOrphanConfirmTitle": "編集済みの繰り返し {{count}} 件を保持しますか？",
         "overrideOrphanConfirmTitle_one": "編集済みの繰り返し {{count}} 件を保持しますか？",
         "overrideOrphanConfirmDetail": "これらの繰り返しは変更後のシリーズに含まれないため、個別の予定として保持されます。",

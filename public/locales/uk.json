@@ -942,6 +942,7 @@
         "recurringScopeThis": "Лише цю подію",
         "recurringScopeFollowing": "Цю та наступні",
         "recurringScopeSeries": "Усю серію",
+        "recurringScopeOccurrence": "«{{title}}» {{date}}",
         "overrideOrphanConfirmTitle": "Зберегти змінені повторення ({{count}})?",
         "overrideOrphanConfirmTitle_one": "Зберегти {{count}} змінене повторення?",
         "overrideOrphanConfirmDetail": "Ці повторення більше не відповідають зміненій серії та будуть збережені як окремі події.",

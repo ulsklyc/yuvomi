@@ -942,6 +942,7 @@
         "recurringScopeThis": "Chỉ sự kiện này",
         "recurringScopeFollowing": "Sự kiện này và các sự kiện sau",
         "recurringScopeSeries": "Toàn bộ chuỗi",
+        "recurringScopeOccurrence": "\"{{title}}\" vào {{date}}",
         "overrideOrphanConfirmTitle": "Giữ {{count}} lần lặp đã chỉnh sửa?",
         "overrideOrphanConfirmTitle_one": "Giữ {{count}} lần lặp đã chỉnh sửa?",
         "overrideOrphanConfirmDetail": "Các lần lặp này không còn khớp với chuỗi đã thay đổi và sẽ được giữ lại dưới dạng sự kiện riêng lẻ.",

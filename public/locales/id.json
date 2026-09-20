@@ -954,6 +954,7 @@
         "recurringScopeThis": "Hanya acara ini",
         "recurringScopeFollowing": "Ini dan berikutnya",
         "recurringScopeSeries": "Seluruh rangkaian",
+        "recurringScopeOccurrence": "\"{{title}}\" pada {{date}}",
         "overrideOrphanConfirmTitle": "Pertahankan {{count}} kejadian yang diedit?",
         "overrideOrphanConfirmTitle_one": "Pertahankan {{count}} kejadian yang diedit?",
         "overrideOrphanConfirmDetail": "Kejadian ini tidak lagi sesuai dengan seri yang diubah dan akan disimpan sebagai acara mandiri.",

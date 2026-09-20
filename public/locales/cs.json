@@ -942,6 +942,7 @@
         "recurringScopeThis": "Jen tuto událost",
         "recurringScopeFollowing": "Tuto a následující",
         "recurringScopeSeries": "Celou sérii",
+        "recurringScopeOccurrence": "„{{title}}“ dne {{date}}",
         "overrideOrphanConfirmTitle": "Ponechat upravené výskyty: {{count}}?",
         "overrideOrphanConfirmTitle_one": "Ponechat {{count}} upravený výskyt?",
         "overrideOrphanConfirmDetail": "Tyto výskyty již neodpovídají změněné sérii a budou zachovány jako samostatné události.",

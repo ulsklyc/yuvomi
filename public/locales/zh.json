@@ -942,6 +942,7 @@
         "recurringScopeThis": "仅此事件",
         "recurringScopeFollowing": "此事件及后续事件",
         "recurringScopeSeries": "整个系列",
+        "recurringScopeOccurrence": "{{date}} 的“{{title}}”",
         "overrideOrphanConfirmTitle": "保留 {{count}} 个已编辑的重复日程吗？",
         "overrideOrphanConfirmTitle_one": "保留 {{count}} 个已编辑的重复日程吗？",
         "overrideOrphanConfirmDetail": "这些重复日程已不再符合修改后的系列，将作为独立日程保留。",

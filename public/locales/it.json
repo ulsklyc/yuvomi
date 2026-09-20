@@ -942,6 +942,7 @@
         "recurringScopeThis": "Solo questo evento",
         "recurringScopeFollowing": "Questo e i successivi",
         "recurringScopeSeries": "Intera serie",
+        "recurringScopeOccurrence": "\"{{title}}\" del {{date}}",
         "overrideOrphanConfirmTitle": "Mantenere {{count}} occorrenze modificate?",
         "overrideOrphanConfirmTitle_one": "Mantenere {{count}} occorrenza modificata?",
         "overrideOrphanConfirmDetail": "Queste occorrenze non rientrano più nella serie modificata e saranno mantenute come eventi indipendenti.",

@@ -954,6 +954,7 @@
         "recurringScopeThis": "Nur diesen Termin",
         "recurringScopeFollowing": "Diesen und folgende",
         "recurringScopeSeries": "Ganze Serie",
+        "recurringScopeOccurrence": "„{{title}}“ am {{date}}",
         "overrideOrphanConfirmTitle": "{{count}} bearbeitete Termine beibehalten?",
         "overrideOrphanConfirmTitle_one": "{{count}} bearbeiteten Termin beibehalten?",
         "overrideOrphanConfirmDetail": "Diese Termine passen nicht mehr in die geänderte Serie und werden als eigenständige Termine beibehalten.",

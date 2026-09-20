@@ -942,6 +942,7 @@
         "recurringScopeThis": "केवल यह इवेंट",
         "recurringScopeFollowing": "यह और आगे वाले",
         "recurringScopeSeries": "पूरी शृंखला",
+        "recurringScopeOccurrence": "{{date}} की \"{{title}}\"",
         "overrideOrphanConfirmTitle": "{{count}} संपादित आवृत्तियाँ रखें?",
         "overrideOrphanConfirmTitle_one": "{{count}} संपादित आवृत्ति रखें?",
         "overrideOrphanConfirmDetail": "ये आवृत्तियाँ बदली हुई शृंखला में अब फिट नहीं होतीं और अलग इवेंट के रूप में रखी जाएँगी।",

@@ -942,6 +942,7 @@
         "recurringScopeThis": "Bara denna händelse",
         "recurringScopeFollowing": "Denna och följande",
         "recurringScopeSeries": "Hela serien",
+        "recurringScopeOccurrence": "\"{{title}}\" den {{date}}",
         "overrideOrphanConfirmTitle": "Behålla {{count}} redigerade förekomster?",
         "overrideOrphanConfirmTitle_one": "Behålla {{count}} redigerad förekomst?",
         "overrideOrphanConfirmDetail": "Dessa förekomster passar inte längre i den ändrade serien och behålls som fristående händelser.",

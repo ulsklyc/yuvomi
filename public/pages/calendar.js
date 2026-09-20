@@ -5894,7 +5894,7 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
       closeModal({ force: true });
       return;
     }
-    const choice = await askOverModal(() => recurringScopeChoice({ action: 'save' }));
+    const choice = await askOverModal(() => recurringScopeChoice({ action: 'save', event }));
     if (!choice) return;
     occurrenceScope = choice;
   }
@@ -6141,14 +6141,46 @@ const RECURRING_SCOPES = [
   ['series', 'calendar.recurringScopeSeries'],
 ];
 
-function renderRecurringScopeChoices(action) {
+/**
+ * WELCHES VORKOMMEN GEMEINT IST, STEHT IM DIALOG (#1284, Review zu #1295).
+ *
+ * Bis #1284 nannte ein nachgefuehrter Hinweis unter dem Auswahlfeld das Datum
+ * (`calendar.recurringScopeHint*`). Mit drei Knoepfen ist jeder Knopf bereits
+ * die Wahl, ein nachgefuehrter Hinweis hat also niemanden mehr, der ihn
+ * nachfuehrt - und ohne ihn fiel das Datum ersatzlos weg. Beim LOESCHEN wiegt
+ * das am schwersten: die Liste bzw. die Detailansicht ist da schon zu, der
+ * Dialog ist das Einzige auf dem Schirm, und wer das falsche Vorkommen
+ * angetippt hat, saehe nicht, wo „Diesen und folgende" die Serie abschneidet.
+ *
+ * Deshalb EINE Zeile ueber der Frage statt drei unter den Knoepfen: das Datum
+ * ist kein Merkmal einer der drei Antworten, sondern der Punkt, an dem alle
+ * drei ansetzen - dreimal dasselbe Datum waere dreimal dieselbe Auskunft, und
+ * unter „Ganze Serie" haette sie gar nichts zu suchen. Die Zeile benennt die
+ * Gruppe nicht (das tut „Gilt für"), sie beschreibt sie: `aria-describedby`,
+ * damit die Vorlesehilfe den Namen des Knopfes nicht mit dem Termintitel
+ * verlaengert.
+ *
+ * DAS DATUM KOMMT AUS `localDate(start_datetime)` - derselbe Weg, auf dem
+ * `eventWhenText` den Tag eines Termins anzeigt, und damit die Anzeigezone des
+ * Haushalts (#829). Ein `toISOString().slice(0, 10)` waere der UTC-Tag und
+ * kippte je nach Zone auf den Nachbartag; bei einem Vorkommen kurz nach
+ * Mitternacht ist das der Regelfall, nicht der Rand. Der Server nennt dasselbe
+ * Vorkommen als `recurrence_id`, und genau das tragen die Endpunkte der Wahl -
+ * bei einer lokalen Serie (zonenlose Wanduhrzeit) sind beide derselbe Tag.
+ */
+function renderRecurringScopeChoices(action, event) {
   const tone = action === 'delete' ? 'btn--danger-outline' : 'btn--secondary';
   const choices = RECURRING_SCOPES.map(([scope, key]) => `
         <button type="button" class="btn ${tone}" data-scope="${scope}">${esc(t(key))}</button>`).join('');
+  const occurrence = esc(t('calendar.recurringScopeOccurrence', {
+    title: event?.title ?? '',
+    date: formatDate(localDate(event?.start_datetime)),
+  }));
   return `
+    <p class="modal-confirm__detail" id="recurring-scope-occurrence">${occurrence}</p>
     <p class="modal-confirm__detail" id="recurring-scope-label">${esc(t('calendar.recurringScopeLabel'))}</p>
     <div class="modal-actions modal-actions--stack">
-      <div class="modal-actions modal-actions--stack" role="group" aria-labelledby="recurring-scope-label">${choices}
+      <div class="modal-actions modal-actions--stack" role="group" aria-labelledby="recurring-scope-label" aria-describedby="recurring-scope-occurrence">${choices}
       </div>
       <button type="button" class="btn btn--ghost" id="recurring-scope-cancel">${esc(t('common.cancel'))}</button>
     </div>`;
@@ -6170,11 +6202,13 @@ function renderRecurringScopeChoices(action) {
  *
  * `action` ist 'save' oder 'delete'; es waehlt nur Titel und Ton der Knoepfe.
  * Optionen, Texte und Bedienung sind dieselben - zwei Dialogarten fuer dieselbe
- * Frage wuerden auseinanderlaufen.
+ * Frage wuerden auseinanderlaufen. `event` ist das angetippte Vorkommen; beide
+ * Aufrufstellen haben es zur Hand, und der Dialog nennt es (siehe
+ * `renderRecurringScopeChoices`).
  *
  * Loest zu 'this' | 'following' | 'series' | null.
  */
-function recurringScopeChoice({ action }) {
+function recurringScopeChoice({ action, event }) {
   return new Promise((resolve) => {
     let resolved = false;
     const finish = (value) => {
@@ -6186,7 +6220,7 @@ function recurringScopeChoice({ action }) {
     openSharedModal({
       title: action === 'delete' ? t('calendar.deleteRecurringTitle') : t('calendar.saveRecurringTitle'),
       size: 'sm',
-      content: renderRecurringScopeChoices(action),
+      content: renderRecurringScopeChoices(action, event),
       onClose: () => finish(null),
       onSave(panel) {
         for (const button of panel.querySelectorAll('[data-scope]')) {
@@ -6290,7 +6324,7 @@ async function requestDeleteEvent(event) {
     if (await confirmLocalWholeSeriesDelete(event)) await deleteEvent(event);
     return;
   }
-  const choice = await recurringScopeChoice({ action: 'delete' });
+  const choice = await recurringScopeChoice({ action: 'delete', event });
   if (choice === 'series') await deleteEvent(event);
   else if (choice === 'following') await deleteThisAndFollowing(event);
   else if (choice === 'this') await deleteSingleOccurrence(event);

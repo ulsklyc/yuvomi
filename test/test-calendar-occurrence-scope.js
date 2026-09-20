@@ -596,3 +596,110 @@ test('Loeschen eines Serientermins: derselbe Dialog, dieselben Knoepfe, nur Tite
   assert.match(deleted.buttons[0].attrs.class, /btn--danger-outline/, 'loeschen ist als zerstoerend ausgewiesen');
   assert.deepEqual(calls, [], 'Abbrechen loescht nichts');
 });
+
+// --------------------------------------------------------------------------
+// DER DIALOG NENNT DAS VORKOMMEN (Review zu #1295)
+//
+// Mit dem Auswahlfeld verschwand auch der nachgefuehrte Hinweis, der das
+// Datum nannte (`calendar.recurringScopeHint*`) - und mit ihm die Auskunft,
+// WELCHEN Termin die drei Knoepfe meinen. Beim Loeschen wiegt das am
+// schwersten: dort ist der Dialog das Einzige auf dem Schirm.
+//
+// Gemessen wird die Zeile, die der Kalender WIRKLICH schreibt, samt der Werte,
+// die er in sie einsetzt - nicht das Vorkommen des Schluessels im Quelltext.
+// --------------------------------------------------------------------------
+
+const UNESCAPE = [['&quot;', '"'], ['&#039;', "'"], ['&lt;', '<'], ['&gt;', '>'], ['&amp;', '&']];
+const unescape = (text) => UNESCAPE.reduce((acc, [from, to]) => acc.replaceAll(from, to), text);
+
+/** Die Detailzeilen des Dialogs, in der Reihenfolge des Markups. */
+function detailLines(content) {
+  return [...String(content ?? '').matchAll(/<p class="modal-confirm__detail"[^>]*>([\s\S]*?)<\/p>/g)]
+    .map(([, text]) => text.trim());
+}
+
+/**
+ * Was der Dialog ueber das Vorkommen sagt: der Schluessel seiner ersten
+ * Detailzeile und die Werte, die die Seite eingesetzt hat. Der Stub von `t`
+ * haengt die Werte als JSON an den Schluessel; `esc` hat sie davor durch die
+ * HTML-Maskierung geschickt, und genau das wird hier rueckgaengig gemacht -
+ * dass es noetig ist, ist der Beleg fuer die Maskierung.
+ */
+function occurrenceLine(dialog) {
+  const [line] = detailLines(dialog.options.content);
+  assert.ok(line, 'der Dialog hat keine Detailzeile');
+  const key = 'calendar.recurringScopeOccurrence';
+  assert.ok(line.startsWith(key), `die erste Detailzeile nennt das Vorkommen nicht: ${line}`);
+  return { raw: line, values: JSON.parse(unescape(line.slice(key.length))) };
+}
+
+/** Oeffnet den Loeschdialog und beantwortet ihn; liefert Dialog und Anfragen. */
+async function clickDelete(event, { answer = 'cancel' } = {}) {
+  const question = scopeQuestion(answer);
+  const calls = [];
+  globalThis.__apiStub = { delete: async (path) => { calls.push(path); return { data: null }; } };
+  try {
+    await settles(calendar.requestDeleteEvent(event), 'Loeschen');
+  } finally {
+    question.uninstall();
+    delete globalThis.__apiStub;
+  }
+  return { dialog: question.dialogs[0], calls };
+}
+
+test('Speichern: der Dialog nennt Titel und Datum des angetippten Vorkommens', async () => {
+  const panel = openForm(OCCURRENCE);
+  userChecks(personBox(panel, 2));
+  const { dialogs } = await clickSave(panel, OCCURRENCE, { answer: 'cancel' });
+  const { values } = occurrenceLine(dialogs[0]);
+  assert.equal(values.date, '2026-10-02', 'das Datum des geoeffneten Vorkommens');
+  assert.equal(values.title, 'Training', 'und sein Titel');
+});
+
+test('Loeschen: derselbe Satz - hier ist der Dialog das Einzige auf dem Schirm', async () => {
+  const { dialog } = await clickDelete(OCCURRENCE);
+  const { values } = occurrenceLine(dialog);
+  assert.equal(values.date, '2026-10-02');
+  assert.equal(values.title, 'Training');
+});
+
+test('die Zeile steht UEBER der Frage und beschreibt die Gruppe, statt sie zu benennen', async () => {
+  const { dialog } = await clickDelete(OCCURRENCE);
+  const { content } = dialog.options;
+  const lines = detailLines(content);
+  assert.equal(lines.length, 2, 'Vorkommen, dann „Gilt für"');
+  assert.ok(lines[0].startsWith('calendar.recurringScopeOccurrence'));
+  assert.equal(lines[1], 'calendar.recurringScopeLabel');
+  // Der Name der Knopfgruppe bleibt „Gilt für". Stuende das Vorkommen in
+  // aria-labelledby, verlaengerte es den Namen jedes einzelnen Knopfes.
+  const group = /role="group" aria-labelledby="([^"]+)" aria-describedby="([^"]+)"/.exec(content);
+  assert.ok(group, 'die Gruppe nennt Name und Beschreibung');
+  assert.equal(group[1], 'recurring-scope-label');
+  assert.equal(group[2], 'recurring-scope-occurrence');
+  assert.match(content, /id="recurring-scope-occurrence">calendar\.recurringScopeOccurrence/);
+});
+
+test('das Datum ist der Tag der Anzeigezone, nicht der UTC-Tag', async () => {
+  // Ein Vorkommen kurz nach Mitternacht: in Europe/Berlin (die Suite nagelt
+  // die Zone fest) liegt sein Zeitpunkt noch im Vortag nach UTC. Wer
+  // `toISOString().slice(0, 10)` schriebe, benennte hier den 1. Oktober und
+  // schnitte die Serie in der Auskunft einen Tag zu frueh ab.
+  const afterMidnight = {
+    ...OCCURRENCE,
+    recurrence_id: '2026-10-02',
+    start_datetime: '2026-10-02T00:30',
+    end_datetime: '2026-10-02T01:30',
+  };
+  assert.equal(new Date(afterMidnight.start_datetime).toISOString().slice(0, 10), '2026-10-01',
+    'die Gegenprobe selbst: der UTC-Tag IST hier der Nachbartag');
+  const { dialog } = await clickDelete(afterMidnight);
+  assert.equal(occurrenceLine(dialog).values.date, '2026-10-02');
+});
+
+test('ein Termintitel ist Userdaten und kommt maskiert im Markup an', async () => {
+  const { dialog } = await clickDelete({ ...OCCURRENCE, title: '<img src=x onerror="alert(1)">' });
+  const { raw, values } = occurrenceLine(dialog);
+  assert.equal(values.title, '<img src=x onerror="alert(1)">', 'der Titel geht unveraendert in den Text');
+  assert.doesNotMatch(raw, /<img/, 'aber nicht als Markup in den Dialog');
+  assert.match(raw, /&lt;img/);
+});

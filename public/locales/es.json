@@ -942,6 +942,7 @@
         "recurringScopeThis": "Solo este evento",
         "recurringScopeFollowing": "Este y los siguientes",
         "recurringScopeSeries": "Toda la serie",
+        "recurringScopeOccurrence": "\"{{title}}\" del {{date}}",
         "overrideOrphanConfirmTitle": "¿Conservar {{count}} repeticiones editadas?",
         "overrideOrphanConfirmTitle_one": "¿Conservar {{count}} repetición editada?",
         "overrideOrphanConfirmDetail": "Estas repeticiones ya no encajan en la serie modificada y se conservarán como eventos independientes.",

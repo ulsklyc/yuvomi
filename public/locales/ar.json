@@ -942,6 +942,7 @@
         "recurringScopeThis": "هذا الحدث فقط",
         "recurringScopeFollowing": "هذا وما يليه",
         "recurringScopeSeries": "السلسلة بأكملها",
+        "recurringScopeOccurrence": "\"{{title}}\" في {{date}}",
         "overrideOrphanConfirmTitle": "هل تريد الاحتفاظ بـ {{count}} من التكرارات المعدّلة؟",
         "overrideOrphanConfirmTitle_one": "هل تريد الاحتفاظ بالتكرار المعدّل ({{count}})؟",
         "overrideOrphanConfirmDetail": "لم تعد هذه التكرارات تتوافق مع السلسلة المعدّلة، وسيتم الاحتفاظ بها كمواعيد مستقلة.",

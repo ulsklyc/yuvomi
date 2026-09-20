@@ -954,6 +954,7 @@
         "recurringScopeThis": "이 일정만",
         "recurringScopeFollowing": "이 일정 및 이후 일정",
         "recurringScopeSeries": "전체 시리즈",
+        "recurringScopeOccurrence": "{{date}} \"{{title}}\"",
         "overrideOrphanConfirmTitle": "수정된 반복 일정 {{count}}개를 유지할까요?",
         "overrideOrphanConfirmTitle_one": "수정된 반복 일정 {{count}}개를 유지할까요?",
         "overrideOrphanConfirmDetail": "이 반복 일정은 변경된 시리즈에 더 이상 맞지 않아 개별 일정으로 유지됩니다.",

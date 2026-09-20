@@ -954,6 +954,7 @@
         "recurringScopeThis": "فقط این رویداد",
         "recurringScopeFollowing": "این و موارد بعدی",
         "recurringScopeSeries": "کل مجموعه",
+        "recurringScopeOccurrence": "«{{title}}» در {{date}}",
         "overrideOrphanConfirmTitle": "{{count}} رخداد ویرایش‌شده حفظ شوند؟",
         "overrideOrphanConfirmTitle_one": "{{count}} رخداد ویرایش‌شده حفظ شود؟",
         "overrideOrphanConfirmDetail": "این رخدادها دیگر با مجموعه تغییر‌یافته سازگار نیستند و به‌صورت رویدادهای مستقل حفظ می‌شوند.",

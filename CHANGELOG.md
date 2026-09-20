@@ -108,7 +108,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   event, and a series that belongs to a synced or subscribed calendar, save as before, without the
   question. Deleting an event of a series asks the same question with the same three buttons,
   instead of a drop-down. A series that already has a person on one event only can be put right by
-  opening one of the events without them, picking the person and choosing "Whole series". A dialog
+  opening one of the events without them, picking the person and choosing "Whole series". Both
+  dialogs say which event they are about, above the three buttons: its title and the date of the
+  occurrence you opened, on the household's clock. That line is what tells you where "This and
+  following" would cut the series, and it matters most when deleting - by then the list or the form
+  has already closed, and the question is the only thing on screen. A dialog
   that has just opened also ignores taps and clicks for a third of a second, so a quick second tap
   on Save - or the second click of a double-click on Delete - can no longer answer a question that
   nobody has read yet; on a phone the dialog slides up into that very spot. The keyboard and screen

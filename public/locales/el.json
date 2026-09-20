@@ -942,6 +942,7 @@
         "recurringScopeThis": "Μόνο αυτό το συμβάν",
         "recurringScopeFollowing": "Αυτό και τα επόμενα",
         "recurringScopeSeries": "Ολόκληρη τη σειρά",
+        "recurringScopeOccurrence": "\"{{title}}\" στις {{date}}",
         "overrideOrphanConfirmTitle": "Διατήρηση {{count}} επεξεργασμένων εμφανίσεων;",
         "overrideOrphanConfirmTitle_one": "Διατήρηση {{count}} επεξεργασμένης εμφάνισης;",
         "overrideOrphanConfirmDetail": "Αυτές οι εμφανίσεις δεν ταιριάζουν πλέον στην αλλαγμένη σειρά και θα διατηρηθούν ως ανεξάρτητα συμβάντα.",

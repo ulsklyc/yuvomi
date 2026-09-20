@@ -942,6 +942,7 @@
         "recurringScopeThis": "Alleen deze afspraak",
         "recurringScopeFollowing": "Deze en volgende",
         "recurringScopeSeries": "Hele reeks",
+        "recurringScopeOccurrence": "\"{{title}}\" op {{date}}",
         "overrideOrphanConfirmTitle": "{{count}} bewerkte herhalingen behouden?",
         "overrideOrphanConfirmTitle_one": "{{count}} bewerkte herhaling behouden?",
         "overrideOrphanConfirmDetail": "Deze herhalingen passen niet meer in de gewijzigde reeks en worden als zelfstandige afspraken behouden.",

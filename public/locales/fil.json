@@ -954,6 +954,7 @@
         "recurringScopeThis": "Ang kaganapang ito lamang",
         "recurringScopeFollowing": "Ito at ang mga kasunod",
         "recurringScopeSeries": "Buong serye",
+        "recurringScopeOccurrence": "\"{{title}}\" noong {{date}}",
         "overrideOrphanConfirmTitle": "Panatilihin ang {{count}} na binagong pag-ulit?",
         "overrideOrphanConfirmTitle_one": "Panatilihin ang {{count}} binagong pag-ulit?",
         "overrideOrphanConfirmDetail": "Hindi na tugma ang mga pag-ulit na ito sa binagong serye at pananatilihin bilang magkakahiwalay na event.",

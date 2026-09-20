@@ -942,6 +942,7 @@
         "recurringScopeThis": "Только это событие",
         "recurringScopeFollowing": "Это и последующие",
         "recurringScopeSeries": "Всю серию",
+        "recurringScopeOccurrence": "«{{title}}» {{date}}",
         "overrideOrphanConfirmTitle": "Сохранить изменённые повторы ({{count}})?",
         "overrideOrphanConfirmTitle_one": "Сохранить {{count}} изменённый повтор?",
         "overrideOrphanConfirmDetail": "Эти повторы больше не соответствуют изменённой серии и будут сохранены как отдельные события.",

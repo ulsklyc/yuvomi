@@ -942,6 +942,7 @@
         "recurringScopeThis": "Csak ezt az eseményt",
         "recurringScopeFollowing": "Ez és a következők",
         "recurringScopeSeries": "Az egész sorozatot",
+        "recurringScopeOccurrence": "{{date}}: „{{title}}”",
         "overrideOrphanConfirmTitle": "Megtartja a(z) {{count}} szerkesztett előfordulást?",
         "overrideOrphanConfirmTitle_one": "Megtartja a(z) {{count}} szerkesztett előfordulást?",
         "overrideOrphanConfirmDetail": "Ezek az előfordulások már nem illenek a módosított sorozatba, ezért önálló eseményként maradnak meg.",
