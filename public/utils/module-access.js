@@ -95,10 +95,14 @@
  *    die die Seite fuer ihre anderen Knoepfe ohnehin stellt. Vorbild:
  *    `tasks.js` (`#btn-manage-categories` hinter `readOnly()`).
  *
- * 8. OFFEN, NICHT ANFASSEN: `POST /meals/:id/to-shopping-list` und
- *    `/recipes/:id/to-shopping-list` schreiben Einkaufsdaten, der Server
- *    urteilt sie aber als `meals`. Ob das so bleibt, ist nicht entschieden -
- *    bis dahin fragt keine Seite fuer diese Knoepfe `shopping`.
+ * 8. KREUZTRANSFER DER KUECHE, ENTSCHIEDEN (#1290): `POST /meals/:id/to-shopping-list`,
+ *    `/meals/week-to-shopping-list` und `/recipes/:id/to-shopping-list`
+ *    schreiben Einkaufsdaten, obwohl der Pfad-Guard sie als `meals` misst.
+ *    Der Server verlangt dort jetzt zusaetzlich das Schreibrecht auf
+ *    `shopping` - und umgekehrt `meals` fuer
+ *    `/shopping/:listId/import-meal-plan`. Die Knoepfe fragen es noch NICHT;
+ *    das ist Sache von P3/P4, und dann mit dem Pfad des ZIELS statt dem der
+ *    Seite (Regel 1).
  */
 
 import { moduleAccess } from '/permissions.js';

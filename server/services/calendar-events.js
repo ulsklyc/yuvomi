@@ -4,7 +4,7 @@
  * Abhängigkeiten: server/services/recurrence.js
  */
 
-import { nextOccurrence, parseRRule, matchesRRuleByday } from './recurrence.js';
+import { nextOccurrence, parseRRule, matchesRRuleByday, untilInstantMs } from './recurrence.js';
 import { hasExplicitZone, localToUTC, utcToWall } from '../utils/timezone.js';
 
 const DEFAULT_EXPANSION_ITERATIONS = 1000;
@@ -182,7 +182,11 @@ export function expandRecurringEvents(
     // COUNT=N begrenzt die Serie auf N Vorkommen ab DTSTART. Gezählt wird über
     // die Instanzen der Serie (nicht das Anzeigefenster) und VOR EXDATE-Entfernung
     // (RFC 5545): ausgenommene Vorkommen zählen mit, erzeugen aber keine Instanz (#513).
-    const maxCount   = parseRRule(event.recurrence_rule)?.count ?? null;
+    const parsedRule = parseRRule(event.recurrence_rule);
+    const maxCount   = parsedRule?.count ?? null;
+    // UNTIL ALS ZEITPUNKT, WO ES EINER IST (#1269). Null heisst "nur als Tag
+    // genannt" - dann bleibt es beim groben Tagesgatter in `nextOccurrence`.
+    const untilMs    = untilInstantMs(parsedRule, { tzid: event.tzid, toUTC: localToUTC });
     let   occurrence = 0;
     let accepted = 0;
 
@@ -211,6 +215,31 @@ export function expandRecurringEvents(
         continue;
       }
 
+      /* UNTIL IST EIN ZEITPUNKT, KEIN TAG (#1269; die drei Schreibweisen stehen
+       * ueber `parseUntilSpec` in recurrence.js).
+       *
+       * `nextOccurrence` zieht die Grenze auf Tagesschluesseln, und das ist ein
+       * Tag zu grosszuegig, sobald das Ende MITTEN in einem Tag liegt. Genau so
+       * schneidet Open-Xchange eine Serie: das Ende der alten Serie ist eine
+       * Sekunde vor dem Start am Schnitttag, die neue beginnt an ihm - der
+       * Termin stand an diesem einen Tag zweimal. Hier, wo der Zeitpunkt des
+       * Vorkommens bekannt ist, wird daraus ein Vergleich von Zeitpunkten.
+       *
+       * VOR DEM ZAEHLEN: was hinter UNTIL liegt, ist kein Vorkommen der Serie
+       * und darf auch nicht gegen COUNT zaehlen (dieselbe Unterscheidung wie
+       * beim BYDAY-Filter darueber).
+       *
+       * NUR WO DAS VORKOMMEN SEINE ZONE SELBST TRAEGT. Ein ganztaegiges oder
+       * zonenloses Vorkommen HAT keinen Zeitpunkt; ihm hier eine Zone zu
+       * unterstellen waere derselbe Fehler noch einmal, nur andersherum. Dort
+       * bleibt es beim Tag - und eine Ganztagsserie behaelt ihren letzten Tag.
+       */
+      let occStart = null;
+      if (untilMs !== null) {
+        occStart = instantFuer(currentDate);
+        if (hasExplicitZone(occStart) && Date.parse(occStart) > untilMs) break;
+      }
+
       if (maxCount !== null && occurrence >= maxCount) break;
       occurrence++;
 
@@ -232,7 +261,7 @@ export function expandRecurringEvents(
       }
 
       if (currentDate >= from || instanceEnd >= from) {
-        const newStart = instantFuer(currentDate);
+        const newStart = occStart ?? instantFuer(currentDate);
         let newEnd = event.end_datetime;
         if (durationMs !== null) {
           if (isAllDay) {

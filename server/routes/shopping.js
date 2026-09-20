@@ -22,6 +22,7 @@ import { memberEmail, listEmailableMembers } from '../services/member-email.js';
 import { isHouseholdMember } from '../services/household-members.js';
 import { buildShoppingListMail } from '../services/shopping-mail.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
+import { mayWriteModule } from '../permissions.js';
 
 const log = createLogger('Shopping');
 
@@ -646,6 +647,22 @@ router.post('/items/undo-transfer', (req, res) => {
       : [];
     if (!ids.length) return res.json({ data: { removed: 0 } });
 
+    // DIESELBE GEGENRICHTUNG (#1290), aber nur fuer den Mahlzeit-Pfad. Die
+    // Ruecknahme loescht Einkaufsartikel UND setzt aus Grund 2. oben
+    // `meal_ingredients.on_shopping_list` zurueck - genau dann schreibt sie in
+    // den Essensplan und braucht dessen Recht. Ein Vorrats- oder
+    // Rezept-Uebertrag traegt kein `added_from_meal`, ruehrt den Plan nicht an
+    // und bleibt ohne diese Frage erreichbar; eine pauschale Sperre haette dem
+    // Einkauf das Undo seiner EIGENEN Uebertraege genommen.
+    //
+    // Je ID eine Abfrage statt eines `IN (...)`: die Liste kommt vom Client
+    // und ist unbegrenzt, die Platzhalter-Grenze von SQLite dagegen nicht.
+    const findSource = db.get().prepare('SELECT added_from_meal FROM shopping_items WHERE id = ?');
+    const touchesMealPlan = ids.some((id) => findSource.get(id)?.added_from_meal);
+    if (touchesMealPlan && !mayWriteModule(req, 'meals')) {
+      return res.status(403).json({ error: 'Write access to the meal plan is required.', code: 403 });
+    }
+
     const removed = db.get().transaction(() => {
       const findItem = db.get()
         .prepare('SELECT id, name, added_from_meal FROM shopping_items WHERE id = ?');
@@ -1160,6 +1177,22 @@ router.post('/:listId/send', sendListLimiter, async (req, res) => {
 // --------------------------------------------------------
 router.post('/:listId/import-meal-plan', (req, res) => {
   try {
+    // DIE GEGENRICHTUNG (#1290): der Pfad sagt `shopping`, geschrieben wird
+    // auch in den Essensplan. Die Uebernahme setzt das Flag
+    // `on_shopping_list` auf den Zutaten, und das ist Essensplan-Bestand -
+    // eine markierte Zutat ist danach weder erneut uebertragbar noch ohne
+    // Ruecknahme zurueckzuholen. Ein Mitglied mit `meals: read` aenderte damit
+    // fremde Plandaten, ein Token mit `shopping:write` allein ebenso.
+    //
+    // AUCH FUER `preview: true`, obwohl die Vorschau nichts schreibt: sie gibt
+    // es nur, um den Schreibvorgang anzukuendigen ("X Zutaten aus Y
+    // Mahlzeiten"), und sie zaehlt dafuer den Essensplan aus. Eine Vorschau,
+    // die rechnet, und ein Import, der danach mit 403 endet, waeren eine
+    // Zusage, die nicht haelt.
+    if (!mayWriteModule(req, 'meals')) {
+      return res.status(403).json({ error: 'Write access to the meal plan is required.', code: 403 });
+    }
+
     const list = db.get()
       .prepare('SELECT id FROM shopping_lists WHERE id = ?')
       .get(req.params.listId);

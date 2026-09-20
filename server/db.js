@@ -20,7 +20,7 @@
 import Database from 'better-sqlite3-multiple-ciphers';
 import path from 'path';
 import fs from 'node:fs/promises';
-import { mkdirSync, existsSync, renameSync, rmSync, copyFileSync, openSync, readSync, closeSync, statSync } from 'node:fs';
+import { mkdirSync, existsSync, renameSync, linkSync, rmSync, copyFileSync, openSync, readSync, closeSync, statSync } from 'node:fs';
 import { createLogger } from './logger.js';
 import { decodeHtmlEntities } from './utils/html-entities.js';
 import { toE164, defaultCountryFromConfig } from './utils/phone.js';
@@ -429,6 +429,12 @@ function init({ plaintextBackup = true } = {}) {
     encryptPlaintextDatabase({ backup: plaintextBackup });
   }
 
+  // Gibt es DB_PATH noch nicht, entsteht die Datenbank unter einem
+  // Arbeitsnamen daneben und wird erst fertig umgehängt (#1287). Erst NACH
+  // den Key-Prüfungen oben: `assertKeyIsNotPlaceholder()` unterscheidet
+  // Abbruch und Warnung daran, ob es DB_PATH schon gibt.
+  createDatabaseFile();
+
   db = new Database(DB_PATH);
 
   applyEncryptionKey(db);
@@ -685,6 +691,164 @@ function encryptPlaintextDatabase({ backup = true } = {}) {
     `${backupPath} still contains UNENCRYPTED data — delete it once you have ` +
     'verified that the app starts and your data is complete.'
   );
+}
+
+/**
+ * Arbeitsname, unter dem eine neue Datenbank entsteht.
+ *
+ * Er liegt NEBEN `DB_PATH`, nicht im Temp-Verzeichnis. Nur im selben
+ * Verzeichnis ist der abschließende Zug ein Umhängen innerhalb eines
+ * Dateisystems und damit unteilbar; über eine Dateisystemgrenze wäre er ein
+ * Kopieren - also wieder ein Zeitraum, in dem `DB_PATH` unfertig existiert,
+ * genau der Zustand, gegen den dieser ganze Vorgang geht.
+ * @returns {string}
+ */
+function creatingFilePath() {
+  return `${DB_PATH}.creating`;
+}
+
+/** Arbeitsdatei samt Nebendateien entfernen; best effort. */
+function removeCreatingFiles(workingPath) {
+  for (const suffix of ['', '-wal', '-shm']) {
+    try { rmSync(`${workingPath}${suffix}`, { force: true }); } catch { /* Aufräumen ist best-effort */ }
+  }
+}
+
+/**
+ * Die Arbeitsdatei zu einer vollständigen, leeren Datenbank machen: Key setzen
+ * und Seite 1 schreiben.
+ *
+ * Geschrieben wird mit `user_version`, nicht mit `journal_mode = WAL`. Beide
+ * legen gemessen dieselben 4096 Byte an und hinterlassen keine Nebendatei,
+ * aber ein Wechsel des Journal-Modus verlangt eine exklusive Sperre und kennt
+ * dabei den Busy-Timeout des Treibers nicht: startet ein zweiter Prozess
+ * gleichzeitig, scheitert er sofort mit „database is locked", statt zu warten.
+ * Ein `user_version`-Schreibvorgang ist eine gewöhnliche Transaktion und
+ * wartet. Den Journal-Modus setzt `init()` ohnehin gleich danach auf der
+ * fertigen Datenbank.
+ *
+ * Der Wert 0 ist der, den eine neue Datenbank ohnehin hat - die Datei bekommt
+ * also nur ihre Seite 1, keinen Inhalt. Auf einer bereits beschriebenen
+ * Arbeitsdatei bleibt sie dadurch, wie sie ist. `user_version` gehört Yuvomi
+ * nicht anderweitig: die Schema-Version steht in `schema_migrations`.
+ */
+function writeFirstDatabasePage(workingPath) {
+  const fresh = new Database(workingPath);
+  try {
+    applyEncryptionKey(fresh);
+    fresh.pragma('user_version = 0');
+  } finally {
+    fresh.close();
+  }
+}
+
+/**
+ * Eine neue Datenbank entsteht unter dem Arbeitsnamen und wird erst fertig an
+ * `DB_PATH` gehängt (#1287).
+ *
+ * `new Database(DB_PATH)` legt die Datei sofort an - mit 0 Byte. Beschrieben
+ * wird sie erst durch `journal_mode = WAL`, das Seite 1 (4096 Byte) in die
+ * Hauptdatei schreibt. Ohne Key liegt dazwischen weniger als 1 ms, mit Key
+ * rund 150 ms Schlüsselableitung (gemessen 147 ms, einmalig beim Anlegen), und
+ * ein Erststart, der in diesem Fenster getötet wird, hinterlässt genau eine
+ * leere `DB_PATH` ohne jede Nebendatei. Vor #1282 begann der nächste Start
+ * darauf einfach frisch - hier das richtige Ergebnis. Seit #1282 verweigert er
+ * ihn, zu Recht für jede andere Herkunft einer leeren Datei, und eine an
+ * dieser Stelle unterbrochene Installation kommt nicht mehr von allein hoch.
+ *
+ * Deshalb entsteht die Datei unter `<DB_PATH>.creating`, bekommt dort den Key
+ * und Seite 1, wird geschlossen - `close()` checkpointet und räumt `-wal` und
+ * `-shm` weg, übrig bleibt genau die eine fertige Datei - und erst dann an
+ * `DB_PATH` gehängt. Stirbt der Start irgendwo davor, liegt nur die
+ * Arbeitsdatei da: `DB_PATH` fehlt, und der nächste Start ist wieder eine
+ * frische Installation. `DB_PATH` ist damit entweder abwesend oder eine
+ * vollständige Datenbank, nie leer.
+ *
+ * Gemessene Randfälle:
+ *   - Eine liegengebliebene Arbeitsdatei ist der Rest genau so eines
+ *     Abbruchs. Sie wird NICHT weggeräumt, sondern weiterbeschrieben: eine
+ *     0-Byte-Datei ist für SQLite eine neue Datenbank, eine mit Seite 1 ist
+ *     schon fertig, und `journal_mode = WAL` ist dort ein No-op. Erst wenn sie
+ *     sich nicht verwenden lässt (kein SQLite, anderer Key, halb geschrieben),
+ *     wird sie entfernt und der Vorgang genau einmal wiederholt. Dass beides
+ *     im Log steht, ist Absicht: sie ist die einzige Spur, dass ein Erststart
+ *     abbrach. Nutzerdaten können nicht darin liegen - der Vorgang läuft nur,
+ *     solange es `DB_PATH` noch nicht gibt, und endet vor der ersten
+ *     Migration.
+ *   - Verzeichnis nicht schreibbar: das Anlegen scheitert beim Öffnen mit
+ *     `SQLITE_CANTOPEN`, wie bisher beim Öffnen von `DB_PATH`. Der Fehler
+ *     bleibt der von SQLite - ein eigener Rat wäre hier geraten, nicht
+ *     gemessen, und der Rechte-Hinweis steht schon in
+ *     `unreadableAtStartError()`.
+ *   - Zwei Prozesse gleichzeitig: beide arbeiten auf DERSELBEN Arbeitsdatei,
+ *     und SQLite serialisiert sie dort genau so, wie es bisher zwei Öffnungen
+ *     von `DB_PATH` serialisiert hat (Busy-Timeout des Treibers: 5 s). Genau
+ *     deshalb wird die liegengebliebene Datei nicht blind gelöscht - gemessen
+ *     riss das dem anderen Prozess die offene Datei unter den Händen weg
+ *     („disk I/O error"), und in 1 von 4 Läufen kam danach KEINER von beiden
+ *     hoch. Der letzte Zug ist `link()`: ist `DB_PATH` inzwischen da,
+ *     scheitert er mit `EEXIST`, statt die Datenbank des anderen Prozesses
+ *     stillschweigend zu überschreiben - was ein `rename()` täte, und zwar
+ *     noch nachdem der andere schon Daten hineingeschrieben hat. Der Verlierer
+ *     räumt seine Arbeitsdatei weg und startet auf der fremden Datenbank
+ *     weiter. Nur wenn das Dateisystem gar keine harten Links kennt (manche
+ *     Netzfreigaben), fällt der Vorgang auf `rename()` zurück, mit vorheriger
+ *     Probe auf `DB_PATH`.
+ */
+function createDatabaseFile() {
+  if (DB_PATH === ':memory:') return;
+  if (existsSync(DB_PATH)) return;
+
+  const workingPath = creatingFilePath();
+  const leftover = existsSync(workingPath);
+  if (leftover) {
+    log.info(
+      `${workingPath} is left over from a first start that was interrupted - ` +
+      'creating the database in it again.'
+    );
+  }
+
+  try {
+    writeFirstDatabasePage(workingPath);
+  } catch (err) {
+    // Ein zweiter Start kann genau jetzt fertig geworden sein; dann gilt seine
+    // Datenbank und hier ist nichts schiefgegangen.
+    if (existsSync(DB_PATH)) {
+      removeCreatingFiles(workingPath);
+      return;
+    }
+    if (!leftover) {
+      removeCreatingFiles(workingPath);
+      throw err;
+    }
+    log.warn(
+      `${workingPath} could not be used (${err?.message}) - removing it and creating ` +
+      'the database again.'
+    );
+    removeCreatingFiles(workingPath);
+    try {
+      writeFirstDatabasePage(workingPath);
+    } catch (retryErr) {
+      removeCreatingFiles(workingPath);
+      throw retryErr;
+    }
+  }
+
+  try {
+    linkSync(workingPath, DB_PATH);
+  } catch (err) {
+    if (err?.code !== 'EEXIST' && !existsSync(DB_PATH)) {
+      try {
+        renameSync(workingPath, DB_PATH);
+      } catch (renameErr) {
+        removeCreatingFiles(workingPath);
+        // Der andere Prozess kann genau hier fertig geworden sein; dann ist
+        // seine Datenbank da und nichts ist schiefgegangen.
+        if (!existsSync(DB_PATH)) throw renameErr;
+      }
+    }
+  }
+  removeCreatingFiles(workingPath);
 }
 
 /**
