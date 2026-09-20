@@ -333,6 +333,7 @@ export const MODULE_ICON = {
   contacts:         'book-user',
   birthdays:        'cake',
   health:           'heart-pulse',
+  fasting:          'timer',
   budget:           'wallet',
   'split-expenses': 'receipt-text',
   settings:         'settings',

@@ -1265,13 +1265,67 @@ function isMultiDayEvent(ev) {
 }
 
 /**
+ * Ganze Kalendertage zwischen zwei Tagesschlüsseln (b - a).
+ *
+ * Über `Date.UTC` gerechnet und NICHT über zwei lokale Date-Objekte: die
+ * Differenz zweier lokaler Mitternachten ist an einer Zeitumstellung 23 oder
+ * 25 Stunden lang, und die Division durch einen Tag macht daraus 0,96 bzw.
+ * 1,04. Dieselbe Rechnung wie `daysBetweenDateKeys()` in utils/countdown.js,
+ * das dort seinen Anlass hatte; ein gemeinsamer Ort in utils/date.js beträfe
+ * fünf Aufrufer und gehört in eine eigene Runde - einer davon steht in DIESER
+ * Datei: wireDurationMemory() hält ein eigenes, lokales daysBetween(), das
+ * dieses hier beschattet.
+ */
+function daysBetween(aKey, bKey) {
+  const utcMidnight = (key) => {
+    const [y, m, d] = String(key).split('-').map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((utcMidnight(bKey) - utcMidnight(aKey)) / (24 * 60 * 60 * 1000));
+}
+
+/**
+ * Dauert dieser Termin 24 Stunden oder länger?
+ *
+ * Die EINE Stelle, an der die Tagesgrenze als LÄNGE gefragt wird, und damit
+ * der Unterschied zu isMultiDayEvent(), das nur nach verschiedenen
+ * Kalendertagen fragt: ein Termin 22:00-01:30 berührt zwei Tage und dauert
+ * dreieinhalb Stunden (#1313). Ab 24 Stunden bleibt es beim durchgehenden
+ * Balken - ein Zeitblock, der in jeder Spalte von oben bis unten läuft, sagt
+ * weniger als ein Band über die Tage.
+ *
+ * Gerechnet wird in der WANDUHRZEIT der Anzeigezone (localDate/localTime), wie
+ * eventEndDate() und das Raster selbst: der UTC-Tag eines Zeitpunkts kippt je
+ * nach Zone und Uhrzeit auf den Nachbartag.
+ */
+function spansFullDayOrLonger(ev) {
+  if (!ev?.start_datetime || !ev.end_datetime) return false;
+  const dayMinutes = 24 * 60;
+  const span = daysBetween(localDate(ev.start_datetime), localDate(ev.end_datetime)) * dayMinutes
+    + timeToMinutes(localTime(ev.end_datetime))
+    - timeToMinutes(localTime(ev.start_datetime));
+  return span >= dayMinutes;
+}
+
+/**
  * Events, die in der Ganztags-Zeile statt im Zeitraster gezeigt werden:
- * echte Ganztags-Events, datums-only Events und mehrtägige Zeit-Events.
- * Mehrtägige Events erscheinen dadurch als durchgehender Balken über alle Tage,
- * statt auf jedem Tag fälschlich als identischer Zeitblock (#225).
+ * echte Ganztags-Events, datums-only Events und Zeit-Events, die über mehrere
+ * Kalendertage laufen UND dabei mindestens 24 Stunden dauern.
+ * Diese erscheinen dadurch als durchgehender Balken über alle Tage, statt auf
+ * jedem Tag fälschlich als identischer Zeitblock (#225).
+ *
+ * Die Längenfrage kam mit #1313 dazu: ohne sie galt jeder Termin, der
+ * Mitternacht überschreitet, als ganztägig - 22:00 bis 01:30 stand als Chip
+ * ohne Uhrzeit über zwei Tagen, und die 90 Minuten nach Mitternacht waren im
+ * Raster nicht zu finden. Ein kurzer Nacht-Termin gehört ins Zeitraster beider
+ * Tage, an der Tagesgrenze geklammert (siehe timeRangeForEvent()).
+ * agendaSegmentKind() bleibt davon unberührt und fragt weiter nur nach den
+ * Kalendertagen: die Agenda nennt für solche Termine schon heute „ab 22:00"
+ * und „bis 01:30" statt zweimal denselben Zeitraum.
  */
 function isAllDayLike(ev) {
-  return !!ev.all_day || !ev.start_datetime.includes('T') || isMultiDayEvent(ev);
+  return !!ev.all_day || !ev.start_datetime.includes('T')
+    || (isMultiDayEvent(ev) && spansFullDayOrLonger(ev));
 }
 
 /**
@@ -2778,7 +2832,7 @@ function renderWeekView(container) {
   const timedEvs = days.map((d) =>
     eventsOnDay(d).filter((e) => !isAllDayLike(e))
   );
-  const layouts = timedEvs.map((events) => layoutOverlaps(events));
+  const layouts = timedEvs.map((events, i) => layoutOverlaps(events, days[i]));
   const schedule = days.map((d) => scheduleEntriesOnDay(d));
   const scheduleChips = schedule.map((items) => state.scheduleDisplay === 'compact' ? items : items.filter((entry) => !scheduleHasTimes(entry) || scheduleIsFullDayShift(entry)));
   const scheduleBlocks = schedule.map((items) => state.scheduleDisplay === 'blocks' ? items.filter((entry) => scheduleHasTimes(entry) && !scheduleIsFullDayShift(entry)) : []);
@@ -2837,7 +2891,7 @@ function renderWeekView(container) {
                   <div class="week-view__hour-line" style="top:${hourOffset(h * 60)};"></div>
                 `).join('')}
                 ${scheduleBlocks[i].map((entry) => renderScheduleTimeBlock(entry, 'week-event', scheduleLayouts[i].get(entry))).join('')}
-                ${timedEvs[i].map((ev) => renderWeekEvent(ev, layouts[i].get(ev.id))).join('')}
+                ${timedEvs[i].map((ev) => renderWeekEvent(ev, layouts[i].get(ev), d)).join('')}
                 ${d === state.today ? `<div class="week-view__now-line" id="now-line" style="top:${hourOffset(nowMinutes())};"></div>` : ''}
               </div>
             `).join('')}
@@ -2929,8 +2983,35 @@ function scrollToHour(scroll, body) {
   scroll.scrollTop = Math.max(0, nowFields().hour * hourHeight - 80);
 }
 
-function renderWeekEvent(ev, layout = null) {
-  const { start, end } = timeRangeForEvent(ev);
+/**
+ * Der Zeit-Text eines Blocks im Zeitraster - fuer den Tag, auf dem er steht.
+ *
+ * Dieselbe Frage, die renderAgendaEvent() laengst beantwortet, und deshalb
+ * dieselbe Antwort: agendaSegmentKind() sagt, ob dieser Tag der Anfang, das
+ * Ende oder der ganze Termin ist. 'start' bekommt `calendar.spanFrom` mit der
+ * START zeit, 'end' `calendar.spanUntil` mit der END zeit, alles andere den
+ * vollen Bereich.
+ *
+ * Ohne das trug ein Nacht-Termin in BEIDEN Spalten "22:00-01:30", obwohl er in
+ * der zweiten um Mitternacht beginnt und um 01:30 vorbei ist - der Text nannte
+ * dort einen Abend, den dieser Tag nicht hat (#1313, aus dem PR-Review).
+ * Raster und Agenda beantworten damit dieselbe Frage ueber denselben Tag
+ * gleich.
+ *
+ * 'all-day' und 'middle' erreichen das Raster nicht: was hier landet, dauert
+ * weniger als 24 Stunden (isAllDayLike()) und beruehrt darum hoechstens zwei
+ * Kalendertage. Sie fallen wie 'single' auf den vollen Bereich zurueck -
+ * dasselbe, was ohne `dayStr` gilt.
+ */
+function gridTimeText(ev, dayStr) {
+  const kind = dayStr ? agendaSegmentKind(ev, dayStr) : 'single';
+  if (kind === 'start') return t('calendar.spanFrom',  { time: formatTime(ev.start_datetime) });
+  if (kind === 'end')   return t('calendar.spanUntil', { time: formatTime(ev.end_datetime) });
+  return `${formatTime(ev.start_datetime)}${ev.end_datetime ? '–' + formatTime(ev.end_datetime) : ''}`;
+}
+
+function renderWeekEvent(ev, layout = null, dayStr = null) {
+  const { start, end } = timeRangeForEvent(ev, dayStr);
   const duration = Math.max(end - start, 30);
 
   const top    = hourOffset(start);
@@ -2943,7 +3024,7 @@ function renderWeekEvent(ev, layout = null) {
          style="top:${top};height:${height};left:${left};width:${width};${eventSurfaceStyle(ev)}"
          title="${esc(ev.title)}${chipAssigneeTitleSuffix(ev)}">
       <div class="week-event__title">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}${calendarRepeatIconHtml(ev)}<span>${esc(ev.title)}</span>${chipAssigneeStack(ev, { size: 14, maxVisible: 2 })}</div>
-      <div class="week-event__time">${formatTime(ev.start_datetime)}${ev.end_datetime ? '–' + formatTime(ev.end_datetime) : ''}</div>
+      <div class="week-event__time">${gridTimeText(ev, dayStr)}</div>
     </div>
   `;
 }
@@ -2992,10 +3073,27 @@ function clickedTime(e, colEl) {
   return `${pad(Math.floor(clamped / 60))}:${pad(clamped % 60)}`;
 }
 
-function timeRangeForEvent(ev) {
-  const start = timeToMinutes(localTime(ev.start_datetime));
+/**
+ * Zeit-Fenster eines Termins in Minuten seit Mitternacht - geklammert auf den
+ * Tag, für den gefragt wird.
+ *
+ * `dayStr` ist der gerenderte Kalendertag. Ein Termin, der vor ihm begonnen
+ * hat, startet in dieser Spalte um Mitternacht; einer, der nach ihm endet,
+ * läuft bis zum Tagesende. Das ist dieselbe Arithmetik, die
+ * scheduleBlockTimeRange() für eine Nachtschicht fährt (Ende nicht nach dem
+ * Start heißt „geht über Mitternacht", Dauer bis `24 * 60`), nur aus
+ * start_datetime/end_datetime statt aus dem Schichttyp (#1313).
+ *
+ * Ohne `dayStr` bleibt es beim ungeklammerten Fenster - der Aufrufer, der
+ * keinen Tag nennt, fragt nach dem Termin, nicht nach seinem Anteil an einem
+ * Tag.
+ */
+function timeRangeForEvent(ev, dayStr = null) {
+  const beginntFrueher = !!dayStr && dayStr > localDate(ev.start_datetime);
+  const start = beginntFrueher ? 0 : timeToMinutes(localTime(ev.start_datetime));
+  const endetSpaeter = !!dayStr && !!ev.end_datetime && dayStr < eventEndDate(ev);
   const end = ev.end_datetime
-    ? timeToMinutes(localTime(ev.end_datetime))
+    ? (endetSpaeter ? 24 * 60 : timeToMinutes(localTime(ev.end_datetime)))
     : start + 60;
   return {
     start,
@@ -3066,8 +3164,19 @@ function assignLanes(items, rangeFn, keyFn) {
   return layout;
 }
 
-function layoutOverlaps(events) {
-  return assignLanes(events, timeRangeForEvent, (ev) => ev.id);
+// `dayStr` reicht den gerenderten Tag bis in die Spanne durch: ein Termin über
+// Mitternacht belegt in jeder Spalte nur seinen Anteil und zieht die
+// Überlappungs-Gruppe des Nachbartags nicht auf (#1313).
+// Schluessel ist das Termin-OBJEKT, nicht `ev.id`: zwei Vorkommen derselben Serie
+// koennen an EINEM Tag liegen, seit ein kurzer Termin ueber Mitternacht ins Raster
+// kommt (#1313). Bei einer taeglichen Nachtschicht 22:00-01:30 traegt der 15. den
+// geklammerten Schwanz des 14. UND den Kopf des 15., und `expandRecurringEvents()`
+// gibt keinem Vorkommen eine eigene id - beide tragen die der Serie. Mit `ev.id`
+// schrieb der zweite Platz den ersten still tot, und der Schwanz wurde in voller
+// Breite ueber den Termin gelegt, mit dem er sich die Spalte teilen muesste.
+// Dieselbe Loesung wie in layoutScheduleBlocks() unten (#1043).
+function layoutOverlaps(events, dayStr = null) {
+  return assignLanes(events, (ev) => timeRangeForEvent(ev, dayStr), (ev) => ev);
 }
 
 // Schichtplan-Gegenstueck zu layoutOverlaps(): gleiche Spalten-Arithmetik, aber
@@ -3086,7 +3195,7 @@ function renderDayView(container) {
   const dayEvs  = eventsOnDay(state.cursor);
   const allday  = dayEvs.filter(isAllDayLike);
   const timed   = dayEvs.filter((e) => !isAllDayLike(e));
-  const layout = layoutOverlaps(timed);
+  const layout = layoutOverlaps(timed, state.cursor);
   const schedule = scheduleEntriesOnDay(state.cursor);
   const scheduleChips = state.scheduleDisplay === 'compact' ? schedule : schedule.filter((entry) => !scheduleHasTimes(entry) || scheduleIsFullDayShift(entry));
   const scheduleBlocks = state.scheduleDisplay === 'blocks' ? schedule.filter((entry) => scheduleHasTimes(entry) && !scheduleIsFullDayShift(entry)) : [];
@@ -3130,7 +3239,7 @@ function renderDayView(container) {
               <div class="week-view__hour-line" style="top:${hourOffset(h * 60)};"></div>
             `).join('')}
             ${scheduleBlocks.map((entry) => renderScheduleTimeBlock(entry, 'day-event', scheduleLayout.get(entry))).join('')}
-            ${timed.map((ev) => renderDayEvent(ev, layout.get(ev.id))).join('')}
+            ${timed.map((ev) => renderDayEvent(ev, layout.get(ev), state.cursor)).join('')}
             ${dayEvs.length === 0 && schedule.length === 0 ? `<div class="day-view__empty-hint" style="top:calc(${hourOffset(state.cursor === state.today ? nowMinutes() : 9 * 60)} + 16px)">${t('calendar.dayEmptyHint')}</div>` : ''}
           </div>
           ${state.cursor === state.today ? `
@@ -3213,8 +3322,8 @@ function renderDayView(container) {
  * 40px-Raster nur Platz fuer den Titel, und eine angeschnittene zweite Zeile
  * ist schlechter als keine.
  */
-function renderDayEvent(ev, layout = null) {
-  const { start, end } = timeRangeForEvent(ev);
+function renderDayEvent(ev, layout = null, dayStr = null) {
+  const { start, end } = timeRangeForEvent(ev, dayStr);
   const duration = Math.max(end - start, 30);
   const roomy = duration >= 60;
 
@@ -3228,7 +3337,7 @@ function renderDayEvent(ev, layout = null) {
   const width = `calc(${100 / cols}% - 14px)`;
 
   const place = ev.location ? ` · ${esc(fmtLocation(ev.location))}` : '';
-  const timeText = `${formatTime(ev.start_datetime)}${ev.end_datetime ? '–' + formatTime(ev.end_datetime) : ''}`;
+  const timeText = gridTimeText(ev, dayStr);
 
   return `
     <div class="day-event${roomy ? '' : ' day-event--tight'}" data-id="${ev.id}"

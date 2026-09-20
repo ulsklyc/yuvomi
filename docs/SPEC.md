@@ -3092,7 +3092,7 @@ default private, with the existing own-record bulk visibility action.
 
 The page supports immediate/earlier start, completed backfill, active-start
 correction, and completed-record edits. First creation requires explicit safety
-acknowledgement on the page: Yuvomi records fasting and is not a
+acknowledgement, shared by page and widget: Yuvomi records fasting and is not a
 medical device or medical advice. Finish persists before the optional summary;
 closing it keeps the fast completed. Undo end PATCHes end_at:null with the returned
 revision. Deletion uses the shared undoable-delete window. Offline display keeps
@@ -3145,6 +3145,10 @@ also filters fasting reminders while Health is globally disabled. Periodic repai
 unchanged delivery state and only considers the latest fast plus pending rows.
 Polling renders text in the device locale; push and external channels use the household
 locale. Both use the `/health/fasting` deep link.
+
+The optional dashboard fasting widget is self-only, requires Health/capability/
+widget permission, and reuses the page's safety, start/finish and clock controls.
+It fits all supported widget sizes and is a web/PWA widget, not a native OS widget.
 
 **`health_vitals`** — one row per measurement.
 

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A fasting timer can now be added to the dashboard.** It shows only your own fast and lets you
+  start or finish it there, using the same safety confirmation and timer controls as the journal.
+  Existing dashboards keep it hidden until you add it from the dashboard editor. (#1180)
+
 - **A reward can now say how many of it there are.** The catalog is shared by the whole household and
   had no idea of quantity, so a cinema evening and a wooden train were the same thing to it: both
   stayed open to every child at once, again and again, as long as the points lasted. A reward now
@@ -21,6 +25,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unit at the same moment cannot both get it. (#1310)
 
 ### Fixed
+
+- **A nightly recurring appointment that crosses midnight no longer covers the entry it should be
+  sharing its column with.** On a day that carries two occurrences of the same series - last
+  night's tail and tonight's start - the second took the first one's place in the layout, so the
+  tail was drawn at full width over anything it overlapped. Only reachable since short overnight
+  entries started appearing in the time grid at all.
+
+- **An appointment that crosses midnight but is shorter than a day is back in the time grid, on both
+  days.** Until now the calendar asked one question about such an entry - does it touch two calendar
+  days? - and every entry that did was drawn as a chip without times in the all-day row above the
+  grid. So an evening from 22:00 to 01:30 looked like two whole days, and the ninety minutes after
+  midnight were nowhere to be found at the hour somebody would look for them. The week and day views
+  now also ask how long it lasts: under 24 hours it is a block in the grid of both days, cut at the
+  day boundary - the first day from its start time to midnight, the second from midnight to its end
+  time - which is the same arithmetic a night shift in the duty roster has had for a while. Because
+  the block stops at midnight, it costs the next morning nothing: an appointment at 09:00 keeps the
+  full width of the column. Entries of 24 hours or more stay in the all-day row on purpose; a bar
+  across the days says more than a block that runs from top to bottom in every column. Each block
+  also says what it is doing on the day it stands on - "from 22:00" on the first day, "until 01:30"
+  on the second - instead of repeating the whole appointment in both columns, where the second one
+  named an evening that day does not have. That is the wording the agenda has used for those days
+  all along, so both views now answer the same question about the same day the same way. An
+  appointment that ends at exactly 00:00 still counts as a single day. (#1313)
 
 - **Filipino was offered as the language for stored entries and then refused when you saved it.**
   The setting listed all 24 languages, but the server built its own list from the locale file names

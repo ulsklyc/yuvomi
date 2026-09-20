@@ -238,6 +238,38 @@ export function getFastingClockMode(database, userId) {
   return ['elapsed', 'remaining'].includes(value) ? value : 'auto';
 }
 
+/**
+ * Dashboard cards are persisted in the service-worker cache. Keep this query
+ * deliberately narrower than getFastingState(): the card needs only the
+ * current clock fields and the end timestamp of the most recent fast.
+ */
+export function getFastingDashboardState(database, actor) {
+  const actorId = asActor(actor);
+  ensureSubject(database, actorId, actorId, { read: true });
+  const settings = database.prepare('SELECT zone_mode FROM health_fasting_settings WHERE user_id = ?').get(actorId);
+  const active = database.prepare(`
+    SELECT id, revision, start_at, goal_minutes
+    FROM health_fasts
+    WHERE user_id = ? AND end_at IS NULL
+    LIMIT 1
+  `).get(actorId) || null;
+  const lastCompleted = database.prepare(`
+    SELECT end_at
+    FROM health_fasts
+    WHERE user_id = ? AND end_at IS NOT NULL
+    ORDER BY end_at DESC, id DESC
+    LIMIT 1
+  `).get(actorId) || null;
+  return {
+    settings: {
+      clock_mode: getFastingClockMode(database, actorId),
+      zone_mode: settings?.zone_mode === 'educational' ? 'educational' : 'timer',
+    },
+    active,
+    lastCompleted,
+  };
+}
+
 export function getFastingState(database, actor, subjectId = Number(actor?.id)) {
   const actorId = asActor(actor);
   const subject = Number(subjectId);
