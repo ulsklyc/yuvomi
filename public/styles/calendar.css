@@ -1627,6 +1627,31 @@
   background: color-mix(in srgb, var(--ev-color) var(--tint-raised), var(--color-surface-work));
 }
 
+/* Die Uhrzeit am ersten und letzten Tag eines Termins ab 24 Stunden (#1350).
+ * Der Titel davor gibt zuerst nach: Basis 0 heisst, er bekommt nur, was die
+ * Uhrzeit uebrig laesst, und kuerzt dann per Ellipse; `max-width: max-content`
+ * haelt einen kurzen Titel kurz, damit die Uhrzeit direkt dahinter bleibt.
+ * Erst wenn vom Titel nichts mehr uebrig ist (gemessen: Drei-Tage-Woche am
+ * Telefon mit 12-Stunden-Format), kuerzt auch die Uhrzeit - per Ellipse statt
+ * hart an der Chipkante abgeschnitten. Eine Mindestbreite fuer den Titel waere
+ * dort zulasten der Uhrzeit gegangen, auch im haeufigen 24-Stunden-Fall. */
+.allday-event > span:has(+ .allday-event__time) {
+  flex: 1 1 0;
+  max-width: max-content;
+}
+
+/* `font: inherit` hebt die kleinere Schrift von <small> auf, das Normalgewicht
+ * setzt die Uhrzeit vom Titel ab, ohne die Tinte aufzuhellen. */
+.allday-event__time {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: inherit;
+  font-weight: var(--font-weight-regular);
+  font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 639px) {
   .event-title-picker {
     grid-template-columns: 1fr;

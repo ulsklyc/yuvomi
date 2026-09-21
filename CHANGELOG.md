@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **In the week and day views, an appointment of a day or more now shows its times on the all-day
+  bar.** An appointment with a start and an end time that lasts 24 hours or longer - a trip from
+  Friday 14:00 to Sunday 11:00, a workshop over three days - stays in the all-day row above the time
+  grid, and there it looked like three whole days. The bar now says "from 14:00" on the first day and
+  "until 11:00" on the last; the days in between carry no time, because the appointment covers them
+  completely. The wording and the 12- or 24-hour format are the ones the agenda has always used for
+  those days, so both views say the same thing about the same day, and the tooltip carries the time
+  as well. An appointment that ends at exactly 00:00 ends on the day before, as everywhere else in
+  the calendar, so that is where its "until" appears. Appointments marked as all-day have no times
+  and look as before. On a narrow bar the title gives way before the time does. The tooltip also
+  shows a calendar name with quotation marks in full now; it used to break off at the first one.
+  (#1350)
+
 - **Health has a ninth tab: a daily nutrition target per person and a log of what was eaten.** You
   type the numbers off the packet in front of you - energy in kcal, fat, of which saturates,
   carbohydrate, of which sugars, protein, salt and fibre - and the tab shows today's total against
