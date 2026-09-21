@@ -59,6 +59,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A birthday without a reminder of its own now shows the reminder it really gets, and saving it
+  no longer moves that reminder.** A birthday can come in without a reminder setting: taken over
+  from Contacts, created for a household member or for a guest of a shared expense, or created
+  through the API without the field. Such a birthday is reminded on the day itself, and always has
+  been. Its form said "1 day before" all the same, and saving the form - even without touching
+  anything - wrote that down, so the reminder quietly moved to the day before. The form now shows
+  "At event time" for these birthdays, the reading view for read-only members says the same, and
+  saving writes a reminder only when you pick one. No existing reminder moves. "At event time" is
+  back in the menu as well, for anybody who wants to be reminded on the day. (#1363)
+
 - **A supply request from Housekeeping now needs shopping rights as well.** The request puts the
   item on the shopping list, and creates a list first when the household has none. Since 2.68.0,
   sending a meal or a recipe to the shopping list asks for write access to the shopping list, but
@@ -73,10 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to - no longer gets the edit form, and rightly so. But nothing took its place, and on a phone the
   list leaves the note out for lack of room: the form had been the only way to it. Tapping a
   birthday now opens a reading view with everything the form shows - picture, date of birth, name
-  day, note and reminder - and not a single control. The one exception is a birthday taken over
-  from Contacts without a reminder of its own: the form claims "1 day before" there, while the
-  reminder actually comes on the day itself, so the reading view says nothing rather than repeat the
-  claim. (#1348)
+  day, note and reminder - and not a single control. (#1348)
 
 - **After a contact import, "Go to Birthdays" is only offered where you can use it.** When imported
   contacts carried a birthday, the result offered to take them over into Birthdays - also to

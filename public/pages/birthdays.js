@@ -65,19 +65,37 @@ function initials(name) {
     .join('') || '?';
 }
 
+// Die Werte sind Minuten vor 12:00 am Geburtstag, so wie `getOffsetMinutes()`
+// in server/services/birthdays.js sie liest. '' ist „Keine": der Server legt
+// dann weder Erinnerung noch Kalendertermin an.
 const REMINDER_OFFSETS = () => [
   { value: '',      label: t('reminders.offsetNone')  },
+  { value: '0',     label: t('reminders.offsetAtTime') },
   { value: '1440',  label: t('reminders.offset1day')  },
   { value: '2880',  label: t('reminders.offset2days') },
   { value: '10080', label: t('reminders.offset1week') },
   { value: 'custom', label: t('reminders.offsetCustom') },
 ];
 
-// Die Leseansicht (#1348) nennt die Erinnerung ueber `reminderReadText()` und
-// uebernimmt dabei die Vorgaben dieser Liste, nicht aber den Rueckfall auf
-// '1440' fuer einen Geburtstag ohne gespeicherten Wert - Begruendung dort.
+/**
+ * Der Vorlauf, mit dem der Server erinnert, als Wert der Auswahl.
+ *
+ * KEIN GESPEICHERTER WERT HEISST „AM TAG" (#1363). Vier Wege legen einen
+ * Geburtstag ohne `reminder_offset` an - Kontakt-Import, Haushaltsmitglied,
+ * Gast einer geteilten Ausgabe, `POST /birthdays` ohne das Feld -, und
+ * `getOffsetMinutes()` rechnet `null` als 0: erinnert wird mittags am
+ * Geburtstag selbst. Der Editor zeigte hier „1 Tag vorher" und schrieb es beim
+ * naechsten Speichern fest; die Erinnerung rutschte um einen Tag, ohne dass
+ * jemand sie angefasst hatte. Entschieden ist: der Editor folgt dem Server.
+ * Editor und Leseansicht lesen den Wert beide hier, damit sie dasselbe sagen.
+ */
+function storedReminderOffset(birthday) {
+  return birthday.reminder_offset ?? '0';
+}
+
 function renderBirthdayReminderSection(birthday = null) {
-  const currentOffset = birthday?.reminder_offset ?? '1440';
+  // Ein neuer Geburtstag beginnt bei „1 Tag vorher" und schreibt es beim Anlegen.
+  const currentOffset = birthday ? storedReminderOffset(birthday) : '1440';
   const customAmount = birthday?.reminder_custom_amount || 1;
   const customUnit = birthday?.reminder_custom_unit || 'days';
   return `
@@ -586,16 +604,14 @@ const REMINDER_UNIT_TO_INTL = {
  * aus `getNumberFormat()` (Format-Locale der Region, gecacht, #521) - wie in
  * `formatFastingDuration()` (utils/health-fasting.js).
  *
- * KEIN GESPEICHERTER WERT HEISST KEINE ZEILE. Der Editor zeigt fuer `null` „1
- * Tag vorher" (`?? '1440'` in renderBirthdayReminderSection), der Server
- * erinnert dann aber am Tag selbst (`getOffsetMinutes()` rechnet `null` als 0) -
- * so steht es bei jedem Geburtstag, der aus den Kontakten uebernommen wurde.
- * Die Leseansicht wiederholt diese Behauptung nicht; sie schweigt, wo der
- * Editor raet. Deshalb sucht sie ohne den Rueckfall des Editors: `null` trifft
- * keine Vorgabe, und ein Wert, den keine Vorgabe kennt, ebenso wenig.
+ * KEIN GESPEICHERTER WERT HEISST „AM TAG", wie im Editor. Bis #1363 schwieg die
+ * Leseansicht hier, weil Editor („1 Tag vorher") und Server (am Tag selbst)
+ * sich widersprachen; seit beide `storedReminderOffset()` folgen, nennt sie
+ * dieselbe Angabe. Ein Wert, den keine Vorgabe kennt, bleibt ohne Zeile: die
+ * Leseansicht schweigt, wo sie nichts Sicheres zu sagen hat.
  */
 function reminderReadText(birthday) {
-  const offset = birthday.reminder_offset;
+  const offset = storedReminderOffset(birthday);
   if (offset === 'custom') {
     const amount = Number.parseInt(birthday.reminder_custom_amount, 10) || 1;
     const unit = REMINDER_UNIT_TO_INTL[birthday.reminder_custom_unit || 'days'] || 'minute';
@@ -784,6 +800,18 @@ function openBirthdayModal({ mode, birthday = null }) {
       reminderOffset?.addEventListener('change', () => {
         if (reminderCustom) reminderCustom.hidden = reminderOffset.value !== 'custom';
       });
+      // DIE ERINNERUNG GEHT NUR MIT, WENN JEMAND SIE GEWAEHLT HAT (#1363). Die
+      // Auswahl zeigt fuer einen Geburtstag ohne gespeicherten Wert „am Tag"
+      // (`storedReminderOffset()`), der Server fuehrt ihn als `null`. Wer den
+      // Dialog nur oeffnet und speichert, soll keinen Wert festschreiben, den
+      // niemand gewaehlt hat - auch nicht Anzahl und Einheit der eigenen
+      // Angabe, die bei jeder anderen Vorgabe verborgen mitstehen.
+      const readReminder = () => ({
+        reminder_offset: panel.querySelector('#bd-reminder-offset').value,
+        reminder_custom_amount: panel.querySelector('#bd-reminder-custom-amount').value,
+        reminder_custom_unit: panel.querySelector('#bd-reminder-custom-unit').value,
+      });
+      const reminderAsOpened = readReminder();
 
       const nameDayMonth = panel.querySelector('#bd-name-day-month');
       const nameDayDay = panel.querySelector('#bd-name-day-day');
@@ -837,10 +865,14 @@ function openBirthdayModal({ mode, birthday = null }) {
           name_day: nameDay.value,
           notes: panel.querySelector('#bd-notes').value.trim(),
           photo_data: photoData,
-          reminder_offset: panel.querySelector('#bd-reminder-offset').value,
-          reminder_custom_amount: panel.querySelector('#bd-reminder-custom-amount').value,
-          reminder_custom_unit: panel.querySelector('#bd-reminder-custom-unit').value,
         };
+        // Ein neuer Geburtstag schreibt, was die Auswahl zeigt; ein bestehender
+        // nur, was sich seit dem Oeffnen geaendert hat. Fehlt das Feld, laesst
+        // `PUT /birthdays/:id` den gespeicherten Wert stehen.
+        const reminder = readReminder();
+        if (!isEdit || Object.keys(reminder).some((key) => reminder[key] !== reminderAsOpened[key])) {
+          Object.assign(body, reminder);
+        }
 
         if (!body.name || !body.birth_date || !isDateInputValid(birthDateRaw)) {
           window.yuvomi?.showToast(t('birthdays.requiredFields'), 'warning');
