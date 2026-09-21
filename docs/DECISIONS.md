@@ -523,18 +523,21 @@ copying them, which makes an edit today change what somebody ate last month.
 
 **What Yuvomi ships as a starting point - a category, a payment method, and with step 4 of #736 a
 set of chores - carries a translation key and a name on its row. As long as nobody renames it,
-every reader sees it in their own language (`label_key ? t(label_key) : name`); a rename makes the
-text the household's. The key is also how Yuvomi recognises the row later, including after the
-household deleted it on purpose.**
+every reader sees it in their own language (`label_key ? t(label_key) : name`); a rename drops the
+translation key and makes the text the household's. A shipped chore also carries a fixed key
+beside the two, which a rename does not touch, and that fixed key is what recognises the row
+later, including after the household deleted it on purpose.**
 
 #736 asked for a cleaning plan, and the direction settled there makes routines a kind of task
 (entry 6). Its step 4 is template sets: an area with its usual routines, applied in one go, drawn
 from the list @elmocito wrote down in the thread. How a shipped set is stored was left open on
 purpose, between a translation key per chore and sets as data in one language, translated once per
 set or shipped in the household's language and edited afterwards. Decided on 21 September 2026:
-neither alone, but the pair that five tables already carry.
+neither alone, but translation key and name together, the pair five tables already carry, and
+beside them a fixed key of the chore's own.
 
-That pair was reached table by table, each time from a list that read wrong in some language:
+The pair was reached table by table, each time from a list that read wrong in some language. A
+fixed key beside it is not part of the pair, and not every one of the five has one:
 
 - **Tasks and contacts, migrations 83 and 84.** When their categories became editable, the seeded
   ones got a stable `key` and a `label_key`, and a category somebody creates carries a `name`
@@ -545,7 +548,9 @@ That pair was reached table by table, each time from a list that read wrong in s
   English to every reader, next to categories in the reader's own language. The comment above the
   migration records why a lookup table in the frontend could not fix it: keyed on names, it cannot
   tell a default from a row the household created under the same name. Whether a row is a default
-  is a property of the row.
+  is a property of the row. The subscription categories had a fixed key already
+  (`budget_subcategory_key`, migration 59); the payment methods have none, and their translation
+  key was matched on the name alone.
 
 Document folders reached the other half. Until migration 157 a module's folder was found by its
 translated name, and two people with different languages created two folders, "Belege" and
@@ -553,26 +558,27 @@ translated name, and two people with different languages created two folders, "B
 `module_key`, while its name stays in the language of whoever created it: the identity without the
 translation.
 
-What the pair does for chores:
+What this shape does for chores:
 
 - **A mixed-language household sees one entry in two languages, each reader in their own.** A set
   stored as data in one language cannot do that: every entry stays in the language of whoever
   applied the set, which is the effect #950 had to remove.
-- **The key is the identity the deletion record needs.** @Kyrodan's condition in #736 was that a
-  shipped chore somebody deleted must not come back with the next update of its set, and
+- **The fixed key is the identity the deletion record needs.** @Kyrodan's condition in #736 was
+  that a shipped chore somebody deleted must not come back with the next update of its set, and
   recognising it needs something to match on. Today's eight suggestions have nothing: they are
-  keys in the source (`TASK_TEMPLATES` in `server/routes/housekeeping.js`), and applying one stores
-  the translated name and nothing else. A rename ends the translation but has to leave the identity
-  in place. The category tables already keep the two apart, a stable `key` beside the `label_key` a
-  rename clears, and a shipped chore needs the same split, or one that was renamed and then deleted
-  comes back with the next update.
+  entries in the source (`TASK_TEMPLATES` in `server/routes/housekeeping.js`), and applying one
+  stores the translated name and nothing else. The translation key cannot be the identity either: a
+  rename drops it, on purpose, because the new name belongs to whoever typed it. So a shipped
+  chore gets a fixed key of its own, the way the task, contact and inventory categories keep a
+  `key` beside the `label_key` a rename clears. Without it, a chore that was renamed and then
+  deleted comes back with the next update.
 - **The text is always filled.** Some readers have no language to ask. A routine is a task, and a
   task's title leaves the app as the `SUMMARY` of a CalDAV to-do
   (`server/services/caldav-todo-outbound.js`) and as the reason of a points booking
   (`awardForCompletion()` in `server/services/rewards.js` copies `tasks.title` into
   `reward_ledger.reason`). So a chore from a set is created with its text already resolved beside
-  the key, never with the text left NULL the way the seeded categories leave `name`. The app reads
-  the key; a reader without a language reads the text.
+  the translation key, never with the text left NULL the way the seeded categories leave `name`.
+  The app reads the translation key; a reader without a language reads the text.
 
 **The price is translation, and it sets the size.** Every shipped chore costs one entry in each of
 the 24 locale files. So the first sets are small, three or four with about twenty chores between
@@ -596,6 +602,8 @@ which nothing would bound.
   (170). A rename clears `label_key` in `server/routes/tasks.js`, `server/routes/contacts.js`,
   `server/routes/inventory/categories.js` and `server/routes/subscriptions.js`, and the pages read
   `label_key ? t(label_key) : name`, for instance `public/utils/task-fields.js`.
+- The fixed key beside the pair, where there is one: `key` in the three category tables,
+  `budget_subcategory_key` on the subscription categories. The payment methods have none.
 - The identity half alone: `family_document_folders.module_key`, resolved by `ensureModuleFolder()`
   in `server/services/document-folders.js`.
 - The chore sets are not built yet. They are step 4 of #736 and wait for areas that a household
@@ -604,10 +612,12 @@ which nothing would bound.
 ### What counts as undoing it
 
 A shipped set stored as text in one language, or applied by copying the translated text into the
-row without its key: the first reads in the applier's language forever, the second forgets where
-the row came from. A key without text beside it, which leaves the CalDAV title and the points
-history with nothing to write. A rename that keeps the translation running, so the household's own
-words are replaced the next time somebody with another language opens the page. Offering a shipped
+row and keeping neither key: the first reads in the applier's language forever, the second forgets
+where the row came from. A translation key without text beside it, which leaves the CalDAV title
+and the points history with nothing to write. The translation key used as the identity, which a
+rename erases, so a renamed chore loses where it came from and returns after it was deleted. A
+rename that keeps the translation running, so the household's own words are replaced the next time
+somebody with another language opens the page. Offering a shipped
 chore again that the household deleted. And sets that grow past what their translations can carry:
 the size is the price of the shape, not a first draft to be extended.
 
