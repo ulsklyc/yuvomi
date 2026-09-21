@@ -1,8 +1,10 @@
 /**
  * Modul: Eingabe-Validierung (Validate)
  * Zweck: Wiederverwendbare Validierungs-Helfer für alle API-Routen
- * Abhängigkeiten: keine
+ * Abhängigkeiten: server/utils/timezone.js (reine Rechnung, keine Datenbank)
  */
+
+import { isValidTimeZone, utcToWall } from '../utils/timezone.js';
 
 // Globale Längengrenzen
 const MAX_TITLE    = 200;
@@ -182,10 +184,84 @@ function collectErrors(results) {
   return results.map((r) => r.error).filter(Boolean);
 }
 
+// Ein Wert, der seinen Zeitpunkt selbst traegt: `Z` oder ein numerischer
+// Offset, mit oder ohne Doppelpunkt (`+02:00`, `+0200`). Die Teile werden
+// selbst gelesen statt ueber `Date.parse`: `+0200` und mehr als drei
+// Nachkommastellen stehen nicht im ECMAScript-Format, und was die Engine
+// daraus macht, ist nicht zugesagt.
+const ZONED_DATETIME_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?(?:(Z)|([+-])(\d{2}):?(\d{2}))$/;
+const NAIVE_DATETIME_RE = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?$/;
+
 /**
- * Validiert ein Datetime-Format YYYY-MM-DD oder YYYY-MM-DDTHH:MM[:SS][Z].
+ * Ein Wert mit `Z` oder Offset als Millisekunden seit Epoch, oder null, wenn
+ * seine Ziffern keinen echten Zeitpunkt bilden (30. Februar, Stunde 24).
+ * @param {string} raw
+ * @returns {number|null}
  */
-function datetime(val, field, required = false) {
+function zonedInstantMs(raw) {
+  const m = ZONED_DATETIME_RE.exec(raw);
+  if (!m) return null;
+  const [, y, mo, d, h, mi, s = '0', frac = '', zulu, sign, oh, om] = m;
+  if (Number(h) > 23 || Number(mi) > 59 || Number(s) > 59) return null;
+  if (!zulu && (Number(oh) > 23 || Number(om) > 59)) return null;
+  const digitsAsUtc = Date.UTC(
+    Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s),
+    Number(frac.padEnd(3, '0').slice(0, 3)),
+  );
+  const check = new Date(digitsAsUtc);
+  if (check.getUTCFullYear() !== Number(y)
+      || check.getUTCMonth() !== Number(mo) - 1
+      || check.getUTCDate() !== Number(d)) return null;
+  const offsetMinutes = zulu ? 0 : (sign === '-' ? -1 : 1) * (Number(oh) * 60 + Number(om));
+  return digitsAsUtc - offsetMinutes * 60000;
+}
+
+/**
+ * Validiert ein Datetime-Format YYYY-MM-DD oder YYYY-MM-DDTHH:MM[:SS[.f]][Z|+hh:mm]
+ * und bringt es in die Form der Spalte, in der es landet (#1364).
+ *
+ * EIN OFFSET WIRD UMGERECHNET, NICHT ABGESCHNITTEN. Bis hierher kamen von
+ * `2026-09-21T16:00:00Z` nur die Ziffern `2026-09-21T16:00` an, und jede Route
+ * speicherte sie als Wanduhrzeit des Haushalts: der Termin lag in Berlin zwei
+ * Stunden zu frueh, ohne Fehler. Ein Wert mit `Z` oder Offset ist ein
+ * eindeutiger Zeitpunkt; welche Form er danach annimmt, haengt an der Spalte,
+ * nicht am Wert - deshalb nennt jeder Aufrufer sein Ziel:
+ *
+ * - `to: 'wall'` mit `zone`: Wanduhrzeit der Haushaltszone, `YYYY-MM-DDTHH:MM`
+ *   (Kalender start/end, Gesundheits-Zeitstempel). Die Zone kommt von der Route
+ *   (`householdTimeZone(db)`): dieses Modul kennt keine Datenbank. Mit
+ *   `allDay: true` zaehlt nur das Datum, wie es gesendet wurde - ein
+ *   ganztaegiger Termin mit `T00:00Z` bleibt westlich von UTC an seinem Tag,
+ *   statt auf den Vorabend zu rutschen.
+ * - `to: 'utc'`: naive UTC `YYYY-MM-DDTHH:MM:SS`, die Form, gegen die der
+ *   Erinnerungs-Scheduler vergleicht (`reminders.remind_at`).
+ * - `to: 'instant'`: UTC-Instant `YYYY-MM-DDTHH:MM:SS.sssZ`, wie ihn
+ *   `/decay-tasks/:id/complete` schreibt (`last_completed`).
+ *
+ * Werte OHNE Offset behalten ihre Bedeutung: Wanduhrzeit, auf
+ * `YYYY-MM-DDTHH:MM` gekuerzt, ein reines Datum bleibt ein reines Datum. Wer
+ * lokale Ziffern schickt, merkt also nichts. Die eine Ausnahme ist die FORM
+ * bei `to: 'utc'`: die zonenlose Eingabe ist dort schon die UTC-Zeit, kommt
+ * aber in dieselbe Form `YYYY-MM-DDTHH:MM:SS` wie ein umgerechneter Offset
+ * (fehlende Sekunden :00, Bruchteile weg), und ein reines Datum wird
+ * `YYYY-MM-DDT00:00:00` - Mitternacht UTC, genau der Zeitpunkt, zu dem der
+ * Scheduler es schon vorher feuerte. Sonst waeren `07:00`, `07:00:00` und
+ * `09:00:00+02:00` drei Erinnerungen fuer einen Zeitpunkt (#1364).
+ *
+ * Ein Offset-Wert OHNE genanntes Ziel wirft: das waere wieder das stille
+ * Abschneiden, gegen das diese Funktion gebaut ist, und ein neuer Aufrufer soll
+ * es beim ersten Versuch merken statt am verschobenen Datensatz.
+ *
+ * @param {any}     val
+ * @param {string}  field
+ * @param {boolean} [required=false]
+ * @param {object}  [opts]
+ * @param {'wall'|'utc'|'instant'} [opts.to]  Form der Zielspalte
+ * @param {string}  [opts.zone]    IANA-Zone des Haushalts (Pflicht bei 'wall')
+ * @param {boolean} [opts.allDay]  ganztaegig: nur das Datum zaehlt
+ * @returns {{ value: string|null, error: string|null }}
+ */
+function datetime(val, field, required = false, { to, zone, allDay = false } = {}) {
   if (!val) {
     if (required) return { value: null, error: `${field} is required.` };
     return { value: null, error: null };
@@ -193,13 +269,31 @@ function datetime(val, field, required = false) {
   if (!DATETIME_RE.test(String(val)))
     return { value: null, error: `${field} must be in YYYY-MM-DD or YYYY-MM-DDTHH:MM format.` };
   const raw = String(val).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return { value: raw, error: null };
-  const match = raw.match(
-    /^(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$/
-  );
+  if (DATE_RE.test(raw)) return { value: to === 'utc' ? `${raw}T00:00:00` : raw, error: null };
+
+  if (ZONED_DATETIME_RE.test(raw)) {
+    if (to !== 'wall' && to !== 'utc' && to !== 'instant') {
+      throw new TypeError(`datetime(): ${field} carries an offset, but the caller names no target form.`);
+    }
+    const ms = zonedInstantMs(raw);
+    if (ms === null) return { value: null, error: `${field} must be a valid date and time.` };
+    if (to === 'wall' && allDay) return { value: raw.slice(0, 10), error: null };
+    if (to === 'wall' && !isValidTimeZone(zone)) {
+      throw new TypeError(`datetime(): ${field} needs the household zone to be converted.`);
+    }
+    const iso = new Date(ms).toISOString();
+    if (to === 'utc') return { value: iso.slice(0, 19), error: null };
+    if (to === 'instant') return { value: iso, error: null };
+    const wall = utcToWall(iso, zone);
+    if (!wall) return { value: null, error: `${field} must be a valid date and time.` };
+    return { value: `${wall.date}T${wall.time.slice(0, 5)}`, error: null };
+  }
+
+  const match = NAIVE_DATETIME_RE.exec(raw);
   if (!match) {
     return { value: null, error: `${field} must be in YYYY-MM-DD or YYYY-MM-DDTHH:MM format.` };
   }
+  if (to === 'utc') return { value: `${match[1]}T${match[2]}:${match[3]}:${match[4] ?? '00'}`, error: null };
   return { value: `${match[1]}T${match[2]}:${match[3]}`, error: null };
 }
 

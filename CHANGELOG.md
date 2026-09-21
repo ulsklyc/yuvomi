@@ -84,6 +84,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exactly as before. Older browsers are supported on the paths nobody can do without - starting the
   app, scrolling it and using a dialog - rather than everywhere. (#1276)
 
+- **A date and time sent to the API with `Z` or a numeric offset is now converted instead of cut
+  off.** `/api/v1` accepted values such as `2026-09-21T16:00:00Z` or `2026-09-21T18:00:00+02:00`,
+  but kept only their digits and dropped the offset: in a household on Europe/Berlin, an event
+  created with `16:00:00Z` - meant as 18:00 local time - landed at 16:00, without any error. Offsets
+  are now converted instead of dropped, into the form the field is stored in. Calendar start and end
+  (also on the occurrence routes and the MCP tool `create_event`) and the health timestamps
+  (`measured_at`, `performed_at`, `consumed_at`, `scheduled_at`, `taken_at`) become household
+  wall-clock time; for an all-day event only the date counts, so a start at midnight UTC stays on
+  its day west of UTC. `remind_at` becomes UTC without a zone suffix in one notation, the form
+  reminders are compared in (a bare date is midnight UTC, when it fired before), and
+  `last_completed` of a housekeeping task becomes a UTC instant, the form `/complete` writes. Values
+  without an offset mean household wall-clock time as before, so a client that sends local digits
+  sees no change. **This changes what is stored for input `/api/v1` already accepted**; as a
+  fix to values stored wrong without an error it is named here rather than deprecated first (see
+  "How long that line holds" in MODULES.md). `PUT /api/v1/calendar/:id` now stores the validated
+  value like `POST` does instead of the raw request value, which had moved a weekly series by an
+  hour at the October clock change, and an empty start is now rejected with 400. Reminders already
+  stored with an offset are not rewritten but compared as the instant they name: one at
+  `18:00:00+02:00` used to come two hours late. Digits that are no real point in time, such as 30
+  February with an offset, are rejected with 400. OpenAPI now says "converted" instead of
+  "normalized" and describes the request form apart from the stored one, since synced events keep
+  their offsets. A `last_completed` without an offset is read in the household time zone instead of
+  the server's. (#1364)
+
 - **Durations are written in your interface language, not in the language of the household
   region.** A fasting duration and a birthday's own reminder took their words from the region: with
   English as your language and "Deutsch (Deutschland)" as the household region, the fasting journal

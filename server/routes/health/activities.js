@@ -10,7 +10,7 @@ import { defaultVisibilityFor } from './visibility-defaults.js';
 import {
   log, VISIBILITIES, MAX_UNIT,
   viewerId, careAwareClause, applyUpdate, badRequest,
-  resolveOwner, writableClause,
+  resolveOwner, writableClause, wallClockInput,
 } from './helpers.js';
 
 const router = express.Router();
@@ -46,7 +46,7 @@ router.post('/activities', (req, res) => {
     const distance    = v.num(b.distance_km, 'distance_km');
     const intensity   = v.str(b.intensity, 'intensity', { max: MAX_UNIT, required: false });
     const calories    = v.num(b.calories, 'calories');
-    const performedAt = v.datetime(b.performed_at, 'performed_at', true);
+    const performedAt = v.datetime(b.performed_at, 'performed_at', true, wallClockInput());
     const note        = v.str(b.note, 'note', { max: v.MAX_TEXT, required: false });
     const visibility  = v.oneOf(b.visibility, VISIBILITIES, 'visibility');
 
@@ -92,7 +92,7 @@ router.patch('/activities/:id', (req, res) => {
     if (b.distance_km !== undefined)  { const r = v.num(b.distance_km, 'distance_km');                         checks.push(r); if (!r.error) fields.distance_km = r.value; }
     if (b.intensity !== undefined)    { const r = v.str(b.intensity, 'intensity', { max: MAX_UNIT, required: false }); checks.push(r); if (!r.error) fields.intensity = r.value; }
     if (b.calories !== undefined)     { const r = v.num(b.calories, 'calories');                               checks.push(r); if (!r.error) fields.calories = r.value; }
-    if (b.performed_at !== undefined) { const r = v.datetime(b.performed_at, 'performed_at', true);            checks.push(r); if (!r.error) fields.performed_at = r.value; }
+    if (b.performed_at !== undefined) { const r = v.datetime(b.performed_at, 'performed_at', true, wallClockInput()); checks.push(r); if (!r.error) fields.performed_at = r.value; }
     if (b.note !== undefined)         { const r = v.str(b.note, 'note', { max: v.MAX_TEXT, required: false }); checks.push(r); if (!r.error) fields.note = r.value; }
     if (b.visibility !== undefined)   { const r = v.oneOf(b.visibility, VISIBILITIES, 'visibility');           checks.push(r); if (!r.error && r.value) fields.visibility = r.value; }
 

@@ -12,7 +12,7 @@ import { defaultVisibilityFor } from './visibility-defaults.js';
 import {
   log, VISIBILITIES, LOG_STATUS, MAX_UNIT,
   viewerId, careAwareClause, toBit, applyUpdate, badRequest,
-  resolveOwner, writableClause, writableChild,
+  resolveOwner, writableClause, writableChild, wallClockInput,
 } from './helpers.js';
 
 const router = express.Router();
@@ -362,9 +362,10 @@ router.post('/medications/:id/logs', (req, res) => {
     if (!medicationWritable(medId, viewer)) return res.status(404).json({ error: 'Medikament nicht gefunden.', code: 404 });
 
     const b = req.body || {};
-    const scheduledAt = v.datetime(b.scheduled_at, 'scheduled_at');
+    const wall        = wallClockInput();
+    const scheduledAt = v.datetime(b.scheduled_at, 'scheduled_at', false, wall);
     const status      = v.oneOf(b.status, LOG_STATUS, 'status');
-    const takenAt     = v.datetime(b.taken_at, 'taken_at');
+    const takenAt     = v.datetime(b.taken_at, 'taken_at', false, wall);
     const dose        = v.num(b.dose_qty, 'dose_qty');
     const note        = v.str(b.note, 'note', { max: v.MAX_TEXT, required: false });
 
@@ -406,7 +407,7 @@ function updateLogStatus(req, res, newStatus) {
 
   const b = req.body || {};
   if (newStatus === 'taken') {
-    const takenAt = v.datetime(b.taken_at, 'taken_at');
+    const takenAt = v.datetime(b.taken_at, 'taken_at', false, wallClockInput());
     if (takenAt.error) return badRequest(res, [takenAt.error]);
     const when = takenAt.value || new Date().toISOString();
     db.get().prepare('UPDATE medication_logs SET status = ?, taken_at = ? WHERE id = ?').run('taken', when, id);
@@ -459,7 +460,7 @@ router.patch('/logs/:id', (req, res) => {
 
     const b = req.body || {};
     const status  = v.oneOf(b.status, LOG_STATUS, 'status');
-    const takenAt = v.datetime(b.taken_at, 'taken_at');
+    const takenAt = v.datetime(b.taken_at, 'taken_at', false, wallClockInput());
     const dose    = v.num(b.dose_qty, 'dose_qty');
     const note    = v.str(b.note, 'note', { max: v.MAX_TEXT, required: false });
 

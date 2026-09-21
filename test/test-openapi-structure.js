@@ -415,7 +415,9 @@ test('calendar occurrence endpoints expose route-specific requests and occurrenc
   assert.equal(onlyMutation.properties.recurrence_rule, undefined);
   assert.equal(onlyMutation.properties.confirmed_orphan_count, undefined);
   assert.equal(onlyMutation.properties.start_datetime.$ref,
-    '#/components/schemas/CalendarDateOrDateTime');
+    '#/components/schemas/CalendarDateOrDateTimeInput');
+  assert.equal(onlyMutation.properties.end_datetime.oneOf[0].$ref,
+    '#/components/schemas/CalendarDateOrDateTimeInput');
   assert.deepEqual(onlyMutation.properties.end_datetime.oneOf[1], { type: 'null' });
   assert.equal(onlyMutation.properties.reminder_offsets.maxItems, 5);
   assert.equal(onlyMutation.properties.reminder_offsets.items.minimum, 0);
@@ -425,16 +427,29 @@ test('calendar occurrence endpoints expose route-specific requests and occurrenc
 
 test('calendar datetime schema distinguishes dates, local wall-clock values, and offsets', () => {
   const spec = buildOpenApiSpec({}, 'test');
-  const dateTime = spec.components.schemas.CalendarDateOrDateTime;
-  assert.equal(dateTime.oneOf.length, 3);
-  assert.deepEqual(dateTime.oneOf.map((variant) => variant.format), ['date', undefined, undefined]);
-  assert.deepEqual(dateTime.oneOf.map((variant) => variant.pattern), [
+  const patterns = [
     '^\\d{4}-\\d{2}-\\d{2}$',
     '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d+)?)?$',
     '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d+)?)?(?:Z|[+-]\\d{2}:?\\d{2})$',
-  ]);
-  assert.ok(dateTime.oneOf[1].description.includes('local wall-clock'));
-  assert.ok(dateTime.oneOf[2].description.includes('normalized'));
+  ];
+  // Anfrage und Antwort sind zwei Schemata (#1364): dieselben drei Formen,
+  // aber eine Anfrage mit Offset wird umgerechnet, ein synchronisierter
+  // Termin behaelt seinen. Ein Schema fuer beides nannte das Abschneiden
+  // "normalized" und beschrieb damit keine der beiden Seiten richtig.
+  for (const name of ['CalendarDateOrDateTime', 'CalendarDateOrDateTimeInput']) {
+    const dateTime = spec.components.schemas[name];
+    assert.equal(dateTime.oneOf.length, 3, name);
+    assert.deepEqual(dateTime.oneOf.map((variant) => variant.format), ['date', undefined, undefined], name);
+    assert.deepEqual(dateTime.oneOf.map((variant) => variant.pattern), patterns, name);
+    assert.ok(dateTime.oneOf[1].description.includes('local wall-clock'), name);
+    assert.ok(!dateTime.oneOf[2].description.includes('normalized'), `${name} calls a conversion "normalized"`);
+  }
+  const input = spec.components.schemas.CalendarDateOrDateTimeInput.oneOf[2].description;
+  assert.ok(input.includes('converted into household wall-clock time'), input);
+  assert.ok(input.includes('only the date counts'), input);
+  const stored = spec.components.schemas.CalendarDateOrDateTime.oneOf[2].description;
+  assert.ok(stored.includes('synchronized event'), stored);
+  assert.ok(!stored.includes('converted'), stored);
 });
 
 test('Outlook account activation documents its exact linked-override conflict', () => {

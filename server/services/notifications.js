@@ -22,6 +22,7 @@ import { syncAllWasteReminders } from './waste-reminders.js';
 import { withoutModulesDeniedToRecipient, withoutSwitchedOffModules } from './reminder-origins.js';
 import { syncAllPreventionReminders } from './prevention-reminders.js';
 import { syncAllFastingReminders } from './fasting-reminders.js';
+import { remindAtCompareKey, remindAtUtcSql } from '../utils/reminder-schedule.js';
 
 const log = createLogger('Notifications');
 const APP_NAME = 'Yuvomi';
@@ -561,7 +562,9 @@ export async function processDueNotifications({
         WHERE pr.id = r.entity_id
       ) END AS prevention_subject_name
     FROM reminders r
-    WHERE r.dismissed = 0 AND r.pushed_at IS NULL AND r.remind_at <= ?
+    -- Als Zeitpunkt verglichen, nicht als Text (#1364): eine roh gespeicherte
+    -- Zeile mit Offset kam sonst um genau diesen Offset zu spaet oder zu frueh.
+    WHERE r.dismissed = 0 AND r.pushed_at IS NULL AND ${remindAtUtcSql('r.remind_at')} <= ?
       -- Kein Push an eine Aufgabe/einen Termin, den es nicht mehr gibt. Seit
       -- Migration v217 raeumen zwei AFTER-DELETE-Trigger diese Erinnerungen mit
       -- ab; der Verweis bleibt aber ein weicher (kein Fremdschluessel auf
@@ -572,7 +575,7 @@ export async function processDueNotifications({
       AND (r.entity_type != 'task'  OR EXISTS (SELECT 1 FROM tasks           WHERE id = r.entity_id))
       AND (r.entity_type != 'event' OR EXISTS (SELECT 1 FROM calendar_events WHERE id = r.entity_id))
     ORDER BY r.remind_at ASC
-  `).all(nowIso);
+  `).all(remindAtCompareKey(nowIso));
 
   // EIN ABGESCHALTETES MODUL MELDET SICH NICHT (#1279). Die Syncs oben raeumen
   // nur die Quellen ab, die sie selbst herstellen; eine Aufgabe, ein Termin, ein

@@ -19,6 +19,7 @@
 
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
+import { householdTimeZone } from '../../utils/timezone.js';
 
 export const log = createLogger('Health');
 
@@ -40,6 +41,18 @@ export const VISIBILITIES = ['private', 'family'];
 export const OPEN_FAMILY = 'family';
 export const OPEN_ALL    = 'all';
 export const NUTRITION_VISIBILITIES = ['private', OPEN_ALL];
+
+/**
+ * Wie die Zeitstempel der Gesundheit geprueft werden (`measured_at`,
+ * `performed_at`, `consumed_at`, `scheduled_at`, `taken_at`): sie sind
+ * Wanduhrzeit des Haushalts. Ein Wert mit `Z` oder Offset wird dorthin
+ * umgerechnet statt abgeschnitten (#1364) - `utcnow()` aus einer
+ * Home-Assistant-Automation landete sonst um den Offset verschoben.
+ * @returns {{ to: 'wall', zone: string }} Optionen fuer `datetime()`
+ */
+export function wallClockInput() {
+  return { to: 'wall', zone: householdTimeZone(db.get()) };
+}
 
 export const LOG_STATUS   = ['taken', 'skipped', 'pending'];
 export const FLOW_LEVELS  = ['spotting', 'light', 'medium', 'heavy'];

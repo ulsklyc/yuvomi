@@ -5,6 +5,12 @@ const VISIT_CAPABILITY_NOTE = 'Each visit carries `can_edit` and `can_delete`: t
   + 'Write access means both the member module permission and, for API tokens, a `housekeeping:write` scope. '
   + 'They are hints for the interface; `PUT`/`DELETE /api/v1/housekeeping/visits/{id}` and `POST .../unpay` check the role themselves.';
 
+// `last_completed` ist ein Zeitpunkt; ein Offset wird der UTC-Instant (#1364).
+const LAST_COMPLETED_INPUT = '`last_completed` with `Z` or a numeric offset is read as an instant and stored as a UTC '
+  + 'instant (`YYYY-MM-DDTHH:MM:SS.sssZ`), the same form `/complete` writes. A value without offset is household '
+  + 'wall-clock time and is read in the household time zone. Up to v2.68.0 the offset was dropped and its digits '
+  + 'kept, and a value without offset was read in the time zone of the server.';
+
 export function housekeepingPaths() {
   return {
     '/api/v1/housekeeping/dashboard': {
@@ -55,10 +61,10 @@ export function housekeepingPaths() {
     },
     '/api/v1/housekeeping/decay-tasks': {
       get: op({ summary: 'List housekeeping decay tasks', tag: 'Housekeeping' }),
-      post: op({ summary: 'Create housekeeping decay task', tag: 'Housekeeping', stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Create housekeeping decay task', tag: 'Housekeeping', stateChanging: true, requestBody: jsonBody(null), description: LAST_COMPLETED_INPUT }),
     },
     '/api/v1/housekeeping/decay-tasks/{taskId}': {
-      patch: op({ summary: 'Update housekeeping decay task', tag: 'Housekeeping', params: [idParam('taskId', 'Decay task ID')], stateChanging: true, requestBody: jsonBody(null) }),
+      patch: op({ summary: 'Update housekeeping decay task', tag: 'Housekeeping', params: [idParam('taskId', 'Decay task ID')], stateChanging: true, requestBody: jsonBody(null), description: LAST_COMPLETED_INPUT }),
       delete: op({ summary: 'Delete housekeeping decay task', tag: 'Housekeeping', params: [idParam('taskId', 'Decay task ID')], stateChanging: true }),
     },
     '/api/v1/housekeeping/decay-tasks/{taskId}/complete': {

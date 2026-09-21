@@ -27,6 +27,7 @@ import { buildOpenApiSpec } from '../openapi.js';
 import { tokenAllows } from '../scopes.js';
 import { moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
 import { toLocalDateKey } from '../../public/utils/date.js';
+import { householdTimeZone } from '../utils/timezone.js';
 import { taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
 import { visibilityWhere } from '../services/visibility.js';
 import { getUpcomingEvents } from '../services/calendar-event-reader.js';
@@ -224,8 +225,12 @@ function listUpcomingEvents(db, actorId, args) {
 
 function createEvent(db, actorId, args) {
   const title = v.str(args.title, 'title', { required: true });
-  const start = v.datetime(args.start_datetime, 'start_datetime', true);
-  const end = v.datetime(args.end_datetime, 'end_datetime', false);
+  // Derselbe Weg wie POST /api/v1/calendar (#1364): ein `Z` oder Offset - von
+  // LLM-Clients die naheliegende Form - wird in die Haushaltszone umgerechnet
+  // statt abgeschnitten; ganztaegig zaehlt nur das Datum.
+  const zoneOpts = { to: 'wall', zone: householdTimeZone(db), allDay: args.all_day === true };
+  const start = v.datetime(args.start_datetime, 'start_datetime', true, zoneOpts);
+  const end = v.datetime(args.end_datetime, 'end_datetime', false, zoneOpts);
   const location = v.str(args.location, 'location', { required: false, max: v.MAX_SHORT });
   const description = v.str(args.description, 'description', { required: false, max: v.MAX_TEXT });
 
@@ -616,7 +621,7 @@ const CORE_TOOLS = [
       type: 'object',
       properties: {
         title:          { type: 'string', description: 'Event title (required).' },
-        start_datetime: { type: 'string', description: 'Start, format YYYY-MM-DD or YYYY-MM-DDTHH:MM (required).' },
+        start_datetime: { type: 'string', description: 'Start, format YYYY-MM-DD or YYYY-MM-DDTHH:MM in household wall-clock time (required). A value with Z or a numeric offset is converted into the household time zone; for all-day events only its date counts.' },
         end_datetime:   { type: 'string', description: 'Optional end, same format as start.' },
         all_day:        { type: 'boolean', description: 'Whether the event lasts all day.' },
         location:       { type: 'string', description: 'Optional location.' },

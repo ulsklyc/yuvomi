@@ -251,7 +251,7 @@ Compare the operations the module requires - method, path, and the response fiel
 
 Third-party modules should build on `/api/v1` and the public browser libraries described above; breaking changes to those are called out in the CHANGELOG. Direct database access, private helpers under `server/`, and undocumented response fields sit outside that line and may change in any release without notice.
 
-How long that line holds: before an operation under `/api/v1` changes or goes away, it is named as deprecated in the CHANGELOG and keeps working unchanged for at least 90 days after the release that says so - a span of time rather than a number of releases, because releases here are frequent and a module author reads the CHANGELOG on their own schedule. If an `/api/v2` ever ships, `/api/v1` keeps being served for twelve months after it.
+How long that line holds: before an operation under `/api/v1` changes or goes away, it is named as deprecated in the CHANGELOG and keeps working unchanged for at least 90 days after the release that says so - a span of time rather than a number of releases, because releases here are frequent and a module author reads the CHANGELOG on their own schedule. A fix that makes an operation do what its documentation says - storing correctly a value it used to store wrong without an error - is not a change in this sense: the CHANGELOG names it explicitly, but it is not listed as deprecated first. If an `/api/v2` ever ships, `/api/v1` keeps being served for twelve months after it.
 
 ## Docker / Podman
 
