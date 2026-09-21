@@ -309,6 +309,43 @@ test('jede dvh-Deklaration in den Stylesheets hat einen Rueckfall, der in Chrome
     'Diese Ausnahme trifft keinen Verstoss mehr - aus EXCEPTIONS streichen');
 });
 
+/**
+ * body und .app-shell tragen fuer `height` genau drei Zeilen, in genau dieser
+ * Reihenfolge (Review zu #1371). Der Guard oben laesst fill-available zwischen
+ * Zwilling und dvh-Zeile nur ZU - er verlangt es nicht, und ohne diesen Test
+ * gingen Entfernen und Vertauschen beide gruen durch (gemessen). Jede Zeile
+ * gilt fuer andere Browser: 100dvh wo dvh bekannt ist, -webkit-fill-available
+ * wo nur das bekannt ist (Safari 13.4 bis 15.3: die SICHTBARE Hoehe), 100vh wo
+ * keins von beiden bekannt ist. Vertauscht gewaenne auf alten Browsern die
+ * falsche Zeile.
+ */
+const IOS_HEIGHT_CHAIN = ['100vh', '-webkit-fill-available', '100dvh'];
+const IOS_HEIGHT_CHAIN_CARRIERS = [
+  { file: 'public/styles/reset.css', selector: 'body' },
+  { file: 'public/styles/layout.css', selector: '.app-shell' },
+];
+
+test('body und .app-shell tragen die Hoehe als 100vh -> -webkit-fill-available -> 100dvh', () => {
+  const wrong = [];
+  for (const { file, selector } of IOS_HEIGHT_CHAIN_CARRIERS) {
+    const rules = [...eachRule(read(file))].filter((rule) => rule.at.length === 0 && rule.selector === selector);
+    assert.ok(rules.length > 0, `Reichweiten-Nachweis: keine Regel ${selector} in ${file} gelesen`);
+    const heights = rules.flatMap((rule) => declarations(rule.body))
+      .filter((decl) => decl.property === 'height')
+      .map((decl) => norm(decl.value));
+    if (JSON.stringify(heights) !== JSON.stringify(IOS_HEIGHT_CHAIN)) {
+      wrong.push(`${file}: ${selector} { height: ${heights.join('; height: ') || '(keine)'} }`);
+    }
+  }
+  assert.deepEqual(wrong, [],
+    `body und .app-shell brauchen genau height: ${IOS_HEIGHT_CHAIN.join('; height: ')} - in dieser `
+    + 'Reihenfolge. iOS Safari 13.4 bis 15.3 kennt -webkit-fill-available, aber kein dvh: fehlt die '
+    + 'Zeile oder steht sie vor 100vh, gilt dort 100vh, die GROSSE Hoehe bei eingefahrener '
+    + 'Adressleiste, und die untere Navigation liegt unter der Adressleiste. An beiden Stellen, weil '
+    + 'fill-available sich am Containing Block misst - body mit 100vh gaebe der Shell wieder die '
+    + 'grosse Hoehe:\n' + wrong.join('\n'));
+});
+
 test('die Ausnahmen haben ihren Anlass noch', () => {
   const lapsed = EXCEPTIONS.filter((ex) => !ex.stillValid());
   assert.deepEqual(lapsed.map((ex) => `${ex.file}: ${ex.selector} - ${ex.reason}`), [],
