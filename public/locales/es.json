@@ -399,6 +399,7 @@
         "historySeriesLoadError": "No se pudo cargar",
         "filterBtn": "Filtrar",
         "filterClearAll": "Borrar todos los filtros",
+        "filterPanelDone": "Hecho",
         "filterGroupPerson": "Persona",
         "filterGroupTag": "Etiqueta",
         "filterGroupPriority": "Prioridad",
@@ -3697,7 +3698,8 @@
         "reversePayment": "Anular",
         "reversePaymentLabel": "Anular el pago de {{payer}} a {{payee}} por {{amount}}",
         "reversePaymentConfirm": "¿Anular este pago?",
-        "reversePaymentConfirmDetail": "{{payer}} a {{payee}}, {{amount}}. Un contraasiento anula el pago y los saldos vuelven a como estaban. El pago sigue en la actividad, marcado como anulado."
+        "reversePaymentConfirmDetail": "{{payer}} a {{payee}}, {{amount}}. Un contraasiento anula el pago y los saldos vuelven a como estaban. El pago sigue en la actividad, marcado como anulado.",
+        "loadMoreActivity": "Cargar más"
     },
     "wmo": {
         "0": "Cielo despejado",

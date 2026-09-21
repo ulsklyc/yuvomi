@@ -418,6 +418,7 @@
         "filterGroupPerson": "شخص",
         "filterGroupTag": "برچسب",
         "filterClearAll": "بازنشانی همه فیلترها",
+        "filterPanelDone": "انجام شد",
         "navLabelOverdue": "کارها، {{count}} معوق",
         "statusArchived": "بایگانی‌شده",
         "archiveButton": "بایگانی کار",
@@ -3697,7 +3698,8 @@
         "reversePayment": "برگشت",
         "reversePaymentLabel": "برگشت پرداخت {{payer}} به {{payee}} به مبلغ {{amount}}",
         "reversePaymentConfirm": "این پرداخت برگشت بخورد؟",
-        "reversePaymentConfirmDetail": "{{payer}} به {{payee}}، {{amount}}. یک ثبت معکوس پرداخت را لغو می‌کند و مانده‌ها به حالت قبل برمی‌گردند. پرداخت با علامت برگشت‌خورده در فعالیت می‌ماند."
+        "reversePaymentConfirmDetail": "{{payer}} به {{payee}}، {{amount}}. یک ثبت معکوس پرداخت را لغو می‌کند و مانده‌ها به حالت قبل برمی‌گردند. پرداخت با علامت برگشت‌خورده در فعالیت می‌ماند.",
+        "loadMoreActivity": "بارگذاری بیشتر"
     },
     "wmo": {
         "0": "آسمان صاف",

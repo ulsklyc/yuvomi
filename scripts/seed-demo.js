@@ -186,7 +186,12 @@ cfgSet.run('currency', 'EUR');
 // deshalb alles ein - explizit als leere Liste, nicht durch Loeschen des
 // Schluessels, damit der Grund am Wert selbst ablesbar bleibt.
 cfgSet.run('disabled_modules', '[]');
-cfgSet.run('date_format', 'dmy_dot');
+// 'dmy', nicht 'dmy_dot': beide schreiben 20.09.2026, aber die Region wird
+// aus dem Tripel Waehrung/Datum/Uhrzeit abgeleitet (detectRegion() in
+// public/settings/region-presets.js), und de-DE fuehrt 'dmy'. Mit 'dmy_dot'
+// stand der Demo-Haushalt auf „Benutzerdefiniert" statt auf einer Region.
+// test:region-presets haelt das Tripel dieser Datei gegen die Presets.
+cfgSet.run('date_format', 'dmy');
 cfgSet.run('time_format', '24h');
 cfgSet.run('app_name', 'Yuvomi');
 cfgSet.run('visible_meal_types', 'breakfast,lunch,dinner,snack');

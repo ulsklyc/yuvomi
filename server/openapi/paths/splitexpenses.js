@@ -37,6 +37,33 @@ const settlementReversalResponse = {
   },
 };
 
+// Eine Seite des Verlaufs (#1309). `offset` steht nur in der Antwort ohne
+// Cursor - dort, wo es auch in der Anfrage etwas bedeutet.
+const activityPageResponse = {
+  type: 'object',
+  required: ['data', 'pagination'],
+  properties: {
+    data: { type: 'array', items: { type: 'object', additionalProperties: true } },
+    pagination: {
+      type: 'object',
+      required: ['limit', 'has_more', 'next_cursor'],
+      properties: {
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        offset: { type: 'integer', minimum: 0, description: 'Only in answers to a request without cursor.' },
+        has_more: { type: 'boolean', description: 'Exact: true only when at least one older entry exists.' },
+        next_cursor: {
+          type: ['object', 'null'],
+          required: ['before_at', 'before_id'],
+          properties: {
+            before_at: { type: 'string', format: 'date-time' },
+            before_id: { type: 'integer' },
+          },
+        },
+      },
+    },
+  },
+};
+
 export function splitexpensesPaths() {
   return {
     '/api/v1/split-expenses/meta': { get: op({ summary: 'Get split expenses metadata', tag: 'SplitExpenses' }) },
@@ -99,7 +126,28 @@ export function splitexpensesPaths() {
       }),
     },
     '/api/v1/split-expenses/groups/{id}/activity': {
-      get: op({ summary: 'Get group activity feed', description: 'Entries of type `payment_registered` carry a `settlement` object: payer, payee, amount, `reversed_at` (null while active) and `can_reverse` for the caller.', tag: 'SplitExpenses', params: [idParam()] }),
+      get: op({
+        summary: 'Get group activity feed',
+        description: 'Newest first (`created_at` descending, `id` ascending within the same second). Page through every entry with the cursor: pass `before_at` and `before_id` from `pagination.next_cursor` of the previous page; entries added meanwhile appear at the top and shift nothing. Without a cursor the endpoint behaves as before (`limit`, `offset`). `pagination.next_cursor` is null when `has_more` is false. Cursor and a non-zero `offset` together answer 400. Entries of type `payment_registered` carry a `settlement` object: payer, payee, amount, `reversed_at` (null while active) and `can_reverse` for the caller.',
+        tag: 'SplitExpenses',
+        params: [
+          idParam(),
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100, default: 30 }, description: 'Page size. Values above 100 are capped at 100.' },
+          { name: 'before_at', in: 'query', required: false, schema: { type: 'string', maxLength: 64 }, description: 'Cursor, taken from `pagination.next_cursor.before_at`. Only together with `before_id`, because several entries can share a second.' },
+          { name: 'before_id', in: 'query', required: false, schema: { type: 'integer', minimum: 1 }, description: 'Cursor, taken from `pagination.next_cursor.before_id`.' },
+          { name: 'offset', in: 'query', required: false, schema: { type: 'integer', minimum: 0, default: 0 }, description: 'Offset paging as before the cursor existed. Entries added while paging shift the pages; prefer the cursor.' },
+        ],
+        responses: {
+          200: {
+            description: 'One page of the activity feed',
+            content: { 'application/json': { schema: activityPageResponse } },
+          },
+          400: apiError('Only one of `before_at`/`before_id` given, or a cursor combined with a non-zero `offset`'),
+          401: { $ref: '#/components/responses/Unauthorized' },
+          404: apiError('Group not found or not visible to the caller'),
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
     },
     '/api/v1/split-expenses/groups/{id}/recurring': {
       get: op({ summary: 'List recurring expenses in group', tag: 'SplitExpenses', params: [idParam()] }),

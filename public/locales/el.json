@@ -399,6 +399,7 @@
         "historySeriesLoadError": "Δεν ήταν δυνατή η φόρτωση",
         "filterBtn": "Φίλτρο",
         "filterClearAll": "Εκκαθάριση όλων των φίλτρων",
+        "filterPanelDone": "Έτοιμο",
         "filterGroupPerson": "Άτομο",
         "filterGroupTag": "Ετικέτα",
         "filterGroupPriority": "Προτεραιότητα",
@@ -3697,7 +3698,8 @@
         "reversePayment": "Ακύρωση",
         "reversePaymentLabel": "Ακύρωση πληρωμής από {{payer}} προς {{payee}} ύψους {{amount}}",
         "reversePaymentConfirm": "Ακύρωση αυτής της πληρωμής;",
-        "reversePaymentConfirmDetail": "{{payer}} προς {{payee}}, {{amount}}. Μια αντίθετη εγγραφή ακυρώνει την πληρωμή και τα υπόλοιπα επιστρέφουν όπως ήταν. Η πληρωμή παραμένει στη δραστηριότητα, σημειωμένη ως ακυρωμένη."
+        "reversePaymentConfirmDetail": "{{payer}} προς {{payee}}, {{amount}}. Μια αντίθετη εγγραφή ακυρώνει την πληρωμή και τα υπόλοιπα επιστρέφουν όπως ήταν. Η πληρωμή παραμένει στη δραστηριότητα, σημειωμένη ως ακυρωμένη.",
+        "loadMoreActivity": "Φόρτωση περισσότερων"
     },
     "wmo": {
         "0": "Αίθριος καιρός",

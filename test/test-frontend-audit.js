@@ -4844,9 +4844,10 @@ test('die Sammelaktions-Pille wohnt in der Shell und kostet die Liste keine Zeil
     assert.match(src, /setBulkPill\(/, `${page}.js muss die Pille über setBulkPill setzen`);
     assert.match(src, /clearBulkPill\(/,
       `${page}.js muss die Pille wegnehmen, sobald es keine Teilmenge mehr gibt`);
-    // Der Schnitt kommt aus `source-text.js` und laeuft dort bis zum Fixpunkt:
-    // die Kette `.replace().replace()` liess bei verschachtelten Klammern ein
-    // `<!--` stehen (CodeQL js/incomplete-multi-character-sanitization, high).
+    // Der Schnitt kommt aus `source-text.js` und liest Kommentare dort wie der
+    // Browser: die Kette `.replace().replace()` liess bei verschachtelten
+    // Klammern ein `<!--` stehen (CodeQL js/incomplete-multi-character-
+    // sanitization, high), der spaetere Fixpunkt einen offenen Kommentar.
     // `test-budget-ui.js` hatte die Schleife samt Begruendung schon, diese
     // Datei die Kette ohne sie - dieselbe Kopie, andere Blindstelle.
     assert.doesNotMatch(withoutHtmlComments(withoutBlockComments(src)),
@@ -14868,6 +14869,33 @@ test('die Tab-Bar zeigt dieselbe Legende wie die Sidebar', () => {
     'das Tab-Label bleibt Text in Textfarbe - der Modulton gehoert dem Zeichen');
 });
 
+/**
+ * Traegt der Selektor die Klasse `cls` als GANZES Token? `.x-reversed` ist
+ * nicht `.x-reverse`, `.x__icon` ist ein anderes Element als `.x`. Ein
+ * Teilstring-Vergleich hielt beide fuer dieselbe Klasse und meldete eine
+ * Umfaerbung, die es nicht gibt - und ein Guard, der Fehlalarme liefert, wird
+ * irgendwann weggefiltert.
+ */
+function selectorHasClass(selector, cls) {
+  const escaped = cls.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`\\.${escaped}(?![\\w-])`).test(selector);
+}
+
+test('Klassen-Leser: ganze Klassen-Tokens, keine Teilstrings (erfundene Faelle)', () => {
+  const cls = 'split-activity-reverse';
+  assert.equal(selectorHasClass('.split-activity-reversed', cls), false,
+    'eine laengere Klasse ist eine andere Klasse');
+  assert.equal(selectorHasClass('.split-activity-reverse__icon', cls), false,
+    'ein BEM-Element ist ein anderes Element');
+  assert.equal(selectorHasClass('.split-activity-reverse--wide', cls), false);
+  assert.equal(selectorHasClass('.x-split-activity-reverse', cls), false);
+  assert.equal(selectorHasClass('.split-activity-reverse', cls), true);
+  assert.equal(selectorHasClass('.btn.split-activity-reverse:hover', cls), true);
+  assert.equal(selectorHasClass('.list > .split-activity-reverse[data-x] .icon', cls), true);
+  assert.equal(selectorHasClass('.split-activity-reverse::before', cls), true);
+  assert.equal(selectorHasClass('.a, .split-activity-reverse', cls), true);
+});
+
 test('kein geteiltes Bedienelement wird unter seinem eigenen Namen umgefaerbt', () => {
   // DIE LUECKE, DIE DIE REGEL DARUEBER OFFEN LAESST, und sie ist dieselbe, an
   // der die Eine-Buttonform-Regel schon einmal blind war: ein Guard, der eine
@@ -14913,7 +14941,7 @@ test('kein geteiltes Bedienelement wird unter seinem eigenen Namen umgefaerbt', 
       // BASIS-Farbe eines geteilten Knopfes, nicht sein Auswahl-Zustand.
       if (/--active\b|--selected\b|\[aria-pressed="true"\]|\.is-active\b/.test(selector)) continue;
       for (const [cls, where] of companions) {
-        if (!selector.includes(`.${cls}`)) continue;
+        if (!selectorHasClass(selector, cls)) continue;
         offenders.push(`${file}: ${selector} faerbt ein geteiltes Bedienelement (Markup: ${where})`);
       }
     }
@@ -15006,6 +15034,55 @@ test('ein Hover auf erhoehter Flaeche nimmt die Stufe ueber DIESER Flaeche', () 
  * Wand-Modus (Block D)
  * ────────────────────────────────────────────────────────────────────────── */
 
+// Jede Einheit, die an der Fensterhoehe haengt: vh und die Familie aus Chrome
+// 108 (dvh, svh, lvh), mit oder ohne fuehrende Null, in jeder Schreibung.
+const WALL_HEIGHT_UNIT = /(?<![\w.])(?:\d*\.)?\d+[dsl]?vh\b/i;
+// Die EINE erlaubte Form: die Bildschirmhoehe selbst, keine Groessenskala.
+// `100dvh`/`100svh` sind die sichtbare Hoehe; `100vh` und `100lvh` sind auf
+// einem mobilen Browser die GROSSE und schoeben den Ausstieg unter die
+// Adressleiste.
+const WALL_SCREEN_HEIGHT = /^(?:min-|max-)?height\s*:\s*100[ds]vh\s*$/i;
+
+/** Die Wand-Deklarationen, die eine Groesse an die Fensterhoehe haengen. */
+function wallHeightScaleFindings(css) {
+  const offenders = [];
+  let wallRules = 0;
+  let declarationsRead = 0;
+  for (const { selector, body } of eachRule(css)) {
+    if (!/\bwall\b|--wall-|clock-widget--wall/.test(selector) && !/--wall-/.test(body)) continue;
+    wallRules += 1;
+    for (const declaration of body.split(';')) {
+      const text = declaration.trim();
+      if (!text) continue;
+      declarationsRead += 1;
+      if (WALL_HEIGHT_UNIT.test(text) && !WALL_SCREEN_HEIGHT.test(text)) {
+        offenders.push(`${selector} { ${text} }`);
+      }
+    }
+  }
+  return { offenders, wallRules, declarationsRead };
+}
+
+test('Wand-Leser: jede Hoehen-Einheit ist eine Skala, nur die Bildschirmhoehe nicht (erfundene Faelle)', () => {
+  const hits = (decl) => wallHeightScaleFindings(`.wall-x { ${decl} }`).offenders.length;
+  // Verboten: jede Hoehen-Einheit als Groessenskala, auch die dynamische.
+  assert.equal(hits('font-size: clamp(1rem, 3vh, 2rem)'), 1);
+  assert.equal(hits('font-size: clamp(1rem, 3dvh, 2rem)'), 1, 'dvh ist genauso Hoehe wie vh');
+  assert.equal(hits('gap: 2svh'), 1);
+  assert.equal(hits('gap: .5vh'), 1, 'ohne fuehrende Null');
+  assert.equal(hits('gap: 3VH'), 1, 'Einheiten sind schreibungsegal');
+  assert.equal(hits('margin-top: calc(-3dvh)'), 1, 'auch negativ');
+  assert.equal(hits('min-height: 100vh'), 1, '100vh ist auf dem Telefon die grosse Hoehe');
+  assert.equal(hits('min-height: 100lvh'), 1);
+  assert.equal(hits('height: 50dvh'), 1, 'nur die ganze Bildschirmhoehe ist keine Skala');
+  // Erlaubt: die Bildschirmhoehe selbst, und die knappe Seite bzw. die Breite.
+  assert.equal(hits('min-height: 100dvh'), 0);
+  assert.equal(hits('height: 100svh'), 0);
+  assert.equal(hits('font-size: clamp(1rem, 3vmin, 2rem)'), 0);
+  assert.equal(hits('font-size: 12vw'), 0);
+  assert.equal(hits('--wall-gap: 3vmax'), 0);
+});
+
 test('die Distanzskala der Wand haengt an der KNAPPEN Seite, nicht an der Hoehe', () => {
   // GEMESSEN, NICHT GERATEN. Mit `vh` in der Mitte des clamp() wurden die
   // Zeilen auf einem Tablet im HOCHFORMAT (768x1024) groesser - dort ist Hoehe
@@ -15014,25 +15091,11 @@ test('die Distanzskala der Wand haengt an der KNAPPEN Seite, nicht an der Hoehe'
   // haelt beide Lagen im Schirm; `vw` bleibt erlaubt, wo die BREITE wirklich
   // die Grenze ist (die Uhr ist eine einzelne lange Ziffernfolge).
   //
-  // `dvh` ist ausdruecklich in Ordnung: `min-height: 100dvh` ist die
-  // Bildschirmhoehe selbst, keine Groessenskala.
-  const css = read('../public/styles/dashboard.css');
-  const offenders = [];
-  let wallRules = 0;
-  let declarationsRead = 0;
-
-  for (const { selector, body } of eachRule(css)) {
-    if (!/\bwall\b|--wall-|clock-widget--wall/.test(selector) && !/--wall-/.test(body)) continue;
-    wallRules += 1;
-    for (const declaration of body.split(';')) {
-      if (!declaration.trim()) continue;
-      declarationsRead += 1;
-      // Nur ECHTE vh-Einheiten: `dvh`/`svh`/`lvh` tragen ihren eigenen Praefix.
-      if (/(^|[^dsl\w.])\d+(\.\d+)?vh\b/.test(declaration)) {
-        offenders.push(`${selector} { ${declaration.trim()} }`);
-      }
-    }
-  }
+  // `dvh` ist KEINE Ausnahme von dieser Regel: `clamp(1rem, 3dvh, 2rem)` haengt
+  // genauso an der Hoehe wie `3vh`. Erlaubt ist nur die Bildschirmhoehe selbst,
+  // `min-height: 100dvh` - keine Groessenskala. Die fruehere Fassung nahm jede
+  // dvh-Einheit aus und liess damit die Skala durch, die sie verbietet.
+  const { offenders, wallRules, declarationsRead } = wallHeightScaleFindings(read('../public/styles/dashboard.css'));
 
   assert.ok(wallRules >= 15,
     `Reichweiten-Nachweis: nur ${wallRules} Wand-Regeln gelesen - greift der Selektor noch?`);
@@ -17673,6 +17736,25 @@ test('withoutCommentsKeepingLines liest nach `${` einen Ausdruck', () => {
 
   assert.equal(withoutCommentsKeepingLines('const n = `${a}` / 2 + "/" + b; // weg').trimEnd(),
     'const n = `${a}` / 2 + "/" + b;', 'nach dem schliessenden Backtick teilt der `/`');
+});
+
+/* EIN OFFENER HTML-KOMMENTAR REICHT BIS ZUM ENDE.
+ *
+ * Die fruehere Fassung von `withoutHtmlComments()` ersetzte geschlossene
+ * Kommentare bis zum Fixpunkt und liess einen offenen `<!--` samt allem
+ * dahinter stehen. Ein Guard sah dort Markup, das im Browser nie entsteht -
+ * und hielt ein auskommentiertes `<script>` fuer geladen.
+ */
+test('withoutHtmlComments liest Kommentare wie der Browser', () => {
+  assert.equal(withoutHtmlComments('<p>a</p><!-- offen <script src="/tot.js"></script>'), '<p>a</p>',
+    'ein Kommentar ohne `-->` gilt bis zum Ende der Quelle');
+  assert.equal(withoutHtmlComments('a<!-- x -->b<!-- y -->c'), 'abc');
+  assert.equal(withoutHtmlComments('a<!-- <!-- innen --> b'), 'a b',
+    'ein Kommentar endet am ERSTEN `-->`');
+  assert.equal(withoutHtmlComments('a<!-- x -->b<!-- offen'), 'ab',
+    'nach einem geschlossenen Kommentar beendet auch ein spaeterer offener die Quelle');
+  assert.equal(withoutHtmlComments('<!<!-- x -->--'), '<!--',
+    'was nach dem Schnitt wie ein Kommentaranfang aussieht, war im Browser Text');
 });
 
 /* EIN IMPORT OHNE AUFRUF IST TOTER CODE.

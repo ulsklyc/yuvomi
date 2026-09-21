@@ -93,6 +93,16 @@
   margin-inline-start: auto;
 }
 
+/* Der Filterknopf steht in einem eigenen Platz VOR der Chip-Leiste (#1373).
+ * Als letztes Kind der seitlich scrollenden Leiste rutschte er auf dem Telefon
+ * mit jedem gewaehlten Filter weiter aus dem sichtbaren Streifen, und das
+ * offene Panel hatte keinen sichtbaren Rueckweg mehr. Hier scrollt er nicht
+ * mit und schrumpft nicht. */
+.tasks-filters__start {
+  display: flex;
+  flex-shrink: 0;
+}
+
 @media (max-width: 639px) {
   /* Kompakter Kopf (Finish-Review Fundament-Phase): die Toolbar schob die
    * erste Aufgabe unter die Falz. Eine Stufe weniger Vertikalraum je Naht. */
@@ -521,11 +531,25 @@
   background: none;
   border: none;
   padding: 0;
-  margin-top: var(--space-1);
 }
 
 .filter-panel__clear:hover {
   color: var(--color-text-primary);
+}
+
+/* Fusszeile des Panels: Zuruecksetzen am Anfang, Schliessen am Ende (#1373).
+ * Ohne gesetzte Filter steht nur das Schliessen da und bleibt trotzdem an der
+ * Endkante - `margin-inline-start: auto` statt `space-between`, das ein
+ * einzelnes Kind an den Anfang legen wuerde. */
+.filter-panel__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+}
+
+.filter-panel__done {
+  margin-inline-start: auto;
 }
 
 /* --------------------------------------------------------

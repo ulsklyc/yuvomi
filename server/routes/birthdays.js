@@ -1,7 +1,7 @@
 import express from 'express';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
-import { collectErrors, date as validateDate, str, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { collectErrors, date as validateDate, oneOf, str, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
 import { hiddenModulesFor } from '../permissions.js';
 import {
@@ -42,6 +42,87 @@ function validateNameDay(val) {
     return { value: null, error: 'Name day must be a valid month and day.' };
   }
   return { value, error: null };
+}
+
+/**
+ * DIE ERINNERUNG EINES GEBURTSTAGS: drei Felder, die der Server bis hierher
+ * ungeprueft schrieb - negative Zahlen, Kommazahlen, Freitext.
+ *
+ * `reminder_offset` ist Text und traegt eine von vier Formen, so wie
+ * `getOffsetMinutes()` und `syncBirthdayCalendarEvent()` in
+ * server/services/birthdays.js sie lesen: `''` = keine Erinnerung und kein
+ * Termin, `null` = am Tag selbst, `'custom'` = Anzahl und Einheit, sonst ganze
+ * Minuten vor 12:00. Neue Minutenwerte muessen ganz und ab 0 sein: ein
+ * negativer Wert erinnert NACH dem Mittag, und das bietet kein Editor an.
+ * Obergrenze ist die groesste Angabe, die die eigene Angabe ausdruecken kann
+ * (999 Wochen) - eine Vorgabe soll nicht weiter reichen als der Weg daneben.
+ *
+ * `reminder_custom_amount` ist 1-999 wie das Zahlenfeld im Editor
+ * (`min="1" max="999"`), `reminder_custom_unit` eine der vier Einheiten, die
+ * `getOffsetMinutes()` kennt. Leer oder null heisst bei beiden „nicht gesetzt";
+ * der Server rechnet dann mit 1 und Tagen, wie bisher.
+ *
+ * BESTANDSWERTE BLEIBEN SCHREIBBAR. Bis v1.6.5 bot der Editor '15', '60' und
+ * '20160' an, und die API nahm jeden Wert. Ein Wert, der GENAU dem
+ * gespeicherten entspricht, geht deshalb unveraendert durch: `PUT` mit einem
+ * zurueckgeschickten Datensatz (GET, ein Feld aendern, PUT) scheitert nicht an
+ * einem Feld, das niemand angefasst hat. Der Editor schickt die Erinnerung nur,
+ * wenn sie sich geaendert hat (#1363) - dann aber alle drei Felder, auch die
+ * verborgene Anzahl, die seit dem Oeffnen den gespeicherten Wert zeigt.
+ */
+const REMINDER_UNITS = ['minutes', 'hours', 'days', 'weeks'];
+const MAX_REMINDER_AMOUNT = 999;
+const MAX_REMINDER_MINUTES = MAX_REMINDER_AMOUNT * 10080;
+
+function isStoredValue(val, stored) {
+  return stored !== undefined && stored !== null && String(val) === String(stored);
+}
+
+/** Eine ganze Zahl ohne Vorzeichen, als Zahl oder als Ziffernfolge. */
+function wholeNumber(val) {
+  if (typeof val === 'number') return Number.isSafeInteger(val) && val >= 0 ? val : null;
+  if (typeof val === 'string' && /^\d{1,9}$/.test(val)) return Number(val);
+  return null;
+}
+
+function validateReminderOffset(val, stored) {
+  if (val === undefined) return { value: undefined, error: null };
+  if (val === null || val === '' || val === 'custom') return { value: val, error: null };
+  if (isStoredValue(val, stored)) return { value: stored, error: null };
+  const minutes = wholeNumber(val);
+  if (minutes === null || minutes > MAX_REMINDER_MINUTES) {
+    return {
+      value: null,
+      error: `Reminder must be empty, "custom" or whole minutes from 0 to ${MAX_REMINDER_MINUTES}.`,
+    };
+  }
+  return { value: String(minutes), error: null };
+}
+
+function validateReminderAmount(val, stored) {
+  if (val === undefined) return { value: undefined, error: null };
+  if (val === null || val === '') return { value: null, error: null };
+  if (isStoredValue(val, stored)) return { value: stored, error: null };
+  const amount = wholeNumber(val);
+  if (amount === null || amount < 1 || amount > MAX_REMINDER_AMOUNT) {
+    return { value: null, error: `Custom reminder amount must be a whole number from 1 to ${MAX_REMINDER_AMOUNT}.` };
+  }
+  return { value: amount, error: null };
+}
+
+function validateReminderUnit(val, stored) {
+  if (val === undefined) return { value: undefined, error: null };
+  if (val === null || val === '') return { value: null, error: null };
+  if (isStoredValue(val, stored)) return { value: stored, error: null };
+  return oneOf(val, REMINDER_UNITS, 'Custom reminder unit');
+}
+
+function validateReminder(body, existing = {}) {
+  return {
+    offset: validateReminderOffset(body.reminder_offset, existing.reminder_offset),
+    amount: validateReminderAmount(body.reminder_custom_amount, existing.reminder_custom_amount),
+    unit: validateReminderUnit(body.reminder_custom_unit, existing.reminder_custom_unit),
+  };
 }
 
 /**
@@ -120,7 +201,8 @@ router.post('/', (req, res) => {
     const vNotes = str(req.body.notes, 'Notes', { max: MAX_TEXT, required: false });
     const vPhoto = validatePhotoData(req.body.photo_data);
     const vNameDay = validateNameDay(req.body.name_day);
-    const errors = collectErrors([vName, vBirthDate, vNotes, vPhoto, vNameDay]);
+    const vReminder = validateReminder(req.body);
+    const errors = collectErrors([vName, vBirthDate, vNotes, vPhoto, vNameDay, ...Object.values(vReminder)]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     const result = db.get().prepare(`
@@ -133,9 +215,9 @@ router.post('/', (req, res) => {
       vNotes.value,
       vPhoto.value ?? null,
       req.authUserId || req.session.userId,
-      req.body.reminder_offset ?? null,
-      req.body.reminder_custom_amount ?? null,
-      req.body.reminder_custom_unit ?? null
+      vReminder.offset.value ?? null,
+      vReminder.amount.value ?? null,
+      vReminder.unit.value ?? null
     );
 
     const birthday = loadBirthday(result.lastInsertRowid);
@@ -221,6 +303,8 @@ router.put('/:id', (req, res) => {
     if (req.body.notes !== undefined) checks.push(str(req.body.notes, 'Notes', { max: MAX_TEXT, required: false }));
     if (req.body.photo_data !== undefined) checks.push(validatePhotoData(req.body.photo_data));
     if (req.body.name_day !== undefined) checks.push(validateNameDay(req.body.name_day));
+    const vReminder = validateReminder(req.body, existing);
+    checks.push(...Object.values(vReminder));
     const errors = collectErrors(checks);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
@@ -245,9 +329,9 @@ router.put('/:id', (req, res) => {
       req.body.name_day !== undefined ? vNameDay.value : existing.name_day,
       req.body.notes !== undefined ? (req.body.notes?.trim() || null) : existing.notes,
       req.body.photo_data !== undefined ? (vPhoto.value ?? null) : existing.photo_data,
-      req.body.reminder_offset !== undefined ? req.body.reminder_offset : existing.reminder_offset,
-      req.body.reminder_custom_amount !== undefined ? req.body.reminder_custom_amount : existing.reminder_custom_amount,
-      req.body.reminder_custom_unit !== undefined ? req.body.reminder_custom_unit : existing.reminder_custom_unit,
+      vReminder.offset.value !== undefined ? vReminder.offset.value : existing.reminder_offset,
+      vReminder.amount.value !== undefined ? vReminder.amount.value : existing.reminder_custom_amount,
+      vReminder.unit.value !== undefined ? vReminder.unit.value : existing.reminder_custom_unit,
       id,
     );
 

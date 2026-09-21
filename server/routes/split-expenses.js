@@ -1057,22 +1057,67 @@ router.post('/groups/:id/settlements/:settlementId/reverse', (req, res) => {
   }
 });
 
+/**
+ * Verlauf einer Gruppe, neueste zuerst (#1309: jeder Eintrag erreichbar).
+ *
+ * Zwei Arten zu blaettern, EINE Reihenfolge: `created_at DESC, id ASC`.
+ * `created_at` hat Sekundengenauigkeit, mehrere Eintraege teilen sich also eine
+ * Sekunde - erst die `id` macht die Reihenfolge eindeutig, und nur ueber eine
+ * eindeutige Reihenfolge laesst sich ohne Luecke und Doppel weiterblaettern.
+ * `id ASC` innerhalb einer Sekunde ist keine Vorliebe, sondern die Reihenfolge,
+ * die SQLite vorher ueber `idx_expense_activity_group_created` ohnehin lieferte
+ * (Indexeintraege mit gleichem Schluessel liegen nach rowid aufsteigend) -
+ * ausgeschrieben, damit sie nicht am Abfrageplan haengt und bestehende Aufrufe
+ * dieselbe Liste bekommen wie bisher.
+ *
+ * - Cursor (`before_at` + `before_id`, aus `pagination.next_cursor`): die Seite
+ *   beginnt HINTER dem letzten Eintrag der vorigen. Neue Eintraege landen vorn
+ *   und verschieben nichts - der Weg, den die Oberflaeche geht.
+ * - `offset`: wie vor dem Cursor, fuer bestehende API-Nutzer. Kommt waehrend
+ *   des Blaetterns ein Eintrag dazu, rutscht dort alles um eins.
+ *
+ * Beides zugleich ist 400: welche Seite gemeint waere, laesst sich nicht sagen.
+ * Eine Zeile mehr als angefragt beantwortet `has_more` genau statt geschaetzt.
+ */
+function activityCursor(query) {
+  const hasAt = query.before_at != null && query.before_at !== '';
+  const hasId = query.before_id != null && query.before_id !== '';
+  if (!hasAt && !hasId) return { cursor: null };
+  const beforeId = Number(query.before_id);
+  if (!hasAt || !hasId || typeof query.before_at !== 'string' || query.before_at.length > 64
+      || !Number.isInteger(beforeId) || beforeId < 1) {
+    return { error: 'before_at and before_id belong together: take both from pagination.next_cursor.' };
+  }
+  return { cursor: { beforeAt: query.before_at, beforeId } };
+}
+
 router.get('/groups/:id/activity', (req, res) => {
   try {
     const groupId = Number(req.params.id);
     if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
     const limit = Math.min(Math.max(Number(req.query.limit) || 30, 1), 100);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
-    const rows = db.get().prepare(`
+    const { cursor, error } = activityCursor(req.query);
+    if (error) return res.status(400).json({ error, code: 400 });
+    if (cursor && offset) return res.status(400).json({ error: 'Use either a cursor or offset, not both.', code: 400 });
+    const keyset = cursor ? 'AND (a.created_at < @beforeAt OR (a.created_at = @beforeAt AND a.id > @beforeId))' : '';
+    const fetched = db.get().prepare(`
       SELECT a.*, u.display_name AS actor_name, u.avatar_color AS actor_color
       FROM expense_activity a
       LEFT JOIN users u ON u.id = a.actor_id
-      WHERE a.group_id = ?
-      ORDER BY a.created_at DESC
-      LIMIT ? OFFSET ?
-    `).all(groupId, limit, offset).map((row) => ({ ...row, metadata: row.metadata ? JSON.parse(row.metadata) : null }));
+      WHERE a.group_id = @groupId ${keyset}
+      ORDER BY a.created_at DESC, a.id ASC
+      LIMIT @size OFFSET @offset
+    `).all({ groupId, size: limit + 1, offset, ...(cursor || {}) });
+    const hasMore = fetched.length > limit;
+    const rows = fetched.slice(0, limit).map((row) => ({ ...row, metadata: row.metadata ? JSON.parse(row.metadata) : null }));
     attachSettlementState(rows, groupId, req);
-    res.json({ data: rows, pagination: { limit, offset, has_more: rows.length === limit } });
+    const last = rows[rows.length - 1];
+    const nextCursor = hasMore && last ? { before_at: last.created_at, before_id: last.id } : null;
+    const pagination = cursor
+      ? { limit, has_more: hasMore, next_cursor: nextCursor }
+      : { limit, offset, has_more: hasMore, next_cursor: nextCursor };
+    res.json({ data: rows, pagination });
   } catch (err) {
     log.error('GET /groups/:id/activity error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

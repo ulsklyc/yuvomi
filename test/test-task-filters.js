@@ -19,6 +19,8 @@
  *          - ein Set ohne Rest verschwindet ganz
  *          - der Speicher wird nicht umgeschrieben
  *          - nach einem Ladefehler wird NICHT gefiltert
+ *          - #1373: das Filter-Panel laesst sich schliessen, egal wie viele
+ *            Filter gewaehlt sind (Knopfplatz, Escape, „Fertig")
  * Ausführen: node --loader ./test/test-browser-loader.mjs --test test/test-task-filters.js
  */
 import test from 'node:test';
@@ -248,4 +250,179 @@ test('derselbe Filter verdraengt sich weiterhin selbst', () => {
 
   assert.equal(raw().length, 1, 'Reihenfolge und Schreibweise machen kein neues Set');
   assert.equal(tasks.getRecentFilters().length, 1);
+});
+
+// ---------------------------------------------------------------------------
+// #1373: Das Filter-Panel muss sich schliessen lassen, egal wie viele Filter
+// gewaehlt sind.
+//
+// Auf dem Telefon scrollt `#filter-bar` seitlich. Der Filterknopf war ihr
+// LETZTES Kind: jeder gewaehlte Filter setzte einen Chip davor und schob den
+// Knopf weiter aus dem sichtbaren Streifen (gemessen auf 375x812: von x=122 auf
+// x=437, Streifen endet bei 243). Das Panel hatte keinen zweiten Schliessweg.
+//
+// Gemessen wird das VERHALTEN von `renderFilters` auf einem kleinen DOM-Stub:
+// wo der Knopf nach dem Waehlen steht, und dass Escape und „Fertig" das Panel
+// wirklich zuklappen - ueber die Verdrahtung, die `renderFilters` selbst
+// anhaengt, nicht ueber eine direkt gerufene Hilfsfunktion.
+// ---------------------------------------------------------------------------
+
+class StubEl {
+  constructor(tag) {
+    this.tagName = tag.toUpperCase();
+    this.children = [];
+    this.parent = null;
+    this.attrs = new Map();
+    this.dataset = {};
+    this.listeners = new Map();
+    this.hidden = false;
+    this.text = '';
+  }
+  set id(v) { this.attrs.set('id', String(v)); }
+  get id() { return this.attrs.get('id') ?? ''; }
+  set className(v) { this.attrs.set('class', String(v)); }
+  get className() { return this.attrs.get('class') ?? ''; }
+  set textContent(v) { this.children = []; this.text = String(v); }
+  get textContent() { return this.text + this.children.map((c) => c.textContent ?? '').join(''); }
+  setAttribute(k, v) { this.attrs.set(k, String(v)); if (k === 'id') this.id = v; }
+  getAttribute(k) { return this.attrs.get(k) ?? null; }
+  appendChild(n) { n.parent = this; this.children.push(n); return n; }
+  append(...ns) { ns.forEach((n) => this.appendChild(n)); }
+  replaceChildren(...ns) { this.children.forEach((c) => { c.parent = null; }); this.children = []; this.append(...ns); }
+  contains(n) { for (let x = n; x; x = x.parent) if (x === this) return true; return false; }
+  *walk() { for (const c of this.children) { if (c instanceof StubEl) { yield c; yield* c.walk(); } } }
+  matches(sel) {
+    if (sel.startsWith('#')) return this.id === sel.slice(1);
+    const m = sel.match(/^\[data-([a-z-]+)\]$/);
+    if (m) {
+      const key = m[1].replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+      return this.dataset[key] !== undefined;
+    }
+    throw new Error(`stub kennt den Selektor nicht: ${sel}`);
+  }
+  querySelector(sel) { for (const e of this.walk()) if (e.matches(sel)) return e; return null; }
+  querySelectorAll(sel) { return [...this.walk()].filter((e) => e.matches(sel)); }
+  closest(sel) { for (let x = this; x instanceof StubEl; x = x.parent) if (x.matches(sel)) return x; return null; }
+  addEventListener(type, fn) {
+    if (!this.listeners.has(type)) this.listeners.set(type, []);
+    this.listeners.get(type).push(fn);
+  }
+  dispatch(type, init = {}) {
+    const ev = { type, target: this, key: init.key, defaultPrevented: false, stopped: false,
+      preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.stopped = true; } };
+    for (let x = this; x && !ev.stopped; x = x.parent) (x.listeners.get(type) ?? []).forEach((fn) => fn(ev));
+    return ev;
+  }
+  click() { return this.dispatch('click'); }
+  focus() { globalThis.document.activeElement = this; }
+}
+
+function mountFilterDom() {
+  globalThis.document = {
+    createElement: (tag) => new StubEl(tag),
+    createTextNode: (text) => ({ textContent: String(text), parent: null }),
+    activeElement: null,
+  };
+  globalThis.window = globalThis.window ?? {};
+  const container = new StubEl('div');
+  const row = container.appendChild(new StubEl('div'));
+  row.className = 'tasks-filters-row';
+  for (const id of ['filter-toggle-slot', 'filter-bar']) row.appendChild(new StubEl('div')).id = id;
+  container.appendChild(new StubEl('div')).id = 'filter-panel';
+  return container;
+}
+
+/** Die Ausgangslage aus dem Issue: Panel offen, mehrere Filter gewaehlt. */
+function openWithFilters(container) {
+  withKnown({ users: [1, 2] });
+  tasks.state.viewMode = 'list';
+  tasks.state.currentUserId = 1;
+  tasks.state.filters = { status: ['open'], priority: ['high', 'urgent', 'medium'], assigned_to: ['2'], category: [], tags: [] };
+  tasks.state.filterPanelOpen = true;
+  tasks.renderFilters(container);
+}
+
+test('#1373: der Filterknopf scrollt nicht mit der Chip-Leiste weg, egal wie viele Filter', () => {
+  const container = mountFilterDom();
+  openWithFilters(container);
+  const bar = container.querySelector('#filter-bar');
+  const toggle = container.querySelector('#filter-toggle-btn');
+  assert.ok(toggle, 'der Knopf wird gerendert');
+  assert.ok(bar.querySelectorAll('[data-filter]').length >= 5, 'Gegenprobe: die Leiste traegt die gewaehlten Chips');
+  assert.equal(bar.contains(toggle), false,
+    'der Knopf steht nicht in der seitlich scrollenden Leiste, sonst schieben ihn die Chips hinaus');
+  assert.equal(container.querySelector('#filter-toggle-slot').contains(toggle), true,
+    'der Knopf steht in seinem festen Platz vor der Leiste');
+});
+
+test('#1373: Escape im offenen Panel klappt es zu und gibt den Fokus an den Knopf', () => {
+  const container = mountFilterDom();
+  openWithFilters(container);
+  const panel = container.querySelector('#filter-panel');
+  assert.equal(panel.hidden, false, 'Ausgangslage: das Panel ist offen');
+  const chip = panel.querySelector('[data-filter]');
+  const ev = chip.dispatch('keydown', { key: 'Escape' });
+  assert.equal(tasks.state.filterPanelOpen, false);
+  assert.equal(panel.hidden, true, 'das Panel ist zu');
+  assert.equal(ev.defaultPrevented, true);
+  assert.equal(globalThis.document.activeElement, container.querySelector('#filter-toggle-btn'),
+    'der Fokus steht auf dem NEU gebauten Knopf');
+
+  // Andere Tasten schliessen nicht - sonst waere das Panel mit jeder Taste zu.
+  openWithFilters(container);
+  panel.querySelector('[data-filter]').dispatch('keydown', { key: 'Enter' });
+  assert.equal(tasks.state.filterPanelOpen, true);
+});
+
+test('#1373: „Fertig" am Ende des Panels klappt es zu, ohne die Filter anzufassen', () => {
+  const container = mountFilterDom();
+  openWithFilters(container);
+  const panel = container.querySelector('#filter-panel');
+  const done = panel.querySelector('#filter-panel-done');
+  assert.ok(done, 'das Panel traegt einen eigenen Schliessweg');
+  assert.equal(done.textContent, 'tasks.filterPanelDone');
+  done.click();
+  assert.equal(panel.hidden, true);
+  assert.equal(tasks.state.filterPanelOpen, false);
+  assert.deepEqual(tasks.state.filters.priority, ['high', 'urgent', 'medium'], 'die Auswahl bleibt');
+});
+
+test('#1373: die Escape-Verdrahtung stapelt sich nicht mit jedem Rendern', () => {
+  const container = mountFilterDom();
+  openWithFilters(container);
+  for (let i = 0; i < 5; i++) tasks.renderFilters(container);
+  const panel = container.querySelector('#filter-panel');
+  assert.equal(panel.listeners.get('keydown').length, 1, 'ein Listener, nicht einer je Rendern');
+});
+
+test('#1373: nach dem Waehlen eines Chips im Panel schliesst Escape es weiterhin', () => {
+  // Review zu #1385: das Rendern tauscht den fokussierten Chip aus, der Fokus
+  // fiel aufs Dokument, und Escape erreichte das Panel nie - genau in dem
+  // Zustand mit mehreren gewaehlten Filtern, um den es im Issue geht.
+  const container = mountFilterDom();
+  openWithFilters(container);
+  const panel = container.querySelector('#filter-panel');
+  const low = () => panel.querySelectorAll('[data-filter]')
+    .find((el) => el.dataset.filter === 'priority' && el.dataset.value === 'low');
+  const before = low();
+  before.focus();
+  // Was der Klick-Handler tut: Zustand aendern, neu rendern.
+  tasks.state.filters.priority.push('low');
+  tasks.renderFilters(container);
+  const after = low();
+  assert.notEqual(after, before, 'Gegenprobe: der Chip ist wirklich ein neuer Knoten');
+  assert.equal(globalThis.document.activeElement, after, 'der Fokus steht auf dem Nachfolger des Chips');
+  globalThis.document.activeElement.dispatch('keydown', { key: 'Escape' });
+  assert.equal(tasks.state.filterPanelOpen, false, 'Escape schliesst das Panel');
+});
+
+test('#1373: verschwindet der fokussierte Chip, geht der Fokus an den Filterknopf', () => {
+  const container = mountFilterDom();
+  openWithFilters(container);
+  const bar = container.querySelector('#filter-bar');
+  const chip = bar.querySelectorAll('[data-filter]').find((el) => el.dataset.value === 'urgent');
+  chip.focus();
+  tasks.state.filters.priority = tasks.state.filters.priority.filter((v) => v !== 'urgent');
+  tasks.renderFilters(container);
+  assert.equal(globalThis.document.activeElement, container.querySelector('#filter-toggle-btn'));
 });

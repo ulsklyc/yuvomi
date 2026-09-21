@@ -417,6 +417,7 @@
         "historySeriesLoadError": "Nepodařilo se načíst",
         "filterBtn": "Filtr",
         "filterClearAll": "Vymazat všechny filtry",
+        "filterPanelDone": "Hotovo",
         "filterGroupPerson": "Osoba",
         "filterGroupTag": "Štítek",
         "filterGroupPriority": "Priorita",
@@ -3267,7 +3268,8 @@
         "reversePayment": "Stornovat",
         "reversePaymentLabel": "Stornovat platbu od {{payer}} pro {{payee}} ve výši {{amount}}",
         "reversePaymentConfirm": "Stornovat tuto platbu?",
-        "reversePaymentConfirmDetail": "{{payer}} pro {{payee}}, {{amount}}. Protizápis platbu zruší a zůstatky se vrátí na předchozí stav. Platba zůstane v aktivitě označená jako stornovaná."
+        "reversePaymentConfirmDetail": "{{payer}} pro {{payee}}, {{amount}}. Protizápis platbu zruší a zůstatky se vrátí na předchozí stav. Platba zůstane v aktivitě označená jako stornovaná.",
+        "loadMoreActivity": "Načíst další"
     },
     "documents": {
         "title": "Dokumenty",

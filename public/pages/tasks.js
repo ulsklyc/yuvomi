@@ -3097,7 +3097,14 @@ function makeChip({ label, active = false, extraClass = '', pressed = undefined,
 function renderFilters(container) {
   const bar   = container.querySelector('#filter-bar');
   const panel = container.querySelector('#filter-panel');
-  if (!bar || !panel) return;
+  const toggleSlot = container.querySelector('#filter-toggle-slot');
+  if (!bar || !panel || !toggleSlot) return;
+
+  // Jedes Rendern tauscht die Chips aus. Stand der Fokus auf einem davon, fiele
+  // er danach aufs Dokument - und Escape erreichte das Panel nicht mehr, genau
+  // nachdem jemand darin einen Filter gewaehlt hat (#1373, Review). Also merken,
+  // WELCHER Chip es war, und ihn nach dem Rendern auf dem neuen Knoten setzen.
+  const focusBefore = rememberFilterFocus(document.activeElement, { bar, panel, toggleSlot });
 
   const statusLabels   = STATUS_LABELS();
   const priorityLabels = PRIORITY_LABELS();
@@ -3218,7 +3225,10 @@ function renderFilters(container) {
     toggleBtn.appendChild(badge);
   }
 
-  bar.appendChild(toggleBtn);
+  // In den festen Platz VOR der Leiste, nicht ans Ende der scrollenden Leiste
+  // (#1373): dort schob jeder gewaehlte Filter den Knopf weiter nach rechts aus
+  // dem sichtbaren Streifen, und das offene Panel hatte keinen Rueckweg mehr.
+  toggleSlot.replaceChildren(toggleBtn);
 
   // ---- Zuletzt verwendete Filter als Quick-Chips ----
   const statusLabelsMap   = STATUS_LABELS();
@@ -3247,7 +3257,10 @@ function renderFilters(container) {
     bar.appendChild(chip);
   });
 
-  if (window.lucide) window.lucide.createIcons({ el: bar });
+  if (window.lucide) {
+    window.lucide.createIcons({ el: bar });
+    window.lucide.createIcons({ el: toggleSlot });
+  }
 
   // ---- Filter-Panel: Gruppen mit allen Optionen ----
   panel.hidden = !state.filterPanelOpen;
@@ -3325,17 +3338,119 @@ function renderFilters(container) {
       panel.appendChild(section);
     });
 
+    // Fusszeile: „Alle zuruecksetzen" am Anfang, das Schliessen am Ende.
+    const footer = document.createElement('div');
+    footer.className = 'filter-panel__footer';
     if (activeCount > 0) {
       const clearBtn = document.createElement('button');
       clearBtn.className = 'filter-panel__clear';
       clearBtn.id = 'filter-clear-all';
       clearBtn.textContent = t('tasks.filterClearAll');
-      panel.appendChild(clearBtn);
+      footer.appendChild(clearBtn);
     }
+
+    // Ein Schliessen AM ENDE des Panels (#1373). Der Knopf oben ist der eine
+    // Ort, der das Panel oeffnet; mit vielen Personen, Kategorien und Tags
+    // wird es aber hoeher als der Bildschirm, und wer unten waehlt, sieht ihn
+    // nicht mehr. Kein Uebernehmen: jeder Chip wirkt sofort, der Knopf klappt
+    // nur zu.
+    const doneBtn = document.createElement('button');
+    doneBtn.type = 'button';
+    doneBtn.className = 'btn btn--secondary btn--sm filter-panel__done';
+    doneBtn.id = 'filter-panel-done';
+    doneBtn.textContent = t('tasks.filterPanelDone');
+    footer.appendChild(doneBtn);
+    panel.appendChild(footer);
+
     if (window.lucide) window.lucide.createIcons({ el: panel });
   }
 
   wireFilterChips(container);
+  wireFilterPanelDismiss(container, panel, toggleSlot);
+  restoreFilterFocus(focusBefore, { bar, panel, toggleSlot });
+}
+
+/**
+ * Wo in Filterleiste, Knopfplatz oder Panel der Fokus stand, als Beschreibung
+ * statt als Knoten - der Knoten ist nach dem Rendern weg. `null`, wenn er
+ * woanders stand: dann faesst das Rendern ihn auch nicht an.
+ */
+function rememberFilterFocus(active, { bar, panel, toggleSlot }) {
+  if (!active || typeof active !== 'object') return null;
+  const zone = [['panel', panel], ['bar', bar], ['slot', toggleSlot]]
+    .find(([, el]) => el.contains(active) && el !== active)?.[0];
+  if (!zone) return null;
+  return {
+    zone,
+    id: active.id || null,
+    filter: active.dataset?.filter ?? null,
+    value: active.dataset?.value ?? null,
+  };
+}
+
+/**
+ * Setzt den Fokus auf den Nachfolger des gemerkten Chips. Gibt es ihn nicht mehr
+ * (ein entfernter Filter-Chip der Leiste, ein zugeklapptes Panel), geht er an
+ * den Filterknopf - der steht immer da und oeffnet und schliesst das Panel.
+ */
+function restoreFilterFocus(before, { bar, panel, toggleSlot }) {
+  if (!before) return;
+  const root = { panel, bar, slot: toggleSlot }[before.zone];
+  let match = null;
+  if (before.filter) {
+    match = [...root.querySelectorAll('[data-filter]')]
+      .find((el) => el.dataset.filter === before.filter && el.dataset.value === before.value) ?? null;
+  } else if (before.id) {
+    match = root.querySelector(`#${before.id}`);
+  }
+  (match ?? toggleSlot.querySelector('#filter-toggle-btn'))?.focus();
+}
+
+/**
+ * Schliesst das Filter-Panel und gibt den Fokus an den Knopf zurueck, der es
+ * geoeffnet hat. `renderFilters` baut den Knopf neu, also muss der Fokus auf
+ * den NEUEN - der alte haengt nach dem Rendern nirgends mehr.
+ */
+function closeFilterPanel(container) {
+  if (!state.filterPanelOpen) return;
+  state.filterPanelOpen = false;
+  renderFilters(container);
+  container.querySelector('#filter-toggle-btn')?.focus();
+}
+
+/* Welche Panels ihre Escape-Verdrahtung schon tragen. Das Panel und der
+ * Knopfplatz ueberleben jedes `renderFilters` (nur ihre Kinder werden
+ * getauscht); ein Listener je Rendern stapelte sich also mit jedem Chip-Klick. */
+const filterPanelDismissWired = new WeakSet();
+
+/**
+ * Escape schliesst das Panel, solange der Fokus in ihm oder auf seinem Knopf
+ * steht (#1373) - wie die Suchleiste des Kalenders, das andere Bedienfeld, das
+ * an Ort und Stelle aufklappt.
+ *
+ * KEIN SCHLIESSEN PER TIPP DANEBEN, obwohl der Melder es vorschlug. Die App
+ * schliesst so nur SCHWEBENDE Ebenen (Popover-Menues, Datumswahl,
+ * Schnellaktionen, Detail-Popover): sie verdecken, was darunter liegt, und
+ * verschwinden, ohne dass sich etwas verschiebt. Dieses Panel steht IM Fluss
+ * und schiebt die Liste nach unten. Ginge es beim Tipp auf eine Aufgabe zu,
+ * rutschte die Liste unter dem Finger um die Panelhoehe nach oben, und der
+ * Tipp traefe eine andere Zeile als die gemeinte. Die Zurueck-Geste bleibt aus
+ * demselben Grund bei den Overlays (utils/overlay-history.js).
+ */
+function wireFilterPanelDismiss(container, panel, toggleSlot) {
+  if (filterPanelDismissWired.has(panel)) return;
+  filterPanelDismissWired.add(panel);
+  const onKeydown = (e) => {
+    if (e.key !== 'Escape' || !state.filterPanelOpen) return;
+    e.preventDefault();
+    e.stopPropagation();
+    closeFilterPanel(container);
+  };
+  panel.addEventListener('keydown', onKeydown);
+  toggleSlot.addEventListener('keydown', onKeydown);
+  panel.addEventListener('click', (e) => {
+    if (e.target.closest('#filter-panel-done')) closeFilterPanel(container);
+  });
 }
 
 /* DIESES MODUL FUEHRT DIE ZAHL NICHT MEHR (#868).
@@ -3670,6 +3785,9 @@ function wireFilterChips(container) {
   container.querySelector('#filter-toggle-btn')?.addEventListener('click', () => {
     state.filterPanelOpen = !state.filterPanelOpen;
     renderFilters(container);
+    // Der Knopf ist gerade neu gebaut worden; ohne das stuende der Fokus
+    // danach auf dem Dokument statt auf dem Knopf, der ihn hatte.
+    container.querySelector('#filter-toggle-btn')?.focus();
   });
 
   // Alle Filter zurücksetzen
@@ -4473,6 +4591,11 @@ export async function render(container, { user }) {
 
       <div class="tasks-body">
         <div class="tasks-filters-row">
+          <!-- Der Filterknopf steht VOR der Chip-Leiste, nicht in ihr (#1373):
+               die Leiste scrollt auf dem Telefon seitlich, und jeder gewaehlte
+               Filter schob den Knopf als letztes Kind aus dem sichtbaren
+               Streifen - das offene Panel liess sich nicht mehr schliessen. -->
+          <div class="tasks-filters__start" id="filter-toggle-slot"></div>
           <div class="tasks-filters" id="filter-bar" role="group" aria-label="${t('tasks.filterBtn')}"></div>
           <div class="tasks-filters__end">
             <!-- Icon PLUS Label, nicht Icon ODER Label: unter 640px faellt das
@@ -4692,6 +4815,10 @@ export const __test = {
   // Gemerkte Filter: der Vertrag ist, dass Lesen und Schreiben AUSEINANDER
   // gehen - sonst schriebe das Bereinigen sich fest (siehe getRecentFilters).
   getRecentFilters, storedRecentFilters, saveRecentFilter,
+  // Filterleiste und -panel als Verhalten (#1373): wo der Knopf landet, und
+  // dass Escape und „Fertig" das Panel wirklich schliessen - samt der
+  // Verdrahtung, die `renderFilters` selbst anhaengt.
+  renderFilters,
   // Die Frische der Referenzlisten ist nur verhaltensgetrieben pruefbar: sie
   // haengt daran, WIE die Antwort kam, nicht daran, dass eine kam.
   refreshTags,
