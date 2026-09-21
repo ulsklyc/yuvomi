@@ -3487,6 +3487,7 @@
         "visitUnpaidToast": "Payment undone.",
         "receiptUploadTitle": "Upload payment receipt",
         "receiptUploadHint": "Attach a payment receipt. It will appear in Documents.",
+        "receiptLabel": "Payment receipt",
         "receiptDocumentName": "Receipt - {{name}} - {{date}}",
         "receiptDocumentDescription": "Payment receipt for {{name}} housekeeping visit on {{date}}.",
         "taskTemplateData": {

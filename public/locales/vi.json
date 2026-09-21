@@ -3487,6 +3487,7 @@
         "visitUnpaidToast": "Đã hoàn tác thanh toán.",
         "receiptUploadTitle": "Tải lên biên lai thanh toán",
         "receiptUploadHint": "Đính kèm một biên lai thanh toán. Nó sẽ xuất hiện trong Tài liệu.",
+        "receiptLabel": "Biên lai thanh toán",
         "receiptDocumentName": "Biên lai - {{name}} - {{date}}",
         "receiptDocumentDescription": "Biên lai thanh toán cho lượt dọn dẹp của {{name}} vào ngày {{date}}.",
         "taskTemplateData": {

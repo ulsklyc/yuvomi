@@ -3487,6 +3487,7 @@
         "visitUnpaidToast": "Ödeme geri alındı.",
         "receiptUploadTitle": "Ödeme makbuzu yükle",
         "receiptUploadHint": "Bir ödeme makbuzu ekleyin. Ardından Belgeler bölümünde görünür.",
+        "receiptLabel": "Ödeme makbuzu",
         "receiptDocumentName": "Makbuz - {{name}} - {{date}}",
         "receiptDocumentDescription": "{{name}} kişisinin {{date}} tarihli ziyareti için ödeme makbuzu.",
         "taskTemplateData": {

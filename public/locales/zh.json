@@ -3487,6 +3487,7 @@
         "visitUnpaidToast": "付款已撤销。",
         "receiptUploadTitle": "上传付款凭证",
         "receiptUploadHint": "添加付款凭证，之后会显示在“文档”中。",
+        "receiptLabel": "付款凭证",
         "receiptDocumentName": "凭证 - {{name}} - {{date}}",
         "receiptDocumentDescription": "{{name}} 于 {{date}} 上门服务的付款凭证。",
         "taskTemplateData": {

@@ -3487,6 +3487,7 @@
         "visitUnpaidToast": "Pago deshecho.",
         "receiptUploadTitle": "Subir comprobante de pago",
         "receiptUploadHint": "Adjunta un comprobante de pago. Aparecerá después en Documentos.",
+        "receiptLabel": "Comprobante de pago",
         "receiptDocumentName": "Comprobante - {{name}} - {{date}}",
         "receiptDocumentDescription": "Comprobante de pago del servicio de {{name}} del {{date}}.",
         "taskTemplateData": {

@@ -3487,6 +3487,7 @@
         "visitUnpaidToast": "Fizetés visszavonva.",
         "receiptUploadTitle": "Fizetési bizonylat feltöltése",
         "receiptUploadHint": "Csatoljon egy fizetési bizonylatot. Megjelenik a Dokumentumok között.",
+        "receiptLabel": "Fizetési bizonylat",
         "receiptDocumentName": "Bizonylat - {{name}} - {{date}}",
         "receiptDocumentDescription": "Fizetési bizonylat {{name}} takarítói munkájához a következő dátumon: {{date}}.",
         "taskTemplateData": {

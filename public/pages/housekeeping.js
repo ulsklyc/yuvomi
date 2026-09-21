@@ -15,6 +15,8 @@ import { wireTablist } from '/utils/tablist.js';
 import { wireScrollFade } from '/utils/ux.js';
 import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
+import { isNavModuleReadOnly } from '/permissions.js';
+import { pathAccess, mayWritePath } from '/utils/module-access.js';
 
 
 
@@ -55,6 +57,101 @@ let state = {
   staffVisits: [],
   currency: 'EUR',
 };
+
+// --------------------------------------------------------
+// Nur-lesen (#467, #1265 P6)
+// --------------------------------------------------------
+
+/**
+ * Darf dieser Nutzer in der Haushaltshilfe schreiben?
+ *
+ * Die VERBINDLICHE Sperre liegt am Server: das Gate an /api/v1 beantwortet
+ * jedes POST/PUT/PATCH/DELETE unter /housekeeping mit 403, sobald das Modul auf
+ * `read` steht. Dies ist die ehrliche UI-Entsprechung. Ohne sie trug die Seite
+ * bei `read` fast jeden Schreibweg voll bedienbar - ein- und auschecken,
+ * Aufgaben aus einer Vorlage oder dem Formular anlegen, abhaken, zuruecknehmen,
+ * bearbeiten und loeschen, ein Profil aus dem Leerzustand anlegen -, und jeder
+ * endete am 403. Die Besuchszeilen waren schon ehrlich: dort bietet der Server
+ * je Besuch an (`can_edit`, `can_delete`, `can_mark_paid`, #1135/#1136) und
+ * rechnet das Modulrecht mit ein (`mayWriteHousekeeping()` in
+ * server/routes/housekeeping.js). Die Seite fragt dort trotzdem selbst, weil
+ * ein Rechtewechsel ohne Neuladen ankommt und die Felder so alt sind wie die
+ * letzte Antwort.
+ *
+ * `housekeeping` ist ein echter Rechte-Schluessel (server/permissions.js,
+ * `NAV_TO_MODULE` in /permissions.js); `!mayWritePath('/housekeeping')` ist
+ * dasselbe Urteil. Als Funktion und nicht als Konstante, damit jedes Neuzeichnen
+ * neu fragt. Vorbild: `waste.js`, `health.js`.
+ *
+ * DREI LINIEN, weil diese Seite ihre Knoepfe einzeln verdrahtet:
+ *   1. das Markup nimmt die Affordanz,
+ *   2. `readOnlyLatch()` nimmt dem uebrig gebliebenen Knoten die Wirkung
+ *      (Positivliste `READ_SAFE_CONTROLS`),
+ *   3. die schreibende Verdrahtung haengt gar nicht erst, und jeder Einstieg
+ *      (Dialog, Buchung, Check-in, Anlegen) fragt selbst noch einmal - auch
+ *      beim Absenden eines Dialogs, der vor einem Rechtewechsel aufging.
+ *
+ * KEIN WANDTABLETT, KEIN PERSONAL. Ein Display fuehrt `housekeeping` nicht in
+ * seiner Scope-Liste (server/display-scopes.js), bekommt das Modul deshalb als
+ * `none` und erreicht diese Seite gar nicht; `DISPLAY_WRITE_ROUTES` nennt keine
+ * Route hierher. Ein Konto der Haushaltshilfe selbst meldet sich auf keinem Weg
+ * an (`canSignIn` in server/auth.js, #243). Ein `actingAsDisplay()` vor der
+ * Modulregel braucht es hier also nicht.
+ */
+function readOnly() {
+  return isNavModuleReadOnly('housekeeping');
+}
+
+/**
+ * Die Bedienelemente dieser Seite, die NICHT schreiben. Alles andere sperrt
+ * `readOnlyLatch()` bei `read`.
+ *
+ * Eine POSITIVLISTE wie `READ_SAFE_ACTIONS` in waste.js und health.js, nur aus
+ * Selektoren statt Aktionsnamen: diese Seite hat keinen `data-action`-Verteiler,
+ * jeder Knopf traegt seinen eigenen Haken. Eine Liste der schreibenden Haken
+ * saehe zu jedem morgen ergaenzten Knopf Ja; so ist er gesperrt, bis ihn jemand
+ * hier als lesend eintraegt.
+ *
+ * Tab wechseln, einen Einsatzbericht oeffnen (Uebersicht, Protokoll, Berichte),
+ * eine Person fuer ihr Protokoll waehlen, den Monat des Berichts oder des
+ * Protokolls wechseln. Verglichen wird das Bedienelement SELBST (`matches`),
+ * nicht ein Vorfahr: die Personenzeile ist lesend, ihr Bearbeiten-Knopf nicht.
+ */
+const READ_SAFE_CONTROLS = [
+  '.housekeeping-tab',
+  '[data-open-visit]',
+  '[data-visit-report]',
+  '.housekeeping-staff-row__select',
+  '#housekeeping-report-prev',
+  '#housekeeping-report-next',
+  '#housekeeping-report-current',
+  '#housekeeping-staff-month',
+].join(', ');
+
+// Was als Bedienelement zaehlt. Ein `label` nicht: sein Klick kommt als eigener
+// Klick am Feld an und wird dort beurteilt - sonst sperrte die Beschriftung des
+// Monatsfilters den Filter.
+const LATCHED_CONTROLS = 'button, input, select, textarea, form, [role="button"]';
+
+/**
+ * Der eine Riegel fuer alle Bedienelemente der Seite, in der ERFASSUNGSPHASE an
+ * `.housekeeping-page` (Klick und Absenden, siehe `renderShell()`).
+ *
+ * WARUM CAPTURE: die Listener haengen an den Knoepfen selbst, nicht an einem
+ * gemeinsamen Verteiler - ein Riegel in der Blasenphase kaeme zu spaet, der
+ * Dialog stuende dann schon (dieselbe Begruendung wie in health.js). Die Dialoge
+ * selbst liegen ausserhalb der Seite; sie fragen in ihrem Einstieg und beim
+ * Absenden.
+ */
+function readOnlyLatch(event) {
+  if (!readOnly()) return;
+  const target = event.target;
+  if (typeof target?.closest !== 'function') return;
+  const control = target.closest(LATCHED_CONTROLS);
+  if (!control || control.matches(READ_SAFE_CONTROLS)) return;
+  event.preventDefault();
+  event.stopPropagation();
+}
 
 function money(value) {
   return getNumberFormat({ style: 'currency', currency: state.currency }).format(Number(value || 0));
@@ -180,7 +277,9 @@ let fab = null;
 
 function updateHousekeepingFab() {
   if (!fab) return;
-  if (state.tab === 'staff') {
+  // Bei `read` blendet layout.css den FAB schon aus; hier faellt auch seine
+  // Aktion weg - ausgeblendet ist nicht unerreichbar.
+  if (state.tab === 'staff' && !readOnly()) {
     setPageFabAction(fab, {
       label: t('housekeeping.addWorker'),
       onClick: () => openStaffModal(null, document.querySelector('#housekeeping-content')),
@@ -208,7 +307,13 @@ function renderShell(container) {
   `);
 
   fab = createPageFab({ id: 'housekeeping-fab' });
-  container.querySelector('.housekeeping-page').appendChild(fab);
+  const page = container.querySelector('.housekeeping-page');
+  page.appendChild(fab);
+  // Der Riegel fuer jeden Knopf der Seite (siehe readOnlyLatch()). Er haengt an
+  // der Seite, die hier jedes Mal neu entsteht - auch nach einem Check-in, der
+  // die ganze Schale neu baut.
+  page.addEventListener('click', readOnlyLatch, true);
+  page.addEventListener('submit', readOnlyLatch, true);
 
   wireTablist(container.querySelector('.housekeeping-tabs'), {
     activeId: state.tab,
@@ -234,6 +339,7 @@ function renderCurrentTab(container) {
 }
 
 async function toggleSession(container, workerId) {
+  if (readOnly()) return;
   const worker = state.workers.find((item) => String(item.id) === String(workerId));
   // `current_session` ist die noch offene Sitzung. `today_session` traegt auch
   // eine abgeschlossene und haette hier ein zweites Auschecken ausgeloest.
@@ -265,13 +371,45 @@ async function toggleSession(container, workerId) {
   }
 }
 
+/**
+ * Der Check-Knopf einer Person bei `housekeeping: read` - die Antwort folgt dem
+ * DATENSATZ.
+ *
+ * Der Knopf traegt zweierlei: die Handlung (ein- oder auschecken) und im
+ * eingecheckten Zustand eine Auskunft, die sonst auf dieser Seite nirgends
+ * steht. Die Zeile daneben nennt nur die Uhrzeit des Einsatzes und liest dafuer
+ * auch eine schon beendete Sitzung von heute (`current_session` gegen
+ * `today_session`, #1133) - ob die Person GERADE da ist, sagt allein der Knopf.
+ *
+ * Eine offene Sitzung bleibt deshalb als ZEICHEN stehen: ein `span role="img"`,
+ * dessen Beschriftung den Zustand nennt, kein `disabled`-Knopf, der Treffer-
+ * flaeche und Hover behielte und „Auschecken" fuer eine Beruehrung verspraeche,
+ * die nichts tut. Ohne offene Sitzung faellt die Stelle ganz weg: „nicht
+ * eingecheckt" ist kein Zustand, den ein leerer Knopf zeigen muesste.
+ *
+ * Der Wortlaut ist der der Uebersichts-Kachel (`dashboard.housekeepingPresent`),
+ * die denselben Zustand aus derselben offenen Sitzung liest - ein Zustand, ein
+ * Satz, in allen Sprachen schon uebersetzt.
+ */
+function presenceSignHtml(checkedIn) {
+  if (!checkedIn) return '';
+  const label = t('dashboard.housekeepingPresent');
+  return `
+      <span class="housekeeping-check-small housekeeping-check-small--static" role="img" aria-label="${esc(label)}">
+        <i data-lucide="log-in" aria-hidden="true"></i>
+        <span>${esc(label)}</span>
+      </span>`;
+}
+
 function renderWorkerSummary() {
   if (!state.workers.length) {
+    // Der Leerzustand bot „Profil anlegen" an; bei `read` faellt die Aktion
+    // weg, die Auskunft bleibt.
     return emptyStateHTML({
       icon: 'user-plus',
       title: t('housekeeping.noWorkerTitle'),
       description: t('housekeeping.noWorkerHint'),
-      action: {
+      action: readOnly() ? null : {
         label: t('housekeeping.setupProfileAction'),
         icon: 'plus',
         attrs: { id: 'housekeeping-create-profile' },
@@ -298,11 +436,12 @@ function renderWorkerSummary() {
         <strong>${esc(worker.display_name)}</strong>
         <span>${esc(session ? `${t('housekeeping.visitRecordedAt')} ${formatTime(session.check_in)}` : (worker.rate_type === 'hourly' ? `${money(worker.hourly_rate)}/${t('housekeeping.rateHourly')}` : `${money(worker.daily_rate)} · ${scheduleLabel(worker.payment_schedule)}`))}</span>
       </div>
+      ${readOnly() ? presenceSignHtml(checkedIn) : `
       <button class="btn ${checkedIn ? 'btn--secondary' : 'btn--primary'} housekeeping-check-small" type="button"
               data-worker-check="${worker.id}">
         <i data-lucide="${checkedIn ? 'log-out' : 'log-in'}" aria-hidden="true"></i>
         <span>${esc(checkedIn ? t('housekeeping.checkOut') : t('housekeeping.checkIn'))}</span>
-      </button>
+      </button>`}
     </section>
   `;
   }).join('');
@@ -406,15 +545,19 @@ function renderDashboard(content) {
     </section>
   `);
   if (window.lucide) window.lucide.createIcons({ el: content });
-  content.querySelectorAll('[data-worker-check]').forEach((btn) => {
-    btn.addEventListener('click', () => toggleSession(document.querySelector('.page-transition') || document.body, btn.dataset.workerCheck));
-  });
-  content.querySelectorAll('[data-edit-visit]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const visit = (state.recentVisits || []).find((v) => String(v.id) === btn.dataset.editVisit);
-      if (visit) openVisitEditModal(visit, content, { onDone: renderDashboard });
+  // `if (!readOnly())` statt `return`: die lesende Verdrahtung (Bericht
+  // oeffnen) steht dahinter und muss bleiben - dieselbe Form wie in health.js.
+  if (!readOnly()) {
+    content.querySelectorAll('[data-worker-check]').forEach((btn) => {
+      btn.addEventListener('click', () => toggleSession(document.querySelector('.page-transition') || document.body, btn.dataset.workerCheck));
     });
-  });
+    content.querySelectorAll('[data-edit-visit]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const visit = (state.recentVisits || []).find((v) => String(v.id) === btn.dataset.editVisit);
+        if (visit) openVisitEditModal(visit, content, { onDone: renderDashboard });
+      });
+    });
+  }
   content.querySelectorAll('[data-open-visit]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const visit = (state.recentVisits || []).find((v) => String(v.id) === btn.dataset.openVisit);
@@ -424,6 +567,7 @@ function renderDashboard(content) {
 }
 
 async function createTask(payload, content) {
+  if (readOnly()) return;
   try {
     await api.post('/housekeeping/decay-tasks', payload);
     window.yuvomi?.showToast(t('housekeeping.taskCreatedToast'), 'success');
@@ -434,25 +578,34 @@ async function createTask(payload, content) {
   }
 }
 
-function renderTasks(content) {
-  content.replaceChildren();
-  const templateButtons = state.templates.map((template, index) => `
-    <button class="housekeeping-template" type="button" data-template-index="${index}">
-      <span>${esc(templateLabel(template, 'name'))}</span>
-      <small>${esc(templateLabel(template, 'area'))} · ${esc(t('housekeeping.everyDays', { days: template.frequency_days }))}</small>
-    </button>
-  `).join('');
-  const taskRows = state.tasks.map((task) => `
-    <article class="housekeeping-task housekeeping-task--${esc(task.urgency_status)}">
+/**
+ * Eine Aufgabenzeile. Bei `housekeeping: read` bleibt die AUSKUNFT - Name,
+ * Bereich, Rhythmus und die Dringlichkeit (Toenung und Beschriftung) -, und
+ * alle Bedienelemente fallen weg: der Kreis links, das Zuruecknehmen, das
+ * Bearbeiten und das Loeschen.
+ *
+ * DER KREIS IST KEIN ZUSTAND. Anders als der Haken einer Aufgabe
+ * (`.task-status-btn--static`) sieht er an jeder Zeile gleich aus - er heisst
+ * „jetzt erledigt" und setzt die Frist zurueck, sagt aber nicht, ob etwas
+ * erledigt ist. Den Zustand der Zeile traegt die Dringlichkeit, und die bleibt.
+ * Ein Zeichen an seiner Stelle haette also nichts zu nennen. Ohne Kreis faellt
+ * seine Spalte weg (`.housekeeping-task--readonly`).
+ */
+function taskRowHtml(task) {
+  const ro = readOnly();
+  return `
+    <article class="housekeeping-task housekeeping-task--${esc(task.urgency_status)}${ro ? ' housekeeping-task--readonly' : ''}">
+      ${ro ? '' : `
       <button class="housekeeping-task__check" type="button" data-complete-task="${esc(task.id)}"
               aria-label="${esc(t('housekeeping.completeTask', { name: task.name }))}">
         <i data-lucide="check" aria-hidden="true"></i>
-      </button>
+      </button>`}
       <div class="housekeeping-task__body">
         <h2>${esc(task.name)}</h2>
         <p>${esc(task.area)} · ${esc(t('housekeeping.everyDays', { days: task.frequency_days }))}</p>
         <span>${esc(urgencyLabel(task.urgency_status))}</span>
       </div>
+      ${ro ? '' : `
       <div class="housekeeping-task__actions row-actions">
         ${task.last_completed ? `
           <button class="row-action" type="button" data-undo-task="${esc(task.id)}"
@@ -467,11 +620,26 @@ function renderTasks(content) {
                 aria-label="${esc(t('housekeeping.deleteTask'))}">
           <i data-lucide="trash-2" aria-hidden="true"></i>
         </button>
-      </div>
+      </div>`}
     </article>
-  `).join('');
+  `;
+}
 
-  content.insertAdjacentHTML('beforeend', `
+/**
+ * Die beiden Anlegewege des Aufgaben-Tabs: die Vorlagen und das eigene
+ * Formular. Beide tun nichts anderes als anlegen, also fallen bei
+ * `housekeeping: read` beide Karten ganz weg: eine Vorlage ist ein Knopf, und
+ * er legt eine Aufgabe an.
+ */
+function taskCreateHtml() {
+  if (readOnly()) return '';
+  const templateButtons = state.templates.map((template, index) => `
+    <button class="housekeeping-template" type="button" data-template-index="${index}">
+      <span>${esc(templateLabel(template, 'name'))}</span>
+      <small>${esc(templateLabel(template, 'area'))} · ${esc(t('housekeeping.everyDays', { days: template.frequency_days }))}</small>
+    </button>
+  `).join('');
+  return `
     <section class="housekeeping-card">
       <h2>${esc(t('housekeeping.taskTemplates'))}</h2>
       <div class="housekeeping-template-list">${templateButtons}</div>
@@ -498,12 +666,22 @@ function renderTasks(content) {
           <span>${esc(t('housekeeping.createTask'))}</span>
         </button>
       </form>
-    </section>
+    </section>`;
+}
+
+function renderTasks(content) {
+  content.replaceChildren();
+  const taskRows = state.tasks.map(taskRowHtml).join('');
+
+  content.insertAdjacentHTML('beforeend', `
+    ${taskCreateHtml()}
     <section class="housekeeping-task-list row-carrier">
       ${taskRows || emptyStateHTML({ icon: 'list-checks', title: t('housekeeping.noTasks') })}
     </section>
   `);
   if (window.lucide) window.lucide.createIcons({ el: content });
+  // Jede Verdrahtung darunter schreibt - bei `read` haengt keine.
+  if (readOnly()) return;
 
   content.querySelectorAll('[data-template-index]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -596,6 +774,7 @@ function renderTasks(content) {
  * zurueck - scheitert die Buchung, steht der Bericht noch da; geschlossen wird
  * erst in `onPaid`. Ohne offenes Modal verhaelt es sich wie `confirmModal`. */
 async function payVisit(visit, onPaid) {
+  if (readOnly()) return;
   const confirmed = await confirmOverModal(t('housekeeping.markPaidConfirm'), {
     closeOnConfirm: false,
     confirmLabel: t('housekeeping.markPaid'),
@@ -618,6 +797,7 @@ async function payVisit(visit, onPaid) {
  * (`can_mark_unpaid`); die Route prueft die Rolle beim Schreiben selbst. Dieselbe
  * Form wie `payVisit`, damit der Bericht auch hier einen Fehler ueberlebt. */
 async function unpayVisit(visit, onUnpaid) {
+  if (readOnly()) return;
   const confirmed = await confirmOverModal(t('housekeeping.markUnpaidConfirm'), {
     closeOnConfirm: false,
     confirmLabel: t('housekeeping.markUnpaid'),
@@ -639,9 +819,13 @@ async function unpayVisit(visit, onUnpaid) {
  * standen beide Knoepfe an jeder Zeile, und ein Mitglied lernte erst beim
  * Speichern, dass ein bezahlter Besuch abgerechnet ist. Die Admin-Regel wird
  * hier nicht nachgebaut. Wo Bearbeiten fehlt, fuehrt der Knopf zum Bericht:
- * lesen darf jede Person, die die Zeile sieht. */
+ * lesen darf jede Person, die die Zeile sieht.
+ *
+ * `readOnly()` steht ZUSAETZLICH da (#1265 P6). Der Server rechnet das
+ * Modulrecht schon in die Felder ein, aber die Felder sind so alt wie die
+ * letzte Antwort, und ein Rechtewechsel kommt ohne Neuladen an. */
 function visitEditActionHtml(visit, visitDate) {
-  if (visit.can_edit) {
+  if (visit.can_edit && !readOnly()) {
     return `<button class="row-action" type="button" data-edit-visit="${esc(visit.id)}"
                 aria-label="${esc(t('housekeeping.editVisit'))}: ${esc(visitDate)}">
           <i data-lucide="edit-2" class="icon-md" aria-hidden="true"></i>
@@ -654,7 +838,7 @@ function visitEditActionHtml(visit, visitDate) {
 }
 
 function visitDeleteActionHtml(visit, visitDate) {
-  if (!visit.can_delete) return '';
+  if (!visit.can_delete || readOnly()) return '';
   return `<button class="row-action row-action--danger" type="button" data-delete-visit="${esc(visit.id)}"
                 aria-label="${esc(t('housekeeping.deleteVisit'))}: ${esc(visitDate)}">
           <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
@@ -662,10 +846,13 @@ function visitDeleteActionHtml(visit, visitDate) {
 }
 
 /* Warum die Knoepfe fehlen, steht in der Metazeile, wo der Zahlstatus die
- * Zeile ohnehin beschreibt - nicht als Tooltip an einem Knopf, den es nicht gibt. */
+ * Zeile ohnehin beschreibt - nicht als Tooltip an einem Knopf, den es nicht gibt.
+ * Bei `housekeeping: read` ist „nur durch einen Admin" nicht der Grund: dort
+ * fehlen die Knoepfe an JEDEM Besuch, bezahlt oder nicht. Die Zeile nennt dann
+ * nur den Zahlstatus. */
 function visitPaymentMeta(visit) {
   if (!visit.paid_at) return t('housekeeping.paymentPending');
-  if (visit.can_edit) return t('housekeeping.paymentPaid');
+  if (visit.can_edit || readOnly()) return t('housekeeping.paymentPaid');
   return `${t('housekeeping.paymentPaid')} · ${t('housekeeping.settledAdminOnly')}`;
 }
 
@@ -787,7 +974,7 @@ function renderReports(content) {
         <strong>${esc(visit.worker_name || t('housekeeping.staff'))}</strong>
         <span>${esc(formatDate(visit.check_in))} · ${esc(money(visit.total_amount))} · ${esc(paid ? t('housekeeping.paymentPaid') : t('housekeeping.paymentPending'))}</span>
       </div>
-      ${!visit.can_mark_paid ? '' : `
+      ${!visit.can_mark_paid || readOnly() ? '' : `
       <button class="btn btn--secondary" type="button" data-pay-report="${visit.id}">
         <i data-lucide="check" class="icon-sm" aria-hidden="true"></i>${esc(t('housekeeping.markPaid'))}
       </button>`}
@@ -841,7 +1028,9 @@ function renderReports(content) {
   });
 
   // Bezahlen direkt an der Ausstehend-Zeile (Audit R2, A2-14): derselbe Flow
-  // wie im Personal-Einsatzlog, hier gegen die Berichtsliste.
+  // wie im Personal-Einsatzlog, hier gegen die Berichtsliste. Bei `read`
+  // haengt er nicht - Monatswahl und Bericht darueber lesen nur.
+  if (readOnly()) return;
   content.querySelectorAll('[data-pay-report]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const visit = visits.find((item) => String(item.id) === btn.dataset.payReport);
@@ -860,13 +1049,16 @@ function openVisitReportModal(visit, content = null, { onRefresh = null } = {}) 
   const paid = !!visit.paid_at;
   // Die Ruecknahme bietet nur an, wem der Server sie zugesteht
   // (`can_mark_unpaid`, #1136) - die Admin-Regel wird hier nicht nachgebaut.
+  // Bei `housekeeping: read` liest der Bericht nur: weder Bezahlen noch
+  // Zuruecknehmen, auch wenn die Felder aus einer aelteren Antwort stammen.
+  const writable = !readOnly();
   let footerAction = '';
-  if (visit.can_mark_paid) {
+  if (writable && visit.can_mark_paid) {
     footerAction = `
           <button class="btn btn--primary" type="button" id="visit-report-pay">
             <i data-lucide="check" class="icon-sm" aria-hidden="true"></i>${esc(t('housekeeping.markPaid'))}
           </button>`;
-  } else if (visit.can_mark_unpaid) {
+  } else if (writable && visit.can_mark_unpaid) {
     footerAction = `
           <button class="btn btn--secondary" type="button" id="visit-report-unpay">
             <i data-lucide="rotate-ccw" class="icon-sm" aria-hidden="true"></i>${esc(t('housekeeping.markUnpaid'))}
@@ -937,9 +1129,10 @@ function renderStaff(content) {
         <strong>${esc(item.display_name)}</strong>
         <span>${esc(item.phone || item.email || '')}</span>
       </button>
+      ${readOnly() ? '' : `
       <button class="btn btn--secondary btn--icon" type="button" data-edit-worker="${item.id}" aria-label="${esc(t('common.edit'))}">
         <i data-lucide="edit-2" aria-hidden="true"></i>
-      </button>
+      </button>`}
     </article>
   `).join('');
   content.insertAdjacentHTML('beforeend', `
@@ -971,13 +1164,6 @@ function renderStaff(content) {
       select();
     });
   });
-  content.querySelectorAll('[data-edit-worker]').forEach((btn) => {
-    btn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      const worker = state.workers.find((item) => String(item.id) === btn.dataset.editWorker) || null;
-      openStaffModal(worker, content);
-    });
-  });
   content.querySelector('#housekeeping-staff-month')?.addEventListener('change', async (event) => {
     state.staffLogMonth = event.currentTarget.value || localDate().slice(0, 7);
     try {
@@ -986,12 +1172,6 @@ function renderStaff(content) {
     } catch (err) {
       window.yuvomi?.showToast(err.message, 'danger');
     }
-  });
-  content.querySelectorAll('[data-edit-visit]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const visit = state.staffVisits.find((item) => String(item.id) === btn.dataset.editVisit);
-      if (visit) openVisitEditModal(visit, content);
-    });
   });
   content.querySelectorAll('[data-open-visit]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -1002,6 +1182,26 @@ function renderStaff(content) {
           if (content.isConnected) renderStaff(content);
         },
       });
+    });
+  });
+  // Alles darunter schreibt. Die lesenden Wege - Person waehlen, Monat, Bericht -
+  // stehen deshalb davor und haengen auch bei `read`.
+  if (!readOnly()) wireStaffWrites(content);
+  if (window.lucide) window.lucide.createIcons({ el: content });
+}
+
+function wireStaffWrites(content) {
+  content.querySelectorAll('[data-edit-worker]').forEach((btn) => {
+    btn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const worker = state.workers.find((item) => String(item.id) === btn.dataset.editWorker) || null;
+      openStaffModal(worker, content);
+    });
+  });
+  content.querySelectorAll('[data-edit-visit]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const visit = state.staffVisits.find((item) => String(item.id) === btn.dataset.editVisit);
+      if (visit) openVisitEditModal(visit, content);
     });
   });
   content.querySelectorAll('[data-pay-visit]').forEach((btn) => {
@@ -1033,14 +1233,33 @@ function renderStaff(content) {
       }
     });
   });
-  if (window.lucide) window.lucide.createIcons({ el: content });
+}
+
+/* Der Bezahl-Knopf des Personal-Protokolls. Er traegt keinen Zustand, den die
+ * Zeile nicht schon nennt: der Zahlstatus steht in der Metazeile
+ * (`visitPaymentMeta()`), siehe renderStaffVisitLog().
+ *
+ * DIE ANTWORT FOLGT DEM DATENSATZ UND DEM RECHT (#1265 P6). Bei
+ * `housekeeping: read` faellt der Knopf ganz weg. Vorher stand er dort als
+ * `disabled` mit der Beschriftung „Als bezahlt markieren" - ein Versprechen fuer
+ * eine Beruehrung, die nichts tut. Dasselbe gilt fuer einen UNBEZAHLTEN Besuch,
+ * dessen Bezahlen der Server nicht anbietet (`can_mark_paid`): das ist genau die
+ * Lage bei `read`, so wie der Server sie meldet. Uebrig bleibt der gesperrte
+ * Knopf am bezahlten Besuch mit Schreibrecht - er stand schon vor #1265 so da
+ * und ist nicht Teil dieser Regel. */
+function staffLogPayHtml(visit, visitDate) {
+  const paid = !!visit.paid_at;
+  if (readOnly() || (!paid && !visit.can_mark_paid)) return '';
+  return `<button class="row-action" type="button" data-pay-visit="${visit.id}" ${visit.can_mark_paid ? '' : 'disabled'}
+                  aria-label="${esc(paid ? t('housekeeping.paymentPaid') : t('housekeeping.markPaid'))}: ${esc(visitDate)}">
+            <i data-lucide="badge-dollar-sign" class="icon-md" aria-hidden="true"></i>
+          </button>`;
 }
 
 function renderStaffVisitLog() {
   const worker = state.workers.find((item) => String(item.id) === String(state.selectedStaffId));
   if (!worker) return '';
   const rows = state.staffVisits.map((visit) => {
-    const paid = !!visit.paid_at;
     /* Die Zeile des Personal-Protokolls ist DIESELBE wie die der Übersicht -
      * die drei Aktionen sind der einzige Unterschied, und sie stehen in der
      * geteilten Bedienzone. Der Zahlstatus geht dabei nicht verloren: er steht
@@ -1054,10 +1273,7 @@ function renderStaffVisitLog() {
           <div class="list-row__meta">${esc(money(visit.total_amount))} · ${esc(visitPaymentMeta(visit))}</div>
         </div>
         <div class="list-row__actions">
-          <button class="row-action" type="button" data-pay-visit="${visit.id}" ${visit.can_mark_paid ? '' : 'disabled'}
-                  aria-label="${esc(paid ? t('housekeeping.paymentPaid') : t('housekeeping.markPaid'))}: ${esc(visitDate)}">
-            <i data-lucide="badge-dollar-sign" class="icon-md" aria-hidden="true"></i>
-          </button>
+          ${staffLogPayHtml(visit, visitDate)}
           ${visitEditActionHtml(visit, visitDate)}
           ${visitDeleteActionHtml(visit, visitDate)}
         </div>
@@ -1084,6 +1300,7 @@ function renderStaffVisitLog() {
 }
 
 function openTaskEditModal(task, content) {
+  if (readOnly()) return;
   openModal({
     title: t('housekeeping.editTask'),
     size: 'md',
@@ -1110,6 +1327,9 @@ function openTaskEditModal(task, content) {
     onSave: (panel) => {
       panel.querySelector('#housekeeping-task-edit-form')?.addEventListener('submit', async (event) => {
         event.preventDefault();
+        // Der Dialog kann vor einem Rechtewechsel aufgegangen sein: dann
+        // unterbleibt der Schreibvorgang, statt am 403 zu enden.
+        if (readOnly()) return;
         const fields = event.currentTarget.elements;
         const frequencyDays = Number(fields.frequency_days.value);
         if (!fields.name.value.trim() || !fields.area.value.trim() || !Number.isInteger(frequencyDays) || frequencyDays < 1) return;
@@ -1131,7 +1351,48 @@ function openTaskEditModal(task, content) {
   });
 }
 
+/**
+ * Der Beleg im Einsatz-Dialog. Er schreibt in ein FREMDES Modul (#1265).
+ *
+ * Hochladen ist `POST /documents`, und der Server misst das als `documents`,
+ * nicht als `housekeeping`. Wer die Haushaltshilfe pflegen, Dokumente aber nur
+ * lesen darf, sah die Ablage, und das Speichern endete am 403 - vor dem
+ * Einsatz selbst, der danach ungespeichert blieb. `applyModuleReadonly()` sieht
+ * das nicht, es urteilt ueber das offene Nav-Modul. Gefragt wird deshalb AM
+ * Bedienelement, mit dem Pfad, den die Handlung schreibt (Regel 1 in
+ * utils/module-access.js), und in den drei Stufen des Anhangsfelds
+ * (components/document-attach.js):
+ *   - `write`: die Ablage wie bisher;
+ *   - `read`: keine Ablage. Ein schon verknuepfter Beleg bleibt als Angabe
+ *     stehen - gesetzt heisst sichtbar -, ohne Beleg faellt die Stelle weg;
+ *   - `none`: nichts, dort antwortet schon das Lesen mit 403.
+ * Die Verknuepfung selbst (`receipt_document_id`) speichert der Einsatz ueber
+ * seinen eigenen Pfad, sie bleibt unangetastet.
+ */
+function receiptFieldHtml(visit) {
+  if (mayWritePath('/documents')) {
+    return `
+        <label class="document-dropzone" id="housekeeping-receipt-dropzone" for="housekeeping-receipt-file">
+          <input class="sr-only" id="housekeeping-receipt-file" type="file" accept="image/png,image/jpeg,image/webp,application/pdf,text/plain,text/csv">
+          <span class="document-dropzone__icon">
+            <i data-lucide="receipt" aria-hidden="true"></i>
+          </span>
+          <span class="document-dropzone__title">${esc(t('housekeeping.receiptUploadTitle'))}</span>
+          <span class="document-dropzone__hint">${esc(t('housekeeping.receiptUploadHint'))}</span>
+          <span class="document-dropzone__file" id="housekeeping-receipt-selected" ${visit.receipt_document_name ? '' : 'hidden'}>
+            ${esc(visit.receipt_document_name || '')}
+          </span>
+        </label>`;
+  }
+  if (pathAccess('/documents') === 'none' || !visit.receipt_document_name) return '';
+  return `
+        <dl class="housekeeping-report-details">
+          <div><dt>${esc(t('housekeeping.receiptLabel'))}</dt><dd>${esc(visit.receipt_document_name)}</dd></div>
+        </dl>`;
+}
+
 function openVisitEditModal(visit, content, { onDone } = {}) {
+  if (readOnly()) return;
   const worker = state.workers.find((item) => String(item.id) === String(visit.worker_id)) || null;
   openModal({
     title: t('housekeeping.editVisit'),
@@ -1165,17 +1426,7 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
                    placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(visit.extras ?? 0)}">
           </label>
         </div>
-        <label class="document-dropzone" id="housekeeping-receipt-dropzone" for="housekeeping-receipt-file">
-          <input class="sr-only" id="housekeeping-receipt-file" type="file" accept="image/png,image/jpeg,image/webp,application/pdf,text/plain,text/csv">
-          <span class="document-dropzone__icon">
-            <i data-lucide="receipt" aria-hidden="true"></i>
-          </span>
-          <span class="document-dropzone__title">${esc(t('housekeeping.receiptUploadTitle'))}</span>
-          <span class="document-dropzone__hint">${esc(t('housekeeping.receiptUploadHint'))}</span>
-          <span class="document-dropzone__file" id="housekeeping-receipt-selected" ${visit.receipt_document_name ? '' : 'hidden'}>
-            ${esc(visit.receipt_document_name || '')}
-          </span>
-        </label>
+        ${receiptFieldHtml(visit)}
         <button class="btn btn--primary housekeeping-form-submit" type="submit">
           <i data-lucide="save" aria-hidden="true"></i>
           <span>${esc(t('common.save'))}</span>
@@ -1185,6 +1436,7 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
     onSave: (panel) => {
       panel.querySelector('#housekeeping-visit-form')?.addEventListener('submit', async (event) => {
         event.preventDefault();
+        if (readOnly()) return;
         const form = event.currentTarget;
         const fields = form.elements;
         const dateValue = fields.date.value;
@@ -1213,7 +1465,13 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
         }
         let receiptDocumentId = visit.receipt_document_id || null;
         try {
-          const file = panel.querySelector('#housekeeping-receipt-file')?.files?.[0];
+          // Der zweite Riegel fuer den Beleg: ohne Schreibrecht auf die
+          // Dokumente wird nichts hochgeladen, auch wenn ein Feld aus einem
+          // aelteren Stand noch eine Datei traegt. Der Einsatz speichert dann
+          // mit der Verknuepfung, die er schon hat.
+          const file = mayWritePath('/documents')
+            ? panel.querySelector('#housekeeping-receipt-file')?.files?.[0]
+            : null;
           if (file) {
             if (file.size > maxUploadBytes()) throw new Error(t('documents.fileTooLarge', { size: maxUploadMb() }));
             const receipt = await api.post('/documents', {
@@ -1286,6 +1544,7 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
 }
 
 function openStaffModal(worker, content, options = {}) {
+  if (readOnly()) return;
   const item = worker || {};
   state.workerAvatar = item.avatar_data ?? null;
   openModal({
@@ -1371,6 +1630,7 @@ function openStaffModal(worker, content, options = {}) {
     onSave: (panel) => {
       panel.querySelector('#housekeeping-worker-form')?.addEventListener('submit', async (event) => {
         event.preventDefault();
+        if (readOnly()) return;
         const form = event.currentTarget;
         const fields = form.elements;
         // Bei einem Bestandssatz neben dem Raster liefert amountStep "any" -
@@ -1527,8 +1787,9 @@ async function openVisitFromDeepLink(editVisitId, container, signal) {
     if (visit) {
       const content = container.querySelector('#housekeeping-content') || container;
       // Wer einen abgerechneten Besuch nicht aendern darf, bekommt den
-      // Bericht statt eines Formulars, das erst beim Speichern scheitert (#1135).
-      if (visit.can_edit) openVisitEditModal(visit, content);
+      // Bericht statt eines Formulars, das erst beim Speichern scheitert (#1135) -
+      // ebenso, wer die Haushaltshilfe nur lesen darf (#1265 P6).
+      if (visit.can_edit && !readOnly()) openVisitEditModal(visit, content);
       else openVisitReportModal(visit, null, { onRefresh: () => renderCurrentTab(container) });
     }
   } catch (err) {
@@ -1602,5 +1863,25 @@ export const __test = {
   visitEditActionHtml,
   visitDeleteActionHtml,
   visitPaymentMeta,
+  // #1265 P6 (test-module-readonly-ui.js): die Nur-lesen-Regel am erzeugten
+  // Markup, an den Einstiegen und am Riegel.
+  readOnly,
+  readOnlyLatch,
+  READ_SAFE_CONTROLS,
+  renderShell,
+  renderDashboard,
+  renderWorkerSummary,
+  renderTasks,
+  renderStaff,
+  staffLogPayHtml,
+  receiptFieldHtml,
+  openVisitEditModal,
+  openVisitReportModal,
+  openTaskEditModal,
+  openStaffModal,
+  toggleSession,
+  createTask,
+  payVisit,
+  unpayVisit,
   state: () => state,
 };

@@ -3491,6 +3491,7 @@
         "visitUnpaidToast": "Płatność cofnięta.",
         "receiptUploadTitle": "Prześlij paragon płatności",
         "receiptUploadHint": "Dołącz paragon płatności. Pojawi się w dokumentach.",
+        "receiptLabel": "Paragon płatności",
         "receiptDocumentName": "Paragon - {{name}} - {{date}}",
         "receiptDocumentDescription": "Paragon płatności za wizytę sprzątającą {{name}} w dniu {{date}}.",
         "taskTemplateData": {

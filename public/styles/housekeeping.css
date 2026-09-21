@@ -19,16 +19,32 @@
   white-space: nowrap;
 }
 
-/* „Bereits erfasst" ist ein Status, kein deaktiviertes Steuerelement — daher
- * lesbarer Sekundärton statt des kaum sichtbaren Disabled-Grau (Audit F9). */
-.housekeeping-check-small:disabled {
+/* ZUSTANDSZEICHEN STATT KNOPF (#1265 P6, dieselbe Bauart wie
+ * `.task-status-btn--static` in tasks.css). Bei `housekeeping: read` bleibt von
+ * einer offenen Sitzung „gerade im Haus" stehen - als `span role="img"`, OHNE
+ * `.btn`: die Knopfklasse braechte Zeiger, Hover und Druckzustand mit, also
+ * genau das, was eine Beruehrung verspricht, die nichts tut. Die Kapselform
+ * steht deshalb hier und nicht in `.btn`.
+ *
+ * Die Farben sind die der frueheren `:disabled`-Regel („Bereits erfasst"), die
+ * seit #1133 kein Element mehr traf - der Knopf wird nicht mehr gesperrt, er
+ * checkt aus. Ihr Satz gilt fuer das Zeichen woertlich: ein Status ist kein
+ * deaktiviertes Steuerelement, daher lesbarer Sekundaerton statt des kaum
+ * sichtbaren Disabled-Grau (Audit F9). */
+.housekeeping-check-small--static {
+  justify-content: center;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
   background: var(--color-surface-3);
   color: var(--color-text-secondary);
-  border-color: var(--color-border);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
   cursor: default;
 }
 
-.housekeeping-check-small:disabled i {
+.housekeeping-check-small--static i,
+.housekeeping-check-small--static svg {
   color: var(--color-success);
 }
 
@@ -426,6 +442,13 @@
   align-items: center;
   min-height: 88px;
   padding: var(--space-3);
+}
+
+/* Bei `housekeeping: read` hat die Zeile keinen Erledigt-Kreis (#1265 P6,
+ * `taskRowHtml()`): ohne ihn laege die Auskunft in der 56px-Spalte, die fuer
+ * den Kreis reserviert ist. Gleiche Spezifitaet, spaeter - gewinnt. */
+.housekeeping-task--readonly {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 /* BEIDE Zustände tragen ihre Tönung allein. Die früher zusätzliche

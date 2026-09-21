@@ -3487,6 +3487,7 @@
         "visitUnpaidToast": "Pagamento desfeito.",
         "receiptUploadTitle": "Enviar comprovante de pagamento",
         "receiptUploadHint": "Anexe um comprovante de pagamento. Ele aparecerá em Documentos.",
+        "receiptLabel": "Comprovante de pagamento",
         "receiptDocumentName": "Comprovante - {{name}} - {{date}}",
         "receiptDocumentDescription": "Comprovante de pagamento da visita de faxina de {{name}} em {{date}}.",
         "taskTemplateData": {

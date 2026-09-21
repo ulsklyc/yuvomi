@@ -3487,6 +3487,7 @@
         "visitUnpaidToast": "支払いを取り消しました。",
         "receiptUploadTitle": "支払い領収書をアップロード",
         "receiptUploadHint": "支払い領収書を添付します。その後ドキュメントに表示されます。",
+        "receiptLabel": "支払い領収書",
         "receiptDocumentName": "領収書 - {{name}} - {{date}}",
         "receiptDocumentDescription": "{{date}} の {{name}} の訪問に対する支払い領収書。",
         "taskTemplateData": {

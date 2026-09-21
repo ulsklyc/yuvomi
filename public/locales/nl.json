@@ -3487,6 +3487,7 @@
         "visitUnpaidToast": "Betaling teruggedraaid.",
         "receiptUploadTitle": "Betalingsbewijs uploaden",
         "receiptUploadHint": "Voeg een betalingsbewijs toe. Het verschijnt in Documenten.",
+        "receiptLabel": "Betalingsbewijs",
         "receiptDocumentName": "Bewijs - {{name}} - {{date}}",
         "receiptDocumentDescription": "Betalingsbewijs voor huishoudbezoek van {{name}} op {{date}}.",
         "taskTemplateData": {

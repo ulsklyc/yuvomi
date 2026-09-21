@@ -3487,6 +3487,7 @@
         "visitUnpaidToast": "भुगतान वापस लिया गया।",
         "receiptUploadTitle": "भुगतान रसीद अपलोड करें",
         "receiptUploadHint": "भुगतान रसीद जोड़ें। यह इसके बाद दस्तावेज़ में दिखेगी।",
+        "receiptLabel": "भुगतान रसीद",
         "receiptDocumentName": "रसीद - {{name}} - {{date}}",
         "receiptDocumentDescription": "{{date}} को {{name}} की विज़िट के लिए भुगतान रसीद।",
         "taskTemplateData": {

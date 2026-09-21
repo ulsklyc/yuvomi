@@ -3487,6 +3487,7 @@
         "visitUnpaidToast": "Оплата отменена.",
         "receiptUploadTitle": "Загрузить чек об оплате",
         "receiptUploadHint": "Прикрепите чек об оплате. Он появится в разделе «Документы».",
+        "receiptLabel": "Чек об оплате",
         "receiptDocumentName": "Чек - {{name}} - {{date}}",
         "receiptDocumentDescription": "Чек об оплате визита {{name}} от {{date}}.",
         "taskTemplateData": {

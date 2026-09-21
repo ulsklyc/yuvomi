@@ -3487,6 +3487,7 @@
         "visitUnpaidToast": "Оплату скасовано.",
         "receiptUploadTitle": "Завантажте квитанцію про оплату",
         "receiptUploadHint": "Додайте квитанцію про оплату. Він з’явиться в Документах.",
+        "receiptLabel": "Квитанція про оплату",
         "receiptDocumentName": "Квитанція - {{name}} - {{date}}",
         "receiptDocumentDescription": "Квитанція про оплату {{name}} візиту прибирання {{date}}.",
         "taskTemplateData": {

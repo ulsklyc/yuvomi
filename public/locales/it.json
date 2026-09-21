@@ -3487,6 +3487,7 @@
         "visitUnpaidToast": "Pagamento annullato.",
         "receiptUploadTitle": "Carica ricevuta di pagamento",
         "receiptUploadHint": "Allega una ricevuta di pagamento. Apparirà in Documenti.",
+        "receiptLabel": "Ricevuta di pagamento",
         "receiptDocumentName": "Ricevuta - {{name}} - {{date}}",
         "receiptDocumentDescription": "Ricevuta di pagamento per la visita del personale delle pulizie {{name}} in data {{date}}.",
         "taskTemplateData": {

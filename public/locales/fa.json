@@ -3491,6 +3491,7 @@
         "visitUnpaidToast": "پرداخت لغو شد.",
         "receiptUploadTitle": "بارگذاری رسید پرداخت",
         "receiptUploadHint": "یک رسید پرداخت اضافه کنید. سپس در اسناد نمایش داده می‌شود.",
+        "receiptLabel": "رسید پرداخت",
         "receiptDocumentName": "رسید - {{name}} - {{date}}",
         "receiptDocumentDescription": "رسید پرداخت برای بازدید {{name}} در {{date}}.",
         "taskTemplateData": {

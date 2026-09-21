@@ -2318,4 +2318,584 @@ test('Gesundheit hat keine Display-Ausnahme - der Server gibt keine her', () => 
     'gaebe es hier eine Route, brauchte die betroffene Stelle ein actingAsDisplay() VOR der Modulregel');
 });
 
+// =========================================================================
+// #1265 P6: Haushaltshilfe
+//
+// Ein eigener Abschnitt mit eigenem Import, damit er neben den Paketen der
+// anderen Seiten steht, ohne deren Zeilen zu beruehren. Gemessen wird wie in
+// P1/P2 am ERZEUGTEN MARKUP und im Paar - bei `read` weg, bei `write` da -,
+// jeweils mit einem Inhalt, den nur ein wirklich gelaufener Renderer ausgibt.
+//
+// ZWEI QUELLEN FUER DIESELBE ANTWORT. Die Besuchszeilen haengen schon an
+// Serverfeldern (`can_edit`, `can_delete`, `can_mark_paid`, #1135/#1136), und
+// der Server rechnet das Modulrecht dort ein. Die Fixtures unten tragen deshalb
+// ABSICHTLICH veraltete Felder (`can_*: true` bei `read`): die Seite muss auch
+// dann schweigen, wenn die letzte Antwort aelter ist als der Rechtewechsel.
+//
+// DIE KREUZABHAENGIGKEIT. Der Einsatz-Dialog laedt einen Beleg hoch, und das
+// ist `POST /documents` - ein Schreibweg in ein FREMDES Modul. Er wird an
+// beiden Enden gemessen: am Markup (`receiptFieldHtml`) und am gefahrenen
+// Absenden, das die Anfrage dann UNTERLASSEN muss.
+//
+// KEIN WANDTABLETT, KEIN PERSONAL. Ein Display erreicht die Seite nicht (der
+// letzte Test dieses Abschnitts), und ein Konto der Haushaltshilfe meldet sich
+// auf keinem Weg an (`canSignIn` in server/auth.js, `npm run test:staff-sign-in`).
+// Die Modulregel nimmt hier also niemandem etwas weg, was der Server ihm gaebe.
+// =========================================================================
+
+const { __test: hk } = await import('../public/pages/housekeeping.js');
+
+const HK_CSS = readFileSync(new URL('../public/styles/housekeeping.css', import.meta.url), 'utf8');
+const LAYOUT_CSS = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+
+/**
+ * Ein Container wie in test-housekeeping-ui.js, der zusaetzlich mitschreibt,
+ * WELCHE Knoepfe ein Renderer verdrahten will. Die Verdrahtung hat kein Markup;
+ * ohne diese Spur liefe „bei read haengt nichts" ins Leere.
+ */
+function hkContainer() {
+  return {
+    html: '',
+    gefragt: [],
+    isConnected: true,
+    replaceChildren() { this.html = ''; },
+    insertAdjacentHTML(_position, markup) { this.html += markup; },
+    querySelector(sel) { this.gefragt.push(sel); return null; },
+    querySelectorAll(sel) { this.gefragt.push(sel); return []; },
+  };
+}
+
+/** Rechte setzen und die Seite in einen bekannten Ausgangszustand bringen. */
+function hkState(patch) {
+  const s = hk.state();
+  Object.assign(s, {
+    tab: 'dashboard', dashboard: {}, tasks: [], templates: [], workers: [],
+    recentVisits: [], reports: [], visitReport: null, selectedStaffId: null,
+    staffVisits: [], currency: 'EUR', reportMonth: null, currentMonth: '2026-08',
+  }, patch);
+  return s;
+}
+
+/**
+ * Faehrt `fn` mit einem API-Stub, der jede Anfrage mitschreibt, und mit einem
+ * Toast, der nichts tut - `window.yuvomi` ist im Mini-DOM ein leeres Objekt,
+ * und ein Fehlerpfad der Seite ruft `showToast` ohne `?.` davor.
+ */
+async function mitHkApi(fn, antworten = {}) {
+  const anfragen = [];
+  const vorher = { api: globalThis.__apiStub, toast: globalThis.window.yuvomi?.showToast };
+  const rec = (methode) => async (url, body) => {
+    anfragen.push(`${methode} ${url}`);
+    return antworten[`${methode} ${url}`] ?? { data: null, body };
+  };
+  globalThis.__apiStub = { get: rec('GET'), post: rec('POST'), put: rec('PUT'), patch: rec('PATCH'), delete: rec('DELETE') };
+  globalThis.window.yuvomi = globalThis.window.yuvomi ?? {};
+  globalThis.window.yuvomi.showToast = () => {};
+  try {
+    await fn(anfragen);
+  } finally {
+    globalThis.__apiStub = vorher.api;
+    globalThis.window.yuvomi.showToast = vorher.toast;
+  }
+  return anfragen;
+}
+
+/**
+ * Faengt, was die Seite `openModal()` uebergibt (der Loader-Stub reicht es an
+ * `__openModal`). Die Dialoge dieser Seite oeffnen synchron.
+ */
+function mitModal(fn) {
+  const geoeffnet = [];
+  const vorher = globalThis.__openModal;
+  globalThis.__openModal = (opts) => { geoeffnet.push(opts); };
+  try { fn(); } finally { globalThis.__openModal = vorher; }
+  return geoeffnet;
+}
+
+const hkBesuch = (over = {}) => ({
+  id: 12, worker_id: 7, check_in: '2026-08-06T09:00:00.000Z', total_amount: 40,
+  daily_rate: 40, extras: 0, paid_at: null, rate_type: 'daily',
+  can_edit: true, can_delete: true, can_mark_paid: true, can_mark_unpaid: false, ...over,
+});
+
+// -------------------------------------------------------------------------
+// Die Frage selbst
+// -------------------------------------------------------------------------
+
+test('housekeeping.readOnly() folgt dem Rechte-Store - und `housekeeping` ist ein Modulname, den es gibt', () => {
+  // Im Paar, wie bei der Gesundheit: ginge der Name ins Leere, fiele
+  // moduleAccess() still auf `write` durch und readOnly() bliebe bei `read` false.
+  assert.equal(hk.readOnly(), false, 'ohne Rechte fail-open');
+  withAccess({ housekeeping: 'read' }, () => assert.equal(hk.readOnly(), true));
+  withAccess({ housekeeping: 'write' }, () => assert.equal(hk.readOnly(), false));
+  withAccess({ documents: 'read' }, () => assert.equal(hk.readOnly(), false,
+    'ein FREMDES Modul auf read sperrt die Seite nicht - nur den Beleg'));
+});
+
+// -------------------------------------------------------------------------
+// Uebersicht: Check-Knopf, Leerzustand, letzte Besuche
+// -------------------------------------------------------------------------
+
+test('Check-Knopf mit `housekeeping: read`: eine offene Sitzung bleibt als Zeichen, sonst faellt er weg', () => {
+  hkState({
+    workers: [
+      { id: 7, display_name: 'Ana', current_session: { check_in: '2026-08-06T08:30:00Z' } },
+      // War heute da, ist aber gegangen: die Zeile nennt den Einsatz, „gerade
+      // im Haus" waere falsch. Das Zeichen haengt an der OFFENEN Sitzung.
+      { id: 8, display_name: 'Bea', current_session: null, today_session: { check_in: '2026-08-06T07:00:00Z' } },
+      { id: 9, display_name: 'Cem', current_session: null, today_session: null },
+    ],
+  });
+
+  const lesen = withAccess({ housekeeping: 'read' }, () => hk.renderWorkerSummary());
+  const [ana, bea, cem] = lesen.split('<section class="housekeeping-worker-strip">').slice(1);
+  assert.equal((lesen.match(/data-worker-check=/g) ?? []).length, 0, 'kein Knopf, der ein- oder auscheckt');
+  assert.doesNotMatch(lesen, /<button/, 'und auch sonst keiner');
+  assert.match(ana, /<span class="housekeeping-check-small housekeeping-check-small--static" role="img" aria-label="dashboard\.housekeepingPresent">/,
+    'die offene Sitzung bleibt als Zeichen, dessen Beschriftung den Zustand nennt');
+  assert.doesNotMatch(ana, /disabled/, 'ein Zeichen, kein gesperrter Knopf');
+  assert.doesNotMatch(bea, /housekeeping-check-small/, 'eine beendete Sitzung ist kein „gerade im Haus"');
+  assert.match(bea, /housekeeping\.visitRecordedAt/, 'ihr Einsatz von heute steht weiter in der Zeile');
+  assert.doesNotMatch(cem, /housekeeping-check-small/, 'ohne Sitzung gibt es keinen Zustand zu zeigen');
+  assert.match(cem, /Cem/, 'der Renderer lief - die Person steht da');
+
+  const schreiben = withAccess({ housekeeping: 'write' }, () => hk.renderWorkerSummary());
+  assert.equal((schreiben.match(/data-worker-check=/g) ?? []).length, 3, 'mit Schreibrecht je Person ein Knopf');
+  assert.match(schreiben, /housekeeping\.checkOut/);
+  assert.match(schreiben, /housekeeping\.checkIn/);
+  assert.doesNotMatch(schreiben, /housekeeping-check-small--static/, 'und kein Zeichen daneben');
+});
+
+test('Leere Uebersicht mit `housekeeping: read`: kein „Profil anlegen"', () => {
+  hkState({ workers: [] });
+  const lesen = withAccess({ housekeeping: 'read' }, () => hk.renderWorkerSummary());
+  assert.doesNotMatch(lesen, /housekeeping-create-profile/);
+  assert.match(lesen, /housekeeping\.noWorkerTitle/, 'die Auskunft bleibt');
+  const schreiben = withAccess({ housekeeping: 'write' }, () => hk.renderWorkerSummary());
+  assert.match(schreiben, /id="housekeeping-create-profile"/, 'mit Schreibrecht bleibt die Aktion - sonst maesse die Zeile oben nichts');
+});
+
+test('Uebersicht mit `housekeeping: read`: nur der Bericht wird verdrahtet, weder Check noch Bearbeiten', () => {
+  hkState({
+    workers: [{ id: 7, display_name: 'Ana', current_session: null }],
+    recentVisits: [hkBesuch()],
+  });
+  const lesen = hkContainer();
+  withAccess({ housekeeping: 'read' }, () => hk.renderDashboard(lesen));
+  assert.ok(!lesen.gefragt.includes('[data-worker-check]'), 'der Check-Knopf wird nicht verdrahtet');
+  assert.ok(!lesen.gefragt.includes('[data-edit-visit]'), 'das Bearbeiten nicht');
+  assert.ok(lesen.gefragt.includes('[data-open-visit]'), 'der Bericht schon - er liest');
+  assert.doesNotMatch(lesen.html, /data-edit-visit=/, 'die veralteten Felder (`can_edit: true`) bieten trotzdem nichts an');
+  assert.match(lesen.html, /data-open-visit="12"/, 'der Besuch fuehrt zu seinem Bericht');
+
+  const schreiben = hkContainer();
+  withAccess({ housekeeping: 'write' }, () => hk.renderDashboard(schreiben));
+  assert.ok(schreiben.gefragt.includes('[data-worker-check]'));
+  assert.ok(schreiben.gefragt.includes('[data-edit-visit]'));
+  assert.match(schreiben.html, /data-edit-visit="12"/);
+});
+
+test('Besuchszeile mit `housekeeping: read`: Bearbeiten und Loeschen weg, der Zahlstatus ohne Admin-Hinweis', () => {
+  const offen = hkBesuch();
+  const bezahlt = hkBesuch({ paid_at: '2026-08-07T10:00:00Z', can_edit: false, can_delete: false, can_mark_paid: false });
+  withAccess({ housekeeping: 'read' }, () => {
+    assert.match(hk.visitEditActionHtml(offen, 'x'), /data-open-visit="12"/, 'statt Bearbeiten der Weg zum Bericht');
+    assert.doesNotMatch(hk.visitEditActionHtml(offen, 'x'), /data-edit-visit/);
+    assert.equal(hk.visitDeleteActionHtml(offen, 'x'), '');
+    // „nur durch einen Admin" ist bei `read` nicht der Grund - dort fehlen die
+    // Knoepfe an jedem Besuch, bezahlt oder nicht.
+    assert.equal(hk.visitPaymentMeta(bezahlt), 'housekeeping.paymentPaid');
+    assert.equal(hk.visitPaymentMeta(offen), 'housekeeping.paymentPending');
+  });
+  withAccess({ housekeeping: 'write' }, () => {
+    assert.match(hk.visitEditActionHtml(offen, 'x'), /data-edit-visit="12"/);
+    assert.match(hk.visitDeleteActionHtml(offen, 'x'), /data-delete-visit="12"/);
+    assert.match(hk.visitPaymentMeta(bezahlt), /housekeeping\.settledAdminOnly/,
+      'mit Schreibrecht nennt die Zeile weiter, warum ein bezahlter Besuch gesperrt ist');
+  });
+});
+
+// -------------------------------------------------------------------------
+// Aufgaben
+// -------------------------------------------------------------------------
+
+test('Aufgaben-Tab mit `housekeeping: read`: kein Anlegen, kein Abhaken, keine Zeilenaktion - die Dringlichkeit bleibt', () => {
+  hkState({
+    templates: [{ key: 'kitchen', name: 'Kueche', area: 'Kueche', frequency_days: 7 }],
+    tasks: [{ id: 3, name: 'Fenster putzen', area: 'Wohnzimmer', frequency_days: 14, urgency_status: 'overdue', last_completed: '2026-07-01' }],
+  });
+  const lesen = hkContainer();
+  withAccess({ housekeeping: 'read' }, () => hk.renderTasks(lesen));
+  for (const weg of ['data-template-index', 'housekeeping-task-form', 'data-complete-task', 'data-undo-task', 'data-edit-task', 'data-delete-task']) {
+    assert.doesNotMatch(lesen.html, new RegExp(weg), `${weg} gehoert zu einem Schreibweg`);
+  }
+  assert.doesNotMatch(lesen.html, /<button/, 'auf diesem Tab schreibt jeder Knopf');
+  assert.match(lesen.html, /Fenster putzen/, 'der Renderer lief - die Aufgabe steht da');
+  assert.match(lesen.html, /housekeeping\.overdue/, 'und ihre Dringlichkeit, als Wort');
+  assert.match(lesen.html, /housekeeping-task--overdue housekeeping-task--readonly/, 'und als Toenung, ohne die Spalte des Kreises');
+  assert.deepEqual(lesen.gefragt, [], 'keine Verdrahtung - jede auf diesem Tab schreibt');
+
+  const schreiben = hkContainer();
+  withAccess({ housekeeping: 'write' }, () => hk.renderTasks(schreiben));
+  for (const da of ['data-template-index="0"', 'id="housekeeping-task-form"', 'data-complete-task="3"', 'data-undo-task="3"', 'data-edit-task="3"', 'data-delete-task="3"']) {
+    assert.ok(schreiben.html.includes(da), `mit Schreibrecht steht ${da} da`);
+  }
+  assert.doesNotMatch(schreiben.html, /housekeeping-task--readonly/);
+  assert.ok(schreiben.gefragt.includes('[data-complete-task]'));
+});
+
+// -------------------------------------------------------------------------
+// Berichte und Einsatzbericht
+// -------------------------------------------------------------------------
+
+test('Berichte-Tab mit `housekeeping: read`: kein Bezahlen, Monat und Bericht bleiben', () => {
+  hkState({ tab: 'reports', visitReport: { month: '2026-08', visits: [hkBesuch()], totals: { pending: 40 } }, reports: [hkBesuch()] });
+  const lesen = hkContainer();
+  withAccess({ housekeeping: 'read' }, () => hk.renderReports(lesen));
+  assert.doesNotMatch(lesen.html, /data-pay-report/, 'auch nicht mit veraltetem `can_mark_paid: true`');
+  assert.match(lesen.html, /data-visit-report="12"/, 'der Bericht bleibt');
+  assert.match(lesen.html, /id="housekeeping-report-prev"/, 'die Monatswahl bleibt');
+  assert.ok(!lesen.gefragt.includes('[data-pay-report]'), 'das Bezahlen wird nicht verdrahtet');
+  assert.ok(lesen.gefragt.includes('[data-visit-report]'));
+
+  const schreiben = hkContainer();
+  withAccess({ housekeeping: 'write' }, () => hk.renderReports(schreiben));
+  assert.match(schreiben.html, /data-pay-report="12"/);
+  assert.ok(schreiben.gefragt.includes('[data-pay-report]'));
+});
+
+test('Einsatzbericht mit `housekeeping: read`: weder Bezahlen noch Zuruecknehmen', () => {
+  const offen = hkBesuch();
+  const bezahlt = hkBesuch({ paid_at: '2026-08-07T10:00:00Z', can_mark_paid: false, can_mark_unpaid: true });
+  for (const [besuch, knopf] of [[offen, 'visit-report-pay'], [bezahlt, 'visit-report-unpay']]) {
+    const lesen = mitModal(() => withAccess({ housekeeping: 'read' }, () => hk.openVisitReportModal(besuch)));
+    assert.equal(lesen.length, 1, 'der Bericht geht auf - er liest nur');
+    assert.doesNotMatch(lesen[0].content, new RegExp(knopf));
+    assert.doesNotMatch(lesen[0].content, /modal-panel__footer/, 'ohne Aktion keine Fusszeile');
+    assert.match(lesen[0].content, /housekeeping\.totalPayment/, 'der Bericht selbst steht vollstaendig da');
+    const schreiben = mitModal(() => withAccess({ housekeeping: 'write' }, () => hk.openVisitReportModal(besuch)));
+    assert.match(schreiben[0].content, new RegExp(`id="${knopf}"`));
+  }
+});
+
+// -------------------------------------------------------------------------
+// Personal
+// -------------------------------------------------------------------------
+
+test('Personal-Tab mit `housekeeping: read`: kein Bearbeiten, die Auswahl und das Protokoll bleiben', () => {
+  hkState({
+    tab: 'staff',
+    workers: [{ id: 7, display_name: 'Ana', phone: '0151 000' }],
+    selectedStaffId: '7',
+    staffVisits: [hkBesuch(), hkBesuch({ id: 13, paid_at: '2026-08-07T10:00:00Z', can_mark_paid: false })],
+  });
+  const lesen = hkContainer();
+  withAccess({ housekeeping: 'read' }, () => hk.renderStaff(lesen));
+  assert.doesNotMatch(lesen.html, /data-edit-worker/);
+  for (const weg of ['data-pay-visit', 'data-edit-visit', 'data-delete-visit']) {
+    assert.doesNotMatch(lesen.html, new RegExp(weg), `${weg}: auch nicht mit veralteten Feldern`);
+  }
+  assert.match(lesen.html, /class="housekeeping-staff-row__select"/, 'die Person bleibt waehlbar');
+  assert.match(lesen.html, /data-open-visit="12"/, 'jeder Besuch fuehrt zu seinem Bericht');
+  assert.match(lesen.html, /data-open-visit="13"/);
+  assert.match(lesen.html, /id="housekeeping-staff-month"/, 'der Monatsfilter bleibt');
+  assert.match(lesen.html, /housekeeping\.paymentPending/, 'der Zahlstatus steht in der Metazeile');
+  assert.doesNotMatch(lesen.html, /housekeeping\.settledAdminOnly/);
+  for (const nie of ['[data-edit-worker]', '[data-edit-visit]', '[data-pay-visit]', '[data-delete-visit]']) {
+    assert.ok(!lesen.gefragt.includes(nie), `${nie} wird nicht verdrahtet`);
+  }
+  for (const lesend of ['[data-select-worker]', '#housekeeping-staff-month', '[data-open-visit]']) {
+    assert.ok(lesen.gefragt.includes(lesend), `${lesend} liest und bleibt verdrahtet`);
+  }
+
+  const schreiben = hkContainer();
+  withAccess({ housekeeping: 'write' }, () => hk.renderStaff(schreiben));
+  assert.match(schreiben.html, /data-edit-worker="7"/);
+  assert.match(schreiben.html, /data-pay-visit="12"/);
+  assert.match(schreiben.html, /data-edit-visit="12"/);
+  assert.match(schreiben.html, /data-delete-visit="12"/);
+  for (const da of ['[data-edit-worker]', '[data-edit-visit]', '[data-pay-visit]', '[data-delete-visit]']) {
+    assert.ok(schreiben.gefragt.includes(da), `mit Schreibrecht wird ${da} verdrahtet`);
+  }
+});
+
+test('Bezahl-Knopf des Protokolls: kein gesperrter Knopf, der „Als bezahlt markieren" verspricht', () => {
+  const offen = hkBesuch();
+  const bezahlt = hkBesuch({ paid_at: '2026-08-07T10:00:00Z', can_mark_paid: false });
+  withAccess({ housekeeping: 'read' }, () => {
+    assert.equal(hk.staffLogPayHtml(offen, 'x'), '');
+    assert.equal(hk.staffLogPayHtml(bezahlt, 'x'), '', 'der Zahlstatus steht in der Metazeile, nicht an einem Knopf');
+  });
+  withAccess({ housekeeping: 'write' }, () => {
+    assert.match(hk.staffLogPayHtml(offen, 'x'), /data-pay-visit="12"/, 'mit Schreibrecht da');
+    assert.doesNotMatch(hk.staffLogPayHtml(offen, 'x'), /disabled/, 'und offen');
+    // Der Server bietet das Bezahlen nicht an (so meldet er `read`): ein
+    // unbezahlter Besuch hat dann nichts, was ein Knopf sagen koennte.
+    assert.equal(hk.staffLogPayHtml(hkBesuch({ can_mark_paid: false }), 'x'), '');
+    // Unangetastet: der bezahlte Besuch mit Schreibrecht behaelt seinen Knopf,
+    // wie er vor #1265 war - nicht Teil dieser Regel.
+    assert.match(hk.staffLogPayHtml(bezahlt, 'x'), /disabled/);
+  });
+});
+
+// -------------------------------------------------------------------------
+// Die Einstiege: ein Aufruf ohne Knopf findet denselben Riegel
+// -------------------------------------------------------------------------
+
+test('jeder Dialog-Einstieg fragt selbst: bei `read` geht keiner auf', () => {
+  hkState({ workers: [{ id: 7, display_name: 'Ana' }] });
+  const aufrufe = [
+    ['openTaskEditModal', () => hk.openTaskEditModal({ id: 3, name: 'A', area: 'B', frequency_days: 7 }, hkContainer())],
+    ['openVisitEditModal', () => hk.openVisitEditModal(hkBesuch(), hkContainer())],
+    ['openStaffModal', () => hk.openStaffModal(null, hkContainer())],
+  ];
+  for (const [name, aufruf] of aufrufe) {
+    const lesen = mitModal(() => withAccess({ housekeeping: 'read' }, aufruf));
+    assert.equal(lesen.length, 0, `${name}() oeffnet bei read nichts`);
+    const schreiben = mitModal(() => withAccess({ housekeeping: 'write' }, aufruf));
+    assert.equal(schreiben.length, 1, `${name}() oeffnet mit Schreibrecht - sonst maesse die Zeile oben nichts`);
+  }
+});
+
+test('Check-in, Anlegen und Bezahlen schreiben bei `read` nichts - auch ohne Knopf aufgerufen', async () => {
+  hkState({ workers: [{ id: 7, display_name: 'Ana', daily_rate: 50, current_session: null }] });
+  const faelle = [
+    ['toggleSession', () => hk.toggleSession(hkContainer(), 7), 'POST /housekeeping/work-sessions/check-in'],
+    ['createTask', () => hk.createTask({ name: 'A', area: 'B', frequency_days: 7 }, hkContainer()), 'POST /housekeeping/decay-tasks'],
+    ['payVisit', () => hk.payVisit(hkBesuch(), async () => {}), 'POST /housekeeping/visits/12/pay'],
+    ['unpayVisit', () => hk.unpayVisit(hkBesuch({ paid_at: '2026-08-07T10:00:00Z' }), async () => {}), 'POST /housekeeping/visits/12/unpay'],
+  ];
+  for (const [name, aufruf, anfrage] of faelle) {
+    const lesen = await mitHkApi(() => withAccess({ housekeeping: 'read' }, aufruf));
+    assert.deepEqual(lesen.filter((a) => !a.startsWith('GET ')), [], `${name}() schreibt bei read nichts`);
+    const schreiben = await mitHkApi(() => withAccess({ housekeeping: 'write' }, aufruf));
+    assert.ok(schreiben.includes(anfrage), `${name}() schreibt mit Schreibrecht (${anfrage}) - gefunden: ${schreiben.join(', ')}`);
+  }
+});
+
+test('ein Dialog, der vor dem Rechtewechsel aufging, schreibt beim Absenden nicht mehr', async () => {
+  hkState({ workers: [{ id: 7, display_name: 'Ana' }] });
+  const [dialog] = mitModal(() => withAccess({ housekeeping: 'write' }, () => hk.openVisitEditModal(hkBesuch(), hkContainer())));
+  const absenden = besuchAbsenden(dialog, { mitDatei: false });
+  const lesen = await mitHkApi(() => withAccess({ housekeeping: 'read' }, absenden));
+  assert.deepEqual(lesen, [], 'kein PUT, das am 403 endete');
+  const schreiben = await mitHkApi(() => withAccess({ housekeeping: 'write' }, absenden));
+  assert.ok(schreiben.includes('PUT /housekeeping/visits/12'), 'mit Schreibrecht speichert derselbe Dialog');
+});
+
+// -------------------------------------------------------------------------
+// Der Beleg: ein Schreibweg in die DOKUMENTE (Kreuzabhaengigkeit)
+// -------------------------------------------------------------------------
+
+/**
+ * Faehrt den echten Absende-Handler des Einsatz-Dialogs. Das Formular und das
+ * Dateifeld sind Attrappen - das Feld traegt eine Datei, als haette jemand sie
+ * vor dem Rechtewechsel gewaehlt, damit der Riegel im Absenden etwas zu tun hat.
+ */
+function besuchAbsenden(dialog, { mitDatei = true } = {}) {
+  let handler = null;
+  const datei = { name: 'beleg.pdf', size: 10 };
+  const panel = {
+    querySelector(sel) {
+      if (sel === '#housekeeping-visit-form') return { addEventListener: (_typ, fn) => { handler = fn; } };
+      if (sel === '#housekeeping-receipt-file') return { files: mitDatei ? [datei] : [] };
+      return null;
+    },
+  };
+  dialog.onSave(panel);
+  assert.equal(typeof handler, 'function', 'der Dialog haengt seinen Absende-Handler an');
+  return () => handler({
+    preventDefault() {},
+    currentTarget: { elements: { date: { value: '2026-08-06' }, daily_rate: { value: '40' }, extras: { value: '0' } } },
+  });
+}
+
+/** `FileReader` gibt es in Node nicht; die Seite liest die Datei damit als Data-URL. */
+async function mitFileReader(fn) {
+  const vorher = globalThis.FileReader;
+  globalThis.FileReader = class {
+    readAsDataURL() { this.result = 'data:application/pdf;base64,AA=='; this.onload?.(); }
+  };
+  try { return await fn(); } finally { globalThis.FileReader = vorher; }
+}
+
+test('Beleg-Feld: die Ablage haengt am Schreibrecht auf die DOKUMENTE, nicht auf die Haushaltshilfe', () => {
+  const mitBeleg = hkBesuch({ receipt_document_id: 44, receipt_document_name: 'Beleg - Ana - 06.08.' });
+  const ohneBeleg = hkBesuch();
+
+  const schreiben = withAccess({ housekeeping: 'write', documents: 'write' }, () => hk.receiptFieldHtml(mitBeleg));
+  assert.match(schreiben, /id="housekeeping-receipt-file" type="file"/, 'mit Schreibrecht die Ablage');
+  assert.match(schreiben, /Beleg - Ana - 06\.08\./);
+
+  withAccess({ housekeeping: 'write', documents: 'read' }, () => {
+    const gesetzt = hk.receiptFieldHtml(mitBeleg);
+    assert.doesNotMatch(gesetzt, /type="file"|document-dropzone/, 'keine Ablage, deren Hochladen am 403 endet');
+    assert.match(gesetzt, /<dt>housekeeping\.receiptLabel<\/dt><dd>Beleg - Ana - 06\.08\.<\/dd>/,
+      'ein verknuepfter Beleg bleibt als Angabe stehen - gesetzt heisst sichtbar');
+    assert.equal(hk.receiptFieldHtml(ohneBeleg), '', 'ohne Beleg faellt die Stelle weg');
+  });
+  withAccess({ housekeeping: 'write', documents: 'none' }, () => {
+    assert.equal(hk.receiptFieldHtml(mitBeleg), '', 'ohne Zugriff auf Dokumente gar nichts - dort antwortet schon das Lesen mit 403');
+  });
+});
+
+test('Beleg beim Absenden: ohne Schreibrecht auf die Dokumente kein POST /documents, der Einsatz speichert trotzdem', async () => {
+  hkState({ workers: [{ id: 7, display_name: 'Ana' }] });
+  const besuch = hkBesuch({ receipt_document_id: 44, receipt_document_name: 'Beleg' });
+  const antworten = { 'POST /documents': { data: { id: 99 } } };
+
+  const nurLesen = await mitFileReader(async () => {
+    let gesendet = null;
+    const anfragen = await mitHkApi(async () => {
+      const put = globalThis.__apiStub.put;
+      globalThis.__apiStub.put = async (url, body) => { gesendet = body; return put(url, body); };
+      await withAccess({ housekeeping: 'write', documents: 'read' }, () => {
+        const [dialog] = mitModal(() => hk.openVisitEditModal(besuch, hkContainer()));
+        return besuchAbsenden(dialog)();
+      });
+    }, antworten);
+    return { anfragen, gesendet };
+  });
+  assert.ok(!nurLesen.anfragen.includes('POST /documents'), 'kein Hochladen, das am 403 endete');
+  assert.ok(nurLesen.anfragen.includes('PUT /housekeeping/visits/12'), 'der Einsatz selbst wird gespeichert');
+  assert.equal(nurLesen.gesendet.receipt_document_id, 44, 'mit der Verknuepfung, die er schon hatte');
+
+  const schreiben = await mitFileReader(async () => {
+    let gesendet = null;
+    const anfragen = await mitHkApi(async () => {
+      const put = globalThis.__apiStub.put;
+      globalThis.__apiStub.put = async (url, body) => { gesendet = body; return put(url, body); };
+      await withAccess({ housekeeping: 'write', documents: 'write' }, () => {
+        const [dialog] = mitModal(() => hk.openVisitEditModal(besuch, hkContainer()));
+        return besuchAbsenden(dialog)();
+      });
+    }, antworten);
+    return { anfragen, gesendet };
+  });
+  assert.ok(schreiben.anfragen.includes('POST /documents'), 'mit Schreibrecht wird hochgeladen - sonst maesse die Zeile oben nichts');
+  assert.equal(schreiben.gesendet.receipt_document_id, 99, 'und der neue Beleg verknuepft');
+});
+
+// -------------------------------------------------------------------------
+// Der Riegel und die Positivliste
+// -------------------------------------------------------------------------
+
+const HK_CODE = readFileSync(new URL('../public/pages/housekeeping.js', import.meta.url), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+test('READ_SAFE_CONTROLS ist eine Positivliste und enthaelt nur lesende Bedienelemente', () => {
+  const erlaubt = hk.READ_SAFE_CONTROLS.split(',').map((s) => s.trim()).sort();
+  assert.deepEqual(erlaubt, [
+    '#housekeeping-report-current', '#housekeeping-report-next', '#housekeeping-report-prev',
+    '#housekeeping-staff-month', '.housekeeping-staff-row__select', '.housekeeping-tab',
+    '[data-open-visit]', '[data-visit-report]',
+  ], 'Tab, Bericht, Personenwahl und Monat - alles andere dieser Seite schreibt');
+  // Kein Eintrag darf veraltet sein: was hier steht, muss im Markup vorkommen.
+  for (const sel of erlaubt) {
+    const kern = sel.replace(/^[#.]|^\[|\]$/g, '');
+    assert.ok(HK_CODE.includes(kern), `${sel} steht in der Liste, aber nicht mehr im Markup`);
+  }
+  // Und die schreibenden Haken stehen ausdruecklich NICHT darin.
+  for (const schreibend of ['data-worker-check', 'data-edit-visit', 'data-template-index', 'data-complete-task',
+    'data-undo-task', 'data-edit-task', 'data-delete-task', 'data-pay-report', 'data-edit-worker',
+    'data-pay-visit', 'data-delete-visit', 'housekeeping-create-profile', 'housekeeping-task-form', 'page-fab']) {
+    assert.ok(!hk.READ_SAFE_CONTROLS.includes(schreibend), `${schreibend} schreibt und gehoert nicht in die Liste`);
+  }
+});
+
+/** Ein Klick auf ein Bedienelement, das genau EINEN Selektor erfuellt. */
+function hkKlick(selektor) {
+  const bedienelement = selektor
+    ? { matches: (liste) => liste.split(',').map((s) => s.trim()).includes(selektor) }
+    : null;
+  return {
+    target: { closest: () => bedienelement },
+    abgefangen: 0,
+    preventDefault() { this.abgefangen += 1; },
+    stopPropagation() { this.abgefangen += 1; },
+  };
+}
+
+test('readOnlyLatch(): bei `read` faengt er jedes Bedienelement ausser den lesenden ab, mit Schreibrecht keines', () => {
+  withAccess({ housekeeping: 'read' }, () => {
+    for (const schreibend of ['[data-edit-worker]', '[data-complete-task]', '#housekeeping-task-form', '.page-fab']) {
+      const e = hkKlick(schreibend);
+      hk.readOnlyLatch(e);
+      assert.equal(e.abgefangen, 2, `${schreibend} wird abgefangen (preventDefault + stopPropagation)`);
+    }
+    for (const lesend of ['[data-open-visit]', '.housekeeping-staff-row__select', '#housekeeping-staff-month', '.housekeeping-tab']) {
+      const e = hkKlick(lesend);
+      hk.readOnlyLatch(e);
+      assert.equal(e.abgefangen, 0, `${lesend} liest und kommt durch`);
+    }
+    const flaeche = hkKlick(null);
+    hk.readOnlyLatch(flaeche);
+    assert.equal(flaeche.abgefangen, 0, 'ein Klick neben jedes Bedienelement (die Personenzeile) kommt durch');
+  });
+  withAccess({ housekeeping: 'write' }, () => {
+    const e = hkKlick('[data-edit-worker]');
+    hk.readOnlyLatch(e);
+    assert.equal(e.abgefangen, 0, 'mit Schreibrecht faengt er nichts ab');
+  });
+});
+
+test('der Riegel haengt an jeder neu gebauten Seite, in der Erfassungsphase, fuer Klick UND Absenden', () => {
+  const haken = [];
+  const seite = {
+    appendChild() {},
+    addEventListener: (typ, fn, capture) => { haken.push({ typ, fn, capture }); },
+  };
+  const container = {
+    replaceChildren() {},
+    insertAdjacentHTML() {},
+    querySelector: (sel) => (sel === '.housekeeping-page' ? seite : null),
+  };
+  hkState({ tab: 'tasks' });
+  hk.renderShell(container);
+  for (const typ of ['click', 'submit']) {
+    const h = haken.find((x) => x.typ === typ && x.fn === hk.readOnlyLatch);
+    assert.ok(h, `readOnlyLatch haengt fuer ${typ}`);
+    assert.equal(h.capture, true, `${typ}: Erfassungsphase - in der Blasenphase kaeme er nach dem Listener am Knopf`);
+  }
+});
+
+// -------------------------------------------------------------------------
+// Die Darstellung: Zeichen und Zeile ohne Kreis
+// -------------------------------------------------------------------------
+
+test('das Zeichen „gerade im Haus" traegt keinen Zeiger und keine Hover-Quittung, der Knopf schon', () => {
+  const css = LAYOUT_CSS + HK_CSS;
+  const zeichen = ['housekeeping-check-small', 'housekeeping-check-small--static'];
+  const knopf = ['btn', 'btn--secondary', 'housekeeping-check-small'];
+  assert.equal(effektiverWert(css, zeichen, 'cursor'), 'default', 'ein Zeigefinger verspricht eine Handlung');
+  assert.equal(effektiverWert(css, knopf, 'cursor'), 'pointer', 'der Knopf behaelt ihn - sonst maesse die Zeile darueber nichts');
+  assert.equal(effektiverWert(css, zeichen, 'background-color', ':hover'), null, 'keine Hover-Regel trifft das Zeichen');
+  assert.equal(effektiverWert(css, zeichen, 'background', ':hover'), null);
+  assert.notEqual(effektiverWert(css, knopf, 'background-color', ':hover'), null, 'der Knopf reagiert weiter');
+  assert.match(effektiverWert(css, zeichen, 'background') ?? '', /--color-surface-3/,
+    'Status statt Disabled-Grau (Audit F9) - die Farben der frueheren :disabled-Regel');
+});
+
+test('die Aufgabenzeile ohne Kreis gibt dessen Spalte frei', () => {
+  const zeile = ['housekeeping-task', 'housekeeping-task--overdue'];
+  assert.equal(effektiverWert(HK_CSS, zeile, 'grid-template-columns'), '56px 1fr');
+  assert.equal(effektiverWert(HK_CSS, [...zeile, 'housekeeping-task--readonly'], 'grid-template-columns'), 'minmax(0, 1fr)',
+    'sonst laege die Auskunft in der 56px-Spalte des Kreises');
+});
+
+// -------------------------------------------------------------------------
+// Wandtablett und Personal
+// -------------------------------------------------------------------------
+
+test('Haushaltshilfe hat keine Display-Ausnahme, und ein Display erreicht die Seite gar nicht', () => {
+  const display = readFileSync(new URL('../server/display-scopes.js', import.meta.url), 'utf8');
+  const routen = display.slice(display.indexOf('DISPLAY_WRITE_ROUTES = Object.freeze(['));
+  const liste = routen.slice(0, routen.indexOf(']);'));
+  assert.ok(!/housekeeping/.test(liste),
+    'gaebe es hier eine Route, brauchte die Seite ein actingAsDisplay() VOR der Modulregel');
+  const scopes = display.slice(display.indexOf('DISPLAY_SCOPES = Object.freeze(['));
+  assert.ok(!/housekeeping:/.test(scopes.slice(0, scopes.indexOf(']);'))),
+    'ohne Scope setzt server/permissions.js das Modul fuer ein Display auf none - die Seite ist fuer es nicht offen');
+});
+
 test.after(() => miniDomAbraeumen());

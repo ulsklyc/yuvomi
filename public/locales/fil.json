@@ -3491,6 +3491,7 @@
         "visitUnpaidToast": "Binawi ang pagbabayad.",
         "receiptUploadTitle": "Mag-upload ng resibo ng bayad",
         "receiptUploadHint": "Maglakip ng resibo ng bayad. Lalabas ito sa Mga Dokumento.",
+        "receiptLabel": "Resibo ng bayad",
         "receiptDocumentName": "Resibo - {{name}} - {{date}}",
         "receiptDocumentDescription": "Resibo ng bayad para sa pagbisita ni {{name}} sa gawaing-bahay noong {{date}}.",
         "taskTemplateData": {

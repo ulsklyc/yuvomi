@@ -3487,6 +3487,7 @@
         "visitUnpaidToast": "Betalningen har ångrats.",
         "receiptUploadTitle": "Ladda upp betalningskvitto",
         "receiptUploadHint": "Bifoga ett betalningskvitto. Det kommer att visas i Dokument.",
+        "receiptLabel": "Betalningskvitto",
         "receiptDocumentName": "Kvitto - {{name}} - {{date}}",
         "receiptDocumentDescription": "Betalningskvitto för {{name}} städbesök den {{date}}.",
         "taskTemplateData": {

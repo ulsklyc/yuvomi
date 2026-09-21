@@ -3064,6 +3064,7 @@
         "visitUnpaidToast": "Zaplacení zrušeno.",
         "receiptUploadTitle": "Nahrát doklad o platbě",
         "receiptUploadHint": "Přiložte doklad o platbě. Zobrazí se v dokumentech.",
+        "receiptLabel": "Doklad o platbě",
         "receiptDocumentName": "Doklad - {{name}} - {{date}}",
         "receiptDocumentDescription": "Doklad o platbě za návštěvu domácí péče {{name}} dne {{date}}.",
         "taskTemplateData": {
