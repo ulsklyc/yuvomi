@@ -3432,6 +3432,7 @@
         "addCustomTask": "अपना कार्य जोड़ें",
         "noReports": "अभी तक कोई रिपोर्ट नहीं।",
         "profileTitle": "सहायक प्रोफ़ाइल",
+        "openWorkerProfile": "प्रोफ़ाइल खोलें",
         "profilePicture": "प्रोफ़ाइल चित्र",
         "workerName": "नाम",
         "workerUsername": "उपयोगकर्ता नाम",
@@ -3489,6 +3490,7 @@
         "visitUnpaidToast": "भुगतान वापस लिया गया।",
         "receiptUploadTitle": "भुगतान रसीद अपलोड करें",
         "receiptUploadHint": "भुगतान रसीद जोड़ें। यह इसके बाद दस्तावेज़ में दिखेगी।",
+        "receiptLabel": "भुगतान रसीद",
         "receiptDocumentName": "रसीद - {{name}} - {{date}}",
         "receiptDocumentDescription": "{{date}} को {{name}} की विज़िट के लिए भुगतान रसीद।",
         "taskTemplateData": {

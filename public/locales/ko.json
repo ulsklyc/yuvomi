@@ -3436,6 +3436,7 @@
         "addCustomTask": "사용자 지정 작업 추가",
         "noReports": "아직 신고 없음.",
         "profileTitle": "가사 관리 프로필",
+        "openWorkerProfile": "프로필 열기",
         "profilePicture": "프로필 사진",
         "workerName": "이름",
         "workerUsername": "사용자 이름",
@@ -3493,6 +3494,7 @@
         "visitUnpaidToast": "지급이 취소되었습니다.",
         "receiptUploadTitle": "결제 영수증 업로드",
         "receiptUploadHint": "결제 영수증을 추가하세요. 이후 문서에 표시됩니다.",
+        "receiptLabel": "결제 영수증",
         "receiptDocumentName": "영수증 - {{name}} - {{date}}",
         "receiptDocumentDescription": "{{date}} {{name}}의 방문 결제 영수증.",
         "taskTemplateData": {

@@ -3432,6 +3432,7 @@
         "addCustomTask": "Προσθήκη δικής σου εργασίας",
         "noReports": "Δεν υπάρχουν ακόμη αναφορές.",
         "profileTitle": "Προφίλ βοηθού",
+        "openWorkerProfile": "Άνοιγμα προφίλ",
         "profilePicture": "Φωτογραφία προφίλ",
         "workerName": "Όνομα",
         "workerUsername": "Όνομα χρήστη",
@@ -3489,6 +3490,7 @@
         "visitUnpaidToast": "Η πληρωμή αναιρέθηκε.",
         "receiptUploadTitle": "Μεταφόρτωση απόδειξης πληρωμής",
         "receiptUploadHint": "Πρόσθεσε μια απόδειξη πληρωμής. Θα εμφανιστεί στη συνέχεια στα Έγγραφα.",
+        "receiptLabel": "Απόδειξη πληρωμής",
         "receiptDocumentName": "Απόδειξη - {{name}} - {{date}}",
         "receiptDocumentDescription": "Απόδειξη πληρωμής για την επίσκεψη {{name}} στις {{date}}.",
         "taskTemplateData": {

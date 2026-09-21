@@ -3432,6 +3432,7 @@
         "addCustomTask": "Aangepast klusje toevoegen",
         "noReports": "Nog geen rapporten.",
         "profileTitle": "Schoonmakerprofiel",
+        "openWorkerProfile": "Profiel openen",
         "profilePicture": "Profielfoto schoonmaker",
         "workerName": "Naam",
         "workerUsername": "Gebruikersnaam",
@@ -3489,6 +3490,7 @@
         "visitUnpaidToast": "Betaling teruggedraaid.",
         "receiptUploadTitle": "Betalingsbewijs uploaden",
         "receiptUploadHint": "Voeg een betalingsbewijs toe. Het verschijnt in Documenten.",
+        "receiptLabel": "Betalingsbewijs",
         "receiptDocumentName": "Bewijs - {{name}} - {{date}}",
         "receiptDocumentDescription": "Betalingsbewijs voor huishoudbezoek van {{name}} op {{date}}.",
         "taskTemplateData": {

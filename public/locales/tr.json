@@ -3432,6 +3432,7 @@
         "addCustomTask": "Kendi görevini ekle",
         "noReports": "Henüz bildirim yok.",
         "profileTitle": "Yardımcı profili",
+        "openWorkerProfile": "Profili aç",
         "profilePicture": "Profil fotoğrafı",
         "workerName": "Ad",
         "workerUsername": "Kullanıcı adı",
@@ -3489,6 +3490,7 @@
         "visitUnpaidToast": "Ödeme geri alındı.",
         "receiptUploadTitle": "Ödeme makbuzu yükle",
         "receiptUploadHint": "Bir ödeme makbuzu ekleyin. Ardından Belgeler bölümünde görünür.",
+        "receiptLabel": "Ödeme makbuzu",
         "receiptDocumentName": "Makbuz - {{name}} - {{date}}",
         "receiptDocumentDescription": "{{name}} kişisinin {{date}} tarihli ziyareti için ödeme makbuzu.",
         "taskTemplateData": {

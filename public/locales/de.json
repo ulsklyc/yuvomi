@@ -3436,6 +3436,7 @@
         "addCustomTask": "Eigene Aufgabe hinzufügen",
         "noReports": "Noch keine Meldungen.",
         "profileTitle": "Hauspflege-Profil",
+        "openWorkerProfile": "Profil öffnen",
         "profilePicture": "Profilbild",
         "workerName": "Name",
         "workerUsername": "Benutzername",
@@ -3493,6 +3494,7 @@
         "visitUnpaidToast": "Zahlung zurückgenommen.",
         "receiptUploadTitle": "Zahlungsbeleg hochladen",
         "receiptUploadHint": "Füge einen Zahlungsbeleg hinzu. Er erscheint anschließend in Dokumente.",
+        "receiptLabel": "Zahlungsbeleg",
         "receiptDocumentName": "Beleg - {{name}} - {{date}}",
         "receiptDocumentDescription": "Zahlungsbeleg für den Einsatz von {{name}} am {{date}}.",
         "taskTemplateData": {
