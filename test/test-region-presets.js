@@ -585,3 +585,36 @@ test('the language part of a region drops the script subtag', () => {
   assert.equal(regionLanguage('custom'), null);
   assert.equal(regionLanguage(null), null);
 });
+
+// DER DEMO-SEED MUSS AUF EINER REGION LANDEN. Er schrieb `date_format:
+// 'dmy_dot'` - ein gueltiges Format, das dasselbe Datum druckt wie 'dmy', aber
+// kein Preset fuehrt es zusammen mit EUR und 24h. `detectRegion()` fand also
+// keines, und der Demo-Haushalt (samt Screenshots) stand auf
+// „Benutzerdefiniert" statt auf de-DE: Zahlen folgten der UI-Sprache, die
+// Region-Auswahl zeigte nichts. Gelesen wird der Quelltext, weil der Seed beim
+// Import eine Datenbank leert; jeder der drei Schluessel muss GENAU einmal als
+// Literal dastehen, sonst schlaegt der Test an, statt still nichts zu pruefen.
+test('the demo seed writes backend-valid formats that resolve to a region preset', async () => {
+  const src = withoutCommentsKeepingLines(await readFile(
+    new URL('../scripts/seed-demo.js', import.meta.url),
+    'utf8',
+  ));
+  const seeded = (key) => {
+    const hits = [...src.matchAll(new RegExp(`cfgSet\\.run\\(\\s*'${key}'\\s*,\\s*'([^']*)'\\s*\\)`, 'g'))];
+    assert.equal(hits.length, 1, `seed-demo.js must set ${key} exactly once as a literal (found ${hits.length})`);
+    return hits[0][1];
+  };
+  const triple = {
+    currency: seeded('currency'),
+    date_format: seeded('date_format'),
+    time_format: seeded('time_format'),
+  };
+
+  assert.ok(CURRENCY_CODES.includes(triple.currency), `seed: invalid currency ${triple.currency}`);
+  assert.ok((await backendList('VALID_DATE_FORMATS')).includes(triple.date_format),
+    `seed: invalid date_format ${triple.date_format}`);
+  assert.ok((await backendList('VALID_TIME_FORMATS')).includes(triple.time_format),
+    `seed: invalid time_format ${triple.time_format}`);
+  assert.notEqual(detectRegion(triple), CUSTOM_REGION,
+    `seed: ${JSON.stringify(triple)} matches no region preset, so the demo household has no region`);
+});
