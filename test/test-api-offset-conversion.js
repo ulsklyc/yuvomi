@@ -216,6 +216,34 @@ test('PUT /calendar/:id speichert denselben Wert wie POST, nicht den rohen', asy
   assert.equal(put.body.data.start_datetime, '2026-09-21T18:00');
 });
 
+test('PUT /calendar/:id: ein leerer oder null-Start ist ein 400, das Ende darf geleert werden', async () => {
+  // Der Start ist Pflicht. Bis v2.68.0 schrieb PUT einen leeren Start roh in
+  // die Zeile; seit PUT den geprueften Wert nimmt, hiess '' dasselbe wie null,
+  // und beides liess den Start still stehen - eine Anfrage, die etwas leeren
+  // will, bekam 200 und nichts geschah. Jetzt dieselbe Antwort wie bei POST.
+  const created = await call('POST', '/calendar', {
+    title: 'Pflichtstart', start_datetime: '2026-09-21T10:00', end_datetime: '2026-09-21T11:00',
+  });
+  const id = created.body.data.id;
+  for (const start of ['', null]) {
+    const res = await call('PUT', `/calendar/${id}`, { start_datetime: start });
+    assert.equal(res.status, 400, `start_datetime: ${JSON.stringify(start)}`);
+    assert.match(res.body.error, /Startdatum is required\./, JSON.stringify(res.body));
+    assert.deepEqual({ ...eventRow(id) },
+      { start_datetime: '2026-09-21T10:00', end_datetime: '2026-09-21T11:00', all_day: 0 },
+      'eine abgewiesene Anfrage aendert nichts');
+  }
+  // Das Ende ist optional: ein Termin ohne Ende ist gueltig, und das Formular
+  // schickt `null`, wenn keins gesetzt ist. Leeren bleibt deshalb erlaubt.
+  for (const end of ['', null]) {
+    await call('PUT', `/calendar/${id}`, { end_datetime: '2026-09-21T11:00' });
+    const res = await call('PUT', `/calendar/${id}`, { end_datetime: end });
+    assert.equal(res.status, 200, `end_datetime: ${JSON.stringify(end)}`);
+    assert.equal(eventRow(id).end_datetime, null, `end_datetime: ${JSON.stringify(end)} leert das Ende`);
+    assert.equal(eventRow(id).start_datetime, '2026-09-21T10:00');
+  }
+});
+
 test('PUT /calendar/:id: ganztaegig mit `T00:00Z` bleibt westlich von UTC am gesendeten Datum', async () => {
   await inZone('America/New_York', async () => {
     const posted = await call('POST', '/calendar', {
