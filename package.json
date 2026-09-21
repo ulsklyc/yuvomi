@@ -390,19 +390,19 @@
     "bcrypt": "^6.0.0",
     "better-sqlite3-multiple-ciphers": "^13.0.3",
     "compression": "^1.8.2",
-    "dotenv": "^17.4.2",
+    "dotenv": "^18.0.0",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
     "express-session": "^1.19.0",
     "helmet": "^8.3.0",
     "libphonenumber-js": "^1.13.13",
     "node-cron": "^4.6.0",
-    "nodemailer": "^10.0.8",
+    "nodemailer": "^10.0.10",
     "openid-client": "^6.8.8",
     "web-push": "^3.6.7"
   },
   "optionalDependencies": {
-    "googleapis": "^180.0.0",
+    "googleapis": "^181.0.0",
     "tsdav": "^2.3.3"
   },
   "license": "MIT",
