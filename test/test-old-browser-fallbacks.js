@@ -594,6 +594,10 @@ const STARTUP_EXCEPTIONS = [
   {
     path: '/i18n.js',
     api: 'Array.prototype.findLast / findLastIndex',
+    // Die Ausnahme gilt dieser EINEN Zeile, nicht der ganzen Datei: ein zweiter
+    // findLastIndex-Aufruf in i18n.js (etwa in pickLocale) waere wieder ein
+    // Startabbruch und muss rot werden (Review zu #1379).
+    line: 'const last = parts.findLastIndex((part) => NUMBER_PARTS.has(part.type));',
     reason: 'steht in formatUnit(), und das ruft kein Skript des Startpfads - nur die Leseansicht '
       + 'eines Geburtstags mit eigener Erinnerungsfrist (pages/birthdays.js) und die Fastendauern '
       + '(utils/health-fasting.js). Unter Chrome 97 faellt dort diese eine Angabe aus, nicht der Start. '
@@ -721,7 +725,8 @@ test('der Startpfad ruft keine API, die neuer ist als die Mindestversion (#1276,
   const matchedExceptions = new Set();
   for (const { path, via, source } of sources) {
     for (const hit of forbiddenCalls(source)) {
-      const exception = STARTUP_EXCEPTIONS.find((ex) => ex.path === path && ex.api === hit.rule.api);
+      const exception = STARTUP_EXCEPTIONS.find((ex) => ex.path === path && ex.api === hit.rule.api
+        && hit.line === ex.line);
       if (exception) { matchedExceptions.add(exception); continue; }
       offenders.push(`${path}:${hit.number} (geladen von ${via}): ${hit.line}\n    ${hit.rule.api} erst ab `
         + `${describeSince(hit.rule.since)} - stattdessen ${hit.rule.instead}`);
