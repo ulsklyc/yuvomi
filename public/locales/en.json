@@ -719,6 +719,7 @@
         "seriesEndedToast": "Series ended from this date.",
         "seriesDeletedToast": "Series deleted.",
         "deleteMealNamed": "Delete {{title}}",
+        "dragHandle": "Drag {{title}} to another day",
         "openRecipeNamed": "Open recipe for {{title}}",
         "viewRecipeNamed": "View recipe for {{title}}"
     },

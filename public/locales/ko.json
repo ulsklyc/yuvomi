@@ -731,6 +731,7 @@
         "seriesEndedToast": "이 날짜부터 시리즈를 종료했습니다.",
         "seriesDeletedToast": "시리즈가 삭제되었습니다.",
         "deleteMealNamed": "{{title}} 삭제",
+        "dragHandle": "{{title}}을(를) 다른 날로 끌기",
         "openRecipeNamed": "{{title}} 레시피 열기",
         "viewRecipeNamed": "{{title}} 레시피 보기"
     },

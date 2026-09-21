@@ -73,6 +73,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **On a phone, a meal can be dragged to another day again, by a grip next to its buttons.** The
+  drag started, and ended the moment the finger moved: on a phone the week plan is a vertical list,
+  another day lies exactly on the scrolling axis, and the browser took the gesture as a scroll and
+  cancelled the drag. Making the whole row draggable would have fixed that and broken scrolling,
+  because on a phone the week consists almost entirely of meal rows. So each row now carries a grip,
+  the same one the shopping list, the category manager and the quick links already use: dragging
+  from the grip moves the meal, and a finger anywhere else on the row scrolls the week as before and
+  still opens the meal with a tap. On a wider screen nothing changes - there is no grip, and the
+  mouse still picks up the whole card. Without a pointer, the date in the meal's dialog remains the
+  way to move it. (#1317)
+
 - **On browsers older than Chrome 108, the main area scrolls and dialogs stay on screen.**
   Yuvomi sized the page, the app frame and the height limit of its dialogs with `dvh`, a unit for
   the visible window height that Chrome understands from version 108 and Safari from 15.4. An older

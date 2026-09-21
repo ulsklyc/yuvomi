@@ -719,6 +719,7 @@
         "seriesEndedToast": "Serien avslutad från detta datum.",
         "seriesDeletedToast": "Serie borttagen.",
         "deleteMealNamed": "Ta bort {{title}}",
+        "dragHandle": "Dra {{title}} till en annan dag",
         "openRecipeNamed": "Öppna receptet för {{title}}",
         "viewRecipeNamed": "Visa receptet för {{title}}"
     },

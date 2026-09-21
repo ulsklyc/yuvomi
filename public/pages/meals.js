@@ -804,6 +804,17 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
     // interaktiver Inhalt in einem Button ist invalides HTML - Screenreader
     // verlieren dann die inneren Aktionen (Critique 2026-08-17). Das Öffnen
     // gehört der Titelfläche; die Aktionen stehen daneben, nicht darin.
+    //
+    // Der Ziehgriff (#1317) gehoert der schmalen Zeile. Dort liegt der
+    // Wochenplan im vertikalen Scroller (.app-content, pan-y), und der Browser
+    // nahm jeden Zug an der Karte als Scroll und brach den Pointer mit
+    // pointercancel ab. Der Griff traegt als einzige Stelle `touch-action:
+    // none` (meals.css), der Rest der Zeile bleibt dem Scrollen. Kein Button:
+    // wie im Kategorie-Manager (role="img") ist er eine Zeigergeste ohne eigene
+    // Tastaturhandlung - der Weg ohne Zeiger ist das Datum im Bearbeiten-
+    // Dialog. Er steht AUSSERHALB von .meal-card__actions, die wireDragDrop
+    // ausnimmt. Ausserhalb der schmalen Fassung ist er ausgeblendet: dort
+    // greift die Maus weiter die ganze Karte.
     return `
       <div class="meal-card" data-meal-id="${meal.id}">
         <button type="button" class="meal-card__open${(meal.recipe_has_own_image || meal.recipe_has_image) ? ' meal-card__open--with-thumb' : ''}"
@@ -820,6 +831,10 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
             <span class="meal-card__ingredients-count">${ingLabel}${esc(ingDoneLabel)}</span>
           </span>` : ''}
         </button>
+        <span class="meal-card__drag" role="img"
+              aria-label="${esc(t('meals.dragHandle', { title: meal.title }))}">
+          <i data-lucide="grip-vertical" class="icon-md" aria-hidden="true"></i>
+        </span>
         <div class="meal-card__actions">
           ${meal.recipe_id && recipesReachable() ? `<a class="meal-card__action-btn meal-card__action-btn--recipe"
             data-action="open-linked-recipe"
@@ -1143,6 +1158,17 @@ function wireDragDrop(grid) {
     // in einen anderen Slot und verschluckte den Klick. Eine Liste vergisst den
     // naechsten Knopf genauso - der Container ist die Regel.
     if (e.target.closest('.meal-card__actions')) return;
+    // Ein Finger (oder Stift) zieht nur am Griff, sobald die Zeile einen zeigt
+    // (#1317). Ueberall sonst gehoert die Geste dem Scroller: er beansprucht sie
+    // wegen `touch-action: pan-y` ohnehin und beendet den Pointer mit
+    // pointercancel - ein hier begonnener Zug brach also nur ab, und das
+    // preventDefault darunter liess nicht einmal den Scroll sauber anlaufen.
+    // Die Maus greift weiter die ganze Karte. Wo der Griff ausgeblendet ist
+    // (breites Board auf einem Tablet), bleibt es beim bisherigen Verhalten.
+    if (e.pointerType !== 'mouse' && !e.target.closest('.meal-card__drag')) {
+      const handle = card.querySelector('.meal-card__drag');
+      if (handle && handle.getClientRects().length > 0) return;
+    }
 
     const slot = card.closest('.meal-slot');
     if (!slot) return;
@@ -1985,6 +2011,10 @@ export const __test = {
   // PR #1200 Review Runde 3, Nice-to-have 4: pinnt, dass ein Wechsel ueber die
   // 640px-Schwelle das Wochen-Label wirklich neu zeichnet (test-meals.js).
   onNarrowWeekLabelQueryChange,
+  // #1317: Griff-Markup und der ECHTE pointerdown-Handler, verhaltensgetrieben
+  // gepinnt (test-meals.js, „Ziehgriff").
+  renderSlot,
+  wireDragDrop,
 };
 
 // --------------------------------------------------------

@@ -719,6 +719,7 @@
         "seriesEndedToast": "Reeks vanaf deze datum beëindigd.",
         "seriesDeletedToast": "Reeks verwijderd.",
         "deleteMealNamed": "{{title}} verwijderen",
+        "dragHandle": "{{title}} naar een andere dag slepen",
         "openRecipeNamed": "Recept voor {{title}} openen",
         "viewRecipeNamed": "Recept voor {{title}} bekijken"
     },

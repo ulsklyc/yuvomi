@@ -719,6 +719,7 @@
         "seriesEndedToast": "この日でシリーズを終了しました。",
         "seriesDeletedToast": "シリーズを削除しました。",
         "deleteMealNamed": "{{title}}を削除",
+        "dragHandle": "{{title}}を別の日にドラッグ",
         "openRecipeNamed": "{{title}}のレシピを開く",
         "viewRecipeNamed": "{{title}}のレシピを表示"
     },

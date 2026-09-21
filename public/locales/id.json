@@ -731,6 +731,7 @@
         "seriesEndedToast": "Seri diakhiri mulai tanggal ini.",
         "seriesDeletedToast": "Seri dihapus.",
         "deleteMealNamed": "Hapus {{title}}",
+        "dragHandle": "Seret {{title}} ke hari lain",
         "openRecipeNamed": "Buka resep {{title}}",
         "viewRecipeNamed": "Lihat resep {{title}}"
     },

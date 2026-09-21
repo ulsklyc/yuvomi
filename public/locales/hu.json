@@ -719,6 +719,7 @@
         "seriesEndedToast": "A sorozat ettől a dátumtól véget ér.",
         "seriesDeletedToast": "Sorozat törölve.",
         "deleteMealNamed": "{{title}} törlése",
+        "dragHandle": "{{title}} áthúzása egy másik napra",
         "openRecipeNamed": "{{title}} receptjének megnyitása",
         "viewRecipeNamed": "{{title}} receptjének megtekintése"
     },

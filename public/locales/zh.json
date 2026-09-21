@@ -719,6 +719,7 @@
         "seriesEndedToast": "已从该日期结束该系列。",
         "seriesDeletedToast": "已删除该系列。",
         "deleteMealNamed": "删除{{title}}",
+        "dragHandle": "将{{title}}拖到另一天",
         "openRecipeNamed": "打开{{title}}的食谱",
         "viewRecipeNamed": "查看{{title}}的食谱"
     },
