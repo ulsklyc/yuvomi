@@ -2952,6 +2952,7 @@
         "nameDayClear": "Naamdag verwijderen",
         "nameDayHint": "Gebruikt dezelfde herinnering als de verjaardag.",
         "nameDayIncomplete": "Selecteer de maand en dag van de naamdag.",
+        "reminderAmountInvalid": "Voer voor de eigen herinnering een geheel getal van 1 tot {{max}} in.",
         "reminderOnDay": "Op de dag zelf",
         "reminderBefore": "{{duration}} van tevoren",
         "reminderAfterNoon": "{{duration}} na 12 uur",

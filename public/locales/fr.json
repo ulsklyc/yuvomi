@@ -2979,6 +2979,7 @@
         "nameDayClear": "Supprimer la fête",
         "nameDayHint": "Utilise le même rappel que l’anniversaire.",
         "nameDayIncomplete": "Sélectionnez le mois et le jour de la fête.",
+        "reminderAmountInvalid": "Saisissez un nombre entier de 1 à {{max}} pour le rappel personnalisé.",
         "reminderOnDay": "Le jour même",
         "reminderBefore": "{{duration}} avant",
         "reminderAfterNoon": "{{duration}} après 12 h",

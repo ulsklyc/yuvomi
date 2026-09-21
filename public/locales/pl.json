@@ -2964,6 +2964,7 @@
         "nameDayClear": "Usuń imieniny",
         "nameDayHint": "Używa tego samego przypomnienia co urodziny.",
         "nameDayIncomplete": "Wybierz miesiąc i dzień imienin.",
+        "reminderAmountInvalid": "Dla własnego przypomnienia wpisz liczbę całkowitą od 1 do {{max}}.",
         "reminderOnDay": "W tym samym dniu",
         "reminderBefore": "Z wyprzedzeniem: {{duration}}",
         "reminderAfterNoon": "Po południu (+{{duration}})",

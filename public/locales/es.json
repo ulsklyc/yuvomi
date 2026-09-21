@@ -2979,6 +2979,7 @@
         "nameDayClear": "Quitar la onomástica",
         "nameDayHint": "Usa el mismo recordatorio que el cumpleaños.",
         "nameDayIncomplete": "Selecciona el mes y el día de la onomástica.",
+        "reminderAmountInvalid": "Introduce un número entero del 1 al {{max}} para el recordatorio personalizado.",
         "reminderOnDay": "El mismo día",
         "reminderBefore": "{{duration}} antes",
         "reminderAfterNoon": "{{duration}} después de las 12:00",

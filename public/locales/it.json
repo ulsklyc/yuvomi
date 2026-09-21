@@ -2979,6 +2979,7 @@
         "nameDayClear": "Rimuovi onomastico",
         "nameDayHint": "Usa lo stesso promemoria del compleanno.",
         "nameDayIncomplete": "Seleziona il mese e il giorno dell’onomastico.",
+        "reminderAmountInvalid": "Inserisci un numero intero da 1 a {{max}} per il promemoria personalizzato.",
         "reminderOnDay": "Il giorno stesso",
         "reminderBefore": "{{duration}} prima",
         "reminderAfterNoon": "{{duration}} dopo mezzogiorno",

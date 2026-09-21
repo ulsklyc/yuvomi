@@ -2952,6 +2952,7 @@
         "nameDayClear": "Remove name day",
         "nameDayHint": "Uses the same reminder as the birthday.",
         "nameDayIncomplete": "Select both the month and day of the name day.",
+        "reminderAmountInvalid": "Enter a whole number from 1 to {{max}} for the custom reminder.",
         "reminderOnDay": "On the day",
         "reminderBefore": "{{duration}} before",
         "reminderAfterNoon": "{{duration}} after midday",

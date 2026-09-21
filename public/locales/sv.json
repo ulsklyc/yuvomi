@@ -2979,6 +2979,7 @@
         "nameDayClear": "Ta bort namnsdag",
         "nameDayHint": "Använder samma påminnelse som födelsedagen.",
         "nameDayIncomplete": "Välj månad och dag för namnsdagen.",
+        "reminderAmountInvalid": "Ange ett heltal från 1 till {{max}} för den egna påminnelsen.",
         "reminderOnDay": "Samma dag",
         "reminderBefore": "{{duration}} innan",
         "reminderAfterNoon": "{{duration}} efter klockan 12",

@@ -2952,6 +2952,7 @@
         "nameDayClear": "Névnap eltávolítása",
         "nameDayHint": "Ugyanazt az emlékeztetőt használja, mint a születésnap.",
         "nameDayIncomplete": "Válaszd ki a névnap hónapját és napját.",
+        "reminderAmountInvalid": "Az egyéni emlékeztetőhöz adj meg egy egész számot 1 és {{max}} között.",
         "reminderOnDay": "Aznap",
         "reminderBefore": "Előtte: {{duration}}",
         "reminderAfterNoon": "Dél után (+{{duration}})",

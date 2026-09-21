@@ -2979,6 +2979,7 @@
         "nameDayClear": "नाम दिवस हटाएँ",
         "nameDayHint": "जन्मदिन वाले ही रिमाइंडर का उपयोग करता है।",
         "nameDayIncomplete": "नाम दिवस का महीना और दिन दोनों चुनें।",
+        "reminderAmountInvalid": "कस्टम रिमाइंडर के लिए 1 से {{max}} तक की पूर्ण संख्या दर्ज करें।",
         "reminderOnDay": "उसी दिन",
         "reminderBefore": "{{duration}} पहले",
         "reminderAfterNoon": "दोपहर 12 बजे के {{duration}} बाद",

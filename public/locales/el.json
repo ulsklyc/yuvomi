@@ -2979,6 +2979,7 @@
         "nameDayClear": "Αφαίρεση ονομαστικής εορτής",
         "nameDayHint": "Χρησιμοποιεί την ίδια υπενθύμιση με τα γενέθλια.",
         "nameDayIncomplete": "Επιλέξτε μήνα και ημέρα ονομαστικής εορτής.",
+        "reminderAmountInvalid": "Εισαγάγετε έναν ακέραιο αριθμό από 1 έως {{max}} για την προσαρμοσμένη υπενθύμιση.",
         "reminderOnDay": "Την ίδια ημέρα",
         "reminderBefore": "{{duration}} πριν",
         "reminderAfterNoon": "{{duration}} μετά τις 12:00",

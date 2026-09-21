@@ -2979,6 +2979,7 @@
         "nameDayClear": "Удалить именины",
         "nameDayHint": "Используется то же напоминание, что и для дня рождения.",
         "nameDayIncomplete": "Выберите месяц и день именин.",
+        "reminderAmountInvalid": "Для своего напоминания введите целое число от 1 до {{max}}.",
         "reminderOnDay": "В тот же день",
         "reminderBefore": "Заранее: {{duration}}",
         "reminderAfterNoon": "После полудня (+{{duration}})",

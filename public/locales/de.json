@@ -2964,6 +2964,7 @@
         "nameDayClear": "Namenstag entfernen",
         "nameDayHint": "Verwendet dieselbe Erinnerung wie der Geburtstag.",
         "nameDayIncomplete": "Bitte Monat und Tag des Namenstags auswählen.",
+        "reminderAmountInvalid": "Für die eigene Erinnerung eine ganze Zahl von 1 bis {{max}} eingeben.",
         "reminderOnDay": "Am Tag selbst",
         "reminderBefore": "{{duration}} vorher",
         "reminderAfterNoon": "{{duration}} nach 12 Uhr",

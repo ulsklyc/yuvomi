@@ -2010,7 +2010,7 @@ function editorAuswahl(html, id) {
  * Zurueck kommt, was an den Server ging - durch JSON, wie in api.js: ein Feld
  * mit `undefined` kaeme dort gar nicht an.
  */
-async function geburtstagSpeichern(eintrag, { mode = 'edit', bedienen = async () => {} } = {}) {
+async function geburtstagSpeichern(eintrag, { mode = 'edit', bedienen = async () => {}, roh = false } = {}) {
   const optionen = withAccess({ calendar: 'write' }, () => modalOptionen(
     () => birthdays.openBirthdayModal({ mode, birthday: mode === 'edit' ? eintrag : null }),
   ));
@@ -2052,7 +2052,8 @@ async function geburtstagSpeichern(eintrag, { mode = 'edit', bedienen = async ()
   };
   globalThis.__apiStub = { get: async () => ({ data: vorher.liste }), post: mitschreiben('post'), put: mitschreiben('put') };
   globalThis.window.yuvomi = globalThis.window.yuvomi ?? {};
-  globalThis.window.yuvomi.showToast = () => {};
+  const toasts = [];
+  globalThis.window.yuvomi.showToast = (text, art) => { toasts.push({ text, art }); };
   try {
     await el['#bd-save'].feuern('click');
   } finally {
@@ -2060,11 +2061,39 @@ async function geburtstagSpeichern(eintrag, { mode = 'edit', bedienen = async ()
     globalThis.window.yuvomi.showToast = vorher.toast;
     birthdays.state.birthdays = vorher.liste;
   }
+  if (roh) return { gesendet, toasts, el };
   assert.equal(gesendet.length, 1, 'genau ein Schreibaufruf - sonst misst der Test den Speichern-Weg nicht');
   return gesendet[0];
 }
 
 const ERINNERUNGSFELDER = ['reminder_offset', 'reminder_custom_amount', 'reminder_custom_unit'];
+
+test('eigene Angabe mit ungueltiger Anzahl: der Editor speichert nicht und sagt es ueber t() (Nachzug zu #1384)', async () => {
+  for (const anzahl of ['0', '1000', '1.5', '']) {
+    const { gesendet, toasts } = await geburtstagSpeichern(geburtstag(), {
+      roh: true,
+      bedienen: async (el) => {
+        el['#bd-reminder-offset'].value = 'custom';
+        el['#bd-reminder-custom-amount'].value = anzahl;
+      },
+    });
+    assert.equal(gesendet.length, 0, `Anzahl ${JSON.stringify(anzahl)}: nichts geht an den Server`);
+    assert.deepEqual(toasts.map((toast) => toast.text), ['birthdays.reminderAmountInvalid{"max":999}'],
+      `Anzahl ${JSON.stringify(anzahl)}: der Hinweis kommt aus t(), nicht als Servermeldung`);
+  }
+});
+
+test('Vorgabe nach getippter ungueltiger Anzahl: gespeichert wird ohne Anzahl und Einheit', async () => {
+  const gesendet = await geburtstagSpeichern(geburtstag(), {
+    bedienen: async (el) => {
+      el['#bd-reminder-custom-amount'].value = '0';
+      el['#bd-reminder-offset'].value = '2880';
+    },
+  });
+  assert.equal(gesendet.body.reminder_offset, '2880');
+  assert.ok(!('reminder_custom_amount' in gesendet.body) && !('reminder_custom_unit' in gesendet.body),
+    'das verborgene Feld laesst das Speichern nicht scheitern');
+});
 
 test('Geburtstag ohne gespeicherte Erinnerung: der Editor zeigt den Tag selbst, wie der Server erinnert', () => {
   const editor = (birthday, mode = 'edit') => withAccess({ calendar: 'write' }, () => modalOptionen(

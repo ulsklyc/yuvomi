@@ -2979,6 +2979,7 @@
         "nameDayClear": "聖名祝日を削除",
         "nameDayHint": "誕生日と同じリマインダーを使用します。",
         "nameDayIncomplete": "聖名祝日の月と日を選択してください。",
+        "reminderAmountInvalid": "カスタムリマインダーには 1 から {{max}} までの整数を入力してください。",
         "reminderOnDay": "当日",
         "reminderBefore": "{{duration}}前",
         "reminderAfterNoon": "正午の{{duration}}後",

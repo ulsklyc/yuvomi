@@ -2952,6 +2952,7 @@
         "nameDayClear": "Xóa ngày tên thánh",
         "nameDayHint": "Dùng cùng lời nhắc với ngày sinh nhật.",
         "nameDayIncomplete": "Chọn cả tháng và ngày của ngày tên thánh.",
+        "reminderAmountInvalid": "Nhập một số nguyên từ 1 đến {{max}} cho lời nhắc tùy chỉnh.",
         "reminderOnDay": "Vào đúng ngày",
         "reminderBefore": "{{duration}} trước",
         "reminderAfterNoon": "{{duration}} sau 12 giờ trưa",

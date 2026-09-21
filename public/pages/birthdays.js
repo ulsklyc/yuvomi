@@ -162,6 +162,33 @@ function reminderOpensAdvanced(birthday) {
   return shown !== '' && shown !== '1440';
 }
 
+// Obergrenze der eigenen Anzahl, wie im Server (`MAX_REMINDER_AMOUNT`,
+// server/routes/birthdays.js) und im Zahlenfeld des Editors.
+const REMINDER_AMOUNT_MAX = 999;
+
+/**
+ * Die Erinnerung, wie der Editor sie speichern darf (Nachzug zu #1384).
+ *
+ * Bei "Eigene Angabe" muss die Anzahl eine ganze Zahl von 1 bis 999 sein, sonst
+ * haelt `invalid` das Speichern an - der Hinweis kommt dann aus t(), nicht als
+ * englische Servermeldung. Bei einer Vorgabe stehen Anzahl und Einheit nur
+ * verborgen mit; ist die Anzahl dort ungueltig (getippt, dann doch eine Vorgabe
+ * gewaehlt), gehen beide nicht mit, statt das Speichern an einem unsichtbaren
+ * Feld scheitern zu lassen.
+ *
+ * @param {{ reminder_offset: string, reminder_custom_amount: string, reminder_custom_unit: string }} reminder
+ * @returns {{ reminder: object, invalid: boolean }}
+ */
+export function reminderToSave(reminder) {
+  const raw = String(reminder.reminder_custom_amount ?? '');
+  const amount = /^\d{1,9}$/.test(raw) ? Number(raw) : NaN;
+  const valid = amount >= 1 && amount <= REMINDER_AMOUNT_MAX;
+  if (reminder.reminder_offset === 'custom') return { reminder, invalid: !valid };
+  if (valid) return { reminder, invalid: false };
+  const { reminder_custom_amount: _amount, reminder_custom_unit: _unit, ...rest } = reminder;
+  return { reminder: rest, invalid: false };
+}
+
 function renderBirthdayReminderSection(birthday = null) {
   // Ein neuer Geburtstag beginnt bei „1 Tag vorher" und schreibt es beim Anlegen.
   const currentOffset = birthday ? storedReminderOffset(birthday) : '1440';
@@ -180,7 +207,7 @@ function renderBirthdayReminderSection(birthday = null) {
       <div class="modal-grid modal-grid--2 reminder-custom" id="bd-reminder-custom" ${currentOffset === 'custom' ? '' : 'hidden'}>
         <div class="form-group" style="margin:0">
           <label class="form-label" for="bd-reminder-custom-amount">${t('reminders.customAmountLabel')}</label>
-          <input class="form-input" type="number" id="bd-reminder-custom-amount" min="1" max="999" value="${customAmount}">
+          <input class="form-input" type="number" id="bd-reminder-custom-amount" min="1" max="${REMINDER_AMOUNT_MAX}" step="1" value="${customAmount}">
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label" for="bd-reminder-custom-unit">${t('reminders.customUnitLabel')}</label>
@@ -939,13 +966,18 @@ function openBirthdayModal({ mode, birthday = null }) {
         // Ein neuer Geburtstag schreibt, was die Auswahl zeigt; ein bestehender
         // nur, was sich seit dem Oeffnen geaendert hat. Fehlt das Feld, laesst
         // `PUT /birthdays/:id` den gespeicherten Wert stehen.
-        const reminder = readReminder();
+        const { reminder, invalid: reminderInvalid } = reminderToSave(readReminder());
         if (!isEdit || Object.keys(reminder).some((key) => reminder[key] !== reminderAsOpened[key])) {
           Object.assign(body, reminder);
         }
 
         if (!body.name || !body.birth_date || !isDateInputValid(birthDateRaw)) {
           window.yuvomi?.showToast(t('birthdays.requiredFields'), 'warning');
+          return;
+        }
+        if (reminderInvalid) {
+          window.yuvomi?.showToast(t('birthdays.reminderAmountInvalid', { max: REMINDER_AMOUNT_MAX }), 'warning');
+          panel.querySelector('#bd-reminder-custom-amount')?.focus();
           return;
         }
 

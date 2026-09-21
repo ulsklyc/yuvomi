@@ -2964,6 +2964,7 @@
         "nameDayClear": "Hapus hari nama",
         "nameDayHint": "Menggunakan pengingat yang sama dengan ulang tahun.",
         "nameDayIncomplete": "Pilih bulan dan tanggal hari nama.",
+        "reminderAmountInvalid": "Masukkan bilangan bulat dari 1 sampai {{max}} untuk pengingat kustom.",
         "reminderOnDay": "Pada hari-H",
         "reminderBefore": "{{duration}} sebelumnya",
         "reminderAfterNoon": "{{duration}} setelah pukul 12.00",

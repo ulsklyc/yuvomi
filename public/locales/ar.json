@@ -2979,6 +2979,7 @@
         "nameDayClear": "إزالة يوم الاسم",
         "nameDayHint": "يستخدم التذكير نفسه المستخدم لعيد الميلاد.",
         "nameDayIncomplete": "اختر شهر ويوم الاسم.",
+        "reminderAmountInvalid": "أدخل عددًا صحيحًا من 1 إلى {{max}} للتذكير المخصص.",
         "reminderOnDay": "في نفس اليوم",
         "reminderBefore": "مسبقًا: {{duration}}",
         "reminderAfterNoon": "بعد 12:00 (+{{duration}})",

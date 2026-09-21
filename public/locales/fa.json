@@ -2964,6 +2964,7 @@
         "nameDayClear": "حذف روز نام",
         "nameDayHint": "از همان یادآور تولد استفاده می‌کند.",
         "nameDayIncomplete": "ماه و روزِ روز نام را انتخاب کنید.",
+        "reminderAmountInvalid": "برای یادآوری سفارشی یک عدد صحیح از ۱ تا {{max}} وارد کنید.",
         "reminderOnDay": "همان روز",
         "reminderBefore": "{{duration}} قبل",
         "reminderAfterNoon": "{{duration}} پس از ساعت ۱۲",

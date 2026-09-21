@@ -2979,6 +2979,7 @@
         "nameDayClear": "İsim gününü kaldır",
         "nameDayHint": "Doğum günüyle aynı hatırlatıcıyı kullanır.",
         "nameDayIncomplete": "İsim gününün ayını ve gününü seçin.",
+        "reminderAmountInvalid": "Özel hatırlatıcı için 1 ile {{max}} arasında bir tam sayı girin.",
         "reminderOnDay": "Gününde",
         "reminderBefore": "{{duration}} önce",
         "reminderAfterNoon": "Öğleden {{duration}} sonra",

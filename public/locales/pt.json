@@ -2979,6 +2979,7 @@
         "nameDayClear": "Remover dia do nome",
         "nameDayHint": "Usa o mesmo lembrete do aniversário.",
         "nameDayIncomplete": "Selecione o mês e o dia do dia do nome.",
+        "reminderAmountInvalid": "Introduza um número inteiro de 1 a {{max}} para o lembrete personalizado.",
         "reminderOnDay": "No próprio dia",
         "reminderBefore": "{{duration}} antes",
         "reminderAfterNoon": "{{duration}} depois do meio-dia",

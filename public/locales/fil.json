@@ -2964,6 +2964,7 @@
         "nameDayClear": "Alisin ang araw ng pangalan",
         "nameDayHint": "Ginagamit ang parehong paalala ng kaarawan.",
         "nameDayIncomplete": "Piliin ang buwan at araw ng araw ng pangalan.",
+        "reminderAmountInvalid": "Maglagay ng buong numero mula 1 hanggang {{max}} para sa sariling paalala.",
         "reminderOnDay": "Sa araw mismo",
         "reminderBefore": "{{duration}} bago",
         "reminderAfterNoon": "{{duration}} pagkalipas ng tanghali",

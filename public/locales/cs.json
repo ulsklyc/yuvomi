@@ -3568,6 +3568,7 @@
         "nameDayClear": "Odebrat svátek",
         "nameDayHint": "Použije stejné upozornění jako narozeniny.",
         "nameDayIncomplete": "Vyberte měsíc i den svátku.",
+        "reminderAmountInvalid": "Pro vlastní připomenutí zadejte celé číslo od 1 do {{max}}.",
         "reminderOnDay": "V daný den",
         "reminderBefore": "Předem: {{duration}}",
         "reminderAfterNoon": "Po 12:00 (+{{duration}})",

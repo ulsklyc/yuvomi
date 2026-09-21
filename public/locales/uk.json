@@ -3020,6 +3020,7 @@
         "nameDayClear": "Видалити іменини",
         "nameDayHint": "Використовується те саме нагадування, що й для дня народження.",
         "nameDayIncomplete": "Виберіть місяць і день іменин.",
+        "reminderAmountInvalid": "Для власного нагадування введіть ціле число від 1 до {{max}}.",
         "reminderOnDay": "У той самий день",
         "reminderBefore": "Заздалегідь: {{duration}}",
         "reminderAfterNoon": "Після полудня (+{{duration}})",
