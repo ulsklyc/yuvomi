@@ -12,6 +12,20 @@
  *        2. START. Was vor dem ersten Bild laeuft, darf kein `Object.hasOwn`
  *           rufen (Chrome erst ab 93): `pickLocale()` tat es, und jeder ohne
  *           gespeicherte Sprache landete auf der Fehlerseite des Routers.
+ *           Seit #1369 dasselbe fuer jede API, die neuer ist als die
+ *           dokumentierte Mindestversion (Liste STARTUP_FORBIDDEN).
+ *        3. SYNTAX. Kein Modul der App traegt Syntax, die neuer ist als die
+ *           Mindestversion - ein Syntaxfehler toetet die ganze Datei, im
+ *           Startpfad also die App, sonst einen ganzen Bildschirm (#1369).
+ *        4. GANZE BLOECKE. Kein Stylesheet nutzt ein Konstrukt, bei dem ein
+ *           Browser an der Mindestversion einen ganzen Block verwirft
+ *           (`@layer`, `@scope`, Nesting, Media-Bereichssyntax) (#1369).
+ *
+ * DIE MINDESTVERSION steht in docs/installation.md, Abschnitt "Browser
+ * Support", zweite Tabellenzeile - gemessen am 21.09.2026 (#1369). Die Suite
+ * liest sie dort und prueft jeden Eintrag ihrer Verbotslisten dagegen: ein
+ * Eintrag, den die Mindestversion schon kann, ist ueberfluessig. Hebt jemand
+ * die Mindestversion, meldet die Suite genau die Eintraege, die dann fallen.
  * Ausfuehren: node --test test/test-old-browser-fallbacks.js
  *
  * DIE ENTSCHEIDUNG (21.09.2026) lautet: alte Browser nur auf kritischen Pfaden
@@ -447,17 +461,147 @@ function startupFiles() {
   return { files, unresolved };
 }
 
-// APIs, die Chrome 91 nicht kennt und die auf dem Startpfad nichts verloren
-// haben. Heute genau eine; die Liste ist die Stelle fuer die naechste.
+/* ──────────────────────────────────────────────────────────────────────────
+ * Die dokumentierte Mindestversion
+ * ────────────────────────────────────────────────────────────────────────── */
+
+const ENGINES = ['chrome', 'firefox', 'safari'];
+const ENGINE_NAMES = { chrome: 'Chrome', firefox: 'Firefox', safari: 'Safari' };
+// "14.1" -> [14, 1]; verglichen wird Stelle fuer Stelle, nicht als Dezimalzahl
+// (15.10 ist neuer als 15.4).
+const parseVersion = (text) => String(text).trim().split('.').map(Number);
+const newer = (a, b) => {
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) > (b[i] ?? 0);
+  }
+  return false;
+};
+const describeSince = (since) => ENGINES.map((e) => `${ENGINE_NAMES[e]} ${since[e]}`).join(', ');
+
+/**
+ * Die zweite Zeile der Tabelle in docs/installation.md ("Starts, every screen
+ * opens, scrolls"): Chrome, Firefox, Safari (macOS), iOS. Gelesen und nicht
+ * abgeschrieben - sonst stuende dieselbe Zahl an zwei Stellen, und nur eine
+ * davon waere die gepruefte.
+ */
+function documentedFloor(markdown) {
+  const row = markdown.split('\n').find((line) => /^\|\s*\*\*Starts, every screen opens, scrolls\*\*\s*\|/.test(line));
+  if (!row) return null;
+  const cells = row.split('|').slice(2, 6).map((cell) => cell.trim());
+  if (cells.length !== 4 || !cells.every((cell) => /^\d+(?:\.\d+)?$/.test(cell))) return null;
+  return { chrome: cells[0], firefox: cells[1], safari: cells[2], ios: cells[3] };
+}
+
+const FLOOR = documentedFloor(read('docs/installation.md'));
+
+// Ein Eintrag einer Verbotsliste ist nur dann sinnvoll, wenn mindestens eine
+// Engine an der Mindestversion ihn NICHT kann.
+const aboveFloor = (since) => ENGINES.some((e) => newer(parseVersion(since[e]), parseVersion(FLOOR[e])));
+
+test('die Mindestversion steht lesbar in docs/installation.md', () => {
+  assert.ok(FLOOR, 'docs/installation.md: keine Zeile "| **Starts, every screen opens, scrolls** | <Chrome> | '
+    + '<Firefox> | <Safari> | <iOS> |" - die Verbotslisten dieser Suite messen gegen genau diese Zeile');
+  assert.equal(documentedFloor('| **Starts, every screen opens, scrolls** | 87 | 79 | 14.1 | 14.5 |').safari, '14.1');
+  assert.equal(documentedFloor('| **Starts, every screen opens, scrolls** | 87 | 79 | 14.1 |'), null);
+  assert.ok(newer(parseVersion('15.10'), parseVersion('15.4')) && !newer(parseVersion('14.1'), parseVersion('14.1')));
+});
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Teil 2 (Fortsetzung): APIs auf dem Startpfad
+ * ────────────────────────────────────────────────────────────────────────── */
+
+// APIs, die neuer sind als die Mindestversion und die man leicht hinschreibt.
+// Versionen aus MDN browser-compat-data 8.1.2 (#1369). Eine Liste von Hand und
+// keine vollstaendige Pruefung: sie haelt die haeufigen Griffe fest, nicht
+// jede denkbare API.
 const STARTUP_FORBIDDEN = [
   {
     api: 'Object.hasOwn',
-    since: 'Chrome 93, Safari 15.4',
+    since: { chrome: '93', firefox: '92', safari: '15.4' },
     instead: 'Object.prototype.hasOwnProperty.call(obj, key)',
     patterns: [
       /\bObject\s*(?:\.\s*hasOwn|\[\s*(['"`])hasOwn\1\s*\])(?![\w$])/,
       /\{[^{}]*\bhasOwn\b[^{}]*\}\s*=\s*Object\b/,
     ],
+  },
+  {
+    api: 'Array.prototype.at / String.prototype.at',
+    since: { chrome: '92', firefox: '90', safari: '15.4' },
+    instead: 'list[list.length - 1]',
+    patterns: [/\.\s*at\s*\(/],
+  },
+  {
+    api: 'Array.prototype.findLast / findLastIndex',
+    since: { chrome: '97', firefox: '104', safari: '15.4' },
+    instead: 'eine Schleife von hinten',
+    patterns: [/\.\s*findLast(?:Index)?\s*\(/],
+  },
+  {
+    api: 'structuredClone',
+    since: { chrome: '98', firefox: '94', safari: '15.4' },
+    instead: 'JSON.parse(JSON.stringify(x)) oder eine gezielte Kopie',
+    patterns: [/\bstructuredClone\s*\(/],
+  },
+  {
+    api: 'crypto.randomUUID',
+    since: { chrome: '92', firefox: '95', safari: '15.4' },
+    instead: 'crypto.getRandomValues()',
+    patterns: [/\.\s*randomUUID\s*\(/],
+  },
+  {
+    api: 'Array.prototype.toSorted / toReversed / toSpliced',
+    since: { chrome: '110', firefox: '115', safari: '16' },
+    instead: '[...list].sort() usw.',
+    patterns: [/\.\s*to(?:Sorted|Reversed|Spliced)\s*\(/],
+  },
+  {
+    api: 'Object.groupBy / Map.groupBy',
+    since: { chrome: '117', firefox: '119', safari: '17.4' },
+    instead: 'reduce() in ein Objekt oder eine Map',
+    patterns: [/\b(?:Object|Map)\s*\.\s*groupBy\b/],
+  },
+  {
+    api: 'Promise.withResolvers',
+    since: { chrome: '119', firefox: '121', safari: '17.4' },
+    instead: 'new Promise((resolve, reject) => ...)',
+    patterns: [/\bPromise\s*\.\s*withResolvers\b/],
+  },
+  {
+    api: 'AbortSignal.timeout',
+    since: { chrome: '124', firefox: '100', safari: '16' },
+    instead: 'AbortController plus setTimeout',
+    patterns: [/\bAbortSignal\s*\.\s*timeout\b/],
+  },
+  {
+    api: 'AbortSignal.any',
+    since: { chrome: '116', firefox: '124', safari: '17.4' },
+    instead: 'ein eigener AbortController, der auf beide Signale hoert',
+    patterns: [/\bAbortSignal\s*\.\s*any\b/],
+  },
+  {
+    api: 'Array.fromAsync',
+    since: { chrome: '121', firefox: '115', safari: '16.4' },
+    instead: 'for await in ein Array',
+    patterns: [/\bArray\s*\.\s*fromAsync\b/],
+  },
+];
+
+/**
+ * Treffer im Startpfad, die bewusst stehen bleiben. Jede Ausnahme wird an
+ * beiden Enden geprueft: der Treffer muss noch da sein, und ihr Grund auch.
+ */
+const STARTUP_EXCEPTIONS = [
+  {
+    path: '/i18n.js',
+    api: 'Array.prototype.findLast / findLastIndex',
+    reason: 'steht in formatUnit(), und das ruft kein Skript des Startpfads - nur die Leseansicht '
+      + 'eines Geburtstags mit eigener Erinnerungsfrist (pages/birthdays.js) und die Fastendauern '
+      + '(utils/health-fasting.js). Unter Chrome 97 faellt dort diese eine Angabe aus, nicht der Start. '
+      + 'Der Ersatz waere eine Schleife und ist ein App-Fix, kein Guard-Fix (#1369).',
+    // Der Grund gilt, solange keine Codezeile des Startpfads formatUnit ruft -
+    // ausser seiner eigenen Definition.
+    stillValid: (startupSources) => startupSources.every(({ source }) => codeLines(source)
+      .every(({ line }) => !/\bformatUnit\s*\(/.test(line) || /\bfunction\s+formatUnit\s*\(/.test(line))),
   },
 ];
 
@@ -524,8 +668,48 @@ test('Leser: findet Object.hasOwn in jeder Form, Kommentare und hasOwnProperty n
   assert.deepEqual(hits('// statt Object.hasOwn\n * Object.hasOwn im Kommentar\nok();'), []);
 });
 
-test('der Startpfad ruft kein Object.hasOwn (Chrome 91 kommt bis zum ersten Bild, #1276)', () => {
+test('Leser: findet die neueren APIs, nicht ihre aelteren Namensvettern (erfundene Faelle)', () => {
+  const apis = (source) => forbiddenCalls(source).map((hit) => hit.rule.api);
+  assert.deepEqual(apis('const last = parts.at(-1);'), ['Array.prototype.at / String.prototype.at']);
+  assert.deepEqual(apis('const i = parts.findLastIndex((p) => p);'), ['Array.prototype.findLast / findLastIndex']);
+  assert.deepEqual(apis('const copy = window.structuredClone(x);'), ['structuredClone']);
+  assert.deepEqual(apis('const id = crypto.randomUUID();'), ['crypto.randomUUID']);
+  assert.deepEqual(apis('const s = list.toSorted();'), ['Array.prototype.toSorted / toReversed / toSpliced']);
+  assert.deepEqual(apis('const g = Object.groupBy(xs, f);'), ['Object.groupBy / Map.groupBy']);
+  assert.deepEqual(apis('const { promise } = Promise.withResolvers();'), ['Promise.withResolvers']);
+  assert.deepEqual(apis('fetch(u, { signal: AbortSignal.timeout(5000) });'), ['AbortSignal.timeout']);
+  assert.deepEqual(apis('const s = AbortSignal.any([a, b]);'), ['AbortSignal.any']);
+  assert.deepEqual(apis('const xs = await Array.fromAsync(it);'), ['Array.fromAsync']);
+  // Die aelteren Nachbarn bleiben erlaubt.
+  assert.deepEqual(apis([
+    'const i = parts.findIndex((p) => p);',
+    'const d = new Date(at); const v = row.attr; const c = item.atTop;',
+    'list.sort(); list.reverse(); list.splice(1, 1); list.toString();',
+    'const ids = crypto.getRandomValues(new Uint8Array(4));',
+    'new AbortController().signal;',
+    'Array.from(xs);',
+  ].join('\n')), []);
+});
+
+test('jeder Eintrag der Start-Verbotsliste ist neuer als die dokumentierte Mindestversion', () => {
+  const stale = STARTUP_FORBIDDEN.filter((rule) => !aboveFloor(rule.since));
+  assert.deepEqual(stale.map((rule) => `${rule.api} (${describeSince(rule.since)})`), [],
+    `Die Mindestversion (${describeSince(FLOOR)}) kann diese APIs schon - der Eintrag verbietet nichts mehr `
+    + 'und gehoert gestrichen');
+});
+
+function startupSources() {
   const { files, unresolved } = startupFiles();
+  const sources = [...files].map(([path, via]) => ({
+    path,
+    via,
+    source: readFileSync(new URL(path.replace(/^\//, ''), PUBLIC), 'utf8'),
+  }));
+  return { files, unresolved, sources };
+}
+
+test('der Startpfad ruft keine API, die neuer ist als die Mindestversion (#1276, #1369)', () => {
+  const { files, unresolved, sources } = startupSources();
   assert.deepEqual(unresolved, [], 'Der Startpfad liess sich nicht vollstaendig aufloesen');
   // Reichweiten-Nachweis an den Dateien, um die es geht: der Router, der den
   // Start fuehrt, und i18n.js, in dem der Fehler von #1276 stand.
@@ -534,16 +718,30 @@ test('der Startpfad ruft kein Object.hasOwn (Chrome 91 kommt bis zum ersten Bild
   }
 
   const offenders = [];
-  for (const [path, via] of files) {
-    const source = readFileSync(new URL(path.replace(/^\//, ''), PUBLIC), 'utf8');
+  const matchedExceptions = new Set();
+  for (const { path, via, source } of sources) {
     for (const hit of forbiddenCalls(source)) {
+      const exception = STARTUP_EXCEPTIONS.find((ex) => ex.path === path && ex.api === hit.rule.api);
+      if (exception) { matchedExceptions.add(exception); continue; }
       offenders.push(`${path}:${hit.number} (geladen von ${via}): ${hit.line}\n    ${hit.rule.api} erst ab `
-        + `${hit.rule.since} - stattdessen ${hit.rule.instead}`);
+        + `${describeSince(hit.rule.since)} - stattdessen ${hit.rule.instead}`);
     }
   }
   assert.deepEqual(offenders, [],
-    'Diese Stellen laufen vor dem ersten Bild; ein aelterer Browser wirft dort und zeigt nur die '
-    + 'Fehlerseite des Routers:\n' + offenders.join('\n'));
+    `Diese Stellen laufen vor dem ersten Bild. Die dokumentierte Mindestversion (${describeSince(FLOOR)}) `
+    + 'kennt die API nicht, wirft dort und zeigt nur die Fehlerseite des Routers:\n' + offenders.join('\n'));
+
+  const stale = STARTUP_EXCEPTIONS.filter((ex) => !matchedExceptions.has(ex));
+  assert.deepEqual(stale.map((ex) => `${ex.path}: ${ex.api}`), [],
+    'Diese Ausnahme trifft keinen Aufruf mehr - aus STARTUP_EXCEPTIONS streichen');
+});
+
+test('die Ausnahmen des Startpfads haben ihren Anlass noch', () => {
+  const { sources } = startupSources();
+  const lapsed = STARTUP_EXCEPTIONS.filter((ex) => !ex.stillValid(sources));
+  assert.deepEqual(lapsed.map((ex) => `${ex.path}: ${ex.api} - ${ex.reason}`), [],
+    'Der Grund dieser Ausnahme besteht nicht mehr: der Aufruf laeuft jetzt beim Start. Die API ersetzen '
+    + 'und die Ausnahme streichen');
 });
 
 test('pickLocale() laeuft ohne Object.hasOwn - als Programm, nicht nur als Text', () => {
@@ -564,4 +762,196 @@ test('pickLocale() laeuft ohne Object.hasOwn - als Programm, nicht nur als Text'
     if (saved) Object.defineProperty(Object, 'hasOwn', saved);
   }
   assert.deepEqual(results, ['de', 'zh-Hant', 'zh', 'en']);
+});
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Teil 3: Syntax in jedem Modul der App (#1369)
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Syntax, die neuer ist als die Mindestversion. Anders als eine fehlende API
+ * wirft sie nicht erst beim Aufruf: der Browser verwirft die GANZE Datei beim
+ * Laden. Im Startpfad heisst das keine App, in einer Seite kein Bildschirm -
+ * deshalb gilt diese Liste fuer jedes Modul, nicht nur fuer den Start.
+ *
+ * Erhoben wurde die Syntax aller Module mit einem echten Parser (acorn,
+ * ecmaVersion-Leiter, #1369): das Neueste in der App ist `||=`/`??=`
+ * (Firefox 79) und ein statisches Klassenfeld (Safari 14.1), beides genau an
+ * der Mindestversion. Private Klassenglieder, statische Initialisierungsbloecke
+ * und Lookbehind stehen nur im vendorten PDF.js. Die Muster hier sind Text und
+ * damit eine Naeherung: sie treffen die Schreibweise, mit der die Konstrukte
+ * tatsaechlich benutzt werden (`this.#x`, `static {`, `(?<=`).
+ */
+const MODULE_SYNTAX_FORBIDDEN = [
+  {
+    syntax: 'private Klassenglieder (#feld, #methode(), #x in obj)',
+    since: { chrome: '74', firefox: '90', safari: '14.1' },
+    patterns: [/\.\s*#[A-Za-z_$]/, /#[A-Za-z_$][\w$]*\s+in\s/],
+  },
+  {
+    syntax: 'statischer Initialisierungsblock (static { ... })',
+    since: { chrome: '94', firefox: '93', safari: '16.4' },
+    patterns: [/\bstatic\s*\{/],
+  },
+  {
+    syntax: 'Lookbehind im regulaeren Ausdruck ((?<= ...) / (?<! ...))',
+    since: { chrome: '62', firefox: '78', safari: '16.4' },
+    patterns: [/\(\?<[=!]/],
+  },
+];
+
+function syntaxHits(source) {
+  const hits = [];
+  for (const { line, number } of codeLines(source)) {
+    for (const rule of MODULE_SYNTAX_FORBIDDEN) {
+      if (rule.patterns.some((pattern) => pattern.test(line))) hits.push({ rule, number, line: line.trim() });
+    }
+  }
+  return hits;
+}
+
+// Jedes Skript der App: Module, klassische Skripte und der Service Worker.
+// Vendor-Code ist fremd und steht fuer sich (PDF.js braucht mehr, das steht in
+// docs/installation.md); lucide.min.js ebenso.
+function appScripts() {
+  return readdirSync(PUBLIC, { recursive: true })
+    .map((entry) => String(entry).split('\\').join('/'))
+    .filter((entry) => /\.m?js$/.test(entry) && !entry.startsWith('vendor/') && entry !== 'lucide.min.js')
+    .sort()
+    .map((entry) => `public/${entry}`);
+}
+
+test('Leser: erkennt neuere Syntax, nicht ihre Doppelgaenger in Strings (erfundene Faelle)', () => {
+  const kinds = (source) => syntaxHits(source).map((hit) => hit.rule.syntax.split(' ')[0]);
+  assert.deepEqual(kinds('class A { #n = 0; get n() { return this.#n; } }'), ['private']);
+  assert.deepEqual(kinds('if (#brand in obj) {}'), ['private']);
+  assert.deepEqual(kinds('class A { static { init(); } }'), ['statischer']);
+  assert.deepEqual(kinds('const re = /(?<=\\$)\\d+/;'), ['Lookbehind']);
+  assert.deepEqual(kinds("const re = new RegExp('(?<!a)b');"), ['Lookbehind']);
+  // Erlaubt: Hex-Farben, Anker, IDs, statische Felder und Methoden, benannte Gruppen.
+  assert.deepEqual(kinds([
+    "el.style.color = '#fff'; const sel = '#main-content'; location.hash = '#top';",
+    'const css = `.x { color: #1a1a18; }`;',
+    'class B { static formAssociated = true; static get observedAttributes() { return []; } }',
+    'const m = /(?<year>\\d{4})-(?:\\d\\d)/.exec(s);',
+    '// this.#privat im Kommentar',
+  ].join('\n')), []);
+});
+
+test('jeder Eintrag der Syntax-Verbotsliste ist neuer als die dokumentierte Mindestversion', () => {
+  const stale = MODULE_SYNTAX_FORBIDDEN.filter((rule) => !aboveFloor(rule.since));
+  assert.deepEqual(stale.map((rule) => `${rule.syntax} (${describeSince(rule.since)})`), [],
+    `Die Mindestversion (${describeSince(FLOOR)}) versteht diese Syntax schon - der Eintrag gehoert gestrichen`);
+});
+
+test('kein Modul der App traegt Syntax, die neuer ist als die Mindestversion (#1369)', () => {
+  const files = appScripts();
+  // Reichweiten-Nachweis: Start, Seiten, Einstellungen und der Service Worker.
+  for (const must of ['public/router.js', 'public/pages/calendar.js', 'public/settings/shell.js', 'public/sw.js']) {
+    assert.ok(files.includes(must), `Reichweiten-Nachweis: ${must} fehlt in der Dateiliste`);
+  }
+  assert.ok(files.length >= 150, `Reichweiten-Nachweis: nur ${files.length} Skripte gefunden`);
+
+  const offenders = [];
+  for (const file of files) {
+    for (const hit of syntaxHits(read(file))) {
+      offenders.push(`${file}:${hit.number}: ${hit.line}\n    ${hit.rule.syntax} erst ab ${describeSince(hit.rule.since)}`);
+    }
+  }
+  assert.deepEqual(offenders, [],
+    `Ein Browser an der Mindestversion (${describeSince(FLOOR)}) verwirft die ganze Datei beim Laden - `
+    + 'im Startpfad die App, sonst den Bildschirm:\n' + offenders.join('\n'));
+});
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Teil 4: Konstrukte, die einen ganzen CSS-Block kosten (#1369)
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Eine unbekannte Eigenschaft kostet eine Zeile; diese Konstrukte kosten einen
+ * ganzen Block, und darin kann die Hoehe der Shell, die Lage der Navigation
+ * oder ein Dialog stehen. Heute nutzt kein Stylesheet der App eines davon.
+ *   - `@layer` / `@scope`: der Block faellt weg, samt allem darin;
+ *   - Nesting: die verschachtelte Regel faellt weg;
+ *   - Bereichssyntax in `@media` (`width >= 768px`): die Bedingung ist
+ *     ungueltig, der Block greift nie - die responsive Regel ist weg.
+ * `@container` gehoert NICHT hierher: Container-Abfragen sind eine bewusste
+ * Verfeinerung oberhalb der Mindestversion (docs/installation.md).
+ */
+const CSS_BLOCK_DROPPERS = [
+  { construct: '@layer', since: { chrome: '99', firefox: '97', safari: '15.4' } },
+  { construct: '@scope', since: { chrome: '118', firefox: '146', safari: '26.4' } },
+  { construct: 'CSS-Nesting', since: { chrome: '120', firefox: '117', safari: '17.2' } },
+  { construct: 'Bereichssyntax in @media', since: { chrome: '104', firefox: '102', safari: '16.4' } },
+];
+const dropper = (name) => CSS_BLOCK_DROPPERS.find((d) => d.construct === name);
+
+// Ein Medienmerkmal in Klammern, das <, > oder = traegt und keinen Doppelpunkt:
+// `(width >= 768px)`, `(400px < width < 800px)`, nicht `(min-width: 768px)`.
+const RANGE_FEATURE = /\([^():]*[<>=][^():]*\)/;
+
+function blockDropperFindings(css) {
+  const findings = [];
+  const plain = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const match of plain.matchAll(/@(layer|scope)\b/gi)) {
+    findings.push({ construct: `@${match[1].toLowerCase()}`, where: plain.slice(match.index, match.index + 60).split('\n')[0] });
+  }
+  for (const { selector, body, at } of eachRule(css)) {
+    // eachRule() steigt in @media/@supports/@container ab; was sonst einen
+    // Block im Rumpf traegt, ist eine verschachtelte Regel. At-Regeln mit
+    // eigenem Rumpf (@starting-style, @font-face) sind kein Nesting.
+    if (!selector.startsWith('@') && body.includes('{')) {
+      findings.push({ construct: 'CSS-Nesting', where: selector });
+    }
+    for (const preamble of at) {
+      if (/^@media\b/i.test(preamble) && RANGE_FEATURE.test(preamble)) {
+        findings.push({ construct: 'Bereichssyntax in @media', where: preamble });
+      }
+    }
+  }
+  // Dieselbe @media-Praeambel steht vor jeder ihrer Regeln - einmal reicht.
+  return findings.filter((f, i) => findings.findIndex((g) => g.construct === f.construct && g.where === f.where) === i);
+}
+
+test('Leser: erkennt die Block-Konstrukte, nicht ihre harmlosen Nachbarn (erfundene Faelle)', () => {
+  const kinds = (css) => blockDropperFindings(css).map((f) => f.construct);
+  assert.deepEqual(kinds('@layer base { .a { color: red } }'), ['@layer']);
+  assert.deepEqual(kinds('@layer base, theme;'), ['@layer']);
+  assert.deepEqual(kinds('@scope (.card) { img { border: 0 } }'), ['@scope']);
+  assert.deepEqual(kinds('.a { color: red; .b { color: blue } }'), ['CSS-Nesting']);
+  assert.deepEqual(kinds('.a { &:hover { color: blue } }'), ['CSS-Nesting']);
+  assert.deepEqual(kinds('@media (width >= 768px) { .a { display: flex } .b { gap: 0 } }'), ['Bereichssyntax in @media']);
+  assert.deepEqual(kinds('@media (400px < width < 800px) { .a { display: flex } }'), ['Bereichssyntax in @media']);
+  // Erlaubt: klassische Media-Merkmale, @supports und @container, @starting-style,
+  // @keyframes, ein Kommentar ueber @layer.
+  assert.deepEqual(kinds([
+    '/* frueher @layer base */',
+    '@media (min-width: 768px) and (max-height: 499px) { .a { display: flex } }',
+    '@supports (height: 100dvh) { :root { --h: 100dvh } }',
+    '@container (min-width: 560px) { .a { display: grid } }',
+    '@starting-style { .p:popover-open { opacity: 0 } }',
+    '@keyframes k { from { opacity: 0 } to { opacity: 1 } }',
+    '.a[data-x="a=b"] { color: red }',
+  ].join('\n')), []);
+});
+
+test('jeder Eintrag der Block-Verbotsliste ist neuer als die dokumentierte Mindestversion', () => {
+  const stale = CSS_BLOCK_DROPPERS.filter((d) => !aboveFloor(d.since));
+  assert.deepEqual(stale.map((d) => `${d.construct} (${describeSince(d.since)})`), [],
+    `Die Mindestversion (${describeSince(FLOOR)}) versteht dieses Konstrukt schon - der Eintrag gehoert gestrichen`);
+});
+
+test('kein Stylesheet nutzt ein Konstrukt, das an der Mindestversion einen ganzen Block kostet (#1369)', () => {
+  const files = appStylesheets();
+  const offenders = [];
+  for (const file of files) {
+    for (const finding of blockDropperFindings(read(file))) {
+      offenders.push(`${file}: ${finding.where}\n    ${finding.construct} erst ab ${describeSince(dropper(finding.construct).since)}`);
+    }
+  }
+  assert.ok(files.length >= 40, `Reichweiten-Nachweis: nur ${files.length} Stylesheets gefunden`);
+  assert.deepEqual(offenders, [],
+    `Ein Browser an der Mindestversion (${describeSince(FLOOR)}) verwirft hier einen ganzen Block. `
+    + 'Die Regel ohne das Konstrukt schreiben (klassische min-/max-width-Merkmale, Selektoren '
+    + 'ausschreiben):\n' + offenders.join('\n'));
 });

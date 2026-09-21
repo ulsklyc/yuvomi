@@ -127,6 +127,7 @@ Such dir deinen Weg aus: [Docker oder Podman](#docker-oder-podman) für volle Ko
 
 - **Image** - `ghcr.io/ulsklyc/`<wbr>`yuvomi:latest`, rund 500 MB.
 - **Braucht** - 256 MB RAM und einen Port, standardmäßig 3000.
+- **Browser** - alles wie vorgesehen ab Chrome und Edge 117, Firefox 129 und Safari 17.5. Bis hinunter zu Chrome 87, Firefox 79 und Safari 14.1 (iOS 14.5) startet und scrollt es noch, schlichter und mit einzelnen fehlenden Funktionen ([gemessen am 21. September 2026](docs/installation.md#browser-support)).
 - **Schreibt** - vier Volumes, die dir gehören: Daten, Backups, Module, Dokumente.
 - **Nach außen** - ab Werk eine Update-Abfrage an die GitHub-Releases-API. Blockier sie, und nichts geht kaputt, nur der Hinweis auf eine neuere Version bleibt aus. Alles andere geht erst nach außen, wenn du eine Funktion nutzt oder einschaltest, die es braucht: das Öffnen der Kalender-Einstellungen lädt die Liste der Feiertagsländer von openholidaysapi.org, die Logo-Suche für ein Abo ruft die Website des Dienstes auf, und Wetter, Feiertage, Wechselkurse, Kalender- und Kontakte-Sync, Rezept-Spiegel, Immich, Paperless oder Papra, Push- und Benachrichtigungskanäle, Cloud-Speicher und Backup verbinden sich erst, wenn du sie einschaltest.
 - **Dein LAN** - Kalender-Abos, WebDAV-Speicher und Rezept-Spiegel unter privaten oder internen Adressen bleiben blockiert, bis du sie freigibst ([wie](docs/installation.md#environment-variables)).
