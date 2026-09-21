@@ -93,7 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   editor offered 15 minutes, 1 hour and 2 weeks, and those remain valid, and a value that is already
   stored - whatever it is - is accepted unchanged when it is sent back, so changing the name or the
   date of such a birthday never fails over a reminder nobody touched. In the editor, a custom amount
-  of 0 or above 999 is now refused instead of being saved.
+  of 0 or above 999 is now refused instead of being saved. (#1384)
 - **On a phone, a meal can be dragged to another day again, by a grip next to its buttons.** The
   drag started, and ended the moment the finger moved: on a phone the week plan is a vertical list,
   another day lies exactly on the scrolling axis, and the browser took the gesture as a scroll and
