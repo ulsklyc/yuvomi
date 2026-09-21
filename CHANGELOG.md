@@ -195,13 +195,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and stood 6 pixels lower than the item and category fields next to it. On a computer it also had a
   fixed width of 80 pixels, too narrow for its own placeholder in half of the 24 languages - English
   showed "Quantit". On a phone, quantity and category each got half of the row, and the preselected
-  category "Miscellaneous" disappeared under the select's arrow. The fields now take the row's
+  category "Miscellaneous" was cut off at the edge of the field. The fields now take the row's
   height, and the category gets more of the width than the quantity, whose entry is only a few
   characters: at the usual phone widths every language's placeholder and preselected category fit
   in full. The words stay as they are rather than becoming "Qty" and "Misc" - the space was the
   problem, not the words, and the same fix covers the longer words in other languages. A custom
   category name that is still too long, or a very narrow screen, now ends with "..." instead of
-  breaking off mid-word under the arrow. (#1372)
+  being cut off mid-word. (#1372)
 
 - **On browsers older than Chrome 97, fasting durations and a birthday's own reminder lead time
   work again.** Both are written by one helper that used `findLastIndex`, which Chrome knows from
