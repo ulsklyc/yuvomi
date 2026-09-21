@@ -30,7 +30,15 @@ import {
 } from '../services/calendar-outbound.js';
 import { mayWriteModule, moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
 import { tokenAllows } from '../scopes.js';
-import { householdTimeZone, storedToInstantMs } from '../utils/timezone.js';
+import {
+  householdTimeZone,
+  localToUTCPrecise,
+  shiftDateKey,
+  storedToInstantMs,
+  todayKey,
+  utcToWall,
+} from '../utils/timezone.js';
+import { addMonthsClamped } from '../utils/interval-date.js';
 
 const log = createLogger('Housekeeping');
 const router = express.Router();
@@ -61,8 +69,41 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+/**
+ * Der laufende Monat (YYYY-MM) des Haushalts. `nowIso().slice(0, 7)` war der
+ * UTC-Monat: oestlich von UTC zeigte die Uebersicht am Ersten frueh noch den
+ * Vormonat, westlich davon am Letzten abends schon den naechsten.
+ */
 function currentMonth() {
-  return nowIso().slice(0, 7);
+  return todayKey(db.get()).slice(0, 7);
+}
+
+/**
+ * Der Monat (YYYY-MM), in dem ein gespeicherter Zeitpunkt im Haushalt liegt.
+ * `check_in` ist ein UTC-Instant, `last_completed` fuehrt daneben zonenlose
+ * Wanduhrzeit (#1364) - `storedToInstantMs()` liest beide Formen.
+ */
+function householdMonthOf(value, tz = householdTimeZone(db.get())) {
+  const ms = storedToInstantMs(value, tz);
+  if (ms === null) return null;
+  return utcToWall(new Date(ms).toISOString(), tz)?.date.slice(0, 7) ?? null;
+}
+
+/**
+ * Ein Monat des Haushalts als halboffenes Intervall [start, end) in UTC, in
+ * der Schreibweise von `check_in` (`toISOString()`), damit der Textvergleich
+ * in SQL dem Zeitvergleich entspricht. `substr(check_in, 1, 7)` war der
+ * UTC-Monat: ein Besuch am Ersten um 00:30 Berliner Zeit stand im Vormonat.
+ */
+function householdMonthRange(monthValue, tz = householdTimeZone(db.get())) {
+  const toInstant = (key) => new Date(localToUTCPrecise(`${key}-01T00:00:00`, tz)).toISOString();
+  const next = addMonthsClamped(`${monthValue}-01`, 1).slice(0, 7);
+  return {
+    start: toInstant(monthValue),
+    // Nach 9999-12 gibt es keinen vierstelligen Monat mehr, den ein
+    // gespeicherter Besuch tragen koennte.
+    end: /^\d{4}-\d{2}$/.test(next) ? toInstant(next) : '9999-12-31T23:59:59.999Z',
+  };
 }
 
 function localDateString(dateValue = new Date()) {
@@ -167,17 +208,20 @@ function taskUrgency(row, tz, now = new Date()) {
     return { urgency: Number.MAX_SAFE_INTEGER, status: 'overdue', due_date: null };
   }
 
-  const due = new Date(completed);
-  due.setDate(due.getDate() + frequencyDays);
-
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+  // Tage sind Tage des Haushalts. `setDate()`/`getDate()` rechneten in der
+  // Zone des SERVERS: bei einem UTC-Container und einem Haushalt in Berlin
+  // stand eine kurz nach Mitternacht erledigte Aufgabe einen Tag zu frueh auf
+  // "heute" bzw. "ueberfaellig".
+  const completedWall = utcToWall(completed.toISOString(), tz);
+  const dueDay = shiftDateKey(completedWall.date, frequencyDays);
+  const today = utcToWall(now.toISOString(), tz).date;
+  const due = new Date(localToUTCPrecise(`${dueDay}T${completedWall.time}`, tz));
   const elapsedDays = Math.max(0, (now.getTime() - completed.getTime()) / 86_400_000);
   const urgency = elapsedDays / frequencyDays;
 
   let status = 'ok';
-  if (today.getTime() > dueDay.getTime()) status = 'overdue';
-  else if (today.getTime() === dueDay.getTime()) status = 'today';
+  if (today > dueDay) status = 'overdue';
+  else if (today === dueDay) status = 'today';
 
   return { urgency, status, due_date: due.toISOString() };
 }
@@ -445,6 +489,7 @@ function loadWorkerById(workerId) {
 }
 
 function monthlySummary(monthValue = currentMonth()) {
+  const { start, end } = householdMonthRange(monthValue);
   const row = db.get().prepare(`
     SELECT
       COUNT(*) AS session_count,
@@ -452,8 +497,8 @@ function monthlySummary(monthValue = currentMonth()) {
       COALESCE(SUM(extras), 0) AS extras_total,
       COALESCE(SUM(daily_rate + extras), 0) AS total_amount
     FROM housekeeping_work_sessions
-    WHERE substr(check_in, 1, 7) = ?
-  `).get(monthValue);
+    WHERE check_in >= ? AND check_in < ?
+  `).get(start, end);
 
   return {
     month: monthValue,
@@ -466,7 +511,9 @@ function monthlySummary(monthValue = currentMonth()) {
 
 function housekeepingDashboard() {
   reconcilePaymentTasks();
+  const tz = householdTimeZone(db.get());
   const monthValue = currentMonth();
+  const monthRange = householdMonthRange(monthValue, tz);
   const context = localDayContext();
   const workers = loadWorkers().map((row) => publicWorker(row, context));
   const worker = workers[0] ?? null;
@@ -481,24 +528,28 @@ function housekeepingDashboard() {
       COALESCE(SUM(CASE WHEN paid_at IS NULL THEN daily_rate + extras ELSE 0 END), 0) AS pending,
       COALESCE(SUM(CASE WHEN paid_at IS NOT NULL THEN daily_rate + extras ELSE 0 END), 0) AS paid
     FROM housekeeping_work_sessions
-    WHERE substr(check_in, 1, 7) = ?
-  `).get(monthValue);
+    WHERE check_in >= ? AND check_in < ?
+  `).get(monthRange.start, monthRange.end);
   const taskRows = db.get().prepare('SELECT * FROM housekeeping_decay_tasks').all();
-  const tz = householdTimeZone(db.get());
   const tasks = taskRows.map((row) => publicDecayTask(row, tz));
-  const chart = db.get().prepare(`
-    SELECT substr(check_in, 1, 7) AS month,
-           COALESCE(SUM(daily_rate + extras), 0) AS total,
-           COALESCE(SUM(CASE WHEN paid_at IS NULL THEN daily_rate + extras ELSE 0 END), 0) AS pending
+  // Gruppiert wird in JS statt per `substr(check_in, 1, 7)`: der Monat eines
+  // Besuchs ist der des Haushalts, und den kennt SQLite nicht.
+  const chartStart = householdMonthRange(addMonthsClamped(`${monthValue}-01`, -5).slice(0, 7), tz).start;
+  const chartByMonth = new Map();
+  for (const row of db.get().prepare(`
+    SELECT check_in, daily_rate, extras, paid_at
     FROM housekeeping_work_sessions
-    WHERE check_in >= strftime('%Y-%m-01T00:00:00Z', 'now', '-5 months')
-    GROUP BY substr(check_in, 1, 7)
-    ORDER BY month ASC
-  `).all().map((row) => ({
-    month: row.month,
-    total: Number(row.total || 0),
-    pending: Number(row.pending || 0),
-  }));
+    WHERE check_in >= ?
+  `).all(chartStart)) {
+    const key = householdMonthOf(row.check_in, tz);
+    if (!key) continue;
+    const bucket = chartByMonth.get(key) ?? { month: key, total: 0, pending: 0 };
+    const amount = Number(row.daily_rate || 0) + Number(row.extras || 0);
+    bucket.total += amount;
+    if (!row.paid_at) bucket.pending += amount;
+    chartByMonth.set(key, bucket);
+  }
+  const chart = [...chartByMonth.values()].sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0));
 
   return {
     worker,
@@ -507,7 +558,8 @@ function housekeepingDashboard() {
     visits_this_month: summary.session_count,
     last_visit: publicSession(lastVisit),
     pending_tasks: tasks.filter((task) => task.urgency_status !== 'ok').length,
-    finished_tasks_this_month: taskRows.filter((task) => task.last_completed?.slice(0, 7) === monthValue).length,
+    finished_tasks_this_month: taskRows
+      .filter((task) => task.last_completed && householdMonthOf(task.last_completed, tz) === monthValue).length,
     pending_payments: Number(payment.pending || 0),
     paid_this_month: Number(payment.paid || 0),
     monthly_payments: chart,
@@ -761,11 +813,12 @@ router.get('/work-sessions', (req, res) => {
     reconcilePaymentTasks();
     const vMonth = month(req.query.month, 'month');
     if (vMonth.error) return res.status(400).json({ error: vMonth.error, code: 400 });
+    const { start, end } = householdMonthRange(vMonth.value || currentMonth());
     const rows = db.get().prepare(`
       SELECT * FROM housekeeping_work_sessions
-      WHERE substr(check_in, 1, 7) = ?
+      WHERE check_in >= ? AND check_in < ?
       ORDER BY check_in DESC
-    `).all(vMonth.value || currentMonth());
+    `).all(start, end);
     res.json({ data: rows.map(publicSession) });
   } catch (err) {
     log.error('GET /work-sessions error:', err);
@@ -783,6 +836,7 @@ router.get('/visits', (req, res) => {
       : { value: null, error: null };
     if (vWorkerId.error) return res.status(400).json({ error: vWorkerId.error, code: 400 });
     const selectedMonth = vMonth.value || currentMonth();
+    const { start, end } = householdMonthRange(selectedMonth);
     const rows = db.get().prepare(`
       SELECT hws.*,
              hw.payment_schedule,
@@ -797,10 +851,10 @@ router.get('/visits', (req, res) => {
       LEFT JOIN users u ON u.id = hw.user_id
       LEFT JOIN tasks t ON t.id = hws.payment_task_id
       LEFT JOIN family_documents fd ON fd.id = hws.receipt_document_id
-      WHERE substr(hws.check_in, 1, 7) = ?
+      WHERE hws.check_in >= ? AND hws.check_in < ?
         AND (? IS NULL OR hws.worker_id = ?)
       ORDER BY hws.check_in DESC
-    `).all(selectedMonth, vWorkerId.value, vWorkerId.value);
+    `).all(start, end, vWorkerId.value, vWorkerId.value);
     const visits = rows.map((row) => ({
       ...publicSession(row),
       worker_name: row.worker_name ?? null,
@@ -986,7 +1040,7 @@ router.put('/visits/:id', (req, res) => {
       );
     })();
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
-    res.json({ data: publicSession(row), summary: monthlySummary(row.check_in.slice(0, 7)) });
+    res.json({ data: publicSession(row), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
     log.error('PUT /visits/:id error:', err);
@@ -1009,7 +1063,7 @@ router.post('/visits/:id/pay', (req, res) => {
       }
     })();
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
-    res.json({ data: publicSession(row), summary: monthlySummary(row.check_in.slice(0, 7)) });
+    res.json({ data: publicSession(row), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
   } catch (err) {
     log.error('POST /visits/:id/pay error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1039,7 +1093,7 @@ router.post('/visits/:id/unpay', (req, res) => {
       })();
     }
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
-    res.json({ data: publicSession(row), summary: monthlySummary(row.check_in.slice(0, 7)) });
+    res.json({ data: publicSession(row), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
   } catch (err) {
     log.error('POST /visits/:id/unpay error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1097,7 +1151,7 @@ router.post('/work-sessions/check-out', (req, res) => {
       `).run(checkOut, vExtras.value ?? session.extras, updateRate, minutesWorked, sessionRateType, sessionHourlyRate, session.id);
     })();
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(session.id);
-    res.json({ data: publicSession(row), summary: monthlySummary(row.check_in.slice(0, 7)) });
+    res.json({ data: publicSession(row), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
   } catch (err) {
     log.error('POST /work-sessions/check-out error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

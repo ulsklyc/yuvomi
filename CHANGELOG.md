@@ -108,6 +108,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Housekeeping tasks turn "due today" and "overdue" on the household's day, not the server's.**
+  The due day of a recurring task was counted in the time zone of the server. On a server running in
+  UTC with a household in Berlin, a task done shortly after midnight counted as done the day before,
+  so it showed "due today" a day early and "overdue" on the day it was actually due; west of UTC the
+  evening hours were off the same way. The due day is now counted from the day the task was done in
+  the household time zone (Settings, Region). (#1387)
+- **Housekeeping counts a visit in the month it happened in the household.** Visits, their totals,
+  the "visits this month" and "paid this month" figures, the monthly payment chart and the tasks
+  finished this month were grouped by UTC month, and the current month itself was the UTC one. A
+  visit on the 1st at 00:30 in Berlin was booked to the month before, and in the first hours of a
+  new month the overview still showed the old one. All of them now use the household's month. (#1387)
+- **A dose marked as taken through the API without a time is stored in household time.** `POST
+  /api/v1/health/logs/{id}/take` without `taken_at`, and a `PATCH` to `taken` without one, stored the
+  current moment as a UTC timestamp, while every time that is sent along is stored as household
+  wall-clock time. The CSV export then showed the UTC time for these doses. The current minute is
+  now stored in the same form as every other dose. The app itself always sends the time and was not
+  affected. (#1387)
+- **Marking an inventory deadline as done no longer stores a broken date when the next one would
+  fall after 9999-12-31.** The next due date then has a five-digit year, which the date format cannot
+  hold: the deadline got a date like "99990-06-01", its reminder a date that is not a date, and the
+  item could not be saved again afterwards. The request is now refused with a message that names
+  the limit, and neither the deadline nor its history change. (#1387)
+- **The photo crop dialog is now cached for offline use like the rest of the app.** Avatars,
+  birthday and inventory photos, recipe pictures and quick-link images all go through one crop
+  dialog, which the app loads only when you pick a picture. It was the one module of that kind the
+  service worker did not cache ahead of time: without a connection the dialog did not open, and
+  right after an update a page that was already open could load a newer dialog than the one it was
+  built for. The check that keeps the offline list complete read only imports written at the top of
+  a file and never saw the ones loaded on demand; it reads both now. (#1383)
 - **A group's shared-expenses activity shows each entry under the household's day.** The date came
   from the stored UTC timestamp, so an entry made late in the evening in a zone east of UTC, or early
   in the morning west of it, showed the neighbouring day. It now follows the household time zone,

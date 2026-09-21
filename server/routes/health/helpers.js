@@ -19,7 +19,7 @@
 
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
-import { householdTimeZone } from '../../utils/timezone.js';
+import { householdTimeZone, utcToWall } from '../../utils/timezone.js';
 
 export const log = createLogger('Health');
 
@@ -52,6 +52,19 @@ export const NUTRITION_VISIBILITIES = ['private', OPEN_ALL];
  */
 export function wallClockInput() {
   return { to: 'wall', zone: householdTimeZone(db.get()) };
+}
+
+/**
+ * "Jetzt" in derselben Form: Wanduhrzeit des Haushalts, `YYYY-MM-DDTHH:MM`.
+ * Fuer den Fall, dass eine Route den Zeitstempel selbst setzt - dort stand
+ * `new Date().toISOString()`, der einzige UTC-Instant in einer Spalte, die
+ * sonst nur Wanduhrzeit fuehrt (Export, Tagesschluessel).
+ * @returns {string}
+ */
+export function wallClockNow() {
+  const nowIso = new Date().toISOString();
+  const wall = utcToWall(nowIso, householdTimeZone(db.get()));
+  return wall ? `${wall.date}T${wall.time.slice(0, 5)}` : nowIso;
 }
 
 export const LOG_STATUS   = ['taken', 'skipped', 'pending'];
