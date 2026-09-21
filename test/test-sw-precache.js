@@ -175,6 +175,9 @@ test('Leser: jede Importform zaehlt, Kommentar und Literaltext nicht (erfundene 
     "/* import('/blockkommentar.js'); */",
     "const hilfe = `<code>node -e \"import('./server/db.js')\"</code>`;",
     "const k = loader.import('/methode.js');",
+    'export const HILFE = `',
+    "  Beispiel: import { a } from '/hilfe-beispiel.js'",
+    '`;',
   ].join('\n');
   const found = moduleSpecifiers(src);
   assert.deepEqual(found.static,

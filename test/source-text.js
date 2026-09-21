@@ -256,8 +256,13 @@ export function moduleSpecifiers(src) {
   const statics = [];
   const statisch = /^([ \t]*)(?:import|export)\b\s*(?:[^'";()]*?\bfrom\s*)?(['"])([^'"\n]+)\2/gm;
   for (const m of code.matchAll(statisch)) {
+    // Vom Schluesselwort bis zum oeffnenden Anfuehrungszeichen muss alles CODE
+    // sein: die Einleitung `[^'";()]*?` kennt kein Backtick und keinen
+    // Zeilenumbruch und liefe sonst von einem echten `export const x = \``
+    // bis zu einem `from '...'` im Text des Literals (Review zu #1383).
     const k = m.index + m[1].length;
-    if (/^(?:import|export)\b/.test(bare.slice(k, k + 7))) statics.push(m[3]);
+    const quote = m.index + m[0].length - m[3].length - 2;
+    if (bare.slice(k, quote) === code.slice(k, quote)) statics.push(m[3]);
   }
   const dynamics = [];
   let computed = 0;
