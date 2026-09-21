@@ -2948,6 +2948,7 @@
         "nameDayClear": "Remove name day",
         "nameDayHint": "Uses the same reminder as the birthday.",
         "nameDayIncomplete": "Select both the month and day of the name day.",
+        "reminderOnDay": "On the day",
         "photoLabel": "Profile picture",
         "photoOptional": "Optional: you can save without a profile picture.",
         "removePhoto": "Remove picture",

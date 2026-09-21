@@ -2960,6 +2960,7 @@
         "nameDayClear": "Namenstag entfernen",
         "nameDayHint": "Verwendet dieselbe Erinnerung wie der Geburtstag.",
         "nameDayIncomplete": "Bitte Monat und Tag des Namenstags auswählen.",
+        "reminderOnDay": "Am Tag selbst",
         "photoLabel": "Profilbild",
         "photoOptional": "Optional: Du kannst auch ohne Profilbild speichern.",
         "removePhoto": "Bild entfernen",

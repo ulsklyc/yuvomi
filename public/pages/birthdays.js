@@ -68,9 +68,13 @@ function initials(name) {
 // Die Werte sind Minuten vor 12:00 am Geburtstag, so wie `getOffsetMinutes()`
 // in server/services/birthdays.js sie liest. '' ist „Keine": der Server legt
 // dann weder Erinnerung noch Kalendertermin an.
+//
+// '0' heisst „Am Tag selbst" mit einem EIGENEN Schluessel, nicht mit dem
+// „Zum Startzeitpunkt" des Kalenders (`reminders.offsetAtTime`): ein
+// Geburtstag hat keinen Startzeitpunkt, erinnert wird mittags am Tag.
 const REMINDER_OFFSETS = () => [
   { value: '',      label: t('reminders.offsetNone')  },
-  { value: '0',     label: t('reminders.offsetAtTime') },
+  { value: '0',     label: t('birthdays.reminderOnDay') },
   { value: '1440',  label: t('reminders.offset1day')  },
   { value: '2880',  label: t('reminders.offset2days') },
   { value: '10080', label: t('reminders.offset1week') },

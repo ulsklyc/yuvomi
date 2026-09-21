@@ -2960,6 +2960,7 @@
         "nameDayClear": "حذف روز نام",
         "nameDayHint": "از همان یادآور تولد استفاده می‌کند.",
         "nameDayIncomplete": "ماه و روزِ روز نام را انتخاب کنید.",
+        "reminderOnDay": "همان روز",
         "nameDayCalendarEventTitle": "روز نام: {{name}}",
         "nameDayCalendarEventDescription": "امروز روز نام {{name}} است.",
         "photoLabel": "عکس نمایه",

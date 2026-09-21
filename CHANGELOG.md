@@ -65,9 +65,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   through the API without the field. Such a birthday is reminded on the day itself, and always has
   been. Its form said "1 day before" all the same, and saving the form - even without touching
   anything - wrote that down, so the reminder quietly moved to the day before. The form now shows
-  "At event time" for these birthdays, the reading view for read-only members says the same, and
-  saving writes a reminder only when you pick one. No existing reminder moves. "At event time" is
-  back in the menu as well, for anybody who wants to be reminded on the day. (#1363)
+  "On the day" for these birthdays, the reading view for read-only members says the same, and
+  saving writes a reminder only when you pick one. No existing reminder moves. "On the day" is also
+  in the menu now, for anybody who wants to pick it. (#1363)
 
 - **A supply request from Housekeeping now needs shopping rights as well.** The request puts the
   item on the shopping list, and creates a list first when the household has none. Since 2.68.0,

@@ -1936,7 +1936,8 @@ test('Leseansicht: eine eigene Erinnerung steht als Dauer da, eine fehlende als 
   // dasselbe wie er.
   const ohne = inhalt({ reminder_offset: null });
   assert.match(ohne, /reminders\.offsetLabel/, 'die Zeile steht da');
-  assert.equal(leseErinnerung(ohne), 'reminders.offsetAtTime', 'und nennt den Tag selbst');
+  assert.equal(leseErinnerung(ohne), 'birthdays.reminderOnDay', 'und nennt den Tag selbst');
+  assert.doesNotMatch(ohne, /reminders\.offsetAtTime/, 'nicht mit dem Startzeitpunkt des Kalenders');
   assert.doesNotMatch(ohne, /reminders\.offset1day/, 'nicht die fruehere Behauptung des Editors');
   assert.match(ohne, /Mag Kuchen/, 'der Rest steht trotzdem da');
 
@@ -2073,8 +2074,14 @@ test('Geburtstag ohne gespeicherte Erinnerung: der Editor zeigt den Tag selbst, 
   for (const eintrag of [geburtstag({ reminder_offset: null }), geburtstag()]) {
     const { gewaehlt } = auswahlAusMarkup(editor(eintrag), 'bd-reminder-offset');
     assert.equal(gewaehlt.value, '0', `ohne Wert (${eintrag.reminder_offset}) steht die Auswahl auf dem Tag selbst`);
-    assert.equal(gewaehlt.label, 'reminders.offsetAtTime');
+    assert.equal(gewaehlt.label, 'birthdays.reminderOnDay', '„Am Tag selbst", ein eigener Schluessel');
   }
+
+  // Der Kalender-Schluessel „Zum Startzeitpunkt" gehoert dem Kalender: ein
+  // Geburtstag hat keinen Startzeitpunkt, erinnert wird mittags am Tag.
+  const { optionen } = auswahlAusMarkup(editor(geburtstag({ reminder_offset: null })), 'bd-reminder-offset');
+  assert.ok(!optionen.some((o) => o.label === 'reminders.offsetAtTime'), 'kein Kalender-Label im Geburtstags-Editor');
+  assert.equal(optionen.filter((o) => o.value === '0').length, 1, 'genau eine Option fuer den Tag selbst');
 
   // Gegenfaelle: ein gespeicherter Wert steht, wie er ist, und ein NEUER
   // Geburtstag beginnt weiter bei „1 Tag vorher".

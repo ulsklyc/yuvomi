@@ -2960,6 +2960,7 @@
         "nameDayClear": "Hapus hari nama",
         "nameDayHint": "Menggunakan pengingat yang sama dengan ulang tahun.",
         "nameDayIncomplete": "Pilih bulan dan tanggal hari nama.",
+        "reminderOnDay": "Pada hari-H",
         "nameDayCalendarEventTitle": "Hari nama: {{name}}",
         "nameDayCalendarEventDescription": "Hari ini adalah hari nama {{name}}.",
         "photoLabel": "Foto profil",

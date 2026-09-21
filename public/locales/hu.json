@@ -2948,6 +2948,7 @@
         "nameDayClear": "Névnap eltávolítása",
         "nameDayHint": "Ugyanazt az emlékeztetőt használja, mint a születésnap.",
         "nameDayIncomplete": "Válaszd ki a névnap hónapját és napját.",
+        "reminderOnDay": "Aznap",
         "nameDayCalendarEventTitle": "Névnap: {{name}}",
         "nameDayCalendarEventDescription": "Ma van {{name}} névnapja.",
         "photoLabel": "Profilkép",
