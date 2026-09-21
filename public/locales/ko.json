@@ -1564,7 +1564,9 @@
         "responsibleFilterEmptyTitle": "이 사람의 항목이 없습니다",
         "responsibleFilterEmptyDescription": "이 선택에서 이번 달에는 어떤 항목에도 담당자가 없습니다.",
         "handoverToSplit": "공동 지출로 옮기기",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (계획: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (계획: {{plan}})",
+        "detailDateLabel": "날짜",
+        "loanDetailStartMonthLabel": "첫 상환 월"
     },
     "settings": {
         "healthCycleEnableLabel": "주기 탭 표시",
@@ -3976,7 +3978,9 @@
         "endsAfter": "{{count}}회 결제 남음",
         "logoTypeError": "PNG, JPEG, WebP 또는 SVG 이미지를 사용하세요.",
         "accountUsernameLabel": "등록 계정",
-        "accountUsernameHint": "이메일 주소 또는 사용자 이름. 비밀번호 입력란이 아닙니다. Yuvomi는 비밀번호를 저장하지 않습니다."
+        "accountUsernameHint": "이메일 주소 또는 사용자 이름. 비밀번호 입력란이 아닙니다. Yuvomi는 비밀번호를 저장하지 않습니다.",
+        "detailAmountLabel": "금액",
+        "detailNextPaymentLabel": "다음 결제"
     },
     "health": {
         "fasting": {

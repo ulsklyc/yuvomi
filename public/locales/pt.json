@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Nenhum lançamento para esta pessoa",
         "responsibleFilterEmptyDescription": "Ninguém é responsável por um lançamento neste mês com esta seleção.",
         "handoverToSplit": "Passar para despesas partilhadas",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (plano: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (plano: {{plan}})",
+        "detailDateLabel": "Data",
+        "loanDetailStartMonthLabel": "Primeiro mês de vencimento"
     },
     "settings": {
         "healthCycleEnableLabel": "Mostrar a aba de ciclo",
@@ -3976,7 +3978,9 @@
         "endsAfter": "Faltam {{count}} pagamentos",
         "logoTypeError": "Use uma imagem PNG, JPEG, WebP ou SVG.",
         "accountUsernameLabel": "Registado com",
-        "accountUsernameHint": "Endereço de e-mail ou nome de utilizador. Não é um campo de palavra-passe - o Yuvomi não guarda palavras-passe."
+        "accountUsernameHint": "Endereço de e-mail ou nome de utilizador. Não é um campo de palavra-passe - o Yuvomi não guarda palavras-passe.",
+        "detailAmountLabel": "Valor",
+        "detailNextPaymentLabel": "Próximo pagamento"
     },
     "health": {
         "fasting": {

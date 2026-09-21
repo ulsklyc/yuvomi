@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Bu kişi için kayıt yok",
         "responsibleFilterEmptyDescription": "Bu seçimde bu ay hiçbir kayıttan kimse sorumlu değil.",
         "handoverToSplit": "Paylaşılan giderlere aktar",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (plana göre: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (plana göre: {{plan}})",
+        "detailDateLabel": "Tarih",
+        "loanDetailStartMonthLabel": "İlk vade ayı"
     },
     "settings": {
         "healthCycleEnableLabel": "Döngü sekmesini göster",
@@ -3976,7 +3978,9 @@
         "endsAfter": "{{count}} ödeme kaldı",
         "logoTypeError": "PNG, JPEG, WebP veya SVG resmi kullanın.",
         "accountUsernameLabel": "Şu adla kayıtlı",
-        "accountUsernameHint": "E-posta adresi veya kullanıcı adı. Parola alanı değildir - Yuvomi parola saklamaz."
+        "accountUsernameHint": "E-posta adresi veya kullanıcı adı. Parola alanı değildir - Yuvomi parola saklamaz.",
+        "detailAmountLabel": "Tutar",
+        "detailNextPaymentLabel": "Sonraki ödeme"
     },
     "health": {
         "fasting": {

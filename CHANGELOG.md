@@ -163,13 +163,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and inviting someone. The rule is the one Tasks, Notes, Contacts and Health already follow:
   something that shows a state stays, something that only acts disappears. An expected entry keeps
   its "expected" tag, a recurring entry and one with a receipt keep their marks, a savings goal that
-  is set stays as a card, a plan row keeps its target, what was spent and what is left, and a
-  subscription keeps its status, due date, cycle and amount - they just no longer open an editor.
-  What you can read stays complete: the monthly summary and chart, the account balances and each
-  account's statement, the loan cards and their report, the subscription analytics, a group's
-  balances, expenses and activity, the reports tab and the CSV exports. A tab with nothing in it yet
-  says so, instead of telling you to use a + button that is not there. Shared expenses are part of
-  Budget in the permission settings, so the same right decides there. (#1265)
+  is set stays as a card, and a plan row keeps its target, what was spent and what is left. An
+  entry, a subscription or a shared expense still opens when you tap it, but into a read-only view
+  instead of the editor: it shows everything the editor would - an entry's subcategory, account,
+  visibility, who is responsible, how it repeats and its receipts; a subscription's description,
+  category, payment method, the account it runs under and its notes; an expense's payer, how it
+  is split and each person's share, its notes and receipts - and offers nothing to change. Receipts
+  are listed only if you may read documents. The same view now opens for an expense in an archived
+  group. A loan's report also shows the account, the first due month, the interest terms and the
+  notes from the loan form. What you can read stays complete: the monthly summary and chart, the
+  account balances and each account's statement, the subscription analytics, a group's balances,
+  expenses and activity, the reports tab and the CSV exports. A tab with nothing in it yet says so,
+  instead of telling you to use a + button that is not there. Shared expenses are part of Budget in
+  the permission settings, so the same right decides there. (#1265)
 
 - **A nightly recurring appointment that crosses midnight no longer covers the entry it should be
   sharing its column with.** On a day that carries two occurrences of the same series - last

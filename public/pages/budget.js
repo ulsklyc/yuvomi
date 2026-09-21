@@ -7,7 +7,8 @@
 
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, confirmOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender } from '/components/modal.js';
-import { renderDocumentAttachField, bindDocumentAttachField } from '/components/document-attach.js';
+import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
+import { openDetailView } from '/components/detail-view.js';
 import { stagger, vibrate, scheduleUndoableDelete } from '/utils/ux.js';
 import { wireTablist } from '/utils/tablist.js';
 import { t, formatDate, formatDayMonth, getLocale, getNumberFormat } from '/i18n.js';
@@ -1088,8 +1089,10 @@ function renderBody() {
       return;
     }
 
+    // Der Zeilen-Klick fragt NICHT selbst: openBudgetModal verzweigt bei
+    // `read` in die Leseansicht, und die ist der Leseweg dieser Zeile.
     const item = e.target.closest('.budget-entry[data-id]');
-    if (item && !action && !readOnly()) {
+    if (item && !action) {
       const entry = state.entries.find((e) => e.id === parseInt(item.dataset.id, 10));
       if (entry) openBudgetModal({ mode: 'edit', entry });
     }
@@ -1383,17 +1386,14 @@ function entryRows(list) {
      * (der Server liefert die Felder gar nicht erst mit) - sie bekommt weder
      * data-id noch einen Titel-Button, ihr sichtbarer Text traegt alles.
      *
-     * Bei `budget: read` dieselbe Form, aus einem anderen Grund: was sich
-     * oeffnen liesse, ist der Bearbeiten-Dialog, und an dem schreibt jedes
-     * Feld. Ein Titel-Button, der ihn verspricht, fuehrte ins 403. Dieselbe
-     * Antwort hat das Archiv der Geteilten Ausgaben schon (renderExpenses):
-     * der Eintrag bleibt ein Listeneintrag, kein Knopf. */
-    const opens = !masked && !ro;
-    const rowInteraction = opens ? `data-id="${e.id}"` : '';
-    const titleCell = !opens
+     * Bei `budget: read` bleibt die Zeile ein Knopf, oeffnet aber die
+     * LESEANSICHT (openBudgetModal verzweigt, P1-Muster). Deshalb verspricht
+     * sein Name dort kein „bearbeiten": Titel und Betrag, nichts weiter. */
+    const rowInteraction = masked ? '' : `data-id="${e.id}"`;
+    const titleCell = masked
       ? `<div class="list-row__name budget-entry__title">${esc(displayTitle)}${sharedBadge}${maskedBadge}${pendingBadge}</div>`
       : `<button class="list-row__name budget-entry__title" type="button"
-           aria-label="${esc(t('budget.editEntry'))}: ${esc(e.title)}, ${amountText}">${esc(displayTitle)}${sharedBadge}${maskedBadge}${pendingBadge}</button>`;
+           aria-label="${ro ? '' : `${esc(t('budget.editEntry'))}: `}${esc(e.title)}, ${amountText}">${esc(displayTitle)}${sharedBadge}${maskedBadge}${pendingBadge}</button>`;
     // ZUSTAENDIGE (#1057) als Avatar-Stapel in der Metazeile - dieselbe Sprache,
     // die Kalender und Aufgaben fuer "wer gehoert dazu" schon sprechen. Bei
     // einer maskierten Buchung faellt er weg: deren Zweck bleibt verborgen, und
@@ -1403,14 +1403,14 @@ function entryRows(list) {
              aria-label="${esc(t('budget.responsibleFilterTo', { name: e.responsible_users[0].display_name ?? '' }))}"
            >${renderAvatarStack(e.responsible_users, { size: 16, maxVisible: 3 })}</button>`
       : '';
-    const rowActions = !opens ? '' : `
+    const rowActions = (masked || ro) ? '' : `
           ${confirmBtn}
           <button class="row-action row-action--danger" data-action="delete" data-id="${e.id}" aria-label="${t('budget.deleteLabel')}">
             <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
           </button>`;
 
     return `
-      <div class="list-row budget-entry${pending ? ' budget-entry--pending' : ''}${masked ? ' budget-entry--masked' : ''}${ro ? ' budget-entry--static' : ''}" ${rowInteraction}>
+      <div class="list-row budget-entry${pending ? ' budget-entry--pending' : ''}${masked ? ' budget-entry--masked' : ''}" ${rowInteraction}>
         <div class="budget-entry__indicator ${indClass}"></div>
         <div class="list-row__main">
           ${titleCell}
@@ -2066,6 +2066,7 @@ function openLoanReport(loan) {
       <div class="loan-report__grid">
         ${cells.map(([label, value]) => `<div><span>${esc(label)}</span><strong>${value}</strong></div>`).join('')}
       </div>
+      ${loanReportDetails(loan)}
       ${loan.is_foreign_currency ? `<p class="form-hint budget-loan-hint">${t('budget.loanRateInfo', {
         currency: esc(loan.currency),
         rate: getNumberFormat({ maximumFractionDigits: 6 }).format(Number(loan.exchange_rate || 1)),
@@ -2102,6 +2103,30 @@ function openLoanReport(loan) {
       panel.querySelector('#loan-report-close')?.addEventListener('click', closeModal);
     },
   });
+}
+
+/**
+ * Die Angaben des Darlehens-Dialogs, die weder die Karte noch der Bericht
+ * sonst trug (#1265 P7): Konto, erster Faelligkeitsmonat, Zinsmodell samt
+ * Anfangstilgung und Notizen. Der Bericht IST die Leseansicht eines Darlehens -
+ * die Karte oeffnet ihn fuer jeden, und bei `budget: read` ist er der einzige
+ * Weg zu diesen Werten. Leere Angaben fallen weg: die Antwort folgt dem
+ * Datensatz. Jeder Wert geht durch esc() - Konto und Notiz sind Eingaben.
+ */
+function loanReportDetails(loan) {
+  const it = loan.interest;
+  const rows = [
+    [t('budget.loanAccountLabel'), accountName(loan.account_id), false],
+    [t('budget.loanDetailStartMonthLabel'), loan.start_month ? formatMonthLabel(loan.start_month) : '', false],
+    [t('budget.loanInitialRepaymentLabel'), it?.initial_repayment_rate != null
+      ? getNumberFormat({ maximumFractionDigits: 2 }).format(Number(it.initial_repayment_rate)) : '', false],
+    [t('budget.loanInterestModeLabel'), it ? loanInterestMeta(it, loan) : '', true],
+    [t('budget.loanNotesLabel'), loan.notes || '', true],
+  ].filter(([, value]) => value);
+  if (!rows.length) return '';
+  return `<div class="loan-report__grid loan-report__grid--details">
+        ${rows.map(([label, value, wide]) => `<div${wide ? ' class="loan-report__cell--wide"' : ''}><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join('')}
+      </div>`;
 }
 
 // Rate in Landes-Locale mit Prozentzeichen (z. B. „2,5 %"). Nicht-brechendes
@@ -2341,12 +2366,80 @@ function responsibleFilterLabel(source) {
   return responsibleFilterName(source.responsibleFilterId, source) || source.responsibleFilterCachedName || '';
 }
 
+/**
+ * Die Zeilen der Leseansicht einer Buchung (#1265 P7) - alles, was der
+ * Bearbeiten-Dialog zeigt, als Text. Eine reine Funktion, damit sich messen
+ * laesst, WAS ein Nur-lesen-Mitglied zu sehen bekommt.
+ *
+ * Der Betrag steht wie im Dialog: bei einer virtuellen Serie der eingegebene
+ * Periodenbetrag, nicht der Monatsanteil der Zeile. Zeilen ohne Wert (keine
+ * Unterkategorie, kein Konto, keine Wiederholung) faellt `detailRowEl` selbst
+ * weg - die Antwort folgt dem Datensatz. Die Belege gehoeren dem
+ * Dokumente-Modul und fragen dessen Recht (`attachmentLinksNode`).
+ */
+function entryReadSections(entry) {
+  const amount = entry.recurrence_virtual && entry.recurrence_full_amount != null
+    ? Math.sign(entry.amount || -1) * Math.abs(entry.recurrence_full_amount)
+    : entry.amount;
+  const interval = entry.recurrence_interval || 'monthly';
+  const count = Math.min(99, Math.max(1, Number(entry.recurrence_interval_count) || 1));
+  const every = count === 1
+    ? t(`budget.interval${interval.charAt(0).toUpperCase()}${interval.slice(1)}`)
+    : `${t('rrule.labelEvery')} ${count} ${intervalUnitLabel(interval, count)}`;
+  const recurrence = entry.is_recurring
+    ? [every, entry.recurrence_virtual ? t('budget.virtualBudgetLabel') : '',
+      entry.recurrence_confirm ? t('budget.confirmFirstLabel') : ''].filter(Boolean).join(' · ')
+    : '';
+  return [
+    { icon: 'banknote', label: t('budget.amountLabel'), value: amountByRole(amount, 'flow').text },
+    { icon: 'calendar', label: t('budget.detailDateLabel'), value: entry.date ? formatDate(entry.date) : '' },
+    { icon: 'tag', label: t('budget.categoryLabel'), value: entry.category ? categoryLabel(entry.category) : '' },
+    { icon: 'tags', label: t('budget.subcategoryLabel'), value: entry.subcategory ? subcategoryLabel(entry.subcategory) : '' },
+    { icon: 'wallet', label: t('budget.accountLabel'), value: accountName(entry.account_id) },
+    {
+      icon: entry.visibility === 'private' ? 'lock' : 'eye',
+      label: t('budget.visibilityLabel'),
+      value: state.budgetMode === 'personal' && entry.visibility ? t(`budget.visibility_${entry.visibility}`) : '',
+    },
+    {
+      icon: (entry.responsible_users?.length ?? 0) > 1 ? 'users' : 'user',
+      label: t('budget.responsibleLabel'),
+      value: (entry.responsible_users ?? []).map((u) => u.display_name).filter(Boolean).join(', '),
+    },
+    { icon: 'repeat', label: t('budget.recurringLabel'), value: recurrence },
+    { icon: 'receipt', label: t('budget.receiptsLabel'), node: attachmentLinksNode(entry.attachments) },
+  ];
+}
+
+/**
+ * Die Buchung bei `budget: read`: eine Leseansicht, sonst nichts (#1265 P7).
+ *
+ * Die Bauart aus P1: der Einstieg in den Editor verzweigt bei `read` in eine
+ * Leseansicht (`openNoteModal` -> `openNoteReadModal` in notes.js), gezeichnet
+ * mit der geteilten Leseansicht, die P1 fuer die Kontakte bei `read` auf
+ * reines Lesen zurueckschneidet - kein `edit`, keine `actions`. Damit gibt es
+ * weder „Bearbeiten" im Kopf noch eine Fusszeile, und keinen gesperrten Knopf.
+ */
+function openEntryReadView(entry) {
+  return openDetailView({
+    title: entry.title,
+    accentColor: 'var(--module-budget)',
+    size: 'sm',
+    sections: entryReadSections(entry),
+  });
+}
+
 function openBudgetModal({ mode, entry = null, initialType = '' }) {
   // DIE DRITTE LINIE, wie an jedem Einstieg in einen Schreibweg dieser Seite:
   // ein Aufruf, der gar nicht ueber einen Knopf kommt (FAB, Leerzustand, eine
   // Darlehensrate, ein Aufrufer von morgen), endet hier. An diesem Dialog
   // schreibt jedes Feld - es gibt keine Teilmenge, die bei `read` bliebe.
-  if (readOnly()) return;
+  // Eine BESTEHENDE Buchung geht deshalb als Leseansicht auf (P1-Muster),
+  // der Anlegeweg entfaellt ganz.
+  if (readOnly()) {
+    if (mode === 'edit' && entry) openEntryReadView(entry);
+    return;
+  }
   const isEdit = mode === 'edit';
   const today  = todayKey();
   // Ein neuer Eintrag gehört in den Monat, den der Nutzer gerade ansieht. Sonst
@@ -3745,6 +3838,12 @@ export const __test = {
   renderLoansPage,
   renderLoanCard,
   renderLoanPaymentEntry,
+  // Die Leseansichten (#1265 P7): die Zeilen als reine Funktionen, und der
+  // Einstieg, dessen Aussage KEIN Markup ist - welche Optionen er
+  // `openDetailView` uebergibt, sieht nur, wer sie ihm abnimmt.
+  entryReadSections,
+  openBudgetModal,
+  loanReportDetails,
   // renderBody() schreibt in den Seitencontainer statt Markup zurueckzugeben;
   // derselbe Griff wie updateTabsForTest oben laesst den ECHTEN Render-Pfad
   // des Buchungs-Tabs laufen, statt seinen Quelltext zu lesen.

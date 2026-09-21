@@ -1564,7 +1564,9 @@
         "responsibleFilterEmptyTitle": "Tidak ada entri untuk orang ini",
         "responsibleFilterEmptyDescription": "Tidak ada yang bertanggung jawab atas entri bulan ini dalam pilihan ini.",
         "handoverToSplit": "Pindahkan ke pengeluaran bersama",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (rencana: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (rencana: {{plan}})",
+        "detailDateLabel": "Tanggal",
+        "loanDetailStartMonthLabel": "Bulan jatuh tempo pertama"
     },
     "settings": {
         "healthCycleEnableLabel": "Tampilkan tab siklus",
@@ -3976,7 +3978,9 @@
         "endsAfter": "Tersisa {{count}} pembayaran",
         "logoTypeError": "Gunakan gambar PNG, JPEG, WebP, atau SVG.",
         "accountUsernameLabel": "Terdaftar atas nama",
-        "accountUsernameHint": "Alamat email atau nama pengguna. Bukan kolom kata sandi - Yuvomi tidak menyimpan kata sandi."
+        "accountUsernameHint": "Alamat email atau nama pengguna. Bukan kolom kata sandi - Yuvomi tidak menyimpan kata sandi.",
+        "detailAmountLabel": "Jumlah",
+        "detailNextPaymentLabel": "Pembayaran berikutnya"
     },
     "health": {
         "fasting": {

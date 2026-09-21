@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Для этого человека нет записей",
         "responsibleFilterEmptyDescription": "В этом месяце никто не отвечает за запись в этой выборке.",
         "handoverToSplit": "Перенести в общие расходы",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (план: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (план: {{plan}})",
+        "detailDateLabel": "Дата",
+        "loanDetailStartMonthLabel": "Первый месяц оплаты"
     },
     "settings": {
         "healthCycleEnableLabel": "Показать вкладку цикла",
@@ -3976,7 +3978,9 @@
         "endsAfter": "Осталось {{count}} платежей",
         "logoTypeError": "Используйте изображение PNG, JPEG, WebP или SVG.",
         "accountUsernameLabel": "Зарегистрировано на",
-        "accountUsernameHint": "Адрес электронной почты или имя пользователя. Это не поле пароля - Yuvomi не хранит пароли."
+        "accountUsernameHint": "Адрес электронной почты или имя пользователя. Это не поле пароля - Yuvomi не хранит пароли.",
+        "detailAmountLabel": "Сумма",
+        "detailNextPaymentLabel": "Следующий платеж"
     },
     "health": {
         "fasting": {

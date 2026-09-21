@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Καμία εγγραφή για αυτό το άτομο",
         "responsibleFilterEmptyDescription": "Κανείς δεν είναι υπεύθυνος για εγγραφή αυτόν τον μήνα σε αυτή την επιλογή.",
         "handoverToSplit": "Μεταφορά στα κοινά έξοδα",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (σχέδιο: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (σχέδιο: {{plan}})",
+        "detailDateLabel": "Ημερομηνία",
+        "loanDetailStartMonthLabel": "Πρώτος μήνας λήξης"
     },
     "settings": {
         "healthCycleEnableLabel": "Εμφάνιση καρτέλας κύκλου",
@@ -3976,7 +3978,9 @@
         "endsAfter": "Απομένουν {{count}} πληρωμές",
         "logoTypeError": "Χρησιμοποιήστε εικόνα PNG, JPEG, WebP ή SVG.",
         "accountUsernameLabel": "Καταχωρημένο ως",
-        "accountUsernameHint": "Διεύθυνση e-mail ή όνομα χρήστη. Δεν είναι πεδίο κωδικού - το Yuvomi δεν αποθηκεύει κωδικούς."
+        "accountUsernameHint": "Διεύθυνση e-mail ή όνομα χρήστη. Δεν είναι πεδίο κωδικού - το Yuvomi δεν αποθηκεύει κωδικούς.",
+        "detailAmountLabel": "Ποσό",
+        "detailNextPaymentLabel": "Επόμενη πληρωμή"
     },
     "health": {
         "fasting": {

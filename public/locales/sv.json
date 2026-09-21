@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Ingen post för den här personen",
         "responsibleFilterEmptyDescription": "Ingen är ansvarig för en post den här månaden i det här urvalet.",
         "handoverToSplit": "Flytta till delade utgifter",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (enligt plan: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (enligt plan: {{plan}})",
+        "detailDateLabel": "Datum",
+        "loanDetailStartMonthLabel": "Första förfallomånaden"
     },
     "settings": {
         "healthCycleEnableLabel": "Visa cykelfliken",
@@ -3976,7 +3978,9 @@
         "endsAfter": "{{count}} betalningar kvar",
         "logoTypeError": "Använd en PNG-, JPEG-, WebP- eller SVG-bild.",
         "accountUsernameLabel": "Registrerad på",
-        "accountUsernameHint": "E-postadress eller användarnamn. Inget lösenordsfält - Yuvomi lagrar inga lösenord."
+        "accountUsernameHint": "E-postadress eller användarnamn. Inget lösenordsfält - Yuvomi lagrar inga lösenord.",
+        "detailAmountLabel": "Belopp",
+        "detailNextPaymentLabel": "Nästa betalning"
     },
     "health": {
         "fasting": {

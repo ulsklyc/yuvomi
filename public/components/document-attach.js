@@ -129,6 +129,46 @@ export function renderDocumentAttachField({
 }
 
 /**
+ * Die verknüpften Belege für eine LESEANSICHT (#1265 P7): je Dokument ein Link,
+ * als DOM gebaut, damit er als `node` in `openDetailView`-Zeilen passt.
+ *
+ * Dieselbe Rechtefrage wie das Feld oben, und aus demselben Grund: die Belege
+ * gehören dem Dokumente-Modul. Bei `documents: none` antwortet schon das Lesen
+ * mit 403, jeder Link ginge ins Leere - dann gibt es keine Zeile (`null`), und
+ * die Leseansicht schweigt über sie wie P6 über den Beleg eines Einsatzes.
+ * Bei `read` und `write` öffnet der Link das Dokument; Lösen und Hochladen
+ * gibt es hier nicht, eine Leseansicht bietet keine Handlung an.
+ *
+ * @param {object[]} attachments - `{ document_id, name, original_name, mime_type }`
+ * @returns {HTMLElement|null}
+ */
+export function attachmentLinksNode(attachments = []) {
+  if (pathAccess('/documents') === 'none') return null;
+  const docs = (attachments || []).filter((a) => a?.document_id);
+  if (!docs.length) return null;
+  const wrap = document.createElement('div');
+  wrap.className = 'detail-chips';
+  for (const doc of docs) {
+    const name = doc.name || doc.original_name || '';
+    const link = document.createElement('a');
+    link.className = 'detail-attachment detail-attachment--file';
+    // Vorschaubar -> /preview, sonst /download: dieselbe Weiche wie die Chips
+    // des Felds, sonst endete eine DOCX im 415.
+    link.href = `/api/v1/documents/${Number(doc.document_id)}/${isPreviewable(doc.mime_type) ? 'preview' : 'download'}`;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.title = t('documentAttach.openAction', { name });
+    const icon = document.createElement('i');
+    icon.dataset.lucide = 'paperclip';
+    icon.className = 'icon-md';
+    icon.setAttribute('aria-hidden', 'true');
+    link.append(icon, document.createTextNode(name));
+    wrap.appendChild(link);
+  }
+  return wrap;
+}
+
+/**
  * Verdrahtet das Feld und gibt einen Controller zurück.
  *
  * Ein Feld je Formular: bind() greift das erste `[data-doc-attach]` im Panel,

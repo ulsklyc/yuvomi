@@ -21,6 +21,7 @@ import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { formatMoney, amountPlaceholder, amountStep, applyAmountFormat, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { isNavModuleReadOnly } from '/permissions.js';
+import { openDetailView } from '/components/detail-view.js';
 
 let state = {
   subscriptions: [],
@@ -52,10 +53,10 @@ function readOnly() {
   return isNavModuleReadOnly('budget');
 }
 
-// Jede `data-action` dieser Seite, die NICHT schreibt - keine. Die Liste steht
-// trotzdem da: sie ist die Regel, und eine morgen ergaenzte Aktion ist damit
-// standardmaessig gesperrt statt standardmaessig offen.
-const READ_SAFE_ACTIONS = new Set();
+// Jede `data-action` dieser Seite, die NICHT schreibt: nur `view`, der Weg in
+// die Leseansicht eines Abos. Eine Positivliste - eine morgen ergaenzte Aktion
+// ist damit standardmaessig gesperrt statt standardmaessig offen.
+const READ_SAFE_ACTIONS = new Set(['view']);
 
 function setHtml(element, html) {
   element.replaceChildren();
@@ -637,13 +638,11 @@ function renderCard(subscription) {
     : t('subscriptions.monthlyEquivalent', { amount: money(subscription.monthly_base) });
   const status = statusMeta(subscription);
   const endInfo = endInfoLabel(subscription);
-  // BEI `budget: read` WIRD DER ZEILENKOERPER ZUM KASTEN. Er oeffnete das
-  // Bearbeiten, und Verlaengern und Loeschen daneben schreiben ebenso - die
-  // Karte bleibt mit allem, was sie sagt: Status, Faelligkeit, Zyklus,
-  // Zahlungsart, Erinnerung, Ende und Betrag. Die Wischflaechen fallen mit weg,
-  // weil die Geste nicht verdrahtet wird (renderContent/bindContent).
+  // BEI `budget: read` OEFFNET DER ZEILENKOERPER DIE LESEANSICHT statt des
+  // Bearbeitens (`view` statt `edit`, P1-Muster) und sagt kein „Bearbeiten"
+  // mehr an. Verlaengern und Loeschen daneben schreiben und fallen weg, die
+  // Wischflaechen mit ihnen, weil die Geste nicht verdrahtet wird.
   const ro = readOnly();
-  const Main = ro ? 'div' : 'button';
   return `
     <div class="swipe-row" data-swipe-id="${subscription.id}">
       ${ro ? '' : `<div class="swipe-reveal swipe-reveal--done swipe-reveal--leading" aria-hidden="true">
@@ -656,8 +655,8 @@ function renderCard(subscription) {
       </div>`}
     <article class="subscription-card ${status.cardClass}"
              data-id="${subscription.id}" style="--subscription-color:${esc(brandColor)}">
-      <${Main} ${ro ? 'class="subscription-card__main"' : `type="button" class="subscription-card__main list-row__main--interactive"
-              data-action="edit"`}>
+      <button type="button" class="subscription-card__main list-row__main--interactive"
+              data-action="${ro ? 'view' : 'edit'}">
         <span class="subscription-card__brand">
           ${subscription.logo_data
             ? `<img src="${esc(subscription.logo_data)}" alt="">`
@@ -686,7 +685,7 @@ function renderCard(subscription) {
           <span>${converted}</span>
         </span>
         ${ro ? '' : `<span class="sr-only">${t('common.edit')}</span>`}
-      </${Main}>
+      </button>
       ${ro ? '' : `<div class="subscription-card__actions">
         <button class="btn btn--secondary btn--icon" data-action="renew" aria-label="${t('subscriptions.markRenewed')}">
           <i data-lucide="calendar-check" aria-hidden="true"></i>
@@ -787,6 +786,7 @@ function bindContent() {
     // eine klickbare Zeile). Ein blosser Tap-Handler auf dem `<article>` haette
     // den Bearbeiten-Knopf entfernt, ohne einen Tastaturweg an seine Stelle zu
     // setzen - das waere kein Aufraeumen, sondern ein Regress.
+    if (action.dataset.action === 'view') openSubscriptionReadView(subscription);
     if (action.dataset.action === 'edit') openSubscriptionModal(subscription);
     if (action.dataset.action === 'renew') await renewSubscription(subscription);
     if (action.dataset.action === 'delete') await deleteSubscription(subscription);
@@ -923,8 +923,59 @@ function wireCombobox(panel, id) {
   }, 0));
 }
 
+/**
+ * Die Zeilen der Leseansicht eines Abos (#1265 P7): was der Bearbeiten-Dialog
+ * zeigt, als Text. Die Karte traegt schon Name, Status, Faelligkeit, Zyklus,
+ * Zahlungsart, Erinnerung und Betrag; nur der Dialog kannte bisher Kategorie
+ * (wo eine Beschreibung sie auf der Karte verdraengt), das Konto, unter dem
+ * das Abo laeuft, und die Notizen. Die Markenfarbe traegt der Farbstreifen.
+ * Leere Zeilen faellt `detailRowEl` selbst weg - die Antwort folgt dem Datensatz.
+ */
+function subscriptionReadSections(subscription) {
+  const converted = subscription.monthly_base === null
+    ? t('subscriptions.conversionUnavailable')
+    : t('subscriptions.monthlyEquivalent', { amount: money(subscription.monthly_base) });
+  const endInfo = endInfoLabel(subscription);
+  return [
+    { icon: 'banknote', label: t('subscriptions.detailAmountLabel'),
+      value: `${money(subscription.amount, subscription.currency)} · ${converted}` },
+    { icon: 'info', label: t('subscriptions.filterLabelStatus'), value: statusMeta(subscription).label },
+    { icon: 'align-left', label: t('subscriptions.descriptionLabel'), value: subscription.description || '', multiline: true },
+    { icon: 'repeat-2', label: t('subscriptions.billingCycleLabel'), value: cycleLabel(subscription) },
+    { icon: 'calendar-clock', label: t('subscriptions.detailNextPaymentLabel'),
+      value: subscription.next_payment_date ? `${formatDate(subscription.next_payment_date)} · ${dueLabel(subscription)}` : '' },
+    { icon: 'bell', label: t('subscriptions.reminderDaysLabel'),
+      value: t('subscriptions.reminderMeta', { count: subscription.reminder_days }) },
+    { icon: endInfo?.icon || 'calendar-x', label: t('subscriptions.endLabel'), value: endInfo?.text || '' },
+    { icon: 'tags', label: t('subscriptions.categoryLabel'), value: subscription.category_id ? rowCategoryLabel(subscription) : '' },
+    { icon: 'wallet-cards', label: t('subscriptions.paymentMethodLabel'),
+      value: subscription.payment_method_id ? rowPaymentMethodLabel(subscription) : '' },
+    { icon: 'at-sign', label: t('subscriptions.accountUsernameLabel'), value: subscription.account_username || '' },
+    { icon: 'sticky-note', label: t('subscriptions.notesLabel'), value: subscription.notes || '', multiline: true },
+  ];
+}
+
+/**
+ * Das Abo bei `budget: read`: eine Leseansicht, sonst nichts. Dieselbe Bauart
+ * wie die Buchung in budget.js (P1-Muster: der Einstieg in den Editor verzweigt,
+ * die geteilte Leseansicht ohne `edit` und ohne `actions`).
+ */
+function openSubscriptionReadView(subscription) {
+  return openDetailView({
+    title: subscription.name,
+    accentColor: subscription.brand_color || subscription.category_color || 'var(--module-budget)',
+    size: 'sm',
+    sections: subscriptionReadSections(subscription),
+  });
+}
+
 export function openSubscriptionModal(subscription = null) {
-  if (readOnly()) return;
+  // Der Riegel steht VOR jeder Vorbereitung: der Anlegeweg entfaellt ganz, ein
+  // bestehendes Abo geht als Leseansicht auf (P1-Muster wie openNoteModal).
+  if (readOnly()) {
+    if (subscription) openSubscriptionReadView(subscription);
+    return;
+  }
   const edit = Boolean(subscription);
   // Jedes Abo trägt seine eigene Währung; das Betragsfeld richtet sich danach
   // und wird beim Wechsel der Währungs-Combobox nachgezogen.
@@ -1711,4 +1762,7 @@ function openMetadataModal() {
  * Messflaeche fuer die Nur-lesen-Regel (#1265 P7): Karten- und Leerzustands-
  * Renderer sind reine Funktionen ueber `state`.
  */
-export const __test = { readOnly, READ_SAFE_ACTIONS, renderCard, renderEmpty, renderSummary, state };
+export const __test = {
+  readOnly, READ_SAFE_ACTIONS, renderCard, renderEmpty, renderSummary, state,
+  subscriptionReadSections, openSubscriptionModal,
+};

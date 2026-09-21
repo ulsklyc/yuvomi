@@ -24,6 +24,16 @@
  *        wirklich gelaufener Renderer ausgibt. Wo die Seite direkt verdrahtet,
  *        prueft die Suite den KOMMENTARFREIEN Quelltext.
  *
+ *        DAZU DIE LESEANSICHTEN (Regel vom 21.09.): ein Datensatz oeffnet bei
+ *        `read` alles, was sein Editor zeigt. Buchung, Abo und Ausgabe tun
+ *        das nach der Bauart aus P1 - der Editor-Einstieg verzweigt wie
+ *        openNoteModal(), gezeichnet mit der geteilten Leseansicht ohne `edit`
+ *        und ohne `actions` wie die Kontakt-Detailansicht. Gemessen an den
+ *        Optionen, die der Einstieg `openDetailView` uebergibt, und an den
+ *        Zeilen selbst; die Belege fragen das Dokumente-Recht. Das Darlehen
+ *        hatte seine Leseansicht schon (der Bericht) und bekommt dort die
+ *        Angaben aus dem Dialog, die ihm fehlten.
+ *
  * Ausfuehren: npm run test:budget-readonly-ui
  */
 import test from 'node:test';
@@ -151,29 +161,29 @@ test('Buchungszeile mit Schreibrecht: Bearbeiten, Verbuchen und Loeschen stehen 
     assert.match(html, /data-action="confirm"/);
     assert.match(html, /data-action="delete"/);
     assert.match(html, /id="budget-manage-categories"/);
-    assert.doesNotMatch(html, /budget-entry--static/);
+    assert.match(html, /aria-label="budget\.editEntry: Stromabschlag, /);
   });
 });
 
-test('Buchungszeile mit `budget: read`: jede Handlung geht, jede Auskunft bleibt', () => {
+test('Buchungszeile mit `budget: read`: jede Handlung geht, die Zeile oeffnet die Leseansicht', () => {
   withAccess({ budget: 'read' }, () => {
     const html = buchungsTab([buchung()]);
-    // Weg: die Bearbeiten-Flaeche (Titel-Knopf und Zeilen-Klick ueber data-id),
-    // Verbuchen, Loeschen, der Kategorie-Verwalter im Listenkopf.
-    assert.doesNotMatch(html, /data-id="17"/);
-    assert.doesNotMatch(html, /<button class="list-row__name/);
+    // Weg: Verbuchen, Loeschen, der Kategorie-Verwalter im Listenkopf.
     assert.doesNotMatch(html, /data-action=/);
     assert.doesNotMatch(html, /budget-manage-categories/);
+    // Die Zeile bleibt ein Knopf - sie oeffnet jetzt die LESEANSICHT (P1-Muster),
+    // und ihr Name verspricht deshalb kein „bearbeiten" mehr.
+    assert.match(html, /data-id="17"/);
+    assert.match(html, /<button class="list-row__name budget-entry__title" type="button"\s+aria-label="Stromabschlag, /);
+    assert.doesNotMatch(html, /budget\.editEntry/);
     // Da: Titel, Betrag, die Zustaende „erwartet", „wiederkehrend", „Beleg"
     // als Zeichen, der Zustaendigen-Filter (liest nur) und der CSV-Export.
-    assert.match(html, /<div class="list-row__name budget-entry__title">Stromabschlag/);
     assert.match(html, /84[.,]50/);
     assert.match(html, /budget-badge--pending/);
     assert.match(html, /budget\.recurringLabel/);
     assert.match(html, /budget\.receiptsAttachedLabel/);
     assert.match(html, /data-responsible="3"/);
     assert.match(html, /budget-csv-export/);
-    assert.match(html, /class="list-row budget-entry budget-entry--pending budget-entry--static"/);
   });
 });
 
@@ -370,18 +380,19 @@ const abo = (over = {}) => ({
   billing_cycle: 'monthly', cycle_interval: 1, reminder_days: 3, end_type: 'never', ...over,
 });
 
-test('Abo-Karte mit `budget: read`: der Koerper wird zum Kasten, Verlaengern, Loeschen und Wischflaechen gehen', () => {
+test('Abo-Karte mit `budget: read`: der Koerper oeffnet die Leseansicht, Verlaengern, Loeschen und Wischflaechen gehen', () => {
   withAccess({ budget: 'write' }, () => {
     const html = abos.renderCard(abo());
     assert.match(html, /<button type="button" class="subscription-card__main list-row__main--interactive"\s+data-action="edit">/);
     assert.match(html, /data-action="renew"/);
     assert.match(html, /data-action="delete"/);
     assert.match(html, /swipe-reveal--done/);
+    assert.match(html, /common\.edit/);
   });
   withAccess({ budget: 'read' }, () => {
     const html = abos.renderCard(abo());
-    assert.doesNotMatch(html, /<button|data-action=|swipe-reveal|list-row__main--interactive/);
-    assert.match(html, /<div class="subscription-card__main">/);
+    assert.match(html, /<button type="button" class="subscription-card__main list-row__main--interactive"\s+data-action="view">/);
+    assert.doesNotMatch(html, /data-action="(edit|renew|delete)"|swipe-reveal|common\.edit/);
     // Die Auskunft: Name, Status, Zyklus, Erinnerung, Betrag.
     assert.match(html, /Streamingdienst/);
     assert.match(html, /subscriptions\.active/);
@@ -423,7 +434,7 @@ test('Abo-Kennzahlen ohne Monatsbudget: bei `budget: read` keine Aufforderung, e
 test('Abos: Kopfaktionen, Listen-Riegel und Wischgeste haengen am Recht', () => {
   // Werkzeugleiste: Kategorien/Zahlungsarten und die Einstellungen schreiben beide.
   assert.match(ABOS_CODE, /\$\{readOnly\(\) \? '' : `<div class="subscriptions-toolbar__actions">/);
-  assert.deepEqual([...abos.READ_SAFE_ACTIONS], [], 'edit, renew und delete schreiben alle drei');
+  assert.deepEqual([...abos.READ_SAFE_ACTIONS], ['view'], 'edit, renew und delete schreiben; nur `view` liest');
   const bind = fn(ABOS_CODE, 'bindContent');
   const riegel = bind.indexOf('if (readOnly() && !READ_SAFE_ACTIONS.has(action.dataset.action)) return;');
   const ersteAktion = bind.indexOf("action.dataset.action === 'edit'");
@@ -470,9 +481,11 @@ test('Gruppe mit Schreibrecht: Bearbeiten, Archivieren, Loeschen, Abrechnen, Ein
 test('Gruppe mit `budget: read`: keine Handlung, aber Salden, Ausgaben und Verlauf', () => {
   withAccess({ budget: 'read' }, () => {
     const html = splitHauptteil();
-    assert.doesNotMatch(html, /split-header-actions|<button|data-expense-id/);
+    assert.doesNotMatch(html, /split-header-actions|data-expense-id/);
+    // Die Ausgabe oeffnet die Leseansicht, nicht das Bearbeiten.
+    assert.match(html, /<button type="button" class="split-expense" data-expense-view="40">/);
+    assert.doesNotMatch(html, /splitExpenses\.editExpense/);
     assert.match(html, /Urlaub Ostsee/);
-    assert.match(html, /<div class="split-expense">/);
     assert.match(html, /Ferienwohnung/);
     assert.match(html, /splitExpenses\.owes/);
   });
@@ -484,7 +497,8 @@ test('Archiv: mit Schreibrecht bleibt „Wiederherstellen", bei `budget: read` n
   withAccess({ budget: 'write' }, () => {
     const html = splitHauptteil({ archiviert: true });
     assert.match(html, /id="split-restore-group"/);
-    assert.doesNotMatch(html, /data-expense-id/, 'im Archiv ist die Ausgabe ein Listeneintrag');
+    assert.doesNotMatch(html, /data-expense-id/, 'im Archiv bearbeitet die Ausgabe nichts');
+    assert.match(html, /data-expense-view="40"/, 'sie oeffnet dort die Leseansicht');
   });
   withAccess({ budget: 'read' }, () => assert.doesNotMatch(splitHauptteil({ archiviert: true }), /split-restore-group/));
 });
@@ -496,7 +510,9 @@ test('Regel 6: `renderExpenses` traegt nicht mehr den Namen des Modulrechts', ()
   // Aufrufer nennt beide Gruende ausdruecklich.
   assert.match(SPLIT_CODE, /function renderExpenses\(asList = false\)/);
   assert.match(fn(SPLIT_CODE, 'renderMain'), /renderExpenses\(archived \|\| ro\)/);
-  assert.match(fn(SPLIT_CODE, 'renderMain'), /if \(!archived && !ro\) \{/);
+  // Der Listen-Handler liest `data-expense-view` in die Leseansicht und nur
+  // `data-expense-id` ins Bearbeiten.
+  assert.match(fn(SPLIT_CODE, 'renderMain'), /if \(btn\.dataset\.expenseView\) openExpenseReadView\(expense\);\n\s*else openExpenseModal\(expense\);/);
 });
 
 test('Keine Gruppe mit `budget: read`: der Titel bleibt, „Erstelle eine Gruppe" geht', () => {
@@ -627,7 +643,7 @@ test('der Riegel haengt in der ERFASSUNGSPHASE am Panel', () => {
     /querySelector\('#budget-body'\)\?\.addEventListener\('click', readOnlyLatch, true\)/);
 });
 
-test('der delegierte Listen-Handler fragt VOR der ersten Aktion, und der Zeilen-Klick fragt mit', () => {
+test('der delegierte Listen-Handler fragt VOR der ersten Aktion, und der Zeilen-Klick fuehrt ueber den Einstieg', () => {
   const body = fn(BUDGET_CODE, 'renderBody');
   const start = body.indexOf("querySelector('#budget-list')?.addEventListener('click'");
   assert.ok(start > 0, 'der Listen-Handler ist nicht mehr da');
@@ -637,8 +653,9 @@ test('der delegierte Listen-Handler fragt VOR der ersten Aktion, und der Zeilen-
   const riegel = handler.indexOf('if (action && readOnly() && !READ_SAFE_ACTIONS.has(action.dataset.action)) return;');
   const ersteAktion = handler.indexOf('[data-action="delete"]');
   assert.ok(riegel > 0 && ersteAktion > 0 && riegel < ersteAktion, 'der Riegel steht hinter dem Loeschen');
-  assert.match(handler, /if \(item && !action && !readOnly\(\)\) \{/,
-    'ein Klick auf die Zeile oeffnet den Bearbeiten-Dialog - bei read nicht');
+  // Der Zeilen-Klick geht an openBudgetModal - und DER verzweigt bei `read`
+  // in die Leseansicht (Test unten), wie openNoteModal in P1.
+  assert.match(handler, /if \(item && !action\) \{\n[^\n]*\n\s*if \(entry\) openBudgetModal\(\{ mode: 'edit', entry \}\);/);
 });
 
 test('Kopfknopf und FAB: der Anlege-Handler fragt selbst, obwohl CSS beide ausblendet', () => {
@@ -652,13 +669,13 @@ test('Kopfknopf und FAB: der Anlege-Handler fragt selbst, obwohl CSS beide ausbl
 
 test('jeder Einstieg in einen Schreibweg fragt selbst noch einmal', () => {
   const faelle = [
-    [BUDGET_CODE, ['openBudgetModal', 'openAccountModal', 'openLoanModal', 'openConfirmBookingModal',
+    [BUDGET_CODE, ['openAccountModal', 'openLoanModal', 'openConfirmBookingModal',
       'openCategoryManager', 'openLoanPaymentEntry', 'saveLoanFromPanel', 'markLoanPayment',
       'deleteLoan', 'deleteLoanPayment', 'deleteEntry', 'deleteEntrySeries']],
     [PLANS_CODE, ['wire', 'openAddPlan', 'openPlanEditor', 'savePlan', 'deletePlan']],
-    [ABOS_CODE, ['openSubscriptionModal', 'saveSubscription', 'renewSubscription', 'deleteSubscription',
+    [ABOS_CODE, ['saveSubscription', 'renewSubscription', 'deleteSubscription',
       'openSettingsModal', 'openMetadataModal']],
-    [SPLIT_CODE, ['archiveGroup', 'restoreGroup', 'deleteGroup', 'openGroupModal', 'openExpenseModal',
+    [SPLIT_CODE, ['archiveGroup', 'restoreGroup', 'deleteGroup', 'openGroupModal',
       'openSettlementModal', 'openMemberModal', 'openGuestModal']],
   ];
   for (const [code, namen] of faelle) {
@@ -667,6 +684,18 @@ test('jeder Einstieg in einen Schreibweg fragt selbst noch einmal', () => {
       const riegel = koerper.indexOf('if (readOnly()) return;');
       assert.ok(riegel >= 0 && riegel < 140, `${name}() fragt nicht (oder zu spaet) nach dem Recht`);
     }
+  }
+  // Die drei Editor-Einstiege eines Datensatzes fragen AUCH - und verzweigen
+  // dabei in die Leseansicht, statt nur abzubrechen (P1: openNoteModal).
+  for (const [code, name, zweig] of [
+    [BUDGET_CODE, 'openBudgetModal', "if (mode === 'edit' && entry) openEntryReadView(entry);"],
+    [ABOS_CODE, 'openSubscriptionModal', 'if (subscription) openSubscriptionReadView(subscription);'],
+    [SPLIT_CODE, 'openExpenseModal', 'if (expense?.id) openExpenseReadView(expense);'],
+  ]) {
+    const koerper = fn(code, name);
+    const riegel = koerper.indexOf('if (readOnly()) {');
+    assert.ok(riegel >= 0 && riegel < 140, `${name}() fragt nicht (oder zu spaet) nach dem Recht`);
+    assert.ok(koerper.indexOf(zweig) > riegel, `${name}() oeffnet bei read keine Leseansicht`);
   }
 });
 
@@ -734,11 +763,218 @@ test('reduzierte Bewegung schlaegt die Hover-Regel des Sparziels weiterhin', () 
   assert.ok(regeln.indexOf(ausnahme[0]) > regeln.indexOf(basis[0]), 'die Ausnahme muss DANACH stehen');
 });
 
-test('die Buchungszeile ohne Bearbeiten traegt keinen Zeiger', () => {
-  const zeiger = regeln.findIndex((r) => r.selector.trim() === '.budget-entry' && /cursor:\s*pointer/.test(r.body));
-  const statisch = regeln.findIndex((r) => r.selector.trim() === '.budget-entry--static' && /cursor:\s*default/.test(r.body));
-  assert.ok(zeiger >= 0 && statisch >= 0);
-  assert.ok(statisch > zeiger, 'gleiche Spezifitaet: die Ausnahme muss DANACH stehen');
+// -------------------------------------------------------------------------
+// Leseansichten (#1265 P7, Regel vom 21.09.): ein Datensatz oeffnet bei `read`
+// alles, was sein Editor zeigt - und bietet dabei keine einzige Handlung an.
+// Die Bauart aus P1: der Einstieg in den Editor verzweigt (openNoteModal ->
+// openNoteReadModal), gezeichnet mit der geteilten Leseansicht ohne `edit` und
+// ohne `actions` (wie die Kontakt-Detailansicht bei `contacts: read`).
+// -------------------------------------------------------------------------
+
+function detailOptionen(fn) {
+  const vorher = globalThis.__openDetailView;
+  let letzte = null;
+  globalThis.__openDetailView = (opts) => { letzte = opts; };
+  try { fn(); } finally {
+    if (vorher === undefined) delete globalThis.__openDetailView;
+    else globalThis.__openDetailView = vorher;
+  }
+  return letzte;
+}
+
+function modalOptionen(fn) {
+  const vorher = globalThis.__openModal;
+  let letzte = null;
+  globalThis.__openModal = (opts) => { letzte = opts; };
+  try { fn(); } finally {
+    if (vorher === undefined) delete globalThis.__openModal;
+    else globalThis.__openModal = vorher;
+  }
+  return letzte;
+}
+
+/** Die Zeilen als { Beschriftung: Wert oder Knoten } - leere fallen weg wie in detailRowEl. */
+function zeilen(sections) {
+  const out = {};
+  for (const s of sections) {
+    if (!s || s.hidden) continue;
+    if (s.node) out[s.label] = s.node;
+    else if (typeof s.value === 'string' && s.value.trim()) out[s.label] = s.value;
+  }
+  return out;
+}
+
+/** Eine Leseansicht bietet nichts an: kein „Bearbeiten" im Kopf, keine Fusszeile. */
+function keineHandlung(opts, wer) {
+  assert.ok(opts, `${wer}: die Leseansicht geht auf`);
+  assert.equal(opts.edit ?? null, null, `${wer}: kein „Bearbeiten" im Kopf`);
+  assert.equal((opts.actions ?? []).length, 0, `${wer}: keine Fusszeilen-Aktion`);
+}
+
+const beleg = { document_id: 5, name: 'Rechnung.pdf', mime_type: 'application/pdf' };
+const belegDocx = {
+  document_id: 6, name: 'Vertrag.docx',
+  mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+};
+
+test('Buchung bei `budget: read`: der Einstieg oeffnet die Leseansicht, nicht den Editor', () => {
+  const eintrag = buchung({ attachments: [beleg] });
+  const lesend = withAccess({ budget: 'read' }, () => detailOptionen(() => budget.openBudgetModal({ mode: 'edit', entry: eintrag })));
+  keineHandlung(lesend, 'Buchung');
+  assert.equal(lesend.title, 'Stromabschlag');
+  assert.equal(withAccess({ budget: 'read' }, () => modalOptionen(() => budget.openBudgetModal({ mode: 'edit', entry: eintrag }))), null,
+    'kein Editor daneben');
+  // Anlegen fuehrt bei `read` nirgends hin - weder Editor noch Leseansicht.
+  assert.equal(withAccess({ budget: 'read' }, () => detailOptionen(() => budget.openBudgetModal({ mode: 'create' }))), null);
+  assert.equal(withAccess({ budget: 'read' }, () => modalOptionen(() => budget.openBudgetModal({ mode: 'create' }))), null);
+});
+
+test('Leseansicht einer Buchung: Unterkategorie, Konto, Sichtbarkeit, Wiederholung und Belege', () => {
+  const vorher = { budgetMode: budget.state.budgetMode, meta: budget.state.meta, accounts: budget.state.accounts };
+  Object.assign(budget.state, {
+    budgetMode: 'personal',
+    accounts: [{ id: 4, name: 'Girokonto' }],
+    meta: { expenseCategories: [{ key: 'housing', name: 'Wohnen' }], incomeCategories: [], subcategories: { housing: [{ key: 'power', name: 'Strom' }] } },
+  });
+  const eintrag = buchung({
+    subcategory: 'power', account_id: 4, visibility: 'private',
+    recurrence_interval: 'monthly', recurrence_interval_count: 1, recurrence_confirm: 1,
+    attachments: [beleg, belegDocx],
+  });
+  try {
+    withAccess({ budget: 'read', documents: 'read' }, () => {
+      const z = zeilen(budget.entryReadSections(eintrag));
+      assert.match(z['budget.amountLabel'], /84[.,]50/);
+      assert.equal(z['budget.detailDateLabel'], '2026-06-03');
+      assert.equal(z['budget.subcategoryLabel'], 'Strom');
+      assert.equal(z['budget.accountLabel'], 'Girokonto');
+      assert.equal(z['budget.visibilityLabel'], 'budget.visibility_private');
+      assert.equal(z['budget.responsibleLabel'], 'Emma');
+      assert.equal(z['budget.recurringLabel'], 'budget.intervalMonthly · budget.confirmFirstLabel');
+      // Die Belege: je einer ein Link, vorschaubar -> /preview, sonst /download.
+      const links = z['budget.receiptsLabel'].childNodes;
+      assert.equal(links.length, 2);
+      assert.equal(links[0].href, '/api/v1/documents/5/preview');
+      assert.equal(links[1].href, '/api/v1/documents/6/download');
+      assert.equal(links[0].rel, 'noopener noreferrer');
+    });
+    // Die Belege gehoeren dem Dokumente-Modul: ohne dessen Leserecht keine Zeile.
+    withAccess({ budget: 'read', documents: 'none' }, () => {
+      const z = zeilen(budget.entryReadSections(eintrag));
+      assert.equal(z['budget.receiptsLabel'], undefined);
+      assert.equal(z['budget.subcategoryLabel'], 'Strom', 'der Rest der Ansicht bleibt');
+    });
+    // Die Antwort folgt dem Datensatz: was nicht gesetzt ist, steht nicht da.
+    budget.state.budgetMode = 'shared';
+    withAccess({ budget: 'read' }, () => {
+      const z = zeilen(budget.entryReadSections(buchung({ is_recurring: 0, attachments: [], responsible_users: [] })));
+      for (const leer of ['budget.subcategoryLabel', 'budget.accountLabel', 'budget.visibilityLabel',
+        'budget.responsibleLabel', 'budget.recurringLabel', 'budget.receiptsLabel']) {
+        assert.equal(z[leer], undefined, `${leer} ohne Wert`);
+      }
+    });
+  } finally { Object.assign(budget.state, vorher); }
+});
+
+test('Abo bei `budget: read`: Leseansicht mit Beschreibung, Kategorie, Konto und Notiz - ohne Handlung', () => {
+  const eintrag = abo({
+    description: 'Premium', category_id: 2, category_name: 'Streaming', payment_method_id: 1,
+    payment_method_name: 'Kreditkarte', account_username: 'familie@example.org', notes: 'Familienabo',
+  });
+  const lesend = withAccess({ budget: 'read' }, () => detailOptionen(() => abos.openSubscriptionModal(eintrag)));
+  keineHandlung(lesend, 'Abo');
+  assert.equal(lesend.title, 'Streamingdienst');
+  const z = zeilen(lesend.sections);
+  assert.match(z['subscriptions.detailAmountLabel'], /12[.,]99/);
+  assert.equal(z['subscriptions.descriptionLabel'], 'Premium');
+  assert.equal(z['subscriptions.categoryLabel'], 'Streaming');
+  assert.equal(z['subscriptions.paymentMethodLabel'], 'Kreditkarte');
+  assert.equal(z['subscriptions.accountUsernameLabel'], 'familie@example.org');
+  assert.equal(z['subscriptions.notesLabel'], 'Familienabo');
+  assert.ok(z['subscriptions.billingCycleLabel'] && z['subscriptions.detailNextPaymentLabel']);
+  assert.equal(withAccess({ budget: 'read' }, () => modalOptionen(() => abos.openSubscriptionModal(eintrag))), null,
+    'kein Editor daneben');
+  assert.equal(withAccess({ budget: 'read' }, () => detailOptionen(() => abos.openSubscriptionModal())), null,
+    'Anlegen fuehrt nirgends hin');
+  // Und ohne Kategorie, Konto und Notiz stehen diese Zeilen nicht da.
+  const leer = withAccess({ budget: 'read' }, () => zeilen(abos.subscriptionReadSections(abo())));
+  for (const k of ['subscriptions.categoryLabel', 'subscriptions.accountUsernameLabel', 'subscriptions.notesLabel']) {
+    assert.equal(leer[k], undefined, `${k} ohne Wert`);
+  }
+});
+
+const ausgabe = {
+  id: 40, title: 'Ferienwohnung', amount: 600, currency: 'EUR', payer_name: 'Alex',
+  expense_date: '2026-08-02', split_method: 'exact', description: 'Anzahlung', attachments: [beleg],
+  splits: [
+    { user_id: 1, display_name: 'Alex', amount: 400, currency: 'EUR' },
+    { user_id: 3, display_name: 'Emma', amount: 200, currency: 'EUR' },
+  ],
+};
+
+test('Ausgabe bei `budget: read`: Aufteilung, Anteile, Notiz und Beleg - ohne Handlung', () => {
+  const lesend = withAccess({ budget: 'read', documents: 'read' }, () => detailOptionen(() => split.openExpenseModal(ausgabe)));
+  keineHandlung(lesend, 'Ausgabe');
+  assert.equal(lesend.title, 'Ferienwohnung');
+  const z = zeilen(lesend.sections);
+  assert.equal(z['splitExpenses.paidBy'], 'Alex');
+  assert.equal(z['splitExpenses.splitMethod'], 'splitExpenses.splitExact');
+  assert.match(z['splitExpenses.participants'], /^Alex: 400[.,]00[^\n]*\nEmma: 200[.,]00/);
+  assert.equal(z['splitExpenses.notes'], 'Anzahlung');
+  assert.equal(z['splitExpenses.receiptsLabel'].childNodes[0].href, '/api/v1/documents/5/preview');
+  withAccess({ budget: 'read', documents: 'none' }, () => (
+    assert.equal(zeilen(split.expenseReadSections(ausgabe))['splitExpenses.receiptsLabel'], undefined)));
+  assert.equal(withAccess({ budget: 'read' }, () => modalOptionen(() => split.openExpenseModal(ausgabe))), null,
+    'kein Editor daneben');
+  // Die Uebergabe aus dem Budget ist eine NEUE Ausgabe - bei `read` fuehrt sie nirgends hin.
+  assert.equal(withAccess({ budget: 'read' }, () => detailOptionen(() => split.openExpenseModal(null, { title: 'Wasser' }))), null);
+});
+
+test('das Paar dazu: mit Schreibrecht oeffnen dieselben drei Einstiege den Editor, keine Leseansicht', () => {
+  const vorherBudget = budget.state.month;
+  const vorherSplit = { ...split.state };
+  budget.state.month = '2026-06';
+  Object.assign(split.state, { activeGroupId: 2, groups: [{ id: 2, default_currency: 'EUR' }], meta: { currencies: ['EUR'] } });
+  try {
+    for (const [wer, oeffnen] of [
+      ['Buchung', () => budget.openBudgetModal({ mode: 'edit', entry: buchung({ attachments: [] }) })],
+      ['Abo', () => abos.openSubscriptionModal(abo())],
+      ['Ausgabe', () => split.openExpenseModal({ ...ausgabe, attachments: [] })],
+    ]) {
+      withAccess({ budget: 'write' }, () => {
+        let lesen = null;
+        const editor = modalOptionen(() => { lesen = detailOptionen(oeffnen); });
+        assert.ok(editor, `${wer}: mit Schreibrecht geht der Editor auf`);
+        assert.equal(lesen, null, `${wer}: und keine Leseansicht`);
+      });
+    }
+  } finally {
+    budget.state.month = vorherBudget;
+    Object.assign(split.state, vorherSplit);
+  }
+});
+
+test('Darlehensbericht: Konto, erster Faelligkeitsmonat, Zinsmodell und Notiz aus dem Dialog', () => {
+  mitKonten([konto()], () => {
+    const html = budget.loanReportDetails(darlehen({
+      account_id: 4, start_month: '2026-01', notes: 'Sondertilgung <jaehrlich>',
+      interest: { mode: 'fixed', fixed_rate: 3.2, initial_repayment_rate: 2, monthly_payment: 850 },
+    }));
+    assert.match(html, /budget\.loanAccountLabel<\/span><strong>Girokonto</);
+    assert.match(html, /budget\.loanDetailStartMonthLabel/);
+    assert.match(html, /budget\.loanInitialRepaymentLabel<\/span><strong>2</);
+    assert.match(html, /class="loan-report__cell--wide"><span>budget\.loanInterestModeLabel/);
+    assert.match(html, /Sondertilgung &lt;jaehrlich&gt;/, 'die Notiz geht durch esc()');
+    assert.doesNotMatch(html, /<button/);
+    assert.equal(budget.loanReportDetails(darlehen()), '', 'ohne Angaben keine leere Kachelreihe');
+  });
+});
+
+test('der Darlehensbericht haengt nicht an `.budget-page` - er ist ein Modal (#1347)', () => {
+  const breit = regeln.filter((r) => r.selector.includes('loan-report__cell--wide'));
+  assert.ok(breit.length >= 1);
+  for (const r of breit) assert.ok(!r.selector.includes('.budget-page'), r.selector);
+  assert.ok(breit.some((r) => /grid-column:\s*1\s*\/\s*-1/.test(r.body)));
 });
 
 test.after(() => miniDomAbraeumen());

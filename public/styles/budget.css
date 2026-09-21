@@ -1120,6 +1120,20 @@
   margin-bottom: var(--space-0h);
 }
 
+/* Die Angaben aus dem Darlehens-Dialog (#1265 P7). Zinsmodell und Notiz sind
+ * Saetze, keine Kennzahlen: sie nehmen die ganze Breite, und die Notiz behaelt
+ * ihre Zeilenumbrueche. Bewusst NICHT unter `.budget-page`: der Bericht ist ein
+ * Modal und steht ausserhalb der Seite (#1347). */
+.loan-report__cell--wide {
+  grid-column: 1 / -1;
+}
+
+.loan-report__cell--wide strong {
+  font-weight: var(--font-weight-regular);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .budget-page .form-grid-2 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1330,14 +1344,6 @@
  */
 .budget-entry {
   cursor: pointer;
-}
-
-/* Bei `budget: read` oeffnet die Zeile nichts - der Bearbeiten-Dialog ist der
- * Schreibweg (#1265 P7). Ein Zeiger verspraeche genau den. Eine eigene Regel
- * NACH der obigen mit gleicher Spezifitaet, keine Gegenregel am Hover: den
- * Zeilen-Hover traegt `.list-row` app-weit, auch fuer die maskierte Zeile. */
-.budget-entry--static {
-  cursor: default;
 }
 
 .budget-entry:focus-visible {

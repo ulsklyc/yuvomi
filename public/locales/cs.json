@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Pro tuto osobu není žádný záznam",
         "responsibleFilterEmptyDescription": "V tomto měsíci nikdo neodpovídá za záznam v tomto výběru.",
         "handoverToSplit": "Převést do sdílených výdajů",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (plán: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (plán: {{plan}})",
+        "detailDateLabel": "Datum",
+        "loanDetailStartMonthLabel": "První měsíc splatnosti"
     },
     "settings": {
         "healthCycleEnableLabel": "Zobrazit kartu cyklu",
@@ -3976,7 +3978,9 @@
         "endsAfter": "Zbývá {{count}} plateb",
         "logoTypeError": "Použijte prosím obrázek ve formátu PNG, JPEG, WebP nebo SVG.",
         "accountUsernameLabel": "Registrováno na",
-        "accountUsernameHint": "E-mailová adresa nebo uživatelské jméno. Není to pole pro heslo - Yuvomi hesla neukládá."
+        "accountUsernameHint": "E-mailová adresa nebo uživatelské jméno. Není to pole pro heslo - Yuvomi hesla neukládá.",
+        "detailAmountLabel": "Částka",
+        "detailNextPaymentLabel": "Další platba"
     },
     "health": {
         "fasting": {

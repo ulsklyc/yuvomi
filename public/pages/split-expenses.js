@@ -5,7 +5,8 @@
 
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
-import { renderDocumentAttachField, bindDocumentAttachField } from '/components/document-attach.js';
+import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
+import { openDetailView } from '/components/detail-view.js';
 import { t, formatDate, getLocale, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { stagger } from '/utils/ux.js';
@@ -465,14 +466,18 @@ function renderMain() {
   const settleButton = main.querySelector('#split-settle');
   if (settleButton) settleButton.disabled = state.expenses.length === 0;
   main.querySelector('#split-invite')?.addEventListener('click', () => openMemberModal());
-  if (!archived && !ro) {
-    main.querySelector('#split-expense-list')?.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-expense-id]');
-      if (!btn) return;
-      const expense = state.expenses.find((item) => item.id === Number(btn.dataset.expenseId));
-      if (expense) openExpenseModal(expense);
-    });
-  }
+  main.querySelector('#split-expense-list')?.addEventListener('click', (e) => {
+    // Zwei Wege, je nach Markup: `data-expense-view` liest (Archiv und
+    // `budget: read`), `data-expense-id` bearbeitet. Den zweiten gibt es bei
+    // `read` gar nicht - und fragt openExpenseModal() trotzdem, verzweigt es
+    // selbst in die Leseansicht.
+    const btn = e.target.closest('[data-expense-view], [data-expense-id]');
+    if (!btn) return;
+    const expense = state.expenses.find((item) => item.id === Number(btn.dataset.expenseView ?? btn.dataset.expenseId));
+    if (!expense) return;
+    if (btn.dataset.expenseView) openExpenseReadView(expense);
+    else openExpenseModal(expense);
+  });
   stagger(main.querySelectorAll('.split-expense, .split-debt, .split-activity-item'));
 }
 
@@ -507,9 +512,16 @@ function renderExpenses(asList = false) {
       </div>
       <div class="split-expense__amount">${money(expense.amount, expense.currency)}</div>
     `;
-    // Im Archiv bleibt der Eintrag ein reiner Listeneintrag - ein Button würde
-    // eine Bearbeiten-Aktion versprechen, die es dort nicht gibt.
-    if (asList) return `<div class="split-expense">${body}</div>`;
+    // Im Archiv und bei `budget: read` oeffnet der Eintrag die LESEANSICHT
+    // (#1265 P7), nicht das Bearbeiten - deshalb nennt sein Name dort keine
+    // Handlung, der Inhalt (Titel, Zahler, Datum, Betrag) sagt, was er ist.
+    if (asList) {
+      return `
+      <button type="button" class="split-expense" data-expense-view="${expense.id}">
+        ${body}
+      </button>
+    `;
+    }
     return `
       <button type="button" class="split-expense" data-expense-id="${expense.id}" aria-label="${esc(expense.title)} - ${t('splitExpenses.editExpense')}">
         ${body}
@@ -1001,8 +1013,50 @@ async function openGroupModal(group = null) {
   });
 }
 
+/**
+ * Die Zeilen der Leseansicht einer Ausgabe (#1265 P7): was der
+ * Bearbeiten-Dialog zeigt - Betrag, Zahler, Datum, die Aufteilung samt Anteil
+ * jeder Person, Notizen und Belege. Die Belege gehoeren dem Dokumente-Modul und
+ * fragen dessen Recht (`attachmentLinksNode`); leere Zeilen fallen weg.
+ */
+function expenseReadSections(expense) {
+  const method = expense.split_method || 'equal';
+  const shares = (expense.splits || [])
+    .map((split) => `${split.display_name || ''}: ${money(split.amount, split.currency || expense.currency)}`)
+    .join('\n');
+  return [
+    { icon: 'banknote', label: t('splitExpenses.amount'), value: money(expense.amount, expense.currency) },
+    { icon: 'user', label: t('splitExpenses.paidBy'), value: expense.payer_name || '' },
+    { icon: 'calendar', label: t('splitExpenses.date'), value: expense.expense_date ? formatDate(expense.expense_date) : '' },
+    { icon: 'split', label: t('splitExpenses.splitMethod'),
+      value: t(`splitExpenses.split${method.charAt(0).toUpperCase()}${method.slice(1)}`) },
+    { icon: 'users', label: t('splitExpenses.participants'), value: shares, multiline: true },
+    { icon: 'sticky-note', label: t('splitExpenses.notes'), value: expense.description || '', multiline: true },
+    { icon: 'receipt', label: t('splitExpenses.receiptsLabel'), node: attachmentLinksNode(expense.attachments) },
+  ];
+}
+
+/**
+ * Die Ausgabe in der Leseansicht: bei `budget: read` und im Archiv. Dieselbe
+ * Bauart wie Buchung und Abo (P1-Muster, geteilte Leseansicht ohne `edit` und
+ * ohne `actions`).
+ */
+function openExpenseReadView(expense) {
+  return openDetailView({
+    title: expense.title,
+    accentColor: 'var(--module-budget)',
+    size: 'sm',
+    sections: expenseReadSections(expense),
+  });
+}
+
 function openExpenseModal(expense = null, prefill = null) {
-  if (readOnly()) return;
+  // Der Riegel steht VOR jeder Vorbereitung: der Anlegeweg (auch die Uebergabe
+  // aus dem Budget) entfaellt, eine bestehende Ausgabe geht als Leseansicht auf.
+  if (readOnly()) {
+    if (expense?.id) openExpenseReadView(expense);
+    return;
+  }
   if (!state.activeGroupId) return openGroupModal();
   const group = state.groups.find((g) => g.id === state.activeGroupId);
   const isEdit = Boolean(expense && expense.id);
@@ -1340,7 +1394,7 @@ function openGuestModal() {
  * den Seitencontainer; der Griff laesst den echten Pfad laufen.
  */
 export const __test = {
-  readOnly, renderExpenses, state,
+  readOnly, renderExpenses, state, expenseReadSections, openExpenseModal,
   renderMainForTest(container) { _container = container; renderMain(); },
   renderGroupsForTest(container) { _container = container; renderGroups(); },
 };

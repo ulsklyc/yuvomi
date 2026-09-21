@@ -1564,7 +1564,9 @@
         "responsibleFilterEmptyTitle": "Walang entry para sa taong ito",
         "responsibleFilterEmptyDescription": "Walang responsable sa anumang entry ngayong buwan sa piniling ito.",
         "handoverToSplit": "Ilipat sa shared expenses",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (plano: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (plano: {{plan}})",
+        "detailDateLabel": "Petsa",
+        "loanDetailStartMonthLabel": "Unang buwan ng taning"
     },
     "settings": {
         "healthCycleEnableLabel": "Ipakita ang tab ng siklo",
@@ -3976,7 +3978,9 @@
         "endsAfter": "{{count}} bayad na lang ang natitira",
         "logoTypeError": "Gumamit ng larawang PNG, JPEG, WebP o SVG.",
         "accountUsernameLabel": "Nakarehistro sa",
-        "accountUsernameHint": "Email address o username. Hindi ito password field - hindi nag-iimbak ng password ang Yuvomi."
+        "accountUsernameHint": "Email address o username. Hindi ito password field - hindi nag-iimbak ng password ang Yuvomi.",
+        "detailAmountLabel": "Halaga",
+        "detailNextPaymentLabel": "Susunod na bayad"
     },
     "health": {
         "fasting": {

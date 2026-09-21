@@ -1564,7 +1564,9 @@
         "responsibleFilterEmptyTitle": "موردی برای این شخص نیست",
         "responsibleFilterEmptyDescription": "در این ماه هیچ‌کس در این گزینش مسئول موردی نیست.",
         "handoverToSplit": "انتقال به هزینه‌های مشترک",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (طرح: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (طرح: {{plan}})",
+        "detailDateLabel": "تاریخ",
+        "loanDetailStartMonthLabel": "اولین ماه سررسید"
     },
     "settings": {
         "healthCycleEnableLabel": "نمایش برگهٔ چرخه",
@@ -3976,7 +3978,9 @@
         "endsAfter": "{{count}} پرداخت باقی‌مانده",
         "logoTypeError": "لطفاً از تصویر PNG، JPEG، WebP یا SVG استفاده کنید.",
         "accountUsernameLabel": "ثبت‌شده با",
-        "accountUsernameHint": "نشانی رایانامه یا نام کاربری. این قسمت گذرواژه نیست - Yuvomi گذرواژه ذخیره نمی‌کند."
+        "accountUsernameHint": "نشانی رایانامه یا نام کاربری. این قسمت گذرواژه نیست - Yuvomi گذرواژه ذخیره نمی‌کند.",
+        "detailAmountLabel": "مبلغ",
+        "detailNextPaymentLabel": "پرداخت بعدی"
     },
     "health": {
         "fasting": {

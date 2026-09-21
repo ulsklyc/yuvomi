@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Nessuna registrazione per questa persona",
         "responsibleFilterEmptyDescription": "Nessuno è responsabile di una registrazione in questo mese con questa selezione.",
         "handoverToSplit": "Passa alle spese condivise",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (piano: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (piano: {{plan}})",
+        "detailDateLabel": "Data",
+        "loanDetailStartMonthLabel": "Primo mese di scadenza"
     },
     "settings": {
         "healthCycleEnableLabel": "Mostra la scheda ciclo",
@@ -3976,7 +3978,9 @@
         "endsAfter": "Ancora {{count}} pagamenti",
         "logoTypeError": "Usa un'immagine PNG, JPEG, WebP o SVG.",
         "accountUsernameLabel": "Registrato con",
-        "accountUsernameHint": "Indirizzo e-mail o nome utente. Non è un campo per password: Yuvomi non memorizza password."
+        "accountUsernameHint": "Indirizzo e-mail o nome utente. Non è un campo per password: Yuvomi non memorizza password.",
+        "detailAmountLabel": "Importo",
+        "detailNextPaymentLabel": "Prossimo pagamento"
     },
     "health": {
         "fasting": {

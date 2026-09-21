@@ -1564,7 +1564,9 @@
         "responsibleFilterEmptyTitle": "Brak wpisów dla tej osoby",
         "responsibleFilterEmptyDescription": "W tym miesiącu nikt nie odpowiada za wpis w tym wyborze.",
         "handoverToSplit": "Przenieś do wydatków wspólnych",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (wg planu: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (wg planu: {{plan}})",
+        "detailDateLabel": "Data",
+        "loanDetailStartMonthLabel": "Pierwszy miesiąc płatności"
     },
     "settings": {
         "healthCycleEnableLabel": "Pokaż kartę cyklu",
@@ -3976,7 +3978,9 @@
         "endsAfter": "Pozostało {{count}} płatności",
         "logoTypeError": "Proszę użyć pliku PNG, JPEG, WebP lub SVG.",
         "accountUsernameLabel": "Zarejestrowano na",
-        "accountUsernameHint": "Adres e-mail lub nazwa użytkownika. To nie jest pole hasła - Yuvomi nie przechowuje haseł."
+        "accountUsernameHint": "Adres e-mail lub nazwa użytkownika. To nie jest pole hasła - Yuvomi nie przechowuje haseł.",
+        "detailAmountLabel": "Kwota",
+        "detailNextPaymentLabel": "Następna płatność"
     },
     "health": {
         "fasting": {

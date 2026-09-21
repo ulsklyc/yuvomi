@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "No entry for this person",
         "responsibleFilterEmptyDescription": "Nobody is responsible for an entry in this month under this selection.",
         "handoverToSplit": "Move to Split Expenses",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (plan: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (plan: {{plan}})",
+        "detailDateLabel": "Date",
+        "loanDetailStartMonthLabel": "First due month"
     },
     "settings": {
         "healthCycleEnableLabel": "Show cycle tab",
@@ -3976,7 +3978,9 @@
         "endsAfter": "{{count}} payments left",
         "logoTypeError": "Use a PNG, JPEG, WebP or SVG image.",
         "accountUsernameLabel": "Registered under",
-        "accountUsernameHint": "E-mail address or username. Not a password field - Yuvomi does not store passwords."
+        "accountUsernameHint": "E-mail address or username. Not a password field - Yuvomi does not store passwords.",
+        "detailAmountLabel": "Amount",
+        "detailNextPaymentLabel": "Next payment"
     },
     "health": {
         "fasting": {

@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Geen boeking voor deze persoon",
         "responsibleFilterEmptyDescription": "Niemand is deze maand verantwoordelijk voor een boeking binnen deze selectie.",
         "handoverToSplit": "Naar gedeelde uitgaven",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (volgens plan: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (volgens plan: {{plan}})",
+        "detailDateLabel": "Datum",
+        "loanDetailStartMonthLabel": "Eerste vervaldatum"
     },
     "settings": {
         "healthCycleEnableLabel": "Cyclustabblad tonen",
@@ -3976,7 +3978,9 @@
         "endsAfter": "Nog {{count}} betalingen",
         "logoTypeError": "Gebruik een PNG-, JPEG-, WebP- of SVG-afbeelding.",
         "accountUsernameLabel": "Geregistreerd op",
-        "accountUsernameHint": "E-mailadres of gebruikersnaam. Geen wachtwoordveld - Yuvomi bewaart geen wachtwoorden."
+        "accountUsernameHint": "E-mailadres of gebruikersnaam. Geen wachtwoordveld - Yuvomi bewaart geen wachtwoorden.",
+        "detailAmountLabel": "Bedrag",
+        "detailNextPaymentLabel": "Volgende betaling"
     },
     "health": {
         "fasting": {

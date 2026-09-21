@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "لا توجد قيود لهذا الشخص",
         "responsibleFilterEmptyDescription": "لا أحد مسؤول عن أي قيد هذا الشهر ضمن هذا التحديد.",
         "handoverToSplit": "نقل إلى النفقات المشتركة",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (الخطة: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (الخطة: {{plan}})",
+        "detailDateLabel": "التاريخ",
+        "loanDetailStartMonthLabel": "أول شهر استحقاق"
     },
     "settings": {
         "healthCycleEnableLabel": "إظهار علامة تبويب الدورة",
@@ -3976,7 +3978,9 @@
         "endsAfter": "المتبقّي: {{count}} دفعة",
         "logoTypeError": "استخدم صورة PNG أو JPEG أو WebP أو SVG.",
         "accountUsernameLabel": "مسجَّل باسم",
-        "accountUsernameHint": "عنوان بريد إلكتروني أو اسم مستخدم. ليس حقل كلمة مرور - لا يحفظ Yuvomi كلمات المرور."
+        "accountUsernameHint": "عنوان بريد إلكتروني أو اسم مستخدم. ليس حقل كلمة مرور - لا يحفظ Yuvomi كلمات المرور.",
+        "detailAmountLabel": "المبلغ",
+        "detailNextPaymentLabel": "الدفعة التالية"
     },
     "health": {
         "fasting": {
