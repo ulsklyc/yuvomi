@@ -2103,6 +2103,38 @@ test('Editor und Leseansicht nennen fuer jeden gespeicherten Wert dieselbe Erinn
   }
 });
 
+test('„Weitere Einstellungen" klappt fuer `null` auf wie fuer \'0\' - beide heissen „Am Tag selbst"', () => {
+  // Die Entscheidung trifft der Aufrufer; der Loader-Stub reicht die Optionen
+  // von `advancedSection()` nur mit diesem Haken heraus.
+  const aufgeklappt = (over) => {
+    let optionen = null;
+    const vorher = globalThis.__advancedSection;
+    globalThis.__advancedSection = (inner, opts) => { optionen = opts; return String(inner); };
+    try {
+      withAccess({ calendar: 'write' }, () => modalOptionen(() => birthdays.openBirthdayModal({
+        mode: 'edit', birthday: geburtstag({ notes: null, name_day: null, ...over }),
+      })));
+    } finally {
+      if (vorher === undefined) delete globalThis.__advancedSection;
+      else globalThis.__advancedSection = vorher;
+    }
+    assert.ok(optionen, 'der Editor baut „Weitere Einstellungen" ueber advancedSection()');
+    return optionen.open;
+  };
+
+  assert.equal(aufgeklappt({ reminder_offset: '0' }), true, '„Am Tag selbst" weicht von der Vorgabe ab');
+  assert.equal(aufgeklappt({ reminder_offset: null }), true, 'NULL heisst dasselbe und klappt genauso auf');
+  assert.equal(aufgeklappt({}), true, 'ein fehlendes Feld ebenso');
+
+  // Gegenfaelle: die Vorgabe eines neuen Geburtstags klappt nicht auf, „Keine"
+  // wie bisher auch nicht, jede andere Vorgabe schon - und die Notiz oeffnet
+  // unabhaengig von der Erinnerung.
+  assert.equal(aufgeklappt({ reminder_offset: '1440' }), false);
+  assert.equal(aufgeklappt({ reminder_offset: '' }), false);
+  assert.equal(aufgeklappt({ reminder_offset: '2880' }), true);
+  assert.equal(aufgeklappt({ reminder_offset: '1440', notes: 'Mag Kuchen' }), true);
+});
+
 test('Oeffnen und Speichern ohne Aenderung schreibt keine Erinnerung', async () => {
   const ohne = await geburtstagSpeichern(geburtstag({ reminder_offset: null }));
   assert.equal(ohne.method, 'put');

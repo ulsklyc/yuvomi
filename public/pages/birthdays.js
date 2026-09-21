@@ -97,6 +97,19 @@ function storedReminderOffset(birthday) {
   return birthday.reminder_offset ?? '0';
 }
 
+/**
+ * Klappt die Erinnerung „Weitere Einstellungen" auf? Ja, wenn sie von der
+ * Vorgabe eines neuen Geburtstags ('1440') abweicht - gemessen an dem, was die
+ * Auswahl zeigt, nicht am Rohwert: `null` und '0' heissen beide „Am Tag
+ * selbst" und klappen gleich auf (#1363). „Keine" ('') klappt wie bisher
+ * nicht auf.
+ */
+function reminderOpensAdvanced(birthday) {
+  if (!birthday) return false;
+  const shown = storedReminderOffset(birthday);
+  return shown !== '' && shown !== '1440';
+}
+
 function renderBirthdayReminderSection(birthday = null) {
   // Ein neuer Geburtstag beginnt bei „1 Tag vorher" und schreibt es beim Anlegen.
   const currentOffset = birthday ? storedReminderOffset(birthday) : '1440';
@@ -750,7 +763,7 @@ function openBirthdayModal({ mode, birthday = null }) {
             <textarea class="form-input" id="bd-notes" rows="3" placeholder="${t('birthdays.notesPlaceholder')}">${esc(birthday?.notes || '')}</textarea>
           </div>
           ${renderBirthdayReminderSection(birthday)}`,
-          { open: isEdit && (!!birthday?.name_day || !!birthday?.notes || (!!birthday?.reminder_offset && birthday.reminder_offset !== '1440')) })}
+          { open: isEdit && (!!birthday?.name_day || !!birthday?.notes || reminderOpensAdvanced(birthday)) })}
         <div class="birthday-modal__hint">${t('birthdays.calendarHint')}</div>
         <div class="birthday-modal__footer">
           ${isEdit ? `<button class="btn btn--danger" id="bd-delete">${t('common.delete')}</button>` : '<div></div>'}

@@ -126,7 +126,14 @@ const STUBS = {
       typeof globalThis.__askOverModal === 'function' ? globalThis.__askOverModal(ask) : ask()
     );
     export const selectModal = async () => null;
-    export const advancedSection = (inner = '') => String(inner);
+    // Wer wissen will, OB ein Abschnitt aufgeklappt aufgeht, setzt
+    // globalThis.__advancedSection und bekommt Inhalt UND Optionen - die
+    // Entscheidung trifft der Aufrufer, und hier kaeme sie sonst nie an.
+    export const advancedSection = (inner = '', options = {}) => (
+      typeof globalThis.__advancedSection === 'function'
+        ? globalThis.__advancedSection(inner, options)
+        : String(inner)
+    );
     export const wireBlurValidation = () => {};
     // Suiten, die pruefen wollen, WO ein Handler einen Fehler meldet (statt zu
     // speichern), setzen globalThis.__reportFieldError - dasselbe Muster wie
