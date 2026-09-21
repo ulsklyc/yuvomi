@@ -2978,6 +2978,8 @@
         "nameDayHint": "Usa o mesmo lembrete do aniversário.",
         "nameDayIncomplete": "Selecione o mês e o dia do dia do nome.",
         "reminderOnDay": "No próprio dia",
+        "reminderBefore": "{{duration}} antes",
+        "reminderAfterNoon": "{{duration}} depois do meio-dia",
         "nameDayCalendarEventTitle": "Dia do nome: {{name}}",
         "nameDayCalendarEventDescription": "Hoje é o dia do nome de {{name}}.",
         "photoLabel": "Foto de perfil",

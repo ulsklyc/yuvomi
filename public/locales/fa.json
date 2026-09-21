@@ -2963,6 +2963,8 @@
         "nameDayHint": "از همان یادآور تولد استفاده می‌کند.",
         "nameDayIncomplete": "ماه و روزِ روز نام را انتخاب کنید.",
         "reminderOnDay": "همان روز",
+        "reminderBefore": "{{duration}} قبل",
+        "reminderAfterNoon": "{{duration}} پس از ساعت ۱۲",
         "nameDayCalendarEventTitle": "روز نام: {{name}}",
         "nameDayCalendarEventDescription": "امروز روز نام {{name}} است.",
         "photoLabel": "عکس نمایه",

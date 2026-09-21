@@ -2963,6 +2963,8 @@
         "nameDayHint": "Menggunakan pengingat yang sama dengan ulang tahun.",
         "nameDayIncomplete": "Pilih bulan dan tanggal hari nama.",
         "reminderOnDay": "Pada hari-H",
+        "reminderBefore": "{{duration}} sebelumnya",
+        "reminderAfterNoon": "{{duration}} setelah pukul 12.00",
         "nameDayCalendarEventTitle": "Hari nama: {{name}}",
         "nameDayCalendarEventDescription": "Hari ini adalah hari nama {{name}}.",
         "photoLabel": "Foto profil",

@@ -94,7 +94,59 @@ const REMINDER_OFFSETS = () => [
  * Editor und Leseansicht lesen den Wert beide hier, damit sie dasselbe sagen.
  */
 function storedReminderOffset(birthday) {
-  return birthday.reminder_offset ?? '0';
+  if (birthday.reminder_offset == null) return '0';
+  const stored = String(birthday.reminder_offset);
+  if (REMINDER_OFFSETS().some((o) => o.value === stored)) return stored;
+  // Ein Wert, den die Liste nicht in DIESER Schreibweise fuehrt, aber in ihrer
+  // Wirkung („01440", "1440.0"), steht auf der Vorgabe, die dasselbe tut.
+  const preset = String(storedReminderMinutes(stored));
+  return REMINDER_OFFSETS().some((o) => o.value === preset) ? preset : stored;
+}
+
+/** Die Minuten vor 12:00, so wie `getOffsetMinutes()` sie aus dem Text liest. */
+function storedReminderMinutes(value) {
+  return Number.parseInt(value, 10) || 0;
+}
+
+/**
+ * Die Auswahl fuer DIESEN Geburtstag: die Vorgaben, und ein gespeicherter
+ * Wert, den keine Vorgabe kennt, als eigene Option (#1367).
+ *
+ * Solche Werte gibt es wirklich: von Mai bis Juli 2026 (bis v1.6.5) bot der
+ * Editor '15', '60' und '20160' an, und `POST`/`PUT /birthdays` nehmen jede
+ * Zahl an. Der Server erinnert dann genau so viele Minuten vor 12:00. Ohne
+ * eigene Option stand die Auswahl auf der ersten, „Keine" - das Gegenteil
+ * dessen, was geschieht. Die Option heisst nach ihrer Wirkung („2 Wochen
+ * vorher") und traegt den gespeicherten Wert unveraendert: wer nichts waehlt,
+ * schreibt nichts (#1363), und wer „Keine" waehlt, hat damit wirklich etwas
+ * geaendert.
+ */
+function birthdayReminderOptions(birthday) {
+  const options = REMINDER_OFFSETS();
+  const shown = birthday ? storedReminderOffset(birthday) : '1440';
+  if (options.some((o) => o.value === shown)) return options;
+  const custom = options.findIndex((o) => o.value === 'custom');
+  options.splice(custom, 0, { value: shown, label: unlistedReminderLabel(shown) });
+  return options;
+}
+
+/**
+ * Die Beschriftung eines Werts, den keine Vorgabe kennt: die Minuten in der
+ * groessten Einheit, die glatt aufgeht („2 Wochen", „90 Minuten"), mit Wort
+ * und Pluralform aus `formatUnit()` (#1365). Ein negativer Wert erinnert NACH
+ * 12:00 - so rechnet `birthdayReminderAt()`, und so steht er da.
+ */
+function unlistedReminderLabel(value) {
+  const minutes = storedReminderMinutes(value);
+  const abs = Math.abs(minutes);
+  const [amount, unit] = abs % 10080 === 0 ? [abs / 10080, 'week']
+    : abs % 1440 === 0 ? [abs / 1440, 'day']
+      : abs % 60 === 0 ? [abs / 60, 'hour']
+        : [abs, 'minute'];
+  const duration = formatUnit(amount, unit, { unitDisplay: 'long' });
+  return minutes < 0
+    ? t('birthdays.reminderAfterNoon', { duration })
+    : t('birthdays.reminderBefore', { duration });
 }
 
 /**
@@ -120,8 +172,8 @@ function renderBirthdayReminderSection(birthday = null) {
       <div class="form-group" style="margin:0">
         <label class="form-label" for="bd-reminder-offset">${t('reminders.offsetLabel')}</label>
         <select class="form-input birthday-modal__select" id="bd-reminder-offset">
-          ${REMINDER_OFFSETS().map((o) =>
-            `<option value="${o.value}" ${currentOffset === o.value ? 'selected' : ''}>${esc(o.label)}</option>`
+          ${birthdayReminderOptions(birthday).map((o) =>
+            `<option value="${esc(o.value)}" ${currentOffset === o.value ? 'selected' : ''}>${esc(o.label)}</option>`
           ).join('')}
         </select>
       </div>
@@ -625,8 +677,8 @@ const REMINDER_UNIT_TO_INTL = {
  * KEIN GESPEICHERTER WERT HEISST „AM TAG", wie im Editor. Bis #1363 schwieg die
  * Leseansicht hier, weil Editor („1 Tag vorher") und Server (am Tag selbst)
  * sich widersprachen; seit beide `storedReminderOffset()` folgen, nennt sie
- * dieselbe Angabe. Ein Wert, den keine Vorgabe kennt, bleibt ohne Zeile: die
- * Leseansicht schweigt, wo sie nichts Sicheres zu sagen hat.
+ * dieselbe Angabe. Ein Wert, den keine Vorgabe kennt, heisst wie seine Option
+ * im Editor („2 Wochen vorher", `birthdayReminderOptions()`, #1367).
  */
 function reminderReadText(birthday) {
   const offset = storedReminderOffset(birthday);
@@ -635,7 +687,7 @@ function reminderReadText(birthday) {
     const unit = REMINDER_UNIT_TO_INTL[birthday.reminder_custom_unit || 'days'] || 'minute';
     return formatUnit(amount, unit, { unitDisplay: 'long' });
   }
-  return REMINDER_OFFSETS().find((o) => o.value === offset)?.label ?? '';
+  return birthdayReminderOptions(birthday).find((o) => o.value === offset)?.label ?? '';
 }
 
 /**

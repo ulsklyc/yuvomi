@@ -3019,6 +3019,8 @@
         "nameDayHint": "Використовується те саме нагадування, що й для дня народження.",
         "nameDayIncomplete": "Виберіть місяць і день іменин.",
         "reminderOnDay": "У той самий день",
+        "reminderBefore": "Заздалегідь: {{duration}}",
+        "reminderAfterNoon": "Після полудня (+{{duration}})",
         "nameDayCalendarEventTitle": "Іменини: {{name}}",
         "nameDayCalendarEventDescription": "Сьогодні іменини у {{name}}.",
         "photoLabel": "Фото профілю",

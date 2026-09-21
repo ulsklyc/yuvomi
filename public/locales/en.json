@@ -2951,6 +2951,8 @@
         "nameDayHint": "Uses the same reminder as the birthday.",
         "nameDayIncomplete": "Select both the month and day of the name day.",
         "reminderOnDay": "On the day",
+        "reminderBefore": "{{duration}} before",
+        "reminderAfterNoon": "{{duration}} after midday",
         "photoLabel": "Profile picture",
         "photoOptional": "Optional: you can save without a profile picture.",
         "removePhoto": "Remove picture",

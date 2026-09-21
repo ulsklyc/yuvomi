@@ -2978,6 +2978,8 @@
         "nameDayHint": "जन्मदिन वाले ही रिमाइंडर का उपयोग करता है।",
         "nameDayIncomplete": "नाम दिवस का महीना और दिन दोनों चुनें।",
         "reminderOnDay": "उसी दिन",
+        "reminderBefore": "{{duration}} पहले",
+        "reminderAfterNoon": "दोपहर 12 बजे के {{duration}} बाद",
         "nameDayCalendarEventTitle": "नाम दिवस: {{name}}",
         "nameDayCalendarEventDescription": "आज {{name}} का नाम दिवस है।",
         "photoLabel": "प्रोफ़ाइल तस्वीर",

@@ -2978,6 +2978,8 @@
         "nameDayHint": "يستخدم التذكير نفسه المستخدم لعيد الميلاد.",
         "nameDayIncomplete": "اختر شهر ويوم الاسم.",
         "reminderOnDay": "في نفس اليوم",
+        "reminderBefore": "مسبقًا: {{duration}}",
+        "reminderAfterNoon": "بعد 12:00 (+{{duration}})",
         "nameDayCalendarEventTitle": "يوم الاسم: {{name}}",
         "nameDayCalendarEventDescription": "اليوم هو يوم اسم {{name}}.",
         "photoLabel": "الصورة الشخصية",

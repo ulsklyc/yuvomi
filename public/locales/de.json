@@ -2963,6 +2963,8 @@
         "nameDayHint": "Verwendet dieselbe Erinnerung wie der Geburtstag.",
         "nameDayIncomplete": "Bitte Monat und Tag des Namenstags auswählen.",
         "reminderOnDay": "Am Tag selbst",
+        "reminderBefore": "{{duration}} vorher",
+        "reminderAfterNoon": "{{duration}} nach 12 Uhr",
         "photoLabel": "Profilbild",
         "photoOptional": "Optional: Du kannst auch ohne Profilbild speichern.",
         "removePhoto": "Bild entfernen",

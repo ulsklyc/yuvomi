@@ -2978,6 +2978,8 @@
         "nameDayHint": "Använder samma påminnelse som födelsedagen.",
         "nameDayIncomplete": "Välj månad och dag för namnsdagen.",
         "reminderOnDay": "Samma dag",
+        "reminderBefore": "{{duration}} innan",
+        "reminderAfterNoon": "{{duration}} efter klockan 12",
         "nameDayCalendarEventTitle": "Namnsdag: {{name}}",
         "nameDayCalendarEventDescription": "I dag har {{name}} namnsdag.",
         "photoLabel": "Profilbild",

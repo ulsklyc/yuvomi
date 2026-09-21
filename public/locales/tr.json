@@ -2978,6 +2978,8 @@
         "nameDayHint": "Doğum günüyle aynı hatırlatıcıyı kullanır.",
         "nameDayIncomplete": "İsim gününün ayını ve gününü seçin.",
         "reminderOnDay": "Gününde",
+        "reminderBefore": "{{duration}} önce",
+        "reminderAfterNoon": "Öğleden {{duration}} sonra",
         "nameDayCalendarEventTitle": "İsim günü: {{name}}",
         "nameDayCalendarEventDescription": "Bugün {{name}} için isim günü.",
         "photoLabel": "Profil resmi",

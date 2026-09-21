@@ -2951,6 +2951,8 @@
         "nameDayHint": "Gebruikt dezelfde herinnering als de verjaardag.",
         "nameDayIncomplete": "Selecteer de maand en dag van de naamdag.",
         "reminderOnDay": "Op de dag zelf",
+        "reminderBefore": "{{duration}} van tevoren",
+        "reminderAfterNoon": "{{duration}} na 12 uur",
         "nameDayCalendarEventTitle": "Naamdag: {{name}}",
         "nameDayCalendarEventDescription": "Vandaag is de naamdag van {{name}}.",
         "photoLabel": "Profielfoto",

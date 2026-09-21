@@ -2978,6 +2978,8 @@
         "nameDayHint": "Utilise le même rappel que l’anniversaire.",
         "nameDayIncomplete": "Sélectionnez le mois et le jour de la fête.",
         "reminderOnDay": "Le jour même",
+        "reminderBefore": "{{duration}} avant",
+        "reminderAfterNoon": "{{duration}} après 12 h",
         "nameDayCalendarEventTitle": "Fête : {{name}}",
         "nameDayCalendarEventDescription": "C’est la fête de {{name}}.",
         "photoLabel": "Photo de profil",

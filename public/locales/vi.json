@@ -2951,6 +2951,8 @@
         "nameDayHint": "Dùng cùng lời nhắc với ngày sinh nhật.",
         "nameDayIncomplete": "Chọn cả tháng và ngày của ngày tên thánh.",
         "reminderOnDay": "Vào đúng ngày",
+        "reminderBefore": "{{duration}} trước",
+        "reminderAfterNoon": "{{duration}} sau 12 giờ trưa",
         "nameDayCalendarEventTitle": "Ngày tên thánh: {{name}}",
         "nameDayCalendarEventDescription": "Hôm nay là ngày tên thánh của {{name}}.",
         "photoLabel": "Ảnh hồ sơ",

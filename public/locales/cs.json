@@ -3559,6 +3559,8 @@
         "nameDayHint": "Použije stejné upozornění jako narozeniny.",
         "nameDayIncomplete": "Vyberte měsíc i den svátku.",
         "reminderOnDay": "V daný den",
+        "reminderBefore": "Předem: {{duration}}",
+        "reminderAfterNoon": "Po 12:00 (+{{duration}})",
         "photoLabel": "Profilový obrázek",
         "photoOptional": "Volitelné: Lze uložit i bez profilového obrázku.",
         "removePhoto": "Odebrat obrázek",

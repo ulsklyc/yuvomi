@@ -128,6 +128,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   saving writes a reminder only when you pick one. No existing reminder moves. "On the day" is also
   in the menu now, for anybody who wants to pick it. (#1363)
 
+- **A birthday reminder the form no longer offers now shows as what it is, not as "None".**
+  Until v1.6.5 the birthday form also offered 15 minutes, 1 hour and 2 weeks before, and the API
+  accepts any number of minutes. Birthdays saved that way kept their value, and they are still
+  reminded that far ahead - but the form, finding no matching entry, showed "None". Picking "None"
+  there to switch the reminder off therefore changed nothing, and the reminder kept coming. Such a
+  birthday now gets an extra entry named after what it does ("2 weeks before", "15 minutes
+  before"), selected and kept for that birthday alone; saving without touching it leaves the
+  reminder as it is, and choosing "None" switches it off. The reading view for read-only members
+  names it the same way. Nothing stored is changed. (#1367)
+
 - **A supply request from Housekeeping now needs shopping rights as well.** The request puts the
   item on the shopping list, and creates a list first when the household has none. Since 2.68.0,
   sending a meal or a recipe to the shopping list asks for write access to the shopping list, but
