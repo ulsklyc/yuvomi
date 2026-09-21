@@ -285,6 +285,10 @@ const PAGE_MODULES = [
   '/components/category-manager.js',
   '/components/icon-picker.js',
   '/components/tag-manager.js',
+  // Der Bildzuschnitt kommt per dynamischem import() aus mehreren Modulen
+  // (Avatare, Geburtstage, Vorrat, Rezepte, Haushaltshilfe, Schnellzugriff).
+  // Der Precache-Guard las dynamische Importe bis dahin nicht.
+  '/utils/avatar-crop.js',
   '/utils/lucide-icons.js',
   '/utils/sortable.js',
   '/vendor/sortablejs/sortable.esm.min.js',

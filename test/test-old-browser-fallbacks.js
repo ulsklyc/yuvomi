@@ -57,6 +57,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { posix } from 'node:path';
 import { eachRule } from './css-rules.js';
+import { moduleSpecifiers, withoutHtmlComments } from './source-text.js';
 import { pickLocale } from '../public/i18n.js';
 
 const REPO = new URL('../', import.meta.url);
@@ -378,36 +379,18 @@ test('--viewport-height ist 100vh und wird erst in @supports zu 100dvh', () => {
  * mehrere Zeilen, mit einfachen UND doppelten Anfuehrungszeichen (die
  * Einstellungsseite fuer Dokumentenspeicher nutzt doppelte). Dynamisches
  * `import()` bleibt draussen - es laeuft erst, wenn der Code es ruft.
+ *
+ * Der Leser ist `moduleSpecifiers()` aus source-text.js - derselbe, mit dem
+ * test-sw-precache.js den Modulgraph liest. Dort kannte eine eigene Kopie nur
+ * einfache Anfuehrungszeichen und sah documents-storage.js als importfrei.
+ * HTML-Kommentare schneidet `withoutHtmlComments()` von dort; ein Kommentar,
+ * der nicht geschlossen wird, gilt wie im Browser bis zum Dateiende.
  */
-function staticImports(source) {
-  const pattern = /^[ \t]*(?:import|export)\b\s*(?:[^'";()]*?\bfrom\s*)?(['"])([^'"\n]+)\1/gm;
-  return [...source.matchAll(pattern)].map((m) => m[2]);
-}
-
-/**
- * HTML ohne Kommentare, per indexOf statt per replace-Regex - wie in
- * test-installer-schema.js (#1198). CodeQL wertet jedes Kommentar-replace
- * einzeln als unvollstaendige Bereinigung (js/incomplete-multi-character-
- * sanitization), auch in einer Fixpunkt-Schleife. Und ein Kommentar, der nicht
- * geschlossen wird, gilt wie im Browser bis zum Dateiende: ein `<script>`
- * dahinter laeuft nie.
- */
-function htmlWithoutComments(src) {
-  let out = '';
-  let pos = 0;
-  for (;;) {
-    const start = src.indexOf('<!--', pos);
-    if (start === -1) return out + src.slice(pos);
-    out += src.slice(pos, start);
-    const end = src.indexOf('-->', start + 4);
-    if (end === -1) return out;
-    pos = end + 3;
-  }
-}
+const staticImports = (source) => moduleSpecifiers(source).static;
 
 /** Die `<script>`-Tags eines HTML-Dokuments, ohne die auskommentierten. */
 function scriptEntries(html) {
-  const tags = [...htmlWithoutComments(html).matchAll(/<script\b[^>]*>/gi)].map((m) => m[0]);
+  const tags = [...withoutHtmlComments(html).matchAll(/<script\b[^>]*>/gi)].map((m) => m[0]);
   return tags.map((tag) => ({
     path: tag.match(/\bsrc=["']([^"']+)["']/i)?.[1],
     module: /\btype=["']module["']/i.test(tag),

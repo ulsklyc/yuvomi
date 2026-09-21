@@ -82,6 +82,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The photo crop dialog is now cached for offline use like the rest of the app.** Avatars,
+  birthday and inventory photos, recipe pictures and quick-link images all go through one crop
+  dialog, which the app loads only when you pick a picture. It was the one module of that kind the
+  service worker did not cache ahead of time: without a connection the dialog did not open, and
+  right after an update a page that was already open could load a newer dialog than the one it was
+  built for. The check that keeps the offline list complete read only imports written at the top of
+  a file and never saw the ones loaded on demand; it reads both now. (#1383)
 - **On a phone, a meal can be dragged to another day again, by a grip next to its buttons.** The
   drag started, and ended the moment the finger moved: on a phone the week plan is a vertical list,
   another day lies exactly on the scrolling axis, and the browser took the gesture as a scroll and

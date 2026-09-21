@@ -8,15 +8,24 @@
  * gemacht, der inhaltlich recht hatte - der Kommentar nannte den alten Namen,
  * und `includes()` liest einen Kommentar als Regel.
  *
- * WARUM EIN FIXPUNKT UND KEIN EINFACHES `replace`: ein einzelner Durchlauf ueber
- * `<!--[\s\S]*?-->` kann das Trennzeichen STEHEN LASSEN. Bei `<!--a<!--b-->`
- * frisst der non-greedy Match von der ersten Klammer bis zum ersten `-->` und
- * laesst nichts uebrig; bei `<!--<!-- -->` bleibt dagegen ein `<!--` zurueck.
- * CodeQL nennt das `js/incomplete-multi-character-sanitization` und stuft es
- * hoch ein. Im Testbaum ist daraus keine Luecke abzuleiten - hier wird eine
- * Repo-Datei gelesen, nicht Fremdeingabe in HTML geschrieben -, aber der
- * SCHNITT ist trotzdem unvollstaendig, und ein Guard, der auf unvollstaendig
- * geschnittenem Text urteilt, urteilt auf einem Text, den es so nicht gibt.
+ * WARUM EIN DURCHLAUF MIT indexOf UND KEIN `replace`: die fruehere Fassung
+ * ersetzte `<!--[\s\S]*?-->` bis zum Fixpunkt. Das schnitt jeden GESCHLOSSENEN
+ * Kommentar, liess aber einen offenen stehen: `<!-- ...` ohne `-->` blieb samt
+ * allem dahinter Text, und ein `<script>` darin zaehlte fuer jeden Guard als
+ * geladen. Im Browser gilt ein unbeendeter Kommentar bis zum Dateiende. Der
+ * Lauf ueber indexOf liest das so, wie der Parser es tut: Kommentar auf bis
+ * zum ersten `-->`, danach weiter im Text, ohne Ende bis zum Schluss. Einen
+ * Fixpunkt braucht er nicht - er setzt nichts zusammen, was vorher nicht
+ * schon Text war (`<!<!-- x -->--` bleibt `<!--` als Text, wie im Browser).
+ * Und CodeQL wertet jedes Kommentar-`replace` einzeln als unvollstaendige
+ * Bereinigung (`js/incomplete-multi-character-sanitization`), auch in einer
+ * Fixpunkt-Schleife; `test-installer-schema.js` (#1198) und
+ * `test-old-browser-fallbacks.js` liefen deshalb schon so.
+ *
+ * GRENZE: `<!-->` und `<!--->` schliesst der Browser sofort, und `--!>` beendet
+ * einen Kommentar ebenfalls. Dieser Schnitt kennt nur `-->` und liest dort
+ * weiter bis zum naechsten `-->` - er blendet dann eher zu viel aus. Im Repo
+ * steht keine der drei Formen.
  *
  * WARUM HIER UND NICHT DREIMAL: `test-budget-ui.js` hatte diese Schleife samt
  * Begruendung bereits, `test-frontend-audit.js` die Kette ohne sie. Zwei Kopien
@@ -28,18 +37,22 @@
  */
 
 /**
- * Schneidet HTML-Kommentare heraus, bis nichts mehr uebrig bleibt.
+ * Schneidet HTML-Kommentare heraus, wie der Browser sie liest: ein Kommentar
+ * ohne `-->` reicht bis zum Ende der Quelle.
  * @param {string} src
  * @returns {string}
  */
 export function withoutHtmlComments(src) {
-  let out = src;
-  let previous;
-  do {
-    previous = out;
-    out = out.replace(/<!--[\s\S]*?-->/g, '');
-  } while (out !== previous);
-  return out;
+  let out = '';
+  let pos = 0;
+  for (;;) {
+    const start = src.indexOf('<!--', pos);
+    if (start === -1) return out + src.slice(pos);
+    out += src.slice(pos, start);
+    const end = src.indexOf('-->', start + 4);
+    if (end === -1) return out;
+    pos = end + 3;
+  }
 }
 
 /**
@@ -111,10 +124,17 @@ export function withoutBlockComments(src) {
  * Gemessen am selben Tag: in `server/`, `public/` (ohne vendor) und `tools/`
  * beginnen sieben Zeilen mit einem Regex-Literal, keines traegt ein unescaptes
  * `/*`, `//` oder Anfuehrungszeichen.
+ *
+ * Mit `{ blankLiterals: true }` werden zusaetzlich String-, Template- und
+ * Regex-Literale durch Leerzeichen ersetzt (Zeilenumbrueche bleiben). Die
+ * Ausgabe ist dann genauso lang wie ohne die Option - Position fuer Position
+ * vergleichbar. `moduleSpecifiers()` fragt so, ob ein `import` im CODE steht
+ * und nicht im Text eines Literals.
  * @param {string} src
+ * @param {{ blankLiterals?: boolean }} [options]
  * @returns {string}
  */
-export function withoutCommentsKeepingLines(src) {
+export function withoutCommentsKeepingLines(src, { blankLiterals = false } = {}) {
   const n = src.length;
   let out = '';
   let i = 0;
@@ -153,7 +173,8 @@ export function withoutCommentsKeepingLines(src) {
     return -1;
   };
   const alsWert = (bis) => {
-    out += src.slice(i, bis);
+    const text = src.slice(i, bis);
+    out += blankLiterals ? text.replace(/[^\n]/g, ' ') : text;
     i = Math.min(bis, n);
     zuletzt = ')';
     wort = '';
@@ -204,6 +225,48 @@ export function withoutCommentsKeepingLines(src) {
     }
   }
   return out;
+}
+
+/**
+ * Die Modul-Specifier einer JS-Quelle, getrennt nach statisch und dynamisch.
+ *
+ * JEDE SCHREIBWEISE, DIE DER BROWSER LAEDT: benannt, Standard, Namensraum,
+ * Seiteneffekt (`import '/x.js'`), Re-Export (`export { a } from '/x.js'`),
+ * ueber mehrere Zeilen, mit einfachen UND doppelten Anfuehrungszeichen - und
+ * dynamisch `import('/x.js')` mit jedem der drei Literale (Backtick nur ohne
+ * `${}`). Ein Leser, der nur eine Schreibweise kennt, sieht eine Datei mit der
+ * anderen als importfrei: `settings/pages/documents-storage.js` schreibt
+ * doppelte Anfuehrungszeichen, und fuer den Precache-Guard hatte sie deshalb
+ * keinen einzigen Import.
+ *
+ * Kommentare zaehlen nicht (ein auskommentierter Import laedt nichts), Text in
+ * einem Literal auch nicht: `admin-backup.js` zeigt einen Shell-Befehl mit
+ * `import('./server/db.js')` im Template - das ist Anzeige, kein Laden. Dafuer
+ * laeuft der Kommentar-Schnitt zweimal, einmal mit geleerten Literalen; ein
+ * `import`, das dort nicht mehr steht, stand in einem Literal.
+ *
+ * Nicht lesbar ist ein dynamischer Specifier, der erst zur Laufzeit entsteht
+ * (`import(pagePath)`, `import(CORE_URL)`) - solche Stellen zaehlt `computed`.
+ * @param {string} src
+ * @returns {{ static: string[], dynamic: string[], computed: number }}
+ */
+export function moduleSpecifiers(src) {
+  const code = withoutCommentsKeepingLines(src);
+  const bare = withoutCommentsKeepingLines(src, { blankLiterals: true });
+  const statics = [];
+  const statisch = /^([ \t]*)(?:import|export)\b\s*(?:[^'";()]*?\bfrom\s*)?(['"])([^'"\n]+)\2/gm;
+  for (const m of code.matchAll(statisch)) {
+    const k = m.index + m[1].length;
+    if (/^(?:import|export)\b/.test(bare.slice(k, k + 7))) statics.push(m[3]);
+  }
+  const dynamics = [];
+  let computed = 0;
+  for (const m of bare.matchAll(/(?<![\w$.])import\s*\(/g)) {
+    const arg = code.slice(m.index + m[0].length).match(/^\s*(['"`])([^'"`\n]*)\1\s*[,)]/);
+    if (arg && !(arg[1] === '`' && arg[2].includes('${'))) dynamics.push(arg[2]);
+    else computed += 1;
+  }
+  return { static: statics, dynamic: dynamics, computed };
 }
 
 /** Nach diesen Woertern beginnt ein Ausdruck, ein `/` dort oeffnet ein Regex-Literal. */

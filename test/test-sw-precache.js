@@ -42,7 +42,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createContext, runInContext } from 'node:vm';
 import { posix } from 'node:path';
-import { withoutHtmlComments } from './source-text.js';
+import { moduleSpecifiers, withoutHtmlComments } from './source-text.js';
 
 const PUBLIC_DIR = fileURLToPath(new URL('../public/', import.meta.url));
 const SRC = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8');
@@ -76,7 +76,7 @@ function loadSwLists() {
   sandbox.self.self = sandbox.self;
   const ctx = createContext(sandbox);
   const lists = runInContext(
-    `${SRC}\n;({ APP_SHELL, PAGE_MODULES, APP_LOCALES, PAGE_MODULE_SET })`,
+    `${SRC}\n;({ APP_SHELL, PAGE_MODULES, APP_LOCALES, PAGE_MODULE_SET, API_CACHE_WHITELIST })`,
     ctx,
   );
   // In Host-Collections umkopieren: Arrays aus der Sandbox tragen deren
@@ -86,47 +86,107 @@ function loadSwLists() {
     PAGE_MODULES: Array.from(lists.PAGE_MODULES),
     APP_LOCALES: Array.from(lists.APP_LOCALES),
     PAGE_MODULE_SET: new Set(Array.from(lists.PAGE_MODULE_SET)),
+    API_CACHE_WHITELIST: Array.from(lists.API_CACHE_WHITELIST),
   };
 }
 
-const { APP_SHELL, PAGE_MODULES, APP_LOCALES, PAGE_MODULE_SET } = loadSwLists();
+const { APP_SHELL, PAGE_MODULES, APP_LOCALES, PAGE_MODULE_SET, API_CACHE_WHITELIST } = loadSwLists();
 
 /**
- * Statische Importe einer Datei, als absolute Pfade.
+ * Importe einer Datei (statisch UND dynamisch), als absolute Pfade.
  *
  * JEDE SCHREIBWEISE ZAEHLT, NICHT NUR DIE HAEUFIGSTE. Der Ausdruck sah lange
- * `from '/pfad'` und sonst nichts. Unsichtbar blieben damit zwei Formen, die
- * der Browser genauso laedt:
+ * `from '/pfad'` und sonst nichts. Unsichtbar blieben damit Formen, die der
+ * Browser genauso laedt:
  *
  *   - relative Specifier - `from './nachbar.js'`
  *   - Seiteneffekt-Importe ohne Bindung - `import '/components/datepicker.js'`
+ *   - doppelte Anfuehrungszeichen - `from "/api.js"`
+ *   - dynamische Importe - `await import('/utils/avatar-crop.js')`
  *
- * Beide Luecken haben je einen echten Fehler getragen, der jahrelang gruen war:
- * `settings/dirty-guard.js` (relativ, aus der Settings-Shell) und
- * `components/datepicker.js` (Seiteneffekt, aus dem Router). Online faellt so
- * etwas nie auf, weil das Netz die Luecke fuellt; offline scheitert der Import
- * und nimmt alles mit, was von der Datei abhaengt.
+ * Die ersten beiden haben je einen echten Fehler getragen, der jahrelang gruen
+ * war: `settings/dirty-guard.js` (relativ, aus der Settings-Shell) und
+ * `components/datepicker.js` (Seiteneffekt, aus dem Router). Die dritte liess
+ * `settings/pages/documents-storage.js` als importfrei erscheinen - der Leser
+ * kannte nur einfache Anfuehrungszeichen. Online faellt so etwas nie auf, weil
+ * das Netz die Luecke fuellt; offline scheitert der Import und nimmt alles
+ * mit, was von der Datei abhaengt.
  *
- * Dynamische Importe stehen weiter bewusst aussen vor: sie sind zur Laufzeit
- * aufloesbar und blockieren keinen Modulgraph.
+ * DYNAMISCHE IMPORTE GEHOEREN DAZU. Die fruehere Begruendung, sie seien zur
+ * Laufzeit aufloesbar und blockierten keinen Modulgraph, stimmt nur online:
+ * offline ist ein nicht precachtes Ziel eines `import()` genauso unerreichbar
+ * wie ein Settings-Blatt (siehe den Registry-Test unten, der genau diese
+ * Luecke schon einmal schliessen musste), und die Geste dahinter scheitert.
+ * Gelesen werden Literale; ein Specifier, der erst zur Laufzeit entsteht
+ * (`import(pagePath)`), ist nicht lesbar und bleibt aussen vor.
+ *
+ * Der Leser ist `moduleSpecifiers()` aus source-text.js, derselbe wie in
+ * test-old-browser-fallbacks.js - eine Schreibweise, die einer von beiden
+ * kennt, kennt damit auch der andere.
  */
-function staticImports(pathname) {
+function moduleImports(pathname) {
   const file = PUBLIC_DIR + pathname.replace(/^\//, '');
   if (!existsSync(file)) return [];
-  const code = readFileSync(file, 'utf8');
+  const { static: statics, dynamic } = moduleSpecifiers(readFileSync(file, 'utf8'));
   const dir = posix.dirname(pathname);
-  const specs = [
-    ...[...code.matchAll(/from\s+'([^']+)'/g)].map((m) => m[1]),
-    // `import 'x';` am Zeilenanfang - ohne `from`, ohne Klammer (das waere ein
-    // dynamischer Import und bleibt draussen).
-    ...[...code.matchAll(/^\s*import\s+'([^']+)'/gm)].map((m) => m[1]),
-  ];
-  return specs
+  return [...statics, ...dynamic]
     .filter((spec) => spec.startsWith('/') || spec.startsWith('.'))
     .map((spec) => (spec.startsWith('/') ? spec : posix.resolve(dir, spec)));
 }
 
 const precached = new Set([...APP_SHELL, ...PAGE_MODULES, ...APP_LOCALES]);
+
+/**
+ * Bewusst nicht precacht, obwohl ein precachtes Modul es importiert. Jede
+ * Ausnahme nennt ihren Grund und wird an beiden Enden geprueft: die Kante muss
+ * noch bestehen (sonst ist die Ausnahme ueberfluessig) und der Anlass auch
+ * (sonst gehoert die Datei in die Liste).
+ */
+const IMPORT_EXCEPTIONS = [
+  {
+    dep: '/vendor/pdfjs/pdf.min.mjs',
+    from: '/pages/documents.js',
+    reason: 'Die PDF-Vorschau braucht die Datei des Dokuments, und die kommt offline nicht: '
+      + '/documents steht nicht auf der Offline-Liste der API (API_CACHE_WHITELIST in sw.js). '
+      + 'Precacht haette pdf.js nichts zu zeigen, und allein reichte es ohnehin nicht - Worker '
+      + '(1.4 MB) und standard_fonts/ gehoerten dazu. Seit der Guard dynamische Importe liest '
+      + '(21.09.2026) sichtbar; die Entscheidung liegt beim Maintainer.',
+    stillValid: () => !API_CACHE_WHITELIST.some((p) => p === '/documents' || p.startsWith('/documents/')),
+  },
+];
+
+test('Leser: jede Importform zaehlt, Kommentar und Literaltext nicht (erfundene Faelle)', () => {
+  const src = [
+    "import { a } from '/einfach.js';",
+    'import { b } from "/doppelt.js";',
+    'import {',
+    '  c,',
+    '  d,',
+    '} from "/mehrzeilig.js";',
+    "import '/seiteneffekt.js';",
+    'import "/seiteneffekt-doppelt.js";',
+    "export { e } from './relativ.js';",
+    "const f = await import('/dyn-einfach.js');",
+    'const g = await import("/dyn-doppelt.js");',
+    'const h = await import(`/dyn-backtick.js`);',
+    'const i = await import(`/pages/${name}.js`);',
+    'const j = await import(pagePath);',
+    "// import { tot } from '/zeilenkommentar.js';",
+    "/* import('/blockkommentar.js'); */",
+    "const hilfe = `<code>node -e \"import('./server/db.js')\"</code>`;",
+    "const k = loader.import('/methode.js');",
+  ].join('\n');
+  const found = moduleSpecifiers(src);
+  assert.deepEqual(found.static,
+    ['/einfach.js', '/doppelt.js', '/mehrzeilig.js', '/seiteneffekt.js', '/seiteneffekt-doppelt.js', './relativ.js']);
+  assert.deepEqual(found.dynamic, ['/dyn-einfach.js', '/dyn-doppelt.js', '/dyn-backtick.js']);
+  assert.equal(found.computed, 2, 'Template mit ${} und Variable sind nicht lesbar und werden gezaehlt');
+
+  // Am Bestand: die Datei, an der der alte Leser (nur einfache Anfuehrungszeichen)
+  // nichts sah.
+  assert.ok(moduleImports('/settings/pages/documents-storage.js').includes('/settings/components.js'),
+    'documents-storage.js importiert mit doppelten Anfuehrungszeichen - der Leser muss es sehen');
+});
 
 test('jeder precachte Pfad existiert (addAll ist All-or-Nothing)', () => {
   const missing = [...precached].filter((p) => p !== '/' && !existsSync(PUBLIC_DIR + p.replace(/^\//, '')));
@@ -138,11 +198,16 @@ test('der transitive Modulgraph ist vollständig precacht (#616)', () => {
   const seen = new Set(roots);
   const queue = [...roots];
   const gaps = [];
+  const usedExceptions = new Set();
 
   while (queue.length) {
     const current = queue.shift();
-    for (const dep of staticImports(current)) {
-      if (!precached.has(dep)) gaps.push(`${dep}  <- importiert von ${current}`);
+    for (const dep of moduleImports(current)) {
+      if (!precached.has(dep)) {
+        const exception = IMPORT_EXCEPTIONS.find((ex) => ex.dep === dep && ex.from === current);
+        if (exception) usedExceptions.add(exception);
+        else gaps.push(`${dep}  <- importiert von ${current}`);
+      }
       if (!seen.has(dep)) {
         seen.add(dep);
         queue.push(dep);
@@ -156,6 +221,13 @@ test('der transitive Modulgraph ist vollständig precacht (#616)', () => {
     + 'Nach einem Update können sie in ihrer alten Fassung gegen ein neues Seitenmodul gebunden '
     + `werden:\n  ${gaps.join('\n  ')}`,
   );
+
+  const stale = IMPORT_EXCEPTIONS.filter((ex) => !usedExceptions.has(ex));
+  assert.deepEqual(stale.map((ex) => `${ex.dep} <- ${ex.from}`), [],
+    'Diese Ausnahme trifft keine fehlende Kante mehr - aus IMPORT_EXCEPTIONS streichen');
+  const expired = IMPORT_EXCEPTIONS.filter((ex) => !ex.stillValid());
+  assert.deepEqual(expired.map((ex) => ex.dep), [],
+    'Der Anlass dieser Ausnahme ist weg - die Datei gehoert jetzt in die Precache-Liste');
 });
 
 test('jedes eager geladene Stylesheet aus index.html ist precacht', () => {
@@ -254,7 +326,10 @@ test('jedes Settings-Blatt der Registry ist precacht', () => {
   // Kanonische Quelle ist die Registry, nicht das Verzeichnis: ein Blatt, das
   // dort nicht steht, ist tot und muss nicht precacht sein.
   const registry = readFileSync(new URL('../public/settings/registry.js', import.meta.url), 'utf8');
-  const leaves = [...registry.matchAll(/loader:\s*\(\)\s*=>\s*import\('([^']+)'\)/g)].map((m) => m[1]);
+  // Jedes der drei Literale: ein Blatt mit doppelten Anfuehrungszeichen fiele
+  // sonst aus der Liste und wuerde nie geprueft, waehrend die Schwelle darunter
+  // weiter erfuellt ist.
+  const leaves = [...registry.matchAll(/loader:\s*\(\)\s*=>\s*import\(\s*(['"`])([^'"`]+)\1\s*\)/g)].map((m) => m[2]);
 
   assert.ok(leaves.length >= 20,
     `Nur ${leaves.length} Blätter in der Registry gefunden - das Muster greift nicht mehr`);
