@@ -18,7 +18,8 @@ import { resolveBudgetMode } from '../services/budget-visibility.js';
 import { hiddenModulesFor } from '../permissions.js';
 import { householdMemberSql } from '../services/household-members.js';
 import { FastingError, getFastingDashboardState } from '../services/fasting.js';
-import { householdTimeZone, utcToWall } from '../utils/timezone.js';
+import { NUTRIENT_KEYS, nutritionSummaryFor } from '../services/health-nutrition.js';
+import { householdTimeZone, utcToWall, todayKey } from '../utils/timezone.js';
 import { isAdminUser, serializeEvents } from './calendar/helpers.js';
 
 const log = createLogger('Dashboard');
@@ -73,6 +74,7 @@ const DENIED_PAYLOAD = Object.freeze({
       nextDose: null, lowStockCount: 0,
     },
     fasting: emptyFastingWidget(),
+    nutrition: emptyNutritionWidget(),
   }),
   housekeeping: () => ({
     housekeeping: {
@@ -88,6 +90,19 @@ function emptyFastingWidget() {
     active: null,
     lastCompleted: null,
   };
+}
+
+/**
+ * Die leere Naehrwert-Bilanz: kein Ziel, nichts gegessen.
+ *
+ * `target: null` ist hier die richtige leere Fassung und nicht ein Ziel aus
+ * Nullen - "kein Ziel gesetzt" und "Ziel 0" sind zwei verschiedene Aussagen
+ * (#1326), und die Kachel sagt bei der ersten "kein Ziel" statt "0 von 0".
+ */
+function emptyNutritionWidget() {
+  const totals = {};
+  for (const key of NUTRIENT_KEYS) totals[key] = 0;
+  return { date: null, target: null, totals, entryCount: 0 };
 }
 
 function emptyBudget(month) {
@@ -702,6 +717,17 @@ router.get('/', (req, res) => {
         log.error('fasting error:', err.message);
         result.fasting = null;
       }
+    }
+
+    try {
+      // Der Tag kommt aus `todayKey()` und damit aus der HAUSHALTSZONE. Der
+      // Rest dieser Route rechnet ihren lokalen Tag ebenso; ein
+      // `toISOString().slice(0, 10)` stuende hier abends westlich von UTC auf
+      // dem Folgetag und zeigte eine leere Bilanz neben einem vollen Tagebuch.
+      result.nutrition = nutritionSummaryFor(d, userId, userId, todayKey(d));
+    } catch (err) {
+      log.error('nutrition error:', err.message);
+      result.nutrition = emptyNutritionWidget();
     }
   }
 

@@ -1,7 +1,7 @@
 import { t } from '/i18n.js';
 import { renderSubTabs } from '/utils/sub-tabs.js';
 
-// Gesundheit ist EIN Seitenmodul mit acht Deep-Link-Routen (Muster wie Settings),
+// Gesundheit ist EIN Seitenmodul mit neun Deep-Link-Routen (Muster wie Settings),
 // nicht — wie die Küche — drei eigenständige Top-Level-Module. Die Sub-Tab-Leiste
 // navigiert zwischen den Routen; das Seitenmodul tauscht via update() nur das
 // aktive Panel aus (Soft-Navigation, kein Full-Reload).
@@ -14,6 +14,7 @@ export const HEALTH_ROUTES = Object.freeze([
   '/health/prevention',
   '/health/labs',
   '/health/activity',
+  '/health/nutrition',
 ]);
 export const HEALTH_STORAGE_KEY = 'yuvomi-health-tab';
 
@@ -28,6 +29,7 @@ export const HEALTH_TABS = ({ cycleEnabled = true, fastingEnabled = false } = {}
   { route: '/health/prevention', labelKey: 'health.tabs.prevention', icon: 'syringe'    },
   { route: '/health/labs',     labelKey: 'health.tabs.labs',     icon: 'flask-conical'  },
   { route: '/health/activity', labelKey: 'health.tabs.activity', icon: 'dumbbell'       },
+  { route: '/health/nutrition', labelKey: 'health.tabs.nutrition', icon: 'salad'         },
 ];
 
 export function isHealthRoute(path) {
@@ -66,8 +68,8 @@ export function renderHealthTabsBar(container, activeRoute, { cycleEnabled = tru
   if (!toolbar) return;
 
   renderSubTabs(toolbar, {
-    // Sichten, keine Zielorte: alle acht Routen tragen `module: 'health'` und
-    // alle acht Panels stehen gleichzeitig im DOM (health.js, panelMarkup) -
+    // Sichten, keine Zielorte: alle neun Routen tragen `module: 'health'` und
+    // alle neun Panels stehen gleichzeitig im DOM (health.js, panelMarkup) -
     // der Tabwechsel tauscht ein Panel, er laedt keine Seite. Die Route ist ein
     // Deep-Link in den Tab-Zustand; das macht die Leiste nicht zur Navigation.
     semantics: 'tabs',

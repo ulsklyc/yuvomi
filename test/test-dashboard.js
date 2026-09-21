@@ -2276,13 +2276,33 @@ function layoutOhne(missing) {
     .map((w, i) => ({ ...w, order: i }));
 }
 
+// DIE LISTE STEHT HIER FEST, NICHT IHRE LAENGE, und der Unterschied ist die
+// Lehre aus der Zahl, die vorher hier stand.
+//
+// Fest sein muss sie: ein Selektor, der aus `WIDGET_IDS` abgeleitet waere,
+// koennte nie melden, dass sich `WIDGET_IDS` geaendert hat - er waere
+// tautologisch und der Guard damit wertlos. Das war die Begruendung der Zahl,
+// und sie gilt unveraendert.
+//
+// Eine ZAHL war trotzdem die falsche Form, und zwar genau am Merge: zwei
+// Zweige, die je ein Widget ergaenzen, schreiben BEIDE `20` -> `21`. Git sieht
+// zweimal dieselbe Aenderung und fuehrt sie konfliktfrei zusammen; danach hat
+// `WIDGET_IDS` 22 Eintraege, hier steht 21, und die Suite ist auf main rot,
+// obwohl jeder Zweig fuer sich gruen war.
+//
+// Die Liste loest beides auf einmal: sie meldet weiterhin JEDE Aenderung an
+// WIDGET_IDS (ihr eigentlicher Zweck), und zwei Zweige, die je eine ANDERE Id
+// ergaenzen, aendern dieselbe Zeile unterschiedlich - das ist ein Konflikt, den
+// git meldet, statt ihn stillschweigend zu verschmelzen.
+const ERWARTETE_WIDGET_IDS = [
+  'tasks', 'calendar', 'meals', 'shopping', 'birthdays', 'countdown', 'budget',
+  'rewards', 'health', 'cycle', 'fasting', 'nutrition', 'housekeeping', 'schedule',
+  'waste', 'family', 'notes', 'weather', 'clock', 'metrics', 'quicklinks',
+];
+
 test('Widget-Merge: eine fehlende Id landet an ihrer Default-Position, nicht hinten', () => {
-  // Die Zahl steht hier fest und wird bei jedem neuen Widget von Hand
-  // nachgezogen - das ist der Zweck: ein Selektor, der aus derselben Liste
-  // abgeleitet waere, koennte nie melden, dass die Liste sich geaendert hat.
-  // Zuletzt nachgezogen fuer `fasting` (#1180); `waste` aus dem Hauptzweig bleibt erhalten.
-  const geprueft = widgets.WIDGET_IDS.length;
-  assert(geprueft === 20, `Reichweite: ${geprueft} Ids geprueft, nicht die erwarteten 20`);
+  assert(widgets.WIDGET_IDS.join(',') === ERWARTETE_WIDGET_IDS.join(','),
+    `Reichweite: WIDGET_IDS ist ${widgets.WIDGET_IDS.join(',')}, erwartet ${ERWARTETE_WIDGET_IDS.join(',')}`);
   const falsch = widgets.WIDGET_IDS.filter((id) => {
     const merged = widgets.normalizeDashboardConfig(layoutOhne(id));
     return merged.map((w) => w.id).join(',') !== widgets.WIDGET_IDS.join(',');

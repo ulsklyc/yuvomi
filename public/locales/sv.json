@@ -305,7 +305,10 @@
         "manage": "Hantera",
         "todayNothingElseTomorrow": "Inget mer idag - imorgon: {{title}}",
         "weatherHighLow": "Högsta {{max}}°, lägsta {{min}}°",
-        "optionCalendarBirthdaysHint": "Utan bock hålls födelsedagar utanför den här rutan - i kalendern står de kvar."
+        "optionCalendarBirthdaysHint": "Utan bock hålls födelsedagar utanför den här rutan - i kalendern står de kvar.",
+        "nutritionNoTarget": "Inget dagsmål angivet än.",
+        "nutritionEntries": "{{count}} poster idag",
+        "nutritionEntries_one": "{{count}} post idag"
     },
     "tasks": {
         "manageCategories": "Hantera kategorier",
@@ -4079,7 +4082,8 @@
             "labs": "Provsvar",
             "activity": "Aktivitet",
             "cycle": "Cykel",
-            "fasting": "Fasta"
+            "fasting": "Fasta",
+            "nutrition": "Näringsvärden"
         },
         "overview": {
             "title": "Översikt",
@@ -4850,7 +4854,62 @@
             "h": "{{hours}} tim",
             "m": "{{minutes}} min"
         },
-        "careBanner": "Du registrerar åt {{name}}."
+        "careBanner": "Du registrerar åt {{name}}.",
+        "nutrition": {
+            "title": "Näringsvärden",
+            "emptyTitle": "Inga näringsvärden registrerade än",
+            "emptyDesc": "Skriv upp vad du har ätit - siffrorna står på förpackningen.",
+            "add": "Lägg till post",
+            "edit": "Redigera post",
+            "saved": "Posten sparad.",
+            "saveError": "Posten kunde inte sparas.",
+            "deleted": "Posten borttagen.",
+            "invalid": "Ange ett namn, en tidpunkt och giltiga tal.",
+            "noEntries": "Inga poster ännu.",
+            "entriesTitle": "Poster",
+            "personsLabel": "Person",
+            "todayTitle": "Idag",
+            "targetTitle": "Dagsmål",
+            "targetSet": "Ange mål",
+            "targetEdit": "Redigera mål",
+            "targetHint": "Lämna tomt det du inte vill följa. En nolla är ett mål, ett tomt fält är det inte.",
+            "targetNone": "Inget dagsmål angivet än.",
+            "targetNoneHint": "Utan mål visar sidan bara summan.",
+            "targetSaved": "Dagsmålet sparat.",
+            "targetSaveError": "Dagsmålet kunde inte sparas.",
+            "ofTarget": "{{value}} av {{target}} {{unit}}",
+            "noTargetValue": "{{value}} {{unit}}",
+            "loadError": "Näringsvärdena kunde inte läsas in.",
+            "loadErrorDesc": "Försök igen senare.",
+            "retry": "Försök igen",
+            "field": {
+                "title": "Namn",
+                "consumedAt": "Tidpunkt",
+                "mealType": "Måltid",
+                "noMealType": "Ingen måltid",
+                "note": "Anteckning"
+            },
+            "meal": {
+                "breakfast": "Frukost",
+                "lunch": "Lunch",
+                "dinner": "Middag",
+                "snack": "Mellanmål"
+            },
+            "nutrient": {
+                "energyKcal": "Energi",
+                "fat": "Fett",
+                "saturatedFat": "varav mättat fett",
+                "carbs": "Kolhydrater",
+                "sugar": "varav sockerarter",
+                "protein": "Protein",
+                "salt": "Salt",
+                "fiber": "Fiber"
+            },
+            "unit": {
+                "kcal": "kcal",
+                "g": "g"
+            }
+        }
     },
     "waste": {
         "title": "Avfallshämtning",

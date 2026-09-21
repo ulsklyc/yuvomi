@@ -30,6 +30,12 @@ function visibilityScopes() {
         { key: 'labs', label: t('health.tabs.labs') },
         { key: 'activities', label: t('health.tabs.activity') },
         { key: 'prevention', label: t('health.tabs.prevention') },
+        // Ohne diese Zeile kennt der Server den Bereich (FLAT_SCOPES), aber
+        // niemand koennte ihn je auf 'family' stellen - die Voreinstellung
+        // bliebe fuer immer 'private'. Genau die Luecke hatte 'prevention'
+        // eine Weile; ein Guard in test:health-visibility-defaults haelt sie
+        // seither zu.
+        { key: 'nutrition', label: t('health.tabs.nutrition') },
         ...(canUseFasting() ? [{ key: 'fasting', label: t('health.fasting.title') }] : []),
       ],
     },

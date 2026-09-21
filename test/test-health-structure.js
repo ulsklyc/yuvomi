@@ -40,6 +40,7 @@ import caregiversRouter from '../server/routes/health/caregivers.js';
 import visibilityDefaultsRouter from '../server/routes/health/visibility-defaults.js';
 import fastingRouter from '../server/routes/health/fasting.js';
 import preventionRouter from '../server/routes/health/prevention.js';
+import nutritionRouter from '../server/routes/health/nutrition.js';
 
 /** Sammelt rekursiv alle {METHOD path}-Paare eines Express-Routers (inkl. gemounteter Sub-Router). */
 function collectRoutes(router) {
@@ -151,6 +152,15 @@ const EXPECTED = [
   'PATCH /prevention/types/:id',
   'DELETE /prevention/types/:id',
   'GET /prevention/due',
+  // Naehrwerte (#1326): Tagesziel, Tagebuch und die Tagesbilanz daraus
+  'GET /nutrition/targets',
+  'PUT /nutrition/targets',
+  'GET /nutrition/entries',
+  'POST /nutrition/entries',
+  'PATCH /nutrition/entries/:id',
+  'DELETE /nutrition/entries/:id',
+  'GET /nutrition/summary',
+  'GET /export/nutrition',
 ];
 
 test('Orchestrator ergibt exakt die erwartete Routentabelle', () => {
@@ -168,6 +178,7 @@ test('die Cluster-Router zusammen ergeben genau die Orchestrator-Routen (keine v
   const perModule = [
     vitalsRouter, medicationsRouter, labsRouter, activitiesRouter, exportRouter, cycleRouter,
     cycleFeedRouter, caregiversRouter, visibilityDefaultsRouter, fastingRouter, preventionRouter,
+    nutritionRouter,
   ].flatMap(collectRoutes);
   // keine Route kommt in mehr als einem Cluster-Router vor
   const seen = new Set();

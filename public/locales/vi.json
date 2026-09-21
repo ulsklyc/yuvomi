@@ -305,7 +305,10 @@
         "manage": "Quản lý",
         "todayNothingElseTomorrow": "Hôm nay không còn gì khác - ngày mai: {{title}}",
         "weatherHighLow": "Cao nhất {{max}}°, thấp nhất {{min}}°",
-        "optionCalendarBirthdaysHint": "Nếu bỏ chọn, sinh nhật sẽ không xuất hiện trong thẻ này - trên lịch vẫn còn."
+        "optionCalendarBirthdaysHint": "Nếu bỏ chọn, sinh nhật sẽ không xuất hiện trong thẻ này - trên lịch vẫn còn.",
+        "nutritionNoTarget": "Chưa đặt mục tiêu hằng ngày.",
+        "nutritionEntries": "{{count}} mục hôm nay",
+        "nutritionEntries_one": "{{count}} mục hôm nay"
     },
     "tasks": {
         "manageCategories": "Quản lý danh mục",
@@ -4079,7 +4082,8 @@
             "labs": "Xét nghiệm",
             "activity": "Hoạt động",
             "cycle": "Chu kỳ",
-            "fasting": "Nhịn ăn"
+            "fasting": "Nhịn ăn",
+            "nutrition": "Dinh dưỡng"
         },
         "overview": {
             "title": "Tổng quan",
@@ -4850,7 +4854,62 @@
             "h": "{{hours}} giờ",
             "m": "{{minutes}} phút"
         },
-        "careBanner": "Bạn đang ghi cho {{name}}."
+        "careBanner": "Bạn đang ghi cho {{name}}.",
+        "nutrition": {
+            "title": "Dinh dưỡng",
+            "emptyTitle": "Chưa ghi nhận dinh dưỡng nào",
+            "emptyDesc": "Ghi lại những gì bạn đã ăn - các con số có trên bao bì.",
+            "add": "Thêm mục",
+            "edit": "Sửa mục",
+            "saved": "Đã lưu mục.",
+            "saveError": "Không thể lưu mục.",
+            "deleted": "Đã xóa mục.",
+            "invalid": "Vui lòng nhập tên, thời điểm và các số hợp lệ.",
+            "noEntries": "Chưa có mục nào.",
+            "entriesTitle": "Các mục",
+            "personsLabel": "Người",
+            "todayTitle": "Hôm nay",
+            "targetTitle": "Mục tiêu hằng ngày",
+            "targetSet": "Đặt mục tiêu",
+            "targetEdit": "Sửa mục tiêu",
+            "targetHint": "Để trống những gì bạn không muốn theo dõi. Số 0 là một mục tiêu, ô trống thì không.",
+            "targetNone": "Chưa đặt mục tiêu hằng ngày.",
+            "targetNoneHint": "Không có mục tiêu, trang này chỉ hiển thị tổng cộng.",
+            "targetSaved": "Đã lưu mục tiêu hằng ngày.",
+            "targetSaveError": "Không thể lưu mục tiêu hằng ngày.",
+            "ofTarget": "{{value}} trên {{target}} {{unit}}",
+            "noTargetValue": "{{value}} {{unit}}",
+            "loadError": "Không thể tải dữ liệu dinh dưỡng.",
+            "loadErrorDesc": "Vui lòng thử lại sau.",
+            "retry": "Thử lại",
+            "field": {
+                "title": "Tên",
+                "consumedAt": "Thời điểm",
+                "mealType": "Bữa ăn",
+                "noMealType": "Không có bữa ăn",
+                "note": "Ghi chú"
+            },
+            "meal": {
+                "breakfast": "Bữa sáng",
+                "lunch": "Bữa trưa",
+                "dinner": "Bữa tối",
+                "snack": "Ăn vặt"
+            },
+            "nutrient": {
+                "energyKcal": "Năng lượng",
+                "fat": "Chất béo",
+                "saturatedFat": "trong đó chất béo bão hòa",
+                "carbs": "Carbohydrate",
+                "sugar": "trong đó đường",
+                "protein": "Chất đạm",
+                "salt": "Muối",
+                "fiber": "Chất xơ"
+            },
+            "unit": {
+                "kcal": "kcal",
+                "g": "g"
+            }
+        }
     },
     "waste": {
         "title": "Thu gom rác",

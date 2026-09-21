@@ -305,7 +305,10 @@
         "manage": "Керувати",
         "todayNothingElseTomorrow": "Більше на сьогодні нічого немає - завтра: {{title}}",
         "weatherHighLow": "Максимум {{max}}°, мінімум {{min}}°",
-        "optionCalendarBirthdaysHint": "Без позначки дні народження не показуються в цій картці, у календарі вони залишаються."
+        "optionCalendarBirthdaysHint": "Без позначки дні народження не показуються в цій картці, у календарі вони залишаються.",
+        "nutritionNoTarget": "Денну ціль ще не задано.",
+        "nutritionEntries": "Сьогодні {{count}} записів",
+        "nutritionEntries_one": "Сьогодні {{count}} запис"
     },
     "tasks": {
         "manageCategories": "Керування категоріями",
@@ -4079,7 +4082,8 @@
             "labs": "Аналізи",
             "activity": "Активність",
             "cycle": "Цикл",
-            "fasting": "Голодування"
+            "fasting": "Голодування",
+            "nutrition": "Харчування"
         },
         "overview": {
             "title": "Огляд",
@@ -4850,7 +4854,62 @@
             "h": "{{hours}} год",
             "m": "{{minutes}} хв"
         },
-        "careBanner": "Ви вносите дані за {{name}}."
+        "careBanner": "Ви вносите дані за {{name}}.",
+        "nutrition": {
+            "title": "Харчування",
+            "emptyTitle": "Записів про харчування ще немає",
+            "emptyDesc": "Запиши, що ти з’їв - цифри є на упаковці.",
+            "add": "Додати запис",
+            "edit": "Редагувати запис",
+            "saved": "Запис збережено.",
+            "saveError": "Не вдалося зберегти запис.",
+            "deleted": "Запис видалено.",
+            "invalid": "Вкажіть назву, час і коректні числа.",
+            "noEntries": "Поки немає записів.",
+            "entriesTitle": "Записи",
+            "personsLabel": "Особа",
+            "todayTitle": "Сьогодні",
+            "targetTitle": "Денна ціль",
+            "targetSet": "Задати ціль",
+            "targetEdit": "Редагувати ціль",
+            "targetHint": "Залиш порожнім те, що не хочеш відстежувати. Нуль - це ціль, порожнє поле - ні.",
+            "targetNone": "Денну ціль ще не задано.",
+            "targetNoneHint": "Без цілі ця сторінка показує лише суму.",
+            "targetSaved": "Денну ціль збережено.",
+            "targetSaveError": "Не вдалося зберегти денну ціль.",
+            "ofTarget": "{{value}} з {{target}} {{unit}}",
+            "noTargetValue": "{{value}} {{unit}}",
+            "loadError": "Не вдалося завантажити дані про харчування.",
+            "loadErrorDesc": "Спробуйте пізніше.",
+            "retry": "Повторити",
+            "field": {
+                "title": "Назва",
+                "consumedAt": "Час",
+                "mealType": "Приймання їжі",
+                "noMealType": "Без приймання їжі",
+                "note": "Нотатка"
+            },
+            "meal": {
+                "breakfast": "Сніданок",
+                "lunch": "Обід",
+                "dinner": "Вечеря",
+                "snack": "Перекус"
+            },
+            "nutrient": {
+                "energyKcal": "Енергетична цінність",
+                "fat": "Жири",
+                "saturatedFat": "з них насичені",
+                "carbs": "Вуглеводи",
+                "sugar": "з них цукри",
+                "protein": "Білки",
+                "salt": "Сіль",
+                "fiber": "Клітковина"
+            },
+            "unit": {
+                "kcal": "ккал",
+                "g": "г"
+            }
+        }
     },
     "waste": {
         "title": "Вивезення сміття",

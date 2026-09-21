@@ -317,7 +317,10 @@
         "manage": "Pamahalaan",
         "todayNothingElseTomorrow": "Wala nang iba ngayon - bukas: {{title}}",
         "weatherHighLow": "Pinakamataas {{max}}°, pinakamababa {{min}}°",
-        "optionCalendarBirthdaysHint": "Kapag hindi nakatsek, hindi lumalabas ang mga kaarawan sa tile na ito - nasa kalendaryo pa rin sila."
+        "optionCalendarBirthdaysHint": "Kapag hindi nakatsek, hindi lumalabas ang mga kaarawan sa tile na ito - nasa kalendaryo pa rin sila.",
+        "nutritionNoTarget": "Wala pang pang-araw-araw na target.",
+        "nutritionEntries": "{{count}} tala ngayong araw",
+        "nutritionEntries_one": "{{count}} tala ngayong araw"
     },
     "tasks": {
         "manageCategories": "Pamahalaan ang mga kategorya",
@@ -4079,7 +4082,8 @@
             "labs": "Resulta ng lab",
             "activity": "Aktibidad",
             "cycle": "Siklo",
-            "fasting": "Pag-aayuno"
+            "fasting": "Pag-aayuno",
+            "nutrition": "Nutrisyon"
         },
         "overview": {
             "title": "Pangkalahatang-tanaw",
@@ -4850,7 +4854,62 @@
             "h": "{{hours}} oras",
             "m": "{{minutes}} min"
         },
-        "careBanner": "Nagtatala ka para kay {{name}}."
+        "careBanner": "Nagtatala ka para kay {{name}}.",
+        "nutrition": {
+            "title": "Nutrisyon",
+            "emptyTitle": "Wala pang naitalang nutrisyon",
+            "emptyDesc": "Itala ang kinain mo - nasa pakete ang mga numero.",
+            "add": "Magdagdag ng tala",
+            "edit": "I-edit ang tala",
+            "saved": "Na-save ang tala.",
+            "saveError": "Hindi ma-save ang tala.",
+            "deleted": "Nabura ang tala.",
+            "invalid": "Maglagay ng pangalan, oras at wastong mga numero.",
+            "noEntries": "Wala pang mga tala.",
+            "entriesTitle": "Mga tala",
+            "personsLabel": "Tao",
+            "todayTitle": "Ngayon",
+            "targetTitle": "Pang-araw-araw na target",
+            "targetSet": "Magtakda ng target",
+            "targetEdit": "I-edit ang target",
+            "targetHint": "Iwanang blangko ang ayaw mong subaybayan. Ang 0 ay target, ang blangko ay hindi.",
+            "targetNone": "Wala pang pang-araw-araw na target.",
+            "targetNoneHint": "Kung walang target, ang kabuuan lang ang ipinapakita ng pahinang ito.",
+            "targetSaved": "Na-save ang pang-araw-araw na target.",
+            "targetSaveError": "Hindi ma-save ang pang-araw-araw na target.",
+            "ofTarget": "{{value}} sa {{target}} {{unit}}",
+            "noTargetValue": "{{value}} {{unit}}",
+            "loadError": "Hindi ma-load ang datos ng nutrisyon.",
+            "loadErrorDesc": "Subukan ulit mamaya.",
+            "retry": "Subukan ulit",
+            "field": {
+                "title": "Pangalan",
+                "consumedAt": "Oras",
+                "mealType": "Pagkain",
+                "noMealType": "Walang pagkain",
+                "note": "Tala"
+            },
+            "meal": {
+                "breakfast": "Almusal",
+                "lunch": "Tanghalian",
+                "dinner": "Hapunan",
+                "snack": "Meryenda"
+            },
+            "nutrient": {
+                "energyKcal": "Enerhiya",
+                "fat": "Taba",
+                "saturatedFat": "kabilang ang saturated",
+                "carbs": "Karbohidrat",
+                "sugar": "kabilang ang asukal",
+                "protein": "Protina",
+                "salt": "Asin",
+                "fiber": "Hibla"
+            },
+            "unit": {
+                "kcal": "kcal",
+                "g": "g"
+            }
+        }
     },
     "waste": {
         "title": "Koleksyon ng basura",

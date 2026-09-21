@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Health has a ninth tab: a daily nutrition target per person and a log of what was eaten.** You
+  type the numbers off the packet in front of you - energy in kcal, fat, of which saturates,
+  carbohydrate, of which sugars, protein, salt and fibre - and the tab shows today's total against
+  your target. Nothing is derived from ingredients: Yuvomi stores the figure you state about your
+  own meal and does not compute one from what a product supposedly is. Every one of the eight is
+  optional, on the entry as well as on the target; a value you leave out stays unstated rather than
+  becoming a zero, so a meal you only knew the calories for does not claim to contain no fat. A
+  target of 0 is a target and reads as one - "no sugar today" is a different statement from "no
+  target set", and the tab and the tile keep them apart. An entry carries a free title, a time, an
+  optional meal type, a note, and says who may see it: only you, or the whole household, with only
+  you as the shipped default. A carer who may record for somebody (Settings, Health) can log for
+  them, and the entry then follows that person's own visibility choice rather than the carer's. The
+  same progress is available as a dashboard tile, hidden until you add it from the dashboard editor,
+  and everything is reachable through `/api/v1/health/nutrition/*` under the existing `health` API
+  scope, so a bridge can write an intake and nothing else. Today's total follows your household time
+  zone, not UTC, so a late dinner counts towards the day you ate it. There is a CSV export per
+  person and date range. (#1326)
+
 - **A fasting timer can now be added to the dashboard.** It shows only your own fast and lets you
   start or finish it there, using the same safety confirmation and timer controls as the journal.
   Existing dashboards keep it hidden until you add it from the dashboard editor. (#1180)

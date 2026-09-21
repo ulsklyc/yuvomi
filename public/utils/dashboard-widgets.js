@@ -39,7 +39,7 @@
  * „Bestandslayout ohne genau eine Id liest sich nicht als umsortiert", über
  * JEDE Id dieser Liste. Wer hier umsortiert, prüft ihn - er ist der Ort, an dem
  * ein Fehler auffällt. */
-export const WIDGET_IDS = ['tasks', 'calendar', 'meals', 'shopping', 'birthdays', 'countdown', 'budget', 'rewards', 'health', 'cycle', 'fasting', 'housekeeping', 'schedule', 'waste', 'family', 'notes', 'weather', 'clock', 'metrics', 'quicklinks'];
+export const WIDGET_IDS = ['tasks', 'calendar', 'meals', 'shopping', 'birthdays', 'countdown', 'budget', 'rewards', 'health', 'cycle', 'fasting', 'nutrition', 'housekeeping', 'schedule', 'waste', 'family', 'notes', 'weather', 'clock', 'metrics', 'quicklinks'];
 
 // Vier kuratierte Formen statt sechs: über vier Auswahlmöglichkeiten pro Widget
 // (× bis zu 12 Widgets) kippt der Anpassen-Modus in Mikro-Entscheidungs-Overhead
@@ -105,7 +105,10 @@ export function defaultWidgetSize(id) {
   // `quicklinks` steht bei der Uhr und nicht bei den Listen: es ist eine ZEILE
   // aus Kacheln (#469), keine Liste aus Zeilen. Auf 1x1 passten zwei davon
   // nebeneinander, und eine Startrampe mit zwei Plaetzen ist keine.
-  if (['weather', 'shopping', 'health', 'cycle', 'fasting', 'meals', 'clock', 'quicklinks'].includes(id)) return '2x1';
+  // `nutrition` steht hier und nicht bei den Listen: die Kachel zeigt eine
+  // Fortschrittszeile je Naehrwert, also Balken nebeneinander - sie braucht
+  // Zeile, nicht Hoehe, genau wie das Fasten daneben.
+  if (['weather', 'shopping', 'health', 'cycle', 'fasting', 'nutrition', 'meals', 'clock', 'quicklinks'].includes(id)) return '2x1';
   // DIE KENNZAHLREIHE IST EINE ZEILE, KEIN BLOCK (Critique 2026-08-13, P1).
   //
   // Hier stand '2x2' mit der Begruendung, das Raster sei der Vergleich, fuer den
@@ -145,7 +148,12 @@ export const COCKPIT_COVERED_WIDGETS = new Set(['tasks', 'calendar', 'shopping',
 // haette jeder Haushalt - auch jeder bestehende, denn eine neu bekannte Id erbt
 // diesen Default - eine Kachel bekommen, die nichts zeigt und um Einrichtung
 // bittet. Sie steht im Anpassen-Tray und kommt, wenn jemand sie holt.
-export const DEFAULT_HIDDEN_WIDGETS = new Set([...COCKPIT_COVERED_WIDGETS, 'rewards', 'health', 'cycle', 'fasting', 'housekeeping', 'schedule', 'waste', 'clock', 'weather', 'quicklinks']);
+// `nutrition` steht bei den Opt-ins aus demselben Grund wie `fasting`: ein
+// Tagebuch fuehrt, wer es fuehren will. Und der Eintrag hier ist nicht
+// Kosmetik - eine Id, die in dieser Menge FEHLT, ist nach dem Update in JEDEM
+// bestehenden Haushalt eingeblendet, weil `normalizeDashboardConfig` eine neu
+// bekannte Id mit `defaultWidgetVisible(id)` einsortiert.
+export const DEFAULT_HIDDEN_WIDGETS = new Set([...COCKPIT_COVERED_WIDGETS, 'rewards', 'health', 'cycle', 'fasting', 'nutrition', 'housekeeping', 'schedule', 'waste', 'clock', 'weather', 'quicklinks']);
 
 export function defaultWidgetVisible(id) {
   return !DEFAULT_HIDDEN_WIDGETS.has(id);

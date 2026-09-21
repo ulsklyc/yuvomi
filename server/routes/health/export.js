@@ -11,9 +11,9 @@
 
 import express from 'express';
 import * as db from '../../db.js';
-import { vitalsToCsv, activitiesToCsv, labsToCsv, medLogsToCsv } from '../../services/health-export.js';
+import { vitalsToCsv, activitiesToCsv, labsToCsv, medLogsToCsv, nutritionToCsv } from '../../services/health-export.js';
 import {
-  log, viewerId, careAwareClause, attachResults,
+  log, viewerId, careAwareClause, attachResults, OPEN_ALL,
   exportFilename, sendCsv, exportRange,
 } from './helpers.js';
 
@@ -78,6 +78,33 @@ router.get('/export/labs', (req, res) => {
     sendCsv(res, exportFilename('labs', from, to), labsToCsv(reports));
   } catch (err) {
     log.error('Error exporting labs:', err.message);
+    res.status(500).json({ error: 'Internal error.', code: 500 });
+  }
+});
+
+// GET /export/nutrition?user_id=&from=&to=
+router.get('/export/nutrition', (req, res) => {
+  try {
+    const viewer   = viewerId(req);
+    const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
+    // OPEN_ALL, nicht der Vorgabewert: health_nutrition_entries fuehrt den
+    // kanonischen Satz. Mit dem eingebauten 'family' haette diese Abfrage
+    // lautlos nur die eigenen Zeilen geliefert und nie eine geoeffnete.
+    const clause   = careAwareClause('e', viewer, personId, OPEN_ALL);
+    const { from, to } = exportRange(req);
+    const params = [...clause.params];
+    let sql = `SELECT e.* FROM health_nutrition_entries e WHERE ${clause.sql}`;
+    // Auf den DATUMSTEIL, nicht auf den ganzen Wert: `consumed_at` ist
+    // Wanduhrzeit (YYYY-MM-DDTHH:mm) und ein `to` ohne Uhrzeit haette den
+    // letzten Tag des Zeitraums sonst komplett verschluckt.
+    if (from) { sql += ' AND substr(e.consumed_at, 1, 10) >= ?'; params.push(from); }
+    if (to)   { sql += ' AND substr(e.consumed_at, 1, 10) <= ?'; params.push(to); }
+    sql += ' ORDER BY e.consumed_at ASC, e.id ASC';
+
+    const rows = db.get().prepare(sql).all(...params);
+    sendCsv(res, exportFilename('nutrition', from, to), nutritionToCsv(rows));
+  } catch (err) {
+    log.error('Error exporting nutrition entries:', err.message);
     res.status(500).json({ error: 'Internal error.', code: 500 });
   }
 });

@@ -305,7 +305,10 @@
         "manage": "Spravovat",
         "todayNothingElseTomorrow": "Dnes už nic dalšího - zítra: {{title}}",
         "weatherHighLow": "Nejvyšší {{max}}°, nejnižší {{min}}°",
-        "optionCalendarBirthdaysHint": "Bez zaškrtnutí narozeniny z této dlaždice zmizí, v kalendáři zůstanou."
+        "optionCalendarBirthdaysHint": "Bez zaškrtnutí narozeniny z této dlaždice zmizí, v kalendáři zůstanou.",
+        "nutritionNoTarget": "Denní cíl zatím není nastaven.",
+        "nutritionEntries": "Dnes {{count}} záznamů",
+        "nutritionEntries_one": "Dnes {{count}} záznam"
     },
     "tasks": {
         "manageCategories": "Spravovat kategorie",
@@ -4079,7 +4082,8 @@
             "labs": "Laboratorní hodnoty",
             "activity": "Aktivita",
             "cycle": "Cyklus",
-            "fasting": "Půst"
+            "fasting": "Půst",
+            "nutrition": "Výživa"
         },
         "overview": {
             "title": "Přehled",
@@ -4850,7 +4854,62 @@
             "h": "{{hours}} h",
             "m": "{{minutes}} min"
         },
-        "careBanner": "Zapisuješ za {{name}}."
+        "careBanner": "Zapisuješ za {{name}}.",
+        "nutrition": {
+            "title": "Výživa",
+            "emptyTitle": "Zatím žádné výživové údaje",
+            "emptyDesc": "Zapiš, co jsi snědl - čísla najdeš na obalu.",
+            "add": "Přidat záznam",
+            "edit": "Upravit záznam",
+            "saved": "Záznam uložen.",
+            "saveError": "Záznam se nepodařilo uložit.",
+            "deleted": "Záznam smazán.",
+            "invalid": "Zadej prosím název, čas a platná čísla.",
+            "noEntries": "Zatím žádné záznamy.",
+            "entriesTitle": "Záznamy",
+            "personsLabel": "Osoba",
+            "todayTitle": "Dnes",
+            "targetTitle": "Denní cíl",
+            "targetSet": "Nastavit cíl",
+            "targetEdit": "Upravit cíl",
+            "targetHint": "Co nechceš sledovat, nech prázdné. Nula je cíl, prázdné pole ne.",
+            "targetNone": "Denní cíl zatím není nastaven.",
+            "targetNoneHint": "Bez cíle tato stránka ukazuje jen součet.",
+            "targetSaved": "Denní cíl uložen.",
+            "targetSaveError": "Denní cíl se nepodařilo uložit.",
+            "ofTarget": "{{value}} z {{target}} {{unit}}",
+            "noTargetValue": "{{value}} {{unit}}",
+            "loadError": "Výživové údaje se nepodařilo načíst.",
+            "loadErrorDesc": "Zkuste to prosím později znovu.",
+            "retry": "Zkusit znovu",
+            "field": {
+                "title": "Název",
+                "consumedAt": "Čas",
+                "mealType": "Jídlo",
+                "noMealType": "Bez jídla",
+                "note": "Poznámka"
+            },
+            "meal": {
+                "breakfast": "Snídaně",
+                "lunch": "Oběd",
+                "dinner": "Večeře",
+                "snack": "Svačina"
+            },
+            "nutrient": {
+                "energyKcal": "Energie",
+                "fat": "Tuky",
+                "saturatedFat": "z toho nasycené",
+                "carbs": "Sacharidy",
+                "sugar": "z toho cukry",
+                "protein": "Bílkoviny",
+                "salt": "Sůl",
+                "fiber": "Vláknina"
+            },
+            "unit": {
+                "kcal": "kcal",
+                "g": "g"
+            }
+        }
     },
     "waste": {
         "title": "Svoz odpadu",

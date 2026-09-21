@@ -305,7 +305,10 @@
         "manage": "管理",
         "todayNothingElseTomorrow": "今日はこの後予定はありません。明日: {{title}}",
         "weatherHighLow": "最高 {{max}}°、最低 {{min}}°",
-        "optionCalendarBirthdaysHint": "チェックを外すと、このタイルに誕生日は表示されません。カレンダーには残ります。"
+        "optionCalendarBirthdaysHint": "チェックを外すと、このタイルに誕生日は表示されません。カレンダーには残ります。",
+        "nutritionNoTarget": "1日の目標はまだ設定されていません。",
+        "nutritionEntries": "今日の記録 {{count}} 件",
+        "nutritionEntries_one": "今日の記録 {{count}} 件"
     },
     "tasks": {
         "manageCategories": "カテゴリーを管理",
@@ -4079,7 +4082,8 @@
             "labs": "検査値",
             "activity": "アクティビティ",
             "cycle": "周期",
-            "fasting": "断食"
+            "fasting": "断食",
+            "nutrition": "栄養"
         },
         "overview": {
             "title": "概要",
@@ -4850,7 +4854,62 @@
             "h": "{{hours}}時間",
             "m": "{{minutes}}分"
         },
-        "careBanner": "{{name}} さんの記録を入力しています。"
+        "careBanner": "{{name}} さんの記録を入力しています。",
+        "nutrition": {
+            "title": "栄養",
+            "emptyTitle": "まだ栄養の記録がありません",
+            "emptyDesc": "食べたものを記録しましょう。数値はパッケージに書かれています。",
+            "add": "記録を追加",
+            "edit": "記録を編集",
+            "saved": "記録を保存しました。",
+            "saveError": "記録を保存できませんでした。",
+            "deleted": "記録を削除しました。",
+            "invalid": "名称、時刻、有効な数値を入力してください。",
+            "noEntries": "まだ記録がありません。",
+            "entriesTitle": "記録",
+            "personsLabel": "対象者",
+            "todayTitle": "今日",
+            "targetTitle": "1日の目標",
+            "targetSet": "目標を設定",
+            "targetEdit": "目標を編集",
+            "targetHint": "記録しない項目は空欄のままにしてください。0 は目標ですが、空欄は目標ではありません。",
+            "targetNone": "1日の目標はまだ設定されていません。",
+            "targetNoneHint": "目標がない場合、このページは合計のみを表示します。",
+            "targetSaved": "1日の目標を保存しました。",
+            "targetSaveError": "1日の目標を保存できませんでした。",
+            "ofTarget": "{{target}} {{unit}} 中 {{value}}",
+            "noTargetValue": "{{value}} {{unit}}",
+            "loadError": "栄養データを読み込めませんでした。",
+            "loadErrorDesc": "後でもう一度お試しください。",
+            "retry": "再試行",
+            "field": {
+                "title": "名称",
+                "consumedAt": "時刻",
+                "mealType": "食事",
+                "noMealType": "食事なし",
+                "note": "メモ"
+            },
+            "meal": {
+                "breakfast": "朝食",
+                "lunch": "昼食",
+                "dinner": "夕食",
+                "snack": "間食"
+            },
+            "nutrient": {
+                "energyKcal": "エネルギー",
+                "fat": "脂質",
+                "saturatedFat": "うち飽和脂肪酸",
+                "carbs": "炭水化物",
+                "sugar": "うち糖類",
+                "protein": "たんぱく質",
+                "salt": "食塩相当量",
+                "fiber": "食物繊維"
+            },
+            "unit": {
+                "kcal": "kcal",
+                "g": "g"
+            }
+        }
     },
     "waste": {
         "title": "ゴミ収集",

@@ -305,7 +305,10 @@
         "manage": "管理",
         "todayNothingElseTomorrow": "今天没有其他安排了。明天：{{title}}",
         "weatherHighLow": "最高 {{max}}°、最低 {{min}}°",
-        "optionCalendarBirthdaysHint": "取消勾选后，此卡片不再显示生日，日历中仍会保留。"
+        "optionCalendarBirthdaysHint": "取消勾选后，此卡片不再显示生日，日历中仍会保留。",
+        "nutritionNoTarget": "尚未设置每日目标。",
+        "nutritionEntries": "今天 {{count}} 条记录",
+        "nutritionEntries_one": "今天 {{count}} 条记录"
     },
     "tasks": {
         "manageCategories": "管理类别",
@@ -4079,7 +4082,8 @@
             "labs": "化验值",
             "activity": "活动",
             "cycle": "周期",
-            "fasting": "断食"
+            "fasting": "断食",
+            "nutrition": "营养"
         },
         "overview": {
             "title": "概览",
@@ -4850,7 +4854,62 @@
             "h": "{{hours}} 小时",
             "m": "{{minutes}} 分钟"
         },
-        "careBanner": "你正在为 {{name}} 记录。"
+        "careBanner": "你正在为 {{name}} 记录。",
+        "nutrition": {
+            "title": "营养",
+            "emptyTitle": "尚未记录营养数据",
+            "emptyDesc": "记录你吃了什么，数字就印在包装上。",
+            "add": "添加记录",
+            "edit": "编辑记录",
+            "saved": "记录已保存。",
+            "saveError": "记录保存失败。",
+            "deleted": "记录已删除。",
+            "invalid": "请填写名称、时间和有效数字。",
+            "noEntries": "暂无记录。",
+            "entriesTitle": "记录",
+            "personsLabel": "成员",
+            "todayTitle": "今天",
+            "targetTitle": "每日目标",
+            "targetSet": "设置目标",
+            "targetEdit": "编辑目标",
+            "targetHint": "不想追踪的项目请留空。0 是一个目标，留空则不是。",
+            "targetNone": "尚未设置每日目标。",
+            "targetNoneHint": "没有目标时，本页只显示累计数值。",
+            "targetSaved": "每日目标已保存。",
+            "targetSaveError": "每日目标保存失败。",
+            "ofTarget": "{{value}} / {{target}} {{unit}}",
+            "noTargetValue": "{{value}} {{unit}}",
+            "loadError": "无法加载营养数据。",
+            "loadErrorDesc": "请稍后重试。",
+            "retry": "重试",
+            "field": {
+                "title": "名称",
+                "consumedAt": "时间",
+                "mealType": "餐次",
+                "noMealType": "无餐次",
+                "note": "备注"
+            },
+            "meal": {
+                "breakfast": "早餐",
+                "lunch": "午餐",
+                "dinner": "晚餐",
+                "snack": "加餐"
+            },
+            "nutrient": {
+                "energyKcal": "能量",
+                "fat": "脂肪",
+                "saturatedFat": "其中饱和脂肪",
+                "carbs": "碳水化合物",
+                "sugar": "其中糖",
+                "protein": "蛋白质",
+                "salt": "盐",
+                "fiber": "膳食纤维"
+            },
+            "unit": {
+                "kcal": "千卡",
+                "g": "克"
+            }
+        }
     },
     "waste": {
         "title": "垃圾收集",

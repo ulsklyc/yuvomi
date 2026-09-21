@@ -83,6 +83,10 @@ export const PERMISSION_WIDGETS = Object.freeze([
   { id: 'health',       module: 'health' },
   { id: 'cycle',        module: 'health' },
   { id: 'fasting',      module: 'health' },
+  // Wie Zyklus und Fasten am Modul health und trotzdem einzeln sperrbar:
+  // wer sein Essen protokolliert, teilt damit nicht zwangslaeufig die
+  // Medikamentenkachel - und umgekehrt (#467, derselbe Grund wie bei cycle).
+  { id: 'nutrition',    module: 'health' },
   { id: 'housekeeping', module: 'housekeeping' },
   { id: 'schedule',     module: 'schedule' },
   { id: 'waste',        module: 'waste' },

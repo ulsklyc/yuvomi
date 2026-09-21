@@ -16,6 +16,7 @@ import { esc, fmtLocation, renderMarkdownLight } from '/utils/html.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays, todayKey as householdToday } from '/utils/date.js';
 import { nowFields, zonedUTCProxy, zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
 import { predictCycle, PHASE } from '/utils/health-cycle.js';
+import { NUTRIENTS, nutrientProgress } from '/utils/health-nutrition.js';
 import { startFasting, finishFasting, startFastingClock, fastingClockSwitchHtml, fastingError } from '/components/fasting-controls.js';
 import { localizeBirthdayEvent } from '/utils/birthday-event.js';
 import { countdownPhrase, countdownRank } from '/utils/countdown.js';
@@ -287,7 +288,7 @@ function maybeHintCustomize(container) {
 // Widget → Modul-Slug für die „Modul deaktiviert?"-Prüfung. Widgets ohne Eintrag
 // (family, weather) sind immer verfügbar. Modulweit, damit Grid-Filter und
 // Wieder-Einblenden-Leiste dieselbe Sichtbarkeitsregel teilen.
-const MODULE_FOR_WIDGET = { tasks: 'tasks', calendar: 'calendar', shopping: 'shopping', meals: 'meals', notes: 'notes', birthdays: 'birthdays', budget: 'budget', rewards: 'rewards', health: 'health', cycle: 'health', fasting: 'health', housekeeping: 'housekeeping', schedule: 'schedule', waste: 'waste' };
+const MODULE_FOR_WIDGET = { tasks: 'tasks', calendar: 'calendar', shopping: 'shopping', meals: 'meals', notes: 'notes', birthdays: 'birthdays', budget: 'budget', rewards: 'rewards', health: 'health', cycle: 'health', fasting: 'health', nutrition: 'health', housekeeping: 'housekeeping', schedule: 'schedule', waste: 'waste' };
 
 const WIDGETS_WITH_OPTIONS = new Set(['calendar', 'tasks', 'notes', 'waste']);
 
@@ -423,6 +424,7 @@ function widgetLabel(id) {
     health:   () => t('nav.health'),
     cycle:    () => t('health.cycle.title'),
     fasting:  () => t('health.fasting.title'),
+    nutrition: () => t('health.nutrition.title'),
     housekeeping: () => t('nav.housekeeping'),
     schedule: () => t('nav.schedule'),
     waste:    () => t('nav.waste'),
@@ -2100,6 +2102,82 @@ function wireFastingWidget(container, rerender, refresh, fasting, signal) {
 }
 
 // --------------------------------------------------------
+// Naehrwerte-Widget (opt-in, #1326)
+// --------------------------------------------------------
+
+/**
+ * `nutrition` kommt fertig gerechnet aus `/dashboard` - dieselbe Bilanz, die
+ * auch `/health/nutrition/summary` liefert (services/health-nutrition.js). Hier
+ * wird nichts zusammengezaehlt: eine zweite Rechnung waere eine zweite Zahl,
+ * und die Kachel wuerde dem Tab widersprechen.
+ *
+ * DREI ZUSTAENDE, NICHT ZWEI, und der mittlere ist der, der sonst verloren geht:
+ *   - kein Ziel gesetzt (`target === null`) -> die Kachel sagt das und bietet
+ *     an, eines zu setzen. NICHT "0 von 0", was wie ein erreichtes Ziel
+ *     aussaehe.
+ *   - ein Ziel gesetzt, aber noch nichts erfasst -> Balken bei 0. Das ist eine
+ *     Aussage ueber den Tag, keine ueber das Ziel.
+ *   - ein Ziel von 0 (etwa Zucker) -> ein echtes Ziel, gegen das gemessen wird.
+ *     `nutrientProgress()` haelt diesen Fall von "kein Ziel" getrennt.
+ */
+function renderNutritionWidget(nutrition) {
+  if (nutrition === null || nutrition === undefined) throw new Error('nutrition widget slice failed to load');
+  const target = nutrition.target;
+  const writable = moduleAccess('health') === 'write';
+
+  if (!target) {
+    return `<div class="widget widget--nutrition">
+      ${widgetHeader('nutrition', t('health.nutrition.title'), null, '/health/nutrition')}
+      <div class="widget__empty">
+        <i data-lucide="salad" class="empty-state__icon" aria-hidden="true"></i>
+        <div>${t('dashboard.nutritionNoTarget')}</div>
+        ${writable ? emptyStateCta('/health/nutrition', t('health.nutrition.targetSet')) : ''}
+      </div>
+    </div>`;
+  }
+
+  // Nur die Naehrwerte mit Ziel: eine Zeile "- von -" waere eine Zeile, die
+  // nichts sagt und doch Platz nimmt. Wer nur Energie und Eiweiss verfolgt,
+  // bekommt zwei Balken, nicht acht.
+  const rows = NUTRIENTS
+    .filter((n) => target[n.key] !== null && target[n.key] !== undefined)
+    .map((n) => {
+      const value = Number(nutrition.totals?.[n.key] ?? 0);
+      const progress = nutrientProgress(value, target[n.key]);
+      const text = t('health.nutrition.ofTarget', {
+        value: fmtDashNum(value), target: fmtDashNum(target[n.key]), unit: t(n.unitKey),
+      });
+      return `<li class="nutrition-widget__row">
+        <span class="nutrition-widget__label">${esc(t(n.labelKey))}</span>
+        <span class="nutrition-widget__bar${progress.over ? ' nutrition-widget__bar--over' : ''}"
+              role="img" aria-label="${esc(`${t(n.labelKey)}: ${text}`)}">
+          <span class="nutrition-widget__fill" style="--nutrition-scale:${progress.ratio}"></span>
+        </span>
+        <span class="nutrition-widget__value">${esc(text)}</span>
+      </li>`;
+    });
+
+  const body = rows.length
+    ? `<ul class="nutrition-widget__rows">${rows.join('')}</ul>`
+    : `<div class="widget__empty"><div>${t('dashboard.nutritionNoTarget')}</div></div>`;
+
+  return `<div class="widget widget--nutrition">
+    ${widgetHeader('nutrition', t('health.nutrition.title'), null, '/health/nutrition')}
+    <div class="widget__body">
+      <div class="nutrition-widget">
+        ${body}
+        <p class="nutrition-widget__count">${esc(t('dashboard.nutritionEntries', { count: Number(nutrition.entryCount) || 0 }))}</p>
+      </div>
+    </div>
+  </div>`;
+}
+
+/** Eine Naehrwert-Zahl auf der Kachel: hoechstens eine Nachkommastelle. */
+function fmtDashNum(value) {
+  return getNumberFormat({ maximumFractionDigits: 1 }).format(Number(value) || 0);
+}
+
+// --------------------------------------------------------
 // Schedule-Widget (wer heute im Dienst oder frei ist)
 // --------------------------------------------------------
 
@@ -3090,6 +3168,7 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
     health: () => renderHealthWidget(data.health ?? {}),
     cycle: () => renderCycleWidget(data.cycle),
     fasting: () => renderFastingWidget(data.fasting),
+    nutrition: () => renderNutritionWidget(data.nutrition),
     housekeeping: () => renderHousekeepingWidget(data.housekeeping ?? {}, currency),
     schedule: (size) => renderScheduleWidget(data.schedule, data.users ?? [], size),
     waste: (size) => renderWasteWidget(data.waste, size),

@@ -1391,6 +1391,50 @@ const MIGRATIONS_SQL = {
     CREATE INDEX IF NOT EXISTS idx_ripm_pantry_item
       ON recipe_ingredient_pantry_matches(pantry_item_id);
   `,
+
+  // Tagesziel je Person und erfasster Eintrag (#1326). Die acht Naehrwerte
+  // sind fest und heissen ueberall gleich; NULL heisst "nicht gesetzt" und 0
+  // ist ein ausdrueckliches Ziel - die Begruendung dazu, samt der Wahl des
+  // kanonischen Sichtbarkeits-Vokabulars, steht bei Migration 223 in
+  // server/db.js. Die Trigger bleiben hier weg: eine Testdatenbank braucht
+  // kein updated_at, das sich selbst nachzieht.
+  223: `
+    CREATE TABLE health_nutrition_targets (
+      user_id          INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      energy_kcal      REAL CHECK (energy_kcal      IS NULL OR energy_kcal      >= 0),
+      fat_g            REAL CHECK (fat_g            IS NULL OR fat_g            >= 0),
+      saturated_fat_g  REAL CHECK (saturated_fat_g  IS NULL OR saturated_fat_g  >= 0),
+      carbs_g          REAL CHECK (carbs_g          IS NULL OR carbs_g          >= 0),
+      sugar_g          REAL CHECK (sugar_g          IS NULL OR sugar_g          >= 0),
+      protein_g        REAL CHECK (protein_g        IS NULL OR protein_g        >= 0),
+      salt_g           REAL CHECK (salt_g           IS NULL OR salt_g           >= 0),
+      fiber_g          REAL CHECK (fiber_g          IS NULL OR fiber_g          >= 0),
+      created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    );
+    CREATE TABLE health_nutrition_entries (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      consumed_at     TEXT    NOT NULL,
+      meal_type       TEXT    CHECK (meal_type IS NULL OR meal_type IN ('breakfast', 'lunch', 'dinner', 'snack')),
+      title           TEXT    NOT NULL,
+      energy_kcal     REAL CHECK (energy_kcal     IS NULL OR energy_kcal     >= 0),
+      fat_g           REAL CHECK (fat_g           IS NULL OR fat_g           >= 0),
+      saturated_fat_g REAL CHECK (saturated_fat_g IS NULL OR saturated_fat_g >= 0),
+      carbs_g         REAL CHECK (carbs_g         IS NULL OR carbs_g         >= 0),
+      sugar_g         REAL CHECK (sugar_g         IS NULL OR sugar_g         >= 0),
+      protein_g       REAL CHECK (protein_g       IS NULL OR protein_g       >= 0),
+      salt_g          REAL CHECK (salt_g          IS NULL OR salt_g          >= 0),
+      fiber_g         REAL CHECK (fiber_g         IS NULL OR fiber_g         >= 0),
+      note            TEXT,
+      visibility      TEXT    NOT NULL DEFAULT 'private' CHECK (visibility IN ('private', 'all')),
+      created_by      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      updated_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    );
+    CREATE INDEX idx_health_nutrition_entries_user_date
+      ON health_nutrition_entries(user_id, consumed_at);
+  `,
 };
 
 export { MIGRATIONS_SQL };

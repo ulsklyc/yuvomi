@@ -23,19 +23,44 @@
 import express from 'express';
 import * as db from '../../db.js';
 import { FastingError, requireFastingCapability } from '../../services/fasting.js';
-import { log, VISIBILITIES, viewerId, badRequest } from './helpers.js';
+import { log, VISIBILITIES, OPEN_FAMILY, OPEN_ALL, viewerId, badRequest } from './helpers.js';
 
 const router = express.Router();
 
 // Die Bereiche ausserhalb der Vitalwerte. Je EINE Voreinstellung, weil jeder
 // von ihnen eine Sorte Eintrag ist.
+//
+// `open` ist der Wert, den DIE TABELLE DES BEREICHS fuer "der Haushalt darf
+// mitlesen" schreibt. Er steht hier und nicht als Konstante im Code, weil er
+// genau an einer Stelle abweicht: `health_nutrition_entries` fuehrt seit
+// Migration 223 den kanonischen Satz aus docs/DECISIONS.md Abschnitt 5 und
+// schreibt dort 'all'. Diese Tabelle hier (`health_visibility_defaults`) fuehrt
+// weiter das Paar private/family - sie ist die WAHL der Person, nicht die
+// Zeile, und eine Migration, die gespeicherte Werte umschreibt, ist in
+// Abschnitt 5 ausdruecklich ausgeschlossen. Uebersetzt wird deshalb beim
+// Lesen, und zwar hier: `defaultVisibilityFor()` und der Nachzieh-Pfad sind die
+// beiden einzigen Stellen, an denen die Wahl auf eine Zeile trifft.
 const FLAT_SCOPES = Object.freeze({
-  meds:       { table: 'medications',        column: 'user_id' },
-  labs:       { table: 'health_lab_reports', column: 'user_id' },
-  activities: { table: 'health_activities',  column: 'user_id' },
-  fasting:    { table: 'health_fasts',       column: 'user_id' },
-  prevention: { table: 'health_prevention_records', column: 'user_id' },
+  meds:       { table: 'medications',        column: 'user_id', open: OPEN_FAMILY },
+  labs:       { table: 'health_lab_reports', column: 'user_id', open: OPEN_FAMILY },
+  activities: { table: 'health_activities',  column: 'user_id', open: OPEN_FAMILY },
+  fasting:    { table: 'health_fasts',       column: 'user_id', open: OPEN_FAMILY },
+  prevention: { table: 'health_prevention_records', column: 'user_id', open: OPEN_FAMILY },
+  nutrition:  { table: 'health_nutrition_entries',  column: 'user_id', open: OPEN_ALL },
 });
+
+/**
+ * Der offene Wert, den die Tabelle eines Bereichs schreibt.
+ *
+ * Vitalmetriken (`vital:<type>`) stehen nicht in FLAT_SCOPES und bleiben beim
+ * Paar der Gesundheit - `health_vitals.visibility` fuehrt 'family'.
+ *
+ * @param {string} scopeKey
+ * @returns {'family'|'all'}
+ */
+export function openVisibilityFor(scopeKey) {
+  return FLAT_SCOPES[scopeKey]?.open ?? OPEN_FAMILY;
+}
 
 // Vitalwerte tragen ihre Voreinstellung JE METRIK: wer den Blutdruck teilen
 // will, teilt damit nicht die Stimmung. Der Metrikname wird nicht gegen eine
@@ -61,7 +86,11 @@ export function isValidScopeKey(key) {
  * Zeile, nicht der Erfassende: traegt eine betreuende Person (#584) einen Wert
  * fuer jemanden ein, gilt die Wahl dessen, dem die Zeile gehoert.
  *
- * @returns {'private'|'family'}
+ * Zurueck kommt der Wert IN DER SCHREIBWEISE DES BEREICHS: gespeichert ist die
+ * Wahl als 'family', und was die Zeile traegt, sagt `openVisibilityFor()`. Fuer
+ * jeden Bereich ausser den Naehrwerten ist das derselbe String wie bisher.
+ *
+ * @returns {'private'|'family'|'all'}
  */
 export function defaultVisibilityFor(database, userId, scopeKey) {
   if (!userId || !scopeKey) return 'private';
@@ -69,7 +98,7 @@ export function defaultVisibilityFor(database, userId, scopeKey) {
     const row = database.prepare(
       'SELECT visibility FROM health_visibility_defaults WHERE user_id = ? AND scope_key = ?'
     ).get(userId, scopeKey);
-    return row?.visibility === 'family' ? 'family' : 'private';
+    return row?.visibility === 'family' ? openVisibilityFor(scopeKey) : 'private';
   } catch (err) {
     // Ein Lesefehler darf das Anlegen nicht kosten, aber auch nicht still zu
     // 'family' werden: der engere Wert ist der sichere Ausgang.
@@ -199,9 +228,15 @@ router.patch('/visibility-defaults/apply', (req, res) => {
       ).run(visibility, viewer, new Date().toISOString(), viewer).changes;
     } else {
       const target = FLAT_SCOPES[scope];
+      // In der Schreibweise DER ZIELTABELLE, nicht in der des Requests: die
+      // Anfrage spricht das Paar private/family (so steht es auch in der
+      // Oberflaeche), die Naehrwert-Tabelle fuehrt private/all. Ohne die
+      // Uebersetzung schriebe dieser Zweig ein 'family' gegen einen CHECK, der
+      // es nicht kennt - der Nachzieh-Knopf endete in einem 500.
+      const stored = visibility === 'family' ? target.open : 'private';
       updated = database.prepare(
         `UPDATE ${target.table} SET visibility = ? WHERE ${target.column} = ?`
-      ).run(visibility, viewer).changes;
+      ).run(stored, viewer).changes;
     }
     res.json({ data: { updated: Number(updated) } });
   } catch (err) {

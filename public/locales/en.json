@@ -305,7 +305,10 @@
         "manage": "Manage",
         "todayNothingElseTomorrow": "Nothing else today - tomorrow: {{title}}",
         "weatherHighLow": "High {{max}}°, low {{min}}°",
-        "optionCalendarBirthdaysHint": "Unchecked, birthdays stay out of this tile - the calendar still shows them."
+        "optionCalendarBirthdaysHint": "Unchecked, birthdays stay out of this tile - the calendar still shows them.",
+        "nutritionNoTarget": "No daily target set yet.",
+        "nutritionEntries": "{{count}} entries today",
+        "nutritionEntries_one": "{{count}} entry today"
     },
     "tasks": {
         "manageCategories": "Manage categories",
@@ -4079,7 +4082,8 @@
             "labs": "Lab values",
             "activity": "Activity",
             "cycle": "Cycle",
-            "fasting": "Fasting"
+            "fasting": "Fasting",
+            "nutrition": "Nutrition"
         },
         "overview": {
             "title": "Overview",
@@ -4850,7 +4854,62 @@
             "h": "{{hours}} h",
             "m": "{{minutes}} min"
         },
-        "careBanner": "You are recording for {{name}}."
+        "careBanner": "You are recording for {{name}}.",
+        "nutrition": {
+            "title": "Nutrition",
+            "emptyTitle": "No nutrition logged yet",
+            "emptyDesc": "Log what you ate - the numbers are on the packet.",
+            "add": "Add entry",
+            "edit": "Edit entry",
+            "saved": "Entry saved.",
+            "saveError": "Entry could not be saved.",
+            "deleted": "Entry deleted.",
+            "invalid": "Please provide a name, a time and valid numbers.",
+            "noEntries": "No entries yet.",
+            "entriesTitle": "Entries",
+            "personsLabel": "Person",
+            "todayTitle": "Today",
+            "targetTitle": "Daily target",
+            "targetSet": "Set target",
+            "targetEdit": "Edit target",
+            "targetHint": "Leave blank what you do not want to track. A 0 is a target, an empty field is not.",
+            "targetNone": "No daily target set yet.",
+            "targetNoneHint": "Without a target this page only shows what has added up.",
+            "targetSaved": "Daily target saved.",
+            "targetSaveError": "Daily target could not be saved.",
+            "ofTarget": "{{value}} of {{target}} {{unit}}",
+            "noTargetValue": "{{value}} {{unit}}",
+            "loadError": "Nutrition data could not be loaded.",
+            "loadErrorDesc": "Please try again later.",
+            "retry": "Try again",
+            "field": {
+                "title": "Name",
+                "consumedAt": "Time",
+                "mealType": "Meal",
+                "noMealType": "No meal",
+                "note": "Note"
+            },
+            "meal": {
+                "breakfast": "Breakfast",
+                "lunch": "Lunch",
+                "dinner": "Dinner",
+                "snack": "Snack"
+            },
+            "nutrient": {
+                "energyKcal": "Energy",
+                "fat": "Fat",
+                "saturatedFat": "of which saturates",
+                "carbs": "Carbohydrate",
+                "sugar": "of which sugars",
+                "protein": "Protein",
+                "salt": "Salt",
+                "fiber": "Fibre"
+            },
+            "unit": {
+                "kcal": "kcal",
+                "g": "g"
+            }
+        }
     },
     "waste": {
         "title": "Waste collection",

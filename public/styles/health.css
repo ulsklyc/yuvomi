@@ -3078,3 +3078,160 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   .fasting-hero, .fasting-card { padding: var(--space-4); }
   .fasting-week { gap: var(--space-1); }
 }
+
+/* ========================================================
+ * NÄHRWERTE-TAB (#1326)
+ * ====================================================== */
+
+.health-nutrition {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.health-nutrition-today__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.health-nutrition-progress {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* Beschriftung - Balken - Zahl in EINER Rasterzeile, damit die Balken aller
+ * acht Zeilen an derselben Kante beginnen und enden: sonst vergliche man acht
+ * Fortschritte, die je woanders anfangen. Unter 480px faellt die Zahl in eine
+ * eigene Zeile, weil drei Spalten dort den Balken auf Fingerbreite quetschen. */
+.health-nutrition-progress__row {
+  display: grid;
+  grid-template-columns: minmax(6rem, 9rem) 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.health-nutrition-progress__label {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.health-nutrition-progress__bar {
+  display: block;
+  block-size: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-fill-well);
+  overflow: hidden;
+}
+
+.health-nutrition-progress__fill {
+  display: block;
+  block-size: 100%;
+  /* scaleX statt einer Breite in Prozent: der Balken bleibt eine
+   * Kompositor-Eigenschaft und rechnet kein Layout nach. */
+  inline-size: 100%;
+  transform: scaleX(var(--nutrition-scale, 0));
+  transform-origin: inline-start;
+  border-radius: inherit;
+  background: var(--module-health);
+}
+
+/* Ueberschritten ist ein ZUSTAND, keine Warnung: die Farbe sagt "darueber",
+ * nicht "falsch" - wer sein Eiweissziel uebertrifft, hat nichts falsch
+ * gemacht. */
+.health-nutrition-progress__bar--over .health-nutrition-progress__fill {
+  background: var(--color-warning);
+}
+
+.health-nutrition-progress__value {
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.health-nutrition-row-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.health-nutrition-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+}
+
+.health-nutrition-row + .health-nutrition-row {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.health-nutrition-row__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.health-nutrition-row__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.health-nutrition-row__title {
+  font-weight: var(--font-weight-semibold, 600);
+  overflow-wrap: anywhere;
+}
+
+.health-nutrition-row__when {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.health-nutrition-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.health-nutrition-row__chip {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  padding: var(--space-0h) var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-2);
+}
+
+.health-nutrition-row__note {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.health-nutrition-row__edit {
+  flex: 0 0 auto;
+}
+
+/* 639px ist die gemeinsame Telefon-Grenze der Seite (tokens.css 11c) - eine
+ * eigene Zahl hier waere ein Breakpoint, den nur dieser Tab kennt. */
+@media (max-width: 639px) {
+  .health-nutrition-progress__row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .health-nutrition-progress__bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

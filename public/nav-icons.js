@@ -334,6 +334,10 @@ export const MODULE_ICON = {
   birthdays:        'cake',
   health:           'heart-pulse',
   fasting:          'timer',
+  // Naehrwerte (#1326). Bewusst nicht `utensils` - das ist die Kueche, und
+  // zwei Module mit demselben Zeichen waeren wieder der Fehler, den dieser
+  // Satz aufgeraeumt hat.
+  nutrition:        'salad',
   budget:           'wallet',
   'split-expenses': 'receipt-text',
   settings:         'settings',

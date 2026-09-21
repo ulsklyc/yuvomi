@@ -305,7 +305,10 @@
         "manage": "Kezelés",
         "todayNothingElseTomorrow": "Mára nincs több teendő - holnap: {{title}}",
         "weatherHighLow": "Legmagasabb: {{max}}°, legalacsonyabb: {{min}}°",
-        "optionCalendarBirthdaysHint": "Pipa nélkül a születésnapok kimaradnak ebből a csempéből, a naptárban továbbra is ott vannak."
+        "optionCalendarBirthdaysHint": "Pipa nélkül a születésnapok kimaradnak ebből a csempéből, a naptárban továbbra is ott vannak.",
+        "nutritionNoTarget": "Még nincs napi cél beállítva.",
+        "nutritionEntries": "Ma {{count}} bejegyzés",
+        "nutritionEntries_one": "Ma {{count}} bejegyzés"
     },
     "tasks": {
         "manageCategories": "Kategóriák kezelése",
@@ -4079,7 +4082,8 @@
             "labs": "Laborértékek",
             "activity": "Tevékenység",
             "cycle": "Ciklus",
-            "fasting": "Böjt"
+            "fasting": "Böjt",
+            "nutrition": "Tápérték"
         },
         "overview": {
             "title": "Áttekintés",
@@ -4850,7 +4854,62 @@
             "h": "{{hours}} ó",
             "m": "{{minutes}} p"
         },
-        "careBanner": "{{name}} nevében rögzítesz."
+        "careBanner": "{{name}} nevében rögzítesz.",
+        "nutrition": {
+            "title": "Tápérték",
+            "emptyTitle": "Még nincs rögzített tápérték",
+            "emptyDesc": "Jegyezd fel, mit ettél - a számok a csomagoláson vannak.",
+            "add": "Bejegyzés hozzáadása",
+            "edit": "Bejegyzés szerkesztése",
+            "saved": "Bejegyzés mentve.",
+            "saveError": "A bejegyzést nem sikerült menteni.",
+            "deleted": "Bejegyzés törölve.",
+            "invalid": "Adj meg nevet, időpontot és érvényes számokat.",
+            "noEntries": "Még nincs bejegyzés.",
+            "entriesTitle": "Bejegyzések",
+            "personsLabel": "Személy",
+            "todayTitle": "Ma",
+            "targetTitle": "Napi cél",
+            "targetSet": "Cél beállítása",
+            "targetEdit": "Cél szerkesztése",
+            "targetHint": "Hagyd üresen, amit nem akarsz követni. A 0 egy cél, az üres mező nem.",
+            "targetNone": "Még nincs napi cél beállítva.",
+            "targetNoneHint": "Cél nélkül ez az oldal csak az összeget mutatja.",
+            "targetSaved": "Napi cél mentve.",
+            "targetSaveError": "A napi célt nem sikerült menteni.",
+            "ofTarget": "{{value}} / {{target}} {{unit}}",
+            "noTargetValue": "{{value}} {{unit}}",
+            "loadError": "A tápértékadatokat nem sikerült betölteni.",
+            "loadErrorDesc": "Próbáld újra később.",
+            "retry": "Újrapróbálkozás",
+            "field": {
+                "title": "Megnevezés",
+                "consumedAt": "Időpont",
+                "mealType": "Étkezés",
+                "noMealType": "Nincs étkezés",
+                "note": "Megjegyzés"
+            },
+            "meal": {
+                "breakfast": "Reggeli",
+                "lunch": "Ebéd",
+                "dinner": "Vacsora",
+                "snack": "Nassolnivaló"
+            },
+            "nutrient": {
+                "energyKcal": "Energia",
+                "fat": "Zsír",
+                "saturatedFat": "ebből telített zsírsav",
+                "carbs": "Szénhidrát",
+                "sugar": "ebből cukor",
+                "protein": "Fehérje",
+                "salt": "Só",
+                "fiber": "Rost"
+            },
+            "unit": {
+                "kcal": "kcal",
+                "g": "g"
+            }
+        }
     },
     "waste": {
         "title": "Hulladékgyűjtés",

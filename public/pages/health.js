@@ -56,6 +56,7 @@ import { HEALTH_ROUTES, renderHealthTabsBar } from '/utils/health-tabs.js';
 import { canUseFasting, isNavModuleReadOnly } from '/permissions.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
 import { intervalMonthsToInput, intervalInputToMonths } from '/utils/health-prevention.js';
+import { NUTRIENTS, MEAL_TYPES, nutrientProgress } from '/utils/health-nutrition.js';
 
 let _container = null;
 
@@ -247,6 +248,7 @@ const WRITE_HOOKS = [
   '[data-med-edit]', '[data-medlog-edit]', '[data-dose-take]', '[data-dose-skip]',
   '[data-ov-dose-take]', '[data-ov-dose-skip]', '[data-prn-take]',
   '[data-activity-edit]', '[data-prevention-edit]', '[data-delete-vital]',
+  '[data-nutrition-edit]', '[data-nutrition-target]',
   '[data-cycle-day]', '[data-cycle-edit]',
 ].join(', ');
 
@@ -399,6 +401,13 @@ const PANELS = () => [
     emptyTitleKey: 'health.activity.emptyTitle',
     emptyDescKey: 'health.activity.emptyDesc',
   },
+  {
+    route: '/health/nutrition',
+    icon: 'salad',
+    titleKey: 'health.nutrition.title',
+    emptyTitleKey: 'health.nutrition.emptyTitle',
+    emptyDescKey: 'health.nutrition.emptyDesc',
+  },
 ];
 
 function normalizeHealthPath(path) {
@@ -428,6 +437,8 @@ function panelMarkup(panel, activeRoute) {
     ? '<div class="health-labs" data-labs-root></div>'
     : panel.route === '/health/activity'
     ? '<div class="health-activity" data-activity-root></div>'
+    : panel.route === '/health/nutrition'
+    ? '<div class="health-nutrition" data-nutrition-root></div>'
     : emptyStateHTML({
       icon: panel.icon,
       title: t(panel.emptyTitleKey),
@@ -488,6 +499,8 @@ function updateHealthFab(activeRoute) {
       setPageFabAction(_fab, { hidden: !canEditFor(labs.personId, labs.meId), label: t('health.labs.add'), onClick: () => openLabModal(null) }); break;
     case '/health/activity':
       setPageFabAction(_fab, { hidden: !canEditFor(activity.personId, activity.meId), label: t('health.activity.add'), onClick: () => openActivityModal(null) }); break;
+    case '/health/nutrition':
+      setPageFabAction(_fab, { hidden: !canEditFor(nutrition.personId, nutrition.meId), label: t('health.nutrition.add'), onClick: () => openNutritionModal(null) }); break;
     default:
       setPageFabAction(_fab, { hidden: true });
   }
@@ -522,6 +535,9 @@ export async function render(container, ctx = {}) {
   overview.meId = ctx.user?.id ?? overview.meId;
   overview.root = null;
   overview.loaded = false;
+  nutrition.meId = ctx.user?.id ?? nutrition.meId;
+  nutrition.root = null;
+  nutrition.loaded = false;
   await Promise.all([loadHealthPrefs(), loadCareGrants(), loadVisibilityDefaults()]);
   const activeRoute = normalizeHealthPath(window.location.pathname);
   const panels = PANELS().filter((panel) => (cycleEnabled || panel.route !== '/health/cycle') && (fastingEnabled || panel.route !== '/health/fasting'));
@@ -564,6 +580,7 @@ export async function render(container, ctx = {}) {
   maybeMountPrevention(activeRoute);
   maybeMountLabs(activeRoute);
   maybeMountActivity(activeRoute);
+  maybeMountNutrition(activeRoute);
 }
 
 // Soft-Navigation zwischen Health-Tabs (vom Router aufgerufen, wenn das Modul
@@ -572,7 +589,7 @@ export async function render(container, ctx = {}) {
 export async function update({ path, user } = {}) {
   if (!_container?.isConnected) return false;
   if (user?.id) healthUser = user;
-  if (user?.id) { vitals.meId = user.id; meds.meId = user.id; labs.meId = user.id; activity.meId = user.id; cycle.meId = user.id; overview.meId = user.id; prevention.meId = user.id; }
+  if (user?.id) { vitals.meId = user.id; meds.meId = user.id; labs.meId = user.id; activity.meId = user.id; cycle.meId = user.id; overview.meId = user.id; prevention.meId = user.id; nutrition.meId = user.id; }
   const activeRoute = normalizeHealthPath(path || window.location.pathname);
 
   _container.querySelector('.sub-tabs-bar')?.remove();
@@ -586,6 +603,7 @@ export async function update({ path, user } = {}) {
   maybeMountPrevention(activeRoute);
   maybeMountLabs(activeRoute);
   maybeMountActivity(activeRoute);
+  maybeMountNutrition(activeRoute);
   return true;
 }
 
@@ -4224,6 +4242,466 @@ async function deletePreventionRecord(row) {
 }
 
 // ========================================================
+// NÄHRWERTE-TAB
+// ========================================================
+
+// Naehrwerte-View-Zustand. ENTGEGENGENOMMEN, NICHT GERECHNET (#1326,
+// docs/DECISIONS.md Abschnitt 8): `summary` kommt fertig vom Server, weil das
+// Dashboard dieselbe Zahl braucht - eine zweite Rechnung hier waere eine
+// zweite Wahrheit, und die Kachel wuerde dem Tab widersprechen.
+const nutrition = {
+  meId: null,
+  personId: null,
+  members: [],
+  entries: [],
+  summary: null,
+  loaded: false,
+  error: false,
+  root: null,
+};
+
+function maybeMountNutrition(activeRoute) {
+  if (activeRoute !== '/health/nutrition') return;
+  const root = _container?.querySelector('[data-nutrition-root]');
+  if (!root) return;
+  if (nutrition.root === root && nutrition.loaded) return;
+  nutrition.root = root;
+  mountNutrition();
+}
+
+async function mountNutrition() {
+  nutrition.root.replaceChildren();
+  nutrition.root.insertAdjacentHTML('beforeend',
+    `<div class="health-nutrition__loading">${esc(t('common.loading'))}</div>`);
+
+  try {
+    await loadHealthMembers(nutrition, healthUser);
+    await loadNutritionData();
+    nutrition.error = false;
+  } catch (err) {
+    console.error('[Health] nutrition mount error:', err);
+    nutrition.error = err;
+  }
+  nutrition.loaded = true;
+  renderNutritionShell();
+}
+
+async function loadNutritionData() {
+  const query = nutrition.personId ? `?user_id=${encodeURIComponent(nutrition.personId)}` : '';
+  // Der Tag fuer die Bilanz wird NICHT hier bestimmt: `todayKey()` im Browser
+  // folgt der Geraetezone, der Server folgt der Haushaltszone - und die Zeile
+  // im Tagebuch traegt die Haushaltszone. Ohne `date` antwortet die Route mit
+  // ihrem eigenen `todayKey()`, und das ist der richtige Tag.
+  const [entries, summary] = await Promise.all([
+    api.get(`/health/nutrition/entries${query}`),
+    api.get(`/health/nutrition/summary${query}`),
+  ]);
+  nutrition.entries = entries.data || [];
+  nutrition.summary = summary.data || null;
+}
+
+async function switchNutritionPerson() {
+  try {
+    await loadNutritionData();
+    nutrition.error = false;
+  } catch (err) {
+    console.error('[Health] nutrition load error:', err);
+    nutrition.error = err;
+  }
+  renderNutritionShell();
+}
+
+async function reloadNutrition() {
+  try {
+    await loadNutritionData();
+    nutrition.error = false;
+  } catch (err) {
+    console.error('[Health] nutrition reload error:', err);
+    nutrition.error = err;
+  }
+  renderNutritionShell();
+}
+
+/**
+ * Die Standard-Sichtbarkeit dieses Bereichs IN SEINER SCHREIBWEISE.
+ *
+ * `defaultVisibility()` antwortet im Paar private/family - so speichert
+ * `health_visibility_defaults` die Wahl der Person, und so steht sie auch in
+ * den Einstellungen. Diese Tabelle fuehrt dagegen den kanonischen Satz
+ * (private/all, docs/DECISIONS.md Abschnitt 5). Uebersetzt wird hier, damit der
+ * Dialog nicht anfaengt, ein zweites Vokabular zu kennen.
+ */
+function defaultNutritionVisibility() {
+  return defaultVisibility('nutrition') === 'family' ? 'all' : 'private';
+}
+
+function renderNutritionShell() {
+  if (!nutrition.root?.isConnected) return;
+  nutrition.root.replaceChildren();
+
+  if (nutrition.error) {
+    mountAreaLoadError(nutrition, 'nutrition', mountNutrition);
+    return;
+  }
+
+  const own = canEditFor(nutrition.personId, nutrition.meId);
+  const entries = [...nutrition.entries].sort((a, b) =>
+    String(b.consumed_at).localeCompare(String(a.consumed_at)));
+
+  nutrition.root.insertAdjacentHTML('beforeend', `
+    ${personSwitcherMarkup(nutrition.members, nutrition.personId, nutrition.meId,
+      { menuId: 'health-person-menu-nutrition', label: t('health.nutrition.personsLabel') })}
+    ${readOnlyBannerMarkup(nutrition.members, nutrition.personId, own, nutrition.meId)}
+    ${nutritionTodaySectionMarkup(own)}
+    <h3 class="health-nutrition__entries-title u-section-title">${esc(t('health.nutrition.entriesTitle'))}</h3>
+    ${entries.length
+      ? `<ul class="health-nutrition-row-list">${entries.map((row) => nutritionRowMarkup(row, own)).join('')}</ul>`
+      : emptyHintHTML(t('health.nutrition.noEntries'))}
+  `);
+  if (window.lucide) window.lucide.createIcons({ el: nutrition.root });
+  wireNutrition();
+  refreshHealthFab();
+}
+
+/** "Heute" - die Summen gegen das Ziel. Der Kern dieses Tabs. */
+function nutritionTodaySectionMarkup(own) {
+  const summary = nutrition.summary;
+  if (!summary) return '';
+  const target = summary.target;
+
+  // KEIN ZIEL IST NICHT ZIEL NULL. Steht gar keine Zeile da, sagt der Abschnitt
+  // das und bietet an, eines zu setzen - statt acht Balken "0 von 0" zu zeigen,
+  // was wie ein erreichtes Ziel aussaehe.
+  const body = target
+    ? `<ul class="health-nutrition-progress">${NUTRIENTS.map((n) => nutritionProgressRowMarkup(n, summary)).join('')}</ul>`
+    : `${emptyHintHTML(t('health.nutrition.targetNone'))}
+       <p class="form-hint">${esc(t('health.nutrition.targetNoneHint'))}</p>`;
+
+  const editBtn = own
+    ? `<button type="button" class="btn btn--secondary btn--sm" data-nutrition-target
+         >${esc(t(target ? 'health.nutrition.targetEdit' : 'health.nutrition.targetSet'))}</button>`
+    : '';
+
+  return `
+    <section class="health-nutrition-today">
+      <div class="health-nutrition-today__head">
+        <h3 class="u-section-title">${esc(t('health.nutrition.todayTitle'))}</h3>
+        ${editBtn}
+      </div>
+      ${body}
+    </section>`;
+}
+
+function nutritionProgressRowMarkup(nutrient, summary) {
+  const value = Number(summary.totals?.[nutrient.key] ?? 0);
+  const goal = summary.target?.[nutrient.key] ?? null;
+  const progress = nutrientProgress(value, goal);
+  const unit = t(nutrient.unitKey);
+  const label = t(nutrient.labelKey);
+
+  const text = progress.hasTarget
+    ? t('health.nutrition.ofTarget', { value: fmtNum(value), target: fmtNum(goal), unit })
+    : t('health.nutrition.noTargetValue', { value: fmtNum(value), unit });
+
+  // `aria-label` traegt denselben Satz wie die sichtbare Zeile: der Balken ist
+  // ein Bild des Textes daneben, keine zusaetzliche Information.
+  const bar = progress.hasTarget
+    ? `<span class="health-nutrition-progress__bar${progress.over ? ' health-nutrition-progress__bar--over' : ''}"
+             role="img" aria-label="${esc(`${label}: ${text}`)}">
+         <span class="health-nutrition-progress__fill" style="--nutrition-scale:${progress.ratio}"></span>
+       </span>`
+    : '';
+
+  return `
+    <li class="health-nutrition-progress__row">
+      <span class="health-nutrition-progress__label">${esc(label)}</span>
+      ${bar}
+      <span class="health-nutrition-progress__value">${esc(text)}</span>
+    </li>`;
+}
+
+function nutritionRowMarkup(row, own) {
+  const meta = [];
+  if (row.meal_type) meta.push(t(`health.nutrition.meal.${row.meal_type}`));
+  for (const n of NUTRIENTS) {
+    // NUR ANGEGEBENE WERTE. Ein `null` bleibt weg statt als "0 g" dazustehen -
+    // die Mahlzeit hat nicht null Gramm Fett, es hat nur niemand eingetragen.
+    if (row[n.key] === null || row[n.key] === undefined) continue;
+    meta.push(`${t(n.labelKey)} ${fmtNum(row[n.key])} ${t(n.unitKey)}`);
+  }
+  const metaHtml = meta.length
+    ? `<span class="health-nutrition-row__meta">${meta.map((m) => `<span class="health-nutrition-row__chip">${esc(m)}</span>`).join('')}</span>`
+    : '';
+  const noteHtml = row.note ? `<span class="health-nutrition-row__note">${esc(row.note)}</span>` : '';
+  const editBtn = own
+    ? `<button type="button" class="btn btn--icon btn--sm health-nutrition-row__edit" data-nutrition-edit="${esc(row.id)}"
+         aria-label="${esc(t('health.nutrition.edit'))}"><i data-lucide="pencil" aria-hidden="true"></i></button>`
+    : '';
+  return `
+    <li class="health-nutrition-row" data-entry-id="${esc(row.id)}">
+      <span class="health-nutrition-row__body">
+        <span class="health-nutrition-row__head">
+          <span class="health-nutrition-row__title">${esc(row.title)}</span>
+          <span class="health-nutrition-row__when">${esc(nutritionWhenText(row.consumed_at))}</span>
+        </span>
+        ${metaHtml}
+        ${noteHtml}
+      </span>
+      ${editBtn}
+    </li>`;
+}
+
+/**
+ * `consumed_at` ist WANDUHRZEIT, kein Instant.
+ *
+ * Deshalb wird der String zerlegt statt durch `new Date()` geschickt: ein
+ * `new Date('2026-09-21T23:30')` liest die Zeit in der GERAETEZONE und ergibt
+ * beim Formatieren je nach Reisetaetigkeit einen anderen Tag als den, an dem
+ * jemand gegessen hat.
+ */
+function nutritionWhenText(consumedAt) {
+  const raw = String(consumedAt || '');
+  const day = raw.slice(0, 10);
+  const time = raw.slice(11, 16);
+  return time ? `${formatDate(day)} ${time}` : formatDate(day);
+}
+
+function wireNutrition() {
+  installPopoverMenus(nutrition.root);
+  wirePersonSwitcher(nutrition, switchNutritionPerson);
+
+  // Der Riegel vor den schreibenden Verdrahtungen dieses Tabs (#1265).
+  if (readOnly()) return;
+
+  nutrition.root.querySelector('[data-nutrition-target]')?.addEventListener('click', () => openNutritionTargetModal());
+
+  nutrition.root.querySelectorAll('[data-nutrition-edit]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      const id = Number(btn.dataset.nutritionEdit);
+      const row = nutrition.entries.find((r) => r.id === id);
+      if (row) openNutritionModal(row);
+    }));
+}
+
+// --------------------------------------------------------
+// Erfassungs-Modal (Anlegen/Bearbeiten inkl. Löschen)
+// --------------------------------------------------------
+
+function nutritionMealSelectMarkup(current) {
+  const options = MEAL_TYPES.map((value) =>
+    `<option value="${esc(value)}"${value === current ? ' selected' : ''}>${esc(t(`health.nutrition.meal.${value}`))}</option>`).join('');
+  return `<option value="">${esc(t('health.nutrition.field.noMealType'))}</option>${options}`;
+}
+
+/** Die acht Zahlenfelder - EINE Schleife ueber NUTRIENTS, keine acht Abschriften. */
+function nutrientFieldsMarkup(prefix, source) {
+  const val = (v) => (v === null || v === undefined ? '' : String(v));
+  return `
+    <div class="modal-grid modal-grid--2 health-nutrition-fields">
+      ${NUTRIENTS.map((n) => `
+        <div class="form-field">
+          <label class="label" for="${prefix}-${esc(n.key)}">${esc(t(n.labelKey))} (${esc(t(n.unitKey))})</label>
+          <input class="input" id="${prefix}-${esc(n.key)}" data-nutrient="${esc(n.key)}"
+                 type="number" inputmode="decimal" min="0" step="${esc(n.step)}"
+                 value="${esc(val(source?.[n.key]))}">
+        </div>`).join('')}
+    </div>`;
+}
+
+/**
+ * Die acht Werte aus einem Formular.
+ *
+ * Ein leeres Feld wird `null` ("nicht angegeben"), eine eingetippte 0 bleibt 0
+ * ("keines"). Das ist derselbe Unterschied wie in der Spalte und in der Route -
+ * er muss an allen drei Stellen halten, sonst geht er an der schwaechsten
+ * verloren.
+ * @returns {object|null} null, wenn eine Eingabe keine Zahl ist
+ */
+function collectNutrients(panel) {
+  const out = {};
+  for (const n of NUTRIENTS) {
+    const raw = panel.querySelector(`[data-nutrient="${n.key}"]`)?.value.trim();
+    if (raw === '' || raw == null) { out[n.key] = null; continue; }
+    const num = Number(raw);
+    if (!Number.isFinite(num) || num < 0) return null;
+    out[n.key] = num;
+  }
+  return out;
+}
+
+function openNutritionTargetModal() {
+  if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
+  const target = nutrition.summary?.target ?? null;
+
+  openModal({
+    title: t('health.nutrition.targetTitle'),
+    size: 'md',
+    content: `
+      <form id="nutrition-target-form" class="form-stack">
+        <p class="form-hint">${esc(t('health.nutrition.targetHint'))}</p>
+        ${nutrientFieldsMarkup('nutrition-target', target)}
+        <div class="modal-actions">
+          <button type="button" class="btn btn--ghost" data-action="cancel">${esc(t('common.cancel'))}</button>
+          <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
+        </div>
+      </form>`,
+    onSave(panel) {
+      panel.querySelector('[data-action="cancel"]')?.addEventListener('click', () => closeModal({ force: true }));
+      panel.querySelector('#nutrition-target-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = panel.querySelector('[type="submit"]');
+        const values = collectNutrients(panel);
+        if (!values) {
+          window.yuvomi?.showToast(t('health.nutrition.invalid'), 'danger');
+          return;
+        }
+        submitBtn.disabled = true;
+        try {
+          await api.put('/health/nutrition/targets', { ...values, ...ownerField(nutrition.personId, nutrition.meId) });
+          closeModal({ force: true });
+          window.yuvomi?.showToast(t('health.nutrition.targetSaved'), 'success');
+          await reloadNutrition();
+          refocusAfterRender();
+        } catch (err) {
+          console.error('[Health] nutrition target save error:', err);
+          submitBtn.disabled = false;
+          window.yuvomi?.showToast(err?.data?.error || t('health.nutrition.targetSaveError'), 'danger');
+        }
+      });
+    },
+  });
+}
+
+function openNutritionModal(row) {
+  if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
+  const isEdit = Boolean(row && row.id);
+  const val = (v) => (v == null ? '' : String(v));
+  const whenValue = isEdit && row.consumed_at
+    ? String(row.consumed_at).slice(0, 16)
+    : localDateTimeValue(new Date());
+  const visibility = row?.visibility || defaultNutritionVisibility();
+
+  openModal({
+    title: isEdit ? t('health.nutrition.edit') : t('health.nutrition.add'),
+    size: 'md',
+    content: `
+      <form id="nutrition-form" class="form-stack">
+        <div class="form-field">
+          <label class="label" for="nutrition-title">${esc(t('health.nutrition.field.title'))}</label>
+          <input class="input" id="nutrition-title" type="text" required maxlength="200" value="${esc(val(row?.title))}">
+        </div>
+        <div class="modal-grid modal-grid--2">
+          <div class="form-field">
+            <label class="label" for="nutrition-consumed-at">${esc(t('health.nutrition.field.consumedAt'))}</label>
+            <yuvomi-datepicker id="nutrition-consumed-at" type="datetime" value="${esc(whenValue)}"></yuvomi-datepicker>
+          </div>
+          <div class="form-field">
+            <label class="label" for="nutrition-meal-type">${esc(t('health.nutrition.field.mealType'))}</label>
+            <select class="input" id="nutrition-meal-type">${nutritionMealSelectMarkup(row?.meal_type ?? null)}</select>
+          </div>
+        </div>
+        ${nutrientFieldsMarkup('nutrition-entry', row)}
+        <div class="form-field">
+          <label class="label" for="nutrition-note">${esc(t('health.nutrition.field.note'))}</label>
+          <textarea class="input" id="nutrition-note" rows="2" maxlength="5000">${esc(val(row?.note))}</textarea>
+        </div>
+        <!-- DIE GETEILTEN BESCHRIFTUNGEN, nicht eigene. docs/DECISIONS.md
+             Abschnitt 5 zaehlt fuenf deutsche Formulierungen fuer denselben
+             Zustand auf und nennt die gemeinsamen Labels als das, was fehlt:
+             common.visibility.* gibt es in allen Locales, und ein eigenes
+             health.nutrition.visibility.* waere die sechste Formulierung
+             gewesen. Die aelteren Gesundheits-Tabs behalten ihre eigenen; sie
+             sprechen auch ein anderes Vokabular (private/family). -->
+        <div class="form-field">
+          <label class="label" for="nutrition-visibility">${esc(t('common.visibility.label'))}</label>
+          <select class="input" id="nutrition-visibility">
+            <option value="private" ${visibility === 'all' ? '' : 'selected'}>${esc(t('common.visibility.private'))}</option>
+            <option value="all" ${visibility === 'all' ? 'selected' : ''}>${esc(t('common.visibility.all'))}</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          ${isEdit ? `<button type="button" class="btn btn--danger btn--ghost" data-action="nutrition-delete">${esc(t('common.delete'))}</button>` : ''}
+          <button type="button" class="btn btn--ghost" data-action="cancel">${esc(t('common.cancel'))}</button>
+          <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
+        </div>
+      </form>`,
+    onSave(panel) {
+      panel.querySelector('[data-action="cancel"]')?.addEventListener('click', () => closeModal({ force: true }));
+      panel.querySelector('[data-action="nutrition-delete"]')?.addEventListener('click', () => deleteNutritionEntry(row));
+
+      panel.querySelector('#nutrition-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = panel.querySelector('[type="submit"]');
+        const body = collectNutritionBody(panel);
+        if (!body) {
+          window.yuvomi?.showToast(t('health.nutrition.invalid'), 'danger');
+          return;
+        }
+        submitBtn.disabled = true;
+        try {
+          if (isEdit) {
+            await api.patch(`/health/nutrition/entries/${row.id}`, body);
+          } else {
+            await api.post('/health/nutrition/entries', { ...body, ...ownerField(nutrition.personId, nutrition.meId) });
+          }
+          closeModal({ force: true });
+          window.yuvomi?.showToast(t('health.nutrition.saved'), 'success');
+          await reloadNutrition();
+          refocusAfterRender();
+        } catch (err) {
+          console.error('[Health] nutrition save error:', err);
+          submitBtn.disabled = false;
+          window.yuvomi?.showToast(err?.data?.error || t('health.nutrition.saveError'), 'danger');
+        }
+      });
+    },
+  });
+}
+
+function collectNutritionBody(panel) {
+  const title = panel.querySelector('#nutrition-title')?.value.trim();
+  const consumedAt = panel.querySelector('#nutrition-consumed-at')?.value;
+  if (!title || !consumedAt) return null;
+  const nutrients = collectNutrients(panel);
+  if (!nutrients) return null;
+
+  return {
+    title,
+    consumed_at: consumedAt,
+    // `|| null` und nicht `|| undefined`: die leere Auswahl heisst "keine
+    // Mahlzeitenart", und ein PATCH muss eine vorhandene damit auch wieder
+    // loeschen koennen.
+    meal_type: panel.querySelector('#nutrition-meal-type')?.value || null,
+    note: panel.querySelector('#nutrition-note')?.value.trim() || null,
+    visibility: panel.querySelector('#nutrition-visibility')?.value || 'private',
+    ...nutrients,
+  };
+}
+
+async function deleteNutritionEntry(row) {
+  if (!row?.id) return;
+  closeModal({ force: true });
+  const idx = nutrition.entries.findIndex((r) => r.id === row.id);
+  if (idx === -1) return;
+  const [removed] = nutrition.entries.splice(idx, 1);
+  renderNutritionShell();
+  scheduleUndoableDelete({
+    // DIE BILANZ OBEN KOMMT VOM SERVER und weiss von einer nur lokal
+    // entfernten Zeile nichts. Erst nach dem wirklich gefahrenen Loeschen
+    // wird sie neu geholt - waehrend der Ruecknahmefrist steht sie zu Recht
+    // noch auf dem alten Stand, denn geloescht ist bis dahin nichts.
+    // `keepalive` ist der Weg beim Verlassen der Seite: dort gibt es nichts
+    // mehr neu zu zeichnen.
+    commit: async ({ keepalive } = {}) => {
+      await api.delete(`/health/nutrition/entries/${row.id}`, { keepalive });
+      if (!keepalive) await reloadNutrition();
+    },
+    restore: () => { nutrition.entries.splice(idx, 0, removed); renderNutritionShell(); },
+    message: t('health.nutrition.deleted'),
+  });
+}
+
+// ========================================================
 // ÜBERSICHT-TAB
 // ========================================================
 
@@ -7312,6 +7790,12 @@ export const __test = {
   labDetailMarkup,
   activityRowMarkup,
   preventionRowMarkup,
+  // Naehrwerte (#1326): die Zeile des Tagebuchs und die Fortschrittszeile.
+  // Beide nehmen ihre Daten als Parameter - die Fortschrittszeile bekommt
+  // die Bilanz uebergeben, statt sie aus dem Modulzustand zu lesen, genau
+  // damit ein Test sie fahren kann, ohne den Tab zu mounten.
+  nutritionRowMarkup,
+  nutritionProgressRowMarkup,
   overviewDueRowMarkup,
   quickCaptureMarkup,
   cycleBubbleMarkup,

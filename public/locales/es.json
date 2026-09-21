@@ -305,7 +305,10 @@
         "manage": "Gestionar",
         "todayNothingElseTomorrow": "Nada más por hoy - mañana: {{title}}",
         "weatherHighLow": "Máxima {{max}}°, mínima {{min}}°",
-        "optionCalendarBirthdaysHint": "Sin marcar, los cumpleaños no aparecen en esta tarjeta; en el calendario siguen estando."
+        "optionCalendarBirthdaysHint": "Sin marcar, los cumpleaños no aparecen en esta tarjeta; en el calendario siguen estando.",
+        "nutritionNoTarget": "Aún no hay objetivo diario.",
+        "nutritionEntries": "{{count}} registros hoy",
+        "nutritionEntries_one": "{{count}} registro hoy"
     },
     "tasks": {
         "manageCategories": "Gestionar categorías",
@@ -4079,7 +4082,8 @@
             "labs": "Analíticas",
             "activity": "Actividad",
             "cycle": "Ciclo",
-            "fasting": "Ayuno"
+            "fasting": "Ayuno",
+            "nutrition": "Nutrición"
         },
         "overview": {
             "title": "Resumen",
@@ -4850,7 +4854,62 @@
             "h": "{{hours}} h",
             "m": "{{minutes}} min"
         },
-        "careBanner": "Estás registrando para {{name}}."
+        "careBanner": "Estás registrando para {{name}}.",
+        "nutrition": {
+            "title": "Nutrición",
+            "emptyTitle": "Aún no hay registros de nutrición",
+            "emptyDesc": "Anota lo que has comido: los números están en el envase.",
+            "add": "Añadir registro",
+            "edit": "Editar registro",
+            "saved": "Registro guardado.",
+            "saveError": "No se pudo guardar el registro.",
+            "deleted": "Registro eliminado.",
+            "invalid": "Indica un nombre, una hora y números válidos.",
+            "noEntries": "Aún no hay registros.",
+            "entriesTitle": "Registros",
+            "personsLabel": "Persona",
+            "todayTitle": "Hoy",
+            "targetTitle": "Objetivo diario",
+            "targetSet": "Definir objetivo",
+            "targetEdit": "Editar objetivo",
+            "targetHint": "Deja en blanco lo que no quieras seguir. Un 0 es un objetivo, un campo vacío no.",
+            "targetNone": "Aún no hay objetivo diario.",
+            "targetNoneHint": "Sin objetivo esta página solo muestra el total acumulado.",
+            "targetSaved": "Objetivo diario guardado.",
+            "targetSaveError": "No se pudo guardar el objetivo diario.",
+            "ofTarget": "{{value}} de {{target}} {{unit}}",
+            "noTargetValue": "{{value}} {{unit}}",
+            "loadError": "No se pudieron cargar los datos de nutrición.",
+            "loadErrorDesc": "Inténtalo de nuevo más tarde.",
+            "retry": "Reintentar",
+            "field": {
+                "title": "Nombre",
+                "consumedAt": "Hora",
+                "mealType": "Comida",
+                "noMealType": "Sin comida",
+                "note": "Nota"
+            },
+            "meal": {
+                "breakfast": "Desayuno",
+                "lunch": "Almuerzo",
+                "dinner": "Cena",
+                "snack": "Tentempié"
+            },
+            "nutrient": {
+                "energyKcal": "Energía",
+                "fat": "Grasas",
+                "saturatedFat": "de las cuales saturadas",
+                "carbs": "Hidratos de carbono",
+                "sugar": "de los cuales azúcares",
+                "protein": "Proteínas",
+                "salt": "Sal",
+                "fiber": "Fibra"
+            },
+            "unit": {
+                "kcal": "kcal",
+                "g": "g"
+            }
+        }
     },
     "waste": {
         "title": "Recogida de basura",

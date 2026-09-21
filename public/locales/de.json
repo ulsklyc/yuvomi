@@ -317,7 +317,10 @@
         "manage": "Verwalten",
         "todayNothingElseTomorrow": "Danach steht heute nichts mehr an - morgen: {{title}}",
         "weatherHighLow": "Höchstwert {{max}}°, Tiefstwert {{min}}°",
-        "optionCalendarBirthdaysHint": "Ohne Haken bleiben Geburtstage aus dieser Kachel - im Kalender stehen sie weiter."
+        "optionCalendarBirthdaysHint": "Ohne Haken bleiben Geburtstage aus dieser Kachel - im Kalender stehen sie weiter.",
+        "nutritionNoTarget": "Noch kein Tagesziel gesetzt.",
+        "nutritionEntries": "{{count}} Einträge heute",
+        "nutritionEntries_one": "{{count}} Eintrag heute"
     },
     "tasks": {
         "manageCategories": "Kategorien verwalten",
@@ -4079,7 +4082,8 @@
             "labs": "Laborwerte",
             "activity": "Aktivität",
             "cycle": "Zyklus",
-            "fasting": "Fasten"
+            "fasting": "Fasten",
+            "nutrition": "Nährwerte"
         },
         "overview": {
             "title": "Übersicht",
@@ -4850,7 +4854,62 @@
             "h": "{{hours}} Std.",
             "m": "{{minutes}} Min."
         },
-        "careBanner": "Du trägst für {{name}} ein."
+        "careBanner": "Du trägst für {{name}} ein.",
+        "nutrition": {
+            "title": "Nährwerte",
+            "emptyTitle": "Noch keine Nährwerte erfasst",
+            "emptyDesc": "Trage ein, was du gegessen hast - die Zahlen stehen auf der Packung.",
+            "add": "Eintrag hinzufügen",
+            "edit": "Eintrag bearbeiten",
+            "saved": "Eintrag gespeichert.",
+            "saveError": "Eintrag konnte nicht gespeichert werden.",
+            "deleted": "Eintrag gelöscht.",
+            "invalid": "Bitte Bezeichnung, Zeitpunkt und gültige Zahlen angeben.",
+            "noEntries": "Noch keine Einträge.",
+            "entriesTitle": "Einträge",
+            "personsLabel": "Person",
+            "todayTitle": "Heute",
+            "targetTitle": "Tagesziel",
+            "targetSet": "Ziel setzen",
+            "targetEdit": "Ziel bearbeiten",
+            "targetHint": "Leer lassen, was du nicht verfolgen willst. Eine 0 ist ein Ziel, ein leeres Feld ist keines.",
+            "targetNone": "Noch kein Tagesziel gesetzt.",
+            "targetNoneHint": "Ohne Ziel zeigt diese Seite nur, was zusammengekommen ist.",
+            "targetSaved": "Tagesziel gespeichert.",
+            "targetSaveError": "Tagesziel konnte nicht gespeichert werden.",
+            "ofTarget": "{{value}} von {{target}} {{unit}}",
+            "noTargetValue": "{{value}} {{unit}}",
+            "loadError": "Nährwerte konnten nicht geladen werden.",
+            "loadErrorDesc": "Bitte versuche es später erneut.",
+            "retry": "Erneut versuchen",
+            "field": {
+                "title": "Bezeichnung",
+                "consumedAt": "Zeitpunkt",
+                "mealType": "Mahlzeit",
+                "noMealType": "Keine Mahlzeit",
+                "note": "Notiz"
+            },
+            "meal": {
+                "breakfast": "Frühstück",
+                "lunch": "Mittagessen",
+                "dinner": "Abendessen",
+                "snack": "Snack"
+            },
+            "nutrient": {
+                "energyKcal": "Energie",
+                "fat": "Fett",
+                "saturatedFat": "davon gesättigte Fettsäuren",
+                "carbs": "Kohlenhydrate",
+                "sugar": "davon Zucker",
+                "protein": "Eiweiß",
+                "salt": "Salz",
+                "fiber": "Ballaststoffe"
+            },
+            "unit": {
+                "kcal": "kcal",
+                "g": "g"
+            }
+        }
     },
     "waste": {
         "title": "Entsorgung",

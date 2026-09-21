@@ -317,7 +317,10 @@
         "manage": "Kelola",
         "todayNothingElseTomorrow": "Tidak ada lagi hari ini - besok: {{title}}",
         "weatherHighLow": "Tertinggi {{max}}°, terendah {{min}}°",
-        "optionCalendarBirthdaysHint": "Tanpa centang, ulang tahun tidak muncul di kartu ini - di kalender tetap ada."
+        "optionCalendarBirthdaysHint": "Tanpa centang, ulang tahun tidak muncul di kartu ini - di kalender tetap ada.",
+        "nutritionNoTarget": "Belum ada target harian.",
+        "nutritionEntries": "{{count}} catatan hari ini",
+        "nutritionEntries_one": "{{count}} catatan hari ini"
     },
     "tasks": {
         "manageCategories": "Kelola kategori",
@@ -4079,7 +4082,8 @@
             "labs": "Hasil lab",
             "activity": "Aktivitas",
             "cycle": "Siklus",
-            "fasting": "Puasa"
+            "fasting": "Puasa",
+            "nutrition": "Gizi"
         },
         "overview": {
             "title": "Ringkasan",
@@ -4850,7 +4854,62 @@
             "h": "{{hours}} j",
             "m": "{{minutes}} mnt"
         },
-        "careBanner": "Kamu mencatat untuk {{name}}."
+        "careBanner": "Kamu mencatat untuk {{name}}.",
+        "nutrition": {
+            "title": "Gizi",
+            "emptyTitle": "Belum ada catatan gizi",
+            "emptyDesc": "Catat apa yang kamu makan - angkanya ada di kemasan.",
+            "add": "Tambah catatan",
+            "edit": "Edit catatan",
+            "saved": "Catatan disimpan.",
+            "saveError": "Catatan tidak dapat disimpan.",
+            "deleted": "Catatan dihapus.",
+            "invalid": "Masukkan nama, waktu, dan angka yang valid.",
+            "noEntries": "Belum ada catatan.",
+            "entriesTitle": "Catatan",
+            "personsLabel": "Orang",
+            "todayTitle": "Hari ini",
+            "targetTitle": "Target harian",
+            "targetSet": "Atur target",
+            "targetEdit": "Edit target",
+            "targetHint": "Biarkan kosong yang tidak ingin kamu lacak. Angka 0 adalah target, kolom kosong bukan.",
+            "targetNone": "Belum ada target harian.",
+            "targetNoneHint": "Tanpa target, halaman ini hanya menampilkan totalnya.",
+            "targetSaved": "Target harian disimpan.",
+            "targetSaveError": "Target harian tidak dapat disimpan.",
+            "ofTarget": "{{value}} dari {{target}} {{unit}}",
+            "noTargetValue": "{{value}} {{unit}}",
+            "loadError": "Data gizi tidak dapat dimuat.",
+            "loadErrorDesc": "Coba lagi nanti.",
+            "retry": "Coba lagi",
+            "field": {
+                "title": "Nama",
+                "consumedAt": "Waktu",
+                "mealType": "Waktu makan",
+                "noMealType": "Tanpa waktu makan",
+                "note": "Catatan"
+            },
+            "meal": {
+                "breakfast": "Sarapan",
+                "lunch": "Makan siang",
+                "dinner": "Makan malam",
+                "snack": "Camilan"
+            },
+            "nutrient": {
+                "energyKcal": "Energi",
+                "fat": "Lemak",
+                "saturatedFat": "termasuk lemak jenuh",
+                "carbs": "Karbohidrat",
+                "sugar": "termasuk gula",
+                "protein": "Protein",
+                "salt": "Garam",
+                "fiber": "Serat"
+            },
+            "unit": {
+                "kcal": "kkal",
+                "g": "g"
+            }
+        }
     },
     "waste": {
         "title": "Pengumpulan sampah",

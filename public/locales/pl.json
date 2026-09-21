@@ -317,7 +317,10 @@
         "manage": "Zarządzaj",
         "todayNothingElseTomorrow": "Nic więcej na dziś - jutro: {{title}}",
         "weatherHighLow": "Najwyższa {{max}}°, najniższa {{min}}°",
-        "optionCalendarBirthdaysHint": "Bez zaznaczenia urodziny nie pojawiają się na tym kaflu - w kalendarzu zostają."
+        "optionCalendarBirthdaysHint": "Bez zaznaczenia urodziny nie pojawiają się na tym kaflu - w kalendarzu zostają.",
+        "nutritionNoTarget": "Nie ustawiono jeszcze celu dziennego.",
+        "nutritionEntries": "Dzisiaj {{count}} wpisów",
+        "nutritionEntries_one": "Dzisiaj {{count}} wpis"
     },
     "tasks": {
         "manageCategories": "Zarządzaj kategoriami",
@@ -4079,7 +4082,8 @@
             "labs": "Wyniki badań",
             "activity": "Aktywność",
             "cycle": "Cykl",
-            "fasting": "Post"
+            "fasting": "Post",
+            "nutrition": "Wartości odżywcze"
         },
         "overview": {
             "title": "Przegląd",
@@ -4850,7 +4854,62 @@
             "h": "{{hours}} godz.",
             "m": "{{minutes}} min"
         },
-        "careBanner": "Wpisujesz dane dla {{name}}."
+        "careBanner": "Wpisujesz dane dla {{name}}.",
+        "nutrition": {
+            "title": "Wartości odżywcze",
+            "emptyTitle": "Brak zapisanych wartości odżywczych",
+            "emptyDesc": "Zapisz, co zjadłeś - liczby są na opakowaniu.",
+            "add": "Dodaj wpis",
+            "edit": "Edytuj wpis",
+            "saved": "Wpis zapisany.",
+            "saveError": "Nie udało się zapisać wpisu.",
+            "deleted": "Wpis usunięty.",
+            "invalid": "Podaj nazwę, godzinę i poprawne liczby.",
+            "noEntries": "Brak wpisów.",
+            "entriesTitle": "Wpisy",
+            "personsLabel": "Osoba",
+            "todayTitle": "Dzisiaj",
+            "targetTitle": "Cel dzienny",
+            "targetSet": "Ustaw cel",
+            "targetEdit": "Edytuj cel",
+            "targetHint": "Zostaw puste to, czego nie chcesz śledzić. Zero to cel, puste pole nim nie jest.",
+            "targetNone": "Nie ustawiono jeszcze celu dziennego.",
+            "targetNoneHint": "Bez celu ta strona pokazuje tylko sumę.",
+            "targetSaved": "Cel dzienny zapisany.",
+            "targetSaveError": "Nie udało się zapisać celu dziennego.",
+            "ofTarget": "{{value}} z {{target}} {{unit}}",
+            "noTargetValue": "{{value}} {{unit}}",
+            "loadError": "Nie udało się wczytać wartości odżywczych.",
+            "loadErrorDesc": "Spróbuj ponownie później.",
+            "retry": "Spróbuj ponownie",
+            "field": {
+                "title": "Nazwa",
+                "consumedAt": "Godzina",
+                "mealType": "Posiłek",
+                "noMealType": "Bez posiłku",
+                "note": "Notatka"
+            },
+            "meal": {
+                "breakfast": "Śniadanie",
+                "lunch": "Obiad",
+                "dinner": "Kolacja",
+                "snack": "Przekąska"
+            },
+            "nutrient": {
+                "energyKcal": "Wartość energetyczna",
+                "fat": "Tłuszcz",
+                "saturatedFat": "w tym kwasy tłuszczowe nasycone",
+                "carbs": "Węglowodany",
+                "sugar": "w tym cukry",
+                "protein": "Białko",
+                "salt": "Sól",
+                "fiber": "Błonnik"
+            },
+            "unit": {
+                "kcal": "kcal",
+                "g": "g"
+            }
+        }
     },
     "waste": {
         "title": "Odbiór odpadów",

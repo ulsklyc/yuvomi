@@ -305,7 +305,10 @@
         "manage": "Управлять",
         "todayNothingElseTomorrow": "Больше на сегодня ничего нет - завтра: {{title}}",
         "weatherHighLow": "Максимум {{max}}°, минимум {{min}}°",
-        "optionCalendarBirthdaysHint": "Без галочки дни рождения не показываются в этой карточке, в календаре они остаются."
+        "optionCalendarBirthdaysHint": "Без галочки дни рождения не показываются в этой карточке, в календаре они остаются.",
+        "nutritionNoTarget": "Дневная цель пока не задана.",
+        "nutritionEntries": "Сегодня {{count}} записей",
+        "nutritionEntries_one": "Сегодня {{count}} запись"
     },
     "tasks": {
         "manageCategories": "Управление категориями",
@@ -4079,7 +4082,8 @@
             "labs": "Анализы",
             "activity": "Активность",
             "cycle": "Цикл",
-            "fasting": "Голодание"
+            "fasting": "Голодание",
+            "nutrition": "Питание"
         },
         "overview": {
             "title": "Обзор",
@@ -4850,7 +4854,62 @@
             "h": "{{hours}} ч",
             "m": "{{minutes}} мин"
         },
-        "careBanner": "Вы вносите данные за {{name}}."
+        "careBanner": "Вы вносите данные за {{name}}.",
+        "nutrition": {
+            "title": "Питание",
+            "emptyTitle": "Записей о питании пока нет",
+            "emptyDesc": "Запишите, что вы съели - цифры указаны на упаковке.",
+            "add": "Добавить запись",
+            "edit": "Изменить запись",
+            "saved": "Запись сохранена.",
+            "saveError": "Не удалось сохранить запись.",
+            "deleted": "Запись удалена.",
+            "invalid": "Укажите название, время и корректные числа.",
+            "noEntries": "Пока нет записей.",
+            "entriesTitle": "Записи",
+            "personsLabel": "Человек",
+            "todayTitle": "Сегодня",
+            "targetTitle": "Дневная цель",
+            "targetSet": "Задать цель",
+            "targetEdit": "Изменить цель",
+            "targetHint": "Оставьте пустым то, что не хотите отслеживать. Ноль - это цель, пустое поле - нет.",
+            "targetNone": "Дневная цель пока не задана.",
+            "targetNoneHint": "Без цели эта страница показывает только сумму.",
+            "targetSaved": "Дневная цель сохранена.",
+            "targetSaveError": "Не удалось сохранить дневную цель.",
+            "ofTarget": "{{value}} из {{target}} {{unit}}",
+            "noTargetValue": "{{value}} {{unit}}",
+            "loadError": "Не удалось загрузить данные о питании.",
+            "loadErrorDesc": "Попробуйте позже.",
+            "retry": "Повторить",
+            "field": {
+                "title": "Название",
+                "consumedAt": "Время",
+                "mealType": "Приём пищи",
+                "noMealType": "Без приёма пищи",
+                "note": "Заметка"
+            },
+            "meal": {
+                "breakfast": "Завтрак",
+                "lunch": "Обед",
+                "dinner": "Ужин",
+                "snack": "Перекус"
+            },
+            "nutrient": {
+                "energyKcal": "Энергетическая ценность",
+                "fat": "Жиры",
+                "saturatedFat": "в том числе насыщенные",
+                "carbs": "Углеводы",
+                "sugar": "в том числе сахара",
+                "protein": "Белки",
+                "salt": "Соль",
+                "fiber": "Клетчатка"
+            },
+            "unit": {
+                "kcal": "ккал",
+                "g": "г"
+            }
+        }
     },
     "waste": {
         "title": "Вывоз мусора",

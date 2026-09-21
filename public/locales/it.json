@@ -305,7 +305,10 @@
         "manage": "Gestisci",
         "todayNothingElseTomorrow": "Nient'altro per oggi - domani: {{title}}",
         "weatherHighLow": "Massima {{max}}°, minima {{min}}°",
-        "optionCalendarBirthdaysHint": "Senza spunta i compleanni restano fuori da questa scheda; nel calendario ci sono ancora."
+        "optionCalendarBirthdaysHint": "Senza spunta i compleanni restano fuori da questa scheda; nel calendario ci sono ancora.",
+        "nutritionNoTarget": "Nessun obiettivo giornaliero impostato.",
+        "nutritionEntries": "{{count}} voci oggi",
+        "nutritionEntries_one": "{{count}} voce oggi"
     },
     "tasks": {
         "manageCategories": "Gestisci categorie",
@@ -4079,7 +4082,8 @@
             "labs": "Esami",
             "activity": "Attività",
             "cycle": "Ciclo",
-            "fasting": "Digiuno"
+            "fasting": "Digiuno",
+            "nutrition": "Nutrizione"
         },
         "overview": {
             "title": "Panoramica",
@@ -4850,7 +4854,62 @@
             "h": "{{hours}} h",
             "m": "{{minutes}} min"
         },
-        "careBanner": "Stai registrando per {{name}}."
+        "careBanner": "Stai registrando per {{name}}.",
+        "nutrition": {
+            "title": "Nutrizione",
+            "emptyTitle": "Nessun dato nutrizionale registrato",
+            "emptyDesc": "Annota cosa hai mangiato: i numeri sono sulla confezione.",
+            "add": "Aggiungi voce",
+            "edit": "Modifica voce",
+            "saved": "Voce salvata.",
+            "saveError": "Impossibile salvare la voce.",
+            "deleted": "Voce eliminata.",
+            "invalid": "Indica un nome, un orario e numeri validi.",
+            "noEntries": "Nessuna voce presente.",
+            "entriesTitle": "Voci",
+            "personsLabel": "Persona",
+            "todayTitle": "Oggi",
+            "targetTitle": "Obiettivo giornaliero",
+            "targetSet": "Imposta obiettivo",
+            "targetEdit": "Modifica obiettivo",
+            "targetHint": "Lascia vuoto ciò che non vuoi monitorare. Uno 0 è un obiettivo, un campo vuoto no.",
+            "targetNone": "Nessun obiettivo giornaliero impostato.",
+            "targetNoneHint": "Senza obiettivo questa pagina mostra solo il totale.",
+            "targetSaved": "Obiettivo giornaliero salvato.",
+            "targetSaveError": "Impossibile salvare l’obiettivo giornaliero.",
+            "ofTarget": "{{value}} su {{target}} {{unit}}",
+            "noTargetValue": "{{value}} {{unit}}",
+            "loadError": "Impossibile caricare i dati nutrizionali.",
+            "loadErrorDesc": "Riprova più tardi.",
+            "retry": "Riprova",
+            "field": {
+                "title": "Nome",
+                "consumedAt": "Orario",
+                "mealType": "Pasto",
+                "noMealType": "Nessun pasto",
+                "note": "Nota"
+            },
+            "meal": {
+                "breakfast": "Colazione",
+                "lunch": "Pranzo",
+                "dinner": "Cena",
+                "snack": "Spuntino"
+            },
+            "nutrient": {
+                "energyKcal": "Energia",
+                "fat": "Grassi",
+                "saturatedFat": "di cui acidi grassi saturi",
+                "carbs": "Carboidrati",
+                "sugar": "di cui zuccheri",
+                "protein": "Proteine",
+                "salt": "Sale",
+                "fiber": "Fibre"
+            },
+            "unit": {
+                "kcal": "kcal",
+                "g": "g"
+            }
+        }
     },
     "waste": {
         "title": "Raccolta rifiuti",

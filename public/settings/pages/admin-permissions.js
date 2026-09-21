@@ -53,6 +53,10 @@ const WIDGET_LABEL_KEYS = {
   rewards: 'nav.rewards',
   health: 'nav.health',
   fasting: 'health.fasting.title',
+  // Wie das Fasten aus dem Wort des Tabs selbst: die Kachel heisst im
+  // Anpassen-Panel schon "Naehrwerte", ein eigener settings.*-Schluessel
+  // waere ein zweiter Name fuer dieselbe Sache.
+  nutrition: 'health.nutrition.title',
   cycle: 'settings.permWidgetCycle',
   housekeeping: 'nav.housekeeping',
   schedule: 'nav.schedule',

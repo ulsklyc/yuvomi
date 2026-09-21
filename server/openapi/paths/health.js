@@ -17,6 +17,43 @@ export function healthPaths() {
     500: { $ref: '#/components/responses/InternalServerError' },
   });
   const booleanPreference = { oneOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }, { type: 'string', enum: ['0', '1'] }] };
+
+  // Naehrwerte (#1326). Die acht stehen hier EINMAL und werden in Ziel wie
+  // Eintrag gespreadet - acht Spalten, die in zwei Schemata von Hand
+  // abgeschrieben werden, sind genau die Bauform, in der eine davon an einer
+  // Stelle anders heisst. `nullable: true` ist die Aussage der Spalte: nicht
+  // angegeben ist etwas anderes als null.
+  const NUTRIENT_FIELDS = ['energy_kcal', 'fat_g', 'saturated_fat_g', 'carbs_g', 'sugar_g', 'protein_g', 'salt_g', 'fiber_g'];
+  const nutrientSchema = Object.fromEntries(NUTRIENT_FIELDS.map((name) => [name, {
+    type: 'number', nullable: true, minimum: 0, maximum: 100000,
+    description: 'null means "not stated" and is not the same as 0.',
+  }]));
+  // Eine VOLLSTAENDIGE requestBody, nicht nur ein Schema - dasselbe Muster wie
+  // `fastingBody` weiter oben. `jsonBody()` nimmt eine $ref-ZEICHENKETTE und
+  // haette ein Schema-Objekt als `{ $ref: { … } }` ausgegeben: gueltiges JSON,
+  // ungueltige OpenAPI, und keiner der beiden Spec-Guards sieht es (sie
+  // pruefen, DASS eine Route dasteht, nicht WAS in ihrem Rumpf steht).
+  const nutrientBody = (extra = {}, required = []) => ({
+    required: true,
+    description: 'JSON request body',
+    content: {
+      'application/json': {
+        schema: {
+          type: 'object',
+          properties: { ...extra, ...nutrientSchema },
+          ...(required.length ? { required } : {}),
+        },
+      },
+    },
+  });
+  const MEAL_TYPE_VALUES = ['breakfast', 'lunch', 'dinner', 'snack'];
+  const wallClock = { type: 'string', pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$', description: 'Household wall-clock time, NOT an instant - "today" is a calendar day in the household zone.' };
+  // Der kanonische Satz aus docs/DECISIONS.md Abschnitt 5, nicht das Paar
+  // private/family der uebrigen Gesundheit. Der benannte Satz ('assignees')
+  // fehlt, weil es in der Gesundheit keine Zuweisungstabelle gibt, die ihn
+  // tragen koennte - er waere von 'private' nicht unterscheidbar.
+  const nutritionVisibility = { type: 'string', enum: ['private', 'all'], default: 'private' };
+
   return {
     '/api/v1/health/vitals': {
       get: op({ summary: 'List vital measurements', tag: 'Health', description: 'Scoped to the viewer; `?user_id=` filters to a family member (only their `family`-visible rows). Optional `type`, `from`, `to` filters.' }),
@@ -226,6 +263,24 @@ export function healthPaths() {
     '/api/v1/health/prevention/records/{id}': {
       patch: op({ summary: 'Update a preventive-care record', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete a preventive-care record', tag: 'Health', params: [idParam()], stateChanging: true }),
+    },
+    '/api/v1/health/nutrition/targets': {
+      get: op({ summary: 'Get a daily nutrition target', tag: 'Health', description: 'Defaults to the signed-in user; `?user_id=` asks for somebody the caller is a caregiver for (#584) and is 403 otherwise - a target carries no visibility of its own, so there is nothing to open. Responds `{ user_id, target }` where `target` is null when no row exists. Null is not zero: a missing row means "no target set", while a stored `sugar_g: 0` is a deliberate target of zero and the progress reads against it.' }),
+      put: op({ summary: 'Set or clear a daily nutrition target', tag: 'Health', stateChanging: true, requestBody: nutrientBody({ user_id: { type: 'integer', minimum: 1, description: 'Caregiver path: the person the target belongs to.' } }), description: 'Replaces the whole target: a nutrient left out is unset afterwards. Sparse like the fasting settings - if all eight are null the row is DELETED rather than stored as zeros, so "no row" stays the only spelling of "no target". Values are 0 to 100000.' }),
+    },
+    '/api/v1/health/nutrition/entries': {
+      get: op({ summary: 'List logged nutrition entries', tag: 'Health', params: [userParam, ...dates, { name: 'meal_type', in: 'query', schema: { type: 'string', enum: MEAL_TYPE_VALUES } }], description: 'Scoped to the viewer; `?user_id=` filters to a family member (their `all`-visible rows, or every row if the viewer is a caregiver for that person). `from`/`to` compare the DATE part of `consumed_at`, which is household wall-clock time rather than an instant.' }),
+      post: op({ summary: 'Log a nutrition entry', tag: 'Health', stateChanging: true, requestBody: nutrientBody({ title: { type: 'string', maxLength: 200 }, consumed_at: wallClock, meal_type: { type: 'string', nullable: true, enum: MEAL_TYPE_VALUES }, note: { type: 'string', nullable: true, maxLength: 5000 }, visibility: nutritionVisibility, user_id: { type: 'integer', minimum: 1, description: 'Caregiver path (#584): the person the entry belongs to.' } }, ['title', 'consumed_at']), description: 'The eight nutrients are stored as VALUES, never as a reference to a recipe: editing a recipe next month must not rewrite what somebody ate last week (docs/DECISIONS.md entry 8). A nutrient left out stays null ("not stated") and is not zero. Without `visibility` the row takes the OWNER\'s default, not the caller\'s.' }),
+    },
+    '/api/v1/health/nutrition/entries/{id}': {
+      patch: op({ summary: 'Update a nutrition entry', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Only the fields present are changed. Sending a nutrient as null clears it back to "not stated"; sending 0 states zero.' }),
+      delete: op({ summary: 'Delete a nutrition entry', tag: 'Health', params: [idParam()], stateChanging: true }),
+    },
+    '/api/v1/health/nutrition/summary': {
+      get: op({ summary: 'Today\'s nutrition totals against the target', tag: 'Health', params: [userParam, { name: 'date', in: 'query', schema: { type: 'string', format: 'date', pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' }, description: 'Defaults to today in the HOUSEHOLD time zone, not the UTC day.' }], description: 'Responds `{ date, target, totals, entryCount }`. `totals` sums only the entries the caller may see. `target` is null both when no target exists and when the caller is not a caregiver for that person - the same rule as GET /nutrition/targets. This is the identical computation the dashboard widget receives, so the tab and the tile can never disagree.' }),
+    },
+    '/api/v1/health/export/nutrition': {
+      get: op({ summary: 'Export nutrition entries as CSV', tag: 'Health', params: [userParam, ...dates], description: 'Same scoping as the list route. Columns are `consumed_at, meal_type, title, energy_kcal, fat_g, saturated_fat_g, carbs_g, sugar_g, protein_g, salt_g, fiber_g, note, visibility`. A nutrient that was never stated stays an EMPTY cell rather than 0. `energy_kcal` is energy EATEN - `health_activities.calories` in the activities export is energy burnt, which is why neither column is called `calories`.' }),
     },
     '/api/v1/health/prevention/due': {
       get: op({ summary: 'List preventive-care items due or overdue', tag: 'Health', description: 'Scoped to the viewer; `?user_id=` computes the list for a family member instead (subject to the same visibility rule as the records list). Derived from each type\'s most recent record plus its interval - the same computation the reminder sync uses, never duplicated.' }),

@@ -111,7 +111,7 @@ test('jede Export-Zeile hat exakt so viele Spalten wie ihr Header', () => {
 test('HEALTH_EXPORT_HEADERS: eingefroren, sprachneutrale Maschinen-Header', () => {
   assert.ok(Object.isFrozen(HEALTH_EXPORT_HEADERS));
   assert.deepEqual(Object.keys(HEALTH_EXPORT_HEADERS).sort(),
-    ['activities', 'cycle', 'labs', 'medLogs', 'vitals']);
+    ['activities', 'cycle', 'labs', 'medLogs', 'nutrition', 'vitals']);
   for (const [key, header] of Object.entries(HEALTH_EXPORT_HEADERS)) {
     assert.ok(header.length > 0, `${key}: leerer Header`);
     assert.equal(new Set(header).size, header.length, `${key}: doppelte Spaltennamen`);

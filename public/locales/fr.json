@@ -305,7 +305,10 @@
         "manage": "Gérer",
         "todayNothingElseTomorrow": "Plus rien d'autre aujourd'hui - demain : {{title}}",
         "weatherHighLow": "Maximale {{max}}°, minimale {{min}}°",
-        "optionCalendarBirthdaysHint": "Sans la coche, les anniversaires n'apparaissent pas dans cette carte - le calendrier les garde."
+        "optionCalendarBirthdaysHint": "Sans la coche, les anniversaires n'apparaissent pas dans cette carte - le calendrier les garde.",
+        "nutritionNoTarget": "Aucun objectif quotidien défini.",
+        "nutritionEntries": "{{count}} entrées aujourd’hui",
+        "nutritionEntries_one": "{{count}} entrée aujourd’hui"
     },
     "tasks": {
         "manageCategories": "Gérer les catégories",
@@ -4079,7 +4082,8 @@
             "labs": "Analyses",
             "activity": "Activité",
             "cycle": "Cycle",
-            "fasting": "Jeûne"
+            "fasting": "Jeûne",
+            "nutrition": "Nutrition"
         },
         "overview": {
             "title": "Aperçu",
@@ -4850,7 +4854,62 @@
             "h": "{{hours}} h",
             "m": "{{minutes}} min"
         },
-        "careBanner": "Vous saisissez pour {{name}}."
+        "careBanner": "Vous saisissez pour {{name}}.",
+        "nutrition": {
+            "title": "Nutrition",
+            "emptyTitle": "Aucune donnée nutritionnelle pour le moment",
+            "emptyDesc": "Note ce que tu as mangé - les chiffres figurent sur l’emballage.",
+            "add": "Ajouter une entrée",
+            "edit": "Modifier l’entrée",
+            "saved": "Entrée enregistrée.",
+            "saveError": "Impossible d’enregistrer l’entrée.",
+            "deleted": "Entrée supprimée.",
+            "invalid": "Indique un nom, une heure et des nombres valides.",
+            "noEntries": "Aucune entrée pour le moment.",
+            "entriesTitle": "Entrées",
+            "personsLabel": "Personne",
+            "todayTitle": "Aujourd’hui",
+            "targetTitle": "Objectif quotidien",
+            "targetSet": "Définir un objectif",
+            "targetEdit": "Modifier l’objectif",
+            "targetHint": "Laisse vide ce que tu ne veux pas suivre. Un 0 est un objectif, un champ vide n’en est pas un.",
+            "targetNone": "Aucun objectif quotidien défini.",
+            "targetNoneHint": "Sans objectif, cette page n’affiche que le total.",
+            "targetSaved": "Objectif quotidien enregistré.",
+            "targetSaveError": "Impossible d’enregistrer l’objectif quotidien.",
+            "ofTarget": "{{value}} sur {{target}} {{unit}}",
+            "noTargetValue": "{{value}} {{unit}}",
+            "loadError": "Les données nutritionnelles n’ont pas pu être chargées.",
+            "loadErrorDesc": "Réessaie plus tard.",
+            "retry": "Réessayer",
+            "field": {
+                "title": "Nom",
+                "consumedAt": "Heure",
+                "mealType": "Repas",
+                "noMealType": "Aucun repas",
+                "note": "Note"
+            },
+            "meal": {
+                "breakfast": "Petit-déjeuner",
+                "lunch": "Déjeuner",
+                "dinner": "Dîner",
+                "snack": "Collation"
+            },
+            "nutrient": {
+                "energyKcal": "Énergie",
+                "fat": "Matières grasses",
+                "saturatedFat": "dont acides gras saturés",
+                "carbs": "Glucides",
+                "sugar": "dont sucres",
+                "protein": "Protéines",
+                "salt": "Sel",
+                "fiber": "Fibres"
+            },
+            "unit": {
+                "kcal": "kcal",
+                "g": "g"
+            }
+        }
     },
     "waste": {
         "title": "Collecte des déchets",

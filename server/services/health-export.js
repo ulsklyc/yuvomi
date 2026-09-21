@@ -37,6 +37,16 @@ const ACTIVITIES_HEADER = ['performed_at', 'type', 'duration_min', 'distance_km'
 const LABS_HEADER = ['report_date', 'lab_name', 'analyte', 'value_num', 'unit', 'ref_low', 'ref_high', 'flag', 'visibility', 'note'];
 const MED_LOGS_HEADER = ['scheduled_at', 'medication', 'status', 'taken_at', 'dose_qty', 'note'];
 const CYCLE_HEADER = ['start_date', 'end_date', 'period_length_days', 'cycle_length_days', 'note', 'visibility'];
+// Die acht Naehrwerte tragen ihre Einheit im Spaltennamen, und `energy_kcal`
+// heisst nicht `calories`: diese Datei fuehrt ACTIVITIES_HEADER mit genau
+// dieser Spalte, und dort ist es die VERBRANNTE Energie. Ein Wort fuer beide
+// Richtungen faellt zuerst hier auf - wer beide Auszuege nebeneinanderlegt,
+// haette zweimal `calories` mit entgegengesetzter Bedeutung.
+const NUTRITION_HEADER = [
+  'consumed_at', 'meal_type', 'title',
+  'energy_kcal', 'fat_g', 'saturated_fat_g', 'carbs_g', 'sugar_g', 'protein_g', 'salt_g', 'fiber_g',
+  'note', 'visibility',
+];
 
 /** Inklusive Tagesdifferenz zweier YYYY-MM-DD-Schlüssel (b − a), sonst ''. */
 function daySpan(aKey, bKey, inclusive = false) {
@@ -91,6 +101,18 @@ export function medLogsToCsv(logs) {
 }
 
 /**
+ * Naehrwert-Eintraege → CSV.
+ *
+ * Ein nicht angegebener Wert bleibt LEER und wird nicht zu 0: die Zelle sagt
+ * damit "nicht angegeben", so wie die Spalte es speichert. Eine 0 dort waere
+ * die Behauptung, die Mahlzeit habe nichts davon enthalten - und genau die
+ * Verwechslung ist der Grund, aus dem die Spalten nullbar sind.
+ */
+export function nutritionToCsv(rows) {
+  return toCsv(NUTRITION_HEADER, (rows || []).map((r) => NUTRITION_HEADER.map((k) => r[k])));
+}
+
+/**
  * Perioden-Episoden → CSV. Erwartet chronologisch aufsteigende Zeilen (älteste
  * zuerst), damit die Zykluslänge = Abstand zum jeweils nächsten Periodenstart
  * berechnet werden kann; die letzte (jüngste) Periode hat keine Folge-Periode und
@@ -119,4 +141,5 @@ export const HEALTH_EXPORT_HEADERS = Object.freeze({
   labs: LABS_HEADER,
   medLogs: MED_LOGS_HEADER,
   cycle: CYCLE_HEADER,
+  nutrition: NUTRITION_HEADER,
 });

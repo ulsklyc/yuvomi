@@ -2196,6 +2196,7 @@ test('WRITE_HOOKS nennt jeden schreibenden Bedienhaken ohne `data-action`', () =
     'data-ov-dose-take', 'data-ov-dose-skip', 'data-prn-take',
     'data-activity-edit', 'data-prevention-edit', 'data-delete-vital',
     'data-cycle-day', 'data-cycle-edit',
+    'data-nutrition-edit', 'data-nutrition-target',
   ];
   assert.deepEqual([...genannt].sort(), [...erwartet].sort());
   for (const hook of erwartet) {

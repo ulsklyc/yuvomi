@@ -145,6 +145,7 @@ const APP_SHELL = [
   '/styles/fasting-controls.css',
   '/utils/health-labs.js',
   '/utils/health-meds.js',
+  '/utils/health-nutrition.js',
   '/utils/health-overview.js',
   '/utils/health-prevention.js',
   '/utils/health-tabs.js',

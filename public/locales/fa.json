@@ -317,7 +317,10 @@
         "manage": "مدیریت",
         "todayNothingElseTomorrow": "امروز دیگر برنامه‌ای نیست - فردا: {{title}}",
         "weatherHighLow": "بیشینه {{max}}°، کمینه {{min}}°",
-        "optionCalendarBirthdaysHint": "بدون تیک، تولدها در این کارت نمایش داده نمی‌شوند؛ در تقویم همچنان هستند."
+        "optionCalendarBirthdaysHint": "بدون تیک، تولدها در این کارت نمایش داده نمی‌شوند؛ در تقویم همچنان هستند.",
+        "nutritionNoTarget": "هنوز هدف روزانه‌ای تعیین نشده است.",
+        "nutritionEntries": "{{count}} رکورد امروز",
+        "nutritionEntries_one": "{{count}} رکورد امروز"
     },
     "tasks": {
         "manageCategories": "مدیریت دسته‌ها",
@@ -4079,7 +4082,8 @@
             "labs": "آزمایش‌ها",
             "activity": "فعالیت",
             "cycle": "چرخه",
-            "fasting": "روزه"
+            "fasting": "روزه",
+            "nutrition": "ارزش غذایی"
         },
         "overview": {
             "title": "نمای کلی",
@@ -4850,7 +4854,62 @@
             "h": "{{hours}} ساعت",
             "m": "{{minutes}} دقیقه"
         },
-        "careBanner": "شما برای {{name}} ثبت می‌کنید."
+        "careBanner": "شما برای {{name}} ثبت می‌کنید.",
+        "nutrition": {
+            "title": "ارزش غذایی",
+            "emptyTitle": "هنوز ارزش غذایی ثبت نشده است",
+            "emptyDesc": "آنچه خورده‌ای را ثبت کن - اعداد روی بسته نوشته شده‌اند.",
+            "add": "افزودن رکورد",
+            "edit": "ویرایش رکورد",
+            "saved": "رکورد ذخیره شد.",
+            "saveError": "ذخیره رکورد ممکن نشد.",
+            "deleted": "رکورد حذف شد.",
+            "invalid": "لطفاً نام، زمان و اعداد معتبر وارد کنید.",
+            "noEntries": "هنوز رکوردی وجود ندارد.",
+            "entriesTitle": "رکوردها",
+            "personsLabel": "فرد",
+            "todayTitle": "امروز",
+            "targetTitle": "هدف روزانه",
+            "targetSet": "تعیین هدف",
+            "targetEdit": "ویرایش هدف",
+            "targetHint": "آنچه را نمی‌خواهی دنبال کنی خالی بگذار. صفر یک هدف است، فیلد خالی نه.",
+            "targetNone": "هنوز هدف روزانه‌ای تعیین نشده است.",
+            "targetNoneHint": "بدون هدف، این صفحه فقط مجموع را نشان می‌دهد.",
+            "targetSaved": "هدف روزانه ذخیره شد.",
+            "targetSaveError": "ذخیره هدف روزانه ممکن نشد.",
+            "ofTarget": "{{value}} از {{target}} {{unit}}",
+            "noTargetValue": "{{value}} {{unit}}",
+            "loadError": "بارگذاری ارزش غذایی ممکن نشد.",
+            "loadErrorDesc": "لطفاً بعداً دوباره تلاش کنید.",
+            "retry": "تلاش دوباره",
+            "field": {
+                "title": "نام",
+                "consumedAt": "زمان",
+                "mealType": "وعده",
+                "noMealType": "بدون وعده",
+                "note": "یادداشت"
+            },
+            "meal": {
+                "breakfast": "صبحانه",
+                "lunch": "ناهار",
+                "dinner": "شام",
+                "snack": "میان‌وعده"
+            },
+            "nutrient": {
+                "energyKcal": "انرژی",
+                "fat": "چربی",
+                "saturatedFat": "از آن چربی اشباع",
+                "carbs": "کربوهیدرات",
+                "sugar": "از آن قند",
+                "protein": "پروتئین",
+                "salt": "نمک",
+                "fiber": "فیبر"
+            },
+            "unit": {
+                "kcal": "کیلوکالری",
+                "g": "گرم"
+            }
+        }
     },
     "waste": {
         "title": "جمع‌آوری زباله",

@@ -317,7 +317,10 @@
         "manage": "관리",
         "todayNothingElseTomorrow": "오늘은 더 이상 일정이 없습니다. 내일: {{title}}",
         "weatherHighLow": "최고 {{max}}°, 최저 {{min}}°",
-        "optionCalendarBirthdaysHint": "체크를 해제하면 이 타일에 생일이 표시되지 않습니다. 캘린더에는 그대로 남습니다."
+        "optionCalendarBirthdaysHint": "체크를 해제하면 이 타일에 생일이 표시되지 않습니다. 캘린더에는 그대로 남습니다.",
+        "nutritionNoTarget": "아직 하루 목표가 없습니다.",
+        "nutritionEntries": "오늘 기록 {{count}}건",
+        "nutritionEntries_one": "오늘 기록 {{count}}건"
     },
     "tasks": {
         "manageCategories": "카테고리 관리",
@@ -4079,7 +4082,8 @@
             "labs": "검사 결과",
             "activity": "활동",
             "cycle": "주기",
-            "fasting": "단식"
+            "fasting": "단식",
+            "nutrition": "영양"
         },
         "overview": {
             "title": "개요",
@@ -4850,7 +4854,62 @@
             "h": "{{hours}}시간",
             "m": "{{minutes}}분"
         },
-        "careBanner": "{{name}} 님의 기록을 입력하고 있습니다."
+        "careBanner": "{{name}} 님의 기록을 입력하고 있습니다.",
+        "nutrition": {
+            "title": "영양",
+            "emptyTitle": "아직 영양 기록이 없습니다",
+            "emptyDesc": "먹은 것을 기록하세요. 숫자는 포장지에 적혀 있습니다.",
+            "add": "기록 추가",
+            "edit": "기록 편집",
+            "saved": "기록이 저장되었습니다.",
+            "saveError": "기록을 저장할 수 없습니다.",
+            "deleted": "기록이 삭제되었습니다.",
+            "invalid": "이름, 시각, 올바른 숫자를 입력해 주세요.",
+            "noEntries": "아직 기록이 없습니다.",
+            "entriesTitle": "기록",
+            "personsLabel": "대상자",
+            "todayTitle": "오늘",
+            "targetTitle": "하루 목표",
+            "targetSet": "목표 설정",
+            "targetEdit": "목표 편집",
+            "targetHint": "기록하지 않을 항목은 비워 두세요. 0은 목표이고, 빈 칸은 목표가 아닙니다.",
+            "targetNone": "아직 하루 목표가 없습니다.",
+            "targetNoneHint": "목표가 없으면 이 페이지는 합계만 보여 줍니다.",
+            "targetSaved": "하루 목표가 저장되었습니다.",
+            "targetSaveError": "하루 목표를 저장할 수 없습니다.",
+            "ofTarget": "{{target}} {{unit}} 중 {{value}}",
+            "noTargetValue": "{{value}} {{unit}}",
+            "loadError": "영양 데이터를 불러올 수 없습니다.",
+            "loadErrorDesc": "나중에 다시 시도해 주세요.",
+            "retry": "다시 시도",
+            "field": {
+                "title": "이름",
+                "consumedAt": "시각",
+                "mealType": "식사",
+                "noMealType": "식사 없음",
+                "note": "메모"
+            },
+            "meal": {
+                "breakfast": "아침",
+                "lunch": "점심",
+                "dinner": "저녁",
+                "snack": "간식"
+            },
+            "nutrient": {
+                "energyKcal": "열량",
+                "fat": "지방",
+                "saturatedFat": "그중 포화지방",
+                "carbs": "탄수화물",
+                "sugar": "그중 당류",
+                "protein": "단백질",
+                "salt": "소금",
+                "fiber": "식이섬유"
+            },
+            "unit": {
+                "kcal": "kcal",
+                "g": "g"
+            }
+        }
     },
     "waste": {
         "title": "쓰레기 수거",

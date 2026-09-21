@@ -305,7 +305,10 @@
         "manage": "إدارة",
         "todayNothingElseTomorrow": "لا شيء آخر اليوم - غدًا: {{title}}",
         "weatherHighLow": "العظمى {{max}}°، الصغرى {{min}}°",
-        "optionCalendarBirthdaysHint": "بدون تحديد تختفي أعياد الميلاد من هذه البطاقة، وتبقى في التقويم."
+        "optionCalendarBirthdaysHint": "بدون تحديد تختفي أعياد الميلاد من هذه البطاقة، وتبقى في التقويم.",
+        "nutritionNoTarget": "لم يُحدَّد هدف يومي بعد.",
+        "nutritionEntries": "{{count}} سجلات اليوم",
+        "nutritionEntries_one": "سجل واحد اليوم"
     },
     "tasks": {
         "manageCategories": "إدارة الفئات",
@@ -4079,7 +4082,8 @@
             "labs": "التحاليل",
             "activity": "النشاط",
             "cycle": "الدورة",
-            "fasting": "الصيام"
+            "fasting": "الصيام",
+            "nutrition": "القيم الغذائية"
         },
         "overview": {
             "title": "نظرة عامة",
@@ -4850,7 +4854,62 @@
             "h": "{{hours}} س",
             "m": "{{minutes}} د"
         },
-        "careBanner": "أنت تسجّل نيابةً عن {{name}}."
+        "careBanner": "أنت تسجّل نيابةً عن {{name}}.",
+        "nutrition": {
+            "title": "القيم الغذائية",
+            "emptyTitle": "لم تُسجَّل قيم غذائية بعد",
+            "emptyDesc": "سجّل ما تناولته - الأرقام مكتوبة على العبوة.",
+            "add": "إضافة سجل",
+            "edit": "تعديل السجل",
+            "saved": "تم حفظ السجل.",
+            "saveError": "تعذر حفظ السجل.",
+            "deleted": "تم حذف السجل.",
+            "invalid": "يرجى إدخال اسم ووقت وأرقام صحيحة.",
+            "noEntries": "لا توجد سجلات بعد.",
+            "entriesTitle": "السجلات",
+            "personsLabel": "الشخص",
+            "todayTitle": "اليوم",
+            "targetTitle": "الهدف اليومي",
+            "targetSet": "تعيين هدف",
+            "targetEdit": "تعديل الهدف",
+            "targetHint": "اترك الحقول التي لا تريد تتبعها فارغة. الصفر هدف، أما الحقل الفارغ فليس هدفًا.",
+            "targetNone": "لم يُحدَّد هدف يومي بعد.",
+            "targetNoneHint": "بدون هدف تعرض هذه الصفحة المجموع فقط.",
+            "targetSaved": "تم حفظ الهدف اليومي.",
+            "targetSaveError": "تعذر حفظ الهدف اليومي.",
+            "ofTarget": "{{value}} من {{target}} {{unit}}",
+            "noTargetValue": "{{value}} {{unit}}",
+            "loadError": "تعذر تحميل القيم الغذائية.",
+            "loadErrorDesc": "يرجى المحاولة لاحقًا.",
+            "retry": "إعادة المحاولة",
+            "field": {
+                "title": "الاسم",
+                "consumedAt": "الوقت",
+                "mealType": "الوجبة",
+                "noMealType": "بدون وجبة",
+                "note": "ملاحظة"
+            },
+            "meal": {
+                "breakfast": "الإفطار",
+                "lunch": "الغداء",
+                "dinner": "العشاء",
+                "snack": "وجبة خفيفة"
+            },
+            "nutrient": {
+                "energyKcal": "الطاقة",
+                "fat": "الدهون",
+                "saturatedFat": "منها دهون مشبعة",
+                "carbs": "الكربوهيدرات",
+                "sugar": "منها سكريات",
+                "protein": "البروتين",
+                "salt": "الملح",
+                "fiber": "الألياف"
+            },
+            "unit": {
+                "kcal": "سعرة",
+                "g": "غ"
+            }
+        }
     },
     "waste": {
         "title": "جمع النفايات",

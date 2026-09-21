@@ -305,7 +305,10 @@
         "manage": "प्रबंधित करें",
         "todayNothingElseTomorrow": "आज और कुछ नहीं - कल: {{title}}",
         "weatherHighLow": "अधिकतम {{max}}°, न्यूनतम {{min}}°",
-        "optionCalendarBirthdaysHint": "बिना निशान के जन्मदिन इस टाइल में नहीं दिखते - कैलेंडर में वे बने रहते हैं।"
+        "optionCalendarBirthdaysHint": "बिना निशान के जन्मदिन इस टाइल में नहीं दिखते - कैलेंडर में वे बने रहते हैं।",
+        "nutritionNoTarget": "अभी तक कोई दैनिक लक्ष्य नहीं।",
+        "nutritionEntries": "आज {{count}} प्रविष्टियाँ",
+        "nutritionEntries_one": "आज {{count}} प्रविष्टि"
     },
     "tasks": {
         "manageCategories": "श्रेणियाँ प्रबंधित करें",
@@ -4079,7 +4082,8 @@
             "labs": "लैब मान",
             "activity": "गतिविधि",
             "cycle": "चक्र",
-            "fasting": "उपवास"
+            "fasting": "उपवास",
+            "nutrition": "पोषण"
         },
         "overview": {
             "title": "अवलोकन",
@@ -4850,7 +4854,62 @@
             "h": "{{hours}} घं",
             "m": "{{minutes}} मि"
         },
-        "careBanner": "आप {{name}} के लिए दर्ज कर रहे हैं।"
+        "careBanner": "आप {{name}} के लिए दर्ज कर रहे हैं।",
+        "nutrition": {
+            "title": "पोषण",
+            "emptyTitle": "अभी तक कोई पोषण प्रविष्टि नहीं",
+            "emptyDesc": "जो खाया वह दर्ज करें - आंकड़े पैकेट पर लिखे होते हैं।",
+            "add": "प्रविष्टि जोड़ें",
+            "edit": "प्रविष्टि संपादित करें",
+            "saved": "प्रविष्टि सहेजी गई।",
+            "saveError": "प्रविष्टि सहेजी नहीं जा सकी।",
+            "deleted": "प्रविष्टि हटाई गई।",
+            "invalid": "कृपया नाम, समय और मान्य संख्याएँ दें।",
+            "noEntries": "अभी तक कोई प्रविष्टि नहीं।",
+            "entriesTitle": "प्रविष्टियाँ",
+            "personsLabel": "व्यक्ति",
+            "todayTitle": "आज",
+            "targetTitle": "दैनिक लक्ष्य",
+            "targetSet": "लक्ष्य सेट करें",
+            "targetEdit": "लक्ष्य संपादित करें",
+            "targetHint": "जिसे ट्रैक नहीं करना है उसे खाली छोड़ें। 0 एक लक्ष्य है, खाली खाना नहीं।",
+            "targetNone": "अभी तक कोई दैनिक लक्ष्य नहीं।",
+            "targetNoneHint": "लक्ष्य के बिना यह पृष्ठ केवल कुल दिखाता है।",
+            "targetSaved": "दैनिक लक्ष्य सहेजा गया।",
+            "targetSaveError": "दैनिक लक्ष्य सहेजा नहीं जा सका।",
+            "ofTarget": "{{target}} {{unit}} में से {{value}}",
+            "noTargetValue": "{{value}} {{unit}}",
+            "loadError": "पोषण डेटा लोड नहीं हो सका।",
+            "loadErrorDesc": "कृपया बाद में पुनः प्रयास करें।",
+            "retry": "पुनः प्रयास करें",
+            "field": {
+                "title": "नाम",
+                "consumedAt": "समय",
+                "mealType": "भोजन",
+                "noMealType": "कोई भोजन नहीं",
+                "note": "टिप्पणी"
+            },
+            "meal": {
+                "breakfast": "नाश्ता",
+                "lunch": "दोपहर का भोजन",
+                "dinner": "रात का भोजन",
+                "snack": "स्नैक"
+            },
+            "nutrient": {
+                "energyKcal": "ऊर्जा",
+                "fat": "वसा",
+                "saturatedFat": "जिसमें संतृप्त वसा",
+                "carbs": "कार्बोहाइड्रेट",
+                "sugar": "जिसमें शर्करा",
+                "protein": "प्रोटीन",
+                "salt": "नमक",
+                "fiber": "फाइबर"
+            },
+            "unit": {
+                "kcal": "किलो कैलोरी",
+                "g": "ग्राम"
+            }
+        }
     },
     "waste": {
         "title": "कचरा संग्रहण",
