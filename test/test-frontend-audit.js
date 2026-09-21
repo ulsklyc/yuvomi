@@ -6414,13 +6414,88 @@ test('phase 3 mobile Shopping quick-add separates name, quantity, category, and 
   const shoppingCss = read('../public/styles/shopping.css');
 
   assert.match(shoppingPage, /<div class="quick-add__input-wrap">[\s\S]*id="item-name-input"[\s\S]*id="autocomplete-dropdown" hidden[\s\S]*<\/div>\s*<input class="quick-add__qty"/);
+  // Die Aufteilung von Menge und Kategorie (#1372: 2:3) pinnt der Guard darunter
+  // als Regel - hier nur die Zusage dieses Tests: drei Spuren, der Knopf am Ende.
   assert.match(
     shoppingCss,
-    /\.quick-add__form\s*\{[\s\S]*display:\s*grid[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*minmax\(0,\s*1fr\)\s*var\(--target-base\)/
+    /\.quick-add__form\s*\{[\s\S]*display:\s*grid[\s\S]*grid-template-columns:\s*minmax\(0,\s*\d+fr\)\s*minmax\(0,\s*\d+fr\)\s*var\(--target-base\)/
   );
   assert.match(shoppingCss, /\.quick-add__input-wrap\s*\{[\s\S]*grid-column:\s*1\s*\/\s*-1/);
   assert.match(shoppingCss, /\.quick-add__qty\s*\{[\s\S]*position:\s*static[\s\S]*min-height:\s*var\(--target-base\)/);
   assert.match(shoppingCss, /\.quick-add__cat\s*\{[\s\S]*min-width:\s*0[\s\S]*min-height:\s*var\(--target-base\)/);
+});
+
+/**
+ * #1372: in der Eingabezeile des Einkaufs stand die Menge niedriger und
+ * schmaler als ihre Nachbarn, und zwei Texte wurden mitten im Wort gekappt.
+ * Gemessen (getBoundingClientRect, echte Stylesheets): bei 1280px Name 50px
+ * hoch, Kategorie 50px, Menge 44px - `height: var(--target-base)` nahm sie als
+ * einziges Feld aus dem `align-items: stretch` der Zeile. Und ihre Spur war
+ * fest (80px): der Platzhalter passte in 12 von 24 Sprachen nicht hinein
+ * („Quantit"). Bei 375px bekam die Kategorie die Haelfte der Zeile, 140px, und
+ * „Miscellaneous" verschwand unter dem Chevron.
+ *
+ * Die Regeln, nicht die Zahlen: (1) kein Feld der Zeile setzt eine feste
+ * Hoehe, nur eine Mindesthoehe; (2) ein Feld mit uebersetztem Text bekommt
+ * keine feste Spur - fest ist nur der Knopf am Ende; (3) die Kategorie
+ * bekommt mehr als die Menge, weil ihr Inhalt ein Wort ist und der der Menge
+ * ein paar Zeichen; (4) was trotzdem nicht passt, endet mit Auslassungspunkten.
+ */
+test('#1372 quick-add fields stretch with their row, and no translated field gets a fixed track', () => {
+  const css = read('../public/styles/shopping.css');
+  const FIELD = /\.quick-add__(?:input|qty|cat)(?![\w-])/;
+  const rules = [...eachRule(css)];
+
+  for (const { selector, body, at } of rules) {
+    if (!FIELD.test(selector)) continue;
+    assert.doesNotMatch(body, /(?:^|[;{\s])height\s*:/,
+      `${at.join(' ')} ${selector} setzt eine feste Hoehe - in einer gedehnten Grid-Zeile steht das Feld damit niedriger als seine Nachbarn (#1372)`);
+  }
+
+  // Top-Level-Spuren einer grid-template-columns-Angabe (Klammern beachten).
+  const tracks = (value) => {
+    const out = [];
+    let depth = 0;
+    let cur = '';
+    for (const ch of value.trim()) {
+      if (ch === '(') depth += 1;
+      if (ch === ')') depth -= 1;
+      if (/\s/.test(ch) && depth === 0) {
+        if (cur) out.push(cur);
+        cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    if (cur) out.push(cur);
+    return out;
+  };
+  const frOf = (track) => Number(/(\d+(?:\.\d+)?)fr\)?$/.exec(track)?.[1] ?? NaN);
+
+  const templates = rules
+    .filter(({ selector }) => selector.trim() === '.quick-add__form')
+    .map(({ body, at }) => ({ at: at.join(' ') || '(Basis)', value: /grid-template-columns\s*:\s*([^;]+)/.exec(body)?.[1] }))
+    .filter(({ value }) => value);
+  assert.ok(templates.length >= 2, `erwartet: eine Basis- und eine Desktop-Aufteilung, gefunden ${templates.length}`);
+
+  for (const { at, value } of templates) {
+    const list = tracks(value);
+    assert.equal(list.at(-1), 'var(--target-base)', `${at}: die letzte Spur ist der Knopf`);
+    const fields = list.slice(0, -1);
+    for (const track of fields) {
+      assert.match(track, /^minmax\(0,\s*[\d.]+fr\)$/,
+        `${at}: Spur „${track}" ist nicht flexibel - ein uebersetzter Platzhalter kennt keine feste Breite (#1372)`);
+    }
+    const [qty, cat] = fields.slice(-2).map(frOf);
+    assert.ok(cat > qty, `${at}: die Kategorie (${cat}fr) muss mehr Platz bekommen als die Menge (${qty}fr)`);
+  }
+
+  for (const cls of ['.quick-add__qty', '.quick-add__cat']) {
+    const base = rules.find(({ selector, at }) => selector.trim() === cls && at.length === 0);
+    assert.ok(base, `${cls}: Basisregel fehlt`);
+    assert.match(base.body, /text-overflow\s*:\s*ellipsis/,
+      `${cls}: ein Text, der nicht passt, endet mit Auslassungspunkten statt mitten im Wort`);
+  }
 });
 
 test('phase 6 touched UI files continue using design tokens for target sizes', () => {

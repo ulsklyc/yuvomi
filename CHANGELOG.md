@@ -73,6 +73,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **In the shopping list's add row, the quantity field is as tall as its neighbours, and
+  "Quantity" and "Miscellaneous" are no longer cut off.** The quantity field had a fixed height
+  and stood 6 pixels lower than the item and category fields next to it. On a computer it also had a
+  fixed width of 80 pixels, too narrow for its own placeholder in half of the 24 languages - English
+  showed "Quantit". On a phone, quantity and category each got half of the row, and the preselected
+  category "Miscellaneous" disappeared under the select's arrow. The fields now take the row's
+  height, and the category gets more of the width than the quantity, whose entry is only a few
+  characters: at the usual phone widths every language's placeholder and preselected category fit
+  in full. The words stay as they are rather than becoming "Qty" and "Misc" - the space was the
+  problem, not the words, and the same fix covers the longer words in other languages. A custom
+  category name that is still too long, or a very narrow screen, now ends with "..." instead of
+  breaking off mid-word under the arrow. (#1372)
+
 - **On browsers older than Chrome 108, the main area scrolls and dialogs stay on screen.**
   Yuvomi sized the page, the app frame and the height limit of its dialogs with `dvh`, a unit for
   the visible window height that Chrome understands from version 108 and Safari from 15.4. An older
