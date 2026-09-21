@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A payment recorded in shared expenses can be reversed.** Until now a settle-up, once saved,
+  stayed for good - a transposed figure or the wrong person could not be taken back, while the
+  expense next to it could be edited and deleted. Each payment in a group's activity now names who
+  paid whom and how much, and offers "Reverse". After a confirmation, a counter-entry cancels the
+  payment and the balances go back to where they were before it. Nothing is deleted: the payment
+  stays in the activity, marked as reversed, together with its payment proof, so the history still
+  shows what happened. To correct a payment, reverse it and record the right one. Group owners and
+  admins can reverse any payment, everyone else the ones they recorded - the same rule as for
+  editing an expense. Without write access to Budget, or in an archived group, the button is not
+  there, but the "reversed" mark is. The API has the same step as
+  `POST /api/v1/split-expenses/groups/{id}/settlements/{settlementId}/reverse`; reversing twice
+  answers 409. (#1309)
+
 - **In the week and day views, an appointment of a day or more now shows its times on the all-day
   bar.** An appointment with a start and an end time that lasts 24 hours or longer - a trip from
   Friday 14:00 to Sunday 11:00, a workshop over three days - stays in the all-day row above the time

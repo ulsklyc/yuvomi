@@ -3646,7 +3646,8 @@
             "recurring_created": "Tekrarlanan gider oluşturuldu",
             "recurring_paused": "Tekrarlanan gider duraklatıldı",
             "recurring_resumed": "Tekrarlanan gider sürdürüldü",
-            "recurring_generated": "Tekrarlanan gider üretildi"
+            "recurring_generated": "Tekrarlanan gider üretildi",
+            "payment_reversed": "Ödeme iptal edildi"
         },
         "splitPercentage": "Yüzde",
         "splitExact": "Kesin tutar",
@@ -3689,7 +3690,13 @@
         "proofDocumentName": "Ödeme belgesi {{group}}: {{name}}",
         "loadError": "Paylaşılan giderler yüklenemedi.",
         "moreMembers": "+{{count}} kişi daha",
-        "moreMembers_one": "+{{count}} kişi daha"
+        "moreMembers_one": "+{{count}} kişi daha",
+        "paymentDetail": "{{payer}} → {{payee}}: {{amount}}",
+        "paymentReversed": "İptal edildi",
+        "reversePayment": "İptal et",
+        "reversePaymentLabel": "{{payer}} tarafından {{payee}} kişisine yapılan {{amount}} tutarındaki ödemeyi iptal et",
+        "reversePaymentConfirm": "Bu ödeme iptal edilsin mi?",
+        "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Ters kayıt ödemeyi geçersiz kılar ve bakiyeler önceki haline döner. Ödeme, iptal edildi olarak etkinlikte kalır."
     },
     "wmo": {
         "0": "Açık",

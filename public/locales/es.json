@@ -3646,7 +3646,8 @@
             "recurring_created": "Gasto recurrente creado",
             "recurring_paused": "Gasto recurrente pausado",
             "recurring_resumed": "Gasto recurrente reanudado",
-            "recurring_generated": "Gasto recurrente generado"
+            "recurring_generated": "Gasto recurrente generado",
+            "payment_reversed": "Pago anulado"
         },
         "splitPercentage": "Porcentaje",
         "splitExact": "Importe exacto",
@@ -3689,7 +3690,13 @@
         "proofDocumentName": "Justificante de pago {{group}}: {{name}}",
         "loadError": "No se pudieron cargar los gastos compartidos.",
         "moreMembers": "+{{count}} más",
-        "moreMembers_one": "+{{count}} más"
+        "moreMembers_one": "+{{count}} más",
+        "paymentDetail": "{{payer}} a {{payee}}: {{amount}}",
+        "paymentReversed": "Anulado",
+        "reversePayment": "Anular",
+        "reversePaymentLabel": "Anular el pago de {{payer}} a {{payee}} por {{amount}}",
+        "reversePaymentConfirm": "¿Anular este pago?",
+        "reversePaymentConfirmDetail": "{{payer}} a {{payee}}, {{amount}}. Un contraasiento anula el pago y los saldos vuelven a como estaban. El pago sigue en la actividad, marcado como anulado."
     },
     "wmo": {
         "0": "Cielo despejado",

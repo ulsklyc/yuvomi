@@ -3216,7 +3216,8 @@
             "recurring_created": "Opakující se výdaj vytvořen",
             "recurring_paused": "Opakující se výdaj pozastaven",
             "recurring_resumed": "Opakující se výdaj obnoven",
-            "recurring_generated": "Opakující se výdaj vygenerován"
+            "recurring_generated": "Opakující se výdaj vygenerován",
+            "payment_reversed": "Platba stornována"
         },
         "splitPercentage": "Procenta",
         "splitExact": "Přesná částka",
@@ -3259,7 +3260,13 @@
         "proofDocumentName": "Doklad o platbě {{group}}: {{name}}",
         "loadError": "Společné výdaje se nepodařilo načíst.",
         "moreMembers": "+{{count}} dalších",
-        "moreMembers_one": "+{{count}} další"
+        "moreMembers_one": "+{{count}} další",
+        "paymentDetail": "{{payer}} pro {{payee}}: {{amount}}",
+        "paymentReversed": "Stornováno",
+        "reversePayment": "Stornovat",
+        "reversePaymentLabel": "Stornovat platbu od {{payer}} pro {{payee}} ve výši {{amount}}",
+        "reversePaymentConfirm": "Stornovat tuto platbu?",
+        "reversePaymentConfirmDetail": "{{payer}} pro {{payee}}, {{amount}}. Protizápis platbu zruší a zůstatky se vrátí na předchozí stav. Platba zůstane v aktivitě označená jako stornovaná."
     },
     "documents": {
         "title": "Dokumenty",

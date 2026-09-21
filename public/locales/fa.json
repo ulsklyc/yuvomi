@@ -3646,7 +3646,8 @@
             "recurring_created": "هزینه تکرارشونده ایجاد شد",
             "recurring_paused": "هزینه تکرارشونده متوقف شد",
             "recurring_resumed": "هزینه تکرارشونده از سر گرفته شد",
-            "recurring_generated": "هزینه تکرارشونده تولید شد"
+            "recurring_generated": "هزینه تکرارشونده تولید شد",
+            "payment_reversed": "پرداخت برگشت خورد"
         },
         "splitPercentage": "درصد",
         "splitExact": "مبلغ دقیق",
@@ -3689,7 +3690,13 @@
         "proofDocumentName": "سند پرداخت {{group}}: {{name}}",
         "loadError": "هزینه‌های مشترک بارگذاری نشدند.",
         "moreMembers": "+{{count}} نفر دیگر",
-        "moreMembers_one": "+{{count}} نفر دیگر"
+        "moreMembers_one": "+{{count}} نفر دیگر",
+        "paymentDetail": "{{payer}} به {{payee}}: {{amount}}",
+        "paymentReversed": "برگشت‌خورده",
+        "reversePayment": "برگشت",
+        "reversePaymentLabel": "برگشت پرداخت {{payer}} به {{payee}} به مبلغ {{amount}}",
+        "reversePaymentConfirm": "این پرداخت برگشت بخورد؟",
+        "reversePaymentConfirmDetail": "{{payer}} به {{payee}}، {{amount}}. یک ثبت معکوس پرداخت را لغو می‌کند و مانده‌ها به حالت قبل برمی‌گردند. پرداخت با علامت برگشت‌خورده در فعالیت می‌ماند."
     },
     "wmo": {
         "0": "آسمان صاف",

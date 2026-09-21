@@ -467,6 +467,7 @@ function renderMain() {
   const settleButton = main.querySelector('#split-settle');
   if (settleButton) settleButton.disabled = state.expenses.length === 0;
   main.querySelector('#split-invite')?.addEventListener('click', () => openMemberModal());
+  main.querySelector('.split-activity')?.addEventListener('click', onActivityClick);
   main.querySelector('#split-expense-list')?.addEventListener('click', (e) => {
     // Zwei Wege, je nach Markup: `data-expense-view` liest (Archiv und
     // `budget: read`), `data-expense-id` bearbeitet. Den zweiten gibt es bei
@@ -577,17 +578,85 @@ function renderExpenses(asList = false) {
   }).join('');
 }
 
+/** Die Werte, die Zeile, Knopf und Rueckfrage einer Zahlung nennen (#1309). */
+function paymentParams(settlement) {
+  return {
+    payer: settlement.payer_name || '',
+    payee: settlement.payee_name || '',
+    amount: money(settlement.amount, settlement.currency),
+  };
+}
+
+/**
+ * Verlauf der Gruppe. Eine eingetragene Zahlung nennt, wer wem wie viel
+ * gezahlt hat, und traegt ihren Stand (#1309): storniert ist ein ZEICHEN, das
+ * bei jedem Recht stehen bleibt; „Stornieren" ist eine Handlung und erscheint
+ * nur, wenn der Server `can_reverse` meldet (Verwalter oder wer sie
+ * eingetragen hat - die Regel wohnt dort), das Modul beschreibbar ist und die
+ * Gruppe nicht im Archiv liegt.
+ */
 function renderActivity() {
   if (!state.activity.length) return `<div class="split-muted">${t('splitExpenses.noActivity')}</div>`;
-  return state.activity.map((item) => `
-    <div class="split-activity-item">
+  const actionable = !readOnly() && !isArchivedView();
+  return state.activity.map((item) => {
+    const settlement = item.settlement;
+    const params = settlement ? paymentParams(settlement) : null;
+    const detail = settlement
+      ? `<span class="split-activity-payment">${esc(t('splitExpenses.paymentDetail', params))}</span>`
+      : '';
+    const reversed = settlement?.reversed_at
+      ? `<span class="split-activity-reversed">${esc(t('splitExpenses.paymentReversed'))}</span>`
+      : '';
+    const action = settlement?.can_reverse && !settlement.reversed_at && actionable
+      ? `<button type="button" class="btn btn--secondary split-reverse-payment" data-reverse-settlement="${settlement.id}" aria-label="${esc(t('splitExpenses.reversePaymentLabel', params))}">${esc(t('splitExpenses.reversePayment'))}</button>`
+      : '';
+    return `
+    <div class="split-activity-item${settlement?.reversed_at ? ' split-activity-item--reversed' : ''}">
       <span class="split-activity-dot"></span>
       <div>
         <strong>${esc(t(`splitExpenses.activityType.${item.type}`))}</strong>
+        ${detail}
         <span>${esc(item.actor_name || t('splitExpenses.system'))} · ${formatDate(item.created_at.slice(0, 10))}</span>
+        ${reversed}
       </div>
+      ${action}
     </div>
-  `).join('');
+  `;
+  }).join('');
+}
+
+/** Delegierter Klick im Verlauf: der einzige Schreibweg dort ist das Storno. */
+function onActivityClick(e) {
+  const btn = e.target.closest('[data-reverse-settlement]');
+  if (!btn) return undefined;
+  return reverseSettlement(Number(btn.dataset.reverseSettlement));
+}
+
+/**
+ * Storno einer Zahlung (#1309): Rueckfrage, dann die Gegenbuchung auf dem
+ * Server. Nichts wird geloescht - die Zahlung bleibt im Verlauf, als storniert
+ * markiert. Scheitert der Aufruf (etwa 409, weil jemand anderes schneller war),
+ * wird trotzdem neu geladen, damit der Schirm den wirklichen Stand zeigt; der
+ * Fehler selbst geht an die globale Meldung.
+ */
+async function reverseSettlement(settlementId) {
+  if (readOnly()) return;
+  const settlement = state.activity.find((item) => item.settlement?.id === settlementId)?.settlement;
+  if (!settlement?.can_reverse || settlement.reversed_at) return;
+  const groupId = state.activeGroupId;
+  const confirmed = await confirmModal(t('splitExpenses.reversePaymentConfirm'), {
+    confirmLabel: t('splitExpenses.reversePayment'),
+    detail: t('splitExpenses.reversePaymentConfirmDetail', paymentParams(settlement)),
+  });
+  if (!confirmed) return;
+  try {
+    await api.post(`/split-expenses/groups/${groupId}/settlements/${settlementId}/reverse`, {});
+  } finally {
+    await refreshDashboard();
+    await loadGroupData();
+    renderAll();
+    refocusAfterRender();
+  }
 }
 
 function categoryIcon(category) {
@@ -1442,6 +1511,7 @@ function openGuestModal() {
  */
 export const __test = {
   readOnly, renderExpenses, state, expenseReadSections, openExpenseModal, groupMetaHtml, openGroupModal,
+  renderActivity, onActivityClick,
   renderMainForTest(container) { _container = container; renderMain(); },
   renderGroupsForTest(container) { _container = container; renderGroups(); },
 };

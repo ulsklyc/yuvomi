@@ -3646,7 +3646,8 @@
             "recurring_created": "定期費用を作成",
             "recurring_paused": "定期費用を一時停止",
             "recurring_resumed": "定期費用を再開",
-            "recurring_generated": "定期費用を生成"
+            "recurring_generated": "定期費用を生成",
+            "payment_reversed": "支払いを取り消し"
         },
         "splitPercentage": "割合",
         "splitExact": "正確な金額",
@@ -3689,7 +3690,13 @@
         "proofDocumentName": "支払いの証明 {{group}}: {{name}}",
         "loadError": "共有費用の読み込みに失敗しました。",
         "moreMembers": "他 {{count}} 人",
-        "moreMembers_one": "他 {{count}} 人"
+        "moreMembers_one": "他 {{count}} 人",
+        "paymentDetail": "{{payer}} から {{payee}}: {{amount}}",
+        "paymentReversed": "取り消し済み",
+        "reversePayment": "取り消す",
+        "reversePaymentLabel": "{{payer}} から {{payee}} への {{amount}} の支払いを取り消す",
+        "reversePaymentConfirm": "この支払いを取り消しますか?",
+        "reversePaymentConfirmDetail": "{{payer}} から {{payee}}、{{amount}}。反対仕訳で支払いが打ち消され、残高は元に戻ります。支払いは取り消し済みとしてアクティビティに残ります。"
     },
     "wmo": {
         "0": "快晴",

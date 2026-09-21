@@ -3646,7 +3646,8 @@
             "recurring_created": "Повторювану витрату створено",
             "recurring_paused": "Повторювану витрату призупинено",
             "recurring_resumed": "Повторювану витрату відновлено",
-            "recurring_generated": "Повторювану витрату згенеровано"
+            "recurring_generated": "Повторювану витрату згенеровано",
+            "payment_reversed": "Платіж сторновано"
         },
         "splitPercentage": "Відсоток",
         "splitExact": "Точна сума",
@@ -3689,7 +3690,13 @@
         "proofDocumentName": "Підтвердження оплати {{group}}: {{name}}",
         "loadError": "Не вдалося завантажити спільні витрати.",
         "moreMembers": "+{{count}} ще",
-        "moreMembers_one": "+{{count}} ще"
+        "moreMembers_one": "+{{count}} ще",
+        "paymentDetail": "{{payer}} → {{payee}}: {{amount}}",
+        "paymentReversed": "Сторновано",
+        "reversePayment": "Сторнувати",
+        "reversePaymentLabel": "Сторнувати платіж {{payer}} для {{payee}} на {{amount}}",
+        "reversePaymentConfirm": "Сторнувати цей платіж?",
+        "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Зворотний запис скасовує платіж, і баланси повертаються до попередніх. Платіж залишається в активності з позначкою «сторновано»."
     },
     "wmo": {
         "0": "Ясне небо",

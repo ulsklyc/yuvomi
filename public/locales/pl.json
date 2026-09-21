@@ -3646,7 +3646,8 @@
             "recurring_created": "Cykliczny wydatek utworzony",
             "recurring_paused": "Cykliczny wydatek wstrzymany",
             "recurring_resumed": "Cykliczny wydatek wznowiony",
-            "recurring_generated": "Cykliczny wydatek wygenerowany"
+            "recurring_generated": "Cykliczny wydatek wygenerowany",
+            "payment_reversed": "Płatność stornowana"
         },
         "splitPercentage": "Procent",
         "splitExact": "Dokładna kwota",
@@ -3689,7 +3690,13 @@
         "proofDocumentName": "Potwierdzenie płatności {{group}}: {{name}}",
         "loadError": "Nie udało się załadować wspólnych wydatków.",
         "moreMembers": "+{{count}} więcej",
-        "moreMembers_one": "+{{count}} więcej"
+        "moreMembers_one": "+{{count}} więcej",
+        "paymentDetail": "{{payer}} dla {{payee}}: {{amount}}",
+        "paymentReversed": "Stornowano",
+        "reversePayment": "Stornuj",
+        "reversePaymentLabel": "Stornuj płatność od {{payer}} dla {{payee}} na kwotę {{amount}}",
+        "reversePaymentConfirm": "Stornować tę płatność?",
+        "reversePaymentConfirmDetail": "{{payer}} dla {{payee}}, {{amount}}. Zapis przeciwny anuluje płatność, a salda wracają do poprzedniego stanu. Płatność pozostaje w aktywności oznaczona jako stornowana."
     },
     "wmo": {
         "0": "Bezchmurnie",

@@ -417,6 +417,30 @@ button.split-expense:hover {
   background: color-mix(in srgb, var(--module-accent) var(--tint-state), transparent);
 }
 
+/* Storno einer Zahlung (#1309). Die Textspalte nimmt den Platz, der Knopf
+ * bleibt so breit wie sein Wort. „Storniert" ist ein Zeichen, kein Knopf: es
+ * steht bei jedem Recht, in der Form der Archiv-Marke, und die Zahlungszeile
+ * darueber ist durchgestrichen - der Betrag zaehlt nicht mehr. */
+.split-activity-item > div {
+  flex: 1 1 auto;
+}
+
+.split-reverse-payment {
+  flex: 0 0 auto;
+}
+
+.split-activity-item--reversed .split-activity-payment {
+  text-decoration: line-through;
+}
+
+.split-activity-item span.split-activity-reversed {
+  align-self: flex-start;
+  padding: var(--space-0h) var(--space-2);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--module-accent) var(--tint-surface), var(--color-surface-2));
+  font-weight: var(--font-weight-medium);
+}
+
 .split-activity-dot {
   width: 10px;
   height: 10px;

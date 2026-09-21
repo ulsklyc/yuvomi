@@ -3646,7 +3646,8 @@
             "recurring_created": "Terugkerende uitgave aangemaakt",
             "recurring_paused": "Terugkerende uitgave gepauzeerd",
             "recurring_resumed": "Terugkerende uitgave hervat",
-            "recurring_generated": "Terugkerende uitgave gegenereerd"
+            "recurring_generated": "Terugkerende uitgave gegenereerd",
+            "payment_reversed": "Betaling tegengeboekt"
         },
         "splitPercentage": "Percentage",
         "splitExact": "Exact bedrag",
@@ -3689,7 +3690,13 @@
         "proofDocumentName": "Betaalbewijs {{group}}: {{name}}",
         "loadError": "Gedeelde uitgaven konden niet worden geladen.",
         "moreMembers": "+{{count}} meer",
-        "moreMembers_one": "+{{count}} meer"
+        "moreMembers_one": "+{{count}} meer",
+        "paymentDetail": "{{payer}} aan {{payee}}: {{amount}}",
+        "paymentReversed": "Tegengeboekt",
+        "reversePayment": "Tegenboeken",
+        "reversePaymentLabel": "Betaling van {{payer}} aan {{payee}} van {{amount}} tegenboeken",
+        "reversePaymentConfirm": "Deze betaling tegenboeken?",
+        "reversePaymentConfirmDetail": "{{payer}} aan {{payee}}, {{amount}}. Een tegenboeking heft de betaling op en de saldi staan weer zoals ervoor. De betaling blijft in de activiteit, gemarkeerd als tegengeboekt."
     },
     "wmo": {
         "0": "Heldere lucht",
