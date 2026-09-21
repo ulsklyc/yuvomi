@@ -87,23 +87,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   UTC with a household in Berlin, a task done shortly after midnight counted as done the day before,
   so it showed "due today" a day early and "overdue" on the day it was actually due; west of UTC the
   evening hours were off the same way. The due day is now counted from the day the task was done in
-  the household time zone (Settings, Region).
+  the household time zone (Settings, Region). (#1387)
 - **Housekeeping counts a visit in the month it happened in the household.** Visits, their totals,
   the "visits this month" and "paid this month" figures, the monthly payment chart and the tasks
   finished this month were grouped by UTC month, and the current month itself was the UTC one. A
   visit on the 1st at 00:30 in Berlin was booked to the month before, and in the first hours of a
-  new month the overview still showed the old one. All of them now use the household's month.
+  new month the overview still showed the old one. All of them now use the household's month. (#1387)
 - **A dose marked as taken through the API without a time is stored in household time.** `POST
   /api/v1/health/logs/{id}/take` without `taken_at`, and a `PATCH` to `taken` without one, stored the
   current moment as a UTC timestamp, while every time that is sent along is stored as household
   wall-clock time. The CSV export then showed the UTC time for these doses. The current minute is
   now stored in the same form as every other dose. The app itself always sends the time and was not
-  affected.
+  affected. (#1387)
 - **Marking an inventory deadline as done no longer stores a broken date when the next one would
   fall after 9999-12-31.** The next due date then has a five-digit year, which the date format cannot
   hold: the deadline got a date like "99990-06-01", its reminder a date that is not a date, and the
   item could not be saved again afterwards. The request is now refused with a message that names
-  the limit, and neither the deadline nor its history change.
+  the limit, and neither the deadline nor its history change. (#1387)
 - **On a phone, a meal can be dragged to another day again, by a grip next to its buttons.** The
   drag started, and ended the moment the finger moved: on a phone the week plan is a vertical list,
   another day lies exactly on the scrolling axis, and the browser took the gesture as a scroll and
