@@ -40,6 +40,9 @@ import { householdTimeZone, utcToWall } from '../../utils/timezone.js';
  *  "Reparatur/Wartung" bzw. "Zubehoer" anbietet (entry-links.js#ROLES). */
 const HISTORY_ENTRY_ROLES = ['maintenance', 'accessory'];
 const DOCS = { table: 'inventory_item_documents', ownerColumn: 'item_id' };
+// Die Speicherform von inventory_item_dates.date: vier Stellen Jahr, also
+// hoechstens 9999-12-31.
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Ein Eintrag, der den AKTUELLEN Kilometerstand des Gegenstands stellen
@@ -345,11 +348,21 @@ function monthsBetween(fromKey, toKey) {
  * nicht erreicht). Ein ceil()-Einstieg sprang in genau diesem Fall ein
  * Intervall zu weit: faellig 2025-06-10, jaehrlich, erledigt 2026-06-05
  * ergab 2027-06-10 statt 2026-06-10.
+ *
+ * Gibt null zurueck, wenn diese Marke hinter 9999-12-31 laege - der Aufrufer
+ * weist die Erledigung dann ab, statt ein fuenfstelliges Jahr zu speichern.
  */
 function rollForwardPast(fromDate, intervalMonths, afterDate) {
   let k = Math.max(1, Math.floor(monthsBetween(fromDate, afterDate) / intervalMonths));
-  while (addMonthsClamped(fromDate, k * intervalMonths) <= afterDate) k += 1;
-  return addMonthsClamped(fromDate, k * intervalMonths);
+  for (;;) {
+    const candidate = addMonthsClamped(fromDate, k * intervalMonths);
+    // Jenseits von 9999-12-31 hat das Jahr fuenf Stellen, und der Textvergleich
+    // unten traegt nicht mehr ('10000-…' < '9999-…'): die Schleife lief an der
+    // Grenze vorbei bis '99990-…', und genau das landete in der Frist.
+    if (!DATE_KEY_RE.test(candidate)) return null;
+    if (candidate > afterDate) return candidate;
+    k += 1;
+  }
 }
 
 /**
@@ -370,6 +383,25 @@ function completeTrackedDate({ item, dateId, values, userId }) {
     return { error: 'Tracked date not found.', code: 404 };
   }
 
+  // Vom FAELLIGKEITSDATUM aus vorrollen, nicht vom Erledigungsdatum - eine
+  // laengst ueberfaellige Frist (mehr als ein Intervall alt) rollte sonst
+  // nur EINMAL vor und landete erneut in der Vergangenheit: die Zeile
+  // bliebe ueberfaellig, keine Erinnerung entstuende (syncTrackedDateReminder
+  // verwirft einen bereits vergangenen remind_at), und ein zweiter Klick auf
+  // "Erledigt" schriebe eine zweite Log-Zeile mit demselben performed_on.
+  // Auf die ERSTE Intervall-Marke nach dem Erledigungsdatum vorrollen.
+  // Gerechnet VOR der Transaktion: liegt die Marke hinter dem letzten
+  // darstellbaren Tag, entsteht weder die Log-Zeile noch eine Aenderung.
+  const nextDate = trackedDate.interval_months != null
+    ? rollForwardPast(trackedDate.date, trackedDate.interval_months, values.performed_on)
+    : null;
+  if (trackedDate.interval_months != null && nextDate === null) {
+    return {
+      error: 'The next due date would fall after 9999-12-31. Choose an earlier completion date or remove the interval.',
+      code: 400,
+    };
+  }
+
   db.get().transaction(() => {
     const inserted = db.get().prepare(`
       INSERT INTO inventory_item_service_log
@@ -383,14 +415,6 @@ function completeTrackedDate({ item, dateId, values, userId }) {
     maybeAdvanceItemOdometer(item.id, values.performed_on, values.odometer);
 
     if (trackedDate.interval_months != null) {
-      // Vom FAELLIGKEITSDATUM aus vorrollen, nicht vom Erledigungsdatum - eine
-      // laengst ueberfaellige Frist (mehr als ein Intervall alt) rollte sonst
-      // nur EINMAL vor und landete erneut in der Vergangenheit: die Zeile
-      // bliebe ueberfaellig, keine Erinnerung entstuende (syncTrackedDateReminder
-      // verwirft einen bereits vergangenen remind_at), und ein zweiter Klick auf
-      // "Erledigt" schriebe eine zweite Log-Zeile mit demselben performed_on.
-      // Auf die ERSTE Intervall-Marke nach dem Erledigungsdatum vorrollen.
-      const nextDate = rollForwardPast(trackedDate.date, trackedDate.interval_months, values.performed_on);
       rollTrackedDateForward(trackedDate, nextDate, item.created_by);
     } else {
       removeTrackedDate(trackedDate.id);

@@ -11,7 +11,7 @@
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 process.env.DB_PATH = ':memory:';
 
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 
@@ -871,6 +871,159 @@ test('unbezahlter Besuch: Mitglied bewegt die Zahlungsaufgabe weiter frei', asyn
   const done = await call('PATCH', `/tasks-api/${taskId}/status`, { as: MEM, body: { status: 'done' } });
   assert.equal(done.status, 200, 'abhaken bleibt Mitgliedssache - es ist dasselbe wie Bezahlen');
   assert.ok(visitRow(visitId).paid_at, 'abgehakt heisst bezahlt');
+});
+
+// --------------------------------------------------------------------------
+// Tage und Monate folgen der Haushaltszone, nicht der Zone des Servers
+// und nicht UTC.
+//
+// Die Uhr steht dafuer fest und die Zone ist ausdruecklich gesetzt: der
+// Unterschied existiert nur ein paar Stunden am Tages- bzw. Monatsrand, eine
+// Probe zur Tagesmitte waere in jeder Zone gruen. Die Maschinenzone darf das
+// Ergebnis nicht bestimmen, deshalb je eine Probe oestlich (Kiritimati, +14)
+// und westlich (Niue, -11) - die alte Rechnung in der Serverzone lag in UTC,
+// Europa und Amerika bei beiden daneben.
+// --------------------------------------------------------------------------
+function setHouseholdZone(zone) {
+  if (zone === null) {
+    db.prepare("DELETE FROM sync_config WHERE key = 'household_timezone'").run();
+    return;
+  }
+  setConfig('household_timezone', zone);
+}
+
+async function atClock(isoInstant, fn) {
+  mock.timers.enable({ apis: ['Date'], now: new Date(isoInstant) });
+  try { return await fn(); } finally { mock.timers.reset(); }
+}
+
+async function decayTaskStatus({ zone, lastCompleted, now }) {
+  setHouseholdZone(zone);
+  const id = db.prepare(`
+    INSERT INTO housekeeping_decay_tasks (name, area, frequency_days, last_completed, created_by)
+    VALUES ('Zonenprobe', 'Flur', 7, ?, ?)
+  `).run(lastCompleted, ADMIN).lastInsertRowid;
+  try {
+    const r = await atClock(now, () => call('GET', '/decay-tasks', { as: ADM }));
+    assert.equal(r.status, 200);
+    return r.body.data.find((task) => task.id === id);
+  } finally {
+    db.prepare('DELETE FROM housekeeping_decay_tasks WHERE id = ?').run(id);
+    setHouseholdZone(null);
+  }
+}
+
+test('Dringlichkeit: der Faelligkeitstag ist ein Tag des Haushalts (oestlich von UTC)', async () => {
+  // Erledigt am 15.09. um 01:00 Kiritimati-Zeit, Rhythmus 7 Tage: faellig am
+  // 22.09. Gefragt am 21.09. um 23:00 Kiritimati-Zeit - noch nicht heute.
+  // In UTC (und jeder Zone bis +12) war es am 14.09. erledigt und am 21.09.
+  // faellig, also "heute".
+  const task = await decayTaskStatus({
+    zone: 'Pacific/Kiritimati',
+    lastCompleted: '2026-09-14T11:00:00.000Z',
+    now: '2026-09-21T09:00:00.000Z',
+  });
+  assert.equal(task.urgency_status, 'ok', 'faellig ist erst morgen, der 22.09. des Haushalts');
+  assert.equal(task.due_date, '2026-09-21T11:00:00.000Z', 'sieben Haushaltstage nach dem Erledigen, zur selben Uhrzeit');
+});
+
+test('Dringlichkeit: der Faelligkeitstag ist ein Tag des Haushalts (westlich von UTC)', async () => {
+  // Erledigt am 15.09. um 01:30 Niue-Zeit, faellig am 22.09.; gefragt am
+  // 21.09. um 23:30 Niue-Zeit. In UTC ist es da schon der 22.09.
+  const task = await decayTaskStatus({
+    zone: 'Pacific/Niue',
+    lastCompleted: '2026-09-15T12:30:00.000Z',
+    now: '2026-09-22T10:30:00.000Z',
+  });
+  assert.equal(task.urgency_status, 'ok');
+
+  const dueToday = await decayTaskStatus({
+    zone: 'Pacific/Niue',
+    lastCompleted: '2026-09-15T12:30:00.000Z',
+    now: '2026-09-22T11:30:00.000Z',
+  });
+  assert.equal(dueToday.urgency_status, 'today', 'eine Stunde spaeter beginnt der 22.09. in Niue');
+});
+
+// Ein Besuch am 01.10. um 00:30 Berliner Zeit ist in UTC noch der 30.09.
+const OCTOBER_VISIT_AT = '2026-09-30T22:30:00.000Z';
+
+function insertVisitAt(checkIn) {
+  return db.prepare(`
+    INSERT INTO housekeeping_work_sessions (check_in, check_out, daily_rate, extras, created_by)
+    VALUES (?, ?, 55, 0, ?)
+  `).run(checkIn, checkIn, ADMIN).lastInsertRowid;
+}
+
+test('Monatsgrenze: ein Besuch gehoert zum Monat des Haushalts, nicht zum UTC-Monat', async () => {
+  setHouseholdZone('Europe/Berlin');
+  const visitId = insertVisitAt(OCTOBER_VISIT_AT);
+  try {
+    const october = await call('GET', '/visits?month=2026-10', { as: ADM });
+    assert.equal(october.status, 200);
+    assert.deepEqual(october.body.data.visits.map((v) => v.id), [visitId], 'der Besuch steht im Oktober');
+    assert.equal(october.body.data.totals.total, 55);
+
+    // Andere Tests dieser Suite checken zur echten Uhr ein, der September kann
+    // also Besuche haben - gefragt wird nur nach diesem einen.
+    const september = await call('GET', '/visits?month=2026-09', { as: ADM });
+    assert.equal(september.body.data.visits.some((v) => v.id === visitId), false, 'und nicht im September');
+
+    const sessions = await call('GET', '/work-sessions?month=2026-10', { as: ADM });
+    assert.deepEqual(sessions.body.data.map((v) => v.id), [visitId]);
+
+    const summary = await call('GET', '/summary?month=2026-10', { as: ADM });
+    assert.equal(summary.body.data.summary.session_count, 1);
+    assert.equal(summary.body.data.summary.total_amount, 55);
+  } finally {
+    db.prepare('DELETE FROM housekeeping_work_sessions WHERE id = ?').run(visitId);
+    setHouseholdZone(null);
+  }
+});
+
+test('Monatsgrenze: ohne ?month= gilt der laufende Monat des Haushalts', async () => {
+  setHouseholdZone('Europe/Berlin');
+  // 01.10. 01:00 in Berlin, in UTC noch September.
+  const CLOCK = '2026-09-30T23:00:00.000Z';
+  const septemberTotal = (data) => data.monthly_payments.find((row) => row.month === '2026-09')?.total ?? 0;
+  const baseline = await atClock(CLOCK, () => call('GET', '/dashboard', { as: ADM }));
+  const visitId = insertVisitAt(OCTOBER_VISIT_AT);
+  try {
+    await atClock(CLOCK, async () => {
+      const visits = await call('GET', '/visits', { as: ADM });
+      assert.equal(visits.body.data.month, '2026-10');
+      assert.deepEqual(visits.body.data.visits.map((v) => v.id), [visitId]);
+
+      const summary = await call('GET', '/summary', { as: ADM });
+      assert.equal(summary.body.data.summary.month, '2026-10');
+      assert.equal(summary.body.data.summary.session_count, 1);
+
+      const dashboard = await call('GET', '/dashboard', { as: ADM });
+      assert.equal(dashboard.body.data.visits_this_month, 1, 'die Kachel zaehlt den Besuch im Oktober');
+      const chartRow = dashboard.body.data.monthly_payments.find((row) => row.month === '2026-10');
+      assert.equal(chartRow?.total, 55, 'die Monatsgrafik bucht ihn auf den Oktober');
+      assert.equal(septemberTotal(dashboard.body.data), septemberTotal(baseline.body.data),
+        'und nicht auf den September');
+    });
+  } finally {
+    db.prepare('DELETE FROM housekeeping_work_sessions WHERE id = ?').run(visitId);
+    setHouseholdZone(null);
+  }
+});
+
+test('Monatsgrenze: eine am Monatsersten frueh erledigte Aufgabe zaehlt im neuen Monat', async () => {
+  setHouseholdZone('Europe/Berlin');
+  const id = db.prepare(`
+    INSERT INTO housekeeping_decay_tasks (name, area, frequency_days, last_completed, created_by)
+    VALUES ('Monatsprobe', 'Flur', 30, ?, ?)
+  `).run(OCTOBER_VISIT_AT, ADMIN).lastInsertRowid;
+  try {
+    const before = await atClock('2026-10-15T10:00:00.000Z', () => call('GET', '/dashboard', { as: ADM }));
+    assert.equal(before.body.data.finished_tasks_this_month, 1);
+  } finally {
+    db.prepare('DELETE FROM housekeeping_decay_tasks WHERE id = ?').run(id);
+    setHouseholdZone(null);
+  }
 });
 
 test('teardown: Server schließen', async () => {

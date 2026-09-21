@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The activity of a shared-expenses group now loads further with "Load more", down to its first
+  entry.** Until now the activity showed the latest 12 entries and nothing before them, so an older
+  payment could not be reversed from the interface. "Load more" appends the next entries below the
+  ones already shown, as often as there are more. Reversing a payment that was loaded this way keeps
+  the list as deep as it was, so the payment stays in view, now marked as reversed, instead of the
+  list jumping back to its first page. Loading more is reading, so the button is there at every
+  access level and in an archived group. The API pages the same way: `GET
+  /api/v1/split-expenses/groups/{id}/activity` returns `pagination.next_cursor`, and passing its
+  `before_at` and `before_id` returns the next page. Entries added while paging appear at the top
+  and shift nothing, unlike `offset`. Without a cursor the endpoint answers as before, with the same
+  entries in the same order; `has_more` is now exact instead of `true` whenever a page happened to be
+  full. (#1309)
+
+- **A payment recorded in shared expenses can be reversed.** Until now a settle-up, once saved,
+  stayed for good - a transposed figure or the wrong person could not be taken back, while the
+  expense next to it could be edited and deleted. Each payment in a group's activity now names who
+  paid whom and how much, and offers "Reverse". After a confirmation, a counter-entry cancels the
+  payment and the balances go back to where they were before it. Nothing is deleted: the payment
+  stays in the activity, marked as reversed, together with its payment proof, so the history still
+  shows what happened. To correct a payment, reverse it and record the right one. Group owners and
+  admins can reverse any payment, everyone else the ones they recorded - the same rule as for
+  editing an expense. Without write access to Budget, or in an archived group, the button is not
+  there, but the "reversed" mark is. The API has the same step as
+  `POST /api/v1/split-expenses/groups/{id}/settlements/{settlementId}/reverse`; reversing twice
+  answers 409. (#1309)
+
 - **In the week and day views, an appointment of a day or more now shows its times on the all-day
   bar.** An appointment with a start and an end time that lasts 24 hours or longer - a trip from
   Friday 14:00 to Sunday 11:00, a workshop over three days - stays in the all-day row above the time
@@ -82,6 +108,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Housekeeping tasks turn "due today" and "overdue" on the household's day, not the server's.**
+  The due day of a recurring task was counted in the time zone of the server. On a server running in
+  UTC with a household in Berlin, a task done shortly after midnight counted as done the day before,
+  so it showed "due today" a day early and "overdue" on the day it was actually due; west of UTC the
+  evening hours were off the same way. The due day is now counted from the day the task was done in
+  the household time zone (Settings, Region). (#1387)
+- **Housekeeping counts a visit in the month it happened in the household.** Visits, their totals,
+  the "visits this month" and "paid this month" figures, the monthly payment chart and the tasks
+  finished this month were grouped by UTC month, and the current month itself was the UTC one. A
+  visit on the 1st at 00:30 in Berlin was booked to the month before, and in the first hours of a
+  new month the overview still showed the old one. All of them now use the household's month. (#1387)
+- **A dose marked as taken through the API without a time is stored in household time.** `POST
+  /api/v1/health/logs/{id}/take` without `taken_at`, and a `PATCH` to `taken` without one, stored the
+  current moment as a UTC timestamp, while every time that is sent along is stored as household
+  wall-clock time. The CSV export then showed the UTC time for these doses. The current minute is
+  now stored in the same form as every other dose. The app itself always sends the time and was not
+  affected. (#1387)
+- **Marking an inventory deadline as done no longer stores a broken date when the next one would
+  fall after 9999-12-31.** The next due date then has a five-digit year, which the date format cannot
+  hold: the deadline got a date like "99990-06-01", its reminder a date that is not a date, and the
+  item could not be saved again afterwards. The request is now refused with a message that names
+  the limit, and neither the deadline nor its history change. (#1387)
+- **The photo crop dialog is now cached for offline use like the rest of the app.** Avatars,
+  birthday and inventory photos, recipe pictures and quick-link images all go through one crop
+  dialog, which the app loads only when you pick a picture. It was the one module of that kind the
+  service worker did not cache ahead of time: without a connection the dialog did not open, and
+  right after an update a page that was already open could load a newer dialog than the one it was
+  built for. The check that keeps the offline list complete read only imports written at the top of
+  a file and never saw the ones loaded on demand; it reads both now. (#1383)
+- **A group's shared-expenses activity shows each entry under the household's day.** The date came
+  from the stored UTC timestamp, so an entry made late in the evening in a zone east of UTC, or early
+  in the morning west of it, showed the neighbouring day. It now follows the household time zone,
+  like the rest of the app. (#1309)
+
+- **The birthday API checks the reminder fields before it stores them.** `POST` and
+  `PUT /api/v1/birthdays` wrote `reminder_offset`, `reminder_custom_amount` and
+  `reminder_custom_unit` exactly as sent - a negative number, a decimal or any text ended up in the
+  database, and the server then reminded at a time nobody had chosen or fell back to a default
+  without saying so. They now answer 400 with a message naming the field. A lead time is empty (no
+  reminder), "custom", or whole minutes from 0 up to 999 weeks, the most the custom amount can
+  express; the custom amount is a whole number from 1 to 999, as in the editor, and the unit is
+  minutes, hours, days or weeks. Records written before this keep working: older versions of the
+  editor offered 15 minutes, 1 hour and 2 weeks, and those remain valid, and a value that is already
+  stored - whatever it is - is accepted unchanged when it is sent back, so changing the name or the
+  date of such a birthday never fails over a reminder nobody touched. In the editor, a custom amount
+  of 0 or above 999 is now refused instead of being saved. (#1384)
 - **On a phone, the task filter panel can be closed again after picking filters.** The Filter
   button sat at the end of the chip row, which scrolls sideways on a phone, and every filter you
   picked put another chip in front of it and pushed it further out of view - with the panel open

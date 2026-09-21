@@ -13,6 +13,7 @@ import { stagger } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { formatMoney, amountPlaceholder, toDecimalString, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
 import { todayKey } from '/utils/date.js';
+import { zonedDateKey } from '/utils/timezone.js';
 import { wireTablist } from '/utils/tablist.js';
 import { findPageFab } from '/utils/fab.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
@@ -29,6 +30,13 @@ let state = {
   expenses: [],
   balances: { balances: [], simplified_debts: [] },
   activity: [],
+  // Verlauf seitenweise (#1309): der Cursor der naechsten Seite, wie ihn der
+  // Server in `pagination.next_cursor` liefert (null = alles geladen), und die
+  // Gruppe, zu der `activity` gehoert - nur innerhalb DERSELBEN Gruppe bleibt
+  // die geladene Tiefe bei einem Neuladen erhalten.
+  activityCursor: null,
+  activityGroupId: null,
+  activityLoadingMore: false,
   query: '',
   category: '',
   // Statusfilter der Gruppenliste (#574): 'archived' zeigt das Archiv
@@ -221,25 +229,125 @@ async function loadGroups() {
   }
 }
 
+// Seitengroesse des Verlaufs. Die Obergrenze des Servers ist 100; beim
+// Nachholen einer schon geladenen Tiefe fragt fetchActivity so viel auf einmal.
+const ACTIVITY_PAGE = 12;
+const ACTIVITY_MAX_PAGE = 100;
+
+// Zaehlt jedes Laden der Gruppendaten. Eine Antwort, die zu einem aelteren
+// Stand gehoert (Gruppenwechsel, Neuladen nach einem Storno), wird verworfen
+// statt angehaengt - sonst landeten Eintraege der alten Gruppe unter der neuen.
+let _activityGeneration = 0;
+
+function activityPath(groupId, limit, cursor = null) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (cursor) {
+    params.set('before_at', cursor.before_at);
+    params.set('before_id', String(cursor.before_id));
+  }
+  return `/split-expenses/groups/${groupId}/activity?${params}`;
+}
+
+const nextActivityCursor = (res) => (res?.pagination?.has_more ? res.pagination.next_cursor ?? null : null);
+
+/** Liegt `item` in der Reihenfolge des Servers (created_at absteigend, id aufsteigend) bei oder hinter `tail`? */
+function atOrPast(item, tail) {
+  if (item.created_at !== tail.created_at) return item.created_at < tail.created_at;
+  return item.id >= tail.id;
+}
+
+/**
+ * Laedt den Verlauf von vorn. Mit `tail` (dem bisher letzten geladenen
+ * Eintrag) wird weitergeblaettert, bis er wieder erreicht ist: ein Neuladen in
+ * derselben Gruppe - etwa nach einem Storno weit unten - behaelt die Tiefe, statt
+ * auf die erste Seite zurueckzufallen und den Eintrag, an dem gerade gehandelt
+ * wurde, aus dem Blick zu nehmen. Doppelte IDs fallen heraus, falls sich
+ * zwischen zwei Seiten etwas verschoben hat.
+ */
+async function fetchActivity(groupId, { depth = ACTIVITY_PAGE, tail = null } = {}) {
+  const first = await api.get(activityPath(groupId, Math.min(Math.max(depth, ACTIVITY_PAGE), ACTIVITY_MAX_PAGE)));
+  const items = [...(first.data || [])];
+  let cursor = nextActivityCursor(first);
+  while (tail && cursor && !(items.length && atOrPast(items[items.length - 1], tail))) {
+    // eslint-disable-next-line no-await-in-loop
+    const more = await api.get(activityPath(groupId, ACTIVITY_MAX_PAGE, cursor));
+    const seen = new Set(items.map((item) => item.id));
+    items.push(...(more.data || []).filter((item) => !seen.has(item.id)));
+    cursor = nextActivityCursor(more);
+  }
+  return { items, cursor };
+}
+
 async function loadGroupData() {
+  const generation = ++_activityGeneration;
+  state.activityLoadingMore = false;
   if (!state.activeGroupId) {
     state.expenses = [];
     state.balances = { balances: [], simplified_debts: [] };
     state.activity = [];
+    state.activityCursor = null;
+    state.activityGroupId = null;
     return;
   }
+  const groupId = state.activeGroupId;
+  // Dieselbe Gruppe: die geladene Tiefe bleibt. Eine andere: erste Seite.
+  const sameGroup = state.activityGroupId === groupId && state.activity.length > 0;
+  const activityRequest = sameGroup
+    ? { depth: state.activity.length + 1, tail: state.activity[state.activity.length - 1] }
+    : {};
   const params = new URLSearchParams();
   if (state.category) params.set('category', state.category);
   const [expenses, balances, activity, groupMembers] = await Promise.all([
-    api.get(`/split-expenses/groups/${state.activeGroupId}/expenses?${params.toString()}`),
-    api.get(`/split-expenses/groups/${state.activeGroupId}/balances`),
-    api.get(`/split-expenses/groups/${state.activeGroupId}/activity?limit=12`),
-    api.get(`/split-expenses/groups/${state.activeGroupId}/members`),
+    api.get(`/split-expenses/groups/${groupId}/expenses?${params.toString()}`),
+    api.get(`/split-expenses/groups/${groupId}/balances`),
+    fetchActivity(groupId, activityRequest),
+    api.get(`/split-expenses/groups/${groupId}/members`),
   ]);
+  // Ein spaeteres Laden hat inzwischen begonnen: dessen Stand gilt, nicht dieser.
+  if (generation !== _activityGeneration) return;
   state.expenses = expenses.data || [];
   state.balances = balances.data || { balances: [], simplified_debts: [] };
-  state.activity = activity.data || [];
+  state.activity = activity.items;
+  state.activityCursor = activity.cursor;
+  state.activityGroupId = groupId;
   state.groupMembers = groupMembers.data || [];
+}
+
+/**
+ * "Mehr laden" im Verlauf (#1309): die naechste Seite hinter dem Cursor,
+ * angehaengt an das Geladene. Ein zweiter Klick, waehrend eine Seite unterwegs
+ * ist, tut nichts. Kommt die Antwort erst nach einem Gruppenwechsel oder einem
+ * Neuladen an, gehoert sie zu einem Stand, den es nicht mehr gibt, und wird
+ * verworfen. Lesen ist keine Handlung - der Knopf steht bei jedem Recht und im
+ * Archiv.
+ */
+async function loadMoreActivity() {
+  const cursor = state.activityCursor;
+  const groupId = state.activeGroupId;
+  if (!cursor || !groupId || state.activityLoadingMore) return;
+  const generation = _activityGeneration;
+  state.activityLoadingMore = true;
+  const hadFocus = typeof document !== 'undefined'
+    && document.activeElement?.matches?.('[data-activity-more]');
+  renderActivityBox({ keepFocus: hadFocus });
+  let res;
+  try {
+    res = await api.get(activityPath(groupId, ACTIVITY_PAGE, cursor));
+  } catch (err) {
+    // Der Knopf muss wieder bedienbar sein; die Meldung selbst geht an die
+    // globale Fehleranzeige.
+    if (generation === _activityGeneration) {
+      state.activityLoadingMore = false;
+      renderActivityBox({ keepFocus: hadFocus });
+    }
+    throw err;
+  }
+  if (generation !== _activityGeneration || groupId !== state.activeGroupId) return;
+  state.activityLoadingMore = false;
+  const seen = new Set(state.activity.map((item) => item.id));
+  state.activity = [...state.activity, ...(res?.data || []).filter((item) => !seen.has(item.id))];
+  state.activityCursor = nextActivityCursor(res);
+  renderActivityBox({ keepFocus: hadFocus });
 }
 
 async function loadMemberCandidates() {
@@ -467,6 +575,7 @@ function renderMain() {
   const settleButton = main.querySelector('#split-settle');
   if (settleButton) settleButton.disabled = state.expenses.length === 0;
   main.querySelector('#split-invite')?.addEventListener('click', () => openMemberModal());
+  main.querySelector('.split-activity')?.addEventListener('click', onActivityClick);
   main.querySelector('#split-expense-list')?.addEventListener('click', (e) => {
     // Zwei Wege, je nach Markup: `data-expense-view` liest (Archiv und
     // `budget: read`), `data-expense-id` bearbeitet. Den zweiten gibt es bei
@@ -577,17 +686,124 @@ function renderExpenses(asList = false) {
   }).join('');
 }
 
+/** Die Werte, die Zeile, Knopf und Rueckfrage einer Zahlung nennen (#1309). */
+function paymentParams(settlement) {
+  return {
+    payer: settlement.payer_name || '',
+    payee: settlement.payee_name || '',
+    amount: money(settlement.amount, settlement.currency),
+  };
+}
+
+/**
+ * Verlauf der Gruppe. Eine eingetragene Zahlung nennt, wer wem wie viel
+ * gezahlt hat, und traegt ihren Stand (#1309): storniert ist ein ZEICHEN, das
+ * bei jedem Recht stehen bleibt; „Stornieren" ist eine Handlung und erscheint
+ * nur, wenn der Server `can_reverse` meldet (Verwalter oder wer sie
+ * eingetragen hat - die Regel wohnt dort), das Modul beschreibbar ist und die
+ * Gruppe nicht im Archiv liegt.
+ */
 function renderActivity() {
   if (!state.activity.length) return `<div class="split-muted">${t('splitExpenses.noActivity')}</div>`;
-  return state.activity.map((item) => `
-    <div class="split-activity-item">
+  const actionable = !readOnly() && !isArchivedView();
+  const items = state.activity.map((item) => activityItemHtml(item, actionable)).join('');
+  // "Mehr laden" (#1309) ist Lesen, keine Handlung: er steht bei jedem Recht
+  // und im Archiv, solange der Server eine weitere Seite meldet.
+  // Waehrend eine Seite unterwegs ist: `aria-disabled` statt `disabled`, damit
+  // der Knopf den Fokus behaelt (ein gesperrter Knopf verliert ihn an die
+  // Seite); den zweiten Klick faengt loadMoreActivity() ab.
+  const busy = state.activityLoadingMore;
+  const more = state.activityCursor
+    ? `<button type="button" class="btn btn--secondary split-activity-more" data-activity-more${busy ? ' aria-disabled="true" aria-busy="true"' : ''}>${esc(t('splitExpenses.loadMoreActivity'))}</button>`
+    : '';
+  return `<div class="split-activity-list" tabindex="-1">${items}</div>${more}`;
+}
+
+/**
+ * Ein Eintrag des Verlaufs. Nachgeladene Seiten laufen durch dieselbe Funktion
+ * und dieselbe Klick-Delegation am Verlauf - ein Storno-Knopf auf Seite drei
+ * ist derselbe Knopf wie auf Seite eins.
+ *
+ * Das Datum ist der Tag in der Haushaltszone: `created_at` ist ein Zeitpunkt in
+ * UTC, und `slice(0, 10)` darauf waere der UTC-Tag - 23:30 UTC in Berlin ist
+ * schon der naechste Tag.
+ */
+function activityItemHtml(item, actionable) {
+  const settlement = item.settlement;
+  const params = settlement ? paymentParams(settlement) : null;
+  const detail = settlement
+    ? `<span class="split-activity-payment">${esc(t('splitExpenses.paymentDetail', params))}</span>`
+    : '';
+  const reversed = settlement?.reversed_at
+    ? `<span class="split-activity-reversed">${esc(t('splitExpenses.paymentReversed'))}</span>`
+    : '';
+  const action = settlement?.can_reverse && !settlement.reversed_at && actionable
+    ? `<button type="button" class="btn btn--secondary split-reverse-payment" data-reverse-settlement="${settlement.id}" aria-label="${esc(t('splitExpenses.reversePaymentLabel', params))}">${esc(t('splitExpenses.reversePayment'))}</button>`
+    : '';
+  return `
+    <div class="split-activity-item${settlement?.reversed_at ? ' split-activity-item--reversed' : ''}">
       <span class="split-activity-dot"></span>
       <div>
         <strong>${esc(t(`splitExpenses.activityType.${item.type}`))}</strong>
-        <span>${esc(item.actor_name || t('splitExpenses.system'))} · ${formatDate(item.created_at.slice(0, 10))}</span>
+        ${detail}
+        <span>${esc(item.actor_name || t('splitExpenses.system'))} · ${esc(formatDate(zonedDateKey(item.created_at)))}</span>
+        ${reversed}
       </div>
+      ${action}
     </div>
-  `).join('');
+  `;
+}
+
+/**
+ * Zeichnet nur den Verlauf neu, nicht die ganze Gruppe: der Klick-Lauscher
+ * haengt am Kasten `.split-activity`, der stehen bleibt. Hatte "Mehr laden" den
+ * Fokus, bekommt ihn der neue Knopf - oder, ist alles geladen, die Liste, damit
+ * er nicht auf den Seitenanfang faellt.
+ */
+function renderActivityBox({ keepFocus = false } = {}) {
+  const box = _container?.querySelector('.split-activity');
+  if (!box) return;
+  box.replaceChildren();
+  box.insertAdjacentHTML('beforeend', renderActivity());
+  if (!keepFocus) return;
+  (box.querySelector('[data-activity-more]') || box.querySelector('.split-activity-list'))?.focus?.();
+}
+
+/** Delegierter Klick im Verlauf: "Mehr laden" liest, der einzige Schreibweg dort ist das Storno. */
+function onActivityClick(e) {
+  if (e.target.closest('[data-activity-more]')) return loadMoreActivity();
+  const btn = e.target.closest('[data-reverse-settlement]');
+  if (!btn) return undefined;
+  return reverseSettlement(Number(btn.dataset.reverseSettlement));
+}
+
+/**
+ * Storno einer Zahlung (#1309): Rueckfrage, dann die Gegenbuchung auf dem
+ * Server. Nichts wird geloescht - die Zahlung bleibt im Verlauf, als storniert
+ * markiert. Scheitert der Aufruf (etwa 409, weil jemand anderes schneller war),
+ * wird trotzdem neu geladen, damit der Schirm den wirklichen Stand zeigt; der
+ * Fehler selbst geht an die globale Meldung. Das Neuladen behaelt die geladene
+ * Tiefe des Verlaufs (loadGroupData): wer auf Seite drei storniert, sieht die
+ * Zahlung danach dort als storniert, statt auf die erste Seite zurueckzufallen.
+ */
+async function reverseSettlement(settlementId) {
+  if (readOnly()) return;
+  const settlement = state.activity.find((item) => item.settlement?.id === settlementId)?.settlement;
+  if (!settlement?.can_reverse || settlement.reversed_at) return;
+  const groupId = state.activeGroupId;
+  const confirmed = await confirmModal(t('splitExpenses.reversePaymentConfirm'), {
+    confirmLabel: t('splitExpenses.reversePayment'),
+    detail: t('splitExpenses.reversePaymentConfirmDetail', paymentParams(settlement)),
+  });
+  if (!confirmed) return;
+  try {
+    await api.post(`/split-expenses/groups/${groupId}/settlements/${settlementId}/reverse`, {});
+  } finally {
+    await refreshDashboard();
+    await loadGroupData();
+    renderAll();
+    refocusAfterRender();
+  }
 }
 
 function categoryIcon(category) {
@@ -1442,6 +1658,7 @@ function openGuestModal() {
  */
 export const __test = {
   readOnly, renderExpenses, state, expenseReadSections, openExpenseModal, groupMetaHtml, openGroupModal,
+  renderActivity, onActivityClick, loadGroupData, loadMoreActivity,
   renderMainForTest(container) { _container = container; renderMain(); },
   renderGroupsForTest(container) { _container = container; renderGroups(); },
 };

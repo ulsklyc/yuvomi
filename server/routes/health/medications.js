@@ -12,7 +12,7 @@ import { defaultVisibilityFor } from './visibility-defaults.js';
 import {
   log, VISIBILITIES, LOG_STATUS, MAX_UNIT,
   viewerId, careAwareClause, toBit, applyUpdate, badRequest,
-  resolveOwner, writableClause, writableChild, wallClockInput,
+  resolveOwner, writableClause, writableChild, wallClockInput, wallClockNow,
 } from './helpers.js';
 
 const router = express.Router();
@@ -409,7 +409,7 @@ function updateLogStatus(req, res, newStatus) {
   if (newStatus === 'taken') {
     const takenAt = v.datetime(b.taken_at, 'taken_at', false, wallClockInput());
     if (takenAt.error) return badRequest(res, [takenAt.error]);
-    const when = takenAt.value || new Date().toISOString();
+    const when = takenAt.value || wallClockNow();
     db.get().prepare('UPDATE medication_logs SET status = ?, taken_at = ? WHERE id = ?').run('taken', when, id);
   } else {
     db.get().prepare('UPDATE medication_logs SET status = ?, taken_at = NULL WHERE id = ?').run('skipped', id);
@@ -474,7 +474,7 @@ router.patch('/logs/:id', (req, res) => {
     // widerspricht, und genau so einer stünde nachher im Export.
     let nextTakenAt;
     if (nextStatus === 'taken') {
-      nextTakenAt = takenAt.value ?? logRow.taken_at ?? new Date().toISOString();
+      nextTakenAt = takenAt.value ?? logRow.taken_at ?? wallClockNow();
     } else {
       nextTakenAt = null;
     }

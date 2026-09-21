@@ -504,6 +504,150 @@ test('Archiv: mit Schreibrecht bleibt „Wiederherstellen", bei `budget: read` n
   withAccess({ budget: 'read' }, () => assert.doesNotMatch(splitHauptteil({ archiviert: true }), /split-restore-group/));
 });
 
+// --- Storno einer Zahlung im Verlauf (#1309) ---
+//
+// Die Handlung „Stornieren" haengt an DREI Bedingungen: der Server meldet
+// `can_reverse` (Verwalter oder wer eingetragen hat - die Regel wohnt dort),
+// das Modul ist beschreibbar, die Gruppe liegt nicht im Archiv. Der Zustand
+// „storniert" ist ein Zeichen und steht bei jedem Recht.
+function zahlung(extra = {}) {
+  return {
+    id: 90, type: 'payment_registered', entity_type: 'settlement', entity_id: 7,
+    actor_name: 'Emma', created_at: '2026-09-20T10:00:00Z',
+    settlement: {
+      id: 7, payer_id: 3, payer_name: 'Emma', payee_id: 1, payee_name: 'Alex',
+      amount_minor: 2000, amount: '20.00', currency: 'EUR', reversed_at: null, can_reverse: true, ...extra,
+    },
+  };
+}
+
+function verlauf(activity, { archiviert = false } = {}) {
+  const vorher = { ...split.state };
+  Object.assign(split.state, { activity, groupStatus: archiviert ? 'archived' : 'active' });
+  try { return split.renderActivity(); } finally { Object.assign(split.state, vorher); }
+}
+
+test('Zahlung im Verlauf: Stornieren nur mit Schreibrecht, `can_reverse` und ausserhalb des Archivs', () => {
+  withAccess({ budget: 'write' }, () => {
+    const html = verlauf([zahlung()]);
+    assert.match(html, /<button type="button" class="btn btn--secondary split-reverse-payment" data-reverse-settlement="7"/);
+    // Durch esc(): der Stub von t() haengt die Werte als JSON an, die
+    // Anfuehrungszeichen kommen also escaped an.
+    const zeile = html.match(/<span class="split-activity-payment">([^<]*)<\/span>/)?.[1].replace(/&quot;/g, '"');
+    assert.match(zeile ?? '', /^splitExpenses\.paymentDetail\{"payer":"Emma","payee":"Alex","amount":"20,00\s€"\}$/,
+      'die Zeile nennt, wer wem wie viel gezahlt hat');
+    assert.doesNotMatch(verlauf([zahlung({ can_reverse: false })]), /data-reverse-settlement/, 'der Server sagt nein');
+    assert.doesNotMatch(verlauf([zahlung()], { archiviert: true }), /data-reverse-settlement/, 'Archiv');
+  });
+  withAccess({ budget: 'read' }, () => {
+    const html = verlauf([zahlung()]);
+    assert.doesNotMatch(html, /data-reverse-settlement|splitExpenses\.reversePayment/);
+    assert.match(html, /splitExpenses\.paymentDetail/, 'die Zahlung selbst bleibt lesbar');
+  });
+});
+
+test('stornierte Zahlung: Zeichen bei jedem Recht, keine Handlung', () => {
+  for (const modus of ['write', 'read']) {
+    withAccess({ budget: modus }, () => {
+      // can_reverse: true trotz Storno - die Oberflaeche verlaesst sich nicht
+      // allein auf den Server, ein Storno des Stornos gibt es nicht.
+      const html = verlauf([zahlung({ reversed_at: '2026-09-21T08:00:00Z', can_reverse: true })]);
+      assert.match(html, /class="split-activity-item split-activity-item--reversed"/, modus);
+      assert.match(html, /<span class="split-activity-reversed">splitExpenses\.paymentReversed<\/span>/, modus);
+      assert.doesNotMatch(html, /data-reverse-settlement/, modus);
+    });
+  }
+  // Eine Aktivitaet ohne Zahlung bekommt weder Zeile noch Zeichen.
+  withAccess({ budget: 'write' }, () => {
+    const html = verlauf([{ id: 1, type: 'expense_created', entity_type: 'expense', actor_name: 'Alex', created_at: '2026-09-20T10:00:00Z' }]);
+    assert.doesNotMatch(html, /split-activity-payment|split-activity-reversed|data-reverse-settlement/);
+  });
+});
+
+/** Klick auf den Knopf aus dem ECHTEN Markup - Attribut und Wert kommen von dort. */
+function klickAus(html) {
+  const knopf = html.match(/<button [^>]*class="[^"]*split-reverse-payment[^"]*"[^>]*>/);
+  assert.ok(knopf, 'kein Storno-Knopf im Markup');
+  const dataset = {};
+  for (const [, name, wert] of knopf[0].matchAll(/data-([\w-]+)="([^"]*)"/g)) {
+    dataset[name.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = wert;
+  }
+  return { target: { closest: (sel) => (/^\[data-[\w-]+\]$/.test(sel) && sel.slice(6, -1).replace(/-([a-z])/g, (_, c) => c.toUpperCase()) in dataset ? { dataset } : null) } };
+}
+
+async function stornoFahren(modus, { bestaetigt = true } = {}) {
+  const posts = [];
+  const fragen = [];
+  const vorher = { ...split.state };
+  const leer = {
+    hidden: false, removeAttribute() {}, replaceChildren() {}, insertAdjacentHTML() {},
+    querySelector: () => null, querySelectorAll: () => [], addEventListener() {},
+  };
+  globalThis.__apiStub = {
+    post: async (path, body) => { posts.push([path, body]); return { data: {} }; },
+    get: async () => ({ data: [] }),
+  };
+  globalThis.__confirmModal = async (titel, optionen) => { fragen.push([titel, optionen]); return bestaetigt; };
+  try {
+    Object.assign(split.state, {
+      activeGroupId: 2, groupStatus: 'active', user: null, activity: [zahlung()],
+      groups: [{ id: 2, name: 'Urlaub Ostsee', type: 'trip', description: '' }], meta: { currencies: ['EUR'], default_currency: 'EUR' },
+    });
+    split.renderMainForTest({ querySelector: () => leer });
+    Object.assign(split.state, { activity: [zahlung()] });
+    const html = withAccess({ budget: 'write' }, () => split.renderActivity());
+    // Nicht ueber withAccess(): der Helfer raeumt synchron auf, also am ERSTEN
+    // await - der Rest des Handlers liefe dann mit geraeumten Rechten.
+    setPermissions({ admin: false, modules: { budget: modus }, widgets: {}, capabilities: {} });
+    await split.onActivityClick(klickAus(html));
+  } finally {
+    clearPermissions();
+    delete globalThis.__apiStub;
+    delete globalThis.__confirmModal;
+    Object.assign(split.state, vorher);
+  }
+  return { posts, fragen };
+}
+
+test('Stornieren: Rueckfrage mit Zahlung, dann POST an die Storno-Route der Zahlung aus dem Markup', async () => {
+  const { posts, fragen } = await stornoFahren('write');
+  assert.equal(fragen.length, 1, 'eine Rueckfrage');
+  assert.equal(fragen[0][0], 'splitExpenses.reversePaymentConfirm');
+  assert.match(fragen[0][1].detail, /^splitExpenses\.reversePaymentConfirmDetail\{"payer":"Emma","payee":"Alex","amount":"20,00\s€"\}$/);
+  assert.deepEqual(posts, [['/split-expenses/groups/2/settlements/7/reverse', {}]]);
+});
+
+test('Stornieren: renderMain haengt den Klick an den Verlauf, den es selbst zeichnet', () => {
+  // Ohne diese Verdrahtung waeren Knopf und Handler je fuer sich gruen und der
+  // Klick taete nichts. Selektor und Klasse im Markup muessen einander treffen.
+  const lauscher = [];
+  let html = '';
+  const main = {
+    removeAttribute() {}, replaceChildren() { html = ''; }, insertAdjacentHTML(_p, m) { html += m; },
+    querySelectorAll: () => [],
+    querySelector: (sel) => (sel === '.split-activity' ? { addEventListener: (typ, f) => lauscher.push([typ, f]) } : null),
+  };
+  const vorher = { ...split.state };
+  Object.assign(split.state, {
+    groupStatus: 'active', activeGroupId: 2, user: null, groups: [{ id: 2, name: 'Urlaub Ostsee', type: 'trip', description: '' }],
+    expenses: [], balances: { balances: [], simplified_debts: [] }, activity: [zahlung()],
+  });
+  try {
+    withAccess({ budget: 'write' }, () => split.renderMainForTest({ querySelector: (sel) => (sel === '#split-main' ? main : null) }));
+  } finally { Object.assign(split.state, vorher); }
+  assert.match(html, /<div class="split-activity">[\s\S]*data-reverse-settlement="7"/);
+  assert.deepEqual(lauscher, [['click', split.onActivityClick]]);
+});
+
+test('Stornieren: abgebrochen schreibt nichts, bei `budget: read` wird nicht einmal gefragt', async () => {
+  const abgebrochen = await stornoFahren('write', { bestaetigt: false });
+  assert.equal(abgebrochen.fragen.length, 1);
+  assert.deepEqual(abgebrochen.posts, []);
+  const lesend = await stornoFahren('read');
+  assert.deepEqual(lesend.fragen, []);
+  assert.deepEqual(lesend.posts, []);
+});
+
 test('Regel 6: `renderExpenses` traegt nicht mehr den Namen des Modulrechts', () => {
   // Der Parameter hiess `readOnly` und meinte „archivierte Gruppe" - zwei
   // Bedeutungen unter einem Namen, genau die Kollision, vor der
@@ -677,7 +821,7 @@ test('jeder Einstieg in einen Schreibweg fragt selbst noch einmal', () => {
     [ABOS_CODE, ['saveSubscription', 'renewSubscription', 'deleteSubscription',
       'openSettingsModal', 'openMetadataModal']],
     [SPLIT_CODE, ['archiveGroup', 'restoreGroup', 'deleteGroup', 'openGroupModal',
-      'openSettlementModal', 'openMemberModal', 'openGuestModal']],
+      'openSettlementModal', 'openMemberModal', 'openGuestModal', 'reverseSettlement']],
   ];
   for (const [code, namen] of faelle) {
     for (const name of namen) {
