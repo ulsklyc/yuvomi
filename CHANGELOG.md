@@ -343,9 +343,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   change itself, so the change is there. Nothing else is taken as done. The decision is made on what
   stands in the database after the failed attempt has rolled back, never on the wording of the
   error - a syntax error, a table that is missing, a constraint that comes out of the migration's own
-  SQL and a mistake in a JavaScript hook all still stop the start, exactly as before. Being locked
-  out is not success either: a start that loses the write lock still fails with its SQLite error
-  instead of recording a migration it never ran. (#1331)
+  SQL and a mistake in a JavaScript hook all still stop the start, exactly as before. The start that
+  came first no longer dies either: it could be locked out of the write by the other one
+  (`SQLITE_BUSY`, `SQLITE_BUSY_SNAPSHOT`), and SQLite reports a snapshot conflict at once, without
+  waiting. Such a start now rolls back and reads again - if the other process has recorded the
+  migration in the meantime, it is done; if not, the runner tries the same migration again, at most
+  five times with a short pause, and only then fails with the original SQLite error. (#1331)
 
 - **The language Yuvomi starts in now follows your browser's whole language tag.** A browser reports
   something like `zh-TW` or `de-AT`, and Yuvomi read only the part in front of the hyphen. For the

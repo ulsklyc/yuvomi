@@ -30,7 +30,7 @@ import Database from 'better-sqlite3-multiple-ciphers';
 // Der Runner wird hier trotzdem gegen EIGENE Datei-Datenbanken gefahren: das
 // Rennen gibt es nur zwischen zwei Verbindungen auf einer Datei, und
 // `:memory:` hat keine zweite.
-const { migrate } = await import('../server/db.js');
+const { migrate, MIGRATION_BUSY_ATTEMPTS } = await import('../server/db.js');
 
 const DIR = mkdtempSync(join(tmpdir(), 'yuvomi-migrate-tolerance-'));
 process.on('exit', () => { try { rmSync(DIR, { recursive: true, force: true }); } catch { /* egal */ } });
@@ -233,35 +233,166 @@ for (const failure of REAL_FAILURES) {
 }
 
 // ---------------------------------------------------------------------------
-// SQLITE_BUSY ist ein Warten, kein Erfolg
+// SQLITE_BUSY: zurueckrollen, frisch lesen, verbucht = fertig, sonst neu versuchen
 // ---------------------------------------------------------------------------
+//
+// Alle BUSY-Faelle hier sind ECHT, nicht simuliert: SQLite selbst wirft sie,
+// ausgeloest durch eine zweite Verbindung an einer Stelle, die der Test
+// bestimmt. SQLITE_BUSY_SNAPSHOT entsteht, wenn diese Transaktion erst LIEST -
+// damit steht ihr Snapshot fest - und die andere Verbindung danach committet:
+// das eigene Schreiben kommt dann nicht mehr an die Sperre, SQLite antwortet
+// SOFORT, ein busy_timeout wartet darauf nicht (gemessen: 0 ms bei 5000 ms
+// Vorgabe des Treibers). Schlichtes SQLITE_BUSY entsteht, solange die andere
+// Verbindung eine Schreibtransaktion offen haelt.
 
-test('SQLITE_BUSY bleibt ein Fehler, auch wenn der andere Prozess die Version schon traegt', () => {
+/** Die andere Verbindung committet irgendetwas, das NICHT die Migration ist. */
+function unrelatedCommitElsewhere(file) {
+  const other = openOther(file);
+  try {
+    other.exec('CREATE TABLE IF NOT EXISTS noise (id INTEGER PRIMARY KEY)');
+    other.prepare('INSERT INTO noise DEFAULT VALUES').run();
+  } finally {
+    other.close();
+  }
+}
+
+/**
+ * Die Migration, deren Transaktion erst liest und dann schreibt, nachdem
+ * `interfere(call)` gelaufen ist. `call` zaehlt die Versuche ab 1.
+ */
+function readsThenWrites(migration, interfere) {
+  let calls = 0;
+  const wrapped = {
+    ...migration,
+    up(handle) {
+      calls += 1;
+      handle.prepare('SELECT COUNT(*) AS c FROM schema_migrations').get();
+      interfere(calls);
+      handle.exec(migration.up);
+    },
+  };
+  return { migration: wrapped, calls: () => calls };
+}
+
+test('SQLITE_BUSY_SNAPSHOT, und der andere Prozess hat die Version verbucht: fertig, Schema wie ungestoert', () => {
   const file = freshFile();
   const database = openMigrating(file);
   const beta = betaMigration(false);
 
-  const readsBeforeTheOtherCommits = {
-    ...beta,
+  const probe = readsThenWrites(beta, (call) => {
+    if (call === 1) applyElsewhere(file, FOREIGN(beta));
+  });
+
+  migrate(database, [ALPHA, probe.migration, GAMMA]);
+
+  // Genau ein Versuch: nach dem BUSY stand die Version schon da, ein zweiter
+  // Anlauf haette an `table beta already exists` geendet und waere erst ueber
+  // die Buchung gerettet worden.
+  assert.equal(probe.calls(), 1);
+  assert.deepEqual(versions(database), [1, 2, 3]);
+  assert.equal(descriptionOf(database, 2), 'beta (anderer Prozess)', 'die Buchung stammt vom anderen Prozess');
+  assert.ok(schemaOf(database).some((o) => o.type === 'index' && o.name === 'idx_beta_alpha'), 'die Migration danach lief');
+
+  const cleanPath = freshFile();
+  const clean = openMigrating(cleanPath);
+  migrate(clean, [ALPHA, betaMigration(false), GAMMA]);
+  assert.deepEqual(schemaOf(database), schemaOf(clean));
+});
+
+test('SQLITE_BUSY_SNAPSHOT, niemand verbucht, die Sperre ist beim naechsten Versuch frei: genau einmal angewendet', () => {
+  const file = freshFile();
+  const database = openMigrating(file);
+  const beta = betaMigration(false);
+
+  const probe = readsThenWrites(beta, (call) => {
+    if (call === 1) unrelatedCommitElsewhere(file);
+  });
+
+  migrate(database, [ALPHA, probe.migration, GAMMA]);
+
+  assert.equal(probe.calls(), 2, 'ein Fehlversuch, ein Erfolg');
+  assert.deepEqual(versions(database), [1, 2, 3]);
+  assert.equal(descriptionOf(database, 2), 'beta', 'dieser Lauf hat selbst verbucht');
+  assert.ok(schemaOf(database).some((o) => o.type === 'index' && o.name === 'idx_beta_alpha'));
+});
+
+test('SQLITE_BUSY (Sperre gehalten), niemand verbucht, die Sperre faellt vor dem naechsten Versuch: angewendet', () => {
+  const file = freshFile();
+  const database = openMigrating(file);
+  // Ohne diese Zeile wartete der Busy-Handler je Versuch die 5000 ms des
+  // Treibers; der Fall bliebe derselbe, nur langsam.
+  database.pragma('busy_timeout = 0');
+  const beta = betaMigration(false);
+  const holder = openOther(file);
+
+  const probe = readsThenWrites(beta, (call) => {
+    if (call === 1) {
+      holder.exec('BEGIN IMMEDIATE');
+      holder.exec('CREATE TABLE IF NOT EXISTS noise (id INTEGER PRIMARY KEY)');
+    } else if (holder.inTransaction) {
+      holder.exec('ROLLBACK');
+    }
+  });
+
+  try {
+    migrate(database, [ALPHA, probe.migration, GAMMA]);
+  } finally {
+    if (holder.inTransaction) holder.exec('ROLLBACK');
+    holder.close();
+  }
+
+  assert.equal(probe.calls(), 2);
+  assert.deepEqual(versions(database), [1, 2, 3]);
+  assert.equal(descriptionOf(database, 2), 'beta');
+});
+
+test('SQLITE_BUSY_SNAPSHOT, das nie aufhoert: nach der Obergrenze stirbt der Lauf mit dem Originalcode', () => {
+  const file = freshFile();
+  const database = openMigrating(file);
+  const beta = betaMigration(false);
+
+  const probe = readsThenWrites(beta, () => unrelatedCommitElsewhere(file));
+
+  assert.throws(
+    () => migrate(database, [ALPHA, probe.migration, GAMMA]),
+    (err) => {
+      assert.equal(err.code, 'SQLITE_BUSY_SNAPSHOT');
+      return true;
+    },
+  );
+
+  assert.equal(probe.calls(), MIGRATION_BUSY_ATTEMPTS, 'genau so viele Versuche wie die Obergrenze');
+  assert.deepEqual(versions(database), [1], 'nichts verbucht, was nicht lief');
+  assert.ok(!schemaOf(database).some((o) => o.name === 'beta' || o.name === 'idx_beta_alpha'));
+});
+
+test('SQLITE_BUSY in einer foreignKeysOff-Migration: die Fremdschluessel-Durchsetzung steht danach wieder', () => {
+  const file = freshFile();
+  const database = openMigrating(file);
+  const beta = { ...betaMigration(false), foreignKeysOff: true };
+
+  const probe = readsThenWrites(beta, () => unrelatedCommitElsewhere(file));
+
+  assert.throws(
+    () => migrate(database, [ALPHA, probe.migration, GAMMA]),
+    (err) => err.code === 'SQLITE_BUSY_SNAPSHOT',
+  );
+  assert.equal(probe.calls(), MIGRATION_BUSY_ATTEMPTS);
+  assert.equal(database.pragma('foreign_keys', { simple: true }), 1);
+});
+
+test('ein echter Fehler wird NICHT wiederholt: nur SQLITE_BUSY bekommt einen neuen Versuch', () => {
+  const database = openMigrating(freshFile());
+  let calls = 0;
+  const broken = {
+    version: 2,
+    description: 'kaputt',
     up(handle) {
-      // Erst LESEN: damit steht der Lese-Snapshot dieser Transaktion fest,
-      // bevor der andere Prozess committet. Das eigene Schreiben danach kommt
-      // dann gar nicht mehr an die Sperre - SQLite antwortet SOFORT mit
-      // SQLITE_BUSY_SNAPSHOT, ein busy_timeout wartet darauf nicht (gemessen:
-      // 0 ms bei 5000 ms Vorgabe des Treibers).
-      handle.prepare('SELECT COUNT(*) AS c FROM schema_migrations').get();
-      applyElsewhere(file, FOREIGN(beta));
-      handle.exec(beta.up);
+      calls += 1;
+      handle.exec('CREATE TABL kaputt (id INTEGER)');
     },
   };
 
-  assert.throws(
-    () => migrate(database, [ALPHA, readsBeforeTheOtherCommits, GAMMA]),
-    (err) => err.code?.startsWith('SQLITE_BUSY') === true,
-  );
-
-  // Der heikle Teil dieses Falls: die Version STEHT da. Wer allein danach
-  // urteilt, verbucht ein Warten als Erfolg - der Lauf war aber nicht dran.
-  assert.equal(descriptionOf(database, 2), 'beta (anderer Prozess)');
-  assert.ok(!schemaOf(database).some((o) => o.name === 'idx_beta_alpha'));
+  assert.throws(() => migrate(database, [ALPHA, broken, GAMMA]), (err) => err.code === 'SQLITE_ERROR');
+  assert.equal(calls, 1);
 });

@@ -9586,6 +9586,11 @@ const MIGRATIONS = [
  * `table ... already exists` und ein Syntaxfehler tragen beide SQLITE_ERROR,
  * und SQLITE_CONSTRAINT_PRIMARYKEY kommt genauso aus einer Migration, die
  * ihre eigene Zeile doppelt schreibt (gemessen, test:migrate-tolerance).
+ *
+ * SQLITE_BUSY zählt hier mit: auch der ausgesperrte Lauf ist zurückgerollt,
+ * und eine Buchung, die danach dasteht, trägt dieselbe Beweiskraft. Die
+ * Abfrage läuft außerhalb jeder Transaktion und liest damit einen FRISCHEN
+ * Snapshot - den alten, an dem SQLITE_BUSY_SNAPSHOT hing, gibt es nicht mehr.
  */
 function migrationAlreadyRecorded(database, migration, err) {
   // Ohne SQLite-Code kommt der Fehler nicht vom Treiber: die
@@ -9594,16 +9599,34 @@ function migrationAlreadyRecorded(database, migration, err) {
   // Programmfehler und bleiben es.
   if (typeof err?.code !== 'string' || !err.code.startsWith('SQLITE_')) return false;
 
-  // SQLITE_BUSY ist die andere Hälfte des Rennens und ein WARTEN, kein Erfolg:
-  // dieser Lauf kam an der Sperre gar nicht vorbei. Dass der andere Prozess in
-  // derselben Sekunde fertig wurde, macht das Warten nicht zum Lauf - und ein
-  // busy_timeout löst es auch nicht, denn SQLite antwortet auf die Schreibsperre
-  // nach einem fremden Commit sofort mit SQLITE_BUSY_SNAPSHOT.
-  if (err.code.startsWith('SQLITE_BUSY')) return false;
-
   return Boolean(
     database.prepare('SELECT version FROM schema_migrations WHERE version = ?').get(migration.version)
   );
+}
+
+/**
+ * Wie oft `migrate()` eine Migration höchstens anfasst, wenn sie an der
+ * Schreibsperre scheitert (SQLITE_BUSY, SQLITE_BUSY_SNAPSHOT), und wie lange es
+ * zwischen zwei Versuchen wartet (linear steigend). Ein busy_timeout hilft bei
+ * SQLITE_BUSY_SNAPSHOT nicht: SQLite meldet den Snapshot-Konflikt sofort, der
+ * Busy-Handler wird gar nicht gefragt (gemessen: 0 ms bei 5000 ms Vorgabe des
+ * Treibers). Erst ein neuer Versuch mit neuer Transaktion liest neu.
+ */
+const MIGRATION_BUSY_ATTEMPTS = 5;
+const MIGRATION_BUSY_BACKOFF_MS = 25;
+
+/** SQLITE_BUSY samt erweiterter Codes (SQLITE_BUSY_SNAPSHOT, SQLITE_BUSY_RECOVERY, ...). */
+function isBusyError(err) {
+  return typeof err?.code === 'string' && err.code.startsWith('SQLITE_BUSY');
+}
+
+/**
+ * Synchron warten. `migrate()` läuft synchron im Startpfad, bevor der Server
+ * Requests annimmt - ein `await` gäbe es dort nicht, und blockieren ist hier
+ * genau das Gewollte.
+ */
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
 /**
@@ -9657,19 +9680,38 @@ function migrate(database = db, migrations = MIGRATIONS) {
   });
 
   /**
-   * Eine Migration fahren und genau den einen fremden Fall hinnehmen: sie ist
-   * schon verbucht, also hat ein anderer Prozess sie angewendet. Jeder andere
-   * Fehler fliegt weiter.
+   * Eine Migration fahren und genau zwei fremde Fälle hinnehmen (#1331):
+   * - sie ist schon verbucht, also hat ein anderer Prozess sie angewendet;
+   * - sie kam an der Schreibsperre nicht vorbei (SQLITE_BUSY*) und ist auch
+   *   nach dem Rollback nicht verbucht: dann ein neuer Versuch mit neuer
+   *   Transaktion und neuem Snapshot, höchstens MIGRATION_BUSY_ATTEMPTS-mal.
+   * Jeder andere Fehler fliegt sofort weiter, SQLITE_BUSY nach dem letzten
+   * Versuch unverändert.
+   *
+   * Kein `runMigration.immediate`: das nähme die Sperre schon am Anfang, säße
+   * aber im Startpfad jeder Installation - der Neuversuch ändert nur den
+   * Fehlerpfad.
    */
   const applyPendingMigration = (migration) => {
-    try {
-      runMigration(migration);
-    } catch (err) {
-      if (!migrationAlreadyRecorded(database, migration, err)) throw err;
-      log.warn(
-        `Migration ${migration.version} war bereits verbucht, als dieser Lauf sie anwenden wollte: `
-        + `${migration.description} - ein anderer Prozess war schneller (#1331).`
-      );
+    for (let attempt = 1; ; attempt++) {
+      try {
+        runMigration(migration);
+        return;
+      } catch (err) {
+        if (migrationAlreadyRecorded(database, migration, err)) {
+          log.warn(
+            `Migration ${migration.version} war bereits verbucht, als dieser Lauf sie anwenden wollte: `
+            + `${migration.description} - ein anderer Prozess war schneller (#1331).`
+          );
+          return;
+        }
+        if (!isBusyError(err) || attempt >= MIGRATION_BUSY_ATTEMPTS) throw err;
+        log.warn(
+          `Migration ${migration.version} kam nicht an die Schreibsperre (${err.code}), `
+          + `Versuch ${attempt + 1} von ${MIGRATION_BUSY_ATTEMPTS} (#1331).`
+        );
+        sleepSync(MIGRATION_BUSY_BACKOFF_MS * attempt);
+      }
     }
   };
 
@@ -10163,4 +10205,4 @@ try {
   if (!(err?.code === EMPTY_DATABASE_FILE && globalThis[RESTORE_TARGET_HANDSHAKE] === true)) throw err;
 }
 
-export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, unknownMigrationVersions, MIGRATIONS, migrate, reconcileCriticalSchema, _setTestDatabase, _resetTestDatabase };
+export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, unknownMigrationVersions, MIGRATIONS, migrate, MIGRATION_BUSY_ATTEMPTS, reconcileCriticalSchema, _setTestDatabase, _resetTestDatabase };
