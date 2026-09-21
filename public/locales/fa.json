@@ -731,6 +731,7 @@
         "seriesEndedToast": "سری از این تاریخ پایان یافت.",
         "seriesDeletedToast": "سری حذف شد.",
         "deleteMealNamed": "حذف {{title}}",
+        "dragHandle": "{{title}} را به روز دیگری بکشید",
         "openRecipeNamed": "باز کردن دستور غذای {{title}}",
         "viewRecipeNamed": "مشاهده دستور غذای {{title}}"
     },

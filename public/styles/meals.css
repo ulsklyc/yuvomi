@@ -529,6 +529,13 @@
   border-top: 1px solid var(--color-border-subtle);
 }
 
+/* Ziehgriff (#1317): nur in der schmalen Fassung sichtbar, siehe dort. Auf dem
+ * Board greift die Maus die ganze Karte, ein Griff kostete in der 148px-Spalte
+ * nur Breite. */
+.meal-card__drag {
+  display: none;
+}
+
 /* Die Titelfläche ist der Öffnen-Button der Karte (edit-meal). Sie trägt das
  * obere Karten-Padding, die Aktionszeile darunter das untere - zusammen ergibt
  * das die frühere Klickfläche der Karte, nur ohne Buttons IM Button
@@ -806,6 +813,39 @@
     padding: 0;
     gap: 0;
     flex: none;
+  }
+
+  /* DER GRIFF IST DIE EINZIGE STELLE DER ZEILE, DIE DEN FINGER NICHT AN DEN
+   * SCROLLER ABGIBT (#1317).
+   *
+   * Der Wochenplan scrollt hier in .app-content mit `touch-action: pan-y`, und
+   * ein anderer Tag liegt genau auf dieser Achse: ein Zug an der Karte war fuer
+   * den Browser ein Scroll, er beendete den Pointer mit pointercancel, und der
+   * Zug endete, bevor er begann. `touch-action: none` auf der ganzen Karte
+   * haette das Ziehen repariert und das Scrollen der Woche zerlegt, denn auf
+   * dem Handy besteht sie fast nur aus Mahlzeit-Zeilen. Dieselbe Loesung wie
+   * .list-row__drag (list-row.css) und .cat-row__handle: schmal, aber hoch.
+   *
+   * Breite und Hoehe mindestens --target-base (44px, auf Touch 48px): der Griff
+   * ist ein Fingerziel, anders als der Listen-Griff, der seine Breite fuer
+   * lange Artikelnamen hergibt. Die Zeile hat hier genug Platz, und ein zu
+   * schmaler Griff liesse den Daumen auf den Titel rutschen, der den Dialog
+   * oeffnet. */
+  .meal-card__drag {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    align-self: stretch;
+    min-width: var(--target-base);
+    min-height: var(--target-base);
+    color: var(--color-text-tertiary);
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .meal-slot--dragging .meal-card__drag {
+    cursor: grabbing;
   }
 
   /* Das Typ-Label ist die Überschrift des Slots, nicht seine erste Zeile: es

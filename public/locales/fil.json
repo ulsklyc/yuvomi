@@ -731,6 +731,7 @@
         "seriesEndedToast": "Natapos ang serye mula sa petsang ito.",
         "seriesDeletedToast": "Natanggal ang serye.",
         "deleteMealNamed": "Tanggalin ang {{title}}",
+        "dragHandle": "I-drag ang {{title}} sa ibang araw",
         "openRecipeNamed": "Buksan ang resipe ng {{title}}",
         "viewRecipeNamed": "Tingnan ang resipe ng {{title}}"
     },

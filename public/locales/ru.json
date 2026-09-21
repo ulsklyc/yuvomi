@@ -719,6 +719,7 @@
         "seriesEndedToast": "Серия завершена с этой даты.",
         "seriesDeletedToast": "Серия удалена.",
         "deleteMealNamed": "Удалить {{title}}",
+        "dragHandle": "Перетащить {{title}} на другой день",
         "openRecipeNamed": "Открыть рецепт {{title}}",
         "viewRecipeNamed": "Посмотреть рецепт {{title}}"
     },

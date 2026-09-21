@@ -719,6 +719,7 @@
         "seriesEndedToast": "Seri bu tarihten itibaren sonlandırıldı.",
         "seriesDeletedToast": "Seri silindi.",
         "deleteMealNamed": "{{title}} yemeğini sil",
+        "dragHandle": "{{title}} yemeğini başka bir güne sürükle",
         "openRecipeNamed": "{{title}} tarifini aç",
         "viewRecipeNamed": "{{title}} tarifini görüntüle"
     },

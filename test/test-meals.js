@@ -15,6 +15,11 @@ import { todayKey } from '../public/utils/date.js';
 import { t } from '../public/i18n.js';
 import { setDisplayTimeZone, _resetDisplayTimeZoneCache } from '../public/utils/timezone.js';
 import { parseQuantity } from '../server/services/shopping-import.js';
+import { eachRule } from './css-rules.js';
+// Dieselben Module, die meals.js ueber den Loader sieht (browser-absolute Pfade):
+// das Griff-Label wird gegen genau das t()/esc() verglichen, das es erzeugt hat.
+import { t as pageT } from '/i18n.js';
+import { esc as pageEsc } from '/utils/html.js';
 
 const mealsSource = readFileSync(new URL('../public/pages/meals.js', import.meta.url), 'utf8');
 
@@ -1324,6 +1329,146 @@ test('meals.js registriert onNarrowWeekLabelQueryChange() wirklich per matchMedi
   assert(call.handler.name === 'onNarrowWeekLabelQueryChange',
     `erwartet den Handler "onNarrowWeekLabelQueryChange", erhalten: "${call.handler.name}". ` +
     'Ein anderer registrierter Handler (z. B. renderWeekGrid direkt) waere hier ein Rueckfall auf Runde 4.');
+});
+
+// --------------------------------------------------------
+// Ziehgriff der schmalen Zeile (#1317)
+//
+// Auf dem Handy nahm der Browser jeden Zug an der Karte als Scroll des
+// pan-y-Scrollers und brach den Pointer mit pointercancel ab. Die Proben laufen
+// durch den ECHTEN pointerdown-Handler aus wireDragDrop() und lesen den Zustand,
+// den ein begonnener Zug hinterlaesst (`meal-slot--dragging`), statt den
+// Quelltext zu durchsuchen. Die Browser-Messung (echte Touch-Eingabe per CDP)
+// steht im PR; hier haelt die Kette die drei Teile fest, die sie braucht:
+// Griff im Markup, Geste nur am Griff, `touch-action: none` nur am Griff.
+// --------------------------------------------------------
+
+/** Minimaler Elementbaum: genau das, was der pointerdown-Handler anfasst. */
+function dragFakeEl(classes, { parent = null, dataset = {}, shown = true } = {}) {
+  const el = {
+    classes: new Set(classes),
+    parent,
+    dataset,
+    children: [],
+    shown,
+    listeners: {},
+    classList: {
+      add: (c) => el.classes.add(c),
+      remove: (c) => el.classes.delete(c),
+      contains: (c) => el.classes.has(c),
+    },
+    closest(sel) {
+      const cls = sel.replace(/^\./, '');
+      for (let n = el; n; n = n.parent) if (n.classes.has(cls)) return n;
+      return null;
+    },
+    querySelector(sel) {
+      const cls = sel.replace(/^\./, '');
+      const walk = (n) => {
+        for (const c of n.children) {
+          if (c.classes.has(cls)) return c;
+          const hit = walk(c);
+          if (hit) return hit;
+        }
+        return null;
+      };
+      return walk(el);
+    },
+    getClientRects: () => (el.shown ? [{ width: 48, height: 48 }] : []),
+    addEventListener(type, fn) { (el.listeners[type] ||= []).push(fn); },
+    removeEventListener() {},
+    setPointerCapture() {},
+  };
+  if (parent) parent.children.push(el);
+  return el;
+}
+
+/** Baut Slot > Karte > {Titel, Griff, Aktionen} und verdrahtet den echten Handler. */
+function dragFixture({ handleShown = true } = {}) {
+  const grid = dragFakeEl(['week-grid']);
+  const slot = dragFakeEl(['meal-slot'], { parent: grid, dataset: { date: '2026-09-21', type: 'dinner' } });
+  const card = dragFakeEl(['meal-card'], { parent: slot, dataset: { mealId: '7' } });
+  const open = dragFakeEl(['meal-card__open'], { parent: card });
+  const handle = dragFakeEl(['meal-card__drag'], { parent: card, shown: handleShown });
+  const icon = dragFakeEl(['lucide'], { parent: handle });
+  const actions = dragFakeEl(['meal-card__actions'], { parent: card });
+
+  const zuvorWindow = globalThis.window;
+  // reduce: true haelt den Geist aus der Probe - er braucht document.body.
+  globalThis.window = { matchMedia: () => ({ matches: true }) };
+  try { mealsUi.wireDragDrop(grid); } finally { globalThis.window = zuvorWindow; }
+
+  const down = (target, pointerType) => {
+    let prevented = false;
+    for (const fn of grid.listeners.pointerdown ?? []) {
+      fn({ target, pointerType, pointerId: 1, clientX: 10, clientY: 10,
+        preventDefault: () => { prevented = true; } });
+    }
+    return { dragging: slot.classes.has('meal-slot--dragging'), prevented };
+  };
+  return { slot, card, open, handle, icon, actions, down };
+}
+
+test('#1317: die Mahlzeit-Zeile traegt einen Ziehgriff mit benanntem Label, ausserhalb der Aktionsleiste', () => {
+  const title = 'Pasta "al forno" & Salat';
+  const html = mealsUi.renderSlot('2026-09-21', { key: 'dinner', label: 'Abendessen' },
+    [{ id: 7, date: '2026-09-21', meal_type: 'dinner', title, ingredients: [] }], 1, 1);
+  const handle = html.match(/<span class="meal-card__drag"[^>]*>[\s\S]*?<\/span>/);
+  assert(handle, 'kein .meal-card__drag im Markup der Mahlzeit - ohne Griff hat der Finger keinen Ort, der das Ziehen besitzt');
+  assert(handle[0].includes('data-lucide="grip-vertical"'), 'Griff ohne grip-vertical-Icon (dasselbe Zeichen wie Einkauf, Kategorien, Quick-Links)');
+  const expectedLabel = pageEsc(pageT('meals.dragHandle', { title }));
+  assert(handle[0].includes(`aria-label="${expectedLabel}"`),
+    `Griff-Label muss t('meals.dragHandle') mit escaptem Titel sein, gefunden: ${handle[0].match(/aria-label="[^"]*"/)?.[0]}`);
+  assert(!handle[0].includes(title), 'der Titel steht unescaped im Griff-Markup');
+  const actionsAt = html.indexOf('class="meal-card__actions"');
+  assert(actionsAt > html.indexOf(handle[0]),
+    'der Griff muss VOR und damit ausserhalb von .meal-card__actions stehen - wireDragDrop nimmt die Aktionsleiste vom Ziehen aus');
+});
+
+test('#1317: ein Finger auf dem Kartenrumpf beginnt KEINEN Zug, wenn die Zeile einen Griff zeigt (die Geste gehoert dem Scroller)', () => {
+  const f = dragFixture();
+  const r = f.down(f.open, 'touch');
+  assert(!r.dragging, 'Touch auf dem Titel hat einen Zug begonnen - der Browser beansprucht die Geste als Scroll und bricht ihn mit pointercancel ab');
+  assert(!r.prevented, 'Touch auf dem Rumpf ruft preventDefault - der Handler darf die Geste gar nicht erst anfassen');
+});
+
+test('#1317: ein Finger auf dem Griff (auch auf seinem Icon) beginnt den Zug', () => {
+  const f = dragFixture();
+  assert(f.down(f.icon, 'touch').dragging, 'Touch auf dem Griff-Icon hat keinen Zug begonnen');
+  const g = dragFixture();
+  assert(g.down(g.handle, 'pen').dragging, 'Stift auf dem Griff hat keinen Zug begonnen');
+});
+
+test('#1317: die Maus greift weiter die ganze Karte (Desktop unveraendert)', () => {
+  const f = dragFixture();
+  assert(f.down(f.open, 'mouse').dragging, 'Maus auf dem Kartenrumpf beginnt keinen Zug mehr - Desktop-Drag waere gebrochen');
+  const g = dragFixture({ handleShown: false });
+  assert(g.down(g.open, 'mouse').dragging, 'Maus auf dem Board (Griff ausgeblendet) beginnt keinen Zug mehr');
+});
+
+test('#1317: ohne sichtbaren Griff (breites Board auf Touch) bleibt es beim bisherigen Verhalten', () => {
+  const f = dragFixture({ handleShown: false });
+  assert(f.down(f.open, 'touch').dragging, 'Touch auf dem Board ohne Griff beginnt keinen Zug mehr - dort gibt es keinen anderen Ort');
+  const g = dragFixture();
+  assert(!g.down(g.actions, 'touch').dragging, 'die Aktionsleiste ist weiterhin kein Griff');
+});
+
+test('#1317: touch-action: none sitzt am Griff der schmalen Zeile und NUR dort, sichtbar nur in der schmalen Fassung', () => {
+  const css = readFileSync(new URL('../public/styles/meals.css', import.meta.url), 'utf8');
+  const narrow = (r) => r.at.some((a) => /max-width:\s*639px/.test(a));
+  const rules = [...eachRule(css)];
+  const handleRules = rules.filter((r) => r.selector.split(',').some((s) => s.trim() === '.meal-card__drag'));
+  const narrowRule = handleRules.find((r) => narrow(r) && /touch-action:\s*none/.test(r.body));
+  assert(narrowRule, 'kein `.meal-card__drag { touch-action: none }` im (max-width: 639px)-Block');
+  assert(/display:\s*flex/.test(narrowRule.body), 'der Griff ist in der schmalen Fassung nicht sichtbar geschaltet');
+  const base = handleRules.find((r) => r.at.length === 0);
+  assert(base && /display:\s*none/.test(base.body), 'der Griff muss ausserhalb der schmalen Fassung ausgeblendet sein (Board greift die ganze Karte)');
+  assert(css.indexOf(base.body) < css.indexOf(narrowRule.body),
+    'die ausblendende Basisregel muss VOR der schmalen stehen, sonst gewinnt sie bei gleicher Spezifitaet');
+  const offenders = rules.filter((r) => /touch-action:\s*none/.test(r.body)
+    && !r.selector.split(',').every((s) => s.trim().endsWith('.meal-card__drag')));
+  assert(offenders.length === 0,
+    `touch-action: none ausserhalb des Griffs zerlegt das Scrollen der Woche: ${offenders.map((r) => r.selector.trim()).join(' | ')}`);
 });
 
 // --------------------------------------------------------

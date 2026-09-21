@@ -719,6 +719,7 @@
         "seriesEndedToast": "श्रृंखला इस तारीख से समाप्त कर दी गई।",
         "seriesDeletedToast": "श्रृंखला हटाई गई।",
         "deleteMealNamed": "{{title}} हटाएं",
+        "dragHandle": "{{title}} को किसी दूसरे दिन पर खींचें",
         "openRecipeNamed": "{{title}} की रेसिपी खोलें",
         "viewRecipeNamed": "{{title}} की रेसिपी देखें"
     },

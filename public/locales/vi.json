@@ -719,6 +719,7 @@
         "seriesEndedToast": "Đã kết thúc chuỗi từ ngày này.",
         "seriesDeletedToast": "Đã xóa chuỗi.",
         "deleteMealNamed": "Xóa {{title}}",
+        "dragHandle": "Kéo {{title}} sang ngày khác",
         "openRecipeNamed": "Mở công thức {{title}}",
         "viewRecipeNamed": "Xem công thức {{title}}"
     },

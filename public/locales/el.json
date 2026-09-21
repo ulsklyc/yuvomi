@@ -719,6 +719,7 @@
         "seriesEndedToast": "Η σειρά τερματίστηκε από αυτή την ημερομηνία.",
         "seriesDeletedToast": "Η σειρά διαγράφηκε.",
         "deleteMealNamed": "Διαγραφή «{{title}}»",
+        "dragHandle": "Σύρετε «{{title}}» σε άλλη ημέρα",
         "openRecipeNamed": "Άνοιγμα συνταγής για «{{title}}»",
         "viewRecipeNamed": "Προβολή συνταγής για «{{title}}»"
     },

@@ -719,6 +719,7 @@
         "seriesEndedToast": "Série ukončena od tohoto data.",
         "seriesDeletedToast": "Série odstraněna.",
         "deleteMealNamed": "Smazat {{title}}",
+        "dragHandle": "Přetáhnout {{title}} na jiný den",
         "openRecipeNamed": "Otevřít recept: {{title}}",
         "viewRecipeNamed": "Zobrazit recept: {{title}}"
     },
