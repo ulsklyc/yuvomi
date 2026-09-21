@@ -82,12 +82,19 @@ export function pickLocale(tags, supported) {
   for (const roh of tags || []) {
     if (!roh) continue;
     const teile = canonicalTag(roh).split('-');
+    // Eine Schrift, die im Tag STEHT, schlaegt jede, die eine Region nur nahelegt.
+    // `zh-Hans-HK` meint Vereinfacht in Hongkong, und macOS, iOS und Android melden
+    // genau das. Ohne diese Sperre antwortet die Regionszuordnung darauf mit
+    // Traditionell - also mit dem Gegenteil dessen, was ausdruecklich dasteht.
+    const traegtSchrift = teile.slice(1).some((teil) => teil.length === 4);
     while (teile.length) {
       const tag = teile.join('-');
       if (supported.includes(tag)) return tag;
-      const letzter = teile[teile.length - 1];
-      const schrift = Object.hasOwn(REGION_SCRIPT, letzter) ? REGION_SCRIPT[letzter] : null;
-      if (schrift && supported.includes(`${teile[0]}-${schrift}`)) return `${teile[0]}-${schrift}`;
+      if (!traegtSchrift) {
+        const letzter = teile[teile.length - 1];
+        const schrift = Object.hasOwn(REGION_SCRIPT, letzter) ? REGION_SCRIPT[letzter] : null;
+        if (schrift && supported.includes(`${teile[0]}-${schrift}`)) return `${teile[0]}-${schrift}`;
+      }
       teile.pop();
     }
   }

@@ -38,12 +38,18 @@
     for (var i = 0; i < tags.length; i++) {
       if (!tags[i]) continue;
       var teile = canonicalTag(tags[i]).split('-');
+      // Eine Schrift, die im Tag STEHT, schlaegt jede, die eine Region nahelegt
+      // (`zh-Hans-HK` meint Vereinfacht) - siehe i18n.js#pickLocale.
+      var traegtSchrift = false;
+      for (var k = 1; k < teile.length; k++) if (teile[k].length === 4) traegtSchrift = true;
       while (teile.length) {
         var tag = teile.join('-');
         if (SUPPORTED.indexOf(tag) !== -1) return tag;
-        var letzter = teile[teile.length - 1];
-        var schrift = Object.prototype.hasOwnProperty.call(REGION_SCRIPT, letzter) ? REGION_SCRIPT[letzter] : null;
-        if (schrift && SUPPORTED.indexOf(teile[0] + '-' + schrift) !== -1) return teile[0] + '-' + schrift;
+        if (!traegtSchrift) {
+          var letzter = teile[teile.length - 1];
+          var schrift = Object.prototype.hasOwnProperty.call(REGION_SCRIPT, letzter) ? REGION_SCRIPT[letzter] : null;
+          if (schrift && SUPPORTED.indexOf(teile[0] + '-' + schrift) !== -1) return teile[0] + '-' + schrift;
+        }
         teile.pop();
       }
     }

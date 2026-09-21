@@ -182,6 +182,12 @@ test('i18n.js loest ein Regions-Tag auf die spezifischste unterstuetzte Locale a
     'Unser `zh` ist Vereinfacht - `CN` darf keine traditionelle Schrift implizieren.');
   assert.equal(pickLocale(['zh-CN'], ohneHant), 'zh');
   assert.equal(pickLocale(['zh-Hant-TW'], mitHant), 'zh-Hant');
+  assert.equal(pickLocale(['zh-Hans-HK'], mitHant), 'zh',
+    'Eine Schrift, die im Tag STEHT, schlaegt die, die eine Region nahelegt. macOS, iOS und '
+    + 'Android melden `zh-Hans-HK`; darauf mit Traditionell zu antworten ist das Gegenteil der '
+    + 'Ansage, und zwar genau bei dem Nutzer, der sich die Muehe gemacht hat, sie zu machen.');
+  assert.equal(pickLocale(['zh-Hans-HK'], [...mitHant, 'zh-Hans']), 'zh-Hans',
+    'Steht die ausdrueckliche Schrift zur Verfuegung, ist sie die Antwort.');
   assert.equal(pickLocale(['zh-Hant-TW'], ohneHant), 'zh',
     'Der letzte Subtag faellt weg, bis etwas passt: zh-Hant-TW > zh-Hant > zh.');
   assert.equal(pickLocale(['ZH-hant-tw'], mitHant), 'zh-Hant',
@@ -243,6 +249,8 @@ test('lang-init.js loest zh-TW auf zh-Hant auf, sobald es diese Locale gibt', ()
   assert.equal(runLangInit({ languages: ['zh-TW'], src: mitHant }), 'zh-Hant');
   assert.equal(runLangInit({ languages: ['zh-CN'], src: mitHant }), 'zh');
   assert.equal(runLangInit({ languages: ['zh-Hant-TW'], src: mitHant }), 'zh-Hant');
+  assert.equal(runLangInit({ languages: ['zh-Hans-HK'], src: mitHant }), 'zh',
+    'Auch die gespiegelte Fassung darf eine ausdrueckliche Schrift nicht ueberstimmen.');
 
   const ohneHant = withSupported(['de', 'en', 'zh']);
   assert.equal(runLangInit({ languages: ['zh-TW'], src: ohneHant }), 'zh');
