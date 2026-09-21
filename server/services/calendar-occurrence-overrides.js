@@ -2044,6 +2044,13 @@ function shiftOwnedReminders(database, eventId, oldAnchor, newAnchor, tz) {
  * Zukunft wandert. Landet sie in der Vergangenheit, bleibt ihr Stand: eine
  * zweite Meldung zu einem Zeitpunkt, der vorbei ist, waere keine Auskunft mehr.
  *
+ * WIEDER SCHARF WIRD NUR, WAS SICH BEWEGT HAT - gemessen am Zeitpunkt der Zeile
+ * vor und nach dem Verschieben, nicht am Start-String. Ein Anbieter darf
+ * denselben Beginn anders schreiben (`10:00Z` als `12:00+02:00`, mit oder ohne
+ * Sekunden); der Riegel oben laesst das durch, und ohne diesen Vergleich kam
+ * eine schon zugestellte Erinnerung ein zweites Mal, obwohl nichts verschoben
+ * wurde (Review-Befund nach #1386).
+ *
  * Synchron und ohne eigene Transaktion: die Inbounds rufen es direkt nach ihrem
  * UPDATE, ohne Yield-Punkt dazwischen.
  *
@@ -2058,17 +2065,20 @@ export function followInboundStartChange(database, eventId, oldStart, newStart, 
   nowMs = Date.now(),
 } = {}) {
   if (String(oldStart ?? '') === String(newStart ?? '')) return;
+  const settledRows = database.prepare(`
+    SELECT id, remind_at FROM reminders
+    WHERE entity_type = 'event' AND entity_id = ?
+      AND (pushed_at IS NOT NULL OR dismissed = 1)
+  `);
+  const before = new Map(settledRows.all(eventId)
+    .map((row) => [row.id, remindAtInstantMs(row.remind_at)]));
   shiftOwnedReminders(database, eventId, oldStart, newStart, tz ?? householdTimeZone(database));
   const rearm = database.prepare(
     'UPDATE reminders SET pushed_at = NULL, dismissed = 0 WHERE id = ?'
   );
-  const rows = database.prepare(`
-    SELECT id, remind_at FROM reminders
-    WHERE entity_type = 'event' AND entity_id = ?
-      AND (pushed_at IS NOT NULL OR dismissed = 1)
-  `).all(eventId);
-  for (const row of rows) {
-    if (remindAtInstantMs(row.remind_at) > nowMs) rearm.run(row.id);
+  for (const row of settledRows.all(eventId)) {
+    const instant = remindAtInstantMs(row.remind_at);
+    if (instant !== before.get(row.id) && instant > nowMs) rearm.run(row.id);
   }
 }
 

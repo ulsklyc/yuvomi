@@ -173,7 +173,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with its first occurrence, and the reminders every assignee inherited move too. A reminder that
   was already delivered or dismissed and now lies in the future goes off again at its new time,
   just as it does after you move an appointment in its dialog; one that has moved into the past
-  keeps its state rather than arriving a second time. Outlook is a one-way push and was not
+  keeps its state rather than arriving a second time, and so does one whose appointment the
+  provider merely wrote down differently at the same time. Outlook is a one-way push and was not
   affected. Reminders that already missed a move before this update are not corrected
   retroactively. (#1377)
 - **On a phone, a meal can be dragged to another day again, by a grip next to its buttons.** The

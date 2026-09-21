@@ -308,6 +308,25 @@ describe('#1377 - was beim Mitwandern gilt', () => {
     ], 'die neue Zeit ist neue Auskunft - wie beim Speichern im Dialog, der die Zeile frisch schreibt');
   });
 
+  it('derselbe Zeitpunkt in anderer Schreibweise ist keine Verschiebung: der Zustellstand bleibt', async () => {
+    google.upsertGoogleEvents([gTimed('gev-9', baseMs)], null, '#4A90E2', {});
+    const ev = eventBy('gev-9');
+    await setReminders(ev.id, [naive(baseMs - HOUR)]);
+    db.prepare("UPDATE reminders SET pushed_at = '2026-01-01T00:00:00Z', dismissed = 1 WHERE entity_id = ?")
+      .run(ev.id);
+
+    // 10:00Z als 12:00+02:00: ein anderer String, derselbe Beginn.
+    const sameInstant = `${naive(baseMs + 2 * HOUR)}+02:00`;
+    google.upsertGoogleEvents([gTimed('gev-9', baseMs, {
+      start: { dateTime: sameInstant, timeZone: 'Europe/Berlin' },
+    })], null, '#4A90E2', {});
+    assert.notEqual(eventBy('gev-9').start_datetime, ev.start_datetime,
+      'Vorbedingung: der Inbound hat einen anderen String geschrieben');
+    assert.deepEqual(remindersOf(ev.id), [
+      { remind_at: naive(baseMs - HOUR), pushed_at: '2026-01-01T00:00:00Z', dismissed: 1 },
+    ], 'die Erinnerung hat sich nicht bewegt, also meldet sie sich auch nicht ein zweites Mal');
+  });
+
   it('eine zugestellte Erinnerung, die in die Vergangenheit wandert, meldet sich nicht ein zweites Mal', async () => {
     const pastMs = Date.now() - 10 * DAY;
     google.upsertGoogleEvents([gTimed('gev-7', baseMs)], null, '#4A90E2', {});
