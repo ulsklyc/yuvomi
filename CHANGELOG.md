@@ -82,6 +82,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Housekeeping tasks turn "due today" and "overdue" on the household's day, not the server's.**
+  The due day of a recurring task was counted in the time zone of the server. On a server running in
+  UTC with a household in Berlin, a task done shortly after midnight counted as done the day before,
+  so it showed "due today" a day early and "overdue" on the day it was actually due; west of UTC the
+  evening hours were off the same way. The due day is now counted from the day the task was done in
+  the household time zone (Settings, Region).
+- **Housekeeping counts a visit in the month it happened in the household.** Visits, their totals,
+  the "visits this month" and "paid this month" figures, the monthly payment chart and the tasks
+  finished this month were grouped by UTC month, and the current month itself was the UTC one. A
+  visit on the 1st at 00:30 in Berlin was booked to the month before, and in the first hours of a
+  new month the overview still showed the old one. All of them now use the household's month.
 - **On a phone, a meal can be dragged to another day again, by a grip next to its buttons.** The
   drag started, and ended the moment the finger moved: on a phone the week plan is a vertical list,
   another day lies exactly on the scrolling axis, and the browser took the gesture as a scroll and
