@@ -324,8 +324,14 @@ export function localToUTCPrecise(localStr, tzid) {
 
   // Kein Fixpunkt in zwei Durchgaengen: Fruehjahrsluecke. Um die Luecke
   // vorschieben statt eine Antwort vorzutaeuschen, die es nicht gibt.
-  const gapMinutes = Math.abs(o2 - o1);
-  return new Date(guessA + gapMinutes * 60000).toISOString().replace('.000Z', 'Z');
+  //
+  // Der SPAETERE der beiden Kandidaten ist die Antwort, und zwar unabhaengig
+  // vom Vorzeichen des Offsets. `guessA + Luecke` war es NICHT: bei positivem
+  // Offset (Europe/Berlin) ist guessA zufaellig der fruehere Kandidat und das
+  // Ergebnis stimmt, bei negativem (jede US-Zone) ist guessA bereits der
+  // spaetere - das Addieren schiebt dann um eine volle Stunde zu weit.
+  // Gemessen fuer 2026-03-08T02:30 in America/New_York: 04:30 EDT statt 03:30.
+  return new Date(Math.max(guessA, guessB)).toISOString().replace('.000Z', 'Z');
 }
 
 /**

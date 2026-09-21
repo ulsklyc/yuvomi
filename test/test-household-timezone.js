@@ -228,6 +228,34 @@ test('localToUTCPrecise trifft jede Wanduhrzeit, die es wirklich gibt', () => {
   assert.equal(roundTrip(localToUTCPrecise, '2026-03-29T02:30:00', zone), '2026-03-29T03:30:00');
 });
 
+test('die Fruehjahrsluecke faellt in JEDER Zone gleich aus, nicht nur bei positivem Offset', () => {
+  // Der Ausweg aus der Luecke war vorzeichenabhaengig und damit in der halben
+  // Welt falsch: `guessA + Luecke` stimmt nur, solange `guessA` der FRUEHERE
+  // der beiden Kandidaten ist - und das ist er nur bei positivem Offset. In
+  // jeder US-Zone ist guessA bereits der spaetere, das Addieren schob um eine
+  // volle Stunde zu weit (gemessen: 04:30 EDT statt 03:30). Richtig ist der
+  // SPAETERE Kandidat, und den nennt `Math.max` ohne Fallunterscheidung.
+  //
+  // Je Zone die Wanduhrzeit MITTEN in der uebersprungenen Stunde; erwartet ist
+  // dieselbe Minute direkt hinter der Luecke.
+  const luecken = [
+    ['Europe/Berlin', '2026-03-29T02:30:00', '2026-03-29T03:30:00'],
+    ['America/New_York', '2026-03-08T02:30:00', '2026-03-08T03:30:00'],
+    ['America/Chicago', '2026-03-08T02:30:00', '2026-03-08T03:30:00'],
+    ['America/Los_Angeles', '2026-03-08T02:30:00', '2026-03-08T03:30:00'],
+    ['Australia/Sydney', '2026-10-04T02:30:00', '2026-10-04T03:30:00'],
+    // Halbstunden- und Viertelstunden-Zonen: die Luecke ist auch hier 60
+    // Minuten breit, aber der Offset selbst ist krumm - ein Rechenweg, der
+    // insgeheim mit vollen Stunden rechnet, faellt hier auf.
+    ['Pacific/Chatham', '2026-09-27T02:45:00', '2026-09-27T03:45:00'],
+  ];
+  for (const [zone, luecke, erwartet] of luecken) {
+    assert.equal(roundTrip(localToUTCPrecise, luecke, zone), erwartet,
+      `${zone}: ${luecke} gibt es nicht, erwartet ist ${erwartet} - eine Zone mit `
+      + 'negativem Offset darf nicht eine Stunde weiter landen als eine mit positivem.');
+  }
+});
+
 test('storedToInstantMsPrecise erbt die Formregeln und tauscht nur die Umrechnung', () => {
   const zone = 'Europe/Berlin';
   // Dieselben drei Formen wie oben bei `storedToInstantMs`, damit ein
