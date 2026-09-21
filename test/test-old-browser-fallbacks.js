@@ -322,17 +322,42 @@ function staticImports(source) {
 }
 
 /**
+ * HTML ohne Kommentare, per indexOf statt per replace-Regex - wie in
+ * test-installer-schema.js (#1198). CodeQL wertet jedes Kommentar-replace
+ * einzeln als unvollstaendige Bereinigung (js/incomplete-multi-character-
+ * sanitization), auch in einer Fixpunkt-Schleife. Und ein Kommentar, der nicht
+ * geschlossen wird, gilt wie im Browser bis zum Dateiende: ein `<script>`
+ * dahinter laeuft nie.
+ */
+function htmlWithoutComments(src) {
+  let out = '';
+  let pos = 0;
+  for (;;) {
+    const start = src.indexOf('<!--', pos);
+    if (start === -1) return out + src.slice(pos);
+    out += src.slice(pos, start);
+    const end = src.indexOf('-->', start + 4);
+    if (end === -1) return out;
+    pos = end + 3;
+  }
+}
+
+/** Die `<script>`-Tags eines HTML-Dokuments, ohne die auskommentierten. */
+function scriptEntries(html) {
+  const tags = [...htmlWithoutComments(html).matchAll(/<script\b[^>]*>/gi)].map((m) => m[0]);
+  return tags.map((tag) => ({
+    path: tag.match(/\bsrc=["']([^"']+)["']/i)?.[1],
+    module: /\btype=["']module["']/i.test(tag),
+  }));
+}
+
+/**
  * Was vor dem ersten Bild laeuft: jedes Skript aus index.html (klassisch und als
  * Modul) und transitiv alles, was die Module statisch importieren. modulepreload
  * zaehlt nicht - es laedt, fuehrt aber nichts aus.
  */
 function startupFiles() {
-  const html = read('public/index.html').replace(/<!--[\s\S]*?-->/g, '');
-  const tags = [...html.matchAll(/<script\b[^>]*>/gi)].map((m) => m[0]);
-  const entries = tags.map((tag) => ({
-    path: tag.match(/\bsrc=["']([^"']+)["']/i)?.[1],
-    module: /\btype=["']module["']/i.test(tag),
-  }));
+  const entries = scriptEntries(read('public/index.html'));
   const files = new Map();
   const unresolved = [];
   const queue = [];
@@ -408,6 +433,23 @@ test('Leser: statische Importe in jeder Schreibweise, dynamische nicht (erfunden
   ].join('\n');
   assert.deepEqual(staticImports(source),
     ['/a.js', './b.js', '../c.js', '/side-effect.js', '/multi.js', './re.js', '/re2.js']);
+});
+
+test('Leser: auskommentierte Skripte zaehlen nicht, auch hinter einem offenen Kommentar (erfundene Faelle)', () => {
+  const html = [
+    '<script src="/classic.js"></script>',
+    '<!-- <script src="/commented.js"></script> -->',
+    '<script type="module" src="/module.js"></script>',
+    '<!-- <!-- verschachtelt --> <script src="/after-first-close.js"></script>',
+    '<!-- nie geschlossen',
+    '<script type="module" src="/after-open-comment.js"></script>',
+  ].join('\n');
+  assert.deepEqual(scriptEntries(html), [
+    { path: '/classic.js', module: false },
+    { path: '/module.js', module: true },
+    // Ein Kommentar endet am ERSTEN `-->`, wie im Browser.
+    { path: '/after-first-close.js', module: false },
+  ]);
 });
 
 test('Leser: findet Object.hasOwn in jeder Form, Kommentare und hasOwnProperty nicht (erfundene Faelle)', () => {
