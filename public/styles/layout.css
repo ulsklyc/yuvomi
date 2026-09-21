@@ -3431,10 +3431,18 @@ html.fab-anim-done .page-fab {
  * ANGELEGT und ENTFERNT (utils/bulk-pill.js) und trägt nie `hidden` - und ein
  * Eintrag für einen Zustand, den niemand setzt, ist keine Absicherung, sondern
  * eine Behauptung über den Bestand. */
+/* Seit #1340 haelt test:hidden-cascade die Regel fuer den ganzen Baum. Der erste
+ * Lauf fand drei weitere geteilte Klassen: `.form-field` (Freitextfeld der
+ * Aktivitaet und Name der Vorsorge in health.js), `.row-action` (der Entfernen-
+ * Knopf der ersten Telefon-/Mail-Zeile im Kontakt) und `.page-toolbar__actions`
+ * (der Quellenfilter der Rezepte, solange kein gespiegeltes Rezept existiert). */
 .page-fab[hidden],
 .btn[hidden],
 .form-group[hidden],
+.form-field[hidden],
+.row-action[hidden],
 .page-toolbar[hidden],
+.page-toolbar__actions[hidden],
 .recipe-detail[hidden],
 p.field-hint--warn[hidden] {
   display: none !important;

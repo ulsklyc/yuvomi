@@ -117,6 +117,12 @@ a.doc-attach__chip-name:focus-visible {
   font-size: var(--text-sm);
 }
 
+/* `display: flex` schlaegt das UA-`[hidden]`: der Leerhinweis stand sonst auch
+ * neben verknuepften Dokumenten (#1340). */
+.doc-attach__empty[hidden] {
+  display: none;
+}
+
 .doc-attach__empty svg {
   width: 16px;
   height: 16px;

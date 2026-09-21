@@ -647,6 +647,12 @@
   margin-top: var(--space-2);
 }
 
+/* `display: flex` schlaegt das UA-`[hidden]`: ohne Anhang stand der leere
+ * Vorschaublock im Termin-Modal (#1340). */
+.event-attachment-preview[hidden] {
+  display: none;
+}
+
 .event-attachment-preview img {
   width: 100%;
   max-height: 180px;

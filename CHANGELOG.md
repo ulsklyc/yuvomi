@@ -59,6 +59,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Controls and hints that are meant to be hidden now really disappear.** Yuvomi hides an element
+  by setting `hidden` on it, and the browser honours that only until a stylesheet gives the element
+  a layout of its own: any `display` rule wins over it. Several places were caught this way and
+  stayed on screen. A task comment you deleted stayed in the list while the undo notice was up. The
+  housekeeping form showed both the daily and the hourly rate, whatever billing type was chosen. The
+  activity form showed its free-text type field and the prevention form its name field when neither
+  applied. The first phone or email row of a contact offered a remove button. An attachments field
+  said "Nothing attached yet" underneath the attachments it listed. A document thumbnail that had not
+  loaded yet covered the category icon with an empty box. The folder breadcrumb and the attachment
+  preview in the event dialog left empty space behind. A new test now reads every element the code
+  hides and every stylesheet rule that sets `display`, and fails when a rule keeps a hidden element
+  on screen. (#1340)
+
 - **With several people assigned, the event dialog now says why no calendar was picked.** Since
   #1060 a new event goes to the calendar that names its one assigned person as the default
   assignee. With two or more people assigned, the assignment deliberately picks nothing and the

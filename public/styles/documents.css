@@ -411,6 +411,12 @@
   font-size: var(--text-sm);
 }
 
+/* `display: flex` schlaegt das UA-`[hidden]`: im Wurzelordner blieb der leere
+ * Pfad samt Aussenabstand ueber der Liste stehen (#1340). */
+.documents-breadcrumb[hidden] {
+  display: none;
+}
+
 .documents-breadcrumb__crumb {
   border: none;
   background: none;

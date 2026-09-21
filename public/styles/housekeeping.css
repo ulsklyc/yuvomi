@@ -311,6 +311,12 @@
   font-weight: var(--font-weight-semibold);
 }
 
+/* `display: grid` schlaegt das UA-`[hidden]`: Stunden- und Tagessatz standen
+ * sonst beide im Formular, gleich welche Abrechnungsart gewaehlt war (#1340). */
+.housekeeping-field[hidden] {
+  display: none;
+}
+
 .housekeeping-field input,
 .housekeeping-field textarea,
 .housekeeping-field select {

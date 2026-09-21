@@ -60,6 +60,13 @@ img, svg, video {
   max-width: 100%;
 }
 
+/* `display: block` oben ist eine Autorenregel und schlaegt das UA-`[hidden]` -
+ * jedes `<img hidden>` der App stand damit sichtbar da, etwa das noch nicht
+ * geladene Dokument-Thumbnail ueber seinem Glyph (#1340, test:hidden-cascade). */
+img[hidden], svg[hidden], video[hidden] {
+  display: none;
+}
+
 /* `color: inherit` ist hier die WICHTIGSTE Zeile, und sie hat gefehlt: `a` und
  * `input, textarea, select` erben ihre Farbe direkt darunter, `button` als
  * einziges der vier tat es nicht. Ohne sie nimmt ein Button die UA-Farbe

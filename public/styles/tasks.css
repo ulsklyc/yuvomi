@@ -1846,6 +1846,12 @@
   gap: var(--space-1);
 }
 
+/* Loeschen blendet den Kommentar per `hidden` aus, solange der Rueckgaengig-Toast
+ * steht - `display: flex` hielt ihn dabei sichtbar (#1340). */
+.task-comment[hidden] {
+  display: none;
+}
+
 .task-comment + .task-comment {
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-border-subtle);

@@ -1462,10 +1462,12 @@ function buildMoreSheetBody() {
  */
 async function renderPage(route, previousPath = null, scrollTarget = 0) {
   const app = document.getElementById('app');
-  const loading = document.getElementById('app-loading');
 
-  // Loading verstecken
-  if (loading) loading.hidden = true;
+  // Den Ladebildschirm (#app-loading) blendet hier bewusst nichts aus: er steht
+  // in #app und faellt mit dessen erstem `replaceChildren` weg - der
+  // App-Shell, der Auth-Seite oder dem Fehlerbildschirm. Bis dahin ueberbrueckt
+  // er das Laden des Seitenmoduls. Das `hidden`, das hier stand, hat nie
+  // gewirkt: `.app-loading { display: flex }` schlug es (#1340).
 
   try {
     const style = loadPageStyle(route.thirdPartyModule ? null : route.module, route.style);
@@ -4741,8 +4743,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
     navigate(location.pathname, false);
   } catch (err) {
     console.error('[Router] Initialisierung fehlgeschlagen:', err);
-    const loading = document.getElementById('app-loading');
-    if (loading) loading.hidden = true;
+    // renderError ersetzt den Inhalt von #app und nimmt den Ladebildschirm mit.
     renderError(document.getElementById('app'), err);
   }
 })();

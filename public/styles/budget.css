@@ -1126,6 +1126,15 @@
   gap: var(--space-3);
 }
 
+/* Die Gegenregel zur Zeile darueber (#1340). Die Darlehensfelder
+ * (#lm-variable-fields, #lm-manual-fields) tragen `.form-grid-2` und werden per
+ * `hidden` geschaltet; heute rendert das Modal ausserhalb von `.budget-page` und
+ * das Raster greift dort nicht - zieht es einmal mit, bleiben sie ohne diese
+ * Zeile sichtbar, wie #inv-odometer-group in PR #1257. */
+.budget-page .form-grid-2[hidden] {
+  display: none;
+}
+
 @media (max-width: 639px) {
   .budget-loans__header,
   .budget-loan-card__footer {
