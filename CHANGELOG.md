@@ -154,8 +154,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stored - whatever it is - is accepted unchanged when it is sent back, so changing the name or the
   date of such a birthday never fails over a reminder nobody touched. In the editor, a custom amount
   that is empty, not a whole number, 0 or above 999 is now refused instead of being saved: the editor
-  says so in the interface language and puts the cursor in the field. An amount typed and then left
-  behind by picking a preset instead is not sent at all, so it cannot block saving. (#1384)
+  says so in the interface language and puts the cursor in the field. It checks only a reminder that
+  is being changed, so a stored amount nobody touched still never blocks saving, and an amount typed
+  and then left behind by picking a preset instead is not sent at all. (#1384)
 - **On a phone, the task filter panel can be closed again after picking filters.** The Filter
   button sat at the end of the chip row, which scrolls sideways on a phone, and every filter you
   picked put another chip in front of it and pushed it further out of view - with the panel open

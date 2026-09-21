@@ -966,10 +966,14 @@ function openBirthdayModal({ mode, birthday = null }) {
         // Ein neuer Geburtstag schreibt, was die Auswahl zeigt; ein bestehender
         // nur, was sich seit dem Oeffnen geaendert hat. Fehlt das Feld, laesst
         // `PUT /birthdays/:id` den gespeicherten Wert stehen.
-        const { reminder, invalid: reminderInvalid } = reminderToSave(readReminder());
-        if (!isEdit || Object.keys(reminder).some((key) => reminder[key] !== reminderAsOpened[key])) {
-          Object.assign(body, reminder);
-        }
+        // Geprueft wird nur, was mitgeht: eine gespeicherte Anzahl ausserhalb
+        // 1-999, die niemand angefasst hat, laesst eine Namensaenderung nicht
+        // scheitern - der Server nimmt sie unveraendert zurueck (#1384).
+        const { reminder, invalid } = reminderToSave(readReminder());
+        const reminderChanged = !isEdit
+          || Object.keys(reminder).some((key) => reminder[key] !== reminderAsOpened[key]);
+        if (reminderChanged) Object.assign(body, reminder);
+        const reminderInvalid = reminderChanged && invalid;
 
         if (!body.name || !body.birth_date || !isDateInputValid(birthDateRaw)) {
           window.yuvomi?.showToast(t('birthdays.requiredFields'), 'warning');

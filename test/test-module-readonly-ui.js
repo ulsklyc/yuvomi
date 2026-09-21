@@ -2083,6 +2083,21 @@ test('eigene Angabe mit ungueltiger Anzahl: der Editor speichert nicht und sagt 
   }
 });
 
+test('eine gespeicherte Anzahl ausserhalb 1-999 blockiert nicht, wenn niemand die Erinnerung anfasst', async () => {
+  // #1384 sagt zu: ein gespeicherter Wert, wie er auch sei, laesst eine
+  // Namensaenderung nie scheitern. Die Pruefung gilt nur dem, was mitgeht.
+  const eintrag = geburtstag({ reminder_offset: 'custom', reminder_custom_amount: 1500, reminder_custom_unit: 'days' });
+  const { gesendet, toasts } = await geburtstagSpeichern(eintrag, {
+    roh: true,
+    bedienen: async (el) => { el['#bd-name'].value = 'Oma Erna M.'; },
+  });
+  assert.deepEqual(toasts.map((toast) => toast.text).filter((text) => text.includes('reminderAmountInvalid')), [],
+    'kein Hinweis zu einer Erinnerung, die nicht mitgeht');
+  assert.equal(gesendet.length, 1, 'gespeichert wird trotzdem');
+  assert.equal(gesendet[0].body.name, 'Oma Erna M.');
+  assert.ok(ERINNERUNGSFELDER.every((feld) => !(feld in gesendet[0].body)), 'die unberuehrte Erinnerung geht nicht mit');
+});
+
 test('Vorgabe nach getippter ungueltiger Anzahl: gespeichert wird ohne Anzahl und Einheit', async () => {
   const gesendet = await geburtstagSpeichern(geburtstag(), {
     bedienen: async (el) => {
