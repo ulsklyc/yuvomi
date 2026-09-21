@@ -17,9 +17,13 @@
  * Kalenderdialog es tut. Outlook hat keinen Inbound (One-Way-Push) und steht
  * deshalb nicht hier.
  *
- * Die Termine liegen RELATIV zu heute in der Zukunft: das ICS-Abo liest nur ein
- * Fenster um heute, und die Zustellzustaende (bereits gemeldet / schon vorbei)
- * haengen an der echten Uhr der Zustellung.
+ * ZEIT UND ZONE STEHEN FEST. Die Uhr der Suite steht auf NOW (`mock.timers`,
+ * nur `Date`): das ICS-Abo liest ein Fenster um "heute", und ob eine Erinnerung
+ * schon vorbei ist, entscheidet `Date.now()` in `followInboundStartChange()`.
+ * Die Haushaltszone ist gesetzt (UTC, dieselbe Zone wie die Saat, die in
+ * `Z`-Zeitpunkten angelegt wird), sonst fiele der Ganztags-Anker (09:00
+ * Haushaltszeit) auf die Zone des Rechners. Ein eigener Block verschiebt dann
+ * bewusst ueber die Zeitumstellung in Europe/Berlin (25.10.2026).
  *
  * Ausfuehren: npm run test:inbound-reminder-shift
  */
@@ -31,7 +35,7 @@ process.env.APPLE_USERNAME = 'apple-user';
 process.env.APPLE_APP_SPECIFIC_PASSWORD = 'apple-pass';
 process.env.ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK = 'true';
 
-import { describe, it, beforeEach, after } from 'node:test';
+import { describe, it, beforeEach, after, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import express from 'express';
@@ -77,7 +81,12 @@ const feedServer = http.createServer((_req, res) => {
 await new Promise((r) => feedServer.listen(0, '127.0.0.1', r));
 const feedUrl = `http://127.0.0.1:${feedServer.address().port}/feed.ics`;
 
-after(() => { apiServer.close(); feedServer.close(); });
+// Ab hier steht die Uhr: 1. Oktober 2026, 12:00 UTC. Nur `Date` - die Timer
+// von fetch und http laufen weiter.
+const NOW = Date.parse('2026-10-01T12:00:00Z');
+mock.timers.enable({ apis: ['Date'], now: NOW });
+
+after(() => { mock.timers.reset(); apiServer.close(); feedServer.close(); });
 
 async function setReminders(eventId, remindAts) {
   const res = await fetch(`${baseUrl}/?entity_type=event&entity_id=${eventId}`, {
@@ -89,13 +98,9 @@ async function setReminders(eventId, remindAts) {
 }
 
 // --------------------------------------------------------------------------
-// Zeiten: relativ zu heute, auf die volle Stunde, naiv-UTC wie `remind_at`
+// Zeiten: fest, zwei Wochen nach NOW, naiv-UTC wie `remind_at`
 // --------------------------------------------------------------------------
-const baseMs = (() => {
-  const d = new Date(Date.now() + 30 * DAY);
-  d.setUTCHours(10, 0, 0, 0);
-  return d.getTime();
-})();
+const baseMs = Date.parse('2026-10-15T10:00:00Z');
 const naive = (ms) => new Date(ms).toISOString().slice(0, 19);
 const zulu = (ms) => `${naive(ms)}Z`;
 const icsStamp = (ms) => `${naive(ms).replace(/[-:]/g, '')}Z`;
@@ -115,6 +120,13 @@ function resetTables() {
   OWNER = add('owner');
   ANNA = add('anna');
   actingUser = ANNA;
+  setHouseholdZone('UTC');
+}
+
+// Die Haushaltszone ist eine Einstellung, kein Umgebungszufall: ohne sie faellt
+// `householdTimeZone()` auf die Zone des Rechners.
+function setHouseholdZone(zone) {
+  db.prepare(`INSERT OR REPLACE INTO sync_config (key, value) VALUES ('household_timezone', ?)`).run(zone);
 }
 
 const remindersOf = (eventId) => db.prepare(`
@@ -333,5 +345,42 @@ describe('#1377 - was beim Mitwandern gilt', () => {
 
     google.upsertGoogleEvents([gTimed('gev-8', baseMs + MOVE)], null, '#4A90E2', {});
     assert.deepEqual(remindersOf(ev.id).map((r) => r.remind_at), [naive(baseMs - HOUR)]);
+  });
+});
+
+// --------------------------------------------------------------------------
+// Ueber die Zeitumstellung: Europe/Berlin, Ende der Sommerzeit am 25.10.2026
+// --------------------------------------------------------------------------
+describe('#1377 - ueber die Zeitumstellung (Europe/Berlin)', () => {
+  beforeEach(() => { resetTables(); setHouseholdZone('Europe/Berlin'); });
+
+  it('Ganztag: 09:00 am Vortag bleibt 09:00 Ortszeit, auch wenn der Tag hinter der Umstellung liegt', async () => {
+    const allDay = (start, end) => ({
+      id: 'gev-dst-1', status: 'confirmed', summary: 'Ausflug',
+      start: { date: start }, end: { date: end },
+    });
+    google.upsertGoogleEvents([allDay('2026-10-23', '2026-10-24')], null, '#4A90E2', {});
+    const ev = eventBy('gev-dst-1');
+    // Am Vortag 09:00 Sommerzeit (CEST, UTC+2) - so schreibt es der Dialog.
+    await setReminders(ev.id, ['2026-10-22T07:00:00']);
+
+    google.upsertGoogleEvents([allDay('2026-10-27', '2026-10-28')], null, '#4A90E2', {});
+    assert.deepEqual(remindersOf(ev.id).map((r) => r.remind_at), ['2026-10-26T08:00:00'],
+      'am neuen Vortag 09:00 Winterzeit (CET, UTC+1) - nicht 10:00, was vier volle Tage ergaeben');
+  });
+
+  it('Zeittermin mit Zone: "1 Stunde vorher" bleibt eine Stunde vor 10:00 Ortszeit', async () => {
+    const timed = (dateTime) => ({
+      id: 'gev-dst-2', status: 'confirmed', summary: 'Zahnarzt',
+      start: { dateTime, timeZone: 'Europe/Berlin' },
+      end: { dateTime: dateTime.replace('T10:', 'T11:'), timeZone: 'Europe/Berlin' },
+    });
+    google.upsertGoogleEvents([timed('2026-10-23T10:00:00+02:00')], null, '#4A90E2', {});
+    const ev = eventBy('gev-dst-2');
+    await setReminders(ev.id, ['2026-10-23T07:00:00']); // 09:00 CEST
+
+    google.upsertGoogleEvents([timed('2026-10-27T10:00:00+01:00')], null, '#4A90E2', {});
+    assert.deepEqual(remindersOf(ev.id).map((r) => r.remind_at), ['2026-10-27T08:00:00'],
+      '09:00 CET: der Vorlauf bleibt 60 Minuten, die Uhrzeit folgt dem Termin');
   });
 });
