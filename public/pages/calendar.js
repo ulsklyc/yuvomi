@@ -2870,7 +2870,7 @@ function renderWeekView(container) {
               return `
               <div class="allday-event" data-id="${ev.id}"
                    style="${eventSurfaceStyle(ev)}"
-                   title="${allDayChipTitle(ev, timeText)}">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}${calendarRepeatIconHtml(ev)}<span>${esc(ev.title)}</span>${allDayChipTimeHtml(timeText)}${chipAssigneeStack(ev, { size: 16, maxVisible: 3 })}</div>
+                   title="${allDayChipTitle(ev, timeText)}">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}${calendarRepeatIconHtml(ev)}<span class="allday-event__label"><span>${esc(ev.title)}</span>${allDayChipTimeHtml(timeText)}</span>${chipAssigneeStack(ev, { size: 16, maxVisible: 3 })}</div>
             `;
             }).join('')}
             ${tasksOnDay(d).map(renderTaskChip).join('')}
@@ -3049,7 +3049,12 @@ function allDayChipTitle(ev, timeText) {
     + chipAssigneeTitleSuffix(ev);
 }
 
-/** Die sichtbare Uhrzeit im Ganztags-Chip, oder nichts. */
+/**
+ * Die sichtbare Uhrzeit im Ganztags-Chip, oder nichts. Sie steht mit dem Titel
+ * in `.allday-event__label`: passt sie neben die Mindestbreite des Titels
+ * nicht mehr, faellt sie dort ganz weg statt gekuerzt zu werden (calendar.css).
+ * title-Attribut und Detailansicht nennen sie weiter.
+ */
 function allDayChipTimeHtml(timeText) {
   return timeText ? `<small class="allday-event__time">${esc(timeText)}</small>` : '';
 }
@@ -3267,7 +3272,7 @@ function renderDayView(container) {
             return `
             <div class="allday-event" data-id="${ev.id}"
                  style="${eventSurfaceStyle(ev)}"
-                 title="${allDayChipTitle(ev, timeText)}">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}${calendarRepeatIconHtml(ev)}<span>${esc(ev.title)}</span>${allDayChipTimeHtml(timeText)}${chipAssigneeStack(ev, { size: 16, maxVisible: 3 })}</div>`;
+                 title="${allDayChipTitle(ev, timeText)}">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}${calendarRepeatIconHtml(ev)}<span class="allday-event__label"><span>${esc(ev.title)}</span>${allDayChipTimeHtml(timeText)}</span>${chipAssigneeStack(ev, { size: 16, maxVisible: 3 })}</div>`;
           }).join('')}
           ${tasksOnDay(state.cursor).map(renderTaskChip).join('')}
         </div>

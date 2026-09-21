@@ -2678,28 +2678,58 @@ test('Ganztags-Chip: der Kalendername im title ist escaped (#1350)', () => {
   assert(!html.includes('"Nord"'), 'ein rohes Anfuehrungszeichen beendet das title-Attribut mitten im Namen');
 });
 
-// Im Browser gemessen (Puppeteer, echtes Markup und echte Stylesheets, PR zu
-// #1350): bei 128 px Chipbreite und 12-Stunden-Format blieb vom Titel ein
-// Buchstabe, in der Drei-Tage-Woche am Telefon gar nichts, und die Uhrzeit
-// wurde dort hart an der Chipkante abgeschnitten. Die Rangfolge steht deshalb
-// im Stylesheet: der Titel vor der Uhrzeit hat Basis 0 und gibt zuerst nach,
-// die Uhrzeit kuerzt erst danach - und dann per Ellipse. Node kann kein Layout
-// rechnen; dieser Test haelt den Mechanismus fest, nicht die Pixel.
-test('Ganztags-Chip: der Titel gibt vor der Uhrzeit nach, die Uhrzeit kuerzt nur per Ellipse (#1350)', () => {
+// Die Rangfolge im engen Chip ist entschieden (PR #1360): DER TITEL GEWINNT.
+// Er behaelt eine Mindestbreite; passt die Uhrzeit daneben nicht mehr, faellt
+// sie auf diesem Chip GANZ weg - kein Stumpf, keine Ellipse. title-Attribut und
+// Detailansicht nennen sie weiter.
+//
+// Node rechnet kein Layout; gemessen ist es im Browser (Tabelle im PR). Hier
+// steht, was die Messung traegt: Titel und Uhrzeit teilen sich EINE
+// umbrechende Zeile von einer Zeilenhoehe mit abgeschnittenem Rest, der Titel
+// bricht mit seiner Mindestbreite um (Flex-Basis aus den Tokens, geklemmt auf
+// max-content, damit ein kurzer Titel keine Uhrzeit blockiert, die neben ihn
+// passt), und die Uhrzeit kann nicht schrumpfen und nicht gekuerzt werden -
+// sie steht ganz in Zeile eins oder ganz in der unsichtbaren zweiten. Die
+// Zugewiesenen stehen ausserhalb, sonst braechen sie mit der Uhrzeit um und
+// verschwaenden mit.
+test('Ganztags-Chip: der Titel gewinnt - die Uhrzeit steht ganz da oder gar nicht (PR #1360)', () => {
+  // (a) Markup: Titel und Uhrzeit in derselben Zeile, die Zugewiesenen dahinter.
+  const ev = longTimedEvent({ assigned_users: [{ id: 1, display_name: 'Linda' }] });
+  let html = '';
+  withOvernightState({ cursor: '2026-06-14', events: [ev] }, () => {
+    const container = fakeContainer();
+    calendarHelpers.renderDayView(container);
+    html = container.html;
+  });
+  const label = /<span class="allday-event__label"><span>[^<]*<\/span><small class="allday-event__time">[^<]*<\/small><\/span>/.exec(html);
+  assert(label, 'Titel und Uhrzeit muessen zusammen in .allday-event__label stehen, die Uhrzeit direkt hinter dem Titel');
+  const nachLabel = html.slice(label.index + label[0].length);
+  assert(nachLabel.trimStart().startsWith('<span class="cal-chip__assigned">'),
+    'die Zugewiesenen stehen HINTER der Zeile, nicht in ihr - sonst braechen sie mit der Uhrzeit um');
+
+  // (b) Stylesheet: die Mechanik, die im Browser gemessen ist.
   const regeln = [...eachRule(calendarCss)];
-  const titel = regeln.find((rule) => /\.allday-event\s*>\s*span:has\(\s*\+\s*\.allday-event__time\s*\)/.test(rule.selector));
+  const zeile = regeln.find((rule) => rule.selector.trim() === '.allday-event__label');
+  assert(zeile, 'es braucht eine Regel fuer .allday-event__label');
+  assert(/display:\s*flex/.test(zeile.body) && /flex-wrap:\s*wrap/.test(zeile.body),
+    `die Zeile muss umbrechen, damit eine Uhrzeit, die nicht passt, als Ganzes in Zeile zwei rutscht: ${zeile.body}`);
+  assert(/(?:^|[\s;])(?:max-)?height:\s*1lh/.test(zeile.body) && /overflow:\s*hidden/.test(zeile.body),
+    `die Zeile ist genau eine Zeilenhoehe hoch und schneidet den Rest ab - Zeile zwei bleibt unsichtbar: ${zeile.body}`);
+
+  const titel = regeln.find((rule) => /\.allday-event__label\s*>\s*span:has\(\s*\+\s*\.allday-event__time\s*\)/.test(rule.selector));
   assert(titel, 'es braucht eine Regel fuer den Titel VOR der Uhrzeit');
-  assert(/flex:\s*1\s+1\s+0(px|%)?\s*;/.test(titel.body) || /flex-basis:\s*0(px|%)?\s*;/.test(titel.body),
-    `der Titel muss Basis 0 haben, sonst schrumpft die Uhrzeit anteilig mit, bevor der Titel nachgegeben hat: ${titel.body}`);
+  assert(/flex:\s*1\s+1\s+var\(--space-\w+\)/.test(titel.body) || /flex-basis:\s*var\(--space-\w+\)/.test(titel.body),
+    `der Titel bricht mit einer Mindestbreite aus den Tokens um (Flex-Basis), nicht mit seiner vollen Laenge - `
+    + `sie entscheidet, wann die Uhrzeit wegfaellt: ${titel.body}`);
   assert(/max-width:\s*max-content/.test(titel.body),
-    `ein kurzer Titel darf nicht in die Breite wachsen, sonst rueckt die Uhrzeit von ihm weg: ${titel.body}`);
+    `ein kurzer Titel klemmt die Mindestbreite auf seine eigene Breite und blockiert keine Uhrzeit, die neben ihn passt: ${titel.body}`);
+
   const zeit = regeln.find((rule) => rule.selector.trim() === '.allday-event__time');
   assert(zeit, 'es braucht eine Regel fuer .allday-event__time');
-  assert(/min-width:\s*0/.test(zeit.body) && /overflow:\s*hidden/.test(zeit.body) && /text-overflow:\s*ellipsis/.test(zeit.body),
-    `reicht der Platz nicht einmal fuer die Uhrzeit, kuerzt sie per Ellipse statt an der Chipkante abgeschnitten zu werden: ${zeit.body}`);
-  const chipSpan = regeln.find((rule) => rule.selector.split(',').map((x) => x.trim()).includes('.allday-event span'));
-  assert(chipSpan && /min-width:\s*0/.test(chipSpan.body) && /text-overflow:\s*ellipsis/.test(chipSpan.body),
-    'der Titel im Chip muss per Ellipse kuerzen koennen');
+  assert(/flex:\s*none/.test(zeit.body) || /flex-shrink:\s*0/.test(zeit.body) || /flex:\s*0\s+0\s+auto/.test(zeit.body),
+    `die Uhrzeit darf nicht schrumpfen - ganz oder gar nicht: ${zeit.body}`);
+  assert(!/text-overflow/.test(zeit.body) && !/min-width:\s*0/.test(zeit.body),
+    `die Uhrzeit wird nie gekuerzt, auch nicht per Ellipse: ${zeit.body}`);
 });
 
 test('eventMapUrl: eine Kartensuche nur, wo ein Ortstext uebrig bleibt (#1110)', () => {

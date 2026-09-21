@@ -1628,25 +1628,53 @@
 }
 
 /* Die Uhrzeit am ersten und letzten Tag eines Termins ab 24 Stunden (#1350).
- * Der Titel davor gibt zuerst nach: Basis 0 heisst, er bekommt nur, was die
- * Uhrzeit uebrig laesst, und kuerzt dann per Ellipse; `max-width: max-content`
- * haelt einen kurzen Titel kurz, damit die Uhrzeit direkt dahinter bleibt.
- * Erst wenn vom Titel nichts mehr uebrig ist (gemessen: Drei-Tage-Woche am
- * Telefon mit 12-Stunden-Format), kuerzt auch die Uhrzeit - per Ellipse statt
- * hart an der Chipkante abgeschnitten. Eine Mindestbreite fuer den Titel waere
- * dort zulasten der Uhrzeit gegangen, auch im haeufigen 24-Stunden-Fall. */
-.allday-event > span:has(+ .allday-event__time) {
+ * DER TITEL GEWINNT: er behaelt eine Mindestbreite, und passt die Uhrzeit
+ * daneben nicht mehr, faellt sie auf diesem Chip ganz weg - kein Stumpf, keine
+ * Ellipse. title-Attribut und Detailansicht nennen sie weiter.
+ *
+ * Mechanik ohne Schwellwert: Titel und Uhrzeit stehen zusammen in einer
+ * umbrechenden Flex-Zeile, die genau eine Zeile hoch ist (`1lh`) und den Rest
+ * abschneidet. Flexbox bricht nach der HYPOTHETISCHEN Groesse um - fuer den
+ * Titel ist das seine Mindestbreite (die Basis unten). Passen sie, Abstand
+ * und Uhrzeit nebeneinander, bleibt die Uhrzeit in Zeile eins und der Titel
+ * waechst in den Rest; sonst rutscht die ganze Uhrzeit in die abgeschnittene
+ * zweite Zeile. Das gilt fuer jede Sprache und beide Zeitformate, weil die
+ * Breite der Uhrzeit gemessen und nicht geschaetzt wird. Die Zugewiesenen
+ * stehen AUSSERHALB dieser Zeile und brechen nie mit um.
+ *
+ * Die Zeile fuellt den Platz zwischen Icons und Zugewiesenen (Basis 0), damit
+ * ihre Breite nicht an der intrinsischen Groesse einer umbrechenden Zeile
+ * haengt. */
+.allday-event__label {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-1);
   flex: 1 1 0;
+  min-width: 0;
+  height: 1lh;
+  overflow: hidden;
+}
+
+/* Mindestbreite des Titels als Flex-BASIS: --space-8 (32px), bei --text-xs
+ * drei Zeichen plus Ellipse. Gemessen die groesste Stufe, bei der die
+ * Wochenansicht auf einem 1440er Schirm die Uhrzeit (24 h) auch an einem Chip
+ * mit zwei Zugewiesenen noch zeigt; --space-10 liess sie dort schon fallen.
+ * Basis statt min-width, weil `max-width: max-content` die hypothetische
+ * Groesse dann auf min(32px, eigene Breite) klemmt: ein kurzer Titel wie "Kur"
+ * blockiert keine Uhrzeit, die neben ihn passt, und laesst keine Luecke. Von
+ * der Basis aus waechst der Titel in den Rest; schrumpfen muss er nur, wenn
+ * die Zeile schmaler ist als die Basis - dann steht die Uhrzeit laengst in
+ * Zeile zwei, und der Titel kuerzt per Ellipse. */
+.allday-event__label > span:has(+ .allday-event__time) {
+  flex: 1 1 var(--space-8);
   max-width: max-content;
 }
 
-/* `font: inherit` hebt die kleinere Schrift von <small> auf, das Normalgewicht
- * setzt die Uhrzeit vom Titel ab, ohne die Tinte aufzuhellen. */
+/* Schrumpft nie und kuerzt nie: ganz oder gar nicht. `font: inherit` hebt die
+ * kleinere Schrift von <small> auf, das Normalgewicht setzt die Uhrzeit vom
+ * Titel ab, ohne die Tinte aufzuhellen. */
 .allday-event__time {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: none;
   font: inherit;
   font-weight: var(--font-weight-regular);
   font-variant-numeric: tabular-nums;
