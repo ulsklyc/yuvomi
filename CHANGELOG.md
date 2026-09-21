@@ -41,6 +41,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Two first starts on the same new database no longer knock each other out.** A fresh installation
+  that is started twice at once - a container restarted while it is still coming up, two replicas on
+  one volume - has both processes decide which migrations are pending before either of them has
+  written anything, and both then apply the same one. The straggler died on it, with `UNIQUE
+  constraint failed: schema_migrations.version` or, where the migration's DDL is not idempotent,
+  `table ... already exists`. A migration that is already recorded is now the one case the runner
+  takes as done and carries on from: the other process wrote that row in the same transaction as the
+  change itself, so the change is there. Nothing else is taken as done. The decision is made on what
+  stands in the database after the failed attempt has rolled back, never on the wording of the
+  error - a syntax error, a table that is missing, a constraint that comes out of the migration's own
+  SQL and a mistake in a JavaScript hook all still stop the start, exactly as before. Being locked
+  out is not success either: a start that loses the write lock still fails with its SQLite error
+  instead of recording a migration it never ran. (#1331)
+
 - **The language Yuvomi starts in now follows your browser's whole language tag.** A browser reports
   something like `zh-TW` or `de-AT`, and Yuvomi read only the part in front of the hyphen. For the
   24 languages it ships that is the right answer every time, but it means a language written in two
