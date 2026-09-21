@@ -373,6 +373,15 @@
   cursor: pointer;
 }
 
+/* DAS BILD DER LESEANSICHT IST KEIN KNOPF (#1348). Die Leseansicht bei
+ * `calendar: read` zeigt es in derselben Fassung wie der Editor, aber als
+ * `span` - hochladen und entfernen sind Handlungen. Der Zeigefinger von oben
+ * verspraeche genau die; die Modifikator-Bauart ist die von
+ * `.note-card__pin--static` (notes.css). */
+.birthday-avatar-editor--static {
+  cursor: default;
+}
+
 .birthday-preview__image {
   width: 100%;
   height: 100%;

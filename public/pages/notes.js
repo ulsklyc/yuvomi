@@ -505,6 +505,11 @@ function renderGrid() {
  * FAB (`document.querySelector('.page-fab')?.click()`), und `.click()` erreicht
  * auch ein Element mit `display: none`. Die CSS-Regel aus #467 haette ihn also
  * nicht aufgehalten.
+ *
+ * MIT IHM GEHEN BESCHREIBUNG UND HINWEIS (#1348). Beide schicken zum +-Knopf
+ * („Neue Notiz über den + Button erstellen", „Tippe auf + für eine neue
+ * Notiz") - bei `read` gibt es ihn nicht. Der Titel bleibt als Auskunft ueber
+ * den Zustand (Regel fuer alle Pakete aus #1265).
  */
 function notesEmptyStateHtml(isFiltered) {
   const q = state.filterQuery.trim().toLowerCase();
@@ -519,12 +524,13 @@ function notesEmptyStateHtml(isFiltered) {
           : t('notes.noResultsCreatorDescription', { name: state.filterCreator }),
     });
   }
+  const ro = readOnly();
   return emptyStateHTML({
     icon: 'file-text',
     title: t('notes.emptyTitle'),
-    description: t('notes.emptyDescription'),
-    hint: t('emptyHint.notes'),
-    action: readOnly() ? null : { label: t('notes.emptyAction'), icon: 'plus', attrs: { id: 'empty-cta-notes' } },
+    description: ro ? '' : t('notes.emptyDescription'),
+    hint: ro ? '' : t('emptyHint.notes'),
+    action: ro ? null : { label: t('notes.emptyAction'), icon: 'plus', attrs: { id: 'empty-cta-notes' } },
   });
 }
 

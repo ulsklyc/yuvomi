@@ -73,6 +73,9 @@ const REMINDER_OFFSETS = () => [
   { value: 'custom', label: t('reminders.offsetCustom') },
 ];
 
+// Die Leseansicht (#1348) nennt die Erinnerung ueber `reminderReadText()` und
+// uebernimmt dabei die Vorgaben dieser Liste, nicht aber den Rueckfall auf
+// '1440' fuer einen Geburtstag ohne gespeicherten Wert - Begruendung dort.
 function renderBirthdayReminderSection(birthday = null) {
   const currentOffset = birthday?.reminder_offset ?? '1440';
   const customAmount = birthday?.reminder_custom_amount || 1;
@@ -270,10 +273,30 @@ export function birthdayItemHtml(birthday) {
   // Bei `calendar: read` faellt BEIDES weg: die zwei Reveal-Flaechen unter der
   // Zeile und die zwei Knoepfe daran. Sie tragen dieselben zwei Handlungen -
   // bearbeiten und loeschen -, und keine davon ist ein Zustand, der ohne sie
-  // unlesbar wuerde: Name, Datum, Alter, Countdown, Namenstag und Notiz stehen
-  // in der Zeile selbst. Eine Reveal-Flaeche ohne Geste waere ausserdem eine
+  // unlesbar wuerde. Eine Reveal-Flaeche ohne Geste waere ausserdem eine
   // Ankuendigung fuer eine Bedienung, die es nicht gibt.
+  //
+  // DIE ZEILE TRAEGT IHRE AUSKUNFT NICHT GANZ (#1348). Die Notiz blendet
+  // birthdays.css unter 560px Traegerbreite aus, mit Namenstag schon unter
+  // 840px - „wer die Notiz sucht, oeffnet den Eintrag". Mit Schreibrecht ist
+  // das der Editor (Wisch nach vorn, Stift). Bei `read` wird deshalb die
+  // Textspalte selbst zum Knopf, und er oeffnet die Leseansicht
+  // (`openBirthdayReadModal`) - ohne ihn waere die Notiz auf dem Telefon
+  // unerreichbar, obwohl Lesen genau das ist, was `read` erlaubt. Gebaut wie
+  // die Kontaktzeile (`.contact-item__open`): `.list-row__main--interactive`
+  // bringt Knopf-Reset und Zielgroesse mit. Deshalb ist die Metazeile ein
+  // `span` - in einem `button` steht nur Phrasing-Inhalt.
   const ro = readOnly();
+  const hauptspalte = `
+        <strong class="list-row__name birthday-item__name">
+          ${esc(birthday.name)}${isToday ? CAKE_SVG : ''}
+        </strong>
+        <span class="list-row__meta birthday-item__meta${hasNameDay ? ' birthday-item__meta--with-name-day' : ''}">
+          <span class="birthday-chip birthday-chip--${chip.mod}">${esc(chip.label)}</span>
+          <span class="birthday-item__when">${esc(ageMeta(birthday))}</span>
+          ${nameDayMeta}
+          ${birthday.notes ? `<span class="birthday-item__notes">${esc(birthday.notes)}</span>` : ''}
+        </span>`;
   return `
     <div class="swipe-row" data-swipe-id="${birthday.id}">
       ${ro ? '' : `
@@ -287,17 +310,9 @@ export function birthdayItemHtml(birthday) {
       </div>`}
     <article class="list-row birthday-item ${isToday ? 'birthday-item--today' : ''}" data-id="${birthday.id}">
       <div class="birthday-item__media">${photoAvatar(birthday)}</div>
-      <div class="list-row__main">
-        <strong class="list-row__name birthday-item__name">
-          ${esc(birthday.name)}${isToday ? CAKE_SVG : ''}
-        </strong>
-        <div class="list-row__meta birthday-item__meta${hasNameDay ? ' birthday-item__meta--with-name-day' : ''}">
-          <span class="birthday-chip birthday-chip--${chip.mod}">${esc(chip.label)}</span>
-          <span class="birthday-item__when">${esc(ageMeta(birthday))}</span>
-          ${nameDayMeta}
-          ${birthday.notes ? `<span class="birthday-item__notes">${esc(birthday.notes)}</span>` : ''}
-        </div>
-      </div>
+      ${ro
+        ? `<button type="button" class="list-row__main list-row__main--interactive" data-open="${birthday.id}">${hauptspalte}</button>`
+        : `<div class="list-row__main">${hauptspalte}</div>`}
       ${ro ? '' : `
       <div class="row-actions birthday-item__actions">
         <button class="row-action" type="button" data-action="edit" data-id="${birthday.id}" aria-label="${t('common.edit')}">
@@ -322,12 +337,17 @@ function emptyStateHtml() {
       title: t('search.noResults'),
     });
   }
+  // Bei `calendar: read` gehen mit dem CTA auch Beschreibung und Hinweis
+  // (#1348): „Füge einen Geburtstag hinzu" und „Trage Geburtstage ein" laden
+  // zu einer Handlung ein, die es hier nicht gibt. Der Titel bleibt als
+  // Auskunft ueber den Zustand (Regel fuer alle Pakete aus #1265).
+  const ro = readOnly();
   return sharedEmptyStateHTML({
     icon: 'cake',
     title: t('birthdays.emptyTitle'),
-    description: t('birthdays.emptyDescription'),
-    hint: t('emptyHint.birthdays'),
-    action: readOnly() ? null : { label: t('birthdays.addButton'), attrs: { id: 'birthdays-empty-cta' } },
+    description: ro ? '' : t('birthdays.emptyDescription'),
+    hint: ro ? '' : t('emptyHint.birthdays'),
+    action: ro ? null : { label: t('birthdays.addButton'), attrs: { id: 'birthdays-empty-cta' } },
   });
 }
 
@@ -504,23 +524,40 @@ function bindEvents() {
     },
   });
 
-  _container.querySelector('#birthdays-list').addEventListener('click', async (e) => {
-    const action = e.target.closest('[data-action]');
-    if (!action) return;
-    // Beide `data-action` dieser Liste schreiben; eine Positivliste haette
-    // nichts aufzunehmen. Das Markup nimmt die Affordanz, das hier die Wirkung.
-    if (readOnly()) return;
-    const id = Number(action.dataset.id);
-    const birthday = state.birthdays.find((item) => item.id === id);
-    if (!birthday) return;
-    if (action.dataset.action === 'edit') {
-      openBirthdayModal({ mode: 'edit', birthday });
-      return;
-    }
-    if (action.dataset.action === 'delete') {
-      deleteBirthday(id);
-    }
-  });
+  _container.querySelector('#birthdays-list').addEventListener('click', onListClick);
+}
+
+/**
+ * Der delegierte Klick der Liste - benannt, damit sich messen laesst, wohin
+ * ein Tipp bei `read` fuehrt (der Handler haengt sonst am Seitencontainer).
+ *
+ * `data-open` ist der EINE lesende Weg und steht deshalb VOR dem Riegel: er
+ * fuehrt durch `openBirthdayModal`, und das oeffnet bei `read` die
+ * Leseansicht statt des Editors. Die Textspalte traegt ihn nur bei `read`
+ * (birthdayItemHtml); mit Schreibrecht bleiben Wisch und Stift der Weg.
+ */
+async function onListClick(e) {
+  const open = e.target.closest('[data-open]');
+  if (open) {
+    const birthday = state.birthdays.find((item) => item.id === Number(open.dataset.open));
+    if (birthday) openBirthdayModal({ mode: 'edit', birthday });
+    return;
+  }
+  const action = e.target.closest('[data-action]');
+  if (!action) return;
+  // Beide `data-action` dieser Liste schreiben; eine Positivliste haette
+  // nichts aufzunehmen. Das Markup nimmt die Affordanz, das hier die Wirkung.
+  if (readOnly()) return;
+  const id = Number(action.dataset.id);
+  const birthday = state.birthdays.find((item) => item.id === id);
+  if (!birthday) return;
+  if (action.dataset.action === 'edit') {
+    openBirthdayModal({ mode: 'edit', birthday });
+    return;
+  }
+  if (action.dataset.action === 'delete') {
+    deleteBirthday(id);
+  }
 }
 
 function birthdayPreviewHtml(name, photoData) {
@@ -528,8 +565,128 @@ function birthdayPreviewHtml(name, photoData) {
   return `<span class="birthday-preview__fallback">${esc(initials(name))}</span>`;
 }
 
+// --------------------------------------------------------
+// Leseansicht bei `calendar: read` (#1348)
+// --------------------------------------------------------
+
+// Die Einheiten des Editors („Benutzerdefiniert") als Intl-Einheiten. Ein
+// unbekannter Wert zaehlt als Minuten - so rechnet `getOffsetMinutes()` in
+// server/services/birthdays.js, und so zeigt ihn der Editor (die erste Option).
+const REMINDER_UNIT_TO_INTL = {
+  minutes: 'minute', hours: 'hour', days: 'day', weeks: 'week',
+};
+
+/**
+ * Die Erinnerung, so wie die Leseansicht sie nennt - oder '' fuer „keine Zeile".
+ *
+ * Eine VORGABE heisst wie im Editor („1 Tag vorher", „Keine"). Eine eigene
+ * Angabe steht als Dauer da („3 Tage"): der Editor zeigt sie als zwei Felder,
+ * Anzahl und Einheit, und `Intl.NumberFormat` setzt die Pluralform, die ein
+ * zusammengeklebtes „3" + „Tage" in keiner Sprache sicher traefe.
+ *
+ * KEIN GESPEICHERTER WERT HEISST KEINE ZEILE. Der Editor zeigt fuer `null` „1
+ * Tag vorher" (`?? '1440'` in renderBirthdayReminderSection), der Server
+ * erinnert dann aber am Tag selbst (`getOffsetMinutes()` rechnet `null` als 0) -
+ * so steht es bei jedem Geburtstag, der aus den Kontakten uebernommen wurde.
+ * Die Leseansicht wiederholt diese Behauptung nicht; sie schweigt, wo der
+ * Editor raet. Deshalb sucht sie ohne den Rueckfall des Editors: `null` trifft
+ * keine Vorgabe, und ein Wert, den keine Vorgabe kennt, ebenso wenig.
+ */
+function reminderReadText(birthday) {
+  const offset = birthday.reminder_offset;
+  if (offset === 'custom') {
+    const amount = Number.parseInt(birthday.reminder_custom_amount, 10) || 1;
+    const unit = REMINDER_UNIT_TO_INTL[birthday.reminder_custom_unit || 'days'] || 'minute';
+    return new Intl.NumberFormat(getLocale(), { style: 'unit', unit, unitDisplay: 'long' }).format(amount);
+  }
+  return REMINDER_OFFSETS().find((o) => o.value === offset)?.label ?? '';
+}
+
+/**
+ * Der Namenstag als Tag und Monat („12. Mai") - so steht er im Editor, als
+ * Monat und Tag, ohne Jahr. Das Jahr 2000 ist ein Schaltjahr, der 29.02.
+ * bleibt also ein gueltiger Tag.
+ */
+function nameDayReadText(nameDay) {
+  const [month, day] = String(nameDay || '').split('-').map(Number);
+  if (!month || !day) return '';
+  return new Intl.DateTimeFormat(getLocale(), { day: 'numeric', month: 'long', timeZone: 'UTC' })
+    .format(new Date(Date.UTC(2000, month - 1, day)));
+}
+
+/**
+ * Eine Zeile der Leseansicht. Das Markup ist das von `detailRowEl()` aus
+ * components/detail-view.js - Icon, Beschriftung, Wert -, als Zeichenkette,
+ * weil der geteilte Dialog seinen Inhalt als Markup bekommt. Die Gestalt kommt
+ * damit aus detail-view.css (in der Shell geladen), nicht aus einer eigenen
+ * Regel. Wie dort: eine Zeile ohne Wert faellt weg.
+ */
+function readRowHtml({ icon, label, value, multiline = false }) {
+  if (!value) return '';
+  return `
+          <div class="detail-row${multiline ? ' detail-row--multiline' : ''}">
+            <i class="detail-row__icon" data-lucide="${icon}" aria-hidden="true"></i>
+            <div class="detail-row__text">
+              <span class="detail-row__label">${esc(label)}</span>
+              <span class="detail-row__value">${esc(value)}</span>
+            </div>
+          </div>`;
+}
+
+/**
+ * Was der Editor zeigt, ohne ein einziges Bedienelement: Bild, Geburtsdatum,
+ * Namenstag, Notiz und Erinnerung. Der Name steht im Titel des Dialogs, wie
+ * der Titel des Zettels in notes.js. Die zwei Hinweissaetze des Editors
+ * (Kalender, Namenstag) erklaeren das Ausfuellen und bleiben weg.
+ */
+function birthdayReadHtml(birthday) {
+  return `
+    <div class="birthday-modal birthday-modal--read" data-view="read" data-birthday-id="${birthday.id}">
+      <div class="birthday-modal__identity">
+        <div class="birthday-modal__photo-wrap" aria-hidden="true">
+          <span class="birthday-avatar-editor birthday-avatar-editor--static">
+            ${birthdayPreviewHtml(birthday.name, birthday.photo_data || null)}
+          </span>
+        </div>
+        <div class="birthday-modal__fields detail-view">
+          <div class="detail-view__rows">
+            ${readRowHtml({ icon: 'cake', label: t('birthdays.birthDateLabel'), value: birthday.birth_date ? formatDate(birthday.birth_date) : '' })}
+            ${readRowHtml({ icon: 'calendar-heart', label: t('birthdays.nameDay'), value: nameDayReadText(birthday.name_day) })}
+            ${readRowHtml({ icon: 'align-left', label: t('birthdays.notesLabel'), value: birthday.notes || '', multiline: true })}
+            ${readRowHtml({ icon: 'bell', label: t('reminders.offsetLabel'), value: reminderReadText(birthday) })}
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+/**
+ * Der Geburtstag bei `calendar: read`: Leseansicht, sonst nichts.
+ *
+ * DIESELBE BAUART WIE DER ZETTEL (`openNoteReadModal` in notes.js, #1311): ein
+ * eigener Dialog statt des Editors mit abgeschalteten Teilen, denn jedes Stueck
+ * des Editors schreibt - das Bild laedt hoch und loescht, die Felder speichern,
+ * die Fusszeile loescht. Ein `disabled`-Formular waere das Versprechen mit
+ * Grauschleier. Kein Fusszeilen-Knopf: es gibt nichts zu tun, das X schliesst.
+ */
+function openBirthdayReadModal(birthday) {
+  openSharedModal({
+    title: birthday.name,
+    size: 'md',
+    content: birthdayReadHtml(birthday),
+    onSave(panel) {
+      window.lucide?.createIcons({ el: panel });
+    },
+  });
+}
+
 function openBirthdayModal({ mode, birthday = null }) {
-  if (readOnly()) return;
+  // Der Riegel steht VOR jeder Vorbereitung: der Anlegeweg entfaellt ganz, ein
+  // bestehender Geburtstag geht als Leseansicht auf (Muster aus notes.js).
+  if (readOnly()) {
+    if (mode === 'edit' && birthday) openBirthdayReadModal(birthday);
+    return;
+  }
   const isEdit = mode === 'edit';
   let photoData = birthday?.photo_data || null;
   const today = todayKey();
@@ -870,4 +1027,7 @@ export async function render(container) {
 export const __test = {
   birthdayItemHtml, emptyStateHtml, importActionHtml, wireBirthdaySwipe,
   readOnly, state,
+  // Der Weg zur Leseansicht (#1348): wohin ein Tipp fuehrt und welcher Dialog
+  // aufgeht, sieht nur, wer `openModal` die Optionen abnimmt.
+  onListClick, openBirthdayModal,
 };

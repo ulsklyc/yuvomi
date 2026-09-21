@@ -68,6 +68,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   page in Yuvomi sends this request today, so only API clients notice the change, and anybody with
   both rights notices no difference. (#1351)
 
+- **With read-only access to Birthdays, tapping a birthday opens it again, so its note can be read
+  on a phone.** Since 2.68.0 a member who may only read the Calendar - the module birthdays belong
+  to - no longer gets the edit form, and rightly so. But nothing took its place, and on a phone the
+  list leaves the note out for lack of room: the form had been the only way to it. Tapping a
+  birthday now opens a reading view with everything the form shows - picture, date of birth, name
+  day, note and reminder - and not a single control. The one exception is a birthday taken over
+  from Contacts without a reminder of its own: the form claims "1 day before" there, while the
+  reminder actually comes on the day itself, so the reading view says nothing rather than repeat the
+  claim. (#1348)
+
+- **After a contact import, "Go to Birthdays" is only offered where you can use it.** When imported
+  contacts carried a birthday, the result offered to take them over into Birthdays - also to
+  members who may only read the Calendar, where the page opened and the import did not, or who may
+  not see it at all, where the app sent them back to the start page. The offer now appears only
+  with permission to edit the Calendar and while Birthdays is switched on for the household; the
+  count of contacts with a birthday stays in the message either way. (#1348)
+
+- **Empty Notes, Contacts and Birthdays pages no longer point read-only members to a + button they
+  do not have.** The button itself was already gone for them, but the text underneath still said
+  "Add new contacts with the + button" and the like. With read-only access the empty page now only
+  says that there is nothing here yet. (#1348)
+
 - **Controls and hints that are meant to be hidden now really disappear.** Yuvomi hides an element
   by setting `hidden` on it, and the browser honours that only until a stylesheet gives the element
   a layout of its own: any `display` rule wins over it. Several places were caught this way and

@@ -21,6 +21,7 @@ import { emptyStateHTML } from '/utils/empty-state.js';
 import '/components/category-manager.js';
 import { findPageFab } from '/utils/fab.js';
 import { isNavModuleReadOnly } from '/permissions.js';
+import { mayWritePath } from '/utils/module-access.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -487,6 +488,12 @@ function filterContacts() {
  * `contacts: read` stehen - das ist ein Filter, kein Schreibweg. Der
  * Anlegen-CTA geht: er klickt den FAB, und `.click()` erreicht auch ein
  * Element, das CSS auf `display: none` gesetzt hat.
+ *
+ * MIT IHM GEHEN BESCHREIBUNG UND HINWEIS (#1348). Beide laden zum Anlegen ein
+ * („Neue Kontakte über den + Button hinzufügen", „Lege wichtige Kontakte an")
+ * - bei `read` gibt es den Knopf nicht, und der Satz schickte die Person zu
+ * einer Handlung, die ihr fehlt. Der Titel bleibt: „Noch keine Kontakte" ist
+ * die Auskunft ueber den Zustand (Regel fuer alle Pakete aus #1265).
  */
 function contactsEmptyStateHtml(filtered) {
   if (filtered) {
@@ -502,12 +509,13 @@ function contactsEmptyStateHtml(filtered) {
       },
     });
   }
+  const ro = readOnly();
   return emptyStateHTML({
     icon: 'users',
     title: t('contacts.emptyTitle'),
-    description: t('contacts.emptyDescription'),
-    hint: t('emptyHint.contacts'),
-    action: readOnly() ? null : {
+    description: ro ? '' : t('contacts.emptyDescription'),
+    hint: ro ? '' : t('emptyHint.contacts'),
+    action: ro ? null : {
       label: t('contacts.emptyAction'),
       icon: 'plus',
       attrs: { 'data-action': 'empty-cta' },
@@ -1552,8 +1560,37 @@ function openImportSelectionModal(named, skipped) {
   });
 }
 
-/** Springt ins Geburtstagsmodul und öffnet dort direkt das Kandidaten-Modal. */
+/**
+ * Darf der Import-Toast in den Geburtstags-Import springen? (#1348)
+ *
+ * DER SPRUNG FUEHRT IN EIN FREMDES MODUL. `/birthdays` gehoert `calendar`
+ * (server/permissions.js), und am Ziel wartet ein Dialog, der
+ * `POST /birthdays/import` schreibt. Dass diese Seite `contacts: write` hat,
+ * sagt darueber nichts - `readOnly()` oben fragt das eigene Modul und saehe
+ * das Ziel nie. Gefragt wird deshalb mit dem Pfad, den die Handlung schreibt
+ * (Regel 1 in utils/module-access.js).
+ *
+ * Ohne die Frage bot der Toast zwei Sackgassen an: bei `calendar: read` ging
+ * die Seite auf und der Dialog nicht (birthdays.js verwirft das Flag bei
+ * `read`), bei `calendar: none` warf der Router auf `/`, und das Flag blieb in
+ * der sessionStorage liegen. Ein haushaltweit abgeschaltetes Modul ist dieselbe
+ * zweite Sackgasse - der Router leitet es genauso um -, deshalb steht diese
+ * Frage mit hier, in derselben Paarung wie in utils/kitchen-transfer.js.
+ */
+function mayOpenBirthdayImport() {
+  return !window.yuvomi?.isModuleDisabled?.('birthdays') && mayWritePath('/birthdays/import');
+}
+
+/**
+ * Springt ins Geburtstagsmodul und öffnet dort direkt das Kandidaten-Modal.
+ *
+ * Der Riegel steht VOR dem Flag, als zweite Linie hinter dem Toast, der die
+ * Aktion gar nicht erst anbietet: ein Toast lebt sechs Sekunden, und ein
+ * Rechtewechsel kommt ohne Reload an. Ein Flag, dessen Seite nie rendert,
+ * bliebe liegen und oeffnete den Dialog beim naechsten Besuch unaufgefordert.
+ */
 function openBirthdayImport() {
+  if (!mayOpenBirthdayImport()) return;
   try { sessionStorage.setItem('yuvomi:birthdays:autoImport', '1'); } catch { /* egal */ }
   window.yuvomi?.navigate('/birthdays');
 }
@@ -1589,6 +1626,17 @@ async function importParsedContacts(list) {
     catSortIndex(a.category) - catSortIndex(b.category) || byName(a, b)
   );
   renderList();
+  showImportResult({ imported, withBirthday, failedList, lastName, lastError });
+}
+
+/**
+ * Das Ergebnis eines vCard-Imports als EIN zusammengesetzter Toast.
+ *
+ * Eine eigene Funktion, weil ihr Aktions-Slot eine Rechtefrage traegt und
+ * `importParsedContacts()` sich nicht messen laesst - sie rendert in den
+ * Seitencontainer.
+ */
+function showImportResult({ imported, withBirthday, failedList, lastName, lastError }) {
   const failed = failedList.length;
 
   // Detail-Segmente im agreement-freien „phrase: n"-Muster (korrekt bei jeder Anzahl).
@@ -1597,10 +1645,14 @@ async function importParsedContacts(list) {
   if (failed > 0)       details.push(t('contacts.importDetailFailed',   { count: failed }));
 
   // Nur ein Aktions-Slot: Fehler-Recovery (Retry der Fehlgeschlagenen) hat Vorrang
-  // vor dem Geburtstags-Sprung.
+  // vor dem Geburtstags-Sprung. Der Sprung steht nur da, wo er ankommt - die
+  // Zahl der Geburtstage in der Meldung bleibt auch ohne ihn stehen, sie ist
+  // eine Auskunft ueber den Import.
   const action = failed > 0
     ? { label: t('contacts.importRetry'), onClick: () => importParsedContacts(failedList) }
-    : (withBirthday > 0 ? { label: t('contacts.importOpenBirthdays'), onClick: openBirthdayImport } : null);
+    : (withBirthday > 0 && mayOpenBirthdayImport()
+      ? { label: t('contacts.importOpenBirthdays'), onClick: openBirthdayImport }
+      : null);
 
   let message;
   let type;
@@ -1634,4 +1686,7 @@ async function importParsedContacts(list) {
 export const __test = {
   renderContactItem, contactsEmptyStateHtml, toolbarActionsHtml,
   openContactDetail, readOnly, state,
+  // Der Import-Toast und sein Sprung (#1348): die Aussage ist ein Aufruf von
+  // `showToast` und ein Flag in der sessionStorage, kein Markup.
+  showImportResult, openBirthdayImport,
 };

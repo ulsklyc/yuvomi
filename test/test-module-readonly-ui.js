@@ -1573,6 +1573,117 @@ test('Kontakt-Detailansicht mit `contacts: read`: kein Bearbeiten, kein Loeschen
 });
 
 // -------------------------------------------------------------------------
+// Der Import-Toast der Kontakte und sein Sprung in ein FREMDES Modul (#1348)
+//
+// Nach einem vCard-Import mit Geburtstagen bot der Toast „Zu Geburtstagen" an.
+// Das Ziel gehoert `calendar`, nicht `contacts`: bei `calendar: read` ging die
+// Seite auf und der Import-Dialog nicht, bei `calendar: none` warf der Router
+// auf `/`, und das Flag blieb in der sessionStorage liegen. Gemessen wird am
+// wirklichen Aufruf von `showToast` und am wirklichen Flag - die Zusage ist
+// das AUSBLEIBEN einer Handlung, und das sieht kein Textguard.
+// -------------------------------------------------------------------------
+
+/** Setzt Stellen an `window.yuvomi` fuer die Dauer von `fn` und raeumt sie wieder ab. */
+function mitYuvomi(felder, fn) {
+  const yuvomi = globalThis.window.yuvomi;
+  const vorher = Object.fromEntries(Object.keys(felder).map((k) => [k, yuvomi[k]]));
+  Object.assign(yuvomi, felder);
+  try { return fn(); } finally {
+    for (const [k, v] of Object.entries(vorher)) {
+      if (v === undefined) delete yuvomi[k];
+      else yuvomi[k] = v;
+    }
+  }
+}
+
+/** Die Argumente des EINEN Toasts, den `fn` zeigt. */
+function toastVon(fn) {
+  const toasts = [];
+  mitYuvomi({
+    showToast: (message, type, duration, action) => toasts.push({ message, type, duration, action }),
+  }, fn);
+  assert.equal(toasts.length, 1, 'genau ein Toast - sonst misst der Test den falschen');
+  return toasts[0];
+}
+
+const importErgebnis = (over = {}) => ({
+  imported: 2, withBirthday: 1, failedList: [], lastName: 'Oma Erna', lastError: null, ...over,
+});
+
+test('Import-Toast: „Zu Geburtstagen" nur, wenn das Ziel `calendar` beschreibbar ist', () => {
+  const bei = (calendar, over) => withAccess({ contacts: 'write', calendar }, () => (
+    toastVon(() => contacts.showImportResult(importErgebnis(over)))
+  ));
+
+  const schreibend = bei('write');
+  assert.equal(schreibend.action?.label, 'contacts.importOpenBirthdays',
+    'mit Schreibrecht auf den Kalender fuehrt der Toast in den Import');
+  assert.equal(schreibend.duration, 6000, 'ein Toast mit Aktion bleibt laenger stehen');
+
+  for (const calendar of ['read', 'none']) {
+    const toast = bei(calendar);
+    assert.equal(toast.action, null,
+      `calendar: ${calendar} - /birthdays gehoert dem Kalender, contacts: write sagt darueber nichts`);
+    assert.equal(toast.duration, 3000);
+    // Die Meldung selbst bleibt vollstaendig - die Zahl ist eine Auskunft ueber
+    // den Import, keine Handlung.
+    assert.match(toast.message, /contacts\.importDetailBirthday/);
+    assert.equal(toast.type, 'success');
+  }
+
+  // Der Wiederholen-Knopf fuer fehlgeschlagene Kontakte schreibt in `contacts`
+  // und bleibt deshalb, wie der Kalender auch steht.
+  const mitFehler = bei('none', { failedList: [{ name: 'X' }] });
+  assert.equal(mitFehler.action?.label, 'contacts.importRetry');
+});
+
+test('Import-Toast: ein abgeschaltetes Geburtstagsmodul ist dieselbe Sackgasse', () => {
+  // Der Router leitet ein haushaltweit abgeschaltetes Modul genauso auf `/`
+  // um wie ein gesperrtes - das Flag bliebe liegen wie bei `calendar: none`.
+  const toast = withAccess({ contacts: 'write', calendar: 'write' }, () => (
+    mitYuvomi({ isModuleDisabled: (modul) => modul === 'birthdays' }, () => (
+      toastVon(() => contacts.showImportResult(importErgebnis()))
+    ))
+  ));
+  assert.equal(toast.action, null);
+});
+
+test('Der Sprung selbst: ohne `calendar: write` kein Flag und keine Navigation', () => {
+  // Die zweite Linie hinter dem Toast: eine Aktion, die vor einem
+  // Rechtewechsel angeboten wurde, lebt sechs Sekunden weiter.
+  const flags = new Map();
+  const vorher = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage');
+  Object.defineProperty(globalThis, 'sessionStorage', {
+    configurable: true,
+    writable: true,
+    value: {
+      getItem: (k) => (flags.has(k) ? flags.get(k) : null),
+      setItem: (k, v) => { flags.set(k, String(v)); },
+      removeItem: (k) => { flags.delete(k); },
+    },
+  });
+  const wege = [];
+  try {
+    mitYuvomi({ navigate: (pfad) => wege.push(pfad) }, () => {
+      for (const calendar of ['none', 'read']) {
+        withAccess({ contacts: 'write', calendar }, () => contacts.openBirthdayImport());
+        assert.equal(flags.size, 0,
+          `calendar: ${calendar} - ein Flag, dessen Seite es nie liest, bliebe liegen und oeffnete den Dialog beim naechsten Besuch`);
+        assert.deepEqual(wege, [], `calendar: ${calendar} - und keine Fahrt in eine Umleitung`);
+      }
+      // Gegenfall: mit Schreibrecht setzt der Sprung sein Flag und faehrt los -
+      // sonst waeren die zwei Zeilen darueber auch bei einem toten Sprung gruen.
+      withAccess({ contacts: 'write', calendar: 'write' }, () => contacts.openBirthdayImport());
+      assert.equal(flags.get('yuvomi:birthdays:autoImport'), '1');
+      assert.deepEqual(wege, ['/birthdays']);
+    });
+  } finally {
+    if (vorher) Object.defineProperty(globalThis, 'sessionStorage', vorher);
+    else delete globalThis.sessionStorage;
+  }
+});
+
+// -------------------------------------------------------------------------
 // Geburtstage - die Seite, deren Modul `calendar` heisst
 // -------------------------------------------------------------------------
 
@@ -1740,6 +1851,160 @@ test('Leere Geburtstagsliste mit `calendar: read`: kein Anlegen-CTA', () => {
       assert.match(html, /birthdays\.emptyTitle/);
     });
   } finally { birthdays.state.query = vorher; }
+});
+
+// -------------------------------------------------------------------------
+// Die Notiz eines Geburtstags bei `calendar: read` (#1348)
+//
+// birthdays.css blendet `.birthday-item__notes` unter 560px Traegerbreite aus,
+// mit Namenstag schon unter 840px - „wer die Notiz sucht, oeffnet den
+// Eintrag". Seit #1311 oeffnete bei `read` aber nichts mehr: auf dem Telefon
+// war die Notiz unerreichbar. Die Bauart ist die des Zettels (#1311): der
+// Editor-Einstieg oeffnet bei `read` eine eigene Leseansicht mit allem, was
+// der Editor zeigt, und ohne ein einziges Bedienelement.
+// -------------------------------------------------------------------------
+
+/** Ein Klick in die Liste, wie `closest()` ihn sieht. */
+function klickAuf(treffer) {
+  return { target: { closest: (sel) => treffer[sel] ?? null } };
+}
+
+/** `state.birthdays` fuer die Dauer von `fn` belegen. */
+function mitGeburtstagen(liste, fn) {
+  const vorher = birthdays.state.birthdays;
+  birthdays.state.birthdays = liste;
+  try { return fn(); } finally { birthdays.state.birthdays = vorher; }
+}
+
+test('Geburtstagszeile mit `calendar: read`: die Textspalte ist der Weg zum Eintrag', () => {
+  withAccess({ calendar: 'write' }, () => {
+    const html = birthdays.birthdayItemHtml(geburtstag());
+    assert.doesNotMatch(html, /data-open=/, 'mit Schreibrecht bleiben Wisch und Stift der Weg in den Editor');
+    assert.match(html, /<div class="list-row__main">/);
+  });
+  withAccess({ calendar: 'read' }, () => {
+    const html = birthdays.birthdayItemHtml(geburtstag());
+    const knopf = /<button type="button" class="list-row__main list-row__main--interactive" data-open="9">([\s\S]*?)<\/button>/.exec(html);
+    assert.ok(knopf, 'ohne diesen Knopf oeffnet bei `read` gar nichts - und die Notiz ist auf dem Telefon ausgeblendet');
+    assert.match(knopf[1], /Oma Erna/, 'der Knopf traegt die Zeile selbst, nicht eine leere Flaeche');
+    assert.doesNotMatch(knopf[1], /<div/, 'in einem `button` steht nur Phrasing-Inhalt');
+  });
+});
+
+test('Ein Tipp bei `calendar: read` oeffnet die Leseansicht, und sie zeigt, was der Editor zeigt', () => {
+  const eintrag = geburtstag({ name_day: '05-12', reminder_offset: '2880' });
+  const offen = mitGeburtstagen([eintrag], () => withAccess({ calendar: 'read' }, () => (
+    modalOptionen(() => birthdays.onListClick(klickAuf({ '[data-open]': { dataset: { open: '9' } } })))
+  )));
+  assert.ok(offen, 'der Tipp oeffnet einen Dialog - Lesen ist erlaubt');
+  assert.equal(offen.title, 'Oma Erna');
+  assert.match(offen.content, /data-view="read"/);
+
+  // Was der Editor zeigt: Bild, Geburtsdatum, Namenstag, Notiz, Erinnerung.
+  assert.match(offen.content, /Mag Kuchen/, 'die Notiz - der Anlass dieses Tickets');
+  assert.match(offen.content, /birthdays\.notesLabel/);
+  assert.match(offen.content, /birthdays\.birthDateLabel/);
+  assert.match(offen.content, /1950/, 'das Geburtsdatum mit seinem Jahr, nicht der naechste Termin');
+  assert.match(offen.content, /birthdays\.nameDay</);
+  assert.match(offen.content, /12\. Mai/, 'der Namenstag als Tag und Monat, wie im Editor - ohne Jahr');
+  assert.match(offen.content, /reminders\.offset2days/, 'die Erinnerung heisst wie im Editor');
+  assert.match(offen.content, /birthday-avatar-editor--static/);
+  assert.match(offen.content, /OE/, 'das Bild in der Fassung des Editors, hier die Initialen');
+
+  // Und kein einziges Bedienelement: jedes Stueck des Editors schreibt.
+  assert.doesNotMatch(offen.content, /<(input|textarea|select|button)\b/);
+  assert.doesNotMatch(offen.content, /yuvomi-datepicker|bd-save|bd-delete|bd-photo/);
+});
+
+test('Leseansicht: eine eigene Erinnerung steht als Dauer da, eine fehlende gar nicht', () => {
+  const inhalt = (over) => withAccess({ calendar: 'read' }, () => (
+    modalOptionen(() => birthdays.openBirthdayModal({ mode: 'edit', birthday: geburtstag(over) }))
+  )).content;
+
+  const eigen = inhalt({ reminder_offset: 'custom', reminder_custom_amount: 3, reminder_custom_unit: 'weeks' });
+  assert.match(eigen, /reminders\.offsetLabel/);
+  assert.match(eigen, /3 Wochen/, 'Anzahl und Einheit des Editors, mit der Pluralform aus Intl');
+  assert.doesNotMatch(eigen, /reminders\.offsetCustom/,
+    '„Benutzerdefiniert…" ist ein Auswahl-Label, keine Auskunft');
+
+  assert.match(inhalt({ reminder_offset: '' }), /reminders\.offsetNone/,
+    '„Keine" ist ein Zustand, den der Editor zeigt');
+
+  // Aus den Kontakten uebernommene Geburtstage tragen `null`: der Editor zeigt
+  // dann „1 Tag vorher", der Server erinnert am Tag selbst. Die Leseansicht
+  // wiederholt keine der beiden Behauptungen.
+  const ohne = inhalt({ reminder_offset: null });
+  assert.doesNotMatch(ohne, /reminders\.offsetLabel/);
+  assert.doesNotMatch(ohne, /reminders\.offset1day/);
+  assert.match(ohne, /Mag Kuchen/, 'der Rest steht trotzdem da');
+
+  // Die Notiz ist Nutzertext und geht durch esc().
+  const roh = inhalt({ notes: '<img src=x onerror=alert(1)>' });
+  assert.doesNotMatch(roh, /<img src=x/);
+  assert.match(roh, /&lt;img src=x/);
+});
+
+test('Geburtstags-Dialog: Editor mit Schreibrecht, bei `read` kein Anlegen und kein Editor', () => {
+  // Gegenfall: mit Schreibrecht steht der ganze Editor da - sonst waeren die
+  // Zusicherungen oben auch gruen, wenn der Abgreifer gar nichts saehe.
+  const schreibend = withAccess({ calendar: 'write' }, () => (
+    modalOptionen(() => birthdays.openBirthdayModal({ mode: 'edit', birthday: geburtstag() }))
+  ));
+  assert.match(schreibend.content, /id="bd-save"/);
+  assert.match(schreibend.content, /id="bd-notes"/);
+  assert.doesNotMatch(schreibend.content, /data-view="read"/);
+
+  const angelegt = withAccess({ calendar: 'read' }, () => (
+    modalOptionen(() => birthdays.openBirthdayModal({ mode: 'create' }))
+  ));
+  assert.equal(angelegt, null, 'ein Dialog zum Anlegen ginge bei `read` nur ins 403');
+
+  // Ein Stift aus einem aelteren Render findet weiter den Riegel.
+  const alt = mitGeburtstagen([geburtstag()], () => withAccess({ calendar: 'read' }, () => (
+    modalOptionen(() => birthdays.onListClick(klickAuf({ '[data-action]': { dataset: { action: 'edit', id: '9' } } })))
+  )));
+  assert.equal(alt, null);
+});
+
+// -------------------------------------------------------------------------
+// Leertexte bei `read` (#1348): die drei Seiten aus P1
+//
+// Der CTA war seit #1311 weg, der Satz, der zu ihm einlud, nicht: „Neue
+// Kontakte über den + Button hinzufügen" unter einer Liste ohne +-Knopf.
+// Beschreibung und Hinweis laden auf allen drei Seiten zum Anlegen ein, also
+// gehen beide; der Titel nennt den Zustand und bleibt.
+// -------------------------------------------------------------------------
+
+test('Leerzustaende bei `read`: kein Satz, der zu einem fehlenden Knopf schickt', () => {
+  const vorherNotes = { ...notes.state };
+  const vorherQuery = birthdays.state.query;
+  Object.assign(notes.state, { notes: [], filterQuery: '', filterCreator: '', filterCategoryIds: [] });
+  birthdays.state.query = '';
+  const seiten = [
+    ['contacts', 'calendar', () => contacts.contactsEmptyStateHtml(false), 'contacts'],
+    ['notes', 'calendar', () => notes.notesEmptyStateHtml(false), 'notes'],
+    ['calendar', 'contacts', () => birthdays.emptyStateHtml(), 'birthdays'],
+  ];
+  try {
+    for (const [modul, anderes, leer, ns] of seiten) {
+      const beschreibung = new RegExp(`${ns}\\.emptyDescription`);
+      const hinweis = new RegExp(`emptyHint\\.${ns}`);
+      withAccess({ [modul]: 'write', [anderes]: 'write' }, () => {
+        const html = leer();
+        assert.match(html, beschreibung, `${ns}: mit Schreibrecht steht die Einladung da`);
+        assert.match(html, hinweis);
+      });
+      withAccess({ [modul]: 'read', [anderes]: 'write' }, () => {
+        const html = leer();
+        assert.doesNotMatch(html, beschreibung, `${ns}: die Einladung zum +-Knopf geht mit dem Knopf`);
+        assert.doesNotMatch(html, hinweis, `${ns}: der Hinweis laedt ebenso zum Anlegen ein`);
+        assert.match(html, new RegExp(`${ns}\\.emptyTitle`), `${ns}: der Titel nennt den Zustand und bleibt`);
+      });
+    }
+  } finally {
+    Object.assign(notes.state, vorherNotes);
+    birthdays.state.query = vorherQuery;
+  }
 });
 
 
