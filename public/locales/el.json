@@ -3647,7 +3647,8 @@
             "recurring_created": "Δημιουργήθηκε επαναλαμβανόμενο έξοδο",
             "recurring_paused": "Το επαναλαμβανόμενο έξοδο τέθηκε σε παύση",
             "recurring_resumed": "Το επαναλαμβανόμενο έξοδο συνεχίστηκε",
-            "recurring_generated": "Δημιουργήθηκε επαναλαμβανόμενο έξοδο"
+            "recurring_generated": "Δημιουργήθηκε επαναλαμβανόμενο έξοδο",
+            "payment_reversed": "Η πληρωμή ακυρώθηκε"
         },
         "splitPercentage": "Ποσοστό",
         "splitExact": "Ακριβές ποσό",
@@ -3690,7 +3691,13 @@
         "proofDocumentName": "Αποδεικτικό πληρωμής {{group}}: {{name}}",
         "loadError": "Δεν ήταν δυνατή η φόρτωση των κοινών εξόδων.",
         "moreMembers": "+{{count}} ακόμη",
-        "moreMembers_one": "+{{count}} ακόμη"
+        "moreMembers_one": "+{{count}} ακόμη",
+        "paymentDetail": "{{payer}} προς {{payee}}: {{amount}}",
+        "paymentReversed": "Ακυρώθηκε",
+        "reversePayment": "Ακύρωση",
+        "reversePaymentLabel": "Ακύρωση πληρωμής από {{payer}} προς {{payee}} ύψους {{amount}}",
+        "reversePaymentConfirm": "Ακύρωση αυτής της πληρωμής;",
+        "reversePaymentConfirmDetail": "{{payer}} προς {{payee}}, {{amount}}. Μια αντίθετη εγγραφή ακυρώνει την πληρωμή και τα υπόλοιπα επιστρέφουν όπως ήταν. Η πληρωμή παραμένει στη δραστηριότητα, σημειωμένη ως ακυρωμένη."
     },
     "wmo": {
         "0": "Αίθριος καιρός",

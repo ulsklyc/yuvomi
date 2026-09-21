@@ -3647,7 +3647,8 @@
             "recurring_created": "Chi phí định kỳ được tạo",
             "recurring_paused": "Chi phí định kỳ bị tạm dừng",
             "recurring_resumed": "Chi phí định kỳ được tiếp tục",
-            "recurring_generated": "Chi phí định kỳ được phát sinh"
+            "recurring_generated": "Chi phí định kỳ được phát sinh",
+            "payment_reversed": "Đã hoàn tác thanh toán"
         },
         "splitPercentage": "Tỷ lệ phần trăm",
         "splitExact": "Số tiền chính xác",
@@ -3690,7 +3691,13 @@
         "proofDocumentName": "Bằng chứng thanh toán {{group}}: {{name}}",
         "loadError": "Không thể tải chi phí chung.",
         "moreMembers": "+{{count}} người nữa",
-        "moreMembers_one": "+{{count}} người nữa"
+        "moreMembers_one": "+{{count}} người nữa",
+        "paymentDetail": "{{payer}} cho {{payee}}: {{amount}}",
+        "paymentReversed": "Đã hoàn tác",
+        "reversePayment": "Hoàn tác",
+        "reversePaymentLabel": "Hoàn tác khoản thanh toán {{amount}} từ {{payer}} cho {{payee}}",
+        "reversePaymentConfirm": "Hoàn tác khoản thanh toán này?",
+        "reversePaymentConfirmDetail": "{{payer}} cho {{payee}}, {{amount}}. Một bút toán đảo sẽ hủy khoản thanh toán và số dư trở lại như trước. Khoản thanh toán vẫn nằm trong hoạt động, được đánh dấu đã hoàn tác."
     },
     "wmo": {
         "0": "Trời quang",

@@ -3647,7 +3647,8 @@
             "recurring_created": "تم إنشاء مصروف متكرر",
             "recurring_paused": "تم إيقاف المصروف المتكرر مؤقتًا",
             "recurring_resumed": "تم استئناف المصروف المتكرر",
-            "recurring_generated": "تم توليد مصروف متكرر"
+            "recurring_generated": "تم توليد مصروف متكرر",
+            "payment_reversed": "تم عكس الدفع"
         },
         "splitPercentage": "نسبة مئوية",
         "splitExact": "مبلغ محدد",
@@ -3690,7 +3691,13 @@
         "proofDocumentName": "إثبات الدفع {{group}}: {{name}}",
         "loadError": "تعذر تحميل المصاريف المشتركة.",
         "moreMembers": "+{{count}} آخرون",
-        "moreMembers_one": "+{{count}} آخر"
+        "moreMembers_one": "+{{count}} آخر",
+        "paymentDetail": "{{payer}} إلى {{payee}}: {{amount}}",
+        "paymentReversed": "معكوس",
+        "reversePayment": "عكس",
+        "reversePaymentLabel": "عكس الدفعة من {{payer}} إلى {{payee}} بمبلغ {{amount}}",
+        "reversePaymentConfirm": "عكس هذه الدفعة؟",
+        "reversePaymentConfirmDetail": "{{payer}} إلى {{payee}}، {{amount}}. قيد معاكس يلغي الدفعة وتعود الأرصدة كما كانت. تبقى الدفعة في النشاط مع علامة معكوسة."
     },
     "wmo": {
         "0": "سماء صافية",

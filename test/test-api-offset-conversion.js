@@ -590,6 +590,29 @@ test('Gesundheit: ein Zeitstempel mit `Z` oder Offset wird Wanduhrzeit des Haush
   assert.equal(taken.body.data.taken_at, '2026-09-16T08:20');
 });
 
+test('Gesundheit: "jetzt" als Einnahmezeit ist Wanduhrzeit des Haushalts, kein UTC-Instant', async () => {
+  // Ohne `taken_at` setzten /take und PATCH `new Date().toISOString()` ein -
+  // die einzige Stelle, an der die Spalte einen UTC-Instant mit `Z` bekam,
+  // waehrend jeder gesendete Wert Wanduhrzeit wird. Im CSV-Export stand dann
+  // die UTC-Uhrzeit, und der Tag kippte in Kiritimati (+14) auf den Vortag.
+  // 2026-09-16T11:30Z ist in Kiritimati der 17.09. um 01:30.
+  await inZone('Pacific/Kiritimati', async () => {
+    const med = await call('POST', '/health/medications', { name: 'Jetztprobe' });
+    const takeLog = await call('POST', `/health/medications/${med.body.data.id}/logs`, { scheduled_at: '2026-09-17T01:00' });
+    const patchLog = await call('POST', `/health/medications/${med.body.data.id}/logs`, { scheduled_at: '2026-09-17T01:00' });
+
+    await withFrozenClock('2026-09-16T11:30:00.000Z', async () => {
+      const taken = await call('POST', `/health/logs/${takeLog.body.data.id}/take`);
+      assert.equal(taken.status, 200, JSON.stringify(taken.body));
+      assert.equal(taken.body.data.taken_at, '2026-09-17T01:30', 'POST /take ohne Body');
+
+      const patched = await call('PATCH', `/health/logs/${patchLog.body.data.id}`, { status: 'taken' });
+      assert.equal(patched.status, 200, JSON.stringify(patched.body));
+      assert.equal(patched.body.data.taken_at, '2026-09-17T01:30', 'PATCH auf taken ohne Zeit');
+    });
+  });
+});
+
 // ── Haushaltshilfe ───────────────────────────────────────────────────────────
 
 test('last_completed mit Offset wird der UTC-Instant, den /complete schreibt', async () => {

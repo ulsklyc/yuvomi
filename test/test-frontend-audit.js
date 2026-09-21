@@ -375,7 +375,7 @@ test('dynamic frontend translation key domains exist in every locale', () => {
   // Handpflege dieser Liste reicht nicht — sie hatte member_removed jahrelang
   // nicht. Der Guard „split activity feed translates every type the backend
   // writes" leitet die Typen direkt aus dem Server-Code ab.
-  const splitActivityTypes = ['group_created', 'group_updated', 'group_archived', 'member_added', 'member_removed', 'guest_created', 'expense_created', 'expense_edited', 'expense_deleted', 'comment_added', 'payment_registered', 'recurring_created', 'recurring_paused', 'recurring_resumed', 'recurring_generated'];
+  const splitActivityTypes = ['group_created', 'group_updated', 'group_archived', 'member_added', 'member_removed', 'guest_created', 'expense_created', 'expense_edited', 'expense_deleted', 'comment_added', 'payment_registered', 'payment_reversed', 'recurring_created', 'recurring_paused', 'recurring_resumed', 'recurring_generated'];
 
   const keys = [
     ...familyRoles.map((role) => `settings.familyRole${role.replace(/(^|_)([a-z])/g, (_, __, c) => c.toUpperCase())}`),

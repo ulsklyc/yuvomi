@@ -3647,7 +3647,8 @@
             "recurring_created": "Wiederkehrende Ausgabe erstellt",
             "recurring_paused": "Wiederkehrende Ausgabe pausiert",
             "recurring_resumed": "Wiederkehrende Ausgabe fortgesetzt",
-            "recurring_generated": "Wiederkehrende Ausgabe erzeugt"
+            "recurring_generated": "Wiederkehrende Ausgabe erzeugt",
+            "payment_reversed": "Zahlung storniert"
         },
         "splitPercentage": "Prozent",
         "splitExact": "Exakter Betrag",
@@ -3690,7 +3691,13 @@
         "proofDocumentName": "Zahlungsnachweis {{group}}: {{name}}",
         "loadError": "Gemeinsame Ausgaben konnten nicht geladen werden.",
         "moreMembers": "+{{count}} weitere",
-        "moreMembers_one": "+{{count}} weitere"
+        "moreMembers_one": "+{{count}} weitere",
+        "paymentDetail": "{{payer}} an {{payee}}: {{amount}}",
+        "paymentReversed": "Storniert",
+        "reversePayment": "Stornieren",
+        "reversePaymentLabel": "Zahlung von {{payer}} an {{payee}} über {{amount}} stornieren",
+        "reversePaymentConfirm": "Diese Zahlung stornieren?",
+        "reversePaymentConfirmDetail": "{{payer}} an {{payee}}, {{amount}}. Eine Gegenbuchung hebt die Zahlung auf, die Salden stehen danach wie vorher. Die Zahlung bleibt als storniert im Verlauf."
     },
     "wmo": {
         "0": "Klarer Himmel",

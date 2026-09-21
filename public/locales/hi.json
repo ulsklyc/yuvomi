@@ -3647,7 +3647,8 @@
             "recurring_created": "दोहराया खर्च बनाया गया",
             "recurring_paused": "दोहराया खर्च रोका गया",
             "recurring_resumed": "दोहराया खर्च फिर शुरू हुआ",
-            "recurring_generated": "दोहराया खर्च बनाया गया"
+            "recurring_generated": "दोहराया खर्च बनाया गया",
+            "payment_reversed": "भुगतान रद्द किया गया"
         },
         "splitPercentage": "प्रतिशत",
         "splitExact": "सटीक राशि",
@@ -3690,7 +3691,13 @@
         "proofDocumentName": "भुगतान प्रमाण {{group}}: {{name}}",
         "loadError": "साझा खर्च लोड नहीं हो सके।",
         "moreMembers": "+{{count}} और",
-        "moreMembers_one": "+{{count}} और"
+        "moreMembers_one": "+{{count}} और",
+        "paymentDetail": "{{payer}} से {{payee}}: {{amount}}",
+        "paymentReversed": "रद्द",
+        "reversePayment": "रद्द करें",
+        "reversePaymentLabel": "{{payer}} से {{payee}} को {{amount}} का भुगतान रद्द करें",
+        "reversePaymentConfirm": "यह भुगतान रद्द करें?",
+        "reversePaymentConfirmDetail": "{{payer}} से {{payee}}, {{amount}}. एक उलटी प्रविष्टि भुगतान को रद्द करती है और शेष पहले जैसे हो जाते हैं. भुगतान गतिविधि में रद्द के रूप में बना रहता है."
     },
     "wmo": {
         "0": "साफ आकाश",

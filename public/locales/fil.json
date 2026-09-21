@@ -3647,7 +3647,8 @@
             "recurring_created": "Nagawa ang paulit-ulit na gastos",
             "recurring_paused": "Napahinto ang paulit-ulit na gastos",
             "recurring_resumed": "Naipagpatuloy ang paulit-ulit na gastos",
-            "recurring_generated": "Nabuo ang paulit-ulit na gastos"
+            "recurring_generated": "Nabuo ang paulit-ulit na gastos",
+            "payment_reversed": "Binawi ang bayad"
         },
         "splitPercentage": "Porsyento",
         "splitExact": "Eksaktong halaga",
@@ -3690,7 +3691,13 @@
         "proofDocumentName": "Patunay ng bayad {{group}}: {{name}}",
         "loadError": "Hindi ma-load ang mga hinating gastos.",
         "moreMembers": "+{{count}} pa",
-        "moreMembers_one": "+{{count}} pa"
+        "moreMembers_one": "+{{count}} pa",
+        "paymentDetail": "{{payer}} kay {{payee}}: {{amount}}",
+        "paymentReversed": "Binawi",
+        "reversePayment": "Bawiin",
+        "reversePaymentLabel": "Bawiin ang bayad ni {{payer}} kay {{payee}} na {{amount}}",
+        "reversePaymentConfirm": "Bawiin ang bayad na ito?",
+        "reversePaymentConfirmDetail": "{{payer}} kay {{payee}}, {{amount}}. Kinakansela ng kabaligtarang entry ang bayad at babalik ang mga balanse sa dati. Mananatili ang bayad sa aktibidad na may markang binawi."
     },
     "wmo": {
         "0": "Maaliwalas na langit",

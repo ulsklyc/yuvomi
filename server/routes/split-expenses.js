@@ -115,6 +115,39 @@ function normalizeLedgerRow(row) {
   };
 }
 
+/**
+ * Storno einer Zahlung (#1309): wann und von wem, oder null.
+ *
+ * Der Zustand steht NICHT in einer eigenen Spalte, sondern in der Gegenbuchung
+ * selbst - `settlement_reversal`-Zeilen im Ledger mit der Zahlung als
+ * `source_id`. Die Salden rechnen ausschliesslich aus dem Ledger; eine Spalte
+ * `settlements.reversed_at` waere eine zweite Wahrheit daneben, und faellt die
+ * Gegenbuchung weg (etwa per Cascade am `created_by`), sagte die Spalte
+ * „storniert", waehrend der Saldo die Zahlung wieder zaehlt. So verschwinden
+ * Zustand und Wirkung nur gemeinsam. `settlements.status` bleibt unberuehrt:
+ * sein zweiter Wert heisst 'deleted', und ein Storno ist keine Loeschung.
+ */
+function settlementReversal(database, settlementId) {
+  const row = database.prepare(`
+    SELECT created_at AS reversed_at, created_by AS reversed_by
+    FROM expense_ledger_entries
+    WHERE source_type = 'settlement_reversal' AND source_id = ?
+    ORDER BY id ASC
+    LIMIT 1
+  `).get(settlementId);
+  return row || null;
+}
+
+/**
+ * Wer einen Eintrag einer Gruppe aendern darf: Gruppenverwalter oder wer ihn
+ * angelegt hat. EINE Regel fuer Ausgabe aendern, Ausgabe loeschen und Zahlung
+ * stornieren (#1309) - `manages` laesst sich vorberechnen, wenn eine Liste
+ * dieselbe Gruppe viele Male fragt.
+ */
+function mayChangeGroupRecord(record, req, manages = canManageGroup(record.group_id, req)) {
+  return manages || record.created_by === userId(req);
+}
+
 function slugifyUsername(value) {
   return String(value || 'guest')
     .normalize('NFD')
@@ -832,7 +865,7 @@ router.put('/expenses/:id', (req, res) => {
   try {
     const existing = loadExpense(Number(req.params.id), req);
     if (!existing) return res.status(404).json({ error: 'Expense not found.', code: 404 });
-    if (!canManageGroup(existing.group_id, req) && existing.created_by !== userId(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!mayChangeGroupRecord(existing, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     const parsed = parseExpenseBody(req.body, existing.converted_currency);
     const payerId = Number(req.body.payer_id || existing.payer_id);
     const participants = Array.isArray(req.body.participants) ? req.body.participants : db.get().prepare('SELECT user_id FROM expense_splits WHERE expense_id = ?').all(existing.id).map((r) => r.user_id);
@@ -880,7 +913,7 @@ router.delete('/expenses/:id', (req, res) => {
   try {
     const existing = loadExpense(Number(req.params.id), req);
     if (!existing) return res.status(404).json({ error: 'Expense not found.', code: 404 });
-    if (!canManageGroup(existing.group_id, req) && existing.created_by !== userId(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!mayChangeGroupRecord(existing, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     db.transaction(() => {
       db.get().prepare("UPDATE expenses SET status = 'deleted', deleted_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?").run(existing.id);
       db.get().prepare('DELETE FROM expense_ledger_entries WHERE source_type = ? AND source_id = ?').run('expense', existing.id);
@@ -975,6 +1008,55 @@ router.post('/groups/:id/settlements', (req, res) => {
   }
 });
 
+/**
+ * Storno einer Zahlung (#1309). Kein Loeschen: die Zahlung bleibt mitsamt
+ * `settlement_entries` und `proof_document_id` stehen, und je gebuchte
+ * Ledger-Zeile entsteht ihr genaues Gegenstueck als `settlement_reversal`. Die
+ * Salden stellen sich dadurch von selbst zurueck, und der Verlauf zeigt beides.
+ *
+ * Ein Storno ist selbst keine Zahlung und hat keine eigene ID - ein Storno des
+ * Stornos gibt es deshalb nicht. Ein zweites Storno derselben Zahlung ist 409;
+ * Pruefung und Buchung stehen in EINER Transaktion ohne await dazwischen.
+ * Korrigieren heisst: stornieren und neu eintragen.
+ */
+router.post('/groups/:id/settlements/:settlementId/reverse', (req, res) => {
+  try {
+    const groupId = Number(req.params.id);
+    if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
+    const settlement = db.get().prepare('SELECT * FROM settlements WHERE id = ? AND group_id = ?').get(Number(req.params.settlementId), groupId);
+    if (!settlement) return res.status(404).json({ error: 'Settlement not found.', code: 404 });
+    if (!mayChangeGroupRecord(settlement, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    const outcome = db.transaction(() => {
+      if (settlementReversal(db.get(), settlement.id)) return 'already_reversed';
+      const booked = db.get().prepare(`
+        SELECT user_id, counterparty_id, amount_minor, currency
+        FROM expense_ledger_entries
+        WHERE source_type = 'settlement' AND source_id = ?
+        ORDER BY id ASC
+      `).all(settlement.id);
+      if (!booked.length) return 'nothing_booked';
+      const insert = db.get().prepare(`
+        INSERT INTO expense_ledger_entries (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
+        VALUES (?, 'settlement_reversal', ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const row of booked) {
+        insert.run(groupId, settlement.id, row.user_id, row.counterparty_id, -row.amount_minor, row.currency, 'Settlement reversal', userId(req));
+      }
+      activity(groupId, userId(req), 'payment_reversed', 'settlement', settlement.id, {
+        amount: minorToDecimal(settlement.amount_minor, settlement.currency),
+        currency: settlement.currency,
+      });
+      return 'reversed';
+    });
+    if (outcome === 'already_reversed') return res.status(409).json({ error: 'Settlement is already reversed.', code: 409 });
+    if (outcome === 'nothing_booked') return res.status(409).json({ error: 'Settlement has no ledger entries to reverse.', code: 409 });
+    res.json({ data: { ...decorateMoney(settlement), ...settlementReversal(db.get(), settlement.id) } });
+  } catch (err) {
+    log.error('POST /groups/:id/settlements/:settlementId/reverse error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
 router.get('/groups/:id/activity', (req, res) => {
   try {
     const groupId = Number(req.params.id);
@@ -989,12 +1071,55 @@ router.get('/groups/:id/activity', (req, res) => {
       ORDER BY a.created_at DESC
       LIMIT ? OFFSET ?
     `).all(groupId, limit, offset).map((row) => ({ ...row, metadata: row.metadata ? JSON.parse(row.metadata) : null }));
+    attachSettlementState(rows, groupId, req);
     res.json({ data: rows, pagination: { limit, offset, has_more: rows.length === limit } });
   } catch (err) {
     log.error('GET /groups/:id/activity error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
+
+/**
+ * Haengt an jede Aktivitaet, die eine Zahlung eintraegt, deren Stand (#1309):
+ * wer an wen, wie viel, ob storniert, und ob DIESER Nutzer stornieren darf.
+ * `can_reverse` kommt vom Server, damit die Oberflaeche die Rechteregel nicht
+ * nachbaut; das Modulrecht (`budget: read`) fragt sie selbst.
+ */
+function attachSettlementState(rows, groupId, req) {
+  const ids = [...new Set(rows
+    .filter((row) => row.type === 'payment_registered' && row.entity_type === 'settlement' && row.entity_id != null)
+    .map((row) => row.entity_id))];
+  if (!ids.length) return;
+  const settlements = db.get().prepare(`
+    SELECT s.id, s.group_id, s.payer_id, s.payee_id, s.amount_minor, s.currency, s.created_by,
+           payer.display_name AS payer_name, payee.display_name AS payee_name,
+           (SELECT MIN(r.created_at) FROM expense_ledger_entries r
+             WHERE r.source_type = 'settlement_reversal' AND r.source_id = s.id) AS reversed_at
+    FROM settlements s
+    LEFT JOIN users payer ON payer.id = s.payer_id
+    LEFT JOIN users payee ON payee.id = s.payee_id
+    WHERE s.group_id = ? AND s.id IN (${ids.map(() => '?').join(', ')})
+  `).all(groupId, ...ids);
+  const byId = new Map(settlements.map((s) => [s.id, s]));
+  const manages = canManageGroup(groupId, req);
+  for (const row of rows) {
+    if (row.type !== 'payment_registered' || row.entity_type !== 'settlement') continue;
+    const s = byId.get(row.entity_id);
+    if (!s) continue;
+    row.settlement = {
+      id: s.id,
+      payer_id: s.payer_id,
+      payer_name: s.payer_name,
+      payee_id: s.payee_id,
+      payee_name: s.payee_name,
+      amount_minor: s.amount_minor,
+      amount: minorToDecimal(s.amount_minor, s.currency),
+      currency: s.currency,
+      reversed_at: s.reversed_at ?? null,
+      can_reverse: !s.reversed_at && mayChangeGroupRecord(s, req, manages),
+    };
+  }
+}
 
 router.get('/groups/:id/recurring', (req, res) => {
   try {

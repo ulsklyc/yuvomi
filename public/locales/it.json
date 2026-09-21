@@ -3647,7 +3647,8 @@
             "recurring_created": "Spesa ricorrente creata",
             "recurring_paused": "Spesa ricorrente sospesa",
             "recurring_resumed": "Spesa ricorrente ripresa",
-            "recurring_generated": "Spesa ricorrente generata"
+            "recurring_generated": "Spesa ricorrente generata",
+            "payment_reversed": "Pagamento stornato"
         },
         "splitPercentage": "Percentuale",
         "splitExact": "Importo esatto",
@@ -3690,7 +3691,13 @@
         "proofDocumentName": "Prova di pagamento {{group}}: {{name}}",
         "loadError": "Impossibile caricare le spese condivise.",
         "moreMembers": "+{{count}} altri",
-        "moreMembers_one": "+{{count}} altro"
+        "moreMembers_one": "+{{count}} altro",
+        "paymentDetail": "{{payer}} a {{payee}}: {{amount}}",
+        "paymentReversed": "Stornato",
+        "reversePayment": "Storna",
+        "reversePaymentLabel": "Storna il pagamento di {{amount}} da {{payer}} a {{payee}}",
+        "reversePaymentConfirm": "Stornare questo pagamento?",
+        "reversePaymentConfirmDetail": "{{payer}} a {{payee}}, {{amount}}. Una scrittura di storno annulla il pagamento e i saldi tornano come prima. Il pagamento resta nell’attività, segnato come stornato."
     },
     "wmo": {
         "0": "Cielo sereno",

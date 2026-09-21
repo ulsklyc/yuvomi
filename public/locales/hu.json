@@ -3647,7 +3647,8 @@
             "recurring_created": "Ismétlődő költség létrehozva",
             "recurring_paused": "Ismétlődő költség szüneteltetve",
             "recurring_resumed": "Ismétlődő költség folytatva",
-            "recurring_generated": "Ismétlődő költség generálva"
+            "recurring_generated": "Ismétlődő költség generálva",
+            "payment_reversed": "Fizetés sztornózva"
         },
         "splitPercentage": "Százalék",
         "splitExact": "Pontos összeg",
@@ -3690,7 +3691,13 @@
         "proofDocumentName": "Fizetési igazolás {{group}}: {{name}}",
         "loadError": "A megosztott költségek betöltése sikertelen.",
         "moreMembers": "+{{count}} további",
-        "moreMembers_one": "+{{count}} további"
+        "moreMembers_one": "+{{count}} további",
+        "paymentDetail": "{{payer}} → {{payee}}: {{amount}}",
+        "paymentReversed": "Sztornózva",
+        "reversePayment": "Sztornózás",
+        "reversePaymentLabel": "{{payer}} {{payee}} részére teljesített {{amount}} összegű fizetésének sztornózása",
+        "reversePaymentConfirm": "Sztornózod ezt a fizetést?",
+        "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Egy ellentételes könyvelés érvényteleníti a fizetést, az egyenlegek visszaállnak. A fizetés sztornózottként a tevékenységben marad."
     },
     "wmo": {
         "0": "Tiszta égbolt",

@@ -139,7 +139,11 @@ const STUBS = {
     // Suiten, die pruefen wollen, OB und WANN ein Handler schliesst (das
     // Formular bleibt nach einem Abbrechen offen), setzen globalThis.__closeModal.
     export const closeModal = (...args) => { globalThis.__closeModal?.(...args); };
-    export const confirmModal = async () => true;
+    // Wer die Rueckfrage selbst sehen will (Titel, Optionen, Antwort), setzt
+    // globalThis.__confirmModal - dasselbe Muster wie __apiStub in /api.js.
+    export const confirmModal = async (...args) => (
+      typeof globalThis.__confirmModal === 'function' ? globalThis.__confirmModal(...args) : true
+    );
     export const confirmOverModal = async (...args) => globalThis.__confirmOverModal?.(...args) ?? true;
     // Wie das Original ohne offenes Modal: ask() oeffnet den Dialog (ueber
     // openModal, also __openModal) und liefert die Antwort. Wer sehen will,

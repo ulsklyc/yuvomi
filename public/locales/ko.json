@@ -3647,7 +3647,8 @@
             "recurring_created": "반복 지출 생성됨",
             "recurring_paused": "반복 지출 일시중지됨",
             "recurring_resumed": "반복 지출 재개됨",
-            "recurring_generated": "반복 지출 생성됨"
+            "recurring_generated": "반복 지출 생성됨",
+            "payment_reversed": "결제 취소됨"
         },
         "splitPercentage": "퍼센트",
         "splitExact": "정확한 금액",
@@ -3690,7 +3691,13 @@
         "proofDocumentName": "결제 증빙 {{group}}: {{name}}",
         "loadError": "공동 지출을 불러오지 못했습니다.",
         "moreMembers": "+{{count}}명 더",
-        "moreMembers_one": "+{{count}}명 더"
+        "moreMembers_one": "+{{count}}명 더",
+        "paymentDetail": "{{payer}} → {{payee}}: {{amount}}",
+        "paymentReversed": "취소됨",
+        "reversePayment": "취소",
+        "reversePaymentLabel": "{{payer}}님이 {{payee}}님에게 보낸 {{amount}} 결제 취소",
+        "reversePaymentConfirm": "이 결제를 취소할까요?",
+        "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. 반대 기입으로 결제가 상쇄되고 잔액은 이전으로 돌아갑니다. 결제는 취소됨으로 표시되어 활동에 남습니다."
     },
     "wmo": {
         "0": "맑음",

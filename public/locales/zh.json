@@ -3647,7 +3647,8 @@
             "recurring_created": "定期支出已创建",
             "recurring_paused": "定期支出已暂停",
             "recurring_resumed": "定期支出已恢复",
-            "recurring_generated": "定期支出已生成"
+            "recurring_generated": "定期支出已生成",
+            "payment_reversed": "付款已冲销"
         },
         "splitPercentage": "百分比",
         "splitExact": "固定金额",
@@ -3690,7 +3691,13 @@
         "proofDocumentName": "付款凭据 {{group}}：{{name}}",
         "loadError": "无法加载共享支出。",
         "moreMembers": "还有 {{count}} 位",
-        "moreMembers_one": "还有 {{count}} 位"
+        "moreMembers_one": "还有 {{count}} 位",
+        "paymentDetail": "{{payer}} 付给 {{payee}}：{{amount}}",
+        "paymentReversed": "已冲销",
+        "reversePayment": "冲销",
+        "reversePaymentLabel": "冲销 {{payer}} 付给 {{payee}} 的 {{amount}}",
+        "reversePaymentConfirm": "冲销这笔付款？",
+        "reversePaymentConfirmDetail": "{{payer}} 付给 {{payee}}，{{amount}}。一笔反向记账会抵消该付款，余额恢复到之前的状态。该付款仍保留在动态中，并标记为已冲销。"
     },
     "wmo": {
         "0": "晴天",

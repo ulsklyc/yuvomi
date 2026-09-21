@@ -3647,7 +3647,8 @@
             "recurring_created": "Повторяющийся расход создан",
             "recurring_paused": "Повторяющийся расход приостановлен",
             "recurring_resumed": "Повторяющийся расход возобновлен",
-            "recurring_generated": "Повторяющийся расход создан автоматически"
+            "recurring_generated": "Повторяющийся расход создан автоматически",
+            "payment_reversed": "Платеж сторнирован"
         },
         "splitPercentage": "Процент",
         "splitExact": "Точная сумма",
@@ -3690,7 +3691,13 @@
         "proofDocumentName": "Подтверждение оплаты {{group}}: {{name}}",
         "loadError": "Не удалось загрузить общие расходы.",
         "moreMembers": "+{{count}} ещё",
-        "moreMembers_one": "+{{count}} ещё"
+        "moreMembers_one": "+{{count}} ещё",
+        "paymentDetail": "{{payer}} → {{payee}}: {{amount}}",
+        "paymentReversed": "Сторнирован",
+        "reversePayment": "Сторнировать",
+        "reversePaymentLabel": "Сторнировать платеж {{payer}} для {{payee}} на {{amount}}",
+        "reversePaymentConfirm": "Сторнировать этот платеж?",
+        "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Обратная проводка отменяет платеж, и балансы возвращаются к прежним. Платеж остается в активности с пометкой «сторнирован»."
     },
     "wmo": {
         "0": "Ясное небо",

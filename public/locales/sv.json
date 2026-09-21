@@ -3647,7 +3647,8 @@
             "recurring_created": "Återkommande utgift skapad",
             "recurring_paused": "Återkommande utgift pausad",
             "recurring_resumed": "Återkommande utgift återupptagen",
-            "recurring_generated": "Återkommande utgift skapades"
+            "recurring_generated": "Återkommande utgift skapades",
+            "payment_reversed": "Betalning återförd"
         },
         "splitPercentage": "Procent",
         "splitExact": "Exakt belopp",
@@ -3690,7 +3691,13 @@
         "proofDocumentName": "Betalningsbevis {{group}}: {{name}}",
         "loadError": "Delade utgifter kunde inte laddas.",
         "moreMembers": "+{{count}} till",
-        "moreMembers_one": "+{{count}} till"
+        "moreMembers_one": "+{{count}} till",
+        "paymentDetail": "{{payer}} till {{payee}}: {{amount}}",
+        "paymentReversed": "Återförd",
+        "reversePayment": "Återför",
+        "reversePaymentLabel": "Återför betalningen från {{payer}} till {{payee}} på {{amount}}",
+        "reversePaymentConfirm": "Återföra den här betalningen?",
+        "reversePaymentConfirmDetail": "{{payer}} till {{payee}}, {{amount}}. En motbokning häver betalningen och saldona blir som förut. Betalningen finns kvar i aktiviteten, markerad som återförd."
     },
     "wmo": {
         "0": "Klart",

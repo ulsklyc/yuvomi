@@ -3647,7 +3647,8 @@
             "recurring_created": "Dépense récurrente créée",
             "recurring_paused": "Dépense récurrente suspendue",
             "recurring_resumed": "Dépense récurrente reprise",
-            "recurring_generated": "Dépense récurrente générée"
+            "recurring_generated": "Dépense récurrente générée",
+            "payment_reversed": "Paiement annulé"
         },
         "splitPercentage": "Pourcentage",
         "splitExact": "Montant exact",
@@ -3690,7 +3691,13 @@
         "proofDocumentName": "Preuve de paiement {{group}} : {{name}}",
         "loadError": "Impossible de charger les dépenses partagées.",
         "moreMembers": "+{{count}} autres",
-        "moreMembers_one": "+{{count}} autre"
+        "moreMembers_one": "+{{count}} autre",
+        "paymentDetail": "{{payer}} à {{payee}} : {{amount}}",
+        "paymentReversed": "Annulé",
+        "reversePayment": "Annuler le paiement",
+        "reversePaymentLabel": "Annuler le paiement de {{payer}} à {{payee}} de {{amount}}",
+        "reversePaymentConfirm": "Annuler ce paiement ?",
+        "reversePaymentConfirmDetail": "{{payer}} à {{payee}}, {{amount}}. Une contre-écriture annule le paiement et les soldes reviennent à leur état précédent. Le paiement reste dans l’activité, marqué comme annulé."
     },
     "wmo": {
         "0": "Ciel dégagé",
