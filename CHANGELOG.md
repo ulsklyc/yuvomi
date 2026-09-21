@@ -152,6 +152,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as long as your access to Health is "write" - the module right is now asked first, so a
   caregiving permission no longer offers a button the server would refuse. (#1265)
 
+- **The budget no longer offers buttons that a read-only member is not allowed to press.** Where
+  your access to Budget is "read", every tab except the reports still carried its writing controls,
+  and each of them ended in an error message: deleting or confirming an entry, opening an entry to
+  edit it, managing categories, adding or editing an account, editing or deleting a loan, booking
+  an instalment or correcting one, setting a category budget or the savings goal; on the
+  subscriptions tab adding, editing, renewing and deleting a subscription - by button and by swipe -
+  and managing its categories, payment methods, monthly budget and currency; on the shared-expenses
+  tab adding an expense or a group, editing, archiving, restoring or deleting a group, settling up
+  and inviting someone. The rule is the one Tasks, Notes, Contacts and Health already follow:
+  something that shows a state stays, something that only acts disappears. An expected entry keeps
+  its "expected" tag, a recurring entry and one with a receipt keep their marks, a savings goal that
+  is set stays as a card, a plan row keeps its target, what was spent and what is left, and a
+  subscription keeps its status, due date, cycle and amount - they just no longer open an editor.
+  What you can read stays complete: the monthly summary and chart, the account balances and each
+  account's statement, the loan cards and their report, the subscription analytics, a group's
+  balances, expenses and activity, the reports tab and the CSV exports. A tab with nothing in it yet
+  says so, instead of telling you to use a + button that is not there. Shared expenses are part of
+  Budget in the permission settings, so the same right decides there. (#1265)
+
 - **A nightly recurring appointment that crosses midnight no longer covers the entry it should be
   sharing its column with.** On a day that carries two occurrences of the same series - last
   night's tail and tonight's start - the second took the first one's place in the layout, so the

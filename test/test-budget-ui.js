@@ -894,7 +894,15 @@ test('ein unangetasteter Bestandsbetrag bleibt speicherbar', () => {
   const clean = withoutComments(budget);
   assert.match(clean, /original(?:Currency)?\s*[=:]/, 'rejectOffGridAmount kennt den Bestandswert nicht');
   // Jeder Aufruf an einem bearbeitbaren Eintrag reicht den gespeicherten Wert durch.
-  const calls = clean.match(/rejectOffGridAmount\([\s\S]*?\)\) return;/g) || [];
+  //
+  // DER AUSDRUCK MISST AUFRUFE, NICHT DIE DEFINITION. Frueher begann ein Treffer
+  // auch an `function rejectOffGridAmount(` und lief ueber Funktionsgrenzen bis
+  // zum naechsten `)) return;` - das war zufaellig ein Aufruf, dessen
+  // `original:` den Treffer gruen hielt. Seit #1265 P7 steht dazwischen ein
+  // `if (readOnly()) return;`, und der Treffer endete dort. `[^;]` haelt jeden
+  // Treffer in EINER Anweisung; gemessen findet er auf main wie hier dieselben
+  // fuenf Aufrufe, jeden einzeln statt einen davon im Bauch der Definition.
+  const calls = clean.match(/(?<!function )rejectOffGridAmount\([^;]*?\)\) return;/g) || [];
   assert.ok(calls.length >= 4, `erwartet 4 Prüfungen, gefunden ${calls.length}`);
   for (const call of calls) {
     assert.match(call, /original:/, `Prüfung ohne Bestandsschutz: ${call.replace(/\s+/g, ' ').slice(0, 90)}`);

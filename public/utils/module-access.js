@@ -82,11 +82,11 @@
  *    Seite, die sich selbst eine baut, verspricht einen Knopf, den der Server
  *    abweist.
  *
- * 6. NAMENSKOLLISION: `renderExpenses(readOnly)` in `split-expenses.js` meint
- *    „archivierte Gruppe", nicht das Modulrecht. Wer dort das Recht
- *    einfuehrt, benennt den Parameter um (etwa `archived`) oder odert die
- *    Modulfrage ausdruecklich hinein - zwei Bedeutungen unter einem Namen
- *    sind ein Rueckfall, der beim naechsten Umbau passiert.
+ * 6. NAMENSKOLLISION: `renderExpenses(readOnly)` in `split-expenses.js` meinte
+ *    „archivierte Gruppe", nicht das Modulrecht. Seit P7 heisst der Parameter
+ *    `asList`, und der Aufrufer odert Archiv und Modulrecht ausdruecklich
+ *    hinein. Dieselbe Regel fuer jede weitere Stelle: zwei Bedeutungen unter
+ *    einem Namen sind ein Rueckfall, der beim naechsten Umbau passiert.
  *
  * 7. KATEGORIE-VERWALTER (`components/category-manager.js`): der AUFRUFER
  *    versteckt den Ausloeser mit seinem `readOnly()`, die Komponente fragt

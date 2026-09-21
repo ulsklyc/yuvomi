@@ -11,8 +11,21 @@ import { vibrate } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
+import { isNavModuleReadOnly } from '/permissions.js';
 
 const view = { month: '', data: null, error: false, ctx: null, root: null };
+
+/**
+ * Darf dieser Nutzer Budgets setzen? (#1265 P7)
+ *
+ * Derselbe Modulname wie in budget.js - der Plan-Tab ist ein Teil davon, nur in
+ * eigener Datei. Jede Zeile dieses Tabs war ein Knopf, der den Bearbeiten-Dialog
+ * oeffnete, und jeder Weg darin schreibt (setzen, aendern, loeschen). Bei
+ * `budget: read` bleibt der Tab eine Auskunft: Soll, Ist und Auslastung.
+ */
+function readOnly() {
+  return isNavModuleReadOnly('budget');
+}
 
 export async function renderPlans(panel, ctx) {
   view.ctx = ctx;
@@ -85,9 +98,9 @@ function renderBody(body) {
     <div class="budget-plan__section">
       <div class="budget-plan__section-head">
         <h3 class="budget-plan__section-title">${t('budget.planCategoryBudgets')}</h3>
-        <button class="btn btn--secondary btn--sm" id="budget-plan-add">
+        ${readOnly() ? '' : `<button class="btn btn--secondary btn--sm" id="budget-plan-add">
           <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>${t('budget.planAddBudget')}
-        </button>
+        </button>`}
       </div>
       <div id="budget-plan-rows" class="row-carrier">${renderRows(d.plans)}</div>
     </div>
@@ -97,7 +110,12 @@ function renderBody(body) {
 }
 
 function renderSavingsCard(savings) {
+  // DIE ANTWORT FOLGT DEM DATENSATZ (#1253): ein gesetztes Sparziel ist Zustand
+  // und bleibt - als Karte, nicht als Knopf. Ein nicht gesetztes ist nur die
+  // Aufforderung, eines zu setzen, und die faellt bei `budget: read` weg.
+  const ro = readOnly();
   if (!savings) {
+    if (ro) return '';
     return `
       <button type="button" class="budget-plan-savings budget-plan-savings--empty" id="budget-plan-savings">
         <div class="budget-plan-savings__prompt">
@@ -128,8 +146,9 @@ function renderSavingsCard(savings) {
         ? t('budget.planSavingsNegative')
         : t('budget.planSavingsShort', { amount: fmt(Math.max(0, savings.remaining)) });
 
+  const Tag = ro ? 'div' : 'button';
   return `
-    <button type="button" class="budget-plan-savings budget-plan-savings--tone-${tone}" id="budget-plan-savings">
+    <${Tag} ${ro ? '' : 'type="button" '}class="budget-plan-savings budget-plan-savings--tone-${tone}${ro ? ' budget-plan-savings--static' : ''}"${ro ? '' : ' id="budget-plan-savings"'}>
       <div class="budget-plan-savings__ring">
         <svg viewBox="0 0 120 120" aria-hidden="true">
           <circle class="budget-plan-savings__ring-track" cx="60" cy="60" r="${R}" fill="none" stroke-width="10" />
@@ -147,20 +166,26 @@ function renderSavingsCard(savings) {
         </div>
         ${status ? `<div class="budget-plan-savings__status budget-plan-savings__status--${tone}">${status}</div>` : ''}
       </div>
-      <i data-lucide="pencil" class="budget-plan-savings__edit" aria-hidden="true"></i>
-      <span class="sr-only">${t('budget.planEditAction')}</span>
-    </button>`;
+      ${ro ? '' : `<i data-lucide="pencil" class="budget-plan-savings__edit" aria-hidden="true"></i>
+      <span class="sr-only">${t('budget.planEditAction')}</span>`}
+    </${Tag}>`;
 }
 
 function renderRows(plans) {
+  const ro = readOnly();
   if (!plans.length) {
+    // „Lege pro Kategorie ein Budget fest" ist eine Anleitung zu einem Weg,
+    // den es bei `budget: read` nicht gibt - der Titel allein ist die Auskunft.
     return emptyStateHTML({
       className: 'budget-plan__empty',
       icon: 'target',
       title: t('budget.planEmptyTitle'),
-      description: t('budget.planEmptyDesc'),
+      description: ro ? '' : t('budget.planEmptyDesc'),
     });
   }
+  // Die Zeile wird bei `budget: read` vom Knopf zum Kasten: Soll, Ist und Rest
+  // sind die Auskunft, das „Bearbeiten" dahinter ist der Schreibweg.
+  const Tag = ro ? 'div' : 'button';
   return plans.map((p) => {
     const tone = toneForRatio(p.ratio, p.over);
     const pct = Math.max(0, Math.min(100, Math.round(p.ratio * 100)));
@@ -172,7 +197,7 @@ function renderRows(plans) {
         ? t('budget.planOverBy', { amount: fmt(Math.abs(p.remaining)) })
         : t('budget.planLeft', { amount: fmt(Math.max(0, p.remaining)) });
     return `
-      <button type="button" class="budget-plan-row budget-plan-row--tone-${tone}" data-category="${view.ctx.esc(p.category)}">
+      <${Tag} ${ro ? '' : 'type="button" '}class="budget-plan-row budget-plan-row--tone-${tone}${ro ? ' budget-plan-row--static' : ''}" data-category="${view.ctx.esc(p.category)}">
         <div class="budget-plan-row__top">
           <span class="budget-plan-row__label">${view.ctx.esc(view.ctx.categoryLabel(p.category))}</span>
           <span class="budget-plan-row__amounts"><strong>${fmt(p.actual)}</strong> / ${fmt(p.planned)}</span>
@@ -181,12 +206,16 @@ function renderRows(plans) {
           <div class="budget-plan-row__fill" style="--plan-scale:${pct / 100}"></div>
         </div>
         ${foot ? `<div class="budget-plan-row__foot">${foot}</div>` : ''}
-        <span class="sr-only">${t('budget.planEditAction')}</span>
-      </button>`;
+        ${ro ? '' : `<span class="sr-only">${t('budget.planEditAction')}</span>`}
+      </${Tag}>`;
   }).join('');
 }
 
 function wire(body) {
+  // Alle drei Verdrahtungen hier schreiben - ein `return` nimmt nichts Lesendes
+  // mit. Das Markup oben traegt bei `read` ohnehin keinen Haken mehr; dies ist
+  // der Riegel fuer einen Knoten aus einem aelteren Render.
+  if (readOnly()) return;
   body.querySelector('#budget-plan-add')?.addEventListener('click', openAddPlan);
   body.querySelector('#budget-plan-savings')?.addEventListener('click', () =>
     openPlanEditor({ category: '__savings__', savings: true }));
@@ -196,6 +225,7 @@ function wire(body) {
 
 // Kategorie-Auswahl für einen neuen Plan (nur Kategorien ohne bestehenden Plan).
 function openAddPlan() {
+  if (readOnly()) return;
   const planned = new Set((view.data?.plans || []).map((p) => p.category));
   const options = (view.ctx.expenseCategories || []).filter((c) => !planned.has(c.key));
   if (!options.length) {
@@ -232,6 +262,7 @@ function openAddPlan() {
 
 // Bestehenden Plan bzw. Sparziel bearbeiten (mit Löschen).
 function openPlanEditor({ category, savings = false }) {
+  if (readOnly()) return;
   const current = savings
     ? view.data?.savings?.planned
     : view.data?.plans?.find((p) => p.category === category)?.planned;
@@ -284,6 +315,7 @@ function bindEnter(panel, fn) {
 }
 
 async function savePlan(panel, category, original = null) {
+  if (readOnly()) return;
   const raw = panel.querySelector('#plan-amount').value;
   const amount = parseFloat(raw);
   if (isNaN(amount) || amount <= 0) {
@@ -323,6 +355,7 @@ async function savePlan(panel, category, original = null) {
 // Damit folgt der Plan-Tab demselben Modell wie Einträge, Darlehen und Raten;
 // eine Vorab-Bestätigung bleibt nur, wo Löschen kaskadiert (Konten).
 async function deletePlan(category) {
+  if (readOnly()) return;
   const previous = category === '__savings__'
     ? view.data?.savings?.planned
     : view.data?.plans?.find((p) => p.category === category)?.planned;
@@ -348,3 +381,9 @@ async function deletePlan(category) {
     window.yuvomi?.showToast(t('budget.loadError'), 'danger');
   }
 }
+
+/**
+ * Messflaeche fuer die Nur-lesen-Regel (#1265 P7): die drei Renderer sind reine
+ * Funktionen ueber `view`, das der Test mit `ctx` fuellt.
+ */
+export const __test = { readOnly, renderSavingsCard, renderRows, view };

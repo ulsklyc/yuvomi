@@ -1332,6 +1332,14 @@
   cursor: pointer;
 }
 
+/* Bei `budget: read` oeffnet die Zeile nichts - der Bearbeiten-Dialog ist der
+ * Schreibweg (#1265 P7). Ein Zeiger verspraeche genau den. Eine eigene Regel
+ * NACH der obigen mit gleicher Spezifitaet, keine Gegenregel am Hover: den
+ * Zeilen-Hover traegt `.list-row` app-weit, auch fuer die maskierte Zeile. */
+.budget-entry--static {
+  cursor: default;
+}
+
 .budget-entry:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset-inset);
@@ -1726,7 +1734,12 @@ button.budget-entry__title {
   cursor: pointer;
   transition: box-shadow var(--transition-base), transform var(--transition-base);
 }
-.budget-plan-savings:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+/* Das gesetzte Sparziel bei `budget: read` (#1265 P7): eine Karte, die nur
+ * auskunft gibt. Die Hover-Quittung haengt deshalb per `:not()` am Knopf - eine
+ * Gegenregel am Zeichen verloere, sobald eine spaetere Regel mit gleicher
+ * Spezifitaet dazukommt (dieselbe Lehre wie `.note-card__pin--static`). */
+.budget-plan-savings--static { cursor: default; }
+.budget-plan-savings:not(.budget-plan-savings--static):hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
 .budget-plan-savings:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset);
@@ -1848,7 +1861,10 @@ button.budget-entry__title {
   cursor: pointer;
   transition: background-color var(--transition-base);
 }
-.budget-plan-row:hover { background-color: var(--color-surface-hover); }
+/* Bei `budget: read` ein Kasten statt eines Knopfs (#1265 P7): kein Zeiger,
+ * keine Hover-Flaeche - beides verspraeche den Bearbeiten-Dialog. */
+.budget-plan-row--static { cursor: default; }
+.budget-plan-row:not(.budget-plan-row--static):hover { background-color: var(--color-surface-hover); }
 .budget-plan-row:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset);
@@ -1882,7 +1898,10 @@ button.budget-entry__title {
   .budget-plan-savings__ring-fill,
   .budget-plan-row,
   .budget-plan-row__fill { transition: none; }
-  .budget-plan-savings:hover { transform: none; }
+  /* Derselbe Selektor wie die Hover-Regel oben, nicht `:hover` allein: der
+   * `:not()` hebt deren Spezifitaet, und eine schwaechere Ausnahme verloere
+   * trotz spaeterer Stelle - das Sparziel huepfte dann wieder. */
+  .budget-plan-savings:not(.budget-plan-savings--static):hover { transform: none; }
 }
 
 /* Zustaendige einer Buchung (#1057) - Avatare in der Metazeile, klickbar als
