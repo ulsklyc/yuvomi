@@ -9507,11 +9507,60 @@ const MIGRATIONS = [
 ];
 
 /**
- * Führt alle ausstehenden Migrations in einer Transaktion aus.
+ * Hat ein ANDERER Prozess genau diese Migration inzwischen verbucht? (#1331)
+ *
+ * Zwei Erststarts auf derselben frischen Datei bestimmen ihre Liste
+ * ausstehender Migrationen, bevor einer von beiden etwas geschrieben hat: jede
+ * Migration läuft in einer deferred begonnenen Transaktion, die ihre
+ * Schreibsperre erst beim ersten Schreiben nimmt - lange nach der
+ * Entscheidung. Der Nachzügler fährt dieselbe Migration deshalb ein zweites
+ * Mal und stirbt daran, je nachdem wie weit er kommt: an der Buchung
+ * (`UNIQUE constraint failed: schema_migrations.version`) oder schon am DDL
+ * (`table ... already exists`).
+ *
+ * Entschieden wird am ZUSTAND, nicht am Fehlertext: die Transaktion dieses
+ * Laufs ist zurückgerollt, die eigene Buchung also wieder weg. Steht die
+ * Version danach trotzdem da, hat ein anderer Prozess sie geschrieben - und
+ * zwar in derselben Transaktion wie ihre Wirkung, sonst stünde sie nicht da.
+ * Ein Syntaxfehler, eine kaputte Tabelle, ein Constraint aus dem Migrations-SQL
+ * selbst hinterlassen keine Buchung und bleiben damit Fehler.
+ *
+ * Der Meldungstext taugt dafür nicht, und der Fehlercode allein auch nicht:
+ * `table ... already exists` und ein Syntaxfehler tragen beide SQLITE_ERROR,
+ * und SQLITE_CONSTRAINT_PRIMARYKEY kommt genauso aus einer Migration, die
+ * ihre eigene Zeile doppelt schreibt (gemessen, test:migrate-tolerance).
  */
-function migrate() {
+function migrationAlreadyRecorded(database, migration, err) {
+  // Ohne SQLite-Code kommt der Fehler nicht vom Treiber: die
+  // Fremdschlüssel-Prüfung unten wirft selbst, ein Tippfehler in einem
+  // up()/afterUp()-Hook wirft einen ReferenceError. Beides sind
+  // Programmfehler und bleiben es.
+  if (typeof err?.code !== 'string' || !err.code.startsWith('SQLITE_')) return false;
+
+  // SQLITE_BUSY ist die andere Hälfte des Rennens und ein WARTEN, kein Erfolg:
+  // dieser Lauf kam an der Sperre gar nicht vorbei. Dass der andere Prozess in
+  // derselben Sekunde fertig wurde, macht das Warten nicht zum Lauf - und ein
+  // busy_timeout löst es auch nicht, denn SQLite antwortet auf die Schreibsperre
+  // nach einem fremden Commit sofort mit SQLITE_BUSY_SNAPSHOT.
+  if (err.code.startsWith('SQLITE_BUSY')) return false;
+
+  return Boolean(
+    database.prepare('SELECT version FROM schema_migrations WHERE version = ?').get(migration.version)
+  );
+}
+
+/**
+ * Führt alle ausstehenden Migrations in einer Transaktion aus.
+ *
+ * Beide Parameter tragen im Betrieb ihren Vorgabewert; sie stehen da, damit ein
+ * Test den Lauf gegen einen GESETZTEN Zustand fahren kann - eine eigene Datei
+ * und eine eigene Migrationsliste - statt gegen ein Rennen zu hoffen.
+ * @param {import('better-sqlite3-multiple-ciphers').Database} [database]
+ * @param {typeof MIGRATIONS} [migrations]
+ */
+function migrate(database = db, migrations = MIGRATIONS) {
   // Migrations-Versions-Tabelle sicherstellen (außerhalb der Haupt-Transaktion)
-  db.exec(`
+  database.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version     INTEGER PRIMARY KEY,
       description TEXT    NOT NULL,
@@ -9520,51 +9569,68 @@ function migrate() {
   `);
 
   const applied = new Set(
-    db.prepare('SELECT version FROM schema_migrations').all().map((r) => r.version)
+    database.prepare('SELECT version FROM schema_migrations').all().map((r) => r.version)
   );
 
-  const pending = MIGRATIONS.filter((m) => !applied.has(m.version));
+  const pending = migrations.filter((m) => !applied.has(m.version));
 
   if (pending.length === 0) return;
 
-  const runMigration = db.transaction((migration) => {
+  const runMigration = database.transaction((migration) => {
     if (typeof migration.up === 'function') {
-      migration.up(db);
+      migration.up(database);
     } else {
-      db.exec(migration.up);
+      database.exec(migration.up);
     }
     // Optionaler JS-Hook für Datenmigrationen, die nach dem Schema-DDL laufen.
     if (typeof migration.afterUp === 'function') {
-      migration.afterUp(db);
+      migration.afterUp(database);
     }
     if (migration.foreignKeysOff) {
-      const violations = db.pragma('foreign_key_check');
+      const violations = database.pragma('foreign_key_check');
       if (violations.length > 0) {
         throw new Error(
           `Migration ${migration.version} left ${violations.length} foreign key violation(s).`
         );
       }
     }
-    db.prepare('INSERT INTO schema_migrations (version, description) VALUES (?, ?)')
+    database.prepare('INSERT INTO schema_migrations (version, description) VALUES (?, ?)')
       .run(migration.version, migration.description);
     log.info(`Migration ${migration.version} applied: ${migration.description}`);
   });
 
+  /**
+   * Eine Migration fahren und genau den einen fremden Fall hinnehmen: sie ist
+   * schon verbucht, also hat ein anderer Prozess sie angewendet. Jeder andere
+   * Fehler fliegt weiter.
+   */
+  const applyPendingMigration = (migration) => {
+    try {
+      runMigration(migration);
+    } catch (err) {
+      if (!migrationAlreadyRecorded(database, migration, err)) throw err;
+      log.warn(
+        `Migration ${migration.version} war bereits verbucht, als dieser Lauf sie anwenden wollte: `
+        + `${migration.description} - ein anderer Prozess war schneller (#1331).`
+      );
+    }
+  };
+
   for (const migration of pending) {
     if (!migration.foreignKeysOff) {
-      runMigration(migration);
+      applyPendingMigration(migration);
       continue;
     }
 
-    db.pragma('foreign_keys = OFF');
-    if (db.pragma('foreign_keys', { simple: true }) !== 0) {
+    database.pragma('foreign_keys = OFF');
+    if (database.pragma('foreign_keys', { simple: true }) !== 0) {
       throw new Error(`Migration ${migration.version} could not disable foreign key enforcement.`);
     }
     try {
-      runMigration(migration);
+      applyPendingMigration(migration);
     } finally {
-      db.pragma('foreign_keys = ON');
-      if (db.pragma('foreign_keys', { simple: true }) !== 1) {
+      database.pragma('foreign_keys = ON');
+      if (database.pragma('foreign_keys', { simple: true }) !== 1) {
         throw new Error(`Migration ${migration.version} could not restore foreign key enforcement.`);
       }
     }
@@ -10040,4 +10106,4 @@ try {
   if (!(err?.code === EMPTY_DATABASE_FILE && globalThis[RESTORE_TARGET_HANDSHAKE] === true)) throw err;
 }
 
-export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, unknownMigrationVersions, MIGRATIONS, reconcileCriticalSchema, _setTestDatabase, _resetTestDatabase };
+export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, unknownMigrationVersions, MIGRATIONS, migrate, reconcileCriticalSchema, _setTestDatabase, _resetTestDatabase };

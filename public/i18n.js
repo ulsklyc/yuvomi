@@ -45,17 +45,68 @@ function applyDocumentLocale(locale) {
   document.documentElement.dir = RTL_LOCALES.has(locale) ? 'rtl' : 'ltr';
 }
 
-/** Resolve locale: manual override > navigator.language > English > default */
+// Regionen, die eine Schrift implizieren. Ein Browser meldet `zh-TW`, nie
+// `zh-Hant-TW`: ohne diese Zuordnung fände ein taiwanisches System eine
+// traditionelle Locale niemals von selbst, sie wäre nur über den manuellen
+// Wähler erreichbar. `CN` und `SG` stehen bewusst NICHT hier - unser `zh` ist
+// Vereinfacht, und genau darauf soll `zh-CN` fallen.
+const REGION_SCRIPT = { TW: 'Hant', HK: 'Hant', MO: 'Hant' };
+
+/**
+ * Kanonische BCP-47-Schreibweise: Sprache klein, Schrift (vier Zeichen)
+ * Titlecase, Region (zwei Zeichen) groß. Ein Browser darf `ZH-hant-tw` melden,
+ * verglichen wird aber gegen Locale-Codes in kanonischer Form - ein Vergleich
+ * über zwei Schreibweisen findet nie etwas.
+ */
+function canonicalTag(tag) {
+  return String(tag).split('-').map((teil, i) => {
+    if (i === 0) return teil.toLowerCase();
+    if (teil.length === 4) return teil[0].toUpperCase() + teil.slice(1).toLowerCase();
+    if (teil.length === 2) return teil.toUpperCase();
+    return teil.toLowerCase();
+  }).join('-');
+}
+
+/**
+ * Wählt aus Browser-Tags die SPEZIFISCHSTE unterstützte Locale: exakter Treffer,
+ * sonst die von der Region implizierte Schrift, sonst der Tag ohne seinen
+ * letzten Subtag - `zh-Hant-TW` > `zh-Hant` > `zh`.
+ *
+ * Reine Funktion mit der Liste als Argument, weil sie sonst nicht messbar wäre:
+ * der Bestand trägt 24 reine Sprachcodes, über die die alte und die neue
+ * Auflösung dasselbe liefern. Erst eine Liste, die es hier noch nicht gibt,
+ * beantwortet die Frage - `zh-TW` muss auf `zh-Hant` fallen, sobald diese Locale
+ * existiert (#1320), und auf `zh`, solange sie es nicht tut.
+ */
+export function pickLocale(tags, supported) {
+  for (const roh of tags || []) {
+    if (!roh) continue;
+    const teile = canonicalTag(roh).split('-');
+    // Eine Schrift, die im Tag STEHT, schlaegt jede, die eine Region nur nahelegt.
+    // `zh-Hans-HK` meint Vereinfacht in Hongkong, und macOS, iOS und Android melden
+    // genau das. Ohne diese Sperre antwortet die Regionszuordnung darauf mit
+    // Traditionell - also mit dem Gegenteil dessen, was ausdruecklich dasteht.
+    const traegtSchrift = teile.slice(1).some((teil) => teil.length === 4);
+    while (teile.length) {
+      const tag = teile.join('-');
+      if (supported.includes(tag)) return tag;
+      if (!traegtSchrift) {
+        const letzter = teile[teile.length - 1];
+        const schrift = Object.hasOwn(REGION_SCRIPT, letzter) ? REGION_SCRIPT[letzter] : null;
+        if (schrift && supported.includes(`${teile[0]}-${schrift}`)) return `${teile[0]}-${schrift}`;
+      }
+      teile.pop();
+    }
+  }
+  return 'en';
+}
+
+/** Resolve locale: manual override > navigator.languages > English */
 function resolveLocale() {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored && SUPPORTED_LOCALES.includes(stored)) return stored;
 
-  const browserLocales = navigator.languages || [navigator.language];
-  for (const tag of browserLocales) {
-    const base = tag.split('-')[0].toLowerCase();
-    if (SUPPORTED_LOCALES.includes(base)) return base;
-  }
-  return 'en';
+  return pickLocale(navigator.languages || [navigator.language], SUPPORTED_LOCALES);
 }
 
 /** Lade eine Locale-JSON-Datei */

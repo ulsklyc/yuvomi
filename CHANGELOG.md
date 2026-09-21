@@ -59,6 +59,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Two first starts on the same new database no longer knock each other out.** A fresh installation
+  that is started twice at once - a container restarted while it is still coming up, two replicas on
+  one volume - has both processes decide which migrations are pending before either of them has
+  written anything, and both then apply the same one. The straggler died on it, with `UNIQUE
+  constraint failed: schema_migrations.version` or, where the migration's DDL is not idempotent,
+  `table ... already exists`. A migration that is already recorded is now the one case the runner
+  takes as done and carries on from: the other process wrote that row in the same transaction as the
+  change itself, so the change is there. Nothing else is taken as done. The decision is made on what
+  stands in the database after the failed attempt has rolled back, never on the wording of the
+  error - a syntax error, a table that is missing, a constraint that comes out of the migration's own
+  SQL and a mistake in a JavaScript hook all still stop the start, exactly as before. Being locked
+  out is not success either: a start that loses the write lock still fails with its SQLite error
+  instead of recording a migration it never ran. (#1331)
+
+- **The language Yuvomi starts in now follows your browser's whole language tag.** A browser reports
+  something like `zh-TW` or `de-AT`, and Yuvomi read only the part in front of the hyphen. For the
+  24 languages it ships that is the right answer every time, but it means a language written in two
+  scripts could never be reached on its own: whoever sets their system to Taiwan would be given the
+  simplified Chinese we have and would have to find the other one in the language menu, if it
+  existed. Yuvomi now answers a tag with the most specific language it actually carries - the exact
+  tag first, then the script a region implies (Taiwan, Hong Kong and Macau write traditional
+  characters, mainland China and Singapore do not), and otherwise the plain language, which is what
+  every language in the app resolves to today, unchanged. The same read happens twice, because the
+  page sets its language once in the `<head>` before anything is rendered and once when the app
+  loads, and the early one had fallen behind: it knew 23 of the 24 languages, Filipino missing since
+  the day it arrived, so a Filipino system was told the page was English while the page came up in
+  Filipino. Both now know the same languages and resolve a tag the same way, and a test holds them
+  together rather than a comment asking the next change to remember. (#1324)
+- **Moving an appointment across a daylight-saving boundary no longer drags its reminder off the
+  lead time you set.** A reminder is a lead - an hour before, a day before - but when the
+  appointment moved, the reminder was carried along by the distance between the two dates on the
+  wall clock rather than by the real distance between the two moments. The two differ by exactly
+  the hour a summer-time change adds or takes away, so an appointment moved from March to July kept
+  "one hour before" in the dialog while the alert landed on the appointment's own start time, and
+  one moved the other way went off two hours early. Nothing looked broken, because "at the start
+  time" is a setting somebody could have chosen on purpose. All four ways an appointment's time
+  changes now run through the same calculation: moving a whole series, moving a single occurrence,
+  an occurrence taking its reminders over from its series, and the "this and all following" split.
+  All-day entries are included, where the reminder hangs on 09:00 local time. The hour the clocks
+  change is covered too, including the one that happens twice in autumn: a reminder moved into it
+  lands on the later of the two readings, the one after the change. The one hour a year that a
+  spring-forward skips has no honest answer, because that time of day never happens - an
+  appointment moved onto it counts as starting when the clocks reach the other side. Reminder
+  times already stored are left as they are. (#1300)
+
 - **Health no longer offers buttons that a read-only member is not allowed to press.** Where your
   access to the module is "read", the largest module in the app still carried every writing control
   across all of its tabs, and each of them ended in an error message once the form was filled in:

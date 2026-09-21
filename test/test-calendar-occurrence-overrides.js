@@ -35,6 +35,7 @@ import {
 import {
   expandRecurringEvents, MAX_EXPANSION_ITERATIONS,
 } from '../server/services/calendar-events.js';
+import { utcToWall } from '../server/utils/timezone.js';
 import {
   BODY_FREE_EVENT_COLUMNS, expandAndResolveEventRows, eventProjectionSql,
 } from '../server/services/calendar-event-reader.js';
@@ -1630,6 +1631,424 @@ test('an occurrence reminder lead survives the DST boundary its zone offset woul
     label: fixture.label,
     ...fixture.expected,
     seriesReminders: ['2026-10-01T06:00:00'],
+  })));
+});
+
+/**
+ * #1300: Wird ein Termin verschoben, nimmt seine Erinnerung den VORLAUF mit -
+ * nicht ihre Uhrzeit.
+ *
+ * Die drei Verschiebe-Stellen dieses Moduls (`shiftOwnedReminders()`,
+ * `copyReminderState()`, `copyResolvedReminderState()`) bildeten den Abstand
+ * zwischen altem und neuem Anker auf der WANDUHR-Achse und addierten ihn auf
+ * `reminders.remind_at` - eine Spalte, die einen ZEITPUNKT meint. Innerhalb
+ * derselben Zonenlage geht das auf, ueber eine DST-Grenze nicht: zwischen
+ * 2026-03-20T09:00 und 2026-07-20T09:00 Europe/Berlin liegen 122 Wanduhr-Tage,
+ * aber nur 121 Tage und 23 Stunden echte Zeit. Diese Stunde wanderte in die
+ * Erinnerung, und bei 60 Minuten Vorlauf landete sie exakt auf dem
+ * Terminbeginn. Weil "zum Startzeitpunkt" ein gueltiges Preset ist, sieht
+ * Vorlauf 0 gewollt aus und meldet sich nie.
+ *
+ * #1291/#1302 haben die schreibende und die lesende Seite auf die
+ * Zeitpunkt-Achse geholt (`reminderAnchorInstantMs()`/`remindAtInstantMs()`);
+ * die drei Verschiebe-Stellen wurden damals nicht mitgezogen.
+ *
+ * GEMESSEN WIRD DER WECKER, NICHT NUR DIE ZEILE. `2026-07-20T07:00:00` sagt
+ * niemandem etwas; erst in der Haushaltszone zurueckgerechnet steht dort
+ * 09:00 - der Terminbeginn. Jede Lage traegt deshalb beide Werte.
+ *
+ * Die dritte Lage jeder Tabelle ueberquert KEINE Grenze: sie haelt fest, dass
+ * eine gewoehnliche Verschiebung unveraendert bleibt.
+ */
+
+/** Die Erinnerungen eines Termins als gespeicherte Zeile UND als Ortszeit-Wecker. */
+function reminderWallTimes(database, eventId, zone) {
+  return database.prepare(`
+    SELECT remind_at FROM reminders
+    WHERE entity_type = 'event' AND entity_id = ?
+    ORDER BY remind_at, created_by
+  `).all(eventId).map((row) => ({
+    stored: row.remind_at,
+    // Die Spalte ist naiv-UTC: das angehaengte "Z" benennt die Zone, in der die
+    // Zeile wirklich steht - anders als in `wallTimeMs()`, wo es eine Notluege
+    // ist, damit sich zwei Wanduhrzeiten abziehen lassen.
+    local: utcToWall(`${row.remind_at}Z`, zone),
+  }));
+}
+
+test('a moved series keeps its reminder lead across a DST boundary', () => {
+  const fixtures = [
+    {
+      label: 'nach vorn ueber die Grenze: Maerz (UTC+1) -> Juli (UTC+2)',
+      start: '2026-03-20T09:00:00',
+      // 09:00 Europe/Berlin ist am 20.03. Winterzeit (UTC+1) = 08:00 UTC,
+      // 60 Minuten Vorlauf = 07:00 UTC.
+      reminder: '2026-03-20T07:00:00',
+      moved: '2026-07-20T09:00:00',
+      // 09:00 Ortszeit ist am 20.07. Sommerzeit (UTC+2) = 07:00 UTC, der
+      // Vorlauf also 06:00 UTC. Die Wanduhr-Rechnung addierte 122 volle Tage
+      // und kam auf 07:00 UTC - den Terminbeginn selbst, Vorlauf 0.
+      expected: [{ stored: '2026-07-20T06:00:00', local: { date: '2026-07-20', time: '08:00:00' } }],
+    },
+    {
+      label: 'zurueck ueber die Grenze: Juli (UTC+2) -> Maerz (UTC+1)',
+      start: '2026-07-20T09:00:00',
+      reminder: '2026-07-20T06:00:00',
+      moved: '2026-03-20T09:00:00',
+      // Gegenrichtung: die Wanduhr-Rechnung lieferte hier 06:00 UTC und damit
+      // 120 Minuten Vorlauf statt 60. Eine Grenze, die nur in EINE Richtung
+      // geprueft wird, laesst den halben Fehler stehen.
+      expected: [{ stored: '2026-03-20T07:00:00', local: { date: '2026-03-20', time: '08:00:00' } }],
+    },
+    {
+      label: 'ohne Grenze: derselbe Zonenversatz auf beiden Seiten',
+      start: '2026-07-20T09:00:00',
+      reminder: '2026-07-20T06:00:00',
+      moved: '2026-07-27T10:30:00',
+      // Nicht-Regression: ohne Grenzueberquerung sind Wanduhr- und
+      // Zeitpunkt-Abstand gleich, das Ergebnis darf sich nicht aendern.
+      expected: [{ stored: '2026-07-27T07:30:00', local: { date: '2026-07-27', time: '09:30:00' } }],
+    },
+    {
+      label: 'ganztaegig ueber die Grenze: reines Datum als Anker',
+      start: '2026-03-20',
+      reminder: '2026-03-20T07:00:00',
+      moved: '2026-07-20',
+      // Ein ganztaegiges Vorkommen hat keine Uhrzeit; `reminderAnchorInstantMs()`
+      // setzt es auf 09:00 Ortszeit - dieselbe Annahme, die der Dialog trifft.
+      // Der Anker wandert damit von 08:00 auf 07:00 UTC, der Vorlauf bleibt.
+      expected: [{ stored: '2026-07-20T06:00:00', local: { date: '2026-07-20', time: '08:00:00' } }],
+    },
+  ];
+  const observed = fixtures.map((fixture) => {
+    const database = createDatabase();
+    const seriesId = Number(insertSeries(database, {
+      title: 'Moved across the boundary',
+      start_datetime: fixture.start,
+      recurrence_rule: 'FREQ=MONTHLY',
+    }));
+    database.prepare(`
+      INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+      VALUES ('event', ?, ?, 1)
+    `).run(seriesId, fixture.reminder);
+    updateSeriesWithOverrides(database, {
+      seriesId,
+      actorId: 1,
+      changes: { start_datetime: fixture.moved },
+    });
+    return {
+      label: fixture.label,
+      start: database.prepare('SELECT start_datetime FROM calendar_events WHERE id = ?')
+        .get(seriesId).start_datetime,
+      reminders: reminderWallTimes(database, seriesId, 'Europe/Berlin'),
+    };
+  });
+  assert.deepEqual(observed, fixtures.map((fixture) => ({
+    label: fixture.label,
+    start: fixture.moved,
+    reminders: fixture.expected,
+  })));
+});
+
+/**
+ * Dieselbe Achse an `copyReminderState()`, ueber ihren echten Aufrufweg.
+ *
+ * Erreicht wird sie, wenn ein Vorkommen seine Erinnerungen NICHT besitzt und
+ * trotzdem eigene bekommt - hier ueber eine abweichende Zuweisung. Die
+ * Erinnerung der Serie wird dann auf den Anker des Vorkommens kopiert, und
+ * `fanOutEventReminders()` verteilt sie an die Zugewiesenen. Ein Aufruf des
+ * Helfers von aussen wuerde genau diese Verdrahtung nicht messen.
+ */
+test('an occurrence inheriting series reminders copies the lead, not the clock time', () => {
+  const fixtures = [
+    {
+      label: 'nach vorn ueber die Grenze',
+      start: '2026-03-20T09:00:00',
+      reminder: '2026-03-20T07:00:00',
+      recurrenceId: '2026-07-20',
+      stored: '2026-07-20T06:00:00',
+      local: { date: '2026-07-20', time: '08:00:00' },
+    },
+    {
+      label: 'zurueck ueber die Grenze',
+      start: '2026-07-20T09:00:00',
+      reminder: '2026-07-20T06:00:00',
+      recurrenceId: '2026-11-20',
+      stored: '2026-11-20T07:00:00',
+      local: { date: '2026-11-20', time: '08:00:00' },
+    },
+    {
+      label: 'ohne Grenze',
+      start: '2026-07-20T09:00:00',
+      reminder: '2026-07-20T06:00:00',
+      recurrenceId: '2026-08-20',
+      stored: '2026-08-20T06:00:00',
+      local: { date: '2026-08-20', time: '08:00:00' },
+    },
+  ];
+  const observed = fixtures.map((fixture) => {
+    const database = createDatabase();
+    const seriesId = Number(insertSeries(database, {
+      title: 'Inherited occurrence reminder',
+      start_datetime: fixture.start,
+      recurrence_rule: 'FREQ=MONTHLY',
+      assigned_to: 2,
+    }));
+    database.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, 2)')
+      .run(seriesId);
+    database.prepare(`
+      INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+      VALUES ('event', ?, ?, 1)
+    `).run(seriesId, fixture.reminder);
+
+    const child = upsertOccurrenceOverride(database, {
+      seriesId,
+      recurrenceId: fixture.recurrenceId,
+      actorId: 1,
+      assignments: [2, 3],
+    }).event;
+    return {
+      label: fixture.label,
+      reminders: reminderWallTimes(database, Number(child.id), 'Europe/Berlin'),
+      // Die Serie behaelt ihre eigene Zeile unveraendert.
+      seriesReminders: reminderWallTimes(database, seriesId, 'Europe/Berlin')
+        .map((row) => row.stored),
+    };
+  });
+  assert.deepEqual(observed, fixtures.map((fixture) => ({
+    label: fixture.label,
+    // Die kopierte Zeile der Erstellerin plus die zwei verteilten Kopien -
+    // alle drei auf demselben Zeitpunkt.
+    reminders: [
+      { stored: fixture.stored, local: fixture.local },
+      { stored: fixture.stored, local: fixture.local },
+      { stored: fixture.stored, local: fixture.local },
+    ],
+    seriesReminders: [fixture.reminder],
+  })));
+});
+
+/**
+ * Und dieselbe Achse an `copyResolvedReminderState()`, ueber den Schnitt
+ * "dieser und alle folgenden": die Erinnerungen der alten Serie ziehen auf die
+ * Nachfolgerin um, deren Anker der Schnitttag ist.
+ */
+test('a following split carries the reminder lead across a DST boundary', () => {
+  const fixtures = [
+    {
+      label: 'nach vorn ueber die Grenze',
+      start: '2026-03-20T09:00:00',
+      reminder: '2026-03-20T07:00:00',
+      splitAt: '2026-07-20',
+      stored: '2026-07-20T06:00:00',
+      local: { date: '2026-07-20', time: '08:00:00' },
+    },
+    {
+      label: 'zurueck ueber die Grenze',
+      start: '2026-07-20T09:00:00',
+      reminder: '2026-07-20T06:00:00',
+      splitAt: '2026-11-20',
+      stored: '2026-11-20T07:00:00',
+      local: { date: '2026-11-20', time: '08:00:00' },
+    },
+    {
+      label: 'ohne Grenze',
+      start: '2026-07-20T09:00:00',
+      reminder: '2026-07-20T06:00:00',
+      splitAt: '2026-08-20',
+      stored: '2026-08-20T06:00:00',
+      local: { date: '2026-08-20', time: '08:00:00' },
+    },
+  ];
+  const observed = fixtures.map((fixture) => {
+    const database = createDatabase();
+    const seriesId = Number(insertSeries(database, {
+      title: 'Split across the boundary',
+      start_datetime: fixture.start,
+      recurrence_rule: 'FREQ=MONTHLY',
+    }));
+    database.prepare(`
+      INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+      VALUES ('event', ?, ?, 1)
+    `).run(seriesId, fixture.reminder);
+
+    const successorId = Number(splitSeries(database, {
+      seriesId,
+      recurrenceId: fixture.splitAt,
+      actorId: 1,
+      changes: { title: 'Successor' },
+    }).series.id);
+    return {
+      label: fixture.label,
+      reminders: reminderWallTimes(database, successorId, 'Europe/Berlin'),
+      // Die abgeschnittene Serie behaelt ihre eigene Erinnerung.
+      seriesReminders: reminderWallTimes(database, seriesId, 'Europe/Berlin')
+        .map((row) => row.stored),
+    };
+  });
+  assert.deepEqual(observed, fixtures.map((fixture) => ({
+    label: fixture.label,
+    reminders: [{ stored: fixture.stored, local: fixture.local }],
+    seriesReminders: [fixture.reminder],
+  })));
+});
+
+/**
+ * #1300, zweite Runde: die Umrechnung selbst muss eindeutig sein.
+ *
+ * Die erste Fassung rechnete den Anker ueber `storedToInstantMs()` und damit
+ * ueber `localToUTC()` - die Ein-Durchgang-Fassung. Die liest die lokalen
+ * Ziffern als UTC, bestimmt den Zonen-Offset AN DIESEM falschen Punkt und
+ * wendet ihn einmal an. Rund um eine DST-Grenze bildet das ein ganzes
+ * Wanduhr-Band auf DENSELBEN Zeitpunkt ab; gemessen in Europe/Berlin
+ * (`localToUTC` -> `utcToWall`, Rundlauf):
+ *
+ *   2026-03-29T00:30 -> 2026-03-28T23:30:00Z -> zurueck 2026-03-29T00:30  ok
+ *   2026-03-29T01:30 -> 2026-03-28T23:30:00Z -> zurueck 2026-03-29T00:30  daneben
+ *   2026-03-29T02:30 -> 2026-03-29T00:30:00Z -> zurueck 2026-03-29T01:30  daneben
+ *   2026-10-25T01:30 -> 2026-10-25T00:30:00Z -> zurueck 2026-10-25T02:30  daneben
+ *
+ * 00:30 und 01:30 ergeben denselben Zeitpunkt. Betroffen ist nicht nur die
+ * Luecken- oder die doppelte Stunde, sondern jede Wanduhrzeit von 01:00 bis
+ * 01:59 am Umstelltag. Auf dieser Achse wurde die Differenz zweier Anker
+ * gebildet - eine Verschiebung von 00:30 auf 01:30 kam als NULL heraus, eine
+ * Verschiebung aus dem Februar in dieses Band um eine Stunde zu kurz. Der
+ * Anker laeuft deshalb seit dieser Runde ueber `storedToInstantMsPrecise()`
+ * und damit ueber die Zwei-Pass-Fixpunkt-Fassung `localToUTCPrecise()`.
+ *
+ * GEMESSEN WIRD DER VORLAUF, NICHT DIE UHRZEIT. Der erwartete Zeitpunkt des
+ * Terminbeginns steht als handabgeleitete UTC-Konstante in der Vorgabe, der
+ * Vorlauf faellt aus ihr und der beobachteten Zeile. Ein Vergleich gegen die
+ * Ortszeit taugt hier nicht: in der doppelten Stunde ist die Wanduhrzeit
+ * zweideutig, sie kann die Antwort also gar nicht ausdruecken.
+ *
+ * FUENF DER SECHS LAGEN WAREN ROT, DIE SECHSTE NICHT. Die doppelte Stunde
+ * (25.10. 02:30) rechneten beide Fassungen gleich; sie steht hier nicht als
+ * Regressionswaechter, sondern weil es dort ZWEI richtige Antworten gibt und
+ * eine Zusicherung, die offenliesse welche, nichts hielte. Welche es ist und
+ * warum, steht an der Lage selbst.
+ *
+ * Die 2026er Grenzen von Europe/Berlin: 2026-03-29T01:00:00Z springt die Uhr
+ * von 02:00 CET (+01:00) auf 03:00 CEST (+02:00), 2026-10-25T01:00:00Z faellt
+ * sie von 03:00 CEST auf 02:00 CET zurueck.
+ */
+test('a moved series keeps its reminder lead inside the hour the conversion could not tell apart', () => {
+  const fixtures = [
+    {
+      label: 'von ausserhalb ins Band: Februar -> 29.03. 01:30 (noch CET)',
+      // 09:00 am 20.02. ist CET (+01:00) = 08:00Z, 60 Minuten Vorlauf = 07:00Z.
+      start: '2026-02-20T09:00:00',
+      reminder: '2026-02-20T07:00:00',
+      // 01:30 am 29.03. liegt VOR dem Sprung um 01:00Z, ist also noch CET
+      // (+01:00) = 2026-03-29T00:30:00Z.
+      moved: '2026-03-29T01:30:00',
+      movedUtc: '2026-03-29T00:30:00Z',
+      // Die Ein-Durchgang-Fassung las den Zielanker als 2026-03-28T23:30:00Z,
+      // eine Stunde zu frueh; der Vorlauf wuchs damit auf 120 Minuten. Diese
+      // Lage ist zugleich ein Regressionswaechter: vor #1300 rechnete die
+      // Stelle auf der Wanduhr-Achse und lag hier RICHTIG.
+      stored: '2026-03-28T23:30:00',
+    },
+    {
+      label: 'innerhalb des Tages ueber den Sprung: 01:30 (CET) -> 03:30 (CEST)',
+      start: '2026-03-29T01:30:00',
+      reminder: '2026-03-28T23:30:00',
+      // 03:30 liegt NACH dem Sprung, ist CEST (+02:00) = 2026-03-29T01:30:00Z.
+      moved: '2026-03-29T03:30:00',
+      movedUtc: '2026-03-29T01:30:00Z',
+      // Der Quellanker war um eine Stunde zu frueh gelesen, die Verschiebung
+      // damit um eine Stunde zu gross: die Erinnerung landete exakt auf dem
+      // Terminbeginn, Vorlauf 0 - genau das Symptom, das #1300 beseitigt.
+      stored: '2026-03-29T00:30:00',
+    },
+    {
+      label: 'aus dem Band heraus: 29.03. 01:30 -> April',
+      start: '2026-03-29T01:30:00',
+      reminder: '2026-03-28T23:30:00',
+      moved: '2026-04-20T09:00:00',
+      movedUtc: '2026-04-20T07:00:00Z',
+      stored: '2026-04-20T06:00:00',
+    },
+    {
+      label: 'eine Stunde innerhalb des Bandes: 00:30 -> 01:30, beide CET',
+      // Beide Uhrzeiten gibt es wirklich, und sie liegen eine echte Stunde
+      // auseinander. Die Ein-Durchgang-Fassung bildete beide auf
+      // 2026-03-28T23:30:00Z ab: die Verschiebung kam als 0 heraus, der
+      // Fruehausstieg auf `shift === 0` liess `remind_at` stehen, und der
+      // Vorlauf wuchs still von 60 auf 120 Minuten. Der Termin bewegte sich,
+      // die Erinnerung nicht, und nichts meldete es.
+      start: '2026-03-29T00:30:00',
+      reminder: '2026-03-28T22:30:00',
+      moved: '2026-03-29T01:30:00',
+      movedUtc: '2026-03-29T00:30:00Z',
+      stored: '2026-03-28T23:30:00',
+    },
+    {
+      label: 'ins Herbstband: September -> 25.10. 01:30 (noch CEST)',
+      // 09:00 am 20.09. ist CEST (+02:00) = 07:00Z, Vorlauf 60 = 06:00Z.
+      start: '2026-09-20T09:00:00',
+      reminder: '2026-09-20T06:00:00',
+      // 01:30 am 25.10. liegt VOR dem Ruecksprung um 01:00Z und ist damit
+      // eindeutig CEST (+02:00) = 2026-10-24T23:30:00Z. Die
+      // Ein-Durchgang-Fassung las 2026-10-25T00:30:00Z, eine Stunde zu spaet.
+      moved: '2026-10-25T01:30:00',
+      movedUtc: '2026-10-24T23:30:00Z',
+      stored: '2026-10-24T22:30:00',
+    },
+    {
+      label: 'in die doppelte Stunde: September -> 25.10. 02:30',
+      start: '2026-09-20T09:00:00',
+      reminder: '2026-09-20T06:00:00',
+      // 02:30 am 25.10. gibt es ZWEIMAL: einmal als CEST (+02:00,
+      // 2026-10-25T00:30:00Z) und einmal als CET (+01:00,
+      // 2026-10-25T01:30:00Z). Beide waeren richtig, und eine Zusicherung, die
+      // offenliesse welche, wuerde nichts halten.
+      //
+      // Gewaehlt ist die SPAETERE, also die Lage nach der Umstellung (CET).
+      // Das ist keine Vorliebe, sondern das dokumentierte Ergebnis von
+      // `localToUTCPrecise()`: der erste Durchgang liest den Offset an
+      // 2026-10-25T02:30:00Z ab, das ist CET, und findet mit ihm bei
+      // 01:30:00Z sofort seinen Fixpunkt. Dieselbe Regel gilt im
+      // Schichtplan-Sync, der denselben Helfer benutzt.
+      moved: '2026-10-25T02:30:00',
+      movedUtc: '2026-10-25T01:30:00Z',
+      stored: '2026-10-25T00:30:00',
+    },
+  ];
+  const observed = fixtures.map((fixture) => {
+    const database = createDatabase();
+    const seriesId = Number(insertSeries(database, {
+      title: 'Moved inside the ambiguous band',
+      start_datetime: fixture.start,
+      recurrence_rule: 'FREQ=MONTHLY',
+    }));
+    database.prepare(`
+      INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+      VALUES ('event', ?, ?, 1)
+    `).run(seriesId, fixture.reminder);
+    updateSeriesWithOverrides(database, {
+      seriesId,
+      actorId: 1,
+      changes: { start_datetime: fixture.moved },
+    });
+    const rows = database.prepare(`
+      SELECT remind_at FROM reminders
+      WHERE entity_type = 'event' AND entity_id = ?
+      ORDER BY remind_at
+    `).all(seriesId);
+    return {
+      label: fixture.label,
+      reminders: rows.map((row) => ({
+        stored: row.remind_at,
+        // Der Vorlauf faellt aus dem handabgeleiteten Zielzeitpunkt und der
+        // beobachteten Zeile - kein Helfer aus dem Modul unter Test.
+        leadMinutes: (Date.parse(fixture.movedUtc) - Date.parse(`${row.remind_at}Z`)) / 60000,
+      })),
+    };
+  });
+  assert.deepEqual(observed, fixtures.map((fixture) => ({
+    label: fixture.label,
+    reminders: [{ stored: fixture.stored, leadMinutes: 60 }],
   })));
 });
 

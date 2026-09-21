@@ -35,8 +35,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const {
-  householdTimeZone, isValidTimeZone, serverTimeZone, shiftDateKey,
-  storedToInstantMs, todayKey,
+  householdTimeZone, isValidTimeZone, localToUTC, localToUTCPrecise, serverTimeZone,
+  shiftDateKey, storedToInstantMs, storedToInstantMsPrecise, todayKey, utcToWall,
 } = await import('../server/utils/timezone.js');
 
 const dbmod = await import('../server/db.js');
@@ -173,6 +173,109 @@ test('storedToInstantMs: der Stringvergleich, den er ersetzt, war falsch', () =>
     storedToInstantMs(local, 'America/Toronto') > Date.parse(nowIso),
     'Der Zeitpunktvergleich stellt ihn richtig',
   );
+});
+
+// --------------------------------------------------------
+// Warum es ZWEI Umrechnungen gibt (#786, #1300)
+// --------------------------------------------------------
+
+/** Wanduhrzeit -> Zeitpunkt -> Wanduhrzeit. Was hier nicht zurueckkommt, war nicht eindeutig. */
+function roundTrip(toUTC, local, zone) {
+  const wall = utcToWall(toUTC(local, zone), zone);
+  return wall ? `${wall.date}T${wall.time}` : null;
+}
+
+test('localToUTC bildet ein ganzes Wanduhr-Band am Umstelltag auf denselben Zeitpunkt ab', () => {
+  // Die Ein-Durchgang-Fassung liest die lokalen Ziffern als UTC, bestimmt den
+  // Offset AN DIESEM falschen Punkt und wendet ihn einmal an. Rund um eine
+  // DST-Grenze ist der Offset dort ein anderer als am richtigen Punkt, und das
+  // Ergebnis ist nicht umkehrbar. Das ist kein Fehler dieser Funktion - es ist
+  // ihr dokumentiertes Verhalten, und mehrere Aufrufer haengen daran. Es ist
+  // der Grund, warum `localToUTCPrecise()` daneben steht.
+  const zone = 'Europe/Berlin';
+  assert.equal(
+    localToUTC('2026-03-29T00:30:00', zone),
+    localToUTC('2026-03-29T01:30:00', zone),
+    'zwei verschiedene, beide existierende Uhrzeiten, ein Ergebnis',
+  );
+  assert.deepEqual(
+    ['2026-03-29T00:30:00', '2026-03-29T01:30:00', '2026-10-25T01:30:00']
+      .map((local) => roundTrip(localToUTC, local, zone)),
+    ['2026-03-29T00:30:00', '2026-03-29T00:30:00', '2026-10-25T02:30:00'],
+  );
+});
+
+test('localToUTCPrecise trifft jede Wanduhrzeit, die es wirklich gibt', () => {
+  const zone = 'Europe/Berlin';
+  // Beide 2026er Grenzen, je die Stunde davor und danach, dazu die doppelte
+  // Stunde im Herbst. Alles ausser der Fruehjahrsluecke muss zurueckkommen.
+  const existing = [
+    '2026-03-29T00:30:00', '2026-03-29T01:00:00', '2026-03-29T01:59:00',
+    '2026-03-29T03:00:00', '2026-03-29T03:30:00',
+    '2026-10-25T00:30:00', '2026-10-25T01:30:00', '2026-10-25T02:30:00',
+    '2026-10-25T03:30:00',
+  ];
+  assert.deepEqual(existing.map((local) => roundTrip(localToUTCPrecise, local, zone)), existing);
+
+  // In der doppelten Stunde sind zwei Antworten richtig; gewaehlt ist die
+  // SPAETERE, also die Lage nach der Umstellung (CET, +01:00). Die Zusicherung
+  // nennt sie, weil eine, die es offenliesse, nichts hielte.
+  assert.equal(localToUTCPrecise('2026-10-25T02:30:00', zone), '2026-10-25T01:30:00Z');
+
+  // Die Fruehjahrsluecke gibt es nicht; dokumentierter Ausweg ist, um ihre
+  // Breite vorzuschieben. 02:30 wird damit zu 03:30 Ortszeit.
+  assert.equal(localToUTCPrecise('2026-03-29T02:30:00', zone), '2026-03-29T01:30:00Z');
+  assert.equal(roundTrip(localToUTCPrecise, '2026-03-29T02:30:00', zone), '2026-03-29T03:30:00');
+});
+
+test('die Fruehjahrsluecke faellt in JEDER Zone gleich aus, nicht nur bei positivem Offset', () => {
+  // Der Ausweg aus der Luecke war vorzeichenabhaengig und damit in der halben
+  // Welt falsch: `guessA + Luecke` stimmt nur, solange `guessA` der FRUEHERE
+  // der beiden Kandidaten ist - und das ist er nur bei positivem Offset. In
+  // jeder US-Zone ist guessA bereits der spaetere, das Addieren schob um eine
+  // volle Stunde zu weit (gemessen: 04:30 EDT statt 03:30). Richtig ist der
+  // SPAETERE Kandidat, und den nennt `Math.max` ohne Fallunterscheidung.
+  //
+  // Je Zone die Wanduhrzeit MITTEN in der uebersprungenen Stunde; erwartet ist
+  // dieselbe Minute direkt hinter der Luecke.
+  const luecken = [
+    ['Europe/Berlin', '2026-03-29T02:30:00', '2026-03-29T03:30:00'],
+    ['America/New_York', '2026-03-08T02:30:00', '2026-03-08T03:30:00'],
+    ['America/Chicago', '2026-03-08T02:30:00', '2026-03-08T03:30:00'],
+    ['America/Los_Angeles', '2026-03-08T02:30:00', '2026-03-08T03:30:00'],
+    ['Australia/Sydney', '2026-10-04T02:30:00', '2026-10-04T03:30:00'],
+    // Halbstunden- und Viertelstunden-Zonen: die Luecke ist auch hier 60
+    // Minuten breit, aber der Offset selbst ist krumm - ein Rechenweg, der
+    // insgeheim mit vollen Stunden rechnet, faellt hier auf.
+    ['Pacific/Chatham', '2026-09-27T02:45:00', '2026-09-27T03:45:00'],
+  ];
+  for (const [zone, luecke, erwartet] of luecken) {
+    assert.equal(roundTrip(localToUTCPrecise, luecke, zone), erwartet,
+      `${zone}: ${luecke} gibt es nicht, erwartet ist ${erwartet} - eine Zone mit `
+      + 'negativem Offset darf nicht eine Stunde weiter landen als eine mit positivem.');
+  }
+});
+
+test('storedToInstantMsPrecise erbt die Formregeln und tauscht nur die Umrechnung', () => {
+  const zone = 'Europe/Berlin';
+  // Dieselben drei Formen wie oben bei `storedToInstantMs`, damit ein
+  // Auseinanderdriften der beiden Rumpfe auffaellt.
+  assert.equal(
+    storedToInstantMsPrecise('2026-08-21T19:00', zone),
+    storedToInstantMs('2026-08-21T19:00', zone),
+  );
+  assert.equal(
+    storedToInstantMsPrecise('2026-08-21T23:00:00Z', 'Asia/Tokyo'),
+    Date.parse('2026-08-21T23:00:00Z'),
+  );
+  assert.equal(storedToInstantMsPrecise('2026-08-21', zone), Date.parse('2026-08-20T22:00:00Z'));
+  assert.equal(storedToInstantMsPrecise('', 'UTC'), null);
+
+  // Und der Unterschied, um den es geht: im Band am Umstelltag liefern die
+  // beiden Fassungen verschiedene Zeitpunkte, und nur der praezise ist der,
+  // den die Uhr an der Wand zeigte.
+  assert.equal(storedToInstantMsPrecise('2026-03-29T01:30', zone), Date.parse('2026-03-29T00:30:00Z'));
+  assert.equal(storedToInstantMs('2026-03-29T01:30', zone), Date.parse('2026-03-28T23:30:00Z'));
 });
 
 // --------------------------------------------------------
