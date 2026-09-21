@@ -2977,6 +2977,7 @@
         "nameDayClear": "移除命名日",
         "nameDayHint": "使用与生日相同的提醒设置。",
         "nameDayIncomplete": "请选择命名日的月份和日期。",
+        "reminderOnDay": "当天提醒",
         "nameDayCalendarEventTitle": "命名日：{{name}}",
         "nameDayCalendarEventDescription": "今天是{{name}}的命名日。",
         "photoLabel": "头像",

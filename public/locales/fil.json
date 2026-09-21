@@ -2962,6 +2962,7 @@
         "nameDayClear": "Alisin ang araw ng pangalan",
         "nameDayHint": "Ginagamit ang parehong paalala ng kaarawan.",
         "nameDayIncomplete": "Piliin ang buwan at araw ng araw ng pangalan.",
+        "reminderOnDay": "Sa araw mismo",
         "nameDayCalendarEventTitle": "Araw ng pangalan: {{name}}",
         "nameDayCalendarEventDescription": "Araw ng pangalan ni {{name}} ngayon.",
         "photoLabel": "Larawan sa profile",

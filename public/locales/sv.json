@@ -2977,6 +2977,7 @@
         "nameDayClear": "Ta bort namnsdag",
         "nameDayHint": "Använder samma påminnelse som födelsedagen.",
         "nameDayIncomplete": "Välj månad och dag för namnsdagen.",
+        "reminderOnDay": "Samma dag",
         "nameDayCalendarEventTitle": "Namnsdag: {{name}}",
         "nameDayCalendarEventDescription": "I dag har {{name}} namnsdag.",
         "photoLabel": "Profilbild",

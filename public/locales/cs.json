@@ -3558,6 +3558,7 @@
         "nameDayClear": "Odebrat svátek",
         "nameDayHint": "Použije stejné upozornění jako narozeniny.",
         "nameDayIncomplete": "Vyberte měsíc i den svátku.",
+        "reminderOnDay": "V daný den",
         "photoLabel": "Profilový obrázek",
         "photoOptional": "Volitelné: Lze uložit i bez profilového obrázku.",
         "removePhoto": "Odebrat obrázek",

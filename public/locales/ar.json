@@ -2977,6 +2977,7 @@
         "nameDayClear": "إزالة يوم الاسم",
         "nameDayHint": "يستخدم التذكير نفسه المستخدم لعيد الميلاد.",
         "nameDayIncomplete": "اختر شهر ويوم الاسم.",
+        "reminderOnDay": "في نفس اليوم",
         "nameDayCalendarEventTitle": "يوم الاسم: {{name}}",
         "nameDayCalendarEventDescription": "اليوم هو يوم اسم {{name}}.",
         "photoLabel": "الصورة الشخصية",

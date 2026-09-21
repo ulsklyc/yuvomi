@@ -2977,6 +2977,7 @@
         "nameDayClear": "Quitar la onomástica",
         "nameDayHint": "Usa el mismo recordatorio que el cumpleaños.",
         "nameDayIncomplete": "Selecciona el mes y el día de la onomástica.",
+        "reminderOnDay": "El mismo día",
         "nameDayCalendarEventTitle": "Onomástica: {{name}}",
         "nameDayCalendarEventDescription": "Hoy es la onomástica de {{name}}.",
         "photoLabel": "Foto de perfil",

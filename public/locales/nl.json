@@ -2950,6 +2950,7 @@
         "nameDayClear": "Naamdag verwijderen",
         "nameDayHint": "Gebruikt dezelfde herinnering als de verjaardag.",
         "nameDayIncomplete": "Selecteer de maand en dag van de naamdag.",
+        "reminderOnDay": "Op de dag zelf",
         "nameDayCalendarEventTitle": "Naamdag: {{name}}",
         "nameDayCalendarEventDescription": "Vandaag is de naamdag van {{name}}.",
         "photoLabel": "Profielfoto",

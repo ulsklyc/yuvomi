@@ -2962,6 +2962,7 @@
         "nameDayClear": "명명 축일 삭제",
         "nameDayHint": "생일과 동일한 알림을 사용합니다.",
         "nameDayIncomplete": "명명 축일의 월과 일을 모두 선택하세요.",
+        "reminderOnDay": "당일",
         "nameDayCalendarEventTitle": "명명 축일: {{name}}",
         "nameDayCalendarEventDescription": "오늘은 {{name}}의 명명 축일입니다.",
         "photoLabel": "프로필 사진",

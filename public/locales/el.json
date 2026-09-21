@@ -2977,6 +2977,7 @@
         "nameDayClear": "Αφαίρεση ονομαστικής εορτής",
         "nameDayHint": "Χρησιμοποιεί την ίδια υπενθύμιση με τα γενέθλια.",
         "nameDayIncomplete": "Επιλέξτε μήνα και ημέρα ονομαστικής εορτής.",
+        "reminderOnDay": "Την ίδια ημέρα",
         "nameDayCalendarEventTitle": "Ονομαστική εορτή: {{name}}",
         "nameDayCalendarEventDescription": "Ο/Η {{name}} έχει ονομαστική εορτή.",
         "photoLabel": "Φωτογραφία προφίλ",

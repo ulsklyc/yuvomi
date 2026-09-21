@@ -2977,6 +2977,7 @@
         "nameDayClear": "聖名祝日を削除",
         "nameDayHint": "誕生日と同じリマインダーを使用します。",
         "nameDayIncomplete": "聖名祝日の月と日を選択してください。",
+        "reminderOnDay": "当日",
         "nameDayCalendarEventTitle": "聖名祝日：{{name}}",
         "nameDayCalendarEventDescription": "今日は{{name}}の聖名祝日です。",
         "photoLabel": "プロフィール画像",

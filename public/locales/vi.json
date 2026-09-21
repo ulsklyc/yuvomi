@@ -2950,6 +2950,7 @@
         "nameDayClear": "Xóa ngày tên thánh",
         "nameDayHint": "Dùng cùng lời nhắc với ngày sinh nhật.",
         "nameDayIncomplete": "Chọn cả tháng và ngày của ngày tên thánh.",
+        "reminderOnDay": "Vào đúng ngày",
         "nameDayCalendarEventTitle": "Ngày tên thánh: {{name}}",
         "nameDayCalendarEventDescription": "Hôm nay là ngày tên thánh của {{name}}.",
         "photoLabel": "Ảnh hồ sơ",

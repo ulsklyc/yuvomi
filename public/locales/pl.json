@@ -2962,6 +2962,7 @@
         "nameDayClear": "Usuń imieniny",
         "nameDayHint": "Używa tego samego przypomnienia co urodziny.",
         "nameDayIncomplete": "Wybierz miesiąc i dzień imienin.",
+        "reminderOnDay": "W tym samym dniu",
         "nameDayCalendarEventTitle": "Imieniny: {{name}}",
         "nameDayCalendarEventDescription": "Dziś są imieniny {{name}}.",
         "photoLabel": "Zdjęcie profilowe",
