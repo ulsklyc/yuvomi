@@ -82,6 +82,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **On a phone, the task filter panel can be closed again after picking filters.** The Filter
+  button sat at the end of the chip row, which scrolls sideways on a phone, and every filter you
+  picked put another chip in front of it and pushed it further out of view - with the panel open
+  and several filters chosen there was nothing left on screen to close it with. The button now has
+  its own place at the start of the row and no longer scrolls with the chips. The panel also ends
+  with a Done button, for when it is taller than the screen, and Escape closes it while the focus is
+  inside it. Tapping next to the panel still leaves it open: the panel sits in the page and pushes
+  the list down, so closing it on a tap would move the list under your finger and the tap would land
+  on a different task. (#1373)
+
 - **On a phone, a meal can be dragged to another day again, by a grip next to its buttons.** The
   drag started, and ended the moment the finger moved: on a phone the week plan is a vertical list,
   another day lies exactly on the scrolling axis, and the browser took the gesture as a scroll and

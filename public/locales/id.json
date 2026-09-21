@@ -418,6 +418,7 @@
         "filterGroupPerson": "Orang",
         "filterGroupTag": "Tag",
         "filterClearAll": "Atur ulang semua filter",
+        "filterPanelDone": "Selesai",
         "navLabelOverdue": "Tugas, {{count}} terlambat",
         "statusArchived": "Diarsipkan",
         "archiveButton": "Arsipkan tugas",

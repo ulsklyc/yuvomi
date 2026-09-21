@@ -418,6 +418,7 @@
         "filterGroupPerson": "Tao",
         "filterGroupTag": "Tag",
         "filterClearAll": "I-clear ang lahat ng pang-sala",
+        "filterPanelDone": "Tapos na",
         "navLabelOverdue": "Mga Gawain, {{count}} ang lampas na sa takdang araw",
         "statusArchived": "Naka-archive",
         "archiveButton": "Itago ang gawain",

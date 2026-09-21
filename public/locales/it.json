@@ -399,6 +399,7 @@
         "historySeriesLoadError": "Impossibile caricare",
         "filterBtn": "Filtro",
         "filterClearAll": "Cancella tutti i filtri",
+        "filterPanelDone": "Fatto",
         "filterGroupPerson": "Persona",
         "filterGroupTag": "Tag",
         "filterGroupPriority": "Priorità",

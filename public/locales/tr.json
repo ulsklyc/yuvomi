@@ -399,6 +399,7 @@
         "historySeriesLoadError": "Yüklenemedi",
         "filterBtn": "Filtrele",
         "filterClearAll": "Tüm filtreleri temizle",
+        "filterPanelDone": "Bitti",
         "filterGroupPerson": "Kişi",
         "filterGroupTag": "Etiket",
         "filterGroupPriority": "Öncelik",

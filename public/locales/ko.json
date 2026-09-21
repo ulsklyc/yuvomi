@@ -418,6 +418,7 @@
         "filterGroupPerson": "담당자",
         "filterGroupTag": "태그",
         "filterClearAll": "모든 필터 초기화",
+        "filterPanelDone": "완료",
         "navLabelOverdue": "할 일, {{count}}개 기한 초과",
         "statusArchived": "보관됨",
         "archiveButton": "할 일 보관",

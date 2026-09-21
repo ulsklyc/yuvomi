@@ -417,6 +417,7 @@
         "historySeriesLoadError": "Could not be loaded",
         "filterBtn": "Filter",
         "filterClearAll": "Clear all filters",
+        "filterPanelDone": "Done",
         "filterGroupPerson": "Person",
         "filterGroupTag": "Tag",
         "filterGroupPriority": "Priority",

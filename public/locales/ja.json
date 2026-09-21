@@ -399,6 +399,7 @@
         "historySeriesLoadError": "読み込めませんでした",
         "filterBtn": "フィルター",
         "filterClearAll": "すべてのフィルターをクリア",
+        "filterPanelDone": "完了",
         "filterGroupPerson": "人物",
         "filterGroupTag": "タグ",
         "filterGroupPriority": "優先度",

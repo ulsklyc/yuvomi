@@ -399,6 +399,7 @@
         "historySeriesLoadError": "Δεν ήταν δυνατή η φόρτωση",
         "filterBtn": "Φίλτρο",
         "filterClearAll": "Εκκαθάριση όλων των φίλτρων",
+        "filterPanelDone": "Έτοιμο",
         "filterGroupPerson": "Άτομο",
         "filterGroupTag": "Ετικέτα",
         "filterGroupPriority": "Προτεραιότητα",

@@ -417,6 +417,7 @@
         "historySeriesLoadError": "Không thể tải",
         "filterBtn": "Bộ lọc",
         "filterClearAll": "Xóa tất cả các bộ lọc",
+        "filterPanelDone": "Xong",
         "filterGroupPerson": "Người",
         "filterGroupTag": "Thẻ",
         "filterGroupPriority": "Độ ưu tiên",

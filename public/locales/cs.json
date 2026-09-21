@@ -417,6 +417,7 @@
         "historySeriesLoadError": "Nepodařilo se načíst",
         "filterBtn": "Filtr",
         "filterClearAll": "Vymazat všechny filtry",
+        "filterPanelDone": "Hotovo",
         "filterGroupPerson": "Osoba",
         "filterGroupTag": "Štítek",
         "filterGroupPriority": "Priorita",

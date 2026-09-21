@@ -417,6 +417,7 @@
         "historySeriesLoadError": "Nem sikerült betölteni",
         "filterBtn": "Szűrő",
         "filterClearAll": "Összes szűrő törlése",
+        "filterPanelDone": "Kész",
         "filterGroupPerson": "Személy",
         "filterGroupTag": "Címke",
         "filterGroupPriority": "Prioritás",

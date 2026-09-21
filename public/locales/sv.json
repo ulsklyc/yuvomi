@@ -399,6 +399,7 @@
         "historySeriesLoadError": "Kunde inte laddas",
         "filterBtn": "Filtrera",
         "filterClearAll": "Rensa alla filter",
+        "filterPanelDone": "Klar",
         "filterGroupPerson": "Person",
         "filterGroupTag": "Tagg",
         "filterGroupPriority": "Prioritet",

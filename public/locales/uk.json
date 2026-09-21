@@ -399,6 +399,7 @@
         "historySeriesLoadError": "Не вдалося завантажити",
         "filterBtn": "Фільтр",
         "filterClearAll": "Скинути всі фільтри",
+        "filterPanelDone": "Готово",
         "filterGroupPerson": "Особа",
         "filterGroupTag": "Тег",
         "filterGroupPriority": "Пріоритет",

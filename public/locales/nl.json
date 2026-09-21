@@ -417,6 +417,7 @@
         "historySeriesLoadError": "Kon niet worden geladen",
         "filterBtn": "Filteren",
         "filterClearAll": "Alle filters wissen",
+        "filterPanelDone": "Klaar",
         "filterGroupPerson": "Persoon",
         "filterGroupTag": "Label",
         "filterGroupPriority": "Prioriteit",

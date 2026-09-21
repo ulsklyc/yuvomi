@@ -399,6 +399,7 @@
         "historySeriesLoadError": "Не удалось загрузить",
         "filterBtn": "Фильтр",
         "filterClearAll": "Сбросить все фильтры",
+        "filterPanelDone": "Готово",
         "filterGroupPerson": "Человек",
         "filterGroupTag": "Тег",
         "filterGroupPriority": "Приоритет",

@@ -399,6 +399,7 @@
         "historySeriesLoadError": "无法加载",
         "filterBtn": "筛选",
         "filterClearAll": "清除所有筛选",
+        "filterPanelDone": "完成",
         "filterGroupPerson": "人员",
         "filterGroupTag": "标签",
         "filterGroupPriority": "优先级",

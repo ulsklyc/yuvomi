@@ -399,6 +399,7 @@
         "historySeriesLoadError": "लोड नहीं हो सका",
         "filterBtn": "फ़िल्टर",
         "filterClearAll": "सभी फ़िल्टर हटाएं",
+        "filterPanelDone": "हो गया",
         "filterGroupPerson": "व्यक्ति",
         "filterGroupTag": "टैग",
         "filterGroupPriority": "प्राथमिकता",
