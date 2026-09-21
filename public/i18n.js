@@ -92,7 +92,9 @@ export function pickLocale(tags, supported) {
       if (supported.includes(tag)) return tag;
       if (!traegtSchrift) {
         const letzter = teile[teile.length - 1];
-        const schrift = Object.hasOwn(REGION_SCRIPT, letzter) ? REGION_SCRIPT[letzter] : null;
+        // hasOwnProperty.call statt Object.hasOwn: das kennt Chrome erst ab 93, und
+        // diese Zeile laeuft beim Start vor dem ersten Bild (#1276).
+        const schrift = Object.prototype.hasOwnProperty.call(REGION_SCRIPT, letzter) ? REGION_SCRIPT[letzter] : null;
         if (schrift && supported.includes(`${teile[0]}-${schrift}`)) return `${teile[0]}-${schrift}`;
       }
       teile.pop();

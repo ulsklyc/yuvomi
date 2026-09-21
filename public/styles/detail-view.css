@@ -287,7 +287,7 @@
    * Sichtbarkeit kamen hinzu. Ohne Grenze läuft die Karte auf einem kurzen
    * Fenster unten aus dem Bild, und mit ihr die Fußzeile, in der „Bearbeiten"
    * und „Löschen" stehen; es bliebe nur Escape. */
-  max-height: calc(100dvh - 2 * var(--space-2));
+  max-height: calc(var(--viewport-height) - 2 * var(--space-2));
   padding: var(--space-4);
   background-color: var(--color-surface);
   border: var(--space-px) solid var(--glass-border-subtle);

@@ -734,7 +734,7 @@
 
 .subscriptions-logo-picker-panel {
   width: min(720px, 100%);
-  max-height: min(720px, calc(100dvh - (2 * var(--space-4))));
+  max-height: min(720px, calc(var(--viewport-height) - (2 * var(--space-4))));
   overflow: auto;
   padding: var(--space-4);
   border: 1px solid var(--glass-border-subtle);
@@ -1055,7 +1055,7 @@
   }
 
   .subscriptions-logo-picker-panel {
-    max-height: min(680px, calc(100dvh - (2 * var(--space-2))));
+    max-height: min(680px, calc(var(--viewport-height) - (2 * var(--space-2))));
   }
 
   .subscriptions-logo-results {

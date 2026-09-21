@@ -28,6 +28,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  /* vh-Zwilling fuer Browser ohne dvh (#1276), siehe .app-shell in layout.css. */
+  min-height: 100vh;
   min-height: 100dvh;
   width: 100%;
   padding: var(--space-4);

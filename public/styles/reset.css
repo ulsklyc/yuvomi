@@ -50,6 +50,11 @@ html {
 }
 
 body {
+  /* 100vh zuerst (#1276): ein Browser ohne dvh (Chrome < 108, Safari < 15.4)
+   * verwirft die zweite Zeile. Ohne Hoehe waechst der Body mit seinem Inhalt,
+   * overflow: hidden schneidet dann nichts mehr ab, und der Hauptbereich hat
+   * keine Grenze, an der er scrollen koennte. */
+  height: 100vh;
   height: 100dvh;
   overflow: hidden;
   background-color: var(--color-bg);

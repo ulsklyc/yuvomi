@@ -46,7 +46,7 @@ yuvomi-fasting-help { display: inline-flex; flex-shrink: 0; }
 .fasting-help__button:hover, .fasting-help__button:focus-visible { color: var(--color-text-primary); background: var(--color-surface-hover); }
 .fasting-help__button:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: var(--focus-ring-offset); }
 .fasting-help__button > svg { width: var(--icon-lg); height: var(--icon-lg); }
-.fasting-help__tooltip { position: fixed; inset: auto; margin: 0; width: min(300px, calc(100vw - var(--space-6))); max-height: calc(100dvh - var(--space-6)); overflow: auto; padding: var(--space-3); border: 0; border-radius: var(--radius-sm); background: var(--color-text-primary); color: var(--color-bg); text-align: start; font-size: var(--text-sm); font-weight: var(--font-weight-regular); line-height: var(--line-height-relaxed); box-shadow: var(--shadow-md); }
+.fasting-help__tooltip { position: fixed; inset: auto; margin: 0; width: min(300px, calc(100vw - var(--space-6))); max-height: calc(var(--viewport-height) - var(--space-6)); overflow: auto; padding: var(--space-3); border: 0; border-radius: var(--radius-sm); background: var(--color-text-primary); color: var(--color-bg); text-align: start; font-size: var(--text-sm); font-weight: var(--font-weight-regular); line-height: var(--line-height-relaxed); box-shadow: var(--shadow-md); }
 .fasting-help__tooltip > span { display: block; margin-block-start: var(--space-2); }
 @media (max-width: 639px) {
   .fasting-editor-grid { grid-template-columns: 1fr; }

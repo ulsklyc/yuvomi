@@ -16,10 +16,14 @@
 .app-shell {
   display: flex;
   flex-direction: column;
-  /* -webkit-fill-available als iOS-Fallback: In manchen iOS-WebKit-Versionen
-   * ist 100dvh minimal kleiner als die tatsächliche WKWebView-Höhe, was zu einem
-   * sichtbaren Streifen unten führt. -webkit-fill-available füllt zuverlässig. */
-  height: -webkit-fill-available;
+  /* 100vh vor 100dvh (#1276): ein Browser ohne dvh (Chrome < 108, Safari
+   * < 15.4) verwirft die zweite Zeile und behaelt die erste. Ohne sie hat die
+   * Shell keine Hoehe, #main-content waechst auf Inhaltshoehe, und der
+   * Hauptbereich scrollt nicht mehr - die Seitenleiste daneben schon. Hier
+   * stand zuvor `-webkit-fill-available` als iOS-Rueckfall; neben 100vh ist
+   * es in jedem Browser ueberstimmt (wer es kennt, kennt auch vh), und bei dvh
+   * war es das schon immer. */
+  height: 100vh;
   height: 100dvh;
   /* Containing-Block für den lebenden Backdrop (.lg-backdrop, position: absolute;
    * inset: 0). Bewusst KEIN isolation/z-index → app-shell bleibt kein eigener
@@ -36,6 +40,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* vh-Zwilling fuer Browser ohne dvh (#1276), siehe .app-shell. */
+  min-height: 100vh;
   min-height: 100dvh;
   width: 100%;
   background-color: var(--color-bg);
@@ -623,8 +629,9 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
    * kein Rand, sondern der Beweis, dass es ein Blatt ist: der Streifen Seite
    * darueber sagt, dass hinter dem Blatt noch etwas liegt, und ist die Flaeche,
    * auf die man tippt, um es zu schliessen. dvh statt vh, weil die mobile
-   * Adressleiste die Hoehe waehrend der Sitzung aendert. */
-  max-block-size: calc(100dvh - var(--nav-bottom-height) - var(--space-8));
+   * Adressleiste die Hoehe waehrend der Sitzung aendert - ueber den Token, weil
+   * die Rechnung var() traegt und ein vh-Zwilling dann nichts rettet (#1276). */
+  max-block-size: calc(var(--viewport-height) - var(--nav-bottom-height) - var(--space-8));
   /* Die Ausfahr-Distanz rechnet die Leiste MIT. `translateY(100%)` schob das
    * Blatt frueher exakt aus dem Bild, weil seine Unterkante der Bildschirmrand
    * war; seit sie ueber der Tab-Leiste liegt, blieben genau deren 76px oben
@@ -1456,7 +1463,7 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   .search-overlay__panel {
     flex: 0 0 auto;
     width: min(640px, 92vw);
-    max-height: calc(100dvh - 12vh - var(--space-6));
+    max-height: calc(var(--viewport-height) - 12vh - var(--space-6));
     background-color: var(--color-surface);
     border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius-lg);
@@ -4184,7 +4191,7 @@ p.field-hint--warn[hidden] {
   /* Mobile: bewusst auf ~88dvh gedeckelt, damit oben ein Streifen des
    * geblurten Moduls sichtbar bleibt — das Sheet wirkt als Karte über dem
    * Modul, nicht als Vollbild-Takeover. Safe-Areas bleiben respektiert. */
-  max-height: min(88dvh, calc(100dvh - (2 * var(--space-3)) - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
+  max-height: min(calc(var(--viewport-height) * 0.88), calc(var(--viewport-height) - (2 * var(--space-3)) - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
   /* clip, NICHT hidden (#805): hidden erzeugt eine Scroll-Box, die der Nutzer
    * mangels Scrollbar nicht bedienen kann, der Browser aber programmatisch
    * scrollt - Chrome ruft beim Fokussieren eines <select> scrollIntoView auf
@@ -4218,13 +4225,13 @@ p.field-hint--warn[hidden] {
 @media (min-width: 768px) {
   .modal-panel {
     max-width: 520px;
-    max-height: calc(100dvh - (2 * var(--space-6)));
+    max-height: calc(var(--viewport-height) - (2 * var(--space-6)));
     border-radius: var(--radius-lg);
     animation: modal-scale-in var(--duration-md) var(--ease-out) forwards;
   }
   .modal-panel--sm { max-width: 400px; }
   .modal-panel--lg { max-width: 680px; }
-  .modal-panel--xl { max-width: min(960px, 95vw); max-height: calc(100dvh - (2 * var(--space-6))); }
+  .modal-panel--xl { max-width: min(960px, 95vw); max-height: calc(var(--viewport-height) - (2 * var(--space-6))); }
 }
 
 .modal-panel__header {
@@ -5724,7 +5731,7 @@ textarea::placeholder {
     flex: 0 0 380px;
     max-width: 420px;
     overflow-y: auto;
-    max-height: calc(100dvh - var(--space-16));
+    max-height: calc(var(--viewport-height) - var(--space-16));
     position: sticky;
     top: var(--space-8);
   }
@@ -5775,7 +5782,7 @@ textarea::placeholder {
   .layout-content-aside__aside {
     flex: 0 0 280px;
     overflow-y: auto;
-    max-height: calc(100dvh - var(--space-16));
+    max-height: calc(var(--viewport-height) - var(--space-16));
     position: sticky;
     top: var(--space-8);
   }

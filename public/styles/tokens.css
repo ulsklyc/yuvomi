@@ -1280,6 +1280,16 @@
   --nav-height-mobile: 60px;
   /* Schwebende Kapsel (Liquid Glass): Zone = Kapsel + 8px Luft oben und unten. */
   --nav-bottom-height: calc(var(--nav-height-mobile) + var(--space-4) + var(--safe-area-inset-bottom));
+  /* Sichtbare Fensterhoehe (#1276). `dvh` kennt Chrome erst ab 108 und Safari
+   * ab 15.4; aeltere Browser verwerfen jede Deklaration damit. Ein vh-Zwilling
+   * davor (`height: 100vh; height: 100dvh`) rettet nur eine Deklaration OHNE
+   * var() oder env(): mit var() gilt sie beim Parsen als gueltig, verdraengt den
+   * Zwilling in der Kaskade und wird erst beim Berechnen ungueltig - dann faellt
+   * der Wert auf den Anfangswert (`none`, `auto`), nicht auf 100vh. Wer die
+   * Fensterhoehe in einer Rechnung mit Tokens braucht, nimmt deshalb diesen
+   * Token. Die Weiche auf dvh steht in @supports hinter diesem Block; Guard:
+   * test/test-old-browser-fallbacks.js. */
+  --viewport-height: 100vh;
   --sidebar-width: 56px;             /* Fallback (mobile: sidebar hidden) */
   --sidebar-width-expanded: 220px;   /* full sidebar (≥1024px), max 240px laut Spec */
   --content-max-width: 1280px;
@@ -1592,6 +1602,19 @@
    * mitverschluckt; der Token sagt stattdessen, was gemeint ist. Guard:
    * "ein Maskenstopp kommt aus --mask-opaque" (test-frontend-audit.js). */
   --mask-opaque: #000;
+}
+
+/* ================================================================
+ * Fensterhoehe: dvh, wo der Browser es kennt (#1276)
+ *
+ * Steht HINTER dem :root-Block oben: gleiche Spezifitaet, also gewinnt die
+ * spaetere Regel. Ein Browser ohne dvh wertet die Bedingung als falsch und
+ * behaelt 100vh - die Deklaration im Block sieht er gar nicht erst.
+ * ================================================================ */
+@supports (height: 100dvh) {
+  :root {
+    --viewport-height: 100dvh;
+  }
 }
 
 /* ================================================================

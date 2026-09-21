@@ -73,6 +73,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **On browsers older than Chrome 108, the main area scrolls and dialogs stay on screen.**
+  Yuvomi sized the page, the app frame and the height limit of its dialogs with `dvh`, a unit for
+  the visible window height that Chrome understands from version 108 and Safari from 15.4. An older
+  browser drops every line that uses it, and with it went the height of the app frame: the main area
+  grew to the full length of its content, so on a Chromebook with Chrome 91 there was nothing left to
+  scroll, while the sidebar next to it scrolled normally. Dialogs lost their height limit the same
+  way and ran off the top and bottom of the screen, taking their buttons with them. Where `dvh` is
+  unknown, these heights now fall back to the plain window height; browsers that know it behave
+  exactly as before. Older browsers are supported on the paths nobody can do without - starting the
+  app, scrolling it and using a dialog - rather than everywhere. (#1276)
+
 - **A birthday without a reminder of its own now shows the reminder it really gets, and saving it
   no longer moves that reminder.** A birthday can come in without a reminder setting: taken over
   from Contacts, created for a household member or for a guest of a shared expense, or created
