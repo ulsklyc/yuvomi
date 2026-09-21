@@ -16,14 +16,23 @@
 .app-shell {
   display: flex;
   flex-direction: column;
-  /* 100vh vor 100dvh (#1276): ein Browser ohne dvh (Chrome < 108, Safari
-   * < 15.4) verwirft die zweite Zeile und behaelt die erste. Ohne sie hat die
-   * Shell keine Hoehe, #main-content waechst auf Inhaltshoehe, und der
-   * Hauptbereich scrollt nicht mehr - die Seitenleiste daneben schon. Hier
-   * stand zuvor `-webkit-fill-available` als iOS-Rueckfall; neben 100vh ist
-   * es in jedem Browser ueberstimmt (wer es kennt, kennt auch vh), und bei dvh
-   * war es das schon immer. */
+  /* Drei Zeilen, und jede gilt fuer andere Browser (#1276). Dieselbe Kette
+   * steht an body in reset.css - an beiden Stellen, weil fill-available sich
+   * am Containing Block misst: haette body 100vh, maesse die Shell auf iOS
+   * wieder die grosse Hoehe.
+   *   - 100dvh: wer dvh kennt (Chrome ab 108, Safari ab 15.4), nimmt die
+   *     letzte Zeile, die beiden davor sind dort ueberstimmt.
+   *   - -webkit-fill-available: wer dvh nicht kennt, aber das hier (Safari
+   *     13.4 bis 15.3, Chromium), fuellt den Containing Block - auf iOS die
+   *     SICHTBARE Hoehe. 100vh waere dort die grosse, bei eingefahrener
+   *     Adressleiste, und die untere Navigation laege unter der Leiste.
+   *   - 100vh: wer beides nicht kennt. Ohne jede Hoehe waechst #main-content
+   *     auf Inhaltshoehe, und der Hauptbereich scrollt nicht mehr - die
+   *     Seitenleiste daneben schon (Chrome 91 auf einem Chromebook, #1276).
+   * Die Reihenfolge ist die Regel: umgestellt gewaenne auf alten Browsern
+   * die falsche Zeile. */
   height: 100vh;
+  height: -webkit-fill-available;
   height: 100dvh;
   /* Containing-Block für den lebenden Backdrop (.lg-backdrop, position: absolute;
    * inset: 0). Bewusst KEIN isolation/z-index → app-shell bleibt kein eigener

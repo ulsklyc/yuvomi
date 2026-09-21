@@ -32,8 +32,12 @@
  * dvh-Deklarationen trugen var(), darunter alle Hoehengrenzen der Dialoge.
  *
  * DESHALB DREI ERLAUBTE FORMEN, und der Leser unterscheidet sie:
- *   - ohne var()/env(): der vh-Zwilling DIREKT davor in derselben Regel, gleiche
- *     Eigenschaft, gleicher Wert bis auf die Einheit;
+ *   - ohne var()/env(): der vh-Zwilling davor in derselben Regel, gleiche
+ *     Eigenschaft, gleicher Wert bis auf die Einheit. Dazwischen darf nur
+ *     dieselbe Eigenschaft ohne dvh-Einheit stehen - so steht
+ *     `height: -webkit-fill-available` zwischen 100vh und 100dvh, das auf iOS
+ *     13.4 bis 15.3 die SICHTBARE Hoehe liefert, wo 100vh die grosse waere
+ *     (Review zu #1371). Jede andere Deklaration dazwischen bricht die Kette;
  *   - mit var()/env(): gar keine dvh-Einheit, sondern `var(--viewport-height)`
  *     aus tokens.css (dort 100vh, in `@supports (height: 100dvh)` 100dvh);
  *   - innerhalb eines `@supports`, das die Einheit selbst abfragt: nichts, denn
@@ -114,6 +118,21 @@ const guardedBySupports = (at) => at.some(
 );
 
 /**
+ * Steht der vh-Zwilling vor der Deklaration an `index`? Rueckwaerts gelesen
+ * darf dazwischen nur dieselbe Eigenschaft OHNE dvh-Einheit stehen - etwa
+ * `-webkit-fill-available` fuer Safari 13.4 bis 15.3. Eine andere Eigenschaft
+ * oder eine weitere dvh-Zeile beendet die Suche.
+ */
+function twinBefore(decls, index, property, expected) {
+  for (let j = index - 1; j >= 0; j -= 1) {
+    const candidate = decls[j];
+    if (candidate.property !== property || hasUnit(candidate.text)) return false;
+    if (norm(candidate.value) === norm(expected)) return true;
+  }
+  return false;
+}
+
+/**
  * Jede Deklaration mit einer dvh-Einheit, die in einem Browser ohne diese
  * Einheit keinen wirksamen Rueckfall hat. `seen` zaehlt die Einheiten, die der
  * Leser in Deklarationen gesehen hat - fuer den Abgleich mit dem Textleser.
@@ -137,9 +156,8 @@ function viewportUnitFindings(css) {
         findings.push({ ...where, kind: 'computed-time' });
         return;
       }
-      const previous = decls[index - 1];
       const expected = twinValue(decl.value);
-      if (!previous || previous.property !== decl.property || norm(previous.value) !== norm(expected)) {
+      if (!twinBefore(decls, index, decl.property, expected)) {
         findings.push({ ...where, kind: 'twin-missing', expected: `${decl.property}: ${expected}` });
       }
     });
@@ -154,7 +172,7 @@ const unitsInText = (css) => countUnits(
 );
 
 const HINTS = {
-  'twin-missing': 'vh-Zwilling direkt davor fehlt',
+  'twin-missing': 'vh-Zwilling davor fehlt (dazwischen darf nur dieselbe Eigenschaft ohne dvh stehen)',
   'computed-time': 'traegt var()/env() - ein vh-Zwilling davor hilft hier NICHT, der Wert faellt '
     + 'beim Berechnen auf seinen Anfangswert; var(--viewport-height) nehmen',
   'custom-property': 'Custom Property - ihr Wert wird erst beim Einsetzen geprueft; die Weiche '
@@ -199,7 +217,7 @@ function appStylesheets() {
 test('Leser: erkennt fehlende, falsche und wirkungslose Rueckfaelle (erfundene Faelle)', () => {
   const kinds = (css) => viewportUnitFindings(css).findings.map((f) => f.kind);
 
-  // Richtig: Zwilling direkt davor, auch in anderer Schreibweise und Familie.
+  // Richtig: Zwilling davor, auch in anderer Schreibweise und Familie.
   assert.deepEqual(kinds('.a { height: 100vh; height: 100dvh; }'), []);
   assert.deepEqual(kinds('.a { width: 50vw; width: 50DVW }'), []);
   assert.deepEqual(kinds('.a { max-height: min(88vh, 90vh); max-height: min(88svh, 90lvh); }'), []);
@@ -207,13 +225,21 @@ test('Leser: erkennt fehlende, falsche und wirkungslose Rueckfaelle (erfundene F
   assert.deepEqual(kinds('@media (min-width: 1px) { @supports (height: 1svh) { .a { height: calc(100svh - var(--x)); } } }'), []);
   // Ein `;` in einem String trennt keine Deklaration.
   assert.deepEqual(kinds('.a { height: 100vh; height: 100dvh; background: url("data:a;b") }'), []);
+  // Zwischen Zwilling und dvh-Zeile: dieselbe Eigenschaft ohne dvh - die iOS-Kette.
+  assert.deepEqual(kinds('.a { height: 100vh; height: -webkit-fill-available; height: 100dvh; }'), []);
+  assert.deepEqual(kinds('.a { height: 100vh; height: -webkit-fill-available; height: stretch; height: 100dvh }'), []);
 
-  // Falsch: kein Zwilling, nicht direkt davor, anderer Wert, andere Eigenschaft.
+  // Falsch: kein Zwilling, fremde Deklaration dazwischen, anderer Wert, andere Eigenschaft.
   assert.deepEqual(kinds('.a { height: 100dvh }'), ['twin-missing']);
   assert.deepEqual(kinds('.a { height: 100vh; color: red; height: 100dvh; }'), ['twin-missing']);
   assert.deepEqual(kinds('.a { height: 50vh; height: 100dvh; }'), ['twin-missing']);
   assert.deepEqual(kinds('.a { min-height: 100vh; height: 100dvh; }'), ['twin-missing']);
   assert.deepEqual(kinds('.a { background: url("x;y"); height: 100dvh; }'), ['twin-missing']);
+  // fill-available allein ist kein Zwilling, und eine dvh-Zeile dazwischen
+  // beendet die Suche: dann fehlt beiden der eigene Zwilling.
+  assert.deepEqual(kinds('.a { height: -webkit-fill-available; height: 100dvh; }'), ['twin-missing']);
+  assert.deepEqual(kinds('.a { height: 100vh; height: 50svh; height: 100dvh; }'), ['twin-missing', 'twin-missing']);
+  assert.deepEqual(kinds('.a { height: 100vh; width: 10px; height: -webkit-fill-available; height: 100dvh; }'), ['twin-missing']);
   assert.deepEqual(kinds('@media (min-width: 768px) { .a { max-height: 100svh; } }'), ['twin-missing']);
 
   // Wirkungslos: der Zwilling steht da, und trotzdem faellt der Wert auf none.
