@@ -113,14 +113,15 @@ function readOnly() {
  * hier als lesend eintraegt.
  *
  * Tab wechseln, einen Einsatzbericht oeffnen (Uebersicht, Protokoll, Berichte),
- * eine Person fuer ihr Protokoll waehlen, den Monat des Berichts oder des
- * Protokolls wechseln. Verglichen wird das Bedienelement SELBST (`matches`),
+ * das Profil einer Person lesen, eine Person fuer ihr Protokoll waehlen, den
+ * Monat des Berichts oder des Protokolls wechseln. Verglichen wird das Bedienelement SELBST (`matches`),
  * nicht ein Vorfahr: die Personenzeile ist lesend, ihr Bearbeiten-Knopf nicht.
  */
 const READ_SAFE_CONTROLS = [
   '.housekeeping-tab',
   '[data-open-visit]',
   '[data-visit-report]',
+  '[data-open-worker]',
   '.housekeeping-staff-row__select',
   '#housekeeping-report-prev',
   '#housekeeping-report-next',
@@ -1043,6 +1044,33 @@ function renderReports(content) {
   });
 }
 
+/* DER EINSATZBERICHT IST DIE LESEANSICHT EINES BESUCHS (#1265 P6). Bei
+ * `housekeeping: read` - und an einem abgerechneten Besuch schon seit #1135 -
+ * fuehrt jeder Weg zu einem Besuch hierher statt in den Einsatz-Dialog. Was
+ * nur der Dialog zeigte, stand damit nirgends: die Arbeitszeit eines Besuchs
+ * nach Stunden und der Beleg. Beides steht jetzt auch hier, in der Form, die der
+ * Dialog ihm gibt: nach Stunden die Minuten und der daraus berechnete Betrag,
+ * sonst der Tagessatz. */
+function visitWorkDetailsHtml(visit) {
+  if (visit.rate_type === 'hourly') {
+    return `
+          <div><dt>${esc(t('housekeeping.minutesWorked'))}</dt><dd>${esc(visit.minutes_worked ?? 0)}</dd></div>
+          <div><dt>${esc(t('housekeeping.computedAmount'))}</dt><dd>${esc(money(visit.daily_rate))}</dd></div>`;
+  }
+  return `
+          <div><dt>${esc(t('housekeeping.dailyRate'))}</dt><dd>${esc(money(visit.daily_rate))}</dd></div>`;
+}
+
+/* Der Beleg im Bericht - so weit das Dokumentenrecht das Lesen erlaubt, dieselbe
+ * Stufe wie im Einsatz-Dialog (`receiptFieldHtml()`): bei `documents: none`
+ * antwortet schon das Lesen mit 403, dort steht er nicht. Gesetzt heisst
+ * sichtbar, ein Besuch ohne Beleg hat keine Zeile dafuer. */
+function visitReceiptDetailHtml(visit) {
+  if (!visit.receipt_document_name || pathAccess('/documents') === 'none') return '';
+  return `
+          <div><dt>${esc(t('housekeeping.receiptLabel'))}</dt><dd>${esc(visit.receipt_document_name)}</dd></div>`;
+}
+
 /* `onRefresh` rendert die Ansicht neu, aus der der Bericht geoeffnet wurde (Uebersicht,
  * Personal, Deep-Link). Ohne ihn ist es der Berichte-Tab in `content`. */
 function openVisitReportModal(visit, content = null, { onRefresh = null } = {}) {
@@ -1080,12 +1108,13 @@ function openVisitReportModal(visit, content = null, { onRefresh = null } = {}) 
         </div>
         <dl class="housekeeping-report-details">
           <div><dt>${esc(t('housekeeping.lastVisit'))}</dt><dd>${esc(formatDate(visit.check_in))} · ${esc(formatTime(visit.check_in))}</dd></div>
-          <div><dt>${esc(t('housekeeping.dailyRate'))}</dt><dd>${esc(money(visit.daily_rate))}</dd></div>
+          ${visitWorkDetailsHtml(visit)}
           <div><dt>${esc(t('housekeeping.extras'))}</dt><dd>${esc(money(visit.extras))}</dd></div>
           <div><dt>${esc(t('housekeeping.totalPayment'))}</dt><dd>${esc(money(visit.total_amount))}</dd></div>
           <div><dt>${esc(t('housekeeping.paymentStatus'))}</dt><dd>${esc(paid ? t('housekeeping.paymentPaid') : t('housekeeping.paymentPending'))}</dd></div>
           ${visit.payment_task_id ? `<div><dt>${esc(t('housekeeping.paymentTask'))}</dt><dd>#${esc(visit.payment_task_id)}</dd></div>` : ''}
           ${visit.calendar_event_id ? `<div><dt>${esc(t('housekeeping.calendarEvent'))}</dt><dd>#${esc(visit.calendar_event_id)}</dd></div>` : ''}
+          ${visitReceiptDetailHtml(visit)}
         </dl>
         ${footerAction ? `
         <div class="modal-panel__footer modal-panel__footer--plain">
@@ -1129,7 +1158,11 @@ function renderStaff(content) {
         <strong>${esc(item.display_name)}</strong>
         <span>${esc(item.phone || item.email || '')}</span>
       </button>
-      ${readOnly() ? '' : `
+      ${readOnly() ? `
+      <button class="btn btn--secondary btn--icon" type="button" data-open-worker="${item.id}"
+              aria-label="${esc(t('housekeeping.openWorkerProfile'))}: ${esc(item.display_name)}">
+        <i data-lucide="id-card" aria-hidden="true"></i>
+      </button>` : `
       <button class="btn btn--secondary btn--icon" type="button" data-edit-worker="${item.id}" aria-label="${esc(t('common.edit'))}">
         <i data-lucide="edit-2" aria-hidden="true"></i>
       </button>`}
@@ -1160,8 +1193,18 @@ function renderStaff(content) {
     // Enter/Space auf dem Namens-Button feuert dessen nativen click und
     // bubbelt hierher - ein eigener keydown-Handler entfiele als Doppelung.
     row.addEventListener('click', (event) => {
-      if (event.target.closest('[data-edit-worker]')) return;
+      if (event.target.closest('[data-edit-worker], [data-open-worker]')) return;
       select();
+    });
+  });
+  // Bei `read` fuehrt das Profil in die Leseansicht (wie der Bericht-Knopf
+  // an einer Besuchszeile) - Kontaktdaten, Geburtstag, Tarif und Notizen
+  // stuenden sonst nur im Bearbeiten-Dialog, und der geht bei `read` nicht auf.
+  content.querySelectorAll('[data-open-worker]').forEach((btn) => {
+    btn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const worker = state.workers.find((item) => String(item.id) === btn.dataset.openWorker);
+      if (worker) openStaffReadModal(worker);
     });
   });
   content.querySelector('#housekeeping-staff-month')?.addEventListener('change', async (event) => {
@@ -1392,7 +1435,13 @@ function receiptFieldHtml(visit) {
 }
 
 function openVisitEditModal(visit, content, { onDone } = {}) {
-  if (readOnly()) return;
+  // Der Riegel steht VOR jeder Vorbereitung, und ein bestehender Besuch geht
+  // bei `read` als Leseansicht auf: der Einsatzbericht zeigt alles, was der
+  // Dialog zeigt (Muster: `openNoteModal()` in notes.js, #1265 P1).
+  if (readOnly()) {
+    openVisitReportModal(visit);
+    return;
+  }
   const worker = state.workers.find((item) => String(item.id) === String(visit.worker_id)) || null;
   openModal({
     title: t('housekeeping.editVisit'),
@@ -1543,8 +1592,67 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
   if (window.lucide) window.lucide.createIcons({ el: panel });
 }
 
+/**
+ * Das Profil einer Person bei `housekeeping: read`: Leseansicht, sonst nichts
+ * (#1265 P6, Muster: `openNoteReadModal()` in notes.js, #1265 P1).
+ *
+ * Warum ein eigener Dialog und nicht der Bearbeiten-Dialog mit gesperrten
+ * Feldern: jedes Stueck davon SCHREIBT - das Bild waehlt eine Datei, jedes Feld
+ * ist eine Eingabe, die Fusszeile speichert. Uebrig bleiben die Werte, und genau
+ * die zeigt dieser Dialog: alles, was der Bearbeiten-Dialog zeigt, und nichts,
+ * was er nicht zeigt. Der Tarif erscheint wie dort nur mit dem Satz, der zur
+ * Abrechnungsart gehoert.
+ *
+ * Die Antwort folgt dem DATENSATZ: ein leeres Feld (kein Benutzername, keine
+ * E-Mail, keine Notiz) bekommt keine Zeile - ein Strich waere ein Wert, den es
+ * nicht gibt. Die beiden Farben stehen als Farbfeld MIT ihrem Wert, damit die
+ * Auskunft nicht allein an der Farbe haengt.
+ */
+function openStaffReadModal(worker) {
+  const hourly = worker.rate_type === 'hourly';
+  const row = (labelKey, valueHtml) => `
+          <div><dt>${esc(t(labelKey))}</dt><dd>${valueHtml}</dd></div>`;
+  const swatch = (color) => `<span class="housekeeping-swatch" style="--swatch:${esc(color)}" aria-hidden="true"></span>${esc(color)}`;
+  openModal({
+    title: t('housekeeping.profileTitle'),
+    size: 'md',
+    content: `
+      <div class="housekeeping-report-modal" data-view="read">
+        <div class="housekeeping-staff-row">
+          <div class="housekeeping-avatar" style="background:${esc(worker.avatar_color) || 'var(--module-housekeeping)'}">
+            ${worker.avatar_data ? `<img src="${esc(worker.avatar_data)}" alt="${esc(worker.display_name)}">` : esc(initials(worker.display_name))}
+          </div>
+          <div>
+            <strong>${esc(worker.display_name)}</strong>
+          </div>
+        </div>
+        <dl class="housekeeping-report-details">
+          ${worker.username ? row('housekeeping.workerUsername', esc(worker.username)) : ''}
+          ${worker.phone ? row('housekeeping.workerPhone', esc(worker.phone)) : ''}
+          ${worker.email ? row('housekeeping.workerEmail', esc(worker.email)) : ''}
+          ${worker.birth_date ? row('housekeeping.workerBirthDate', esc(formatDate(worker.birth_date))) : ''}
+          ${row('housekeeping.rateType', esc(t(hourly ? 'housekeeping.rateHourly' : 'housekeeping.rateDaily')))}
+          ${hourly
+    ? row('housekeeping.hourlyRate', esc(money(worker.hourly_rate)))
+    : row('housekeeping.dailyRate', esc(money(worker.daily_rate)))}
+          ${row('housekeeping.paymentSchedule', esc(scheduleLabel(worker.payment_schedule)))}
+          ${worker.calendar_color ? row('housekeeping.calendarColor', swatch(worker.calendar_color)) : ''}
+          ${worker.avatar_color ? row('housekeeping.profileColor', swatch(worker.avatar_color)) : ''}
+          ${worker.notes ? `
+          <div class="housekeeping-report-details__block"><dt>${esc(t('housekeeping.workerNotes'))}</dt><dd>${esc(worker.notes)}</dd></div>` : ''}
+        </dl>
+      </div>
+    `,
+  });
+}
+
 function openStaffModal(worker, content, options = {}) {
-  if (readOnly()) return;
+  // Der Riegel steht VOR jeder Vorbereitung: der Anlegeweg entfaellt ganz, eine
+  // bestehende Person geht als Leseansicht auf (wie `openNoteModal()`).
+  if (readOnly()) {
+    if (worker) openStaffReadModal(worker);
+    return;
+  }
   const item = worker || {};
   state.workerAvatar = item.avatar_data ?? null;
   openModal({
@@ -1879,6 +1987,7 @@ export const __test = {
   openVisitReportModal,
   openTaskEditModal,
   openStaffModal,
+  openStaffReadModal,
   toggleSession,
   createTask,
   payVisit,

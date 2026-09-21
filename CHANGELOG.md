@@ -162,11 +162,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rather than as a greyed-out button, and something that only acts disappears. A housekeeper who is
   checked in right now therefore still shows as "Currently here", in the words of the dashboard
   tile, and every chore keeps its name, area, rhythm and how urgent it is. Visits, the monthly
-  reports, the month switch and the visit report stay as they were. The receipt upload in the visit
-  dialog now also asks about Documents, where the receipt is stored: somebody allowed to edit
-  Housekeeping but only to read Documents saw the upload, and saving ended in an error before the
-  visit itself was saved. The upload is gone for them, a receipt that is already linked stays
-  listed, and saving the visit keeps it. (#1265)
+  reports and the month switch stay as they were. What only an edit form used to show is now
+  readable too: a housekeeper's profile opens as a read-only view with everything the form shows -
+  contact details, birthday, billing, schedule, colours and notes - and the visit report now also
+  lists the minutes worked on an hourly visit and the payment receipt, where your access to
+  Documents lets you read it. The receipt upload in the visit dialog now also asks about Documents,
+  where the receipt is stored: somebody allowed to edit Housekeeping but only to read Documents saw
+  the upload, and saving ended in an error before the visit itself was saved. The upload is gone
+  for them, a receipt that is already linked stays listed, and saving the visit keeps it. (#1265)
 
 - **A nightly recurring appointment that crosses midnight no longer covers the entry it should be
   sharing its column with.** On a day that carries two occurrences of the same series - last

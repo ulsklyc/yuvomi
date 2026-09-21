@@ -605,6 +605,36 @@
   text-align: right;
 }
 
+/* Ein langer Freitext (die Notizen eines Profils, #1265 P6) steht UNTER seiner
+ * Beschriftung statt rechtsbuendig daneben, mit den Zeilenumbruechen, die er
+ * im Bearbeiten-Dialog hatte. Die Zeilenregel oben traegt (0,1,1), deshalb die
+ * Klasse hier mit ihrem Traeger. */
+.housekeeping-report-details .housekeeping-report-details__block {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.housekeeping-report-details__block dd {
+  text-align: start;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+/* Kalender- und Profilfarbe in der Leseansicht eines Profils: ein Farbfeld,
+ * immer MIT dem Wert daneben (die Auskunft haengt nicht allein an der Farbe).
+ * Der Wert ist DATEN und kommt als `--swatch` aus dem Markup, wie
+ * `--bar-scale` am Zahlungsdiagramm. */
+.housekeeping-swatch {
+  display: inline-block;
+  inline-size: var(--space-4);
+  block-size: var(--space-4);
+  margin-inline-end: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--swatch);
+  vertical-align: middle;
+}
+
 .housekeeping-staff-row {
   display: grid;
   grid-template-columns: 48px 1fr auto;

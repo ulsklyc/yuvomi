@@ -2592,6 +2592,7 @@ test('Personal-Tab mit `housekeeping: read`: kein Bearbeiten, die Auswahl und da
   const lesen = hkContainer();
   withAccess({ housekeeping: 'read' }, () => hk.renderStaff(lesen));
   assert.doesNotMatch(lesen.html, /data-edit-worker/);
+  assert.match(lesen.html, /data-open-worker="7"/, 'statt Bearbeiten der Weg ins Profil (Leseansicht)');
   for (const weg of ['data-pay-visit', 'data-edit-visit', 'data-delete-visit']) {
     assert.doesNotMatch(lesen.html, new RegExp(weg), `${weg}: auch nicht mit veralteten Feldern`);
   }
@@ -2604,13 +2605,14 @@ test('Personal-Tab mit `housekeeping: read`: kein Bearbeiten, die Auswahl und da
   for (const nie of ['[data-edit-worker]', '[data-edit-visit]', '[data-pay-visit]', '[data-delete-visit]']) {
     assert.ok(!lesen.gefragt.includes(nie), `${nie} wird nicht verdrahtet`);
   }
-  for (const lesend of ['[data-select-worker]', '#housekeeping-staff-month', '[data-open-visit]']) {
+  for (const lesend of ['[data-select-worker]', '#housekeeping-staff-month', '[data-open-visit]', '[data-open-worker]']) {
     assert.ok(lesen.gefragt.includes(lesend), `${lesend} liest und bleibt verdrahtet`);
   }
 
   const schreiben = hkContainer();
   withAccess({ housekeeping: 'write' }, () => hk.renderStaff(schreiben));
   assert.match(schreiben.html, /data-edit-worker="7"/);
+  assert.doesNotMatch(schreiben.html, /data-open-worker/, 'mit Schreibrecht zeigt der Bearbeiten-Dialog alles');
   assert.match(schreiben.html, /data-pay-visit="12"/);
   assert.match(schreiben.html, /data-edit-visit="12"/);
   assert.match(schreiben.html, /data-delete-visit="12"/);
@@ -2642,19 +2644,108 @@ test('Bezahl-Knopf des Protokolls: kein gesperrter Knopf, der „Als bezahlt mar
 // Die Einstiege: ein Aufruf ohne Knopf findet denselben Riegel
 // -------------------------------------------------------------------------
 
-test('jeder Dialog-Einstieg fragt selbst: bei `read` geht keiner auf', () => {
+test('jeder Dialog-Einstieg fragt selbst: bei `read` kein Editor, ein bestehender Datensatz geht als Leseansicht auf', () => {
   hkState({ workers: [{ id: 7, display_name: 'Ana' }] });
-  const aufrufe = [
-    ['openTaskEditModal', () => hk.openTaskEditModal({ id: 3, name: 'A', area: 'B', frequency_days: 7 }, hkContainer())],
-    ['openVisitEditModal', () => hk.openVisitEditModal(hkBesuch(), hkContainer())],
-    ['openStaffModal', () => hk.openStaffModal(null, hkContainer())],
+  // Das Muster aus P1 (`openNoteModal()`): der Riegel steht im Einstieg, der
+  // Anlegeweg fuehrt nirgends hin, ein bestehender Datensatz in die Leseansicht.
+  const faelle = [
+    // Die Hausaufgabe hat keine: ihr Bearbeiten-Dialog zeigt Name, Bereich und
+    // Rhythmus, und alle drei stehen in der Zeile selbst (taskRowHtml).
+    ['openTaskEditModal', () => hk.openTaskEditModal({ id: 3, name: 'A', area: 'B', frequency_days: 7 }, hkContainer()), null],
+    ['openVisitEditModal', () => hk.openVisitEditModal(hkBesuch(), hkContainer()), 'housekeeping.visitReportDetails'],
+    ['openStaffModal (anlegen)', () => hk.openStaffModal(null, hkContainer()), null],
+    ['openStaffModal (bestehend)', () => hk.openStaffModal({ id: 7, display_name: 'Ana', payment_schedule: 'monthly' }, hkContainer()), 'housekeeping.profileTitle'],
   ];
-  for (const [name, aufruf] of aufrufe) {
+  for (const [name, aufruf, leseansicht] of faelle) {
     const lesen = mitModal(() => withAccess({ housekeeping: 'read' }, aufruf));
-    assert.equal(lesen.length, 0, `${name}() oeffnet bei read nichts`);
+    if (leseansicht) {
+      assert.equal(lesen.length, 1, `${name}: der Datensatz geht auf - Lesen ist erlaubt`);
+      assert.equal(lesen[0].title, leseansicht, `${name}: als Leseansicht`);
+      assert.doesNotMatch(lesen[0].content, /<form|<input|<select|<textarea|type="submit"/, `${name}: ohne ein einziges Eingabefeld`);
+    } else {
+      assert.equal(lesen.length, 0, `${name}() oeffnet bei read nichts`);
+    }
     const schreiben = mitModal(() => withAccess({ housekeeping: 'write' }, aufruf));
     assert.equal(schreiben.length, 1, `${name}() oeffnet mit Schreibrecht - sonst maesse die Zeile oben nichts`);
+    assert.match(schreiben[0].content, /<form/, `${name}: mit Schreibrecht der Editor`);
   }
+});
+
+// -------------------------------------------------------------------------
+// Leseansichten: alles, was der Editor zeigt (#1265, Regel vom 21.09.)
+//
+// Gemessen am WERT, nicht an der Beschriftung: jeder Wert, den der Editor mit
+// Schreibrecht zeigt, muss bei `read` in der Leseansicht stehen - je als Paar
+// aus der Form im Editor (ein Betrag steht dort roh im Eingabefeld) und der
+// Form in der Leseansicht (formatiert). Die Zusicherung am Editor sorgt dafuer,
+// dass die Liste nicht an Werten misst, die gar keiner zeigt.
+// -------------------------------------------------------------------------
+
+test('Profil bei `housekeeping: read`: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs', () => {
+  const ana = {
+    id: 7, display_name: 'Ana Lopez', username: 'ana.l', phone: '0151 2345', email: 'ana@example.org',
+    birth_date: '1990-04-12', rate_type: 'hourly', daily_rate: 0, hourly_rate: 14.5,
+    payment_schedule: 'twice_monthly', calendar_color: '#12AB34', avatar_color: '#FF8800',
+    notes: 'Schluessel beim Nachbarn\nDienstags frueher',
+  };
+  const werte = [
+    ['Ana Lopez', 'Ana Lopez'], ['ana.l', 'ana.l'], ['0151 2345', '0151 2345'],
+    ['ana@example.org', 'ana@example.org'], ['1990-04-12', '1990-04-12'],
+    ['housekeeping.rateHourly', 'housekeeping.rateHourly'], ['value="14.5"', '14,50'],
+    ['housekeeping.scheduleTwiceMonthly', 'housekeeping.scheduleTwiceMonthly'],
+    ['#12AB34', '#12AB34'], ['#FF8800', '#FF8800'], ['Schluessel beim Nachbarn', 'Schluessel beim Nachbarn'],
+  ];
+
+  const [editor] = mitModal(() => withAccess({ housekeeping: 'write' }, () => hk.openStaffModal(ana, hkContainer())));
+  for (const [imEditor] of werte) assert.ok(editor.content.includes(imEditor), `der Editor zeigt ${imEditor} - sonst misst die Liste nichts`);
+
+  const [lesen] = mitModal(() => withAccess({ housekeeping: 'read' }, () => hk.openStaffModal(ana, hkContainer())));
+  for (const [, inLeseansicht] of werte) assert.ok(lesen.content.includes(inLeseansicht), `die Leseansicht zeigt ${inLeseansicht}`);
+  assert.match(lesen.content, /<span class="housekeeping-swatch" style="--swatch:#12AB34" aria-hidden="true"><\/span>#12AB34/,
+    'die Farbe als Feld UND als Wert - nicht allein an der Farbe');
+  assert.doesNotMatch(lesen.content, /housekeeping\.dailyRate/, 'wie im Editor nur der Satz der gewaehlten Abrechnungsart');
+
+  // Die Antwort folgt dem Datensatz: was nicht gesetzt ist, bekommt keine Zeile.
+  const [knapp] = mitModal(() => withAccess({ housekeeping: 'read' }, () => (
+    hk.openStaffReadModal({ id: 8, display_name: 'Bea', rate_type: 'daily', daily_rate: 60, payment_schedule: 'monthly' })
+  )));
+  for (const leer of ['workerUsername', 'workerPhone', 'workerEmail', 'workerBirthDate', 'workerNotes', 'hourlyRate']) {
+    assert.doesNotMatch(knapp.content, new RegExp(`housekeeping\\.${leer}`), `${leer} ist nicht gesetzt und hat keine Zeile`);
+  }
+  assert.match(knapp.content, /housekeeping\.dailyRate/);
+  assert.match(knapp.content, /60,00/);
+});
+
+test('Besuch bei `housekeeping: read`: der Einsatzbericht zeigt jeden Wert des Einsatz-Dialogs, auch Minuten und Beleg', () => {
+  hkState({ workers: [{ id: 7, display_name: 'Ana' }] });
+  const stunden = hkBesuch({
+    rate_type: 'hourly', minutes_worked: 135, daily_rate: 31.5, extras: 4,
+    receipt_document_id: 44, receipt_document_name: 'Beleg - Ana - 06.08.',
+  });
+  const werte = [
+    ['2026-08-06', '2026-08-06'], ['value="135"', '135'], ['31,50', '31,50'],
+    ['value="4"', '4,00'], ['Beleg - Ana - 06.08.', 'Beleg - Ana - 06.08.'],
+  ];
+
+  const [editor] = mitModal(() => withAccess({ housekeeping: 'write' }, () => hk.openVisitEditModal(stunden, hkContainer())));
+  for (const [imEditor] of werte) assert.ok(editor.content.includes(imEditor), `der Editor zeigt ${imEditor} - sonst misst die Liste nichts`);
+
+  const [lesen] = mitModal(() => withAccess({ housekeeping: 'read' }, () => hk.openVisitEditModal(stunden, hkContainer())));
+  for (const [, inLeseansicht] of werte) assert.ok(lesen.content.includes(inLeseansicht), `der Einsatzbericht zeigt ${inLeseansicht}`);
+  assert.match(lesen.content, /<dt>housekeeping\.minutesWorked<\/dt><dd>135<\/dd>/);
+  assert.match(lesen.content, /<dt>housekeeping\.computedAmount<\/dt>/, 'nach Stunden wie im Dialog: der berechnete Betrag');
+  assert.match(lesen.content, /<dt>housekeeping\.receiptLabel<\/dt><dd>Beleg - Ana - 06\.08\.<\/dd>/);
+
+  // Der Beleg folgt dem Dokumentenrecht, im Bericht wie im Dialog.
+  const [ohneDokumente] = mitModal(() => withAccess({ housekeeping: 'read', documents: 'none' }, () => hk.openVisitReportModal(stunden)));
+  assert.doesNotMatch(ohneDokumente.content, /receiptLabel/, 'bei `documents: none` antwortet schon das Lesen mit 403');
+  const [nurLesen] = mitModal(() => withAccess({ housekeeping: 'read', documents: 'read' }, () => hk.openVisitReportModal(stunden)));
+  assert.match(nurLesen.content, /receiptLabel/, 'Lesen genuegt');
+
+  // Ein Besuch nach Tagessatz behaelt seine Zeile, und ohne Beleg gibt es keine.
+  const [tag] = mitModal(() => withAccess({ housekeeping: 'read' }, () => hk.openVisitReportModal(hkBesuch())));
+  assert.match(tag.content, /<dt>housekeeping\.dailyRate<\/dt>/);
+  assert.doesNotMatch(tag.content, /minutesWorked|receiptLabel/);
 });
 
 test('Check-in, Anlegen und Bezahlen schreiben bei `read` nichts - auch ohne Knopf aufgerufen', async () => {
@@ -2788,8 +2879,8 @@ test('READ_SAFE_CONTROLS ist eine Positivliste und enthaelt nur lesende Bedienel
   assert.deepEqual(erlaubt, [
     '#housekeeping-report-current', '#housekeeping-report-next', '#housekeeping-report-prev',
     '#housekeeping-staff-month', '.housekeeping-staff-row__select', '.housekeeping-tab',
-    '[data-open-visit]', '[data-visit-report]',
-  ], 'Tab, Bericht, Personenwahl und Monat - alles andere dieser Seite schreibt');
+    '[data-open-visit]', '[data-open-worker]', '[data-visit-report]',
+  ], 'Tab, Bericht, Profil, Personenwahl und Monat - alles andere dieser Seite schreibt');
   // Kein Eintrag darf veraltet sein: was hier steht, muss im Markup vorkommen.
   for (const sel of erlaubt) {
     const kern = sel.replace(/^[#.]|^\[|\]$/g, '');
@@ -2823,7 +2914,7 @@ test('readOnlyLatch(): bei `read` faengt er jedes Bedienelement ausser den lesen
       hk.readOnlyLatch(e);
       assert.equal(e.abgefangen, 2, `${schreibend} wird abgefangen (preventDefault + stopPropagation)`);
     }
-    for (const lesend of ['[data-open-visit]', '.housekeeping-staff-row__select', '#housekeeping-staff-month', '.housekeeping-tab']) {
+    for (const lesend of ['[data-open-visit]', '[data-open-worker]', '.housekeeping-staff-row__select', '#housekeeping-staff-month', '.housekeeping-tab']) {
       const e = hkKlick(lesend);
       hk.readOnlyLatch(e);
       assert.equal(e.abgefangen, 0, `${lesend} liest und kommt durch`);
