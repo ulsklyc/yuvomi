@@ -1,5 +1,5 @@
 /** Pure fasting timer and dial calculations shared by the page and tests. */
-import { getNumberFormat, t } from '../i18n.js';
+import { formatUnit, t } from '../i18n.js';
 
 const MAX_GOAL_HOURS = 14 * 24;
 const MINUTE = 60 * 1000;
@@ -158,9 +158,7 @@ export function formatFastingDuration(rawMinutes) {
   const hours = Math.floor((total % DAY_MINUTES) / 60);
   const minutes = total % 60;
   const parts = [];
-  const unit = (value, name) => getNumberFormat({
-    style: 'unit', unit: name, unitDisplay: 'short',
-  }).format(value);
+  const unit = (value, name) => formatUnit(value, name, { unitDisplay: 'short' });
   if (days) parts.push(unit(days, 'day'));
   if (hours) parts.push(unit(hours, 'hour'));
   if (minutes || parts.length === 0) parts.push(unit(minutes, 'minute'));

@@ -17,6 +17,7 @@ import {
   fastingStatsQuery,
   shouldLoadFastingStats,
 } from '../public/utils/health-fasting.js';
+import { withLocales } from './i18n-env.js';
 
 test('journal filters stay out of stats requests and completion hints name their calendar', () => {
   const view = { self: 1, subject: 2, from: '2026-09-01', to: '2026-09-30' };
@@ -127,13 +128,27 @@ test('dial reserves future goal days and uses neutral overlapping educational ph
   assert.equal(fastingDialModel({ zoneMode: 'timer' }).zones.length, 0);
 });
 
-test('duration formatter preserves days and minutes', () => {
-  const unit = (value, name) => new Intl.NumberFormat('de', {
-    style: 'unit', unit: name, unitDisplay: 'short',
-  }).format(value);
-  assert.equal(formatFastingDuration(25 * 60 + 7), [
-    unit(1, 'day'), unit(1, 'hour'), unit(7, 'minute'),
-  ].join(' '));
+// Interface language and region are set apart (test/i18n-env.js), otherwise the
+// test cannot see which of them supplies the word: with both left at `de` it
+// compared against Intl('de'), and "1 Tg. 1 Std. 7 Min." under an English
+// interface stayed green (#1365). The word belongs to the person, the number to
+// the household.
+test('duration formatter preserves days and minutes in the interface language with region digits', async () => {
+  const duration = 25 * 60 + 7;
+  await withLocales({ language: 'en', region: 'de-DE' }, () => {
+    assert.equal(formatFastingDuration(duration), '1 day 1 hr 7 min');
+    assert.equal(formatFastingDuration(1000 * 24 * 60 + 60), '1.000 days 1 hr', 'grouping from the region');
+    assert.equal(formatFastingDuration(0), '0 min');
+  });
+  await withLocales({ language: 'de', region: 'de-DE' }, () => {
+    assert.equal(formatFastingDuration(duration), '1 Tg. 1 Std. 7 Min.');
+  });
+  await withLocales({ language: 'en', region: 'ar-SA' }, () => {
+    assert.equal(formatFastingDuration(duration), '١ day ١ hr ٧ min');
+  });
+  await withLocales({ language: 'fr', region: 'de-CH' }, () => {
+    assert.equal(formatFastingDuration(1000 * 24 * 60 + 60), "1'000\u202fj 1\u202fh");
+  });
 });
 
 test('clock ticks within the first minute and never wraps total hours', () => {

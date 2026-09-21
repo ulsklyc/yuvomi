@@ -11,7 +11,9 @@ import {
   numberLocaleFor,
 } from '../public/settings/region-presets.js';
 import { CURRENCY_CODES } from '../public/utils/currency-codes.js';
-import { REGION_TAG } from '../public/i18n.js';
+import { REGION_TAG, formatUnit, getNumberFormat } from '../public/i18n.js';
+import { withoutCommentsKeepingLines } from './source-text.js';
+import { withLocales } from './i18n-env.js';
 import { isRegionTag, regionLanguage } from '../server/utils/i18n.js';
 
 // Die Formprüfung aus getFormatLocale() wird IMPORTIERT, nicht gespiegelt. Bis
@@ -201,32 +203,267 @@ test('beide Formprüfungen nehmen zwei- UND dreibuchstabige Sprachcodes', () => 
   }
 });
 
-test('money/number formatting uses getFormatLocale, never getLocale (#521 regression guard)', async () => {
-  // Zahlen/Währungen MÜSSEN über getFormatLocale() (region-abhängig, z. B. de-CH
-  // → 123'456.78) formatiert werden, nicht über getLocale() (nur UI-Sprache).
-  // Ein Intl.NumberFormat(getLocale()) irgendwo unter public/ ist ein Rückfall
-  // in den #521-Bug. (Intl.DateTimeFormat(getLocale()) für Monats-/Wochentags-
-  // namen bleibt korrekt sprachgebunden und wird hier nicht erfasst.)
-  const dir = new URL('../public/', import.meta.url);
+// --------------------------------------------------------------------------
+// #521 und #1365: WELCHE Locale formatiert eine Zahl, und welche ein Wort.
+//
+// Die Zahl gehört dem Haushalt, das Wort der Person. Ziffern, Trenner und
+// Beträge folgen der Region (`getFormatLocale()`, über `getNumberFormat()`),
+// ein Wert mit Einheit bekommt sein Wort aus der UI-Sprache und seine Zahl aus
+// der Region (`formatUnit()`). Beides lebt in public/i18n.js.
+//
+// Der Vorgänger dieses Guards las die SCHREIBWEISE `NumberFormat(getLocale()`
+// und war damit an zwei Stellen blind: `new Intl.NumberFormat(currentLocale)`
+// in i18n.js sah er nicht, und `getNumberFormat({ style: 'unit' })` sah er als
+// richtig an - die Region lieferte dort auch das Wort, und eine englische
+// Oberfläche zeigte „3 Wochen" (#1365). Er prüft jetzt die REGEL: Intl.NumberFormat
+// nur an den Stellen unten, `style: 'unit'` nur im Helfer.
+//
+// Gelesen wird über withoutCommentsKeepingLines() aus source-text.js: ein
+// Kommentar, der Intl.NumberFormat NENNT, formatiert nichts, und ein Guard, der
+// ihn meldet, prüft wieder eine Schreibweise. Code hinter einer URL in einem
+// String (`'https://...'`) bleibt dabei sichtbar - das hält der Test mit den
+// Proben unten fest, bevor er dem Leser den Bestand glaubt.
+// --------------------------------------------------------------------------
+
+// Jede Stelle, an der Intl.NumberFormat stehen darf, mit Funktion und Grund.
+// Eine neue braucht einen Eintrag hier, und eine verwaiste Erlaubnis fällt auf.
+const NUMBER_FORMAT_PLACES = [
+  { file: 'public/i18n.js', fn: 'getNumberFormat',
+    why: 'Zahlen und Beträge in der Format-Locale der Region (#521)' },
+  { file: 'public/i18n.js', fn: 'formatUnit',
+    why: 'Wert mit Einheit: Wort aus der UI-Sprache, Zahl aus der Region (#1365)' },
+  { file: 'public/utils/money.js', fn: 'numberSeparators',
+    why: 'misst Dezimal- und Gruppentrenner JEDER Region für die Eingabe, zeigt nichts an' },
+  { file: 'public/utils/digits.js', fn: 'buildDigitMap',
+    why: 'liest die Ziffern jedes Ziffernsystems über das neutrale en, zeigt nichts an' },
+];
+
+// `style: 'unit'` macht aus einer Zahl ein Wort, und das Wort gehört der
+// UI-Sprache. Nur der Helfer darf es: er setzt die Zahl der Region ein.
+const UNIT_STYLE_PLACES = [
+  { file: 'public/i18n.js', fn: 'formatUnit', why: 'der Helfer selbst (#1365)' },
+];
+
+// Die Option in jeder Schreibweise, auch als Objekt in einer Variablen oder als
+// Zuweisung: `style: 'unit'`, `'style': "unit"`, `opts.style = 'unit'`,
+// `opts['style'] = 'unit'`. Ein Vergleich (`style === 'unit'`) setzt nichts.
+const UNIT_STYLE = /(?:\bstyle\b|\[\s*(['"`])style\1\s*\]|(['"`])style\2)\s*(?::|=(?!=))\s*(['"`])unit\3/g;
+const NUMBER_FORMAT = /\bNumberFormat\b/g;
+
+/** Umfang einer Funktion auf oberster Ebene: vom Kopf bis zur `}` am Zeilenanfang. */
+function functionSpan(code, name) {
+  const head = new RegExp(`^(?:export\\s+)?(?:async\\s+)?function\\s+${name}\\s*\\(`, 'm').exec(code);
+  if (!head) return null;
+  const end = code.indexOf('\n}', head.index);
+  return end === -1 ? null : { from: head.index, to: end + 2 };
+}
+
+const lineOf = (code, index) => code.slice(0, index).split('\n').length;
+
+/**
+ * Wo steht `pattern` ausserhalb der erlaubten Stellen? Liefert die Funde als
+ * `datei:zeile` und die Stellen, die nichts mehr brauchen oder fehlen.
+ * @param {{ rel: string, src: string }[]} files
+ */
+function placesReport(files, places, pattern) {
+  const offenders = [];
+  const used = new Set();
+  const missing = [];
+  for (const { rel, src } of files) {
+    const code = withoutCommentsKeepingLines(src);
+    const spans = [];
+    for (const place of places.filter((p) => p.file === rel)) {
+      const span = functionSpan(code, place.fn);
+      if (span) spans.push({ ...span, place });
+      else missing.push(`${place.file}: function ${place.fn}`);
+    }
+    for (const hit of code.matchAll(pattern)) {
+      const inside = spans.find((s) => hit.index >= s.from && hit.index < s.to);
+      if (inside) used.add(inside.place);
+      else offenders.push(`${rel}:${lineOf(code, hit.index)}`);
+    }
+  }
+  const unused = places.filter((p) => !used.has(p) && !missing.some((m) => m.endsWith(` ${p.fn}`)));
+  return { offenders, missing, unused: unused.map((p) => `${p.file}: ${p.fn}`) };
+}
+
+async function publicScripts() {
+  const root = new URL('../public/', import.meta.url);
   const files = [];
   async function walk(url) {
     for (const ent of await readdir(url, { withFileTypes: true })) {
       if (ent.name === 'lucide.min.js') continue;
       const child = new URL(ent.name + (ent.isDirectory() ? '/' : ''), url);
       if (ent.isDirectory()) await walk(child);
-      else if (ent.name.endsWith('.js')) files.push(child);
+      else if (ent.name.endsWith('.js')) {
+        files.push({ rel: `public/${child.href.slice(root.href.length)}`, src: await readFile(child, 'utf8') });
+      }
     }
   }
-  await walk(dir);
+  await walk(root);
+  return files;
+}
 
-  const offenders = [];
-  for (const file of files) {
-    const src = await readFile(file, 'utf8');
-    if (/NumberFormat\(\s*getLocale\(\)/.test(src)) {
-      offenders.push(file.pathname.replace(/.*\/public\//, 'public/'));
-    }
+test('der Leser sieht Code hinter einer URL und Optionen in Variablen, keine Kommentare', () => {
+  const probe = (src, places, pattern) => placesReport([{ rel: 'public/probe.js', src }], places, pattern);
+  const helper = [{ file: 'public/probe.js', fn: 'formatUnit', why: 'Probe' }];
+
+  // Die zwei Rückfälle aus #1365: getLocale() irgendwo, currentLocale ausserhalb des Helfers.
+  assert.deepEqual(probe(
+    "const url = 'https://example.org/a//b'; const f = new Intl.NumberFormat(getLocale(), {});",
+    [], NUMBER_FORMAT,
+  ).offenders, ['public/probe.js:1'], 'Code hinter `//` in einem String muss sichtbar bleiben');
+  assert.deepEqual(probe([
+    'export function formatUnit(value) {',
+    "  return new Intl.NumberFormat(currentLocale, { style: 'unit', unit: 'day' }).format(value);",
+    '}',
+    'export function formatDate(value) {',
+    '  return new Intl.NumberFormat(currentLocale).format(value);',
+    '}',
+  ].join('\n'), helper, NUMBER_FORMAT).offenders, ['public/probe.js:5'],
+  'im Helfer erlaubt, eine Funktion weiter nicht');
+  assert.deepEqual(probe('const { NumberFormat } = Intl;\nconst f = Intl["NumberFormat"];', [], NUMBER_FORMAT).offenders,
+    ['public/probe.js:1', 'public/probe.js:2'], 'auch ohne den Punkt');
+  assert.deepEqual(probe('// new Intl.NumberFormat(getLocale())\n/* Intl.NumberFormat */', [], NUMBER_FORMAT).offenders, [],
+    'ein Kommentar formatiert nichts');
+
+  // style: 'unit' in jeder Schreibweise, auch als Objekt in einer Variablen.
+  assert.deepEqual(probe([
+    "const opts = { style: 'unit', unit: 'week' };",
+    'getNumberFormat(opts).format(3);',
+    "const b = { 'style': \"unit\" };",
+    "b.style = 'unit';",
+    "b['style'] = `unit`;",
+    "if (b.style === 'unit') b.ok = true;",
+  ].join('\n'), [], UNIT_STYLE).offenders,
+  ['public/probe.js:1', 'public/probe.js:3', 'public/probe.js:4', 'public/probe.js:5']);
+
+  // Eine Erlaubnis, deren Funktion fehlt, meldet sich - sonst deckte sie still nichts.
+  assert.deepEqual(probe('const x = 1;', helper, NUMBER_FORMAT).missing, ['public/probe.js: function formatUnit']);
+});
+
+test('Intl.NumberFormat steht nur an den erlaubten Stellen (#521, #1365)', async () => {
+  const report = placesReport(await publicScripts(), NUMBER_FORMAT_PLACES, NUMBER_FORMAT);
+  assert.deepEqual(report.missing, [], 'eine erlaubte Stelle gibt es nicht mehr - Liste nachziehen');
+  assert.deepEqual(report.offenders, [],
+    'Intl.NumberFormat ausserhalb der erlaubten Stellen. Zahlen und Beträge laufen über '
+    + 'getNumberFormat() (Region, #521), ein Wert mit Einheit über formatUnit() (Wort aus der '
+    + 'UI-Sprache, Zahl aus der Region, #1365). Eine eigene Stelle braucht einen Eintrag mit Grund '
+    + `in NUMBER_FORMAT_PLACES:\n  ${report.offenders.join('\n  ')}`);
+  assert.deepEqual(report.unused, [], 'eine Erlaubnis ohne Intl.NumberFormat deckt morgen eine neue Stelle');
+});
+
+test("style: 'unit' steht nur im Helfer formatUnit() (#1365)", async () => {
+  const report = placesReport(await publicScripts(), UNIT_STYLE_PLACES, UNIT_STYLE);
+  assert.deepEqual(report.missing, [], 'der Helfer fehlt');
+  assert.deepEqual(report.offenders, [],
+    "style: 'unit' ausserhalb von formatUnit(): das Wort käme aus der Region statt aus der "
+    + `UI-Sprache. formatUnit(wert, einheit, { unitDisplay }) nehmen:\n  ${report.offenders.join('\n  ')}`);
+  assert.deepEqual(report.unused, [], 'der Helfer setzt style: unit nicht mehr - dann misst dieser Guard nichts');
+});
+
+// Die Zahl gehört dem Haushalt, das Wort der Person. Gefahren wird die ECHTE
+// i18n.js mit getrennt gesetzter UI-Sprache und Region (test/i18n-env.js).
+const UNIT_CASES = [
+  { language: 'en', region: 'de-DE', weeks: '3 weeks', hours: '1,5 hours' },
+  { language: 'fr', region: 'de-CH', weeks: '3 semaines', hours: '1.5 heure' },
+  { language: 'de', region: 'de-DE', weeks: '3 Wochen', hours: '1,5 Stunden' },
+  // Arabische Ziffern (arab) aus der Region, das Wort aus der Sprache.
+  { language: 'ar', region: 'ar-SA', weeks: '٣ أسابيع', hours: '١٫٥ ساعة' },
+  { language: 'en', region: 'ar-SA', weeks: '٣ weeks', hours: '١٫٥ hours' },
+  // Persisch bringt eigene Ziffern (arabext) mit - die Region ersetzt sie ganz.
+  { language: 'fa', region: 'fa-IR', weeks: '۳ هفته', hours: '۱٫۵ ساعت' },
+  { language: 'fa', region: 'de-DE', weeks: '3 هفته', hours: '1,5 ساعت' },
+  { language: 'en', region: 'fa-IR', weeks: '۳ weeks', hours: '۱٫۵ hours' },
+];
+
+test('Wert mit Einheit: Wort aus der UI-Sprache, Zahl aus der Region (#1365)', async () => {
+  for (const { language, region, weeks, hours } of UNIT_CASES) {
+    await withLocales({ language, region }, () => {
+      assert.equal(formatUnit(3, 'week', { unitDisplay: 'long' }), weeks, `UI ${language} + Region ${region}`);
+      assert.equal(formatUnit(1.5, 'hour', { unitDisplay: 'long' }), hours, `UI ${language} + Region ${region}`);
+    });
   }
-  assert.deepEqual(offenders, [], `Intl.NumberFormat(getLocale()) muss getFormatLocale() sein: ${offenders.join(', ')}`);
+  // Wo Sprache und Region zusammenpassen, bleibt es beim Wortlaut von vorher.
+  await withLocales({ language: 'de', region: 'de-DE' }, () => {
+    const vorher = (value, unit) => new Intl.NumberFormat('de-DE', { style: 'unit', unit, unitDisplay: 'long' }).format(value);
+    assert.equal(formatUnit(3, 'week', { unitDisplay: 'long' }), vorher(3, 'week'));
+    assert.equal(formatUnit(1.5, 'hour', { unitDisplay: 'long' }), vorher(1.5, 'hour'));
+  });
+});
+
+test('Arabisch 1 und 2 haben keinen Zahlteil und bleiben, wie die Sprache sie schreibt', async () => {
+  for (const region of ['ar-SA', 'de-DE']) {
+    await withLocales({ language: 'ar', region }, () => {
+      assert.equal(formatUnit(1, 'week', { unitDisplay: 'long' }), 'أسبوع', region);
+      assert.equal(formatUnit(2, 'week', { unitDisplay: 'long' }), 'أسبوعان', region);
+    });
+  }
+});
+
+test('die Region ersetzt die Zahl ganz: Gruppierung, Vorzeichen und seine Richtungsmarke', async () => {
+  await withLocales({ language: 'en', region: 'de-CH' }, () => {
+    assert.equal(formatUnit(1234.5, 'hour', { unitDisplay: 'long' }), "1'234.5 hours");
+  });
+  // ar-SA setzt ein ALM vor das Minus - es kommt mit der Zahl.
+  await withLocales({ language: 'en', region: 'ar-SA' }, () => {
+    assert.equal(formatUnit(-1.5, 'hour', { unitDisplay: 'long' }), '؜-١٫٥ hours');
+  });
+  // fa schreibt LRM und U+2212 vor seine Zahl - beides geht mit ihr.
+  await withLocales({ language: 'fa', region: 'de-DE' }, () => {
+    assert.equal(formatUnit(-1.5, 'hour', { unitDisplay: 'long' }), '-1,5 ساعت');
+  });
+});
+
+test('ein Regionswechsel ohne setLocale() trifft keinen alten Formatter (Cache-Schlüssel)', async () => {
+  await withLocales({ language: 'en', region: 'de-DE' }, ({ setRegion }) => {
+    const hours = () => formatUnit(1.5, 'hour', { unitDisplay: 'long' });
+    assert.equal(hours(), '1,5 hours');
+    setRegion('de-CH');
+    assert.equal(hours(), '1.5 hours');
+    setRegion('ar-SA');
+    assert.equal(hours(), '١٫٥ hours');
+    setRegion(null);
+    assert.equal(hours(), '1.5 hours', 'ohne Region folgt auch die Zahl der UI-Sprache');
+  });
+});
+
+test('Zahlen und Beträge folgen weiter allein der Region (#521)', async () => {
+  await withLocales({ language: 'en', region: 'de-DE' }, () => {
+    assert.equal(getNumberFormat({ maximumFractionDigits: 1 }).format(1234.5), '1.234,5');
+    assert.equal(getNumberFormat({ style: 'currency', currency: 'EUR' }).format(1234.5), '1.234,50 €');
+  });
+});
+
+// Birthdays und andere Seiten laden '/i18n.js' unter test-browser-loader.mjs als
+// Stub, und dessen formatUnit ist ein Nachbau. Er muss rechnen wie das
+// Original, sonst messen deren Suiten den Stub statt der App.
+test('der formatUnit-Stub des Browser-Loaders rechnet wie das Original', async () => {
+  const { resolve } = await import('./test-browser-loader.mjs');
+  const { url } = await resolve('/i18n.js', {}, () => { throw new Error('/i18n.js ist kein Stub mehr'); });
+  const stub = await import(url);
+  const values = [0, 1, 2, 3, 11, -1.5, 1.5, 1234.5];
+  const pairs = [...UNIT_CASES.map(({ language, region }) => [language, region]), ['ar', 'de-DE'], ['de', 'de-CH']];
+  const vorher = { locale: globalThis.__locale, formatLocale: globalThis.__formatLocale };
+  try {
+    for (const [language, region] of pairs) {
+      globalThis.__locale = language;
+      globalThis.__formatLocale = region;
+      await withLocales({ language, region }, () => {
+        for (const unit of ['minute', 'hour', 'day', 'week']) {
+          for (const unitDisplay of ['short', 'long']) {
+            for (const value of values) {
+              assert.equal(stub.formatUnit(value, unit, { unitDisplay }), formatUnit(value, unit, { unitDisplay }),
+                `${language} + ${region}: ${value} ${unit} ${unitDisplay}`);
+            }
+          }
+        }
+      });
+    }
+  } finally {
+    globalThis.__locale = vorher.locale;
+    globalThis.__formatLocale = vorher.formatLocale;
+  }
 });
 
 test('i18n.js exports getFormatLocale + gecachten getNumberFormat als Zahl-Formatier-Quelle', async () => {

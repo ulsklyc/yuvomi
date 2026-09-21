@@ -97,6 +97,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   their offsets. A `last_completed` without an offset is read in the household time zone instead of
   the server's. (#1364)
 
+- **Durations are written in your interface language, not in the language of the household
+  region.** A fasting duration and a birthday's own reminder took their words from the region: with
+  English as your language and "Deutsch (Deutschland)" as the household region, the fasting journal
+  read "1 Tg. 1 Std. 7 Min." and a birthday reminder "3 Wochen", and an English interface with a
+  Saudi region showed the Arabic word. The region was only ever meant to decide how numbers look,
+  and it still does: the words, their plural form and their order now come from your language, and
+  the digits and separators of the number from the region, the same as every amount next to it -
+  "1,5 hours" in German number style, "٣ weeks" with Arabic digits. Where language and region
+  match, nothing changes. (#1365)
+
 - **A birthday without a reminder of its own now shows the reminder it really gets, and saving it
   no longer moves that reminder.** A birthday can come in without a reminder setting: taken over
   from Contacts, created for a household member or for a guest of a shared expense, or created

@@ -81,6 +81,29 @@ const STUBS = {
     export const getFormatLocale = () => globalThis.__formatLocale ?? 'de';
     export const getNumberFormat = (options = {}) =>
       new Intl.NumberFormat(globalThis.__formatLocale ?? 'de', options);
+    // Wert mit Einheit: das Wort aus der UI-Sprache (__locale), die Zahl aus der
+    // Region (__formatLocale) - dieselbe Rechnung wie formatUnit() in
+    // public/i18n.js. Ein Nachbau, weil das Original die Sprache aus seinem
+    // eigenen Modulzustand liest und nicht aus __locale. Damit er nicht still
+    // auseinanderlaeuft, fuehrt test:region-presets Original und Stub ueber
+    // dieselben Sprach- und Regionspaare.
+    export const formatUnit = (value, unit, options = {}) => {
+      const { unitDisplay, ...digits } = options;
+      const parts = new Intl.NumberFormat(globalThis.__locale ?? 'de', {
+        ...digits, style: 'unit', unit, unitDisplay,
+      }).formatToParts(value);
+      const numeric = (part) => ['minusSign', 'plusSign', 'integer', 'group', 'decimal', 'fraction'].includes(part.type);
+      let first = parts.findIndex(numeric);
+      if (first === -1) return parts.map((part) => part.value).join('');
+      const last = parts.findLastIndex(numeric);
+      while (first > 0 && parts[first - 1].type === 'literal'
+        && /^[\\u061c\\u200e\\u200f]+$/.test(parts[first - 1].value)) first--;
+      return [
+        ...parts.slice(0, first).map((part) => part.value),
+        new Intl.NumberFormat(globalThis.__formatLocale ?? 'de', digits).format(value),
+        ...parts.slice(last + 1).map((part) => part.value),
+      ].join('');
+    };
     export const getSupportedLocales = () => ['de', 'en'];
     export const formatDate = (d) => String(d);
     export const formatDayMonth = (d) => String(d);
