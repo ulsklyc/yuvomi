@@ -28,7 +28,7 @@ import {
 import {
   log, NUTRITION_VISIBILITIES, OPEN_ALL,
   viewerId, careAwareClause, applyUpdate, badRequest,
-  resolveOwner, writableClause, canWriteFor,
+  resolveOwner, writableClause, canWriteFor, wallClockInput,
 } from './helpers.js';
 
 const router = express.Router();
@@ -182,7 +182,7 @@ router.post('/nutrition/entries', (req, res) => {
     const b = req.body || {};
 
     const title      = v.str(b.title, 'title', { max: v.MAX_TITLE });
-    const consumedAt = v.datetime(b.consumed_at, 'consumed_at', true);
+    const consumedAt = v.datetime(b.consumed_at, 'consumed_at', true, wallClockInput());
     const mealType   = v.oneOf(b.meal_type, MEAL_TYPES, 'meal_type');
     const note       = v.str(b.note, 'note', { max: v.MAX_TEXT, required: false });
     const visibility = v.oneOf(b.visibility, NUTRITION_VISIBILITIES, 'visibility');
@@ -235,7 +235,7 @@ router.patch('/nutrition/entries/:id', (req, res) => {
     const checks = [];
 
     if (b.title !== undefined) { const r = v.str(b.title, 'title', { max: v.MAX_TITLE }); checks.push(r); if (!r.error) fields.title = r.value; }
-    if (b.consumed_at !== undefined) { const r = v.datetime(b.consumed_at, 'consumed_at', true); checks.push(r); if (!r.error) fields.consumed_at = r.value; }
+    if (b.consumed_at !== undefined) { const r = v.datetime(b.consumed_at, 'consumed_at', true, wallClockInput()); checks.push(r); if (!r.error) fields.consumed_at = r.value; }
     if (b.meal_type !== undefined) {
       if (b.meal_type === null || b.meal_type === '') fields.meal_type = null;
       else { const r = v.oneOf(b.meal_type, MEAL_TYPES, 'meal_type'); checks.push(r.value ? r : { value: null, error: 'meal_type is invalid.' }); if (r.value) fields.meal_type = r.value; }

@@ -47,7 +47,10 @@ export function healthPaths() {
     },
   });
   const MEAL_TYPE_VALUES = ['breakfast', 'lunch', 'dinner', 'snack'];
-  const wallClock = { type: 'string', pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$', description: 'Household wall-clock time, NOT an instant - "today" is a calendar day in the household zone.' };
+  const wallClock = { type: 'string', pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2}(\\.[0-9]+)?)?(Z|[+-][0-9]{2}:?[0-9]{2})?$', description: 'Household wall-clock time, NOT an instant - "today" is a calendar day in the household zone. Stored as YYYY-MM-DDTHH:MM. A value with Z or a numeric offset is converted into the household zone rather than having its offset dropped.' };
+  // Dieselbe Regel fuer jeden Zeitstempel dieses Bereichs, deren Rumpf kein
+  // eigenes Schema traegt (#1364).
+  const WALL_CLOCK_INPUT = ' Timestamps (`measured_at`, `performed_at`, `consumed_at`, `scheduled_at`, `taken_at`) are household wall-clock time, stored as `YYYY-MM-DDTHH:MM`. A value without offset is taken as such; a value with `Z` or a numeric offset is read as an instant and converted into the household time zone, so the same moment sent in UTC or with a local offset lands on the same minute. Up to v2.68.0 the offset was dropped and its digits kept.';
   // Der kanonische Satz aus docs/DECISIONS.md Abschnitt 5, nicht das Paar
   // private/family der uebrigen Gesundheit. Der benannte Satz ('assignees')
   // fehlt, weil es in der Gesundheit keine Zuweisungstabelle gibt, die ihn
@@ -57,10 +60,10 @@ export function healthPaths() {
   return {
     '/api/v1/health/vitals': {
       get: op({ summary: 'List vital measurements', tag: 'Health', description: 'Scoped to the viewer; `?user_id=` filters to a family member (only their `family`-visible rows). Optional `type`, `from`, `to` filters.' }),
-      post: op({ summary: 'Create a vital measurement', tag: 'Health', stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Create a vital measurement', tag: 'Health', stateChanging: true, requestBody: jsonBody(null), description: WALL_CLOCK_INPUT.trim() }),
     },
     '/api/v1/health/vitals/{id}': {
-      patch: op({ summary: 'Update a vital measurement', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      patch: op({ summary: 'Update a vital measurement', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: WALL_CLOCK_INPUT.trim() }),
       delete: op({ summary: 'Delete a vital measurement', tag: 'Health', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/health/medications': {
@@ -81,7 +84,7 @@ export function healthPaths() {
     },
     '/api/v1/health/medications/{id}/logs': {
       get: op({ summary: 'List a medication\'s dose log', tag: 'Health', params: [idParam()], description: 'Optional `from`/`to` filters on `scheduled_at`.' }),
-      post: op({ summary: 'Add a dose-log entry', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Add a dose-log entry', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: WALL_CLOCK_INPUT.trim() }),
     },
     '/api/v1/health/logs/{id}': {
       patch: op({
@@ -90,7 +93,7 @@ export function healthPaths() {
         params: [idParam()],
         stateChanging: true,
         requestBody: jsonBody(null),
-        description: 'Body: { status?, taken_at?, dose_qty?, note? } (#701). `status: "pending"` undoes a take or a skip. The timestamp travels with the status rather than beside it: anything other than `taken` clears `taken_at`, because a dose that was not taken cannot carry a time it was taken at - and that entry would end up in the CSV export too. Restricted to the owner of the medication.',
+        description: 'Body: { status?, taken_at?, dose_qty?, note? } (#701). `status: "pending"` undoes a take or a skip. The timestamp travels with the status rather than beside it: anything other than `taken` clears `taken_at`, because a dose that was not taken cannot carry a time it was taken at - and that entry would end up in the CSV export too. Restricted to the owner of the medication.' + WALL_CLOCK_INPUT,
       }),
       delete: op({
         summary: 'Delete a dose-log entry',
@@ -101,7 +104,7 @@ export function healthPaths() {
       }),
     },
     '/api/v1/health/logs/{id}/take': {
-      post: op({ summary: 'Mark a dose as taken', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Mark a dose as taken', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: WALL_CLOCK_INPUT.trim() }),
     },
     '/api/v1/health/logs/{id}/skip': {
       post: op({ summary: 'Mark a dose as skipped', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
@@ -123,10 +126,10 @@ export function healthPaths() {
     },
     '/api/v1/health/activities': {
       get: op({ summary: 'List activities', tag: 'Health', description: 'Scoped to the viewer; `?user_id=`, `type`, `from`, `to` filters supported.' }),
-      post: op({ summary: 'Create an activity', tag: 'Health', stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Create an activity', tag: 'Health', stateChanging: true, requestBody: jsonBody(null), description: WALL_CLOCK_INPUT.trim() }),
     },
     '/api/v1/health/activities/{id}': {
-      patch: op({ summary: 'Update an activity', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      patch: op({ summary: 'Update an activity', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: WALL_CLOCK_INPUT.trim() }),
       delete: op({ summary: 'Delete an activity', tag: 'Health', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/health/export/vitals': {
@@ -273,7 +276,7 @@ export function healthPaths() {
       post: op({ summary: 'Log a nutrition entry', tag: 'Health', stateChanging: true, requestBody: nutrientBody({ title: { type: 'string', maxLength: 200 }, consumed_at: wallClock, meal_type: { type: 'string', nullable: true, enum: MEAL_TYPE_VALUES }, note: { type: 'string', nullable: true, maxLength: 5000 }, visibility: nutritionVisibility, user_id: { type: 'integer', minimum: 1, description: 'Caregiver path (#584): the person the entry belongs to.' } }, ['title', 'consumed_at']), description: 'The eight nutrients are stored as VALUES, never as a reference to a recipe: editing a recipe next month must not rewrite what somebody ate last week (docs/DECISIONS.md entry 8). A nutrient left out stays null ("not stated") and is not zero. Without `visibility` the row takes the OWNER\'s default, not the caller\'s.' }),
     },
     '/api/v1/health/nutrition/entries/{id}': {
-      patch: op({ summary: 'Update a nutrition entry', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Only the fields present are changed. Sending a nutrient as null clears it back to "not stated"; sending 0 states zero.' }),
+      patch: op({ summary: 'Update a nutrition entry', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Only the fields present are changed. Sending a nutrient as null clears it back to "not stated"; sending 0 states zero.' + WALL_CLOCK_INPUT }),
       delete: op({ summary: 'Delete a nutrition entry', tag: 'Health', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/health/nutrition/summary': {

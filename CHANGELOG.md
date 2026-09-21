@@ -73,6 +73,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A date and time sent to the API with `Z` or a numeric offset is now converted instead of cut
+  off.** `/api/v1` accepted values such as `2026-09-21T16:00:00Z` or `2026-09-21T18:00:00+02:00`,
+  but kept only their digits and dropped the offset: in a household on Europe/Berlin, an event
+  created with `16:00:00Z` - meant as 18:00 local time - landed at 16:00, without any error. Offsets
+  are now converted instead of dropped, into the form the field is stored in. Calendar start and end
+  (also on the occurrence routes and the MCP tool `create_event`) and the health timestamps
+  (`measured_at`, `performed_at`, `consumed_at`, `scheduled_at`, `taken_at`) become household
+  wall-clock time; for an all-day event only the date counts, so a start at midnight UTC stays on
+  its day west of UTC. `remind_at` becomes UTC without a zone suffix, the form reminders are compared
+  in, and `last_completed` of a housekeeping task becomes a UTC instant, the form `/complete` writes.
+  Values without an offset mean household wall-clock time as before, so a client that sends local
+  digits sees no change. **This changes what is stored for input `/api/v1` already accepted**, which
+  is why it is called out here: a client that sent UTC and relied on its digits being kept as local
+  time now gets the time it sent. `PUT /api/v1/calendar/:id` now stores the validated value like
+  `POST` does; it used to write the raw request value, so the same input was stored in two different
+  forms, and a weekly series whose start was set that way moved by an hour at the October clock
+  change. Reminders that were stored with an offset before this release are not rewritten, but they
+  are now compared as the instant they name: a reminder at `18:00:00+02:00` used to come two hours
+  late, one at `-04:00` four hours early. Digits that are no real point in time, such as 30 February
+  with an offset, are now rejected with 400 instead of being stored. The OpenAPI description now says
+  "converted" instead of "normalized" and describes the request form separately from the stored one,
+  because events that came in through calendar sync keep their offsets. A `last_completed` without an
+  offset is now read in the household time zone instead of the server's. (#1364)
+
 - **A supply request from Housekeeping now needs shopping rights as well.** The request puts the
   item on the shopping list, and creates a list first when the household has none. Since 2.68.0,
   sending a meal or a recipe to the shopping list asks for write access to the shopping list, but

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { setEventAssignments } from '../routes/calendar/helpers.js';
+import { remindAtCompareKey, remindAtUtcSql } from '../utils/reminder-schedule.js';
 
 // --------------------------------------------------------
 // Standard-Zuweisung für synchronisierte Termine (#459).
@@ -192,7 +193,8 @@ export async function applyDefaultAssigneesToExisting(
   candidates = listBackfillCandidates(d),
   { batchSize = BACKFILL_BATCH_SIZE, now = new Date() } = {},
 ) {
-  const nowIso = now.toISOString();
+  // Derselbe Vergleich wie beim Zustellen (#1364): `remind_at` als Zeitpunkt.
+  const nowKey = remindAtCompareKey(now);
   const stillEligible = d.prepare(`
     SELECT ec.default_assignee_user_id AS userId,
            e.created_by AS authorId, e.attachment_document_id AS documentId
@@ -207,12 +209,13 @@ export async function applyDefaultAssigneesToExisting(
   );
   const hasFutureTemplate = d.prepare(`
     SELECT 1 FROM reminders
-    WHERE entity_type = 'event' AND entity_id = ? AND created_by = ? AND remind_at > ?
+    WHERE entity_type = 'event' AND entity_id = ? AND created_by = ?
+      AND ${remindAtUtcSql('remind_at')} > ?
   `);
   const settlePastInherited = d.prepare(`
     UPDATE reminders SET dismissed = 1
     WHERE entity_type = 'event' AND entity_id = ? AND created_by = ?
-      AND assigned_from IS NOT NULL AND remind_at <= ?
+      AND assigned_from IS NOT NULL AND ${remindAtUtcSql('remind_at')} <= ?
   `);
 
   let assigned = 0;
@@ -224,9 +227,9 @@ export async function applyDefaultAssigneesToExisting(
         const row = stillEligible.get(eventId);
         if (!row || row.userId !== userId) continue;
         setPrimary.run(userId, eventId);
-        if (row.documentId || (row.authorId !== null && hasFutureTemplate.get(eventId, row.authorId, nowIso))) {
+        if (row.documentId || (row.authorId !== null && hasFutureTemplate.get(eventId, row.authorId, nowKey))) {
           setEventAssignments(d, eventId, [userId]);
-          settlePastInherited.run(eventId, userId, nowIso);
+          settlePastInherited.run(eventId, userId, nowKey);
         } else {
           addAssignment.run(eventId, userId);
         }
@@ -355,7 +358,7 @@ export function reassignDefaultOnCalendarMove(
   d.prepare(`
     UPDATE reminders SET dismissed = 1
     WHERE entity_type = 'event' AND entity_id = ? AND created_by = ?
-      AND assigned_from IS NOT NULL AND remind_at <= ?
-  `).run(eventId, toDefaultUserId, new Date().toISOString());
+      AND assigned_from IS NOT NULL AND ${remindAtUtcSql('remind_at')} <= ?
+  `).run(eventId, toDefaultUserId, remindAtCompareKey(new Date()));
   return true;
 }

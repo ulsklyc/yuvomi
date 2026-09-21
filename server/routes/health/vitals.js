@@ -10,7 +10,7 @@ import { defaultVisibilityFor, vitalScopeKey } from './visibility-defaults.js';
 import {
   log, VISIBILITIES, MAX_UNIT,
   viewerId, careAwareClause, applyUpdate, badRequest,
-  resolveOwner, writableClause,
+  resolveOwner, writableClause, wallClockInput,
 } from './helpers.js';
 
 const router = express.Router();
@@ -46,7 +46,7 @@ router.post('/vitals', (req, res) => {
     const valueNum2  = v.num(b.value_num2, 'value_num2');
     const valueNum3  = v.num(b.value_num3, 'value_num3');
     const unit       = v.str(b.unit, 'unit', { max: MAX_UNIT, required: false });
-    const measuredAt = v.datetime(b.measured_at, 'measured_at', true);
+    const measuredAt = v.datetime(b.measured_at, 'measured_at', true, wallClockInput());
     const note       = v.str(b.note, 'note', { max: v.MAX_TEXT, required: false });
     const visibility = v.oneOf(b.visibility, VISIBILITIES, 'visibility');
 
@@ -94,7 +94,7 @@ router.patch('/vitals/:id', (req, res) => {
     if (b.value_num2 !== undefined)  { const r = v.num(b.value_num2, 'value_num2');                checks.push(r); if (!r.error) fields.value_num2 = r.value; }
     if (b.value_num3 !== undefined)  { const r = v.num(b.value_num3, 'value_num3');                checks.push(r); if (!r.error) fields.value_num3 = r.value; }
     if (b.unit !== undefined)        { const r = v.str(b.unit, 'unit', { max: MAX_UNIT, required: false }); checks.push(r); if (!r.error) fields.unit = r.value; }
-    if (b.measured_at !== undefined) { const r = v.datetime(b.measured_at, 'measured_at', true);   checks.push(r); if (!r.error) fields.measured_at = r.value; }
+    if (b.measured_at !== undefined) { const r = v.datetime(b.measured_at, 'measured_at', true, wallClockInput()); checks.push(r); if (!r.error) fields.measured_at = r.value; }
     if (b.note !== undefined)        { const r = v.str(b.note, 'note', { max: v.MAX_TEXT, required: false }); checks.push(r); if (!r.error) fields.note = r.value; }
     if (b.visibility !== undefined)  { const r = v.oneOf(b.visibility, VISIBILITIES, 'visibility'); checks.push(r); if (!r.error && r.value) fields.visibility = r.value; }
 

@@ -10,7 +10,7 @@ import { str, color, datetime, rrule, collectErrors, MAX_TITLE, MAX_TEXT, DATE_R
 import { normalizeVisibility, visibilityWhere } from '../../services/visibility.js';
 import { hasAnyOccurrence } from '../../services/recurrence.js';
 import { resolveProjectedEventRows } from '../../services/calendar-event-reader.js';
-import { utcToWall } from '../../utils/timezone.js';
+import { householdTimeZone, utcToWall } from '../../utils/timezone.js';
 import {
   StorageError,
   cleanupStagedUpload,
@@ -223,9 +223,13 @@ function isPossibleCalendarDateTime(value) {
     && (offsetMinute === undefined || Number(offsetMinute) <= 59);
 }
 
-function validateOccurrenceMutationBody(database, body, { following = false } = {}) {
+function validateOccurrenceMutationBody(database, body, { following = false, master } = {}) {
   const values = {};
   const errors = [];
+  // Ein Offset wird in die Haushaltszone umgerechnet (#1364); ganztaegig zaehlt
+  // nur das Datum. Schickt der Body `all_day` nicht mit, gilt der Wert der Serie.
+  const zone = householdTimeZone(database);
+  const allDay = typeof body.all_day === 'boolean' ? body.all_day : !!master?.all_day;
   const validateString = (field, label, options = {}) => {
     if (!Object.hasOwn(body, field)) return;
     const nullable = options.nullable === true;
@@ -254,7 +258,7 @@ function validateOccurrenceMutationBody(database, body, { following = false } = 
       errors.push(`${label}: Gib ein Datum mit optionaler Uhrzeit an${nullable ? ' oder lasse das Feld leer' : ''}.`);
       return;
     }
-    const result = datetime(body[field], label, true);
+    const result = datetime(body[field], label, true, { to: 'wall', zone, allDay });
     if (result.error) errors.push(`${label}: Gib ein gültiges Datum mit optionaler Uhrzeit an.`);
     else if (!isPossibleCalendarDateTime(body[field])) {
       errors.push(`${label}: Gib ein gültiges Datum mit optionaler Uhrzeit an.`);
@@ -381,8 +385,11 @@ router.post('/', async (req, res) => {
 
     const vTitle = str(req.body.title, 'Titel', { max: MAX_TITLE });
     const vDesc  = str(req.body.description, 'Beschreibung', { max: MAX_TEXT, required: false });
-    const vStart = datetime(req.body.start_datetime, 'Startdatum', true);
-    const vEnd   = datetime(req.body.end_datetime, 'Enddatum');
+    // Ein Wert mit `Z` oder Offset wird in die Haushaltszone umgerechnet statt
+    // abgeschnitten (#1364); ganztaegig zaehlt nur sein Datum.
+    const zoneOpts = { to: 'wall', zone: householdTimeZone(db.get()), allDay: !!req.body.all_day };
+    const vStart = datetime(req.body.start_datetime, 'Startdatum', true, zoneOpts);
+    const vEnd   = datetime(req.body.end_datetime, 'Enddatum', false, zoneOpts);
     // Kein Fallback auf eine Palettenfarbe: fehlt die Angabe, bekommt der Termin
     // KEINE eigene Farbe (NULL) und leiht sich die der zugewiesenen Person
     // (#891). `color()` liefert fuer undefined/null/'' bereits value: null.
@@ -614,10 +621,25 @@ router.put('/:id', async (req, res) => {
     if (rejectLinkedOccurrenceResource(res, event, req)) return;
 
     const checks = [];
+    // GESPEICHERT WIRD DER GEPRUEFTE WERT, NICHT DER ROHE (#1364). Bis hierher
+    // pruefte PUT mit `datetime()` und schrieb dann `req.body.start_datetime`:
+    // dieselbe Eingabe landete per POST gekuerzt und per PUT roh in der Zeile,
+    // und eine Serie mit rohem `Z`-Start wiederholte ihren UTC-Suffix und
+    // rutschte ueber die Zeitumstellung um eine Stunde. Ganztaegig ist, was der
+    // Body sagt, sonst was schon gespeichert ist.
+    const zoneOpts = {
+      to: 'wall',
+      zone: householdTimeZone(db.get()),
+      allDay: req.body.all_day !== undefined ? !!req.body.all_day : !!event.all_day,
+    };
+    const vStart = req.body.start_datetime !== undefined
+      ? datetime(req.body.start_datetime, 'Startdatum', false, zoneOpts) : null;
+    const vEnd = req.body.end_datetime !== undefined
+      ? datetime(req.body.end_datetime, 'Enddatum', false, zoneOpts) : null;
     if (req.body.title          !== undefined) checks.push(str(req.body.title, 'Titel', { max: MAX_TITLE, required: false }));
     if (req.body.description    !== undefined) checks.push(str(req.body.description, 'Beschreibung', { max: MAX_TEXT, required: false }));
-    if (req.body.start_datetime !== undefined) checks.push(datetime(req.body.start_datetime, 'Startdatum'));
-    if (req.body.end_datetime   !== undefined) checks.push(datetime(req.body.end_datetime, 'Enddatum'));
+    if (vStart) checks.push(vStart);
+    if (vEnd)   checks.push(vEnd);
     if (req.body.color          !== undefined) checks.push(color(req.body.color, 'Farbe'));
     if (req.body.location       !== undefined) checks.push(str(req.body.location, 'Ort', { max: MAX_TITLE, required: false }));
     // Der unveränderte Bestandswert kommt ohne Prüfung durch: Die Regel steht
@@ -668,9 +690,13 @@ router.put('/:id', async (req, res) => {
       });
     }
     const {
-      title, description, start_datetime, end_datetime,
+      title, description,
       all_day, location, color: colorVal, recurrence_rule,
     } = req.body;
+    // Dieselbe Lesart wie der Rohwert davor: `undefined` = nicht mitgeschickt,
+    // `null`/'' = der Validator liefert null (Start: nicht anfassen, Ende: leeren).
+    const start_datetime = vStart ? vStart.value : undefined;
+    const end_datetime   = vEnd ? vEnd.value : undefined;
 
     // AUCH BEIM BEARBEITEN DARF KEINE LEERE SERIE ENTSTEHEN (#960) - aber nur
     // dann abweisen, wenn DIESE Anfrage sie leer macht.
@@ -1078,7 +1104,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
     }
     baseOccurrenceFor(master, req.params.recurrenceId);
 
-    const mutation = validateOccurrenceMutationBody(db.get(), req.body);
+    const mutation = validateOccurrenceMutationBody(db.get(), req.body, { master });
     const { values: validated, errors } = mutation;
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
@@ -1223,7 +1249,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
     }
     const selectedBase = baseOccurrenceFor(master, req.params.recurrenceId);
 
-    const mutation = validateOccurrenceMutationBody(db.get(), req.body, { following: true });
+    const mutation = validateOccurrenceMutationBody(db.get(), req.body, { following: true, master });
     const { values: validated } = mutation;
     const caldavProvided = req.body.target_caldav_account_id !== undefined
       || req.body.target_caldav_calendar_url !== undefined;

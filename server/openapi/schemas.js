@@ -29,10 +29,10 @@ const calendarOccurrenceProperties = {
 const calendarOccurrenceMutationProperties = {
   title: { type: 'string', maxLength: 200 },
   description: { type: ['string', 'null'], maxLength: 5000 },
-  start_datetime: { $ref: '#/components/schemas/CalendarDateOrDateTime' },
+  start_datetime: { $ref: '#/components/schemas/CalendarDateOrDateTimeInput' },
   end_datetime: {
     oneOf: [
-      { $ref: '#/components/schemas/CalendarDateOrDateTime' },
+      { $ref: '#/components/schemas/CalendarDateOrDateTimeInput' },
       { type: 'null' },
     ],
   },
@@ -538,8 +538,15 @@ export const schemas = {
           },
           required: ['data'],
         },
+        // ZWEI SCHEMATA, weil Anfrage und Antwort nicht dieselbe Menge sind
+        // (#1364): eine Anfrage mit `Z` oder Offset wird in die Haushaltszone
+        // umgerechnet und kommt als Wanduhrzeit zurueck, ein aus einem
+        // Fremdkalender synchronisierter Termin behaelt dagegen seinen Instant
+        // samt Offset. Ein gemeinsames Schema hat beides als "normalized"
+        // beschrieben und damit das Abschneiden wie eine Umrechnung aussehen
+        // lassen.
         CalendarDateOrDateTime: {
-          description: 'A calendar date or date-time accepted by calendar mutations.',
+          description: 'A calendar date or date-time as stored and returned. Events created or edited through the API or the app carry household wall-clock time; events that came in through calendar sync (CalDAV, Google, Outlook, ICS) keep the instant they arrived with, including its Z or numeric offset.',
           oneOf: [
             {
               type: 'string',
@@ -550,12 +557,33 @@ export const schemas = {
             {
               type: 'string',
               pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d+)?)?$',
-              description: 'Yuvomi local wall-clock value. Seconds and fractional seconds are optional and are normalized to YYYY-MM-DDTHH:MM.',
+              description: 'Yuvomi local wall-clock value in the household time zone, without offset.',
             },
             {
               type: 'string',
               pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d+)?)?(?:Z|[+-]\\d{2}:?\\d{2})$',
-              description: 'Accepted UTC or numeric-offset input. Seconds, fractional seconds, and the offset are normalized to YYYY-MM-DDTHH:MM.',
+              description: 'Instant with Z or a numeric offset, as stored for a synchronized event. Returned unchanged.',
+            },
+          ],
+        },
+        CalendarDateOrDateTimeInput: {
+          description: 'A calendar date or date-time accepted by calendar mutations. What is stored is household wall-clock time: a value without offset is taken as such, a value with Z or a numeric offset is converted into the household time zone.',
+          oneOf: [
+            {
+              type: 'string',
+              format: 'date',
+              pattern: '^\\d{4}-\\d{2}-\\d{2}$',
+              description: 'Date-only value in YYYY-MM-DD form.',
+            },
+            {
+              type: 'string',
+              pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d+)?)?$',
+              description: 'Yuvomi local wall-clock value in the household time zone. Seconds and fractional seconds are optional and are dropped; stored as YYYY-MM-DDTHH:MM.',
+            },
+            {
+              type: 'string',
+              pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d+)?)?(?:Z|[+-]\\d{2}:?\\d{2})$',
+              description: 'UTC or numeric-offset input. Read as an instant and converted into household wall-clock time, stored as YYYY-MM-DDTHH:MM - 2026-09-21T16:00:00Z in a Europe/Berlin household becomes 2026-09-21T18:00. For an all-day event only the date counts: the value is stored as its YYYY-MM-DD date as sent, so a midnight-UTC start stays on its day west of UTC. In the hour a DST change repeats, two instants map to the same wall-clock time; the stored value cannot tell them apart, so one of the two reads back an hour off.',
             },
           ],
         },

@@ -5,6 +5,16 @@ const apiError = (description) => ({
   content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } },
 });
 
+/**
+ * Gilt fuer POST und PUT gleich (#1364), deshalb einmal: ein Offset wird
+ * umgerechnet statt abgeschnitten, und PUT speichert den geprueften Wert.
+ */
+const DATETIME_INPUT = ' `start_datetime` and `end_datetime` take the forms of `CalendarDateOrDateTimeInput`: '
+  + 'a value without offset is household wall-clock time, a value with `Z` or a numeric offset is read as an '
+  + 'instant and converted into the household time zone (`2026-09-21T16:00:00Z` in a Europe/Berlin household is '
+  + 'stored as `2026-09-21T18:00`). For an all-day event only the date of such a value counts. Up to v2.68.0 '
+  + 'the offset was dropped and its digits kept as wall-clock time.';
+
 export function calendarPaths() {
   return {
     '/api/v1/calendar': {
@@ -25,7 +35,7 @@ export function calendarPaths() {
         summary: 'Create calendar event',
         tag: 'Calendar',
         stateChanging: true,
-        description: 'Supports optional document-storage attachments via `attachment_name`, `attachment_mime`, `attachment_size`, and `attachment_data` (base64 data URL). New attachments are linked through `attachment_document_id`; legacy events may still return `attachment_data`. Set `target_caldav_account_id` and `target_caldav_calendar_url` to push the event to a CalDAV calendar (omit or null for a local-only event).',
+        description: 'Supports optional document-storage attachments via `attachment_name`, `attachment_mime`, `attachment_size`, and `attachment_data` (base64 data URL). New attachments are linked through `attachment_document_id`; legacy events may still return `attachment_data`. Set `target_caldav_account_id` and `target_caldav_calendar_url` to push the event to a CalDAV calendar (omit or null for a local-only event).' + DATETIME_INPUT,
         requestBody: jsonBody(null),
         responses: {
           201: {
@@ -261,7 +271,7 @@ export function calendarPaths() {
         tag: 'Calendar',
         params: [idParam()],
         stateChanging: true,
-        description: 'Supports document-storage attachments. Omit attachment fields to preserve the current attachment, send new `attachment_data` to create and link a document, or set `remove_attachment` to true to unlink it without deleting the library document. Legacy events may still return `attachment_data`. A recurrence-rule or anchor change that would orphan linked replacements returns 409 with `calendar_override_orphans` and the exact `orphaned_override_count`; retry with the same value in `confirmed_orphan_count` to preserve those replacements as standalone events. The same confirmation is required before assigning an outbound target to a series with linked replacements. Changing a mirrored field (title, description, location, color, all-day, start/end, recurrence) of an event synced to Google pushes the change there, and switching `target_google_calendar_id` moves it to the other Google calendar. The remote call runs after the response and is retried by the next sync run if it fails.',
+        description: 'Supports document-storage attachments. Omit attachment fields to preserve the current attachment, send new `attachment_data` to create and link a document, or set `remove_attachment` to true to unlink it without deleting the library document. Legacy events may still return `attachment_data`. A recurrence-rule or anchor change that would orphan linked replacements returns 409 with `calendar_override_orphans` and the exact `orphaned_override_count`; retry with the same value in `confirmed_orphan_count` to preserve those replacements as standalone events. The same confirmation is required before assigning an outbound target to a series with linked replacements. Changing a mirrored field (title, description, location, color, all-day, start/end, recurrence) of an event synced to Google pushes the change there, and switching `target_google_calendar_id` moves it to the other Google calendar. The remote call runs after the response and is retried by the next sync run if it fails. PUT stores the validated start and end, exactly as POST does; up to v2.68.0 it wrote the raw request value.' + DATETIME_INPUT,
         requestBody: jsonBody(null),
         responses: {
           200: {

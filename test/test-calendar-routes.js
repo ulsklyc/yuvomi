@@ -3546,21 +3546,31 @@ test('PUT / — eine Serie mit eigener Zone wird an ihrem Ortstag geprueft', asy
   // Serie hat ein Vorkommen und ist gueltig. Ohne Zonenhinweis sah der Guard
   // den Ersten, hielt sie fuer leer und wies die Bearbeitung ab - fuer einen
   // Termin, den der Kalender daneben anzeigte.
+  //
+  // DER BODY LAESST DEN START IN RUHE (#1364). Bis v2.68.0 schrieb PUT den
+  // rohen Wert, und dieser Test schickte den gespeicherten Instant einfach
+  // zurueck. Seitdem wird ein `Z` im Body in die Wanduhrzeit des Haushalts
+  // umgerechnet - in einem Haushalt westlich von UTC IST der 1. Februar 01:00Z
+  // dann der 31. Januar, und die Gegenprobe unten waere zu Recht 200 statt 400.
+  // Geprueft wird hier aber der GESPEICHERTE Instant, und der bleibt stehen,
+  // wenn nur die Regel geaendert wird.
   const id = insertEvent({ title: 'NY-Serie', start_datetime: '2026-02-01T01:00:00Z' });
   db.prepare('UPDATE calendar_events SET tzid = ? WHERE id = ?').run('America/New_York', id);
 
   const res = await call('PUT', `/${id}`, { body: {
-    title: 'NY-Serie', start_datetime: '2026-02-01T01:00:00Z',
+    title: 'NY-Serie',
     recurrence_rule: 'FREQ=MONTHLY;BYMONTHDAY=-1;UNTIL=20260220',
   } });
   assert.equal(res.status, 200, `erwartet 200, bekommen ${res.status}`);
+  assert.equal(db.prepare('SELECT start_datetime FROM calendar_events WHERE id = ?').get(id).start_datetime,
+    '2026-02-01T01:00:00Z', 'der gespeicherte Instant bleibt, was er war');
 
   // GEGENPROBE IM TEST SELBST: ohne eigene Zone ist der 1. Februar wirklich
   // kein Monatsletzter, und der Guard greift weiter. Sonst waere der Fix eine
   // Abschaltung mit Umweg.
   const ohne = insertEvent({ title: 'Ohne Zone', start_datetime: '2026-02-01T01:00:00Z' });
   const res2 = await call('PUT', `/${ohne}`, { body: {
-    title: 'Ohne Zone', start_datetime: '2026-02-01T01:00:00Z',
+    title: 'Ohne Zone',
     recurrence_rule: 'FREQ=MONTHLY;BYMONTHDAY=-1;UNTIL=20260220',
   } });
   assert.equal(res2.status, 400, `ohne Zone erwartet 400, bekommen ${res2.status}`);

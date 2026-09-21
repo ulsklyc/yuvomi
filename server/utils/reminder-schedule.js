@@ -73,3 +73,42 @@ export function reminderDateBefore(dueDateKey, offsetDays) {
 export function reminderIsInThePast(remindAt, now = new Date()) {
   return new Date(`${remindAt}Z`).getTime() <= now.getTime();
 }
+
+/**
+ * `reminders.remind_at` als Zeitpunkt, in SQL: ein naiv-UTC-Schluessel
+ * `YYYY-MM-DDTHH:MM:SS.sss`, der sich als Text richtig vergleichen laesst.
+ *
+ * WARUM NICHT DIE SPALTE SELBST (#1364). Die Spalte ist naiv-UTC, aber bis
+ * einschliesslich v2.68.0 speicherte `POST`/`PUT /api/v1/reminders` den Wert
+ * ROH, und ein Wert mit Offset steht deshalb so in Bestandsinstallationen:
+ * `18:00:00+02:00`.
+ * Als Text gegen `new Date().toISOString()` verglichen ist er erst um 18:00
+ * UTC faellig, also zwei Stunden zu spaet; ein westlicher Offset (`-04:00`)
+ * feuert entsprechend zu frueh. Die Routen rechnen neue Werte inzwischen um,
+ * die alten Zeilen bleiben aber stehen - repariert wird deshalb die LESEseite,
+ * ohne Migration.
+ *
+ * SQLite liest `Z` und `+hh:mm` selbst und rechnet sie nach UTC, ein
+ * zonenloser Wert gilt ihm als UTC - genau die Bedeutung der Spalte. `+hhmm`
+ * ohne Doppelpunkt (vom Validator ebenfalls angenommen) kennt es nicht und
+ * liefert NULL, deshalb wird der Doppelpunkt vorher eingesetzt. Ein reines
+ * Datum wird Mitternacht UTC, wie es auch der Textvergleich behandelte.
+ *
+ * @param {string} column  Spaltenausdruck, z.B. 'r.remind_at' - nie Nutzereingabe
+ * @returns {string} SQL-Ausdruck
+ */
+export function remindAtUtcSql(column) {
+  const withColon = `CASE WHEN ${column} GLOB '*[+-][0-9][0-9][0-9][0-9]'`
+    + ` THEN substr(${column}, 1, length(${column}) - 2) || ':' || substr(${column}, -2)`
+    + ` ELSE ${column} END`;
+  return `strftime('%Y-%m-%dT%H:%M:%f', ${withColon})`;
+}
+
+/**
+ * Die Gegenseite von `remindAtUtcSql()`: ein Zeitpunkt im selben Schluessel.
+ * @param {Date|string} instant  Date oder ISO-Zeitpunkt mit Zone
+ * @returns {string} YYYY-MM-DDTHH:MM:SS.sss (UTC, ohne Suffix)
+ */
+export function remindAtCompareKey(instant) {
+  return new Date(instant).toISOString().slice(0, 23);
+}

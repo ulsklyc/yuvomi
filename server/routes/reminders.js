@@ -13,6 +13,7 @@ import { fanOutEventReminders, eventAuthorId } from '../services/event-reminder-
 import { deniedModules } from '../permissions.js';
 import { tokenAllows } from '../scopes.js';
 import { ORIGIN_MODULE, withoutSwitchedOffModules } from '../services/reminder-origins.js';
+import { remindAtCompareKey, remindAtUtcSql } from '../utils/reminder-schedule.js';
 
 const log    = createLogger('Reminders');
 const router = express.Router();
@@ -176,7 +177,7 @@ const MAX_REMINDERS_PER_ENTITY = 5;
 // --------------------------------------------------------
 // GET /api/v1/reminders/pending
 // Gibt alle fälligen, nicht-verworfenen Erinnerungen des aktuellen Nutzers zurück.
-// "Fällig" = remind_at <= jetzt
+// "Fällig" = remind_at <= jetzt, als Zeitpunkt verglichen (#1364)
 // Response: { data: Reminder[] }
 // --------------------------------------------------------
 router.get('/pending', (req, res) => {
@@ -238,7 +239,7 @@ router.get('/pending', (req, res) => {
       FROM reminders r
       WHERE r.created_by  = ?
         AND r.dismissed   = 0
-        AND r.remind_at  <= ?
+        AND ${remindAtUtcSql('r.remind_at')} <= ?
         AND r.entity_type IN (${origins.map(() => '?').join(', ')})
         -- Eine 'cycle_period'/'cycle_log_nudge'-Zeile, deren Anker bereits
         -- geloescht wurde (Eigentuemer geloescht, Einstellung geaendert, o.ae.),
@@ -271,7 +272,7 @@ router.get('/pending', (req, res) => {
           OR EXISTS (SELECT 1 FROM calendar_events WHERE id = r.entity_id)
         )
       ORDER BY r.remind_at ASC
-    `).all(userId, now, ...origins);
+    `).all(userId, remindAtCompareKey(now), ...origins);
 
     // Die dritte Achse neben Token-Scopes und Mitgliedsrechten: ein Modul, das
     // der Haushalt abgeschaltet hat, gibt es hier nicht - auch nicht als
@@ -381,10 +382,15 @@ router.post('/', (req, res) => {
   try {
     const userId = req.authUserId || req.session.userId;
     const { entity_type, entity_id, remind_at } = req.body;
+    // `remind_at` ist naiv-UTC. Ein `Z` oder Offset wird dorthin umgerechnet
+    // und der GEPRUEFTE Wert gespeichert (#1364): roh gespeichert verglich der
+    // Scheduler `18:00:00+02:00` als Text gegen die UTC-Zeit und meldete sich
+    // zwei Stunden zu spaet.
+    const vRemindAt = v.datetime(remind_at, 'remind_at', true, { to: 'utc' });
 
     const errors = v.collectErrors([
       v.id(entity_id,          'entity_id'),
-      v.datetime(remind_at,    'remind_at', true),
+      vRemindAt,
     ]);
 
     // Der `v.oneOf` gegen VALID_ENTITY_TYPES stand hier zusätzlich und sagte
@@ -415,7 +421,7 @@ router.post('/', (req, res) => {
     const result = db.get().prepare(`
       INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
       VALUES (?, ?, ?, ?)
-    `).run(entity_type, entityId, remind_at, userId);
+    `).run(entity_type, entityId, vRemindAt.value, userId);
 
     syncEventFanout(entity_type, entityId, userId);
 
@@ -458,12 +464,16 @@ router.put('/', (req, res) => {
       return res.status(400).json({ error: 'remind_ats muss ein Array sein.', code: 400 });
     }
 
-    // Duplikate entfernen, jeden Eintrag als Datetime validieren, Cap anwenden.
-    const unique = [...new Set(remindAts)];
-    const errors = v.collectErrors(unique.map((value, i) => v.datetime(value, `remind_ats[${i}]`, true)));
+    // Jeden Eintrag validieren und nach naiv-UTC bringen (#1364), DANACH
+    // Duplikate entfernen und den Cap anwenden: `16:00:00` und
+    // `18:00:00+02:00` sind derselbe Zeitpunkt und damit eine Erinnerung.
+    const checked = [...new Set(remindAts)]
+      .map((value, i) => v.datetime(value, `remind_ats[${i}]`, true, { to: 'utc' }));
+    const errors = v.collectErrors(checked);
     if (errors.length) {
       return res.status(400).json({ error: errors.join(' '), code: 400 });
     }
+    const unique = [...new Set(checked.map((result) => result.value))];
     if (unique.length > MAX_REMINDERS_PER_ENTITY) {
       return res.status(400).json({ error: `Maximal ${MAX_REMINDERS_PER_ENTITY} Erinnerungen je Eintrag.`, code: 400 });
     }

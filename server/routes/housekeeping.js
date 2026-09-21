@@ -30,6 +30,7 @@ import {
 } from '../services/calendar-outbound.js';
 import { mayWriteModule, moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
 import { tokenAllows } from '../scopes.js';
+import { householdTimeZone, storedToInstantMs } from '../utils/timezone.js';
 
 const log = createLogger('Housekeeping');
 const router = express.Router();
@@ -147,9 +148,21 @@ function publicWorker(row, context = localDayContext()) {
   };
 }
 
-function taskUrgency(row, now = new Date()) {
+/**
+ * @param {object} row  housekeeping_decay_tasks-Zeile
+ * @param {string} tz   IANA-Zone aus householdTimeZone(); der Aufrufer loest
+ *        sie einmal je Anfrage auf, nicht je Zeile
+ * @param {Date} [now]
+ */
+function taskUrgency(row, tz, now = new Date()) {
   const frequencyDays = Math.max(1, Number(row.frequency_days || 1));
-  const completed = row.last_completed ? new Date(row.last_completed) : null;
+  // `last_completed` fuehrt zwei Formen (#1364): Instants mit `Z` - von
+  // `/complete` und aus umgerechneter Offset-Eingabe - und zonenlose Werte aus
+  // der API, die Wanduhrzeit des Haushalts meinen. `new Date()` las die
+  // zonenlosen in der Zone des SERVERS; `storedToInstantMs()` liest sie in der
+  // des Haushalts und laesst Instants, was sie sind.
+  const completedMs = row.last_completed ? storedToInstantMs(row.last_completed, tz) : null;
+  const completed = completedMs === null ? null : new Date(completedMs);
   if (!completed || Number.isNaN(completed.getTime())) {
     return { urgency: Number.MAX_SAFE_INTEGER, status: 'overdue', due_date: null };
   }
@@ -169,8 +182,8 @@ function taskUrgency(row, now = new Date()) {
   return { urgency, status, due_date: due.toISOString() };
 }
 
-function publicDecayTask(row) {
-  const computed = taskUrgency(row);
+function publicDecayTask(row, tz) {
+  const computed = taskUrgency(row, tz);
   return {
     id: row.id,
     name: row.name,
@@ -471,7 +484,8 @@ function housekeepingDashboard() {
     WHERE substr(check_in, 1, 7) = ?
   `).get(monthValue);
   const taskRows = db.get().prepare('SELECT * FROM housekeeping_decay_tasks').all();
-  const tasks = taskRows.map(publicDecayTask);
+  const tz = householdTimeZone(db.get());
+  const tasks = taskRows.map((row) => publicDecayTask(row, tz));
   const chart = db.get().prepare(`
     SELECT substr(check_in, 1, 7) AS month,
            COALESCE(SUM(daily_rate + extras), 0) AS total,
@@ -1093,8 +1107,9 @@ router.post('/work-sessions/check-out', (req, res) => {
 router.get('/decay-tasks', (_req, res) => {
   try {
     const rows = db.get().prepare('SELECT * FROM housekeeping_decay_tasks ORDER BY area COLLATE NOCASE, name COLLATE NOCASE').all();
+    const tz = householdTimeZone(db.get());
     const tasks = rows
-      .map(publicDecayTask)
+      .map((row) => publicDecayTask(row, tz))
       .sort((a, b) => {
         const rank = { overdue: 0, today: 1, ok: 2 };
         const rankDiff = rank[a.urgency_status] - rank[b.urgency_status];
@@ -1113,7 +1128,9 @@ router.post('/decay-tasks', (req, res) => {
     const vName = str(req.body.name, 'name', { max: MAX_TITLE });
     const vArea = str(req.body.area, 'area', { max: MAX_SHORT });
     const vFrequency = num(req.body.frequency_days, 'frequency_days', { required: true });
-    const vCompleted = datetime(req.body.last_completed, 'last_completed');
+    // Ein `Z` oder Offset wird der UTC-Instant, den auch `/complete` schreibt
+    // (#1364), statt seine Ziffern als Wanduhrzeit zu behalten.
+    const vCompleted = datetime(req.body.last_completed, 'last_completed', false, { to: 'instant' });
     const errors = collectErrors([vName, vArea, vFrequency, vCompleted]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
     if (!Number.isInteger(vFrequency.value) || vFrequency.value < 1) {
@@ -1125,7 +1142,7 @@ router.post('/decay-tasks', (req, res) => {
       VALUES (?, ?, ?, ?, ?)
     `).run(vName.value, vArea.value, vFrequency.value, vCompleted.value, userId(req));
     const row = db.get().prepare('SELECT * FROM housekeeping_decay_tasks WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json({ data: publicDecayTask(row) });
+    res.status(201).json({ data: publicDecayTask(row, householdTimeZone(db.get())) });
   } catch (err) {
     log.error('POST /decay-tasks error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1142,7 +1159,7 @@ router.patch('/decay-tasks/:taskId', (req, res) => {
     const vName = req.body.name !== undefined ? str(req.body.name, 'name', { max: MAX_TITLE }) : { value: existing.name, error: null };
     const vArea = req.body.area !== undefined ? str(req.body.area, 'area', { max: MAX_SHORT }) : { value: existing.area, error: null };
     const vFrequency = req.body.frequency_days !== undefined ? num(req.body.frequency_days, 'frequency_days', { required: true }) : { value: existing.frequency_days, error: null };
-    const vCompleted = req.body.last_completed !== undefined ? datetime(req.body.last_completed, 'last_completed') : { value: existing.last_completed, error: null };
+    const vCompleted = req.body.last_completed !== undefined ? datetime(req.body.last_completed, 'last_completed', false, { to: 'instant' }) : { value: existing.last_completed, error: null };
     const errors = collectErrors([vName, vArea, vFrequency, vCompleted]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
     if (!Number.isInteger(Number(vFrequency.value)) || Number(vFrequency.value) < 1) {
@@ -1155,7 +1172,7 @@ router.patch('/decay-tasks/:taskId', (req, res) => {
       WHERE id = ?
     `).run(vName.value, vArea.value, Number(vFrequency.value), vCompleted.value, vId.value);
     const row = db.get().prepare('SELECT * FROM housekeeping_decay_tasks WHERE id = ?').get(vId.value);
-    res.json({ data: publicDecayTask(row) });
+    res.json({ data: publicDecayTask(row, householdTimeZone(db.get())) });
   } catch (err) {
     log.error('PATCH /decay-tasks/:taskId error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1171,7 +1188,7 @@ router.post('/decay-tasks/:taskId/complete', (req, res) => {
 
     db.get().prepare('UPDATE housekeeping_decay_tasks SET last_completed = ? WHERE id = ?').run(nowIso(), vId.value);
     const row = db.get().prepare('SELECT * FROM housekeeping_decay_tasks WHERE id = ?').get(vId.value);
-    res.json({ data: publicDecayTask(row) });
+    res.json({ data: publicDecayTask(row, householdTimeZone(db.get())) });
   } catch (err) {
     log.error('POST /decay-tasks/:taskId/complete error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
