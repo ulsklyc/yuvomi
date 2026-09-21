@@ -122,7 +122,7 @@
  *    Konto oeffnet den Kontoauszug, also kommt der Kreditrahmen in dessen
  *    Kopf; eine Split-Gruppe wird per Tipp nur ausgewaehlt, also kommen
  *    Standardwaehrung, Standardaufteilung und Mitglieder als kompakte Zeile
- *    in den Gruppenkopf (#1352, dort gebaut).
+ *    in den Gruppenkopf (entschieden am 21.09.2026 fuer #1352).
  */
 
 import { moduleAccess } from '/permissions.js';
