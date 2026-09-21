@@ -13,6 +13,40 @@ const noteInputProperties = {
   category_ids: { type: 'array', maxItems: 50, uniqueItems: true, items: { type: 'integer', minimum: 1 } },
 };
 
+// Die Erinnerungsfelder spiegeln `validateReminder()` in
+// server/routes/birthdays.js; die Obergrenze ist 999 Wochen in Minuten.
+const BIRTHDAY_REMINDER_MAX_MINUTES = 999 * 10080;
+
+const birthdayInputProperties = {
+  name: { type: 'string', maxLength: 200 },
+  birth_date: { type: 'string', format: 'date' },
+  name_day: { type: ['string', 'null'], pattern: '^\\d{2}-\\d{2}$', description: 'Month and day (`MM-DD`), or null to clear it.' },
+  notes: { type: ['string', 'null'], maxLength: 5000 },
+  photo_data: { type: ['string', 'null'], description: 'A base64 image data URL (png, jpeg, webp, gif), or null to remove it.' },
+  reminder_offset: {
+    description: 'Lead time before 12:00 on the birthday in the household time zone. Whole minutes as a number or digit string (`"1440"` = one day before), `"custom"` to use `reminder_custom_amount` and `reminder_custom_unit`, `""` for no reminder and no calendar event, or null for the day itself. On update, a value equal to the one already stored is accepted unchanged even if it lies outside these rules, so older records stay editable.',
+    oneOf: [
+      { type: 'null' },
+      { type: 'string', enum: ['', 'custom'] },
+      { type: 'string', pattern: '^\\d{1,9}$' },
+      { type: 'integer', minimum: 0, maximum: BIRTHDAY_REMINDER_MAX_MINUTES },
+    ],
+  },
+  reminder_custom_amount: {
+    description: 'Amount for a custom lead time, 1-999. Empty or null means unset (counted as 1).',
+    oneOf: [
+      { type: 'null' },
+      { type: 'integer', minimum: 1, maximum: 999 },
+      { type: 'string', pattern: '^([1-9]\\d{0,2})?$' },
+    ],
+  },
+  reminder_custom_unit: {
+    description: 'Unit for a custom lead time. Empty or null means unset (counted as days).',
+    type: ['string', 'null'],
+    enum: ['minutes', 'hours', 'days', 'weeks', '', null],
+  },
+};
+
 const calendarOccurrenceProperties = {
   series_id: { type: 'integer', minimum: 1 },
   recurrence_id: { type: 'string', format: 'date' },
@@ -141,6 +175,15 @@ export const schemas = {
         NoteUpdateInput: {
           type: 'object',
           properties: noteInputProperties,
+        },
+        BirthdayCreateInput: {
+          type: 'object',
+          required: ['name', 'birth_date'],
+          properties: birthdayInputProperties,
+        },
+        BirthdayUpdateInput: {
+          type: 'object',
+          properties: birthdayInputProperties,
         },
         NoteCategoryInput: {
           type: 'object',

@@ -1,15 +1,29 @@
 import { op, jsonBody, idParam } from '../helpers.js';
 
+// POST und PUT pruefen ihre Felder und antworten mit 400 (validateReminder()
+// und die Nachbarn in server/routes/birthdays.js); `op()` fuehrt ohne
+// eigene Antwortmenge nur 200/401/500.
+function withBadRequest(status, description, extra = {}) {
+  return {
+    [status]: { description },
+    400: { $ref: '#/components/responses/BadRequest' },
+    401: { $ref: '#/components/responses/Unauthorized' },
+    ...extra,
+    500: { $ref: '#/components/responses/InternalServerError' },
+  };
+}
+
 export function birthdaysPaths() {
   return {
     '/api/v1/birthdays': {
       get: op({ summary: 'List birthdays', tag: 'Birthdays' }),
       post: op({
         summary: 'Create birthday',
-        description: 'Optional `name_day` uses `MM-DD` (month and day only). When set, it creates a separate yearly calendar occurrence and uses the same `reminder_offset` as the birthday.',
+        description: 'Optional `name_day` uses `MM-DD` (month and day only). When set, it creates a separate yearly calendar occurrence and uses the same `reminder_offset` as the birthday. An invalid name, date, photo or reminder field is refused with 400 and nothing is stored.',
         tag: 'Birthdays',
         stateChanging: true,
-        requestBody: jsonBody(null),
+        requestBody: jsonBody('#/components/schemas/BirthdayCreateInput'),
+        responses: withBadRequest(201, 'Birthday created'),
       }),
     },
     '/api/v1/birthdays/upcoming': {
@@ -58,11 +72,12 @@ export function birthdaysPaths() {
     '/api/v1/birthdays/{id}': {
       put: op({
         summary: 'Update birthday',
-        description: 'Optional `name_day` uses `MM-DD`; send `null` to clear it and remove its generated calendar event and reminder. Omitted fields remain unchanged.',
+        description: 'Optional `name_day` uses `MM-DD`; send `null` to clear it and remove its generated calendar event and reminder. Omitted fields remain unchanged. A reminder field sent with exactly the value already stored is accepted unchanged, so records written by older versions stay editable; any other invalid value is refused with 400 and nothing is stored.',
         tag: 'Birthdays',
         params: [idParam()],
         stateChanging: true,
-        requestBody: jsonBody(null),
+        requestBody: jsonBody('#/components/schemas/BirthdayUpdateInput'),
+        responses: withBadRequest(200, 'Birthday updated', { 404: { description: 'Birthday not found' } }),
       }),
       delete: op({ summary: 'Delete birthday', tag: 'Birthdays', params: [idParam()], stateChanging: true }),
     },

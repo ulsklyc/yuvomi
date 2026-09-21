@@ -185,6 +185,122 @@ test('POST /: zu lange Notizen → 400 (kein Datensatz)', async () => {
 });
 
 // --------------------------------------------------------------------------
+// Erinnerung: reminder_offset / reminder_custom_amount / reminder_custom_unit
+//
+// Bis hierher schrieben POST und PUT die drei Felder ungeprueft. Die Regeln
+// stehen an `validateReminder()` in server/routes/birthdays.js; hier zaehlt,
+// dass sie an der ROUTE greifen und dass gespeicherte Altwerte (Editor bis
+// v1.6.5: '15', '60', '20160'; die API nahm jeden Wert) ein PUT nicht sperren.
+// --------------------------------------------------------------------------
+const reminderRow = (id) => ({ ...db.prepare(
+  'SELECT reminder_offset, reminder_custom_amount, reminder_custom_unit FROM birthdays WHERE id = ?',
+).get(id) });
+
+test('POST /: ungueltige Erinnerung → 400 mit Feldname, kein Datensatz', async () => {
+  const cases = [
+    [{ reminder_offset: -60 }, /Reminder must be/],
+    [{ reminder_offset: '-60' }, /Reminder must be/],
+    [{ reminder_offset: 1.5 }, /Reminder must be/],
+    [{ reminder_offset: '1440.5' }, /Reminder must be/],
+    [{ reminder_offset: 'morgen' }, /Reminder must be/],
+    [{ reminder_offset: true }, /Reminder must be/],
+    [{ reminder_offset: 999 * 10080 + 1 }, /Reminder must be/],
+    [{ reminder_offset: 'custom', reminder_custom_amount: 0 }, /Custom reminder amount/],
+    [{ reminder_offset: 'custom', reminder_custom_amount: 1000 }, /Custom reminder amount/],
+    [{ reminder_offset: 'custom', reminder_custom_amount: 2.5 }, /Custom reminder amount/],
+    [{ reminder_offset: 'custom', reminder_custom_amount: '-3' }, /Custom reminder amount/],
+    [{ reminder_offset: 'custom', reminder_custom_amount: 'drei' }, /Custom reminder amount/],
+    [{ reminder_offset: 'custom', reminder_custom_unit: 'months' }, /Custom reminder unit/],
+    [{ reminder_offset: 'custom', reminder_custom_unit: 7 }, /Custom reminder unit/],
+  ];
+  const before = db.prepare('SELECT COUNT(*) AS n FROM birthdays').get().n;
+  for (const [fields, message] of cases) {
+    const r = await call('POST', '/', { name: 'Falsch', birth_date: '1990-01-01', ...fields });
+    assert.equal(r.status, 400, `${JSON.stringify(fields)} muss abgewiesen werden`);
+    assert.match(r.body.error, message, JSON.stringify(fields));
+  }
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM birthdays').get().n, before);
+});
+
+test('POST /: gueltige Erinnerungen werden angenommen und kanonisch gespeichert', async () => {
+  const none = { reminder_custom_amount: null, reminder_custom_unit: null };
+  const cases = [
+    [{ reminder_offset: '' }, { reminder_offset: '', ...none }],
+    [{ reminder_offset: null }, { reminder_offset: null, ...none }],
+    [{ reminder_offset: '0' }, { reminder_offset: '0', ...none }],
+    [{ reminder_offset: 1440 }, { reminder_offset: '1440', ...none }],
+    // Die Werte, die der Editor bis v1.6.5 anbot, sind auch neu gueltig.
+    [{ reminder_offset: '20160' }, { reminder_offset: '20160', ...none }],
+    [{ reminder_offset: String(999 * 10080) }, { reminder_offset: String(999 * 10080), ...none }],
+    // So schickt der Editor es: Zahlenfeld und Auswahl als Text.
+    [{ reminder_offset: 'custom', reminder_custom_amount: '3', reminder_custom_unit: 'weeks' },
+      { reminder_offset: 'custom', reminder_custom_amount: 3, reminder_custom_unit: 'weeks' }],
+    [{ reminder_offset: 'custom', reminder_custom_amount: 999, reminder_custom_unit: 'minutes' },
+      { reminder_offset: 'custom', reminder_custom_amount: 999, reminder_custom_unit: 'minutes' }],
+    // Leeres Zahlenfeld heisst „nicht gesetzt", der Server rechnet mit 1.
+    [{ reminder_offset: '1440', reminder_custom_amount: '', reminder_custom_unit: '' },
+      { reminder_offset: '1440', ...none }],
+  ];
+  for (const [fields, expected] of cases) {
+    const r = await call('POST', '/', { name: 'Richtig', birth_date: '1990-01-01', ...fields });
+    assert.equal(r.status, 201, `${JSON.stringify(fields)}: ${r.body?.error}`);
+    assert.deepEqual(reminderRow(r.body.data.id), expected, JSON.stringify(fields));
+  }
+});
+
+test('PUT /:id: ungueltige neue Erinnerung → 400, nichts geschrieben', async () => {
+  const created = await call('POST', '/', { name: 'Putprobe', birth_date: '1990-01-01', reminder_offset: '1440' });
+  const id = created.body.data.id;
+  for (const fields of [
+    { reminder_offset: '-5' },
+    { reminder_offset: 'bald' },
+    { reminder_custom_amount: 0 },
+    { reminder_custom_unit: 'years' },
+  ]) {
+    const r = await call('PUT', `/${id}`, { name: 'Umbenannt', ...fields });
+    assert.equal(r.status, 400, JSON.stringify(fields));
+  }
+  const row = db.prepare('SELECT name, reminder_offset FROM birthdays WHERE id = ?').get(id);
+  assert.deepEqual({ ...row }, { name: 'Putprobe', reminder_offset: '1440' });
+});
+
+test('PUT /:id: gespeicherte Altwerte sperren kein PUT (Bestandsschutz)', async () => {
+  // Werte, die heute nicht mehr angenommen wuerden - direkt geschrieben, wie
+  // sie ueber die alte API in eine Installation gekommen sein koennen.
+  const id = db.prepare(`
+    INSERT INTO birthdays (name, birth_date, created_by, reminder_offset, reminder_custom_amount, reminder_custom_unit)
+    VALUES ('Altbestand', '1980-05-05', ?, '-60', 5000, 'months')
+  `).run(USER).lastInsertRowid;
+  const legacy = { reminder_offset: '-60', reminder_custom_amount: 5000, reminder_custom_unit: 'months' };
+
+  // 1. Der Editor schickt die Erinnerung nicht mit, wenn niemand sie aendert.
+  const renamed = await call('PUT', `/${id}`, { name: 'Altbestand neu', notes: 'x' });
+  assert.equal(renamed.status, 200, renamed.body?.error);
+  assert.deepEqual(reminderRow(id), legacy, 'ungeschickte Felder bleiben stehen');
+
+  // 2. Eine API-Rundreise (GET, ein Feld aendern, PUT) schickt sie zurueck.
+  const roundTrip = await call('PUT', `/${id}`, { name: 'Rundreise', ...legacy });
+  assert.equal(roundTrip.status, 200, roundTrip.body?.error);
+  assert.deepEqual(reminderRow(id), legacy);
+  // ... auch in der Schreibweise des Editors: Zahlenfeld als Text.
+  const asText = await call('PUT', `/${id}`, { ...legacy, reminder_custom_amount: '5000' });
+  assert.equal(asText.status, 200, asText.body?.error);
+  assert.deepEqual(reminderRow(id), legacy);
+
+  // 3. Waehlt jemand im Editor eine Vorgabe, gehen alle drei Felder mit - auch
+  //    die verborgene Anzahl, die seit dem Oeffnen den gespeicherten Wert zeigt.
+  const changed = await call('PUT', `/${id}`, {
+    reminder_offset: '1440', reminder_custom_amount: '5000', reminder_custom_unit: 'minutes',
+  });
+  assert.equal(changed.status, 200, changed.body?.error);
+  assert.deepEqual(reminderRow(id), { reminder_offset: '1440', reminder_custom_amount: 5000, reminder_custom_unit: 'minutes' });
+
+  // 4. Der Altwert gilt nur, solange er in SEINER Zeile steht: neu ist er ungueltig.
+  const other = await call('PUT', `/${id}`, { reminder_offset: '-60' });
+  assert.equal(other.status, 400);
+});
+
+// --------------------------------------------------------------------------
 // GET / (Seiteneffekt, Filter, Sortierung + Tiebreak)
 // --------------------------------------------------------------------------
 test('GET /: syncAllBirthdayReminders materialisiert Kalender-Event für roh eingefügten Datensatz', async () => {

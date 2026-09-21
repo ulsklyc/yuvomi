@@ -2010,9 +2010,9 @@ person. No country- or name-based lookup is performed.
 | family_user_id | INTEGER | FK → Users (CASCADE delete), UNIQUE (one linked user per birthday), nullable |
 | contact_id | INTEGER | FK → Contacts (SET NULL on delete), UNIQUE partial (one birthday per source contact); set when imported from a contact, nullable |
 | created_by | INTEGER | FK → Users (CASCADE delete), NOT NULL |
-| reminder_offset | TEXT | Minutes before 12:00 on the birthday in the household time zone, as text ("1440" = 1 day before), or "custom"; "" = no reminder and no calendar event; NULL = on the day itself. The editor creates birthdays with "1440"; the import from Contacts, a household member's birthday, a split-expense guest and POST without the field store NULL |
-| reminder_custom_amount | INTEGER | Amount for custom offset, nullable |
-| reminder_custom_unit | TEXT | Unit for custom offset: "minutes", "hours", "days", "weeks", nullable |
+| reminder_offset | TEXT | Minutes before 12:00 on the birthday in the household time zone, as text ("1440" = 1 day before), or "custom"; "" = no reminder and no calendar event; NULL = on the day itself. The editor creates birthdays with "1440"; the import from Contacts, a household member's birthday, a split-expense guest and POST without the field store NULL. POST/PUT accept whole minutes from 0 to 10069920 (999 weeks); on PUT, a value equal to the stored one passes unchanged, so rows written before the check (older editors offered "15", "60", "20160"; the API took anything) stay editable |
+| reminder_custom_amount | INTEGER | Amount for custom offset, 1-999, nullable (NULL counts as 1) |
+| reminder_custom_unit | TEXT | Unit for custom offset: "minutes", "hours", "days", "weeks", nullable (NULL counts as days) |
 
 ### API Tokens
 Named Bearer / X-API-Key tokens for non-interactive external integrations. Admin-only creation and revocation. Token values are SHA-256-hashed at rest; the plaintext is shown only once after creation.
