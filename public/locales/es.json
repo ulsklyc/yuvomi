@@ -3430,6 +3430,7 @@
         "addCustomTask": "Agregar tarea personalizada",
         "noReports": "Aún no hay reportes.",
         "profileTitle": "Perfil de limpieza",
+        "openWorkerProfile": "Abrir perfil",
         "profilePicture": "Foto de perfil",
         "workerName": "Nombre",
         "workerUsername": "Usuario",
@@ -3487,6 +3488,7 @@
         "visitUnpaidToast": "Pago deshecho.",
         "receiptUploadTitle": "Subir comprobante de pago",
         "receiptUploadHint": "Adjunta un comprobante de pago. Aparecerá después en Documentos.",
+        "receiptLabel": "Comprobante de pago",
         "receiptDocumentName": "Comprobante - {{name}} - {{date}}",
         "receiptDocumentDescription": "Comprobante de pago del servicio de {{name}} del {{date}}.",
         "taskTemplateData": {

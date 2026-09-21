@@ -3430,6 +3430,7 @@
         "addCustomTask": "Додайте індивідуальну роботу",
         "noReports": "Звітів ще немає.",
         "profileTitle": "Профіль працівника",
+        "openWorkerProfile": "Відкрити профіль",
         "profilePicture": "Фотографія профілю працівника",
         "workerName": "Ім'я",
         "workerUsername": "Ім'я користувача",
@@ -3487,6 +3488,7 @@
         "visitUnpaidToast": "Оплату скасовано.",
         "receiptUploadTitle": "Завантажте квитанцію про оплату",
         "receiptUploadHint": "Додайте квитанцію про оплату. Він з’явиться в Документах.",
+        "receiptLabel": "Квитанція про оплату",
         "receiptDocumentName": "Квитанція - {{name}} - {{date}}",
         "receiptDocumentDescription": "Квитанція про оплату {{name}} візиту прибирання {{date}}.",
         "taskTemplateData": {

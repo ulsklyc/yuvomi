@@ -3434,6 +3434,7 @@
         "addCustomTask": "Magdagdag ng sariling gawain",
         "noReports": "Wala pang ulat.",
         "profileTitle": "Profile ng katulong",
+        "openWorkerProfile": "Buksan ang profile",
         "profilePicture": "Larawan sa profile ng katulong",
         "workerName": "Pangalan",
         "workerUsername": "Username",
@@ -3491,6 +3492,7 @@
         "visitUnpaidToast": "Binawi ang pagbabayad.",
         "receiptUploadTitle": "Mag-upload ng resibo ng bayad",
         "receiptUploadHint": "Maglakip ng resibo ng bayad. Lalabas ito sa Mga Dokumento.",
+        "receiptLabel": "Resibo ng bayad",
         "receiptDocumentName": "Resibo - {{name}} - {{date}}",
         "receiptDocumentDescription": "Resibo ng bayad para sa pagbisita ni {{name}} sa gawaing-bahay noong {{date}}.",
         "taskTemplateData": {

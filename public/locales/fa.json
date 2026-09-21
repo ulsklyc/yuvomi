@@ -3434,6 +3434,7 @@
         "addCustomTask": "افزودن کار سفارشی",
         "noReports": "هنوز گزارشی نیست.",
         "profileTitle": "نمایه نظافت خانه",
+        "openWorkerProfile": "باز کردن نمایه",
         "profilePicture": "عکس نمایه",
         "workerName": "نام",
         "workerUsername": "نام کاربری",
@@ -3491,6 +3492,7 @@
         "visitUnpaidToast": "پرداخت لغو شد.",
         "receiptUploadTitle": "بارگذاری رسید پرداخت",
         "receiptUploadHint": "یک رسید پرداخت اضافه کنید. سپس در اسناد نمایش داده می‌شود.",
+        "receiptLabel": "رسید پرداخت",
         "receiptDocumentName": "رسید - {{name}} - {{date}}",
         "receiptDocumentDescription": "رسید پرداخت برای بازدید {{name}} در {{date}}.",
         "taskTemplateData": {

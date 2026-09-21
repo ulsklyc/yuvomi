@@ -3430,6 +3430,7 @@
         "addCustomTask": "Adicionar tarefa personalizada",
         "noReports": "Nenhuma ocorrência ainda.",
         "profileTitle": "Perfil da faxineira",
+        "openWorkerProfile": "Abrir perfil",
         "profilePicture": "Foto de perfil da faxineira",
         "workerName": "Nome",
         "workerUsername": "Usuário",
@@ -3487,6 +3488,7 @@
         "visitUnpaidToast": "Pagamento desfeito.",
         "receiptUploadTitle": "Enviar comprovante de pagamento",
         "receiptUploadHint": "Anexe um comprovante de pagamento. Ele aparecerá em Documentos.",
+        "receiptLabel": "Comprovante de pagamento",
         "receiptDocumentName": "Comprovante - {{name}} - {{date}}",
         "receiptDocumentDescription": "Comprovante de pagamento da visita de faxina de {{name}} em {{date}}.",
         "taskTemplateData": {

@@ -3430,6 +3430,7 @@
         "addCustomTask": "Egyéni házimunka hozzáadása",
         "noReports": "Még nincs jelentés.",
         "profileTitle": "Háztartási profil",
+        "openWorkerProfile": "Profil megnyitása",
         "profilePicture": "Háztartási profilkép",
         "workerName": "Név",
         "workerUsername": "Felhasználónév",
@@ -3487,6 +3488,7 @@
         "visitUnpaidToast": "Fizetés visszavonva.",
         "receiptUploadTitle": "Fizetési bizonylat feltöltése",
         "receiptUploadHint": "Csatoljon egy fizetési bizonylatot. Megjelenik a Dokumentumok között.",
+        "receiptLabel": "Fizetési bizonylat",
         "receiptDocumentName": "Bizonylat - {{name}} - {{date}}",
         "receiptDocumentDescription": "Fizetési bizonylat {{name}} takarítói munkájához a következő dátumon: {{date}}.",
         "taskTemplateData": {

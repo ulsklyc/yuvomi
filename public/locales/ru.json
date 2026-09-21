@@ -3430,6 +3430,7 @@
         "addCustomTask": "Добавить свою задачу",
         "noReports": "Сообщений пока нет.",
         "profileTitle": "Профиль помощника",
+        "openWorkerProfile": "Открыть профиль",
         "profilePicture": "Фото профиля",
         "workerName": "Имя",
         "workerUsername": "Имя пользователя",
@@ -3487,6 +3488,7 @@
         "visitUnpaidToast": "Оплата отменена.",
         "receiptUploadTitle": "Загрузить чек об оплате",
         "receiptUploadHint": "Прикрепите чек об оплате. Он появится в разделе «Документы».",
+        "receiptLabel": "Чек об оплате",
         "receiptDocumentName": "Чек - {{name}} - {{date}}",
         "receiptDocumentDescription": "Чек об оплате визита {{name}} от {{date}}.",
         "taskTemplateData": {

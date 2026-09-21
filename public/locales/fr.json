@@ -3430,6 +3430,7 @@
         "addCustomTask": "Ajouter une tâche personnalisée",
         "noReports": "Aucun signalement.",
         "profileTitle": "Profil ménage",
+        "openWorkerProfile": "Ouvrir le profil",
         "profilePicture": "Photo de profil",
         "workerName": "Nom",
         "workerUsername": "Identifiant",
@@ -3487,6 +3488,7 @@
         "visitUnpaidToast": "Paiement annulé.",
         "receiptUploadTitle": "Téléverser un justificatif de paiement",
         "receiptUploadHint": "Ajoutez un justificatif de paiement. Il apparaîtra ensuite dans Documents.",
+        "receiptLabel": "Justificatif de paiement",
         "receiptDocumentName": "Justificatif - {{name}} - {{date}}",
         "receiptDocumentDescription": "Justificatif de paiement pour l'intervention de {{name}} du {{date}}.",
         "taskTemplateData": {
