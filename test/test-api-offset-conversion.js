@@ -609,6 +609,24 @@ test('Gesundheit: "jetzt" als Einnahmezeit ist Wanduhrzeit des Haushalts, kein U
       const patched = await call('PATCH', `/health/logs/${patchLog.body.data.id}`, { status: 'taken' });
       assert.equal(patched.status, 200, JSON.stringify(patched.body));
       assert.equal(patched.body.data.taken_at, '2026-09-17T01:30', 'PATCH auf taken ohne Zeit');
+
+      // Der dritte Weg: ein Eintrag, der gleich als genommen angelegt wird.
+      // POST /medications/:id/logs schrieb `taken_at` so, wie es kam - fehlte
+      // es, stand NULL neben `taken`, und im CSV-Export blieb die Einnahmezeit
+      // leer. `null` und `''` sind dasselbe "keine Angabe".
+      for (const body of [
+        { status: 'taken' },
+        { status: 'taken', taken_at: null },
+        { status: 'taken', taken_at: '' },
+      ]) {
+        const created = await call('POST', `/health/medications/${med.body.data.id}/logs`, body);
+        assert.equal(created.status, 201, JSON.stringify(created.body));
+        assert.equal(created.body.data.taken_at, '2026-09-17T01:30', `POST logs ${JSON.stringify(body)}`);
+      }
+
+      // Nicht genommen bleibt ohne Zeit - "jetzt" gehoert nur zu `taken`.
+      const pending = await call('POST', `/health/medications/${med.body.data.id}/logs`, { status: 'pending' });
+      assert.equal(pending.body.data.taken_at, null, 'POST logs pending');
     });
   });
 });
