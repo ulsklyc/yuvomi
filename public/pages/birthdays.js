@@ -2,7 +2,7 @@ import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, advancedSection } from '/components/modal.js';
 import { stagger, scheduleUndoableDelete } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
-import { t, formatDate, parseDateInput, isDateInputValid, getLocale, getNumberFormat } from '/i18n.js';
+import { t, formatDate, parseDateInput, isDateInputValid, getLocale, formatUnit } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { todayKey } from '/utils/date.js';
@@ -599,7 +599,7 @@ function reminderReadText(birthday) {
   if (offset === 'custom') {
     const amount = Number.parseInt(birthday.reminder_custom_amount, 10) || 1;
     const unit = REMINDER_UNIT_TO_INTL[birthday.reminder_custom_unit || 'days'] || 'minute';
-    return getNumberFormat({ style: 'unit', unit, unitDisplay: 'long' }).format(amount);
+    return formatUnit(amount, unit, { unitDisplay: 'long' });
   }
   return REMINDER_OFFSETS().find((o) => o.value === offset)?.label ?? '';
 }

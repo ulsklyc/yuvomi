@@ -8,7 +8,7 @@
  */
 
 import { api } from '/api.js';
-import { t, getFormatLocale, formatDate } from '/i18n.js';
+import { t, getNumberFormat, formatDate } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import {
   openModal as openSharedModal,
@@ -112,11 +112,11 @@ function withIntent(item) {
 
 /**
  * Menge ohne überflüssige Nachkommastellen: 2 bleibt "2", 2,5 wird lokalisiert.
- * getFormatLocale() statt getLocale() - die Zahlenformat-Präferenz ist von der
- * UI-Sprache entkoppelt (#521).
+ * getNumberFormat() formatiert in der Format-Locale der Region - die
+ * Zahlenformat-Präferenz ist von der UI-Sprache entkoppelt (#521).
  */
 function formatQuantity(value) {
-  return new Intl.NumberFormat(getFormatLocale(), { maximumFractionDigits: 2 }).format(Number(value) || 0);
+  return getNumberFormat({ maximumFractionDigits: 2 }).format(Number(value) || 0);
 }
 
 /**

@@ -147,6 +147,7 @@ export async function setLocale(locale) {
   localStorage.setItem(STORAGE_KEY, locale);
   currentLocale = locale;
   _numberFormatCache.clear();
+  _unitFormatCache.clear();
   const loaded = locale === DEFAULT_LOCALE
     ? fallbackTranslations
     : await loadLocale(locale);
@@ -409,6 +410,69 @@ export function getNumberFormat(options = {}) {
     _numberFormatCache.set(key, fmt);
   }
   return fmt;
+}
+
+// Die Zahlteile eines formatToParts-Ergebnisses. Was dazwischen oder daneben
+// steht (Einheitswort, Leerzeichen, Richtungsmarken), gehört der Sprache.
+const NUMBER_PARTS = new Set(['minusSign', 'plusSign', 'integer', 'group', 'decimal', 'fraction']);
+// Eine Richtungsmarke direkt vor dem Vorzeichen gehört zur Zahl: `ar-SA` setzt
+// ein ALM vor das Minus, `fa-IR` ein LRM. Sie wandert mit der Zahl aus.
+const BIDI_MARK = /^[\u061c\u200e\u200f]+$/;
+
+// Gecachte Formatter-Paare je (UI-Sprache × Format-Locale × Einheit × Options),
+// aus demselben Grund wie _numberFormatCache. Beide Locales stehen im Schlüssel:
+// ein Sprachwechsel ändert das Wort, ein Regionswechsel die Ziffern, und die
+// Region wechselt ohne setLocale() (Einstellungen, Abgleich der
+// Haushaltseinstellungen im Router). setLocale() leert den Cache zusätzlich,
+// bevor es 'locale-changed' meldet.
+const _unitFormatCache = new Map();
+
+/**
+ * Formatiert einen Wert mit Einheit („3 weeks", „1 Tg. 1 Std."): die Zahl gehört
+ * dem Haushalt, das Wort der Person (#1365).
+ *
+ * Wort, Pluralform und Wortstellung kommen aus der UI-Sprache (CLDR über
+ * `style: 'unit'`), die Zahlteile - Ziffern, Dezimal- und Tausendertrenner,
+ * Vorzeichen - aus der Region (`getFormatLocale()`), wie jede andere Zahl und
+ * jeder Betrag daneben (#521). Eine zusammengesetzte Locale aus Sprache und
+ * Regions-Land (`en-DE`) kennt ICU nur für wenige Paare und fällt still zurück;
+ * deshalb zwei Formatter und ein Tausch der Zahl über formatToParts.
+ *
+ * Die Zahl der Sprache ist der Abschnitt vom ersten bis zum letzten Zahlteil,
+ * samt einer Richtungsmarke direkt davor. An ihre Stelle tritt die Zahl der
+ * Region vollständig. Hat das Ergebnis der Sprache gar keinen Zahlteil
+ * (Arabisch 1 und 2: „أسبوع", „أسبوعان"), bleibt es unverändert.
+ *
+ * `style: 'unit'` steht nur hier; test:region-presets hält das fest.
+ *
+ * @param {number} value
+ * @param {string} unit  Intl-Einheit, z. B. 'day', 'hour', 'week'
+ * @param {Intl.NumberFormatOptions} [options]  `unitDisplay` und Zifferoptionen
+ * @returns {string}
+ */
+export function formatUnit(value, unit, options = {}) {
+  const language = currentLocale;
+  const region = getFormatLocale();
+  const key = `${language}\u0000${region}\u0000${unit}\u0000${JSON.stringify(options)}`;
+  let pair = _unitFormatCache.get(key);
+  if (!pair) {
+    const { unitDisplay, ...digits } = options;
+    pair = {
+      word: new Intl.NumberFormat(language, { ...digits, style: 'unit', unit, unitDisplay }),
+      number: new Intl.NumberFormat(region, digits),
+    };
+    _unitFormatCache.set(key, pair);
+  }
+  const parts = pair.word.formatToParts(value);
+  let first = parts.findIndex((part) => NUMBER_PARTS.has(part.type));
+  if (first === -1) return parts.map((part) => part.value).join('');
+  const last = parts.findLastIndex((part) => NUMBER_PARTS.has(part.type));
+  while (first > 0 && parts[first - 1].type === 'literal' && BIDI_MARK.test(parts[first - 1].value)) first--;
+  return [
+    ...parts.slice(0, first).map((part) => part.value),
+    pair.number.format(value),
+    ...parts.slice(last + 1).map((part) => part.value),
+  ].join('');
 }
 
 /** Liste der unterstützten Locales */

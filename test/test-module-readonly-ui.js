@@ -1966,6 +1966,31 @@ test('Geburtstags-Dialog: Editor mit Schreibrecht, bei `read` kein Anlegen und k
   assert.equal(alt, null);
 });
 
+// Die Dauer einer eigenen Erinnerung (#1365): unter englischer Oberflaeche mit
+// Region de-DE stand „3 Wochen" da - der Zahlformatierer der Region lieferte
+// auch das Wort. Das Wort gehoert der UI-Sprache (`__locale`), die Zahl der
+// Region (`__formatLocale`). Der Stub von formatUnit ist ein Nachbau;
+// test:region-presets haelt ihn am Original.
+test('Leseansicht: die Dauer spricht die UI-Sprache, die Ziffern bleiben die der Region (#1365)', () => {
+  const vorher = { locale: globalThis.__locale, formatLocale: globalThis.__formatLocale };
+  const dauer = () => withAccess({ calendar: 'read' }, () => (
+    modalOptionen(() => birthdays.openBirthdayModal({
+      mode: 'edit',
+      birthday: geburtstag({ reminder_offset: 'custom', reminder_custom_amount: 3, reminder_custom_unit: 'weeks' }),
+    }))
+  )).content;
+  try {
+    globalThis.__locale = 'en';
+    globalThis.__formatLocale = 'de-DE';
+    assert.match(dauer(), /3 weeks/);
+    globalThis.__formatLocale = 'ar-SA';
+    assert.match(dauer(), /٣ weeks/, 'die Ziffern der Region, das Wort der Sprache');
+  } finally {
+    globalThis.__locale = vorher.locale;
+    globalThis.__formatLocale = vorher.formatLocale;
+  }
+});
+
 // -------------------------------------------------------------------------
 // Leertexte bei `read` (#1348): die drei Seiten aus P1
 //
