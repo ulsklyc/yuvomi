@@ -6470,7 +6470,11 @@ test('#1372 quick-add fields stretch with their row, and no translated field get
     if (cur) out.push(cur);
     return out;
   };
-  const frOf = (track) => Number(/(\d+(?:\.\d+)?)fr\)?$/.exec(track)?.[1] ?? NaN);
+  // EINE Grammatik fuer Format-Gate und Wert: `5`, `0.5` und `.5`. Ein Leser,
+  // der nur `\d+(?:\.\d+)?` kennt, nimmt aus `.5fr` die 5 und dreht den
+  // Vergleich Kategorie > Menge still um.
+  const FLEX_TRACK = /^minmax\(0,\s*(\d+(?:\.\d+)?|\.\d+)fr\)$/;
+  const frOf = (track) => Number(FLEX_TRACK.exec(track)?.[1] ?? NaN);
 
   const templates = rules
     .filter(({ selector }) => selector.trim() === '.quick-add__form')
@@ -6483,7 +6487,7 @@ test('#1372 quick-add fields stretch with their row, and no translated field get
     assert.equal(list.at(-1), 'var(--target-base)', `${at}: die letzte Spur ist der Knopf`);
     const fields = list.slice(0, -1);
     for (const track of fields) {
-      assert.match(track, /^minmax\(0,\s*[\d.]+fr\)$/,
+      assert.match(track, FLEX_TRACK,
         `${at}: Spur „${track}" ist nicht flexibel - ein uebersetzter Platzhalter kennt keine feste Breite (#1372)`);
     }
     const [qty, cat] = fields.slice(-2).map(frOf);
