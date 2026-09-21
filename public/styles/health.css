@@ -1964,6 +1964,14 @@ button.health-med-card:hover {
   transition: transform var(--duration-md) ease;
 }
 
+/* Derselbe Fall wie beim Sparziel-Balken in dashboard.css: der Ursprung steht
+ * ausgeschrieben, weil `transform-origin` keine logischen Schluesselwoerter
+ * kennt - und damit muss die Spiegelung es auch. Ohne sie waechst der Balken
+ * in `ar` und `fa` aus der rechten Kante nach links, also aus dem ZEILENENDE. */
+[dir="rtl"] .cycle-preg__bar-fill {
+  transform-origin: right center;
+}
+
 .cycle-preg__due { font-size: var(--text-sm); color: var(--color-text-secondary); }
 .cycle-preg__nodate { font-size: var(--text-sm); color: var(--color-text-secondary); margin: 0; }
 .cycle-preg__paused { font-size: var(--text-xs); color: var(--color-text-tertiary); margin: 0; }
@@ -3138,9 +3146,23 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
    * Kompositor-Eigenschaft und rechnet kein Layout nach. */
   inline-size: 100%;
   transform: scaleX(var(--nutrition-scale, 0));
-  transform-origin: inline-start;
+  /* AUSGESCHRIEBEN, NICHT LOGISCH: `transform-origin` kennt `inline-start`
+   * nicht - die Grammatik nimmt nur `left|right|top|bottom|center` und
+   * Laengen. Ein logisches Schluesselwort macht die Deklaration ungueltig,
+   * sie faellt weg, und der Ursprung steht auf dem Vorgabewert `50% 50%`:
+   * der Balken waechst dann aus der MITTE nach beiden Seiten. Im Browser
+   * gemessen: `inline-start` ergibt 245px bei 490px Breite, `left center`
+   * ergibt 0px. Dieselbe Falle samt Spiegelung steht seit dem Budget-Widget
+   * in dashboard.css (`.budget-widget__share-saved`). */
+  transform-origin: left center;
   border-radius: inherit;
   background: var(--module-health);
+}
+
+/* Der Zeilenanfang liegt in `ar`/`fa` rechts, und weil der Ursprung oben
+ * ausgeschrieben steht, muss die Spiegelung es auch. */
+[dir="rtl"] .health-nutrition-progress__fill {
+  transform-origin: right center;
 }
 
 /* Ueberschritten ist ein ZUSTAND, keine Warnung: die Farbe sagt "darueber",

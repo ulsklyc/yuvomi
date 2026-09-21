@@ -5366,8 +5366,12 @@ svg.weather-forecast__icon {
 .nutrition-widget__row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--space-2) var(--space-3); }
 .nutrition-widget__label { font-size: var(--text-sm); color: var(--color-text-secondary); min-width: 0; overflow-wrap: anywhere; }
 .nutrition-widget__bar { grid-column: 1 / -1; grid-row: 2; display: block; block-size: var(--space-2); border-radius: var(--radius-full); background: var(--color-fill-well); overflow: hidden; }
-.nutrition-widget__fill { display: block; block-size: 100%; inline-size: 100%; transform: scaleX(var(--nutrition-scale, 0)); transform-origin: inline-start; border-radius: inherit; background: var(--module-health); }
+.nutrition-widget__fill { display: block; block-size: 100%; inline-size: 100%; transform: scaleX(var(--nutrition-scale, 0)); transform-origin: left center; border-radius: inherit; background: var(--module-health); }
 .nutrition-widget__bar--over .nutrition-widget__fill { background: var(--color-warning); }
+/* `transform-origin` nimmt kein `inline-start` - siehe .budget-widget__share-saved
+ * weiter oben. Der Ursprung steht deshalb ausgeschrieben, und die Spiegelung fuer
+ * `ar`/`fa` ebenso. */
+[dir="rtl"] .nutrition-widget__fill { transform-origin: right center; }
 .nutrition-widget__value { font-size: var(--text-sm); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .nutrition-widget__count { margin: 0; font-size: var(--text-xs); color: var(--color-text-secondary); }
 @container (min-width: 320px) {
