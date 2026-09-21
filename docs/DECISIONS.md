@@ -483,8 +483,10 @@ Two consequences follow from the same reasoning rather than from taste:
 ### Where the rule lives
 
 Not in one function, for the same reason as entry 7: it is a rule about which columns get written
-at all. None of it exists yet - the decision came first and the tickets are #1326 to #1329 - so
-what follows is what the rule requires of them, not a description of the schema:
+at all. The first quarter of it exists: #1326 built the daily target, the logged intake and the
+dashboard progress, in `health_nutrition_targets` and `health_nutrition_entries`. #1327 to #1329
+are still ahead, so what follows is partly a description of the schema and partly what the rule
+requires of the tickets that remain:
 
 - `recipe_ingredients.quantity` stays TEXT (`server/db.js`, migration 13), and no code path parses
   it into a number and a unit. `server/services/recipe-providers/mealie.js`
