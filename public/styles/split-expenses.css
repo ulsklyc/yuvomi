@@ -69,6 +69,13 @@
   color: var(--color-text-secondary);
 }
 
+/* Die Angaben des Gruppen-Dialogs bei `budget: read` (#1265 P7): eine Zeile
+ * unter der Beschreibung, eine Stufe kleiner, damit sie als Nachsatz liest. */
+.split-group-meta {
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
 /* Die Kennzahl-Zeile ist .metric-grid (budget.css). Die frühere eigene
  * .split-summary-card war die dritte von fünf Kartenbauarten im selben Modul
  * (Critique 2026-07-30, P0) - ersatzlos entfallen, das Markup trägt jetzt

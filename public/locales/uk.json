@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Для цієї особи немає записів",
         "responsibleFilterEmptyDescription": "Цього місяця ніхто не відповідає за запис у цій вибірці.",
         "handoverToSplit": "Перенести до спільних витрат",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (план: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (план: {{plan}})",
+        "detailDateLabel": "Дата",
+        "loanDetailStartMonthLabel": "Перший місяць сплати"
     },
     "settings": {
         "healthCycleEnableLabel": "Показати вкладку циклу",
@@ -3016,6 +3018,7 @@
         "nameDayClear": "Видалити іменини",
         "nameDayHint": "Використовується те саме нагадування, що й для дня народження.",
         "nameDayIncomplete": "Виберіть місяць і день іменин.",
+        "reminderOnDay": "У той самий день",
         "nameDayCalendarEventTitle": "Іменини: {{name}}",
         "nameDayCalendarEventDescription": "Сьогодні іменини у {{name}}.",
         "photoLabel": "Фото профілю",
@@ -3682,7 +3685,9 @@
         "proofLabel": "Підтвердження оплати",
         "proofHint": "Одне підтвердження, наприклад знімок переказу.",
         "proofDocumentName": "Підтвердження оплати {{group}}: {{name}}",
-        "loadError": "Не вдалося завантажити спільні витрати."
+        "loadError": "Не вдалося завантажити спільні витрати.",
+        "moreMembers": "+{{count}} ще",
+        "moreMembers_one": "+{{count}} ще"
     },
     "wmo": {
         "0": "Ясне небо",
@@ -3978,7 +3983,9 @@
         "endsAfter": "Залишилось {{count}} платежів",
         "logoTypeError": "Використайте зображення PNG, JPEG, WebP або SVG.",
         "accountUsernameLabel": "Зареєстровано на",
-        "accountUsernameHint": "Адреса електронної пошти або ім'я користувача. Це не поле пароля - Yuvomi не зберігає паролі."
+        "accountUsernameHint": "Адреса електронної пошти або ім'я користувача. Це не поле пароля - Yuvomi не зберігає паролі.",
+        "detailAmountLabel": "Сума",
+        "detailNextPaymentLabel": "Наступний платіж"
     },
     "health": {
         "fasting": {

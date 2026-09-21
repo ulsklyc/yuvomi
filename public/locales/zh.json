@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "该成员没有记录",
         "responsibleFilterEmptyDescription": "在此筛选下，本月没有任何记录有负责人。",
         "handoverToSplit": "转入共享支出",
-        "loanRemainingInstallmentsForecast": "{{forecast}}（计划：{{plan}}）"
+        "loanRemainingInstallmentsForecast": "{{forecast}}（计划：{{plan}}）",
+        "detailDateLabel": "日期",
+        "loanDetailStartMonthLabel": "首期月份"
     },
     "settings": {
         "healthCycleEnableLabel": "显示周期标签页",
@@ -2975,6 +2977,7 @@
         "nameDayClear": "移除命名日",
         "nameDayHint": "使用与生日相同的提醒设置。",
         "nameDayIncomplete": "请选择命名日的月份和日期。",
+        "reminderOnDay": "当天提醒",
         "nameDayCalendarEventTitle": "命名日：{{name}}",
         "nameDayCalendarEventDescription": "今天是{{name}}的命名日。",
         "photoLabel": "头像",
@@ -3682,7 +3685,9 @@
         "proofLabel": "付款凭据",
         "proofHint": "一份凭据，例如转账截图。",
         "proofDocumentName": "付款凭据 {{group}}：{{name}}",
-        "loadError": "无法加载共享支出。"
+        "loadError": "无法加载共享支出。",
+        "moreMembers": "还有 {{count}} 位",
+        "moreMembers_one": "还有 {{count}} 位"
     },
     "wmo": {
         "0": "晴天",
@@ -3978,7 +3983,9 @@
         "endsAfter": "还剩 {{count}} 次付款",
         "logoTypeError": "请使用 PNG、JPEG、WebP 或 SVG 图片。",
         "accountUsernameLabel": "注册账号",
-        "accountUsernameHint": "电子邮箱地址或用户名。这不是密码字段，Yuvomi 不保存密码。"
+        "accountUsernameHint": "电子邮箱地址或用户名。这不是密码字段，Yuvomi 不保存密码。",
+        "detailAmountLabel": "金额",
+        "detailNextPaymentLabel": "下次付款"
     },
     "health": {
         "fasting": {

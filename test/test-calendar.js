@@ -2482,6 +2482,256 @@ test('Zeitraster und Agenda sagen fuer denselben Tag denselben Zeit-Text (PR #13
   });
 });
 
+// --------------------------------------------------------
+// Die Uhrzeit am Ganztags-Chip (#1350, entschieden in D#1081)
+//
+// Ein ZEITGEBUNDENER Termin ab 24 Stunden bleibt in der Ganztags-Zeile - das
+// ist die andere Haelfte der Entscheidung, deren kurzen Fall #1313 gebaut hat.
+// Der Chip trug dort aber keine Uhrzeit: 14:00 bis 11:00 zwei Tage spaeter sah
+// an allen drei Tagen aus wie drei ganze Tage.
+//
+// Die Regel, wie im Faden zugesagt: am ersten Tag die Startzeit, am letzten die
+// Endzeit, dazwischen nichts; echte Ganztags-Termine unveraendert; ein Ende um
+// exakt 00:00 gehoert dem Vortag (#804, eventEndDate()); und KEIN neues
+// Vokabular - dieselben Beschriftungen wie die Agenda. Deshalb vergleicht ein
+// Test Chip und Agenda fuer denselben Tag Zeichen fuer Zeichen.
+//
+// Die Tage werden in der ANZEIGEZONE zugeordnet. Der Zonen-Fall weiter unten
+// nimmt zwei Instants, deren letzter Tag mit der Zone wandert - eine feste Zone
+// allein waere in ihrer Zone gruen und blind in jeder anderen.
+// --------------------------------------------------------
+
+// Der Fall aus dem Faden (dort 10. bis 12.), in die Woche von withOvernightState
+// gelegt: Sonntag, der 14., 14:00 bis Dienstag, der 16., 11:00 - 45 Stunden.
+function longTimedEvent(extra = {}) {
+  return {
+    id: 4301, title: 'Workshop', all_day: 0, assigned_users: [],
+    start_datetime: '2026-06-14T14:00', end_datetime: '2026-06-16T11:00',
+    ...extra,
+  };
+}
+
+// Die Ganztags-Zellen der Wochenansicht, je Tag. Die Zellen selbst tragen kein
+// Datum; sie stehen in derselben Reihenfolge wie die Tageskoepfe darueber.
+function weekAlldayCellsByDay(html) {
+  const days = [...html.matchAll(/class="week-view__day-header" data-date="([^"]+)"/g)].map((m) => m[1]);
+  const row = html.slice(html.indexOf('class="allday-row"'), html.indexOf('week-view__scroll'));
+  const cells = row.split('<div class="allday-cell">').slice(1);
+  assert(days.length === 7 && cells.length === 7,
+    `Vorbedingung: sieben Tageskoepfe und sieben Ganztags-Zellen: ${days.length} / ${cells.length}`);
+  return new Map(days.map((d, i) => [d, cells[i]]));
+}
+
+// Der Ganztags-Chip eines Termins in einem Stueck Markup: sein title-Attribut
+// und seine sichtbare Uhrzeit ('' ohne), oder null, wenn er dort nicht steht.
+function alldayChip(html, id) {
+  const m = new RegExp(`<div class="allday-event" data-id="${id}"[^>]*?title="([^"]*)">([\\s\\S]*?)</div>`).exec(html);
+  if (!m) return null;
+  const time = /class="allday-event__time">([^<]*)</.exec(m[2]);
+  return { title: m[1], time: time ? time[1] : '' };
+}
+
+// Das, was der Chip sagen soll - ueber dieselben (gestubbten) Funktionen, die
+// auch die Agenda ruft, und escaped wie im Markup.
+const abZeit  = (ev) => escStub(tStub('calendar.spanFrom',  { time: formatTimeStub(ev.start_datetime) }));
+const bisZeit = (ev) => escStub(tStub('calendar.spanUntil', { time: formatTimeStub(ev.end_datetime) }));
+
+// Prueft EINEN Tag: kein Chip (erwartet === null), ein Chip ohne Uhrzeit
+// (erwartet === '') oder ein Chip mit genau dieser Uhrzeit - sichtbar UND im
+// title, der den Tooltip und den zugaenglichen Namen traegt.
+function assertChipTime(chip, erwartet, wo) {
+  if (erwartet === null) {
+    assert(chip === null, `${wo}: an diesem Tag darf kein Chip stehen: ${JSON.stringify(chip)}`);
+    return;
+  }
+  assert(chip !== null, `${wo}: an diesem Tag muss der Chip stehen`);
+  if (erwartet === '') {
+    assert(chip.time === '', `${wo}: dieser Tag bekommt keine Uhrzeit: ${chip.time}`);
+    assert(!chip.title.includes('calendar.span'), `${wo}: auch der title nennt keine Uhrzeit: ${chip.title}`);
+    return;
+  }
+  assert(chip.time === erwartet, `${wo}: sichtbar muss "${erwartet}" stehen: "${chip.time}"`);
+  assert(chip.title.includes(erwartet), `${wo}: der title muss "${erwartet}" tragen: ${chip.title}`);
+}
+
+function weekChips(events, id) {
+  let cells;
+  withOvernightState({ events }, () => {
+    const container = fakeContainer();
+    calendarHelpers.renderWeekView(container);
+    cells = weekAlldayCellsByDay(container.html);
+  });
+  return (day) => alldayChip(cells.get(day) ?? '', id);
+}
+
+function dayChip(events, id, day) {
+  let chip;
+  withOvernightState({ cursor: day, events }, () => {
+    const container = fakeContainer();
+    calendarHelpers.renderDayView(container);
+    chip = alldayChip(container.html, id);
+  });
+  return chip;
+}
+
+test('renderWeekView: ein Termin ab 24 Stunden sagt "ab" am ersten und "bis" am letzten Tag, dazwischen nichts (#1350)', () => {
+  const ev = longTimedEvent();
+  assert(isAllDayLike(ev) === true, 'Vorbedingung: 45 Stunden stehen in der Ganztags-Zeile');
+  const chipAm = weekChips([longTimedEvent()], ev.id);
+  assertChipTime(chipAm('2026-06-14'), abZeit(ev),  'Woche, Tag 1');
+  assertChipTime(chipAm('2026-06-15'), '',          'Woche, Tag 2');
+  assertChipTime(chipAm('2026-06-16'), bisZeit(ev), 'Woche, Tag 3');
+  assertChipTime(chipAm('2026-06-17'), null,        'Woche, Tag nach dem Ende');
+});
+
+test('renderDayView: ein Termin ab 24 Stunden sagt "ab" am ersten und "bis" am letzten Tag, dazwischen nichts (#1350)', () => {
+  const ev = longTimedEvent();
+  assertChipTime(dayChip([longTimedEvent()], ev.id, '2026-06-14'), abZeit(ev),  'Tag 1');
+  assertChipTime(dayChip([longTimedEvent()], ev.id, '2026-06-15'), '',          'Tag 2');
+  assertChipTime(dayChip([longTimedEvent()], ev.id, '2026-06-16'), bisZeit(ev), 'Tag 3');
+});
+
+test('Ganztags-Chip: ein echter Ganztags-Termin bekommt an keinem Tag eine Uhrzeit (#1350)', () => {
+  // Beide Speicherformen: Ende als T00:00, das INKLUSIV gemeint ist, und reines Datum.
+  const formen = [
+    { id: 4302, title: 'Urlaub', all_day: 1, assigned_users: [],
+      start_datetime: '2026-06-14T00:00', end_datetime: '2026-06-16T00:00' },
+    { id: 4303, title: 'Messe', all_day: 1, assigned_users: [],
+      start_datetime: '2026-06-14', end_datetime: '2026-06-16' },
+  ];
+  for (const ev of formen) {
+    const chipAm = weekChips([{ ...ev }], ev.id);
+    for (const day of ['2026-06-14', '2026-06-15', '2026-06-16']) {
+      assertChipTime(chipAm(day), '', `Woche, ${ev.start_datetime}, ${day}`);
+      assertChipTime(dayChip([{ ...ev }], ev.id, day), '', `Tag, ${ev.start_datetime}, ${day}`);
+    }
+  }
+});
+
+test('Ganztags-Chip: endet der Termin exakt um Mitternacht, steht das "bis" am Vortag (#1350, #804)', () => {
+  // 14:00 am 14. bis 00:00 am 17.: eventEndDate() zieht das Ende auf den 16.,
+  // der 17. zeigt den Termin gar nicht.
+  const ev = longTimedEvent({ id: 4304, end_datetime: '2026-06-17T00:00' });
+  assert(calendarHelpers.eventEndDate(ev) === '2026-06-16', 'Vorbedingung: der letzte Tag ist der 16.');
+  const chipAm = weekChips([{ ...ev }], ev.id);
+  assertChipTime(chipAm('2026-06-14'), abZeit(ev),  'Woche, Starttag');
+  assertChipTime(chipAm('2026-06-15'), '',          'Woche, dazwischen');
+  assertChipTime(chipAm('2026-06-16'), bisZeit(ev), 'Woche, Vortag der Mitternacht');
+  assertChipTime(chipAm('2026-06-17'), null,        'Woche, der Tag, an dem um 00:00 Schluss ist');
+  assertChipTime(dayChip([{ ...ev }], ev.id, '2026-06-16'), bisZeit(ev), 'Tag, Vortag der Mitternacht');
+  assertChipTime(dayChip([{ ...ev }], ev.id, '2026-06-17'), null,        'Tag, der Tag, an dem um 00:00 Schluss ist');
+});
+
+test('Ganztags-Chip: welcher Tag "ab" und welcher "bis" sagt, folgt der ANZEIGEZONE (#1350)', () => {
+  // Dieselben zwei Zeitpunkte, drei Haushalte:
+  //   Europe/Berlin (+02:00):      14. 14:00 bis 17. 00:30 - "bis" am 17.
+  //   UTC:                         14. 12:00 bis 16. 22:30 - "bis" am 16., der 17. ohne Chip
+  //   Pacific/Kiritimati (+14:00): 15. 02:00 bis 17. 12:30 - "ab" erst am 15.
+  const instants = { id: 4305, start_datetime: '2026-06-14T12:00:00Z', end_datetime: '2026-06-16T22:30:00Z' };
+  const ev = longTimedEvent(instants);
+  const erwartet = {
+    'Europe/Berlin':      { '2026-06-14': abZeit(ev), '2026-06-15': '', '2026-06-16': '',         '2026-06-17': bisZeit(ev) },
+    UTC:                  { '2026-06-14': abZeit(ev), '2026-06-15': '', '2026-06-16': bisZeit(ev), '2026-06-17': null },
+    'Pacific/Kiritimati': { '2026-06-14': null,       '2026-06-15': abZeit(ev), '2026-06-16': '',  '2026-06-17': bisZeit(ev) },
+  };
+  for (const [zone, tage] of Object.entries(erwartet)) {
+    withDisplayTimeZone(zone, () => {
+      const chipAm = weekChips([longTimedEvent(instants)], ev.id);
+      for (const [day, soll] of Object.entries(tage)) {
+        assertChipTime(chipAm(day), soll, `${zone}, Woche, ${day}`);
+        assertChipTime(dayChip([longTimedEvent(instants)], ev.id, day), soll, `${zone}, Tag, ${day}`);
+      }
+    });
+  }
+});
+
+test('Ganztags-Chip und Agenda sagen fuer denselben Tag dieselbe Uhrzeit (#1350)', () => {
+  // "Those labels already exist, because the agenda uses them": kein eigenes
+  // Vokabular, auch kein eigenes Format - Zeichen fuer Zeichen dasselbe.
+  const ev = longTimedEvent();
+  for (const day of ['2026-06-14', '2026-06-16']) {
+    const chip = dayChip([longTimedEvent()], ev.id, day);
+    let agendaText = '';
+    withOvernightState({ cursor: day, events: [longTimedEvent()] }, () => {
+      const agenda = fakeAgendaContainer();
+      calendarHelpers.renderAgendaView(agenda);
+      agendaText = agendaTimeText(agenda.html, ev.id, day);
+    });
+    assert(agendaText !== '', `Vorbedingung: die Agenda muss den Termin am ${day} auffuehren`);
+    assert(chip && chip.time === agendaText,
+      `am ${day} muessen Chip und Agenda dasselbe sagen - Chip: ${chip?.time} / Agenda: ${agendaText}`);
+  }
+});
+
+test('Ganztags-Chip: der Kalendername im title ist escaped (#1350)', () => {
+  // Der title wird mit der Uhrzeit neu zusammengesetzt; der Kalendername (auch
+  // der Name eines ICS-Abos) lief dort bisher als EINZIGER Teil ungeescaped
+  // hinein - die Monatsansicht escaped ihn laengst.
+  const ev = longTimedEvent({ cal_name: 'Familie "Nord" & Co' });
+  let html = '';
+  withOvernightState({ events: [ev] }, () => {
+    const container = fakeContainer();
+    calendarHelpers.renderWeekView(container);
+    html = container.html;
+  });
+  assert(html.includes('Familie &quot;Nord&quot; &amp; Co'), 'der Kalendername muss escaped im title stehen');
+  assert(!html.includes('"Nord"'), 'ein rohes Anfuehrungszeichen beendet das title-Attribut mitten im Namen');
+});
+
+// Die Rangfolge im engen Chip ist entschieden (PR #1360): DER TITEL GEWINNT.
+// Er behaelt eine Mindestbreite; passt die Uhrzeit daneben nicht mehr, faellt
+// sie auf diesem Chip GANZ weg - kein Stumpf, keine Ellipse. title-Attribut und
+// Detailansicht nennen sie weiter.
+//
+// Node rechnet kein Layout; gemessen ist es im Browser (Tabelle im PR). Hier
+// steht, was die Messung traegt: Titel und Uhrzeit teilen sich EINE
+// umbrechende Zeile von einer Zeilenhoehe mit abgeschnittenem Rest, der Titel
+// bricht mit seiner Mindestbreite um (Flex-Basis aus den Tokens, geklemmt auf
+// max-content, damit ein kurzer Titel keine Uhrzeit blockiert, die neben ihn
+// passt), und die Uhrzeit kann nicht schrumpfen und nicht gekuerzt werden -
+// sie steht ganz in Zeile eins oder ganz in der unsichtbaren zweiten. Die
+// Zugewiesenen stehen ausserhalb, sonst braechen sie mit der Uhrzeit um und
+// verschwaenden mit.
+test('Ganztags-Chip: der Titel gewinnt - die Uhrzeit steht ganz da oder gar nicht (PR #1360)', () => {
+  // (a) Markup: Titel und Uhrzeit in derselben Zeile, die Zugewiesenen dahinter.
+  const ev = longTimedEvent({ assigned_users: [{ id: 1, display_name: 'Linda' }] });
+  let html = '';
+  withOvernightState({ cursor: '2026-06-14', events: [ev] }, () => {
+    const container = fakeContainer();
+    calendarHelpers.renderDayView(container);
+    html = container.html;
+  });
+  const label = /<span class="allday-event__label"><span>[^<]*<\/span><small class="allday-event__time">[^<]*<\/small><\/span>/.exec(html);
+  assert(label, 'Titel und Uhrzeit muessen zusammen in .allday-event__label stehen, die Uhrzeit direkt hinter dem Titel');
+  const nachLabel = html.slice(label.index + label[0].length);
+  assert(nachLabel.trimStart().startsWith('<span class="cal-chip__assigned">'),
+    'die Zugewiesenen stehen HINTER der Zeile, nicht in ihr - sonst braechen sie mit der Uhrzeit um');
+
+  // (b) Stylesheet: die Mechanik, die im Browser gemessen ist.
+  const regeln = [...eachRule(calendarCss)];
+  const zeile = regeln.find((rule) => rule.selector.trim() === '.allday-event__label');
+  assert(zeile, 'es braucht eine Regel fuer .allday-event__label');
+  assert(/display:\s*flex/.test(zeile.body) && /flex-wrap:\s*wrap/.test(zeile.body),
+    `die Zeile muss umbrechen, damit eine Uhrzeit, die nicht passt, als Ganzes in Zeile zwei rutscht: ${zeile.body}`);
+  assert(/(?:^|[\s;])(?:max-)?height:\s*1lh/.test(zeile.body) && /overflow:\s*hidden/.test(zeile.body),
+    `die Zeile ist genau eine Zeilenhoehe hoch und schneidet den Rest ab - Zeile zwei bleibt unsichtbar: ${zeile.body}`);
+
+  const titel = regeln.find((rule) => /\.allday-event__label\s*>\s*span:has\(\s*\+\s*\.allday-event__time\s*\)/.test(rule.selector));
+  assert(titel, 'es braucht eine Regel fuer den Titel VOR der Uhrzeit');
+  assert(/flex:\s*1\s+1\s+var\(--space-\w+\)/.test(titel.body) || /flex-basis:\s*var\(--space-\w+\)/.test(titel.body),
+    `der Titel bricht mit einer Mindestbreite aus den Tokens um (Flex-Basis), nicht mit seiner vollen Laenge - `
+    + `sie entscheidet, wann die Uhrzeit wegfaellt: ${titel.body}`);
+  assert(/max-width:\s*max-content/.test(titel.body),
+    `ein kurzer Titel klemmt die Mindestbreite auf seine eigene Breite und blockiert keine Uhrzeit, die neben ihn passt: ${titel.body}`);
+
+  const zeit = regeln.find((rule) => rule.selector.trim() === '.allday-event__time');
+  assert(zeit, 'es braucht eine Regel fuer .allday-event__time');
+  assert(/flex:\s*none/.test(zeit.body) || /flex-shrink:\s*0/.test(zeit.body) || /flex:\s*0\s+0\s+auto/.test(zeit.body),
+    `die Uhrzeit darf nicht schrumpfen - ganz oder gar nicht: ${zeit.body}`);
+  assert(!/text-overflow/.test(zeit.body) && !/min-width:\s*0/.test(zeit.body),
+    `die Uhrzeit wird nie gekuerzt, auch nicht per Ellipse: ${zeit.body}`);
+});
+
 test('eventMapUrl: eine Kartensuche nur, wo ein Ortstext uebrig bleibt (#1110)', () => {
   const { eventMapUrl } = calendarHelpers;
   assert(typeof eventMapUrl === 'function', 'eventMapUrl muss ueber __test erreichbar sein');

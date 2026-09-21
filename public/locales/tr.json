@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Bu kişi için kayıt yok",
         "responsibleFilterEmptyDescription": "Bu seçimde bu ay hiçbir kayıttan kimse sorumlu değil.",
         "handoverToSplit": "Paylaşılan giderlere aktar",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (plana göre: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (plana göre: {{plan}})",
+        "detailDateLabel": "Tarih",
+        "loanDetailStartMonthLabel": "İlk vade ayı"
     },
     "settings": {
         "healthCycleEnableLabel": "Döngü sekmesini göster",
@@ -2975,6 +2977,7 @@
         "nameDayClear": "İsim gününü kaldır",
         "nameDayHint": "Doğum günüyle aynı hatırlatıcıyı kullanır.",
         "nameDayIncomplete": "İsim gününün ayını ve gününü seçin.",
+        "reminderOnDay": "Gününde",
         "nameDayCalendarEventTitle": "İsim günü: {{name}}",
         "nameDayCalendarEventDescription": "Bugün {{name}} için isim günü.",
         "photoLabel": "Profil resmi",
@@ -3682,7 +3685,9 @@
         "proofLabel": "Ödeme belgesi",
         "proofHint": "Tek bir belge, örneğin havalenin ekran görüntüsü.",
         "proofDocumentName": "Ödeme belgesi {{group}}: {{name}}",
-        "loadError": "Paylaşılan giderler yüklenemedi."
+        "loadError": "Paylaşılan giderler yüklenemedi.",
+        "moreMembers": "+{{count}} kişi daha",
+        "moreMembers_one": "+{{count}} kişi daha"
     },
     "wmo": {
         "0": "Açık",
@@ -3978,7 +3983,9 @@
         "endsAfter": "{{count}} ödeme kaldı",
         "logoTypeError": "PNG, JPEG, WebP veya SVG resmi kullanın.",
         "accountUsernameLabel": "Şu adla kayıtlı",
-        "accountUsernameHint": "E-posta adresi veya kullanıcı adı. Parola alanı değildir - Yuvomi parola saklamaz."
+        "accountUsernameHint": "E-posta adresi veya kullanıcı adı. Parola alanı değildir - Yuvomi parola saklamaz.",
+        "detailAmountLabel": "Tutar",
+        "detailNextPaymentLabel": "Sonraki ödeme"
     },
     "health": {
         "fasting": {

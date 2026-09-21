@@ -1564,7 +1564,9 @@
         "responsibleFilterEmptyTitle": "موردی برای این شخص نیست",
         "responsibleFilterEmptyDescription": "در این ماه هیچ‌کس در این گزینش مسئول موردی نیست.",
         "handoverToSplit": "انتقال به هزینه‌های مشترک",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (طرح: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (طرح: {{plan}})",
+        "detailDateLabel": "تاریخ",
+        "loanDetailStartMonthLabel": "اولین ماه سررسید"
     },
     "settings": {
         "healthCycleEnableLabel": "نمایش برگهٔ چرخه",
@@ -2960,6 +2962,7 @@
         "nameDayClear": "حذف روز نام",
         "nameDayHint": "از همان یادآور تولد استفاده می‌کند.",
         "nameDayIncomplete": "ماه و روزِ روز نام را انتخاب کنید.",
+        "reminderOnDay": "همان روز",
         "nameDayCalendarEventTitle": "روز نام: {{name}}",
         "nameDayCalendarEventDescription": "امروز روز نام {{name}} است.",
         "photoLabel": "عکس نمایه",
@@ -3682,7 +3685,9 @@
         "proofLabel": "سند پرداخت",
         "proofHint": "یک سند، برای نمونه تصویر انتقال وجه.",
         "proofDocumentName": "سند پرداخت {{group}}: {{name}}",
-        "loadError": "هزینه‌های مشترک بارگذاری نشدند."
+        "loadError": "هزینه‌های مشترک بارگذاری نشدند.",
+        "moreMembers": "+{{count}} نفر دیگر",
+        "moreMembers_one": "+{{count}} نفر دیگر"
     },
     "wmo": {
         "0": "آسمان صاف",
@@ -3978,7 +3983,9 @@
         "endsAfter": "{{count}} پرداخت باقی‌مانده",
         "logoTypeError": "لطفاً از تصویر PNG، JPEG، WebP یا SVG استفاده کنید.",
         "accountUsernameLabel": "ثبت‌شده با",
-        "accountUsernameHint": "نشانی رایانامه یا نام کاربری. این قسمت گذرواژه نیست - Yuvomi گذرواژه ذخیره نمی‌کند."
+        "accountUsernameHint": "نشانی رایانامه یا نام کاربری. این قسمت گذرواژه نیست - Yuvomi گذرواژه ذخیره نمی‌کند.",
+        "detailAmountLabel": "مبلغ",
+        "detailNextPaymentLabel": "پرداخت بعدی"
     },
     "health": {
         "fasting": {

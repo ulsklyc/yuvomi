@@ -5,8 +5,9 @@
 
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
-import { renderDocumentAttachField, bindDocumentAttachField } from '/components/document-attach.js';
-import { t, formatDate, getLocale, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
+import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
+import { openDetailView } from '/components/detail-view.js';
+import { t, formatDate, getLocale, getNumberFormat, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { stagger } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -15,6 +16,7 @@ import { todayKey } from '/utils/date.js';
 import { wireTablist } from '/utils/tablist.js';
 import { findPageFab } from '/utils/fab.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
+import { isNavModuleReadOnly } from '/permissions.js';
 
 let state = {
   meta: null,
@@ -59,6 +61,25 @@ export function prefillSplitExpense(data) {
   _pendingPrefill = data ?? null;
 }
 let _statusTablist = null;   // wireTablist-Handle des Statusfilters (sync ohne onChange)
+
+/**
+ * Darf dieser Nutzer hier schreiben? (#467, #1265 P7)
+ *
+ * `budget`, nicht ein eigenes Modul: `server/scopes.js` fuehrt
+ * `split-expenses` als zweiten Praefix von `budget`, und die Rechte kennen
+ * keinen Schluessel `split-expenses` - eine Frage danach fiele still auf
+ * `write` (die Falle, in die `birthdays.js` in P1 lief). Dasselbe gilt fuer
+ * einen Gast: auch seine Schreibwege misst der Server an `budget`.
+ *
+ * NICHT zu verwechseln mit dem Archiv (`isArchivedView()`): das ist eine
+ * Eigenschaft der GRUPPE, dies eine des NUTZERS. Beide fuehren zur selben
+ * Leseansicht, aber aus verschiedenen Gruenden - und nur das Archiv bietet
+ * „Wiederherstellen" an, weil das dort ein Schreibrecht voraussetzt, das
+ * der Nutzer hat.
+ */
+function readOnly() {
+  return isNavModuleReadOnly('budget');
+}
 
 function setHtml(element, html) {
   element.replaceChildren();
@@ -116,19 +137,19 @@ export async function render(container, { user, embedded = false } = {}) {
           <${TitleTag} class="split-title">${t('splitExpenses.title')}</${TitleTag}>
           <p class="split-subtitle">${t('splitExpenses.subtitle')}</p>
         </div>
-        <button class="btn ${addExpenseBtnVariant}" id="split-add-expense">
+        ${readOnly() ? '' : `<button class="btn ${addExpenseBtnVariant}" id="split-add-expense">
           <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
           ${t('splitExpenses.addExpense')}
-        </button>
+        </button>`}
       </header>
       <section class="metric-grid" id="split-summary"></section>
       <div class="split-layout">
         <aside class="split-groups-panel">
           <div class="split-panel-head">
             <div class="split-panel-title">${t('splitExpenses.groups')}</div>
-            <button class="btn btn--icon" id="split-add-group" aria-label="${t('splitExpenses.addGroup')}" ${isSplitGuest() ? 'hidden' : ''}>
+            ${readOnly() ? '' : `<button class="btn btn--icon" id="split-add-group" aria-label="${t('splitExpenses.addGroup')}" ${isSplitGuest() ? 'hidden' : ''}>
               <i data-lucide="plus" aria-hidden="true"></i>
-            </button>
+            </button>`}
           </div>
           <label class="split-search" for="split-group-search">
             <span class="split-search__label">${t('splitExpenses.searchGroups')}</span>
@@ -331,7 +352,9 @@ function renderGroups() {
         className: 'split-empty-inline',
         icon: 'receipt-text',
         title: t('splitExpenses.emptyGroupsTitle'),
-        description: t('splitExpenses.emptyGroupsText'),
+        // „Erstelle eine Gruppe" beschreibt bei `budget: read` einen Weg, den es
+        // nicht gibt - der Titel allein ist die Auskunft.
+        description: readOnly() ? '' : t('splitExpenses.emptyGroupsText'),
       }));
     return;
   }
@@ -361,13 +384,14 @@ function renderMain() {
         className: 'split-main-empty',
         icon: 'users-round',
         title: t('splitExpenses.emptyGroupsTitle'),
-        description: t('splitExpenses.emptyGroupsText'),
+        description: readOnly() ? '' : t('splitExpenses.emptyGroupsText'),
       }));
     return;
   }
   // Archiv-Ansicht: Salden, Ausgaben und Verlauf bleiben lesbar, alle
   // schreibenden Aktionen weichen dem Wiederherstellen (#574).
   const archived = isArchivedView();
+  const ro = readOnly();
   const GroupTag = _embedded ? 'h3' : 'h2';
   const SectionTag = _embedded ? 'h4' : 'h3';
   setHtml(main, `
@@ -377,8 +401,12 @@ function renderMain() {
         <p class="split-group-type">${t(`splitExpenses.groupType.${group.type}`)}</p>
         ${archived ? `<p class="split-archived-badge"><i data-lucide="archive" class="icon-md" aria-hidden="true"></i>${t('splitExpenses.statusArchived')}</p>` : ''}
         <p>${esc(group.description || t('splitExpenses.groupDefaultDescription'))}</p>
+        ${ro ? groupMetaHtml(group) : ''}
       </div>
-      <div class="split-header-actions">
+      ${/* Bei `budget: read` faellt die ganze Leiste: Bearbeiten, Archivieren,
+          * Loeschen, Abrechnen, Mitglied einladen und im Archiv Wiederherstellen
+          * schreiben alle. Salden, Ausgaben und Verlauf darunter bleiben. */ ''}
+      ${ro ? '' : `<div class="split-header-actions">
         ${archived ? `
         <button class="btn btn--secondary" id="split-restore-group" ${isSplitGuest() ? 'hidden' : ''}>
           <i data-lucide="archive-restore" class="icon-md" aria-hidden="true"></i>
@@ -407,7 +435,7 @@ function renderMain() {
           <i data-lucide="user-plus" class="icon-md" aria-hidden="true"></i>
           ${t('splitExpenses.addMember')}
         </button>`}
-      </div>
+      </div>`}
     </section>
     <div class="split-content-grid">
       <section class="split-card split-card--balances">
@@ -421,7 +449,7 @@ function renderMain() {
         <div class="split-card-head">
           <${SectionTag} class="split-card-title">${t('splitExpenses.recentExpenses')}</${SectionTag}>
         </div>
-        <div id="split-expense-list">${renderExpenses(archived)}</div>
+        <div id="split-expense-list">${renderExpenses(archived || ro)}</div>
       </section>
       <section class="split-card">
         <div class="split-card-head">
@@ -439,15 +467,65 @@ function renderMain() {
   const settleButton = main.querySelector('#split-settle');
   if (settleButton) settleButton.disabled = state.expenses.length === 0;
   main.querySelector('#split-invite')?.addEventListener('click', () => openMemberModal());
-  if (!archived) {
-    main.querySelector('#split-expense-list')?.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-expense-id]');
-      if (!btn) return;
-      const expense = state.expenses.find((item) => item.id === Number(btn.dataset.expenseId));
-      if (expense) openExpenseModal(expense);
-    });
-  }
+  main.querySelector('#split-expense-list')?.addEventListener('click', (e) => {
+    // Zwei Wege, je nach Markup: `data-expense-view` liest (Archiv und
+    // `budget: read`), `data-expense-id` bearbeitet. Den zweiten gibt es bei
+    // `read` gar nicht - und fragt openExpenseModal() trotzdem, verzweigt es
+    // selbst in die Leseansicht.
+    const btn = e.target.closest('[data-expense-view], [data-expense-id]');
+    if (!btn) return;
+    const expense = state.expenses.find((item) => item.id === Number(btn.dataset.expenseView ?? btn.dataset.expenseId));
+    if (!expense) return;
+    if (btn.dataset.expenseView) openExpenseReadView(expense);
+    else openExpenseModal(expense);
+  });
   stagger(main.querySelectorAll('.split-expense, .split-debt, .split-activity-item'));
+}
+
+// So viele Namen stehen in der Kopfzeile einer Gruppe, der Rest als „+N".
+const GROUP_META_NAMES = 5;
+
+/**
+ * Die Angaben des Gruppen-Dialogs, die der Kopf sonst nicht traegt (#1265 P7):
+ * Standardwaehrung, Standardaufteilung samt Vorbelegung je Person, und die
+ * Mitglieder. Nur bei `budget: read` - mit Schreibrecht fuehrt der Stift in den
+ * Dialog, der sie zeigt; bei `read` gibt es den Stift nicht, und die Werte
+ * stehen dort, wo der Blick ohnehin landet, statt hinter einem neuen Knopf.
+ *
+ * EINE Zeile, nicht endlos: bis GROUP_META_NAMES Namen, danach „+N" ueber einen
+ * Plural-Schluessel. Alles geht als Text durch esc() - Namen und Waehrung sind
+ * Daten, und t() liefert kein Markup.
+ */
+function groupMetaHtml(group) {
+  const members = state.groupMembers || [];
+  const method = group.default_split_method || 'equal';
+  const values = defaultSplitValues(group);
+  // Zahlformat der Haushalts-Einstellung, nicht der Sprache (#521, getNumberFormat).
+  // Der Dialog fuehrt die Vorbelegung als rohe Zahl mit hoechstens zwei
+  // Nachkommastellen, die Einheit steht dort in der Methode („Prozent"). Hier,
+  // ohne das Feld daneben, traegt die Zahl ihre Einheit selbst - und zwar so, wie
+  // die Region sie schreibt: Stellung und Abstand des Prozentzeichens kommen aus
+  // Intl („60%" in en-US, „60 %" in de-DE), nicht aus einem festen Literal.
+  const percent = getNumberFormat({ style: 'percent', maximumFractionDigits: 2 });
+  const number = getNumberFormat({ maximumFractionDigits: 2 });
+  const preset = (value) => (method === 'percentage'
+    ? percent.format(Number(value) / 100)
+    : number.format(Number(value)));
+  const presets = members
+    .map((m) => [m.display_name, values[m.user_id ?? m.id]])
+    .filter(([, value]) => value != null && value !== '')
+    .map(([name, value]) => `${name} ${preset(value)}`);
+  const methodLabel = t(`splitExpenses.split${method.charAt(0).toUpperCase()}${method.slice(1)}`);
+  const names = members.slice(0, GROUP_META_NAMES)
+    .map((m) => (m.role === 'guest' ? `${m.display_name} (${t('splitExpenses.roleGuest')})` : m.display_name));
+  const rest = members.length - names.length;
+  if (rest > 0) names.push(t('splitExpenses.moreMembers', { count: rest }));
+  const parts = [
+    group.default_currency ? `${t('splitExpenses.currency')}: ${group.default_currency}` : '',
+    `${t('splitExpenses.defaultSplit')}: ${presets.length ? `${methodLabel} - ${presets.join(', ')}` : methodLabel}`,
+    names.length ? `${t('splitExpenses.members')}: ${names.join(', ')}` : '',
+  ].filter(Boolean);
+  return `<p class="split-group-meta">${esc(parts.join(' · '))}</p>`;
 }
 
 function renderBalances() {
@@ -461,7 +539,10 @@ function renderBalances() {
   `).join('');
 }
 
-function renderExpenses(readOnly = false) {
+// Regel 6 aus utils/module-access.js: der Parameter hiess `readOnly` und meinte
+// die archivierte Gruppe. Er heisst jetzt nach dem, was er bewirkt - der
+// Aufrufer odert Archiv und Modulrecht hinein (renderMain).
+function renderExpenses(asList = false) {
   if (!state.expenses.length) return `<div class="split-muted">${t('splitExpenses.noExpenses')}</div>`;
   return state.expenses.map((expense) => {
     // Beleg-Marke (#583): dass ein Nachweis vorliegt, ist die Information -
@@ -478,9 +559,16 @@ function renderExpenses(readOnly = false) {
       </div>
       <div class="split-expense__amount">${money(expense.amount, expense.currency)}</div>
     `;
-    // Im Archiv bleibt der Eintrag ein reiner Listeneintrag - ein Button würde
-    // eine Bearbeiten-Aktion versprechen, die es dort nicht gibt.
-    if (readOnly) return `<div class="split-expense">${body}</div>`;
+    // Im Archiv und bei `budget: read` oeffnet der Eintrag die LESEANSICHT
+    // (#1265 P7), nicht das Bearbeiten - deshalb nennt sein Name dort keine
+    // Handlung, der Inhalt (Titel, Zahler, Datum, Betrag) sagt, was er ist.
+    if (asList) {
+      return `
+      <button type="button" class="split-expense" data-expense-view="${expense.id}">
+        ${body}
+      </button>
+    `;
+    }
     return `
       <button type="button" class="split-expense" data-expense-id="${expense.id}" aria-label="${esc(expense.title)} - ${t('splitExpenses.editExpense')}">
         ${body}
@@ -520,6 +608,7 @@ function categoryIcon(category) {
 }
 
 async function archiveGroup(groupId) {
+  if (readOnly()) return;
   const confirmed = await confirmModal(t('splitExpenses.archiveGroupConfirm'), {
     confirmLabel: t('splitExpenses.archiveGroup'),
   });
@@ -538,6 +627,7 @@ async function archiveGroup(groupId) {
  * jederzeit umkehrbar.
  */
 async function restoreGroup(groupId) {
+  if (readOnly()) return;
   await api.post(`/split-expenses/groups/${groupId}/unarchive`, {});
   state.groupStatus = 'active';
   state.activeGroupId = groupId;
@@ -553,6 +643,7 @@ async function refreshDashboard() {
 }
 
 async function deleteGroup(groupId) {
+  if (readOnly()) return;
   const confirmed = await confirmModal(t('splitExpenses.deleteGroupConfirm'), {
     danger: true,
     confirmLabel: t('splitExpenses.deleteGroup'),
@@ -922,6 +1013,7 @@ async function syncEditedGroupMembers(group, form) {
 }
 
 async function openGroupModal(group = null) {
+  if (readOnly()) return;
   const currency = state.meta?.default_currency || 'EUR';
   const isEdit = Boolean(group);
   const candidates = isEdit ? await loadMemberCandidates() : [];
@@ -948,6 +1040,7 @@ async function openGroupModal(group = null) {
       updateGroupDefaults(panel);
       panel.querySelector('#split-group-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (readOnly()) return;
         const form = panel.querySelector('#split-group-form');
         const data = Object.fromEntries(new FormData(form));
         collectGroupDefaults(form, data);
@@ -967,7 +1060,50 @@ async function openGroupModal(group = null) {
   });
 }
 
+/**
+ * Die Zeilen der Leseansicht einer Ausgabe (#1265 P7): was der
+ * Bearbeiten-Dialog zeigt - Betrag, Zahler, Datum, die Aufteilung samt Anteil
+ * jeder Person, Notizen und Belege. Die Belege gehoeren dem Dokumente-Modul und
+ * fragen dessen Recht (`attachmentLinksNode`); leere Zeilen fallen weg.
+ */
+function expenseReadSections(expense) {
+  const method = expense.split_method || 'equal';
+  const shares = (expense.splits || [])
+    .map((split) => `${split.display_name || ''}: ${money(split.amount, split.currency || expense.currency)}`)
+    .join('\n');
+  return [
+    { icon: 'banknote', label: t('splitExpenses.amount'), value: money(expense.amount, expense.currency) },
+    { icon: 'user', label: t('splitExpenses.paidBy'), value: expense.payer_name || '' },
+    { icon: 'calendar', label: t('splitExpenses.date'), value: expense.expense_date ? formatDate(expense.expense_date) : '' },
+    { icon: 'split', label: t('splitExpenses.splitMethod'),
+      value: t(`splitExpenses.split${method.charAt(0).toUpperCase()}${method.slice(1)}`) },
+    { icon: 'users', label: t('splitExpenses.participants'), value: shares, multiline: true },
+    { icon: 'sticky-note', label: t('splitExpenses.notes'), value: expense.description || '', multiline: true },
+    { icon: 'receipt', label: t('splitExpenses.receiptsLabel'), node: attachmentLinksNode(expense.attachments) },
+  ];
+}
+
+/**
+ * Die Ausgabe in der Leseansicht: bei `budget: read` und im Archiv. Dieselbe
+ * Bauart wie Buchung und Abo (P1-Muster, geteilte Leseansicht ohne `edit` und
+ * ohne `actions`).
+ */
+function openExpenseReadView(expense) {
+  return openDetailView({
+    title: expense.title,
+    accentColor: 'var(--module-budget)',
+    size: 'sm',
+    sections: expenseReadSections(expense),
+  });
+}
+
 function openExpenseModal(expense = null, prefill = null) {
+  // Der Riegel steht VOR jeder Vorbereitung: der Anlegeweg (auch die Uebergabe
+  // aus dem Budget) entfaellt, eine bestehende Ausgabe geht als Leseansicht auf.
+  if (readOnly()) {
+    if (expense?.id) openExpenseReadView(expense);
+    return;
+  }
   if (!state.activeGroupId) return openGroupModal();
   const group = state.groups.find((g) => g.id === state.activeGroupId);
   const isEdit = Boolean(expense && expense.id);
@@ -1064,6 +1200,7 @@ function openExpenseModal(expense = null, prefill = null) {
       });
       updateSplitInputs(panel);
       panel.querySelector('#split-delete-expense')?.addEventListener('click', async () => {
+        if (readOnly()) return;
         // confirmOverModal statt confirmModal: das Ausgaben-Formular trägt
         // Betrag, Teilnehmer, Aufteilung und wartende Belege - „Abbrechen" gibt
         // es unverändert zurück, statt alles davon zu verdrängen.
@@ -1081,6 +1218,7 @@ function openExpenseModal(expense = null, prefill = null) {
       });
       panel.querySelector('#split-expense-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (readOnly()) return;
         if (!validateSplitForm(panel)) return;
         const form = panel.querySelector('#split-expense-form');
         const data = Object.fromEntries(new FormData(form));
@@ -1113,6 +1251,7 @@ function openExpenseModal(expense = null, prefill = null) {
 }
 
 function openSettlementModal() {
+  if (readOnly()) return;
   const group = state.groups.find((g) => g.id === state.activeGroupId);
   // Vorbefüllung aus der offenen Schuld: bevorzugt die, in der ich selbst der
   // Schuldner bin - statt Zahler=Empfänger=erstes Mitglied und leerem Betrag.
@@ -1187,6 +1326,7 @@ function openSettlementModal() {
       panel.querySelector('#split-cancel-settlement')?.addEventListener('click', () => closeModal());
       form?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (readOnly()) return;
         if (samePerson()) { syncSameHint(); payeeSel.focus(); return; }
         const data = Object.fromEntries(new FormData(form));
         data.amount = decimalString(data.amount);
@@ -1207,6 +1347,7 @@ function openSettlementModal() {
 }
 
 async function openMemberModal() {
+  if (readOnly()) return;
   const candidates = await loadMemberCandidates();
   openSharedModal({
     title: t('splitExpenses.addMember'),
@@ -1226,6 +1367,7 @@ async function openMemberModal() {
       panel.querySelector('#split-new-guest')?.addEventListener('click', () => openGuestModal());
       panel.querySelector('#split-member-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (readOnly()) return;
         const data = Object.fromEntries(new FormData(panel.querySelector('#split-member-form')));
         const [source, id] = String(data.member_ref || '').split(':');
         delete data.member_ref;
@@ -1243,6 +1385,7 @@ async function openMemberModal() {
 }
 
 function openGuestModal() {
+  if (readOnly()) return;
   openSharedModal({
     title: t('splitExpenses.createGuest'),
     content: `
@@ -1270,6 +1413,7 @@ function openGuestModal() {
       });
       panel.querySelector('#split-guest-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (readOnly()) return;
         const form = panel.querySelector('#split-guest-form');
         const birthDateRaw = form.querySelector('[name="birth_date"]')?.value || '';
         if (!isDateInputValid(birthDateRaw)) return;
@@ -1291,3 +1435,13 @@ function openGuestModal() {
     },
   });
 }
+
+/**
+ * Messflaeche fuer die Nur-lesen-Regel (#1265 P7). `renderMain()` schreibt in
+ * den Seitencontainer; der Griff laesst den echten Pfad laufen.
+ */
+export const __test = {
+  readOnly, renderExpenses, state, expenseReadSections, openExpenseModal, groupMetaHtml, openGroupModal,
+  renderMainForTest(container) { _container = container; renderMain(); },
+  renderGroupsForTest(container) { _container = container; renderGroups(); },
+};

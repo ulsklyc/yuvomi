@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Καμία εγγραφή για αυτό το άτομο",
         "responsibleFilterEmptyDescription": "Κανείς δεν είναι υπεύθυνος για εγγραφή αυτόν τον μήνα σε αυτή την επιλογή.",
         "handoverToSplit": "Μεταφορά στα κοινά έξοδα",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (σχέδιο: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (σχέδιο: {{plan}})",
+        "detailDateLabel": "Ημερομηνία",
+        "loanDetailStartMonthLabel": "Πρώτος μήνας λήξης"
     },
     "settings": {
         "healthCycleEnableLabel": "Εμφάνιση καρτέλας κύκλου",
@@ -2975,6 +2977,7 @@
         "nameDayClear": "Αφαίρεση ονομαστικής εορτής",
         "nameDayHint": "Χρησιμοποιεί την ίδια υπενθύμιση με τα γενέθλια.",
         "nameDayIncomplete": "Επιλέξτε μήνα και ημέρα ονομαστικής εορτής.",
+        "reminderOnDay": "Την ίδια ημέρα",
         "nameDayCalendarEventTitle": "Ονομαστική εορτή: {{name}}",
         "nameDayCalendarEventDescription": "Ο/Η {{name}} έχει ονομαστική εορτή.",
         "photoLabel": "Φωτογραφία προφίλ",
@@ -3682,7 +3685,9 @@
         "proofLabel": "Αποδεικτικό πληρωμής",
         "proofHint": "Ένα αποδεικτικό, π.χ. στιγμιότυπο του εμβάσματος.",
         "proofDocumentName": "Αποδεικτικό πληρωμής {{group}}: {{name}}",
-        "loadError": "Δεν ήταν δυνατή η φόρτωση των κοινών εξόδων."
+        "loadError": "Δεν ήταν δυνατή η φόρτωση των κοινών εξόδων.",
+        "moreMembers": "+{{count}} ακόμη",
+        "moreMembers_one": "+{{count}} ακόμη"
     },
     "wmo": {
         "0": "Αίθριος καιρός",
@@ -3978,7 +3983,9 @@
         "endsAfter": "Απομένουν {{count}} πληρωμές",
         "logoTypeError": "Χρησιμοποιήστε εικόνα PNG, JPEG, WebP ή SVG.",
         "accountUsernameLabel": "Καταχωρημένο ως",
-        "accountUsernameHint": "Διεύθυνση e-mail ή όνομα χρήστη. Δεν είναι πεδίο κωδικού - το Yuvomi δεν αποθηκεύει κωδικούς."
+        "accountUsernameHint": "Διεύθυνση e-mail ή όνομα χρήστη. Δεν είναι πεδίο κωδικού - το Yuvomi δεν αποθηκεύει κωδικούς.",
+        "detailAmountLabel": "Ποσό",
+        "detailNextPaymentLabel": "Επόμενη πληρωμή"
     },
     "health": {
         "fasting": {

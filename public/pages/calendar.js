@@ -2865,11 +2865,14 @@ function renderWeekView(container) {
             `).join('')}
             ${scheduleChips[i].map((entry) => renderScheduleChip(entry, 'allday-holiday', { showFullRange: true, clickable: true })).join('')}
             ${waste[i].map((occ) => renderWasteChip(occ)).join('')}
-            ${alldayEvs[i].map((ev) => `
+            ${alldayEvs[i].map((ev) => {
+              const timeText = allDayChipTimeText(ev, d);
+              return `
               <div class="allday-event" data-id="${ev.id}"
                    style="${eventSurfaceStyle(ev)}"
-                   title="${esc(ev.title)}${ev.cal_name ? ' · ' + ev.cal_name : ''}${chipAssigneeTitleSuffix(ev)}">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}${calendarRepeatIconHtml(ev)}<span>${esc(ev.title)}</span>${chipAssigneeStack(ev, { size: 16, maxVisible: 3 })}</div>
-            `).join('')}
+                   title="${allDayChipTitle(ev, timeText)}">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}${calendarRepeatIconHtml(ev)}<span class="allday-event__label"><span>${esc(ev.title)}</span>${allDayChipTimeHtml(timeText)}</span>${chipAssigneeStack(ev, { size: 16, maxVisible: 3 })}</div>
+            `;
+            }).join('')}
             ${tasksOnDay(d).map(renderTaskChip).join('')}
           </div>
         `).join('')}
@@ -3008,6 +3011,52 @@ function gridTimeText(ev, dayStr) {
   if (kind === 'start') return t('calendar.spanFrom',  { time: formatTime(ev.start_datetime) });
   if (kind === 'end')   return t('calendar.spanUntil', { time: formatTime(ev.end_datetime) });
   return `${formatTime(ev.start_datetime)}${ev.end_datetime ? '–' + formatTime(ev.end_datetime) : ''}`;
+}
+
+/**
+ * Die Uhrzeit eines Chips in der Ganztags-Zeile - fuer den Tag, auf dem er
+ * steht (#1350, entschieden in D#1081).
+ *
+ * Ein ZEITGEBUNDENER Termin ab 24 Stunden bleibt in der Ganztags-Zeile
+ * (isAllDayLike()), trug dort aber keine Uhrzeit: 14:00 bis 11:00 zwei Tage
+ * spaeter sah an allen drei Tagen aus wie drei ganze Tage. Jetzt nennt der
+ * Chip am ersten Tag die Startzeit und am letzten die Endzeit, dazwischen
+ * nichts.
+ *
+ * Kein neues Vokabular: dieselbe Frage (agendaSegmentKind()) und dieselbe
+ * Antwort (gridTimeText(), also `calendar.spanFrom`/`calendar.spanUntil` ueber
+ * formatTime()) wie Agenda und Zeitraster. Damit gilt auch dieselbe
+ * Tageszuordnung: ein Ende um exakt 00:00 zieht eventEndDate() auf den Vortag
+ * (#804), dort steht dann das "bis".
+ *
+ * 'all-day' (ein echter Ganztags-Termin hat keine Uhrzeit) und 'middle'
+ * bekommen nichts. 'single' erreicht die Ganztags-Zeile nicht - was dort als
+ * Zeit-Termin landet, beruehrt mehrere Kalendertage.
+ */
+function allDayChipTimeText(ev, dayStr) {
+  const kind = agendaSegmentKind(ev, dayStr);
+  return (kind === 'start' || kind === 'end') ? gridTimeText(ev, dayStr) : '';
+}
+
+/**
+ * Das title-Attribut eines Ganztags-Chips, fertig escaped: Titel, die Uhrzeit
+ * dieses Tages, Kalender, Zugewiesene. Die Uhrzeit steht auch hier und nicht
+ * nur im sichtbaren Text - der Chip hat keine Rolle, Tooltip und
+ * zugaenglicher Name kommen aus diesem Attribut und dem Inhalt (#1350).
+ */
+function allDayChipTitle(ev, timeText) {
+  return [ev.title, timeText, ev.cal_name].filter(Boolean).map((part) => esc(part)).join(' · ')
+    + chipAssigneeTitleSuffix(ev);
+}
+
+/**
+ * Die sichtbare Uhrzeit im Ganztags-Chip, oder nichts. Sie steht mit dem Titel
+ * in `.allday-event__label`: passt sie neben die Mindestbreite des Titels
+ * nicht mehr, faellt sie dort ganz weg statt gekuerzt zu werden (calendar.css).
+ * title-Attribut und Detailansicht nennen sie weiter.
+ */
+function allDayChipTimeHtml(timeText) {
+  return timeText ? `<small class="allday-event__time">${esc(timeText)}</small>` : '';
 }
 
 function renderWeekEvent(ev, layout = null, dayStr = null) {
@@ -3218,10 +3267,13 @@ function renderDayView(container) {
           `).join('')}
           ${scheduleChips.map((entry) => renderScheduleChip(entry, 'allday-holiday', { showFullRange: true, clickable: true })).join('')}
           ${dayWaste.map((occ) => renderWasteChip(occ)).join('')}
-          ${allday.map((ev) => `
+          ${allday.map((ev) => {
+            const timeText = allDayChipTimeText(ev, state.cursor);
+            return `
             <div class="allday-event" data-id="${ev.id}"
                  style="${eventSurfaceStyle(ev)}"
-                 title="${esc(ev.title)}${ev.cal_name ? ' · ' + ev.cal_name : ''}${chipAssigneeTitleSuffix(ev)}">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}${calendarRepeatIconHtml(ev)}<span>${esc(ev.title)}</span>${chipAssigneeStack(ev, { size: 16, maxVisible: 3 })}</div>`).join('')}
+                 title="${allDayChipTitle(ev, timeText)}">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}${calendarRepeatIconHtml(ev)}<span class="allday-event__label"><span>${esc(ev.title)}</span>${allDayChipTimeHtml(timeText)}</span>${chipAssigneeStack(ev, { size: 16, maxVisible: 3 })}</div>`;
+          }).join('')}
           ${tasksOnDay(state.cursor).map(renderTaskChip).join('')}
         </div>
       </div>` : ''}

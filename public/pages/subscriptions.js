@@ -20,6 +20,8 @@ import { CURRENCY_CODES } from '/utils/currency-codes.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { formatMoney, amountPlaceholder, amountStep, applyAmountFormat, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
 import { attachOverlay } from '/utils/overlay-history.js';
+import { isNavModuleReadOnly } from '/permissions.js';
+import { openDetailView } from '/components/detail-view.js';
 
 let state = {
   subscriptions: [],
@@ -35,6 +37,26 @@ let state = {
   user: null,
 };
 let container = null;
+
+// --------------------------------------------------------
+// Nur-lesen (#467, #1265 P7)
+// --------------------------------------------------------
+
+/**
+ * Darf dieser Nutzer Abos pflegen? Die Abos sind ein Budget-Reiter und liegen
+ * unter `/budget/subscriptions`, also fragt die Seite dasselbe Modul wie
+ * budget.js. Ohne diese Frage trug sie bei `budget: read` jeden Schreibweg:
+ * anlegen, bearbeiten, verlaengern, loeschen (Knopf UND Wischgeste),
+ * Kategorien und Zahlungsarten, Monatsbudget und Basiswaehrung.
+ */
+function readOnly() {
+  return isNavModuleReadOnly('budget');
+}
+
+// Jede `data-action` dieser Seite, die NICHT schreibt: nur `view`, der Weg in
+// die Leseansicht eines Abos. Eine Positivliste - eine morgen ergaenzte Aktion
+// ist damit standardmaessig gesperrt statt standardmaessig offen.
+const READ_SAFE_ACTIONS = new Set(['view']);
 
 function setHtml(element, html) {
   element.replaceChildren();
@@ -220,14 +242,14 @@ export async function render(target, { user } = {}) {
         <button class="btn btn--ghost subscriptions-filter-reset" id="subscriptions-reset-filters" type="button" hidden>
           <i data-lucide="filter-x" class="icon-sm" aria-hidden="true"></i>${t('subscriptions.resetFilters')}
         </button>
-        <div class="subscriptions-toolbar__actions">
+        ${readOnly() ? '' : `<div class="subscriptions-toolbar__actions">
           <button class="btn btn--secondary btn--icon" id="subscriptions-manage" aria-label="${t('subscriptions.manageMetadata')}" title="${t('subscriptions.manageMetadata')}">
             <i data-lucide="tags" aria-hidden="true"></i>
           </button>
           <button class="btn btn--secondary btn--icon" id="subscriptions-settings" aria-label="${t('subscriptions.settingsTitle')}" title="${t('subscriptions.settingsTitle')}">
             <i data-lucide="settings-2" aria-hidden="true"></i>
           </button>
-        </div>
+        </div>`}
       </div>
       <div id="subscriptions-content">${renderSkeletonList({ rows: 5, lines: 2 })}</div>
     </div>
@@ -330,8 +352,8 @@ function bindToolbar() {
     renderContent();
   });
   container.querySelector('#subscriptions-reset-filters').addEventListener('click', resetFilters);
-  container.querySelector('#subscriptions-manage').addEventListener('click', openMetadataModal);
-  container.querySelector('#subscriptions-settings').addEventListener('click', openSettingsModal);
+  container.querySelector('#subscriptions-manage')?.addEventListener('click', openMetadataModal);
+  container.querySelector('#subscriptions-settings')?.addEventListener('click', openSettingsModal);
 }
 
 async function reload(options) {
@@ -423,7 +445,7 @@ function renderSummary() {
       <article class="metric-card${isOverBudget ? ' metric-card--negative' : ''}">
         <div class="metric-card__label">${hasBudget ? (isOverBudget ? t('subscriptions.overBudget') : t('subscriptions.remainingBudget')) : t('subscriptions.noBudgetLimit')}</div>
         <div class="metric-card__value">${hasBudget ? money(Math.abs(summary.remaining_budget)) : t('subscriptions.unlimited')}</div>
-        <div class="metric-card__note${isOverBudget ? ' metric-card__note--danger' : ''}">${hasBudget ? `${realPercentage}% ${t('subscriptions.budgetUsed')}` : t('subscriptions.setBudgetHint')}</div>
+        <div class="metric-card__note${isOverBudget ? ' metric-card__note--danger' : ''}">${hasBudget ? `${realPercentage}% ${t('subscriptions.budgetUsed')}` : (readOnly() ? '' : t('subscriptions.setBudgetHint'))}</div>
       </article>
       <article class="metric-card">
         <div class="metric-card__label">${t('subscriptions.yearlyProjection')}</div>
@@ -616,20 +638,25 @@ function renderCard(subscription) {
     : t('subscriptions.monthlyEquivalent', { amount: money(subscription.monthly_base) });
   const status = statusMeta(subscription);
   const endInfo = endInfoLabel(subscription);
+  // BEI `budget: read` OEFFNET DER ZEILENKOERPER DIE LESEANSICHT statt des
+  // Bearbeitens (`view` statt `edit`, P1-Muster) und sagt kein „Bearbeiten"
+  // mehr an. Verlaengern und Loeschen daneben schreiben und fallen weg, die
+  // Wischflaechen mit ihnen, weil die Geste nicht verdrahtet wird.
+  const ro = readOnly();
   return `
     <div class="swipe-row" data-swipe-id="${subscription.id}">
-      <div class="swipe-reveal swipe-reveal--done swipe-reveal--leading" aria-hidden="true">
+      ${ro ? '' : `<div class="swipe-reveal swipe-reveal--done swipe-reveal--leading" aria-hidden="true">
         <i data-lucide="calendar-check" class="icon-md"></i>
         <span>${t('subscriptions.markRenewed')}</span>
       </div>
       <div class="swipe-reveal swipe-reveal--delete swipe-reveal--trailing" aria-hidden="true">
         <i data-lucide="trash-2" class="icon-md"></i>
         <span>${t('common.delete')}</span>
-      </div>
+      </div>`}
     <article class="subscription-card ${status.cardClass}"
              data-id="${subscription.id}" style="--subscription-color:${esc(brandColor)}">
       <button type="button" class="subscription-card__main list-row__main--interactive"
-              data-action="edit">
+              data-action="${ro ? 'view' : 'edit'}">
         <span class="subscription-card__brand">
           ${subscription.logo_data
             ? `<img src="${esc(subscription.logo_data)}" alt="">`
@@ -657,16 +684,16 @@ function renderCard(subscription) {
           <strong>${money(subscription.amount, subscription.currency)}</strong>
           <span>${converted}</span>
         </span>
-        <span class="sr-only">${t('common.edit')}</span>
+        ${ro ? '' : `<span class="sr-only">${t('common.edit')}</span>`}
       </button>
-      <div class="subscription-card__actions">
+      ${ro ? '' : `<div class="subscription-card__actions">
         <button class="btn btn--secondary btn--icon" data-action="renew" aria-label="${t('subscriptions.markRenewed')}">
           <i data-lucide="calendar-check" aria-hidden="true"></i>
         </button>
         <button class="btn btn--secondary btn--icon" data-action="delete" aria-label="${t('subscriptions.delete')}">
           <i data-lucide="trash-2" aria-hidden="true"></i>
         </button>
-      </div>
+      </div>`}
     </article>
     </div>
   `;
@@ -727,11 +754,15 @@ function renderEmpty() {
       action: { label: t('subscriptions.resetFilters'), attrs: { id: 'subscriptions-empty-reset' } },
     });
   }
+  // Bei `budget: read` bleibt nur der Titel: Beschreibung und CTA sind die
+  // Aufforderung zum Anlegen. Der Filter-Leerzustand oben bleibt ganz - sein
+  // Weg zurueck ist ein Filter, kein Schreibweg.
+  const ro = readOnly();
   return emptyStateHTML({
     icon: 'repeat-2',
     title: t('subscriptions.emptyTitle'),
-    description: t('subscriptions.emptyDescription'),
-    action: { label: t('subscriptions.add'), attrs: { id: 'subscriptions-empty-add' } },
+    description: ro ? '' : t('subscriptions.emptyDescription'),
+    action: ro ? null : { label: t('subscriptions.add'), attrs: { id: 'subscriptions-empty-add' } },
   });
 }
 
@@ -747,16 +778,24 @@ function bindContent() {
     if (!subscription) return;
 
     if (!action) return;
+    // Der Riegel vor der ersten Aktion: das Markup nimmt die Affordanz, das hier
+    // auch einem Knoten aus einem aelteren Render die Wirkung.
+    if (readOnly() && !READ_SAFE_ACTIONS.has(action.dataset.action)) return;
     // Der Zeilenkoerper OEFFNET das Bearbeiten und ist dafuer ein echter
     // `<button>` (`.list-row__main--interactive`, das app-weite Vokabular fuer
     // eine klickbare Zeile). Ein blosser Tap-Handler auf dem `<article>` haette
     // den Bearbeiten-Knopf entfernt, ohne einen Tastaturweg an seine Stelle zu
     // setzen - das waere kein Aufraeumen, sondern ein Regress.
+    if (action.dataset.action === 'view') openSubscriptionReadView(subscription);
     if (action.dataset.action === 'edit') openSubscriptionModal(subscription);
     if (action.dataset.action === 'renew') await renewSubscription(subscription);
     if (action.dataset.action === 'delete') await deleteSubscription(subscription);
   });
-  if (list) {
+  // Wischen hat kein Markup, das man wegnehmen koennte (Regel 3 in
+  // utils/module-access.js): bei `read` bleibt die VERDRAHTUNG aus - ein Riegel
+  // im Ende-Handler kaeme erst, wenn die Zeile schon verschoben ist. Und ohne
+  // Geste auch kein Hinweis auf eine.
+  if (list && !readOnly()) {
     wireSubscriptionSwipe(list);
     maybeShowSwipeHint(list);
   }
@@ -884,7 +923,59 @@ function wireCombobox(panel, id) {
   }, 0));
 }
 
+/**
+ * Die Zeilen der Leseansicht eines Abos (#1265 P7): was der Bearbeiten-Dialog
+ * zeigt, als Text. Die Karte traegt schon Name, Status, Faelligkeit, Zyklus,
+ * Zahlungsart, Erinnerung und Betrag; nur der Dialog kannte bisher Kategorie
+ * (wo eine Beschreibung sie auf der Karte verdraengt), das Konto, unter dem
+ * das Abo laeuft, und die Notizen. Die Markenfarbe traegt der Farbstreifen.
+ * Leere Zeilen faellt `detailRowEl` selbst weg - die Antwort folgt dem Datensatz.
+ */
+function subscriptionReadSections(subscription) {
+  const converted = subscription.monthly_base === null
+    ? t('subscriptions.conversionUnavailable')
+    : t('subscriptions.monthlyEquivalent', { amount: money(subscription.monthly_base) });
+  const endInfo = endInfoLabel(subscription);
+  return [
+    { icon: 'banknote', label: t('subscriptions.detailAmountLabel'),
+      value: `${money(subscription.amount, subscription.currency)} · ${converted}` },
+    { icon: 'info', label: t('subscriptions.filterLabelStatus'), value: statusMeta(subscription).label },
+    { icon: 'align-left', label: t('subscriptions.descriptionLabel'), value: subscription.description || '', multiline: true },
+    { icon: 'repeat-2', label: t('subscriptions.billingCycleLabel'), value: cycleLabel(subscription) },
+    { icon: 'calendar-clock', label: t('subscriptions.detailNextPaymentLabel'),
+      value: subscription.next_payment_date ? `${formatDate(subscription.next_payment_date)} · ${dueLabel(subscription)}` : '' },
+    { icon: 'bell', label: t('subscriptions.reminderDaysLabel'),
+      value: t('subscriptions.reminderMeta', { count: subscription.reminder_days }) },
+    { icon: endInfo?.icon || 'calendar-x', label: t('subscriptions.endLabel'), value: endInfo?.text || '' },
+    { icon: 'tags', label: t('subscriptions.categoryLabel'), value: subscription.category_id ? rowCategoryLabel(subscription) : '' },
+    { icon: 'wallet-cards', label: t('subscriptions.paymentMethodLabel'),
+      value: subscription.payment_method_id ? rowPaymentMethodLabel(subscription) : '' },
+    { icon: 'at-sign', label: t('subscriptions.accountUsernameLabel'), value: subscription.account_username || '' },
+    { icon: 'sticky-note', label: t('subscriptions.notesLabel'), value: subscription.notes || '', multiline: true },
+  ];
+}
+
+/**
+ * Das Abo bei `budget: read`: eine Leseansicht, sonst nichts. Dieselbe Bauart
+ * wie die Buchung in budget.js (P1-Muster: der Einstieg in den Editor verzweigt,
+ * die geteilte Leseansicht ohne `edit` und ohne `actions`).
+ */
+function openSubscriptionReadView(subscription) {
+  return openDetailView({
+    title: subscription.name,
+    accentColor: subscription.brand_color || subscription.category_color || 'var(--module-budget)',
+    size: 'sm',
+    sections: subscriptionReadSections(subscription),
+  });
+}
+
 export function openSubscriptionModal(subscription = null) {
+  // Der Riegel steht VOR jeder Vorbereitung: der Anlegeweg entfaellt ganz, ein
+  // bestehendes Abo geht als Leseansicht auf (P1-Muster wie openNoteModal).
+  if (readOnly()) {
+    if (subscription) openSubscriptionReadView(subscription);
+    return;
+  }
   const edit = Boolean(subscription);
   // Jedes Abo trägt seine eigene Währung; das Betragsfeld richtet sich danach
   // und wird beim Wechsel der Währungs-Combobox nachgezogen.
@@ -1150,6 +1241,7 @@ async function fileToDataUrl(file) {
 }
 
 async function saveSubscription(panel, existing, searchedLogoData = null) {
+  if (readOnly()) return;
   const dateInput = panel.querySelector('#subscription-next-date');
   const currencyInput = panel.querySelector('#subscription-currency');
   if (!isDateInputValid(dateInput.value)) {
@@ -1333,6 +1425,7 @@ function openLogoPickerModal(panel, initialQuery, onSelect) {
 // Bestaetigung, die nur an einem der beiden haengt, ist keine Regel, sondern
 // eine Eigenschaft des Wegs.
 async function renewSubscription(subscription) {
+  if (readOnly()) return;
   const confirmed = await confirmModal(
     t('subscriptions.renewConfirm', { name: subscription.name }),
     { detail: t('subscriptions.renewConfirmDetail', { date: formatDate(subscription.next_payment_date) }) });
@@ -1349,6 +1442,7 @@ async function renewSubscription(subscription) {
 }
 
 async function deleteSubscription(subscription) {
+  if (readOnly()) return;
   const confirmed = await confirmModal(t('subscriptions.deleteConfirm', { name: subscription.name }),
     { danger: true, detail: t('subscriptions.deleteConfirmDetail') });
   if (!confirmed) return;
@@ -1363,6 +1457,7 @@ async function deleteSubscription(subscription) {
 }
 
 async function openSettingsModal() {
+  if (readOnly()) return;
   const content = `
     <form id="subscriptions-settings-form">
       <div class="form-group">
@@ -1400,6 +1495,7 @@ async function openSettingsModal() {
       panel.querySelector('#subscriptions-settings-cancel').addEventListener('click', closeModal);
       panel.querySelector('#subscriptions-settings-form').addEventListener('submit', async (event) => {
         event.preventDefault();
+        if (readOnly()) return;
         const baseCurrency = panel.querySelector('#subscriptions-base-currency').value;
         if (!baseCurrency) {
           reportFieldError(panel.querySelector('#subscriptions-base-currency-search'), t('subscriptions.currencyRequired'));
@@ -1476,6 +1572,7 @@ function metadataRows(items, kind) {
 }
 
 function openMetadataModal() {
+  if (readOnly()) return;
   const content = `
     <div class="subscriptions-metadata">
       <section>
@@ -1507,6 +1604,7 @@ function openMetadataModal() {
     onSave(panel) {
       panel.querySelector('#subscriptions-metadata-close').addEventListener('click', closeModal);
       panel.querySelector('#subscription-add-category').addEventListener('click', async () => {
+        if (readOnly()) return;
         const name = panel.querySelector('#subscription-new-category').value.trim();
         if (!name) return;
         await api.post('/budget/subscriptions/categories', {
@@ -1519,6 +1617,7 @@ function openMetadataModal() {
         openMetadataModal();
       });
       panel.querySelector('#subscription-add-method').addEventListener('click', async () => {
+        if (readOnly()) return;
         const name = panel.querySelector('#subscription-new-method').value.trim();
         if (!name) return;
         await api.post('/budget/subscriptions/payment-methods', { name });
@@ -1529,6 +1628,7 @@ function openMetadataModal() {
       });
       panel.querySelectorAll('[data-move]').forEach((button) => {
         button.addEventListener('click', async () => {
+          if (readOnly()) return;
           // aria-disabled statt disabled: der Button bleibt fokussierbar, der
           // No-op-Klick am Listenrand wird hier verworfen (siehe layout.css).
           if (button.getAttribute('aria-disabled') === 'true') return;
@@ -1585,6 +1685,7 @@ function openMetadataModal() {
       });
       panel.querySelectorAll('[data-act="save"]').forEach((button) => {
         button.addEventListener('click', async () => {
+          if (readOnly()) return;
           const li = button.closest('li');
           const id = Number(li.dataset.id);
           const editRow = li.querySelector('.subscriptions-metadata-row__edit');
@@ -1616,6 +1717,7 @@ function openMetadataModal() {
       });
       panel.querySelectorAll('[data-act="delete"]').forEach((button) => {
         button.addEventListener('click', async () => {
+          if (readOnly()) return;
           const li = button.closest('li');
           const id = Number(li.dataset.id);
           const isCat = li.dataset.kind === 'categories';
@@ -1655,3 +1757,12 @@ function openMetadataModal() {
     },
   });
 }
+
+/**
+ * Messflaeche fuer die Nur-lesen-Regel (#1265 P7): Karten- und Leerzustands-
+ * Renderer sind reine Funktionen ueber `state`.
+ */
+export const __test = {
+  readOnly, READ_SAFE_ACTIONS, renderCard, renderEmpty, renderSummary, state,
+  subscriptionReadSections, openSubscriptionModal,
+};

@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "इस व्यक्ति के लिए कोई प्रविष्टि नहीं",
         "responsibleFilterEmptyDescription": "इस चयन में इस माह किसी प्रविष्टि के लिए कोई जिम्मेदार नहीं है।",
         "handoverToSplit": "साझा खर्च में ले जाएं",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (योजना: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (योजना: {{plan}})",
+        "detailDateLabel": "तारीख",
+        "loanDetailStartMonthLabel": "पहला देय महीना"
     },
     "settings": {
         "healthCycleEnableLabel": "चक्र टैब दिखाएँ",
@@ -2975,6 +2977,7 @@
         "nameDayClear": "नाम दिवस हटाएँ",
         "nameDayHint": "जन्मदिन वाले ही रिमाइंडर का उपयोग करता है।",
         "nameDayIncomplete": "नाम दिवस का महीना और दिन दोनों चुनें।",
+        "reminderOnDay": "उसी दिन",
         "nameDayCalendarEventTitle": "नाम दिवस: {{name}}",
         "nameDayCalendarEventDescription": "आज {{name}} का नाम दिवस है।",
         "photoLabel": "प्रोफ़ाइल तस्वीर",
@@ -3682,7 +3685,9 @@
         "proofLabel": "भुगतान प्रमाण",
         "proofHint": "एक प्रमाण, जैसे ट्रांसफ़र का स्क्रीनशॉट।",
         "proofDocumentName": "भुगतान प्रमाण {{group}}: {{name}}",
-        "loadError": "साझा खर्च लोड नहीं हो सके।"
+        "loadError": "साझा खर्च लोड नहीं हो सके।",
+        "moreMembers": "+{{count}} और",
+        "moreMembers_one": "+{{count}} और"
     },
     "wmo": {
         "0": "साफ आकाश",
@@ -3978,7 +3983,9 @@
         "endsAfter": "{{count}} भुगतान शेष",
         "logoTypeError": "PNG, JPEG, WebP या SVG चित्र इस्तेमाल करें।",
         "accountUsernameLabel": "इसके नाम पंजीकृत",
-        "accountUsernameHint": "ईमेल पता या उपयोगकर्ता नाम। यह पासवर्ड फ़ील्ड नहीं है - Yuvomi पासवर्ड सहेजता नहीं है।"
+        "accountUsernameHint": "ईमेल पता या उपयोगकर्ता नाम। यह पासवर्ड फ़ील्ड नहीं है - Yuvomi पासवर्ड सहेजता नहीं है।",
+        "detailAmountLabel": "राशि",
+        "detailNextPaymentLabel": "अगला भुगतान"
     },
     "health": {
         "fasting": {

@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Для этого человека нет записей",
         "responsibleFilterEmptyDescription": "В этом месяце никто не отвечает за запись в этой выборке.",
         "handoverToSplit": "Перенести в общие расходы",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (план: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (план: {{plan}})",
+        "detailDateLabel": "Дата",
+        "loanDetailStartMonthLabel": "Первый месяц оплаты"
     },
     "settings": {
         "healthCycleEnableLabel": "Показать вкладку цикла",
@@ -2975,6 +2977,7 @@
         "nameDayClear": "Удалить именины",
         "nameDayHint": "Используется то же напоминание, что и для дня рождения.",
         "nameDayIncomplete": "Выберите месяц и день именин.",
+        "reminderOnDay": "В тот же день",
         "nameDayCalendarEventTitle": "Именины: {{name}}",
         "nameDayCalendarEventDescription": "Сегодня именины у {{name}}.",
         "photoLabel": "Фото профиля",
@@ -3682,7 +3685,9 @@
         "proofLabel": "Подтверждение оплаты",
         "proofHint": "Одно подтверждение, например скриншот перевода.",
         "proofDocumentName": "Подтверждение оплаты {{group}}: {{name}}",
-        "loadError": "Не удалось загрузить общие расходы."
+        "loadError": "Не удалось загрузить общие расходы.",
+        "moreMembers": "+{{count}} ещё",
+        "moreMembers_one": "+{{count}} ещё"
     },
     "wmo": {
         "0": "Ясное небо",
@@ -3978,7 +3983,9 @@
         "endsAfter": "Осталось {{count}} платежей",
         "logoTypeError": "Используйте изображение PNG, JPEG, WebP или SVG.",
         "accountUsernameLabel": "Зарегистрировано на",
-        "accountUsernameHint": "Адрес электронной почты или имя пользователя. Это не поле пароля - Yuvomi не хранит пароли."
+        "accountUsernameHint": "Адрес электронной почты или имя пользователя. Это не поле пароля - Yuvomi не хранит пароли.",
+        "detailAmountLabel": "Сумма",
+        "detailNextPaymentLabel": "Следующий платеж"
     },
     "health": {
         "fasting": {

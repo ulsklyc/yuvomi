@@ -1564,7 +1564,9 @@
         "responsibleFilterEmptyTitle": "이 사람의 항목이 없습니다",
         "responsibleFilterEmptyDescription": "이 선택에서 이번 달에는 어떤 항목에도 담당자가 없습니다.",
         "handoverToSplit": "공동 지출로 옮기기",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (계획: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (계획: {{plan}})",
+        "detailDateLabel": "날짜",
+        "loanDetailStartMonthLabel": "첫 상환 월"
     },
     "settings": {
         "healthCycleEnableLabel": "주기 탭 표시",
@@ -2960,6 +2962,7 @@
         "nameDayClear": "명명 축일 삭제",
         "nameDayHint": "생일과 동일한 알림을 사용합니다.",
         "nameDayIncomplete": "명명 축일의 월과 일을 모두 선택하세요.",
+        "reminderOnDay": "당일",
         "nameDayCalendarEventTitle": "명명 축일: {{name}}",
         "nameDayCalendarEventDescription": "오늘은 {{name}}의 명명 축일입니다.",
         "photoLabel": "프로필 사진",
@@ -3682,7 +3685,9 @@
         "proofLabel": "결제 증빙",
         "proofHint": "증빙 하나, 예를 들어 이체 스크린샷입니다.",
         "proofDocumentName": "결제 증빙 {{group}}: {{name}}",
-        "loadError": "공동 지출을 불러오지 못했습니다."
+        "loadError": "공동 지출을 불러오지 못했습니다.",
+        "moreMembers": "+{{count}}명 더",
+        "moreMembers_one": "+{{count}}명 더"
     },
     "wmo": {
         "0": "맑음",
@@ -3978,7 +3983,9 @@
         "endsAfter": "{{count}}회 결제 남음",
         "logoTypeError": "PNG, JPEG, WebP 또는 SVG 이미지를 사용하세요.",
         "accountUsernameLabel": "등록 계정",
-        "accountUsernameHint": "이메일 주소 또는 사용자 이름. 비밀번호 입력란이 아닙니다. Yuvomi는 비밀번호를 저장하지 않습니다."
+        "accountUsernameHint": "이메일 주소 또는 사용자 이름. 비밀번호 입력란이 아닙니다. Yuvomi는 비밀번호를 저장하지 않습니다.",
+        "detailAmountLabel": "금액",
+        "detailNextPaymentLabel": "다음 결제"
     },
     "health": {
         "fasting": {

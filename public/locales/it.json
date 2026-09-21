@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Nessuna registrazione per questa persona",
         "responsibleFilterEmptyDescription": "Nessuno è responsabile di una registrazione in questo mese con questa selezione.",
         "handoverToSplit": "Passa alle spese condivise",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (piano: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (piano: {{plan}})",
+        "detailDateLabel": "Data",
+        "loanDetailStartMonthLabel": "Primo mese di scadenza"
     },
     "settings": {
         "healthCycleEnableLabel": "Mostra la scheda ciclo",
@@ -2975,6 +2977,7 @@
         "nameDayClear": "Rimuovi onomastico",
         "nameDayHint": "Usa lo stesso promemoria del compleanno.",
         "nameDayIncomplete": "Seleziona il mese e il giorno dell’onomastico.",
+        "reminderOnDay": "Il giorno stesso",
         "nameDayCalendarEventTitle": "Onomastico: {{name}}",
         "nameDayCalendarEventDescription": "Oggi è l’onomastico di {{name}}.",
         "photoLabel": "Foto profilo",
@@ -3682,7 +3685,9 @@
         "proofLabel": "Prova di pagamento",
         "proofHint": "Una prova, ad esempio lo screenshot del bonifico.",
         "proofDocumentName": "Prova di pagamento {{group}}: {{name}}",
-        "loadError": "Impossibile caricare le spese condivise."
+        "loadError": "Impossibile caricare le spese condivise.",
+        "moreMembers": "+{{count}} altri",
+        "moreMembers_one": "+{{count}} altro"
     },
     "wmo": {
         "0": "Cielo sereno",
@@ -3978,7 +3983,9 @@
         "endsAfter": "Ancora {{count}} pagamenti",
         "logoTypeError": "Usa un'immagine PNG, JPEG, WebP o SVG.",
         "accountUsernameLabel": "Registrato con",
-        "accountUsernameHint": "Indirizzo e-mail o nome utente. Non è un campo per password: Yuvomi non memorizza password."
+        "accountUsernameHint": "Indirizzo e-mail o nome utente. Non è un campo per password: Yuvomi non memorizza password.",
+        "detailAmountLabel": "Importo",
+        "detailNextPaymentLabel": "Prossimo pagamento"
     },
     "health": {
         "fasting": {

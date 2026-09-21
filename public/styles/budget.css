@@ -1120,6 +1120,20 @@
   margin-bottom: var(--space-0h);
 }
 
+/* Die Angaben aus dem Darlehens-Dialog (#1265 P7). Zinsmodell und Notiz sind
+ * Saetze, keine Kennzahlen: sie nehmen die ganze Breite, und die Notiz behaelt
+ * ihre Zeilenumbrueche. Bewusst NICHT unter `.budget-page`: der Bericht ist ein
+ * Modal und steht ausserhalb der Seite (#1347). */
+.loan-report__cell--wide {
+  grid-column: 1 / -1;
+}
+
+.loan-report__cell--wide strong {
+  font-weight: var(--font-weight-regular);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .budget-page .form-grid-2 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1726,7 +1740,12 @@ button.budget-entry__title {
   cursor: pointer;
   transition: box-shadow var(--transition-base), transform var(--transition-base);
 }
-.budget-plan-savings:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+/* Das gesetzte Sparziel bei `budget: read` (#1265 P7): eine Karte, die nur
+ * auskunft gibt. Die Hover-Quittung haengt deshalb per `:not()` am Knopf - eine
+ * Gegenregel am Zeichen verloere, sobald eine spaetere Regel mit gleicher
+ * Spezifitaet dazukommt (dieselbe Lehre wie `.note-card__pin--static`). */
+.budget-plan-savings--static { cursor: default; }
+.budget-plan-savings:not(.budget-plan-savings--static):hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
 .budget-plan-savings:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset);
@@ -1848,7 +1867,10 @@ button.budget-entry__title {
   cursor: pointer;
   transition: background-color var(--transition-base);
 }
-.budget-plan-row:hover { background-color: var(--color-surface-hover); }
+/* Bei `budget: read` ein Kasten statt eines Knopfs (#1265 P7): kein Zeiger,
+ * keine Hover-Flaeche - beides verspraeche den Bearbeiten-Dialog. */
+.budget-plan-row--static { cursor: default; }
+.budget-plan-row:not(.budget-plan-row--static):hover { background-color: var(--color-surface-hover); }
 .budget-plan-row:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset);
@@ -1882,7 +1904,10 @@ button.budget-entry__title {
   .budget-plan-savings__ring-fill,
   .budget-plan-row,
   .budget-plan-row__fill { transition: none; }
-  .budget-plan-savings:hover { transform: none; }
+  /* Derselbe Selektor wie die Hover-Regel oben, nicht `:hover` allein: der
+   * `:not()` hebt deren Spezifitaet, und eine schwaechere Ausnahme verloere
+   * trotz spaeterer Stelle - das Sparziel huepfte dann wieder. */
+  .budget-plan-savings:not(.budget-plan-savings--static):hover { transform: none; }
 }
 
 /* Zustaendige einer Buchung (#1057) - Avatare in der Metazeile, klickbar als

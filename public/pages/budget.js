@@ -7,7 +7,8 @@
 
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, confirmOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender } from '/components/modal.js';
-import { renderDocumentAttachField, bindDocumentAttachField } from '/components/document-attach.js';
+import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
+import { openDetailView } from '/components/detail-view.js';
 import { stagger, vibrate, scheduleUndoableDelete } from '/utils/ux.js';
 import { wireTablist } from '/utils/tablist.js';
 import { t, formatDate, formatDayMonth, getLocale, getNumberFormat } from '/i18n.js';
@@ -31,6 +32,7 @@ import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
 import { withChosenPeople } from '/utils/people-picker.js';
+import { isNavModuleReadOnly } from '/permissions.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -274,6 +276,66 @@ const DEFAULT_COLOR_ID = 'default';
 function tabCaps() {
   if (_user?.access_scope === 'split_guest') return TAB_CAPS['split-expenses'];
   return TAB_CAPS[state.activeTab] ?? TAB_CAPS.budget;
+}
+
+// --------------------------------------------------------
+// Nur-lesen (#467, #1265 P7)
+// --------------------------------------------------------
+
+/**
+ * Darf dieser Nutzer im Budget schreiben?
+ *
+ * Die VERBINDLICHE Sperre liegt am Server; dies ist die ehrliche
+ * UI-Entsprechung. Ohne sie zeichneten Buchungen, Konten und Darlehen jeden
+ * Schreibweg auch bei `budget: read` - Loeschen, Verbuchen, Bearbeiten,
+ * Rate buchen, Kategorien verwalten -, und jeder endete am 403.
+ *
+ * `budget` ist der Modulname, den die Rechte wirklich fuehren
+ * (server/permissions.js), anders als `birthdays` in P1. Er deckt auch
+ * `/split-expenses` (server/scopes.js). Abos, Geteilte Ausgaben und der Plan
+ * sind eigene Dateien mit eigenem Markup; jede fragt dasselbe Modul selbst,
+ * dieser Teil regelt, was `budget.js` zeichnet.
+ *
+ * Als Funktion, nicht als Konstante: ein Rechtewechsel kommt ohne Reload an.
+ */
+function readOnly() {
+  return isNavModuleReadOnly('budget');
+}
+
+// Jede `data-action` dieser Seite, die NICHT schreibt. Eine Positivliste,
+// damit eine morgen ergaenzte Schreib-Aktion standardmaessig gesperrt ist.
+const READ_SAFE_ACTIONS = new Set(['loan-filter']);
+
+// Die schreibenden Bedienhaken OHNE `data-action` - Konten, Leerzustaende und
+// der Kategorie-Verwalter sind einzeln verdrahtet, nicht ueber einen Verteiler.
+const WRITE_HOOKS = [
+  '[data-edit]', '#budget-add-account', '#budget-add-account-empty',
+  '#budget-empty-loan', '#budget-manage-categories', '#empty-cta-budget',
+].join(', ');
+
+// Abos und Geteilte Ausgaben sind eingebettete Seiten mit eigenem Markup und
+// eigenen Aktionsnamen (`data-action="edit"` in subscriptions.js) - und mit
+// ihrer eigenen Nur-lesen-Regel. Dieser Riegel deutete ihre Namen nach der
+// Liste oben, und eine Aenderung an einer der beiden Listen verschoebe still,
+// was auf der anderen Seite gesperrt ist. Er bleibt deshalb draussen.
+const EMBEDDED_PANELS = '#budget-subscriptions-panel, #budget-split-expenses-panel';
+
+/**
+ * Der zweite Riegel hinter dem Markup, in der ERFASSUNGSPHASE am Panel: ein
+ * Knoten aus einem aelteren Render verliert hier seine Wirkung, bevor der
+ * Listener am Knopf selbst laeuft. Dieselbe Bauart wie `readOnlyLatch()` in
+ * health.js, weil diese Seite ihre Knoepfe ebenfalls einzeln verdrahtet.
+ */
+function readOnlyLatch(e) {
+  if (!readOnly()) return;
+  if (e.target.closest(EMBEDDED_PANELS)) return;
+  const action = e.target.closest('[data-action]');
+  const schreibt = action
+    ? !READ_SAFE_ACTIONS.has(action.dataset.action)
+    : Boolean(e.target.closest(WRITE_HOOKS));
+  if (!schreibt) return;
+  e.preventDefault();
+  e.stopPropagation();
 }
 
 // --------------------------------------------------------
@@ -592,6 +654,9 @@ export async function render(container, { user }) {
   `);
 
   if (window.lucide) lucide.createIcons({ el: container });
+  // `#budget-body` bleibt ueber jeden renderBody() hinweg dasselbe Element -
+  // nur seine Kinder werden ersetzt -, also genuegt EIN Riegel pro Seitenaufbau.
+  container.querySelector('#budget-body')?.addEventListener('click', readOnlyLatch, true);
 
   // Vor dem ersten Laden synchronisieren, nicht erst danach: `state.month` und
   // `state.activeTab` stehen schon, also kann „Aktuell" seinen Zielzustand VOR
@@ -664,7 +729,11 @@ function wireNav() {
   // Neu-Aktion je Tab — spiegelt TAB_CAPS.add. Tabs ohne Neu-Aktion (Berichte,
   // Split-Ausgaben - die Unterseite bringt ihren eigenen Kopfknopf/FAB mit)
   // blenden beide Auslöser aus, der Handler bleibt dort folgenlos.
+  // Kopfknopf und FAB blendet CSS aus (html[data-module-readonly]); der Handler
+  // bleibt trotzdem gesperrt - ausgeblendet ist nicht unerreichbar, und der
+  // Plan-Zweig klickt einen Knopf per `.click()`.
   const addHandler = () => {
+    if (readOnly()) return;
     switch (state.activeTab) {
       case 'subscriptions':  openSubscriptionModal(); return;
       case 'plan':           _container.querySelector('#budget-plan-add')?.click(); return;
@@ -931,7 +1000,8 @@ function renderBody() {
             <i data-lucide="wallet" class="icon-sm" aria-hidden="true"></i>
             <span>${esc(accountName(state.accountFilterId))}</span>
             <i data-lucide="x" class="icon-sm" aria-hidden="true"></i>
-          </button>` : ''}
+          </button>
+          ${statementCreditLimitHtml()}` : ''}
           ${state.responsibleFilterId != null ? `
           <button class="budget-account-chip" id="budget-clear-responsible-filter" type="button"
                   aria-label="${esc(t('budget.clearResponsibleFilter'))}">
@@ -947,10 +1017,11 @@ function renderBody() {
           title="${esc(t('budget.groupByResponsible'))}">
           <i data-lucide="users" class="icon-sm" aria-hidden="true"></i>${esc(t('budget.groupByResponsible'))}
         </button>` : ''}
+        ${readOnly() ? '' : `
         <button class="btn btn--secondary budget-manage-categories" id="budget-manage-categories"
           title="${t('budget.manageCategories')}">
           <i data-lucide="tags" class="icon-sm" aria-hidden="true"></i>${t('budget.manageCategories')}
-        </button>
+        </button>`}
         ${state.entries.length ? `
         <a href="/api/v1/budget/export?month=${state.month}${state.budgetMode === 'personal' ? `&scope=${state.scope}` : ''}" class="btn btn--secondary budget-csv-export">
           <i data-lucide="download" class="icon-sm" aria-hidden="true"></i>CSV
@@ -995,6 +1066,13 @@ function renderBody() {
   stagger(_container.querySelector('#budget-list')?.querySelectorAll('.budget-entry') ?? []);
 
   _container.querySelector('#budget-list')?.addEventListener('click', async (e) => {
+    // Der Riegel vor der ersten Aktion (siehe READ_SAFE_ACTIONS): das Markup
+    // nimmt die Affordanz, das hier nimmt auch dem uebrig gebliebenen Knoten
+    // die Wirkung. Der Zustaendigen-Filter traegt kein `data-action` und
+    // bleibt - er liest nur.
+    const action = e.target.closest('[data-action]');
+    if (action && readOnly() && !READ_SAFE_ACTIONS.has(action.dataset.action)) return;
+
     const delBtn = e.target.closest('[data-action="delete"]');
     if (delBtn) { await deleteEntry(parseInt(delBtn.dataset.id, 10)); return; }
 
@@ -1012,8 +1090,10 @@ function renderBody() {
       return;
     }
 
+    // Der Zeilen-Klick fragt NICHT selbst: openBudgetModal verzweigt bei
+    // `read` in die Leseansicht, und die ist der Leseweg dieser Zeile.
     const item = e.target.closest('.budget-entry[data-id]');
-    if (item && !e.target.closest('[data-action]')) {
+    if (item && !action) {
       const entry = state.entries.find((e) => e.id === parseInt(item.dataset.id, 10));
       if (entry) openBudgetModal({ mode: 'edit', entry });
     }
@@ -1173,12 +1253,17 @@ function visibleEntries() {
 
 function renderEntries() {
   if (!state.entries.length) {
+    // BEI `budget: read` BLEIBT NUR DER TITEL. Beschreibung und Hinweis sind
+    // Anleitungen zum Anlegen („ueber den + Button"), und der CTA klickt den
+    // FAB per `.click()` - das erreicht auch ein Element mit `display: none`.
+    // „Keine Eintraege diesen Monat" ist die Auskunft; der Rest fuehrte ins 403.
+    const ro = readOnly();
     return emptyStateHTML({
       icon: 'dollar-sign',
       title: t('budget.emptyTitle'),
-      description: t('budget.emptyDescription'),
-      hint: t('emptyHint.budget'),
-      action: { label: t('budget.emptyAction'), icon: 'plus', attrs: { id: 'empty-cta-budget' } },
+      description: ro ? '' : t('budget.emptyDescription'),
+      hint: ro ? '' : t('emptyHint.budget'),
+      action: ro ? null : { label: t('budget.emptyAction'), icon: 'plus', attrs: { id: 'empty-cta-budget' } },
     });
   }
 
@@ -1210,8 +1295,27 @@ function renderEntries() {
   return entryRows(rows);
 }
 
+/**
+ * Der Kreditrahmen im Kopf des Kontoauszugs (#1265 P7).
+ *
+ * Er ist der eine Wert des Konto-Dialogs, den weder die Karte (sie rechnet ihn
+ * in „verfuegbar" um) noch der Auszug zeigte - bei `budget: read` war er damit
+ * nirgends zu lesen. Er steht dort, wo der Tipp auf die Karte ohnehin landet,
+ * statt hinter einem neuen Knopf. IN BEIDEN MODI: der Auszug ist eine Leseflaeche,
+ * der Dialog ein eigener Schritt - der Wert steht damit nie zweimal auf
+ * demselben Bildschirm, und eine Sonderregel je Recht waere eine zweite Wahrheit
+ * ueber dasselbe Konto. Nur fuer Kreditkarten: der Dialog zeigt und speichert das
+ * Feld nur dort (am-credit-fields).
+ */
+function statementCreditLimitHtml() {
+  const account = (state.accounts ?? []).find((a) => a.id === state.accountFilterId);
+  if (!account || account.type !== 'credit' || account.credit_limit == null) return '';
+  return `<div class="budget-list-header__filter">${esc(t('budget.creditLimitLabel'))} ${esc(formatAmount(account.credit_limit, account.currency || state.currency))}</div>`;
+}
+
 /** Die Buchungszeilen selbst - einmal gebaut, von Liste und Gruppen benutzt. */
 function entryRows(list) {
+  const ro = readOnly();
   return list.map((e) => {
     const isIncome  = e.amount > 0;
     const amtClass  = isIncome ? 'budget-entry__amount--income' : 'budget-entry__amount--expenses';
@@ -1284,7 +1388,9 @@ function entryRows(list) {
     const pendingBadge = pending
       ? ` <span class="budget-badge budget-badge--pending">${esc(t('budget.pendingBadge'))}</span>`
       : '';
-    const confirmBtn = pending
+    // Das Verbuchen ist die Handlung, „erwartet" der Zustand: bei `budget:
+    // read` geht der Knopf, die Plakette daneben bleibt und sagt es weiter.
+    const confirmBtn = pending && !ro
       ? `<button class="row-action" data-action="confirm" data-id="${e.id}" aria-label="${esc(t('budget.confirmAction'))}: ${esc(e.title)}">
           <i data-lucide="check" class="icon-md" aria-hidden="true"></i>
         </button>`
@@ -1297,12 +1403,16 @@ function entryRows(list) {
      * bleibt Maus-Klickflaeche (data-id + Delegation am #budget-list).
      * Eine maskierte Zeile ist keine Bedienflaeche: es gibt nichts zu oeffnen
      * (der Server liefert die Felder gar nicht erst mit) - sie bekommt weder
-     * data-id noch einen Titel-Button, ihr sichtbarer Text traegt alles. */
+     * data-id noch einen Titel-Button, ihr sichtbarer Text traegt alles.
+     *
+     * Bei `budget: read` bleibt die Zeile ein Knopf, oeffnet aber die
+     * LESEANSICHT (openBudgetModal verzweigt, P1-Muster). Deshalb verspricht
+     * sein Name dort kein „bearbeiten": Titel und Betrag, nichts weiter. */
     const rowInteraction = masked ? '' : `data-id="${e.id}"`;
     const titleCell = masked
       ? `<div class="list-row__name budget-entry__title">${esc(displayTitle)}${sharedBadge}${maskedBadge}${pendingBadge}</div>`
       : `<button class="list-row__name budget-entry__title" type="button"
-           aria-label="${esc(t('budget.editEntry'))}: ${esc(e.title)}, ${amountText}">${esc(displayTitle)}${sharedBadge}${maskedBadge}${pendingBadge}</button>`;
+           aria-label="${ro ? '' : `${esc(t('budget.editEntry'))}: `}${esc(e.title)}, ${amountText}">${esc(displayTitle)}${sharedBadge}${maskedBadge}${pendingBadge}</button>`;
     // ZUSTAENDIGE (#1057) als Avatar-Stapel in der Metazeile - dieselbe Sprache,
     // die Kalender und Aufgaben fuer "wer gehoert dazu" schon sprechen. Bei
     // einer maskierten Buchung faellt er weg: deren Zweck bleibt verborgen, und
@@ -1312,7 +1422,7 @@ function entryRows(list) {
              aria-label="${esc(t('budget.responsibleFilterTo', { name: e.responsible_users[0].display_name ?? '' }))}"
            >${renderAvatarStack(e.responsible_users, { size: 16, maxVisible: 3 })}</button>`
       : '';
-    const rowActions = masked ? '' : `
+    const rowActions = (masked || ro) ? '' : `
           ${confirmBtn}
           <button class="row-action row-action--danger" data-action="delete" data-id="${e.id}" aria-label="${t('budget.deleteLabel')}">
             <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
@@ -1334,6 +1444,9 @@ function entryRows(list) {
 }
 
 function renderAccountsPage() {
+  // Bei `budget: read` bleiben Saldo, Nettovermoegen, Archiv-Umschalter und der
+  // Kontoauszug (Drilldown) - alles Lesen. Anlegen und Bearbeiten gehen.
+  const ro = readOnly();
   const all = state.accounts ?? [];
   const hasArchived = all.some((a) => a.archived);
   const visible = all.filter((a) => state.accountsShowArchived || !a.archived);
@@ -1356,9 +1469,9 @@ function renderAccountsPage() {
       <span class="panel-head__title">${t('budget.accountsTab')}</span>
       <div class="panel-head__actions">
         ${archiveToggle}
-        <button class="btn btn--secondary" id="budget-add-account" type="button">
+        ${ro ? '' : `<button class="btn btn--secondary" id="budget-add-account" type="button">
           <i data-lucide="plus" class="icon-sm" aria-hidden="true"></i>${t('budget.addAccount')}
-        </button>
+        </button>`}
       </div>
     </div>
     <div class="metric-grid">
@@ -1375,8 +1488,8 @@ function renderAccountsPage() {
         ${emptyStateHTML({
     icon: 'wallet',
     title: t('budget.accountsEmptyTitle'),
-    description: t('budget.accountsEmptyDescription'),
-    action: { label: t('budget.addAccount'), icon: 'plus', attrs: { id: 'budget-add-account-empty' } },
+    description: ro ? '' : t('budget.accountsEmptyDescription'),
+    action: ro ? null : { label: t('budget.addAccount'), icon: 'plus', attrs: { id: 'budget-add-account-empty' } },
   })}
       </div>`;
   }
@@ -1410,9 +1523,9 @@ function renderAccountsPage() {
             <span class="budget-account__starting">${t('budget.startingBalanceShort')} ${formatAmount(a.starting_balance)}</span>
           </span>
         </button>
-        <button class="budget-account__edit" type="button" data-edit="${a.id}" aria-label="${t('budget.editAccount')}">
+        ${ro ? '' : `<button class="budget-account__edit" type="button" data-edit="${a.id}" aria-label="${t('budget.editAccount')}">
           <i data-lucide="pencil" class="icon-sm" aria-hidden="true"></i>
-        </button>
+        </button>`}
       </div>`;
   }).join('');
 
@@ -1455,6 +1568,7 @@ function wireAccountsPage() {
 }
 
 function openAccountModal(account = null) {
+  if (readOnly()) return;
   const isEdit = !!account;
   // Ein Konto kann eine eigene Währung tragen (budget_accounts.currency). Der
   // Saldo rastert dann nach dieser, nicht nach der des Haushalts: sonst wies ein
@@ -1559,6 +1673,7 @@ function openAccountModal(account = null) {
       });
 
       panel.querySelector('#am-archive')?.addEventListener('click', async () => {
+        if (readOnly()) return;
         const nextArchived = !account.archived;
         try {
           await api.put(`/budget/accounts/${account.id}`, { archived: nextArchived });
@@ -1573,6 +1688,7 @@ function openAccountModal(account = null) {
       });
 
       panel.querySelector('#am-delete')?.addEventListener('click', async () => {
+        if (readOnly()) return;
         // confirmOverModal statt confirmModal: „Abbrechen" gibt das Konto-Modal
         // unverändert zurück, statt es samt Eingaben zu verdrängen. Bestätigt
         // der Nutzer, ist es beim Weiterlaufen hier bereits geschlossen.
@@ -1593,6 +1709,7 @@ function openAccountModal(account = null) {
       });
 
       panel.querySelector('#am-save').addEventListener('click', async () => {
+        if (readOnly()) return;
         const saveBtn = panel.querySelector('#am-save');
         const name    = panel.querySelector('#am-name').value.trim();
         const type    = panel.querySelector('#am-type').value;
@@ -1804,7 +1921,7 @@ function renderLoanPaymentEntry(loan, payment) {
         <div class="list-row__meta budget-entry__meta">${meta}</div>
       </div>
       <div class="budget-entry__amount budget-entry__amount--${flow}">${amountText}</div>
-      <div class="list-row__actions">
+      ${readOnly() ? '' : `<div class="list-row__actions">
         ${entry ? `
         <button class="row-action" data-action="loan-payment-edit" data-loan-id="${loan.id}" data-payment-id="${payment.id}" data-entry-id="${entry.id}" aria-label="${t('common.edit')}">
           <i data-lucide="pencil" class="icon-md" aria-hidden="true"></i>
@@ -1812,7 +1929,7 @@ function renderLoanPaymentEntry(loan, payment) {
         <button class="row-action row-action--danger" data-action="loan-payment-delete" data-loan-id="${loan.id}" data-payment-id="${payment.id}" data-entry-id="${entry?.id ?? ''}" aria-label="${t('budget.deleteLabel')}">
           <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
         </button>
-      </div>
+      </div>`}
     </div>
   `;
 }
@@ -1820,12 +1937,13 @@ function renderLoanPaymentEntry(loan, payment) {
 function renderLoansPage() {
   const loans = state.loans?.loans ?? [];
   if (!loans.length) {
+    const ro = readOnly();
     return `<div class="budget-tab-panel page-scrollport budget-tab-panel--loans">
       ${emptyStateHTML({
     icon: 'hand-coins',
     title: t('budget.loansEmpty'),
-    description: t('budget.loansEmptyDescription'),
-    action: { label: t('budget.newLoan'), icon: 'plus', attrs: { id: 'budget-empty-loan' } },
+    description: ro ? '' : t('budget.loansEmptyDescription'),
+    action: ro ? null : { label: t('budget.newLoan'), icon: 'plus', attrs: { id: 'budget-empty-loan' } },
   })}
     </div>`;
   }
@@ -1904,6 +2022,7 @@ function wireLoansPage() {
  * zu führen, und jedes dabei fehlende Feld wird beim Speichern stillschweigend geleert.
  */
 async function openLoanPaymentEntry(loanId, paymentId) {
+  if (readOnly()) return;
   try {
     const res = await api.get(`/budget?loan_id=${loanId}`);
     const entry = (res.data ?? []).find((e) => e.loan_payment_id === paymentId);
@@ -1966,6 +2085,7 @@ function openLoanReport(loan) {
       <div class="loan-report__grid">
         ${cells.map(([label, value]) => `<div><span>${esc(label)}</span><strong>${value}</strong></div>`).join('')}
       </div>
+      ${loanReportDetails(loan)}
       ${loan.is_foreign_currency ? `<p class="form-hint budget-loan-hint">${t('budget.loanRateInfo', {
         currency: esc(loan.currency),
         rate: getNumberFormat({ maximumFractionDigits: 6 }).format(Number(loan.exchange_rate || 1)),
@@ -2002,6 +2122,30 @@ function openLoanReport(loan) {
       panel.querySelector('#loan-report-close')?.addEventListener('click', closeModal);
     },
   });
+}
+
+/**
+ * Die Angaben des Darlehens-Dialogs, die weder die Karte noch der Bericht
+ * sonst trug (#1265 P7): Konto, erster Faelligkeitsmonat, Zinsmodell samt
+ * Anfangstilgung und Notizen. Der Bericht IST die Leseansicht eines Darlehens -
+ * die Karte oeffnet ihn fuer jeden, und bei `budget: read` ist er der einzige
+ * Weg zu diesen Werten. Leere Angaben fallen weg: die Antwort folgt dem
+ * Datensatz. Jeder Wert geht durch esc() - Konto und Notiz sind Eingaben.
+ */
+function loanReportDetails(loan) {
+  const it = loan.interest;
+  const rows = [
+    [t('budget.loanAccountLabel'), accountName(loan.account_id), false],
+    [t('budget.loanDetailStartMonthLabel'), loan.start_month ? formatMonthLabel(loan.start_month) : '', false],
+    [t('budget.loanInitialRepaymentLabel'), it?.initial_repayment_rate != null
+      ? getNumberFormat({ maximumFractionDigits: 2 }).format(Number(it.initial_repayment_rate)) : '', false],
+    [t('budget.loanInterestModeLabel'), it ? loanInterestMeta(it, loan) : '', true],
+    [t('budget.loanNotesLabel'), loan.notes || '', true],
+  ].filter(([, value]) => value);
+  if (!rows.length) return '';
+  return `<div class="loan-report__grid loan-report__grid--details">
+        ${rows.map(([label, value, wide]) => `<div${wide ? ' class="loan-report__cell--wide"' : ''}><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join('')}
+      </div>`;
 }
 
 // Rate in Landes-Locale mit Prozentzeichen (z. B. „2,5 %"). Nicht-brechendes
@@ -2083,7 +2227,10 @@ function renderLoanCard(loan) {
       </div>
       <div class="budget-loan-card__footer">
         <span>${t('budget.loanNextDue', { month: nextDue })}</span>
-        <div class="budget-loan-card__actions">
+        ${/* Bei `budget: read` gehen alle drei: Bearbeiten, Loeschen und das
+            * Buchen einer Rate schreiben. Faelligkeit, Fortschritt und der
+            * Bericht hinter der Karte bleiben - sie sind die Auskunft. */ ''}
+        ${readOnly() ? '' : `<div class="budget-loan-card__actions">
           <button class="btn btn--secondary btn--icon" data-action="loan-edit" data-id="${loan.id}" aria-label="${t('budget.editLoan')}">
             <i data-lucide="pencil" aria-hidden="true"></i>
           </button>
@@ -2093,7 +2240,7 @@ function renderLoanCard(loan) {
           <button class="btn btn--primary" data-action="loan-pay" data-id="${loan.id}" ${payDisabled}>
             ${t('budget.markLoanPaid')}
           </button>
-        </div>
+        </div>`}
       </div>
     </article>
   `;
@@ -2142,6 +2289,7 @@ function formatEntryDate(dateStr) {
 // --------------------------------------------------------
 
 function openCategoryManager() {
+  if (readOnly()) return;
   // Die Auffrischung haengt am Ereignis, nicht am Schliessen: beim Loeschen
   // raeumt `confirmOverModal` das Modal darunter ab, bevor `api.delete` laeuft
   // (siehe `_notifyChanged` in components/category-manager.js).
@@ -2237,7 +2385,80 @@ function responsibleFilterLabel(source) {
   return responsibleFilterName(source.responsibleFilterId, source) || source.responsibleFilterCachedName || '';
 }
 
+/**
+ * Die Zeilen der Leseansicht einer Buchung (#1265 P7) - alles, was der
+ * Bearbeiten-Dialog zeigt, als Text. Eine reine Funktion, damit sich messen
+ * laesst, WAS ein Nur-lesen-Mitglied zu sehen bekommt.
+ *
+ * Der Betrag steht wie im Dialog: bei einer virtuellen Serie der eingegebene
+ * Periodenbetrag, nicht der Monatsanteil der Zeile. Zeilen ohne Wert (keine
+ * Unterkategorie, kein Konto, keine Wiederholung) faellt `detailRowEl` selbst
+ * weg - die Antwort folgt dem Datensatz. Die Belege gehoeren dem
+ * Dokumente-Modul und fragen dessen Recht (`attachmentLinksNode`).
+ */
+function entryReadSections(entry) {
+  const amount = entry.recurrence_virtual && entry.recurrence_full_amount != null
+    ? Math.sign(entry.amount || -1) * Math.abs(entry.recurrence_full_amount)
+    : entry.amount;
+  const interval = entry.recurrence_interval || 'monthly';
+  const count = Math.min(99, Math.max(1, Number(entry.recurrence_interval_count) || 1));
+  const every = count === 1
+    ? t(`budget.interval${interval.charAt(0).toUpperCase()}${interval.slice(1)}`)
+    : `${t('rrule.labelEvery')} ${count} ${intervalUnitLabel(interval, count)}`;
+  const recurrence = entry.is_recurring
+    ? [every, entry.recurrence_virtual ? t('budget.virtualBudgetLabel') : '',
+      entry.recurrence_confirm ? t('budget.confirmFirstLabel') : ''].filter(Boolean).join(' · ')
+    : '';
+  return [
+    { icon: 'banknote', label: t('budget.amountLabel'), value: amountByRole(amount, 'flow').text },
+    { icon: 'calendar', label: t('budget.detailDateLabel'), value: entry.date ? formatDate(entry.date) : '' },
+    { icon: 'tag', label: t('budget.categoryLabel'), value: entry.category ? categoryLabel(entry.category) : '' },
+    { icon: 'tags', label: t('budget.subcategoryLabel'), value: entry.subcategory ? subcategoryLabel(entry.subcategory) : '' },
+    { icon: 'wallet', label: t('budget.accountLabel'), value: accountName(entry.account_id) },
+    {
+      icon: entry.visibility === 'private' ? 'lock' : 'eye',
+      label: t('budget.visibilityLabel'),
+      value: state.budgetMode === 'personal' && entry.visibility ? t(`budget.visibility_${entry.visibility}`) : '',
+    },
+    {
+      icon: (entry.responsible_users?.length ?? 0) > 1 ? 'users' : 'user',
+      label: t('budget.responsibleLabel'),
+      value: (entry.responsible_users ?? []).map((u) => u.display_name).filter(Boolean).join(', '),
+    },
+    { icon: 'repeat', label: t('budget.recurringLabel'), value: recurrence },
+    { icon: 'receipt', label: t('budget.receiptsLabel'), node: attachmentLinksNode(entry.attachments) },
+  ];
+}
+
+/**
+ * Die Buchung bei `budget: read`: eine Leseansicht, sonst nichts (#1265 P7).
+ *
+ * Die Bauart aus P1: der Einstieg in den Editor verzweigt bei `read` in eine
+ * Leseansicht (`openNoteModal` -> `openNoteReadModal` in notes.js), gezeichnet
+ * mit der geteilten Leseansicht, die P1 fuer die Kontakte bei `read` auf
+ * reines Lesen zurueckschneidet - kein `edit`, keine `actions`. Damit gibt es
+ * weder „Bearbeiten" im Kopf noch eine Fusszeile, und keinen gesperrten Knopf.
+ */
+function openEntryReadView(entry) {
+  return openDetailView({
+    title: entry.title,
+    accentColor: 'var(--module-budget)',
+    size: 'sm',
+    sections: entryReadSections(entry),
+  });
+}
+
 function openBudgetModal({ mode, entry = null, initialType = '' }) {
+  // DIE DRITTE LINIE, wie an jedem Einstieg in einen Schreibweg dieser Seite:
+  // ein Aufruf, der gar nicht ueber einen Knopf kommt (FAB, Leerzustand, eine
+  // Darlehensrate, ein Aufrufer von morgen), endet hier. An diesem Dialog
+  // schreibt jedes Feld - es gibt keine Teilmenge, die bei `read` bliebe.
+  // Eine BESTEHENDE Buchung geht deshalb als Leseansicht auf (P1-Muster),
+  // der Anlegeweg entfaellt ganz.
+  if (readOnly()) {
+    if (mode === 'edit' && entry) openEntryReadView(entry);
+    return;
+  }
   const isEdit = mode === 'edit';
   const today  = todayKey();
   // Ein neuer Eintrag gehört in den Monat, den der Nutzer gerade ansieht. Sonst
@@ -2530,6 +2751,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
       };
 
       const addCategory = async () => {
+        if (readOnly()) return;
         const name = await requestNameInPanel(panel, {
           title: t('budget.newCategoryTitle'),
           label: t('budget.newCategoryPrompt'),
@@ -2547,6 +2769,7 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
       };
 
       const addSubcategory = async () => {
+        if (readOnly()) return;
         const category = panel.querySelector('#bm-category').value;
         if (!category) return;
         const name = await requestNameInPanel(panel, {
@@ -2631,6 +2854,10 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
       });
 
       panel.querySelector('#bm-save').addEventListener('click', async () => {
+        // Der Riegel am ANDEREN Ende: ein Rechtewechsel erreicht auch einen
+        // offenen Dialog, und das Speichern ueberspringt dann den Schreibvorgang,
+        // statt ihn in ein 403 laufen zu lassen.
+        if (readOnly()) return;
         const saveBtn    = panel.querySelector('#bm-save');
         if (currentType === 'loan') {
           await saveLoanFromPanel(panel, saveBtn, { closeAfterSave: true });
@@ -3144,6 +3371,7 @@ function wireLoanPaidInstallmentsField(panel) {
 }
 
 async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave = false } = {}) {
+  if (readOnly()) return;
   const isEdit = Boolean(loan);
   const borrower = panel.querySelector('#lm-borrower').value.trim();
   const title = panel.querySelector('#lm-title').value.trim() || borrower;
@@ -3264,6 +3492,7 @@ async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave =
 }
 
 function openLoanModal(loan = null) {
+  if (readOnly()) return;
   const isEdit = Boolean(loan);
   const todayMonth = todayKey().slice(0, 7);
   const loanCurrency = loan?.currency || state.currency;
@@ -3329,6 +3558,7 @@ function openLoanModal(loan = null) {
 }
 
 async function markLoanPayment(id) {
+  if (readOnly()) return;
   const loan = state.loans.loans.find((item) => item.id === id);
   if (!loan?.next_installment_number) return;
   const today = todayKey();
@@ -3366,6 +3596,7 @@ async function markLoanPayment(id) {
 }
 
 async function deleteLoan(id) {
+  if (readOnly()) return;
   const loan = state.loans.loans.find((item) => item.id === id);
   if (!loan) return;
 
@@ -3389,6 +3620,7 @@ async function deleteLoan(id) {
 }
 
 async function deleteLoanPayment(loanId, paymentId) {
+  if (readOnly()) return;
   const loan = state.loans.loans.find((item) => item.id === loanId);
   const payment = loan?.payments?.find((item) => item.id === paymentId);
 
@@ -3427,6 +3659,7 @@ async function deleteLoanPayment(loanId, paymentId) {
  * Bestaetigen haette die Diskrepanz zum Kontoauszug bestehen lassen.
  */
 async function openConfirmBookingModal(id) {
+  if (readOnly()) return;
   const entry = state.entries.find((e) => e.id === id);
   if (!entry) return;
 
@@ -3457,6 +3690,7 @@ async function openConfirmBookingModal(id) {
     onSave(panel) {
       panel.querySelector('#cb-cancel').addEventListener('click', closeModal);
       panel.querySelector('#cb-save').addEventListener('click', async () => {
+        if (readOnly()) return;
         const amountEl = panel.querySelector('#cb-amount');
         const value = parseFloat(amountEl.value);
         if (!Number.isFinite(value) || value <= 0) {
@@ -3481,6 +3715,7 @@ async function openConfirmBookingModal(id) {
 }
 
 async function deleteEntry(id) {
+  if (readOnly()) return;
   const entry = state.entries.find((e) => e.id === id);
 
   if (entry && (entry.is_recurring || entry.recurrence_parent_id)) {
@@ -3559,6 +3794,7 @@ function recurringChoiceModal({ title, thisLabel, seriesLabel, seriesDanger = fa
 }
 
 async function deleteEntrySeries(id) {
+  if (readOnly()) return;
   const entry = state.entries.find((e) => e.id === id);
   const parentId = entry?.recurrence_parent_id ?? (entry?.is_recurring ? entry.id : id);
   state.entries = state.entries.filter((e) => e.id !== parentId && e.recurrence_parent_id !== parentId);
@@ -3609,5 +3845,33 @@ export const __test = {
   updateTabsForTest(container) {
     _container = container;
     updateTabs();
+  },
+  // #1265 P7: die Nur-lesen-Regel ist eine Aussage ueber genau dieses Markup
+  // und ueber die Riegel davor - gemessen in test:budget-readonly-ui.
+  readOnly,
+  READ_SAFE_ACTIONS,
+  WRITE_HOOKS,
+  readOnlyLatch,
+  renderEntries,
+  renderAccountsPage,
+  renderLoansPage,
+  renderLoanCard,
+  renderLoanPaymentEntry,
+  // Die Leseansichten (#1265 P7): die Zeilen als reine Funktionen, und der
+  // Einstieg, dessen Aussage KEIN Markup ist - welche Optionen er
+  // `openDetailView` uebergibt, sieht nur, wer sie ihm abnimmt.
+  entryReadSections,
+  openBudgetModal,
+  loanReportDetails,
+  // Der Darlehens-Dialog selbst - nur, damit die Suite misst, dass jeder Wert,
+  // den er mit Schreibrecht zeigt, im Bericht steht (P6-Muster).
+  openLoanModal,
+  openAccountModal,
+  // renderBody() schreibt in den Seitencontainer statt Markup zurueckzugeben;
+  // derselbe Griff wie updateTabsForTest oben laesst den ECHTEN Render-Pfad
+  // des Buchungs-Tabs laufen, statt seinen Quelltext zu lesen.
+  renderBodyForTest(container) {
+    _container = container;
+    renderBody();
   },
 };

@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Không có mục nào cho người này",
         "responsibleFilterEmptyDescription": "Tháng này không ai phụ trách mục nào trong lựa chọn này.",
         "handoverToSplit": "Chuyển sang chi tiêu chung",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (kế hoạch: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (kế hoạch: {{plan}})",
+        "detailDateLabel": "Ngày",
+        "loanDetailStartMonthLabel": "Tháng đáo hạn đầu tiên"
     },
     "settings": {
         "healthCycleEnableLabel": "Hiện tab chu kỳ",
@@ -2948,6 +2950,7 @@
         "nameDayClear": "Xóa ngày tên thánh",
         "nameDayHint": "Dùng cùng lời nhắc với ngày sinh nhật.",
         "nameDayIncomplete": "Chọn cả tháng và ngày của ngày tên thánh.",
+        "reminderOnDay": "Vào đúng ngày",
         "nameDayCalendarEventTitle": "Ngày tên thánh: {{name}}",
         "nameDayCalendarEventDescription": "Hôm nay là ngày tên thánh của {{name}}.",
         "photoLabel": "Ảnh hồ sơ",
@@ -3682,7 +3685,9 @@
         "proofLabel": "Bằng chứng thanh toán",
         "proofHint": "Một bằng chứng, ví dụ ảnh chụp màn hình chuyển khoản.",
         "proofDocumentName": "Bằng chứng thanh toán {{group}}: {{name}}",
-        "loadError": "Không thể tải chi phí chung."
+        "loadError": "Không thể tải chi phí chung.",
+        "moreMembers": "+{{count}} người nữa",
+        "moreMembers_one": "+{{count}} người nữa"
     },
     "wmo": {
         "0": "Trời quang",
@@ -3978,7 +3983,9 @@
         "endsAfter": "Còn {{count}} lần thanh toán",
         "logoTypeError": "Sử dụng ảnh PNG, JPEG, WebP hoặc SVG.",
         "accountUsernameLabel": "Đăng ký dưới tên",
-        "accountUsernameHint": "Địa chỉ e-mail hoặc tên đăng nhập. Đây không phải ô mật khẩu - Yuvomi không lưu mật khẩu."
+        "accountUsernameHint": "Địa chỉ e-mail hoặc tên đăng nhập. Đây không phải ô mật khẩu - Yuvomi không lưu mật khẩu.",
+        "detailAmountLabel": "Số tiền",
+        "detailNextPaymentLabel": "Khoản thanh toán tiếp theo"
     },
     "health": {
         "fasting": {

@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "この人の記録はありません",
         "responsibleFilterEmptyDescription": "この選択では、今月どの記録にも担当者がいません。",
         "handoverToSplit": "共有支出に移す",
-        "loanRemainingInstallmentsForecast": "{{forecast}}（計画: {{plan}}）"
+        "loanRemainingInstallmentsForecast": "{{forecast}}（計画: {{plan}}）",
+        "detailDateLabel": "日付",
+        "loanDetailStartMonthLabel": "初回支払月"
     },
     "settings": {
         "healthCycleEnableLabel": "周期タブを表示",
@@ -2975,6 +2977,7 @@
         "nameDayClear": "聖名祝日を削除",
         "nameDayHint": "誕生日と同じリマインダーを使用します。",
         "nameDayIncomplete": "聖名祝日の月と日を選択してください。",
+        "reminderOnDay": "当日",
         "nameDayCalendarEventTitle": "聖名祝日：{{name}}",
         "nameDayCalendarEventDescription": "今日は{{name}}の聖名祝日です。",
         "photoLabel": "プロフィール画像",
@@ -3682,7 +3685,9 @@
         "proofLabel": "支払いの証明",
         "proofHint": "証明を1件、たとえば振込のスクリーンショット。",
         "proofDocumentName": "支払いの証明 {{group}}: {{name}}",
-        "loadError": "共有費用の読み込みに失敗しました。"
+        "loadError": "共有費用の読み込みに失敗しました。",
+        "moreMembers": "他 {{count}} 人",
+        "moreMembers_one": "他 {{count}} 人"
     },
     "wmo": {
         "0": "快晴",
@@ -3978,7 +3983,9 @@
         "endsAfter": "残り{{count}}回の支払い",
         "logoTypeError": "PNG、JPEG、WebP、SVG画像を使用してください。",
         "accountUsernameLabel": "登録先アカウント",
-        "accountUsernameHint": "メールアドレスまたはユーザー名。パスワード欄ではありません。Yuvomi はパスワードを保存しません。"
+        "accountUsernameHint": "メールアドレスまたはユーザー名。パスワード欄ではありません。Yuvomi はパスワードを保存しません。",
+        "detailAmountLabel": "金額",
+        "detailNextPaymentLabel": "次回支払い"
     },
     "health": {
         "fasting": {

@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Nenhum lançamento para esta pessoa",
         "responsibleFilterEmptyDescription": "Ninguém é responsável por um lançamento neste mês com esta seleção.",
         "handoverToSplit": "Passar para despesas partilhadas",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (plano: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (plano: {{plan}})",
+        "detailDateLabel": "Data",
+        "loanDetailStartMonthLabel": "Primeiro mês de vencimento"
     },
     "settings": {
         "healthCycleEnableLabel": "Mostrar a aba de ciclo",
@@ -2975,6 +2977,7 @@
         "nameDayClear": "Remover dia do nome",
         "nameDayHint": "Usa o mesmo lembrete do aniversário.",
         "nameDayIncomplete": "Selecione o mês e o dia do dia do nome.",
+        "reminderOnDay": "No próprio dia",
         "nameDayCalendarEventTitle": "Dia do nome: {{name}}",
         "nameDayCalendarEventDescription": "Hoje é o dia do nome de {{name}}.",
         "photoLabel": "Foto de perfil",
@@ -3682,7 +3685,9 @@
         "proofLabel": "Comprovativo de pagamento",
         "proofHint": "Um comprovativo, por exemplo a captura da transferência.",
         "proofDocumentName": "Comprovativo de pagamento {{group}}: {{name}}",
-        "loadError": "Não foi possível carregar as despesas compartilhadas."
+        "loadError": "Não foi possível carregar as despesas compartilhadas.",
+        "moreMembers": "+{{count}} outros",
+        "moreMembers_one": "+{{count}} outro"
     },
     "wmo": {
         "0": "Céu limpo",
@@ -3978,7 +3983,9 @@
         "endsAfter": "Faltam {{count}} pagamentos",
         "logoTypeError": "Use uma imagem PNG, JPEG, WebP ou SVG.",
         "accountUsernameLabel": "Registado com",
-        "accountUsernameHint": "Endereço de e-mail ou nome de utilizador. Não é um campo de palavra-passe - o Yuvomi não guarda palavras-passe."
+        "accountUsernameHint": "Endereço de e-mail ou nome de utilizador. Não é um campo de palavra-passe - o Yuvomi não guarda palavras-passe.",
+        "detailAmountLabel": "Valor",
+        "detailNextPaymentLabel": "Próximo pagamento"
     },
     "health": {
         "fasting": {

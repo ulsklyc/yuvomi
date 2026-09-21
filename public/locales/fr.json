@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Aucune écriture pour cette personne",
         "responsibleFilterEmptyDescription": "Personne n'est responsable d'une écriture ce mois-ci avec cette sélection.",
         "handoverToSplit": "Basculer vers les dépenses partagées",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (plan : {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (plan : {{plan}})",
+        "detailDateLabel": "Date",
+        "loanDetailStartMonthLabel": "Premier mois d’échéance"
     },
     "settings": {
         "healthCycleEnableLabel": "Afficher l’onglet cycle",
@@ -2975,6 +2977,7 @@
         "nameDayClear": "Supprimer la fête",
         "nameDayHint": "Utilise le même rappel que l’anniversaire.",
         "nameDayIncomplete": "Sélectionnez le mois et le jour de la fête.",
+        "reminderOnDay": "Le jour même",
         "nameDayCalendarEventTitle": "Fête : {{name}}",
         "nameDayCalendarEventDescription": "C’est la fête de {{name}}.",
         "photoLabel": "Photo de profil",
@@ -3682,7 +3685,9 @@
         "proofLabel": "Preuve de paiement",
         "proofHint": "Une preuve, par exemple la capture du virement.",
         "proofDocumentName": "Preuve de paiement {{group}} : {{name}}",
-        "loadError": "Impossible de charger les dépenses partagées."
+        "loadError": "Impossible de charger les dépenses partagées.",
+        "moreMembers": "+{{count}} autres",
+        "moreMembers_one": "+{{count}} autre"
     },
     "wmo": {
         "0": "Ciel dégagé",
@@ -3978,7 +3983,9 @@
         "endsAfter": "Encore {{count}} paiements",
         "logoTypeError": "Utilisez une image PNG, JPEG, WebP ou SVG.",
         "accountUsernameLabel": "Enregistré sous",
-        "accountUsernameHint": "Adresse e-mail ou nom d'utilisateur. Ce n'est pas un champ de mot de passe - Yuvomi n'enregistre aucun mot de passe."
+        "accountUsernameHint": "Adresse e-mail ou nom d'utilisateur. Ce n'est pas un champ de mot de passe - Yuvomi n'enregistre aucun mot de passe.",
+        "detailAmountLabel": "Montant",
+        "detailNextPaymentLabel": "Prochain paiement"
     },
     "health": {
         "fasting": {

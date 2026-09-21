@@ -1564,7 +1564,9 @@
         "responsibleFilterEmptyTitle": "Keine Buchung für diese Person",
         "responsibleFilterEmptyDescription": "In diesem Monat ist niemand für eine Buchung dieser Auswahl zuständig.",
         "handoverToSplit": "In geteilte Ausgaben übernehmen",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (Plan: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (Plan: {{plan}})",
+        "detailDateLabel": "Datum",
+        "loanDetailStartMonthLabel": "Erster Fälligkeitsmonat"
     },
     "settings": {
         "healthCycleEnableLabel": "Zyklus-Tab anzeigen",
@@ -2960,6 +2962,7 @@
         "nameDayClear": "Namenstag entfernen",
         "nameDayHint": "Verwendet dieselbe Erinnerung wie der Geburtstag.",
         "nameDayIncomplete": "Bitte Monat und Tag des Namenstags auswählen.",
+        "reminderOnDay": "Am Tag selbst",
         "photoLabel": "Profilbild",
         "photoOptional": "Optional: Du kannst auch ohne Profilbild speichern.",
         "removePhoto": "Bild entfernen",
@@ -3682,7 +3685,9 @@
         "proofLabel": "Zahlungsnachweis",
         "proofHint": "Ein Nachweis, etwa der Screenshot der Überweisung.",
         "proofDocumentName": "Zahlungsnachweis {{group}}: {{name}}",
-        "loadError": "Gemeinsame Ausgaben konnten nicht geladen werden."
+        "loadError": "Gemeinsame Ausgaben konnten nicht geladen werden.",
+        "moreMembers": "+{{count}} weitere",
+        "moreMembers_one": "+{{count}} weitere"
     },
     "wmo": {
         "0": "Klarer Himmel",
@@ -3978,7 +3983,9 @@
         "endsAfter": "Noch {{count}} Zahlungen",
         "logoTypeError": "Bitte ein PNG-, JPEG-, WebP- oder SVG-Bild verwenden.",
         "accountUsernameLabel": "Registriert unter",
-        "accountUsernameHint": "E-Mail-Adresse oder Benutzername. Kein Passwortfeld - Yuvomi speichert keine Passwörter."
+        "accountUsernameHint": "E-Mail-Adresse oder Benutzername. Kein Passwortfeld - Yuvomi speichert keine Passwörter.",
+        "detailAmountLabel": "Betrag",
+        "detailNextPaymentLabel": "Nächste Zahlung"
     },
     "health": {
         "fasting": {

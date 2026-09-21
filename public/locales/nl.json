@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Geen boeking voor deze persoon",
         "responsibleFilterEmptyDescription": "Niemand is deze maand verantwoordelijk voor een boeking binnen deze selectie.",
         "handoverToSplit": "Naar gedeelde uitgaven",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (volgens plan: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (volgens plan: {{plan}})",
+        "detailDateLabel": "Datum",
+        "loanDetailStartMonthLabel": "Eerste vervaldatum"
     },
     "settings": {
         "healthCycleEnableLabel": "Cyclustabblad tonen",
@@ -2948,6 +2950,7 @@
         "nameDayClear": "Naamdag verwijderen",
         "nameDayHint": "Gebruikt dezelfde herinnering als de verjaardag.",
         "nameDayIncomplete": "Selecteer de maand en dag van de naamdag.",
+        "reminderOnDay": "Op de dag zelf",
         "nameDayCalendarEventTitle": "Naamdag: {{name}}",
         "nameDayCalendarEventDescription": "Vandaag is de naamdag van {{name}}.",
         "photoLabel": "Profielfoto",
@@ -3682,7 +3685,9 @@
         "proofLabel": "Betaalbewijs",
         "proofHint": "Eén bewijs, bijvoorbeeld een screenshot van de overboeking.",
         "proofDocumentName": "Betaalbewijs {{group}}: {{name}}",
-        "loadError": "Gedeelde uitgaven konden niet worden geladen."
+        "loadError": "Gedeelde uitgaven konden niet worden geladen.",
+        "moreMembers": "+{{count}} meer",
+        "moreMembers_one": "+{{count}} meer"
     },
     "wmo": {
         "0": "Heldere lucht",
@@ -3978,7 +3983,9 @@
         "endsAfter": "Nog {{count}} betalingen",
         "logoTypeError": "Gebruik een PNG-, JPEG-, WebP- of SVG-afbeelding.",
         "accountUsernameLabel": "Geregistreerd op",
-        "accountUsernameHint": "E-mailadres of gebruikersnaam. Geen wachtwoordveld - Yuvomi bewaart geen wachtwoorden."
+        "accountUsernameHint": "E-mailadres of gebruikersnaam. Geen wachtwoordveld - Yuvomi bewaart geen wachtwoorden.",
+        "detailAmountLabel": "Bedrag",
+        "detailNextPaymentLabel": "Volgende betaling"
     },
     "health": {
         "fasting": {

@@ -1564,7 +1564,9 @@
         "responsibleFilterEmptyTitle": "Brak wpisów dla tej osoby",
         "responsibleFilterEmptyDescription": "W tym miesiącu nikt nie odpowiada za wpis w tym wyborze.",
         "handoverToSplit": "Przenieś do wydatków wspólnych",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (wg planu: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (wg planu: {{plan}})",
+        "detailDateLabel": "Data",
+        "loanDetailStartMonthLabel": "Pierwszy miesiąc płatności"
     },
     "settings": {
         "healthCycleEnableLabel": "Pokaż kartę cyklu",
@@ -2960,6 +2962,7 @@
         "nameDayClear": "Usuń imieniny",
         "nameDayHint": "Używa tego samego przypomnienia co urodziny.",
         "nameDayIncomplete": "Wybierz miesiąc i dzień imienin.",
+        "reminderOnDay": "W tym samym dniu",
         "nameDayCalendarEventTitle": "Imieniny: {{name}}",
         "nameDayCalendarEventDescription": "Dziś są imieniny {{name}}.",
         "photoLabel": "Zdjęcie profilowe",
@@ -3682,7 +3685,9 @@
         "proofLabel": "Potwierdzenie płatności",
         "proofHint": "Jedno potwierdzenie, na przykład zrzut ekranu przelewu.",
         "proofDocumentName": "Potwierdzenie płatności {{group}}: {{name}}",
-        "loadError": "Nie udało się załadować wspólnych wydatków."
+        "loadError": "Nie udało się załadować wspólnych wydatków.",
+        "moreMembers": "+{{count}} więcej",
+        "moreMembers_one": "+{{count}} więcej"
     },
     "wmo": {
         "0": "Bezchmurnie",
@@ -3978,7 +3983,9 @@
         "endsAfter": "Pozostało {{count}} płatności",
         "logoTypeError": "Proszę użyć pliku PNG, JPEG, WebP lub SVG.",
         "accountUsernameLabel": "Zarejestrowano na",
-        "accountUsernameHint": "Adres e-mail lub nazwa użytkownika. To nie jest pole hasła - Yuvomi nie przechowuje haseł."
+        "accountUsernameHint": "Adres e-mail lub nazwa użytkownika. To nie jest pole hasła - Yuvomi nie przechowuje haseł.",
+        "detailAmountLabel": "Kwota",
+        "detailNextPaymentLabel": "Następna płatność"
     },
     "health": {
         "fasting": {
