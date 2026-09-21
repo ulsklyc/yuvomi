@@ -501,12 +501,20 @@ function groupMetaHtml(group) {
   const method = group.default_split_method || 'equal';
   const values = defaultSplitValues(group);
   // Zahlformat der Haushalts-Einstellung, nicht der Sprache (#521, getNumberFormat).
+  // Der Dialog fuehrt die Vorbelegung als rohe Zahl mit hoechstens zwei
+  // Nachkommastellen, die Einheit steht dort in der Methode („Prozent"). Hier,
+  // ohne das Feld daneben, traegt die Zahl ihre Einheit selbst - und zwar so, wie
+  // die Region sie schreibt: Stellung und Abstand des Prozentzeichens kommen aus
+  // Intl („60%" in en-US, „60 %" in de-DE), nicht aus einem festen Literal.
+  const percent = getNumberFormat({ style: 'percent', maximumFractionDigits: 2 });
   const number = getNumberFormat({ maximumFractionDigits: 2 });
-  const unit = method === 'percentage' ? ' %' : '';
+  const preset = (value) => (method === 'percentage'
+    ? percent.format(Number(value) / 100)
+    : number.format(Number(value)));
   const presets = members
     .map((m) => [m.display_name, values[m.user_id ?? m.id]])
     .filter(([, value]) => value != null && value !== '')
-    .map(([name, value]) => `${name} ${number.format(Number(value))}${unit}`);
+    .map(([name, value]) => `${name} ${preset(value)}`);
   const methodLabel = t(`splitExpenses.split${method.charAt(0).toUpperCase()}${method.slice(1)}`);
   const names = members.slice(0, GROUP_META_NAMES)
     .map((m) => (m.role === 'guest' ? `${m.display_name} (${t('splitExpenses.roleGuest')})` : m.display_name));

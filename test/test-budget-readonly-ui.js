@@ -1166,13 +1166,38 @@ test('Gruppenkopf bei `budget: read`: Waehrung, Standardaufteilung und Mitgliede
   const werte = {
     'splitExpenses.currency': [[/<option value="EUR" selected>EUR</], /^EUR$/],
     'splitExpenses.defaultSplit': [[/<option value="percentage" selected>/, /name="default_value_1"[^>]*value="60"/, /name="default_value_3"[^>]*value="40"/],
-      /^splitExpenses\.splitPercentage - Alex 60 %, Emma 40 %$/],
+      /^splitExpenses\.splitPercentage - Alex 60\u00a0%, Emma 40\u00a0%$/],
     'splitExpenses.members': [[/value="user:1" checked[\s\S]*Alex/, /value="user:3" checked[\s\S]*Emma · splitExpenses\.roleGuest/],
       /^Alex, Emma \(splitExpenses\.roleGuest\)$/],
   };
   jederWert(werte, editor.content, gruppenZeile(gruppenKopf(gruppe(), mitglieder, 'read')), 'Gruppe');
   // Mit Schreibrecht fuehrt der Stift in den Dialog - der Kopf bleibt, wie er war.
   assert.doesNotMatch(gruppenKopf(gruppe(), mitglieder, 'write'), /split-group-meta/);
+});
+
+test('Gruppenkopf: das Prozentzeichen schreibt die Region, nicht ein festes Literal', () => {
+  // Der Dialog fuehrt die Vorbelegung als rohe Zahl (hoechstens zwei
+  // Nachkommastellen), die Einheit steckt dort in der Methode. Die Zeile nennt
+  // sie selbst - Stellung und Abstand kommen aus Intl ueber getNumberFormat().
+  const vorher = globalThis.__formatLocale;
+  const zeile = (locale, config) => {
+    globalThis.__formatLocale = locale;
+    return gruppenZeile(gruppenKopf(gruppe({ default_split_config: JSON.stringify(config) }), mitglieder, 'read'))['splitExpenses.defaultSplit'];
+  };
+  try {
+    const sechzigVierzig = [{ user_id: 1, percentage: 60 }, { user_id: 3, percentage: 40 }];
+    assert.equal(zeile('en-US', sechzigVierzig), 'splitExpenses.splitPercentage - Alex 60%, Emma 40%');
+    assert.equal(zeile('de-DE', sechzigVierzig), 'splitExpenses.splitPercentage - Alex 60 %, Emma 40 %');
+    // Zwei Nachkommastellen wie im Dialog, mit dem Dezimaltrenner der Region.
+    assert.equal(zeile('de-DE', [{ user_id: 1, percentage: '66.67' }, { user_id: 3, percentage: '33.33' }]),
+      'splitExpenses.splitPercentage - Alex 66,67 %, Emma 33,33 %');
+  } finally {
+    if (vorher === undefined) delete globalThis.__formatLocale; else globalThis.__formatLocale = vorher;
+  }
+  // Anteile bleiben reine Zahlen - ohne Zeichen.
+  const anteile = gruppenZeile(gruppenKopf(gruppe({ default_split_method: 'shares',
+    default_split_config: JSON.stringify([{ user_id: 1, shares: 2 }, { user_id: 3, shares: 1 }]) }), mitglieder, 'read'));
+  assert.equal(anteile['splitExpenses.defaultSplit'], 'splitExpenses.splitShares - Alex 2, Emma 1');
 });
 
 test('Gruppenkopf: bei vielen Mitgliedern Namen bis zur Grenze, danach „+N"; Namen gehen durch esc()', () => {
