@@ -414,6 +414,6 @@
   "allowScripts": {
     "better-sqlite3-multiple-ciphers@13.0.3": true,
     "bcrypt@6.0.0": true,
-    "puppeteer@25.10.0": true
+    "puppeteer@25.11.0": true
   }
 }
