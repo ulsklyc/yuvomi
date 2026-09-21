@@ -190,7 +190,7 @@ function collectErrors(results) {
 // Nachkommastellen stehen nicht im ECMAScript-Format, und was die Engine
 // daraus macht, ist nicht zugesagt.
 const ZONED_DATETIME_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?(?:(Z)|([+-])(\d{2}):?(\d{2}))$/;
-const NAIVE_DATETIME_RE = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/;
+const NAIVE_DATETIME_RE = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?$/;
 
 /**
  * Ein Wert mit `Z` oder Offset als Millisekunden seit Epoch, oder null, wenn
@@ -238,10 +238,15 @@ function zonedInstantMs(raw) {
  * - `to: 'instant'`: UTC-Instant `YYYY-MM-DDTHH:MM:SS.sssZ`, wie ihn
  *   `/decay-tasks/:id/complete` schreibt (`last_completed`).
  *
- * Werte OHNE Offset bleiben, was sie waren: Wanduhrzeit, auf `YYYY-MM-DDTHH:MM`
- * gekuerzt - bei `to: 'utc'` unveraendert, denn dort ist die zonenlose Form
- * selbst schon die UTC-Zeit, und ein reines Datum bleibt ein reines Datum. Wer
- * lokale Ziffern schickt, merkt also nichts.
+ * Werte OHNE Offset behalten ihre Bedeutung: Wanduhrzeit, auf
+ * `YYYY-MM-DDTHH:MM` gekuerzt, ein reines Datum bleibt ein reines Datum. Wer
+ * lokale Ziffern schickt, merkt also nichts. Die eine Ausnahme ist die FORM
+ * bei `to: 'utc'`: die zonenlose Eingabe ist dort schon die UTC-Zeit, kommt
+ * aber in dieselbe Form `YYYY-MM-DDTHH:MM:SS` wie ein umgerechneter Offset
+ * (fehlende Sekunden :00, Bruchteile weg), und ein reines Datum wird
+ * `YYYY-MM-DDT00:00:00` - Mitternacht UTC, genau der Zeitpunkt, zu dem der
+ * Scheduler es schon vorher feuerte. Sonst waeren `07:00`, `07:00:00` und
+ * `09:00:00+02:00` drei Erinnerungen fuer einen Zeitpunkt (#1364).
  *
  * Ein Offset-Wert OHNE genanntes Ziel wirft: das waere wieder das stille
  * Abschneiden, gegen das diese Funktion gebaut ist, und ein neuer Aufrufer soll
@@ -264,7 +269,7 @@ function datetime(val, field, required = false, { to, zone, allDay = false } = {
   if (!DATETIME_RE.test(String(val)))
     return { value: null, error: `${field} must be in YYYY-MM-DD or YYYY-MM-DDTHH:MM format.` };
   const raw = String(val).trim();
-  if (DATE_RE.test(raw)) return { value: raw, error: null };
+  if (DATE_RE.test(raw)) return { value: to === 'utc' ? `${raw}T00:00:00` : raw, error: null };
 
   if (ZONED_DATETIME_RE.test(raw)) {
     if (to !== 'wall' && to !== 'utc' && to !== 'instant') {
@@ -284,11 +289,11 @@ function datetime(val, field, required = false, { to, zone, allDay = false } = {
     return { value: `${wall.date}T${wall.time.slice(0, 5)}`, error: null };
   }
 
-  if (to === 'utc') return { value: raw, error: null };
   const match = NAIVE_DATETIME_RE.exec(raw);
   if (!match) {
     return { value: null, error: `${field} must be in YYYY-MM-DD or YYYY-MM-DDTHH:MM format.` };
   }
+  if (to === 'utc') return { value: `${match[1]}T${match[2]}:${match[3]}:${match[4] ?? '00'}`, error: null };
   return { value: `${match[1]}T${match[2]}:${match[3]}`, error: null };
 }
 

@@ -14,10 +14,12 @@ const EVENT_FANOUT = ' For `entity_type=event`, a reminder set by the person who
 /**
  * `remind_at` ist naiv-UTC; ein Offset wird dorthin umgerechnet (#1364).
  */
-const REMIND_AT_INPUT = ' `remind_at` is UTC without a zone suffix (`YYYY-MM-DDTHH:MM:SS`), and a value without offset is '
-  + 'stored as sent. A value with `Z` or a numeric offset is read as an instant and converted into that form: '
-  + '`2026-09-22T18:00:00+02:00` is stored as `2026-09-22T16:00:00`. Up to v2.68.0 such a value was stored '
-  + 'unchanged; those rows are still read as the instant they name and fire on time.';
+const REMIND_AT_INPUT = ' `remind_at` is stored as UTC without a zone suffix, always as `YYYY-MM-DDTHH:MM:SS`. A value '
+  + 'without offset already is UTC and is only brought into that form: missing seconds become `:00`, fractions '
+  + 'are dropped, and a date alone becomes midnight UTC, the moment it fired at before. A value with `Z` or a '
+  + 'numeric offset is read as an instant and converted: `2026-09-22T18:00:00+02:00` is stored as '
+  + '`2026-09-22T16:00:00`. Up to v2.68.0 values were stored as sent; rows with an offset from then are still '
+  + 'read as the instant they name and fire on time.';
 
 export function remindersPaths() {
   return {

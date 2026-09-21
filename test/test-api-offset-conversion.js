@@ -167,9 +167,13 @@ test('datetime(): Werte ohne Offset bleiben, was sie waren', () => {
   assert.equal(datetime('2026-09-21T18:00', 'f', true, wall).value, '2026-09-21T18:00');
   assert.equal(datetime('2026-09-21T18:00:59.999', 'f', true, wall).value, '2026-09-21T18:00');
   assert.equal(datetime('2026-09-21', 'f', true, wall).value, '2026-09-21');
-  // naiv-UTC: die zonenlose Form IST schon die Zielform und bleibt unberuehrt.
+  // naiv-UTC: die zonenlose Form IST schon die UTC-Zeit.
   assert.equal(datetime('2026-09-22T16:00:00', 'f', true, { to: 'utc' }).value, '2026-09-22T16:00:00');
-  assert.equal(datetime('2026-09-22', 'f', true, { to: 'utc' }).value, '2026-09-22');
+  // Die Form von naiv-UTC ist eine: Sekunden ergaenzt, Bruchteile weg, ein
+  // reines Datum wird Mitternacht UTC - der Zeitpunkt, zu dem es schon feuerte.
+  assert.equal(datetime('2026-09-22T16:00', 'f', true, { to: 'utc' }).value, '2026-09-22T16:00:00');
+  assert.equal(datetime('2026-09-22T16:00:00.999', 'f', true, { to: 'utc' }).value, '2026-09-22T16:00:00');
+  assert.equal(datetime('2026-09-22', 'f', true, { to: 'utc' }).value, '2026-09-22T00:00:00');
   // Ohne Ziel und ohne Offset: das bisherige Verhalten.
   assert.equal(datetime('2026-09-21T18:00:30', 'f').value, '2026-09-21T18:00');
 });
@@ -414,6 +418,30 @@ test('POST und PUT /reminders speichern einen Offset als naiv-UTC', async () => 
   });
   assert.equal(put.status, 200);
   assert.deepEqual(put.body.data.map((r) => r.remind_at), ['2099-01-01T07:00:00']);
+});
+
+test('PUT /reminders: derselbe Zeitpunkt in jeder Schreibweise ist EINE Erinnerung', async () => {
+  const withTime = newEvent('Fuenf Schreibweisen');
+  const put = await call('PUT', `/reminders?entity_type=event&entity_id=${withTime}`, {
+    remind_ats: ['2099-01-01T07:00', '2099-01-01T07:00:00', '2099-01-01T07:00:00.000',
+      '2099-01-01T07:00:00Z', '2099-01-01T09:00:00+02:00'],
+  });
+  assert.equal(put.status, 200, JSON.stringify(put.body));
+  assert.deepEqual(put.body.data.map((r) => r.remind_at), ['2099-01-01T07:00:00']);
+
+  // Ein reines Datum ist Mitternacht UTC - so feuerte es schon immer, jetzt
+  // steht es auch so in der Zeile und faellt mit seinen Schreibweisen zusammen.
+  const dateOnly = newEvent('Reines Datum');
+  const put2 = await call('PUT', `/reminders?entity_type=event&entity_id=${dateOnly}`, {
+    remind_ats: ['2099-01-01', '2099-01-01T00:00', '2099-01-01T01:00:00+01:00'],
+  });
+  assert.equal(put2.status, 200, JSON.stringify(put2.body));
+  assert.deepEqual(put2.body.data.map((r) => r.remind_at), ['2099-01-01T00:00:00']);
+
+  const posted = await call('POST', '/reminders', {
+    entity_type: 'event', entity_id: newEvent('POST naiv'), remind_at: '2099-01-01T07:00',
+  });
+  assert.equal(posted.body.data.remind_at, '2099-01-01T07:00:00');
 });
 
 test('remind_at mit Offset feuert puenktlich - auch eine schon roh so gespeicherte Zeile', async () => {

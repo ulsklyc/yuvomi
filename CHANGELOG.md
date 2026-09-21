@@ -81,10 +81,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (also on the occurrence routes and the MCP tool `create_event`) and the health timestamps
   (`measured_at`, `performed_at`, `consumed_at`, `scheduled_at`, `taken_at`) become household
   wall-clock time; for an all-day event only the date counts, so a start at midnight UTC stays on
-  its day west of UTC. `remind_at` becomes UTC without a zone suffix, the form reminders are compared
-  in, and `last_completed` of a housekeeping task becomes a UTC instant, the form `/complete` writes.
-  Values without an offset mean household wall-clock time as before, so a client that sends local
-  digits sees no change. **This changes what is stored for input `/api/v1` already accepted**; as a
+  its day west of UTC. `remind_at` becomes UTC without a zone suffix in one notation, the form
+  reminders are compared in (a bare date is midnight UTC, when it fired before), and
+  `last_completed` of a housekeeping task becomes a UTC instant, the form `/complete` writes. Values
+  without an offset mean household wall-clock time as before, so a client that sends local digits
+  sees no change. **This changes what is stored for input `/api/v1` already accepted**; as a
   fix to values stored wrong without an error it is named here rather than deprecated first (see
   "How long that line holds" in MODULES.md). `PUT /api/v1/calendar/:id` now stores the validated
   value like `POST` does instead of the raw request value, which had moved a weekly series by an
