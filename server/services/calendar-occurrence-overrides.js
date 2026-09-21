@@ -813,7 +813,8 @@ function syncOwnedAttachmentAccess(database, documentId, visibility, userIds) {
  * pruefen, eine Serie um ganze Tage verschieben) und genau das FALSCHE fuer
  * alles, was einen Zeitpunkt meint. Der Erinnerungs-Vergleich laeuft deshalb
  * auf der anderen Achse: der Anker durch `reminderAnchorInstantMs()`, die
- * Zeile durch `remindAtInstantMs()` (#1291).
+ * Zeile durch `remindAtInstantMs()` (#1291), und ihre Verschiebung beim
+ * Verschieben des Termins durch `reminderShiftMs()` (#1300).
  */
 function wallTimeMs(value) {
   const raw = String(value ?? '');
@@ -869,6 +870,40 @@ function shiftedDateTimeLike(value, shiftMs) {
   if (DATE_ONLY_RE.test(source)) return shifted.slice(0, 10);
   const local = shifted.slice(0, /T\d{2}:\d{2}:\d{2}/.test(source) ? 19 : 16);
   return /Z$/.test(source) ? `${local}Z` : local;
+}
+
+/**
+ * Der Abstand zweier Terminanker auf der ZEITPUNKT-Achse: das Mass, um das eine
+ * Erinnerung mitwandert, wenn ihr Termin verschoben wird.
+ *
+ * NICHT `wallTimeMs()`, obwohl beide Anker Wanduhrzeiten sind (#1300). Der
+ * Wanduhr-Abstand zaehlt Kalendertage, der echte zaehlt Sekunden, und ueber
+ * einer DST-Grenze gehen beide um den Zonenversatz auseinander: zwischen dem
+ * 20.03. und dem 20.07. liegen in Europe/Berlin 122 Wanduhr-Tage, aber nur 121
+ * Tage und 23 Stunden. Auf `remind_at` addiert - eine Spalte, die einen
+ * Zeitpunkt meint - verschob diese Stunde den Vorlauf: aus 60 Minuten wurden 0,
+ * die Erinnerung lag auf dem Terminbeginn. Weil "zum Startzeitpunkt" ein
+ * gueltiges Preset ist, sah das gewollt aus und hat sich nie gemeldet.
+ *
+ * Fuer `start_datetime` bleibt `shiftedDateTimeLike()` oben richtig: eine Serie
+ * um ganze Tage zu schieben heisst, die Wanduhrzeit zu behalten.
+ *
+ * Die Zone wird hier geholt statt vom Aufrufer erwartet: alle drei
+ * Verschiebe-Stellen haben die Verbindung zur Hand, und so kann kein kuenftiger
+ * Aufrufer die falsche durchreichen.
+ */
+function reminderShiftMs(database, sourceAnchor, targetAnchor) {
+  const tz = householdTimeZone(database);
+  return reminderAnchorInstantMs(targetAnchor, tz) - reminderAnchorInstantMs(sourceAnchor, tz);
+}
+
+/**
+ * Eine verschobene Erinnerungszeile: `remind_at` als Zeitpunkt gelesen, um
+ * `shiftMs` bewegt und in der Form zurueckgeschrieben, in der sie ankam.
+ */
+function shiftedRemindAt(remindAt, shiftMs) {
+  const shifted = new Date(remindAtInstantMs(remindAt) + shiftMs).toISOString();
+  return /Z$/.test(String(remindAt)) ? shifted : shifted.slice(0, 19);
 }
 
 function firstSlotSeriesChanges(master, selected, changes) {
@@ -981,10 +1016,12 @@ function replaceReminders(database, eventId, actorId, anchorStart, offsets) {
   }
 }
 
+/**
+ * Die Erinnerungen einer Serie auf ein Vorkommen kopieren - um den Abstand der
+ * beiden Anker verschoben, damit jede Zeile ihren Vorlauf behaelt (#1300).
+ */
 function copyReminderState(database, sourceId, targetId, sourceAnchor, targetAnchor) {
-  const sourceStart = wallTimeMs(sourceAnchor);
-  const targetStart = wallTimeMs(targetAnchor);
-  const shift = targetStart - sourceStart;
+  const shift = reminderShiftMs(database, sourceAnchor, targetAnchor);
   if (!Number.isFinite(shift)) return;
   const insert = database.prepare(`
     INSERT INTO reminders
@@ -995,10 +1032,9 @@ function copyReminderState(database, sourceId, targetId, sourceAnchor, targetAnc
     SELECT remind_at, dismissed, created_by, assigned_from
     FROM reminders WHERE entity_type = 'event' AND entity_id = ?
   `).all(sourceId)) {
-    const shifted = new Date(wallTimeMs(row.remind_at) + shift).toISOString();
     insert.run(
       targetId,
-      /Z$/.test(String(row.remind_at)) ? shifted : shifted.slice(0, 19),
+      shiftedRemindAt(row.remind_at, shift),
       row.dismissed,
       row.created_by,
       row.assigned_from,
@@ -1803,7 +1839,7 @@ function copyResolvedReminderState(database, {
     DELETE FROM reminders
     WHERE entity_type = 'event' AND entity_id = ? AND assigned_from IS NOT NULL
   `).run(targetEventId);
-  const shift = wallTimeMs(targetAnchor) - wallTimeMs(sourceAnchor);
+  const shift = reminderShiftMs(database, sourceAnchor, targetAnchor);
   const insert = database.prepare(`
     INSERT INTO reminders
       (entity_type, entity_id, remind_at, dismissed, created_by, assigned_from)
@@ -1813,10 +1849,9 @@ function copyResolvedReminderState(database, {
     const createdBy = Number(row.created_by);
     if (targetOwn.has(createdBy)) continue;
     if (row.assigned_from !== null && !targetAssignees.has(createdBy)) continue;
-    const shifted = new Date(wallTimeMs(row.remind_at) + shift).toISOString();
     insert.run(
       targetEventId,
-      /Z$/.test(String(row.remind_at)) ? shifted : shifted.slice(0, 19),
+      shiftedRemindAt(row.remind_at, shift),
       row.dismissed,
       createdBy,
       row.assigned_from,
@@ -1904,8 +1939,14 @@ function applySeriesChanges(database, seriesId, changes) {
   `).run(...entries.map(([, value]) => value), seriesId);
 }
 
+/**
+ * Die eigenen Erinnerungen eines Termins mitnehmen, wenn er verschoben wird.
+ *
+ * Verschoben wird um den Abstand der beiden Anker auf der Zeitpunkt-Achse: der
+ * Vorlauf bleibt, die Uhrzeit darf sich aendern (#1300).
+ */
 function shiftOwnedReminders(database, eventId, oldAnchor, newAnchor) {
-  const shift = wallTimeMs(newAnchor) - wallTimeMs(oldAnchor);
+  const shift = reminderShiftMs(database, oldAnchor, newAnchor);
   if (!Number.isFinite(shift) || shift === 0) return;
   const rows = database.prepare(`
     SELECT id, remind_at FROM reminders
@@ -1913,8 +1954,7 @@ function shiftOwnedReminders(database, eventId, oldAnchor, newAnchor) {
   `).all(eventId);
   const update = database.prepare('UPDATE reminders SET remind_at = ? WHERE id = ?');
   for (const row of rows) {
-    const shifted = new Date(wallTimeMs(row.remind_at) + shift).toISOString();
-    update.run(/Z$/.test(String(row.remind_at)) ? shifted : shifted.slice(0, 19), row.id);
+    update.run(shiftedRemindAt(row.remind_at, shift), row.id);
   }
 }
 
