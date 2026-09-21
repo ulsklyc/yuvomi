@@ -6,6 +6,14 @@
  * buildPaths() gespreadet sein, jedes Fragment nicht leer, und kein Pfad-Key
  * darf über zwei Modul-Dateien kollidieren. Verhindert, dass eine kuenftig
  * angelegte Modul-Datei still aus der Spec faellt.
+ *
+ * Seit #1344 dazu die Verweise IM Dokument: jeder `$ref` der fertigen Spec
+ * (paths UND components) ist ein String und zeigt auf ein Ziel, das im selben
+ * Dokument existiert. Die uebrigen Tests hier und in test:openapi-coverage
+ * pruefen die Liste der Routen oder einzelne, namentlich genannte Schemas -
+ * keiner lief ueber alle Verweise. Ein `jsonBody(schemaObjekt)` statt
+ * `jsonBody('#/components/schemas/Name')` war dort so gruen wie ein Verweis
+ * auf ein Schema, das es nicht gibt.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -158,6 +166,120 @@ test('kein Pfad-Parameter mit Namens-Bedeutung ist als Zahl deklariert', () => {
 
   assert.deepEqual(offenders, [],
     `Diese Pfad-Parameter tragen einen Namen, sind aber als integer deklariert:\n${offenders.join('\n')}`);
+});
+
+/**
+ * Jeder `$ref` der fertigen Spec, mit seinem Fundort.
+ *
+ * DIE GANZE SPEC, NICHT NUR `paths`. Verweise stehen auch in
+ * `components.schemas` (Schema auf Schema) und in den 409-Antworten, die
+ * `buildOpenApiSpec` erst nachtraegt; ein Leser, der Teile auslaesst, prueft
+ * sie nie und meldet trotzdem gruen. Gelaufen wird deshalb rekursiv durch
+ * Objekte UND Arrays (`allOf`, `oneOf`, `parameters`, `items`). `$ref` zaehlt
+ * als eigene Eigenschaft auch mit dem Wert `undefined`: im ausgelieferten JSON
+ * faellt so ein Schluessel still weg und hinterlaesst ein Schema, das alles
+ * erlaubt.
+ */
+function collectRefs(node, path = [], out = []) {
+  if (node === null || typeof node !== 'object') return out;
+  if (Array.isArray(node)) {
+    node.forEach((child, i) => collectRefs(child, [...path, i], out));
+    return out;
+  }
+  if (Object.hasOwn(node, '$ref')) out.push({ path: [...path, '$ref'], value: node.$ref });
+  for (const [key, child] of Object.entries(node)) collectRefs(child, [...path, key], out);
+  return out;
+}
+
+/** Fundort lesbar wie ein Zugriff: `paths["/api/v1/x"].post.requestBody...` */
+function refLocation(path) {
+  return path.map((key, i) => {
+    if (typeof key === 'number') return `[${key}]`;
+    if (/^[A-Za-z_$][\w$]*$/.test(key)) return i === 0 ? key : `.${key}`;
+    return `[${JSON.stringify(key)}]`;
+  }).join('');
+}
+
+/**
+ * Loest `#/a/b/c` gegen das DOKUMENT auf, nie gegen eine angenommene Sektion.
+ *
+ * Gemessen fuer #1344: ein Pruefer, der nur in `components.schemas`
+ * nachschlug, meldete vier Fehlalarme - `#/components/responses/Unauthorized`
+ * und seine drei Geschwister leben unter `components.responses`. Derselbe
+ * Pruefer waere in der Gegenrichtung blind fuer jeden Verweis in eine Sektion,
+ * die er nicht kennt. Gefolgt wird deshalb genau dem Pfad, den der Verweis
+ * nennt (JSON Pointer nach RFC 6901: `~1` ist `/`, `~0` ist `~`), und nur ueber
+ * EIGENE Schluessel: `(o || {})[k]` faende unter `#/components/schemas/constructor`
+ * die Funktion aus dem Prototyp und hielte den Verweis fuer aufgeloest.
+ *
+ * Ein Ziel ist immer ein Objekt (Schema, Antwort, Parameter); ein Verweis auf
+ * einen Text wie `#/info/title` ist kaputt, obwohl es den Pfad gibt. Verweise
+ * ausserhalb des Dokuments (`other.json#/...`) loesen nie auf: die Spec wird
+ * als EINE Datei ausgeliefert, ein Integrator hat nichts anderes in der Hand.
+ * `undefined` heisst hier "kaputt" und wird gemeldet, nicht verschluckt.
+ */
+function resolveRef(doc, ref) {
+  if (!ref.startsWith('#/')) return undefined;
+  let node = doc;
+  for (const raw of ref.slice(2).split('/')) {
+    let key;
+    try {
+      key = decodeURIComponent(raw).replace(/~1/g, '/').replace(/~0/g, '~');
+    } catch {
+      return undefined;
+    }
+    if (node === null || typeof node !== 'object' || !Object.hasOwn(node, key)) return undefined;
+    node = node[key];
+  }
+  return node !== null && typeof node === 'object' ? node : undefined;
+}
+
+// Die Verweis-Tests lesen die fertige Spec, nicht buildPaths(): nur dort
+// stehen `components` und die nachgetragenen Antworten mit drin.
+const refSpec = buildOpenApiSpec({}, 'test');
+const specRefs = collectRefs(refSpec);
+
+test('der $ref-Sammler erreicht jeden Verweis der Spec (#1344)', () => {
+  // Gegen einen Sammler, der gruen ist, weil er nichts findet: die Zahl darf
+  // wachsen und schrumpfen, aber nicht auf null fallen.
+  assert.ok(specRefs.length > 0,
+    'kein einziger $ref gefunden - der Sammler laeuft ins Leere, und die Tests unten pruefen nichts');
+  // Und gegen einen Sammler, der nur TEILE erreicht: eine zweite, unabhaengige
+  // Zaehlung ueber den serialisierten Text. Ein `$ref`-Schluessel steht dort
+  // genau einmal als `"$ref":`, in einem Text-Wert waeren die Anfuehrungszeichen
+  // maskiert. Verglichen werden nur Verweise, die JSON ueberhaupt schreibt -
+  // ein `$ref: undefined` faellt beim Serialisieren weg und meldet sich unten.
+  const textual = JSON.stringify(refSpec).match(/"\$ref":/g)?.length ?? 0;
+  const serialised = specRefs.filter((r) => r.value !== undefined).length;
+  assert.equal(serialised, textual,
+    `der Sammler sieht ${serialised} Verweise, der Text der Spec enthaelt ${textual} - `
+    + 'er laesst einen Teil des Dokuments aus');
+});
+
+test('jeder $ref der Spec ist ein String (#1344)', () => {
+  // `jsonBody()` nimmt einen Verweis-STRING und baut `{ $ref: schemaRef }`.
+  // Bekommt es ein Schema-Objekt, entsteht `{ $ref: { type: 'object', ... } }`:
+  // gueltiges JSON, kein gueltiges OpenAPI, und der Request-Body der Route
+  // beschreibt still nichts. Beim Bau von #1326 nur durch Lesen der Spec
+  // aufgefallen, kein Test hatte hineingeschaut.
+  const kaputt = specRefs
+    .filter((r) => typeof r.value !== 'string')
+    .map((r) => `${refLocation(r.path)} = ${JSON.stringify(r.value)?.slice(0, 120) ?? String(r.value)}`);
+  assert.deepEqual(kaputt, [],
+    'Diese $ref sind kein String. jsonBody() nimmt nur einen Verweis wie \'#/components/schemas/Name\'; '
+    + 'ein Schema-Objekt gehoert nach components.schemas oder ohne $ref direkt unter `schema`:\n  '
+    + kaputt.join('\n  '));
+});
+
+test('jeder $ref-String zeigt auf ein Ziel im selben Dokument (#1344)', () => {
+  // Die zweite Haelfte: ein String allein ist noch kein Verweis. Ein Tippfehler
+  // im Namen oder ein umbenanntes Schema laesst `#/components/schemas/Alt`
+  // ins Leere zeigen, und ein Pruefer, der nur den Typ ansieht, bleibt gruen.
+  const toteVerweise = specRefs
+    .filter((r) => typeof r.value === 'string' && resolveRef(refSpec, r.value) === undefined)
+    .map((r) => `${refLocation(r.path)} -> ${r.value}`);
+  assert.deepEqual(toteVerweise, [],
+    'Diese $ref zeigen auf kein Objekt in der Spec:\n  ' + toteVerweise.join('\n  '));
 });
 
 test('calendar occurrence conflicts and split successes have exact schemas', () => {
