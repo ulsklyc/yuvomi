@@ -102,7 +102,20 @@
  *    `shopping` - und umgekehrt `meals` fuer
  *    `/shopping/:listId/import-meal-plan`. Die Knoepfe fragen es noch NICHT;
  *    das ist Sache von P3/P4, und dann mit dem Pfad des ZIELS statt dem der
- *    Seite (Regel 1).
+ *    Seite (Regel 1). Das Zielrecht gilt nur fuer AUSDRUECKLICHE Uebertraege.
+ *    Was eine Aktion bloss MITerzeugt (der Check-in der Haushaltshilfe legt
+ *    Termin und Zahlungsaufgabe an), fragt kein Zielrecht, weder am Server
+ *    noch am Knopf - die Abgrenzung steht in docs/DECISIONS.md, Abschnitt 10.
+ *
+ * 9. LESEANSICHT BEI `read`, ENTSCHIEDEN (#1265): ein Datensatz oeffnet bei
+ *    `read` eine Leseansicht mit ALLEM, was der Editor zeigt - nicht den
+ *    Editor mit abgeschalteten Teilen und nicht bloss die Felder der Zeile.
+ *    Vorbild ist `openNoteReadModal()` in `notes.js` (P1, #1311). Damit gilt
+ *    Regel 2 auch fuer Felder, die NUR im Editor stehen: wer lesen darf, sieht
+ *    sie, als Zeichen statt als Eingabe. Und ein Leertext, der zu einer
+ *    Handlung einlaedt („Tippe auf + ...“), entfaellt bei `read` zusammen mit
+ *    dem Knopf, den er meint: `action: readOnly() ? null : ...` allein laesst
+ *    `hint` und `description` des Leerzustands stehen.
  */
 
 import { moduleAccess } from '/permissions.js';

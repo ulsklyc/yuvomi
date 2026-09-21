@@ -416,8 +416,10 @@ Not in one function, because it is a rule about which columns get written at all
 consequences: `recipe_ingredients` keeps a quantity as free text and `pantry_items` keeps a number
 plus a unit, and the comment above `pantry_items.quantity` (`server/db.js`) says why - a stepper and
 a minimum need a number. Bridging the two is a household statement, not a computation over a
-catalogue. `pantry_item_id` does not exist anywhere yet, and when it does, it is written on
-confirmation only.
+catalogue. Since migration 222 (#1335) that statement has a table of its own,
+`recipe_ingredient_pantry_matches`, and it is written on confirmation only:
+`PUT /recipes/:id/ingredient-match` in `server/routes/recipes.js` is the one route that creates a
+match.
 
 ### What counts as undoing it
 
@@ -514,3 +516,174 @@ nutrition values, including a barcode lookup against an outside database, which 
 refusal wearing a scanner. A key/value nutrient table, or a ninth nutrient added without asking
 what the eight were for. And a logged intake that points at a recipe for its numbers instead of
 copying them, which makes an edit today change what somebody ate last month.
+
+---
+
+## 9. A shipped name follows the reader until somebody renames it
+
+**What Yuvomi ships as a starting point - a category, a payment method, and with step 4 of #736 a
+set of chores - carries a translation key and a name on its row. As long as nobody renames it,
+every reader sees it in their own language (`label_key ? t(label_key) : name`); a rename makes the
+text the household's. The key is also how Yuvomi recognises the row later, including after the
+household deleted it on purpose.**
+
+#736 asked for a cleaning plan, and the direction settled there makes routines a kind of task
+(entry 6). Its step 4 is template sets: an area with its usual routines, applied in one go, drawn
+from the list @elmocito wrote down in the thread. How a shipped set is stored was left open on
+purpose, between a translation key per chore and sets as data in one language, translated once per
+set or shipped in the household's language and edited afterwards. Decided on 21 September 2026:
+neither alone, but the pair that five tables already carry.
+
+That pair was reached table by table, each time from a list that read wrong in some language:
+
+- **Tasks and contacts, migrations 83 and 84.** When their categories became editable, the seeded
+  ones got a stable `key` and a `label_key`, and a category somebody creates carries a `name`
+  instead.
+- **Inventory, migration 143.** The five seeded categories had been German literals and stayed
+  German in every language until they moved to the same shape.
+- **Subscriptions, migration 170 (#950).** The payment methods were stored as English text and read
+  English to every reader, next to categories in the reader's own language. The comment above the
+  migration records why a lookup table in the frontend could not fix it: keyed on names, it cannot
+  tell a default from a row the household created under the same name. Whether a row is a default
+  is a property of the row.
+
+Document folders reached the other half. Until migration 157 a module's folder was found by its
+translated name, and two people with different languages created two folders, "Belege" and
+"Receipts", each holding half of the receipts. Since then a module folder is found by its
+`module_key`, while its name stays in the language of whoever created it: the identity without the
+translation.
+
+What the pair does for chores:
+
+- **A mixed-language household sees one entry in two languages, each reader in their own.** A set
+  stored as data in one language cannot do that: every entry stays in the language of whoever
+  applied the set, which is the effect #950 had to remove.
+- **The key is the identity the deletion record needs.** @Kyrodan's condition in #736 was that a
+  shipped chore somebody deleted must not come back with the next update of its set, and
+  recognising it needs something to match on. Today's eight suggestions have nothing: they are
+  keys in the source (`TASK_TEMPLATES` in `server/routes/housekeeping.js`), and applying one stores
+  the translated name and nothing else. A rename ends the translation but has to leave the identity
+  in place. The category tables already keep the two apart, a stable `key` beside the `label_key` a
+  rename clears, and a shipped chore needs the same split, or one that was renamed and then deleted
+  comes back with the next update.
+- **The text is always filled.** Some readers have no language to ask. A routine is a task, and a
+  task's title leaves the app as the `SUMMARY` of a CalDAV to-do
+  (`server/services/caldav-todo-outbound.js`) and as the reason of a points booking
+  (`awardForCompletion()` in `server/services/rewards.js` copies `tasks.title` into
+  `reward_ledger.reason`). So a chore from a set is created with its text already resolved beside
+  the key, never with the text left NULL the way the seeded categories leave `name`. The app reads
+  the key; a reader without a language reads the text.
+
+**The price is translation, and it sets the size.** Every shipped chore costs one entry in each of
+the 24 locale files. So the first sets are small, three or four with about twenty chores between
+them, picked from @elmocito's list rather than all 74 of it. Whatever a household adds beyond that,
+it adds in its own words, which cost nothing to translate.
+
+**How this stands to entry 7.** Entry 7 declines "a seed list of canonical ingredients, products or
+nutrition values", and a shipped chore set is a seed list. It is not the kind entry 7 means. The
+criterion there is whether a row stays true without anybody tending it, and a nutrition table fails
+it because it states facts about products that change under it. A chore set states no fact:
+"clean the shower every 14 days" is a suggestion the household accepts, changes or deletes, and
+once applied the row is theirs, with their interval and, after a rename, their words. Nothing
+computes over it, and a suggestion that has aged is still a usable suggestion rather than a wrong
+answer. What it costs to keep is translation, which the size of the sets bounds, not correctness,
+which nothing would bound.
+
+### Where the rule lives
+
+- The five tables in `server/db.js`: `task_categories` and `contact_categories` (migrations 83 and
+  84), `inventory_categories` (143), `subscription_categories` and `subscription_payment_methods`
+  (170). A rename clears `label_key` in `server/routes/tasks.js`, `server/routes/contacts.js`,
+  `server/routes/inventory/categories.js` and `server/routes/subscriptions.js`, and the pages read
+  `label_key ? t(label_key) : name`, for instance `public/utils/task-fields.js`.
+- The identity half alone: `family_document_folders.module_key`, resolved by `ensureModuleFolder()`
+  in `server/services/document-folders.js`.
+- The chore sets are not built yet. They are step 4 of #736 and wait for areas that a household
+  creates and reuses (step 3).
+
+### What counts as undoing it
+
+A shipped set stored as text in one language, or applied by copying the translated text into the
+row without its key: the first reads in the applier's language forever, the second forgets where
+the row came from. A key without text beside it, which leaves the CalDAV title and the points
+history with nothing to write. A rename that keeps the translation running, so the household's own
+words are replaced the next time somebody with another language opens the page. Offering a shipped
+chore again that the household deleted. And sets that grow past what their translations can carry:
+the size is the price of the shape, not a first draft to be extended.
+
+---
+
+## 10. A follow-on entry belongs to the action that made it
+
+**What an action writes into another module as its automatic consequence belongs to that action
+and needs only the action's right, on both axes, member permission and token scope. The other
+module's right is asked only for an explicit transfer, where a person sends something into that
+module: then the route asks `mayWriteModule(req, '<target>')`, and the page asks the same at the
+control before it draws it.**
+
+The path guard in `server/index.js` judges a request by its path prefix (`moduleForPath()` in
+`server/scopes.js`), so a route that writes across that line has to ask for the second right itself,
+or nobody does. Whether it has to was decided three times, twice in one direction and once in the
+other:
+
+- **#1290, September 2026.** Three meal and recipe routes put items on the shopping list, and the
+  shopping list's meal-plan import flipped meal-plan flags, each judged only by its own path.
+  Decided: writing into a module needs write access to that module. #1303 built it: the
+  `to-shopping-list` routes ask for `shopping`, `import-meal-plan` asks for `meals`, and undoing a
+  transfer asks for `meals` only when one of its items came from the meal plan.
+- **#1351, September 2026.** A housekeeping supply request creates a shopping item, and a shopping
+  list when there is none. Decided the same way, built in #1353.
+- **#1349, September 2026.** Checking a housekeeper in creates a calendar event for the visit and,
+  if the household keeps payment tasks, a task to pay; marking the visit paid completes that task,
+  and editing or deleting the visit moves or removes both. The read-only work on the Housekeeping
+  page asked whether #1290 reaches this far. Decided: it does not. With the calendar right asked
+  there, a member with `calendar: read` could no longer check anybody in, for a reason the
+  Housekeeping page cannot show: it has no calendar control to leave out, only a check-in button
+  that would refuse.
+
+That last reason is the whole line. An explicit transfer names its target on its control - "to
+shopping list", "import meal plan" - so the page can ask the target's right there and leave the
+control out (rule 1 in the header of `public/utils/module-access.js`), and a refusal matches
+something the person can see. A follow-on entry has no control of its own. Asking its module's
+right would make an action fail for a reason that, seen from the page it stands on, does not exist.
+
+### How to sort the next case
+
+1. **Does the control name the other module?** "Add to shopping list" does, "Check in" does not.
+2. **Is the row in the other module what the person asked for, or what the action leaves behind?**
+   Without its shopping item a supply request has done nothing; without its calendar event a
+   check-in has still recorded the visit.
+3. **Who keeps the row afterwards?** A follow-on entry is kept in step by its source: the event and
+   the payment task of a visit move and disappear with the visit. A transferred item lives on in
+   the target and is bought, edited and deleted there.
+
+A yes to the first question, or "what the person asked for" in the second, makes it a transfer.
+A route without a control, reached over the API, is sorted by the second question alone, which is
+how the supply request, with no caller in `public/`, landed on the transfer side. The third
+question is the check: a follow-on entry the source does not keep in step is a transfer somebody
+forgot to ask about.
+
+### Where the rule lives
+
+- `mayWriteModule()` in `server/permissions.js`, both axes in one call. The transfer routes ask it
+  before any lookup that could answer 404, so a refusal does not confirm that an id exists: the
+  `to-shopping-list` routes in `server/routes/meals.js` and `server/routes/recipes.js` for
+  `shopping`, `import-meal-plan` and the undo of a meal transfer in `server/routes/shopping.js` for
+  `meals`, `PUT /recipes/:id/ingredient-match` for `pantry`, because it hooks a row of the pantry
+  into a recipe, and the housekeeping supply request with #1353.
+- `npm run test:cross-module-write` (`test/test-cross-module-write-rights.js`) holds those routes on
+  both axes and checks the effect after each refusal, not only the status.
+- The follow-on entries of a visit in `server/routes/housekeeping.js`: `createVisitCalendarEvent()`
+  and `createPaymentTask()` at check-in, the completed task at payment, `updateVisitLinks()` and
+  `deleteVisitLinks()` on edit and delete. None of them asks for more than `housekeeping`.
+- The same shape, older than the question: a task's status change books its points and takes them
+  back through `syncTaskRewards()` in `server/services/rewards.js`, called from
+  `server/routes/tasks.js`, and asks nothing of `rewards`.
+- On the page: rule 8 in the header of `public/utils/module-access.js`.
+
+### What counts as undoing it
+
+A `mayWriteModule()` call for the module of a follow-on entry, which lets an action refuse for a
+right its page never mentions. A transfer that asks only for its own path's right, which is #1290
+again. And a new route that writes into another module without deciding which of the two it is:
+the next reader of this entry should find the answer in the route's comment, not by guessing.

@@ -195,6 +195,26 @@ deletions cannot be learned at all. Tracked as #1002.
   between them, deriving a total from what the ingredients *are*, which is the catalogue
   again and nothing else. The line and its reasons are entry 8 in
   [DECISIONS.md](DECISIONS.md).
+- **One event in several CalDAV calendars** (#1297) is declined for now, and this one is *not this
+  way* rather than *not at all*. An event has one CalDAV target (`target_caldav_account_id` and
+  `target_caldav_calendar_url` on `calendar_events`); for an event with several people on it the
+  dialog says since #1346 that the assignment picks no calendar, and which one is used instead.
+  Several targets do exist for Outlook (`outlook_event_links`, one row per event and account), and
+  only because nothing ever comes back from Outlook. CalDAV reads back, and the return path
+  recognises an event by its UID alone, without the calendar it came from
+  (`server/services/caldav-sync.js`, the lookup on `external_calendar_id`, the column that holds
+  the UID): three copies would fall onto one row, and whichever calendar was read last would win.
+  Several targets would be a rebuild at the core of the sync, and every one of its conflict cases -
+  moving an event, deleting it, editing it in two calendars at once - multiplies with the number of
+  copies.
+
+  **The route that works today** is the usual one in CalDAV: a shared family calendar that everybody
+  subscribes to, set as the target for such events. That also matches how Yuvomi reads an event
+  with several people on it, as a family event. Two routes stay out even if this comes back:
+  matching copies by date, time and title, which stores a guessed identity (entry 7 in
+  [DECISIONS.md](DECISIONS.md)), and a fingerprint in the notes field, because `description` is a
+  mirrored field and would travel as visible text with every edit. *Opens with:* a return path that
+  knows which calendar an event came from.
 
 ---
 
