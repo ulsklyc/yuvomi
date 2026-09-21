@@ -313,12 +313,14 @@ export async function applyDefaultAssigneesToExisting(
  * @param {number|null} move.toCalRefId   external_calendars.id NACH dem Umzug
  * @param {number|null} move.toDefaultUserId Standard-Person des neuen Kalenders
  *        (die Aufrufer loesen sie einmal je Kalender auf, nicht je Termin)
+ * @param {Date} [move.now] Bezugszeitpunkt fuer "vergangen"; ersetzbar fuer
+ *        Tests, wie bei `applyDefaultAssigneesToExisting()`
  * @returns {boolean} true, wenn die Zuweisung umgestellt wurde
  */
 export function reassignDefaultOnCalendarMove(
   d,
   eventId,
-  { fromCalRefId = null, toCalRefId = null, toDefaultUserId = null } = {},
+  { fromCalRefId = null, toCalRefId = null, toDefaultUserId = null, now = new Date() } = {},
 ) {
   if (!eventId || fromCalRefId == null || toCalRefId == null) return false;
   if (Number(fromCalRefId) === Number(toCalRefId)) return false;
@@ -359,6 +361,6 @@ export function reassignDefaultOnCalendarMove(
     UPDATE reminders SET dismissed = 1
     WHERE entity_type = 'event' AND entity_id = ? AND created_by = ?
       AND assigned_from IS NOT NULL AND ${remindAtUtcSql('remind_at')} <= ?
-  `).run(eventId, toDefaultUserId, remindAtCompareKey(new Date()));
+  `).run(eventId, toDefaultUserId, remindAtCompareKey(now));
   return true;
 }

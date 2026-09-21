@@ -120,6 +120,35 @@ function offsetOf(ms, offsetMinutes, { colon = true } = {}) {
   return `${digits}${offsetMinutes < 0 ? '-' : '+'}${hh}${colon ? ':' : ''}${mm}`;
 }
 
+/**
+ * Stellt die Uhr des Prozesses fuer die Dauer von `fn` auf `iso`.
+ *
+ * `GET /reminders/pending` liest `new Date()` selbst und nimmt kein `now`
+ * entgegen. Feste, weit entfernte Zeitpunkte (2000/2099) reichen hier nicht:
+ * Text- und Zeitpunktvergleich gehen nur innerhalb der Offset-Breite um
+ * "jetzt" auseinander, weit davon entfernt sind beide gleicher Meinung, und
+ * der Test saehe den Fehler nie. Also steht die Uhr - dasselbe Muster wie in
+ * test/test-dashboard.js. Der Server laeuft im selben Prozess und sieht
+ * dieselbe Uhr; die Tests dieser Datei laufen nacheinander, zwischen Setzen
+ * und Zuruecksetzen laeuft nichts anderes.
+ */
+async function withFrozenClock(iso, fn) {
+  const RealDate = Date;
+  const fixed = RealDate.parse(iso);
+  class FrozenDate extends RealDate {
+    constructor(...args) {
+      if (args.length === 0) super(fixed);
+      else super(...args);
+    }
+    static now() { return fixed; }
+  }
+  globalThis.Date = FrozenDate;
+  try { return await fn(); } finally { globalThis.Date = RealDate; }
+}
+
+// Der "jetzt"-Zeitpunkt der Erinnerungs-Tests, fest statt aus der Wanduhr.
+const NOW = '2026-09-22T16:30:00.000Z';
+
 // ── datetime(): die Rechnung selbst ─────────────────────────────────────────
 
 test('datetime(): ein Offset wird in die Wanduhrzeit der Zone umgerechnet, nicht abgeschnitten', () => {
@@ -389,21 +418,27 @@ test('POST und PUT /reminders speichern einen Offset als naiv-UTC', async () => 
 
 test('remind_at mit Offset feuert puenktlich - auch eine schon roh so gespeicherte Zeile', async () => {
   const eventId = newEvent('Faellig mit Offset');
-  const now = Date.now();
+  const now = Date.parse(NOW);
   const insert = db.prepare(`
     INSERT INTO reminders (entity_type, entity_id, remind_at, created_by) VALUES ('event', ?, ?, ?)
   `);
-  // Bestand wie vor dem Fix: roh mit Offset in der Zeile.
+  // Bestand wie vor dem Fix: roh mit Offset in der Zeile. 30 Minuten vor
+  // "jetzt" in +02:00 steht als Text NACH "jetzt" in UTC, 30 Minuten danach in
+  // -04:00 als Text davor - genau die zwei Richtungen des Textvergleichs.
   const dueEast = insert.run(eventId, offsetOf(now - 30 * 60000, 120), ADMIN).lastInsertRowid;
   const dueNoColon = insert.run(eventId, offsetOf(now - 30 * 60000, 120, { colon: false }), ADMIN).lastInsertRowid;
   const notYetWest = insert.run(eventId, offsetOf(now + 30 * 60000, -240), ADMIN).lastInsertRowid;
+  assert.deepEqual(
+    [offsetOf(now - 30 * 60000, 120), offsetOf(now + 30 * 60000, -240)],
+    ['2026-09-22T18:00:00+02:00', '2026-09-22T13:00:00-04:00'],
+  );
   // Und der Weg, den die Route jetzt geht: dieselbe Eingabe, umgerechnet gespeichert.
   const viaRoute = await call('POST', '/reminders', {
     entity_type: 'event', entity_id: newEvent('Faellig ueber die Route'), remind_at: offsetOf(now - 30 * 60000, 120),
   });
   assert.equal(viaRoute.status, 201);
 
-  const pending = await call('GET', '/reminders/pending');
+  const pending = await withFrozenClock(NOW, () => call('GET', '/reminders/pending'));
   assert.equal(pending.status, 200);
   const ids = pending.body.data.map((r) => r.id);
   assert.ok(ids.includes(dueEast), `+02:00 vor 30 min ist faellig: ${JSON.stringify(ids)}`);
@@ -414,7 +449,7 @@ test('remind_at mit Offset feuert puenktlich - auch eine schon roh so gespeicher
 
 test('der Push-Lauf haelt remind_at als Zeitpunkt, nicht als Text', async () => {
   const eventId = newEvent('Push mit Offset');
-  const now = new Date('2026-09-22T16:30:00.000Z');
+  const now = new Date(NOW);
   const insert = db.prepare(`
     INSERT INTO reminders (entity_type, entity_id, remind_at, created_by) VALUES ('event', ?, ?, ?)
   `);
@@ -475,18 +510,23 @@ test('Kalenderumzug: eine vergangene geerbte Erinnerung mit Offset gilt als verw
     VALUES ('Umzug', '2026-09-30T10:00', 'offset-move-uid', 'caldav', ?, ?, ?)
   `).run(refA, ADMIN, ANNA).lastInsertRowid;
   db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(id, ANNA);
-  db.prepare(`
+  const insert = db.prepare(`
     INSERT INTO reminders (entity_type, entity_id, remind_at, created_by) VALUES ('event', ?, ?, ?)
-  `).run(id, offsetOf(Date.now() - 30 * 60000, 120), ADMIN);
+  `);
+  insert.run(id, '2026-09-22T18:00:00+02:00', ADMIN);   // 16:00Z, 30 Minuten vorbei
+  insert.run(id, '2026-09-22T13:00:00-04:00', ADMIN);   // 17:00Z, in 30 Minuten
 
   assert.equal(reassignDefaultOnCalendarMove(db, id, {
-    fromCalRefId: refA, toCalRefId: refB, toDefaultUserId: BEN,
+    fromCalRefId: refA, toCalRefId: refB, toDefaultUserId: BEN, now: new Date(NOW),
   }), true);
   const bens = db.prepare(`
-    SELECT dismissed FROM reminders WHERE entity_type = 'event' AND entity_id = ? AND created_by = ?
-  `).all(id, BEN);
-  assert.equal(bens.length, 1, 'Ben erbt die Erinnerung');
-  assert.equal(Number(bens[0].dismissed), 1, 'sie liegt 30 Minuten zurueck und kommt nicht als Meldung');
+    SELECT remind_at, dismissed FROM reminders
+    WHERE entity_type = 'event' AND entity_id = ? AND created_by = ? ORDER BY remind_at
+  `).all(id, BEN).map((r) => ({ ...r }));
+  assert.deepEqual(bens, [
+    { remind_at: '2026-09-22T13:00:00-04:00', dismissed: 0 },
+    { remind_at: '2026-09-22T18:00:00+02:00', dismissed: 1 },
+  ], 'Ben erbt beide; die vergangene kommt nicht als Meldung, die kuenftige schon');
 });
 
 // ── Gesundheit ───────────────────────────────────────────────────────────────
