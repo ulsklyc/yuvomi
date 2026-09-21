@@ -41,6 +41,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The language Yuvomi starts in now follows your browser's whole language tag.** A browser reports
+  something like `zh-TW` or `de-AT`, and Yuvomi read only the part in front of the hyphen. For the
+  24 languages it ships that is the right answer every time, but it means a language written in two
+  scripts could never be reached on its own: whoever sets their system to Taiwan would be given the
+  simplified Chinese we have and would have to find the other one in the language menu, if it
+  existed. Yuvomi now answers a tag with the most specific language it actually carries - the exact
+  tag first, then the script a region implies (Taiwan, Hong Kong and Macau write traditional
+  characters, mainland China and Singapore do not), and otherwise the plain language, which is what
+  every language in the app resolves to today, unchanged. The same read happens twice, because the
+  page sets its language once in the `<head>` before anything is rendered and once when the app
+  loads, and the early one had fallen behind: it knew 23 of the 24 languages, Filipino missing since
+  the day it arrived, so a Filipino system was told the page was English while the page came up in
+  Filipino. Both now know the same languages and resolve a tag the same way, and a test holds them
+  together rather than a comment asking the next change to remember. (#1324)
 - **Moving an appointment across a daylight-saving boundary no longer drags its reminder off the
   lead time you set.** A reminder is a lead - an hour before, a day before - but when the
   appointment moved, the reminder was carried along by the distance between the two dates on the
