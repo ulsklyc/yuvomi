@@ -11,6 +11,8 @@
  *               dauerhaft in ein Rezept ein (#1314)
  *          POST /shopping/:listId/import-meal-plan -> setzt
  *               meal_ingredients.on_shopping_list, also Essensplan-Daten
+ *          POST /housekeeping/supply-requests -> legt shopping_items an und,
+ *               wenn der Haushalt noch keine hat, eine Einkaufsliste (#1351)
  *
  *        Dazu die Ruecknahme `POST /shopping/items/undo-transfer`, die dasselbe
  *        Flag zurueckdreht - aber nur fuer Artikel aus einem Mahlzeit-Uebertrag
@@ -43,6 +45,7 @@ const dbmod = await import('../server/db.js');
 const { default: mealsRouter } = await import('../server/routes/meals.js');
 const { default: recipesRouter } = await import('../server/routes/recipes.js');
 const { default: shoppingRouter } = await import('../server/routes/shopping.js');
+const { default: housekeepingRouter } = await import('../server/routes/housekeeping.js');
 const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
 const db = dbmod.get();
 
@@ -72,6 +75,7 @@ app.use((req, _res, next) => {
 app.use('/api/v1/meals', mealsRouter);
 app.use('/api/v1/recipes', recipesRouter);
 app.use('/api/v1/shopping', shoppingRouter);
+app.use('/api/v1/housekeeping', housekeepingRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => { server.close(); });
@@ -295,6 +299,102 @@ test('Token mit meals:write, aber ohne Vorrats-Scope, ordnet nichts zu', async (
   });
   assertDeniedShape(res, 'der Pfad sagt /recipes, benannt wird eine Zeile des Vorrats');
   assert.equal(matchCount(), vorher);
+});
+
+// =========================================================================
+// 1c. Die Haushaltshilfe bestellt in den Einkauf (#1351)
+// =========================================================================
+
+// DIESELBE FRAGE, EIN VIERTES MODUL. `POST /housekeeping/supply-requests`
+// haengt unter `housekeeping`, legt aber einen Einkaufsartikel an - und hat
+// der Haushalt noch keine Liste, ueber `defaultShoppingList()` gleich eine
+// ganze Liste dazu. #1303 hatte die Route gesehen und fuer ein eigenes Ticket
+// liegen lassen.
+const allItems = () => db.prepare('SELECT COUNT(*) AS c FROM shopping_items').get().c;
+const listCount = () => db.prepare('SELECT COUNT(*) AS c FROM shopping_lists').get().c;
+const supplyCount = () => db.prepare('SELECT COUNT(*) AS c FROM housekeeping_supply_requests').get().c;
+
+/**
+ * Ein Haushalt OHNE Einkaufsliste, nur fuer die Dauer von `fn`. Erst in diesem
+ * Zustand legt die Route eine Liste an, und erst hier laesst sich messen, dass
+ * ein abgewiesener Aufruf auch KEINE angelegt hat - mit der Liste `LIST` im
+ * Bestand nimmt `defaultShoppingList()` einfach die. Der Savepoint rollt danach
+ * alles zurueck, die uebrigen Faelle finden `LIST` unveraendert vor.
+ */
+async function ohneEinkaufsliste(fn) {
+  db.exec('SAVEPOINT ohne_einkaufsliste');
+  try {
+    db.prepare('DELETE FROM shopping_lists').run();
+    assert.equal(listCount(), 0, 'Vorbedingung: der Haushalt hat keine Liste');
+    return await fn();
+  } finally {
+    db.exec('ROLLBACK TO ohne_einkaufsliste');
+    db.exec('RELEASE ohne_einkaufsliste');
+  }
+}
+
+test('Vorbedingung: mit Einkaufsrecht legt eine Materialanfrage Artikel und notfalls die Liste an', async () => {
+  asMember({ housekeeping: 'write', shopping: 'write' });
+  const vorher = itemCount();
+  const res = await call('POST', '/housekeeping/supply-requests', { name: 'Spuelmittel', quantity: '2' });
+  assert.equal(res.status, 201);
+  assert.equal(itemCount(), vorher + 1, 'der Artikel steht auf der vorhandenen Liste');
+
+  // OHNE DIESEN FALL SAGT DIE LISTENZAEHLUNG UNTEN NICHTS: er zeigt, dass die
+  // Route in diesem Zustand wirklich eine Liste anlegt.
+  await ohneEinkaufsliste(async () => {
+    const ohne = await call('POST', '/housekeeping/supply-requests', { name: 'Schwamm' });
+    assert.equal(ohne.status, 201);
+    assert.equal(listCount(), 1, 'die Route hat eine Liste angelegt');
+    assert.equal(allItems(), 1, 'und den Artikel darauf');
+  });
+});
+
+for (const stufe of ['none', 'read']) {
+  test(`Mitglied mit housekeeping: write, shopping: ${stufe} bestellt nichts in den Einkauf`, async () => {
+    asMember({ housekeeping: 'write', shopping: stufe });
+    const artikel = allItems();
+    const listen = listCount();
+    const anfragen = supplyCount();
+    const res = await call('POST', '/housekeeping/supply-requests', { name: `Spuelmittel-${stufe}` });
+    assertDeniedShape(res, `shopping: ${stufe} darf nicht in eine Liste schreiben`);
+    assert.equal(allItems(), artikel, 'kein Artikel angelegt');
+    assert.equal(listCount(), listen, 'keine Liste angelegt');
+    assert.equal(supplyCount(), anfragen, 'und keine Anfrage ohne ihren Artikel');
+
+    await ohneEinkaufsliste(async () => {
+      const ohne = await call('POST', '/housekeeping/supply-requests', { name: `Schwamm-${stufe}` });
+      assertDeniedShape(ohne, `shopping: ${stufe} legt auch keine Liste an`);
+      assert.equal(listCount(), 0, 'keine neue Liste');
+      assert.equal(allItems(), 0, 'kein Artikel');
+    });
+  });
+}
+
+test('Token mit housekeeping:write, aber ohne Einkaufs-Scope, bestellt nichts', async () => {
+  asToken(['housekeeping:write']);
+  const artikel = allItems();
+  const anfragen = supplyCount();
+  const res = await call('POST', '/housekeeping/supply-requests', { name: 'Spuelmittel-Token' });
+  assertDeniedShape(res, 'der Pfad sagt housekeeping, geschrieben wird in den Einkauf');
+  assert.equal(allItems(), artikel, 'kein Artikel angelegt');
+  assert.equal(supplyCount(), anfragen);
+
+  await ohneEinkaufsliste(async () => {
+    assertDeniedShape(
+      await call('POST', '/housekeeping/supply-requests', { name: 'Schwamm-Token' }),
+      'auch ohne Liste bleibt es beim 403',
+    );
+    assert.equal(listCount(), 0, 'keine neue Liste');
+  });
+});
+
+test('Token mit beiden Scopes bestellt', async () => {
+  asToken(['housekeeping:write', 'shopping:write']);
+  const vorher = itemCount();
+  const res = await call('POST', '/housekeeping/supply-requests', { name: 'Spuelmittel-Scopes' });
+  assert.equal(res.status, 201);
+  assert.equal(itemCount(), vorher + 1);
 });
 
 // =========================================================================

@@ -64,8 +64,23 @@ export function housekeepingPaths() {
     '/api/v1/housekeeping/decay-tasks/{taskId}/complete': {
       post: op({ summary: 'Mark housekeeping decay task complete', tag: 'Housekeeping', params: [idParam('taskId', 'Decay task ID')], stateChanging: true }),
     },
+    // Der Pfad sagt `housekeeping`, geschrieben wird in den Einkauf - also
+    // steht auch die 403 ausgeschrieben, wie bei /meals/{id}/to-shopping-list
+    // (#1351, Regel aus #1290).
     '/api/v1/housekeeping/supply-requests': {
-      post: op({ summary: 'Create housekeeping supply request and shopping item', tag: 'Housekeeping', stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({
+        summary: 'Create housekeeping supply request and shopping item',
+        tag: 'Housekeeping',
+        description: 'Creates a shopping item, and a shopping list when the household has none yet, so it requires write access to the `shopping` module in addition to `housekeeping` - a credential scoped to housekeeping alone is refused with 403.',
+        stateChanging: true,
+        requestBody: jsonBody(null),
+        responses: {
+          201: { description: 'Successful response' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
     },
     '/api/v1/housekeeping/maintenance-log': {
       get: op({ summary: 'List housekeeping maintenance log entries', tag: 'Housekeeping' }),

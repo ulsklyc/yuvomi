@@ -59,6 +59,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A supply request from Housekeeping now needs shopping rights as well.** The request puts the
+  item on the shopping list, and creates a list first when the household has none. Since 2.68.0,
+  sending a meal or a recipe to the shopping list asks for write access to the shopping list, but
+  this request was left out and asked only for housekeeping: a member who may only look at the
+  shopping list, or an API token scoped to housekeeping alone, could still add items to it. It now
+  asks the same question before it creates anything, and answers a missing right the same way. No
+  page in Yuvomi sends this request today, so only API clients notice the change, and anybody with
+  both rights notices no difference. (#1351)
+
 - **Controls and hints that are meant to be hidden now really disappear.** Yuvomi hides an element
   by setting `hidden` on it, and the browser honours that only until a stylesheet gives the element
   a layout of its own: any `display` rule wins over it. Several places were caught this way and

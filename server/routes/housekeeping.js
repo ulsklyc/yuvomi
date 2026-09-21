@@ -28,7 +28,7 @@ import {
   mirroredFieldsChanged,
   queueEventDeletion,
 } from '../services/calendar-outbound.js';
-import { moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
+import { mayWriteModule, moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
 import { tokenAllows } from '../scopes.js';
 
 const log = createLogger('Housekeeping');
@@ -1193,6 +1193,19 @@ router.delete('/decay-tasks/:taskId', (req, res) => {
 
 router.post('/supply-requests', (req, res) => {
   try {
+    // WER IN DEN EINKAUF SCHREIBT, BRAUCHT DAS EINKAUFS-RECHT (#1351, Regel aus
+    // #1290, ausfuehrlich in routes/meals.js). Der Pfad sagt `housekeeping`,
+    // angelegt wird ein `shopping_items`-Eintrag und ueber
+    // `defaultShoppingList()` notfalls eine ganze Einkaufsliste. Die Riegel in
+    // server/index.js urteilen am ersten Pfadsegment und sehen davon nichts;
+    // `mayWriteModule()` prueft Mitgliedsrecht und Token-Scope in einem Aufruf.
+    //
+    // Als Erstes, vor Validierung und Transaktion: eine Antwort darf einem
+    // Gesperrten nichts ueber den Einkauf verraten, und angelegt wird nichts.
+    if (!mayWriteModule(req, 'shopping')) {
+      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403 });
+    }
+
     const vName = str(req.body.name, 'name', { max: MAX_TITLE });
     const vQuantity = str(req.body.quantity, 'quantity', { max: MAX_SHORT, required: false });
     const errors = collectErrors([vName, vQuantity]);
