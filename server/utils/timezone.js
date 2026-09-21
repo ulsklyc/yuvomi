@@ -135,6 +135,43 @@ export function hasExplicitZone(value) {
  * @returns {number|null} ms seit Epoch, oder null bei unlesbarem Wert
  */
 export function storedToInstantMs(value, tz) {
+  return readStoredInstant(value, tz, localToUTC);
+}
+
+/**
+ * Dieselbe Lesart, nur mit der DST-genauen Umrechnung (`localToUTCPrecise`).
+ *
+ * Fuer den Erinnerungspfad (#1300): dort wird die Differenz zweier so gelesener
+ * Anker auf `reminders.remind_at` addiert, und `localToUTC()` bildet rund um
+ * eine DST-Grenze ein ganzes Wanduhr-Band auf DENSELBEN Zeitpunkt ab - 00:30
+ * und 01:30 am Umstelltag ergeben in Europe/Berlin beide 23:30Z. Eine
+ * Verschiebung zwischen zwei solchen Uhrzeiten kaeme als 0 heraus, und der
+ * Vorlauf waechse still um eine Stunde.
+ *
+ * `storedToInstantMs()` daneben bleibt unveraendert: sein einziger anderer
+ * Aufrufer (`calendar-event-reader.js`) sortiert und filtert Termine, und dort
+ * kostet eine Stunde innerhalb der Umstellstunde nichts, waehrend jeder Wert
+ * zwei zusaetzliche `Intl`-Formatierungen kosten wuerde.
+ * @param {string} value  Wert aus start_datetime/end_datetime
+ * @param {string} tz     IANA-Zone (aus householdTimeZone)
+ * @returns {number|null} ms seit Epoch, oder null bei unlesbarem Wert
+ */
+export function storedToInstantMsPrecise(value, tz) {
+  return readStoredInstant(value, tz, localToUTCPrecise);
+}
+
+/**
+ * Die eine Stelle, die die zwei Speicherformen auseinanderhaelt - welche
+ * Umrechnung die zonenlose Haelfte nimmt, entscheidet der Aufrufer.
+ *
+ * Ohne diesen gemeinsamen Rumpf stuenden die Formregeln (reines Datum ->
+ * Mitternacht, fehlende Sekunden) zweimal da und drifteten auseinander.
+ * @param {string} value
+ * @param {string} tz
+ * @param {(localStr: string, tzid: string) => string} toUTC
+ * @returns {number|null}
+ */
+function readStoredInstant(value, tz, toUTC) {
   const raw = String(value ?? '').trim();
   if (!raw) return null;
   if (hasExplicitZone(raw)) {
@@ -142,7 +179,7 @@ export function storedToInstantMs(value, tz) {
     return Number.isNaN(ms) ? null : ms;
   }
   const local = raw.length <= 10 ? `${raw}T00:00:00` : (raw.length === 16 ? `${raw}:00` : raw);
-  const ms = new Date(localToUTC(local, tz)).getTime();
+  const ms = new Date(toUTC(local, tz)).getTime();
   return Number.isNaN(ms) ? null : ms;
 }
 
@@ -209,6 +246,86 @@ export function localToUTC(localStr, tzid) {
     const offsetMs = fakeUTC.getTime() - asUTC;
     return new Date(fakeUTC.getTime() + offsetMs).toISOString().replace('.000Z', 'Z');
   } catch { return localStr; }
+}
+
+/**
+ * Zonen-Offset (Minuten, Wanduhr minus UTC) an einem gegebenen UTC-Zeitpunkt,
+ * ueber utcToWall gelesen - dieselbe Intl-Quelle wie ueberall sonst in diesem
+ * Baum, nur zurueckgerechnet in eine Zahl statt Datumsteilen.
+ */
+function offsetMinutesAt(utcMs, tzid) {
+  const wall = utcToWall(new Date(utcMs).toISOString(), tzid);
+  if (!wall) return null;
+  return (Date.parse(`${wall.date}T${wall.time}Z`) - utcMs) / 60000;
+}
+
+/**
+ * Lokale Wanduhrzeit -> UTC, DST-korrekt per Fixpunkt-Iteration.
+ *
+ * `localToUTC()` daneben macht nur EINEN Durchgang: die lokalen Ziffern werden
+ * als UTC gelesen, der Zonen-Offset AN DIESEM (falschen) Punkt bestimmt und
+ * einmal angewandt. Das stimmt, solange der Offset an der falschen und der
+ * richtigen Stelle gleich ist - rund um eine DST-Grenze aber nicht (bis zu
+ * einer Offset-Breite daneben), und eine wegen des Fruehjahrssprungs gar nicht
+ * existierende Wanduhrzeit wird gar nicht erst erkannt. Praktisch heisst das:
+ * ein ganzes Wanduhr-Band bildet auf DENSELBEN Zeitpunkt ab (in Europe/Berlin
+ * ergeben 00:30 und 01:30 am 29.03.2026 beide 23:30Z), die Abbildung ist dort
+ * also nicht eindeutig.
+ *
+ * ZWEI FASSUNGEN, NICHT EINE GEAENDERTE: `localToUTC()` bleibt, wie es ist -
+ * ICS-Parser, Expansion und Outbound verlassen sich auf sein exaktes
+ * Ein-Durchgang-Verhalten, und eine Umstellung dort waere eine andere Frage mit
+ * anderen Tests. Wer die tatsaechliche Minute braucht (eine Erinnerung, die eine
+ * Stunde zu frueh oder spaet feuert, ist keine Erinnerung mehr), nimmt diese
+ * hier: der Schichtplan-Sync (#786) und der Erinnerungspfad des Kalenders
+ * (#1300).
+ *
+ * Verfahren (der uebliche Zwei-Pass-Fixpunkt): Startschaetzung wie localToUTC,
+ * daraus den Offset ablesen, die Schaetzung damit korrigieren, den Offset an
+ * DIESER korrigierten Stelle erneut ablesen. Bleibt er gleich, ist das
+ * Ergebnis exakt (der Rundlauf-Test, den ein einzelner Durchgang nie macht).
+ * Weicht er ab, liegt localStr auf/um eine DST-Grenze:
+ * - Zweiter Durchgang stabilisiert sich (Herbst/Fold, die Wanduhrzeit gab es
+ *   zweimal): das Ergebnis des zweiten Durchgangs gilt - eine der beiden
+ *   gueltigen Antworten, deterministisch statt zufaellig. Es ist die SPAETERE,
+ *   also die Lage nach der Umstellung (in Europe/Berlin CET): der erste
+ *   Durchgang startet auf der Winterseite und findet dort seinen Fixpunkt.
+ * - Kein Fixpunkt nach zwei Durchgaengen (Fruehling/Luecke, die Wanduhrzeit
+ *   gab es GAR NICHT): um die Luecke vorschieben, deren Breite die Differenz
+ *   der beiden gesehenen Offsets ist - dokumentierter Ausweichweg, keine
+ *   perfekte Antwort, weil es keine gibt.
+ *
+ * Ground-truth manuell geprueft (Europe/Berlin): 06:00 lokal am 2026-03-29
+ * (schon CEST, +02:00) -> 04:00Z; 06:00 lokal am 2026-10-25 (schon wieder CET,
+ * +01:00) -> 05:00Z; beide Tage liegen fuer 06:00 bereits auf der jeweils
+ * richtigen Seite der Grenze, single-pass und diese Funktion stimmen dort
+ * ueberein - der Unterschied zeigt sich erst innerhalb der Sprung-/Fold-Stunde
+ * selbst.
+ *
+ * @param {string} localStr  'YYYY-MM-DDTHH:mm:ss' ohne Offset
+ * @param {string} tzid      IANA-Zone
+ * @returns {string} UTC-ISO mit 'Z'
+ */
+export function localToUTCPrecise(localStr, tzid) {
+  const naiveMs = Date.parse(`${localStr}Z`);
+  if (Number.isNaN(naiveMs)) return localToUTC(localStr, tzid);
+
+  const o1 = offsetMinutesAt(naiveMs, tzid);
+  if (o1 == null) return localToUTC(localStr, tzid);
+  const guessA = naiveMs - o1 * 60000;
+
+  const o2 = offsetMinutesAt(guessA, tzid);
+  if (o2 == null) return localToUTC(localStr, tzid);
+  if (o2 === o1) return new Date(guessA).toISOString().replace('.000Z', 'Z');
+
+  const guessB = naiveMs - o2 * 60000;
+  const o3 = offsetMinutesAt(guessB, tzid);
+  if (o3 === o2) return new Date(guessB).toISOString().replace('.000Z', 'Z');
+
+  // Kein Fixpunkt in zwei Durchgaengen: Fruehjahrsluecke. Um die Luecke
+  // vorschieben statt eine Antwort vorzutaeuschen, die es nicht gibt.
+  const gapMinutes = Math.abs(o2 - o1);
+  return new Date(guessA + gapMinutes * 60000).toISOString().replace('.000Z', 'Z');
 }
 
 /**

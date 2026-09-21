@@ -1893,6 +1893,165 @@ test('a following split carries the reminder lead across a DST boundary', () => 
   })));
 });
 
+/**
+ * #1300, zweite Runde: die Umrechnung selbst muss eindeutig sein.
+ *
+ * Die erste Fassung rechnete den Anker ueber `storedToInstantMs()` und damit
+ * ueber `localToUTC()` - die Ein-Durchgang-Fassung. Die liest die lokalen
+ * Ziffern als UTC, bestimmt den Zonen-Offset AN DIESEM falschen Punkt und
+ * wendet ihn einmal an. Rund um eine DST-Grenze bildet das ein ganzes
+ * Wanduhr-Band auf DENSELBEN Zeitpunkt ab; gemessen in Europe/Berlin
+ * (`localToUTC` -> `utcToWall`, Rundlauf):
+ *
+ *   2026-03-29T00:30 -> 2026-03-28T23:30:00Z -> zurueck 2026-03-29T00:30  ok
+ *   2026-03-29T01:30 -> 2026-03-28T23:30:00Z -> zurueck 2026-03-29T00:30  daneben
+ *   2026-03-29T02:30 -> 2026-03-29T00:30:00Z -> zurueck 2026-03-29T01:30  daneben
+ *   2026-10-25T01:30 -> 2026-10-25T00:30:00Z -> zurueck 2026-10-25T02:30  daneben
+ *
+ * 00:30 und 01:30 ergeben denselben Zeitpunkt. Betroffen ist nicht nur die
+ * Luecken- oder die doppelte Stunde, sondern jede Wanduhrzeit von 01:00 bis
+ * 01:59 am Umstelltag. Auf dieser Achse wurde die Differenz zweier Anker
+ * gebildet - eine Verschiebung von 00:30 auf 01:30 kam als NULL heraus, eine
+ * Verschiebung aus dem Februar in dieses Band um eine Stunde zu kurz. Der
+ * Anker laeuft deshalb seit dieser Runde ueber `storedToInstantMsPrecise()`
+ * und damit ueber die Zwei-Pass-Fixpunkt-Fassung `localToUTCPrecise()`.
+ *
+ * GEMESSEN WIRD DER VORLAUF, NICHT DIE UHRZEIT. Der erwartete Zeitpunkt des
+ * Terminbeginns steht als handabgeleitete UTC-Konstante in der Vorgabe, der
+ * Vorlauf faellt aus ihr und der beobachteten Zeile. Ein Vergleich gegen die
+ * Ortszeit taugt hier nicht: in der doppelten Stunde ist die Wanduhrzeit
+ * zweideutig, sie kann die Antwort also gar nicht ausdruecken.
+ *
+ * FUENF DER SECHS LAGEN WAREN ROT, DIE SECHSTE NICHT. Die doppelte Stunde
+ * (25.10. 02:30) rechneten beide Fassungen gleich; sie steht hier nicht als
+ * Regressionswaechter, sondern weil es dort ZWEI richtige Antworten gibt und
+ * eine Zusicherung, die offenliesse welche, nichts hielte. Welche es ist und
+ * warum, steht an der Lage selbst.
+ *
+ * Die 2026er Grenzen von Europe/Berlin: 2026-03-29T01:00:00Z springt die Uhr
+ * von 02:00 CET (+01:00) auf 03:00 CEST (+02:00), 2026-10-25T01:00:00Z faellt
+ * sie von 03:00 CEST auf 02:00 CET zurueck.
+ */
+test('a moved series keeps its reminder lead inside the hour the conversion could not tell apart', () => {
+  const fixtures = [
+    {
+      label: 'von ausserhalb ins Band: Februar -> 29.03. 01:30 (noch CET)',
+      // 09:00 am 20.02. ist CET (+01:00) = 08:00Z, 60 Minuten Vorlauf = 07:00Z.
+      start: '2026-02-20T09:00:00',
+      reminder: '2026-02-20T07:00:00',
+      // 01:30 am 29.03. liegt VOR dem Sprung um 01:00Z, ist also noch CET
+      // (+01:00) = 2026-03-29T00:30:00Z.
+      moved: '2026-03-29T01:30:00',
+      movedUtc: '2026-03-29T00:30:00Z',
+      // Die Ein-Durchgang-Fassung las den Zielanker als 2026-03-28T23:30:00Z,
+      // eine Stunde zu frueh; der Vorlauf wuchs damit auf 120 Minuten. Diese
+      // Lage ist zugleich ein Regressionswaechter: vor #1300 rechnete die
+      // Stelle auf der Wanduhr-Achse und lag hier RICHTIG.
+      stored: '2026-03-28T23:30:00',
+    },
+    {
+      label: 'innerhalb des Tages ueber den Sprung: 01:30 (CET) -> 03:30 (CEST)',
+      start: '2026-03-29T01:30:00',
+      reminder: '2026-03-28T23:30:00',
+      // 03:30 liegt NACH dem Sprung, ist CEST (+02:00) = 2026-03-29T01:30:00Z.
+      moved: '2026-03-29T03:30:00',
+      movedUtc: '2026-03-29T01:30:00Z',
+      // Der Quellanker war um eine Stunde zu frueh gelesen, die Verschiebung
+      // damit um eine Stunde zu gross: die Erinnerung landete exakt auf dem
+      // Terminbeginn, Vorlauf 0 - genau das Symptom, das #1300 beseitigt.
+      stored: '2026-03-29T00:30:00',
+    },
+    {
+      label: 'aus dem Band heraus: 29.03. 01:30 -> April',
+      start: '2026-03-29T01:30:00',
+      reminder: '2026-03-28T23:30:00',
+      moved: '2026-04-20T09:00:00',
+      movedUtc: '2026-04-20T07:00:00Z',
+      stored: '2026-04-20T06:00:00',
+    },
+    {
+      label: 'eine Stunde innerhalb des Bandes: 00:30 -> 01:30, beide CET',
+      // Beide Uhrzeiten gibt es wirklich, und sie liegen eine echte Stunde
+      // auseinander. Die Ein-Durchgang-Fassung bildete beide auf
+      // 2026-03-28T23:30:00Z ab: die Verschiebung kam als 0 heraus, der
+      // Fruehausstieg auf `shift === 0` liess `remind_at` stehen, und der
+      // Vorlauf wuchs still von 60 auf 120 Minuten. Der Termin bewegte sich,
+      // die Erinnerung nicht, und nichts meldete es.
+      start: '2026-03-29T00:30:00',
+      reminder: '2026-03-28T22:30:00',
+      moved: '2026-03-29T01:30:00',
+      movedUtc: '2026-03-29T00:30:00Z',
+      stored: '2026-03-28T23:30:00',
+    },
+    {
+      label: 'ins Herbstband: September -> 25.10. 01:30 (noch CEST)',
+      // 09:00 am 20.09. ist CEST (+02:00) = 07:00Z, Vorlauf 60 = 06:00Z.
+      start: '2026-09-20T09:00:00',
+      reminder: '2026-09-20T06:00:00',
+      // 01:30 am 25.10. liegt VOR dem Ruecksprung um 01:00Z und ist damit
+      // eindeutig CEST (+02:00) = 2026-10-24T23:30:00Z. Die
+      // Ein-Durchgang-Fassung las 2026-10-25T00:30:00Z, eine Stunde zu spaet.
+      moved: '2026-10-25T01:30:00',
+      movedUtc: '2026-10-24T23:30:00Z',
+      stored: '2026-10-24T22:30:00',
+    },
+    {
+      label: 'in die doppelte Stunde: September -> 25.10. 02:30',
+      start: '2026-09-20T09:00:00',
+      reminder: '2026-09-20T06:00:00',
+      // 02:30 am 25.10. gibt es ZWEIMAL: einmal als CEST (+02:00,
+      // 2026-10-25T00:30:00Z) und einmal als CET (+01:00,
+      // 2026-10-25T01:30:00Z). Beide waeren richtig, und eine Zusicherung, die
+      // offenliesse welche, wuerde nichts halten.
+      //
+      // Gewaehlt ist die SPAETERE, also die Lage nach der Umstellung (CET).
+      // Das ist keine Vorliebe, sondern das dokumentierte Ergebnis von
+      // `localToUTCPrecise()`: der erste Durchgang liest den Offset an
+      // 2026-10-25T02:30:00Z ab, das ist CET, und findet mit ihm bei
+      // 01:30:00Z sofort seinen Fixpunkt. Dieselbe Regel gilt im
+      // Schichtplan-Sync, der denselben Helfer benutzt.
+      moved: '2026-10-25T02:30:00',
+      movedUtc: '2026-10-25T01:30:00Z',
+      stored: '2026-10-25T00:30:00',
+    },
+  ];
+  const observed = fixtures.map((fixture) => {
+    const database = createDatabase();
+    const seriesId = Number(insertSeries(database, {
+      title: 'Moved inside the ambiguous band',
+      start_datetime: fixture.start,
+      recurrence_rule: 'FREQ=MONTHLY',
+    }));
+    database.prepare(`
+      INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+      VALUES ('event', ?, ?, 1)
+    `).run(seriesId, fixture.reminder);
+    updateSeriesWithOverrides(database, {
+      seriesId,
+      actorId: 1,
+      changes: { start_datetime: fixture.moved },
+    });
+    const rows = database.prepare(`
+      SELECT remind_at FROM reminders
+      WHERE entity_type = 'event' AND entity_id = ?
+      ORDER BY remind_at
+    `).all(seriesId);
+    return {
+      label: fixture.label,
+      reminders: rows.map((row) => ({
+        stored: row.remind_at,
+        // Der Vorlauf faellt aus dem handabgeleiteten Zielzeitpunkt und der
+        // beobachteten Zeile - kein Helfer aus dem Modul unter Test.
+        leadMinutes: (Date.parse(fixture.movedUtc) - Date.parse(`${row.remind_at}Z`)) / 60000,
+      })),
+    };
+  });
+  assert.deepEqual(observed, fixtures.map((fixture) => ({
+    label: fixture.label,
+    reminders: [{ stored: fixture.stored, leadMinutes: 60 }],
+  })));
+});
+
 test('restoring the actor reminder keeps every other owner state reachable', () => {
   const database = createDatabase();
   const seriesId = Number(insertSeries(database, {

@@ -62,11 +62,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the hour a summer-time change adds or takes away, so an appointment moved from March to July kept
   "one hour before" in the dialog while the alert landed on the appointment's own start time, and
   one moved the other way went off two hours early. Nothing looked broken, because "at the start
-  time" is a setting somebody could have chosen on purpose. Every way an appointment's time changes
-  is covered: moving a whole series, moving a single occurrence, an occurrence taking its
-  reminders over from its series, and the "this and all following" split. All-day entries are
-  included, where the reminder hangs on 09:00 local time. Reminder times already stored are left
-  as they are; every move from here on lands on the lead you set. (#1300)
+  time" is a setting somebody could have chosen on purpose. All four ways an appointment's time
+  changes now run through the same calculation: moving a whole series, moving a single occurrence,
+  an occurrence taking its reminders over from its series, and the "this and all following" split.
+  All-day entries are included, where the reminder hangs on 09:00 local time. The hour the clocks
+  change is covered too, including the one that happens twice in autumn: a reminder moved into it
+  lands on the later of the two readings, the one after the change. The one hour a year that a
+  spring-forward skips has no honest answer, because that time of day never happens - an
+  appointment moved onto it counts as starting when the clocks reach the other side. Reminder
+  times already stored are left as they are. (#1300)
 
 - **Health no longer offers buttons that a read-only member is not allowed to press.** Where your
   access to the module is "read", the largest module in the app still carried every writing control

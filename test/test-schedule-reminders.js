@@ -466,8 +466,9 @@ test('shiftReminderAt (via syncScheduleRemindersForUser) rechnet ueber den Herbs
 
 // The nonexistent-wall-clock-time (spring gap) case: 2026-03-29 02:30 local
 // never happened - the clock jumps straight from 02:00 to 03:00 at
-// 2026-03-29T01:00:00Z. localToUTCPrecise() (schedule-reminders.js) documents
-// its fallback for exactly this: advance past the gap by the gap's own width.
+// 2026-03-29T01:00:00Z. localToUTCPrecise() (server/utils/timezone.js - it
+// lived in schedule-reminders.js until #1300 needed it twice) documents its
+// fallback for exactly this: advance past the gap by the gap's own width.
 //
 // Hand-derivation, following localToUTCPrecise()'s own documented procedure:
 //   naiveMs  = 2026-03-29T02:30:00Z (the local digits read literally as UTC)
