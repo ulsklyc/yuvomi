@@ -3697,7 +3697,8 @@
         "reversePayment": "Återför",
         "reversePaymentLabel": "Återför betalningen från {{payer}} till {{payee}} på {{amount}}",
         "reversePaymentConfirm": "Återföra den här betalningen?",
-        "reversePaymentConfirmDetail": "{{payer}} till {{payee}}, {{amount}}. En motbokning häver betalningen och saldona blir som förut. Betalningen finns kvar i aktiviteten, markerad som återförd."
+        "reversePaymentConfirmDetail": "{{payer}} till {{payee}}, {{amount}}. En motbokning häver betalningen och saldona blir som förut. Betalningen finns kvar i aktiviteten, markerad som återförd.",
+        "loadMoreActivity": "Läs in fler"
     },
     "wmo": {
         "0": "Klart",

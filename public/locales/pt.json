@@ -3697,7 +3697,8 @@
         "reversePayment": "Estornar",
         "reversePaymentLabel": "Estornar o pagamento de {{payer}} para {{payee}} de {{amount}}",
         "reversePaymentConfirm": "Estornar este pagamento?",
-        "reversePaymentConfirmDetail": "{{payer}} para {{payee}}, {{amount}}. Um lançamento inverso anula o pagamento e os saldos voltam ao que eram. O pagamento continua na atividade, marcado como estornado."
+        "reversePaymentConfirmDetail": "{{payer}} para {{payee}}, {{amount}}. Um lançamento inverso anula o pagamento e os saldos voltam ao que eram. O pagamento continua na atividade, marcado como estornado.",
+        "loadMoreActivity": "Carregar mais"
     },
     "wmo": {
         "0": "Céu limpo",

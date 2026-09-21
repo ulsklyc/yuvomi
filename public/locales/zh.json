@@ -3697,7 +3697,8 @@
         "reversePayment": "冲销",
         "reversePaymentLabel": "冲销 {{payer}} 付给 {{payee}} 的 {{amount}}",
         "reversePaymentConfirm": "冲销这笔付款？",
-        "reversePaymentConfirmDetail": "{{payer}} 付给 {{payee}}，{{amount}}。一笔反向记账会抵消该付款，余额恢复到之前的状态。该付款仍保留在动态中，并标记为已冲销。"
+        "reversePaymentConfirmDetail": "{{payer}} 付给 {{payee}}，{{amount}}。一笔反向记账会抵消该付款，余额恢复到之前的状态。该付款仍保留在动态中，并标记为已冲销。",
+        "loadMoreActivity": "加载更多"
     },
     "wmo": {
         "0": "晴天",

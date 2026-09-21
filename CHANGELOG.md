@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The activity of a shared-expenses group now loads further with "Load more", down to its first
+  entry.** Until now the activity showed the latest 12 entries and nothing before them, so an older
+  payment could not be reversed from the interface. "Load more" appends the next entries below the
+  ones already shown, as often as there are more. Reversing a payment that was loaded this way keeps
+  the list as deep as it was, so the payment stays in view, now marked as reversed, instead of the
+  list jumping back to its first page. Loading more is reading, so the button is there at every
+  access level and in an archived group. The API pages the same way: `GET
+  /api/v1/split-expenses/groups/{id}/activity` returns `pagination.next_cursor`, and passing its
+  `before_at` and `before_id` returns the next page. Entries added while paging appear at the top
+  and shift nothing, unlike `offset`. Without a cursor the endpoint answers as before, with the same
+  entries in the same order; `has_more` is now exact instead of `true` whenever a page happened to be
+  full. (#1309)
+
 - **A payment recorded in shared expenses can be reversed.** Until now a settle-up, once saved,
   stayed for good - a transposed figure or the wrong person could not be taken back, while the
   expense next to it could be edited and deleted. Each payment in a group's activity now names who
@@ -94,6 +107,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   API's answer either. (#1314)
 
 ### Fixed
+
+- **A group's shared-expenses activity shows each entry under the household's day.** The date came
+  from the stored UTC timestamp, so an entry made late in the evening in a zone east of UTC, or early
+  in the morning west of it, showed the neighbouring day. It now follows the household time zone,
+  like the rest of the app. (#1309)
 
 - **On a phone, a meal can be dragged to another day again, by a grip next to its buttons.** The
   drag started, and ended the moment the finger moved: on a phone the week plan is a vertical list,

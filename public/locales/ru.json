@@ -3697,7 +3697,8 @@
         "reversePayment": "Сторнировать",
         "reversePaymentLabel": "Сторнировать платеж {{payer}} для {{payee}} на {{amount}}",
         "reversePaymentConfirm": "Сторнировать этот платеж?",
-        "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Обратная проводка отменяет платеж, и балансы возвращаются к прежним. Платеж остается в активности с пометкой «сторнирован»."
+        "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Обратная проводка отменяет платеж, и балансы возвращаются к прежним. Платеж остается в активности с пометкой «сторнирован».",
+        "loadMoreActivity": "Загрузить ещё"
     },
     "wmo": {
         "0": "Ясное небо",

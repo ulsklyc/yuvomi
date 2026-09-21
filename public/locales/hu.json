@@ -3697,7 +3697,8 @@
         "reversePayment": "Sztornózás",
         "reversePaymentLabel": "{{payer}} {{payee}} részére teljesített {{amount}} összegű fizetésének sztornózása",
         "reversePaymentConfirm": "Sztornózod ezt a fizetést?",
-        "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Egy ellentételes könyvelés érvényteleníti a fizetést, az egyenlegek visszaállnak. A fizetés sztornózottként a tevékenységben marad."
+        "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Egy ellentételes könyvelés érvényteleníti a fizetést, az egyenlegek visszaállnak. A fizetés sztornózottként a tevékenységben marad.",
+        "loadMoreActivity": "Továbbiak betöltése"
     },
     "wmo": {
         "0": "Tiszta égbolt",

@@ -3697,7 +3697,8 @@
         "reversePayment": "Annuler le paiement",
         "reversePaymentLabel": "Annuler le paiement de {{payer}} à {{payee}} de {{amount}}",
         "reversePaymentConfirm": "Annuler ce paiement ?",
-        "reversePaymentConfirmDetail": "{{payer}} à {{payee}}, {{amount}}. Une contre-écriture annule le paiement et les soldes reviennent à leur état précédent. Le paiement reste dans l’activité, marqué comme annulé."
+        "reversePaymentConfirmDetail": "{{payer}} à {{payee}}, {{amount}}. Une contre-écriture annule le paiement et les soldes reviennent à leur état précédent. Le paiement reste dans l’activité, marqué comme annulé.",
+        "loadMoreActivity": "Charger plus"
     },
     "wmo": {
         "0": "Ciel dégagé",

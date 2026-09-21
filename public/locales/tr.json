@@ -3697,7 +3697,8 @@
         "reversePayment": "İptal et",
         "reversePaymentLabel": "{{payer}} tarafından {{payee}} kişisine yapılan {{amount}} tutarındaki ödemeyi iptal et",
         "reversePaymentConfirm": "Bu ödeme iptal edilsin mi?",
-        "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Ters kayıt ödemeyi geçersiz kılar ve bakiyeler önceki haline döner. Ödeme, iptal edildi olarak etkinlikte kalır."
+        "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Ters kayıt ödemeyi geçersiz kılar ve bakiyeler önceki haline döner. Ödeme, iptal edildi olarak etkinlikte kalır.",
+        "loadMoreActivity": "Daha fazla yükle"
     },
     "wmo": {
         "0": "Açık",

@@ -3697,7 +3697,8 @@
         "reversePayment": "عكس",
         "reversePaymentLabel": "عكس الدفعة من {{payer}} إلى {{payee}} بمبلغ {{amount}}",
         "reversePaymentConfirm": "عكس هذه الدفعة؟",
-        "reversePaymentConfirmDetail": "{{payer}} إلى {{payee}}، {{amount}}. قيد معاكس يلغي الدفعة وتعود الأرصدة كما كانت. تبقى الدفعة في النشاط مع علامة معكوسة."
+        "reversePaymentConfirmDetail": "{{payer}} إلى {{payee}}، {{amount}}. قيد معاكس يلغي الدفعة وتعود الأرصدة كما كانت. تبقى الدفعة في النشاط مع علامة معكوسة.",
+        "loadMoreActivity": "تحميل المزيد"
     },
     "wmo": {
         "0": "سماء صافية",

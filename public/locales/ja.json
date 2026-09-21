@@ -3697,7 +3697,8 @@
         "reversePayment": "取り消す",
         "reversePaymentLabel": "{{payer}} から {{payee}} への {{amount}} の支払いを取り消す",
         "reversePaymentConfirm": "この支払いを取り消しますか?",
-        "reversePaymentConfirmDetail": "{{payer}} から {{payee}}、{{amount}}。反対仕訳で支払いが打ち消され、残高は元に戻ります。支払いは取り消し済みとしてアクティビティに残ります。"
+        "reversePaymentConfirmDetail": "{{payer}} から {{payee}}、{{amount}}。反対仕訳で支払いが打ち消され、残高は元に戻ります。支払いは取り消し済みとしてアクティビティに残ります。",
+        "loadMoreActivity": "さらに読み込む"
     },
     "wmo": {
         "0": "快晴",

@@ -3697,7 +3697,8 @@
         "reversePayment": "Reverse",
         "reversePaymentLabel": "Reverse payment from {{payer}} to {{payee}} of {{amount}}",
         "reversePaymentConfirm": "Reverse this payment?",
-        "reversePaymentConfirmDetail": "{{payer}} to {{payee}}, {{amount}}. A counter-entry cancels the payment and balances return to where they were. The payment stays in the activity, marked as reversed."
+        "reversePaymentConfirmDetail": "{{payer}} to {{payee}}, {{amount}}. A counter-entry cancels the payment and balances return to where they were. The payment stays in the activity, marked as reversed.",
+        "loadMoreActivity": "Load more"
     },
     "wmo": {
         "0": "Clear sky",

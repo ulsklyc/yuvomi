@@ -3697,7 +3697,8 @@
         "reversePayment": "Stornieren",
         "reversePaymentLabel": "Zahlung von {{payer}} an {{payee}} über {{amount}} stornieren",
         "reversePaymentConfirm": "Diese Zahlung stornieren?",
-        "reversePaymentConfirmDetail": "{{payer}} an {{payee}}, {{amount}}. Eine Gegenbuchung hebt die Zahlung auf, die Salden stehen danach wie vorher. Die Zahlung bleibt als storniert im Verlauf."
+        "reversePaymentConfirmDetail": "{{payer}} an {{payee}}, {{amount}}. Eine Gegenbuchung hebt die Zahlung auf, die Salden stehen danach wie vorher. Die Zahlung bleibt als storniert im Verlauf.",
+        "loadMoreActivity": "Mehr laden"
     },
     "wmo": {
         "0": "Klarer Himmel",
