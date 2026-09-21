@@ -3684,7 +3684,9 @@
         "proofLabel": "Prova di pagamento",
         "proofHint": "Una prova, ad esempio lo screenshot del bonifico.",
         "proofDocumentName": "Prova di pagamento {{group}}: {{name}}",
-        "loadError": "Impossibile caricare le spese condivise."
+        "loadError": "Impossibile caricare le spese condivise.",
+        "moreMembers": "+{{count}} altri",
+        "moreMembers_one": "+{{count}} altro"
     },
     "wmo": {
         "0": "Cielo sereno",

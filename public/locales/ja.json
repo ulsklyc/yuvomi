@@ -3684,7 +3684,9 @@
         "proofLabel": "支払いの証明",
         "proofHint": "証明を1件、たとえば振込のスクリーンショット。",
         "proofDocumentName": "支払いの証明 {{group}}: {{name}}",
-        "loadError": "共有費用の読み込みに失敗しました。"
+        "loadError": "共有費用の読み込みに失敗しました。",
+        "moreMembers": "他 {{count}} 人",
+        "moreMembers_one": "他 {{count}} 人"
     },
     "wmo": {
         "0": "快晴",

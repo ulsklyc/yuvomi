@@ -3684,7 +3684,9 @@
         "proofLabel": "Fizetési igazolás",
         "proofHint": "Egy igazolás, például az utalás képernyőképe.",
         "proofDocumentName": "Fizetési igazolás {{group}}: {{name}}",
-        "loadError": "A megosztott költségek betöltése sikertelen."
+        "loadError": "A megosztott költségek betöltése sikertelen.",
+        "moreMembers": "+{{count}} további",
+        "moreMembers_one": "+{{count}} további"
     },
     "wmo": {
         "0": "Tiszta égbolt",

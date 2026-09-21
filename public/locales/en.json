@@ -3684,7 +3684,9 @@
         "proofLabel": "Payment proof",
         "proofHint": "One proof, for example a screenshot of the transfer.",
         "proofDocumentName": "Payment proof {{group}}: {{name}}",
-        "loadError": "Shared expenses could not be loaded."
+        "loadError": "Shared expenses could not be loaded.",
+        "moreMembers": "+{{count}} more",
+        "moreMembers_one": "+{{count}} more"
     },
     "wmo": {
         "0": "Clear sky",

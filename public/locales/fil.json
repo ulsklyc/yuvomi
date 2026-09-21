@@ -3684,7 +3684,9 @@
         "proofLabel": "Patunay ng bayad",
         "proofHint": "Isang patunay, halimbawa ay screenshot ng paglilipat.",
         "proofDocumentName": "Patunay ng bayad {{group}}: {{name}}",
-        "loadError": "Hindi ma-load ang mga hinating gastos."
+        "loadError": "Hindi ma-load ang mga hinating gastos.",
+        "moreMembers": "+{{count}} pa",
+        "moreMembers_one": "+{{count}} pa"
     },
     "wmo": {
         "0": "Maaliwalas na langit",

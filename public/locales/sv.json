@@ -3684,7 +3684,9 @@
         "proofLabel": "Betalningsbevis",
         "proofHint": "Ett bevis, till exempel en skärmbild av överföringen.",
         "proofDocumentName": "Betalningsbevis {{group}}: {{name}}",
-        "loadError": "Delade utgifter kunde inte laddas."
+        "loadError": "Delade utgifter kunde inte laddas.",
+        "moreMembers": "+{{count}} till",
+        "moreMembers_one": "+{{count}} till"
     },
     "wmo": {
         "0": "Klart",

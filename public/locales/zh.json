@@ -3684,7 +3684,9 @@
         "proofLabel": "付款凭据",
         "proofHint": "一份凭据，例如转账截图。",
         "proofDocumentName": "付款凭据 {{group}}：{{name}}",
-        "loadError": "无法加载共享支出。"
+        "loadError": "无法加载共享支出。",
+        "moreMembers": "还有 {{count}} 位",
+        "moreMembers_one": "还有 {{count}} 位"
     },
     "wmo": {
         "0": "晴天",

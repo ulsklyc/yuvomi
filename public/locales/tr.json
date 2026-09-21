@@ -3684,7 +3684,9 @@
         "proofLabel": "Ödeme belgesi",
         "proofHint": "Tek bir belge, örneğin havalenin ekran görüntüsü.",
         "proofDocumentName": "Ödeme belgesi {{group}}: {{name}}",
-        "loadError": "Paylaşılan giderler yüklenemedi."
+        "loadError": "Paylaşılan giderler yüklenemedi.",
+        "moreMembers": "+{{count}} kişi daha",
+        "moreMembers_one": "+{{count}} kişi daha"
     },
     "wmo": {
         "0": "Açık",

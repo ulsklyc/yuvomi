@@ -3684,7 +3684,9 @@
         "proofLabel": "Zahlungsnachweis",
         "proofHint": "Ein Nachweis, etwa der Screenshot der Überweisung.",
         "proofDocumentName": "Zahlungsnachweis {{group}}: {{name}}",
-        "loadError": "Gemeinsame Ausgaben konnten nicht geladen werden."
+        "loadError": "Gemeinsame Ausgaben konnten nicht geladen werden.",
+        "moreMembers": "+{{count}} weitere",
+        "moreMembers_one": "+{{count}} weitere"
     },
     "wmo": {
         "0": "Klarer Himmel",

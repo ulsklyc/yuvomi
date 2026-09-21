@@ -3257,7 +3257,9 @@
         "proofLabel": "Doklad o platbě",
         "proofHint": "Jeden doklad, například snímek převodu.",
         "proofDocumentName": "Doklad o platbě {{group}}: {{name}}",
-        "loadError": "Společné výdaje se nepodařilo načíst."
+        "loadError": "Společné výdaje se nepodařilo načíst.",
+        "moreMembers": "+{{count}} dalších",
+        "moreMembers_one": "+{{count}} další"
     },
     "documents": {
         "title": "Dokumenty",

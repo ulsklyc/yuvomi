@@ -180,7 +180,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is split and each person's share, its notes and receipts - and offers nothing to change. Receipts
   are listed only if you may read documents. The same view now opens for an expense in an archived
   group. A loan's report also shows the account, the first due month, the interest terms and the
-  notes from the loan form. What you can read stays complete: the monthly summary and chart, the
+  notes from the loan form. Where a value only lived in a form, it now stands where a tap already
+  leads, without a new button: a credit card's statement shows its credit limit at the top (for
+  everyone - the card itself only shows what is still available), and at "read" a shared-expense
+  group shows its default currency, its default split and its members under the description,
+  with the names cut off after five and the rest counted. What you can read stays complete: the monthly summary and chart, the
   account balances and each account's statement, the subscription analytics, a group's balances,
   expenses and activity, the reports tab and the CSV exports. A tab with nothing in it yet says so,
   instead of telling you to use a + button that is not there. Shared expenses are part of Budget in

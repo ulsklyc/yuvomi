@@ -3684,7 +3684,9 @@
         "proofLabel": "결제 증빙",
         "proofHint": "증빙 하나, 예를 들어 이체 스크린샷입니다.",
         "proofDocumentName": "결제 증빙 {{group}}: {{name}}",
-        "loadError": "공동 지출을 불러오지 못했습니다."
+        "loadError": "공동 지출을 불러오지 못했습니다.",
+        "moreMembers": "+{{count}}명 더",
+        "moreMembers_one": "+{{count}}명 더"
     },
     "wmo": {
         "0": "맑음",

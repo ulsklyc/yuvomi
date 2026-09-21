@@ -3684,7 +3684,9 @@
         "proofLabel": "Potwierdzenie płatności",
         "proofHint": "Jedno potwierdzenie, na przykład zrzut ekranu przelewu.",
         "proofDocumentName": "Potwierdzenie płatności {{group}}: {{name}}",
-        "loadError": "Nie udało się załadować wspólnych wydatków."
+        "loadError": "Nie udało się załadować wspólnych wydatków.",
+        "moreMembers": "+{{count}} więcej",
+        "moreMembers_one": "+{{count}} więcej"
     },
     "wmo": {
         "0": "Bezchmurnie",

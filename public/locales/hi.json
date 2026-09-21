@@ -3684,7 +3684,9 @@
         "proofLabel": "भुगतान प्रमाण",
         "proofHint": "एक प्रमाण, जैसे ट्रांसफ़र का स्क्रीनशॉट।",
         "proofDocumentName": "भुगतान प्रमाण {{group}}: {{name}}",
-        "loadError": "साझा खर्च लोड नहीं हो सके।"
+        "loadError": "साझा खर्च लोड नहीं हो सके।",
+        "moreMembers": "+{{count}} और",
+        "moreMembers_one": "+{{count}} और"
     },
     "wmo": {
         "0": "साफ आकाश",

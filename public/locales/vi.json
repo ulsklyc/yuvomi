@@ -3684,7 +3684,9 @@
         "proofLabel": "Bằng chứng thanh toán",
         "proofHint": "Một bằng chứng, ví dụ ảnh chụp màn hình chuyển khoản.",
         "proofDocumentName": "Bằng chứng thanh toán {{group}}: {{name}}",
-        "loadError": "Không thể tải chi phí chung."
+        "loadError": "Không thể tải chi phí chung.",
+        "moreMembers": "+{{count}} người nữa",
+        "moreMembers_one": "+{{count}} người nữa"
     },
     "wmo": {
         "0": "Trời quang",

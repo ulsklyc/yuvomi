@@ -7,7 +7,7 @@ import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
 import { openDetailView } from '/components/detail-view.js';
-import { t, formatDate, getLocale, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
+import { t, formatDate, getLocale, getNumberFormat, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { stagger } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -401,6 +401,7 @@ function renderMain() {
         <p class="split-group-type">${t(`splitExpenses.groupType.${group.type}`)}</p>
         ${archived ? `<p class="split-archived-badge"><i data-lucide="archive" class="icon-md" aria-hidden="true"></i>${t('splitExpenses.statusArchived')}</p>` : ''}
         <p>${esc(group.description || t('splitExpenses.groupDefaultDescription'))}</p>
+        ${ro ? groupMetaHtml(group) : ''}
       </div>
       ${/* Bei `budget: read` faellt die ganze Leiste: Bearbeiten, Archivieren,
           * Loeschen, Abrechnen, Mitglied einladen und im Archiv Wiederherstellen
@@ -479,6 +480,44 @@ function renderMain() {
     else openExpenseModal(expense);
   });
   stagger(main.querySelectorAll('.split-expense, .split-debt, .split-activity-item'));
+}
+
+// So viele Namen stehen in der Kopfzeile einer Gruppe, der Rest als „+N".
+const GROUP_META_NAMES = 5;
+
+/**
+ * Die Angaben des Gruppen-Dialogs, die der Kopf sonst nicht traegt (#1265 P7):
+ * Standardwaehrung, Standardaufteilung samt Vorbelegung je Person, und die
+ * Mitglieder. Nur bei `budget: read` - mit Schreibrecht fuehrt der Stift in den
+ * Dialog, der sie zeigt; bei `read` gibt es den Stift nicht, und die Werte
+ * stehen dort, wo der Blick ohnehin landet, statt hinter einem neuen Knopf.
+ *
+ * EINE Zeile, nicht endlos: bis GROUP_META_NAMES Namen, danach „+N" ueber einen
+ * Plural-Schluessel. Alles geht als Text durch esc() - Namen und Waehrung sind
+ * Daten, und t() liefert kein Markup.
+ */
+function groupMetaHtml(group) {
+  const members = state.groupMembers || [];
+  const method = group.default_split_method || 'equal';
+  const values = defaultSplitValues(group);
+  // Zahlformat der Haushalts-Einstellung, nicht der Sprache (#521, getNumberFormat).
+  const number = getNumberFormat({ maximumFractionDigits: 2 });
+  const unit = method === 'percentage' ? ' %' : '';
+  const presets = members
+    .map((m) => [m.display_name, values[m.user_id ?? m.id]])
+    .filter(([, value]) => value != null && value !== '')
+    .map(([name, value]) => `${name} ${number.format(Number(value))}${unit}`);
+  const methodLabel = t(`splitExpenses.split${method.charAt(0).toUpperCase()}${method.slice(1)}`);
+  const names = members.slice(0, GROUP_META_NAMES)
+    .map((m) => (m.role === 'guest' ? `${m.display_name} (${t('splitExpenses.roleGuest')})` : m.display_name));
+  const rest = members.length - names.length;
+  if (rest > 0) names.push(t('splitExpenses.moreMembers', { count: rest }));
+  const parts = [
+    group.default_currency ? `${t('splitExpenses.currency')}: ${group.default_currency}` : '',
+    `${t('splitExpenses.defaultSplit')}: ${presets.length ? `${methodLabel} - ${presets.join(', ')}` : methodLabel}`,
+    names.length ? `${t('splitExpenses.members')}: ${names.join(', ')}` : '',
+  ].filter(Boolean);
+  return `<p class="split-group-meta">${esc(parts.join(' · '))}</p>`;
 }
 
 function renderBalances() {
@@ -1394,7 +1433,7 @@ function openGuestModal() {
  * den Seitencontainer; der Griff laesst den echten Pfad laufen.
  */
 export const __test = {
-  readOnly, renderExpenses, state, expenseReadSections, openExpenseModal,
+  readOnly, renderExpenses, state, expenseReadSections, openExpenseModal, groupMetaHtml, openGroupModal,
   renderMainForTest(container) { _container = container; renderMain(); },
   renderGroupsForTest(container) { _container = container; renderGroups(); },
 };

@@ -3684,7 +3684,9 @@
         "proofLabel": "سند پرداخت",
         "proofHint": "یک سند، برای نمونه تصویر انتقال وجه.",
         "proofDocumentName": "سند پرداخت {{group}}: {{name}}",
-        "loadError": "هزینه‌های مشترک بارگذاری نشدند."
+        "loadError": "هزینه‌های مشترک بارگذاری نشدند.",
+        "moreMembers": "+{{count}} نفر دیگر",
+        "moreMembers_one": "+{{count}} نفر دیگر"
     },
     "wmo": {
         "0": "آسمان صاف",

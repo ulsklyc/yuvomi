@@ -3684,7 +3684,9 @@
         "proofLabel": "Bukti pembayaran",
         "proofHint": "Satu bukti, misalnya tangkapan layar transfer.",
         "proofDocumentName": "Bukti pembayaran {{group}}: {{name}}",
-        "loadError": "Pengeluaran bersama tidak dapat dimuat."
+        "loadError": "Pengeluaran bersama tidak dapat dimuat.",
+        "moreMembers": "+{{count}} lagi",
+        "moreMembers_one": "+{{count}} lagi"
     },
     "wmo": {
         "0": "Langit cerah",

@@ -1000,7 +1000,8 @@ function renderBody() {
             <i data-lucide="wallet" class="icon-sm" aria-hidden="true"></i>
             <span>${esc(accountName(state.accountFilterId))}</span>
             <i data-lucide="x" class="icon-sm" aria-hidden="true"></i>
-          </button>` : ''}
+          </button>
+          ${statementCreditLimitHtml()}` : ''}
           ${state.responsibleFilterId != null ? `
           <button class="budget-account-chip" id="budget-clear-responsible-filter" type="button"
                   aria-label="${esc(t('budget.clearResponsibleFilter'))}">
@@ -1292,6 +1293,24 @@ function renderEntries() {
   }
 
   return entryRows(rows);
+}
+
+/**
+ * Der Kreditrahmen im Kopf des Kontoauszugs (#1265 P7).
+ *
+ * Er ist der eine Wert des Konto-Dialogs, den weder die Karte (sie rechnet ihn
+ * in „verfuegbar" um) noch der Auszug zeigte - bei `budget: read` war er damit
+ * nirgends zu lesen. Er steht dort, wo der Tipp auf die Karte ohnehin landet,
+ * statt hinter einem neuen Knopf. IN BEIDEN MODI: der Auszug ist eine Leseflaeche,
+ * der Dialog ein eigener Schritt - der Wert steht damit nie zweimal auf
+ * demselben Bildschirm, und eine Sonderregel je Recht waere eine zweite Wahrheit
+ * ueber dasselbe Konto. Nur fuer Kreditkarten: der Dialog zeigt und speichert das
+ * Feld nur dort (am-credit-fields).
+ */
+function statementCreditLimitHtml() {
+  const account = (state.accounts ?? []).find((a) => a.id === state.accountFilterId);
+  if (!account || account.type !== 'credit' || account.credit_limit == null) return '';
+  return `<div class="budget-list-header__filter">${esc(t('budget.creditLimitLabel'))} ${esc(formatAmount(account.credit_limit, account.currency || state.currency))}</div>`;
 }
 
 /** Die Buchungszeilen selbst - einmal gebaut, von Liste und Gruppen benutzt. */
@@ -3847,6 +3866,7 @@ export const __test = {
   // Der Darlehens-Dialog selbst - nur, damit die Suite misst, dass jeder Wert,
   // den er mit Schreibrecht zeigt, im Bericht steht (P6-Muster).
   openLoanModal,
+  openAccountModal,
   // renderBody() schreibt in den Seitencontainer statt Markup zurueckzugeben;
   // derselbe Griff wie updateTabsForTest oben laesst den ECHTEN Render-Pfad
   // des Buchungs-Tabs laufen, statt seinen Quelltext zu lesen.

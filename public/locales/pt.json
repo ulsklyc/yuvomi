@@ -3684,7 +3684,9 @@
         "proofLabel": "Comprovativo de pagamento",
         "proofHint": "Um comprovativo, por exemplo a captura da transferência.",
         "proofDocumentName": "Comprovativo de pagamento {{group}}: {{name}}",
-        "loadError": "Não foi possível carregar as despesas compartilhadas."
+        "loadError": "Não foi possível carregar as despesas compartilhadas.",
+        "moreMembers": "+{{count}} outros",
+        "moreMembers_one": "+{{count}} outro"
     },
     "wmo": {
         "0": "Céu limpo",

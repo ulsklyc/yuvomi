@@ -127,12 +127,13 @@ const buchung = (over = {}) => ({
 });
 
 /** Laesst den echten Render-Pfad des Buchungs-Tabs laufen und gibt sein Markup zurueck. */
-function buchungsTab(entries) {
+function buchungsTab(entries, extra = {}) {
   const vorher = { ...budget.state };
   Object.assign(budget.state, {
     activeTab: 'budget', loadError: null, prevSummary: null, entries,
     summary: { income: 0, expenses: -84.5, balance: -84.5, byCategory: [], pending: { count: 0 } },
     responsibleFilterId: null, groupByResponsible: false, accountFilterId: null,
+    ...extra,
   });
   let html = '';
   const body = {
@@ -1071,6 +1072,122 @@ test('Darlehen: der Bericht zeigt jeden Wert des Darlehens-Dialogs, den Karte un
     assert.notEqual(berichtKacheln(html)['budget.loanDetailStartMonthLabel'], '2026-01');
     assert.equal(budget.loanReportDetails(darlehen()), '', 'ohne Angaben keine leere Kachelreihe');
   });
+});
+
+// -------------------------------------------------------------------------
+// Konto und Gruppe (Entscheidung Ulas, 21.09.): fehlt bei `read` ein Wert,
+// steht er dort, wo der Tipp ohnehin landet - kein neuer Knopf nur fuers Lesen.
+// -------------------------------------------------------------------------
+
+test('Kontoauszug: der Kreditrahmen aus dem Konto-Dialog steht im Kopf - in beiden Modi', () => {
+  const karte = konto({ type: 'credit', credit_limit: 2000, credit_bank: 'Hausbank', available_limit: 1500, currency: 'EUR' });
+  // Der Dialog zeigt den Rahmen mit Schreibrecht roh im Feld - sonst mass die Zeile unten nichts.
+  const editor = mitKonten([karte], () => withAccess({ budget: 'write' }, () => modalOptionen(() => budget.openAccountModal(karte))));
+  assert.match(editor.content, /id="am-credit-limit"[^>]*value="2000"/);
+  const kopf = (modus, account) => mitKonten([account], () => withAccess({ budget: modus }, () => {
+    const vorher = budget.state.accountFilterId;
+    budget.state.accountFilterId = account.id;
+    try { return buchungsTab([buchung({ account_id: account.id })], { accountFilterId: account.id }); } finally { budget.state.accountFilterId = vorher; }
+  }));
+  for (const modus of ['read', 'write']) {
+    const html = kopf(modus, karte);
+    assert.match(html, /id="budget-clear-account-filter"/, `${modus}: der Auszug ist offen`);
+    assert.match(html, /<div class="budget-list-header__filter">budget\.creditLimitLabel 2\.000,00\s€<\/div>/,
+      `${modus}: der Rahmen steht im Kopf des Auszugs`);
+  }
+  // Die Antwort folgt dem Datensatz: kein Rahmen gesetzt, oder gar keine Kreditkarte - keine Zeile.
+  assert.doesNotMatch(kopf('read', { ...karte, credit_limit: null }), /creditLimitLabel/);
+  assert.doesNotMatch(kopf('read', konto({ credit_limit: 2000 })), /creditLimitLabel/, 'nur die Kreditkarte fuehrt das Feld');
+});
+
+const gruppe = (over = {}) => ({
+  id: 2, name: 'Urlaub Ostsee', type: 'trip', description: '', member_count: 2,
+  default_currency: 'EUR', default_split_method: 'percentage',
+  default_split_config: JSON.stringify([{ user_id: 1, percentage: 60 }, { user_id: 3, percentage: 40 }]),
+  ...over,
+});
+const mitglieder = [
+  { user_id: 1, display_name: 'Alex', role: 'owner' },
+  { user_id: 3, display_name: 'Emma', role: 'guest' },
+];
+
+/** Der Gruppenkopf, wie renderMain() ihn baut. */
+function gruppenKopf(g, members, modus) {
+  const vorher = { ...split.state };
+  Object.assign(split.state, {
+    groupStatus: 'active', activeGroupId: g.id, user: null, groups: [g], groupMembers: members,
+    expenses: [], balances: { balances: [], simplified_debts: [] }, activity: [],
+  });
+  let html = '';
+  const main = {
+    removeAttribute() {}, replaceChildren() { html = ''; },
+    insertAdjacentHTML(_p, m) { html += m; }, querySelector: () => null, querySelectorAll: () => [],
+  };
+  try {
+    withAccess({ budget: modus }, () => split.renderMainForTest({ querySelector: (sel) => (sel === '#split-main' ? main : null) }));
+  } finally { Object.assign(split.state, vorher); }
+  return html;
+}
+
+/** Die Zeile als { Beschriftung: Wert } - entschluesselt wie im Browser. */
+function gruppenZeile(html) {
+  const m = html.match(/<p class="split-group-meta">([^<]*)<\/p>/);
+  if (!m) return {};
+  const text = m[1].replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  return Object.fromEntries(text.split(' · ').map((teil) => {
+    const i = teil.indexOf(': ');
+    return [teil.slice(0, i), teil.slice(i + 2)];
+  }));
+}
+
+test('Gruppenkopf bei `budget: read`: Waehrung, Standardaufteilung und Mitglieder aus dem Gruppen-Dialog', async () => {
+  const vorher = { ...split.state };
+  const kandidaten = [
+    { source: 'user', user_id: 1, display_name: 'Alex', in_group: true, group_role: 'owner' },
+    { source: 'user', user_id: 3, display_name: 'Emma', in_group: true, group_role: 'guest' },
+  ];
+  Object.assign(split.state, {
+    activeGroupId: 2, groups: [gruppe()], groupMembers: mitglieder, user: null,
+    meta: { currencies: ['EUR', 'USD'], group_types: ['trip', 'household'], default_currency: 'EUR' },
+  });
+  globalThis.__apiStub = { get: async () => ({ data: kandidaten }) };
+  let editor = null;
+  const vorherModal = globalThis.__openModal;
+  globalThis.__openModal = (opts) => { editor = opts; };
+  try {
+    setPermissions({ admin: false, modules: { budget: 'write' }, widgets: {}, capabilities: {} });
+    await split.openGroupModal(gruppe());
+  } finally {
+    clearPermissions();
+    delete globalThis.__apiStub;
+    if (vorherModal === undefined) delete globalThis.__openModal; else globalThis.__openModal = vorherModal;
+    Object.assign(split.state, vorher);
+  }
+  const werte = {
+    'splitExpenses.currency': [[/<option value="EUR" selected>EUR</], /^EUR$/],
+    'splitExpenses.defaultSplit': [[/<option value="percentage" selected>/, /name="default_value_1"[^>]*value="60"/, /name="default_value_3"[^>]*value="40"/],
+      /^splitExpenses\.splitPercentage - Alex 60 %, Emma 40 %$/],
+    'splitExpenses.members': [[/value="user:1" checked[\s\S]*Alex/, /value="user:3" checked[\s\S]*Emma · splitExpenses\.roleGuest/],
+      /^Alex, Emma \(splitExpenses\.roleGuest\)$/],
+  };
+  jederWert(werte, editor.content, gruppenZeile(gruppenKopf(gruppe(), mitglieder, 'read')), 'Gruppe');
+  // Mit Schreibrecht fuehrt der Stift in den Dialog - der Kopf bleibt, wie er war.
+  assert.doesNotMatch(gruppenKopf(gruppe(), mitglieder, 'write'), /split-group-meta/);
+});
+
+test('Gruppenkopf: bei vielen Mitgliedern Namen bis zur Grenze, danach „+N"; Namen gehen durch esc()', () => {
+  const viele = ['Alex', 'Emma', 'Leo', 'Maria', 'Linda', 'Tom', '<b>Zoe</b>']
+    .map((display_name, i) => ({ user_id: i + 1, display_name, role: 'member' }));
+  const html = gruppenKopf(gruppe({ default_split_method: 'equal', default_split_config: null }), viele, 'read');
+  const z = gruppenZeile(html);
+  assert.equal(z['splitExpenses.members'], 'Alex, Emma, Leo, Maria, Linda, splitExpenses.moreMembers{"count":2}');
+  assert.equal(z['splitExpenses.defaultSplit'], 'splitExpenses.splitEqual', 'gleich verteilt: keine Vorbelegung je Person');
+  const ein = gruppenZeile(gruppenKopf(gruppe({ default_split_method: 'equal' }), viele.slice(0, 6), 'read'));
+  assert.match(ein['splitExpenses.members'], /splitExpenses\.moreMembers\{"count":1\}$/);
+  const alle = gruppenKopf(gruppe({ default_split_method: 'equal' }), [...viele.slice(0, 4), viele[6]], 'read');
+  assert.match(alle, /&lt;b&gt;Zoe&lt;\/b&gt;/, 'ein Name ist Text, kein Markup');
+  assert.doesNotMatch(alle, /<b>Zoe/);
+  assert.doesNotMatch(alle, /moreMembers/, 'bis zur Grenze kein „+N"');
 });
 
 test('der Darlehensbericht haengt nicht an `.budget-page` - er ist ein Modal (#1347)', () => {

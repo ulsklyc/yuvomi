@@ -3684,7 +3684,9 @@
         "proofLabel": "Preuve de paiement",
         "proofHint": "Une preuve, par exemple la capture du virement.",
         "proofDocumentName": "Preuve de paiement {{group}} : {{name}}",
-        "loadError": "Impossible de charger les dépenses partagées."
+        "loadError": "Impossible de charger les dépenses partagées.",
+        "moreMembers": "+{{count}} autres",
+        "moreMembers_one": "+{{count}} autre"
     },
     "wmo": {
         "0": "Ciel dégagé",

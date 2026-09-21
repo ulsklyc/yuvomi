@@ -3684,7 +3684,9 @@
         "proofLabel": "Justificante de pago",
         "proofHint": "Un justificante, por ejemplo la captura de la transferencia.",
         "proofDocumentName": "Justificante de pago {{group}}: {{name}}",
-        "loadError": "No se pudieron cargar los gastos compartidos."
+        "loadError": "No se pudieron cargar los gastos compartidos.",
+        "moreMembers": "+{{count}} más",
+        "moreMembers_one": "+{{count}} más"
     },
     "wmo": {
         "0": "Cielo despejado",

@@ -3684,7 +3684,9 @@
         "proofLabel": "Betaalbewijs",
         "proofHint": "Eén bewijs, bijvoorbeeld een screenshot van de overboeking.",
         "proofDocumentName": "Betaalbewijs {{group}}: {{name}}",
-        "loadError": "Gedeelde uitgaven konden niet worden geladen."
+        "loadError": "Gedeelde uitgaven konden niet worden geladen.",
+        "moreMembers": "+{{count}} meer",
+        "moreMembers_one": "+{{count}} meer"
     },
     "wmo": {
         "0": "Heldere lucht",

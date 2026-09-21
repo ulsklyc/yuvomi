@@ -3684,7 +3684,9 @@
         "proofLabel": "إثبات الدفع",
         "proofHint": "إثبات واحد، مثل لقطة شاشة للتحويل.",
         "proofDocumentName": "إثبات الدفع {{group}}: {{name}}",
-        "loadError": "تعذر تحميل المصاريف المشتركة."
+        "loadError": "تعذر تحميل المصاريف المشتركة.",
+        "moreMembers": "+{{count}} آخرون",
+        "moreMembers_one": "+{{count}} آخر"
     },
     "wmo": {
         "0": "سماء صافية",
