@@ -45,6 +45,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   start or finish it there, using the same safety confirmation and timer controls as the journal.
   Existing dashboards keep it hidden until you add it from the dashboard editor. (#1180)
 
+- **Inventory tracked dates can now recur, keep a service history, and vehicles have an odometer.**
+  Give a tracked date (TÜV, boiler service, chimney sweep, extinguisher check, ...) a recurring
+  interval in months, and pressing "Done" rolls it forward instead of just clearing it - the
+  reminder moves with it. Every completion is kept in a new service-history view on the item,
+  alongside its linked maintenance bookings and documents with a running cost total, and a
+  vehicle's history now plots its odometer readings as a small trend chart. Vehicles can also
+  carry a manual odometer reading (km or mi) - a tracked date can add a distance interval as a
+  hint ("1,400 km to go") next to its date, though only the date itself ever produces a reminder.
+
 - **A reward can now say how many of it there are.** The catalog is shared by the whole household and
   had no idea of quantity, so a cinema evening and a wooden train were the same thing to it: both
   stayed open to every child at once, again and again, as long as the points lasted. A reward now
@@ -83,6 +92,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   still opens the meal with a tap. On a wider screen nothing changes - there is no grip, and the
   mouse still picks up the whole card. Without a pointer, the date in the meal's dialog remains the
   way to move it. (#1317)
+- **In the shopping list's add row, the quantity field is as tall as its neighbours, and
+  "Quantity" and "Miscellaneous" are no longer cut off.** The quantity field had a fixed height
+  and stood 6 pixels lower than the item and category fields next to it. On a computer it also had a
+  fixed width of 80 pixels, too narrow for its own placeholder in half of the 24 languages - English
+  showed "Quantit". On a phone, quantity and category each got half of the row, and the preselected
+  category "Miscellaneous" disappeared under the select's arrow. The fields now take the row's
+  height, and the category gets more of the width than the quantity, whose entry is only a few
+  characters: at the usual phone widths every language's placeholder and preselected category fit
+  in full. The words stay as they are rather than becoming "Qty" and "Misc" - the space was the
+  problem, not the words, and the same fix covers the longer words in other languages. A custom
+  category name that is still too long, or a very narrow screen, now ends with "..." instead of
+  breaking off mid-word under the arrow. (#1372)
 
 - **On browsers older than Chrome 108, the main area scrolls and dialogs stay on screen.**
   Yuvomi sized the page, the app frame and the height limit of its dialogs with `dvh`, a unit for
@@ -138,6 +159,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "On the day" for these birthdays, the reading view for read-only members says the same, and
   saving writes a reminder only when you pick one. No existing reminder moves. "On the day" is also
   in the menu now, for anybody who wants to pick it. (#1363)
+
+- **A birthday reminder the form no longer offers now shows as what it is, not as "None".**
+  Until v1.6.5 the birthday form also offered 15 minutes, 1 hour and 2 weeks before, and the API
+  accepts any number of minutes. Birthdays saved that way kept their value, and they are still
+  reminded that far ahead - but the form, finding no matching entry, showed "None". Picking "None"
+  there to switch the reminder off therefore changed nothing, and the reminder kept coming. Such a
+  birthday now gets an extra entry named after what it does ("2 weeks before", "15 minutes
+  before"), selected and kept for that birthday alone; saving without touching it leaves the
+  reminder as it is, and choosing "None" switches it off. The reading view for read-only members
+  names it the same way. Nothing stored is changed. (#1367)
 
 - **A supply request from Housekeeping now needs shopping rights as well.** The request puts the
   item on the shopping list, and creates a list first when the household has none. Since 2.68.0,

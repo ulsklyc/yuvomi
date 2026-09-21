@@ -20,7 +20,37 @@ test('leeres/fehlendes Array ist gültig (keine Fristen)', () => {
 test('gültige Zeile mit explizitem Vorlauf', () => {
   const result = validateTrackedDatesInput([{ label: 'TÜV', date: '2027-06-01', reminder_offset_days: 60 }]);
   assert.deepEqual(result.errors, []);
-  assert.deepEqual(result.values, [{ label: 'TÜV', date: '2027-06-01', reminder_offset_days: 60 }]);
+  assert.deepEqual(result.values, [{
+    label: 'TÜV', date: '2027-06-01', reminder_offset_days: 60,
+    interval_months: null, interval_distance: null,
+  }]);
+});
+
+test('interval_months/interval_distance bleiben NULL, wenn weggelassen (heutiges Einmal-Verhalten)', () => {
+  const result = validateTrackedDatesInput([{ label: 'Service', date: '2027-06-01' }]);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.values[0].interval_months, null);
+  assert.equal(result.values[0].interval_distance, null);
+});
+
+test('gültiges interval_months/interval_distance wird übernommen', () => {
+  const result = validateTrackedDatesInput([{
+    label: 'TÜV', date: '2027-06-01', interval_months: 24, interval_distance: 15000,
+  }]);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.values[0].interval_months, 24);
+  assert.equal(result.values[0].interval_distance, 15000);
+});
+
+test('interval_months außerhalb 1-600 ist ein Fehler', () => {
+  assert.ok(validateTrackedDatesInput([{ label: 'TÜV', date: '2027-06-01', interval_months: 0 }]).errors.length > 0);
+  assert.ok(validateTrackedDatesInput([{ label: 'TÜV', date: '2027-06-01', interval_months: 601 }]).errors.length > 0);
+});
+
+test('interval_distance muss eine positive ganze Zahl sein', () => {
+  assert.ok(validateTrackedDatesInput([{ label: 'TÜV', date: '2027-06-01', interval_distance: 0 }]).errors.length > 0);
+  assert.ok(validateTrackedDatesInput([{ label: 'TÜV', date: '2027-06-01', interval_distance: -5 }]).errors.length > 0);
+  assert.ok(validateTrackedDatesInput([{ label: 'TÜV', date: '2027-06-01', interval_distance: 1.5 }]).errors.length > 0);
 });
 
 test('fehlender Vorlauf bekommt den Default 30', () => {

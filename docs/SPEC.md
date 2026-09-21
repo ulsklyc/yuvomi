@@ -2858,7 +2858,7 @@ series' materialized instance or an `is_pending` (expected) entry is rejected. C
 linked to it, so a collective receipt split across several items does not silently copy its total
 onto each one.
 
-### Inventory Item Dates (migration v140)
+### Inventory Item Dates (migration v140, recurrence/service log/odometer in v224)
 Custom, per-item tracked dates beyond the built-in warranty deadline — TÜV, service, insurance
 renewal, or anything else with a date and its own reminder lead time.
 
@@ -2867,15 +2867,79 @@ renewal, or anything else with a date and its own reminder lead time.
 | item_id | INTEGER | FK → Inventory Items (CASCADE delete), NOT NULL |
 | label | TEXT | NOT NULL |
 | date | TEXT | NOT NULL, `YYYY-MM-DD` |
-| reminder_offset_days | INTEGER | NOT NULL (default 30), CHECK `0–365` — an explicit `0` ("remind me on the day") is preserved, not coerced to the default |
+| reminder_offset_days | INTEGER | NOT NULL (default 30), CHECK `0-365` - an explicit `0` ("remind me on the day") is preserved, not coerced to the default |
+| interval_months | INTEGER | nullable, CHECK `1-600` - NULL keeps the one-off behaviour above; a value recurs the date on completion (see below) |
+| interval_distance | INTEGER | nullable, CHECK `> 0` - a distance hint only (see below), never a reminder |
 | created_by | INTEGER | FK → Users (SET NULL) |
 | created_at / updated_at | TEXT | ISO 8601 |
 
 Capped at 10 rows per item (`MAX_TRACKED_DATES_PER_ITEM`). `PUT /api/v1/inventory/items/:id` treats
 `tracked_dates` as a full replace-set like `attachment_document_ids`: omitting the field leaves
 existing rows untouched, an empty array clears all of them, and an invalid or over-the-cap payload
-rejects the whole write with no partial insert. Each row drives its own [reminder](#reminders),
-recreated whenever the item is saved.
+rejects the whole write with no partial insert. **Because this is a full replace, every row gets a
+new id on every item save** - free-text rows have no natural key to diff on. Each row drives its own
+[reminder](#reminders), recreated whenever the item is saved.
+
+**Completion (`POST /api/v1/inventory/items/:id/dates/:dateId/complete`, v224).** Marking a tracked
+date done writes one `inventory_item_service_log` row (a label/date snapshot, plus optional
+odometer/vendor/note) and either:
+
+- rolls `date` forward by `interval_months` (clamped to the end of the target month, e.g. 31 Jan + 1
+  month → 28/29 Feb) to the first such mark after the completion day, however late the completion
+  was (due 2025-06-10 yearly, done 2026-06-05 → 2026-06-10), and re-syncs its reminder - **the row
+  keeps its id**, unlike a full item save,
+  so its ICS `UID` stays stable and only its `DTSTART` moves; or
+- if `interval_months` is not set, removes the date and its reminder - the completion lives on only
+  in the service log.
+
+As with every reminder in this app, a completion whose new reminder moment already lies in the past
+does not write one - no retroactive nagging.
+
+**`interval_distance` is a hint, never a reminder.** The app cannot know when an odometer will pass
+a distance threshold, so it renders beside the date (e.g. "1,400 km to go") and never produces a
+`reminders` row or an ICS `VEVENT` of its own - odometer readings are manual only, there is no
+telematics/vehicle-API integration.
+
+**Service log (`inventory_item_service_log`, v224).** One row per completed or manually logged
+service event: `item_id` (CASCADE delete), `item_date_id` (nullable, **SET NULL** - not CASCADE - so
+"the TÜV was done on 2026-03-11" stays true after the tracked-date row it came from is replaced or
+deleted on the next item save), `label`/`performed_on` (a snapshot, **never rendered by joining
+through `item_date_id`** since that column can go NULL at any time), plus optional `odometer`,
+`vendor`, `note`, `created_by` (SET NULL), `created_at` and `updated_at`. Plain CRUD under
+`/api/v1/inventory/items/:id/service-log`. A service log row's `odometer` advances
+`inventory_items.odometer`/`odometer_on` only when its `performed_on` is the newest reading on file -
+a backdated repair invoice must never rewind the car's current mileage. That cached reading is not
+one-directional, though: editing or deleting the row that currently supplies it (`PUT`/`DELETE`
+`/api/v1/inventory/items/:id/service-log/:logId`) recomputes it from whatever remains, which can
+lower it to an earlier row's value or clear it to `NULL` if no row carries a reading anymore - the
+same "was this row the source" check gates both, so an edit or deletion of any *other* row never
+touches the cached value.
+
+**History view (`GET /api/v1/inventory/items/:id/history`, v224).** A read-only aggregation, no new
+store: service-log rows, linked budget entries with the `maintenance`/`accessory` roles (via the
+existing item↔booking links), and linked documents, merged into one dated timeline with a cost total.
+Visibility follows the existing rules unchanged - budget-entry visibility through the household's
+`shared`/`personal` budget mode (no admin bypass), document visibility through the same rule every
+other document link uses. Inventory items have no per-item visibility model of their own (they are
+household-wide); service log rows are therefore visible to the whole household.
+
+**Odometer (`inventory_items.odometer`/`odometer_unit`/`odometer_on`, v224).** A manual reading,
+gated by `inventory_categories.tracks_odometer` (an additive boolean column, default off, seeded on
+for the built-in `vehicles` category only) rather than a hardcoded `category === 'vehicles'` string
+comparison - a household-renamed `vehicles` category keeps the flag through its stable `key`, not
+through a literal that would silently stop matching a new name. `odometer_unit` is `km` or `mi`
+(defaults to `km` when a reading is given without one), `odometer_on` is the date of that reading, defaulting to today's date
+(household zone) when a reading arrives without one - the odometer-regression guard on the service
+log needs a date to know whether a new entry competes with the current reading at all. A category
+without `tracks_odometer` silently clears all three fields rather than rejecting the write, on both
+create and update, so switching an item away from such a category drops a previously set reading
+automatically; there is currently no UI to flag a household's own category for tracking (only
+`vehicles` ships with it), and deleting a category that carried the flag has no way back once the
+category manager reassigns affected items to `other`. Like every other item field, `PUT` is a full
+replace: omitting these fields clears the reading. The item
+detail view plots every service-log entry that carries an `odometer` value (plus the item's own
+current reading, if it isn't already represented by one) as a small trend chart above the History
+timeline, using the shared chart geometry in `public/utils/chart.js`.
 
 ### Expense Groups
 Split expense groups (migration v39).

@@ -353,9 +353,19 @@
   }
 }
 
+/* Menge und Kategorie teilen sich die zweite Zeile 2:3, nicht halbe-halbe
+ * (#1372). Die Menge traegt ein paar Zeichen („2", „500 g"), die Kategorie ein
+ * Wort - und das laengste steht als Vorauswahl da: „Miscellaneous" braucht in
+ * einem Select mit Chevron rund 150px, die Haelfte bekam bei 375px 140px und
+ * schnitt es mitten im Wort ab. Gemessen ueber alle 24 Sprachen bei 375px:
+ * mit 2:3 passen jeder Mengen-Platzhalter (laengster „Hoeveelheid", 90px) und
+ * jede Vorauswahl ganz hinein.
+ *
+ * KEINE feste Spur fuer ein uebersetztes Feld: die Breite, die eine Sprache
+ * braucht, kennt keine Zahl in diesem Blatt. Fest ist nur der Knopf. */
 .quick-add__form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) var(--target-base);
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) var(--target-base);
   gap: var(--space-2);
   align-items: stretch;
 }
@@ -389,11 +399,19 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-shadow), transparent);
 }
 
+/* Nur `min-height`, keine `height` (#1372). Die Zeile ist ein Grid mit
+ * `align-items: stretch`: Namensfeld und Kategorie wachsen mit ihrem Polster
+ * auf 50px, und eine feste Hoehe nahm die Menge als einziges Feld aus der
+ * Dehnung - sie stand 6px niedriger daneben (44 gegen 50 bei 1280px).
+ *
+ * Seitlich `--space-2` statt `--space-3`: der Inhalt steht mittig und ist kurz,
+ * das gesparte Polster geht an den Platzhalter. Reicht die Breite trotzdem
+ * nicht (320px), endet er mit Auslassungspunkten statt mitten im Wort. */
 .quick-add__qty {
   position: static;
   width: 100%;
   min-width: 0;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2);
   border-radius: var(--radius-sm);
   border: 1.5px solid var(--color-border-control);
   background-color: var(--color-surface);
@@ -401,8 +419,8 @@
   font-size: var(--text-base);
   font-variant-numeric: tabular-nums;
   text-align: center;
+  text-overflow: ellipsis;
   min-height: var(--target-base);
-  height: var(--target-base);
 }
 
 /* Sichtbarer Fokus-Ring wie beim Namensfeld (Audit F-10): der reine
@@ -423,6 +441,9 @@
   background-color: var(--color-surface);
   color: var(--color-text-secondary);
   font-size: var(--text-base);
+  /* Eine eigene, laengere Kategorie endet sichtbar vor dem Chevron statt
+   * darunter (wie `select.input` in layout.css). */
+  text-overflow: ellipsis;
   cursor: pointer;
   min-height: var(--target-base);
 }
@@ -435,7 +456,10 @@
 
 @media (min-width: 1024px) {
   .quick-add__form {
-    grid-template-columns: minmax(0, 1fr) calc(var(--target-lg) + var(--space-8)) minmax(calc(var(--target-lg) * 2), calc(var(--target-lg) * 3)) var(--target-base);
+    /* Das Namensfeld behaelt die Haelfte, Menge und Kategorie teilen sich den
+     * Rest wieder 2:3. Hier stand fuer die Menge eine feste Spur von 80px: der
+     * Platzhalter passte in 12 von 24 Sprachen nicht hinein („Quantit", #1372). */
+    grid-template-columns: minmax(0, 5fr) minmax(0, 2fr) minmax(0, 3fr) var(--target-base);
   }
 
   .quick-add__input-wrap {

@@ -2090,7 +2090,7 @@ test('Geburtstag ohne gespeicherte Erinnerung: der Editor zeigt den Tag selbst, 
 });
 
 test('Editor und Leseansicht nennen fuer jeden gespeicherten Wert dieselbe Erinnerung', () => {
-  for (const reminder_offset of [null, '', '0', '1440', '2880', '10080']) {
+  for (const reminder_offset of [null, '', '0', '1440', '2880', '10080', '20160', '15', '-90', '01440']) {
     const eintrag = geburtstag({ reminder_offset });
     const editor = withAccess({ calendar: 'write' }, () => modalOptionen(
       () => birthdays.openBirthdayModal({ mode: 'edit', birthday: eintrag }),
@@ -2180,6 +2180,77 @@ test('Eine gewaehlte Erinnerung wird geschrieben', async () => {
   const neu = await geburtstagSpeichern(geburtstag(), { mode: 'create' });
   assert.equal(neu.method, 'post');
   assert.deepEqual(ERINNERUNGSFELDER.map((feld) => neu.body[feld]), ['1440', '1', 'days']);
+});
+
+// -------------------------------------------------------------------------
+// Ein gespeicherter Wert, den der Editor nicht mehr anbietet (#1367)
+//
+// Bis v1.6.5 bot der Editor '15', '60' und '20160' an, und `POST`/`PUT
+// /birthdays` nehmen jede Zahl an. Der Server erinnert so viele Minuten vor
+// 12:00 (`getOffsetMinutes()`), der Editor stand ohne passende Option auf der
+// ersten, „Keine". Wer dort „Keine" waehlte, um die Erinnerung abzuschalten,
+// aenderte nichts - und sie lief weiter.
+// -------------------------------------------------------------------------
+
+/** Der Editor mit Schreibrecht, als Markup. */
+const geburtstagsEditor = (eintrag) => withAccess({ calendar: 'write' }, () => modalOptionen(
+  () => birthdays.openBirthdayModal({ mode: 'edit', birthday: eintrag }),
+)).content;
+
+test('Ein Wert, den der Editor nicht anbietet, steht als eigene Option da, wie er wirkt', () => {
+  const faelle = [
+    ['20160', /^birthdays\.reminderBefore\{.*2 Wochen/],
+    ['15', /^birthdays\.reminderBefore\{.*15 Minuten/],
+    ['60', /^birthdays\.reminderBefore\{.*1 Stunde\b/],
+    ['4320', /^birthdays\.reminderBefore\{.*3 Tage/],
+    ['-90', /^birthdays\.reminderAfterNoon\{.*90 Minuten/],
+  ];
+  for (const [reminder_offset, beschriftung] of faelle) {
+    const { optionen, gewaehlt } = auswahlAusMarkup(geburtstagsEditor(geburtstag({ reminder_offset })), 'bd-reminder-offset');
+    assert.equal(gewaehlt.value, reminder_offset, `${reminder_offset}: die Auswahl traegt den gespeicherten Wert`);
+    assert.match(gewaehlt.label, beschriftung, `${reminder_offset}: benannt nach der Wirkung`);
+    assert.notEqual(gewaehlt.label, 'reminders.offsetNone', 'nicht „Keine" - der Server erinnert');
+    assert.ok(optionen.some((o) => o.value === ''), '„Keine" bleibt waehlbar');
+    assert.equal(optionen.at(-1).value, 'custom', 'die eigene Angabe bleibt die letzte Option');
+  }
+
+  // Die Option gibt es nur fuer diesen Eintrag: ein Geburtstag mit einer
+  // Vorgabe bekommt keine zusaetzliche.
+  const vorgabe = auswahlAusMarkup(geburtstagsEditor(geburtstag({ reminder_offset: '2880' })), 'bd-reminder-offset');
+  assert.deepEqual(vorgabe.optionen.map((o) => o.value), ['', '0', '1440', '2880', '10080', 'custom']);
+
+  // Ein Wert, der in anderer Schreibweise dasselbe tut wie eine Vorgabe, steht
+  // auf der Vorgabe - und ein unlesbarer auf dem Tag selbst, wie der Server
+  // ihn liest (`parseInt(...) || 0`).
+  assert.equal(auswahlAusMarkup(geburtstagsEditor(geburtstag({ reminder_offset: '01440' })), 'bd-reminder-offset').gewaehlt.value, '1440');
+  assert.equal(auswahlAusMarkup(geburtstagsEditor(geburtstag({ reminder_offset: 'abc' })), 'bd-reminder-offset').gewaehlt.value, '0');
+
+  // Der gespeicherte Wert steht jetzt im Markup, und die API nimmt jeden Text:
+  // er geht durch esc() wie jeder Nutzerwert.
+  const roh = geburtstagsEditor(geburtstag({ reminder_offset: '5"><img src=x onerror=alert(1)>' }));
+  assert.doesNotMatch(roh, /<img src=x/);
+  assert.match(roh, /value="5&quot;&gt;&lt;img/);
+});
+
+test('Ein unbekannter Wert bleibt beim Speichern ohne Wahl stehen, „Keine" schaltet ihn ab', async () => {
+  const eintrag = () => geburtstag({ reminder_offset: '20160' });
+
+  const unberuehrt = await geburtstagSpeichern(eintrag());
+  assert.equal(unberuehrt.body.name, 'Oma Erna', 'gespeichert wurde wirklich');
+  for (const feld of ERINNERUNGSFELDER) {
+    assert.ok(!(feld in unberuehrt.body), `${feld} bleibt weg, also bleiben die zwei Wochen stehen`);
+  }
+
+  // Der eigentliche Fall: wer „Keine" waehlt, will die Erinnerung loswerden.
+  // Stand die Auswahl schon auf „Keine", war das keine Aenderung und ging nie
+  // an den Server.
+  const keine = await geburtstagSpeichern(eintrag(), {
+    bedienen: async (el) => {
+      el['#bd-reminder-offset'].value = '';
+      await el['#bd-reminder-offset'].feuern('change');
+    },
+  });
+  assert.equal(keine.body.reminder_offset, '', '„Keine" geht an den Server');
 });
 
 test('Geburtstags-Dialog: Editor mit Schreibrecht, bei `read` kein Anlegen und kein Editor', () => {
