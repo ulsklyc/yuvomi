@@ -618,8 +618,9 @@ const REMINDER_UNIT_TO_INTL = {
  * Angabe steht als Dauer da („3 Tage"): der Editor zeigt sie als zwei Felder,
  * Anzahl und Einheit, und der Zahlformatierer setzt die Pluralform, die ein
  * zusammengeklebtes „3" + „Tage" in keiner Sprache sicher traefe. Er kommt
- * aus `getNumberFormat()` (Format-Locale der Region, gecacht, #521) - wie in
- * `formatFastingDuration()` (utils/health-fasting.js).
+ * aus `formatUnit()` (#1365): Wort und Pluralform aus der UI-Sprache, die Zahl
+ * aus der Format-Locale der Region (#521) - wie in `formatFastingDuration()`
+ * (utils/health-fasting.js).
  *
  * KEIN GESPEICHERTER WERT HEISST „AM TAG", wie im Editor. Bis #1363 schwieg die
  * Leseansicht hier, weil Editor („1 Tag vorher") und Server (am Tag selbst)

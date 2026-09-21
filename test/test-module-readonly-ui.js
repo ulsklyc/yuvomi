@@ -2211,16 +2211,20 @@ test('Geburtstags-Dialog: Editor mit Schreibrecht, bei `read` kein Anlegen und k
 // test:region-presets haelt ihn am Original.
 test('Leseansicht: die Dauer spricht die UI-Sprache, die Ziffern bleiben die der Region (#1365)', () => {
   const vorher = { locale: globalThis.__locale, formatLocale: globalThis.__formatLocale };
-  const dauer = () => withAccess({ calendar: 'read' }, () => (
-    modalOptionen(() => birthdays.openBirthdayModal({
-      mode: 'edit',
-      birthday: geburtstag({ reminder_offset: 'custom', reminder_custom_amount: 3, reminder_custom_unit: 'weeks' }),
-    }))
+  const lesen = (over) => withAccess({ calendar: 'read' }, () => (
+    modalOptionen(() => birthdays.openBirthdayModal({ mode: 'edit', birthday: geburtstag(over) }))
   )).content;
+  const dauer = () => lesen({ reminder_offset: 'custom', reminder_custom_amount: 3, reminder_custom_unit: 'weeks' });
   try {
     globalThis.__locale = 'en';
     globalThis.__formatLocale = 'de-DE';
     assert.match(dauer(), /3 weeks/);
+    // Ohne gespeicherten Wert bleibt es beim Tag selbst (#1363) - ein
+    // Schluessel, kein Zahlwort; der Stub-t() gibt ihn als Schluessel aus.
+    assert.equal(leseErinnerung(lesen({ reminder_offset: null })), 'birthdays.reminderOnDay');
+    const locale = (code) => JSON.parse(readFileSync(new URL(`../public/locales/${code}.json`, import.meta.url), 'utf8'));
+    assert.equal(locale('en').birthdays.reminderOnDay, 'On the day');
+    assert.equal(locale('de').birthdays.reminderOnDay, 'Am Tag selbst');
     globalThis.__formatLocale = 'ar-SA';
     assert.match(dauer(), /٣ weeks/, 'die Ziffern der Region, das Wort der Sprache');
   } finally {
