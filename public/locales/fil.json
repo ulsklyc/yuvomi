@@ -141,6 +141,7 @@
         "todayMeals": "Mga pagkain ngayon",
         "todayTitle": "Ngayon sa isang sulyap",
         "todayTask": "Gawain",
+        "todayTaskStarted": "Gawain · sinimulan",
         "todayEvent": "Kaganapan",
         "todayShopping": "Pamimili",
         "todayShoppingCount": "{{count}} ang naka-bukas",

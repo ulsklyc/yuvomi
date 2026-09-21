@@ -129,6 +129,7 @@
         "todayMeals": "Страви на сьогодні",
         "todayTitle": "Важливе сьогодні",
         "todayTask": "Завдання",
+        "todayTaskStarted": "Завдання · розпочато",
         "todayEvent": "Подія",
         "todayShopping": "Покупки",
         "todayShoppingCount": "{{count}} відкрито",

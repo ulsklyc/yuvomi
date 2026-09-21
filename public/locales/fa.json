@@ -141,6 +141,7 @@
         "todayMeals": "غذای امروز",
         "todayTitle": "مهم‌های امروز",
         "todayTask": "کار",
+        "todayTaskStarted": "کار · شروع‌شده",
         "todayEvent": "رویداد",
         "todayShopping": "خرید",
         "todayShoppingCount": "{{count}} باقی‌مانده",

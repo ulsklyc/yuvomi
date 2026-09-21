@@ -129,6 +129,7 @@
         "todayMeals": "今日の食事",
         "todayTitle": "今日の重要事項",
         "todayTask": "タスク",
+        "todayTaskStarted": "タスク · 開始済み",
         "todayEvent": "予定",
         "todayShopping": "買い物",
         "todayShoppingCount": "{{count}} 件未完了",

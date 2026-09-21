@@ -129,6 +129,7 @@
         "todayMeals": "Today's meals",
         "todayTitle": "Today at a glance",
         "todayTask": "Task",
+        "todayTaskStarted": "Task · started",
         "todayEvent": "Event",
         "todayShopping": "Shopping",
         "todayShoppingCount": "{{count}} open",

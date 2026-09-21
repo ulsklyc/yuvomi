@@ -910,7 +910,10 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
         timeLabel: overdue ? t('dashboard.overdue') : dueValid ? t('dashboard.todayUntil', { time: formatTime(due) }) : '',
         overdue,
         title: task.title,
-        sub: t('dashboard.todayTask'),
+        // Begonnenes sagt es in der Unterzeile, nicht mit einem weiteren Zeichen
+        // (#1251): die Zeile ist auf dem Telefon schon voll, und als Wort liest
+        // es auch ein Screenreader mit.
+        sub: t(task.status === 'in_progress' ? 'dashboard.todayTaskStarted' : 'dashboard.todayTask'),
         icon: 'check-square',
         tone: 'task',
         route: '/tasks',
@@ -978,6 +981,8 @@ function skeletonWidget(lines = 3) {
 // Widget-Renderer
 // --------------------------------------------------------
 
+const TASK_STATUS_IN_PROGRESS = () => t('tasks.statusInProgress');
+
 function renderUrgentTasks(tasks) {
   if (!tasks.length) {
     return `<div class="widget widget--tasks">
@@ -991,10 +996,20 @@ function renderUrgentTasks(tasks) {
 
   const items = tasks.map((t) => {
     const due = formatDueDate(t.due_date, t.due_time);
+    // Begonnen traegt dasselbe Zeichen wie in der Aufgabenliste (#1251), keine
+    // eigene Bauart. Nur dort: eine offene Zeile bekommt keinen leeren Ring, sonst
+    // haette jede Zeile ein viertes Zeichen. Das Wort steht als sr-only daneben,
+    // weil die Zeile role="button" ist und ihre Kinder damit keine eigene Rolle
+    // mehr tragen - ein role="img" am Ring waere dort verloren.
+    const started = t.status === 'in_progress'
+      ? `<span class="task-status-btn task-status-btn--in_progress task-status-btn--static" aria-hidden="true"></span>
+        <span class="sr-only">${esc(TASK_STATUS_IN_PROGRESS())}</span>`
+      : '';
     return `
       <div class="task-item" data-task-id="${t.id}" data-task-title="${esc(t.title)}" role="button" tabindex="0">
         ${t.priority !== 'none' ? `<div class="task-item__priority task-item__priority--${t.priority}" title="${esc(PRIORITY_LABELS()[t.priority] ?? t.priority)}" aria-hidden="true"></div>` : ''}
         <span class="sr-only">${PRIORITY_LABELS()[t.priority] ?? t.priority}</span>
+        ${started}
         <div class="task-item__content">
           <div class="task-item__title">${esc(t.title)}</div>
           ${due ? `<div class="task-item__meta ${due.overdue ? 'task-item__meta--overdue' : ''} ${due.soon ? 'task-item__meta--soon' : ''}">${due.text}</div>` : ''}
@@ -5222,7 +5237,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { loadScheduleSlice, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab };
+export const __test = { loadScheduleSlice, renderUrgentTasks, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

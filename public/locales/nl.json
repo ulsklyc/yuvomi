@@ -129,6 +129,7 @@
         "todayMeals": "Maaltijden van vandaag",
         "todayTitle": "Vandaag in één oogopslag",
         "todayTask": "Taak",
+        "todayTaskStarted": "Taak · begonnen",
         "todayEvent": "Evenement",
         "todayShopping": "Boodschappen",
         "todayShoppingCount": "{{count}} open",

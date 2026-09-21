@@ -129,6 +129,7 @@
         "todayMeals": "Mai ételek",
         "todayTitle": "Mai nap áttekintése",
         "todayTask": "Feladat",
+        "todayTaskStarted": "Feladat · elkezdve",
         "todayEvent": "Esemény",
         "todayShopping": "Bevásárlás",
         "todayShoppingCount": "{{count}} nyitott",

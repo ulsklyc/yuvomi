@@ -129,6 +129,7 @@
         "todayMeals": "Bugünün yemekleri",
         "todayTitle": "Bugün önemli",
         "todayTask": "Görev",
+        "todayTaskStarted": "Görev · başlandı",
         "todayEvent": "Etkinlik",
         "todayShopping": "Alışveriş",
         "todayShoppingCount": "{{count}} açık",

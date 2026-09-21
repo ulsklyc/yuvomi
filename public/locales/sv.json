@@ -129,6 +129,7 @@
         "todayMeals": "Dagens måltider",
         "todayTitle": "Viktigt idag",
         "todayTask": "Uppgift",
+        "todayTaskStarted": "Uppgift · påbörjad",
         "todayEvent": "Händelse",
         "todayShopping": "Inköp",
         "todayShoppingCount": "{{count}} öppna",

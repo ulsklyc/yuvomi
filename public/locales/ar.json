@@ -129,6 +129,7 @@
         "todayMeals": "وجبات اليوم",
         "todayTitle": "المهم اليوم",
         "todayTask": "مهمة",
+        "todayTaskStarted": "مهمة · بدأت",
         "todayEvent": "موعد",
         "todayShopping": "تسوق",
         "todayShoppingCount": "{{count}} مفتوحة",

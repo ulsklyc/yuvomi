@@ -141,6 +141,7 @@
         "todayMeals": "오늘의 식사",
         "todayTitle": "오늘의 중요한 일",
         "todayTask": "할 일",
+        "todayTaskStarted": "할 일 · 시작함",
         "todayEvent": "일정",
         "todayShopping": "장보기",
         "todayShoppingCount": "{{count}}개 남음",

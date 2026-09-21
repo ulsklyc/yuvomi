@@ -762,6 +762,55 @@ test('Tagesprogramm: leerer Tag liefert Ausblick (nextUpcoming) und Erledigt-Zä
   nodeAssert.equal(result.tasksDoneToday, 2, 'der Erledigt-Zähler wird durchgereicht');
 });
 
+test('Tagesprogramm: eine begonnene Aufgabe sagt es in der Unterzeile (#1251)', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const todayStr = toLocalDateKey(new Date());
+  const result = __test.buildTodayProgram({
+    urgentTasks: [
+      { id: 1, title: 'Offen', due_date: todayStr, due_time: '09:00:00', status: 'open' },
+      { id: 2, title: 'Angefangen', due_date: todayStr, due_time: '10:00:00', status: 'in_progress' },
+    ],
+  });
+  const sub = Object.fromEntries(result.rows.map((r) => [r.title, r.sub]));
+  nodeAssert.equal(sub.Offen, 'dashboard.todayTask', 'eine offene Aufgabe bleibt bei "Aufgabe"');
+  nodeAssert.equal(sub.Angefangen, 'dashboard.todayTaskStarted', 'eine begonnene Aufgabe heisst "Aufgabe · begonnen"');
+
+  // Als sichtbarer Text in der Karte, nicht als Symbol: so liest ihn auch ein Screenreader.
+  const prevWindow = global.window;
+  global.window = { yuvomi: null };
+  try {
+    const html = __test.renderTodayCockpit({ urgentTasks: [{ id: 2, title: 'Angefangen', due_date: todayStr, status: 'in_progress' }] }, []);
+    nodeAssert.match(html, /<span class="today-cockpit-card__sub">dashboard\.todayTaskStarted<\/span>/,
+      'die Unterzeile traegt das Wort als Text');
+  } finally {
+    global.window = prevWindow;
+  }
+});
+
+test('Aufgaben-Kachel: begonnene Aufgabe traegt das Zeichen der Aufgabenliste, samt Wort (#1251)', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const todayStr = toLocalDateKey(new Date());
+  const html = __test.renderUrgentTasks([
+    { id: 1, title: 'Offen', priority: 'none', due_date: todayStr, status: 'open' },
+    { id: 2, title: 'Angefangen', priority: 'none', due_date: todayStr, status: 'in_progress' },
+  ]);
+  const rows = html.split('class="task-item"').slice(1);
+  nodeAssert.equal(rows.length, 2);
+  const [offen, angefangen] = rows;
+  nodeAssert.match(angefangen, /class="task-status-btn task-status-btn--in_progress task-status-btn--static"[^>]*aria-hidden="true"/,
+    'dasselbe Zeichen wie in der Aufgabenliste, als Dekoration');
+  nodeAssert.match(angefangen, /<span class="sr-only">tasks\.statusInProgress<\/span>/,
+    'der Status steht fuer Screenreader als Wort in der Zeile');
+  nodeAssert.doesNotMatch(offen, /task-status-btn|tasks\.statusInProgress/,
+    'eine offene Aufgabe bekommt kein viertes Zeichen');
+
+  // Die Kachel laeuft auf `/`, wo tasks.css nicht geladen ist: ohne eigene Regel
+  // in dashboard.css waere das Zeichen dort unsichtbar.
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  nodeAssert.match(css, /\.task-item \.task-status-btn--in_progress::after\s*\{[^}]*--color-warning/,
+    'dashboard.css zeichnet den Ring in der Farbe der Aufgabenliste');
+});
+
 test('eventStartDate: ganztägige Termine (date-only) landen auf dem lokalen Kalendertag (Issue #466)', async () => {
   const { __test } = await import('../public/pages/dashboard.js');
   // Google speichert ganztägige Termine als reines Datum "2026-07-10". `new Date()`
@@ -1428,6 +1477,9 @@ test('Dashboard-Endpoint: dringende Aufgaben, anstehende Termine, Einkaufslisten
     nodeAssert.ok(Array.isArray(urgent.assigned_users), 'assigned_users ist ein Array (addAssignedUsers lief)');
     nodeAssert.equal(urgent.assigned_users.length, 1, 'die eine Zuweisung ist enthalten');
     nodeAssert.equal(urgent.assigned_users_json, undefined, 'das rohe JSON-Feld wird entfernt');
+    // Die Uebersicht zeigt "begonnen" aus diesem Feld (#1251) - faellt es aus
+    // der Abfrage, sieht jede Aufgabe wieder offen aus.
+    nodeAssert.equal(urgent.status, 'open', 'der Status wird mitgeliefert (#1251)');
     nodeAssert.equal(
       body.urgentTasks.find((t) => t.title === 'Widget Abgelegt'),
       undefined,

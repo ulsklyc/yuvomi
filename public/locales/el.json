@@ -129,6 +129,7 @@
         "todayMeals": "Γεύματα σήμερα",
         "todayTitle": "Σημαντικά σήμερα",
         "todayTask": "Εργασία",
+        "todayTaskStarted": "Εργασία · ξεκίνησε",
         "todayEvent": "Συμβάν",
         "todayShopping": "Ψώνια",
         "todayShoppingCount": "{{count}} ανοικτά",

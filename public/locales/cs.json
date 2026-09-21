@@ -129,6 +129,7 @@
         "todayMeals": "Dnešní jídla",
         "todayTitle": "Dnešní přehled",
         "todayTask": "Úkol",
+        "todayTaskStarted": "Úkol · zahájeno",
         "todayEvent": "Událost",
         "todayShopping": "Nákupy",
         "todayShoppingCount": "{{count}} otevřených",

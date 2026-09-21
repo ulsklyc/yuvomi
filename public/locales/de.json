@@ -141,6 +141,7 @@
         "todayMeals": "Heute essen",
         "todayTitle": "Heute wichtig",
         "todayTask": "Aufgabe",
+        "todayTaskStarted": "Aufgabe · begonnen",
         "todayEvent": "Termin",
         "todayShopping": "Einkauf",
         "todayShoppingCount": "{{count}} offen",

@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The overview now says when a task has been started.** In "Today" a task used to read "Task"
+  whether anyone had begun it or not, so starting it from there left no trace on screen. A task in
+  progress now reads "Task · started", as text, so a screen reader announces it too, and the row
+  gets no wider on a phone. Where the tasks tile is switched on, a started task carries the same
+  amber ring as in the task list, and the status is read out with it. Open tasks look as before.
+  (#1251)
+
 - **The activity of a shared-expenses group now loads further with "Load more", down to its first
   entry.** Until now the activity showed the latest 12 entries and nothing before them, so an older
   payment could not be reversed from the interface. "Load more" appends the next entries below the

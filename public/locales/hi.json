@@ -129,6 +129,7 @@
         "todayMeals": "आज का भोजन",
         "todayTitle": "आज महत्वपूर्ण",
         "todayTask": "कार्य",
+        "todayTaskStarted": "कार्य · शुरू",
         "todayEvent": "कार्यक्रम",
         "todayShopping": "खरीदारी",
         "todayShoppingCount": "{{count}} खुले",

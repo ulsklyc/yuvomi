@@ -560,6 +560,26 @@
   height: 7px;
 }
 
+/* BEGONNEN: DAS ZEICHEN AUS DER AUFGABENLISTE (#1251), nicht eine vierte
+ * Bauart. Gleiche Klassen wie dort (`.task-status-btn--in_progress
+ * --static`), aber tasks.css liegt auf `/` nicht an - router.js laedt pro Route
+ * nur das Stylesheet des eigenen Moduls. Deshalb zeichnet diese Regel den Ring
+ * nach, mit denselben Werten wie tasks.css (Groesse --space-5, 2px, Warnfarbe).
+ * Ohne Trefflaeche und ohne Hover: das Zeichen ist hier Auskunft, die Zeile
+ * selbst ist der Knopf. */
+.task-item .task-status-btn--in_progress {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.task-item .task-status-btn--in_progress::after {
+  content: '';
+  width: var(--space-5);
+  height: var(--space-5);
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-warning);
+}
+
 .task-item__content {
   flex: 1;
   min-width: 0;

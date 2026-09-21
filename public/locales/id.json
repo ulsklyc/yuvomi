@@ -141,6 +141,7 @@
         "todayMeals": "Makan hari ini",
         "todayTitle": "Penting hari ini",
         "todayTask": "Tugas",
+        "todayTaskStarted": "Tugas · dimulai",
         "todayEvent": "Acara",
         "todayShopping": "Belanja",
         "todayShoppingCount": "{{count}} tersisa",

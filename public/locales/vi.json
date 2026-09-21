@@ -129,6 +129,7 @@
         "todayMeals": "Bữa ăn hôm nay",
         "todayTitle": "Tổng quan hôm nay",
         "todayTask": "Nhiệm vụ",
+        "todayTaskStarted": "Nhiệm vụ · đã bắt đầu",
         "todayEvent": "Sự kiện",
         "todayShopping": "Mua sắm",
         "todayShoppingCount": "{{count}} mục đang mở",
