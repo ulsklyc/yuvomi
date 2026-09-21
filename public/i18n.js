@@ -468,7 +468,10 @@ export function formatUnit(value, unit, options = {}) {
   const parts = pair.word.formatToParts(value);
   let first = parts.findIndex((part) => NUMBER_PARTS.has(part.type));
   if (first === -1) return parts.map((part) => part.value).join('');
-  const last = parts.findLastIndex((part) => NUMBER_PARTS.has(part.type));
+  // Rueckwaerts gezaehlt statt findLastIndex: das kennt Chrome erst ab 97, die
+  // Mindestversion ist 87 (docs/installation.md, test:old-browser-fallbacks).
+  let last = parts.length - 1;
+  while (!NUMBER_PARTS.has(parts[last].type)) last--;
   while (first > 0 && parts[first - 1].type === 'literal' && BIDI_MARK.test(parts[first - 1].value)) first--;
   return [
     ...parts.slice(0, first).map((part) => part.value),

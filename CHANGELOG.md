@@ -200,6 +200,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   category name that is still too long, or a very narrow screen, now ends with "..." instead of
   breaking off mid-word under the arrow. (#1372)
 
+- **On browsers older than Chrome 97, fasting durations and a birthday's own reminder lead time
+  work again.** Both are written by one helper that used `findLastIndex`, which Chrome knows from
+  version 97; below that the helper stopped with an error wherever one of these values was shown -
+  in Fasting, and on a birthday whose reminder is set to a custom lead time, in its view and in the
+  editor. It now counts backwards by hand, so it works down to the documented minimum of Chrome 87
+  and reads exactly as before everywhere else.
+
 - **On browsers older than Chrome 108, the main area scrolls and dialogs stay on screen.**
   Yuvomi sized the page, the app frame and the height limit of its dialogs with `dvh`, a unit for
   the visible window height that Chrome understands from version 108 and Safari from 15.4. An older

@@ -72,7 +72,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { posix } from 'node:path';
 import { eachRule } from './css-rules.js';
 import { moduleSpecifiers, withoutHtmlComments } from './source-text.js';
-import { pickLocale } from '../public/i18n.js';
+import { formatUnit, pickLocale } from '../public/i18n.js';
 
 const REPO = new URL('../', import.meta.url);
 const PUBLIC = new URL('../public/', import.meta.url);
@@ -574,22 +574,9 @@ const STARTUP_FORBIDDEN = [
  * beiden Enden geprueft: der Treffer muss noch da sein, und ihr Grund auch.
  */
 const STARTUP_EXCEPTIONS = [
-  {
-    path: '/i18n.js',
-    api: 'Array.prototype.findLast / findLastIndex',
-    // Die Ausnahme gilt dieser EINEN Zeile, nicht der ganzen Datei: ein zweiter
-    // findLastIndex-Aufruf in i18n.js (etwa in pickLocale) waere wieder ein
-    // Startabbruch und muss rot werden (Review zu #1379).
-    line: 'const last = parts.findLastIndex((part) => NUMBER_PARTS.has(part.type));',
-    reason: 'steht in formatUnit(), und das ruft kein Skript des Startpfads - nur die Leseansicht '
-      + 'eines Geburtstags mit eigener Erinnerungsfrist (pages/birthdays.js) und die Fastendauern '
-      + '(utils/health-fasting.js). Unter Chrome 97 faellt dort diese eine Angabe aus, nicht der Start. '
-      + 'Der Ersatz waere eine Schleife und ist ein App-Fix, kein Guard-Fix (#1369).',
-    // Der Grund gilt, solange keine Codezeile des Startpfads formatUnit ruft -
-    // ausser seiner eigenen Definition.
-    stillValid: (startupSources) => startupSources.every(({ source }) => codeLines(source)
-      .every(({ line }) => !/\bformatUnit\s*\(/.test(line) || /\bfunction\s+formatUnit\s*\(/.test(line))),
-  },
+  // Leer seit dem Fix zu formatUnit(): dessen findLastIndex war die einzige
+  // Ausnahme und ist eine Schleife geworden. Eine neue braucht `path`, `api`,
+  // die EINE `line`, einen `reason` und ein `stillValid`, das den Grund prueft.
 ];
 
 // Zeilen, die Code sind: Kommentarzeilen zaehlen nicht, ein Hinweis wie "statt
@@ -750,6 +737,26 @@ test('pickLocale() laeuft ohne Object.hasOwn - als Programm, nicht nur als Text'
     if (saved) Object.defineProperty(Object, 'hasOwn', saved);
   }
   assert.deepEqual(results, ['de', 'zh-Hant', 'zh', 'en']);
+});
+
+test('formatUnit() laeuft ohne findLastIndex - als Programm, nicht nur als Text', () => {
+  // Nicht im Startpfad, aber an der Mindestversion (Chrome 87) auf dem Schirm:
+  // die Leseansicht eines Geburtstags mit eigener Erinnerungsfrist und die
+  // Fastendauern. findLastIndex kennt Chrome erst ab 97; dort warf der Aufruf,
+  // und die Angabe fehlte. Erwartet wird dasselbe Ergebnis wie mit der API.
+  const cases = [[2, 'day'], [1, 'week'], [1.5, 'hour'], [-3, 'minute'], [1234.5, 'hour']];
+  const format = () => cases.flatMap(([value, unit]) => ['short', 'long']
+    .map((unitDisplay) => formatUnit(value, unit, { unitDisplay })));
+  const expected = format();
+  const saved = Object.getOwnPropertyDescriptor(Array.prototype, 'findLastIndex');
+  delete Array.prototype.findLastIndex;
+  let results;
+  try {
+    results = format();
+  } finally {
+    if (saved) Object.defineProperty(Array.prototype, 'findLastIndex', saved);
+  }
+  assert.deepEqual(results, expected);
 });
 
 /* ──────────────────────────────────────────────────────────────────────────
