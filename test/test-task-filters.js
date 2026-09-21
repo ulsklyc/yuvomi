@@ -394,3 +394,35 @@ test('#1373: die Escape-Verdrahtung stapelt sich nicht mit jedem Rendern', () =>
   const panel = container.querySelector('#filter-panel');
   assert.equal(panel.listeners.get('keydown').length, 1, 'ein Listener, nicht einer je Rendern');
 });
+
+test('#1373: nach dem Waehlen eines Chips im Panel schliesst Escape es weiterhin', () => {
+  // Review zu #1385: das Rendern tauscht den fokussierten Chip aus, der Fokus
+  // fiel aufs Dokument, und Escape erreichte das Panel nie - genau in dem
+  // Zustand mit mehreren gewaehlten Filtern, um den es im Issue geht.
+  const container = mountFilterDom();
+  openWithFilters(container);
+  const panel = container.querySelector('#filter-panel');
+  const low = () => panel.querySelectorAll('[data-filter]')
+    .find((el) => el.dataset.filter === 'priority' && el.dataset.value === 'low');
+  const before = low();
+  before.focus();
+  // Was der Klick-Handler tut: Zustand aendern, neu rendern.
+  tasks.state.filters.priority.push('low');
+  tasks.renderFilters(container);
+  const after = low();
+  assert.notEqual(after, before, 'Gegenprobe: der Chip ist wirklich ein neuer Knoten');
+  assert.equal(globalThis.document.activeElement, after, 'der Fokus steht auf dem Nachfolger des Chips');
+  globalThis.document.activeElement.dispatch('keydown', { key: 'Escape' });
+  assert.equal(tasks.state.filterPanelOpen, false, 'Escape schliesst das Panel');
+});
+
+test('#1373: verschwindet der fokussierte Chip, geht der Fokus an den Filterknopf', () => {
+  const container = mountFilterDom();
+  openWithFilters(container);
+  const bar = container.querySelector('#filter-bar');
+  const chip = bar.querySelectorAll('[data-filter]').find((el) => el.dataset.value === 'urgent');
+  chip.focus();
+  tasks.state.filters.priority = tasks.state.filters.priority.filter((v) => v !== 'urgent');
+  tasks.renderFilters(container);
+  assert.equal(globalThis.document.activeElement, container.querySelector('#filter-toggle-btn'));
+});

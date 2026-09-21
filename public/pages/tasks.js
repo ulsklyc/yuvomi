@@ -3100,6 +3100,12 @@ function renderFilters(container) {
   const toggleSlot = container.querySelector('#filter-toggle-slot');
   if (!bar || !panel || !toggleSlot) return;
 
+  // Jedes Rendern tauscht die Chips aus. Stand der Fokus auf einem davon, fiele
+  // er danach aufs Dokument - und Escape erreichte das Panel nicht mehr, genau
+  // nachdem jemand darin einen Filter gewaehlt hat (#1373, Review). Also merken,
+  // WELCHER Chip es war, und ihn nach dem Rendern auf dem neuen Knoten setzen.
+  const focusBefore = rememberFilterFocus(document.activeElement, { bar, panel, toggleSlot });
+
   const statusLabels   = STATUS_LABELS();
   const priorityLabels = PRIORITY_LABELS();
   // Im Kanban ist der Statusfilter unwirksam (die Spalten SIND der Status) und
@@ -3361,6 +3367,43 @@ function renderFilters(container) {
 
   wireFilterChips(container);
   wireFilterPanelDismiss(container, panel, toggleSlot);
+  restoreFilterFocus(focusBefore, { bar, panel, toggleSlot });
+}
+
+/**
+ * Wo in Filterleiste, Knopfplatz oder Panel der Fokus stand, als Beschreibung
+ * statt als Knoten - der Knoten ist nach dem Rendern weg. `null`, wenn er
+ * woanders stand: dann faesst das Rendern ihn auch nicht an.
+ */
+function rememberFilterFocus(active, { bar, panel, toggleSlot }) {
+  if (!active || typeof active !== 'object') return null;
+  const zone = [['panel', panel], ['bar', bar], ['slot', toggleSlot]]
+    .find(([, el]) => el.contains(active) && el !== active)?.[0];
+  if (!zone) return null;
+  return {
+    zone,
+    id: active.id || null,
+    filter: active.dataset?.filter ?? null,
+    value: active.dataset?.value ?? null,
+  };
+}
+
+/**
+ * Setzt den Fokus auf den Nachfolger des gemerkten Chips. Gibt es ihn nicht mehr
+ * (ein entfernter Filter-Chip der Leiste, ein zugeklapptes Panel), geht er an
+ * den Filterknopf - der steht immer da und oeffnet und schliesst das Panel.
+ */
+function restoreFilterFocus(before, { bar, panel, toggleSlot }) {
+  if (!before) return;
+  const root = { panel, bar, slot: toggleSlot }[before.zone];
+  let match = null;
+  if (before.filter) {
+    match = [...root.querySelectorAll('[data-filter]')]
+      .find((el) => el.dataset.filter === before.filter && el.dataset.value === before.value) ?? null;
+  } else if (before.id) {
+    match = root.querySelector(`#${before.id}`);
+  }
+  (match ?? toggleSlot.querySelector('#filter-toggle-btn'))?.focus();
 }
 
 /**
