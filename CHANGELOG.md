@@ -174,6 +174,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as long as your access to Health is "write" - the module right is now asked first, so a
   caregiving permission no longer offers a button the server would refuse. (#1265)
 
+- **Housekeeping no longer offers buttons that a read-only member is not allowed to press.** Where
+  your access to the module is "read", the page still carried most of its writing controls, and each
+  of them ended in an error message: checking a housekeeper in or out, adding a chore from a
+  template or from the form, marking a chore done, undoing that, editing or deleting a chore,
+  editing a housekeeper's profile and setting up the first one from the empty page. The visit log
+  also showed a greyed-out "Mark as paid" button that did nothing. The rule is the one Tasks, Notes
+  and Health already follow: something that shows a state stays, as a sign that names the state
+  rather than as a greyed-out button, and something that only acts disappears. A housekeeper who is
+  checked in right now therefore still shows as "Currently here", in the words of the dashboard
+  tile, and every chore keeps its name, area, rhythm and how urgent it is. Visits, the monthly
+  reports and the month switch stay as they were. What only an edit form used to show is now
+  readable too: a housekeeper's profile opens as a read-only view with everything the form shows -
+  contact details, birthday, billing, schedule, colours and notes - and the visit report now also
+  lists the minutes worked on an hourly visit and the payment receipt, where your access to
+  Documents lets you read it. The receipt upload in the visit dialog now also asks about Documents,
+  where the receipt is stored: somebody allowed to edit Housekeeping but only to read Documents saw
+  the upload, and saving ended in an error before the visit itself was saved. The upload is gone
+  for them, a receipt that is already linked stays listed, and saving the visit keeps it. (#1265)
+
 - **A nightly recurring appointment that crosses midnight no longer covers the entry it should be
   sharing its column with.** On a day that carries two occurrences of the same series - last
   night's tail and tonight's start - the second took the first one's place in the layout, so the

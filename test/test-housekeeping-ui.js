@@ -90,13 +90,21 @@ test('Admin: bezahlter und unbezahlter Besuch behalten Bearbeiten und Loeschen',
   assert.doesNotMatch(html, /housekeeping\.settledAdminOnly/);
 });
 
-test('nur lesend: auch der unbezahlte Besuch hat ein gesperrtes Bezahlen und keinen Bearbeiten-Knopf', () => {
+test('nur lesend: der unbezahlte Besuch bietet kein Bezahlen an, auch kein gesperrtes (#1265 P6)', () => {
+  // Hier stand bis #1265 ein `disabled`-Knopf mit der Beschriftung „Als bezahlt
+  // markieren" - ein Versprechen fuer eine Beruehrung, die nichts tut. Ohne
+  // `can_mark_paid` hat ein UNBEZAHLTER Besuch nichts, was ein Knopf sagen
+  // koennte: „ausstehend" steht in der Metazeile. Die Rechte-Seite derselben
+  // Regel (`housekeeping: read` im Rechte-Store, auch bei veralteten Feldern)
+  // misst test-module-readonly-ui.js.
   const html = staffLogHtml([asReader(openVisit)]);
-  assert.match(html, /data-pay-visit="12" disabled/, 'Bezahlen gesperrt');
+  assert.equal(count(html, 'data-pay-visit='), 0, 'kein Bezahlen, weder offen noch gesperrt');
   assert.equal(count(html, 'data-edit-visit='), 0);
-  assert.equal(count(html, 'data-open-visit="12"'), 1);
+  assert.equal(count(html, 'data-open-visit="12"'), 1, 'der Weg zum Bericht bleibt');
+  assert.match(html, /housekeeping\.paymentPending/, 'der Zahlstatus steht in der Metazeile');
   const member = staffLogHtml([asMember(openVisit)]);
-  assert.doesNotMatch(member, /data-pay-visit="12" disabled/, 'mit Schreibrecht bleibt Bezahlen offen');
+  assert.match(member, /data-pay-visit="12"/, 'mit Schreibrecht bleibt Bezahlen');
+  assert.doesNotMatch(member, /data-pay-visit="12" disabled/, 'und zwar offen');
 });
 
 test('ohne Serverfelder bietet die Zeile nichts an, was scheitern koennte', () => {

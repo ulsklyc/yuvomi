@@ -3430,6 +3430,7 @@
         "addCustomTask": "إضافة مهمة مخصصة",
         "noReports": "لا توجد بلاغات بعد.",
         "profileTitle": "ملف التدبير المنزلي",
+        "openWorkerProfile": "فتح الملف الشخصي",
         "profilePicture": "صورة الملف الشخصي",
         "workerName": "الاسم",
         "workerUsername": "اسم المستخدم",
@@ -3487,6 +3488,7 @@
         "visitUnpaidToast": "تم التراجع عن الدفع.",
         "receiptUploadTitle": "رفع إيصال الدفع",
         "receiptUploadHint": "أرفق إيصال دفع. سيظهر بعد ذلك في المستندات.",
+        "receiptLabel": "إيصال الدفع",
         "receiptDocumentName": "إيصال - {{name}} - {{date}}",
         "receiptDocumentDescription": "إيصال دفع لزيارة {{name}} بتاريخ {{date}}.",
         "taskTemplateData": {

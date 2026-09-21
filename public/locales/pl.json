@@ -3434,6 +3434,7 @@
         "addCustomTask": "Dodaj własne zadanie",
         "noReports": "Brak zgłoszeń.",
         "profileTitle": "Profil pomocy domowej",
+        "openWorkerProfile": "Otwórz profil",
         "profilePicture": "Zdjęcie profilowe",
         "workerName": "Imię",
         "workerUsername": "Nazwa użytkownika",
@@ -3491,6 +3492,7 @@
         "visitUnpaidToast": "Płatność cofnięta.",
         "receiptUploadTitle": "Prześlij paragon płatności",
         "receiptUploadHint": "Dołącz paragon płatności. Pojawi się w dokumentach.",
+        "receiptLabel": "Paragon płatności",
         "receiptDocumentName": "Paragon - {{name}} - {{date}}",
         "receiptDocumentDescription": "Paragon płatności za wizytę sprzątającą {{name}} w dniu {{date}}.",
         "taskTemplateData": {
