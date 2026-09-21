@@ -130,7 +130,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without any time, so the CSV export left the time column empty for it. It now stores the current
   minute in household time, the same as marking a dose as taken or correcting it to taken already
   do. Doses stored this way before keep their empty time. The app itself always sends the time and
-  was not affected.
+  was not affected. (#1399)
 - **Marking an inventory deadline as done no longer stores a broken date when the next one would
   fall after 9999-12-31.** The next due date then has a five-digit year, which the date format cannot
   hold: the deadline got a date like "99990-06-01", its reminder a date that is not a date, and the
