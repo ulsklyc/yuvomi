@@ -242,10 +242,21 @@ export async function render(container) {
   // denen fast immer "Alle" aktiv ist. Nur sichtbar, sobald mindestens ein
   // gespiegeltes Rezept existiert (renderSourceFilter füllt/versteckt sie nach
   // dem Laden).
+  //
+  // SLOT UND FILTER SIND ZWEI KNOTEN. In `.page-toolbar__actions` dockt der
+  // Router auf dem Desktop den FAB an (dockFabIntoToolbar in router.js). Solange
+  // der Slot selbst der Filter war, stand der „Neues Rezept"-Knopf ohne
+  // gespiegelte Rezepte in einem `hidden`-Container, und mit ihnen warf
+  // renderSourceFilter() ihn per replaceChildren() aus dem DOM. Der Slot wird
+  // deshalb nie ausgeblendet und nie geleert; der Filter hat seinen eigenen
+  // Container darin (test:hidden-cascade haelt beides).
   const actions = document.createElement('div');
   actions.className = 'page-toolbar__actions';
-  actions.id = 'recipes-source-filter';
-  actions.hidden = true;
+  const sourceFilter = document.createElement('div');
+  sourceFilter.className = 'recipes-source-filter';
+  sourceFilter.id = 'recipes-source-filter';
+  sourceFilter.hidden = true;
+  actions.appendChild(sourceFilter);
   toolbar.appendChild(actions);
 
   const list = document.createElement('div');

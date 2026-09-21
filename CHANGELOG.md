@@ -72,6 +72,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hides and every stylesheet rule that sets `display`, and fails when a rule keeps a hidden element
   on screen. (#1340)
 
+- **The recipes page keeps its "+ Recipe" button on a wide screen when recipes from Mealie or Tandoor
+  are in the list.** From 1024 pixels wide, the round add button moves up into the page header, into
+  the same spot as the "Filter by source" menu. As soon as a mirrored recipe was in the list, building
+  that menu cleared the spot and took the button with it, and the n shortcut stopped working along
+  with it. The filter now has a place of its own next to the button. (#1340)
+
 - **With several people assigned, the event dialog now says why no calendar was picked.** Since
   #1060 a new event goes to the calendar that names its one assigned person as the default
   assignee. With two or more people assigned, the assignment deliberately picks nothing and the

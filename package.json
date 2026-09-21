@@ -184,7 +184,7 @@
     "test:settings-cron-label": "node --loader ./test/test-browser-loader.mjs --test test/test-settings-cron-label.js",
     "test:mobile-scroll-layout": "node --test test/test-mobile-scroll-layout.js",
     "test:frontend-audit": "node --test test/test-frontend-audit.js",
-    "test:hidden-cascade": "node --test test/test-hidden-cascade.js",
+    "test:hidden-cascade": "node --loader ./test/test-browser-loader.mjs --test test/test-hidden-cascade.js test/test-recipes-fab-dock.js",
     "test:layer-boundary": "node --test test/test-layer-boundary.js",
     "test:region-presets": "node --test test/test-region-presets.js",
     "test:docker-publish": "node --test test/test-docker-publish.js",

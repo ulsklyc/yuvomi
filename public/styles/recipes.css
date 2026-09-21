@@ -425,6 +425,19 @@ button.recipe-detail__ingredient-match:hover {
   min-width: 160px;
 }
 
+/* Der Filter hat einen eigenen Container IM Aktions-Slot, weil der Router in
+ * den Slot den FAB andockt (siehe recipes.js). `display: contents` laesst den
+ * Trigger darin wie zuvor als Flex-Kind des Slots stehen. */
+.recipes-source-filter {
+  display: contents;
+}
+
+/* `display: contents` schlaegt das UA-`[hidden]` wie jede andere Angabe - ohne
+ * gespiegelte Rezepte bliebe der Trigger sonst stehen. */
+.recipes-source-filter[hidden] {
+  display: none;
+}
+
 /* Das Häkchen-Muster der Einfachauswahl (.popover-menu__item-check--hidden)
  * wohnt seit 2026-08-31 beim restlichen popover-menu-Vokabular in layout.css -
  * es hat mit dem Personen-Umschalter der Gesundheit einen zweiten Nutzer. */

@@ -727,15 +727,26 @@ function rescuesFor(el, rules, runtimeAncestors = RUNTIME_ANCESTORS) {
 const describe = (el) => `${el.tag ?? '?'}${el.id ? `#${el.id}` : ''}${el.classes.map((c) => `.${c}`).join('')}`;
 const elementKey = (el) => `${el.file}:${el.line ?? ''}|${describe(el)}`;
 
-/** Ein Befund als Text, fuer jemanden, der diese Kaskade nie getroffen hat. */
-function report({ el, sites, offenders }) {
+/**
+ * Ein Befund als Text, fuer jemanden, der diese Kaskade nie getroffen hat.
+ *
+ * DER RAT IST TEIL DES GUARDS. Fuer den Andock-Slot des Routers (`dockSlot`)
+ * waere die uebliche Paarung genau der falsche Fix: `.page-toolbar__actions[hidden]`
+ * haette den dort angedockten "Neues Rezept"-Knopf versteckt (Review zu #1347).
+ * Dort lautet der Rat deshalb, den Slot gar nicht auszublenden.
+ */
+function report({ el, sites, offenders }, { dockSlot = null } = {}) {
   const setters = [...new Set(offenders.map((o) => `${o.file}: \`${o.selector} { display: ${o.display}${o.important ? ' !important' : ''} }\``))];
   const pairing = [...new Set(offenders.map((o) => `\`${o.subject.raw}[hidden] { display: none; }\``))];
   const origin = el.origin === 'markup' || el.origin === 'createElement' ? ` (${el.file}:${el.line})` : '';
+  const advice = dockSlot && el.classes.includes(dockSlot)
+    ? `KEINE [hidden]-Regel fuer .${dockSlot}: in diesen Slot dockt der Router den FAB, eine Rettungsregel `
+      + 'versteckte ihn mit. Den eigenen Inhalt in einen eigenen Container IM Slot legen und nur den schalten.'
+    : `es fehlt eine [hidden]-Regel mit display: none, die dieses Element trifft - etwa ${pairing.join(' oder ')}`;
   return `${describe(el)}${origin}\n`
     + `      ausgeblendet: ${sites.join(', ')}\n`
     + `      setzt display: ${setters.join(' | ')}\n`
-    + `      es fehlt eine [hidden]-Regel mit display: none, die dieses Element trifft - etwa ${pairing.join(' oder ')}`;
+    + `      ${advice}`;
 }
 
 /** Jedes ausgeblendete Element, das eine Regel sichtbar haelt und keine zurueckholt. */
@@ -817,8 +828,33 @@ function collectTree() {
     return local.length ? local : found;
   };
 
+  /** Die Elemente, die eine Kette an der Stelle `at` meint - leer, wenn nicht aufloesbar. */
+  const resolveChain = (file, src, lineOf, expr, at) => {
+    const resolved = [];
+    for (const target of targetsOf(expr, src, at) ?? []) {
+      if (target.node) {
+        // Das Element steht dort, wo es gebaut wird, nicht dort, wo es
+        // ausgeblendet wird - sonst zaehlte jede Schreibstelle als eigenes.
+        resolved.push({ ...target.node, file, line: lineOf(target.node.at) });
+        continue;
+      }
+      const found = nodesFor(target.selector, file);
+      if (found?.length) {
+        resolved.push(...found);
+      } else if (found) {
+        // Der Selektor benennt ein Element, das kein Markup im Baum traegt
+        // (etwa per Hilfsfunktion gebaut): es geht mit dem ins Urteil, was
+        // der Selektor selbst sagt.
+        const s = parseCompound(compoundsOf(target.selector.trim()).at(-1));
+        resolved.push({ tag: s.tag, id: s.ids[0] ?? null, classes: s.classes, attrs: null, ancestors: null, file, line: lineOf(at), origin: 'selector' });
+      }
+    }
+    return resolved;
+  };
+
   const elements = [];
   const unresolved = [];
+  const cleared = [];
   let writes = 0;
   for (const node of index) {
     if (node.hidden) elements.push({ el: node, site: `${node.file}:${node.line} (hidden im Markup)` });
@@ -828,29 +864,17 @@ function collectTree() {
     const lineOf = lineCounter(src);
     for (const w of hiddenWrites(src)) {
       writes += 1;
-      const line = lineOf(w.index);
-      const site = `${file}:${line} (\`${w.expr.replace(/\s+/g, ' ')}.hidden = ...\`)`;
-      const resolved = [];
-      for (const target of targetsOf(w.expr, src, w.index) ?? []) {
-        if (target.node) {
-          // Das Element steht dort, wo es gebaut wird, nicht dort, wo es
-          // ausgeblendet wird - sonst zaehlte jede Schreibstelle als eigenes.
-          resolved.push({ ...target.node, file, line: lineOf(target.node.at) });
-          continue;
-        }
-        const found = nodesFor(target.selector, file);
-        if (found?.length) {
-          resolved.push(...found);
-        } else if (found) {
-          // Der Selektor benennt ein Element, das kein Markup im Baum traegt
-          // (etwa per Hilfsfunktion gebaut): es geht mit dem ins Urteil, was
-          // der Selektor selbst sagt.
-          const s = parseCompound(compoundsOf(target.selector.trim()).at(-1));
-          resolved.push({ tag: s.tag, id: s.ids[0] ?? null, classes: s.classes, attrs: null, ancestors: null, file, line, origin: 'selector' });
-        }
-      }
+      const site = `${file}:${lineOf(w.index)} (\`${w.expr.replace(/\s+/g, ' ')}.hidden = ...\`)`;
+      const resolved = resolveChain(file, src, lineOf, w.expr, w.index);
       if (!resolved.length) { unresolved.push(site); continue; }
       for (const el of resolved) elements.push({ el, site });
+    }
+    // Wer die Kinder eines Knotens ersetzt, nimmt auch mit, was ein anderer
+    // hineingehaengt hat - fuer den Andock-Slot des Routers der FAB.
+    for (const m of src.matchAll(/\.replaceChildren\s*\(/g)) {
+      const expr = chainBefore(src, m.index);
+      const site = `${file}:${lineOf(m.index)} (\`${expr.replace(/\s+/g, ' ')}.replaceChildren(...)\`)`;
+      for (const el of resolveChain(file, src, lineOf, expr, m.index)) cleared.push({ el, site });
     }
   }
 
@@ -858,7 +882,36 @@ function collectTree() {
     .filter((f) => f.endsWith('.css'))
     .flatMap((f) => displayRules(readFileSync(new URL(f, STYLES), 'utf8'), f));
 
-  return { elements, unresolved, writes, rules };
+  return { elements, unresolved, writes, rules, index, cleared };
+}
+
+/* ===========================================================================
+ * Der Andock-Slot des Routers
+ * ======================================================================== */
+
+/**
+ * DER SLOT, IN DEN DER ROUTER DEN FAB DOCKT, GEHOERT NICHT DEM MODUL ALLEIN.
+ *
+ * Auf dem Desktop haengt dockFabIntoToolbar() (router.js) den Page-FAB in den
+ * ersten `.page-toolbar__actions` unter #main-content. Blendet ein Modul diesen
+ * Knoten aus, blendet es seine Primaeraktion mit aus; ersetzt es seine Kinder,
+ * wirft es den FAB aus dem DOM, und kein spaeterer Router-Schritt holt ihn
+ * zurueck. Beides hat die Rezepte-Seite getan, weil ihr Quellenfilter der Slot
+ * WAR (Review zu #1347): ohne gespiegelte Rezepte stand der "Neues
+ * Rezept"-Knopf in einem `hidden`-Container - sichtbar nur, weil
+ * `.page-toolbar__actions { display: flex }` das UA-`[hidden]` schlug, und die
+ * erste Rettungsregel dieser Suite fuer die Klasse hat ihn versteckt. Mit
+ * gespiegelten Rezepten nahm `replaceChildren()` ihn mit, schon auf main.
+ *
+ * Die Klasse liest der Guard aus dockFabIntoToolbar() selbst, nicht aus einer
+ * Konstante: waehlt der Router seinen Slot anders, schuetzt der Guard den neuen.
+ */
+function dockSlotClass(routerSrc) {
+  const src = withoutCommentsKeepingLines(routerSrc);
+  const start = src.indexOf('function dockFabIntoToolbar(');
+  if (start < 0) return null;
+  const body = src.slice(start, closingBracket(src, src.indexOf('{', start)) + 1);
+  return /\bslot\s*=\s*[^;]*querySelector\(\s*(['"])\.([\w-]+)\1\s*\)/.exec(body)?.[2] ?? null;
 }
 
 /* ===========================================================================
@@ -968,6 +1021,20 @@ test('CSS-Leser: display je Einzelselektor, Subjekt und Vorfahren getrennt', () 
   assert.deepEqual(rules[2].at, ['@media (min-width: 40rem)'], 'die Regel im At-Block wird gesehen');
 });
 
+test('Slot-Leser: die Klasse kommt aus dockFabIntoToolbar(), nicht aus einer Konstante', () => {
+  const router = [
+    '// function dockFabIntoToolbar(fab) { const slot = main.querySelector(\'.zz-kommentar\'); }',
+    'function other() { const slot = main.querySelector(\'.zz-fremd\'); }',
+    'function dockFabIntoToolbar(fab) {',
+    '  /* `.page-fab` bleibt */',
+    "  const slot = main?.querySelector('.zz-slot');",
+    '  slot.appendChild(fab);',
+    '}',
+  ].join('\n');
+  assert.equal(dockSlotClass(router), 'zz-slot');
+  assert.equal(dockSlotClass('function dockFabIntoToolbar(fab) { return false; }'), null);
+});
+
 /* ===========================================================================
  * Urteil an erfundener Eingabe
  * ======================================================================== */
@@ -988,6 +1055,18 @@ test('der Zustand von PR #1257 wird mit Element, Selektor und fehlender Regel be
   assert.match(message, /div#inv-odometer-group\.inventory-form-row/, 'welches Element');
   assert.match(message, /zz\.css: `\.inventory-form-row \{ display: grid \}`/, 'welcher Selektor display setzt');
   assert.match(message, /`\.inventory-form-row\[hidden\] \{ display: none; \}`/, 'welche Regel fehlt');
+});
+
+test('fuer den Andock-Slot raet die Meldung vom [hidden]-Fix ab, statt ihn vorzuschlagen', () => {
+  const [finding] = judgeInvented('<div class="page-toolbar__actions" id="zz-filter" hidden></div>',
+    '.page-toolbar__actions { display: flex; }');
+  assert.ok(finding, 'der Slot mit hidden und display: flex ist ein Befund');
+  const message = report(finding, { dockSlot: 'page-toolbar__actions' });
+  assert.doesNotMatch(message, /\.page-toolbar__actions\[hidden\] \{ display: none; \}/,
+    'die Meldung schlaegt genau den Fix vor, der den angedockten FAB versteckt');
+  assert.match(message, /KEINE \[hidden\]-Regel fuer \.page-toolbar__actions/);
+  // Ohne Slot-Klasse bleibt es beim ueblichen Rat.
+  assert.match(report(finding), /\.page-toolbar__actions\[hidden\] \{ display: none; \}/);
 });
 
 test('jede der drei Rettungsformen holt das Element zurueck', () => {
@@ -1031,12 +1110,13 @@ const theTree = () => (cachedTree ??= collectTree());
 
 test('jedes ausgeblendete Element, das eine Regel sichtbar haelt, hat eine [hidden]-Regel', () => {
   const tree = theTree();
-  const found = findings(tree.elements, tree.rules);
+  const dockSlot = dockSlotClass(readFileSync(new URL('../public/router.js', import.meta.url), 'utf8'));
+  const lines = findings(tree.elements, tree.rules).map((f) => report(f, { dockSlot }));
   assert.deepEqual(
-    found.map(report), [],
+    lines, [],
     'Diese Elemente blendet der Code mit `hidden` aus, eine Autorenregel setzt aber `display` '
     + 'und schlaegt damit das UA-`[hidden] { display: none }` - sie bleiben sichtbar und bedienbar:\n  '
-    + found.map(report).join('\n  '),
+    + lines.join('\n  '),
   );
 });
 
@@ -1060,6 +1140,30 @@ test('Reichweite: der Sammler findet ausgeblendete Elemente und die Regeln, die 
     `Nur ${contested.size} ausgeblendete Elemente mit einer display-Regel - der CSS-Leser oder die Aufloesung greift nicht mehr`);
   assert.ok(share >= 0.6,
     `Nur ${Math.round(share * 100)} % der \`.hidden =\`-Stellen aufgeloest - die Rueckverfolgung greift nicht mehr`);
+});
+
+test('der Andock-Slot des Routers wird nie ausgeblendet und nie geleert', () => {
+  const slot = dockSlotClass(readFileSync(new URL('../public/router.js', import.meta.url), 'utf8'));
+  assert.ok(slot, "dockFabIntoToolbar() in router.js waehlt seinen Slot nicht mehr ueber querySelector('.<klasse>') "
+    + '- der Guard weiss nicht mehr, welchen Knoten er schuetzt');
+  const tree = theTree();
+
+  // Reichweite: ohne Slot-Knoten im Index und ohne aufgeloeste replaceChildren-
+  // Stellen waere die leere Liste unten ein Befund ueber nichts.
+  const slots = tree.index.filter((n) => n.classes.includes(slot));
+  assert.ok(slots.length >= 5, `Nur ${slots.length} Knoten mit .${slot} im Baum - der Markup-Leser greift nicht mehr`);
+  assert.ok(tree.cleared.length >= 100,
+    `Nur ${tree.cleared.length} aufgeloeste replaceChildren-Ziele - die Rueckverfolgung greift nicht mehr`);
+
+  const hits = (list, what) => [...new Set(list
+    .filter(({ el }) => el.classes.includes(slot))
+    .map(({ el, site }) => `${describe(el)} (${el.file}:${el.line}) ${what}: ${site}`))];
+  const found = [...hits(tree.elements, 'ausgeblendet'), ...hits(tree.cleared, 'geleert')];
+  assert.deepEqual(found, [],
+    `In .${slot} dockt der Router auf dem Desktop den FAB an (dockFabIntoToolbar in router.js). `
+    + 'Ausgeblendet verschwindet die Primaeraktion der Seite mit, geleert fliegt sie aus dem DOM. '
+    + 'Eigenen Inhalt in einen eigenen Container IM Slot legen und nur den schalten '
+    + `(wie #recipes-source-filter in recipes.js):\n  ${found.join('\n  ')}`);
 });
 
 test('Reichweite: jede Ausnahme in RUNTIME_ANCESTORS traegt noch', () => {

@@ -3432,17 +3432,22 @@ html.fab-anim-done .page-fab {
  * Eintrag für einen Zustand, den niemand setzt, ist keine Absicherung, sondern
  * eine Behauptung über den Bestand. */
 /* Seit #1340 haelt test:hidden-cascade die Regel fuer den ganzen Baum. Der erste
- * Lauf fand drei weitere geteilte Klassen: `.form-field` (Freitextfeld der
- * Aktivitaet und Name der Vorsorge in health.js), `.row-action` (der Entfernen-
- * Knopf der ersten Telefon-/Mail-Zeile im Kontakt) und `.page-toolbar__actions`
- * (der Quellenfilter der Rezepte, solange kein gespiegeltes Rezept existiert). */
+ * Lauf fand zwei weitere geteilte Klassen: `.form-field` (Freitextfeld der
+ * Aktivitaet und Name der Vorsorge in health.js) und `.row-action` (der
+ * Entfernen-Knopf der ersten Telefon-/Mail-Zeile im Kontakt).
+ *
+ * `.page-toolbar__actions` steht hier BEWUSST NICHT. In diesen Slot dockt der
+ * Router auf dem Desktop den FAB (dockFabIntoToolbar); wer ihn ausblendet,
+ * blendet die Primaeraktion der Seite mit aus. Die Rezepte taten genau das mit
+ * ihrem Quellenfilter, und nur `display: flex` hier hielt den Knopf sichtbar -
+ * eine Rettungsregel an dieser Stelle haette ihn versteckt (Review zu #1347).
+ * Der Slot wird deshalb nie `hidden`; test:hidden-cascade verbietet es. */
 .page-fab[hidden],
 .btn[hidden],
 .form-group[hidden],
 .form-field[hidden],
 .row-action[hidden],
 .page-toolbar[hidden],
-.page-toolbar__actions[hidden],
 .recipe-detail[hidden],
 p.field-hint--warn[hidden] {
   display: none !important;
