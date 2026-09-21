@@ -408,7 +408,7 @@
   "license": "MIT",
   "devDependencies": {
     "axe-core": "^4.13.0",
-    "puppeteer": "^25.10.0",
+    "puppeteer": "^25.11.0",
     "sharp": "^0.35.4"
   },
   "allowScripts": {
