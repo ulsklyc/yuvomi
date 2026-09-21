@@ -121,25 +121,38 @@ const ZIELE = {
   ],
 };
 
+const KEIN_ZIEL = { value: null, ambiguous: false, severalAssignees: false };
+
 test('#1060: genau eine Person, genau ein Kalender - das ist das Ziel', () => {
-  assert.deepEqual(assigneeSyncTarget(ZIELE, [3]), { value: 'google:emma@group.calendar.google.com', ambiguous: false });
-  assert.deepEqual(assigneeSyncTarget(ZIELE, ['4']), { value: 'caldav:4|https://dav.example.org/cal/leo/', ambiguous: false },
+  assert.deepEqual(assigneeSyncTarget(ZIELE, [3]), { value: 'google:emma@group.calendar.google.com', ambiguous: false, severalAssignees: false });
+  assert.deepEqual(assigneeSyncTarget(ZIELE, ['4']), { value: 'caldav:4|https://dav.example.org/cal/leo/', ambiguous: false, severalAssignees: false },
     'IDs aus dem Formular kommen als Text');
-  assert.deepEqual(assigneeSyncTarget(ZIELE, [3, 3]), { value: 'google:emma@group.calendar.google.com', ambiguous: false },
+  assert.deepEqual(assigneeSyncTarget(ZIELE, [3, 3]), { value: 'google:emma@group.calendar.google.com', ambiguous: false, severalAssignees: false },
     'dieselbe Person doppelt ist eine Person');
 });
 
 test('#1060: kein Ziel ohne eindeutige Person oder ohne Kalender, der sie nennt', () => {
-  assert.deepEqual(assigneeSyncTarget(ZIELE, []), { value: null, ambiguous: false });
-  assert.deepEqual(assigneeSyncTarget(ZIELE, [3, 4]), { value: null, ambiguous: false },
-    'zwei Zugewiesene bekommen kein automatisches Ziel');
-  assert.deepEqual(assigneeSyncTarget(ZIELE, [2]), { value: null, ambiguous: false },
+  assert.deepEqual(assigneeSyncTarget(ZIELE, []), KEIN_ZIEL);
+  assert.deepEqual(assigneeSyncTarget(ZIELE, [2]), KEIN_ZIEL,
     'eine Person ohne Kalender faellt auf den eigenen Standard des Autors zurueck');
-  assert.deepEqual(assigneeSyncTarget(ZIELE, [1]), { value: null, ambiguous: false },
+  assert.deepEqual(assigneeSyncTarget(ZIELE, [1]), KEIN_ZIEL,
     'Outlook traegt keine Standard-Zuweisung und wird nie ueber sie gewaehlt');
-  assert.deepEqual(assigneeSyncTarget(null, [3]), { value: null, ambiguous: false });
-  assert.deepEqual(assigneeSyncTarget(ZIELE, [0]), { value: null, ambiguous: false },
+  assert.deepEqual(assigneeSyncTarget(null, [3]), KEIN_ZIEL);
+  assert.deepEqual(assigneeSyncTarget(ZIELE, [0]), KEIN_ZIEL,
     'null aus einem leeren Feld ist keine Person');
+});
+
+test('#1332: zwei Zugewiesene bekommen kein Ziel - und die Antwort sagt, dass die Zuweisung eins gehabt haette', () => {
+  assert.deepEqual(assigneeSyncTarget(ZIELE, [3, 4]), { value: null, ambiguous: false, severalAssignees: true },
+    'die Regel bleibt: kein automatisches Ziel, aber der Dialog muss es sagen');
+  assert.deepEqual(assigneeSyncTarget(ZIELE, [3, 2]), { value: null, ambiguous: false, severalAssignees: true },
+    'EINE von beiden mit Kalender genuegt - allein zugewiesen haette sie ihn bekommen');
+  assert.deepEqual(assigneeSyncTarget(ZIELE, [1, 2]), KEIN_ZIEL,
+    'nennt kein Kalender eine von ihnen, gibt es nichts zu erklaeren - wie bei einer Person ohne Kalender');
+  assert.deepEqual(assigneeSyncTarget({ google: [], caldav: [] }, [3, 4]), KEIN_ZIEL,
+    'ein Haushalt ohne Sync-Ziele bekommt an zwei Personen keinen Hinweis');
+  assert.deepEqual(assigneeSyncTarget(ZIELE, [2, 0]), KEIN_ZIEL,
+    'eine 0 ist niemand - Number(null) ist 0 und traefe sonst den Kalender OHNE Standard-Zuweisung');
 });
 
 test('#1060: das Terminformular ruft die Regel auf - nur beim Anlegen, und die eigene Wahl gewinnt', () => {
@@ -161,6 +174,12 @@ test('#1060: das Terminformular ruft die Regel auf - nur beim Anlegen, und die e
     'eine geaenderte Zuweisung rechnet das Ziel neu');
   assert.match(src, /id="event-sync-target-assignee-hint" hidden>\$\{t\('calendar\.syncTargetAssigneeAmbiguous'\)\}/,
     'bei zwei Kalendern fuer dieselbe Person sagt das Formular, warum nichts gewaehlt ist');
+  // Das Verhalten dazu misst test:calendar-sync-target-hint am Formular selbst;
+  // hier steht nur, woran der Hinweis fuer mehrere Personen haengt (#1332).
+  assert.match(src, /id="event-sync-target-several-hint" hidden><\/small>/,
+    'bei mehreren Zugewiesenen hat das Formular einen eigenen Hinweis');
+  assert.match(form, /zielVonHand = true;\s*if \(mehrdeutigHint\) mehrdeutigHint\.hidden = true;\s*if \(mehrerePersonenHint\) mehrerePersonenHint\.hidden = true;/,
+    'eine Wahl von Hand nimmt beide Hinweise zurueck');
   // Der Hinweis steht mit der Zielwahl unter „Weitere Einstellungen", und das
   // ist beim Anlegen zu - ohne Aufklappen sagte das Formular es niemandem
   // (Review zu #1125).
@@ -173,5 +192,5 @@ test('#1060: nennen zwei Kalender dieselbe Person, wird nicht geraten', () => {
     ...ZIELE,
     caldav: [...ZIELE.caldav, { accountId: 5, accountName: 'Mailbox', calendarUrl: 'https://dav.example.org/cal/emma/', calendarName: 'Emma Sport', defaultAssigneeUserId: 3 }],
   };
-  assert.deepEqual(assigneeSyncTarget(doppelt, [3]), { value: null, ambiguous: true });
+  assert.deepEqual(assigneeSyncTarget(doppelt, [3]), { value: null, ambiguous: true, severalAssignees: false });
 });

@@ -985,6 +985,7 @@
         "agendaDayEmpty": "Nic naplánováno",
         "openInMap": "Otevřít v Mapách",
         "syncTargetAssigneeAmbiguous": "Tuto osobu má jako výchozí přiřazení více kalendářů. Vyber cíl sám.",
+        "syncTargetSeveralAssignees": "Je přiřazeno více osob, proto přiřazení nevybírá žádný kalendář. Místo toho platí: {{target}}.",
         "filtersSources": "Kalendáře",
         "filterUnassigned": "Nepřiřazeno"
     },

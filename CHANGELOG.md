@@ -59,6 +59,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **With several people assigned, the event dialog now says why no calendar was picked.** Since
+  #1060 a new event goes to the calendar that names its one assigned person as the default
+  assignee. With two or more people assigned, the assignment deliberately picks nothing and the
+  event goes to your own default target - and until now it did so without a word, although the
+  notes for 2.66.0 said the dialog tells you instead of guessing. It now does, right under the
+  calendar choice, and names the calendar used instead, or "Store locally only" when your default
+  target is not available. The hint appears only when a calendar names at least one of the assigned
+  people, because only then would the assignment have picked something; a household without
+  default assignees sees nothing new. Choosing a calendar yourself removes the hint, and two
+  calendars naming the same person keep their own hint as before. (#1332)
+
 - **Two first starts on the same new database no longer knock each other out.** A fresh installation
   that is started twice at once - a container restarted while it is still coming up, two replicas on
   one volume - has both processes decide which migrations are pending before either of them has

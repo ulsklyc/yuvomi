@@ -985,6 +985,7 @@
         "agendaDayEmpty": "予定なし",
         "openInMap": "地図で開く",
         "syncTargetAssigneeAmbiguous": "複数のカレンダーでこの人が既定の割り当てになっています。保存先を自分で選んでください。",
+        "syncTargetSeveralAssignees": "複数の人が割り当てられているため、割り当てではカレンダーを選びません。代わりに使用: {{target}}",
         "filtersSources": "カレンダー",
         "filterUnassigned": "割り当てなし"
     },

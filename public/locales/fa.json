@@ -997,6 +997,7 @@
         "agendaDayEmpty": "چیزی برنامه‌ریزی نشده",
         "openInMap": "باز کردن در نقشه",
         "syncTargetAssigneeAmbiguous": "چند تقویم این فرد را به‌عنوان واگذاری پیش‌فرض دارند. مقصد را خودت انتخاب کن.",
+        "syncTargetSeveralAssignees": "چند نفر واگذار شده‌اند، پس واگذاری هیچ تقویمی را انتخاب نمی‌کند. به‌جای آن استفاده می‌شود: {{target}}.",
         "filtersSources": "تقویم‌ها",
         "filterUnassigned": "واگذارنشده"
     },

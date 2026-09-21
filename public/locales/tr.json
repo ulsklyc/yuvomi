@@ -985,6 +985,7 @@
         "agendaDayEmpty": "Planlanmış bir şey yok",
         "openInMap": "Haritada aç",
         "syncTargetAssigneeAmbiguous": "Birden fazla takvimde bu kişi varsayılan atama olarak ayarlı. Hedefi kendin seç.",
+        "syncTargetSeveralAssignees": "Birden fazla kişi atanmış, bu yüzden atama bir takvim seçmez. Bunun yerine kullanılan: {{target}}.",
         "filtersSources": "Takvimler",
         "filterUnassigned": "Atanmamış"
     },

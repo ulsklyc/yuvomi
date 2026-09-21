@@ -985,6 +985,7 @@
         "agendaDayEmpty": "Không có kế hoạch",
         "openInMap": "Mở trong Bản đồ",
         "syncTargetAssigneeAmbiguous": "Nhiều lịch đặt người này làm người được giao mặc định. Hãy tự chọn đích.",
+        "syncTargetSeveralAssignees": "Có nhiều người được giao, nên việc giao không chọn lịch nào. Thay vào đó dùng: {{target}}.",
         "filtersSources": "Lịch",
         "filterUnassigned": "Chưa được giao"
     },

@@ -997,6 +997,7 @@
         "agendaDayEmpty": "Nic zaplanowane",
         "openInMap": "Otwórz w mapach",
         "syncTargetAssigneeAmbiguous": "Kilka kalendarzy ma tę osobę jako domyślne przypisanie. Wybierz cel samodzielnie.",
+        "syncTargetSeveralAssignees": "Przypisano kilka osób, więc przypisanie nie wybiera kalendarza. Zamiast tego obowiązuje: {{target}}.",
         "filtersSources": "Kalendarze",
         "filterUnassigned": "Nieprzypisane"
     },

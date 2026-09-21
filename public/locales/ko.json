@@ -997,6 +997,7 @@
         "agendaDayEmpty": "예정된 일정 없음",
         "openInMap": "지도에서 열기",
         "syncTargetAssigneeAmbiguous": "여러 캘린더에서 이 사람이 기본 할당으로 지정되어 있습니다. 대상을 직접 선택하세요.",
+        "syncTargetSeveralAssignees": "여러 사람이 할당되어 있어 할당으로는 캘린더를 선택하지 않습니다. 대신 사용: {{target}}",
         "filtersSources": "캘린더",
         "filterUnassigned": "할당되지 않음"
     },

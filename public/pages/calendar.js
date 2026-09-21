@@ -5438,11 +5438,15 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
     // selbst um: das Verschieben zwischen Kalendern ist ein Vorgang
     // (`outbound_move_to`, #593), keine Feldaenderung.
     const mehrdeutigHint = panel.querySelector('#event-sync-target-assignee-hint');
+    // Mehrere Zugewiesene waehlen ebenfalls nichts, und der Termin geht an den
+    // eigenen Standard. Das geschah still, obwohl der CHANGELOG zu #1060 sagt,
+    // der Dialog sage es (#1332). Der Hinweis nennt, was stattdessen gilt.
+    const mehrerePersonenHint = panel.querySelector('#event-sync-target-several-hint');
     let zielVonHand = false;
     let ziele = null;
     const zielNachZuweisung = () => {
       if (mode !== 'create' || zielVonHand || !ziele) return;
-      const { value, ambiguous } = assigneeSyncTarget(ziele, getSelectedUserIds(panel, 'cal_assigned'));
+      const { value, ambiguous, severalAssignees } = assigneeSyncTarget(ziele, getSelectedUserIds(panel, 'cal_assigned'));
       if (mehrdeutigHint) {
         mehrdeutigHint.hidden = !ambiguous;
         // Die Zielwahl steht unter „Weitere Einstellungen", und das ist beim
@@ -5459,12 +5463,25 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
         syncTargetSelect.value = '';
         applyDefaultSyncTarget(syncTargetSelect);
       }
+      if (mehrerePersonenHint) {
+        mehrerePersonenHint.hidden = !severalAssignees;
+        if (severalAssignees) {
+          // Erst nach dem Rueckfall lesen: genannt wird das Ziel, das WIRKLICH
+          // eingestellt ist - der eigene Standard, oder „Nur lokal speichern",
+          // wenn der nicht (mehr) angeboten wird. Der Kalendername kommt vom
+          // Anbieter, deshalb textContent.
+          const gilt = Array.from(syncTargetSelect.options).find((o) => o.value === syncTargetSelect.value);
+          mehrerePersonenHint.textContent = t('calendar.syncTargetSeveralAssignees', { target: gilt?.textContent ?? '' });
+          mehrerePersonenHint.closest('details')?.setAttribute('open', '');
+        }
+      }
       syncOutlookHint();
     };
     syncTargetSelect.addEventListener('change', () => {
       // Ein programmatisch gesetzter Wert feuert kein change - das hier ist die Hand.
       zielVonHand = true;
       if (mehrdeutigHint) mehrdeutigHint.hidden = true;
+      if (mehrerePersonenHint) mehrerePersonenHint.hidden = true;
       syncOutlookHint();
     });
     // Einen Tick spaeter lesen: bindUserMultiSelect raeumt "Niemand" im selben change ab.
@@ -5702,6 +5719,7 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
       <small class="form-hint">${t('calendar.syncTargetHint')}</small>
       <small class="form-hint" id="event-sync-target-outlook-hint" hidden>${t('settings.outlookPushHint')}</small>
       <small class="form-hint" id="event-sync-target-assignee-hint" hidden>${t('calendar.syncTargetAssigneeAmbiguous')}</small>
+      <small class="form-hint" id="event-sync-target-several-hint" hidden></small>
     </div>
 
     <div class="form-group">

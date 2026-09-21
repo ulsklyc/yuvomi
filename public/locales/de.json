@@ -997,6 +997,7 @@
         "agendaDayEmpty": "Nichts geplant",
         "openInMap": "In Maps öffnen",
         "syncTargetAssigneeAmbiguous": "Mehrere Kalender haben diese Person als Standard-Zuweisung. Wähle das Ziel selbst.",
+        "syncTargetSeveralAssignees": "Mehrere Personen sind zugewiesen, darum wählt die Zuweisung keinen Kalender. Stattdessen gilt: {{target}}.",
         "filtersSources": "Kalender",
         "filterUnassigned": "Nicht zugewiesen"
     },

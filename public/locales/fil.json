@@ -997,6 +997,7 @@
         "agendaDayEmpty": "Walang nakaplano",
         "openInMap": "Buksan sa Maps",
         "syncTargetAssigneeAmbiguous": "Ilang kalendaryo ang may taong ito bilang default na nakatalaga. Piliin mismo ang target.",
+        "syncTargetSeveralAssignees": "Maraming tao ang nakatalaga, kaya walang kalendaryong pinipili ang pagtatalaga. Ginagamit sa halip: {{target}}.",
         "filtersSources": "Mga kalendaryo",
         "filterUnassigned": "Walang nakatalaga"
     },

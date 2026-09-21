@@ -985,6 +985,7 @@
         "agendaDayEmpty": "没有安排",
         "openInMap": "在地图中打开",
         "syncTargetAssigneeAmbiguous": "多个日历将此人设为默认分配对象。请自行选择目标。",
+        "syncTargetSeveralAssignees": "已分配多人，因此不会根据分配选择日历。改为使用：{{target}}",
         "filtersSources": "日历",
         "filterUnassigned": "未分配"
     },

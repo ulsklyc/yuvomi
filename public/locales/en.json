@@ -985,6 +985,7 @@
         "agendaDayEmpty": "Nothing planned",
         "openInMap": "Open in Maps",
         "syncTargetAssigneeAmbiguous": "Several calendars have this person as their default assignee. Choose the target yourself.",
+        "syncTargetSeveralAssignees": "Several people are assigned, so the assignment does not pick a calendar. Used instead: {{target}}.",
         "filtersSources": "Calendars",
         "filterUnassigned": "Unassigned"
     },

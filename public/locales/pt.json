@@ -985,6 +985,7 @@
         "agendaDayEmpty": "Nada planeado",
         "openInMap": "Abrir no Maps",
         "syncTargetAssigneeAmbiguous": "Vários calendários têm esta pessoa como atribuição padrão. Escolha o destino manualmente.",
+        "syncTargetSeveralAssignees": "Várias pessoas estão atribuídas, por isso a atribuição não escolhe nenhum calendário. Usado em vez disso: {{target}}.",
         "filtersSources": "Calendários",
         "filterUnassigned": "Não atribuídos"
     },

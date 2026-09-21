@@ -985,6 +985,7 @@
         "agendaDayEmpty": "कुछ भी नियोजित नहीं",
         "openInMap": "मानचित्र में खोलें",
         "syncTargetAssigneeAmbiguous": "कई कैलेंडर में यह व्यक्ति डिफ़ॉल्ट असाइनमेंट है। लक्ष्य स्वयं चुनें।",
+        "syncTargetSeveralAssignees": "कई लोग असाइन हैं, इसलिए असाइनमेंट कोई कैलेंडर नहीं चुनता। इसके बजाय लागू: {{target}}।",
         "filtersSources": "कैलेंडर",
         "filterUnassigned": "किसी को नहीं सौंपे गए"
     },

@@ -985,6 +985,7 @@
         "agendaDayEmpty": "Inget planerat",
         "openInMap": "Öppna i Kartor",
         "syncTargetAssigneeAmbiguous": "Flera kalendrar har den här personen som standardtilldelning. Välj målet själv.",
+        "syncTargetSeveralAssignees": "Flera personer är tilldelade, så tilldelningen väljer ingen kalender. I stället gäller: {{target}}.",
         "filtersSources": "Kalendrar",
         "filterUnassigned": "Ej tilldelade"
     },

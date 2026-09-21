@@ -997,6 +997,7 @@
         "agendaDayEmpty": "Tidak ada rencana",
         "openInMap": "Buka di Maps",
         "syncTargetAssigneeAmbiguous": "Beberapa kalender memiliki orang ini sebagai penugasan default. Pilih sendiri tujuannya.",
+        "syncTargetSeveralAssignees": "Beberapa orang ditugaskan, jadi penugasan tidak memilih kalender. Yang digunakan sebagai gantinya: {{target}}.",
         "filtersSources": "Kalender",
         "filterUnassigned": "Belum ditugaskan"
     },

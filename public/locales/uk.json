@@ -985,6 +985,7 @@
         "agendaDayEmpty": "Нічого не заплановано",
         "openInMap": "Відкрити на картах",
         "syncTargetAssigneeAmbiguous": "Кілька календарів мають цю особу як призначення за замовчуванням. Обери ціль сам.",
+        "syncTargetSeveralAssignees": "Призначено кількох осіб, тому призначення не вибирає календар. Замість цього діє: {{target}}.",
         "filtersSources": "Календарі",
         "filterUnassigned": "Не призначені"
     },

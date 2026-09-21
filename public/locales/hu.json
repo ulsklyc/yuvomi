@@ -985,6 +985,7 @@
         "agendaDayEmpty": "Semmi sincs tervezve",
         "openInMap": "Megnyitás a Térképen",
         "syncTargetAssigneeAmbiguous": "Több naptárnak is ez a személy az alapértelmezett hozzárendelése. Válaszd ki magad a célt.",
+        "syncTargetSeveralAssignees": "Több személy van hozzárendelve, ezért a hozzárendelés nem választ naptárat. Helyette ez érvényes: {{target}}.",
         "filtersSources": "Naptárak",
         "filterUnassigned": "Senkihez sincs rendelve"
     },
