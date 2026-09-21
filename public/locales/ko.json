@@ -521,7 +521,10 @@
         "historyTickedBy": "체크한 사람: {{name}}",
         "reminderLockedNeedsDueDate": "이 작업에는 변경할 수 없는 알림이 있습니다. 따라서 마감일이 필요합니다.",
         "kanbanColCollapse": "열 접기",
-        "kanbanColExpand": "열 펼치기"
+        "kanbanColExpand": "열 펼치기",
+        "kanbanArchiveDone": "완료된 항목 모두 보관",
+        "kanbanArchiveDoneConfirm": "이 열의 완료된 할 일을 모두 보관할까요?",
+        "kanbanArchiveDoneAction": "보관"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}}개 식사",

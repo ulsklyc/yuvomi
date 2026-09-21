@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Every done task on the board can be archived in one action.** The "Done" column of the board
+  now has an archive button next to its count. After a confirmation it moves the done tasks the
+  column currently shows into the archive - the ones it shows, so a task someone else completes
+  while the board is open stays where it is until you have seen it, and a search narrows what goes.
+  Their status stays done, and each one can still be brought back on its own. Archiving several
+  tasks from the list's selection mode now takes a single request as well: before, it sent one per
+  task, stopped at the first locked task or rate limit and then did not refresh, although the rest
+  had already been archived. Locked tasks you may not change are left out and the message says how
+  many. For API clients the new `POST /api/v1/tasks/archive` takes `{ ids }` (at most 500), applies
+  the same rules as archiving a single task in one transaction, skips tasks the caller cannot see,
+  and returns `{ archived, skipped }`. (#1250)
+
 - **The activity of a shared-expenses group now loads further with "Load more", down to its first
   entry.** Until now the activity showed the latest 12 entries and nothing before them, so an older
   payment could not be reversed from the interface. "Load more" appends the next entries below the

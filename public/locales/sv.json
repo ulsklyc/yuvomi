@@ -509,7 +509,10 @@
         "historyTickedBy": "bockad av {{name}}",
         "reminderLockedNeedsDueDate": "Den här uppgiften har en påminnelse som du inte får ändra. Därför behövs ett slutdatum.",
         "kanbanColCollapse": "Fäll ihop kolumnen",
-        "kanbanColExpand": "Fäll ut kolumnen"
+        "kanbanColExpand": "Fäll ut kolumnen",
+        "kanbanArchiveDone": "Arkivera allt klart",
+        "kanbanArchiveDoneConfirm": "Arkivera alla klara uppgifter i den här kolumnen?",
+        "kanbanArchiveDoneAction": "Arkivera"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} måltider",

@@ -509,7 +509,10 @@
         "historyTickedBy": "由 {{name}} 勾选",
         "reminderLockedNeedsDueDate": "此任务有一个你无法更改的提醒。因此它需要一个截止日期。",
         "kanbanColCollapse": "收起该列",
-        "kanbanColExpand": "展开该列"
+        "kanbanColExpand": "展开该列",
+        "kanbanArchiveDone": "归档全部已完成",
+        "kanbanArchiveDoneConfirm": "要归档此列中所有已完成的任务吗？",
+        "kanbanArchiveDoneAction": "归档"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} 餐",

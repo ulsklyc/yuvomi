@@ -509,7 +509,10 @@
         "historyTickedBy": "coché par {{name}}",
         "reminderLockedNeedsDueDate": "Cette tâche a un rappel que vous n’êtes pas autorisé à modifier. Elle a donc besoin d’une date d’échéance.",
         "kanbanColCollapse": "Réduire la colonne",
-        "kanbanColExpand": "Agrandir la colonne"
+        "kanbanColExpand": "Agrandir la colonne",
+        "kanbanArchiveDone": "Archiver tout ce qui est terminé",
+        "kanbanArchiveDoneConfirm": "Archiver toutes les tâches terminées de cette colonne ?",
+        "kanbanArchiveDoneAction": "Archiver"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} repas",

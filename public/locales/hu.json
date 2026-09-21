@@ -509,7 +509,10 @@
         "historyTickedBy": "kipipálta: {{name}}",
         "reminderLockedNeedsDueDate": "Ehhez a feladathoz emlékeztető tartozik, amelyet nem módosíthatsz. Ezért határidőre van szüksége.",
         "kanbanColCollapse": "Oszlop összecsukása",
-        "kanbanColExpand": "Oszlop kibővítése"
+        "kanbanColExpand": "Oszlop kibővítése",
+        "kanbanArchiveDone": "Minden kész archiválása",
+        "kanbanArchiveDoneConfirm": "Archiválod az oszlop összes kész feladatát?",
+        "kanbanArchiveDoneAction": "Archiválás"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} étkezésből",

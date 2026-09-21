@@ -521,7 +521,10 @@
         "historyTickedBy": "minarkahan ni {{name}}",
         "reminderLockedNeedsDueDate": "May paalala ang gawaing ito na hindi mo maaaring baguhin. Kailangan nito ng petsa ng deadline.",
         "kanbanColCollapse": "Itago ang column",
-        "kanbanColExpand": "Ilabas ang column"
+        "kanbanColExpand": "Ilabas ang column",
+        "kanbanArchiveDone": "I-archive lahat ng tapos na",
+        "kanbanArchiveDoneConfirm": "I-archive ang lahat ng tapos na gawain sa column na ito?",
+        "kanbanArchiveDoneAction": "I-archive"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} na (mga) pagkain",

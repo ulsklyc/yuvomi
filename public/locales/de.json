@@ -521,7 +521,10 @@
         "historyTickedBy": "abgehakt von {{name}}",
         "reminderLockedNeedsDueDate": "Diese Aufgabe hat eine Erinnerung, die du nicht ändern darfst. Sie braucht deshalb ein Fälligkeitsdatum.",
         "kanbanColCollapse": "Spalte einklappen",
-        "kanbanColExpand": "Spalte ausklappen"
+        "kanbanColExpand": "Spalte ausklappen",
+        "kanbanArchiveDone": "Alles Erledigte archivieren",
+        "kanbanArchiveDoneConfirm": "Alle erledigten Aufgaben in dieser Spalte archivieren?",
+        "kanbanArchiveDoneAction": "Archivieren"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} Mahlzeiten",

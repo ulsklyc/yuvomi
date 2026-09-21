@@ -509,7 +509,10 @@
         "historyTickedBy": "отметил(а) {{name}}",
         "reminderLockedNeedsDueDate": "У этой задачи есть напоминание, которое вы не можете изменить. Поэтому ей нужен срок выполнения.",
         "kanbanColCollapse": "Свернуть столбец",
-        "kanbanColExpand": "Развернуть столбец"
+        "kanbanColExpand": "Развернуть столбец",
+        "kanbanArchiveDone": "Архивировать все выполненные",
+        "kanbanArchiveDoneConfirm": "Архивировать все выполненные задачи в этом столбце?",
+        "kanbanArchiveDoneAction": "Архивировать"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} приёма пищи",

@@ -509,7 +509,10 @@
         "historyTickedBy": "وضع العلامة {{name}}",
         "reminderLockedNeedsDueDate": "هذه المهمة لديها تذكير لا يمكنك تغييره. لذلك تحتاج إلى تاريخ استحقاق.",
         "kanbanColCollapse": "طيّ العمود",
-        "kanbanColExpand": "توسيع العمود"
+        "kanbanColExpand": "توسيع العمود",
+        "kanbanArchiveDone": "أرشفة كل المهام المنجزة",
+        "kanbanArchiveDoneConfirm": "أرشفة جميع المهام المنجزة في هذا العمود؟",
+        "kanbanArchiveDoneAction": "أرشفة"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} وجبات",

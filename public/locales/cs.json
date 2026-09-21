@@ -509,7 +509,10 @@
         "historyTickedBy": "odškrtl(a) {{name}}",
         "reminderLockedNeedsDueDate": "Tento úkol má připomínku, kterou nemůžeš změnit. Proto potřebuje datum splnění.",
         "kanbanColCollapse": "Sbalit sloupec",
-        "kanbanColExpand": "Rozbalit sloupec"
+        "kanbanColExpand": "Rozbalit sloupec",
+        "kanbanArchiveDone": "Archivovat vše hotové",
+        "kanbanArchiveDoneConfirm": "Archivovat všechny hotové úkoly v tomto sloupci?",
+        "kanbanArchiveDoneAction": "Archivovat"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} jídla",

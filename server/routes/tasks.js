@@ -612,6 +612,46 @@ router.post('/tags/apply', (req, res) => {
   }
 });
 
+// POST /api/v1/tasks/archive  Body: { ids }
+// Legt mehrere Aufgaben auf einmal ab (#1250). Vorbild ist /tags/apply: der
+// Client schickt die IDs, die er zeigt, und nicht "alles Erledigte" - was
+// jemand anderes erledigt hat, nachdem die Liste gezeichnet war, soll nicht
+// ungesehen mit ins Archiv wandern. Vorher lief die Mehrfachauswahl als eine
+// Anfrage je Aufgabe; die Schleife brach am ersten Fehler (Sperre,
+// Ratenlimit) ab und lud dann nicht neu, obwohl der Rest schon abgelegt war.
+//
+// Dieselben Regeln wie PATCH /:id/archive, je ID geprueft: Unsichtbares faellt
+// still heraus (die Existenz ist selbst eine Auskunft, siehe #769), gesperrte
+// Aufgaben ohne Recht an der Definition werden uebersprungen und als
+// `skipped` gezaehlt (#830). Die Modul-Schreibrechte haelt das Gate in
+// server/index.js, wie fuer jeden schreibenden Aufruf unter /tasks.
+// Schon Abgelegtes bleibt, wie es ist: sein archived_at ist der Zeitpunkt des
+// ersten Ablegens, und den ueberschreibt eine Sammelaktion nicht.
+router.post('/archive', (req, res) => {
+  try {
+    const ids = Array.isArray(req.body.ids)
+      ? [...new Set(req.body.ids.map(Number).filter(Number.isInteger))]
+      : [];
+    if (!ids.length)
+      return res.status(400).json({ error: 'ids must be a non-empty array of task IDs.', code: 400 });
+    if (ids.length > MAX_BULK_TASKS)
+      return res.status(400).json({ error: `At most ${MAX_BULK_TASKS} tasks at a time.`, code: 400 });
+
+    const me = req.authUserId || req.session.userId;
+    const targets = visibleTaskIds(ids, me);
+    const allowed = editableTaskIds(targets, req);
+    const stamp = nowStamp();
+    const update = db.get().prepare('UPDATE tasks SET archived_at = ? WHERE id = ? AND archived_at IS NULL');
+    const archived = db.get().transaction(() =>
+      allowed.reduce((n, id) => n + update.run(stamp, id).changes, 0))();
+
+    res.json({ data: { archived, skipped: targets.length - allowed.length } });
+  } catch (err) {
+    log.error('POST /archive error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
 // PUT /api/v1/tasks/tags/:tag  Body: { name }
 // Benennt einen Tag auf allen sichtbaren Aufgaben um. Zielt der neue Name auf
 // einen vorhandenen Tag, führt das die beiden zusammen - das ist gewollt und der

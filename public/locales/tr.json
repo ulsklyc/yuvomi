@@ -509,7 +509,10 @@
         "historyTickedBy": "işaretleyen: {{name}}",
         "reminderLockedNeedsDueDate": "Bu görevde değiştirmenize izin verilmeyen bir hatırlatıcı var. Bu nedenle bir bitiş tarihi gerekiyor.",
         "kanbanColCollapse": "Sütunu daralt",
-        "kanbanColExpand": "Sütunu genişlet"
+        "kanbanColExpand": "Sütunu genişlet",
+        "kanbanArchiveDone": "Tamamlananların hepsini arşivle",
+        "kanbanArchiveDoneConfirm": "Bu sütundaki tüm tamamlanan görevler arşivlensin mi?",
+        "kanbanArchiveDoneAction": "Arşivle"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} öğünden",

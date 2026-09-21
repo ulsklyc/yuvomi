@@ -509,7 +509,10 @@
         "historyTickedBy": "marcado por {{name}}",
         "reminderLockedNeedsDueDate": "Esta tarea tiene un recordatorio que no puedes cambiar. Por eso necesita una fecha de vencimiento.",
         "kanbanColCollapse": "Contraer columna",
-        "kanbanColExpand": "Expandir columna"
+        "kanbanColExpand": "Expandir columna",
+        "kanbanArchiveDone": "Archivar todo lo hecho",
+        "kanbanArchiveDoneConfirm": "¿Archivar todas las tareas hechas de esta columna?",
+        "kanbanArchiveDoneAction": "Archivar"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} comidas",

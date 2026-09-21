@@ -509,7 +509,10 @@
         "historyTickedBy": "ticked off by {{name}}",
         "reminderLockedNeedsDueDate": "This task has a reminder you are not allowed to change. It therefore needs a due date.",
         "kanbanColCollapse": "Collapse column",
-        "kanbanColExpand": "Expand column"
+        "kanbanColExpand": "Expand column",
+        "kanbanArchiveDone": "Archive all done",
+        "kanbanArchiveDoneConfirm": "Archive every done task in this column?",
+        "kanbanArchiveDoneAction": "Archive"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} meals",

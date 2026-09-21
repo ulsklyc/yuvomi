@@ -5,7 +5,8 @@
  *        Regel muss auf jedem Schreibweg greifen und nicht nur dort, wo das UI
  *        den Knopf ausblendet. Geprüft werden PUT (Vollupdate wie aus dem
  *        Dialog), PATCH /:id/status, PATCH /:id/archive, DELETE, die
- *        Dokument-Verknüpfung, die drei Tag-Sammelwege und die Vererbung auf
+ *        Dokument-Verknüpfung, die drei Tag-Sammelwege, die Sammel-Ablage
+ *        POST /archive (#1250) und die Vererbung auf
  *        Unteraufgaben. Berechtigt sind Ersteller:in und Admins - bewusst nicht
  *        `family_role`.
  * Ausführen: npm run test:task-lock
@@ -371,6 +372,80 @@ test('DELETE /tags/:tag: der Tag bleibt an der gesperrten Aufgabe hängen', asyn
   assert.equal(r.body.data.skipped, 1);
   assert.equal(db.prepare('SELECT COUNT(*) c FROM task_tags WHERE task_id = ?').get(locked.body.data.id).c, 1);
   assert.equal(db.prepare('SELECT COUNT(*) c FROM task_tags WHERE task_id = ?').get(open.body.data.id).c, 0);
+});
+
+// --------------------------------------------------------
+// Sammel-Ablage (#1250): dieselben Regeln wie PATCH /:id/archive, je ID
+// --------------------------------------------------------
+
+const archivedAt = (id) => db.prepare('SELECT archived_at FROM tasks WHERE id = ?').get(id).archived_at;
+
+test('POST /archive: legt eine Auswahl in einem Aufruf ab und lässt den Status stehen', async () => {
+  const a = await call('POST', '/', { as: asParent, body: { title: 'Sammel A', visibility: 'all', status: 'done' } });
+  const b = await call('POST', '/', { as: asParent, body: { title: 'Sammel B', visibility: 'all', status: 'done' } });
+  const r = await call('POST', '/archive', { as: asChild, body: { ids: [a.body.data.id, b.body.data.id] } });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.data, { archived: 2, skipped: 0 });
+  for (const t of [a, b]) {
+    assert.ok(archivedAt(t.body.data.id), 'archived_at wird gesetzt');
+    assert.equal(db.prepare('SELECT status FROM tasks WHERE id = ?').get(t.body.data.id).status, 'done');
+  }
+});
+
+test('POST /archive: gesperrte Aufgaben werden übersprungen und gezählt, der Rest geht durch', async () => {
+  const locked = await lockedTask('Gesperrt, erledigt', { status: 'done' });
+  const open   = await call('POST', '/', { as: asParent, body: { title: 'Frei, erledigt', visibility: 'all', status: 'done' } });
+  const r = await call('POST', '/archive', { as: asChild, body: { ids: [locked.id, open.body.data.id] } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.archived, 1);
+  assert.equal(r.body.data.skipped, 1, 'die Teilausführung muss in der Antwort stehen');
+  assert.equal(archivedAt(locked.id), null);
+  assert.ok(archivedAt(open.body.data.id));
+
+  // Ersteller:in und Admin kommen durch - wie beim Einzelweg.
+  const byAdmin = await call('POST', '/archive', { as: asAdmin, body: { ids: [locked.id] } });
+  assert.deepEqual(byAdmin.body.data, { archived: 1, skipped: 0 });
+});
+
+test('POST /archive: eine Unteraufgabe erbt die Sperre ihrer Elternaufgabe', async () => {
+  const parent = await lockedTask('Gesperrte Eltern');
+  const sub = (await call('POST', '/', { as: asParent, body: { title: 'Punkt', parent_task_id: parent.id } })).body.data;
+  const r = await call('POST', '/archive', { as: asChild, body: { ids: [sub.id] } });
+  assert.deepEqual(r.body.data, { archived: 0, skipped: 1 });
+  assert.equal(archivedAt(sub.id), null);
+});
+
+test('POST /archive: eine fremde private Aufgabe fällt still heraus', async () => {
+  const priv = await call('POST', '/', { as: asParent, body: { title: 'Privat', visibility: 'private', status: 'done' } });
+  const mine = await call('POST', '/', { as: asChild, body: { title: 'Meine', visibility: 'all', status: 'done' } });
+  const r = await call('POST', '/archive', { as: asChild, body: { ids: [priv.body.data.id, mine.body.data.id, 99999999] } });
+  assert.equal(r.status, 200);
+  // Weder abgelegt noch als "gesperrt" gezaehlt: beides waere eine Auskunft
+  // darueber, dass es die Aufgabe gibt.
+  assert.deepEqual(r.body.data, { archived: 1, skipped: 0 });
+  assert.equal(archivedAt(priv.body.data.id), null);
+});
+
+test('POST /archive: schon Abgelegtes behält den Zeitpunkt des ersten Ablegens', async () => {
+  const t = await call('POST', '/', { as: asParent, body: { title: 'Längst abgelegt', visibility: 'all' } });
+  db.prepare('UPDATE tasks SET archived_at = ? WHERE id = ?').run('2020-01-01T00:00:00Z', t.body.data.id);
+  const r = await call('POST', '/archive', { as: asParent, body: { ids: [t.body.data.id] } });
+  assert.deepEqual(r.body.data, { archived: 0, skipped: 0 });
+  assert.equal(archivedAt(t.body.data.id), '2020-01-01T00:00:00Z');
+});
+
+test('POST /archive: ohne ids 400, über 500 IDs 400 und nichts abgelegt', async () => {
+  assert.equal((await call('POST', '/archive', { as: asParent, body: {} })).status, 400);
+  assert.equal((await call('POST', '/archive', { as: asParent, body: { ids: [] } })).status, 400);
+  const t = await call('POST', '/', { as: asParent, body: { title: 'Nicht über die Grenze', visibility: 'all' } });
+  const tooMany = [t.body.data.id, ...Array.from({ length: 500 }, (_, i) => 10_000_000 + i)];
+  const r = await call('POST', '/archive', { as: asParent, body: { ids: tooMany } });
+  assert.equal(r.status, 400);
+  assert.equal(archivedAt(t.body.data.id), null, 'eine abgewiesene Anfrage legt auch nichts teilweise ab');
+  // Genau 500 geht noch durch.
+  const ok = await call('POST', '/archive', { as: asParent, body: { ids: tooMany.slice(0, 500) } });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.data.archived, 1);
 });
 
 // --------------------------------------------------------

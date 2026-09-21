@@ -509,7 +509,10 @@
         "historyTickedBy": "τσεκαρίστηκε από {{name}}",
         "reminderLockedNeedsDueDate": "Αυτή η εργασία έχει μια υπενθύμιση που δεν επιτρέπεται να αλλάξετε. Χρειάζεται επομένως ημερομηνία λήξης.",
         "kanbanColCollapse": "Σύμπτυξη στήλης",
-        "kanbanColExpand": "Επέκταση στήλης"
+        "kanbanColExpand": "Επέκταση στήλης",
+        "kanbanArchiveDone": "Αρχειοθέτηση όλων των ολοκληρωμένων",
+        "kanbanArchiveDoneConfirm": "Αρχειοθέτηση όλων των ολοκληρωμένων εργασιών αυτής της στήλης;",
+        "kanbanArchiveDoneAction": "Αρχειοθέτηση"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} γεύματα",

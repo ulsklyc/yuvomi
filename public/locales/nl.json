@@ -509,7 +509,10 @@
         "historyTickedBy": "afgevinkt door {{name}}",
         "reminderLockedNeedsDueDate": "Deze taak heeft een herinnering die je niet mag wijzigen. Daarom is een einddatum nodig.",
         "kanbanColCollapse": "Kolom inklappen",
-        "kanbanColExpand": "Kolom uitklappen"
+        "kanbanColExpand": "Kolom uitklappen",
+        "kanbanArchiveDone": "Alles wat klaar is archiveren",
+        "kanbanArchiveDoneConfirm": "Alle afgeronde taken in deze kolom archiveren?",
+        "kanbanArchiveDoneAction": "Archiveren"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} maaltijden",

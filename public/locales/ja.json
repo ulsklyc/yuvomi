@@ -509,7 +509,10 @@
         "historyTickedBy": "チェックしたのは {{name}}",
         "reminderLockedNeedsDueDate": "このタスクには変更できないリマインダーが設定されています。そのため期限日が必要です。",
         "kanbanColCollapse": "列を閉じる",
-        "kanbanColExpand": "列を開く"
+        "kanbanColExpand": "列を開く",
+        "kanbanArchiveDone": "完了をすべてアーカイブ",
+        "kanbanArchiveDoneConfirm": "この列の完了したタスクをすべてアーカイブしますか？",
+        "kanbanArchiveDoneAction": "アーカイブ"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}}件の食事",

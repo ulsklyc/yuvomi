@@ -521,7 +521,10 @@
         "historyTickedBy": "dicentang oleh {{name}}",
         "reminderLockedNeedsDueDate": "Tugas ini memiliki pengingat yang tidak boleh Anda ubah. Karena itu tugas ini memerlukan tanggal jatuh tempo.",
         "kanbanColCollapse": "Ciutkan kolom",
-        "kanbanColExpand": "Bentangkan kolom"
+        "kanbanColExpand": "Bentangkan kolom",
+        "kanbanArchiveDone": "Arsipkan semua yang selesai",
+        "kanbanArchiveDoneConfirm": "Arsipkan semua tugas selesai di kolom ini?",
+        "kanbanArchiveDoneAction": "Arsipkan"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} hidangan",

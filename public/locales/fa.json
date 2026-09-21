@@ -521,7 +521,10 @@
         "historyTickedBy": "علامت‌زده توسط {{name}}",
         "reminderLockedNeedsDueDate": "این کار یادآوری دارد که اجازه تغییر آن را ندارید. بنابراین به تاریخ سرسید نیاز دارد.",
         "kanbanColCollapse": "جمع کردن ستون",
-        "kanbanColExpand": "باز کردن ستون"
+        "kanbanColExpand": "باز کردن ستون",
+        "kanbanArchiveDone": "بایگانی همه کارهای انجام‌شده",
+        "kanbanArchiveDoneConfirm": "همه کارهای انجام‌شده در این ستون بایگانی شوند؟",
+        "kanbanArchiveDoneAction": "بایگانی"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} وعده",

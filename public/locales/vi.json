@@ -509,7 +509,10 @@
         "historyTickedBy": "đánh dấu bởi {{name}}",
         "reminderLockedNeedsDueDate": "Công việc này có một nhắc nhở mà bạn không được phép thay đổi. Vì vậy nó cần một ngày đến hạn.",
         "kanbanColCollapse": "Thu gọn cột",
-        "kanbanColExpand": "Mở rộng cột"
+        "kanbanColExpand": "Mở rộng cột",
+        "kanbanArchiveDone": "Lưu trữ tất cả đã xong",
+        "kanbanArchiveDoneConfirm": "Lưu trữ mọi công việc đã xong trong cột này?",
+        "kanbanArchiveDoneAction": "Lưu trữ"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} bữa ăn",

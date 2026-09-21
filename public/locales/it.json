@@ -509,7 +509,10 @@
         "historyTickedBy": "spuntato da {{name}}",
         "reminderLockedNeedsDueDate": "Questa attività ha un promemoria che non puoi modificare. Serve quindi una data di scadenza.",
         "kanbanColCollapse": "Comprimi colonna",
-        "kanbanColExpand": "Espandi colonna"
+        "kanbanColExpand": "Espandi colonna",
+        "kanbanArchiveDone": "Archivia tutte le completate",
+        "kanbanArchiveDoneConfirm": "Archiviare tutte le attività completate di questa colonna?",
+        "kanbanArchiveDoneAction": "Archivia"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} pasti",

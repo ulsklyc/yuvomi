@@ -521,7 +521,10 @@
         "historyTickedBy": "odhaczone przez {{name}}",
         "reminderLockedNeedsDueDate": "To zadanie ma przypomnienie, którego nie możesz zmienić. Dlatego wymaga terminu.",
         "kanbanColCollapse": "Zwiń kolumnę",
-        "kanbanColExpand": "Rozwiń kolumnę"
+        "kanbanColExpand": "Rozwiń kolumnę",
+        "kanbanArchiveDone": "Zarchiwizuj wszystkie ukończone",
+        "kanbanArchiveDoneConfirm": "Zarchiwizować wszystkie ukończone zadania w tej kolumnie?",
+        "kanbanArchiveDoneAction": "Zarchiwizuj"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} posiłki",
