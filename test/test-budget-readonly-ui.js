@@ -829,41 +829,82 @@ test('Buchung bei `budget: read`: der Einstieg oeffnet die Leseansicht, nicht de
   assert.equal(withAccess({ budget: 'read' }, () => modalOptionen(() => budget.openBudgetModal({ mode: 'create' }))), null);
 });
 
-test('Leseansicht einer Buchung: Unterkategorie, Konto, Sichtbarkeit, Wiederholung und Belege', () => {
-  const vorher = { budgetMode: budget.state.budgetMode, meta: budget.state.meta, accounts: budget.state.accounts };
+/*
+ * DER WERT, NICHT DIE BESCHRIFTUNG (P6-Muster, #1349). Jeder Wert, den der
+ * Editor mit Schreibrecht zeigt, muss bei `read` in der Leseansicht stehen - je
+ * als Paar aus der Form im Editor (roh im Feld, `selected`, `checked`) und der
+ * Form in der Leseansicht. Die Zusicherung am Editor haelt die Liste ehrlich:
+ * sie misst nur Werte, die der Dialog wirklich zeigt.
+ *
+ * Und die Liste ist VOLLSTAENDIG: bei einem Datensatz, der jedes Feld traegt,
+ * muss die Leseansicht genau die Zeilen der Liste erzeugen - nicht mehr, nicht
+ * weniger. Eine tot gestellte Zeile faellt dort und an ihrem Wert auf, eine
+ * morgen ergaenzte ohne Eintrag hier ebenfalls. Eine Handliste, die nur ein
+ * paar Zeilen prueft, liess die Erinnerung eines Abos still verschwinden.
+ */
+function jederWert(werte, editorInhalt, z, wer) {
+  assert.deepEqual(Object.keys(z).sort(), Object.keys(werte).sort(),
+    `${wer}: die Leseansicht erzeugt genau die Zeilen der Liste`);
+  for (const [label, [imEditor, inLeseansicht]] of Object.entries(werte)) {
+    for (const re of imEditor) assert.match(editorInhalt, re, `${wer}: der Editor zeigt ${re} - sonst misst ${label} nichts`);
+    if (typeof inLeseansicht === 'function') assert.ok(inLeseansicht(z[label]), `${wer}: ${label} in der Leseansicht`);
+    else assert.match(z[label], inLeseansicht, `${wer}: ${label} in der Leseansicht`);
+  }
+}
+
+/** Ein Beleg-Knoten mit genau diesem Dokument als Link. */
+const belegLink = (id, name, art = 'preview') => (node) => (
+  node?.childNodes?.length === 1
+  && node.childNodes[0].href === `/api/v1/documents/${id}/${art}`
+  && node.childNodes[0].textContent === name
+);
+
+test('Buchung: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs', async () => {
+  const echt = await import('../public/components/user-multi-select.js');
+  const vorher = { ...budget.state };
+  const vorherPicker = globalThis.__renderUserMultiSelect;
+  globalThis.__renderUserMultiSelect = echt.renderUserMultiSelect;
   Object.assign(budget.state, {
-    budgetMode: 'personal',
+    month: '2026-06', budgetMode: 'personal',
     accounts: [{ id: 4, name: 'Girokonto' }],
+    members: [{ id: 3, display_name: 'Emma' }, { id: 1, display_name: 'Alex' }],
     meta: { expenseCategories: [{ key: 'housing', name: 'Wohnen' }], incomeCategories: [], subcategories: { housing: [{ key: 'power', name: 'Strom' }] } },
   });
+  // Ein Datensatz, der JEDES Feld traegt, das die Ansicht zeigen kann - die
+  // virtuelle Serie dazu, weil sie den Betrag umschaltet (Periodenbetrag).
   const eintrag = buchung({
-    subcategory: 'power', account_id: 4, visibility: 'private',
-    recurrence_interval: 'monthly', recurrence_interval_count: 1, recurrence_confirm: 1,
-    attachments: [beleg, belegDocx],
+    amount: -84.5, recurrence_full_amount: 1014, recurrence_virtual: 1, recurrence_confirm: 1,
+    recurrence_interval: 'monthly', recurrence_interval_count: 1,
+    subcategory: 'power', account_id: 4, visibility: 'private', attachments: [beleg],
   });
+  const werte = {
+    'budget.amountLabel': [[/id="bm-amount"[^>]*value="1014"/, /amount-type-btn--expenses amount-type-btn--active/], /^-1\.014,00\s€$/],
+    'budget.detailDateLabel': [[/id="bm-date"\s+value="2026-06-03"/], /^2026-06-03$/],
+    'budget.categoryLabel': [[/<option value="housing" selected>budget\.categoryHousing</], /^budget\.categoryHousing$/],
+    'budget.subcategoryLabel': [[/<option value="power" selected>Strom</], /^Strom$/],
+    'budget.accountLabel': [[/<option value="4" selected>Girokonto</], /^Girokonto$/],
+    'budget.visibilityLabel': [[/<option value="private" selected>/], /^budget\.visibility_private$/],
+    'budget.responsibleLabel': [[/value="3"[^>]*checked/], /^Emma$/],
+    'budget.recurringLabel': [
+      [/id="bm-recurring" checked/, /<option value="monthly" selected>/, /id="bm-interval-count"[^>]*value="1"/,
+        /id="bm-virtual" checked/, /id="bm-confirm-first" checked/],
+      /^budget\.intervalMonthly · budget\.virtualBudgetLabel · budget\.confirmFirstLabel$/],
+    'budget.receiptsLabel': [[/Rechnung\.pdf/], belegLink(5, 'Rechnung.pdf')],
+  };
   try {
-    withAccess({ budget: 'read', documents: 'read' }, () => {
-      const z = zeilen(budget.entryReadSections(eintrag));
-      assert.match(z['budget.amountLabel'], /84[.,]50/);
-      assert.equal(z['budget.detailDateLabel'], '2026-06-03');
-      assert.equal(z['budget.subcategoryLabel'], 'Strom');
-      assert.equal(z['budget.accountLabel'], 'Girokonto');
-      assert.equal(z['budget.visibilityLabel'], 'budget.visibility_private');
-      assert.equal(z['budget.responsibleLabel'], 'Emma');
-      assert.equal(z['budget.recurringLabel'], 'budget.intervalMonthly · budget.confirmFirstLabel');
-      // Die Belege: je einer ein Link, vorschaubar -> /preview, sonst /download.
-      const links = z['budget.receiptsLabel'].childNodes;
-      assert.equal(links.length, 2);
-      assert.equal(links[0].href, '/api/v1/documents/5/preview');
-      assert.equal(links[1].href, '/api/v1/documents/6/download');
-      assert.equal(links[0].rel, 'noopener noreferrer');
-    });
+    const editor = withAccess({ budget: 'write', documents: 'read' }, () => modalOptionen(() => budget.openBudgetModal({ mode: 'edit', entry: eintrag })));
+    const lesend = withAccess({ budget: 'read', documents: 'read' }, () => detailOptionen(() => budget.openBudgetModal({ mode: 'edit', entry: eintrag })));
+    keineHandlung(lesend, 'Buchung');
+    jederWert(werte, editor.content, zeilen(lesend.sections), 'Buchung');
+
     // Die Belege gehoeren dem Dokumente-Modul: ohne dessen Leserecht keine Zeile.
     withAccess({ budget: 'read', documents: 'none' }, () => {
       const z = zeilen(budget.entryReadSections(eintrag));
       assert.equal(z['budget.receiptsLabel'], undefined);
       assert.equal(z['budget.subcategoryLabel'], 'Strom', 'der Rest der Ansicht bleibt');
     });
+    // Ohne virtuelle Serie steht der Betrag der Zeile, nicht ein Periodenbetrag.
+    withAccess({ budget: 'read' }, () => assert.match(zeilen(budget.entryReadSections(buchung()))['budget.amountLabel'], /^-84,50\s€$/));
     // Die Antwort folgt dem Datensatz: was nicht gesetzt ist, steht nicht da.
     budget.state.budgetMode = 'shared';
     withAccess({ budget: 'read' }, () => {
@@ -873,38 +914,64 @@ test('Leseansicht einer Buchung: Unterkategorie, Konto, Sichtbarkeit, Wiederholu
         assert.equal(z[leer], undefined, `${leer} ohne Wert`);
       }
     });
-  } finally { Object.assign(budget.state, vorher); }
-});
-
-test('Abo bei `budget: read`: Leseansicht mit Beschreibung, Kategorie, Konto und Notiz - ohne Handlung', () => {
-  const eintrag = abo({
-    description: 'Premium', category_id: 2, category_name: 'Streaming', payment_method_id: 1,
-    payment_method_name: 'Kreditkarte', account_username: 'familie@example.org', notes: 'Familienabo',
-  });
-  const lesend = withAccess({ budget: 'read' }, () => detailOptionen(() => abos.openSubscriptionModal(eintrag)));
-  keineHandlung(lesend, 'Abo');
-  assert.equal(lesend.title, 'Streamingdienst');
-  const z = zeilen(lesend.sections);
-  assert.match(z['subscriptions.detailAmountLabel'], /12[.,]99/);
-  assert.equal(z['subscriptions.descriptionLabel'], 'Premium');
-  assert.equal(z['subscriptions.categoryLabel'], 'Streaming');
-  assert.equal(z['subscriptions.paymentMethodLabel'], 'Kreditkarte');
-  assert.equal(z['subscriptions.accountUsernameLabel'], 'familie@example.org');
-  assert.equal(z['subscriptions.notesLabel'], 'Familienabo');
-  assert.ok(z['subscriptions.billingCycleLabel'] && z['subscriptions.detailNextPaymentLabel']);
-  assert.equal(withAccess({ budget: 'read' }, () => modalOptionen(() => abos.openSubscriptionModal(eintrag))), null,
-    'kein Editor daneben');
-  assert.equal(withAccess({ budget: 'read' }, () => detailOptionen(() => abos.openSubscriptionModal())), null,
-    'Anlegen fuehrt nirgends hin');
-  // Und ohne Kategorie, Konto und Notiz stehen diese Zeilen nicht da.
-  const leer = withAccess({ budget: 'read' }, () => zeilen(abos.subscriptionReadSections(abo())));
-  for (const k of ['subscriptions.categoryLabel', 'subscriptions.accountUsernameLabel', 'subscriptions.notesLabel']) {
-    assert.equal(leer[k], undefined, `${k} ohne Wert`);
+  } finally {
+    Object.assign(budget.state, vorher);
+    if (vorherPicker === undefined) delete globalThis.__renderUserMultiSelect;
+    else globalThis.__renderUserMultiSelect = vorherPicker;
   }
 });
 
+test('Abo: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs - ohne Handlung', () => {
+  const vorher = { ...abos.state.meta };
+  Object.assign(abos.state.meta, {
+    categories: [{ id: 2, name: 'Streaming' }], payment_methods: [{ id: 1, name: 'Kreditkarte' }],
+    billing_cycles: ['monthly', 'yearly'],
+  });
+  const eintrag = abo({
+    description: 'Premium', category_id: 2, category_name: 'Streaming', payment_method_id: 1,
+    payment_method_name: 'Kreditkarte', account_username: 'familie@example.org', notes: 'Familienabo',
+    end_type: 'on_date', end_date: '2026-12-31', brand_color: '#E50914',
+  });
+  const werte = {
+    'subscriptions.detailAmountLabel': [[/id="subscription-amount"[^>]*value="12\.99"/, /id="subscription-currency" type="hidden" value="EUR"/],
+      /^12,99\s€ · subscriptions\.monthlyEquivalent\{"amount":"12,99\s€"\}$/],
+    'subscriptions.filterLabelStatus': [[/id="subscription-enabled" type="checkbox" checked/], /^subscriptions\.active$/],
+    'subscriptions.descriptionLabel': [[/id="subscription-description"[^>]*value="Premium"/], /^Premium$/],
+    'subscriptions.billingCycleLabel': [[/id="subscription-cycle" type="hidden" value="monthly"/, /id="subscription-interval"[^>]*value="1"/],
+      /^subscriptions\.cycle\.monthly$/],
+    'subscriptions.detailNextPaymentLabel': [[/id="subscription-next-date"[^>]*value="2026-10-01"/], /^2026-10-01 · subscriptions\./],
+    'subscriptions.reminderDaysLabel': [[/id="subscription-reminder"[^>]*value="3"/], /^subscriptions\.reminderMeta\{"count":3\}$/],
+    'subscriptions.endLabel': [[/id="subscription-end-date"[^>]*value="2026-12-31"/], /^subscriptions\.endsOn\{"date":"2026-12-31"\}$/],
+    'subscriptions.categoryLabel': [[/id="subscription-category" type="hidden" value="2"/], /^Streaming$/],
+    'subscriptions.paymentMethodLabel': [[/id="subscription-method" type="hidden" value="1"/], /^Kreditkarte$/],
+    'subscriptions.accountUsernameLabel': [[/id="subscription-account"[^>]*value="familie@example\.org"/], /^familie@example\.org$/],
+    'subscriptions.notesLabel': [[/Familienabo<\/textarea>/], /^Familienabo$/],
+  };
+  try {
+    const editor = withAccess({ budget: 'write' }, () => modalOptionen(() => abos.openSubscriptionModal(eintrag)));
+    const lesend = withAccess({ budget: 'read' }, () => detailOptionen(() => abos.openSubscriptionModal(eintrag)));
+    keineHandlung(lesend, 'Abo');
+    assert.equal(lesend.title, 'Streamingdienst');
+    jederWert(werte, editor.content, zeilen(lesend.sections), 'Abo');
+    // Die Markenfarbe ist keine Zeile, sondern der Farbstreifen der Ansicht.
+    assert.match(editor.content, /id="subscription-color" type="color" value="#E50914"/);
+    assert.equal(lesend.accentColor, '#E50914');
+
+    assert.equal(withAccess({ budget: 'read' }, () => modalOptionen(() => abos.openSubscriptionModal(eintrag))), null,
+      'kein Editor daneben');
+    assert.equal(withAccess({ budget: 'read' }, () => detailOptionen(() => abos.openSubscriptionModal())), null,
+      'Anlegen fuehrt nirgends hin');
+    // Ohne Beschreibung, Kategorie, Zahlungsart, Konto, Notiz und Ende stehen diese Zeilen nicht da.
+    const leer = withAccess({ budget: 'read' }, () => zeilen(abos.subscriptionReadSections(abo())));
+    for (const k of ['subscriptions.descriptionLabel', 'subscriptions.categoryLabel', 'subscriptions.paymentMethodLabel',
+      'subscriptions.accountUsernameLabel', 'subscriptions.notesLabel', 'subscriptions.endLabel']) {
+      assert.equal(leer[k], undefined, `${k} ohne Wert`);
+    }
+  } finally { Object.assign(abos.state.meta, vorher); }
+});
+
 const ausgabe = {
-  id: 40, title: 'Ferienwohnung', amount: 600, currency: 'EUR', payer_name: 'Alex',
+  id: 40, title: 'Ferienwohnung', amount: 600, currency: 'EUR', payer_id: 1, payer_name: 'Alex',
   expense_date: '2026-08-02', split_method: 'exact', description: 'Anzahlung', attachments: [beleg],
   splits: [
     { user_id: 1, display_name: 'Alex', amount: 400, currency: 'EUR' },
@@ -912,22 +979,40 @@ const ausgabe = {
   ],
 };
 
-test('Ausgabe bei `budget: read`: Aufteilung, Anteile, Notiz und Beleg - ohne Handlung', () => {
-  const lesend = withAccess({ budget: 'read', documents: 'read' }, () => detailOptionen(() => split.openExpenseModal(ausgabe)));
-  keineHandlung(lesend, 'Ausgabe');
-  assert.equal(lesend.title, 'Ferienwohnung');
-  const z = zeilen(lesend.sections);
-  assert.equal(z['splitExpenses.paidBy'], 'Alex');
-  assert.equal(z['splitExpenses.splitMethod'], 'splitExpenses.splitExact');
-  assert.match(z['splitExpenses.participants'], /^Alex: 400[.,]00[^\n]*\nEmma: 200[.,]00/);
-  assert.equal(z['splitExpenses.notes'], 'Anzahlung');
-  assert.equal(z['splitExpenses.receiptsLabel'].childNodes[0].href, '/api/v1/documents/5/preview');
-  withAccess({ budget: 'read', documents: 'none' }, () => (
-    assert.equal(zeilen(split.expenseReadSections(ausgabe))['splitExpenses.receiptsLabel'], undefined)));
-  assert.equal(withAccess({ budget: 'read' }, () => modalOptionen(() => split.openExpenseModal(ausgabe))), null,
-    'kein Editor daneben');
-  // Die Uebergabe aus dem Budget ist eine NEUE Ausgabe - bei `read` fuehrt sie nirgends hin.
-  assert.equal(withAccess({ budget: 'read' }, () => detailOptionen(() => split.openExpenseModal(null, { title: 'Wasser' }))), null);
+test('Ausgabe: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs - ohne Handlung', () => {
+  const vorher = { ...split.state };
+  Object.assign(split.state, {
+    activeGroupId: 2, groups: [{ id: 2, default_currency: 'EUR' }], meta: { currencies: ['EUR', 'USD'] },
+    groupMembers: [{ id: 1, display_name: 'Alex' }, { id: 3, display_name: 'Emma' }],
+  });
+  const werte = {
+    'splitExpenses.amount': [[/name="amount"[^>]*value="600"/, /<option value="EUR" selected>/], /^600,00\s€$/],
+    'splitExpenses.paidBy': [[/<option value="1" selected>Alex</], /^Alex$/],
+    'splitExpenses.date': [[/name="expense_date"[^>]*value="2026-08-02"/], /^2026-08-02$/],
+    'splitExpenses.splitMethod': [[/<option value="exact" selected>/], /^splitExpenses\.splitExact$/],
+    'splitExpenses.participants': [[/name="split_value_1"[^>]*value="400"/, /name="split_value_3"[^>]*value="200"/],
+      /^Alex: 400,00\s€\nEmma: 200,00\s€$/],
+    'splitExpenses.notes': [[/Anzahlung<\/textarea>/], /^Anzahlung$/],
+    'splitExpenses.receiptsLabel': [[/Rechnung\.pdf/], belegLink(5, 'Rechnung.pdf')],
+  };
+  try {
+    const editor = withAccess({ budget: 'write', documents: 'read' }, () => modalOptionen(() => split.openExpenseModal(ausgabe)));
+    const lesend = withAccess({ budget: 'read', documents: 'read' }, () => detailOptionen(() => split.openExpenseModal(ausgabe)));
+    keineHandlung(lesend, 'Ausgabe');
+    assert.equal(lesend.title, 'Ferienwohnung');
+    jederWert(werte, editor.content, zeilen(lesend.sections), 'Ausgabe');
+
+    withAccess({ budget: 'read', documents: 'none' }, () => (
+      assert.equal(zeilen(split.expenseReadSections(ausgabe))['splitExpenses.receiptsLabel'], undefined)));
+    assert.equal(withAccess({ budget: 'read' }, () => modalOptionen(() => split.openExpenseModal(ausgabe))), null,
+      'kein Editor daneben');
+    // Die Uebergabe aus dem Budget ist eine NEUE Ausgabe - bei `read` fuehrt sie nirgends hin.
+    assert.equal(withAccess({ budget: 'read' }, () => detailOptionen(() => split.openExpenseModal(null, { title: 'Wasser' }))), null);
+    const leer = withAccess({ budget: 'read' }, () => zeilen(split.expenseReadSections({ ...ausgabe, description: '', attachments: [], splits: [] })));
+    for (const k of ['splitExpenses.notes', 'splitExpenses.receiptsLabel', 'splitExpenses.participants']) {
+      assert.equal(leer[k], undefined, `${k} ohne Wert`);
+    }
+  } finally { Object.assign(split.state, vorher); }
 });
 
 test('das Paar dazu: mit Schreibrecht oeffnen dieselben drei Einstiege den Editor, keine Leseansicht', () => {
@@ -954,18 +1039,36 @@ test('das Paar dazu: mit Schreibrecht oeffnen dieselben drei Einstiege den Edito
   }
 });
 
-test('Darlehensbericht: Konto, erster Faelligkeitsmonat, Zinsmodell und Notiz aus dem Dialog', () => {
+/** Die Kacheln des Berichts als { Beschriftung: Wert }, entschluesselt wie im Browser. */
+function berichtKacheln(html) {
+  const ent = (s) => s.replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  return Object.fromEntries([...html.matchAll(/<div(?: class="[^"]*")?><span>([^<]*)<\/span><strong>([^<]*)<\/strong><\/div>/g)]
+    .map((m) => [ent(m[1]), ent(m[2])]));
+}
+
+test('Darlehen: der Bericht zeigt jeden Wert des Darlehens-Dialogs, den Karte und Kennzahlen nicht tragen', () => {
   mitKonten([konto()], () => {
-    const html = budget.loanReportDetails(darlehen({
-      account_id: 4, start_month: '2026-01', notes: 'Sondertilgung <jaehrlich>',
-      interest: { mode: 'fixed', fixed_rate: 3.2, initial_repayment_rate: 2, monthly_payment: 850 },
-    }));
-    assert.match(html, /budget\.loanAccountLabel<\/span><strong>Girokonto</);
-    assert.match(html, /budget\.loanDetailStartMonthLabel/);
-    assert.match(html, /budget\.loanInitialRepaymentLabel<\/span><strong>2</);
-    assert.match(html, /class="loan-report__cell--wide"><span>budget\.loanInterestModeLabel/);
+    const loan = darlehen({
+      account_id: 4, start_month: '2026-01', notes: 'Sondertilgung <jaehrlich>', currency: 'EUR',
+      interest: { mode: 'fixed', principal: 20000, fixed_rate: 3.2, initial_repayment_rate: 2, monthly_payment: 850 },
+    });
+    const werte = {
+      'budget.loanAccountLabel': [[/<option value="4" selected>Girokonto</], /^Girokonto$/],
+      'budget.loanDetailStartMonthLabel': [[/id="lm-start" value="2026-01"/], /2026/],
+      'budget.loanInitialRepaymentLabel': [[/id="lm-initial-repayment"[^>]*value="2"/], /^2$/],
+      'budget.loanInterestModeLabel': [[/<option value="fixed" selected>/, /id="lm-fixed-rate"[^>]*value="3\.2"/],
+        /^budget\.loanMonthlyRate\{"amount":"850,00\s€"\} · budget\.loanRateFixed\{"rate":"3,2\s%"\}$/],
+      'budget.loanNotesLabel': [[/Sondertilgung &lt;jaehrlich&gt;<\/textarea>/], /^Sondertilgung <jaehrlich>$/],
+    };
+    const editor = withAccess({ budget: 'write' }, () => modalOptionen(() => budget.openLoanModal(loan)));
+    const html = budget.loanReportDetails(loan);
+    jederWert(werte, editor.content, berichtKacheln(html), 'Darlehen');
     assert.match(html, /Sondertilgung &lt;jaehrlich&gt;/, 'die Notiz geht durch esc()');
+    assert.match(html, /class="loan-report__cell--wide"><span>budget\.loanInterestModeLabel/);
+    assert.match(html, /class="loan-report__cell--wide"><span>budget\.loanNotesLabel/);
     assert.doesNotMatch(html, /<button/);
+    // Der erste Faelligkeitsmonat steht als Monatsname, nicht als Schluessel.
+    assert.notEqual(berichtKacheln(html)['budget.loanDetailStartMonthLabel'], '2026-01');
     assert.equal(budget.loanReportDetails(darlehen()), '', 'ohne Angaben keine leere Kachelreihe');
   });
 });

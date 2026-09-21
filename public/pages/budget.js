@@ -3844,6 +3844,9 @@ export const __test = {
   entryReadSections,
   openBudgetModal,
   loanReportDetails,
+  // Der Darlehens-Dialog selbst - nur, damit die Suite misst, dass jeder Wert,
+  // den er mit Schreibrecht zeigt, im Bericht steht (P6-Muster).
+  openLoanModal,
   // renderBody() schreibt in den Seitencontainer statt Markup zurueckzugeben;
   // derselbe Griff wie updateTabsForTest oben laesst den ECHTEN Render-Pfad
   // des Buchungs-Tabs laufen, statt seinen Quelltext zu lesen.
