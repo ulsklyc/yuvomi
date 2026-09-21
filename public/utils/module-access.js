@@ -116,6 +116,13 @@
  *    Handlung einlaedt („Tippe auf + ...“), entfaellt bei `read` zusammen mit
  *    dem Knopf, den er meint: `action: readOnly() ? null : ...` allein laesst
  *    `hint` und `description` des Leerzustands stehen.
+ *    FUEHRT DER TIPP SCHON WOANDERSHIN, weil er nicht den Datensatz selbst
+ *    oeffnet, steht ein Wert, der sonst nur im Editor stand, bei `read` dort,
+ *    wo der Tipp landet - einen neuen Knopf nur zum Lesen gibt es nicht. Ein
+ *    Konto oeffnet den Kontoauszug, also kommt der Kreditrahmen in dessen
+ *    Kopf; eine Split-Gruppe wird per Tipp nur ausgewaehlt, also kommen
+ *    Standardwaehrung, Standardaufteilung und Mitglieder als kompakte Zeile
+ *    in den Gruppenkopf (#1352, dort gebaut).
  */
 
 import { moduleAccess } from '/permissions.js';
