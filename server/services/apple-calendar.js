@@ -33,6 +33,7 @@ import { householdTimeZone } from '../utils/timezone.js';
 import { createCalDAVClient } from '../utils/caldav-client.js';
 import { nearestIcalColorName } from '../utils/ical-color.js';
 import { outboundEvent } from './outbound-dtstart.js';
+import { followInboundStartChange } from './calendar-occurrence-overrides.js';
 
 const APPLE_COLOR = '#FC3C44';
 
@@ -415,7 +416,7 @@ async function runSync({ makeClient } = {}) {
           if (pendingDeletionUids.has(ev.uid)) continue;
 
           const existing = db.get().prepare(
-            `SELECT id, outbound_dirty, calendar_ref_id FROM calendar_events WHERE external_calendar_id = ? AND external_source = 'apple'`
+            `SELECT id, outbound_dirty, calendar_ref_id, start_datetime FROM calendar_events WHERE external_calendar_id = ? AND external_source = 'apple'`
           ).get(ev.uid);
 
           // Eine lokale Bearbeitung, die noch auf ihren Push wartet, darf der
@@ -444,6 +445,8 @@ async function runSync({ makeClient } = {}) {
               obj.url ?? null, existing.id
             );
             eventId = existing.id;
+            // In iCloud verschoben (#1377): die Erinnerungen ziehen mit.
+            followInboundStartChange(db.get(), eventId, existing.start_datetime, ev.dtstart);
             // Von einem Kalender in einen anderen verschoben (#1270): die
             // unangetastete Standard-Zuweisung zieht mit um.
             reassignDefaultOnCalendarMove(db.get(), eventId, {

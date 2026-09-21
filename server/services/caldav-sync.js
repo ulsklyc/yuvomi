@@ -23,6 +23,7 @@ import { createCalDAVClient, supportsComponent } from '../utils/caldav-client.js
 import { rruleLine } from './recurrence.js';
 import { nearestIcalColorName } from '../utils/ical-color.js';
 import { outboundEvent } from './outbound-dtstart.js';
+import { followInboundStartChange } from './calendar-occurrence-overrides.js';
 
 // Reused functions from apple-calendar.js
 import {
@@ -506,7 +507,7 @@ async function runSync({ createClient } = {}) {
   // großen Kalendern spürbar Zeit und verkürzt damit das synchrone Verarbeitungsfenster.
   const conn = db.get();
   const selExistingEvent = conn.prepare(
-    `SELECT id, outbound_dirty, calendar_ref_id FROM calendar_events WHERE external_calendar_id = ? AND external_source = 'caldav'`
+    `SELECT id, outbound_dirty, calendar_ref_id, start_datetime FROM calendar_events WHERE external_calendar_id = ? AND external_source = 'caldav'`
   );
   // Offene Löschungen einmal je Lauf, nicht je eingehendem Termin.
   const pendingDeletionUids = outbound.pendingDeletionUids('caldav');
@@ -711,6 +712,8 @@ async function runSync({ createClient } = {}) {
                 ];
                 changed = updEvent.run(...values, existing.id, ...values).changes > 0;
                 eventId = existing.id;
+                // Auf dem Server verschoben (#1377): die Erinnerungen ziehen mit.
+                if (changed) followInboundStartChange(conn, eventId, existing.start_datetime, ev.dtstart);
                 // Von einem Kalender in einen anderen verschoben (#1270): die
                 // unangetastete Standard-Zuweisung zieht mit um.
                 reassignDefaultOnCalendarMove(db.get(), eventId, {

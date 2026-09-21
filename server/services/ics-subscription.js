@@ -15,6 +15,7 @@ import { assignDefaultToEvent } from './sync-assignment.js';
 import { parseICS, expandRRULE, normalizeRecurrenceOverrides } from './ics-parser.js';
 import { isBlockedAddress, readPrivateNetworkOptIn, createGuardedLookup } from '../utils/ssrf.js';
 import { safeRequest } from '../utils/http.js';
+import { followInboundStartChange } from './calendar-occurrence-overrides.js';
 
 const log = createLogger('ICS');
 
@@ -178,7 +179,7 @@ async function syncOne(sub) {
     // wird. Ein unveränderter Lauf würde also weiterhin schreiben, nur für
     // changes und total_changes() unsichtbar.
     const findExisting = db.get().prepare(`
-      SELECT id FROM calendar_events
+      SELECT id, start_datetime FROM calendar_events
       WHERE subscription_id = ? AND external_calendar_id = ?
     `);
 
@@ -237,7 +238,12 @@ async function syncOne(sub) {
               ev.summary, ev.description, ev.dtstart, ev.dtend,
               ev.allDay ? 1 : 0, ev.location, color,
             ];
-            changedEvents += updateEvent.run(...values, existing.id, ...values).changes;
+            const updated = updateEvent.run(...values, existing.id, ...values).changes;
+            changedEvents += updated;
+            // Im Feed verschoben (#1377): die Erinnerungen ziehen mit. Nur wenn
+            // das UPDATE griff - eine lokal bearbeitete Zeile (user_modified)
+            // behaelt ihren Start und damit auch ihre Erinnerungen.
+            if (updated) followInboundStartChange(db.get(), existing.id, existing.start_datetime, ev.dtstart);
           } else {
             insertEvent.run(ev.summary, ev.description, ev.dtstart, ev.dtend,
               ev.allDay ? 1 : 0, ev.location, color, ev.uid, sub.id, ev.rrule, createdBy);

@@ -2021,6 +2021,57 @@ function shiftOwnedReminders(database, eventId, oldAnchor, newAnchor, tz) {
   }
 }
 
+/**
+ * Die Erinnerungen eines Termins mitnehmen, den ein Anbieter verschoben hat
+ * (#1377) - die EINE Stelle fuer jeden Inbound (Google, CalDAV, Apple, ICS-Abo).
+ *
+ * Bis hierher schrieben die Inbounds `start_datetime` neu und liessen
+ * `reminders.remind_at` stehen. Die Zustellung haelt den absoluten Zeitpunkt
+ * gegen die Uhr, also kam "1 Stunde vorher" nach einer Verschiebung in Google
+ * zur alten Zeit - bei einem nach vorn gezogenen Termin erst nach seinem Beginn.
+ *
+ * DIE VERSCHIEBUNG IST DIESELBE WIE IN YUVOMI: `shiftOwnedReminders()`, also der
+ * Abstand der beiden Anker auf der Zeitpunkt-Achse (#1300), fuer jede Zeile des
+ * Termins - eigene und geerbte (#921). Ganztag rechnet ueber denselben Anker
+ * (09:00 der Haushaltszone), eine Serie haengt ihre Erinnerungen am Master, und
+ * ein eingelesenes Einzelvorkommen ist eine eigene Zeile mit eigener ID.
+ *
+ * DER ZUSTELLSTAND FOLGT DEM DIALOG, NICHT DER SERIEN-ROUTE. Ein eingelesener
+ * Termin wird in Yuvomi ueber den Einzeltermin-Weg verschoben, und dort schreibt
+ * der Dialog die Erinnerungen frisch (`PUT /reminders`), `fanOutEventReminders()`
+ * behandelt eine andere Uhrzeit ebenso als neue Auskunft. Deshalb meldet sich
+ * eine schon zugestellte oder weggeklickte Erinnerung wieder, wenn sie in die
+ * Zukunft wandert. Landet sie in der Vergangenheit, bleibt ihr Stand: eine
+ * zweite Meldung zu einem Zeitpunkt, der vorbei ist, waere keine Auskunft mehr.
+ *
+ * Synchron und ohne eigene Transaktion: die Inbounds rufen es direkt nach ihrem
+ * UPDATE, ohne Yield-Punkt dazwischen.
+ *
+ * @param {object} database
+ * @param {number} eventId
+ * @param {string} oldStart  start_datetime vor dem Inbound
+ * @param {string} newStart  start_datetime, wie der Inbound ihn geschrieben hat
+ * @param {{ tz?: string, nowMs?: number }} [options]
+ */
+export function followInboundStartChange(database, eventId, oldStart, newStart, {
+  tz,
+  nowMs = Date.now(),
+} = {}) {
+  if (String(oldStart ?? '') === String(newStart ?? '')) return;
+  shiftOwnedReminders(database, eventId, oldStart, newStart, tz ?? householdTimeZone(database));
+  const rearm = database.prepare(
+    'UPDATE reminders SET pushed_at = NULL, dismissed = 0 WHERE id = ?'
+  );
+  const rows = database.prepare(`
+    SELECT id, remind_at FROM reminders
+    WHERE entity_type = 'event' AND entity_id = ?
+      AND (pushed_at IS NOT NULL OR dismissed = 1)
+  `).all(eventId);
+  for (const row of rows) {
+    if (remindAtInstantMs(row.remind_at) > nowMs) rearm.run(row.id);
+  }
+}
+
 function refreshInheritedChild(database, child, oldResolved, updatedMaster, tz) {
   const fields = parseOverrideFields(child.overridden_fields);
   const newBase = baseOccurrenceFor(updatedMaster, child.recurrence_id);
