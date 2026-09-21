@@ -265,6 +265,53 @@ test('eine ein Jahr spaet, aber vor dem Stichtag erledigte Jahresfrist ueberspri
   assert.equal(rolled.date, '2026-06-10', 'die erste Jahresmarke nach dem Erledigungsdatum, nicht die uebernaechste');
 });
 
+test('eine Frist, deren naechste Marke nach 9999-12-31 laege, wird mit 400 abgewiesen und bleibt unangetastet', async () => {
+  // Die naechste Jahresmarke nach 9999-12-31 waere 10000-06-01 - ein Datum,
+  // das YYYY-MM-DD nicht mehr fassen kann. Vorher lief der Textvergleich in
+  // rollForwardPast() daran vorbei ('10000-…' < '9999-…'), die Schleife lief
+  // bis '99990-06-01', das landete in der Frist, die Erinnerung bekam
+  // 'NaN-NaN-NaNT09:00', und der Gegenstand liess sich danach nicht mehr
+  // speichern. Die Log-Zeile ist Teil derselben Transaktion und darf ebenso
+  // wenig entstehen.
+  const created = await call('POST', '/items', {
+    body: {
+      name: 'Ewige Wartung',
+      tracked_dates: [{ label: 'Wartung', date: '9999-06-01', reminder_offset_days: 30, interval_months: 12 }],
+    },
+  });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const itemId = created.body.data.id;
+  const dateId = created.body.data.tracked_dates[0].id;
+  const remindersBefore = trackedDateReminders(dateId).map((r) => r.remind_at);
+
+  const completed = await call('POST', `/items/${itemId}/dates/${dateId}/complete`, {
+    body: { performed_on: '9999-12-31' },
+  });
+  assert.equal(completed.status, 400, JSON.stringify(completed.body));
+  assert.match(completed.body.error, /9999-12-31/, 'die Meldung nennt die Grenze');
+
+  const row = db.prepare('SELECT date FROM inventory_item_dates WHERE id = ?').get(dateId);
+  assert.equal(row.date, '9999-06-01', 'die Frist bleibt, wie sie war');
+  assert.deepEqual(trackedDateReminders(dateId).map((r) => r.remind_at), remindersBefore, 'die Erinnerung bleibt');
+  const logRows = db.prepare('SELECT id FROM inventory_item_service_log WHERE item_id = ?').all(itemId);
+  assert.equal(logRows.length, 0, 'kein Log-Eintrag fuer eine abgewiesene Erledigung');
+
+  // Die Grenze liegt genau dort: landet die naechste Marke noch in 9999,
+  // geht die Erledigung durch.
+  const lastYear = await call('POST', '/items', {
+    body: {
+      name: 'Letzte Wartung',
+      tracked_dates: [{ label: 'Wartung', date: '9998-12-31', reminder_offset_days: 0, interval_months: 12 }],
+    },
+  });
+  const lastDateId = lastYear.body.data.tracked_dates[0].id;
+  const inRange = await call('POST', `/items/${lastYear.body.data.id}/dates/${lastDateId}/complete`, {
+    body: { performed_on: '9998-12-31' },
+  });
+  assert.equal(inRange.status, 201, JSON.stringify(inRange.body));
+  assert.equal(inRange.body.data.tracked_dates.find((d) => d.id === lastDateId).date, '9999-12-31');
+});
+
 // --------------------------------------------------------
 // Die Historie uebersteht ein nachfolgendes Item-Speichern
 // --------------------------------------------------------

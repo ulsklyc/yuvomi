@@ -99,6 +99,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wall-clock time. The CSV export then showed the UTC time for these doses. The current minute is
   now stored in the same form as every other dose. The app itself always sends the time and was not
   affected.
+- **Marking an inventory deadline as done no longer stores a broken date when the next one would
+  fall after 9999-12-31.** The next due date then has a five-digit year, which the date format cannot
+  hold: the deadline got a date like "99990-06-01", its reminder a date that is not a date, and the
+  item could not be saved again afterwards. The request is now refused with a message that names
+  the limit, and neither the deadline nor its history change.
 - **On a phone, a meal can be dragged to another day again, by a grip next to its buttons.** The
   drag started, and ended the moment the finger moved: on a phone the week plan is a vertical list,
   another day lies exactly on the scrolling axis, and the browser took the gesture as a scroll and
