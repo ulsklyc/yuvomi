@@ -52,6 +52,18 @@ test('fasting clients receive concrete lifecycle schemas, revision transports an
   assert.match(paths['/api/v1/health/export/fasting'].get.description, /same household display-zone completion-date filters as history/);
   assert.ok(paths['/api/v1/health/export/fasting'].get.responses[200].content['text/csv']);
 });
+test('meals apply-plan describes what the route does: additive without replace_existing, 201', () => {
+  // Die Route (server/routes/meals.js, POST /apply-plan) hat belegte Slots nie
+  // uebersprungen; die Spec versprach es seit v2.52.0. Pinnt den korrigierten
+  // Vertrag, das Verhalten selbst halten die Tests in test:meals-routes.
+  const post = buildOpenApiSpec({}).paths['/api/v1/meals/apply-plan'].post;
+  assert.doesNotMatch(post.description, /instead of skipping/);
+  assert.match(post.description, /added next to any meal already planned for the same date and meal type/);
+  assert.match(post.description, /date and meal type pair named in `assignments` is deleted first/);
+  assert.ok(post.responses[201]);
+  assert.ok(!post.responses[200]);
+  assert.ok(post.responses[400]);
+});
 const indexSrc = readFileSync(new URL('index.js', pathsDir), 'utf8');
 const moduleFiles = readdirSync(pathsDir)
   .filter((f) => f.endsWith('.js') && f !== 'index.js')

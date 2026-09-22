@@ -224,6 +224,40 @@ test('POST /apply-plan mit replace_existing: ersetzt Meals im selben Slot', asyn
   assert.equal(rows[0].title, 'Neu');
 });
 
+// Die OpenAPI-Beschreibung versprach seit v2.52.0 ein Überspringen belegter
+// Slots ohne replace_existing. Die Route hat nie übersprungen, sie legt
+// dazu; die Beschreibung folgt jetzt dem Code, und diese Tests halten den
+// Vertrag fest (Überspringen macht das Frontend selbst, meals.js
+// buildRandomMealAssignments).
+test('POST /apply-plan ohne replace_existing: legt neben belegten Slot dazu, überspringt nicht', async () => {
+  await createMeal({ date: '2026-04-20', meal_type: 'dinner', title: 'Bestand' });
+  const r = await call('POST', '/apply-plan', {
+    assignments: [{ date: '2026-04-20', meal_type: 'dinner', title: 'Neu' }],
+  });
+  assert.equal(r.status, 201);
+  assert.equal(r.body.data.length, 1);
+  const titles = db.prepare(`SELECT title FROM meals WHERE date = '2026-04-20' AND meal_type = 'dinner' ORDER BY id`).all().map((m) => m.title);
+  assert.deepEqual(titles, ['Bestand', 'Neu']);
+});
+
+test('POST /apply-plan mit replace_existing: leert nur die genannten Datum/Typ-Paare', async () => {
+  await createMeal({ date: '2026-04-27', meal_type: 'dinner', title: 'Ersetzt' });
+  await createMeal({ date: '2026-04-27', meal_type: 'lunch', title: 'Anderer Typ' });
+  await createMeal({ date: '2026-04-28', meal_type: 'dinner', title: 'Anderer Tag' });
+  const r = await call('POST', '/apply-plan', {
+    replace_existing: true,
+    assignments: [{ date: '2026-04-27', meal_type: 'dinner', title: 'Neu' }],
+  });
+  assert.equal(r.status, 201);
+  const rows = db.prepare(`SELECT date, meal_type, title FROM meals WHERE date IN ('2026-04-27', '2026-04-28') ORDER BY date, meal_type`).all()
+    .map((m) => `${m.date} ${m.meal_type} ${m.title}`);
+  assert.deepEqual(rows, [
+    '2026-04-27 dinner Neu',
+    '2026-04-27 lunch Anderer Typ',
+    '2026-04-28 dinner Anderer Tag',
+  ]);
+});
+
 // --------------------------------------------------------------------------
 // PUT /:id
 // --------------------------------------------------------------------------

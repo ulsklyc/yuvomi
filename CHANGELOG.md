@@ -127,6 +127,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The API reference now describes `POST /api/v1/meals/apply-plan` as it behaves.** Since 2.52.0
+  it said that without `replace_existing` a slot that already has a meal is skipped. The endpoint
+  has never done that: it adds the new meals next to the ones already planned for the same date and
+  meal type. The description now says so, and that `replace_existing: true` first removes the meals
+  of exactly the date and meal type pairs named in the request, leaving every other slot alone. It
+  also lists the actual answers, `201` on success and `400` when an assignment is invalid, instead of
+  `200`. The endpoint itself is unchanged; a client that relied on the skip has to leave occupied
+  slots out of `assignments` itself, as the app does.
 - **Housekeeping tasks turn "due today" and "overdue" on the household's day, not the server's.**
   The due day of a recurring task was counted in the time zone of the server. On a server running in
   UTC with a household in Berlin, a task done shortly after midnight counted as done the day before,

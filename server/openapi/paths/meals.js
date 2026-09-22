@@ -52,7 +52,19 @@ export function mealsPaths() {
       }),
     },
     '/api/v1/meals/apply-plan': {
-      post: op({ summary: 'Apply a set of planned meals at once', tag: 'Meals', stateChanging: true, requestBody: jsonBody(null), description: 'Body: { assignments, replace_existing? }. Writes several day/meal-type assignments in one call; `replace_existing: true` overwrites what is already planned on those slots instead of skipping them.' }),
+      post: op({
+        summary: 'Apply a set of planned meals at once',
+        tag: 'Meals',
+        description: 'Body: { assignments, replace_existing? }. Creates one meal per assignment (`date`, `meal_type`, `title`, optional `notes`, `recipe_url`, `recipe_id`, `ingredients`) in a single transaction and returns them. Without `replace_existing`, nothing is skipped or overwritten: the new meals are added next to any meal already planned for the same date and meal type. With `replace_existing: true`, every meal already planned for a date and meal type pair named in `assignments` is deleted first (an occurrence of a weekly series is excepted from the series, so it does not come back); other slots stay untouched. If any assignment is invalid or names an unknown recipe, the request is refused with 400 and nothing is written.',
+        stateChanging: true,
+        requestBody: jsonBody(null),
+        responses: {
+          201: { description: 'Meals created' },
+          400: { description: 'Missing or invalid assignments, or an unknown recipe_id. Nothing is written.' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
     },
   };
 }
