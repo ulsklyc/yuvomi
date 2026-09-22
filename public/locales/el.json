@@ -3705,7 +3705,9 @@
         "reversePaymentLabel": "Ακύρωση πληρωμής από {{payer}} προς {{payee}} ύψους {{amount}}",
         "reversePaymentConfirm": "Ακύρωση αυτής της πληρωμής;",
         "reversePaymentConfirmDetail": "{{payer}} προς {{payee}}, {{amount}}. Μια αντίθετη εγγραφή ακυρώνει την πληρωμή και τα υπόλοιπα επιστρέφουν όπως ήταν. Η πληρωμή παραμένει στη δραστηριότητα, σημειωμένη ως ακυρωμένη.",
-        "loadMoreActivity": "Φόρτωση περισσότερων"
+        "loadMoreActivity": "Φόρτωση περισσότερων",
+        "expenseDetail": "{{title}}: {{amount}}",
+        "expenseDeleted": "Διαγράφηκε"
     },
     "wmo": {
         "0": "Αίθριος καιρός",

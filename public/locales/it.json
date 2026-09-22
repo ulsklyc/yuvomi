@@ -3705,7 +3705,9 @@
         "reversePaymentLabel": "Storna il pagamento di {{amount}} da {{payer}} a {{payee}}",
         "reversePaymentConfirm": "Stornare questo pagamento?",
         "reversePaymentConfirmDetail": "{{payer}} a {{payee}}, {{amount}}. Una scrittura di storno annulla il pagamento e i saldi tornano come prima. Il pagamento resta nell’attività, segnato come stornato.",
-        "loadMoreActivity": "Carica altri"
+        "loadMoreActivity": "Carica altri",
+        "expenseDetail": "{{title}}: {{amount}}",
+        "expenseDeleted": "Eliminata"
     },
     "wmo": {
         "0": "Cielo sereno",

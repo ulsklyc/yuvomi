@@ -3273,7 +3273,9 @@
         "reversePaymentLabel": "Stornovat platbu od {{payer}} pro {{payee}} ve výši {{amount}}",
         "reversePaymentConfirm": "Stornovat tuto platbu?",
         "reversePaymentConfirmDetail": "{{payer}} pro {{payee}}, {{amount}}. Protizápis platbu zruší a zůstatky se vrátí na předchozí stav. Platba zůstane v aktivitě označená jako stornovaná.",
-        "loadMoreActivity": "Načíst další"
+        "loadMoreActivity": "Načíst další",
+        "expenseDetail": "{{title}}: {{amount}}",
+        "expenseDeleted": "Smazáno"
     },
     "documents": {
         "title": "Dokumenty",

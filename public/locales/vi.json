@@ -3705,7 +3705,9 @@
         "reversePaymentLabel": "Hoàn tác khoản thanh toán {{amount}} từ {{payer}} cho {{payee}}",
         "reversePaymentConfirm": "Hoàn tác khoản thanh toán này?",
         "reversePaymentConfirmDetail": "{{payer}} cho {{payee}}, {{amount}}. Một bút toán đảo sẽ hủy khoản thanh toán và số dư trở lại như trước. Khoản thanh toán vẫn nằm trong hoạt động, được đánh dấu đã hoàn tác.",
-        "loadMoreActivity": "Tải thêm"
+        "loadMoreActivity": "Tải thêm",
+        "expenseDetail": "{{title}}: {{amount}}",
+        "expenseDeleted": "Đã xóa"
     },
     "wmo": {
         "0": "Trời quang",

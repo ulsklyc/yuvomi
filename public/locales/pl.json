@@ -3705,7 +3705,9 @@
         "reversePaymentLabel": "Stornuj płatność od {{payer}} dla {{payee}} na kwotę {{amount}}",
         "reversePaymentConfirm": "Stornować tę płatność?",
         "reversePaymentConfirmDetail": "{{payer}} dla {{payee}}, {{amount}}. Zapis przeciwny anuluje płatność, a salda wracają do poprzedniego stanu. Płatność pozostaje w aktywności oznaczona jako stornowana.",
-        "loadMoreActivity": "Wczytaj więcej"
+        "loadMoreActivity": "Wczytaj więcej",
+        "expenseDetail": "{{title}}: {{amount}}",
+        "expenseDeleted": "Usunięto"
     },
     "wmo": {
         "0": "Bezchmurnie",

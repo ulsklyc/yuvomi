@@ -240,9 +240,9 @@ test('Settlement-Validierung: Nicht-Mitglied -> 400', async () => {
 });
 
 // --------------------------------------------------------------------------
-// Geld: Delete räumt Ledger auf
+// Geld: Delete bucht eine Gegenbuchung (#1382)
 // --------------------------------------------------------------------------
-test('Delete der Ausgabe entfernt ihre Ledger-Einträge (Rest = nur Settlement)', async () => {
+test('Delete der Ausgabe hebt ihre Buchung per Gegenbuchung auf (Rest = nur Settlement)', async () => {
   const r = await call('DELETE', `/expenses/${EXPENSE}`, { actor: { id: OWNER, role: 'member' } });
   assert.equal(r.status, 200);
   const net = await netByUser(GROUP);

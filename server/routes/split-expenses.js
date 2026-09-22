@@ -909,6 +909,27 @@ router.put('/expenses/:id', (req, res) => {
   }
 });
 
+/**
+ * Loeschen einer Ausgabe (#1382). Die Ledger-Zeilen der Ausgabe bleiben
+ * stehen, daneben entsteht je `expense`-Zeile ihr genaues Negativ als
+ * `expense_reversal` (gleiche `source_id`) - dieselbe Form wie das Storno einer
+ * Zahlung (#1309). Die Salden stellen sich so von selbst zurueck, und das
+ * Ledger sagt weiter, warum.
+ *
+ * Gespiegelt werden die GEBUCHTEN Zeilen, nicht aus dem Datensatz neu
+ * gerechnet: eine Fremdwaehrungs-Ausgabe steht im Ledger in
+ * `converted_currency`, und genau dieser Betrag muss wieder heraus.
+ *
+ * Ein Ausgleich ist nicht an Ausgaben gebunden (`settlements` kennt nur zwei
+ * Personen und einen Betrag) und bleibt unberuehrt; nach dem Loeschen zeigen
+ * die Salden, was er ohne die Ausgabe zu viel war.
+ *
+ * Statuswechsel und Gegenbuchung stehen in EINER Transaktion, und der ganze
+ * Handler laeuft ohne await: `loadExpense` findet nur aktive Ausgaben, ein
+ * zweites Loeschen ist deshalb 404 und bucht nie ein zweites Negativ. Aeltere
+ * Loeschungen haben ihre Zeilen schon verloren und brauchen nichts: ihr Saldo
+ * stimmt, nur der Verlauf fehlt dort.
+ */
 router.delete('/expenses/:id', (req, res) => {
   try {
     const existing = loadExpense(Number(req.params.id), req);
@@ -916,8 +937,26 @@ router.delete('/expenses/:id', (req, res) => {
     if (!mayChangeGroupRecord(existing, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     db.transaction(() => {
       db.get().prepare("UPDATE expenses SET status = 'deleted', deleted_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?").run(existing.id);
-      db.get().prepare('DELETE FROM expense_ledger_entries WHERE source_type = ? AND source_id = ?').run('expense', existing.id);
-      activity(existing.group_id, userId(req), 'expense_deleted', 'expense', existing.id, { title: existing.title });
+      const booked = db.get().prepare(`
+        SELECT group_id, user_id, counterparty_id, amount_minor, currency, memo
+        FROM expense_ledger_entries
+        WHERE source_type = 'expense' AND source_id = ?
+        ORDER BY id ASC
+      `).all(existing.id);
+      const insert = db.get().prepare(`
+        INSERT INTO expense_ledger_entries (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
+        VALUES (?, 'expense_reversal', ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const row of booked) {
+        insert.run(row.group_id, existing.id, row.user_id, row.counterparty_id, -row.amount_minor, row.currency, row.memo, userId(req));
+      }
+      // Der Betrag, unter dem die Ausgabe in der Liste stand (eingegeben, in
+      // seiner Waehrung); das Ledger fuehrt den umgerechneten.
+      activity(existing.group_id, userId(req), 'expense_deleted', 'expense', existing.id, {
+        title: existing.title,
+        amount: minorToDecimal(existing.amount_minor, existing.currency),
+        currency: existing.currency,
+      });
     });
     res.json({ data: { ok: true } });
   } catch (err) {
@@ -1112,6 +1151,7 @@ router.get('/groups/:id/activity', (req, res) => {
     const hasMore = fetched.length > limit;
     const rows = fetched.slice(0, limit).map((row) => ({ ...row, metadata: row.metadata ? JSON.parse(row.metadata) : null }));
     attachSettlementState(rows, groupId, req);
+    attachExpenseState(rows, groupId);
     const last = rows[rows.length - 1];
     const nextCursor = hasMore && last ? { before_at: last.created_at, before_id: last.id } : null;
     const pagination = cursor
@@ -1162,6 +1202,43 @@ function attachSettlementState(rows, groupId, req) {
       currency: s.currency,
       reversed_at: s.reversed_at ?? null,
       can_reverse: !s.reversed_at && mayChangeGroupRecord(s, req, manages),
+    };
+  }
+}
+
+/**
+ * Haengt an jede Aktivitaet, die eine Ausgabe anlegt oder loescht, deren
+ * Stand (#1382): Titel, Betrag, und ob sie inzwischen geloescht ist. Die
+ * Oberflaeche zeigt eine geloeschte Ausgabe damit weiter im Verlauf - als
+ * Zeichen, in derselben Form wie eine stornierte Zahlung.
+ *
+ * Der Betrag ist der eingegebene in seiner Waehrung, wie ihn die Ausgabenliste
+ * zeigte; das Ledger fuehrt den umgerechneten. `expense_edited` bekommt nichts:
+ * der Datensatz traegt nur den letzten Stand, und der alte Eintrag nennte einen
+ * Betrag, den es zu seiner Zeit nicht gab.
+ */
+const EXPENSE_STATE_TYPES = new Set(['expense_created', 'recurring_generated', 'expense_deleted']);
+function attachExpenseState(rows, groupId) {
+  const wanted = (row) => EXPENSE_STATE_TYPES.has(row.type) && row.entity_type === 'expense' && row.entity_id != null;
+  const ids = [...new Set(rows.filter(wanted).map((row) => row.entity_id))];
+  if (!ids.length) return;
+  const expenses = db.get().prepare(`
+    SELECT id, title, amount_minor, currency, status, deleted_at
+    FROM expenses
+    WHERE group_id = ? AND id IN (${ids.map(() => '?').join(', ')})
+  `).all(groupId, ...ids);
+  const byId = new Map(expenses.map((e) => [e.id, e]));
+  for (const row of rows) {
+    if (!wanted(row)) continue;
+    const e = byId.get(row.entity_id);
+    if (!e) continue;
+    row.expense = {
+      id: e.id,
+      title: e.title,
+      amount_minor: e.amount_minor,
+      amount: minorToDecimal(e.amount_minor, e.currency),
+      currency: e.currency,
+      deleted_at: e.status === 'deleted' ? (e.deleted_at ?? null) : null,
     };
   }
 }

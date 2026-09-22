@@ -3705,7 +3705,9 @@
         "reversePaymentLabel": "Bawiin ang bayad ni {{payer}} kay {{payee}} na {{amount}}",
         "reversePaymentConfirm": "Bawiin ang bayad na ito?",
         "reversePaymentConfirmDetail": "{{payer}} kay {{payee}}, {{amount}}. Kinakansela ng kabaligtarang entry ang bayad at babalik ang mga balanse sa dati. Mananatili ang bayad sa aktibidad na may markang binawi.",
-        "loadMoreActivity": "Mag-load pa"
+        "loadMoreActivity": "Mag-load pa",
+        "expenseDetail": "{{title}}: {{amount}}",
+        "expenseDeleted": "Natanggal"
     },
     "wmo": {
         "0": "Maaliwalas na langit",

@@ -3705,7 +3705,9 @@
         "reversePaymentLabel": "{{payer}}님이 {{payee}}님에게 보낸 {{amount}} 결제 취소",
         "reversePaymentConfirm": "이 결제를 취소할까요?",
         "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. 반대 기입으로 결제가 상쇄되고 잔액은 이전으로 돌아갑니다. 결제는 취소됨으로 표시되어 활동에 남습니다.",
-        "loadMoreActivity": "더 불러오기"
+        "loadMoreActivity": "더 불러오기",
+        "expenseDetail": "{{title}}: {{amount}}",
+        "expenseDeleted": "삭제됨"
     },
     "wmo": {
         "0": "맑음",

@@ -3058,6 +3058,8 @@ Immutable double-entry ledger derived from expense splits and settlements.
 | memo | TEXT | nullable |
 | created_by | INTEGER | FK → Users (CASCADE delete), NOT NULL |
 
+**Deleting an expense (#1382).** `DELETE /api/v1/split-expenses/expenses/:id` sets the expense to `status = 'deleted'` and books the exact negative of every `expense` ledger row as `expense_reversal` (same `source_id`, same `memo`, `created_by` = who deleted it), in one transaction. The original rows stay, so balances end up where they would be without the expense and the ledger still shows why. The reversal mirrors the booked rows rather than recomputing from the expense: an expense in another currency is booked and cancelled in `converted_currency`. Settlements are not tied to expenses and stay untouched. Same rights as editing: group owners/admins or whoever created it, with `budget: write`. Deleting twice answers 404. The activity feed logs `expense_deleted` with `title`, `amount` and `currency` (the amount as entered, as the expense list showed it), and entries of type `expense_created`, `recurring_generated` and `expense_deleted` carry an `expense` object (`title`, `amount`, `currency`, `deleted_at`). Editing an expense (`PUT`) still replaces its `expense` rows in place.
+
 ### Settlements
 Debt payments between group members. A debt-simplification algorithm produces the minimal transfer set.
 

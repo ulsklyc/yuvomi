@@ -3705,7 +3705,9 @@
         "reversePaymentLabel": "{{payer}} से {{payee}} को {{amount}} का भुगतान रद्द करें",
         "reversePaymentConfirm": "यह भुगतान रद्द करें?",
         "reversePaymentConfirmDetail": "{{payer}} से {{payee}}, {{amount}}. एक उलटी प्रविष्टि भुगतान को रद्द करती है और शेष पहले जैसे हो जाते हैं. भुगतान गतिविधि में रद्द के रूप में बना रहता है.",
-        "loadMoreActivity": "और लोड करें"
+        "loadMoreActivity": "और लोड करें",
+        "expenseDetail": "{{title}}: {{amount}}",
+        "expenseDeleted": "हटाया गया"
     },
     "wmo": {
         "0": "साफ आकाश",

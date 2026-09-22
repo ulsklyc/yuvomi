@@ -128,7 +128,7 @@ export function splitexpensesPaths() {
     '/api/v1/split-expenses/groups/{id}/activity': {
       get: op({
         summary: 'Get group activity feed',
-        description: 'Newest first (`created_at` descending, `id` ascending within the same second). Page through every entry with the cursor: pass `before_at` and `before_id` from `pagination.next_cursor` of the previous page; entries added meanwhile appear at the top and shift nothing. Without a cursor the endpoint behaves as before (`limit`, `offset`). `pagination.next_cursor` is null when `has_more` is false. Cursor and a non-zero `offset` together answer 400. Entries of type `payment_registered` carry a `settlement` object: payer, payee, amount, `reversed_at` (null while active) and `can_reverse` for the caller.',
+        description: 'Newest first (`created_at` descending, `id` ascending within the same second). Page through every entry with the cursor: pass `before_at` and `before_id` from `pagination.next_cursor` of the previous page; entries added meanwhile appear at the top and shift nothing. Without a cursor the endpoint behaves as before (`limit`, `offset`). `pagination.next_cursor` is null when `has_more` is false. Cursor and a non-zero `offset` together answer 400. Entries of type `payment_registered` carry a `settlement` object: payer, payee, amount, `reversed_at` (null while active) and `can_reverse` for the caller. Entries of type `expense_created`, `recurring_generated` and `expense_deleted` carry an `expense` object: `title`, `amount`, `currency` (as entered) and `deleted_at` (null while active).',
         tag: 'SplitExpenses',
         params: [
           idParam(),
@@ -155,7 +155,13 @@ export function splitexpensesPaths() {
     },
     '/api/v1/split-expenses/expenses/{id}': {
       put: op({ summary: 'Update expense (`attachment_document_ids` replaces the receipt links; omit the field to leave them untouched)', tag: 'SplitExpenses', params: [idParam()], stateChanging: true, documentDeleteConflict: true, requestBody: jsonBody(null) }),
-      delete: op({ summary: 'Delete expense', tag: 'SplitExpenses', params: [idParam()], stateChanging: true }),
+      delete: op({
+        summary: 'Delete expense',
+        tag: 'SplitExpenses',
+        description: 'Marks the expense deleted and books an exact counter-entry (`expense_reversal`) for every ledger row it booked, in the currency it was booked in, so balances end up where they would be without it. The original ledger rows stay. Settlements are not tied to expenses and stay untouched. Allowed for group owners/admins and for whoever created the expense, with write access to the `budget` module. A second delete answers 404; the activity feed records `expense_deleted`.',
+        params: [idParam()],
+        stateChanging: true,
+      }),
     },
     '/api/v1/split-expenses/expenses/{id}/comments': {
       post: op({ summary: 'Add expense comment', tag: 'SplitExpenses', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),

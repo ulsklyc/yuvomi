@@ -3705,7 +3705,9 @@
         "reversePaymentLabel": "Betaling van {{payer}} aan {{payee}} van {{amount}} tegenboeken",
         "reversePaymentConfirm": "Deze betaling tegenboeken?",
         "reversePaymentConfirmDetail": "{{payer}} aan {{payee}}, {{amount}}. Een tegenboeking heft de betaling op en de saldi staan weer zoals ervoor. De betaling blijft in de activiteit, gemarkeerd als tegengeboekt.",
-        "loadMoreActivity": "Meer laden"
+        "loadMoreActivity": "Meer laden",
+        "expenseDetail": "{{title}}: {{amount}}",
+        "expenseDeleted": "Verwijderd"
     },
     "wmo": {
         "0": "Heldere lucht",

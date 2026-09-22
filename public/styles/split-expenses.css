@@ -420,7 +420,8 @@ button.split-expense:hover {
 /* Storno einer Zahlung (#1309). Die Textspalte nimmt den Platz, der Knopf
  * bleibt so breit wie sein Wort. „Storniert" ist ein Zeichen, kein Knopf: es
  * steht bei jedem Recht, in der Form der Archiv-Marke, und die Zahlungszeile
- * darueber ist durchgestrichen - der Betrag zaehlt nicht mehr. */
+ * darueber ist durchgestrichen - der Betrag zaehlt nicht mehr. Eine geloeschte
+ * Ausgabe (#1382) traegt dieselben Klassen: Zeile und Zeichen sehen gleich aus. */
 .split-activity-item > div {
   flex: 1 1 auto;
 }

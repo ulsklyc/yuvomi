@@ -304,3 +304,38 @@ test('Datum: der Tag in der Haushaltszone, nicht der UTC-Tag', () => {
     Object.assign(split.state, vorher);
   }
 });
+
+test('geloeschte Ausgabe (#1382): Zeichen am Anlege-Eintrag, Loesch-Eintrag nennt sie ohne Zeichen', () => {
+  const vorher = { ...split.state };
+  const ausgabe = (extra = {}) => ({ id: 9, title: 'Einkauf', amount_minor: 3000, amount: '30.00', currency: 'EUR', deleted_at: null, ...extra });
+  const zeichne = (activity, modus = 'write') => {
+    Object.assign(split.state, { activity, activityCursor: null, groupStatus: 'active' });
+    return withAccess({ budget: modus }, () => split.renderActivity());
+  };
+  try {
+    // Aktiv: die Zeile nennt die Ausgabe, kein Zeichen, nicht durchgestrichen.
+    const aktiv = zeichne([eintrag(1, { entity_id: 9, expense: ausgabe() })]);
+    // Der t()-Stub haengt die Parameter an: Titel und der Betrag in seiner Waehrung.
+    const detail = /<span class="split-activity-payment">splitExpenses\.expenseDetail\{&quot;title&quot;:&quot;Einkauf&quot;,&quot;amount&quot;:&quot;30,00\s€&quot;\}<\/span>/;
+    assert.match(aktiv, detail);
+    assert.doesNotMatch(aktiv, /split-activity-item--reversed|split-activity-reversed/);
+
+    // Geloescht: bei jedem Recht das Zeichen und die durchgestrichene Zeile.
+    const weg = ausgabe({ deleted_at: '2026-09-21T08:00:00Z' });
+    for (const modus of ['write', 'read']) {
+      const html = zeichne([
+        eintrag(2, { type: 'expense_deleted', entity_id: 9, expense: weg }),
+        eintrag(1, { entity_id: 9, expense: weg }),
+      ], modus);
+      const [loeschung, anlage] = html.split('<div class="split-activity-item').slice(1);
+      assert.match(anlage, /^ split-activity-item--reversed"/, modus);
+      assert.match(anlage, /<span class="split-activity-reversed">splitExpenses\.expenseDeleted<\/span>/, modus);
+      assert.match(loeschung, /^"/, `${modus}: der Loesch-Eintrag ist nicht durchgestrichen`);
+      assert.match(loeschung, detail, modus);
+      assert.doesNotMatch(loeschung, /split-activity-reversed/, modus);
+      assert.doesNotMatch(html, /data-reverse-settlement/, `${modus}: keine Handlung`);
+    }
+  } finally {
+    Object.assign(split.state, vorher);
+  }
+});

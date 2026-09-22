@@ -731,17 +731,29 @@ function renderActivity() {
 function activityItemHtml(item, actionable) {
   const settlement = item.settlement;
   const params = settlement ? paymentParams(settlement) : null;
-  const detail = settlement
-    ? `<span class="split-activity-payment">${esc(t('splitExpenses.paymentDetail', params))}</span>`
-    : '';
-  const reversed = settlement?.reversed_at
-    ? `<span class="split-activity-reversed">${esc(t('splitExpenses.paymentReversed'))}</span>`
-    : '';
+  const expense = item.expense;
+  // Eine geloeschte Ausgabe (#1382) bleibt im Verlauf lesbar: der Eintrag, der
+  // sie angelegt hat, traegt „Geloescht" als Zeichen und ist durchgestrichen -
+  // wie eine stornierte Zahlung. Der Loesch-Eintrag selbst nennt nur, was
+  // geloescht wurde; sein Typ sagt den Rest.
+  const expenseGone = Boolean(expense?.deleted_at) && item.type !== 'expense_deleted';
+  let detail = '';
+  if (settlement) {
+    detail = `<span class="split-activity-payment">${esc(t('splitExpenses.paymentDetail', params))}</span>`;
+  } else if (expense) {
+    detail = `<span class="split-activity-payment">${esc(t('splitExpenses.expenseDetail', { title: expense.title || '', amount: money(expense.amount, expense.currency) }))}</span>`;
+  }
+  let reversed = '';
+  if (settlement?.reversed_at) {
+    reversed = `<span class="split-activity-reversed">${esc(t('splitExpenses.paymentReversed'))}</span>`;
+  } else if (expenseGone) {
+    reversed = `<span class="split-activity-reversed">${esc(t('splitExpenses.expenseDeleted'))}</span>`;
+  }
   const action = settlement?.can_reverse && !settlement.reversed_at && actionable
     ? `<button type="button" class="btn btn--secondary split-reverse-payment" data-reverse-settlement="${settlement.id}" aria-label="${esc(t('splitExpenses.reversePaymentLabel', params))}">${esc(t('splitExpenses.reversePayment'))}</button>`
     : '';
   return `
-    <div class="split-activity-item${settlement?.reversed_at ? ' split-activity-item--reversed' : ''}">
+    <div class="split-activity-item${settlement?.reversed_at || expenseGone ? ' split-activity-item--reversed' : ''}">
       <span class="split-activity-dot"></span>
       <div>
         <strong>${esc(t(`splitExpenses.activityType.${item.type}`))}</strong>

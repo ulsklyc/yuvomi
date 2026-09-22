@@ -3705,7 +3705,9 @@
         "reversePaymentLabel": "Batalkan pembayaran dari {{payer}} ke {{payee}} sebesar {{amount}}",
         "reversePaymentConfirm": "Batalkan pembayaran ini?",
         "reversePaymentConfirmDetail": "{{payer}} ke {{payee}}, {{amount}}. Entri balik membatalkan pembayaran dan saldo kembali seperti semula. Pembayaran tetap ada di aktivitas dengan tanda dibatalkan.",
-        "loadMoreActivity": "Muat lebih banyak"
+        "loadMoreActivity": "Muat lebih banyak",
+        "expenseDetail": "{{title}}: {{amount}}",
+        "expenseDeleted": "Dihapus"
     },
     "wmo": {
         "0": "Langit cerah",
