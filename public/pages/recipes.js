@@ -9,7 +9,7 @@ import { esc } from '/utils/html.js';
 import { openModal as openSharedModal, closeModal as closeSharedModal, advancedSection, wireBlurValidation, reportFieldError } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME } from '/utils/shopping-categories.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
-import { resolveShoppingTarget, announceTransfer } from '/utils/kitchen-transfer.js';
+import { resolveShoppingTarget, announceTransfer, mayTransferRecipeToShopping } from '/utils/kitchen-transfer.js';
 import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { ingredientRowHTML } from '/utils/ingredient-row.js';
 import { scheduleUndoableDelete } from '/utils/ux.js';
@@ -761,15 +761,8 @@ function renderRecipeList() {
       addToMeals.textContent = t('recipes.addToMeals');
       detailActions.appendChild(addToMeals);
 
-      if (state.lists.length && ingredients.length) {
-        const addToShopping = document.createElement('button');
-        addToShopping.className = 'btn btn--secondary';
-        addToShopping.type = 'button';
-        addToShopping.dataset.action = 'to-shopping';
-        addToShopping.dataset.id = String(recipe.id);
-        addToShopping.textContent = t('common.toShoppingList');
-        detailActions.appendChild(addToShopping);
-      }
+      const addToShopping = shoppingTransferButton(recipe, ingredients);
+      if (addToShopping) detailActions.appendChild(addToShopping);
 
       if (recipe.recipe_url) {
         const link = document.createElement('a');
@@ -1253,7 +1246,28 @@ async function planRecipe(recipe, btn) {
   if (btn) btn.blur();
 }
 
+/**
+ * Der Knopf „Auf die Einkaufsliste" im Rezeptdetail - oder `null`, wenn er
+ * nichts ausloesen koennte: ohne Liste, ohne Zutaten, oder weil der Server ihn
+ * abwiese. Das sind ZWEI Riegel (#1290): `/recipes` misst der Pfad-Guard als
+ * `meals`, die Route verlangt dazu `shopping`. Mit `shopping: read` laedt
+ * `state.lists` trotzdem - die Liste allein ist also keine Erlaubnis.
+ */
+function shoppingTransferButton(recipe, ingredients) {
+  if (!state.lists.length || !ingredients.length) return null;
+  if (!mayTransferRecipeToShopping(recipe.id)) return null;
+  const btn = document.createElement('button');
+  btn.className = 'btn btn--secondary';
+  btn.type = 'button';
+  btn.dataset.action = 'to-shopping';
+  btn.dataset.id = String(recipe.id);
+  btn.textContent = t('common.toShoppingList');
+  return btn;
+}
+
 async function transferRecipe(recipe, btn) {
+  // Zweite Linie hinter dem Markup (Regel 2 in utils/module-access.js).
+  if (!mayTransferRecipeToShopping(recipe.id)) return;
   // Vorprüfung, Listenwahl und die Antwort auf „es gibt keine Liste" liegen im
   // geteilten Baustein. Vorher lieh sich diese Stelle `meals.noShoppingLists` -
   // der Text der Rezepte hing damit an einem fremden Modul, und ein Refactor im
@@ -1330,3 +1344,11 @@ async function duplicateRecipe(recipe) {
     window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
   }
 }
+
+export const __test = {
+  // #1290: der Transfer in den Einkauf braucht BEIDE Schreibrechte - Knopf und
+  // Handler werden als Programm gefahren (test-kitchen-transfer-ui.js).
+  state,
+  shoppingTransferButton,
+  transferRecipe,
+};

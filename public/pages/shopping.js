@@ -13,6 +13,7 @@ import { promptModal, openModal, closeModal, confirmModal, reportFieldError, ref
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { addLocalDays, todayKey } from '/utils/date.js';
 import { renderKitchenTabsBar, refreshKitchenBadges } from '/utils/kitchen-tabs.js';
+import { mayImportMealPlan } from '/utils/kitchen-transfer.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
 import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import '/components/category-manager.js';
@@ -724,7 +725,12 @@ function renderTabs(container) {
         items: [
           { action: 'rename-list', label: t('shopping.renameListLabel'), icon: 'pencil', id: state.activeList.id },
           { action: 'duplicate-list', label: t('shopping.duplicateListLabel'), icon: 'copy' },
-          { action: 'import-meals', label: t('shopping.importMeals'), icon: 'utensils' },
+          // Die Uebernahme schreibt auch in den Essensplan (`on_shopping_list`),
+          // und die Route verlangt dafuer `meals: write` - schon fuer die
+          // Vorschau (#1290). Ohne das endete der Eintrag im 403.
+          ...(mayImportMealPlan(state.activeList.id)
+            ? [{ action: 'import-meals', label: t('shopping.importMeals'), icon: 'utensils' }]
+            : []),
           { action: 'send-list', label: t('shopping.sendList'), icon: 'mail' },
           { action: 'manage-categories', label: t('shopping.manageCategories'), icon: 'tags' },
           { action: 'manage-stores', label: t('shopping.manageStores'), icon: 'store' },
@@ -2417,6 +2423,8 @@ function updateListCounter(listId, totalDelta, checkedDelta) {
 
 function openMealPlanImport(container) {
   if (!state.activeListId) return;
+  // Zweite Linie hinter dem Menue (Regel 2 in utils/module-access.js).
+  if (!mayImportMealPlan(state.activeListId)) return;
   const today = todayKey();
   const defaultTo = addLocalDays(today, 6);
 
@@ -2457,6 +2465,9 @@ function openMealPlanImport(container) {
         const from = panel.querySelector('#shopping-import-from')?.value || '';
         const to = panel.querySelector('#shopping-import-to')?.value || '';
         if (!from || !to || !previewEl) return;
+        // Die Rechte koennen sich aendern, waehrend der Dialog offen steht; die
+        // Vorschau verlangt serverseitig dieselben zwei wie der Import (#1290).
+        if (!mayImportMealPlan(state.activeListId)) return;
         try {
           const data = await api.post(`/shopping/${state.activeListId}/import-meal-plan`, { from, to, preview: true });
           const transferred = Number(data.data?.transferred) || 0;
@@ -2487,6 +2498,7 @@ function openMealPlanImport(container) {
         const from = panel.querySelector('#shopping-import-from')?.value || '';
         const to = panel.querySelector('#shopping-import-to')?.value || '';
         if (!from || !to) return;
+        if (!mayImportMealPlan(state.activeListId)) return;
         try {
           const data = await api.post(`/shopping/${state.activeListId}/import-meal-plan`, { from, to });
           if (!data.data?.transferred) {
@@ -3447,4 +3459,8 @@ export const __test = {
   acknowledgeOwnChange,
   getLiveFeedForTest: () => _liveFeed,
   abortLiveUpdatesForTest: () => { _liveController?.abort(); _liveController = null; _liveFeed = null; },
+  // #1290: die Uebernahme aus dem Essensplan braucht auch `meals: write` -
+  // Menue und Einstieg werden als Programm gefahren (test-kitchen-transfer-ui.js).
+  renderTabs,
+  openMealPlanImport,
 };
