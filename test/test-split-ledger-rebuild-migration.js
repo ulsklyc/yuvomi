@@ -167,6 +167,15 @@ test('vollstaendige und geloeschte Ausgaben bleiben unberuehrt', () => {
   assert.equal(bookedRows(DELETED).length, 0, 'geloeschte Ausgabe bekommt keine Zeilen');
 });
 
+test('der Verlauf der Gruppe nennt jede wiederhergestellte Ausgabe genau einmal', async () => {
+  const r = await OWN.call('GET', `/split-expenses/groups/${GROUP}/activity`);
+  assert.equal(r.status, 200);
+  const list = Array.isArray(r.body.data) ? r.body.data : r.body.data.items;
+  const restored = list.filter((a) => a.type === 'ledger_restored');
+  assert.deepEqual(restored.map((a) => a.entity_id).sort((a, b) => a - b), [LOST_REMAINDER, LOST_FX].sort((a, b) => a - b));
+  assert.ok(restored.every((a) => a.actor_id === null && a.entity_type === 'expense'), 'kein Akteur, Ausgabe als Bezug');
+});
+
 test('Salden danach gleich dem Stand vor dem Verlust', async () => {
   assert.deepEqual(await balances(), BALANCES);
 });
@@ -197,14 +206,30 @@ test('Upgrade von v225 durch den echten Runner baut die Zeilen auf und verbucht 
       INSERT INTO expenses (group_id, title, amount_minor, currency, converted_amount_minor, converted_currency, payer_id, created_by, status)
       VALUES (?, 'Einkauf', 2000, 'USD', 1850, 'EUR', ?, ?, ?)
     `).run(groupId, own, own, status).lastInsertRowid;
-    // Die verlorene Ausgabe: Anteile da, Ledger-Zeilen weg. Dazu eine geloeschte.
-    const lost = addExpense('active');
-    const gone = addExpense('deleted');
-    for (const id of [lost, gone]) {
+    const addSplits = (id) => {
       for (const [who, amount] of [[own, 925], [pay, 925]]) {
         fresh.prepare('INSERT INTO expense_splits (expense_id, user_id, amount_minor, currency) VALUES (?, ?, ?, ?)').run(id, who, amount, 'EUR');
       }
-    }
+    };
+    // Gruppe WG: zwei verlorene Ausgaben (Anteile da, Ledger-Zeilen weg) und eine geloeschte.
+    const lost = addExpense('active');
+    const lost2 = addExpense('active');
+    const gone = addExpense('deleted');
+    for (const id of [lost, lost2, gone]) addSplits(id);
+    // Gruppe Urlaub: eine vollstaendige Ausgabe - keine Reparatur, kein Eintrag.
+    const otherGroup = fresh.prepare("INSERT INTO expense_groups (name, created_by) VALUES ('Urlaub', ?)").run(own).lastInsertRowid;
+    const complete = fresh.prepare(`
+      INSERT INTO expenses (group_id, title, amount_minor, currency, converted_amount_minor, converted_currency, payer_id, created_by)
+      VALUES (?, 'Hotel', 1850, 'EUR', 1850, 'EUR', ?, ?)
+    `).run(otherGroup, own, own).lastInsertRowid;
+    addSplits(complete);
+    const ledger = fresh.prepare(`
+      INSERT INTO expense_ledger_entries (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
+      VALUES (?, 'expense', ?, ?, ?, ?, 'EUR', 'Hotel', ?)
+    `);
+    ledger.run(otherGroup, complete, own, null, 1850, own);
+    ledger.run(otherGroup, complete, own, own, -925, own);
+    ledger.run(otherGroup, complete, pay, own, -925, own);
     assert.equal(fresh.prepare('SELECT MAX(version) AS v FROM schema_migrations').get().v, 225, 'Fixture: Stand v225');
 
     dbmod.migrate(fresh, dbmod.MIGRATIONS);
@@ -212,13 +237,26 @@ test('Upgrade von v225 durch den echten Runner baut die Zeilen auf und verbucht 
     assert.ok(fresh.prepare('SELECT 1 FROM schema_migrations WHERE version = 226').get(), 'v226 verbucht');
     const rows = fresh.prepare(`
       SELECT group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by
-      FROM expense_ledger_entries ORDER BY id
+      FROM expense_ledger_entries WHERE group_id = ? ORDER BY id
+    `).all(groupId);
+    const rowsOf = (id) => [
+      { group_id: groupId, source_type: 'expense', source_id: id, user_id: own, counterparty_id: null, amount_minor: 1850, currency: 'EUR', memo: 'Einkauf', created_by: own },
+      { group_id: groupId, source_type: 'expense', source_id: id, user_id: own, counterparty_id: own, amount_minor: -925, currency: 'EUR', memo: 'Einkauf', created_by: own },
+      { group_id: groupId, source_type: 'expense', source_id: id, user_id: pay, counterparty_id: own, amount_minor: -925, currency: 'EUR', memo: 'Einkauf', created_by: own },
+    ];
+    assert.deepEqual(rows, [...rowsOf(lost), ...rowsOf(lost2)], 'nur die aktiven Ausgaben, Zahler zuerst, im umgerechneten Betrag');
+    assert.equal(fresh.prepare('SELECT COUNT(*) AS n FROM expense_ledger_entries WHERE group_id = ?').get(otherGroup).n, 3, 'vollstaendige Ausgabe unberuehrt');
+
+    // Verlauf: genau ein Eintrag je wiederhergestellter Ausgabe, keiner in der Gruppe ohne Reparatur.
+    const activity = fresh.prepare(`
+      SELECT group_id, actor_id, type, entity_type, entity_id, metadata FROM expense_activity ORDER BY id
     `).all();
-    assert.deepEqual(rows, [
-      { group_id: groupId, source_type: 'expense', source_id: lost, user_id: own, counterparty_id: null, amount_minor: 1850, currency: 'EUR', memo: 'Einkauf', created_by: own },
-      { group_id: groupId, source_type: 'expense', source_id: lost, user_id: own, counterparty_id: own, amount_minor: -925, currency: 'EUR', memo: 'Einkauf', created_by: own },
-      { group_id: groupId, source_type: 'expense', source_id: lost, user_id: pay, counterparty_id: own, amount_minor: -925, currency: 'EUR', memo: 'Einkauf', created_by: own },
-    ], 'nur die aktive Ausgabe, Zahler zuerst, im umgerechneten Betrag');
+    const restored = (id) => ({
+      group_id: groupId, actor_id: null, type: 'ledger_restored', entity_type: 'expense', entity_id: id,
+      metadata: JSON.stringify({ title: 'Einkauf', amount_minor: 1850, currency: 'EUR' }),
+    });
+    assert.deepEqual(activity, [restored(lost), restored(lost2)], 'N Eintraege fuer N wiederhergestellte Ausgaben');
+    assert.equal(activity.filter((a) => a.group_id === otherGroup).length, 0, 'Gruppe ohne Reparatur: kein Eintrag');
     assert.ok(
       logged.some((line) => line.includes(`shared expense ${lost} in group ${groupId}`)),
       'Log nennt Ausgabe und Gruppe',

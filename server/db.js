@@ -9657,6 +9657,16 @@ const MIGRATIONS = [
     // Nur aktive Ausgaben (geloeschte sind ohne Zeilen richtig), nur fehlende
     // Zeilen; ein zweiter Lauf findet nichts mehr. Das Log nennt Ausgabe und
     // Gruppe, damit ein Admin eine veraenderte Bilanz erklaeren kann.
+    //
+    // Die Gruppe sieht es selbst im Verlauf: je wiederhergestellter Ausgabe
+    // genau ein Eintrag 'ledger_restored' (entity 'expense', actor_id NULL -
+    // niemand hat gehandelt, die Oberflaeche zeigt "System"). metadata traegt
+    // Titel und den gebuchten (umgerechneten) Betrag. Das Schema von
+    // expense_activity ist hier dasselbe wie bei seiner Anlage in v39: keine
+    // Spalte ist seitdem dazugekommen, und type hat keinen CHECK. Die Spalten
+    // stehen ausdruecklich im INSERT, created_at kommt aus dem Default - eine
+    // spaetere Spalte bricht das nur, wenn sie NOT NULL ohne Default ist, und
+    // die verbietet .claude/rules/db-migrations.md ohnehin.
     up(db) {
       db.exec(`
         DROP TABLE IF EXISTS temp._v226_missing;
@@ -9682,6 +9692,11 @@ const MIGRATIONS = [
           FROM expenses e JOIN _v226_missing m ON m.id = e.id JOIN expense_splits s ON s.expense_id = e.id
         ) x
         ORDER BY x.id, x.ord;
+        INSERT INTO expense_activity (group_id, actor_id, type, entity_type, entity_id, metadata)
+        SELECT e.group_id, NULL, 'ledger_restored', 'expense', e.id,
+               json_object('title', e.title, 'amount_minor', e.converted_amount_minor, 'currency', e.converted_currency)
+        FROM expenses e JOIN _v226_missing m ON m.id = e.id
+        ORDER BY e.id;
         DROP TABLE _v226_missing;
       `);
       for (const row of rebuilt) {

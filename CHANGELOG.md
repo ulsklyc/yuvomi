@@ -181,7 +181,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   update now rebuilds them from the expense and its shares, exactly as they are booked when an
   expense is saved, including the converted amount of an expense in another currency. Only active
   expenses without any booking are touched; deleted expenses and complete ones stay as they are.
-  (#1309)
+  The group's activity shows "Booking restored" once for each expense that was repaired, so a
+  changed balance has a visible reason. (#1309)
 
 - **A failed restore explains itself in your language and keeps your place.** When a backup did
   not open, the restore dialog showed the server's English explanation, up to several paragraphs

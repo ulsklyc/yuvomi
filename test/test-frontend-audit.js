@@ -10145,6 +10145,17 @@ test('split activity feed translates every type the backend writes', () => {
     'server/routes/split-expenses.js': read('../server/routes/split-expenses.js'),
     'server/services/split-expenses-scheduler.js': read('../server/services/split-expenses-scheduler.js'),
     'scripts/seed-demo.js': read('../scripts/seed-demo.js'),
+    // Migration v226 schreibt 'ledger_restored' selbst per SQL. Nur ihr Block,
+    // nicht die ganze db.js: dort stehen Listen wie
+    // IN ('expense', 'expense_reversal', 'settlement', ...), die das Regex als
+    // Typen laese.
+    'server/db.js (v226)': (() => {
+      const db = read('../server/db.js');
+      const start = db.indexOf('    version: 226,');
+      assert.ok(start > 0, 'Migration v226 in server/db.js nicht gefunden');
+      const end = db.indexOf('\n  },\n', start);
+      return db.slice(start, end);
+    })(),
   };
 
   // activity(groupId, actor, 'type', …) bzw. insertActivity(db, …, 'type', …).

@@ -304,3 +304,30 @@ test('Datum: der Tag in der Haushaltszone, nicht der UTC-Tag', () => {
     Object.assign(split.state, vorher);
   }
 });
+
+// Migration v226 schreibt 'ledger_restored' ohne Akteur (#1382): der Eintrag
+// traegt den uebersetzten Typ und "System" statt eines Namens - und der Key
+// steht in jeder Sprache, sonst zeigte die Seite den rohen Key.
+test('Buchung wiederhergestellt: eigener Typtext, "System" als Akteur, in jeder Sprache uebersetzt', async () => {
+  const vorher = { ...split.state };
+  try {
+    Object.assign(split.state, {
+      activity: [eintrag(1, { type: 'ledger_restored', actor_id: null, actor_name: null, metadata: { title: 'Einkauf', amount_minor: 1850, currency: 'EUR' } })],
+      activityCursor: null, groupStatus: 'active',
+    });
+    const html = withAccess({ budget: 'write' }, () => split.renderActivity());
+    assert.match(html, /<strong>splitExpenses\.activityType\.ledger_restored<\/strong>/);
+    assert.match(html, /splitExpenses\.system · /, 'ohne Akteur steht "System"');
+    assert.doesNotMatch(html, /data-reverse-settlement/, 'keine Handlung am Eintrag');
+  } finally {
+    Object.assign(split.state, vorher);
+  }
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const dir = new URL('../public/locales/', import.meta.url);
+  const files = readdirSync(dir).filter((f) => f.endsWith('.json'));
+  assert.equal(files.length, 24);
+  for (const file of files) {
+    const text = JSON.parse(readFileSync(new URL(file, dir), 'utf8')).splitExpenses?.activityType?.ledger_restored;
+    assert.ok(typeof text === 'string' && text.trim() && !text.includes('activityType'), `${file}: ledger_restored fehlt`);
+  }
+});
