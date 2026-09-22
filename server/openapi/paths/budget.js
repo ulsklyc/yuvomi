@@ -1,4 +1,4 @@
-import { op, jsonBody, idParam, stringPathParam, langParam } from '../helpers.js';
+import { op, jsonBody, idParam, stringPathParam, langParam, DOCUMENT_LINKS_READ_NOTE } from '../helpers.js';
 
 export function budgetPaths() {
   return {
@@ -63,6 +63,7 @@ export function budgetPaths() {
       get: op({
         summary: 'List budget entries',
         tag: 'Budget',
+        description: `Each entry carries \`attachments\`. ${DOCUMENT_LINKS_READ_NOTE}`,
         params: [{
           name: 'scope',
           in: 'query',
@@ -71,10 +72,10 @@ export function budgetPaths() {
           schema: { type: 'string', enum: ['mine', 'household'], default: 'mine' },
         }],
       }),
-      post: op({ summary: 'Create budget entry (optional `visibility`: private|shared; owner is the creator; optional `attachment_document_ids`: receipts from the documents module)', tag: 'Budget', stateChanging: true, documentDeleteConflict: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Create budget entry (optional `visibility`: private|shared; owner is the creator; optional `attachment_document_ids`: receipts from the documents module)', tag: 'Budget', description: DOCUMENT_LINKS_READ_NOTE, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/budget/{id}': {
-      put: op({ summary: 'Update budget entry (`attachment_document_ids` replaces the receipt links; omit the field to leave them untouched)', tag: 'Budget', params: [idParam()], stateChanging: true, documentDeleteConflict: true, requestBody: jsonBody(null) }),
+      put: op({ summary: 'Update budget entry (`attachment_document_ids` replaces the receipt links; omit the field to leave them untouched)', tag: 'Budget', params: [idParam()], description: DOCUMENT_LINKS_READ_NOTE, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete budget entry', tag: 'Budget', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/budget/{id}/confirm': {

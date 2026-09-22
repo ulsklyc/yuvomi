@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **You can sign out on your other devices.** Since a session now lasts 90 days without use, a lost
+  phone or a borrowed laptop could stay signed in for months, and signing out only ended the
+  session on the device you were using. Settings, Account, now has "Other devices" with a button
+  that ends every other session of your account after a confirmation, including ones started with
+  single sign-on; this device stays signed in, and the page says how many sessions were ended,
+  counting only ones that were still valid. Clicking it too often asks you to wait a moment; the
+  limit applies to each member separately, so one member cannot lock out another. API
+  tokens and paired wall displays are not sessions and keep working; they are revoked under API
+  tokens and Displays as before. For API clients: `POST /api/v1/auth/logout-others` needs a
+  browser session and a CSRF token, answers `{ ok: true, ended }`, and refuses an API token with
+  403. (#1354)
+
 - **API clients can fill only the empty slots of the meal plan.** `POST /api/v1/meals/apply-plan`
   takes a new option `skip_occupied: true`. An assignment whose date and meal type already hold a
   meal is then left out instead of being added next to it, and the answer lists it in `skipped` as
@@ -19,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   assignments for the same empty slot are all created. The option has to be a JSON boolean, and
   combining it with `replace_existing` is refused with `400`. Without the option the endpoint
   behaves and answers exactly as before. (Discussion #1380)
+
 - **Every done task on the board can be archived in one action.** The "Done" column of the board
   now has an archive button next to its count. After a confirmation it moves the done tasks the
   column currently shows into the archive - the ones it shows, so a task someone else completes
@@ -161,6 +174,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `receipt_document_name` are `null` unless you may read the document, API tokens need a
   `documents:read` scope for them, and `PUT /api/v1/housekeeping/visits/{id}` answers 403 when it
   would replace a receipt you cannot see or link one without access to documents. (#1358)
+
+- **Receipts on budget entries, shared expenses and inventory items no longer name documents you
+  may not read.** Their API sent the file name and document number of every linked receipt to
+  anyone who could open the budget or the inventory, also to members without access to documents
+  and to API tokens without a documents scope. Without access to documents a receipt now only says
+  that it is there: the detail view shows "Attached" where the name was, and the inventory no
+  longer shows a link that leads nowhere or lists the document in an item's history. Linking a
+  receipt or a payment proof needs access to documents, and existing receipts stay when such a
+  member saves the entry. For API clients `attachments[].document_id`, `name`, `original_name`,
+  `mime_type` and `file_size` are `null` without access to the documents module (for API tokens a
+  `documents:read` scope), a settlement's `proof_document_id` is `null` unless you may read that
+  document, and a non-empty `attachment_document_ids` or a `proof_document_id` is answered with the
+  same 403 for every id. (#1358)
 
 - **An edited shared expense keeps counting after the editor's account is deleted.** When a group
   owner or admin edited someone else's expense and that editor's account was later deleted, the

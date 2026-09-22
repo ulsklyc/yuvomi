@@ -180,6 +180,21 @@ test('personal settings leaf modules import without browser globals', async () =
   }
 });
 
+test('sign out other devices names the rate limit instead of a generic failure (#1354)', async () => {
+  // Review zu #1423: ein 429 las sich wie "fehlgeschlagen", obwohl nur zu
+  // schnell geklickt wurde - die Seite muss sagen, dass Warten hilft.
+  const { logoutOthersErrorText } = await import('/settings/pages/personal-account.js');
+  assert.equal(typeof logoutOthersErrorText, 'function');
+  assert.equal(logoutOthersErrorText({ status: 429 }), 'settings.otherSessionsTooManyAttempts');
+  assert.equal(logoutOthersErrorText({ status: 500 }), 'settings.otherSessionsError');
+  assert.equal(logoutOthersErrorText(new Error('offline')), 'settings.otherSessionsError');
+
+  // Der Klick-Handler nimmt genau diese Funktion - sonst misst der Fall oben
+  // eine Funktion, die niemand aufruft.
+  const source = await readFile(new URL('../public/settings/pages/personal-account.js', import.meta.url), 'utf8');
+  assert.match(source, /catch \(error\) \{\s*showError\(errorBox, logoutOthersErrorText\(error\)\);/);
+});
+
 test('settings reuse the authenticated router user instead of blocking on auth.me', async () => {
   const source = await readFile(
     new URL('../public/pages/settings.js', import.meta.url),
