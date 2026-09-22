@@ -2774,6 +2774,9 @@
             "vaccination": "Vacuna",
             "checkup": "Revisión"
         },
+        "backupRestoreKeyLabel": "Clave de la copia de seguridad",
+        "backupRestoreKeyHint": "Esta copia de seguridad procede de otra instalación. Introduce su DB_ENCRYPTION_KEY: solo se usa para esta restauración y no se guarda; después, los datos quedan cifrados con la clave de esta instalación.",
+        "backupRestoreKeyHttpWarning": "Esta página no está abierta por HTTPS: la clave viajará por la red sin cifrar.",
         "otherSessionsTitle": "Otros dispositivos",
         "otherSessionsHint": "Cierra la sesión de tu cuenta en todos los demás dispositivos y navegadores. Este dispositivo sigue con la sesión iniciada. Los tokens de API y las pantallas de pared vinculadas no se ven afectados.",
         "otherSessionsButton": "Cerrar sesión en otros dispositivos",

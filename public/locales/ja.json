@@ -2774,6 +2774,9 @@
             "vaccination": "予防接種",
             "checkup": "健診"
         },
+        "backupRestoreKeyLabel": "バックアップのキー",
+        "backupRestoreKeyHint": "このバックアップは別のインストールのものです。そのインストールの DB_ENCRYPTION_KEY を入力してください。キーはこの復元にのみ使われ、保存されません。復元後のデータはこのインストールのキーで暗号化されます。",
+        "backupRestoreKeyHttpWarning": "このページは HTTPS で開かれていません。キーは暗号化されずにネットワークを通ります。",
         "otherSessionsTitle": "他のデバイス",
         "otherSessionsHint": "他のすべてのデバイスとブラウザーでアカウントからサインアウトします。このデバイスはサインインしたままです。API トークンとペアリング済みのウォールディスプレイには影響しません。",
         "otherSessionsButton": "他のデバイスからサインアウト",

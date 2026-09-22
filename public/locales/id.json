@@ -2786,6 +2786,9 @@
             "vaccination": "Vaksinasi",
             "checkup": "Pemeriksaan"
         },
+        "backupRestoreKeyLabel": "Kunci cadangan",
+        "backupRestoreKeyHint": "Cadangan ini berasal dari instalasi lain. Masukkan DB_ENCRYPTION_KEY instalasi tersebut: kunci hanya dipakai untuk pemulihan ini dan tidak disimpan, lalu data dienkripsi dengan kunci instalasi ini.",
+        "backupRestoreKeyHttpWarning": "Halaman ini tidak dibuka melalui HTTPS: kunci akan dikirim lewat jaringan tanpa enkripsi.",
         "otherSessionsTitle": "Perangkat lain",
         "otherSessionsHint": "Mengeluarkan akunmu dari semua perangkat dan browser lain. Perangkat ini tetap masuk. Token API dan layar dinding yang dipasangkan tidak terpengaruh.",
         "otherSessionsButton": "Keluar dari perangkat lain",

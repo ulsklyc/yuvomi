@@ -2774,6 +2774,9 @@
             "vaccination": "Tiêm chủng",
             "checkup": "Kiểm tra"
         },
+        "backupRestoreKeyLabel": "Khóa của bản sao lưu",
+        "backupRestoreKeyHint": "Bản sao lưu này đến từ một bản cài đặt khác. Hãy nhập DB_ENCRYPTION_KEY của bản cài đặt đó: khóa chỉ được dùng cho lần khôi phục này và không được lưu, sau đó dữ liệu được mã hóa bằng khóa của bản cài đặt này.",
+        "backupRestoreKeyHttpWarning": "Trang này không được mở qua HTTPS: khóa sẽ đi qua mạng mà không được mã hóa.",
         "otherSessionsTitle": "Thiết bị khác",
         "otherSessionsHint": "Đăng xuất tài khoản của bạn trên mọi thiết bị và trình duyệt khác. Thiết bị này vẫn đăng nhập. Mã API và màn hình treo tường đã ghép nối không bị ảnh hưởng.",
         "otherSessionsButton": "Đăng xuất trên thiết bị khác",

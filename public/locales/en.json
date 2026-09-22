@@ -2774,6 +2774,9 @@
             "vaccination": "Vaccination",
             "checkup": "Check-up"
         },
+        "backupRestoreKeyLabel": "Backup key",
+        "backupRestoreKeyHint": "This backup comes from another installation. Enter that installation's DB_ENCRYPTION_KEY: it is used only for this restore and is not stored, and afterwards the data is encrypted with this installation's key.",
+        "backupRestoreKeyHttpWarning": "This page is not open over HTTPS: the key will cross the network unencrypted.",
         "otherSessionsTitle": "Other devices",
         "otherSessionsHint": "Signs your account out on every other device and browser. This device stays signed in. API tokens and paired wall displays are not affected.",
         "otherSessionsButton": "Sign out on other devices",

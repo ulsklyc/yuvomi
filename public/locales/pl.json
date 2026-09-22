@@ -2786,6 +2786,9 @@
             "vaccination": "Szczepienie",
             "checkup": "Badanie"
         },
+        "backupRestoreKeyLabel": "Klucz kopii zapasowej",
+        "backupRestoreKeyHint": "Ta kopia zapasowa pochodzi z innej instalacji. Wpisz jej DB_ENCRYPTION_KEY: zostanie użyty tylko do tego przywracania i nie zostanie zapisany, a potem dane będą zaszyfrowane kluczem tej instalacji.",
+        "backupRestoreKeyHttpWarning": "Ta strona nie jest otwarta przez HTTPS: klucz zostanie przesłany przez sieć bez szyfrowania.",
         "otherSessionsTitle": "Inne urządzenia",
         "otherSessionsHint": "Wylogowuje twoje konto na wszystkich innych urządzeniach i przeglądarkach. To urządzenie pozostaje zalogowane. Nie dotyczy to tokenów API ani sparowanych wyświetlaczy ściennych.",
         "otherSessionsButton": "Wyloguj na innych urządzeniach",

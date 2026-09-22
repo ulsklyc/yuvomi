@@ -2774,6 +2774,9 @@
             "vaccination": "Aşı",
             "checkup": "Kontrol"
         },
+        "backupRestoreKeyLabel": "Yedeğin anahtarı",
+        "backupRestoreKeyHint": "Bu yedek başka bir kurulumdan geliyor. O kurulumun DB_ENCRYPTION_KEY değerini girin: yalnızca bu geri yükleme için kullanılır ve kaydedilmez, ardından veriler bu kurulumun anahtarıyla şifrelenir.",
+        "backupRestoreKeyHttpWarning": "Bu sayfa HTTPS üzerinden açılmadı: anahtar ağ üzerinden şifrelenmeden iletilecek.",
         "otherSessionsTitle": "Diğer cihazlar",
         "otherSessionsHint": "Hesabının diğer tüm cihaz ve tarayıcılardaki oturumunu kapatır. Bu cihazda oturum açık kalır. API belirteçleri ve eşlenmiş duvar ekranları etkilenmez.",
         "otherSessionsButton": "Diğer cihazlarda oturumu kapat",
