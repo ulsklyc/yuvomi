@@ -15,6 +15,7 @@ import express from 'express';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 import { addLocalDays, toLocalDateKey } from '../public/utils/date.js';
 import { withoutBlockComments } from './source-text.js';
+import { eachRule } from './css-rules.js';
 
 // Dynamisch geladen, weil beide Module inzwischen server/db.js in ihren
 // Import-Graphen ziehen: statische Imports laufen vor der DB_PATH-Zuweisung
@@ -809,6 +810,18 @@ test('Aufgaben-Kachel: begonnene Aufgabe traegt das Zeichen der Aufgabenliste, s
   const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
   nodeAssert.match(css, /\.task-item \.task-status-btn--in_progress::after\s*\{[^}]*--color-warning/,
     'dashboard.css zeichnet den Ring in der Farbe der Aufgabenliste');
+
+  // Oeffnet man eine Aufgabe aus der Kachel, haengt `ensureTaskStyles()` tasks.css
+  // fuer den Rest der Sitzung an - und dessen `.task-status-btn` hat die
+  // Trefflaeche (44px) samt negativem Rand. Die Regel hier muss die Masse selbst
+  // festlegen, sonst waechst der Ring in der Kachel mit (Review zu #1400).
+  const ringBox = [...eachRule(css)].find((rule) => rule.at.length === 0
+    && rule.selector.trim() === '.task-item .task-status-btn--in_progress');
+  nodeAssert.ok(ringBox, 'die Kachel hat eine eigene Regel fuer das Zeichen');
+  for (const [prop, value] of [['width', 'var(--space-5)'], ['height', 'var(--space-5)'], ['margin-top', '0']]) {
+    nodeAssert.match(ringBox.body, new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*${value.replace(/[()]/g, '\\$&')}\\s*(?:;|$)`),
+      `${prop}: ${value} - sonst uebernimmt tasks.css die Trefflaeche, sobald es geladen ist`);
+  }
 });
 
 test('eventStartDate: ganztägige Termine (date-only) landen auf dem lokalen Kalendertag (Issue #466)', async () => {
