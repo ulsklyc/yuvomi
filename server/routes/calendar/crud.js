@@ -81,7 +81,7 @@ function attachmentRights(req) {
   };
 }
 
-async function runWithAttachmentClonePlan(database, actorId, stagedClones, operation, { mayClone = () => false } = {}) {
+async function runWithAttachmentClonePlan(database, stagedClones, operation, { mayClone = () => false } = {}) {
   try {
     return operation({});
   } catch (error) {
@@ -126,7 +126,6 @@ async function runWithAttachmentClonePlan(database, actorId, stagedClones, opera
           database,
           clone.sourceDocument,
           clone.staged,
-          actorId,
         ),
       };
     };
@@ -1052,7 +1051,6 @@ router.put('/:id', async (req, res) => {
       if (req.body.countdown !== undefined) seriesChanges.countdown = req.body.countdown ? 1 : 0;
       await runWithAttachmentClonePlan(
         db.get(),
-        event.created_by,
         stagedClones,
         (cloneOptions) => updateSeriesWithOverrides(db.get(), {
           mayWidenAttachment: rights.mayWidenAttachment,
@@ -1462,7 +1460,6 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
     };
     const result = await runWithAttachmentClonePlan(
       db.get(),
-      master.created_by,
       stagedClones,
       (cloneOptions) => {
         assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), seriesId, req.params.recurrenceId));

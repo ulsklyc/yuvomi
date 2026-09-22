@@ -197,9 +197,12 @@ export function createAttachmentDocument(database, attachment, staged, body, act
  * der Besitzerin - auch nicht die Zugewiesene, die den Split ausgeloest hat.
  * Weiter geoeffnet wird die Kopie danach nur von einer Verwalterin.
  */
-export function cloneAttachmentDocument(database, source, staged, actorId) {
+export function cloneAttachmentDocument(database, source, staged) {
   if (!source || !staged) return null;
-  const cloneId = insertAttachmentClone(database, source, staged, actorId);
+  // Die Kopie gehoert IMMER der Besitzerin der Quelle - nie der Person, die den
+  // Split ausloest. Sonst koennte sie ueber die Kopie verwalten, was ihr an der
+  // Quelle nicht gehoert.
+  const cloneId = insertAttachmentClone(database, source, staged);
   database.prepare(`
     INSERT OR IGNORE INTO family_document_access (document_id, user_id)
     SELECT ?, user_id FROM family_document_access WHERE document_id = ?
@@ -207,7 +210,7 @@ export function cloneAttachmentDocument(database, source, staged, actorId) {
   return cloneId;
 }
 
-function insertAttachmentClone(database, source, staged, actorId) {
+function insertAttachmentClone(database, source, staged) {
   return database.prepare(`
     INSERT INTO family_documents
       (name, description, category, status, visibility, folder_id, original_name,
@@ -228,7 +231,7 @@ function insertAttachmentClone(database, source, staged, actorId) {
     staged.storage_provider,
     staged.storage_backend,
     staged.storage_key,
-    actorId,
+    source.created_by,
   ).lastInsertRowid;
 }
 

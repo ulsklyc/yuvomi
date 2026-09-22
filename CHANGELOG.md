@@ -225,9 +225,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no longer makes a private attachment visible again: its visibility is carried over to the
   document only by the person who owns it (the event's creator) or an admin, and only with
   permission to edit documents; anyone else can only narrow it. The sync of connected calendars,
-  which reassigns an event when it moves to a calendar with another default person, only adds
-  that person to an attachment already shared with selected members - it never makes one visible
-  to the whole family and never opens a private one.
+  which reassigns an event when it moves to a calendar with another default person, adds that
+  person to its attachment only when the event is shown to its assignees and the attachment is
+  already shared with selected members - it never makes one visible to the whole family, never
+  opens a private one and leaves the owner's sharing alone on other events. A copy made when a
+  series is split keeps the original's sharing and owner.
   Splitting a series or detaching an occurrence no longer copies an attachment for someone who
   cannot see it or may not edit documents; the new part then has no attachment and the original
   stays on the series. For API clients `attachment_document_id`, `attachment_preview_url`,

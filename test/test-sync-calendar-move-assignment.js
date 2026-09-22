@@ -618,13 +618,34 @@ describe('#1358 - der Umzug oeffnet kein Anhang-Dokument', () => {
     }
   });
 
-  it('ein eingeschraenktes Dokument bekommt die neue Person dazu, wird aber nie family', () => {
+  it('an einem Termin fuer Zugewiesene bekommt ein eingeschraenktes Dokument die neue Person dazu, family wird es nie', () => {
+    const refA = externalCalendar('caldav', CAL_A, 'A', ANNA);
+    const refB = externalCalendar('caldav', CAL_B, 'B', BEN);
+    const { id, documentId } = seedWithDocument(refA, 'restricted', 'assignees');
+    db.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(documentId, CHRIS);
+    assert.equal(move(id, refA, refB), true);
+    assert.deepEqual(docState(documentId), { visibility: 'restricted', access: [BEN, CHRIS].sort((a, b) => a - b) },
+      'Ben kommt dazu, die Freigabe an Chris bleibt, family wird es nicht');
+  });
+
+  it('an einem Termin fuer alle bleibt die Einschraenkung der Besitzerin, wie sie ist', () => {
     const refA = externalCalendar('caldav', CAL_A, 'A', ANNA);
     const refB = externalCalendar('caldav', CAL_B, 'B', BEN);
     const { id, documentId } = seedWithDocument(refA, 'restricted', 'all');
     db.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(documentId, CHRIS);
     assert.equal(move(id, refA, refB), true);
-    assert.deepEqual(docState(documentId), { visibility: 'restricted', access: [BEN, CHRIS].sort((a, b) => a - b) },
-      'Ben kommt dazu, die Freigabe an Chris bleibt, family wird es nicht');
+    assert.deepEqual(docState(documentId), { visibility: 'restricted', access: [CHRIS] },
+      'der Sync fuegt niemanden hinzu - die Entscheidung der Besitzerin geht vor');
+  });
+
+  it('an einem privaten Termin bekommt die neue Person keinen Zugriff auf das Dokument', () => {
+    const refA = externalCalendar('caldav', CAL_A, 'A', ANNA);
+    const refB = externalCalendar('caldav', CAL_B, 'B', BEN);
+    const { id, documentId } = seedWithDocument(refA, 'restricted', 'private');
+    db.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(documentId, CHRIS);
+    assert.equal(move(id, refA, refB), true);
+    const state = docState(documentId);
+    assert.equal(state.access.includes(BEN), false, 'Ben sieht den Termin nicht, also auch nicht sein Dokument');
+    assert.notEqual(state.visibility, 'family');
   });
 });

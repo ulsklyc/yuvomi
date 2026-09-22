@@ -83,9 +83,10 @@ export function canManageDocument(document, { userId, isAdmin }) {
  *     duerfen, siehe `documentWidenPredicate()`): die Zielsichtbarkeit gilt wie
  *     bisher, auch weiter als vorher;
  *   - `grantAssignees` (Abgleich der Standard-Zuweisung durch die Kalender-
- *     Syncs, ohne Person dahinter): nur ein schon eingeschraenktes Dokument
- *     bekommt die Zugewiesenen als Freigabe dazu. Nichts wird `family`, ein
- *     privates Dokument bleibt zu, niemand verliert eine Freigabe;
+ *     Syncs, ohne Person dahinter): nur an einem Termin fuer Zugewiesene
+ *     bekommt ein schon eingeschraenktes Dokument die Zugewiesenen als
+ *     Freigabe dazu. Sonst gilt der Verengungspfad: nichts wird `family`,
+ *     ein privates Dokument bleibt zu, niemand kommt dazu;
  *   - sonst wird nur enger: `family` -> `restricted`/`private`, `restricted`
  *     verliert Personen, die nicht mehr drankommen, `private` bleibt `private`.
  *     Niemand bekommt Zugriff, den er vorher nicht hatte.
@@ -105,7 +106,12 @@ export function applyDocumentAccess(database, documentId, {
   const grant = database.prepare('INSERT OR IGNORE INTO family_document_access (document_id, user_id) VALUES (?, ?)');
   const wanted = [...new Set(userIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))];
 
-  if (grantAssignees && !mayWiden) {
+  // Nur an einem Termin fuer Zugewiesene (Ziel `restricted`) und nur an einem
+  // schon eingeschraenkten Dokument: dann sieht die neue Person den Termin und
+  // bekommt das Dokument dazu. Ein privater Termin oder einer fuer alle faellt
+  // in den Verengungspfad - dort kommt niemand dazu, die Einschraenkung der
+  // Besitzerin geht vor (Re-Review #1432).
+  if (grantAssignees && !mayWiden && visibility === 'restricted') {
     if (current.visibility === 'restricted') for (const userId of wanted) grant.run(documentId, userId);
     return;
   }

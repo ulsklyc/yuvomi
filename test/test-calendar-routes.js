@@ -683,8 +683,8 @@ test('default-assignee-backfill - oeffnet kein privates Anhang-Dokument und mach
     assert.equal(snapshot.length, 2);
     assert.equal(await applyDefaultAssigneesToExisting(db, snapshot), 2);
     assert.deepEqual(state(privateDoc), { visibility: 'private', access: [] }, 'privat bleibt privat, auch am Termin fuer alle');
-    assert.deepEqual(state(restrictedDoc), { visibility: 'restricted', access: [TOM.id] },
-      'eingeschraenkt bekommt die neue Person dazu, family wird es nicht');
+    assert.deepEqual(state(restrictedDoc), { visibility: 'restricted', access: [] },
+      'am Termin fuer alle bleibt die Einschraenkung der Besitzerin: niemand kommt dazu, family wird es nicht');
   } finally {
     db.prepare(`DELETE FROM calendar_events WHERE id IN (${ids.join(',')})`).run();
     db.prepare('DELETE FROM external_calendars WHERE id = ?').run(refId);
@@ -3950,4 +3950,13 @@ test('Anhang: die Kopie beim Split behaelt die Freigaben der Quelle (#1358, Revi
   assert.deepEqual(access(cloneId), [MARIA.id], 'die Kopie traegt die Freigabe der Quelle');
   assert.equal(db.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(cloneId).visibility, 'restricted',
     'und wird nicht weiter als die Quelle');
+  assert.equal(db.prepare('SELECT created_by FROM family_documents WHERE id = ?').get(cloneId).created_by, ADMIN.id,
+    'die Kopie gehoert der Besitzerin der Quelle, nicht Maria');
+
+  // Maria verwaltet die Kopie nicht: am Nachfolger weitet sie nichts.
+  const widen = await call('PUT', `/${split.body.data.id}`, { actor: MARIA, body: { visibility: 'all' } });
+  assert.equal(widen.status, 200, JSON.stringify(widen.body));
+  assert.equal(db.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(cloneId).visibility, 'restricted',
+    'die Kopie bleibt eingeschraenkt');
+  assert.deepEqual(access(cloneId), [MARIA.id]);
 });
