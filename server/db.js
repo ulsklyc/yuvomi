@@ -422,6 +422,9 @@ function init({ plaintextBackup = true } = {}) {
   mkdirSync(path.dirname(DB_PATH), { recursive: true });
   removeRestoreStaging();
   migrateLegacyDbFile();
+  // Scheitert die Umbenennung einer Legacy-oikos.db, faellt DB_PATH auf sie
+  // zurueck - und Reste eines Restores tragen dann ihren Namen.
+  removeRestoreStaging();
 
   // Beide Prüfungen laufen VOR dem Öffnen: fehlt der Cipher-Support, darf gar
   // nicht erst eine unverschlüsselte Datei entstehen.
@@ -10456,6 +10459,10 @@ async function syncDirectory(dirPath) {
  * Die Verbindung muss dafuer zu sein, und `-wal`/`-shm` der alten Datenbank
  * muessen VOR dem Umhaengen weg sein: SQLite wendete ein liegengebliebenes
  * `-wal` sonst auf die neue Datei an. Beides erledigt der Aufrufer.
+ * DB_PATH muss eine echte Datei sein, kein Symlink: `rename()` ersetzt den
+ * Verzeichniseintrag, einen Symlink also durch die Datei, statt ihm zu folgen.
+ * Dasselbe gilt schon fuer die Verschluesselungs-Migration und `.creating`;
+ * docs/installation.md sagt es beim Restore.
  * @param {string} stagingPath  fertig geschriebene Arbeitsdatei oder, beim
  *   Rollback, die Rollback-Kopie
  */
@@ -10511,6 +10518,9 @@ function otherProcessAlive(pid) {
  * Jeder Prozess, der db.js laedt, laeuft hier durch (`init()`). Eine Datei,
  * deren Prozess noch lebt, gehoert zu einem laufenden Restore und bleibt
  * liegen (Review #1431) - siehe `otherProcessAlive()` fuer die Grenze.
+ * Der Compose-Restore aus docs/installation.md schreibt die Nummer 0: er laeuft
+ * bei gestopptem Server in einem eigenen Container, dessen Nummern hier nichts
+ * bedeuten - 0 heisst „kein Eigentuemer", sein Rest wird immer weggeraeumt.
  */
 function removeRestoreStaging() {
   if (DB_PATH === ':memory:') return;
@@ -10664,9 +10674,15 @@ async function restoreValidatedFile(sourcePath) {
       }
     } catch (rollbackErr) {
       log.error('Rollback after failed restore also failed:', rollbackErr);
-      throw rollbackFailedError(err, rollbackErr, {
-        rollbackPath: rollbackCreated && !rolledBack ? rollbackPath : null,
-      });
+      // Nur wenn die Instanz wirklich nicht mehr wie vorher dasteht: getauscht,
+      // oder ohne Verbindung. Scheitert bloss das Aufraeumen der Arbeitsdatei
+      // (etwa EACCES), laeuft die alte Datenbank weiter - dann gilt der
+      // urspruengliche Fehler, samt seinem Grund (Review #1431).
+      if (swapped || !db) {
+        throw rollbackFailedError(err, rollbackErr, {
+          swapped, rolledBack, rollbackPath: rollbackCreated ? rollbackPath : null,
+        });
+      }
     }
     throw err;
   }
@@ -10683,18 +10699,22 @@ async function restoreValidatedFile(sourcePath) {
  * @param {{ rollbackPath: string | null }} where  Rollback-Kopie, falls sie
  *   noch nicht zurueck an DB_PATH liegt
  */
-function rollbackFailedError(restoreErr, rollbackErr, { rollbackPath }) {
+function rollbackFailedError(restoreErr, rollbackErr, { swapped, rolledBack, rollbackPath }) {
   const lines = [
     `Restore failed: ${restoreErr?.message ?? String(restoreErr)}`,
     `Putting the previous database back failed as well: ${rollbackErr?.message ?? String(rollbackErr)}.`,
   ];
-  if (rollbackPath) {
+  if (swapped && !rolledBack && rollbackPath) {
     lines.push(
       `The database from before the restore is kept at ${rollbackPath}. Stop Yuvomi, move that file `
       + `to ${DB_PATH} (and delete ${DB_PATH}-wal and ${DB_PATH}-shm if they exist), then start Yuvomi again.`
     );
-  } else {
+  } else if (swapped && !rolledBack) {
+    lines.push(`There was no database at ${DB_PATH} before this restore. Restart Yuvomi.`);
+  } else if (rolledBack) {
     lines.push(`The database from before the restore is back at ${DB_PATH}, but it could not be opened again. Restart Yuvomi.`);
+  } else {
+    lines.push(`The restore never replaced ${DB_PATH}; the database there is the one from before, but it could not be opened again. Restart Yuvomi.`);
   }
   return new Error(lines.join(' '), { cause: restoreErr });
 }

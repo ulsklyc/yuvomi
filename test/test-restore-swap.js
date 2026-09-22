@@ -23,7 +23,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, chmodSync } from 'node:fs';
 import fsp from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -518,3 +518,124 @@ for (const art of ['Arbeitsdatei', 'halbe Rollback-Kopie']) {
     assert.ok(names.includes(name(lebendePid)), `die Datei des lebenden Prozesses bleibt: ${names.join(', ')}`);
   });
 }
+
+// ---------------------------------------------------------------------------
+// Dritte Review-Runde #1431
+// ---------------------------------------------------------------------------
+
+test('#1431 scheitert nur das Aufraeumen der Arbeitsdatei, bleibt es beim urspruenglichen Fehler', async () => {
+  // Das Kopieren des Backups scheitert (vor dem Tausch), und beim Wegraeumen
+  // der Arbeitsdatei kommt EACCES. Die alte Datenbank laeuft weiter - eine
+  // Meldung, die von einem gescheiterten Rueckweg oder von Dateien zum
+  // Verschieben spricht, waere falsch.
+  const backupPath = await bigBackup(KEY, 'aus dem Backup');
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  const realCopyFile = fsp.copyFile;
+  const realUnlink = fsp.unlink;
+  let stagingUnlinks = 0;
+  fsp.copyFile = async (src, dest, mode) => {
+    if (String(src) === backupPath) {
+      throw Object.assign(new Error('ENOSPC: no space left on device, copyfile'), { code: 'ENOSPC' });
+    }
+    return realCopyFile(src, dest, mode);
+  };
+  fsp.unlink = async (filePath) => {
+    // Das erste Wegraeumen (vor dem Kopieren) laeuft, das im Fehlerpfad nicht.
+    if (String(filePath).includes('.restore-tmp-') && ++stagingUnlinks > 1) {
+      throw Object.assign(new Error('EACCES: permission denied, unlink'), { code: 'EACCES' });
+    }
+    return realUnlink(filePath);
+  };
+  try {
+    await assert.rejects(
+      () => target.mod.restoreFromFile(backupPath),
+      (err) => {
+        assert.match(err.message, /^ENOSPC/, `der urspruengliche Fehler: ${err.message}`);
+        assert.doesNotMatch(err.message, /Putting the previous database back|move that file|Restart Yuvomi/);
+        return true;
+      }
+    );
+  } finally {
+    fsp.copyFile = realCopyFile;
+    fsp.unlink = realUnlink;
+  }
+  assert.ok(stagingUnlinks > 1, 'Vorbedingung: der Fehlerpfad hat die Arbeitsdatei wegraeumen wollen');
+  assert.equal(target.mod.get().prepare('SELECT note FROM restore_probe').get()?.note, 'vor dem Restore');
+  target.mod.get().close();
+});
+
+/** Der `sh -c`-Teil des Compose-Restores aus docs/installation.md. */
+function documentedComposeRestore() {
+  const doc = readFileSync(new URL('../docs/installation.md', import.meta.url), 'utf8');
+  const line = doc.split('\n').find((l) => l.startsWith('docker compose run --rm -v "$BACKUP:/tmp/yuvomi-restore.db:ro"'));
+  assert.ok(line, 'installation.md muss den Compose-Restore zeigen');
+  const match = line.match(/ -c '([^']+)'$/);
+  assert.ok(match, 'der Befehl endet in sh -c \'...\'');
+  return match[1];
+}
+
+/** Den dokumentierten Befehl hier ausfuehren - mit echtem sh, cp, mv, sync. */
+function runComposeRestore(backupPath, dbPath, { killMidCopy = false } = {}) {
+  const script = documentedComposeRestore().replaceAll('/tmp/yuvomi-restore.db', backupPath);
+  const env = { ...process.env, DB_PATH: dbPath };
+  if (killMidCopy) {
+    // Ein cp, das beim Kopieren des Backups die Haelfte schreibt und dann die
+    // Shell mit SIGKILL beendet - wie ein Container, der mittendrin stirbt.
+    const shimDir = tempDir('yuvomi-test-swap-shim-');
+    const shim = join(shimDir, 'cp');
+    writeFileSync(shim, [
+      '#!/bin/sh',
+      'if [ "$1" = "$SWAP_BACKUP" ]; then',
+      '  size=$(wc -c < "$1")',
+      '  head -c $((size / 2)) "$1" > "$2"',
+      '  kill -9 $PPID',
+      '  exit 1',
+      'fi',
+      'exec /bin/cp "$@"',
+      '',
+    ].join('\n'));
+    chmodSync(shim, 0o755);
+    env.PATH = `${shimDir}:${process.env.PATH}`;
+    env.SWAP_BACKUP = backupPath;
+  }
+  return spawnSync('/bin/sh', ['-c', script], { env, encoding: 'utf8' });
+}
+
+test('#1431 der dokumentierte Compose-Restore: stirbt er mitten im Kopieren, bleibt die alte Datenbank heil', async () => {
+  const backupPath = await bigBackup(null, 'aus dem Backup');
+  const target = await frozenTarget(null, 'vor dem Restore');
+  target.mod.get().close();
+
+  const run = runComposeRestore(backupPath, target.dbPath, { killMidCopy: true });
+  assert.equal(run.signal, 'SIGKILL', `die Shell muss am Kopieren gestorben sein: ${run.stderr}`);
+  assert.deepEqual(
+    inspect(target.dbPath, null),
+    { note: 'vor dem Restore', check: 'ok' },
+    'DB_PATH muss die alte Datenbank sein - keine halbe Kopie des Backups'
+  );
+
+  // Der naechste Start raeumt den Rest des Befehls weg.
+  const mod = await bootDb(target.dbPath, null);
+  assert.equal(mod.get().prepare('SELECT note FROM restore_probe').get()?.note, 'vor dem Restore');
+  mod.get().close();
+  assert.deepEqual(
+    readdirSync(target.dir).filter((name) => name.includes('.restore-tmp') || name.endsWith('.partial')),
+    [],
+    'kein Rest des abgebrochenen Befehls bleibt liegen'
+  );
+});
+
+test('#1431 der dokumentierte Compose-Restore: ein vollstaendiger Lauf tauscht ein und behaelt die Rollback-Kopie', async () => {
+  const backupPath = await bigBackup(null, 'aus dem Backup');
+  const target = await frozenTarget(null, 'vor dem Restore');
+  target.mod.get().close();
+
+  const run = runComposeRestore(backupPath, target.dbPath);
+  assert.equal(run.status, 0, `der Befehl muss gelingen: ${run.stderr}`);
+  assert.equal(sha256(target.dbPath), sha256(backupPath), 'DB_PATH ist das Backup');
+  const names = readdirSync(target.dir);
+  const rollbacks = names.filter((name) => IS_ROLLBACK_COPY.test(name));
+  assert.equal(rollbacks.length, 1, `eine Rollback-Kopie: ${names.join(', ')}`);
+  assert.equal(inspect(join(target.dir, rollbacks[0]), null).note, 'vor dem Restore');
+  assert.deepEqual(names.filter((name) => name.includes('.restore-tmp') || name.endsWith('.partial')), []);
+});

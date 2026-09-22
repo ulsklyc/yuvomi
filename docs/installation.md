@@ -1271,19 +1271,21 @@ Admins can restore a backup from **Settings → Administration → Backup and re
 SERVICE=yuvomi
 BACKUP="$PWD/yuvomi-backup-20260401.db"
 docker compose stop "$SERVICE"
-docker compose run --rm -v "$BACKUP:/tmp/yuvomi-restore.db:ro" --entrypoint sh "$SERVICE" -c 'set -eu; target="${DB_PATH:-/data/yuvomi.db}"; case "$target" in */oikos.db) target="${target%/oikos.db}/yuvomi.db";; esac; stamp=$(date -u +%Y%m%dT%H%M%SZ); if [ -f "$target" ]; then cp "$target" "$target.pre-restore-$stamp"; fi; rm -f "$target-wal" "$target-shm"; cp /tmp/yuvomi-restore.db "$target"; chown node:node "$target" 2>/dev/null || true'
+docker compose run --rm -v "$BACKUP:/tmp/yuvomi-restore.db:ro" --entrypoint sh "$SERVICE" -c 'set -eu; target="${DB_PATH:-/data/yuvomi.db}"; case "$target" in */oikos.db) target="${target%/oikos.db}/yuvomi.db";; esac; stamp=$(date -u +%Y%m%dT%H%M%SZ); if [ -f "$target" ]; then cp "$target" "$target.pre-restore-$stamp.0.partial"; sync; mv "$target.pre-restore-$stamp.0.partial" "$target.pre-restore-$stamp"; fi; staging="$target.restore-tmp-0-$stamp"; cp /tmp/yuvomi-restore.db "$staging"; chown node:node "$staging" 2>/dev/null || true; sync; rm -f "$target-wal" "$target-shm"; mv "$staging" "$target"; sync'
 docker compose up -d "$SERVICE"
 ```
 
 If your Compose service is renamed, set `SERVICE` to that name, for example `SERVICE=familyplanner`.
 
-For a local CLI restore outside Docker, set the same environment variables used by the app and run:
+The command copies the backup next to the database first and only then moves it over the database file in one step, so an interrupted restore leaves the old database in place; Yuvomi removes the leftover copy on its next start. `DB_PATH` must be a regular file, not a symlink: the restore replaces the file at that path, so a symlink there would be replaced by the restored file instead of being followed.
+
+For a local CLI restore outside Docker, stop Yuvomi first, set the same environment variables used by the app and run:
 
 ```bash
 DB_PATH=/path/to/yuvomi.db node --import dotenv/config scripts/restore-backup.js ./yuvomi-backup-20260401.db
 ```
 
-The restore helper validates that the file is a Yuvomi database and undamaged (every page is checked), and refuses one written by a newer Yuvomi than the one running (update first, then restore), before replacing the active database. The replacement is written next to the database file and swapped in with a single rename, so an interrupted restore leaves the old database in place. It also keeps a pre-restore copy next to the database file for emergency rollback.
+The restore helper validates that the file is a Yuvomi database and undamaged (every page is checked), and refuses one written by a newer Yuvomi than the one running (update first, then restore), before replacing the active database. The replacement is written next to the database file and swapped in with a single rename, so an interrupted restore leaves the old database in place. It also keeps a pre-restore copy next to the database file for emergency rollback. The CLI restore is not coordinated with a running server - a restore from the settings page at the same time, or the server's open connection to the replaced file, would work against it - so run it only while Yuvomi is stopped.
 
 ### Moving to a new server (backup from another installation)
 
