@@ -373,6 +373,52 @@ test('forgot-password: zwei schnelle Anfragen fuer dasselbe Konto - die zuletzt 
     'die zuletzt zugestellte Mail traegt einen Link, der nicht mehr gilt');
 });
 
+test('forgot-password: drei schnelle Anfragen ergeben hoechstens zwei Versande, der letzte mit gueltigem Link', async () => {
+  // Je Konto laeuft ein Versand und wartet hoechstens einer. Eine dritte
+  // Anfrage waehrenddessen faellt weg: der wartende Job erzeugt ohnehin das
+  // neueste Token. Ohne Grenze stapelte eine Schleife beliebig viele Jobs.
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  const calls = [];
+  const delivered = [];
+  const { app } = await makeAuthApp(db, {
+    sendMail: (m) => new Promise((resolve) => {
+      calls.push({ m, release: () => { delivered.push(m); resolve(); } });
+    }),
+  });
+  const { createServer } = await import('node:http');
+  const server = createServer(app);
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const ask = () => fetch(`http://127.0.0.1:${server.address().port}/auth/forgot-password`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ identifier: 'alice' }),
+  }).then((r) => r.text());
+  const settle = () => new Promise((r) => setTimeout(r, 50));
+  let released = 0;
+  const releaseReversed = () => {
+    const open = calls.slice(released);
+    released = calls.length;
+    for (const c of open.reverse()) c.release();
+  };
+  try {
+    for (let i = 0; i < 3; i += 1) { await ask(); await settle(); }
+    for (let i = 0; i < 5 && released < calls.length; i += 1) {
+      releaseReversed();
+      await settle();
+    }
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+  await app.locals.drain();
+  assert.ok(delivered.length <= 2, `${delivered.length} Versande statt hoechstens zwei`);
+  const rows = db.prepare('SELECT token_hash FROM password_resets').all();
+  assert.equal(rows.length, 1, 'genau ein Token gilt');
+  const lastToken = delivered.at(-1).html.match(/token=([a-f0-9]+)/)[1];
+  assert.equal(crypto.createHash('sha256').update(lastToken).digest('hex'), rows[0].token_hash,
+    'der zuletzt verschickte Link gilt nicht');
+});
+
 test('reset-password rejects an invalid token', async () => {
   const db = makeDb();
   seedContactsAndEmail(db);

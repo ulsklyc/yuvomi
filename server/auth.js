@@ -1559,8 +1559,9 @@ export function buildResetRoutes(targetRouter, {
   // eine Antwort behaelt.
   const emailFor = (userId) => memberEmail(userId, { db: getDb() });
 
-  // Laufender Versand je Konto (userId -> Ende der Kette). Kein globaler
-  // Takt: verschiedene Konten laufen weiter nebeneinander.
+  // Versand je Konto (userId -> { tail, waiting }): hoechstens einer laeuft
+  // und einer wartet. Kein globaler Takt: verschiedene Konten laufen weiter
+  // nebeneinander.
   const resetMailChain = new Map();
 
   /**
@@ -1576,18 +1577,28 @@ export function buildResetRoutes(targetRouter, {
    * wartende Antwort; seit sie vorher rausgeht, haelt es diese Kette. Ein
    * Token-Check direkt vor `sendMail` reicht dafuer nicht: zwischen
    * `createToken()` und `sendMail()` liegt kein await, er waere immer wahr.
+   *
+   * Die Kette ist auf einen laufenden und einen wartenden Job begrenzt. Wartet
+   * schon einer, faellt eine weitere Anfrage weg: der wartende Job erzeugt
+   * ohnehin das neueste Token, und eine Schleife staute sonst beliebig viele
+   * Jobs samt Mails auf.
    */
   // async, damit ein Wurf in resolveUser() als Rejection beim .catch() des
   // Aufrufers landet statt als ungefangene Ausnahme im setImmediate.
   async function sendResetLinkFor(identifier) {
     const userId = resolveUser(identifier);
     if (!userId) return undefined;
-    const previous = resetMailChain.get(userId) || Promise.resolve();
-    const job = previous.then(() => issueResetMail(userId));
-    const tail = job.catch(() => {});
-    resetMailChain.set(userId, tail);
-    tail.then(() => {
-      if (resetMailChain.get(userId) === tail) resetMailChain.delete(userId);
+    const entry = resetMailChain.get(userId);
+    if (entry?.waiting) return undefined;
+    const state = { tail: null, waiting: !!entry };
+    const job = (entry ? entry.tail : Promise.resolve()).then(() => {
+      state.waiting = false;
+      return issueResetMail(userId);
+    });
+    state.tail = job.catch(() => {});
+    resetMailChain.set(userId, state);
+    state.tail.then(() => {
+      if (resetMailChain.get(userId) === state) resetMailChain.delete(userId);
     });
     return job;
   }
