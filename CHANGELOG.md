@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **API clients can fill only the empty slots of the meal plan.** `POST /api/v1/meals/apply-plan`
+  takes a new option `skip_occupied: true`. An assignment whose date and meal type already hold a
+  meal is then left out instead of being added next to it, and the answer lists it in `skipped` as
+  `{ index, date, meal_type, reason: "occupied" }`, where `index` is its position in `assignments`,
+  so an importer such as a Mealie meal-plan sync knows what did not land. A weekly recurring meal
+  occupies its slot even in a week nobody has opened yet, up to and including its last day; an
+  occurrence that was deleted or moved away does not. "Occupied" means before the call, so several
+  assignments for the same empty slot are all created. The option has to be a JSON boolean, and
+  combining it with `replace_existing` is refused with `400`. Without the option the endpoint
+  behaves and answers exactly as before. (Discussion #1380)
 - **Every done task on the board can be archived in one action.** The "Done" column of the board
   now has an archive button next to its count. After a confirmation it moves the done tasks the
   column currently shows into the archive - the ones it shows, so a task someone else completes
@@ -50,7 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shows what happened. To correct a payment, reverse it and record the right one. Group owners and
   admins can reverse any payment, everyone else the ones they recorded - the same rule as for
   editing an expense. Without write access to Budget, or in an archived group, the button is not
-  there, but the "reversed" mark is. The API has the same step as
+  there, but the "reversed" mark is. Deleting the account of whoever reversed a payment leaves it
+  reversed and the balances as they were. The API has the same step as
   `POST /api/v1/split-expenses/groups/{id}/settlements/{settlementId}/reverse`; reversing twice
   answers 409. (#1309)
 
@@ -150,6 +161,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `receipt_document_name` are `null` unless you may read the document, API tokens need a
   `documents:read` scope for them, and `PUT /api/v1/housekeeping/visits/{id}` answers 403 when it
   would replace a receipt you cannot see or link one without access to documents. (#1358)
+
+- **An edited shared expense keeps counting after the editor's account is deleted.** When a group
+  owner or admin edited someone else's expense and that editor's account was later deleted, the
+  expense stayed in the list but silently dropped out of every balance. Edits now leave the expense
+  tied to whoever created it, so it counts until it is deleted itself; the activity still shows who
+  edited it. Expenses edited this way before are corrected when the update starts. An expense whose
+  editor was already deleted before the update is not repaired: it still shows in the list without
+  counting in the balances. (#1309)
 
 - **An account created at the first single sign-on now gets its contact entry.** Every other way of
   adding a household member - an invitation, the first setup, an admin creating the account - also

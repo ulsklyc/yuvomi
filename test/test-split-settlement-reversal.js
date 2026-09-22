@@ -246,3 +246,97 @@ test('Verlauf: Zahlung traegt ihren Stand, can_reverse folgt der Regel je Betrac
   assert.equal(eintrag.actor_id, CR.id);
   assert.deepEqual(eintrag.metadata, { amount: '10.00', currency: 'EUR' });
 });
+
+// Beide Haelften eines Paares - Buchung und Gegenbuchung - haengen per
+// `created_by ON DELETE CASCADE` an einem Konto. Trug die Gegenbuchung die
+// STORNIERENDE Person, riss das Loeschen eines Kontos das Paar auseinander:
+// nur eine Haelfte verschwand, und der Saldo stimmte nicht mehr. Die
+// Gegenbuchung traegt deshalb den `created_by` ihrer Originalzeile; wer
+// storniert hat, steht in `expense_activity.actor_id` (payment_reversed).
+async function reversedAt(sid) {
+  const r = await OWN.call('GET', `/split-expenses/groups/${GROUP}/activity?limit=100`);
+  assert.equal(r.status, 200);
+  return r.body.data.find((a) => a.type === 'payment_registered' && a.entity_id === sid)?.settlement?.reversed_at;
+}
+
+test('Konto der STORNIERENDEN Person geloescht: Zahlung bleibt storniert, Salden bleiben', async () => {
+  const M2 = await member('manager2', 'Mara');
+  assert.equal((await OWN.call('POST', `/split-expenses/groups/${GROUP}/members`, { user_id: M2.id, role: 'admin' })).status, 201);
+  const base = await balances();
+  const s = await registerPayment(CR, '3.00');
+  const r = await reverse(M2, s);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.reversed_by, M2.id, 'reversed_by nennt weiter, wer storniert hat');
+  assert.deepEqual(await balances(), base);
+
+  const eintrag = db.prepare("SELECT actor_id FROM expense_activity WHERE type = 'payment_reversed' AND entity_type = 'settlement' AND entity_id = ?").get(s);
+  assert.equal(eintrag.actor_id, M2.id, 'wer storniert hat, steht im Verlauf');
+
+  const del = await adminCall('DELETE', `/auth/users/${M2.id}`);
+  assert.equal(del.status, 200);
+  assert.deepEqual(await balances(), base, 'die stornierte Zahlung zaehlt nicht wieder');
+  assert.match(String(await reversedAt(s)), /^\d{4}-\d{2}-\d{2}T/, 'bleibt storniert');
+  const again = await reverse(OWN, s);
+  assert.equal(again.status, 409);
+  assert.equal(again.body.error, 'Settlement is already reversed.');
+
+  const booked = ledger(s, 'settlement');
+  const reversed = ledger(s, 'settlement_reversal');
+  assert.equal(reversed.length, 2);
+  assert.ok(booked.every((row) => row.created_by === CR.id));
+  assert.deepEqual(reversed.map((row) => row.created_by), booked.map((row) => row.created_by), 'Gegenbuchung traegt den Autor der Originalzeile');
+});
+
+test('Konto der ERFASSENDEN Person geloescht: Buchung und Gegenbuchung fallen gemeinsam', async () => {
+  const RC = await member('recorder', 'Rolf');
+  assert.equal((await OWN.call('POST', `/split-expenses/groups/${GROUP}/members`, { user_id: RC.id, role: 'guest' })).status, 201);
+  const base = await balances();
+  const s = await registerPayment(RC, '2.00');
+  assert.equal((await reverse(MGR, s)).status, 200);
+  assert.deepEqual(await balances(), base);
+
+  // Rolf ist weder Zahler noch Empfaenger - kein RESTRICT haelt das Loeschen
+  // auf. Die Zahlung selbst haengt per `settlements.created_by` CASCADE an ihm.
+  const del = await adminCall('DELETE', `/auth/users/${RC.id}`);
+  assert.equal(del.status, 200);
+  assert.deepEqual(await balances(), base, 'Salden wie vor der Zahlung');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM settlements WHERE id = ?').get(s).n, 0);
+  assert.equal(ledger(s, 'settlement').length, 0);
+  assert.equal(ledger(s, 'settlement_reversal').length, 0, 'keine Gegenbuchung ohne Partner');
+});
+
+// Dieselbe Klasse an einer Ausgabe: das Bearbeiten schreibt ihre Ledger-Zeilen
+// neu. Trugen die neuen Zeilen die BEARBEITENDE Person, verschwanden sie mit
+// deren Konto, waehrend die Ausgabe (`expenses.created_by` = Ersteller) aktiv
+// stehen blieb und nicht mehr in den Salden zaehlte. Die Zeilen tragen immer
+// `expenses.created_by`; wer bearbeitet hat, steht in `expense_edited`.
+test('Konto der BEARBEITENDEN Person geloescht: die Ausgabe zaehlt weiter in den Salden', async () => {
+  const R3 = await member('author3', 'Anna');
+  const M3 = await member('manager3', 'Mika');
+  assert.equal((await OWN.call('POST', `/split-expenses/groups/${GROUP}/members`, { user_id: R3.id, role: 'guest' })).status, 201);
+  assert.equal((await OWN.call('POST', `/split-expenses/groups/${GROUP}/members`, { user_id: M3.id, role: 'admin' })).status, 201);
+  const base = await balances();
+  const created = await R3.call('POST', `/split-expenses/groups/${GROUP}/expenses`, {
+    title: 'Getraenke', amount: '8.00', currency: 'EUR', split_method: 'equal', payer_id: OWN.id,
+    participants: [OWN.id, OTH.id], expense_date: '2026-09-02',
+  });
+  assert.equal(created.status, 201);
+  const eid = created.body.data.id;
+  const edited = await M3.call('PUT', `/split-expenses/expenses/${eid}`, {
+    title: 'Getraenke', amount: '12.00', currency: 'EUR', split_method: 'equal', payer_id: OWN.id,
+    participants: [OWN.id, OTH.id], expense_date: '2026-09-02',
+  });
+  assert.equal(edited.status, 200);
+  const afterEdit = await balances();
+  assert.deepEqual(afterEdit, { ...base, [OWN.id]: base[OWN.id] + 600, [OTH.id]: base[OTH.id] - 600 });
+  const eintrag = db.prepare("SELECT actor_id FROM expense_activity WHERE type = 'expense_edited' AND entity_type = 'expense' AND entity_id = ? ORDER BY id DESC").get(eid);
+  assert.equal(eintrag.actor_id, M3.id, 'wer bearbeitet hat, steht im Verlauf');
+
+  const del = await adminCall('DELETE', `/auth/users/${M3.id}`);
+  assert.equal(del.status, 200);
+  assert.equal(db.prepare('SELECT status FROM expenses WHERE id = ?').get(eid).status, 'active');
+  assert.deepEqual(await balances(), afterEdit, 'die Ausgabe zaehlt weiter');
+  const rows = ledger(eid, 'expense');
+  assert.equal(rows.length, 3);
+  assert.ok(rows.every((row) => row.created_by === R3.id), 'Ledger-Zeilen tragen den Ersteller der Ausgabe');
+});
