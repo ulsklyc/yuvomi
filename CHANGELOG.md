@@ -174,6 +174,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Single sign-on finds your account even when its stored address has a stray space.** Signing
+  in through the identity provider links to an existing account by email address. The address
+  from the provider was already trimmed, but one stored on the member's contact with a leading or
+  trailing space, for example from the contact form or an import, did not match, and the household
+  got a second member with the same address. Both sides are now compared without surrounding
+  spaces, for the primary and every further address of the contact. (Follow-up to #1357)
+
+- **A dose logged as pending or skipped no longer keeps an intake time.** When an API client
+  created a medication log with the status pending or skipped and sent a `taken_at` along, the
+  time was stored and appeared in the export as if the dose had been taken. Only a taken dose
+  carries an intake time now, as when you change the status afterwards. Entries saved before stay
+  as they are. (Follow-up to #701)
+
 - **A failed restore explains itself in your language and keeps your place.** When a backup did
   not open, the restore dialog showed the server's English explanation, up to several paragraphs
   long, also in a German interface. Each known cause now has a short translated message with the

@@ -195,3 +195,27 @@ test('der Limiter zaehlt je Mitglied, nicht je Adresse', async () => {
   const patient = await login('patient', 'patientpass1234');
   assert.equal((await signOutOthers(patient)).status, 200, 'ein anderes Mitglied von derselben Adresse ist frei');
 });
+
+test('Loeschen eines Mitglieds beendet jede seiner Sitzungen, auch eine abgelaufene Zeile', async () => {
+  // Loeschen laeuft ueber denselben Helfer wie "Auf anderen Geraeten abmelden"
+  // statt ueber eine eigene Kopie der Schleife.
+  await createMember('leaving');
+  const phone = await login('leaving', 'leavingpass1234');
+  const laptop = await login('leaving', 'leavingpass1234');
+  const stale = await login('leaving', 'leavingpass1234');
+  db.prepare('UPDATE sessions SET expired_at = ? WHERE sid = ?').run(Date.now() - 1000, sidOf(stale.cookie));
+  const admin = await login('admin', 'adminpass123');
+  const { id } = db.prepare("SELECT id FROM users WHERE username = 'leaving'").get();
+
+  const res = await fetch(`${BASE}/api/v1/auth/users/${id}`, {
+    method: 'DELETE',
+    headers: { Cookie: admin.cookie, 'X-CSRF-Token': admin.csrfToken },
+  });
+  assert.equal(res.status, 200);
+  for (const s of [phone, laptop, stale]) {
+    assert.equal(db.prepare('SELECT 1 FROM sessions WHERE sid = ?').get(sidOf(s.cookie)), undefined,
+      'keine Sitzungszeile des geloeschten Mitglieds bleibt');
+  }
+  assert.equal(await meStatus(phone), 401);
+  assert.equal(await meStatus(admin), 200, 'die Sitzung des Admins bleibt');
+});

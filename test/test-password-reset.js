@@ -217,3 +217,23 @@ test('reset-password updates the hash and consumes the token', async () => {
   assert.equal(await bcrypt.compare('brandnewpw', hash), true);
   assert.equal(db.prepare('SELECT COUNT(*) c FROM password_resets').get().c, 0);
 });
+
+test('reset-password beendet jede Sitzung des Kontos, auch eine abgelaufene Zeile, und nur dessen', async () => {
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  db.exec('CREATE TABLE sessions (sid TEXT PRIMARY KEY, sess TEXT NOT NULL, expired_at INTEGER NOT NULL)');
+  const later = Date.now() + 3_600_000;
+  const insert = db.prepare('INSERT INTO sessions (sid, sess, expired_at) VALUES (?, ?, ?)');
+  insert.run('alice-1', JSON.stringify({ userId: 1 }), later);
+  insert.run('alice-2', JSON.stringify({ userId: 1 }), later);
+  insert.run('alice-stale', JSON.stringify({ userId: 1 }), Date.now() - 1000);
+  insert.run('bob-1', JSON.stringify({ userId: 2 }), later);
+  insert.run('broken', 'not json', later);
+  const { app, sent } = await makeAuthApp(db);
+  await callJson(app, 'POST', '/auth/forgot-password', { identifier: 'alice' });
+  const token = sent[0].html.match(/token=([a-f0-9]+)/)[1];
+  const { status } = await callJson(app, 'POST', '/auth/reset-password', { token, password: 'brandnewpw' });
+  assert.equal(status, 200);
+  const left = db.prepare('SELECT sid FROM sessions ORDER BY sid').all().map((r) => r.sid);
+  assert.deepEqual(left, ['bob-1', 'broken']);
+});

@@ -280,6 +280,25 @@ test('matcht E-Mail case-insensitiv', () => {
   assert(user.id === localId, 'Case-insensitiver E-Mail-Match fehlgeschlagen');
 });
 
+test('verknüpft auch, wenn die gespeicherte Adresse Leerraum traegt (primaer und sekundaer)', () => {
+  // Der Claim wird getrimmt (#1357), die gespeicherte Seite nicht: ein Kontakt
+  // mit ' dora@example.com ' (Kontaktformular, Import) verfehlte das Konto, und
+  // der Haushalt bekam ein zweites Mitglied mit derselben Adresse.
+  const db = buildOidcTestDb();
+  const primaryId = addLocalUserWithEmail(db, 'dora', '  Dora@Example.com ');
+  const primary = findOrCreateOidcUser(db, { sub: 'link-sub-ws1', email: 'dora@example.com', email_verified: true });
+  assert(primary.id === primaryId, `Primaere Adresse mit Leerraum verfehlt: ${primary.id} statt ${primaryId}`);
+
+  const db2 = buildOidcTestDb();
+  const secId = addLocalUserWithEmail(db2, 'ella', 'ella.primary@example.com');
+  const contact = db2.prepare('SELECT id FROM contacts WHERE family_user_id = ?').get(secId);
+  db2.prepare("INSERT INTO contact_emails (contact_id, label, value, is_primary) VALUES (?, 'work', ?, 0)")
+    .run(contact.id, ' ella.work@example.com  ');
+  const secondary = findOrCreateOidcUser(db2, { sub: 'link-sub-ws2', email: 'ella.work@example.com', email_verified: true });
+  assert(secondary.id === secId, `Sekundaere Adresse mit Leerraum verfehlt: ${secondary.id} statt ${secId}`);
+  assert(db2.prepare('SELECT count(*) AS n FROM users').get().n === 1, 'kein zweites Konto');
+});
+
 test('verknüpft NICHT bei unverifizierter E-Mail (Takeover-Schutz)', () => {
   const db = buildOidcTestDb();
   addLocalUserWithEmail(db, 'charlie', 'charlie@example.com');

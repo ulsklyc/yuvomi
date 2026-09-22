@@ -743,12 +743,13 @@ function updateUserRoleSessions(userId, role) {
 
 /**
  * Beendet alle Sitzungen eines Mitglieds ausser `exceptSid` und meldet, wie
- * viele es waren. Der eine Weg fuer Passwortwechsel, 2FA, Admin-Passwort und
- * "Auf anderen Geraeten abmelden" (#1354). API-Tokens und Wandtabletts sind
- * keine Zeilen dieser Tabelle und bleiben unberuehrt.
+ * viele es waren. Der eine Weg fuer Passwortwechsel, 2FA, Admin-Passwort,
+ * Passwort-Reset, Loeschen und "Auf anderen Geraeten abmelden" (#1354).
+ * API-Tokens und Wandtabletts sind keine Zeilen dieser Tabelle und bleiben
+ * unberuehrt. `database` nur fuer die per DI gebauten Reset-Routen.
  */
-function invalidateUserSessions(userId, exceptSid) {
-  const allSessions = db.get().prepare('SELECT sid, sess, expired_at FROM sessions').all();
+function invalidateUserSessions(userId, exceptSid, database = db.get()) {
+  const allSessions = database.prepare('SELECT sid, sess, expired_at FROM sessions').all();
   const now = Date.now();
   let ended = 0;
   for (const row of allSessions) {
@@ -756,7 +757,7 @@ function invalidateUserSessions(userId, exceptSid) {
     try {
       const sess = JSON.parse(row.sess);
       if (sess.userId === userId) {
-        const { changes } = db.get().prepare('DELETE FROM sessions WHERE sid = ?').run(row.sid);
+        const { changes } = database.prepare('DELETE FROM sessions WHERE sid = ?').run(row.sid);
         // Geloescht wird auch eine abgelaufene Zeile, die der 15-Minuten-Sweep
         // noch nicht erwischt hat - gezaehlt nur eine, die noch galt. Sonst
         // meldete die Seite "1 andere Sitzung beendet", wo keine mehr lebte.
@@ -1160,7 +1161,9 @@ export function findOrCreateOidcUser(database, claims) {
   //    Family-User-E-Mails hängen an contacts.email (Primär) bzw.
   //    contact_emails.value (Sekundär). Verknüpft wird nur, wenn GENAU EIN noch
   //    nicht OIDC-gebundener Account die E-Mail führt; 0 oder >1 Treffer →
-  //    sicherheitshalber neuer Account.
+  //    sicherheitshalber neuer Account. Beide Seiten gleich normalisiert: der
+  //    Claim ist oben getrimmt, die gespeicherte Adresse kann Leerraum tragen
+  //    (Formular, Import) und wird hier beim Lesen getrimmt.
   const trustMissingVerified = process.env.OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM === 'true';
   if (email && (email_verified === true || (trustMissingVerified && email_verified !== false))) {
     const matches = database.prepare(`
@@ -1169,7 +1172,7 @@ export function findOrCreateOidcUser(database, claims) {
       JOIN contacts c ON c.family_user_id = u.id
       LEFT JOIN contact_emails ce ON ce.contact_id = c.id
       WHERE u.oidc_sub IS NULL
-        AND (lower(c.email) = lower(?) OR lower(ce.value) = lower(?))
+        AND (lower(trim(c.email)) = lower(?) OR lower(trim(ce.value)) = lower(?))
     `).all(email, email);
 
     if (matches.length === 1) {
@@ -1617,13 +1620,8 @@ export function buildResetRoutes(targetRouter, {
       getDb().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, userId);
       resetService.consumeToken(token);
       // Best-effort: invalidate existing sessions for this user.
-      try {
-        const rows = getDb().prepare('SELECT sid, sess FROM sessions').all();
-        for (const r of rows) {
-          try { if (JSON.parse(r.sess)?.userId === userId) getDb().prepare('DELETE FROM sessions WHERE sid = ?').run(r.sid); }
-          catch { /* ignore malformed session rows */ }
-        }
-      } catch { /* sessions table may not exist in tests */ }
+      try { invalidateUserSessions(userId, null, getDb()); }
+      catch { /* sessions table may not exist in tests */ }
       res.json({ data: { ok: true } });
     } catch (err) {
       log.error('reset-password error:', err.message);
@@ -3310,16 +3308,8 @@ router.delete('/users/:id', requireAuth, requireAdmin, csrfMiddleware, (req, res
       return res.status(404).json({ error: 'User not found.', code: 404 });
     }
 
-    // Alle aktiven Sessions des geloeschten Users invalidieren
-    const allSessions = db.get().prepare('SELECT sid, sess FROM sessions').all();
-    for (const row of allSessions) {
-      try {
-        const sess = JSON.parse(row.sess);
-        if (sess.userId === userId) {
-          db.get().prepare('DELETE FROM sessions WHERE sid = ?').run(row.sid);
-        }
-      } catch { /* ignore malformed session */ }
-    }
+    // Alle Sessions des geloeschten Users invalidieren
+    invalidateUserSessions(userId);
 
     res.json({ ok: true });
   } catch (err) {
