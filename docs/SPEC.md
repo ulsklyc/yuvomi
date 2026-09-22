@@ -5296,10 +5296,16 @@ daily use: the store slid on every request, but `express-session` without `rolli
   write with a 403 that looks like a missing permission.
 - **Throttled, not `rolling`.** The session middleware runs before the static files in
   `server/index.js`; `rolling: true` would put the session id into the `Set-Cookie` of publicly
-  cacheable asset responses. Static files never re-date, and only `requireAuth()` does. The session
-  records `cookieRefreshedAt`; changing it is what makes `express-session` send the cookie and save
-  the store entry. A session from before #1356 has no timestamp and moves to 90 days on its first
-  authenticated request.
+  cacheable asset responses. Static files never re-date, and only `requireAuth()` does. It re-issues
+  the signed value the browser sent (as the oikos.sid takeover does) with the shared cookie options,
+  and it is due when the expiry the browser last received (`sess.cookie.expires` in the store) is
+  less than 90 days minus 12 hours away. A session from before #1356 still carries the old week and
+  moves to 90 days on its first authenticated request.
+- **The refresh never mutates `req.session`.** A modified session is saved with `store.set()`,
+  which is an `INSERT OR REPLACE`: a request still in flight while its session is revoked (password
+  reset, enabling 2FA, `invalidateUserSessions`, account deletion) would recreate the deleted row for
+  90 days. The refresh writes the new expiry with `UPDATE ... WHERE sid = ?` only
+  (`extendCookie`), which leaves a deleted row deleted (review finding on #1407).
 - **Store and cookie.** The store entry still slides on every request (`touch`), so it never ends
   before the cookie and at most one throttle window after it.
 - **The price.** A stolen cookie that is never used stays valid for up to 90 days; one that is used

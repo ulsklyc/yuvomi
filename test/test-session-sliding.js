@@ -23,6 +23,10 @@
  *      Auffrischen und bei der oikos.sid-Uebernahme, CSRF-Cookie beim Login,
  *      in `/auth/me` und in der CSRF-Middleware - und der Store-Eintrag laeuft
  *      nie VOR dem Cookie ab.
+ *   5. Eine Bestandssitzung mit der alten Woche rueckt sofort auf 90 Tage vor.
+ *   6. Eine faellige Auffrischung in einem Request, waehrend dessen die
+ *      Sitzung widerrufen wird, legt die geloeschte Zeile nicht neu an
+ *      (Review zu #1407: `set()` ist ein `INSERT OR REPLACE`).
  *
  * DIE UHR IST GEMOCKT, NUR `Date`. Der Server laeuft im selben Prozess
  * (`server-ready.js`), also sehen express-session, der Session-Store und die
@@ -186,8 +190,8 @@ test('Session-Cookie, CSRF-Cookie und Store teilen eine Lebensdauer', async () =
 });
 
 test('eine Sitzung von vor #1356 rueckt beim ersten Request auf 90 Tage vor', async () => {
-  // Bestandssitzungen tragen die alte Woche als `originalMaxAge` und keinen
-  // Drossel-Zeitstempel. express-session setzt vor dem Senden auf
+  // Bestandssitzungen tragen die alte Woche als `originalMaxAge` und als
+  // Ablauf (`sess.cookie.expires`). express-session setzt am Ende auf
   // `originalMaxAge` zurueck; wer nur `maxAge` umstellt, schickt wieder sieben
   // Tage hinaus.
   const cookie = cookieHeader((await login(0)).headers.get('set-cookie'));
@@ -195,7 +199,6 @@ test('eine Sitzung von vor #1356 rueckt beim ersten Request auf 90 Tage vor', as
   const sid = signed.slice(2, signed.lastIndexOf('.'));
   const row = db.prepare('SELECT sess FROM sessions WHERE sid = ?').get(sid);
   const sess = JSON.parse(row.sess);
-  delete sess.cookieRefreshedAt;
   sess.cookie.originalMaxAge = 7 * DAY;
   sess.cookie.expires = new Date(T0 + 7 * DAY).toISOString();
   db.prepare('UPDATE sessions SET sess = ?, expired_at = ? WHERE sid = ?')
@@ -208,6 +211,58 @@ test('eine Sitzung von vor #1356 rueckt beim ersten Request auf 90 Tage vor', as
     assert.equal(expiryOf(line, T0 + at), T0 + at + NINETY_DAYS, `90 Tage statt der alten Woche: ${line}`);
   }
   assert.equal(storeExpiry(cookie), T0 + at + NINETY_DAYS, 'der Store zieht mit');
+});
+
+test('eine faellige Auffrischung holt eine widerrufene Sitzung nicht zurueck', async () => {
+  // DAS RENNEN AUS DEM REVIEW ZU #1407. Ein Request ist schon an `requireAuth`
+  // vorbei und wartet in seinem Handler, waehrend die Sitzung widerrufen wird
+  // (`invalidateUserSessions`, Passwort-Reset, 2FA, Kontoloeschung - alle
+  // loeschen die Zeile). War er faellig und hat die Auffrischung `req.session`
+  // veraendert, nimmt express-session am Ende `set()` statt `touch()`, und das
+  // `INSERT OR REPLACE` legt die geloeschte Zeile fuer 90 Tage neu an.
+  //
+  // Der Halt ist eine Middleware direkt HINTER `requireAuth` im echten Stapel:
+  // sie wartet auf ein Versprechen, das der Test erst nach dem DELETE einloest.
+  const { default: app } = await import('../server/index.js');
+  const { requireAuth } = await import('../server/auth.js');
+  let release;
+  let arrived;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const reached = new Promise((resolve) => { arrived = resolve; });
+  app.use('/api/v1', async (req, res, next) => {
+    if (req.headers['x-test-hold'] !== '1') return next();
+    arrived();
+    await gate;
+    next();
+  });
+  const stack = app.router.stack;
+  const hold = stack.pop();
+  const authAt = stack.findIndex((layer) => layer.handle === requireAuth);
+  assert.ok(authAt >= 0, 'requireAuth steht im Stapel');
+  stack.splice(authAt + 1, 0, hold);
+
+  try {
+    const cookie = cookieHeader((await login(0)).headers.get('set-cookie'));
+    const signed = decodeURIComponent(/yuvomi\.sid=([^;]+)/.exec(cookie)[1]);
+    const sid = signed.slice(2, signed.lastIndexOf('.'));
+
+    clockAt(13 * HOUR); // faellig
+    const pending = fetch(`${BASE}/api/v1/tasks`, { headers: { Cookie: cookie, 'x-test-hold': '1' } });
+    await reached;
+    db.prepare('DELETE FROM sessions WHERE sid = ?').run(sid); // der Widerruf
+    release();
+    const res = await pending;
+    await res.arrayBuffer();
+
+    const row = db.prepare('SELECT sid FROM sessions WHERE sid = ?').get(sid);
+    assert.equal(row, undefined, 'die widerrufene Sitzung bleibt geloescht');
+    clockAt(13 * HOUR + 60_000);
+    const direct = await fetch(`${BASE}/api/v1/auth/me`, { headers: { Cookie: cookie } });
+    assert.equal(direct.status, 401, 'der Folgerequest mit dem alten Cookie wird abgewiesen');
+  } finally {
+    stack.splice(stack.indexOf(hold), 1);
+    release();
+  }
 });
 
 test('keine ausgeschriebene Lebensdauer neben der Konstante', () => {

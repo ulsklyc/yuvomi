@@ -39,13 +39,15 @@ export const SESSION_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
 export const SESSION_COOKIE_REFRESH_AFTER_MS = 12 * 60 * 60 * 1000;
 
 /**
- * Ist seit der letzten Auffrischung genug Zeit vergangen? Ohne Zeitstempel
- * (eine Sitzung von vor #1356, noch mit der alten Woche) ist sie sofort faellig -
- * so rueckt jede bestehende Sitzung beim ersten Request auf die 90 Tage vor.
- * @param {unknown} lastRefreshedAt Millisekunden seit Epoch oder nichts
+ * Ist die Auffrischung faellig? Gemessen am Ablauf, den der Browser zuletzt
+ * bekommen hat: sind davon weniger als 90 Tage minus zwoelf Stunden uebrig,
+ * liegt die letzte Ausstellung mindestens zwoelf Stunden zurueck. Ohne Ablauf
+ * ist sie sofort faellig; eine Sitzung von vor #1356 (alte Woche) ebenso - so
+ * rueckt jede bestehende Sitzung beim ersten Request auf die 90 Tage vor.
+ * @param {number|null} expiresAt Ablauf des zuletzt ausgestellten Cookies, ms seit Epoch
  * @param {number} now Millisekunden seit Epoch
  */
-export function sessionCookieRefreshDue(lastRefreshedAt, now) {
-  if (typeof lastRefreshedAt !== 'number' || !Number.isFinite(lastRefreshedAt)) return true;
-  return now - lastRefreshedAt >= SESSION_COOKIE_REFRESH_AFTER_MS;
+export function sessionCookieRefreshDue(expiresAt, now) {
+  if (typeof expiresAt !== 'number' || !Number.isFinite(expiresAt)) return true;
+  return expiresAt - now <= SESSION_MAX_AGE_MS - SESSION_COOKIE_REFRESH_AFTER_MS;
 }
