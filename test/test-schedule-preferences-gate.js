@@ -94,3 +94,23 @@ test('the exception is exact - a longer path is not swept in', async () => {
   const r = await memberCall('GET', '/schedule/preferencesX');
   assert.equal(r.status, 403);
 });
+
+// Die Ausnahme gilt NUR fuer Sitzungen (READ_LEVEL_WRITES, Achse `session`):
+// ein Token mit `schedule:read` bleibt an `schedule:write` gebunden - auch
+// ueber HTTP, nicht nur in der Funktion.
+test('token with schedule:read -> PUT /schedule/preferences denied, GET allowed', async () => {
+  const crypto = await import('node:crypto');
+  const { get } = await import('../server/db.js');
+  const token = 'yuvomi_test_schedule_prefs_read_token';
+  get().prepare(`
+    INSERT INTO api_tokens (name, token_hash, token_prefix, created_by, scopes)
+    VALUES ('schedule-read', ?, 'yuvomi_test', 1, ?)
+  `).run(crypto.createHash('sha256').update(token).digest('hex'), JSON.stringify(['schedule:read']));
+  const call = (method, body) => fetch(`${BASE}/api/v1/schedule/preferences`, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  assert.equal((await call('GET')).status, 200, 'Gegenprobe: das Token kommt durch, wo es lesen darf');
+  assert.equal((await call('PUT', { weeklyHours: 20 })).status, 403);
+});

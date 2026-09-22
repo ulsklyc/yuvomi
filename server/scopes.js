@@ -191,6 +191,12 @@ function moduleForPath(path) {
 const READ_LEVEL_WRITES = Object.freeze([
   Object.freeze({
     id: 'schedule-preferences',
+    // OHNE Falten von Schreibweise und Schlussstrich - mit Absicht, und es
+    // schliesst: `/Schedule/Preferences` oder `/schedule/preferences/` erreicht
+    // dieselbe Route, faellt hier aber nicht unter die Ausnahme und verlangt
+    // `schedule: write`. Strenger als die Route ist nur ein Fehlalarm, nie eine
+    // Umgehung. Nicht an den Rezept-Eintrag darunter "angleichen", ohne es zu
+    // entscheiden: die Oberflaeche schickt nur die kleine Form.
     pattern: '^\\/schedule\\/preferences$',
     flags: '',
     methods: null,

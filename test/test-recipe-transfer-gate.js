@@ -191,6 +191,27 @@ test('Token mit meals:read + shopping:read bleibt draussen', async () => {
   assert.equal(onList(zutat), 0);
 });
 
+test('READ_LEVEL_WRITES: jeder Eintrag mit Methodenliste nennt genau die Methoden des Routers', async () => {
+  const { READ_LEVEL_WRITES } = await import('../server/scopes.js');
+  const routers = { recipes: (await import('../server/routes/recipes.js')).default };
+  const mitMethoden = READ_LEVEL_WRITES.filter((e) => e.methods !== null);
+  assert.ok(mitMethoden.length > 0, 'Gegenprobe: es gibt Eintraege mit Methodenliste');
+  for (const entry of mitMethoden) {
+    const re = new RegExp(entry.pattern, entry.flags);
+    const praefix = entry.pattern.match(/^\^\\\/([a-z-]+)\\\//)?.[1];
+    assert.ok(routers[praefix], `${entry.id}: den Router fuer /${praefix} hier eintragen`);
+    const methoden = new Set();
+    for (const layer of routers[praefix].stack) {
+      if (!layer.route) continue;
+      const beispiel = `/${praefix}${String(layer.route.path).replace(/:[A-Za-z_]+/g, '1')}`;
+      if (!re.test(beispiel)) continue;
+      for (const [m, an] of Object.entries(layer.route.methods)) if (an) methoden.add(m.toUpperCase());
+    }
+    assert.deepEqual([...methoden].sort(), [...entry.methods].sort(),
+      `${entry.id}: die Tabelle muss genau die Methoden nennen, die der Router unter dem Pfad fuehrt`);
+  }
+});
+
 test('Token ohne meals-Scope bleibt draussen, auch unter anderer Schreibweise', async () => {
   const call = withToken(['shopping:write']);
   const { id, zutat } = await seedRecipe();
