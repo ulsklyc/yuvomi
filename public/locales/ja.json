@@ -2776,7 +2776,18 @@
         },
         "backupRestoreKeyLabel": "バックアップのキー",
         "backupRestoreKeyHint": "このバックアップは別のインストールのものです。そのインストールの DB_ENCRYPTION_KEY を入力してください。キーはこの復元にのみ使われ、保存されません。復元後のデータはこのインストールのキーで暗号化されます。",
-        "backupRestoreKeyHttpWarning": "このページは HTTPS で開かれていません。キーは暗号化されずにネットワークを通ります。"
+        "backupRestoreKeyHttpWarning": "このページは HTTPS で開かれていません。キーは暗号化されずにネットワークを通ります。",
+        "otherSessionsTitle": "他のデバイス",
+        "otherSessionsHint": "他のすべてのデバイスとブラウザーでアカウントからサインアウトします。このデバイスはサインインしたままです。API トークンとペアリング済みのウォールディスプレイには影響しません。",
+        "otherSessionsButton": "他のデバイスからサインアウト",
+        "otherSessionsConfirm": "他のすべてのデバイスからサインアウトしますか?",
+        "otherSessionsConfirmDetail": "そこであなたのアカウントでサインインしている人は、もう一度サインインする必要があります。このデバイスはサインインしたままです。",
+        "otherSessionsEnded": "他のセッションを {{count}} 件終了しました。",
+        "otherSessionsEnded_one": "他のセッションを {{count}} 件終了しました。",
+        "otherSessionsEnded_few": "他のセッションを {{count}} 件終了しました。",
+        "otherSessionsNone": "他のデバイスではサインインしていませんでした。",
+        "otherSessionsError": "他のデバイスからのサインアウトに失敗しました。",
+        "otherSessionsTooManyAttempts": "リクエストが多すぎます。少し待ってから、もう一度お試しください。"
     },
     "login": {
         "tagline": "家族のプランナーへおかえりなさい。",

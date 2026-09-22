@@ -251,6 +251,8 @@ const auth = {
   enableTwoFactor: (code) => api.post('/auth/2fa/enable', { code }),
   disableTwoFactor: (code) => api.post('/auth/2fa/disable', { code }),
   regenerateRecoveryCodes: (code) => api.post('/auth/2fa/recovery-codes', { code }),
+  // Beendet jede andere Sitzung des Kontos, diese bleibt (#1354). Antwort: { ok, ended }.
+  logoutOthers: () => api.post('/auth/logout-others', {}),
   logout: async () => {
     try {
       return await api.post('/auth/logout');

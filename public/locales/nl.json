@@ -2776,7 +2776,18 @@
         },
         "backupRestoreKeyLabel": "Sleutel van de back-up",
         "backupRestoreKeyHint": "Deze back-up komt van een andere installatie. Voer de DB_ENCRYPTION_KEY van die installatie in: die wordt alleen voor dit herstel gebruikt en niet opgeslagen, daarna zijn de gegevens versleuteld met de sleutel van deze installatie.",
-        "backupRestoreKeyHttpWarning": "Deze pagina is niet via HTTPS geopend: de sleutel gaat onversleuteld over het netwerk."
+        "backupRestoreKeyHttpWarning": "Deze pagina is niet via HTTPS geopend: de sleutel gaat onversleuteld over het netwerk.",
+        "otherSessionsTitle": "Andere apparaten",
+        "otherSessionsHint": "Meldt je account af op alle andere apparaten en browsers. Dit apparaat blijft aangemeld. API-tokens en gekoppelde wandschermen blijven ongemoeid.",
+        "otherSessionsButton": "Afmelden op andere apparaten",
+        "otherSessionsConfirm": "Afmelden op alle andere apparaten?",
+        "otherSessionsConfirmDetail": "Wie daar met jouw account is aangemeld, moet zich opnieuw aanmelden. Dit apparaat blijft aangemeld.",
+        "otherSessionsEnded": "{{count}} andere sessies beëindigd.",
+        "otherSessionsEnded_one": "{{count}} andere sessie beëindigd.",
+        "otherSessionsEnded_few": "{{count}} andere sessies beëindigd.",
+        "otherSessionsNone": "Je account was op geen enkel ander apparaat aangemeld.",
+        "otherSessionsError": "Afmelden op andere apparaten is mislukt.",
+        "otherSessionsTooManyAttempts": "Te veel verzoeken. Wacht even en probeer het dan opnieuw."
     },
     "login": {
         "tagline": "Welkom terug bij je gezinsplanner.",

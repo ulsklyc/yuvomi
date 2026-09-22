@@ -2776,7 +2776,18 @@
         },
         "backupRestoreKeyLabel": "Backup key",
         "backupRestoreKeyHint": "This backup comes from another installation. Enter that installation's DB_ENCRYPTION_KEY: it is used only for this restore and is not stored, and afterwards the data is encrypted with this installation's key.",
-        "backupRestoreKeyHttpWarning": "This page is not open over HTTPS: the key will cross the network unencrypted."
+        "backupRestoreKeyHttpWarning": "This page is not open over HTTPS: the key will cross the network unencrypted.",
+        "otherSessionsTitle": "Other devices",
+        "otherSessionsHint": "Signs your account out on every other device and browser. This device stays signed in. API tokens and paired wall displays are not affected.",
+        "otherSessionsButton": "Sign out on other devices",
+        "otherSessionsConfirm": "Sign out on all other devices?",
+        "otherSessionsConfirmDetail": "Anyone signed in with your account there has to sign in again. This device stays signed in.",
+        "otherSessionsEnded": "{{count}} other sessions ended.",
+        "otherSessionsEnded_one": "{{count}} other session ended.",
+        "otherSessionsEnded_few": "{{count}} other sessions ended.",
+        "otherSessionsNone": "Your account was not signed in on any other device.",
+        "otherSessionsError": "Signing out on other devices failed.",
+        "otherSessionsTooManyAttempts": "Too many requests. Please wait a moment, then try again."
     },
     "login": {
         "tagline": "Welcome back to your family planner.",
