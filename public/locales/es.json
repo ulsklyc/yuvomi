@@ -3552,7 +3552,8 @@
         "currentMonth": "Este mes",
         "noVisitReportsInMonth": "No se registró ningún servicio en {{month}}.",
         "settledAdminOnly": "Solo un administrador puede modificarlo o eliminarlo",
-        "reportVisitsCount": "Visitas"
+        "reportVisitsCount": "Visitas",
+        "receiptPresent": "Adjunto"
     },
     "userMultiSelect": {
         "moreUsers": "más",
