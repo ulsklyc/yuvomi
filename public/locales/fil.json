@@ -2797,6 +2797,7 @@
         "backupRestoreErrorOwnKeyMissing": "Walang DB_ENCRYPTION_KEY ang installation na ito kaya hindi nito mabuksan ang backup. I-set ang DB_ENCRYPTION_KEY, i-restart ang Yuvomi at saka mag-restore gamit ang key ng backup.",
         "backupRestoreErrorDamaged": "Sira o kulang ang backup; tama ang key. Kunin muli ang file, ihambing ang laki at sha256sum nito sa orihinal at i-restore ang kopyang iyon. Walang binago rito.",
         "backupRestoreErrorCorrupt": "Sira o kulang ang backup. Kunin muli ang file, ihambing ang laki at sha256sum nito sa orihinal at i-restore ang kopyang iyon, o gumamit ng mas lumang backup. Walang binago rito.",
+        "backupRestoreErrorInProgress": "May restore nang tumatakbo sa installation na ito. Hintaying matapos ito, pagkatapos ay tingnan kung aling backup ang nakalagay bago mag-restore muli. Walang binago ang kahilingang ito.",
         "backupRestoreErrorUnreadable": "Hindi mabasa ang backup. Tiyaking kumpleto ang file at subukang muli; nasa server log ang eksaktong dahilan. Walang binago rito.",
         "backupRestoreErrorGeneric": "Nabigo ang restore. Nasa server log ang eksaktong dahilan.",
         "backupRestoreErrorNeverEncrypted": "Kung hindi kailanman na-encrypt ang file, hindi ito wastong Yuvomi database.",

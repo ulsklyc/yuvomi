@@ -2785,6 +2785,7 @@
         "backupRestoreErrorOwnKeyMissing": "このインストールには DB_ENCRYPTION_KEY がないため、バックアップを開けません。DB_ENCRYPTION_KEY を設定して Yuvomi を再起動し、バックアップのキーで復元してください。",
         "backupRestoreErrorDamaged": "バックアップが破損しているか不完全です。キーは正しいです。ファイルを取得し直し、サイズと sha256sum を元のファイルと比べてから、そのコピーを復元してください。ここでは何も変更されていません。",
         "backupRestoreErrorCorrupt": "バックアップが破損しているか不完全です。ファイルを取得し直し、サイズと sha256sum を元のファイルと比べてからそのコピーを復元するか、古いバックアップを使ってください。ここでは何も変更されていません。",
+        "backupRestoreErrorInProgress": "このインストールではすでに復元が実行中です。完了するまで待ち、再度復元する前にどのバックアップが適用されているか確認してください。このリクエストでは何も変更されていません。",
         "backupRestoreErrorUnreadable": "バックアップを読み取れませんでした。ファイルが完全か確認してもう一度お試しください。正確な原因はサーバーログにあります。ここでは何も変更されていません。",
         "backupRestoreErrorGeneric": "復元に失敗しました。正確な原因はサーバーログにあります。",
         "backupRestoreErrorNeverEncrypted": "ファイルが一度も暗号化されていない場合、有効な Yuvomi のデータベースではありません。",

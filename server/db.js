@@ -21,7 +21,7 @@ import Database from 'better-sqlite3-multiple-ciphers';
 import path from 'path';
 import os from 'node:os';
 import fs from 'node:fs/promises';
-import { mkdirSync, existsSync, renameSync, linkSync, rmSync, copyFileSync, openSync, readSync, closeSync, statSync } from 'node:fs';
+import { mkdirSync, existsSync, renameSync, linkSync, rmSync, copyFileSync, openSync, readSync, closeSync, statSync, readdirSync } from 'node:fs';
 import { createLogger } from './logger.js';
 import { decodeHtmlEntities } from './utils/html-entities.js';
 import { toE164, defaultCountryFromConfig } from './utils/phone.js';
@@ -10100,7 +10100,11 @@ function firstFinding(result) {
  * Gemessen mit Schluessel: 2 MB samt ganzem Restore unter 200 ms, 91 MB (300 000 Zeilen, zwei
  * Indizes) rund 0,9 s gegen 1,9 s fuer `integrity_check` - der Restore
  * blockiert solange den Server, deshalb die schnellere Pruefung.
- * `quick_check(1)` hoert nach dem ersten Befund auf; einer reicht.
+ * `quick_check(1)` hoert nach dem ersten Befund auf; einer reicht. Es meldet
+ * nicht nur kaputte Seiten, sondern auch Zeilen, die eine NOT-NULL-Regel
+ * ihrer Tabelle verletzen (gemessen: „NULL value in a.x"; CHECK-Regeln prueft
+ * es nicht) - deshalb sagt die Meldung „haelt nicht zusammen" und nicht
+ * „Seite unlesbar".
  * @param {import('better-sqlite3-multiple-ciphers').Database} candidate
  * @param {boolean} encrypted
  */
@@ -10116,8 +10120,9 @@ function assertBackupIntact(candidate, encrypted) {
   if (result === 'ok') return;
   throw restoreError(
     `Backup file is damaged: the integrity check found an error in it (${firstFinding(result)}). `
-    + 'Its first pages open, but not every page of it is readable, and restoring it would put a '
-    + 'broken database in place. Nothing on this instance was changed. Get the backup again from '
+    + 'Its first page opens, but the file does not hold together - a damaged page or a row that '
+    + 'breaks a NOT NULL rule of its table - and restoring it would put a broken database in place. Nothing on '
+    + 'this instance was changed. Get the backup again from '
     + 'where it is stored and check that its size and sha256sum match the stored original, then '
     + 'restore that copy - or restore an older backup.',
     'backup_corrupt'
@@ -10351,6 +10356,19 @@ async function rekeyForeignBackup(sourcePath, oldKey) {
 }
 
 /**
+ * Laeuft in diesem Prozess gerade ein Restore? Ein zweiter (zweiter Tab,
+ * zweiter Admin) wird sofort abgelehnt, statt mit dem ersten um dieselben
+ * Dateien zu ringen: im Review von #1431 nachgestellt, ueberschrieb der zweite die
+ * halbe Arbeitsdatei bzw. die Rollback-Kopie des ersten, und der erste hing
+ * danach eine Mischung an DB_PATH (`database disk image is malformed`).
+ * Gesetzt wird der Riegel vor dem ersten `await`, geloest im `finally`.
+ * Gegen einen Restore aus einem ANDEREN Prozess (CLI neben dem Server) wirkt
+ * er nicht - dafuer traegt jede Arbeitsdatei einen eigenen Namen
+ * (`restoreStagingPath()`).
+ */
+let restoreRunning = false;
+
+/**
  * Backup einspielen.
  * @param {string} sourcePath
  * @param {{ backupKey?: string | Buffer | null }} [options] `backupKey`: der
@@ -10359,6 +10377,22 @@ async function rekeyForeignBackup(sourcePath, oldKey) {
  *   wird nicht gespeichert und steht in keiner Meldung.
  */
 async function restoreFromFile(sourcePath, { backupKey = null } = {}) {
+  if (restoreRunning) {
+    throw restoreError(
+      'Another restore is already running on this instance. Wait until it has finished, then check '
+      + 'which backup is in place before restoring again. This request changed nothing.',
+      'restore_in_progress'
+    );
+  }
+  restoreRunning = true;
+  try {
+    return await restoreFromFileUnlocked(sourcePath, { backupKey });
+  } finally {
+    restoreRunning = false;
+  }
+}
+
+async function restoreFromFileUnlocked(sourcePath, { backupKey }) {
   const oldKey = backupKeyBytes(backupKey);
   // Ein Klartext-Backup braucht keinen Schluessel - es laeuft wie bisher und
   // wird von init() mit dem eigenen verschluesselt.
@@ -10375,6 +10409,8 @@ async function restoreFromFile(sourcePath, { backupKey = null } = {}) {
   }
 }
 
+const RESTORE_STAGING_SUFFIX = '.restore-tmp';
+
 /**
  * Arbeitsname, unter dem `restoreFromFile()` die neue Datenbank ablegt, bevor
  * sie an `DB_PATH` gehaengt wird (#1422). Neben `DB_PATH`, nicht im
@@ -10382,7 +10418,9 @@ async function restoreFromFile(sourcePath, { backupKey = null } = {}) {
  * innerhalb eines Dateisystems und damit unteilbar - wie `.creating` (#1287).
  */
 function restoreStagingPath() {
-  return `${DB_PATH}.restore-tmp`;
+  // Eigener Name je Restore: ein Restore aus einem zweiten Prozess (CLI neben
+  // dem laufenden Server) ueberschreibt so nie die Arbeitsdatei des ersten.
+  return `${DB_PATH}${RESTORE_STAGING_SUFFIX}-${process.pid}-${Date.now().toString(36)}`;
 }
 
 /** Verzeichnis-Eintrag auf die Platte bringen; best effort (nicht jedes Dateisystem kann es). */
@@ -10443,16 +10481,23 @@ async function stageDatabaseCopy(from, stagingPath) {
  */
 function removeRestoreStaging() {
   if (DB_PATH === ':memory:') return;
-  const stagingPath = restoreStagingPath();
-  if (!existsSync(stagingPath)) return;
-  log.info(`${stagingPath} is left over from a restore that was interrupted before the swap - removing it. The database is the one from before that restore.`);
-  try { rmSync(stagingPath, { force: true }); } catch { /* best effort */ }
+  const dir = path.dirname(DB_PATH);
+  const prefix = `${path.basename(DB_PATH)}${RESTORE_STAGING_SUFFIX}`;
+  let names;
+  try { names = readdirSync(dir); } catch { return; }
+  for (const name of names) {
+    if (!name.startsWith(prefix)) continue;
+    const stagingPath = path.join(dir, name);
+    log.info(`${stagingPath} is left over from a restore that was interrupted before the swap - removing it. The database is the one from before that restore.`);
+    try { rmSync(stagingPath, { force: true }); } catch { /* best effort */ }
+  }
 }
 
 async function restoreValidatedFile(sourcePath) {
   const backupVersion = validateBackupFile(sourcePath);
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const rollbackPath = `${DB_PATH}.pre-restore-${timestamp}`;
+  const rollbackPartialPath = `${rollbackPath}.partial`;
   const stagingPath = restoreStagingPath();
   let rollbackCreated = false;
   // Offen ist die Verbindung, außer im Leer-Fall des Restore-CLI (#1282, siehe
@@ -10476,8 +10521,17 @@ async function restoreValidatedFile(sourcePath) {
       db = null;
     }
 
+    // Die Rollback-Kopie entsteht wie die Arbeitsdatei: unter einem
+    // Zwischennamen vollstaendig geschrieben, auf die Platte gebracht, dann
+    // umbenannt. Ein direktes Kopieren hinterliess bei einem Abbruch eine
+    // abgeschnittene Datei unter dem Namen, den die Anleitung als Rueckweg
+    // nennt. Kein harter Link statt der Kopie: er spart das Kopieren, aber
+    // bis zum Tausch waeren Rollback und DB_PATH dieselbe Datei - ein
+    // gescheiterter Restore, der die alte Datenbank wieder oeffnet, schriebe
+    // dann in die Rollback-Kopie mit.
     try {
-      await fs.copyFile(DB_PATH, rollbackPath);
+      await stageDatabaseCopy(DB_PATH, rollbackPartialPath);
+      await fs.rename(rollbackPartialPath, rollbackPath);
       rollbackCreated = true;
     } catch (err) {
       if (err?.code !== 'ENOENT') throw err;
@@ -10520,6 +10574,7 @@ async function restoreValidatedFile(sourcePath) {
   } catch (err) {
     try {
       await unlinkIfExists(stagingPath);
+      await unlinkIfExists(rollbackPartialPath);
       if (swapped) {
         // init() kann die neue Datenbank schon geoeffnet haben.
         if (db) {

@@ -183,7 +183,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   start. A backup of this installation with a damaged page further in was also restored without
   complaint, because only its first page was read. Every page is now checked before anything is
   changed, and a damaged backup is refused with a translated message that says to fetch the file
-  again or use an older backup. (#1422)
+  again or use an older backup. The copy kept under `.pre-restore-*` is written the same way, so
+  an interrupted restore never leaves a cut-off copy under that name. A second restore started
+  while one is still running, from another tab or another admin, is now refused with a message
+  instead of racing the first one. (#1422)
 
 - **A failed restore explains itself in your language and keeps your place.** When a backup did
   not open, the restore dialog showed the server's English explanation, up to several paragraphs

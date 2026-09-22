@@ -121,7 +121,9 @@ router.post(
       if (err?.reason) log.warn(`Database restore failed: ${err.message}`);
       else log.error('Database restore failed:', err);
       const message = err?.message || 'Database restore failed.';
-      res.status(400).json({ error: message, code: 400, ...(err?.reason ? { reason: err.reason } : {}) });
+      // Ein zweiter Restore, waehrend der erste laeuft, ist ein Konflikt, keine kaputte Anfrage.
+      const status = err?.reason === 'restore_in_progress' ? 409 : 400;
+      res.status(status).json({ error: message, code: status, ...(err?.reason ? { reason: err.reason } : {}) });
     } finally {
       // Der Schluessel lebt nur fuer diesen Restore.
       backupKey?.fill(0);

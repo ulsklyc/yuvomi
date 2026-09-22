@@ -2797,6 +2797,7 @@
         "backupRestoreErrorOwnKeyMissing": "Ta instalacja nie ma DB_ENCRYPTION_KEY, więc nie może otworzyć kopii zapasowej. Ustaw DB_ENCRYPTION_KEY, uruchom ponownie Yuvomi, a potem przywróć z kluczem kopii.",
         "backupRestoreErrorDamaged": "Kopia zapasowa jest uszkodzona lub niekompletna; klucz jest poprawny. Pobierz plik ponownie, porównaj rozmiar i sha256sum z oryginałem i przywróć tę kopię. Nic tu nie zostało zmienione.",
         "backupRestoreErrorCorrupt": "Kopia zapasowa jest uszkodzona lub niekompletna. Pobierz plik ponownie, porównaj rozmiar i sha256sum z oryginałem i przywróć tę kopię albo użyj starszej kopii zapasowej. Nic tu nie zostało zmienione.",
+        "backupRestoreErrorInProgress": "Na tej instalacji trwa już przywracanie. Poczekaj, aż się zakończy, i sprawdź, która kopia zapasowa jest wgrana, zanim przywrócisz ponownie. To żądanie niczego nie zmieniło.",
         "backupRestoreErrorUnreadable": "Nie udało się odczytać kopii zapasowej. Sprawdź, czy plik jest kompletny, i spróbuj ponownie; dokładna przyczyna jest w logu serwera. Nic tu nie zostało zmienione.",
         "backupRestoreErrorGeneric": "Przywracanie nie powiodło się. Dokładna przyczyna jest w logu serwera.",
         "backupRestoreErrorNeverEncrypted": "Jeśli plik nigdy nie był zaszyfrowany, nie jest prawidłową bazą danych Yuvomi.",

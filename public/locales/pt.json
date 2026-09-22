@@ -2785,6 +2785,7 @@
         "backupRestoreErrorOwnKeyMissing": "Esta instalação não tem DB_ENCRYPTION_KEY e por isso não consegue abrir o backup. Defina DB_ENCRYPTION_KEY, reinicie o Yuvomi e depois restaure com a chave do backup.",
         "backupRestoreErrorDamaged": "O backup está danificado ou incompleto; a chave está certa. Obtenha o ficheiro novamente, compare o tamanho e o sha256sum com o original e restaure essa cópia. Nada foi alterado aqui.",
         "backupRestoreErrorCorrupt": "O backup está danificado ou incompleto. Obtenha o ficheiro novamente, compare o tamanho e o sha256sum com o original e restaure essa cópia, ou use um backup mais antigo. Nada foi alterado aqui.",
+        "backupRestoreErrorInProgress": "Já está a decorrer um restauro nesta instalação. Aguarde que termine e verifique qual backup está em vigor antes de restaurar novamente. Este pedido não alterou nada.",
         "backupRestoreErrorUnreadable": "Não foi possível ler o backup. Verifique se o ficheiro está completo e tente novamente; a causa exata está no registo do servidor. Nada foi alterado aqui.",
         "backupRestoreErrorGeneric": "O restauro falhou. A causa exata está no registo do servidor.",
         "backupRestoreErrorNeverEncrypted": "Se o ficheiro nunca foi cifrado, não é uma base de dados válida do Yuvomi.",

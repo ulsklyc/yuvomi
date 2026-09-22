@@ -323,6 +323,40 @@ test('POST /restore: valides Backup wird wiederhergestellt (Roundtrip)', async (
   assert.doesNotThrow(() => database().prepare('SELECT MAX(version) FROM schema_migrations').get());
 });
 
+test('POST /restore: ein zweiter Restore, waehrend der erste laeuft → 409 restore_in_progress (#1431)', async () => {
+  const dl = await call('GET', '/database', { actor: ADM });
+  assert.equal(dl.status, 200);
+  // Den ersten Restore beim Kopieren seiner Upload-Datei anhalten.
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  let reached;
+  const copying = new Promise((resolve) => { reached = resolve; });
+  const realCopyFile = fs.promises.copyFile;
+  let held = false;
+  fs.promises.copyFile = async (src, dest, mode) => {
+    if (!held && String(src).endsWith(`${path.sep}restore.db`)) {
+      held = true;
+      reached();
+      await gate;
+    }
+    return realCopyFile(src, dest, mode);
+  };
+  try {
+    const first = call('POST', '/restore', { actor: ADM, raw: dl.buf });
+    await copying;
+    const second = await call('POST', '/restore', { actor: ADM, raw: dl.buf });
+    assert.equal(second.status, 409);
+    assert.equal(second.body.reason, 'restore_in_progress');
+    assert.equal(second.body.code, 409);
+    release();
+    assert.equal((await first).status, 200, 'der erste Restore laeuft zu Ende');
+  } finally {
+    release();
+    fs.promises.copyFile = realCopyFile;
+  }
+  assert.doesNotThrow(() => database().prepare('SELECT MAX(version) FROM schema_migrations').get());
+});
+
 // ── Downgrade-Schutz (Leitlinien-Audit 03.09.2026, Nebenbefund N1) ──────────────
 // Ein Backup aus einer NEUEREN Yuvomi-Version traegt Migrationsnummern, die
 // dieser Build nicht kennt. Bis hierher pruefte der Restore nur, ob

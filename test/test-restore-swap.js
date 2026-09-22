@@ -23,7 +23,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import fsp from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -195,7 +195,11 @@ test('#1422 die Arbeitsdatei entsteht NEBEN DB_PATH und ist nach dem Restore weg
   target.mod.get().close();
   const run = restoreKilledMidCopy(backupPath, { dbPath: target.dbPath, key: KEY });
   assert.equal(run.signal, 'SIGKILL');
-  assert.ok(existsSync(`${target.dbPath}.restore-tmp`), `Arbeitsdatei neben DB_PATH erwartet: ${readdirSync(target.dir).join(', ')}`);
+  assert.equal(
+    readdirSync(target.dir).filter((name) => name.startsWith('yuvomi.db.restore-tmp')).length,
+    1,
+    `Arbeitsdatei neben DB_PATH erwartet: ${readdirSync(target.dir).join(', ')}`
+  );
 
   // Ein vollstaendiger Restore laesst keine liegen.
   const ziel = await frozenTarget(KEY, 'vor dem Restore');
@@ -282,3 +286,141 @@ test('#1422 ein heiles eigenes Backup laeuft durch die Pruefung', async () => {
   assert.equal(target.mod.get().pragma('quick_check(1)', { simple: true }), 'ok');
   target.mod.get().close();
 });
+
+// ---------------------------------------------------------------------------
+// Review #1431: zwei Restores, Rollback-Kopie, Rollback nach dem Tausch
+// ---------------------------------------------------------------------------
+
+test('#1431 ein zweiter Restore waehrend des ersten wird sofort abgelehnt, der erste laeuft sauber durch', async () => {
+  // Ohne Riegel teilten sich beide die Arbeitsdatei: der zweite ueberschrieb
+  // die halbe Kopie des ersten, und der erste hing eine Mischung an DB_PATH.
+  const backupA = await bigBackup(KEY, 'Backup A');
+  const backupB = await bigBackup(KEY, 'Backup B');
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  let reached;
+  const copying = new Promise((resolve) => { reached = resolve; });
+  const realCopyFile = fsp.copyFile;
+  fsp.copyFile = async (src, dest, mode) => {
+    if (String(src) === backupA) {
+      reached();
+      await gate;
+    }
+    return realCopyFile(src, dest, mode);
+  };
+  try {
+    const first = target.mod.restoreFromFile(backupA);
+    await copying;
+    await assert.rejects(
+      () => target.mod.restoreFromFile(backupB),
+      (err) => err.reason === 'restore_in_progress' && /changed nothing/.test(err.message)
+    );
+    release();
+    await first;
+  } finally {
+    release();
+    fsp.copyFile = realCopyFile;
+  }
+
+  assert.equal(target.mod.get().prepare('SELECT note FROM restore_probe LIMIT 1').get()?.note, 'Backup A');
+  assert.equal(target.mod.get().pragma('quick_check(1)', { simple: true }), 'ok');
+  // Der Riegel ist wieder offen: der naechste Restore laeuft.
+  await target.mod.restoreFromFile(backupB);
+  assert.equal(target.mod.get().prepare('SELECT note FROM restore_probe LIMIT 1').get()?.note, 'Backup B');
+  target.mod.get().close();
+});
+
+test('#1431 der Riegel loest sich auch nach einem gescheiterten Restore', async () => {
+  const kaputt = join(tempDir('yuvomi-test-swap-'), 'kein-sqlite.db');
+  writeFileSync(kaputt, 'das ist keine Datenbank, aber lang genug fuer einen Kopf');
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  await assert.rejects(() => target.mod.restoreFromFile(kaputt));
+  await assert.rejects(
+    () => target.mod.restoreFromFile(kaputt),
+    (err) => err.reason !== 'restore_in_progress',
+    'der zweite Versuch scheitert an der Datei, nicht am Riegel'
+  );
+  target.mod.get().close();
+});
+
+/** Restore im Kindprozess, der beim Anlegen der ROLLBACK-Kopie die Haelfte schreibt und stirbt. */
+const KILL_MID_ROLLBACK_COPY = `
+  import fs from 'node:fs/promises';
+  import { readFileSync, writeFileSync } from 'node:fs';
+  const live = process.env.DB_PATH;
+  const realCopyFile = fs.copyFile;
+  fs.copyFile = async (src, dest, mode) => {
+    if (String(src) === live) {
+      const bytes = readFileSync(src);
+      writeFileSync(dest, bytes.subarray(0, Math.floor(bytes.length / 2)));
+      process.stdout.write('half-written\\n');
+      process.kill(process.pid, 'SIGKILL');
+      await new Promise(() => {});
+    }
+    return realCopyFile(src, dest, mode);
+  };
+  const db = await import(process.env.SWAP_DB_MODULE);
+  await db.restoreFromFile(process.env.SWAP_BACKUP);
+  process.stdout.write('restored\\n');
+`;
+
+test('#1431 stirbt der Restore beim Anlegen der Rollback-Kopie, liegt unter .pre-restore-* keine abgeschnittene Kopie', async () => {
+  const backupPath = await bigBackup(KEY, 'aus dem Backup');
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  // Gross genug, dass eine halbe Kopie nicht zufaellig heil aussieht.
+  const insert = target.mod.get().prepare('INSERT INTO restore_probe (note) VALUES (?)');
+  for (let i = 0; i < 400; i++) insert.run(`${'y'.repeat(200)}-${i}`);
+  target.mod.get().close();
+
+  const env = {
+    ...process.env, DB_PATH: target.dbPath, LOG_LEVEL: 'error', DB_ENCRYPTION_KEY: KEY,
+    SWAP_BACKUP: backupPath, SWAP_DB_MODULE: DB_MODULE,
+  };
+  const run = spawnSync(process.execPath, ['--input-type=module', '-e', KILL_MID_ROLLBACK_COPY], {
+    cwd: tempDir('yuvomi-test-swap-cwd-'), env, encoding: 'utf8',
+  });
+  assert.equal(run.signal, 'SIGKILL', `der Kindprozess muss beim Kopieren gestorben sein: ${run.stderr}`);
+  assert.match(run.stdout, /half-written/, 'Vorbedingung: der Abbruch traf die Rollback-Kopie');
+
+  const names = readdirSync(target.dir);
+  const rollbacks = names.filter((name) => /\.pre-restore-[^.]+$/.test(name));
+  assert.deepEqual(rollbacks, [], `unter dem Rollback-Namen darf keine halbe Kopie liegen: ${names.join(', ')}`);
+  assert.deepEqual(inspect(target.dbPath, KEY), { note: 'vor dem Restore', check: 'ok' }, 'DB_PATH ist die alte Datenbank');
+});
+
+/** Besteht die Validierung (Tabelle da, Version 1), scheitert aber in init() an den Migrationen. */
+function backupThatFailsAfterTheSwap() {
+  const pfad = join(tempDir('yuvomi-test-swap-'), 'scheitert.db');
+  const handle = new Database(pfad);
+  handle.exec(`CREATE TABLE schema_migrations (
+    version INTEGER PRIMARY KEY, description TEXT NOT NULL, applied_at TEXT NOT NULL DEFAULT ''
+  )`);
+  handle.prepare('INSERT INTO schema_migrations (version, description) VALUES (1, ?)').run('nur die Tabelle');
+  handle.close();
+  return pfad;
+}
+
+for (const [fall, key] of [['mit Schluessel', KEY], ['ohne Schluessel', null]]) {
+  test(`#1431 scheitert init() nach dem Tausch (${fall}), holt der Rollback die alte Datenbank zurueck`, async () => {
+    const target = await frozenTarget(key, 'vor dem Restore');
+    await assert.rejects(() => target.mod.restoreFromFile(backupThatFailsAfterTheSwap()));
+
+    assert.equal(
+      target.mod.get().prepare('SELECT note FROM restore_probe').get()?.note,
+      'vor dem Restore',
+      'die Instanz laeuft wieder auf der alten Datenbank'
+    );
+    target.mod.get().pragma('wal_checkpoint(TRUNCATE)');
+    assert.equal(sha256(target.dbPath), target.hash, 'DB_PATH ist Byte fuer Byte die alte Datei');
+    const names = readdirSync(target.dir);
+    assert.deepEqual(
+      names.filter((name) => name.includes('.restore-tmp') || name.endsWith('.partial')),
+      [],
+      `keine Arbeitsdatei bleibt liegen: ${names.join(', ')}`
+    );
+    assert.equal(names.filter((name) => /\.pre-restore-[^.]+$/.test(name)).length, 1, 'die Rollback-Kopie bleibt stehen');
+    target.mod.get().close();
+  });
+}

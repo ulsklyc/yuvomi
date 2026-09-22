@@ -35,7 +35,7 @@ export function backupPaths() {
         tag: 'Backup',
         admin: true,
         stateChanging: true,
-        description: 'A backup carries the encryption of the installation that wrote it. To restore an encrypted backup from ANOTHER installation, send that installation\'s DB_ENCRYPTION_KEY in `X-Backup-Key`: the backup is re-encrypted with this installation\'s own key, and the sent key is used only for this request and never stored. The key is accepted only in this header, never in the URL. If this installation\'s own key already opens the backup, the header is ignored. An installation without a DB_ENCRYPTION_KEY of its own refuses a backup key rather than storing the backup decrypted. Every 400 response may carry a machine-readable `reason`: `backup_key_required` (the backup does not open with this installation\'s key - send `X-Backup-Key`), `backup_key_wrong`, `backup_key_invalid` (header is not base64), `own_key_missing`, `backup_damaged`, `backup_unreadable`, `backup_corrupt` (the integrity check found damage in the backup file). A failed restore leaves this installation unchanged.',
+        description: 'A backup carries the encryption of the installation that wrote it. To restore an encrypted backup from ANOTHER installation, send that installation\'s DB_ENCRYPTION_KEY in `X-Backup-Key`: the backup is re-encrypted with this installation\'s own key, and the sent key is used only for this request and never stored. The key is accepted only in this header, never in the URL. If this installation\'s own key already opens the backup, the header is ignored. An installation without a DB_ENCRYPTION_KEY of its own refuses a backup key rather than storing the backup decrypted. Every 400 response may carry a machine-readable `reason`: `backup_key_required` (the backup does not open with this installation\'s key - send `X-Backup-Key`), `backup_key_wrong`, `backup_key_invalid` (header is not base64), `own_key_missing`, `backup_damaged`, `backup_unreadable`, `backup_corrupt` (the integrity check found damage in the backup file). A second restore while one is still running is refused with 409 and reason `restore_in_progress`. A failed restore leaves this installation unchanged.',
         params: [{
           name: 'X-Backup-Key',
           in: 'header',
@@ -57,6 +57,7 @@ export function backupPaths() {
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
+          409: { description: 'Another restore is still running on this instance (reason `restore_in_progress`); nothing was changed' },
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
