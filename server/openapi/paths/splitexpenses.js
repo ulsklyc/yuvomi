@@ -33,7 +33,7 @@ const settlementReversalResponse = {
         created_at: { type: 'string', format: 'date-time' },
         updated_at: { type: 'string', format: 'date-time' },
         reversed_at: { type: 'string', format: 'date-time' },
-        reversed_by: { type: 'integer', description: 'Who reversed the payment. The counter-entries themselves keep the `created_by` of the rows they reverse.' },
+        reversed_by: { type: ['integer', 'null'], description: 'Who reversed the payment, from the `payment_reversed` activity; `null` when that account no longer exists. The counter-entries themselves keep the `created_by` of the rows they reverse.' },
       },
     },
   },

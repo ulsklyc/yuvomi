@@ -339,7 +339,14 @@ function serializeExpenseList(expenses, viewerId) {
   return expenses.map((expense) => serializeExpense(expense, prefetched, viewerId));
 }
 
-function insertExpenseLedger(database, expense, splits, actorId, sourceType = 'expense') {
+// `created_by` jeder Ledger-Zeile ist `expense.created_by`, nie die Person, die
+// gerade anlegt oder bearbeitet: Ausgabe und Zeilen haengen per ON DELETE
+// CASCADE am selben Konto und fallen so nur gemeinsam. Trug ein PUT die
+// bearbeitende Person ein, nahm deren Kontoloeschung die Zeilen mit, und die
+// weiter aktive Ausgabe zaehlte nicht mehr im Saldo. Wer bearbeitet hat, steht
+// in `expense_edited` (expense_activity.actor_id).
+function insertExpenseLedger(database, expense, splits, sourceType = 'expense') {
+  const actorId = expense.created_by;
   const insert = database.prepare(`
     INSERT INTO expense_ledger_entries
       (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
@@ -351,12 +358,12 @@ function insertExpenseLedger(database, expense, splits, actorId, sourceType = 'e
   }
 }
 
-function replaceExpenseSplits(database, expense, splits, actorId) {
+function replaceExpenseSplits(database, expense, splits) {
   database.prepare('DELETE FROM expense_splits WHERE expense_id = ?').run(expense.id);
   database.prepare('DELETE FROM expense_ledger_entries WHERE source_type IN (?, ?) AND source_id = ?').run('expense', 'expense_reversal', expense.id);
   const insertSplit = database.prepare('INSERT INTO expense_splits (expense_id, user_id, amount_minor, currency) VALUES (?, ?, ?, ?)');
   for (const split of splits) insertSplit.run(expense.id, split.user_id, split.amount_minor, split.currency);
-  insertExpenseLedger(database, expense, splits, actorId);
+  insertExpenseLedger(database, expense, splits);
 }
 
 function parseExpenseBody(body, fallbackCurrency) {
@@ -851,7 +858,7 @@ router.post('/groups/:id/expenses', (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(groupId, parsed.title, parsed.description, parsed.amountMinor, parsed.currency, parsed.convertedAmountMinor, parsed.convertedCurrency, JSON.stringify(req.body.exchange_snapshot || null), payerId, parsed.category, parsed.method, parsed.expenseDate, userId(req));
       const expense = db.get().prepare('SELECT * FROM expenses WHERE id = ?').get(result.lastInsertRowid);
-      replaceExpenseSplits(db.get(), expense, splits, userId(req));
+      replaceExpenseSplits(db.get(), expense, splits);
       // Belege (#583): nur sichtbare Dokumente, sonst liesse sich über geratene
       // IDs der Name eines fremden Dokuments auslesen.
       replaceDocumentLinks(db.get(), {
@@ -899,7 +906,7 @@ router.put('/expenses/:id', (req, res) => {
         WHERE id = ?
       `).run(parsed.title, parsed.description, parsed.amountMinor, parsed.currency, parsed.convertedAmountMinor, parsed.convertedCurrency, JSON.stringify(req.body.exchange_snapshot || null), payerId, parsed.category, parsed.method, parsed.expenseDate, existing.id);
       const expense = db.get().prepare('SELECT * FROM expenses WHERE id = ?').get(existing.id);
-      replaceExpenseSplits(db.get(), expense, splits, userId(req));
+      replaceExpenseSplits(db.get(), expense, splits);
       // Belege nur anfassen, wenn das Feld mitkommt - ein PUT, das nur den
       // Betrag korrigiert, darf sie nicht stillschweigend abräumen.
       if (req.body.attachment_document_ids !== undefined) {

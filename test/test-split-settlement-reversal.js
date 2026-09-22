@@ -304,3 +304,39 @@ test('Konto der ERFASSENDEN Person geloescht: Buchung und Gegenbuchung fallen ge
   assert.equal(ledger(s, 'settlement').length, 0);
   assert.equal(ledger(s, 'settlement_reversal').length, 0, 'keine Gegenbuchung ohne Partner');
 });
+
+// Dieselbe Klasse an einer Ausgabe: das Bearbeiten schreibt ihre Ledger-Zeilen
+// neu. Trugen die neuen Zeilen die BEARBEITENDE Person, verschwanden sie mit
+// deren Konto, waehrend die Ausgabe (`expenses.created_by` = Ersteller) aktiv
+// stehen blieb und nicht mehr in den Salden zaehlte. Die Zeilen tragen immer
+// `expenses.created_by`; wer bearbeitet hat, steht in `expense_edited`.
+test('Konto der BEARBEITENDEN Person geloescht: die Ausgabe zaehlt weiter in den Salden', async () => {
+  const R3 = await member('author3', 'Anna');
+  const M3 = await member('manager3', 'Mika');
+  assert.equal((await OWN.call('POST', `/split-expenses/groups/${GROUP}/members`, { user_id: R3.id, role: 'guest' })).status, 201);
+  assert.equal((await OWN.call('POST', `/split-expenses/groups/${GROUP}/members`, { user_id: M3.id, role: 'admin' })).status, 201);
+  const base = await balances();
+  const created = await R3.call('POST', `/split-expenses/groups/${GROUP}/expenses`, {
+    title: 'Getraenke', amount: '8.00', currency: 'EUR', split_method: 'equal', payer_id: OWN.id,
+    participants: [OWN.id, OTH.id], expense_date: '2026-09-02',
+  });
+  assert.equal(created.status, 201);
+  const eid = created.body.data.id;
+  const edited = await M3.call('PUT', `/split-expenses/expenses/${eid}`, {
+    title: 'Getraenke', amount: '12.00', currency: 'EUR', split_method: 'equal', payer_id: OWN.id,
+    participants: [OWN.id, OTH.id], expense_date: '2026-09-02',
+  });
+  assert.equal(edited.status, 200);
+  const afterEdit = await balances();
+  assert.deepEqual(afterEdit, { ...base, [OWN.id]: base[OWN.id] + 600, [OTH.id]: base[OTH.id] - 600 });
+  const eintrag = db.prepare("SELECT actor_id FROM expense_activity WHERE type = 'expense_edited' AND entity_type = 'expense' AND entity_id = ? ORDER BY id DESC").get(eid);
+  assert.equal(eintrag.actor_id, M3.id, 'wer bearbeitet hat, steht im Verlauf');
+
+  const del = await adminCall('DELETE', `/auth/users/${M3.id}`);
+  assert.equal(del.status, 200);
+  assert.equal(db.prepare('SELECT status FROM expenses WHERE id = ?').get(eid).status, 'active');
+  assert.deepEqual(await balances(), afterEdit, 'die Ausgabe zaehlt weiter');
+  const rows = ledger(eid, 'expense');
+  assert.equal(rows.length, 3);
+  assert.ok(rows.every((row) => row.created_by === R3.id), 'Ledger-Zeilen tragen den Ersteller der Ausgabe');
+});
