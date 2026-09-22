@@ -162,3 +162,78 @@ test('OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM gilt dem Verknuepfen, nicht dem Ko
   assert.equal(contactsOf(user.id).length, 1);
   assert.equal(contactsOf(user.id)[0].email, null, 'nur email_verified: true bringt die Adresse in den Kontakt');
 });
+
+test('Leerraum um die Adresse wird abgeschnitten', async () => {
+  await ssoSignIn({
+    claims: { sub: 'contact-trim', email_verified: true },
+    userinfo: { name: 'Tim Trim', email: '  a@x.de  ', email_verified: true },
+  });
+  assert.equal(contactsOf(userBySub('contact-trim').id)[0]?.email, 'a@x.de');
+});
+
+test('eine Adresse ueber MAX_TITLE (200) wird nicht uebernommen', async () => {
+  const long = `${'l'.repeat(195)}@x.de_`;
+  assert.ok(long.length > 200, 'Vorbedingung: laenger als MAX_TITLE');
+  await ssoSignIn({
+    claims: { sub: 'contact-long', email_verified: true },
+    userinfo: { name: 'Lara Lang', email: long, email_verified: true },
+  });
+  const contacts = contactsOf(userBySub('contact-long').id);
+  assert.equal(contacts.length, 1);
+  assert.equal(contacts[0].email, null);
+});
+
+/** Legt ein lokales Mitglied samt Kontakt an, wie es die Verknuepfung vorfindet. */
+function addLocalMember(username, email) {
+  const id = Number(database.prepare(`
+    INSERT INTO users (username, display_name, password_hash) VALUES (?, ?, 'x')
+  `).run(username, `Lokal ${username}`).lastInsertRowid);
+  database.prepare("INSERT INTO contacts (name, category, email, family_user_id) VALUES (?, 'misc', ?, ?)")
+    .run(`Lokal ${username}`, email, id);
+  return id;
+}
+
+test('Verknuepfung: der vorhandene Kontakt bleibt unveraendert und der einzige', async () => {
+  const memberId = addLocalMember('lokal-link', 'lokal@example.com');
+  const before = contactsOf(memberId);
+
+  const location = await ssoSignIn({
+    claims: { sub: 'contact-link', email_verified: true },
+    userinfo: { name: 'Anderer Name', email: 'lokal@example.com', email_verified: true },
+  });
+  assert.equal(location, '/', 'Vorbedingung: die Anmeldung gelingt');
+  assert.equal(userBySub('contact-link')?.id, memberId, 'Vorbedingung: verknuepft, kein neues Konto');
+  assert.deepEqual(contactsOf(memberId), before);
+  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM contacts WHERE lower(email) = ?').get('lokal@example.com').n, 1);
+});
+
+test('Verknuepfung: Leerraum und Grossschreibung in der Adresse des Anbieters verfehlen das Konto nicht', async () => {
+  const memberId = addLocalMember('lokal-trim', 'Link@x.de');
+  const location = await ssoSignIn({
+    claims: { sub: 'contact-link-trim', email_verified: true },
+    userinfo: { name: 'Link Trim', email: '  link@x.de ', email_verified: true },
+  });
+  assert.equal(location, '/', 'Vorbedingung: die Anmeldung gelingt');
+  assert.equal(userBySub('contact-link-trim')?.id, memberId, 'verknuepft statt eines zweiten Kontos');
+  assert.equal(database.prepare("SELECT COUNT(*) AS n FROM contacts WHERE lower(trim(email)) = 'link@x.de'").get().n, 1,
+    'kein zweiter Mitglieder-Kontakt mit derselben Adresse');
+});
+
+test('scheitert die Kontaktanlage, entsteht auch kein Konto', async () => {
+  database.exec(`
+    CREATE TRIGGER test_block_contact BEFORE INSERT ON contacts
+    WHEN NEW.name = 'Kaputt Kontakt'
+    BEGIN SELECT RAISE(ABORT, 'contact blocked by test'); END;
+  `);
+  try {
+    const location = await ssoSignIn({
+      claims: { sub: 'contact-atomic', email_verified: true },
+      userinfo: { name: 'Kaputt Kontakt', preferred_username: 'kaputt', email: 'kaputt@example.com', email_verified: true },
+    });
+    assert.equal(location, '/login?error=oidc_failed');
+  } finally {
+    database.exec('DROP TRIGGER test_block_contact');
+  }
+  assert.equal(userBySub('contact-atomic'), undefined, 'kein Konto ohne Kontakt');
+  assert.equal(database.prepare("SELECT COUNT(*) AS n FROM users WHERE username = 'kaputt'").get().n, 0);
+});

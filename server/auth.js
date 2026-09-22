@@ -1112,7 +1112,12 @@ function sanitizeOidcUsername(raw) {
  *   das Konto neu wäre und die automatische Kontoerstellung abgeschaltet ist.
  */
 export function findOrCreateOidcUser(database, claims) {
-  const { sub, iss, email, email_verified, name, preferred_username, username: usernameClaim } = claims;
+  const { sub, iss, email_verified, name, preferred_username, username: usernameClaim } = claims;
+  // Die Adresse EINMAL normalisieren und denselben Wert fuers Verknuepfen und
+  // fuer den Kontakt nehmen: verglich die Verknuepfung die rohe Adresse und
+  // speicherte der Kontakt die getrimmte, verfehlte `'  a@x.de '` das lokale
+  // Konto, und der Haushalt hatte zwei Mitglieder mit derselben Adresse (#1357).
+  const email = typeof claims.email === 'string' ? (claims.email.trim() || undefined) : claims.email;
 
   // Der Issuer aus dem validierten ID-Token kennt sich selbst am besten; OIDC_ISSUER
   // ist nur der konfigurierte Einstiegspunkt und kann davon abweichen (CNAME o. Ä.).
@@ -1189,9 +1194,8 @@ export function findOrCreateOidcUser(database, claims) {
   //    zu), kein Geburtsdatum (ein Geburtstag, den die Person hier nie
   //    eingetragen hat) und bewusst nur hier, beim ANLEGEN: Schritt 1 gibt ein
   //    bekanntes Konto unveraendert zurueck, bis D#848 den Abgleich regelt.
-  const contactEmail = email_verified === true && typeof email === 'string'
-    && email.trim() && email.trim().length <= MAX_TITLE
-    ? email.trim()
+  const contactEmail = email_verified === true && typeof email === 'string' && email.length <= MAX_TITLE
+    ? email
     : undefined;
 
   // oidc_provider = Issuer-URL (zukunftssicher für mehrere Provider)
