@@ -52,7 +52,7 @@ export function inventoryPaths() {
     },
     '/api/v1/inventory/items/{id}': {
       get: op({ summary: 'Get an inventory item', description: `The item carries \`attachments\` and \`linked_entries\`. ${DOCUMENT_LINKS_READ_NOTE} ${BUDGET_LINKS_READ_NOTE}`, tag: 'Inventory', params: [idParam('id', 'Item ID')] }),
-      put: op({ summary: 'Replace an inventory item (`attachment_document_ids` replaces the document links, omit to leave untouched; `tracked_dates` replaces the whole set of custom tracked dates, omit to leave untouched; `odometer`/`odometer_unit`/`odometer_on` are a full replace like every other field - omitting them clears the reading, as does switching to a `category` without `tracks_odometer` set)', tag: 'Inventory', params: [idParam('id', 'Item ID')], description: DOCUMENT_LINKS_READ_NOTE, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
+      put: op({ summary: 'Replace an inventory item (`attachment_document_ids` replaces the document links, omit to leave untouched; `tracked_dates` replaces the whole set of custom tracked dates, omit to leave untouched; `odometer`/`odometer_unit`/`odometer_on` are a full replace like every other field - omitting them clears the reading, as does switching to a `category` without `tracks_odometer` set)', tag: 'Inventory', params: [idParam('id', 'Item ID')], description: `${DOCUMENT_LINKS_READ_NOTE} ${BUDGET_LINKS_READ_NOTE}`, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete an inventory item', tag: 'Inventory', params: [idParam('id', 'Item ID')], stateChanging: true }),
     },
     '/api/v1/inventory/items/{id}/entries': {
@@ -77,7 +77,7 @@ export function inventoryPaths() {
     '/api/v1/inventory/items/{id}/dates/{dateId}/complete': {
       post: op({
         summary: 'Mark a tracked date as done',
-        description: "Writes a service-log entry (label/date snapshot, optional odometer/vendor/note). If the date carries `interval_months`, it rolls forward by that many months (same id, so its reminder and ICS UID stay stable) and its reminder re-syncs; otherwise the date and its reminder are removed and the completion lives on only in the service log.",
+        description: "Writes a service-log entry (label/date snapshot, optional odometer/vendor/note). If the date carries `interval_months`, it rolls forward by that many months (same id, so its reminder and ICS UID stay stable) and its reminder re-syncs; otherwise the date and its reminder are removed and the completion lives on only in the service log. Answers with the updated item. " + BUDGET_LINKS_READ_NOTE,
         tag: 'Inventory',
         params: [idParam('id', 'Item ID'), idParam('dateId', 'Tracked date ID')],
         stateChanging: true,

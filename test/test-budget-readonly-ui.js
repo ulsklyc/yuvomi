@@ -1219,6 +1219,56 @@ test('Inventar-Formular: verknuepfte Buchungen und ihre Knoepfe nur mit Leserech
     'auch beim Anlegen keine Buchungsauswahl');
 });
 
+/**
+ * Ein Panel, das jede Abfrage beantwortet und mitschreibt, welche Selektoren
+ * gefragt wurden. Kein DOM (bewusst, siehe test/mini-dom.js): gemessen wird
+ * nur, OB die Verdrahtung nach einem Knoten greift - ein Riegel, der im
+ * Markup steht, aber nicht in der Verdrahtung, faellt so auf.
+ */
+function aufzeichnendesPanel() {
+  const gefragt = [];
+  const knoten = () => {
+    const gesetzt = {};
+    return new Proxy(function () {}, {
+      get(_t, prop) {
+        if (prop === 'then') return undefined;
+        if (prop === Symbol.toPrimitive) return () => '';
+        if (prop in gesetzt) return gesetzt[prop];
+        if (prop === 'value' || prop === 'textContent') return '';
+        if (prop === 'dataset') { gesetzt.dataset = {}; return gesetzt.dataset; }
+        if (prop === 'files' || prop === 'children' || prop === 'childNodes') return [];
+        if (prop === 'length') return 0;
+        if (prop === 'querySelector') return (sel) => { gefragt.push(sel); return knoten(); };
+        if (prop === 'querySelectorAll') return (sel) => { gefragt.push(sel); return []; };
+        if (prop === 'closest') return () => null;
+        return knoten();
+      },
+      set(_t, prop, value) { gesetzt[prop] = value; return true; },
+      apply() { return knoten(); },
+    });
+  };
+  return { panel: knoten(), gefragt };
+}
+
+test('Inventar-Formular: die Verdrahtung greift ohne Budgetrecht nicht nach den Buchungs-Knoepfen (#1433)', async () => {
+  // Das Markup allein reicht nicht: die Verdrahtung fragt `querySelector()`
+  // und haengt an das Ergebnis einen Listener. Faellt ihr Riegel, waehrend das
+  // Markup die Knoepfe weglaesst, bricht das Oeffnen im echten DOM an `null`.
+  const { __test: inventory } = await import('../public/pages/inventory.js');
+  const gegenstand = { id: 7, name: 'Kamera', category: 'other', status: 'active', condition: 'good', linked_entries: [], linked_entries_total: 0, attachments: [], tracked_dates: [] };
+  const BUCHUNG = ['[data-action="add-booking"]', '[data-linked-entries]', '[data-action="link-booking"]'];
+  const verdrahtet = (modules, mode) => {
+    const { panel, gefragt } = aufzeichnendesPanel();
+    withAccess(modules, () => inventory.buildItemForm({ mode, item: mode === 'edit' ? gegenstand : null }).wire(panel));
+    return BUCHUNG.filter((sel) => gefragt.includes(sel));
+  };
+  // Die Positivseite zuerst: sonst misst der Stub nichts.
+  assert.deepEqual(verdrahtet({ inventory: 'write', budget: 'write' }, 'edit'), ['[data-action="add-booking"]', '[data-linked-entries]']);
+  assert.deepEqual(verdrahtet({ inventory: 'write', budget: 'write' }, 'create'), ['[data-action="link-booking"]']);
+  assert.deepEqual(verdrahtet({ inventory: 'write', budget: 'none' }, 'edit'), [], 'Bearbeiten: kein Buchungs-Knoten gefragt');
+  assert.deepEqual(verdrahtet({ inventory: 'write', budget: 'none' }, 'create'), [], 'Anlegen: keine Buchungsauswahl gefragt');
+});
+
 test('das Paar dazu: mit Schreibrecht oeffnen dieselben drei Einstiege den Editor, keine Leseansicht', () => {
   const vorherBudget = budget.state.month;
   const vorherSplit = { ...split.state };
