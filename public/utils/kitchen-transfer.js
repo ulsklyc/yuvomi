@@ -36,9 +36,11 @@
  * auf der man nichts anlegen darf, ist eine Sackgasse. Den Transfer SELBST
  * misst der Pfad-Guard je nach Weg verschieden (Vorrat als `shopping`,
  * Mahlzeit und Rezept als `meals`); seit #1290 verlangt die Route in jedem
- * Fall das Einkaufs-Recht. Die Oberflaeche fragt es fuer den Transfer-Knopf
- * erst mit P3/P4 - bis dahin prueft `resolveShoppingTarget()` hier bewusst
- * nichts.
+ * Fall das Einkaufs-Recht. Der Transfer-Knopf fragt deshalb BEIDE Riegel
+ * (`mayTransferMealToShopping()`, `mayTransferRecipeToShopping()`), und
+ * dasselbe tut die Gegenrichtung im Einkauf (`mayImportMealPlan()`).
+ * `resolveShoppingTarget()` prueft bewusst nichts:
+ * es ist die Listenwahl, nicht der Riegel - der sitzt am Knopf und im Handler.
  *
  * `selectModal` kommt aus `components/`, obwohl diese Datei in `utils/` liegt.
  * Die Alternative wäre, die Listenauswahl beim Aufrufer zu lassen - dann kapselt
@@ -52,6 +54,55 @@ import { api } from '/api.js';
 import { selectModal } from '/components/modal.js';
 import { refreshKitchenBadges } from '/utils/kitchen-tabs.js';
 import { mayWritePath } from '/utils/module-access.js';
+
+/**
+ * Darf dieses Konto den AUSDRUECKLICHEN Transfer einer Mahlzeit bzw. eines
+ * Rezepts in den Einkauf ausloesen (#1290)?
+ *
+ * ZWEI RIEGEL, UND BEIDE MUESSEN AUFGEHEN. Der Pfad-Guard in server/index.js
+ * misst den Aufruf am Pfad - `/meals/...` und `/recipes/...` gehoeren beide
+ * dem Scope-Modul `meals` -, und die Route verlangt dazu das Schreibrecht auf
+ * `shopping`. Wer nur nach dem Ziel fragt, zeigt (bei der Mahlzeit) einem
+ * Mitglied mit `meals: read` einen Knopf, den der Pfad-Guard abweist; wer nur
+ * nach der Seite fragt, war der Stand vor diesem Fix.
+ *
+ * Was der Pfad-Guard verlangt, beantwortet `mayWritePath()`: fuer die Mahlzeit
+ * `meals: write` (die Route kippt `on_shopping_list` im Essensplan), fuer das
+ * Rezept nur `meals: read` - die zweite Serverausnahme, entschieden am
+ * 22.09.2026 (`READ_LEVEL_WRITES` in server/scopes.js, Regel 8 in
+ * utils/module-access.js). Die Funktionen hier bilden also nichts selbst ab.
+ *
+ * Je Quelle eine Funktion mit dem Pfad als LITERAL, statt eines Parameters:
+ * `npm run test:module-write-access` liest jede Frage an `mayWritePath()` als
+ * Text und gleicht sie mit dem Urteil des Servers ab - ein durchgereichter
+ * Pfad waere fuer den Guard unsichtbar.
+ *
+ * @param {number|string} mealId
+ * @returns {boolean}
+ */
+export function mayTransferMealToShopping(mealId) {
+  return mayWritePath(`/meals/${mealId}/to-shopping-list`) && mayWritePath('/shopping');
+}
+
+/**
+ * @param {number|string} recipeId
+ * @returns {boolean}
+ */
+export function mayTransferRecipeToShopping(recipeId) {
+  return mayWritePath(`/recipes/${recipeId}/to-shopping-list`) && mayWritePath('/shopping');
+}
+
+/**
+ * Die Gegenrichtung: „Aus dem Essensplan uebernehmen" im Einkauf (#1290).
+ * Der Pfad-Guard misst `shopping`, die Route verlangt dazu `meals` - schon fuer
+ * die Vorschau, weil die den Schreibvorgang ankuendigt.
+ *
+ * @param {number|string} listId
+ * @returns {boolean}
+ */
+export function mayImportMealPlan(listId) {
+  return mayWritePath(`/shopping/${listId}/import-meal-plan`) && mayWritePath('/meals');
+}
 
 /**
  * Standzeit der Transfer-Toasts.

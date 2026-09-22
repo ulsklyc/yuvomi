@@ -12,7 +12,7 @@ import { esc } from '/utils/html.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { DEFAULT_CATEGORY_NAME } from '/utils/shopping-categories.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
-import { resolveShoppingTarget, announceTransfer, mountMissingShoppingList } from '/utils/kitchen-transfer.js';
+import { resolveShoppingTarget, announceTransfer, mountMissingShoppingList, mayTransferMealToShopping } from '/utils/kitchen-transfer.js';
 import { ingredientRowHTML } from '/utils/ingredient-row.js';
 import { addLocalDays, startOfLocalWeekKey, todayKey } from '/utils/date.js';
 import { normalizeRecipeMealTypes, recipeSupportsMealType, recipeAllowsMealType } from '/utils/recipe-meal-types.js';
@@ -795,7 +795,10 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
     const ingCount    = ownCount || recipeCount;
     const ingLabel    = ingCount > 0 ? t('meals.ingredientCount', { count: ingCount }) : '';
     const ingDoneLabel = ownCount > 0 && ingDone === ownCount ? ' ✓' : '';
-    const canTransfer  = recipeCount > 0 || (ownCount > 0 && ingDone < ownCount);
+    // Und nur, wenn der Server den Transfer annaehme: Pfad-Guard (`meals`) UND
+    // Einkaufs-Recht (#1290). Ohne eines davon endete der Knopf im 403.
+    const canTransfer  = (recipeCount > 0 || (ownCount > 0 && ingDone < ownCount))
+      && mayTransferMealToShopping(meal.id);
     const recurrenceBadge = meal.recurrence_template_id
       ? `<span class="meal-card__recurrence" aria-label="${t('meals.recurrenceBadge')}"><i data-lucide="repeat-2" class="icon-sm" aria-hidden="true"></i></span>`
       : '';
@@ -1567,6 +1570,9 @@ function openMealModal(opts) {
         const selectEl = panel.querySelector('#transfer-list-select');
         const listId   = parseInt(selectEl?.value, 10);
         if (!listId || !state.modal?.meal) return;
+        // Zweite Linie hinter dem Markup (Regel 2 in utils/module-access.js):
+        // die Rechte koennen sich aendern, waehrend der Dialog offen steht.
+        if (!mayTransferMealToShopping(state.modal.meal.id)) return;
         const btn = panel.querySelector('#transfer-btn');
         btn.disabled = true;
         try {
@@ -1641,6 +1647,9 @@ function buildModalContent({ mode, date, mealType, meal }) {
     : '';
 
   const hasIngOpen = isEdit && meal.ingredients?.some((i) => !i.on_shopping_list);
+  // Der Abschnitt „Auf die Einkaufsliste" entfaellt GANZ, wenn der Server den
+  // Transfer abwiese (#1290) - ein Auswahlfeld ohne Knopf verspraeche dasselbe.
+  const canTransfer = hasIngOpen && mayTransferMealToShopping(meal.id);
 
   const recipeOptionHtml = (r) => `<option value="${r.id}" ${isEdit && meal.recipe_id === r.id ? 'selected' : ''}>${esc(r.title)}</option>`;
   // Optgroups nur, sobald gespiegelte Rezepte wirklich vorkommen: ohne Mirror-
@@ -1753,7 +1762,7 @@ function buildModalContent({ mode, date, mealType, meal }) {
 
     ${advancedSection(advancedFieldsHtml, { open: advancedOpen })}
 
-    ${isEdit && hasIngOpen ? `
+    ${canTransfer ? `
     <div class="shopping-transfer">
       <div class="shopping-transfer__label">
         <i data-lucide="shopping-cart" class="icon-sm" aria-hidden="true"></i>
@@ -1945,6 +1954,10 @@ async function deleteMeal(mealId) {
 // --------------------------------------------------------
 
 async function transferMeal(mealId, btn) {
+  // Zweite Linie hinter dem Markup (Regel 2 in utils/module-access.js): der
+  // Knopf fehlt ohne beide Rechte, und der Handler loest den Aufruf dann auch
+  // nicht aus.
+  if (!mayTransferMealToShopping(mealId)) return;
   // Vorprüfung, Listenwahl und die Antwort auf „es gibt keine Liste" liegen im
   // geteilten Baustein (utils/kitchen-transfer.js).
   const target = await resolveShoppingTarget(state.lists);
@@ -2015,6 +2028,12 @@ export const __test = {
   // gepinnt (test-meals.js, „Ziehgriff").
   renderSlot,
   wireDragDrop,
+  // #1290: der Transfer in den Einkauf braucht BEIDE Schreibrechte - Markup
+  // (Kachel und Dialog) und der Handler werden als Programm gefahren
+  // (test-kitchen-transfer-ui.js).
+  buildModalContent,
+  openMealModal,
+  transferMeal,
 };
 
 // --------------------------------------------------------
