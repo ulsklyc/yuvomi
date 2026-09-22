@@ -1,7 +1,7 @@
 /**
  * Modul: Toast-Lage ueber offenen Dialogen (#1160)
- * Zweck: Der untere Shell-Stapel (Toasts, Sammelpille) weicht den Bedienknoepfen
- *        eines offenen Dialogs aus. Er bleibt sichtbar, aber er liegt nie ueber
+ * Zweck: Der untere Shell-Stapel (Toasts, Sammelpille) weicht den Bedienleisten
+ *        eines offenen Dialogs aus. Er bleibt sichtbar, aber er liegt nicht ueber
  *        Kopf, Fuss oder Aktionszeile eines Dialogs und nimmt deshalb keinen
  *        Klick, der dem Dialog gilt.
  *
@@ -25,20 +25,35 @@
  * gemessen feststehen: ob ueber dem Dialog Platz fuer den Stapel ist, sieht
  * keine Regel voraus.
  *
+ * DIE ZUSAGE, und sie gilt fuer JEDE Geometrie (test:toast-placement rechnet
+ * sie ueber tausende nach): der Stapel liegt ganz im Bild, innerhalb der
+ * Sicherheitszonen, und er verdeckt keine Bedienleiste, solange es irgendeine
+ * Lage gibt, die keine verdeckt. Die erste Fassung hielt das nicht: bei einem
+ * Vollbild-Dialog ohne erkannte Leisten landete der Stapel ganz ueber dem
+ * oberen Rand, unsichtbar und nicht mehr wegzuklicken (Review an #1421).
+ *
  * DIE REIHENFOLGE DER LAGEN, jeweils die erste, die passt:
  *   1. Wo er steht, wenn er keinen Dialog beruehrt - eine Meldung springt nicht
  *      ohne Grund.
- *   2. Ueber dem Dialog, wenn dort Platz ist (Telefon: der Streifen ueber dem
- *      Sheet; Desktop: ueber einem kurzen Dialog). Er verdeckt dann nichts.
+ *   2. Ueber dem Dialog (Telefon: der Streifen ueber dem Sheet; Desktop: ueber
+ *      einem kurzen Dialog). Er verdeckt dann nichts.
  *   3. Unter dem Dialog, aus demselben Grund.
  *   4. Wo er steht, wenn er dort nur Inhalt verdeckt, keine Bedienleiste.
- *   5. Im Dialog, direkt ueber seiner unteren Aktionsleiste. Er verdeckt dann
- *      das untere Ende des scrollbaren Inhalts, der sich unter ihm hervorholen
- *      laesst, aber keinen Knopf in Kopf oder Fuss.
- * Nur wenn nichts davon passt (ein Dialog, der die ganze Hoehe fuellt und
- * keinen Inhalt zwischen Kopf und Fuss laesst), bleibt Lage 5 ohne Pruefung
- * des Kopfes - ein verdeckter Kopf ist dann das kleinere Uebel als ein
- * verdecktes "Speichern".
+ *   5. Im Dialog, direkt ueber seiner unteren Bedienleiste; er verdeckt dann das
+ *      Ende des scrollbaren Inhalts, der sich unter ihm hervorholen laesst.
+ *   6. Jede andere freie Lage, die naechste zu seinem Platz. Freie Lagen liegen
+ *      immer an einer Kante - einer Leiste oder des Bildes -, deshalb reicht es,
+ *      diese Kanten durchzugehen.
+ *   7. Gibt es keine freie Lage, die mit der kleinsten verdeckten Flaeche. Ist
+ *      der Stapel hoeher als das Bild, beginnt er oben, damit sein erster
+ *      Toast sichtbar und wegzuklicken bleibt.
+ *
+ * WO DIE LEISTEN SIND: `.modal-panel__header/__footer` und `.modal-actions`
+ * (openModal, confirmModal, Detailansicht) und `[data-dialog-actions]` fuer
+ * Dialoge mit eigenen Kopf- und Fusszeilen. Traegt ein Dialog keins von beiden,
+ * gelten seine Bedienelemente selbst als Leisten - nie mehr der ganze Dialog:
+ * damit fiel Lage 5 auf die schon verworfene Lage 2 zurueck. Welcher Dialog
+ * welchen Weg nimmt, haelt das Register in test/test-toast-placement.js fest.
  *
  * Die Abstaende kommen aus tokens.css (`--toast-dock-gap` in layout.css), die
  * Lage schreibt dieses Modul als drei Variablen an den Stapel; die Regel, die
@@ -48,18 +63,22 @@
 /** Was als offener Dialog zaehlt: jede Dialogrolle, sichtbar und nicht inert. */
 export const DIALOG_SELECTOR = '[role="dialog"]';
 
-/**
- * Die Bedienleisten eines Dialogs. Liegt keine davon im Dialog (Datumswahl,
- * kleine Auswahlfenster), gilt der ganze Dialog als Bedienflaeche.
- */
-export const ACTION_ZONE_SELECTOR = '.modal-panel__header, .modal-panel__footer, .modal-actions';
+/** Die ausgezeichneten Bedienleisten eines Dialogs. */
+export const ACTION_ZONE_SELECTOR =
+  '.modal-panel__header, .modal-panel__footer, .modal-actions, [data-dialog-actions]';
+
+/** Rueckfall ohne Auszeichnung: die Bedienelemente selbst. */
+const CONTROL_SELECTOR =
+  'button, a[href], input, select, textarea, [role="button"], [tabindex]:not([tabindex="-1"])';
 
 function intersects(a, b) {
   return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 }
 
-function box(top, bottom, left, right) {
-  return { top, bottom, left, right, width: right - left, height: bottom - top };
+function overlapArea(a, b) {
+  const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+  const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+  return w > 0 && h > 0 ? w * h : 0;
 }
 
 /**
@@ -77,8 +96,7 @@ function box(top, bottom, left, right) {
  * @param {DOMRect|object} input.primary  der Dialog, an dem er sich ausrichtet
  * @param {Array<DOMRect|object>} input.dialogs alle offenen Dialoge
  * @param {Array<DOMRect|object>} input.zones   alle Bedienleisten
- * @returns {null | {edge: 'top'|'bottom', offset: number, mode: string}}
- *          null = der Stapel bleibt, wo er steht
+ * @returns {null | {top: number}} null = der Stapel bleibt, wo er steht
  */
 export function chooseToastPlacement({
   viewport, gap, safeTop = 0, safeBottom = 0,
@@ -87,39 +105,53 @@ export function chooseToastPlacement({
 }) {
   if (!dialogs.some((d) => intersects(stack, d))) return null;
 
+  const h = dockedHeight;
   const left = dockedCenter - dockedWidth / 2;
   const right = dockedCenter + dockedWidth / 2;
-  const h = dockedHeight;
-  const clearOf = (rect, list) => !list.some((r) => intersects(rect, r));
+  const minTop = safeTop + gap;
+  const maxTop = viewport.height - safeBottom - gap - h;
+  const at = (top) => ({ top, bottom: top + h, left, right, width: dockedWidth, height: h });
+  const inView = (top) => top >= minTop && top <= maxTop;
+  const clear = (top, list) => !list.some((r) => intersects(at(top), r));
 
-  // 2. Ueber dem Dialog.
-  const aboveBottom = primary.top - gap;
-  const above = box(aboveBottom - h, aboveBottom, left, right);
-  if (above.top >= safeTop + gap && clearOf(above, dialogs)) {
-    return { mode: 'above-dialog', edge: 'bottom', offset: viewport.height - aboveBottom };
-  }
-
-  // 3. Unter dem Dialog.
-  const belowTop = primary.bottom + gap;
-  const below = box(belowTop, belowTop + h, left, right);
-  if (below.bottom <= viewport.height - safeBottom - gap && clearOf(below, dialogs)) {
-    return { mode: 'below-dialog', edge: 'top', offset: belowTop };
+  // 2. und 3.: neben dem Dialog, ohne ihn zu beruehren.
+  for (const top of [primary.top - gap - h, primary.bottom + gap]) {
+    if (inView(top) && clear(top, dialogs)) return { top };
   }
 
   // 4. Am eigenen Platz, solange dort keine Bedienleiste liegt.
-  if (clearOf(stack, zones)) return null;
+  if (!zones.some((z) => intersects(stack, z))) return null;
 
-  // 5. Ueber der unteren Aktionsleiste des Dialogs.
+  // 5. Ueber der unteren Bedienleiste des Dialogs.
   const middle = primary.top + primary.height / 2;
-  const lower = zones.filter((z) => z.top + z.height / 2 >= middle
-    && z.left < primary.right && z.right > primary.left);
-  const floor = lower.length ? Math.min(...lower.map((z) => z.top)) : primary.bottom;
-  const dockBottom = floor - gap;
-  const docked = box(dockBottom - h, dockBottom, left, right);
-  if (docked.top >= safeTop && clearOf(docked, zones)) {
-    return { mode: 'above-actions', edge: 'bottom', offset: viewport.height - dockBottom };
+  const lower = zones.filter((z) => z.top >= middle && z.left < primary.right && z.right > primary.left);
+  if (lower.length) {
+    const top = Math.min(...lower.map((z) => z.top)) - gap - h;
+    if (inView(top) && clear(top, zones)) return { top };
   }
-  return { mode: 'above-actions-forced', edge: 'bottom', offset: viewport.height - dockBottom };
+
+  // 6. Die naechste freie Lage an einer Kante - erst mit Abstand zur Leiste,
+  // dann auf Stoss, wenn die Luecke fuer den Abstand zu schmal ist.
+  const edgesAt = (margin) => [minTop, maxTop, ...zones.flatMap((z) => [z.top - margin - h, z.bottom + margin])];
+  const candidates = [...edgesAt(gap), ...edgesAt(0)].filter(inView);
+  const nearest = (list) => list
+    .filter((top) => clear(top, zones))
+    .sort((a, b) => Math.abs(a - stack.top) - Math.abs(b - stack.top))[0];
+  const free = nearest(edgesAt(gap).filter(inView)) ?? nearest(edgesAt(0).filter(inView));
+  if (free !== undefined) return { top: free };
+
+  // 7. Nichts ist frei: die kleinste verdeckte Flaeche, und immer im Bild.
+  if (maxTop < minTop) return { top: minTop };
+  let best = minTop;
+  let bestArea = Infinity;
+  for (const top of candidates.length ? candidates : [minTop]) {
+    const area = zones.reduce((sum, z) => sum + overlapArea(at(top), z), 0);
+    if (area < bestArea) {
+      best = top;
+      bestArea = area;
+    }
+  }
+  return { top: best };
 }
 
 function isOpen(el) {
@@ -138,8 +170,28 @@ function isOpen(el) {
     && r.left < document.documentElement.clientWidth;
 }
 
-function openDialogs(root = document) {
-  return [...root.querySelectorAll(DIALOG_SELECTOR)].filter(isOpen);
+function openDialogs() {
+  return [...document.querySelectorAll(DIALOG_SELECTOR)].filter(isOpen);
+}
+
+function visibleRects(elements) {
+  return elements
+    .filter((el) => el.getClientRects().length > 0)
+    .map((el) => el.getBoundingClientRect())
+    .filter((r) => r.width > 0 && r.height > 0);
+}
+
+/**
+ * Die Bedienleisten eines Dialogs: die ausgezeichneten, sonst seine
+ * Bedienelemente, und nur wenn er keine hat, er selbst.
+ */
+function dialogZones(dialog) {
+  const own = (selector) => [...dialog.querySelectorAll(selector)]
+    .filter((el) => el.closest(DIALOG_SELECTOR) === dialog);
+  const marked = visibleRects(own(ACTION_ZONE_SELECTOR));
+  if (marked.length) return marked;
+  const controls = visibleRects(own(CONTROL_SELECTOR));
+  return controls.length ? controls : [dialog.getBoundingClientRect()];
 }
 
 function pxProperty(el, name) {
@@ -149,7 +201,7 @@ function pxProperty(el, name) {
 
 function undock(stack) {
   delete stack.dataset.dock;
-  stack.style.removeProperty('--toast-dock-offset');
+  stack.style.removeProperty('--toast-dock-top');
   stack.style.removeProperty('--toast-dock-center');
   stack.style.removeProperty('--toast-dock-width');
 }
@@ -174,13 +226,12 @@ export function placeToastStack(stack) {
   const primaryEl = candidates[candidates.length - 1];
 
   const dialogs = dialogEls.map((d) => d.getBoundingClientRect());
-  const zones = dialogEls.flatMap((d) => {
-    const own = [...d.querySelectorAll(ACTION_ZONE_SELECTOR)]
-      .filter((z) => z.closest(DIALOG_SELECTOR) === d && z.getClientRects().length > 0)
-      .map((z) => z.getBoundingClientRect())
-      .filter((r) => r.width > 0 && r.height > 0);
-    return own.length ? own : [d.getBoundingClientRect()];
-  });
+  // Ein Dialog, in dem ein anderer offen ist (die Dokumentauswahl im
+  // Aufgabenformular), liegt unter ihm; seine Leisten sind dann nicht zu
+  // erreichen und nehmen dem Stapel nur Platz.
+  const zones = dialogEls
+    .filter((d) => !dialogEls.some((other) => other !== d && d.contains(other)))
+    .flatMap(dialogZones);
 
   const viewport = {
     width: document.documentElement.clientWidth,
@@ -188,7 +239,7 @@ export function placeToastStack(stack) {
   };
   const gap = pxProperty(stack, '--toast-dock-gap');
   const primary = primaryEl.getBoundingClientRect();
-  const width = Math.max(0, Math.min(rect.width, primary.width - 2 * gap));
+  const width = Math.min(rect.width, Math.max(primary.width - 2 * gap, 0)) || rect.width;
   const half = width / 2;
   const center = Math.min(
     Math.max(primary.left + primary.width / 2, gap + half),
@@ -218,8 +269,8 @@ export function placeToastStack(stack) {
     undock(stack);
     return null;
   }
-  stack.style.setProperty('--toast-dock-offset', `${decision.offset}px`);
-  stack.dataset.dock = decision.edge;
+  stack.style.setProperty('--toast-dock-top', `${decision.top}px`);
+  stack.dataset.dock = 'placed';
   return decision;
 }
 
@@ -227,7 +278,8 @@ export function placeToastStack(stack) {
  * Haelt die Lage des Stapels aktuell: wenn ein Toast kommt oder geht, ein
  * Dialog auf- oder zugeht, sich seine Groesse aendert oder er fertig
  * eingefahren ist (die Einfahrt skaliert und verschiebt das Panel, gemessen
- * wird deshalb erst nach `animationend`). Einmal je Frame.
+ * wird deshalb erst nach `animationend`). Einmal je Frame, und nur, solange
+ * etwas im Stapel steht.
  *
  * @param {HTMLElement} stack
  * @returns {() => void} baut die Beobachter wieder ab
@@ -237,17 +289,20 @@ export function watchToastPlacement(stack) {
   const resize = typeof ResizeObserver === 'function' ? new ResizeObserver(() => schedule()) : null;
   const dialogMutations = new MutationObserver(() => schedule());
   let observedDialogs = [];
+  const occupied = () => Boolean(stack.querySelector(':scope > :not(:empty)'));
 
   function observeDialogs() {
-    const current = stack.getBoundingClientRect().height > 0 ? openDialogs() : [];
+    const current = occupied() ? openDialogs() : [];
     if (current.length === observedDialogs.length && current.every((d, i) => d === observedDialogs[i])) return;
     observedDialogs = current;
     dialogMutations.disconnect();
     resize?.disconnect();
     resize?.observe(stack);
     for (const d of current) {
+      // Nur Attribute: Knoten, die kommen und gehen, sieht schon der
+      // Beobachter am Dokument.
       dialogMutations.observe(d.closest('.modal-overlay') ?? d, {
-        childList: true, subtree: true, attributes: true, attributeFilter: ['inert', 'hidden', 'class'],
+        subtree: true, attributes: true, attributeFilter: ['inert', 'hidden', 'class'],
       });
       resize?.observe(d);
     }
@@ -265,13 +320,18 @@ export function watchToastPlacement(stack) {
 
   const stackMutations = new MutationObserver(schedule);
   stackMutations.observe(stack, { childList: true, subtree: true });
-  const bodyMutations = new MutationObserver(schedule);
-  bodyMutations.observe(document.body, { childList: true });
+  // Das GANZE Dokument, nicht nur `body`: Dialoge entstehen auch tiefer (das
+  // Onboarding in der Shell, die Auswahlfenster in einem Formular). Waehrend der
+  // Stapel leer ist, kostet ein Umbau damit nur diese eine Abfrage.
+  const documentMutations = new MutationObserver(() => {
+    if (occupied() || stack.dataset.dock) schedule();
+  });
+  documentMutations.observe(document.body, { childList: true, subtree: true });
   resize?.observe(stack);
 
   // Nach JEDER Einfahrt neu messen, solange etwas im Stapel steht - nicht nur,
   // wenn schon ein Dialog bekannt ist: der erste Blick faellt in dessen Einfahrt.
-  const onSettled = () => { if (stack.querySelector(':scope > :not(:empty)')) schedule(); };
+  const onSettled = () => { if (occupied()) schedule(); };
   window.addEventListener('resize', schedule);
   document.addEventListener('animationend', onSettled, true);
   document.addEventListener('transitionend', onSettled, true);
@@ -280,7 +340,7 @@ export function watchToastPlacement(stack) {
   return () => {
     if (frame) cancelAnimationFrame(frame);
     stackMutations.disconnect();
-    bodyMutations.disconnect();
+    documentMutations.disconnect();
     dialogMutations.disconnect();
     resize?.disconnect();
     window.removeEventListener('resize', schedule);

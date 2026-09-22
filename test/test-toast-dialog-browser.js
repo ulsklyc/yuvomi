@@ -25,7 +25,7 @@
 
 import { test, before, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { startHarness, openPage } from './document-guards-harness.js';
+import { startHarness, openPage, gotoRoute } from './document-guards-harness.js';
 
 let harness;
 
@@ -84,14 +84,15 @@ async function settleAnimations(page) {
  * Misst das oberste Dialogfenster: welche Knoepfe in Kopf und Fuss an ihrer
  * Mitte etwas anderes treffen, und ob der Toast dabei sichtbar ist.
  */
-async function measureDialog(page) {
-  return page.evaluate(() => {
-    const panels = [...document.querySelectorAll('.modal-overlay:not([inert]) .modal-panel')];
+const MODAL_PANEL = '.modal-overlay:not([inert]) .modal-panel';
+const MODAL_CONTROLS = '.modal-panel__header button, .modal-panel__footer button, .modal-panel__footer a, .modal-actions button';
+
+async function measureDialog(page, { panelSelector = MODAL_PANEL, controlSelector = MODAL_CONTROLS } = {}) {
+  return page.evaluate(({ panelSelector, controlSelector }) => {
+    const panels = [...document.querySelectorAll(panelSelector)];
     const panel = panels.at(-1);
     if (!panel) return { panel: false };
-    const controls = [...panel.querySelectorAll(
-      '.modal-panel__header button, .modal-panel__footer button, .modal-panel__footer a, .modal-actions button',
-    )].filter((el) => {
+    const controls = [...panel.querySelectorAll(controlSelector)].filter((el) => {
       const r = el.getBoundingClientRect();
       return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden';
     });
@@ -99,7 +100,10 @@ async function measureDialog(page) {
     for (const el of controls) {
       const r = el.getBoundingClientRect();
       const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-      if (!el.contains(hit)) {
+      // Ein gesperrter Knopf nimmt keine Zeiger an (`.btn:disabled`), der Treffer
+      // faellt durch ihn hindurch; verdeckt ist er dann nur, wenn der Stapel dort liegt.
+      const blocked = el.disabled ? Boolean(hit?.closest('.shell-bottom-stack')) : !el.contains(hit);
+      if (blocked) {
         covered.push({
           control: el.id || el.className || el.textContent.trim(),
           hit: hit?.closest('.toast')?.className || hit?.className || String(hit),
@@ -117,7 +121,7 @@ async function measureDialog(page) {
       toastVisible = inView && toast.contains(hit);
     }
     return { panel: true, controls: controls.length, covered, toast: Boolean(toast), toastVisible };
-  });
+  }, { panelSelector, controlSelector });
 }
 
 async function openEventEditor(page, eventId) {
@@ -188,6 +192,85 @@ for (const device of ['desktop', 'mobile']) {
       assert.equal(measured.toast, true, 'der Erinnerungs-Toast ist verschwunden - so misst die Sonde nichts');
       assert.deepEqual(measured.covered, [], 'ein Knopf der Rueckfrage ist an seiner Mitte verdeckt');
       assert.equal(measured.toastVisible, true, 'der Toast muss sichtbar und oben bleiben');
+    } finally {
+      await page.close();
+    }
+  });
+}
+
+/*
+ * DIALOGE OHNE `.modal-panel`-LEISTEN (Review an #1421).
+ *
+ * Die erste Fassung kannte Bedienleisten nur als `.modal-panel__header/__footer`
+ * und `.modal-actions`; fehlten sie, galt der ganze Dialog als Leiste. Fuer
+ * einen Vollbild-Dialog rechnete sie den Stapel damit ueber den oberen Rand
+ * hinaus - die Erinnerung war weg und nicht mehr wegzuklicken. Der Rundgang
+ * beim ersten Start ist genau so ein Dialog (`role="dialog"` auf der ganzen
+ * Flaeche), die Dokumentauswahl einer mit eigenen Kopf- und Fusszeilen.
+ */
+for (const device of ['mobile', 'desktop']) {
+  test(`#1160 ${device} - ueber dem Vollbild-Rundgang bleibt der Toast im Bild und seine Knoepfe frei`, async () => {
+    const page = await openPage(harness, { device, locale: 'de' });
+    try {
+      await seedDueReminder(page);
+      // Der Harness unterdrueckt den Rundgang ueber diesen Schluessel; das
+      // Konto des Seeds hat ihn noch nicht gesehen.
+      await page.evaluate(() => localStorage.removeItem('yuvomi-onboarded'));
+      await gotoRoute(page, '/');
+      await page.waitForSelector('.onboarding-overlay .onboarding-actions button', { timeout: 10000 });
+      await page.waitForSelector('.toast--reminder', { timeout: 10000 });
+      await settleAnimations(page);
+      const measured = await measureDialog(page, {
+        panelSelector: '.onboarding-overlay',
+        controlSelector: '.onboarding-actions button',
+      });
+      assert.equal(measured.panel, true, 'kein Rundgang offen');
+      assert.ok(measured.controls >= 1, 'keine Knoepfe im Rundgang gemessen');
+      assert.equal(measured.toast, true, 'der Erinnerungs-Toast ist verschwunden - so misst die Sonde nichts');
+      assert.equal(measured.toastVisible, true, 'der Toast muss sichtbar, im Bild und oben bleiben');
+      assert.deepEqual(measured.covered, [], 'ein Knopf des Rundgangs ist an seiner Mitte verdeckt');
+    } finally {
+      await page.close();
+    }
+  });
+}
+
+for (const device of ['mobile', 'desktop']) {
+  test(`#1160 ${device} - die Dokumentauswahl in einem Formular bleibt bedienbar, der Toast bleibt sichtbar`, async () => {
+    const page = await openPage(harness, { device, locale: 'de' });
+    try {
+      await seedDueReminder(page);
+      // Die echten Bausteine: openModal mit dem Anhangsfeld, das die Aufgaben,
+      // das Budget und das Inventar ebenso einbinden.
+      await page.evaluate(async () => {
+        const { openModal } = await import('/components/modal.js');
+        const attach = await import('/components/document-attach.js');
+        openModal({
+          title: 'Toast probe attach',
+          // Hoch wie ein echtes Formular: die Auswahl liegt IM Panel und wird von
+          // dessen Rand beschnitten, ein Zwei-Zeilen-Formular schnitte sie ab.
+          content: `<div class="modal-panel__body"><div style="min-height: 520px">${attach.renderDocumentAttachField()}</div></div>
+            <div class="modal-panel__footer"><button class="btn btn--primary" type="button">OK</button></div>`,
+          dirtyGuard: false,
+        });
+        const panel = document.querySelector('#shared-modal-overlay .modal-panel');
+        attach.bindDocumentAttachField(panel);
+      });
+      await page.waitForSelector('[data-doc-attach-pick]');
+      await settleAnimations(page);
+      await page.$eval('[data-doc-attach-pick]', (el) => el.click());
+      await page.waitForSelector('.doc-attach-picker__panel [data-picker-confirm]');
+      await page.waitForNetworkIdle({ idleTime: 300, timeout: 5000 }).catch(() => {});
+      await settleAnimations(page);
+      const measured = await measureDialog(page, {
+        panelSelector: '.doc-attach-picker__panel',
+        controlSelector: '.doc-attach-picker__header button, .doc-attach-picker__footer button',
+      });
+      assert.equal(measured.panel, true, 'keine Dokumentauswahl offen');
+      assert.ok(measured.controls >= 3, `zu wenige Knoepfe gemessen (${measured.controls})`);
+      assert.equal(measured.toast, true, 'der Erinnerungs-Toast ist verschwunden - so misst die Sonde nichts');
+      assert.equal(measured.toastVisible, true, 'der Toast muss sichtbar, im Bild und oben bleiben');
+      assert.deepEqual(measured.covered, [], 'ein Knopf der Dokumentauswahl ist an seiner Mitte verdeckt');
     } finally {
       await page.close();
     }

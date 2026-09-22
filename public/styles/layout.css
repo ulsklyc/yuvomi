@@ -5932,8 +5932,9 @@ textarea::placeholder {
  * Kalenderdialogs und nahm den Klick: die Erinnerung war verworfen, der Termin
  * nicht gespeichert. Welche Lage frei ist (ueber dem Dialog, unter ihm, ueber
  * seiner Aktionsleiste), steht erst gemessen fest; das entscheidet
- * utils/toast-placement.js und schreibt es als Variablen hierher. `measure` ist
- * der Zwischenstand, in dem es die Hoehe in der Dialogbreite abliest.
+ * utils/toast-placement.js und schreibt es als Variablen hierher, immer als
+ * Oberkante im Bild. `measure` ist der Zwischenstand, in dem es die Hoehe in
+ * der Dialogbreite abliest.
  * Attribut plus Klasse schlaegt die Media-Queries oben ohne `!important`. */
 .shell-bottom-stack {
   --toast-dock-gap: var(--space-3);
@@ -5944,12 +5945,8 @@ textarea::placeholder {
   width: var(--toast-dock-width);
 }
 
-.shell-bottom-stack[data-dock="bottom"] {
-  bottom: var(--toast-dock-offset);
-}
-
-.shell-bottom-stack[data-dock="top"] {
-  top: var(--toast-dock-offset);
+.shell-bottom-stack[data-dock="placed"] {
+  top: var(--toast-dock-top);
   bottom: auto;
 }
 
