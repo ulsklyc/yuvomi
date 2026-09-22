@@ -199,30 +199,38 @@ test('jede Geometrie: im Bild, und keine Bedienleiste verdeckt, wo es eine freie
 // ------------------------------------------------------------------
 
 /*
- * JEDE STELLE, DIE EINEN DIALOG BAUT, UND WO SEINE KNOEPFE SITZEN.
+ * JEDE STELLE, DIE EINEN DIALOG BAUT, UND WO SEINE KNOEPFE SITZEN - je Datei
+ * gezaehlt nach dem Weg, auf dem die Platzierung die Leisten findet:
  *
- * `modal-panel`: der Dialog traegt `.modal-panel__header`/`__footer` bzw.
- * `.modal-actions` (openModal, confirmModal, detail-view).
+ * `modalPanel`: `.modal-panel__header`/`__footer` bzw. `.modal-actions`
+ *   (openModal, confirmModal, Detailansicht, eigene modal-panel-Dialoge).
  * `marked`: eigene Kopf-/Fusszeilen, ausgezeichnet mit `data-dialog-actions`.
- * `none`: ein Dialog ohne Leisten; die Platzierung behandelt dann seine Knoepfe
- * selbst als Bedienflaeche (Datumswahl) - mit Grund.
+ * `none`: ein Dialog ohne Leisten; die Platzierung behandelt dann seine
+ *   Bedienelemente selbst als Leisten - nur mit Grund (`why`).
  *
  * Eine Denylist ("diese Dialoge sind schlecht") sagte zu jedem neuen Dialog JA.
- * Diese Liste sagt NEIN, bis er hier steht.
+ * Diese Liste sagt NEIN, bis er hier steht. Und sie wird in BEIDE Richtungen
+ * gegen das Markup gelesen: die erste Fassung fuehrte den Rundgang als
+ * modal-panel, obwohl er `data-dialog-actions` traegt, und die Pruefung der
+ * Auszeichnung uebersprang ihn damit (Review an #1421).
  */
 const DIALOG_REGISTRY = {
-  'public/components/modal.js': { count: 1, zones: 'modal-panel' },
-  'public/components/detail-view.js': { count: 1, zones: 'modal-panel' },
-  'public/components/document-attach.js': { count: 1, zones: 'marked' },
-  'public/components/datepicker.js': { count: 1, zones: 'none', why: 'Monatsraster ohne Leiste; jeder Tag ist ein Knopf und damit selbst Bedienflaeche' },
-  'public/pages/budget.js': { count: 1, zones: 'marked' },
-  'public/pages/calendar.js': { count: 1, zones: 'modal-panel' },
-  'public/pages/dashboard.js': { count: 1, zones: 'modal-panel' },
-  'public/pages/documents.js': { count: 1, zones: 'marked' },
-  'public/pages/inventory.js': { count: 1, zones: 'marked' },
-  'public/pages/subscriptions.js': { count: 1, zones: 'marked' },
-  'public/router.js': { count: 3, zones: 'modal-panel', why: 'Mehr-Blatt und Suche sind Navigation, keine Formulare; die Tastenhilfe ist ein modal-panel' },
+  'public/components/modal.js': { modalPanel: 1 },
+  'public/components/detail-view.js': { modalPanel: 1 },
+  'public/components/document-attach.js': { marked: 1 },
+  'public/components/datepicker.js': { none: 1, why: 'Monatsraster ohne Leiste; jeder Tag ist ein Knopf und damit selbst Leiste' },
+  'public/pages/budget.js': { marked: 1 },
+  'public/pages/calendar.js': { modalPanel: 1 },
+  'public/pages/dashboard.js': { marked: 1 },
+  'public/pages/documents.js': { marked: 1 },
+  'public/pages/inventory.js': { marked: 1 },
+  'public/pages/subscriptions.js': { marked: 1 },
+  'public/router.js': { modalPanel: 1, none: 2, why: 'Mehr-Blatt und Suche sind Navigation ohne Kopf- und Fusszeile; ihre Links und Felder sind selbst die Leisten' },
 };
+
+const dialogCount = (entry) => (entry.modalPanel ?? 0) + (entry.marked ?? 0) + (entry.none ?? 0);
+const MARK = /data-dialog-actions|dataset\.dialogActions\s*=/g;
+const MODAL_PANEL_ZONE = /modal-panel__header|modal-panel__footer|modal-actions/;
 
 const ROOT = new URL('..', import.meta.url).pathname;
 
@@ -248,17 +256,33 @@ test('jeder Dialog der App steht im Register, mit dem Weg zu seinen Knoepfen', (
     const count = (code.match(DIALOG_ROLE) || []).length;
     if (count) found[relative(ROOT, path)] = count;
   }
-  const expected = Object.fromEntries(Object.entries(DIALOG_REGISTRY).map(([k, v]) => [k, v.count]));
+  const expected = Object.fromEntries(Object.entries(DIALOG_REGISTRY).map(([k, v]) => [k, dialogCount(v)]));
   assert.deepEqual(found, expected,
     'ein Dialog kam dazu oder fiel weg - im Register eintragen und sagen, wo seine Knoepfe sitzen');
 });
 
-test('ein als "marked" eingetragener Dialog zeichnet seine Leisten auch aus', () => {
+test('das Register stimmt mit dem Markup ueberein, in beide Richtungen', () => {
+  const code = (file) => readFileSync(join(ROOT, file), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   for (const [file, entry] of Object.entries(DIALOG_REGISTRY)) {
-    if (entry.zones !== 'marked') continue;
-    const source = readFileSync(join(ROOT, file), 'utf8');
-    const marks = (source.match(/data-dialog-actions|dataset\.dialogActions\s*=/g) || []).length;
-    assert.ok(marks >= entry.count,
-      `${file}: ${marks} Auszeichnung(en) fuer ${entry.count} Dialog(e) - jede Bedienleiste braucht data-dialog-actions`);
+    const source = code(file);
+    const marks = (source.match(MARK) || []).length;
+    if (entry.marked) {
+      assert.ok(marks >= entry.marked,
+        `${file}: ${marks} Auszeichnung(en) fuer ${entry.marked} ausgezeichnete(n) Dialog(e) - jede Leiste braucht data-dialog-actions`);
+    } else {
+      assert.equal(marks, 0, `${file}: traegt data-dialog-actions, steht aber nicht als "marked" im Register`);
+    }
+    if (entry.modalPanel) {
+      assert.match(source, MODAL_PANEL_ZONE, `${file}: als modalPanel gefuehrt, aber ohne modal-panel-Leisten`);
+    }
+    if (entry.none) assert.ok(entry.why, `${file}: ein Dialog ohne Leisten braucht einen Grund`);
+  }
+  // Und keine Auszeichnung ausserhalb des Registers.
+  for (const path of walk(join(ROOT, 'public'))) {
+    const file = relative(ROOT, path);
+    if (DIALOG_REGISTRY[file]) continue;
+    const marks = (code(file).match(MARK) || []).length;
+    assert.equal(marks, 0, `${file}: traegt data-dialog-actions, baut aber keinen registrierten Dialog`);
   }
 });
