@@ -16,6 +16,7 @@ import { emptyHintEl, emptyStateEl } from '/utils/empty-state.js';
 import { wireScrollFade, wireCollapsingHeader, wireSwipeToDismiss } from '/utils/ux.js';
 import { TOAST_SURFACES, toastSurface } from '/utils/toast-surface.js';
 import { BULK_PILL_LAYER, clearBulkPill } from '/utils/bulk-pill.js';
+import { watchToastPlacement } from '/utils/toast-placement.js';
 import { COMPOSITION_MODES } from '/utils/page-layout.js';
 import { init as initReminders, stop as stopReminders } from '/reminders.js';
 import { initPush, stopPush } from '/push.js';
@@ -1679,9 +1680,13 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
   }
 }
 
+/** Baut den Beobachter der Toast-Lage ab (#1160); je Shell-Aufbau einer. */
+let _stopToastPlacement = null;
+
 /**
  * App-Shell mit Navigation einmalig aufbauen (nach erstem Login).
  */
+
 function renderAppShell(container) {
   // Gast und Display teilen sich die schmale Navigation: beide sind
   // Nicht-Mitglieder mit einer festen, kleinen Erlaubnis, und beide haben
@@ -2129,6 +2134,11 @@ function renderAppShell(container) {
   if (moreSheet)  shellNodes.push(moreSheet);
   shellNodes.push(searchOverlay, routeAnnouncer);
   container.replaceChildren(...shellNodes);
+  // Der Stapel weicht den Knoepfen offener Dialoge aus (#1160, Begruendung in
+  // utils/toast-placement.js). Ein neuer Shell-Aufbau baut einen neuen Stapel,
+  // also geht der Beobachter des alten mit.
+  _stopToastPlacement?.();
+  _stopToastPlacement = watchToastPlacement(bottomStack);
   // Die Kapsel ist ein NEUER Knoten; der Beobachter des Tab-Indikators haengt
   // sonst am verworfenen (siehe observeNavCapsule weiter unten).
   observeNavCapsule();

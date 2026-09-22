@@ -1348,7 +1348,7 @@ function openLogoPickerModal(panel, initialQuery, onSelect) {
   panel.insertAdjacentHTML('beforeend', `
     <div class="subscriptions-logo-picker-modal" role="dialog" aria-modal="true" aria-labelledby="subscription-logo-picker-title">
       <div class="subscriptions-logo-picker-panel">
-        <div class="subscriptions-logo-picker-head">
+        <div class="subscriptions-logo-picker-head" data-dialog-actions>
           <h3 id="subscription-logo-picker-title">${t('subscriptions.logoSearchTitle')}</h3>
           <button class="btn btn--secondary btn--icon" type="button" id="subscription-logo-picker-close" aria-label="${esc(t('common.close'))}">
             <i data-lucide="x" aria-hidden="true"></i>
@@ -1356,7 +1356,7 @@ function openLogoPickerModal(panel, initialQuery, onSelect) {
         </div>
         <form id="subscription-logo-search-form" class="subscriptions-logo-search-form">
           <label class="form-label" for="subscription-logo-search-input">${t('subscriptions.logoSearchLabel')}</label>
-          <div class="subscriptions-logo-search">
+          <div class="subscriptions-logo-search" data-dialog-actions>
             <input class="form-input" id="subscription-logo-search-input" inputmode="url"
                    placeholder="${esc(t('subscriptions.logoSearchPlaceholder'))}" value="${esc(initialQuery || '')}">
             <button class="btn btn--primary" type="submit">

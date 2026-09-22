@@ -423,7 +423,7 @@ function openDocumentPicker(panel, { excludeIds = new Set(), single = false } = 
     overlay.insertAdjacentHTML('afterbegin', `
       <div class="doc-attach-picker__panel" role="dialog" aria-modal="true"
            aria-label="${esc(t('documentAttach.pickerTitle'))}">
-        <div class="doc-attach-picker__header">
+        <div class="doc-attach-picker__header" data-dialog-actions>
           <strong>${esc(t('documentAttach.pickerTitle'))}</strong>
           <button class="btn btn--icon" type="button" data-picker-close
                   aria-label="${esc(t('common.cancel'))}">
@@ -436,7 +436,7 @@ function openDocumentPicker(panel, { excludeIds = new Set(), single = false } = 
         <div class="doc-attach-picker__list" data-picker-list>
           <p class="doc-attach-picker__status">${esc(t('common.loading'))}</p>
         </div>
-        <div class="doc-attach-picker__footer">
+        <div class="doc-attach-picker__footer" data-dialog-actions>
           <button class="btn btn--secondary" type="button" data-picker-close>${esc(t('common.cancel'))}</button>
           <button class="btn btn--primary" type="button" data-picker-confirm disabled>
             ${esc(t('documentAttach.confirmSelection'))}

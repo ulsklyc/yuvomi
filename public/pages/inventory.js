@@ -1260,14 +1260,14 @@ function openBookingPicker(panel, { initialMonth, includeRole = false } = {}) {
     overlay.insertAdjacentHTML('afterbegin', `
       <div class="inventory-booking-picker__panel" role="dialog" aria-modal="true"
            aria-label="${esc(t('inventory.bookingPickerTitle'))}">
-        <div class="inventory-booking-picker__header">
+        <div class="inventory-booking-picker__header" data-dialog-actions>
           <strong>${esc(t('inventory.bookingPickerTitle'))}</strong>
           <button class="btn btn--icon" type="button" data-picker-close
                   aria-label="${esc(t('common.cancel'))}">
             <i data-lucide="x" aria-hidden="true"></i>
           </button>
         </div>
-        <div class="inventory-booking-picker__nav">
+        <div class="inventory-booking-picker__nav" data-dialog-actions>
           <button class="btn btn--icon" type="button" data-picker-prev
                   aria-label="${esc(t('inventory.bookingPickerPrevMonth'))}">
             <i data-lucide="chevron-left" aria-hidden="true"></i>
@@ -1288,7 +1288,7 @@ function openBookingPicker(panel, { initialMonth, includeRole = false } = {}) {
               ${ROLES.map((r) => `<option value="${r}">${esc(roleLabel(r))}</option>`).join('')}
             </select>
           </div>
-          <div class="inventory-booking-picker__role-footer">
+          <div class="inventory-booking-picker__role-footer" data-dialog-actions>
             <button class="btn btn--secondary" type="button" data-picker-role-back>${esc(t('common.back'))}</button>
             <button class="btn btn--primary" type="button" data-picker-role-confirm>${esc(t('inventory.addBooking'))}</button>
           </div>
