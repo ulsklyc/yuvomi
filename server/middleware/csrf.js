@@ -12,6 +12,7 @@
  */
 
 import crypto from 'node:crypto';
+import { SESSION_MAX_AGE_MS } from '../utils/session-lifetime.js';
 
 const TOKEN_LENGTH = 32; // Bytes → 64 Hex-Zeichen
 
@@ -40,7 +41,7 @@ function csrfMiddleware(req, res, next) {
     httpOnly: false,
     sameSite: 'lax',
     secure: process.env.SESSION_SECURE === 'true',
-    maxAge: 1000 * 60 * 60 * 24 * 7, // 7 Tage (gleich wie Session)
+    maxAge: SESSION_MAX_AGE_MS, // gleich wie die Sitzung (#1356)
   });
 
   // Token auch als Response-Header senden (zuverlaessiger als Cookie auf iOS-PWA,

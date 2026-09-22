@@ -2045,9 +2045,11 @@ kind, not a second account model ([DECISIONS entry 4](DECISIONS.md#4-a-household
 `split_expense_guest_users`, and `householdMemberSql()` gained one more `NOT EXISTS` clause, so a
 display is out of **every** list of people at once. `accessScopeSql()` resolves it to `display`.
 
-**Why not a normal account.** A session ends after seven days, so somebody would regularly type a
-password on a device that hangs on a wall - and that password is the most valuable thing on the
-tablet. In a household that signs in only through SSO such an account could not exist at all. And a
+**Why not a normal account.** A normal account signs in with a password, so somebody would type it
+on a device that hangs on a wall - and that password is the most valuable thing on the tablet. When
+this was decided a session also ended seven days after sign-in, which made that a weekly chore; since
+#1356 it ends after 90 days without use (see [Session lifetime](#session-lifetime-1356)), but the
+password would still sit behind every sign-in. In a household that signs in only through SSO such an account could not exist at all. And a
 second factor on a device nobody ever signs out of protects nothing. The row therefore carries the
 placeholder `$display$` in `password_hash` (`NOT NULL`, the same shape SSO-only accounts use with
 `$oidc$`), and `canSignIn()` refuses it - one rule that closes password login, the OIDC callback and
@@ -5275,9 +5277,34 @@ exception list is empty and each entry would have to carry its reason on the spo
 without a justification is a gap with better camouflage.
 
 Authentication options for external integrations:
-- **Session cookie:** standard browser session after login
+- **Session cookie:** standard browser session after login, sliding for 90 days (see [Session lifetime](#session-lifetime-1356))
 - **Bearer token:** `Authorization: Bearer <token>` — tokens created via Settings → Administration → API access (admin only)
 - **X-API-Key header:** `X-API-Key: <token>` — alternative header accepted alongside Bearer (the plain `API-Key` header is also accepted for MCP-client compatibility)
+
+### Session lifetime (#1356)
+
+A browser session ends after **90 days without use**, not 90 days after sign-in. Every request
+that passes `requireAuth()` on a session keeps it alive; the session cookie is re-dated to now + 90
+days **at most every 12 hours**, the same throttle the wall display uses for its own cookie
+(`DISPLAY_COOKIE_REFRESH_AFTER_MS`). Until #1356 the session ended seven days after sign-in even for
+daily use: the store slid on every request, but `express-session` without `rolling` sends no new
+`Set-Cookie` for an unchanged session, so the browser kept the expiry it got at sign-in.
+
+- **One number.** `SESSION_MAX_AGE_MS` in `server/utils/session-lifetime.js` feeds the session
+  cookie, the oikos.sid takeover, the store fallback and every CSRF cookie. No environment variable,
+  no "keep me signed in" checkbox. A CSRF cookie that expired before the session would fail the next
+  write with a 403 that looks like a missing permission.
+- **Throttled, not `rolling`.** The session middleware runs before the static files in
+  `server/index.js`; `rolling: true` would put the session id into the `Set-Cookie` of publicly
+  cacheable asset responses. Static files never re-date, and only `requireAuth()` does. The session
+  records `cookieRefreshedAt`; changing it is what makes `express-session` send the cookie and save
+  the store entry. A session from before #1356 has no timestamp and moves to 90 days on its first
+  authenticated request.
+- **Store and cookie.** The store entry still slides on every request (`touch`), so it never ends
+  before the cookie and at most one throttle window after it.
+- **The price.** A stolen cookie that is never used stays valid for up to 90 days; one that is used
+  keeps itself alive, as it already did against the store before. Signing out ends it at once, and
+  signing out other devices (#1354) is the counterpart for a lost device.
 
 ### Retry-safe writes (`Idempotency-Key`, #822)
 

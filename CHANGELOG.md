@@ -125,6 +125,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   who may not see the pantry at all are not told which row it is - not in the page and not in the
   API's answer either. (#1314)
 
+### Changed
+
+- **You stay signed in as long as you open Yuvomi at least once every 90 days.** Until now every
+  browser was signed out seven days after signing in, even when it was used every day. The sign-in
+  now slides: each visit keeps it alive, and only a device that has not been used for 90 days has
+  to sign in again. The cookie is renewed at most every 12 hours, never on images, styles or other
+  static files, so the session id does not travel in responses a proxy might cache. There is no
+  setting and no "keep me signed in" checkbox; signing out still ends the session at once. Existing
+  sign-ins move to the 90 days on their next visit. (#1356)
+
 ### Fixed
 
 - **The API reference now describes `POST /api/v1/meals/apply-plan` as it behaves.** Since 2.52.0

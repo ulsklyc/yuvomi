@@ -11,6 +11,7 @@ import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import * as db from './db.js';
 import { generateToken, csrfMiddleware } from './middleware/csrf.js';
+import { SESSION_MAX_AGE_MS, sessionCookieRefreshDue } from './utils/session-lifetime.js';
 import { collectErrors, date as validateDate, str, MAX_SHORT, MAX_TITLE } from './middleware/validate.js';
 import { createLogger } from './logger.js';
 import { memberEmail } from './services/member-email.js';
@@ -192,7 +193,7 @@ class BetterSQLiteStore extends session.Store {
 
   set(sid, sess, callback) {
     try {
-      const ttl = sess.cookie?.maxAge ?? 7 * 24 * 60 * 60 * 1000;
+      const ttl = sess.cookie?.maxAge ?? SESSION_MAX_AGE_MS;
       const expiredAt = Date.now() + ttl;
       db.get()
         .prepare('INSERT OR REPLACE INTO sessions (sid, sess, expired_at) VALUES (?, ?, ?)')
@@ -212,9 +213,14 @@ class BetterSQLiteStore extends session.Store {
     }
   }
 
+  // Laeuft bei JEDEM Request mit Sitzung, auch bei statischen Dateien: der
+  // Eintrag gleitet also mindestens so weit wie das Cookie, das `requireAuth`
+  // nur alle zwoelf Stunden nachdatiert (#1356). Der Store endet damit nie vor
+  // dem Cookie, hoechstens eine Drosselfrist danach - ein gueltiges Cookie
+  // fuehrt nie ins Leere.
   touch(sid, sess, callback) {
     try {
-      const ttl = sess.cookie?.maxAge ?? 7 * 24 * 60 * 60 * 1000;
+      const ttl = sess.cookie?.maxAge ?? SESSION_MAX_AGE_MS;
       const expiredAt = Date.now() + ttl;
       db.get()
         .prepare('UPDATE sessions SET expired_at = ? WHERE sid = ?')
@@ -287,7 +293,8 @@ const expressSession = session({
     // (e.g. reverse proxy, direct URL entry), causing 401 on login. Lax is safe
     // because CSRF is protected by the double-submit token and HTTPS secure flag.
     sameSite: 'lax',
-    maxAge: 1000 * 60 * 60 * 24 * 7, // 7 Tage in ms
+    // Gleitend: `requireAuth` datiert das Cookie gedrosselt nach (#1356).
+    maxAge: SESSION_MAX_AGE_MS,
   },
 });
 
@@ -315,7 +322,7 @@ function sessionMiddleware(req, res, next) {
         httpOnly: true,
         sameSite: 'lax',
         secure: process.env.SESSION_SECURE === 'true',
-        maxAge: 1000 * 60 * 60 * 24 * 7,
+        maxAge: SESSION_MAX_AGE_MS,
         path: '/',
         encode: (v) => v, // Wert ist bereits kodiert → kein Doppel-Encoding
       });
@@ -849,6 +856,7 @@ function requireAuth(req, res, next) {
     req.authRole = req.session.role;
     // Interaktive Sessions kennen kein Token-Scoping.
     req.authScopes = null;
+    refreshSessionCookieIfDue(req);
     applyRoleModuleAccess(req);
     return next();
   }
@@ -858,6 +866,39 @@ function requireAuth(req, res, next) {
 /**
  * Prüft ob der authentifizierte User Admin-Rolle hat.
  */
+
+/**
+ * Datiert das Session-Cookie nach - gedrosselt, wie beim Wandtablett (#1356).
+ *
+ * DIE SITZUNG GLEITET: sie endet nach `SESSION_MAX_AGE_MS` ohne Benutzung,
+ * nicht so lange nach der Anmeldung. Der Store verlaengert sich ohnehin bei
+ * jedem Request (`touch`); das Cookie im Browser tat es nie, weil
+ * express-session ohne `rolling` bei unveraenderter Sitzung kein `Set-Cookie`
+ * schickt. Hier wird die Sitzung darum hoechstens alle zwoelf Stunden
+ * VERAENDERT (`cookieRefreshedAt`) - das allein bringt express-session dazu,
+ * das Cookie mit frischem Ablauf zu senden und den Store-Eintrag zu speichern.
+ *
+ * NUR HIER, NICHT IN DER SESSION-MIDDLEWARE: die haengt vor den statischen
+ * Dateien, eine Auffrischung dort schriebe die Session-ID in oeffentlich
+ * cachebare Asset-Antworten (Begruendung bei `SESSION_COOKIE_REFRESH_AFTER_MS`).
+ *
+ * DIE LAUFZEIT WIRD MITGESETZT, weil express-session vor dem Senden `touch()`
+ * ruft und das auf `originalMaxAge` zuruecksetzt. Eine Sitzung von vor #1356
+ * traegt dort noch die alte Woche und schickte ohne diese Zeilen wieder sieben
+ * Tage hinaus. Der `maxAge`-Setter zieht `originalMaxAge` in express-session
+ * 1.19 von selbst nach; die zweite Zeile steht da, damit das nicht an diesem
+ * Nebeneffekt haengt.
+ */
+function refreshSessionCookieIfDue(req) {
+  // Ohne Cookie-Objekt ist es keine express-session (Routentests haengen ein
+  // nacktes `{ userId, role }` an) - es gibt nichts nachzudatieren.
+  if (!req.session.cookie) return;
+  const now = Date.now();
+  if (!sessionCookieRefreshDue(req.session.cookieRefreshedAt, now)) return;
+  req.session.cookieRefreshedAt = now;
+  req.session.cookie.maxAge = SESSION_MAX_AGE_MS;
+  req.session.cookie.originalMaxAge = SESSION_MAX_AGE_MS;
+}
 
 /**
  * Richtet eine neue Session nach erfolgter Authentifizierung ein.
@@ -882,11 +923,14 @@ function setupAuthSession(req, res, user) {
       req.session.userId    = user.id;
       req.session.role      = user.role;
       req.session.csrfToken = generateToken();
+      // Die Anmeldung stellt das Cookie frisch aus - die Drossel in
+      // `refreshSessionCookieIfDue` zaehlt ab hier.
+      req.session.cookieRefreshedAt = Date.now();
       res.cookie('csrf-token', req.session.csrfToken, {
         httpOnly: false,
         sameSite: 'lax',
         secure: process.env.SESSION_SECURE === 'true',
-        maxAge: 1000 * 60 * 60 * 24 * 7,
+        maxAge: SESSION_MAX_AGE_MS,
       });
       resolve();
     });
@@ -2169,7 +2213,7 @@ router.get('/me', requireAuth, (req, res) => {
       httpOnly: false,
       sameSite: 'lax',
       secure: process.env.SESSION_SECURE === 'true',
-      maxAge: 1000 * 60 * 60 * 24 * 7,
+      maxAge: SESSION_MAX_AGE_MS,
     });
 
     res.json({

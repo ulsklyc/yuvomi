@@ -7,9 +7,11 @@
  * Abhaengigkeiten: node:crypto, server/db.js (synchroner Treiber - kein `await`
  *        vor DB-Calls).
  *
- * WARUM KEIN NORMALES KONTO. Eine Sitzung endet nach sieben Tagen, also tippte
- * jemand regelmaessig ein Passwort auf ein Geraet, das an der Wand haengt - und
- * dieses Passwort ist das wertvollste, was auf dem Tablett liegt. In einem
+ * WARUM KEIN NORMALES KONTO. Ein normales Konto meldet sich mit Passwort an,
+ * also tippte jemand ein Passwort auf ein Geraet, das an der Wand haengt - und
+ * dieses Passwort ist das wertvollste, was auf dem Tablett liegt. Damals endete
+ * eine Sitzung nach sieben Tagen; seit #1356 gleitet sie ueber 90 Tage ohne
+ * Benutzung (server/utils/session-lifetime.js), am Passwort aendert das nichts. In einem
  * Haushalt, der nur per SSO anmeldet, koennte so ein Konto gar nicht erst
  * existieren. Und ein zweiter Faktor auf einem Geraet, von dem sich nie jemand
  * abmeldet, schuetzt nichts.
