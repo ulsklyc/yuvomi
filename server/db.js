@@ -19,6 +19,7 @@
 
 import Database from 'better-sqlite3-multiple-ciphers';
 import path from 'path';
+import os from 'node:os';
 import fs from 'node:fs/promises';
 import { mkdirSync, existsSync, renameSync, linkSync, rmSync, copyFileSync, openSync, readSync, closeSync, statSync } from 'node:fs';
 import { createLogger } from './logger.js';
@@ -532,10 +533,20 @@ function assertKeyIsNotPlaceholder() {
 
 function applyEncryptionKey(database) {
   if (!DB_KEY) return;
+  applyKeyBytes(database, Buffer.from(DB_KEY, 'utf8'));
+}
+
+/**
+ * Schluessel als Bytes setzen. Hex statt Text: der Wert landet in einem
+ * PRAGMA, und Hex kann dort weder quoten noch etwas anderes ausdruecken.
+ * @param {import('better-sqlite3-multiple-ciphers').Database} database
+ * @param {Buffer} bytes
+ */
+function applyKeyBytes(database, bytes) {
   // `cipher` muss vor `key` gesetzt werden. `sqlcipher` = AES-256 im
   // SQLCipher-Format (statt des Default-Ciphers ChaCha20).
   database.pragma("cipher = 'sqlcipher'");
-  database.pragma(`key="x'${Buffer.from(DB_KEY, 'utf8').toString('hex')}'"`);
+  database.pragma(`key="x'${bytes.toString('hex')}'"`);
 }
 
 function assertReadable(database) {
@@ -9955,26 +9966,46 @@ async function backupToFile(destinationPath) {
  */
 function undecryptableBackupError(cause) {
   if (!DB_KEY) {
-    return new Error(
+    return restoreError(
       'Backup file could not be read: it has no plain SQLite header, so it is likely encrypted - '
       + 'and DB_ENCRYPTION_KEY is not set on this instance, so there is nothing to decrypt it with. '
       + 'A backup carries the encryption of the instance that wrote it: set DB_ENCRYPTION_KEY to '
       + "that instance's key and restart Yuvomi, then restore again. If the file was never "
       + 'encrypted, it is not a valid Yuvomi database.',
-      { cause }
+      'own_key_missing',
+      cause
     );
   }
-  return new Error(
+  return restoreError(
     "Backup file could not be decrypted with this instance's DB_ENCRYPTION_KEY. A backup carries "
-    + 'the encryption of the instance that wrote it, so a backup from another installation cannot '
-    + 'be read here. Do NOT just set DB_ENCRYPTION_KEY to that installation\'s key and restart: '
+    + 'the encryption of the instance that wrote it, so a backup from another installation needs '
+    + "that installation's key: enter it as the backup key and restore again (on the command "
+    + 'line: `scripts/restore-backup.js <file> --backup-key-stdin`, with the key on stdin). It is used only for '
+    + "this restore - the backup is re-encrypted with this instance's own key and the entered key "
+    + 'is not stored. Do NOT just set DB_ENCRYPTION_KEY to that installation\'s key and restart: '
     + "this instance's own database is encrypted with the key it has now, so after the swap Yuvomi "
-    + 'would not start at all and this dialog would be out of reach. Taking over a backup from '
-    + 'another installation replaces the database file and sets the key together, with Yuvomi '
-    + 'stopped - see "CLI / Docker Compose restore" on this page. If both installations really do '
-    + 'have the same key, the file is not a Yuvomi database.',
-    { cause }
+    + 'would not start at all and this dialog would be out of reach. The manual route, which '
+    + 'replaces the database file and sets the key together with Yuvomi stopped, is under '
+    + '"CLI / Docker Compose restore" on this page. If both installations really do have the same '
+    + 'key, the file is not a Yuvomi database.',
+    'backup_key_required',
+    cause
   );
+}
+
+/**
+ * Fehler mit maschinenlesbarem Grund fuer den Restore-Dialog (#1267): er
+ * entscheidet daran, ob er das Feld fuer den Backup-Schluessel zeigt. Die
+ * Meldung selbst nennt nie einen Schluessel, weder den eigenen noch den des
+ * Backups.
+ * @param {string} message
+ * @param {string} reason
+ * @param {unknown} [cause]
+ */
+function restoreError(message, reason, cause) {
+  const err = cause === undefined ? new Error(message) : new Error(message, { cause });
+  err.reason = reason;
+  return err;
 }
 
 /**
@@ -10116,7 +10147,184 @@ function keptJournalName(rollbackPath, kind) {
   return `${rollbackPath}.${kind}-kept`;
 }
 
-async function restoreFromFile(sourcePath) {
+/** `true`, wenn DB_ENCRYPTION_KEY dieser Instanz die Datei oeffnet und liest. */
+function opensWithOwnKey(filePath) {
+  if (!DB_KEY) return false;
+  let candidate;
+  try {
+    candidate = new Database(filePath, { readonly: true, fileMustExist: true });
+    applyEncryptionKey(candidate);
+    assertReadable(candidate);
+    return true;
+  } catch {
+    // Jeder Fehler heisst nur „nicht mit diesem Schluessel" - die Diagnose
+    // uebernimmt der Weg mit dem Backup-Schluessel.
+    return false;
+  } finally {
+    candidate?.close();
+  }
+}
+
+/** Backup-Schluessel als Bytes; `null`, wenn keiner (oder ein leerer) gegeben ist. */
+function backupKeyBytes(backupKey) {
+  if (backupKey == null) return null;
+  const bytes = Buffer.isBuffer(backupKey) ? backupKey : Buffer.from(String(backupKey), 'utf8');
+  return bytes.length > 0 ? bytes : null;
+}
+
+/**
+ * Warum der Backup-Schluessel die Datei nicht oeffnet - getrennt wie in
+ * `unreadableBackupError()`: nur `SQLITE_NOTADB` heisst „falscher Schluessel",
+ * `SQLITE_CORRUPT` gibt es nur mit dem richtigen (Seite 1 hat die HMAC-Pruefung
+ * bestanden).
+ */
+function foreignKeyReadError(cause, { keyProven = false } = {}) {
+  const code = typeof cause?.code === 'string' ? cause.code : '';
+  if (code === 'SQLITE_NOTADB' && !keyProven) {
+    return restoreError(
+      'Backup file could not be decrypted with the backup key you entered. It has to be exactly '
+      + 'the DB_ENCRYPTION_KEY of the installation that wrote this backup - every character counts, '
+      + 'including spaces at either end. Nothing on this instance was changed. If the key is right, '
+      + 'the file is not a Yuvomi database or was cut short before it got here.',
+      'backup_key_wrong',
+      cause
+    );
+  }
+  // Node-Fehler (etwa EACCES aus copyFile) tragen den Code schon am Anfang
+  // ihrer Meldung - dann nicht ein zweites Mal davorsetzen.
+  const text = cause?.message ?? String(cause);
+  const detail = code && text.startsWith(`${code}:`) ? text : `${code || 'no SQLite error code'}: ${text}`;
+  // Gemessen scheitert eine spaetere Seite beim Umschluesseln immer mit
+  // SQLITE_CORRUPT. Der NOTADB-Zweig mit `keyProven` ist in keiner Messung
+  // aufgetreten; er ist defensiv und sichert ab, dass ein nach bewiesenem
+  // Schluessel doch gemeldetes NOTADB nie als „falscher Schluessel" ankommt.
+  if (code.startsWith('SQLITE_CORRUPT') || (keyProven && code === 'SQLITE_NOTADB')) {
+    return restoreError(
+      `Backup file is damaged or incomplete (${detail}). The backup key is right: it opens the `
+      + 'first page, which a wrong key never does. Nothing on this instance was changed. Get the '
+      + 'backup again from where it is stored and check that its size and sha256sum match the '
+      + 'stored original, then restore that copy.',
+      'backup_damaged',
+      cause
+    );
+  }
+  return restoreError(
+    `Backup file could not be read (${detail}). Nothing on this instance was changed.`,
+    'backup_unreadable',
+    cause
+  );
+}
+
+/**
+ * Backup einer ANDEREN Installation auf den eigenen Schluessel umschluesseln (#1267).
+ *
+ * Entschieden in #1267: der Schluessel des Backups lebt nur fuer diesen
+ * Restore, die Datenbank wird auf DB_ENCRYPTION_KEY dieser Instanz
+ * umgeschluesselt. Der eigene Schluessel bleibt die eine Quelle der Wahrheit -
+ * jede Alternative (alten Key in die Env schreiben, nur im Speicher halten,
+ * Key-Datei auf dem Volume) endete am naechsten Neustart oder neben den Daten.
+ *
+ * Gearbeitet wird an einer Kopie in einem eigenen Temp-Verzeichnis, nie an
+ * DB_PATH: erst wenn die Kopie mit dem alten Schluessel lesbar war und auf den
+ * neuen umgestellt ist, laeuft sie in den bestehenden Restore - der sie mit dem
+ * EIGENEN Schluessel validiert und dann erst die Datenbank tauscht. Ein
+ * falscher Schluessel endet also vor jeder Aenderung an dieser Instanz.
+ * `PRAGMA rekey` schreibt die Seiten verschluesselt um; die Datei liegt zu
+ * keinem Zeitpunkt entschluesselt auf der Platte.
+ *
+ * Ohne eigenen Schluessel wird abgelehnt: umschluesseln ginge hier nur auf
+ * Klartext, und ein still entschluesseltes Backup unterliefe die
+ * Verschluesselung der Quellinstanz.
+ *
+ * @param {string} sourcePath
+ * @param {Buffer} oldKey
+ * @returns {Promise<{ dir: string, path: string }>}
+ */
+async function rekeyForeignBackup(sourcePath, oldKey) {
+  if (!DB_KEY) {
+    throw restoreError(
+      'A backup key was given, but DB_ENCRYPTION_KEY is not set on this instance. A restore with a '
+      + "backup key re-encrypts the backup with this instance's own key; without one it would have "
+      + 'to be stored decrypted, and this restore refuses that. Set DB_ENCRYPTION_KEY on this '
+      + 'instance (for example to a value from `openssl rand -hex 32`) and restart Yuvomi - its '
+      + 'current database is encrypted with it on that start - then restore again with the backup '
+      + 'key. Nothing on this instance was changed.',
+      'own_key_missing'
+    );
+  }
+  assertCipherSupport();
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'yuvomi-rekey-'));
+  const workingPath = path.join(dir, 'rekeyed.db');
+  try {
+    try {
+      await fs.copyFile(sourcePath, workingPath);
+    } catch (err) {
+      throw foreignKeyReadError(err);
+    }
+    let working;
+    try {
+      working = new Database(workingPath, { fileMustExist: true });
+    } catch (err) {
+      throw foreignKeyReadError(err);
+    }
+    try {
+      working.pragma('temp_store = MEMORY');
+      applyKeyBytes(working, oldKey);
+      try {
+        assertReadable(working);
+      } catch (err) {
+        throw foreignKeyReadError(err);
+      }
+      // Ein Backup aus `VACUUM INTO` einer WAL-Datenbank traegt das WAL-Flag
+      // im Kopf. DELETE haelt das Umschluesseln in EINER Datei: ohne entstuende
+      // ein `-wal` neben der Arbeitskopie im Temp-Verzeichnis. init() stellt
+      // nach dem Restore ohnehin wieder auf WAL.
+      try {
+        working.pragma('journal_mode = DELETE');
+        working.pragma(`rekey="x'${Buffer.from(DB_KEY, 'utf8').toString('hex')}'"`);
+      } catch (err) {
+        // Seite 1 ist oben mit diesem Schluessel entschluesselt worden - ein
+        // Fehler hier liegt nicht am Schluessel: an einer spaeteren Seite
+        // (SQLITE_CORRUPT) oder am Temp-Verzeichnis (SQLITE_FULL, SQLITE_IOERR,
+        // voller Datentraeger), das dann als backup_unreadable ankommt.
+        throw foreignKeyReadError(err, { keyProven: true });
+      }
+    } finally {
+      working.close();
+    }
+  } catch (err) {
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    throw err;
+  }
+  return { dir, path: workingPath };
+}
+
+/**
+ * Backup einspielen.
+ * @param {string} sourcePath
+ * @param {{ backupKey?: string | Buffer | null }} [options] `backupKey`: der
+ *   DB_ENCRYPTION_KEY der Installation, die das Backup geschrieben hat - nur
+ *   fuer ein verschluesseltes Backup einer ANDEREN Installation (#1267). Er
+ *   wird nicht gespeichert und steht in keiner Meldung.
+ */
+async function restoreFromFile(sourcePath, { backupKey = null } = {}) {
+  const oldKey = backupKeyBytes(backupKey);
+  // Ein Klartext-Backup braucht keinen Schluessel - es laeuft wie bisher und
+  // wird von init() mit dem eigenen verschluesselt.
+  // Oeffnet der EIGENE Schluessel das Backup, ist es eines dieser Installation
+  // und der Backup-Schluessel gar nicht gefragt - etwa bei einem API-Client,
+  // der den Header immer mitschickt.
+  const rekeyed = oldKey && !isPlaintextDatabase(sourcePath) && !opensWithOwnKey(sourcePath)
+    ? await rekeyForeignBackup(sourcePath, oldKey)
+    : null;
+  try {
+    return await restoreValidatedFile(rekeyed?.path ?? sourcePath);
+  } finally {
+    if (rekeyed) await fs.rm(rekeyed.dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+async function restoreValidatedFile(sourcePath) {
   const backupVersion = validateBackupFile(sourcePath);
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const rollbackPath = `${DB_PATH}.pre-restore-${timestamp}`;

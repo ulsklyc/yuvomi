@@ -2,6 +2,7 @@ import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
 import { confirmModal } from '/components/modal.js';
 import { formatCronSchedule } from '/settings/cron-label.js';
+import { backupKeyFieldHtml, encodeBackupKey, keyFieldAfterError, keyFieldDescribedBy } from '/settings/backup-key.js';
 import {
   createDisclosure,
   createInfoRow,
@@ -65,6 +66,7 @@ function renderPage(container) {
             </label>
             <input class="sr-only" type="file" id="backup-restore-file" accept=".db,.sqlite,.sqlite3,application/octet-stream" />
             <div class="settings-backup-file" id="backup-selected-file" hidden></div>
+            ${backupKeyFieldHtml(window.location.protocol)}
             <div id="backup-restore-error" class="form-error" role="alert" hidden></div>
             <div class="settings-form-actions">
               <button type="submit" class="btn btn--danger-outline" id="backup-restore-btn" disabled>${t('settings.backupRestoreButton')}</button>
@@ -473,8 +475,30 @@ function bindRestoreEvents(container) {
   const restoreBtn = container.querySelector('#backup-restore-btn');
   const errorEl = container.querySelector('#backup-restore-error');
   const dropzone = container.querySelector('#backup-dropzone');
+  const keyGroup = container.querySelector('#backup-restore-key-group');
+  const keyInput = container.querySelector('#backup-restore-key');
+  const httpWarning = container.querySelector('#backup-restore-key-http');
 
   if (!form || !fileInput || !selectedFile || !restoreBtn || !errorEl) return;
+
+  // Das Feld erscheint erst, wenn der Server sagt, dass es gebraucht wird: ein
+  // Backup DIESER Installation oeffnet der eigene Schluessel, und ein Feld, das
+  // immer dasteht, fragt nach einem Geheimnis, das niemand eingeben muss.
+  function showKeyField() {
+    if (!keyGroup || !keyInput) return;
+    keyGroup.hidden = false;
+    // Ueber HTTP geht der Schluessel im Klartext uebers Netz - sagen, nicht sperren.
+    const { protocol } = window.location;
+    if (httpWarning) httpWarning.hidden = protocol !== 'http:';
+    keyInput.setAttribute('aria-describedby', keyFieldDescribedBy(protocol));
+    keyInput.focus();
+  }
+
+  function resetKeyField() {
+    if (!keyGroup || !keyInput) return;
+    keyInput.value = '';
+    keyGroup.hidden = true;
+  }
 
   function setFile(file) {
     if (!file) {
@@ -490,6 +514,7 @@ function bindRestoreEvents(container) {
 
   fileInput.addEventListener('change', () => {
     errorEl.hidden = true;
+    resetKeyField();
     setFile(fileInput.files?.[0]);
   });
 
@@ -511,6 +536,7 @@ function bindRestoreEvents(container) {
     transfer.items.add(file);
     fileInput.files = transfer.files;
     errorEl.hidden = true;
+    resetKeyField();
     setFile(file);
   });
 
@@ -529,11 +555,18 @@ function bindRestoreEvents(container) {
     errorEl.hidden = true;
     restoreBtn.disabled = true;
     restoreBtn.textContent = t('settings.backupRestoring');
+    // Nur im Header, nie in der URL; nach dem Versuch nicht aufbewahrt.
+    const backupKey = keyGroup && !keyGroup.hidden ? keyInput?.value ?? '' : '';
+    const headers = backupKey ? { 'X-Backup-Key': encodeBackupKey(backupKey) } : {};
     try {
-      await api.rawPost('/backup/restore', file);
+      await api.rawPost('/backup/restore', file, headers);
+      resetKeyField();
       window.yuvomi?.showToast(t('settings.backupRestoredToast'), 'success');
       window.location.reload();
     } catch (err) {
+      const action = keyFieldAfterError(err?.data?.reason);
+      if (action === 'show') showKeyField();
+      else if (action === 'reset') resetKeyField();
       showError(errorEl, err.message ?? t('common.errorGeneric'));
       restoreBtn.disabled = false;
       restoreBtn.textContent = t('settings.backupRestoreButton');
