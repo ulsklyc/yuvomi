@@ -309,6 +309,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   page in Yuvomi sends this request today, so only API clients notice the change, and anybody with
   both rights notices no difference. (#1351)
 
+- **With read-only access to Tasks, a started task is announced as started.** Members who may only
+  read Tasks see a status sign instead of the check button, and a screen reader reads out what it
+  shows. For a task in progress it said "Open", while the sign itself showed the amber ring of a
+  started task. It now says "In Progress", in the task list, for a subtask in the list and for a
+  subtask in the reading view. Open and done tasks are announced as before.
+
 - **With read-only access to Birthdays, tapping a birthday opens it again, so its note can be read
   on a phone.** Since 2.68.0 a member who may only read the Calendar - the module birthdays belong
   to - no longer gets the edit form, and rightly so. But nothing took its place, and on a phone the

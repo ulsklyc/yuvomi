@@ -51,6 +51,18 @@ export const FILTER_STATUSES = () => [...STATUSES(), { value: 'archived', label:
 export const PRIORITY_LABELS = () => Object.fromEntries(PRIORITIES().map((p) => [p.value, p.label]));
 export const STATUS_LABELS   = () => Object.fromEntries(FILTER_STATUSES().map((s) => [s.value, s.label]));
 
+/**
+ * Wie heisst dieser Zustand? Fuer jedes Zeichen, das den Zustand NENNT statt
+ * eine Handlung anzubieten (Leserecht, Tablett). Es sind drei Zustaende, nicht
+ * zwei: die Frage „erledigt oder nicht?" rief eine begonnene Aufgabe „offen",
+ * waehrend der Ring daneben gelb „in Bearbeitung" zeigte. Ein unbekannter Wert
+ * liest sich als offen - so, wie ihn auch der Ring zeichnet.
+ */
+export function statusLabel(status) {
+  const labels = STATUS_LABELS();
+  return labels[status] ?? labels.open;
+}
+
 // --------------------------------------------------------
 // Ablage und Sperre
 // --------------------------------------------------------

@@ -44,7 +44,7 @@ import { isNavModuleReadOnly } from '/permissions.js';
 import { zonedDateKey } from '/utils/timezone.js';
 import { historyDayLabel } from '/utils/day-label.js';
 import {
-  FALLBACK_CATEGORY, PRIORITY_LABELS, STATUS_LABELS,
+  FALLBACK_CATEGORY, PRIORITY_LABELS, STATUS_LABELS, statusLabel,
   isArchived, canEditTaskDefinition, catLabel, normalizeTagList,
   docMime, docHref, docIcon, formatDueDate,
 } from '/utils/task-fields.js';
@@ -256,7 +256,7 @@ function subtaskListNode(task, ctx) {
     row.dataset.status = status;
     if (nurLesen) {
       row.setAttribute('role', 'img');
-      row.setAttribute('aria-label', `${title}: ${t(status === 'done' ? 'tasks.statusDone' : 'tasks.statusOpen')}`);
+      row.setAttribute('aria-label', `${title}: ${statusLabel(status)}`);
     } else {
       row.setAttribute('aria-pressed', String(status === 'done'));
       row.setAttribute('aria-label', t('tasks.subtaskMarkDone', { title }));

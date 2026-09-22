@@ -192,6 +192,36 @@ test('Aufgabenzeile mit `tasks: read`: der Haken wird zum Zustandszeichen', () =
   });
 });
 
+// DAS ZEICHEN NENNT JEDEN DER DREI ZUSTAENDE BEIM NAMEN. Die Beschriftung
+// kannte nur „erledigt oder nicht" und rief eine begonnene Aufgabe „offen" -
+// sehend sah man den gelben Ring, der Screenreader sagte das Gegenteil. Der
+// Knopf mit Schreibrecht braucht die Unterscheidung nicht, weil er eine
+// Handlung nennt; das Zeichen nennt den Zustand und muss ihn deshalb treffen.
+test('Zustandszeichen bei `tasks: read`: eine begonnene Aufgabe heisst "In Bearbeitung", nicht "Offen"', () => {
+  const zustaende = [
+    ['open', 'tasks.statusOpen'],
+    ['in_progress', 'tasks.statusInProgress'],
+    ['done', 'tasks.statusDone'],
+  ];
+  withAccess({ tasks: 'read' }, () => {
+    for (const [status, key] of zustaende) {
+      const html = tasks.renderTaskCard(aufgabe({ status }));
+      const zeichen = html.match(/<span class="task-status-btn [^"]*task-status-btn--static"[^>]*aria-label="([^"]*)"/);
+      assert.ok(zeichen, `Zeichen fuer ${status} vorhanden`);
+      assert.equal(zeichen[1], `Müll rausbringen: ${key}`, `Aufgabe im Zustand ${status}`);
+
+      const mitTeil = tasks.renderTaskCard(aufgabe({ subtasks: [{ id: 8, title: 'Tonne', status }] }));
+      const teil = mitTeil.match(/subtask-item__checkbox--static[^"]*"[^>]*aria-label="([^"]*)"/);
+      assert.ok(teil, `Teilaufgaben-Zeichen fuer ${status} vorhanden`);
+      assert.equal(teil[1], `Tonne: ${key}`, `Teilaufgabe der Liste im Zustand ${status}`);
+
+      const ctx = { users: [], currentUserId: 1, isAdmin: false, categories: [], container: null, onChanged: () => {} };
+      const zeile = detail.subtaskListNode(aufgabe({ subtasks: [{ id: 8, title: 'Tonne', status }] }), ctx).childNodes[0];
+      assert.equal(zeile.getAttribute('aria-label'), `Tonne: ${key}`, `Teilaufgabe der Leseansicht im Zustand ${status}`);
+    }
+  });
+});
+
 test('Aufgabenzeile mit `tasks: read`: auch die aufgeklappte Unteraufgabenliste bietet kein Anlegen an', () => {
   withAccess({ tasks: 'read' }, () => {
     const html = tasks.renderTaskCard(aufgabe({
