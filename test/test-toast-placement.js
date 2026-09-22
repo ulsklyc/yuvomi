@@ -235,43 +235,45 @@ test('jede Geometrie: im Bild, und keine Bedienleiste verdeckt, wo es eine freie
 // ------------------------------------------------------------------
 
 /*
- * JEDER DIALOG DER APP, IN QUELLTEXT-REIHENFOLGE JE DATEI, UND WO SEINE KNOEPFE
- * SITZEN - so, wie die Platzierung die Leisten findet:
+ * JEDER DIALOG DER APP, IN QUELLTEXT-REIHENFOLGE JE DATEI, UND WELCHE LEISTEN ER
+ * AUSZEICHNET - gebunden an ihre Klassen, nicht an eine Zahl:
  *
- * `modalPanel`: `.modal-panel__header`/`__footer` bzw. `.modal-actions`
- *   (openModal, confirmModal, eigene modal-panel-Dialoge). Baut ein Helfer die
- *   Leiste, nennt `via` ihn.
- * `marked: n`: eigene Kopf-/Fusszeilen, jede mit `data-dialog-actions`; n ist
- *   die Zahl der Leisten DIESES Dialogs.
- * `none`: ein Dialog ohne Leisten; die Platzierung behandelt dann seine
- *   Bedienelemente selbst als Leisten - nur mit Grund (`why`).
+ * `bars`: die Klassen der Elemente, die `data-dialog-actions` tragen (eigene
+ *   Kopf- und Fusszeilen). Genau diese, nicht mehr und nicht weniger.
+ * `panel`: modal-panel-Leisten, die im Abschnitt stehen muessen; baut ein
+ *   Helfer sie, nennt `via` ihn.
+ * `none`: ein Dialog ohne Leisten - nur mit Grund (`why`).
+ *
+ * Seit dem Ersatz-Review an #1421 haengt der Schutz NICHT mehr am Register: die
+ * Platzierung nimmt jeden sichtbaren Knopf eines Dialogs immer dazu, und ein
+ * fehlendes Auszeichnen bricht nichts mehr. Das Register haelt fest, was
+ * ausgezeichnet IST, damit eine Leiste ihre Auszeichnung nicht still verliert.
+ *
+ * Drei Runden am Review zu #1421 fuehrten hierher. Der Rundgang stand als
+ * modal-panel und wurde uebersprungen; dann zaehlte die Pruefung je Datei (zwei
+ * Leisten, ein Dialog - eine davon zu loeschen blieb gruen); dann je Dialog, aber
+ * als Zahl, und eine Attrappe `<span data-dialog-actions>` hielt sie. Jetzt
+ * gehoert zu jedem Dialog der Abschnitt ab seiner Rolle bis zur naechsten, und
+ * darin muessen genau die genannten Klassen die Auszeichnung tragen.
  *
  * Eine Denylist ("diese Dialoge sind schlecht") sagte zu jedem neuen Dialog JA.
  * Diese Liste sagt NEIN, bis er hier steht.
- *
- * GEPRUEFT WIRD JE DIALOG, NICHT JE DATEI (zweimal am Review zu #1421 gelernt).
- * Die erste Fassung fuehrte den Rundgang als modal-panel, obwohl er
- * `data-dialog-actions` traegt, und uebersprang ihn. Die zweite zaehlte die
- * Auszeichnungen je Datei gegen die Zahl der Dialoge: zwei Leisten, ein Dialog
- * - eine davon zu loeschen blieb gruen. Jetzt gehoert zu jedem Dialog der
- * Abschnitt ab seiner Rolle bis zur naechsten, und darin muss GENAU stehen, was
- * das Register sagt; ausserhalb der Abschnitte steht keine Auszeichnung.
  */
 const DIALOG_REGISTRY = {
-  'public/components/modal.js': [{ modalPanel: true }],
-  'public/components/detail-view.js': [{ modalPanel: true, via: 'detailFooterEl(' }],
-  'public/components/document-attach.js': [{ marked: 2 }],
+  'public/components/modal.js': [{ panel: ['modal-panel__header'] }],
+  'public/components/detail-view.js': [{ panel: ['modal-panel__footer'], via: 'detailFooterEl(' }],
+  'public/components/document-attach.js': [{ bars: ['doc-attach-picker__header', 'doc-attach-picker__footer'] }],
   'public/components/datepicker.js': [{ none: true, why: 'Monatsraster ohne Leiste; jeder Tag ist ein Knopf und damit selbst Leiste' }],
-  'public/pages/budget.js': [{ marked: 2 }],
-  'public/pages/calendar.js': [{ modalPanel: true }],
-  'public/pages/dashboard.js': [{ marked: 1 }],
-  'public/pages/documents.js': [{ marked: 2 }],
-  'public/pages/inventory.js': [{ marked: 3 }],
-  'public/pages/subscriptions.js': [{ marked: 2 }],
+  'public/pages/budget.js': [{ bars: ['budget-inline-modal__header', 'budget-inline-modal__footer'] }],
+  'public/pages/calendar.js': [{ panel: ['modal-panel__header'] }],
+  'public/pages/dashboard.js': [{ bars: ['onboarding-actions'] }],
+  'public/pages/documents.js': [{ bars: ['dms-preview__header', 'dms-preview__actions'] }],
+  'public/pages/inventory.js': [{ bars: ['inventory-booking-picker__header', 'inventory-booking-picker__nav', 'inventory-booking-picker__role-footer'] }],
+  'public/pages/subscriptions.js': [{ bars: ['subscriptions-logo-picker-head', 'subscriptions-logo-search'] }],
   'public/router.js': [
     { none: true, why: 'Mehr-Blatt: Navigation ohne Kopf- und Fusszeile, seine Links sind selbst die Leisten' },
     { none: true, why: 'Suche: Feld und Treffer sind selbst die Leisten' },
-    { modalPanel: true },
+    { panel: ['modal-panel__header'] },
   ],
 };
 
@@ -310,6 +312,25 @@ function dialogSections(source) {
 
 const countMarks = (text) => (text.match(MARK) || []).length;
 
+/**
+ * Die Klassen der Elemente, die in einem Abschnitt `data-dialog-actions`
+ * tragen - aus dem Markup (`<div class="x" data-dialog-actions>`) und aus der
+ * DOM-API (`el.className = 'x'; el.dataset.dialogActions = ''`). Ein Element
+ * ohne Klasse heisst `(ohne Klasse)` und passt damit zu keinem Eintrag.
+ */
+function markedBars(section) {
+  const bars = [];
+  for (const [tag] of section.matchAll(/<[a-z][\w-]*\b[^>]*\bdata-dialog-actions\b[^>]*>/g)) {
+    const cls = tag.match(/\bclass="([^"]*)"/)?.[1].trim().split(/\s+/)[0];
+    bars.push(cls || '(ohne Klasse)');
+  }
+  for (const [, variable] of section.matchAll(/\b(\w+)\.dataset\.dialogActions\s*=/g)) {
+    const cls = section.match(new RegExp(`\\b${variable}\\.className\\s*=\\s*'([^']*)'`))?.[1].trim().split(/\s+/)[0];
+    bars.push(cls || '(ohne Klasse)');
+  }
+  return bars.sort();
+}
+
 test('jeder Dialog der App steht im Register, mit dem Weg zu seinen Knoepfen', () => {
   const found = {};
   for (const path of walk(join(ROOT, 'public'))) {
@@ -322,7 +343,7 @@ test('jeder Dialog der App steht im Register, mit dem Weg zu seinen Knoepfen', (
     'ein Dialog kam dazu oder fiel weg - im Register eintragen und sagen, wo seine Knoepfe sitzen');
 });
 
-test('jeder Dialog traegt genau die Leisten, die das Register ihm zuschreibt', () => {
+test('jeder Dialog zeichnet genau die Leisten aus, die das Register nennt - nach Klasse', () => {
   for (const [file, entries] of Object.entries(DIALOG_REGISTRY)) {
     const source = code(file);
     const { lead, sections } = dialogSections(source);
@@ -330,15 +351,14 @@ test('jeder Dialog traegt genau die Leisten, die das Register ihm zuschreibt', (
     entries.forEach((entry, i) => {
       const section = sections[i] ?? '';
       const label = `${file}, Dialog ${i + 1}`;
-      const marks = countMarks(section);
-      assert.equal(marks, entry.marked ?? 0,
-        `${label}: ${marks} Leiste(n) mit data-dialog-actions, das Register sagt ${entry.marked ?? 0}`);
-      if (entry.modalPanel) {
+      assert.deepEqual(markedBars(section), [...(entry.bars ?? [])].sort(),
+        `${label}: diese Elemente tragen data-dialog-actions - das Register nennt andere`);
+      for (const cls of entry.panel ?? []) {
         if (entry.via) {
           assert.ok(section.includes(entry.via), `${label}: ruft ${entry.via} nicht auf`);
-          assert.match(source, MODAL_PANEL_ZONE, `${label}: ${entry.via} baut keine modal-panel-Leiste`);
+          assert.ok(source.includes(cls), `${label}: ${entry.via} baut keine ${cls}`);
         } else {
-          assert.match(section, MODAL_PANEL_ZONE, `${label}: als modalPanel gefuehrt, aber ohne modal-panel-Leiste`);
+          assert.ok(section.includes(cls), `${label}: als ${cls} gefuehrt, aber ohne diese Leiste`);
         }
       }
       if (entry.none) assert.ok(entry.why, `${label}: ein Dialog ohne Leisten braucht einen Grund`);

@@ -47,25 +47,37 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
  * Legt einen Termin und eine faellige Erinnerung dafuer an und laesst die
  * Erinnerungen sofort abgleichen - das Polling wartet sonst eine Minute.
  */
-async function seedDueReminder(page) {
-  const eventId = await page.evaluate(async () => {
+async function seedDueReminder(page, { count = 1, refresh = true } = {}) {
+  const ids = await page.evaluate(async ({ count, refresh }) => {
     const { api } = await import('/api.js');
-    const { data: event } = await api.post('/calendar', {
-      title: 'Toast probe event',
-      start_datetime: '2048-04-03T09:00:00',
-      end_datetime: '2048-04-03T10:00:00',
-    });
-    await api.post('/reminders', {
-      entity_type: 'event',
-      entity_id: event.id,
-      remind_at: '2020-01-01T08:00:00',
-    });
-    const reminders = await import('/reminders.js');
-    reminders.refresh();
-    return event.id;
-  });
-  await page.waitForSelector('.toast--reminder', { timeout: 10000 });
-  return eventId;
+    const created = [];
+    for (let i = 0; i < count; i += 1) {
+      const { data: event } = await api.post('/calendar', {
+        title: i === 0 ? 'Toast probe event' : `Toast probe event ${i + 1}`,
+        start_datetime: '2048-04-03T09:00:00',
+        end_datetime: '2048-04-03T10:00:00',
+      });
+      await api.post('/reminders', {
+        entity_type: 'event',
+        entity_id: event.id,
+        remind_at: '2020-01-01T08:00:00',
+      });
+      created.push(event.id);
+    }
+    if (refresh) (await import('/reminders.js')).refresh();
+    return created;
+  }, { count, refresh });
+  if (refresh) await waitForToasts(page, count);
+  return ids[0];
+}
+
+/** Wartet, bis mindestens `count` Erinnerungs-Toasts im Stapel stehen. */
+async function waitForToasts(page, count) {
+  await page.waitForFunction(
+    (n) => document.querySelectorAll('.toast--reminder').length >= n,
+    { timeout: 10000 },
+    count,
+  );
 }
 
 /** Wartet, bis jede laufende Animation der Seite zu Ende ist. */
@@ -110,17 +122,19 @@ async function measureDialog(page, { panelSelector = MODAL_PANEL, controlSelecto
         });
       }
     }
-    const toast = document.querySelector('.toast--reminder');
-    let toastVisible = false;
-    if (toast) {
+    // Sichtbar heisst: mindestens EIN Toast ganz im Bild und an seiner Mitte
+    // oben. Bei engem Platz zeigt der Stapel nur einen (die uebrigen bleiben
+    // fuer die Live-Region im Dokument), also zaehlt der beste.
+    const toasts = [...document.querySelectorAll('.toast--reminder')];
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    const toastVisible = toasts.some((toast) => {
       const r = toast.getBoundingClientRect();
-      const vw = document.documentElement.clientWidth;
-      const vh = document.documentElement.clientHeight;
-      const inView = r.top >= 0 && r.left >= 0 && r.bottom <= vh && r.right <= vw && r.height > 0;
+      const inView = r.top >= 0 && r.left >= 0 && r.bottom <= vh && r.right <= vw && r.height > 1 && r.width > 1;
       const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-      toastVisible = inView && toast.contains(hit);
-    }
-    return { panel: true, controls: controls.length, covered, toast: Boolean(toast), toastVisible };
+      return inView && toast.contains(hit);
+    });
+    return { panel: true, controls: controls.length, covered, toast: toasts.length > 0, toastVisible };
   }, { panelSelector, controlSelector });
 }
 
@@ -348,3 +362,97 @@ test('#1160 800x900 - unter einem hohen Popover legt sich der Toast nicht auf di
     await page.close();
   }
 });
+
+/*
+ * DIE ZWEITE REVIEW-RUNDE (Ersatz-Review an #1421, im Browser gemessen).
+ *
+ * 1. openModal-Dialoge tragen immer `.modal-panel__header`; ihre Speichern-
+ *    Zeile steht aber oft in einer eigenen Klasse im Koerper
+ *    (`.settings-form-actions`, `.housekeeping-form-submit`). Sobald der Kopf
+ *    als Leiste zaehlte, fiel der Rueckfall auf die Bedienelemente weg, und
+ *    "Speichern" lag wieder unter dem Toast.
+ * 2. Der Koerper scrollt; ohne Neumessen beim Scrollen wanderte die
+ *    Aktionszeile unter den Toast, der vor dem Scrollen richtig lag.
+ * 3. Drei Toasts im Kalender-Editor fanden auf kleinen Bildern keinen freien
+ *    Platz und deckten Loeschen und Abbrechen.
+ */
+const FAMILY_SIZES = [
+  { label: '1280x900', device: 'desktop', viewport: { width: 1280, height: 900, deviceScaleFactor: 1 } },
+  { label: '1280x700', device: 'desktop', viewport: { width: 1280, height: 700, deviceScaleFactor: 1 } },
+  { label: '320x568', device: 'mobile', viewport: { width: 320, height: 568, deviceScaleFactor: 2, isMobile: true, hasTouch: true } },
+];
+
+for (const size of FAMILY_SIZES) {
+  test(`#1160 ${size.label} - Mitglied bearbeiten, ans Ende gescrollt: Speichern und Abbrechen bleiben frei (2 Toasts)`, async () => {
+    const page = await openPage(harness, { device: size.device, locale: 'de' });
+    try {
+      await seedDueReminder(page, { count: 2, refresh: false });
+      await page.setViewport(size.viewport);
+      await gotoRoute(page, '/settings/admin/family');
+      await waitForToasts(page, 2);
+      await page.waitForSelector('[data-edit-user]');
+      await page.$eval('[data-edit-user]', (el) => el.click());
+      await page.waitForSelector('#edit-member-cancel');
+      await settleAnimations(page);
+      // Ans Ende des Koerpers scrollen, wie ein Mensch es tut, um zu speichern.
+      await page.$eval('#shared-modal-overlay .modal-panel__body', (body) => {
+        body.scrollTop = body.scrollHeight;
+      });
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      await settleAnimations(page);
+      const measured = await measureDialog(page, {
+        controlSelector: `${MODAL_CONTROLS}, .settings-form-actions button`,
+      });
+      assert.equal(measured.panel, true, 'kein Dialog offen');
+      assert.ok(measured.controls >= 3, `zu wenige Knoepfe gemessen (${measured.controls})`);
+      assert.equal(measured.toast, true, 'die Erinnerungs-Toasts sind verschwunden - so misst die Sonde nichts');
+      assert.equal(measured.toastVisible, true, 'mindestens ein Toast muss sichtbar bleiben');
+      assert.deepEqual(measured.covered, [], 'Speichern oder Abbrechen liegt unter dem Stapel');
+
+      const requests = [];
+      page.on('request', (req) => requests.push(`${req.method()} ${new URL(req.url()).pathname}`));
+      const box = await page.$eval('#edit-member-cancel', (el) => {
+        const r = el.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      });
+      await page.mouse.click(box.x, box.y);
+      await page.waitForFunction(() => !document.querySelector('.modal-overlay'), { timeout: 5000 }).catch(() => {});
+      assert.equal(await page.$('.modal-overlay'), null, `Abbrechen hat den Dialog nicht geschlossen: ${JSON.stringify(requests)}`);
+      assert.ok(!requests.some((r) => /reminders\/\d+\/dismiss/.test(r)), `der Klick verwarf eine Erinnerung: ${JSON.stringify(requests)}`);
+    } finally {
+      await page.close();
+    }
+  });
+}
+
+const SMALL_SIZES = [
+  { label: '667x375', device: 'desktop', viewport: { width: 667, height: 375, deviceScaleFactor: 1 } },
+  { label: '320x568', device: 'mobile', viewport: { width: 320, height: 568, deviceScaleFactor: 2, isMobile: true, hasTouch: true } },
+  // Telefon quer: hier findet selbst der Kalender-Editor fuer drei Toasts keinen
+  // freien Platz mehr; ohne das Zuruecknehmen bis auf einen lag der Stapel auf
+  // "Zurueck" im Kopf (gemessen, Gegenprobe mit abgeschaltetem Zuruecknehmen).
+  { label: '568x320', device: 'mobile', viewport: { width: 568, height: 320, deviceScaleFactor: 2, isMobile: true, hasTouch: true } },
+];
+
+for (const size of SMALL_SIZES) {
+  test(`#1160 ${size.label} - drei Toasts im Kalender-Editor decken keinen seiner Knoepfe`, async () => {
+    const page = await openPage(harness, { device: size.device, locale: 'de' });
+    try {
+      const eventId = await seedDueReminder(page, { count: 3, refresh: false });
+      await page.setViewport(size.viewport);
+      await gotoRoute(page, '/calendar');
+      await waitForToasts(page, 3);
+      await openEventEditor(page, eventId);
+      const measured = await measureDialog(page);
+      assert.equal(measured.panel, true, 'kein Dialog offen');
+      assert.ok(measured.controls >= 3, `zu wenige Knoepfe gemessen (${measured.controls})`);
+      assert.equal(measured.toast, true, 'die Erinnerungs-Toasts sind verschwunden - so misst die Sonde nichts');
+      assert.equal(measured.toastVisible, true, 'mindestens ein Toast muss sichtbar bleiben');
+      assert.deepEqual(measured.covered, [], 'ein Knopf des Editors liegt unter dem Stapel');
+      assert.equal(await page.$$eval('.toast--reminder', (list) => list.length), 3,
+        'die verborgenen Toasts muessen im Dokument bleiben (Live-Region)');
+    } finally {
+      await page.close();
+    }
+  });
+}

@@ -5950,6 +5950,23 @@ textarea::placeholder {
   bottom: auto;
 }
 
+/* Kein freier Platz neben dem Dialog: nur der letzte Toast bleibt sichtbar.
+ * Die uebrigen bleiben im Dokument und damit fuer die Live-Region lesbar - die
+ * Schreibweise ist die von `.sr-only` (reset.css), nicht `display: none`, das
+ * sie auch dem Screenreader naehme. Sie kommen zurueck, sobald Platz ist. */
+.shell-bottom-stack .toast.toast--tucked {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  pointer-events: none;
+}
+
 .toast {
   display: flex;
   align-items: center;
