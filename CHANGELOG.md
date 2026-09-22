@@ -142,8 +142,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   owner or admin edited someone else's expense and that editor's account was later deleted, the
   expense stayed in the list but silently dropped out of every balance. Edits now leave the expense
   tied to whoever created it, so it counts until it is deleted itself; the activity still shows who
-  edited it. Expenses edited this way before the update stay affected until they are edited once
-  more. (#1309)
+  edited it. Expenses edited this way before are corrected when the update starts. An expense whose
+  editor was already deleted before the update is not repaired: it still shows in the list without
+  counting in the balances. (#1309)
 
 - **Deleting a folder no longer reveals activity on documents you cannot see.** Before deleting a
   folder the app asks the server what the deletion would affect and sends that answer back with the
