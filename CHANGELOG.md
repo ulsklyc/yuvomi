@@ -184,7 +184,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   colour of a calendar of the same account, including one that has since been deleted on the
   server. The appointment then shows the colour of its person or its calendar again. The repair
   waits until a sync has seen every such appointment of the account, so one in a deselected
-  calendar is still repaired once the calendar is selected again. A colour picked in Yuvomi that is
+  calendar is still repaired once the calendar is selected again. It does not wait for
+  appointments of a calendar that was deleted on the server or that the server returns completely
+  empty, since no later sync would see them. A colour picked in Yuvomi that is
   not one of that account's calendar colours stays, and so does any colour the server sets on the
   appointment itself. After that, syncs leave colours alone, and so does an account added later,
   unless it takes over old appointments of a deleted account. (#1270)

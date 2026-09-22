@@ -698,9 +698,26 @@ async function runSync({ createClient } = {}) {
   `);
   // Am Laufende: gibt es noch Altzeilen dieses Kontos, die der Lauf NICHT
   // gesehen hat? Dann wartet der Merker, egal aus welchem Grund die Zeile
-  // ausblieb - abgewaehlter Kalender, verworfener VEVENT, leere Antwort,
-  // gescheiterter Prune, Kalender ohne VEVENT-Unterstuetzung. Eine Liste
-  // solcher Gruende veraltet mit dem naechsten Pfad, diese Frage nicht.
+  // ausblieb - abgewaehlter Kalender, verworfener VEVENT, gescheiterter
+  // Prune, Kalender ohne VEVENT-Unterstuetzung. Eine Liste solcher Gruende
+  // veraltet mit dem naechsten Pfad, diese Frage nicht.
+  //
+  // Gewartet wird aber nur auf Zeilen, die ein spaeterer Lauf noch sehen
+  // KANN. Zwei Faelle koennen es nie, und auf sie zu warten hiesse, die
+  // Heilung fuer immer bei jedem Lauf offen zu halten:
+  //   - ein Kalender, den der Server nicht mehr meldet (auf dem Server
+  //     geloescht). Seine URL bleibt ueber die abgewaehlte Auswahl oder
+  //     external_calendars in `legacy.urls`, seine Zeilen holt aber niemand
+  //     mehr ab und niemand loescht sie.
+  //   - ein Kalender, der vollstaendig leer antwortet. Der Prune laesst seine
+  //     Zeilen dann stehen (Leer-Bremse), und eine wirklich geleerte Sammlung
+  //     antwortet bei jedem Lauf so. Eine nur voruebergehend leere Antwort
+  //     ist davon nicht zu unterscheiden; ihre Zeilen verpassen die Heilung.
+  //     Das ist der kleinere Schaden. Hat der Parser in dieser Sammlung
+  //     etwas verworfen, ist sie nicht leer, und es wird weiter gewartet.
+  // Die Farbmenge der Heilung (`legacy.colors`) bleibt davon unberuehrt: sie
+  // schliesst die Farbe eines geloeschten Kalenders ein, genau die traegt
+  // ein Termin, der aus ihm umgezogen ist.
   const selLegacyCandidates = conn.prepare(`
     SELECT e.id, e.color, x.external_id AS calendar_url
     FROM calendar_events e
@@ -755,6 +772,9 @@ async function runSync({ createClient } = {}) {
       // Zeilen, die dieser Lauf MIT COLOR-Zeile gesehen hat: die gehoeren dem
       // Termin, sie stehen der Heilung nicht mehr offen.
       const seenWithColor = new Set();
+      // Sammlungen, in denen der Parser einen VEVENT verworfen hat: eine
+      // scheinbar leere Antwort ist dort keine leere Sammlung.
+      const skippedCalendarUrls = new Set();
       // Faellt ein Kalender oder ein Termin aus, hat die Heilung nicht alles
       // gesehen, und der Merker wartet auf den naechsten Lauf.
       let healComplete = true;
@@ -829,7 +849,7 @@ async function runSync({ createClient } = {}) {
 
         // Parse and upsert events
         const calendarUids = new Set();
-        fetchedCalendars.push({ calRefId, calendarName: selCal.calendar_name, calendarUids });
+        fetchedCalendars.push({ calRefId, calendarName: selCal.calendar_name, calendarUids, calendarUrl: selCal.calendar_url });
 
         for (const obj of calObjects) {
           // RECURRENCE-ID-Overrides zusammenführen, sonst überschreibt ein
@@ -837,8 +857,10 @@ async function runSync({ createClient } = {}) {
           // Was der Parser verwirft, wird benannt: ein still fehlender Termin
           // sah bisher aus wie einer, den der Server nie geliefert hat (#883).
           const parsed = normalizeRecurrenceOverrides(parseICS(obj.data || '', {
-            onSkip: ({ uid, reason }) =>
-              log.warn(`Skipped VEVENT (${reason}) uid=${uid ?? '(none)'} at ${obj.url ?? '(unknown URL)'}`),
+            onSkip: ({ uid, reason }) => {
+              skippedCalendarUrls.add(selCal.calendar_url);
+              log.warn(`Skipped VEVENT (${reason}) uid=${uid ?? '(none)'} at ${obj.url ?? '(unknown URL)'}`);
+            },
           }));
           if (!parsed.length && !String(obj.data || '').includes('BEGIN:VEVENT')) {
             log.warn(`Calendar object without any VEVENT at ${obj.url ?? '(unknown URL)'}`);
@@ -1057,8 +1079,14 @@ async function runSync({ createClient } = {}) {
       totalSyncedEvents  += accountEventCount;
       totalChangedEvents += accountChangedCount;
       if (legacy !== null && healComplete) {
+        const onServer = new Set(serverCalendars.map((sc) => sc.url));
+        const emptied = new Set(fetchedCalendars
+          .filter((c) => c.calendarUids.size === 0 && !skippedCalendarUrls.has(c.calendarUrl))
+          .map((c) => c.calendarUrl));
         const pending = selLegacyCandidates.all(legacyCutoff, legacyCutoff).some((r) =>
           legacy.urls.has(r.calendar_url)
+          && onServer.has(r.calendar_url)
+          && !emptied.has(r.calendar_url)
           && legacy.colors.has(String(r.color).toLowerCase())
           && !seenWithColor.has(r.id));
         if (!pending) setHealMarker.run(healKey);

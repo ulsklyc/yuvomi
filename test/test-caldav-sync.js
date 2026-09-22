@@ -1610,11 +1610,23 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     assert.strictEqual(marker(d), null);
   }));
 
-  it('eine leere Antwort, die die Zeilen stehen laesst, haelt den Merker zurueck', () => withDb(async (d) => {
+  it('ein vollstaendig leerer Kalender haelt den Merker NICHT fuer immer zurueck', () => withDb(async (d) => {
+    // B existiert, antwortet aber leer - wie eine wirklich geleerte Sammlung,
+    // und das bei jedem Lauf. Der Prune laesst die Zeile stehen (Leer-Bremse);
+    // auf sie zu warten hielte die Heilung fuer immer offen.
     await legacyRowInB(d);
-    await sync({ createClient: rawClient({ objects: { [CAL_B]: [] } }) });
-    assert.strictEqual(row(d).color, COLOR_B, 'Vorbedingung: die Zeile steht noch');
-    assert.strictEqual(marker(d), null);
+    for (let i = 0; i < 3; i++) await sync({ createClient: rawClient({ objects: { [CAL_B]: [] } }) });
+    assert.strictEqual(row(d).color, COLOR_B, 'Vorbedingung: die Zeile steht noch, ungesehen');
+    assert.strictEqual(marker(d), '1');
+  }));
+
+  it('ein auf dem Server geloeschter Kalender haelt den Merker NICHT fuer immer zurueck', () => withDb(async (d) => {
+    // B ist samt Terminen auf dem Server geloescht. Seine URL bleibt ueber die
+    // abgewaehlte Auswahl in der Zurechnung, die Zeile holt aber niemand mehr.
+    await legacyRowInB(d);
+    for (let i = 0; i < 3; i++) await sync({ createClient: rawClient({ calendars: [CAL_A] }) });
+    assert.strictEqual(row(d).color, COLOR_B, 'Vorbedingung: die Zeile steht noch, ungesehen');
+    assert.strictEqual(marker(d), '1');
   }));
 
   it('ein gescheiterter Prune haelt den Merker zurueck', () => withDb(async (d) => {
