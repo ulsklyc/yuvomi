@@ -551,6 +551,58 @@ test('POST members via contact_id mit Geburtstag: erzeugt Nutzer + Geburtstags-A
   assert.equal(bday.birth_date, '1992-07-07');
 });
 
+// Der Kontakt ist Quelldatum aus `contacts`: ohne dessen Leserecht (Mitglied
+// oder Token) antwortet die Route wie bei einer unbekannten ID und legt
+// nichts an - sonst verriete der angelegte Gast Name, Telefon und E-Mail.
+test('POST members via contact_id: ohne Kontaktrecht 404 wie eine unbekannte ID, nichts angelegt', async () => {
+  const frei = db.prepare(`INSERT INTO contacts (name, category, phone, email) VALUES ('Geheim Kontakt', 'Sonstiges', '0171', 'geheim@example.test')`).run().lastInsertRowid;
+  const verknuepft = db.prepare(`INSERT INTO contacts (name, category, family_user_id) VALUES ('Geheim Verknuepft', 'Sonstiges', ?)`).run(mkUser('geheim.verknuepft')).lastInsertRowid;
+  const users = () => db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
+  const members = () => db.prepare('SELECT COUNT(*) AS n FROM expense_group_members WHERE group_id = ?').get(OPS).n;
+
+  const unbekannt = await call('POST', `/groups/${OPS}/members`, { actor: { id: OWNER, role: 'member' }, body: { contact_id: 999999, role: 'guest' } });
+  assert.equal(unbekannt.status, 404, 'eine unbekannte Kontakt-ID ist 404, kein 500');
+
+  const vorherNutzer = users();
+  const vorherMitglieder = members();
+  for (const actor of [
+    { id: OWNER, role: 'member', moduleAccess: { contacts: 'none' } },
+    { id: OWNER, role: 'member', scopes: ['budget:write'] },
+  ]) {
+    for (const contactId of [frei, verknuepft]) {
+      const r = await call('POST', `/groups/${OPS}/members`, { actor, body: { contact_id: contactId, role: 'guest' } });
+      assert.equal(r.status, 404, 'dieselbe Antwort wie bei einer unbekannten ID');
+      assert.equal(r.body.error, unbekannt.body.error, 'auch derselbe Text');
+    }
+  }
+  assert.equal(users(), vorherNutzer, 'kein Gastnutzer angelegt');
+  assert.equal(members(), vorherMitglieder, 'kein Mitglied hinzugefuegt');
+  assert.equal(db.prepare('SELECT family_user_id FROM contacts WHERE id = ?').get(frei).family_user_id, null, 'Kontakt nicht verknuepft');
+
+  const lesend = await call('POST', `/groups/${OPS}/members`, {
+    actor: { id: OWNER, role: 'member', moduleAccess: { contacts: 'read' } }, body: { contact_id: frei, role: 'guest' },
+  });
+  assert.equal(lesend.status, 201, 'contacts: read reicht');
+});
+
+// Der Passwort-Hash ist der einzige asynchrone Schritt. Liegt er zwischen dem
+// Lesen des Kontakts und dem Schreiben des Gastes, legen zwei gleichzeitige
+// Anfragen zwei Gaeste fuer denselben Kontakt an.
+test('POST members via contact_id: zwei gleichzeitige Anfragen legen EINEN Gast an', async () => {
+  const contactId = db.prepare(`INSERT INTO contacts (name, category) VALUES ('Parallel Kontakt', 'Sonstiges')`).run().lastInsertRowid;
+  const before = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
+  const body = { contact_id: contactId, role: 'guest' };
+  const actor = { id: OWNER, role: 'member' };
+  const [a, b] = await Promise.all([
+    call('POST', `/groups/${OPS}/members`, { actor, body }),
+    call('POST', `/groups/${OPS}/members`, { actor, body }),
+  ]);
+  assert.equal(a.status, 201);
+  assert.equal(b.status, 201);
+  assert.equal(a.body.data.user_id, b.body.data.user_id, 'beide Antworten nennen denselben Gast');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM users').get().n, before + 1, 'genau ein neuer Nutzer');
+});
+
 test('POST members: user_id noch contact_id -> 400', async () => {
   const r = await call('POST', `/groups/${OPS}/members`, { actor: { id: OWNER, role: 'member' }, body: { role: 'guest' } });
   assert.equal(r.status, 400);

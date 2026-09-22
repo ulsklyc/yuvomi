@@ -184,7 +184,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `POST /api/v1/shopping/{listId}/import-pantry` also needs `pantry:read`. The member picker of a
   shared-expense group now shows phone, email and birthday only with read access to contacts and
   to the calendar, where birthdays live, and offers contacts as new members only with access to
-  contacts. An inventory item shows its linked budget bookings, their total and the bookings in its
+  contacts; adding a contact as a member needs that access too and otherwise answers as if the
+  contact did not exist. Adding the same contact twice at the same moment now creates one guest
+  instead of failing, and an unknown contact answers 404 instead of a server error. An inventory item shows its linked budget bookings, their total and the bookings in its
   history only with read access to the budget; without it, linking a booking or pre-filling the
   purchase price from one answers as if the booking did not exist. (#1433)
 

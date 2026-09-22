@@ -186,27 +186,47 @@ function uniqueUsername(base) {
   return username;
 }
 
+/**
+ * Der Nutzer zu einem Kontakt, notfalls als neuer Gast. `null`, wenn es den
+ * Kontakt nicht gibt.
+ *
+ * KEIN YIELD ZWISCHEN LESEN UND SCHREIBEN. Der Passwort-Hash ist der einzige
+ * asynchrone Schritt, er laeuft deshalb VOR dem Lesen, auf das geschrieben
+ * wird: danach liest die Transaktion den Kontakt neu, prueft die Verknuepfung
+ * und legt Nutzer samt Artefakten synchron an. Stand der Hash dazwischen,
+ * legten zwei gleichzeitige Anfragen zwei Gaeste an oder scheiterten am
+ * selben Benutzernamen. Die Vorabfrage spart nur den Hash, wenn der Kontakt
+ * schon einen Nutzer hat oder fehlt.
+ *
+ * Der Geburtstag aus dem Kontakt ist Kontaktdatum (wie in den
+ * Mitglieds-Kandidaten) und der angelegte Geburtstag ein Folgeeintrag des
+ * Gastes (docs/DECISIONS.md Abschnitt 10) - beides fragt kein Kalenderrecht.
+ */
 async function userFromContact(database, contactId, actorId) {
-  const contact = database.prepare('SELECT * FROM contacts WHERE id = ?').get(contactId);
-  if (!contact) throw new Error('Contact not found.');
-  if (contact.family_user_id) return contact.family_user_id;
-  const username = uniqueUsername(contact.name);
+  const known = database.prepare('SELECT family_user_id FROM contacts WHERE id = ?').get(contactId);
+  if (!known) return null;
+  if (known.family_user_id) return known.family_user_id;
   const passwordHash = await hashPassword(crypto.randomBytes(24).toString('base64url'));
-  const created = database.prepare(`
-    INSERT INTO users (username, display_name, password_hash, avatar_color, role, family_role)
-    VALUES (?, ?, ?, ?, 'member', 'other')
-  `).run(username, contact.name, passwordHash, randomAvatarColor());
-  database.prepare('UPDATE contacts SET family_user_id = ? WHERE id = ?').run(created.lastInsertRowid, contact.id);
-  if (contact.birthday) {
-    syncGuestArtifacts(database, created.lastInsertRowid, {
-      displayName: contact.name,
-      phone: contact.phone,
-      email: contact.email,
-      birthDate: contact.birthday,
-      actorUserId: actorId,
-    });
-  }
-  return created.lastInsertRowid;
+  return database.transaction(() => {
+    const contact = database.prepare('SELECT * FROM contacts WHERE id = ?').get(contactId);
+    if (!contact) return null;
+    if (contact.family_user_id) return contact.family_user_id;
+    const created = database.prepare(`
+      INSERT INTO users (username, display_name, password_hash, avatar_color, role, family_role)
+      VALUES (?, ?, ?, ?, 'member', 'other')
+    `).run(uniqueUsername(contact.name), contact.name, passwordHash, randomAvatarColor());
+    database.prepare('UPDATE contacts SET family_user_id = ? WHERE id = ?').run(created.lastInsertRowid, contact.id);
+    if (contact.birthday) {
+      syncGuestArtifacts(database, created.lastInsertRowid, {
+        displayName: contact.name,
+        phone: contact.phone,
+        email: contact.email,
+        birthDate: contact.birthday,
+        actorUserId: actorId,
+      });
+    }
+    return created.lastInsertRowid;
+  })();
 }
 
 function syncGuestArtifacts(database, userId, { displayName, phone, email, birthDate, actorUserId }) {
@@ -739,7 +759,13 @@ router.post('/groups/:id/members', async (req, res) => {
     const vContactId = req.body.contact_id ? validateId(req.body.contact_id, 'contact_id') : { value: null, error: null };
     if (vUserId.error || vContactId.error) return res.status(400).json({ error: vUserId.error || vContactId.error, code: 400 });
     const role = GROUP_ROLES.includes(req.body.role) && req.body.role !== 'owner' ? req.body.role : 'guest';
+    // Ein Kontakt ist Quelldatum aus `contacts`: ohne dessen Leserecht (beide
+    // Achsen) dieselbe Antwort wie fuer eine unbekannte ID, und angelegt wird
+    // nichts - der Gast truege Name, Telefon und E-Mail des Kontakts.
+    const contactNotFound = () => res.status(404).json({ error: 'Contact not found.', code: 404 });
+    if (vContactId.value && !mayReadModule(req, 'contacts')) return contactNotFound();
     const memberUserId = vContactId.value ? await userFromContact(db.get(), vContactId.value, userId(req)) : vUserId.value;
+    if (vContactId.value && !memberUserId) return contactNotFound();
     if (!memberUserId) return res.status(400).json({ error: 'user_id or contact_id is required.', code: 400 });
     const exists = db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(memberUserId);
     if (!exists) return res.status(404).json({ error: 'User not found.', code: 404 });
