@@ -137,14 +137,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **A housekeeping visit no longer tells the name of a receipt you may not see.** The visit list
-  and the visit report sent the file name of a visit's receipt to everyone who could open the
+- **A housekeeping visit no longer gives away a receipt you may not see.** The housekeeping API
+  sent the file name and document number of a visit's receipt to everyone who could open the
   housekeeping module, also to members without access to documents and when the receipt was a
-  private document of someone else. The page already hid it without document access, but the API
-  still returned it. The name now comes only when you may read that document, by the same rule the
-  documents module uses; otherwise it is empty, and the visit keeps its receipt, so editing the
-  visit does not remove it. For API tokens the name needs a `documents:read` scope next to
-  `housekeeping:read`. (#1358)
+  private document of someone else. The page already hid the name without document access, but the
+  API still returned it. Name and number now come only when you may read that document, by the same
+  rule the documents module uses; otherwise the visit only says that it has a receipt, and the edit
+  dialog shows "Attached" instead of an upload field. Saving such a visit keeps the receipt: before,
+  saving it could silently remove someone else's private receipt, and it can no longer be replaced
+  or removed by someone who cannot see it. Linking a receipt now needs access to documents. For API
+  clients every visit and work session carries `has_receipt`; `receipt_document_id` and
+  `receipt_document_name` are `null` unless you may read the document, API tokens need a
+  `documents:read` scope for them, and `PUT /api/v1/housekeeping/visits/{id}` answers 403 when it
+  would replace a receipt you cannot see or link one without access to documents. (#1358)
 
 - **Deleting a folder no longer reveals activity on documents you cannot see.** Before deleting a
   folder the app asks the server what the deletion would affect and sends that answer back with the

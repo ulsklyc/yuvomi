@@ -3552,7 +3552,8 @@
         "currentMonth": "Поточний",
         "noVisitReportsInMonth": "За період {{month}} відвідувань персоналу не зафіксовано.",
         "settledAdminOnly": "Змінити або видалити може лише адміністратор",
-        "reportVisitsCount": "Відвідування"
+        "reportVisitsCount": "Відвідування",
+        "receiptPresent": "Додано"
     },
     "userMultiSelect": {
         "moreUsers": "інші",

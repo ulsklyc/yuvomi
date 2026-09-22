@@ -3556,7 +3556,8 @@
         "currentMonth": "Bieżący",
         "noVisitReportsInMonth": "Brak zarejestrowanych wizyt personelu w okresie {{month}}.",
         "settledAdminOnly": "Zmienić lub usunąć może tylko admin",
-        "reportVisitsCount": "Wizyty"
+        "reportVisitsCount": "Wizyty",
+        "receiptPresent": "Dołączony"
     },
     "splitExpenses": {
         "title": "Wspólne wydatki",

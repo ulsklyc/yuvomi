@@ -3552,7 +3552,8 @@
         "currentMonth": "वर्तमान",
         "noVisitReportsInMonth": "{{month}} में कोई विज़िट दर्ज नहीं हुई।",
         "settledAdminOnly": "केवल एडमिन ही इसे बदल या हटा सकता है",
-        "reportVisitsCount": "विज़िट"
+        "reportVisitsCount": "विज़िट",
+        "receiptPresent": "संलग्न"
     },
     "userMultiSelect": {
         "moreUsers": "और",

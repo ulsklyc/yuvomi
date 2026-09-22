@@ -3556,7 +3556,8 @@
         "currentMonth": "Kasalukuyan",
         "noVisitReportsInMonth": "Walang naitalang pagbisita ng tauhan sa {{month}}.",
         "settledAdminOnly": "Tanging admin ang maaaring baguhin o burahin ito",
-        "reportVisitsCount": "Mga pagbisita"
+        "reportVisitsCount": "Mga pagbisita",
+        "receiptPresent": "Nakalakip"
     },
     "splitExpenses": {
         "title": "Mga hinating gastos",

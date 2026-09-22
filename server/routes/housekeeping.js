@@ -29,7 +29,7 @@ import {
   queueEventDeletion,
 } from '../services/calendar-outbound.js';
 import { hiddenModulesFor, mayWriteModule, moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
-import { filterVisibleDocumentIds } from '../services/document-access.js';
+import { documentVisibleSql } from '../services/document-access.js';
 import { tokenAllows } from '../scopes.js';
 import {
   householdTimeZone,
@@ -138,14 +138,18 @@ function localDayRange(context = localDayContext()) {
   return { start: start.toISOString(), end: end.toISOString() };
 }
 
-function publicSession(row) {
+// `receipts` ist das Urteil aus `receiptAccess(req)`; ohne es bleibt der Beleg
+// maskiert (#1358). Der Name steht nur in Liste und Bericht, die ID ueberall.
+function publicSession(row, receipts = MASKED_RECEIPTS) {
   if (!row) return null;
+  const { receipt_document_id: receiptDocumentId, has_receipt: hasReceipt } = receipts.view(row);
   return {
     id: row.id,
     worker_id: row.worker_id ?? null,
     calendar_event_id: row.calendar_event_id ?? null,
     payment_task_id: row.payment_task_id ?? null,
-    receipt_document_id: row.receipt_document_id ?? null,
+    receipt_document_id: receiptDocumentId,
+    has_receipt: hasReceipt,
     check_in: row.check_in,
     check_out: row.check_out,
     daily_rate: Number(row.daily_rate || 0),
@@ -159,7 +163,7 @@ function publicSession(row) {
   };
 }
 
-function publicWorker(row, context = localDayContext()) {
+function publicWorker(row, context = localDayContext(), receipts = MASKED_RECEIPTS) {
   if (!row) return null;
   const todaySession = loadTodaySession(row.id, context);
   return {
@@ -182,8 +186,8 @@ function publicWorker(row, context = localDayContext()) {
     // `today_session` heisst "war heute da" und traegt die Zeitangabe darunter.
     // Solange beide die letzte Sitzung des Tages lieferten, blieb ein Arbeiter
     // nach dem Auschecken "eingecheckt" (#1133).
-    current_session: publicSession(loadOpenSession(row.id)),
-    today_session: publicSession(todaySession),
+    current_session: publicSession(loadOpenSession(row.id), receipts),
+    today_session: publicSession(todaySession, receipts),
     notes: row.notes ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -510,13 +514,13 @@ function monthlySummary(monthValue = currentMonth()) {
   };
 }
 
-function housekeepingDashboard() {
+function housekeepingDashboard(receipts = MASKED_RECEIPTS) {
   reconcilePaymentTasks();
   const tz = householdTimeZone(db.get());
   const monthValue = currentMonth();
   const monthRange = householdMonthRange(monthValue, tz);
   const context = localDayContext();
-  const workers = loadWorkers().map((row) => publicWorker(row, context));
+  const workers = loadWorkers().map((row) => publicWorker(row, context, receipts));
   const worker = workers[0] ?? null;
   const summary = monthlySummary(monthValue);
   const lastVisit = db.get().prepare(`
@@ -557,7 +561,7 @@ function housekeepingDashboard() {
     workers,
     current_session: null,
     visits_this_month: summary.session_count,
-    last_visit: publicSession(lastVisit),
+    last_visit: publicSession(lastVisit, receipts),
     pending_tasks: tasks.filter((task) => task.urgency_status !== 'ok').length,
     finished_tasks_this_month: taskRows
       .filter((task) => task.last_completed && householdMonthOf(task.last_completed, tz) === monthValue).length,
@@ -621,34 +625,75 @@ function visitCapabilities(row, req) {
   };
 }
 
-// DER NAME DES BELEGS GEHOERT DEM DOKUMENTE-MODUL, NICHT DEM BESUCH (#1358).
+// DER BELEG GEHOERT DEM DOKUMENTE-MODUL, NICHT DEM BESUCH (#1358).
 //
 // Der Besuch bleibt beim Quellmodul housekeeping (docs/DECISIONS.md: automatische
 // Folgeeintraege folgen dem Quellmodul), sein Beleg ist aber eine Zeile aus
 // family_documents. Der Pfad-Guard in server/index.js urteilt am ersten
-// Segment und fragt hier deshalb nie nach `documents`. Vorher jointen beide
-// Leserouten `fd.name` ohne Frage - bei `documents: none`, mit einem Token ohne
-// documents-Scope oder bei einem fremden privaten Dokument kam der Name
-// trotzdem an. Dass die Seite ihn bei `none` nicht zeichnet, ist eine
-// Darstellungsentscheidung, die API beantwortet die Frage am Browser vorbei.
+// Segment und fragt hier deshalb nie nach `documents`. Vorher gingen Name und
+// ID an jeden Leser von housekeeping - bei `documents: none`, mit einem Token
+// ohne documents-Scope oder bei einem fremden privaten Dokument. Dass die Seite
+// den Namen bei `none` nicht zeichnet, ist eine Darstellungsentscheidung, die
+// API beantwortet die Frage am Browser vorbei.
 //
-// Zwei Fragen, beide aus den geteilten Stellen und ohne Nachbau: die
+// EIN Urteil fuer Name UND ID, aus den geteilten Stellen und ohne Nachbau: die
 // Modulachse (`hiddenModulesFor`: Mitgliedsrecht UND Token-Scope) und die
-// Sichtbarkeit des einzelnen Dokuments (`filterVisibleDocumentIds`, dieselbe
-// Regel wie im Dokumente-Modul). Was durchfaellt, wird `null`, die Antwort
-// behaelt ihre Form. `receipt_document_id` bleibt stehen: es ist eine Spalte
-// des Besuchs, der Bearbeiten-Dialog schickt sie zurueck, und ohne sie haengte
-// ein Speichern den Beleg ab.
-function visibleReceiptNames(req, rows) {
+// Sichtbarkeit des einzelnen Dokuments (`documentVisibleSql`, dieselbe Regel
+// wie im Dokumente-Modul). Wer durchfaellt, bekommt `null` fuer beide - auch die
+// ID verraet sonst, dass es ein Dokument dieser Nummer gibt (document-access.js).
+// Uebrig bleibt `has_receipt`, eine Aussage ueber den Besuch, nicht ueber das
+// Dokument.
+//
+// Das Urteil entsteht einmal je Anfrage und geht an `publicSession()`; wer es
+// nicht mitgibt, bekommt die maskierte Form. Ein kuenftiger Serialisierer, der
+// es vergisst, leakt deshalb nichts.
+function receiptAccess(req) {
+  const hidden = hiddenModulesFor(req, ['documents']).has('documents');
+  const viewer = userId(req);
   const names = new Map();
-  if (hiddenModulesFor(req, ['documents']).has('documents')) return names;
-  const ids = rows.map((row) => row.receipt_document_id).filter((id) => id != null);
-  const visible = new Set(filterVisibleDocumentIds(db.get(), ids, userId(req)));
-  for (const row of rows) {
-    if (visible.has(row.receipt_document_id)) names.set(row.id, row.receipt_document_name ?? null);
-  }
-  return names;
+  const load = (ids) => {
+    const wanted = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0 && !names.has(id)))];
+    if (hidden || !wanted.length) return;
+    for (const id of wanted) names.set(id, undefined);
+    const rows = db.get().prepare(`
+      SELECT d.id, d.name FROM family_documents d
+      WHERE d.id IN (${wanted.map(() => '?').join(', ')}) AND ${documentVisibleSql('d')}
+    `).all(...wanted, { userId: viewer });
+    for (const row of rows) names.set(row.id, row.name);
+  };
+  const visible = (id) => {
+    if (hidden || id == null) return false;
+    load([id]);
+    return names.get(id) !== undefined;
+  };
+  return {
+    /** Laedt die Belege einer Liste in einer Abfrage statt je Zeile. */
+    preload(rows) {
+      load(rows.filter(Boolean).map((row) => row.receipt_document_id));
+      return this;
+    },
+    /** Darf diese Anfrage auf das Dokument als Beleg zugreifen? */
+    visible,
+    view(row) {
+      const id = row.receipt_document_id ?? null;
+      const seen = visible(id);
+      return {
+        receipt_document_id: seen ? id : null,
+        receipt_document_name: seen ? names.get(id) : null,
+        has_receipt: id != null,
+      };
+    },
+  };
 }
+
+// Die Form ohne Urteil: nichts vom Dokument, nur dass es einen Beleg gibt.
+const MASKED_RECEIPTS = Object.freeze({
+  view: (row) => ({
+    receipt_document_id: null,
+    receipt_document_name: null,
+    has_receipt: row.receipt_document_id != null,
+  }),
+});
 
 async function createWorkerUser({ username, displayName, avatarColor, avatarData, actorUserId }) {
   const finalUsername = username || `housekeeper_${Date.now()}`;
@@ -691,9 +736,9 @@ function defaultShoppingList(actorId) {
   return result.lastInsertRowid;
 }
 
-router.get('/dashboard', (_req, res) => {
+router.get('/dashboard', (req, res) => {
   try {
-    res.json({ data: housekeepingDashboard() });
+    res.json({ data: housekeepingDashboard(receiptAccess(req)) });
   } catch (err) {
     log.error('GET /dashboard error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -711,7 +756,7 @@ router.get('/task-templates', (_req, res) => {
 
 router.get('/worker', (req, res) => {
   try {
-    res.json({ data: publicWorker(loadWorker(), localDayContext(req.query)) });
+    res.json({ data: publicWorker(loadWorker(), localDayContext(req.query), receiptAccess(req)) });
   } catch (err) {
     log.error('GET /worker error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -721,7 +766,8 @@ router.get('/worker', (req, res) => {
 router.get('/workers', (req, res) => {
   try {
     const context = localDayContext(req.query);
-    res.json({ data: loadWorkers().map((worker) => publicWorker(worker, context)) });
+    const receipts = receiptAccess(req);
+    res.json({ data: loadWorkers().map((worker) => publicWorker(worker, context, receipts)) });
   } catch (err) {
     log.error('GET /workers error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -811,7 +857,7 @@ router.post('/worker', async (req, res) => {
     })();
 
     const saved = existing ? loadWorkerById(existing.id) : loadWorkers().find((worker) => worker.user_id === targetUserId);
-    res.status(existing ? 200 : 201).json({ data: publicWorker(saved) });
+    res.status(existing ? 200 : 201).json({ data: publicWorker(saved, localDayContext(), receiptAccess(req)) });
   } catch (err) {
     if (err.message?.includes('UNIQUE constraint')) {
       return res.status(409).json({ error: 'Username is already taken.', code: 409 });
@@ -827,7 +873,7 @@ router.get('/summary', (req, res) => {
     if (vMonth.error) return res.status(400).json({ error: vMonth.error, code: 400 });
     res.json({
       data: {
-        current_session: publicSession(loadOpenSession()),
+        current_session: publicSession(loadOpenSession(), receiptAccess(req)),
         default_daily_rate: defaultDailyRate(),
         summary: monthlySummary(vMonth.value || currentMonth()),
       },
@@ -849,7 +895,8 @@ router.get('/work-sessions', (req, res) => {
       WHERE check_in >= ? AND check_in < ?
       ORDER BY check_in DESC
     `).all(start, end);
-    res.json({ data: rows.map(publicSession) });
+    const receipts = receiptAccess(req).preload(rows);
+    res.json({ data: rows.map((row) => publicSession(row, receipts)) });
   } catch (err) {
     log.error('GET /work-sessions error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -874,27 +921,25 @@ router.get('/visits', (req, res) => {
              u.avatar_color AS worker_avatar_color,
              u.avatar_data AS worker_avatar_data,
              t.status AS payment_task_status,
-             t.title AS payment_task_title,
-             fd.name AS receipt_document_name
+             t.title AS payment_task_title
       FROM housekeeping_work_sessions hws
       LEFT JOIN housekeeping_workers hw ON hw.id = hws.worker_id
       LEFT JOIN users u ON u.id = hw.user_id
       LEFT JOIN tasks t ON t.id = hws.payment_task_id
-      LEFT JOIN family_documents fd ON fd.id = hws.receipt_document_id
       WHERE hws.check_in >= ? AND hws.check_in < ?
         AND (? IS NULL OR hws.worker_id = ?)
       ORDER BY hws.check_in DESC
     `).all(start, end, vWorkerId.value, vWorkerId.value);
-    const receiptNames = visibleReceiptNames(req, rows);
+    const receipts = receiptAccess(req).preload(rows);
     const visits = rows.map((row) => ({
-      ...publicSession(row),
+      ...publicSession(row, receipts),
       worker_name: row.worker_name ?? null,
       worker_avatar_color: row.worker_avatar_color ?? DEFAULT_CALENDAR_COLOR,
       worker_avatar_data: row.worker_avatar_data ?? null,
       payment_schedule: row.payment_schedule ?? 'monthly',
       payment_task_status: row.payment_task_status ?? null,
       payment_task_title: row.payment_task_title ?? null,
-      receipt_document_name: receiptNames.get(row.id) ?? null,
+      receipt_document_name: receipts.view(row).receipt_document_name,
       total_amount: Number(row.daily_rate || 0) + Number(row.extras || 0),
       ...visitCapabilities(row, req),
     }));
@@ -954,7 +999,7 @@ router.post('/work-sessions/check-in', (req, res) => {
       `).run(worker.id, checkIn, null, vDailyRate.value, vExtras.value ?? 0, eventId, taskId, actorId, workerRateType, workerHourlyRate);
     })();
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json({ data: publicSession(row), summary: monthlySummary() });
+    res.status(201).json({ data: publicSession(row, receiptAccess(req)), summary: monthlySummary() });
   } catch (err) {
     log.error('POST /work-sessions/check-in error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -972,25 +1017,24 @@ router.get('/visits/:id', (req, res) => {
              u.avatar_color AS worker_avatar_color,
              u.avatar_data  AS worker_avatar_data,
              t.status  AS payment_task_status,
-             t.title   AS payment_task_title,
-             fd.name   AS receipt_document_name
+             t.title   AS payment_task_title
       FROM housekeeping_work_sessions hws
       LEFT JOIN housekeeping_workers hw ON hw.id = hws.worker_id
       LEFT JOIN users u ON u.id = hw.user_id
       LEFT JOIN tasks t ON t.id = hws.payment_task_id
-      LEFT JOIN family_documents fd ON fd.id = hws.receipt_document_id
       WHERE hws.id = ?
     `).get(vId.value);
     if (!row) return res.status(404).json({ error: 'Visit not found.', code: 404 });
+    const receipts = receiptAccess(req);
     const visit = {
-      ...publicSession(row),
+      ...publicSession(row, receipts),
       worker_name: row.worker_name ?? null,
       worker_avatar_color: row.worker_avatar_color ?? null,
       worker_avatar_data: row.worker_avatar_data ?? null,
       payment_schedule: row.payment_schedule ?? 'monthly',
       payment_task_status: row.payment_task_status ?? null,
       payment_task_title: row.payment_task_title ?? null,
-      receipt_document_name: visibleReceiptNames(req, [row]).get(row.id) ?? null,
+      receipt_document_name: receipts.view(row).receipt_document_name,
       total_amount: Number(row.daily_rate || 0) + Number(row.extras || 0),
       ...visitCapabilities(row, req),
     };
@@ -1025,16 +1069,32 @@ router.put('/visits/:id', (req, res) => {
     if (vMinutesWorked.error) return res.status(400).json({ error: vMinutesWorked.error, code: 400 });
     const errors = collectErrors([vDate, vDailyRate, vExtras, vEventTitle, vPaymentTitle, vPaymentDescription, vReceiptId]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
-    // Die bestehende Verknuepfung zu BEHALTEN verlangt keine Sichtbarkeit, sie
-    // zu AENDERN schon (Regel 2 in services/document-links.js). Der Dialog
-    // schickt `receipt_document_id` unveraendert zurueck; wer den Beleg nicht
-    // sehen darf, haengte ihn sonst beim Speichern ab (#1358). Die Loeschsperre
-    // gilt fuer beide Wege.
-    let receiptDocumentId = vReceiptId.value;
-    if (vReceiptId.value !== null && vReceiptId.value === existing.receipt_document_id) {
-      assertDocumentsNotDeleting([vReceiptId.value]);
-    } else if (vReceiptId.value !== null) {
-      receiptDocumentId = assertDocumentLinkTargetsAvailable(db.get(), [vReceiptId.value], userId(req))[0] ?? null;
+    // Der Beleg folgt Regel 2 aus services/document-links.js: entfernen oder
+    // ersetzen kann man nur, was man sieht (#1358). Wer den GESPEICHERTEN Beleg
+    // nicht sieht, bekommt seine ID maskiert (`receiptAccess`), und der Dialog
+    // schickt dann `null` zurueck - das heisst "behalten", nicht "loesen". Eine
+    // andere ID waere ein Ersetzen und ist 403. Eine NEUE Verknuepfung verlangt
+    // Zugriff auf das Dokumente-Modul (Mitgliedsrecht UND Token-Scope) und die
+    // Sichtbarkeit des Dokuments; ein unsichtbares faellt wie bisher still auf
+    // `null`. Die Loeschsperre gilt auch fuer die unveraenderte ID.
+    const receipts = receiptAccess(req);
+    const storedReceipt = existing.receipt_document_id ?? null;
+    let receiptDocumentId = storedReceipt;
+    if (req.body.receipt_document_id !== undefined) {
+      const wanted = vReceiptId.value;
+      if (wanted !== null && wanted === storedReceipt) {
+        assertDocumentsNotDeleting([wanted]);
+      } else if (storedReceipt !== null && !receipts.visible(storedReceipt)) {
+        if (wanted !== null) {
+          return res.status(403).json({ error: 'You cannot replace a receipt you may not see.', code: 403 });
+        }
+      } else if (wanted === null) {
+        receiptDocumentId = null;
+      } else if (hiddenModulesFor(req, ['documents']).has('documents')) {
+        return res.status(403).json({ error: 'Linking a receipt requires access to documents.', code: 403 });
+      } else {
+        receiptDocumentId = assertDocumentLinkTargetsAvailable(db.get(), [wanted], userId(req))[0] ?? null;
+      }
     }
     if (vDailyRate.value < 0 || (vExtras.value ?? 0) < 0) {
       return res.status(400).json({ error: 'Amounts must be greater than or equal to zero.', code: 400 });
@@ -1058,7 +1118,7 @@ router.put('/visits/:id', (req, res) => {
         checkIn,
         effectiveDailyRate,
         vExtras.value ?? 0,
-        req.body.receipt_document_id !== undefined ? receiptDocumentId : existing.receipt_document_id,
+        receiptDocumentId,
         vMinutesWorked.value !== null ? vMinutesWorked.value : existing.minutes_worked,
         existing.id,
       );
@@ -1075,7 +1135,7 @@ router.put('/visits/:id', (req, res) => {
       );
     })();
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
-    res.json({ data: publicSession(row), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
+    res.json({ data: publicSession(row, receiptAccess(req)), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
     log.error('PUT /visits/:id error:', err);
@@ -1098,7 +1158,7 @@ router.post('/visits/:id/pay', (req, res) => {
       }
     })();
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
-    res.json({ data: publicSession(row), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
+    res.json({ data: publicSession(row, receiptAccess(req)), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
   } catch (err) {
     log.error('POST /visits/:id/pay error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1128,7 +1188,7 @@ router.post('/visits/:id/unpay', (req, res) => {
       })();
     }
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
-    res.json({ data: publicSession(row), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
+    res.json({ data: publicSession(row, receiptAccess(req)), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
   } catch (err) {
     log.error('POST /visits/:id/unpay error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1186,7 +1246,7 @@ router.post('/work-sessions/check-out', (req, res) => {
       `).run(checkOut, vExtras.value ?? session.extras, updateRate, minutesWorked, sessionRateType, sessionHourlyRate, session.id);
     })();
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(session.id);
-    res.json({ data: publicSession(row), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
+    res.json({ data: publicSession(row, receiptAccess(req)), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
   } catch (err) {
     log.error('POST /work-sessions/check-out error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
