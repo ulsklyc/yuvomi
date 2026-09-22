@@ -15,7 +15,7 @@ import {
   sendDocumentLinkRefusal, visibleDocumentRef,
 } from '../services/document-links.js';
 import { sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
-import { buildSplits, decorateMoney, insertExpenseLedger, minorToDecimal, parseMoneyToMinor, simplifyDebts } from '../services/split-expenses.js';
+import { buildSplits, decorateMoney, minorToDecimal, parseMoneyToMinor, simplifyDebts } from '../services/split-expenses.js';
 import { CURRENCY_CODES } from '../../public/utils/currency-codes.js';
 import { syncBirthdayArtifacts } from '../services/birthdays.js';
 import { householdMemberSql, newNonMembers, staffMessage } from '../services/household-members.js';
@@ -354,6 +354,29 @@ function settlementForViewer(row, req) {
     ...decorateMoney(row),
     proof_document_id: documentRefForViewer(db.get(), row.proof_document_id, documentViewer(req)),
   };
+}
+
+// `created_by` jeder Ledger-Zeile ist `expense.created_by`, nie die Person, die
+// gerade anlegt oder bearbeitet: Ausgabe und Zeilen haengen per ON DELETE
+// CASCADE am selben Konto und fallen so nur gemeinsam. Trug ein PUT die
+// bearbeitende Person ein, nahm deren Kontoloeschung die Zeilen mit, und die
+// weiter aktive Ausgabe zaehlte nicht mehr im Saldo. Wer bearbeitet hat, steht
+// in `expense_edited` (expense_activity.actor_id).
+//
+// Migration v226 baut verlorene Zeilen mit einer EINGEFRORENEN SQL-Fassung
+// dieser Regel neu auf. Aendert sich die Regel, wird test:split-ledger-rebuild-
+// migration rot - dann gilt die neue Regel ab hier, v226 bleibt, wie sie ist.
+function insertExpenseLedger(database, expense, splits, sourceType = 'expense') {
+  const actorId = expense.created_by;
+  const insert = database.prepare(`
+    INSERT INTO expense_ledger_entries
+      (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  insert.run(expense.group_id, sourceType, expense.id, expense.payer_id, null, expense.converted_amount_minor, expense.converted_currency, expense.title, actorId);
+  for (const split of splits) {
+    insert.run(expense.group_id, sourceType, expense.id, split.user_id, expense.payer_id, -split.amount_minor, split.currency, expense.title, actorId);
+  }
 }
 
 function replaceExpenseSplits(database, expense, splits) {

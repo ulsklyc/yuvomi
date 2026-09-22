@@ -25,7 +25,6 @@ import { mkdirSync, existsSync, renameSync, linkSync, rmSync, copyFileSync, open
 import { createLogger } from './logger.js';
 import { decodeHtmlEntities } from './utils/html-entities.js';
 import { toE164, defaultCountryFromConfig } from './utils/phone.js';
-import { rebuildMissingExpenseLedger } from './services/split-expenses.js';
 
 const log = createLogger('DB');
 
@@ -9644,13 +9643,50 @@ const MIGRATIONS = [
     // Zeilen, die ein Kontoloeschen vorher schon per created_by ON DELETE
     // CASCADE genommen hatte, konnte ein UPDATE nicht zurueckholen (#1382).
     // Eine aktive Ausgabe ohne eine einzige 'expense'-Zeile zaehlte seitdem in
-    // keinem Saldo. Neu aufgebaut wird aus expenses + expense_splits mit
-    // derselben Funktion, mit der die Route bucht - keine zweite Fassung der
-    // Regel. Nur fehlende Zeilen, nur aktive Ausgaben; ein zweiter Lauf findet
-    // nichts mehr.
+    // keinem Saldo. Alle Zeilen einer Ausgabe entstehen gemeinsam mit einem
+    // created_by und fallen deshalb nur gemeinsam - "keine Zeile" ist die Suche.
+    //
+    // Neu aufgebaut aus expenses + expense_splits nach der Regel von
+    // insertExpenseLedger (server/routes/split-expenses.js), hier als SQL
+    // EINGEFROREN: eine Migration laeuft auf dem Schema ihrer Version, ein
+    // Aufruf der lebenden Funktion braeche sie, sobald die Regel eine spaetere
+    // Spalte schreibt. test:split-ledger-rebuild-migration vergleicht beide
+    // Fassungen; wird er rot, hat sich die Buchungsregel geaendert - diese
+    // Migration dann NICHT anfassen.
+    //
+    // Nur aktive Ausgaben (geloeschte sind ohne Zeilen richtig), nur fehlende
+    // Zeilen; ein zweiter Lauf findet nichts mehr. Das Log nennt Ausgabe und
+    // Gruppe, damit ein Admin eine veraenderte Bilanz erklaeren kann.
     up(db) {
-      const rebuilt = rebuildMissingExpenseLedger(db);
-      if (rebuilt > 0) log.info(`Rebuilt ledger rows of ${rebuilt} active shared expense(s).`);
+      db.exec(`
+        DROP TABLE IF EXISTS temp._v226_missing;
+        CREATE TEMP TABLE _v226_missing AS
+          SELECT e.id FROM expenses e
+          WHERE e.status = 'active'
+            AND NOT EXISTS (SELECT 1 FROM expense_ledger_entries l
+                            WHERE l.source_type = 'expense' AND l.source_id = e.id);
+      `);
+      const rebuilt = db.prepare(`
+        SELECT e.id, e.group_id FROM expenses e JOIN _v226_missing m ON m.id = e.id ORDER BY e.id
+      `).all();
+      db.exec(`
+        INSERT INTO expense_ledger_entries
+          (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
+        SELECT x.group_id, 'expense', x.id, x.user_id, x.counterparty_id, x.amount_minor, x.currency, x.title, x.created_by
+        FROM (
+          SELECT e.id, 0 AS ord, e.group_id, e.payer_id AS user_id, NULL AS counterparty_id,
+                 e.converted_amount_minor AS amount_minor, e.converted_currency AS currency, e.title, e.created_by
+          FROM expenses e JOIN _v226_missing m ON m.id = e.id
+          UNION ALL
+          SELECT e.id, s.id, e.group_id, s.user_id, e.payer_id, -s.amount_minor, s.currency, e.title, e.created_by
+          FROM expenses e JOIN _v226_missing m ON m.id = e.id JOIN expense_splits s ON s.expense_id = e.id
+        ) x
+        ORDER BY x.id, x.ord;
+        DROP TABLE _v226_missing;
+      `);
+      for (const row of rebuilt) {
+        log.info(`Rebuilt the ledger rows of shared expense ${row.id} in group ${row.group_id}; its balances change accordingly.`);
+      }
     },
   },
 ];

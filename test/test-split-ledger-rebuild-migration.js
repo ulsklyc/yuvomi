@@ -6,8 +6,20 @@
  *        und die weiter aktive Ausgabe fiel still aus allen Salden. v225 hat
  *        den Autor der noch vorhandenen Zeilen korrigiert, die schon
  *        verlorenen kann ein UPDATE nicht zurueckholen. v226 baut sie aus
- *        `expenses` + `expense_splits` neu auf - ueber `insertExpenseLedger`,
- *        dieselbe Funktion, mit der die Route bucht.
+ *        `expenses` + `expense_splits` neu auf, mit einer als SQL
+ *        EINGEFRORENEN Fassung der Regel von `insertExpenseLedger`.
+ *
+ *        Zwei Teile:
+ *        1. Aequivalenz: Zeilen, die die ROUTE bucht, gegen Zeilen, die die
+ *           eingefrorene Migration aufbaut. ROT HEISST: die Buchungsregel hat
+ *           sich geaendert. Dann v226 NICHT anfassen - sie laeuft auf
+ *           Bestandsinstallationen genau einmal, auf dem Schema ihrer Version,
+ *           und hat damals richtig gebaut. Stattdessen diesen Vergleich an die
+ *           neue Regel anpassen (bzw. auf den Stand von v226 festnageln).
+ *        2. Upgrade durch den echten Runner: frische Datenbank bis v225
+ *           migrieren, eine verlorene Ausgabe saeen, dann `migrate()` mit
+ *           allen Migrationen - so, wie eine Bestandsinstallation das Update
+ *           faehrt.
  *
  *        Der Verlust wird ueber den echten Weg hergestellt: Ausgaben ueber die
  *        Routen anlegen, ihre Zeilen so stempeln, wie der alte PUT es tat, und
@@ -18,6 +30,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+
+import Database from 'better-sqlite3-multiple-ciphers';
 
 import { startTestServer, cookieHeader } from './server-ready.js';
 
@@ -163,4 +177,56 @@ test('zweiter Lauf aendert nichts', () => {
   migration226.up(db);
   assert.equal(db.prepare('SELECT total_changes() AS n').get().n, changesBefore, 'keine Zeile beruehrt');
   assert.deepEqual(snapshot(), before);
+});
+
+test('Upgrade von v225 durch den echten Runner baut die Zeilen auf und verbucht v226', () => {
+  const fresh = new Database(':memory:');
+  fresh.pragma('foreign_keys = ON');
+  const logged = [];
+  const write = process.stdout.write;
+  try {
+    process.stdout.write = (chunk, ...rest) => { logged.push(String(chunk)); return write.call(process.stdout, chunk, ...rest); };
+    dbmod.migrate(fresh, dbmod.MIGRATIONS.filter((m) => m.version <= 225));
+    const user = (name) => fresh.prepare(
+      "INSERT INTO users (username, display_name, password_hash, role) VALUES (?, ?, 'x', 'member')",
+    ).run(name, name).lastInsertRowid;
+    const own = user('own');
+    const pay = user('pay');
+    const groupId = fresh.prepare("INSERT INTO expense_groups (name, created_by) VALUES ('WG', ?)").run(own).lastInsertRowid;
+    const addExpense = (status) => fresh.prepare(`
+      INSERT INTO expenses (group_id, title, amount_minor, currency, converted_amount_minor, converted_currency, payer_id, created_by, status)
+      VALUES (?, 'Einkauf', 2000, 'USD', 1850, 'EUR', ?, ?, ?)
+    `).run(groupId, own, own, status).lastInsertRowid;
+    // Die verlorene Ausgabe: Anteile da, Ledger-Zeilen weg. Dazu eine geloeschte.
+    const lost = addExpense('active');
+    const gone = addExpense('deleted');
+    for (const id of [lost, gone]) {
+      for (const [who, amount] of [[own, 925], [pay, 925]]) {
+        fresh.prepare('INSERT INTO expense_splits (expense_id, user_id, amount_minor, currency) VALUES (?, ?, ?, ?)').run(id, who, amount, 'EUR');
+      }
+    }
+    assert.equal(fresh.prepare('SELECT MAX(version) AS v FROM schema_migrations').get().v, 225, 'Fixture: Stand v225');
+
+    dbmod.migrate(fresh, dbmod.MIGRATIONS);
+
+    assert.ok(fresh.prepare('SELECT 1 FROM schema_migrations WHERE version = 226').get(), 'v226 verbucht');
+    const rows = fresh.prepare(`
+      SELECT group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by
+      FROM expense_ledger_entries ORDER BY id
+    `).all();
+    assert.deepEqual(rows, [
+      { group_id: groupId, source_type: 'expense', source_id: lost, user_id: own, counterparty_id: null, amount_minor: 1850, currency: 'EUR', memo: 'Einkauf', created_by: own },
+      { group_id: groupId, source_type: 'expense', source_id: lost, user_id: own, counterparty_id: own, amount_minor: -925, currency: 'EUR', memo: 'Einkauf', created_by: own },
+      { group_id: groupId, source_type: 'expense', source_id: lost, user_id: pay, counterparty_id: own, amount_minor: -925, currency: 'EUR', memo: 'Einkauf', created_by: own },
+    ], 'nur die aktive Ausgabe, Zahler zuerst, im umgerechneten Betrag');
+    assert.ok(
+      logged.some((line) => line.includes(`shared expense ${lost} in group ${groupId}`)),
+      'Log nennt Ausgabe und Gruppe',
+    );
+    assert.ok(!logged.some((line) => line.includes(`shared expense ${gone} `)), 'geloeschte Ausgabe steht nicht im Log');
+    assert.equal(fresh.prepare("SELECT COUNT(*) AS n FROM sqlite_temp_master WHERE name = '_v226_missing'").get().n, 0, 'Hilfstabelle geraeumt');
+  } finally {
+    process.stdout.write = write;
+    fresh.close();
+  }
 });
