@@ -201,6 +201,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   document, and a non-empty `attachment_document_ids` or a `proof_document_id` is answered with the
   same 403 for every id. (#1358)
 
+- **A task no longer names or counts documents you may not read.** The tasks API sent the linked
+  documents of a task with their names, and the number of them, to everyone who could see the task,
+  also to members without access to documents and to API tokens without a documents scope. Without
+  access to documents a task now says nothing about its documents: no paperclip on the card, no
+  documents row in the detail view, and saving the task keeps its documents. For API clients
+  `document_count` and `documents` are `null` without access to the documents module (for API
+  tokens a `documents:read` scope) - `null` means "not told", not "none" -
+  `GET /api/v1/tasks/{id}/documents` answers 403, and
+  `PUT /api/v1/tasks/{id}/documents` answers the same 403 for every id in a non-empty
+  `document_ids`. (#1358)
+
 - **An edited shared expense keeps counting after the editor's account is deleted.** When a group
   owner or admin edited someone else's expense and that editor's account was later deleted, the
   expense stayed in the list but silently dropped out of every balance. Edits now leave the expense

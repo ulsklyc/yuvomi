@@ -3724,4 +3724,23 @@ test('Haushaltshilfe hat keine Display-Ausnahme, und ein Display erreicht die Se
     'ohne Scope setzt server/permissions.js das Modul fuer ein Display auf none - die Seite ist fuer es nicht offen');
 });
 
+test('Aufgaben-Dokumente ohne Dokumentenrecht: keine Zahl, keine Zeile, kein Link auf /documents/null (#1358)', () => {
+  // So kommt eine Aufgabe ohne Leserecht auf die Dokumente an: der Server sagt
+  // weder wie viele noch welche (`document_count` und `documents` sind null).
+  const verdeckt = aufgabe({ document_count: null, documents: null });
+  const mitDokumenten = aufgabe({ document_count: 2, documents: [{ id: 5, name: 'Anleitung.pdf', mime_type: 'application/pdf' }] });
+  withAccess({ tasks: 'write', documents: 'read' }, () => {
+    assert.doesNotMatch(tasks.renderTaskCard(verdeckt), /task-card__docs|null/, 'keine Klammer ohne Zahl');
+    assert.match(tasks.renderTaskCard(mitDokumenten), /task-card__docs/, 'Gegenfall: mit Zahl die Klammer');
+    assert.equal(detail.documentListNode(null), null, 'keine Zeile ohne Liste');
+    assert.equal(detail.documentListNode([{ id: null, name: null }]), null, 'ein Eintrag ohne ID wird kein Link');
+    const node = detail.documentListNode(mitDokumenten.documents);
+    assert.equal(node.childNodes[0].href, '/api/v1/documents/5/preview', 'Gegenfall: mit ID der Link');
+  });
+  withAccess({ tasks: 'write', documents: 'none' }, () => {
+    assert.equal(detail.documentListNode(mitDokumenten.documents), null,
+      'bei `documents: none` keine Zeile - jeder Link ginge ins 403');
+  });
+});
+
 test.after(() => miniDomAbraeumen());
