@@ -653,6 +653,8 @@ function receiptAccess(req) {
   const names = new Map();
   const load = (ids) => {
     const wanted = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0 && !names.has(id)))];
+    // Die Modulachse steht nur hier: ohne Dokumentenzugriff wird nichts
+    // geladen, und ein nicht geladenes Dokument ist fuer `visible()` unsichtbar.
     if (hidden || !wanted.length) return;
     for (const id of wanted) names.set(id, undefined);
     const rows = db.get().prepare(`
@@ -662,7 +664,7 @@ function receiptAccess(req) {
     for (const row of rows) names.set(row.id, row.name);
   };
   const visible = (id) => {
-    if (hidden || id == null) return false;
+    if (id == null) return false;
     load([id]);
     return names.get(id) !== undefined;
   };

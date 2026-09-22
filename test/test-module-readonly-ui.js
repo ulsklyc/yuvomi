@@ -3525,6 +3525,20 @@ test('Beleg, den der Server nicht nennt: ein ruhiges Zeichen statt einer leeren 
   withAccess({ housekeeping: 'write', documents: 'none' }, () => {
     assert.equal(hk.receiptFieldHtml(verdeckt), '', 'bei `documents: none` bleibt die Stelle leer wie bisher');
   });
+
+  // Verdeckt heisst: die ID ist maskiert - nicht "der Name fehlt". Ein Besuch
+  // mit sichtbarer ID, aber ohne Namen (leerer Dokumentname, ein Serialisierer
+  // ohne Namensfeld) gehoert dem Betrachter und behaelt seine Ablage.
+  for (const ohneName of [
+    hkBesuch({ has_receipt: true, receipt_document_id: 44, receipt_document_name: '' }),
+    hkBesuch({ has_receipt: true, receipt_document_id: 44 }),
+  ]) {
+    withAccess({ housekeeping: 'write', documents: 'write' }, () => {
+      const feld = hk.receiptFieldHtml(ohneName);
+      assert.match(feld, /id="housekeeping-receipt-file" type="file"/, 'mit sichtbarer ID bleibt die Ablage');
+      assert.doesNotMatch(feld, zeichen);
+    });
+  }
 });
 
 test('Beleg, den der Server nicht nennt: Speichern schickt null und laedt nichts hoch (#1358)', async () => {

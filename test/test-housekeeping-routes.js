@@ -1203,6 +1203,23 @@ test('Beleg: wer den gespeicherten nicht sieht, kann ihn weder loesen noch erset
     }
     assert.equal(storedReceipt(visitId), privateDoc);
 
+    // Dieselbe Regel fuer die anderen Wege, auf denen der Beleg verborgen ist:
+    // ohne Dokumentenrecht, und ein Token ohne documents-Scope - dessen Nutzer
+    // (der Admin) den Beleg selbst angelegt hat und ihn sonst saehe.
+    for (const [label, as] of [
+      ['documents: none', { ...MEM, moduleAccess: { documents: 'none' } }],
+      ['Token nur housekeeping:write', { id: ADMIN, role: 'admin', authMethod: 'api_token', authScopes: ['housekeeping:write'] }],
+    ]) {
+      const right = await put(as, { receipt_document_id: privateDoc });
+      const wrong = await put(as, { receipt_document_id: ownDoc });
+      assert.equal(right.status, 403, `${label}: die richtige ID ist 403`);
+      assert.deepEqual({ status: right.status, body: right.body }, { status: wrong.status, body: wrong.body },
+        `${label}: richtige und falsche ID antworten gleich`);
+      assert.deepEqual(right.body, replaced.body, `${label}: und wie beim Mitglied ohne Sicht`);
+      assert.equal((await put(as, { receipt_document_id: null })).status, 200);
+      assert.equal(storedReceipt(visitId), privateDoc, `${label}: null behaelt den Beleg`);
+    }
+
     // Wer ihn sieht, darf ihn loesen.
     assert.equal((await put(ADM, { receipt_document_id: null })).status, 200);
     assert.equal(storedReceipt(visitId), null, 'die Erstellerin loest ihn');

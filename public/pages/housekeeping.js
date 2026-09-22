@@ -1081,9 +1081,11 @@ function visitReceiptDetailHtml(visit) {
  * dem Besuch, Name und ID dem Dokumente-Modul - beide kommen dann als `null`.
  * Die Stelle zeigt nur, DASS es ihn gibt, ohne Ablage zum Ersetzen: der Server
  * nimmt einen unsichtbaren Beleg weder weg noch tauscht er ihn, und das
- * Speichern schickt `null`, was dort "behalten" heisst. */
+ * Speichern schickt `null`, was dort "behalten" heisst. Gefragt wird nach der
+ * Server-Regel, der maskierten ID - nicht nach dem Namen: ein Besuch mit
+ * sichtbarer ID ohne Namensfeld oder mit leerem Namen gehoert dem Betrachter. */
 function receiptHiddenFromViewer(visit) {
-  return Boolean(visit.has_receipt) && !visit.receipt_document_name;
+  return Boolean(visit.has_receipt) && visit.receipt_document_id == null;
 }
 
 /* `onRefresh` rendert die Ansicht neu, aus der der Bericht geoeffnet wurde (Uebersicht,
