@@ -50,7 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shows what happened. To correct a payment, reverse it and record the right one. Group owners and
   admins can reverse any payment, everyone else the ones they recorded - the same rule as for
   editing an expense. Without write access to Budget, or in an archived group, the button is not
-  there, but the "reversed" mark is. The API has the same step as
+  there, but the "reversed" mark is. Deleting the account of whoever reversed a payment leaves it
+  reversed and the balances as they were. The API has the same step as
   `POST /api/v1/split-expenses/groups/{id}/settlements/{settlementId}/reverse`; reversing twice
   answers 409. (#1309)
 
