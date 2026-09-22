@@ -221,6 +221,14 @@ async function addAccount(name, caldavUrl, username, password, { createClient } 
 
   const accountId = result.lastInsertRowid;
 
+  // Ein neues Konto hat keine Termine aus der Zeit vor v2.50 und damit nichts,
+  // was die einmalige Farb-Heilung (#1270) finden duerfte. Der Merker gleich
+  // beim Anlegen haelt sie hier ganz fern: eine Farbe, die einer Kalenderfarbe
+  // dieses Kontos gleicht, ist bei einem neuen Konto immer eine gewaehlte.
+  db.get().prepare(
+    "INSERT INTO sync_config (key, value) VALUES (?, '1') ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+  ).run(legacyColorHealKey(accountId));
+
   // OPT-IN, NICHT OPT-OUT (#732): Ein neues Konto bringt seine Kalender
   // abgewaehlt mit. Vorher lief nach dem Verbinden sofort jeder gefundene
   // Kalender in den Haushalt - bei einem Konto mit Arbeits-, Geburtstags- und
@@ -368,6 +376,8 @@ function deleteAccount(accountId, { deleteEvents = false } = {}) {
     const cleared = deleteEvents ? deleteMirroredEvents(db.get(), calendarUrls) : 0;
     const rows = detachAccountRows(accountId);
     db.get().prepare('DELETE FROM caldav_accounts WHERE id = ?').run(accountId);
+    // Der Merker der Farb-Heilung (#1270) haengt an keinem Fremdschluessel.
+    db.get().prepare('DELETE FROM sync_config WHERE key = ?').run(legacyColorHealKey(accountId));
     return { detached: rows, removed: cleared };
   })();
 

@@ -1408,6 +1408,30 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     assert.strictEqual(row(d, OVERRIDE_UID).color, null);
   }));
 
+  it('ein neu angelegtes Konto hat keine Altlast: die Heilung laeuft dort nie', () => withDb(async (d) => {
+    // Ein Konto, das es vor v2.50 nicht gab, kann keine eingebrannte Farbe
+    // tragen. Eine Farbe dort ist eine gewaehlte, auch wenn sie zufaellig der
+    // Kalenderfarbe gleicht (etwa ein hochgeladener Termin mit Palettenfarbe,
+    // dessen COLOR-Zeile der Server nicht aufbewahrt).
+    d.exec('DELETE FROM caldav_calendar_selection; DELETE FROM caldav_accounts;');
+    const client = async () => ({
+      fetchCalendars: async () => [
+        { url: CAL_A, displayName: 'A', components: ['VEVENT'], calendarColor: COLOR_A },
+      ],
+    });
+    const { accountId } = await addAccount('Neu', 'https://dav.example/', 'u3', 'p', { createClient: client });
+    d.prepare('UPDATE caldav_calendar_selection SET enabled = 1').run();
+    d.prepare(`
+      INSERT INTO calendar_events (title, start_datetime, external_calendar_id, external_source, color, color_modified, created_by)
+      VALUES ('Training', '2026-01-05T17:00:00Z', ?, 'caldav', ?, 1, 1)
+    `).run(UID, COLOR_A);
+
+    await sync({ createClient: clientWith({ inCal: CAL_A, calendars: [CAL_A] }) });
+    assert.strictEqual(row(d).color, COLOR_A, 'die gewaehlte Farbe bleibt');
+    assert.strictEqual(marker(d, `caldav_legacy_color_heal_done_${accountId}`), '1');
+
+  }));
+
   it('eine gewaehlte Farbe, die keine Kalenderfarbe ist, bleibt', () => withDb(async (d) => {
     // Gegenprobe: ohne sie waere der Test oben auch gruen, wenn der Inbound
     // jede lokal gefuehrte Farbe verwuerfe.
@@ -1862,8 +1886,16 @@ describe('CalDAV: das Aufräumen beim Abwählen ist eine Wahl (#732)', () => {
     const d = buildDb();
     _setTestDatabase(d);
     try {
+      // Merker der Farb-Heilung (#1270) von Konto 1 und einem Nachbarn.
+      d.exec(`INSERT INTO sync_config (key, value) VALUES
+        ('caldav_legacy_color_heal_done_1', '1'), ('caldav_legacy_color_heal_done_2', '1')`);
       const result = deleteAccount(1);
       assert.equal(result.removed, 0);
+      assert.deepEqual(
+        d.prepare("SELECT key FROM sync_config WHERE key LIKE 'caldav_legacy_color_heal_done_%'").all().map((r) => r.key),
+        ['caldav_legacy_color_heal_done_2'],
+        'mit dem Konto geht sein Merker, der des Nachbarn bleibt'
+      );
       assert.equal(titles(d).length, 5, 'die Termine bleiben sichtbar, wie bisher');
     } finally {
       _resetTestDatabase();
