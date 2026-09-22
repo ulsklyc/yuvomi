@@ -720,15 +720,6 @@ function renderActivity() {
 }
 
 /**
- * Ein Eintrag des Verlaufs. Nachgeladene Seiten laufen durch dieselbe Funktion
- * und dieselbe Klick-Delegation am Verlauf - ein Storno-Knopf auf Seite drei
- * ist derselbe Knopf wie auf Seite eins.
- *
- * Das Datum ist der Tag in der Haushaltszone: `created_at` ist ein Zeitpunkt in
- * UTC, und `slice(0, 10)` darauf waere der UTC-Tag - 23:30 UTC in Berlin ist
- * schon der naechste Tag.
- */
-/**
  * Welche Ausgabe Migration v226 wiederhergestellt hat (#1382): Titel und
  * gebuchter Betrag, damit mehrere Eintraege "Buchung wiederhergestellt"
  * unterscheidbar sind. Den Betrag rechnet der Server in `amount` um - er
@@ -741,6 +732,15 @@ function restoredDetail(item) {
   return `<span class="split-activity-payment">${esc(`${title}${sum}`)}</span>`;
 }
 
+/**
+ * Ein Eintrag des Verlaufs. Nachgeladene Seiten laufen durch dieselbe Funktion
+ * und dieselbe Klick-Delegation am Verlauf - ein Storno-Knopf auf Seite drei
+ * ist derselbe Knopf wie auf Seite eins.
+ *
+ * Das Datum ist der Tag in der Haushaltszone: `created_at` ist ein Zeitpunkt in
+ * UTC, und `slice(0, 10)` darauf waere der UTC-Tag - 23:30 UTC in Berlin ist
+ * schon der naechste Tag.
+ */
 function activityItemHtml(item, actionable) {
   const settlement = item.settlement;
   const params = settlement ? paymentParams(settlement) : null;
