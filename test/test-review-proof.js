@@ -22,9 +22,8 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { copyFileSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { copyFileSync, writeFileSync } from 'node:fs';
 import { readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -32,6 +31,7 @@ import { fileURLToPath } from 'node:url';
 import {
   adressenImStrom, beurteile, bejaht, bejahtIrgendwo, zaehleBelege, zaehleSeit
 } from '../.github/scripts/review-verdict.mjs';
+import { tempDir } from './tmp-dir.js';
 
 const fixture = JSON.parse(
   readFileSync(new URL('./review-proof-fixture.json', import.meta.url), 'utf8')
@@ -827,7 +827,7 @@ const SKRIPT = fileURLToPath(new URL('../.github/scripts/review-verdict.mjs', im
 
 /** Faehrt das Skript als Programm, unter einem frei waehlbaren Dateinamen. */
 function fahre(dateiname, { ergebnis, aeusserungen = [], seit = '2026-09-09T06:40:37Z', kopf = 'abc' }) {
-  const ordner = mkdtempSync(join(tmpdir(), 'review-proof-'));
+  const ordner = tempDir('review-proof-');
   const ziel = join(ordner, dateiname);
   copyFileSync(SKRIPT, ziel);
   const strom = join(ordner, 'exec.json');

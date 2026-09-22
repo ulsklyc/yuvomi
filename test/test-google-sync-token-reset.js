@@ -12,14 +12,13 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
+import { tempDir } from './tmp-dir.js';
 
 // DB_PATH vor dem Import auf eine Wegwerf-Datei: db.js migriert beim Modul-Load.
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
-process.env.DB_PATH = join(mkdtempSync(join(tmpdir(), 'yuvomi-gtok-')), 'unused.db');
+process.env.DB_PATH = join(tempDir('yuvomi-gtok-'), 'unused.db');
 const { MIGRATIONS } = await import('../server/db.js');
 
 const MIGRATION = MIGRATIONS.find((m) => m.version === 158);
@@ -32,7 +31,7 @@ function applyMigration(db, migration) {
 
 /** Echte Migrationskette bis v157 - der Stand vor dieser Migration. */
 function buildPreDatabase() {
-  const db = new Database(join(mkdtempSync(join(tmpdir(), 'yuvomi-gtok-')), 'db.sqlite'));
+  const db = new Database(join(tempDir('yuvomi-gtok-'), 'db.sqlite'));
   for (const migration of MIGRATIONS.filter((m) => m.version <= 157)) {
     applyMigration(db, migration);
   }
@@ -87,7 +86,7 @@ test('die Kalenderauswahl bleibt aktiviert, es wird nur der Token verworfen', ()
 });
 
 test('ohne jeden Nutzer und ohne Kalender läuft die Migration durch', () => {
-  const db = new Database(join(mkdtempSync(join(tmpdir(), 'yuvomi-gtok-')), 'db.sqlite'));
+  const db = new Database(join(tempDir('yuvomi-gtok-'), 'db.sqlite'));
   for (const migration of MIGRATIONS.filter((m) => m.version <= 157)) applyMigration(db, migration);
 
   assert.doesNotThrow(() => applyMigration(db, MIGRATION), 'eine frische Installation hat weder das eine noch das andere');

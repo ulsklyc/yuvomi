@@ -38,13 +38,13 @@
 
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3-multiple-ciphers';
 import puppeteer from 'puppeteer';
 import { SETTINGS_LEAVES } from '../public/settings/registry.js';
+import { tempDir } from './tmp-dir.js';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -308,7 +308,7 @@ export async function startHarness() {
   let baseUrl = external;
 
   if (!external) {
-    tmpDir = mkdtempSync(join(tmpdir(), 'yuvomi-document-guards-'));
+    tmpDir = tempDir('yuvomi-document-guards-');
     dbPath = join(tmpDir, 'guards.db');
     port = await freePort();
     baseUrl = `http://127.0.0.1:${port}`;

@@ -12,22 +12,21 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
+import { tempDir } from './tmp-dir.js';
 
 // DB_PATH vor dem Import auf eine Wegwerf-Datei: db.js migriert beim Modul-Load.
 // Geprüft wird hier nur die exportierte v128-SQL gegen eine eigens gebaute Vor-v128-DB.
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
-process.env.DB_PATH = join(mkdtempSync(join(tmpdir(), 'yuvomi-intervalmig-')), 'unused.db');
+process.env.DB_PATH = join(tempDir('yuvomi-intervalmig-'), 'unused.db');
 const { MIGRATIONS } = await import('../server/db.js');
 
 const V128 = MIGRATIONS.find((m) => m.version === 128);
 
 /** Stand von budget_entries + budget_recurrence_skipped direkt vor v128. */
 function seedPreV128() {
-  const db = new Database(join(mkdtempSync(join(tmpdir(), 'yuvomi-intervalmig-')), 'db.sqlite'));
+  const db = new Database(join(tempDir('yuvomi-intervalmig-'), 'db.sqlite'));
   db.exec(`
     CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL);
 

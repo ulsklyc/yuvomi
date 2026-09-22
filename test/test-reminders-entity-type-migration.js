@@ -12,16 +12,15 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
+import { tempDir } from './tmp-dir.js';
 
 // DB_PATH vor dem Import auf eine Wegwerf-Datei setzen: db.js initialisiert beim
 // Modul-Load (und migriert dabei). Geprüft wird hier nur die exportierte v140-SQL
 // gegen eine eigens aufgebaute Vor-v140-DB.
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
-process.env.DB_PATH = join(mkdtempSync(join(tmpdir(), 'yuvomi-remindermig-')), 'unused.db');
+process.env.DB_PATH = join(tempDir('yuvomi-remindermig-'), 'unused.db');
 const { MIGRATIONS } = await import('../server/db.js');
 
 const V140 = MIGRATIONS.find((m) => m.version === 140);
@@ -30,7 +29,7 @@ const V140 = MIGRATIONS.find((m) => m.version === 140);
 // samt notification_deliveries (FK auf reminders, ON DELETE CASCADE) und je einer
 // Zeile pro Tabelle.
 function seedPreV140() {
-  const db = new Database(join(mkdtempSync(join(tmpdir(), 'yuvomi-remindermig-')), 'db.sqlite'));
+  const db = new Database(join(tempDir('yuvomi-remindermig-'), 'db.sqlite'));
   db.exec(`
     CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL);
 
