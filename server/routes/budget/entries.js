@@ -10,7 +10,7 @@ import { str, oneOf, date as validateDate, num, rrule, collectErrors, MAX_TITLE,
 import { normalizeBudgetVisibility } from '../../services/budget-visibility.js';
 import { todayKey } from '../../utils/timezone.js';
 import { sendDocumentDeletionConflict } from '../../services/document-deletion-lock.js';
-import { assertDocumentLinkTargetsAvailable } from '../../services/document-links.js';
+import { assertDocumentLinkTargetsAvailable, documentViewer, sendDocumentLinkRefusal } from '../../services/document-links.js';
 import { attachmentsFor, replaceAttachments, withAttachments } from './attachments.js';
 import {
   budgetFilter, budgetCategoryExpr, maskEntries, getBudgetMode, mayEdit, bookedOnly,
@@ -264,7 +264,7 @@ router.get('/', (req, res) => {
 
     const entries = db.get().prepare(sql).all(...params).map(withResponsibles);
     res.json({
-      data: maskEntries(req, withAttachments(entries, req.authUserId || req.session.userId)),
+      data: maskEntries(req, withAttachments(entries, documentViewer(req))),
     });
   } catch (err) {
     log.error('', err);
@@ -321,7 +321,7 @@ router.post('/', (req, res) => {
       req.body.visibility,
       getBudgetMode() === 'personal' ? 'private' : 'shared'
     );
-    assertDocumentLinkTargetsAvailable(db.get(), req.body.attachment_document_ids, me);
+    assertDocumentLinkTargetsAvailable(db.get(), req.body.attachment_document_ids, documentViewer(req));
 
     const result = db.get().prepare(`
       INSERT INTO budget_entries
@@ -338,15 +338,16 @@ router.post('/', (req, res) => {
 
     // Belege (#583): optional, deshalb erst nach dem Insert - der Eintrag steht
     // auch ohne sie, ein unbekanntes Dokument darf ihn nicht scheitern lassen.
-    replaceAttachments(result.lastInsertRowid, req.body.attachment_document_ids, me);
+    replaceAttachments(result.lastInsertRowid, req.body.attachment_document_ids, documentViewer(req));
     // Zustaendige (#1057) - ein Etikett neben der Buchung, keine Forderung.
     replaceResponsibles(result.lastInsertRowid, req.body.responsible_user_ids);
 
     const entry = entryWithLoanMeta(result.lastInsertRowid);
 
-    res.status(201).json({ data: { ...entry, attachments: attachmentsFor(entry.id, me) } });
+    res.status(201).json({ data: { ...entry, attachments: attachmentsFor(entry.id, documentViewer(req)) } });
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
+    if (sendDocumentLinkRefusal(res, err)) return;
     log.error('', err);
     res.status(500).json({ error: 'Internal error', code: 500 });
   }
@@ -560,9 +561,8 @@ router.put('/:id/series', (req, res) => {
       })();
     }
 
-    const me = req.authUserId || req.session.userId;
     const updated = entryWithLoanMeta(parentId);
-    res.json({ data: { ...updated, attachments: attachmentsFor(parentId, me) } });
+    res.json({ data: { ...updated, attachments: attachmentsFor(parentId, documentViewer(req)) } });
   } catch (err) {
     log.error('PUT /budget/:id/series error:', err);
     res.status(500).json({ error: 'Internal error', code: 500 });
@@ -707,10 +707,10 @@ router.put('/:id', (req, res) => {
       : null;
 
     // Guard attachment targets before the main entry/loan transaction: a 409
-    // must leave every requested field unchanged, not only the link table.
-    const me = req.authUserId || req.session.userId;
+    // (deletion lock) or 403 (no documents access, #1358) must leave every
+    // requested field unchanged, not only the link table.
     if (req.body.attachment_document_ids !== undefined) {
-      assertDocumentLinkTargetsAvailable(db.get(), req.body.attachment_document_ids, me);
+      assertDocumentLinkTargetsAvailable(db.get(), req.body.attachment_document_ids, documentViewer(req));
     }
 
     const tx = db.get().transaction(() => {
@@ -770,7 +770,7 @@ router.put('/:id', (req, res) => {
     // Betrag korrigiert, darf die angehaengten Belege nicht stillschweigend
     // abraeumen.
     if (req.body.attachment_document_ids !== undefined) {
-      replaceAttachments(id, req.body.attachment_document_ids, me);
+      replaceAttachments(id, req.body.attachment_document_ids, documentViewer(req));
     }
     // Dieselbe Zurueckhaltung wie bei den Belegen: nur anfassen, wenn das Feld
     // mitkommt (#1057). replaceResponsibles() prueft das selbst.
@@ -778,9 +778,10 @@ router.put('/:id', (req, res) => {
 
     const updated = entryWithLoanMeta(id);
 
-    res.json({ data: { ...updated, attachments: attachmentsFor(id, me) } });
+    res.json({ data: { ...updated, attachments: attachmentsFor(id, documentViewer(req)) } });
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
+    if (sendDocumentLinkRefusal(res, err)) return;
     log.error('', err);
     res.status(500).json({ error: 'Internal error', code: 500 });
   }
@@ -828,9 +829,8 @@ router.patch('/:id/confirm', (req, res) => {
        WHERE id = ?
     `).run(nextAmount, req.body.date ?? null, id);
 
-    const me = req.authUserId || req.session.userId;
     const updated = entryWithLoanMeta(id);
-    res.json({ data: { ...updated, attachments: attachmentsFor(id, me) } });
+    res.json({ data: { ...updated, attachments: attachmentsFor(id, documentViewer(req)) } });
   } catch (err) {
     log.error('PATCH /budget/:id/confirm error:', err);
     res.status(500).json({ error: 'Internal error', code: 500 });

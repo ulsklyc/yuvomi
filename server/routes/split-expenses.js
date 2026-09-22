@@ -10,7 +10,10 @@ import { hashPassword, normalizePassword } from '../utils/password.js';
 import { createLogger } from '../logger.js';
 import { collectErrors, date as validateDate, id as validateId, str, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
-import { documentLinksFor, loadDocumentLinks, replaceDocumentLinks, visibleDocumentRef } from '../services/document-links.js';
+import {
+  documentLinksFor, documentRefForViewer, documentViewer, loadDocumentLinks, replaceDocumentLinks,
+  sendDocumentLinkRefusal, visibleDocumentRef,
+} from '../services/document-links.js';
 import { sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
 import { buildSplits, decorateMoney, minorToDecimal, parseMoneyToMinor, simplifyDebts } from '../services/split-expenses.js';
 import { CURRENCY_CODES } from '../../public/utils/currency-codes.js';
@@ -287,7 +290,7 @@ function loadExpense(expenseId, req) {
 // Belege einer Ausgabe: Tabellen-Adresse für den geteilten Verknüpfungs-Service.
 const EXPENSE_ATTACHMENTS = { table: 'expense_attachments', ownerColumn: 'expense_id', extraColumns: ['kind'] };
 
-function serializeExpense(expense, prefetched, viewerId) {
+function serializeExpense(expense, prefetched, viewer) {
   const splits = prefetched
     ? (prefetched.splits.get(expense.id) || [])
     : db.get().prepare(`
@@ -302,7 +305,7 @@ function serializeExpense(expense, prefetched, viewerId) {
   // gehört. Vorher lieferte der Join den Namen an jedes Gruppenmitglied aus.
   const attachments = prefetched
     ? (prefetched.attachments.get(expense.id) || [])
-    : documentLinksFor(db.get(), { ...EXPENSE_ATTACHMENTS, ownerId: expense.id, userId: viewerId });
+    : documentLinksFor(db.get(), { ...EXPENSE_ATTACHMENTS, ownerId: expense.id, viewer });
   return {
     ...decorateMoney(expense, ['amount_minor', 'converted_amount_minor']),
     splits,
@@ -315,7 +318,7 @@ function serializeExpense(expense, prefetched, viewerId) {
  * rows in 2 queries total (WHERE expense_id IN (...)) instead of 2 per row.
  * Kills the N+1 in the list endpoints (was up to ~201 queries for 100 rows).
  */
-function serializeExpenseList(expenses, viewerId) {
+function serializeExpenseList(expenses, viewer) {
   if (!expenses.length) return [];
   const ids = expenses.map((e) => e.id);
   const placeholders = ids.map(() => '?').join(', ');
@@ -333,10 +336,24 @@ function serializeExpenseList(expenses, viewerId) {
     splits.get(expense_id).push({ ...rest, amount: minorToDecimal(rest.amount_minor, rest.currency) });
   }
 
-  const attachments = loadDocumentLinks(db.get(), { ...EXPENSE_ATTACHMENTS, ownerIds: ids, userId: viewerId });
+  const attachments = loadDocumentLinks(db.get(), { ...EXPENSE_ATTACHMENTS, ownerIds: ids, viewer });
 
   const prefetched = { splits, attachments };
-  return expenses.map((expense) => serializeExpense(expense, prefetched, viewerId));
+  return expenses.map((expense) => serializeExpense(expense, prefetched, viewer));
+}
+
+/**
+ * Eine Zahlung, wie sie dieser Anfrage gezeigt wird. Der Zahlungsnachweis ist
+ * ein Dokument: seine ID geht nur an, wer das Dokumente-Modul lesen darf und
+ * das Dokument sieht (#1358) - storniert etwa ein Gruppenverwalter die Zahlung
+ * eines anderen, nannte die Antwort sonst die ID eines fremden privaten
+ * Dokuments.
+ */
+function settlementForViewer(row, req) {
+  return {
+    ...decorateMoney(row),
+    proof_document_id: documentRefForViewer(db.get(), row.proof_document_id, documentViewer(req)),
+  };
 }
 
 // `created_by` jeder Ledger-Zeile ist `expense.created_by`, nie die Person, die
@@ -473,7 +490,7 @@ router.get('/dashboard', (req, res) => {
       ORDER BY e.expense_date DESC, e.created_at DESC
       LIMIT 8
     `).all({ uid, restrictedGroupId, isGuest });
-    const recentSerialized = serializeExpenseList(recent, userId(req));
+    const recentSerialized = serializeExpenseList(recent, documentViewer(req));
     res.json({ data: { total_owed: totalOwed, total_owing: totalOwing, groups, recent_expenses: recentSerialized } });
   } catch (err) {
     log.error('GET /dashboard error:', err);
@@ -824,7 +841,7 @@ router.get('/groups/:id/expenses', (req, res) => {
       ORDER BY e.expense_date DESC, e.created_at DESC
       LIMIT @limit OFFSET @offset
     `).all({ groupId, search, category, recurringOnly: recurringOnly ? 1 : 0, limit, offset });
-    const serialized = serializeExpenseList(rows, userId(req));
+    const serialized = serializeExpenseList(rows, documentViewer(req));
     res.json({ data: serialized, pagination: { limit, offset, has_more: serialized.length === limit } });
   } catch (err) {
     log.error('GET /groups/:id/expenses error:', err);
@@ -865,15 +882,16 @@ router.post('/groups/:id/expenses', (req, res) => {
         ...EXPENSE_ATTACHMENTS,
         ownerId: expense.id,
         documentIds: req.body.attachment_document_ids,
-        userId: userId(req),
+        viewer: documentViewer(req),
         extraValues: { kind: 'receipt' },
       });
       activity(groupId, userId(req), 'expense_created', 'expense', expense.id, { title: parsed.title });
       return expense.id;
     });
-    res.status(201).json({ data: serializeExpense(loadExpense(createdId, req), null, userId(req)) });
+    res.status(201).json({ data: serializeExpense(loadExpense(createdId, req), null, documentViewer(req)) });
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
+    if (sendDocumentLinkRefusal(res, err)) return;
     const message = err.message || 'Invalid expense.';
     log.error('POST /groups/:id/expenses error:', err);
     res.status(message.includes('Internal') ? 500 : 400).json({ error: message, code: message.includes('Internal') ? 500 : 400 });
@@ -914,15 +932,16 @@ router.put('/expenses/:id', (req, res) => {
           ...EXPENSE_ATTACHMENTS,
           ownerId: existing.id,
           documentIds: req.body.attachment_document_ids,
-          userId: userId(req),
+          viewer: documentViewer(req),
           extraValues: { kind: 'receipt' },
         });
       }
       activity(existing.group_id, userId(req), 'expense_edited', 'expense', existing.id, { title: parsed.title });
     });
-    res.json({ data: serializeExpense(loadExpense(existing.id, req), null, userId(req)) });
+    res.json({ data: serializeExpense(loadExpense(existing.id, req), null, documentViewer(req)) });
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
+    if (sendDocumentLinkRefusal(res, err)) return;
     log.error('PUT /expenses/:id error:', err);
     res.status(400).json({ error: err.message || 'Invalid expense.', code: 400 });
   }
@@ -1001,7 +1020,7 @@ router.post('/groups/:id/settlements', (req, res) => {
     // Zahlungsnachweis: nur ein Dokument, das diese Person sehen darf (#583).
     // Vorher wurde die rohe ID übernommen - eine geratene fremde ID hätte sich
     // so an die Zahlung heften lassen.
-    const proofDocumentId = visibleDocumentRef(db.get(), req.body.proof_document_id, userId(req));
+    const proofDocumentId = visibleDocumentRef(db.get(), req.body.proof_document_id, documentViewer(req));
     const settlementId = db.transaction(() => {
       const result = db.get().prepare(`
         INSERT INTO settlements (group_id, payer_id, payee_id, amount_minor, currency, notes, proof_document_id, created_by)
@@ -1019,9 +1038,10 @@ router.post('/groups/:id/settlements', (req, res) => {
       return result.lastInsertRowid;
     });
     const row = db.get().prepare('SELECT * FROM settlements WHERE id = ?').get(settlementId);
-    res.status(201).json({ data: decorateMoney(row) });
+    res.status(201).json({ data: settlementForViewer(row, req) });
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
+    if (sendDocumentLinkRefusal(res, err)) return;
     log.error('POST /groups/:id/settlements error:', err);
     res.status(400).json({ error: err.message || 'Invalid settlement.', code: 400 });
   }
@@ -1075,7 +1095,7 @@ router.post('/groups/:id/settlements/:settlementId/reverse', (req, res) => {
     });
     if (outcome === 'already_reversed') return res.status(409).json({ error: 'Settlement is already reversed.', code: 409 });
     if (outcome === 'nothing_booked') return res.status(409).json({ error: 'Settlement has no ledger entries to reverse.', code: 409 });
-    res.json({ data: { ...decorateMoney(settlement), ...settlementReversal(db.get(), settlement.id) } });
+    res.json({ data: { ...settlementForViewer(settlement, req), ...settlementReversal(db.get(), settlement.id) } });
   } catch (err) {
     log.error('POST /groups/:id/settlements/:settlementId/reverse error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1267,7 +1287,7 @@ router.get('/search', (req, res) => {
         AND (@isGuest = 0 OR g.id = @restrictedGroupId)
       ORDER BY e.expense_date DESC LIMIT 10
     `).all({ uid, q, restrictedGroupId, isGuest });
-    const expensesSerialized = serializeExpenseList(expenses, userId(req));
+    const expensesSerialized = serializeExpenseList(expenses, documentViewer(req));
     const people = db.get().prepare(`
       SELECT DISTINCT u.id, u.display_name, u.username, u.avatar_color
       FROM users u

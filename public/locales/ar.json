@@ -5471,7 +5471,8 @@
         "confirmSelection": "إضافة المحدد",
         "openAction": "فتح {{name}}",
         "limitReached": "بحد أقصى {{count}} مستندات.",
-        "limitReached_one": "مستند واحد بحد أقصى."
+        "limitReached_one": "مستند واحد بحد أقصى.",
+        "presentHidden": "مرفق"
     },
     "join": {
         "title": "إعداد حسابك",

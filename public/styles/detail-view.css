@@ -226,6 +226,15 @@
   color: var(--active-module-accent, var(--color-accent));
 }
 
+/* Ein Beleg, den der Server diesem Betrachter nicht nennt (#1358): Zustand,
+ * kein Link - deshalb ohne Akzentfarbe. */
+.detail-attachment--present {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-base);
+  color: var(--color-text-secondary);
+}
+
 /* --------------------------------------------------------
  * Fußzeile: Objektaktionen
  * -------------------------------------------------------- */

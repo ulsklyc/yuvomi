@@ -1160,6 +1160,43 @@ test('Ausgabe: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs - ohne Ha
   } finally { Object.assign(split.state, vorher); }
 });
 
+test('Beleg, den der Server nicht nennt: "Vorhanden" statt eines Links ins Leere - Buchung, Ausgabe, Inventar (#1358)', async () => {
+  // So kommt ein Beleg ohne Leserecht auf die Dokumente an: die Zeile bleibt,
+  // ID und Name sind maskiert (services/document-links.js, Regel 3).
+  const verdeckt = { id: 9, document_id: null, name: null, original_name: null, mime_type: null, file_size: null };
+  const { __test: inventory } = await import('../public/pages/inventory.js');
+  const vorher = { ...split.state };
+  Object.assign(split.state, {
+    activeGroupId: 2, groups: [{ id: 2, default_currency: 'EUR' }], meta: { currencies: ['EUR', 'USD'] },
+    groupMembers: [{ id: 1, display_name: 'Alex' }, { id: 3, display_name: 'Emma' }],
+  });
+  const nurVorhanden = (node) => node?.childNodes?.length === 1
+    && node.childNodes[0].href === undefined
+    && node.childNodes[0].textContent === 'documentAttach.presentHidden';
+  try {
+    for (const documents of ['read', 'write']) {
+      withAccess({ budget: 'read', documents }, () => {
+        const b = zeilen(budget.entryReadSections(buchung({ attachments: [verdeckt] })))['budget.receiptsLabel'];
+        assert.ok(nurVorhanden(b), `Buchung, documents: ${documents}: ein Zeichen, kein Link`);
+        const s = zeilen(split.expenseReadSections({ ...ausgabe, attachments: [verdeckt, verdeckt] }))['splitExpenses.receiptsLabel'];
+        assert.ok(nurVorhanden(s), `Ausgabe, documents: ${documents}: EIN Zeichen fuer alle verdeckten`);
+        const gemischt = zeilen(split.expenseReadSections({ ...ausgabe, attachments: [verdeckt, beleg] }))['splitExpenses.receiptsLabel'];
+        assert.equal(gemischt.childNodes.length, 2, 'neben einem sichtbaren Beleg steht das Zeichen zusaetzlich');
+        assert.equal(gemischt.childNodes[1].href, '/api/v1/documents/5/preview');
+        assert.deepEqual(inventory.attachmentDetailEntries([verdeckt]), [{ text: 'documentAttach.presentHidden' }],
+          `Inventar, documents: ${documents}: kein Link auf /documents/null`);
+      });
+    }
+    withAccess({ budget: 'read', documents: 'none' }, () => {
+      assert.equal(zeilen(budget.entryReadSections(buchung({ attachments: [verdeckt] })))['budget.receiptsLabel'], undefined,
+        'bei `documents: none` bleibt die Stelle leer wie beim Beleg eines Einsatzes');
+      assert.equal(zeilen(split.expenseReadSections({ ...ausgabe, attachments: [verdeckt] }))['splitExpenses.receiptsLabel'], undefined);
+      assert.deepEqual(inventory.attachmentDetailEntries([verdeckt]), []);
+      assert.deepEqual(inventory.attachmentDetailEntries([beleg]), [], 'auch ein sichtbarer Beleg: der Link ginge ins 403');
+    });
+  } finally { Object.assign(split.state, vorher); }
+});
+
 test('das Paar dazu: mit Schreibrecht oeffnen dieselben drei Einstiege den Editor, keine Leseansicht', () => {
   const vorherBudget = budget.state.month;
   const vorherSplit = { ...split.state };
