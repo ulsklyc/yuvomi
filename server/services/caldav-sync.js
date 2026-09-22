@@ -546,6 +546,35 @@ async function runSync({ createClient } = {}) {
            OR external_object_url IS NOT COALESCE(?, external_object_url)
           )
   `);
+  // Eingebrannte Kalenderfarbe aus der Zeit vor #891 loesen (#1270). Bis
+  // v2.48 schrieb der Import die Farbe des Kalenders in die Eigenfarb-Spalte,
+  // und Migration 167 hat jede damals schon bearbeitete Zeile als "lokal
+  // umgefaerbt" uebernommen (color_modified = user_modified). Seitdem gewinnt
+  // diese geerbte Farbe dauerhaft gegen die der zugewiesenen Person - und nach
+  // einem Umzug in einen anderen Kalender ist es sogar die Farbe des ALTEN.
+  //
+  // Erkannt wird sie hier und nicht per Migration, weil erst der Sync beide
+  // Seiten kennt: der Termin selbst traegt keine COLOR-Zeile (die Farbe kann
+  // also nicht vom Server fuer DIESEN Termin stammen), und der gespeicherte
+  // Wert ist genau die Farbe eines Kalenders dieses Kontos. Der Farbwaehler
+  // bietet neu nur die feste Palette an, eine bewusst gewaehlte Farbe trifft
+  // einen Kalenderwert also nur zufaellig - das ist der Preis der Regel, und
+  // er ist kleiner als eine fuer immer falsch gefaerbte Serie. Geheilt wird
+  // zum Zustand "nie eine gelernt" (color_modified = 0), damit der Ausgang auf
+  // dem Server nichts loescht.
+  const healBurntInColor = conn.prepare(`
+    UPDATE calendar_events
+    SET color = NULL, color_modified = 0
+    WHERE id = ?
+      AND color_modified = 1
+      AND color IS NOT NULL
+      AND (   EXISTS (SELECT 1 FROM caldav_calendar_selection s
+                      WHERE s.account_id = ? AND s.calendar_color IS NOT NULL
+                        AND lower(s.calendar_color) = lower(calendar_events.color))
+           OR EXISTS (SELECT 1 FROM external_calendars x
+                      WHERE x.source = 'caldav' AND x.color IS NOT NULL
+                        AND lower(x.color) = lower(calendar_events.color)))
+  `);
   const insEvent = conn.prepare(`
     INSERT INTO calendar_events
       (title, description, start_datetime, end_datetime, all_day,
@@ -710,7 +739,9 @@ async function runSync({ createClient } = {}) {
                   ev.allDay ? 1 : 0, ev.location, ev.rrule, ev.tzid ?? null, evColor, calRefId,
                   obj.url ?? null,
                 ];
-                changed = updEvent.run(...values, existing.id, ...values).changes > 0;
+                // Vor dem Update: danach sieht der Vergleich den geheilten Stand.
+                const healed = !evColor && healBurntInColor.run(existing.id, account.id).changes > 0;
+                changed = updEvent.run(...values, existing.id, ...values).changes > 0 || healed;
                 eventId = existing.id;
                 // Auf dem Server verschoben (#1377): die Erinnerungen ziehen mit.
                 if (changed) followInboundStartChange(conn, eventId, existing.start_datetime, ev.dtstart);

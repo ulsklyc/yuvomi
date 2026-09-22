@@ -1135,6 +1135,185 @@ describe('CalDAV: eine Bearbeitung friert die Farbe nicht mehr ein (#899)', () =
 });
 
 // --------------------------------------------------------
+// Eingebrannte Kalenderfarbe aus der Zeit vor #891 (#1270)
+// --------------------------------------------------------
+
+describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
+  const CAL_A = 'https://dav.example/cal-a/';
+  const CAL_B = 'https://dav.example/cal-b/';
+  const COLOR_A = '#4A90E2';
+  const COLOR_B = '#E24A4A';
+
+  function buildDb() {
+    const d = new DatabaseSync(':memory:');
+    d.exec(`
+      CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, display_name TEXT);
+      INSERT INTO users (display_name) VALUES ('Owner');
+
+      CREATE TABLE caldav_accounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT, caldav_url TEXT, username TEXT, password TEXT, last_sync TEXT
+      );
+      CREATE TABLE caldav_calendar_selection (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
+        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+      );
+      CREATE TABLE external_calendars (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source TEXT NOT NULL, external_id TEXT NOT NULL, name TEXT, color TEXT,
+        default_assignee_user_id INTEGER,
+        UNIQUE(source, external_id)
+      );
+      CREATE TABLE calendar_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL, description TEXT,
+        start_datetime TEXT, end_datetime TEXT, all_day INTEGER NOT NULL DEFAULT 0,
+        location TEXT, color TEXT, recurrence_rule TEXT, tzid TEXT,
+        external_calendar_id TEXT, external_source TEXT,
+        calendar_ref_id INTEGER, created_by INTEGER,
+        user_modified INTEGER NOT NULL DEFAULT 0, assigned_to INTEGER,
+        color_modified INTEGER NOT NULL DEFAULT 0,
+        target_caldav_account_id INTEGER, target_caldav_calendar_url TEXT,
+        outbound_dirty INTEGER NOT NULL DEFAULT 0,
+        outbound_attempts INTEGER NOT NULL DEFAULT 0,
+        outbound_move_to TEXT,
+        external_object_url TEXT
+      );
+      CREATE TABLE calendar_pending_deletions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source TEXT NOT NULL, calendar_external_id TEXT NOT NULL,
+        event_external_id TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT,
+        object_url TEXT,
+        UNIQUE(source, calendar_external_id, event_external_id)
+      );
+      CREATE TABLE event_assignments (
+        event_id INTEGER, user_id INTEGER, UNIQUE(event_id, user_id)
+      );
+      CREATE TABLE calendar_event_exceptions (
+        event_id INTEGER NOT NULL, exception_date TEXT NOT NULL,
+        PRIMARY KEY (event_id, exception_date)
+      );
+
+      INSERT INTO caldav_accounts (name, caldav_url, username, password)
+        VALUES ('Radicale', 'https://dav.example/', 'u', 'p');
+      INSERT INTO caldav_calendar_selection
+        (account_id, calendar_url, calendar_name, calendar_color, enabled)
+        VALUES (1, '${CAL_A}', 'A', '${COLOR_A}', 1),
+               (1, '${CAL_B}', 'B', '${COLOR_B}', 1);
+    `);
+    return d;
+  }
+
+  // Die Serie liegt in `inCal`; die andere Sammlung ist leer. So sieht der
+  // Umzug von A nach B aus, den Kyrodan in einem anderen Client gemacht hat:
+  // gleiche UID, anderer Kalender.
+  function clientWith({ inCal, color = null }) {
+    const ics = [
+      'BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT',
+      'UID:series-1@test', 'SUMMARY:Training',
+      ...(color ? [`COLOR:${color}`] : []),
+      'DTSTART:20260105T170000Z', 'DTEND:20260105T180000Z',
+      'RRULE:FREQ=WEEKLY',
+      'END:VEVENT', 'END:VCALENDAR',
+    ].join('\r\n');
+    return async () => ({
+      fetchCalendars: async () => [
+        { url: CAL_A, displayName: 'A' },
+        { url: CAL_B, displayName: 'B' },
+      ],
+      fetchCalendarObjects: async ({ calendar }) => (calendar.url === inCal
+        ? [{ url: `${inCal}series-1.ics`, data: ics }]
+        : []),
+      createCalendarObject: async () => ({}),
+    });
+  }
+
+  const row = (d) => d.prepare(`
+    SELECT e.color, e.color_modified, ec.external_id AS cal
+    FROM calendar_events e LEFT JOIN external_calendars ec ON ec.id = e.calendar_ref_id
+    WHERE e.external_calendar_id = 'series-1@test'
+  `).get();
+
+  // Der Stand einer Bestandsinstallation: vor v2.49.0 schrieb der Import die
+  // Kalenderfarbe in die Eigenfarb-Spalte, und Migration 167 hat jede Zeile mit
+  // user_modified = 1 als "lokal umgefaerbt" uebernommen.
+  function burnIn(d, color) {
+    d.prepare(`UPDATE calendar_events SET color = ?, user_modified = 1, color_modified = 1`).run(color);
+  }
+
+  it('der Umzug nach B loest die eingebrannte Farbe von A', async () => {
+    const d = buildDb();
+    _setTestDatabase(d);
+    try {
+      await sync({ createClient: clientWith({ inCal: CAL_A }) });
+      burnIn(d, COLOR_A);
+
+      await sync({ createClient: clientWith({ inCal: CAL_B }) });
+      const after = row(d);
+      assert.strictEqual(after.cal, CAL_B, 'Vorbedingung: der Kalender ist mitgezogen');
+      assert.strictEqual(after.color, null, 'die Farbe von A ist geerbt, keine Eigenfarbe');
+      assert.strictEqual(after.color_modified, 0, 'der Server fuehrt die Farbe wieder');
+    } finally {
+      _resetTestDatabase();
+      d.close();
+    }
+  });
+
+  it('auch ohne Umzug und unabhaengig von der Schreibweise', async () => {
+    const d = buildDb();
+    _setTestDatabase(d);
+    try {
+      await sync({ createClient: clientWith({ inCal: CAL_A }) });
+      burnIn(d, COLOR_A.toLowerCase());
+
+      await sync({ createClient: clientWith({ inCal: CAL_A }) });
+      assert.strictEqual(row(d).color, null);
+    } finally {
+      _resetTestDatabase();
+      d.close();
+    }
+  });
+
+  it('eine gewaehlte Farbe, die keine Kalenderfarbe ist, bleibt', async () => {
+    // Gegenprobe: ohne sie waere der Test oben auch gruen, wenn der Inbound
+    // jede lokal gefuehrte Farbe verwuerfe.
+    const d = buildDb();
+    _setTestDatabase(d);
+    try {
+      await sync({ createClient: clientWith({ inCal: CAL_A }) });
+      burnIn(d, '#8156C0');
+
+      await sync({ createClient: clientWith({ inCal: CAL_B }) });
+      const after = row(d);
+      assert.strictEqual(after.color, '#8156C0');
+      assert.strictEqual(after.color_modified, 1);
+    } finally {
+      _resetTestDatabase();
+      d.close();
+    }
+  });
+
+  it('traegt der Termin selbst eine COLOR-Zeile, bleibt die lokale Farbe', async () => {
+    // Mit COLOR-Zeile spricht der Server ueber DIESEN Termin; die lokal
+    // gefuehrte Farbe gewinnt dann wie bisher (#899), die Heilung greift nicht.
+    const d = buildDb();
+    _setTestDatabase(d);
+    try {
+      await sync({ createClient: clientWith({ inCal: CAL_A }) });
+      burnIn(d, COLOR_A);
+
+      await sync({ createClient: clientWith({ inCal: CAL_B, color: 'tomato' }) });
+      assert.strictEqual(row(d).color, COLOR_A);
+    } finally {
+      _resetTestDatabase();
+      d.close();
+    }
+  });
+});
+
+// --------------------------------------------------------
 // Bestandskonten: Aufgabenlisten fliegen aus der Kalenderauswahl (#617)
 // --------------------------------------------------------
 

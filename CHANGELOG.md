@@ -174,6 +174,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Synced appointments lose a calendar colour that was never theirs.** Up to v2.48.0 the CalDAV
+  import wrote the calendar's colour into each appointment as if it had been chosen for it. For an
+  appointment that had been edited in Yuvomi before v2.50.0, that copy was kept as a deliberate
+  choice, so it went on beating the colour of the assigned person, and after a move to another
+  calendar it even showed the colour of the old one. The CalDAV sync now recognises such a colour:
+  when the appointment itself carries no colour on the server and the stored one is exactly the
+  colour of one of the account's calendars, it is dropped, and the appointment shows the colour of
+  its person or its calendar again. A colour picked in Yuvomi that is not a calendar colour stays,
+  and so does any colour the server sets on the appointment itself. (#1270)
+
 - **A failed restore explains itself in your language and keeps your place.** When a backup did
   not open, the restore dialog showed the server's English explanation, up to several paragraphs
   long, also in a German interface. Each known cause now has a short translated message with the
