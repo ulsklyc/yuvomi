@@ -3556,7 +3556,8 @@
         "currentMonth": "Aktuell",
         "noVisitReportsInMonth": "Im {{month}} wurden keine Einsätze erfasst.",
         "settledAdminOnly": "Ändern oder löschen nur durch einen Admin",
-        "reportVisitsCount": "Besuche"
+        "reportVisitsCount": "Besuche",
+        "receiptPresent": "Vorhanden"
     },
     "splitExpenses": {
         "title": "Gemeinsame Ausgaben",

@@ -2438,7 +2438,7 @@ Individual check-in/check-out sessions (migrations v33, v34, v35, v36, v37, v48)
 | worker_id | INTEGER | FK → Housekeeping Workers (SET NULL on delete), nullable |
 | calendar_event_id | INTEGER | FK → Calendar Events (SET NULL on delete), nullable |
 | payment_task_id | INTEGER | FK → Tasks (SET NULL on delete), nullable |
-| receipt_document_id | INTEGER | FK → Family Documents (SET NULL on delete), nullable |
+| receipt_document_id | INTEGER | FK → Family Documents (SET NULL on delete), nullable. Every serialized session carries `has_receipt`; the id (and in the visit list and report the name, `receipt_document_name`) go only to callers who may read that document - Documents access, token scope, document visibility (#1358) - otherwise `null`. On update, a caller who cannot see the stored receipt keeps it (`null` or a missing field change nothing, any id - the stored one included - is the same 403); a new link needs Documents access |
 | paid_at | TEXT | DATETIME, nullable |
 | created_by | INTEGER | FK → Users (CASCADE delete), NOT NULL |
 | created_at | TEXT | ISO 8601 |
