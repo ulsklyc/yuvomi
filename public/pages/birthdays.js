@@ -412,7 +412,7 @@ export function birthdayItemHtml(birthday) {
           ${birthday.notes ? `<span class="birthday-item__notes">${esc(birthday.notes)}</span>` : ''}
         </span>`;
   return `
-    <div class="swipe-row" data-swipe-id="${birthday.id}">
+    <div class="swipe-row${ro ? ' swipe-row--static' : ''}" data-swipe-id="${birthday.id}">
       ${ro ? '' : `
       <div class="swipe-reveal swipe-reveal--edit swipe-reveal--leading" aria-hidden="true">
         <i data-lucide="pencil" class="icon-md"></i>

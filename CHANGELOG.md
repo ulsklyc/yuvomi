@@ -174,6 +174,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Screen readers and keyboards get a few rough edges less.** Toasts no longer interrupt what a
+  screen reader is reading or get announced twice: only errors and warnings interrupt, everything
+  else waits its turn. "Edit member" now starts in the username field instead of on the hidden
+  picture upload, which showed up as a stray strip over the dialog title and had no name for
+  screen readers. The member and invite lists in Settings are valid lists again when empty or
+  after a load error, the two-factor card keeps a gap between its hint and its buttons, and with
+  read-only access, birthday and subscription rows no longer show a swipe arrow on touchscreens,
+  since there is nothing to swipe. A toast now also stays clear of a focused person chip in a
+  dialog, not only of the chip's first pixel.
+
 - **A failed restore explains itself in your language and keeps your place.** When a backup did
   not open, the restore dialog showed the server's English explanation, up to several paragraphs
   long, also in a German interface. Each known cause now has a short translated message with the

@@ -14404,6 +14404,40 @@ test('ein Toast-Container hat genau einen Namensgeber', () => {
 });
 
 // --------------------------------------------------------------------------
+// DIE REGION SAGT AN, NICHT DER TOAST
+//
+// a11y-Runde: jeder Toast trug `role="alert"` (implizit `aria-live="assertive"`)
+// und stand dabei in einer Region, die selbst ansagt - auch in der hoeflichen.
+// Eine Erfolgsmeldung oder Erinnerung unterbrach damit die laufende Vorlesung,
+// und je nach Screenreader kam sie zweimal (einmal fuer die Region, einmal fuer
+// die Rolle). Die Dringlichkeit waehlt die Region (utils/toast-surface.js); ein
+// Toast darin traegt keine eigene Live-Rolle.
+// --------------------------------------------------------------------------
+test('ein Toast traegt keine eigene Live-Rolle - die Region sagt an', () => {
+  const offenders = [];
+  let creators = 0;
+  for (const rel of walkJsFiles('../public/')) {
+    const src = withoutCommentsKeepingLines(read(rel));
+    if (!/\btoastSurface\s*\(/.test(src)) continue;
+    // Jede Variable, die ein Toast wird: `x.className = 'toast ...'` oder als Template.
+    const names = new Set([...src.matchAll(/\b([A-Za-z_$][\w$]*)\.className\s*=\s*['"`]toast(?:\s|['"`]|\$)/g)].map((m) => m[1]));
+    creators += names.size;
+    src.split('\n').forEach((line, i) => {
+      for (const name of names) {
+        const own = new RegExp(`\\b${name.replace(/\$/g, '\\$')}\\.setAttribute\\(\\s*['"](?:role|aria-live)['"]`);
+        if (own.test(line)) offenders.push(`${rel}:${i + 1} ${line.trim()}`);
+      }
+    });
+  }
+  assert.ok(creators >= 2, `nur ${creators} Toast-Bauer gefunden - Shell und Erinnerungen bauen je einen`);
+  assert.deepEqual(offenders, [], 'ein Toast in einer Live-Region traegt eine eigene Live-Rolle');
+  // Die Regionen selbst sagen weiter an, jede mit ihrer Dringlichkeit.
+  const router = read('../public/router.js');
+  assert.match(router, /toastContainerPolite\.setAttribute\('aria-live', 'polite'\)/);
+  assert.match(router, /toastContainerAssertive\.setAttribute\('aria-live', 'assertive'\)/);
+});
+
+// --------------------------------------------------------------------------
 // DIE HERKUENFTE DER ERINNERUNGEN SIND DIE DES SERVERS
 //
 // Der Erinnerungs-Toast weist seit Block 2 aus, WORAUS eine Meldung stammt

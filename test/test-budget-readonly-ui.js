@@ -389,9 +389,13 @@ test('Abo-Karte mit `budget: read`: der Koerper oeffnet die Leseansicht, Verlaen
     assert.match(html, /data-action="delete"/);
     assert.match(html, /swipe-reveal--done/);
     assert.match(html, /common\.edit/);
+    assert.doesNotMatch(html, /swipe-row--static/, 'mit Geste bleibt der Wisch-Chevron');
   });
   withAccess({ budget: 'read' }, () => {
     const html = abos.renderCard(abo());
+    // Ohne Geste auch kein Wisch-Chevron (Muster aus #1426): auf Touch stand
+    // der Pfeil sonst an einer Zeile, die sich nicht wischen laesst.
+    assert.match(html, /class="swipe-row swipe-row--static"/, 'ohne Geste auch kein Wisch-Chevron');
     assert.match(html, /<button type="button" class="subscription-card__main list-row__main--interactive"\s+data-action="view">/);
     assert.doesNotMatch(html, /data-action="(edit|renew|delete)"|swipe-reveal|common\.edit/);
     // Die Auskunft: Name, Status, Zyklus, Erinnerung, Betrag.

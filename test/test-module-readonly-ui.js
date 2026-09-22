@@ -1751,6 +1751,7 @@ test('Geburtstagszeile mit Schreibrecht: zwei Knoepfe und zwei Wischflaechen', (
     assert.match(html, /data-action="delete"/);
     assert.match(html, /swipe-reveal--edit/);
     assert.match(html, /swipe-reveal--delete/);
+    assert.doesNotMatch(html, /swipe-row--static/, 'mit Geste bleibt der Wisch-Chevron');
   });
 });
 
@@ -1761,6 +1762,9 @@ test('Geburtstagszeile mit `calendar: read`: beide Handlungen weg, die Auskunft 
     assert.doesNotMatch(html, /data-action="delete"/);
     assert.doesNotMatch(html, /swipe-reveal/,
       'eine Reveal-Flaeche ohne Geste kuendigt eine Bedienung an, die es nicht gibt');
+    // Ebenso der Wisch-Chevron (`.swipe-row::after`, Muster aus #1426): auf
+    // Touch stand der Pfeil an einer Zeile, die sich nicht wischen laesst.
+    assert.match(html, /class="swipe-row swipe-row--static"/, 'ohne Geste auch kein Wisch-Chevron');
     assert.doesNotMatch(html, /row-actions/);
 
     // Nichts davon war ein Zustand, der ohne die Knoepfe unlesbar wuerde - die

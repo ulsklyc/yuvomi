@@ -225,6 +225,55 @@ test('sign out other devices: hint, status and buttons keep a token gap, an empt
   for (const rule of bare) assert.doesNotMatch(rule.body, /margin|padding|min-height|height/, rule.body);
 });
 
+test('two-factor card: every line and the button row keep a token gap, in every state (a11y leftovers)', async () => {
+  // a11y-Runde: in der 2FA-Karte standen Hinweis und Knopf mit 0 px
+  // untereinander, der Fokusring des Knopfes lag auf dem Hinweis. Dieselbe
+  // Loesung wie "Andere Geraete" (#1427): jede Zeile nach der ersten und die
+  // Knopfreihe tragen eine Klasse, deren Abstand aus tokens.css kommt.
+  const { twoFactorCardHtml } = await import('/settings/pages/personal-account.js');
+  const states = [
+    { enabled: false, pending: false, recovery_remaining: 0, required: false },
+    { enabled: false, pending: false, recovery_remaining: 0, required: true },
+    { enabled: true, pending: false, recovery_remaining: 8, required: false },
+    { enabled: true, pending: false, recovery_remaining: 0, required: true },
+  ];
+  for (const state of states) {
+    const html = twoFactorCardHtml(state);
+    // Die Karte selbst, dann ihre Zeilen in Dokumentreihenfolge (p und div).
+    const [, ...lines] = [...html.matchAll(/<(p|div)\b[^>]*>/g)]
+      .map(([tag]) => ({ tag, classes: tag.match(/class="([^"]*)"/)?.[1]?.split(/\s+/) ?? [] }));
+    assert.ok(lines.length >= 3, `zu wenige Zeilen gelesen (${JSON.stringify(state)})`);
+    const [lead, ...rest] = lines;
+    assert.ok(lead.classes.includes('form-hint'), `die erste Zeile ist der Hinweis: ${lead.tag}`);
+    for (const { tag, classes } of rest) {
+      const expected = classes.includes('settings-form-actions') ? 'settings-2fa__actions' : 'settings-2fa__note';
+      assert.ok(classes.includes(expected), `${tag} ohne ${expected} (${JSON.stringify(state)})`);
+    }
+  }
+
+  // Die Codes-Ansicht: die Statuszeile steht NACH der Knopfreihe und ist leer,
+  // bis kopiert wurde; die Rueckfrage: Hinweis und Formular.
+  const source = await readFile(new URL('../public/settings/pages/personal-account.js', import.meta.url), 'utf8');
+  const recovery = source.slice(source.indexOf('function renderRecoveryCodes'), source.indexOf('function askForCode'));
+  assert.match(recovery, /class="settings-form-actions settings-2fa__actions"/);
+  assert.match(recovery, /class="form-hint settings-2fa__note" id="two-factor-copy-status" role="status"><\/p>/,
+    'Statuszeile traegt ihre Klasse und bleibt leer im Markup');
+  const ask = source.slice(source.indexOf('function askForCode'));
+  assert.match(ask, /<form id="two-factor-confirm-form" class="settings-form settings-2fa__form">/);
+
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const marginTopOf = (selector) => {
+    const rule = rules.find((r) => !r.at?.length && r.selector.split(',').map((s) => s.trim()).includes(selector));
+    return rule?.body.match(/(?:^|;)\s*margin-top\s*:\s*([^;]+)/)?.[1]?.trim() ?? null;
+  };
+  for (const selector of ['.settings-2fa__note:not(:empty)', '.settings-2fa__actions', '.settings-2fa__form']) {
+    assert.match(marginTopOf(selector) ?? '', /^var\(--space-\d+\)$/, `${selector}: Abstand aus tokens.css`);
+  }
+  const bare = rules.filter((r) => r.selector.split(',').map((s) => s.trim()).includes('.settings-2fa__note'));
+  for (const rule of bare) assert.doesNotMatch(rule.body, /margin|padding|min-height|height/, rule.body);
+});
+
 test('settings reuse the authenticated router user instead of blocking on auth.me', async () => {
   const source = await readFile(
     new URL('../public/pages/settings.js', import.meta.url),
