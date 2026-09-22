@@ -14,7 +14,8 @@ import {
   str, oneOf, num, date, id as idParam, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT,
 } from '../../middleware/validate.js';
 import {
-  assertDocumentLinkTargetsAvailable, documentLinksFor, loadDocumentLinks, replaceDocumentLinks,
+  assertDocumentLinkTargetsAvailable, documentLinksFor, documentViewer, loadDocumentLinks, replaceDocumentLinks,
+  sendDocumentLinkRefusal,
 } from '../../services/document-links.js';
 import { sendDocumentDeletionConflict } from '../../services/document-deletion-lock.js';
 import {
@@ -117,7 +118,8 @@ function locationPath(locationId) {
   return parent ? `${parent.name} · ${loc.name}` : loc.name;
 }
 
-function loadItem(id, userId) {
+// `viewer` ist `documentViewer(req)`: Belege folgen dem Dokumentenrecht (#1358).
+function loadItem(id, userId, viewer) {
   const item = db.get().prepare('SELECT * FROM inventory_items WHERE id = ?').get(id);
   if (!item) return null;
   const category = db.get().prepare('SELECT name, icon, label_key FROM inventory_categories WHERE key = ?').get(item.category);
@@ -128,14 +130,14 @@ function loadItem(id, userId) {
     category_icon: category?.icon ?? 'package',
     category_label_key: category?.label_key ?? null,
     location_path: locationPath(item.location_id),
-    attachments: documentLinksFor(db.get(), { ...DOCS, ownerId: item.id, userId }),
+    attachments: documentLinksFor(db.get(), { ...DOCS, ownerId: item.id, viewer }),
     linked_entries: linkedEntries,
     linked_entries_total: computeTotal(linkedEntries),
     tracked_dates: loadTrackedDates(item.id),
   };
 }
 
-function loadItems({ category, locationId, status, q } = {}, userId) {
+function loadItems({ category, locationId, status, q } = {}, userId, viewer) {
   const clauses = [];
   const params = [];
   if (category !== undefined) { clauses.push('ii.category = ?'); params.push(category); }
@@ -157,7 +159,7 @@ function loadItems({ category, locationId, status, q } = {}, userId) {
     ${where}
     ORDER BY ii.name COLLATE NOCASE ASC
   `).all(...params);
-  const byItem = loadDocumentLinks(db.get(), { ...DOCS, ownerIds: rows.map((r) => r.id), userId });
+  const byItem = loadDocumentLinks(db.get(), { ...DOCS, ownerIds: rows.map((r) => r.id), viewer });
   const entriesByItem = loadLinkedEntriesForItems(rows.map((r) => r.id), userId);
   const datesByItem = loadTrackedDatesForItems(rows.map((r) => r.id));
   return rows.map((row) => {
@@ -345,7 +347,7 @@ router.get('/', (req, res) => {
     const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : undefined;
     const userId = req.authUserId || req.session.userId;
 
-    res.json({ data: loadItems({ category, locationId, status, q }, userId) });
+    res.json({ data: loadItems({ category, locationId, status, q }, userId, documentViewer(req)) });
   } catch (err) {
     log.error('GET / error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -360,7 +362,7 @@ router.get('/:id', (req, res) => {
     const vId = idParam(req.params.id, 'Gegenstand-ID');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const userId = req.authUserId || req.session.userId;
-    const item = loadItem(vId.value, userId);
+    const item = loadItem(vId.value, userId, documentViewer(req));
     if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
     res.json({ data: item });
   } catch (err) {
@@ -407,7 +409,7 @@ router.post('/', (req, res) => {
     // DELETE /:id): wirft syncReminder - etwa an einem Kaufdatum, das die
     // Datumsrechnung nicht parsen kann -, darf der Gegenstand nicht trotzdem
     // geschrieben bleiben, waehrend die Anfrage mit 500 endet.
-    assertDocumentLinkTargetsAvailable(db.get(), req.body.attachment_document_ids, userId);
+    assertDocumentLinkTargetsAvailable(db.get(), req.body.attachment_document_ids, documentViewer(req));
     const result = db.get().transaction(() => {
       const inserted = db.get().prepare(`
         INSERT INTO inventory_items
@@ -438,16 +440,17 @@ router.post('/', (req, res) => {
     // Belege sind optional, deshalb erst nach dem Insert - der Gegenstand
     // steht auch ohne sie, ein unbekanntes Dokument darf ihn nicht scheitern lassen.
     replaceDocumentLinks(db.get(), {
-      ...DOCS, ownerId: result.lastInsertRowid, documentIds: req.body.attachment_document_ids, userId,
+      ...DOCS, ownerId: result.lastInsertRowid, documentIds: req.body.attachment_document_ids, viewer: documentViewer(req),
     });
 
     if (entry) {
       linkEntry({ itemId: result.lastInsertRowid, entryId: entry.id, role: 'purchase', amountShare: null, userId });
     }
 
-    res.status(201).json({ data: loadItem(result.lastInsertRowid, userId) });
+    res.status(201).json({ data: loadItem(result.lastInsertRowid, userId, documentViewer(req)) });
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
+    if (sendDocumentLinkRefusal(res, err)) return;
     log.error('POST / error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
@@ -477,7 +480,7 @@ router.put('/:id', (req, res) => {
     // reminders half-updated.
     const userId = req.authUserId || req.session.userId;
     if (req.body.attachment_document_ids !== undefined) {
-      assertDocumentLinkTargetsAvailable(db.get(), req.body.attachment_document_ids, userId);
+      assertDocumentLinkTargetsAvailable(db.get(), req.body.attachment_document_ids, documentViewer(req));
     }
 
     // Update und Erinnerungs-Sync in einer Transaktion, gleiche Begruendung wie
@@ -515,13 +518,14 @@ router.put('/:id', (req, res) => {
     // (gleiches Muster wie server/routes/budget/entries.js#PUT /:id).
     if (req.body.attachment_document_ids !== undefined) {
       replaceDocumentLinks(db.get(), {
-        ...DOCS, ownerId: item.id, documentIds: req.body.attachment_document_ids, userId,
+        ...DOCS, ownerId: item.id, documentIds: req.body.attachment_document_ids, viewer: documentViewer(req),
       });
     }
 
-    res.json({ data: loadItem(item.id, userId) });
+    res.json({ data: loadItem(item.id, userId, documentViewer(req)) });
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
+    if (sendDocumentLinkRefusal(res, err)) return;
     log.error('PUT /:id error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
@@ -557,7 +561,7 @@ router.post('/:id/entries', (req, res) => {
     const result = linkEntry({ itemId: item.id, entryId: vEntryId.value, role: vRole.value, amountShare, userId });
     if (result.error) return res.status(result.code).json({ error: result.error, code: result.code });
 
-    res.status(201).json({ data: loadItem(item.id, userId) });
+    res.status(201).json({ data: loadItem(item.id, userId, documentViewer(req)) });
   } catch (err) {
     log.error('POST /:id/entries error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -582,7 +586,7 @@ router.delete('/:id/entries/:entryId', (req, res) => {
     const result = unlinkEntry({ itemId: item.id, entryId: vEntryId.value, userId });
     if (result.error) return res.status(result.code).json({ error: result.error, code: result.code });
 
-    res.json({ data: loadItem(item.id, userId) });
+    res.json({ data: loadItem(item.id, userId, documentViewer(req)) });
   } catch (err) {
     log.error('DELETE /:id/entries/:entryId error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -610,7 +614,7 @@ router.post('/:id/dates/:dateId/complete', (req, res) => {
     const result = completeTrackedDate({ item, dateId: vDateId.value, values: value, userId });
     if (result.error) return res.status(result.code).json({ error: result.error, code: result.code });
 
-    res.status(201).json({ data: loadItem(item.id, userId) });
+    res.status(201).json({ data: loadItem(item.id, userId, documentViewer(req)) });
   } catch (err) {
     log.error('POST /:id/dates/:dateId/complete error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -715,7 +719,7 @@ router.get('/:id/history', (req, res) => {
     if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
 
     const userId = req.authUserId || req.session.userId;
-    res.json({ data: loadHistory(item.id, userId) });
+    res.json({ data: loadHistory(item.id, userId, documentViewer(req)) });
   } catch (err) {
     log.error('GET /:id/history error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

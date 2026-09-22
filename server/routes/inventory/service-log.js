@@ -432,8 +432,12 @@ function completeTrackedDate({ item, dateId, values, userId }) {
  * sortierten Zeitleiste zusammengefuehrt. Reine Aggregation, kein neuer
  * Speicher (DECISIONS.md #6) - beide Sichtbarkeitsregeln laufen ueber ihre
  * bestehenden, einzigen Stellen (DECISIONS.md #2).
+ *
+ * `viewer` ist `documentViewer(req)`. Ohne Leserecht auf die Dokumente kommen
+ * die Belege maskiert (#1358) - eine Verlaufszeile ohne Namen und Ziel sagt
+ * nichts, sie faellt deshalb ganz weg.
  */
-function loadHistory(itemId, userId) {
+function loadHistory(itemId, userId, viewer) {
   const logRows = loadServiceLog(itemId).map((row) => ({
     type: 'service_log',
     id: row.id,
@@ -456,7 +460,9 @@ function loadHistory(itemId, userId) {
   }));
 
   const householdTz = householdTimeZone(db.get());
-  const documentRows = documentLinksFor(db.get(), { ...DOCS, ownerId: itemId, userId }).map((doc) => ({
+  const documents = documentLinksFor(db.get(), { ...DOCS, ownerId: itemId, viewer })
+    .filter((doc) => doc.document_id != null);
+  const documentRows = documents.map((doc) => ({
     type: 'document',
     id: doc.document_id,
     // doc.created_at ist ein UTC-Instant (%Y-%m-%dT%H:%M:%SZ) - der Link-
