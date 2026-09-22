@@ -641,7 +641,14 @@ async function seite(modules, { search = '', items = [artikel()], lists = [LISTE
     zustand({ lists, items });
     const calls = await withAccess(modules, () => aufrufe(async () => {
       await shopping.render(c, { user: { id: 7 }, signal: route.signal });
-      await new Promise((r) => setImmediate(r)); // der Deep-Link importiert erst
+      // Der Deep-Link ruft `openCategoryManager()` ohne `await`, und der holt
+      // sein Modal erst nach einem dynamischen `import()`. Wie viele Ticks das
+      // dauert, ist Sache der Node-Version (Node 22 brauchte mehr als einen) -
+      // also warten, bis der Dialog da ist, hoechstens eine Sekunde. Ohne
+      // Deep-Link oder bei `read` kommt keiner, dann laeuft die Frist ab.
+      if (search.includes('manage=')) {
+        for (let i = 0; i < 100 && !modals.length; i += 1) await new Promise((r) => setTimeout(r, 10));
+      }
     }, {
       'GET /shopping': { data: lists },
       [`GET /shopping/${LISTE.id}/items`]: { data: items, list: lists[0] ?? null },
