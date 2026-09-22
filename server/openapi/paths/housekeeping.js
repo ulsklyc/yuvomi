@@ -12,7 +12,7 @@ const RECEIPT_NOTE = 'Every visit or work session carries `has_receipt` (whether
   + 'module, for API tokens a `documents:read` scope, and the document\'s own visibility. Otherwise both are `null`.';
 
 const RECEIPT_WRITE_NOTE = '`receipt_document_id` links a receipt. A caller who cannot see the stored receipt keeps it: '
-  + '`null`, an empty value or leaving the field out changes nothing, and any other id is refused with 403. A new link needs '
+  + '`null`, an empty value or leaving the field out changes nothing, and any id - the stored one included - is refused with the same 403. A new link needs '
   + 'access to the Documents module (for API tokens a `documents` scope), otherwise 403; a document the caller cannot see is '
   + 'not linked. A caller who can see the stored receipt may clear it with `null`.';
 

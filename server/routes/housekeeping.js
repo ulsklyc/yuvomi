@@ -1072,22 +1072,27 @@ router.put('/visits/:id', (req, res) => {
     // Der Beleg folgt Regel 2 aus services/document-links.js: entfernen oder
     // ersetzen kann man nur, was man sieht (#1358). Wer den GESPEICHERTEN Beleg
     // nicht sieht, bekommt seine ID maskiert (`receiptAccess`), und der Dialog
-    // schickt dann `null` zurueck - das heisst "behalten", nicht "loesen". Eine
-    // andere ID waere ein Ersetzen und ist 403. Eine NEUE Verknuepfung verlangt
-    // Zugriff auf das Dokumente-Modul (Mitgliedsrecht UND Token-Scope) und die
-    // Sichtbarkeit des Dokuments; ein unsichtbares faellt wie bisher still auf
-    // `null`. Die Loeschsperre gilt auch fuer die unveraenderte ID.
+    // schickt dann `null` zurueck - das heisst "behalten", nicht "loesen", ohne
+    // jede weitere Pruefung. JEDE Zahl ist dann dieselbe 403, auch die
+    // gespeicherte: fragte der Zweig erst "unveraendert?", antwortete die
+    // richtig geratene ID mit 200 (oder 409 aus der Loeschsperre) und alle
+    // anderen mit 403 - bei fortlaufenden rowids ein Orakel fuer die maskierte
+    // ID. Die Sichtbarkeit steht deshalb VOR jedem Vergleich mit ihr.
+    // Eine NEUE Verknuepfung verlangt Zugriff auf das Dokumente-Modul
+    // (Mitgliedsrecht UND Token-Scope) und die Sichtbarkeit des Dokuments; ein
+    // unsichtbares faellt wie bisher still auf `null`. Die Loeschsperre gilt
+    // auch fuer die unveraenderte ID - fuer den, der den Beleg sieht.
     const receipts = receiptAccess(req);
     const storedReceipt = existing.receipt_document_id ?? null;
     let receiptDocumentId = storedReceipt;
     if (req.body.receipt_document_id !== undefined) {
       const wanted = vReceiptId.value;
-      if (wanted !== null && wanted === storedReceipt) {
-        assertDocumentsNotDeleting([wanted]);
-      } else if (storedReceipt !== null && !receipts.visible(storedReceipt)) {
+      if (storedReceipt !== null && !receipts.visible(storedReceipt)) {
         if (wanted !== null) {
-          return res.status(403).json({ error: 'You cannot replace a receipt you may not see.', code: 403 });
+          return res.status(403).json({ error: 'You cannot change a receipt you may not see.', code: 403 });
         }
+      } else if (wanted !== null && wanted === storedReceipt) {
+        assertDocumentsNotDeleting([wanted]);
       } else if (wanted === null) {
         receiptDocumentId = null;
       } else if (hiddenModulesFor(req, ['documents']).has('documents')) {

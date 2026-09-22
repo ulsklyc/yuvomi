@@ -19,6 +19,7 @@ const dbmod = await import('../server/db.js');
 const { default: housekeepingRouter } = await import('../server/routes/housekeeping.js');
 const { default: tasksRouter } = await import('../server/routes/tasks.js');
 const { computeHourlyAmount } = await import('../server/services/housekeeping-billing.js');
+const { lockDocumentDeletes, unlockDocumentDeletes } = await import('../server/services/document-deletion-lock.js');
 const db = dbmod.get();
 
 const ADMIN = db.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')`).run().lastInsertRowid;
@@ -1177,14 +1178,30 @@ test('Beleg: wer den gespeicherten nicht sieht, kann ihn weder loesen noch erset
     assert.equal(storedReceipt(visitId), privateDoc, 'ein leerer Wert ebenso');
     assert.equal((await put(MEM, {})).status, 200);
     assert.equal(storedReceipt(visitId), privateDoc, 'ein fehlendes Feld ebenso');
-    assert.equal((await put(MEM, { receipt_document_id: privateDoc })).status, 200);
-    assert.equal(storedReceipt(visitId), privateDoc, 'die unveraenderte ID ebenso');
-
+    // KEIN ORAKEL: jede Zahl bekommt dieselbe Antwort, auch die richtige.
+    // Sonst liesse sich die maskierte ID raten - rowids sind fortlaufend, und
+    // 200 gegen 403 verriete den Treffer.
     const replaced = await put(MEM, { receipt_document_id: ownDoc });
     assert.equal(replaced.status, 403);
     assert.equal(replaced.body.code, 403);
     assert.equal(typeof replaced.body.error, 'string');
     assert.equal(storedReceipt(visitId), privateDoc, 'ersetzen darf er ihn auch nicht');
+    const guessedRight = await put(MEM, { receipt_document_id: privateDoc });
+    assert.deepEqual({ status: guessedRight.status, body: guessedRight.body }, { status: 403, body: replaced.body },
+      'die richtig geratene ID antwortet genau wie eine falsche');
+    const guessedWrong = await put(MEM, { receipt_document_id: 999999 });
+    assert.deepEqual({ status: guessedWrong.status, body: guessedWrong.body }, { status: 403, body: replaced.body });
+    // Auch der Loeschzustand des unsichtbaren Belegs darf nicht durchscheinen.
+    lockDocumentDeletes([privateDoc]);
+    try {
+      const locked = await put(MEM, { receipt_document_id: privateDoc });
+      assert.deepEqual({ status: locked.status, body: locked.body }, { status: 403, body: replaced.body },
+        'im Loeschfenster weiter 403, nicht 409');
+      assert.equal((await put(MEM, { receipt_document_id: null })).status, 200, 'behalten fragt die Loeschsperre nicht');
+    } finally {
+      unlockDocumentDeletes([privateDoc]);
+    }
+    assert.equal(storedReceipt(visitId), privateDoc);
 
     // Wer ihn sieht, darf ihn loesen.
     assert.equal((await put(ADM, { receipt_document_id: null })).status, 200);
