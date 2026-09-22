@@ -25,6 +25,7 @@ import { mkdirSync, existsSync, renameSync, linkSync, rmSync, copyFileSync, open
 import { createLogger } from './logger.js';
 import { decodeHtmlEntities } from './utils/html-entities.js';
 import { toE164, defaultCountryFromConfig } from './utils/phone.js';
+import { rebuildMissingExpenseLedger } from './services/split-expenses.js';
 
 const log = createLogger('DB');
 
@@ -9635,6 +9636,22 @@ const MIGRATIONS = [
           ORDER BY s.id ASC LIMIT 1
         );
     `,
+  },
+  {
+    version: 226,
+    description: 'Split: rebuild ledger rows of active expenses lost to an account deletion',
+    // v225 hat den Autor der noch vorhandenen Ledger-Zeilen korrigiert; die
+    // Zeilen, die ein Kontoloeschen vorher schon per created_by ON DELETE
+    // CASCADE genommen hatte, konnte ein UPDATE nicht zurueckholen (#1382).
+    // Eine aktive Ausgabe ohne eine einzige 'expense'-Zeile zaehlte seitdem in
+    // keinem Saldo. Neu aufgebaut wird aus expenses + expense_splits mit
+    // derselben Funktion, mit der die Route bucht - keine zweite Fassung der
+    // Regel. Nur fehlende Zeilen, nur aktive Ausgaben; ein zweiter Lauf findet
+    // nichts mehr.
+    up(db) {
+      const rebuilt = rebuildMissingExpenseLedger(db);
+      if (rebuilt > 0) log.info(`Rebuilt ledger rows of ${rebuilt} active shared expense(s).`);
+    },
   },
 ];
 

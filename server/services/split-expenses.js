@@ -187,10 +187,79 @@ function decorateMoney(row, fields = ['amount_minor']) {
   return out;
 }
 
+/**
+ * Die Ledger-Zeilen einer Ausgabe: der Zahler bekommt den umgerechneten Betrag
+ * gutgeschrieben, jeder Anteil wird ihm gegenueber belastet. EINE Regel fuer
+ * die Route (Anlegen, Bearbeiten) und fuer den Neuaufbau verlorener Zeilen
+ * (Migration v226) - eine zweite Fassung liefe beim naechsten Umbau still
+ * auseinander.
+ *
+ * `created_by` jeder Ledger-Zeile ist `expense.created_by`, nie die Person, die
+ * gerade anlegt oder bearbeitet: Ausgabe und Zeilen haengen per ON DELETE
+ * CASCADE am selben Konto und fallen so nur gemeinsam. Trug ein PUT die
+ * bearbeitende Person ein, nahm deren Kontoloeschung die Zeilen mit, und die
+ * weiter aktive Ausgabe zaehlte nicht mehr im Saldo. Wer bearbeitet hat, steht
+ * in `expense_edited` (expense_activity.actor_id).
+ *
+ * Vorsicht beim Erweitern: Migration v226 ruft diese Funktion auf, und zwar auf
+ * dem Schema von v226. Eine Spalte, die erst eine spaetere Migration anlegt,
+ * darf hier nicht als Pflichtspalte auftauchen - v226 bereitet das INSERT
+ * deshalb immer vor, auch ohne eine einzige verlorene Zeile, und jede Suite,
+ * die eine frische Datenbank migriert, wird dann rot statt erst die
+ * Bestandsinstallation beim Update.
+ */
+const EXPENSE_LEDGER_INSERT = `
+  INSERT INTO expense_ledger_entries
+    (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+`;
+
+function insertExpenseLedger(database, expense, splits, sourceType = 'expense', insert = database.prepare(EXPENSE_LEDGER_INSERT)) {
+  const actorId = expense.created_by;
+  insert.run(expense.group_id, sourceType, expense.id, expense.payer_id, null, expense.converted_amount_minor, expense.converted_currency, expense.title, actorId);
+  for (const split of splits) {
+    insert.run(expense.group_id, sourceType, expense.id, split.user_id, expense.payer_id, -split.amount_minor, split.currency, expense.title, actorId);
+  }
+}
+
+/**
+ * Baut die Ledger-Zeilen aktiver Ausgaben neu auf, die keine einzige
+ * 'expense'-Zeile mehr haben (#1382). So entstanden sie: bis v225 stempelte
+ * ein PUT die Zeilen mit der bearbeitenden Person, und das Loeschen ihres
+ * Kontos nahm per `created_by ON DELETE CASCADE` alle Zeilen der Ausgabe mit
+ * (sie entstehen immer gemeinsam, mit demselben `created_by`) - die Ausgabe
+ * blieb aktiv und fiel still aus den Salden.
+ *
+ * Quelle ist dieselbe wie beim Buchen: der Datensatz und seine gespeicherten
+ * Anteile, durch `insertExpenseLedger`. Geloeschte Ausgaben bleiben ohne
+ * Zeilen, das ist ihr gewollter Zustand; vollstaendige werden nicht
+ * angefasst. Ein zweiter Lauf findet nichts mehr. Gibt die Zahl der neu
+ * aufgebauten Ausgaben zurueck.
+ */
+function rebuildMissingExpenseLedger(database) {
+  const insert = database.prepare(EXPENSE_LEDGER_INSERT);
+  const missing = database.prepare(`
+    SELECT e.* FROM expenses e
+    WHERE e.status = 'active'
+      AND NOT EXISTS (
+        SELECT 1 FROM expense_ledger_entries l
+        WHERE l.source_type = 'expense' AND l.source_id = e.id
+      )
+    ORDER BY e.id
+  `).all();
+  const splitsOf = database.prepare('SELECT user_id, amount_minor, currency FROM expense_splits WHERE expense_id = ? ORDER BY id');
+  for (const expense of missing) {
+    insertExpenseLedger(database, expense, splitsOf.all(expense.id), 'expense', insert);
+  }
+  return missing.length;
+}
+
 export {
   buildSplits,
   decorateMoney,
+  insertExpenseLedger,
   minorToDecimal,
   parseMoneyToMinor,
+  rebuildMissingExpenseLedger,
   simplifyDebts,
 };
