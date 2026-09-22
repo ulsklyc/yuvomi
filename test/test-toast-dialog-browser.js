@@ -526,3 +526,106 @@ test('#1160 568x320 - der juengste Toast bleibt sichtbar, auch nach einem Fehler
   }
 });
 
+/*
+ * DER KLAPPEN-AUSLOESER IST EIN BEDIENELEMENT (a11y-Runde auf 64cc2f5c0): im
+ * Budget-Dialog bei 1280px lag "Weitere Einstellungen" (`<summary>`) ganz unter
+ * dem Stapel, ein Klick dort traf den Toast. `summary` zaehlt seitdem wie ein
+ * Knopf.
+ */
+test('#1160 desktop - Budget-Eintrag: "Weitere Einstellungen" bleibt frei', async () => {
+  const page = await openPage(harness, { device: 'desktop', locale: 'de' });
+  try {
+    await seedDueReminder(page, { count: 2, refresh: false });
+    await gotoRoute(page, '/budget');
+    await waitForToasts(page, 2);
+    await page.waitForSelector('#budget-add');
+    await page.$eval('#budget-add', (el) => el.click());
+    await page.waitForSelector('#bm-title');
+    await settleAnimations(page);
+    // Unten im Koerper: erst ins Bild holen, wie ein Mensch es tut.
+    await page.$eval('.form-advanced__summary', (el) => el.scrollIntoView({ block: 'end' }));
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await settleAnimations(page);
+    const measured = await measureDialog(page, { controlSelector: '.form-advanced__summary' });
+    assert.equal(measured.panel, true, 'kein Dialog offen');
+    assert.equal(measured.controls, 1, 'der Klappen-Ausloeser fehlt - so misst die Sonde nichts');
+    assert.equal(measured.toast, true, 'die Erinnerungs-Toasts sind verschwunden - so misst die Sonde nichts');
+    assert.deepEqual(measured.covered, [], '"Weitere Einstellungen" liegt unter dem Stapel');
+    assert.equal(measured.toastVisible, true, 'mindestens ein Toast muss sichtbar bleiben');
+  } finally {
+    await page.close();
+  }
+});
+
+/*
+ * WCAG 2.4.11, FOCUS NOT OBSCURED (a11y-Runde auf 64cc2f5c0). Die Platzierung
+ * hielt Knoepfe frei, Felder nicht: in "Mitglied bearbeiten" bei 375px lag ein
+ * Feld ganz unter dem Stapel, und wer per Tab dorthin kam, sah seinen Fokus
+ * nicht. Seitdem zaehlt das GERADE fokussierte Element als Bedienflaeche, und
+ * `focusin` misst neu. Die Sonde geht per Tab durch jedes Feld des Dialogs und
+ * fragt an seiner Mitte, ob es oben liegt. Vorbedingung: beim Oeffnen liegt der
+ * Stapel ueber mindestens einem Feld - sonst misst sie nichts.
+ */
+test('#1160 375x812 - Mitglied bearbeiten: jedes Feld, auf dem der Tab-Fokus landet, liegt frei (WCAG 2.4.11)', async () => {
+  const page = await openPage(harness, { device: 'mobile', locale: 'de' });
+  try {
+    await seedDueReminder(page, { count: 2, refresh: false });
+    await gotoRoute(page, '/settings/admin/family');
+    await waitForToasts(page, 2);
+    await page.waitForSelector('[data-edit-user]');
+    await page.$eval('[data-edit-user]', (el) => el.click());
+    await page.waitForSelector('#edit-member-cancel');
+    await settleAnimations(page);
+
+    const FIELDS = 'input:not([type="hidden"]), select, textarea';
+    const underStack = await page.evaluate((fields) => {
+      const stack = document.querySelector('.shell-bottom-stack').getBoundingClientRect();
+      const panel = [...document.querySelectorAll('.modal-overlay:not([inert]) .modal-panel')].at(-1);
+      return [...panel.querySelectorAll(fields)].filter((el) => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0
+          && r.left < stack.right && r.right > stack.left && r.top < stack.bottom && r.bottom > stack.top;
+      }).map((el) => el.id || el.name || el.type);
+    }, FIELDS);
+    assert.ok(underStack.length >= 1, 'beim Oeffnen liegt kein Feld unter dem Stapel - so misst die Sonde nichts');
+
+    // Ohne Uebergaenge: sonst misst schon das `transitionend` des Fokusrings neu,
+    // und die Sonde saehe nicht, ob `focusin` es tut. Ein Feld ohne Uebergang
+    // im Fokusstil (Checkbox) hat nur diesen einen Anlass (Gegenprobe ohne den
+    // Listener: gruen, solange Uebergaenge liefen).
+    await page.addStyleTag({ content: '*, *::before, *::after { transition: none !important; }' });
+
+    const covered = [];
+    const seen = new Set();
+    for (let i = 0; i < 40; i += 1) {
+      await page.keyboard.press('Tab');
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      await settleAnimations(page);
+      const probe = await page.evaluate((fields) => {
+        const el = document.activeElement;
+        const panel = [...document.querySelectorAll('.modal-overlay:not([inert]) .modal-panel')].at(-1);
+        if (!el || !panel?.contains(el) || !el.matches(fields)) return null;
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) return null;
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return {
+          field: el.id || el.name || el.type,
+          free: Boolean(hit) && (el === hit || el.contains(hit) || Boolean(el.labels?.[0]?.contains(hit))),
+          hit: hit?.closest('.toast')?.className || hit?.className || String(hit),
+        };
+      }, FIELDS);
+      if (!probe) continue;
+      if (seen.has(probe.field)) break;
+      seen.add(probe.field);
+      if (!probe.free) covered.push(probe);
+    }
+    assert.ok(seen.size >= 3, `zu wenige Felder per Tab erreicht (${[...seen].join(', ')})`);
+    const measured = await measureDialog(page, { controlSelector: `${MODAL_CONTROLS}, .settings-form-actions button` });
+    assert.equal(measured.toast, true, 'die Erinnerungs-Toasts sind verschwunden - so misst die Sonde nichts');
+    assert.deepEqual(covered, [], `ein fokussiertes Feld liegt unter dem Stapel (beim Oeffnen darunter: ${underStack.join(', ')})`);
+    assert.equal(measured.toastVisible, true, 'mindestens ein Toast muss sichtbar bleiben');
+  } finally {
+    await page.close();
+  }
+});
+

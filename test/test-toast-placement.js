@@ -135,6 +135,38 @@ test('ein Vollbild-Dialog mit Kopf und Fuss: der Stapel liegt dazwischen, nicht 
   assert.ok(r && r.bottom <= footer.top && r.top >= header.bottom, 'zwischen Kopf und Fuss');
 });
 
+/*
+ * WCAG 2.4.11 (a11y-Runde auf 64cc2f5c0): Knoepfe hielt der Stapel frei, das
+ * FOKUSSIERTE Feld nicht. Im Budget-Dialog bei 375 lag `#bm-title` ganz unter
+ * dem Toast, wer per Tab dorthin kam, sah seinen Fokus nicht. Hier liegt der
+ * Stapel mitten im Koerper eines Vollbild-Dialogs, beruehrt keine Leiste und
+ * blieb deshalb stehen (Lage 4) - auf dem Feld, das gerade den Fokus hat.
+ */
+test('WCAG 2.4.11: das fokussierte Feld in einem Vollbild-Dialog bleibt frei (375x812)', () => {
+  const dialog = box(0, 0, 375, 812);
+  const header = box(0, 0, 375, 64);
+  const footer = box(740, 0, 375, 72);
+  const field = box(610, 16, 343, 44);
+  const input = {
+    viewport: { width: 375, height: 812 },
+    gap: 12,
+    stack: box(600, 16, 343, 66),
+    dockedHeight: 66,
+    dockedWidth: 343,
+    dockedCenter: 187.5,
+    primary: dialog,
+    dialogs: [dialog],
+    zones: [header, footer],
+    focused: field,
+  };
+  const r = placedRect(input, chooseToastPlacement(input));
+  assert.ok(r, 'der Stapel bleibt auf dem fokussierten Feld stehen');
+  assert.ok(!intersects(r, field), `Stapel ${Math.round(r.top)}..${Math.round(r.bottom)} verdeckt das Feld ${field.top}..${field.bottom}`);
+  assert.ok(!intersects(r, header) && !intersects(r, footer), 'und dabei keine Leiste');
+  // Ohne Fokus im Dialog bleibt es bei der alten Lage: ein Feld allein ist keine Leiste.
+  assert.equal(chooseToastPlacement({ ...input, focused: null }), null, 'ohne Fokus springt der Stapel nicht');
+});
+
 test('der Popover aus dem Review: der Stapel legt sich nicht auf die untere Navigation (800x900)', () => {
   const popover = box(50, 200, 400, 750);
   const nav = box(824, 0, 800, 76);

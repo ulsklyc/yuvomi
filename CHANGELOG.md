@@ -260,8 +260,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   saved nothing, without any message. While a dialog is open, messages at the bottom of the screen
   now move out of the way of its title bar and buttons: above the dialog when there is room (on a
   phone, the strip above the sheet), otherwise just above the dialog's buttons. This holds for the
-  welcome tour and for pickers inside a form, such as choosing a document, too. They always stay
-  on screen and can still be dismissed. (#1160)
+  welcome tour and for pickers inside a form, such as choosing a document, too. They also keep
+  clear of the field you are typing in and of expandable sections such as "More settings", so a
+  field reached with the Tab key is never hidden behind a message. They always stay on screen and
+  can still be dismissed. (#1160)
 
 - **Deleting a folder no longer reveals activity on documents you cannot see.** Before deleting a
   folder the app asks the server what the deletion would affect and sends that answer back with the

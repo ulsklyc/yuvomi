@@ -62,6 +62,15 @@
  * misst neu. Welcher Dialog welche Leisten auszeichnet, haelt das Register in
  * test/test-toast-placement.js fest.
  *
+ * DAZU DAS FOKUSSIERTE ELEMENT (WCAG 2.4.11, Focus Not Obscured): ein Feld ist
+ * keine Leiste, aber wer per Tab darauf landet, muss seinen Fokus sehen. Die
+ * a11y-Runde auf 64cc2f5c0 mass im Budget-Dialog bei 375px `#bm-title` ganz
+ * unter dem Toast, in "Mitglied bearbeiten" und Housekeeping ebenso ein Feld.
+ * Frei gehalten wird nur das GERADE fokussierte Element, nicht jedes Feld -
+ * sonst faende der Stapel in einem Formular nie Platz und klappte staendig
+ * ein. Es zaehlt nur, wenn es in einem offenen Dialog liegt und nicht der
+ * Dialog selbst ist; `focusin` misst neu, beschnitten wie die Knoepfe.
+ *
  * FINDET SICH KEIN FREIER PLATZ und stehen mehrere Toasts im Stapel, zeigt er
  * nur noch den juengsten (bei 568x320 deckten drei Toasts im Kalender-Editor
  * dessen Kopf). Die uebrigen bleiben im Dokument, zurueckgenommen
@@ -79,8 +88,12 @@ export const DIALOG_SELECTOR = '[role="dialog"]';
 export const ACTION_ZONE_SELECTOR =
   '.modal-panel__header, .modal-panel__footer, .modal-actions, [data-dialog-actions]';
 
-/** Immer dazu: die Bedienelemente selbst. */
-const CONTROL_SELECTOR = 'button, [type="submit"], a[href], [role="button"]';
+/**
+ * Immer dazu: die Bedienelemente selbst. `summary` ist der Ausloeser einer
+ * Klappe ("Weitere Einstellungen" im Budget-Dialog) und nimmt einen Klick wie
+ * ein Knopf; lag der Toast darauf, traf ein Klick dort den Toast.
+ */
+const CONTROL_SELECTOR = 'button, [type="submit"], a[href], [role="button"], summary';
 
 /** Rueckfall fuer einen Dialog ganz ohne Knoepfe (Datumswahl ohne Leiste). */
 const FIELD_SELECTOR = 'input, select, textarea, [tabindex]:not([tabindex="-1"])';
@@ -112,15 +125,18 @@ function overlapArea(a, b) {
  * @param {Array<DOMRect|object>} input.zones   alle Bedienleisten
  * @param {Array<DOMRect|object>} [input.keepClear=[]] Shell-Flaechen, die frei
  *        bleiben muessen, solange daneben Platz ist (die sichtbare untere Navigation)
+ * @param {DOMRect|object|null} [input.focused=null] das fokussierte Element im
+ *        Dialog; es zaehlt wie eine Bedienleiste (WCAG 2.4.11)
  * @returns {null | {top: number, covers: boolean}} null = der Stapel bleibt,
  *          wo er steht; `covers` = auch diese Lage beruehrt eine Leiste
  */
 export function chooseToastPlacement({
   viewport, gap, safeTop = 0, safeBottom = 0,
   stack, dockedHeight, dockedWidth, dockedCenter,
-  primary, dialogs, zones, keepClear = [],
+  primary, dialogs, zones: marked, keepClear = [], focused = null,
 }) {
   if (!dialogs.some((d) => intersects(stack, d))) return null;
+  const zones = focused ? [...marked, focused] : marked;
 
   const h = dockedHeight;
   const left = dockedCenter - dockedWidth / 2;
@@ -226,6 +242,21 @@ function clippedRect(el, dialog) {
   }
   if (bottom - top <= 0 || right - left <= 0) return null;
   return { top, bottom, left, right, width: right - left, height: bottom - top };
+}
+
+/**
+ * Das fokussierte Element, wenn es in einem der offenen Dialoge liegt -
+ * beschnitten auf seinen sichtbaren Ausschnitt. Fokus auf `body`, ausserhalb
+ * der Dialoge oder auf dem Dialog selbst (openModal fokussiert das Panel)
+ * zaehlt nicht: dessen Rechteck ist der ganze Dialog.
+ */
+function focusedRect(dialogEls) {
+  const active = document.activeElement;
+  if (!active || active === document.body || active === document.documentElement) return null;
+  const dialog = active.closest(DIALOG_SELECTOR);
+  if (!dialog || active === dialog || !dialogEls.includes(dialog)) return null;
+  if (active.getClientRects().length === 0) return null;
+  return clippedRect(active, dialog);
 }
 
 function visibleRects(elements, dialog) {
@@ -390,6 +421,7 @@ export function placeToastStack(stack) {
     dialogs,
     zones,
     keepClear: uncoveredChrome(),
+    focused: focusedRect(dialogEls),
   };
   let decision = chooseToastPlacement(input);
   // Kein freier Platz fuer den ganzen Stapel: nur der letzte Toast bleibt sichtbar.
@@ -481,6 +513,14 @@ export function watchToastPlacement(stack) {
     onSettled();
   };
   document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+  // Das fokussierte Feld zaehlt als Bedienflaeche (WCAG 2.4.11): ein Tab in
+  // einem Dialog misst neu. Fokus ohne offenen Dialog oder ausserhalb von ihm
+  // steigt vor jeder Messung aus.
+  const onFocus = (event) => {
+    if (!observedDialogs.some((d) => d.contains(event.target))) return;
+    schedule();
+  };
+  document.addEventListener('focusin', onFocus);
   schedule();
 
   return () => {
@@ -492,6 +532,7 @@ export function watchToastPlacement(stack) {
     window.removeEventListener('resize', schedule);
     window.visualViewport?.removeEventListener('resize', onSettled);
     document.removeEventListener('scroll', onScroll, { capture: true });
+    document.removeEventListener('focusin', onFocus);
     document.removeEventListener('animationend', onSettled, true);
     document.removeEventListener('transitionend', onSettled, true);
     undock(stack);
