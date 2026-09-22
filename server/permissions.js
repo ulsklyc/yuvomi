@@ -404,16 +404,18 @@ export function mayWriteModule(req, moduleKey) {
  * Darf dieses Credential in diesem Modul LESEN? Das Gegenstueck zu
  * `mayWriteModule()`, beide Achsen in einem Aufruf.
  *
- * Fuer Routen, die unter dem Praefix ihres ZIELS haengen und dabei ein
- * anderes Modul als Quelle lesen: `POST /pantry/import-shopping` liest
- * abgehakte Einkaufsartikel, `POST /shopping/:listId/import-pantry` liest
- * Vorratszeilen. Der Pfad-Guard in server/index.js misst nur das Ziel; was
- * aus der Quelle kopiert wird, ist danach im Ziel lesbar. Ohne diese Frage las
- * ein Mitglied mit `shopping: none` die Einkaufsliste ueber den Vorrat.
+ * Fuer jede Stelle, deren Pfad einem Modul gehoert und die Daten eines
+ * ANDEREN liest: die Importe zwischen Vorrat und Einkauf, die Kontakt- und
+ * Geburtstagsfelder der Split-Kandidaten, Buchungen am Inventar, Vorratszeilen
+ * am Rezept, Belege, Geburtstags-Importkandidaten. Der Pfad-Guard in
+ * server/index.js misst nur das eigene Modul.
+ *
+ * EINE REGEL: gebaut auf `hiddenModulesFor()`, damit "lesen darf" und "wird
+ * ausgeblendet" nie auseinanderlaufen. Kein Nachbau aus `tokenAllows()` und
+ * `deniedModules()` an der Aufrufstelle.
  */
 export function mayReadModule(req, moduleKey) {
-  return tokenAllows(req?.authScopes, moduleKey, 'read')
-    && moduleAccessVerdict(req?.sessionModuleAccess, moduleKey, 'read') === MODULE_ACCESS_ALLOW;
+  return !hiddenModulesFor(req, [moduleKey]).has(moduleKey);
 }
 
 // Urteil der Modulrechte-Prüfung. 'allow' = durchlassen, 'none' = Modul ganz

@@ -43,6 +43,10 @@ app.use((req, _res, next) => {
   // cookieSession: eine Sitzung, die neben einem API-Token mitkommt - requireAuth
   // setzt authUserId/authRole dann aus dem Token, req.session bleibt die Sitzung.
   req.session = actor.cookieSession ?? { userId: actor.id, role: actor.role };
+  // Beide Rechte-Achsen wie in requireAuth/applyRoleModuleAccess; ohne Angabe
+  // unbeschraenkt, damit die uebrigen Faelle unveraendert laufen.
+  req.sessionModuleAccess = actor.moduleAccess ?? null;
+  req.authScopes = actor.scopes ?? null;
   next();
 });
 app.use('/', splitRouter);
@@ -809,6 +813,55 @@ test('verwaister Gast: Suche liefert nichts (kein Fallback auf "unbeschränkt")'
 test('verwaister Gast darf weiterhin keine Gruppe anlegen -> 403', async () => {
   const r = await call('POST', '/groups', { actor: { id: ORPHAN_ID, role: 'member' }, body: { name: 'Freigeschaltet?' } });
   assert.equal(r.status, 403);
+});
+
+// --------------------------------------------------------------------------
+// member-candidates liest Kontakte und Geburtstage: die Felder folgen deren
+// Leserecht (Kontakte = `contacts`, Geburtstage = `calendar`), auf beiden
+// Achsen. Die Route bleibt offen - die Auswahl der Haushaltsmitglieder
+// braucht nur Name und ID.
+// --------------------------------------------------------------------------
+test('member-candidates: Kontakt- und Geburtstagsfelder folgen dem Leserecht', async () => {
+  db.prepare("UPDATE contacts SET family_user_id = NULL WHERE family_user_id = ?").run(OWNER);
+  db.prepare(`INSERT INTO contacts (name, phone, email, family_user_id) VALUES ('Owner Kontakt', '+49 111', 'owner@example.test', ?)`).run(OWNER);
+  db.prepare(`INSERT INTO contacts (name, phone, email, birthday) VALUES ('Nachbarin Kandidat', '+49 222', 'nachbarin@example.test', '1980-05-06')`).run();
+  db.prepare(`INSERT INTO birthdays (name, birth_date, created_by, family_user_id) VALUES ('Owner', '1975-01-02', ?, ?)`).run(OWNER, OWNER);
+
+  const path = `/groups/${GROUP}/member-candidates`;
+  const owner = (rows) => rows.find((r) => r.source === 'user' && r.user_id === OWNER);
+  const nachbarin = (rows) => rows.find((r) => r.source === 'contact' && r.display_name === 'Nachbarin Kandidat');
+
+  // Vorbedingung: mit allen Rechten stehen die Felder da, sonst misst der Rest nichts.
+  const voll = await call('GET', path, { actor: { id: OWNER, role: 'member' } });
+  assert.equal(voll.status, 200);
+  assert.equal(owner(voll.body.data).phone, '+49 111');
+  assert.equal(owner(voll.body.data).email, 'owner@example.test');
+  assert.equal(owner(voll.body.data).birth_date, '1975-01-02');
+  assert.equal(nachbarin(voll.body.data)?.email, 'nachbarin@example.test');
+
+  const ohneKontakte = await call('GET', path, { actor: { id: OWNER, role: 'member', moduleAccess: { contacts: 'none' } } });
+  assert.equal(ohneKontakte.status, 200, 'die Auswahl der Haushaltsmitglieder bleibt');
+  assert.equal(owner(ohneKontakte.body.data).display_name, 'OWNER');
+  assert.equal(owner(ohneKontakte.body.data).phone, null, 'keine Telefonnummer ohne contacts');
+  assert.equal(owner(ohneKontakte.body.data).email, null, 'keine E-Mail ohne contacts');
+  assert.equal(owner(ohneKontakte.body.data).birth_date, '1975-01-02', 'der Geburtstag haengt am Kalender, nicht an contacts');
+  assert.equal(ohneKontakte.body.data.some((r) => r.source === 'contact'), false, 'keine Kontakte als Kandidaten');
+
+  const ohneKalender = await call('GET', path, { actor: { id: OWNER, role: 'member', moduleAccess: { calendar: 'none' } } });
+  assert.equal(owner(ohneKalender.body.data).birth_date, null, 'kein Geburtstag ohne calendar');
+  assert.equal(owner(ohneKalender.body.data).phone, '+49 111', 'Kontaktfelder bleiben mit contacts');
+  assert.equal(nachbarin(ohneKalender.body.data)?.birth_date, '1980-05-06', 'der Geburtstag eines Kontakts ist Kontaktdatum');
+
+  const lesend = await call('GET', path, { actor: { id: OWNER, role: 'member', moduleAccess: { contacts: 'read', calendar: 'read' } } });
+  assert.equal(owner(lesend.body.data).phone, '+49 111', 'read reicht');
+  assert.equal(owner(lesend.body.data).birth_date, '1975-01-02');
+
+  const token = await call('GET', path, { actor: { id: OWNER, role: 'member', scopes: ['budget:write'] } });
+  assert.equal(token.status, 200);
+  assert.equal(owner(token.body.data).phone, null, 'Token ohne contacts:read');
+  assert.equal(owner(token.body.data).email, null);
+  assert.equal(owner(token.body.data).birth_date, null, 'Token ohne calendar:read');
+  assert.equal(token.body.data.some((r) => r.source === 'contact'), false);
 });
 
 test('teardown: Server schließen', async () => {

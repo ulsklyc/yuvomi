@@ -89,7 +89,7 @@ export function splitexpensesPaths() {
       post: op({ summary: 'Add member to group', tag: 'SplitExpenses', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/split-expenses/groups/{id}/member-candidates': {
-      get: op({ summary: 'List users and contacts that can be added to a group', tag: 'SplitExpenses', params: [idParam()] }),
+      get: op({ summary: 'List users and contacts that can be added to a group', description: 'Phone and email come only with read access to the Contacts module, a member\'s birthday only with read access to the Calendar module (for API tokens `contacts:read` and `calendar:read`); otherwise they are null. Contacts are offered as candidates only with Contacts access.', tag: 'SplitExpenses', params: [idParam()] }),
     },
     '/api/v1/split-expenses/groups/{id}/members/{userId}': {
       delete: op({ summary: 'Remove member from group', tag: 'SplitExpenses', params: [idParam(), { name: 'userId', in: 'path', required: true, schema: { type: 'integer' } }], stateChanging: true }),

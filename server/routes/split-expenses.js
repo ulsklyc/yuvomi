@@ -20,6 +20,7 @@ import { CURRENCY_CODES } from '../../public/utils/currency-codes.js';
 import { syncBirthdayArtifacts } from '../services/birthdays.js';
 import { householdMemberSql, newNonMembers, staffMessage } from '../services/household-members.js';
 import { todayKey } from '../utils/timezone.js';
+import { mayReadModule } from '../permissions.js';
 
 const log = createLogger('SplitExpenses');
 const router = express.Router();
@@ -700,15 +701,29 @@ router.get('/groups/:id/member-candidates', (req, res) => {
         AND NOT EXISTS (SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = u.id)
       ORDER BY display_name COLLATE NOCASE ASC
     `).all({ groupId });
-    const contacts = db.get().prepare(`
+    // DIE FELDER FOLGEN DEM RECHT IHRER QUELLE. Der Pfad gehoert `budget`,
+    // Telefon und E-Mail kommen aber aus `contacts`, das Geburtsdatum eines
+    // Mitglieds aus den Geburtstagen (`calendar`). Ohne das jeweilige
+    // Leserecht (Mitgliedsrecht UND Token-Scope) bleiben die Felder null, und
+    // freie Kontakte werden gar nicht erst angeboten. Die Route selbst bleibt
+    // offen: die Auswahl braucht nur Name und ID der Haushaltsmitglieder.
+    const readsContacts = mayReadModule(req, 'contacts');
+    const readsBirthdays = mayReadModule(req, 'calendar');
+    const visiblePeople = people.map((row) => ({
+      ...row,
+      phone: readsContacts ? row.phone : null,
+      email: readsContacts ? row.email : null,
+      birth_date: readsBirthdays ? row.birth_date : null,
+    }));
+    const contacts = readsContacts ? db.get().prepare(`
       SELECT 'contact' AS source, NULL AS user_id, c.id AS contact_id, c.name AS display_name,
              NULL AS username, '#2563EB' AS avatar_color, 'other' AS family_role,
              c.phone, c.email, c.birthday AS birth_date, 0 AS in_group, NULL AS group_role
       FROM contacts c
       WHERE c.family_user_id IS NULL
       ORDER BY c.name COLLATE NOCASE ASC
-    `).all();
-    res.json({ data: [...people, ...contacts] });
+    `).all() : [];
+    res.json({ data: [...visiblePeople, ...contacts] });
   } catch (err) {
     log.error('GET /groups/:id/member-candidates error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

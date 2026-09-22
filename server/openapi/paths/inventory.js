@@ -100,7 +100,7 @@ export function inventoryPaths() {
     '/api/v1/inventory/items/{id}/history': {
       get: op({
         summary: "Get an item's service history",
-        description: 'Read-only aggregation of service-log entries, linked budget entries (maintenance/accessory roles) and linked documents into one dated timeline, with a cost total - no separate store. Budget-entry and document visibility follow their existing rules (personal/shared budget mode, document sharing) with no admin bypass. Without access to the Documents module (for API tokens a `documents:read` scope) linked documents are left out of the timeline.',
+        description: 'Read-only aggregation of service-log entries, linked budget entries (maintenance/accessory roles) and linked documents into one dated timeline, with a cost total - no separate store. Budget-entry and document visibility follow their existing rules (personal/shared budget mode, document sharing) with no admin bypass. Without access to the Documents module (for API tokens a `documents:read` scope) linked documents are left out of the timeline, and without access to the Budget module (for API tokens a `budget:read` scope) linked budget entries are left out as well and the total is 0.',
         tag: 'Inventory',
         params: [idParam('id', 'Item ID')],
       }),
@@ -108,6 +108,7 @@ export function inventoryPaths() {
     '/api/v1/inventory/entries/{entryId}/items': {
       get: op({
         summary: 'List inventory items linked to a budget entry',
+        description: 'Needs read access to the Budget module (for API tokens a `budget:read` scope); without it the entry answers 404 like an unknown one.',
         tag: 'Inventory',
         params: [idParam('entryId', 'Budget entry ID')],
       }),
