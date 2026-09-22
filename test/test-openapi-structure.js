@@ -74,10 +74,11 @@ test('meals apply-plan documents skip_occupied and the skipped answer (Discussio
   assert.deepEqual(body.required, ['assignments']);
   const ok = post.responses[201].content['application/json'].schema;
   assert.deepEqual(ok.required, ['data']);
-  assert.deepEqual(ok.properties.skipped.items.required, ['date', 'meal_type', 'reason']);
+  assert.deepEqual(ok.properties.skipped.items.required, ['index', 'date', 'meal_type', 'reason']);
+  assert.equal(ok.properties.skipped.items.properties.index.type, 'integer');
   assert.deepEqual(ok.properties.skipped.items.properties.reason.enum, ['occupied']);
   assert.match(post.description, /`skip_occupied` and `replace_existing` together are refused with 400/);
-  assert.match(post.responses[400].description, /skip_occupied/);
+  assert.match(post.responses[400].description, /`skip_occupied` that is not a boolean/);
 });
 const indexSrc = readFileSync(new URL('index.js', pathsDir), 'utf8');
 const moduleFiles = readdirSync(pathsDir)

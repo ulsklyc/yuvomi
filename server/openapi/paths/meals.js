@@ -55,7 +55,7 @@ export function mealsPaths() {
       post: op({
         summary: 'Apply a set of planned meals at once',
         tag: 'Meals',
-        description: 'Body: { assignments, replace_existing?, skip_occupied? }. Creates one meal per assignment (`date`, `meal_type`, `title`, optional `notes`, `recipe_url`, `recipe_id`, `ingredients`) in a single transaction and returns them. Without `replace_existing` or `skip_occupied`, nothing is skipped or overwritten: the new meals are added next to any meal already planned for the same date and meal type. With `replace_existing: true`, every meal already planned for a date and meal type pair named in `assignments` is deleted first (an occurrence of a weekly series is excepted from the series, so it does not come back); other slots stay untouched. With `skip_occupied: true`, an assignment whose date and meal type pair already holds a meal before the call is not created and is listed in `skipped` instead; an occurrence of a weekly series counts as a meal even if its week was never opened, a deleted occurrence does not. Several assignments for the same pair that was empty before the call are all created. `skip_occupied` and `replace_existing` together are refused with 400. If any assignment is invalid or names an unknown recipe, the request is refused with 400 and nothing is written.',
+        description: 'Body: { assignments, replace_existing?, skip_occupied? }. Creates one meal per assignment (`date`, `meal_type`, `title`, optional `notes`, `recipe_url`, `recipe_id`, `ingredients`) in a single transaction and returns them. Without `replace_existing` or `skip_occupied`, nothing is skipped or overwritten: the new meals are added next to any meal already planned for the same date and meal type. With `replace_existing: true`, every meal already planned for a date and meal type pair named in `assignments` is deleted first (an occurrence of a weekly series is excepted from the series, so it does not come back); other slots stay untouched. With `skip_occupied: true`, an assignment whose date and meal type pair already holds a meal before the call is not created and is listed in `skipped` instead, with its position in `assignments` as `index`; an occurrence of a weekly series counts as a meal even if its week was never opened, a deleted occurrence does not. Several assignments for the same pair that was empty before the call are all created. `skip_occupied` and `replace_existing` together are refused with 400. If any assignment is invalid or names an unknown recipe, the request is refused with 400 and nothing is written.',
         stateChanging: true,
         requestBody: {
           required: true,
@@ -83,7 +83,7 @@ export function mealsPaths() {
                     },
                   },
                   replace_existing: { type: 'boolean', default: false, description: 'Delete the meals of every named date and meal type pair first.' },
-                  skip_occupied: { type: 'boolean', default: false, description: 'Only fill pairs that are empty before the call; the others come back in `skipped`. Cannot be combined with `replace_existing`.' },
+                  skip_occupied: { type: 'boolean', default: false, description: 'Only fill pairs that are empty before the call; the others come back in `skipped`. Must be a JSON boolean (anything else is refused with 400). Cannot be combined with `replace_existing`.' },
                 },
               },
             },
@@ -103,8 +103,9 @@ export function mealsPaths() {
                       type: 'array',
                       items: {
                         type: 'object',
-                        required: ['date', 'meal_type', 'reason'],
+                        required: ['index', 'date', 'meal_type', 'reason'],
                         properties: {
+                          index: { type: 'integer', minimum: 0, description: 'Position of the skipped assignment in `assignments`.' },
                           date: { type: 'string', format: 'date' },
                           meal_type: { type: 'string', enum: ['breakfast', 'lunch', 'dinner', 'snack'] },
                           reason: { type: 'string', enum: ['occupied'] },
@@ -116,7 +117,7 @@ export function mealsPaths() {
               },
             },
           },
-          400: { description: 'Missing or invalid assignments, an unknown recipe_id, or `skip_occupied` together with `replace_existing`. Nothing is written.' },
+          400: { description: 'Missing or invalid assignments, an unknown recipe_id, `skip_occupied` that is not a boolean, or `skip_occupied` together with `replace_existing`. Nothing is written.' },
           401: { $ref: '#/components/responses/Unauthorized' },
           500: { $ref: '#/components/responses/InternalServerError' },
         },
