@@ -971,14 +971,15 @@ router.get('/:id', (req, res) => {
 
     addAssignedUsers(task);
     task.subtasks = loadSubtasks(task.id, me);
-    attachDocumentCounts([task], documentViewer(req));
+    const viewer = documentViewer(req);
+    attachDocumentCounts([task], viewer);
     // Die verknüpften Dokumente beim Namen, nicht nur gezählt (#733). Die
     // Detailansicht zeigte hier seit jeher eine Zeile „Dokumente" an, las dafür
     // aber ein Feld, das die API nie gefüllt hat - die Zeile war deshalb immer
     // leer, egal wie viele Dokumente an der Aufgabe hingen. Die Liste kommt aus
     // derselben Funktion wie GET /:id/documents, also mit derselben
     // Sichtbarkeitsprüfung - und ohne Dokumentenrecht `null` (#1358).
-    task.documents = loadTaskDocuments(task.id, documentViewer(req));
+    task.documents = loadTaskDocuments(task.id, viewer);
     attachTags([task]);
     res.json({ data: task });
   } catch (err) {

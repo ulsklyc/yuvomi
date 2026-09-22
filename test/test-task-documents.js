@@ -247,6 +247,9 @@ test('deleting a document cascades and removes the link', async () => {
 const NO_DOCS = [
   ['documents: none', { userId: BOB, role: 'member', moduleAccess: { documents: 'none' } }],
   ['Token ohne documents-Scope', { userId: BOB, role: 'member', authMethod: 'api_token', authScopes: ['tasks:write'] }],
+  // Der Admin sieht jedes Familien-Dokument - sein Token ohne documents-Scope
+  // trotzdem nicht: der Scope schneidet, die Rolle erweitert nicht.
+  ['Admin-Token ohne documents-Scope', { userId: ALICE, role: 'admin', authMethod: 'api_token', authScopes: ['tasks:write'] }],
 ];
 
 function linkedIds(taskId) {
@@ -261,6 +264,7 @@ test('Dokumentenrecht: ohne documents-Lesen nennen Liste, Detail und GET /docume
 
   const readable = [
     ['Mitglied', { userId: BOB, role: 'member' }],
+    ['Admin-Sitzung', { userId: ALICE, role: 'admin' }],
     ['documents: read', { userId: BOB, role: 'member', moduleAccess: { documents: 'read' } }],
     ['Token mit documents:read', { userId: BOB, role: 'member', authMethod: 'api_token', authScopes: ['tasks:read', 'documents:read'] }],
   ];
@@ -291,8 +295,11 @@ test('Dokumentenrecht: ohne documents-Lesen nennen Liste, Detail und GET /docume
       const docs = await h.call('GET', `/${taskId}/documents`);
       assert.equal(docs.status, 403, `${label}: GET /documents ist 403`);
       assert.equal(docs.body.code, 403);
-      assert.doesNotMatch(JSON.stringify([detail.body, list.body, docs.body]), new RegExp(`Doc-|"id":${docId}\\b`),
-        `${label}: weder Name noch ID irgendwo in den Antworten`);
+      // Nur Felder, die ein DOKUMENT benennen: eine blanke `"id":N`-Suche
+      // traefe auch eine Aufgabe mit derselben Nummer.
+      assert.doesNotMatch(JSON.stringify([detail.body, list.body, docs.body]),
+        /Doc-|file\.pdf|application\/pdf|"document_id"|"documents":\[/,
+        `${label}: weder Name, Datei, Typ noch Dokumentliste in den Antworten`);
     } finally { await h.close(); }
   }
 });
@@ -321,10 +328,14 @@ test('Dokumentenrecht: ohne documents-Lesen verknuepft PUT nichts, jede ID antwo
       } finally { unlockDocumentDeletes([stored]); }
       assert.deepEqual(linkedIds(taskId), [stored], `${label}: nichts verknuepft`);
 
-      const kept = await h.call('PUT', `/${taskId}/documents`, { document_ids: [] });
-      assert.equal(kept.status, 200, `${label}: eine leere Liste ist kein Verknuepfen`);
-      assert.equal(kept.body.data, null, `${label}: und die Antwort nennt nichts`);
-      assert.deepEqual(linkedIds(taskId), [stored], `${label}: und loest nichts, was er nicht sieht`);
+      // Leer, `null` oder gar kein Feld: kein Verknuepfen - und mit Recht hiesse
+      // jede der drei "alle sichtbaren loesen", ohne Recht loest keine etwas.
+      for (const [form, body] of [['[]', { document_ids: [] }], ['null', { document_ids: null }], ['ohne Feld', {}]]) {
+        const kept = await h.call('PUT', `/${taskId}/documents`, body);
+        assert.equal(kept.status, 200, `${label}, ${form}: kein Verknuepfen`);
+        assert.equal(kept.body.data, null, `${label}, ${form}: und die Antwort nennt nichts`);
+        assert.deepEqual(linkedIds(taskId), [stored], `${label}, ${form}: und loest nichts, was er nicht sieht`);
+      }
     } finally { await h.close(); }
   }
 
