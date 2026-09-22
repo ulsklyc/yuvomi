@@ -83,6 +83,24 @@ function buildCalDAVICS(event, householdZone = null) {
 // Helper Functions
 // --------------------------------------------------------
 
+/** Migration, mit der #891 den Import aufhoeren liess, Kalenderfarben einzubrennen. */
+const LEGACY_COLOR_FIX_MIGRATION = 166;
+
+/**
+ * Wann diese Installation den Fix aus #891 bekam (`applied_at` von Migration
+ * 166), oder null ohne `schema_migrations` - das gibt es nur in gekuerzten
+ * Test-Fixtures, nie nach `migrate()`. Aeltere Zeilen koennen eine
+ * eingebrannte Farbe tragen, juengere nicht (#1270).
+ */
+function legacyColorCutoff(conn) {
+  const hasTable = conn.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'"
+  ).get();
+  if (!hasTable) return null;
+  return conn.prepare('SELECT applied_at FROM schema_migrations WHERE version = ?')
+    .get(LEGACY_COLOR_FIX_MIGRATION)?.applied_at ?? null;
+}
+
 /** sync_config-Schluessel des einmaligen Farb-Heilungslaufs je Konto (#1270). */
 function legacyColorHealKey(accountId) {
   return `caldav_legacy_color_heal_done_${accountId}`;
@@ -90,7 +108,8 @@ function legacyColorHealKey(accountId) {
 
 /**
  * Die Kalenderfarben, die der alte Import (bis v2.48) in Termine DIESES Kontos
- * eingebrannt haben kann (#1270), kleingeschrieben.
+ * eingebrannt haben kann (#1270), kleingeschrieben - und die Kalender-URLs, die
+ * dem Konto dabei zugerechnet werden (`urls`), fuer die Pruefung am Laufende.
  *
  * Zwei Quellen. Die Auswahl des Kontos traegt jeden Kalender, den der Server
  * noch meldet, auch abgewaehlte. Ein inzwischen auf dem Server GELOESCHTER
@@ -107,11 +126,13 @@ function legacyColorHealKey(accountId) {
 function legacyCalendarColors(conn, accountId) {
   const home = (url) => String(url).replace(/\/+$/, '').replace(/\/[^/]*$/, '/');
   const colors = new Set();
+  const urls = new Set();
   const homes = new Set();
   const own = conn.prepare(
     'SELECT calendar_url, calendar_color FROM caldav_calendar_selection WHERE account_id = ?'
   ).all(accountId);
   for (const row of own) {
+    urls.add(row.calendar_url);
     homes.add(home(row.calendar_url));
     if (row.calendar_color) colors.add(String(row.calendar_color).toLowerCase());
   }
@@ -123,9 +144,10 @@ function legacyCalendarColors(conn, accountId) {
   ).all();
   for (const row of known) {
     if (foreign.has(row.external_id) || !homes.has(home(row.external_id))) continue;
+    urls.add(row.external_id);
     colors.add(String(row.color).toLowerCase());
   }
-  return colors;
+  return { colors, urls };
 }
 
 function normalizeCalColor(c) {
@@ -239,15 +261,17 @@ async function addAccount(name, caldavUrl, username, password, { createClient } 
     // weitere Abgrenzung kostet wenig: die Heilung laeuft auch dann nur an
     // Zeilen, die DIESES Konto per UID wiedersieht, und nur mit seinen
     // Kalenderfarben.
+    const cutoff = legacyColorCutoff(db.get());
     const orphaned = db.get().prepare(`
       SELECT 1 FROM calendar_events e
       LEFT JOIN external_calendars x ON x.id = e.calendar_ref_id
       WHERE e.external_source = 'caldav'
         AND e.color_modified = 1 AND e.color IS NOT NULL
+        AND (? IS NULL OR datetime(e.created_at) < datetime(?))
         AND (x.external_id IS NULL
              OR x.external_id NOT IN (SELECT calendar_url FROM caldav_calendar_selection))
       LIMIT 1
-    `).get();
+    `).get(cutoff, cutoff);
     if (!orphaned) {
       db.get().prepare(
         "INSERT INTO sync_config (key, value) VALUES (?, '1') ON CONFLICT(key) DO UPDATE SET value = excluded.value"
@@ -658,9 +682,33 @@ async function runSync({ createClient } = {}) {
   // Server selbst, und die Heilung erreicht ihn nicht mehr.
   // Geheilt wird zum Zustand "nie eine gelernt" (color_modified = 0), damit
   // der Ausgang auf dem Server nichts loescht.
-  const healBurntInColor = conn.prepare(
-    'UPDATE calendar_events SET color = NULL, color_modified = 0 WHERE id = ? AND color_modified = 1'
-  );
+  //
+  // NUR ZEILEN, DIE AELTER SIND ALS DER FIX. Eingebrannt hat allein der Import
+  // vor #891, und #891 kam mit Migration 166. Eine Zeile, die nach deren
+  // `applied_at` angelegt wurde, hat nie eine geerbte Farbe bekommen - auch
+  // nicht auf einem Konto, das zwischen v2.49 und diesem Update angelegt
+  // wurde, und auch nicht nach einem Loeschen und Neuanlegen des Kontos. Ohne
+  // `schema_migrations` (nur in gekuerzten Test-Fixtures, nie nach
+  // `migrate()`) gilt keine Altersgrenze.
+  const legacyCutoff = legacyColorCutoff(conn);
+  const healBurntInColor = conn.prepare(`
+    UPDATE calendar_events SET color = NULL, color_modified = 0
+    WHERE id = ? AND color_modified = 1
+      AND (? IS NULL OR datetime(created_at) < datetime(?))
+  `);
+  // Am Laufende: gibt es noch Altzeilen dieses Kontos, die der Lauf NICHT
+  // gesehen hat? Dann wartet der Merker, egal aus welchem Grund die Zeile
+  // ausblieb - abgewaehlter Kalender, verworfener VEVENT, leere Antwort,
+  // gescheiterter Prune, Kalender ohne VEVENT-Unterstuetzung. Eine Liste
+  // solcher Gruende veraltet mit dem naechsten Pfad, diese Frage nicht.
+  const selLegacyCandidates = conn.prepare(`
+    SELECT e.id, e.color, x.external_id AS calendar_url
+    FROM calendar_events e
+    JOIN external_calendars x ON x.id = e.calendar_ref_id
+    WHERE e.external_source = 'caldav'
+      AND e.color_modified = 1 AND e.color IS NOT NULL
+      AND (? IS NULL OR datetime(e.created_at) < datetime(?))
+  `);
   const selHealMarker = conn.prepare('SELECT 1 AS done FROM sync_config WHERE key = ?');
   const setHealMarker = conn.prepare(
     "INSERT INTO sync_config (key, value) VALUES (?, '1') ON CONFLICT(key) DO UPDATE SET value = excluded.value"
@@ -702,7 +750,11 @@ async function runSync({ createClient } = {}) {
 
       // Einmalige Heilung eingebrannter Kalenderfarben (#1270), siehe oben.
       const healKey = legacyColorHealKey(account.id);
-      const burntInColors = selHealMarker.get(healKey) ? null : legacyCalendarColors(conn, account.id);
+      const legacy = selHealMarker.get(healKey) ? null : legacyCalendarColors(conn, account.id);
+      const burntInColors = legacy?.colors ?? null;
+      // Zeilen, die dieser Lauf MIT COLOR-Zeile gesehen hat: die gehoeren dem
+      // Termin, sie stehen der Heilung nicht mehr offen.
+      const seenWithColor = new Set();
       // Faellt ein Kalender oder ein Termin aus, hat die Heilung nicht alles
       // gesehen, und der Merker wartet auf den naechsten Lauf.
       let healComplete = true;
@@ -748,6 +800,7 @@ async function runSync({ createClient } = {}) {
         // Termine dieses Kalenders in Ruhe lässt.
         if (!supportsComponent(serverCal, 'VEVENT')) {
           log.warn(`Calendar ${selCal.calendar_name} does not accept events, disabling.`);
+          healComplete = false;
           db.get().prepare(`
             UPDATE caldav_calendar_selection SET enabled = 0
             WHERE account_id = ? AND calendar_url = ?
@@ -847,10 +900,14 @@ async function runSync({ createClient } = {}) {
                   obj.url ?? null,
                 ];
                 // Vor dem Update: danach sieht der Vergleich den geheilten Stand.
-                const healed = !evColor && burntInColors !== null
+                // `hasColor`, nicht `evColor`: auch eine COLOR-Zeile mit einem
+                // unlesbaren Wert (etwa #RRGGBBAA) sagt, dass der Server ueber
+                // DIESEN Termin spricht.
+                if (ev.hasColor) seenWithColor.add(existing.id);
+                const healed = !ev.hasColor && burntInColors !== null
                   && existing.color_modified === 1 && existing.color != null
                   && burntInColors.has(String(existing.color).toLowerCase())
-                  && healBurntInColor.run(existing.id).changes > 0;
+                  && healBurntInColor.run(existing.id, legacyCutoff, legacyCutoff).changes > 0;
                 changed = updEvent.run(...values, existing.id, ...values).changes > 0 || healed;
                 eventId = existing.id;
                 // Auf dem Server verschoben (#1377): die Erinnerungen ziehen mit.
@@ -999,7 +1056,13 @@ async function runSync({ createClient } = {}) {
 
       totalSyncedEvents  += accountEventCount;
       totalChangedEvents += accountChangedCount;
-      if (burntInColors !== null && healComplete) setHealMarker.run(healKey);
+      if (legacy !== null && healComplete) {
+        const pending = selLegacyCandidates.all(legacyCutoff, legacyCutoff).some((r) =>
+          legacy.urls.has(r.calendar_url)
+          && legacy.colors.has(String(r.color).toLowerCase())
+          && !seenWithColor.has(r.id));
+        if (!pending) setHealMarker.run(healKey);
+      }
       successfulAccounts++;
 
       log.debug(

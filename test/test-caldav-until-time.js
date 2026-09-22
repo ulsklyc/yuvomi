@@ -64,6 +64,8 @@ function buildDb() {
       default_assignee_user_id INTEGER, UNIQUE(source, external_id)
     );
     CREATE TABLE calendar_events (
+      -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL, description TEXT,
       start_datetime TEXT, end_datetime TEXT, all_day INTEGER NOT NULL DEFAULT 0,

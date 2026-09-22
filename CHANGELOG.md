@@ -178,14 +178,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   import wrote the calendar's colour into each appointment as if it had been chosen for it. For an
   appointment that had been edited in Yuvomi before v2.50.0, that copy was kept as a deliberate
   choice, so it went on beating the colour of the assigned person, and after a move to another
-  calendar it even showed the colour of the old one. The first complete CalDAV sync of each
-  account after this update now removes such a colour once: when the appointment itself carries no
-  colour on the server and the stored one is exactly the colour of a calendar of the same account,
-  including one that has since been deleted on the server. The appointment then shows the colour
-  of its person or its calendar again. A colour picked in Yuvomi that is not one of that account's
-  calendar colours stays, and so does any colour the server sets on the appointment itself. Later
-  syncs leave colours alone, and so does an account added later, unless it takes over appointments
-  of a deleted account. (#1270)
+  calendar it even showed the colour of the old one. The CalDAV sync now removes such a colour once
+  per account: only on appointments that were imported before v2.49.0 reached this installation,
+  when the appointment itself carries no colour on the server and the stored one is exactly the
+  colour of a calendar of the same account, including one that has since been deleted on the
+  server. The appointment then shows the colour of its person or its calendar again. The repair
+  waits until a sync has seen every such appointment of the account, so one in a deselected
+  calendar is still repaired once the calendar is selected again. A colour picked in Yuvomi that is
+  not one of that account's calendar colours stays, and so does any colour the server sets on the
+  appointment itself. After that, syncs leave colours alone, and so does an account added later,
+  unless it takes over old appointments of a deleted account. (#1270)
 
 - **A failed restore explains itself in your language and keeps your place.** When a backup did
   not open, the restore dialog showed the server's English explanation, up to several paragraphs

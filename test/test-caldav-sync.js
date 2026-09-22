@@ -48,6 +48,8 @@ describe('CalDAV Multi-Account Sync', () => {
       );
 
       CREATE TABLE calendar_events (
+        -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         id                          INTEGER PRIMARY KEY AUTOINCREMENT,
         title                       TEXT NOT NULL,
         external_calendar_id        TEXT,
@@ -168,6 +170,8 @@ describe('CalDAV Multi-Account Sync', () => {
     const db2 = new DatabaseSync(':memory:');
     db2.exec(`
       CREATE TABLE calendar_events (
+        -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
         title           TEXT NOT NULL,
         external_source TEXT NOT NULL DEFAULT 'local'
@@ -239,6 +243,8 @@ describe('pruneDeletedEvents (#508)', () => {
     db = new DatabaseSync(':memory:');
     db.exec(`
       CREATE TABLE calendar_events (
+        -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         id                   INTEGER PRIMARY KEY AUTOINCREMENT,
         title                TEXT NOT NULL,
         external_calendar_id TEXT,
@@ -423,6 +429,8 @@ describe('CalDAV sync yields to the event loop (#519)', () => {
         UNIQUE(source, external_id)
       );
       CREATE TABLE calendar_events (
+        -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL, description TEXT,
         start_datetime TEXT, end_datetime TEXT, all_day INTEGER NOT NULL DEFAULT 0,
@@ -578,6 +586,8 @@ describe('CalDAV: RECURRENCE-ID-Overrides killen die Serie nicht (#549)', () => 
         default_assignee_user_id INTEGER, UNIQUE(source, external_id)
       );
       CREATE TABLE calendar_events (
+        -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL, description TEXT,
         start_datetime TEXT, end_datetime TEXT, all_day INTEGER NOT NULL DEFAULT 0,
@@ -762,6 +772,8 @@ describe('CalDAV: No-op-Syncs bleiben im Standard-Log-Level still', () => {
         UNIQUE(source, external_id)
       );
       CREATE TABLE calendar_events (
+        -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL, description TEXT,
         start_datetime TEXT, end_datetime TEXT, all_day INTEGER NOT NULL DEFAULT 0,
@@ -1000,6 +1012,8 @@ describe('CalDAV: eine Bearbeitung friert die Farbe nicht mehr ein (#899)', () =
         UNIQUE(source, external_id)
       );
       CREATE TABLE calendar_events (
+        -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL, description TEXT,
         start_datetime TEXT, end_datetime TEXT, all_day INTEGER NOT NULL DEFAULT 0,
@@ -1184,6 +1198,8 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
         UNIQUE(source, external_id)
       );
       CREATE TABLE calendar_events (
+        -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL, description TEXT,
         start_datetime TEXT, end_datetime TEXT, all_day INTEGER NOT NULL DEFAULT 0,
@@ -1534,6 +1550,127 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     );
   }));
 
+  // Freier Client fuer die Pfade, in denen eine Altzeile NICHT gesehen wird.
+  // `objects`: Kalender-URL -> Liste von ICS-Texten; `components`: URL -> Liste.
+  function rawClient({ calendars = [CAL_A, CAL_B], objects = {}, components = {} } = {}) {
+    return async () => ({
+      fetchCalendars: async () => calendars.map((url) => ({
+        url, displayName: url, ...(components[url] ? { components: components[url] } : {}),
+      })),
+      fetchCalendarObjects: async ({ calendar }) =>
+        (objects[calendar.url] || []).map((data, i) => ({ url: `${calendar.url}obj-${i}.ics`, data })),
+      createCalendarObject: async () => ({}),
+    });
+  }
+  const icsOf = (...vevents) => ['BEGIN:VCALENDAR', 'VERSION:2.0', ...vevents.flat(), 'END:VCALENDAR'].join('\r\n');
+  const otherEvent = [
+    'BEGIN:VEVENT', 'UID:other@test', 'SUMMARY:Anderes',
+    'DTSTART:20260106T170000Z', 'DTEND:20260106T180000Z', 'END:VEVENT',
+  ];
+
+  // Die Altzeile liegt in B; danach sieht der Lauf sie aus je einem Grund nicht.
+  async function legacyRowInB(d) {
+    await sync({ createClient: clientWith({ inCal: CAL_B }) });
+    legacyState(d, COLOR_B);
+  }
+
+  it('ein abgewaehlter Kalender mit Altzeilen haelt den Merker zurueck', () => withDb(async (d) => {
+    await legacyRowInB(d);
+    d.prepare('UPDATE caldav_calendar_selection SET enabled = 0 WHERE calendar_url = ?').run(CAL_B);
+
+    await sync({ createClient: rawClient() });
+    assert.strictEqual(marker(d), null, 'die Zeile in B hat der Lauf nie gesehen');
+
+    // Wird B wieder angehakt, holt der naechste Lauf die Heilung nach.
+    d.prepare('UPDATE caldav_calendar_selection SET enabled = 1 WHERE calendar_url = ?').run(CAL_B);
+    await sync({ createClient: clientWith({ inCal: CAL_B }) });
+    assert.strictEqual(row(d).color, null);
+    assert.strictEqual(marker(d), '1');
+  }));
+
+  it('ein verworfener VEVENT haelt den Merker zurueck', () => withDb(async (d) => {
+    await legacyRowInB(d);
+    // Ohne DTSTART verwirft der Parser den Termin (onSkip). Weil der Kalender
+    // danach leer wirkt, laesst der Prune seine Zeilen stehen (Schutz vor
+    // einer vorlaeufig leeren Antwort) - gesehen wurde die Zeile nicht.
+    const broken = icsOf(['BEGIN:VEVENT', `UID:${UID}`, 'SUMMARY:Training', 'END:VEVENT']);
+    await sync({ createClient: rawClient({ objects: { [CAL_B]: [broken] } }) });
+    assert.strictEqual(row(d).color, COLOR_B, 'Vorbedingung: die Zeile steht noch, ungeheilt');
+    assert.strictEqual(marker(d), null);
+  }));
+
+  it('ein Kalender ohne VEVENT-Unterstuetzung schiebt den Merker auf', () => withDb(async (d) => {
+    // Wie der fehlende Kalender: der Lauf hat B nicht gelesen, also hat er
+    // nicht alles gesehen - auch wenn die Altzeile selbst in A liegt und heilt.
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    const inA = icsOf(vevent());
+    await sync({ createClient: rawClient({ objects: { [CAL_A]: [inA] }, components: { [CAL_B]: ['VTODO'] } }) });
+    assert.strictEqual(row(d).color, null, 'Vorbedingung: die Zeile in A heilt');
+    assert.strictEqual(marker(d), null);
+  }));
+
+  it('eine leere Antwort, die die Zeilen stehen laesst, haelt den Merker zurueck', () => withDb(async (d) => {
+    await legacyRowInB(d);
+    await sync({ createClient: rawClient({ objects: { [CAL_B]: [] } }) });
+    assert.strictEqual(row(d).color, COLOR_B, 'Vorbedingung: die Zeile steht noch');
+    assert.strictEqual(marker(d), null);
+  }));
+
+  it('ein gescheiterter Prune haelt den Merker zurueck', () => withDb(async (d) => {
+    await legacyRowInB(d);
+    d.exec(`CREATE TRIGGER no_delete BEFORE DELETE ON calendar_events
+            BEGIN SELECT RAISE(ABORT, 'prune boom'); END;`);
+    // B liefert nur einen anderen Termin: der Prune will die Altzeile
+    // loeschen und scheitert.
+    await sync({ createClient: rawClient({ objects: { [CAL_B]: [icsOf(otherEvent)] } }) });
+    assert.strictEqual(row(d).color, COLOR_B, 'Vorbedingung: die Zeile steht noch');
+    assert.strictEqual(marker(d), null);
+  }));
+
+  it('eine COLOR-Zeile mit unlesbarem Wert gehoert trotzdem dem Termin', () => withDb(async (d) => {
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    // #RRGGBBAA kennt resolveIcalColor nicht; die Zeile steht aber da.
+    await sync({ createClient: clientWith({ inCal: CAL_A, color: '#4A90E2FF' }) });
+    assert.strictEqual(row(d).color, COLOR_A);
+  }));
+
+  // Migration 166 (#891) beendete das Einbrennen. Die Fixture fuehrt dafuer
+  // eine kleine schema_migrations.
+  function fixAppliedAt(d, appliedAt) {
+    d.exec(`CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, description TEXT, applied_at TEXT NOT NULL);`);
+    d.prepare('INSERT INTO schema_migrations (version, description, applied_at) VALUES (166, ?, ?)').run('#891', appliedAt);
+  }
+
+  it('eine Zeile, die NACH dem Fix aus #891 entstand, heilt nie', () => withDb(async (d) => {
+    // Etwa ein Konto, das zwischen v2.49 und diesem Update angelegt wurde:
+    // sein Import hat nie eine Kalenderfarbe eingebrannt. Eine Farbe gleich
+    // der Kalenderfarbe ist dort eine gewaehlte.
+    fixAppliedAt(d, '2026-08-27T08:00:00Z');
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    // Am selben Tag, eine halbe Stunde spaeter, im Leerzeichen-Format aelterer
+    // Migrationen: ein reiner Textvergleich hielte ' ' < 'T' fuer aelter.
+    d.prepare("UPDATE calendar_events SET created_at = '2026-08-27 08:30:00'").run();
+    legacyState(d, COLOR_A);
+
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.strictEqual(row(d).color, COLOR_A);
+    assert.strictEqual(marker(d), '1', 'ohne Altzeilen ist das Konto erledigt');
+  }));
+
+  it('eine Zeile von VOR dem Fix heilt, auch im alten Datumsformat', () => withDb(async (d) => {
+    // Gegenprobe zur Altersgrenze; das Leerzeichen-Format stammt aus aelteren
+    // Migrationen (datetime('now')) und muss richtig verglichen werden.
+    fixAppliedAt(d, '2026-08-27T08:00:00Z');
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    d.prepare("UPDATE calendar_events SET created_at = '2026-08-27 07:59:00'").run();
+    legacyState(d, COLOR_A);
+
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.strictEqual(row(d).color, null);
+  }));
+
   it('ein Kalender, den der Server nicht mehr kennt, schiebt den Merker auf', () => withDb(async (d) => {
     await sync({ createClient: clientWith({ inCal: CAL_A }) });
     legacyState(d, COLOR_A);
@@ -1619,6 +1756,8 @@ describe('CalDAV: eine Aufgabenliste bleibt kein Terminziel (#617)', () => {
         UNIQUE(source, external_id)
       );
       CREATE TABLE calendar_events (
+        -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL, description TEXT,
         start_datetime TEXT, end_datetime TEXT, all_day INTEGER NOT NULL DEFAULT 0,
@@ -1879,6 +2018,8 @@ describe('CalDAV: das Aufräumen beim Abwählen ist eine Wahl (#732)', () => {
         UNIQUE(source, external_id)
       );
       CREATE TABLE calendar_events (
+        -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL, start_datetime TEXT,
         external_calendar_id TEXT, external_source TEXT NOT NULL DEFAULT 'local',
@@ -2076,6 +2217,8 @@ describe('CalDAV: neue Kalender sind opt-in (#732)', () => {
         default_assignee_user_id INTEGER, UNIQUE(source, external_id)
       );
       CREATE TABLE calendar_events (
+        -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
         calendar_ref_id INTEGER, external_source TEXT NOT NULL DEFAULT 'local',
         -- addAccount sucht hier nach Altzeilen der Farb-Heilung (#1270).
