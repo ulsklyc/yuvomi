@@ -503,7 +503,26 @@ test('#1160 568x320 - der juengste Toast bleibt sichtbar, auch nach einem Fehler
     const measured = await measureDialog(page);
     assert.deepEqual(measured.covered, [], 'ein Knopf des Editors liegt unter dem Stapel');
     assert.equal(measured.toastVisible, true, 'der juengste Toast muss sichtbar sein');
+
+    // Nach dem Schliessen kommen die zurueckgenommenen Toasts zurueck - und
+    // wieder bedienbar. Ohne `inert = false` in untuck() blieben sie sichtbar,
+    // aber Verwerfen und Oeffnen reagierten nicht mehr (Review an #1421).
+    await page.evaluate(async () => (await import('/components/modal.js')).closeModal({ force: true }));
+    await page.waitForFunction(() => !document.querySelector('.modal-overlay'), { timeout: 5000 });
+    await settleAnimations(page);
+    const after = await page.evaluate(() => {
+      const all = [...document.querySelectorAll('.shell-bottom-stack .toast')];
+      return {
+        count: all.length,
+        inert: all.filter((t) => t.inert).length,
+        tucked: all.filter((t) => t.classList.contains('toast--tucked')).length,
+      };
+    });
+    assert.ok(after.count >= 2, `die Toasts sind mit dem Dialog verschwunden (${JSON.stringify(after)})`);
+    assert.equal(after.tucked, 0, `nach dem Schliessen ist noch ein Toast zurueckgenommen (${JSON.stringify(after)})`);
+    assert.equal(after.inert, 0, `nach dem Schliessen ist noch ein Toast inert (${JSON.stringify(after)})`);
   } finally {
     await page.close();
   }
 });
+

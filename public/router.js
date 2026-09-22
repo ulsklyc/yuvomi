@@ -1680,11 +1680,12 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
   }
 }
 
+/** Baut den Beobachter der Toast-Lage ab (#1160); je Shell-Aufbau einer. */
+let _stopToastPlacement = null;
+
 /**
  * App-Shell mit Navigation einmalig aufbauen (nach erstem Login).
  */
-/** Baut den Beobachter der Toast-Lage ab (#1160); je Shell-Aufbau einer. */
-let _stopToastPlacement = null;
 
 function renderAppShell(container) {
   // Gast und Display teilen sich die schmale Navigation: beide sind

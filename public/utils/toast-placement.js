@@ -474,7 +474,13 @@ export function watchToastPlacement(stack) {
   // Der Koerper eines Dialogs scrollt, und mit ihm wandern seine Knoepfe unter
   // den Stapel (Einkauf, Artikel-Details bei 1280x700). Scroll bubbelt nicht,
   // daher in der Capture-Phase; passiv und je Frame einmal.
-  document.addEventListener('scroll', onSettled, { capture: true, passive: true });
+  // Beim Scrollen der Seite ohne Dialog gibt es nichts zu messen: ohne offenen
+  // Dialog und ohne gesetzte Lage steigt der Beobachter vor jeder Messung aus.
+  const onScroll = () => {
+    if (!stack.dataset.dock && !observedDialogs.length) return;
+    onSettled();
+  };
+  document.addEventListener('scroll', onScroll, { capture: true, passive: true });
   schedule();
 
   return () => {
@@ -485,7 +491,7 @@ export function watchToastPlacement(stack) {
     resize?.disconnect();
     window.removeEventListener('resize', schedule);
     window.visualViewport?.removeEventListener('resize', onSettled);
-    document.removeEventListener('scroll', onSettled, { capture: true });
+    document.removeEventListener('scroll', onScroll, { capture: true });
     document.removeEventListener('animationend', onSettled, true);
     document.removeEventListener('transitionend', onSettled, true);
     undock(stack);
