@@ -2784,6 +2784,7 @@
         "backupRestoreErrorKeyInvalid": "La clave no llegó al servidor de forma legible. Introdúcela de nuevo y vuelve a restaurar. Aquí no se ha cambiado nada.",
         "backupRestoreErrorOwnKeyMissing": "Esta instalación no tiene DB_ENCRYPTION_KEY, así que no puede abrir la copia de seguridad. Define DB_ENCRYPTION_KEY, reinicia Yuvomi y luego restaura con la clave de la copia.",
         "backupRestoreErrorDamaged": "La copia de seguridad está dañada o incompleta; la clave es correcta. Vuelve a obtener el archivo, compara su tamaño y sha256sum con el original y restaura esa copia. Aquí no se ha cambiado nada.",
+        "backupRestoreErrorCorrupt": "La copia de seguridad está dañada o incompleta. Vuelve a obtener el archivo, compara su tamaño y sha256sum con el original y restaura esa copia, o usa una copia de seguridad anterior. Aquí no se ha cambiado nada.",
         "backupRestoreErrorUnreadable": "No se pudo leer la copia de seguridad. Comprueba que el archivo esté completo e inténtalo de nuevo; la causa exacta está en el registro del servidor. Aquí no se ha cambiado nada.",
         "backupRestoreErrorGeneric": "La restauración ha fallado. La causa exacta está en el registro del servidor.",
         "backupRestoreErrorNeverEncrypted": "Si el archivo nunca se cifró, no es una base de datos válida de Yuvomi.",

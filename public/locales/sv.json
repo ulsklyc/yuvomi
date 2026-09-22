@@ -2784,6 +2784,7 @@
         "backupRestoreErrorKeyInvalid": "Nyckeln kom inte fram till servern i läsbar form. Ange den igen och återställ en gång till. Inget har ändrats här.",
         "backupRestoreErrorOwnKeyMissing": "Den här installationen har ingen DB_ENCRYPTION_KEY och kan därför inte öppna säkerhetskopian. Ange DB_ENCRYPTION_KEY, starta om Yuvomi och återställ sedan med säkerhetskopians nyckel.",
         "backupRestoreErrorDamaged": "Säkerhetskopian är skadad eller ofullständig; nyckeln stämmer. Hämta filen igen, jämför storlek och sha256sum med originalet och återställ den kopian. Inget har ändrats här.",
+        "backupRestoreErrorCorrupt": "Säkerhetskopian är skadad eller ofullständig. Hämta filen igen, jämför storlek och sha256sum med originalet och återställ den kopian, eller använd en äldre säkerhetskopia. Inget har ändrats här.",
         "backupRestoreErrorUnreadable": "Säkerhetskopian kunde inte läsas. Kontrollera att filen är fullständig och försök igen; den exakta orsaken finns i serverloggen. Inget har ändrats här.",
         "backupRestoreErrorGeneric": "Återställningen misslyckades. Den exakta orsaken finns i serverloggen.",
         "backupRestoreErrorNeverEncrypted": "Har filen aldrig krypterats är den ingen giltig Yuvomi-databas.",

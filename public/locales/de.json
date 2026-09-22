@@ -2796,6 +2796,7 @@
         "backupRestoreErrorKeyInvalid": "Der Schlüssel kam beim Server nicht lesbar an. Gib ihn erneut ein und stelle noch einmal wieder her. Hier wurde nichts geändert.",
         "backupRestoreErrorOwnKeyMissing": "Diese Installation hat keinen DB_ENCRYPTION_KEY und kann das Backup deshalb nicht öffnen. Setze DB_ENCRYPTION_KEY, starte Yuvomi neu und stelle dann mit dem Schlüssel des Backups wieder her.",
         "backupRestoreErrorDamaged": "Das Backup ist beschädigt oder unvollständig, der Schlüssel stimmt. Hol die Datei erneut, vergleiche Größe und sha256sum mit dem Original und stelle diese Kopie wieder her. Hier wurde nichts geändert.",
+        "backupRestoreErrorCorrupt": "Das Backup ist beschädigt oder unvollständig. Hol die Datei erneut, vergleiche Größe und sha256sum mit dem Original und stelle diese Kopie wieder her oder nimm ein älteres Backup. Hier wurde nichts geändert.",
         "backupRestoreErrorUnreadable": "Das Backup ließ sich nicht lesen. Prüfe, ob die Datei vollständig ist, und versuche es erneut; die genaue Ursache steht im Server-Log. Hier wurde nichts geändert.",
         "backupRestoreErrorGeneric": "Die Wiederherstellung ist fehlgeschlagen. Die genaue Ursache steht im Server-Log.",
         "backupRestoreErrorNeverEncrypted": "Wurde die Datei nie verschlüsselt, ist sie keine gültige Yuvomi-Datenbank.",

@@ -420,6 +420,7 @@ function init({ plaintextBackup = true } = {}) {
   // Instanz, und ein Journal daneben ginge dabei verloren (#1282).
   assertDatabaseFileNotEmpty();
   mkdirSync(path.dirname(DB_PATH), { recursive: true });
+  removeRestoreStaging();
   migrateLegacyDbFile();
 
   // Beide Prüfungen laufen VOR dem Öffnen: fehlt der Cipher-Support, darf gar
@@ -10056,14 +10057,15 @@ function unreadableBackupError(encrypted, cause) {
 
   const detail = `${code || 'no SQLite error code'}: ${cause?.message ?? String(cause)}`;
   if (DB_KEY && code.startsWith('SQLITE_CORRUPT')) {
-    return new Error(
+    return restoreError(
       `Backup file is damaged or incomplete (${detail}). DB_ENCRYPTION_KEY is not the problem: it `
       + 'does open this file - its first page decrypted and passed the integrity check, which a '
       + 'wrong key never does. Most likely the file was cut short before it got here, by a download '
       + 'or copy that stopped early. Nothing on this instance was changed. Get the backup again from '
       + 'where it is stored - download or copy it once more - and check that its size and sha256sum '
       + 'match the stored original, then restore that copy.',
-      { cause }
+      'backup_corrupt',
+      cause
     );
   }
 
@@ -10072,6 +10074,54 @@ function unreadableBackupError(encrypted, cause) {
     lines.push('Check that the file is there and that the user this restore runs as may read it.');
   }
   return new Error(lines.join(' '), { cause });
+}
+
+/** Erste Zeile eines Befunds ohne die Kopfzeile `*** in database main ***`. */
+function firstFinding(result) {
+  const text = String(result);
+  return text.split('\n').find((line) => line.trim() && !line.startsWith('***')) ?? text;
+}
+
+/**
+ * Jede Seite des Backups lesen, bevor es eingespielt wird (#1422).
+ *
+ * `assertReadable()` liest nur `sqlite_master`. Ein EIGENES Backup mit einer
+ * kaputten Seite dahinter (gemessen: ein gekipptes Byte in Seite 5, mit und
+ * ohne Schluessel) ging damit ohne Fehler durch, wurde eingespielt, und die
+ * Instanz lief danach auf einer Datenbank, deren `quick_check` Hunderte
+ * unerreichbare Seiten meldet. Der Weg mit Backup-Schluessel lehnte dieselbe
+ * Datei schon ab - nur weil das Umschluesseln jede Seite anfasst.
+ *
+ * `quick_check` statt `integrity_check`: es liest jede Seite (mit Schluessel
+ * also auch deren HMAC) und prueft den Aufbau jedes B-Baums, laeuft aber
+ * linear. Was `integrity_check` zusaetzlich prueft - ob jeder Index genau zu
+ * seiner Tabelle passt -, kann in einem Backup aus `VACUUM INTO` nur durch
+ * eine kaputte Seite auseinanderlaufen, und die findet schon `quick_check`.
+ * Gemessen mit Schluessel: 2 MB samt ganzem Restore unter 200 ms, 91 MB (300 000 Zeilen, zwei
+ * Indizes) rund 0,9 s gegen 1,9 s fuer `integrity_check` - der Restore
+ * blockiert solange den Server, deshalb die schnellere Pruefung.
+ * `quick_check(1)` hoert nach dem ersten Befund auf; einer reicht.
+ * @param {import('better-sqlite3-multiple-ciphers').Database} candidate
+ * @param {boolean} encrypted
+ */
+function assertBackupIntact(candidate, encrypted) {
+  let result;
+  try {
+    result = candidate.pragma('quick_check(1)', { simple: true });
+  } catch (err) {
+    const code = typeof err?.code === 'string' ? err.code : '';
+    if (!code.startsWith('SQLITE_CORRUPT')) throw unreadableBackupError(encrypted, err);
+    result = `${code}: ${err.message}`;
+  }
+  if (result === 'ok') return;
+  throw restoreError(
+    `Backup file is damaged: the integrity check found an error in it (${firstFinding(result)}). `
+    + 'Its first pages open, but not every page of it is readable, and restoring it would put a '
+    + 'broken database in place. Nothing on this instance was changed. Get the backup again from '
+    + 'where it is stored and check that its size and sha256sum match the stored original, then '
+    + 'restore that copy - or restore an older backup.',
+    'backup_corrupt'
+  );
 }
 
 function validateBackupFile(sourcePath) {
@@ -10095,6 +10145,7 @@ function validateBackupFile(sourcePath) {
     } catch (err) {
       throw unreadableBackupError(encrypted, err);
     }
+    assertBackupIntact(candidate, encrypted);
     const row = candidate.prepare(`
       SELECT name
       FROM sqlite_master
@@ -10324,10 +10375,85 @@ async function restoreFromFile(sourcePath, { backupKey = null } = {}) {
   }
 }
 
+/**
+ * Arbeitsname, unter dem `restoreFromFile()` die neue Datenbank ablegt, bevor
+ * sie an `DB_PATH` gehaengt wird (#1422). Neben `DB_PATH`, nicht im
+ * Temp-Verzeichnis: nur im selben Verzeichnis ist das Umhaengen ein `rename()`
+ * innerhalb eines Dateisystems und damit unteilbar - wie `.creating` (#1287).
+ */
+function restoreStagingPath() {
+  return `${DB_PATH}.restore-tmp`;
+}
+
+/** Verzeichnis-Eintrag auf die Platte bringen; best effort (nicht jedes Dateisystem kann es). */
+async function syncDirectory(dirPath) {
+  let handle;
+  try {
+    handle = await fs.open(dirPath, 'r');
+    await handle.sync();
+  } catch {
+    /* ein Dateisystem ohne fsync auf Verzeichnisse: der rename bleibt unteilbar, nur nicht sofort dauerhaft */
+  } finally {
+    await handle?.close().catch(() => {});
+  }
+}
+
+/**
+ * Die fertige Arbeitsdatei unteilbar an `DB_PATH` haengen (#1422). Sie ist
+ * vorher vollstaendig neben `DB_PATH` kopiert und auf die Platte gebracht
+ * (`stageDatabaseCopy()`); hier wird nur noch umbenannt.
+ *
+ * Vorher wurde das Backup direkt ueber `DB_PATH` kopiert. Ein Kopieren ist
+ * nicht unteilbar: starb der Prozess mittendrin oder lief die Platte voll,
+ * lag an `DB_PATH` eine halb geschriebene Datei - halb Backup, halb nichts -,
+ * und der naechste Start fand eine kaputte Datenbank. Der Rueckweg ueber
+ * `.pre-restore-*` stand zwar da, aber nichts sagte dem Admin, dass er ihn
+ * braucht. Jetzt ist `DB_PATH` zu jedem Zeitpunkt entweder die alte oder die
+ * neue Datenbank: bis zum `rename()` ist nur die Arbeitsdatei betroffen, und
+ * die raeumt der naechste Start weg (`removeRestoreStaging()`).
+ *
+ * Die Verbindung muss dafuer zu sein, und `-wal`/`-shm` der alten Datenbank
+ * muessen VOR dem Umhaengen weg sein: SQLite wendete ein liegengebliebenes
+ * `-wal` sonst auf die neue Datei an. Beides erledigt der Aufrufer.
+ * @param {string} stagingPath  fertig geschriebene Arbeitsdatei
+ */
+async function swapIntoDbPath(stagingPath) {
+  await fs.rename(stagingPath, DB_PATH);
+  await syncDirectory(path.dirname(DB_PATH));
+}
+
+/** `from` nach `stagingPath` kopieren und die Datei auf die Platte bringen. */
+async function stageDatabaseCopy(from, stagingPath) {
+  await unlinkIfExists(stagingPath);
+  await fs.copyFile(from, stagingPath);
+  const handle = await fs.open(stagingPath, 'r+');
+  try {
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+}
+
+/**
+ * Eine Arbeitsdatei, die ein abgebrochener Restore liegen liess, wegraeumen.
+ * Sie ist nie an `DB_PATH` gehaengt worden - die Datenbank ist die alte, und
+ * das Backup liegt dort, woher es kam. Ohne Aufraeumen laege eine vollstaendige
+ * Kopie des Backups im Datenverzeichnis, bei einem Klartext-Backup sogar
+ * unverschluesselt.
+ */
+function removeRestoreStaging() {
+  if (DB_PATH === ':memory:') return;
+  const stagingPath = restoreStagingPath();
+  if (!existsSync(stagingPath)) return;
+  log.info(`${stagingPath} is left over from a restore that was interrupted before the swap - removing it. The database is the one from before that restore.`);
+  try { rmSync(stagingPath, { force: true }); } catch { /* best effort */ }
+}
+
 async function restoreValidatedFile(sourcePath) {
   const backupVersion = validateBackupFile(sourcePath);
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const rollbackPath = `${DB_PATH}.pre-restore-${timestamp}`;
+  const stagingPath = restoreStagingPath();
   let rollbackCreated = false;
   // Offen ist die Verbindung, außer im Leer-Fall des Restore-CLI (#1282, siehe
   // Auto-Init am Dateiende). Nur eine offene Verbindung wird unten per
@@ -10335,15 +10461,21 @@ async function restoreValidatedFile(sourcePath) {
   // Rest-Journal zu löschen verliert nichts.
   const wasOpen = Boolean(db);
   let keptJournalPath = null;
+  // Ab hier liegt an DB_PATH die Datenbank aus dem Backup (#1422).
+  let swapped = false;
 
   try {
+    await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
+    // Zuerst die Arbeitsdatei: scheitert schon das Kopieren (volle Platte),
+    // ist die laufende Verbindung noch gar nicht angefasst.
+    await stageDatabaseCopy(sourcePath, stagingPath);
+
     if (db) {
       try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* best effort */ }
       db.close();
       db = null;
     }
 
-    await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
     try {
       await fs.copyFile(DB_PATH, rollbackPath);
       rollbackCreated = true;
@@ -10368,7 +10500,8 @@ async function restoreValidatedFile(sourcePath) {
     }
     await unlinkIfExists(`${DB_PATH}-wal`);
     await unlinkIfExists(`${DB_PATH}-shm`);
-    await fs.copyFile(sourcePath, DB_PATH);
+    await swapIntoDbPath(stagingPath);
+    swapped = true;
 
     // Ohne Klartext-Sicherheitskopie: stammt das Backup aus der Zeit vor der
     // Verschlüsselung, verschlüsselt init() es jetzt — die Sicherung dafür ist
@@ -10385,21 +10518,34 @@ async function restoreValidatedFile(sourcePath) {
       keptJournalPath,
     };
   } catch (err) {
-    if (rollbackCreated) {
-      try {
+    try {
+      await unlinkIfExists(stagingPath);
+      if (swapped) {
+        // init() kann die neue Datenbank schon geoeffnet haben.
         if (db) {
           db.close();
           db = null;
         }
-        await unlinkIfExists(`${DB_PATH}-wal`);
-        await unlinkIfExists(`${DB_PATH}-shm`);
-        await fs.copyFile(rollbackPath, DB_PATH);
-        if (keptJournalPath) {
-          // Der Rollback stellt den Stand vor dem Restore her: das Journal
-          // gehört wieder neben die (leere) Datei, an der die Meldung es nennt.
-          await renameIfExists(keptJournalName(rollbackPath, 'wal'), `${DB_PATH}-wal`);
-          await renameIfExists(keptJournalName(rollbackPath, 'shm'), `${DB_PATH}-shm`);
+        if (rollbackCreated) {
+          // Die neue Datenbank liegt schon an DB_PATH: die alte auf demselben
+          // Weg zurueck, unteilbar wie der Tausch selbst.
+          await unlinkIfExists(`${DB_PATH}-wal`);
+          await unlinkIfExists(`${DB_PATH}-shm`);
+          await stageDatabaseCopy(rollbackPath, stagingPath);
+          await swapIntoDbPath(stagingPath);
         }
+      }
+      // Vor dem Tausch ist DB_PATH die alte Datei geblieben, nach dem Rollback
+      // ist sie es wieder: ein beiseite gelegtes Journal gehoert zurueck neben
+      // die (leere) Datei, an der die Meldung es nennt.
+      if (keptJournalPath) {
+        await renameIfExists(keptJournalName(rollbackPath, 'wal'), `${DB_PATH}-wal`);
+        await renameIfExists(keptJournalName(rollbackPath, 'shm'), `${DB_PATH}-shm`);
+      }
+      if (!db && swapped && !rollbackCreated) {
+        // Vorher gab es keine Datenbank: nichts zurueckzuholen.
+        try { init({ plaintextBackup: false }); } catch { /* preserve original restore error */ }
+      } else if (!db) {
         try {
           init({ plaintextBackup: false });
         } catch (reopenErr) {
@@ -10407,11 +10553,9 @@ async function restoreValidatedFile(sourcePath) {
           // alte Stand, kein gescheiterter Rollback.
           if (reopenErr?.code !== EMPTY_DATABASE_FILE) throw reopenErr;
         }
-      } catch (rollbackErr) {
-        log.error('Rollback after failed restore also failed:', rollbackErr);
       }
-    } else if (!db) {
-      try { init({ plaintextBackup: false }); } catch { /* preserve original restore error */ }
+    } catch (rollbackErr) {
+      log.error('Rollback after failed restore also failed:', rollbackErr);
     }
     throw err;
   }

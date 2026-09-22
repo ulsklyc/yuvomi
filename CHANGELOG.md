@@ -174,6 +174,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A restore can no longer leave a half-written database behind, and a damaged backup is refused.**
+  A restore copied the backup straight over the database file, so if Yuvomi was stopped or the
+  disk filled up in the middle of it, the next start found a broken database, and nothing said
+  that the copy kept under `.pre-restore-*` was the way back. The backup is now written next to
+  the database first and swapped in with a single rename, so the database is always either the
+  old one or the restored one; a copy left over by an interrupted restore is removed on the next
+  start. A backup of this installation with a damaged page further in was also restored without
+  complaint, because only its first page was read. Every page is now checked before anything is
+  changed, and a damaged backup is refused with a translated message that says to fetch the file
+  again or use an older backup. (#1422)
+
 - **A failed restore explains itself in your language and keeps your place.** When a backup did
   not open, the restore dialog showed the server's English explanation, up to several paragraphs
   long, also in a German interface. Each known cause now has a short translated message with the

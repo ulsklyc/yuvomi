@@ -1283,7 +1283,7 @@ For a local CLI restore outside Docker, set the same environment variables used 
 DB_PATH=/path/to/yuvomi.db node --import dotenv/config scripts/restore-backup.js ./yuvomi-backup-20260401.db
 ```
 
-The restore helper validates that the file is a Yuvomi database, and refuses one written by a newer Yuvomi than the one running (update first, then restore), before replacing the active database. It also keeps a pre-restore copy next to the database file for emergency rollback.
+The restore helper validates that the file is a Yuvomi database and undamaged (every page is checked), and refuses one written by a newer Yuvomi than the one running (update first, then restore), before replacing the active database. The replacement is written next to the database file and swapped in with a single rename, so an interrupted restore leaves the old database in place. It also keeps a pre-restore copy next to the database file for emergency rollback.
 
 ### Moving to a new server (backup from another installation)
 

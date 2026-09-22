@@ -2784,6 +2784,7 @@
         "backupRestoreErrorKeyInvalid": "Khóa không đến máy chủ ở dạng đọc được. Hãy nhập lại và khôi phục thêm lần nữa. Không có gì bị thay đổi ở đây.",
         "backupRestoreErrorOwnKeyMissing": "Bản cài đặt này không có DB_ENCRYPTION_KEY nên không mở được bản sao lưu. Hãy đặt DB_ENCRYPTION_KEY, khởi động lại Yuvomi rồi khôi phục bằng khóa của bản sao lưu.",
         "backupRestoreErrorDamaged": "Bản sao lưu bị hỏng hoặc không đầy đủ; khóa là đúng. Hãy lấy lại tệp, so sánh kích thước và sha256sum với bản gốc rồi khôi phục bản sao đó. Không có gì bị thay đổi ở đây.",
+        "backupRestoreErrorCorrupt": "Bản sao lưu bị hỏng hoặc không đầy đủ. Hãy lấy lại tệp, so sánh kích thước và sha256sum với bản gốc rồi khôi phục bản sao đó, hoặc dùng một bản sao lưu cũ hơn. Không có gì bị thay đổi ở đây.",
         "backupRestoreErrorUnreadable": "Không đọc được bản sao lưu. Hãy kiểm tra tệp có đầy đủ không rồi thử lại; nguyên nhân chính xác nằm trong nhật ký máy chủ. Không có gì bị thay đổi ở đây.",
         "backupRestoreErrorGeneric": "Khôi phục thất bại. Nguyên nhân chính xác nằm trong nhật ký máy chủ.",
         "backupRestoreErrorNeverEncrypted": "Nếu tệp chưa từng được mã hóa, đó không phải cơ sở dữ liệu Yuvomi hợp lệ.",
