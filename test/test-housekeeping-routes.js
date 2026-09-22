@@ -1249,6 +1249,32 @@ test('Beleg: eine neue Verknuepfung verlangt Dokumentenzugriff und Sichtbarkeit 
     assert.equal(token.status, 403, 'ein Token ohne documents-Scope setzt keine ID');
     assert.equal(storedReceipt(visitId), null);
 
+    // KEIN ORAKEL auch beim neuen Verknuepfen: eine unbekannte oder geloeschte
+    // ID und ein Dokument im Loeschfenster antworten wie ein vorhandenes. Die
+    // Abweisung steht deshalb VOR Sichtbarkeit und Loeschsperre
+    // (assertDocumentLinkTargetsAvailable) - dahinter gaebe die unbekannte ID
+    // 200 und die gesperrte 409.
+    const deletedDoc = insertDocument('Quittung geloescht', 'family', ADMIN);
+    db.prepare('DELETE FROM family_documents WHERE id = ?').run(deletedDoc);
+    for (const [label, as, refused] of [
+      ['documents: none', { ...MEM, moduleAccess: { documents: 'none' } }, noneMember],
+      ['Token ohne documents-Scope', { id: ADMIN, role: 'admin', authMethod: 'api_token', authScopes: ['housekeeping:write'] }, token],
+    ]) {
+      const same = { status: refused.status, body: refused.body };
+      for (const id of [999999, deletedDoc]) {
+        const res = await put(as, { receipt_document_id: id });
+        assert.deepEqual({ status: res.status, body: res.body }, same, `${label}: ID ${id} antwortet wie ein vorhandenes Dokument`);
+      }
+      lockDocumentDeletes([familyDoc]);
+      try {
+        const locked = await put(as, { receipt_document_id: familyDoc });
+        assert.deepEqual({ status: locked.status, body: locked.body }, same, `${label}: im Loeschfenster weiter 403, nicht 409`);
+      } finally {
+        unlockDocumentDeletes([familyDoc]);
+      }
+      assert.equal(storedReceipt(visitId), null, `${label}: nichts verknuepft`);
+    }
+
     assert.equal((await put(MEM, { receipt_document_id: privateDoc })).status, 200);
     assert.equal(storedReceipt(visitId), null, 'ein fremdes privates Dokument wird nicht verknuepft');
 

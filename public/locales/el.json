@@ -5468,7 +5468,8 @@
         "confirmSelection": "Προσθήκη επιλογής",
         "openAction": "Άνοιγμα {{name}}",
         "limitReached": "Το πολύ {{count}} έγγραφα.",
-        "limitReached_one": "Το πολύ {{count}} έγγραφο."
+        "limitReached_one": "Το πολύ {{count}} έγγραφο.",
+        "presentHidden": "Επισυνάπτεται"
     },
     "join": {
         "title": "Ρύθμιση λογαριασμού",

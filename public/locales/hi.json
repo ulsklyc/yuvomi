@@ -5468,7 +5468,8 @@
         "confirmSelection": "चयनित जोड़ें",
         "openAction": "{{name}} खोलें",
         "limitReached": "अधिकतम {{count}} दस्तावेज़।",
-        "limitReached_one": "अधिकतम {{count}} दस्तावेज़।"
+        "limitReached_one": "अधिकतम {{count}} दस्तावेज़।",
+        "presentHidden": "संलग्न"
     },
     "join": {
         "title": "अपना खाता सेट करें",

@@ -5468,7 +5468,8 @@
         "confirmSelection": "Добавить выбранные",
         "openAction": "Открыть {{name}}",
         "limitReached": "Не более {{count}} документов.",
-        "limitReached_one": "Не более {{count}} документа."
+        "limitReached_one": "Не более {{count}} документа.",
+        "presentHidden": "Прикреплён"
     },
     "join": {
         "title": "Настройка учётной записи",

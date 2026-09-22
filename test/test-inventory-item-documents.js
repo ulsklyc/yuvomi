@@ -32,7 +32,14 @@ const B = db.prepare("INSERT INTO users (username, display_name, password_hash, 
 let actor = { id: A };
 const app = express();
 app.use(express.json());
-app.use((req, _res, next) => { req.authUserId = actor.id; req.session = { userId: actor.id }; next(); });
+app.use((req, _res, next) => {
+  req.authUserId = actor.id;
+  req.session = { userId: actor.id };
+  req.sessionModuleAccess = actor.moduleAccess ?? null;
+  req.authMethod = actor.authMethod;
+  req.authScopes = actor.authScopes ?? null;
+  next();
+});
 app.use('/items', itemsRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
@@ -203,4 +210,74 @@ test('geloeschtes Dokument nimmt seine Verknuepfung mit', async () => {
   assert.deepEqual(linkedDocumentIds(item.id), []);
   // Der Gegenstand selbst bleibt bestehen.
   assert.ok(db.prepare('SELECT id FROM inventory_items WHERE id = ?').get(item.id));
+});
+
+// ── Dokumentenrecht (#1358) ─────────────────────────────────────────────────────
+// Der Beleg ist eine Zeile des Dokumente-Moduls. Wer es nicht lesen darf
+// (Mitgliedsrecht `documents: none` oder ein Token ohne documents:read),
+// bekommt weder Namen noch ID, und jede ID, die er verknuepfen will, antwortet
+// mit derselben 403 - sonst waere die Antwort ein Orakel.
+
+const NONE = { id: A, moduleAccess: { documents: 'none' } };
+const TOKEN = { id: A, authMethod: 'api_token', authScopes: ['inventory:write'] };
+const TOKEN_DOCS = { id: A, authMethod: 'api_token', authScopes: ['inventory:write', 'documents:read'] };
+const docFields = (list) => (list || []).map((a) => ({
+  document_id: a.document_id, name: a.name, original_name: a.original_name, mime_type: a.mime_type, file_size: a.file_size,
+}));
+const MASKED = { document_id: null, name: null, original_name: null, mime_type: null, file_size: null };
+
+test('Dokumentenrecht: ohne documents-Lesen kommen Belege maskiert - Liste, Einzelabruf, Verlauf (#1358)', async () => {
+  const doc = insertDocument({ name: 'Garantie Recht' });
+  const item = await createItem({ name: 'Rechteprobe', attachment_document_ids: [doc] });
+  const open = [{ document_id: doc, name: 'Garantie Recht', original_name: 'Garantie Recht.pdf', mime_type: 'application/pdf', file_size: 1234 }];
+  const seen = async (as) => {
+    const list = await call('GET', '/items', { as });
+    const one = await call('GET', `/items/${item.id}`, { as });
+    const history = await call('GET', `/items/${item.id}/history`, { as });
+    assert.equal(list.status, 200);
+    assert.equal(one.status, 200);
+    assert.equal(history.status, 200);
+    return {
+      list: docFields(list.body.data.find((i) => i.id === item.id).attachments),
+      one: docFields(one.body.data.attachments),
+      history: history.body.data.timeline.filter((row) => row.type === 'document').map((row) => ({ id: row.id, label: row.label })),
+    };
+  };
+  const visible = { list: open, one: open, history: [{ id: doc, label: 'Garantie Recht' }] };
+  const masked = { list: [MASKED], one: [MASKED], history: [] };
+  assert.deepEqual(await seen({ id: A }), visible);
+  assert.deepEqual(await seen({ ...NONE, moduleAccess: { documents: 'read' } }), visible, 'Leserecht reicht');
+  assert.deepEqual(await seen(NONE), masked, 'documents: none sieht nur, dass ein Beleg da ist');
+  assert.deepEqual(await seen(TOKEN), masked, 'ein Token ohne documents-Scope ebenso');
+  assert.deepEqual(await seen(TOKEN_DOCS), visible);
+});
+
+test('Dokumentenrecht: ohne documents-Lesen verknuepft POST/PUT nichts, jede ID antwortet gleich (#1358)', async () => {
+  const doc = insertDocument({ name: 'Garantie Schreiben' });
+  const other = insertDocument({ name: 'Garantie Anders' });
+  const item = await createItem({ name: 'Schreibprobe', attachment_document_ids: [doc] });
+  const count = () => db.prepare('SELECT COUNT(*) AS n FROM inventory_items').get().n;
+  for (const [label, as] of [['documents: none', NONE], ['Token ohne documents-Scope', TOKEN]]) {
+    const before = count();
+    const post = (ids) => call('POST', '/items', { as, body: { name: 'Neu', attachment_document_ids: ids } });
+    const valid = await post([other]);
+    assert.equal(valid.status, 403, `${label}: POST mit Beleg ist 403`);
+    assert.equal(valid.body.code, 403);
+    const invalid = await post([987654]);
+    assert.deepEqual({ status: invalid.status, body: invalid.body }, { status: 403, body: valid.body }, `${label}: POST gleich`);
+    assert.equal(count(), before, `${label}: kein Gegenstand angelegt`);
+
+    const put = (ids) => call('PUT', `/items/${item.id}`, { as, body: { name: 'Schreibprobe', attachment_document_ids: ids } });
+    for (const ids of [[other], [doc], [987654]]) {
+      const res = await put(ids);
+      assert.deepEqual({ status: res.status, body: res.body }, { status: 403, body: valid.body }, `${label}: PUT ${ids}`);
+    }
+    assert.deepEqual(linkedDocumentIds(item.id), [doc]);
+    const kept = await put([]);
+    assert.equal(kept.status, 200, `${label}: leere Liste ist kein Verknuepfen`);
+    assert.deepEqual(linkedDocumentIds(item.id), [doc], `${label}: und loest nichts`);
+  }
+  const readable = await call('PUT', `/items/${item.id}`, { as: TOKEN_DOCS, body: { name: 'Schreibprobe', attachment_document_ids: [other] } });
+  assert.equal(readable.status, 200);
+  assert.deepEqual(linkedDocumentIds(item.id), [other]);
 });

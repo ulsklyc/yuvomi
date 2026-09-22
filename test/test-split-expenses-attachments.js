@@ -38,6 +38,9 @@ app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
   req.session = { userId: actor.id, role: actor.role };
+  req.sessionModuleAccess = actor.moduleAccess ?? null;
+  req.authMethod = actor.authMethod;
+  req.authScopes = actor.authScopes ?? null;
   next();
 });
 app.use('/', splitRouter);
@@ -183,4 +186,102 @@ test('gelöschte Ausgabe und gelöschtes Dokument räumen die Verknüpfung ab', 
   db.prepare('DELETE FROM family_documents WHERE id = ?').run(doc);
   assert.deepEqual(linkedDocumentIds(expense.id), []);
   assert.ok(db.prepare('SELECT id FROM expenses WHERE id = ?').get(expense.id));
+});
+
+// ── Dokumentenrecht (#1358) ─────────────────────────────────────────────────────
+// Beleg und Zahlungsnachweis sind Zeilen des Dokumente-Moduls. Wer es nicht
+// lesen darf (Mitgliedsrecht `documents: none` oder ein Token ohne
+// documents:read), bekommt weder Namen noch ID, und jede ID, die er verknuepfen
+// will, antwortet mit derselben 403 - sonst waere die Antwort ein Orakel.
+
+const NONE = { id: OWNER, role: 'member', moduleAccess: { documents: 'none' } };
+const TOKEN = { id: OWNER, role: 'member', authMethod: 'api_token', authScopes: ['budget:write'] };
+const TOKEN_DOCS = { id: OWNER, role: 'member', authMethod: 'api_token', authScopes: ['budget:write', 'documents:read'] };
+const docFields = (list) => (list || []).map((a) => ({
+  document_id: a.document_id, name: a.name, original_name: a.original_name, mime_type: a.mime_type, file_size: a.file_size,
+}));
+const MASKED = { document_id: null, name: null, original_name: null, mime_type: null, file_size: null };
+const expenseBody = (extra = {}) => ({ title: 'Einkauf', amount: '30.00', currency: 'EUR', expense_date: '2030-06-01', ...extra });
+
+test('Dokumentenrecht: ohne documents-Lesen kommen Belege maskiert - Liste und PUT-Antwort (#1358)', async () => {
+  const doc = insertDocument({ name: 'Bon Recht' });
+  const expense = await createExpense({ title: 'Rechteprobe', attachment_document_ids: [doc] });
+  const listed = async (as) => {
+    const res = await call('GET', `/groups/${GROUP}/expenses`, { as });
+    assert.equal(res.status, 200);
+    return docFields(res.body.data.find((e) => e.id === expense.id).attachments);
+  };
+  const open = [{ document_id: doc, name: 'Bon Recht', original_name: 'Bon Recht.pdf', mime_type: 'application/pdf', file_size: 999 }];
+  assert.deepEqual(await listed({ id: OWNER, role: 'member' }), open);
+  assert.deepEqual(await listed({ ...NONE, moduleAccess: { documents: 'read' } }), open, 'Leserecht reicht');
+  assert.deepEqual(await listed(NONE), [MASKED], 'documents: none sieht nur, dass ein Beleg da ist');
+  assert.deepEqual(await listed(TOKEN), [MASKED], 'ein Token ohne documents-Scope ebenso');
+  assert.deepEqual(await listed(TOKEN_DOCS), open);
+
+  const put = await call('PUT', `/expenses/${expense.id}`, { as: NONE, body: expenseBody({ title: 'Rechteprobe' }) });
+  assert.equal(put.status, 200);
+  assert.deepEqual(docFields(put.body.data.attachments), [MASKED], 'PUT-Antwort');
+  assert.deepEqual(linkedDocumentIds(expense.id), [doc]);
+});
+
+test('Dokumentenrecht: ohne documents-Lesen verknuepft POST/PUT nichts, jede ID antwortet gleich (#1358)', async () => {
+  const doc = insertDocument({ name: 'Bon Schreiben' });
+  const other = insertDocument({ name: 'Bon Anders' });
+  const expense = await createExpense({ title: 'Schreibprobe', attachment_document_ids: [doc] });
+  const count = () => db.prepare('SELECT COUNT(*) AS n FROM expenses').get().n;
+  for (const [label, as] of [['documents: none', NONE], ['Token ohne documents-Scope', TOKEN]]) {
+    const before = count();
+    const post = (ids) => call('POST', `/groups/${GROUP}/expenses`, { as, body: expenseBody({ attachment_document_ids: ids }) });
+    const valid = await post([other]);
+    assert.equal(valid.status, 403, `${label}: POST mit Beleg ist 403`);
+    assert.equal(valid.body.code, 403);
+    const invalid = await post([987654]);
+    assert.deepEqual({ status: invalid.status, body: invalid.body }, { status: 403, body: valid.body }, `${label}: POST gleich`);
+    assert.equal(count(), before, `${label}: keine Ausgabe angelegt`);
+
+    const put = (ids) => call('PUT', `/expenses/${expense.id}`, { as, body: expenseBody({ title: 'Schreibprobe', attachment_document_ids: ids }) });
+    for (const ids of [[other], [doc], [987654]]) {
+      const res = await put(ids);
+      assert.deepEqual({ status: res.status, body: res.body }, { status: 403, body: valid.body }, `${label}: PUT ${ids}`);
+    }
+    assert.deepEqual(linkedDocumentIds(expense.id), [doc]);
+    assert.equal((await put([])).status, 200, `${label}: leere Liste ist kein Verknuepfen`);
+    assert.deepEqual(linkedDocumentIds(expense.id), [doc], `${label}: und loest nichts`);
+
+    const settle = (proof) => call('POST', `/groups/${GROUP}/settlements`, {
+      as, body: { payer_id: MEM, payee_id: OWNER, amount: '1.00', currency: 'EUR', proof_document_id: proof },
+    });
+    const proofValid = await settle(other);
+    assert.deepEqual({ status: proofValid.status, body: proofValid.body }, { status: 403, body: valid.body },
+      `${label}: Zahlungsnachweis ist 403`);
+    const proofInvalid = await settle(987654);
+    assert.deepEqual({ status: proofInvalid.status, body: proofInvalid.body }, { status: 403, body: valid.body },
+      `${label}: gueltiger und ungueltiger Nachweis antworten gleich`);
+    assert.equal((await settle(null)).status, 201, `${label}: eine Zahlung ohne Nachweis geht`);
+  }
+  const readable = await call('PUT', `/expenses/${expense.id}`, { as: TOKEN_DOCS, body: expenseBody({ title: 'Schreibprobe', attachment_document_ids: [other] }) });
+  assert.equal(readable.status, 200);
+  assert.deepEqual(linkedDocumentIds(expense.id), [other]);
+});
+
+test('Dokumentenrecht: der Zahlungsnachweis in der Antwort folgt Recht und Sichtbarkeit (#1358)', async () => {
+  const privat = insertDocument({ name: 'Nachweis privat', createdBy: OWNER, visibility: 'private' });
+  const made = await call('POST', `/groups/${GROUP}/settlements`, {
+    body: { payer_id: MEM, payee_id: OWNER, amount: '2.00', currency: 'EUR', proof_document_id: privat },
+  });
+  assert.equal(made.status, 201);
+  assert.equal(made.body.data.proof_document_id, privat, 'die Erstellerin sieht ihren Nachweis');
+  // MEM verwaltet die Gruppe und darf stornieren, das private Dokument der
+  // Erstellerin sieht er aber nicht - die ID darf ihm die Antwort nicht nennen.
+  const reversed = await call('POST', `/groups/${GROUP}/settlements/${made.body.data.id}/reverse`, { as: { id: MEM, role: 'member' } });
+  assert.equal(reversed.status, 200);
+  assert.equal(reversed.body.data.proof_document_id, null);
+
+  const shared = insertDocument({ name: 'Nachweis Familie' });
+  const second = await call('POST', `/groups/${GROUP}/settlements`, {
+    body: { payer_id: MEM, payee_id: OWNER, amount: '3.00', currency: 'EUR', proof_document_id: shared },
+  });
+  const noneReversed = await call('POST', `/groups/${GROUP}/settlements/${second.body.data.id}/reverse`, { as: NONE });
+  assert.equal(noneReversed.status, 200);
+  assert.equal(noneReversed.body.data.proof_document_id, null, 'documents: none bekommt die ID nicht');
 });

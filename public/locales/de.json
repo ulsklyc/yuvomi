@@ -5468,7 +5468,8 @@
         "confirmSelection": "Übernehmen",
         "openAction": "{{name}} öffnen",
         "limitReached": "Höchstens {{count}} Dokumente möglich.",
-        "limitReached_one": "Höchstens {{count}} Dokument möglich."
+        "limitReached_one": "Höchstens {{count}} Dokument möglich.",
+        "presentHidden": "Vorhanden"
     },
     "join": {
         "title": "Konto einrichten",

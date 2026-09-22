@@ -5468,7 +5468,8 @@
         "confirmSelection": "Add selected",
         "openAction": "Open {{name}}",
         "limitReached": "At most {{count}} documents.",
-        "limitReached_one": "At most {{count}} document."
+        "limitReached_one": "At most {{count}} document.",
+        "presentHidden": "Attached"
     },
     "join": {
         "title": "Set up your account",

@@ -5468,7 +5468,8 @@
         "confirmSelection": "Aggiungi selezione",
         "openAction": "Apri {{name}}",
         "limitReached": "Al massimo {{count}} documenti.",
-        "limitReached_one": "Al massimo {{count}} documento."
+        "limitReached_one": "Al massimo {{count}} documento.",
+        "presentHidden": "Allegato"
     },
     "join": {
         "title": "Configura il tuo account",

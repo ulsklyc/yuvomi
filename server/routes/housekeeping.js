@@ -14,7 +14,9 @@ import { collectErrors, color, date, datetime, month, num, oneOf, str, id as val
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { minutesBetween, computeHourlyAmount } from '../services/housekeeping-billing.js';
 import { assertDocumentsNotDeleting, sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
-import { assertDocumentLinkTargetsAvailable } from '../services/document-links.js';
+import {
+  assertDocumentLinkTargetsAvailable, documentViewer, mayReadDocuments, sendDocumentLinkRefusal,
+} from '../services/document-links.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
 import {
   formatDateKey,
@@ -28,7 +30,7 @@ import {
   mirroredFieldsChanged,
   queueEventDeletion,
 } from '../services/calendar-outbound.js';
-import { hiddenModulesFor, mayWriteModule, moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
+import { mayWriteModule, moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
 import { documentVisibleSql } from '../services/document-access.js';
 import { tokenAllows } from '../scopes.js';
 import {
@@ -637,7 +639,8 @@ function visitCapabilities(row, req) {
 // API beantwortet die Frage am Browser vorbei.
 //
 // EIN Urteil fuer Name UND ID, aus den geteilten Stellen und ohne Nachbau: die
-// Modulachse (`hiddenModulesFor`: Mitgliedsrecht UND Token-Scope) und die
+// Modulachse (`mayReadDocuments` aus services/document-links.js: Mitgliedsrecht
+// UND Token-Scope, dieselbe Frage wie bei Budget, Ausgaben und Inventar) und die
 // Sichtbarkeit des einzelnen Dokuments (`documentVisibleSql`, dieselbe Regel
 // wie im Dokumente-Modul). Wer durchfaellt, bekommt `null` fuer beide - auch die
 // ID verraet sonst, dass es ein Dokument dieser Nummer gibt (document-access.js).
@@ -648,7 +651,7 @@ function visitCapabilities(row, req) {
 // nicht mitgibt, bekommt die maskierte Form. Ein kuenftiger Serialisierer, der
 // es vergisst, leakt deshalb nichts.
 function receiptAccess(req) {
-  const hidden = hiddenModulesFor(req, ['documents']).has('documents');
+  const hidden = !mayReadDocuments(req);
   const viewer = userId(req);
   const names = new Map();
   const load = (ids) => {
@@ -1097,10 +1100,9 @@ router.put('/visits/:id', (req, res) => {
         assertDocumentsNotDeleting([wanted]);
       } else if (wanted === null) {
         receiptDocumentId = null;
-      } else if (hiddenModulesFor(req, ['documents']).has('documents')) {
-        return res.status(403).json({ error: 'Linking a receipt requires access to documents.', code: 403 });
       } else {
-        receiptDocumentId = assertDocumentLinkTargetsAvailable(db.get(), [wanted], userId(req))[0] ?? null;
+        // Ohne Dokumentenzugriff wirft das die geteilte 403 (document-links.js).
+        receiptDocumentId = assertDocumentLinkTargetsAvailable(db.get(), [wanted], documentViewer(req))[0] ?? null;
       }
     }
     if (vDailyRate.value < 0 || (vExtras.value ?? 0) < 0) {
@@ -1145,6 +1147,7 @@ router.put('/visits/:id', (req, res) => {
     res.json({ data: publicSession(row, receiptAccess(req)), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
+    if (sendDocumentLinkRefusal(res, err)) return;
     log.error('PUT /visits/:id error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }

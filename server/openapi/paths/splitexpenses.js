@@ -1,4 +1,4 @@
-import { op, jsonBody, idParam } from '../helpers.js';
+import { op, jsonBody, idParam, DOCUMENT_LINKS_READ_NOTE } from '../helpers.js';
 
 const apiError = (description) => ({
   description,
@@ -26,7 +26,7 @@ const settlementReversalResponse = {
         amount: { type: 'string', description: 'Decimal amount, e.g. `20.00`.' },
         currency: { type: 'string', description: 'ISO 4217 code.' },
         notes: { type: ['string', 'null'] },
-        proof_document_id: { type: ['integer', 'null'], description: 'Kept as is - a reversal does not detach the payment proof.' },
+        proof_document_id: { type: ['integer', 'null'], description: 'Kept as is - a reversal does not detach the payment proof. `null` in the response unless the caller may read that document (access to the Documents module, for API tokens a `documents:read` scope, and the document\'s own visibility).' },
         status: { type: 'string', enum: ['active', 'deleted'], description: 'Unchanged by a reversal.' },
         paid_at: { type: 'string', format: 'date-time' },
         created_by: { type: 'integer' },
@@ -98,14 +98,14 @@ export function splitexpensesPaths() {
       post: op({ summary: 'Create a guest user and add them to a group', tag: 'SplitExpenses', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/split-expenses/groups/{id}/expenses': {
-      get: op({ summary: 'List group expenses', tag: 'SplitExpenses', params: [idParam()] }),
-      post: op({ summary: 'Create expense in group (optional `attachment_document_ids`: receipts from the documents module, filtered by document visibility)', tag: 'SplitExpenses', params: [idParam()], stateChanging: true, documentDeleteConflict: true, requestBody: jsonBody(null) }),
+      get: op({ summary: 'List group expenses', description: `Each expense carries \`attachments\`. ${DOCUMENT_LINKS_READ_NOTE}`, tag: 'SplitExpenses', params: [idParam()] }),
+      post: op({ summary: 'Create expense in group (optional `attachment_document_ids`: receipts from the documents module, filtered by document visibility)', tag: 'SplitExpenses', params: [idParam()], description: DOCUMENT_LINKS_READ_NOTE, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/split-expenses/groups/{id}/balances': {
       get: op({ summary: 'Get group balances', tag: 'SplitExpenses', params: [idParam()] }),
     },
     '/api/v1/split-expenses/groups/{id}/settlements': {
-      post: op({ summary: 'Record settlement (optional `proof_document_id`: one payment proof, ignored when the document is not visible to the caller)', tag: 'SplitExpenses', params: [idParam()], stateChanging: true, documentDeleteConflict: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Record settlement (optional `proof_document_id`: one payment proof, ignored when the document is not visible to the caller)', tag: 'SplitExpenses', params: [idParam()], description: 'The response carries `proof_document_id` only when the caller may read that document (access to the Documents module, for API tokens a `documents:read` scope, and the document\'s own visibility), else `null`.', stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/split-expenses/groups/{id}/settlements/{settlementId}/reverse': {
       post: op({
@@ -156,7 +156,7 @@ export function splitexpensesPaths() {
       post: op({ summary: 'Create recurring expense in group', tag: 'SplitExpenses', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/split-expenses/expenses/{id}': {
-      put: op({ summary: 'Update expense (`attachment_document_ids` replaces the receipt links; omit the field to leave them untouched)', tag: 'SplitExpenses', params: [idParam()], stateChanging: true, documentDeleteConflict: true, requestBody: jsonBody(null) }),
+      put: op({ summary: 'Update expense (`attachment_document_ids` replaces the receipt links; omit the field to leave them untouched)', tag: 'SplitExpenses', params: [idParam()], description: DOCUMENT_LINKS_READ_NOTE, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete expense', tag: 'SplitExpenses', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/split-expenses/expenses/{id}/comments': {

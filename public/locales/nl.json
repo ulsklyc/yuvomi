@@ -5468,7 +5468,8 @@
         "confirmSelection": "Selectie toevoegen",
         "openAction": "{{name}} openen",
         "limitReached": "Maximaal {{count}} documenten.",
-        "limitReached_one": "Maximaal {{count}} document."
+        "limitReached_one": "Maximaal {{count}} document.",
+        "presentHidden": "Aanwezig"
     },
     "join": {
         "title": "Account instellen",

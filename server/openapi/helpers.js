@@ -29,6 +29,16 @@ function idempotencyHeaderParam() {
   };
 }
 
+// Belege gehoeren dem Dokumente-Modul (#1358, server/services/document-links.js):
+// ein Text je Richtung, damit Budget, Ausgaben und Inventar dasselbe sagen.
+const DOCUMENT_LINKS_READ_NOTE = 'Linked documents follow the Documents module: a document the caller cannot see is left out, and '
+  + 'without access to the Documents module (for API tokens a `documents:read` scope) every remaining link comes masked - '
+  + '`document_id`, `name`, `original_name`, `mime_type` and `file_size` are `null`, only the link itself says that a document is attached.';
+
+const DOCUMENT_LINK_REFUSAL = 'Linking a document needs access to the Documents module (for API tokens a `documents:read` scope). '
+  + 'Without it, any document id - a stored one, a visible one or one that does not exist - is refused with this same 403, before any '
+  + 'visibility or deletion check. An empty list or leaving the field out is not a link and changes nothing.';
+
 function jsonBody(schemaRef, description = 'JSON request body') {
   return {
     required: true,
@@ -52,6 +62,7 @@ function op({
   responses = null,
   stateChanging = false,
   documentDeleteConflict = false,
+  documentLinkRefusal = false,
 }) {
   const operation = {
     tags: [tag],
@@ -73,6 +84,9 @@ function op({
     operation.responses[409] = {
       description: 'A requested document is being deleted. Retry after the operation finishes. The response body reason is `DOCUMENT_DELETE_IN_PROGRESS`.',
     };
+  }
+  if (documentLinkRefusal) {
+    operation.responses[403] = { description: DOCUMENT_LINK_REFUSAL };
   }
   if (params.length || stateChanging) {
     operation.parameters = [...params];
@@ -116,4 +130,7 @@ function langParam() {
   };
 }
 
-export { authSecurity, csrfHeaderParam, idempotencyHeaderParam, jsonBody, op, idParam, stringPathParam, langParam };
+export {
+  authSecurity, csrfHeaderParam, idempotencyHeaderParam, jsonBody, op, idParam, stringPathParam, langParam,
+  DOCUMENT_LINKS_READ_NOTE, DOCUMENT_LINK_REFUSAL,
+};

@@ -5468,7 +5468,8 @@
         "confirmSelection": "Tambahkan pilihan",
         "openAction": "Buka {{name}}",
         "limitReached": "Maksimal {{count}} dokumen.",
-        "limitReached_one": "Maksimal {{count}} dokumen."
+        "limitReached_one": "Maksimal {{count}} dokumen.",
+        "presentHidden": "Terlampir"
     },
     "join": {
         "title": "Siapkan akun Anda",

@@ -5468,7 +5468,8 @@
         "confirmSelection": "Lägg till valda",
         "openAction": "Öppna {{name}}",
         "limitReached": "Högst {{count}} dokument.",
-        "limitReached_one": "Högst {{count}} dokument."
+        "limitReached_one": "Högst {{count}} dokument.",
+        "presentHidden": "Bifogat"
     },
     "join": {
         "title": "Skapa ditt konto",

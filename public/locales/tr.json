@@ -5468,7 +5468,8 @@
         "confirmSelection": "Seçilenleri ekle",
         "openAction": "{{name}} ögesini aç",
         "limitReached": "En fazla {{count}} belge.",
-        "limitReached_one": "En fazla {{count}} belge."
+        "limitReached_one": "En fazla {{count}} belge.",
+        "presentHidden": "Ekli"
     },
     "join": {
         "title": "Hesabını oluştur",

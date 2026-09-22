@@ -144,10 +144,21 @@ export function renderDocumentAttachField({
  */
 export function attachmentLinksNode(attachments = []) {
   if (pathAccess('/documents') === 'none') return null;
-  const docs = (attachments || []).filter((a) => a?.document_id);
-  if (!docs.length) return null;
+  const list = (attachments || []).filter(Boolean);
+  const docs = list.filter((a) => a.document_id);
+  // Ein Beleg, den der Server nicht nennt (#1358): die Zeile kommt mit
+  // `document_id: null` und ohne Namen. Wie beim Beleg eines Einsatzes steht
+  // dann ein ruhiges "Vorhanden" statt eines Links, der ins Leere ginge.
+  const hidden = list.length > docs.length;
+  if (!docs.length && !hidden) return null;
   const wrap = document.createElement('div');
   wrap.className = 'detail-chips';
+  if (hidden) {
+    const present = document.createElement('span');
+    present.className = 'detail-attachment detail-attachment--present';
+    present.textContent = t('documentAttach.presentHidden');
+    wrap.appendChild(present);
+  }
   for (const doc of docs) {
     const name = doc.name || doc.original_name || '';
     const link = document.createElement('a');

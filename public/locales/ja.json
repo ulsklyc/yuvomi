@@ -5468,7 +5468,8 @@
         "confirmSelection": "選択を追加",
         "openAction": "{{name}} を開く",
         "limitReached": "書類は最大 {{count}} 件までです。",
-        "limitReached_one": "書類は最大 {{count}} 件までです。"
+        "limitReached_one": "書類は最大 {{count}} 件までです。",
+        "presentHidden": "添付あり"
     },
     "join": {
         "title": "アカウントの設定",

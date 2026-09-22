@@ -5468,7 +5468,8 @@
         "confirmSelection": "Kiválasztottak hozzáadása",
         "openAction": "{{name}} megnyitása",
         "limitReached": "Legfeljebb {{count}} dokumentum.",
-        "limitReached_one": "Legfeljebb {{count}} dokumentum."
+        "limitReached_one": "Legfeljebb {{count}} dokumentum.",
+        "presentHidden": "Csatolva"
     },
     "join": {
         "title": "Fiók beállítása",

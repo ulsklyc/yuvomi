@@ -5468,7 +5468,8 @@
         "confirmSelection": "Thêm mục đã chọn",
         "openAction": "Mở {{name}}",
         "limitReached": "Tối đa {{count}} tài liệu.",
-        "limitReached_one": "Tối đa {{count}} tài liệu."
+        "limitReached_one": "Tối đa {{count}} tài liệu.",
+        "presentHidden": "Đã đính kèm"
     },
     "join": {
         "title": "Thiết lập tài khoản",

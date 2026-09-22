@@ -5468,7 +5468,8 @@
         "confirmSelection": "Přidat vybrané",
         "openAction": "Otevřít {{name}}",
         "limitReached": "Nejvýše dokumentů: {{count}}.",
-        "limitReached_one": "Nejvýše dokumentů: {{count}}."
+        "limitReached_one": "Nejvýše dokumentů: {{count}}.",
+        "presentHidden": "Přiložen"
     },
     "join": {
         "title": "Nastavení účtu",
