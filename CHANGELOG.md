@@ -137,6 +137,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A reminder no longer sits on top of a dialog's buttons and takes the click meant for them.**
+  When a reminder came due while a dialog was open, its message could lie exactly over "Save": on a
+  desktop screen the calendar dialog's Save, Cancel and Delete were all under it, and on a phone the
+  first row of the sheet's buttons or its close button. Clicking there dismissed the reminder and
+  saved nothing, without any message. While a dialog is open, messages at the bottom of the screen
+  now move out of the way of its title bar and buttons: above the dialog when there is room (on a
+  phone, the strip above the sheet), otherwise just above the dialog's buttons. They stay
+  visible and can still be dismissed. (#1160)
+
 - **Deleting a folder no longer reveals activity on documents you cannot see.** Before deleting a
   folder the app asks the server what the deletion would affect and sends that answer back with the
   deletion, so nothing changes unnoticed in between. That answer was built over every document in

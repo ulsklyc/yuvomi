@@ -57,8 +57,8 @@ const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
  * "Speichern": am 12.09.2026 wurden dadurch drei Kalender-Sonden rot, einen Tag
  * spaeter waeren sie zufaellig wieder gruen gewesen. Keine Sonde prueft
  * Erinnerungen, also soll auch keine davon abhaengen, an welchem Tag der
- * Handlauf faehrt. Der Fehler in der Oberflaeche selbst ist #1160 und gehoert in
- * eine eigene Sonde, nicht in ein Ausblenden hier.
+ * Handlauf faehrt. Der Fehler in der Oberflaeche selbst ist #1160; seine Sonde
+ * (test-toast-dialog-browser.js) legt ihre faellige Erinnerung selbst an.
  *
  * VERWORFEN, NICHT GELOESCHT, und die Geburtstage bleiben unangetastet. Ihre
  * Kalendertermine und Erinnerungen entstehen erst beim ersten Abgleich
