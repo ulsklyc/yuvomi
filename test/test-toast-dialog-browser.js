@@ -456,3 +456,54 @@ for (const size of SMALL_SIZES) {
     }
   });
 }
+
+/*
+ * WELCHER TOAST BLEIBT, UND WAS DIE ANDEREN NOCH KOENNEN (Review an #1421).
+ *
+ * Die bestimmte Live-Region (Fehler) steht im Stapel immer HINTER der
+ * hoeflichen (Erinnerungen). Wer den letzten nach DOM-Reihenfolge behielt,
+ * behielt jede Fehlermeldung und nahm die Erinnerung zurueck, die gerade kam.
+ * Und ein zurueckgenommener Toast ist unsichtbar - seine Knoepfe (Verwerfen,
+ * Oeffnen) duerfen dann auch per Tab nicht erreichbar sein.
+ */
+test('#1160 568x320 - der juengste Toast bleibt sichtbar, auch nach einem Fehler; die zurueckgenommenen sind inert', async () => {
+  const page = await openPage(harness, { device: 'mobile', locale: 'de' });
+  try {
+    const eventId = await seedDueReminder(page, { count: 1, refresh: false });
+    await page.setViewport({ width: 568, height: 320, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+    await gotoRoute(page, '/calendar');
+    await waitForToasts(page, 1);
+    await openEventEditor(page, eventId);
+    // Erst ein Fehler (bestimmt, lange Standzeit), DANACH eine neue Erinnerung.
+    await page.evaluate(() => window.yuvomi.showToast('Toast probe error', 'danger', 30000));
+    await page.waitForFunction(() => document.querySelectorAll('.toast--danger').length >= 1);
+    await seedDueReminder(page, { count: 1, refresh: false });
+    await page.evaluate(async () => (await import('/reminders.js')).refresh());
+    await waitForToasts(page, 2);
+    await settleAnimations(page);
+    const state = await page.evaluate(() => {
+      const reminders = [...document.querySelectorAll('.toast--reminder')];
+      const newest = reminders[reminders.length - 1];
+      const all = [...document.querySelectorAll('.shell-bottom-stack .toast')];
+      return {
+        count: all.length,
+        tucked: all.filter((t) => t.classList.contains('toast--tucked')).length,
+        newestTucked: newest.classList.contains('toast--tucked'),
+        newestInert: newest.inert,
+        dangerTucked: document.querySelector('.toast--danger')?.classList.contains('toast--tucked'),
+        tuckedNotInert: all.filter((t) => t.classList.contains('toast--tucked') && !t.inert).length,
+      };
+    });
+    assert.equal(state.count, 3, `drei Toasts erwartet (${JSON.stringify(state)})`);
+    assert.ok(state.tucked >= 1, `bei 568x320 muss der Stapel zuruecknehmen, sonst misst die Sonde nichts (${JSON.stringify(state)})`);
+    assert.equal(state.newestTucked, false, `die zuletzt eingetroffene Erinnerung wurde zurueckgenommen (${JSON.stringify(state)})`);
+    assert.equal(state.newestInert, false, 'der sichtbare Toast darf nicht inert sein');
+    assert.equal(state.dangerTucked, true, `der aeltere Fehler muss zuruecktreten (${JSON.stringify(state)})`);
+    assert.equal(state.tuckedNotInert, 0, 'ein zurueckgenommener Toast ist per Tab erreichbar (nicht inert)');
+    const measured = await measureDialog(page);
+    assert.deepEqual(measured.covered, [], 'ein Knopf des Editors liegt unter dem Stapel');
+    assert.equal(measured.toastVisible, true, 'der juengste Toast muss sichtbar sein');
+  } finally {
+    await page.close();
+  }
+});

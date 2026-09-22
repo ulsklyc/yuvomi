@@ -63,10 +63,9 @@
  * test/test-toast-placement.js fest.
  *
  * FINDET SICH KEIN FREIER PLATZ und stehen mehrere Toasts im Stapel, zeigt er
- * nur noch den letzten (bei 667x375 deckten drei Toasts im Kalender-Editor
- * Loeschen und Abbrechen). Die uebrigen bleiben im Dokument, nur optisch
- * zurueckgenommen (`.toast--tucked`), damit die Live-Region nichts verliert;
- * sie kommen wieder, sobald Platz ist.
+ * nur noch den juengsten (bei 568x320 deckten drei Toasts im Kalender-Editor
+ * dessen Kopf). Die uebrigen bleiben im Dokument, zurueckgenommen
+ * (`.toast--tucked`) und `inert`, und kommen wieder, sobald Platz ist.
  *
  * Die Abstaende kommen aus tokens.css (`--toast-dock-gap` in layout.css), die
  * Lage schreibt dieses Modul als drei Variablen an den Stapel; die Regel, die
@@ -272,19 +271,56 @@ function pxProperty(el, name) {
   return Number.isFinite(value) ? value : 0;
 }
 
+/**
+ * WANN EIN TOAST KAM, nicht wo er steht. Der Stapel haengt die bestimmte
+ * Live-Region (Fehler, Warnungen) immer HINTER die hoefliche (Erinnerungen);
+ * wer "den letzten" nach DOM-Reihenfolge behielt, behielt deshalb jede
+ * Fehlermeldung und nahm die Erinnerung zurueck, die gerade eingetroffen war
+ * (Review an #1421). Die Beobachtung des Stapels vergibt die Nummer beim
+ * Einfuegen.
+ */
+const ARRIVAL = new WeakMap();
+let arrivalCount = 0;
+
+function noteArrivals(records) {
+  for (const record of records) {
+    for (const node of record.addedNodes) {
+      if (node.nodeType !== 1) continue;
+      const toasts = node.matches('.toast') ? [node] : [...node.querySelectorAll('.toast')];
+      for (const toast of toasts) if (!ARRIVAL.has(toast)) ARRIVAL.set(toast, ++arrivalCount);
+    }
+  }
+}
+
 /** Der Stapel nimmt zurueckgenommene Toasts wieder auf. */
 function untuck(stack) {
-  for (const toast of stack.querySelectorAll('.toast--tucked')) toast.classList.remove('toast--tucked');
+  for (const toast of stack.querySelectorAll('.toast--tucked')) {
+    toast.classList.remove('toast--tucked');
+    toast.inert = false;
+  }
 }
 
 /**
- * Nimmt alle Toasts bis auf den letzten optisch zurueck (sie bleiben im
- * Dokument). Gibt zurueck, ob sich etwas geaendert hat.
+ * Nimmt alle Toasts bis auf den juengsten zurueck. Sie bleiben im Dokument,
+ * sind aber `inert`: ihre Knoepfe (Verwerfen, Oeffnen) waren sonst per Tab
+ * erreichbar - unsichtbar, ohne Fokusring, unter einem Dialog ohne Fokusfalle
+ * wie der Symbolwahl im Kalender (Review an #1421). Gibt zurueck, ob sich
+ * etwas geaendert hat.
  */
-function tuckAllButLast(stack) {
+function tuckAllButNewest(stack) {
   const toasts = [...stack.querySelectorAll('.toast')].filter((t) => t.getClientRects().length > 0);
   if (toasts.length < 2) return false;
-  for (const toast of toasts.slice(0, -1)) toast.classList.add('toast--tucked');
+  // Ohne Nummer (vor der Beobachtung eingefuegt) gilt ein Toast als aelter als
+  // jeder nummerierte, und unter diesen entscheidet die DOM-Reihenfolge.
+  const rank = (i) => ARRIVAL.get(toasts[i]) ?? i - toasts.length;
+  let newestIndex = 0;
+  for (let i = 1; i < toasts.length; i += 1) if (rank(i) > rank(newestIndex)) newestIndex = i;
+  const newest = toasts[newestIndex];
+  for (const toast of toasts) {
+    if (toast === newest) continue;
+    toast.classList.add('toast--tucked');
+    toast.inert = true;
+  }
   return true;
 }
 
@@ -357,7 +393,7 @@ export function placeToastStack(stack) {
   };
   let decision = chooseToastPlacement(input);
   // Kein freier Platz fuer den ganzen Stapel: nur der letzte Toast bleibt sichtbar.
-  if (decision?.covers && tuckAllButLast(stack)) {
+  if (decision?.covers && tuckAllButNewest(stack)) {
     decision = chooseToastPlacement({ ...input, dockedHeight: stack.getBoundingClientRect().height });
   }
   if (!decision) {
@@ -413,7 +449,10 @@ export function watchToastPlacement(stack) {
     if (!frame) frame = requestAnimationFrame(run);
   }
 
-  const stackMutations = new MutationObserver(schedule);
+  const stackMutations = new MutationObserver((records) => {
+    noteArrivals(records);
+    schedule();
+  });
   stackMutations.observe(stack, { childList: true, subtree: true });
   // Der ganze Baum unter `body`, nicht nur seine Kinder: Dialoge entstehen auch
   // tiefer (das Onboarding in der Shell, die Auswahlfenster in einem Formular).
