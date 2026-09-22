@@ -1570,6 +1570,9 @@ function openMealModal(opts) {
         const selectEl = panel.querySelector('#transfer-list-select');
         const listId   = parseInt(selectEl?.value, 10);
         if (!listId || !state.modal?.meal) return;
+        // Zweite Linie hinter dem Markup (Regel 2 in utils/module-access.js):
+        // die Rechte koennen sich aendern, waehrend der Dialog offen steht.
+        if (!mayTransferMealToShopping(state.modal.meal.id)) return;
         const btn = panel.querySelector('#transfer-btn');
         btn.disabled = true;
         try {
@@ -2029,6 +2032,7 @@ export const __test = {
   // (Kachel und Dialog) und der Handler werden als Programm gefahren
   // (test-kitchen-transfer-ui.js).
   buildModalContent,
+  openMealModal,
   transferMeal,
 };
 

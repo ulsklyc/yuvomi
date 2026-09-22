@@ -27,6 +27,8 @@ import assert from 'node:assert/strict';
 globalThis.HTMLElement = globalThis.HTMLElement ?? class {};
 globalThis.customElements = globalThis.customElements ?? { define() {}, get() {} };
 globalThis.window = globalThis.window ?? {};
+// Toasts ins Leere: der Einkauf ruft `window.yuvomi.showToast` ohne `?.`.
+globalThis.window.yuvomi = { showToast() {}, ...globalThis.window.yuvomi };
 
 const { installMiniDom } = await import('./mini-dom.js');
 installMiniDom();
@@ -238,3 +240,85 @@ for (const [name, modules] of KEIN_IMPORT_IN_DEN_EINKAUF) {
     });
   });
 }
+
+// -------------------------------------------------------------------------
+// Die Dialoge als Programm: Rechte aendern sich, WAEHREND sie offen stehen
+// -------------------------------------------------------------------------
+
+/**
+ * Ein Panel-Stub, der je Selektor EIN Element liefert und dessen Listener
+ * mitschreibt - genug fuer die Verdrahtung eines Dialogs. Gemessen wird davon
+ * nur der eine Handler, den der Test herausgreift.
+ */
+function stubPanel(werte = {}) {
+  const elemente = new Map();
+  const element = (sel) => {
+    if (!elemente.has(sel)) {
+      const listeners = {};
+      elemente.set(sel, {
+        listeners, value: werte[sel] ?? '', hidden: false, disabled: false, checked: false,
+        addEventListener(typ, fn) { listeners[typ] = fn; },
+        replaceChildren() {}, appendChild() {}, querySelectorAll: () => [],
+      });
+    }
+    return elemente.get(sel);
+  };
+  return { querySelector: element, querySelectorAll: () => [], element };
+}
+
+/** Einen Dialog mit dem echten `onSave` oeffnen und das Panel zurueckgeben. */
+function oeffne(openFn, werte) {
+  const panel = stubPanel(werte);
+  const zuvor = globalThis.__openModal;
+  globalThis.__openModal = (opts) => opts.onSave(panel);
+  try {
+    openFn();
+  } finally {
+    globalThis.__openModal = zuvor;
+  }
+  return panel;
+}
+
+test('Mahlzeit-Dialog: gehen die Rechte verloren, waehrend er offen steht, schickt der Transfer-Knopf nichts', async () => {
+  const zuvor = meals.state.lists;
+  meals.state.lists = [LISTE];
+  try {
+    const panel = await withAccess(BEIDE, () => oeffne(
+      () => meals.openMealModal({ mode: 'edit', date: '2026-09-21', mealType: 'lunch', meal: mahlzeit() }),
+      { '#transfer-list-select': String(LISTE.id) },
+    ));
+    const klick = panel.element('#transfer-btn').listeners.click;
+    assert.equal(typeof klick, 'function', 'Gegenprobe: der Dialog hat den Transfer-Knopf verdrahtet');
+    for (const [name, modules] of KEIN_TRANSFER_AUS_DER_KUECHE) {
+      const posts = await withAccess(modules, () => recordPosts(() => klick()));
+      assert.deepEqual(posts, [], `mit ${name} endete der Klick im 403`);
+    }
+    const posts = await withAccess(BEIDE, () => recordPosts(() => klick()));
+    assert.deepEqual(posts, ['/meals/11/to-shopping-list'], 'Gegenprobe: mit beiden Rechten geht der Transfer raus');
+  } finally {
+    meals.state.lists = zuvor;
+    meals.state.modal = null;
+  }
+});
+
+test('Import-Dialog im Einkauf: gehen die Rechte verloren, waehrend er offen steht, schicken Vorschau und Uebernehmen nichts', async () => {
+  const zuvorId = shopping.state.activeListId;
+  shopping.state.activeListId = LISTE.id;
+  try {
+    const panel = await withAccess(BEIDE, () => oeffne(
+      () => shopping.openMealPlanImport({}),
+      { '#shopping-import-from': '2026-09-21', '#shopping-import-to': '2026-09-27' },
+    ));
+    const vorschau = panel.element('#shopping-import-from').listeners.change;
+    const absenden = () => panel.element('#shopping-import-meals-form').listeners.submit({ preventDefault() {} });
+    assert.equal(typeof vorschau, 'function', 'Gegenprobe: der Dialog hat die Vorschau verdrahtet');
+    for (const [name, modules] of KEIN_IMPORT_IN_DEN_EINKAUF) {
+      const posts = await withAccess(modules, () => recordPosts(async () => { await vorschau(); await absenden(); }));
+      assert.deepEqual(posts, [], `mit ${name} endeten Vorschau und Uebernehmen im 403`);
+    }
+    const posts = await withAccess(BEIDE, () => recordPosts(() => vorschau()));
+    assert.deepEqual(posts, [`/shopping/${LISTE.id}/import-meal-plan`], 'Gegenprobe: mit beiden Rechten rechnet die Vorschau');
+  } finally {
+    shopping.state.activeListId = zuvorId;
+  }
+});

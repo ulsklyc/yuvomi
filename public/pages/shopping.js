@@ -2465,6 +2465,9 @@ function openMealPlanImport(container) {
         const from = panel.querySelector('#shopping-import-from')?.value || '';
         const to = panel.querySelector('#shopping-import-to')?.value || '';
         if (!from || !to || !previewEl) return;
+        // Die Rechte koennen sich aendern, waehrend der Dialog offen steht; die
+        // Vorschau verlangt serverseitig dieselben zwei wie der Import (#1290).
+        if (!mayImportMealPlan(state.activeListId)) return;
         try {
           const data = await api.post(`/shopping/${state.activeListId}/import-meal-plan`, { from, to, preview: true });
           const transferred = Number(data.data?.transferred) || 0;
@@ -2495,6 +2498,7 @@ function openMealPlanImport(container) {
         const from = panel.querySelector('#shopping-import-from')?.value || '';
         const to = panel.querySelector('#shopping-import-to')?.value || '';
         if (!from || !to) return;
+        if (!mayImportMealPlan(state.activeListId)) return;
         try {
           const data = await api.post(`/shopping/${state.activeListId}/import-meal-plan`, { from, to });
           if (!data.data?.transferred) {
