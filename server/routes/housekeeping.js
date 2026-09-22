@@ -13,7 +13,7 @@ import { normalizeAvatarData, syncFamilyMemberArtifacts } from '../auth.js';
 import { collectErrors, color, date, datetime, month, num, oneOf, str, id as validateId, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { minutesBetween, computeHourlyAmount } from '../services/housekeeping-billing.js';
-import { sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
+import { assertDocumentsNotDeleting, sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
 import { assertDocumentLinkTargetsAvailable } from '../services/document-links.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
 import {
@@ -28,7 +28,8 @@ import {
   mirroredFieldsChanged,
   queueEventDeletion,
 } from '../services/calendar-outbound.js';
-import { mayWriteModule, moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
+import { hiddenModulesFor, mayWriteModule, moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
+import { filterVisibleDocumentIds } from '../services/document-access.js';
 import { tokenAllows } from '../scopes.js';
 import {
   householdTimeZone,
@@ -620,6 +621,35 @@ function visitCapabilities(row, req) {
   };
 }
 
+// DER NAME DES BELEGS GEHOERT DEM DOKUMENTE-MODUL, NICHT DEM BESUCH (#1358).
+//
+// Der Besuch bleibt beim Quellmodul housekeeping (docs/DECISIONS.md: automatische
+// Folgeeintraege folgen dem Quellmodul), sein Beleg ist aber eine Zeile aus
+// family_documents. Der Pfad-Guard in server/index.js urteilt am ersten
+// Segment und fragt hier deshalb nie nach `documents`. Vorher jointen beide
+// Leserouten `fd.name` ohne Frage - bei `documents: none`, mit einem Token ohne
+// documents-Scope oder bei einem fremden privaten Dokument kam der Name
+// trotzdem an. Dass die Seite ihn bei `none` nicht zeichnet, ist eine
+// Darstellungsentscheidung, die API beantwortet die Frage am Browser vorbei.
+//
+// Zwei Fragen, beide aus den geteilten Stellen und ohne Nachbau: die
+// Modulachse (`hiddenModulesFor`: Mitgliedsrecht UND Token-Scope) und die
+// Sichtbarkeit des einzelnen Dokuments (`filterVisibleDocumentIds`, dieselbe
+// Regel wie im Dokumente-Modul). Was durchfaellt, wird `null`, die Antwort
+// behaelt ihre Form. `receipt_document_id` bleibt stehen: es ist eine Spalte
+// des Besuchs, der Bearbeiten-Dialog schickt sie zurueck, und ohne sie haengte
+// ein Speichern den Beleg ab.
+function visibleReceiptNames(req, rows) {
+  const names = new Map();
+  if (hiddenModulesFor(req, ['documents']).has('documents')) return names;
+  const ids = rows.map((row) => row.receipt_document_id).filter((id) => id != null);
+  const visible = new Set(filterVisibleDocumentIds(db.get(), ids, userId(req)));
+  for (const row of rows) {
+    if (visible.has(row.receipt_document_id)) names.set(row.id, row.receipt_document_name ?? null);
+  }
+  return names;
+}
+
 async function createWorkerUser({ username, displayName, avatarColor, avatarData, actorUserId }) {
   const finalUsername = username || `housekeeper_${Date.now()}`;
   const password = crypto.randomBytes(24).toString('base64url');
@@ -855,6 +885,7 @@ router.get('/visits', (req, res) => {
         AND (? IS NULL OR hws.worker_id = ?)
       ORDER BY hws.check_in DESC
     `).all(start, end, vWorkerId.value, vWorkerId.value);
+    const receiptNames = visibleReceiptNames(req, rows);
     const visits = rows.map((row) => ({
       ...publicSession(row),
       worker_name: row.worker_name ?? null,
@@ -863,7 +894,7 @@ router.get('/visits', (req, res) => {
       payment_schedule: row.payment_schedule ?? 'monthly',
       payment_task_status: row.payment_task_status ?? null,
       payment_task_title: row.payment_task_title ?? null,
-      receipt_document_name: row.receipt_document_name ?? null,
+      receipt_document_name: receiptNames.get(row.id) ?? null,
       total_amount: Number(row.daily_rate || 0) + Number(row.extras || 0),
       ...visitCapabilities(row, req),
     }));
@@ -959,7 +990,7 @@ router.get('/visits/:id', (req, res) => {
       payment_schedule: row.payment_schedule ?? 'monthly',
       payment_task_status: row.payment_task_status ?? null,
       payment_task_title: row.payment_task_title ?? null,
-      receipt_document_name: row.receipt_document_name ?? null,
+      receipt_document_name: visibleReceiptNames(req, [row]).get(row.id) ?? null,
       total_amount: Number(row.daily_rate || 0) + Number(row.extras || 0),
       ...visitCapabilities(row, req),
     };
@@ -994,13 +1025,17 @@ router.put('/visits/:id', (req, res) => {
     if (vMinutesWorked.error) return res.status(400).json({ error: vMinutesWorked.error, code: 400 });
     const errors = collectErrors([vDate, vDailyRate, vExtras, vEventTitle, vPaymentTitle, vPaymentDescription, vReceiptId]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
-    const receiptDocumentId = req.body.receipt_document_id !== undefined && vReceiptId.value !== null
-      ? assertDocumentLinkTargetsAvailable(
-        db.get(),
-        [vReceiptId.value],
-        req.authUserId || req.session.userId,
-      )[0] ?? null
-      : vReceiptId.value;
+    // Die bestehende Verknuepfung zu BEHALTEN verlangt keine Sichtbarkeit, sie
+    // zu AENDERN schon (Regel 2 in services/document-links.js). Der Dialog
+    // schickt `receipt_document_id` unveraendert zurueck; wer den Beleg nicht
+    // sehen darf, haengte ihn sonst beim Speichern ab (#1358). Die Loeschsperre
+    // gilt fuer beide Wege.
+    let receiptDocumentId = vReceiptId.value;
+    if (vReceiptId.value !== null && vReceiptId.value === existing.receipt_document_id) {
+      assertDocumentsNotDeleting([vReceiptId.value]);
+    } else if (vReceiptId.value !== null) {
+      receiptDocumentId = assertDocumentLinkTargetsAvailable(db.get(), [vReceiptId.value], userId(req))[0] ?? null;
+    }
     if (vDailyRate.value < 0 || (vExtras.value ?? 0) < 0) {
       return res.status(400).json({ error: 'Amounts must be greater than or equal to zero.', code: 400 });
     }

@@ -1026,6 +1026,112 @@ test('Monatsgrenze: eine am Monatsersten frueh erledigte Aufgabe zaehlt im neuen
   }
 });
 
+// --------------------------------------------------------------------------
+// Beleg eines Besuchs: der Name folgt dem Dokumentenrecht (#1358)
+// --------------------------------------------------------------------------
+// Der Besuch bleibt beim Quellmodul housekeeping, der Name des Belegs ist aber
+// eine Zeile des Dokumente-Moduls. Beide Leserouten joinen ihn, deshalb fragen
+// beide nach beiden Achsen (Mitgliedsrecht UND Token-Scope) und nach der
+// Sichtbarkeit des einzelnen Dokuments.
+function insertDocument(name, visibility, createdBy) {
+  return db.prepare(`
+    INSERT INTO family_documents (name, category, visibility, original_name, mime_type, file_size, content_data, created_by)
+    VALUES (?, 'finance', ?, ?, 'text/plain', 1, 'x', ?)
+  `).run(name, visibility, `${name}.txt`, createdBy).lastInsertRowid;
+}
+
+function insertVisitWithReceipt(checkIn, documentId) {
+  return db.prepare(`
+    INSERT INTO housekeeping_work_sessions (check_in, check_out, daily_rate, extras, created_by, receipt_document_id)
+    VALUES (?, ?, 40, 0, ?, ?)
+  `).run(checkIn, checkIn, ADMIN, documentId).lastInsertRowid;
+}
+
+test('Belegname: nur wer das Dokument sehen darf, bekommt ihn - Liste und Einzelbericht (#1358)', async () => {
+  const familyDoc = insertDocument('Quittung Familie', 'family', ADMIN);
+  const privateDoc = insertDocument('Quittung privat', 'private', ADMIN);
+  const familyVisit = insertVisitWithReceipt('2026-05-12T10:00:00.000Z', familyDoc);
+  const privateVisit = insertVisitWithReceipt('2026-05-13T10:00:00.000Z', privateDoc);
+  const names = async (as) => {
+    const list = await call('GET', '/visits?month=2026-05', { as });
+    assert.equal(list.status, 200);
+    const byId = new Map(list.body.data.visits.map((v) => [v.id, v]));
+    const one = await call('GET', `/visits/${familyVisit}`, { as });
+    const two = await call('GET', `/visits/${privateVisit}`, { as });
+    assert.equal(one.status, 200);
+    assert.equal(two.status, 200);
+    // Die Verknuepfung selbst ist eine Spalte des Besuchs und bleibt stehen:
+    // der Bearbeiten-Dialog schickt sie zurueck, ohne sie haette ein Speichern
+    // den Beleg abgehaengt.
+    assert.equal(one.body.data.receipt_document_id, familyDoc);
+    assert.equal(byId.get(privateVisit).receipt_document_id, privateDoc);
+    return {
+      list: [byId.get(familyVisit).receipt_document_name, byId.get(privateVisit).receipt_document_name],
+      detail: [one.body.data.receipt_document_name, two.body.data.receipt_document_name],
+    };
+  };
+  try {
+    const both = ['Quittung Familie', 'Quittung privat'];
+    const familyOnly = ['Quittung Familie', null];
+    const none = [null, null];
+
+    assert.deepEqual(await names(ADM), { list: both, detail: both }, 'die Erstellerin sieht beide');
+    assert.deepEqual(await names(MEM), { list: familyOnly, detail: familyOnly },
+      'ein fremdes privates Dokument bleibt privat');
+    assert.deepEqual(await names({ ...MEM, moduleAccess: { documents: 'read' } }), { list: familyOnly, detail: familyOnly },
+      'Leserecht auf die Dokumente reicht fuer den Namen');
+    assert.deepEqual(await names({ ...MEM, moduleAccess: { documents: 'none' } }), { list: none, detail: none },
+      'documents: none bekommt keinen Namen');
+    assert.deepEqual(await names({ ...ADM, moduleAccess: { documents: 'none' } }), { list: none, detail: none },
+      'documents: none sperrt auch die eigenen Dokumente');
+    assert.deepEqual(await names(TOKEN_READ), { list: none, detail: none },
+      'ein Token ohne documents-Scope bekommt keinen Namen');
+    assert.deepEqual(await names({ ...TOKEN_READ, authScopes: ['housekeeping:read', 'documents:read'] }), { list: both, detail: both },
+      'mit documents:read liefert das Token den Namen');
+  } finally {
+    db.prepare('DELETE FROM housekeeping_work_sessions WHERE id IN (?, ?)').run(familyVisit, privateVisit);
+    db.prepare('DELETE FROM family_documents WHERE id IN (?, ?)').run(familyDoc, privateDoc);
+  }
+});
+
+test('Beleg: wer ihn nicht sieht, haengt ihn beim Speichern nicht ab (#1358)', async () => {
+  // Der Bearbeiten-Dialog schickt `receipt_document_id` unveraendert zurueck.
+  // Die Verknuepfung ZU AENDERN verlangt Sichtbarkeit, sie zu BEHALTEN nicht:
+  // sonst raeumte das Speichern den privaten Beleg einer anderen Person weg,
+  // den der Dialog nie gezeigt hat (Regel 2 in services/document-links.js).
+  const privateDoc = insertDocument('Quittung privat', 'private', ADMIN);
+  const ownDoc = insertDocument('Eigene Quittung', 'private', MEMBER);
+  const visitId = insertVisitWithReceipt('2026-05-14T10:00:00.000Z', privateDoc);
+  try {
+    const kept = await call('PUT', `/visits/${visitId}`, {
+      as: MEM,
+      body: { date: '2026-05-14', daily_rate: 45, extras: 0, receipt_document_id: privateDoc },
+    });
+    assert.equal(kept.status, 200);
+    assert.equal(db.prepare('SELECT receipt_document_id FROM housekeeping_work_sessions WHERE id = ?').get(visitId).receipt_document_id,
+      privateDoc, 'der unsichtbare Beleg bleibt verknuepft');
+
+    const swapped = await call('PUT', `/visits/${visitId}`, {
+      as: MEM,
+      body: { date: '2026-05-14', daily_rate: 45, extras: 0, receipt_document_id: ownDoc },
+    });
+    assert.equal(swapped.status, 200);
+    assert.equal(db.prepare('SELECT receipt_document_id FROM housekeeping_work_sessions WHERE id = ?').get(visitId).receipt_document_id,
+      ownDoc, 'einen eigenen Beleg darf das Mitglied weiter setzen');
+
+    const foreign = await call('PUT', `/visits/${visitId}`, {
+      as: MEM,
+      body: { date: '2026-05-14', daily_rate: 45, extras: 0, receipt_document_id: privateDoc },
+    });
+    assert.equal(foreign.status, 200);
+    assert.equal(db.prepare('SELECT receipt_document_id FROM housekeeping_work_sessions WHERE id = ?').get(visitId).receipt_document_id,
+      null, 'ein fremdes privates Dokument neu verknuepfen geht weiter nicht');
+  } finally {
+    db.prepare('DELETE FROM housekeeping_work_sessions WHERE id = ?').run(visitId);
+    db.prepare('DELETE FROM family_documents WHERE id IN (?, ?)').run(privateDoc, ownDoc);
+  }
+});
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });

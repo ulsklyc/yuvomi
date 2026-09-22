@@ -137,6 +137,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A housekeeping visit no longer tells the name of a receipt you may not see.** The visit list
+  and the visit report sent the file name of a visit's receipt to everyone who could open the
+  housekeeping module, also to members without access to documents and when the receipt was a
+  private document of someone else. The page already hid it without document access, but the API
+  still returned it. The name now comes only when you may read that document, by the same rule the
+  documents module uses; otherwise it is empty, and the visit keeps its receipt, so editing the
+  visit does not remove it. For API tokens the name needs a `documents:read` scope next to
+  `housekeeping:read`. (#1358)
+
 - **Deleting a folder no longer reveals activity on documents you cannot see.** Before deleting a
   folder the app asks the server what the deletion would affect and sends that answer back with the
   deletion, so nothing changes unnoticed in between. That answer was built over every document in
