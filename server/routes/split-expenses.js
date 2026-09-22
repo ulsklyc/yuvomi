@@ -187,46 +187,69 @@ function uniqueUsername(base) {
 }
 
 /**
- * Der Nutzer zu einem Kontakt, notfalls als neuer Gast. `null`, wenn es den
- * Kontakt nicht gibt.
- *
- * KEIN YIELD ZWISCHEN LESEN UND SCHREIBEN. Der Passwort-Hash ist der einzige
- * asynchrone Schritt, er laeuft deshalb VOR dem Lesen, auf das geschrieben
- * wird: danach liest die Transaktion den Kontakt neu, prueft die Verknuepfung
- * und legt Nutzer samt Artefakten synchron an. Stand der Hash dazwischen,
- * legten zwei gleichzeitige Anfragen zwei Gaeste an oder scheiterten am
- * selben Benutzernamen. Die Vorabfrage spart nur den Hash, wenn der Kontakt
- * schon einen Nutzer hat oder fehlt.
+ * Eine Abweisung aus einer Transaktion heraus: der Wurf rollt alles zurueck,
+ * was die Transaktion bis dahin geschrieben hat, und der Handler antwortet mit
+ * Status und Text. So bleibt nach einer Abweisung nie ein halber Zustand
+ * (etwa ein Gast ohne Mitgliedschaft) stehen.
+ */
+class Refusal extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+function sendRefusal(res, err) {
+  return res.status(err.status).json({ error: err.message, code: err.status });
+}
+
+/**
+ * Die Gruppenpruefung der Schreibrouten, in der Form, die eine Transaktion
+ * braucht: sie wirft statt zu antworten.
+ */
+function assertManagesGroup(groupId, req) {
+  if (!requireGroupAccess(groupId, req)) throw new Refusal(404, 'Group not found.');
+  if (!canManageGroup(groupId, req)) throw new Refusal(403, 'Not authorized.');
+}
+
+/** Ein zufaelliges Passwort fuer einen Gast, der sich nie selbst anmeldet. */
+function randomGuestPasswordHash() {
+  return hashPassword(crypto.randomBytes(24).toString('base64url'));
+}
+
+/**
+ * Der Nutzer zu einem Kontakt, notfalls als neuer Gast. SYNCHRON und nur
+ * innerhalb der Transaktion des Aufrufers: er liest den Kontakt und schreibt
+ * auf dem Gelesenen. `passwordHash` bringt der Aufrufer mit, gehasht VOR der
+ * Transaktion (der einzige asynchrone Schritt).
  *
  * Der Geburtstag aus dem Kontakt ist Kontaktdatum (wie in den
  * Mitglieds-Kandidaten) und der angelegte Geburtstag ein Folgeeintrag des
  * Gastes (docs/DECISIONS.md Abschnitt 10) - beides fragt kein Kalenderrecht.
  */
-async function userFromContact(database, contactId, actorId) {
-  const known = database.prepare('SELECT family_user_id FROM contacts WHERE id = ?').get(contactId);
-  if (!known) return null;
-  if (known.family_user_id) return known.family_user_id;
-  const passwordHash = await hashPassword(crypto.randomBytes(24).toString('base64url'));
-  return database.transaction(() => {
-    const contact = database.prepare('SELECT * FROM contacts WHERE id = ?').get(contactId);
-    if (!contact) return null;
-    if (contact.family_user_id) return contact.family_user_id;
-    const created = database.prepare(`
-      INSERT INTO users (username, display_name, password_hash, avatar_color, role, family_role)
-      VALUES (?, ?, ?, ?, 'member', 'other')
-    `).run(uniqueUsername(contact.name), contact.name, passwordHash, randomAvatarColor());
-    database.prepare('UPDATE contacts SET family_user_id = ? WHERE id = ?').run(created.lastInsertRowid, contact.id);
-    if (contact.birthday) {
-      syncGuestArtifacts(database, created.lastInsertRowid, {
-        displayName: contact.name,
-        phone: contact.phone,
-        email: contact.email,
-        birthDate: contact.birthday,
-        actorUserId: actorId,
-      });
-    }
-    return created.lastInsertRowid;
-  })();
+function userFromContact(database, contactId, actorId, passwordHash) {
+  const contact = database.prepare('SELECT * FROM contacts WHERE id = ?').get(contactId);
+  if (!contact) throw new Refusal(404, 'Contact not found.');
+  if (contact.family_user_id) return contact.family_user_id;
+  // Ohne Hash kein Gast. Kommt hier nur an, wenn der Kontakt bei der
+  // Vorabfrage schon verknuepft war und es jetzt nicht mehr ist - ohne await
+  // dazwischen unmoeglich, also ein Programmierfehler, kein Nutzerfehler.
+  if (!passwordHash) throw new Error('userFromContact: contact lost its user without a yield.');
+  const created = database.prepare(`
+    INSERT INTO users (username, display_name, password_hash, avatar_color, role, family_role)
+    VALUES (?, ?, ?, ?, 'member', 'other')
+  `).run(uniqueUsername(contact.name), contact.name, passwordHash, randomAvatarColor());
+  database.prepare('UPDATE contacts SET family_user_id = ? WHERE id = ?').run(created.lastInsertRowid, contact.id);
+  if (contact.birthday) {
+    syncGuestArtifacts(database, created.lastInsertRowid, {
+      displayName: contact.name,
+      phone: contact.phone,
+      email: contact.email,
+      birthDate: contact.birthday,
+      actorUserId: actorId,
+    });
+  }
+  return created.lastInsertRowid;
 }
 
 function syncGuestArtifacts(database, userId, { displayName, phone, email, birthDate, actorUserId }) {
@@ -758,28 +781,55 @@ router.post('/groups/:id/members', async (req, res) => {
     const vUserId = req.body.user_id ? validateId(req.body.user_id, 'user_id') : { value: null, error: null };
     const vContactId = req.body.contact_id ? validateId(req.body.contact_id, 'contact_id') : { value: null, error: null };
     if (vUserId.error || vContactId.error) return res.status(400).json({ error: vUserId.error || vContactId.error, code: 400 });
+    if (!vUserId.value && !vContactId.value) return res.status(400).json({ error: 'user_id or contact_id is required.', code: 400 });
     const role = GROUP_ROLES.includes(req.body.role) && req.body.role !== 'owner' ? req.body.role : 'guest';
     // Ein Kontakt ist Quelldatum aus `contacts`: ohne dessen Leserecht (beide
     // Achsen) dieselbe Antwort wie fuer eine unbekannte ID, und angelegt wird
     // nichts - der Gast truege Name, Telefon und E-Mail des Kontakts.
-    const contactNotFound = () => res.status(404).json({ error: 'Contact not found.', code: 404 });
-    if (vContactId.value && !mayReadModule(req, 'contacts')) return contactNotFound();
-    const memberUserId = vContactId.value ? await userFromContact(db.get(), vContactId.value, userId(req)) : vUserId.value;
-    if (vContactId.value && !memberUserId) return contactNotFound();
-    if (!memberUserId) return res.status(400).json({ error: 'user_id or contact_id is required.', code: 400 });
-    const exists = db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(memberUserId);
-    if (!exists) return res.status(404).json({ error: 'User not found.', code: 404 });
-    // Mitglieder und Gaeste, aber kein Hauspersonal (#1207). Eine bestehende
-    // Mitgliedschaft bleibt gueltig und laesst sich weiter aendern.
-    const already = db.get().prepare('SELECT 1 FROM expense_group_members WHERE group_id = ? AND user_id = ?').get(groupId, memberUserId);
-    const staff = newNonMembers([memberUserId], { stored: already ? [memberUserId] : [], guestsAllowed: true });
-    if (staff.length) return res.status(400).json({ error: staffMessage(staff), code: 400 });
-    db.get().prepare(`
-      INSERT INTO expense_group_members (group_id, user_id, role, invited_by)
-      VALUES (?, ?, ?, ?)
-      ON CONFLICT(group_id, user_id) DO UPDATE SET role = excluded.role
-    `).run(groupId, memberUserId, role, userId(req));
-    activity(groupId, userId(req), 'member_added', 'member', memberUserId, { role });
+    if (vContactId.value && !mayReadModule(req, 'contacts')) {
+      return res.status(404).json({ error: 'Contact not found.', code: 404 });
+    }
+
+    // KEIN YIELD ZWISCHEN LESEN UND SCHREIBEN. Der Passwort-Hash eines neuen
+    // Gastes ist der einzige asynchrone Schritt und laeuft deshalb ZUERST. Die
+    // Vorabfrage spart ihn nur, wenn der Kontakt fehlt oder schon einen Nutzer
+    // hat. Alles, worauf danach geschrieben wird - Gruppe, Verwalterrecht,
+    // Kontakt, Mitgliedschaft -, liest die Transaktion neu: eine Gruppe, die
+    // waehrend des Hashes verschwand, hinterlaesst sonst einen Gast ohne
+    // Gruppe, und zwei gleichzeitige Anfragen legen zwei Gaeste an.
+    let passwordHash = null;
+    if (vContactId.value) {
+      const known = db.get().prepare('SELECT family_user_id FROM contacts WHERE id = ?').get(vContactId.value);
+      if (!known) return res.status(404).json({ error: 'Contact not found.', code: 404 });
+      if (!known.family_user_id) passwordHash = await randomGuestPasswordHash();
+    }
+
+    let memberUserId;
+    try {
+      memberUserId = db.transaction(() => {
+        assertManagesGroup(groupId, req);
+        const uid = vContactId.value
+          ? userFromContact(db.get(), vContactId.value, userId(req), passwordHash)
+          : vUserId.value;
+        const exists = db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(uid);
+        if (!exists) throw new Refusal(404, 'User not found.');
+        // Mitglieder und Gaeste, aber kein Hauspersonal (#1207). Eine bestehende
+        // Mitgliedschaft bleibt gueltig und laesst sich weiter aendern.
+        const already = db.get().prepare('SELECT 1 FROM expense_group_members WHERE group_id = ? AND user_id = ?').get(groupId, uid);
+        const staff = newNonMembers([uid], { stored: already ? [uid] : [], guestsAllowed: true });
+        if (staff.length) throw new Refusal(400, staffMessage(staff));
+        db.get().prepare(`
+          INSERT INTO expense_group_members (group_id, user_id, role, invited_by)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(group_id, user_id) DO UPDATE SET role = excluded.role
+        `).run(groupId, uid, role, userId(req));
+        activity(groupId, userId(req), 'member_added', 'member', uid, { role });
+        return uid;
+      });
+    } catch (err) {
+      if (err instanceof Refusal) return sendRefusal(res, err);
+      throw err;
+    }
     res.status(201).json({ data: { group_id: groupId, user_id: memberUserId, role } });
   } catch (err) {
     log.error('POST /groups/:id/members error:', err);
@@ -820,32 +870,47 @@ router.post('/groups/:id/guests', async (req, res) => {
     const password = String(req.body.password || '');
     if (normalizePassword(password).length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters long.', code: 400 });
     const familyRole = FAMILY_ROLES.includes(req.body.family_role) ? req.body.family_role : 'other';
-    const username = req.body.username && /^[a-zA-Z0-9._-]{3,64}$/.test(req.body.username)
+    const requestedUsername = req.body.username && /^[a-zA-Z0-9._-]{3,64}$/.test(req.body.username)
       ? String(req.body.username)
-      : uniqueUsername(vDisplayName.value);
-    const exists = db.get().prepare('SELECT 1 FROM users WHERE username = ?').get(username);
-    if (exists) return res.status(409).json({ error: 'Username is already taken.', code: 409 });
+      : null;
+
+    // KEIN YIELD ZWISCHEN LESEN UND SCHREIBEN (wie POST /members): erst der
+    // Hash, dann in EINER synchronen Transaktion Gruppe und Verwalterrecht neu
+    // pruefen, den Benutzernamen pruefen bzw. vergeben und anlegen. Stand die
+    // Namenspruefung vor dem Hash, endeten zwei gleichzeitige Anfragen mit
+    // demselben Namen im 500 statt im 409, und eine waehrend des Hashes
+    // geloeschte Gruppe liess einen Gast ohne Gruppe zurueck.
     const hash = await hashPassword(password);
 
-    const createdUserId = db.transaction(() => {
-      const created = db.get().prepare(`
-        INSERT INTO users (username, display_name, password_hash, avatar_color, role, family_role)
-        VALUES (?, ?, ?, ?, 'member', ?)
-      `).run(username, vDisplayName.value, hash, randomAvatarColor(), familyRole);
-      syncGuestArtifacts(db.get(), created.lastInsertRowid, {
-        displayName: vDisplayName.value,
-        phone: vPhone.value,
-        email: vEmail.value,
-        birthDate: vBirthDate.value,
-        actorUserId: userId(req),
+    let createdUserId;
+    try {
+      createdUserId = db.transaction(() => {
+        assertManagesGroup(groupId, req);
+        const username = requestedUsername ?? uniqueUsername(vDisplayName.value);
+        const exists = db.get().prepare('SELECT 1 FROM users WHERE username = ?').get(username);
+        if (exists) throw new Refusal(409, 'Username is already taken.');
+        const created = db.get().prepare(`
+          INSERT INTO users (username, display_name, password_hash, avatar_color, role, family_role)
+          VALUES (?, ?, ?, ?, 'member', ?)
+        `).run(username, vDisplayName.value, hash, randomAvatarColor(), familyRole);
+        syncGuestArtifacts(db.get(), created.lastInsertRowid, {
+          displayName: vDisplayName.value,
+          phone: vPhone.value,
+          email: vEmail.value,
+          birthDate: vBirthDate.value,
+          actorUserId: userId(req),
+        });
+        db.get().prepare('INSERT INTO expense_group_members (group_id, user_id, role, invited_by) VALUES (?, ?, ?, ?)')
+          .run(groupId, created.lastInsertRowid, 'guest', userId(req));
+        db.get().prepare('INSERT OR IGNORE INTO split_expense_guest_users (user_id, group_id, created_by) VALUES (?, ?, ?)')
+          .run(created.lastInsertRowid, groupId, userId(req));
+        activity(groupId, userId(req), 'guest_created', 'member', created.lastInsertRowid, { display_name: vDisplayName.value });
+        return created.lastInsertRowid;
       });
-      db.get().prepare('INSERT INTO expense_group_members (group_id, user_id, role, invited_by) VALUES (?, ?, ?, ?)')
-        .run(groupId, created.lastInsertRowid, 'guest', userId(req));
-      db.get().prepare('INSERT OR IGNORE INTO split_expense_guest_users (user_id, group_id, created_by) VALUES (?, ?, ?)')
-        .run(created.lastInsertRowid, groupId, userId(req));
-      activity(groupId, userId(req), 'guest_created', 'member', created.lastInsertRowid, { display_name: vDisplayName.value });
-      return created.lastInsertRowid;
-    });
+    } catch (err) {
+      if (err instanceof Refusal) return sendRefusal(res, err);
+      throw err;
+    }
 
     const user = db.get().prepare(`
       SELECT u.id, u.username, u.display_name, u.avatar_color, u.avatar_data, u.family_role,

@@ -693,6 +693,8 @@ forgot to ask about.
   new guest gets is a follow-on entry of the guest and asks nothing of `calendar`.
 - `npm run test:cross-module-write` (`test/test-cross-module-write-rights.js`) holds those routes on
   both axes and checks the effect after each refusal, not only the status.
+  `npm run test:split-expenses-routes` holds the member candidates and adding a contact,
+  `npm run test:inventory-item-entries` the budget bookings of an inventory item.
 - The follow-on entries of a visit in `server/routes/housekeeping.js`: `createVisitCalendarEvent()`
   and `createPaymentTask()` at check-in, the completed task at payment, `updateVisitLinks()` and
   `deleteVisitLinks()` on edit and delete. None of them asks for more than `housekeeping`.

@@ -181,14 +181,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shopping cart on a pantry row. Without it the server answers 403 and copies nothing. Both buttons
   stand on the page of that source module, so nobody who can see them loses them. For API clients:
   `POST /api/v1/pantry/import-shopping` also needs `shopping:read`, and
-  `POST /api/v1/shopping/{listId}/import-pantry` also needs `pantry:read`. The member picker of a
-  shared-expense group now shows phone, email and birthday only with read access to contacts and
-  to the calendar, where birthdays live, and offers contacts as new members only with access to
-  contacts; adding a contact as a member needs that access too and otherwise answers as if the
-  contact did not exist. Adding the same contact twice at the same moment now creates one guest
-  instead of failing, and an unknown contact answers 404 instead of a server error. An inventory item shows its linked budget bookings, their total and the bookings in its
-  history only with read access to the budget; without it, linking a booking or pre-filling the
-  purchase price from one answers as if the booking did not exist. (#1433)
+  `POST /api/v1/shopping/{listId}/import-pantry` also needs `pantry:read`. (#1433)
+
+- **Choosing members for a shared-expense group shows contact details only with access to
+  them.** The member picker now shows phone and email only with read access to contacts, and a
+  member's birthday only with read access to the calendar, where birthdays live. Contacts are
+  offered as new members only with access to contacts, and adding one without it answers as if
+  the contact did not exist. Adding the same contact twice at the same moment now creates one
+  guest instead of failing, creating two guests with the same username at once gives one guest
+  and a clear "already taken", and a group removed while a guest is being added leaves no guest
+  account behind. An unknown contact answers 404 instead of a server error. (#1433)
+
+- **An inventory item shows its budget bookings only with access to the budget.** Without read
+  access to the budget, an item no longer shows its linked bookings, their total or the bookings
+  in its history, and the edit form leaves out the bookings section and its buttons instead of
+  claiming there are none. Linking, unlinking or pre-filling the purchase price from a booking
+  answers as if the booking did not exist. (#1433)
 
 - **A failed restore explains itself in your language and keeps your place.** When a backup did
   not open, the restore dialog showed the server's English explanation, up to several paragraphs

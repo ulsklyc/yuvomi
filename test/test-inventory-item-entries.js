@@ -337,6 +337,17 @@ for (const [name, viewer] of [['budget: none', NO_BUDGET], ['Token ohne budget:r
 
     assert.equal((await call('GET', `/entries/${entry}/items`, { as: viewer })).status, 404);
   });
+
+  test(`Budgetrecht (${name}): Entfernen einer Verknuepfung antwortet 404, der Link bleibt`, async () => {
+    const entry = insertEntry({ title: `Entfernen ${name}`, amount: -12, date: '2030-02-05' });
+    const item = await createItem({ entry_id: entry });
+    const links = () => db.prepare('SELECT COUNT(*) AS c FROM inventory_item_entries WHERE item_id = ? AND entry_id = ?').get(item.id, entry).c;
+    assert.equal(links(), 1, 'Vorbedingung: die Verknuepfung steht');
+
+    const r = await call('DELETE', `/items/${item.id}/entries/${entry}`, { as: viewer });
+    assert.equal(r.status, 404, 'wie bei einer unbekannten Buchung');
+    assert.equal(links(), 1, 'die Verknuepfung steht noch');
+  });
 }
 
 test('Budgetrecht: read reicht', async () => {

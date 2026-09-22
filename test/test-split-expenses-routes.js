@@ -603,6 +603,70 @@ test('POST members via contact_id: zwei gleichzeitige Anfragen legen EINEN Gast 
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM users').get().n, before + 1, 'genau ein neuer Nutzer');
 });
 
+// WAEHREND DES HASHES AENDERT SICH DIE WELT. Der Passwort-Hash ist der einzige
+// asynchrone Schritt der Route; alles, worauf geschrieben wird - Gruppe,
+// Verwalterrecht, Kontakt -, muss NACH ihm noch einmal gelesen werden, in
+// derselben synchronen Transaktion wie das Schreiben. Sonst bleibt ein Gast
+// ohne Gruppe zurueck oder ein entzogenes Recht schreibt trotzdem.
+// Der Eingriff laeuft nach HASH_WINDOW_MS: der Handler hat die Vorpruefungen
+// dann laengst hinter sich, der bcrypt-Hash (12 Runden, gemessen ~550 ms)
+// laeuft noch.
+const HASH_WINDOW_MS = 150;
+async function duringHash(action, request) {
+  const timer = new Promise((resolve) => setTimeout(() => { action(); resolve(); }, HASH_WINDOW_MS));
+  const [res] = await Promise.all([request(), timer]);
+  return res;
+}
+
+test('POST members via contact_id: Gruppe waehrend des Hashes geloescht -> 404, kein verwaister Gast', async () => {
+  const g = (await call('POST', '/groups', { actor: { id: OWNER, role: 'member' }, body: { name: 'Verschwindet', type: 'household', default_currency: 'EUR' } })).body.data.id;
+  const contactId = db.prepare(`INSERT INTO contacts (name, category) VALUES ('Hash Kontakt Gruppe', 'Sonstiges')`).run().lastInsertRowid;
+  const before = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
+  const r = await duringHash(
+    () => db.prepare('DELETE FROM expense_groups WHERE id = ?').run(g),
+    () => call('POST', `/groups/${g}/members`, { actor: { id: OWNER, role: 'member' }, body: { contact_id: contactId, role: 'guest' } }),
+  );
+  assert.equal(r.status, 404, 'die Gruppe gibt es nicht mehr');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM users').get().n, before, 'kein Gastnutzer ohne Gruppe');
+  assert.equal(db.prepare('SELECT family_user_id FROM contacts WHERE id = ?').get(contactId).family_user_id, null, 'Kontakt nicht verknuepft');
+});
+
+test('POST members via contact_id: Verwalterrecht waehrend des Hashes entzogen -> 403, nichts angelegt', async () => {
+  const g = (await call('POST', '/groups', { actor: { id: OWNER, role: 'member' }, body: { name: 'Entzogen', type: 'household', default_currency: 'EUR' } })).body.data.id;
+  assert.equal((await call('POST', `/groups/${g}/members`, { actor: { id: OWNER, role: 'member' }, body: { user_id: MGR, role: 'admin' } })).status, 201);
+  const contactId = db.prepare(`INSERT INTO contacts (name, category) VALUES ('Hash Kontakt Recht', 'Sonstiges')`).run().lastInsertRowid;
+  const before = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
+  const r = await duringHash(
+    () => db.prepare("UPDATE expense_group_members SET role = 'guest' WHERE group_id = ? AND user_id = ?").run(g, MGR),
+    () => call('POST', `/groups/${g}/members`, { actor: { id: MGR, role: 'member' }, body: { contact_id: contactId, role: 'guest' } }),
+  );
+  assert.equal(r.status, 403);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM users').get().n, before, 'kein Gastnutzer');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM expense_group_members WHERE group_id = ?').get(g).n, 2, 'keine neue Mitgliedschaft');
+});
+
+test('POST guests: Gruppe waehrend des Hashes geloescht -> 404, kein verwaister Gast', async () => {
+  const g = (await call('POST', '/groups', { actor: { id: OWNER, role: 'member' }, body: { name: 'Verschwindet Gast', type: 'household', default_currency: 'EUR' } })).body.data.id;
+  const before = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
+  const r = await duringHash(
+    () => db.prepare('DELETE FROM expense_groups WHERE id = ?').run(g),
+    () => call('POST', `/groups/${g}/guests`, { actor: { id: OWNER, role: 'member' }, body: { display_name: 'Waise', password: 'geheim12345' } }),
+  );
+  assert.equal(r.status, 404);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM users').get().n, before, 'kein Gastnutzer ohne Gruppe');
+});
+
+test('POST guests: zwei gleichzeitige Anfragen mit demselben Benutzernamen -> 201 und 409', async () => {
+  const body = { display_name: 'Zwilling', username: 'zwilling.gast', password: 'geheim12345' };
+  const actor = { id: OWNER, role: 'member' };
+  const results = await Promise.all([
+    call('POST', `/groups/${GROUP}/guests`, { actor, body }),
+    call('POST', `/groups/${GROUP}/guests`, { actor, body }),
+  ]);
+  assert.deepEqual(results.map((r) => r.status).sort(), [201, 409], 'der zweite ist ein Konflikt, kein Serverfehler');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM users WHERE username = 'zwilling.gast'").get().n, 1);
+});
+
 test('POST members: user_id noch contact_id -> 400', async () => {
   const r = await call('POST', `/groups/${OPS}/members`, { actor: { id: OWNER, role: 'member' }, body: { role: 'guest' } });
   assert.equal(r.status, 400);

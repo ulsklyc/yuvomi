@@ -1197,6 +1197,28 @@ test('Beleg, den der Server nicht nennt: "Vorhanden" statt eines Links ins Leere
   } finally { Object.assign(split.state, vorher); }
 });
 
+test('Inventar-Formular: verknuepfte Buchungen und ihre Knoepfe nur mit Leserecht auf das Budget (#1433)', async () => {
+  // Ohne `budget: read` liefert der Server keine verknuepften Buchungen, und
+  // jedes Nachschlagen einer Buchung antwortet 404. "Keine verknuepften
+  // Buchungen" waere dann falsch, und "Buchung hinzufuegen" endete im Fehler -
+  // Abschnitt und Knoepfe fallen weg (Regel 1 in utils/module-access.js).
+  const { __test: inventory } = await import('../public/pages/inventory.js');
+  const gegenstand = { id: 7, name: 'Kamera', category: 'other', status: 'active', condition: 'good', linked_entries: [], linked_entries_total: 0, attachments: [] };
+  const markup = (modules, mode) => withAccess(modules, () => inventory.buildItemForm({ mode, item: mode === 'edit' ? gegenstand : null }).content);
+  for (const budget of ['read', 'write']) {
+    const edit = markup({ inventory: 'write', budget }, 'edit');
+    assert.match(edit, /data-linked-entries/, `budget: ${budget}: der Abschnitt steht da`);
+    assert.match(edit, /data-action="add-booking"/);
+    assert.match(markup({ inventory: 'write', budget }, 'create'), /data-action="link-booking"/);
+  }
+  const ohne = markup({ inventory: 'write', budget: 'none' }, 'edit');
+  assert.doesNotMatch(ohne, /data-linked-entries/, 'kein "keine verknuepften Buchungen", das nicht stimmt');
+  assert.doesNotMatch(ohne, /data-action="add-booking"/, 'kein Knopf, der im Fehler endet');
+  assert.doesNotMatch(ohne, /inventory\.linkedBookingsLabel/);
+  assert.doesNotMatch(markup({ inventory: 'write', budget: 'none' }, 'create'), /data-action="link-booking"/,
+    'auch beim Anlegen keine Buchungsauswahl');
+});
+
 test('das Paar dazu: mit Schreibrecht oeffnen dieselben drei Einstiege den Editor, keine Leseansicht', () => {
   const vorherBudget = budget.state.month;
   const vorherSplit = { ...split.state };
