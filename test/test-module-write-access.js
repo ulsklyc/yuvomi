@@ -212,6 +212,19 @@ test('Helfer: `/schedule/preferences` bildet die EINE Serverausnahme exakt ab', 
   });
 });
 
+test('Helfer: Rezept -> Einkauf bildet die zweite Serverausnahme exakt ab (#1290)', () => {
+  withAccess({ meals: 'read' }, () => {
+    assert.equal(access.mayWritePath('/recipes/7/to-shopping-list'), true, 'die Quelle wird nur gelesen');
+    assert.equal(access.mayWritePath('/Recipes/7/To-Shopping-List/'), true, 'gefaltet wie der Server');
+    assert.equal(access.mayWritePath('/recipes/7/to-shopping-listX'), false, 'exakt, kein startsWith');
+    assert.equal(access.mayWritePath('/recipes/7'), false, 'jeder andere Schreibweg bleibt `meals: write`');
+    assert.equal(access.mayWritePath('/meals/7/to-shopping-list'), false, 'Mahlzeit -> Einkauf schreibt in den Plan');
+  });
+  withAccess({ meals: 'none' }, () => {
+    assert.equal(access.mayWritePath('/recipes/7/to-shopping-list'), false, 'bei `none` bleibt es gesperrt');
+  });
+});
+
 // =========================================================================
 // 2. Drift-Guard gegen server/scopes.js
 // =========================================================================
@@ -230,6 +243,8 @@ function pfadKorpus() {
     '/reminders?entity_type=task&entity_id=1', '/extensions/demo/items', '/recipe-providers/accounts',
     '/split-expenses/groups/1/expenses', '/birthdays/1', '/weather', '/family/members', '/search?q=x',
     '/shopping/items/undo-transfer', '/documents#x',
+    '/recipes/1/to-shopping-list', '/Recipes/1/To-Shopping-List/', '/recipes/1/to-shopping-listX',
+    '/recipes/x/to-shopping-list', '/recipes/1', '/meals/1/to-shopping-list',
   ]);
   const aufruf = /\bapi\.(?:get|getWithSource|post|put|patch|delete)\(\s*(['"`])/g;
   for (const { src } of SOURCES) {

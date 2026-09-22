@@ -95,7 +95,7 @@ import scheduleRouter from './routes/schedule.js';
 import scheduleFeedRouter from './routes/schedule-feed.js';
 import schedulePreferencesRouter from './routes/schedule-preferences.js';
 import scheduleExtrasRouter from './routes/schedule-extras.js';
-import { moduleForPath, requiredAccess, sessionModuleAccessRequirement, tokenAllows } from './scopes.js';
+import { sessionModuleAccessRequirement, tokenAccessRequirement, tokenAllows } from './scopes.js';
 import { moduleAccessVerdict, MODULE_ACCESS_DENIED, MODULE_ACCESS_READ_ONLY } from './permissions.js';
 import { BODY_LIMIT, MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from './utils/upload-limit.js';
 import { createServiceWorkerResponseLoader } from './utils/service-worker.js';
@@ -568,8 +568,10 @@ app.use('/api/v1', (req, res, next) => {
   // gilt NUR fuer `authMethod === 'display'`; fuer ein gescoptes Token aendert
   // sich nichts.
   if (req.authMethod === 'display' && displayMayAct(req.method, req.path)) return next();
-  const moduleKey = moduleForPath(req.path);
-  const access = requiredAccess(req.method);
+  // `tokenAccessRequirement()` statt `moduleForPath()` + `requiredAccess()`:
+  // dieselbe Regel, plus die EINE Ausnahme, die fuer beide Achsen gilt
+  // (Rezept -> Einkauf liest `meals`, #1290 - Begruendung in server/scopes.js).
+  const { moduleKey, access } = tokenAccessRequirement(req.path, req.method);
   if (tokenAllows(req.authScopes, moduleKey, access)) return next();
   return res.status(403).json({ error: 'Token scope does not permit this operation.', code: 403 });
 });
@@ -592,6 +594,11 @@ app.use('/api/v1', (req, res, next) => {
   // Schlüssel bleibt `schedule`, damit `none` weiterhin verweigert wird; die
   // API-Token-Scope-Prüfung oben bleibt unveraendert an `schedule:write`
   // gebunden.
+  //
+  // AUSNAHME POST /recipes/:id/to-shopping-list (#1290, 22.09.2026): die Route
+  // liest das Rezept und schreibt nur in den Einkauf, also reicht `meals: read`;
+  // `shopping: write` verlangt die Route selbst. Anders als oben gilt diese
+  // Ausnahme auch im Token-Gate darueber (server/scopes.js).
   // DIESELBE DISPLAY-AUSNAHME WIE IM GATE DARUEBER (#1209), und sie muss hier
   // ein zweites Mal stehen. Ein Display traegt `modules.tasks === 'read'` -
   // absichtlich, denn seine Oberflaeche soll kein Anlegen und kein Bearbeiten

@@ -103,10 +103,15 @@
  *    `/shopping/:listId/import-meal-plan`. Die Knoepfe fragen BEIDE Riegel,
  *    den Pfad, den sie posten (der Pfad-Guard), UND das Ziel (Regel 1):
  *    `mayTransferMealToShopping()`, `mayTransferRecipeToShopping()` und
- *    `mayImportMealPlan()` in `utils/kitchen-transfer.js`. Nur das Ziel zu
- *    fragen zeigte einem
- *    Mitglied mit `meals: read` den Rezept-Knopf, den der Pfad-Guard abweist.
- *    Das Zielrecht gilt nur fuer AUSDRUECKLICHE Uebertraege.
+ *    `mayImportMealPlan()` in `utils/kitchen-transfer.js`. Fuer das REZEPT
+ *    senkt der Server den Pfad-Guard auf `meals: read` (entschieden am
+ *    22.09.2026: die Route liest die Quelle und schreibt nur das Ziel;
+ *    `isRecipeToShoppingTransfer()` in server/scopes.js, fuer Mitglieder und
+ *    Tokens). `mayWritePath()` bildet das exakt ab wie Regel 5 - dieselbe
+ *    Warnung gilt: keine Seite baut sich so etwas selbst. Die Mahlzeit bleibt
+ *    bei `meals: write`, ihre Route kippt `on_shopping_list` im Plan. Nur das
+ *    Ziel zu fragen zeigte dort einem Mitglied mit `meals: read` einen Knopf,
+ *    den der Pfad-Guard abweist. Das Zielrecht gilt nur fuer AUSDRUECKLICHE Uebertraege.
  *    Was eine Aktion bloss MITerzeugt (der Check-in der Haushaltshilfe legt
  *    Termin und Zahlungsaufgabe an), fragt kein Zielrecht, weder am Server
  *    noch am Knopf - die Abgrenzung steht in docs/DECISIONS.md, Abschnitt 10.
@@ -207,5 +212,15 @@ export function pathAccess(path) {
 export function mayWritePath(path) {
   const access = pathAccess(path);
   if (requestPath(path) === '/schedule/preferences') return access !== 'none';
+  if (RECIPE_TO_SHOPPING_RE.test(requestPath(path))) return access !== 'none';
   return access === 'write';
 }
+
+/**
+ * Die zweite Serverausnahme (Regel 8): `POST /recipes/:id/to-shopping-list`
+ * liest das Rezept und schreibt nur in den Einkauf, also reicht dort
+ * `meals: read`. Dasselbe Muster wie `isRecipeToShoppingTransfer()` in
+ * server/scopes.js - gefaltet, mit optionalem Schlussstrich, numerische ID.
+ * Die Methode kennt der Helfer nicht; unter diesem Pfad gibt es nur POST.
+ */
+const RECIPE_TO_SHOPPING_RE = /^\/recipes\/\d+\/to-shopping-list\/?$/i;

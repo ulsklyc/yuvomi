@@ -71,8 +71,21 @@ const BEIDE = { meals: 'write', shopping: 'write' };
 const KEIN_TRANSFER_AUS_DER_KUECHE = [
   ['shopping: read', { meals: 'write', shopping: 'read' }],
   ['shopping: none', { meals: 'write', shopping: 'none' }],
-  // Der Pfad-Guard: `/meals` und `/recipes` gehoeren dem Modul `meals`.
+  // Der Pfad-Guard: `/meals` gehoert dem Modul `meals`, und die Route kippt
+  // `on_shopping_list` im Essensplan - Mahlzeit -> Einkauf braucht `meals: write`.
   ['meals: read', { meals: 'read', shopping: 'write' }],
+];
+// Rezept -> Einkauf LIEST das Rezept (Entscheidung 22.09.2026, server/scopes.js
+// `isRecipeToShoppingTransfer`): dort reicht `meals: read`, `none` bleibt zu.
+const REZEPT_ERLAUBT = [
+  ['beiden Schreibrechten', BEIDE],
+  ['meals: read + shopping: write', { meals: 'read', shopping: 'write' }],
+];
+const KEIN_REZEPT_TRANSFER = [
+  ['shopping: read', { meals: 'write', shopping: 'read' }],
+  ['shopping: none', { meals: 'write', shopping: 'none' }],
+  ['meals: none', { meals: 'none', shopping: 'write' }],
+  ['meals: read + shopping: read', { meals: 'read', shopping: 'read' }],
 ];
 const KEIN_IMPORT_IN_DEN_EINKAUF = [
   ['meals: read', { shopping: 'write', meals: 'read' }],
@@ -161,18 +174,20 @@ async function mitListe(fn) {
   }
 }
 
-test('Rezept mit beiden Schreibrechten: Knopf da, Handler schickt den Transfer', async () => {
-  await mitListe(async () => {
-    await withAccess(BEIDE, async () => {
-      const btn = recipes.shoppingTransferButton(rezept, zutaten);
-      assert.equal(btn?.dataset.action, 'to-shopping');
-      const posts = await recordPosts(() => recipes.transferRecipe(rezept, null));
-      assert.deepEqual(posts, ['/recipes/21/to-shopping-list']);
+for (const [name, modules] of REZEPT_ERLAUBT) {
+  test(`Rezept mit ${name}: Knopf da, Handler schickt den Transfer`, async () => {
+    await mitListe(async () => {
+      await withAccess(modules, async () => {
+        const btn = recipes.shoppingTransferButton(rezept, zutaten);
+        assert.equal(btn?.dataset.action, 'to-shopping');
+        const posts = await recordPosts(() => recipes.transferRecipe(rezept, null));
+        assert.deepEqual(posts, ['/recipes/21/to-shopping-list']);
+      });
     });
   });
-});
+}
 
-for (const [name, modules] of KEIN_TRANSFER_AUS_DER_KUECHE) {
+for (const [name, modules] of KEIN_REZEPT_TRANSFER) {
   test(`Rezept mit ${name}: kein Knopf, und der Handler schickt nichts`, async () => {
     await mitListe(async () => {
       await withAccess(modules, async () => {
@@ -316,8 +331,9 @@ test('Import-Dialog im Einkauf: gehen die Rechte verloren, waehrend er offen ste
       const posts = await withAccess(modules, () => recordPosts(async () => { await vorschau(); await absenden(); }));
       assert.deepEqual(posts, [], `mit ${name} endeten Vorschau und Uebernehmen im 403`);
     }
-    const posts = await withAccess(BEIDE, () => recordPosts(() => vorschau()));
-    assert.deepEqual(posts, [`/shopping/${LISTE.id}/import-meal-plan`], 'Gegenprobe: mit beiden Rechten rechnet die Vorschau');
+    const posts = await withAccess(BEIDE, () => recordPosts(async () => { await vorschau(); await absenden(); }));
+    assert.deepEqual(posts, [`/shopping/${LISTE.id}/import-meal-plan`, `/shopping/${LISTE.id}/import-meal-plan`],
+      'Gegenprobe: mit beiden Rechten rechnet die Vorschau, und Uebernehmen schickt den Import');
   } finally {
     shopping.state.activeListId = zuvorId;
   }

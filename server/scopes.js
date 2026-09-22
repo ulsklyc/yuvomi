@@ -177,8 +177,56 @@ function moduleForPath(path) {
  */
 function sessionModuleAccessRequirement(path, method) {
   const moduleKey = moduleForPath(path);
-  const access = path === '/schedule/preferences' ? 'read' : requiredAccess(method);
+  const access = path === '/schedule/preferences' || isRecipeToShoppingTransfer(path, method)
+    ? 'read'
+    : requiredAccess(method);
   return { moduleKey, access };
+}
+
+/**
+ * REZEPT -> EINKAUF LIEST DIE QUELLE UND SCHREIBT DAS ZIEL (#1290, entschieden
+ * am 22.09.2026). `POST /recipes/:id/to-shopping-list` legt `shopping_items`
+ * an und aendert am Rezept nichts - der Pfad-Guard verlangte trotzdem
+ * `meals: write`, weil `/recipes` dem Modul `meals` gehoert. Fuer GENAU diese
+ * Route reicht deshalb `meals: read`; das Schreibrecht auf das Ziel verlangt
+ * die Route selbst (`mayWriteModule(req, 'shopping')` in routes/recipes.js).
+ *
+ * SCHMAL MIT ABSICHT. Nur POST, nur dieser Pfad mit numerischer ID: jeder
+ * andere Schreibweg unter `/recipes` braucht weiter `meals: write`. Der
+ * Modul-Schluessel bleibt `meals`, damit `none` weiter verweigert. Schreibweise
+ * und Schlussstrich werden gefaltet, weil Express beides beim Routen ignoriert
+ * (GHSA-cvwj: ein woertlicher Vergleich waere hier STRENGER als die Route und
+ * damit nur ein Fehlalarm - gefaltet urteilt der Guard fuer jede Schreibweise,
+ * die die Route erreicht, gleich). Mahlzeit -> Einkauf faellt NICHT darunter:
+ * jene Route setzt `meal_ingredients.on_shopping_list` und schreibt damit in
+ * den Essensplan.
+ *
+ * Gilt fuer BEIDE Gates in server/index.js - Mitgliedsrechte hier ueber
+ * `sessionModuleAccessRequirement()`, Token-Scopes ueber
+ * `tokenAccessRequirement()`.
+ * @param {string} path
+ * @param {string} method
+ * @returns {boolean}
+ */
+function isRecipeToShoppingTransfer(path, method) {
+  return String(method || '').toUpperCase() === 'POST'
+    && /^\/recipes\/\d+\/to-shopping-list\/?$/i.test(String(path || ''));
+}
+
+/**
+ * Modul-Schluessel + benoetigtes Niveau fuer ein gescoptes Zugangsmittel
+ * (Token, Display). Anders als die Session-Variante OHNE die
+ * `/schedule/preferences`-Ausnahme (die bleibt an `schedule:write` gebunden),
+ * aber MIT der Rezept-Ausnahme: dort ist die Regel fuer beide Achsen dieselbe.
+ * @param {string} path
+ * @param {string} method
+ * @returns {{ moduleKey: string|null, access: 'read'|'write' }}
+ */
+function tokenAccessRequirement(path, method) {
+  return {
+    moduleKey: moduleForPath(path),
+    access: isRecipeToShoppingTransfer(path, method) ? 'read' : requiredAccess(method),
+  };
 }
 
 /** All scope module keys including runtime extension modules. */
@@ -238,6 +286,8 @@ export {
   requiredAccess,
   moduleForPath,
   sessionModuleAccessRequirement,
+  tokenAccessRequirement,
+  isRecipeToShoppingTransfer,
   tokenAllows,
   getModuleKeys,
   getAllScopes,

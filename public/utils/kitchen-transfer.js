@@ -37,8 +37,9 @@
  * misst der Pfad-Guard je nach Weg verschieden (Vorrat als `shopping`,
  * Mahlzeit und Rezept als `meals`); seit #1290 verlangt die Route in jedem
  * Fall das Einkaufs-Recht. Der Transfer-Knopf fragt deshalb BEIDE Riegel
- * (`mayTransferMealToShopping()`, `mayTransferRecipeToShopping()`), und dasselbe tut die Gegenrichtung im Einkauf
- * (`mayImportMealPlan()`). `resolveShoppingTarget()` prueft bewusst nichts:
+ * (`mayTransferMealToShopping()`, `mayTransferRecipeToShopping()`), und
+ * dasselbe tut die Gegenrichtung im Einkauf (`mayImportMealPlan()`).
+ * `resolveShoppingTarget()` prueft bewusst nichts:
  * es ist die Listenwahl, nicht der Riegel - der sitzt am Knopf und im Handler.
  *
  * `selectModal` kommt aus `components/`, obwohl diese Datei in `utils/` liegt.
@@ -61,9 +62,15 @@ import { mayWritePath } from '/utils/module-access.js';
  * ZWEI RIEGEL, UND BEIDE MUESSEN AUFGEHEN. Der Pfad-Guard in server/index.js
  * misst den Aufruf am Pfad - `/meals/...` und `/recipes/...` gehoeren beide
  * dem Scope-Modul `meals` -, und die Route verlangt dazu das Schreibrecht auf
- * `shopping`. Wer nur nach dem Ziel fragt, zeigt einem Mitglied mit
- * `meals: read` einen Knopf, den der Pfad-Guard abweist; wer nur nach der
- * Seite fragt, war der Stand vor diesem Fix.
+ * `shopping`. Wer nur nach dem Ziel fragt, zeigt (bei der Mahlzeit) einem
+ * Mitglied mit `meals: read` einen Knopf, den der Pfad-Guard abweist; wer nur
+ * nach der Seite fragt, war der Stand vor diesem Fix.
+ *
+ * Was der Pfad-Guard verlangt, beantwortet `mayWritePath()`: fuer die Mahlzeit
+ * `meals: write` (die Route kippt `on_shopping_list` im Essensplan), fuer das
+ * Rezept nur `meals: read` - die zweite Serverausnahme, entschieden am
+ * 22.09.2026 (`isRecipeToShoppingTransfer()` in server/scopes.js, Regel 8 in
+ * utils/module-access.js). Die Funktionen hier bilden also nichts selbst ab.
  *
  * Je Quelle eine Funktion mit dem Pfad als LITERAL, statt eines Parameters:
  * `npm run test:module-write-access` liest jede Frage an `mayWritePath()` als
