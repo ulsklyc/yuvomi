@@ -616,6 +616,13 @@ export function bindRestoreEvents(container) {
       restoreBtn.removeAttribute('aria-disabled');
       restoreBtn.textContent = t('settings.backupRestoreButton');
       await modalClosed;
+      // Nur einen Fokus umsetzen, den niemand selbst gewaehlt hat: wo das
+      // Modal ihn abgelegt hat (Knopf, Seitenwurzel, body) oder schon im Feld.
+      // Wer waehrend einer langen Anfrage weitergearbeitet hat, bleibt dort.
+      const current = document.activeElement;
+      const untouched = !current || current === document.body || current.id === 'main-content'
+        || current === restoreBtn || current === keyInput;
+      if (!untouched) return;
       const fieldAppeared = action === 'show' && keyGroup && !keyGroup.hidden;
       (fieldAppeared ? keyInput : restoreBtn).focus();
     }

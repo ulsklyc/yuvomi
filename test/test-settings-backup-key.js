@@ -217,16 +217,17 @@ test('Fehlertext: der Grund wird zum uebersetzten Text, nicht zur englischen Ser
 
 test('Fehlertext: jeder bekannte Grund hat einen eigenen Key, ein unbekannter den allgemeinen', async () => {
   const { restoreErrorText } = await import('../public/settings/backup-key.js');
+  // Der Stub von t() liefert den Key; mehrteilige Texte kommen als Folge von Keys.
   const expected = {
-    backup_key_required: 'settings.backupRestoreErrorKeyRequired',
-    backup_key_wrong: 'settings.backupRestoreErrorKeyWrong',
-    backup_key_invalid: 'settings.backupRestoreErrorKeyInvalid',
-    own_key_missing: 'settings.backupRestoreErrorOwnKeyMissing',
-    backup_damaged: 'settings.backupRestoreErrorDamaged',
-    backup_unreadable: 'settings.backupRestoreErrorUnreadable',
+    backup_key_required: ['settings.backupRestoreErrorKeyRequired'],
+    backup_key_wrong: ['settings.backupRestoreErrorKeyWrong', 'settings.backupRestoreErrorKeyRightButNotDb', 'settings.backupRestoreErrorNothingChanged'],
+    backup_key_invalid: ['settings.backupRestoreErrorKeyInvalid'],
+    own_key_missing: ['settings.backupRestoreErrorOwnKeyMissing', 'settings.backupRestoreErrorNeverEncrypted', 'settings.backupRestoreErrorNothingChanged'],
+    backup_damaged: ['settings.backupRestoreErrorDamaged'],
+    backup_unreadable: ['settings.backupRestoreErrorUnreadable'],
   };
-  for (const [reason, key] of Object.entries(expected)) {
-    assert.equal(restoreErrorText({ message: LONG_ENGLISH, data: { reason } }), key, reason);
+  for (const [reason, keys] of Object.entries(expected)) {
+    assert.equal(restoreErrorText({ message: LONG_ENGLISH, data: { reason } }), keys.join(' '), reason);
   }
   // Jeder Grund aus dem Server steht in der Tabelle - dieselbe Quelle wie oben.
   const db = readFileSync(new URL('../server/db.js', import.meta.url), 'utf8');
@@ -243,10 +244,44 @@ test('Fehlertext: jeder bekannte Grund hat einen eigenen Key, ein unbekannter de
   const locales = new URL('../public/locales/', import.meta.url);
   for (const file of readdirSync(locales).filter((name) => name.endsWith('.json'))) {
     const settings = JSON.parse(readFileSync(new URL(file, locales), 'utf8')).settings;
-    for (const key of [...Object.values(expected), 'settings.backupRestoreErrorGeneric']) {
+    for (const key of [...Object.values(expected).flat(), 'settings.backupRestoreErrorGeneric']) {
       assert.equal(typeof settings[key.replace('settings.', '')], 'string', `${file}: ${key}`);
     }
   }
+});
+
+/**
+ * DIE ZWEITE MOEGLICHKEIT GEHOERT IN DEN TEXT (Review zu #1427) - dieselbe
+ * Symmetrie, die `nenntSchluesselUndAlternative()` in test-db-encryption.js fuer
+ * die Servertexte haelt. Ohne Klartext-Kopf ist eine Datei verschluesselt ODER
+ * gar keine Datenbank, und `SQLITE_NOTADB` sagt nicht, welches von beiden. Ein
+ * Text, der nur den Schluessel nennt, schickt einen Admin ohne eigenen
+ * Schluessel los, einen zu setzen, den er nicht braucht.
+ *
+ * Strukturell fuer ALLE Sprachen: die Alternative ist ein eigener Key, den
+ * `restoreErrorText()` anhaengt - oben geprueft -, und hier steht fest, dass
+ * jede Sprache ihn mit Inhalt fuellt und der Haupttext den Schlusssatz nicht
+ * doppelt traegt. Fuer de und en dazu der Wortlaut.
+ */
+test('Fehlertext: own_key_missing und backup_key_wrong nennen auch „keine Yuvomi-Datenbank"', () => {
+  const locales = new URL('../public/locales/', import.meta.url);
+  const files = readdirSync(locales).filter((name) => name.endsWith('.json'));
+  assert.equal(files.length, 24, 'Vorbedingung: alle Sprachen gelesen');
+  for (const file of files) {
+    const s = JSON.parse(readFileSync(new URL(file, locales), 'utf8')).settings;
+    for (const key of ['backupRestoreErrorNeverEncrypted', 'backupRestoreErrorKeyRightButNotDb', 'backupRestoreErrorNothingChanged']) {
+      assert.ok(typeof s[key] === 'string' && s[key].includes('Yuvomi') !== (key === 'backupRestoreErrorNothingChanged'), `${file}: ${key}`);
+    }
+    for (const key of ['backupRestoreErrorOwnKeyMissing', 'backupRestoreErrorKeyWrong']) {
+      assert.ok(!s[key].includes(s.backupRestoreErrorNothingChanged), `${file}: ${key} traegt den Schlusssatz selbst`);
+    }
+  }
+  const de = JSON.parse(readFileSync(new URL('de.json', locales), 'utf8')).settings;
+  assert.match(de.backupRestoreErrorNeverEncrypted, /nie verschlüsselt.*keine gültige Yuvomi-Datenbank/);
+  assert.match(de.backupRestoreErrorKeyRightButNotDb, /Schlüssel richtig.*keine Yuvomi-Datenbank.*abgeschnitten/);
+  const en = JSON.parse(readFileSync(new URL('en.json', locales), 'utf8')).settings;
+  assert.match(en.backupRestoreErrorNeverEncrypted, /never encrypted.*not a valid Yuvomi database/);
+  assert.match(en.backupRestoreErrorKeyRightButNotDb, /key is right.*not a Yuvomi database.*cut short/);
 });
 
 test('describedby: die Fehlerbox kommt dazu, Hinweis und HTTP-Warnung bleiben, und sie geht wieder', async () => {
@@ -318,6 +353,26 @@ test('Fokus: schliesst das Modal VOR der Antwort, faellt er nicht auf main-conte
   await Promise.all([f.form.dispatch('submit'), modal.done]);
   await tick();
   assert.equal(f.doc.activeElement?.id, 'backup-restore-btn');
+});
+
+test('Fokus: wer waehrend einer langen Anfrage weitergearbeitet hat, wird nicht zurueckgerissen', async () => {
+  // Review zu #1427: der Fokus wurde bedingungslos gesetzt. Nur wo ihn das
+  // Modal abgelegt hat (Knopf, #main-content, body) oder wo er ohnehin im Feld
+  // steht, ist er noch „unser" - alles andere hat jemand selbst gewaehlt.
+  const f = restoreForm();
+  bindRestoreEvents(f.container);
+  const modal = delayedModal(f, 1);
+  rejectAfter(40, 'backup_key_required');
+  f.btn.focus();
+  const pending = f.form.dispatch('submit');
+  await modal.done;
+  await tick();
+  const elsewhere = new FakeEl(f.doc, 'webdav-url');
+  elsewhere.focus();
+  await pending;
+  await tick();
+  assert.equal(f.els['backup-restore-key-group'].hidden, false, 'Vorbedingung: das Feld ist erschienen');
+  assert.equal(f.doc.activeElement?.id, 'webdav-url');
 });
 
 test('Sperre: waehrend des Requests loest ein zweiter Klick keinen zweiten Restore aus', async () => {

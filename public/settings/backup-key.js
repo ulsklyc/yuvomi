@@ -70,15 +70,33 @@ export function keyFieldAfterError(reason) {
   return 'reset';
 }
 
+/** Saetze aneinander; nach dem CJK-Punkt „。" ohne Leerzeichen. */
+function sentences(...parts) {
+  return parts.reduce((text, part) => (text.endsWith('。') ? text + part : `${text} ${part}`));
+}
+
 /**
  * Grund aus server/db.js bzw. server/routes/backup.js -> Text. Die Schluessel
  * stehen ausgeschrieben da, damit die i18n-Guards sie als Aufruf finden.
  */
 export const REASON_TEXT = Object.freeze({
   backup_key_required: () => t('settings.backupRestoreErrorKeyRequired'),
-  backup_key_wrong: () => t('settings.backupRestoreErrorKeyWrong'),
+  // Beide Texte nennen auch den ANDEREN Ausgang, wie ihre Servertexte
+  // (`nenntSchluesselUndAlternative()` in test-db-encryption.js): ohne
+  // Klartext-Kopf ist die Datei verschluesselt ODER keine Datenbank, und
+  // SQLite sagt nicht, welches. Die Alternative ist ein eigener Key, damit ein
+  // Test sie in jeder Sprache strukturell nachweisen kann.
+  backup_key_wrong: () => sentences(
+    t('settings.backupRestoreErrorKeyWrong'),
+    t('settings.backupRestoreErrorKeyRightButNotDb'),
+    t('settings.backupRestoreErrorNothingChanged'),
+  ),
   backup_key_invalid: () => t('settings.backupRestoreErrorKeyInvalid'),
-  own_key_missing: () => t('settings.backupRestoreErrorOwnKeyMissing'),
+  own_key_missing: () => sentences(
+    t('settings.backupRestoreErrorOwnKeyMissing'),
+    t('settings.backupRestoreErrorNeverEncrypted'),
+    t('settings.backupRestoreErrorNothingChanged'),
+  ),
   backup_damaged: () => t('settings.backupRestoreErrorDamaged'),
   backup_unreadable: () => t('settings.backupRestoreErrorUnreadable'),
 });

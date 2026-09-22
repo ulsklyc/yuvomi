@@ -120,7 +120,7 @@ const pointerClick = (target, pointerType = 'mouse') => makeEvent('click', { tar
 /** Ein per Tastatur ausgeloester Klick: leere Zeigerart, detail 0. */
 const keyboardClick = (target) => makeEvent('click', { target, pointerType: '', detail: 0 });
 
-const { armPointerDeadTime, openModal, closeModal } = await import('../public/components/modal.js');
+const { armPointerDeadTime, openModal, closeModal, whenModalClosed } = await import('../public/components/modal.js');
 
 // --------------------------------------------------------
 // 1) Die Sperre selbst - mit eigener Uhr, ohne openModal
@@ -418,4 +418,88 @@ test('ohne pointerDeadTime bleibt ein Overlay vom ersten Moment an bedienbar', (
   const blatt = openDialog({ openedAt: 0, pointerDeadTime: false });
   blatt.tap(40);
   assert.equal(blatt.chosen, 'this', 'ein Formular schluckt den ersten Klick nicht');
+});
+
+// --------------------------------------------------------
+// 3) whenModalClosed() - das ECHTE, nicht der Stub des Loaders
+// --------------------------------------------------------
+//
+// Der Restore-Dialog (admin-backup.js) wartet darauf, bevor er den Fokus ins
+// Schluesselfeld setzt: mobil schliesst das Modal animiert bis zu 400 ms nach
+// der Antwort und gibt DANN den Fokus an den Ausloeser zurueck. Loest das
+// Warten vor dieser Rueckgabe auf - oder gar nicht -, gewinnt wieder das Modal.
+// test-settings-backup-key.js kann das nicht sehen: dort ersetzt der Loader
+// modal.js durch einen Stub. Deshalb hier gegen `_doClose()` selbst.
+
+/** Ausloeser, der wie im Browser den Fokus annimmt und es protokolliert. */
+function makeTrigger(log) {
+  const node = makeNode('button#trigger');
+  node.tagName = 'BUTTON';
+  node.id = 'trigger';
+  node.focus = () => { document.activeElement = node; log.push('focus'); };
+  return node;
+}
+
+/** Offenes Modal aus einem vorigen Test abraeumen, dann frisches Dokument. */
+async function freshDocument({ width }) {
+  installDocument();
+  await closeModal({ force: true });
+  installDocument();
+  window.innerWidth = width;
+}
+
+/** Ob das Promise nach allen anstehenden Mikro- und einem Makrotask aufgeloest ist. */
+async function settled(promise) {
+  let done = false;
+  promise.then(() => { done = true; });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  return done;
+}
+
+function fireAnimationEnd(overlay) {
+  const panel = overlay.querySelector('.modal-panel');
+  for (const l of [...panel._listeners]) if (l.type === 'animationend') l.handler(makeEvent('animationend'));
+}
+
+test('whenModalClosed: ohne offenes Modal loest es sofort auf', async () => {
+  await freshDocument({ width: 1024 });
+  assert.equal(await settled(whenModalClosed()), true);
+});
+
+test('whenModalClosed: mobil loest es erst NACH der Fokus-Rueckgabe des animierten Schliessens auf', async () => {
+  await freshDocument({ width: 375 });
+  const log = [];
+  const trigger = makeTrigger(log);
+  document.activeElement = trigger;
+  const dialog = openDialog({ openedAt: 0 });
+  document.activeElement = null; // der Fokus liegt im Dialog
+  await closeModal({ force: true });
+  const closed = whenModalClosed().then(() => log.push('resolved'));
+
+  assert.equal(await settled(closed), false, 'loest auf, waehrend die Schliess-Animation noch laeuft');
+  assert.equal(dialog.overlay.isConnected, true, 'Vorbedingung: das Overlay steht noch');
+
+  fireAnimationEnd(dialog.overlay);
+  assert.equal(await settled(closed), true, 'loest nach dem Ende der Animation nicht auf');
+  assert.deepEqual(log, ['focus', 'resolved'], 'Reihenfolge: erst gibt das Modal den Fokus zurueck, dann loest das Warten auf');
+});
+
+test('whenModalClosed: ein openModal() waehrend des Schliessens haelt das Warten auf das ALTE nicht an', async () => {
+  await freshDocument({ width: 375 });
+  const first = openDialog({ openedAt: 0 });
+  await closeModal({ force: true });
+  const waitFirst = whenModalClosed();
+
+  const second = openDialog({ openedAt: 1000 });
+  const waitSecond = whenModalClosed();
+  assert.equal(await settled(waitFirst), false, 'das erste Overlay steht noch in seiner Animation');
+
+  fireAnimationEnd(first.overlay);
+  assert.equal(await settled(waitFirst), true, 'das Warten auf das erste haengt am zweiten Dialog');
+  assert.equal(await settled(waitSecond), false, 'das Warten auf das zweite endet mit dem ersten');
+  assert.equal(second.overlay.isConnected, true);
+
+  await closeModal({ force: true });
+  fireAnimationEnd(second.overlay);
+  assert.equal(await settled(waitSecond), true);
 });
