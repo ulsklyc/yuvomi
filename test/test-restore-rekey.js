@@ -295,6 +295,7 @@ test(
       await assert.rejects(
         () => target.mod.restoreFromFile(backupPath, { backupKey: KEY_ALT }),
         (err) => err.reason === 'backup_unreadable' && /Nothing on this instance was changed/.test(err.message)
+          && !/(\b[A-Z_]{3,}): \1:/.test(err.message)
       );
       assertUntouched(target);
     } finally {

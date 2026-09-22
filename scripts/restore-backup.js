@@ -40,6 +40,10 @@ async function readKeyFromStdin() {
   const chunks = [];
   for await (const chunk of process.stdin) chunks.push(chunk);
   let bytes = Buffer.concat(chunks);
+  // Best effort: die gelesenen Stuecke nicht neben der Kopie stehen lassen.
+  // Ganz leer wird der Speicher damit nicht - applyKeyBytes() baut daraus
+  // einen Hex-String, und Strings lassen sich in JS nicht ueberschreiben.
+  chunks.forEach((chunk) => chunk.fill(0));
   if (bytes.at(-1) === 0x0a) bytes = bytes.subarray(0, -1);
   if (bytes.at(-1) === 0x0d) bytes = bytes.subarray(0, -1);
   if (bytes.length === 0) throw new Error('--backup-key-stdin was given, but stdin carried no key.');

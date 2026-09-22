@@ -39,9 +39,11 @@ export function backupKeyFieldHtml(protocol = '') {
 /** Gruende, bei denen der Schluessel des Backups weiterhilft: Feld zeigen. */
 const SHOW_REASONS = new Set(['backup_key_required', 'backup_key_wrong', 'backup_key_invalid']);
 /**
- * Gruende, bei denen der eingegebene Schluessel bewiesen richtig war - die
- * Datei ist das Problem. Feld und Wert bleiben, damit der zweite Versuch mit
- * einer neu geholten Datei nicht am Abtippen scheitert.
+ * Gruende, bei denen die Datei das Problem ist und nicht der Schluessel:
+ * `backup_damaged` gibt es nur mit bewiesen richtigem Schluessel,
+ * `backup_unreadable` auch VOR seiner Pruefung (etwa fehlendes Leserecht beim
+ * Kopieren) - dort ist er nicht widerlegt. Feld und Wert bleiben, damit der
+ * zweite Versuch mit einer neu geholten Datei nicht am Abtippen scheitert.
  */
 const KEEP_REASONS = new Set(['backup_damaged', 'backup_unreadable']);
 

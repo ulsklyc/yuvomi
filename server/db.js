@@ -10126,9 +10126,14 @@ function foreignKeyReadError(cause, { keyProven = false } = {}) {
       cause
     );
   }
-  const detail = `${code || 'no SQLite error code'}: ${cause?.message ?? String(cause)}`;
-  // Nach bestandenem ersten Lesen ist der Schluessel bewiesen: was danach an
-  // einer spaeteren Seite scheitert, ist die Datei, nie der Schluessel.
+  // Node-Fehler (etwa EACCES aus copyFile) tragen den Code schon am Anfang
+  // ihrer Meldung - dann nicht ein zweites Mal davorsetzen.
+  const text = cause?.message ?? String(cause);
+  const detail = code && text.startsWith(`${code}:`) ? text : `${code || 'no SQLite error code'}: ${text}`;
+  // Gemessen scheitert eine spaetere Seite beim Umschluesseln immer mit
+  // SQLITE_CORRUPT. Der NOTADB-Zweig mit `keyProven` ist in keiner Messung
+  // aufgetreten; er ist defensiv und sichert ab, dass ein nach bewiesenem
+  // Schluessel doch gemeldetes NOTADB nie als „falscher Schluessel" ankommt.
   if (code.startsWith('SQLITE_CORRUPT') || (keyProven && code === 'SQLITE_NOTADB')) {
     return restoreError(
       `Backup file is damaged or incomplete (${detail}). The backup key is right: it opens the `
@@ -10215,7 +10220,9 @@ async function rekeyForeignBackup(sourcePath, oldKey) {
         working.pragma(`rekey="x'${Buffer.from(DB_KEY, 'utf8').toString('hex')}'"`);
       } catch (err) {
         // Seite 1 ist oben mit diesem Schluessel entschluesselt worden - ein
-        // Fehler hier liegt an einer spaeteren Seite, nicht am Schluessel.
+        // Fehler hier liegt nicht am Schluessel: an einer spaeteren Seite
+        // (SQLITE_CORRUPT) oder am Temp-Verzeichnis (SQLITE_FULL, SQLITE_IOERR,
+        // voller Datentraeger), das dann als backup_unreadable ankommt.
         throw foreignKeyReadError(err, { keyProven: true });
       }
     } finally {
