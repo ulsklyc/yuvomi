@@ -1068,6 +1068,41 @@ export function restoreFocusAfterClose(memo) {
   return gesetzt;
 }
 
+/**
+ * Wartende auf das Ende EINES Overlays, je Knoten. Aufgeloest wird in
+ * `_doClose()` nach dem Focus-Restore - wer danach fokussiert, gewinnt.
+ * @type {Map<HTMLElement, Array<() => void>>}
+ */
+const _closeWaiters = new Map();
+
+/**
+ * Loest auf, sobald das gerade offene Modal wirklich weg ist und seinen Fokus
+ * zurueckgegeben hat; ohne offenes Modal sofort.
+ *
+ * `confirmModal()` loest schon beim Klick auf, mobil laeuft das Schliessen aber
+ * noch bis zu 400 ms weiter (Animation) und setzt am Ende den Fokus auf den
+ * Ausloeser. Wer nach der Rueckfrage selbst fokussiert - etwa ein Feld, das
+ * eine schnelle Serverantwort einblendet -, verliert ihn sonst an dieses Ende.
+ * Gilt fuer das Overlay, das beim Aufruf offen ist, nicht fuer ein spaeteres.
+ * @returns {Promise<void>}
+ */
+export function whenModalClosed() {
+  const overlay = activeOverlay;
+  if (!overlay || !overlay.isConnected) return Promise.resolve();
+  return new Promise((resolve) => {
+    const list = _closeWaiters.get(overlay) ?? [];
+    list.push(resolve);
+    _closeWaiters.set(overlay, list);
+  });
+}
+
+function _releaseCloseWaiters(overlay) {
+  const list = _closeWaiters.get(overlay);
+  if (!list) return;
+  _closeWaiters.delete(overlay);
+  for (const resolve of list) resolve();
+}
+
 function _doClose(overlayEl) {
   const target = overlayEl ?? activeOverlay;
   if (!target) return;
@@ -1105,6 +1140,10 @@ function _doClose(overlayEl) {
       window.yuvomi.restoreThemeColor();
     }
   }
+
+  // Erst NACH dem Focus-Restore: wer auf das Schliessen gewartet hat, setzt
+  // seinen Fokus danach und behaelt ihn.
+  _releaseCloseWaiters(target);
 }
 
 // --------------------------------------------------------

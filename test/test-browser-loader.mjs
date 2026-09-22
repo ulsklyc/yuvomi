@@ -39,6 +39,7 @@ const STUBS = {
       put: async (...a) => viaStub('put', a, { data: null }),
       patch: async (...a) => viaStub('patch', a, { data: null }),
       delete: async (...a) => viaStub('delete', a, { data: null }),
+      rawPost: async (...a) => viaStub('rawPost', a, { data: null }),
     };
     export const auth = {
       me: async () => ({ user: null }),
@@ -145,6 +146,9 @@ const STUBS = {
       typeof globalThis.__confirmModal === 'function' ? globalThis.__confirmModal(...args) : true
     );
     export const confirmOverModal = async (...args) => globalThis.__confirmOverModal?.(...args) ?? true;
+    // Wer ein VERZOEGERTES Schliessen nachstellt (mobil: Animation bis 400 ms),
+    // setzt globalThis.__whenModalClosed; ohne das ist das Modal sofort zu.
+    export const whenModalClosed = async (...args) => globalThis.__whenModalClosed?.(...args);
     // Wie das Original ohne offenes Modal: ask() oeffnet den Dialog (ueber
     // openModal, also __openModal) und liefert die Antwort. Wer sehen will,
     // DASS eine Frage ueber dem Formular gestellt wird statt es zu ersetzen,

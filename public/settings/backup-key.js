@@ -10,6 +10,8 @@ import { t } from '/i18n.js';
 
 const HINT_ID = 'backup-restore-key-hint';
 const HTTP_ID = 'backup-restore-key-http';
+/** Fehlerbox des Restore-Formulars; sie steht in admin-backup.js. */
+export const RESTORE_ERROR_ID = 'backup-restore-error';
 
 /**
  * Wert fuer `aria-describedby` des Feldes. Ueber HTTP gehoert die Warnung
@@ -17,10 +19,18 @@ const HTTP_ID = 'backup-restore-key-http';
  * Verknuepfung hoerte ein Screenreader-Nutzer sie nie. Ueber HTTPS gehoert sie
  * NICHT dazu - ein per `aria-describedby` verknuepftes Element wird auch dann
  * vorgelesen, wenn es `hidden` ist (accname), die Warnung kaeme also falsch.
+ *
+ * Die Fehlerbox gehoert nur dazu, solange sie sichtbar ist - aus demselben
+ * Grund: eine versteckte alte Meldung kaeme sonst mit. Ohne den Verweis hoerte
+ * ein Screenreader sie aber gar nicht im Zusammenhang mit dem Feld: der Fokus
+ * springt hinein, und `role="alert"` kuendigt die Meldung nur beim Erscheinen an.
  * @param {string} protocol  `window.location.protocol`
+ * @param {{ withError?: boolean }} [options]
  */
-export function keyFieldDescribedBy(protocol) {
-  return protocol === 'http:' ? `${HINT_ID} ${HTTP_ID}` : HINT_ID;
+export function keyFieldDescribedBy(protocol, { withError = false } = {}) {
+  const ids = protocol === 'http:' ? [HINT_ID, HTTP_ID] : [HINT_ID];
+  if (withError) ids.push(RESTORE_ERROR_ID);
+  return ids.join(' ');
 }
 
 /** Markup des Feldes; `aria-describedby` setzt `keyFieldDescribedBy()` beim Einblenden. */
@@ -58,6 +68,43 @@ export function keyFieldAfterError(reason) {
   if (SHOW_REASONS.has(reason)) return 'show';
   if (KEEP_REASONS.has(reason)) return 'keep';
   return 'reset';
+}
+
+/**
+ * Grund aus server/db.js bzw. server/routes/backup.js -> Text. Die Schluessel
+ * stehen ausgeschrieben da, damit die i18n-Guards sie als Aufruf finden.
+ */
+export const REASON_TEXT = Object.freeze({
+  backup_key_required: () => t('settings.backupRestoreErrorKeyRequired'),
+  backup_key_wrong: () => t('settings.backupRestoreErrorKeyWrong'),
+  backup_key_invalid: () => t('settings.backupRestoreErrorKeyInvalid'),
+  own_key_missing: () => t('settings.backupRestoreErrorOwnKeyMissing'),
+  backup_damaged: () => t('settings.backupRestoreErrorDamaged'),
+  backup_unreadable: () => t('settings.backupRestoreErrorUnreadable'),
+});
+
+/**
+ * Text fuer die Fehlerbox nach einem gescheiterten Restore.
+ *
+ * Der Server schreibt seine Auskunft englisch und ausfuehrlich (bis zu 944
+ * Zeichen) - fuer das Log und die Kommandozeile. Im Dialog zaehlt der
+ * `reason`: jeder bekannte Grund hat einen knappen, uebersetzten Text mit dem
+ * naechsten Schritt, ein unbekannter den allgemeinen. Die Servermeldung wird
+ * NICHT angehaengt; sie steht im Server-Log, und die Texte sagen das.
+ *
+ * Ohne `reason` bleibt es bei der Servermeldung, wie in `twoFactorErrorText()`
+ * (personal-account.js): diese Fehler tragen ihren Inhalt nur im Text, etwa
+ * „Backup aus einer neueren Yuvomi-Version, erst aktualisieren". Ein
+ * allgemeiner Text verloere genau den naechsten Schritt.
+ * @param {{ message?: string, data?: { reason?: string } } | undefined} err
+ * @returns {string}
+ */
+export function restoreErrorText(err) {
+  const reason = err?.data?.reason;
+  if (!reason) return err?.message || t('common.errorGeneric');
+  return Object.hasOwn(REASON_TEXT, reason)
+    ? REASON_TEXT[reason]()
+    : t('settings.backupRestoreErrorGeneric');
 }
 
 /** Base64 der UTF-8-Bytes - so erwartet der Server `X-Backup-Key`. */

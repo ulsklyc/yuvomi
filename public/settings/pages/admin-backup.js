@@ -1,8 +1,14 @@
 import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
-import { confirmModal } from '/components/modal.js';
+import { confirmModal, whenModalClosed } from '/components/modal.js';
 import { formatCronSchedule } from '/settings/cron-label.js';
-import { backupKeyFieldHtml, encodeBackupKey, keyFieldAfterError, keyFieldDescribedBy } from '/settings/backup-key.js';
+import {
+  backupKeyFieldHtml,
+  encodeBackupKey,
+  keyFieldAfterError,
+  keyFieldDescribedBy,
+  restoreErrorText,
+} from '/settings/backup-key.js';
 import {
   createDisclosure,
   createInfoRow,
@@ -468,7 +474,8 @@ function bindWebdavBackupEvents(container) {
   });
 }
 
-function bindRestoreEvents(container) {
+/** Exportiert fuer test/test-settings-backup-key.js: dort laeuft der Handler als Programm. */
+export function bindRestoreEvents(container) {
   const form = container.querySelector('#backup-restore-form');
   const fileInput = container.querySelector('#backup-restore-file');
   const selectedFile = container.querySelector('#backup-selected-file');
@@ -490,15 +497,32 @@ function bindRestoreEvents(container) {
     // Ueber HTTP geht der Schluessel im Klartext uebers Netz - sagen, nicht sperren.
     const { protocol } = window.location;
     if (httpWarning) httpWarning.hidden = protocol !== 'http:';
-    keyInput.setAttribute('aria-describedby', keyFieldDescribedBy(protocol));
-    keyInput.focus();
+    describeKeyField();
   }
 
   function resetKeyField() {
     if (!keyGroup || !keyInput) return;
     keyInput.value = '';
+    keyInput.removeAttribute('aria-invalid');
     keyGroup.hidden = true;
   }
+
+  // Die Fehlerbox gehoert ins describedby des Feldes, solange sie zu sehen ist
+  // - Regel und Grund in keyFieldDescribedBy().
+  function describeKeyField() {
+    keyInput?.setAttribute(
+      'aria-describedby',
+      keyFieldDescribedBy(window.location.protocol, { withError: !errorEl.hidden }),
+    );
+  }
+
+  function hideError() {
+    errorEl.hidden = true;
+    describeKeyField();
+  }
+
+  // Ein neuer Versuch am Schluessel nimmt die Markierung des alten zurueck.
+  keyInput?.addEventListener('input', () => keyInput.removeAttribute('aria-invalid'));
 
   function setFile(file) {
     if (!file) {
@@ -513,7 +537,7 @@ function bindRestoreEvents(container) {
   }
 
   fileInput.addEventListener('change', () => {
-    errorEl.hidden = true;
+    hideError();
     resetKeyField();
     setFile(fileInput.files?.[0]);
   });
@@ -535,25 +559,40 @@ function bindRestoreEvents(container) {
     const transfer = new DataTransfer();
     transfer.items.add(file);
     fileInput.files = transfer.files;
-    errorEl.hidden = true;
+    hideError();
     resetKeyField();
     setFile(file);
   });
 
+  // Waehrend des Requests wird der Knopf NICHT `disabled` - dasselbe wie bei
+  // „Auf anderen Geraeten abmelden" (#1423): ein deaktivierter Knopf nimmt den
+  // Fokus nicht an, den das Modal ihm beim Schliessen zurueckgibt, und er fiel
+  // auf #main-content. Die Sperre haelt `restoring`, `aria-disabled` sagt sie an.
+  let restoring = false;
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (restoring) return;
     const file = fileInput.files?.[0];
     if (!file) return;
+    restoring = true;
     // Die Warnung zu Dateien ausserhalb der DB stand bisher nur auf dem
     // Dokumentenspeicher-Blatt - also nicht dort, wo sie gebraucht wird.
     if (!await confirmModal(t('settings.backupRestoreConfirm'), {
       danger: true,
       confirmLabel: t('settings.backupRestoreButton'),
       detail: t('settings.backupRestoreDetail'),
-    })) return;
+    })) {
+      restoring = false;
+      return;
+    }
+    // Mobil ist das Modal hier noch nicht zu: es schliesst animiert (bis zu
+    // 400 ms) und gibt DANN den Fokus an den Ausloeser zurueck. Eine schnellere
+    // Antwort setzte den Fokus ins Feld, und das Schliessen zoege ihn wieder ab.
+    const modalClosed = whenModalClosed();
 
-    errorEl.hidden = true;
-    restoreBtn.disabled = true;
+    hideError();
+    restoreBtn.setAttribute('aria-disabled', 'true');
     restoreBtn.textContent = t('settings.backupRestoring');
     // Nur im Header, nie in der URL; nach dem Versuch nicht aufbewahrt.
     const backupKey = keyGroup && !keyGroup.hidden ? keyInput?.value ?? '' : '';
@@ -564,12 +603,21 @@ function bindRestoreEvents(container) {
       window.yuvomi?.showToast(t('settings.backupRestoredToast'), 'success');
       window.location.reload();
     } catch (err) {
-      const action = keyFieldAfterError(err?.data?.reason);
+      const reason = err?.data?.reason;
+      const action = keyFieldAfterError(reason);
       if (action === 'show') showKeyField();
       else if (action === 'reset') resetKeyField();
-      showError(errorEl, err.message ?? t('common.errorGeneric'));
-      restoreBtn.disabled = false;
+      // Nur ein widerlegter Schluessel ist ein ungueltiger Eintrag.
+      if (reason === 'backup_key_wrong') keyInput?.setAttribute('aria-invalid', 'true');
+      else keyInput?.removeAttribute('aria-invalid');
+      showError(errorEl, restoreErrorText(err));
+      describeKeyField();
+      restoring = false;
+      restoreBtn.removeAttribute('aria-disabled');
       restoreBtn.textContent = t('settings.backupRestoreButton');
+      await modalClosed;
+      const fieldAppeared = action === 'show' && keyGroup && !keyGroup.hidden;
+      (fieldAppeared ? keyInput : restoreBtn).focus();
     }
   });
 }

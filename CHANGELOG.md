@@ -174,6 +174,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A failed restore explains itself in your language and keeps your place.** When a backup did
+  not open, the restore dialog showed the server's English explanation, up to several paragraphs
+  long, also in a German interface. Each known cause now has a short translated message with the
+  next step, and anything else gets a general one that points to the server log. A screen reader
+  now reads the message together with the backup key field, and a wrong key marks the field as
+  invalid until you type again. After the answer the focus lands in the key field when it
+  appears, otherwise on the restore button, also on phones, where the closing confirmation used
+  to take it away again; before, it could end up at the top of the page. A second click while a
+  restore is running still starts nothing. (#1267)
+
 - **A housekeeping visit no longer gives away a receipt you may not see.** The housekeeping API
   sent the file name and document number of a visit's receipt to everyone who could open the
   housekeeping module, also to members without access to documents and when the receipt was a
