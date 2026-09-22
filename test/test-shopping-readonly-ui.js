@@ -425,38 +425,49 @@ test('Reiterleiste bei `read`: der Anlegeweg fragt nicht einmal nach dem Namen',
   }
 });
 
-test('Einstiege bei `read`: Abhaken, Loeschen, Senden und die Verwalter schicken nichts und oeffnen nichts', async () => {
-  zustand();
+/**
+ * Was ein Einstieg ausloest: Anfragen, geoeffnete Dialoge, Undo-Fenster. Die
+ * Dialog-Mitschrift steht um das GANZE Warten herum - der Kategorie-Verwalter
+ * holt sein Modal erst nach einem dynamischen Import.
+ */
+async function wirkung(fn) {
+  const modals = [];
   const undo = [];
+  const zuvorModal = globalThis.__openModal;
+  globalThis.__openModal = (opts) => { modals.push(opts); };
   globalThis.__undoStub = (opts) => undo.push(opts);
   try {
-    let modals = [];
-    const posts = await withAccess(LESEN, () => aufrufe(async () => {
-      await shopping.toggleShoppingItem(1, 0, container());
-      shopping.deleteItemUndoable(1, container());
-      shopping.clearCheckedUndoable(container());
-      await shopping.openSendListDialog(container());
-      modals = modalMitschnitt(() => {
-        shopping.openDuplicateListDialog(container());
-        shopping.openStoreManager(container());
-      });
-      await shopping.openCategoryManager(container());
-    }));
-    assert.deepEqual(posts, []);
-    assert.deepEqual(modals, []);
-    assert.equal(undo.length, 0);
-
-    zustand();
-    const gegen = await withAccess(SCHREIBEN, () => aufrufe(async () => {
-      await shopping.toggleShoppingItem(1, 0, container());
-      zustand(); // abgehakt gaebe es nichts Offenes mehr zu senden
-      await shopping.openSendListDialog(container());
-    }));
-    assert.deepEqual(gegen, ['PATCH /shopping/items/1', 'GET /shopping/send-recipients'], 'Gegenfall');
+    const calls = await aufrufe(fn);
+    return { calls, modals: modals.length, undo: undo.length };
   } finally {
+    globalThis.__openModal = zuvorModal;
     delete globalThis.__undoStub;
   }
-});
+}
+
+// Je Einstieg die Lage, in der er mit Schreibrecht WIRKLICH etwas tut - sonst
+// hielte eine leere Vorbedingung (nichts abgehakt, nichts offen) den Lesefall
+// gruen, auch ohne Riegel.
+const EINSTIEGE = [
+  ['Abhaken', {}, () => shopping.toggleShoppingItem(1, 0, container()), { calls: ['PATCH /shopping/items/1'] }],
+  ['Loeschen', {}, () => shopping.deleteItemUndoable(1, container()), { undo: 1 }],
+  ['Abgehakte loeschen', { items: [artikel({ is_checked: 1 })] }, () => shopping.clearCheckedUndoable(container()), { undo: 1 }],
+  ['Senden', {}, () => shopping.openSendListDialog(container()), { calls: ['GET /shopping/send-recipients'] }],
+  ['Duplizieren', {}, () => shopping.openDuplicateListDialog(container()), { modals: 1 }],
+  ['Laeden verwalten', {}, () => shopping.openStoreManager(container()), { modals: 1 }],
+  ['Kategorien verwalten', {}, () => shopping.openCategoryManager(container()), { modals: 1 }],
+];
+
+for (const [name, lage, einstieg, erwartet] of EINSTIEGE) {
+  test(`Einstieg „${name}" bei \`read\`: keine Anfrage, kein Dialog, kein Undo-Fenster`, async () => {
+    zustand(lage);
+    assert.deepEqual(await withAccess(LESEN, () => wirkung(einstieg)), { calls: [], modals: 0, undo: 0 });
+    zustand(lage);
+    const gegen = await withAccess(SCHREIBEN, () => wirkung(einstieg));
+    assert.deepEqual(gegen, { calls: [], modals: 0, undo: 0, ...erwartet },
+      'Gegenfall: mit Schreibrecht tut der Einstieg etwas - sonst misst der Lesefall nichts');
+  });
+}
 
 test('Live-Auffrischung bei `read`: das Zeichen behaelt seine Zustands-Beschriftung', async () => {
   zustand();
@@ -583,4 +594,151 @@ test('CSS: eine Zeile ohne Geste zeigt keinen Wisch-Chevron', () => {
   assert.ok(basis >= 0 && statisch >= 0);
   assert.ok(statisch > basis, 'gleiche Spezifitaet - die Ausnahme muss NACH der Basisregel stehen');
   assert.match(regeln[statisch].body, /content:\s*none/);
+});
+
+// -------------------------------------------------------------------------
+// Seitenaufbau: FAB, Deep-Links
+// -------------------------------------------------------------------------
+
+/**
+ * `render()` als Programm: ein Container, der sein Markup sammelt und die
+ * Knoten liefert, nach denen die Seite fragt, dazu die Antworten der Ladewege.
+ * Der FAB wird ueber `document.getElementById` gesucht (utils/fab.js) - er ist
+ * nur da, wenn render() ihn wirklich gezeichnet hat, wie im echten DOM.
+ */
+async function seite(modules, { search = '', items = [artikel()], lists = [LISTE] } = {}) {
+  let html = '';
+  const gefragt = [];
+  const bar = Object.assign(new MiniElement('div'), lauscher());
+  const content = new MiniElement('div');
+  const root = Object.assign(lauscher(), { classList: { toggle() {}, contains: () => false } });
+  const treffer = { scrolled: 0, scrollIntoView() { this.scrolled += 1; }, closest: () => null };
+  const fab = { listeners: {}, addEventListener(type, fn) { this.listeners[type] = fn; }, getAttribute: () => null, setAttribute() {}, removeAttribute() {} };
+  const neueListe = { clicks: 0, click() { this.clicks += 1; } };
+  const knoten = {
+    '#list-tabs-bar': bar, '#list-content': content, '.shopping-page': root,
+    '.shopping-item[data-item-id="1"]': treffer, '[data-action="new-list"]': neueListe,
+  };
+  const c = {
+    replaceChildren() { html = ''; },
+    insertAdjacentHTML(_pos, markup) { html += markup; },
+    querySelector: (sel) => { gefragt.push(sel); return knoten[sel] ?? null; },
+    querySelectorAll: () => [],
+    isConnected: true,
+  };
+  const zuvorId = globalThis.document.getElementById;
+  globalThis.document.getElementById = (id) => {
+    if (id === 'fab-new-item') return html.includes('id="fab-new-item"') ? fab : null;
+    return zuvorId(id);
+  };
+  const zuvorOrt = globalThis.window.location;
+  globalThis.window.location = { search, pathname: '/shopping' };
+  const route = new AbortController();
+  const modals = [];
+  const zuvorModal = globalThis.__openModal;
+  globalThis.__openModal = (opts) => { modals.push(opts); };
+  try {
+    zustand({ lists, items });
+    const calls = await withAccess(modules, () => aufrufe(async () => {
+      await shopping.render(c, { user: { id: 7 }, signal: route.signal });
+      await new Promise((r) => setImmediate(r)); // der Deep-Link importiert erst
+    }, {
+      'GET /shopping': { data: lists },
+      [`GET /shopping/${LISTE.id}/items`]: { data: items, list: lists[0] ?? null },
+    }));
+    return { html, gefragt, fab, neueListe, treffer, modals, calls };
+  } finally {
+    route.abort();
+    shopping.abortLiveUpdatesForTest();
+    globalThis.document.getElementById = zuvorId;
+    globalThis.window.location = zuvorOrt;
+    globalThis.__openModal = zuvorModal;
+  }
+}
+
+test('Seitenaufbau bei `read`: kein FAB im Markup', async () => {
+  const lesend = await seite(LESEN);
+  assert.doesNotMatch(lesend.html, /page-fab|fab-new-item/);
+  assert.match(lesend.html, /class="shopping-page/, 'Gegenprobe: die Seite wurde gezeichnet');
+  assert.match((await seite(SCHREIBEN)).html, /id="fab-new-item"/, 'Gegenfall: mit Schreibrecht steht der FAB');
+});
+
+test('FAB: geht das Schreibrecht nach dem Aufbau verloren, legt sein Klick nichts an', async () => {
+  // Ohne Liste fuehrt der FAB auf „Neue Liste" - der Klick dort ist messbar.
+  const { fab, neueListe } = await seite(SCHREIBEN, { lists: [], items: [] });
+  const klickFab = () => fab.listeners.click({ currentTarget: fab });
+  assert.equal(typeof fab.listeners.click, 'function', 'Gegenprobe: der FAB ist verdrahtet');
+  await withAccess(LESEN, () => klickFab());
+  assert.equal(neueListe.clicks, 0, 'bei `read` erreicht der FAB den Anlegeweg nicht');
+  await withAccess(SCHREIBEN, () => klickFab());
+  assert.equal(neueListe.clicks, 1, 'Gegenfall: mit Schreibrecht fuehrt er zu „Neue Liste"');
+});
+
+test('Deep-Link ?manage=categories: bei `read` geht der Verwalter nicht auf', async () => {
+  assert.equal((await seite(LESEN, { search: '?manage=categories' })).modals.length, 0);
+  const gegen = await seite(SCHREIBEN, { search: '?manage=categories' });
+  assert.equal(gegen.modals.length, 1, 'Gegenfall: mit Schreibrecht oeffnet der Link den Verwalter');
+  assert.equal(gegen.modals[0].title, 'shopping.manageCategories');
+});
+
+test('Deep-Link ?highlight=: der Suchtreffer kommt auch bei `read` an', async () => {
+  // Bei `read` gibt es keinen Abhak-Knopf, an dem der Treffer frueher hing -
+  // der Container liefert, was das echte DOM dann liefert: nur die Zeile.
+  const { treffer, gefragt } = await seite(LESEN, { search: '?highlight=1' });
+  assert.ok(gefragt.includes('.shopping-item[data-item-id="1"]'), 'gesucht wird ueber die Zeile');
+  assert.equal(treffer.scrolled, 1, 'der Treffer wird angesteuert');
+});
+
+// -------------------------------------------------------------------------
+// Nachtraege aus dem Review
+// -------------------------------------------------------------------------
+
+test('Leseansicht: die Notiz geht durch esc()', () => {
+  zustand();
+  const html = shopping.itemReadHtml(artikel({ notes: '<img src=x onerror=alert(1)>' }));
+  assert.doesNotMatch(html, /<img/);
+  assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
+});
+
+/** Den Dialog „In den Vorrat" oeffnen und bestaetigen - mit oder ohne Haken bei „entfernen". */
+async function inDenVorrat(offen, bestaetigt) {
+  zustand({ items: [artikel({ is_checked: 1 })] });
+  let opts;
+  const zuvor = globalThis.__openModal;
+  globalThis.__openModal = (o) => { opts = o; };
+  try {
+    await withAccess(offen, () => aufrufe(() => shopping.openPantryTransfer(container())));
+  } finally {
+    globalThis.__openModal = zuvor;
+  }
+  const felder = {};
+  const panel = {
+    querySelector: (sel) => {
+      if (sel === '#pantry-transfer-clear' && !opts.content.includes('id="pantry-transfer-clear"')) return null;
+      return (felder[sel] ??= {
+        value: '', checked: true, listeners: {},
+        addEventListener(type, fn) { this.listeners[type] = fn; },
+      });
+    },
+    querySelectorAll: () => [],
+  };
+  opts.onSave(panel);
+  const calls = await withAccess(bestaetigt, () => aufrufe(
+    () => felder['#pantry-transfer-confirm'].listeners.click({ currentTarget: {} }),
+    { 'POST /pantry/import-shopping': { data: { added: 1, merged: 0 } } },
+  ));
+  return { content: opts.content, calls };
+}
+
+test('„In den Vorrat": ohne Schreibrecht im Einkauf kein Abraeumen der Liste', async () => {
+  const lesend = await inDenVorrat(LESEN, LESEN);
+  assert.doesNotMatch(lesend.content, /pantry-transfer-clear/, 'die Checkbox verspraeche ein DELETE, das im 403 endet');
+  assert.deepEqual(lesend.calls, ['POST /pantry/import-shopping']);
+  // Aufgegangen mit Schreibrecht, abgesendet nach dem Verlust: der Haken steht,
+  // das Abraeumen trotzdem nicht.
+  assert.deepEqual((await inDenVorrat(SCHREIBEN, LESEN)).calls, ['POST /pantry/import-shopping']);
+  const gegen = await inDenVorrat(SCHREIBEN, SCHREIBEN);
+  assert.match(gegen.content, /id="pantry-transfer-clear"/);
+  assert.deepEqual(gegen.calls, ['POST /pantry/import-shopping', `DELETE /shopping/${LISTE.id}/items/checked`],
+    'Gegenfall: mit Schreibrecht raeumt die Uebernahme die Liste ab');
 });

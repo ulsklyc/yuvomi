@@ -2377,11 +2377,13 @@ async function openPantryTransfer(container) {
            sie loescht die eingekauften Artikel von der Liste, ist standardmaessig
            aktiv, und war als nackte System-Checkbox in System-Groesse die
            unauffaelligste (Critique 2026-07-30, P2). Der Default bleibt aktiv: wer
-           eingekauft und eingeraeumt hat, will nicht doppelt kaufen. -->
-      <label class="form-check pantry-transfer__clear">
+           eingekauft und eingeraeumt hat, will nicht doppelt kaufen.
+           Das Abraeumen ist ein DELETE im EINKAUF: ohne dessen Schreibrecht
+           entfaellt die Checkbox, sonst endete der Uebertrag danach im 403 (#1265). -->
+      ${readOnly() ? '' : `<label class="form-check pantry-transfer__clear">
         <input type="checkbox" id="pantry-transfer-clear" checked>
         <span>${esc(t('shopping.toPantryClearList'))}</span>
-      </label>
+      </label>`}
       <div class="modal-panel__footer modal-panel__footer--plain">
         <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
         <button type="button" class="btn btn--primary" id="pantry-transfer-confirm">${esc(t('common.apply'))}</button>
@@ -2394,7 +2396,9 @@ async function openPantryTransfer(container) {
       panel.querySelector('#pantry-transfer-confirm').addEventListener('click', async (e) => {
         const btn = e.currentTarget;
         const locationId = panel.querySelector('#pantry-transfer-location').value || null;
-        const clearList = panel.querySelector('#pantry-transfer-clear').checked;
+        // Beim Absenden neu gefragt: die Rechte koennen sich geaendert haben,
+        // waehrend der Dialog offen stand.
+        const clearList = !readOnly() && Boolean(panel.querySelector('#pantry-transfer-clear')?.checked);
         const listId = state.activeListId;
 
         const items = [...panel.querySelectorAll('.pantry-transfer__row')].map((row) => ({
@@ -3609,8 +3613,10 @@ export async function render(container, { user, signal: routeSignal = null } = {
     }
   }
 
-  // Deep-Link: ?manage=categories öffnet den Kategorie-Manager sofort.
-  if (!readOnly() && new URLSearchParams(window.location.search).get('manage') === 'categories') {
+  // Deep-Link: ?manage=categories öffnet den Kategorie-Manager sofort. Bei
+  // `read` riegelt `openCategoryManager()` selbst ab - ein zweiter Riegel hier
+  // waere von aussen nicht zu unterscheiden und damit von keinem Test belegt.
+  if (new URLSearchParams(window.location.search).get('manage') === 'categories') {
     openCategoryManager(container, { fromDeepLink: true });
   }
 }
@@ -3700,4 +3706,5 @@ export const __test = {
   openCategoryManager,
   openStoreManager,
   READ_SAFE_ACTIONS,
+  render,
 };
