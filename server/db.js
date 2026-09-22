@@ -10052,10 +10052,23 @@ function restoreError(message, reason, cause) {
  * @returns {Error}
  */
 function unreadableBackupError(encrypted, cause) {
+  const code = typeof cause?.code === 'string' ? cause.code : '';
   if (!encrypted) {
+    // Kopf da, aber schon die Schemaseite kaputt: ein beschaedigtes Backup,
+    // keine fremde Datei - derselbe Grund wie aus `assertBackupIntact()`
+    // (Codex-Befund in #1431).
+    if (code.startsWith('SQLITE_CORRUPT')) {
+      return restoreError(
+        `Backup file is damaged (${code}: ${cause?.message ?? String(cause)}). Its SQLite header is `
+        + 'intact, but its schema page is not. Nothing on this instance was changed. Get the backup '
+        + 'again from where it is stored and check that its size and sha256sum match the stored '
+        + 'original, then restore that copy - or restore an older backup.',
+        'backup_corrupt',
+        cause
+      );
+    }
     return new Error('Backup file is not a valid Yuvomi database.', { cause });
   }
-  const code = typeof cause?.code === 'string' ? cause.code : '';
   if (code === 'SQLITE_NOTADB') return undecryptableBackupError(cause);
 
   const detail = `${code || 'no SQLite error code'}: ${cause?.message ?? String(cause)}`;
@@ -10398,7 +10411,32 @@ async function restoreFromFile(sourcePath, { backupKey = null } = {}) {
   }
 }
 
+/**
+ * `true`, wenn `sourcePath` dieselbe Datei ist wie DB_PATH (auch per Symlink
+ * oder hartem Link). Ein Restore der laufenden Datenbank auf sich selbst
+ * kopierte die Hauptdatei VOR dem Checkpoint: was nur im `-wal` stand, fehlte
+ * der Arbeitsdatei, und das rename haengte diesen alten Stand als „Erfolg" ein
+ * (Codex-Befund in #1431).
+ */
+function isActiveDatabaseFile(sourcePath) {
+  try {
+    const source = statSync(sourcePath);
+    const active = statSync(DB_PATH);
+    return source.dev === active.dev && source.ino === active.ino;
+  } catch {
+    return false;
+  }
+}
+
 async function restoreFromFileUnlocked(sourcePath, { backupKey }) {
+  if (isActiveDatabaseFile(sourcePath)) {
+    throw new Error(
+      `Backup file ${sourcePath} is the active database itself (DB_PATH). Restoring it onto itself `
+      + 'would drop the changes that are still only in its write-ahead log. Nothing on this instance '
+      + 'was changed. Restore a backup file instead - download one under Settings, Backup, or copy '
+      + 'the database file while Yuvomi is stopped.'
+    );
+  }
   const oldKey = backupKeyBytes(backupKey);
   // Ein Klartext-Backup braucht keinen Schluessel - es laeuft wie bisher und
   // wird von init() mit dem eigenen verschluesselt.
@@ -10631,8 +10669,15 @@ async function restoreValidatedFile(sourcePath) {
     };
   } catch (err) {
     try {
-      await unlinkIfExists(stagingPath);
-      await unlinkIfExists(rollbackPartialPath);
+      // Best effort: ein Rest, der nicht weggeht (EACCES), darf das
+      // Wiederoeffnen unten nicht verhindern - der naechste Start raeumt ihn weg.
+      for (const leftover of [stagingPath, rollbackPartialPath]) {
+        try {
+          await unlinkIfExists(leftover);
+        } catch (cleanupErr) {
+          log.warn(`Could not remove ${leftover} after a failed restore: ${cleanupErr?.message ?? cleanupErr}`);
+        }
+      }
       if (swapped) {
         // init() kann die neue Datenbank schon geoeffnet haben.
         if (db) {
@@ -10696,8 +10741,10 @@ async function restoreValidatedFile(sourcePath) {
  * der Dialog zeigt diese Meldung selbst, und sie nennt den Weg von Hand.
  * @param {Error} restoreErr
  * @param {Error} rollbackErr
- * @param {{ rollbackPath: string | null }} where  Rollback-Kopie, falls sie
- *   noch nicht zurueck an DB_PATH liegt
+ * @param {{ swapped: boolean, rolledBack: boolean, rollbackPath: string | null }} state
+ *   `swapped`: das Backup lag schon an DB_PATH; `rolledBack`: die Rollback-Kopie
+ *   ist per rename zurueck; `rollbackPath`: die Rollback-Kopie, falls eine
+ *   angelegt wurde (vorher gab es sonst keine Datenbank)
  */
 function rollbackFailedError(restoreErr, rollbackErr, { swapped, rolledBack, rollbackPath }) {
   const lines = [
@@ -10710,7 +10757,10 @@ function rollbackFailedError(restoreErr, rollbackErr, { swapped, rolledBack, rol
       + `to ${DB_PATH} (and delete ${DB_PATH}-wal and ${DB_PATH}-shm if they exist), then start Yuvomi again.`
     );
   } else if (swapped && !rolledBack) {
-    lines.push(`There was no database at ${DB_PATH} before this restore. Restart Yuvomi.`);
+    lines.push(
+      `There was no database at ${DB_PATH} before this restore, and the restored one does not start. `
+      + `Delete ${DB_PATH} (with ${DB_PATH}-wal and ${DB_PATH}-shm) to start as a fresh instance, or restore another backup.`
+    );
   } else if (rolledBack) {
     lines.push(`The database from before the restore is back at ${DB_PATH}, but it could not be opened again. Restart Yuvomi.`);
   } else {

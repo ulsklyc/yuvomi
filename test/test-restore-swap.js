@@ -23,7 +23,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, writeFileSync, chmodSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, chmodSync, copyFileSync, linkSync, symlinkSync } from 'node:fs';
 import fsp from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -591,10 +591,11 @@ function runComposeRestore(backupPath, dbPath, { killMidCopy = false } = {}) {
       '  kill -9 $PPID',
       '  exit 1',
       'fi',
-      'exec /bin/cp "$@"',
+      'PATH="$SWAP_ORIG_PATH" exec cp "$@"',
       '',
     ].join('\n'));
     chmodSync(shim, 0o755);
+    env.SWAP_ORIG_PATH = process.env.PATH;
     env.PATH = `${shimDir}:${process.env.PATH}`;
     env.SWAP_BACKUP = backupPath;
   }
@@ -638,4 +639,136 @@ test('#1431 der dokumentierte Compose-Restore: ein vollstaendiger Lauf tauscht e
   assert.equal(rollbacks.length, 1, `eine Rollback-Kopie: ${names.join(', ')}`);
   assert.equal(inspect(join(target.dir, rollbacks[0]), null).note, 'vor dem Restore');
   assert.deepEqual(names.filter((name) => name.includes('.restore-tmp') || name.endsWith('.partial')), []);
+});
+
+// ---------------------------------------------------------------------------
+// Vierte Runde #1431
+// ---------------------------------------------------------------------------
+
+function hasNote(filePath, note) {
+  let handle;
+  try {
+    handle = openWith(filePath, null);
+    return Boolean(handle.prepare('SELECT 1 FROM restore_probe WHERE note = ?').get(note));
+  } catch (err) {
+    return err.code ?? err.message;
+  } finally {
+    handle?.close();
+  }
+}
+
+test('#1431 der dokumentierte Compose-Restore behaelt das Write-Ahead-Log bei der Rollback-Kopie', async () => {
+  // `docker compose stop` ohne Checkpoint: die letzte Transaktion steht nur im -wal.
+  const laufend = join(tempDir('yuvomi-test-swap-'), 'laufend.db');
+  const mod = await bootDb(laufend, null);
+  mod.get().exec('CREATE TABLE restore_probe (note TEXT)');
+  mod.get().prepare('INSERT INTO restore_probe (note) VALUES (?)').run('vor dem Restore');
+  mod.get().pragma('wal_checkpoint(TRUNCATE)');
+  mod.get().pragma('wal_autocheckpoint = 0');
+  mod.get().prepare('INSERT INTO restore_probe (note) VALUES (?)').run('letzte Zeile');
+  const dir = tempDir('yuvomi-test-swap-');
+  const dbPath = join(dir, 'yuvomi.db');
+  for (const suffix of ['', '-wal', '-shm']) copyFileSync(`${laufend}${suffix}`, `${dbPath}${suffix}`);
+  mod.get().close();
+  const nurHauptdatei = join(tempDir('yuvomi-test-swap-'), 'nur-haupt.db');
+  copyFileSync(dbPath, nurHauptdatei);
+  assert.notEqual(hasNote(nurHauptdatei, 'letzte Zeile'), true, 'Vorbedingung: ohne das -wal fehlt die letzte Zeile');
+
+  const backupPath = await bigBackup(null, 'aus dem Backup');
+  const run = runComposeRestore(backupPath, dbPath);
+  assert.equal(run.status, 0, `der Befehl muss gelingen: ${run.stderr}`);
+  assert.equal(sha256(dbPath), sha256(backupPath), 'DB_PATH ist das Backup');
+  const rollback = readdirSync(dir).find((name) => IS_ROLLBACK_COPY.test(name) && !name.endsWith('-wal'));
+  assert.ok(rollback, `eine Rollback-Kopie: ${readdirSync(dir).join(', ')}`);
+  assert.equal(
+    hasNote(join(dir, rollback), 'letzte Zeile'),
+    true,
+    `die Rollback-Kopie traegt auch, was nur im -wal stand: ${readdirSync(dir).join(', ')}`
+  );
+});
+
+test('#1431 scheitert die Rollback-Kopie und dann das Aufraeumen, wird die alte Datenbank trotzdem wieder geoeffnet', async () => {
+  const backupPath = await bigBackup(KEY, 'aus dem Backup');
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  const realCopyFile = fsp.copyFile;
+  const realUnlink = fsp.unlink;
+  let stagingUnlinks = 0;
+  fsp.copyFile = async (src, dest, mode) => {
+    // Die Rollback-Kopie: nach db.close(), vor dem Tausch.
+    if (String(src) === target.dbPath) {
+      throw Object.assign(new Error('ENOSPC: no space left on device, copyfile'), { code: 'ENOSPC' });
+    }
+    return realCopyFile(src, dest, mode);
+  };
+  fsp.unlink = async (filePath) => {
+    if (String(filePath).includes('.restore-tmp-') && ++stagingUnlinks > 1) {
+      throw Object.assign(new Error('EACCES: permission denied, unlink'), { code: 'EACCES' });
+    }
+    return realUnlink(filePath);
+  };
+  try {
+    await assert.rejects(
+      () => target.mod.restoreFromFile(backupPath),
+      (err) => {
+        assert.match(err.message, /^ENOSPC/, `der urspruengliche Fehler: ${err.message}`);
+        return true;
+      }
+    );
+  } finally {
+    fsp.copyFile = realCopyFile;
+    fsp.unlink = realUnlink;
+  }
+  assert.ok(stagingUnlinks > 1, 'Vorbedingung: der Fehlerpfad wollte die Arbeitsdatei wegraeumen');
+  assert.equal(
+    target.mod.get().prepare('SELECT note FROM restore_probe').get()?.note,
+    'vor dem Restore',
+    'die alte Datenbank ist wieder offen'
+  );
+  target.mod.get().close();
+});
+
+for (const art of ['derselbe Pfad', 'harter Link', 'Symlink']) {
+  test(`#1431 die laufende Datenbank auf sich selbst zurueckspielen wird abgelehnt (${art})`, async () => {
+    const target = await frozenTarget(KEY, 'vor dem Restore');
+    // Nur im -wal: ohne Ablehnung haengte das rename den Stand davor ein.
+    target.mod.get().pragma('wal_autocheckpoint = 0');
+    target.mod.get().prepare('UPDATE restore_probe SET note = ?').run('nur im wal');
+    let source = target.dbPath;
+    if (art === 'harter Link') {
+      source = join(tempDir('yuvomi-test-swap-'), 'link.db');
+      linkSync(target.dbPath, source);
+    } else if (art === 'Symlink') {
+      source = join(tempDir('yuvomi-test-swap-'), 'symlink.db');
+      symlinkSync(target.dbPath, source);
+    }
+    await assert.rejects(
+      () => target.mod.restoreFromFile(source),
+      /is the active database itself \(DB_PATH\).*Nothing on this instance was changed/s
+    );
+    assert.equal(target.mod.get().prepare('SELECT note FROM restore_probe').get()?.note, 'nur im wal');
+    assert.deepEqual(readdirSync(target.dir).filter((name) => name.includes('.pre-restore-')), [], 'keine Rollback-Kopie');
+    target.mod.get().close();
+  });
+}
+
+test('#1431 Klartext-Backup mit kaputter Schemaseite: backup_corrupt statt „not a valid Yuvomi database"', async () => {
+  const backupPath = await bigBackup(null, 'aus dem Backup');
+  const kaputt = join(tempDir('yuvomi-test-swap-'), 'kaputt.db');
+  const bytes = Buffer.from(readFileSync(backupPath));
+  // Kopf (100 Byte) heil, der Rest von Seite 1 - der sqlite_master-Seite - Muell.
+  bytes.fill(0x41, 100, PAGE);
+  writeFileSync(kaputt, bytes);
+  const probe = openWith(kaputt, null);
+  let code;
+  try { probe.prepare('SELECT count(*) FROM sqlite_master').get(); } catch (err) { code = err.code; }
+  probe.close();
+  assert.match(String(code), /^SQLITE_CORRUPT/, 'Vorbedingung: schon das Lesen von sqlite_master scheitert mit CORRUPT');
+
+  const target = await frozenTarget(null, 'vor dem Restore');
+  await assert.rejects(
+    () => target.mod.restoreFromFile(kaputt),
+    (err) => err.reason === 'backup_corrupt' && /Nothing on this instance was changed/.test(err.message)
+  );
+  assertUntouched(target, 'vor dem Restore');
+  target.mod.get().close();
 });
