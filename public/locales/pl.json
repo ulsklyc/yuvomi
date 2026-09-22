@@ -5483,8 +5483,7 @@
         "confirmSelection": "Dodaj wybrane",
         "openAction": "Otwórz {{name}}",
         "limitReached": "Maksymalnie dokumentów: {{count}}.",
-        "limitReached_one": "Maksymalnie dokumentów: {{count}}.",
-        "presentHidden": "Dołączony"
+        "limitReached_one": "Maksymalnie dokumentów: {{count}}."
     },
     "join": {
         "title": "Skonfiguruj konto",

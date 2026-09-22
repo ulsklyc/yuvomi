@@ -5483,8 +5483,7 @@
         "confirmSelection": "افزودن انتخاب‌شده‌ها",
         "openAction": "باز کردن {{name}}",
         "limitReached": "حداکثر {{count}} سند.",
-        "limitReached_one": "حداکثر {{count}} سند.",
-        "presentHidden": "پیوست شده"
+        "limitReached_one": "حداکثر {{count}} سند."
     },
     "join": {
         "title": "راه‌اندازی حساب",

@@ -5483,8 +5483,7 @@
         "confirmSelection": "添加所选",
         "openAction": "打开 {{name}}",
         "limitReached": "最多 {{count}} 份文档。",
-        "limitReached_one": "最多 {{count}} 份文档。",
-        "presentHidden": "已附上"
+        "limitReached_one": "最多 {{count}} 份文档。"
     },
     "join": {
         "title": "设置你的账户",

@@ -5483,8 +5483,7 @@
         "confirmSelection": "Додати вибрані",
         "openAction": "Відкрити {{name}}",
         "limitReached": "Не більше ніж {{count}} документів.",
-        "limitReached_one": "Не більше ніж {{count}} документ.",
-        "presentHidden": "Додано"
+        "limitReached_one": "Не більше ніж {{count}} документ."
     },
     "join": {
         "title": "Налаштування облікового запису",

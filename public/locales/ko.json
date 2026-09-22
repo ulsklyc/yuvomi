@@ -5483,8 +5483,7 @@
         "confirmSelection": "선택 항목 추가",
         "openAction": "{{name}} 열기",
         "limitReached": "문서는 최대 {{count}}개입니다.",
-        "limitReached_one": "문서는 최대 {{count}}개입니다.",
-        "presentHidden": "첨부됨"
+        "limitReached_one": "문서는 최대 {{count}}개입니다."
     },
     "join": {
         "title": "계정 설정",

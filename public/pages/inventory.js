@@ -952,19 +952,16 @@ function photoDetailNode(photoData) {
 /**
  * Die Belege fuer die Detailansicht. Sie gehoeren dem Dokumente-Modul: bei
  * `documents: none` gibt es keine Zeile, jeder Link ginge ins 403 (dieselbe
- * Antwort wie attachmentLinksNode in components/document-attach.js). Einen
- * Beleg, den der Server nicht nennt (#1358: `document_id` null, kein Name),
- * zeigt die Zeile einmal als "Vorhanden" statt als Link auf `/documents/null`.
+ * Antwort wie attachmentLinksNode in components/document-attach.js). Ohne
+ * Leserecht kommt vom Server `attachments: null` (#1358) - dann gibt es keine
+ * Zeile und keinen Hinweis; eine Zeile ohne ID wird nie zum Link.
  */
 function attachmentDetailEntries(attachments) {
   if (pathAccess('/documents') === 'none') return [];
-  const list = (attachments || []).filter(Boolean);
-  const entries = list.filter((doc) => doc.document_id).map((doc) => ({
+  return (attachments || []).filter((doc) => doc?.document_id).map((doc) => ({
     text: doc.name || doc.original_name || '',
     href: `/api/v1/documents/${Number(doc.document_id)}/preview`,
   }));
-  if (entries.length < list.length) entries.unshift({ text: t('documentAttach.presentHidden') });
-  return entries;
 }
 
 /**

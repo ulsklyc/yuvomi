@@ -72,6 +72,9 @@ app.use((req, _res, next) => {
   // cookieSession: eine Sitzung, die neben einem API-Token mitkommt - requireAuth
   // setzt authUserId/authRole dann aus dem Token, req.session bleibt die Sitzung.
   req.session = actor.cookieSession ?? { userId: actor.id, role: actor.role };
+  // Modulrechte und Token-Scope fuer die Dokumentenrecht-Faelle (#1358).
+  req.sessionModuleAccess = actor.moduleAccess ?? null;
+  req.authScopes = actor.authScopes ?? null;
   next();
 });
 app.use(express.json({ limit: '10mb' }));
@@ -3574,4 +3577,78 @@ test('PUT / — eine Serie mit eigener Zone wird an ihrem Ortstag geprueft', asy
     recurrence_rule: 'FREQ=MONTHLY;BYMONTHDAY=-1;UNTIL=20260220',
   } });
   assert.equal(res2.status, 400, `ohne Zone erwartet 400, bekommen ${res2.status}`);
+});
+
+// ── Anhang folgt dem Dokumentenrecht (#1358) ──────────────────────────────────
+// Ein Termin-Anhang liegt als Dokument im Dokumente-Modul. Wer dort nichts
+// sehen darf - Mitgliedsrecht `documents: none`, ein Token ohne documents:read
+// oder ein Dokument, das inzwischen privat ist -, bekommt den Anhang nicht:
+// ID, Vorschau- und Download-URL, Name, Typ und Groesse sind `null`, auf jedem
+// Leseweg des Kalenders.
+test('Anhang: ohne Dokumentenrecht oder Sicht aufs Dokument nennt der Termin ihn nicht (#1358)', async () => {
+  // Zehn Tage voraus in der Haushaltszone: im 90-Tage-Fenster von /upcoming.
+  const { todayKey, shiftDateKey } = await import('../server/utils/timezone.js');
+  const day = shiftDateKey(todayKey(db), 10);
+  const dataUrl = `data:text/plain;base64,${Buffer.from('Geheimer Anhang').toString('base64')}`;
+  const created = await call('POST', '/', { actor: ADMIN, body: {
+    title: 'Qzxanhangsrecht', start_datetime: `${day}T09:00`,
+    attachment_data: dataUrl, attachment_name: 'vertrag.txt',
+  } });
+  assert.equal(created.status, 201);
+  const eventId = created.body.data.id;
+  const docId = created.body.data.attachment_document_id;
+  assert.ok(docId);
+
+  const attachmentFields = (event) => ({
+    attachment_document_id: event.attachment_document_id,
+    attachment_preview_url: event.attachment_preview_url,
+    attachment_download_url: event.attachment_download_url,
+    attachment_name: event.attachment_name,
+    attachment_mime: event.attachment_mime,
+    attachment_size: event.attachment_size,
+    attachment_data: event.attachment_data,
+  });
+  const shown = {
+    attachment_document_id: docId,
+    attachment_preview_url: `/api/v1/documents/${docId}/preview`,
+    attachment_download_url: `/api/v1/documents/${docId}/download`,
+    attachment_name: 'vertrag.txt',
+    attachment_mime: 'text/plain',
+    attachment_size: Buffer.byteLength('Geheimer Anhang'),
+    attachment_data: null,
+  };
+  const hidden = Object.fromEntries(Object.keys(shown).map((key) => [key, null]));
+
+  // Jeder Leseweg: Einzelabruf, Fenster, anstehend, Suche.
+  const readAll = async (actor) => {
+    const one = await call('GET', `/${eventId}`, { actor });
+    const range = await call('GET', `/?from=${day}&to=${shiftDateKey(day, 1)}`, { actor });
+    const upcoming = await call('GET', '/upcoming?limit=20', { actor });
+    const search = await call('GET', `/search?q=${encodeURIComponent('Qzxanhangsrecht')}`, { actor });
+    for (const res of [one, range, upcoming, search]) assert.equal(res.status, 200);
+    const pick = (list) => list.find((event) => event.id === eventId);
+    return [['GET /:id', one.body.data], ['GET /', pick(range.body.data)],
+      ['GET /upcoming', pick(upcoming.body.data)], ['GET /search', pick(search.body.data)]]
+      .map(([path, event]) => { assert.ok(event, `Termin ist in ${path} da`); return attachmentFields(event); });
+  };
+
+  const NONE = { ...MARIA, moduleAccess: { documents: 'none' } };
+  const TOKEN = { ...MARIA, authScopes: ['calendar:read'] };
+  const TOKEN_DOCS = { ...MARIA, authScopes: ['calendar:read', 'documents:read'] };
+
+  for (const fields of await readAll(MARIA)) assert.deepEqual(fields, shown, 'mit Dokumentenrecht bleibt der Anhang');
+  for (const fields of await readAll({ ...MARIA, moduleAccess: { documents: 'read' } })) assert.deepEqual(fields, shown);
+  for (const fields of await readAll(TOKEN_DOCS)) assert.deepEqual(fields, shown, 'Token mit documents:read');
+  for (const fields of await readAll(NONE)) assert.deepEqual(fields, hidden, 'documents: none sieht keinen Anhang');
+  for (const fields of await readAll(TOKEN)) assert.deepEqual(fields, hidden, 'Token ohne documents:read ebenso');
+
+  // Das Dokument selbst wird privat: der Termin bleibt fuer alle sichtbar,
+  // der Anhang nur fuer den, der das Dokument sieht.
+  db.prepare("UPDATE family_documents SET visibility = 'private' WHERE id = ?").run(docId);
+  for (const fields of await readAll(MARIA)) assert.deepEqual(fields, hidden, 'privates Dokument einer anderen Person');
+  for (const fields of await readAll(ADMIN)) assert.deepEqual(fields, shown, 'wer es angelegt hat, sieht es weiter');
+
+  // Die verdeckten Antworten nennen die Nummer nirgends, auch nicht in einer URL.
+  const raw = await call('GET', `/${eventId}`, { actor: NONE });
+  assert.doesNotMatch(JSON.stringify(raw.body), new RegExp(`/documents/${docId}/`));
 });

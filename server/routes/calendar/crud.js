@@ -20,6 +20,7 @@ import {
 import { queueEventDeletion, markEventOutbound, flushOutbound } from '../../services/calendar-outbound.js';
 import { SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN } from '../../services/calendar-events.js';
 import { newNonMembers, nonMemberMessage } from '../../services/household-members.js';
+import { documentViewer } from '../../services/document-links.js';
 import {
   assertSuccessorHasOccurrence,
   baseOccurrenceFor,
@@ -351,6 +352,7 @@ router.get('/:id', (req, res) => {
     const database = db.get();
     const resolved = resolveProjectedEventRows(database, [event])[0];
     res.json({ data: serializeEvent(resolved, {
+      viewer: documentViewer(req),
       database,
       actorId: getUserId(req),
       isAdmin: isAdminUser(req),
@@ -507,6 +509,7 @@ router.post('/', async (req, res) => {
     `).get(eventId);
 
     res.status(201).json({ data: serializeEvent(event, {
+      viewer: documentViewer(req),
       database: db.get(),
       actorId: getUserId(req),
       isAdmin: isAdminUser(req),
@@ -1043,6 +1046,7 @@ router.put('/:id', async (req, res) => {
     `).get(id);
 
     res.json({ data: serializeEvent(updated, {
+      viewer: documentViewer(req),
       database: db.get(),
       actorId: getUserId(req),
       isAdmin: isAdminUser(req),
@@ -1199,6 +1203,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
 
     res.json({
       data: serializeEvent(result.event, {
+        viewer: documentViewer(req),
         database: db.get(),
         actorId,
         isAdmin,
@@ -1387,6 +1392,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
     stagedUpload = null;
     res.status(result.wholeSeries ? 200 : 201).json({
       data: serializeEvent(result.series, {
+        viewer: documentViewer(req),
         database: db.get(),
         actorId,
         isAdmin,

@@ -5483,8 +5483,7 @@
         "confirmSelection": "Idagdag ang napili",
         "openAction": "Buksan ang {{name}}",
         "limitReached": "Hanggang {{count}} dokumento lang.",
-        "limitReached_one": "Hanggang {{count}} dokumento lang.",
-        "presentHidden": "Nakalakip"
+        "limitReached_one": "Hanggang {{count}} dokumento lang."
     },
     "join": {
         "title": "I-set up ang iyong account",

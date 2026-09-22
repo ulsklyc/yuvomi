@@ -6,6 +6,7 @@
 
 import { StorageError } from '../../services/document-storage.js';
 import { ensureModuleFolder } from '../../services/document-folders.js';
+import { filterVisibleDocumentIds } from '../../services/document-access.js';
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../../utils/upload-limit.js';
 import { contentMatchesMime } from '../../utils/file-signature.js';
 import { isAdminRequest } from '../../middleware/require-admin.js';
@@ -370,7 +371,22 @@ export function serializeEvent(event, context = null) {
     overridden_fields,
     ...rest
   } = event;
-  const documentId = event.attachment_document_id ?? null;
+  // DER ANHANG IST EIN DOKUMENT UND FOLGT DEM DOKUMENTENRECHT (#1358). Seit
+  // er im Dokumente-Modul liegt, nannte der Termin dessen ID, Name und
+  // Vorschau-URL jedem, der den Termin sieht - auch mit `documents: none`,
+  // einem Token ohne documents:read oder wenn das Dokument selbst inzwischen
+  // privat ist. Wer es nicht sehen darf, bekommt keinen Anhang: ID, URLs,
+  // Name, Typ und Groesse sind `null`, der Client zeigt dann nichts. Ohne
+  // `context.viewer` (documentViewer(req)) gilt dieselbe verdeckte Form - ein
+  // Aufrufer, der ihn vergisst, leakt nichts. Ein alter Inline-Anhang ohne
+  // Dokument gehoert dem Termin und bleibt.
+  const storedDocumentId = event.attachment_document_id ?? null;
+  const visibleDocumentIds = context?.visibleAttachmentDocumentIds
+    ?? visibleAttachmentDocumentIds([event], context);
+  const documentId = storedDocumentId != null && visibleDocumentIds.has(Number(storedDocumentId))
+    ? storedDocumentId
+    : null;
+  const documentHidden = storedDocumentId != null && documentId == null;
   const metadata = recurrenceMetadata(event, context);
   return {
     ...rest,
@@ -381,8 +397,9 @@ export function serializeEvent(event, context = null) {
       name_day: name_day ?? null,
     } : {}),
     assigned_users,
+    ...(documentHidden ? { attachment_name: null, attachment_mime: null, attachment_size: null } : {}),
     attachment_document_id: documentId,
-    attachment_data: documentId ? null : attachmentDataUrl(event),
+    attachment_data: storedDocumentId ? null : attachmentDataUrl(event),
     attachment_preview_url: documentId
       ? `/api/v1/documents/${documentId}/preview`
       : null,
@@ -394,6 +411,19 @@ export function serializeEvent(event, context = null) {
   };
 }
 
+/**
+ * Die Anhang-Dokumente dieser Termine, die `context.viewer` sehen darf: das
+ * Dokumente-Modul lesen (Mitgliedsrecht und Token-Scope) UND das einzelne
+ * Dokument sehen. Eine Abfrage fuer die ganze Liste.
+ * @returns {Set<number>}
+ */
+function visibleAttachmentDocumentIds(events, context) {
+  const viewer = context?.viewer;
+  if (!context?.database || viewer?.readsDocuments !== true) return new Set();
+  const ids = events.map((event) => event?.attachment_document_id).filter((id) => id != null);
+  return new Set(filterVisibleDocumentIds(context.database, ids, viewer.userId));
+}
+
 /** Serializes a result set with one capability classification per master. */
 export function serializeEvents(events, context) {
   if (!Array.isArray(events) || events.length === 0) return [];
@@ -403,7 +433,11 @@ export function serializeEvents(events, context) {
     events,
     { actorId: context.actorId ?? null },
   );
-  const bulkContext = { ...context, capabilitiesBySeriesId };
+  const bulkContext = {
+    ...context,
+    capabilitiesBySeriesId,
+    visibleAttachmentDocumentIds: visibleAttachmentDocumentIds(events, context),
+  };
   return events.map((event) => serializeEvent(event, bulkContext));
 }
 
