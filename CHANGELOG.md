@@ -137,6 +137,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An account created at the first single sign-on now gets its contact entry.** Every other way of
+  adding a household member - an invitation, the first setup, an admin creating the account - also
+  creates the member's contact, which holds the e-mail address the household uses, for example to
+  send a shopping list. An account created by the first OIDC sign-in had none. It now gets one with
+  its name and, if the identity provider marks the address as verified (`email_verified`), that
+  e-mail address. No picture, no birth date and no phone number are taken over, and later sign-ins
+  change nothing, so edits made in Yuvomi stay. (#1357)
+
 - **"To shopping list" only appears where it can work.** Since 2.68.0, sending ingredients from
   the kitchen to the shopping list needs permission to change the shopping list, and taking over
   the meal plan from inside the shopping list needs permission to change the meal plan. The buttons
@@ -144,11 +152,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   meal, the "To shopping list" button in a recipe and the transfer section in the meal dialog, and
   one who may only view the meal plan still saw "Import meal plan" in the list menu - each of them
   ended in an error. They are now left out for anyone who lacks the permissions the action needs.
+
 - **A family member who may only view the meal plan can put a recipe on the shopping list.**
   Sending a recipe's ingredients to the shopping list only reads the recipe, so it now needs
   permission to view the meal plan and to change the shopping list, for members and for API tokens
   alike. Sending a planned meal still needs permission to change the meal plan, because it marks
   the meal's ingredients as transferred.
+
 - **Deleting a folder no longer reveals activity on documents you cannot see.** Before deleting a
   folder the app asks the server what the deletion would affect and sends that answer back with the
   deletion, so nothing changes unnoticed in between. That answer was built over every document in

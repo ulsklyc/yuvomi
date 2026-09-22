@@ -206,17 +206,20 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/):
 **Examples:**
 
 ```
-feat(meals): add drag & drop between day slots
-fix(calendar): handle timezone offset in recurring events
-docs(readme): add Apple CalDAV setup instructions
-refactor(auth): extract session validation into middleware
-test(budget): add CSV export edge cases
-chore: update helmet to 8.3
+feat(auth): sessions slide for 90 days, re-dated every 12 h
+fix(health): a dose posted as taken without a time gets "now"
+fix(tasks): filter panel stays closable on the phone
+docs: calendar sync carries no reminders
+fix(api): birthdays refuse invalid reminder fields
+chore(deps): bump puppeteer to 25.11.0
 ```
 
 **Rules:**
 
-- Subject line: imperative mood, lowercase, no period, max 72 characters
+- Subject line: says what is true after the change, from the reader's side ("a dose posted as taken gets
+  now"), not an order to the code ("set taken_at"); lowercase, no period, max 72 characters. It is what
+  the release notes and the CHANGELOG are written from, so it names the effect, not the edit. Automated
+  commits (Dependabot's "bump ...") keep their own form.
 - Body (optional): explain *why*, not *what* - the diff shows the what
 - One logical change per commit - don't mix features with formatting
 
