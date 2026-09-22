@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **API clients can fill only the empty slots of the meal plan.** `POST /api/v1/meals/apply-plan`
+  takes a new option `skip_occupied: true`. An assignment whose date and meal type already hold a
+  meal is then left out instead of being added next to it, and the answer lists it in `skipped` as
+  `{ index, date, meal_type, reason: "occupied" }`, where `index` is its position in `assignments`,
+  so an importer such as a Mealie meal-plan sync knows what did not land. A weekly recurring meal
+  occupies its slot even in a week nobody has opened yet, up to and including its last day; an
+  occurrence that was deleted or moved away does not. "Occupied" means before the call, so several
+  assignments for the same empty slot are all created. The option has to be a JSON boolean, and
+  combining it with `replace_existing` is refused with `400`. Without the option the endpoint
+  behaves and answers exactly as before. (Discussion #1380)
 - **Every done task on the board can be archived in one action.** The "Done" column of the board
   now has an archive button next to its count. After a confirmation it moves the done tasks the
   column currently shows into the archive - the ones it shows, so a task someone else completes

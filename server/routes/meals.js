@@ -100,7 +100,17 @@ function createMealRecord({ date, meal_type, title, notes, recipe_url, recipe_id
   return loadMealWithIngredients(result.lastInsertRowid);
 }
 
-function materializeRecurringMeals(from, to) {
+/**
+ * Die Vorkommen von Wochenserien im Zeitraum from..to (einschliesslich), die
+ * noch keine Zeile haben und angelegt werden muessten: `[{ template, date }]`,
+ * nach Vorlage und Datum sortiert. EINE Regel fuer den Materialisierer und fuer
+ * die Belegt-Pruefung von apply-plan - eine Kopie liefe beim naechsten
+ * Randfall (Serienende, Ausnahme) still auseinander. Ein Vorkommen faellt weg,
+ * wenn eine Ausnahme es streicht (geloescht oder weggeschoben) oder die Serie
+ * an dem Tag schon eine Zeile hat; die zaehlt dann selbst, mit ihrem heutigen
+ * meal_type. Liest nur.
+ */
+function pendingOccurrences(from, to) {
   const templates = db.get().prepare(`
     SELECT *
     FROM meal_recurrence_templates
@@ -108,20 +118,55 @@ function materializeRecurringMeals(from, to) {
       AND (end_date IS NULL OR end_date >= ?)
     ORDER BY id ASC
   `).all(to, from);
+  if (!templates.length) return [];
 
-  if (!templates.length) return;
+  const hasException = db.get().prepare(`
+    SELECT 1
+    FROM meal_recurrence_exceptions
+    WHERE template_id = ? AND date = ?
+  `);
+  const hasMeal = db.get().prepare(`
+    SELECT 1
+    FROM meals
+    WHERE recurrence_template_id = ? AND date = ?
+  `);
+  const pending = [];
+  for (const template of templates) {
+    if (!VALID_WEEKDAYS.includes(template.weekday)) continue;
+    for (const date of datesForTemplateInRange(template, from, to)) {
+      if (hasException.get(template.id, date) || hasMeal.get(template.id, date)) continue;
+      pending.push({ template, date });
+    }
+  }
+  return pending;
+}
+
+/**
+ * Pruefer fuer apply-plan mit skip_occupied: ist der Slot (date + meal_type)
+ * belegt? Belegt heisst: eine gespeicherte Mahlzeit ODER ein Vorkommen einer
+ * Wochenserie, das `materializeRecurringMeals` beim Aufschlagen der Woche
+ * anlegen wuerde. Vorkommen existieren erst als Zeile, wenn jemand die Woche
+ * geladen hat; ein Import in eine nie geoeffnete Woche saehe sonst einen leeren
+ * Slot, den die Serie beim ersten Blick daneben fuellt. Fragt die Serien je
+ * DISTINKTEM Datum ab, nie ueber einen Bereich zwischen den Zuweisungen - die
+ * Daten kommen vom API-Aufrufer, min..max waere eine Tagesschleife nach seiner
+ * Wahl.
+ */
+function slotOccupancyChecker() {
+  const hasMeal = db.get().prepare('SELECT 1 FROM meals WHERE date = ? AND meal_type = ? LIMIT 1');
+  const pendingByDate = new Map();
+  return (date, mealType) => {
+    if (hasMeal.get(date, mealType)) return true;
+    if (!pendingByDate.has(date)) pendingByDate.set(date, pendingOccurrences(date, date));
+    return pendingByDate.get(date).some((occurrence) => occurrence.template.meal_type === mealType);
+  };
+}
+
+function materializeRecurringMeals(from, to) {
+  const pending = pendingOccurrences(from, to);
+  if (!pending.length) return;
 
   const createMeals = db.get().transaction(() => {
-    const hasException = db.get().prepare(`
-      SELECT 1
-      FROM meal_recurrence_exceptions
-      WHERE template_id = ? AND date = ?
-    `);
-    const hasMeal = db.get().prepare(`
-      SELECT 1
-      FROM meals
-      WHERE recurrence_template_id = ? AND date = ?
-    `);
     const templateIngredients = db.get().prepare(`
       SELECT name, quantity, category
       FROM meal_recurrence_ingredients
@@ -133,23 +178,22 @@ function materializeRecurringMeals(from, to) {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    for (const template of templates) {
-      if (!VALID_WEEKDAYS.includes(template.weekday)) continue;
-      const ingredients = templateIngredients.all(template.id);
-      for (const date of datesForTemplateInRange(template, from, to)) {
-        if (hasException.get(template.id, date) || hasMeal.get(template.id, date)) continue;
-        const result = insertMeal.run(
-          date,
-          template.meal_type,
-          template.title,
-          template.notes,
-          template.recipe_url,
-          template.recipe_id,
-          template.id,
-          template.created_by
-        );
-        insertMealIngredients(result.lastInsertRowid, ingredients);
+    const ingredientsByTemplate = new Map();
+    for (const { template, date } of pending) {
+      if (!ingredientsByTemplate.has(template.id)) {
+        ingredientsByTemplate.set(template.id, templateIngredients.all(template.id));
       }
+      const result = insertMeal.run(
+        date,
+        template.meal_type,
+        template.title,
+        template.notes,
+        template.recipe_url,
+        template.recipe_id,
+        template.id,
+        template.created_by
+      );
+      insertMealIngredients(result.lastInsertRowid, ingredientsByTemplate.get(template.id));
     }
   });
 
@@ -376,10 +420,28 @@ router.post('/', (req, res) => {
   }
 });
 
+/**
+ * POST /api/v1/meals/apply-plan
+ * Body: { assignments, replace_existing?, skip_occupied? }
+ * Ohne Option additiv; replace_existing leert die genannten Slots zuerst;
+ * skip_occupied legt nur in Slots an, die vor dem Aufruf leer waren
+ * (Discussion #1380), und nennt die uebrigen in `skipped`.
+ * Response: 201 { data: Meal[] } bzw. mit skip_occupied { data, skipped }
+ */
 router.post('/apply-plan', (req, res) => {
   try {
     const assignments = Array.isArray(req.body.assignments) ? req.body.assignments : [];
     const replaceExisting = req.body.replace_existing === true;
+    // skip_occupied ist neu und von Anfang an streng: ein "true" als String
+    // liefe sonst still im additiven Modus und fuellte belegte Slots doppelt.
+    // replace_existing bleibt, wie es war (`=== true`), sonst bricht ein Client.
+    if (req.body.skip_occupied !== undefined && typeof req.body.skip_occupied !== 'boolean') {
+      return res.status(400).json({ error: 'skip_occupied muss true oder false sein.', code: 400 });
+    }
+    const skipOccupied = req.body.skip_occupied === true;
+    if (replaceExisting && skipOccupied) {
+      return res.status(400).json({ error: 'skip_occupied und replace_existing schliessen sich aus.', code: 400 });
+    }
     if (!assignments.length) {
       return res.status(400).json({ error: 'Mindestens eine Mahlzeit ist erforderlich.', code: 400 });
     }
@@ -413,8 +475,24 @@ router.post('/apply-plan', (req, res) => {
       if (!recipeExists) return res.status(400).json({ error: 'Rezept nicht gefunden.', code: 400 });
     }
 
+    const skipped = [];
     const created = db.transaction(() => {
       const actorId = req.authUserId || req.session.userId;
+      if (skipOccupied) {
+        // "Besetzt" zaehlt gegen den Stand VOR dem Aufruf: erst alle Slots
+        // pruefen, dann schreiben. Mehrere Zuweisungen fuer denselben vorher
+        // leeren Slot landen damit alle, wie im additiven Standardmodus.
+        const isOccupied = slotOccupancyChecker();
+        const occupied = new Map();
+        const toCreate = prepared.filter((assignment, index) => {
+          const slot = `${assignment.date}\u0000${assignment.meal_type}`;
+          if (!occupied.has(slot)) occupied.set(slot, isOccupied(assignment.date, assignment.meal_type));
+          if (!occupied.get(slot)) return true;
+          skipped.push({ index, date: assignment.date, meal_type: assignment.meal_type, reason: 'occupied' });
+          return false;
+        });
+        return toCreate.map((assignment) => createMealRecord(assignment, actorId));
+      }
       if (replaceExisting) {
         const slots = [...new Set(prepared.map((assignment) => `${assignment.date}\u0000${assignment.meal_type}`))];
         const selectMeals = db.get().prepare('SELECT * FROM meals WHERE date = ? AND meal_type = ? ORDER BY id ASC');
@@ -428,7 +506,8 @@ router.post('/apply-plan', (req, res) => {
       return prepared.map((assignment) => createMealRecord(assignment, actorId));
     });
 
-    res.status(201).json({ data: created });
+    // `skipped` nur im neuen Modus: ohne die Option bleibt die Antwort, wie sie war.
+    res.status(201).json(skipOccupied ? { data: created, skipped } : { data: created });
   } catch (err) {
     log.error('POST /apply-plan', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
