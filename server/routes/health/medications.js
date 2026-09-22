@@ -383,10 +383,17 @@ router.post('/medications/:id/logs', (req, res) => {
     const errors = v.collectErrors(checks);
     if (errors.length) return badRequest(res, errors);
 
+    // Wie /take und PATCH: eine genommene Dosis ohne Zeit bekommt "jetzt" als
+    // Wanduhrzeit des Haushalts. NULL neben `taken` waere eine Einnahme ohne
+    // Einnahmezeit - im CSV-Export stuende die Spalte leer, und die Anzeige
+    // muesste auf `created_at` ausweichen, einen UTC-Instant.
+    const nextStatus  = status.value || 'pending';
+    const nextTakenAt = nextStatus === 'taken' ? (takenAt.value || wallClockNow()) : takenAt.value;
+
     const result = db.get().prepare(`
       INSERT INTO medication_logs (medication_id, schedule_id, scheduled_at, status, taken_at, dose_qty, note)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(medId, scheduleId, scheduledAt.value, status.value || 'pending', takenAt.value, dose.value, note.value);
+    `).run(medId, scheduleId, scheduledAt.value, nextStatus, nextTakenAt, dose.value, note.value);
 
     const row = db.get().prepare('SELECT * FROM medication_logs WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json({ data: row });

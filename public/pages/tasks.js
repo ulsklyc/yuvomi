@@ -2516,6 +2516,11 @@ function kanbanBoardHtml(cols, grouped) {
               </span>
             </button>
             <span class="kanban-col__count">${grouped[col.status].length}</span>
+            ${col.status === 'done' && grouped.done.length && !readOnly() ? `
+            <button type="button" class="btn btn--ghost btn--icon btn--icon-sm kanban-col__action" data-kanban-archive-done
+                    aria-label="${t('tasks.kanbanArchiveDone')}" title="${t('tasks.kanbanArchiveDone')}">
+              <i data-lucide="archive" class="icon-sm" aria-hidden="true"></i>
+            </button>` : ''}
           </div>
           <div class="kanban-col__body" id="${bodyId}" data-drop-zone="${col.status}"${collapsed ? ' hidden' : ''}>
             ${grouped[col.status].length
@@ -2529,6 +2534,28 @@ function kanbanBoardHtml(cols, grouped) {
       `;
       }).join('')}
     </div>`;
+}
+
+/**
+ * „Alles Erledigte ablegen" am Kopf der Erledigt-Spalte (#1250).
+ *
+ * Es gehen genau die Karten, die die Spalte gerade zeigt - samt Such- und
+ * Filtereinschraenkung -, nicht „alles mit Status erledigt" auf dem Server.
+ * Was jemand anderes erledigt, waehrend das Brett offen ist, bleibt liegen,
+ * bis es zu sehen war. Die Rueckfrage steht davor, weil der Rueckweg eine
+ * Karte nach der anderen waere.
+ */
+async function archiveDoneColumn(container) {
+  const ids = filteredTasks().filter((task) => kanbanColumnOf(task) === 'done').map((task) => task.id);
+  if (!ids.length) return;
+  const ok = await confirmModal(t('tasks.kanbanArchiveDoneConfirm'), {
+    confirmLabel: t('tasks.kanbanArchiveDoneAction'),
+  });
+  if (!ok) return;
+  await archiveTaskIds(ids, container);
+  // Die Rueckfrage gibt den Fokus beim Schliessen zurueck, das Neuzeichnen
+  // nimmt den Knopf dann weg - ohne das landete er auf document.body.
+  refocusAfterRender();
 }
 
 function wireKanbanSortable(container) {
@@ -2599,6 +2626,12 @@ function wireKanbanClicks(container) {
     if (colToggle) {
       toggleKanbanCol(colToggle.dataset.kanbanToggle);
       renderKanban(container);
+      return;
+    }
+
+    if (e.target.closest('[data-kanban-archive-done]')) {
+      if (readOnly()) return;
+      await archiveDoneColumn(container);
       return;
     }
 
@@ -4058,14 +4091,18 @@ function wireBulkActions(container) {
       return;
     }
 
+    if (action === 'bulk-archive') {
+      state.selectedTaskIds.clear();
+      updateBulkActionsBar(container);
+      await archiveTaskIds(taskIds, container);
+      return;
+    }
+
     try {
       if (action === 'bulk-mark-done' || action === 'bulk-mark-open') {
         const status = btn.dataset.status;
         await Promise.all(taskIds.map(id => api.patch(`/tasks/${id}/status`, { status })));
         window.yuvomi.showToast(t('tasks.bulkStatusChanged'), 'success');
-      } else if (action === 'bulk-archive') {
-        await Promise.all(taskIds.map(id => setTaskArchived(id, true)));
-        window.yuvomi.showToast(t('tasks.bulkArchived'), 'success');
       }
 
       state.selectedTaskIds.clear();
@@ -4075,6 +4112,43 @@ function wireBulkActions(container) {
       window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
     }
   });
+}
+
+// Server-Obergrenze von POST /tasks/archive (MAX_BULK_TASKS in
+// server/routes/tasks.js). Mehr als das schickt der Client in Teilen.
+const ARCHIVE_BATCH = 500;
+
+/**
+ * Mehrere Aufgaben ablegen - ein Aufruf je 500 IDs statt einer je Aufgabe
+ * (#1250). Die Mehrfachauswahl lief vorher als Promise.all ueber
+ * PATCH /:id/archive: bei einer gesperrten Aufgabe oder dem Ratenlimit brach
+ * sie mit einer Fehlermeldung ab und lud NICHT neu, obwohl der Rest schon
+ * abgelegt war - die Liste zeigte dann Aufgaben, die es dort nicht mehr gab.
+ *
+ * Geschickt werden die IDs, die die Ansicht zeigt, nie "alles Erledigte": was
+ * jemand anderes erledigt, nachdem die Liste gezeichnet war, bleibt liegen.
+ * Gesperrte Aufgaben ueberspringt der Server und zaehlt sie; der Toast sagt
+ * das, statt eine stille Teilausfuehrung als Erfolg zu melden. Neu geladen
+ * wird in jedem Fall, auch nach einem Fehler.
+ */
+async function archiveTaskIds(taskIds, container) {
+  let skipped = 0;
+  try {
+    for (let i = 0; i < taskIds.length; i += ARCHIVE_BATCH) {
+      const res = await api.post('/tasks/archive', { ids: taskIds.slice(i, i + ARCHIVE_BATCH) });
+      skipped += res?.data?.skipped ?? 0;
+    }
+    window.yuvomi.showToast(
+      skipped
+        ? `${t('tasks.bulkArchived')} ${t('tasks.tagsSkippedLocked', { count: skipped })}`
+        : t('tasks.bulkArchived'),
+      'success');
+  } catch (err) {
+    window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+  }
+  // Wie beim Ansichtswechsel: scheitert das Nachladen am Netz, wird wenigstens
+  // der vorhandene Bestand neu gezeichnet.
+  await loadTasks(container).catch(() => renderTaskList(container));
 }
 
 // Bulk-Delete mit Optimistic-Update + Undo-Toast — spiegelt handleDeleteTask
@@ -4783,6 +4857,10 @@ export const __test = {
   // versteckten Knoten nimmt weiter Karten an, und die verschwinden dann in
   // einer Spalte, die niemand sieht.
   wireKanbanSortable,
+  // Sammel-Ablage (#1250): die Mehrfachauswahl und der Kopf der Erledigt-
+  // Spalte, beide mit dem Aufruf, den sie absetzen - gezaehlt wird, WIE OFT
+  // sie den Server fragen, und das sieht kein Textguard.
+  wireBulkActions, archiveDoneColumn, filteredTasks,
   // Was ein Wandtablett zu sehen und zu fassen bekommt (#1209). Die Karte
   // traegt drei Wege zum selben Statuswechsel - Haken, Wisch, Teilaufgabe -,
   // und am Display darf nur der erste erscheinen, weil nur er nach der Person

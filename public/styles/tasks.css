@@ -1486,6 +1486,13 @@
 
 /* .kanban-col__title — Typografie via .nav-section-label-Schicht (Sentence-Case, Critique P2); Farbe inline (Spalten-Accent) */
 
+/* „Alles Erledigte archivieren" (#1250): steht hinter dem Zaehler und darf
+   weder schrumpfen noch den Titel verdraengen - der Titelknopf traegt flex: 1. */
+.kanban-col__action {
+  flex-shrink: 0;
+  margin-inline-start: var(--space-1);
+}
+
 .kanban-col__count {
   /* AA-lesbar (disabled/neutral-300 fiel durch — Critique) */
   font-size: var(--text-xs);

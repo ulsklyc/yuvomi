@@ -51,6 +51,7 @@ export function healthPaths() {
   // Dieselbe Regel fuer jeden Zeitstempel dieses Bereichs, deren Rumpf kein
   // eigenes Schema traegt (#1364).
   const WALL_CLOCK_INPUT = ' Timestamps (`measured_at`, `performed_at`, `consumed_at`, `scheduled_at`, `taken_at`) are household wall-clock time, stored as `YYYY-MM-DDTHH:MM`. A value without offset is taken as such; a value with `Z` or a numeric offset is read as an instant and converted into the household time zone, so the same moment sent in UTC or with a local offset lands on the same minute. Up to v2.68.0 the offset was dropped and its digits kept.';
+  const TAKEN_NOW = ' A dose that ends up `taken` without a `taken_at` gets the current minute in household wall-clock time, so no path stores `taken` without a time.';
   // Der kanonische Satz aus docs/DECISIONS.md Abschnitt 5, nicht das Paar
   // private/family der uebrigen Gesundheit. Der benannte Satz ('assignees')
   // fehlt, weil es in der Gesundheit keine Zuweisungstabelle gibt, die ihn
@@ -84,7 +85,7 @@ export function healthPaths() {
     },
     '/api/v1/health/medications/{id}/logs': {
       get: op({ summary: 'List a medication\'s dose log', tag: 'Health', params: [idParam()], description: 'Optional `from`/`to` filters on `scheduled_at`.' }),
-      post: op({ summary: 'Add a dose-log entry', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: WALL_CLOCK_INPUT.trim() }),
+      post: op({ summary: 'Add a dose-log entry', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { scheduled_at?, schedule_id?, status?, taken_at?, dose_qty?, note? }; `status` defaults to `pending`.' + TAKEN_NOW + WALL_CLOCK_INPUT }),
     },
     '/api/v1/health/logs/{id}': {
       patch: op({
@@ -93,7 +94,7 @@ export function healthPaths() {
         params: [idParam()],
         stateChanging: true,
         requestBody: jsonBody(null),
-        description: 'Body: { status?, taken_at?, dose_qty?, note? } (#701). `status: "pending"` undoes a take or a skip. The timestamp travels with the status rather than beside it: anything other than `taken` clears `taken_at`, because a dose that was not taken cannot carry a time it was taken at - and that entry would end up in the CSV export too. Restricted to the owner of the medication.' + WALL_CLOCK_INPUT,
+        description: 'Body: { status?, taken_at?, dose_qty?, note? } (#701). `status: "pending"` undoes a take or a skip. The timestamp travels with the status rather than beside it: anything other than `taken` clears `taken_at`, because a dose that was not taken cannot carry a time it was taken at - and that entry would end up in the CSV export too. Restricted to the owner of the medication. Switching to `taken` without `taken_at` keeps a time already stored, otherwise the current minute is used.' + TAKEN_NOW + WALL_CLOCK_INPUT,
       }),
       delete: op({
         summary: 'Delete a dose-log entry',
@@ -104,7 +105,7 @@ export function healthPaths() {
       }),
     },
     '/api/v1/health/logs/{id}/take': {
-      post: op({ summary: 'Mark a dose as taken', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: WALL_CLOCK_INPUT.trim() }),
+      post: op({ summary: 'Mark a dose as taken', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { taken_at? }.' + TAKEN_NOW + WALL_CLOCK_INPUT }),
     },
     '/api/v1/health/logs/{id}/skip': {
       post: op({ summary: 'Mark a dose as skipped', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),

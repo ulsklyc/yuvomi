@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Every done task on the board can be archived in one action.** The "Done" column of the board
+  now has an archive button next to its count. After a confirmation it moves the done tasks the
+  column currently shows into the archive - the ones it shows, so a task someone else completes
+  while the board is open stays where it is until you have seen it, and a search narrows what goes.
+  Their status stays done, and each one can still be brought back on its own. Archiving several
+  tasks from the list's selection mode now takes a single request as well: before, it sent one per
+  task, stopped at the first locked task or rate limit and then did not refresh, although the rest
+  had already been archived. Locked tasks you may not change are left out and the message says how
+  many. For API clients the new `POST /api/v1/tasks/archive` takes `{ ids }` (at most 500), applies
+  the same rules as archiving a single task in one transaction, skips tasks the caller cannot see,
+  and returns `{ archived, skipped }`. (#1250)
+
 - **The overview now says when a task has been started.** In "Today" a task used to read "Task"
   whether anyone had begun it or not, so starting it from there left no trace on screen. A task in
   progress now reads "Task · started", as text, so a screen reader announces it too, and the row
@@ -132,6 +144,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wall-clock time. The CSV export then showed the UTC time for these doses. The current minute is
   now stored in the same form as every other dose. The app itself always sends the time and was not
   affected. (#1387)
+- **A dose recorded through the API as taken without a time now gets the current time.** `POST
+  /api/v1/health/medications/{id}/logs` with `status: "taken"` and no `taken_at` stored the dose
+  without any time, so the CSV export left the time column empty for it. It now stores the current
+  minute in household time, the same as marking a dose as taken or correcting it to taken already
+  do. Doses stored this way before keep their empty time. The app itself always sends the time and
+  was not affected. (#1399)
 - **Marking an inventory deadline as done no longer stores a broken date when the next one would
   fall after 9999-12-31.** The next due date then has a five-digit year, which the date format cannot
   hold: the deadline got a date like "99990-06-01", its reminder a date that is not a date, and the
@@ -202,13 +220,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and stood 6 pixels lower than the item and category fields next to it. On a computer it also had a
   fixed width of 80 pixels, too narrow for its own placeholder in half of the 24 languages - English
   showed "Quantit". On a phone, quantity and category each got half of the row, and the preselected
-  category "Miscellaneous" disappeared under the select's arrow. The fields now take the row's
+  category "Miscellaneous" was cut off. The fields now take the row's
   height, and the category gets more of the width than the quantity, whose entry is only a few
   characters: at the usual phone widths every language's placeholder and preselected category fit
   in full. The words stay as they are rather than becoming "Qty" and "Misc" - the space was the
   problem, not the words, and the same fix covers the longer words in other languages. A custom
   category name that is still too long, or a very narrow screen, now ends with "..." instead of
-  breaking off mid-word under the arrow. (#1372)
+  being cut off mid-word. (#1372)
 
 - **On browsers older than Chrome 97, fasting durations and a birthday's own reminder lead time
   work again.** Both are written by one helper that used `findLastIndex`, which Chrome knows from
