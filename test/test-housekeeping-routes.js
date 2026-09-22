@@ -19,6 +19,7 @@ const dbmod = await import('../server/db.js');
 const { default: housekeepingRouter } = await import('../server/routes/housekeeping.js');
 const { default: tasksRouter } = await import('../server/routes/tasks.js');
 const { computeHourlyAmount } = await import('../server/services/housekeeping-billing.js');
+const { lockDocumentDeletes, unlockDocumentDeletes } = await import('../server/services/document-deletion-lock.js');
 const db = dbmod.get();
 
 const ADMIN = db.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')`).run().lastInsertRowid;
@@ -1023,6 +1024,242 @@ test('Monatsgrenze: eine am Monatsersten frueh erledigte Aufgabe zaehlt im neuen
   } finally {
     db.prepare('DELETE FROM housekeeping_decay_tasks WHERE id = ?').run(id);
     setHouseholdZone(null);
+  }
+});
+
+// --------------------------------------------------------------------------
+// Beleg eines Besuchs: Name UND Verknuepfung folgen dem Dokumentenrecht (#1358)
+// --------------------------------------------------------------------------
+// Der Besuch bleibt beim Quellmodul housekeeping, der Beleg ist aber eine Zeile
+// des Dokumente-Moduls. Name und ID gehen deshalb nur an, wer das Dokument
+// lesen darf - Modulachse (Mitgliedsrecht UND Token-Scope) plus Sichtbarkeit
+// des einzelnen Dokuments. Uebrig bleibt das housekeeping-eigene `has_receipt`.
+function insertDocument(name, visibility, createdBy) {
+  return db.prepare(`
+    INSERT INTO family_documents (name, category, visibility, original_name, mime_type, file_size, content_data, created_by)
+    VALUES (?, 'finance', ?, ?, 'text/plain', 1, 'x', ?)
+  `).run(name, visibility, `${name}.txt`, createdBy).lastInsertRowid;
+}
+
+function insertVisitWithReceipt(checkIn, documentId, { open = false, workerId = null } = {}) {
+  return db.prepare(`
+    INSERT INTO housekeeping_work_sessions (worker_id, check_in, check_out, daily_rate, extras, created_by, receipt_document_id)
+    VALUES (?, ?, ?, 40, 0, ?, ?)
+  `).run(workerId, checkIn, open ? null : checkIn, ADMIN, documentId).lastInsertRowid;
+}
+
+function storedReceipt(visitId) {
+  return db.prepare('SELECT receipt_document_id FROM housekeeping_work_sessions WHERE id = ?').get(visitId).receipt_document_id;
+}
+
+const receiptOf = (session) => session && {
+  id: session.receipt_document_id,
+  has: session.has_receipt,
+  ...(Object.hasOwn(session, 'receipt_document_name') ? { name: session.receipt_document_name } : {}),
+};
+
+test('Beleg: Name und ID nur fuer wer das Dokument lesen darf - Liste und Einzelbericht (#1358)', async () => {
+  const familyDoc = insertDocument('Quittung Familie', 'family', ADMIN);
+  const privateDoc = insertDocument('Quittung privat', 'private', ADMIN);
+  const memberPrivateDoc = insertDocument('Quittung Mitglied', 'private', MEMBER);
+  const familyVisit = insertVisitWithReceipt('2026-05-12T10:00:00.000Z', familyDoc);
+  const privateVisit = insertVisitWithReceipt('2026-05-13T10:00:00.000Z', privateDoc);
+  const memberVisit = insertVisitWithReceipt('2026-05-14T10:00:00.000Z', memberPrivateDoc);
+  const visitIds = [familyVisit, privateVisit, memberVisit];
+  const receipts = async (as) => {
+    const list = await call('GET', '/visits?month=2026-05', { as });
+    assert.equal(list.status, 200);
+    const byId = new Map(list.body.data.visits.map((v) => [v.id, v]));
+    const sessions = await call('GET', '/work-sessions?month=2026-05', { as });
+    assert.equal(sessions.status, 200);
+    const sessionById = new Map(sessions.body.data.map((s) => [s.id, s]));
+    const out = { list: [], detail: [], sessions: [] };
+    for (const id of visitIds) {
+      const one = await call('GET', `/visits/${id}`, { as });
+      assert.equal(one.status, 200);
+      out.list.push(receiptOf(byId.get(id)));
+      out.detail.push(receiptOf(one.body.data));
+      out.sessions.push(receiptOf(sessionById.get(id)));
+    }
+    return out;
+  };
+  const expect = (...seen) => {
+    const docs = [familyDoc, privateDoc, memberPrivateDoc];
+    const names = ['Quittung Familie', 'Quittung privat', 'Quittung Mitglied'];
+    const withName = seen.map((ok, i) => ({ id: ok ? docs[i] : null, has: true, name: ok ? names[i] : null }));
+    return { list: withName, detail: withName, sessions: withName.map(({ id, has }) => ({ id, has })) };
+  };
+  try {
+    assert.deepEqual(await receipts(ADM), expect(true, true, false),
+      'der Admin sieht, was er angelegt hat - ein fremdes privates Dokument nicht, Admin hin oder her');
+    assert.deepEqual(await receipts(MEM), expect(true, false, true),
+      'ein Mitglied sieht Familie und Eigenes, nicht das private des Admins');
+    assert.deepEqual(await receipts({ ...MEM, moduleAccess: { documents: 'read' } }), expect(true, false, true),
+      'Leserecht auf die Dokumente reicht');
+    assert.deepEqual(await receipts({ ...MEM, moduleAccess: { documents: 'none' } }), expect(false, false, false),
+      'documents: none bekommt weder Namen noch ID, auch nicht fuer das eigene Dokument');
+    assert.deepEqual(await receipts(TOKEN_READ), expect(false, false, false),
+      'ein Token ohne documents-Scope bekommt weder Namen noch ID');
+    assert.deepEqual(await receipts({ ...TOKEN_READ, authScopes: ['housekeeping:read', 'documents:read'] }), expect(true, true, false),
+      'mit documents:read liefert das Token, was sein Nutzer sieht');
+    assert.deepEqual(await receipts({ id: MEMBER, role: 'member', authMethod: 'api_token', authScopes: ['housekeeping:read', 'documents:read'] }),
+      expect(true, false, true), 'ein Mitglieds-Token mit documents:read sieht das fremde private Dokument trotzdem nicht');
+
+    db.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(privateDoc, MEMBER);
+    assert.deepEqual(await receipts(MEM), expect(true, true, true), 'eine Freigabe an das Mitglied macht den Beleg sichtbar');
+  } finally {
+    db.prepare(`DELETE FROM housekeeping_work_sessions WHERE id IN (${visitIds.map(() => '?').join(', ')})`).run(...visitIds);
+    db.prepare('DELETE FROM family_documents WHERE id IN (?, ?, ?)').run(familyDoc, privateDoc, memberPrivateDoc);
+  }
+});
+
+test('Beleg: jeder Serialisierer maskiert die ID - Arbeiter, Status, Dashboard, Check-out, Bezahlen, Bearbeiten (#1358)', async () => {
+  const privateDoc = insertDocument('Quittung privat', 'private', ADMIN);
+  const created = await call('POST', '/worker', { as: ADM, body: { display_name: 'Belegprobe', daily_rate: 40, rate_type: 'daily' } });
+  assert.equal(created.status, 201);
+  const workerId = created.body.data.id;
+  const visitId = insertVisitWithReceipt(new Date().toISOString(), privateDoc, { open: true, workerId });
+  const masked = { id: null, has: true };
+  try {
+    const workers = await call('GET', '/workers', { as: MEM });
+    const worker = workers.body.data.find((w) => w.id === workerId);
+    assert.equal(worker.current_session.id, visitId);
+    assert.deepEqual(receiptOf(worker.current_session), masked, 'current_session am Arbeiter');
+    assert.deepEqual(receiptOf(worker.today_session), masked, 'today_session am Arbeiter');
+
+    const summary = await call('GET', '/summary', { as: MEM });
+    assert.equal(summary.body.data.current_session.id, visitId);
+    assert.deepEqual(receiptOf(summary.body.data.current_session), masked, 'current_session in /summary');
+
+    const dashboard = await call('GET', '/dashboard', { as: MEM });
+    assert.equal(dashboard.body.data.last_visit.id, visitId);
+    assert.deepEqual(receiptOf(dashboard.body.data.last_visit), masked, 'last_visit im Dashboard');
+    const dashWorker = dashboard.body.data.workers.find((w) => w.id === workerId);
+    assert.deepEqual(receiptOf(dashWorker.current_session), masked, 'Arbeiter im Dashboard');
+
+    const adminView = await call('GET', '/summary', { as: ADM });
+    assert.deepEqual(receiptOf(adminView.body.data.current_session), { id: privateDoc, has: true }, 'die Erstellerin sieht die ID');
+
+    const checkedOut = await call('POST', '/work-sessions/check-out', { as: MEM, body: { worker_id: workerId } });
+    assert.equal(checkedOut.status, 200);
+    assert.deepEqual(receiptOf(checkedOut.body.data), masked, 'Check-out-Antwort');
+
+    const date = checkedOut.body.data.check_in.slice(0, 10);
+    const edited = await call('PUT', `/visits/${visitId}`, { as: MEM, body: { date, daily_rate: 40, extras: 0 } });
+    assert.equal(edited.status, 200);
+    assert.deepEqual(receiptOf(edited.body.data), masked, 'PUT-Antwort');
+
+    const paid = await call('POST', `/visits/${visitId}/pay`, { as: MEM });
+    assert.equal(paid.status, 200);
+    assert.deepEqual(receiptOf(paid.body.data), masked, 'Bezahlen-Antwort');
+    assert.equal(storedReceipt(visitId), privateDoc, 'gespeichert bleibt der Beleg unberuehrt');
+  } finally {
+    db.prepare('DELETE FROM housekeeping_work_sessions WHERE id = ?').run(visitId);
+    db.prepare('DELETE FROM family_documents WHERE id = ?').run(privateDoc);
+    db.prepare('DELETE FROM housekeeping_workers WHERE id = ?').run(workerId);
+  }
+});
+
+test('Beleg: wer den gespeicherten nicht sieht, kann ihn weder loesen noch ersetzen (#1358)', async () => {
+  // Regel 2 aus services/document-links.js: Entfernen kann man nur, was man
+  // sieht. Der Dialog schickt bei maskierter ID `null` zurueck - das heisst
+  // "behalten", nicht "loesen".
+  const privateDoc = insertDocument('Quittung privat', 'private', ADMIN);
+  const ownDoc = insertDocument('Eigene Quittung', 'private', MEMBER);
+  const visitId = insertVisitWithReceipt('2026-05-14T10:00:00.000Z', privateDoc);
+  const put = (as, extra) => call('PUT', `/visits/${visitId}`, {
+    as,
+    body: { date: '2026-05-14', daily_rate: 45, extras: 0, ...extra },
+  });
+  try {
+    assert.equal((await put(MEM, { receipt_document_id: null })).status, 200);
+    assert.equal(storedReceipt(visitId), privateDoc, 'null von einem, der den Beleg nicht sieht, behaelt ihn');
+    assert.equal((await put(MEM, { receipt_document_id: '' })).status, 200);
+    assert.equal(storedReceipt(visitId), privateDoc, 'ein leerer Wert ebenso');
+    assert.equal((await put(MEM, {})).status, 200);
+    assert.equal(storedReceipt(visitId), privateDoc, 'ein fehlendes Feld ebenso');
+    // KEIN ORAKEL: jede Zahl bekommt dieselbe Antwort, auch die richtige.
+    // Sonst liesse sich die maskierte ID raten - rowids sind fortlaufend, und
+    // 200 gegen 403 verriete den Treffer.
+    const replaced = await put(MEM, { receipt_document_id: ownDoc });
+    assert.equal(replaced.status, 403);
+    assert.equal(replaced.body.code, 403);
+    assert.equal(typeof replaced.body.error, 'string');
+    assert.equal(storedReceipt(visitId), privateDoc, 'ersetzen darf er ihn auch nicht');
+    const guessedRight = await put(MEM, { receipt_document_id: privateDoc });
+    assert.deepEqual({ status: guessedRight.status, body: guessedRight.body }, { status: 403, body: replaced.body },
+      'die richtig geratene ID antwortet genau wie eine falsche');
+    const guessedWrong = await put(MEM, { receipt_document_id: 999999 });
+    assert.deepEqual({ status: guessedWrong.status, body: guessedWrong.body }, { status: 403, body: replaced.body });
+    // Auch der Loeschzustand des unsichtbaren Belegs darf nicht durchscheinen.
+    lockDocumentDeletes([privateDoc]);
+    try {
+      const locked = await put(MEM, { receipt_document_id: privateDoc });
+      assert.deepEqual({ status: locked.status, body: locked.body }, { status: 403, body: replaced.body },
+        'im Loeschfenster weiter 403, nicht 409');
+      assert.equal((await put(MEM, { receipt_document_id: null })).status, 200, 'behalten fragt die Loeschsperre nicht');
+    } finally {
+      unlockDocumentDeletes([privateDoc]);
+    }
+    assert.equal(storedReceipt(visitId), privateDoc);
+
+    // Dieselbe Regel fuer die anderen Wege, auf denen der Beleg verborgen ist:
+    // ohne Dokumentenrecht, und ein Token ohne documents-Scope - dessen Nutzer
+    // (der Admin) den Beleg selbst angelegt hat und ihn sonst saehe.
+    for (const [label, as] of [
+      ['documents: none', { ...MEM, moduleAccess: { documents: 'none' } }],
+      ['Token nur housekeeping:write', { id: ADMIN, role: 'admin', authMethod: 'api_token', authScopes: ['housekeeping:write'] }],
+    ]) {
+      const right = await put(as, { receipt_document_id: privateDoc });
+      const wrong = await put(as, { receipt_document_id: ownDoc });
+      assert.equal(right.status, 403, `${label}: die richtige ID ist 403`);
+      assert.deepEqual({ status: right.status, body: right.body }, { status: wrong.status, body: wrong.body },
+        `${label}: richtige und falsche ID antworten gleich`);
+      assert.deepEqual(right.body, replaced.body, `${label}: und wie beim Mitglied ohne Sicht`);
+      assert.equal((await put(as, { receipt_document_id: null })).status, 200);
+      assert.equal(storedReceipt(visitId), privateDoc, `${label}: null behaelt den Beleg`);
+    }
+
+    // Wer ihn sieht, darf ihn loesen.
+    assert.equal((await put(ADM, { receipt_document_id: null })).status, 200);
+    assert.equal(storedReceipt(visitId), null, 'die Erstellerin loest ihn');
+  } finally {
+    db.prepare('DELETE FROM housekeeping_work_sessions WHERE id = ?').run(visitId);
+    db.prepare('DELETE FROM family_documents WHERE id IN (?, ?)').run(privateDoc, ownDoc);
+  }
+});
+
+test('Beleg: eine neue Verknuepfung verlangt Dokumentenzugriff und Sichtbarkeit (#1358)', async () => {
+  const familyDoc = insertDocument('Quittung Familie', 'family', ADMIN);
+  const privateDoc = insertDocument('Quittung privat', 'private', ADMIN);
+  const ownDoc = insertDocument('Eigene Quittung', 'private', MEMBER);
+  const visitId = insertVisitWithReceipt('2026-05-15T10:00:00.000Z', null);
+  const put = (as, extra) => call('PUT', `/visits/${visitId}`, {
+    as,
+    body: { date: '2026-05-15', daily_rate: 45, extras: 0, ...extra },
+  });
+  try {
+    const noneMember = await put({ ...MEM, moduleAccess: { documents: 'none' } }, { receipt_document_id: familyDoc });
+    assert.equal(noneMember.status, 403, 'documents: none setzt keine ID');
+    assert.equal(noneMember.body.code, 403);
+    assert.equal(storedReceipt(visitId), null);
+
+    const token = await put({ id: ADMIN, role: 'admin', authMethod: 'api_token', authScopes: ['housekeeping:write'] },
+      { receipt_document_id: familyDoc });
+    assert.equal(token.status, 403, 'ein Token ohne documents-Scope setzt keine ID');
+    assert.equal(storedReceipt(visitId), null);
+
+    assert.equal((await put(MEM, { receipt_document_id: privateDoc })).status, 200);
+    assert.equal(storedReceipt(visitId), null, 'ein fremdes privates Dokument wird nicht verknuepft');
+
+    assert.equal((await put(MEM, { receipt_document_id: ownDoc })).status, 200);
+    assert.equal(storedReceipt(visitId), ownDoc, 'ein eigenes Dokument schon');
+
+    assert.equal((await put(MEM, { receipt_document_id: null })).status, 200);
+    assert.equal(storedReceipt(visitId), null, 'und wer es sieht, loest es wieder');
+  } finally {
+    db.prepare('DELETE FROM housekeeping_work_sessions WHERE id = ?').run(visitId);
+    db.prepare('DELETE FROM family_documents WHERE id IN (?, ?, ?)').run(familyDoc, privateDoc, ownDoc);
   }
 });
 

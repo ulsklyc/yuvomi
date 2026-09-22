@@ -3552,7 +3552,8 @@
         "currentMonth": "Bu Ay",
         "noVisitReportsInMonth": "{{month}} döneminde ziyaret kaydedilmedi.",
         "settledAdminOnly": "Yalnızca bir yönetici değiştirebilir veya silebilir",
-        "reportVisitsCount": "Ziyaretler"
+        "reportVisitsCount": "Ziyaretler",
+        "receiptPresent": "Ekli"
     },
     "userMultiSelect": {
         "moreUsers": "daha",

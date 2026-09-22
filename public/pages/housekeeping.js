@@ -1066,9 +1066,26 @@ function visitWorkDetailsHtml(visit) {
  * antwortet schon das Lesen mit 403, dort steht er nicht. Gesetzt heisst
  * sichtbar, ein Besuch ohne Beleg hat keine Zeile dafuer. */
 function visitReceiptDetailHtml(visit) {
-  if (!visit.receipt_document_name || pathAccess('/documents') === 'none') return '';
+  if (pathAccess('/documents') === 'none') return '';
+  if (receiptHiddenFromViewer(visit)) {
+    return `
+          <div><dt>${esc(t('housekeeping.receiptLabel'))}</dt><dd>${esc(t('housekeeping.receiptPresent'))}</dd></div>`;
+  }
+  if (!visit.receipt_document_name) return '';
   return `
           <div><dt>${esc(t('housekeeping.receiptLabel'))}</dt><dd>${esc(visit.receipt_document_name)}</dd></div>`;
+}
+
+/* Der Besuch hat einen Beleg, den der Server diesem Betrachter nicht nennt
+ * (#1358): ein privates Dokument einer anderen Person. `has_receipt` gehoert
+ * dem Besuch, Name und ID dem Dokumente-Modul - beide kommen dann als `null`.
+ * Die Stelle zeigt nur, DASS es ihn gibt, ohne Ablage zum Ersetzen: der Server
+ * nimmt einen unsichtbaren Beleg weder weg noch tauscht er ihn, und das
+ * Speichern schickt `null`, was dort "behalten" heisst. Gefragt wird nach der
+ * Server-Regel, der maskierten ID - nicht nach dem Namen: ein Besuch mit
+ * sichtbarer ID ohne Namensfeld oder mit leerem Namen gehoert dem Betrachter. */
+function receiptHiddenFromViewer(visit) {
+  return Boolean(visit.has_receipt) && visit.receipt_document_id == null;
 }
 
 /* `onRefresh` rendert die Ansicht neu, aus der der Bericht geoeffnet wurde (Uebersicht,
@@ -1413,6 +1430,12 @@ function openTaskEditModal(task, content) {
  * seinen eigenen Pfad, sie bleibt unangetastet.
  */
 function receiptFieldHtml(visit) {
+  if (pathAccess('/documents') !== 'none' && receiptHiddenFromViewer(visit)) {
+    return `
+        <dl class="housekeeping-report-details">
+          <div><dt>${esc(t('housekeeping.receiptLabel'))}</dt><dd>${esc(t('housekeeping.receiptPresent'))}</dd></div>
+        </dl>`;
+  }
   if (mayWritePath('/documents')) {
     return `
         <label class="document-dropzone" id="housekeeping-receipt-dropzone" for="housekeeping-receipt-file">
@@ -1517,8 +1540,10 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
           // Der zweite Riegel fuer den Beleg: ohne Schreibrecht auf die
           // Dokumente wird nichts hochgeladen, auch wenn ein Feld aus einem
           // aelteren Stand noch eine Datei traegt. Der Einsatz speichert dann
-          // mit der Verknuepfung, die er schon hat.
-          const file = mayWritePath('/documents')
+          // mit der Verknuepfung, die er schon hat. Ebenso bei einem Beleg,
+          // den der Server nicht nennt (#1358): ihn ersetzen weist der Server
+          // mit 403 ab, das hochgeladene Dokument bliebe verwaist liegen.
+          const file = mayWritePath('/documents') && !receiptHiddenFromViewer(visit)
             ? panel.querySelector('#housekeeping-receipt-file')?.files?.[0]
             : null;
           if (file) {

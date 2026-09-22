@@ -3124,7 +3124,8 @@
         "currentMonth": "Aktuální měsíc",
         "noVisitReportsInMonth": "V období {{month}} nebyly zaznamenány žádné návštěvy.",
         "settledAdminOnly": "Upravit nebo smazat ji může jen admin",
-        "reportVisitsCount": "Návštěvy"
+        "reportVisitsCount": "Návštěvy",
+        "receiptPresent": "Přiložen"
     },
     "splitExpenses": {
         "title": "Společné výdaje",

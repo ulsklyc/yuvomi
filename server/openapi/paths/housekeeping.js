@@ -3,7 +3,18 @@ import { op, jsonBody, idParam } from '../helpers.js';
 const VISIT_CAPABILITY_NOTE = 'Each visit carries `can_edit` and `can_delete`: true when the caller may write to the Housekeeping module and the visit is either unpaid or the caller is an admin '
   + '(a paid visit is settled), `can_mark_paid`: true when the caller may write and the visit is unpaid, and `can_mark_unpaid`: true when the visit is paid and the caller is an admin. '
   + 'Write access means both the member module permission and, for API tokens, a `housekeeping:write` scope. '
-  + 'They are hints for the interface; `PUT`/`DELETE /api/v1/housekeeping/visits/{id}` and `POST .../unpay` check the role themselves.';
+  + 'They are hints for the interface; `PUT`/`DELETE /api/v1/housekeeping/visits/{id}` and `POST .../unpay` check the role themselves. '
+  + 'The visit list and report also carry `receipt_document_name`. ';
+
+// Beleg-Felder an jeder Sitzung (#1358): ein Urteil fuer Name und ID.
+const RECEIPT_NOTE = 'Every visit or work session carries `has_receipt` (whether a receipt is linked). `receipt_document_id` '
+  + '(and, where present, `receipt_document_name`) are set only when the caller may read that document: access to the Documents '
+  + 'module, for API tokens a `documents:read` scope, and the document\'s own visibility. Otherwise both are `null`.';
+
+const RECEIPT_WRITE_NOTE = '`receipt_document_id` links a receipt. A caller who cannot see the stored receipt keeps it: '
+  + '`null`, an empty value or leaving the field out changes nothing, and any id - the stored one included - is refused with the same 403. A new link needs '
+  + 'access to the Documents module (for API tokens a `documents` scope), otherwise 403; a document the caller cannot see is '
+  + 'not linked. A caller who can see the stored receipt may clear it with `null`.';
 
 // `last_completed` ist ein Zeitpunkt; ein Offset wird der UTC-Instant (#1364).
 const LAST_COMPLETED_INPUT = '`last_completed` with `Z` or a numeric offset is read as an instant and stored as a UTC '
@@ -14,23 +25,23 @@ const LAST_COMPLETED_INPUT = '`last_completed` with `Z` or a numeric offset is r
 export function housekeepingPaths() {
   return {
     '/api/v1/housekeeping/dashboard': {
-      get: op({ summary: 'Get housekeeping dashboard', tag: 'Housekeeping' }),
+      get: op({ summary: 'Get housekeeping dashboard', tag: 'Housekeeping', description: RECEIPT_NOTE }),
     },
     '/api/v1/housekeeping/task-templates': {
       get: op({ summary: 'List housekeeping task templates', tag: 'Housekeeping' }),
     },
     '/api/v1/housekeeping/worker': {
-      get: op({ summary: 'Get primary housekeeper profile', tag: 'Housekeeping' }),
+      get: op({ summary: 'Get primary housekeeper profile', tag: 'Housekeeping', description: RECEIPT_NOTE }),
       post: op({ summary: 'Create or update housekeeper profile', tag: 'Housekeeping', admin: true, stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/housekeeping/workers': {
-      get: op({ summary: 'List housekeeper profiles', tag: 'Housekeeping' }),
+      get: op({ summary: 'List housekeeper profiles', tag: 'Housekeeping', description: RECEIPT_NOTE }),
     },
     '/api/v1/housekeeping/summary': {
-      get: op({ summary: 'Get monthly housekeeping summary', tag: 'Housekeeping' }),
+      get: op({ summary: 'Get monthly housekeeping summary', tag: 'Housekeeping', description: RECEIPT_NOTE }),
     },
     '/api/v1/housekeeping/work-sessions': {
-      get: op({ summary: 'List housekeeping work sessions for a month', tag: 'Housekeeping' }),
+      get: op({ summary: 'List housekeeping work sessions for a month', tag: 'Housekeeping', description: RECEIPT_NOTE }),
     },
     '/api/v1/housekeeping/work-sessions/check-in': {
       post: op({ summary: 'Check in a housekeeper', tag: 'Housekeeping', stateChanging: true, requestBody: jsonBody(null) }),
@@ -39,11 +50,25 @@ export function housekeepingPaths() {
       post: op({ summary: 'Check out a housekeeper', tag: 'Housekeeping', stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/housekeeping/visits': {
-      get: op({ summary: 'List housekeeping visits for a month', tag: 'Housekeeping', description: VISIT_CAPABILITY_NOTE }),
+      get: op({ summary: 'List housekeeping visits for a month', tag: 'Housekeeping', description: VISIT_CAPABILITY_NOTE + RECEIPT_NOTE }),
     },
     '/api/v1/housekeeping/visits/{id}': {
-      get: op({ summary: 'Get housekeeping visit', tag: 'Housekeeping', params: [idParam()], description: VISIT_CAPABILITY_NOTE }),
-      put: op({ summary: 'Update housekeeping visit', tag: 'Housekeeping', params: [idParam()], stateChanging: true, documentDeleteConflict: true, requestBody: jsonBody(null) }),
+      get: op({ summary: 'Get housekeeping visit', tag: 'Housekeeping', params: [idParam()], description: VISIT_CAPABILITY_NOTE + RECEIPT_NOTE }),
+      put: op({
+        summary: 'Update housekeeping visit',
+        tag: 'Housekeeping',
+        params: [idParam()],
+        description: RECEIPT_WRITE_NOTE,
+        stateChanging: true,
+        documentDeleteConflict: true,
+        requestBody: jsonBody(null),
+        responses: {
+          200: { description: 'Successful response' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
       delete: op({ summary: 'Delete housekeeping visit', tag: 'Housekeeping', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/housekeeping/visits/{id}/pay': {

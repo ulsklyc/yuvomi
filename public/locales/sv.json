@@ -3552,7 +3552,8 @@
         "currentMonth": "Nuvarande",
         "noVisitReportsInMonth": "Inga personalbesök registrerades under {{month}}.",
         "settledAdminOnly": "Bara en admin kan ändra eller ta bort",
-        "reportVisitsCount": "Besök"
+        "reportVisitsCount": "Besök",
+        "receiptPresent": "Bifogat"
     },
     "userMultiSelect": {
         "moreUsers": "mer",

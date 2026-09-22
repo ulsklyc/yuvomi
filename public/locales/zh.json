@@ -3552,7 +3552,8 @@
         "currentMonth": "当前",
         "noVisitReportsInMonth": "{{month}}没有上门服务记录。",
         "settledAdminOnly": "只有管理员可以修改或删除",
-        "reportVisitsCount": "上门次数"
+        "reportVisitsCount": "上门次数",
+        "receiptPresent": "已附上"
     },
     "userMultiSelect": {
         "moreUsers": "更多",

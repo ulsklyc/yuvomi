@@ -3556,7 +3556,8 @@
         "currentMonth": "جاری",
         "noVisitReportsInMonth": "در {{month}} هیچ بازدیدی ثبت نشده است.",
         "settledAdminOnly": "فقط یک مدیر می‌تواند آن را تغییر دهد یا حذف کند",
-        "reportVisitsCount": "بازدیدها"
+        "reportVisitsCount": "بازدیدها",
+        "receiptPresent": "پیوست شده"
     },
     "splitExpenses": {
         "title": "هزینه‌های مشترک",
