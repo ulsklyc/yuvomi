@@ -184,6 +184,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to take it away again; before, it could end up at the top of the page. A second click while a
   restore is running still starts nothing. (#1267)
 
+- **"Other devices" in Settings, Account, has room between its lines again.** The note, the
+  status line and the button sat directly on top of each other, so "2 other sessions ended" read
+  like part of the note and the button's focus ring covered it. They are now spaced like the
+  other cards on the page, and an empty status line takes no space. (#1354)
+
 - **A housekeeping visit no longer gives away a receipt you may not see.** The housekeeping API
   sent the file name and document number of a visit's receipt to everyone who could open the
   housekeeping module, also to members without access to documents and when the receipt was a

@@ -344,11 +344,26 @@ function askForCode(card, texts, onConfirm, onCancel) {
 }
 
 /**
- * Uebersetzt einen Fehler der 2FA-Routen. Der Server nennt den Grund in
- * `reason`, damit die Oberflaeche nicht am englischen Text hangeln muss.
- * @param {any} err
+ * Karte "Auf anderen Geraeten abmelden" (#1354, #1423). Hinweis, Status und
+ * Knopfreihe tragen eigene Klassen fuer ihren Abstand (settings.css): ohne ihn
+ * las sich der Status als vierte Zeile des Hinweises, und der Fokusring des
+ * Knopfes lag auf dem Statustext. Die Statuszeile bleibt LEER im Markup - erst
+ * ihr Text gibt ihr den Abstand (`:not(:empty)`), sonst stuende Leerraum da.
  * @returns {string}
  */
+export function otherSessionsCardHtml() {
+  return `
+      <div class="settings-card settings-sessions">
+        <h3 class="settings-card__title">${t('settings.otherSessionsTitle')}</h3>
+        <p class="form-hint">${t('settings.otherSessionsHint')}</p>
+        <p class="form-hint settings-sessions__status" id="logout-others-status" role="status"></p>
+        <div id="logout-others-error" class="form-error settings-sessions__error" role="alert" hidden></div>
+        <div class="settings-form-actions settings-sessions__actions">
+          <button type="button" class="btn btn--danger-outline" id="logout-others-btn">${t('settings.otherSessionsButton')}</button>
+        </div>
+      </div>`;
+}
+
 /**
  * Fehlertext fuer "Auf anderen Geraeten abmelden" (#1354). Ein 429 heisst nur
  * "zu schnell geklickt" - dann sagt die Seite, dass Warten hilft, statt einen
@@ -362,6 +377,12 @@ export function logoutOthersErrorText(err) {
   return t('settings.otherSessionsError');
 }
 
+/**
+ * Uebersetzt einen Fehler der 2FA-Routen. Der Server nennt den Grund in
+ * `reason`, damit die Oberflaeche nicht am englischen Text hangeln muss.
+ * @param {any} err
+ * @returns {string}
+ */
 function twoFactorErrorText(err) {
   if (err?.status === 429) return t('settings.twoFactorTooManyAttempts');
   const reason = err?.data?.reason;
@@ -546,15 +567,7 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
 
       ${oidcCardHtml(oidcState, oidcNotice)}
 
-      <div class="settings-card">
-        <h3 class="settings-card__title">${t('settings.otherSessionsTitle')}</h3>
-        <p class="form-hint">${t('settings.otherSessionsHint')}</p>
-        <p class="form-hint" id="logout-others-status" role="status"></p>
-        <div id="logout-others-error" class="form-error" role="alert" hidden></div>
-        <div class="settings-form-actions">
-          <button type="button" class="btn btn--danger-outline" id="logout-others-btn">${t('settings.otherSessionsButton')}</button>
-        </div>
-      </div>
+      ${otherSessionsCardHtml()}
     </section>
 
     <section class="settings-section">

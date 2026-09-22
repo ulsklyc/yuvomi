@@ -3186,6 +3186,26 @@
 .settings-page [hidden] { display: none !important; }
 
 /* --------------------------------------------------------
+   Auf anderen Geraeten abmelden (#1354, #1423)
+
+   Hinweis, Statuszeile und Knopfreihe standen ohne Abstand untereinander:
+   der Status las sich als vierte Zeile des Hinweises, und der Fokusring des
+   Knopfes lag auf dem Statustext. Die Abstaende folgen dem `.settings-form` der
+   Nachbarkarten (--space-3 vor der Aktion), zwischen zwei Hinweiszeilen der
+   kleinere Schritt. Die Statuszeile bekommt ihren nur mit Text - leer bleibt
+   sie eine Live-Region ohne Hoehe und ohne Leerraum.
+   -------------------------------------------------------- */
+.settings-sessions__status:not(:empty),
+.settings-sessions__error {
+  margin-top: var(--space-2);
+  margin-bottom: 0;
+}
+
+.settings-sessions__actions {
+  margin-top: var(--space-3);
+}
+
+/* --------------------------------------------------------
    Zwei-Faktor-Anmeldung (#672)
 
    Der QR-Code steht auf einer eigenen weissen Flaeche, nicht auf der

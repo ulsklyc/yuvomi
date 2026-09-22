@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import { test } from 'node:test';
+import { eachRule } from './css-rules.js';
 
 import {
   LEGACY_SETTINGS_STORAGE_KEY,
@@ -193,6 +194,35 @@ test('sign out other devices names the rate limit instead of a generic failure (
   // eine Funktion, die niemand aufruft.
   const source = await readFile(new URL('../public/settings/pages/personal-account.js', import.meta.url), 'utf8');
   assert.match(source, /catch \(error\) \{\s*showError\(errorBox, logoutOthersErrorText\(error\)\);/);
+});
+
+test('sign out other devices: hint, status and buttons keep a token gap, an empty status none (#1423)', async () => {
+  // a11y-Audit zu #1423: zwischen Hinweis, Statuszeile und Knopfreihe standen
+  // 0 px. Der Status las sich als vierte Zeile des Hinweises, und der Fokusring
+  // des Knopfes lag auf dem Statustext.
+  const { otherSessionsCardHtml } = await import('/settings/pages/personal-account.js');
+  assert.equal(typeof otherSessionsCardHtml, 'function', 'die Karte hat einen eigenen Baustein');
+  const html = otherSessionsCardHtml();
+  const classesOf = (id) => html.match(new RegExp(`<[^>]*id="${id}"[^>]*>`))?.[0]?.match(/class="([^"]*)"/)?.[1]?.split(/\s+/) ?? [];
+  assert.ok(classesOf('logout-others-status').includes('settings-sessions__status'), 'Statuszeile traegt ihre Klasse');
+  // Leer im Markup, damit `:not(:empty)` greift - schon ein Zeilenumbruch darin
+  // gaebe der leeren Zeile ihren Abstand.
+  assert.match(html, /id="logout-others-status"[^>]*><\/p>/);
+  const actions = html.match(/<div class="([^"]*)">\s*<button[^>]*id="logout-others-btn"/)?.[1]?.split(/\s+/) ?? [];
+  assert.ok(actions.includes('settings-sessions__actions'), 'Knopfreihe traegt ihre Klasse');
+
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const marginTopOf = (selector) => {
+    const rule = rules.find((r) => r.selector.split(',').map((s) => s.trim()).includes(selector));
+    return rule?.body.match(/(?:^|;)\s*margin-top\s*:\s*([^;]+)/)?.[1]?.trim() ?? null;
+  };
+  assert.match(marginTopOf('.settings-sessions__status:not(:empty)') ?? '', /^var\(--space-\d+\)$/, 'Status: Abstand aus tokens.css');
+  assert.match(marginTopOf('.settings-sessions__actions') ?? '', /^var\(--space-\d+\)$/, 'Knopfreihe: Abstand aus tokens.css');
+  // Die LEERE Statuszeile bekommt keinen: keine Regel auf die blosse Klasse,
+  // die Hoehe oder Abstand setzt.
+  const bare = rules.filter((r) => r.selector.split(',').map((s) => s.trim()).includes('.settings-sessions__status'));
+  for (const rule of bare) assert.doesNotMatch(rule.body, /margin|padding|min-height|height/, rule.body);
 });
 
 test('settings reuse the authenticated router user instead of blocking on auth.me', async () => {
