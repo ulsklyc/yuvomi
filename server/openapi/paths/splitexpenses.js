@@ -6,8 +6,10 @@ const apiError = (description) => ({
 });
 
 // Antwort des Stornos (#1309): die Zahlung, wie sie in `settlements` steht,
-// plus wann und von wem sie storniert wurde. Beides kommt aus der Gegenbuchung
-// im Ledger, nicht aus einer eigenen Spalte.
+// plus wann und von wem sie storniert wurde. `reversed_at` kommt aus der
+// Gegenbuchung im Ledger, `reversed_by` aus dem Verlauf (`payment_reversed`) -
+// die Gegenbuchung traegt den `created_by` der Originalzeile, nicht die
+// stornierende Person. Keine eigene Spalte.
 const settlementReversalResponse = {
   type: 'object',
   required: ['data'],
@@ -31,7 +33,7 @@ const settlementReversalResponse = {
         created_at: { type: 'string', format: 'date-time' },
         updated_at: { type: 'string', format: 'date-time' },
         reversed_at: { type: 'string', format: 'date-time' },
-        reversed_by: { type: 'integer' },
+        reversed_by: { type: ['integer', 'null'], description: 'Who reversed the payment, from the `payment_reversed` activity; `null` when that account no longer exists. The counter-entries themselves keep the `created_by` of the rows they reverse.' },
       },
     },
   },
