@@ -41,6 +41,7 @@ import { splitMentions, applyMention } from '/utils/mentions.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { parseRemindAtAsUtc } from '/utils/reminder-offset.js';
 import { isNavModuleReadOnly } from '/permissions.js';
+import { pathAccess } from '/utils/module-access.js';
 import { zonedDateKey } from '/utils/timezone.js';
 import { historyDayLabel } from '/utils/day-label.js';
 import {
@@ -355,9 +356,15 @@ function subtaskListNode(task, ctx) {
  * Bilder stehen als Vorschau statt als Wort: an einer Aufgabe hängt meist ein
  * abfotografierter Zettel, und ein Dateiname beantwortet die Frage nicht, wegen
  * der man das Foto angehängt hat. Alles andere bleibt ein Chip mit Link.
+ *
+ * Ohne Leserecht auf die Dokumente liefert der Server `documents: null` (#1358)
+ * und die Zeile faellt weg; bei `documents: none` fragt sie das Recht selbst,
+ * wie attachmentLinksNode, denn jeder Link ginge dort ins 403. Ein Eintrag ohne
+ * ID wird nie zu einem Link auf `/documents/null`.
  */
 function documentListNode(docs) {
-  const list = Array.isArray(docs) ? docs : [];
+  if (pathAccess('/documents') === 'none') return null;
+  const list = (Array.isArray(docs) ? docs : []).filter((doc) => doc?.id);
   if (!list.length) return null;
 
   const images = list.filter((doc) => docMime(doc).startsWith('image/'));
@@ -1175,4 +1182,4 @@ function seriesHistoryNode(task) {
  * der sich die Nur-lesen-Regel (#467) an dieser Ansicht MESSEN laesst - alles
  * andere hier haengt an `openDetailView` und damit am echten DOM.
  */
-export const __test = { subtaskListNode, descriptionNode };
+export const __test = { subtaskListNode, descriptionNode, documentListNode };
