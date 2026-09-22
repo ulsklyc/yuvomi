@@ -2783,7 +2783,8 @@
         "otherSessionsEnded_one": "Đã kết thúc {{count}} phiên khác.",
         "otherSessionsEnded_few": "Đã kết thúc {{count}} phiên khác.",
         "otherSessionsNone": "Tài khoản của bạn không đăng nhập trên thiết bị nào khác.",
-        "otherSessionsError": "Không thể đăng xuất trên các thiết bị khác."
+        "otherSessionsError": "Không thể đăng xuất trên các thiết bị khác.",
+        "otherSessionsTooManyAttempts": "Quá nhiều yêu cầu. Vui lòng đợi một chút rồi thử lại."
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại trình lập kế hoạch gia đình.",

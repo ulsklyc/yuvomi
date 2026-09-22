@@ -2783,7 +2783,8 @@
         "otherSessionsEnded_one": "{{count}} annan session avslutad.",
         "otherSessionsEnded_few": "{{count}} andra sessioner avslutade.",
         "otherSessionsNone": "Ditt konto var inte inloggat på någon annan enhet.",
-        "otherSessionsError": "Det gick inte att logga ut på andra enheter."
+        "otherSessionsError": "Det gick inte att logga ut på andra enheter.",
+        "otherSessionsTooManyAttempts": "För många förfrågningar. Vänta en stund och försök sedan igen."
     },
     "login": {
         "tagline": "Välkommen tillbaka till din familjeplanerare.",

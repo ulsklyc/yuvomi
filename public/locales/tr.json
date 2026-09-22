@@ -2783,7 +2783,8 @@
         "otherSessionsEnded_one": "{{count}} diğer oturum sonlandırıldı.",
         "otherSessionsEnded_few": "{{count}} diğer oturum sonlandırıldı.",
         "otherSessionsNone": "Hesabın başka hiçbir cihazda oturum açmış değildi.",
-        "otherSessionsError": "Diğer cihazlarda oturum kapatılamadı."
+        "otherSessionsError": "Diğer cihazlarda oturum kapatılamadı.",
+        "otherSessionsTooManyAttempts": "Çok fazla istek. Lütfen biraz bekle, sonra tekrar dene."
     },
     "login": {
         "tagline": "Aile planlayıcına tekrar hoş geldin.",

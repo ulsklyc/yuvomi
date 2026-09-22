@@ -394,9 +394,14 @@ const twoFactorLimiter = rateLimit({
 
 // Eigener Limiter fuer "Auf anderen Geraeten abmelden" (#1354). Zaehlt alle
 // Antworten wie der Reset-Limiter: jeder Aufruf liest die ganze Sitzungstabelle.
+// Gezaehlt wird JE MITGLIED, nicht je Adresse: hinter einem Proxy ohne
+// `trust proxy` kommt der ganze Haushalt von einer IP, und ein Mitglied saehe
+// sich sonst von den Klicks eines anderen gesperrt. Der Limiter sitzt hinter
+// `requireAuth`, `req.authUserId` steht also immer.
 const sessionRevokeLimiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60_000,
   max: parseInt(process.env.RATE_LIMIT_MAX_ATTEMPTS) || 5,
+  keyGenerator: (req) => `user:${req.authUserId}`,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Zu viele Anfragen. Bitte warte kurz.', code: 429 },
@@ -743,14 +748,19 @@ function updateUserRoleSessions(userId, role) {
  * keine Zeilen dieser Tabelle und bleiben unberuehrt.
  */
 function invalidateUserSessions(userId, exceptSid) {
-  const allSessions = db.get().prepare('SELECT sid, sess FROM sessions').all();
+  const allSessions = db.get().prepare('SELECT sid, sess, expired_at FROM sessions').all();
+  const now = Date.now();
   let ended = 0;
   for (const row of allSessions) {
     if (row.sid === exceptSid) continue;
     try {
       const sess = JSON.parse(row.sess);
       if (sess.userId === userId) {
-        ended += db.get().prepare('DELETE FROM sessions WHERE sid = ?').run(row.sid).changes;
+        const { changes } = db.get().prepare('DELETE FROM sessions WHERE sid = ?').run(row.sid);
+        // Geloescht wird auch eine abgelaufene Zeile, die der 15-Minuten-Sweep
+        // noch nicht erwischt hat - gezaehlt nur eine, die noch galt. Sonst
+        // meldete die Seite "1 andere Sitzung beendet", wo keine mehr lebte.
+        if (row.expired_at > now) ended += changes;
       }
     } catch { /* ignore malformed session */ }
   }

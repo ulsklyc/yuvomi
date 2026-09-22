@@ -2783,7 +2783,8 @@
         "otherSessionsEnded_one": "{{count}} altra sessione terminata.",
         "otherSessionsEnded_few": "{{count}} altre sessioni terminate.",
         "otherSessionsNone": "Il tuo account non era connesso su nessun altro dispositivo.",
-        "otherSessionsError": "Uscita dagli altri dispositivi non riuscita."
+        "otherSessionsError": "Uscita dagli altri dispositivi non riuscita.",
+        "otherSessionsTooManyAttempts": "Troppe richieste. Attendi un momento, poi riprova."
     },
     "login": {
         "tagline": "Bentornato nel tuo pianificatore familiare.",

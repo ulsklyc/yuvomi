@@ -2783,7 +2783,8 @@
         "otherSessionsEnded_one": "Завершён {{count}} другой сеанс.",
         "otherSessionsEnded_few": "Завершено {{count}} других сеанса.",
         "otherSessionsNone": "Ваша учётная запись не была открыта ни на одном другом устройстве.",
-        "otherSessionsError": "Не удалось выйти на других устройствах."
+        "otherSessionsError": "Не удалось выйти на других устройствах.",
+        "otherSessionsTooManyAttempts": "Слишком много запросов. Подождите немного и попробуйте снова."
     },
     "login": {
         "tagline": "С возвращением в ваш семейный планировщик.",

@@ -2795,7 +2795,8 @@
         "otherSessionsEnded_one": "다른 세션 {{count}}개를 종료했습니다.",
         "otherSessionsEnded_few": "다른 세션 {{count}}개를 종료했습니다.",
         "otherSessionsNone": "다른 기기에 로그인된 계정이 없었습니다.",
-        "otherSessionsError": "다른 기기에서 로그아웃하지 못했습니다."
+        "otherSessionsError": "다른 기기에서 로그아웃하지 못했습니다.",
+        "otherSessionsTooManyAttempts": "요청이 너무 많습니다. 잠시 기다린 후 다시 시도하세요."
     },
     "login": {
         "tagline": "가족 플래너에 다시 오신 것을 환영합니다.",

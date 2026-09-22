@@ -2795,7 +2795,8 @@
         "otherSessionsEnded_one": "{{count}} sesi lain diakhiri.",
         "otherSessionsEnded_few": "{{count}} sesi lain diakhiri.",
         "otherSessionsNone": "Akunmu tidak masuk di perangkat lain mana pun.",
-        "otherSessionsError": "Gagal keluar dari perangkat lain."
+        "otherSessionsError": "Gagal keluar dari perangkat lain.",
+        "otherSessionsTooManyAttempts": "Terlalu banyak permintaan. Tunggu sebentar, lalu coba lagi."
     },
     "login": {
         "tagline": "Selamat datang kembali di perencana keluarga Anda.",

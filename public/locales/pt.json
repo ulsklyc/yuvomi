@@ -2783,7 +2783,8 @@
         "otherSessionsEnded_one": "{{count}} outra sessão terminada.",
         "otherSessionsEnded_few": "{{count}} outras sessões terminadas.",
         "otherSessionsNone": "A tua conta não tinha sessão iniciada em nenhum outro dispositivo.",
-        "otherSessionsError": "Não foi possível terminar a sessão noutros dispositivos."
+        "otherSessionsError": "Não foi possível terminar a sessão noutros dispositivos.",
+        "otherSessionsTooManyAttempts": "Demasiados pedidos. Aguarda um momento e tenta novamente."
     },
     "login": {
         "tagline": "Bem-vindo de volta ao teu planeador familiar.",

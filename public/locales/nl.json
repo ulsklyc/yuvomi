@@ -2783,7 +2783,8 @@
         "otherSessionsEnded_one": "{{count}} andere sessie beëindigd.",
         "otherSessionsEnded_few": "{{count}} andere sessies beëindigd.",
         "otherSessionsNone": "Je account was op geen enkel ander apparaat aangemeld.",
-        "otherSessionsError": "Afmelden op andere apparaten is mislukt."
+        "otherSessionsError": "Afmelden op andere apparaten is mislukt.",
+        "otherSessionsTooManyAttempts": "Te veel verzoeken. Wacht even en probeer het dan opnieuw."
     },
     "login": {
         "tagline": "Welkom terug bij je gezinsplanner.",

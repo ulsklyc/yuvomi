@@ -2783,7 +2783,8 @@
         "otherSessionsEnded_one": "{{count}} másik munkamenet befejezve.",
         "otherSessionsEnded_few": "{{count}} másik munkamenet befejezve.",
         "otherSessionsNone": "A fiókod egyetlen más eszközön sem volt bejelentkezve.",
-        "otherSessionsError": "A kijelentkezés más eszközökön nem sikerült."
+        "otherSessionsError": "A kijelentkezés más eszközökön nem sikerült.",
+        "otherSessionsTooManyAttempts": "Túl sok kérés. Várj egy kicsit, majd próbáld újra."
     },
     "login": {
         "tagline": "Üdv újra a családi tervezőben.",

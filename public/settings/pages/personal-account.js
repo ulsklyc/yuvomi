@@ -349,6 +349,19 @@ function askForCode(card, texts, onConfirm, onCancel) {
  * @param {any} err
  * @returns {string}
  */
+/**
+ * Fehlertext fuer "Auf anderen Geraeten abmelden" (#1354). Ein 429 heisst nur
+ * "zu schnell geklickt" - dann sagt die Seite, dass Warten hilft, statt einen
+ * Fehlschlag zu melden, nach dem man es gleich wieder versucht.
+ *
+ * @param {{ status?: number }} err
+ * @returns {string}
+ */
+export function logoutOthersErrorText(err) {
+  if (err?.status === 429) return t('settings.otherSessionsTooManyAttempts');
+  return t('settings.otherSessionsError');
+}
+
 function twoFactorErrorText(err) {
   if (err?.status === 429) return t('settings.twoFactorTooManyAttempts');
   const reason = err?.data?.reason;
@@ -725,8 +738,8 @@ function bindEvents(container, user, profileState) {
           ? t('settings.otherSessionsEnded', { count: ended })
           : t('settings.otherSessionsNone');
       }
-    } catch {
-      showError(errorBox, t('settings.otherSessionsError'));
+    } catch (error) {
+      showError(errorBox, logoutOthersErrorText(error));
     } finally {
       logoutOthersBusy = false;
       logoutOthersButton.removeAttribute('aria-disabled');

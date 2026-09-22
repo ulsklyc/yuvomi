@@ -2783,7 +2783,8 @@
         "otherSessionsEnded_one": "{{count}} sesión más cerrada.",
         "otherSessionsEnded_few": "{{count}} sesiones más cerradas.",
         "otherSessionsNone": "Tu cuenta no tenía la sesión iniciada en ningún otro dispositivo.",
-        "otherSessionsError": "No se pudo cerrar la sesión en otros dispositivos."
+        "otherSessionsError": "No se pudo cerrar la sesión en otros dispositivos.",
+        "otherSessionsTooManyAttempts": "Demasiadas solicitudes. Espera un momento y vuelve a intentarlo."
     },
     "login": {
         "tagline": "Bienvenido de nuevo a tu planificador familiar.",

@@ -2783,7 +2783,8 @@
         "otherSessionsEnded_one": "Ukončena {{count}} další relace.",
         "otherSessionsEnded_few": "Ukončeny {{count}} další relace.",
         "otherSessionsNone": "Tvůj účet nebyl přihlášen na žádném jiném zařízení.",
-        "otherSessionsError": "Odhlášení na ostatních zařízeních se nezdařilo."
+        "otherSessionsError": "Odhlášení na ostatních zařízeních se nezdařilo.",
+        "otherSessionsTooManyAttempts": "Příliš mnoho požadavků. Chvíli počkej a zkus to znovu."
     },
     "login": {
         "tagline": "Vítejte zpět ve svém rodinném plánovači.",

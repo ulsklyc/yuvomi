@@ -2783,7 +2783,8 @@
         "otherSessionsEnded_one": "{{count}} other session ended.",
         "otherSessionsEnded_few": "{{count}} other sessions ended.",
         "otherSessionsNone": "Your account was not signed in on any other device.",
-        "otherSessionsError": "Signing out on other devices failed."
+        "otherSessionsError": "Signing out on other devices failed.",
+        "otherSessionsTooManyAttempts": "Too many requests. Please wait a moment, then try again."
     },
     "login": {
         "tagline": "Welcome back to your family planner.",

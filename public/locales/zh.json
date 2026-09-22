@@ -2783,7 +2783,8 @@
         "otherSessionsEnded_one": "已结束 {{count}} 个其他会话。",
         "otherSessionsEnded_few": "已结束 {{count}} 个其他会话。",
         "otherSessionsNone": "你的账户没有在其他任何设备上登录。",
-        "otherSessionsError": "在其他设备上退出失败。"
+        "otherSessionsError": "在其他设备上退出失败。",
+        "otherSessionsTooManyAttempts": "请求过多，请稍候再试。"
     },
     "login": {
         "tagline": "欢迎回到您的家庭计划工具。",

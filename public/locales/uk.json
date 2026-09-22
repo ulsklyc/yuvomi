@@ -2783,7 +2783,8 @@
         "otherSessionsEnded_one": "Завершено {{count}} інший сеанс.",
         "otherSessionsEnded_few": "Завершено {{count}} інші сеанси.",
         "otherSessionsNone": "Ваш обліковий запис не був відкритий на жодному іншому пристрої.",
-        "otherSessionsError": "Не вдалося вийти на інших пристроях."
+        "otherSessionsError": "Не вдалося вийти на інших пристроях.",
+        "otherSessionsTooManyAttempts": "Забагато запитів. Зачекайте трохи й спробуйте знову."
     },
     "login": {
         "tagline": "З поверненням до вашого сімейного планувальника.",

@@ -64,6 +64,24 @@ const created = await fetch(`${BASE}/api/v1/auth/users`, {
 });
 assert.equal(created.status, 201, 'zweites Mitglied angelegt');
 
+const db = (await import('../server/db.js')).get();
+const { DISPLAY_COOKIE } = await import('../server/services/display-accounts.js');
+
+/** Die Sitzungs-ID hinter einem Cookie-Header (signiert: `s:<sid>.<sig>`). */
+function sidOf(cookie) {
+  const signed = decodeURIComponent(/yuvomi\.sid=([^;]+)/.exec(cookie)[1]);
+  return signed.slice(2, signed.lastIndexOf('.'));
+}
+
+async function createMember(username) {
+  const res = await fetch(`${BASE}/api/v1/auth/users`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: adminSetup.cookie, 'X-CSRF-Token': adminSetup.csrfToken },
+    body: JSON.stringify({ username, display_name: username, password: `${username}pass1234` }),
+  });
+  assert.equal(res.status, 201, `Mitglied ${username} angelegt`);
+}
+
 test('beendet alle anderen Sitzungen des Mitglieds, die eigene und fremde bleiben', async () => {
   const phone = await login('kid', 'kidpass1234');
   const laptop = await login('kid', 'kidpass1234');
@@ -113,4 +131,67 @@ test('ein API-Token beendet keine Sitzungen und bleibt selbst gueltig', async ()
   assert.equal(await meStatus(secondAdmin), 200, 'Sitzung B lebt');
   const probe = await fetch(`${BASE}/api/v1/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
   assert.equal(probe.status, 200, 'das Token selbst bleibt gueltig');
+});
+
+test('eine abgelaufene, noch nicht aufgeraeumte Zeile zaehlt nicht als beendete Sitzung', async () => {
+  // Der Store raeumt abgelaufene Zeilen nur alle 15 Minuten weg. Bis dahin steht
+  // eine Sitzung, die laengst nicht mehr gilt, noch in der Tabelle - die Antwort
+  // darf sie nicht als "1 andere Sitzung beendet" melden (Review zu #1423).
+  await createMember('expiry');
+  const caller = await login('expiry', 'expirypass1234');
+  const stale = await login('expiry', 'expirypass1234');
+  db.prepare('UPDATE sessions SET expired_at = ? WHERE sid = ?').run(Date.now() - 1000, sidOf(stale.cookie));
+
+  const body = await (await signOutOthers(caller)).json();
+  assert.equal(body.ended, 0, 'eine abgelaufene Zeile ist keine lebende Sitzung');
+  const left = db.prepare('SELECT 1 FROM sessions WHERE sid = ?').get(sidOf(stale.cookie));
+  assert.equal(left, undefined, 'geloescht wird die abgelaufene Zeile trotzdem');
+  assert.equal(await meStatus(caller), 200, 'die eigene Sitzung bleibt');
+});
+
+test('ein gekoppeltes Display neben einer Sitzung wird abgewiesen, und nichts endet', async () => {
+  const admin = await login('admin', 'adminpass123');
+  const secondAdmin = await login('admin', 'adminpass123');
+  const adminHeaders = { 'Content-Type': 'application/json', Cookie: admin.cookie, 'X-CSRF-Token': admin.csrfToken };
+  const createdDisplay = await fetch(`${BASE}/api/v1/displays`, {
+    method: 'POST', headers: adminHeaders, body: JSON.stringify({ display_name: 'Kueche' }),
+  });
+  assert.equal(createdDisplay.status, 201, 'Display angelegt');
+  const displayId = (await createdDisplay.json()).data.id;
+  const issued = await fetch(`${BASE}/api/v1/displays/${displayId}/pairing-code`, {
+    method: 'POST', headers: adminHeaders, body: '{}',
+  });
+  const { code } = (await issued.json()).data;
+  const paired = await fetch(`${BASE}/api/v1/displays/pair`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  });
+  assert.equal(paired.status, 201, 'Geraet gekoppelt');
+  const match = String(paired.headers.get('set-cookie') || '').match(new RegExp(`${DISPLAY_COOKIE}=([^;]+)`));
+  assert.ok(match, 'Display-Cookie gesetzt');
+
+  // Das Tablett, auf dem sich ausserdem ein Mensch angemeldet hat: Sitzungs-
+  // Cookie UND gueltiges CSRF-Token der Sitzung, dazu das Display-Cookie.
+  const res = await signOutOthers(
+    { cookie: `${admin.cookie}; ${DISPLAY_COOKIE}=${match[1]}`, csrfToken: admin.csrfToken },
+  );
+  assert.equal(res.status, 403, 'das Display fuehrt, und ein Display beendet keine Sitzungen');
+  assert.equal(await meStatus(secondAdmin), 200, 'die andere Sitzung lebt');
+});
+
+test('der Limiter zaehlt je Mitglied, nicht je Adresse', async () => {
+  // Hinter einem Proxy ohne `trust proxy` kommt der ganze Haushalt von EINER
+  // Adresse. Zaehlte der Limiter je IP, sperrte ein Mitglied mit ein paar
+  // Klicks alle anderen aus (Review zu #1423). Diese Suite laeuft komplett von
+  // 127.0.0.1 - genau diese Lage.
+  await createMember('eager');
+  await createMember('patient');
+  const eager = await login('eager', 'eagerpass1234');
+  const statuses = [];
+  for (let i = 0; i < 7; i += 1) statuses.push((await signOutOthers(eager)).status);
+  assert.ok(statuses.includes(429), `wer zu oft klickt, wird gebremst: ${statuses.join(',')}`);
+
+  const patient = await login('patient', 'patientpass1234');
+  assert.equal((await signOutOthers(patient)).status, 200, 'ein anderes Mitglied von derselben Adresse ist frei');
 });

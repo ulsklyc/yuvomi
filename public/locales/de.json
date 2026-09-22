@@ -2795,7 +2795,8 @@
         "otherSessionsEnded_one": "{{count}} andere Sitzung beendet.",
         "otherSessionsEnded_few": "{{count}} andere Sitzungen beendet.",
         "otherSessionsNone": "Auf keinem anderen Gerät war dein Konto angemeldet.",
-        "otherSessionsError": "Abmelden auf anderen Geräten fehlgeschlagen."
+        "otherSessionsError": "Abmelden auf anderen Geräten fehlgeschlagen.",
+        "otherSessionsTooManyAttempts": "Zu viele Anfragen. Bitte warte kurz und versuche es dann erneut."
     },
     "login": {
         "tagline": "Willkommen zurück bei deinem Familienplaner.",

@@ -2795,7 +2795,8 @@
         "otherSessionsEnded_one": "{{count}} ibang session ang tinapos.",
         "otherSessionsEnded_few": "{{count}} ibang session ang tinapos.",
         "otherSessionsNone": "Hindi naka-sign in ang account mo sa anumang ibang device.",
-        "otherSessionsError": "Hindi nagawang mag-sign out sa ibang device."
+        "otherSessionsError": "Hindi nagawang mag-sign out sa ibang device.",
+        "otherSessionsTooManyAttempts": "Masyadong maraming kahilingan. Maghintay sandali, saka subukang muli."
     },
     "login": {
         "tagline": "Maligayang pagbabalik sa iyong family planner.",

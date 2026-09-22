@@ -2783,7 +2783,8 @@
         "otherSessionsEnded_one": "他のセッションを {{count}} 件終了しました。",
         "otherSessionsEnded_few": "他のセッションを {{count}} 件終了しました。",
         "otherSessionsNone": "他のデバイスではサインインしていませんでした。",
-        "otherSessionsError": "他のデバイスからのサインアウトに失敗しました。"
+        "otherSessionsError": "他のデバイスからのサインアウトに失敗しました。",
+        "otherSessionsTooManyAttempts": "リクエストが多すぎます。少し待ってから、もう一度お試しください。"
     },
     "login": {
         "tagline": "家族のプランナーへおかえりなさい。",

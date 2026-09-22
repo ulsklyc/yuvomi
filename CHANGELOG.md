@@ -13,7 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   phone or a borrowed laptop could stay signed in for months, and signing out only ended the
   session on the device you were using. Settings, Account, now has "Other devices" with a button
   that ends every other session of your account after a confirmation, including ones started with
-  single sign-on; this device stays signed in, and the page says how many sessions were ended. API
+  single sign-on; this device stays signed in, and the page says how many sessions were ended,
+  counting only ones that were still valid. Clicking it too often asks you to wait a moment; the
+  limit applies to each member separately, so one member cannot lock out another. API
   tokens and paired wall displays are not sessions and keep working; they are revoked under API
   tokens and Displays as before. For API clients: `POST /api/v1/auth/logout-others` needs a
   browser session and a CSRF token, answers `{ ok: true, ended }`, and refuses an API token with

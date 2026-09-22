@@ -2795,7 +2795,8 @@
         "otherSessionsEnded_one": "{{count}} نشست دیگر پایان یافت.",
         "otherSessionsEnded_few": "{{count}} نشست دیگر پایان یافت.",
         "otherSessionsNone": "حساب تو در هیچ دستگاه دیگری وارد نشده بود.",
-        "otherSessionsError": "خروج از دستگاه‌های دیگر ناموفق بود."
+        "otherSessionsError": "خروج از دستگاه‌های دیگر ناموفق بود.",
+        "otherSessionsTooManyAttempts": "درخواست‌های بیش از حد. کمی صبر کنید و دوباره تلاش کنید."
     },
     "login": {
         "tagline": "دوباره به برنامه‌ریز خانوادگی‌تان خوش آمدید.",
