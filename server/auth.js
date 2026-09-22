@@ -36,6 +36,7 @@ import { passwordResetService as defaultResetService } from './services/password
 import { inviteService as defaultInviteService } from './services/invites.js';
 import { parseScopes, serializeScopes, normalizeScopes } from './scopes.js';
 import { hashPassword, normalizePassword, verifyPassword } from './utils/password.js';
+import { accountIdsByEmail } from './utils/email-match.js';
 import {
   resolvePermissions, buildSessionModuleAccess, clientPermissions,
   invitePresetPermissions, isValidInvitePreset, writeSubjectPermissions,
@@ -1161,19 +1162,14 @@ export function findOrCreateOidcUser(database, claims) {
   //    Family-User-E-Mails hängen an contacts.email (Primär) bzw.
   //    contact_emails.value (Sekundär). Verknüpft wird nur, wenn GENAU EIN noch
   //    nicht OIDC-gebundener Account die E-Mail führt; 0 oder >1 Treffer →
-  //    sicherheitshalber neuer Account. Beide Seiten gleich normalisiert: der
-  //    Claim ist oben getrimmt, die gespeicherte Adresse kann Leerraum tragen
-  //    (Formular, Import) und wird hier beim Lesen getrimmt.
+  //    sicherheitshalber neuer Account. Beide Seiten laufen durch dieselbe
+  //    Regel (`accountIdsByEmail`, utils/email-match.js): die gespeicherte
+  //    Adresse kann Leerraum tragen (Formular, Import, auch Tab oder NBSP).
+  //    `assertSsoOnlyAllowed` fragt mit denselben Optionen.
   const trustMissingVerified = process.env.OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM === 'true';
   if (email && (email_verified === true || (trustMissingVerified && email_verified !== false))) {
-    const matches = database.prepare(`
-      SELECT DISTINCT u.id
-      FROM users u
-      JOIN contacts c ON c.family_user_id = u.id
-      LEFT JOIN contact_emails ce ON ce.contact_id = c.id
-      WHERE u.oidc_sub IS NULL
-        AND (lower(trim(c.email)) = lower(?) OR lower(trim(ce.value)) = lower(?))
-    `).all(email, email);
+    const matches = accountIdsByEmail(database, email, { secondary: true, unlinkedOnly: true })
+      .map((id) => ({ id }));
 
     if (matches.length === 1) {
       // Ein Konto, das sich nicht anmelden darf, wird nicht verknuepft: es
@@ -1521,6 +1517,7 @@ export function buildResetRoutes(targetRouter, {
   resetService = defaultResetService,
   baseUrl = process.env.BASE_URL || '',
   limiter = passwordResetLimiter,
+  defer = (fn) => setImmediate(fn),
 } = {}) {
   const getDb = () => (database || db.get());
 
@@ -1529,16 +1526,18 @@ export function buildResetRoutes(targetRouter, {
     if (!id) return null;
     const byName = getDb().prepare('SELECT id FROM users WHERE username = ?').get(id);
     if (byName) return byName.id;
-    // Dieselbe Regel wie die SSO-Verknuepfung: beide Seiten getrimmt und ohne
-    // Gross-/Kleinschreibung verglichen, und nur GENAU EIN Konto zaehlt. Bei
-    // zwei Treffern ging der Link sonst an irgendeines; so geht er an keines,
-    // und die Antwort nach aussen bleibt dieselbe.
-    const byEmail = getDb().prepare(`
-      SELECT DISTINCT family_user_id AS id FROM contacts
-      WHERE family_user_id IS NOT NULL AND lower(trim(email)) = lower(?)
-      LIMIT 2
-    `).all(id);
-    return byEmail.length === 1 ? byEmail[0].id : null;
+    // Dieselbe Vergleichsregel wie die SSO-Verknuepfung (utils/email-match.js),
+    // gezaehlt nur Kontakte, die auf ein bestehendes Konto zeigen, und nur
+    // GENAU EIN Konto zaehlt. Bei zwei Treffern ging der Link sonst an
+    // irgendeines; so geht er an keines, und die Antwort bleibt dieselbe.
+    // Gaeste der geteilten Ausgaben machen eine Adresse nicht mehrdeutig: ein
+    // Gast entsteht aus einem beliebigen Kontakt und sperrte sonst den Reset
+    // des Mitglieds mit derselben Adresse. Allein bleibt ein Gast erreichbar.
+    const ids = accountIdsByEmail(getDb(), id);
+    const members = ids.filter((uid) => !isSplitExpenseGuest(uid, getDb()));
+    if (members.length === 1) return members[0];
+    if (members.length === 0 && ids.length === 1) return ids[0];
+    return null;
   }
 
   /**
@@ -1560,43 +1559,52 @@ export function buildResetRoutes(targetRouter, {
   // eine Antwort behaelt.
   const emailFor = (userId) => memberEmail(userId, { db: getDb() });
 
-  targetRouter.post('/forgot-password', limiter, async (req, res) => {
-    try {
-      const { identifier } = req.body || {};
-      const userId = resolveUser(identifier);
-      // Anti-enumeration: identical response regardless of outcome. Deshalb
-      // gehen auch die beiden neuen Gruende (#847) durch dieselbe Antwort -
-      // ein eigener Statuscode fuer "dieses Konto hat kein Passwort" wuerde
-      // verraten, welche Konten per SSO gefuehrt werden.
-      if (userId && (isPasswordLoginEnabled(getDb()) || isSplitExpenseGuest(userId, getDb()))
-          && hasResettablePassword(userId)
-          && emailService.isConfigured()) {
-        const to = emailFor(userId);
-        // Reset links MUST use an explicitly configured, trusted origin.
-        // Never derive it from the request Host header (password-reset
-        // poisoning: a forged Host would point the victim's token at an
-        // attacker-controlled domain).
-        const origin = String(baseUrl || '').trim().replace(/\/$/, '');
-        if (to && origin) {
-          const { token } = resetService.createToken(userId);
-          const link = `${origin}/reset-password?token=${token}`;
-          await emailService.sendMail({
-            to,
-            subject: 'Reset your Yuvomi password',
-            text: `Open this link to choose a new password (valid for 1 hour): ${link}`,
-            html: `<p>Open this link to choose a new password (valid for 1 hour):</p>`
-              + `<p><a href="${link}">${link}</a></p>`,
-          }).catch((err) => log.error('Reset mail failed:', err.message));
-        } else if (to && !origin) {
-          log.warn('BASE_URL not configured; password-reset link not sent.');
-        }
-      }
-      res.json({ data: { ok: true } });
-    } catch (err) {
-      log.error('forgot-password error:', err.message);
-      // Still return generic success to avoid leaking failures.
-      res.json({ data: { ok: true } });
+  /**
+   * Die eigentliche Arbeit hinter "Passwort vergessen": Konto aufloesen und
+   * gegebenenfalls den Link verschicken. Laeuft NACH der Antwort (`defer`),
+   * damit deren Dauer nicht verraet, ob es das Konto gibt - ein Mailversand
+   * dauert messbar laenger als "nichts gefunden". Fehler landen nur im Log.
+   */
+  async function sendResetLinkFor(identifier) {
+    const userId = resolveUser(identifier);
+    // Anti-enumeration: die Antwort ist schon raus und fuer jeden Ausgang
+    // gleich. Deshalb gehen auch die beiden Gruende aus #847 hier still durch -
+    // ein eigener Statuscode fuer "dieses Konto hat kein Passwort" wuerde
+    // verraten, welche Konten per SSO gefuehrt werden.
+    if (!userId || !(isPasswordLoginEnabled(getDb()) || isSplitExpenseGuest(userId, getDb()))
+        || !hasResettablePassword(userId)
+        || !emailService.isConfigured()) {
+      return;
     }
+    const to = emailFor(userId);
+    // Reset links MUST use an explicitly configured, trusted origin.
+    // Never derive it from the request Host header (password-reset
+    // poisoning: a forged Host would point the victim's token at an
+    // attacker-controlled domain).
+    const origin = String(baseUrl || '').trim().replace(/\/$/, '');
+    if (to && origin) {
+      const { token } = resetService.createToken(userId);
+      const link = `${origin}/reset-password?token=${token}`;
+      await emailService.sendMail({
+        to,
+        subject: 'Reset your Yuvomi password',
+        text: `Open this link to choose a new password (valid for 1 hour): ${link}`,
+        html: `<p>Open this link to choose a new password (valid for 1 hour):</p>`
+          + `<p><a href="${link}">${link}</a></p>`,
+      }).catch((err) => log.error('Reset mail failed:', err.message));
+    } else if (to && !origin) {
+      log.warn('BASE_URL not configured; password-reset link not sent.');
+    }
+  }
+
+  targetRouter.post('/forgot-password', limiter, (req, res) => {
+    const { identifier } = req.body || {};
+    // Erst antworten, dann arbeiten: dieselbe Antwort, dieselbe Zeit, fuer ein
+    // bekanntes wie fuer ein unbekanntes Konto.
+    res.json({ data: { ok: true } });
+    defer(() => sendResetLinkFor(identifier).catch((err) => {
+      log.error('forgot-password error:', err.message);
+    }));
   });
 
   targetRouter.post('/reset-password', limiter, async (req, res) => {
@@ -2882,7 +2890,7 @@ function adminUserRow(userId) {
  * @param {string|undefined} password
  * @returns {string|null} Fehlermeldung oder null
  */
-function assertSsoOnlyAllowed(ssoOnly, password, { linked = false, email = null, excludeUserId = null } = {}) {
+export function assertSsoOnlyAllowed(ssoOnly, password, { linked = false, email = null, excludeUserId = null } = {}) {
   if (!ssoOnly) return null;
   if (!isOidcEnabled()) {
     return 'An account without a password requires OIDC to be configured.';
@@ -2906,22 +2914,16 @@ function assertSsoOnlyAllowed(ssoOnly, password, { linked = false, email = null,
   // Und sie muss dieses eine Konto meinen: `findOrCreateOidcUser` verknuepft
   // nur bei GENAU einem Treffer und laesst zwei Kandidaten unangetastet.
   //
-  // Die Bedingung ist bewusst dieselbe wie dort - `lower()` UND die
-  // Zweitadressen aus `contact_emails`. Eine engere Pruefung hier waere
+  // Die Bedingung ist bewusst dieselbe wie dort - dieselbe Funktion mit
+  // denselben Optionen (`accountIdsByEmail`: Leerraum, Schreibweise UND die
+  // Zweitadressen aus `contact_emails`). Eine engere Pruefung hier waere
   // schlimmer als keine: sie gaebe gruenes Licht fuer genau die Faelle, an
   // denen der Linker spaeter scheitert (andere Gross-/Kleinschreibung, oder
   // dieselbe Adresse als Zweitadresse eines anderen Mitglieds), und das Konto
   // stuende dann ohne Passwort und ohne Verknuepfung da.
-  const clash = db.get().prepare(`
-    SELECT 1
-    FROM users u
-    JOIN contacts c ON c.family_user_id = u.id
-    LEFT JOIN contact_emails ce ON ce.contact_id = c.id
-    WHERE u.id IS NOT ?
-      AND u.oidc_sub IS NULL
-      AND (lower(c.email) = lower(?) OR lower(ce.value) = lower(?))
-    LIMIT 1
-  `).get(excludeUserId, address, address);
+  const clash = accountIdsByEmail(db.get(), address, {
+    secondary: true, unlinkedOnly: true, excludeUserId,
+  }).length > 0;
   if (clash) {
     return 'This email address already belongs to another member, so SSO could not tell the accounts apart.';
   }

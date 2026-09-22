@@ -85,21 +85,26 @@ test('cleanupExpired deletes only stale rows', () => {
 import express from 'express';
 import bcrypt from 'bcrypt';
 
-function makeAuthApp(db, { baseUrl = 'https://oikos.test' } = {}) {
+function makeAuthApp(db, { baseUrl = 'https://oikos.test', sendMail = null } = {}) {
   // Lazy import so the route module reads our injected services.
   return import('../server/auth.js').then(({ buildResetRoutes }) => {
     const sent = [];
     const app = express();
     app.use(express.json());
     const router = express.Router();
+    const pending = [];
     buildResetRoutes(router, {
       database: db,
-      emailService: { isConfigured: () => true, sendMail: async (m) => { sent.push(m); } },
+      emailService: { isConfigured: () => true, sendMail: sendMail || (async (m) => { sent.push(m); }) },
       resetService: createPasswordResetService({ db }),
       baseUrl,
       limiter: (_req, _res, next) => next(), // bypass rate limiting in tests
+      // Der Versand laeuft nach der Antwort (Antwortzeit ist kein Konto-Orakel);
+      // `drain` wartet darauf, damit die Tests danach zaehlen koennen.
+      defer: (fn) => { pending.push(new Promise((r) => setImmediate(() => Promise.resolve(fn()).finally(r)))); },
     });
     app.use('/auth', router);
+    app.locals.drain = () => Promise.all(pending.splice(0));
     return { app, sent };
   });
 }
@@ -115,6 +120,7 @@ async function callJson(app, method, path, body) {
   });
   const json = await res.json().catch(() => null);
   server.close();
+  await app.locals.drain?.();
   return { status: res.status, json };
 }
 
@@ -211,6 +217,87 @@ test('forgot-password schickt bei mehrdeutiger Adresse an niemanden und antworte
   assert.equal(res.status, 200);
   assert.deepEqual(res.json, { data: { ok: true } }, 'dieselbe Antwort wie bei jedem anderen Ausgang');
   assert.equal(sent.length, 0, 'kein Link an ein beliebiges der beiden Konten');
+});
+
+test('forgot-password findet eine Adresse mit Tab, CR oder NBSP', async () => {
+  for (const stored of ['\talice@test\r', ' Alice@Test ']) {
+    const db = makeDb();
+    db.exec('CREATE TABLE contacts (id INTEGER PRIMARY KEY AUTOINCREMENT, family_user_id INTEGER, email TEXT);');
+    db.prepare('INSERT INTO contacts (family_user_id, email) VALUES (1, ?)').run(stored);
+    const { app, sent } = await makeAuthApp(db);
+    await callJson(app, 'POST', '/auth/forgot-password', { identifier: 'alice@test' });
+    assert.equal(sent.length, 1, `gespeichert als ${JSON.stringify(stored)}`);
+  }
+});
+
+function makeDbWithGuest({ guestEmail, memberEmail }) {
+  const db = makeDb();
+  db.prepare("INSERT INTO users (id, username) VALUES (2,'gast')").run();
+  db.exec(`CREATE TABLE contacts (id INTEGER PRIMARY KEY AUTOINCREMENT, family_user_id INTEGER, email TEXT);
+    CREATE TABLE split_expense_guest_users (user_id INTEGER PRIMARY KEY);`);
+  db.prepare('INSERT INTO split_expense_guest_users (user_id) VALUES (2)').run();
+  if (memberEmail) db.prepare('INSERT INTO contacts (family_user_id, email) VALUES (1, ?)').run(memberEmail);
+  db.prepare('INSERT INTO contacts (family_user_id, email) VALUES (2, ?)').run(guestEmail);
+  return db;
+}
+
+test('forgot-password: ein Gastkonto aus den geteilten Ausgaben macht die Adresse nicht mehrdeutig', async () => {
+  // Ein Gast entsteht aus einem beliebigen Kontakt; fuehrt der zufaellig
+  // dieselbe Adresse wie ein Mitglied, sperrte er sonst dessen Reset.
+  const db = makeDbWithGuest({ memberEmail: 'alice@test', guestEmail: 'Alice@Test' });
+  const { app, sent } = await makeAuthApp(db);
+  await callJson(app, 'POST', '/auth/forgot-password', { identifier: 'alice@test' });
+  assert.equal(sent.length, 1, 'das Mitglied bekommt seinen Link');
+});
+
+test('forgot-password: ein Gast allein wird ueber seine Adresse weiterhin gefunden', async () => {
+  const db = makeDbWithGuest({ guestEmail: 'gast@test' });
+  const { app, sent } = await makeAuthApp(db);
+  await callJson(app, 'POST', '/auth/forgot-password', { identifier: 'gast@test' });
+  assert.equal(sent.length, 1);
+});
+
+test('forgot-password antwortet, bevor der Versand fertig ist, und in jedem Fall gleich', async () => {
+  // Wartete die Antwort auf den Mailserver, verriete ihre Dauer, ob es das
+  // Konto gibt. Der Versand laeuft deshalb danach im Hintergrund.
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const started = [];
+  const { app } = await makeAuthApp(db, {
+    sendMail: async (m) => { started.push(m); await gate; },
+  });
+  const { createServer } = await import('node:http');
+  const server = createServer(app);
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const ask = async (identifier) => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 1500);
+    try {
+      const res = await fetch(`http://127.0.0.1:${server.address().port}/auth/forgot-password`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ identifier }), signal: ctrl.signal,
+      });
+      return { status: res.status, type: res.headers.get('content-type'), body: await res.text() };
+    } catch {
+      return 'timeout';
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  try {
+    const known = await ask('alice');
+    assert.notEqual(known, 'timeout', 'die Antwort wartete auf den Mailversand');
+    const unknown = await ask('niemand');
+    assert.deepEqual(unknown, known, 'unbekanntes Konto antwortet genauso');
+  } finally {
+    release();
+    server.closeAllConnections?.();
+    server.close();
+  }
+  await app.locals.drain();
+  assert.equal(started.length, 1, 'der Versand lief trotzdem');
 });
 
 test('reset-password rejects an invalid token', async () => {
