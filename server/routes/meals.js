@@ -100,6 +100,36 @@ function createMealRecord({ date, meal_type, title, notes, recipe_url, recipe_id
   return loadMealWithIngredients(result.lastInsertRowid);
 }
 
+/**
+ * Ist der Slot (date + meal_type) belegt? Belegt heisst: eine gespeicherte
+ * Mahlzeit ODER ein Vorkommen einer Wochenserie, das `materializeRecurringMeals`
+ * beim Aufschlagen der Woche anlegen wuerde. Vorkommen existieren erst als
+ * Zeile, wenn jemand die Woche geladen hat; ein Import in eine nie geoeffnete
+ * Woche saehe sonst einen leeren Slot, den die Serie beim ersten Blick fuellt.
+ * Die Serien-Regel ist dieselbe wie dort: eine Ausnahme (geloeschtes oder
+ * weggeschobenes Vorkommen) belegt nicht, und hat die Serie an dem Tag schon
+ * eine Zeile, zaehlt nur diese Zeile mit ihrem heutigen meal_type. Liest nur,
+ * materialisiert nichts.
+ */
+function slotOccupancyChecker() {
+  const hasMeal = db.get().prepare('SELECT 1 FROM meals WHERE date = ? AND meal_type = ? LIMIT 1');
+  const seriesTemplates = db.get().prepare(`
+    SELECT t.*
+    FROM meal_recurrence_templates t
+    WHERE t.meal_type = ?
+      AND t.start_date <= ?
+      AND (t.end_date IS NULL OR t.end_date >= ?)
+      AND NOT EXISTS (SELECT 1 FROM meal_recurrence_exceptions e WHERE e.template_id = t.id AND e.date = ?)
+      AND NOT EXISTS (SELECT 1 FROM meals m WHERE m.recurrence_template_id = t.id AND m.date = ?)
+  `);
+  return (date, mealType) => {
+    if (hasMeal.get(date, mealType)) return true;
+    return seriesTemplates.all(mealType, date, date, date, date).some((template) =>
+      VALID_WEEKDAYS.includes(template.weekday)
+      && datesForTemplateInRange(template, date, date).length > 0);
+  };
+}
+
 function materializeRecurringMeals(from, to) {
   const templates = db.get().prepare(`
     SELECT *
@@ -376,10 +406,22 @@ router.post('/', (req, res) => {
   }
 });
 
+/**
+ * POST /api/v1/meals/apply-plan
+ * Body: { assignments, replace_existing?, skip_occupied? }
+ * Ohne Option additiv; replace_existing leert die genannten Slots zuerst;
+ * skip_occupied legt nur in Slots an, die vor dem Aufruf leer waren
+ * (Discussion #1380), und nennt die uebrigen in `skipped`.
+ * Response: 201 { data: Meal[] } bzw. mit skip_occupied { data, skipped }
+ */
 router.post('/apply-plan', (req, res) => {
   try {
     const assignments = Array.isArray(req.body.assignments) ? req.body.assignments : [];
     const replaceExisting = req.body.replace_existing === true;
+    const skipOccupied = req.body.skip_occupied === true;
+    if (replaceExisting && skipOccupied) {
+      return res.status(400).json({ error: 'skip_occupied und replace_existing schliessen sich aus.', code: 400 });
+    }
     if (!assignments.length) {
       return res.status(400).json({ error: 'Mindestens eine Mahlzeit ist erforderlich.', code: 400 });
     }
@@ -413,8 +455,24 @@ router.post('/apply-plan', (req, res) => {
       if (!recipeExists) return res.status(400).json({ error: 'Rezept nicht gefunden.', code: 400 });
     }
 
+    const skipped = [];
     const created = db.transaction(() => {
       const actorId = req.authUserId || req.session.userId;
+      if (skipOccupied) {
+        // "Besetzt" zaehlt gegen den Stand VOR dem Aufruf: erst alle Slots
+        // pruefen, dann schreiben. Mehrere Zuweisungen fuer denselben vorher
+        // leeren Slot landen damit alle, wie im additiven Standardmodus.
+        const isOccupied = slotOccupancyChecker();
+        const occupied = new Map();
+        const toCreate = prepared.filter((assignment) => {
+          const slot = `${assignment.date}\u0000${assignment.meal_type}`;
+          if (!occupied.has(slot)) occupied.set(slot, isOccupied(assignment.date, assignment.meal_type));
+          if (!occupied.get(slot)) return true;
+          skipped.push({ date: assignment.date, meal_type: assignment.meal_type, reason: 'occupied' });
+          return false;
+        });
+        return toCreate.map((assignment) => createMealRecord(assignment, actorId));
+      }
       if (replaceExisting) {
         const slots = [...new Set(prepared.map((assignment) => `${assignment.date}\u0000${assignment.meal_type}`))];
         const selectMeals = db.get().prepare('SELECT * FROM meals WHERE date = ? AND meal_type = ? ORDER BY id ASC');
@@ -428,7 +486,8 @@ router.post('/apply-plan', (req, res) => {
       return prepared.map((assignment) => createMealRecord(assignment, actorId));
     });
 
-    res.status(201).json({ data: created });
+    // `skipped` nur im neuen Modus: ohne die Option bleibt die Antwort, wie sie war.
+    res.status(201).json(skipOccupied ? { data: created, skipped } : { data: created });
   } catch (err) {
     log.error('POST /apply-plan', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
