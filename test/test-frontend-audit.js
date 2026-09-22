@@ -14404,6 +14404,38 @@ test('ein Toast-Container hat genau einen Namensgeber', () => {
 });
 
 // --------------------------------------------------------------------------
+// EIN VERSTECKTER DATEI-INPUT OHNE LABEL IST EIN WERKZEUG, KEIN FELD
+//
+// a11y-Runde: `#edit-member-avatar-file` hatte keinen Namen (axe `label`,
+// critical) und bekam als erstes Feld des Dialogs den Erstfokus; per
+// `.sr-only:focus-visible` erschien er als Streifen ueber dem Dialogkopf. Wer
+// einen `.sr-only`-Datei-Input ueber einen eigenen Knopf oeffnet (Vorschau,
+// Stift, "Hochladen"), gibt ihm einen Namen und nimmt ihn aus der Tab-Folge:
+// der Knopf ist der Weg, und modal.js ueberspringt `tabindex="-1"` beim
+// Erstfokus. Ein Input, den ein `<label for>` bedient (Dropzonen), bleibt in
+// der Tab-Folge - dort IST er der Tastaturweg.
+// --------------------------------------------------------------------------
+test('ein versteckter Datei-Input ohne <label for> ist benannt und ausser Tab-Folge', () => {
+  const offenders = [];
+  let seen = 0;
+  for (const rel of walkJsFiles('../public/')) {
+    const src = read(rel);
+    for (const [tag] of src.matchAll(/<input\b(?=[^>]*\btype="file")(?=[^>]*\bclass="[^"]*\bsr-only\b)[^>]*>/g)) {
+      seen += 1;
+      const id = tag.match(/\bid="([^"]+)"/)?.[1];
+      if (id && src.includes(`for="${id}"`)) continue;
+      const named = /\baria-label(?:ledby)?="/.test(tag);
+      const untabbable = /\btabindex="-1"/.test(tag);
+      if (!named || !untabbable) {
+        offenders.push(`${rel}: ${id ?? tag.slice(0, 60)}${named ? '' : ' ohne Namen'}${untabbable ? '' : ' in der Tab-Folge'}`);
+      }
+    }
+  }
+  assert.ok(seen >= 8, `nur ${seen} versteckte Datei-Inputs gefunden - der Scan greift nicht`);
+  assert.deepEqual(offenders, []);
+});
+
+// --------------------------------------------------------------------------
 // DIE REGION SAGT AN, NICHT DER TOAST
 //
 // a11y-Runde: jeder Toast trug `role="alert"` (implizit `aria-live="assertive"`)

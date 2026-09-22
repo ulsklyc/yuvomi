@@ -983,7 +983,8 @@ function openRecipeModal(mode, recipe = null) {
           <div class="recipe-image-editor">
             <button type="button" class="recipe-image-preview" id="recipe-image-preview"
                     aria-label="${esc(t('recipes.imageLabel'))}"></button>
-            <input class="sr-only" id="recipe-image" type="file" accept="image/png,image/jpeg,image/webp">
+            <input class="sr-only" id="recipe-image" type="file" accept="image/png,image/jpeg,image/webp"
+                   aria-label="${esc(t('recipes.imageLabel'))}" tabindex="-1">
             <button type="button" class="btn btn--secondary btn--sm" id="recipe-image-pick">${t('recipes.imageChoose')}</button>
             <button type="button" class="btn btn--ghost btn--sm" id="recipe-image-remove">${t('recipes.imageRemove')}</button>
           </div>

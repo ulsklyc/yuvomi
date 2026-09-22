@@ -1,9 +1,10 @@
 /**
- * Modul: Familie in den Einstellungen - a11y-Sonde im Browser
- * Zweck: Was die a11y-Runden an "Familie" (admin-family.js) gemessen haben,
- *        im gerenderten Dokument festhalten: gueltige Listen, ein benannter
- *        Datei-Input und ein Erstfokus auf dem ersten Feld, das man sieht.
- * Ausfuehren: npm run test:family-dialog-browser (haengt an test:document-guards)
+ * Modul: Dialog-a11y im Browser (Familie, Foto-Dialoge)
+ * Zweck: Was die a11y-Runden an "Familie" (admin-family.js) und an den
+ *        Foto-Dialogen gemessen haben, im gerenderten Dokument festhalten:
+ *        gueltige Listen, benannte Datei-Inputs ausserhalb der Tab-Folge und
+ *        ein Erstfokus auf dem ersten Feld, das man sieht.
+ * Ausfuehren: npm run test:dialog-a11y-browser (haengt an test:document-guards)
  *
  * WARUM IM BROWSER: alle drei Befunde entstehen erst im Dokument. Der leere
  * Zustand der Einladungen wird per `createElement('p')` in die `<ul>` gehaengt,
@@ -139,4 +140,55 @@ for (const device of ['desktop', 'mobile']) {
       await page.close();
     }
   });
+}
+
+/*
+ * DIE FOTO-DIALOGE (Nachtrag zur a11y-Runde). Dasselbe Muster wie in
+ * "Mitglied bearbeiten": ein `.sr-only`-Datei-Input, den eine Vorschau oder ein
+ * Knopf oeffnet. Im Geburtstags-Dialog lag der Erstfokus darauf (gemessen auf
+ * desktop und mobile); in Rezept, Inventar und Haushaltshilfe war er ohne
+ * Namen und ein zweiter, unsichtbarer Tab-Halt neben seinem Knopf.
+ */
+const PHOTO_DIALOGS = [
+  { name: 'Geburtstag anlegen', route: '/birthdays', open: ['#fab-new-birthday'], file: 'bd-photo', first: 'bd-name' },
+  { name: 'Rezept anlegen', route: '/recipes', open: ['#fab-new-recipe'], file: 'recipe-image' },
+  { name: 'Inventar anlegen', route: '/inventory', open: ['.page-fab'], file: 'inv-photo' },
+  { name: 'Haushaltshilfe bearbeiten', route: '/housekeeping', open: ['[data-tab-id="staff"]', '[data-edit-worker]'], file: 'housekeeping-avatar-file' },
+];
+
+for (const dialog of PHOTO_DIALOGS) {
+  for (const device of ['desktop', 'mobile']) {
+    test(`${dialog.name} ${device}: der Foto-Input ist benannt, ausser Tab-Folge und nicht der Erstfokus`, async () => {
+      const page = await openPage(harness, { device, locale: 'de' });
+      try {
+        await gotoRoute(page, dialog.route);
+        for (const selector of dialog.open) {
+          await page.waitForSelector(selector, { timeout: 10000 });
+          await page.$eval(selector, (el) => el.click());
+        }
+        await page.waitForSelector(`#${dialog.file}`, { timeout: 10000 });
+        await page.waitForFunction(
+          () => document.activeElement && document.activeElement !== document.body
+            && Boolean(document.activeElement.closest('.modal-overlay')),
+          { timeout: 5000 },
+        );
+        await new Promise((r) => setTimeout(r, 150));
+        const state = await page.evaluate((fileId) => {
+          const el = document.activeElement;
+          const file = document.getElementById(fileId);
+          return {
+            active: el?.id || el?.getAttribute('name') || el?.tagName,
+            fileTabIndex: file.tabIndex,
+            fileLabel: file.getAttribute('aria-label') || '',
+          };
+        }, dialog.file);
+        assert.notEqual(state.active, dialog.file, 'der Erstfokus liegt auf dem versteckten Datei-Input');
+        if (dialog.first) assert.equal(state.active, dialog.first, `der Erstfokus liegt auf ${state.active}`);
+        assert.equal(state.fileTabIndex, -1, 'der Datei-Input liegt in der Tab-Folge - sein Knopf ist der Weg');
+        assert.ok(state.fileLabel, 'der Datei-Input hat keinen zugaenglichen Namen');
+      } finally {
+        await page.close();
+      }
+    });
+  }
 }
