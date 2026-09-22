@@ -51,6 +51,7 @@ function someFreeTop(input) {
   const left = input.dockedCenter - input.dockedWidth / 2;
   for (let top = Math.ceil(minTop); top + input.dockedHeight <= maxBottom; top += 1) {
     const r = box(top, left, input.dockedWidth, input.dockedHeight);
+    if ((input.keepClear ?? []).some((c) => intersects(r, c))) continue;
     if (!input.zones.some((z) => intersects(r, z))) return top;
   }
   return null;
@@ -76,6 +77,19 @@ function checkInvariant(input, label) {
     assert.ok(Math.abs(r.top - minTop) <= eps, `${label}: zu hoher Stapel beginnt nicht oben (${r.top})`);
   }
   assert.ok(r.left >= -eps && r.right <= input.viewport.width + eps, `${label}: Stapel ragt seitlich hinaus`);
+  // Die Navigation bleibt frei, solange es im Bild ueberhaupt einen Platz neben ihr gibt.
+  const { minTop: lo, maxBottom: hi } = bounds(input);
+  const roomBesideChrome = (() => {
+    for (let top = Math.ceil(lo); top + input.dockedHeight <= hi; top += 1) {
+      const probe = box(top, r.left, input.dockedWidth, input.dockedHeight);
+      if (!(input.keepClear ?? []).some((c) => intersects(probe, c))) return true;
+    }
+    return false;
+  })();
+  if (roomBesideChrome) {
+    const hit = (input.keepClear ?? []).find((c) => intersects(r, c));
+    assert.equal(hit, undefined, `${label}: Stapel ${Math.round(r.top)}..${Math.round(r.bottom)} liegt auf der Navigation`);
+  }
   if (input.zones.some((z) => intersects(r, z))) {
     assert.equal(someFreeTop(input), null,
       `${label}: verdeckt eine Bedienleiste, obwohl bei top=${someFreeTop(input)} Platz war`);
@@ -119,6 +133,25 @@ test('ein Vollbild-Dialog mit Kopf und Fuss: der Stapel liegt dazwischen, nicht 
   checkInvariant(input, 'Vollbild mit Leisten');
   const r = placedRect(input, chooseToastPlacement(input));
   assert.ok(r && r.bottom <= footer.top && r.top >= header.bottom, 'zwischen Kopf und Fuss');
+});
+
+test('der Popover aus dem Review: der Stapel legt sich nicht auf die untere Navigation (800x900)', () => {
+  const popover = box(50, 200, 400, 750);
+  const nav = box(824, 0, 800, 76);
+  checkInvariant({
+    viewport: { width: 800, height: 900 },
+    gap: 12,
+    safeTop: 0,
+    safeBottom: 0,
+    stack: box(824 - 16 - 64, 210, 380, 64),
+    dockedHeight: 64,
+    dockedWidth: 376,
+    dockedCenter: 400,
+    primary: popover,
+    dialogs: [popover],
+    zones: [box(740, 200, 400, 60)],
+    keepClear: [nav],
+  }, 'Popover ueber der Navigation');
 });
 
 // Fester Zufall: jeder Lauf prueft dieselben Geometrien, ein roter Fall ist
@@ -178,11 +211,14 @@ test('jede Geometrie: im Bild, und keine Bedienleiste verdeckt, wo es eine freie
     const half = dockedWidth / 2;
     const dockedCenter = Math.min(Math.max(dialog.left + dialog.width / 2, gap + half), vw - gap - half);
 
+    // Eine sichtbare untere Navigation (Telefon, Tablet) in jeder zweiten Welt.
+    const keepClear = rnd() < 0.5 ? [box(vh - between(56, 96), 0, vw, vh)] : [];
     checkInvariant({
       viewport: { width: vw, height: vh },
       gap,
       safeTop,
       safeBottom,
+      keepClear,
       stack,
       dockedHeight: h,
       dockedWidth,
@@ -199,38 +235,49 @@ test('jede Geometrie: im Bild, und keine Bedienleiste verdeckt, wo es eine freie
 // ------------------------------------------------------------------
 
 /*
- * JEDE STELLE, DIE EINEN DIALOG BAUT, UND WO SEINE KNOEPFE SITZEN - je Datei
- * gezaehlt nach dem Weg, auf dem die Platzierung die Leisten findet:
+ * JEDER DIALOG DER APP, IN QUELLTEXT-REIHENFOLGE JE DATEI, UND WO SEINE KNOEPFE
+ * SITZEN - so, wie die Platzierung die Leisten findet:
  *
  * `modalPanel`: `.modal-panel__header`/`__footer` bzw. `.modal-actions`
- *   (openModal, confirmModal, Detailansicht, eigene modal-panel-Dialoge).
- * `marked`: eigene Kopf-/Fusszeilen, ausgezeichnet mit `data-dialog-actions`.
+ *   (openModal, confirmModal, eigene modal-panel-Dialoge). Baut ein Helfer die
+ *   Leiste, nennt `via` ihn.
+ * `marked: n`: eigene Kopf-/Fusszeilen, jede mit `data-dialog-actions`; n ist
+ *   die Zahl der Leisten DIESES Dialogs.
  * `none`: ein Dialog ohne Leisten; die Platzierung behandelt dann seine
  *   Bedienelemente selbst als Leisten - nur mit Grund (`why`).
  *
  * Eine Denylist ("diese Dialoge sind schlecht") sagte zu jedem neuen Dialog JA.
- * Diese Liste sagt NEIN, bis er hier steht. Und sie wird in BEIDE Richtungen
- * gegen das Markup gelesen: die erste Fassung fuehrte den Rundgang als
- * modal-panel, obwohl er `data-dialog-actions` traegt, und die Pruefung der
- * Auszeichnung uebersprang ihn damit (Review an #1421).
+ * Diese Liste sagt NEIN, bis er hier steht.
+ *
+ * GEPRUEFT WIRD JE DIALOG, NICHT JE DATEI (zweimal am Review zu #1421 gelernt).
+ * Die erste Fassung fuehrte den Rundgang als modal-panel, obwohl er
+ * `data-dialog-actions` traegt, und uebersprang ihn. Die zweite zaehlte die
+ * Auszeichnungen je Datei gegen die Zahl der Dialoge: zwei Leisten, ein Dialog
+ * - eine davon zu loeschen blieb gruen. Jetzt gehoert zu jedem Dialog der
+ * Abschnitt ab seiner Rolle bis zur naechsten, und darin muss GENAU stehen, was
+ * das Register sagt; ausserhalb der Abschnitte steht keine Auszeichnung.
  */
 const DIALOG_REGISTRY = {
-  'public/components/modal.js': { modalPanel: 1 },
-  'public/components/detail-view.js': { modalPanel: 1 },
-  'public/components/document-attach.js': { marked: 1 },
-  'public/components/datepicker.js': { none: 1, why: 'Monatsraster ohne Leiste; jeder Tag ist ein Knopf und damit selbst Leiste' },
-  'public/pages/budget.js': { marked: 1 },
-  'public/pages/calendar.js': { modalPanel: 1 },
-  'public/pages/dashboard.js': { marked: 1 },
-  'public/pages/documents.js': { marked: 1 },
-  'public/pages/inventory.js': { marked: 1 },
-  'public/pages/subscriptions.js': { marked: 1 },
-  'public/router.js': { modalPanel: 1, none: 2, why: 'Mehr-Blatt und Suche sind Navigation ohne Kopf- und Fusszeile; ihre Links und Felder sind selbst die Leisten' },
+  'public/components/modal.js': [{ modalPanel: true }],
+  'public/components/detail-view.js': [{ modalPanel: true, via: 'detailFooterEl(' }],
+  'public/components/document-attach.js': [{ marked: 2 }],
+  'public/components/datepicker.js': [{ none: true, why: 'Monatsraster ohne Leiste; jeder Tag ist ein Knopf und damit selbst Leiste' }],
+  'public/pages/budget.js': [{ marked: 2 }],
+  'public/pages/calendar.js': [{ modalPanel: true }],
+  'public/pages/dashboard.js': [{ marked: 1 }],
+  'public/pages/documents.js': [{ marked: 2 }],
+  'public/pages/inventory.js': [{ marked: 3 }],
+  'public/pages/subscriptions.js': [{ marked: 2 }],
+  'public/router.js': [
+    { none: true, why: 'Mehr-Blatt: Navigation ohne Kopf- und Fusszeile, seine Links sind selbst die Leisten' },
+    { none: true, why: 'Suche: Feld und Treffer sind selbst die Leisten' },
+    { modalPanel: true },
+  ],
 };
 
-const dialogCount = (entry) => (entry.modalPanel ?? 0) + (entry.marked ?? 0) + (entry.none ?? 0);
 const MARK = /data-dialog-actions|dataset\.dialogActions\s*=/g;
 const MODAL_PANEL_ZONE = /modal-panel__header|modal-panel__footer|modal-actions/;
+const DIALOG_ROLE = /role="dialog"|setAttribute\(\s*'role'\s*,\s*'dialog'\s*\)/g;
 
 const ROOT = new URL('..', import.meta.url).pathname;
 
@@ -245,44 +292,62 @@ function walk(dir, out = []) {
   return out;
 }
 
-const DIALOG_ROLE = /role="dialog"|setAttribute\(\s*'role'\s*,\s*'dialog'\s*\)/g;
+/** Quelltext ohne Kommentare: ein Kommentar baut keinen Dialog und zeichnet nichts aus. */
+function code(file) {
+  return readFileSync(join(ROOT, file), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+}
+
+/** Je Dialog der Abschnitt ab seiner Rolle bis zur naechsten; davor der Vorlauf. */
+function dialogSections(source) {
+  const starts = [...source.matchAll(DIALOG_ROLE)].map((m) => m.index);
+  return {
+    lead: source.slice(0, starts[0] ?? source.length),
+    sections: starts.map((start, i) => source.slice(start, starts[i + 1] ?? source.length)),
+  };
+}
+
+const countMarks = (text) => (text.match(MARK) || []).length;
 
 test('jeder Dialog der App steht im Register, mit dem Weg zu seinen Knoepfen', () => {
   const found = {};
   for (const path of walk(join(ROOT, 'public'))) {
-    const source = readFileSync(path, 'utf8');
-    // Kommentare zaehlen nicht: sie bauen keinen Dialog.
-    const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-    const count = (code.match(DIALOG_ROLE) || []).length;
-    if (count) found[relative(ROOT, path)] = count;
+    const file = relative(ROOT, path);
+    const count = dialogSections(code(file)).sections.length;
+    if (count) found[file] = count;
   }
-  const expected = Object.fromEntries(Object.entries(DIALOG_REGISTRY).map(([k, v]) => [k, dialogCount(v)]));
+  const expected = Object.fromEntries(Object.entries(DIALOG_REGISTRY).map(([k, v]) => [k, v.length]));
   assert.deepEqual(found, expected,
     'ein Dialog kam dazu oder fiel weg - im Register eintragen und sagen, wo seine Knoepfe sitzen');
 });
 
-test('das Register stimmt mit dem Markup ueberein, in beide Richtungen', () => {
-  const code = (file) => readFileSync(join(ROOT, file), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-  for (const [file, entry] of Object.entries(DIALOG_REGISTRY)) {
+test('jeder Dialog traegt genau die Leisten, die das Register ihm zuschreibt', () => {
+  for (const [file, entries] of Object.entries(DIALOG_REGISTRY)) {
     const source = code(file);
-    const marks = (source.match(MARK) || []).length;
-    if (entry.marked) {
-      assert.ok(marks >= entry.marked,
-        `${file}: ${marks} Auszeichnung(en) fuer ${entry.marked} ausgezeichnete(n) Dialog(e) - jede Leiste braucht data-dialog-actions`);
-    } else {
-      assert.equal(marks, 0, `${file}: traegt data-dialog-actions, steht aber nicht als "marked" im Register`);
-    }
-    if (entry.modalPanel) {
-      assert.match(source, MODAL_PANEL_ZONE, `${file}: als modalPanel gefuehrt, aber ohne modal-panel-Leisten`);
-    }
-    if (entry.none) assert.ok(entry.why, `${file}: ein Dialog ohne Leisten braucht einen Grund`);
+    const { lead, sections } = dialogSections(source);
+    assert.equal(countMarks(lead), 0, `${file}: data-dialog-actions vor dem ersten Dialog gehoert zu keinem`);
+    entries.forEach((entry, i) => {
+      const section = sections[i] ?? '';
+      const label = `${file}, Dialog ${i + 1}`;
+      const marks = countMarks(section);
+      assert.equal(marks, entry.marked ?? 0,
+        `${label}: ${marks} Leiste(n) mit data-dialog-actions, das Register sagt ${entry.marked ?? 0}`);
+      if (entry.modalPanel) {
+        if (entry.via) {
+          assert.ok(section.includes(entry.via), `${label}: ruft ${entry.via} nicht auf`);
+          assert.match(source, MODAL_PANEL_ZONE, `${label}: ${entry.via} baut keine modal-panel-Leiste`);
+        } else {
+          assert.match(section, MODAL_PANEL_ZONE, `${label}: als modalPanel gefuehrt, aber ohne modal-panel-Leiste`);
+        }
+      }
+      if (entry.none) assert.ok(entry.why, `${label}: ein Dialog ohne Leisten braucht einen Grund`);
+    });
   }
   // Und keine Auszeichnung ausserhalb des Registers.
   for (const path of walk(join(ROOT, 'public'))) {
     const file = relative(ROOT, path);
     if (DIALOG_REGISTRY[file]) continue;
-    const marks = (code(file).match(MARK) || []).length;
-    assert.equal(marks, 0, `${file}: traegt data-dialog-actions, baut aber keinen registrierten Dialog`);
+    assert.equal(countMarks(code(file)), 0, `${file}: traegt data-dialog-actions, baut aber keinen registrierten Dialog`);
   }
 });

@@ -276,3 +276,75 @@ for (const device of ['mobile', 'desktop']) {
     }
   });
 }
+
+/*
+ * DIE UNTERE NAVIGATION BLEIBT FREI (Review an #1421).
+ *
+ * Ein modales Overlay deckt die Tab-Leiste ab, ein Popover nicht: die
+ * Detailansicht ist ab 768px ein nicht-modales Popover, und bis 1023px steht
+ * die Leiste noch. Die erste Fassung hielt ihr `--nav-bottom-height` nur an der
+ * Grundlage des Stapels frei; unter einem hohen Popover legte sie ihn auf die
+ * Leiste, und der Erinnerungs-Toast nahm dreissig Sekunden lang deren Tipps.
+ */
+test('#1160 800x900 - unter einem hohen Popover legt sich der Toast nicht auf die Tab-Leiste', async () => {
+  const page = await openPage(harness, { device: 'desktop', locale: 'de' });
+  try {
+    await page.setViewport({ width: 800, height: 900, deviceScaleFactor: 1 });
+    await seedDueReminder(page);
+    await page.evaluate(async () => {
+      const { openDetailView } = await import('/components/detail-view.js');
+      const anchor = document.createElement('button');
+      anchor.textContent = 'Anker';
+      anchor.style.cssText = 'position:fixed;top:40px;left:300px';
+      document.body.append(anchor);
+      // Zehn Zeilen: der Popover endet bei 800x900 gemessen um y=775, knapp
+      // ueber der Leiste (824). Ueber ihm ist kein Platz, unter ihm - zwischen
+      // Popover und Leiste - genau nicht genug; dort lag der Stapel (787..853).
+      openDetailView({
+        title: 'Toast probe popover',
+        anchor,
+        sections: Array.from({ length: 10 }, (_, i) => ({ icon: 'info', label: `Zeile ${i + 1}`, value: 'Eine Notiz.', multiline: true })),
+        actions: [{ label: 'Aktion', variant: 'secondary', onClick: () => {} }],
+      });
+    });
+    await page.waitForSelector('.detail-popover');
+    await settleAnimations(page);
+    const result = await page.evaluate(() => {
+      const nav = document.querySelector('.nav-bottom');
+      const navRect = nav.getBoundingClientRect();
+      const targets = [...nav.querySelectorAll('a, button')].filter((el) => el.getBoundingClientRect().width > 0);
+      const covered = targets.filter((el) => {
+        const r = el.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return Boolean(hit?.closest('.shell-bottom-stack'));
+      }).map((el) => el.getAttribute('aria-label') || el.textContent.trim());
+      const toast = document.querySelector('.toast--reminder');
+      const t = toast?.getBoundingClientRect();
+      const popover = document.querySelector('.detail-popover').getBoundingClientRect();
+      // Die Flaeche zaehlt, nicht nur die Mitte der Ziele: ein Toast, der die
+      // obere Haelfte der Leiste deckt, nimmt dort jeden Tipp, und gemessen lag
+      // er genau so (787..853 ueber einer Leiste ab 824, Zielmitten bei 862).
+      const overlapsNav = Boolean(t && t.bottom > navRect.top && t.top < navRect.bottom
+        && t.right > navRect.left && t.left < navRect.right);
+      return {
+        overlapsNav,
+        navVisible: navRect.height > 0,
+        targets: targets.length,
+        covered,
+        toast: Boolean(toast),
+        toastInView: Boolean(t && t.top >= 0 && t.bottom <= innerHeight && t.height > 0),
+        popoverBottom: Math.round(popover.bottom),
+        toastTop: t ? Math.round(t.top) : null,
+        navTop: Math.round(navRect.top),
+      };
+    });
+    assert.equal(result.navVisible, true, 'bei 800px muss die Tab-Leiste stehen - sonst misst die Sonde nichts');
+    assert.ok(result.targets >= 3, `zu wenige Ziele in der Tab-Leiste (${result.targets})`);
+    assert.equal(result.toast, true, 'der Erinnerungs-Toast ist verschwunden - so misst die Sonde nichts');
+    assert.equal(result.toastInView, true, `der Toast muss im Bild bleiben (${JSON.stringify(result)})`);
+    assert.equal(result.overlapsNav, false, `der Toast liegt auf der Tab-Leiste (${JSON.stringify(result)})`);
+    assert.deepEqual(result.covered, [], `der Toast deckt Ziele der Tab-Leiste (${JSON.stringify(result)})`);
+  } finally {
+    await page.close();
+  }
+});

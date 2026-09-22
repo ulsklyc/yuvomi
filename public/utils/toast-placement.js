@@ -96,12 +96,14 @@ function overlapArea(a, b) {
  * @param {DOMRect|object} input.primary  der Dialog, an dem er sich ausrichtet
  * @param {Array<DOMRect|object>} input.dialogs alle offenen Dialoge
  * @param {Array<DOMRect|object>} input.zones   alle Bedienleisten
+ * @param {Array<DOMRect|object>} [input.keepClear=[]] Shell-Flaechen, die frei
+ *        bleiben muessen, solange daneben Platz ist (die sichtbare untere Navigation)
  * @returns {null | {top: number}} null = der Stapel bleibt, wo er steht
  */
 export function chooseToastPlacement({
   viewport, gap, safeTop = 0, safeBottom = 0,
   stack, dockedHeight, dockedWidth, dockedCenter,
-  primary, dialogs, zones,
+  primary, dialogs, zones, keepClear = [],
 }) {
   if (!dialogs.some((d) => intersects(stack, d))) return null;
 
@@ -111,8 +113,13 @@ export function chooseToastPlacement({
   const minTop = safeTop + gap;
   const maxTop = viewport.height - safeBottom - gap - h;
   const at = (top) => ({ top, bottom: top + h, left, right, width: dockedWidth, height: h });
-  const inView = (top) => top >= minTop && top <= maxTop;
   const clear = (top, list) => !list.some((r) => intersects(at(top), r));
+  // Im Bild UND neben der Navigation: die Grundlage des Stapels haelt ihr
+  // `--nav-bottom-height` frei, eine Lage am Dialog muss das ebenso. Ein
+  // Popover (Detailansicht ab 768px) deckt sie nicht ab, ein Toast darauf
+  // naehme ihre Tipps (Review an #1421).
+  const inBounds = (top) => top >= minTop && top <= maxTop;
+  const inView = (top) => inBounds(top) && clear(top, keepClear);
 
   // 2. und 3.: neben dem Dialog, ohne ihn zu beruehren.
   for (const top of [primary.top - gap - h, primary.bottom + gap]) {
@@ -132,7 +139,8 @@ export function chooseToastPlacement({
 
   // 6. Die naechste freie Lage an einer Kante - erst mit Abstand zur Leiste,
   // dann auf Stoss, wenn die Luecke fuer den Abstand zu schmal ist.
-  const edgesAt = (margin) => [minTop, maxTop, ...zones.flatMap((z) => [z.top - margin - h, z.bottom + margin])];
+  const edgesAt = (margin) => [minTop, maxTop, ...[...zones, ...keepClear]
+    .flatMap((z) => [z.top - margin - h, z.bottom + margin])];
   const candidates = [...edgesAt(gap), ...edgesAt(0)].filter(inView);
   const nearest = (list) => list
     .filter((top) => clear(top, zones))
@@ -140,11 +148,15 @@ export function chooseToastPlacement({
   const free = nearest(edgesAt(gap).filter(inView)) ?? nearest(edgesAt(0).filter(inView));
   if (free !== undefined) return { top: free };
 
-  // 7. Nichts ist frei: die kleinste verdeckte Flaeche, und immer im Bild.
+  // 7. Nichts ist frei: die kleinste verdeckte Flaeche, und immer im Bild -
+  // neben der Navigation, wenn es das gibt, sonst auch auf ihr.
   if (maxTop < minTop) return { top: minTop };
+  const fallback = candidates.length
+    ? candidates
+    : [...edgesAt(gap), ...edgesAt(0)].filter(inBounds);
   let best = minTop;
   let bestArea = Infinity;
-  for (const top of candidates.length ? candidates : [minTop]) {
+  for (const top of fallback.length ? fallback : [minTop]) {
     const area = zones.reduce((sum, z) => sum + overlapArea(at(top), z), 0);
     if (area < bestArea) {
       best = top;
@@ -192,6 +204,21 @@ function dialogZones(dialog) {
   if (marked.length) return marked;
   const controls = visibleRects(own(CONTROL_SELECTOR));
   return controls.length ? controls : [dialog.getBoundingClientRect()];
+}
+
+/**
+ * Shell-Flaechen, die der Stapel frei laesst: die untere Navigation, solange
+ * sie sichtbar ist und kein Dialog-Hintergrund ueber ihr liegt. Ein modales
+ * Overlay deckt sie ab (dann ist sie ohnehin nicht zu erreichen), ein Popover
+ * nicht.
+ */
+function uncoveredChrome() {
+  const nav = document.querySelector('.nav-bottom');
+  if (!nav || nav.getClientRects().length === 0) return [];
+  const r = nav.getBoundingClientRect();
+  if (r.width === 0 || r.height === 0) return [];
+  const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  return hit && nav.contains(hit) ? [r] : [];
 }
 
 function pxProperty(el, name) {
@@ -264,6 +291,7 @@ export function placeToastStack(stack) {
     primary,
     dialogs,
     zones,
+    keepClear: uncoveredChrome(),
   });
   if (!decision) {
     undock(stack);
