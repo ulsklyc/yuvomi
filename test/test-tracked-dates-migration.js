@@ -9,19 +9,18 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
+import { tempDir } from './tmp-dir.js';
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
-process.env.DB_PATH = join(mkdtempSync(join(tmpdir(), 'yuvomi-trackeddatesmig-')), 'unused.db');
+process.env.DB_PATH = join(tempDir('yuvomi-trackeddatesmig-'), 'unused.db');
 const { MIGRATIONS } = await import('../server/db.js');
 
 const V141 = MIGRATIONS.find((m) => m.version === 141);
 
 function seedPreV141() {
-  const db = new Database(join(mkdtempSync(join(tmpdir(), 'yuvomi-trackeddatesmig-')), 'db.sqlite'));
+  const db = new Database(join(tempDir('yuvomi-trackeddatesmig-'), 'db.sqlite'));
   db.exec(`
     CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL);
     CREATE TABLE inventory_items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);

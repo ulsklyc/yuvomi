@@ -13,19 +13,18 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
+import { tempDir } from './tmp-dir.js';
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
-process.env.DB_PATH = join(mkdtempSync(join(tmpdir(), 'yuvomi-pantrymig-')), 'unused.db');
+process.env.DB_PATH = join(tempDir('yuvomi-pantrymig-'), 'unused.db');
 const { MIGRATIONS } = await import('../server/db.js');
 
 const V162 = MIGRATIONS.find((m) => m.version === 162);
 
 function seedPreV162() {
-  const db = new Database(join(mkdtempSync(join(tmpdir(), 'yuvomi-pantrymig-')), 'db.sqlite'));
+  const db = new Database(join(tempDir('yuvomi-pantrymig-'), 'db.sqlite'));
   db.exec(`
     CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL);
     CREATE TABLE pantry_items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);

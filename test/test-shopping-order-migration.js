@@ -12,16 +12,15 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
+import { tempDir } from './tmp-dir.js';
 
 // DB_PATH vor dem Import auf eine Wegwerf-Datei setzen: db.js initialisiert beim
 // Modul-Load (und migriert dabei). Geprüft wird hier nur die exportierte
 // v133-SQL gegen eine selbst aufgebaute Vor-v133-DB.
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
-process.env.DB_PATH = join(mkdtempSync(join(tmpdir(), 'yuvomi-sortmig-')), 'unused.db');
+process.env.DB_PATH = join(tempDir('yuvomi-sortmig-'), 'unused.db');
 const { MIGRATIONS } = await import('../server/db.js');
 
 const V133 = MIGRATIONS.find((m) => m.version === 133);
@@ -32,7 +31,7 @@ const V133 = MIGRATIONS.find((m) => m.version === 133);
  * Nummerierung je (Liste, Kategorie) läuft und nicht global.
  */
 function seedPreV133() {
-  const db = new Database(join(mkdtempSync(join(tmpdir(), 'yuvomi-sortmig-')), 'db.sqlite'));
+  const db = new Database(join(tempDir('yuvomi-sortmig-'), 'db.sqlite'));
   db.exec(`
     CREATE TABLE shopping_items (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -27,20 +27,21 @@
 
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync, chmodSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, chmodSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3-multiple-ciphers';
+import { tempDir } from './tmp-dir.js';
 
 const PLAINTEXT_HEADER = Buffer.from('SQLite format 3\0', 'binary');
 const KEY_ALT = 'schluessel-der-alten-instanz-0123';
 const KEY_NEU = 'schluessel-der-neuen-instanz-4567';
 
 function tmpDir() {
-  return mkdtempSync(join(tmpdir(), 'yuvomi-test-rekey-'));
+  return tempDir('yuvomi-test-rekey-');
 }
 
 // Vor jedem Import von db.js: ohne wirksames DB_PATH legte der Import eine
