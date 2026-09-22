@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "Mennyiségek megtartása",
         "duplicateKeepNotes": "Jegyzetek és linkek megtartása",
         "duplicateSubmit": "Duplikálás",
-        "duplicateError": "A listát nem sikerult duplikálni."
+        "duplicateError": "A listát nem sikerult duplikálni.",
+        "itemStateChecked": "kipipálva",
+        "itemStateOpen": "nincs kipipálva"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} étel megtervezve.",

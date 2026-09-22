@@ -646,7 +646,9 @@
         "duplicateKeepQuantities": "Pertahankan jumlah",
         "duplicateKeepNotes": "Pertahankan catatan & tautan",
         "duplicateSubmit": "Duplikat",
-        "duplicateError": "Daftar tidak dapat diduplikat."
+        "duplicateError": "Daftar tidak dapat diduplikat.",
+        "itemStateChecked": "dicentang",
+        "itemStateOpen": "belum dicentang"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} makanan direncanakan.",

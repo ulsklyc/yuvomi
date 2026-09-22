@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "Зберегти кількість",
         "duplicateKeepNotes": "Зберегти нотатки й посилання",
         "duplicateSubmit": "Дублювати",
-        "duplicateError": "Не вдалося дублювати список."
+        "duplicateError": "Не вдалося дублювати список.",
+        "itemStateChecked": "позначено",
+        "itemStateOpen": "не позначено"
     },
     "meals": {
         "randomizeSuccess_few": "Заплановано {{count}} прийоми їжі.",

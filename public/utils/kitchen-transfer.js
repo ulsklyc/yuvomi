@@ -39,6 +39,8 @@
  * Fall das Einkaufs-Recht. Der Transfer-Knopf fragt deshalb BEIDE Riegel
  * (`mayTransferMealToShopping()`, `mayTransferRecipeToShopping()`), und
  * dasselbe tut die Gegenrichtung im Einkauf (`mayImportMealPlan()`).
+ * Vorrat und Einkauf untereinander brauchen je Richtung nur den Riegel des
+ * Ziels (`mayTransferPantryToShopping()`, `mayTransferShoppingToPantry()`).
  * `resolveShoppingTarget()` prueft bewusst nichts:
  * es ist die Listenwahl, nicht der Riegel - der sitzt am Knopf und im Handler.
  *
@@ -102,6 +104,38 @@ export function mayTransferRecipeToShopping(recipeId) {
  */
 export function mayImportMealPlan(listId) {
   return mayWritePath(`/shopping/${listId}/import-meal-plan`) && mayWritePath('/meals');
+}
+
+/**
+ * Vorrat -> Einkauf: der Warenkorb einer Vorratszeile und die Sammel-Pille
+ * „Alles auf die Einkaufsliste" (#1265).
+ *
+ * EIN RIEGEL, NICHT ZWEI. Der Pfad-Guard misst `POST /shopping/:id/import-pantry`
+ * als `shopping`, und die Route verlangt nichts weiter - die Vorratszeilen
+ * liest sie nur. Wer die Seite sieht, hat den Vorrat ohnehin mindestens zum
+ * Lesen. Mit `shopping: read` endeten beide Wege bis hierher im 403.
+ *
+ * OHNE LISTEN-ID: beim Zeichnen steht das Ziel noch nicht fest (es wird erst
+ * nach dem Tippen gewaehlt), und das Urteil haengt nur am Praefix. Der Pfad
+ * steht trotzdem als Literal da, damit `npm run test:module-write-access` ihn
+ * gegen den Server lesen kann.
+ *
+ * @returns {boolean}
+ */
+export function mayTransferPantryToShopping() {
+  return mayWritePath('/shopping/:listId/import-pantry');
+}
+
+/**
+ * Einkauf -> Vorrat: „In den Vorrat" in der Sammel-Pille des Einkaufs (#1265).
+ * Der Pfad-Guard misst `POST /pantry/import-shopping` als `pantry`; die
+ * Einkaufsseite fragte bisher nur, ob das Modul abgeschaltet ist, und zeigte
+ * den Weg deshalb auch bei `pantry: read`.
+ *
+ * @returns {boolean}
+ */
+export function mayTransferShoppingToPantry() {
+  return mayWritePath('/pantry/import-shopping');
 }
 
 /**

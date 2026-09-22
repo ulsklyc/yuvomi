@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "Giữ số lượng",
         "duplicateKeepNotes": "Giữ ghi chú & liên kết",
         "duplicateSubmit": "Nhân bản",
-        "duplicateError": "Không thể nhân bản danh sách."
+        "duplicateError": "Không thể nhân bản danh sách.",
+        "itemStateChecked": "đã đánh dấu",
+        "itemStateOpen": "chưa đánh dấu"
     },
     "meals": {
         "randomizeSuccess_few": "Đã lên kế hoạch {{count}} bữa ăn.",

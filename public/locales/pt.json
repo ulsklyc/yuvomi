@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "Manter quantidades",
         "duplicateKeepNotes": "Manter notas e links",
         "duplicateSubmit": "Duplicar",
-        "duplicateError": "Não foi possível duplicar a lista."
+        "duplicateError": "Não foi possível duplicar a lista.",
+        "itemStateChecked": "marcado",
+        "itemStateOpen": "não marcado"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} refeições planeadas.",

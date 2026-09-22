@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "الاحتفاظ بالكميات",
         "duplicateKeepNotes": "الاحتفاظ بالملاحظات والروابط",
         "duplicateSubmit": "تكرار",
-        "duplicateError": "تعذّر تكرار القائمة."
+        "duplicateError": "تعذّر تكرار القائمة.",
+        "itemStateChecked": "تم التأشير",
+        "itemStateOpen": "لم يُؤشَّر عليه"
     },
     "meals": {
         "randomizeSuccess_few": "تم تخطيط {{count}} وجبات.",

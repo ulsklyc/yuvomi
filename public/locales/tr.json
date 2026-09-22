@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "Miktarları koru",
         "duplicateKeepNotes": "Notları ve bağlantıları koru",
         "duplicateSubmit": "Kopyala",
-        "duplicateError": "Liste kopyalanamadı."
+        "duplicateError": "Liste kopyalanamadı.",
+        "itemStateChecked": "işaretlendi",
+        "itemStateOpen": "işaretlenmedi"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} öğün planlandı.",

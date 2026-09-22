@@ -565,6 +565,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the upload, and saving ended in an error before the visit itself was saved. The upload is gone
   for them, a receipt that is already linked stays listed, and saving the visit keeps it. (#1265)
 
+- **The shopping list no longer offers buttons that a read-only member is not allowed to press.**
+  Where your access to Shopping is "read", every row could still be ticked off (by its box, by
+  tapping the row and by swiping), deleted (by button and by swipe), edited and dragged into a new
+  order, and the page kept the quick-add field, the + button, "Create new list" and the whole list menu -
+  rename, duplicate, import from the meal plan, send, categories, stores and delete. Each of them
+  ended in an error message, and a ticked item sprang back. The rule is the one Tasks, Notes and
+  Housekeeping already follow: something that shows a state stays, something that only acts
+  disappears. The box stays as a sign that says whether the item is ticked off or still open, and
+  it keeps following what others in the household tick off. What only the edit form used to show
+  is readable too: an item with a price, a store, a link or a note gets a button that opens a
+  read-only view with everything the form shows, and the link can be opened from there. An empty
+  list or a household without lists now only says so, instead of inviting you to add something.
+  Two ways between the kitchen tabs also ask the right of the tab they write into: "Into pantry"
+  on the shopping list needs write access to the Pantry, and the cart on a pantry row and "Add all
+  to shopping list" need write access to Shopping. Before, both ended in an error message for a
+  member who could only read the other tab. (#1265)
+
 - **A nightly recurring appointment that crosses midnight no longer covers the entry it should be
   sharing its column with.** On a day that carries two occurrences of the same series - last
   night's tail and tonight's start - the second took the first one's place in the layout, so the

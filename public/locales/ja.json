@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "数量を引き継ぐ",
         "duplicateKeepNotes": "メモとリンクを引き継ぐ",
         "duplicateSubmit": "複製",
-        "duplicateError": "リストを複製できませんでした。"
+        "duplicateError": "リストを複製できませんでした。",
+        "itemStateChecked": "チェック済み",
+        "itemStateOpen": "未チェック"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} 件の食事を計画しました。",

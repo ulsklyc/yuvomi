@@ -6580,6 +6580,14 @@ textarea::placeholder {
   transform: translateY(-50%) scaleX(-1);
 }
 
+/* Eine Zeile OHNE Geste (Nur-lesen, #1265): der Chevron versprache einen Wisch,
+ * den keine Verdrahtung beantwortet. Die Zeile behaelt `.swipe-row` fuer ihre
+ * Form und ihre Nachschlage-Selektoren; nur die Richtungsangabe faellt weg.
+ * Steht NACH der Basisregel: gleiche Spezifitaet, die Reihenfolge entscheidet. */
+.swipe-row--static::after {
+  content: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .swipe-row::after { display: none; }
 }

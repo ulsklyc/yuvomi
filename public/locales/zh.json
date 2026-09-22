@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "保留数量",
         "duplicateKeepNotes": "保留备注和链接",
         "duplicateSubmit": "复制",
-        "duplicateError": "无法复制该清单。"
+        "duplicateError": "无法复制该清单。",
+        "itemStateChecked": "已勾选",
+        "itemStateOpen": "未勾选"
     },
     "meals": {
         "randomizeSuccess_few": "已规划 {{count}} 餐。",
