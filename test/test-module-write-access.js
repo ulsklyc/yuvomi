@@ -229,6 +229,17 @@ test('Helfer: Rezept -> Einkauf bildet die zweite Serverausnahme exakt ab (#1290
 // 2. Drift-Guard gegen server/scopes.js
 // =========================================================================
 
+test('Drift-Guard: die benannten Ausnahmen sind eine exakte Kopie von READ_LEVEL_WRITES', () => {
+  const plain = (list) => list.map((e) => ({
+    id: e.id, pattern: e.pattern, flags: e.flags,
+    methods: e.methods === null ? null : [...e.methods], axes: [...e.axes],
+  }));
+  assert.deepEqual(plain(access.READ_LEVEL_WRITES), plain(serverScopes.READ_LEVEL_WRITES),
+    'public/utils/module-access.js muss server/scopes.js folgen - dort geaendert, hier nachziehen');
+  assert.deepEqual(serverScopes.READ_LEVEL_WRITES.map((e) => e.id), ['schedule-preferences', 'recipe-to-shopping'],
+    'eine neue Ausnahme ist eine Entscheidung - diese Liste haelt fest, dass es genau diese zwei gibt');
+});
+
 test('Drift-Guard: die Tabelle ist eine exakte Kopie von SCOPE_MODULES', () => {
   const plain = (list) => list.map((m) => ({ key: m.key, prefixes: [...m.prefixes] }));
   assert.deepEqual(plain(access.SCOPE_MODULES), plain(serverScopes.SCOPE_MODULES),

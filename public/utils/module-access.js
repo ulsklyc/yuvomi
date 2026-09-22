@@ -106,12 +106,13 @@
  *    `mayImportMealPlan()` in `utils/kitchen-transfer.js`. Fuer das REZEPT
  *    senkt der Server den Pfad-Guard auf `meals: read` (entschieden am
  *    22.09.2026: die Route liest die Quelle und schreibt nur das Ziel;
- *    `isRecipeToShoppingTransfer()` in server/scopes.js, fuer Mitglieder und
- *    Tokens). `mayWritePath()` bildet das exakt ab wie Regel 5 - dieselbe
- *    Warnung gilt: keine Seite baut sich so etwas selbst. Die Mahlzeit bleibt
- *    bei `meals: write`, ihre Route kippt `on_shopping_list` im Plan. Nur das
- *    Ziel zu fragen zeigte dort einem Mitglied mit `meals: read` einen Knopf,
- *    den der Pfad-Guard abweist. Das Zielrecht gilt nur fuer AUSDRUECKLICHE Uebertraege.
+ *    `READ_LEVEL_WRITES` in server/scopes.js, fuer Mitglieder und Tokens).
+ *    `mayWritePath()` bildet das ueber die Kopie derselben Tabelle exakt ab
+ *    wie Regel 5 - dieselbe Warnung gilt: keine Seite baut sich so etwas
+ *    selbst. Die Mahlzeit bleibt bei `meals: write`, ihre Route kippt
+ *    `on_shopping_list` im Plan. Nur das Ziel zu fragen zeigte dort einem
+ *    Mitglied mit `meals: read` einen Knopf, den der Pfad-Guard abweist. Das
+ *    Zielrecht gilt nur fuer AUSDRUECKLICHE Uebertraege.
  *    Was eine Aktion bloss MITerzeugt (der Check-in der Haushaltshilfe legt
  *    Termin und Zahlungsaufgabe an), fragt kein Zielrecht, weder am Server
  *    noch am Knopf - die Abgrenzung steht in docs/DECISIONS.md, Abschnitt 10.
@@ -203,24 +204,46 @@ export function pathAccess(path) {
 }
 
 /**
+ * Kopie von `READ_LEVEL_WRITES` aus server/scopes.js - die benannten
+ * Ausnahmen, fuer die der Server bei einem schreibenden Aufruf `read` reicht
+ * (Regel 5 und Regel 8 im Kopf). Der Drift-Guard in
+ * `npm run test:module-write-access` vergleicht Eintrag fuer Eintrag. Aendern
+ * heisst: dort aendern, hier nachziehen - eine Seite baut sich keine eigene.
+ */
+export const READ_LEVEL_WRITES = Object.freeze([
+  Object.freeze({
+    id: 'schedule-preferences',
+    pattern: '^\\/schedule\\/preferences$',
+    flags: '',
+    methods: null,
+    axes: Object.freeze(['session']),
+  }),
+  Object.freeze({
+    id: 'recipe-to-shopping',
+    pattern: '^\\/recipes\\/\\d+\\/to-shopping-list\\/?$',
+    flags: 'i',
+    methods: Object.freeze(['POST']),
+    axes: Object.freeze(['session', 'token']),
+  }),
+]);
+
+// Die Oberflaeche ist eine Sitzung: sie liest nur die Eintraege dieser Achse.
+// Die Methode kennt der Helfer nicht - `mayWritePath()` fragt immer nach einem
+// Schreibaufruf, und unter den Pfaden der Tabelle gibt es jeweils nur die
+// Methoden, die sie nennt.
+const SESSION_READ_LEVEL = READ_LEVEL_WRITES
+  .filter((entry) => entry.axes.includes('session'))
+  .map((entry) => new RegExp(entry.pattern, entry.flags));
+
+/**
  * Wuerde der Server einen SCHREIBENDEN Aufruf auf diesen Pfad annehmen?
- * Mit der einen Serverausnahme `/schedule/preferences` (Regel 5 im Kopf):
- * dort reicht `read`, und zwar nur bei exakt diesem Pfad.
+ * Fuer die Pfade aus `READ_LEVEL_WRITES` reicht `read` (nie `none`).
  * @param {string} path
  * @returns {boolean}
  */
 export function mayWritePath(path) {
   const access = pathAccess(path);
-  if (requestPath(path) === '/schedule/preferences') return access !== 'none';
-  if (RECIPE_TO_SHOPPING_RE.test(requestPath(path))) return access !== 'none';
+  const p = requestPath(path);
+  if (SESSION_READ_LEVEL.some((re) => re.test(p))) return access !== 'none';
   return access === 'write';
 }
-
-/**
- * Die zweite Serverausnahme (Regel 8): `POST /recipes/:id/to-shopping-list`
- * liest das Rezept und schreibt nur in den Einkauf, also reicht dort
- * `meals: read`. Dasselbe Muster wie `isRecipeToShoppingTransfer()` in
- * server/scopes.js - gefaltet, mit optionalem Schlussstrich, numerische ID.
- * Die Methode kennt der Helfer nicht; unter diesem Pfad gibt es nur POST.
- */
-const RECIPE_TO_SHOPPING_RE = /^\/recipes\/\d+\/to-shopping-list\/?$/i;

@@ -162,62 +162,82 @@ function moduleForPath(path) {
 }
 
 /**
+ * DIE BENANNTEN AUSNAHMEN VOM PFAD-GUARD - EINE TABELLE FUER ALLE LESER.
+ *
+ * Der Pfad-Guard verlangt fuer jeden schreibenden Aufruf das Schreibrecht auf
+ * das Modul des Pfads. Genau diese Eintraege senken das noetige Niveau auf
+ * `read`, ohne den Modul-Schluessel anzufassen (`none` bleibt verweigert - ein
+ * `null`-Schluessel wuerde `moduleAccessVerdict()` bedingungslos erlauben
+ * lassen). Gelesen wird die Tabelle von beiden Gates in server/index.js (ueber
+ * die beiden Funktionen darunter), und `public/utils/module-access.js` fuehrt
+ * eine Kopie, die `npm run test:module-write-access` Eintrag fuer Eintrag
+ * dagegen haelt. Eine neue Ausnahme entsteht HIER und nur hier.
+ *
+ *   - `schedule-preferences` (S-12, UX-Audit): Vorlaufzeit und Wochenstunden
+ *     haengen an der EIGENEN users-Zeile, kein Admin-Gate. Exakt dieser Pfad,
+ *     kein `startsWith` (`/schedule/preferencesX` ist nicht mitgemeint), jede
+ *     Methode, nur fuer Sitzungen - ein Token bleibt an `schedule:write`
+ *     gebunden.
+ *   - `recipe-to-shopping` (#1290, entschieden am 22.09.2026): die Route liest
+ *     das Rezept und legt nur `shopping_items` an; `shopping: write` verlangt
+ *     sie selbst (`mayWriteModule`). Nur POST, numerische ID, fuer Sitzungen
+ *     UND Tokens. Schreibweise und Schlussstrich werden gefaltet, weil Express
+ *     beides beim Routen ignoriert (GHSA-cvwj). Mahlzeit -> Einkauf faellt
+ *     NICHT darunter: jene Route kippt `on_shopping_list` im Essensplan.
+ *
+ * `pattern`/`flags` sind die Teile eines RegExp als Text, damit die Kopie im
+ * Client vergleichbar bleibt; `methods: null` heisst jede Methode.
+ */
+const READ_LEVEL_WRITES = Object.freeze([
+  Object.freeze({
+    id: 'schedule-preferences',
+    pattern: '^\\/schedule\\/preferences$',
+    flags: '',
+    methods: null,
+    axes: Object.freeze(['session']),
+  }),
+  Object.freeze({
+    id: 'recipe-to-shopping',
+    pattern: '^\\/recipes\\/\\d+\\/to-shopping-list\\/?$',
+    flags: 'i',
+    methods: Object.freeze(['POST']),
+    axes: Object.freeze(['session', 'token']),
+  }),
+]);
+
+const READ_LEVEL_MATCHERS = READ_LEVEL_WRITES.map((entry) => ({
+  ...entry,
+  re: new RegExp(entry.pattern, entry.flags),
+}));
+
+/** Senkt eine benannte Ausnahme fuer diese Achse das Niveau auf `read`? */
+function readLevelWrite(axis, path, method) {
+  const verb = String(method || '').toUpperCase();
+  const p = String(path || '');
+  return READ_LEVEL_MATCHERS.some((entry) => entry.axes.includes(axis)
+    && (entry.methods === null || entry.methods.includes(verb))
+    && entry.re.test(p));
+}
+
+/**
  * Modul-Schlüssel + benötigtes Zugriffsniveau für eine Session-Anfrage
- * (`moduleAccessVerdict()`'s zweites/drittes Argument). Anders als
- * `moduleForPath()` + `requiredAccess()` allein senkt dies das Niveau auf
- * `read` für genau `/schedule/preferences` (S-12, UX-Audit: die eigene
- * Erinnerungsvorlaufzeit/Wochenstunden hängen an der EIGENEN users-Zeile,
- * kein Admin-Gate) — ohne den Modul-Schlüssel selbst auf `null` zu setzen,
- * was `moduleAccessVerdict()` unconditional auf "erlaubt" zwingen würde,
- * auch für `none`-Zugriff. Exaktes `===`, kein `startsWith`, damit
- * `/schedule/preferencesX` nicht mitgemeint ist.
+ * (`moduleAccessVerdict()`'s zweites/drittes Argument): `moduleForPath()` +
+ * `requiredAccess()`, abgesenkt auf `read` fuer die Eintraege aus
+ * `READ_LEVEL_WRITES` mit der Achse `session`.
  * @param {string} path z. B. "/schedule/preferences"
  * @param {string} method HTTP-Methode
  * @returns {{ moduleKey: string|null, access: 'read'|'write' }}
  */
 function sessionModuleAccessRequirement(path, method) {
-  const moduleKey = moduleForPath(path);
-  const access = path === '/schedule/preferences' || isRecipeToShoppingTransfer(path, method)
-    ? 'read'
-    : requiredAccess(method);
-  return { moduleKey, access };
+  return {
+    moduleKey: moduleForPath(path),
+    access: readLevelWrite('session', path, method) ? 'read' : requiredAccess(method),
+  };
 }
 
 /**
- * REZEPT -> EINKAUF LIEST DIE QUELLE UND SCHREIBT DAS ZIEL (#1290, entschieden
- * am 22.09.2026). `POST /recipes/:id/to-shopping-list` legt `shopping_items`
- * an und aendert am Rezept nichts - der Pfad-Guard verlangte trotzdem
- * `meals: write`, weil `/recipes` dem Modul `meals` gehoert. Fuer GENAU diese
- * Route reicht deshalb `meals: read`; das Schreibrecht auf das Ziel verlangt
- * die Route selbst (`mayWriteModule(req, 'shopping')` in routes/recipes.js).
- *
- * SCHMAL MIT ABSICHT. Nur POST, nur dieser Pfad mit numerischer ID: jeder
- * andere Schreibweg unter `/recipes` braucht weiter `meals: write`. Der
- * Modul-Schluessel bleibt `meals`, damit `none` weiter verweigert. Schreibweise
- * und Schlussstrich werden gefaltet, weil Express beides beim Routen ignoriert
- * (GHSA-cvwj: ein woertlicher Vergleich waere hier STRENGER als die Route und
- * damit nur ein Fehlalarm - gefaltet urteilt der Guard fuer jede Schreibweise,
- * die die Route erreicht, gleich). Mahlzeit -> Einkauf faellt NICHT darunter:
- * jene Route setzt `meal_ingredients.on_shopping_list` und schreibt damit in
- * den Essensplan.
- *
- * Gilt fuer BEIDE Gates in server/index.js - Mitgliedsrechte hier ueber
- * `sessionModuleAccessRequirement()`, Token-Scopes ueber
- * `tokenAccessRequirement()`.
- * @param {string} path
- * @param {string} method
- * @returns {boolean}
- */
-function isRecipeToShoppingTransfer(path, method) {
-  return String(method || '').toUpperCase() === 'POST'
-    && /^\/recipes\/\d+\/to-shopping-list\/?$/i.test(String(path || ''));
-}
-
-/**
- * Modul-Schluessel + benoetigtes Niveau fuer ein gescoptes Zugangsmittel
- * (Token, Display). Anders als die Session-Variante OHNE die
- * `/schedule/preferences`-Ausnahme (die bleibt an `schedule:write` gebunden),
- * aber MIT der Rezept-Ausnahme: dort ist die Regel fuer beide Achsen dieselbe.
+ * Dasselbe fuer ein gescoptes Zugangsmittel (Token, Display): abgesenkt nur
+ * fuer die Eintraege mit der Achse `token`.
  * @param {string} path
  * @param {string} method
  * @returns {{ moduleKey: string|null, access: 'read'|'write' }}
@@ -225,7 +245,7 @@ function isRecipeToShoppingTransfer(path, method) {
 function tokenAccessRequirement(path, method) {
   return {
     moduleKey: moduleForPath(path),
-    access: isRecipeToShoppingTransfer(path, method) ? 'read' : requiredAccess(method),
+    access: readLevelWrite('token', path, method) ? 'read' : requiredAccess(method),
   };
 }
 
@@ -287,7 +307,7 @@ export {
   moduleForPath,
   sessionModuleAccessRequirement,
   tokenAccessRequirement,
-  isRecipeToShoppingTransfer,
+  READ_LEVEL_WRITES,
   tokenAllows,
   getModuleKeys,
   getAllScopes,

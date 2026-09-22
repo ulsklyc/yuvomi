@@ -76,7 +76,7 @@ const KEIN_TRANSFER_AUS_DER_KUECHE = [
   ['meals: read', { meals: 'read', shopping: 'write' }],
 ];
 // Rezept -> Einkauf LIEST das Rezept (Entscheidung 22.09.2026, server/scopes.js
-// `isRecipeToShoppingTransfer`): dort reicht `meals: read`, `none` bleibt zu.
+// `READ_LEVEL_WRITES`): dort reicht `meals: read`, `none` bleibt zu.
 const REZEPT_ERLAUBT = [
   ['beiden Schreibrechten', BEIDE],
   ['meals: read + shopping: write', { meals: 'read', shopping: 'write' }],
