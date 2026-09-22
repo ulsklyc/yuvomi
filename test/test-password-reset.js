@@ -220,7 +220,7 @@ test('forgot-password schickt bei mehrdeutiger Adresse an niemanden und antworte
 });
 
 test('forgot-password findet eine Adresse mit Tab, CR oder NBSP', async () => {
-  for (const stored of ['\talice@test\r', ' Alice@Test ']) {
+  for (const stored of ['\talice@test\r', '\u00a0Alice@Test\u00a0']) {
     const db = makeDb();
     db.exec('CREATE TABLE contacts (id INTEGER PRIMARY KEY AUTOINCREMENT, family_user_id INTEGER, email TEXT);');
     db.prepare('INSERT INTO contacts (family_user_id, email) VALUES (1, ?)').run(stored);
@@ -298,6 +298,27 @@ test('forgot-password antwortet, bevor der Versand fertig ist, und in jedem Fall
   }
   await app.locals.drain();
   assert.equal(started.length, 1, 'der Versand lief trotzdem');
+});
+
+test('emailMatchKey und forgot-password bleiben linear bei langem Leerraum im Inneren', async () => {
+  // Ein Regex wie /^\s+|\s+$/ probiert die rechte Alternative an jeder
+  // Position neu und laeuft bei Leerraum im INNEREN quadratisch - auf einem
+  // oeffentlichen Pfad ohne Anmeldung. Gemessen: 90 000 Leerzeichen, 26 s.
+  const { emailMatchKey } = await import('../server/utils/email-match.js');
+  const long = `a${' '.repeat(50_000)}b`;
+  let t = performance.now();
+  emailMatchKey(long);
+  const unitMs = performance.now() - t;
+  assert.ok(unitMs < 1000, `emailMatchKey brauchte ${Math.round(unitMs)} ms`);
+
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  const { app } = await makeAuthApp(db);
+  t = performance.now();
+  const { status } = await callJson(app, 'POST', '/auth/forgot-password', { identifier: long });
+  const routeMs = performance.now() - t;
+  assert.equal(status, 200);
+  assert.ok(routeMs < 2000, `forgot-password samt Hintergrundarbeit brauchte ${Math.round(routeMs)} ms`);
 });
 
 test('reset-password rejects an invalid token', async () => {

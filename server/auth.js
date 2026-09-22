@@ -1598,13 +1598,19 @@ export function buildResetRoutes(targetRouter, {
   }
 
   targetRouter.post('/forgot-password', limiter, (req, res) => {
-    const { identifier } = req.body || {};
-    // Erst antworten, dann arbeiten: dieselbe Antwort, dieselbe Zeit, fuer ein
-    // bekanntes wie fuer ein unbekanntes Konto.
-    res.json({ data: { ok: true } });
-    defer(() => sendResetLinkFor(identifier).catch((err) => {
+    try {
+      const { identifier } = req.body || {};
+      // Erst antworten, dann arbeiten: dieselbe Antwort, dieselbe Zeit, fuer ein
+      // bekanntes wie fuer ein unbekanntes Konto.
+      res.json({ data: { ok: true } });
+      defer(() => sendResetLinkFor(identifier).catch((err) => {
+        log.error('forgot-password error:', err.message);
+      }));
+    } catch (err) {
       log.error('forgot-password error:', err.message);
-    }));
+      // Auch hier die generische Antwort: ein Fehler darf nichts verraten.
+      if (!res.headersSent) res.json({ data: { ok: true } });
+    }
   });
 
   targetRouter.post('/reset-password', limiter, async (req, res) => {

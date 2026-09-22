@@ -302,12 +302,23 @@ test('verknüpft auch, wenn die gespeicherte Adresse Leerraum traegt (primaer un
 test('verknüpft auch über Tab, CR und geschütztes Leerzeichen (NBSP) in der gespeicherten Adresse', () => {
   // SQLites trim() nimmt nur Leerzeichen weg. Ein Import bringt auch Tab, CR
   // oder NBSP mit - beide Seiten laufen deshalb durch dieselbe JS-Regel.
-  for (const [i, stored] of ['\tfrida@example.com\r', ' Frida@Example.com '].entries()) {
+  for (const [i, stored] of ['\tfrida@example.com\r', '\u00a0Frida@Example.com\u00a0'].entries()) {
     const db = buildOidcTestDb();
     const localId = addLocalUserWithEmail(db, `frida${i}`, stored);
     const user = findOrCreateOidcUser(db, { sub: `link-sub-nbsp-${i}`, email: 'frida@example.com', email_verified: true });
     assert(user.id === localId, `Adresse ${JSON.stringify(stored)} verfehlt: ${user.id} statt ${localId}`);
   }
+});
+
+test('verknüpft NICHT über Unicode-Faltung (Kelvin-Zeichen statt K)', () => {
+  // Klein geschrieben wird nur ASCII, wie SQLites lower(). JS toLowerCase()
+  // faltet das Kelvin-Zeichen U+212A zu "k" - eine Adresse, die der Anbieter
+  // so meldet, ist aber nicht die gespeicherte ASCII-Adresse.
+  const db = buildOidcTestDb();
+  const localId = addLocalUserWithEmail(db, 'kate', 'kate@x.de');
+  const user = findOrCreateOidcUser(db, { sub: 'link-sub-kelvin', email: '\u212Aate@x.de', email_verified: true });
+  assert(user.id !== localId, 'Kelvin-Adresse wurde mit dem ASCII-Konto verknuepft');
+  assert(db.prepare('SELECT count(*) AS n FROM users').get().n === 2, 'es entsteht ein eigenes Konto');
 });
 
 test('Konto ohne Passwort: die Doppelprüfung sieht dieselbe Adresse mit Leerraum, wie der Linker', () => {

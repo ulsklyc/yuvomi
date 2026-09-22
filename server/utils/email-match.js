@@ -8,19 +8,26 @@
  *
  * Normalisiert wird in JS, auf beiden Seiten mit derselben Funktion. SQLites
  * `trim()` entfernt nur Leerzeichen - ein Tab, ein CR oder ein geschuetztes
- * Leerzeichen (NBSP) aus einem Import blieben stehen, und `lower()` kennt nur
- * ASCII. Zwei Regeln, eine je Seite, wuerden sich genau dort widersprechen.
+ * Leerzeichen (NBSP) aus einem Import blieben stehen. Klein geschrieben wird
+ * dagegen bewusst nur ASCII, genau wie SQLites `lower()`: `toLowerCase()`
+ * faltet auch Zeichen wie das Kelvin-Zeichen U+212A zu "k" und verknuepfte
+ * damit eine Adresse, die nicht die gespeicherte ist.
  */
 
 /**
- * Vergleichsschluessel einer Adresse: Leerraum an beiden Enden weg (`\s` deckt
- * Tab, CR, LF und NBSP ab), dann klein geschrieben. Leer ergibt ''.
+ * Vergleichsschluessel einer Adresse: Leerraum an beiden Enden weg
+ * (`String#trim`: Tab, CR, LF, NBSP, U+FEFF), dann nur A-Z klein geschrieben.
+ * Leer ergibt ''.
+ *
+ * Bewusst `trim()` und kein Regex wie `/^\s+|\s+$/`: der probiert die rechte
+ * Alternative an jeder Position neu und laeuft bei langem Leerraum im INNEREN
+ * quadratisch - auf "Passwort vergessen", einem Pfad ohne Anmeldung.
  * @param {unknown} value
  * @returns {string}
  */
 export function emailMatchKey(value) {
   if (value === null || value === undefined) return '';
-  return String(value).replace(/^\s+|\s+$/g, '').toLowerCase();
+  return String(value).trim().replace(/[A-Z]/g, (c) => c.toLowerCase());
 }
 
 /**
