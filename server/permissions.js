@@ -400,6 +400,22 @@ export function mayWriteModule(req, moduleKey) {
     && moduleAccessVerdict(req?.sessionModuleAccess, moduleKey, 'write') === MODULE_ACCESS_ALLOW;
 }
 
+/**
+ * Darf dieses Credential in diesem Modul LESEN? Das Gegenstueck zu
+ * `mayWriteModule()`, beide Achsen in einem Aufruf.
+ *
+ * Fuer Routen, die unter dem Praefix ihres ZIELS haengen und dabei ein
+ * anderes Modul als Quelle lesen: `POST /pantry/import-shopping` liest
+ * abgehakte Einkaufsartikel, `POST /shopping/:listId/import-pantry` liest
+ * Vorratszeilen. Der Pfad-Guard in server/index.js misst nur das Ziel; was
+ * aus der Quelle kopiert wird, ist danach im Ziel lesbar. Ohne diese Frage las
+ * ein Mitglied mit `shopping: none` die Einkaufsliste ueber den Vorrat.
+ */
+export function mayReadModule(req, moduleKey) {
+  return tokenAllows(req?.authScopes, moduleKey, 'read')
+    && moduleAccessVerdict(req?.sessionModuleAccess, moduleKey, 'read') === MODULE_ACCESS_ALLOW;
+}
+
 // Urteil der Modulrechte-Prüfung. 'allow' = durchlassen, 'none' = Modul ganz
 // gesperrt, 'read-only' = nur Lesen erlaubt, Schreibversuch abgewiesen.
 export const MODULE_ACCESS_ALLOW = 'allow';

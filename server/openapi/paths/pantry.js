@@ -26,7 +26,8 @@ export function pantryPaths() {
     '/api/v1/pantry/import-shopping': {
       post: op({
         summary: 'Take checked shopping items into the pantry',
-        description: 'Creates or increments pantry items from the checked items of a shopping list. Does not modify the shopping list itself — clear it separately via DELETE /api/v1/shopping/{listId}/items/checked.',
+        description: 'Creates or increments pantry items from the checked items of a shopping list. Does not modify the shopping list itself - clear it separately via DELETE /api/v1/shopping/{listId}/items/checked. '
+          + 'Reads the shopping list, so it requires read access to the `shopping` module in addition to `pantry` - a credential without it is refused with 403.',
         tag: 'Pantry',
         stateChanging: true,
         requestBody: jsonBody(null),

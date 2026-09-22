@@ -681,6 +681,10 @@ forgot to ask about.
   `shopping`, `import-meal-plan` and the undo of a meal transfer in `server/routes/shopping.js` for
   `meals`, `PUT /recipes/:id/ingredient-match` for `pantry`, because it hooks a row of the pantry
   into a recipe, and the housekeeping supply request with #1353.
+- `mayReadModule()` beside it for the other half: a transfer that copies rows out of another
+  module reads that module, so it asks for read access to the source. `POST /pantry/import-shopping`
+  asks for `shopping`, `POST /shopping/:listId/import-pantry` for `pantry`, both before the list
+  lookup. The controls need no second check, because each stands on its source's own page.
 - `npm run test:cross-module-write` (`test/test-cross-module-write-rights.js`) holds those routes on
   both axes and checks the effect after each refusal, not only the status.
 - The follow-on entries of a visit in `server/routes/housekeeping.js`: `createVisitCalendarEvent()`

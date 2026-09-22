@@ -174,6 +174,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Permissions: importing between pantry and shopping now checks the source module too.** Moving
+  checked items from the shopping list into the pantry and putting pantry items on the shopping
+  list were judged only by the module they write into. The import also needs read access to the
+  module it copies from: the shopping list for "Into pantry", the pantry for the shopping cart
+  on a pantry row. Without it the server answers 403 and copies nothing. Both buttons stand on the
+  page of that source module, so nobody who can see them loses them. For API clients:
+  `POST /api/v1/pantry/import-shopping` also needs `shopping:read`, and
+  `POST /api/v1/shopping/{listId}/import-pantry` also needs `pantry:read`. (#1290)
+
 - **A failed restore explains itself in your language and keeps your place.** When a backup did
   not open, the restore dialog showed the server's English explanation, up to several paragraphs
   long, also in a German interface. Each known cause now has a short translated message with the
