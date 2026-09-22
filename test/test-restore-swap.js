@@ -420,7 +420,101 @@ for (const [fall, key] of [['mit Schluessel', KEY], ['ohne Schluessel', null]]) 
       [],
       `keine Arbeitsdatei bleibt liegen: ${names.join(', ')}`
     );
-    assert.equal(names.filter((name) => /\.pre-restore-[^.]+$/.test(name)).length, 1, 'die Rollback-Kopie bleibt stehen');
+    assert.deepEqual(
+      names.filter((name) => name.includes('.pre-restore-')),
+      [],
+      'die Rollback-Kopie ist per rename zurueck an DB_PATH gegangen, nicht kopiert'
+    );
     target.mod.get().close();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Re-Review #1431: Rollback ohne zweite Kopie, Meldung bei gescheitertem Rollback
+// ---------------------------------------------------------------------------
+
+const IS_ROLLBACK_COPY = /\.pre-restore-[^./]+$/;
+
+test('#1431 volle Platte beim Rollback: die alte Datenbank kommt trotzdem zurueck, ohne zweite Kopie', async () => {
+  // Scheitert init() nach dem Tausch, liegt die neue Datei noch an DB_PATH.
+  // Den Rollback per Kopie traf dann ENOSPC - genau der Fall aus #1422.
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  const realCopyFile = fsp.copyFile;
+  fsp.copyFile = async (src, dest, mode) => {
+    if (IS_ROLLBACK_COPY.test(String(src))) {
+      throw Object.assign(new Error('ENOSPC: no space left on device, copyfile'), { code: 'ENOSPC' });
+    }
+    return realCopyFile(src, dest, mode);
+  };
+  try {
+    await assert.rejects(() => target.mod.restoreFromFile(backupThatFailsAfterTheSwap()));
+  } finally {
+    fsp.copyFile = realCopyFile;
+  }
+  assert.equal(
+    target.mod.get().prepare('SELECT note FROM restore_probe').get()?.note,
+    'vor dem Restore',
+    'die Instanz laeuft wieder auf der alten Datenbank'
+  );
+  target.mod.get().pragma('wal_checkpoint(TRUNCATE)');
+  assert.equal(sha256(target.dbPath), target.hash, 'DB_PATH ist Byte fuer Byte die alte Datei');
+  target.mod.get().close();
+});
+
+test('#1431 scheitert auch der Rollback, sagt die Meldung das und nennt die Rollback-Kopie', async () => {
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  const realRename = fsp.rename;
+  const realCopyFile = fsp.copyFile;
+  // Beide Wege zurueck blockieren: das rename (neu) und die Kopie (vorher).
+  fsp.rename = async (from, to) => {
+    if (IS_ROLLBACK_COPY.test(String(from))) {
+      throw Object.assign(new Error('EIO: i/o error, rename'), { code: 'EIO' });
+    }
+    return realRename(from, to);
+  };
+  fsp.copyFile = async (src, dest, mode) => {
+    if (IS_ROLLBACK_COPY.test(String(src))) {
+      throw Object.assign(new Error('EIO: i/o error, copyfile'), { code: 'EIO' });
+    }
+    return realCopyFile(src, dest, mode);
+  };
+  try {
+    await assert.rejects(
+      () => target.mod.restoreFromFile(backupThatFailsAfterTheSwap()),
+      (err) => {
+        const rollback = readdirSync(target.dir).find((name) => IS_ROLLBACK_COPY.test(name));
+        assert.ok(rollback, 'Vorbedingung: die Rollback-Kopie steht noch');
+        assert.match(err.message, /Putting the previous database back failed as well: EIO/);
+        assert.ok(err.message.includes(join(target.dir, rollback)), `die Meldung nennt die Rollback-Kopie: ${err.message}`);
+        assert.equal(err.reason, undefined, 'ohne reason - kein Dialogtext darf „nichts geaendert" sagen');
+        return true;
+      }
+    );
+  } finally {
+    fsp.rename = realRename;
+    fsp.copyFile = realCopyFile;
+  }
+});
+
+for (const art of ['Arbeitsdatei', 'halbe Rollback-Kopie']) {
+  test(`#1431 der Start raeumt eine ${art} eines toten Prozesses weg, die eines lebenden laesst er liegen`, async () => {
+    const dir = tempDir('yuvomi-test-swap-');
+    const dbPath = join(dir, 'yuvomi.db');
+    // Ein Prozess, der sicher tot ist, und einer, der sicher lebt (der Vater
+    // dieses Testprozesses; nicht dieser selbst - den behandelt der Start als eigenen).
+    const tot = spawnSync(process.execPath, ['-e', 'process.stdout.write(String(process.pid))'], { encoding: 'utf8' });
+    const totePid = Number(tot.stdout);
+    const lebendePid = process.ppid;
+    const name = (pid) => (art === 'Arbeitsdatei'
+      ? `yuvomi.db.restore-tmp-${pid}-abc`
+      : `yuvomi.db.pre-restore-2026-01-01T00-00-00-000Z.${pid}.partial`);
+    writeFileSync(join(dir, name(totePid)), 'rest');
+    writeFileSync(join(dir, name(lebendePid)), 'laeuft noch');
+
+    const mod = await bootDb(dbPath, KEY);
+    mod.get().close();
+    const names = readdirSync(dir);
+    assert.ok(!names.includes(name(totePid)), `die Datei des toten Prozesses ist weg: ${names.join(', ')}`);
+    assert.ok(names.includes(name(lebendePid)), `die Datei des lebenden Prozesses bleibt: ${names.join(', ')}`);
   });
 }

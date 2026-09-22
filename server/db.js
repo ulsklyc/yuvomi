@@ -10363,8 +10363,11 @@ async function rekeyForeignBackup(sourcePath, oldKey) {
  * danach eine Mischung an DB_PATH (`database disk image is malformed`).
  * Gesetzt wird der Riegel vor dem ersten `await`, geloest im `finally`.
  * Gegen einen Restore aus einem ANDEREN Prozess (CLI neben dem Server) wirkt
- * er nicht - dafuer traegt jede Arbeitsdatei einen eigenen Namen
- * (`restoreStagingPath()`).
+ * er nicht. Dafuer tragen Arbeitsdatei und halbe Rollback-Kopie die
+ * Prozessnummer im Namen: kein Prozess ueberschreibt die des anderen, und
+ * `removeRestoreStaging()` raeumt nur Dateien toter Prozesse weg. Den Tausch
+ * selbst serialisiert das nicht - beide haengten nacheinander eine
+ * vollstaendige Datenbank an DB_PATH.
  */
 let restoreRunning = false;
 
@@ -10453,7 +10456,8 @@ async function syncDirectory(dirPath) {
  * Die Verbindung muss dafuer zu sein, und `-wal`/`-shm` der alten Datenbank
  * muessen VOR dem Umhaengen weg sein: SQLite wendete ein liegengebliebenes
  * `-wal` sonst auf die neue Datei an. Beides erledigt der Aufrufer.
- * @param {string} stagingPath  fertig geschriebene Arbeitsdatei
+ * @param {string} stagingPath  fertig geschriebene Arbeitsdatei oder, beim
+ *   Rollback, die Rollback-Kopie
  */
 async function swapIntoDbPath(stagingPath) {
   await fs.rename(stagingPath, DB_PATH);
@@ -10472,24 +10476,64 @@ async function stageDatabaseCopy(from, stagingPath) {
   }
 }
 
+const ROLLBACK_PARTIAL_SUFFIX = '.partial';
+
 /**
- * Eine Arbeitsdatei, die ein abgebrochener Restore liegen liess, wegraeumen.
- * Sie ist nie an `DB_PATH` gehaengt worden - die Datenbank ist die alte, und
- * das Backup liegt dort, woher es kam. Ohne Aufraeumen laege eine vollstaendige
- * Kopie des Backups im Datenverzeichnis, bei einem Klartext-Backup sogar
- * unverschluesselt.
+ * Lebt der Prozess, der eine liegengebliebene Datei angelegt hat, noch - und
+ * ist es nicht dieser? `process.kill(pid, 0)` prueft nur, sendet nichts;
+ * `EPERM` heisst „gibt es, gehoert einem anderen Benutzer".
+ *
+ * Grenze: die Nummer gilt nur im selben PID-Namensraum. Ein CLI-Restore per
+ * `docker compose run` laeuft in einem eigenen Container; seine Nummer kann
+ * hier einen fremden Prozess treffen (dann bleibt die Datei bis zum naechsten
+ * Start liegen) oder keinen (dann wird sie geloescht, und sein rename scheitert
+ * - vor dem Tausch, DB_PATH bleibt die alte Datenbank).
+ * @param {number} pid
+ */
+function otherProcessAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return err?.code === 'EPERM';
+  }
+}
+
+/**
+ * Reste eines abgebrochenen Restores wegraeumen: die Arbeitsdatei
+ * (`<DB_PATH>.restore-tmp-<pid>-<zeit>`) und eine halbe Rollback-Kopie
+ * (`<DB_PATH>.pre-restore-<zeit>.<pid>.partial`). Die Arbeitsdatei ist nie an
+ * `DB_PATH` gehaengt worden - die Datenbank ist die alte, und das Backup liegt
+ * dort, woher es kam. Ohne Aufraeumen laege eine vollstaendige Kopie des
+ * Backups im Datenverzeichnis, bei einem Klartext-Backup sogar unverschluesselt.
+ *
+ * Jeder Prozess, der db.js laedt, laeuft hier durch (`init()`). Eine Datei,
+ * deren Prozess noch lebt, gehoert zu einem laufenden Restore und bleibt
+ * liegen (Review #1431) - siehe `otherProcessAlive()` fuer die Grenze.
  */
 function removeRestoreStaging() {
   if (DB_PATH === ':memory:') return;
   const dir = path.dirname(DB_PATH);
-  const prefix = `${path.basename(DB_PATH)}${RESTORE_STAGING_SUFFIX}`;
+  const base = path.basename(DB_PATH);
+  const stagingPrefix = `${base}${RESTORE_STAGING_SUFFIX}-`;
+  const rollbackPrefix = `${base}.pre-restore-`;
   let names;
   try { names = readdirSync(dir); } catch { return; }
   for (const name of names) {
-    if (!name.startsWith(prefix)) continue;
-    const stagingPath = path.join(dir, name);
-    log.info(`${stagingPath} is left over from a restore that was interrupted before the swap - removing it. The database is the one from before that restore.`);
-    try { rmSync(stagingPath, { force: true }); } catch { /* best effort */ }
+    let pid;
+    if (name.startsWith(stagingPrefix)) {
+      pid = Number(name.slice(stagingPrefix.length).split('-')[0]);
+    } else if (name.startsWith(rollbackPrefix) && name.endsWith(ROLLBACK_PARTIAL_SUFFIX)) {
+      const parts = name.slice(0, -ROLLBACK_PARTIAL_SUFFIX.length).split('.');
+      pid = Number(parts[parts.length - 1]);
+    } else {
+      continue;
+    }
+    if (otherProcessAlive(pid)) continue;
+    const leftover = path.join(dir, name);
+    log.info(`${leftover} is left over from a restore that was interrupted before the swap - removing it. The database is the one from before that restore.`);
+    try { rmSync(leftover, { force: true }); } catch { /* best effort */ }
   }
 }
 
@@ -10497,7 +10541,9 @@ async function restoreValidatedFile(sourcePath) {
   const backupVersion = validateBackupFile(sourcePath);
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const rollbackPath = `${DB_PATH}.pre-restore-${timestamp}`;
-  const rollbackPartialPath = `${rollbackPath}.partial`;
+  // Mit Prozessnummer wie die Arbeitsdatei: `removeRestoreStaging()` laesst
+  // die Datei eines noch laufenden fremden Prozesses liegen.
+  const rollbackPartialPath = `${rollbackPath}.${process.pid}${ROLLBACK_PARTIAL_SUFFIX}`;
   const stagingPath = restoreStagingPath();
   let rollbackCreated = false;
   // Offen ist die Verbindung, außer im Leer-Fall des Restore-CLI (#1282, siehe
@@ -10508,6 +10554,8 @@ async function restoreValidatedFile(sourcePath) {
   let keptJournalPath = null;
   // Ab hier liegt an DB_PATH die Datenbank aus dem Backup (#1422).
   let swapped = false;
+  // Die Rollback-Kopie ist per rename zurueck an DB_PATH.
+  let rolledBack = false;
 
   try {
     await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
@@ -10582,12 +10630,17 @@ async function restoreValidatedFile(sourcePath) {
           db = null;
         }
         if (rollbackCreated) {
-          // Die neue Datenbank liegt schon an DB_PATH: die alte auf demselben
-          // Weg zurueck, unteilbar wie der Tausch selbst.
+          // Die neue Datenbank liegt schon an DB_PATH: die alte per rename
+          // zurueck, nicht per Kopie. Eine Kopie braucht noch einmal so viel
+          // Platz wie die alte Datenbank, waehrend die neue noch an DB_PATH
+          // liegt - bei vollem Datentraeger (der Fall aus #1422) scheiterte der
+          // Rollback, und die Instanz blieb auf dem gescheiterten Backup ohne
+          // Verbindung stehen (Review #1431). Das rename ist unteilbar und
+          // braucht keinen Platz; die Rollback-Kopie ist danach DB_PATH selbst.
           await unlinkIfExists(`${DB_PATH}-wal`);
           await unlinkIfExists(`${DB_PATH}-shm`);
-          await stageDatabaseCopy(rollbackPath, stagingPath);
-          await swapIntoDbPath(stagingPath);
+          await swapIntoDbPath(rollbackPath);
+          rolledBack = true;
         }
       }
       // Vor dem Tausch ist DB_PATH die alte Datei geblieben, nach dem Rollback
@@ -10611,9 +10664,39 @@ async function restoreValidatedFile(sourcePath) {
       }
     } catch (rollbackErr) {
       log.error('Rollback after failed restore also failed:', rollbackErr);
+      throw rollbackFailedError(err, rollbackErr, {
+        rollbackPath: rollbackCreated && !rolledBack ? rollbackPath : null,
+      });
     }
     throw err;
   }
+}
+
+/**
+ * Meldung, wenn nach einem gescheiterten Restore auch der Rueckweg scheitert
+ * (Review #1431). Die Instanz steht dann NICHT mehr wie vorher da - der
+ * urspruengliche Fehler (oft mit einem Grund, dessen Dialogtext „hier wurde
+ * nichts geaendert" sagt) waere eine falsche Auskunft. Deshalb ohne `reason`:
+ * der Dialog zeigt diese Meldung selbst, und sie nennt den Weg von Hand.
+ * @param {Error} restoreErr
+ * @param {Error} rollbackErr
+ * @param {{ rollbackPath: string | null }} where  Rollback-Kopie, falls sie
+ *   noch nicht zurueck an DB_PATH liegt
+ */
+function rollbackFailedError(restoreErr, rollbackErr, { rollbackPath }) {
+  const lines = [
+    `Restore failed: ${restoreErr?.message ?? String(restoreErr)}`,
+    `Putting the previous database back failed as well: ${rollbackErr?.message ?? String(rollbackErr)}.`,
+  ];
+  if (rollbackPath) {
+    lines.push(
+      `The database from before the restore is kept at ${rollbackPath}. Stop Yuvomi, move that file `
+      + `to ${DB_PATH} (and delete ${DB_PATH}-wal and ${DB_PATH}-shm if they exist), then start Yuvomi again.`
+    );
+  } else {
+    lines.push(`The database from before the restore is back at ${DB_PATH}, but it could not be opened again. Restart Yuvomi.`);
+  }
+  return new Error(lines.join(' '), { cause: restoreErr });
 }
 
 // --------------------------------------------------------
