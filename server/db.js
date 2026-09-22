@@ -9661,7 +9661,11 @@ const MIGRATIONS = [
     // Die Gruppe sieht es selbst im Verlauf: je wiederhergestellter Ausgabe
     // genau ein Eintrag 'ledger_restored' (entity 'expense', actor_id NULL -
     // niemand hat gehandelt, die Oberflaeche zeigt "System"). metadata traegt
-    // Titel und den gebuchten (umgerechneten) Betrag. Das Schema von
+    // Titel und den gebuchten (umgerechneten) Betrag - als
+    // {title, amount_minor, currency} und nicht wie payment_* als
+    // {amount: Dezimal, currency}, weil eingefrorenes SQL die Nachkommastellen
+    // je Waehrung (ISO 4217, server/services/split-expenses.js) nicht anwenden
+    // kann; die Dezimalform ergaenzt GET /groups/:id/activity. Das Schema von
     // expense_activity ist hier dasselbe wie bei seiner Anlage in v39: keine
     // Spalte ist seitdem dazugekommen, und type hat keinen CHECK. Die Spalten
     // stehen ausdruecklich im INSERT, created_at kommt aus dem Default - eine

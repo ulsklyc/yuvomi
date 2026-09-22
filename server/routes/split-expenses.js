@@ -1159,7 +1159,16 @@ router.get('/groups/:id/activity', (req, res) => {
       LIMIT @size OFFSET @offset
     `).all({ groupId, size: limit + 1, offset, ...(cursor || {}) });
     const hasMore = fetched.length > limit;
-    const rows = fetched.slice(0, limit).map((row) => ({ ...row, metadata: row.metadata ? JSON.parse(row.metadata) : null }));
+    const rows = fetched.slice(0, limit).map((row) => {
+      const metadata = row.metadata ? JSON.parse(row.metadata) : null;
+      // 'ledger_restored' (Migration v226) speichert den Betrag in Minor-Units:
+      // eingefrorenes SQL kennt die Nachkommastellen je Waehrung nicht. Hier
+      // bekommt er dieselbe Dezimalform wie payment_registered (`amount`).
+      if (row.type === 'ledger_restored' && Number.isInteger(metadata?.amount_minor) && metadata.currency) {
+        return { ...row, metadata: decorateMoney(metadata) };
+      }
+      return { ...row, metadata };
+    });
     attachSettlementState(rows, groupId, req);
     const last = rows[rows.length - 1];
     const nextCursor = hasMore && last ? { before_at: last.created_at, before_id: last.id } : null;

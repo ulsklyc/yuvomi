@@ -10145,16 +10145,24 @@ test('split activity feed translates every type the backend writes', () => {
     'server/routes/split-expenses.js': read('../server/routes/split-expenses.js'),
     'server/services/split-expenses-scheduler.js': read('../server/services/split-expenses-scheduler.js'),
     'scripts/seed-demo.js': read('../scripts/seed-demo.js'),
-    // Migration v226 schreibt 'ledger_restored' selbst per SQL. Nur ihr Block,
-    // nicht die ganze db.js: dort stehen Listen wie
-    // IN ('expense', 'expense_reversal', 'settlement', ...), die das Regex als
-    // Typen laese.
-    'server/db.js (v226)': (() => {
+    // Migrationen, die selbst in expense_activity schreiben (v226:
+    // 'ledger_restored'). Gelesen wird jeder MIGRATIONS-Eintrag, der
+    // `INSERT INTO expense_activity` enthaelt - nicht die ganze db.js: dort
+    // stehen Listen wie IN ('expense', 'expense_reversal', ...) oder
+    // ('admin', 'member'), die das Regex als Typen laese.
+    ...(() => {
       const db = read('../server/db.js');
-      const start = db.indexOf('    version: 226,');
-      assert.ok(start > 0, 'Migration v226 in server/db.js nicht gefunden');
-      const end = db.indexOf('\n  },\n', start);
-      return db.slice(start, end);
+      const start = db.indexOf('const MIGRATIONS = [');
+      assert.ok(start !== -1, 'const MIGRATIONS = [ in server/db.js nicht gefunden');
+      const end = db.indexOf('\n];', start);
+      assert.ok(end !== -1, 'Ende von MIGRATIONS in server/db.js nicht gefunden');
+      const writers = {};
+      for (const entry of db.slice(start, end).split(/\n  \{\n    version: /).slice(1)) {
+        if (!entry.includes('INSERT INTO expense_activity')) continue;
+        writers[`server/db.js (v${entry.match(/^\d+/)[0]})`] = entry;
+      }
+      assert.ok(Object.keys(writers).length >= 1, 'keine Migration schreibt in expense_activity - Zerlegung von MIGRATIONS passt nicht mehr');
+      return writers;
     })(),
   };
 

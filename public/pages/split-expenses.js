@@ -728,12 +728,25 @@ function renderActivity() {
  * UTC, und `slice(0, 10)` darauf waere der UTC-Tag - 23:30 UTC in Berlin ist
  * schon der naechste Tag.
  */
+/**
+ * Welche Ausgabe Migration v226 wiederhergestellt hat (#1382): Titel und
+ * gebuchter Betrag, damit mehrere Eintraege "Buchung wiederhergestellt"
+ * unterscheidbar sind. Den Betrag rechnet der Server in `amount` um - er
+ * kennt die Nachkommastellen je Waehrung (ISO 4217), der Browser nicht.
+ */
+function restoredDetail(item) {
+  if (item.type !== 'ledger_restored' || !item.metadata?.title) return '';
+  const { title, amount, currency } = item.metadata;
+  const sum = amount != null && currency ? ` · ${money(amount, currency)}` : '';
+  return `<span class="split-activity-payment">${esc(`${title}${sum}`)}</span>`;
+}
+
 function activityItemHtml(item, actionable) {
   const settlement = item.settlement;
   const params = settlement ? paymentParams(settlement) : null;
   const detail = settlement
     ? `<span class="split-activity-payment">${esc(t('splitExpenses.paymentDetail', params))}</span>`
-    : '';
+    : restoredDetail(item);
   const reversed = settlement?.reversed_at
     ? `<span class="split-activity-reversed">${esc(t('splitExpenses.paymentReversed'))}</span>`
     : '';

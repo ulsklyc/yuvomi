@@ -174,6 +174,10 @@ test('der Verlauf der Gruppe nennt jede wiederhergestellte Ausgabe genau einmal'
   const restored = list.filter((a) => a.type === 'ledger_restored');
   assert.deepEqual(restored.map((a) => a.entity_id).sort((a, b) => a - b), [LOST_REMAINDER, LOST_FX].sort((a, b) => a - b));
   assert.ok(restored.every((a) => a.actor_id === null && a.entity_type === 'expense'), 'kein Akteur, Ausgabe als Bezug');
+  // Der Betrag liegt in Minor-Units; die API ergaenzt die Dezimalform nach ISO 4217.
+  assert.deepEqual(restored.find((a) => a.entity_id === LOST_FX).metadata, {
+    title: 'Urlaub', amount_minor: 1850, currency: 'EUR', amount: '18.50',
+  });
 });
 
 test('Salden danach gleich dem Stand vor dem Verlust', async () => {

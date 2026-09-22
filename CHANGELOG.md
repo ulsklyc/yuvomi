@@ -182,7 +182,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   expense is saved, including the converted amount of an expense in another currency. Only active
   expenses without any booking are touched; deleted expenses and complete ones stay as they are.
   The group's activity shows "Booking restored" once for each expense that was repaired, so a
-  changed balance has a visible reason. (#1309)
+  changed balance has a visible reason, and each entry names the expense and its amount. (#1382)
 
 - **A failed restore explains itself in your language and keeps your place.** When a backup did
   not open, the restore dialog showed the server's English explanation, up to several paragraphs
