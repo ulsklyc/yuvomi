@@ -9576,21 +9576,28 @@ const MIGRATIONS = [
       -- nachgezogen. Nur UPDATE, und nur wo sich etwas unterscheidet - ein
       -- zweiter Lauf findet nichts mehr.
       --
+      -- expense_reversal gehoert dazu: eine Gegenbuchung einer Ausgabe teilt
+      -- source_id und damit expenses.created_by mit ihrer Buchung - blieben
+      -- nur die 'expense'-Zeilen im Blick, risse diese Migration genau so ein
+      -- Paar auseinander.
+      --
       -- Nicht angefasst: Zeilen ohne ihre Ausgabe (source_id ist kein echter
       -- Fremdschluessel, es gibt also keinen Ersteller, den man eintragen
       -- koennte) und eine Ausgabe ohne created_by (die Spalte ist NOT NULL,
       -- der Filter haelt das nur fest, statt eine NULL in eine NOT-NULL-Spalte
-      -- zu schreiben). Ledger-Zeilen, deren Bearbeiter schon geloescht ist,
+      -- zu schreiben), und ein Autor, den es in users nicht gibt (der
+      -- Fremdschluessel wuerde beim Serverstart werfen). Ledger-Zeilen, deren Bearbeiter schon geloescht ist,
       -- gibt es nicht mehr - die hat die Kaskade genommen, und ein UPDATE kann
       -- sie nicht zurueckholen.
       UPDATE expense_ledger_entries
       SET created_by = (SELECT e.created_by FROM expenses e WHERE e.id = expense_ledger_entries.source_id)
-      WHERE source_type = 'expense'
+      WHERE source_type IN ('expense', 'expense_reversal')
         AND EXISTS (
           SELECT 1 FROM expenses e
           WHERE e.id = expense_ledger_entries.source_id
             AND e.created_by IS NOT NULL
             AND e.created_by <> expense_ledger_entries.created_by
+            AND EXISTS (SELECT 1 FROM users u WHERE u.id = e.created_by)
         );
 
       -- Dasselbe fuer das Storno einer Zahlung: die Gegenbuchung
@@ -9609,6 +9616,7 @@ const MIGRATIONS = [
         AND EXISTS (
           SELECT 1 FROM expense_ledger_entries s
           WHERE s.source_type = 'settlement' AND s.source_id = expense_ledger_entries.source_id
+            AND EXISTS (SELECT 1 FROM users u WHERE u.id = s.created_by)
         )
         AND created_by <> (
           SELECT s.created_by FROM expense_ledger_entries s

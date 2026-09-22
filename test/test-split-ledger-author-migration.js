@@ -97,10 +97,14 @@ assert.equal(created.status, 201);
 const EXPENSE = created.body.data.id;
 assert.equal((await ED.call('PUT', `/split-expenses/expenses/${EXPENSE}`, body('12.00'))).status, 200);
 
-// Zahlung von Anna erfasst (Paul an Olivia), von Emil storniert.
-const settled = await AUT.call('POST', `/split-expenses/groups/${GROUP}/settlements`, { payer_id: PAY.id, payee_id: OWN.id, amount: '2.00', currency: 'EUR' });
+// Zahlung von PAUL erfasst (Paul an Olivia), von Emil storniert. Bewusst eine
+// andere Person als Anna und dieselbe id wie die Ausgabe: griffe die
+// Ausgaben-Korrektur auch 'settlement'-Zeilen (oder gar keinen Typfilter), trugen
+// sie danach Annas id - und nur so wird der falsche Typ sichtbar.
+const settled = await PAY.call('POST', `/split-expenses/groups/${GROUP}/settlements`, { payer_id: PAY.id, payee_id: OWN.id, amount: '2.00', currency: 'EUR' });
 assert.equal(settled.status, 201);
 const SETTLEMENT = settled.body.data.id;
+assert.equal(SETTLEMENT, EXPENSE, 'Fixture: Zahlung und Ausgabe teilen die id');
 assert.equal((await ED.call('POST', `/split-expenses/groups/${GROUP}/settlements/${SETTLEMENT}/reverse`)).status, 200);
 
 // Eine zweite Ausgabe, die nie bearbeitet wurde - die Migration darf sie nicht anfassen.
@@ -112,20 +116,37 @@ const UNTOUCHED = untouched.body.data.id;
 // Stornierender am Ledger.
 db.prepare("UPDATE expense_ledger_entries SET created_by = ? WHERE source_type = 'expense' AND source_id = ?").run(ED.id, EXPENSE);
 db.prepare("UPDATE expense_ledger_entries SET created_by = ? WHERE source_type = 'settlement_reversal' AND source_id = ?").run(ED.id, SETTLEMENT);
+// Eine Ausgaben-Gegenbuchung (expense_reversal, #1416) mit dem Bearbeiter -
+// Betrag 0, damit sie die Salden nicht verschiebt.
+const addRow = db.prepare(`
+  INSERT INTO expense_ledger_entries (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
+  VALUES (?, ?, ?, ?, NULL, 0, 'EUR', 'fixture', ?)
+`);
+addRow.run(GROUP, 'expense_reversal', EXPENSE, OWN.id, ED.id);
+// Waisen: eine Ausgabenzeile ohne Ausgabe, eine Gegenbuchung ohne Buchung.
+const ORPHAN_EXPENSE = 999001;
+const ORPHAN_SETTLEMENT = 999002;
+addRow.run(GROUP, 'expense', ORPHAN_EXPENSE, OWN.id, ED.id);
+addRow.run(GROUP, 'settlement_reversal', ORPHAN_SETTLEMENT, OWN.id, ED.id);
 const BALANCES = await balances();
 
-test('Migration v225 existiert am Ende von MIGRATIONS', () => {
+test('Migration v225 existiert', () => {
+  // Nicht an die Position im Array gebunden: die naechste Migration haengt
+  // dahinter an, und diese Suite soll davon nicht rot werden.
   assert.ok(migration225, 'MIGRATIONS enthaelt v225');
-  assert.equal(dbmod.MIGRATIONS.at(-1).version, 225);
+  assert.equal(migration225.version, 225);
 });
 
 test('Migration setzt created_by auf den Autor des Datensatzes', () => {
   assert.deepEqual(authors('expense', EXPENSE), [ED.id, ED.id, ED.id], 'Ausgangslage: vom Bearbeiter gestempelt');
   db.exec(migration225.up);
   assert.deepEqual(authors('expense', EXPENSE), [AUT.id, AUT.id, AUT.id], 'Ausgabe: Ersteller');
-  assert.deepEqual(authors('settlement', SETTLEMENT), [AUT.id, AUT.id]);
-  assert.deepEqual(authors('settlement_reversal', SETTLEMENT), [AUT.id, AUT.id], 'Gegenbuchung: Autor der Buchung');
+  assert.deepEqual(authors('expense_reversal', EXPENSE), [AUT.id], 'Ausgaben-Gegenbuchung: Ersteller der Ausgabe');
+  assert.deepEqual(authors('settlement', SETTLEMENT), [PAY.id, PAY.id], 'Buchung einer Zahlung bleibt bei ihrem Autor');
+  assert.deepEqual(authors('settlement_reversal', SETTLEMENT), [PAY.id, PAY.id], 'Gegenbuchung: Autor der Buchung');
   assert.deepEqual(authors('expense', UNTOUCHED), [AUT.id, AUT.id, AUT.id]);
+  assert.deepEqual(authors('expense', ORPHAN_EXPENSE), [ED.id], 'Waise ohne Ausgabe bleibt');
+  assert.deepEqual(authors('settlement_reversal', ORPHAN_SETTLEMENT), [ED.id], 'Waise ohne Buchung bleibt');
 });
 
 test('zweiter Lauf aendert nichts', () => {
