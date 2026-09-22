@@ -800,18 +800,25 @@ test('Kalender-Detailansicht: Löschen, Zurücksetzen und Bearbeiten fallen weg,
 // Die Begründung für das Ausblenden des Einlösens - am Server gemessen
 // -------------------------------------------------------------------------
 
-test('die Ausnahmen vom Modulrecht stehen am Server, und es sind genau zwei Sorten', () => {
+test('die Ausnahmen vom Modulrecht stehen am Server, und es sind genau zwei Sorten', async () => {
   // WOVON DIESE SEITE ABHÄNGT. Bekäme `/rewards/redemptions` eine
   // Niveau-Senkung wie `/schedule/preferences`, gehörte der Einlöse-Knopf
   // einem Menschen mit `rewards: read` zurück. Und verlöre ein Display seine
   // benannten Schreibrouten, gehörten Personenauswahl und Tablett-Einlösen
   // weg. Beides sind Entscheidungen, die anderswo fallen - dieser Test macht
   // die Kopplung sichtbar, statt sie zu erraten.
-  const scopes = readFileSync(new URL('../server/scopes.js', import.meta.url), 'utf8');
-  const fn = scopes.slice(scopes.indexOf('function sessionModuleAccessRequirement(path, method) {'));
-  const body = fn.slice(0, fn.indexOf('\n}\n'));
-  assert.match(body, /path === '\/schedule\/preferences'/);
-  assert.ok(!body.includes('rewards'),
+  //
+  // Die Senkungen stehen seit #1290 in EINER Tabelle (`READ_LEVEL_WRITES` in
+  // server/scopes.js), die beide Gates lesen - gemessen wird deshalb das
+  // Urteil, nicht die Schreibweise der Funktion.
+  const { READ_LEVEL_WRITES, sessionModuleAccessRequirement } = await import('../server/scopes.js');
+  assert.equal(sessionModuleAccessRequirement('/schedule/preferences', 'PUT').access, 'read',
+    'Gegenprobe: die Tabelle wird wirklich gelesen');
+  for (const pfad of ['/rewards/redemptions', '/rewards/redemptions/1/approve', '/rewards/1/redeem', '/rewards']) {
+    assert.equal(sessionModuleAccessRequirement(pfad, 'POST').access, 'write',
+      `eine Senkung für ${pfad} hieße: der Einlöse-Knopf gehört in rewards.js zurück`);
+  }
+  assert.ok(!READ_LEVEL_WRITES.some((e) => /rewards/i.test(e.pattern)),
     'eine Senkung für /rewards hieße: der Einlöse-Knopf gehört in rewards.js zurück');
 
   // Die zweite Sorte: benannte Routen für ein gekoppeltes Gerät.
