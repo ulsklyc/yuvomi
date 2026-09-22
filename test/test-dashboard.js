@@ -818,8 +818,11 @@ test('Aufgaben-Kachel: begonnene Aufgabe traegt das Zeichen der Aufgabenliste, s
   const ringBox = [...eachRule(css)].find((rule) => rule.at.length === 0
     && rule.selector.trim() === '.task-item .task-status-btn--in_progress');
   nodeAssert.ok(ringBox, 'die Kachel hat eine eigene Regel fuer das Zeichen');
+  const declarations = new Map(ringBox.body.split(';')
+    .map((decl) => decl.split(':').map((part) => part.trim()))
+    .filter(([prop, value]) => prop && value !== undefined));
   for (const [prop, value] of [['width', 'var(--space-5)'], ['height', 'var(--space-5)'], ['margin-top', '0']]) {
-    nodeAssert.match(ringBox.body, new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*${value.replace(/[()]/g, '\\$&')}\\s*(?:;|$)`),
+    nodeAssert.equal(declarations.get(prop), value,
       `${prop}: ${value} - sonst uebernimmt tasks.css die Trefflaeche, sobald es geladen ist`);
   }
 });
