@@ -321,6 +321,58 @@ test('emailMatchKey und forgot-password bleiben linear bei langem Leerraum im In
   assert.ok(routeMs < 2000, `forgot-password samt Hintergrundarbeit brauchte ${Math.round(routeMs)} ms`);
 });
 
+test('forgot-password: zwei schnelle Anfragen fuer dasselbe Konto - die zuletzt zugestellte Mail traegt den gueltigen Link', async () => {
+  // Der Versand laeuft im Hintergrund. Kommt die zweite Anfrage, bevor der
+  // Mailserver die erste angenommen hat, loescht ihr createToken() den ersten
+  // Token - und liefen beide Versande nebeneinander, koennte die ERSTE Mail
+  // zuletzt ankommen, mit einem Link, der nicht mehr gilt.
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  const calls = [];
+  const delivered = [];
+  const { app } = await makeAuthApp(db, {
+    sendMail: (m) => new Promise((resolve) => {
+      calls.push({ m, release: () => { delivered.push(m); resolve(); } });
+    }),
+  });
+  const { createServer } = await import('node:http');
+  const server = createServer(app);
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const ask = () => fetch(`http://127.0.0.1:${server.address().port}/auth/forgot-password`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ identifier: 'alice' }),
+  }).then((r) => r.text());
+  const settle = () => new Promise((r) => setTimeout(r, 50));
+  let released = 0;
+  // Gibt die noch haengenden Versande frei, den spaeter begonnenen zuerst -
+  // so, wie ein langsamer Mailserver die Reihenfolge umdrehen kann.
+  const releaseReversed = () => {
+    const open = calls.slice(released);
+    released = calls.length;
+    for (const c of open.reverse()) c.release();
+  };
+  try {
+    await ask();
+    await settle();
+    await ask();
+    await settle();
+    for (let i = 0; i < 4 && released < calls.length; i += 1) {
+      releaseReversed();
+      await settle();
+    }
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+  await app.locals.drain();
+  assert.equal(delivered.length, 2, 'beide Anfragen verschicken eine Mail');
+  const rows = db.prepare('SELECT token_hash FROM password_resets').all();
+  assert.equal(rows.length, 1, 'genau ein Token gilt');
+  const lastToken = delivered.at(-1).html.match(/token=([a-f0-9]+)/)[1];
+  assert.equal(crypto.createHash('sha256').update(lastToken).digest('hex'), rows[0].token_hash,
+    'die zuletzt zugestellte Mail traegt einen Link, der nicht mehr gilt');
+});
+
 test('reset-password rejects an invalid token', async () => {
   const db = makeDb();
   seedContactsAndEmail(db);

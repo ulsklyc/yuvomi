@@ -1559,19 +1559,47 @@ export function buildResetRoutes(targetRouter, {
   // eine Antwort behaelt.
   const emailFor = (userId) => memberEmail(userId, { db: getDb() });
 
+  // Laufender Versand je Konto (userId -> Ende der Kette). Kein globaler
+  // Takt: verschiedene Konten laufen weiter nebeneinander.
+  const resetMailChain = new Map();
+
   /**
    * Die eigentliche Arbeit hinter "Passwort vergessen": Konto aufloesen und
    * gegebenenfalls den Link verschicken. Laeuft NACH der Antwort (`defer`),
    * damit deren Dauer nicht verraet, ob es das Konto gibt - ein Mailversand
    * dauert messbar laenger als "nichts gefunden". Fehler landen nur im Log.
+   *
+   * Je Konto hintereinander: kommt eine zweite Anfrage, bevor der Mailserver
+   * die erste Mail angenommen hat, loescht ihr `createToken()` den ersten
+   * Token. Liefen beide Versande nebeneinander, koennte die erste Mail zuletzt
+   * ankommen - mit einem Link, der nicht mehr gilt. Frueher hielt das die
+   * wartende Antwort; seit sie vorher rausgeht, haelt es diese Kette. Ein
+   * Token-Check direkt vor `sendMail` reicht dafuer nicht: zwischen
+   * `createToken()` und `sendMail()` liegt kein await, er waere immer wahr.
    */
+  // async, damit ein Wurf in resolveUser() als Rejection beim .catch() des
+  // Aufrufers landet statt als ungefangene Ausnahme im setImmediate.
   async function sendResetLinkFor(identifier) {
     const userId = resolveUser(identifier);
+    if (!userId) return undefined;
+    const previous = resetMailChain.get(userId) || Promise.resolve();
+    const job = previous.then(() => issueResetMail(userId));
+    const tail = job.catch(() => {});
+    resetMailChain.set(userId, tail);
+    tail.then(() => {
+      if (resetMailChain.get(userId) === tail) resetMailChain.delete(userId);
+    });
+    return job;
+  }
+
+  async function issueResetMail(userId) {
     // Anti-enumeration: die Antwort ist schon raus und fuer jeden Ausgang
     // gleich. Deshalb gehen auch die beiden Gruende aus #847 hier still durch -
     // ein eigener Statuscode fuer "dieses Konto hat kein Passwort" wuerde
-    // verraten, welche Konten per SSO gefuehrt werden.
-    if (!userId || !(isPasswordLoginEnabled(getDb()) || isSplitExpenseGuest(userId, getDb()))
+    // verraten, welche Konten per SSO gefuehrt werden. Geprueft wird erst
+    // hier, nach dem Warten auf einen vorigen Versand: der Zustand kann sich
+    // in der Zwischenzeit geaendert haben.
+    if (!(isPasswordLoginEnabled(getDb()) || isSplitExpenseGuest(userId, getDb()))
         || !hasResettablePassword(userId)
         || !emailService.isConfigured()) {
       return;
