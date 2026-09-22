@@ -180,7 +180,15 @@ function buildOidcTestDb() {
     CREATE TABLE contacts (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
       name           TEXT NOT NULL,
+      category       TEXT,
+      phone          TEXT,
       email          TEXT,
+      family_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
+    );
+    -- Ein neues SSO-Konto bekommt seinen Kontakt ueber syncFamilyMemberArtifacts
+    -- (#1357); die Funktion fragt dabei auch nach einem Geburtstag.
+    CREATE TABLE birthdays (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
       family_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
     );
     CREATE TABLE contact_emails (
@@ -191,6 +199,20 @@ function buildOidcTestDb() {
       is_primary INTEGER NOT NULL DEFAULT 0
     );
   `);
+  // node:sqlite kennt kein `transaction()` wie better-sqlite3; findOrCreateOidcUser
+  // legt Konto und Kontakt in einer Transaktion an (#1357). Dieselbe Semantik:
+  // BEGIN, bei Wurf ROLLBACK und weiterwerfen.
+  db.transaction = (fn) => (...args) => {
+    db.exec('BEGIN');
+    try {
+      const out = fn(...args);
+      db.exec('COMMIT');
+      return out;
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+  };
   return db;
 }
 
