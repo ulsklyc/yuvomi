@@ -190,11 +190,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   housekeeping module, also to members without access to documents and when the receipt was a
   private document of someone else. The page already hid the name without document access, but the
   API still returned it. Name and number now come only when you may read that document, by the same
-  rule the documents module uses; otherwise the visit only says that it has a receipt, and the edit
-  dialog shows "Attached" instead of an upload field. Saving such a visit keeps the receipt: before,
+  rule the documents module uses. Without access to documents the visit does not even say that it
+  has a receipt; with access but without sight of that document, the edit dialog shows "Attached"
+  instead of an upload field. Saving such a visit keeps the receipt: before,
   saving it could silently remove someone else's private receipt, and it can no longer be replaced
   or removed by someone who cannot see it. Linking a receipt now needs access to documents. For API
-  clients every visit and work session carries `has_receipt`; `receipt_document_id` and
+  clients every visit and work session carries `has_receipt`, which is `null` without access to the
+  documents module; `receipt_document_id` and
   `receipt_document_name` are `null` unless you may read the document, API tokens need a
   `documents:read` scope for them, and `PUT /api/v1/housekeeping/visits/{id}` answers 403 when it
   would replace a receipt you cannot see or link one without access to documents. (#1358)
@@ -217,9 +219,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   name and a link to it to everyone who could see the event, also to members without access to
   documents, to API tokens without a documents scope and when the document itself had been made
   private. Such members now see the event without an attachment, in the calendar and on the
-  dashboard. For API clients `attachment_document_id`, `attachment_preview_url`,
+  dashboard. Adding an attachment now needs permission to add documents, and the event dialog only
+  offers the upload area then; an attachment you cannot see can no longer be replaced or removed
+  by saving the event. For API clients `attachment_document_id`, `attachment_preview_url`,
   `attachment_download_url`, `attachment_name`, `attachment_mime` and `attachment_size` are `null`
-  unless you may read that document. (#1358)
+  unless you may read that document, a non-empty `attachment_data` without a `documents:write`
+  right is answered with 403, and so is replacing or removing an attachment whose document you
+  cannot read. (#1358)
 
 - **Documents: the folder delete preview no longer hints at documents you cannot see.** Before
   deleting a folder the app asks what the deletion would affect. That answer already counted only

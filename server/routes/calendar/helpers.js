@@ -7,6 +7,8 @@
 import { StorageError } from '../../services/document-storage.js';
 import { ensureModuleFolder } from '../../services/document-folders.js';
 import { filterVisibleDocumentIds } from '../../services/document-access.js';
+import { documentViewer } from '../../services/document-links.js';
+import { mayWriteModule } from '../../permissions.js';
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../../utils/upload-limit.js';
 import { contentMatchesMime } from '../../utils/file-signature.js';
 import { isAdminRequest } from '../../middleware/require-admin.js';
@@ -212,6 +214,46 @@ export function cloneAttachmentDocument(database, source, staged, actorId) {
     staged.storage_key,
     actorId,
   ).lastInsertRowid;
+}
+
+/* EIN ANHANG IST EIN DOKUMENT - HOCHLADEN IST EINE UEBERTRAGUNG (#1358).
+ *
+ * Ein neuer Anhang legt eine Zeile in family_documents an: das ist keine
+ * Folge des Termins, sondern eine Datei, die jemand ausdruecklich ins
+ * Dokumente-Modul schickt, benannt am eigenen Bedienelement. Nach
+ * docs/DECISIONS.md Eintrag 10 fragt die Route dafuer das Zielrecht,
+ * `mayWriteModule(req, 'documents')` (Mitgliedsrecht UND Token-Scope), und
+ * zwar als Erstes, vor jeder Suche, die mit 404 antworten koennte. Der Dialog
+ * blendet die Ablage aus demselben Grund aus (`eventAttachmentFieldHtml()`).
+ */
+export const ATTACHMENT_UPLOAD_REFUSAL = 'Attaching a file needs write access to documents.';
+
+/** Bringt der Body einen neuen Anhang mit? Jeder nicht leere Wert zaehlt. */
+function bodyUploadsAttachment(body) {
+  const value = body?.attachment_data;
+  if (value === undefined || value === null) return false;
+  return !(typeof value === 'string' && value.trim() === '');
+}
+
+/** `true`, wenn der Body hochlaedt und der Aufrufer Dokumente nicht schreiben darf. */
+export function attachmentUploadRefused(req) {
+  return bodyUploadsAttachment(req.body) && !mayWriteModule(req, 'documents');
+}
+
+/* WER DEN GESPEICHERTEN ANHANG NICHT SIEHT, LOEST IHN NICHT AB (#1358).
+ * Dieselbe Regel wie bei Belegen (services/document-links.js, Regel 2):
+ * Ersetzen und Entfernen gehen nur, wenn der Aufrufer das Dokumente-Modul
+ * lesen darf und das gespeicherte Dokument sieht. Ohne Leserecht ist jede
+ * Aenderung am Anhang dieselbe 403 - auch bei einem Termin ohne Anhang,
+ * sonst verriete die Antwort, ob es einen gibt. Ein alter Inline-Anhang ohne
+ * Dokument gehoert dem Termin und haelt niemanden mit Leserecht auf. */
+export const ATTACHMENT_CHANGE_REFUSAL = 'Changing this attachment needs access to its document.';
+
+export function storedAttachmentLocked(req, database, storedDocumentId) {
+  const viewer = documentViewer(req);
+  if (!viewer.readsDocuments) return true;
+  if (storedDocumentId == null) return false;
+  return filterVisibleDocumentIds(database, [storedDocumentId], viewer.userId).length === 0;
 }
 
 export function attachmentDataUrl(event) {

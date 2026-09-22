@@ -680,7 +680,10 @@ forgot to ask about.
   `to-shopping-list` routes in `server/routes/meals.js` and `server/routes/recipes.js` for
   `shopping`, `import-meal-plan` and the undo of a meal transfer in `server/routes/shopping.js` for
   `meals`, `PUT /recipes/:id/ingredient-match` for `pantry`, because it hooks a row of the pantry
-  into a recipe, and the housekeeping supply request with #1353.
+  into a recipe, the housekeeping supply request with #1353, and a calendar attachment upload for
+  `documents` (#1358, `attachmentUploadRefused()` in `server/routes/calendar/helpers.js`): the
+  attachment lands in the Documents module as a document of its own, named on the dialog's upload
+  area.
 - `npm run test:cross-module-write` (`test/test-cross-module-write-rights.js`) holds those routes on
   both axes and checks the effect after each refusal, not only the status.
 - The follow-on entries of a visit in `server/routes/housekeeping.js`: `createVisitCalendarEvent()`

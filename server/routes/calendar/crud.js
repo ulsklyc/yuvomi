@@ -41,6 +41,8 @@ import {
   isAdminUser,
   eventIcon,
   parseAttachment,
+  attachmentUploadRefused, storedAttachmentLocked,
+  ATTACHMENT_UPLOAD_REFUSAL, ATTACHMENT_CHANGE_REFUSAL,
   caldavTarget,
   cloneAttachmentDocument,
   googleTarget,
@@ -167,6 +169,19 @@ function storedOccurrenceAssignees(database, seriesId, recurrenceId) {
   `).get(seriesId, recurrenceId);
   const ownsAssignments = existing && parseOverrideFields(existing.overridden_fields).includes('assignments');
   return storedEventAssignees(database, ownsAssignments ? existing.id : seriesId);
+}
+
+/**
+ * Das Anhang-Dokument, das an diesem Serientermin gerade gilt: das der
+ * Ausnahme, wenn sie den Anhang selbst fuehrt, sonst das der Serie.
+ */
+function storedOccurrenceAttachmentDocument(database, master, recurrenceId) {
+  const existing = database.prepare(`
+    SELECT attachment_document_id, overridden_fields FROM calendar_events
+    WHERE recurrence_parent_id = ? AND recurrence_id = ?
+  `).get(master.id, recurrenceId);
+  const ownsAttachment = existing && parseOverrideFields(existing.overridden_fields).includes('attachment');
+  return ownsAttachment ? existing.attachment_document_id : master.attachment_document_id;
 }
 
 /** Wer am Termin steht, so wie es der Schreibvorgang gerade vorfindet. */
@@ -383,6 +398,10 @@ router.post('/', async (req, res) => {
         sessionUserId: req.session?.userId || null,
       });
       return res.status(401).json({ error: 'Not authenticated.', code: 401 });
+    }
+    // Hochladen braucht das Dokumente-Schreibrecht (DECISIONS.md Eintrag 10).
+    if (attachmentUploadRefused(req)) {
+      return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403 });
     }
 
     const vTitle = str(req.body.title, 'Titel', { max: MAX_TITLE });
@@ -618,6 +637,10 @@ router.put('/:id', async (req, res) => {
   let stagedUpload;
   const stagedClones = [];
   try {
+    // Vor der Suche: die Absage verraet nicht, ob es den Termin gibt.
+    if (attachmentUploadRefused(req)) {
+      return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403 });
+    }
     const id    = parseInt(req.params.id, 10);
     const event = loadVisibleEvent(id, req);
     if (!event) return res.status(404).json({ error: 'Termin nicht gefunden', code: 404 });
@@ -771,6 +794,10 @@ router.put('/:id', async (req, res) => {
         error: 'attachment_data und remove_attachment widersprechen sich.',
         code: 400,
       });
+    }
+    if ((replacementRequested || removalRequested)
+        && storedAttachmentLocked(req, db.get(), event.attachment_document_id)) {
+      return res.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403 });
     }
     const attachment = replacementRequested
       ? parseAttachment(req.body.attachment_data)
@@ -1098,6 +1125,9 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
     const seriesId = parseInt(req.params.seriesId, 10);
     const actorId = getUserId(req);
     const isAdmin = isAdminUser(req);
+    if (attachmentUploadRefused(req)) {
+      return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403 });
+    }
     const master = Number.isInteger(seriesId) ? loadVisibleEvent(seriesId, req) : null;
     if (!master) {
       return sendCalendarOccurrenceError(res, new CalendarOccurrenceError(
@@ -1148,6 +1178,10 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
         error: 'attachment_data und remove_attachment widersprechen sich.',
         code: 400,
       });
+    }
+    if ((replacementRequested || removalRequested)
+        && storedAttachmentLocked(req, db.get(), storedOccurrenceAttachmentDocument(db.get(), master, req.params.recurrenceId))) {
+      return res.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403 });
     }
     const parsedAttachment = replacementRequested
       ? parseAttachment(req.body.attachment_data)
@@ -1244,6 +1278,9 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
     const seriesId = parseInt(req.params.seriesId, 10);
     const actorId = getUserId(req);
     const isAdmin = isAdminUser(req);
+    if (attachmentUploadRefused(req)) {
+      return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403 });
+    }
     const master = Number.isInteger(seriesId) ? loadVisibleEvent(seriesId, req) : null;
     if (!master) {
       return sendCalendarOccurrenceError(res, new CalendarOccurrenceError(
@@ -1320,6 +1357,10 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
         error: 'attachment_data und remove_attachment widersprechen sich.',
         code: 400,
       });
+    }
+    if ((replacementRequested || removalRequested)
+        && storedAttachmentLocked(req, db.get(), storedOccurrenceAttachmentDocument(db.get(), master, req.params.recurrenceId))) {
+      return res.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403 });
     }
     const parsedAttachment = replacementRequested
       ? parseAttachment(req.body.attachment_data)

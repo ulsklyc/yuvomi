@@ -542,3 +542,34 @@ test('`write` schließt `read` ein, und ein Scope erweitert keine Rollensperre',
   assert.ok(gesperrt.urgentTasks.length > 0, 'was beide Achsen erlauben, bleibt');
   clearModuleDenials(KID);
 });
+
+test('Termin-Anhang auf dem Dashboard folgt dem Dokumentenrecht (#1358)', async () => {
+  const docId = db.prepare(`
+    INSERT INTO family_documents (name, category, visibility, original_name, mime_type, file_size, content_data, created_by)
+    VALUES ('Einladung', 'other', 'family', 'einladung.pdf', 'application/pdf', 3, 'x', ?)
+  `).run(PARENT).lastInsertRowid;
+  db.prepare("UPDATE calendar_events SET attachment_document_id = ?, attachment_name = 'einladung.pdf' WHERE id = ?")
+    .run(docId, eventId);
+  const attachmentOf = async (userId) => {
+    const body = await dashboardAs(userId);
+    const event = body.upcomingEvents.find((e) => e.id === eventId);
+    assert.ok(event, 'der Termin steht in den anstehenden');
+    return { id: event.attachment_document_id, name: event.attachment_name, url: event.attachment_preview_url };
+  };
+  const shown = { id: docId, name: 'einladung.pdf', url: `/api/v1/documents/${docId}/preview` };
+  const hidden = { id: null, name: null, url: null };
+  try {
+    assert.deepEqual(await attachmentOf(PARENT), shown, 'mit Dokumentenrecht');
+    denyModules(KID, ['documents']);
+    assert.deepEqual(await attachmentOf(KID), hidden, 'documents: none sieht den Anhang nicht');
+    clearModuleDenials(KID);
+    tokenScopes = ['dashboard:read', 'calendar:read'];
+    assert.deepEqual(await attachmentOf(PARENT), hidden, 'ein Token ohne documents:read ebenso');
+    tokenScopes = ['dashboard:read', 'calendar:read', 'documents:read'];
+    assert.deepEqual(await attachmentOf(PARENT), shown, 'mit documents:read wieder da');
+  } finally {
+    tokenScopes = null;
+    clearModuleDenials(KID);
+    db.prepare('UPDATE calendar_events SET attachment_document_id = NULL, attachment_name = NULL WHERE id = ?').run(eventId);
+  }
+});

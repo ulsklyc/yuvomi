@@ -3652,3 +3652,96 @@ test('Anhang: ohne Dokumentenrecht oder Sicht aufs Dokument nennt der Termin ihn
   const raw = await call('GET', `/${eventId}`, { actor: NONE });
   assert.doesNotMatch(JSON.stringify(raw.body), new RegExp(`/documents/${docId}/`));
 });
+
+// ── Anhang hochladen ist eine Uebertragung ins Dokumente-Modul (#1358) ────────
+// docs/DECISIONS.md Eintrag 10: ein neuer Anhang legt ein Dokument an und
+// braucht deshalb das Dokumente-Schreibrecht (Mitgliedsrecht UND Token-Scope),
+// geprueft vor jeder Suche. Und wer den gespeicherten Anhang nicht sieht, loest
+// ihn weder durch Ersetzen noch durch Entfernen ab.
+test('Anhang: Hochladen braucht documents-Schreibrecht, vor der Suche und ohne Dokument anzulegen (#1358)', async () => {
+  const dataUrl = `data:text/plain;base64,${Buffer.from('Neuer Anhang').toString('base64')}`;
+  const documents = () => db.prepare('SELECT COUNT(*) AS n FROM family_documents').get().n;
+  const events = () => db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+  const READ_DOCS = { ...MARIA, moduleAccess: { documents: 'read' } };
+  const TOKEN = { ...MARIA, authScopes: ['calendar:write', 'documents:read'] };
+  const body = { title: 'Uploadprobe', start_datetime: '2041-02-01T09:00', attachment_data: dataUrl, attachment_name: 'a.txt' };
+
+  for (const [label, actor] of [['documents: read', READ_DOCS], ['Token ohne documents:write', TOKEN]]) {
+    const before = { documents: documents(), events: events() };
+    const post = await call('POST', '/', { actor, body });
+    assert.equal(post.status, 403, `${label}: POST mit Anhang`);
+    assert.deepEqual({ documents: documents(), events: events() }, before, `${label}: weder Termin noch Dokument angelegt`);
+    const unknown = await call('PUT', '/987654', { actor, body: { title: 'x', attachment_data: dataUrl } });
+    assert.deepEqual({ status: unknown.status, body: unknown.body }, { status: post.status, body: post.body },
+      `${label}: die Absage kommt vor der Suche, ein unbekannter Termin antwortet gleich`);
+  }
+  const plain = await call('POST', '/', { actor: READ_DOCS, body: { title: 'Ohne Anhang', start_datetime: '2041-02-01T09:00' } });
+  assert.equal(plain.status, 201, 'ohne Anhang reicht das Kalenderrecht');
+  const withRight = await call('POST', '/', { actor: MARIA, body });
+  assert.equal(withRight.status, 201, 'mit documents-Schreibrecht geht es');
+});
+
+test('Anhang: wer den gespeicherten nicht sieht, kann ihn weder ersetzen noch entfernen (#1358)', async () => {
+  const dataUrl = (text) => `data:text/plain;base64,${Buffer.from(text).toString('base64')}`;
+  const created = await call('POST', '/', { actor: ADMIN, body: {
+    title: 'Fremder Anhang', start_datetime: '2041-03-01T09:00',
+    attachment_data: dataUrl('privat'), attachment_name: 'privat.txt',
+  } });
+  assert.equal(created.status, 201);
+  const eventId = created.body.data.id;
+  const docId = created.body.data.attachment_document_id;
+  db.prepare("UPDATE family_documents SET visibility = 'private' WHERE id = ?").run(docId);
+  const stored = () => db.prepare('SELECT attachment_document_id FROM calendar_events WHERE id = ?').get(eventId).attachment_document_id;
+
+  const replace = await call('PUT', `/${eventId}`, { actor: MARIA, body: { attachment_data: dataUrl('neu'), attachment_name: 'neu.txt' } });
+  assert.equal(replace.status, 403, 'Ersetzen eines unsichtbaren Anhangs');
+  const remove = await call('PUT', `/${eventId}`, { actor: MARIA, body: { remove_attachment: true } });
+  assert.equal(remove.status, 403, 'Entfernen eines unsichtbaren Anhangs');
+  const nullData = await call('PUT', `/${eventId}`, { actor: MARIA, body: { attachment_data: null } });
+  assert.equal(nullData.status, 403, 'attachment_data: null ist dasselbe Entfernen');
+  assert.equal(stored(), docId, 'der Anhang bleibt');
+
+  const edit = await call('PUT', `/${eventId}`, { actor: MARIA, body: { title: 'Nur der Titel' } });
+  assert.equal(edit.status, 200, 'eine Bearbeitung ohne Anhangsfelder geht weiter');
+  assert.equal(stored(), docId, 'und laesst den Anhang stehen');
+
+  // Ohne Leserecht auf die Dokumente ist jedes Entfernen dieselbe 403 - auch
+  // an einem Termin ohne Anhang, sonst verriete die Antwort, ob es einen gibt.
+  const NONE = { ...MARIA, moduleAccess: { documents: 'none' } };
+  const bare = await call('POST', '/', { actor: MARIA, body: { title: 'Ohne Anhang', start_datetime: '2041-03-02T09:00' } });
+  const noneWith = await call('PUT', `/${eventId}`, { actor: NONE, body: { remove_attachment: true } });
+  const noneWithout = await call('PUT', `/${bare.body.data.id}`, { actor: NONE, body: { remove_attachment: true } });
+  assert.deepEqual({ status: noneWithout.status, body: noneWithout.body }, { status: noneWith.status, body: noneWith.body });
+  assert.equal(noneWith.status, 403);
+
+  const own = await call('PUT', `/${eventId}`, { actor: ADMIN, body: { remove_attachment: true } });
+  assert.equal(own.status, 200, 'wer das Dokument sieht, darf den Anhang loesen');
+  assert.equal(stored(), null);
+});
+
+test('Anhang: auch an einem Serientermin loest ihn nur, wer ihn sieht (#1358)', async () => {
+  const created = await call('POST', '/', { actor: MARIA, body: {
+    title: 'Serie mit Anhang', start_datetime: '2055-04-01T09:00:00', recurrence_rule: 'FREQ=DAILY;COUNT=5',
+    attachment_data: `data:text/plain;base64,${Buffer.from('serie').toString('base64')}`, attachment_name: 's.txt',
+  } });
+  assert.equal(created.status, 201);
+  const seriesId = created.body.data.id;
+  const docId = created.body.data.attachment_document_id;
+  // Das Dokument gehoert jetzt einer anderen Person und ist privat.
+  db.prepare("UPDATE family_documents SET visibility = 'private', created_by = ? WHERE id = ?").run(ADMIN.id, docId);
+
+  for (const route of [`/${seriesId}/occurrences/2055-04-02`, `/${seriesId}/occurrences/2055-04-03/following`]) {
+    const remove = await call('PUT', route, { actor: MARIA, body: { remove_attachment: true } });
+    assert.equal(remove.status, 403, `${route}: Entfernen`);
+    const replace = await call('PUT', route, { actor: MARIA, body: {
+      attachment_data: `data:text/plain;base64,${Buffer.from('neu').toString('base64')}`, attachment_name: 'n.txt',
+    } });
+    assert.equal(replace.status, 403, `${route}: Ersetzen`);
+  }
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events WHERE recurrence_parent_id = ?').get(seriesId).n, 0,
+    'keine Ausnahme angelegt');
+  const upload = await call('PUT', `/987654/occurrences/2055-04-02`, { actor: { ...MARIA, moduleAccess: { documents: 'read' } }, body: {
+    attachment_data: `data:text/plain;base64,${Buffer.from('x').toString('base64')}`,
+  } });
+  assert.equal(upload.status, 403, 'Hochladen ohne Schreibrecht: 403 vor der Seriensuche');
+});

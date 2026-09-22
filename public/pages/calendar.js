@@ -53,6 +53,7 @@ import { nowFields, todayKey, zonedDateKey, zonedTimeKey } from '/utils/timezone
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
 import { moduleAccess } from '/permissions.js';
+import { pathAccess } from '/utils/module-access.js';
 import {
   applyPendingCalendarDeleteOverlay,
   createCalendarLoadCoordinator,
@@ -5709,6 +5710,65 @@ function defaultNewEventTime(dateStr) {
   return `${pad(rounded.hour)}:${pad(rounded.minute)}`;
 }
 
+/**
+ * Das Anhangsfeld im Termin-Dialog. Ein Anhang ist ein Dokument im
+ * Dokumente-Modul, das Hochladen also eine ausdrueckliche Uebertragung dorthin
+ * (docs/DECISIONS.md, Eintrag 10): die Ablage steht nur, wer dort schreiben darf
+ * - der Server verlangt dasselbe (`attachmentUploadRefused()`). Die drei Stufen
+ * wie in components/document-attach.js:
+ *   - `write`: Ablage, Vorschau, Entfernen;
+ *   - `read`: keine Ablage, ein sichtbarer Anhang bleibt mit Vorschau und
+ *     Entfernen (das Loesen legt nichts im Dokumente-Modul an);
+ *   - `none`: nichts - der Server nennt den Anhang dann gar nicht (#1358).
+ */
+function eventAttachmentFieldHtml(event) {
+  const access = pathAccess('/documents');
+  if (access === 'none') return '';
+  const shown = hasAttachment(event);
+  if (access !== 'write') {
+    if (!shown) return '';
+    return `
+    <div class="form-group">
+      <span class="form-label">${t('calendar.attachmentLabel')}</span>
+      <div class="event-attachment-preview" id="modal-attachment-preview">
+        ${attachmentPreviewHtml(event)}
+      </div>
+      <button class="btn btn--secondary" id="modal-remove-attachment" type="button">${t('calendar.attachmentRemove')}</button>
+    </div>`;
+  }
+  return `
+    <div class="form-group">
+      <label class="form-label" for="modal-attachment">${t('calendar.attachmentLabel')}</label>
+      <p class="document-storage-target">
+        <i data-lucide="${state.documentUploadBackend === 'webdav' ? 'cloud' : state.documentUploadBackend === 'local_folder' ? 'folder' : 'database'}" aria-hidden="true"></i>
+        <span>${t('documents.activeUploadTarget', {
+          target: state.documentUploadBackend === 'webdav'
+            ? t('documents.storageWebdav')
+            : state.documentUploadBackend === 'local_folder'
+              ? t('documents.storageLocalFolder')
+              : t('documents.storageLocal'),
+        })}</span>
+      </p>
+      <label class="document-dropzone" id="modal-attachment-dropzone" for="modal-attachment">
+        <input class="sr-only" id="modal-attachment" type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+        <span class="document-dropzone__icon">
+          <i data-lucide="file-up" aria-hidden="true"></i>
+        </span>
+        <span class="document-dropzone__title">${t('documents.dropzoneTitle')}</span>
+        <span class="document-dropzone__hint">${t('documents.dropzoneHint')}</span>
+        <span class="document-dropzone__file" id="modal-selected-attachment" ${event?.attachment_name ? '' : 'hidden'}>
+          ${event?.attachment_name ? esc(selectedAttachmentLabel(event.attachment_name)) : ''}
+        </span>
+      </label>
+      <div class="form-help">${t('calendar.attachmentHint')}</div>
+      <div class="event-attachment-preview" id="modal-attachment-preview" ${shown ? '' : 'hidden'}>
+        ${shown ? attachmentPreviewHtml(event) : ''}
+      </div>
+      <button class="btn btn--secondary" id="modal-remove-attachment" type="button"
+              ${shown ? '' : 'hidden'}>${t('calendar.attachmentRemove')}</button>
+    </div>`;
+}
+
 function buildEventModalContent({ mode, event, date, reminder = null, time = null }) {
   const isEdit = mode === 'edit';
   const today  = date || state.today;
@@ -5780,36 +5840,7 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
                 placeholder="${t('calendar.descriptionPlaceholder')}">${esc(isEdit && event.description ? event.description : '')}</textarea>
     </div>
 
-    <div class="form-group">
-      <label class="form-label" for="modal-attachment">${t('calendar.attachmentLabel')}</label>
-      <p class="document-storage-target">
-        <i data-lucide="${state.documentUploadBackend === 'webdav' ? 'cloud' : state.documentUploadBackend === 'local_folder' ? 'folder' : 'database'}" aria-hidden="true"></i>
-        <span>${t('documents.activeUploadTarget', {
-          target: state.documentUploadBackend === 'webdav'
-            ? t('documents.storageWebdav')
-            : state.documentUploadBackend === 'local_folder'
-              ? t('documents.storageLocalFolder')
-              : t('documents.storageLocal'),
-        })}</span>
-      </p>
-      <label class="document-dropzone" id="modal-attachment-dropzone" for="modal-attachment">
-        <input class="sr-only" id="modal-attachment" type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
-        <span class="document-dropzone__icon">
-          <i data-lucide="file-up" aria-hidden="true"></i>
-        </span>
-        <span class="document-dropzone__title">${t('documents.dropzoneTitle')}</span>
-        <span class="document-dropzone__hint">${t('documents.dropzoneHint')}</span>
-        <span class="document-dropzone__file" id="modal-selected-attachment" ${isEdit && event.attachment_name ? '' : 'hidden'}>
-          ${isEdit && event.attachment_name ? esc(selectedAttachmentLabel(event.attachment_name)) : ''}
-        </span>
-      </label>
-      <div class="form-help">${t('calendar.attachmentHint')}</div>
-      <div class="event-attachment-preview" id="modal-attachment-preview" ${isEdit && hasAttachment(event) ? '' : 'hidden'}>
-        ${isEdit && hasAttachment(event) ? attachmentPreviewHtml(event) : ''}
-      </div>
-      <button class="btn btn--secondary" id="modal-remove-attachment" type="button"
-              ${isEdit && hasAttachment(event) ? '' : 'hidden'}>${t('calendar.attachmentRemove')}</button>
-    </div>`;
+    ${eventAttachmentFieldHtml(isEdit ? event : null)}`;
 
   return `
     <div class="event-title-picker">

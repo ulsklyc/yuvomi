@@ -3744,3 +3744,24 @@ test('Aufgaben-Dokumente ohne Dokumentenrecht: keine Zahl, keine Zeile, kein Lin
 });
 
 test.after(() => miniDomAbraeumen());
+
+test('Termin-Dialog: die Anhang-Ablage steht nur mit documents-Schreibrecht (#1358, DECISIONS.md Eintrag 10)', () => {
+  // Ein neuer Anhang legt ein Dokument an - eine Uebertragung ins
+  // Dokumente-Modul. Der Server verlangt dafuer `documents: write`, der Dialog
+  // bietet die Ablage deshalb nur dann an.
+  const ohne = { id: 7, title: 'Arzt', start_datetime: '2030-05-01T10:00', end_datetime: '2030-05-01T11:00', visibility: 'all' };
+  const mit = {
+    ...ohne, attachment_document_id: 12, attachment_name: 'befund.pdf', attachment_mime: 'application/pdf',
+    attachment_preview_url: '/api/v1/documents/12/preview', attachment_download_url: '/api/v1/documents/12/download',
+  };
+  const render = (documents, event) => withAccess({ calendar: 'write', documents },
+    () => calendar.buildEventModalContent({ mode: 'edit', event }));
+  for (const event of [ohne, mit]) {
+    assert.match(render('write', event), /id="modal-attachment"/, 'write: die Ablage steht');
+    assert.doesNotMatch(render('read', event), /id="modal-attachment"/, 'read: keine Ablage');
+    assert.doesNotMatch(render('none', event), /id="modal-attachment/, 'none: gar nichts vom Anhang');
+  }
+  assert.match(render('read', mit), /id="modal-remove-attachment"/, 'read: ein sichtbarer Anhang laesst sich loesen');
+  assert.match(render('read', mit), /documents\/12\/download/, 'read: und bleibt als Vorschau');
+  assert.doesNotMatch(render('read', ohne), /calendar\.attachmentLabel/, 'read ohne Anhang: die Stelle faellt weg');
+});
