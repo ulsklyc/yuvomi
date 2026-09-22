@@ -126,16 +126,28 @@ function normalizeLedgerRow(row) {
  * „storniert", waehrend der Saldo die Zahlung wieder zaehlt. So verschwinden
  * Zustand und Wirkung nur gemeinsam. `settlements.status` bleibt unberuehrt:
  * sein zweiter Wert heisst 'deleted', und ein Storno ist keine Loeschung.
+ *
+ * Die Gegenbuchung traegt den `created_by` ihrer Originalzeile (wer die Zahlung
+ * erfasst hat), damit Buchung und Gegenbuchung am selben Konto haengen und nur
+ * gemeinsam fallen. Wer storniert hat, steht deshalb nicht im Ledger, sondern
+ * im Verlauf (`payment_reversed`, actor_id) - `null`, wenn das Konto fehlt.
  */
 function settlementReversal(database, settlementId) {
   const row = database.prepare(`
-    SELECT created_at AS reversed_at, created_by AS reversed_by
+    SELECT created_at AS reversed_at
     FROM expense_ledger_entries
     WHERE source_type = 'settlement_reversal' AND source_id = ?
     ORDER BY id ASC
     LIMIT 1
   `).get(settlementId);
-  return row || null;
+  if (!row) return null;
+  const actor = database.prepare(`
+    SELECT actor_id FROM expense_activity
+    WHERE type = 'payment_reversed' AND entity_type = 'settlement' AND entity_id = ?
+    ORDER BY id ASC
+    LIMIT 1
+  `).get(settlementId);
+  return { reversed_at: row.reversed_at, reversed_by: actor ? actor.actor_id : null };
 }
 
 /**
@@ -327,7 +339,14 @@ function serializeExpenseList(expenses, viewerId) {
   return expenses.map((expense) => serializeExpense(expense, prefetched, viewerId));
 }
 
-function insertExpenseLedger(database, expense, splits, actorId, sourceType = 'expense') {
+// `created_by` jeder Ledger-Zeile ist `expense.created_by`, nie die Person, die
+// gerade anlegt oder bearbeitet: Ausgabe und Zeilen haengen per ON DELETE
+// CASCADE am selben Konto und fallen so nur gemeinsam. Trug ein PUT die
+// bearbeitende Person ein, nahm deren Kontoloeschung die Zeilen mit, und die
+// weiter aktive Ausgabe zaehlte nicht mehr im Saldo. Wer bearbeitet hat, steht
+// in `expense_edited` (expense_activity.actor_id).
+function insertExpenseLedger(database, expense, splits, sourceType = 'expense') {
+  const actorId = expense.created_by;
   const insert = database.prepare(`
     INSERT INTO expense_ledger_entries
       (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
@@ -339,12 +358,12 @@ function insertExpenseLedger(database, expense, splits, actorId, sourceType = 'e
   }
 }
 
-function replaceExpenseSplits(database, expense, splits, actorId) {
+function replaceExpenseSplits(database, expense, splits) {
   database.prepare('DELETE FROM expense_splits WHERE expense_id = ?').run(expense.id);
   database.prepare('DELETE FROM expense_ledger_entries WHERE source_type IN (?, ?) AND source_id = ?').run('expense', 'expense_reversal', expense.id);
   const insertSplit = database.prepare('INSERT INTO expense_splits (expense_id, user_id, amount_minor, currency) VALUES (?, ?, ?, ?)');
   for (const split of splits) insertSplit.run(expense.id, split.user_id, split.amount_minor, split.currency);
-  insertExpenseLedger(database, expense, splits, actorId);
+  insertExpenseLedger(database, expense, splits);
 }
 
 function parseExpenseBody(body, fallbackCurrency) {
@@ -839,7 +858,7 @@ router.post('/groups/:id/expenses', (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(groupId, parsed.title, parsed.description, parsed.amountMinor, parsed.currency, parsed.convertedAmountMinor, parsed.convertedCurrency, JSON.stringify(req.body.exchange_snapshot || null), payerId, parsed.category, parsed.method, parsed.expenseDate, userId(req));
       const expense = db.get().prepare('SELECT * FROM expenses WHERE id = ?').get(result.lastInsertRowid);
-      replaceExpenseSplits(db.get(), expense, splits, userId(req));
+      replaceExpenseSplits(db.get(), expense, splits);
       // Belege (#583): nur sichtbare Dokumente, sonst liesse sich über geratene
       // IDs der Name eines fremden Dokuments auslesen.
       replaceDocumentLinks(db.get(), {
@@ -887,7 +906,7 @@ router.put('/expenses/:id', (req, res) => {
         WHERE id = ?
       `).run(parsed.title, parsed.description, parsed.amountMinor, parsed.currency, parsed.convertedAmountMinor, parsed.convertedCurrency, JSON.stringify(req.body.exchange_snapshot || null), payerId, parsed.category, parsed.method, parsed.expenseDate, existing.id);
       const expense = db.get().prepare('SELECT * FROM expenses WHERE id = ?').get(existing.id);
-      replaceExpenseSplits(db.get(), expense, splits, userId(req));
+      replaceExpenseSplits(db.get(), expense, splits);
       // Belege nur anfassen, wenn das Feld mitkommt - ein PUT, das nur den
       // Betrag korrigiert, darf sie nicht stillschweigend abräumen.
       if (req.body.attachment_document_ids !== undefined) {
@@ -1029,7 +1048,7 @@ router.post('/groups/:id/settlements/:settlementId/reverse', (req, res) => {
     const outcome = db.transaction(() => {
       if (settlementReversal(db.get(), settlement.id)) return 'already_reversed';
       const booked = db.get().prepare(`
-        SELECT user_id, counterparty_id, amount_minor, currency
+        SELECT user_id, counterparty_id, amount_minor, currency, created_by
         FROM expense_ledger_entries
         WHERE source_type = 'settlement' AND source_id = ?
         ORDER BY id ASC
@@ -1039,8 +1058,14 @@ router.post('/groups/:id/settlements/:settlementId/reverse', (req, res) => {
         INSERT INTO expense_ledger_entries (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
         VALUES (?, 'settlement_reversal', ?, ?, ?, ?, ?, ?, ?)
       `);
+      // `created_by` kommt aus der Originalzeile, nicht von der stornierenden
+      // Person: beide Zeilen haengen per ON DELETE CASCADE an diesem Konto und
+      // fallen so nur gemeinsam. Mit dem Konto der stornierenden Person
+      // verschwaende sonst nur die Gegenbuchung, und die stornierte Zahlung
+      // zaehlte still wieder im Saldo. Wer storniert hat, steht in
+      // `payment_reversed` (expense_activity.actor_id).
       for (const row of booked) {
-        insert.run(groupId, settlement.id, row.user_id, row.counterparty_id, -row.amount_minor, row.currency, 'Settlement reversal', userId(req));
+        insert.run(groupId, settlement.id, row.user_id, row.counterparty_id, -row.amount_minor, row.currency, 'Settlement reversal', row.created_by);
       }
       activity(groupId, userId(req), 'payment_reversed', 'settlement', settlement.id, {
         amount: minorToDecimal(settlement.amount_minor, settlement.currency),
