@@ -2785,7 +2785,10 @@
         "healthPreventionKind": {
             "vaccination": "Bakuna",
             "checkup": "Check-up"
-        }
+        },
+        "backupRestoreKeyLabel": "Key ng backup",
+        "backupRestoreKeyHint": "Galing ang backup na ito sa ibang installation. Ilagay ang DB_ENCRYPTION_KEY ng installation na iyon: gagamitin lang ito para sa restore na ito at hindi ise-save, at pagkatapos ay naka-encrypt ang data gamit ang key ng installation na ito.",
+        "backupRestoreKeyHttpWarning": "Hindi bukas ang page na ito sa HTTPS: dadaan ang key sa network nang hindi naka-encrypt."
     },
     "login": {
         "tagline": "Maligayang pagbabalik sa iyong family planner.",

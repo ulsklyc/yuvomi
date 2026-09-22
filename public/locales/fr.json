@@ -2773,7 +2773,10 @@
         "healthPreventionKind": {
             "vaccination": "Vaccin",
             "checkup": "Bilan"
-        }
+        },
+        "backupRestoreKeyLabel": "Clé de la sauvegarde",
+        "backupRestoreKeyHint": "Cette sauvegarde provient d'une autre installation. Saisissez sa DB_ENCRYPTION_KEY : elle sert uniquement à cette restauration et n'est pas enregistrée ; ensuite, les données sont chiffrées avec la clé de cette installation.",
+        "backupRestoreKeyHttpWarning": "Cette page n'est pas ouverte en HTTPS : la clé transitera sur le réseau sans chiffrement."
     },
     "login": {
         "tagline": "Bon retour sur votre planificateur familial.",

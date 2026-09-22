@@ -2785,7 +2785,10 @@
         "healthPreventionKind": {
             "vaccination": "Szczepienie",
             "checkup": "Badanie"
-        }
+        },
+        "backupRestoreKeyLabel": "Klucz kopii zapasowej",
+        "backupRestoreKeyHint": "Ta kopia zapasowa pochodzi z innej instalacji. Wpisz jej DB_ENCRYPTION_KEY: zostanie użyty tylko do tego przywracania i nie zostanie zapisany, a potem dane będą zaszyfrowane kluczem tej instalacji.",
+        "backupRestoreKeyHttpWarning": "Ta strona nie jest otwarta przez HTTPS: klucz zostanie przesłany przez sieć bez szyfrowania."
     },
     "login": {
         "tagline": "Witaj ponownie w swoim planerze rodzinnym.",

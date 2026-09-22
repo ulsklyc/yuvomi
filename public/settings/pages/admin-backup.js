@@ -65,6 +65,13 @@ function renderPage(container) {
             </label>
             <input class="sr-only" type="file" id="backup-restore-file" accept=".db,.sqlite,.sqlite3,application/octet-stream" />
             <div class="settings-backup-file" id="backup-selected-file" hidden></div>
+            <div class="form-group" id="backup-restore-key-group" hidden>
+              <label class="form-label" for="backup-restore-key">${t('settings.backupRestoreKeyLabel')}</label>
+              <input class="form-input" type="password" id="backup-restore-key"
+                autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="backup-restore-key-hint" />
+              <p class="form-hint" id="backup-restore-key-hint">${t('settings.backupRestoreKeyHint')}</p>
+              <p class="form-hint form-hint--danger" id="backup-restore-key-http" hidden>${t('settings.backupRestoreKeyHttpWarning')}</p>
+            </div>
             <div id="backup-restore-error" class="form-error" role="alert" hidden></div>
             <div class="settings-form-actions">
               <button type="submit" class="btn btn--danger-outline" id="backup-restore-btn" disabled>${t('settings.backupRestoreButton')}</button>
@@ -466,6 +473,22 @@ function bindWebdavBackupEvents(container) {
   });
 }
 
+/**
+ * Gruende aus `POST /backup/restore`, bei denen der Schluessel des Backups
+ * weiterhilft (#1267): das Backup stammt aus einer anderen Installation, oder
+ * der eingegebene Schluessel passte nicht. `own_key_missing` gehoert NICHT
+ * dazu - ohne eigenen Schluessel lehnt der Server jeden Backup-Schluessel ab.
+ */
+const BACKUP_KEY_REASONS = new Set(['backup_key_required', 'backup_key_wrong', 'backup_key_invalid']);
+
+/** Base64 der UTF-8-Bytes - so erwartet der Server `X-Backup-Key`. */
+function encodeBackupKey(key) {
+  const bytes = new TextEncoder().encode(key);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
 function bindRestoreEvents(container) {
   const form = container.querySelector('#backup-restore-form');
   const fileInput = container.querySelector('#backup-restore-file');
@@ -473,8 +496,28 @@ function bindRestoreEvents(container) {
   const restoreBtn = container.querySelector('#backup-restore-btn');
   const errorEl = container.querySelector('#backup-restore-error');
   const dropzone = container.querySelector('#backup-dropzone');
+  const keyGroup = container.querySelector('#backup-restore-key-group');
+  const keyInput = container.querySelector('#backup-restore-key');
+  const httpWarning = container.querySelector('#backup-restore-key-http');
 
   if (!form || !fileInput || !selectedFile || !restoreBtn || !errorEl) return;
+
+  // Das Feld erscheint erst, wenn der Server sagt, dass es gebraucht wird: ein
+  // Backup DIESER Installation oeffnet der eigene Schluessel, und ein Feld, das
+  // immer dasteht, fragt nach einem Geheimnis, das niemand eingeben muss.
+  function showKeyField() {
+    if (!keyGroup || !keyInput) return;
+    keyGroup.hidden = false;
+    // Ueber HTTP geht der Schluessel im Klartext uebers Netz - sagen, nicht sperren.
+    if (httpWarning) httpWarning.hidden = window.location.protocol !== 'http:';
+    keyInput.focus();
+  }
+
+  function resetKeyField() {
+    if (!keyGroup || !keyInput) return;
+    keyInput.value = '';
+    keyGroup.hidden = true;
+  }
 
   function setFile(file) {
     if (!file) {
@@ -490,6 +533,7 @@ function bindRestoreEvents(container) {
 
   fileInput.addEventListener('change', () => {
     errorEl.hidden = true;
+    resetKeyField();
     setFile(fileInput.files?.[0]);
   });
 
@@ -511,6 +555,7 @@ function bindRestoreEvents(container) {
     transfer.items.add(file);
     fileInput.files = transfer.files;
     errorEl.hidden = true;
+    resetKeyField();
     setFile(file);
   });
 
@@ -529,11 +574,17 @@ function bindRestoreEvents(container) {
     errorEl.hidden = true;
     restoreBtn.disabled = true;
     restoreBtn.textContent = t('settings.backupRestoring');
+    // Nur im Header, nie in der URL; nach dem Versuch nicht aufbewahrt.
+    const backupKey = keyGroup && !keyGroup.hidden ? keyInput?.value ?? '' : '';
+    const headers = backupKey ? { 'X-Backup-Key': encodeBackupKey(backupKey) } : {};
     try {
-      await api.rawPost('/backup/restore', file);
+      await api.rawPost('/backup/restore', file, headers);
+      resetKeyField();
       window.yuvomi?.showToast(t('settings.backupRestoredToast'), 'success');
       window.location.reload();
     } catch (err) {
+      if (BACKUP_KEY_REASONS.has(err?.data?.reason)) showKeyField();
+      else resetKeyField();
       showError(errorEl, err.message ?? t('common.errorGeneric'));
       restoreBtn.disabled = false;
       restoreBtn.textContent = t('settings.backupRestoreButton');

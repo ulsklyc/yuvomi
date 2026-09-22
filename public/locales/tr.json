@@ -2773,7 +2773,10 @@
         "healthPreventionKind": {
             "vaccination": "Aşı",
             "checkup": "Kontrol"
-        }
+        },
+        "backupRestoreKeyLabel": "Yedeğin anahtarı",
+        "backupRestoreKeyHint": "Bu yedek başka bir kurulumdan geliyor. O kurulumun DB_ENCRYPTION_KEY değerini girin: yalnızca bu geri yükleme için kullanılır ve kaydedilmez, ardından veriler bu kurulumun anahtarıyla şifrelenir.",
+        "backupRestoreKeyHttpWarning": "Bu sayfa HTTPS üzerinden açılmadı: anahtar ağ üzerinden şifrelenmeden iletilecek."
     },
     "login": {
         "tagline": "Aile planlayıcına tekrar hoş geldin.",

@@ -2773,7 +2773,10 @@
         "healthPreventionKind": {
             "vaccination": "Očkování",
             "checkup": "Prohlídka"
-        }
+        },
+        "backupRestoreKeyLabel": "Klíč zálohy",
+        "backupRestoreKeyHint": "Tato záloha pochází z jiné instalace. Zadejte její DB_ENCRYPTION_KEY: použije se jen pro toto obnovení a neuloží se, poté jsou data šifrována klíčem této instalace.",
+        "backupRestoreKeyHttpWarning": "Tato stránka není otevřena přes HTTPS: klíč bude po síti přenesen nešifrovaně."
     },
     "login": {
         "tagline": "Vítejte zpět ve svém rodinném plánovači.",

@@ -2773,7 +2773,10 @@
         "healthPreventionKind": {
             "vaccination": "لقاح",
             "checkup": "فحص"
-        }
+        },
+        "backupRestoreKeyLabel": "مفتاح النسخة الاحتياطية",
+        "backupRestoreKeyHint": "هذه النسخة الاحتياطية من تثبيت آخر. أدخل DB_ENCRYPTION_KEY الخاص بذلك التثبيت: يُستخدم لهذه الاستعادة فقط ولا يُحفظ، وبعدها تُشفَّر البيانات بمفتاح هذا التثبيت.",
+        "backupRestoreKeyHttpWarning": "هذه الصفحة غير مفتوحة عبر HTTPS: سيُنقل المفتاح عبر الشبكة دون تشفير."
     },
     "login": {
         "tagline": "مرحبًا بعودتك إلى منظّم عائلتك.",

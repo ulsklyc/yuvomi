@@ -2785,7 +2785,10 @@
         "healthPreventionKind": {
             "vaccination": "واکسن",
             "checkup": "معاینه"
-        }
+        },
+        "backupRestoreKeyLabel": "کلید پشتیبان",
+        "backupRestoreKeyHint": "این پشتیبان از نصب دیگری است. DB_ENCRYPTION_KEY آن نصب را وارد کنید: فقط برای همین بازیابی استفاده و ذخیره نمی‌شود، و پس از آن داده‌ها با کلید این نصب رمزگذاری می‌شوند.",
+        "backupRestoreKeyHttpWarning": "این صفحه از طریق HTTPS باز نشده است: کلید بدون رمزگذاری از شبکه عبور می‌کند."
     },
     "login": {
         "tagline": "دوباره به برنامه‌ریز خانوادگی‌تان خوش آمدید.",

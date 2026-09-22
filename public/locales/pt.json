@@ -2773,7 +2773,10 @@
         "healthPreventionKind": {
             "vaccination": "Vacina",
             "checkup": "Check-up"
-        }
+        },
+        "backupRestoreKeyLabel": "Chave do backup",
+        "backupRestoreKeyHint": "Este backup vem de outra instalação. Introduza a DB_ENCRYPTION_KEY dessa instalação: é usada apenas neste restauro e não é guardada; depois, os dados ficam cifrados com a chave desta instalação.",
+        "backupRestoreKeyHttpWarning": "Esta página não está aberta por HTTPS: a chave vai atravessar a rede sem cifragem."
     },
     "login": {
         "tagline": "Bem-vindo de volta ao teu planeador familiar.",

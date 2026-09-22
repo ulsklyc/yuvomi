@@ -2785,7 +2785,10 @@
         "healthPreventionKind": {
             "vaccination": "Impfung",
             "checkup": "Untersuchung"
-        }
+        },
+        "backupRestoreKeyLabel": "Schlüssel des Backups",
+        "backupRestoreKeyHint": "Das Backup stammt aus einer anderen Installation. Gib deren DB_ENCRYPTION_KEY ein: Er wird nur für diese Wiederherstellung verwendet und nicht gespeichert, danach sind die Daten mit dem Schlüssel dieser Installation verschlüsselt.",
+        "backupRestoreKeyHttpWarning": "Diese Seite ist nicht über HTTPS geöffnet: Der Schlüssel wird unverschlüsselt über das Netzwerk übertragen."
     },
     "login": {
         "tagline": "Willkommen zurück bei deinem Familienplaner.",

@@ -2773,7 +2773,10 @@
         "healthPreventionKind": {
             "vaccination": "Vaccination",
             "checkup": "Kontroll"
-        }
+        },
+        "backupRestoreKeyLabel": "Säkerhetskopians nyckel",
+        "backupRestoreKeyHint": "Den här säkerhetskopian kommer från en annan installation. Ange dess DB_ENCRYPTION_KEY: den används bara för den här återställningen och sparas inte, därefter krypteras datan med den här installationens nyckel.",
+        "backupRestoreKeyHttpWarning": "Sidan är inte öppnad via HTTPS: nyckeln skickas okrypterad över nätverket."
     },
     "login": {
         "tagline": "Välkommen tillbaka till din familjeplanerare.",
