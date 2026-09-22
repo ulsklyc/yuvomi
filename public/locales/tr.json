@@ -2773,7 +2773,18 @@
         "healthPreventionKind": {
             "vaccination": "Aşı",
             "checkup": "Kontrol"
-        }
+        },
+        "otherSessionsTitle": "Diğer cihazlar",
+        "otherSessionsHint": "Hesabının diğer tüm cihaz ve tarayıcılardaki oturumunu kapatır. Bu cihazda oturum açık kalır. API belirteçleri ve eşlenmiş duvar ekranları etkilenmez.",
+        "otherSessionsButton": "Diğer cihazlarda oturumu kapat",
+        "otherSessionsConfirm": "Diğer tüm cihazlarda oturum kapatılsın mı?",
+        "otherSessionsConfirmDetail": "Orada hesabınla oturum açmış olan herkes yeniden oturum açmak zorunda kalır. Bu cihazda oturum açık kalır.",
+        "otherSessionsEnded": "{{count}} diğer oturum sonlandırıldı.",
+        "otherSessionsEnded_one": "{{count}} diğer oturum sonlandırıldı.",
+        "otherSessionsEnded_few": "{{count}} diğer oturum sonlandırıldı.",
+        "otherSessionsNone": "Hesabın başka hiçbir cihazda oturum açmış değildi.",
+        "otherSessionsError": "Diğer cihazlarda oturum kapatılamadı.",
+        "otherSessionsTooManyAttempts": "Çok fazla istek. Lütfen biraz bekle, sonra tekrar dene."
     },
     "login": {
         "tagline": "Aile planlayıcına tekrar hoş geldin.",

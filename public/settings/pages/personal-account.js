@@ -5,6 +5,7 @@ import {
   t,
 } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { confirmModal } from '/components/modal.js';
 import { prefersInkText } from '/utils/contrast.js';
 
 function initials(name) {
@@ -348,6 +349,19 @@ function askForCode(card, texts, onConfirm, onCancel) {
  * @param {any} err
  * @returns {string}
  */
+/**
+ * Fehlertext fuer "Auf anderen Geraeten abmelden" (#1354). Ein 429 heisst nur
+ * "zu schnell geklickt" - dann sagt die Seite, dass Warten hilft, statt einen
+ * Fehlschlag zu melden, nach dem man es gleich wieder versucht.
+ *
+ * @param {{ status?: number }} err
+ * @returns {string}
+ */
+export function logoutOthersErrorText(err) {
+  if (err?.status === 429) return t('settings.otherSessionsTooManyAttempts');
+  return t('settings.otherSessionsError');
+}
+
 function twoFactorErrorText(err) {
   if (err?.status === 429) return t('settings.twoFactorTooManyAttempts');
   const reason = err?.data?.reason;
@@ -531,6 +545,16 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
       ${twoFactorCardHtml(twoFactorState)}
 
       ${oidcCardHtml(oidcState, oidcNotice)}
+
+      <div class="settings-card">
+        <h3 class="settings-card__title">${t('settings.otherSessionsTitle')}</h3>
+        <p class="form-hint">${t('settings.otherSessionsHint')}</p>
+        <p class="form-hint" id="logout-others-status" role="status"></p>
+        <div id="logout-others-error" class="form-error" role="alert" hidden></div>
+        <div class="settings-form-actions">
+          <button type="button" class="btn btn--danger-outline" id="logout-others-btn">${t('settings.otherSessionsButton')}</button>
+        </div>
+      </div>
     </section>
 
     <section class="settings-section">
@@ -685,6 +709,41 @@ function bindEvents(container, user, profileState) {
       showError(passwordError, error.message);
     } finally {
       submitButton.disabled = false;
+    }
+  });
+
+  // Auf anderen Geraeten abmelden (#1354). Der Knopf wird waehrend des Requests
+  // nicht `disabled`: ein fokussierter Knopf, der deaktiviert wird, verliert den
+  // Fokus, und das Modal hat ihn gerade erst dorthin zurueckgegeben.
+  const logoutOthersButton = container.querySelector('#logout-others-btn');
+  let logoutOthersBusy = false;
+  logoutOthersButton?.addEventListener('click', async () => {
+    if (logoutOthersBusy) return;
+    const status = container.querySelector('#logout-others-status');
+    const errorBox = container.querySelector('#logout-others-error');
+    const confirmed = await confirmModal(t('settings.otherSessionsConfirm'), {
+      confirmLabel: t('settings.otherSessionsButton'),
+      detail: t('settings.otherSessionsConfirmDetail'),
+      danger: true,
+    });
+    if (!confirmed) return;
+    logoutOthersBusy = true;
+    logoutOthersButton.setAttribute('aria-disabled', 'true');
+    clearError(errorBox);
+    if (status) status.textContent = '';
+    try {
+      const { ended = 0 } = await auth.logoutOthers() ?? {};
+      if (status) {
+        status.textContent = ended > 0
+          ? t('settings.otherSessionsEnded', { count: ended })
+          : t('settings.otherSessionsNone');
+      }
+    } catch (error) {
+      showError(errorBox, logoutOthersErrorText(error));
+    } finally {
+      logoutOthersBusy = false;
+      logoutOthersButton.removeAttribute('aria-disabled');
+      if (!container.contains(document.activeElement)) logoutOthersButton.focus({ preventScroll: true });
     }
   });
 

@@ -2773,7 +2773,18 @@
         "healthPreventionKind": {
             "vaccination": "Vaccination",
             "checkup": "Check-up"
-        }
+        },
+        "otherSessionsTitle": "Other devices",
+        "otherSessionsHint": "Signs your account out on every other device and browser. This device stays signed in. API tokens and paired wall displays are not affected.",
+        "otherSessionsButton": "Sign out on other devices",
+        "otherSessionsConfirm": "Sign out on all other devices?",
+        "otherSessionsConfirmDetail": "Anyone signed in with your account there has to sign in again. This device stays signed in.",
+        "otherSessionsEnded": "{{count}} other sessions ended.",
+        "otherSessionsEnded_one": "{{count}} other session ended.",
+        "otherSessionsEnded_few": "{{count}} other sessions ended.",
+        "otherSessionsNone": "Your account was not signed in on any other device.",
+        "otherSessionsError": "Signing out on other devices failed.",
+        "otherSessionsTooManyAttempts": "Too many requests. Please wait a moment, then try again."
     },
     "login": {
         "tagline": "Welcome back to your family planner.",

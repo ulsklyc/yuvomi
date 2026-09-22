@@ -5311,6 +5311,16 @@ daily use: the store slid on every request, but `express-session` without `rolli
 - **The price.** A stolen cookie that is never used stays valid for up to 90 days; one that is used
   keeps itself alive, as it already did against the store before. Signing out ends it at once, and
   signing out other devices (#1354) is the counterpart for a lost device.
+- **Signing out other devices (#1354).** Settings → Account → "Other devices" calls
+  `POST /api/v1/auth/logout-others` (CSRF, own rate limiter keyed per user, not per IP: behind a
+  proxy without `trust proxy` the whole household shares one address), which ends every session of
+  the user except the calling one through `invalidateUserSessions` - the same path a password
+  change and enabling 2FA take - and answers `{ ok: true, ended }`. `ended` counts only sessions
+  that were still valid; an expired row the 15-minute sweep has not removed yet is deleted but not
+  counted. Only a browser session may call it: an API
+  token or a wall display has no current session to keep (403). API tokens and paired wall displays
+  are not rows of the session store and stay valid; they are revoked under API tokens and Displays.
+  There is no per-session list: a session row stores no device hint.
 
 ### Retry-safe writes (`Idempotency-Key`, #822)
 

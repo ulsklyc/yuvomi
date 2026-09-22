@@ -2773,7 +2773,18 @@
         "healthPreventionKind": {
             "vaccination": "Vacina",
             "checkup": "Check-up"
-        }
+        },
+        "otherSessionsTitle": "Outros dispositivos",
+        "otherSessionsHint": "Termina a sessão da tua conta em todos os outros dispositivos e navegadores. Este dispositivo continua com sessão iniciada. Os tokens de API e os ecrãs de parede emparelhados não são afetados.",
+        "otherSessionsButton": "Terminar sessão noutros dispositivos",
+        "otherSessionsConfirm": "Terminar sessão em todos os outros dispositivos?",
+        "otherSessionsConfirmDetail": "Quem tiver sessão iniciada lá com a tua conta terá de iniciar sessão novamente. Este dispositivo continua com sessão iniciada.",
+        "otherSessionsEnded": "{{count}} outras sessões terminadas.",
+        "otherSessionsEnded_one": "{{count}} outra sessão terminada.",
+        "otherSessionsEnded_few": "{{count}} outras sessões terminadas.",
+        "otherSessionsNone": "A tua conta não tinha sessão iniciada em nenhum outro dispositivo.",
+        "otherSessionsError": "Não foi possível terminar a sessão noutros dispositivos.",
+        "otherSessionsTooManyAttempts": "Demasiados pedidos. Aguarda um momento e tenta novamente."
     },
     "login": {
         "tagline": "Bem-vindo de volta ao teu planeador familiar.",

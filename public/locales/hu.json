@@ -2773,7 +2773,18 @@
         "healthPreventionKind": {
             "vaccination": "Védőoltás",
             "checkup": "Szűrés"
-        }
+        },
+        "otherSessionsTitle": "Más eszközök",
+        "otherSessionsHint": "Kijelentkezteti a fiókodat az összes többi eszközön és böngészőben. Ez az eszköz bejelentkezve marad. Az API-tokeneket és a párosított fali kijelzőket ez nem érinti.",
+        "otherSessionsButton": "Kijelentkezés más eszközökön",
+        "otherSessionsConfirm": "Kijelentkezel az összes többi eszközön?",
+        "otherSessionsConfirmDetail": "Aki ott a fiókoddal van bejelentkezve, annak újra be kell jelentkeznie. Ez az eszköz bejelentkezve marad.",
+        "otherSessionsEnded": "{{count}} másik munkamenet befejezve.",
+        "otherSessionsEnded_one": "{{count}} másik munkamenet befejezve.",
+        "otherSessionsEnded_few": "{{count}} másik munkamenet befejezve.",
+        "otherSessionsNone": "A fiókod egyetlen más eszközön sem volt bejelentkezve.",
+        "otherSessionsError": "A kijelentkezés más eszközökön nem sikerült.",
+        "otherSessionsTooManyAttempts": "Túl sok kérés. Várj egy kicsit, majd próbáld újra."
     },
     "login": {
         "tagline": "Üdv újra a családi tervezőben.",
