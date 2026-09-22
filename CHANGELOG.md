@@ -137,6 +137,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A housekeeping visit no longer gives away a receipt you may not see.** The housekeeping API
+  sent the file name and document number of a visit's receipt to everyone who could open the
+  housekeeping module, also to members without access to documents and when the receipt was a
+  private document of someone else. The page already hid the name without document access, but the
+  API still returned it. Name and number now come only when you may read that document, by the same
+  rule the documents module uses; otherwise the visit only says that it has a receipt, and the edit
+  dialog shows "Attached" instead of an upload field. Saving such a visit keeps the receipt: before,
+  saving it could silently remove someone else's private receipt, and it can no longer be replaced
+  or removed by someone who cannot see it. Linking a receipt now needs access to documents. For API
+  clients every visit and work session carries `has_receipt`; `receipt_document_id` and
+  `receipt_document_name` are `null` unless you may read the document, API tokens need a
+  `documents:read` scope for them, and `PUT /api/v1/housekeeping/visits/{id}` answers 403 when it
+  would replace a receipt you cannot see or link one without access to documents. (#1358)
+
 - **An account created at the first single sign-on now gets its contact entry.** Every other way of
   adding a household member - an invitation, the first setup, an admin creating the account - also
   creates the member's contact, which holds the e-mail address the household uses, for example to

@@ -3552,7 +3552,8 @@
         "currentMonth": "Τρέχων",
         "noVisitReportsInMonth": "Δεν καταγράφηκε καμία επίσκεψη για {{month}}.",
         "settledAdminOnly": "Μόνο ένας διαχειριστής μπορεί να την αλλάξει ή να τη διαγράψει",
-        "reportVisitsCount": "Επισκέψεις"
+        "reportVisitsCount": "Επισκέψεις",
+        "receiptPresent": "Επισυνάπτεται"
     },
     "userMultiSelect": {
         "moreUsers": "ακόμη",

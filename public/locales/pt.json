@@ -3552,7 +3552,8 @@
         "currentMonth": "Atual",
         "noVisitReportsInMonth": "Nenhuma visita da equipe registrada em {{month}}.",
         "settledAdminOnly": "Só um admin pode alterar ou excluir",
-        "reportVisitsCount": "Visitas"
+        "reportVisitsCount": "Visitas",
+        "receiptPresent": "Anexado"
     },
     "userMultiSelect": {
         "moreUsers": "mais",

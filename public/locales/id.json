@@ -3556,7 +3556,8 @@
         "currentMonth": "Saat ini",
         "noVisitReportsInMonth": "Tidak ada kunjungan tercatat pada {{month}}.",
         "settledAdminOnly": "Hanya admin yang dapat mengubah atau menghapusnya",
-        "reportVisitsCount": "Kunjungan"
+        "reportVisitsCount": "Kunjungan",
+        "receiptPresent": "Terlampir"
     },
     "splitExpenses": {
         "title": "Pengeluaran Bersama",
