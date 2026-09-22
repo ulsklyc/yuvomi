@@ -60,7 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shows what happened. To correct a payment, reverse it and record the right one. Group owners and
   admins can reverse any payment, everyone else the ones they recorded - the same rule as for
   editing an expense. Without write access to Budget, or in an archived group, the button is not
-  there, but the "reversed" mark is. The API has the same step as
+  there, but the "reversed" mark is. Deleting the account of whoever reversed a payment leaves it
+  reversed and the balances as they were. The API has the same step as
   `POST /api/v1/split-expenses/groups/{id}/settlements/{settlementId}/reverse`; reversing twice
   answers 409. (#1309)
 
@@ -173,6 +174,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `documents:read` scope), a settlement's `proof_document_id` is `null` unless you may read that
   document, and a non-empty `attachment_document_ids` or a `proof_document_id` is answered with the
   same 403 for every id. (#1358)
+
+- **An edited shared expense keeps counting after the editor's account is deleted.** When a group
+  owner or admin edited someone else's expense and that editor's account was later deleted, the
+  expense stayed in the list but silently dropped out of every balance. Edits now leave the expense
+  tied to whoever created it, so it counts until it is deleted itself; the activity still shows who
+  edited it. Expenses edited this way before are corrected when the update starts. An expense whose
+  editor was already deleted before the update is not repaired: it still shows in the list without
+  counting in the balances. (#1309)
 
 - **An account created at the first single sign-on now gets its contact entry.** Every other way of
   adding a household member - an invitation, the first setup, an admin creating the account - also
