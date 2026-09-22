@@ -3181,6 +3181,7 @@
         "folderDeleteContentsChangedToast": "削除中にフォルダーの内容が変更されたため、フォルダーは保持されました。削除できたドキュメント: {{deleted}}。",
         "folderDeleteContentsChangedWithFailuresToast": "フォルダーの内容が変更され、一部のドキュメントを削除できませんでした。フォルダーは保持されました。",
         "folderDeleteInProgressToast": "このフォルダーは現在削除中です。処理が完了してからもう一度お試しください。",
+        "folderDeleteNotManageableToast": "何も削除されていません。このフォルダーには、削除する権限のないドキュメントが含まれるようになりました。",
         "housekeepingFolder": "家事",
         "calendarItemsFolder": "カレンダー項目",
         "folderBrowserTitle": "フォルダー",

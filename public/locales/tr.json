@@ -3181,6 +3181,7 @@
         "folderDeleteContentsChangedToast": "Silme sırasında klasör içeriği değiştiği için klasör korundu. Başarıyla silinen belgeler: {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "Klasör içeriği değişti ve bazı belgeler silinemedi. Klasör korundu.",
         "folderDeleteInProgressToast": "Bu klasör şu anda siliniyor. İşlem tamamlandığında tekrar deneyin.",
+        "folderDeleteNotManageableToast": "Hiçbir şey silinmedi. Bu klasörde artık silme izniniz olmayan belgeler var.",
         "housekeepingFolder": "Ev işleri",
         "calendarItemsFolder": "Takvim öğeleri",
         "folderBrowserTitle": "Klasörler",

@@ -3181,6 +3181,7 @@
         "folderDeleteContentsChangedToast": "Вміст теки змінився під час видалення, тому теку збережено. Успішно видалено документів: {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "Вміст теки змінився, а деякі документи не вдалося видалити. Теку збережено.",
         "folderDeleteInProgressToast": "Цю теку зараз видаляють. Спробуйте ще раз після завершення операції.",
+        "folderDeleteNotManageableToast": "Нічого не видалено. У цій теці тепер є документи, які вам не дозволено видаляти.",
         "housekeepingFolder": "Прибирання",
         "calendarItemsFolder": "Елементи календаря",
         "folderBrowserTitle": "Папки",

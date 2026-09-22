@@ -3238,6 +3238,7 @@
         "folderDeleteContentsChangedToast": "Zawartość folderu zmieniła się podczas usuwania, więc folder zachowano. Pomyślnie usunięte dokumenty: {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "Zawartość folderu zmieniła się, a niektórych dokumentów nie udało się usunąć. Folder zachowano.",
         "folderDeleteInProgressToast": "Ten folder jest obecnie usuwany. Spróbuj ponownie po zakończeniu operacji.",
+        "folderDeleteNotManageableToast": "Nic nie zostało usunięte. Ten folder zawiera teraz dokumenty, których nie możesz usunąć.",
         "housekeepingFolder": "Sprzątanie",
         "calendarItemsFolder": "Wpisy kalendarza",
         "folderBrowserTitle": "Foldery",

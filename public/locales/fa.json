@@ -3238,6 +3238,7 @@
         "folderDeleteContentsChangedToast": "محتوای پوشه هنگام حذف تغییر کرد، بنابراین پوشه حفظ شد. اسناد حذف‌شده با موفقیت: {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "محتوای پوشه تغییر کرد و برخی اسناد حذف نشدند. پوشه حفظ شد.",
         "folderDeleteInProgressToast": "این پوشه در حال حذف است. پس از پایان عملیات دوباره تلاش کنید.",
+        "folderDeleteNotManageableToast": "چیزی حذف نشد. این پوشه اکنون اسنادی دارد که اجازه حذف آن‌ها را ندارید.",
         "housekeepingFolder": "خدمتکار خانه",
         "calendarItemsFolder": "مدخل‌های تقویم",
         "folderBrowserTitle": "پوشه‌ها",

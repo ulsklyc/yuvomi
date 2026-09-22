@@ -3181,6 +3181,7 @@
         "folderDeleteContentsChangedToast": "Τα περιεχόμενα του φακέλου άλλαξαν κατά τη διαγραφή, οπότε ο φάκελος διατηρήθηκε. Έγγραφα που διαγράφηκαν: {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "Τα περιεχόμενα του φακέλου άλλαξαν και ορισμένα έγγραφα δεν διαγράφηκαν. Ο φάκελος διατηρήθηκε.",
         "folderDeleteInProgressToast": "Αυτός ο φάκελος διαγράφεται τώρα. Δοκιμάστε ξανά όταν ολοκληρωθεί η διαδικασία.",
+        "folderDeleteNotManageableToast": "Δεν διαγράφηκε τίποτα. Αυτός ο φάκελος περιέχει πλέον έγγραφα που δεν επιτρέπεται να διαγράψετε.",
         "housekeepingFolder": "Νοικοκυριό",
         "calendarItemsFolder": "Στοιχεία ημερολογίου",
         "folderBrowserTitle": "Φάκελοι",

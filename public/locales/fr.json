@@ -3181,6 +3181,7 @@
         "folderDeleteContentsChangedToast": "Le contenu du dossier a changé pendant la suppression ; le dossier a donc été conservé. Documents supprimés : {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "Le contenu du dossier a changé et certains documents n’ont pas pu être supprimés. Le dossier a été conservé.",
         "folderDeleteInProgressToast": "Ce dossier est en cours de suppression. Réessayez une fois l’opération terminée.",
+        "folderDeleteNotManageableToast": "Rien n’a été supprimé. Ce dossier contient désormais des documents que vous n’êtes pas autorisé à supprimer.",
         "housekeepingFolder": "Ménage",
         "calendarItemsFolder": "Éléments du calendrier",
         "folderBrowserTitle": "Dossiers",

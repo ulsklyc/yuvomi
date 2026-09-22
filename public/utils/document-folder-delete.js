@@ -64,6 +64,13 @@ export async function handleFolderDeleteFailure({
     showToast?.(translate('documents.folderDeleteInProgressToast'), 'warning');
     return;
   }
+  // Since #1355 the preview snapshot covers only visible documents, so a
+  // document the caller may not delete that arrives after the preview reaches
+  // this point as a 403 instead of a 409. The server text is English.
+  if (err?.status === 403 && err.data?.reason === 'FOLDER_DOCUMENTS_NOT_MANAGEABLE') {
+    showToast?.(translate('documents.folderDeleteNotManageableToast'), 'warning');
+    return;
+  }
   showToast?.(err?.data?.error ?? translate('common.unknownError'), 'danger');
 }
 

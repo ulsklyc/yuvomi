@@ -3238,6 +3238,7 @@
         "folderDeleteContentsChangedToast": "De inhoud van de map veranderde tijdens het verwijderen, daarom is de map behouden. Verwijderde documenten: {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "De inhoud van de map is veranderd en sommige documenten konden niet worden verwijderd. De map is behouden.",
         "folderDeleteInProgressToast": "Deze map wordt momenteel verwijderd. Probeer het opnieuw wanneer de bewerking klaar is.",
+        "folderDeleteNotManageableToast": "Er is niets verwijderd. Deze map bevat nu documenten die je niet mag verwijderen.",
         "housekeepingFolder": "Huishouden",
         "calendarItemsFolder": "Kalenderitems",
         "folderBrowserTitle": "Mappen",

@@ -3238,6 +3238,7 @@
         "folderDeleteContentsChangedToast": "삭제 중 폴더 내용이 변경되어 폴더를 유지했습니다. 성공적으로 삭제된 문서: {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "폴더 내용이 변경되었고 일부 문서를 삭제하지 못했습니다. 폴더를 유지했습니다.",
         "folderDeleteInProgressToast": "이 폴더는 현재 삭제 중입니다. 작업이 끝난 후 다시 시도하세요.",
+        "folderDeleteNotManageableToast": "아무것도 삭제되지 않았습니다. 이 폴더에 이제 삭제 권한이 없는 문서가 있습니다.",
         "housekeepingFolder": "가사 도우미",
         "calendarItemsFolder": "캘린더 항목",
         "folderBrowserTitle": "폴더",

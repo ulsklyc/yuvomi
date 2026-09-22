@@ -866,6 +866,160 @@ test('DELETE with documents locks previewed documents and folders against concur
   }
 });
 
+function seedMember(prefix) {
+  return get().prepare(`
+    INSERT INTO users (username, display_name, password_hash, role)
+    VALUES (?, ?, 'hash', 'member')
+  `).run(`${prefix}-${randomUUID()}`, prefix).lastInsertRowid;
+}
+
+function insertFolderDocument(folderId, createdBy, visibility, name = `doc-${randomUUID()}`) {
+  return get().prepare(`
+    INSERT INTO family_documents
+      (name, original_name, mime_type, file_size, content_data, category, visibility, status, folder_id, created_by)
+    VALUES (?, ?, 'text/plain', 1, ?, 'other', ?, 'active', ?, ?)
+  `).run(name, `${name}.txt`, Buffer.from('x'), visibility, folderId, createdBy).lastInsertRowid;
+}
+
+test('the delete-impact snapshot ignores every change to documents the caller cannot see (#1355)', async () => {
+  const memberId = seedMember('snapshot-member');
+  const ownerId = seedMember('snapshot-owner');
+  const memberHarness = createHarness({ userId: memberId, role: 'member' });
+  const adminHarness = createHarness();
+  try {
+    const folder = await adminHarness.call('POST', '/folders', { name: `Hidden-activity-${randomUUID()}` });
+    const folderId = folder.body.data.id;
+    insertFolderDocument(folderId, memberId, 'family');
+    const preview = async () => {
+      const impact = await memberHarness.call('GET', `/folders/${folderId}/delete-impact`);
+      assert.equal(impact.status, 200);
+      return impact.body.data.snapshot;
+    };
+    const before = await preview();
+
+    // added
+    const hiddenId = insertFolderDocument(folderId, ownerId, 'private');
+    assert.equal(await preview(), before, 'adding a hidden document must not change the snapshot');
+    // changed
+    get().prepare("UPDATE family_documents SET name = 'renamed hidden' WHERE id = ?").run(hiddenId);
+    assert.equal(await preview(), before, 'changing a hidden document must not change the snapshot');
+    // linked
+    const taskId = get().prepare("INSERT INTO tasks (title, created_by) VALUES ('Hidden link', ?)")
+      .run(ownerId).lastInsertRowid;
+    get().prepare('INSERT INTO task_documents (task_id, document_id, created_by) VALUES (?, ?, ?)')
+      .run(taskId, hiddenId, ownerId);
+    assert.equal(await preview(), before, 'linking a hidden document must not change the snapshot');
+    // removed
+    get().prepare('DELETE FROM family_documents WHERE id = ?').run(hiddenId);
+    assert.equal(await preview(), before, 'removing a hidden document must not change the snapshot');
+
+    // Gegenprobe: ein SICHTBARES neues Dokument aendert ihn weiterhin.
+    insertFolderDocument(folderId, ownerId, 'family');
+    assert.notEqual(await preview(), before, 'a visible change must still change the snapshot');
+  } finally {
+    await Promise.all([memberHarness.close(), adminHarness.close()]);
+  }
+});
+
+test('a branch the caller may not delete answers 403 before any 409 content check (#1355)', async () => {
+  const memberId = seedMember('race-member');
+  const ownerId = seedMember('race-owner');
+  const memberHarness = createHarness({ userId: memberId, role: 'member' });
+  try {
+    const folder = await memberHarness.call('POST', '/folders', { name: `Race-${randomUUID()}` });
+    const folderId = folder.body.data.id;
+    const ownedId = insertFolderDocument(folderId, memberId, 'family');
+    const impact = await memberHarness.call('GET', `/folders/${folderId}/delete-impact`);
+    assert.equal(impact.body.data.can_delete_documents, true);
+    const query = `/folders/${folderId}?documents=delete`
+      + `&expected_documents=${impact.body.data.documents}`
+      + `&expected_folders=${impact.body.data.removed_folders}`
+      + `&expected_snapshot=${impact.body.data.snapshot}`;
+
+    // Nach der Vorschau kommt ein fuer das Mitglied unsichtbares Dokument dazu.
+    const hiddenId = insertFolderDocument(folderId, ownerId, 'private');
+    const hiddenRace = await memberHarness.call('DELETE', query);
+    assert.equal(hiddenRace.status, 403, 'an invisible late document must not surface as 409');
+    assert.equal(hiddenRace.body.reason, 'FOLDER_DOCUMENTS_NOT_MANAGEABLE');
+    get().prepare('DELETE FROM family_documents WHERE id = ?').run(hiddenId);
+
+    // Ein sichtbares, fremdes Dokument (nicht verwaltbar) darf ebenso kein 409 sein.
+    const foreignId = insertFolderDocument(folderId, ownerId, 'family');
+    const foreignRace = await memberHarness.call('DELETE', query);
+    assert.equal(foreignRace.status, 403);
+    assert.equal(foreignRace.body.reason, 'FOLDER_DOCUMENTS_NOT_MANAGEABLE');
+    get().prepare('DELETE FROM family_documents WHERE id = ?').run(foreignId);
+
+    // Ein sichtbares, eigenes Dokument nach der Vorschau bleibt ein 409.
+    const lateOwnId = insertFolderDocument(folderId, memberId, 'family');
+    const visibleRace = await memberHarness.call('DELETE', query);
+    assert.equal(visibleRace.status, 409);
+    assert.equal(visibleRace.body.reason, 'FOLDER_CONTENT_CHANGED');
+
+    assert.equal(get().prepare('SELECT COUNT(*) AS count FROM family_documents WHERE id IN (?, ?)')
+      .get(ownedId, lateOwnId).count, 2, 'no refused request may delete anything');
+    assert.ok(get().prepare('SELECT id FROM family_document_folders WHERE id = ?').get(folderId));
+  } finally {
+    await memberHarness.close();
+  }
+});
+
+test('unfile is not blocked by somebody else\'s single-document delete in progress (#1355)', async () => {
+  const { lockDocumentDeletes, unlockDocumentDeletes } = await import('../server/services/document-deletion-lock.js');
+  const memberId = seedMember('unfile-member');
+  const ownerId = seedMember('unfile-owner');
+  const memberHarness = createHarness({ userId: memberId, role: 'member' });
+  const lockedIds = [];
+  try {
+    const folder = await memberHarness.call('POST', '/folders', { name: `Unfile-lock-${randomUUID()}` });
+    const folderId = folder.body.data.id;
+    const visibleId = insertFolderDocument(folderId, ownerId, 'family');
+    const hiddenId = insertFolderDocument(folderId, ownerId, 'private');
+    // Die Einzel-Loeschung (DELETE /:id) haelt ihre Sperre ueber den ganzen
+    // asynchronen Storage-Aufruf - genau dieses Fenster wird hier gehalten.
+    lockedIds.push(visibleId, hiddenId);
+    lockDocumentDeletes(lockedIds);
+
+    const impact = await memberHarness.call('GET', `/folders/${folderId}/delete-impact`);
+    const destructive = await memberHarness.call('DELETE',
+      `/folders/${folderId}?documents=delete&expected_snapshot=${impact.body.data.snapshot}`);
+    assert.equal(destructive.status, 403, 'the destructive mode keeps its gates');
+
+    const unfile = await memberHarness.call('DELETE',
+      `/folders/${folderId}?documents=unfile`
+      + `&expected_documents=${impact.body.data.documents}&expected_folders=${impact.body.data.removed_folders}`);
+    assert.equal(unfile.status, 200, 'a locked (possibly hidden) document must not refuse the unfile');
+    assert.equal(unfile.body.data.unfiled_documents, 1);
+    assert.equal(get().prepare('SELECT id FROM family_document_folders WHERE id = ?').get(folderId), undefined);
+    const rows = get().prepare('SELECT id, folder_id FROM family_documents WHERE id IN (?, ?) ORDER BY id')
+      .all(visibleId, hiddenId);
+    assert.deepEqual(rows.map((row) => row.folder_id), [null, null]);
+  } finally {
+    unlockDocumentDeletes(lockedIds);
+    await memberHarness.close();
+  }
+});
+
+test('destructive delete still waits for a single-document delete in progress (#1355)', async () => {
+  const { lockDocumentDeletes, unlockDocumentDeletes } = await import('../server/services/document-deletion-lock.js');
+  const h = createHarness();
+  let documentId = null;
+  try {
+    const folder = await h.call('POST', '/folders', { name: `Delete-lock-${randomUUID()}` });
+    documentId = insertFolderDocument(folder.body.data.id, ADMIN_ID, 'family');
+    const impact = await h.call('GET', `/folders/${folder.body.data.id}/delete-impact`);
+    lockDocumentDeletes([documentId]);
+    const del = await h.call('DELETE',
+      `/folders/${folder.body.data.id}?documents=delete&expected_snapshot=${impact.body.data.snapshot}`);
+    assert.equal(del.status, 409);
+    assert.equal(del.body.reason, 'FOLDER_DELETE_IN_PROGRESS');
+    assert.ok(get().prepare('SELECT id FROM family_documents WHERE id = ?').get(documentId));
+  } finally {
+    unlockDocumentDeletes([documentId]);
+    await h.close();
+  }
+});
+
 test('DELETE /folders/:id returns 404 for unknown id', async () => {
   const h = createHarness();
   try {

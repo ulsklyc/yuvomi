@@ -3181,6 +3181,7 @@
         "folderDeleteContentsChangedToast": "El contenido de la carpeta cambió durante la eliminación, por lo que se conservó. Documentos eliminados correctamente: {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "El contenido de la carpeta cambió y algunos documentos no pudieron eliminarse. La carpeta se conservó.",
         "folderDeleteInProgressToast": "Esta carpeta se está eliminando. Inténtalo de nuevo cuando termine la operación.",
+        "folderDeleteNotManageableToast": "No se ha eliminado nada. Esta carpeta ahora contiene documentos que no puedes eliminar.",
         "housekeepingFolder": "Limpieza",
         "calendarItemsFolder": "Elementos del calendario",
         "folderBrowserTitle": "Carpetas",

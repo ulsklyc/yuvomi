@@ -3238,6 +3238,7 @@
         "folderDeleteContentsChangedToast": "Nội dung thư mục đã thay đổi trong khi xóa, vì vậy thư mục được giữ lại. Tài liệu đã xóa thành công: {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "Nội dung thư mục đã thay đổi và không thể xóa một số tài liệu. Thư mục được giữ lại.",
         "folderDeleteInProgressToast": "Thư mục này đang được xóa. Hãy thử lại khi thao tác hoàn tất.",
+        "folderDeleteNotManageableToast": "Không có gì bị xóa. Thư mục này hiện có tài liệu mà bạn không được phép xóa.",
         "housekeepingFolder": "Dọn dẹp",
         "calendarItemsFolder": "Mục trên lịch",
         "folderBrowserTitle": "Thư mục",

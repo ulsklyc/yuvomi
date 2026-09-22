@@ -3181,6 +3181,7 @@
         "folderDeleteContentsChangedToast": "हटाते समय फ़ोल्डर की सामग्री बदल गई, इसलिए फ़ोल्डर रखा गया। सफलतापूर्वक हटाए गए दस्तावेज़: {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "फ़ोल्डर की सामग्री बदल गई और कुछ दस्तावेज़ हटाए नहीं जा सके। फ़ोल्डर रखा गया।",
         "folderDeleteInProgressToast": "यह फ़ोल्डर अभी हटाया जा रहा है। प्रक्रिया पूरी होने पर फिर प्रयास करें।",
+        "folderDeleteNotManageableToast": "कुछ भी नहीं हटाया गया। इस फ़ोल्डर में अब ऐसे दस्तावेज़ हैं जिन्हें हटाने की आपको अनुमति नहीं है।",
         "housekeepingFolder": "गृहकार्य",
         "calendarItemsFolder": "कैलेंडर आइटम",
         "folderBrowserTitle": "फ़ोल्डर",

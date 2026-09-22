@@ -118,6 +118,32 @@ test('immediate content conflict refreshes the impact dialog without a delayed w
   assert.deepEqual(toasts, []);
 });
 
+test('a 403 for a branch the caller may not delete becomes a translated warning, never the server text (#1355)', async () => {
+  for (const delayed of [true, false]) {
+    const toasts = [];
+    let refreshes = 0;
+    await handleFolderDeleteFailure({
+      err: {
+        status: 403,
+        data: {
+          error: 'Not authorized to delete every document in this folder.',
+          reason: 'FOLDER_DOCUMENTS_NOT_MANAGEABLE',
+        },
+      },
+      delayed,
+      translate: (key) => `translated:${key}`,
+      showToast: (...args) => { toasts.push(args); },
+      refreshImpact: async () => { refreshes += 1; },
+    });
+
+    assert.deepEqual(toasts, [[
+      'translated:documents.folderDeleteNotManageableToast',
+      'warning',
+    ]], `delayed=${delayed}`);
+    assert.equal(refreshes, 0, 'a permission refusal must not reopen the impact dialog');
+  }
+});
+
 test('two pending deletes restore in canonical order in both Undo permutations', () => {
   for (const undoOrder of [[0, 1], [1, 0]]) {
     const state = makeState();

@@ -3238,6 +3238,7 @@
         "folderDeleteContentsChangedToast": "A mappa tartalma törlés közben megváltozott, ezért a mappa megmaradt. Sikeresen törölt dokumentumok: {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "A mappa tartalma megváltozott, és néhány dokumentumot nem sikerült törölni. A mappa megmaradt.",
         "folderDeleteInProgressToast": "A mappa törlése folyamatban van. Próbálja újra a művelet befejezése után.",
+        "folderDeleteNotManageableToast": "Semmi sem lett törölve. A mappában már olyan dokumentumok is vannak, amelyeket nem törölhet.",
         "housekeepingFolder": "Háztartás",
         "calendarItemsFolder": "Naptár elemei",
         "folderBrowserTitle": "Mappák",

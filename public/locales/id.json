@@ -3238,6 +3238,7 @@
         "folderDeleteContentsChangedToast": "Isi folder berubah selama penghapusan, sehingga folder dipertahankan. Dokumen yang berhasil dihapus: {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "Isi folder berubah dan beberapa dokumen tidak dapat dihapus. Folder dipertahankan.",
         "folderDeleteInProgressToast": "Folder ini sedang dihapus. Coba lagi setelah operasi selesai.",
+        "folderDeleteNotManageableToast": "Tidak ada yang dihapus. Folder ini sekarang berisi dokumen yang tidak boleh Anda hapus.",
         "housekeepingFolder": "Asisten Rumah Tangga",
         "calendarItemsFolder": "Entri kalender",
         "folderBrowserTitle": "Folder",

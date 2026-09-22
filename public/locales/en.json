@@ -3238,6 +3238,7 @@
         "folderDeleteContentsChangedToast": "The folder contents changed during deletion, so the folder was kept. Documents deleted successfully: {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "The folder contents changed and some documents could not be deleted. The folder was kept.",
         "folderDeleteInProgressToast": "This folder is currently being deleted. Try again when the operation finishes.",
+        "folderDeleteNotManageableToast": "Nothing was deleted. This folder now contains documents you are not allowed to delete.",
         "housekeepingFolder": "Housekeeping",
         "calendarItemsFolder": "Calendar items",
         "folderBrowserTitle": "Folders",

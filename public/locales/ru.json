@@ -3181,6 +3181,7 @@
         "folderDeleteContentsChangedToast": "Содержимое папки изменилось во время удаления, поэтому папка сохранена. Успешно удалено документов: {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "Содержимое папки изменилось, а некоторые документы удалить не удалось. Папка сохранена.",
         "folderDeleteInProgressToast": "Эта папка сейчас удаляется. Повторите попытку после завершения операции.",
+        "folderDeleteNotManageableToast": "Ничего не удалено. В этой папке теперь есть документы, которые вам нельзя удалять.",
         "housekeepingFolder": "Уборка",
         "calendarItemsFolder": "Элементы календаря",
         "folderBrowserTitle": "Папки",

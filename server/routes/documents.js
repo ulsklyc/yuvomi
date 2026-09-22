@@ -729,15 +729,21 @@ router.get('/folders/:id/delete-impact', (req, res) => {
     const canDeleteDocuments = visibleDocuments.length === documents.length
       && visibleDocuments.every((document) => mayManage(req, document));
 
-    const linkedState = folderDeleteLinkedState(documents.map((document) => document.id));
-    const visibleLinkedState = folderDeleteLinkedState(visibleDocuments.map((document) => document.id));
+    // DER SNAPSHOT DECKT NUR, WAS DIE FRAGENDE PERSON SIEHT (#1355). Ueber
+    // alle Dokumente gebildet, aenderte er sich mit jedem unsichtbaren
+    // Dokument, das in den Zweig kam, ging oder verknuepft wurde - zweimal
+    // fragen verriet Aktivitaet an fremden privaten Dokumenten. Die Sicherheit
+    // haengt nicht am Hash: das DELETE verweigert (403), solange irgendetwas
+    // im Zweig unsichtbar oder fremd ist.
+    const visibleIds = visibleDocuments.map((document) => document.id);
+    const visibleLinkedState = folderDeleteLinkedState(visibleIds);
     res.json({ data: {
       id,
       removed_folders: subtree.length,
       documents: visibleDocuments.length,
       can_delete_documents: canDeleteDocuments,
       linked_records: folderDeleteLinkedRecords(visibleLinkedState),
-      snapshot: folderDeleteSnapshot(subtree, documents.map((document) => document.id), linkedState),
+      snapshot: folderDeleteSnapshot(subtree, visibleIds, visibleLinkedState),
     } });
   } catch (err) {
     log.error('GET /folders/:id/delete-impact error:', err);
@@ -895,16 +901,35 @@ router.delete('/folders/:id', async (req, res) => {
       });
     }
 
+    // ERST DIE BERECHTIGUNG, DANN DER VERGLEICH (#1355). Die Besitzpruefung
+    // laeuft ueber den GANZEN Zweig, bevor ein externer Speicher angefasst
+    // wird - sonst koennte ein Mitglied erst eigene Dateien loeschen und beim
+    // ersten fremden Dokument in einem halben Baum stranden. Und sie laeuft
+    // vor dem Snapshot-Vergleich: wer den Zweig ohnehin nicht loeschen darf,
+    // bekommt nie ein 409 "Inhalt geaendert", das nur ueber unsichtbare
+    // Dokumente zustande kaeme.
+    if (deleteDocuments && (visibleDocumentIds.size !== documents.length
+        || !documents.every((document) => mayManage(req, document)))) {
+      return res.status(403).json({
+        error: 'Not authorized to delete every document in this folder.',
+        code: 403,
+        reason: 'FOLDER_DOCUMENTS_NOT_MANAGEABLE',
+      });
+    }
+
     // Der Dialog bestaetigt konkrete Zahlen UND Identitaeten. Hat sich der
-    // Zweig seit seinem Impact-GET veraendert, darf der folgende Klick nicht
-    // still andere Inhalte loeschen als angezeigt. Der destruktive Modus ist
-    // neu und verlangt den Snapshot; der sichere Unfile-Default bleibt fuer
-    // alte Clients ohne Erwartungswerte kompatibel.
-    const currentLinkedState = folderDeleteLinkedState(documents.map((document) => document.id));
+    // sichtbare Zweig seit seinem Impact-GET veraendert, darf der folgende
+    // Klick nicht still andere Inhalte loeschen als angezeigt. Der destruktive
+    // Modus ist neu und verlangt den Snapshot; der sichere Unfile-Default
+    // bleibt fuer alte Clients ohne Erwartungswerte kompatibel. Der Snapshot
+    // wird wie im GET nur ueber die sichtbaren Dokumente gebildet.
+    const visibleIds = documents
+      .map((document) => document.id)
+      .filter((documentId) => visibleDocumentIds.has(documentId));
     const currentSnapshot = folderDeleteSnapshot(
       subtree,
-      documents.map((document) => document.id),
-      currentLinkedState,
+      visibleIds,
+      folderDeleteLinkedState(visibleIds),
     );
     if ((expectedDocuments !== null && expectedDocuments !== visibleDocumentIds.size)
         || (expectedFolders !== null && expectedFolders !== subtree.length)
@@ -916,16 +941,18 @@ router.delete('/folders/:id', async (req, res) => {
       });
     }
 
-    // Die Besitzprüfung läuft über den GANZEN Zweig, bevor ein externer
-    // Speicher angefasst wird. Sonst könnte ein Mitglied erst eigene Dateien
-    // löschen und beim ersten fremden Dokument in einem halben Baum stranden.
-    if (deleteDocuments && (visibleDocumentIds.size !== documents.length
-        || !documents.every((document) => mayManage(req, document)))) {
-      return res.status(403).json({ error: 'Not authorized to delete every document in this folder.', code: 403 });
-    }
-
+    // Die Dokumentsperre gilt nur fuer das destruktive Loeschen (#1355).
+    // Entordnen loescht allein die Ordnerzeile, folder_id faellt per
+    // ON DELETE SET NULL - ein Dokument, dessen Einzel-Loeschung gerade
+    // laeuft, verliert dabei nur seinen Ordner und verschwindet danach wie
+    // geplant. Auf dessen Sperre zu warten hiess, an einer fremden Loeschung
+    // zu scheitern, die das Entordnen gar nicht beruehrt, und bei einem
+    // unsichtbaren Dokument verriet das 409 fremde Aktivitaet. Die
+    // Ordnersperre bleibt fuer beide Modi: ein Zweig im destruktiven Loeschen
+    // wird nicht nebenher entordnet. Pruefung und Schreiben laufen ohne
+    // await dazwischen.
     const overlapsActiveDeletion = subtree.some((folderId) => activeFolderTreeDeletes.has(folderId))
-      || documents.some((document) => documentDeleteIsActive(document.id));
+      || (deleteDocuments && documents.some((document) => documentDeleteIsActive(document.id)));
     if (overlapsActiveDeletion) return deletionInProgress(res);
 
     if (deleteDocuments) {

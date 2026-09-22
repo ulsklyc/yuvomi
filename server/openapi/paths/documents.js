@@ -171,7 +171,7 @@ export function documentsPaths() {
         summary: 'Delete a document folder subtree',
         tag: 'Documents',
         stateChanging: true,
-        description: 'Deletes the folder and all subfolders. `documents=unfile` keeps every document row and clears its folder link, including documents hidden from the caller, while reporting only the visible unfile count. `documents=delete` requires the opaque HMAC snapshot from the latest delete-impact response; the token binds exact folder, document and collateral-link identities. The route then sequentially deletes visible document content and rows while locking the previewed identities, subtree targets and new document links. Destructive deletion is rejected before the first storage operation if any document is hidden from the caller, if a non-admin does not own every visible document, or if the previewed identities changed. A 207 response distinguishes storage, database-row and concurrent-content failures while retaining the folder subtree.',
+        description: 'Deletes the folder and all subfolders. `documents=unfile` keeps every document row and clears its folder link, including documents hidden from the caller, while reporting only the visible unfile count. `documents=delete` requires the opaque HMAC snapshot from the latest delete-impact response; the token binds exact folder identities and the document and collateral-link identities visible to the caller. The route then sequentially deletes visible document content and rows while locking the previewed identities, subtree targets and new document links. Destructive deletion is rejected before the first storage operation: first with 403 `FOLDER_DOCUMENTS_NOT_MANAGEABLE` if any document is hidden from the caller or a non-admin does not own every visible document, then with 409 `FOLDER_CONTENT_CHANGED` if the previewed identities changed. `documents=unfile` is not blocked by a single-document deletion in progress, only by an overlapping folder deletion. A 207 response distinguishes storage, database-row and concurrent-content failures while retaining the folder subtree.',
         params: [
           idParam(),
           {
@@ -207,7 +207,7 @@ export function documentsPaths() {
           207: { description: 'Some documents were deleted, but storage failures or a concurrent content change left the folder subtree in place' },
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
-          403: { $ref: '#/components/responses/Forbidden' },
+          403: { description: 'documents=delete only: the subtree holds a document hidden from the caller or one the caller may not manage (reason FOLDER_DOCUMENTS_NOT_MANAGEABLE). Checked before the snapshot comparison.' },
           404: { description: 'Folder not found' },
           409: { description: 'Folder contents changed after the impact preview or the subtree overlaps an active deletion batch' },
           500: { $ref: '#/components/responses/InternalServerError' },
@@ -218,7 +218,7 @@ export function documentsPaths() {
       get: op({
         summary: 'Preview the impact of deleting a document folder subtree',
         tag: 'Documents',
-        description: 'Returns the visible document count, exact folder count, affected-record counts grouped by module, an opaque HMAC snapshot bound to folder, document and collateral-link identities, and whether the caller may delete every affected document. Hidden-document totals are never returned; their presence only makes destructive deletion unavailable.',
+        description: 'Returns the visible document count, exact folder count, affected-record counts grouped by module, an opaque HMAC snapshot bound to the folder identities and the visible document and collateral-link identities (changes to hidden documents never change it), and whether the caller may delete every affected document. Hidden-document totals are never returned; their presence only makes destructive deletion unavailable.',
         params: [idParam()],
         responses: {
           200: { description: 'Folder deletion impact' },

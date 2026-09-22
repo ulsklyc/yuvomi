@@ -3368,6 +3368,7 @@
         "folderDeleteContentsChangedToast": "Obsah složky se během odstraňování změnil, proto složka zůstala zachována. Úspěšně odstraněné dokumenty: {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "Obsah složky se změnil a některé dokumenty se nepodařilo odstranit. Složka zůstala zachována.",
         "folderDeleteInProgressToast": "Tato složka se právě odstraňuje. Zkuste to znovu po dokončení.",
+        "folderDeleteNotManageableToast": "Nic nebylo odstraněno. Tato složka nyní obsahuje dokumenty, které nemáte oprávnění odstranit.",
         "housekeepingFolder": "Domácí práce",
         "calendarItemsFolder": "Položky kalendáře",
         "folderBrowserTitle": "Složky",

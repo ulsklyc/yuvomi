@@ -3238,6 +3238,7 @@
         "folderDeleteContentsChangedToast": "Nagbago ang laman ng folder habang tinatanggal, kaya pinanatili ang folder. Matagumpay na natanggal na dokumento: {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "Nagbago ang laman ng folder at may mga dokumentong hindi natanggal. Pinanatili ang folder.",
         "folderDeleteInProgressToast": "Kasalukuyang tinatanggal ang folder na ito. Subukan muli kapag tapos na ang proseso.",
+        "folderDeleteNotManageableToast": "Walang natanggal. May mga dokumento na ngayon sa folder na ito na hindi mo pinapayagang tanggalin.",
         "housekeepingFolder": "Gawaing-bahay",
         "calendarItemsFolder": "Mga item sa kalendaryo",
         "folderBrowserTitle": "Mga folder",

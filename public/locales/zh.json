@@ -3181,6 +3181,7 @@
         "folderDeleteContentsChangedToast": "删除期间文件夹内容发生变化，因此已保留文件夹。成功删除的文档：{{deleted}}。",
         "folderDeleteContentsChangedWithFailuresToast": "文件夹内容发生了变化，且部分文档无法删除。文件夹已保留。",
         "folderDeleteInProgressToast": "此文件夹正在删除中。请在操作完成后重试。",
+        "folderDeleteNotManageableToast": "未删除任何内容。此文件夹现在包含你无权删除的文档。",
         "housekeepingFolder": "家务",
         "calendarItemsFolder": "日历项目",
         "folderBrowserTitle": "文件夹",

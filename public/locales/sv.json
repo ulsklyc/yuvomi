@@ -3181,6 +3181,7 @@
         "folderDeleteContentsChangedToast": "Mappens innehåll ändrades under borttagningen, så mappen behölls. Borttagna dokument: {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "Mappens innehåll ändrades och vissa dokument kunde inte tas bort. Mappen behölls.",
         "folderDeleteInProgressToast": "Mappen tas bort just nu. Försök igen när åtgärden är klar.",
+        "folderDeleteNotManageableToast": "Inget togs bort. Mappen innehåller nu dokument som du inte får ta bort.",
         "housekeepingFolder": "Städning",
         "calendarItemsFolder": "Kalenderobjekt",
         "folderBrowserTitle": "Mappar",

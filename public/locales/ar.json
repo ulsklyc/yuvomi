@@ -3181,6 +3181,7 @@
         "folderDeleteContentsChangedToast": "تغيّرت محتويات المجلد أثناء الحذف، لذلك تم الاحتفاظ به. المستندات المحذوفة بنجاح: {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "تغيّرت محتويات المجلد وتعذر حذف بعض المستندات. تم الاحتفاظ بالمجلد.",
         "folderDeleteInProgressToast": "يتم حذف هذا المجلد حاليًا. حاول مرة أخرى بعد انتهاء العملية.",
+        "folderDeleteNotManageableToast": "لم يُحذف أي شيء. يحتوي هذا المجلد الآن على مستندات غير مسموح لك بحذفها.",
         "housekeepingFolder": "التدبير المنزلي",
         "calendarItemsFolder": "عناصر التقويم",
         "folderBrowserTitle": "المجلدات",

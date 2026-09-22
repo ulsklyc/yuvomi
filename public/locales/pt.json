@@ -3181,6 +3181,7 @@
         "folderDeleteContentsChangedToast": "O conteúdo da pasta mudou durante a exclusão, por isso a pasta foi mantida. Documentos excluídos: {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "O conteúdo da pasta mudou e alguns documentos não puderam ser excluídos. A pasta foi mantida.",
         "folderDeleteInProgressToast": "Esta pasta está sendo excluída. Tente novamente quando a operação terminar.",
+        "folderDeleteNotManageableToast": "Nada foi excluído. Esta pasta agora contém documentos que você não tem permissão para excluir.",
         "housekeepingFolder": "Faxina",
         "calendarItemsFolder": "Itens do calendário",
         "folderBrowserTitle": "Pastas",

@@ -3238,6 +3238,7 @@
         "folderDeleteContentsChangedToast": "Der Ordnerinhalt hat sich während der Löschung geändert, deshalb blieb der Ordner erhalten. Erfolgreich gelöschte Dokumente: {{deleted}}.",
         "folderDeleteContentsChangedWithFailuresToast": "Der Ordnerinhalt hat sich geändert und einige Dokumente konnten nicht gelöscht werden. Der Ordner blieb erhalten.",
         "folderDeleteInProgressToast": "Dieser Ordner wird gerade gelöscht. Versuche es nach Abschluss erneut.",
+        "folderDeleteNotManageableToast": "Es wurde nichts gelöscht. In diesem Ordner liegen inzwischen Dokumente, die du nicht löschen darfst.",
         "housekeepingFolder": "Haushaltshilfe",
         "calendarItemsFolder": "Kalendereinträge",
         "folderBrowserTitle": "Ordner",
