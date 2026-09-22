@@ -1468,6 +1468,72 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     assert.strictEqual(marker(d, `caldav_legacy_color_heal_done_${accountId}`), '1');
   }));
 
+  it('wieder angelegt, der alte Kalender lebt noch: die Altzeile heilt trotzdem', () => withDb(async (d) => {
+    // Der schlichte Fall ohne Umzug. Er haelt die REIHENFOLGE in addAccount
+    // fest: die Suche nach Altzeilen muss VOR dem Eintrag der neuen Auswahl
+    // laufen - danach haengt die Zeile scheinbar an einem lebenden Konto (dem
+    // neuen), und der Merker schnitte ihr die Heilung ab.
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    d.exec('DELETE FROM caldav_calendar_selection WHERE account_id = 1; DELETE FROM caldav_accounts WHERE id = 1;');
+
+    const { accountId } = await addAccount('Wieder', 'https://dav.example/', 'u1', 'p', { createClient: accountClient([CAL_A, CAL_B]) });
+    assert.strictEqual(marker(d, `caldav_legacy_color_heal_done_${accountId}`), null);
+    d.prepare('UPDATE caldav_calendar_selection SET enabled = 1').run();
+
+    await sync({ createClient: clientWith({ inCal: CAL_A, calendars: [CAL_A, CAL_B] }) });
+    const after = row(d);
+    assert.strictEqual(after.color, null);
+    assert.strictEqual(after.color_modified, 0);
+  }));
+
+  it('eine Altzeile ganz ohne Kalenderzuordnung zaehlt auch als verwaist', () => withDb(async (d) => {
+    // calendar_ref_id NULL: der LEFT JOIN findet keinen Kalender. Auch so eine
+    // Zeile haelt den Merker beim Anlegen zurueck; der erste vollstaendige
+    // Lauf setzt ihn dann. Ein lebendes Nachbarkonto muss dabei sein: gegen
+    // eine LEERE Auswahl ist auch `NULL NOT IN (...)` wahr, und der Test
+    // saehe den NULL-Zweig gar nicht.
+    d.exec(`
+      DELETE FROM caldav_calendar_selection; DELETE FROM caldav_accounts;
+      INSERT INTO caldav_accounts (id, name, caldav_url, username, password) VALUES (2, 'Nachbar', 'https://dav.example/', 'u2', 'p');
+      INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled)
+        VALUES (2, '${CAL_C}', 'C', '${COLOR_C}', 0);
+    `);
+    d.prepare(`
+      INSERT INTO calendar_events (title, start_datetime, external_calendar_id, external_source, calendar_ref_id, color, color_modified, user_modified, created_by)
+      VALUES ('Training', '2026-01-05T17:00:00Z', ?, 'caldav', NULL, ?, 1, 1, 1)
+    `).run(UID, COLOR_A);
+
+    const { accountId } = await addAccount('Wieder', 'https://dav.example/', 'u1', 'p', { createClient: accountClient([CAL_A]) });
+    const key = `caldav_legacy_color_heal_done_${accountId}`;
+    assert.strictEqual(marker(d, key), null, 'die Zeile ohne Kalender ist eine Altzeile');
+    d.prepare('UPDATE caldav_calendar_selection SET enabled = 1').run();
+
+    await sync({ createClient: clientWith({ inCal: CAL_A, calendars: [CAL_A] }) });
+    assert.strictEqual(row(d).color, null);
+    assert.strictEqual(marker(d, key), '1', 'der erste vollstaendige Lauf setzt ihn');
+  }));
+
+  it('scheitert das Anlegen, bleibt weder Konto noch Merker zurueck', () => withDb(async (d) => {
+    // Konto, Auswahl und Merker stehen in EINER Transaktion: scheitert der
+    // Eintrag eines Kalenders, darf kein halbes Konto samt Merker liegen
+    // bleiben, der ihm spaeter die Heilung abschneidet.
+    d.exec(`
+      DELETE FROM caldav_calendar_selection; DELETE FROM caldav_accounts;
+      CREATE TRIGGER boom BEFORE INSERT ON caldav_calendar_selection
+        BEGIN SELECT RAISE(ABORT, 'boom'); END;
+    `);
+    await assert.rejects(
+      addAccount('Neu', 'https://dav.example/', 'u3', 'p', { createClient: accountClient([CAL_A]) }),
+      /boom/
+    );
+    assert.strictEqual(d.prepare('SELECT COUNT(*) AS n FROM caldav_accounts').get().n, 0, 'kein Konto');
+    assert.strictEqual(
+      d.prepare("SELECT COUNT(*) AS n FROM sync_config WHERE key LIKE 'caldav_legacy_color_heal_done_%'").get().n, 0,
+      'kein Merker'
+    );
+  }));
+
   it('ein Kalender, den der Server nicht mehr kennt, schiebt den Merker auf', () => withDb(async (d) => {
     await sync({ createClient: clientWith({ inCal: CAL_A }) });
     legacyState(d, COLOR_A);
