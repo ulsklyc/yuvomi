@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **You can sign out on your other devices.** Since a session now lasts 90 days without use, a lost
+  phone or a borrowed laptop could stay signed in for months, and signing out only ended the
+  session on the device you were using. Settings, Account, now has "Other devices" with a button
+  that ends every other session of your account after a confirmation, including ones started with
+  single sign-on; this device stays signed in, and the page says how many sessions were ended,
+  counting only ones that were still valid. Clicking it too often asks you to wait a moment; the
+  limit applies to each member separately, so one member cannot lock out another. API
+  tokens and paired wall displays are not sessions and keep working; they are revoked under API
+  tokens and Displays as before. For API clients: `POST /api/v1/auth/logout-others` needs a
+  browser session and a CSRF token, answers `{ ok: true, ended }`, and refuses an API token with
+  403. (#1354)
+
 - **API clients can fill only the empty slots of the meal plan.** `POST /api/v1/meals/apply-plan`
   takes a new option `skip_occupied: true`. An assignment whose date and meal type already hold a
   meal is then left out instead of being added next to it, and the answer lists it in `skipped` as
@@ -19,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   assignments for the same empty slot are all created. The option has to be a JSON boolean, and
   combining it with `replace_existing` is refused with `400`. Without the option the endpoint
   behaves and answers exactly as before. (Discussion #1380)
+
 - **Every done task on the board can be archived in one action.** The "Done" column of the board
   now has an archive button next to its count. After a confirmation it moves the done tasks the
   column currently shows into the archive - the ones it shows, so a task someone else completes
@@ -177,6 +190,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its name and, if the identity provider marks the address as verified (`email_verified`), that
   e-mail address. No picture, no birth date and no phone number are taken over, and later sign-ins
   change nothing, so edits made in Yuvomi stay. (#1357)
+
+- **"To shopping list" only appears where it can work.** Since 2.68.0, sending ingredients from
+  the kitchen to the shopping list needs permission to change the shopping list, and taking over
+  the meal plan from inside the shopping list needs permission to change the meal plan. The buttons
+  did not know that yet: a family member who may only view the shopping list still saw the cart on a
+  meal, the "To shopping list" button in a recipe and the transfer section in the meal dialog, and
+  one who may only view the meal plan still saw "Import meal plan" in the list menu - each of them
+  ended in an error. They are now left out for anyone who lacks the permissions the action needs.
+
+- **A family member who may only view the meal plan can put a recipe on the shopping list.**
+  Sending a recipe's ingredients to the shopping list only reads the recipe, so it now needs
+  permission to view the meal plan and to change the shopping list, for members and for API tokens
+  alike. Sending a planned meal still needs permission to change the meal plan, because it marks
+  the meal's ingredients as transferred.
 
 - **A reminder no longer sits on top of a dialog's buttons and takes the click meant for them.**
   When a reminder came due while a dialog was open, its message could lie exactly over "Save": on a

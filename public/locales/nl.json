@@ -2773,7 +2773,18 @@
         "healthPreventionKind": {
             "vaccination": "Vaccinatie",
             "checkup": "Controle"
-        }
+        },
+        "otherSessionsTitle": "Andere apparaten",
+        "otherSessionsHint": "Meldt je account af op alle andere apparaten en browsers. Dit apparaat blijft aangemeld. API-tokens en gekoppelde wandschermen blijven ongemoeid.",
+        "otherSessionsButton": "Afmelden op andere apparaten",
+        "otherSessionsConfirm": "Afmelden op alle andere apparaten?",
+        "otherSessionsConfirmDetail": "Wie daar met jouw account is aangemeld, moet zich opnieuw aanmelden. Dit apparaat blijft aangemeld.",
+        "otherSessionsEnded": "{{count}} andere sessies beëindigd.",
+        "otherSessionsEnded_one": "{{count}} andere sessie beëindigd.",
+        "otherSessionsEnded_few": "{{count}} andere sessies beëindigd.",
+        "otherSessionsNone": "Je account was op geen enkel ander apparaat aangemeld.",
+        "otherSessionsError": "Afmelden op andere apparaten is mislukt.",
+        "otherSessionsTooManyAttempts": "Te veel verzoeken. Wacht even en probeer het dan opnieuw."
     },
     "login": {
         "tagline": "Welkom terug bij je gezinsplanner.",

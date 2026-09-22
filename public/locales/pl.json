@@ -2785,7 +2785,18 @@
         "healthPreventionKind": {
             "vaccination": "Szczepienie",
             "checkup": "Badanie"
-        }
+        },
+        "otherSessionsTitle": "Inne urządzenia",
+        "otherSessionsHint": "Wylogowuje twoje konto na wszystkich innych urządzeniach i przeglądarkach. To urządzenie pozostaje zalogowane. Nie dotyczy to tokenów API ani sparowanych wyświetlaczy ściennych.",
+        "otherSessionsButton": "Wyloguj na innych urządzeniach",
+        "otherSessionsConfirm": "Wylogować na wszystkich innych urządzeniach?",
+        "otherSessionsConfirmDetail": "Każdy, kto jest tam zalogowany na twoje konto, musi zalogować się ponownie. To urządzenie pozostaje zalogowane.",
+        "otherSessionsEnded": "Zakończono {{count}} innych sesji.",
+        "otherSessionsEnded_one": "Zakończono {{count}} inną sesję.",
+        "otherSessionsEnded_few": "Zakończono {{count}} inne sesje.",
+        "otherSessionsNone": "Twoje konto nie było zalogowane na żadnym innym urządzeniu.",
+        "otherSessionsError": "Nie udało się wylogować na innych urządzeniach.",
+        "otherSessionsTooManyAttempts": "Zbyt wiele żądań. Poczekaj chwilę i spróbuj ponownie."
     },
     "login": {
         "tagline": "Witaj ponownie w swoim planerze rodzinnym.",

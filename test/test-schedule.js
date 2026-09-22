@@ -2106,7 +2106,7 @@ test('view-schedule-entry is a read action, reachable by a read-only member (S-1
   assert.match(schedulePage, /openModal\(\{ title: t\('schedule\.entryDetailTitle'\), size: 'sm', content: renderScheduleEntryDetailContent\(entry\), dirtyGuard: false \}\)/);
 });
 
-test('a read-only Schedule member can still save their own reminder offset and weekly hours (S-12)', () => {
+test('a read-only Schedule member can still save their own reminder offset and weekly hours (S-12)', async () => {
   // Client side: "My settings" must no longer disable the toggle/select/input
   // based on readOnly() - this is a personal preference (own reminder lead
   // time / own overtime target), not a write to shared schedule data.
@@ -2131,7 +2131,15 @@ test('a read-only Schedule member can still save their own reminder offset and w
   assert.ok(helperStart !== -1, 'sessionModuleAccessRequirement() must exist next to moduleForPath()');
   const helperBody = scopesSrc.slice(helperStart, scopesSrc.indexOf('\n}\n', helperStart));
   assert.match(helperBody, /moduleForPath\(path\)/);
-  assert.match(helperBody, /path === '\/schedule\/preferences' \? 'read' : requiredAccess\(method\)/);
+  // Die Ausnahme steht seit #1290 in einer Tabelle (`READ_LEVEL_WRITES`), die
+  // beide Gates und der Client lesen. Geprueft wird deshalb das URTEIL, nicht
+  // die Schreibweise: exakt dieser Pfad, Modul bleibt `schedule`, nur Sitzungen.
+  const { sessionModuleAccessRequirement, tokenAccessRequirement } = await import('../server/scopes.js');
+  assert.deepEqual(sessionModuleAccessRequirement('/schedule/preferences', 'PUT'), { moduleKey: 'schedule', access: 'read' });
+  assert.deepEqual(sessionModuleAccessRequirement('/schedule/preferencesX', 'PUT'), { moduleKey: 'schedule', access: 'write' });
+  assert.deepEqual(sessionModuleAccessRequirement('/schedule/shifts', 'PUT'), { moduleKey: 'schedule', access: 'write' });
+  assert.equal(tokenAccessRequirement('/schedule/preferences', 'PUT').access, 'write',
+    'ein Token bleibt an schedule:write gebunden');
   assert.match(scopesSrc, /export \{[\s\S]*sessionModuleAccessRequirement,[\s\S]*\};/, 'the helper must be exported for server/index.js to use');
 
   const serverIndex = readFileSync(new URL('../server/index.js', import.meta.url), 'utf8');

@@ -2773,7 +2773,18 @@
         "healthPreventionKind": {
             "vaccination": "Vaccinazione",
             "checkup": "Controllo"
-        }
+        },
+        "otherSessionsTitle": "Altri dispositivi",
+        "otherSessionsHint": "Disconnette il tuo account da tutti gli altri dispositivi e browser. Questo dispositivo resta connesso. I token API e i display a parete associati non sono interessati.",
+        "otherSessionsButton": "Esci dagli altri dispositivi",
+        "otherSessionsConfirm": "Uscire da tutti gli altri dispositivi?",
+        "otherSessionsConfirmDetail": "Chi ha effettuato l’accesso lì con il tuo account dovrà accedere di nuovo. Questo dispositivo resta connesso.",
+        "otherSessionsEnded": "{{count}} altre sessioni terminate.",
+        "otherSessionsEnded_one": "{{count}} altra sessione terminata.",
+        "otherSessionsEnded_few": "{{count}} altre sessioni terminate.",
+        "otherSessionsNone": "Il tuo account non era connesso su nessun altro dispositivo.",
+        "otherSessionsError": "Uscita dagli altri dispositivi non riuscita.",
+        "otherSessionsTooManyAttempts": "Troppe richieste. Attendi un momento, poi riprova."
     },
     "login": {
         "tagline": "Bentornato nel tuo pianificatore familiare.",

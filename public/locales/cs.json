@@ -2773,7 +2773,18 @@
         "healthPreventionKind": {
             "vaccination": "Očkování",
             "checkup": "Prohlídka"
-        }
+        },
+        "otherSessionsTitle": "Ostatní zařízení",
+        "otherSessionsHint": "Odhlásí tvůj účet na všech ostatních zařízeních a prohlížečích. Toto zařízení zůstane přihlášené. API tokeny a spárované nástěnné displeje nejsou dotčeny.",
+        "otherSessionsButton": "Odhlásit na ostatních zařízeních",
+        "otherSessionsConfirm": "Odhlásit na všech ostatních zařízeních?",
+        "otherSessionsConfirmDetail": "Kdo je tam přihlášen tvým účtem, se musí přihlásit znovu. Toto zařízení zůstane přihlášené.",
+        "otherSessionsEnded": "Ukončeno {{count}} dalších relací.",
+        "otherSessionsEnded_one": "Ukončena {{count}} další relace.",
+        "otherSessionsEnded_few": "Ukončeny {{count}} další relace.",
+        "otherSessionsNone": "Tvůj účet nebyl přihlášen na žádném jiném zařízení.",
+        "otherSessionsError": "Odhlášení na ostatních zařízeních se nezdařilo.",
+        "otherSessionsTooManyAttempts": "Příliš mnoho požadavků. Chvíli počkej a zkus to znovu."
     },
     "login": {
         "tagline": "Vítejte zpět ve svém rodinném plánovači.",

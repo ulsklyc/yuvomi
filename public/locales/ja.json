@@ -2773,7 +2773,18 @@
         "healthPreventionKind": {
             "vaccination": "予防接種",
             "checkup": "健診"
-        }
+        },
+        "otherSessionsTitle": "他のデバイス",
+        "otherSessionsHint": "他のすべてのデバイスとブラウザーでアカウントからサインアウトします。このデバイスはサインインしたままです。API トークンとペアリング済みのウォールディスプレイには影響しません。",
+        "otherSessionsButton": "他のデバイスからサインアウト",
+        "otherSessionsConfirm": "他のすべてのデバイスからサインアウトしますか?",
+        "otherSessionsConfirmDetail": "そこであなたのアカウントでサインインしている人は、もう一度サインインする必要があります。このデバイスはサインインしたままです。",
+        "otherSessionsEnded": "他のセッションを {{count}} 件終了しました。",
+        "otherSessionsEnded_one": "他のセッションを {{count}} 件終了しました。",
+        "otherSessionsEnded_few": "他のセッションを {{count}} 件終了しました。",
+        "otherSessionsNone": "他のデバイスではサインインしていませんでした。",
+        "otherSessionsError": "他のデバイスからのサインアウトに失敗しました。",
+        "otherSessionsTooManyAttempts": "リクエストが多すぎます。少し待ってから、もう一度お試しください。"
     },
     "login": {
         "tagline": "家族のプランナーへおかえりなさい。",

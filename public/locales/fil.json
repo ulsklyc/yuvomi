@@ -2785,7 +2785,18 @@
         "healthPreventionKind": {
             "vaccination": "Bakuna",
             "checkup": "Check-up"
-        }
+        },
+        "otherSessionsTitle": "Ibang device",
+        "otherSessionsHint": "Nila-log out ang account mo sa lahat ng iba pang device at browser. Mananatiling naka-sign in ang device na ito. Hindi apektado ang mga API token at ang mga naka-pair na wall display.",
+        "otherSessionsButton": "Mag-sign out sa ibang device",
+        "otherSessionsConfirm": "Mag-sign out sa lahat ng ibang device?",
+        "otherSessionsConfirmDetail": "Kailangang mag-sign in muli ng sinumang naka-sign in doon gamit ang account mo. Mananatiling naka-sign in ang device na ito.",
+        "otherSessionsEnded": "{{count}} ibang session ang tinapos.",
+        "otherSessionsEnded_one": "{{count}} ibang session ang tinapos.",
+        "otherSessionsEnded_few": "{{count}} ibang session ang tinapos.",
+        "otherSessionsNone": "Hindi naka-sign in ang account mo sa anumang ibang device.",
+        "otherSessionsError": "Hindi nagawang mag-sign out sa ibang device.",
+        "otherSessionsTooManyAttempts": "Masyadong maraming kahilingan. Maghintay sandali, saka subukang muli."
     },
     "login": {
         "tagline": "Maligayang pagbabalik sa iyong family planner.",

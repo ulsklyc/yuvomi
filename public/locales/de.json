@@ -2785,7 +2785,18 @@
         "healthPreventionKind": {
             "vaccination": "Impfung",
             "checkup": "Untersuchung"
-        }
+        },
+        "otherSessionsTitle": "Andere Geräte",
+        "otherSessionsHint": "Meldet dein Konto auf allen anderen Geräten und Browsern ab. Dieses Gerät bleibt angemeldet. API-Tokens und gekoppelte Wandtabletts sind davon nicht betroffen.",
+        "otherSessionsButton": "Auf anderen Geräten abmelden",
+        "otherSessionsConfirm": "Auf allen anderen Geräten abmelden?",
+        "otherSessionsConfirmDetail": "Wer dort mit deinem Konto angemeldet ist, muss sich neu anmelden. Dieses Gerät bleibt angemeldet.",
+        "otherSessionsEnded": "{{count}} andere Sitzungen beendet.",
+        "otherSessionsEnded_one": "{{count}} andere Sitzung beendet.",
+        "otherSessionsEnded_few": "{{count}} andere Sitzungen beendet.",
+        "otherSessionsNone": "Auf keinem anderen Gerät war dein Konto angemeldet.",
+        "otherSessionsError": "Abmelden auf anderen Geräten fehlgeschlagen.",
+        "otherSessionsTooManyAttempts": "Zu viele Anfragen. Bitte warte kurz und versuche es dann erneut."
     },
     "login": {
         "tagline": "Willkommen zurück bei deinem Familienplaner.",

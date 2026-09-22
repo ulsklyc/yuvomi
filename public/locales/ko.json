@@ -2785,7 +2785,18 @@
         "healthPreventionKind": {
             "vaccination": "예방접종",
             "checkup": "검진"
-        }
+        },
+        "otherSessionsTitle": "다른 기기",
+        "otherSessionsHint": "다른 모든 기기와 브라우저에서 계정을 로그아웃합니다. 이 기기는 로그인 상태로 유지됩니다. API 토큰과 페어링된 벽걸이 디스플레이는 영향을 받지 않습니다.",
+        "otherSessionsButton": "다른 기기에서 로그아웃",
+        "otherSessionsConfirm": "다른 모든 기기에서 로그아웃할까요?",
+        "otherSessionsConfirmDetail": "그곳에서 내 계정으로 로그인한 사람은 다시 로그인해야 합니다. 이 기기는 로그인 상태로 유지됩니다.",
+        "otherSessionsEnded": "다른 세션 {{count}}개를 종료했습니다.",
+        "otherSessionsEnded_one": "다른 세션 {{count}}개를 종료했습니다.",
+        "otherSessionsEnded_few": "다른 세션 {{count}}개를 종료했습니다.",
+        "otherSessionsNone": "다른 기기에 로그인된 계정이 없었습니다.",
+        "otherSessionsError": "다른 기기에서 로그아웃하지 못했습니다.",
+        "otherSessionsTooManyAttempts": "요청이 너무 많습니다. 잠시 기다린 후 다시 시도하세요."
     },
     "login": {
         "tagline": "가족 플래너에 다시 오신 것을 환영합니다.",

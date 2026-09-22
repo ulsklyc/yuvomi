@@ -2773,7 +2773,18 @@
         "healthPreventionKind": {
             "vaccination": "疫苗接种",
             "checkup": "体检"
-        }
+        },
+        "otherSessionsTitle": "其他设备",
+        "otherSessionsHint": "在所有其他设备和浏览器上退出你的账户。此设备保持登录。API 令牌和已配对的墙面显示屏不受影响。",
+        "otherSessionsButton": "在其他设备上退出",
+        "otherSessionsConfirm": "要在所有其他设备上退出吗?",
+        "otherSessionsConfirmDetail": "在那里用你的账户登录的任何人都需要重新登录。此设备保持登录。",
+        "otherSessionsEnded": "已结束 {{count}} 个其他会话。",
+        "otherSessionsEnded_one": "已结束 {{count}} 个其他会话。",
+        "otherSessionsEnded_few": "已结束 {{count}} 个其他会话。",
+        "otherSessionsNone": "你的账户没有在其他任何设备上登录。",
+        "otherSessionsError": "在其他设备上退出失败。",
+        "otherSessionsTooManyAttempts": "请求过多，请稍候再试。"
     },
     "login": {
         "tagline": "欢迎回到您的家庭计划工具。",

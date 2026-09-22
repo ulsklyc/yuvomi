@@ -2785,7 +2785,18 @@
         "healthPreventionKind": {
             "vaccination": "واکسن",
             "checkup": "معاینه"
-        }
+        },
+        "otherSessionsTitle": "دستگاه‌های دیگر",
+        "otherSessionsHint": "حساب تو را از همهٔ دستگاه‌ها و مرورگرهای دیگر خارج می‌کند. این دستگاه وارد شده باقی می‌ماند. توکن‌های API و نمایشگرهای دیواری جفت‌شده تحت تأثیر قرار نمی‌گیرند.",
+        "otherSessionsButton": "خروج از دستگاه‌های دیگر",
+        "otherSessionsConfirm": "از همهٔ دستگاه‌های دیگر خارج شوید؟",
+        "otherSessionsConfirmDetail": "هر کسی که آنجا با حساب تو وارد شده باید دوباره وارد شود. این دستگاه وارد شده باقی می‌ماند.",
+        "otherSessionsEnded": "{{count}} نشست دیگر پایان یافت.",
+        "otherSessionsEnded_one": "{{count}} نشست دیگر پایان یافت.",
+        "otherSessionsEnded_few": "{{count}} نشست دیگر پایان یافت.",
+        "otherSessionsNone": "حساب تو در هیچ دستگاه دیگری وارد نشده بود.",
+        "otherSessionsError": "خروج از دستگاه‌های دیگر ناموفق بود.",
+        "otherSessionsTooManyAttempts": "درخواست‌های بیش از حد. کمی صبر کنید و دوباره تلاش کنید."
     },
     "login": {
         "tagline": "دوباره به برنامه‌ریز خانوادگی‌تان خوش آمدید.",

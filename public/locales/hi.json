@@ -2773,7 +2773,18 @@
         "healthPreventionKind": {
             "vaccination": "टीका",
             "checkup": "जांच"
-        }
+        },
+        "otherSessionsTitle": "अन्य डिवाइस",
+        "otherSessionsHint": "आपके खाते को अन्य सभी डिवाइस और ब्राउज़र से साइन आउट करता है। यह डिवाइस साइन इन रहता है। API टोकन और जोड़े गए वॉल डिस्प्ले प्रभावित नहीं होते।",
+        "otherSessionsButton": "अन्य डिवाइस से साइन आउट करें",
+        "otherSessionsConfirm": "अन्य सभी डिवाइस से साइन आउट करें?",
+        "otherSessionsConfirmDetail": "वहाँ आपके खाते से साइन इन किए हुए हर व्यक्ति को फिर से साइन इन करना होगा। यह डिवाइस साइन इन रहता है।",
+        "otherSessionsEnded": "{{count}} अन्य सत्र समाप्त किए गए।",
+        "otherSessionsEnded_one": "{{count}} अन्य सत्र समाप्त किया गया।",
+        "otherSessionsEnded_few": "{{count}} अन्य सत्र समाप्त किए गए।",
+        "otherSessionsNone": "आपका खाता किसी अन्य डिवाइस पर साइन इन नहीं था।",
+        "otherSessionsError": "अन्य डिवाइस से साइन आउट नहीं हो सका।",
+        "otherSessionsTooManyAttempts": "बहुत अधिक अनुरोध। कृपया थोड़ा रुकें, फिर दोबारा कोशिश करें।"
     },
     "login": {
         "tagline": "अपने पारिवारिक प्लानर में फिर से आपका स्वागत है।",

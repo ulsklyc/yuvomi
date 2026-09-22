@@ -2773,7 +2773,18 @@
         "healthPreventionKind": {
             "vaccination": "Vacuna",
             "checkup": "Revisión"
-        }
+        },
+        "otherSessionsTitle": "Otros dispositivos",
+        "otherSessionsHint": "Cierra la sesión de tu cuenta en todos los demás dispositivos y navegadores. Este dispositivo sigue con la sesión iniciada. Los tokens de API y las pantallas de pared vinculadas no se ven afectados.",
+        "otherSessionsButton": "Cerrar sesión en otros dispositivos",
+        "otherSessionsConfirm": "¿Cerrar sesión en todos los demás dispositivos?",
+        "otherSessionsConfirmDetail": "Quien haya iniciado sesión allí con tu cuenta tendrá que volver a iniciarla. Este dispositivo sigue con la sesión iniciada.",
+        "otherSessionsEnded": "{{count}} sesiones más cerradas.",
+        "otherSessionsEnded_one": "{{count}} sesión más cerrada.",
+        "otherSessionsEnded_few": "{{count}} sesiones más cerradas.",
+        "otherSessionsNone": "Tu cuenta no tenía la sesión iniciada en ningún otro dispositivo.",
+        "otherSessionsError": "No se pudo cerrar la sesión en otros dispositivos.",
+        "otherSessionsTooManyAttempts": "Demasiadas solicitudes. Espera un momento y vuelve a intentarlo."
     },
     "login": {
         "tagline": "Bienvenido de nuevo a tu planificador familiar.",
