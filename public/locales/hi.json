@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "मात्राएं बनाए रखें",
         "duplicateKeepNotes": "नोट्स और लिंक बनाए रखें",
         "duplicateSubmit": "डुप्लीकेट करें",
-        "duplicateError": "सूची डुप्लीकेट नहीं की जा सकी।"
+        "duplicateError": "सूची डुप्लीकेट नहीं की जा सकी।",
+        "itemStateChecked": "टिक किया गया",
+        "itemStateOpen": "टिक नहीं किया गया"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} भोजन योजनाबद्ध किए गए।",

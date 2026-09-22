@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "Keep quantities",
         "duplicateKeepNotes": "Keep notes & links",
         "duplicateSubmit": "Duplicate",
-        "duplicateError": "The list could not be duplicated."
+        "duplicateError": "The list could not be duplicated.",
+        "itemStateChecked": "checked off",
+        "itemStateOpen": "not checked off"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} meals planned.",

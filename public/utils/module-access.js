@@ -113,6 +113,12 @@
  *    `on_shopping_list` im Plan. Nur das Ziel zu fragen zeigte dort einem
  *    Mitglied mit `meals: read` einen Knopf, den der Pfad-Guard abweist. Das
  *    Zielrecht gilt nur fuer AUSDRUECKLICHE Uebertraege.
+ *    VORRAT UND EINKAUF (#1265 P4) sind das einfachere Paar: beide Routen
+ *    lesen die Quelle nur und verlangen nichts ausser dem Pfad-Guard, der das
+ *    ZIEL misst - `POST /shopping/:id/import-pantry` als `shopping`,
+ *    `POST /pantry/import-shopping` als `pantry`. Also EIN Riegel je Richtung:
+ *    `mayTransferPantryToShopping()` und `mayTransferShoppingToPantry()`,
+ *    ebenfalls in `utils/kitchen-transfer.js`.
  *    Was eine Aktion bloss MITerzeugt (der Check-in der Haushaltshilfe legt
  *    Termin und Zahlungsaufgabe an), fragt kein Zielrecht, weder am Server
  *    noch am Knopf - die Abgrenzung steht in docs/DECISIONS.md, Abschnitt 10.

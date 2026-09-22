@@ -13,14 +13,15 @@ import { promptModal, openModal, closeModal, confirmModal, reportFieldError, ref
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { addLocalDays, todayKey } from '/utils/date.js';
 import { renderKitchenTabsBar, refreshKitchenBadges } from '/utils/kitchen-tabs.js';
-import { mayImportMealPlan } from '/utils/kitchen-transfer.js';
+import { mayImportMealPlan, mayTransferShoppingToPantry } from '/utils/kitchen-transfer.js';
+import { mayWritePath } from '/utils/module-access.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
 import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import '/components/category-manager.js';
 import { findPageFab } from '/utils/fab.js';
 import { setBulkPill, clearBulkPill, bulkPillLayer } from '/utils/bulk-pill.js';
 import { makeSortable } from '/utils/sortable.js';
-import { amountPlaceholder, centsToAmountInput, amountInputToCents, toDecimalString, breaksOffAtSeparator } from '/utils/money.js';
+import { amountPlaceholder, formatMoney, currencyFractionDigits, centsToAmountInput, amountInputToCents, toDecimalString, breaksOffAtSeparator } from '/utils/money.js';
 import { startLiveFeed } from '/utils/live-feed.js';
 import { createPageController } from '/utils/page-lifecycle.js';
 
@@ -171,6 +172,45 @@ function toggleCategoryCollapse(button) {
   if (rowsEl) rowsEl.hidden = nowCollapsed;
 
   saveCollapsedCategories(state.currentUserId, state.activeListId, state.collapsedCategories);
+}
+
+// --------------------------------------------------------
+// Nur-lesen (#1265 P4)
+// --------------------------------------------------------
+
+/**
+ * Darf dieses Konto in den Einkauf schreiben? Regel 1 in utils/module-access.js:
+ * `!mayWritePath('/shopping')` ist dasselbe Urteil wie
+ * `isNavModuleReadOnly('shopping')`. Als Funktion, damit jedes Neuzeichnen neu
+ * fragt - ein Rechtewechsel kommt ohne Neuladen an.
+ *
+ * WAS BEI `read` BLEIBT: die Listen-Reiter, das Auf- und Zuklappen der
+ * Kategorien, der Haken als ZEICHEN (`.item-check--static`, gesetzt oder offen
+ * - beides ist ein Zustand des Datensatzes) und, wo der Artikel mehr traegt als
+ * die Zeile zeigt, eine Leseansicht (Regel 9). WAS GEHT: Quick-Add und FAB,
+ * neue Liste, das ganze Listenmenue, Griff, Loeschen, Bearbeiten und beide
+ * Wischgesten - die zwei letzten haben kein Markup und bleiben deshalb
+ * unverdrahtet (Regel 3).
+ *
+ * KEIN WANDTABLETT: ein Display fuehrt `shopping` nicht in seiner Scope-Liste
+ * (server/display-scopes.js) und erreicht diese Seite nicht; ein
+ * `actingAsDisplay()` davor braucht es hier nicht.
+ */
+function readOnly() {
+  return !mayWritePath('/shopping');
+}
+
+/**
+ * Die `data-action`s dieser Seite, die NICHT schreiben - eine Positivliste wie
+ * in waste.js: eine morgen ergaenzte Schreib-Aktion ist bei `read` damit zu,
+ * bis sie hier ausdruecklich eingetragen wird. Das Klappen der Kategorien laeuft
+ * ueber `data-category-toggle`, nicht ueber `data-action`, und steht davor.
+ */
+const READ_SAFE_ACTIONS = new Set(['switch-list', 'item-details']);
+
+/** Der Riegel im delegierten Handler: laesst bei `read` nur die Positivliste durch. */
+function readOnlyBlocks(action) {
+  return readOnly() && !READ_SAFE_ACTIONS.has(action);
 }
 
 function shouldIgnoreShoppingRowToggle(target) {
@@ -490,6 +530,9 @@ function settleIntents(items, listId, { fromCache = false, startedAt = 0 } = {})
 }
 
 async function toggleShoppingItem(id, checked, container) {
+  // Dritte Linie hinter Markup und Handler-Riegel: auch ein Aufruf, den ein
+  // Rechtewechsel ueberholt hat, schickt nichts.
+  if (readOnly()) return;
   const newVal = checked ? 0 : 1;
   const listId = state.activeListId;
   const item   = state.items.find((i) => i.id === id);
@@ -592,6 +635,7 @@ async function toggleShoppingItem(id, checked, container) {
  * Geburtstagen als harmlos gelernt hat, verlor hier ohne Rückweg.
  */
 function deleteItemUndoable(id, container) {
+  if (readOnly()) return;
   const item     = state.items.find((i) => i.id === id);
   const snapshot = item ? { ...item } : null;
   // Was die Zeile ZEIGT - danach richtet sich, was der Zaehler abzieht. Der
@@ -714,7 +758,11 @@ function renderTabs(container) {
   // native Popover-API im Top-Layer und wird deshalb vom `overflow-x: auto`
   // dieser Leiste nicht geclippt; ein absolut positioniertes Eigenbau-Menü wäre
   // hier abgeschnitten worden.
-  const actionsHtml = state.activeList ? `
+  // Bei `read` entfaellt das GANZE Menue: jeder Eintrag schreibt (umbenennen,
+  // duplizieren, uebernehmen, senden - ein POST -, verwalten, loeschen), und
+  // ein Ausloeser ohne Eintraege waere ein Knopf, der nichts oeffnet.
+  const ro = readOnly();
+  const actionsHtml = state.activeList && !ro ? `
     <div class="list-tabs-bar__actions">
       ${popoverMenuHtml({
         id: 'list-actions-menu',
@@ -742,9 +790,9 @@ function renderTabs(container) {
   bar.insertAdjacentHTML('beforeend', `
     <i data-lucide="list" class="list-tabs-bar__marker" aria-hidden="true"></i>
     ${tabsHtml}
-    <button class="list-tab__new" data-action="new-list" aria-label="${t('shopping.newListButton')}">
+    ${ro ? '' : `<button class="list-tab__new" data-action="new-list" aria-label="${t('shopping.newListButton')}">
       <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
-    </button>
+    </button>`}
     ${actionsHtml}
   `);
   if (window.lucide) window.lucide.createIcons({ el: bar });
@@ -764,6 +812,8 @@ function renderTabs(container) {
  * nicht die erste.
  */
 async function openSendListDialog(container) {
+  // Der Versand ist am Server ein POST und zaehlt dort als Schreiben.
+  if (readOnly()) return;
   const listId = state.activeListId;
   const openCount = state.items.filter((item) => !checkedOf(item)).length;
   if (!openCount) {
@@ -866,6 +916,7 @@ async function openSendListDialog(container) {
  * Listen-Übersicht dafür wäre eine Anfrage für eine Antwort, die schon da ist.
  */
 async function openDuplicateListDialog(container) {
+  if (readOnly()) return;
   const source = state.activeList;
   if (!source) return;
 
@@ -962,15 +1013,19 @@ function renderListContent(container) {
     // Aktionszone der Leiste dann weg, statt vier tote Menü-Einträge zu zeigen.
     // Geteilter Renderer (utils/empty-state.js), damit dieser Zustand dieselbe
     // Reihenfolge und Rolle trägt wie die drei Geschwister-Tabs.
+    // Bei `read` bleibt nur der Titel: Beschreibung und Hinweis laden zum
+    // Anlegen und Fuellen ein, und der Knopf, den sie meinen, entfaellt
+    // (Regel 9 in utils/module-access.js).
+    const ro = readOnly();
     mountEmptyState(content, {
       icon: 'shopping-cart',
       title: t('shopping.noLists'),
-      description: t('shopping.noListsDescription'),
+      description: ro ? undefined : t('shopping.noListsDescription'),
       // Nennt die EINGEHENDE Station des Kreislaufs (der Essensplan füllt die
       // Liste) - wie der Vorrat, dessen Hinweis auf den Einkauf zeigt. Dieser
       // Zustand war der einzige der vier ohne Hinweis (Critique 2026-07-29).
-      hint: t('shopping.noListsHint'),
-      action: {
+      hint: ro ? undefined : t('shopping.noListsHint'),
+      action: ro ? null : {
         label: t('shopping.newListButton'),
         icon: 'plus',
         onClick: () => container.querySelector('[data-action="new-list"]')?.click(),
@@ -981,7 +1036,7 @@ function renderListContent(container) {
 
   content.replaceChildren();
   content.insertAdjacentHTML('beforeend', `
-    <!-- Quick-Add -->
+    ${readOnly() ? '' : `<!-- Quick-Add -->
     <div class="quick-add">
       <form class="quick-add__form" id="quick-add-form" novalidate autocomplete="off">
         <div class="quick-add__input-wrap">
@@ -998,7 +1053,7 @@ function renderListContent(container) {
           <i data-lucide="plus" class="icon-lg" aria-hidden="true"></i>
         </button>
       </form>
-    </div>
+    </div>`}
 
     <!-- Die Sammelaktions-Leiste stand hier als statischer Block über der
          Liste. Seit Etappe 5 ist sie eine Pille in der unteren Shell-Zone
@@ -1067,12 +1122,15 @@ function mountItems(listEl, container) {
   }
 
   if (!state.items.length) {
+    // Bei `read` nur der Zustand: Beschreibung („Der Name genuegt ...") und
+    // Hinweis (abgehakte Artikel in den Vorrat) meinen beide eine Handlung.
+    const ro = readOnly();
     mountEmptyState(listEl, {
       icon: 'shopping-cart',
       title: t('shopping.emptyList'),
-      description: t('shopping.emptyListDescription'),
-      hint: t('emptyHint.shopping'),
-      action: {
+      description: ro ? undefined : t('shopping.emptyListDescription'),
+      hint: ro ? undefined : t('emptyHint.shopping'),
+      action: ro ? null : {
         label: t('shopping.emptyAction'),
         icon: 'plus',
         onClick: () => document.querySelector('.page-fab')?.click(),
@@ -1162,25 +1220,80 @@ function renderItemTags(tags) {
   return chips.join('');
 }
 
+/**
+ * Traegt der Artikel etwas, das NUR im Bearbeiten-Dialog steht? Name, Menge,
+ * Etiketten und (ueber die Gruppe) die Kategorie zeigt die Zeile selbst; Preis,
+ * Laden, Link und Notiz nicht. Nur dann hat die Leseansicht bei `read` etwas zu
+ * sagen, und nur dann bekommt die Zeile ihren Knopf - die Antwort folgt dem
+ * DATENSATZ (Regel 2), ein Knopf ohne neuen Inhalt sagte nichts, was die Zeile
+ * nicht schon sagt.
+ */
+function hasReadDetails(item) {
+  return item.price_cents != null || Boolean(storeName(item)) || Boolean(item.url) || Boolean(item.notes);
+}
+
+/** Name des Ladens eines Artikels, leer, wenn keiner (mehr) gesetzt ist. */
+function storeName(item) {
+  if (item?.store_id == null) return '';
+  return state.stores.find((st) => st.id === item.store_id)?.name ?? '';
+}
+
+/**
+ * Der Haken als ZEICHEN (#1265 P4, Bauart `.task-status-btn--static`): ein
+ * `span role="img"`, dessen Beschriftung den Zustand nennt, statt eines
+ * deaktivierten Knopfs, der „abhaken" verspraeche. Kein `data-action`: der
+ * Zeilenklick sucht den Knopf ueber genau dieses Attribut und findet so nichts.
+ */
+function itemStateLabel(item) {
+  return `${item.name}: ${t(checkedOf(item) ? 'shopping.itemStateChecked' : 'shopping.itemStateOpen')}`;
+}
+
+function renderItemCheck(item, isDone) {
+  if (readOnly()) {
+    return `
+        <span class="item-check item-check--static ${isDone ? 'item-check--checked' : ''}"
+              role="img" aria-label="${esc(itemStateLabel(item))}">
+          <i data-lucide="check" class="item-check__icon" aria-hidden="true"></i>
+        </span>`;
+  }
+  return `
+        <button class="item-check ${isDone ? 'item-check--checked' : ''}"
+                data-action="toggle-item" data-id="${item.id}" data-checked="${checkedOf(item)}"
+                aria-label="${isDone ? t('shopping.markUndoneLabel', { name: esc(item.name) }) : t('shopping.markDoneLabel', { name: esc(item.name) })}">
+          <i data-lucide="check" class="item-check__icon" aria-hidden="true"></i>
+        </button>`;
+}
+
+/**
+ * Die Bedienzone bei `read`: hoechstens der Knopf zur Leseansicht, und nur,
+ * wenn es dort etwas zu lesen gibt. Der Container bleibt auch leer stehen,
+ * damit die Zeile ihre Form behaelt.
+ */
+function renderReadActions(item) {
+  if (!hasReadDetails(item)) return '';
+  return `
+          <button class="row-action" data-action="item-details" data-id="${item.id}"
+                  aria-label="${t('shopping.detailsLabel', { name: esc(item.name) })}">
+            <i data-lucide="info" class="icon-md" aria-hidden="true"></i>
+          </button>`;
+}
+
 function renderItem(item) {
   const isDone = Boolean(checkedOf(item));
+  const ro = readOnly();
   return `
-    <div class="swipe-row" data-swipe-id="${item.id}" data-swipe-checked="${checkedOf(item)}">
-      <div class="swipe-reveal swipe-reveal--done swipe-reveal--leading" aria-hidden="true">
+    <div class="swipe-row${ro ? ' swipe-row--static' : ''}" data-swipe-id="${item.id}" data-swipe-checked="${checkedOf(item)}">
+      ${ro ? '' : `<div class="swipe-reveal swipe-reveal--done swipe-reveal--leading" aria-hidden="true">
         <i data-lucide="${isDone ? 'rotate-ccw' : 'check'}" class="icon-xl" aria-hidden="true"></i>
         <span>${isDone ? t('shopping.swipeBack') : t('shopping.swipeCheck')}</span>
       </div>
       <div class="swipe-reveal swipe-reveal--delete swipe-reveal--trailing" aria-hidden="true">
         <i data-lucide="trash-2" class="icon-xl" aria-hidden="true"></i>
         <span>${t('shopping.swipeDelete')}</span>
-      </div>
-      <div class="list-row shopping-item ${isDone ? 'shopping-item--checked' : ''}"
+      </div>`}
+      <div class="list-row shopping-item ${isDone ? 'shopping-item--checked' : ''}${ro ? ' shopping-item--static' : ''}"
            data-item-id="${item.id}">
-        <button class="item-check ${isDone ? 'item-check--checked' : ''}"
-                data-action="toggle-item" data-id="${item.id}" data-checked="${checkedOf(item)}"
-                aria-label="${isDone ? t('shopping.markUndoneLabel', { name: esc(item.name) }) : t('shopping.markDoneLabel', { name: esc(item.name) })}">
-          <i data-lucide="check" class="item-check__icon" aria-hidden="true"></i>
-        </button>
+        ${renderItemCheck(item, isDone)}
         <div class="list-row__main">
           <div class="list-row__name">${esc(item.name)}${renderItemMeta(item)}</div>
           ${item.quantity || item.tags?.length ? `<div class="list-row__meta">
@@ -1193,7 +1306,7 @@ function renderItem(item) {
              vorher hingen die zwei Buttons als direkte Flex-Kinder in der Zeile,
              wodurch die Bedienzone in jedem Tab anders zusammengesetzt war. -->
         <div class="list-row__actions">
-          <!-- Griff für die Handsortierung (#678). Ein BUTTON, kein role="img"
+          ${ro ? renderReadActions(item) : `<!-- Griff für die Handsortierung (#678). Ein BUTTON, kein role="img"
                wie im Kategorie-Manager: dort steht daneben ein Auf/Ab-Paar als
                Tastaturpfad, hier trägt der Griff ihn selbst (Pfeiltasten bei
                Fokus). Die Einkaufszeile hat schon Abhaken, Details, Löschen und
@@ -1216,7 +1329,7 @@ function renderItem(item) {
                  Zeile, die fuer dieselbe Tat ein anderes Zeichen sprach
                  (Critique 2026-08-27, P3). */ ''}
             <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
-          </button>
+          </button>`}
         </div>
       </div>
     </div>`;
@@ -1758,10 +1871,17 @@ function updateItemRow(container, item) {
   const checkBtn = row.querySelector('.item-check');
   if (checkBtn) {
     checkBtn.classList.toggle('item-check--checked', isDone);
-    checkBtn.dataset.checked = String(checkedOf(item));
-    checkBtn.setAttribute('aria-label', isDone
-      ? t('shopping.markUndoneLabel', { name: item.name })
-      : t('shopping.markDoneLabel', { name: item.name }));
+    // Das Zeichen bei `read` nennt den ZUSTAND; eine Live-Auffrischung (jemand
+    // anderes hakt ab) laeuft ueber genau diese Stelle und darf ihm nicht die
+    // Handlungs-Beschriftung des Knopfs anhaengen.
+    if (checkBtn.classList.contains('item-check--static')) {
+      checkBtn.setAttribute('aria-label', itemStateLabel(item));
+    } else {
+      checkBtn.dataset.checked = String(checkedOf(item));
+      checkBtn.setAttribute('aria-label', isDone
+        ? t('shopping.markUndoneLabel', { name: item.name })
+        : t('shopping.markDoneLabel', { name: item.name }));
+    }
   }
 
   // Der Sortiergriff hängt am Erledigt-Zustand (#678): abgehaktes sortiert sich
@@ -1850,9 +1970,74 @@ function refreshItemName(container, item) {
  * Weg an einer Stelle, an der man gerade einen Namen tippt, wäre eine
  * Fehlerquelle, kein Gewinn.
  */
+/**
+ * Eine Zeile der Leseansicht - das Markup von `detailRowEl()` aus
+ * components/detail-view.js (Icon, Beschriftung, Wert), als Zeichenkette wie
+ * in birthdays.js. Ohne Wert keine Zeile: ein Strich waere ein Wert, den es
+ * nicht gibt.
+ */
+function readRowHtml({ icon, label, valueHtml, multiline = false }) {
+  if (!valueHtml) return '';
+  return `
+        <div class="detail-row${multiline ? ' detail-row--multiline' : ''}">
+          <i class="detail-row__icon" data-lucide="${icon}" aria-hidden="true"></i>
+          <div class="detail-row__text">
+            <span class="detail-row__label">${esc(label)}</span>
+            <span class="detail-row__value">${valueHtml}</span>
+          </div>
+        </div>`;
+}
+
+/** Der Preis als Betrag in der Haushaltswaehrung, in deren kleinster Einheit gespeichert. */
+function priceReadText(cents) {
+  if (cents == null) return '';
+  return formatMoney(Number(cents) / 10 ** currencyFractionDigits(state.currency), state.currency);
+}
+
+/**
+ * Der Artikel bei `shopping: read`: Leseansicht, sonst nichts (Regel 9,
+ * Bauart `openNoteReadModal()` in notes.js). Alles, was der Bearbeiten-Dialog
+ * zeigt - Menge, Kategorie, Preis, Laden, Link, Notiz -, als Wert statt als
+ * Eingabe; der Name steht im Titel. Kein Fusszeilen-Knopf, das X schliesst.
+ * Der Link bleibt ein Link: ihn zu oeffnen ist Lesen.
+ */
+function itemReadHtml(item) {
+  const url = String(item.url ?? '').trim();
+  const link = /^https?:\/\//i.test(url)
+    ? `<a class="item-details__link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a>`
+    : esc(url);
+  return `
+    <div class="item-details-read detail-view" data-view="read" data-item-id="${item.id}">
+      <div class="detail-view__rows">
+        ${readRowHtml({ icon: 'hash', label: t('shopping.itemQtyLabel'), valueHtml: esc(item.quantity || '') })}
+        ${readRowHtml({ icon: 'tag', label: t('shopping.categoryLabel'), valueHtml: item.category ? esc(categoryLabel(item.category)) : '' })}
+        ${readRowHtml({ icon: 'receipt', label: t('shopping.priceLabel'), valueHtml: esc(priceReadText(item.price_cents)) })}
+        ${readRowHtml({ icon: 'store', label: t('shopping.storeLabel'), valueHtml: esc(storeName(item)) })}
+        ${readRowHtml({ icon: 'link', label: t('shopping.urlLabel'), valueHtml: link })}
+        ${readRowHtml({ icon: 'align-left', label: t('shopping.notesLabel'), valueHtml: esc(item.notes || ''), multiline: true })}
+      </div>
+    </div>`;
+}
+
+function openItemReadModal(item) {
+  openModal({
+    title: item.name,
+    size: 'md',
+    content: itemReadHtml(item),
+    onSave(panel) {
+      window.lucide?.createIcons({ el: panel });
+    },
+  });
+}
+
 function openItemDetails(itemId, container) {
   const item = state.items.find((i) => i.id === itemId);
   if (!item) return;
+  // Der Riegel steht VOR jeder Vorbereitung: bei `read` geht die Leseansicht auf.
+  if (readOnly()) {
+    openItemReadModal(item);
+    return;
+  }
 
   const linkPreview = (value) => {
     const v = String(value ?? '').trim();
@@ -1963,6 +2148,8 @@ function openItemDetails(itemId, container) {
 
       form?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        // Der Dialog kann vor einem Rechtewechsel aufgegangen sein.
+        if (readOnly()) return;
         const name = nameEl.value.trim();
         if (!name) {
           reportFieldError(nameEl, t('common.nameRequired'));
@@ -2055,9 +2242,17 @@ function updateItemsList(container) {
     mountItems(listEl, container);
     if (window.lucide) window.lucide.createIcons({ el: listEl });
     stagger(listEl.querySelectorAll('.shopping-item'));
-    wireSwipeGestures(container);
-    wireItemReorder(container);
-    maybeShowSwipeHint(container);
+    // Regel 3 in utils/module-access.js: Wischen und Ziehen haben kein Markup,
+    // das man wegnehmen koennte - bei `read` bleibt die VERDRAHTUNG aus. Ein
+    // Riegel im Ende-Handler kaeme zu spaet, die Zeile waere schon weggewischt.
+    // Der Wisch-Hinweis zeigte eine Geste, die es dann nicht gibt.
+    if (readOnly()) {
+      destroyItemSortables();
+    } else {
+      wireSwipeGestures(container);
+      wireItemReorder(container);
+      maybeShowSwipeHint(container);
+    }
   }
   updateCheckedActions(container);
 }
@@ -2129,6 +2324,9 @@ function parseShoppingQuantity(raw) {
  * Vorrat einen Tap entfernt.
  */
 async function openPantryTransfer(container) {
+  // Der Uebertrag schreibt in den VORRAT (Pfad-Guard `pantry`) - die Frage
+  // gehoert dem fremden Modul, nicht dieser Seite (Regel 1).
+  if (!mayTransferShoppingToPantry()) return;
   const checked = state.items.filter((i) => checkedOf(i));
   if (!checked.length) return;
 
@@ -2179,11 +2377,13 @@ async function openPantryTransfer(container) {
            sie loescht die eingekauften Artikel von der Liste, ist standardmaessig
            aktiv, und war als nackte System-Checkbox in System-Groesse die
            unauffaelligste (Critique 2026-07-30, P2). Der Default bleibt aktiv: wer
-           eingekauft und eingeraeumt hat, will nicht doppelt kaufen. -->
-      <label class="form-check pantry-transfer__clear">
+           eingekauft und eingeraeumt hat, will nicht doppelt kaufen.
+           Das Abraeumen ist ein DELETE im EINKAUF: ohne dessen Schreibrecht
+           entfaellt die Checkbox, sonst endete der Uebertrag danach im 403 (#1265). -->
+      ${readOnly() ? '' : `<label class="form-check pantry-transfer__clear">
         <input type="checkbox" id="pantry-transfer-clear" checked>
         <span>${esc(t('shopping.toPantryClearList'))}</span>
-      </label>
+      </label>`}
       <div class="modal-panel__footer modal-panel__footer--plain">
         <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
         <button type="button" class="btn btn--primary" id="pantry-transfer-confirm">${esc(t('common.apply'))}</button>
@@ -2196,7 +2396,9 @@ async function openPantryTransfer(container) {
       panel.querySelector('#pantry-transfer-confirm').addEventListener('click', async (e) => {
         const btn = e.currentTarget;
         const locationId = panel.querySelector('#pantry-transfer-location').value || null;
-        const clearList = panel.querySelector('#pantry-transfer-clear').checked;
+        // Beim Absenden neu gefragt: die Rechte koennen sich geaendert haben,
+        // waehrend der Dialog offen stand.
+        const clearList = !readOnly() && Boolean(panel.querySelector('#pantry-transfer-clear')?.checked);
         const listId = state.activeListId;
 
         const items = [...panel.querySelectorAll('.pantry-transfer__row')].map((row) => ({
@@ -2291,7 +2493,9 @@ function updateCheckedActions(container, { userChecked = false } = {}) {
   }
 
   const actions = [];
-  if (!window.yuvomi?.isModuleDisabled?.('pantry')) {
+  // „In den Vorrat" schreibt in den VORRAT: abgeschaltet ODER ohne
+  // Schreibrecht dort endete die Kapsel im Leeren bzw. im 403 (#1265).
+  if (!window.yuvomi?.isModuleDisabled?.('pantry') && mayTransferShoppingToPantry()) {
     actions.push({
       label: t('shopping.toPantry'),
       onClick: () => openPantryTransfer(container),
@@ -2300,7 +2504,7 @@ function updateCheckedActions(container, { userChecked = false } = {}) {
   // Nur das Verb, nicht „Abgehakt löschen": das Label links nennt den Bezug,
   // und der ganze Satz steht im aria-label. Das Löschen der GANZEN Liste sitzt
   // woanders (Überlaufmenü) und hat einen eigenen Bestätigungsdialog.
-  actions.push({
+  if (!readOnly()) actions.push({
     label: t('common.delete'),
     ariaLabel: t('shopping.clearChecked', { count: checkedCount }),
     // Die Zahl als Marke - sie wird sichtbar, wo das Subjekt links wegfällt
@@ -2317,6 +2521,10 @@ function updateCheckedActions(container, { userChecked = false } = {}) {
     confirm: { question: t('shopping.clearCheckedConfirm', { count: checkedCount }) },
     onClick: () => clearCheckedUndoable(container),
   });
+  // Ohne eine einzige Aktion ist die Pille ein Satz ohne Anschluss - sie
+  // erscheint dann gar nicht erst. Bei `shopping: read` kommt es ohnehin nie
+  // dazu: nur das eigene Abhaken eroeffnet einen Batch.
+  if (!actions.length) return;
 
   // KEINE Icons mehr. Sie kosteten je 12px Breite plus Abstand auf einer
   // Fläche, die einzeilig bleiben muss, und benannten nichts, was das Wort
@@ -2347,6 +2555,7 @@ function updateCheckedActions(container, { userChecked = false } = {}) {
  * Shell und ist von dort aus nicht mehr erreichbar - sie ruft direkt.
  */
 function clearCheckedUndoable(container) {
+  if (readOnly()) return;
   const checked = state.items.filter((i) => checkedOf(i));
   const count   = checked.length;
   if (!count) return;
@@ -2903,6 +3112,9 @@ function wireTabBar(container) {
       await switchList(Number(target.dataset.id), container);
     }
 
+    // Derselbe Riegel wie im Inhalt: nur die Positivliste kommt durch.
+    if (readOnlyBlocks(target.dataset.action)) return;
+
     if (target.dataset.action === 'new-list') {
       const name = await promptModal(t('shopping.newListPrompt'));
       if (!name) return;
@@ -2952,6 +3164,8 @@ function wireListContentEvents(container) {
 
     const target = e.target.closest('[data-action]');
     if (!target) {
+      // Der Zeilenklick hakt ab - bei `read` gibt es nichts abzuhaken.
+      if (readOnly()) return;
       if (shouldIgnoreShoppingRowToggle(e.target)) return;
       const row = e.target.closest('.shopping-item');
       if (!row) return;
@@ -2961,6 +3175,11 @@ function wireListContentEvents(container) {
       return;
     }
     const action = target.dataset.action;
+
+    // Der eine Riegel fuer alle Aktionen darunter (siehe READ_SAFE_ACTIONS):
+    // das Markup nimmt die Affordanz, diese Zeile den Effekt eines Knotens,
+    // der trotzdem stehen geblieben ist.
+    if (readOnlyBlocks(action)) return;
 
     // ---- Artikel abhaken ----
     if (action === 'toggle-item') {
@@ -3127,6 +3346,7 @@ function wireListContentEvents(container) {
  * @param {Element} container Seiten-Container
  */
 function openStoreManager(container) {
+  if (readOnly()) return;
   // Die Arbeit haengt am Ereignis, nicht am Schliessen: `confirmOverModal`
   // raeumt beim Loeschen das Modal darunter gleich mit ab, das
   // `category-manager-changed` kommt also erst DANACH. Ein in onClose
@@ -3172,6 +3392,8 @@ function openStoreManager(container) {
 }
 
 async function openCategoryManager(container, { fromDeepLink = false } = {}) {
+  // Regel 7: der Aufrufer versteckt den Ausloeser, die Komponente fragt nicht.
+  if (readOnly()) return;
   const { openModal } = await import('/components/modal.js');
 
   // Die geteilte Komponente (Audit F-15) dispatcht ohne Detail — der lokale
@@ -3335,9 +3557,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
            Rest ein Tagged Template ("TypeError: toolbar is not a function"). -->
       <div class="list-tabs-bar" id="list-tabs-bar"></div>
       <div id="list-content" style="flex:1;display:flex;flex-direction:column;overflow:hidden"></div>
-      <button class="page-fab" id="fab-new-item" aria-label="${t('shopping.addItemLabel')}" data-dock-label="${t('newLabel.shopping')}">
+      ${readOnly() ? '' : `<button class="page-fab" id="fab-new-item" aria-label="${t('shopping.addItemLabel')}" data-dock-label="${t('newLabel.shopping')}">
         <i data-lucide="plus" class="icon-xl" aria-hidden="true"></i>
-      </button>
+      </button>`}
     </div>
   `);
 
@@ -3348,6 +3570,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
   wireListContentEvents(container);
 
   findPageFab('fab-new-item')?.addEventListener('click', (e) => {
+    if (readOnly()) return;
     const input = container.querySelector('#item-name-input');
     if (!input) {
       // Keine Liste aktiv → neue Liste erstellen
@@ -3374,7 +3597,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Deep-Link: ?highlight=<id> scrollt zum Artikel
   const highlightId = parseInt(new URLSearchParams(window.location.search).get('highlight'), 10) || null;
   if (highlightId) {
-    const el = container.querySelector(`[data-action="toggle-item"][data-id="${highlightId}"]`);
+    // Ueber die Zeile, nicht ueber den Abhak-Knopf: bei `read` steht dort ein
+    // Zeichen ohne `data-action`, und ein Suchtreffer muss trotzdem ankommen.
+    const el = container.querySelector(`.shopping-item[data-item-id="${highlightId}"]`);
     if (el) {
       // Steht der Treffer in einer eingeklappten Kategorie, bleibt er bei
       // [hidden] unsichtbar, obwohl der Selektor ihn findet - ein globaler
@@ -3388,7 +3613,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
     }
   }
 
-  // Deep-Link: ?manage=categories öffnet den Kategorie-Manager sofort.
+  // Deep-Link: ?manage=categories öffnet den Kategorie-Manager sofort. Bei
+  // `read` riegelt `openCategoryManager()` selbst ab - ein zweiter Riegel hier
+  // waere von aussen nicht zu unterscheiden und damit von keinem Test belegt.
   if (new URLSearchParams(window.location.search).get('manage') === 'categories') {
     openCategoryManager(container, { fromDeepLink: true });
   }
@@ -3463,4 +3690,21 @@ export const __test = {
   // Menue und Einstieg werden als Programm gefahren (test-kitchen-transfer-ui.js).
   renderTabs,
   openMealPlanImport,
+  // #1265 P4: Nur-lesen - Zeile, Leerzustaende, Leseansicht und Riegel werden
+  // am echten Markup bzw. als Programm gefahren (test-shopping-readonly-ui.js).
+  renderItem,
+  renderListContent,
+  mountItems,
+  updateItemRow,
+  updateItemsList,
+  itemReadHtml,
+  wireListContentEvents,
+  wireTabBar,
+  openPantryTransfer,
+  openSendListDialog,
+  openDuplicateListDialog,
+  openCategoryManager,
+  openStoreManager,
+  READ_SAFE_ACTIONS,
+  render,
 };

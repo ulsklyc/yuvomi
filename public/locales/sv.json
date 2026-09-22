@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "Behåll mängder",
         "duplicateKeepNotes": "Behåll anteckningar och länkar",
         "duplicateSubmit": "Duplicera",
-        "duplicateError": "Listan kunde inte dupliceras."
+        "duplicateError": "Listan kunde inte dupliceras.",
+        "itemStateChecked": "avbockad",
+        "itemStateOpen": "inte avbockad"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} måltider planerade.",

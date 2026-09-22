@@ -646,7 +646,9 @@
         "duplicateKeepQuantities": "Zachowaj ilości",
         "duplicateKeepNotes": "Zachowaj notatki i linki",
         "duplicateSubmit": "Duplikuj",
-        "duplicateError": "Nie udało się zduplikować listy."
+        "duplicateError": "Nie udało się zduplikować listy.",
+        "itemStateChecked": "odhaczone",
+        "itemStateOpen": "nieodhaczone"
     },
     "meals": {
         "randomizeSuccess_few": "Zaplanowano {{count}} posiłki.",

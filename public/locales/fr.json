@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "Conserver les quantités",
         "duplicateKeepNotes": "Conserver notes et liens",
         "duplicateSubmit": "Dupliquer",
-        "duplicateError": "La liste n'a pas pu être dupliquée."
+        "duplicateError": "La liste n'a pas pu être dupliquée.",
+        "itemStateChecked": "coché",
+        "itemStateOpen": "non coché"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} repas planifiés.",

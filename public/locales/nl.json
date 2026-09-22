@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "Hoeveelheden behouden",
         "duplicateKeepNotes": "Notities en links behouden",
         "duplicateSubmit": "Dupliceren",
-        "duplicateError": "De lijst kon niet worden gedupliceerd."
+        "duplicateError": "De lijst kon niet worden gedupliceerd.",
+        "itemStateChecked": "afgevinkt",
+        "itemStateOpen": "niet afgevinkt"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} maaltijden gepland.",

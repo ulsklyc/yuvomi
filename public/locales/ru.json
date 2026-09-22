@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "Сохранить количество",
         "duplicateKeepNotes": "Сохранить заметки и ссылки",
         "duplicateSubmit": "Дублировать",
-        "duplicateError": "Не удалось дублировать список."
+        "duplicateError": "Не удалось дублировать список.",
+        "itemStateChecked": "отмечено",
+        "itemStateOpen": "не отмечено"
     },
     "meals": {
         "randomizeSuccess_few": "Запланировано {{count}} приёма пищи.",

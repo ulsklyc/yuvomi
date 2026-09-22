@@ -731,7 +731,7 @@
  * Abhakmoment ohne sie (Signaturelement-Runde 2026-08-31). Grün bleibt die
  * BESTÄTIGUNG: „erledigt" spricht app-weit --color-success, der Modulton
  * lädt nur ein. */
-.item-check:hover::before {
+.item-check:not(.item-check--static):hover::before {
   border-color: var(--module-accent, var(--color-accent));
 }
 
@@ -762,6 +762,26 @@
 }
 
 .item-check--checked .item-check__icon { display: block; }
+
+/* DAS ZEICHEN STATT DES KNOPFS (#1265 P4, Bauart `.task-status-btn--static`).
+ * Bei `shopping: read` bleibt der Kasten stehen, weil er die Auskunft traegt -
+ * abgehakt oder offen -, aber nichts an ihm lockt zum Tippen: neutraler Zeiger,
+ * kein Hover-Rahmen (den nimmt die Hover-Regel oben per `:not()` aus, keine
+ * Gegenregel hier) und kein Pop beim Zeichnen - der Pop quittiert eine
+ * Beruehrung, und bei jedem Neuaufbau einer gelesenen Liste liefe er ohne eine.
+ *
+ * ZWEI KLASSEN IM SELEKTOR: `.item-check--checked` traegt die Animation mit
+ * derselben Spezifitaet (0,1,0); eine einzelne Klasse hier hinge an der
+ * Quellreihenfolge (dieselbe Falle wie in tasks.css, Review zu PR #1252). */
+.item-check.item-check--static {
+  cursor: default;
+  animation: none;
+}
+
+/* Die Zeile hakt bei `read` nicht ab - also auch kein Zeiger, der es verspricht. */
+.shopping-item.shopping-item--static {
+  cursor: default;
+}
 
 /* Textspalte, Name und Menge kommen aus .list-row__main / __name / __meta
  * (styles/list-row.css).

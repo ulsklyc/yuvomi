@@ -646,7 +646,9 @@
         "duplicateKeepQuantities": "Mengen übernehmen",
         "duplicateKeepNotes": "Notizen & Links übernehmen",
         "duplicateSubmit": "Duplizieren",
-        "duplicateError": "Die Liste konnte nicht dupliziert werden."
+        "duplicateError": "Die Liste konnte nicht dupliziert werden.",
+        "itemStateChecked": "abgehakt",
+        "itemStateOpen": "offen"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} Mahlzeiten geplant.",

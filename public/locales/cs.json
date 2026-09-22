@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "Zachovat množství",
         "duplicateKeepNotes": "Zachovat poznámky a odkazy",
         "duplicateSubmit": "Duplikovat",
-        "duplicateError": "Seznam se nepodařilo duplikovat."
+        "duplicateError": "Seznam se nepodařilo duplikovat.",
+        "itemStateChecked": "odškrtnuto",
+        "itemStateOpen": "neodškrtnuto"
     },
     "meals": {
         "randomizeSuccess_few": "Naplánována {{count}} jídla.",

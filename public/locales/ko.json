@@ -646,7 +646,9 @@
         "duplicateKeepQuantities": "수량 유지",
         "duplicateKeepNotes": "메모 및 링크 유지",
         "duplicateSubmit": "복제",
-        "duplicateError": "목록을 복제할 수 없습니다."
+        "duplicateError": "목록을 복제할 수 없습니다.",
+        "itemStateChecked": "체크됨",
+        "itemStateOpen": "체크 안 됨"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}}개의 식사가 계획되었습니다.",

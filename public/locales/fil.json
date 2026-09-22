@@ -646,7 +646,9 @@
         "duplicateKeepQuantities": "Panatilihin ang dami",
         "duplicateKeepNotes": "Panatilihin ang mga tala at link",
         "duplicateSubmit": "I-duplicate",
-        "duplicateError": "Hindi ma-duplicate ang listahan."
+        "duplicateError": "Hindi ma-duplicate ang listahan.",
+        "itemStateChecked": "naka-check",
+        "itemStateOpen": "hindi pa naka-check"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} na pagkain ang naplano.",
