@@ -657,9 +657,12 @@ test('default-assignee-backfill - die Bestätigung bindet die Menge, nicht nur i
 // ────────────────────────────────────────────────────────────────────────────
 // #1307: Ein Termin, der VOR #1306 zwischen zwei Kalendern desselben Kontos
 // umgezogen ist, traegt noch die Standard-Person des ALTEN Kalenders - der
-// Laufzeit-Fix sieht den Umzug nie wieder. Dieselbe Aktion stellt ihn um, nach
-// derselben "unangetastet"-Regel wie der Umzug. Jeder Fall unter "bleibt"
-// haengt an einer Klausel; faellt sie, wird genau dieser Fall umgestellt.
+// Laufzeit-Fix sieht den Umzug nie wieder. Dieselbe Aktion listet ihn in der
+// Vorschau, nach derselben "unangetastet"-Regel wie der Umzug, und stellt ihn
+// nur um, wenn der Admin ihn einzeln abhakt: ein Kalender, dessen
+// Standard-Person spaeter umgestellt wurde, sieht in den Daten genauso aus.
+// Jeder Fall unter "bleibt" haengt an einer Klausel; faellt sie, steht genau
+// dieser Fall in der Liste.
 // ────────────────────────────────────────────────────────────────────────────
 
 function seedMovedFixture() {
@@ -761,26 +764,71 @@ const assignmentOf = (id) => ({
   users: db.prepare('SELECT user_id FROM event_assignments WHERE event_id = ? ORDER BY user_id').all(id).map((r) => r.user_id),
 });
 
-test('default-assignee-backfill - stellt vor #1306 umgezogene Termine auf den neuen Kalender um (#1307)', async () => {
+const MOVED_KEYS = ['moved', 'movedRows', 'movedSeries', 'movedGoogle', 'movedApple'];
+const pick = (entry) => ({ event_id: entry.event_id, from_user_id: entry.from_user_id, to_user_id: entry.to_user_id });
+
+test('default-assignee-backfill - die Vorschau listet vor #1306 umgezogene Termine einzeln (#1307)', async () => {
   const route = '/external-calendars/default-assignee-backfill';
-  const before = (await call('GET', route)).body.data.count;
+  const before = (await call('GET', route)).body.data;
+  const { ids, cleanup } = seedMovedFixture();
+  try {
+    const counted = (await call('GET', route)).body.data;
+    // Die Zahl und das Token bleiben die des Nachtragens (#1154, #1171): ein
+    // umgezogener Termin ist kein Teil der pauschalen Menge.
+    assert.equal(counted.count, before.count, 'die Zahl nennt nur leere Termine');
+    assert.equal(counted.token, before.token, 'das Token auch');
+
+    const listed = counted.moved.filter((m) => Object.values(ids).includes(m.event_id));
+    assert.deepEqual(listed.map((m) => m.event_id).sort((a, b) => a - b),
+      MOVED_KEYS.map((k) => ids[k]).sort((a, b) => a - b), 'genau die fuenf umgezogenen Termine, jeder einzeln');
+    const first = listed.find((m) => m.event_id === ids.moved);
+    assert.deepEqual(first, {
+      event_id: ids.moved, title: 'mv-moved', start_datetime: '2036-02-04T10:00', all_day: 0,
+      calendar_name: 'Moved', from_user_id: MARIA.id, from_name: 'Maria', to_user_id: TOM.id, to_name: 'Tom',
+    }, 'Titel, Datum, Kalender und "X -> Y" fuer die Vorschau');
+  } finally {
+    cleanup();
+  }
+});
+
+test('default-assignee-backfill - ohne Auswahl bleibt jeder umgezogene Termin stehen (#1307)', async () => {
+  const route = '/external-calendars/default-assignee-backfill';
+  const { ids, cleanup } = seedMovedFixture();
+  try {
+    // Ein Termin in einem Kalender, dessen Standard-Person spaeter umgestellt
+    // wurde, sieht genau so aus wie ein umgezogener. Eine Bestaetigung, die
+    // nichts einzeln abhakt - ein API-Client von vor der Liste -, darf ihn
+    // deshalb nicht umstellen.
+    const counted = (await call('GET', route)).body.data;
+    const applied = await call('POST', route, { body: { expected_count: counted.count, expected_token: counted.token } });
+    assert.equal(applied.status, 200);
+    for (const key of MOVED_KEYS) {
+      assert.deepEqual(assignmentOf(ids[key]), key === 'movedRows'
+        ? { assignedTo: null, users: [MARIA.id] }
+        : { assignedTo: MARIA.id, users: [MARIA.id] }, `${key}: nicht abgehakt, nicht umgestellt`);
+    }
+  } finally {
+    cleanup();
+  }
+});
+
+test('default-assignee-backfill - stellt nur die abgehakten Termine um (#1307)', async () => {
+  const route = '/external-calendars/default-assignee-backfill';
   const { ids, cleanup, HAND } = seedMovedFixture();
   try {
     const counted = (await call('GET', route)).body.data;
-    assert.equal(counted.count, before + 5, 'gezaehlt werden die fuenf umgezogenen Termine');
+    const byId = new Map(counted.moved.map((m) => [m.event_id, m]));
+    const chosen = ['moved', 'movedRows', 'movedSeries', 'movedGoogle'];
+    const moves = chosen.map((k) => pick(byId.get(ids[k])));
 
-    // Die Menge ist bestaetigt, nicht nur ihre Groesse - ueber dasselbe Token.
-    const stale = await call('POST', route, { body: { expected_count: counted.count, expected_token: '0'.repeat(64) } });
-    assert.equal(stale.status, 409);
-    assert.deepEqual(assignmentOf(ids.moved), { assignedTo: MARIA.id, users: [MARIA.id] }, 'eine veraltete Rueckfrage stellt nichts um');
-
-    const applied = await call('POST', route, { body: { expected_count: counted.count, expected_token: counted.token } });
+    const applied = await call('POST', route, { body: { expected_count: counted.count, expected_token: counted.token, moves } });
     assert.equal(applied.status, 200);
-    assert.equal(applied.body.data.assigned, before + 5);
+    assert.equal(applied.body.data.assigned, counted.count + chosen.length);
 
-    for (const key of ['moved', 'movedRows', 'movedSeries', 'movedGoogle', 'movedApple']) {
-      assert.deepEqual(assignmentOf(ids[key]), { assignedTo: TOM.id, users: [TOM.id] }, `${key}: die Person des Kalenders, in dem der Termin liegt`);
+    for (const key of chosen) {
+      assert.deepEqual(assignmentOf(ids[key]), { assignedTo: TOM.id, users: [TOM.id] }, `${key}: abgehakt, die Person des Kalenders, in dem er liegt`);
     }
+    assert.deepEqual(assignmentOf(ids.movedApple), { assignedTo: MARIA.id, users: [MARIA.id] }, 'abgewaehlt: bleibt');
     assert.deepEqual(assignmentOf(ids.manual), { assignedTo: HAND, users: [HAND] }, 'von Hand zugewiesen bleibt');
     assert.deepEqual(assignmentOf(ids.manualSame), { assignedTo: MARIA.id, users: [MARIA.id] }, 'von Hand auf die Person von A: bleibt');
     assert.deepEqual(assignmentOf(ids.twoPeople), { assignedTo: MARIA.id, users: [ADMIN.id, MARIA.id].sort((a, b) => a - b) }, 'zwei Personen bleiben');
@@ -798,34 +846,44 @@ test('default-assignee-backfill - stellt vor #1306 umgezogene Termine auf den ne
       ['mv-moved-series', 'mv-moved-series', 'mv-moved-series-override'], 'drei Vorkommen, eins davon ersetzt');
     for (const occ of series) assert.equal(occ.assigned_to, TOM.id, `${occ.title} ${occ.start_datetime}`);
 
-    assert.equal((await call('GET', route)).body.data.count, before, 'ein zweiter Lauf findet nichts mehr');
+    const again = (await call('GET', route)).body.data;
+    assert.deepEqual(again.moved.filter((m) => Object.values(ids).includes(m.event_id)).map((m) => m.event_id), [ids.movedApple],
+      'nur der abgewaehlte steht noch in der Liste');
   } finally {
     cleanup();
   }
 });
 
-test('default-assignee-backfill - ein umgezogener Termin ist Teil der bestaetigten Menge (#1307, #1171)', async () => {
+test('default-assignee-backfill - die Bestaetigung bindet jeden abgehakten Termin (#1307, #1171)', async () => {
   const route = '/external-calendars/default-assignee-backfill';
-  const { cals, event, cleanup } = seedMovedFixture();
+  const { ids, cleanup } = seedMovedFixture();
   try {
-    // Ein leerer Termin in B: das Nachtragen gaebe ihn Tom.
-    const empty = event('mv-token-empty', { refId: cals.b });
     const counted = (await call('GET', route)).body.data;
-    // Jetzt bekommt er Maria (die Person von A) - dieselbe Zeile, dieselbe
-    // Zielperson Tom, aber umgestellt wuerde nun eine VORHANDENE Zuweisung.
-    db.prepare('UPDATE calendar_events SET assigned_to = ? WHERE id = ?').run(MARIA.id, empty);
-    db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(empty, MARIA.id);
-    assert.equal((await call('GET', route)).body.data.count, counted.count, 'die Zahl allein sieht den Wechsel nicht');
-    const swapped = await call('POST', route, { body: { expected_count: counted.count, expected_token: counted.token } });
-    assert.equal(swapped.status, 409, 'bestaetigt war ein Nachtragen, kein Umstellen');
-    assert.deepEqual(assignmentOf(empty), { assignedTo: MARIA.id, users: [MARIA.id] });
+    const entry = counted.moved.find((m) => m.event_id === ids.moved);
+    const body = (moves) => ({ body: { expected_count: counted.count, expected_token: counted.token, moves } });
+
+    // Keine Liste, kein Termin: abgewiesen statt ignoriert.
+    for (const bad of ['x', [1], [{ event_id: ids.moved }], [{ ...pick(entry), event_id: 'a' }], [pick(entry), pick(entry)]]) {
+      assert.equal((await call('POST', route, body(bad))).status, 400, JSON.stringify(bad));
+    }
+
+    // Abgehakt war Maria -> Tom. Wer inzwischen etwas anderes waere, ist nicht bestaetigt.
+    const stale = await call('POST', route, body([{ ...pick(entry), from_user_id: ADMIN.id }]));
+    assert.equal(stale.status, 409);
+    assert.ok(Array.isArray(stale.body.data.moved), 'die 409 bringt die aktuelle Liste mit');
+    const wrongTarget = await call('POST', route, body([{ ...pick(entry), to_user_id: ADMIN.id }]));
+    assert.equal(wrongTarget.status, 409);
+    // Ein Termin, der gar nicht zur Wahl stand.
+    const notOffered = await call('POST', route, body([{ event_id: ids.manual, from_user_id: MARIA.id, to_user_id: TOM.id }]));
+    assert.equal(notOffered.status, 409);
+    assert.deepEqual(assignmentOf(ids.moved), { assignedTo: MARIA.id, users: [MARIA.id] }, 'eine veraltete Auswahl stellt nichts um');
 
     // Zwischen Bestaetigung und Abarbeitung von Hand bearbeitet: bleibt stehen.
-    const { applyDefaultAssigneesToExisting, listBackfillCandidates } = await import('../server/services/sync-assignment.js');
-    const snapshot = listBackfillCandidates(db);
-    db.prepare('UPDATE calendar_events SET user_modified = 1 WHERE id = ?').run(empty);
-    await applyDefaultAssigneesToExisting(db, snapshot);
-    assert.deepEqual(assignmentOf(empty), { assignedTo: MARIA.id, users: [MARIA.id] }, 'die Hand gewinnt auch mitten im Lauf');
+    const { applyDefaultAssigneesToExisting } = await import('../server/services/sync-assignment.js');
+    db.prepare('UPDATE calendar_events SET user_modified = 1 WHERE id = ?').run(ids.moved);
+    const written = await applyDefaultAssigneesToExisting(db, [{ eventId: ids.moved, userId: TOM.id, fromUserId: MARIA.id }]);
+    assert.equal(written, 0);
+    assert.deepEqual(assignmentOf(ids.moved), { assignedTo: MARIA.id, users: [MARIA.id] }, 'die Hand gewinnt auch mitten im Lauf');
   } finally {
     cleanup();
   }

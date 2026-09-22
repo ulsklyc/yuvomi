@@ -174,20 +174,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Appointments moved to another calendar before 2.68.0 can now take that calendar's person.**
-  Since 2.68.0 an appointment moved between two calendars of one account takes the new calendar's
-  default assignee along, and with it the colour. Appointments moved before that kept the person of
-  the calendar they came from, and nothing ever changed that, because the move itself was long
-  over. "Apply to existing appointments" under Settings > Sync now includes them: an appointment
-  whose only assignee is still the default assignee of another calendar of the same account gets
-  the default assignee of the calendar it is in now. The count in the confirmation includes them,
-  and the confirmation still covers exactly the appointments it counted. An appointment edited in
-  Yuvomi, assigned to more than one person or to anyone else, created in Yuvomi and sent to the
-  calendar, or in a calendar without a default assignee stays as it is. For a recurring
-  appointment the whole series changes, including occurrences edited on their own that do not
-  have their own assignment. The confirmation names the one case it cannot tell apart: an
-  appointment in a calendar whose default assignee was changed later, when the previous person is
-  the default assignee of another calendar of the same account, changes as well. (#1307)
+- **Appointments moved to another calendar before 2.68.0 can now take that calendar's person, one
+  by one.** Since 2.68.0 an appointment moved between two calendars of one account takes the new
+  calendar's default assignee along, and with it the colour. Appointments moved before that kept
+  the person of the calendar they came from, and nothing ever changed that, because the move itself
+  was long over. "Apply to existing appointments" under Settings > Sync now lists them in its
+  confirmation: every appointment whose only assignee is still the default assignee of another
+  calendar of the same account, with its title, date, calendar and "from X to Y". All are selected;
+  untick what should stay, and only the selected ones change. They are listed one by one because
+  the stored data cannot tell such an appointment apart from one in a calendar whose default
+  assignee was changed later, when the previous person is another calendar's default assignee - an
+  automatic repair would have changed those too. Unassigned appointments are filled as before. An
+  appointment edited in Yuvomi, assigned to more than one person or to anyone else, created in
+  Yuvomi and sent to the calendar, or in a calendar without a default assignee is not listed. For a
+  recurring appointment the whole series changes, including occurrences edited on their own that do
+  not have their own assignment. For API clients: `GET` on the backfill route returns the list as
+  `moved`, and `POST` takes the picked entries as `moves`; without them no existing assignment
+  changes. (#1307)
 
 - **A failed restore explains itself in your language and keeps your place.** When a backup did
   not open, the restore dialog showed the server's English explanation, up to several paragraphs

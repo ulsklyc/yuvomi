@@ -14,6 +14,7 @@ import {
   applyDefaultAssigneesToExisting,
   backfillCandidatesToken,
   listBackfillCandidates,
+  listMovedCandidates,
 } from '../../services/sync-assignment.js';
 
 const log = createLogger('Calendar');
@@ -229,19 +230,64 @@ router.patch('/external-calendars', requireAdmin, (req, res) => {
 });
 
 /**
+ * Die umgezogenen Termine fuer die Vorschau (#1307): je Termin Titel, Beginn,
+ * Kalender und "von Person X auf Person Y". Der Admin hakt sie einzeln ab.
+ */
+function movedPreview(d) {
+  return listMovedCandidates(d).map((m) => ({
+    event_id: m.eventId,
+    title: m.title,
+    start_datetime: m.startDatetime,
+    all_day: m.allDay,
+    calendar_name: m.calendarName,
+    from_user_id: m.fromUserId,
+    from_name: m.fromName,
+    to_user_id: m.userId,
+    to_name: m.toName,
+  }));
+}
+
+/** Obergrenze fuer `moves`: die Liste ist eine Auswahl aus der Vorschau, kein Massenweg. */
+const MAX_MOVES = 5000;
+
+/**
+ * `moves` aus dem Body: eine Liste { event_id, from_user_id, to_user_id }, je
+ * Termin hoechstens einmal. Fehlt sie, ist nichts abgehakt.
+ * @returns {{ eventId: number, fromUserId: number, userId: number }[] | null} null = ungueltig
+ */
+function parseMoves(raw) {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw) || raw.length > MAX_MOVES) return null;
+  const seen = new Set();
+  const moves = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') return null;
+    const { event_id: eventId, from_user_id: fromUserId, to_user_id: userId } = item;
+    if (![eventId, fromUserId, userId].every((v) => Number.isInteger(v) && v > 0)) return null;
+    if (seen.has(eventId)) return null;
+    seen.add(eventId);
+    moves.push({ eventId, fromUserId, userId });
+  }
+  return moves;
+}
+
+/**
  * GET /api/v1/calendar/external-calendars/default-assignee-backfill
  * Admin only. Zählt, wie viele bereits importierte Termine das Nachtragen der
- * Standard-Zuweisung füllen würde (#1154), dazu vor #1306 umgezogene Termine,
- * die noch die Person ihres alten Kalenders tragen (#1307) - die Zahl steht in
- * der Rückfrage.
+ * Standard-Zuweisung füllen würde (#1154) - die Zahl steht in der Rückfrage.
  * Das Token ist der Fingerabdruck genau dieser Menge (#1171) und geht mit der
  * Bestätigung zurück.
- * Response: { data: { count, token } }
+ * `moved` listet dazu die vor #1306 umgezogenen Termine, die noch die Person
+ * ihres alten Kalenders tragen (#1307) - einzeln, weil sie sich in den Daten
+ * nicht von einem Kalender mit später umgestellter Standard-Person trennen
+ * lassen. Sie zählen nicht in `count` und gehen nur abgehakt zurück.
+ * Response: { data: { count, token, moved: [...] } }
  */
 router.get('/external-calendars/default-assignee-backfill', requireAdmin, (req, res) => {
   try {
-    const candidates = listBackfillCandidates(db.get());
-    res.json({ data: { count: candidates.length, token: backfillCandidatesToken(candidates) } });
+    const d = db.get();
+    const candidates = listBackfillCandidates(d);
+    res.json({ data: { count: candidates.length, token: backfillCandidatesToken(candidates), moved: movedPreview(d) } });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
@@ -252,9 +298,9 @@ router.get('/external-calendars/default-assignee-backfill', requireAdmin, (req, 
  * POST /api/v1/calendar/external-calendars/default-assignee-backfill
  * Admin only. Wendet die Standard-Zuweisung jedes Kalenders aller Konten auf
  * seine schon importierten Termine an, die noch niemandem zugewiesen sind
- * (#1154). Eine vorhandene Zuweisung bleibt unangetastet - ausser der
- * unangetasteten Standard-Person eines anderen Kalenders desselben Kontos an
- * einem umgezogenen Termin (#1307, listBackfillCandidates).
+ * (#1154). Eine vorhandene Zuweisung bleibt unangetastet - ausser an den
+ * umgezogenen Terminen, die der Admin in der Vorschau einzeln abgehakt hat
+ * (`moves`, #1307).
  *
  * Die Rueckfrage hat eine Menge genannt, und nur diese Menge ist bestaetigt:
  * hat sie sich seither geaendert (jemand hat Zuweisungen entfernt, eine
@@ -264,8 +310,15 @@ router.get('/external-calendars/default-assignee-backfill', requireAdmin, (req, 
  * (#1171). Ohne Token bleibt es beim Zahlenvergleich, damit ein API-Client, der
  * die Route vor dem Token angebunden hat, nicht bricht. Die Aktion ist nur
  * Termin fuer Termin zuruecknehmbar.
- * Body: { expected_count: number, expected_token?: string }
- * Response: { data: { assigned } } | 409 { data: { count, token } }
+ *
+ * Jeder abgehakte Umzug nennt Termin, bisherige und neue Person - genau die
+ * Zeile, die die Vorschau gezeigt hat. Steht er so nicht mehr in der Liste
+ * (inzwischen bearbeitet, Standard-Person umgestellt, nie angeboten), ist die
+ * Auswahl veraltet: 409 mit der aktuellen Vorschau, und nichts wird geschrieben.
+ * Ohne `moves` wird kein Termin umgestellt.
+ * Body: { expected_count: number, expected_token?: string,
+ *         moves?: { event_id, from_user_id, to_user_id }[] }
+ * Response: { data: { assigned } } | 409 { data: { count, token, moved } }
  */
 router.post('/external-calendars/default-assignee-backfill', requireAdmin, async (req, res) => {
   try {
@@ -278,17 +331,29 @@ router.post('/external-calendars/default-assignee-backfill', requireAdmin, async
       && (typeof expectedToken !== 'string' || !/^[0-9a-f]{64}$/.test(expectedToken))) {
       return res.status(400).json({ error: 'expected_token ist ungültig.', code: 400 });
     }
+    const moves = parseMoves(req.body?.moves);
+    if (!moves) {
+      return res.status(400).json({ error: 'moves ist ungültig.', code: 400 });
+    }
     // Gezählt und festgehalten im selben synchronen Schritt: genau diese Liste
     // ist bestätigt, und nur sie wird abgearbeitet - auch wenn zwischen den
     // Happen neue Kandidaten dazukommen.
-    const candidates = listBackfillCandidates(db.get());
+    const d = db.get();
+    const candidates = listBackfillCandidates(d);
     const token = backfillCandidatesToken(candidates);
-    if (candidates.length !== expected || (expectedToken && expectedToken !== token)) {
+    const offered = new Map(listMovedCandidates(d).map((m) => [m.eventId, m]));
+    const movesStillOffered = moves.every((m) => {
+      const current = offered.get(m.eventId);
+      return current && current.fromUserId === m.fromUserId && current.userId === m.userId;
+    });
+    if (candidates.length !== expected || (expectedToken && expectedToken !== token) || !movesStillOffered) {
       return res.status(409).json({
-        error: 'Die Termine haben sich seit der Zählung geändert.', code: 409, data: { count: candidates.length, token },
+        error: 'Die Termine haben sich seit der Zählung geändert.',
+        code: 409,
+        data: { count: candidates.length, token, moved: movedPreview(d) },
       });
     }
-    res.json({ data: { assigned: await applyDefaultAssigneesToExisting(db.get(), candidates) } });
+    res.json({ data: { assigned: await applyDefaultAssigneesToExisting(d, [...candidates, ...moves]) } });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });

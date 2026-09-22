@@ -144,10 +144,12 @@ const UNASSIGNED_MAPPED_EVENTS = `
 // Fix umgezogen ist, liegt laengst in B und traegt noch die Standard-Person von
 // A - der Wechsel kommt nie wieder, und mit ihm auch nicht die Korrektur.
 //
-// Dieselbe Aktion wie das Nachtragen (#1154) nimmt ihn mit, mit derselben
-// Rueckfrage, derselben Bestaetigung ueber die Menge (#1171) und in denselben
-// Happen. Kandidat ist ein Termin in B, dessen Zuweisung die UNANGETASTETE
-// Standard-Person eines anderen Kalenders A ist - dieselbe Regel wie beim Umzug
+// Dieselbe Aktion wie das Nachtragen (#1154) zeigt ihn an, aber EINZELN: die
+// Vorschau listet jeden Kandidaten (Titel, Datum, Kalender, Person X -> Y), der
+// Admin hakt ab, was umgestellt werden soll, und nur die abgehakten Termine
+// gehen mit der Bestaetigung zurueck (listMovedCandidates, Route). Kandidat ist
+// ein Termin in B, dessen Zuweisung die UNANGETASTETE Standard-Person eines
+// anderen Kalenders A ist - dieselbe Regel wie beim Umzug
 // (UNTOUCHED_DEFAULT_ASSIGNMENT). A ist dabei nicht bekannt, nur moeglich; deshalb:
 //   - A liegt beim selben Anbieter und, bei CalDAV, im selben Konto (ueber
 //     caldav_calendar_selection): nur dort kann ein Termin mit derselben
@@ -162,13 +164,16 @@ const UNASSIGNED_MAPPED_EVENTS = `
 //     setzt es nie zurueck. Ein so bearbeiteter Termin bleibt stehen; die
 //     sichere Richtung.
 //
-// WAS DIE REGEL NICHT SIEHT: einen geaenderten Kalender statt eines umgezogenen
-// Termins. Stellt ein Admin die Standard-Person von B von X auf Y um, und X ist
-// die Standard-Person eines anderen Kalenders desselben Kontos, sehen die
-// frueher importierten Termine von B genau so aus wie umgezogene - eine Spur des
-// Import-Kalenders gibt es nicht. Sie bekommen dann Y. Die Rueckfrage sagt das
-// (settings.sync.backfillDetail), wie sie die von Hand entfernte Zuweisung des
-// Nachtragens nennt.
+// WARUM EINZELN: die Regel sieht einen geaenderten Kalender nicht. Stellt ein
+// Admin die Standard-Person von B von X auf Y um, und X ist die Standard-Person
+// eines anderen Kalenders desselben Kontos, sehen die frueher importierten
+// Termine von B genau so aus wie umgezogene. Gemessen am Schema gibt es keine
+// Spur, die beides trennt: `event_assignments` hat weder Herkunft noch Zeit,
+// `external_calendars` merkt sich nicht, wann eine Standard-Person wechselte,
+// CalDAV und iCloud ueberschreiben `external_object_url` bei jedem Inbound, und
+// Google behaelt die Event-ID ueber einen Umzug. Jede pauschale Reparatur haette
+// solche Termine still umgestellt. Die Unterscheidung kennt nur, wer den Termin
+// kennt - deshalb entscheidet der Admin je Termin, und ohne Haken bleibt er.
 //
 // Ein verknuepftes Vorkommen einer Serie ist eine lokale Zeile ohne
 // calendar_ref_id: es erbt die Zuweisung vom Master und zieht mit ihm um; fuehrt
@@ -221,26 +226,41 @@ function moveDefaultAssignment(d, eventId, toUserId, nowKey) {
 const BACKFILL_BATCH_SIZE = 50;
 
 /**
- * Die Kandidaten, wie sie JETZT sind: Termin und die Person seines Kalenders.
- * Die Route vergleicht sie mit der bestätigten Menge und reicht genau diese
- * Liste an applyDefaultAssigneesToExisting() weiter.
+ * Die Kandidaten des Nachtragens, wie sie JETZT sind: Termin ohne Zuweisung und
+ * die Person seines Kalenders (#1154). Die Route vergleicht sie mit der
+ * bestätigten Menge und reicht genau diese Liste an
+ * applyDefaultAssigneesToExisting() weiter. Umgezogene Termine (#1307) stehen
+ * NICHT darin, siehe listMovedCandidates().
  *
  * @param {object} d better-sqlite3 Datenbank-Handle
- * Zwei Arten: ein Termin ohne Zuweisung (#1154) und ein vor #1306 umgezogener
- * Termin, der noch die Person seines alten Kalenders traegt (#1307) - er fuehrt
- * zusaetzlich `fromUserId`, die Person, die er verliert.
- *
- * @returns {{ eventId: number, userId: number, fromUserId?: number }[]}
+ * @returns {{ eventId: number, userId: number }[]}
  */
 export function listBackfillCandidates(d) {
-  const unassigned = d.prepare(
-    `SELECT e.id AS eventId, ec.default_assignee_user_id AS userId ${UNASSIGNED_MAPPED_EVENTS}`
+  return d.prepare(
+    `SELECT e.id AS eventId, ec.default_assignee_user_id AS userId ${UNASSIGNED_MAPPED_EVENTS} ORDER BY e.id`
   ).all();
-  const moved = d.prepare(
-    `SELECT e.id AS eventId, ec.default_assignee_user_id AS userId, cur.user_id AS fromUserId ${MOVED_DEFAULT_EVENTS}`
-  ).all();
-  // Die beiden Mengen schliessen sich aus (keine Zuweisung / genau eine).
-  return [...unassigned, ...moved].sort((a, b) => a.eventId - b.eventId);
+}
+
+/**
+ * Die vor #1306 umgezogenen Termine (#1307), wie sie JETZT sind - fuer die
+ * Vorschau, in der der Admin jeden einzeln abhakt. Kein Teil der pauschalen
+ * Menge aus listBackfillCandidates(): umgestellt wird nur, was die Bestaetigung
+ * einzeln nennt (siehe MOVED_DEFAULT_EVENTS, "WARUM EINZELN").
+ *
+ * @param {object} d better-sqlite3 Datenbank-Handle
+ * @returns {{ eventId: number, userId: number, fromUserId: number, title: string,
+ *   startDatetime: string, allDay: number, calendarName: string, fromName: string,
+ *   toName: string }[]} nach Beginn sortiert
+ */
+export function listMovedCandidates(d) {
+  return d.prepare(`
+    SELECT e.id AS eventId, ec.default_assignee_user_id AS userId, cur.user_id AS fromUserId,
+           e.title AS title, e.start_datetime AS startDatetime, e.all_day AS allDay,
+           ec.name AS calendarName, u.display_name AS toName,
+           (SELECT fu.display_name FROM users fu WHERE fu.id = cur.user_id) AS fromName
+    ${MOVED_DEFAULT_EVENTS}
+    ORDER BY e.start_datetime, e.id
+  `).all();
 }
 
 /**
@@ -254,18 +274,12 @@ export function listBackfillCandidates(d) {
  * Rückfrage gezählt hat. Die Liste kommt nach Termin-ID sortiert, der
  * Fingerabdruck ist also für dieselbe Menge immer derselbe.
  *
- * @param {{ eventId: number, userId: number, fromUserId?: number }[]} candidates
+ * @param {{ eventId: number, userId: number }[]} candidates
  * @returns {string} SHA-256, hex
  */
 export function backfillCandidatesToken(candidates) {
   const hash = createHash('sha256');
-  // Ein umzustellender Termin nennt auch die Person, die er verliert: wird ein
-  // leerer Termin inzwischen von Hand jemandem zugewiesen, ist er zwar weiter
-  // Kandidat fuer dieselbe Person, bestaetigt war aber ein Fuellen, kein
-  // Umstellen (#1307).
-  for (const { eventId, userId, fromUserId } of candidates) {
-    hash.update(fromUserId == null ? `${eventId}:${userId};` : `${eventId}:${userId}:${fromUserId};`);
-  }
+  for (const { eventId, userId } of candidates) hash.update(`${eventId}:${userId};`);
   return hash.digest('hex');
 }
 
@@ -301,7 +315,11 @@ export function backfillCandidatesToken(candidates) {
  * Erinnerungen hat, nimmt den teuren Weg gar nicht erst.
  *
  * @param {object} d better-sqlite3 Datenbank-Handle
- * @param {{ eventId: number, userId: number }[]} [candidates] bestätigte Liste; Standard: die aktuelle
+ * @param {{ eventId: number, userId: number, fromUserId?: number }[]} [candidates]
+ *   bestätigte Liste; Standard: die aktuelle des Nachtragens. Ein Eintrag mit
+ *   `fromUserId` ist ein einzeln abgehakter umgezogener Termin (#1307): er wird
+ *   nur umgestellt, wenn er beim Schreiben noch genau von dieser Person auf
+ *   diese Person ginge.
  * @param {{ batchSize?: number, now?: Date }} [options]
  * @returns {Promise<number>} Anzahl der zugewiesenen Termine
  */
