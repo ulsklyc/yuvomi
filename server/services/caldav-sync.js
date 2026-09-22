@@ -213,40 +213,68 @@ async function addAccount(name, caldavUrl, username, password, { createClient } 
     log.warn('WARNING: DB_ENCRYPTION_KEY is not set - CalDAV credentials will be stored unencrypted.');
   }
 
-  // Insert account
-  const result = db.get().prepare(`
-    INSERT INTO caldav_accounts (name, caldav_url, username, password)
-    VALUES (?, ?, ?, ?)
-  `).run(name, caldavUrl, username, password);
+  // Konto, Kalenderauswahl und der Merker der Farb-Heilung (#1270) in EINEM
+  // Zug: ein Konto ohne Merker wuerde spaeter heilen, obwohl es nichts zu
+  // heilen gibt, und ein Merker ohne Konto zeigte ins Leere.
+  const insertAccount = db.get().transaction(() => {
+    const result = db.get().prepare(`
+      INSERT INTO caldav_accounts (name, caldav_url, username, password)
+      VALUES (?, ?, ?, ?)
+    `).run(name, caldavUrl, username, password);
+    const accountId = result.lastInsertRowid;
 
-  const accountId = result.lastInsertRowid;
+    // Ein wirklich neues Konto hat keine Termine aus der Zeit vor v2.50, also
+    // nichts, was die einmalige Farb-Heilung finden duerfte; der Merker gleich
+    // beim Anlegen haelt sie dort ganz fern. NICHT aber ein WIEDER angelegtes:
+    // `deleteAccount` laesst die Termine standardmaessig stehen, und der
+    // Inbound uebernimmt sie per UID - samt eingebrannter Farbe. Loeschen und
+    // neu Anlegen ist genau das, was jemand mit falschen Farben versucht.
+    //
+    // Abgegrenzt wird deshalb ueber die Zeilen selbst, nicht ueber die URLs
+    // des neuen Kontos: jede Kandidatenzeile (CalDAV, color_modified = 1, mit
+    // Farbe), die an KEINEM Kalender eines lebenden Kontos haengt. Ein Abgleich
+    // gegen die Kalender-URLs des neuen Kontos verfehlte genau Kyrodans Fall -
+    // die Zeile zeigt auf den alten Kalender A, der auf dem Server geloescht
+    // ist und in der neuen Liste fehlt, waehrend ihr Termin in B liegt. Die
+    // weitere Abgrenzung kostet wenig: die Heilung laeuft auch dann nur an
+    // Zeilen, die DIESES Konto per UID wiedersieht, und nur mit seinen
+    // Kalenderfarben.
+    const orphaned = db.get().prepare(`
+      SELECT 1 FROM calendar_events e
+      LEFT JOIN external_calendars x ON x.id = e.calendar_ref_id
+      WHERE e.external_source = 'caldav'
+        AND e.color_modified = 1 AND e.color IS NOT NULL
+        AND (x.external_id IS NULL
+             OR x.external_id NOT IN (SELECT calendar_url FROM caldav_calendar_selection))
+      LIMIT 1
+    `).get();
+    if (!orphaned) {
+      db.get().prepare(
+        "INSERT INTO sync_config (key, value) VALUES (?, '1') ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+      ).run(legacyColorHealKey(accountId));
+    }
 
-  // Ein neues Konto hat keine Termine aus der Zeit vor v2.50 und damit nichts,
-  // was die einmalige Farb-Heilung (#1270) finden duerfte. Der Merker gleich
-  // beim Anlegen haelt sie hier ganz fern: eine Farbe, die einer Kalenderfarbe
-  // dieses Kontos gleicht, ist bei einem neuen Konto immer eine gewaehlte.
-  db.get().prepare(
-    "INSERT INTO sync_config (key, value) VALUES (?, '1') ON CONFLICT(key) DO UPDATE SET value = excluded.value"
-  ).run(legacyColorHealKey(accountId));
+    // OPT-IN, NICHT OPT-OUT (#732): Ein neues Konto bringt seine Kalender
+    // abgewaehlt mit. Vorher lief nach dem Verbinden sofort jeder gefundene
+    // Kalender in den Haushalt - bei einem Konto mit Arbeits-, Geburtstags- und
+    // Feiertagskalendern also drei Kalender, die niemand bestellt hat, und deren
+    // Termine man einzeln wieder loswerden musste. Wer verbindet, waehlt danach
+    // aus; das ist ein Klick mehr und eine Ueberraschung weniger.
+    const calendarData = [];
+    for (const cal of eventCalendars(calendars)) {
+      const calColor = normalizeCalColor(cal.calendarColor) || '#4A90E2';
+      const calName = cal.displayName || 'Unnamed Calendar';
 
-  // OPT-IN, NICHT OPT-OUT (#732): Ein neues Konto bringt seine Kalender
-  // abgewaehlt mit. Vorher lief nach dem Verbinden sofort jeder gefundene
-  // Kalender in den Haushalt - bei einem Konto mit Arbeits-, Geburtstags- und
-  // Feiertagskalendern also drei Kalender, die niemand bestellt hat, und deren
-  // Termine man einzeln wieder loswerden musste. Wer verbindet, waehlt danach
-  // aus; das ist ein Klick mehr und eine Ueberraschung weniger.
-  const calendarData = [];
-  for (const cal of eventCalendars(calendars)) {
-    const calColor = normalizeCalColor(cal.calendarColor) || '#4A90E2';
-    const calName = cal.displayName || 'Unnamed Calendar';
+      db.get().prepare(`
+        INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled)
+        VALUES (?, ?, ?, ?, 0)
+      `).run(accountId, cal.url, calName, calColor);
 
-    db.get().prepare(`
-      INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled)
-      VALUES (?, ?, ?, ?, 0)
-    `).run(accountId, cal.url, calName, calColor);
-
-    calendarData.push({ url: cal.url, name: calName, color: calColor, enabled: false });
-  }
+      calendarData.push({ url: cal.url, name: calName, color: calColor, enabled: false });
+    }
+    return { accountId, calendarData };
+  });
+  const { accountId, calendarData } = insertAccount();
 
   log.info(`Added CalDAV account "${name}" with ${calendarData.length} calendars.`);
 
@@ -624,6 +652,10 @@ async function runSync({ createClient } = {}) {
   // und jeder weitere Lauf truege nur das Fehlalarm-Risiko weiter, ohne noch
   // etwas zu finden. Der Merker liegt in sync_config und wird erst gesetzt,
   // wenn der Lauf des Kontos jeden Termin gesehen hat (siehe `healComplete`).
+  // Eine Ausnahme bleibt: ein Termin mit ausstehender lokaler Bearbeitung
+  // (outbound_dirty) wird nicht gelesen, sondern im selben Lauf mit seiner
+  // Farbe als COLOR-Zeile hinausgeschoben - danach traegt er sie auf dem
+  // Server selbst, und die Heilung erreicht ihn nicht mehr.
   // Geheilt wird zum Zustand "nie eine gelernt" (color_modified = 0), damit
   // der Ausgang auf dem Server nichts loescht.
   const healBurntInColor = conn.prepare(
@@ -788,6 +820,13 @@ async function runSync({ createClient } = {}) {
               // Eine lokale Bearbeitung, die noch auf ihren Push wartet, darf der
               // Inbound nicht mit dem alten Serverstand überschreiben (#593).
               if (existing?.outbound_dirty) {
+                // Den Merker aufschieben hilft DIESER Zeile meist nicht mehr:
+                // der Ausgang desselben Laufs schiebt ihre Farbe als
+                // COLOR:<name> hinaus, und mit COLOR-Zeile heilt der naechste
+                // Lauf sie nicht (#1270). Wer eine eingebrannte Farbe in Yuvomi
+                // bearbeitet, hat sie damit zu seiner gemacht. Aufgeschoben
+                // wird trotzdem, fuer die uebrigen Termine eines Laufs, der
+                // nicht alles gesehen hat.
                 healComplete = false;
                 accountEventCount++;
                 continue;

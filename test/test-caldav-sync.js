@@ -1271,6 +1271,13 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
 
   async function withDb(fn) {
     const d = buildDb();
+    // `node:sqlite` kennt kein `.transaction()`; addAccount und deleteAccount
+    // brauchen eines. Derselbe Shim wie im Block zum Aufraeumen (#732).
+    d.transaction = (fn2) => (...args) => {
+      d.exec('BEGIN');
+      try { const out = fn2(...args); d.exec('COMMIT'); return out; }
+      catch (err) { d.exec('ROLLBACK'); throw err; }
+    };
     _setTestDatabase(d);
     try { await fn(d); } finally { _resetTestDatabase(); d.close(); }
   }
@@ -1408,18 +1415,23 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     assert.strictEqual(row(d, OVERRIDE_UID).color, null);
   }));
 
-  it('ein neu angelegtes Konto hat keine Altlast: die Heilung laeuft dort nie', () => withDb(async (d) => {
+  // Verbindungstest von addAccount: meldet die Kalender mit ihren Farben.
+  const accountClient = (urls) => async () => ({
+    fetchCalendars: async () => urls.map((url) => ({
+      url, displayName: url, components: ['VEVENT'],
+      calendarColor: url === CAL_A ? COLOR_A : url === CAL_B ? COLOR_B : COLOR_C,
+    })),
+  });
+
+  it('ein wirklich neues Konto ohne Altzeilen wird uebersprungen', () => withDb(async (d) => {
     // Ein Konto, das es vor v2.50 nicht gab, kann keine eingebrannte Farbe
     // tragen. Eine Farbe dort ist eine gewaehlte, auch wenn sie zufaellig der
     // Kalenderfarbe gleicht (etwa ein hochgeladener Termin mit Palettenfarbe,
     // dessen COLOR-Zeile der Server nicht aufbewahrt).
     d.exec('DELETE FROM caldav_calendar_selection; DELETE FROM caldav_accounts;');
-    const client = async () => ({
-      fetchCalendars: async () => [
-        { url: CAL_A, displayName: 'A', components: ['VEVENT'], calendarColor: COLOR_A },
-      ],
-    });
-    const { accountId } = await addAccount('Neu', 'https://dav.example/', 'u3', 'p', { createClient: client });
+    const { accountId } = await addAccount('Neu', 'https://dav.example/', 'u3', 'p', { createClient: accountClient([CAL_A]) });
+    assert.strictEqual(marker(d, `caldav_legacy_color_heal_done_${accountId}`), '1',
+      'ohne Altzeilen gilt das Konto gleich als erledigt');
     d.prepare('UPDATE caldav_calendar_selection SET enabled = 1').run();
     d.prepare(`
       INSERT INTO calendar_events (title, start_datetime, external_calendar_id, external_source, color, color_modified, created_by)
@@ -1428,8 +1440,62 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
 
     await sync({ createClient: clientWith({ inCal: CAL_A, calendars: [CAL_A] }) });
     assert.strictEqual(row(d).color, COLOR_A, 'die gewaehlte Farbe bleibt');
-    assert.strictEqual(marker(d, `caldav_legacy_color_heal_done_${accountId}`), '1');
+  }));
 
+  it('ein geloeschtes und wieder angelegtes Konto heilt die uebernommenen Zeilen', () => withDb(async (d) => {
+    // Der Weg eines Betroffenen: Konto loeschen (die Termine bleiben stehen)
+    // und neu anlegen - UNIQUE(caldav_url, username) laesst nichts anderes zu.
+    // Der Inbound uebernimmt die alten Zeilen per UID samt eingebrannter
+    // Farbe. Dazu Kyrodans Umzug: der alte Kalender A ist auf dem Server weg,
+    // der Termin liegt in B, und die Zeile zeigt noch auf A - ein Abgleich
+    // gegen die Kalender-URLs des neuen Kontos saehe sie nicht.
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    // Was deleteAccount(1) ohne deleteEvents an diesen Tabellen tut: das Konto
+    // und per CASCADE seine Auswahl gehen, die Termine bleiben. (Der Aufruf
+    // selbst braucht die Aufgaben-Tabellen, die diese Fixture nicht hat.)
+    d.exec('DELETE FROM caldav_calendar_selection WHERE account_id = 1; DELETE FROM caldav_accounts WHERE id = 1;');
+
+    const { accountId } = await addAccount('Wieder', 'https://dav.example/', 'u1', 'p', { createClient: accountClient([CAL_B]) });
+    assert.strictEqual(marker(d, `caldav_legacy_color_heal_done_${accountId}`), null,
+      'mit Altzeilen ohne lebendes Konto steht die Heilung noch aus');
+    d.prepare('UPDATE caldav_calendar_selection SET enabled = 1').run();
+
+    await sync({ createClient: clientWith({ inCal: CAL_B, calendars: [CAL_B] }) });
+    const after = row(d);
+    assert.strictEqual(after.cal, CAL_B, 'Vorbedingung: der Inbound hat die Zeile uebernommen');
+    assert.strictEqual(after.color, null, 'die eingebrannte Farbe von A ist weg');
+    assert.strictEqual(marker(d, `caldav_legacy_color_heal_done_${accountId}`), '1');
+  }));
+
+  it('ein Kalender, den der Server nicht mehr kennt, schiebt den Merker auf', () => withDb(async (d) => {
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+
+    // B ist angehakt, fehlt aber in der Liste des Servers.
+    await sync({ createClient: clientWith({ inCal: CAL_A, calendars: [CAL_A] }) });
+    assert.strictEqual(marker(d), null);
+  }));
+
+  it('ein Termin mit ausstehender lokaler Bearbeitung schiebt den Merker auf', () => withDb(async (d) => {
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    d.prepare('UPDATE calendar_events SET outbound_dirty = 1').run();
+
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.strictEqual(marker(d), null);
+  }));
+
+  it('ein Fehler an einem Termin schiebt den Merker auf', () => withDb(async (d) => {
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    // Das Schreiben an diesem Termin scheitert: der catch je Termin greift.
+    d.exec(`CREATE TRIGGER boom BEFORE UPDATE OF color ON calendar_events
+            BEGIN SELECT RAISE(ABORT, 'boom'); END;`);
+
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.strictEqual(row(d).color, COLOR_A, 'Vorbedingung: der Termin ist gescheitert');
+    assert.strictEqual(marker(d), null);
   }));
 
   it('eine gewaehlte Farbe, die keine Kalenderfarbe ist, bleibt', () => withDb(async (d) => {
@@ -1945,9 +2011,17 @@ describe('CalDAV: neue Kalender sind opt-in (#732)', () => {
       );
       CREATE TABLE calendar_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
-        calendar_ref_id INTEGER, external_source TEXT NOT NULL DEFAULT 'local'
+        calendar_ref_id INTEGER, external_source TEXT NOT NULL DEFAULT 'local',
+        -- addAccount sucht hier nach Altzeilen der Farb-Heilung (#1270).
+        color TEXT, color_modified INTEGER NOT NULL DEFAULT 0
       );
     `);
+    // addAccount schreibt in einer Transaktion (#1270); `node:sqlite` hat keine.
+    d.transaction = (fn) => (...args) => {
+      d.exec('BEGIN');
+      try { const out = fn(...args); d.exec('COMMIT'); return out; }
+      catch (err) { d.exec('ROLLBACK'); throw err; }
+    };
     return d;
   }
 
