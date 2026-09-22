@@ -181,6 +181,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   got a second member with the same address. Both sides are now compared without surrounding
   spaces, for the primary and every further address of the contact. (Follow-up to #1357)
 
+- **"Forgot password" finds your account by email regardless of spaces and capitals.** Asking for
+  a reset link with your email address only worked when it matched the stored contact address
+  exactly, so a stored address with a stray space or different capitalisation sent no link. Both
+  sides are now compared the same way as for single sign-on. When two accounts carry the same
+  address, no link is sent to either, instead of to whichever came first; the page answers the
+  same as always, so it does not reveal whether an address belongs to an account.
+
 - **A dose logged as pending or skipped no longer keeps an intake time.** When an API client
   created a medication log with the status pending or skipped and sent a `taken_at` along, the
   time was stored and appeared in the export as if the dose had been taken. Only a taken dose

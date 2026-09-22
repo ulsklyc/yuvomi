@@ -1529,10 +1529,16 @@ export function buildResetRoutes(targetRouter, {
     if (!id) return null;
     const byName = getDb().prepare('SELECT id FROM users WHERE username = ?').get(id);
     if (byName) return byName.id;
-    const byEmail = getDb().prepare(
-      'SELECT family_user_id AS id FROM contacts WHERE email = ? AND family_user_id IS NOT NULL LIMIT 1'
-    ).get(id);
-    return byEmail?.id ?? null;
+    // Dieselbe Regel wie die SSO-Verknuepfung: beide Seiten getrimmt und ohne
+    // Gross-/Kleinschreibung verglichen, und nur GENAU EIN Konto zaehlt. Bei
+    // zwei Treffern ging der Link sonst an irgendeines; so geht er an keines,
+    // und die Antwort nach aussen bleibt dieselbe.
+    const byEmail = getDb().prepare(`
+      SELECT DISTINCT family_user_id AS id FROM contacts
+      WHERE family_user_id IS NOT NULL AND lower(trim(email)) = lower(?)
+      LIMIT 2
+    `).all(id);
+    return byEmail.length === 1 ? byEmail[0].id : null;
   }
 
   /**

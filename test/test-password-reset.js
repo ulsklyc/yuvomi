@@ -186,6 +186,33 @@ test('forgot-password also resolves a user by email', async () => {
   assert.equal(sent.length, 1);
 });
 
+test('forgot-password findet eine gespeicherte Adresse mit Leerraum und anderer Schreibweise', async () => {
+  // Dieselbe Normalisierung wie die SSO-Verknuepfung: beide Seiten getrimmt
+  // und ohne Gross-/Kleinschreibung verglichen.
+  const db = makeDb();
+  db.exec('CREATE TABLE contacts (id INTEGER PRIMARY KEY AUTOINCREMENT, family_user_id INTEGER, email TEXT);');
+  db.prepare("INSERT INTO contacts (family_user_id, email) VALUES (1, '  Alice@Test ')").run();
+  const { app, sent } = await makeAuthApp(db);
+  await callJson(app, 'POST', '/auth/forgot-password', { identifier: 'alice@test' });
+  assert.equal(sent.length, 1, 'die Adresse mit Leerraum findet das Konto');
+});
+
+test('forgot-password schickt bei mehrdeutiger Adresse an niemanden und antwortet gleich', async () => {
+  // Zwei Konten fuehren nach der Normalisierung dieselbe Adresse. Wie bei der
+  // SSO-Verknuepfung zaehlt nur GENAU EIN Treffer - vorher ging der Link per
+  // LIMIT 1 an irgendeines der beiden.
+  const db = makeDb();
+  db.prepare("INSERT INTO users (id, username) VALUES (2,'bob')").run();
+  db.exec('CREATE TABLE contacts (id INTEGER PRIMARY KEY AUTOINCREMENT, family_user_id INTEGER, email TEXT);');
+  db.prepare("INSERT INTO contacts (family_user_id, email) VALUES (1, 'shared@test')").run();
+  db.prepare("INSERT INTO contacts (family_user_id, email) VALUES (2, 'Shared@Test ')").run();
+  const { app, sent } = await makeAuthApp(db);
+  const res = await callJson(app, 'POST', '/auth/forgot-password', { identifier: 'shared@test' });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.json, { data: { ok: true } }, 'dieselbe Antwort wie bei jedem anderen Ausgang');
+  assert.equal(sent.length, 0, 'kein Link an ein beliebiges der beiden Konten');
+});
+
 test('reset-password rejects an invalid token', async () => {
   const db = makeDb();
   seedContactsAndEmail(db);
