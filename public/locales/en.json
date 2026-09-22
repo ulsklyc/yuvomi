@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "Keep quantities",
         "duplicateKeepNotes": "Keep notes & links",
         "duplicateSubmit": "Duplicate",
-        "duplicateError": "The list could not be duplicated."
+        "duplicateError": "The list could not be duplicated.",
+        "itemStateChecked": "checked off",
+        "itemStateOpen": "not checked off"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} meals planned.",
@@ -2773,7 +2775,31 @@
         "healthPreventionKind": {
             "vaccination": "Vaccination",
             "checkup": "Check-up"
-        }
+        },
+        "backupRestoreKeyLabel": "Backup key",
+        "backupRestoreKeyHint": "This backup comes from another installation. Enter that installation's DB_ENCRYPTION_KEY: it is used only for this restore and is not stored, and afterwards the data is encrypted with this installation's key.",
+        "backupRestoreKeyHttpWarning": "This page is not open over HTTPS: the key will cross the network unencrypted.",
+        "backupRestoreErrorKeyRequired": "This installation's key does not open the backup. If it comes from another installation, enter that installation's key below and restore again; otherwise the file is not a Yuvomi database. Do not change this installation's DB_ENCRYPTION_KEY: Yuvomi would no longer start. Nothing was changed here.",
+        "backupRestoreErrorKeyWrong": "This key does not open the backup. It has to be exactly the DB_ENCRYPTION_KEY of the installation that wrote the backup, spaces at either end included.",
+        "backupRestoreErrorKeyInvalid": "The key did not reach the server in a readable form. Enter it again and restore once more. Nothing was changed here.",
+        "backupRestoreErrorOwnKeyMissing": "This installation has no DB_ENCRYPTION_KEY, so it cannot open the backup. Set DB_ENCRYPTION_KEY, restart Yuvomi and then restore with the backup's key.",
+        "backupRestoreErrorDamaged": "The backup is damaged or incomplete; the key is right. Get the file again, compare its size and sha256sum with the original and restore that copy. Nothing was changed here.",
+        "backupRestoreErrorUnreadable": "The backup could not be read. Check that the file is complete and try again; the exact cause is in the server log. Nothing was changed here.",
+        "backupRestoreErrorGeneric": "The restore failed. The exact cause is in the server log.",
+        "backupRestoreErrorNeverEncrypted": "If the file was never encrypted, it is not a valid Yuvomi database.",
+        "backupRestoreErrorKeyRightButNotDb": "If the key is right, the file is not a Yuvomi database or was cut short.",
+        "backupRestoreErrorNothingChanged": "Nothing was changed here.",
+        "otherSessionsTitle": "Other devices",
+        "otherSessionsHint": "Signs your account out on every other device and browser. This device stays signed in. API tokens and paired wall displays are not affected.",
+        "otherSessionsButton": "Sign out on other devices",
+        "otherSessionsConfirm": "Sign out on all other devices?",
+        "otherSessionsConfirmDetail": "Anyone signed in with your account there has to sign in again. This device stays signed in.",
+        "otherSessionsEnded": "{{count}} other sessions ended.",
+        "otherSessionsEnded_one": "{{count}} other session ended.",
+        "otherSessionsEnded_few": "{{count}} other sessions ended.",
+        "otherSessionsNone": "Your account was not signed in on any other device.",
+        "otherSessionsError": "Signing out on other devices failed.",
+        "otherSessionsTooManyAttempts": "Too many requests. Please wait a moment, then try again."
     },
     "login": {
         "tagline": "Welcome back to your family planner.",
@@ -3552,7 +3578,8 @@
         "currentMonth": "Current",
         "noVisitReportsInMonth": "No staff visits recorded in {{month}}.",
         "settledAdminOnly": "Only an admin can change or delete it",
-        "reportVisitsCount": "Visits"
+        "reportVisitsCount": "Visits",
+        "receiptPresent": "Attached"
     },
     "userMultiSelect": {
         "moreUsers": "more",
@@ -5456,7 +5483,8 @@
         "confirmSelection": "Add selected",
         "openAction": "Open {{name}}",
         "limitReached": "At most {{count}} documents.",
-        "limitReached_one": "At most {{count}} document."
+        "limitReached_one": "At most {{count}} document.",
+        "presentHidden": "Attached"
     },
     "join": {
         "title": "Set up your account",

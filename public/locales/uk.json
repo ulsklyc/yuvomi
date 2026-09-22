@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "Зберегти кількість",
         "duplicateKeepNotes": "Зберегти нотатки й посилання",
         "duplicateSubmit": "Дублювати",
-        "duplicateError": "Не вдалося дублювати список."
+        "duplicateError": "Не вдалося дублювати список.",
+        "itemStateChecked": "позначено",
+        "itemStateOpen": "не позначено"
     },
     "meals": {
         "randomizeSuccess_few": "Заплановано {{count}} прийоми їжі.",
@@ -2773,7 +2775,31 @@
         "healthPreventionKind": {
             "vaccination": "Щеплення",
             "checkup": "Огляд"
-        }
+        },
+        "backupRestoreKeyLabel": "Ключ резервної копії",
+        "backupRestoreKeyHint": "Ця резервна копія створена іншою інсталяцією. Введіть її DB_ENCRYPTION_KEY: він використовується лише для цього відновлення й не зберігається, після чого дані шифруються ключем цієї інсталяції.",
+        "backupRestoreKeyHttpWarning": "Сторінку відкрито не через HTTPS: ключ буде передано мережею без шифрування.",
+        "backupRestoreErrorKeyRequired": "Ключ цієї інсталяції не відкриває резервну копію. Якщо її створила інша інсталяція, введіть нижче її ключ і повторіть відновлення; інакше файл не є базою даних Yuvomi. Не змінюйте DB_ENCRYPTION_KEY цієї інсталяції: після цього Yuvomi більше не запуститься. Тут нічого не змінено.",
+        "backupRestoreErrorKeyWrong": "Цей ключ не відкриває резервну копію. Це має бути саме DB_ENCRYPTION_KEY інсталяції, що створила копію, разом із пробілами на краях.",
+        "backupRestoreErrorKeyInvalid": "Ключ надійшов на сервер у нечитабельному вигляді. Введіть його знову й повторіть відновлення. Тут нічого не змінено.",
+        "backupRestoreErrorOwnKeyMissing": "Ця інсталяція не має DB_ENCRYPTION_KEY, тому не може відкрити резервну копію. Задайте DB_ENCRYPTION_KEY, перезапустіть Yuvomi, а потім відновіть копію з її ключем.",
+        "backupRestoreErrorDamaged": "Резервна копія пошкоджена або неповна; ключ правильний. Отримайте файл знову, порівняйте розмір і sha256sum з оригіналом і відновіть цю копію. Тут нічого не змінено.",
+        "backupRestoreErrorUnreadable": "Не вдалося прочитати резервну копію. Перевірте, чи файл повний, і спробуйте знову; точна причина є в журналі сервера. Тут нічого не змінено.",
+        "backupRestoreErrorGeneric": "Відновлення не вдалося. Точна причина є в журналі сервера.",
+        "backupRestoreErrorNeverEncrypted": "Якщо файл ніколи не шифрувався, це не дійсна база даних Yuvomi.",
+        "backupRestoreErrorKeyRightButNotDb": "Якщо ключ правильний, файл не є базою даних Yuvomi або був обрізаний.",
+        "backupRestoreErrorNothingChanged": "Тут нічого не змінено.",
+        "otherSessionsTitle": "Інші пристрої",
+        "otherSessionsHint": "Виконує вихід з вашого облікового запису на всіх інших пристроях і в браузерах. Цей пристрій залишиться в системі. API-токени та під’єднані настінні дисплеї не зачіпаються.",
+        "otherSessionsButton": "Вийти на інших пристроях",
+        "otherSessionsConfirm": "Вийти на всіх інших пристроях?",
+        "otherSessionsConfirmDetail": "Усім, хто ввійшов там під вашим обліковим записом, доведеться ввійти знову. Цей пристрій залишиться в системі.",
+        "otherSessionsEnded": "Завершено інших сеансів: {{count}}.",
+        "otherSessionsEnded_one": "Завершено {{count}} інший сеанс.",
+        "otherSessionsEnded_few": "Завершено {{count}} інші сеанси.",
+        "otherSessionsNone": "Ваш обліковий запис не був відкритий на жодному іншому пристрої.",
+        "otherSessionsError": "Не вдалося вийти на інших пристроях.",
+        "otherSessionsTooManyAttempts": "Забагато запитів. Зачекайте трохи й спробуйте знову."
     },
     "login": {
         "tagline": "З поверненням до вашого сімейного планувальника.",
@@ -3552,7 +3578,8 @@
         "currentMonth": "Поточний",
         "noVisitReportsInMonth": "За період {{month}} відвідувань персоналу не зафіксовано.",
         "settledAdminOnly": "Змінити або видалити може лише адміністратор",
-        "reportVisitsCount": "Відвідування"
+        "reportVisitsCount": "Відвідування",
+        "receiptPresent": "Додано"
     },
     "userMultiSelect": {
         "moreUsers": "інші",
@@ -5456,7 +5483,8 @@
         "confirmSelection": "Додати вибрані",
         "openAction": "Відкрити {{name}}",
         "limitReached": "Не більше ніж {{count}} документів.",
-        "limitReached_one": "Не більше ніж {{count}} документ."
+        "limitReached_one": "Не більше ніж {{count}} документ.",
+        "presentHidden": "Додано"
     },
     "join": {
         "title": "Налаштування облікового запису",

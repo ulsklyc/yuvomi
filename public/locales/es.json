@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "Mantener cantidades",
         "duplicateKeepNotes": "Mantener notas y enlaces",
         "duplicateSubmit": "Duplicar",
-        "duplicateError": "No se pudo duplicar la lista."
+        "duplicateError": "No se pudo duplicar la lista.",
+        "itemStateChecked": "marcado",
+        "itemStateOpen": "sin marcar"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} comidas planificadas.",
@@ -2773,7 +2775,31 @@
         "healthPreventionKind": {
             "vaccination": "Vacuna",
             "checkup": "Revisión"
-        }
+        },
+        "backupRestoreKeyLabel": "Clave de la copia de seguridad",
+        "backupRestoreKeyHint": "Esta copia de seguridad procede de otra instalación. Introduce su DB_ENCRYPTION_KEY: solo se usa para esta restauración y no se guarda; después, los datos quedan cifrados con la clave de esta instalación.",
+        "backupRestoreKeyHttpWarning": "Esta página no está abierta por HTTPS: la clave viajará por la red sin cifrar.",
+        "backupRestoreErrorKeyRequired": "La clave de esta instalación no abre la copia de seguridad. Si procede de otra instalación, introduce abajo la clave de esa instalación y vuelve a restaurar; si no, el archivo no es una base de datos de Yuvomi. No cambies la DB_ENCRYPTION_KEY de esta instalación: después Yuvomi ya no arrancaría. Aquí no se ha cambiado nada.",
+        "backupRestoreErrorKeyWrong": "Esta clave no abre la copia de seguridad. Tiene que ser exactamente la DB_ENCRYPTION_KEY de la instalación que la escribió, incluidos los espacios de los extremos.",
+        "backupRestoreErrorKeyInvalid": "La clave no llegó al servidor de forma legible. Introdúcela de nuevo y vuelve a restaurar. Aquí no se ha cambiado nada.",
+        "backupRestoreErrorOwnKeyMissing": "Esta instalación no tiene DB_ENCRYPTION_KEY, así que no puede abrir la copia de seguridad. Define DB_ENCRYPTION_KEY, reinicia Yuvomi y luego restaura con la clave de la copia.",
+        "backupRestoreErrorDamaged": "La copia de seguridad está dañada o incompleta; la clave es correcta. Vuelve a obtener el archivo, compara su tamaño y sha256sum con el original y restaura esa copia. Aquí no se ha cambiado nada.",
+        "backupRestoreErrorUnreadable": "No se pudo leer la copia de seguridad. Comprueba que el archivo esté completo e inténtalo de nuevo; la causa exacta está en el registro del servidor. Aquí no se ha cambiado nada.",
+        "backupRestoreErrorGeneric": "La restauración ha fallado. La causa exacta está en el registro del servidor.",
+        "backupRestoreErrorNeverEncrypted": "Si el archivo nunca se cifró, no es una base de datos válida de Yuvomi.",
+        "backupRestoreErrorKeyRightButNotDb": "Si la clave es correcta, el archivo no es una base de datos de Yuvomi o está truncado.",
+        "backupRestoreErrorNothingChanged": "Aquí no se ha cambiado nada.",
+        "otherSessionsTitle": "Otros dispositivos",
+        "otherSessionsHint": "Cierra la sesión de tu cuenta en todos los demás dispositivos y navegadores. Este dispositivo sigue con la sesión iniciada. Los tokens de API y las pantallas de pared vinculadas no se ven afectados.",
+        "otherSessionsButton": "Cerrar sesión en otros dispositivos",
+        "otherSessionsConfirm": "¿Cerrar sesión en todos los demás dispositivos?",
+        "otherSessionsConfirmDetail": "Quien haya iniciado sesión allí con tu cuenta tendrá que volver a iniciarla. Este dispositivo sigue con la sesión iniciada.",
+        "otherSessionsEnded": "{{count}} sesiones más cerradas.",
+        "otherSessionsEnded_one": "{{count}} sesión más cerrada.",
+        "otherSessionsEnded_few": "{{count}} sesiones más cerradas.",
+        "otherSessionsNone": "Tu cuenta no tenía la sesión iniciada en ningún otro dispositivo.",
+        "otherSessionsError": "No se pudo cerrar la sesión en otros dispositivos.",
+        "otherSessionsTooManyAttempts": "Demasiadas solicitudes. Espera un momento y vuelve a intentarlo."
     },
     "login": {
         "tagline": "Bienvenido de nuevo a tu planificador familiar.",
@@ -3552,7 +3578,8 @@
         "currentMonth": "Este mes",
         "noVisitReportsInMonth": "No se registró ningún servicio en {{month}}.",
         "settledAdminOnly": "Solo un administrador puede modificarlo o eliminarlo",
-        "reportVisitsCount": "Visitas"
+        "reportVisitsCount": "Visitas",
+        "receiptPresent": "Adjunto"
     },
     "userMultiSelect": {
         "moreUsers": "más",
@@ -5456,7 +5483,8 @@
         "confirmSelection": "Añadir selección",
         "openAction": "Abrir {{name}}",
         "limitReached": "Como máximo {{count}} documentos.",
-        "limitReached_one": "Como máximo {{count}} documento."
+        "limitReached_one": "Como máximo {{count}} documento.",
+        "presentHidden": "Adjunto"
     },
     "join": {
         "title": "Configura tu cuenta",

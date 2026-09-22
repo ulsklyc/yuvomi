@@ -19,7 +19,7 @@ import {
   refocusAfterRender,
 } from '/components/modal.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
-import { resolveShoppingTarget, announceTransfer } from '/utils/kitchen-transfer.js';
+import { resolveShoppingTarget, announceTransfer, mayTransferPantryToShopping } from '/utils/kitchen-transfer.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 // Alias, weil dieses Modul selbst eine `emptyStateEl()`-Funktion hat, die den
@@ -522,7 +522,9 @@ function renderFilters() {
  */
 function renderBulkBar() {
   const items = visibleItems();
-  if (state.filter !== 'low' || !state.items.length || !items.length) {
+  // Die Pille traegt genau EINE Aktion, und die schreibt in den EINKAUF
+  // (#1265): ohne Schreibrecht dort endete sie im 403 - also keine Pille.
+  if (state.filter !== 'low' || !state.items.length || !items.length || !mayTransferPantryToShopping()) {
     clearBulkPill();
     return;
   }
@@ -799,7 +801,9 @@ function rowEl(item) {
   // genau der Grund, aus dem der Knopf ursprünglich an die Zeilenkante wanderte.
   const cartSlot = document.createElement('div');
   cartSlot.className = 'pantry-row__cart-slot';
-  if (status.out || status.low) cartSlot.appendChild(cartEl(item));
+  // Der Warenkorb schreibt in den EINKAUF, gefragt wird also dessen Recht
+  // (#1265, Regel 1 in utils/module-access.js). Der Slot bleibt trotzdem.
+  if ((status.out || status.low) && mayTransferPantryToShopping()) cartSlot.appendChild(cartEl(item));
   actions.appendChild(cartSlot);
 
   const stepper = document.createElement('div');
@@ -1043,6 +1047,9 @@ function shortfallText(item) {
 
 async function sendToShopping(items, btn) {
   if (!items.length) return;
+  // Zweite Linie hinter Warenkorb und Pille - auch fuer einen Knoten, den ein
+  // Rechtewechsel ueberholt hat.
+  if (!mayTransferPantryToShopping()) return;
 
   let lists;
   try {
@@ -1333,4 +1340,9 @@ export const __test = {
   // Bestaetigung aus einem frueheren Fall schuetzt sonst den Artikel des
   // naechsten vor seiner eigenen Auffrischung.
   resetLoadOrderForTest: () => { _pantryAppliedLoad = 0; settledAt.clear(); },
+  // #1265 P4: der Warenkorb der Zeile und sein Handler schreiben in den
+  // Einkauf - gemessen am echten Knoten und als Programm
+  // (test-shopping-readonly-ui.js).
+  rowEl,
+  sendToShopping,
 };

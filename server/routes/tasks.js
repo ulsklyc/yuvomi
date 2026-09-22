@@ -9,7 +9,8 @@ import { mayWriteModule } from '../permissions.js';
 import express from 'express';
 import * as db from '../db.js';
 import { documentVisibleSql } from '../services/document-access.js';
-import { assertDocumentsNotDeleting, sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
+import { sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
+import { assertDocumentLinkTargetsAvailable, documentViewer, sendDocumentLinkRefusal } from '../services/document-links.js';
 import { nextDueAfterCompletion } from '../services/recurrence.js';
 import { syncTaskRewards } from '../services/rewards.js';
 import { completionFeed, seriesHistory, syncTaskCompletion } from '../services/task-completions.js';
@@ -210,16 +211,24 @@ function addAssignedUsers(task) {
  * Hängt jedem Task die Anzahl der für die Person sichtbaren, verknüpften
  * Dokumente an (document_count, #503). Eine einzige gruppierte Abfrage statt
  * pro-Task, damit die Listen-Route günstig bleibt.
+ *
+ * Auch die ZAHL gehoert dem Dokumente-Modul (#1358): ohne dessen Leserecht
+ * (Mitgliedsrecht UND Token-Scope, `documentViewer(req)`) ist sie `null` -
+ * "nicht gesagt", nicht 0 ("keine").
  */
-function attachDocumentCounts(tasks, me) {
+function attachDocumentCounts(tasks, viewer) {
   if (!tasks.length) return tasks;
+  if (!viewer?.readsDocuments) {
+    for (const task of tasks) task.document_count = null;
+    return tasks;
+  }
   const counts = db.get().prepare(`
     SELECT td.task_id AS id, COUNT(*) AS n
     FROM task_documents td
     JOIN family_documents d ON d.id = td.document_id
     WHERE d.status != 'archived' AND ${DOC_VISIBLE_SQL}
     GROUP BY td.task_id
-  `).all({ me });
+  `).all({ me: viewer.userId });
   const map = new Map(counts.map((r) => [r.id, r.n]));
   for (const task of tasks) task.document_count = map.get(task.id) ?? 0;
   return tasks;
@@ -934,7 +943,7 @@ router.get('/', (req, res) => {
     `;
 
     const rows = db.get().prepare(sql).all(...params).map(task => ({ ...task, subtasks: JSON.parse(task.subtasks || '[]') })).map(addAssignedUsers);
-    res.json({ data: attachTags(attachDocumentCounts(rows, me)) });
+    res.json({ data: attachTags(attachDocumentCounts(rows, documentViewer(req))) });
   } catch (err) {
     log.error('GET / error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -962,14 +971,15 @@ router.get('/:id', (req, res) => {
 
     addAssignedUsers(task);
     task.subtasks = loadSubtasks(task.id, me);
-    attachDocumentCounts([task], me);
+    const viewer = documentViewer(req);
+    attachDocumentCounts([task], viewer);
     // Die verknüpften Dokumente beim Namen, nicht nur gezählt (#733). Die
     // Detailansicht zeigte hier seit jeher eine Zeile „Dokumente" an, las dafür
     // aber ein Feld, das die API nie gefüllt hat - die Zeile war deshalb immer
     // leer, egal wie viele Dokumente an der Aufgabe hingen. Die Liste kommt aus
     // derselben Funktion wie GET /:id/documents, also mit derselben
-    // Sichtbarkeitsprüfung.
-    task.documents = loadTaskDocuments(task.id, me);
+    // Sichtbarkeitsprüfung - und ohne Dokumentenrecht `null` (#1358).
+    task.documents = loadTaskDocuments(task.id, viewer);
     attachTags([task]);
     res.json({ data: task });
   } catch (err) {
@@ -1900,8 +1910,14 @@ function findVisibleTask(id, me) {
   `).get(id, me, me);
 }
 
-/** Für die Person sichtbare, mit der Aufgabe verknüpfte Dokumente. */
-function loadTaskDocuments(taskId, me) {
+/**
+ * Für die Person sichtbare, mit der Aufgabe verknüpfte Dokumente. Ohne
+ * Leserecht auf das Dokumente-Modul `null` (#1358): die Aufgabe sagt dann
+ * weder Namen noch IDs noch, wie viele es sind.
+ */
+function loadTaskDocuments(taskId, viewer) {
+  if (!viewer?.readsDocuments) return null;
+  const me = viewer.userId;
   return db.get().prepare(`
     SELECT d.id, d.name, d.category, d.original_name, d.mime_type, d.file_size,
            d.storage_backend, td.created_at AS linked_at
@@ -1943,7 +1959,14 @@ router.get('/:id/documents', (req, res) => {
     const me = req.authUserId || req.session.userId;
     const task = findVisibleTask(req.params.id, me);
     if (!task) return res.status(404).json({ error: 'Task not found.', code: 404 });
-    res.json({ data: loadTaskDocuments(task.id, me) });
+    // Die Route liefert nur Dokumente: ohne Leserecht dort dieselbe Antwort,
+    // die der Pfad-Guard vor /documents gaebe (#1358). Erst nach der Aufgabe
+    // gefragt, damit eine unsichtbare Aufgabe weiter 404 bleibt.
+    const viewer = documentViewer(req);
+    if (!viewer.readsDocuments) {
+      return res.status(403).json({ error: 'Reading linked documents requires access to documents.', code: 403 });
+    }
+    res.json({ data: loadTaskDocuments(task.id, viewer) });
   } catch (err) {
     log.error('GET /:id/documents error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1963,13 +1986,13 @@ router.put('/:id/documents', (req, res) => {
     // Formular, der Zettel, auf den die Aufgabe verweist (#830).
     if (!mayEditTaskDefinition(task, req)) return res.status(403).json(LOCKED_ERROR);
 
-    const requested = Array.isArray(req.body.document_ids)
-      ? [...new Set(req.body.document_ids.map(Number).filter((n) => Number.isInteger(n) && n > 0))]
-      : [];
-
-    const canSee = db.get().prepare(`SELECT 1 FROM family_documents d WHERE d.id = @id AND ${DOC_VISIBLE_SQL}`);
-    const visibleIds = requested.filter((id) => canSee.get({ id, me }));
-    assertDocumentsNotDeleting(visibleIds);
+    // Sichtbarkeit, Loeschsperre und Dokumentenrecht aus der einen Stelle
+    // (services/document-links.js): ohne Leserecht auf die Dokumente ist jede
+    // nicht leere Liste dieselbe 403, vor jeder weiteren Pruefung (#1358).
+    const viewer = documentViewer(req);
+    const visibleIds = assertDocumentLinkTargetsAvailable(db.get(), req.body.document_ids, viewer);
+    // Ohne Leserecht ist nichts sichtbar - eine leere Liste loest also nichts.
+    if (!viewer.readsDocuments) return res.json({ data: null });
 
     db.get().transaction(() => {
       // Nur die für diese Person sichtbaren Alt-Verknüpfungen entfernen.
@@ -1985,9 +2008,10 @@ router.put('/:id/documents', (req, res) => {
       for (const id of visibleIds) ins.run(task.id, id, me);
     })();
 
-    res.json({ data: loadTaskDocuments(task.id, me) });
+    res.json({ data: loadTaskDocuments(task.id, viewer) });
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
+    if (sendDocumentLinkRefusal(res, err)) return;
     log.error('PUT /:id/documents error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }

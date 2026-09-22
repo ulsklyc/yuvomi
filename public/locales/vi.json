@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "Giữ số lượng",
         "duplicateKeepNotes": "Giữ ghi chú & liên kết",
         "duplicateSubmit": "Nhân bản",
-        "duplicateError": "Không thể nhân bản danh sách."
+        "duplicateError": "Không thể nhân bản danh sách.",
+        "itemStateChecked": "đã đánh dấu",
+        "itemStateOpen": "chưa đánh dấu"
     },
     "meals": {
         "randomizeSuccess_few": "Đã lên kế hoạch {{count}} bữa ăn.",
@@ -2773,7 +2775,31 @@
         "healthPreventionKind": {
             "vaccination": "Tiêm chủng",
             "checkup": "Kiểm tra"
-        }
+        },
+        "backupRestoreKeyLabel": "Khóa của bản sao lưu",
+        "backupRestoreKeyHint": "Bản sao lưu này đến từ một bản cài đặt khác. Hãy nhập DB_ENCRYPTION_KEY của bản cài đặt đó: khóa chỉ được dùng cho lần khôi phục này và không được lưu, sau đó dữ liệu được mã hóa bằng khóa của bản cài đặt này.",
+        "backupRestoreKeyHttpWarning": "Trang này không được mở qua HTTPS: khóa sẽ đi qua mạng mà không được mã hóa.",
+        "backupRestoreErrorKeyRequired": "Khóa của bản cài đặt này không mở được bản sao lưu. Nếu bản sao lưu đến từ bản cài đặt khác, hãy nhập khóa của bản cài đặt đó bên dưới rồi khôi phục lại; nếu không, tệp này không phải cơ sở dữ liệu Yuvomi. Đừng đổi DB_ENCRYPTION_KEY của bản cài đặt này: sau đó Yuvomi sẽ không khởi động được nữa. Không có gì bị thay đổi ở đây.",
+        "backupRestoreErrorKeyWrong": "Khóa này không mở được bản sao lưu. Nó phải đúng hệt DB_ENCRYPTION_KEY của bản cài đặt đã ghi bản sao lưu, kể cả khoảng trắng ở hai đầu.",
+        "backupRestoreErrorKeyInvalid": "Khóa không đến máy chủ ở dạng đọc được. Hãy nhập lại và khôi phục thêm lần nữa. Không có gì bị thay đổi ở đây.",
+        "backupRestoreErrorOwnKeyMissing": "Bản cài đặt này không có DB_ENCRYPTION_KEY nên không mở được bản sao lưu. Hãy đặt DB_ENCRYPTION_KEY, khởi động lại Yuvomi rồi khôi phục bằng khóa của bản sao lưu.",
+        "backupRestoreErrorDamaged": "Bản sao lưu bị hỏng hoặc không đầy đủ; khóa là đúng. Hãy lấy lại tệp, so sánh kích thước và sha256sum với bản gốc rồi khôi phục bản sao đó. Không có gì bị thay đổi ở đây.",
+        "backupRestoreErrorUnreadable": "Không đọc được bản sao lưu. Hãy kiểm tra tệp có đầy đủ không rồi thử lại; nguyên nhân chính xác nằm trong nhật ký máy chủ. Không có gì bị thay đổi ở đây.",
+        "backupRestoreErrorGeneric": "Khôi phục thất bại. Nguyên nhân chính xác nằm trong nhật ký máy chủ.",
+        "backupRestoreErrorNeverEncrypted": "Nếu tệp chưa từng được mã hóa, đó không phải cơ sở dữ liệu Yuvomi hợp lệ.",
+        "backupRestoreErrorKeyRightButNotDb": "Nếu khóa đúng, tệp không phải cơ sở dữ liệu Yuvomi hoặc đã bị cắt cụt.",
+        "backupRestoreErrorNothingChanged": "Không có gì bị thay đổi ở đây.",
+        "otherSessionsTitle": "Thiết bị khác",
+        "otherSessionsHint": "Đăng xuất tài khoản của bạn trên mọi thiết bị và trình duyệt khác. Thiết bị này vẫn đăng nhập. Mã API và màn hình treo tường đã ghép nối không bị ảnh hưởng.",
+        "otherSessionsButton": "Đăng xuất trên thiết bị khác",
+        "otherSessionsConfirm": "Đăng xuất trên mọi thiết bị khác?",
+        "otherSessionsConfirmDetail": "Ai đang đăng nhập bằng tài khoản của bạn ở đó sẽ phải đăng nhập lại. Thiết bị này vẫn đăng nhập.",
+        "otherSessionsEnded": "Đã kết thúc {{count}} phiên khác.",
+        "otherSessionsEnded_one": "Đã kết thúc {{count}} phiên khác.",
+        "otherSessionsEnded_few": "Đã kết thúc {{count}} phiên khác.",
+        "otherSessionsNone": "Tài khoản của bạn không đăng nhập trên thiết bị nào khác.",
+        "otherSessionsError": "Không thể đăng xuất trên các thiết bị khác.",
+        "otherSessionsTooManyAttempts": "Quá nhiều yêu cầu. Vui lòng đợi một chút rồi thử lại."
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại trình lập kế hoạch gia đình.",
@@ -3552,7 +3578,8 @@
         "currentMonth": "Hiện tại",
         "noVisitReportsInMonth": "Không có lượt đến của nhân viên được ghi nhận trong {{month}}.",
         "settledAdminOnly": "Chỉ quản trị viên mới có thể sửa hoặc xoá",
-        "reportVisitsCount": "Số lượt đến"
+        "reportVisitsCount": "Số lượt đến",
+        "receiptPresent": "Đã đính kèm"
     },
     "userMultiSelect": {
         "moreUsers": "thêm",
@@ -5456,7 +5483,8 @@
         "confirmSelection": "Thêm mục đã chọn",
         "openAction": "Mở {{name}}",
         "limitReached": "Tối đa {{count}} tài liệu.",
-        "limitReached_one": "Tối đa {{count}} tài liệu."
+        "limitReached_one": "Tối đa {{count}} tài liệu.",
+        "presentHidden": "Đã đính kèm"
     },
     "join": {
         "title": "Thiết lập tài khoản",

@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "Behåll mängder",
         "duplicateKeepNotes": "Behåll anteckningar och länkar",
         "duplicateSubmit": "Duplicera",
-        "duplicateError": "Listan kunde inte dupliceras."
+        "duplicateError": "Listan kunde inte dupliceras.",
+        "itemStateChecked": "avbockad",
+        "itemStateOpen": "inte avbockad"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} måltider planerade.",
@@ -2773,7 +2775,31 @@
         "healthPreventionKind": {
             "vaccination": "Vaccination",
             "checkup": "Kontroll"
-        }
+        },
+        "backupRestoreKeyLabel": "Säkerhetskopians nyckel",
+        "backupRestoreKeyHint": "Den här säkerhetskopian kommer från en annan installation. Ange dess DB_ENCRYPTION_KEY: den används bara för den här återställningen och sparas inte, därefter krypteras datan med den här installationens nyckel.",
+        "backupRestoreKeyHttpWarning": "Sidan är inte öppnad via HTTPS: nyckeln skickas okrypterad över nätverket.",
+        "backupRestoreErrorKeyRequired": "Den här installationens nyckel öppnar inte säkerhetskopian. Kommer den från en annan installation, ange den installationens nyckel nedan och återställ igen; annars är filen ingen Yuvomi-databas. Ändra inte den här installationens DB_ENCRYPTION_KEY: då startar Yuvomi inte längre. Inget har ändrats här.",
+        "backupRestoreErrorKeyWrong": "Den här nyckeln öppnar inte säkerhetskopian. Det måste vara exakt DB_ENCRYPTION_KEY för installationen som skrev säkerhetskopian, inklusive mellanslag i kanterna.",
+        "backupRestoreErrorKeyInvalid": "Nyckeln kom inte fram till servern i läsbar form. Ange den igen och återställ en gång till. Inget har ändrats här.",
+        "backupRestoreErrorOwnKeyMissing": "Den här installationen har ingen DB_ENCRYPTION_KEY och kan därför inte öppna säkerhetskopian. Ange DB_ENCRYPTION_KEY, starta om Yuvomi och återställ sedan med säkerhetskopians nyckel.",
+        "backupRestoreErrorDamaged": "Säkerhetskopian är skadad eller ofullständig; nyckeln stämmer. Hämta filen igen, jämför storlek och sha256sum med originalet och återställ den kopian. Inget har ändrats här.",
+        "backupRestoreErrorUnreadable": "Säkerhetskopian kunde inte läsas. Kontrollera att filen är fullständig och försök igen; den exakta orsaken finns i serverloggen. Inget har ändrats här.",
+        "backupRestoreErrorGeneric": "Återställningen misslyckades. Den exakta orsaken finns i serverloggen.",
+        "backupRestoreErrorNeverEncrypted": "Har filen aldrig krypterats är den ingen giltig Yuvomi-databas.",
+        "backupRestoreErrorKeyRightButNotDb": "Stämmer nyckeln är filen ingen Yuvomi-databas eller så har den kapats.",
+        "backupRestoreErrorNothingChanged": "Inget har ändrats här.",
+        "otherSessionsTitle": "Andra enheter",
+        "otherSessionsHint": "Loggar ut ditt konto på alla andra enheter och webbläsare. Den här enheten förblir inloggad. API-token och kopplade väggskärmar påverkas inte.",
+        "otherSessionsButton": "Logga ut på andra enheter",
+        "otherSessionsConfirm": "Logga ut på alla andra enheter?",
+        "otherSessionsConfirmDetail": "Den som är inloggad där med ditt konto måste logga in igen. Den här enheten förblir inloggad.",
+        "otherSessionsEnded": "{{count}} andra sessioner avslutade.",
+        "otherSessionsEnded_one": "{{count}} annan session avslutad.",
+        "otherSessionsEnded_few": "{{count}} andra sessioner avslutade.",
+        "otherSessionsNone": "Ditt konto var inte inloggat på någon annan enhet.",
+        "otherSessionsError": "Det gick inte att logga ut på andra enheter.",
+        "otherSessionsTooManyAttempts": "För många förfrågningar. Vänta en stund och försök sedan igen."
     },
     "login": {
         "tagline": "Välkommen tillbaka till din familjeplanerare.",
@@ -3552,7 +3578,8 @@
         "currentMonth": "Nuvarande",
         "noVisitReportsInMonth": "Inga personalbesök registrerades under {{month}}.",
         "settledAdminOnly": "Bara en admin kan ändra eller ta bort",
-        "reportVisitsCount": "Besök"
+        "reportVisitsCount": "Besök",
+        "receiptPresent": "Bifogat"
     },
     "userMultiSelect": {
         "moreUsers": "mer",
@@ -5456,7 +5483,8 @@
         "confirmSelection": "Lägg till valda",
         "openAction": "Öppna {{name}}",
         "limitReached": "Högst {{count}} dokument.",
-        "limitReached_one": "Högst {{count}} dokument."
+        "limitReached_one": "Högst {{count}} dokument.",
+        "presentHidden": "Bifogat"
     },
     "join": {
         "title": "Skapa ditt konto",

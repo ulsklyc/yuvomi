@@ -646,7 +646,9 @@
         "duplicateKeepQuantities": "수량 유지",
         "duplicateKeepNotes": "메모 및 링크 유지",
         "duplicateSubmit": "복제",
-        "duplicateError": "목록을 복제할 수 없습니다."
+        "duplicateError": "목록을 복제할 수 없습니다.",
+        "itemStateChecked": "체크됨",
+        "itemStateOpen": "체크 안 됨"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}}개의 식사가 계획되었습니다.",
@@ -2785,7 +2787,31 @@
         "healthPreventionKind": {
             "vaccination": "예방접종",
             "checkup": "검진"
-        }
+        },
+        "backupRestoreKeyLabel": "백업 키",
+        "backupRestoreKeyHint": "이 백업은 다른 설치본에서 만들어졌습니다. 그 설치본의 DB_ENCRYPTION_KEY를 입력하세요. 키는 이번 복원에만 사용되고 저장되지 않으며, 복원 후 데이터는 이 설치본의 키로 암호화됩니다.",
+        "backupRestoreKeyHttpWarning": "이 페이지는 HTTPS로 열려 있지 않습니다. 키가 암호화되지 않은 채 네트워크로 전송됩니다.",
+        "backupRestoreErrorKeyRequired": "이 설치본의 키로는 백업을 열 수 없습니다. 다른 설치본의 백업이라면 아래에 그 설치본의 키를 입력하고 다시 복원하세요. 그렇지 않다면 이 파일은 Yuvomi 데이터베이스가 아닙니다. 이 설치본의 DB_ENCRYPTION_KEY는 바꾸지 마세요. 바꾸면 Yuvomi가 더 이상 시작되지 않습니다. 여기서는 아무것도 바뀌지 않았습니다.",
+        "backupRestoreErrorKeyWrong": "이 키로는 백업을 열 수 없습니다. 백업을 만든 설치본의 DB_ENCRYPTION_KEY와 양 끝의 공백까지 정확히 같아야 합니다.",
+        "backupRestoreErrorKeyInvalid": "키가 읽을 수 있는 형태로 서버에 도착하지 않았습니다. 다시 입력하고 한 번 더 복원하세요. 여기서는 아무것도 바뀌지 않았습니다.",
+        "backupRestoreErrorOwnKeyMissing": "이 설치본에는 DB_ENCRYPTION_KEY가 없어 백업을 열 수 없습니다. DB_ENCRYPTION_KEY를 설정하고 Yuvomi를 다시 시작한 뒤 백업의 키로 복원하세요.",
+        "backupRestoreErrorDamaged": "백업이 손상되었거나 불완전합니다. 키는 맞습니다. 파일을 다시 가져와 크기와 sha256sum을 원본과 비교한 뒤 그 사본을 복원하세요. 여기서는 아무것도 바뀌지 않았습니다.",
+        "backupRestoreErrorUnreadable": "백업을 읽을 수 없습니다. 파일이 완전한지 확인하고 다시 시도하세요. 정확한 원인은 서버 로그에 있습니다. 여기서는 아무것도 바뀌지 않았습니다.",
+        "backupRestoreErrorGeneric": "복원에 실패했습니다. 정확한 원인은 서버 로그에 있습니다.",
+        "backupRestoreErrorNeverEncrypted": "파일이 한 번도 암호화되지 않았다면 유효한 Yuvomi 데이터베이스가 아닙니다.",
+        "backupRestoreErrorKeyRightButNotDb": "키가 맞다면 이 파일은 Yuvomi 데이터베이스가 아니거나 중간에 잘렸습니다.",
+        "backupRestoreErrorNothingChanged": "여기서는 아무것도 바뀌지 않았습니다.",
+        "otherSessionsTitle": "다른 기기",
+        "otherSessionsHint": "다른 모든 기기와 브라우저에서 계정을 로그아웃합니다. 이 기기는 로그인 상태로 유지됩니다. API 토큰과 페어링된 벽걸이 디스플레이는 영향을 받지 않습니다.",
+        "otherSessionsButton": "다른 기기에서 로그아웃",
+        "otherSessionsConfirm": "다른 모든 기기에서 로그아웃할까요?",
+        "otherSessionsConfirmDetail": "그곳에서 내 계정으로 로그인한 사람은 다시 로그인해야 합니다. 이 기기는 로그인 상태로 유지됩니다.",
+        "otherSessionsEnded": "다른 세션 {{count}}개를 종료했습니다.",
+        "otherSessionsEnded_one": "다른 세션 {{count}}개를 종료했습니다.",
+        "otherSessionsEnded_few": "다른 세션 {{count}}개를 종료했습니다.",
+        "otherSessionsNone": "다른 기기에 로그인된 계정이 없었습니다.",
+        "otherSessionsError": "다른 기기에서 로그아웃하지 못했습니다.",
+        "otherSessionsTooManyAttempts": "요청이 너무 많습니다. 잠시 기다린 후 다시 시도하세요."
     },
     "login": {
         "tagline": "가족 플래너에 다시 오신 것을 환영합니다.",
@@ -3556,7 +3582,8 @@
         "currentMonth": "이번 달",
         "noVisitReportsInMonth": "{{month}}에는 기록된 방문이 없습니다.",
         "settledAdminOnly": "관리자만 변경하거나 삭제할 수 있습니다",
-        "reportVisitsCount": "방문"
+        "reportVisitsCount": "방문",
+        "receiptPresent": "첨부됨"
     },
     "splitExpenses": {
         "title": "공동 지출",
@@ -5456,7 +5483,8 @@
         "confirmSelection": "선택 항목 추가",
         "openAction": "{{name}} 열기",
         "limitReached": "문서는 최대 {{count}}개입니다.",
-        "limitReached_one": "문서는 최대 {{count}}개입니다."
+        "limitReached_one": "문서는 최대 {{count}}개입니다.",
+        "presentHidden": "첨부됨"
     },
     "join": {
         "title": "계정 설정",

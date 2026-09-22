@@ -5,6 +5,7 @@ import {
   t,
 } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { confirmModal } from '/components/modal.js';
 import { prefersInkText } from '/utils/contrast.js';
 
 function initials(name) {
@@ -343,6 +344,40 @@ function askForCode(card, texts, onConfirm, onCancel) {
 }
 
 /**
+ * Karte "Auf anderen Geraeten abmelden" (#1354, #1423). Hinweis, Status und
+ * Knopfreihe tragen eigene Klassen fuer ihren Abstand (settings.css): ohne ihn
+ * las sich der Status als vierte Zeile des Hinweises, und der Fokusring des
+ * Knopfes lag auf dem Statustext. Die Statuszeile bleibt LEER im Markup - erst
+ * ihr Text gibt ihr den Abstand (`:not(:empty)`), sonst stuende Leerraum da.
+ * @returns {string}
+ */
+export function otherSessionsCardHtml() {
+  return `
+      <div class="settings-card settings-sessions">
+        <h3 class="settings-card__title">${t('settings.otherSessionsTitle')}</h3>
+        <p class="form-hint">${t('settings.otherSessionsHint')}</p>
+        <p class="form-hint settings-sessions__status" id="logout-others-status" role="status"></p>
+        <div id="logout-others-error" class="form-error settings-sessions__error" role="alert" hidden></div>
+        <div class="settings-form-actions settings-sessions__actions">
+          <button type="button" class="btn btn--danger-outline" id="logout-others-btn">${t('settings.otherSessionsButton')}</button>
+        </div>
+      </div>`;
+}
+
+/**
+ * Fehlertext fuer "Auf anderen Geraeten abmelden" (#1354). Ein 429 heisst nur
+ * "zu schnell geklickt" - dann sagt die Seite, dass Warten hilft, statt einen
+ * Fehlschlag zu melden, nach dem man es gleich wieder versucht.
+ *
+ * @param {{ status?: number }} err
+ * @returns {string}
+ */
+export function logoutOthersErrorText(err) {
+  if (err?.status === 429) return t('settings.otherSessionsTooManyAttempts');
+  return t('settings.otherSessionsError');
+}
+
+/**
  * Uebersetzt einen Fehler der 2FA-Routen. Der Server nennt den Grund in
  * `reason`, damit die Oberflaeche nicht am englischen Text hangeln muss.
  * @param {any} err
@@ -531,6 +566,8 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
       ${twoFactorCardHtml(twoFactorState)}
 
       ${oidcCardHtml(oidcState, oidcNotice)}
+
+      ${otherSessionsCardHtml()}
     </section>
 
     <section class="settings-section">
@@ -685,6 +722,41 @@ function bindEvents(container, user, profileState) {
       showError(passwordError, error.message);
     } finally {
       submitButton.disabled = false;
+    }
+  });
+
+  // Auf anderen Geraeten abmelden (#1354). Der Knopf wird waehrend des Requests
+  // nicht `disabled`: ein fokussierter Knopf, der deaktiviert wird, verliert den
+  // Fokus, und das Modal hat ihn gerade erst dorthin zurueckgegeben.
+  const logoutOthersButton = container.querySelector('#logout-others-btn');
+  let logoutOthersBusy = false;
+  logoutOthersButton?.addEventListener('click', async () => {
+    if (logoutOthersBusy) return;
+    const status = container.querySelector('#logout-others-status');
+    const errorBox = container.querySelector('#logout-others-error');
+    const confirmed = await confirmModal(t('settings.otherSessionsConfirm'), {
+      confirmLabel: t('settings.otherSessionsButton'),
+      detail: t('settings.otherSessionsConfirmDetail'),
+      danger: true,
+    });
+    if (!confirmed) return;
+    logoutOthersBusy = true;
+    logoutOthersButton.setAttribute('aria-disabled', 'true');
+    clearError(errorBox);
+    if (status) status.textContent = '';
+    try {
+      const { ended = 0 } = await auth.logoutOthers() ?? {};
+      if (status) {
+        status.textContent = ended > 0
+          ? t('settings.otherSessionsEnded', { count: ended })
+          : t('settings.otherSessionsNone');
+      }
+    } catch (error) {
+      showError(errorBox, logoutOthersErrorText(error));
+    } finally {
+      logoutOthersBusy = false;
+      logoutOthersButton.removeAttribute('aria-disabled');
+      if (!container.contains(document.activeElement)) logoutOthersButton.focus({ preventScroll: true });
     }
   });
 

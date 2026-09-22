@@ -16,17 +16,16 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
+import { tempDir } from './tmp-dir.js';
 
 // db.js leitet den effektiven Pfad beim Modul-Load aus DB_PATH ab - hier nur
 // gesetzt, damit der Import nicht gegen die echte Anwendungsdatenbank läuft.
 // Verwendet wird ausschließlich der exportierte MIGRATIONS-Array, nicht
 // db.js' eigene init()/get()-Instanz (gleiches Muster wie
 // test-calendar-outbound-migration.js / test-budget-loans-migration.js).
-process.env.DB_PATH = join(mkdtempSync(join(tmpdir(), 'yuvomi-recipeprovidermig-')), 'unused.db');
+process.env.DB_PATH = join(tempDir('yuvomi-recipeprovidermig-'), 'unused.db');
 const { MIGRATIONS } = await import('../server/db.js');
 
 function applyMigration(db, migration) {

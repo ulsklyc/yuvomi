@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "Mantieni le quantità",
         "duplicateKeepNotes": "Mantieni note e link",
         "duplicateSubmit": "Duplica",
-        "duplicateError": "Impossibile duplicare la lista."
+        "duplicateError": "Impossibile duplicare la lista.",
+        "itemStateChecked": "spuntato",
+        "itemStateOpen": "non spuntato"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} pasti pianificati.",
@@ -2773,7 +2775,31 @@
         "healthPreventionKind": {
             "vaccination": "Vaccinazione",
             "checkup": "Controllo"
-        }
+        },
+        "backupRestoreKeyLabel": "Chiave del backup",
+        "backupRestoreKeyHint": "Questo backup proviene da un'altra installazione. Inserisci la sua DB_ENCRYPTION_KEY: viene usata solo per questo ripristino e non viene salvata; poi i dati sono cifrati con la chiave di questa installazione.",
+        "backupRestoreKeyHttpWarning": "Questa pagina non è aperta tramite HTTPS: la chiave attraverserà la rete senza cifratura.",
+        "backupRestoreErrorKeyRequired": "La chiave di questa installazione non apre il backup. Se proviene da un'altra installazione, inserisci qui sotto la sua chiave e ripristina di nuovo; altrimenti il file non è un database Yuvomi. Non cambiare la DB_ENCRYPTION_KEY di questa installazione: poi Yuvomi non si avvierebbe più. Qui non è stato modificato nulla.",
+        "backupRestoreErrorKeyWrong": "Questa chiave non apre il backup. Deve essere esattamente la DB_ENCRYPTION_KEY dell'installazione che ha scritto il backup, spazi alle estremità compresi.",
+        "backupRestoreErrorKeyInvalid": "La chiave non è arrivata al server in forma leggibile. Inseriscila di nuovo e ripristina ancora. Qui non è stato modificato nulla.",
+        "backupRestoreErrorOwnKeyMissing": "Questa installazione non ha una DB_ENCRYPTION_KEY e quindi non può aprire il backup. Imposta DB_ENCRYPTION_KEY, riavvia Yuvomi e poi ripristina con la chiave del backup.",
+        "backupRestoreErrorDamaged": "Il backup è danneggiato o incompleto; la chiave è giusta. Recupera di nuovo il file, confronta dimensione e sha256sum con l'originale e ripristina quella copia. Qui non è stato modificato nulla.",
+        "backupRestoreErrorUnreadable": "Impossibile leggere il backup. Verifica che il file sia completo e riprova; la causa esatta è nel log del server. Qui non è stato modificato nulla.",
+        "backupRestoreErrorGeneric": "Il ripristino non è riuscito. La causa esatta è nel log del server.",
+        "backupRestoreErrorNeverEncrypted": "Se il file non è mai stato cifrato, non è un database Yuvomi valido.",
+        "backupRestoreErrorKeyRightButNotDb": "Se la chiave è giusta, il file non è un database Yuvomi oppure è stato troncato.",
+        "backupRestoreErrorNothingChanged": "Qui non è stato modificato nulla.",
+        "otherSessionsTitle": "Altri dispositivi",
+        "otherSessionsHint": "Disconnette il tuo account da tutti gli altri dispositivi e browser. Questo dispositivo resta connesso. I token API e i display a parete associati non sono interessati.",
+        "otherSessionsButton": "Esci dagli altri dispositivi",
+        "otherSessionsConfirm": "Uscire da tutti gli altri dispositivi?",
+        "otherSessionsConfirmDetail": "Chi ha effettuato l’accesso lì con il tuo account dovrà accedere di nuovo. Questo dispositivo resta connesso.",
+        "otherSessionsEnded": "{{count}} altre sessioni terminate.",
+        "otherSessionsEnded_one": "{{count}} altra sessione terminata.",
+        "otherSessionsEnded_few": "{{count}} altre sessioni terminate.",
+        "otherSessionsNone": "Il tuo account non era connesso su nessun altro dispositivo.",
+        "otherSessionsError": "Uscita dagli altri dispositivi non riuscita.",
+        "otherSessionsTooManyAttempts": "Troppe richieste. Attendi un momento, poi riprova."
     },
     "login": {
         "tagline": "Bentornato nel tuo pianificatore familiare.",
@@ -3552,7 +3578,8 @@
         "currentMonth": "Corrente",
         "noVisitReportsInMonth": "Nessuna visita del personale registrata per {{month}}.",
         "settledAdminOnly": "Solo un admin può modificarla o eliminarla",
-        "reportVisitsCount": "Visite"
+        "reportVisitsCount": "Visite",
+        "receiptPresent": "Allegato"
     },
     "userMultiSelect": {
         "moreUsers": "altri",
@@ -5456,7 +5483,8 @@
         "confirmSelection": "Aggiungi selezione",
         "openAction": "Apri {{name}}",
         "limitReached": "Al massimo {{count}} documenti.",
-        "limitReached_one": "Al massimo {{count}} documento."
+        "limitReached_one": "Al massimo {{count}} documento.",
+        "presentHidden": "Allegato"
     },
     "join": {
         "title": "Configura il tuo account",

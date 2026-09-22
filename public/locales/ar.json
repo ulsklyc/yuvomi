@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "الاحتفاظ بالكميات",
         "duplicateKeepNotes": "الاحتفاظ بالملاحظات والروابط",
         "duplicateSubmit": "تكرار",
-        "duplicateError": "تعذّر تكرار القائمة."
+        "duplicateError": "تعذّر تكرار القائمة.",
+        "itemStateChecked": "تم التأشير",
+        "itemStateOpen": "لم يُؤشَّر عليه"
     },
     "meals": {
         "randomizeSuccess_few": "تم تخطيط {{count}} وجبات.",
@@ -2773,7 +2775,31 @@
         "healthPreventionKind": {
             "vaccination": "لقاح",
             "checkup": "فحص"
-        }
+        },
+        "backupRestoreKeyLabel": "مفتاح النسخة الاحتياطية",
+        "backupRestoreKeyHint": "هذه النسخة الاحتياطية من تثبيت آخر. أدخل DB_ENCRYPTION_KEY الخاص بذلك التثبيت: يُستخدم لهذه الاستعادة فقط ولا يُحفظ، وبعدها تُشفَّر البيانات بمفتاح هذا التثبيت.",
+        "backupRestoreKeyHttpWarning": "هذه الصفحة غير مفتوحة عبر HTTPS: سيُنقل المفتاح عبر الشبكة دون تشفير.",
+        "backupRestoreErrorKeyRequired": "مفتاح هذا التثبيت لا يفتح النسخة الاحتياطية. إذا كانت من تثبيت آخر، فأدخل مفتاح ذلك التثبيت أدناه وأعد الاستعادة؛ وإلا فالملف ليس قاعدة بيانات Yuvomi. لا تغيّر DB_ENCRYPTION_KEY لهذا التثبيت: بعدها لن يبدأ Yuvomi. لم يتغير شيء هنا.",
+        "backupRestoreErrorKeyWrong": "هذا المفتاح لا يفتح النسخة الاحتياطية. يجب أن يكون تمامًا DB_ENCRYPTION_KEY الخاص بالتثبيت الذي كتب النسخة، بما في ذلك المسافات في الطرفين.",
+        "backupRestoreErrorKeyInvalid": "لم يصل المفتاح إلى الخادم بصيغة مقروءة. أدخله مرة أخرى وأعد الاستعادة. لم يتغير شيء هنا.",
+        "backupRestoreErrorOwnKeyMissing": "ليس لهذا التثبيت DB_ENCRYPTION_KEY، لذلك لا يمكنه فتح النسخة الاحتياطية. عيّن DB_ENCRYPTION_KEY وأعد تشغيل Yuvomi ثم استعد النسخة بمفتاحها.",
+        "backupRestoreErrorDamaged": "النسخة الاحتياطية تالفة أو ناقصة، والمفتاح صحيح. احصل على الملف مرة أخرى وقارن حجمه وsha256sum بالأصل ثم استعد تلك النسخة. لم يتغير شيء هنا.",
+        "backupRestoreErrorUnreadable": "تعذّرت قراءة النسخة الاحتياطية. تحقق من أن الملف كامل وحاول مرة أخرى؛ السبب الدقيق في سجل الخادم. لم يتغير شيء هنا.",
+        "backupRestoreErrorGeneric": "فشلت الاستعادة. السبب الدقيق في سجل الخادم.",
+        "backupRestoreErrorNeverEncrypted": "إذا لم يُشفَّر الملف قط، فهو ليس قاعدة بيانات Yuvomi صالحة.",
+        "backupRestoreErrorKeyRightButNotDb": "إذا كان المفتاح صحيحًا، فالملف ليس قاعدة بيانات Yuvomi أو قُطع قبل اكتماله.",
+        "backupRestoreErrorNothingChanged": "لم يتغير شيء هنا.",
+        "otherSessionsTitle": "الأجهزة الأخرى",
+        "otherSessionsHint": "يسجّل خروج حسابك من جميع الأجهزة والمتصفحات الأخرى. يبقى هذا الجهاز مسجّل الدخول. لا يتأثر رموز API وشاشات الحائط المقترنة.",
+        "otherSessionsButton": "تسجيل الخروج من الأجهزة الأخرى",
+        "otherSessionsConfirm": "تسجيل الخروج من جميع الأجهزة الأخرى؟",
+        "otherSessionsConfirmDetail": "على كل من سجّل الدخول بحسابك هناك أن يسجّل الدخول من جديد. يبقى هذا الجهاز مسجّل الدخول.",
+        "otherSessionsEnded": "تم إنهاء {{count}} جلسات أخرى.",
+        "otherSessionsEnded_one": "تم إنهاء جلسة أخرى واحدة.",
+        "otherSessionsEnded_few": "تم إنهاء {{count}} جلسات أخرى.",
+        "otherSessionsNone": "لم يكن حسابك مسجّل الدخول على أي جهاز آخر.",
+        "otherSessionsError": "فشل تسجيل الخروج من الأجهزة الأخرى.",
+        "otherSessionsTooManyAttempts": "طلبات كثيرة. انتظر قليلًا ثم حاول مرة أخرى."
     },
     "login": {
         "tagline": "مرحبًا بعودتك إلى منظّم عائلتك.",
@@ -3552,7 +3578,8 @@
         "currentMonth": "الشهر الحالي",
         "noVisitReportsInMonth": "لم تُسجل أي زيارة في {{month}}.",
         "settledAdminOnly": "لا يمكن تعديله أو حذفه إلا بواسطة مسؤول",
-        "reportVisitsCount": "الزيارات"
+        "reportVisitsCount": "الزيارات",
+        "receiptPresent": "مرفق"
     },
     "userMultiSelect": {
         "moreUsers": "آخرون",
@@ -5456,7 +5483,8 @@
         "confirmSelection": "إضافة المحدد",
         "openAction": "فتح {{name}}",
         "limitReached": "بحد أقصى {{count}} مستندات.",
-        "limitReached_one": "مستند واحد بحد أقصى."
+        "limitReached_one": "مستند واحد بحد أقصى.",
+        "presentHidden": "مرفق"
     },
     "join": {
         "title": "إعداد حسابك",

@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "Zachovat množství",
         "duplicateKeepNotes": "Zachovat poznámky a odkazy",
         "duplicateSubmit": "Duplikovat",
-        "duplicateError": "Seznam se nepodařilo duplikovat."
+        "duplicateError": "Seznam se nepodařilo duplikovat.",
+        "itemStateChecked": "odškrtnuto",
+        "itemStateOpen": "neodškrtnuto"
     },
     "meals": {
         "randomizeSuccess_few": "Naplánována {{count}} jídla.",
@@ -2773,7 +2775,31 @@
         "healthPreventionKind": {
             "vaccination": "Očkování",
             "checkup": "Prohlídka"
-        }
+        },
+        "backupRestoreKeyLabel": "Klíč zálohy",
+        "backupRestoreKeyHint": "Tato záloha pochází z jiné instalace. Zadejte její DB_ENCRYPTION_KEY: použije se jen pro toto obnovení a neuloží se, poté jsou data šifrována klíčem této instalace.",
+        "backupRestoreKeyHttpWarning": "Tato stránka není otevřena přes HTTPS: klíč bude po síti přenesen nešifrovaně.",
+        "backupRestoreErrorKeyRequired": "Klíč této instalace zálohu neotevře. Pokud pochází z jiné instalace, zadejte níže její klíč a obnovte znovu; jinak soubor není databáze Yuvomi. Neměňte DB_ENCRYPTION_KEY této instalace: Yuvomi by se pak už nespustil. Nic zde nebylo změněno.",
+        "backupRestoreErrorKeyWrong": "Tento klíč zálohu neotevře. Musí to být přesně DB_ENCRYPTION_KEY instalace, která zálohu vytvořila, včetně mezer na okrajích.",
+        "backupRestoreErrorKeyInvalid": "Klíč nedorazil na server v čitelné podobě. Zadejte ho znovu a obnovte ještě jednou. Nic zde nebylo změněno.",
+        "backupRestoreErrorOwnKeyMissing": "Tato instalace nemá DB_ENCRYPTION_KEY, a proto zálohu neotevře. Nastavte DB_ENCRYPTION_KEY, restartujte Yuvomi a pak obnovte s klíčem zálohy.",
+        "backupRestoreErrorDamaged": "Záloha je poškozená nebo neúplná, klíč je správný. Stáhněte soubor znovu, porovnejte velikost a sha256sum s originálem a obnovte tuto kopii. Nic zde nebylo změněno.",
+        "backupRestoreErrorUnreadable": "Zálohu se nepodařilo přečíst. Zkontrolujte, zda je soubor úplný, a zkuste to znovu; přesná příčina je v logu serveru. Nic zde nebylo změněno.",
+        "backupRestoreErrorGeneric": "Obnovení se nezdařilo. Přesná příčina je v logu serveru.",
+        "backupRestoreErrorNeverEncrypted": "Pokud soubor nikdy nebyl šifrovaný, není platnou databází Yuvomi.",
+        "backupRestoreErrorKeyRightButNotDb": "Pokud je klíč správný, soubor není databáze Yuvomi nebo byl zkrácen.",
+        "backupRestoreErrorNothingChanged": "Nic zde nebylo změněno.",
+        "otherSessionsTitle": "Ostatní zařízení",
+        "otherSessionsHint": "Odhlásí tvůj účet na všech ostatních zařízeních a prohlížečích. Toto zařízení zůstane přihlášené. API tokeny a spárované nástěnné displeje nejsou dotčeny.",
+        "otherSessionsButton": "Odhlásit na ostatních zařízeních",
+        "otherSessionsConfirm": "Odhlásit na všech ostatních zařízeních?",
+        "otherSessionsConfirmDetail": "Kdo je tam přihlášen tvým účtem, se musí přihlásit znovu. Toto zařízení zůstane přihlášené.",
+        "otherSessionsEnded": "Ukončeno {{count}} dalších relací.",
+        "otherSessionsEnded_one": "Ukončena {{count}} další relace.",
+        "otherSessionsEnded_few": "Ukončeny {{count}} další relace.",
+        "otherSessionsNone": "Tvůj účet nebyl přihlášen na žádném jiném zařízení.",
+        "otherSessionsError": "Odhlášení na ostatních zařízeních se nezdařilo.",
+        "otherSessionsTooManyAttempts": "Příliš mnoho požadavků. Chvíli počkej a zkus to znovu."
     },
     "login": {
         "tagline": "Vítejte zpět ve svém rodinném plánovači.",
@@ -3124,7 +3150,8 @@
         "currentMonth": "Aktuální měsíc",
         "noVisitReportsInMonth": "V období {{month}} nebyly zaznamenány žádné návštěvy.",
         "settledAdminOnly": "Upravit nebo smazat ji může jen admin",
-        "reportVisitsCount": "Návštěvy"
+        "reportVisitsCount": "Návštěvy",
+        "receiptPresent": "Přiložen"
     },
     "splitExpenses": {
         "title": "Společné výdaje",
@@ -5456,7 +5483,8 @@
         "confirmSelection": "Přidat vybrané",
         "openAction": "Otevřít {{name}}",
         "limitReached": "Nejvýše dokumentů: {{count}}.",
-        "limitReached_one": "Nejvýše dokumentů: {{count}}."
+        "limitReached_one": "Nejvýše dokumentů: {{count}}.",
+        "presentHidden": "Přiložen"
     },
     "join": {
         "title": "Nastavení účtu",

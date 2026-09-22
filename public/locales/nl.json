@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "Hoeveelheden behouden",
         "duplicateKeepNotes": "Notities en links behouden",
         "duplicateSubmit": "Dupliceren",
-        "duplicateError": "De lijst kon niet worden gedupliceerd."
+        "duplicateError": "De lijst kon niet worden gedupliceerd.",
+        "itemStateChecked": "afgevinkt",
+        "itemStateOpen": "niet afgevinkt"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} maaltijden gepland.",
@@ -2773,7 +2775,31 @@
         "healthPreventionKind": {
             "vaccination": "Vaccinatie",
             "checkup": "Controle"
-        }
+        },
+        "backupRestoreKeyLabel": "Sleutel van de back-up",
+        "backupRestoreKeyHint": "Deze back-up komt van een andere installatie. Voer de DB_ENCRYPTION_KEY van die installatie in: die wordt alleen voor dit herstel gebruikt en niet opgeslagen, daarna zijn de gegevens versleuteld met de sleutel van deze installatie.",
+        "backupRestoreKeyHttpWarning": "Deze pagina is niet via HTTPS geopend: de sleutel gaat onversleuteld over het netwerk.",
+        "backupRestoreErrorKeyRequired": "De sleutel van deze installatie opent de back-up niet. Komt hij van een andere installatie, voer dan hieronder de sleutel van die installatie in en herstel opnieuw; anders is het bestand geen Yuvomi-database. Wijzig de DB_ENCRYPTION_KEY van deze installatie niet: daarna start Yuvomi niet meer. Hier is niets gewijzigd.",
+        "backupRestoreErrorKeyWrong": "Deze sleutel opent de back-up niet. Het moet precies de DB_ENCRYPTION_KEY zijn van de installatie die de back-up schreef, spaties aan de randen inbegrepen.",
+        "backupRestoreErrorKeyInvalid": "De sleutel kwam niet leesbaar bij de server aan. Voer hem opnieuw in en herstel nog een keer. Hier is niets gewijzigd.",
+        "backupRestoreErrorOwnKeyMissing": "Deze installatie heeft geen DB_ENCRYPTION_KEY en kan de back-up daarom niet openen. Stel DB_ENCRYPTION_KEY in, start Yuvomi opnieuw en herstel daarna met de sleutel van de back-up.",
+        "backupRestoreErrorDamaged": "De back-up is beschadigd of onvolledig; de sleutel klopt. Haal het bestand opnieuw op, vergelijk grootte en sha256sum met het origineel en herstel die kopie. Hier is niets gewijzigd.",
+        "backupRestoreErrorUnreadable": "De back-up kon niet worden gelezen. Controleer of het bestand volledig is en probeer het opnieuw; de precieze oorzaak staat in het serverlog. Hier is niets gewijzigd.",
+        "backupRestoreErrorGeneric": "Het herstel is mislukt. De precieze oorzaak staat in het serverlog.",
+        "backupRestoreErrorNeverEncrypted": "Is het bestand nooit versleuteld, dan is het geen geldige Yuvomi-database.",
+        "backupRestoreErrorKeyRightButNotDb": "Klopt de sleutel, dan is het bestand geen Yuvomi-database of is het afgekapt.",
+        "backupRestoreErrorNothingChanged": "Hier is niets gewijzigd.",
+        "otherSessionsTitle": "Andere apparaten",
+        "otherSessionsHint": "Meldt je account af op alle andere apparaten en browsers. Dit apparaat blijft aangemeld. API-tokens en gekoppelde wandschermen blijven ongemoeid.",
+        "otherSessionsButton": "Afmelden op andere apparaten",
+        "otherSessionsConfirm": "Afmelden op alle andere apparaten?",
+        "otherSessionsConfirmDetail": "Wie daar met jouw account is aangemeld, moet zich opnieuw aanmelden. Dit apparaat blijft aangemeld.",
+        "otherSessionsEnded": "{{count}} andere sessies beëindigd.",
+        "otherSessionsEnded_one": "{{count}} andere sessie beëindigd.",
+        "otherSessionsEnded_few": "{{count}} andere sessies beëindigd.",
+        "otherSessionsNone": "Je account was op geen enkel ander apparaat aangemeld.",
+        "otherSessionsError": "Afmelden op andere apparaten is mislukt.",
+        "otherSessionsTooManyAttempts": "Te veel verzoeken. Wacht even en probeer het dan opnieuw."
     },
     "login": {
         "tagline": "Welkom terug bij je gezinsplanner.",
@@ -3552,7 +3578,8 @@
         "currentMonth": "Huidig",
         "noVisitReportsInMonth": "Geen personeelsbezoeken vastgelegd in {{month}}.",
         "settledAdminOnly": "Alleen een beheerder kan dit wijzigen of verwijderen",
-        "reportVisitsCount": "Bezoeken"
+        "reportVisitsCount": "Bezoeken",
+        "receiptPresent": "Aanwezig"
     },
     "userMultiSelect": {
         "moreUsers": "meer",
@@ -5456,7 +5483,8 @@
         "confirmSelection": "Selectie toevoegen",
         "openAction": "{{name}} openen",
         "limitReached": "Maximaal {{count}} documenten.",
-        "limitReached_one": "Maximaal {{count}} document."
+        "limitReached_one": "Maximaal {{count}} document.",
+        "presentHidden": "Aanwezig"
     },
     "join": {
         "title": "Account instellen",

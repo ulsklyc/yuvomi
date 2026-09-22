@@ -646,7 +646,9 @@
         "duplicateKeepQuantities": "Pertahankan jumlah",
         "duplicateKeepNotes": "Pertahankan catatan & tautan",
         "duplicateSubmit": "Duplikat",
-        "duplicateError": "Daftar tidak dapat diduplikat."
+        "duplicateError": "Daftar tidak dapat diduplikat.",
+        "itemStateChecked": "dicentang",
+        "itemStateOpen": "belum dicentang"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} makanan direncanakan.",
@@ -2785,7 +2787,31 @@
         "healthPreventionKind": {
             "vaccination": "Vaksinasi",
             "checkup": "Pemeriksaan"
-        }
+        },
+        "backupRestoreKeyLabel": "Kunci cadangan",
+        "backupRestoreKeyHint": "Cadangan ini berasal dari instalasi lain. Masukkan DB_ENCRYPTION_KEY instalasi tersebut: kunci hanya dipakai untuk pemulihan ini dan tidak disimpan, lalu data dienkripsi dengan kunci instalasi ini.",
+        "backupRestoreKeyHttpWarning": "Halaman ini tidak dibuka melalui HTTPS: kunci akan dikirim lewat jaringan tanpa enkripsi.",
+        "backupRestoreErrorKeyRequired": "Kunci instalasi ini tidak membuka cadangan. Jika cadangan berasal dari instalasi lain, masukkan kunci instalasi tersebut di bawah lalu pulihkan lagi; jika tidak, file ini bukan database Yuvomi. Jangan ubah DB_ENCRYPTION_KEY instalasi ini: setelah itu Yuvomi tidak akan bisa dimulai. Tidak ada yang diubah di sini.",
+        "backupRestoreErrorKeyWrong": "Kunci ini tidak membuka cadangan. Harus persis DB_ENCRYPTION_KEY instalasi yang menulis cadangan, termasuk spasi di kedua ujung.",
+        "backupRestoreErrorKeyInvalid": "Kunci tidak sampai ke server dalam bentuk yang terbaca. Masukkan lagi lalu pulihkan sekali lagi. Tidak ada yang diubah di sini.",
+        "backupRestoreErrorOwnKeyMissing": "Instalasi ini tidak memiliki DB_ENCRYPTION_KEY sehingga tidak dapat membuka cadangan. Atur DB_ENCRYPTION_KEY, mulai ulang Yuvomi, lalu pulihkan dengan kunci cadangan.",
+        "backupRestoreErrorDamaged": "Cadangan rusak atau tidak lengkap; kuncinya benar. Ambil file lagi, bandingkan ukuran dan sha256sum dengan aslinya, lalu pulihkan salinan itu. Tidak ada yang diubah di sini.",
+        "backupRestoreErrorUnreadable": "Cadangan tidak dapat dibaca. Pastikan file lengkap lalu coba lagi; penyebab pastinya ada di log server. Tidak ada yang diubah di sini.",
+        "backupRestoreErrorGeneric": "Pemulihan gagal. Penyebab pastinya ada di log server.",
+        "backupRestoreErrorNeverEncrypted": "Jika file tidak pernah dienkripsi, file ini bukan database Yuvomi yang valid.",
+        "backupRestoreErrorKeyRightButNotDb": "Jika kuncinya benar, file ini bukan database Yuvomi atau terpotong.",
+        "backupRestoreErrorNothingChanged": "Tidak ada yang diubah di sini.",
+        "otherSessionsTitle": "Perangkat lain",
+        "otherSessionsHint": "Mengeluarkan akunmu dari semua perangkat dan browser lain. Perangkat ini tetap masuk. Token API dan layar dinding yang dipasangkan tidak terpengaruh.",
+        "otherSessionsButton": "Keluar dari perangkat lain",
+        "otherSessionsConfirm": "Keluar dari semua perangkat lain?",
+        "otherSessionsConfirmDetail": "Siapa pun yang masuk dengan akunmu di sana harus masuk lagi. Perangkat ini tetap masuk.",
+        "otherSessionsEnded": "{{count}} sesi lain diakhiri.",
+        "otherSessionsEnded_one": "{{count}} sesi lain diakhiri.",
+        "otherSessionsEnded_few": "{{count}} sesi lain diakhiri.",
+        "otherSessionsNone": "Akunmu tidak masuk di perangkat lain mana pun.",
+        "otherSessionsError": "Gagal keluar dari perangkat lain.",
+        "otherSessionsTooManyAttempts": "Terlalu banyak permintaan. Tunggu sebentar, lalu coba lagi."
     },
     "login": {
         "tagline": "Selamat datang kembali di perencana keluarga Anda.",
@@ -3556,7 +3582,8 @@
         "currentMonth": "Saat ini",
         "noVisitReportsInMonth": "Tidak ada kunjungan tercatat pada {{month}}.",
         "settledAdminOnly": "Hanya admin yang dapat mengubah atau menghapusnya",
-        "reportVisitsCount": "Kunjungan"
+        "reportVisitsCount": "Kunjungan",
+        "receiptPresent": "Terlampir"
     },
     "splitExpenses": {
         "title": "Pengeluaran Bersama",
@@ -5456,7 +5483,8 @@
         "confirmSelection": "Tambahkan pilihan",
         "openAction": "Buka {{name}}",
         "limitReached": "Maksimal {{count}} dokumen.",
-        "limitReached_one": "Maksimal {{count}} dokumen."
+        "limitReached_one": "Maksimal {{count}} dokumen.",
+        "presentHidden": "Terlampir"
     },
     "join": {
         "title": "Siapkan akun Anda",

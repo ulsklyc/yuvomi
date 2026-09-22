@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "Сохранить количество",
         "duplicateKeepNotes": "Сохранить заметки и ссылки",
         "duplicateSubmit": "Дублировать",
-        "duplicateError": "Не удалось дублировать список."
+        "duplicateError": "Не удалось дублировать список.",
+        "itemStateChecked": "отмечено",
+        "itemStateOpen": "не отмечено"
     },
     "meals": {
         "randomizeSuccess_few": "Запланировано {{count}} приёма пищи.",
@@ -2773,7 +2775,31 @@
         "healthPreventionKind": {
             "vaccination": "Прививка",
             "checkup": "Осмотр"
-        }
+        },
+        "backupRestoreKeyLabel": "Ключ резервной копии",
+        "backupRestoreKeyHint": "Эта резервная копия создана другой установкой. Введите её DB_ENCRYPTION_KEY: он используется только для этого восстановления и не сохраняется, после чего данные шифруются ключом этой установки.",
+        "backupRestoreKeyHttpWarning": "Страница открыта не по HTTPS: ключ будет передан по сети без шифрования.",
+        "backupRestoreErrorKeyRequired": "Ключ этой установки не открывает резервную копию. Если она создана другой установкой, введите ниже её ключ и повторите восстановление; иначе файл не является базой данных Yuvomi. Не меняйте DB_ENCRYPTION_KEY этой установки: после этого Yuvomi перестанет запускаться. Здесь ничего не изменено.",
+        "backupRestoreErrorKeyWrong": "Этот ключ не открывает резервную копию. Это должен быть точно DB_ENCRYPTION_KEY установки, создавшей копию, включая пробелы по краям.",
+        "backupRestoreErrorKeyInvalid": "Ключ дошёл до сервера в нечитаемом виде. Введите его снова и повторите восстановление. Здесь ничего не изменено.",
+        "backupRestoreErrorOwnKeyMissing": "У этой установки нет DB_ENCRYPTION_KEY, поэтому она не может открыть резервную копию. Задайте DB_ENCRYPTION_KEY, перезапустите Yuvomi и затем восстановите копию с её ключом.",
+        "backupRestoreErrorDamaged": "Резервная копия повреждена или неполна; ключ верный. Получите файл заново, сравните размер и sha256sum с оригиналом и восстановите эту копию. Здесь ничего не изменено.",
+        "backupRestoreErrorUnreadable": "Не удалось прочитать резервную копию. Проверьте, что файл полный, и попробуйте снова; точная причина указана в журнале сервера. Здесь ничего не изменено.",
+        "backupRestoreErrorGeneric": "Восстановление не удалось. Точная причина указана в журнале сервера.",
+        "backupRestoreErrorNeverEncrypted": "Если файл никогда не был зашифрован, это не действительная база данных Yuvomi.",
+        "backupRestoreErrorKeyRightButNotDb": "Если ключ верный, файл не является базой данных Yuvomi или был обрезан.",
+        "backupRestoreErrorNothingChanged": "Здесь ничего не изменено.",
+        "otherSessionsTitle": "Другие устройства",
+        "otherSessionsHint": "Выполняет выход из вашей учётной записи на всех других устройствах и в браузерах. Это устройство останется в системе. API-токены и подключённые настенные дисплеи не затрагиваются.",
+        "otherSessionsButton": "Выйти на других устройствах",
+        "otherSessionsConfirm": "Выйти на всех других устройствах?",
+        "otherSessionsConfirmDetail": "Всем, кто вошёл там под вашей учётной записью, придётся войти снова. Это устройство останется в системе.",
+        "otherSessionsEnded": "Завершено других сеансов: {{count}}.",
+        "otherSessionsEnded_one": "Завершён {{count}} другой сеанс.",
+        "otherSessionsEnded_few": "Завершено {{count}} других сеанса.",
+        "otherSessionsNone": "Ваша учётная запись не была открыта ни на одном другом устройстве.",
+        "otherSessionsError": "Не удалось выйти на других устройствах.",
+        "otherSessionsTooManyAttempts": "Слишком много запросов. Подождите немного и попробуйте снова."
     },
     "login": {
         "tagline": "С возвращением в ваш семейный планировщик.",
@@ -3552,7 +3578,8 @@
         "currentMonth": "Текущий",
         "noVisitReportsInMonth": "За период {{month}} визитов не записано.",
         "settledAdminOnly": "Изменить или удалить может только администратор",
-        "reportVisitsCount": "Визиты"
+        "reportVisitsCount": "Визиты",
+        "receiptPresent": "Прикреплён"
     },
     "userMultiSelect": {
         "moreUsers": "ещё",
@@ -5456,7 +5483,8 @@
         "confirmSelection": "Добавить выбранные",
         "openAction": "Открыть {{name}}",
         "limitReached": "Не более {{count}} документов.",
-        "limitReached_one": "Не более {{count}} документа."
+        "limitReached_one": "Не более {{count}} документа.",
+        "presentHidden": "Прикреплён"
     },
     "join": {
         "title": "Настройка учётной записи",

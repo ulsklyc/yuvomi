@@ -5924,6 +5924,49 @@ textarea::placeholder {
   }
 }
 
+/* DER STAPEL WEICHT DEN KNOEPFEN EINES OFFENEN DIALOGS AUS (#1160).
+ *
+ * Er steht ueber Dialogen (`--z-toast` ueber `--z-modal`), damit eine Meldung
+ * waehrend eines Dialogs sichtbar bleibt - positioniert ist er aber fuer die
+ * Seite. Bei 1280x900 lag der Erinnerungs-Toast genau auf "Speichern" des
+ * Kalenderdialogs und nahm den Klick: die Erinnerung war verworfen, der Termin
+ * nicht gespeichert. Welche Lage frei ist (ueber dem Dialog, unter ihm, ueber
+ * seiner Aktionsleiste), steht erst gemessen fest; das entscheidet
+ * utils/toast-placement.js und schreibt es als Variablen hierher, immer als
+ * Oberkante im Bild. `measure` ist der Zwischenstand, in dem es die Hoehe in
+ * der Dialogbreite abliest.
+ * Attribut plus Klasse schlaegt die Media-Queries oben ohne `!important`. */
+.shell-bottom-stack {
+  --toast-dock-gap: var(--space-3);
+}
+
+.shell-bottom-stack[data-dock] {
+  left: var(--toast-dock-center);
+  width: var(--toast-dock-width);
+}
+
+.shell-bottom-stack[data-dock="placed"] {
+  top: var(--toast-dock-top);
+  bottom: auto;
+}
+
+/* Kein freier Platz neben dem Dialog: nur der juengste Toast bleibt sichtbar.
+ * Die uebrigen bleiben im Dokument, in der Schreibweise von `.sr-only`
+ * (reset.css) und `inert` (utils/toast-placement.js), damit ihre Knoepfe nicht
+ * unsichtbar per Tab erreichbar sind. Sie kommen zurueck, sobald Platz ist. */
+.shell-bottom-stack .toast.toast--tucked {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  pointer-events: none;
+}
+
 .toast {
   display: flex;
   align-items: center;
@@ -6578,6 +6621,14 @@ textarea::placeholder {
  * Zeilenende, und das liegt in RTL links. */
 [dir='rtl'] .swipe-row::after {
   transform: translateY(-50%) scaleX(-1);
+}
+
+/* Eine Zeile OHNE Geste (Nur-lesen, #1265): der Chevron versprache einen Wisch,
+ * den keine Verdrahtung beantwortet. Die Zeile behaelt `.swipe-row` fuer ihre
+ * Form und ihre Nachschlage-Selektoren; nur die Richtungsangabe faellt weg.
+ * Steht NACH der Basisregel: gleiche Spezifitaet, die Reihenfolge entscheidet. */
+.swipe-row--static::after {
+  content: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

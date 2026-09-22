@@ -10,7 +10,10 @@ import { hashPassword, normalizePassword } from '../utils/password.js';
 import { createLogger } from '../logger.js';
 import { collectErrors, date as validateDate, id as validateId, str, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
-import { documentLinksFor, loadDocumentLinks, replaceDocumentLinks, visibleDocumentRef } from '../services/document-links.js';
+import {
+  documentLinksFor, documentRefForViewer, documentViewer, loadDocumentLinks, replaceDocumentLinks,
+  sendDocumentLinkRefusal, visibleDocumentRef,
+} from '../services/document-links.js';
 import { sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
 import { buildSplits, decorateMoney, minorToDecimal, parseMoneyToMinor, simplifyDebts } from '../services/split-expenses.js';
 import { CURRENCY_CODES } from '../../public/utils/currency-codes.js';
@@ -126,16 +129,28 @@ function normalizeLedgerRow(row) {
  * „storniert", waehrend der Saldo die Zahlung wieder zaehlt. So verschwinden
  * Zustand und Wirkung nur gemeinsam. `settlements.status` bleibt unberuehrt:
  * sein zweiter Wert heisst 'deleted', und ein Storno ist keine Loeschung.
+ *
+ * Die Gegenbuchung traegt den `created_by` ihrer Originalzeile (wer die Zahlung
+ * erfasst hat), damit Buchung und Gegenbuchung am selben Konto haengen und nur
+ * gemeinsam fallen. Wer storniert hat, steht deshalb nicht im Ledger, sondern
+ * im Verlauf (`payment_reversed`, actor_id) - `null`, wenn das Konto fehlt.
  */
 function settlementReversal(database, settlementId) {
   const row = database.prepare(`
-    SELECT created_at AS reversed_at, created_by AS reversed_by
+    SELECT created_at AS reversed_at
     FROM expense_ledger_entries
     WHERE source_type = 'settlement_reversal' AND source_id = ?
     ORDER BY id ASC
     LIMIT 1
   `).get(settlementId);
-  return row || null;
+  if (!row) return null;
+  const actor = database.prepare(`
+    SELECT actor_id FROM expense_activity
+    WHERE type = 'payment_reversed' AND entity_type = 'settlement' AND entity_id = ?
+    ORDER BY id ASC
+    LIMIT 1
+  `).get(settlementId);
+  return { reversed_at: row.reversed_at, reversed_by: actor ? actor.actor_id : null };
 }
 
 /**
@@ -275,7 +290,7 @@ function loadExpense(expenseId, req) {
 // Belege einer Ausgabe: Tabellen-Adresse für den geteilten Verknüpfungs-Service.
 const EXPENSE_ATTACHMENTS = { table: 'expense_attachments', ownerColumn: 'expense_id', extraColumns: ['kind'] };
 
-function serializeExpense(expense, prefetched, viewerId) {
+function serializeExpense(expense, prefetched, viewer) {
   const splits = prefetched
     ? (prefetched.splits.get(expense.id) || [])
     : db.get().prepare(`
@@ -290,7 +305,7 @@ function serializeExpense(expense, prefetched, viewerId) {
   // gehört. Vorher lieferte der Join den Namen an jedes Gruppenmitglied aus.
   const attachments = prefetched
     ? (prefetched.attachments.get(expense.id) || [])
-    : documentLinksFor(db.get(), { ...EXPENSE_ATTACHMENTS, ownerId: expense.id, userId: viewerId });
+    : documentLinksFor(db.get(), { ...EXPENSE_ATTACHMENTS, ownerId: expense.id, viewer });
   return {
     ...decorateMoney(expense, ['amount_minor', 'converted_amount_minor']),
     splits,
@@ -303,7 +318,7 @@ function serializeExpense(expense, prefetched, viewerId) {
  * rows in 2 queries total (WHERE expense_id IN (...)) instead of 2 per row.
  * Kills the N+1 in the list endpoints (was up to ~201 queries for 100 rows).
  */
-function serializeExpenseList(expenses, viewerId) {
+function serializeExpenseList(expenses, viewer) {
   if (!expenses.length) return [];
   const ids = expenses.map((e) => e.id);
   const placeholders = ids.map(() => '?').join(', ');
@@ -321,13 +336,34 @@ function serializeExpenseList(expenses, viewerId) {
     splits.get(expense_id).push({ ...rest, amount: minorToDecimal(rest.amount_minor, rest.currency) });
   }
 
-  const attachments = loadDocumentLinks(db.get(), { ...EXPENSE_ATTACHMENTS, ownerIds: ids, userId: viewerId });
+  const attachments = loadDocumentLinks(db.get(), { ...EXPENSE_ATTACHMENTS, ownerIds: ids, viewer });
 
   const prefetched = { splits, attachments };
-  return expenses.map((expense) => serializeExpense(expense, prefetched, viewerId));
+  return expenses.map((expense) => serializeExpense(expense, prefetched, viewer));
 }
 
-function insertExpenseLedger(database, expense, splits, actorId, sourceType = 'expense') {
+/**
+ * Eine Zahlung, wie sie dieser Anfrage gezeigt wird. Der Zahlungsnachweis ist
+ * ein Dokument: seine ID geht nur an, wer das Dokumente-Modul lesen darf und
+ * das Dokument sieht (#1358) - storniert etwa ein Gruppenverwalter die Zahlung
+ * eines anderen, nannte die Antwort sonst die ID eines fremden privaten
+ * Dokuments.
+ */
+function settlementForViewer(row, req) {
+  return {
+    ...decorateMoney(row),
+    proof_document_id: documentRefForViewer(db.get(), row.proof_document_id, documentViewer(req)),
+  };
+}
+
+// `created_by` jeder Ledger-Zeile ist `expense.created_by`, nie die Person, die
+// gerade anlegt oder bearbeitet: Ausgabe und Zeilen haengen per ON DELETE
+// CASCADE am selben Konto und fallen so nur gemeinsam. Trug ein PUT die
+// bearbeitende Person ein, nahm deren Kontoloeschung die Zeilen mit, und die
+// weiter aktive Ausgabe zaehlte nicht mehr im Saldo. Wer bearbeitet hat, steht
+// in `expense_edited` (expense_activity.actor_id).
+function insertExpenseLedger(database, expense, splits, sourceType = 'expense') {
+  const actorId = expense.created_by;
   const insert = database.prepare(`
     INSERT INTO expense_ledger_entries
       (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
@@ -339,12 +375,12 @@ function insertExpenseLedger(database, expense, splits, actorId, sourceType = 'e
   }
 }
 
-function replaceExpenseSplits(database, expense, splits, actorId) {
+function replaceExpenseSplits(database, expense, splits) {
   database.prepare('DELETE FROM expense_splits WHERE expense_id = ?').run(expense.id);
   database.prepare('DELETE FROM expense_ledger_entries WHERE source_type IN (?, ?) AND source_id = ?').run('expense', 'expense_reversal', expense.id);
   const insertSplit = database.prepare('INSERT INTO expense_splits (expense_id, user_id, amount_minor, currency) VALUES (?, ?, ?, ?)');
   for (const split of splits) insertSplit.run(expense.id, split.user_id, split.amount_minor, split.currency);
-  insertExpenseLedger(database, expense, splits, actorId);
+  insertExpenseLedger(database, expense, splits);
 }
 
 function parseExpenseBody(body, fallbackCurrency) {
@@ -454,7 +490,7 @@ router.get('/dashboard', (req, res) => {
       ORDER BY e.expense_date DESC, e.created_at DESC
       LIMIT 8
     `).all({ uid, restrictedGroupId, isGuest });
-    const recentSerialized = serializeExpenseList(recent, userId(req));
+    const recentSerialized = serializeExpenseList(recent, documentViewer(req));
     res.json({ data: { total_owed: totalOwed, total_owing: totalOwing, groups, recent_expenses: recentSerialized } });
   } catch (err) {
     log.error('GET /dashboard error:', err);
@@ -805,7 +841,7 @@ router.get('/groups/:id/expenses', (req, res) => {
       ORDER BY e.expense_date DESC, e.created_at DESC
       LIMIT @limit OFFSET @offset
     `).all({ groupId, search, category, recurringOnly: recurringOnly ? 1 : 0, limit, offset });
-    const serialized = serializeExpenseList(rows, userId(req));
+    const serialized = serializeExpenseList(rows, documentViewer(req));
     res.json({ data: serialized, pagination: { limit, offset, has_more: serialized.length === limit } });
   } catch (err) {
     log.error('GET /groups/:id/expenses error:', err);
@@ -839,22 +875,23 @@ router.post('/groups/:id/expenses', (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(groupId, parsed.title, parsed.description, parsed.amountMinor, parsed.currency, parsed.convertedAmountMinor, parsed.convertedCurrency, JSON.stringify(req.body.exchange_snapshot || null), payerId, parsed.category, parsed.method, parsed.expenseDate, userId(req));
       const expense = db.get().prepare('SELECT * FROM expenses WHERE id = ?').get(result.lastInsertRowid);
-      replaceExpenseSplits(db.get(), expense, splits, userId(req));
+      replaceExpenseSplits(db.get(), expense, splits);
       // Belege (#583): nur sichtbare Dokumente, sonst liesse sich über geratene
       // IDs der Name eines fremden Dokuments auslesen.
       replaceDocumentLinks(db.get(), {
         ...EXPENSE_ATTACHMENTS,
         ownerId: expense.id,
         documentIds: req.body.attachment_document_ids,
-        userId: userId(req),
+        viewer: documentViewer(req),
         extraValues: { kind: 'receipt' },
       });
       activity(groupId, userId(req), 'expense_created', 'expense', expense.id, { title: parsed.title });
       return expense.id;
     });
-    res.status(201).json({ data: serializeExpense(loadExpense(createdId, req), null, userId(req)) });
+    res.status(201).json({ data: serializeExpense(loadExpense(createdId, req), null, documentViewer(req)) });
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
+    if (sendDocumentLinkRefusal(res, err)) return;
     const message = err.message || 'Invalid expense.';
     log.error('POST /groups/:id/expenses error:', err);
     res.status(message.includes('Internal') ? 500 : 400).json({ error: message, code: message.includes('Internal') ? 500 : 400 });
@@ -887,7 +924,7 @@ router.put('/expenses/:id', (req, res) => {
         WHERE id = ?
       `).run(parsed.title, parsed.description, parsed.amountMinor, parsed.currency, parsed.convertedAmountMinor, parsed.convertedCurrency, JSON.stringify(req.body.exchange_snapshot || null), payerId, parsed.category, parsed.method, parsed.expenseDate, existing.id);
       const expense = db.get().prepare('SELECT * FROM expenses WHERE id = ?').get(existing.id);
-      replaceExpenseSplits(db.get(), expense, splits, userId(req));
+      replaceExpenseSplits(db.get(), expense, splits);
       // Belege nur anfassen, wenn das Feld mitkommt - ein PUT, das nur den
       // Betrag korrigiert, darf sie nicht stillschweigend abräumen.
       if (req.body.attachment_document_ids !== undefined) {
@@ -895,15 +932,16 @@ router.put('/expenses/:id', (req, res) => {
           ...EXPENSE_ATTACHMENTS,
           ownerId: existing.id,
           documentIds: req.body.attachment_document_ids,
-          userId: userId(req),
+          viewer: documentViewer(req),
           extraValues: { kind: 'receipt' },
         });
       }
       activity(existing.group_id, userId(req), 'expense_edited', 'expense', existing.id, { title: parsed.title });
     });
-    res.json({ data: serializeExpense(loadExpense(existing.id, req), null, userId(req)) });
+    res.json({ data: serializeExpense(loadExpense(existing.id, req), null, documentViewer(req)) });
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
+    if (sendDocumentLinkRefusal(res, err)) return;
     log.error('PUT /expenses/:id error:', err);
     res.status(400).json({ error: err.message || 'Invalid expense.', code: 400 });
   }
@@ -982,7 +1020,7 @@ router.post('/groups/:id/settlements', (req, res) => {
     // Zahlungsnachweis: nur ein Dokument, das diese Person sehen darf (#583).
     // Vorher wurde die rohe ID übernommen - eine geratene fremde ID hätte sich
     // so an die Zahlung heften lassen.
-    const proofDocumentId = visibleDocumentRef(db.get(), req.body.proof_document_id, userId(req));
+    const proofDocumentId = visibleDocumentRef(db.get(), req.body.proof_document_id, documentViewer(req));
     const settlementId = db.transaction(() => {
       const result = db.get().prepare(`
         INSERT INTO settlements (group_id, payer_id, payee_id, amount_minor, currency, notes, proof_document_id, created_by)
@@ -1000,9 +1038,10 @@ router.post('/groups/:id/settlements', (req, res) => {
       return result.lastInsertRowid;
     });
     const row = db.get().prepare('SELECT * FROM settlements WHERE id = ?').get(settlementId);
-    res.status(201).json({ data: decorateMoney(row) });
+    res.status(201).json({ data: settlementForViewer(row, req) });
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
+    if (sendDocumentLinkRefusal(res, err)) return;
     log.error('POST /groups/:id/settlements error:', err);
     res.status(400).json({ error: err.message || 'Invalid settlement.', code: 400 });
   }
@@ -1029,7 +1068,7 @@ router.post('/groups/:id/settlements/:settlementId/reverse', (req, res) => {
     const outcome = db.transaction(() => {
       if (settlementReversal(db.get(), settlement.id)) return 'already_reversed';
       const booked = db.get().prepare(`
-        SELECT user_id, counterparty_id, amount_minor, currency
+        SELECT user_id, counterparty_id, amount_minor, currency, created_by
         FROM expense_ledger_entries
         WHERE source_type = 'settlement' AND source_id = ?
         ORDER BY id ASC
@@ -1039,8 +1078,14 @@ router.post('/groups/:id/settlements/:settlementId/reverse', (req, res) => {
         INSERT INTO expense_ledger_entries (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
         VALUES (?, 'settlement_reversal', ?, ?, ?, ?, ?, ?, ?)
       `);
+      // `created_by` kommt aus der Originalzeile, nicht von der stornierenden
+      // Person: beide Zeilen haengen per ON DELETE CASCADE an diesem Konto und
+      // fallen so nur gemeinsam. Mit dem Konto der stornierenden Person
+      // verschwaende sonst nur die Gegenbuchung, und die stornierte Zahlung
+      // zaehlte still wieder im Saldo. Wer storniert hat, steht in
+      // `payment_reversed` (expense_activity.actor_id).
       for (const row of booked) {
-        insert.run(groupId, settlement.id, row.user_id, row.counterparty_id, -row.amount_minor, row.currency, 'Settlement reversal', userId(req));
+        insert.run(groupId, settlement.id, row.user_id, row.counterparty_id, -row.amount_minor, row.currency, 'Settlement reversal', row.created_by);
       }
       activity(groupId, userId(req), 'payment_reversed', 'settlement', settlement.id, {
         amount: minorToDecimal(settlement.amount_minor, settlement.currency),
@@ -1050,7 +1095,7 @@ router.post('/groups/:id/settlements/:settlementId/reverse', (req, res) => {
     });
     if (outcome === 'already_reversed') return res.status(409).json({ error: 'Settlement is already reversed.', code: 409 });
     if (outcome === 'nothing_booked') return res.status(409).json({ error: 'Settlement has no ledger entries to reverse.', code: 409 });
-    res.json({ data: { ...decorateMoney(settlement), ...settlementReversal(db.get(), settlement.id) } });
+    res.json({ data: { ...settlementForViewer(settlement, req), ...settlementReversal(db.get(), settlement.id) } });
   } catch (err) {
     log.error('POST /groups/:id/settlements/:settlementId/reverse error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1242,7 +1287,7 @@ router.get('/search', (req, res) => {
         AND (@isGuest = 0 OR g.id = @restrictedGroupId)
       ORDER BY e.expense_date DESC LIMIT 10
     `).all({ uid, q, restrictedGroupId, isGuest });
-    const expensesSerialized = serializeExpenseList(expenses, userId(req));
+    const expensesSerialized = serializeExpenseList(expenses, documentViewer(req));
     const people = db.get().prepare(`
       SELECT DISTINCT u.id, u.display_name, u.username, u.avatar_color
       FROM users u

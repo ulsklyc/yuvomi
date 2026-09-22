@@ -392,6 +392,21 @@ const twoFactorLimiter = rateLimit({
   message: { error: 'Zu viele Versuche. Bitte warte kurz.', code: 429 },
 });
 
+// Eigener Limiter fuer "Auf anderen Geraeten abmelden" (#1354). Zaehlt alle
+// Antworten wie der Reset-Limiter: jeder Aufruf liest die ganze Sitzungstabelle.
+// Gezaehlt wird JE MITGLIED, nicht je Adresse: hinter einem Proxy ohne
+// `trust proxy` kommt der ganze Haushalt von einer IP, und ein Mitglied saehe
+// sich sonst von den Klicks eines anderen gesperrt. Der Limiter sitzt hinter
+// `requireAuth`, `req.authUserId` steht also immer.
+const sessionRevokeLimiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60_000,
+  max: parseInt(process.env.RATE_LIMIT_MAX_ATTEMPTS) || 5,
+  keyGenerator: (req) => `user:${req.authUserId}`,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Zu viele Anfragen. Bitte warte kurz.', code: 429 },
+});
+
 // Wie lange ein bestandenes Passwort auf den zweiten Faktor warten darf.
 const TWO_FACTOR_WINDOW_MS = 5 * 60 * 1000;
 
@@ -726,17 +741,30 @@ function updateUserRoleSessions(userId, role) {
   }
 }
 
+/**
+ * Beendet alle Sitzungen eines Mitglieds ausser `exceptSid` und meldet, wie
+ * viele es waren. Der eine Weg fuer Passwortwechsel, 2FA, Admin-Passwort und
+ * "Auf anderen Geraeten abmelden" (#1354). API-Tokens und Wandtabletts sind
+ * keine Zeilen dieser Tabelle und bleiben unberuehrt.
+ */
 function invalidateUserSessions(userId, exceptSid) {
-  const allSessions = db.get().prepare('SELECT sid, sess FROM sessions').all();
+  const allSessions = db.get().prepare('SELECT sid, sess, expired_at FROM sessions').all();
+  const now = Date.now();
+  let ended = 0;
   for (const row of allSessions) {
     if (row.sid === exceptSid) continue;
     try {
       const sess = JSON.parse(row.sess);
       if (sess.userId === userId) {
-        db.get().prepare('DELETE FROM sessions WHERE sid = ?').run(row.sid);
+        const { changes } = db.get().prepare('DELETE FROM sessions WHERE sid = ?').run(row.sid);
+        // Geloescht wird auch eine abgelaufene Zeile, die der 15-Minuten-Sweep
+        // noch nicht erwischt hat - gezaehlt nur eine, die noch galt. Sonst
+        // meldete die Seite "1 andere Sitzung beendet", wo keine mehr lebte.
+        if (row.expired_at > now) ended += changes;
       }
     } catch { /* ignore malformed session */ }
   }
+  return ended;
 }
 
 function authenticateApiToken(req) {
@@ -1112,7 +1140,12 @@ function sanitizeOidcUsername(raw) {
  *   das Konto neu wäre und die automatische Kontoerstellung abgeschaltet ist.
  */
 export function findOrCreateOidcUser(database, claims) {
-  const { sub, iss, email, email_verified, name, preferred_username, username: usernameClaim } = claims;
+  const { sub, iss, email_verified, name, preferred_username, username: usernameClaim } = claims;
+  // Die Adresse EINMAL normalisieren und denselben Wert fuers Verknuepfen und
+  // fuer den Kontakt nehmen: verglich die Verknuepfung die rohe Adresse und
+  // speicherte der Kontakt die getrimmte, verfehlte `'  a@x.de '` das lokale
+  // Konto, und der Haushalt hatte zwei Mitglieder mit derselben Adresse (#1357).
+  const email = typeof claims.email === 'string' ? (claims.email.trim() || undefined) : claims.email;
 
   // Der Issuer aus dem validierten ID-Token kennt sich selbst am besten; OIDC_ISSUER
   // ist nur der konfigurierte Einstiegspunkt und kann davon abweichen (CNAME o. Ä.).
@@ -1179,13 +1212,35 @@ export function findOrCreateOidcUser(database, claims) {
   const display_name = (name || preferred_username || usernameClaim || email || username).slice(0, 128);
   const avatar_color = avatarColors[Math.floor(Math.random() * avatarColors.length)];
 
-  // oidc_provider = Issuer-URL (zukunftssicher für mehrere Provider)
-  const result = database.prepare(`
-    INSERT INTO users (username, display_name, password_hash, avatar_color, role, oidc_sub, oidc_provider)
-    VALUES (?, ?, ?, ?, 'member', ?, ?)
-  `).run(username, display_name, OIDC_PASSWORD_SENTINEL, avatar_color, sub, provider);
+  // 5. Der Kontakt entsteht wie auf jedem anderen Anlageweg (#1357, D#1254):
+  //    Einladung, Ersteinrichtung und Admin rufen `syncFamilyMemberArtifacts`
+  //    in DERSELBEN Transaktion wie das INSERT, sonst kennt der Haushalt die
+  //    Adresse des neuen Mitglieds nicht. Uebernommen werden nur Name und eine
+  //    VERIFIZIERTE Adresse - strikt `email_verified === true`, das Opt-in
+  //    OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM gilt dem Verknuepfen, nicht dem
+  //    Kontakt. Kein Bild (eine fremde URL, die CSP laesst nur eigene Bilder
+  //    zu), kein Geburtsdatum (ein Geburtstag, den die Person hier nie
+  //    eingetragen hat) und bewusst nur hier, beim ANLEGEN: Schritt 1 gibt ein
+  //    bekanntes Konto unveraendert zurueck, bis D#848 den Abgleich regelt.
+  const contactEmail = email_verified === true && typeof email === 'string' && email.length <= MAX_TITLE
+    ? email
+    : undefined;
 
-  return database.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid);
+  // oidc_provider = Issuer-URL (zukunftssicher für mehrere Provider)
+  const userId = database.transaction(() => {
+    const result = database.prepare(`
+      INSERT INTO users (username, display_name, password_hash, avatar_color, role, oidc_sub, oidc_provider)
+      VALUES (?, ?, ?, ?, 'member', ?, ?)
+    `).run(username, display_name, OIDC_PASSWORD_SENTINEL, avatar_color, sub, provider);
+    syncFamilyMemberArtifacts(database, result.lastInsertRowid, {
+      displayName: display_name,
+      email: contactEmail,
+      actorUserId: result.lastInsertRowid,
+    });
+    return result.lastInsertRowid;
+  })();
+
+  return database.prepare('SELECT * FROM users WHERE id = ?').get(userId);
 }
 
 /**
@@ -1880,6 +1935,29 @@ router.post('/logout', requireAuth, csrfMiddleware, (req, res) => {
     res.clearCookie(LEGACY_SESSION_COOKIE); // best effort: verwaistes Legacy-Cookie räumen
     res.json({ ok: true });
   });
+});
+
+/**
+ * POST /api/v1/auth/logout-others
+ * Beendet jede andere Sitzung des angemeldeten Mitglieds, die aufrufende bleibt
+ * (#1354). Seit D#1242 lebt eine unbenutzte Sitzung 90 Tage - das hier ist der
+ * Widerruf dazu. Nur fuer eine Browser-Sitzung: ein API-Token oder ein
+ * Wandtablett hat keine "aktuelle" Sitzung, die es ausnehmen koennte, und wuerde
+ * sonst auch die des Mitglieds selbst beenden. Tokens und Tabletts selbst
+ * bleiben gueltig; sie werden unter API-Tokens bzw. Displays widerrufen.
+ * Response: { ok: true, ended: number }
+ */
+router.post('/logout-others', requireAuth, csrfMiddleware, sessionRevokeLimiter, (req, res) => {
+  if (req.authMethod !== 'session' || !req.sessionID) {
+    return res.status(403).json({ error: 'Only a signed-in browser session can sign out other sessions.', code: 403 });
+  }
+  try {
+    const ended = invalidateUserSessions(req.authUserId, req.sessionID);
+    res.json({ ok: true, ended });
+  } catch (err) {
+    log.error('Sign out other sessions error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
 });
 
 /**

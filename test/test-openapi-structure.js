@@ -64,6 +64,22 @@ test('meals apply-plan describes what the route does: additive without replace_e
   assert.ok(!post.responses[200]);
   assert.ok(post.responses[400]);
 });
+test('meals apply-plan documents skip_occupied and the skipped answer (Discussion #1380)', () => {
+  // Die Route legt mit skip_occupied nur in vorher leere Slots an und nennt
+  // die uebrigen in `skipped`; das Verhalten halten die Tests in test:meals-routes.
+  const post = buildOpenApiSpec({}).paths['/api/v1/meals/apply-plan'].post;
+  const body = post.requestBody.content['application/json'].schema;
+  assert.equal(body.properties.skip_occupied.type, 'boolean');
+  assert.equal(body.properties.replace_existing.type, 'boolean');
+  assert.deepEqual(body.required, ['assignments']);
+  const ok = post.responses[201].content['application/json'].schema;
+  assert.deepEqual(ok.required, ['data']);
+  assert.deepEqual(ok.properties.skipped.items.required, ['index', 'date', 'meal_type', 'reason']);
+  assert.equal(ok.properties.skipped.items.properties.index.type, 'integer');
+  assert.deepEqual(ok.properties.skipped.items.properties.reason.enum, ['occupied']);
+  assert.match(post.description, /`skip_occupied` and `replace_existing` together are refused with 400/);
+  assert.match(post.responses[400].description, /`skip_occupied` that is not a boolean/);
+});
 const indexSrc = readFileSync(new URL('index.js', pathsDir), 'utf8');
 const moduleFiles = readdirSync(pathsDir)
   .filter((f) => f.endsWith('.js') && f !== 'index.js')

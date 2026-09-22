@@ -646,7 +646,9 @@
         "duplicateKeepQuantities": "Panatilihin ang dami",
         "duplicateKeepNotes": "Panatilihin ang mga tala at link",
         "duplicateSubmit": "I-duplicate",
-        "duplicateError": "Hindi ma-duplicate ang listahan."
+        "duplicateError": "Hindi ma-duplicate ang listahan.",
+        "itemStateChecked": "naka-check",
+        "itemStateOpen": "hindi pa naka-check"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} na pagkain ang naplano.",
@@ -2785,7 +2787,31 @@
         "healthPreventionKind": {
             "vaccination": "Bakuna",
             "checkup": "Check-up"
-        }
+        },
+        "backupRestoreKeyLabel": "Key ng backup",
+        "backupRestoreKeyHint": "Galing ang backup na ito sa ibang installation. Ilagay ang DB_ENCRYPTION_KEY ng installation na iyon: gagamitin lang ito para sa restore na ito at hindi ise-save, at pagkatapos ay naka-encrypt ang data gamit ang key ng installation na ito.",
+        "backupRestoreKeyHttpWarning": "Hindi bukas ang page na ito sa HTTPS: dadaan ang key sa network nang hindi naka-encrypt.",
+        "backupRestoreErrorKeyRequired": "Hindi nabubuksan ng key ng installation na ito ang backup. Kung galing ito sa ibang installation, ilagay sa ibaba ang key ng installation na iyon at mag-restore muli; kung hindi, hindi Yuvomi database ang file. Huwag palitan ang DB_ENCRYPTION_KEY ng installation na ito: hindi na magsisimula ang Yuvomi pagkatapos. Walang binago rito.",
+        "backupRestoreErrorKeyWrong": "Hindi nabubuksan ng key na ito ang backup. Dapat itong eksaktong DB_ENCRYPTION_KEY ng installation na sumulat ng backup, kasama ang mga espasyo sa magkabilang dulo.",
+        "backupRestoreErrorKeyInvalid": "Hindi dumating sa server ang key sa nababasang anyo. Ilagay itong muli at mag-restore ulit. Walang binago rito.",
+        "backupRestoreErrorOwnKeyMissing": "Walang DB_ENCRYPTION_KEY ang installation na ito kaya hindi nito mabuksan ang backup. I-set ang DB_ENCRYPTION_KEY, i-restart ang Yuvomi at saka mag-restore gamit ang key ng backup.",
+        "backupRestoreErrorDamaged": "Sira o kulang ang backup; tama ang key. Kunin muli ang file, ihambing ang laki at sha256sum nito sa orihinal at i-restore ang kopyang iyon. Walang binago rito.",
+        "backupRestoreErrorUnreadable": "Hindi mabasa ang backup. Tiyaking kumpleto ang file at subukang muli; nasa server log ang eksaktong dahilan. Walang binago rito.",
+        "backupRestoreErrorGeneric": "Nabigo ang restore. Nasa server log ang eksaktong dahilan.",
+        "backupRestoreErrorNeverEncrypted": "Kung hindi kailanman na-encrypt ang file, hindi ito wastong Yuvomi database.",
+        "backupRestoreErrorKeyRightButNotDb": "Kung tama ang key, hindi Yuvomi database ang file o naputol ito.",
+        "backupRestoreErrorNothingChanged": "Walang binago rito.",
+        "otherSessionsTitle": "Ibang device",
+        "otherSessionsHint": "Nila-log out ang account mo sa lahat ng iba pang device at browser. Mananatiling naka-sign in ang device na ito. Hindi apektado ang mga API token at ang mga naka-pair na wall display.",
+        "otherSessionsButton": "Mag-sign out sa ibang device",
+        "otherSessionsConfirm": "Mag-sign out sa lahat ng ibang device?",
+        "otherSessionsConfirmDetail": "Kailangang mag-sign in muli ng sinumang naka-sign in doon gamit ang account mo. Mananatiling naka-sign in ang device na ito.",
+        "otherSessionsEnded": "{{count}} ibang session ang tinapos.",
+        "otherSessionsEnded_one": "{{count}} ibang session ang tinapos.",
+        "otherSessionsEnded_few": "{{count}} ibang session ang tinapos.",
+        "otherSessionsNone": "Hindi naka-sign in ang account mo sa anumang ibang device.",
+        "otherSessionsError": "Hindi nagawang mag-sign out sa ibang device.",
+        "otherSessionsTooManyAttempts": "Masyadong maraming kahilingan. Maghintay sandali, saka subukang muli."
     },
     "login": {
         "tagline": "Maligayang pagbabalik sa iyong family planner.",
@@ -3556,7 +3582,8 @@
         "currentMonth": "Kasalukuyan",
         "noVisitReportsInMonth": "Walang naitalang pagbisita ng tauhan sa {{month}}.",
         "settledAdminOnly": "Tanging admin ang maaaring baguhin o burahin ito",
-        "reportVisitsCount": "Mga pagbisita"
+        "reportVisitsCount": "Mga pagbisita",
+        "receiptPresent": "Nakalakip"
     },
     "splitExpenses": {
         "title": "Mga hinating gastos",
@@ -5456,7 +5483,8 @@
         "confirmSelection": "Idagdag ang napili",
         "openAction": "Buksan ang {{name}}",
         "limitReached": "Hanggang {{count}} dokumento lang.",
-        "limitReached_one": "Hanggang {{count}} dokumento lang."
+        "limitReached_one": "Hanggang {{count}} dokumento lang.",
+        "presentHidden": "Nakalakip"
     },
     "join": {
         "title": "I-set up ang iyong account",

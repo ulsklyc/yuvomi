@@ -258,6 +258,190 @@ test('POST /apply-plan mit replace_existing: leert nur die genannten Datum/Typ-P
   ]);
 });
 
+// skip_occupied (Discussion #1380): ein Import (Mealie) soll nur LEERE Slots
+// fuellen. "Besetzt" heisst: der Slot (date + meal_type) hat vor dem Aufruf
+// mindestens eine Mahlzeit - eine gespeicherte oder ein noch nicht
+// materialisiertes Vorkommen einer Wochenserie. Alle Tests hier meiden
+// `lunch`, weil die Serien-Tests weiter unten unbegrenzte lunch-Serien anlegen.
+const mealsIn = (d, type) => db.prepare('SELECT title FROM meals WHERE date = ? AND meal_type = ? ORDER BY id').all(d, type).map((m) => m.title);
+
+test('POST /apply-plan mit skip_occupied: belegter Slot bleibt, leerer wird gefuellt, skipped nennt den Slot', async () => {
+  await createMeal({ date: '2045-01-10', meal_type: 'dinner', title: 'Bestand' });
+  const r = await call('POST', '/apply-plan', {
+    skip_occupied: true,
+    assignments: [
+      { date: '2045-01-10', meal_type: 'dinner', title: 'Import belegt' },
+      { date: '2045-01-10', meal_type: 'breakfast', title: 'Import leer' },
+    ],
+  });
+  assert.equal(r.status, 201);
+  assert.deepEqual(r.body.data.map((m) => m.title), ['Import leer']);
+  assert.deepEqual(r.body.skipped, [{ index: 0, date: '2045-01-10', meal_type: 'dinner', reason: 'occupied' }]);
+  assert.deepEqual(mealsIn('2045-01-10', 'dinner'), ['Bestand']);
+  assert.deepEqual(mealsIn('2045-01-10', 'breakfast'), ['Import leer']);
+});
+
+test('POST /apply-plan mit skip_occupied: alles belegt -> 201, data leer, nichts geschrieben', async () => {
+  await createMeal({ date: '2045-01-11', meal_type: 'snack', title: 'Bestand' });
+  const r = await call('POST', '/apply-plan', {
+    skip_occupied: true,
+    assignments: [{ date: '2045-01-11', meal_type: 'snack', title: 'Import' }],
+  });
+  assert.equal(r.status, 201);
+  assert.deepEqual(r.body.data, []);
+  assert.deepEqual(r.body.skipped, [{ index: 0, date: '2045-01-11', meal_type: 'snack', reason: 'occupied' }]);
+  assert.deepEqual(mealsIn('2045-01-11', 'snack'), ['Bestand']);
+});
+
+test('POST /apply-plan mit skip_occupied: mehrere Zuweisungen fuer denselben vorher leeren Slot werden alle angelegt', async () => {
+  // "besetzt" zaehlt gegen den Stand VOR dem Aufruf - wie im additiven
+  // Standardmodus landen beide; der erste angelegte Eintrag sperrt den zweiten nicht.
+  const r = await call('POST', '/apply-plan', {
+    skip_occupied: true,
+    assignments: [
+      { date: '2045-01-12', meal_type: 'dinner', title: 'Eins' },
+      { date: '2045-01-12', meal_type: 'dinner', title: 'Zwei' },
+    ],
+  });
+  assert.equal(r.status, 201);
+  assert.equal(r.body.data.length, 2);
+  assert.deepEqual(r.body.skipped, []);
+  assert.deepEqual(mealsIn('2045-01-12', 'dinner'), ['Eins', 'Zwei']);
+});
+
+test('POST /apply-plan mit skip_occupied: ein nicht materialisiertes Serienvorkommen belegt den Slot', async () => {
+  const start = '2045-02-06';
+  const until = addDays(start, 56);
+  await createMeal({ date: start, meal_type: 'breakfast', title: 'Serie', repeat_weekly: true, repeat_until: until });
+  const virtual = addDays(start, 21);
+  const afterEnd = addDays(start, 63);
+  const otherDay = addDays(start, 22);
+  assert.deepEqual(mealsIn(virtual, 'breakfast'), [], 'Vorkommen ist noch keine Zeile');
+  const r = await call('POST', '/apply-plan', {
+    skip_occupied: true,
+    assignments: [
+      { date: virtual, meal_type: 'breakfast', title: 'Import Serie' },
+      { date: virtual, meal_type: 'dinner', title: 'Import anderer Typ' },
+      { date: otherDay, meal_type: 'breakfast', title: 'Import anderer Tag' },
+      { date: afterEnd, meal_type: 'breakfast', title: 'Import nach Ende' },
+    ],
+  });
+  assert.equal(r.status, 201);
+  assert.deepEqual(r.body.skipped, [{ index: 0, date: virtual, meal_type: 'breakfast', reason: 'occupied' }]);
+  assert.deepEqual(r.body.data.map((m) => m.title), ['Import anderer Typ', 'Import anderer Tag', 'Import nach Ende']);
+  // Die Pruefung liest nur: sie materialisiert kein Vorkommen als Nebenwirkung.
+  assert.deepEqual(mealsIn(virtual, 'breakfast'), []);
+});
+
+test('POST /apply-plan mit skip_occupied: ein geloeschtes Serienvorkommen belegt nicht, ein verschobenes nur seinen neuen Slot', async () => {
+  const start = '2045-04-03';
+  const until = addDays(start, 56);
+  await createMeal({ date: start, meal_type: 'snack', title: 'Serie', repeat_weekly: true, repeat_until: until });
+  const deletedDay = addDays(start, 7);
+  const retypedDay = addDays(start, 14);
+  await call('GET', `/?week=${deletedDay}`);
+  await call('GET', `/?week=${retypedDay}`);
+  const occ = (d) => db.prepare(`SELECT id FROM meals WHERE date = ? AND meal_type = 'snack' AND recurrence_template_id IS NOT NULL`).get(d).id;
+  assert.equal((await call('DELETE', `/${occ(deletedDay)}`)).status, 204);
+  assert.equal((await call('PUT', `/${occ(retypedDay)}`, { meal_type: 'dinner' })).status, 200);
+
+  const r = await call('POST', '/apply-plan', {
+    skip_occupied: true,
+    assignments: [
+      { date: deletedDay, meal_type: 'snack', title: 'Import geloescht' },
+      { date: retypedDay, meal_type: 'snack', title: 'Import alter Typ' },
+      { date: retypedDay, meal_type: 'dinner', title: 'Import neuer Typ' },
+    ],
+  });
+  assert.equal(r.status, 201);
+  assert.deepEqual(r.body.data.map((m) => m.title), ['Import geloescht', 'Import alter Typ']);
+  assert.deepEqual(r.body.skipped, [{ index: 2, date: retypedDay, meal_type: 'dinner', reason: 'occupied' }]);
+});
+
+test('POST /apply-plan mit skip_occupied: das Vorkommen GENAU am repeat_until-Tag belegt, eine Woche danach nicht', async () => {
+  // repeat_until ist die letzte Wiederholung EINSCHLIESSLICH (#619). Galt der
+  // Grenztag als frei, landete der Import dort, und das Aufschlagen der Woche
+  // legte die Serienmahlzeit daneben.
+  const start = '2045-06-05';
+  const until = addDays(start, 28);
+  await createMeal({ date: start, meal_type: 'dinner', title: 'Serie', repeat_weekly: true, repeat_until: until });
+  const r = await call('POST', '/apply-plan', {
+    skip_occupied: true,
+    assignments: [
+      { date: until, meal_type: 'dinner', title: 'Import am Ende' },
+      { date: addDays(until, 7), meal_type: 'dinner', title: 'Import danach' },
+    ],
+  });
+  assert.equal(r.status, 201);
+  assert.deepEqual(r.body.skipped, [{ index: 0, date: until, meal_type: 'dinner', reason: 'occupied' }]);
+  assert.deepEqual(r.body.data.map((m) => m.title), ['Import danach']);
+  await call('GET', `/?week=${until}`);
+  assert.deepEqual(mealsIn(until, 'dinner'), ['Serie']);
+});
+
+test('POST /apply-plan mit skip_occupied: ein per Datum verschobenes Vorkommen gibt den alten Slot frei und belegt den neuen', async () => {
+  const start = '2045-08-07';
+  const until = addDays(start, 28);
+  await createMeal({ date: start, meal_type: 'breakfast', title: 'Serie', repeat_weekly: true, repeat_until: until });
+  const oldDay = addDays(start, 14);
+  const newDay = addDays(oldDay, 2);
+  await call('GET', `/?week=${oldDay}`);
+  const occ = db.prepare(`SELECT id FROM meals WHERE date = ? AND meal_type = 'breakfast' AND recurrence_template_id IS NOT NULL`).get(oldDay).id;
+  assert.equal((await call('PUT', `/${occ}`, { date: newDay })).status, 200);
+
+  const r = await call('POST', '/apply-plan', {
+    skip_occupied: true,
+    assignments: [
+      { date: oldDay, meal_type: 'breakfast', title: 'Import alter Tag' },
+      { date: newDay, meal_type: 'breakfast', title: 'Import neuer Tag' },
+    ],
+  });
+  assert.equal(r.status, 201);
+  assert.deepEqual(r.body.data.map((m) => m.title), ['Import alter Tag']);
+  assert.deepEqual(r.body.skipped, [{ index: 1, date: newDay, meal_type: 'breakfast', reason: 'occupied' }]);
+  await call('GET', `/?week=${oldDay}`);
+  assert.deepEqual(mealsIn(oldDay, 'breakfast'), ['Import alter Tag'], 'die Ausnahme haelt: keine Serienmahlzeit am alten Tag');
+});
+
+test('POST /apply-plan: skip_occupied, das kein Boolean ist -> 400 statt still additiv', async () => {
+  await createMeal({ date: '2045-01-15', meal_type: 'dinner', title: 'Bestand' });
+  for (const value of ['true', 1, null, 'yes']) {
+    const r = await call('POST', '/apply-plan', {
+      skip_occupied: value,
+      assignments: [{ date: '2045-01-15', meal_type: 'dinner', title: 'Import' }],
+    });
+    assert.equal(r.status, 400, `skip_occupied: ${JSON.stringify(value)}`);
+    assert.match(r.body.error, /skip_occupied/);
+  }
+  assert.deepEqual(mealsIn('2045-01-15', 'dinner'), ['Bestand']);
+});
+
+test('POST /apply-plan: skip_occupied und replace_existing zugleich -> 400, nichts geschrieben', async () => {
+  await createMeal({ date: '2045-01-13', meal_type: 'dinner', title: 'Bestand' });
+  const r = await call('POST', '/apply-plan', {
+    skip_occupied: true,
+    replace_existing: true,
+    assignments: [{ date: '2045-01-13', meal_type: 'dinner', title: 'Import' }],
+  });
+  assert.equal(r.status, 400);
+  assert.match(r.body.error, /skip_occupied/);
+  assert.deepEqual(mealsIn('2045-01-13', 'dinner'), ['Bestand']);
+});
+
+test('POST /apply-plan ohne skip_occupied: Antwort unveraendert, kein skipped-Feld, belegter Slot bekommt Zuwachs', async () => {
+  await createMeal({ date: '2045-01-14', meal_type: 'dinner', title: 'Bestand' });
+  for (const body of [{}, { skip_occupied: false }]) {
+    const r = await call('POST', '/apply-plan', {
+      ...body,
+      assignments: [{ date: '2045-01-14', meal_type: 'dinner', title: 'Neu' }],
+    });
+    assert.equal(r.status, 201);
+    assert.deepEqual(Object.keys(r.body), ['data']);
+    assert.equal(r.body.data.length, 1);
+  }
+  assert.deepEqual(mealsIn('2045-01-14', 'dinner'), ['Bestand', 'Neu', 'Neu']);
+});
+
 // --------------------------------------------------------------------------
 // PUT /:id
 // --------------------------------------------------------------------------

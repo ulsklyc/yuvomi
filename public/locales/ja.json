@@ -634,7 +634,9 @@
         "duplicateKeepQuantities": "数量を引き継ぐ",
         "duplicateKeepNotes": "メモとリンクを引き継ぐ",
         "duplicateSubmit": "複製",
-        "duplicateError": "リストを複製できませんでした。"
+        "duplicateError": "リストを複製できませんでした。",
+        "itemStateChecked": "チェック済み",
+        "itemStateOpen": "未チェック"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} 件の食事を計画しました。",
@@ -2773,7 +2775,31 @@
         "healthPreventionKind": {
             "vaccination": "予防接種",
             "checkup": "健診"
-        }
+        },
+        "backupRestoreKeyLabel": "バックアップのキー",
+        "backupRestoreKeyHint": "このバックアップは別のインストールのものです。そのインストールの DB_ENCRYPTION_KEY を入力してください。キーはこの復元にのみ使われ、保存されません。復元後のデータはこのインストールのキーで暗号化されます。",
+        "backupRestoreKeyHttpWarning": "このページは HTTPS で開かれていません。キーは暗号化されずにネットワークを通ります。",
+        "backupRestoreErrorKeyRequired": "このインストールのキーではバックアップを開けません。別のインストールのものなら、下にそのインストールのキーを入力してもう一度復元してください。そうでなければ、このファイルは Yuvomi のデータベースではありません。このインストールの DB_ENCRYPTION_KEY は変更しないでください。変更すると Yuvomi が起動しなくなります。ここでは何も変更されていません。",
+        "backupRestoreErrorKeyWrong": "このキーではバックアップを開けません。バックアップを書き出したインストールの DB_ENCRYPTION_KEY と、両端の空白も含めて完全に一致している必要があります。",
+        "backupRestoreErrorKeyInvalid": "キーが読み取れる形でサーバーに届きませんでした。もう一度入力して復元し直してください。ここでは何も変更されていません。",
+        "backupRestoreErrorOwnKeyMissing": "このインストールには DB_ENCRYPTION_KEY がないため、バックアップを開けません。DB_ENCRYPTION_KEY を設定して Yuvomi を再起動し、バックアップのキーで復元してください。",
+        "backupRestoreErrorDamaged": "バックアップが破損しているか不完全です。キーは正しいです。ファイルを取得し直し、サイズと sha256sum を元のファイルと比べてから、そのコピーを復元してください。ここでは何も変更されていません。",
+        "backupRestoreErrorUnreadable": "バックアップを読み取れませんでした。ファイルが完全か確認してもう一度お試しください。正確な原因はサーバーログにあります。ここでは何も変更されていません。",
+        "backupRestoreErrorGeneric": "復元に失敗しました。正確な原因はサーバーログにあります。",
+        "backupRestoreErrorNeverEncrypted": "ファイルが一度も暗号化されていない場合、有効な Yuvomi のデータベースではありません。",
+        "backupRestoreErrorKeyRightButNotDb": "キーが正しい場合、このファイルは Yuvomi のデータベースではないか、途中で切れています。",
+        "backupRestoreErrorNothingChanged": "ここでは何も変更されていません。",
+        "otherSessionsTitle": "他のデバイス",
+        "otherSessionsHint": "他のすべてのデバイスとブラウザーでアカウントからサインアウトします。このデバイスはサインインしたままです。API トークンとペアリング済みのウォールディスプレイには影響しません。",
+        "otherSessionsButton": "他のデバイスからサインアウト",
+        "otherSessionsConfirm": "他のすべてのデバイスからサインアウトしますか?",
+        "otherSessionsConfirmDetail": "そこであなたのアカウントでサインインしている人は、もう一度サインインする必要があります。このデバイスはサインインしたままです。",
+        "otherSessionsEnded": "他のセッションを {{count}} 件終了しました。",
+        "otherSessionsEnded_one": "他のセッションを {{count}} 件終了しました。",
+        "otherSessionsEnded_few": "他のセッションを {{count}} 件終了しました。",
+        "otherSessionsNone": "他のデバイスではサインインしていませんでした。",
+        "otherSessionsError": "他のデバイスからのサインアウトに失敗しました。",
+        "otherSessionsTooManyAttempts": "リクエストが多すぎます。少し待ってから、もう一度お試しください。"
     },
     "login": {
         "tagline": "家族のプランナーへおかえりなさい。",
@@ -3552,7 +3578,8 @@
         "currentMonth": "今月",
         "noVisitReportsInMonth": "{{month}}の訪問記録はありません。",
         "settledAdminOnly": "変更・削除できるのは管理者だけです",
-        "reportVisitsCount": "訪問"
+        "reportVisitsCount": "訪問",
+        "receiptPresent": "添付あり"
     },
     "userMultiSelect": {
         "moreUsers": "他",
@@ -5456,7 +5483,8 @@
         "confirmSelection": "選択を追加",
         "openAction": "{{name}} を開く",
         "limitReached": "書類は最大 {{count}} 件までです。",
-        "limitReached_one": "書類は最大 {{count}} 件までです。"
+        "limitReached_one": "書類は最大 {{count}} 件までです。",
+        "presentHidden": "添付あり"
     },
     "join": {
         "title": "アカウントの設定",

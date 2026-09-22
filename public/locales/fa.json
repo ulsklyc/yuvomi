@@ -646,7 +646,9 @@
         "duplicateKeepQuantities": "حفظ مقدارها",
         "duplicateKeepNotes": "حفظ یادداشت‌ها و لینک‌ها",
         "duplicateSubmit": "کپی",
-        "duplicateError": "کپی کردن فهرست ممکن نشد."
+        "duplicateError": "کپی کردن فهرست ممکن نشد.",
+        "itemStateChecked": "تیک خورده",
+        "itemStateOpen": "تیک نخورده"
     },
     "meals": {
         "randomizeSuccess_few": "{{count}} وعده برنامه‌ریزی شد.",
@@ -2785,7 +2787,31 @@
         "healthPreventionKind": {
             "vaccination": "واکسن",
             "checkup": "معاینه"
-        }
+        },
+        "backupRestoreKeyLabel": "کلید پشتیبان",
+        "backupRestoreKeyHint": "این پشتیبان از نصب دیگری است. DB_ENCRYPTION_KEY آن نصب را وارد کنید: فقط برای همین بازیابی استفاده و ذخیره نمی‌شود، و پس از آن داده‌ها با کلید این نصب رمزگذاری می‌شوند.",
+        "backupRestoreKeyHttpWarning": "این صفحه از طریق HTTPS باز نشده است: کلید بدون رمزگذاری از شبکه عبور می‌کند.",
+        "backupRestoreErrorKeyRequired": "کلید این نصب پشتیبان را باز نمی‌کند. اگر پشتیبان از نصب دیگری است، کلید آن نصب را در پایین وارد کنید و دوباره بازیابی کنید؛ وگرنه فایل پایگاه داده Yuvomi نیست. DB_ENCRYPTION_KEY این نصب را تغییر ندهید: پس از آن Yuvomi دیگر اجرا نمی‌شود. اینجا چیزی تغییر نکرد.",
+        "backupRestoreErrorKeyWrong": "این کلید پشتیبان را باز نمی‌کند. باید دقیقاً DB_ENCRYPTION_KEY نصبی باشد که پشتیبان را نوشته است، حتی فاصله‌های ابتدا و انتها.",
+        "backupRestoreErrorKeyInvalid": "کلید به شکل خوانا به سرور نرسید. آن را دوباره وارد کنید و دوباره بازیابی کنید. اینجا چیزی تغییر نکرد.",
+        "backupRestoreErrorOwnKeyMissing": "این نصب DB_ENCRYPTION_KEY ندارد و به همین دلیل نمی‌تواند پشتیبان را باز کند. DB_ENCRYPTION_KEY را تنظیم کنید، Yuvomi را دوباره راه‌اندازی کنید و سپس با کلید پشتیبان بازیابی کنید.",
+        "backupRestoreErrorDamaged": "پشتیبان آسیب‌دیده یا ناقص است؛ کلید درست است. فایل را دوباره بگیرید، اندازه و sha256sum آن را با نسخه اصلی مقایسه کنید و همان نسخه را بازیابی کنید. اینجا چیزی تغییر نکرد.",
+        "backupRestoreErrorUnreadable": "پشتیبان خوانده نشد. بررسی کنید که فایل کامل باشد و دوباره تلاش کنید؛ علت دقیق در گزارش سرور است. اینجا چیزی تغییر نکرد.",
+        "backupRestoreErrorGeneric": "بازیابی ناموفق بود. علت دقیق در گزارش سرور است.",
+        "backupRestoreErrorNeverEncrypted": "اگر فایل هرگز رمزگذاری نشده باشد، پایگاه داده معتبر Yuvomi نیست.",
+        "backupRestoreErrorKeyRightButNotDb": "اگر کلید درست است، فایل پایگاه داده Yuvomi نیست یا ناقص بریده شده است.",
+        "backupRestoreErrorNothingChanged": "اینجا چیزی تغییر نکرد.",
+        "otherSessionsTitle": "دستگاه‌های دیگر",
+        "otherSessionsHint": "حساب تو را از همهٔ دستگاه‌ها و مرورگرهای دیگر خارج می‌کند. این دستگاه وارد شده باقی می‌ماند. توکن‌های API و نمایشگرهای دیواری جفت‌شده تحت تأثیر قرار نمی‌گیرند.",
+        "otherSessionsButton": "خروج از دستگاه‌های دیگر",
+        "otherSessionsConfirm": "از همهٔ دستگاه‌های دیگر خارج شوید؟",
+        "otherSessionsConfirmDetail": "هر کسی که آنجا با حساب تو وارد شده باید دوباره وارد شود. این دستگاه وارد شده باقی می‌ماند.",
+        "otherSessionsEnded": "{{count}} نشست دیگر پایان یافت.",
+        "otherSessionsEnded_one": "{{count}} نشست دیگر پایان یافت.",
+        "otherSessionsEnded_few": "{{count}} نشست دیگر پایان یافت.",
+        "otherSessionsNone": "حساب تو در هیچ دستگاه دیگری وارد نشده بود.",
+        "otherSessionsError": "خروج از دستگاه‌های دیگر ناموفق بود.",
+        "otherSessionsTooManyAttempts": "درخواست‌های بیش از حد. کمی صبر کنید و دوباره تلاش کنید."
     },
     "login": {
         "tagline": "دوباره به برنامه‌ریز خانوادگی‌تان خوش آمدید.",
@@ -3556,7 +3582,8 @@
         "currentMonth": "جاری",
         "noVisitReportsInMonth": "در {{month}} هیچ بازدیدی ثبت نشده است.",
         "settledAdminOnly": "فقط یک مدیر می‌تواند آن را تغییر دهد یا حذف کند",
-        "reportVisitsCount": "بازدیدها"
+        "reportVisitsCount": "بازدیدها",
+        "receiptPresent": "پیوست شده"
     },
     "splitExpenses": {
         "title": "هزینه‌های مشترک",
@@ -5456,7 +5483,8 @@
         "confirmSelection": "افزودن انتخاب‌شده‌ها",
         "openAction": "باز کردن {{name}}",
         "limitReached": "حداکثر {{count}} سند.",
-        "limitReached_one": "حداکثر {{count}} سند."
+        "limitReached_one": "حداکثر {{count}} سند.",
+        "presentHidden": "پیوست شده"
     },
     "join": {
         "title": "راه‌اندازی حساب",

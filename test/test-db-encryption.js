@@ -21,13 +21,13 @@
 
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, existsSync, readFileSync, readdirSync, copyFileSync, writeFileSync, chmodSync, rmSync, renameSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, copyFileSync, writeFileSync, chmodSync, rmSync, renameSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3-multiple-ciphers';
+import { tempDir } from './tmp-dir.js';
 
 const KEY = 'test-encryption-key-0123456789';
 const PLAINTEXT_HEADER = Buffer.from('SQLite format 3\0', 'binary');
@@ -48,7 +48,7 @@ async function bootDb(dbPath, encryptionKey) {
 }
 
 function tmpDir() {
-  return mkdtempSync(join(tmpdir(), 'yuvomi-encryption-'));
+  return tempDir('yuvomi-encryption-');
 }
 
 /** true, wenn die Datei mit dem unverschlüsselten SQLite-Header beginnt. */

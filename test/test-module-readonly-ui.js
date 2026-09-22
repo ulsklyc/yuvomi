@@ -800,18 +800,25 @@ test('Kalender-Detailansicht: Löschen, Zurücksetzen und Bearbeiten fallen weg,
 // Die Begründung für das Ausblenden des Einlösens - am Server gemessen
 // -------------------------------------------------------------------------
 
-test('die Ausnahmen vom Modulrecht stehen am Server, und es sind genau zwei Sorten', () => {
+test('die Ausnahmen vom Modulrecht stehen am Server, und es sind genau zwei Sorten', async () => {
   // WOVON DIESE SEITE ABHÄNGT. Bekäme `/rewards/redemptions` eine
   // Niveau-Senkung wie `/schedule/preferences`, gehörte der Einlöse-Knopf
   // einem Menschen mit `rewards: read` zurück. Und verlöre ein Display seine
   // benannten Schreibrouten, gehörten Personenauswahl und Tablett-Einlösen
   // weg. Beides sind Entscheidungen, die anderswo fallen - dieser Test macht
   // die Kopplung sichtbar, statt sie zu erraten.
-  const scopes = readFileSync(new URL('../server/scopes.js', import.meta.url), 'utf8');
-  const fn = scopes.slice(scopes.indexOf('function sessionModuleAccessRequirement(path, method) {'));
-  const body = fn.slice(0, fn.indexOf('\n}\n'));
-  assert.match(body, /path === '\/schedule\/preferences'/);
-  assert.ok(!body.includes('rewards'),
+  //
+  // Die Senkungen stehen seit #1290 in EINER Tabelle (`READ_LEVEL_WRITES` in
+  // server/scopes.js), die beide Gates lesen - gemessen wird deshalb das
+  // Urteil, nicht die Schreibweise der Funktion.
+  const { READ_LEVEL_WRITES, sessionModuleAccessRequirement } = await import('../server/scopes.js');
+  assert.equal(sessionModuleAccessRequirement('/schedule/preferences', 'PUT').access, 'read',
+    'Gegenprobe: die Tabelle wird wirklich gelesen');
+  for (const pfad of ['/rewards/redemptions', '/rewards/redemptions/1/approve', '/rewards/1/redeem', '/rewards']) {
+    assert.equal(sessionModuleAccessRequirement(pfad, 'POST').access, 'write',
+      `eine Senkung für ${pfad} hieße: der Einlöse-Knopf gehört in rewards.js zurück`);
+  }
+  assert.ok(!READ_LEVEL_WRITES.some((e) => /rewards/i.test(e.pattern)),
     'eine Senkung für /rewards hieße: der Einlöse-Knopf gehört in rewards.js zurück');
 
   // Die zweite Sorte: benannte Routen für ein gekoppeltes Gerät.
@@ -3507,6 +3514,57 @@ test('Beleg-Feld: die Ablage haengt am Schreibrecht auf die DOKUMENTE, nicht auf
   });
 });
 
+test('Beleg, den der Server nicht nennt: ein ruhiges Zeichen statt einer leeren Ablage (#1358)', () => {
+  // So kommt ein Besuch an, dessen Beleg ein privates Dokument einer anderen
+  // Person ist: `has_receipt` bleibt, Name und ID sind maskiert.
+  const verdeckt = hkBesuch({ has_receipt: true, receipt_document_id: null, receipt_document_name: null });
+  const zeichen = /<dt>housekeeping\.receiptLabel<\/dt><dd>housekeeping\.receiptPresent<\/dd>/;
+  for (const documents of ['write', 'read']) {
+    withAccess({ housekeeping: 'write', documents }, () => {
+      const feld = hk.receiptFieldHtml(verdeckt);
+      assert.doesNotMatch(feld, /type="file"|document-dropzone/, `documents: ${documents} - keine Ablage, die den Beleg ersetzen wuerde`);
+      assert.match(feld, zeichen, `documents: ${documents} - der Dialog sagt, dass es einen Beleg gibt`);
+      assert.doesNotMatch(feld, /undefined|null/);
+    });
+    const [bericht] = mitModal(() => withAccess({ housekeeping: 'read', documents }, () => hk.openVisitReportModal(verdeckt)));
+    assert.match(bericht.content, zeichen, `documents: ${documents} - der Bericht zeigt dasselbe wie der Dialog`);
+  }
+  withAccess({ housekeeping: 'write', documents: 'none' }, () => {
+    assert.equal(hk.receiptFieldHtml(verdeckt), '', 'bei `documents: none` bleibt die Stelle leer wie bisher');
+  });
+
+  // Verdeckt heisst: die ID ist maskiert - nicht "der Name fehlt". Ein Besuch
+  // mit sichtbarer ID, aber ohne Namen (leerer Dokumentname, ein Serialisierer
+  // ohne Namensfeld) gehoert dem Betrachter und behaelt seine Ablage.
+  for (const ohneName of [
+    hkBesuch({ has_receipt: true, receipt_document_id: 44, receipt_document_name: '' }),
+    hkBesuch({ has_receipt: true, receipt_document_id: 44 }),
+  ]) {
+    withAccess({ housekeeping: 'write', documents: 'write' }, () => {
+      const feld = hk.receiptFieldHtml(ohneName);
+      assert.match(feld, /id="housekeeping-receipt-file" type="file"/, 'mit sichtbarer ID bleibt die Ablage');
+      assert.doesNotMatch(feld, zeichen);
+    });
+  }
+});
+
+test('Beleg, den der Server nicht nennt: Speichern schickt null und laedt nichts hoch (#1358)', async () => {
+  hkState({ workers: [{ id: 7, display_name: 'Ana' }] });
+  const verdeckt = hkBesuch({ has_receipt: true, receipt_document_id: null, receipt_document_name: null });
+  let gesendet = null;
+  const anfragen = await mitFileReader(() => mitHkApi(async () => {
+    const put = globalThis.__apiStub.put;
+    globalThis.__apiStub.put = async (url, body) => { gesendet = body; return put(url, body); };
+    await withAccess({ housekeeping: 'write', documents: 'write' }, () => {
+      const [dialog] = mitModal(() => hk.openVisitEditModal(verdeckt, hkContainer()));
+      return besuchAbsenden(dialog)();
+    });
+  }, { 'POST /documents': { data: { id: 99 } } }));
+  assert.ok(!anfragen.includes('POST /documents'), 'keine Ablage, also kein Hochladen');
+  assert.ok(anfragen.includes('PUT /housekeeping/visits/12'));
+  assert.equal(gesendet.receipt_document_id, null, 'null heisst beim Server "behalten"');
+});
+
 test('Beleg beim Absenden: ohne Schreibrecht auf die Dokumente kein POST /documents, der Einsatz speichert trotzdem', async () => {
   hkState({ workers: [{ id: 7, display_name: 'Ana' }] });
   const besuch = hkBesuch({ receipt_document_id: 44, receipt_document_name: 'Beleg' });
@@ -3664,6 +3722,25 @@ test('Haushaltshilfe hat keine Display-Ausnahme, und ein Display erreicht die Se
   const scopes = display.slice(display.indexOf('DISPLAY_SCOPES = Object.freeze(['));
   assert.ok(!/housekeeping:/.test(scopes.slice(0, scopes.indexOf(']);'))),
     'ohne Scope setzt server/permissions.js das Modul fuer ein Display auf none - die Seite ist fuer es nicht offen');
+});
+
+test('Aufgaben-Dokumente ohne Dokumentenrecht: keine Zahl, keine Zeile, kein Link auf /documents/null (#1358)', () => {
+  // So kommt eine Aufgabe ohne Leserecht auf die Dokumente an: der Server sagt
+  // weder wie viele noch welche (`document_count` und `documents` sind null).
+  const verdeckt = aufgabe({ document_count: null, documents: null });
+  const mitDokumenten = aufgabe({ document_count: 2, documents: [{ id: 5, name: 'Anleitung.pdf', mime_type: 'application/pdf' }] });
+  withAccess({ tasks: 'write', documents: 'read' }, () => {
+    assert.doesNotMatch(tasks.renderTaskCard(verdeckt), /task-card__docs|null/, 'keine Klammer ohne Zahl');
+    assert.match(tasks.renderTaskCard(mitDokumenten), /task-card__docs/, 'Gegenfall: mit Zahl die Klammer');
+    assert.equal(detail.documentListNode(null), null, 'keine Zeile ohne Liste');
+    assert.equal(detail.documentListNode([{ id: null, name: null }]), null, 'ein Eintrag ohne ID wird kein Link');
+    const node = detail.documentListNode(mitDokumenten.documents);
+    assert.equal(node.childNodes[0].href, '/api/v1/documents/5/preview', 'Gegenfall: mit ID der Link');
+  });
+  withAccess({ tasks: 'write', documents: 'none' }, () => {
+    assert.equal(detail.documentListNode(mitDokumenten.documents), null,
+      'bei `documents: none` keine Zeile - jeder Link ginge ins 403');
+  });
 });
 
 test.after(() => miniDomAbraeumen());

@@ -3004,7 +3004,7 @@ function requestNameInPanel(panel, { title, label, placeholder }) {
     overlay.className = 'budget-inline-modal';
     setHtml(overlay, `
       <div class="budget-inline-modal__panel" role="dialog" aria-modal="true" aria-label="${esc(title)}">
-        <div class="budget-inline-modal__header">
+        <div class="budget-inline-modal__header" data-dialog-actions>
           <strong>${esc(title)}</strong>
           <button class="btn btn--icon" type="button" data-action="inline-cancel" aria-label="${t('common.cancel')}">
             <i data-lucide="x" aria-hidden="true"></i>
@@ -3014,7 +3014,7 @@ function requestNameInPanel(panel, { title, label, placeholder }) {
           <label class="form-label" for="budget-inline-name">${esc(label)}</label>
           <input class="form-input" id="budget-inline-name" type="text" placeholder="${esc(placeholder)}">
         </div>
-        <div class="budget-inline-modal__footer">
+        <div class="budget-inline-modal__footer" data-dialog-actions>
           <button class="btn btn--secondary" type="button" data-action="inline-cancel">${t('common.cancel')}</button>
           <button class="btn btn--primary" type="button" data-action="inline-save">${t('common.add')}</button>
         </div>

@@ -646,7 +646,9 @@
         "duplicateKeepQuantities": "Zachowaj ilości",
         "duplicateKeepNotes": "Zachowaj notatki i linki",
         "duplicateSubmit": "Duplikuj",
-        "duplicateError": "Nie udało się zduplikować listy."
+        "duplicateError": "Nie udało się zduplikować listy.",
+        "itemStateChecked": "odhaczone",
+        "itemStateOpen": "nieodhaczone"
     },
     "meals": {
         "randomizeSuccess_few": "Zaplanowano {{count}} posiłki.",
@@ -2785,7 +2787,31 @@
         "healthPreventionKind": {
             "vaccination": "Szczepienie",
             "checkup": "Badanie"
-        }
+        },
+        "backupRestoreKeyLabel": "Klucz kopii zapasowej",
+        "backupRestoreKeyHint": "Ta kopia zapasowa pochodzi z innej instalacji. Wpisz jej DB_ENCRYPTION_KEY: zostanie użyty tylko do tego przywracania i nie zostanie zapisany, a potem dane będą zaszyfrowane kluczem tej instalacji.",
+        "backupRestoreKeyHttpWarning": "Ta strona nie jest otwarta przez HTTPS: klucz zostanie przesłany przez sieć bez szyfrowania.",
+        "backupRestoreErrorKeyRequired": "Klucz tej instalacji nie otwiera kopii zapasowej. Jeśli pochodzi z innej instalacji, wpisz poniżej jej klucz i przywróć ponownie; w przeciwnym razie plik nie jest bazą danych Yuvomi. Nie zmieniaj DB_ENCRYPTION_KEY tej instalacji: potem Yuvomi przestałby się uruchamiać. Nic tu nie zostało zmienione.",
+        "backupRestoreErrorKeyWrong": "Ten klucz nie otwiera kopii zapasowej. Musi to być dokładnie DB_ENCRYPTION_KEY instalacji, która zapisała kopię, łącznie ze spacjami na brzegach.",
+        "backupRestoreErrorKeyInvalid": "Klucz nie dotarł do serwera w czytelnej postaci. Wpisz go ponownie i przywróć jeszcze raz. Nic tu nie zostało zmienione.",
+        "backupRestoreErrorOwnKeyMissing": "Ta instalacja nie ma DB_ENCRYPTION_KEY, więc nie może otworzyć kopii zapasowej. Ustaw DB_ENCRYPTION_KEY, uruchom ponownie Yuvomi, a potem przywróć z kluczem kopii.",
+        "backupRestoreErrorDamaged": "Kopia zapasowa jest uszkodzona lub niekompletna; klucz jest poprawny. Pobierz plik ponownie, porównaj rozmiar i sha256sum z oryginałem i przywróć tę kopię. Nic tu nie zostało zmienione.",
+        "backupRestoreErrorUnreadable": "Nie udało się odczytać kopii zapasowej. Sprawdź, czy plik jest kompletny, i spróbuj ponownie; dokładna przyczyna jest w logu serwera. Nic tu nie zostało zmienione.",
+        "backupRestoreErrorGeneric": "Przywracanie nie powiodło się. Dokładna przyczyna jest w logu serwera.",
+        "backupRestoreErrorNeverEncrypted": "Jeśli plik nigdy nie był zaszyfrowany, nie jest prawidłową bazą danych Yuvomi.",
+        "backupRestoreErrorKeyRightButNotDb": "Jeśli klucz jest poprawny, plik nie jest bazą danych Yuvomi albo został ucięty.",
+        "backupRestoreErrorNothingChanged": "Nic tu nie zostało zmienione.",
+        "otherSessionsTitle": "Inne urządzenia",
+        "otherSessionsHint": "Wylogowuje twoje konto na wszystkich innych urządzeniach i przeglądarkach. To urządzenie pozostaje zalogowane. Nie dotyczy to tokenów API ani sparowanych wyświetlaczy ściennych.",
+        "otherSessionsButton": "Wyloguj na innych urządzeniach",
+        "otherSessionsConfirm": "Wylogować na wszystkich innych urządzeniach?",
+        "otherSessionsConfirmDetail": "Każdy, kto jest tam zalogowany na twoje konto, musi zalogować się ponownie. To urządzenie pozostaje zalogowane.",
+        "otherSessionsEnded": "Zakończono {{count}} innych sesji.",
+        "otherSessionsEnded_one": "Zakończono {{count}} inną sesję.",
+        "otherSessionsEnded_few": "Zakończono {{count}} inne sesje.",
+        "otherSessionsNone": "Twoje konto nie było zalogowane na żadnym innym urządzeniu.",
+        "otherSessionsError": "Nie udało się wylogować na innych urządzeniach.",
+        "otherSessionsTooManyAttempts": "Zbyt wiele żądań. Poczekaj chwilę i spróbuj ponownie."
     },
     "login": {
         "tagline": "Witaj ponownie w swoim planerze rodzinnym.",
@@ -3556,7 +3582,8 @@
         "currentMonth": "Bieżący",
         "noVisitReportsInMonth": "Brak zarejestrowanych wizyt personelu w okresie {{month}}.",
         "settledAdminOnly": "Zmienić lub usunąć może tylko admin",
-        "reportVisitsCount": "Wizyty"
+        "reportVisitsCount": "Wizyty",
+        "receiptPresent": "Dołączony"
     },
     "splitExpenses": {
         "title": "Wspólne wydatki",
@@ -5456,7 +5483,8 @@
         "confirmSelection": "Dodaj wybrane",
         "openAction": "Otwórz {{name}}",
         "limitReached": "Maksymalnie dokumentów: {{count}}.",
-        "limitReached_one": "Maksymalnie dokumentów: {{count}}."
+        "limitReached_one": "Maksymalnie dokumentów: {{count}}.",
+        "presentHidden": "Dołączony"
     },
     "join": {
         "title": "Skonfiguruj konto",

@@ -824,8 +824,7 @@ test('pendingUpdateUids meldet genau die wartenden Bearbeitungen', () => {
 // ── Migration v113 gegen eine befüllte Bestands-DB ──────────────────────────────
 
 test('v113 ist additiv und startet mit neutralen Markern', async () => {
-  const { mkdtempSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
+  const { tempDir } = await import('./tmp-dir.js');
   const { join } = await import('node:path');
   const { default: Database } = await import('better-sqlite3-multiple-ciphers');
   const { MIGRATIONS } = await import('../server/db.js');
@@ -836,7 +835,7 @@ test('v113 ist additiv und startet mit neutralen Markern', async () => {
     migration.afterUp?.(conn);
   };
 
-  const old = new Database(join(mkdtempSync(join(tmpdir(), 'yuvomi-todomig-')), 'db.sqlite'));
+  const old = new Database(join(tempDir('yuvomi-todomig-'), 'db.sqlite'));
   for (const migration of MIGRATIONS.filter((m) => m.version <= 112)) apply(old, migration);
 
   // Bestand, wie ihn ein Nutzer mit VTODO-Spiegel mitbringt.
@@ -879,8 +878,7 @@ test('v113 ist additiv und startet mit neutralen Markern', async () => {
 });
 
 test('v123 entkoppelt den Bestand toter Kontokennungen und lässt lebende in Ruhe', async () => {
-  const { mkdtempSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
+  const { tempDir } = await import('./tmp-dir.js');
   const { join } = await import('node:path');
   const { default: Database } = await import('better-sqlite3-multiple-ciphers');
   const { MIGRATIONS } = await import('../server/db.js');
@@ -891,7 +889,7 @@ test('v123 entkoppelt den Bestand toter Kontokennungen und lässt lebende in Ruh
     migration.afterUp?.(conn);
   };
 
-  const old = new Database(join(mkdtempSync(join(tmpdir(), 'yuvomi-detachmig-')), 'db.sqlite'));
+  const old = new Database(join(tempDir('yuvomi-detachmig-'), 'db.sqlite'));
   for (const migration of MIGRATIONS.filter((m) => m.version <= 122)) apply(old, migration);
 
   // Bestand eines Haushalts, der schon einmal ein CalDAV-Konto gelöscht hat:

@@ -26,6 +26,7 @@ import { formatMoney } from '/utils/money.js';
 import { todayKey } from '/utils/date.js';
 import { formatDate, getLocale, getNumberFormat } from '/i18n.js';
 import { renderDocumentAttachField, bindDocumentAttachField } from '/components/document-attach.js';
+import { pathAccess } from '/utils/module-access.js';
 import { warrantyStatus, hasUpcomingDeadline, dateStatus, countUpcomingDeadlines } from '/utils/inventory-warranty.js';
 import { openDetailView, closeDetailView } from '/components/detail-view.js';
 import { wireScrollFade } from '/utils/ux.js';
@@ -949,6 +950,24 @@ function photoDetailNode(photoData) {
 }
 
 /**
+ * Die Belege fuer die Detailansicht. Sie gehoeren dem Dokumente-Modul: bei
+ * `documents: none` gibt es keine Zeile, jeder Link ginge ins 403 (dieselbe
+ * Antwort wie attachmentLinksNode in components/document-attach.js). Einen
+ * Beleg, den der Server nicht nennt (#1358: `document_id` null, kein Name),
+ * zeigt die Zeile einmal als "Vorhanden" statt als Link auf `/documents/null`.
+ */
+function attachmentDetailEntries(attachments) {
+  if (pathAccess('/documents') === 'none') return [];
+  const list = (attachments || []).filter(Boolean);
+  const entries = list.filter((doc) => doc.document_id).map((doc) => ({
+    text: doc.name || doc.original_name || '',
+    href: `/api/v1/documents/${Number(doc.document_id)}/preview`,
+  }));
+  if (entries.length < list.length) entries.unshift({ text: t('documentAttach.presentHidden') });
+  return entries;
+}
+
+/**
  * Lese-Zeilen fuer die Detailansicht. Zeilen ohne Inhalt fallen selbst weg
  * (detailRowEl), also keine Fallunterscheidung hier noetig.
  * @returns {Array} Sections fuer openDetailView
@@ -958,10 +977,7 @@ function renderItemDetail(item, history, onDoneTrackedDate, historyLoadFailed) {
     text: `${link.title} · ${formatMoney(link.amount, _householdCurrency)}`,
     sub: `${roleLabel(link.role)} · ${formatDate(link.date)}`,
   }));
-  const attachmentEntries = (item.attachments || []).map((doc) => ({
-    text: doc.name || doc.original_name || '',
-    href: `/api/v1/documents/${doc.document_id}/preview`,
-  }));
+  const attachmentEntries = attachmentDetailEntries(item.attachments);
 
   return [
     { icon: 'image', label: t('inventory.photoLabel'), node: photoDetailNode(item.photo_data) },
@@ -1244,14 +1260,14 @@ function openBookingPicker(panel, { initialMonth, includeRole = false } = {}) {
     overlay.insertAdjacentHTML('afterbegin', `
       <div class="inventory-booking-picker__panel" role="dialog" aria-modal="true"
            aria-label="${esc(t('inventory.bookingPickerTitle'))}">
-        <div class="inventory-booking-picker__header">
+        <div class="inventory-booking-picker__header" data-dialog-actions>
           <strong>${esc(t('inventory.bookingPickerTitle'))}</strong>
           <button class="btn btn--icon" type="button" data-picker-close
                   aria-label="${esc(t('common.cancel'))}">
             <i data-lucide="x" aria-hidden="true"></i>
           </button>
         </div>
-        <div class="inventory-booking-picker__nav">
+        <div class="inventory-booking-picker__nav" data-dialog-actions>
           <button class="btn btn--icon" type="button" data-picker-prev
                   aria-label="${esc(t('inventory.bookingPickerPrevMonth'))}">
             <i data-lucide="chevron-left" aria-hidden="true"></i>
@@ -1272,7 +1288,7 @@ function openBookingPicker(panel, { initialMonth, includeRole = false } = {}) {
               ${ROLES.map((r) => `<option value="${r}">${esc(roleLabel(r))}</option>`).join('')}
             </select>
           </div>
-          <div class="inventory-booking-picker__role-footer">
+          <div class="inventory-booking-picker__role-footer" data-dialog-actions>
             <button class="btn btn--secondary" type="button" data-picker-role-back>${esc(t('common.back'))}</button>
             <button class="btn btn--primary" type="button" data-picker-role-confirm>${esc(t('inventory.addBooking'))}</button>
           </div>
@@ -2067,4 +2083,5 @@ export const __test = {
   categoryLabel,
   itemCategoryLabel,
   categoryOptionsHtml,
+  attachmentDetailEntries,
 };
