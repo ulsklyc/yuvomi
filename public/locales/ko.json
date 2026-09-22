@@ -2786,6 +2786,9 @@
             "vaccination": "예방접종",
             "checkup": "검진"
         },
+        "backupRestoreKeyLabel": "백업 키",
+        "backupRestoreKeyHint": "이 백업은 다른 설치본에서 만들어졌습니다. 그 설치본의 DB_ENCRYPTION_KEY를 입력하세요. 키는 이번 복원에만 사용되고 저장되지 않으며, 복원 후 데이터는 이 설치본의 키로 암호화됩니다.",
+        "backupRestoreKeyHttpWarning": "이 페이지는 HTTPS로 열려 있지 않습니다. 키가 암호화되지 않은 채 네트워크로 전송됩니다.",
         "otherSessionsTitle": "다른 기기",
         "otherSessionsHint": "다른 모든 기기와 브라우저에서 계정을 로그아웃합니다. 이 기기는 로그인 상태로 유지됩니다. API 토큰과 페어링된 벽걸이 디스플레이는 영향을 받지 않습니다.",
         "otherSessionsButton": "다른 기기에서 로그아웃",

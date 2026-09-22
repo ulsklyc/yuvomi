@@ -2774,6 +2774,9 @@
             "vaccination": "Védőoltás",
             "checkup": "Szűrés"
         },
+        "backupRestoreKeyLabel": "A biztonsági mentés kulcsa",
+        "backupRestoreKeyHint": "Ez a biztonsági mentés egy másik telepítésből származik. Add meg annak DB_ENCRYPTION_KEY értékét: csak ehhez a visszaállításhoz használjuk, nem tároljuk, utána az adatokat ennek a telepítésnek a kulcsa titkosítja.",
+        "backupRestoreKeyHttpWarning": "Ez az oldal nem HTTPS-en keresztül van megnyitva: a kulcs titkosítatlanul halad át a hálózaton.",
         "otherSessionsTitle": "Más eszközök",
         "otherSessionsHint": "Kijelentkezteti a fiókodat az összes többi eszközön és böngészőben. Ez az eszköz bejelentkezve marad. Az API-tokeneket és a párosított fali kijelzőket ez nem érinti.",
         "otherSessionsButton": "Kijelentkezés más eszközökön",

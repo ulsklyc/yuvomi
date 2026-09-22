@@ -2774,6 +2774,9 @@
             "vaccination": "Vaccinatie",
             "checkup": "Controle"
         },
+        "backupRestoreKeyLabel": "Sleutel van de back-up",
+        "backupRestoreKeyHint": "Deze back-up komt van een andere installatie. Voer de DB_ENCRYPTION_KEY van die installatie in: die wordt alleen voor dit herstel gebruikt en niet opgeslagen, daarna zijn de gegevens versleuteld met de sleutel van deze installatie.",
+        "backupRestoreKeyHttpWarning": "Deze pagina is niet via HTTPS geopend: de sleutel gaat onversleuteld over het netwerk.",
         "otherSessionsTitle": "Andere apparaten",
         "otherSessionsHint": "Meldt je account af op alle andere apparaten en browsers. Dit apparaat blijft aangemeld. API-tokens en gekoppelde wandschermen blijven ongemoeid.",
         "otherSessionsButton": "Afmelden op andere apparaten",

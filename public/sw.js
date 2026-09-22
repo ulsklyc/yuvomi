@@ -305,6 +305,7 @@ const PAGE_MODULES = [
   '/settings/components.js',
   '/settings/module-order.js',
   '/settings/cron-label.js',
+  '/settings/backup-key.js',
   '/settings/currency.js',
   '/settings/preferences-cache.js',
   '/settings/region-presets.js',

@@ -18,6 +18,40 @@ const router = express.Router();
 const log = createLogger('Backup');
 const RESTORE_LIMIT = process.env.BACKUP_UPLOAD_LIMIT || '100mb';
 
+/**
+ * Schluessel eines Backups aus einer ANDEREN Installation (#1267): nur im
+ * Header, nie in der Query - URLs landen in Proxy- und Zugriffslogs. Der Wert
+ * ist Base64 der UTF-8-Bytes, damit jeder Schluessel verlustfrei durchkommt,
+ * auch einer mit Leerzeichen am Rand oder Zeichen ausserhalb von Latin-1, die
+ * ein Header roh nicht tragen kann.
+ */
+const BACKUP_KEY_HEADER = 'X-Backup-Key';
+const BACKUP_KEY_MAX_LENGTH = 4096;
+
+class BackupKeyHeaderError extends Error {
+  constructor() {
+    super(`${BACKUP_KEY_HEADER} must be the backup key encoded as base64 (UTF-8 bytes).`);
+    this.reason = 'backup_key_invalid';
+  }
+}
+
+/** @returns {Buffer | null} */
+function backupKeyFromHeader(req) {
+  const raw = req.get(BACKUP_KEY_HEADER);
+  if (raw === undefined) return null;
+  const value = raw.trim();
+  if (!value || value.length > BACKUP_KEY_MAX_LENGTH || !/^[A-Za-z0-9+/]+={0,2}$/.test(value)) {
+    throw new BackupKeyHeaderError();
+  }
+  const bytes = Buffer.from(value, 'base64');
+  // Buffer.from() ueberspringt stillschweigend, was es nicht lesen kann - nur
+  // eine Kodierung, die sich identisch zuruecklesen laesst, ist dieser Schluessel.
+  if (bytes.length === 0 || bytes.toString('base64').replace(/=+$/, '') !== value.replace(/=+$/, '')) {
+    throw new BackupKeyHeaderError();
+  }
+  return bytes;
+}
+
 function backupFileName() {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   return `yuvomi-backup-${stamp}.db`;
@@ -63,15 +97,17 @@ router.post(
   express.raw({ type: 'application/octet-stream', limit: RESTORE_LIMIT }),
   async (req, res) => {
     let dir = null;
+    let backupKey = null;
     try {
       if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
         return res.status(400).json({ error: 'Backup file is required.', code: 400 });
       }
+      backupKey = backupKeyFromHeader(req);
 
       dir = await fs.mkdtemp(path.join(os.tmpdir(), 'yuvomi-restore-'));
       const uploadPath = path.join(dir, 'restore.db');
       await fs.writeFile(uploadPath, req.body);
-      const result = await restoreFromFile(uploadPath);
+      const result = await restoreFromFile(uploadPath, { backupKey });
 
       res.json({
         ok: true,
@@ -80,10 +116,15 @@ router.post(
         },
       });
     } catch (err) {
-      log.error('Database restore failed:', err);
+      // Ein erwarteter Befund (mit `reason`) geht nur als Meldung ins Log - sie
+      // nennt nie einen Schluessel. Alles andere samt Stack, wie bisher.
+      if (err?.reason) log.warn(`Database restore failed: ${err.message}`);
+      else log.error('Database restore failed:', err);
       const message = err?.message || 'Database restore failed.';
-      res.status(400).json({ error: message, code: 400 });
+      res.status(400).json({ error: message, code: 400, ...(err?.reason ? { reason: err.reason } : {}) });
     } finally {
+      // Der Schluessel lebt nur fuer diesen Restore.
+      backupKey?.fill(0);
       if (dir) {
         try { await fs.rm(dir, { recursive: true, force: true }); } catch { /* best effort */ }
       }

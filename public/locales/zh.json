@@ -2774,6 +2774,9 @@
             "vaccination": "疫苗接种",
             "checkup": "体检"
         },
+        "backupRestoreKeyLabel": "备份的密钥",
+        "backupRestoreKeyHint": "此备份来自另一个安装实例。请输入该实例的 DB_ENCRYPTION_KEY：它只用于本次恢复，不会被保存；恢复后的数据使用本实例的密钥加密。",
+        "backupRestoreKeyHttpWarning": "此页面未通过 HTTPS 打开：密钥将以未加密形式经网络传输。",
         "otherSessionsTitle": "其他设备",
         "otherSessionsHint": "在所有其他设备和浏览器上退出你的账户。此设备保持登录。API 令牌和已配对的墙面显示屏不受影响。",
         "otherSessionsButton": "在其他设备上退出",

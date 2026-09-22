@@ -2774,6 +2774,9 @@
             "vaccination": "Vaccin",
             "checkup": "Bilan"
         },
+        "backupRestoreKeyLabel": "Clé de la sauvegarde",
+        "backupRestoreKeyHint": "Cette sauvegarde provient d'une autre installation. Saisissez sa DB_ENCRYPTION_KEY : elle sert uniquement à cette restauration et n'est pas enregistrée ; ensuite, les données sont chiffrées avec la clé de cette installation.",
+        "backupRestoreKeyHttpWarning": "Cette page n'est pas ouverte en HTTPS : la clé transitera sur le réseau sans chiffrement.",
         "otherSessionsTitle": "Autres appareils",
         "otherSessionsHint": "Déconnecte ton compte de tous les autres appareils et navigateurs. Cet appareil reste connecté. Les jetons API et les écrans muraux associés ne sont pas concernés.",
         "otherSessionsButton": "Se déconnecter des autres appareils",

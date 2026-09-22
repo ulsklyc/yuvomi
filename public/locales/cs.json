@@ -2774,6 +2774,9 @@
             "vaccination": "Očkování",
             "checkup": "Prohlídka"
         },
+        "backupRestoreKeyLabel": "Klíč zálohy",
+        "backupRestoreKeyHint": "Tato záloha pochází z jiné instalace. Zadejte její DB_ENCRYPTION_KEY: použije se jen pro toto obnovení a neuloží se, poté jsou data šifrována klíčem této instalace.",
+        "backupRestoreKeyHttpWarning": "Tato stránka není otevřena přes HTTPS: klíč bude po síti přenesen nešifrovaně.",
         "otherSessionsTitle": "Ostatní zařízení",
         "otherSessionsHint": "Odhlásí tvůj účet na všech ostatních zařízeních a prohlížečích. Toto zařízení zůstane přihlášené. API tokeny a spárované nástěnné displeje nejsou dotčeny.",
         "otherSessionsButton": "Odhlásit na ostatních zařízeních",

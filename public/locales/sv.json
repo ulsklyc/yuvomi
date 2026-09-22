@@ -2774,6 +2774,9 @@
             "vaccination": "Vaccination",
             "checkup": "Kontroll"
         },
+        "backupRestoreKeyLabel": "Säkerhetskopians nyckel",
+        "backupRestoreKeyHint": "Den här säkerhetskopian kommer från en annan installation. Ange dess DB_ENCRYPTION_KEY: den används bara för den här återställningen och sparas inte, därefter krypteras datan med den här installationens nyckel.",
+        "backupRestoreKeyHttpWarning": "Sidan är inte öppnad via HTTPS: nyckeln skickas okrypterad över nätverket.",
         "otherSessionsTitle": "Andra enheter",
         "otherSessionsHint": "Loggar ut ditt konto på alla andra enheter och webbläsare. Den här enheten förblir inloggad. API-token och kopplade väggskärmar påverkas inte.",
         "otherSessionsButton": "Logga ut på andra enheter",

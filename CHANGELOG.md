@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A backup from another installation can be restored without touching a shell.** A backup
+  carries the encryption of the installation that wrote it, so moving to a new server ended at
+  "could not be decrypted", and every way around it meant swapping files and keys by hand - on
+  Umbrel, where the key is fixed, there was none at all. When a backup does not open with this
+  installation's key, the restore dialog now asks for the old installation's `DB_ENCRYPTION_KEY`.
+  The backup is decrypted with it and re-encrypted with this installation's own key before it
+  replaces the database; the entered key is used only for that restore and is not stored. A wrong
+  key leaves everything as it was. An installation without a key of its own refuses, instead of
+  storing the backup decrypted, and over plain HTTP the dialog warns that the key crosses the
+  network unencrypted. API clients send the key as base64 in the `X-Backup-Key` header of
+  `POST /api/v1/backup/restore` (never in the URL), and `scripts/restore-backup.js` reads it from
+  stdin with `--backup-key-stdin`. See "Moving to a new server" in the installation guide. (#1267)
+
 - **You can sign out on your other devices.** Since a session now lasts 90 days without use, a lost
   phone or a borrowed laptop could stay signed in for months, and signing out only ended the
   session on the device you were using. Settings, Account, now has "Other devices" with a button
