@@ -2773,7 +2773,18 @@
         "healthPreventionKind": {
             "vaccination": "Vaccination",
             "checkup": "Kontroll"
-        }
+        },
+        "otherSessionsTitle": "Andra enheter",
+        "otherSessionsHint": "Loggar ut ditt konto på alla andra enheter och webbläsare. Den här enheten förblir inloggad. API-token och kopplade väggskärmar påverkas inte.",
+        "otherSessionsButton": "Logga ut på andra enheter",
+        "otherSessionsConfirm": "Logga ut på alla andra enheter?",
+        "otherSessionsConfirmDetail": "Den som är inloggad där med ditt konto måste logga in igen. Den här enheten förblir inloggad.",
+        "otherSessionsEnded": "{{count}} andra sessioner avslutade.",
+        "otherSessionsEnded_one": "{{count}} annan session avslutad.",
+        "otherSessionsEnded_few": "{{count}} andra sessioner avslutade.",
+        "otherSessionsNone": "Ditt konto var inte inloggat på någon annan enhet.",
+        "otherSessionsError": "Det gick inte att logga ut på andra enheter.",
+        "otherSessionsTooManyAttempts": "För många förfrågningar. Vänta en stund och försök sedan igen."
     },
     "login": {
         "tagline": "Välkommen tillbaka till din familjeplanerare.",

@@ -125,6 +125,24 @@ export function authPaths() {
     '/api/v1/auth/logout': {
       post: op({ summary: 'Logout current session', tag: 'Auth', stateChanging: true }),
     },
+    '/api/v1/auth/logout-others': {
+      post: op({
+        summary: 'Sign out all other sessions',
+        tag: 'Auth',
+        stateChanging: true,
+        description: 'Ends every browser session of the signed-in user except the calling one (#1354) and '
+          + 'answers `{ ok: true, ended }` with the number of sessions ended. Only a browser session may call '
+          + 'it: an API token or a wall display has no current session to keep and gets 403. API tokens and '
+          + 'paired wall displays are not sessions and stay valid; revoke them under API tokens and Displays.',
+        responses: {
+          200: { description: 'Other sessions ended; `ended` is their number' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          429: { description: 'Too many requests' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
     '/api/v1/auth/oidc/config': {
       get: op({
         summary: 'Get sign-in availability',

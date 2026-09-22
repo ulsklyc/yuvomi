@@ -2785,7 +2785,18 @@
         "healthPreventionKind": {
             "vaccination": "Vaksinasi",
             "checkup": "Pemeriksaan"
-        }
+        },
+        "otherSessionsTitle": "Perangkat lain",
+        "otherSessionsHint": "Mengeluarkan akunmu dari semua perangkat dan browser lain. Perangkat ini tetap masuk. Token API dan layar dinding yang dipasangkan tidak terpengaruh.",
+        "otherSessionsButton": "Keluar dari perangkat lain",
+        "otherSessionsConfirm": "Keluar dari semua perangkat lain?",
+        "otherSessionsConfirmDetail": "Siapa pun yang masuk dengan akunmu di sana harus masuk lagi. Perangkat ini tetap masuk.",
+        "otherSessionsEnded": "{{count}} sesi lain diakhiri.",
+        "otherSessionsEnded_one": "{{count}} sesi lain diakhiri.",
+        "otherSessionsEnded_few": "{{count}} sesi lain diakhiri.",
+        "otherSessionsNone": "Akunmu tidak masuk di perangkat lain mana pun.",
+        "otherSessionsError": "Gagal keluar dari perangkat lain.",
+        "otherSessionsTooManyAttempts": "Terlalu banyak permintaan. Tunggu sebentar, lalu coba lagi."
     },
     "login": {
         "tagline": "Selamat datang kembali di perencana keluarga Anda.",

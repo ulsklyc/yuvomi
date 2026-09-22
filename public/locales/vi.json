@@ -2773,7 +2773,18 @@
         "healthPreventionKind": {
             "vaccination": "Tiêm chủng",
             "checkup": "Kiểm tra"
-        }
+        },
+        "otherSessionsTitle": "Thiết bị khác",
+        "otherSessionsHint": "Đăng xuất tài khoản của bạn trên mọi thiết bị và trình duyệt khác. Thiết bị này vẫn đăng nhập. Mã API và màn hình treo tường đã ghép nối không bị ảnh hưởng.",
+        "otherSessionsButton": "Đăng xuất trên thiết bị khác",
+        "otherSessionsConfirm": "Đăng xuất trên mọi thiết bị khác?",
+        "otherSessionsConfirmDetail": "Ai đang đăng nhập bằng tài khoản của bạn ở đó sẽ phải đăng nhập lại. Thiết bị này vẫn đăng nhập.",
+        "otherSessionsEnded": "Đã kết thúc {{count}} phiên khác.",
+        "otherSessionsEnded_one": "Đã kết thúc {{count}} phiên khác.",
+        "otherSessionsEnded_few": "Đã kết thúc {{count}} phiên khác.",
+        "otherSessionsNone": "Tài khoản của bạn không đăng nhập trên thiết bị nào khác.",
+        "otherSessionsError": "Không thể đăng xuất trên các thiết bị khác.",
+        "otherSessionsTooManyAttempts": "Quá nhiều yêu cầu. Vui lòng đợi một chút rồi thử lại."
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại trình lập kế hoạch gia đình.",

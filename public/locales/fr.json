@@ -2773,7 +2773,18 @@
         "healthPreventionKind": {
             "vaccination": "Vaccin",
             "checkup": "Bilan"
-        }
+        },
+        "otherSessionsTitle": "Autres appareils",
+        "otherSessionsHint": "Déconnecte ton compte de tous les autres appareils et navigateurs. Cet appareil reste connecté. Les jetons API et les écrans muraux associés ne sont pas concernés.",
+        "otherSessionsButton": "Se déconnecter des autres appareils",
+        "otherSessionsConfirm": "Se déconnecter de tous les autres appareils ?",
+        "otherSessionsConfirmDetail": "Toute personne connectée là-bas avec ton compte devra se reconnecter. Cet appareil reste connecté.",
+        "otherSessionsEnded": "{{count}} autres sessions fermées.",
+        "otherSessionsEnded_one": "{{count}} autre session fermée.",
+        "otherSessionsEnded_few": "{{count}} autres sessions fermées.",
+        "otherSessionsNone": "Ton compte n’était connecté sur aucun autre appareil.",
+        "otherSessionsError": "La déconnexion des autres appareils a échoué.",
+        "otherSessionsTooManyAttempts": "Trop de requêtes. Patiente un instant, puis réessaie."
     },
     "login": {
         "tagline": "Bon retour sur votre planificateur familial.",

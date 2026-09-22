@@ -2773,7 +2773,18 @@
         "healthPreventionKind": {
             "vaccination": "لقاح",
             "checkup": "فحص"
-        }
+        },
+        "otherSessionsTitle": "الأجهزة الأخرى",
+        "otherSessionsHint": "يسجّل خروج حسابك من جميع الأجهزة والمتصفحات الأخرى. يبقى هذا الجهاز مسجّل الدخول. لا يتأثر رموز API وشاشات الحائط المقترنة.",
+        "otherSessionsButton": "تسجيل الخروج من الأجهزة الأخرى",
+        "otherSessionsConfirm": "تسجيل الخروج من جميع الأجهزة الأخرى؟",
+        "otherSessionsConfirmDetail": "على كل من سجّل الدخول بحسابك هناك أن يسجّل الدخول من جديد. يبقى هذا الجهاز مسجّل الدخول.",
+        "otherSessionsEnded": "تم إنهاء {{count}} جلسات أخرى.",
+        "otherSessionsEnded_one": "تم إنهاء جلسة أخرى واحدة.",
+        "otherSessionsEnded_few": "تم إنهاء {{count}} جلسات أخرى.",
+        "otherSessionsNone": "لم يكن حسابك مسجّل الدخول على أي جهاز آخر.",
+        "otherSessionsError": "فشل تسجيل الخروج من الأجهزة الأخرى.",
+        "otherSessionsTooManyAttempts": "طلبات كثيرة. انتظر قليلًا ثم حاول مرة أخرى."
     },
     "login": {
         "tagline": "مرحبًا بعودتك إلى منظّم عائلتك.",
