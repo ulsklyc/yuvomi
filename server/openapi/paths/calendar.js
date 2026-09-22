@@ -15,7 +15,11 @@ const apiError = (description) => ({
 const ATTACHMENT_RIGHTS = ' A new attachment creates a document in the Documents module and therefore needs write access '
   + 'there (member right, for API tokens a `documents:write` scope); without it any non-empty `attachment_data` is refused with 403 '
   + 'before the event is looked up. Replacing or removing an attachment needs read access to the Documents module and sight of the '
-  + 'stored document; otherwise the same 403, and the attachment stays.';
+  + 'stored document; otherwise the same 403, and the attachment stays. The 403 bodies carry `reason` `ATTACHMENT_UPLOAD_REFUSED` or '
+  + '`ATTACHMENT_CHANGE_REFUSED`. Saving an event carries its visibility and assignees over to the attachment\'s document; it opens the '
+  + 'document further only for a caller with write access to documents who can see it, otherwise it only narrows. A split or a '
+  + 'detach copies the attachment for the new series or event only for such a caller; otherwise the new one has no attachment and '
+  + 'the original stays on the original series.';
 
 const DATETIME_INPUT = ' `start_datetime` and `end_datetime` take the forms of `CalendarDateOrDateTimeInput`: '
   + 'a value without offset is household wall-clock time, a value with `Z` or a numeric offset is read as an '

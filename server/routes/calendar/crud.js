@@ -21,6 +21,8 @@ import { queueEventDeletion, markEventOutbound, flushOutbound } from '../../serv
 import { SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN } from '../../services/calendar-events.js';
 import { newNonMembers, nonMemberMessage } from '../../services/household-members.js';
 import { documentViewer } from '../../services/document-links.js';
+import { documentWidenPredicate } from '../../services/document-access.js';
+import { mayWriteModule } from '../../permissions.js';
 import {
   assertSuccessorHasOccurrence,
   baseOccurrenceFor,
@@ -57,7 +59,22 @@ import {
 const log = createLogger('Calendar');
 const router = express.Router();
 
-async function runWithAttachmentClonePlan(database, actorId, stagedClones, operation) {
+/**
+ * Was dieser Aufrufer mit Anhang-Dokumenten tun darf (#1358): weiter oeffnen
+ * (Sichtbarkeit des Termins aufs Dokument uebertragen) und kopieren (Split,
+ * Abloesen) nur mit Dokumente-Schreibrecht UND Sicht auf das Dokument. Sonst
+ * wird nur verengt, und ein Nachfolger bekommt keine Kopie - ohne 403, damit
+ * der Termin bearbeitbar bleibt; der Anhang bleibt an der alten Serie.
+ */
+function attachmentRights(req) {
+  const allowed = documentWidenPredicate(db.get(), {
+    actorId: getUserId(req),
+    documentsWritable: mayWriteModule(req, 'documents'),
+  });
+  return { mayWidenAttachment: allowed, mayCloneAttachment: allowed };
+}
+
+async function runWithAttachmentClonePlan(database, actorId, stagedClones, operation, { mayClone = () => false } = {}) {
   try {
     return operation({});
   } catch (error) {
@@ -66,6 +83,11 @@ async function runWithAttachmentClonePlan(database, actorId, stagedClones, opera
     const contents = new Map();
     const prepared = [];
     for (const request of error.requests) {
+      // Keine Kopie ohne Recht: weder gelesen noch gestaged, `consume` liefert `null`.
+      if (!mayClone(request.sourceDocumentId)) {
+        prepared.push({ request, refused: true, used: false });
+        continue;
+      }
       const sourceDocument = database.prepare('SELECT * FROM family_documents WHERE id = ?')
         .get(request.sourceDocumentId);
       if (!sourceDocument) throw new Error('Attachment clone source document no longer exists.');
@@ -90,6 +112,7 @@ async function runWithAttachmentClonePlan(database, actorId, stagedClones, opera
         && Number(entry.request.sourceDocumentId) === Number(sourceDocumentId));
       if (!clone) throw new Error('No staged attachment clone matches the detached owner.');
       clone.used = true;
+      if (clone.refused) return null;
       return {
         ...clone.request.attachment,
         attachment_document_id: cloneAttachmentDocument(
@@ -108,6 +131,7 @@ async function runWithAttachmentClonePlan(database, actorId, stagedClones, opera
         consume('detached', childId, sourceDocumentId),
     });
     for (const clone of prepared) {
+      if (clone.refused) continue;
       const index = stagedClones.indexOf(clone.staged);
       if (index >= 0) stagedClones.splice(index, 1);
       if (!clone.used) {
@@ -401,7 +425,7 @@ router.post('/', async (req, res) => {
     }
     // Hochladen braucht das Dokumente-Schreibrecht (DECISIONS.md Eintrag 10).
     if (attachmentUploadRefused(req)) {
-      return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403 });
+      return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403, reason: 'ATTACHMENT_UPLOAD_REFUSED' });
     }
 
     const vTitle = str(req.body.title, 'Titel', { max: MAX_TITLE });
@@ -499,7 +523,9 @@ router.post('/', async (req, res) => {
         normalizeVisibility(req.body.visibility),
         req.body.countdown ? 1 : 0
       );
-      setEventAssignments(db.get(), result.lastInsertRowid, userIds);
+      setEventAssignments(db.get(), result.lastInsertRowid, userIds, {
+        mayWidenAttachment: attachmentRights(req).mayWidenAttachment,
+      });
       return result.lastInsertRowid;
     })();
 
@@ -639,12 +665,13 @@ router.put('/:id', async (req, res) => {
   try {
     // Vor der Suche: die Absage verraet nicht, ob es den Termin gibt.
     if (attachmentUploadRefused(req)) {
-      return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403 });
+      return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403, reason: 'ATTACHMENT_UPLOAD_REFUSED' });
     }
     const id    = parseInt(req.params.id, 10);
     const event = loadVisibleEvent(id, req);
     if (!event) return res.status(404).json({ error: 'Termin nicht gefunden', code: 404 });
     if (rejectLinkedOccurrenceResource(res, event, req)) return;
+    const rights = attachmentRights(req);
 
     const checks = [];
     // GESPEICHERT WIRD DER GEPRUEFTE WERT, NICHT DER ROHE (#1364). Bis hierher
@@ -797,7 +824,7 @@ router.put('/:id', async (req, res) => {
     }
     if ((replacementRequested || removalRequested)
         && storedAttachmentLocked(req, db.get(), event.attachment_document_id)) {
-      return res.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403 });
+      return res.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403, reason: 'ATTACHMENT_CHANGE_REFUSED' });
     }
     const attachment = replacementRequested
       ? parseAttachment(req.body.attachment_data)
@@ -969,7 +996,7 @@ router.put('/:id', async (req, res) => {
         colorModified,
         id
       );
-      setEventAssignments(db.get(), id, userIds);
+      setEventAssignments(db.get(), id, userIds, { mayWidenAttachment: rights.mayWidenAttachment });
     };
 
     const linkedOverrideCount = db.get().prepare(`
@@ -1021,6 +1048,7 @@ router.put('/:id', async (req, res) => {
         event.created_by,
         stagedClones,
         (cloneOptions) => updateSeriesWithOverrides(db.get(), {
+          mayWidenAttachment: rights.mayWidenAttachment,
           seriesId: id,
           actorId: getUserId(req),
           isAdmin: isAdminUser(req),
@@ -1031,6 +1059,7 @@ router.put('/:id', async (req, res) => {
           authorizeActor: false,
           ...cloneOptions,
         }),
+        { mayClone: rights.mayCloneAttachment },
       );
     } else {
       db.get().transaction(applyUpdate)();
@@ -1126,7 +1155,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
     const actorId = getUserId(req);
     const isAdmin = isAdminUser(req);
     if (attachmentUploadRefused(req)) {
-      return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403 });
+      return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403, reason: 'ATTACHMENT_UPLOAD_REFUSED' });
     }
     const master = Number.isInteger(seriesId) ? loadVisibleEvent(seriesId, req) : null;
     if (!master) {
@@ -1181,7 +1210,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
     }
     if ((replacementRequested || removalRequested)
         && storedAttachmentLocked(req, db.get(), storedOccurrenceAttachmentDocument(db.get(), master, req.params.recurrenceId))) {
-      return res.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403 });
+      return res.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403, reason: 'ATTACHMENT_CHANGE_REFUSED' });
     }
     const parsedAttachment = replacementRequested
       ? parseAttachment(req.body.attachment_data)
@@ -1208,6 +1237,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
 
     assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), seriesId, req.params.recurrenceId));
     const result = upsertOccurrenceOverride(db.get(), {
+      mayWidenAttachment: attachmentRights(req).mayWidenAttachment,
       seriesId,
       recurrenceId: req.params.recurrenceId,
       actorId,
@@ -1279,7 +1309,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
     const actorId = getUserId(req);
     const isAdmin = isAdminUser(req);
     if (attachmentUploadRefused(req)) {
-      return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403 });
+      return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403, reason: 'ATTACHMENT_UPLOAD_REFUSED' });
     }
     const master = Number.isInteger(seriesId) ? loadVisibleEvent(seriesId, req) : null;
     if (!master) {
@@ -1360,7 +1390,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
     }
     if ((replacementRequested || removalRequested)
         && storedAttachmentLocked(req, db.get(), storedOccurrenceAttachmentDocument(db.get(), master, req.params.recurrenceId))) {
-      return res.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403 });
+      return res.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403, reason: 'ATTACHMENT_CHANGE_REFUSED' });
     }
     const parsedAttachment = replacementRequested
       ? parseAttachment(req.body.attachment_data)
@@ -1393,7 +1423,9 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
       changes.target_outlook_calendar_id = vOutlook.value.calendarId;
     }
     if (vIcon !== undefined) changes.icon = vIcon;
+    const rights = attachmentRights(req);
     const commonOptions = {
+      mayWidenAttachment: rights.mayWidenAttachment,
       seriesId,
       recurrenceId: req.params.recurrenceId,
       actorId,
@@ -1429,6 +1461,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
         assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), seriesId, req.params.recurrenceId));
         return splitSeries(db.get(), { ...commonOptions, ...cloneOptions });
       },
+      { mayClone: rights.mayCloneAttachment },
     );
     stagedUpload = null;
     res.status(result.wholeSeries ? 200 : 201).json({

@@ -3648,6 +3648,14 @@ test('Anhang: ohne Dokumentenrecht oder Sicht aufs Dokument nennt der Termin ihn
   for (const fields of await readAll(MARIA)) assert.deepEqual(fields, hidden, 'privates Dokument einer anderen Person');
   for (const fields of await readAll(ADMIN)) assert.deepEqual(fields, shown, 'wer es angelegt hat, sieht es weiter');
 
+  // `attachment_locked` sagt nur, DASS ein Anhang haengt, den der Betrachter
+  // nicht sieht - und nur, wer Dokumente lesen darf. Sonst `null`.
+  const locked = async (actor) => (await call('GET', `/${eventId}`, { actor })).body.data.attachment_locked;
+  assert.equal(await locked(MARIA), true, 'fremdes privates Dokument: gesperrt');
+  assert.equal(await locked(ADMIN), false, 'die Erstellerin: nicht gesperrt');
+  assert.equal(await locked(NONE), null, 'documents: none: nicht einmal das');
+  assert.equal(await locked(TOKEN), null, 'Token ohne documents:read: ebenso');
+
   // Die verdeckten Antworten nennen die Nummer nirgends, auch nicht in einer URL.
   const raw = await call('GET', `/${eventId}`, { actor: NONE });
   assert.doesNotMatch(JSON.stringify(raw.body), new RegExp(`/documents/${docId}/`));
@@ -3670,6 +3678,7 @@ test('Anhang: Hochladen braucht documents-Schreibrecht, vor der Suche und ohne D
     const before = { documents: documents(), events: events() };
     const post = await call('POST', '/', { actor, body });
     assert.equal(post.status, 403, `${label}: POST mit Anhang`);
+    assert.equal(post.body.reason, 'ATTACHMENT_UPLOAD_REFUSED');
     assert.deepEqual({ documents: documents(), events: events() }, before, `${label}: weder Termin noch Dokument angelegt`);
     const unknown = await call('PUT', '/987654', { actor, body: { title: 'x', attachment_data: dataUrl } });
     assert.deepEqual({ status: unknown.status, body: unknown.body }, { status: post.status, body: post.body },
@@ -3695,6 +3704,7 @@ test('Anhang: wer den gespeicherten nicht sieht, kann ihn weder ersetzen noch en
 
   const replace = await call('PUT', `/${eventId}`, { actor: MARIA, body: { attachment_data: dataUrl('neu'), attachment_name: 'neu.txt' } });
   assert.equal(replace.status, 403, 'Ersetzen eines unsichtbaren Anhangs');
+  assert.equal(replace.body.reason, 'ATTACHMENT_CHANGE_REFUSED', 'mit einem Grund, den der Client uebersetzt');
   const remove = await call('PUT', `/${eventId}`, { actor: MARIA, body: { remove_attachment: true } });
   assert.equal(remove.status, 403, 'Entfernen eines unsichtbaren Anhangs');
   const nullData = await call('PUT', `/${eventId}`, { actor: MARIA, body: { attachment_data: null } });
@@ -3744,4 +3754,118 @@ test('Anhang: auch an einem Serientermin loest ihn nur, wer ihn sieht (#1358)', 
     attachment_data: `data:text/plain;base64,${Buffer.from('x').toString('base64')}`,
   } });
   assert.equal(upload.status, 403, 'Hochladen ohne Schreibrecht: 403 vor der Seriensuche');
+});
+
+// ── Das Speichern eines Termins oeffnet kein fremdes Dokument (#1358) ─────────
+// Der Anhang folgt Sichtbarkeit und Zuweisung des Termins. Weiter oeffnen darf
+// das nur, wer Dokumente schreiben darf UND das Dokument sieht; sonst wird nur
+// verengt. Und ein Split oder Abloesen kopiert den Anhang nur fuer so jemanden.
+test('Anhang: Bearbeiten durch eine Nicht-Sehende oeffnet das Dokument nicht wieder - Einzeltermin und Serie (#1358)', async () => {
+  const dataUrl = `data:text/plain;base64,${Buffer.from('privat').toString('base64')}`;
+  const docRow = (id) => ({ ...db.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(id) });
+  const access = (id) => db.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id')
+    .all(id).map((r) => r.user_id);
+  for (const recurrence_rule of [null, 'FREQ=DAILY;COUNT=3']) {
+    const created = await call('POST', '/', { actor: ADMIN, body: {
+      title: 'Sync-Probe', start_datetime: '2042-01-01T09:00', recurrence_rule,
+      attachment_data: dataUrl, attachment_name: 'p.txt',
+    } });
+    assert.equal(created.status, 201);
+    const eventId = created.body.data.id;
+    const docId = created.body.data.attachment_document_id;
+    db.prepare("UPDATE family_documents SET visibility = 'private' WHERE id = ?").run(docId);
+    const label = recurrence_rule ? 'Serie' : 'Einzeltermin';
+
+    for (const actor of [MARIA, { ...MARIA, moduleAccess: { documents: 'none' } }, { ...MARIA, authScopes: ['calendar:write'] }]) {
+      const edit = await call('PUT', `/${eventId}`, { actor, body: { title: 'Nur der Titel', visibility: 'all' } });
+      assert.equal(edit.status, 200, `${label}: Bearbeiten geht`);
+      assert.deepEqual(docRow(docId), { visibility: 'private' }, `${label}: das Dokument bleibt privat`);
+      const seen = await call('GET', `/${eventId}`, { actor: MARIA });
+      assert.equal(seen.body.data.attachment_name, null, `${label}: und bleibt fuer Maria verborgen`);
+    }
+
+    // Eingeschraenkt auf TOM: eine Nicht-Sehende fuegt sich hinzu - der Zugriff waechst nicht.
+    db.prepare("UPDATE family_documents SET visibility = 'restricted' WHERE id = ?").run(docId);
+    db.prepare('INSERT OR IGNORE INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(docId, TOM.id);
+    const widen = await call('PUT', `/${eventId}`, { actor: MARIA, body: { visibility: 'assignees', assigned_to: [TOM.id, MARIA.id] } });
+    assert.equal(widen.status, 200);
+    assert.deepEqual({ ...docRow(docId), access: access(docId) }, { visibility: 'restricted', access: [TOM.id] },
+      `${label}: Maria bekommt keinen Zugriff`);
+    // Verengen bleibt: wer herausfaellt, verliert den Zugriff.
+    const narrow = await call('PUT', `/${eventId}`, { actor: MARIA, body: { visibility: 'assignees', assigned_to: [MARIA.id] } });
+    assert.equal(narrow.status, 200);
+    assert.deepEqual(access(docId), [], `${label}: TOM faellt heraus, niemand kommt dazu`);
+
+    // Wer das Dokument sieht und schreiben darf, oeffnet es wie bisher.
+    const owner = await call('PUT', `/${eventId}`, { actor: ADMIN, body: { visibility: 'all' } });
+    assert.equal(owner.status, 200);
+    assert.deepEqual(docRow(docId), { visibility: 'family' }, `${label}: die Erstellerin darf es oeffnen`);
+  }
+});
+
+test('Anhang: Split und Abloesen kopieren kein Dokument ohne Sicht oder Schreibrecht (#1358)', async () => {
+  const dataUrl = `data:text/plain;base64,${Buffer.from('serie').toString('base64')}`;
+  const documents = () => db.prepare('SELECT COUNT(*) AS n FROM family_documents').get().n;
+  const cases = [
+    ['fremdes privates Dokument', MARIA, 'private'],
+    ['documents: none', { ...MARIA, moduleAccess: { documents: 'none' } }, 'family'],
+    ['Token nur calendar:write', { ...MARIA, authScopes: ['calendar:write'] }, 'family'],
+  ];
+  let year = 2060;
+  for (const [label, actor, docVisibility] of cases) {
+    // Split ueber /following.
+    year += 1;
+    const series = await call('POST', '/', { actor: MARIA, body: {
+      title: `Split ${label}`, start_datetime: `${year}-01-01T09:00:00`, recurrence_rule: 'FREQ=DAILY;COUNT=5',
+      attachment_data: dataUrl, attachment_name: 's.txt',
+    } });
+    assert.equal(series.status, 201);
+    const docId = series.body.data.attachment_document_id;
+    db.prepare('UPDATE family_documents SET visibility = ?, created_by = ? WHERE id = ?').run(docVisibility, ADMIN.id, docId);
+    const before = documents();
+    const split = await call('PUT', `/${series.body.data.id}/occurrences/${year}-01-03/following`, {
+      actor, body: { title: 'Nachfolger' },
+    });
+    assert.equal(split.status, 201, `${label}: der Split geht weiter`);
+    assert.equal(split.body.data.attachment_document_id, null, `${label}: der Nachfolger hat keinen Anhang`);
+    assert.equal(db.prepare('SELECT attachment_document_id FROM calendar_events WHERE id = ?').get(split.body.data.id)
+      .attachment_document_id, null, `${label}: auch gespeichert nicht`);
+    assert.equal(documents(), before, `${label}: keine Dokumentkopie`);
+    assert.equal(db.prepare('SELECT attachment_document_id FROM calendar_events WHERE id = ?').get(series.body.data.id)
+      .attachment_document_id, docId, `${label}: das Original bleibt an der alten Serie`);
+
+    // Abloesen: eine Ausnahme verwaist, weil die Regel sich aendert.
+    year += 1;
+    const detachSeries = await call('POST', '/', { actor: MARIA, body: {
+      title: `Detach ${label}`, start_datetime: `${year}-01-01T09:00:00`, recurrence_rule: 'FREQ=DAILY;COUNT=5',
+      attachment_data: dataUrl, attachment_name: 'd.txt',
+    } });
+    const seriesId = detachSeries.body.data.id;
+    const detachDoc = detachSeries.body.data.attachment_document_id;
+    const override = await call('PUT', `/${seriesId}/occurrences/${year}-01-03`, { actor: MARIA, body: { title: 'Ausnahme' } });
+    assert.equal(override.status, 200);
+    db.prepare('UPDATE family_documents SET visibility = ?, created_by = ? WHERE id = ?').run(docVisibility, ADMIN.id, detachDoc);
+    const beforeDetach = documents();
+    const rule = { recurrence_rule: 'FREQ=WEEKLY;COUNT=3' };
+    const conflict = await call('PUT', `/${seriesId}`, { actor, body: rule });
+    assert.equal(conflict.status, 409, `${label}: die verwaiste Ausnahme wird erst bestaetigt`);
+    const detached = await call('PUT', `/${seriesId}`, {
+      actor, body: { ...rule, confirmed_orphan_count: conflict.body.orphaned_override_count },
+    });
+    assert.equal(detached.status, 200, `${label}: das Abloesen geht weiter`);
+    assert.equal(db.prepare('SELECT attachment_document_id FROM calendar_events WHERE id = ?').get(override.body.data.id)
+      .attachment_document_id, null, `${label}: die abgeloeste Ausnahme hat keinen Anhang`);
+    assert.equal(documents(), beforeDetach, `${label}: keine Dokumentkopie beim Abloesen`);
+  }
+
+  // Die Gegenrichtung: mit Sicht und Schreibrecht wird wie bisher kopiert.
+  const own = await call('POST', '/', { actor: MARIA, body: {
+    title: 'Split eigen', start_datetime: '2070-01-01T09:00:00', recurrence_rule: 'FREQ=DAILY;COUNT=5',
+    attachment_data: dataUrl, attachment_name: 'e.txt',
+  } });
+  const before = documents();
+  const split = await call('PUT', `/${own.body.data.id}/occurrences/2070-01-03/following`, { actor: MARIA, body: { title: 'Nachfolger' } });
+  assert.equal(split.status, 201);
+  assert.ok(split.body.data.attachment_document_id, 'eigene Serie: der Nachfolger bekommt seine Kopie');
+  assert.equal(documents(), before + 1);
 });

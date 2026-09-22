@@ -651,6 +651,10 @@ export const schemas = {
               type: ['integer', 'null'],
               description: 'The attachment\'s document in the Documents module. Null unless the caller may read that document: access to the Documents module (for API tokens a `documents:read` scope) and the document\'s own visibility. Without it the event carries no attachment at all - id, URLs, name, MIME type and size are null.',
             },
+            attachment_locked: {
+              type: ['boolean', 'null'],
+              description: 'True when the event has an attachment whose document the caller may not see (for example a private document of another member); it names nothing about that document, and such an attachment cannot be replaced or removed by this caller. False otherwise. Null without read access to the Documents module (for API tokens a `documents:read` scope).',
+            },
             attachment_preview_url: { type: ['string', 'null'], description: 'Null whenever attachment_document_id is null.' },
             attachment_download_url: { type: ['string', 'null'], description: 'Null whenever attachment_document_id is null.' },
             attachment_data: {

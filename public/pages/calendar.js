@@ -4161,6 +4161,8 @@ export const __test = {
   // Die Nur-lesen-Weiche (#467) und der Anlegeweg, den sie als erstes schliesst.
   readOnly, openEventModal,
   buildEventModalContent,
+  calendarSaveErrorMessage,
+  hasCurrentAttachment,
   fetchWindow,
   getWeekRange,
   getRangeForView,
@@ -5285,6 +5287,15 @@ function openEventModal({ mode, event = null, date = null, reminder = null, time
  * Orten entsteht: als eigenes Modal (neuer Termin, Desktop-Bearbeiten) und als
  * zweites Pane der Detailansicht, das erst beim Wechsel gemountet wird.
  */
+/**
+ * Hat der Termin im Dialog gerade einen Anhang? Ein gewaehlter Name zaehlt, und
+ * bis zur ersten Aenderung der gespeicherte. Danach traegt der Knopf
+ * "Entfernen" nichts mehr - in der Stufe `read` blieb er sonst allein stehen.
+ */
+function hasCurrentAttachment(attachmentState, event) {
+  return Boolean(attachmentState?.name) || (!attachmentState?.changed && hasAttachment(event));
+}
+
 function wireEventForm(panel, { mode, event = null, reminder = null }) {
   const isEdit = mode === 'edit';
   // Der Wiederholungsbaustein kennt absichtlich keine Feld-IDs des Kalenders.
@@ -5396,11 +5407,14 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
     removed: false,
   };
 
+  // Der Entfernen-Knopf folgt dem Zustand auch ohne Ablage (Stufe `read`): nach
+  // dem Entfernen blieb er dort sonst allein stehen, weil die Funktion vor ihm
+  // zurueckkehrte.
   const syncSelectedAttachment = () => {
+    if (removeAttachment) removeAttachment.hidden = !hasCurrentAttachment(attachmentState, event);
     if (!selectedAttachment) return;
     selectedAttachment.hidden = !attachmentState.name;
     selectedAttachment.textContent = attachmentState.name ? selectedAttachmentLabel(attachmentState.name) : '';
-    if (removeAttachment) removeAttachment.hidden = !attachmentState.name;
   };
 
   const syncAttachmentSelection = () => {
@@ -5724,6 +5738,17 @@ function defaultNewEventTime(dateStr) {
 function eventAttachmentFieldHtml(event) {
   const access = pathAccess('/documents');
   if (access === 'none') return '';
+  // Ein Anhang, dessen Dokument dieser Betrachter nicht sieht (#1358): der
+  // Server sagt nur `attachment_locked`, nichts ueber das Dokument. Stehen
+  // bleibt ein klarer Zustand - ohne Ablage und ohne Entfernen, denn beides
+  // wuerde der Server abweisen, und ein Ersetzen loeste den Anhang ab.
+  if (event?.attachment_locked === true) {
+    return `
+    <div class="form-group">
+      <span class="form-label">${t('calendar.attachmentLabel')}</span>
+      <p class="form-help" id="modal-attachment-locked">${esc(t('documentAttach.lockedPrivate'))}</p>
+    </div>`;
+  }
   const shown = hasAttachment(event);
   if (access !== 'write') {
     if (!shown) return '';
@@ -6010,6 +6035,18 @@ function confirmLocalWholeSeriesDelete(event) {
     confirmLabel: t('calendar.deleteWholeSeriesOnlyConfirm'),
     danger: true,
   });
+}
+
+/**
+ * Die Meldung zu einem abgewiesenen Speichern. Die beiden Anhang-Absagen
+ * (#1358) tragen einen `reason` und bekommen einen uebersetzten Satz statt
+ * des englischen Servertexts; alles andere wie bisher.
+ */
+function calendarSaveErrorMessage(err) {
+  const reason = err?.data?.reason;
+  if (reason === 'ATTACHMENT_CHANGE_REFUSED') return t('calendar.attachmentChangeRefused');
+  if (reason === 'ATTACHMENT_UPLOAD_REFUSED') return t('calendar.attachmentUploadRefused');
+  return err?.data?.error ?? t('calendar.saveError');
 }
 
 async function saveEvent(overlay, mode, event, existingReminder = null, attachmentState = null) {
@@ -6303,7 +6340,7 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
     // Server-Validierungsmeldung bevorzugen, sonst lokalisierter Fallback; der
     // rohe err.message-Text (Netzwerk/JS) wird nie gezeigt. Das Modal bleibt offen
     // und der Button reaktiviert — die Eingaben des Nutzers bleiben erhalten.
-    window.yuvomi?.showToast(err.data?.error ?? t('calendar.saveError'), 'danger');
+    window.yuvomi?.showToast(calendarSaveErrorMessage(err), 'danger');
     saveBtn.disabled    = false;
     saveBtn.textContent = mode === 'edit' ? t('common.save') : t('common.create');
   }

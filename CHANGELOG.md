@@ -191,8 +191,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   private document of someone else. The page already hid the name without document access, but the
   API still returned it. Name and number now come only when you may read that document, by the same
   rule the documents module uses. Without access to documents the visit does not even say that it
-  has a receipt; with access but without sight of that document, the edit dialog shows "Attached"
-  instead of an upload field. Saving such a visit keeps the receipt: before,
+  has a receipt; with access but without sight of that document, the report and the edit dialog
+  say "Attachment present (private)" instead of an upload field. Saving such a visit keeps the receipt: before,
   saving it could silently remove someone else's private receipt, and it can no longer be replaced
   or removed by someone who cannot see it. Linking a receipt now needs access to documents. For API
   clients every visit and work session carries `has_receipt`, which is `null` without access to the
@@ -221,11 +221,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   private. Such members now see the event without an attachment, in the calendar and on the
   dashboard. Adding an attachment now needs permission to add documents, and the event dialog only
   offers the upload area then; an attachment you cannot see can no longer be replaced or removed
-  by saving the event. For API clients `attachment_document_id`, `attachment_preview_url`,
+  by saving the event, and the dialog says "Attachment present (private)" instead. Saving an event
+  no longer makes a private attachment visible again: its visibility is carried over to the
+  document only by someone who may edit documents and can see it, anyone else can only narrow it.
+  Splitting a series or detaching an occurrence no longer copies an attachment for someone who
+  cannot see it or may not edit documents; the new part then has no attachment and the original
+  stays on the series. For API clients `attachment_document_id`, `attachment_preview_url`,
   `attachment_download_url`, `attachment_name`, `attachment_mime` and `attachment_size` are `null`
-  unless you may read that document, a non-empty `attachment_data` without a `documents:write`
-  right is answered with 403, and so is replacing or removing an attachment whose document you
-  cannot read. (#1358)
+  unless you may read that document, `attachment_locked` says whether there is one you cannot
+  see (`null` without access to documents), a non-empty `attachment_data` without a
+  `documents:write` right is answered with 403, and so is replacing or removing an attachment
+  whose document you cannot read. (#1358)
 
 - **Documents: the folder delete preview no longer hints at documents you cannot see.** Before
   deleting a folder the app asks what the deletion would affect. That answer already counted only

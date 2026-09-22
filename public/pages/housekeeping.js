@@ -1069,7 +1069,7 @@ function visitReceiptDetailHtml(visit) {
   if (pathAccess('/documents') === 'none') return '';
   if (receiptHiddenFromViewer(visit)) {
     return `
-          <div><dt>${esc(t('housekeeping.receiptLabel'))}</dt><dd>${esc(t('housekeeping.receiptPresent'))}</dd></div>`;
+          <div><dt>${esc(t('housekeeping.receiptLabel'))}</dt><dd>${esc(t('documentAttach.lockedPrivate'))}</dd></div>`;
   }
   if (!visit.receipt_document_name) return '';
   return `
@@ -1433,7 +1433,7 @@ function receiptFieldHtml(visit) {
   if (pathAccess('/documents') !== 'none' && receiptHiddenFromViewer(visit)) {
     return `
         <dl class="housekeeping-report-details">
-          <div><dt>${esc(t('housekeeping.receiptLabel'))}</dt><dd>${esc(t('housekeeping.receiptPresent'))}</dd></div>
+          <div><dt>${esc(t('housekeeping.receiptLabel'))}</dt><dd>${esc(t('documentAttach.lockedPrivate'))}</dd></div>
         </dl>`;
   }
   if (mayWritePath('/documents')) {

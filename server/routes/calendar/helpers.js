@@ -6,7 +6,7 @@
 
 import { StorageError } from '../../services/document-storage.js';
 import { ensureModuleFolder } from '../../services/document-folders.js';
-import { filterVisibleDocumentIds } from '../../services/document-access.js';
+import { applyDocumentAccess, filterVisibleDocumentIds } from '../../services/document-access.js';
 import { documentViewer } from '../../services/document-links.js';
 import { mayWriteModule } from '../../permissions.js';
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../../utils/upload-limit.js';
@@ -278,25 +278,28 @@ export function parseAssignedTo(val) {
   return [];
 }
 
-export function syncAttachmentDocumentAccess(d, documentId, eventVisibility, userIds) {
+/**
+ * Das Anhang-Dokument folgt Sichtbarkeit und Zuweisung des Termins - weiter
+ * oeffnen darf es aber nur, wem `mayWiden(documentId)` das zugesteht
+ * (Dokumente schreiben UND das Dokument sehen, #1358). Ohne Urteil wird nur
+ * verengt: `applyDocumentAccess()` in services/document-access.js.
+ */
+export function syncAttachmentDocumentAccess(d, documentId, eventVisibility, userIds, { mayWiden = () => false } = {}) {
   if (!documentId) return;
   const visibility = eventVisibility === 'private'
     ? 'private'
     : eventVisibility === 'assignees'
       ? 'restricted'
       : 'family';
-  d.prepare('UPDATE family_documents SET visibility = ? WHERE id = ?')
-    .run(visibility, documentId);
-  d.prepare('DELETE FROM family_document_access WHERE document_id = ?').run(documentId);
-  if (visibility !== 'restricted') return;
-  const insert = d.prepare(`
-    INSERT OR IGNORE INTO family_document_access (document_id, user_id)
-    VALUES (?, ?)
-  `);
-  for (const userId of userIds) insert.run(documentId, userId);
+  applyDocumentAccess(d, documentId, { visibility, userIds, mayWiden: mayWiden(documentId) === true });
 }
 
-export function setEventAssignments(d, eventId, userIds) {
+/**
+ * `options.mayWidenAttachment` kommt vom Aufrufer (`documentWidenPredicate()`);
+ * ohne ihn - etwa beim Zuweisungs-Abgleich der Kalender-Syncs - wird das
+ * Anhang-Dokument nur verengt, nie weiter geoeffnet.
+ */
+export function setEventAssignments(d, eventId, userIds, { mayWidenAttachment } = {}) {
   // Wer VORHER dranstand - gebraucht wird das eine Zeile weiter unten, um die
   // Erinnerungen derer abzuraeumen, die nicht mehr dranstehen (#921). Deshalb
   // hier und nicht erst nach dem DELETE, das die Auskunft vernichtet.
@@ -332,7 +335,8 @@ export function setEventAssignments(d, eventId, userIds) {
     d,
     event?.attachment_document_id,
     event?.visibility,
-    userIds
+    userIds,
+    { mayWiden: mayWidenAttachment },
   );
 }
 
@@ -429,6 +433,11 @@ export function serializeEvent(event, context = null) {
     ? storedDocumentId
     : null;
   const documentHidden = storedDocumentId != null && documentId == null;
+  // `attachment_locked` (#1358): wer Dokumente lesen darf, erfaehrt, DASS hier
+  // ein Anhang haengt, den er nicht sieht - ohne ID, Name oder Typ. Der Dialog
+  // bietet dann weder Ablage noch Entfernen an (der Server verweigert beides).
+  // Ohne Leserecht auf die Dokumente `null` wie die anderen Anhangsfelder.
+  const attachmentLocked = context?.viewer?.readsDocuments === true ? documentHidden : null;
   const metadata = recurrenceMetadata(event, context);
   return {
     ...rest,
@@ -441,6 +450,7 @@ export function serializeEvent(event, context = null) {
     assigned_users,
     ...(documentHidden ? { attachment_name: null, attachment_mime: null, attachment_size: null } : {}),
     attachment_document_id: documentId,
+    attachment_locked: attachmentLocked,
     attachment_data: storedDocumentId ? null : attachmentDataUrl(event),
     attachment_preview_url: documentId
       ? `/api/v1/documents/${documentId}/preview`

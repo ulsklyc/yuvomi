@@ -741,6 +741,8 @@
         "searchCountCapped": "{{shown}} van {{total}} resultaten",
         "title": "Agenda",
         "attachmentRemove": "Bijlage verwijderen",
+        "attachmentChangeRefused": "Je kunt deze bijlage niet wijzigen: het document is privé, of je hebt geen toegang tot documenten.",
+        "attachmentUploadRefused": "Alleen wie documenten mag bewerken, kan een bijlage toevoegen.",
         "newEvent": "Nieuw evenement",
         "editEvent": "Evenement bewerken",
         "addEvent": "Evenement toevoegen",
@@ -3578,8 +3580,7 @@
         "currentMonth": "Huidig",
         "noVisitReportsInMonth": "Geen personeelsbezoeken vastgelegd in {{month}}.",
         "settledAdminOnly": "Alleen een beheerder kan dit wijzigen of verwijderen",
-        "reportVisitsCount": "Bezoeken",
-        "receiptPresent": "Aanwezig"
+        "reportVisitsCount": "Bezoeken"
     },
     "userMultiSelect": {
         "moreUsers": "meer",
@@ -5483,7 +5484,8 @@
         "confirmSelection": "Selectie toevoegen",
         "openAction": "{{name}} openen",
         "limitReached": "Maximaal {{count}} documenten.",
-        "limitReached_one": "Maximaal {{count}} document."
+        "limitReached_one": "Maximaal {{count}} document.",
+        "lockedPrivate": "Bijlage aanwezig (privé)"
     },
     "join": {
         "title": "Account instellen",
