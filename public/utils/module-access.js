@@ -100,9 +100,13 @@
  *    schreiben Einkaufsdaten, obwohl der Pfad-Guard sie als `meals` misst.
  *    Der Server verlangt dort jetzt zusaetzlich das Schreibrecht auf
  *    `shopping` - und umgekehrt `meals` fuer
- *    `/shopping/:listId/import-meal-plan`. Die Knoepfe fragen es noch NICHT;
- *    das ist Sache von P3/P4, und dann mit dem Pfad des ZIELS statt dem der
- *    Seite (Regel 1). Das Zielrecht gilt nur fuer AUSDRUECKLICHE Uebertraege.
+ *    `/shopping/:listId/import-meal-plan`. Die Knoepfe fragen BEIDE Riegel,
+ *    den Pfad, den sie posten (der Pfad-Guard), UND das Ziel (Regel 1):
+ *    `mayTransferMealToShopping()`, `mayTransferRecipeToShopping()` und
+ *    `mayImportMealPlan()` in `utils/kitchen-transfer.js`. Nur das Ziel zu
+ *    fragen zeigte einem
+ *    Mitglied mit `meals: read` den Rezept-Knopf, den der Pfad-Guard abweist.
+ *    Das Zielrecht gilt nur fuer AUSDRUECKLICHE Uebertraege.
  *    Was eine Aktion bloss MITerzeugt (der Check-in der Haushaltshilfe legt
  *    Termin und Zahlungsaufgabe an), fragt kein Zielrecht, weder am Server
  *    noch am Knopf - die Abgrenzung steht in docs/DECISIONS.md, Abschnitt 10.

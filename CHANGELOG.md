@@ -137,6 +137,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **"To shopping list" only appears where it can work.** Since 2.68.0, sending a meal's or a
+  recipe's ingredients to the shopping list needs permission to change both the meal plan and the
+  shopping list, and taking over the meal plan from inside the shopping list needs the same two.
+  The buttons did not know that yet: a family member who may only view the shopping list, or only
+  view the meal plan, still saw the cart on a meal, the "To shopping list" button in a recipe, the
+  transfer section in the meal dialog and "Import meal plan" in the list menu, and each of them ended
+  in an error. They are now left out for anyone missing one of the two permissions.
 - **Deleting a folder no longer reveals activity on documents you cannot see.** Before deleting a
   folder the app asks the server what the deletion would affect and sends that answer back with the
   deletion, so nothing changes unnoticed in between. That answer was built over every document in
