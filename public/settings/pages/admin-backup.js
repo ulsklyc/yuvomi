@@ -2,6 +2,7 @@ import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
 import { confirmModal } from '/components/modal.js';
 import { formatCronSchedule } from '/settings/cron-label.js';
+import { backupKeyFieldHtml, encodeBackupKey, keyFieldAfterError, keyFieldDescribedBy } from '/settings/backup-key.js';
 import {
   createDisclosure,
   createInfoRow,
@@ -65,13 +66,7 @@ function renderPage(container) {
             </label>
             <input class="sr-only" type="file" id="backup-restore-file" accept=".db,.sqlite,.sqlite3,application/octet-stream" />
             <div class="settings-backup-file" id="backup-selected-file" hidden></div>
-            <div class="form-group" id="backup-restore-key-group" hidden>
-              <label class="form-label" for="backup-restore-key">${t('settings.backupRestoreKeyLabel')}</label>
-              <input class="form-input" type="password" id="backup-restore-key"
-                autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="backup-restore-key-hint" />
-              <p class="form-hint" id="backup-restore-key-hint">${t('settings.backupRestoreKeyHint')}</p>
-              <p class="form-hint form-hint--danger" id="backup-restore-key-http" hidden>${t('settings.backupRestoreKeyHttpWarning')}</p>
-            </div>
+            ${backupKeyFieldHtml(window.location.protocol)}
             <div id="backup-restore-error" class="form-error" role="alert" hidden></div>
             <div class="settings-form-actions">
               <button type="submit" class="btn btn--danger-outline" id="backup-restore-btn" disabled>${t('settings.backupRestoreButton')}</button>
@@ -473,22 +468,6 @@ function bindWebdavBackupEvents(container) {
   });
 }
 
-/**
- * Gruende aus `POST /backup/restore`, bei denen der Schluessel des Backups
- * weiterhilft (#1267): das Backup stammt aus einer anderen Installation, oder
- * der eingegebene Schluessel passte nicht. `own_key_missing` gehoert NICHT
- * dazu - ohne eigenen Schluessel lehnt der Server jeden Backup-Schluessel ab.
- */
-const BACKUP_KEY_REASONS = new Set(['backup_key_required', 'backup_key_wrong', 'backup_key_invalid']);
-
-/** Base64 der UTF-8-Bytes - so erwartet der Server `X-Backup-Key`. */
-function encodeBackupKey(key) {
-  const bytes = new TextEncoder().encode(key);
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
-}
-
 function bindRestoreEvents(container) {
   const form = container.querySelector('#backup-restore-form');
   const fileInput = container.querySelector('#backup-restore-file');
@@ -509,7 +488,9 @@ function bindRestoreEvents(container) {
     if (!keyGroup || !keyInput) return;
     keyGroup.hidden = false;
     // Ueber HTTP geht der Schluessel im Klartext uebers Netz - sagen, nicht sperren.
-    if (httpWarning) httpWarning.hidden = window.location.protocol !== 'http:';
+    const { protocol } = window.location;
+    if (httpWarning) httpWarning.hidden = protocol !== 'http:';
+    keyInput.setAttribute('aria-describedby', keyFieldDescribedBy(protocol));
     keyInput.focus();
   }
 
@@ -583,8 +564,9 @@ function bindRestoreEvents(container) {
       window.yuvomi?.showToast(t('settings.backupRestoredToast'), 'success');
       window.location.reload();
     } catch (err) {
-      if (BACKUP_KEY_REASONS.has(err?.data?.reason)) showKeyField();
-      else resetKeyField();
+      const action = keyFieldAfterError(err?.data?.reason);
+      if (action === 'show') showKeyField();
+      else if (action === 'reset') resetKeyField();
       showError(errorEl, err.message ?? t('common.errorGeneric'));
       restoreBtn.disabled = false;
       restoreBtn.textContent = t('settings.backupRestoreButton');

@@ -28,6 +28,15 @@ if (!backupPath) {
 
 /** Alles von stdin; genau EIN abschliessender Zeilenumbruch gehoert nicht zum Schluessel. */
 async function readKeyFromStdin() {
+  // Auf einem Terminal wuerde der Schluessel beim Tippen sichtbar mitlaufen
+  // und landete, einmal abgeschickt, womoeglich in der Shell-Historie.
+  if (process.stdin.isTTY) {
+    throw new Error(
+      '--backup-key-stdin reads the key from a pipe, not from the terminal. Pipe it in without '
+      + 'echoing it, for example: IFS= read -rs OLDKEY; printf %s "$OLDKEY" | node '
+      + 'scripts/restore-backup.js <file> --backup-key-stdin; unset OLDKEY'
+    );
+  }
   const chunks = [];
   for await (const chunk of process.stdin) chunks.push(chunk);
   let bytes = Buffer.concat(chunks);
@@ -46,15 +55,16 @@ const resolved = path.resolve(backupPath);
 // db.js; eine gesunde Datenbank öffnet der Import weiter wie bisher.
 globalThis[Symbol.for('yuvomi.db.restoreTarget')] = true;
 
+let backupKey = null;
+let exitCode = 1;
 try {
   // Dynamisch und innerhalb des try: jeder Abbruch beim Öffnen der Datenbank
   // (falscher Key, unlesbare Datei, ...) endet als `Restore failed: ...`
   // statt als ungefangene Ausnahme mit Stacktrace.
-  const backupKey = keyFromStdin ? await readKeyFromStdin() : null;
+  backupKey = keyFromStdin ? await readKeyFromStdin() : null;
   const { getPath, restoreFromFile } = await import('../server/db.js');
   await fs.access(resolved);
   const result = await restoreFromFile(resolved, { backupKey });
-  backupKey?.fill(0);
   console.log(`Restored ${resolved} into ${getPath()}. Schema v${result.schemaVersion}.`);
   if (result.rollbackPath) {
     console.log(`Previous database copy saved at ${result.rollbackPath}.`);
@@ -68,8 +78,11 @@ try {
       + `discard the log the first time the copy is opened.`
     );
   }
-  process.exit(0);
+  exitCode = 0;
 } catch (err) {
   console.error(`Restore failed: ${err?.message || err}`);
-  process.exit(1);
+} finally {
+  // Der Schluessel lebt nur fuer diesen Restore - auch wenn er scheitert.
+  backupKey?.fill(0);
 }
+process.exit(exitCode);

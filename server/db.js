@@ -9915,7 +9915,8 @@ function undecryptableBackupError(cause) {
   return restoreError(
     "Backup file could not be decrypted with this instance's DB_ENCRYPTION_KEY. A backup carries "
     + 'the encryption of the instance that wrote it, so a backup from another installation needs '
-    + "that installation's key: enter it as the backup key and restore again. It is used only for "
+    + "that installation's key: enter it as the backup key and restore again (on the command "
+    + 'line: `scripts/restore-backup.js <file> --backup-key-stdin`, with the key on stdin). It is used only for '
     + "this restore - the backup is re-encrypted with this instance's own key and the entered key "
     + 'is not stored. Do NOT just set DB_ENCRYPTION_KEY to that installation\'s key and restart: '
     + "this instance's own database is encrypted with the key it has now, so after the swap Yuvomi "
@@ -10082,6 +10083,24 @@ function keptJournalName(rollbackPath, kind) {
   return `${rollbackPath}.${kind}-kept`;
 }
 
+/** `true`, wenn DB_ENCRYPTION_KEY dieser Instanz die Datei oeffnet und liest. */
+function opensWithOwnKey(filePath) {
+  if (!DB_KEY) return false;
+  let candidate;
+  try {
+    candidate = new Database(filePath, { readonly: true, fileMustExist: true });
+    applyEncryptionKey(candidate);
+    assertReadable(candidate);
+    return true;
+  } catch {
+    // Jeder Fehler heisst nur „nicht mit diesem Schluessel" - die Diagnose
+    // uebernimmt der Weg mit dem Backup-Schluessel.
+    return false;
+  } finally {
+    candidate?.close();
+  }
+}
+
 /** Backup-Schluessel als Bytes; `null`, wenn keiner (oder ein leerer) gegeben ist. */
 function backupKeyBytes(backupKey) {
   if (backupKey == null) return null;
@@ -10095,9 +10114,9 @@ function backupKeyBytes(backupKey) {
  * `SQLITE_CORRUPT` gibt es nur mit dem richtigen (Seite 1 hat die HMAC-Pruefung
  * bestanden).
  */
-function foreignKeyReadError(cause) {
+function foreignKeyReadError(cause, { keyProven = false } = {}) {
   const code = typeof cause?.code === 'string' ? cause.code : '';
-  if (code === 'SQLITE_NOTADB') {
+  if (code === 'SQLITE_NOTADB' && !keyProven) {
     return restoreError(
       'Backup file could not be decrypted with the backup key you entered. It has to be exactly '
       + 'the DB_ENCRYPTION_KEY of the installation that wrote this backup - every character counts, '
@@ -10108,7 +10127,9 @@ function foreignKeyReadError(cause) {
     );
   }
   const detail = `${code || 'no SQLite error code'}: ${cause?.message ?? String(cause)}`;
-  if (code.startsWith('SQLITE_CORRUPT')) {
+  // Nach bestandenem ersten Lesen ist der Schluessel bewiesen: was danach an
+  // einer spaeteren Seite scheitert, ist die Datei, nie der Schluessel.
+  if (code.startsWith('SQLITE_CORRUPT') || (keyProven && code === 'SQLITE_NOTADB')) {
     return restoreError(
       `Backup file is damaged or incomplete (${detail}). The backup key is right: it opens the `
       + 'first page, which a wrong key never does. Nothing on this instance was changed. Get the '
@@ -10166,7 +10187,11 @@ async function rekeyForeignBackup(sourcePath, oldKey) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'yuvomi-rekey-'));
   const workingPath = path.join(dir, 'rekeyed.db');
   try {
-    await fs.copyFile(sourcePath, workingPath);
+    try {
+      await fs.copyFile(sourcePath, workingPath);
+    } catch (err) {
+      throw foreignKeyReadError(err);
+    }
     let working;
     try {
       working = new Database(workingPath, { fileMustExist: true });
@@ -10181,10 +10206,18 @@ async function rekeyForeignBackup(sourcePath, oldKey) {
       } catch (err) {
         throw foreignKeyReadError(err);
       }
-      // rekey ist im WAL-Modus nicht erlaubt; ein Backup aus `VACUUM INTO`
-      // einer WAL-Datenbank traegt das WAL-Flag im Kopf.
-      working.pragma('journal_mode = DELETE');
-      working.pragma(`rekey="x'${Buffer.from(DB_KEY, 'utf8').toString('hex')}'"`);
+      // Ein Backup aus `VACUUM INTO` einer WAL-Datenbank traegt das WAL-Flag
+      // im Kopf. DELETE haelt das Umschluesseln in EINER Datei: ohne entstuende
+      // ein `-wal` neben der Arbeitskopie im Temp-Verzeichnis. init() stellt
+      // nach dem Restore ohnehin wieder auf WAL.
+      try {
+        working.pragma('journal_mode = DELETE');
+        working.pragma(`rekey="x'${Buffer.from(DB_KEY, 'utf8').toString('hex')}'"`);
+      } catch (err) {
+        // Seite 1 ist oben mit diesem Schluessel entschluesselt worden - ein
+        // Fehler hier liegt an einer spaeteren Seite, nicht am Schluessel.
+        throw foreignKeyReadError(err, { keyProven: true });
+      }
     } finally {
       working.close();
     }
@@ -10207,7 +10240,10 @@ async function restoreFromFile(sourcePath, { backupKey = null } = {}) {
   const oldKey = backupKeyBytes(backupKey);
   // Ein Klartext-Backup braucht keinen Schluessel - es laeuft wie bisher und
   // wird von init() mit dem eigenen verschluesselt.
-  const rekeyed = oldKey && !isPlaintextDatabase(sourcePath)
+  // Oeffnet der EIGENE Schluessel das Backup, ist es eines dieser Installation
+  // und der Backup-Schluessel gar nicht gefragt - etwa bei einem API-Client,
+  // der den Header immer mitschickt.
+  const rekeyed = oldKey && !isPlaintextDatabase(sourcePath) && !opensWithOwnKey(sourcePath)
     ? await rekeyForeignBackup(sourcePath, oldKey)
     : null;
   try {

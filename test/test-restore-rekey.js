@@ -27,7 +27,8 @@
 
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync, chmodSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -39,7 +40,7 @@ const KEY_ALT = 'schluessel-der-alten-instanz-0123';
 const KEY_NEU = 'schluessel-der-neuen-instanz-4567';
 
 function tmpDir() {
-  return mkdtempSync(join(tmpdir(), 'yuvomi-rekey-'));
+  return mkdtempSync(join(tmpdir(), 'yuvomi-test-rekey-'));
 }
 
 // Vor jedem Import von db.js: ohne wirksames DB_PATH legte der Import eine
@@ -206,6 +207,130 @@ test('ein Klartext-Backup mit Backup-Schluessel laeuft wie bisher durch und wird
   assert.equal(liveNote(mod), 'klartext-backup');
   mod.get().close();
   assert.deepEqual(probeWith(dbPath, KEY_NEU), { note: 'klartext-backup' });
+});
+
+// ---------------------------------------------------------------------------
+// Beschaedigte Backups mit dem RICHTIGEN Schluessel (Review-Runde 1 auf #1417)
+// ---------------------------------------------------------------------------
+
+const sha256 = (filePath) => createHash('sha256').update(readFileSync(filePath)).digest('hex');
+const PAGE = 4096;
+
+/** Ein Backup mit genug Seiten, dass Seite 5 zu den Daten gehoert. */
+async function bigBackup(key) {
+  const dir = tmpDir();
+  const mod = await bootDb(join(dir, 'quelle.db'), key);
+  mod.get().exec('CREATE TABLE restore_probe (note TEXT)');
+  const insert = mod.get().prepare('INSERT INTO restore_probe (note) VALUES (?)');
+  for (let i = 0; i < 400; i++) insert.run(`${'x'.repeat(200)}-${i}`);
+  const backupPath = join(dir, 'backup.db');
+  await mod.backupToFile(backupPath);
+  mod.get().close();
+  return backupPath;
+}
+
+/** Zielinstanz, deren Datei nach dem Checkpoint per Hash festgehalten wird. */
+async function frozenTarget() {
+  const target = await targetWithMarker(KEY_NEU, 'bleibt stehen');
+  target.mod.get().pragma('wal_checkpoint(TRUNCATE)');
+  target.hash = sha256(target.dbPath);
+  target.names = readdirSync(target.dir).sort();
+  return target;
+}
+
+function assertUntouched(target) {
+  assert.equal(liveNote(target.mod), 'bleibt stehen', 'die laufende Datenbank ist dieselbe');
+  target.mod.get().pragma('wal_checkpoint(TRUNCATE)');
+  assert.equal(sha256(target.dbPath), target.hash, 'die Datei der Zielinstanz ist Byte fuer Byte unveraendert');
+  assert.deepEqual(readdirSync(target.dir).sort(), target.names, 'im Datenverzeichnis ist nichts dazugekommen');
+}
+
+test('richtiger Schluessel, abgeschnittene Datei: backup_damaged, Zielinstanz unveraendert', async () => {
+  const backupPath = await bigBackup(KEY_ALT);
+  const kurz = join(tmpDir(), 'kurz.db');
+  const buf = readFileSync(backupPath);
+  writeFileSync(kurz, buf.subarray(0, Math.floor(buf.length / 2)));
+  const target = await frozenTarget();
+
+  await assert.rejects(
+    () => target.mod.restoreFromFile(kurz, { backupKey: KEY_ALT }),
+    (err) => err.reason === 'backup_damaged' && /The backup key is right/.test(err.message)
+  );
+  assertUntouched(target);
+  target.mod.get().close();
+});
+
+test('richtiger Schluessel, gekipptes Byte in Seite 5: backup_damaged statt Fehler ohne Grund', async () => {
+  // Gemessen: Seite 1 entschluesselt, `SELECT ... sqlite_master` besteht, erst
+  // das Umschluesseln liest Seite 5 und scheitert an deren HMAC. Vor dem Fix
+  // kam das als nacktes SQLITE_CORRUPT ohne `reason` heraus, und der Dialog
+  // leerte das Feld mit dem richtigen Schluessel.
+  const backupPath = await bigBackup(KEY_ALT);
+  const kaputt = join(tmpDir(), 'kaputt.db');
+  const buf = Buffer.from(readFileSync(backupPath));
+  buf[4 * PAGE + 100] ^= 0xff;
+  writeFileSync(kaputt, buf);
+  const target = await frozenTarget();
+
+  await assert.rejects(
+    () => target.mod.restoreFromFile(kaputt, { backupKey: KEY_ALT }),
+    (err) => {
+      assert.equal(err.reason, 'backup_damaged', `Grund fehlt oder falsch: ${err.code} ${err.message}`);
+      assert.ok(!/could not be decrypted with the backup key/.test(err.message), 'der Schluessel stimmt - nie „falscher Schluessel"');
+      return true;
+    }
+  );
+  assertUntouched(target);
+  target.mod.get().close();
+});
+
+test(
+  'richtiger Schluessel, Backup nicht lesbar: backup_unreadable, Zielinstanz unveraendert',
+  { skip: process.getuid?.() === 0 && 'root ignoriert Dateirechte' },
+  async () => {
+    const backupPath = await bigBackup(KEY_ALT);
+    chmodSync(backupPath, 0o000);
+    const target = await frozenTarget();
+    try {
+      await assert.rejects(
+        () => target.mod.restoreFromFile(backupPath, { backupKey: KEY_ALT }),
+        (err) => err.reason === 'backup_unreadable' && /Nothing on this instance was changed/.test(err.message)
+      );
+      assertUntouched(target);
+    } finally {
+      chmodSync(backupPath, 0o600);
+      target.mod.get().close();
+    }
+  }
+);
+
+test('ein Backup DIESER Installation mit mitgeschicktem Schluessel laeuft den normalen Weg', async () => {
+  // Ein API-Client, der den Header immer schickt: der eigene Schluessel
+  // oeffnet das Backup, also ist der Backup-Schluessel gar nicht gefragt.
+  const backupPath = await backupWithMarker(KEY_NEU, 'eigenes Backup');
+  const { mod } = await targetWithMarker(KEY_NEU, 'vorher');
+  await mod.restoreFromFile(backupPath, { backupKey: 'irgendein-anderer-schluessel-00' });
+  assert.equal(liveNote(mod), 'eigenes Backup');
+  mod.get().close();
+});
+
+test('nach jedem Restore mit Backup-Schluessel bleibt kein Arbeitsverzeichnis im Temp liegen', async () => {
+  const prod = () => new Set(readdirSync(tmpdir()).filter((name) => name.startsWith('yuvomi-rekey-')));
+  const vorher = prod();
+
+  const gut = await backupWithMarker(KEY_ALT, 'gut');
+  const { mod } = await targetWithMarker(KEY_NEU, 'x');
+  await mod.restoreFromFile(gut, { backupKey: KEY_ALT });
+  await assert.rejects(() => mod.restoreFromFile(gut, { backupKey: 'falsch-0123456789' }));
+  const kaputt = join(tmpDir(), 'kaputt.db');
+  const buf = Buffer.from(readFileSync(await bigBackup(KEY_ALT)));
+  buf[4 * PAGE + 100] ^= 0xff;
+  writeFileSync(kaputt, buf);
+  await assert.rejects(() => mod.restoreFromFile(kaputt, { backupKey: KEY_ALT }));
+  mod.get().close();
+
+  const uebrig = [...prod()].filter((name) => !vorher.has(name));
+  assert.deepEqual(uebrig, [], 'Erfolg, falscher Schluessel und beschaedigte Datei raeumen ihr Arbeitsverzeichnis weg');
 });
 
 // ---------------------------------------------------------------------------
