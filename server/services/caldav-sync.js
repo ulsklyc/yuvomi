@@ -83,6 +83,51 @@ function buildCalDAVICS(event, householdZone = null) {
 // Helper Functions
 // --------------------------------------------------------
 
+/** sync_config-Schluessel des einmaligen Farb-Heilungslaufs je Konto (#1270). */
+function legacyColorHealKey(accountId) {
+  return `caldav_legacy_color_heal_done_${accountId}`;
+}
+
+/**
+ * Die Kalenderfarben, die der alte Import (bis v2.48) in Termine DIESES Kontos
+ * eingebrannt haben kann (#1270), kleingeschrieben.
+ *
+ * Zwei Quellen. Die Auswahl des Kontos traegt jeden Kalender, den der Server
+ * noch meldet, auch abgewaehlte. Ein inzwischen auf dem Server GELOESCHTER
+ * Kalender faellt beim Aktualisieren aus der Auswahl, seine Farbe steht dann
+ * nur noch in `external_calendars` - und genau das ist der Fall, in dem jemand
+ * Termine aus einem alten Kalender umzieht und ihn danach aufgibt. Diese
+ * Tabelle kennt aber kein Konto. Einem Konto zugerechnet wird ein Eintrag dort
+ * deshalb nur, wenn er in keiner fremden Auswahl steht UND im selben
+ * Kalender-Home liegt wie ein Kalender dieses Kontos (die URL ohne ihr letztes
+ * Segment: `/calendars/<nutzer>/` bei Nextcloud und Radicale, `/<dsid>/calendars/`
+ * bei iCloud). Sonst heilte die Farbe eines fremden Kontos eine hier bewusst
+ * gewaehlte.
+ */
+function legacyCalendarColors(conn, accountId) {
+  const home = (url) => String(url).replace(/\/+$/, '').replace(/\/[^/]*$/, '/');
+  const colors = new Set();
+  const homes = new Set();
+  const own = conn.prepare(
+    'SELECT calendar_url, calendar_color FROM caldav_calendar_selection WHERE account_id = ?'
+  ).all(accountId);
+  for (const row of own) {
+    homes.add(home(row.calendar_url));
+    if (row.calendar_color) colors.add(String(row.calendar_color).toLowerCase());
+  }
+  const foreign = new Set(conn.prepare(
+    'SELECT calendar_url FROM caldav_calendar_selection WHERE account_id <> ?'
+  ).all(accountId).map((row) => row.calendar_url));
+  const known = conn.prepare(
+    "SELECT external_id, color FROM external_calendars WHERE source = 'caldav' AND color IS NOT NULL"
+  ).all();
+  for (const row of known) {
+    if (foreign.has(row.external_id) || !homes.has(home(row.external_id))) continue;
+    colors.add(String(row.color).toLowerCase());
+  }
+  return colors;
+}
+
 function normalizeCalColor(c) {
   if (!c) return null;
   if (/^#[0-9a-fA-F]{8}$/.test(c)) return c.slice(0, 7); // strip alpha
@@ -507,7 +552,7 @@ async function runSync({ createClient } = {}) {
   // großen Kalendern spürbar Zeit und verkürzt damit das synchrone Verarbeitungsfenster.
   const conn = db.get();
   const selExistingEvent = conn.prepare(
-    `SELECT id, outbound_dirty, calendar_ref_id, start_datetime FROM calendar_events WHERE external_calendar_id = ? AND external_source = 'caldav'`
+    `SELECT id, outbound_dirty, calendar_ref_id, start_datetime, color, color_modified FROM calendar_events WHERE external_calendar_id = ? AND external_source = 'caldav'`
   );
   // Offene Löschungen einmal je Lauf, nicht je eingehendem Termin.
   const pendingDeletionUids = outbound.pendingDeletionUids('caldav');
@@ -553,28 +598,31 @@ async function runSync({ createClient } = {}) {
   // diese geerbte Farbe dauerhaft gegen die der zugewiesenen Person - und nach
   // einem Umzug in einen anderen Kalender ist es sogar die Farbe des ALTEN.
   //
-  // Erkannt wird sie hier und nicht per Migration, weil erst der Sync beide
-  // Seiten kennt: der Termin selbst traegt keine COLOR-Zeile (die Farbe kann
-  // also nicht vom Server fuer DIESEN Termin stammen), und der gespeicherte
-  // Wert ist genau die Farbe eines Kalenders dieses Kontos. Der Farbwaehler
-  // bietet neu nur die feste Palette an, eine bewusst gewaehlte Farbe trifft
-  // einen Kalenderwert also nur zufaellig - das ist der Preis der Regel, und
-  // er ist kleiner als eine fuer immer falsch gefaerbte Serie. Geheilt wird
-  // zum Zustand "nie eine gelernt" (color_modified = 0), damit der Ausgang auf
-  // dem Server nichts loescht.
-  const healBurntInColor = conn.prepare(`
-    UPDATE calendar_events
-    SET color = NULL, color_modified = 0
-    WHERE id = ?
-      AND color_modified = 1
-      AND color IS NOT NULL
-      AND (   EXISTS (SELECT 1 FROM caldav_calendar_selection s
-                      WHERE s.account_id = ? AND s.calendar_color IS NOT NULL
-                        AND lower(s.calendar_color) = lower(calendar_events.color))
-           OR EXISTS (SELECT 1 FROM external_calendars x
-                      WHERE x.source = 'caldav' AND x.color IS NOT NULL
-                        AND lower(x.color) = lower(calendar_events.color)))
-  `);
+  // DAS KEHRT DIE ABWAEGUNG VON MIGRATION 167 UM, und zwar nur hier. Die
+  // Migration hat alle bearbeiteten Zeilen geschuetzt, weil sie eine
+  // eingebrannte Farbe von einer bewusst gewaehlten nicht trennen konnte: sie
+  // sah nur die Zeile. Der Sync sieht mehr. Seit #897/#899 schreibt der
+  // Ausgang eine in Yuvomi gewaehlte Farbe als COLOR-Zeile auf den Server, und
+  // der Inbound liest sie als Eigenfarbe - eine Farbe, die dem Termin wirklich
+  // gehoert, steht also am VEVENT. Fehlt dort die COLOR-Zeile und ist der
+  // gespeicherte Wert genau die Farbe eines Kalenders DIESES Kontos, bleibt als
+  // Herkunft praktisch nur der alte Import. Der Farbwaehler bietet nur die
+  // feste Palette an; eine bewusste Wahl trifft einen Kalenderwert also nur
+  // zufaellig.
+  //
+  // EINMAL JE KONTO, nicht bei jedem Lauf: es ist eine Reparatur von Altlasten,
+  // und jeder weitere Lauf truege nur das Fehlalarm-Risiko weiter, ohne noch
+  // etwas zu finden. Der Merker liegt in sync_config und wird erst gesetzt,
+  // wenn der Lauf des Kontos jeden Termin gesehen hat (siehe `healComplete`).
+  // Geheilt wird zum Zustand "nie eine gelernt" (color_modified = 0), damit
+  // der Ausgang auf dem Server nichts loescht.
+  const healBurntInColor = conn.prepare(
+    'UPDATE calendar_events SET color = NULL, color_modified = 0 WHERE id = ? AND color_modified = 1'
+  );
+  const selHealMarker = conn.prepare('SELECT 1 AS done FROM sync_config WHERE key = ?');
+  const setHealMarker = conn.prepare(
+    "INSERT INTO sync_config (key, value) VALUES (?, '1') ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+  );
   const insEvent = conn.prepare(`
     INSERT INTO calendar_events
       (title, description, start_datetime, end_datetime, all_day,
@@ -610,6 +658,13 @@ async function runSync({ createClient } = {}) {
         continue;
       }
 
+      // Einmalige Heilung eingebrannter Kalenderfarben (#1270), siehe oben.
+      const healKey = legacyColorHealKey(account.id);
+      const burntInColors = selHealMarker.get(healKey) ? null : legacyCalendarColors(conn, account.id);
+      // Faellt ein Kalender oder ein Termin aus, hat die Heilung nicht alles
+      // gesehen, und der Merker wartet auf den naechsten Lauf.
+      let healComplete = true;
+
       // Fetch all calendars from server
       const serverCalendars = await client.fetchCalendars();
 
@@ -634,6 +689,7 @@ async function runSync({ createClient } = {}) {
 
         if (!serverCal) {
           log.warn(`Calendar ${selCal.calendar_url} not found on server, disabling.`);
+          healComplete = false;
           db.get().prepare(`
             UPDATE caldav_calendar_selection SET enabled = 0
             WHERE account_id = ? AND calendar_url = ?
@@ -663,6 +719,7 @@ async function runSync({ createClient } = {}) {
           calObjects = await client.fetchCalendarObjects({ calendar: serverCal });
         } catch (err) {
           log.error(`Failed to fetch calendar objects from ${selCal.calendar_name}:`, err.message);
+          healComplete = false;
           continue;
         }
         calendarsByUrl.set(selCal.calendar_url, serverCal);
@@ -721,6 +778,7 @@ async function runSync({ createClient } = {}) {
               // Eine lokale Bearbeitung, die noch auf ihren Push wartet, darf der
               // Inbound nicht mit dem alten Serverstand überschreiben (#593).
               if (existing?.outbound_dirty) {
+                healComplete = false;
                 accountEventCount++;
                 continue;
               }
@@ -740,7 +798,10 @@ async function runSync({ createClient } = {}) {
                   obj.url ?? null,
                 ];
                 // Vor dem Update: danach sieht der Vergleich den geheilten Stand.
-                const healed = !evColor && healBurntInColor.run(existing.id, account.id).changes > 0;
+                const healed = !evColor && burntInColors !== null
+                  && existing.color_modified === 1 && existing.color != null
+                  && burntInColors.has(String(existing.color).toLowerCase())
+                  && healBurntInColor.run(existing.id).changes > 0;
                 changed = updEvent.run(...values, existing.id, ...values).changes > 0 || healed;
                 eventId = existing.id;
                 // Auf dem Server verschoben (#1377): die Erinnerungen ziehen mit.
@@ -779,6 +840,7 @@ async function runSync({ createClient } = {}) {
               if (changed) accountChangedCount++;
             } catch (err) {
               log.error(`Failed to upsert event UID ${ev.uid}:`, err.message);
+              healComplete = false;
             }
           }
 
@@ -888,6 +950,7 @@ async function runSync({ createClient } = {}) {
 
       totalSyncedEvents  += accountEventCount;
       totalChangedEvents += accountChangedCount;
+      if (burntInColors !== null && healComplete) setHealMarker.run(healKey);
       successfulAccounts++;
 
       log.debug(

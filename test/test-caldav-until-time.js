@@ -47,6 +47,8 @@ function buildDb() {
   d.exec(`
     CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, display_name TEXT);
     INSERT INTO users (display_name) VALUES ('Owner');
+    -- Merker der einmaligen Farb-Heilung (#1270) liegen hier.
+    CREATE TABLE sync_config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
     CREATE TABLE caldav_accounts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT, caldav_url TEXT, username TEXT, password TEXT, last_sync TEXT
