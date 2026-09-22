@@ -1,11 +1,13 @@
 import { createHash } from 'node:crypto';
 import { setEventAssignments } from '../routes/calendar/helpers.js';
 
-// Die Standard-Zuweisung eines Kalenders ist eine Haushaltseinstellung, kein
-// Wunsch einer Person: das Anhang-Dokument eines `assignees`-Termins folgt der
-// Zuweisung hier wie bisher, auch weiter (#1358 verengt nur Bearbeitungen durch
-// Personen, die das Dokument nicht sehen - siehe setEventAssignments()).
-const FOLLOW_ASSIGNMENT = Object.freeze({ mayWidenAttachment: () => true });
+// Die Standard-Zuweisung eines Kalenders laeuft ohne Person dahinter - ueber
+// den Auto-Sync, sobald jemand einen Termin im externen Client zwischen zwei
+// Kalendern verschiebt, oder ueber den Backfill. Sie darf ein Anhang-Dokument
+// deshalb NICHT weiter oeffnen (#1358): ein schon eingeschraenktes Dokument
+// bekommt die neue Person als Freigabe dazu, mehr nicht. Nichts wird `family`,
+// ein privates Dokument bleibt zu (applyDocumentAccess, `grantAssignees`).
+const FOLLOW_ASSIGNMENT = Object.freeze({ grantAssigneesOnly: true });
 import { remindAtCompareKey, remindAtUtcSql } from '../utils/reminder-schedule.js';
 
 // --------------------------------------------------------

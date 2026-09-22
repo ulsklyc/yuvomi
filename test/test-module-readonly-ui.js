@@ -3796,7 +3796,54 @@ test('Termin-Dialog: Anhang-Absagen des Servers kommen uebersetzt, der Entfernen
     'nach dem Entfernen ist nichts mehr zu entfernen - auch ohne Ablage (Stufe read)');
   assert.equal(calendar.hasCurrentAttachment({ name: null, changed: false }, { attachment_data: 'data:x' }), true,
     'ein alter Anhang ohne Namen bleibt entfernbar');
-  // Die Stelle, die den Knopf setzt, steht VOR der Rueckkehr ohne Ablage.
-  const sync = CAL_SRC.slice(CAL_SRC.indexOf('const syncSelectedAttachment = () => {'));
-  assert.ok(sync.indexOf('removeAttachment.hidden = !hasCurrentAttachment(') < sync.indexOf('if (!selectedAttachment) return;'));
+});
+
+test('Termin-Dialog, Stufe read: nach dem Entfernen bleibt der Entfernen-Knopf nicht allein stehen (#1358)', () => {
+  // Ausgefuehrt, nicht gelesen: wireEventForm() an einem Panel ohne Ablage
+  // (so rendert es die Stufe read) und ein Klick auf "Entfernen".
+  const permissiv = () => new Proxy(function stub() {}, {
+    get(target, prop) {
+      if (prop in target) return target[prop];
+      if (prop === Symbol.iterator) return function* leer() {};
+      if (prop === Symbol.toPrimitive) return () => '';
+      if (prop === 'then') return undefined;
+      if (prop === 'length') return 0;
+      if (prop === 'querySelectorAll' || prop === 'getElementsByTagName') return () => [];
+      if (prop === 'value' || prop === 'textContent') return '';
+      if (prop === 'checked' || prop === 'hidden' || prop === 'disabled') return false;
+      return permissiv();
+    },
+    apply() { return permissiv(); },
+    set(target, prop, value) { target[prop] = value; return true; },
+  });
+  const listeners = {};
+  const entfernen = {
+    hidden: false,
+    addEventListener(type, fn) { listeners[type] = fn; },
+  };
+  const fehlend = new Set(['#modal-selected-attachment', '#modal-attachment', '#modal-attachment-dropzone']);
+  const panel = new Proxy({}, {
+    get(_target, prop) {
+      if (prop === 'querySelector') {
+        return (selector) => {
+          if (fehlend.has(selector)) return null;
+          if (selector === '#modal-remove-attachment') return entfernen;
+          return permissiv();
+        };
+      }
+      if (prop === 'querySelectorAll') return () => [];
+      return permissiv()[prop];
+    },
+  });
+  const event = {
+    id: 9, title: 'Arzt', start_datetime: '2030-05-01T10:00', end_datetime: '2030-05-01T11:00', visibility: 'all',
+    attachment_document_id: 12, attachment_name: 'befund.pdf', attachment_mime: 'application/pdf',
+  };
+  withAccess({ calendar: 'write', documents: 'read' }, () => {
+    calendar.wireEventForm(panel, { mode: 'edit', event });
+  });
+  assert.equal(typeof listeners.click, 'function', 'der Knopf ist verdrahtet');
+  assert.equal(entfernen.hidden, false, 'vor dem Entfernen steht er');
+  listeners.click();
+  assert.equal(entfernen.hidden, true, 'nach dem Entfernen ist er weg');
 });

@@ -657,6 +657,40 @@ test('default-assignee-backfill - die Bestätigung bindet die Menge, nicht nur i
   }
 });
 
+test('default-assignee-backfill - oeffnet kein privates Anhang-Dokument und macht keins family (#1358)', async () => {
+  const { applyDefaultAssigneesToExisting, listBackfillCandidates } = await import('../server/services/sync-assignment.js');
+  const refId = db.prepare(`
+    INSERT INTO external_calendars (source, external_id, name, default_assignee_user_id)
+    VALUES ('caldav', 'https://dav.example/backfill-private/', 'Privat', ?)
+  `).run(TOM.id).lastInsertRowid;
+  const doc = (visibility) => db.prepare(`
+    INSERT INTO family_documents (name, original_name, mime_type, file_size, content_data, visibility, created_by)
+    VALUES ('bf-privat', 'bf-privat.txt', 'text/plain', 1, 'x', ?, ?)
+  `).run(visibility, ADMIN.id).lastInsertRowid;
+  const privateDoc = doc('private');
+  const restrictedDoc = doc('restricted');
+  const mk = (title, documentId) => db.prepare(`
+    INSERT INTO calendar_events (title, start_datetime, created_by, external_source, calendar_ref_id, visibility, attachment_document_id)
+    VALUES (?, '2035-06-01T10:00', ?, 'caldav', ?, 'all', ?)
+  `).run(title, ADMIN.id, refId, documentId).lastInsertRowid;
+  const ids = [mk('bf-private-doc', privateDoc), mk('bf-restricted-doc', restrictedDoc)];
+  const state = (id) => ({
+    visibility: db.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(id).visibility,
+    access: db.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id').all(id).map((r) => r.user_id),
+  });
+  try {
+    const snapshot = listBackfillCandidates(db).filter((c) => ids.includes(c.eventId));
+    assert.equal(snapshot.length, 2);
+    assert.equal(await applyDefaultAssigneesToExisting(db, snapshot), 2);
+    assert.deepEqual(state(privateDoc), { visibility: 'private', access: [] }, 'privat bleibt privat, auch am Termin fuer alle');
+    assert.deepEqual(state(restrictedDoc), { visibility: 'restricted', access: [TOM.id] },
+      'eingeschraenkt bekommt die neue Person dazu, family wird es nicht');
+  } finally {
+    db.prepare(`DELETE FROM calendar_events WHERE id IN (${ids.join(',')})`).run();
+    db.prepare('DELETE FROM external_calendars WHERE id = ?').run(refId);
+  }
+});
+
 test('default-assignee-backfill - arbeitet in Happen und kommt trotzdem bis zum Ende (#1154)', async () => {
   const { applyDefaultAssigneesToExisting } = await import('../server/services/sync-assignment.js');
   const refId = db.prepare(`
@@ -3868,4 +3902,52 @@ test('Anhang: Split und Abloesen kopieren kein Dokument ohne Sicht oder Schreibr
   assert.equal(split.status, 201);
   assert.ok(split.body.data.attachment_document_id, 'eigene Serie: der Nachfolger bekommt seine Kopie');
   assert.equal(documents(), before + 1);
+});
+
+test('Anhang: weiter oeffnen darf nur, wer das Dokument verwalten darf - Sehen reicht nicht (#1358)', async () => {
+  // Wie im Dokumente-Modul (canManageDocument): Erstellerin oder Admin. Eine
+  // Zugewiesene mit documents:write sieht das Dokument, gehoert ihr aber nicht.
+  const created = await call('POST', '/', { actor: ADMIN, body: {
+    title: 'Verwalten-Probe', start_datetime: '2043-01-01T09:00', visibility: 'assignees', assigned_to: [MARIA.id],
+    attachment_data: `data:text/plain;base64,${Buffer.from('eng').toString('base64')}`, attachment_name: 'e.txt',
+  } });
+  assert.equal(created.status, 201);
+  const eventId = created.body.data.id;
+  const docId = created.body.data.attachment_document_id;
+  const visibility = () => db.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(docId).visibility;
+  assert.equal(visibility(), 'restricted');
+  const seen = await call('GET', `/${eventId}`, { actor: MARIA });
+  assert.equal(seen.body.data.attachment_document_id, docId, 'Maria sieht das Dokument');
+
+  const widen = await call('PUT', `/${eventId}`, { actor: MARIA, body: { visibility: 'all' } });
+  assert.equal(widen.status, 200);
+  assert.equal(visibility(), 'restricted', 'Maria macht das Dokument nicht family');
+
+  const owner = await call('PUT', `/${eventId}`, { actor: ADMIN, body: { visibility: 'all' } });
+  assert.equal(owner.status, 200);
+  assert.equal(visibility(), 'family', 'die Erstellerin darf es');
+});
+
+test('Anhang: die Kopie beim Split behaelt die Freigaben der Quelle (#1358, Review)', async () => {
+  // Eine Zugewiesene mit documents:write und Freigabe auf das eingeschraenkte
+  // Dokument teilt die Serie. Die Kopie gehoert der Terminerstellerin; ohne die
+  // Freigaben der Quelle saehe sie am Nachfolger niemand ausser dieser.
+  const created = await call('POST', '/', { actor: ADMIN, body: {
+    title: 'Freigabe-Split', start_datetime: '2071-01-01T09:00:00', recurrence_rule: 'FREQ=DAILY;COUNT=5',
+    visibility: 'assignees', assigned_to: [MARIA.id],
+    attachment_data: `data:text/plain;base64,${Buffer.from('frei').toString('base64')}`, attachment_name: 'f.txt',
+  } });
+  assert.equal(created.status, 201);
+  const sourceId = created.body.data.attachment_document_id;
+  const access = (id) => db.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id')
+    .all(id).map((r) => r.user_id);
+  assert.deepEqual(access(sourceId), [MARIA.id]);
+
+  const split = await call('PUT', `/${created.body.data.id}/occurrences/2071-01-03/following`, { actor: MARIA, body: { title: 'Nachfolger' } });
+  assert.equal(split.status, 201, JSON.stringify(split.body));
+  const cloneId = split.body.data.attachment_document_id;
+  assert.ok(cloneId && cloneId !== sourceId, 'Maria sieht die Kopie am Nachfolger');
+  assert.deepEqual(access(cloneId), [MARIA.id], 'die Kopie traegt die Freigabe der Quelle');
+  assert.equal(db.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(cloneId).visibility, 'restricted',
+    'und wird nicht weiter als die Quelle');
 });

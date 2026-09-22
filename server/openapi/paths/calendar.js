@@ -17,7 +17,7 @@ const ATTACHMENT_RIGHTS = ' A new attachment creates a document in the Documents
   + 'before the event is looked up. Replacing or removing an attachment needs read access to the Documents module and sight of the '
   + 'stored document; otherwise the same 403, and the attachment stays. The 403 bodies carry `reason` `ATTACHMENT_UPLOAD_REFUSED` or '
   + '`ATTACHMENT_CHANGE_REFUSED`. Saving an event carries its visibility and assignees over to the attachment\'s document; it opens the '
-  + 'document further only for a caller with write access to documents who can see it, otherwise it only narrows. A split or a '
+  + 'document further only for a caller with write access to documents who can see it and may manage it (its creator - for an attachment the event creator - or an admin), otherwise it only narrows. The default-assignee sync of connected calendars only adds the new assignee to a document that is already shared with selected members; it never makes a document visible to the family and never opens a private one. A split or a '
   + 'detach copies the attachment for the new series or event only for such a caller; otherwise the new one has no attachment and '
   + 'the original stays on the original series.';
 

@@ -21,7 +21,7 @@ import { queueEventDeletion, markEventOutbound, flushOutbound } from '../../serv
 import { SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN } from '../../services/calendar-events.js';
 import { newNonMembers, nonMemberMessage } from '../../services/household-members.js';
 import { documentViewer } from '../../services/document-links.js';
-import { documentWidenPredicate } from '../../services/document-access.js';
+import { documentClonePredicate, documentWidenPredicate } from '../../services/document-access.js';
 import { mayWriteModule } from '../../permissions.js';
 import {
   assertSuccessorHasOccurrence,
@@ -61,17 +61,24 @@ const router = express.Router();
 
 /**
  * Was dieser Aufrufer mit Anhang-Dokumenten tun darf (#1358): weiter oeffnen
- * (Sichtbarkeit des Termins aufs Dokument uebertragen) und kopieren (Split,
- * Abloesen) nur mit Dokumente-Schreibrecht UND Sicht auf das Dokument. Sonst
+ * (Sichtbarkeit des Termins aufs Dokument uebertragen) nur mit Dokumente-
+ * Schreibrecht, Sicht UND Verwaltungsrecht (Erstellerin oder Admin); kopieren
+ * (Split, Abloesen) mit Schreibrecht und Sicht auf die Quelle. Sonst
  * wird nur verengt, und ein Nachfolger bekommt keine Kopie - ohne 403, damit
  * der Termin bearbeitbar bleibt; der Anhang bleibt an der alten Serie.
  */
 function attachmentRights(req) {
-  const allowed = documentWidenPredicate(db.get(), {
+  const actor = {
     actorId: getUserId(req),
+    isAdmin: isAdminUser(req),
     documentsWritable: mayWriteModule(req, 'documents'),
-  });
-  return { mayWidenAttachment: allowed, mayCloneAttachment: allowed };
+  };
+  return {
+    // Weiter oeffnen: nur wer das Dokument auch verwalten darf.
+    mayWidenAttachment: documentWidenPredicate(db.get(), actor),
+    // Kopieren: wer es sieht und Dokumente schreiben darf.
+    mayCloneAttachment: documentClonePredicate(db.get(), actor),
+  };
 }
 
 async function runWithAttachmentClonePlan(database, actorId, stagedClones, operation, { mayClone = () => false } = {}) {

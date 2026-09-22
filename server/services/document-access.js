@@ -79,8 +79,13 @@ export function canManageDocument(document, { userId, isAdmin }) {
  * Bearbeiterin das Dokument gar nicht sah oder kein Dokumentenrecht hatte. Ein
  * privates Dokument einer anderen Person wurde so mit einem normalen Speichern
  * wieder `family`. Jetzt gilt:
- *   - `mayWiden` (Dokumente schreiben UND das Dokument sehen, der Aufrufer
- *     entscheidet): die Zielsichtbarkeit gilt wie bisher, auch weiter als vorher;
+ *   - `mayWiden` (Dokumente schreiben, das Dokument sehen UND es verwalten
+ *     duerfen, siehe `documentWidenPredicate()`): die Zielsichtbarkeit gilt wie
+ *     bisher, auch weiter als vorher;
+ *   - `grantAssignees` (Abgleich der Standard-Zuweisung durch die Kalender-
+ *     Syncs, ohne Person dahinter): nur ein schon eingeschraenktes Dokument
+ *     bekommt die Zugewiesenen als Freigabe dazu. Nichts wird `family`, ein
+ *     privates Dokument bleibt zu, niemand verliert eine Freigabe;
  *   - sonst wird nur enger: `family` -> `restricted`/`private`, `restricted`
  *     verliert Personen, die nicht mehr drankommen, `private` bleibt `private`.
  *     Niemand bekommt Zugriff, den er vorher nicht hatte.
@@ -89,7 +94,9 @@ export function canManageDocument(document, { userId, isAdmin }) {
  * @param {number} documentId
  * @param {{ visibility: 'private'|'restricted'|'family', userIds: number[], mayWiden: boolean }} target
  */
-export function applyDocumentAccess(database, documentId, { visibility, userIds = [], mayWiden = false }) {
+export function applyDocumentAccess(database, documentId, {
+  visibility, userIds = [], mayWiden = false, grantAssignees = false,
+}) {
   if (!documentId) return;
   const current = database.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(documentId);
   if (!current) return;
@@ -97,6 +104,11 @@ export function applyDocumentAccess(database, documentId, { visibility, userIds 
   const clearAccess = database.prepare('DELETE FROM family_document_access WHERE document_id = ?');
   const grant = database.prepare('INSERT OR IGNORE INTO family_document_access (document_id, user_id) VALUES (?, ?)');
   const wanted = [...new Set(userIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+
+  if (grantAssignees && !mayWiden) {
+    if (current.visibility === 'restricted') for (const userId of wanted) grant.run(documentId, userId);
+    return;
+  }
 
   if (mayWiden || visibility === 'private' || current.visibility === 'family') {
     // Voller Abgleich: erlaubt, oder das Ziel ist ohnehin enger als/gleich `family`.
@@ -120,11 +132,34 @@ export function applyDocumentAccess(database, documentId, { visibility, userIds 
 /**
  * Darf dieser Aufrufer ein Anhang-Dokument weiter oeffnen als bisher? Nur mit
  * Dokumente-Schreibrecht (`documentsWritable`, vom Aufrufer aus
- * `mayWriteModule(req, 'documents')`) und wenn er das Dokument sieht.
+ * `mayWriteModule(req, 'documents')`), wenn er das Dokument sieht UND es
+ * verwalten darf (`canManageDocument`: Erstellerin oder Admin). Sehen allein
+ * reicht nicht - das Dokumente-Modul verweigert einer Nicht-Besitzerin das
+ * Aendern der Sichtbarkeit ebenso. Ein Termin-Anhang gehoert der Person, die
+ * den Termin angelegt hat (`created_by` des Dokuments), sie behaelt das Recht.
  * @returns {(documentId: number) => boolean}
  */
-export function documentWidenPredicate(database, { actorId, documentsWritable }) {
+export function documentWidenPredicate(database, { actorId, isAdmin = false, documentsWritable }) {
+  return (documentId) => {
+    if (documentsWritable !== true || actorId == null) return false;
+    if (!documentSeenBy(database, documentId, actorId)) return false;
+    const document = database.prepare('SELECT created_by FROM family_documents WHERE id = ?').get(documentId);
+    return Boolean(document) && canManageDocument(document, { userId: actorId, isAdmin });
+  };
+}
+
+/**
+ * Darf dieser Aufrufer ein Anhang-Dokument KOPIEREN (Split, Abloesen)? Mit
+ * Dokumente-Schreibrecht und Sicht auf die Quelle; die Kopie gehoert danach
+ * der Terminerstellerin und wird nur von einer Verwalterin weiter geoeffnet.
+ * @returns {(documentId: number) => boolean}
+ */
+export function documentClonePredicate(database, { actorId, documentsWritable }) {
   return (documentId) => documentsWritable === true
     && actorId != null
-    && filterVisibleDocumentIds(database, [documentId], actorId).length > 0;
+    && documentSeenBy(database, documentId, actorId);
+}
+
+function documentSeenBy(database, documentId, userId) {
+  return filterVisibleDocumentIds(database, [documentId], userId).length > 0;
 }

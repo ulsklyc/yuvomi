@@ -223,7 +223,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   offers the upload area then; an attachment you cannot see can no longer be replaced or removed
   by saving the event, and the dialog says "Attachment present (private)" instead. Saving an event
   no longer makes a private attachment visible again: its visibility is carried over to the
-  document only by someone who may edit documents and can see it, anyone else can only narrow it.
+  document only by the person who owns it (the event's creator) or an admin, and only with
+  permission to edit documents; anyone else can only narrow it. The sync of connected calendars,
+  which reassigns an event when it moves to a calendar with another default person, only adds
+  that person to an attachment already shared with selected members - it never makes one visible
+  to the whole family and never opens a private one.
   Splitting a series or detaching an occurrence no longer copies an attachment for someone who
   cannot see it or may not edit documents; the new part then has no attachment and the original
   stays on the series. For API clients `attachment_document_id`, `attachment_preview_url`,

@@ -190,8 +190,24 @@ export function createAttachmentDocument(database, attachment, staged, body, act
   return result.lastInsertRowid;
 }
 
+/**
+ * Kopie eines Anhang-Dokuments fuer einen Nachfolger oder abgeloesten Termin.
+ * Sie erbt Sichtbarkeit UND Freigaben der Quelle (#1358, Review): ohne die
+ * Freigaben saehe ein eingeschraenktes Dokument am neuen Termin niemand ausser
+ * der Besitzerin - auch nicht die Zugewiesene, die den Split ausgeloest hat.
+ * Weiter geoeffnet wird die Kopie danach nur von einer Verwalterin.
+ */
 export function cloneAttachmentDocument(database, source, staged, actorId) {
   if (!source || !staged) return null;
+  const cloneId = insertAttachmentClone(database, source, staged, actorId);
+  database.prepare(`
+    INSERT OR IGNORE INTO family_document_access (document_id, user_id)
+    SELECT ?, user_id FROM family_document_access WHERE document_id = ?
+  `).run(cloneId, source.id);
+  return cloneId;
+}
+
+function insertAttachmentClone(database, source, staged, actorId) {
   return database.prepare(`
     INSERT INTO family_documents
       (name, description, category, status, visibility, folder_id, original_name,
@@ -284,22 +300,28 @@ export function parseAssignedTo(val) {
  * (Dokumente schreiben UND das Dokument sehen, #1358). Ohne Urteil wird nur
  * verengt: `applyDocumentAccess()` in services/document-access.js.
  */
-export function syncAttachmentDocumentAccess(d, documentId, eventVisibility, userIds, { mayWiden = () => false } = {}) {
+export function syncAttachmentDocumentAccess(d, documentId, eventVisibility, userIds, {
+  mayWiden = () => false, grantAssignees = false,
+} = {}) {
   if (!documentId) return;
   const visibility = eventVisibility === 'private'
     ? 'private'
     : eventVisibility === 'assignees'
       ? 'restricted'
       : 'family';
-  applyDocumentAccess(d, documentId, { visibility, userIds, mayWiden: mayWiden(documentId) === true });
+  applyDocumentAccess(d, documentId, {
+    visibility, userIds, mayWiden: mayWiden(documentId) === true, grantAssignees,
+  });
 }
 
 /**
  * `options.mayWidenAttachment` kommt vom Aufrufer (`documentWidenPredicate()`);
- * ohne ihn - etwa beim Zuweisungs-Abgleich der Kalender-Syncs - wird das
- * Anhang-Dokument nur verengt, nie weiter geoeffnet.
+ * ohne ihn wird das Anhang-Dokument nur verengt, nie weiter geoeffnet.
+ * `options.grantAssigneesOnly` (Standard-Zuweisung der Kalender-Syncs): ein
+ * schon eingeschraenktes Dokument bekommt die Zugewiesenen als Freigabe dazu,
+ * sonst aendert sich nichts - nichts wird `family`, nichts Privates geht auf.
  */
-export function setEventAssignments(d, eventId, userIds, { mayWidenAttachment } = {}) {
+export function setEventAssignments(d, eventId, userIds, { mayWidenAttachment, grantAssigneesOnly = false } = {}) {
   // Wer VORHER dranstand - gebraucht wird das eine Zeile weiter unten, um die
   // Erinnerungen derer abzuraeumen, die nicht mehr dranstehen (#921). Deshalb
   // hier und nicht erst nach dem DELETE, das die Auskunft vernichtet.
@@ -336,7 +358,7 @@ export function setEventAssignments(d, eventId, userIds, { mayWidenAttachment } 
     event?.attachment_document_id,
     event?.visibility,
     userIds,
-    { mayWiden: mayWidenAttachment },
+    { mayWiden: mayWidenAttachment, grantAssignees: grantAssigneesOnly },
   );
 }
 
