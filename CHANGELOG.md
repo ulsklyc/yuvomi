@@ -60,7 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **"Today" no longer gives a false all-clear.** Open doses, pending approvals (for the person who
   approves them), today's bin and "put it out tonight", birthdays, your own shift, due reminders,
   the housekeeper on site and pantry batches that expire today now appear in the sheet; "Nothing
-  else today" only shows once nothing is open. The same on the wall display.
+  else today" only shows once nothing is open. The same on the wall display. A number the sheet
+  already names, such as open doses or pending approvals, no longer repeats in the metrics row.
 
 - **Finished appointments step back** (#1449). The event tile's limit of five counts only what is
   still coming, and finished events sit stepped back above it; in the today sheet and on the wall

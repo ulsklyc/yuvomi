@@ -2182,6 +2182,10 @@ function metricTileFor(id, data, currency, sheetSpeaks = new Set()) {
       // eine Kachel, die je nach Berechtigung etwas anderes zeigt, ist zwei
       // Kacheln mit einem Namen.
       if (!h.hasMeds || !(h.dosesTotal > 0)) return null;
+      // Nennt das Heute-Blatt die offenen Dosen schon, waere „2 offen" hier
+      // dieselbe Zahl ein zweites Mal - ausser eine Packung muss nachbestellt
+      // werden, das sagt das Blatt nicht.
+      if (sheetSpeaks.has('doses') && !(h.lowStockCount > 0)) return null;
       const offen = h.dosesTotal - (h.dosesTaken ?? 0) - (h.dosesSkipped ?? 0);
       return {
         id, route, icon: widgetIcon('health'), label: t('nav.health'),

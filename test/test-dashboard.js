@@ -812,6 +812,31 @@ test('Freigaben: die Zahl steht an genau einer Stelle - Widget > Heute-Blatt > K
   });
 });
 
+/* Dieselbe Regel fuer die Dosen (Browser-Abnahme der Integration: „2 Dosen
+ * offen" im Blatt, „2 offen" in der Gesundheits-Kachel darunter). Die Kachel
+ * tritt zurueck, solange das Blatt die offenen Dosen nennt - ausser eine
+ * Packung muss nachbestellt werden: das sagt das Blatt nicht. */
+test('Dosen: die Zahl offener Dosen steht nicht in Blatt UND Kennzahlkachel', async () => {
+  const data = {
+    budget: { entryCount: 3, balance: 100, income: 200 },
+    birthdays: [{ name: 'Oma', days_until: 5, kind: 'birthday' }],
+    health: { ...openDoses(), lowStockCount: 0 },
+  };
+  const metricsOnly = [{ id: 'metrics', visible: true, size: '2x1' }];
+  const healthTile = (html) => /metric-card[^]*?metricDoses/.test(html);
+  await withSheetEnv({ perms: { admin: true } }, (__test) => {
+    nodeAssert.ok(sheetKinds(__test.buildTodayCockpitModel(data, metricsOnly, { now: todayAt(7) })).includes('dose'),
+      'Vorbedingung: das Blatt nennt die Dosen');
+    nodeAssert.ok(!healthTile(__test.renderDashboardLayout(metricsOnly, data, null, 'EUR', { glanceHidden: false })),
+      'neben dem Blatt keine zweite Dosen-Zahl');
+    nodeAssert.ok(healthTile(__test.renderDashboardLayout(metricsOnly, data, null, 'EUR', { glanceHidden: true })),
+      'ohne Blatt traegt die Kachel sie');
+    const refill = { ...data, health: { ...data.health, lowStockCount: 1 } };
+    nodeAssert.match(__test.renderDashboardLayout(metricsOnly, refill, null, 'EUR', { glanceHidden: false }), /healthRefill/,
+      'eine Nachbestellung sagt das Blatt nicht - die Kachel bleibt');
+  });
+});
+
 test('Heute-Blatt: die Tonne von heute und die von morgen (heute Abend rausstellen)', () => withSheetEnv({}, (__test) => {
   const today = toLocalDateKey(new Date());
   const tomorrow = addLocalDays(today, 1);
