@@ -181,7 +181,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was long over. "Apply to existing appointments" under Settings > Sync now lists them in its
   confirmation: every appointment whose only assignee is still the default assignee of another
   calendar of the same account, with its title, date, calendar and "from X to Y". All are selected;
-  untick what should stay, and only the selected ones change. They are listed one by one because
+  untick what should stay, and only the selected ones change. The list shows at most 5000 at a
+  time, oldest first, and says how many there are; the rest appear the next time. They are listed one by one because
   the stored data cannot tell such an appointment apart from one in a calendar whose default
   assignee was changed later, when the previous person is another calendar's default assignee - an
   automatic repair would have changed those too. Unassigned appointments are filled as before. An
@@ -189,8 +190,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Yuvomi and sent to the calendar, or in a calendar without a default assignee is not listed. For a
   recurring appointment the whole series changes, including occurrences edited on their own that do
   not have their own assignment. For API clients: `GET` on the backfill route returns the list as
-  `moved`, and `POST` takes the picked entries as `moves`; without them no existing assignment
-  changes. (#1307)
+  `moved` (at most 5000, with `moved_total`), and `POST` takes the picked entries as `moves`;
+  without them no existing assignment changes. (#1307)
 
 - **Single sign-on finds your account even when its stored address has a stray space.** Signing
   in through the identity provider links to an existing account by email address. The address

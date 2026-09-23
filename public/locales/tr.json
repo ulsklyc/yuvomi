@@ -2572,6 +2572,7 @@
             "backfillFillCount_one": "Atanmamış {{count}} randevu",
             "backfillMovedTitle": "Başka bir takvimin varsayılan atamasını taşıyan randevular",
             "backfillMovedHint": "Bu randevular hâlâ aynı hesaptaki başka bir takvimin varsayılan atamasını taşıyor. Bu, taşınmış bir randevu ya da varsayılan ataması sonradan değiştirilmiş bir takvim olabilir. Yalnızca seçilen randevular değişir, diğerleri olduğu gibi kalır.",
+            "backfillMovedPartial": "{{total}} randevudan ilk {{shown}} tanesi gösteriliyor. Uyguladıktan sonra kalanlar bir sonraki açılışta görünür.",
             "backfillMovedAll": "Tümünü seç",
             "backfillMovedChange": "{{from}} yerine {{to}}"
         },

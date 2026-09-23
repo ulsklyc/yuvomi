@@ -2572,6 +2572,7 @@
             "backfillFillCount_one": "{{count}} afspraak zonder toewijzing",
             "backfillMovedTitle": "Afspraken met de standaardtoewijzing van een andere agenda",
             "backfillMovedHint": "Deze afspraken dragen nog de standaardtoewijzing van een andere agenda van hetzelfde account. Dat kan een verplaatste afspraak zijn, of een agenda waarvan de standaardtoewijzing later is gewijzigd. Alleen de geselecteerde afspraken veranderen, de andere blijven zoals ze zijn.",
+            "backfillMovedPartial": "De eerste {{shown}} van {{total}} worden getoond. Na het toepassen verschijnen de overige de volgende keer dat je dit opent.",
             "backfillMovedAll": "Alles selecteren",
             "backfillMovedChange": "Van {{from}} naar {{to}}"
         },

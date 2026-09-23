@@ -45,12 +45,12 @@ const MOVED = [
 ];
 
 /** Beantwortet die Aktion selbst und merkt sich jeden POST-Body. */
-function interceptBackfill(page, { count, moved }) {
+function interceptBackfill(page, { count, moved, movedTotal = moved.length }) {
   const posts = [];
   page.__yuvomiRequestInterceptor = (req) => {
     if (!req.url().includes(ENDPOINT)) return false;
     if (req.method() === 'GET') {
-      req.respond({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { count, token: TOKEN, moved } }) });
+      req.respond({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { count, token: TOKEN, moved, moved_total: movedTotal } }) });
       return true;
     }
     if (req.method() === 'POST') {
@@ -122,6 +122,30 @@ test('ohne leere Termine und ohne Haken gibt es nichts zu bestaetigen (#1307)', 
     await page.click('#backfill-review-cancel');
     await page.waitForFunction(() => !document.querySelector('#backfill-review-form'));
     assert.equal(posts.length, 0, 'Abbrechen schickt nichts');
+  } finally {
+    await page.close();
+  }
+});
+
+test('eine gekuerzte Liste sagt, wie viele es insgesamt sind (#1307)', async () => {
+  // Der Server liefert hoechstens so viele, wie eine Bestaetigung annimmt
+  // (movedCandidatesLimit); `moved_total` nennt den Rest.
+  const page = await openPage(harness, { device: 'desktop' });
+  try {
+    interceptBackfill(page, { count: 0, moved: MOVED, movedTotal: 5 });
+    await openReview(page);
+    assert.equal(
+      await page.$eval('.backfill-moved__partial', (p) => p.textContent.trim()),
+      'Angezeigt werden die ersten 2 von 5. Nach dem Übernehmen erscheinen die übrigen beim nächsten Öffnen.',
+    );
+    await clickPastDeadTime(page, '#backfill-review-cancel');
+    await page.waitForFunction(() => !document.querySelector('#backfill-review-form'));
+
+    // Vollstaendige Liste: kein Hinweis.
+    interceptBackfill(page, { count: 0, moved: MOVED });
+    await page.click('#sync-default-assignee-backfill-btn');
+    await page.waitForSelector('#backfill-review-form .backfill-moved__item');
+    assert.equal(await page.$('.backfill-moved__partial'), null);
   } finally {
     await page.close();
   }

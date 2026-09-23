@@ -2572,6 +2572,7 @@
             "backfillFillCount_one": "{{count}} nepřiřazená událost",
             "backfillMovedTitle": "Události s výchozím přiřazením jiného kalendáře",
             "backfillMovedHint": "Tyto události stále nesou výchozí přiřazení jiného kalendáře téhož účtu. Může jít o přesunutou událost, nebo o kalendář, jehož výchozí přiřazení bylo později změněno. Změní se jen vybrané události, ostatní zůstanou beze změny.",
+            "backfillMovedPartial": "Zobrazeno prvních {{shown}} z {{total}}. Po použití se zbývající zobrazí při dalším otevření.",
             "backfillMovedAll": "Vybrat vše",
             "backfillMovedChange": "Z {{from}} na {{to}}"
         },

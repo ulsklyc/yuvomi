@@ -15,6 +15,8 @@ import {
   backfillCandidatesToken,
   listBackfillCandidates,
   listMovedCandidates,
+  countMovedCandidates,
+  movedCandidatesLimit,
 } from '../../services/sync-assignment.js';
 
 const log = createLogger('Calendar');
@@ -232,9 +234,16 @@ router.patch('/external-calendars', requireAdmin, (req, res) => {
 /**
  * Die umgezogenen Termine fuer die Vorschau (#1307): je Termin Titel, Beginn,
  * Kalender und "von Person X auf Person Y". Der Admin hakt sie einzeln ab.
+ * Hoechstens movedCandidatesLimit.max, aelteste zuerst - dieselbe Grenze, die
+ * parseMoves() fuer die Bestaetigung zieht; `moved_total` nennt, wie viele es
+ * insgesamt sind.
  */
+function movedPreviewFields(d) {
+  return { moved: movedPreview(d), moved_total: countMovedCandidates(d) };
+}
+
 function movedPreview(d) {
-  return listMovedCandidates(d).map((m) => ({
+  return listMovedCandidates(d, { limit: movedCandidatesLimit.max }).map((m) => ({
     event_id: m.eventId,
     title: m.title,
     start_datetime: m.startDatetime,
@@ -247,24 +256,25 @@ function movedPreview(d) {
   }));
 }
 
-/** Obergrenze fuer `moves`: die Liste ist eine Auswahl aus der Vorschau, kein Massenweg. */
-const MAX_MOVES = 5000;
-
 /**
  * `moves` aus dem Body: eine Liste { event_id, from_user_id, to_user_id }, je
- * Termin hoechstens einmal. Fehlt sie, ist nichts abgehakt.
- * @returns {{ eventId: number, fromUserId: number, userId: number }[] | null} null = ungueltig
+ * Termin hoechstens einmal und hoechstens movedCandidatesLimit.max Eintraege -
+ * so viele, wie die Vorschau zeigt. Fehlt sie, ist nichts abgehakt.
+ * @returns {{ eventId: number, fromUserId: number, userId: number }[] | { error: string }}
  */
 function parseMoves(raw) {
   if (raw === undefined || raw === null) return [];
-  if (!Array.isArray(raw) || raw.length > MAX_MOVES) return null;
+  if (!Array.isArray(raw)) return { error: 'moves ist ungültig.' };
+  const max = movedCandidatesLimit.max;
+  if (raw.length > max) return { error: `moves nimmt höchstens ${max} Termine je Bestätigung an.` };
+  const invalid = { error: 'moves ist ungültig.' };
   const seen = new Set();
   const moves = [];
   for (const item of raw) {
-    if (!item || typeof item !== 'object') return null;
+    if (!item || typeof item !== 'object') return invalid;
     const { event_id: eventId, from_user_id: fromUserId, to_user_id: userId } = item;
-    if (![eventId, fromUserId, userId].every((v) => Number.isInteger(v) && v > 0)) return null;
-    if (seen.has(eventId)) return null;
+    if (![eventId, fromUserId, userId].every((v) => Number.isInteger(v) && v > 0)) return invalid;
+    if (seen.has(eventId)) return invalid;
     seen.add(eventId);
     moves.push({ eventId, fromUserId, userId });
   }
@@ -281,13 +291,13 @@ function parseMoves(raw) {
  * ihres alten Kalenders tragen (#1307) - einzeln, weil sie sich in den Daten
  * nicht von einem Kalender mit später umgestellter Standard-Person trennen
  * lassen. Sie zählen nicht in `count` und gehen nur abgehakt zurück.
- * Response: { data: { count, token, moved: [...] } }
+ * Response: { data: { count, token, moved: [...], moved_total } }
  */
 router.get('/external-calendars/default-assignee-backfill', requireAdmin, (req, res) => {
   try {
     const d = db.get();
     const candidates = listBackfillCandidates(d);
-    res.json({ data: { count: candidates.length, token: backfillCandidatesToken(candidates), moved: movedPreview(d) } });
+    res.json({ data: { count: candidates.length, token: backfillCandidatesToken(candidates), ...movedPreviewFields(d) } });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
@@ -318,7 +328,7 @@ router.get('/external-calendars/default-assignee-backfill', requireAdmin, (req, 
  * Ohne `moves` wird kein Termin umgestellt.
  * Body: { expected_count: number, expected_token?: string,
  *         moves?: { event_id, from_user_id, to_user_id }[] }
- * Response: { data: { assigned } } | 409 { data: { count, token, moved } }
+ * Response: { data: { assigned } } | 409 { data: { count, token, moved, moved_total } }
  */
 router.post('/external-calendars/default-assignee-backfill', requireAdmin, async (req, res) => {
   try {
@@ -332,8 +342,8 @@ router.post('/external-calendars/default-assignee-backfill', requireAdmin, async
       return res.status(400).json({ error: 'expected_token ist ungültig.', code: 400 });
     }
     const moves = parseMoves(req.body?.moves);
-    if (!moves) {
-      return res.status(400).json({ error: 'moves ist ungültig.', code: 400 });
+    if (!Array.isArray(moves)) {
+      return res.status(400).json({ error: moves.error, code: 400 });
     }
     // Gezählt und festgehalten im selben synchronen Schritt: genau diese Liste
     // ist bestätigt, und nur sie wird abgearbeitet - auch wenn zwischen den
@@ -350,7 +360,7 @@ router.post('/external-calendars/default-assignee-backfill', requireAdmin, async
       return res.status(409).json({
         error: 'Die Termine haben sich seit der Zählung geändert.',
         code: 409,
-        data: { count: candidates.length, token, moved: movedPreview(d) },
+        data: { count: candidates.length, token, ...movedPreviewFields(d) },
       });
     }
     res.json({ data: { assigned: await applyDefaultAssigneesToExisting(d, [...candidates, ...moves]) } });

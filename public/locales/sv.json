@@ -2572,6 +2572,7 @@
             "backfillFillCount_one": "{{count}} möte utan tilldelning",
             "backfillMovedTitle": "Möten med en annan kalenders standardtilldelning",
             "backfillMovedHint": "De här mötena har fortfarande standardtilldelningen för en annan kalender i samma konto. Det kan vara ett möte som flyttats, eller en kalender vars standardtilldelning ändrades senare. Bara de valda mötena ändras, de andra förblir som de är.",
+            "backfillMovedPartial": "Visar de första {{shown}} av {{total}}. När du har tillämpat dem visas resten nästa gång du öppnar det här.",
             "backfillMovedAll": "Markera alla",
             "backfillMovedChange": "Från {{from}} till {{to}}"
         },

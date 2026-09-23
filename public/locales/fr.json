@@ -2572,6 +2572,7 @@
             "backfillFillCount_one": "{{count}} rendez-vous sans attribution",
             "backfillMovedTitle": "Rendez-vous avec l’attribution par défaut d’un autre calendrier",
             "backfillMovedHint": "Ces rendez-vous portent encore l’attribution par défaut d’un autre calendrier du même compte. Il peut s’agir d’un rendez-vous déplacé, ou d’un calendrier dont l’attribution par défaut a été modifiée ensuite. Seuls les rendez-vous sélectionnés changent, les autres restent tels quels.",
+            "backfillMovedPartial": "Affichage des {{shown}} premiers sur {{total}}. Après l’application, les autres apparaissent à la prochaine ouverture.",
             "backfillMovedAll": "Tout sélectionner",
             "backfillMovedChange": "De {{from}} à {{to}}"
         },

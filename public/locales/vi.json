@@ -2572,6 +2572,7 @@
             "backfillFillCount_one": "{{count}} lịch hẹn chưa có người được giao",
             "backfillMovedTitle": "Lịch hẹn mang người được giao mặc định của lịch khác",
             "backfillMovedHint": "Các lịch hẹn này vẫn mang người được giao mặc định của một lịch khác trong cùng tài khoản. Đó có thể là lịch hẹn đã được chuyển, hoặc một lịch có người được giao mặc định đã được đổi sau đó. Chỉ các lịch hẹn được chọn mới thay đổi, các lịch hẹn khác giữ nguyên.",
+            "backfillMovedPartial": "Đang hiển thị {{shown}} mục đầu tiên trên {{total}}. Sau khi áp dụng, các mục còn lại sẽ hiện ra ở lần mở tiếp theo.",
             "backfillMovedAll": "Chọn tất cả",
             "backfillMovedChange": "Từ {{from}} sang {{to}}"
         },

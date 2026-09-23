@@ -2607,6 +2607,7 @@
             "backfillFillCount_one": "{{count}} Termin ohne Zuweisung",
             "backfillMovedTitle": "Termine mit der Standard-Zuweisung eines anderen Kalenders",
             "backfillMovedHint": "Diese Termine tragen noch die Standard-Zuweisung eines anderen Kalenders desselben Kontos. Das kann ein verschobener Termin sein oder ein Kalender, dessen Standard-Zuweisung später geändert wurde. Umgestellt werden nur die ausgewählten Termine, die anderen bleiben, wie sie sind.",
+            "backfillMovedPartial": "Angezeigt werden die ersten {{shown}} von {{total}}. Nach dem Übernehmen erscheinen die übrigen beim nächsten Öffnen.",
             "backfillMovedAll": "Alle auswählen",
             "backfillMovedChange": "Von {{from}} zu {{to}}"
         },

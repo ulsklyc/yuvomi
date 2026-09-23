@@ -252,25 +252,48 @@ export function listBackfillCandidates(d) {
 }
 
 /**
+ * Obergrenze der Einzelliste (#1307): so viele umgezogene Termine zeigt die
+ * Vorschau hoechstens, und so viele nimmt eine Bestaetigung hoechstens an.
+ * EINE Zahl fuer beide Seiten - stand sie nur an der Bestaetigung, hakte die
+ * Vorschau ab 5001 Kandidaten alles vor, und die Standard-Bestaetigung scheiterte
+ * jedes Mal mit 400. Die uebrigen erscheinen nach dem Uebernehmen beim naechsten
+ * Oeffnen. Ein Objekt statt einer Konstante, damit ein Test die Grenze fuer
+ * DENSELBEN Aufrufpfad kleiner stellen kann, ohne 5001 Termine anzulegen.
+ */
+export const movedCandidatesLimit = { max: 5000 };
+
+/**
+ * Wie viele umgezogene Termine es JETZT gibt, unabhaengig von der Grenze.
+ * @param {object} d better-sqlite3 Datenbank-Handle
+ * @returns {number}
+ */
+export function countMovedCandidates(d) {
+  return d.prepare(`SELECT COUNT(*) AS n ${MOVED_DEFAULT_EVENTS}`).get().n;
+}
+
+/**
  * Die vor #1306 umgezogenen Termine (#1307), wie sie JETZT sind - fuer die
  * Vorschau, in der der Admin jeden einzeln abhakt. Kein Teil der pauschalen
  * Menge aus listBackfillCandidates(): umgestellt wird nur, was die Bestaetigung
  * einzeln nennt (siehe MOVED_DEFAULT_EVENTS, "WARUM EINZELN").
  *
  * @param {object} d better-sqlite3 Datenbank-Handle
+ * @param {{ limit?: number }} [options] hoechstens so viele, aelteste zuerst
  * @returns {{ eventId: number, userId: number, fromUserId: number, title: string,
  *   startDatetime: string, allDay: number, calendarName: string, fromName: string,
- *   toName: string }[]} nach Beginn sortiert
+ *   toName: string }[]} nach Beginn sortiert, bei gleichem Beginn nach ID
  */
-export function listMovedCandidates(d) {
-  return d.prepare(`
+export function listMovedCandidates(d, { limit } = {}) {
+  const rows = d.prepare(`
     SELECT e.id AS eventId, ec.default_assignee_user_id AS userId, cur.user_id AS fromUserId,
            e.title AS title, e.start_datetime AS startDatetime, e.all_day AS allDay,
            ec.name AS calendarName, u.display_name AS toName,
            (SELECT fu.display_name FROM users fu WHERE fu.id = cur.user_id) AS fromName
     ${MOVED_DEFAULT_EVENTS}
     ORDER BY e.start_datetime, e.id
-  `).all();
+    ${limit == null ? '' : 'LIMIT @limit'}
+  `);
+  return limit == null ? rows.all() : rows.all({ limit });
 }
 
 /**

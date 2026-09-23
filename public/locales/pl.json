@@ -2584,6 +2584,7 @@
             "backfillFillCount_one": "{{count}} termin bez przypisania",
             "backfillMovedTitle": "Terminy z domyślnym przypisaniem innego kalendarza",
             "backfillMovedHint": "Te terminy wciąż mają domyślne przypisanie innego kalendarza tego samego konta. Może to być przeniesiony termin albo kalendarz, którego domyślne przypisanie zmieniono później. Zmieniają się tylko zaznaczone terminy, pozostałe zostają bez zmian.",
+            "backfillMovedPartial": "Wyświetlono pierwsze {{shown}} z {{total}}. Po zastosowaniu pozostałe pojawią się przy następnym otwarciu.",
             "backfillMovedAll": "Zaznacz wszystkie",
             "backfillMovedChange": "Z {{from}} na {{to}}"
         },

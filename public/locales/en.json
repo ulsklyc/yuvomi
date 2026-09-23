@@ -2595,6 +2595,7 @@
             "backfillFillCount_one": "{{count}} unassigned appointment",
             "backfillMovedTitle": "Appointments with another calendar's default assignee",
             "backfillMovedHint": "These appointments still carry the default assignee of another calendar of the same account. That can be an appointment that was moved, or a calendar whose default assignee was changed later. Only the selected appointments change; the others stay as they are.",
+            "backfillMovedPartial": "Showing the first {{shown}} of {{total}}. After you apply them, the rest appear the next time you open this.",
             "backfillMovedAll": "Select all",
             "backfillMovedChange": "From {{from}} to {{to}}"
         },

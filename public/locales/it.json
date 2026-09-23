@@ -2572,6 +2572,7 @@
             "backfillFillCount_one": "{{count}} appuntamento senza assegnazione",
             "backfillMovedTitle": "Appuntamenti con l’assegnazione predefinita di un altro calendario",
             "backfillMovedHint": "Questi appuntamenti portano ancora l’assegnazione predefinita di un altro calendario dello stesso account. Può trattarsi di un appuntamento spostato o di un calendario la cui assegnazione predefinita è stata cambiata in seguito. Cambiano solo gli appuntamenti selezionati, gli altri restano come sono.",
+            "backfillMovedPartial": "Vengono mostrati i primi {{shown}} di {{total}}. Dopo averli applicati, gli altri compaiono alla prossima apertura.",
             "backfillMovedAll": "Seleziona tutti",
             "backfillMovedChange": "Da {{from}} a {{to}}"
         },

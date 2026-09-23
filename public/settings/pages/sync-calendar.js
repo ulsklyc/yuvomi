@@ -140,12 +140,14 @@ function bindDefaultAssigneeBackfill(container) {
     let count = 0;
     let token = null;
     let moved = [];
+    let movedTotal = 0;
     try {
       await withBusy(btn, async () => {
         const res = await api.get(endpoint);
         count = res.data?.count ?? 0;
         token = res.data?.token ?? null;
         moved = Array.isArray(res.data?.moved) ? res.data.moved : [];
+        movedTotal = Number.isInteger(res.data?.moved_total) ? res.data.moved_total : moved.length;
       });
     } catch (err) {
       if (isModalContextCurrent(context)) showToast(err.message || t('common.errorGeneric'), 'danger');
@@ -166,7 +168,7 @@ function bindDefaultAssigneeBackfill(container) {
       });
       if (!confirmed) return;
     } else {
-      const picked = await pickMovedCandidates(count, moved);
+      const picked = await pickMovedCandidates(count, moved, movedTotal);
       if (!picked) return;
       moves = picked;
     }
@@ -202,10 +204,13 @@ function movedCandidateMeta(entry) {
  *
  * @param {number} count Termine ohne Zuweisung (werden pauschal gefüllt)
  * @param {object[]} moved die Vorschau-Einträge vom Server
+ * @param {number} movedTotal wie viele es insgesamt gibt: der Server liefert
+ *   höchstens so viele, wie eine Bestätigung annimmt; die übrigen kommen beim
+ *   nächsten Öffnen
  * @returns {Promise<{event_id: number, from_user_id: number, to_user_id: number}[] | null>}
  *   die abgehakten Umzüge, oder null bei Abbruch
  */
-function pickMovedCandidates(count, moved) {
+function pickMovedCandidates(count, moved, movedTotal = moved.length) {
   return new Promise((resolve) => {
     let resolved = false;
     const finish = (value) => {
@@ -239,6 +244,8 @@ function pickMovedCandidates(count, moved) {
           <fieldset class="backfill-review__part backfill-moved" aria-describedby="backfill-moved-hint">
             <legend class="backfill-review__heading">${esc(t('settings.sync.backfillMovedTitle'))}</legend>
             <p class="modal-confirm__detail" id="backfill-moved-hint">${esc(t('settings.sync.backfillMovedHint'))}</p>
+            ${movedTotal > moved.length ? `
+              <p class="modal-confirm__detail backfill-moved__partial">${esc(t('settings.sync.backfillMovedPartial', { shown: moved.length, total: movedTotal }))}</p>` : ''}
             ${moved.length > 1 ? `
               <label class="form-check backfill-moved__all">
                 <input type="checkbox" id="backfill-moved-all" checked>

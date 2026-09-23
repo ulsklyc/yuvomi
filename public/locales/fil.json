@@ -2607,6 +2607,7 @@
             "backfillFillCount_one": "{{count}} appointment na walang naaatasan",
             "backfillMovedTitle": "Mga appointment na may default na naaatasan ng ibang kalendaryo",
             "backfillMovedHint": "Dala pa rin ng mga appointment na ito ang default na naaatasan ng ibang kalendaryo sa parehong account. Maaaring ito ay appointment na inilipat, o kalendaryong binago kalaunan ang default na naaatasan. Ang mga napiling appointment lamang ang babaguhin; mananatili ang iba.",
+            "backfillMovedPartial": "Ipinapakita ang unang {{shown}} sa {{total}}. Pagkatapos ilapat, lalabas ang iba sa susunod na pagbukas mo nito.",
             "backfillMovedAll": "Piliin lahat",
             "backfillMovedChange": "Mula kay {{from}} papunta kay {{to}}"
         },

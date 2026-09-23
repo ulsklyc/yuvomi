@@ -857,6 +857,45 @@ test('default-assignee-backfill - stellt nur die abgehakten Termine um (#1307)',
   }
 });
 
+test('default-assignee-backfill - Vorschau und Bestaetigung haben dieselbe Obergrenze (#1307)', async () => {
+  const route = '/external-calendars/default-assignee-backfill';
+  const { movedCandidatesLimit } = await import('../server/services/sync-assignment.js');
+  assert.equal(movedCandidatesLimit?.max, 5000, 'die Grenze der Vorschau ist die der Bestaetigung');
+  const { ids, cleanup } = seedMovedFixture();
+  const saved = movedCandidatesLimit.max;
+  const fixture = new Set(Object.values(ids));
+  try {
+    // Die Route liest die Grenze bei jedem Aufruf aus demselben Objekt; der Test
+    // setzt sie klein, statt 5001 Termine anzulegen.
+    movedCandidatesLimit.max = 3;
+    const counted = (await call('GET', route)).body.data;
+    const total = counted.moved_total;
+    assert.ok(total >= 5, `alle fuenf umgezogenen Termine zaehlen mit (${total})`);
+    assert.equal(counted.moved.length, 3, 'die Vorschau liefert hoechstens die Grenze');
+    const order = counted.moved.map((m) => `${m.start_datetime}#${String(m.event_id).padStart(9, '0')}`);
+    assert.deepEqual(order, [...order].sort(), 'stabil sortiert, aelteste zuerst');
+
+    // Die Standard-Bestaetigung - alles vorausgewaehlt - geht durch.
+    const moves = counted.moved.map(pick);
+    const applied = await call('POST', route, { body: { expected_count: counted.count, expected_token: counted.token, moves } });
+    assert.equal(applied.status, 200, JSON.stringify(applied.body));
+
+    const again = (await call('GET', route)).body.data;
+    assert.equal(again.moved_total, total - 3, 'die uebrigen erscheinen beim naechsten Oeffnen');
+    assert.ok(again.moved.every((m) => !moves.some((x) => x.event_id === m.event_id)));
+    assert.ok(again.moved.some((m) => fixture.has(m.event_id)));
+
+    // Mehr als die Grenze bleibt ein 400 - mit einer Meldung, die sie nennt.
+    const tooMany = [1, 2, 3, 4].map((n) => ({ event_id: 900000 + n, from_user_id: MARIA.id, to_user_id: TOM.id }));
+    const refused = await call('POST', route, { body: { expected_count: again.count, expected_token: again.token, moves: tooMany } });
+    assert.equal(refused.status, 400);
+    assert.match(refused.body.error, /\b3\b/, 'die Meldung nennt die Grenze');
+  } finally {
+    movedCandidatesLimit.max = saved;
+    cleanup();
+  }
+});
+
 test('default-assignee-backfill - die Bestaetigung bindet jeden abgehakten Termin (#1307, #1171)', async () => {
   const route = '/external-calendars/default-assignee-backfill';
   const { ids, cleanup } = seedMovedFixture();
