@@ -128,11 +128,14 @@ export const TODAY_SHEET_SOURCES = [
     // Wartende Freigaben - entscheiden duerfen nur Admins (PATCH
     // /rewards/redemptions/:id), also spricht die Zeile nur zu ihnen. Ein Kind
     // sieht seine eigene Anfrage auf der Belohnungsseite, nicht als Auftrag.
+    // Wer freigibt, sagt die ANTWORT (`rewards.view`, dieselbe Pruefung wie
+    // das Modul): in der Sicht `self` zaehlt `pending` die eigenen Bitten des
+    // Kindes, und die waeren hier als „Freigabe" gelesen worden.
     id: 'approvals',
     module: 'rewards',
     widget: 'rewards',
-    allowed: (ctx) => ctx.isAdmin,
     collect(data) {
+      if (data?.rewards?.view !== 'approver') return [];
       const pending = Number(data?.rewards?.pending) || 0;
       if (!pending) return [];
       return [{
@@ -364,6 +367,20 @@ export function collectSourceRows(data, ctx, sources = TODAY_SHEET_SOURCES) {
     if (source.settled?.(data, ctx)) settled = true;
   }
   return { rows, settled };
+}
+
+/**
+ * Welche Quellen tragen fuer diesen Betrachter gerade eine Zeile ins Blatt?
+ * Die Kennzahlreihe fragt das, damit eine Zahl, die das Blatt schon nennt
+ * (offene Freigaben), nicht noch einmal als Kachel daneben steht - die
+ * Kein-Echo-Regel in die andere Richtung.
+ */
+export function speakingSourceIds(data, ctx, sources = TODAY_SHEET_SOURCES) {
+  const ids = new Set();
+  for (const source of sources) {
+    if (sourceSpeaks(source, ctx) && source.collect(data, ctx).length) ids.add(source.id);
+  }
+  return ids;
 }
 
 const bySortKey = (a, b) => (a.sortKey < b.sortKey ? -1 : a.sortKey > b.sortKey ? 1 : 0);

@@ -744,16 +744,71 @@ test('Heute-Blatt: eine offene Dosis steht im Blatt und haelt die Coda auf', () 
 }));
 
 test('Heute-Blatt: die wartende Freigabe spricht nur zu Admins', async () => {
-  const data = { upcomingEvents: [eveningEvent()], rewards: { standings: [], participantCount: 0, pending: 2 } };
+  const data = { upcomingEvents: [eveningEvent()], rewards: { view: 'approver', standings: [], participantCount: 0, pending: 2 } };
   await withSheetEnv({ perms: { admin: true } }, (__test) => {
     const model = __test.buildTodayCockpitModel(data, [], { now: todayAt(9) });
     nodeAssert.ok(sheetKinds(model).includes('approval'), 'der Admin sieht die Freigabe');
     nodeAssert.equal(model.coda, null, 'und keine Entwarnung daneben');
   });
+  // Das Kind bekommt vom Server die Sicht `self`; `pending` zaehlt dort seine
+  // eigenen Bitten (siehe den Test "(a2 x a8)" darunter).
+  const kid = { ...data, rewards: { view: 'self', me: 7, standings: [], participantCount: 0, pending: 1 } };
   await withSheetEnv({ perms: { admin: false } }, (__test) => {
-    const model = __test.buildTodayCockpitModel(data, [], { now: todayAt(9) });
+    const model = __test.buildTodayCockpitModel(kid, [], { now: todayAt(9) });
     nodeAssert.ok(!sheetKinds(model).includes('approval'), 'ein Kind entscheidet keine Freigaben');
     nodeAssert.match(String(model.coda), /todayNothingElse/, 'fuer das Kind ist der Tag ohne sie vollstaendig');
+  });
+});
+
+/* DIE SICHT KOMMT VOM SERVER (Integration 2026-09-23, a2 x a8). Seit der
+ * Belohnungs-Umbau liefert /dashboard `rewards.pending` je Sicht: `approver`
+ * zaehlt alle offenen Anfragen, `self` nur die EIGENEN des Kindes. Die
+ * Blatt-Quelle fragte nur das Client-Recht `isAdmin` - wer die Anfrage-Zahl
+ * eines Kindes mit gesetztem Admin-Flag (veralteter Rechte-Stand, anderes
+ * Konto im selben Speicher) bekam, las die eigene Bitte als "Freigabe". Die
+ * Antwort traegt die Entscheidung schon; das Blatt folgt ihr. */
+test('Heute-Blatt: Freigaben sprechen nur in der Sicht "approver" (a2 x a8)', async () => {
+  const self = { upcomingEvents: [eveningEvent()], rewards: { view: 'self', me: 7, standings: [], pending: 1 } };
+  await withSheetEnv({ perms: { admin: true } }, (__test) => {
+    const model = __test.buildTodayCockpitModel(self, [], { now: todayAt(9) });
+    nodeAssert.ok(!sheetKinds(model).includes('approval'),
+      `die eigene Anfrage eines Kindes ist keine Freigabe, erhalten: ${sheetKinds(model)}`);
+  });
+  const family = { upcomingEvents: [eveningEvent()], rewards: { view: 'family', standings: [], pending: 0 } };
+  await withSheetEnv({ perms: { admin: true } }, (__test) => {
+    const model = __test.buildTodayCockpitModel(family, [], { now: todayAt(9) });
+    nodeAssert.ok(!sheetKinds(model).includes('approval'), 'die Familien-Sicht kennt keine Freigaben');
+  });
+});
+
+/* DIE ZAHL OFFENER FREIGABEN STEHT GENAU EINMAL: Belohnungen-Widget vor
+ * Heute-Blatt vor Eltern-Kennzahlkachel. Widget sichtbar -> Blatt und Kachel
+ * schweigen (Kein-Echo, `shown`); Widget aus, Blatt da -> nur das Blatt; Blatt
+ * ausgeblendet -> die Kachel. Geprueft am AUFRUFER (`renderDashboardLayout`),
+ * weil die Kachel nur dort erfaehrt, ob das Blatt die Zahl schon traegt. */
+test('Freigaben: die Zahl steht an genau einer Stelle - Widget > Heute-Blatt > Kennzahlkachel', async () => {
+  const data = {
+    upcomingEvents: [eveningEvent()],
+    // Budget und Geburtstag halten die Reihe bei mindestens zwei Kacheln.
+    budget: { entryCount: 3, balance: 100, income: 200 },
+    birthdays: [{ name: 'Oma', days_until: 5, kind: 'birthday' }],
+    rewards: { view: 'approver', me: 1, standings: [], participantCount: 2, pending: 2, catalog: [] },
+  };
+  const metricsOnly = [{ id: 'metrics', visible: true, size: '2x1' }];
+  const pendingTile = (html) => /metric-card[^]*?rewardsPending/.test(html);
+  await withSheetEnv({ perms: { admin: true } }, (__test) => {
+    const sheet = __test.buildTodayCockpitModel(data, metricsOnly, { now: todayAt(9) });
+    nodeAssert.ok(sheetKinds(sheet).includes('approval'), 'ohne Belohnungen-Widget traegt das Blatt die Freigabe');
+    const withSheet = __test.renderDashboardLayout(metricsOnly, data, null, 'EUR', { glanceHidden: false });
+    nodeAssert.ok(!pendingTile(withSheet), 'neben dem Blatt nennt die Kennzahlkachel die Freigaben nicht noch einmal');
+    const withoutSheet = __test.renderDashboardLayout(metricsOnly, data, null, 'EUR', { glanceHidden: true });
+    nodeAssert.ok(pendingTile(withoutSheet), 'ist das Blatt ausgeblendet, traegt die Kachel die Zahl');
+    const withWidget = [...metricsOnly, { id: 'rewards', visible: true, size: '1x2' }];
+    const sheetBesideWidget = __test.buildTodayCockpitModel(data, withWidget, { now: todayAt(9) });
+    nodeAssert.ok(!sheetKinds(sheetBesideWidget).includes('approval'), 'neben dem Widget schweigt das Blatt');
+    const layout = __test.renderDashboardLayout(withWidget, data, null, 'EUR', { glanceHidden: false });
+    nodeAssert.ok(!pendingTile(layout.replace(/<div class="widget widget--rewards[^]*$/, '')),
+      'neben dem Widget schweigt die Kachel');
   });
 });
 
@@ -827,7 +882,7 @@ test('Heute-Blatt: Kein-Echo gilt auch fuer die neuen Quellen', () => withSheetE
   const today = toLocalDateKey(new Date());
   const data = {
     health: openDoses(),
-    rewards: { pending: 1 },
+    rewards: { view: 'approver', pending: 1 },
     wastePickups: [{ date_key: today, type_name: 'Restmuell' }],
     myShiftsToday: [{ shift_type: { id: 3, name: 'Fruehdienst', start_time: '06:00', end_time: '14:00' } }],
     housekeeping: { present: true, presentSince: `${today}T08:30:00`, workerName: 'Maria' },

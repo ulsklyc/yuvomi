@@ -7,7 +7,7 @@
 import { api, auth } from '/api.js';
 import { createPageController } from '/utils/page-lifecycle.js';
 import { canSeeWidget, moduleAccess, navModuleAccess, canUseFasting } from '/permissions.js';
-import { todaySheetContext, collectSourceRows, composeTodaySheet, codaAllowed } from '/utils/today-sheet.js';
+import { todaySheetContext, collectSourceRows, composeTodaySheet, codaAllowed, speakingSourceIds } from '/utils/today-sheet.js';
 import { t, formatDate, formatDayMonth, formatTime, timeSuffix, getLocale, getNumberFormat } from '/i18n.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { resolveEventColor } from '/utils/event-color.js';
@@ -2067,7 +2067,7 @@ function renderBudgetWidget(budget, currency, size = '1x1') {
 const METRIC_TILE_ORDER = ['tasks', 'shopping', 'budget', 'split-expenses', 'birthdays', 'meals', 'notes', 'rewards', 'health', 'housekeeping'];
 const METRIC_TILE_COUNT = 4;
 
-function metricTileFor(id, data, currency) {
+function metricTileFor(id, data, currency, sheetSpeaks = new Set()) {
   const route = { tasks: '/tasks', shopping: '/shopping', budget: '/budget', birthdays: '/birthdays', meals: '/meals', notes: '/notes', rewards: '/rewards', health: '/health', housekeeping: '/housekeeping' }[id];
   switch (id) {
     case 'tasks': {
@@ -2161,8 +2161,11 @@ function metricTileFor(id, data, currency) {
           note: rewardGoalLabel(own.balance, r.catalog),
         };
       }
+      // Die Zahl offener Freigaben steht an GENAU EINER Stelle: im
+      // Belohnungen-Widget (dann filtert `shown` diese Kachel weg), sonst im
+      // Heute-Blatt, und nur wenn keines von beiden sie traegt, hier.
       const pending = r.view === 'approver' ? Number(r.pending) || 0 : 0;
-      if (!pending) return null;
+      if (!pending || sheetSpeaks.has('approvals')) return null;
       return {
         id, route, icon: widgetIcon('rewards'), label: t('nav.rewards'),
         value: t('dashboard.rewardsPending', { count: pending }),
@@ -2336,12 +2339,12 @@ function renderMetricTile(tile) {
  * dessen Kachel - und wer es wieder einblendet, verliert sie. Die Reihe folgt
  * dem Layout, statt eine eigene Vorstellung davon zu pflegen.
  */
-function selectMetricTiles(data, currency, shown = new Set()) {
+function selectMetricTiles(data, currency, shown = new Set(), sheetSpeaks = new Set()) {
   const tiles = METRIC_TILE_ORDER
     .filter((id) => isWidgetModuleEnabled(id))
     .filter((id) => !COCKPIT_COVERED_WIDGETS.has(id))
     .filter((id) => !shown.has(id))
-    .map((id) => metricTileFor(id, data, currency))
+    .map((id) => metricTileFor(id, data, currency, sheetSpeaks))
     .filter(Boolean)
     .slice(0, METRIC_TILE_COUNT);
 
@@ -2353,8 +2356,8 @@ function selectMetricTiles(data, currency, shown = new Set()) {
 /* Die AUSWAHL steht getrennt von der DARSTELLUNG, damit die Zusage pruefbar ist,
  * ohne ein Dokument zu bauen: was die Reihe zeigt, ist die Aussage - dass sie es
  * in einem <a> zeigt, ist ihre Form. */
-function renderMetricTiles(data, currency, shown = new Set()) {
-  const tiles = selectMetricTiles(data, currency, shown);
+function renderMetricTiles(data, currency, shown = new Set(), sheetSpeaks = new Set()) {
+  const tiles = selectMetricTiles(data, currency, shown, sheetSpeaks);
   if (!tiles.length) return '';
   // Die Reihe war das einzige Widget ohne Ueberschrift: per H-Taste sprang man
   // an ihr vorbei, und ihre vier Zahlen hingen unter der vorigen Kachel. Die
@@ -3246,6 +3249,24 @@ const PROGRAM_ROW_CAP = 6;
  * @returns {{rows: object[], overflow: number, state: object|null,
  *            shopping: object|null, coda: string|null}}
  */
+/** Der Blatt-Kontext - Cockpit, Wand und Kennzahlreihe fragen denselben. */
+function todaySheetContextFor(cfg, now, existing = []) {
+  const todayKey = zonedDateKey(now);
+  return todaySheetContext({
+    todayKey,
+    tomorrowKey: addLocalDays(todayKey, 1),
+    nowTime: zonedTimeKey(now),
+    cfg,
+    isModuleDisabled: (module) => Boolean(window.yuvomi?.isModuleDisabled(module)),
+    existing,
+  });
+}
+
+/** Die Quellen, die im Heute-Blatt gerade eine Zeile tragen (siehe speakingSourceIds). */
+function todaySheetSpeaks(data, cfg, now = new Date()) {
+  return speakingSourceIds(data, todaySheetContextFor(cfg, now));
+}
+
 function buildTodayCockpitModel(data, cfg = [], { cap = PROGRAM_ROW_CAP, now = new Date() } = {}) {
   // Kein Echo: ist das Modul-Widget einer Domäne sichtbar, entfallen ihre
   // Programm-Zeilen — jede Domäne hat genau eine Repräsentation (Cockpit ODER
@@ -3265,15 +3286,7 @@ function buildTodayCockpitModel(data, cfg = [], { cap = PROGRAM_ROW_CAP, now = n
   // in utils/today-sheet.js - mit denselben drei Riegeln wie oben
   // (Modulschalter, Recht, Kein-Echo) und derselben Zeilenform. Cockpit und
   // Wand fragen beide hier; die Wand reicht nur keine Kachel-Konfiguration mit.
-  const todayKey = zonedDateKey(now);
-  const sheetContext = todaySheetContext({
-    todayKey,
-    tomorrowKey: addLocalDays(todayKey, 1),
-    nowTime: zonedTimeKey(now),
-    cfg,
-    isModuleDisabled: (module) => Boolean(window.yuvomi?.isModuleDisabled(module)),
-    existing: program.rows,
-  });
+  const sheetContext = todaySheetContextFor(cfg, now, program.rows);
   const contributed = collectSourceRows(data, sheetContext);
   const sheet = composeTodaySheet([...program.rows, ...contributed.rows], { cap });
   const visibleRows = sheet.rows;
@@ -3386,7 +3399,7 @@ function buildTodayCockpitModel(data, cfg = [], { cap = PROGRAM_ROW_CAP, now = n
   // Widerspruch zur Zeile darueber.
   let coda = null;
   if (codaAllowed(sheet)) {
-    const tomorrowKey = addLocalDays(todayKey, 1);
+    const tomorrowKey = sheetContext.tomorrowKey;
     const tomorrowTask = includeTasks && program.nextDueTask?.due_date === tomorrowKey ? program.nextDueTask : null;
     coda = tomorrowTask
       ? t('dashboard.todayNothingElseTomorrow', { title: tomorrowTask.title })
@@ -3999,9 +4012,12 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
     // DERSELBEN Bedingung, nach der die Kacheln gleich gefiltert werden, damit
     // die beiden nicht auseinanderlaufen; `metrics` selbst ist ausgenommen, es
     // waere sonst sein eigener Grund zu schweigen.
+    // Dazu, welche Zahl das Heute-Blatt schon nennt (offene Freigaben): die
+    // Kein-Echo-Regel gilt auch zwischen Blatt und Kachel. Ein ausgeblendetes
+    // Blatt nennt nichts.
     metrics: () => renderMetricTiles(data, currency, new Set(
       cfg.filter((w) => w.visible && w.id !== 'metrics' && isWidgetModuleEnabled(w.id)).map((w) => w.id),
-    )),
+    ), glanceHidden ? new Set() : todaySheetSpeaks(data, cfg)),
   };
 
   const tiles = cfg
