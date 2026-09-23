@@ -3684,7 +3684,8 @@
             "recurring_paused": "Повторювану витрату призупинено",
             "recurring_resumed": "Повторювану витрату відновлено",
             "recurring_generated": "Повторювану витрату згенеровано",
-            "payment_reversed": "Платіж сторновано"
+            "payment_reversed": "Платіж сторновано",
+            "ledger_restored": "Проведення відновлено"
         },
         "splitPercentage": "Відсоток",
         "splitExact": "Точна сума",

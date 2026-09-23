@@ -3684,7 +3684,8 @@
             "recurring_paused": "반복 지출 일시중지됨",
             "recurring_resumed": "반복 지출 재개됨",
             "recurring_generated": "반복 지출 생성됨",
-            "payment_reversed": "결제 취소됨"
+            "payment_reversed": "결제 취소됨",
+            "ledger_restored": "기록 복원됨"
         },
         "splitPercentage": "퍼센트",
         "splitExact": "정확한 금액",

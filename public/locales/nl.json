@@ -3684,7 +3684,8 @@
             "recurring_paused": "Terugkerende uitgave gepauzeerd",
             "recurring_resumed": "Terugkerende uitgave hervat",
             "recurring_generated": "Terugkerende uitgave gegenereerd",
-            "payment_reversed": "Betaling tegengeboekt"
+            "payment_reversed": "Betaling tegengeboekt",
+            "ledger_restored": "Boeking hersteld"
         },
         "splitPercentage": "Percentage",
         "splitExact": "Exact bedrag",

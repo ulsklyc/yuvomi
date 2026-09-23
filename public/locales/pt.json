@@ -3684,7 +3684,8 @@
             "recurring_paused": "Despesa recorrente pausada",
             "recurring_resumed": "Despesa recorrente retomada",
             "recurring_generated": "Despesa recorrente gerada",
-            "payment_reversed": "Pagamento estornado"
+            "payment_reversed": "Pagamento estornado",
+            "ledger_restored": "Lançamento restaurado"
         },
         "splitPercentage": "Porcentagem",
         "splitExact": "Valor exato",

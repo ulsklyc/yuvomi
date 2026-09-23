@@ -3684,7 +3684,8 @@
             "recurring_paused": "定期費用を一時停止",
             "recurring_resumed": "定期費用を再開",
             "recurring_generated": "定期費用を生成",
-            "payment_reversed": "支払いを取り消し"
+            "payment_reversed": "支払いを取り消し",
+            "ledger_restored": "記帳を復元"
         },
         "splitPercentage": "割合",
         "splitExact": "正確な金額",

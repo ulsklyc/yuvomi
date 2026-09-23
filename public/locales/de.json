@@ -3684,7 +3684,8 @@
             "recurring_paused": "Wiederkehrende Ausgabe pausiert",
             "recurring_resumed": "Wiederkehrende Ausgabe fortgesetzt",
             "recurring_generated": "Wiederkehrende Ausgabe erzeugt",
-            "payment_reversed": "Zahlung storniert"
+            "payment_reversed": "Zahlung storniert",
+            "ledger_restored": "Buchung wiederhergestellt"
         },
         "splitPercentage": "Prozent",
         "splitExact": "Exakter Betrag",

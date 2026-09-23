@@ -3684,7 +3684,8 @@
             "recurring_paused": "Återkommande utgift pausad",
             "recurring_resumed": "Återkommande utgift återupptagen",
             "recurring_generated": "Återkommande utgift skapades",
-            "payment_reversed": "Betalning återförd"
+            "payment_reversed": "Betalning återförd",
+            "ledger_restored": "Bokföring återställd"
         },
         "splitPercentage": "Procent",
         "splitExact": "Exakt belopp",

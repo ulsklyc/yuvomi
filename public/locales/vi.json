@@ -3684,7 +3684,8 @@
             "recurring_paused": "Chi phí định kỳ bị tạm dừng",
             "recurring_resumed": "Chi phí định kỳ được tiếp tục",
             "recurring_generated": "Chi phí định kỳ được phát sinh",
-            "payment_reversed": "Đã hoàn tác thanh toán"
+            "payment_reversed": "Đã hoàn tác thanh toán",
+            "ledger_restored": "Đã khôi phục bút toán"
         },
         "splitPercentage": "Tỷ lệ phần trăm",
         "splitExact": "Số tiền chính xác",

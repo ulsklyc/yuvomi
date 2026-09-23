@@ -3684,7 +3684,8 @@
             "recurring_paused": "Ismétlődő költség szüneteltetve",
             "recurring_resumed": "Ismétlődő költség folytatva",
             "recurring_generated": "Ismétlődő költség generálva",
-            "payment_reversed": "Fizetés sztornózva"
+            "payment_reversed": "Fizetés sztornózva",
+            "ledger_restored": "Könyvelés visszaállítva"
         },
         "splitPercentage": "Százalék",
         "splitExact": "Pontos összeg",

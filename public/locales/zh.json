@@ -3684,7 +3684,8 @@
             "recurring_paused": "定期支出已暂停",
             "recurring_resumed": "定期支出已恢复",
             "recurring_generated": "定期支出已生成",
-            "payment_reversed": "付款已冲销"
+            "payment_reversed": "付款已冲销",
+            "ledger_restored": "记账已恢复"
         },
         "splitPercentage": "百分比",
         "splitExact": "固定金额",

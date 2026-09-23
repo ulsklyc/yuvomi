@@ -3684,7 +3684,8 @@
             "recurring_paused": "Dépense récurrente suspendue",
             "recurring_resumed": "Dépense récurrente reprise",
             "recurring_generated": "Dépense récurrente générée",
-            "payment_reversed": "Paiement annulé"
+            "payment_reversed": "Paiement annulé",
+            "ledger_restored": "Écriture rétablie"
         },
         "splitPercentage": "Pourcentage",
         "splitExact": "Montant exact",

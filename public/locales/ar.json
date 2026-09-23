@@ -3684,7 +3684,8 @@
             "recurring_paused": "تم إيقاف المصروف المتكرر مؤقتًا",
             "recurring_resumed": "تم استئناف المصروف المتكرر",
             "recurring_generated": "تم توليد مصروف متكرر",
-            "payment_reversed": "تم عكس الدفع"
+            "payment_reversed": "تم عكس الدفع",
+            "ledger_restored": "تمت استعادة القيد"
         },
         "splitPercentage": "نسبة مئوية",
         "splitExact": "مبلغ محدد",

@@ -3684,7 +3684,8 @@
             "recurring_paused": "Pengeluaran berulang dijeda",
             "recurring_resumed": "Pengeluaran berulang dilanjutkan",
             "recurring_generated": "Pengeluaran berulang dihasilkan",
-            "payment_reversed": "Pembayaran dibatalkan"
+            "payment_reversed": "Pembayaran dibatalkan",
+            "ledger_restored": "Pembukuan dipulihkan"
         },
         "splitPercentage": "Persen",
         "splitExact": "Jumlah pasti",
