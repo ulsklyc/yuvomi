@@ -178,21 +178,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   import wrote the calendar's colour into each appointment as if it had been chosen for it. For an
   appointment that had been edited in Yuvomi before v2.50.0, that copy was kept as a deliberate
   choice, so it went on beating the colour of the assigned person, and after a move to another
-  calendar it even showed the colour of the old one. The CalDAV sync now removes such a colour once
-  per account: only on appointments that were imported before v2.49.0 reached this installation,
-  when the appointment itself carries no colour on the server and the stored one is exactly the
-  colour of a calendar of the same account, including one that has since been deleted on the server.
-  The appointment then shows the colour of its person or its calendar again. The repair waits until
-  a sync has seen every such appointment of the account, so one in a deselected calendar is still
-  repaired once the calendar is selected again. For appointments of a calendar that is missing on
-  the server or that the server returns completely empty, it stops waiting after three syncs in a
-  row, scheduled or started by hand, since an empty answer is usually a passing error, but a deleted
-  calendar never comes back. Appointments that Yuvomi uploaded itself are repaired only if their
-  colour is exactly that of the calendar they were uploaded to, and only if they were edited in
-  Yuvomi before v2.50.0; an uploaded appointment that was never edited keeps its colour. A colour
-  picked in Yuvomi that is not one of that account's calendar colours stays, and so does any colour
-  the server sets on the appointment itself. After that, syncs leave colours alone, and so does an
-  account added later, unless it takes over old appointments of a deleted account. (#1270)
+  calendar it even showed the colour of the old one. For 30 days after its first sync following this
+  update, each CalDAV account now removes such a colour when it meets the appointment: only on
+  appointments imported before v2.49.0 reached this installation and edited before v2.50.0, when the
+  appointment carries no colour of its own on the server and the stored one is exactly the colour of
+  a calendar of that account, including one deleted on the server since. The appointment then shows
+  the colour of its person or its calendar again. Appointments that Yuvomi uploaded itself count
+  only with the colour of the calendar they were uploaded to. A colour picked in Yuvomi that is not
+  one of that account's calendar colours stays, and so does any colour the server sets on the
+  appointment itself. An account added later does not do this, unless it takes over old appointments
+  of a deleted account. (#1270)
 
 - **Screen readers and keyboards get a few rough edges less.** Toasts no longer interrupt what a
   screen reader is reading or get announced twice: only errors and warnings interrupt, everything

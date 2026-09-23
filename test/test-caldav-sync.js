@@ -22,7 +22,7 @@ describe('CalDAV Multi-Account Sync', () => {
 
     // Create tables (simplified schema for testing)
     db.exec(`
-      -- Merker der einmaligen Farb-Heilung (#1270) liegen hier.
+      -- Die Frist der Farb-Heilung (#1270) liegt hier.
       CREATE TABLE sync_config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE caldav_accounts (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -411,7 +411,7 @@ describe('CalDAV sync yields to the event loop (#519)', () => {
       CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, display_name TEXT);
       INSERT INTO users (display_name) VALUES ('Owner');
 
-      -- Merker der einmaligen Farb-Heilung (#1270) liegen hier.
+      -- Die Frist der Farb-Heilung (#1270) liegt hier.
       CREATE TABLE sync_config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE caldav_accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -569,7 +569,7 @@ describe('CalDAV: RECURRENCE-ID-Overrides killen die Serie nicht (#549)', () => 
     d.exec(`
       CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, display_name TEXT);
       INSERT INTO users (display_name) VALUES ('Owner');
-      -- Merker der einmaligen Farb-Heilung (#1270) liegen hier.
+      -- Die Frist der Farb-Heilung (#1270) liegt hier.
       CREATE TABLE sync_config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE caldav_accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -754,7 +754,7 @@ describe('CalDAV: No-op-Syncs bleiben im Standard-Log-Level still', () => {
       CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, display_name TEXT);
       INSERT INTO users (display_name) VALUES ('Owner');
 
-      -- Merker der einmaligen Farb-Heilung (#1270) liegen hier.
+      -- Die Frist der Farb-Heilung (#1270) liegt hier.
       CREATE TABLE sync_config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE caldav_accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -994,7 +994,7 @@ describe('CalDAV: eine Bearbeitung friert die Farbe nicht mehr ein (#899)', () =
       CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, display_name TEXT);
       INSERT INTO users (display_name) VALUES ('Owner');
 
-      -- Merker der einmaligen Farb-Heilung (#1270) liegen hier.
+      -- Die Frist der Farb-Heilung (#1270) liegt hier.
       CREATE TABLE sync_config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE caldav_accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1173,7 +1173,7 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
   const COLOR_B = '#E24A4A';
   const COLOR_C = '#8156C0';
   const UID = 'series-1@test';
-  const MARKER_1 = 'caldav_legacy_color_heal_done_1';
+  const HEAL_KEY_1 = 'caldav_legacy_color_heal_since_1';
 
   function buildDb() {
     const d = new DatabaseSync(':memory:');
@@ -1252,18 +1252,16 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
 
   // Die Serie liegt in `inCal`, alle anderen Kalender sind leer. So sieht der
   // Umzug von A nach B aus, den Kyrodan in einem anderen Client gemacht hat:
-  // gleiche UID, anderer Kalender. `failCal` laesst einen Abruf scheitern.
-  function clientWith({ inCal, color = null, override = false, failCal = null, calendars = [CAL_A, CAL_B, CAL_C] }) {
+  // gleiche UID, anderer Kalender.
+  function clientWith({ inCal, color = null, override = false, calendars = [CAL_A, CAL_B, CAL_C] }) {
     const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', ...vevent({ color })];
     if (override) lines.push(...vevent({ recurrenceId: '20260112T170000Z', start: '20260112T190000Z' }));
     lines.push('END:VCALENDAR');
     const ics = lines.join('\r\n');
     return async () => ({
       fetchCalendars: async () => calendars.map((url) => ({ url, displayName: url })),
-      fetchCalendarObjects: async ({ calendar }) => {
-        if (calendar.url === failCal) throw new Error('boom');
-        return calendar.url === inCal ? [{ url: `${inCal}series-1.ics`, data: ics }] : [];
-      },
+      fetchCalendarObjects: async ({ calendar }) =>
+        (calendar.url === inCal ? [{ url: `${inCal}series-1.ics`, data: ics }] : []),
       createCalendarObject: async () => ({}),
     });
   }
@@ -1273,12 +1271,15 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     FROM calendar_events e LEFT JOIN external_calendars ec ON ec.id = e.calendar_ref_id
     WHERE e.external_calendar_id = ?
   `).get(uid);
-  const marker = (d, key = MARKER_1) => d.prepare('SELECT value FROM sync_config WHERE key = ?').get(key)?.value ?? null;
+  // Stand der Farb-Heilung eines Kontos: null (Frist noch nicht begonnen),
+  // 'never' oder der Beginn der Frist.
+  const healState = (d, key = HEAL_KEY_1) => d.prepare('SELECT value FROM sync_config WHERE key = ?').get(key)?.value ?? null;
+  const ISO = /^\d{4}-\d{2}-\d{2}T/;
 
   // Der Stand einer Bestandsinstallation direkt nach dem Update: vor v2.49.0
   // schrieb der Import die Kalenderfarbe in die Eigenfarb-Spalte, Migration
   // 167 hat jede bearbeitete Zeile als "lokal umgefaerbt" uebernommen, und die
-  // einmalige Heilung ist noch nicht gelaufen (kein Merker).
+  // Frist der Heilung hat noch nicht begonnen.
   function legacyState(d, color, uid = UID) {
     d.prepare(`UPDATE calendar_events SET color = ?, user_modified = 1, color_modified = 1
                WHERE external_calendar_id = ?`).run(color, uid);
@@ -1308,7 +1309,7 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     assert.strictEqual(after.color, null, 'die Farbe von A ist geerbt, keine Eigenfarbe');
     assert.strictEqual(after.color_modified, 0, 'der Server fuehrt die Farbe wieder');
     assert.strictEqual(after.outbound_dirty, 0, 'die Heilung schickt nichts hinaus');
-    assert.strictEqual(marker(d), '1', 'der Lauf ist fuer dieses Konto erledigt');
+    assert.match(healState(d), ISO, 'der erste Lauf hat die Frist begonnen');
   }));
 
   it('auch ohne Umzug und unabhaengig von der Schreibweise', () => withDb(async (d) => {
@@ -1377,32 +1378,6 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     assert.strictEqual(row(d).color, COLOR_C, 'eine bewusst gewaehlte Farbe bleibt');
   }));
 
-  it('laeuft je Konto nur einmal: der zweite Lauf heilt nicht mehr', () => withDb(async (d) => {
-    await sync({ createClient: clientWith({ inCal: CAL_A }) });
-    legacyState(d, COLOR_A);
-    await sync({ createClient: clientWith({ inCal: CAL_A }) });
-    assert.strictEqual(row(d).color, null, 'Vorbedingung: der erste Lauf heilt');
-
-    // Danach setzt jemand in Yuvomi bewusst genau diese Farbe.
-    d.prepare('UPDATE calendar_events SET color = ?, color_modified = 1').run(COLOR_A);
-    await sync({ createClient: clientWith({ inCal: CAL_A }) });
-    assert.strictEqual(row(d).color, COLOR_A, 'nach dem Merker bleibt die Farbe stehen');
-  }));
-
-  it('setzt den Merker erst, wenn der Lauf alles gesehen hat', () => withDb(async (d) => {
-    await sync({ createClient: clientWith({ inCal: CAL_A }) });
-    legacyState(d, COLOR_A);
-
-    // B scheitert beim Abruf, der Termin liegt aber schon dort.
-    await sync({ createClient: clientWith({ inCal: CAL_B, failCal: CAL_B }) });
-    assert.strictEqual(marker(d), null, 'ein unvollstaendiger Lauf ist nicht erledigt');
-    assert.strictEqual(row(d).color, COLOR_A, 'Vorbedingung: der Termin wurde nicht gesehen');
-
-    await sync({ createClient: clientWith({ inCal: CAL_B }) });
-    assert.strictEqual(row(d).color, null, 'der naechste vollstaendige Lauf holt es nach');
-    assert.strictEqual(marker(d), '1');
-  }));
-
   it('zaehlt eine reine Heilung als Aenderung', () => withDb(async (d) => {
     await sync({ createClient: clientWith({ inCal: CAL_A }) });
     legacyState(d, COLOR_A);
@@ -1446,7 +1421,7 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     // dessen COLOR-Zeile der Server nicht aufbewahrt).
     d.exec('DELETE FROM caldav_calendar_selection; DELETE FROM caldav_accounts;');
     const { accountId } = await addAccount('Neu', 'https://dav.example/', 'u3', 'p', { createClient: accountClient([CAL_A]) });
-    assert.strictEqual(marker(d, `caldav_legacy_color_heal_done_${accountId}`), '1',
+    assert.strictEqual(healState(d, `caldav_legacy_color_heal_since_${accountId}`), 'never',
       'ohne Altzeilen gilt das Konto gleich als erledigt');
     d.prepare('UPDATE caldav_calendar_selection SET enabled = 1').run();
     d.prepare(`
@@ -1473,7 +1448,7 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     d.exec('DELETE FROM caldav_calendar_selection WHERE account_id = 1; DELETE FROM caldav_accounts WHERE id = 1;');
 
     const { accountId } = await addAccount('Wieder', 'https://dav.example/', 'u1', 'p', { createClient: accountClient([CAL_B]) });
-    assert.strictEqual(marker(d, `caldav_legacy_color_heal_done_${accountId}`), null,
+    assert.strictEqual(healState(d, `caldav_legacy_color_heal_since_${accountId}`), null,
       'mit Altzeilen ohne lebendes Konto steht die Heilung noch aus');
     d.prepare('UPDATE caldav_calendar_selection SET enabled = 1').run();
 
@@ -1481,20 +1456,20 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     const after = row(d);
     assert.strictEqual(after.cal, CAL_B, 'Vorbedingung: der Inbound hat die Zeile uebernommen');
     assert.strictEqual(after.color, null, 'die eingebrannte Farbe von A ist weg');
-    assert.strictEqual(marker(d, `caldav_legacy_color_heal_done_${accountId}`), '1');
+    assert.match(healState(d, `caldav_legacy_color_heal_since_${accountId}`), ISO);
   }));
 
   it('wieder angelegt, der alte Kalender lebt noch: die Altzeile heilt trotzdem', () => withDb(async (d) => {
     // Der schlichte Fall ohne Umzug. Er haelt die REIHENFOLGE in addAccount
     // fest: die Suche nach Altzeilen muss VOR dem Eintrag der neuen Auswahl
     // laufen - danach haengt die Zeile scheinbar an einem lebenden Konto (dem
-    // neuen), und der Merker schnitte ihr die Heilung ab.
+    // neuen), und die Heilung liefe dort nie.
     await sync({ createClient: clientWith({ inCal: CAL_A }) });
     legacyState(d, COLOR_A);
     d.exec('DELETE FROM caldav_calendar_selection WHERE account_id = 1; DELETE FROM caldav_accounts WHERE id = 1;');
 
     const { accountId } = await addAccount('Wieder', 'https://dav.example/', 'u1', 'p', { createClient: accountClient([CAL_A, CAL_B]) });
-    assert.strictEqual(marker(d, `caldav_legacy_color_heal_done_${accountId}`), null);
+    assert.strictEqual(healState(d, `caldav_legacy_color_heal_since_${accountId}`), null);
     d.prepare('UPDATE caldav_calendar_selection SET enabled = 1').run();
 
     await sync({ createClient: clientWith({ inCal: CAL_A, calendars: [CAL_A, CAL_B] }) });
@@ -1505,8 +1480,8 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
 
   it('eine Altzeile ganz ohne Kalenderzuordnung zaehlt auch als verwaist', () => withDb(async (d) => {
     // calendar_ref_id NULL: der LEFT JOIN findet keinen Kalender. Auch so eine
-    // Zeile haelt den Merker beim Anlegen zurueck; der erste vollstaendige
-    // Lauf setzt ihn dann. Ein lebendes Nachbarkonto muss dabei sein: gegen
+    // Zeile laesst die Heilung beim Anlegen offen; der erste Lauf beginnt die
+    // Frist und heilt sie. Ein lebendes Nachbarkonto muss dabei sein: gegen
     // eine LEERE Auswahl ist auch `NULL NOT IN (...)` wahr, und der Test
     // saehe den NULL-Zweig gar nicht.
     d.exec(`
@@ -1521,18 +1496,18 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     `).run(UID, COLOR_A);
 
     const { accountId } = await addAccount('Wieder', 'https://dav.example/', 'u1', 'p', { createClient: accountClient([CAL_A]) });
-    const key = `caldav_legacy_color_heal_done_${accountId}`;
-    assert.strictEqual(marker(d, key), null, 'die Zeile ohne Kalender ist eine Altzeile');
+    const key = `caldav_legacy_color_heal_since_${accountId}`;
+    assert.strictEqual(healState(d, key), null, 'die Zeile ohne Kalender ist eine Altzeile');
     d.prepare('UPDATE caldav_calendar_selection SET enabled = 1').run();
 
     await sync({ createClient: clientWith({ inCal: CAL_A, calendars: [CAL_A] }) });
     assert.strictEqual(row(d).color, null);
-    assert.strictEqual(marker(d, key), '1', 'der erste vollstaendige Lauf setzt ihn');
+    assert.match(healState(d, key), ISO, 'der erste Lauf beginnt die Frist');
   }));
 
-  it('scheitert das Anlegen, bleibt weder Konto noch Merker zurueck', () => withDb(async (d) => {
-    // Konto, Auswahl und Merker stehen in EINER Transaktion: scheitert der
-    // Eintrag eines Kalenders, darf kein halbes Konto samt Merker liegen
+  it('scheitert das Anlegen, bleibt weder Konto noch Heilungs-Eintrag zurueck', () => withDb(async (d) => {
+    // Konto, Auswahl und Heilungs-Entscheidung stehen in EINER Transaktion:
+    // scheitert der Eintrag eines Kalenders, darf kein halbes Konto samt Eintrag liegen
     // bleiben, der ihm spaeter die Heilung abschneidet.
     d.exec(`
       DELETE FROM caldav_calendar_selection; DELETE FROM caldav_accounts;
@@ -1545,12 +1520,12 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     );
     assert.strictEqual(d.prepare('SELECT COUNT(*) AS n FROM caldav_accounts').get().n, 0, 'kein Konto');
     assert.strictEqual(
-      d.prepare("SELECT COUNT(*) AS n FROM sync_config WHERE key LIKE 'caldav_legacy_color_heal_done_%'").get().n, 0,
-      'kein Merker'
+      d.prepare("SELECT COUNT(*) AS n FROM sync_config WHERE key LIKE 'caldav_legacy_color_heal_%'").get().n, 0,
+      'kein Heilungs-Eintrag'
     );
   }));
 
-  // Freier Client fuer die Pfade, in denen eine Altzeile NICHT gesehen wird.
+  // Freier Client: beliebige Objekte je Kalender und Komponenten je Kalender.
   // `objects`: Kalender-URL -> Liste von ICS-Texten; `components`: URL -> Liste.
   function rawClient({ calendars = [CAL_A, CAL_B], objects = {}, components = {} } = {}) {
     return async () => ({
@@ -1568,160 +1543,6 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     'DTSTART:20260106T170000Z', 'DTEND:20260106T180000Z', 'END:VEVENT',
   ];
 
-  // Die Altzeile liegt in B; danach sieht der Lauf sie aus je einem Grund nicht.
-  async function legacyRowInB(d) {
-    await sync({ createClient: clientWith({ inCal: CAL_B }) });
-    legacyState(d, COLOR_B);
-  }
-
-  it('ein abgewaehlter Kalender mit Altzeilen haelt den Merker zurueck', () => withDb(async (d) => {
-    await legacyRowInB(d);
-    d.prepare('UPDATE caldav_calendar_selection SET enabled = 0 WHERE calendar_url = ?').run(CAL_B);
-
-    await sync({ createClient: rawClient() });
-    assert.strictEqual(marker(d), null, 'die Zeile in B hat der Lauf nie gesehen');
-
-    // Wird B wieder angehakt, holt der naechste Lauf die Heilung nach.
-    d.prepare('UPDATE caldav_calendar_selection SET enabled = 1 WHERE calendar_url = ?').run(CAL_B);
-    await sync({ createClient: clientWith({ inCal: CAL_B }) });
-    assert.strictEqual(row(d).color, null);
-    assert.strictEqual(marker(d), '1');
-  }));
-
-  it('ein verworfener VEVENT haelt den Merker zurueck', () => withDb(async (d) => {
-    await legacyRowInB(d);
-    // Ohne DTSTART verwirft der Parser den Termin (onSkip). Weil der Kalender
-    // danach leer wirkt, laesst der Prune seine Zeilen stehen (Schutz vor
-    // einer vorlaeufig leeren Antwort) - gesehen wurde die Zeile nicht.
-    const broken = icsOf(['BEGIN:VEVENT', `UID:${UID}`, 'SUMMARY:Training', 'END:VEVENT']);
-    await sync({ createClient: rawClient({ objects: { [CAL_B]: [broken] } }) });
-    assert.strictEqual(row(d).color, COLOR_B, 'Vorbedingung: die Zeile steht noch, ungeheilt');
-    assert.strictEqual(marker(d), null);
-  }));
-
-  it('ein Kalender ohne VEVENT-Unterstuetzung schiebt den Merker auf', () => withDb(async (d) => {
-    // Wie der fehlende Kalender: der Lauf hat B nicht gelesen, also hat er
-    // nicht alles gesehen - auch wenn die Altzeile selbst in A liegt und heilt.
-    await sync({ createClient: clientWith({ inCal: CAL_A }) });
-    legacyState(d, COLOR_A);
-    const inA = icsOf(vevent());
-    await sync({ createClient: rawClient({ objects: { [CAL_A]: [inA] }, components: { [CAL_B]: ['VTODO'] } }) });
-    assert.strictEqual(row(d).color, null, 'Vorbedingung: die Zeile in A heilt');
-    assert.strictEqual(marker(d), null);
-  }));
-
-  const STRANDED_KEY = 'caldav_legacy_color_heal_stranded_1';
-
-  // Gestrandet: Zeilen, die womoeglich kein Lauf mehr sieht. Gewartet wird
-  // drei Laeufe in Folge - eine leere Antwort ist meist ein stiller Fehler
-  // (calendar-prune.js), kein geleerter Kalender.
-  async function runsUntilMarker(d, createClient, runs = 3) {
-    const seen = [];
-    for (let i = 0; i < runs; i++) {
-      await sync({ createClient });
-      seen.push(marker(d));
-    }
-    return seen;
-  }
-
-  it('ein vollstaendig leerer Kalender setzt den Merker erst nach drei Laeufen in Folge', () => withDb(async (d) => {
-    await legacyRowInB(d);
-    const seen = await runsUntilMarker(d, rawClient({ objects: { [CAL_B]: [] } }));
-    assert.deepStrictEqual(seen, [null, null, '1'], 'nach 1 und 2 Laeufen nicht, nach 3 schon');
-    assert.strictEqual(row(d).color, COLOR_B, 'die ungesehene Zeile bleibt, wie sie ist');
-    assert.strictEqual(marker(d, STRANDED_KEY), null, 'der Zaehler raeumt sich weg');
-  }));
-
-  it('ein Lauf, der alles sieht, raeumt den Zaehler gestrandeter Laeufe weg', () => withDb(async (d) => {
-    await legacyRowInB(d);
-    await sync({ createClient: rawClient({ objects: { [CAL_B]: [] } }) });
-    await sync({ createClient: rawClient({ objects: { [CAL_B]: [] } }) });
-    assert.strictEqual(marker(d, STRANDED_KEY), '2', 'Vorbedingung: zwei gestrandete Laeufe');
-    await sync({ createClient: clientWith({ inCal: CAL_B }) });
-    assert.strictEqual(row(d).color, null, 'B liefert wieder, die Zeile heilt');
-    assert.strictEqual(marker(d), '1');
-    assert.strictEqual(marker(d, STRANDED_KEY), null, 'der Zaehler ist weg');
-  }));
-
-  it('ein auf dem Server geloeschter Kalender setzt den Merker erst nach drei Laeufen in Folge', () => withDb(async (d) => {
-    // B war abgewaehlt und ist samt Terminen auf dem Server geloescht; seine
-    // URL bleibt ueber die Auswahl in der Zurechnung.
-    await legacyRowInB(d);
-    d.prepare('UPDATE caldav_calendar_selection SET enabled = 0 WHERE calendar_url = ?').run(CAL_B);
-    const seen = await runsUntilMarker(d, rawClient({ calendars: [CAL_A] }));
-    assert.deepStrictEqual(seen, [null, null, '1']);
-  }));
-
-  it('ein einzelner leerer Lauf aller Kalender direkt nach dem Update setzt den Merker nicht', () => withDb(async (d) => {
-    // Probe 1 des Reviews: alle Kalender antworten im ersten Lauf leer (ein
-    // stiller Fehler), danach wieder normal - die Altzeile heilt.
-    await legacyRowInB(d);
-    await sync({ createClient: rawClient({ objects: { [CAL_A]: [], [CAL_B]: [] } }) });
-    assert.strictEqual(marker(d), null);
-    await sync({ createClient: clientWith({ inCal: CAL_B }) });
-    assert.strictEqual(row(d).color, null);
-  }));
-
-  it('ein abgewaehlter Kalender, der einmal in der Liste fehlt, gilt nicht als geloescht', () => withDb(async (d) => {
-    // Probe 2: B ist abgewaehlt (echt ausstehend), fehlt einmal in
-    // fetchCalendars und ist danach wieder da. Der Zaehler faengt neu an.
-    await legacyRowInB(d);
-    d.prepare('UPDATE caldav_calendar_selection SET enabled = 0 WHERE calendar_url = ?').run(CAL_B);
-    await sync({ createClient: rawClient({ calendars: [CAL_A] }) });
-    assert.strictEqual(marker(d), null, 'ein Lauf reicht nicht');
-    await sync({ createClient: rawClient() });
-    assert.strictEqual(marker(d, STRANDED_KEY), null, 'B ist wieder da: echt ausstehend, Zaehler zurueck');
-    await sync({ createClient: rawClient({ calendars: [CAL_A] }) });
-    await sync({ createClient: rawClient({ calendars: [CAL_A] }) });
-    assert.strictEqual(marker(d), null, 'die Folge zaehlt neu, zwei Laeufe reichen nicht');
-  }));
-
-  it('ein Objekt mit leerem Inhalt gilt nicht nach einem Lauf als geleerter Kalender', () => withDb(async (d) => {
-    // Probe 3: B liefert ein Objekt ohne data.
-    await legacyRowInB(d);
-    await sync({ createClient: rawClient({ objects: { [CAL_B]: [''] } }) });
-    assert.strictEqual(marker(d), null);
-  }));
-
-  it('eine Altzeile ohne Kalenderzuordnung strandet auch neben einem abgewaehlten Kalender', () => withDb(async (d) => {
-    // Thread zu :724 und Re-Review: die Zeile gehoert keinem bestimmten
-    // Kalender. An den abgewaehlten B gebunden hielte sie den Merker
-    // unbegrenzt, auch wenn sie gar nicht dort liegt.
-    await legacyRowInB(d);
-    d.prepare('UPDATE calendar_events SET calendar_ref_id = NULL').run();
-    d.prepare('UPDATE caldav_calendar_selection SET enabled = 0 WHERE calendar_url = ?').run(CAL_B);
-    const seen = await runsUntilMarker(d, rawClient({ objects: { [CAL_A]: [icsOf(otherEvent)] } }));
-    assert.deepStrictEqual(seen, [null, null, '1']);
-  }));
-
-  it('eine Altzeile ohne Kalenderzuordnung und ohne ungelesenen Kalender strandet', () => withDb(async (d) => {
-    await legacyRowInB(d);
-    d.prepare('UPDATE calendar_events SET calendar_ref_id = NULL').run();
-    const seen = await runsUntilMarker(d, rawClient({ objects: { [CAL_B]: [icsOf(otherEvent)] } }));
-    assert.deepStrictEqual(seen, [null, null, '1']);
-  }));
-
-  it('ein hochgeladener alter lokaler Termin haelt den Merker nicht offen', () => withDb(async (d) => {
-    // Variante ohne echte Altzeile: der hochgeladene Termin ist kein Kandidat,
-    // auch nicht fuer die Pruefung am Laufende. Zaehlte er, bliebe er nach
-    // dem Ruecklauf ohne COLOR-Zeile fuer immer "ausstehend" (die Heilung
-    // selbst laesst ihn ja stehen).
-    d.exec(`CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, description TEXT, applied_at TEXT NOT NULL);
-            INSERT INTO schema_migrations VALUES (166, '#891', '2026-08-27T08:00:00Z');`);
-    const localId = d.prepare(`
-      INSERT INTO calendar_events (title, start_datetime, end_datetime, external_source, color, created_by,
-                                   target_caldav_account_id, target_caldav_calendar_url, created_at)
-      VALUES ('Lokal', '2026-01-07T17:00:00Z', '2026-01-07T18:00:00Z', 'local', ?, 1, 1, ?, '2026-08-01T10:00:00Z')
-    `).run(COLOR_A, CAL_A).lastInsertRowid;
-    await sync({ createClient: rawClient({ objects: { [CAL_A]: [icsOf(otherEvent)] } }) });
-    const uid = d.prepare('SELECT external_calendar_id FROM calendar_events WHERE id = ?').get(localId).external_calendar_id;
-    const back = icsOf(['BEGIN:VEVENT', `UID:${uid}`, 'SUMMARY:Lokal',
-      'DTSTART:20260107T170000Z', 'DTEND:20260107T180000Z', 'END:VEVENT']);
-    await sync({ createClient: rawClient({ objects: { [CAL_A]: [back, icsOf(otherEvent)] } }) });
-    assert.strictEqual(marker(d), '1', 'nach dem Ruecklauf ist das Konto erledigt');
-    assert.strictEqual(d.prepare('SELECT color FROM calendar_events WHERE id = ?').get(localId).color, COLOR_A);
-  }));
-
   it('beim Neuanlegen zaehlt eine hochgeladene, nie bearbeitete Zeile nicht als Altlast', () => withDb(async (d) => {
     // Die Waisen-Pruefung in addAccount nimmt denselben Filter: eine Zeile mit
     // user_modified = 0 kann keine eingebrannte Farbe tragen und darf das neue
@@ -1731,7 +1552,7 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     d.exec('DELETE FROM caldav_calendar_selection WHERE account_id = 1; DELETE FROM caldav_accounts WHERE id = 1;');
 
     const { accountId } = await addAccount('Wieder', 'https://dav.example/', 'u1', 'p', { createClient: accountClient([CAL_B]) });
-    assert.strictEqual(marker(d, `caldav_legacy_color_heal_done_${accountId}`), '1');
+    assert.strictEqual(healState(d, `caldav_legacy_color_heal_since_${accountId}`), 'never');
   }));
 
   // Ein von retireLegacyInstances() (google-calendar.js) abgeloestes
@@ -1755,25 +1576,14 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
   };
 
   it('ein hochgeladener Termin mit der Farbe eines ANDEREN Kalenders als seines Ziels heilt nie', () => withDb(async (d) => {
-    // Eine echte Altzeile im abgewaehlten B haelt die Heilung offen.
-    await legacyRowInB(d);
-    d.prepare('UPDATE caldav_calendar_selection SET enabled = 0 WHERE calendar_url = ?').run(CAL_B);
     const id = retiredGoogleOccurrence(d);
-    d.prepare("UPDATE calendar_events SET created_at = '2026-08-01T09:00:00Z' WHERE external_calendar_id = ?").run(UID);
     await sync({ createClient: rawClient({ objects: { [CAL_A]: [icsOf(otherEvent)] } }) });
     assert.strictEqual(d.prepare('SELECT external_source FROM calendar_events WHERE id = ?').get(id).external_source, 'caldav',
       'Vorbedingung: hochgeladen');
 
     await sync({ createClient: rawClient({ objects: { [CAL_A]: [backWithoutColor(d, id), icsOf(otherEvent)] } }) });
-    assert.strictEqual(marker(d), null, 'Vorbedingung: die Heilung war offen');
+    assert.match(healState(d), ISO, 'Vorbedingung: die Heilung laeuft');
     assert.strictEqual(d.prepare('SELECT color FROM calendar_events WHERE id = ?').get(id).color, COLOR_B);
-  }));
-
-  it('ein hochgeladener Termin mit fremder Kalenderfarbe haelt den Merker nicht offen', () => withDb(async (d) => {
-    const id = retiredGoogleOccurrence(d);
-    await sync({ createClient: rawClient({ objects: { [CAL_A]: [icsOf(otherEvent)] } }) });
-    await sync({ createClient: rawClient({ objects: { [CAL_A]: [backWithoutColor(d, id), icsOf(otherEvent)] } }) });
-    assert.strictEqual(marker(d), '1');
   }));
 
   it('beim Neuanlegen zaehlt ein hochgeladener Termin mit fremder Kalenderfarbe nicht als Altlast', () => withDb(async (d) => {
@@ -1784,7 +1594,7 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     d.prepare("DELETE FROM calendar_events WHERE external_calendar_id = 'other@test'").run();
 
     const { accountId } = await addAccount('Wieder', 'https://dav.example/', 'u1', 'p', { createClient: accountClient([CAL_B]) });
-    assert.strictEqual(marker(d, `caldav_legacy_color_heal_done_${accountId}`), '1');
+    assert.strictEqual(healState(d, `caldav_legacy_color_heal_since_${accountId}`), 'never');
   }));
 
   it('ein vor v2.49 hochgeladener Termin mit der Farbe seines Zielkalenders heilt', () => withDb(async (d) => {
@@ -1861,18 +1671,12 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     // (user_modified = 1), ein nur hochgeladener Termin ist das nicht.
     d.exec(`CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, description TEXT, applied_at TEXT NOT NULL);
             INSERT INTO schema_migrations VALUES (166, '#891', '2026-08-27T08:00:00Z');`);
-    // Eine echte Altzeile im abgewaehlten B haelt die Heilung ueber beide
-    // Laeufe offen - sonst schlosse der Merker sie schon vor dem zweiten.
-    await legacyRowInB(d);
-    d.prepare("UPDATE calendar_events SET created_at = '2026-08-01T09:00:00Z'").run();
-    d.prepare('UPDATE caldav_calendar_selection SET enabled = 0 WHERE calendar_url = ?').run(CAL_B);
     const localId = d.prepare(`
       INSERT INTO calendar_events (title, start_datetime, end_datetime, external_source, color, created_by,
                                    target_caldav_account_id, target_caldav_calendar_url, created_at)
       VALUES ('Lokal', '2026-01-07T17:00:00Z', '2026-01-07T18:00:00Z', 'local', ?, 1, 1, ?, '2026-08-01T10:00:00Z')
     `).run(COLOR_A, CAL_A).lastInsertRowid;
     await sync({ createClient: rawClient({ objects: { [CAL_A]: [icsOf(otherEvent)] } }) });
-    assert.strictEqual(marker(d), null, 'Vorbedingung: die Heilung ist noch offen');
     const uploaded = d.prepare('SELECT external_source, external_calendar_id, color_modified FROM calendar_events WHERE id = ?').get(localId);
     assert.strictEqual(uploaded.external_source, 'caldav', 'Vorbedingung: hochgeladen');
     assert.strictEqual(uploaded.color_modified, 1);
@@ -1880,19 +1684,8 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     const back = icsOf(['BEGIN:VEVENT', `UID:${uploaded.external_calendar_id}`, 'SUMMARY:Lokal',
       'DTSTART:20260107T170000Z', 'DTEND:20260107T180000Z', 'END:VEVENT']);
     await sync({ createClient: rawClient({ objects: { [CAL_A]: [back, icsOf(otherEvent)] } }) });
-    assert.strictEqual(marker(d), null, 'Vorbedingung: die Heilung war auch im zweiten Lauf offen');
+    assert.match(healState(d), ISO, 'Vorbedingung: die Heilung laeuft');
     assert.strictEqual(d.prepare('SELECT color FROM calendar_events WHERE id = ?').get(localId).color, COLOR_A);
-  }));
-
-  it('ein gescheiterter Prune haelt den Merker zurueck', () => withDb(async (d) => {
-    await legacyRowInB(d);
-    d.exec(`CREATE TRIGGER no_delete BEFORE DELETE ON calendar_events
-            BEGIN SELECT RAISE(ABORT, 'prune boom'); END;`);
-    // B liefert nur einen anderen Termin: der Prune will die Altzeile
-    // loeschen und scheitert.
-    await sync({ createClient: rawClient({ objects: { [CAL_B]: [icsOf(otherEvent)] } }) });
-    assert.strictEqual(row(d).color, COLOR_B, 'Vorbedingung: die Zeile steht noch');
-    assert.strictEqual(marker(d), null);
   }));
 
   it('eine COLOR-Zeile mit unlesbarem Wert gehoert trotzdem dem Termin', () => withDb(async (d) => {
@@ -1923,7 +1716,6 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
 
     await sync({ createClient: clientWith({ inCal: CAL_A }) });
     assert.strictEqual(row(d).color, COLOR_A);
-    assert.strictEqual(marker(d), '1', 'ohne Altzeilen ist das Konto erledigt');
   }));
 
   it('eine Zeile von VOR dem Fix heilt, auch im alten Datumsformat', () => withDb(async (d) => {
@@ -1938,34 +1730,102 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     assert.strictEqual(row(d).color, null);
   }));
 
-  it('ein Kalender, den der Server nicht mehr kennt, schiebt den Merker auf', () => withDb(async (d) => {
+  // --- Frist statt Merker ---
+
+  const daysAgo = (n) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
+
+  it('die Heilung laeuft innerhalb der Frist von 30 Tagen ab dem ersten Lauf', () => withDb(async (d) => {
     await sync({ createClient: clientWith({ inCal: CAL_A }) });
     legacyState(d, COLOR_A);
+    d.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?)').run(HEAL_KEY_1, daysAgo(29));
 
-    // B ist angehakt, fehlt aber in der Liste des Servers.
-    await sync({ createClient: clientWith({ inCal: CAL_A, calendars: [CAL_A] }) });
-    assert.strictEqual(marker(d), null);
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.strictEqual(row(d).color, null);
   }));
 
-  it('ein Termin mit ausstehender lokaler Bearbeitung schiebt den Merker auf', () => withDb(async (d) => {
+  it('nach Ablauf der Frist heilt nichts mehr', () => withDb(async (d) => {
     await sync({ createClient: clientWith({ inCal: CAL_A }) });
     legacyState(d, COLOR_A);
-    d.prepare('UPDATE calendar_events SET outbound_dirty = 1').run();
+    d.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?)').run(HEAL_KEY_1, daysAgo(31));
 
     await sync({ createClient: clientWith({ inCal: CAL_A }) });
-    assert.strictEqual(marker(d), null);
+    assert.strictEqual(row(d).color, COLOR_A);
   }));
 
-  it('ein Fehler an einem Termin schiebt den Merker auf', () => withDb(async (d) => {
+  it('traegt IRGENDEINE Kopie einer UID eine COLOR-Zeile, bleibt die Farbe, egal in welcher Reihenfolge', () => withDb(async (d) => {
+    // Beim Umzug liefert der Server dieselbe UID kurz in zwei Kalendern. Die
+    // Reihenfolge der Kalender darf nicht entscheiden, ob die Farbe bleibt.
+    const withColor = icsOf(vevent({ color: 'tomato' }));
+    const without = icsOf(vevent());
     await sync({ createClient: clientWith({ inCal: CAL_A }) });
+
     legacyState(d, COLOR_A);
-    // Das Schreiben an diesem Termin scheitert: der catch je Termin greift.
-    d.exec(`CREATE TRIGGER boom BEFORE UPDATE OF color ON calendar_events
-            BEGIN SELECT RAISE(ABORT, 'boom'); END;`);
+    await sync({ createClient: rawClient({ objects: { [CAL_A]: [withColor], [CAL_B]: [without] } }) });
+    assert.strictEqual(row(d).color, COLOR_A, 'COLOR im ersten Kalender');
+
+    legacyState(d, COLOR_A);
+    await sync({ createClient: rawClient({ objects: { [CAL_A]: [without], [CAL_B]: [withColor] } }) });
+    assert.strictEqual(row(d).color, COLOR_A, 'COLOR im zweiten Kalender');
+  }));
+
+  it('die Farbe einer reinen Aufgabenliste zaehlt nicht als Kalenderfarbe', () => withDb(async (d) => {
+    // Konten von vor dem Komponentenfilter (#617) tragen Aufgabenlisten noch in
+    // der Auswahl. Eine VTODO-Liste hat nie eine Farbe in einen Termin gebrannt.
+    const LIST = `${HOME_1}aufgaben/`;
+    const COLOR_LIST = '#12A4B6';
+    d.prepare(`INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled)
+               VALUES (1, ?, 'Aufgaben', ?, 0)`).run(LIST, COLOR_LIST);
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_LIST);
+
+    await sync({ createClient: rawClient({
+      calendars: [CAL_A, CAL_B, LIST],
+      objects: { [CAL_A]: [icsOf(vevent())] },
+      components: { [LIST]: ['VTODO'] },
+    }) });
+    assert.strictEqual(row(d).color, COLOR_LIST);
+  }));
+
+  it('eine Zeile aus genau der Sekunde der Migration 166 zaehlt als alt', () => withDb(async (d) => {
+    fixAppliedAt(d, '2026-08-27T08:00:00Z');
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    d.prepare("UPDATE calendar_events SET created_at = '2026-08-27T08:00:00Z'").run();
+    legacyState(d, COLOR_A);
 
     await sync({ createClient: clientWith({ inCal: CAL_A }) });
-    assert.strictEqual(row(d).color, COLOR_A, 'Vorbedingung: der Termin ist gescheitert');
-    assert.strictEqual(marker(d), null);
+    assert.strictEqual(row(d).color, null);
+  }));
+
+  it('ein umgehaengtes Konto (neuer Benutzer) entscheidet neu und heilt uebernommene Altzeilen', () => withDb(async (d) => {
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    d.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?)').run(HEAL_KEY_1, daysAgo(40));
+
+    await updateAccount(1, { username: 'u9', createClient: accountClient([CAL_A, CAL_B]) });
+    assert.strictEqual(healState(d), null, 'die alte, abgelaufene Frist ist verworfen');
+    d.prepare('UPDATE caldav_calendar_selection SET enabled = 1 WHERE calendar_url = ?').run(CAL_A);
+
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.strictEqual(row(d).color, null);
+  }));
+
+  it('ein umgehaengtes Konto ohne Altzeilen heilt nie', () => withDb(async (d) => {
+    d.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?)').run(HEAL_KEY_1, daysAgo(2));
+    await updateAccount(1, { caldavUrl: 'https://dav2.example/', createClient: accountClient([CAL_A]) });
+    assert.strictEqual(healState(d), 'never');
+  }));
+
+  it('ein reiner Passwortwechsel laesst die Frist stehen', () => withDb(async (d) => {
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    const since = daysAgo(40);
+    d.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?)').run(HEAL_KEY_1, since);
+
+    await updateAccount(1, { password: 'neu', createClient: accountClient([CAL_A, CAL_B]) });
+    assert.strictEqual(healState(d), since);
+    d.prepare('UPDATE caldav_calendar_selection SET enabled = 1 WHERE calendar_url = ?').run(CAL_A);
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.strictEqual(row(d).color, COLOR_A, 'die Frist ist abgelaufen');
   }));
 
   it('eine gewaehlte Farbe, die keine Kalenderfarbe ist, bleibt', () => withDb(async (d) => {
@@ -2005,7 +1865,7 @@ describe('CalDAV: eine Aufgabenliste bleibt kein Terminziel (#617)', () => {
       CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, display_name TEXT);
       INSERT INTO users (display_name) VALUES ('Owner');
 
-      -- Merker der einmaligen Farb-Heilung (#1270) liegen hier.
+      -- Die Frist der Farb-Heilung (#1270) liegt hier.
       CREATE TABLE sync_config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE caldav_accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2166,7 +2026,7 @@ describe('CalDAV: die Kalenderauswahl überlebt das Aktualisieren (#732)', () =>
   function buildDb() {
     const d = new DatabaseSync(':memory:');
     d.exec(`
-      -- Merker der einmaligen Farb-Heilung (#1270) liegen hier.
+      -- Die Frist der Farb-Heilung (#1270) liegt hier.
       CREATE TABLE sync_config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE caldav_accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2266,7 +2126,7 @@ describe('CalDAV: das Aufräumen beim Abwählen ist eine Wahl (#732)', () => {
       CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, display_name TEXT);
       INSERT INTO users (display_name) VALUES ('Owner');
 
-      -- Merker der einmaligen Farb-Heilung (#1270) liegen hier.
+      -- Die Frist der Farb-Heilung (#1270) liegt hier.
       CREATE TABLE sync_config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE caldav_accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2426,16 +2286,15 @@ describe('CalDAV: das Aufräumen beim Abwählen ist eine Wahl (#732)', () => {
     const d = buildDb();
     _setTestDatabase(d);
     try {
-      // Merker der Farb-Heilung (#1270) von Konto 1 und einem Nachbarn.
+      // Frist der Farb-Heilung (#1270) von Konto 1 und einem Nachbarn.
       d.exec(`INSERT INTO sync_config (key, value) VALUES
-        ('caldav_legacy_color_heal_done_1', '1'), ('caldav_legacy_color_heal_done_2', '1'),
-        ('caldav_legacy_color_heal_stranded_1', '2'), ('caldav_legacy_color_heal_stranded_2', '1')`);
+        ('caldav_legacy_color_heal_since_1', '2026-09-23T10:00:00.000Z'), ('caldav_legacy_color_heal_since_2', 'never')`);
       const result = deleteAccount(1);
       assert.equal(result.removed, 0);
       assert.deepEqual(
         d.prepare("SELECT key FROM sync_config WHERE key LIKE 'caldav_legacy_color_heal_%' ORDER BY key").all().map((r) => r.key),
-        ['caldav_legacy_color_heal_done_2', 'caldav_legacy_color_heal_stranded_2'],
-        'mit dem Konto gehen sein Merker und sein Zaehler, die des Nachbarn bleiben'
+        ['caldav_legacy_color_heal_since_2'],
+        'mit dem Konto geht seine Frist, die des Nachbarn bleibt'
       );
       assert.equal(titles(d).length, 5, 'die Termine bleiben sichtbar, wie bisher');
     } finally {
@@ -2467,7 +2326,7 @@ describe('CalDAV: neue Kalender sind opt-in (#732)', () => {
   function buildDb() {
     const d = new DatabaseSync(':memory:');
     d.exec(`
-      -- Merker der einmaligen Farb-Heilung (#1270) liegen hier.
+      -- Die Frist der Farb-Heilung (#1270) liegt hier.
       CREATE TABLE sync_config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE caldav_accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
