@@ -195,6 +195,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   anything and says to run it as the user Yuvomi runs as.
   (#1422)
 
+- **Shared expenses that lost their bookings to a deleted account count in the balances again.**
+  Until edits stopped tying an expense to its editor, deleting the account of someone who had
+  edited another member's shared expense also removed that expense's bookings: the expense stayed
+  in the list but no longer counted in any balance, and that fix could not bring them back. The
+  update now rebuilds them from the expense and its shares, exactly as they are booked when an
+  expense is saved, including the converted amount of an expense in another currency. Only active
+  expenses without any booking are touched; deleted expenses and complete ones stay as they are.
+  The group's activity shows "Booking restored" once for each expense that was repaired, so a
+  changed balance has a visible reason, and each entry names the expense and its amount. (#1382)
+
 - **Single sign-on finds your account even when its stored address has a stray space.** Signing
   in through the identity provider links to an existing account by email address. The address
   from the provider was already trimmed, but one stored on the member's contact with a leading or

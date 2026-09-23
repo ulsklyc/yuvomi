@@ -10145,6 +10145,32 @@ test('split activity feed translates every type the backend writes', () => {
     'server/routes/split-expenses.js': read('../server/routes/split-expenses.js'),
     'server/services/split-expenses-scheduler.js': read('../server/services/split-expenses-scheduler.js'),
     'scripts/seed-demo.js': read('../scripts/seed-demo.js'),
+    // Migrationen, die selbst in expense_activity schreiben (v226:
+    // 'ledger_restored'). Gelesen wird jeder MIGRATIONS-Eintrag, der
+    // `INSERT INTO expense_activity` enthaelt - nicht die ganze db.js: dort
+    // stehen Listen wie IN ('expense', 'expense_reversal', ...) oder
+    // ('admin', 'member'), die das Regex als Typen laese.
+    ...(() => {
+      const db = read('../server/db.js');
+      const start = db.indexOf('const MIGRATIONS = [');
+      assert.ok(start !== -1, 'const MIGRATIONS = [ in server/db.js nicht gefunden');
+      const end = db.indexOf('\n];', start);
+      assert.ok(end !== -1, 'Ende von MIGRATIONS in server/db.js nicht gefunden');
+      const block = db.slice(start, end);
+      const entries = block.split(/\n  \{\n    version: /).slice(1);
+      // Jeder `version:`-Schluessel muss als eigener Eintrag zerlegt sein - ein
+      // anders formatierter Eintrag klebte sonst am Vorgaenger und fiele mit
+      // seinem Aktivitaetstyp still durch.
+      const versionKeys = (block.match(/\bversion:\s*\d+/g) || []).length;
+      assert.equal(entries.length, versionKeys, `MIGRATIONS-Zerlegung: ${entries.length} Eintraege, aber ${versionKeys} version-Schluessel`);
+      const writers = {};
+      for (const entry of entries) {
+        if (!entry.includes('INSERT INTO expense_activity')) continue;
+        writers[`server/db.js (v${entry.match(/^\d+/)[0]})`] = entry;
+      }
+      assert.ok(Object.keys(writers).length >= 1, 'keine Migration schreibt in expense_activity - Zerlegung von MIGRATIONS passt nicht mehr');
+      return writers;
+    })(),
   };
 
   // activity(groupId, actor, 'type', …) bzw. insertActivity(db, …, 'type', …).
