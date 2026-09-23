@@ -247,6 +247,33 @@ function assertNoNewNonMembers(database, userIds, stored) {
   if (strangers.length) throw new NonMemberAssignmentError(nonMemberMessage(strangers));
 }
 
+/**
+ * Die Sperrpruefung fuer einen Anhang (#1358), wiederholt DORT, wo geschrieben
+ * wird. Die fruehe Pruefung vor dem Hochladen bleibt als billiger Abbruch; sie
+ * allein genuegt nicht, denn zwischen ihr und dem Schreiben liegt das
+ * Bereitstellen der neuen Datei (await), und in dieser Zeit kann die Besitzerin
+ * das Dokument privat stellen oder die Freigabe entziehen. Deshalb synchron
+ * nach dem letzten await, mit frisch gelesener `attachment_document_id`.
+ */
+class AttachmentLockedError extends Error {}
+
+function assertAttachmentStillChangeable(req, database, storedDocumentId, { replacementRequested, removalRequested }) {
+  if (!(replacementRequested || removalRequested)) return;
+  if (storedAttachmentLocked(req, database, storedDocumentId)) throw new AttachmentLockedError();
+}
+
+/** Anhang inzwischen gesperrt: gestagte Uploads wegraeumen, dann dieselbe 403 wie die fruehe Pruefung. */
+async function sendAttachmentLocked(res, staged) {
+  if (staged.length > 0) {
+    try {
+      await cleanupCalendarUploads(staged);
+    } catch (cleanupError) {
+      return sendStorageError(res, cleanupError, 'Calendar attachment storage cleanup failed.');
+    }
+  }
+  return res.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403, reason: 'ATTACHMENT_CHANGE_REFUSED' });
+}
+
 /** Eine abgelehnte Personenwahl: gestagte Uploads wegraeumen, dann 400 mit ihrer Meldung. */
 async function sendNonMemberAssignment(res, err, staged) {
   if (staged.length > 0) {
@@ -912,6 +939,10 @@ router.put('/:id', async (req, res) => {
     const outlookCalendarId = vOutlook ? vOutlook.value.calendarId : event.target_outlook_calendar_id;
 
     const applyUpdate = () => {
+      // Der Anhang gegen den Stand, den dieses Schreiben vorfindet (#1358).
+      assertAttachmentStillChangeable(req, db.get(),
+        db.get().prepare('SELECT attachment_document_id FROM calendar_events WHERE id = ?').get(id)?.attachment_document_id,
+        { replacementRequested, removalRequested });
       // Neu nur Haushaltsmitglieder (#1207), gegen den Stand, den dieses Schreiben vorfindet.
       if (assignedTouched) assertNoNewNonMembers(db.get(), userIds, storedEventAssignees(db.get(), id));
       const documentId = replacementRequested
@@ -1134,6 +1165,7 @@ router.put('/:id', async (req, res) => {
       return sendCalendarOccurrenceError(res, err);
     }
     if (err instanceof NonMemberAssignmentError) return sendNonMemberAssignment(res, err, staged);
+    if (err instanceof AttachmentLockedError) return sendAttachmentLocked(res, staged);
     if (err instanceof StorageError && staged.length === 0) {
       log.error('PUT /:id storage error:', err);
       return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
@@ -1251,6 +1283,10 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
     if (vIcon !== undefined) changes.icon = vIcon;
 
     assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), seriesId, req.params.recurrenceId));
+    // Synchron nach dem letzten await: der Anhang, wie er jetzt gilt (#1358).
+    assertAttachmentStillChangeable(req, db.get(),
+      storedOccurrenceAttachmentDocument(db.get(), loadVisibleEvent(seriesId, req) ?? master, req.params.recurrenceId),
+      { replacementRequested, removalRequested });
     const result = upsertOccurrenceOverride(db.get(), {
       mayWidenAttachment: attachmentRights(req).mayWidenAttachment,
       seriesId,
@@ -1298,6 +1334,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
       return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
     }
     if (err instanceof NonMemberAssignmentError) return sendNonMemberAssignment(res, err, [stagedUpload].filter(Boolean));
+    if (err instanceof AttachmentLockedError) return sendAttachmentLocked(res, [stagedUpload].filter(Boolean));
     log.error('PUT occurrence failed:', err);
     if (stagedUpload) {
       try {
@@ -1473,6 +1510,10 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
       stagedClones,
       (cloneOptions) => {
         assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), seriesId, req.params.recurrenceId));
+        // Synchron nach dem letzten await: der Anhang, wie er jetzt gilt (#1358).
+        assertAttachmentStillChangeable(req, db.get(),
+          storedOccurrenceAttachmentDocument(db.get(), loadVisibleEvent(seriesId, req) ?? master, req.params.recurrenceId),
+          { replacementRequested, removalRequested });
         return splitSeries(db.get(), { ...commonOptions, ...cloneOptions });
       },
       { mayClone: rights.mayCloneAttachment },
@@ -1495,6 +1536,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
       return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
     }
     if (err instanceof NonMemberAssignmentError) return sendNonMemberAssignment(res, err, staged);
+    if (err instanceof AttachmentLockedError) return sendAttachmentLocked(res, staged);
     log.error('PUT occurrence following failed:', err);
     if (staged.length > 0) {
       try {

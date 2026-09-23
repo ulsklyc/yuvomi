@@ -4065,3 +4065,105 @@ test('Anhang: die Kopie prueft Recht und Quelle nach dem Lesen der Datei erneut 
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
+
+// ── Ersetzen prueft das Recht nach dem Hochladen erneut (#1358) ──────────────
+// Zwischen der fruehen Sperrpruefung und dem Schreiben liegt das Bereitstellen
+// der neuen Datei (await). Stellt die Besitzerin das Dokument in dieser Zeit auf
+// privat oder entzieht die Freigabe, darf der Request den Anhang nicht mehr
+// abloesen: 403 wie die fruehe Pruefung, nichts geschrieben, keine Waise.
+async function withUploadRace(run) {
+  const fs = await import('node:fs/promises');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'yuvomi-replace-race-'));
+  const previousEnabled = process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+  const previousPath = process.env.DOCUMENT_STORAGE_LOCAL_PATH;
+  process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'true';
+  process.env.DOCUMENT_STORAGE_LOCAL_PATH = dir;
+  const fsp = fs.default;
+  const originalWrite = fsp.writeFile;
+  const files = async () => (await fs.readdir(dir, { recursive: true, withFileTypes: true }))
+    .filter((entry) => entry.isFile()).length;
+  let onWrite = null;
+  fsp.writeFile = async (...args) => {
+    const hook = onWrite;
+    onWrite = null;
+    if (hook) hook();
+    return originalWrite.apply(fsp, args);
+  };
+  try {
+    return await run({ files, armWrite: (hook) => { onWrite = hook; } });
+  } finally {
+    fsp.writeFile = originalWrite;
+    if (previousEnabled === undefined) delete process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+    else process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = previousEnabled;
+    if (previousPath === undefined) delete process.env.DOCUMENT_STORAGE_LOCAL_PATH;
+    else process.env.DOCUMENT_STORAGE_LOCAL_PATH = previousPath;
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+}
+
+const RACE_CASES = [
+  ['auf privat gestellt', (docId) => {
+    db.prepare("UPDATE family_documents SET created_by = ?, visibility = 'family' WHERE id = ?").run(TOM.id, docId);
+  }, (docId) => db.prepare("UPDATE family_documents SET visibility = 'private' WHERE id = ?").run(docId)],
+  ['Freigabe entzogen', (docId) => {
+    db.prepare("UPDATE family_documents SET created_by = ?, visibility = 'restricted' WHERE id = ?").run(TOM.id, docId);
+    db.prepare('INSERT OR IGNORE INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(docId, MARIA.id);
+  }, (docId) => db.prepare('DELETE FROM family_document_access WHERE document_id = ? AND user_id = ?').run(docId, MARIA.id)],
+];
+
+/** Faehrt beide Faelle und sammelt die Befunde - kein Abbruch beim ersten. */
+async function raceEachCase(route, { recurrence_rule = null, year }) {
+  const failures = [];
+  await withUploadRace(async ({ files, armWrite }) => {
+    let offset = 0;
+    for (const [label, share, revoke] of RACE_CASES) {
+      offset += 1;
+      const start = `${year + offset}-01-01T09:00:00`;
+      const created = await call('POST', '/', { actor: MARIA, body: {
+        title: `Ersetzen ${label}`, start_datetime: start, recurrence_rule,
+        attachment_data: `data:text/plain;base64,${Buffer.from('alt').toString('base64')}`, attachment_name: 'alt.txt',
+      } });
+      const eventId = created.body.data.id;
+      const docId = created.body.data.attachment_document_id;
+      share(docId);
+      const counts = () => ({
+        documents: db.prepare('SELECT COUNT(*) AS n FROM family_documents').get().n,
+        events: db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n,
+      });
+      const before = { ...counts(), files: await files() };
+      let revoked = false;
+      armWrite(() => { revoked = true; revoke(docId); });
+      const res = await call('PUT', route(eventId, year + offset), { actor: MARIA, body: {
+        attachment_data: `data:text/plain;base64,${Buffer.from('neu').toString('base64')}`, attachment_name: 'neu.txt',
+      } });
+      const after = { ...counts(), files: await files() };
+      const check = (ok, what) => { if (!ok) failures.push(`${label}: ${what}`); };
+      check(revoked, 'die neue Datei wurde nicht bereitgestellt');
+      check(res.status === 403 && res.body?.reason === 'ATTACHMENT_CHANGE_REFUSED', `403 erwartet, bekam ${res.status}`);
+      check(db.prepare('SELECT attachment_document_id FROM calendar_events WHERE id = ?').get(eventId).attachment_document_id === docId,
+        'der Anhang wurde abgeloest');
+      check(JSON.stringify(after) === JSON.stringify(before), `geschrieben oder liegengeblieben: ${JSON.stringify({ before, after })}`);
+    }
+  });
+  return failures;
+}
+
+test('Anhang ersetzen: PUT /:id prueft das Recht nach dem Hochladen erneut (#1358)', async () => {
+  assert.deepEqual(await raceEachCase((id) => `/${id}`, { year: 2080 }), []);
+});
+
+test('Anhang ersetzen: PUT /:id an einer Serie prueft das Recht nach dem Hochladen erneut (#1358)', async () => {
+  assert.deepEqual(await raceEachCase((id) => `/${id}`, { recurrence_rule: 'FREQ=DAILY;COUNT=5', year: 2083 }), []);
+});
+
+test('Anhang ersetzen: ein Vorkommen prueft das Recht nach dem Hochladen erneut (#1358)', async () => {
+  assert.deepEqual(await raceEachCase((id, y) => `/${id}/occurrences/${y}-01-03`,
+    { recurrence_rule: 'FREQ=DAILY;COUNT=5', year: 2086 }), []);
+});
+
+test('Anhang ersetzen: dieses und folgende Vorkommen pruefen das Recht nach dem Hochladen erneut (#1358)', async () => {
+  assert.deepEqual(await raceEachCase((id, y) => `/${id}/occurrences/${y}-01-03/following`,
+    { recurrence_rule: 'FREQ=DAILY;COUNT=5', year: 2089 }), []);
+});
