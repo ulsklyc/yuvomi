@@ -131,7 +131,7 @@ export function expandAndResolveEventRows(database, rows, from, to, options = {}
  */
 export function getUpcomingEvents(d, {
   userId = null, limit = 5, windowDays = 90, fromToday = false, assignedTo = null,
-  includeBirthdays = true, now = new Date(),
+  includeBirthdays = true, now = new Date(), keepEndedToday = 0,
 } = {}) {
   const tz      = householdTimeZone(d);
   const nowDate = todayKey(d, now);
@@ -235,10 +235,28 @@ export function getUpcomingEvents(d, {
   // slots. Linked children still need effective inheritance before filtering.
   const candidates = rawEvents.filter((event) => !event.recurrence_rule
     || (matchesAssignment(event) && matchesBirthday(event)));
-  return expandAndResolveEventRows(d, candidates, sqlFrom, future, {
+  /* BEENDETES VON HEUTE ZAEHLT NICHT IN DEN DECKEL (#1449). Mit `fromToday`
+   * beginnt die Liste um Mitternacht, damit der Morgentermin sichtbar bleibt
+   * (#230) - aber gezaehlt wurde er mit: um 19:28 fuellten fuenf vorbeie
+   * Termine das Limit, und der um 21:00 fiel heraus. Mit `keepEndedToday`
+   * kommen die beendeten Termine von heute AUSSERHALB des Limits mit (die
+   * juengsten, hoechstens so viele), und `limit` gilt nur dem, was noch kommt.
+   *
+   * „Beendet" heisst: das ENDE liegt hinter uns, als Zeitpunkt verglichen wie
+   * der Start oben. Ein laufender Termin zaehlt also als kommend, und ein
+   * ganztaegiger endet nie an seinem eigenen Tag. Ohne Ende gilt der Start als
+   * Ende - ein Termin ohne Dauer ist vorbei, sobald er begonnen hat. */
+  const keepEnded = fromToday ? Math.max(0, Number(keepEndedToday) || 0) : 0;
+  const nowMs = now.getTime();
+  const hasEnded = (event) => {
+    if (!keepEnded || event.all_day) return false;
+    const endMs = storedToInstantMs(event.end_datetime || event.start_datetime, tz);
+    return endMs !== null && endMs <= nowMs;
+  };
+  const sorted = expandAndResolveEventRows(d, candidates, sqlFrom, future, {
     lightweight: true,
     expansion: {
-      maxOccurrencesPerSeries: limit,
+      maxOccurrencesPerSeries: limit + keepEnded,
       occurrenceFilter: isUpcoming,
       maxIterations: MAX_EXPANSION_ITERATIONS,
     },
@@ -248,6 +266,9 @@ export function getUpcomingEvents(d, {
     .filter(matchesBirthday)
     // Offset-bearing and local timestamps must compete by effective instant,
     // including linked replacements moved before their original series slot.
-    .sort((a, b) => startInstant(a) - startInstant(b))
-    .slice(0, limit);
+    .sort((a, b) => startInstant(a) - startInstant(b));
+  if (!keepEnded) return sorted.slice(0, limit);
+  const ended = sorted.filter(hasEnded).slice(-keepEnded);
+  const ahead = sorted.filter((event) => !hasEnded(event)).slice(0, limit);
+  return [...ended, ...ahead].sort((a, b) => startInstant(a) - startInstant(b));
 }

@@ -266,7 +266,9 @@ test('Tagesprogramm: Termin, Aufgabe und Mahlzeit mischen sich chronologisch', a
     // Nur dinner geplant: selectTodayMeal fällt zu jeder Tageszeit auf dinner
     // vor (deterministisch, kein withHour nötig).
     todayMeals: [{ id: 33, meal_type: 'dinner', title: 'Pasta' }],
-  });
+  // Feste Uhr: seit #1449 verlaesst ein beendeter Termin das Programm, und
+  // der um 14:00 waere am Nachmittag sonst schon vorbei.
+  }, { now: todayAt(8) });
 
   const kinds = result.rows.map((r) => r.kind);
   nodeAssert.deepEqual(kinds, ['task', 'event', 'meal'], 'Aufgabe 09:30 → Termin 14:00 → Abendessen (nominal 18:30)');
@@ -631,7 +633,8 @@ test('Cockpit-Coda nennt die morgen fällige Aufgabe statt falscher Entwarnung',
     const withTomorrow = __test.renderTodayCockpit({
       upcomingEvents: [{ id: 1, title: 'Heute Abend', start_datetime: `${todayStr}T20:00:00` }],
       urgentTasks: [{ id: 5, title: 'Zettel abgeben', due_date: tomorrowStr, status: 'open' }],
-    }, []);
+    // Feste Uhr (#1449): nach 20 Uhr waere der Termin vorbei und die Zeile weg.
+    }, [], false, { now: todayAt(9) });
     nodeAssert.match(withTomorrow, /todayNothingElseTomorrow/, 'Coda warnt vor der Morgen-Frist');
     // Leerer Tag, nur die Morgen-Aufgabe → Zustandszeile trägt sie als Ausblick.
     const stateRow = __test.renderTodayCockpit({
@@ -695,6 +698,238 @@ test('a disabled Schedule module cannot suppress "Heute frei" via a stale widget
     global.window = prevWindow;
   }
 });
+
+/* DAS HEUTE-BLATT KENNT JEDE QUELLE, DIE ETWAS OFFEN HAT (Critique 23.09.2026,
+ * P1). Gemessen an Linda: zwei offene Dosen um 08:00 und eine wartende
+ * Freigabe lagen in derselben Antwort, und das Blatt schloss mit „Danach steht
+ * heute nichts mehr an". Die Faelle unten laufen alle ueber das MODELL, das
+ * Cockpit und Wand gemeinsam lesen - und mit fester Uhr: offen oder nicht
+ * haengt an der Tageszeit (Dosis faellig, Tonne vor Mittag). */
+function todayAt(hour, minute = 0) {
+  const now = new Date();
+  now.setHours(hour, minute, 0, 0);
+  return now;
+}
+
+async function withSheetEnv({ perms = { admin: true }, disabled = [] } = {}, fn) {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+  const prevWindow = global.window;
+  global.window = { yuvomi: { isModuleDisabled: (m) => disabled.includes(m) } };
+  setPermissions({ admin: false, modules: {}, widgets: {}, capabilities: {}, ...perms });
+  try {
+    return fn(__test);
+  } finally {
+    clearPermissions();
+    global.window = prevWindow;
+  }
+}
+
+const sheetKinds = (model) => model.rows.map((row) => row.kind);
+const eveningEvent = () => ({ id: 1, title: 'Elternabend', start_datetime: `${toLocalDateKey(new Date())}T20:00:00` });
+const openDoses = () => ({ hasMeds: true, dosesTotal: 2, dosesTaken: 0, dosesSkipped: 0, nextDose: { name: 'Eisen', time: '08:00' } });
+
+test('Heute-Blatt: eine offene Dosis steht im Blatt und haelt die Coda auf', () => withSheetEnv({}, (__test) => {
+  const model = __test.buildTodayCockpitModel(
+    { upcomingEvents: [eveningEvent()], health: openDoses() }, [], { now: todayAt(9) },
+  );
+  nodeAssert.ok(sheetKinds(model).includes('dose'), `die Dosis ist eine Zeile, erhalten: ${sheetKinds(model)}`);
+  nodeAssert.equal(model.coda, null, 'keine Entwarnung, solange eine Dosis offen ist');
+
+  const taken = __test.buildTodayCockpitModel(
+    { upcomingEvents: [eveningEvent()], health: { ...openDoses(), dosesTaken: 2, nextDose: null } }, [], { now: todayAt(9) },
+  );
+  nodeAssert.ok(!sheetKinds(taken).includes('dose'), 'genommene Dosen sind keine offene Zeile');
+  nodeAssert.match(String(taken.coda), /todayNothingElse/, 'sind alle genommen, faellt die Coda wieder');
+}));
+
+test('Heute-Blatt: die wartende Freigabe spricht nur zu Admins', async () => {
+  const data = { upcomingEvents: [eveningEvent()], rewards: { standings: [], participantCount: 0, pending: 2 } };
+  await withSheetEnv({ perms: { admin: true } }, (__test) => {
+    const model = __test.buildTodayCockpitModel(data, [], { now: todayAt(9) });
+    nodeAssert.ok(sheetKinds(model).includes('approval'), 'der Admin sieht die Freigabe');
+    nodeAssert.equal(model.coda, null, 'und keine Entwarnung daneben');
+  });
+  await withSheetEnv({ perms: { admin: false } }, (__test) => {
+    const model = __test.buildTodayCockpitModel(data, [], { now: todayAt(9) });
+    nodeAssert.ok(!sheetKinds(model).includes('approval'), 'ein Kind entscheidet keine Freigaben');
+    nodeAssert.match(String(model.coda), /todayNothingElse/, 'fuer das Kind ist der Tag ohne sie vollstaendig');
+  });
+});
+
+test('Heute-Blatt: die Tonne von heute und die von morgen (heute Abend rausstellen)', () => withSheetEnv({}, (__test) => {
+  const today = toLocalDateKey(new Date());
+  const tomorrow = addLocalDays(today, 1);
+  const morning = __test.buildTodayCockpitModel({
+    upcomingEvents: [eveningEvent()],
+    wastePickups: [
+      { date_key: today, type_name: 'Restmuell', deep_link: '?type=1' },
+      { date_key: today, type_name: 'Papier', deep_link: '?type=2' },
+    ],
+  }, [], { now: todayAt(7) });
+  const wasteRows = morning.rows.filter((row) => row.kind === 'waste');
+  nodeAssert.equal(wasteRows.length, 1, 'zwei Tonnen eines Tages sind eine Zeile');
+  nodeAssert.match(wasteRows[0].title, /Restmuell.*Papier/);
+  nodeAssert.equal(morning.coda, null, 'am Morgen muss die Tonne noch raus - keine Entwarnung');
+
+  const afternoon = __test.buildTodayCockpitModel({
+    upcomingEvents: [eveningEvent()],
+    wastePickups: [{ date_key: today, type_name: 'Restmuell' }],
+  }, [], { now: todayAt(15) });
+  nodeAssert.ok(sheetKinds(afternoon).includes('waste'), 'am Nachmittag bleibt die Auskunft stehen');
+  nodeAssert.match(String(afternoon.coda), /todayNothingElse/, 'die abgeholte Tonne haelt die Coda nicht auf');
+
+  const eve = __test.buildTodayCockpitModel({ wastePickups: [{ date_key: tomorrow, type_name: 'Bio' }] }, [], { now: todayAt(9) });
+  const tonight = eve.rows.find((row) => row.kind === 'waste');
+  nodeAssert.match(String(tonight?.sub), /todayWasteTonight/, 'die Abholung von morgen heisst: heute Abend rausstellen');
+  nodeAssert.equal(eve.coda, null);
+  nodeAssert.equal(eve.state, null, 'ein Tag mit offener Tonne ist nicht „heute frei"');
+}));
+
+test('Heute-Blatt: die Coda faellt, wenn alles Offene erledigt ist', () => withSheetEnv({}, (__test) => {
+  const model = __test.buildTodayCockpitModel({
+    upcomingEvents: [eveningEvent()],
+    health: { ...openDoses(), dosesTaken: 1, dosesSkipped: 1, nextDose: null },
+    rewards: { pending: 0 },
+    wastePickups: [],
+    housekeeping: { present: true, presentSince: `${toLocalDateKey(new Date())}T08:30:00`, workerName: 'Maria' },
+  }, [], { now: todayAt(9) });
+  nodeAssert.deepEqual(sheetKinds(model).sort(), ['event', 'housekeeping'], 'Termin und Auskunft, nichts Offenes');
+  nodeAssert.match(String(model.coda), /todayNothingElse/, 'nichts mehr offen - jetzt stimmt die Entwarnung');
+}));
+
+/* Gefunden in der Browser-Verifikation: der Check-in der Haushaltshilfe ist ein
+ * Instant ('...Z'), und die Zeile las ihren Platz im Tag per Regex aus dem
+ * String - also in UTC, waehrend die Beschriftung daneben die Haushaltszone
+ * zeigte. „seit 08:30" stand deshalb HINTER einer Dosis um 08:00 nicht,
+ * sondern davor. Die Zone ist hier fest auf Honolulu gestellt, damit der Fall
+ * auch in einer CI in UTC rot werden kann. */
+test('Heute-Blatt: die Haushaltshilfe sortiert nach der Haushaltsuhr, nicht nach UTC', async () => {
+  const tz = await import('/utils/timezone.js');
+  await withSheetEnv({}, (__test) => {
+    tz.setDisplayTimeZone('Pacific/Honolulu');
+    try {
+      const now = new Date();
+      const today = tz.zonedDateKey(now);
+      const model = __test.buildTodayCockpitModel({
+        housekeeping: { present: true, presentSince: `${today}T18:30:00Z`, workerName: 'Maria' },
+      }, [], { now });
+      const row = model.rows.find((r) => r.kind === 'housekeeping');
+      nodeAssert.equal(row?.sortKey, tz.zonedTimeKey(`${today}T18:30:00Z`), 'der Platz im Tag ist die Wanduhr des Haushalts');
+      nodeAssert.equal(row.sortKey, '08:30');
+    } finally {
+      tz.setDisplayTimeZone(null);
+    }
+  });
+});
+
+test('Heute-Blatt: Kein-Echo gilt auch fuer die neuen Quellen', () => withSheetEnv({}, (__test) => {
+  const today = toLocalDateKey(new Date());
+  const data = {
+    health: openDoses(),
+    rewards: { pending: 1 },
+    wastePickups: [{ date_key: today, type_name: 'Restmuell' }],
+    myShiftsToday: [{ shift_type: { id: 3, name: 'Fruehdienst', start_time: '06:00', end_time: '14:00' } }],
+    housekeeping: { present: true, presentSince: `${today}T08:30:00`, workerName: 'Maria' },
+    birthdays: [{ id: 4, name: 'Oma Erna', days_until: 0, kind: 'birthday' }],
+  };
+  const all = __test.buildTodayCockpitModel(data, [], { now: todayAt(9) });
+  nodeAssert.deepEqual(
+    [...new Set(sheetKinds(all))].sort(),
+    ['approval', 'birthday', 'dose', 'housekeeping', 'shift', 'waste'],
+    'Vorbedingung: ohne Kacheln spricht jede Quelle',
+  );
+  for (const [widget, kind] of [['health', 'dose'], ['rewards', 'approval'], ['waste', 'waste'],
+    ['schedule', 'shift'], ['housekeeping', 'housekeeping'], ['birthdays', 'birthday']]) {
+    const model = __test.buildTodayCockpitModel(data, [{ id: widget, visible: true }], { now: todayAt(9) });
+    nodeAssert.ok(!sheetKinds(model).includes(kind), `sichtbare ${widget}-Kachel: keine ${kind}-Zeile im Blatt`);
+    nodeAssert.ok(sheetKinds(model).length > 0, 'die uebrigen Quellen sprechen weiter');
+  }
+}));
+
+test('Heute-Blatt: ohne Gesundheitsrecht keine Dosen, abgeschaltetes Modul spricht nicht', async () => {
+  const data = { upcomingEvents: [eveningEvent()], health: openDoses() };
+  // Die Gegenprobe zuerst: ein Mitglied mit vollen Rechten sieht die Dosis.
+  // Ohne sie waere jede Abwesenheit unten auch beim Nichtstun gruen.
+  await withSheetEnv({ perms: { admin: false } }, (__test) => {
+    const model = __test.buildTodayCockpitModel(data, [], { now: todayAt(9) });
+    nodeAssert.ok(sheetKinds(model).includes('dose'), 'Vorbedingung: mit Recht steht die Dosis im Blatt');
+  });
+  await withSheetEnv({ perms: { admin: false, widgets: { health: 'none' } } }, (__test) => {
+    const model = __test.buildTodayCockpitModel(data, [], { now: todayAt(9) });
+    nodeAssert.ok(!sheetKinds(model).includes('dose'), 'ein gesperrtes Gesundheits-Widget heisst: keine Dosen im Blatt');
+  });
+  await withSheetEnv({ perms: { admin: false, modules: { health: 'none' } } }, (__test) => {
+    const model = __test.buildTodayCockpitModel(data, [], { now: todayAt(9) });
+    nodeAssert.ok(!sheetKinds(model).includes('dose'), 'ein gesperrtes Gesundheitsmodul ebenso');
+  });
+  await withSheetEnv({ disabled: ['health'] }, (__test) => {
+    const model = __test.buildTodayCockpitModel(data, [], { now: todayAt(9) });
+    nodeAssert.ok(!sheetKinds(model).includes('dose'), 'ein abgeschaltetes Modul spricht nicht');
+  });
+});
+
+test('Heute-Blatt: unter dem Deckel bleibt, was offen ist', () => withSheetEnv({}, (__test) => {
+  const today = toLocalDateKey(new Date());
+  const events = Array.from({ length: 7 }, (_, i) => ({
+    id: 100 + i, title: `Termin ${i}`, start_datetime: `${today}T${String(10 + i).padStart(2, '0')}:00:00`,
+  }));
+  const model = __test.buildTodayCockpitModel(
+    { upcomingEvents: events, health: { ...openDoses(), nextDose: { name: 'Eisen', time: '23:00' } } },
+    [], { now: todayAt(9) },
+  );
+  nodeAssert.ok(sheetKinds(model).includes('dose'), 'die offene Dosis spaet am Abend faellt nicht unter den Deckel');
+  nodeAssert.equal(model.rows.length, __test.PROGRAM_ROW_CAP);
+  nodeAssert.equal(model.overflow, 2);
+  nodeAssert.equal(model.coda, null);
+}));
+
+test('Wand: dieselben Quellen, dieselbe Coda-Regel wie das Cockpit', () => withSheetEnv({}, (__test) => {
+  const data = { upcomingEvents: [eveningEvent()], health: openDoses(), users: [] };
+  const html = __test.renderWallSurface(data, null, { now: todayAt(9) });
+  nodeAssert.match(html, /wall-row--health/, 'die Dosis steht auch an der Wand');
+  nodeAssert.ok(!/todayNothingElse/.test(html), 'und die Wand gibt keine falsche Entwarnung');
+  const done = __test.renderWallSurface(
+    { upcomingEvents: [eveningEvent()], health: { ...openDoses(), dosesTaken: 2, nextDose: null }, users: [] },
+    null, { now: todayAt(9) },
+  );
+  nodeAssert.match(done, /todayNothingElse/, 'alles genommen: die Wand schliesst mit der Coda');
+}));
+
+/* #1449: BEENDETE TERMINE TRETEN ZURUECK. Das Blatt verspricht, was heute NOCH
+ * ansteht; ein Termin, dessen Ende hinter uns liegt, verlaesst es. Die
+ * Termin-Kachel behaelt ihn, aber zurueckgetreten und oberhalb des Kommenden -
+ * und ihr Fuenfer-Limit zaehlt nur das Kommende. */
+test('Heute-Blatt: ein beendeter Termin verlaesst das Blatt (#1449)', () => withSheetEnv({}, (__test) => {
+  const today = toLocalDateKey(new Date());
+  const model = __test.buildTodayCockpitModel({
+    upcomingEvents: [
+      { id: 1, title: 'Fruehsport', start_datetime: `${today}T06:30:00`, end_datetime: `${today}T07:30:00` },
+      { id: 2, title: 'Laeuft noch', start_datetime: `${today}T08:30:00`, end_datetime: `${today}T10:00:00` },
+      { id: 3, title: 'Ganztags', start_datetime: today, all_day: 1 },
+      eveningEvent(),
+    ],
+  }, [], { now: todayAt(9) });
+  const titles = model.rows.map((row) => row.title);
+  nodeAssert.ok(!titles.includes('Fruehsport'), `der beendete Termin ist weg, erhalten: ${titles}`);
+  nodeAssert.ok(titles.includes('Laeuft noch'), 'ein laufender Termin bleibt');
+  nodeAssert.ok(titles.includes('Ganztags'), 'ein Ganztagstermin endet nicht an seinem Tag');
+}));
+
+test('Termin-Kachel: beendete Termine treten zurueck, das Limit zaehlt nur Kommendes (#1449)', () => withSheetEnv({}, (__test) => {
+  const today = toLocalDateKey(new Date());
+  const ended = Array.from({ length: 5 }, (_, i) => ({
+    id: 10 + i, title: `Vorbei ${i}`,
+    start_datetime: `${today}T0${i + 1}:00:00`, end_datetime: `${today}T0${i + 1}:30:00`,
+  }));
+  const html = __test.renderUpcomingEvents([...ended, eveningEvent()], { now: todayAt(19, 28) });
+  nodeAssert.match(html, /Elternabend/, 'der kommende Abendtermin steht in der Kachel');
+  const endedRows = html.match(/event-item--ended/g) ?? [];
+  nodeAssert.equal(endedRows.length, 2, 'die zwei juengsten beendeten stehen zurueckgetreten darueber');
+  nodeAssert.match(html, /eventsEndedMore/, 'der Rest faltet sich in eine Zahl');
+  nodeAssert.ok(html.indexOf('Vorbei 4') < html.indexOf('Elternabend'), 'Beendetes oberhalb des Kommenden');
+  nodeAssert.ok(!html.includes('Vorbei 0'), 'aeltere beendete stehen nicht einzeln da');
+}));
 
 test('Notiz-Widget: nur der Auszug landet im DOM, nie der Volltext (Paket 3)', async () => {
   const { __test } = await import('../public/pages/dashboard.js');
@@ -1823,6 +2058,54 @@ test('getUpcomingEvents: fromToday=true zeigt heutige vergangene Termine (Issue 
     'Heute-Morgen-Termin muss mit fromToday=true erscheinen');
   assert(!events.find((e) => e.title === 'Past one-off'),
     'Termin von gestern darf auch mit fromToday nicht erscheinen');
+});
+
+/* #1449: DAS FUENFER-LIMIT ZAEHLT NUR, WAS NOCH KOMMT. Gemessen im Issue: um
+ * 19:28 lieferte die Abfrage fuenf laengst vorbeie Termine und liess den um
+ * 21:00 fallen. Beendete Termine von heute kommen weiter mit (die Kachel zeigt
+ * sie zurueckgetreten), aber AUSSERHALB des Deckels. Wanduhrzeit ohne Zone plus
+ * ein `now` aus derselben lokalen Uhr: die Haushaltszone faellt hier auf die
+ * Serverzone zurueck (keine sync_config), beide Seiten lesen also dieselbe. */
+test('getUpcomingEvents: das Limit zaehlt nur Kommendes, Beendetes von heute kommt ausserhalb mit (#1449)', () => {
+  cdb.exec('SAVEPOINT ended_today');
+  try {
+    const day = '2091-03-10';
+    const ended = ['06:00', '07:00', '08:00', '09:00', '10:00'].map((time, index) => insertEvent({
+      title: `Vorbei ${index + 1}`, start_datetime: `${day}T${time}:00`,
+      end_datetime: `${day}T${time.slice(0, 2)}:30:00`, created_by: cuTheo,
+    }));
+    const running = insertEvent({
+      title: 'Laeuft noch', start_datetime: `${day}T19:00:00`, end_datetime: `${day}T20:00:00`, created_by: cuTheo,
+    });
+    const evening = insertEvent({ title: 'Abendtermin', start_datetime: `${day}T21:00:00`, created_by: cuTheo });
+    const allDay = insertEvent({ title: 'Ganztags', start_datetime: day, all_day: 1, created_by: cuTheo });
+    const now = new Date(2091, 2, 10, 19, 28);
+
+    const plain = getUpcomingEvents(cdb, { userId: cuTheo, limit: 5, fromToday: true, windowDays: 1, now });
+    nodeAssert.ok(!plain.some((e) => Number(e.id) === Number(evening)),
+      'Vorbedingung: ohne die Option verdraengen die beendeten Termine den Abendtermin');
+
+    const events = getUpcomingEvents(cdb, {
+      userId: cuTheo, limit: 2, fromToday: true, windowDays: 1, now, keepEndedToday: 20,
+    });
+    const ids = events.map((e) => Number(e.id));
+    for (const id of ended) nodeAssert.ok(ids.includes(Number(id)), 'beendete Termine von heute bleiben dabei');
+    // Der Deckel von 2 gilt dem, was noch kommt: der laufende Termin zaehlt
+    // als kommend, der ganztaegige endet nie am eigenen Tag - beide passen,
+    // der Abendtermin ist der dritte und faellt heraus.
+    nodeAssert.ok(ids.includes(Number(running)), 'ein laufender Termin zaehlt als kommend');
+    nodeAssert.ok(ids.includes(Number(allDay)), 'ein Ganztagstermin endet nicht an seinem eigenen Tag');
+    nodeAssert.equal(events.length, ended.length + 2, 'das Limit zaehlt nur die zwei kommenden');
+    nodeAssert.ok(!ids.includes(Number(evening)), 'der dritte kommende faellt unter den Deckel');
+
+    const five = getUpcomingEvents(cdb, {
+      userId: cuTheo, limit: 5, fromToday: true, windowDays: 1, now, keepEndedToday: 20,
+    });
+    nodeAssert.ok(five.some((e) => Number(e.id) === Number(evening)),
+      'mit Fuenfer-Deckel steht der Abendtermin wieder drin (Abnahme aus #1449)');
+  } finally {
+    cdb.exec('ROLLBACK TO ended_today; RELEASE ended_today');
+  }
 });
 
 test('getUpcomingEvents: zukünftige Termine sortiert und auf limit begrenzt', () => {

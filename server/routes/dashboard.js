@@ -20,8 +20,10 @@ import { documentViewer } from '../services/document-links.js';
 import { householdMemberSql } from '../services/household-members.js';
 import { FastingError, getFastingDashboardState } from '../services/fasting.js';
 import { NUTRIENT_KEYS, nutritionSummaryFor } from '../services/health-nutrition.js';
-import { householdTimeZone, utcToWall, todayKey } from '../utils/timezone.js';
+import { householdTimeZone, utcToWall, todayKey, shiftDateKey } from '../utils/timezone.js';
 import { isAdminUser, serializeEvents } from './calendar/helpers.js';
+import { getOccurrences as getWasteOccurrences } from '../services/waste-store.js';
+import { scheduleData } from '../services/schedule.js';
 
 const log = createLogger('Dashboard');
 
@@ -83,7 +85,16 @@ const DENIED_PAYLOAD = Object.freeze({
       visitsThisMonth: 0, unpaidAmount: 0, lastVisit: null,
     },
   }),
+  // Die zwei Felder des Heute-Blatts (Critique 23.09.2026, P1). Eigene Namen
+  // statt `waste`/`schedule`: unter diesen Namen legt der Browser die Slices
+  // der Kacheln ab (`ensureWasteSlice`, `ensureScheduleSlice`), und ein
+  // gleichnamiges Feld hier liesse sie nie mehr laden.
+  waste: () => ({ wastePickups: [] }),
+  schedule: () => ({ myShiftsToday: [] }),
 });
+
+/** Wie viele beendete Termine von heute ausserhalb des Deckels mitkommen (#1449). */
+const ENDED_TODAY_POOL = 20;
 
 function emptyFastingWidget() {
   return {
@@ -268,8 +279,13 @@ router.get('/', (req, res) => {
   // Geteilte Logik mit /calendar/upcoming: expandiert wiederkehrende Serien,
   // sodass auch Termine erscheinen, deren Master-Start in der Vergangenheit liegt.
   if (allows('calendar')) try {
+    // Der Deckel von fuenf zaehlt nur, was noch kommt (#1449); beendete Termine
+    // von heute kommen ausserhalb mit - die Kachel zeigt sie zurueckgetreten,
+    // das Heute-Blatt laesst sie weg. Welche beendet sind, entscheidet der
+    // Browser an der Uhr: ein Termin endet auch zwischen zwei Abrufen.
     result.upcomingEvents = serializeEvents(getUpcomingEvents(d, {
       userId, limit: 5, fromToday: true, assignedTo: eventsAssignedTo, includeBirthdays,
+      keepEndedToday: ENDED_TODAY_POOL,
     }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminUser(req) });
   } catch (err) {
     log.error('upcomingEvents error:', err.message);
@@ -767,6 +783,52 @@ router.get('/', (req, res) => {
   } catch (err) {
     log.error('housekeeping error:', err.message);
     result.housekeeping = { configured: false, present: false, presentSince: null, workerName: null, visitsThisMonth: 0, unpaidAmount: 0, lastVisit: null };
+  }
+
+  // Abfuhr fuer das Heute-Blatt: heute (Tonne raus) und morgen (heute Abend
+  // rausstellen). Dieselbe Aufloesung wie Kachel, Modul und Kalender
+  // (`getOccurrences`, invariant #3: nie doppelt), nur das Zwei-Tage-Fenster
+  // und nur die Felder, die eine Zeile braucht. Die Typ-Auswahl der Kachel
+  // gilt hier nicht: die Zeile spricht nur, wenn die Kachel NICHT sichtbar ist.
+  if (allows('waste')) try {
+    const tomorrow = shiftDateKey(todayLocalKey, 1);
+    result.wastePickups = getWasteOccurrences(d, { from: todayLocalKey, to: tomorrow })
+      .map((o) => ({
+        date_key: o.date_key,
+        type_id: o.type_id,
+        type_name: o.type_name,
+        type_icon: o.type_icon,
+        type_color: o.type_color,
+        deep_link: o.deep_link,
+      }));
+  } catch (err) {
+    log.error('wastePickups error:', err.message);
+    result.wastePickups = [];
+  }
+
+  // Die EIGENE Schicht von heute - nicht die des Haushalts, die zeigt die
+  // Schichtplan-Kachel. Freie Tage sind keine Zeile: „frei" ist die Abwesenheit
+  // eines Programmpunkts, kein Programmpunkt.
+  if (allows('schedule')) try {
+    result.myShiftsToday = scheduleData(todayLocalKey, todayLocalKey, userId).entries
+      .filter((entry) => entry.shift_type && !entry.is_free)
+      .map((entry) => ({
+        date_key: entry.date_key,
+        source: entry.source,
+        crosses_midnight: entry.crosses_midnight,
+        shift_type: {
+          id: entry.shift_type.id,
+          name: entry.shift_type.name,
+          short_code: entry.shift_type.short_code ?? null,
+          start_time: entry.shift_type.start_time ?? null,
+          end_time: entry.shift_type.end_time ?? null,
+          color: entry.shift_type.color ?? null,
+          icon: entry.shift_type.icon ?? null,
+        },
+      }));
+  } catch (err) {
+    log.error('myShiftsToday error:', err.message);
+    result.myShiftsToday = [];
   }
 
   // „Heute dran"-Karte: pro Mitglied die Zahl der heute fälligen oder über-

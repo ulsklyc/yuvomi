@@ -151,6 +151,22 @@ db.prepare(`
   VALUES (?, NULL, 40, 0, ?, ?)
 `).run(`${todayLocal}T09:00:00`, workerId, PARENT);
 
+// Abfuhr und Schichtplan fuehrt die Antwort erst seit dem Heute-Blatt mit
+// (Befund P1 der Dashboard-Critique vom 23.09.2026): die Tonne, die heute
+// rausmuss, und die eigene Schicht. Beide gehoeren einem Modul und muessen mit
+// ihm verschwinden.
+const wasteTypeId = db.prepare(`
+  INSERT INTO waste_types (name, icon, color, created_by) VALUES ('Restmuell', 'trash-2', '#6B7280', ?)
+`).run(PARENT).lastInsertRowid;
+db.prepare('INSERT INTO waste_one_off_pickups (type_id, date, created_by) VALUES (?, ?, ?)')
+  .run(wasteTypeId, todayLocal, PARENT);
+const shiftTypeId = db.prepare(`
+  INSERT INTO schedule_shift_types (name, short_code, start_time, end_time, color, created_by)
+  VALUES ('Fruehdienst', 'F', '06:00', '14:00', '#00668F', ?)
+`).run(PARENT).lastInsertRowid;
+db.prepare('INSERT INTO schedule_extra_shifts (user_id, date_key, shift_type_id, created_by) VALUES (?, ?, ?, ?)')
+  .run(KID, todayLocal, shiftTypeId, PARENT);
+
 // --------------------------------------------------------------------------
 // Server: die Auth-Schicht wird nachgestellt wie in server/auth.js
 // (`applyRoleModuleAccess`) - Admin bekommt null (Bypass), ein eingeschränktes
@@ -232,6 +248,26 @@ test('Vorbedingung: ohne Einschränkung liefert der Endpoint dem Mitglied jeden 
   assert.equal(body.health.dosesTotal, 1);
   assert.equal(body.housekeeping.present, true);
   assert.equal(body.countdownTotal, 2, 'ein Termin- und ein Aufgaben-Countdown (#647)');
+  assert.equal(body.wastePickups[0]?.type_name, 'Restmuell', 'die Abholung von heute steht in der Antwort');
+  assert.equal(body.myShiftsToday[0]?.shift_type?.name, 'Fruehdienst', 'die eigene Schicht von heute');
+});
+
+test('Heute-Blatt: Abfuhr nur fuer heute und morgen, die Schicht nur die eigene', async () => {
+  clearModuleDenials(KID);
+  const later = db.prepare('INSERT INTO waste_one_off_pickups (type_id, date, created_by) VALUES (?, ?, ?)')
+    .run(wasteTypeId, inThreeDays, PARENT).lastInsertRowid;
+  try {
+    const kid = await dashboardAs(KID);
+    assert.deepEqual(kid.wastePickups.map((p) => p.date_key), [todayLocal],
+      'eine Abholung in drei Tagen gehoert nicht ins Heute-Blatt');
+    assert.equal(kid.wastePickups[0].type_color, '#6B7280');
+
+    const parent = await dashboardAs(PARENT);
+    assert.deepEqual(parent.myShiftsToday, [], 'die Schicht des Kindes ist nicht die Schicht der Eltern');
+    assert.equal(parent.wastePickups.length, 1, 'die Abfuhr ist haushaltsweit');
+  } finally {
+    db.prepare('DELETE FROM waste_one_off_pickups WHERE id = ?').run(later);
+  }
 });
 
 // --------------------------------------------------------------------------
@@ -307,6 +343,8 @@ const MODULE_PROBES = {
   rewards: (b) => b.rewards.standings.length + b.rewards.participantCount,
   health: (b) => (b.health.hasMeds ? 1 : 0) + b.health.dosesTotal + b.health.lowStockCount,
   housekeeping: (b) => (b.housekeeping.configured ? 1 : 0) + (b.housekeeping.present ? 1 : 0),
+  waste: (b) => b.wastePickups.length,
+  schedule: (b) => b.myShiftsToday.length,
 };
 
 test('Jedes gesperrte Modul verschwindet, und keins nimmt ein anderes mit', async () => {

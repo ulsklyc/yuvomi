@@ -7,6 +7,7 @@
 import { api, auth } from '/api.js';
 import { createPageController } from '/utils/page-lifecycle.js';
 import { canSeeWidget, moduleAccess, navModuleAccess, canUseFasting } from '/permissions.js';
+import { todaySheetContext, collectSourceRows, composeTodaySheet, codaAllowed } from '/utils/today-sheet.js';
 import { t, formatDate, formatTime, timeSuffix, getLocale, getNumberFormat } from '/i18n.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { resolveEventColor } from '/utils/event-color.js';
@@ -97,6 +98,32 @@ function calendarEventRoute(event) {
   const occurrenceDate = eventOccurrenceDateKey(event);
   if (/^\d{4}-\d{2}-\d{2}$/.test(occurrenceDate)) params.set('date', occurrenceDate);
   return `/calendar?${params.toString()}`;
+}
+
+/** Jetzt als Wanduhr-Stempel des Haushalts ('YYYY-MM-DDTHH:MM'). */
+function householdNowStamp(now = new Date()) {
+  return `${zonedDateKey(now)}T${zonedTimeKey(now)}`;
+}
+
+/**
+ * Ist dieser Termin vorbei (#1449)? „Vorbei" heisst: sein ENDE liegt hinter
+ * uns, gelesen in der Wanduhr des Haushalts - dieselbe Regel wie serverseitig
+ * in `getUpcomingEvents` (`keepEndedToday`). Ein laufender Termin zaehlt also
+ * noch, ein ganztaegiger endet nie an seinem eigenen Tag, und ohne Ende ist
+ * der Start das Ende.
+ *
+ * Gefragt wird hier und nicht nur beim Laden, weil ein Termin auch zwischen
+ * zwei Abrufen endet: das unberuehrte Wandtablet soll um 9:31 nicht mehr den
+ * Termin bis 9:30 zeigen, sondern erst in einer Viertelstunde.
+ */
+function eventHasEnded(event, nowStamp) {
+  if (!event || event.all_day) return false;
+  const end = String(event.end_datetime || event.start_datetime || '');
+  if (end.length <= 10) return false;
+  const endDay = zonedDateKey(end);
+  const endTime = zonedTimeKey(end);
+  if (!endDay || !endTime) return false;
+  return `${endDay}T${endTime}` <= nowStamp;
 }
 
 function getAppName() {
@@ -871,15 +898,19 @@ const MEAL_SORT_TIME = { breakfast: '08:00', lunch: '12:30', snack: '15:30', din
  * dann heute Fälliges ohne Uhrzeit (00:02). upcomingEvents liefert nur „ab
  * jetzt" - Vergangenes verschwindet also von selbst aus dem Programm.
  */
-function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, includeMeals = true } = {}) {
+function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, includeMeals = true, now = new Date() } = {}) {
   const highlights = buildTodayHighlights(data);
-  const todayKey = householdToday();
+  const todayKey = zonedDateKey(now);
+  const nowStamp = householdNowStamp(now);
   const events = Array.isArray(data?.upcomingEvents) ? data.upcomingEvents : [];
   const rows = [];
 
   if (includeCalendar) {
     for (const event of events) {
       if (eventOccurrenceDateKey(event) !== todayKey) continue;
+      // Das Blatt verspricht, was heute NOCH ansteht (#1449): ein beendeter
+      // Termin verlaesst es. Die Termin-Kachel behaelt ihn zurueckgetreten.
+      if (eventHasEnded(event, nowStamp)) continue;
       const start = eventStartDate(event);
       const timed = !event.all_day && start && String(event.start_datetime).length > 10;
       rows.push({
@@ -893,6 +924,10 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
         tone: 'event',
         route: calendarEventRoute(event),
         who: event.assigned_users?.[0] ?? null,
+        // Beitrags-Vertrag (utils/today-sheet.js): ein Termin ist ein Rahmen
+        // des Tages, kein Auftrag - er haelt die Coda nicht auf.
+        priority: 40,
+        open: false,
       });
     }
   }
@@ -919,6 +954,8 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
         tone: 'task',
         route: '/tasks',
         who: task.assigned_users?.[0] ?? null,
+        priority: overdue ? 10 : 30,
+        open: true,
       });
     }
   }
@@ -935,6 +972,8 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
       tone: 'dinner',
       route: '/meals',
       who: null,
+      priority: 80,
+      open: false,
     });
   }
 
@@ -1026,7 +1065,30 @@ function renderUrgentTasks(tasks) {
   </div>`;
 }
 
-function renderUpcomingEvents(events) {
+/* BEENDETE TERMINE TRETEN ZURUECK, UND DAS LIMIT ZAEHLT NUR KOMMENDES (#1449).
+ *
+ * Die Kachel las nie die Endzeit: ein Termin, der um 9:00 vorbei war, sah aus
+ * wie einer um 18:00, und fuenf vorbeie fuellten das Limit, waehrend der um
+ * 21:00 fehlte. Der Server liefert das Kommende jetzt ungedeckelt vom
+ * Vergangenen (`keepEndedToday`); hier entscheidet die Uhr, was davon vorbei
+ * ist - auch zwischen zwei Abrufen.
+ *
+ * Die zwei juengsten beendeten stehen zurueckgetreten UEBER dem Kommenden
+ * (chronologisch sind sie frueher), der Rest faltet sich in eine Zahl: an einem
+ * vollen Tag waeren sonst sechs vergangene Zeilen der Inhalt der Kachel.
+ * Zurueckgetreten heisst: Farbe statt Deckung (#1230) und ein Wort im Etikett
+ * statt „Heute" - der Zustand haengt nicht an der Farbe allein. */
+const ENDED_EVENTS_SHOWN = 2;
+const UPCOMING_EVENTS_SHOWN = 5;
+
+function renderUpcomingEvents(allEvents, { now = new Date() } = {}) {
+  const todayKey = zonedDateKey(now);
+  const nowStamp = householdNowStamp(now);
+  const endedToday = allEvents.filter((e) => eventOccurrenceDateKey(e) === todayKey && eventHasEnded(e, nowStamp));
+  const ended = endedToday.slice(-ENDED_EVENTS_SHOWN);
+  const folded = endedToday.length - ended.length;
+  const ahead = allEvents.filter((e) => !endedToday.includes(e)).slice(0, UPCOMING_EVENTS_SHOWN);
+  const events = [...ended, ...ahead];
   if (!events.length) {
     return `<div class="widget widget--calendar">
       ${widgetHeader('calendar', t('nav.calendar'), 0, '/calendar')}
@@ -1039,15 +1101,19 @@ function renderUpcomingEvents(events) {
 
   // Der Tagesvergleich ueber KEYS, nicht ueber `toDateString()`: das las die
   // Browser-Zone und machte „heute" zu einer Frage an das Geraet (#851).
-  const today = householdToday();
+  const today = todayKey;
   const items = events.map((e) => {
     const d = eventStartDate(e) ?? new Date(e.start_datetime);
     const dayKey = eventOccurrenceDateKey(e);
     const isToday = dayKey === today;
+    const isEnded = ended.includes(e);
     const _suffix = timeSuffix();
     const timeStr = e.all_day ? t('dashboard.allDay') : `${formatTime(d)}${_suffix ? ' ' + _suffix : ''}`.trim();
+    const badge = isEnded
+      ? `<span class="event-time-badge">${esc(t('dashboard.eventEnded'))}</span>`
+      : `<span class="event-time-badge ${isToday ? 'event-time-badge--today' : ''}">${isToday ? t('common.today') : relativeDateLabel(dayKey)}</span>`;
     return `
-      <div class="event-item" data-route="${esc(calendarEventRoute(e))}" role="button" tabindex="0">
+      <div class="event-item${isEnded ? ' event-item--ended' : ''}" data-route="${esc(calendarEventRoute(e))}" role="button" tabindex="0">
         <!-- Dieselbe Regel wie im Kalender, aus derselben Datei. Hier stand
              e.color || e.cal_color - dieselbe Frage ohne den Zweig fuer die
              zugewiesene Person, was seit #891 zwei verschiedene Antworten
@@ -1056,7 +1122,7 @@ function renderUpcomingEvents(events) {
         <div class="event-item__content">
           <div class="event-item__title">${esc(e.title)}</div>
           <div class="event-item__time">
-            <span class="event-time-badge ${isToday ? 'event-time-badge--today' : ''}">${isToday ? t('common.today') : relativeDateLabel(dayKey)}</span>
+            ${badge}
             ${timeStr}
             ${e.location ? ` · ${esc(fmtLocation(e.location))}` : ''}
             ${e.cal_name ? `<span class="event-item__cal">${esc(e.cal_name)}</span>` : ''}
@@ -1067,9 +1133,14 @@ function renderUpcomingEvents(events) {
     `;
   }).join('');
 
+  const earlier = folded > 0
+    ? `<p class="event-list__earlier">${esc(t('dashboard.eventsEndedMore', { count: folded }))}</p>`
+    : '';
+  // Die Zahl im Kopf ist das Kommende: „3 Termine" neben zwei vorbeien und
+  // drei kommenden hiesse sonst mal dies, mal das.
   return `<div class="widget widget--calendar">
-    ${widgetHeader('calendar', t('nav.calendar'), events.length, '/calendar')}
-    <div class="widget__body">${items}</div>
+    ${widgetHeader('calendar', t('nav.calendar'), ahead.length, '/calendar')}
+    <div class="widget__body">${earlier}${items}</div>
   </div>`;
 }
 
@@ -2455,7 +2526,7 @@ function renderHousekeepingWidget(hk, currency) {
  * Es erscheint NUR dann - nicht am Einkauf, nicht am Essen, und im
  * Solo-Haushalt an keiner Zeile (`whoMark` entscheidet das selbst). Ein
  * Zeichen, das immer da ist, sagt nichts. */
-function renderTodayRow(row) {
+function renderTodayRow(row, extraClass = '') {
   const mark = whoMark(row.who);
   // Trailing-Detail ist die ZEIT, kein Zähler mehr: die Programm-Zeile
   // beantwortet „wann", und dieselbe Badge-Form für drei Bedeutungen
@@ -2493,7 +2564,7 @@ function renderTodayRow(row) {
       </span>
       ${time}
   `;
-  const attrs = `class="today-cockpit-card today-cockpit-card--${row.tone}" data-route="${esc(row.route)}"${objectAttrs}`;
+  const attrs = `class="today-cockpit-card today-cockpit-card--${esc(row.tone)}${extraClass}" data-route="${esc(row.route)}"${objectAttrs}`;
   return opensModal
     ? `<button type="button" ${attrs}>${inner}</button>`
     : `<a href="${esc(row.route)}" ${attrs}>${inner}</a>`;
@@ -2534,7 +2605,7 @@ const PROGRAM_ROW_CAP = 6;
  * @returns {{rows: object[], overflow: number, state: object|null,
  *            shopping: object|null, coda: string|null}}
  */
-function buildTodayCockpitModel(data, cfg = [], { cap = PROGRAM_ROW_CAP } = {}) {
+function buildTodayCockpitModel(data, cfg = [], { cap = PROGRAM_ROW_CAP, now = new Date() } = {}) {
   // Kein Echo: ist das Modul-Widget einer Domäne sichtbar, entfallen ihre
   // Programm-Zeilen — jede Domäne hat genau eine Repräsentation (Cockpit ODER
   // Widget), statt dieselbe Aufgabe/Termin doppelt zu zeigen.
@@ -2546,9 +2617,26 @@ function buildTodayCockpitModel(data, cfg = [], { cap = PROGRAM_ROW_CAP } = {}) 
   const includeMeals = domainInCockpit('meals');
   const includeShopping = domainInCockpit('shopping');
 
-  const program = buildTodayProgram(data, { includeTasks, includeCalendar, includeMeals });
-  const visibleRows = program.rows.slice(0, cap);
-  const overflow = program.rows.length - visibleRows.length;
+  const program = buildTodayProgram(data, { includeTasks, includeCalendar, includeMeals, now });
+
+  // Die uebrigen Quellen des Blatts (Dosen, Freigaben, Abfuhr, Geburtstag,
+  // Schicht, Erinnerungen, Haushaltshilfe) sprechen ueber den Beitrags-Vertrag
+  // in utils/today-sheet.js - mit denselben drei Riegeln wie oben
+  // (Modulschalter, Recht, Kein-Echo) und derselben Zeilenform. Cockpit und
+  // Wand fragen beide hier; die Wand reicht nur keine Kachel-Konfiguration mit.
+  const todayKey = zonedDateKey(now);
+  const sheetContext = todaySheetContext({
+    todayKey,
+    tomorrowKey: addLocalDays(todayKey, 1),
+    nowTime: zonedTimeKey(now),
+    cfg,
+    isModuleDisabled: (module) => Boolean(window.yuvomi?.isModuleDisabled(module)),
+    existing: program.rows,
+  });
+  const contributed = collectSourceRows(data, sheetContext);
+  const sheet = composeTodaySheet([...program.rows, ...contributed.rows], { cap });
+  const visibleRows = sheet.rows;
+  const overflow = sheet.overflow;
 
   // Ausblick über heute hinaus: das chronologisch Nächste aus Termin UND
   // fälliger Aufgabe - die Beruhigung darf nicht um Mitternacht enden
@@ -2615,8 +2703,10 @@ function buildTodayCockpitModel(data, cfg = [], { cap = PROGRAM_ROW_CAP } = {}) 
   // Schichtplan-Kachel mehr etwas behauptet.
   const scheduleWidgetVisible = !window.yuvomi?.isModuleDisabled('schedule') && widgetShown('schedule');
   let state = null;
-  if (!program.rows.length && !scheduleWidgetVisible) {
-    const sayAllDone = includeTasks && program.tasksDoneToday > 0;
+  if (!sheet.allRows.length && !scheduleWidgetVisible) {
+    // „Alles erledigt" sagt auch eine Quelle, deren Offenes heute geschafft
+    // ist (alle Dosen genommen) - sonst hiesse derselbe Tag „Heute frei".
+    const sayAllDone = (includeTasks && program.tasksDoneToday > 0) || contributed.settled;
     if (sayAllDone || includeCalendar) {
       state = {
         title: sayAllDone ? t('dashboard.todayAllDone') : t('dashboard.todayFree'),
@@ -2648,9 +2738,14 @@ function buildTodayCockpitModel(data, cfg = [], { cap = PROGRAM_ROW_CAP } = {}) 
   // eine Aufgabe fällig, sagt die Coda es dazu - sonst wäre „nichts mehr" um
   // 21 Uhr eine falsche Entwarnung (Critique P3). Nur morgen, nicht später:
   // eine Frist in drei Tagen ist keine Falle.
+  //
+  // Seit dem Beitrags-Vertrag ausserdem nur, wenn keine Zeile mehr OFFEN ist
+  // (`codaAllowed`): unter einer offenen Dosis, einer wartenden Freigabe oder
+  // der Tonne am Morgen ist „nichts mehr" keine Entwarnung, sondern ein
+  // Widerspruch zur Zeile darueber.
   let coda = null;
-  if (program.rows.length > 0 && overflow === 0) {
-    const tomorrowKey = addLocalDays(householdToday(), 1);
+  if (codaAllowed(sheet)) {
+    const tomorrowKey = addLocalDays(todayKey, 1);
     const tomorrowTask = includeTasks && program.nextDueTask?.due_date === tomorrowKey ? program.nextDueTask : null;
     coda = tomorrowTask
       ? t('dashboard.todayNothingElseTomorrow', { title: tomorrowTask.title })
@@ -2661,15 +2756,32 @@ function buildTodayCockpitModel(data, cfg = [], { cap = PROGRAM_ROW_CAP } = {}) 
   // SEHEN ist, nicht, was heute ansteht. „Wer heute dran ist" zaehlt ueber den
   // ganzen Tag - sonst verschwaende jemand aus der Antwort, nur weil seine
   // Zeilen hinter dem Deckel liegen.
-  return { rows: visibleRows, allRows: program.rows, overflow, state, shopping, coda };
+  return { rows: visibleRows, allRows: sheet.allRows, overflow, state, shopping, coda };
 }
 
-function renderTodayCockpit(data, cfg = [], editing = false) {
-  const model = buildTodayCockpitModel(data, cfg);
+function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date() } = {}) {
+  const model = buildTodayCockpitModel(data, cfg, { now });
 
+  /* DIE BREITE BUEHNE TRAEGT ZWEI SPALTEN ZEILEN (Critique 23.09.2026). Am
+   * Desktop ist das Blatt 1140px breit, und eine Zeile nutzte davon ~200px
+   * Text - dazwischen lag ein leeres Band bis zur Uhrzeit. Ab einer
+   * Containerbreite (dashboard.css, `today-cockpit__rows--split`) laufen die
+   * Zeilen deshalb in zwei Spalten, SPALTENWEISE: links die fruehe, rechts die
+   * spaete Haelfte des Tages, damit das Programm von oben nach unten gelesen
+   * bleibt. Die Haelfte steht hier, weil nur das Markup die Zahl kennt; auf
+   * schmaler Buehne haben die Klassen keine Wirkung, das Blatt bleibt eine
+   * Liste in unveraenderter Hoehe. */
+  const listRows = [];
+  if (model.state) listRows.push(renderTodayStateRow(model.state));
+  const split = model.rows.length >= 2;
+  const perColumn = Math.ceil(model.rows.length / 2);
+  listRows.push(...model.rows.map((row, index) => renderTodayRow(row, split && index >= perColumn
+    ? ` today-cockpit-card--col2${index === perColumn ? ' today-cockpit-card--col-start' : ''}`
+    : '')));
   const parts = [];
-  if (model.state) parts.push(renderTodayStateRow(model.state));
-  parts.push(...model.rows.map(renderTodayRow));
+  if (listRows.length) {
+    parts.push(`<div class="today-cockpit__rows${split ? ' today-cockpit__rows--split' : ''}"${split ? ` style="--today-rows-per-column:${perColumn}"` : ''}>${listRows.join('')}</div>`);
+  }
   if (model.overflow > 0) {
     parts.push(`<div class="today-cockpit__more">${esc(t('dashboard.todayMore', { count: model.overflow }))}</div>`);
   }
@@ -3995,8 +4107,8 @@ function renderWallError() {
  * `wireWallSurface`). Weil sonst nichts auf der Flaeche beruehrbar ist,
  * kollidiert dieses Wecken mit nichts.
  */
-function renderWallSurface(data, weather, { failed = false, loading = false, updatedAt = null } = {}) {
-  const model = failed || loading ? null : buildTodayCockpitModel(data, [], { cap: WALL_ROW_CAP });
+function renderWallSurface(data, weather, { failed = false, loading = false, updatedAt = null, now = new Date() } = {}) {
+  const model = failed || loading ? null : buildTodayCockpitModel(data, [], { cap: WALL_ROW_CAP, now });
 
   let main;
   if (failed) {
@@ -4482,10 +4594,11 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // dahinter waere die falscheste aller Angaben.
   let lastLoadedAt = null;
   try {
-    const [dashRes, weatherRes, prefsRes] = await Promise.all([
+    const [dashRes, weatherRes, prefsRes, remindersRes] = await Promise.all([
       api.get(layoutHintQuery('/dashboard')),
       api.get(`/weather?lang=${encodeURIComponent(getLocale())}`).catch(() => ({ data: null })),
       api.get('/preferences').catch(() => ({ data: {} })),
+      loadPendingReminders(),
     ]);
     // Ueberholt oder verlassen, waehrend die Antworten unterwegs waren (#977):
     // dieser Aufbau gehoert niemandem mehr und faesst die Flaeche nicht an.
@@ -4533,6 +4646,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
         setCountdownAvailability(data?.countdowns);
       } catch { /* die ungefilterte Antwort steht bereits - lieber mehr als nichts */ }
     }
+    data.pendingReminders = remindersRes;
     glanceVisible = prefsRes.data?.dashboard_today_glance !== false;
     savedGlanceVisible = glanceVisible;
     followsDefault = prefsRes.data?.dashboard_follows_default !== false;
@@ -4641,6 +4755,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       fresh.cycle = data.cycle;
       fresh.schedule = data.schedule;
       fresh.waste = data.waste;
+      fresh.pendingReminders = data.pendingReminders;
       data = fresh;
       setCountdownAvailability(data?.countdowns);
       lastLoadedAt = new Date();
@@ -5134,6 +5249,8 @@ export async function render(container, { user, signal: routeSignal = null } = {
       }
       fresh.schedule = data.schedule;
       fresh.waste = data.waste;
+      fresh.pendingReminders = await loadPendingReminders();
+      if (signal.aborted) return;
       data = fresh;
       lastLoadedAt = new Date();
       rebuildDashboard(widgetConfig);
@@ -5172,7 +5289,24 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // 06:00 muss die Flaeche umschalten, wenn es so weit ist - nicht erst beim
   // naechsten Laden. Ein zweiter Timer nur dafuer waere ein zweiter Takt fuer
   // dieselbe Minute.
-  startClockTicker(container, signal, wallMode ? () => syncWallMode(location.pathname) : null);
+  //
+  // Derselbe Takt traegt die Grenzen des Tages (#1449): endet ein Termin, wird
+  // eine Dosis faellig oder ist die Tonne mittags abgeholt, aendert sich das
+  // Blatt - ohne Neuladen, denn das unberuehrte Wandtablet wartet sonst bis zum
+  // stillen Refresh. Gebaut wird nur, wenn sich der Stand WIRKLICH geaendert
+  // hat: der Fingerabdruck ist billig, ein Neuaufbau je Minute waere es nicht.
+  let dayFingerprint = todayFingerprint(data, widgetConfig);
+  const followDayBoundaries = () => {
+    if (loadFailed || isCustomizing) return;
+    const next = todayFingerprint(data, widgetConfig);
+    if (next === dayFingerprint) return;
+    dayFingerprint = next;
+    rebuildDashboard(widgetConfig);
+  };
+  startClockTicker(container, signal, () => {
+    if (wallMode) syncWallMode(location.pathname);
+    followDayBoundaries();
+  });
 
   // 30-Minuten Auto-Refresh für Wetter (inkl. optionaler Standort-Aktualisierung).
   // Anker ist der Datensatz, nicht der Karten-Button: seit dem Masthead-Umzug
@@ -5218,6 +5352,41 @@ export async function render(container, { user, signal: routeSignal = null } = {
 }
 
 /**
+ * Was sich am Tag allein durch die Uhr aendert: welche Zeilen im Blatt stehen
+ * (samt offen/ueberfaellig) und welche Termine vorbei sind. Ein Stempel, kein
+ * Markup - verglichen wird nur, ob ein Neuaufbau etwas anderes zeigen wuerde.
+ */
+function todayFingerprint(data, cfg, now = new Date()) {
+  if (!data) return '';
+  const model = buildTodayCockpitModel(data, cfg, { now });
+  const nowStamp = householdNowStamp(now);
+  const ended = (Array.isArray(data.upcomingEvents) ? data.upcomingEvents : [])
+    .filter((event) => eventHasEnded(event, nowStamp))
+    .map((event) => `${event.id}@${event.start_datetime}`);
+  return JSON.stringify([
+    model.rows.map((row) => [row.kind, row.objectId, row.title, row.open, Boolean(row.overdue)]),
+    model.overflow, Boolean(model.coda), Boolean(model.state), ended,
+  ]);
+}
+
+/**
+ * Die faelligen Erinnerungen fuer das Heute-Blatt (utils/today-sheet.js).
+ *
+ * Derselbe Endpunkt, den die Glocke pollt - er filtert Herkuenfte schon nach
+ * Modulrecht und Token-Scope (`mayTouchOrigin`), das Blatt waehlt daraus nur
+ * noch, welche Herkunft eine Zeile ist. Ein Fehler kostet die Zeilen, nicht
+ * die Uebersicht: die Erinnerung spricht weiter ueber Toast und Glocke.
+ */
+async function loadPendingReminders() {
+  try {
+    const res = await api.get('/reminders/pending');
+    return Array.isArray(res?.data) ? res.data : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Der Schichtplan eines Tages fuer die Kachel: Eintraege, ob es ueberhaupt
  * Typen gibt, und die Namen der Plan-Besitzer. data.users kommt aus der
  * Mitgliederliste (#1207); auch Hauspersonal kann einen Plan haben, und seine
@@ -5238,7 +5407,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { loadScheduleSlice, renderUrgentTasks, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab };
+export const __test = { loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

@@ -6,7 +6,7 @@ export function dashboardPaths() {
       get: op({
         summary: 'Get dashboard data',
         tag: 'Dashboard',
-        description: 'Aggregated data for every overview tile. Optional query parameters filter tasks, upcoming events and pinned notes before row limits and counts are computed. Task filters apply to every task slice (`urgentTasks`, `openTaskCount`, `overdueTaskCount`, `memberTodayTasks`, `tasksDoneToday`); note filters apply to both `pinnedNotes` and `pinnedNotesCount`. The browser derives these filters from per-widget `options` stored in `dashboard_widgets`.',
+        description: 'Aggregated data for every overview tile. Optional query parameters filter tasks, upcoming events and pinned notes before row limits and counts are computed. Task filters apply to every task slice (`urgentTasks`, `openTaskCount`, `overdueTaskCount`, `memberTodayTasks`, `tasksDoneToday`); note filters apply to both `pinnedNotes` and `pinnedNotesCount`. The browser derives these filters from per-widget `options` stored in `dashboard_widgets`. `upcomingEvents` counts only appointments that have not ended toward its five-item cap; already ended ones of today (end before now in the household time zone, never all-day ones) come along outside the cap. `wastePickups` lists the collections of today and tomorrow (Waste module), `myShiftsToday` the own shifts of the caller of today (Schedule module); both are empty when the module is denied.',
         params: [
           {
             name: 'notes_category',
