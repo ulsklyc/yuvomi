@@ -176,6 +176,11 @@ app.use(compression());
 // --------------------------------------------------------
 // Request-Parsing
 // --------------------------------------------------------
+// Schreibsperre waehrend eines Restores (#1431). Vor den Body-Parsern: ein
+// zweiter Restore wird abgewiesen, bevor sein Upload gelesen wird. Vor den
+// Sessions: auch deren Schreiben (Login, Logout) gehoert dazu. Vor /mcp und
+// allen Routern, damit kein Schreibzugriff durchrutscht.
+app.use(createRestoreWriteGate(db.isRestoreRunning));
 app.use(express.json({ limit: BODY_LIMIT }));
 app.use(express.urlencoded({ extended: true, limit: BODY_LIMIT }));
 
@@ -189,13 +194,6 @@ app.use((err, req, res, next) => {
   }
   next(err);
 });
-
-// --------------------------------------------------------
-// Schreibsperre waehrend eines Restores (#1431)
-// Vor den Sessions: auch deren Schreiben (Login, Logout) gehoert dazu, und
-// vor /mcp und allen Routern, damit kein Schreibzugriff durchrutscht.
-// --------------------------------------------------------
-app.use(createRestoreWriteGate(db.isRestoreRunning));
 
 // --------------------------------------------------------
 // Sessions

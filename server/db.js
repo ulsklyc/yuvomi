@@ -23,6 +23,7 @@ import os from 'node:os';
 import fs from 'node:fs/promises';
 import { mkdirSync, existsSync, renameSync, linkSync, rmSync, copyFileSync, openSync, readSync, closeSync, statSync, readdirSync } from 'node:fs';
 import { createLogger } from './logger.js';
+import { RESTORE_IN_PROGRESS_MESSAGE, RESTORE_IN_PROGRESS_REASON } from './utils/restore-messages.js';
 import { decodeHtmlEntities } from './utils/html-entities.js';
 import { toE164, defaultCountryFromConfig } from './utils/phone.js';
 
@@ -10442,11 +10443,7 @@ let restoreRunning = false;
  */
 async function restoreFromFile(sourcePath, { backupKey = null } = {}) {
   if (restoreRunning) {
-    throw restoreError(
-      'Another restore is already running on this instance. Wait until it has finished, then check '
-      + 'which backup is in place before restoring again. This request changed nothing.',
-      'restore_in_progress'
-    );
+    throw restoreError(RESTORE_IN_PROGRESS_MESSAGE, RESTORE_IN_PROGRESS_REASON);
   }
   restoreRunning = true;
   // Ab jetzt nimmt die laufende Verbindung keine Schreibzugriffe mehr an

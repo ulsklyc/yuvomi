@@ -1101,7 +1101,7 @@ test('#1431 ein verschluesseltes Backup (VACUUM INTO) laeuft auch waehrend eines
   target.mod.get().close();
 });
 
-test('#1431 restoreWriteGate: schreibende Requests bekommen waehrend eines Restores 503, lesende und der Restore selbst nicht', async () => {
+test('#1431 restoreWriteGate: schreibende Requests bekommen waehrend eines Restores 503, ein zweiter Restore 409, lesende gehen durch', async () => {
   const { createRestoreWriteGate } = await import('../server/middleware/restore-gate.js');
   let running = true;
   const gate = createRestoreWriteGate(() => running);
@@ -1121,16 +1121,19 @@ test('#1431 restoreWriteGate: schreibende Requests bekommen waehrend eines Resto
   assert.equal(post.res.body.code, 503);
   for (const method of ['PUT', 'PATCH', 'DELETE']) assert.equal(call(method, '/mcp').passed, false, method);
   assert.equal(call('GET', '/api/v1/tasks').passed, true);
-  assert.equal(call('POST', '/api/v1/backup/restore?x=1').passed, true, 'der Restore-Endpunkt antwortet selbst mit 409');
+  const second = call('POST', '/api/v1/backup/restore?x=1');
+  assert.equal(second.passed, false, 'ein zweiter Restore kommt nicht bis zur Route');
+  assert.equal(second.res.statusCode, 409);
+  assert.equal(second.res.body.reason, 'restore_in_progress');
   running = false;
   assert.equal(call('POST', '/api/v1/tasks').passed, true);
 });
 
-test('#1431 restoreWriteGate haengt vor Sessions und Routern', () => {
+test('#1431 restoreWriteGate haengt vor Body-Parsern, Sessions und Routern', () => {
   const source = readFileSync(new URL('../server/index.js', import.meta.url), 'utf8');
   const gate = source.indexOf('app.use(createRestoreWriteGate(db.isRestoreRunning));');
   assert.ok(gate > 0, 'server/index.js muss den Riegel mit db.isRestoreRunning einhaengen');
-  for (const later of ['app.use(sessionMiddleware);', "app.use('/api/v1/auth', authRouter);", "app.use('/mcp'", "app.use('/api/v1/tasks', tasksRouter);"]) {
+  for (const later of ['app.use(express.json(', 'app.use(express.urlencoded(', 'app.use(sessionMiddleware);', "app.use('/api/v1/auth', authRouter);", "app.use('/mcp'", "app.use('/api/v1/tasks', tasksRouter);"]) {
     assert.ok(source.indexOf(later) > gate, `${later} kommt nach dem Riegel`);
   }
 });

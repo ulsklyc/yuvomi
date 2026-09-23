@@ -176,7 +176,14 @@ class BetterSQLiteStore extends session.Store {
     `);
     // Abgelaufene Sessions regelmäßig aufräumen (alle 15 Minuten)
     setInterval(() => {
-      db.get().prepare('DELETE FROM sessions WHERE expired_at <= ?').run(Date.now());
+      // Waehrend eines Restores ist die Verbindung gesperrt oder zu (#1431) -
+      // ein Wurf hier waere eine ungefangene Ausnahme im Timer.
+      if (db.isRestoreRunning()) return;
+      try {
+        db.get().prepare('DELETE FROM sessions WHERE expired_at <= ?').run(Date.now());
+      } catch (err) {
+        log.warn(`Session cleanup failed: ${err?.message ?? err}`);
+      }
     }, 15 * 60_000).unref();
   }
 
@@ -192,6 +199,11 @@ class BetterSQLiteStore extends session.Store {
   }
 
   set(sid, sess, callback) {
+    // Waehrend eines Restores nimmt die Datenbank keine Schreibzugriffe an
+    // (#1431). Schreibende Requests weist `restoreWriteGate` ab; hier kommen nur
+    // Aenderungen aus Lesezugriffen an (etwa ein neues CSRF-Token). Sie
+    // verfallen still, statt den Seitenaufruf mit 500 zu beenden.
+    if (db.isRestoreRunning()) return callback(null);
     try {
       const ttl = sess.cookie?.maxAge ?? SESSION_MAX_AGE_MS;
       const expiredAt = Date.now() + ttl;
@@ -234,6 +246,9 @@ class BetterSQLiteStore extends session.Store {
   // dem Cookie, hoechstens eine Drosselfrist danach - ein gueltiges Cookie
   // fuehrt nie ins Leere.
   touch(sid, sess, callback) {
+    // Waehrend eines Restores: die Sitzung bleibt einfach so lange gueltig,
+    // wie sie war (#1431) - statt jeden Seitenaufruf mit 500 zu beenden.
+    if (db.isRestoreRunning()) return callback(null);
     try {
       const ttl = sess.cookie?.maxAge ?? SESSION_MAX_AGE_MS;
       const expiredAt = Date.now() + ttl;
@@ -788,9 +803,13 @@ function authenticateApiToken(req) {
   `).get(tokenHash);
   if (!row) return null;
 
-  db.get().prepare(`
-    UPDATE api_tokens SET last_used_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?
-  `).run(row.id);
+  // Buchfuehrung, kein Teil der Anfrage: waehrend eines Restores (#1431)
+  // entfaellt sie, statt jeden Token-Aufruf mit 500 zu beenden.
+  if (!db.isRestoreRunning()) {
+    db.get().prepare(`
+      UPDATE api_tokens SET last_used_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?
+    `).run(row.id);
+  }
 
   req.apiToken = publicApiToken(row);
   req.user = {
@@ -955,6 +974,10 @@ function requireAuth(req, res, next) {
  * alten Woche schriebe sonst `expired_at` wieder auf sieben Tage.
  */
 function refreshSessionCookieIfDue(req, res) {
+  // Waehrend eines Restores nicht nachdatieren (#1431): der Store nimmt nichts
+  // an, und ein neues Cookie ohne passende Zeile liefe auseinander. Der
+  // naechste Request danach holt es nach.
+  if (db.isRestoreRunning()) return;
   const cookie = req.session.cookie;
   // Ohne Cookie-Objekt ist es keine express-session (Routentests haengen ein
   // nacktes `{ userId, role }` an) - es gibt nichts nachzudatieren.

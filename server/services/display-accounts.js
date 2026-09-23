@@ -365,6 +365,10 @@ export function authenticateDisplayDevice(token, { db } = {}) {
   // schon das Feststellen die Frist verbrauchen, bekaeme ausgerechnet
   // `/auth/me` - die Route, die ein Tablett beim Start fragt - nie eine
   // Auffrischung zu sehen.
+  // Waehrend eines Restores nimmt die Datenbank keine Schreibzugriffe an
+  // (#1431): kein `last_seen_at` und keine Auffrischung, deren Frist sich
+  // nicht festhalten liesse. Das Tablett bleibt angemeldet wie zuvor.
+  if (dbModule.isRestoreRunning()) return { userId: row.user_id, deviceId: row.id, refreshCookie: false };
   const refreshCookie = cookieRefreshDue(row.cookie_refreshed_at, seen);
   database.prepare('UPDATE display_devices SET last_seen_at = ? WHERE id = ?').run(seen, row.id);
   return { userId: row.user_id, deviceId: row.id, refreshCookie };

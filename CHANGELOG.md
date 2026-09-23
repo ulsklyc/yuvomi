@@ -186,7 +186,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   again or use an older backup. The copy kept under `.pre-restore-*` is written the same way, so
   an interrupted restore never leaves a cut-off copy under that name. A second restore started
   while one is still running, from another tab or another admin, is now refused with a message
-  instead of racing the first one. (#1422)
+  instead of racing the first one. Changes made while a restore is running are refused with a
+  translated note to try again in a minute, instead of seeming saved and then disappearing; pages
+  keep loading in the meantime. A restore that cannot give the restored database the owner of
+  the current one stops before replacing anything and says to run it as the user Yuvomi runs as.
+  (#1422)
 
 - **Screen readers and keyboards get a few rough edges less.** Toasts no longer interrupt what a
   screen reader is reading or get announced twice: only errors and warnings interrupt, everything
