@@ -4539,3 +4539,106 @@ test('Anhang ersetzen: dieses und folgende Vorkommen pruefen das Recht nach dem 
   assert.deepEqual(await raceEachCase((id, y) => `/${id}/occurrences/${y}-01-03/following`,
     { recurrence_rule: 'FREQ=DAILY;COUNT=5', year: 2089 }), []);
 });
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Farb-Heilung (#1270): eine lokale Farbwahl nimmt den Termin aus dem Schnappschuss
+// ════════════════════════════════════════════════════════════════════════════════
+
+test('Farb-Heilung: umgefaerbt und exakt zurueckgefaerbt bleibt die Farbe, auch wenn der Server COLOR verwirft (#1270)', async () => {
+  const { sync } = await import('../server/services/caldav-sync.js');
+  const CAL = 'https://dav.example/heal-legacy/';
+  const LEGACY = '#4A90E2';
+  const UID_LEGACY = 'legacy-heal-1@test';
+  const account = () => {
+    db.prepare("INSERT INTO caldav_accounts (id, name, caldav_url, username, password) VALUES (70, 'Heal', 'https://dav.example/', 'heal', 'p')").run();
+    db.prepare(`INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled)
+                VALUES (70, ?, 'Alt', ?, 1)`).run(CAL, LEGACY);
+  };
+  const vevent = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', `UID:${UID_LEGACY}`, 'SUMMARY:Alt',
+    'DTSTART:20350310T090000Z', 'DTEND:20350310T100000Z', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+  const client = (objects) => async () => ({
+    fetchCalendars: async () => [{ url: CAL, displayName: 'Alt', components: ['VEVENT'] }],
+    fetchCalendarObjects: async () => objects,
+    createCalendarObject: async () => ({}),
+  });
+
+  account();
+  const refId = db.prepare(`INSERT INTO external_calendars (source, external_id, name, color)
+                            VALUES ('caldav', ?, 'Alt', ?) RETURNING id`).get(CAL, LEGACY).id;
+  const id = insertEvent({ title: 'Altlast', external_source: 'caldav', calendar_ref_id: refId, color: LEGACY, user_modified: 1 });
+  db.prepare(`UPDATE calendar_events SET external_calendar_id = ?, color_modified = 1, created_at = '2020-01-01T00:00:00Z'
+              WHERE id = ?`).run(UID_LEGACY, id);
+  try {
+    // Erster Lauf: die Frist beginnt, der Kalender antwortet leer - die Zeile
+    // steht im Schnappschuss, ungeheilt.
+    await sync({ createClient: client([]) });
+    assert.ok(Object.hasOwn(JSON.parse(db.prepare("SELECT value FROM sync_config WHERE key = 'caldav_legacy_color_heal_snapshot_70'").get().value), String(id)),
+      'Vorbedingung: die Zeile steht im Schnappschuss');
+
+    // Ohne Konto gibt es keinen Ausgang: die Wahl erreicht den Server nie.
+    db.prepare('DELETE FROM caldav_accounts WHERE id = 70').run();
+    assert.equal((await call('PUT', `/${id}`, { body: { color: '#3CA368' } })).status, 200);
+    assert.equal((await call('PUT', `/${id}`, { body: { color: LEGACY } })).status, 200);
+    account();
+
+    await sync({ createClient: client([{ url: `${CAL}legacy.ics`, data: vevent }]) });
+    assert.equal(db.prepare('SELECT color FROM calendar_events WHERE id = ?').get(id).color, LEGACY);
+  } finally {
+    db.prepare('DELETE FROM calendar_events WHERE id = ?').run(id);
+    db.prepare('DELETE FROM caldav_accounts WHERE id = 70').run();
+    db.prepare("DELETE FROM sync_config WHERE key LIKE 'caldav_legacy_color_heal_%'").run();
+  }
+});
+
+test('Farb-Heilung: eine Bearbeitung ohne Farbwechsel laesst den Schnappschuss stehen (#1270)', async () => {
+  const id = insertEvent({ title: 'Nur Titel', external_source: 'caldav', color: '#4A90E2', user_modified: 1 });
+  db.prepare("UPDATE calendar_events SET external_calendar_id = 'legacy-heal-2@test' WHERE id = ?").run(id);
+  db.prepare("INSERT INTO sync_config (key, value) VALUES ('caldav_legacy_color_heal_snapshot_71', ?)")
+    .run(JSON.stringify({ [id]: '#4a90e2' }));
+  try {
+    assert.equal((await call('PUT', `/${id}`, { body: { title: 'Nur Titel neu', color: '#4a90e2' } })).status, 200);
+    assert.deepEqual(JSON.parse(db.prepare("SELECT value FROM sync_config WHERE key = 'caldav_legacy_color_heal_snapshot_71'").get().value),
+      { [id]: '#4a90e2' });
+  } finally {
+    db.prepare('DELETE FROM calendar_events WHERE id = ?').run(id);
+    db.prepare("DELETE FROM sync_config WHERE key LIKE 'caldav_legacy_color_heal_%'").run();
+  }
+});
+
+test('Farb-Heilung: eine Farbwahl vor dem ersten Heil-Lauf kommt nicht in den Schnappschuss (#1270)', async () => {
+  // Ein Konto legt den Schnappschuss erst bei seinem ersten Heil-Lauf an -
+  // fuer ein neu angelegtes oder umgehaengtes Konto erst beim naechsten Takt.
+  // Eine Wahl davor darf dort nicht als Altlast landen.
+  const { sync } = await import('../server/services/caldav-sync.js');
+  const CAL = 'https://dav.example/heal-early/';
+  const CAL2 = 'https://dav.example/heal-early-2/';
+  const LEGACY = '#4A90E2';
+  const CHOSEN = '#3CA368';
+  const UID_EARLY = 'legacy-heal-early@test';
+  const refId = db.prepare(`INSERT INTO external_calendars (source, external_id, name, color)
+                            VALUES ('caldav', ?, 'Frueh', ?) RETURNING id`).get(CAL, LEGACY).id;
+  const id = insertEvent({ title: 'Frueh', external_source: 'caldav', calendar_ref_id: refId, color: LEGACY, user_modified: 1 });
+  db.prepare(`UPDATE calendar_events SET external_calendar_id = ?, color_modified = 1, created_at = '2020-01-01T00:00:00Z'
+              WHERE id = ?`).run(UID_EARLY, id);
+  try {
+    // Noch kein Konto, also weder Schnappschuss noch Ausgang: gewaehlt wird
+    // die Farbe des anderen Kalenders.
+    assert.equal((await call('PUT', `/${id}`, { body: { color: CHOSEN } })).status, 200);
+
+    db.prepare("INSERT INTO caldav_accounts (id, name, caldav_url, username, password) VALUES (71, 'Frueh', 'https://dav.example/', 'early', 'p')").run();
+    db.prepare(`INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled)
+                VALUES (71, ?, 'Frueh', ?, 1), (71, ?, 'Frueh 2', ?, 0)`).run(CAL, LEGACY, CAL2, CHOSEN);
+    const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', `UID:${UID_EARLY}`, 'SUMMARY:Frueh',
+      'DTSTART:20350310T090000Z', 'DTEND:20350310T100000Z', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+    await sync({ createClient: async () => ({
+      fetchCalendars: async () => [CAL, CAL2].map((url) => ({ url, displayName: url, components: ['VEVENT'] })),
+      fetchCalendarObjects: async ({ calendar }) => (calendar.url === CAL ? [{ url: `${CAL}early.ics`, data: ics }] : []),
+      createCalendarObject: async () => ({}),
+    }) });
+    assert.equal(db.prepare('SELECT color FROM calendar_events WHERE id = ?').get(id).color, CHOSEN);
+  } finally {
+    db.prepare('DELETE FROM calendar_events WHERE id = ?').run(id);
+    db.prepare('DELETE FROM caldav_accounts WHERE id = 71').run();
+    db.prepare("DELETE FROM sync_config WHERE key LIKE 'caldav_legacy_color_heal_%'").run();
+  }
+});

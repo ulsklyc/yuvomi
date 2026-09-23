@@ -23,6 +23,7 @@ import { newNonMembers, nonMemberMessage } from '../../services/household-member
 import { documentViewer } from '../../services/document-links.js';
 import { documentClonePredicate, documentWidenPredicate } from '../../services/document-access.js';
 import { mayWriteModule } from '../../permissions.js';
+import { recordLocalColorChoice } from '../../services/legacy-color-snapshot.js';
 import {
   assertSuccessorHasOccurrence,
   baseOccurrenceFor,
@@ -928,9 +929,8 @@ router.put('/:id', async (req, res) => {
     // (`utils/ical-color.js`). Der Farbwähler im Client vergleicht aus
     // demselben Grund über `sameColor()`.
     const asColorKey = (c) => (c == null ? null : String(c).toLowerCase());
-    const colorModified = (colorTouched && asColorKey(colorVal) !== asColorKey(event.color))
-      ? 1
-      : event.color_modified;
+    const colorChanged = colorTouched && asColorKey(colorVal) !== asColorKey(event.color);
+    const colorModified = colorChanged ? 1 : event.color_modified;
 
     const caldavAccountId = vCaldav ? vCaldav.value.accountId : event.target_caldav_account_id;
     const caldavCalendarUrl = vCaldav ? vCaldav.value.calendarUrl : event.target_caldav_calendar_url;
@@ -1043,6 +1043,10 @@ router.put('/:id', async (req, res) => {
         colorModified,
         id
       );
+      // Eine lokale Farbwahl macht einen gespiegelten Termin dauerhaft zu
+      // keiner Altlast der Farb-Heilung mehr (#1270), auch wenn er spaeter
+      // wieder die alte Farbe bekommt oder die Wahl den Server nie erreicht.
+      if (colorChanged && event.external_source === 'caldav') recordLocalColorChoice(db.get(), [id]);
       setEventAssignments(db.get(), id, userIds, { mayWidenAttachment: rights.mayWidenAttachment });
     };
 

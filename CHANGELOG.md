@@ -195,6 +195,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   anything and says to run it as the user Yuvomi runs as.
   (#1422)
 
+- **Synced appointments lose a calendar colour that was never theirs.** Up to v2.48.0 the CalDAV
+  import wrote the calendar's colour into each appointment as if it had been chosen for it. For an
+  appointment that had been edited in Yuvomi before v2.50.0, that copy was kept as a deliberate
+  choice, so it went on beating the colour of the assigned person, and after a move to another
+  calendar it even showed the colour of the old one. For 30 days after its first sync following this
+  update, each CalDAV account now removes such a colour when it meets the appointment: only on
+  appointments that were created before v2.49.0 reached this installation and have been edited in
+  Yuvomi, when the appointment carries no colour of its own on the server and the stored one is
+  exactly the colour of a calendar of that account, including one deleted on the server since. The
+  appointment then shows the colour of its person or its calendar again. Appointments that Yuvomi
+  uploaded itself count only with the colour of the calendar they were uploaded to, and a colour
+  chosen in Yuvomi after these 30 days began stays. A colour picked in Yuvomi that is not one of
+  that account's calendar colours stays, and so does any colour the server sets on the appointment
+  itself. An account added later does not do this, unless it takes over old appointments of a
+  deleted account; the same applies when an account is pointed at a different server address or user
+  name. (#1270)
+
 - **Appointments moved to another calendar before 2.68.0 can now take that calendar's person, one
   by one.** Since 2.68.0 an appointment moved between two calendars of one account takes the new
   calendar's default assignee along, and with it the colour. Appointments moved before that kept

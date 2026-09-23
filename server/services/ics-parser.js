@@ -221,7 +221,13 @@ function parseICS(ics, { onSkip, allowMissingUid = false } = {}) {
     // eigene VEVENTs einträgt, würde sonst still unvollständig importiert;
     // der Aufrufer entscheidet, ob das den Import blockiert.
     const hasRDate = /^RDATE(?:;[^:]*)?:/im.test(block);
-    events.push({ uid, summary, description, location, dtstart, dtend, rrule, allDay, color, exdates, recurrenceId, tzid, categories, status, hasRDate });
+    // Ob der VEVENT eine COLOR-Zeile TRAEGT, unabhaengig davon, ob ihr Wert
+    // lesbar ist: `color` ist null fuer "keine Zeile" wie fuer "Wert
+    // unbekannt" (etwa #RRGGBBAA). Die Farb-Heilung des CalDAV-Syncs (#1270)
+    // braucht den Unterschied - eine vorhandene Zeile heisst, der Server
+    // spricht ueber DIESEN Termin.
+    const hasColor = get('COLOR') !== null;
+    events.push({ uid, summary, description, location, dtstart, dtend, rrule, allDay, color, hasColor, exdates, recurrenceId, tzid, categories, status, hasRDate });
   }
   return events;
 }

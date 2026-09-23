@@ -42,6 +42,7 @@ import {
   utcToWall,
 } from '../utils/timezone.js';
 import { addMonthsClamped } from '../utils/interval-date.js';
+import { recordLocalColorChoice } from '../services/legacy-color-snapshot.js';
 
 const log = createLogger('Housekeeping');
 const router = express.Router();
@@ -415,6 +416,12 @@ function updateVisitLinks(database, session, worker, checkIn, dailyRate, extras,
       session.calendar_event_id,
     );
     const after = database.prepare('SELECT * FROM calendar_events WHERE id = ?').get(session.calendar_event_id);
+    // Die Farbe der Betreuungskraft ist eine lokale Wahl: ein gespiegelter
+    // Besuch ist damit keine Altlast der Farb-Heilung (#1270) mehr.
+    if (before && after && after.external_source === 'caldav'
+        && String(before.color ?? '').toLowerCase() !== String(after.color ?? '').toLowerCase()) {
+      recordLocalColorChoice(database, [session.calendar_event_id]);
+    }
     // Marker inline statt über markEventOutbound, aus zwei Gründen:
     //
     //   - markEventOutbound lehnt einen schreibgeschützten Provider ab
