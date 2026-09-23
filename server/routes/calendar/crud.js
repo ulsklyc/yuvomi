@@ -120,11 +120,21 @@ async function runWithAttachmentClonePlan(database, stagedClones, operation, { m
       if (!clone) throw new Error('No staged attachment clone matches the detached owner.');
       clone.used = true;
       if (clone.refused) return null;
+      // KEIN AWAIT ZWISCHEN LESEN UND SCHREIBEN (CLAUDE.md, #1358). Die Quelle
+      // und das Recht wurden VOR dem Lesen und Bereitstellen der Datei geprueft;
+      // dazwischen lag ein await, in dem die Besitzerin das Dokument privat
+      // stellen oder die Freigabe entziehen konnte. Deshalb hier, synchron und
+      // in der Transaktion, die Zeile frisch lesen und das Recht neu fragen.
+      // Faellt eines weg, entsteht keine Kopie - die bereitgestellte Datei
+      // raeumt die Schleife unten weg (`written` bleibt false).
+      const fresh = database.prepare('SELECT * FROM family_documents WHERE id = ?').get(sourceDocumentId);
+      if (!fresh || !mayClone(sourceDocumentId)) return null;
+      clone.written = true;
       return {
         ...clone.request.attachment,
         attachment_document_id: cloneAttachmentDocument(
           database,
-          clone.sourceDocument,
+          fresh,
           clone.staged,
         ),
       };
@@ -140,7 +150,7 @@ async function runWithAttachmentClonePlan(database, stagedClones, operation, { m
       if (clone.refused) continue;
       const index = stagedClones.indexOf(clone.staged);
       if (index >= 0) stagedClones.splice(index, 1);
-      if (!clone.used) {
+      if (!clone.written) {
         try {
           await cleanupStagedUpload(clone.staged);
         } catch (cleanupError) {

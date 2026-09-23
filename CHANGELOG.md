@@ -216,15 +216,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   private document of someone else. The page already hid the name without document access, but the
   API still returned it. Name and number now come only when you may read that document, by the same
   rule the documents module uses. Without access to documents the visit does not even say that it
-  has a receipt; with access but without sight of that document, the report and the edit dialog
-  say "Attachment present (private)" instead of an upload field. Saving such a visit keeps the receipt: before,
-  saving it could silently remove someone else's private receipt, and it can no longer be replaced
-  or removed by someone who cannot see it. Linking a receipt now needs access to documents. For API
-  clients every visit and work session carries `has_receipt`, which is `null` without access to the
-  documents module; `receipt_document_id` and
-  `receipt_document_name` are `null` unless you may read the document, API tokens need a
-  `documents:read` scope for them, and `PUT /api/v1/housekeeping/visits/{id}` answers 403 when it
-  would replace a receipt you cannot see or link one without access to documents. (#1358)
+  has a receipt; with access but without sight of that document, the report and the edit dialog say
+  "Attachment present (private)" instead of an upload field. Saving such a visit keeps the receipt:
+  before, saving it could silently remove someone else's private receipt, and it can no longer be
+  replaced or removed by someone who cannot see it. Linking a receipt now needs access to
+  documents. For API clients every visit and work session carries `has_receipt`, which is `null`
+  without access to the documents module; `receipt_document_id` and `receipt_document_name` are
+  `null` unless you may read the document, API tokens need a `documents:read` scope for them, and
+  `PUT /api/v1/housekeeping/visits/{id}` answers 403 when it would replace a receipt you cannot see
+  or link one without access to documents. (#1358)
 
 - **Receipts on budget entries, shared expenses and inventory items no longer name or count
   documents you may not read.** Their API sent the file name and document number of every linked
@@ -245,25 +245,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   documents, to API tokens without a documents scope and when the document itself had been made
   private. Such members now see the event without an attachment, in the calendar and on the
   dashboard. Adding an attachment now needs permission to add documents, and the event dialog only
-  offers the upload area then; an attachment you cannot see can no longer be replaced or removed
-  by saving the event, and the event view and the dialog say "Attachment present (private)" instead. Saving an event
-  no longer makes a private attachment visible again: its visibility is carried over to the
-  document only by the person who owns it (the event's creator) or an admin, and only with
-  permission to edit documents; anyone else can only narrow it. The sync of connected calendars,
-  which reassigns an event when it moves to a calendar with another default person, never changes
-  who may see its attachment, with one exception: when the event is shown to its assignees and
-  the attachment is already shared with selected members, that person is added to them. Otherwise
-  the owner's sharing stays exactly as it is - nothing becomes visible to the whole family,
-  nothing private is opened, nothing is made private and no share is removed. A copy made when a
-  series is split keeps the original's sharing and owner.
-  Splitting a series or detaching an occurrence no longer copies an attachment for someone who
-  cannot see it or may not edit documents; the new part then has no attachment and the original
-  stays on the series. For API clients `attachment_document_id`, `attachment_preview_url`,
-  `attachment_download_url`, `attachment_name`, `attachment_mime` and `attachment_size` are `null`
-  unless you may read that document, `attachment_locked` says whether there is one you cannot
-  see (`null` without access to documents), a non-empty `attachment_data` without a
-  `documents:write` right is answered with 403, and so is replacing or removing an attachment
-  whose document you cannot read. (#1358)
+  offers the upload area then; an attachment you cannot see can no longer be replaced or removed by
+  saving the event, and the event view and the dialog say "Attachment present (private)" instead.
+  Saving an event no longer makes a private attachment visible again: its visibility is carried
+  over to the document only by the person who owns it (the event's creator) or an admin, and only
+  with permission to edit documents; anyone else can only narrow it. The sync of connected
+  calendars, which reassigns an event when it moves to a calendar with another default person,
+  never changes who may see its attachment, with one exception: when the event is shown to its
+  assignees and the attachment is already shared with selected members, that person is added to
+  them. Otherwise the owner's sharing stays exactly as it is - nothing becomes visible to the whole
+  family, nothing private is opened, nothing is made private and no share is removed. A copy made
+  when a series is split keeps the original's sharing and owner. Splitting a series or detaching an
+  occurrence no longer copies an attachment for someone who cannot see it or may not edit
+  documents; the new part then has no attachment and the original stays on the series. For API
+  clients `attachment_document_id`, `attachment_preview_url`, `attachment_download_url`,
+  `attachment_name`, `attachment_mime` and `attachment_size` are `null` unless you may read that
+  document, `attachment_locked` says whether there is one you cannot see (`null` without access to
+  documents), a non-empty `attachment_data` without a `documents:write` right is answered with 403,
+  and so is replacing or removing an attachment whose document you cannot read. (#1358)
 
 - **Documents: the folder delete preview no longer hints at documents you cannot see.** Before
   deleting a folder the app asks what the deletion would affect. That answer already counted only

@@ -4001,3 +4001,67 @@ test('Anhang: teilt eine Nicht-Besitzerin die Serie und weist neu zu, meldet der
   const asAdmin = await call('GET', `/${successorId}`, { actor: ADMIN });
   assert.ok(asAdmin.body.data.attachment_document_id, 'die Besitzerin sieht ihn und kann ihn freigeben');
 });
+
+test('Anhang: die Kopie prueft Recht und Quelle nach dem Lesen der Datei erneut (#1358, kein await zwischen Lesen und Schreiben)', async () => {
+  // Waehrend die Quelldatei gelesen wird (entfernter Speicher, hier ein
+  // gepatchtes fs.stat), stellt Tom sein Dokument auf privat. Die Kopie darf
+  // danach nicht mehr entstehen - weder als Zeile noch als liegengebliebene Datei.
+  const fs = await import('node:fs/promises');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'yuvomi-clone-race-'));
+  const previousEnabled = process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+  const previousPath = process.env.DOCUMENT_STORAGE_LOCAL_PATH;
+  process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'true';
+  process.env.DOCUMENT_STORAGE_LOCAL_PATH = dir;
+  const fsp = fs.default;
+  const originalStat = fsp.stat;
+  const listFiles = async () => (await fs.readdir(dir, { recursive: true, withFileTypes: true }))
+    .filter((entry) => entry.isFile()).length;
+  try {
+    for (const [label, change] of [
+      ['auf privat gestellt', (docId) => db.prepare("UPDATE family_documents SET visibility = 'private' WHERE id = ?").run(docId)],
+      ['Freigabe entzogen', (docId) => db.prepare('DELETE FROM family_document_access WHERE document_id = ? AND user_id = ?').run(docId, MARIA.id)],
+    ]) {
+      const year = label === 'auf privat gestellt' ? 2074 : 2075;
+      const created = await call('POST', '/', { actor: MARIA, body: {
+        title: `Race ${label}`, start_datetime: `${year}-01-01T09:00:00`, recurrence_rule: 'FREQ=DAILY;COUNT=5',
+        attachment_data: `data:text/plain;base64,${Buffer.from('race').toString('base64')}`, attachment_name: 'r.txt',
+      } });
+      assert.equal(created.status, 201);
+      const sourceId = created.body.data.attachment_document_id;
+      // Das Dokument gehoert Tom; Maria sieht es zu Beginn (family bzw. Freigabe).
+      if (label === 'auf privat gestellt') {
+        db.prepare("UPDATE family_documents SET created_by = ?, visibility = 'family' WHERE id = ?").run(TOM.id, sourceId);
+      } else {
+        db.prepare("UPDATE family_documents SET created_by = ?, visibility = 'restricted' WHERE id = ?").run(TOM.id, sourceId);
+        db.prepare('INSERT OR IGNORE INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(sourceId, MARIA.id);
+      }
+      const documentsBefore = db.prepare('SELECT COUNT(*) AS n FROM family_documents').get().n;
+      const filesBefore = await listFiles();
+      let changed = false;
+      fsp.stat = async (...args) => {
+        if (!changed) { changed = true; change(sourceId); }
+        return originalStat.apply(fsp, args);
+      };
+      let split;
+      try {
+        split = await call('PUT', `/${created.body.data.id}/occurrences/${year}-01-03/following`, { actor: MARIA, body: { title: 'Nachfolger' } });
+      } finally {
+        fsp.stat = originalStat;
+      }
+      assert.equal(changed, true, `${label}: die Datei wurde gelesen`);
+      assert.equal(split.status, 201, `${label}: der Split geht weiter`);
+      assert.equal(split.body.data.attachment_document_id, null, `${label}: keine Kopie mehr, der Nachfolger hat keinen Anhang`);
+      assert.equal(db.prepare('SELECT COUNT(*) AS n FROM family_documents').get().n, documentsBefore, `${label}: keine neue Zeile`);
+      assert.equal(await listFiles(), filesBefore, `${label}: die bereitgestellte Datei ist wieder weg`);
+    }
+  } finally {
+    fsp.stat = originalStat;
+    if (previousEnabled === undefined) delete process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+    else process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = previousEnabled;
+    if (previousPath === undefined) delete process.env.DOCUMENT_STORAGE_LOCAL_PATH;
+    else process.env.DOCUMENT_STORAGE_LOCAL_PATH = previousPath;
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
