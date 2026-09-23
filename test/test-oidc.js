@@ -138,7 +138,7 @@ const { _setTestDatabase } = await import('../server/db.js');
 const sessionDb = buildSchemaDb(); // schema_migrations + alle Migrationen; die sessions-Tabelle legt der BetterSQLiteStore-Konstruktor selbst per CREATE TABLE IF NOT EXISTS an
 _setTestDatabase(sessionDb);
 
-const { findOrCreateOidcUser } = await import('../server/auth.js');
+const { findOrCreateOidcUser, assertSsoOnlyAllowed } = await import('../server/auth.js');
 
 function buildOidcTestDb() {
   const db = new DatabaseSync(':memory:');
@@ -278,6 +278,73 @@ test('matcht E-Mail case-insensitiv', () => {
   const userinfo = { sub: 'link-sub-ci', email: 'carol@example.COM', email_verified: true };
   const user = findOrCreateOidcUser(db, userinfo);
   assert(user.id === localId, 'Case-insensitiver E-Mail-Match fehlgeschlagen');
+});
+
+test('verknüpft auch, wenn die gespeicherte Adresse Leerraum traegt (primaer und sekundaer)', () => {
+  // Der Claim wird getrimmt (#1357), die gespeicherte Seite nicht: ein Kontakt
+  // mit ' dora@example.com ' (Kontaktformular, Import) verfehlte das Konto, und
+  // der Haushalt bekam ein zweites Mitglied mit derselben Adresse.
+  const db = buildOidcTestDb();
+  const primaryId = addLocalUserWithEmail(db, 'dora', '  Dora@Example.com ');
+  const primary = findOrCreateOidcUser(db, { sub: 'link-sub-ws1', email: 'dora@example.com', email_verified: true });
+  assert(primary.id === primaryId, `Primaere Adresse mit Leerraum verfehlt: ${primary.id} statt ${primaryId}`);
+
+  const db2 = buildOidcTestDb();
+  const secId = addLocalUserWithEmail(db2, 'ella', 'ella.primary@example.com');
+  const contact = db2.prepare('SELECT id FROM contacts WHERE family_user_id = ?').get(secId);
+  db2.prepare("INSERT INTO contact_emails (contact_id, label, value, is_primary) VALUES (?, 'work', ?, 0)")
+    .run(contact.id, ' ella.work@example.com  ');
+  const secondary = findOrCreateOidcUser(db2, { sub: 'link-sub-ws2', email: 'ella.work@example.com', email_verified: true });
+  assert(secondary.id === secId, `Sekundaere Adresse mit Leerraum verfehlt: ${secondary.id} statt ${secId}`);
+  assert(db2.prepare('SELECT count(*) AS n FROM users').get().n === 1, 'kein zweites Konto');
+});
+
+test('verknüpft auch über Tab, CR und geschütztes Leerzeichen (NBSP) in der gespeicherten Adresse', () => {
+  // SQLites trim() nimmt nur Leerzeichen weg. Ein Import bringt auch Tab, CR
+  // oder NBSP mit - beide Seiten laufen deshalb durch dieselbe JS-Regel.
+  for (const [i, stored] of ['\tfrida@example.com\r', '\u00a0Frida@Example.com\u00a0'].entries()) {
+    const db = buildOidcTestDb();
+    const localId = addLocalUserWithEmail(db, `frida${i}`, stored);
+    const user = findOrCreateOidcUser(db, { sub: `link-sub-nbsp-${i}`, email: 'frida@example.com', email_verified: true });
+    assert(user.id === localId, `Adresse ${JSON.stringify(stored)} verfehlt: ${user.id} statt ${localId}`);
+  }
+});
+
+test('verknüpft NICHT über Unicode-Faltung (Kelvin-Zeichen statt K)', () => {
+  // Klein geschrieben wird nur ASCII, wie SQLites lower(). JS toLowerCase()
+  // faltet das Kelvin-Zeichen U+212A zu "k" - eine Adresse, die der Anbieter
+  // so meldet, ist aber nicht die gespeicherte ASCII-Adresse.
+  const db = buildOidcTestDb();
+  const localId = addLocalUserWithEmail(db, 'kate', 'kate@x.de');
+  const user = findOrCreateOidcUser(db, { sub: 'link-sub-kelvin', email: '\u212Aate@x.de', email_verified: true });
+  assert(user.id !== localId, 'Kelvin-Adresse wurde mit dem ASCII-Konto verknuepft');
+  assert(db.prepare('SELECT count(*) AS n FROM users').get().n === 2, 'es entsteht ein eigenes Konto');
+});
+
+test('Konto ohne Passwort: die Doppelprüfung sieht dieselbe Adresse mit Leerraum, wie der Linker', () => {
+  // Die Pruefung vor `sso_only` muss genau das vorhersagen, woran die
+  // Verknuepfung scheitert. Sieht der Linker zwei Konten mit derselben Adresse
+  // (eine davon mit Leerraum gespeichert), darf die Pruefung kein drittes,
+  // passwortloses Konto mit dieser Adresse durchwinken.
+  const saved = {};
+  const env = {
+    OIDC_ISSUER: 'https://idp.example.com', OIDC_CLIENT_ID: 'c', OIDC_CLIENT_SECRET: 's',
+    OIDC_REDIRECT_URI: 'https://home.example/api/v1/auth/oidc/callback',
+  };
+  for (const [k, v] of Object.entries(env)) { saved[k] = process.env[k]; process.env[k] = v; }
+  try {
+    for (const [i, stored] of [' gina@example.com ', '\tGina@Example.com\u00a0'].entries()) {
+      const db = buildOidcTestDb();
+      _setTestDatabase(db);
+      addLocalUserWithEmail(db, `gina${i}`, stored);
+      const err = assertSsoOnlyAllowed(true, '', { email: 'gina@example.com' });
+      assert(err && /already belongs to another member/.test(err),
+        `Adresse ${JSON.stringify(stored)} wurde nicht als belegt erkannt: ${err}`);
+    }
+  } finally {
+    _setTestDatabase(sessionDb);
+    for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  }
 });
 
 test('verknüpft NICHT bei unverifizierter E-Mail (Takeover-Schutz)', () => {

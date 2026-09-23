@@ -191,6 +191,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deleted account; the same applies when an account is pointed at a different server address or user
   name. (#1270)
 
+- **Single sign-on finds your account even when its stored address has a stray space.** Signing
+  in through the identity provider links to an existing account by email address. The address
+  from the provider was already trimmed, but one stored on the member's contact with a leading or
+  trailing space, tab or non-breaking space, for example from the contact form or an import, did
+  not match, and the household got a second member with the same address. Both sides are now
+  compared by the same rule, for the primary and every further address of the contact. Creating a
+  member without a password uses that rule too, so it no longer allows an address that sign-in
+  would then find twice. (Follow-up to #1357)
+
+- **"Forgot password" finds your account by email regardless of spaces and capitals.** Asking for
+  a reset link with your email address only worked when it matched the stored contact address
+  exactly, so a stored address with a stray space or different capitalisation sent no link. Both
+  sides are now compared the same way as for single sign-on. When two accounts carry the same
+  address, no link is sent to either, instead of to whichever came first: if several members of
+  your household share one address, reset by username instead. A guest of shared expenses with
+  the same address does not count. The page now answers right away and sends the mail
+  afterwards, so neither its answer nor how long it takes reveals whether an address belongs to
+  an account.
+
+- **A dose logged as pending or skipped no longer keeps an intake time.** When an API client
+  created a medication log with the status pending or skipped and sent a `taken_at` along, the
+  time was stored and appeared in the export as if the dose had been taken. Only a taken dose
+  carries an intake time now, as when you change the status afterwards. Entries saved before stay
+  as they are. (Follow-up to #701)
+
 - **Screen readers and keyboards get a few rough edges less.** Toasts no longer interrupt what a
   screen reader is reading or get announced twice: only errors and warnings interrupt, everything
   else waits its turn. "Edit member" now starts in the username field instead of on the hidden

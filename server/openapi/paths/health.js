@@ -85,7 +85,7 @@ export function healthPaths() {
     },
     '/api/v1/health/medications/{id}/logs': {
       get: op({ summary: 'List a medication\'s dose log', tag: 'Health', params: [idParam()], description: 'Optional `from`/`to` filters on `scheduled_at`.' }),
-      post: op({ summary: 'Add a dose-log entry', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { scheduled_at?, schedule_id?, status?, taken_at?, dose_qty?, note? }; `status` defaults to `pending`.' + TAKEN_NOW + WALL_CLOCK_INPUT }),
+      post: op({ summary: 'Add a dose-log entry', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { scheduled_at?, schedule_id?, status?, taken_at?, dose_qty?, note? }; `status` defaults to `pending`. Only a `taken` entry keeps `taken_at`: sent alongside `pending` or `skipped`, it is dropped and stored as null.' + TAKEN_NOW + WALL_CLOCK_INPUT }),
     },
     '/api/v1/health/logs/{id}': {
       patch: op({
