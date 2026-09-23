@@ -2572,7 +2572,8 @@
             "backfillFillCount_one": "{{count}} hozzárendelés nélküli időpont",
             "backfillMovedTitle": "Egy másik naptár alapértelmezett hozzárendelését viselő időpontok",
             "backfillMovedHint": "Ezek az időpontok még ugyanazon fiók egy másik naptárának alapértelmezett hozzárendelését viselik. Ez lehet áthelyezett időpont, vagy olyan naptár, amelynek alapértelmezett hozzárendelését később módosították. Csak a kijelölt időpontok változnak, a többi marad, ahogy van.",
-            "backfillMovedPartial": "Az első {{shown}} látható a(z) {{total}} közül. Alkalmazás után a többi a következő megnyitáskor jelenik meg.",
+            "backfillMovedPartial": "A(z) {{first}}. és {{last}}. közötti időpontok, összesen {{total}}. A „Hozzárendelés” ennek az oldalnak a kijelölését alkalmazza, a „Következők” alkalmazás nélkül lapoz tovább. A ki nem jelölt időpontok változatlanok maradnak.",
+            "backfillMovedNext": "Következők",
             "backfillMovedAll": "Összes kijelölése",
             "backfillMovedChange": "{{from}} helyett {{to}}"
         },

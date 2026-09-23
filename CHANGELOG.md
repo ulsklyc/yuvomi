@@ -182,7 +182,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   confirmation: every appointment whose only assignee is still the default assignee of another
   calendar of the same account, with its title, date, calendar and "from X to Y". All are selected;
   untick what should stay, and only the selected ones change. The list shows at most 5000 at a
-  time, oldest first, and says how many there are; the rest appear the next time. They are listed one by one because
+  time, oldest first; "Show next" moves on to the following ones without applying the current
+  page. Only appointments you are allowed to see are listed, so another member's private
+  appointments stay private here too. They are listed one by one because
   the stored data cannot tell such an appointment apart from one in a calendar whose default
   assignee was changed later, when the previous person is another calendar's default assignee - an
   automatic repair would have changed those too. Unassigned appointments are filled as before. An
@@ -190,7 +192,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Yuvomi and sent to the calendar, or in a calendar without a default assignee is not listed. For a
   recurring appointment the whole series changes, including occurrences edited on their own that do
   not have their own assignment. For API clients: `GET` on the backfill route returns the list as
-  `moved` (at most 5000, with `moved_total`), and `POST` takes the picked entries as `moves`;
+  `moved` in pages of at most 5000 (`moved_total`, `moved_next`, `moved_after`), and `POST` takes the picked entries as `moves`;
   without them no existing assignment changes. (#1307)
 
 - **Shared expenses that lost their bookings to a deleted account count in the balances again.**

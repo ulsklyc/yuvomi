@@ -705,13 +705,16 @@ function seedMovedFixture() {
   select(X, urls.a); select(X, urls.b); select(X, urls.none); select(Y, urls.other);
 
   const events = [];
-  const event = (title, { refId, source = 'caldav', primary = null, rows = [], rrule = null, userModified = 0, targetCaldav = null } = {}) => {
+  const event = (title, {
+    refId, source = 'caldav', primary = null, rows = [], rrule = null, userModified = 0, targetCaldav = null,
+    visibility = 'all', createdBy = ADMIN.id, start = '2036-02-04T10:00',
+  } = {}) => {
     const id = Number(db.prepare(`
       INSERT INTO calendar_events
         (title, start_datetime, end_datetime, created_by, external_source, calendar_ref_id, assigned_to,
-         recurrence_rule, user_modified, target_caldav_calendar_url, external_calendar_id)
-      VALUES (?, '2036-02-04T10:00', '2036-02-04T11:00', ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(title, ADMIN.id, source, refId, primary, rrule, userModified, targetCaldav, `${title}@remote`).lastInsertRowid);
+         recurrence_rule, user_modified, target_caldav_calendar_url, external_calendar_id, visibility)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(title, start, start, createdBy, source, refId, primary, rrule, userModified, targetCaldav, `${title}@remote`, visibility).lastInsertRowid);
     for (const uid of rows) db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(id, uid);
     events.push(id);
     return id;
@@ -853,6 +856,101 @@ test('default-assignee-backfill - stellt nur die abgehakten Termine um (#1307)',
     assert.deepEqual(again.moved.filter((m) => Object.values(ids).includes(m.event_id)).map((m) => m.event_id), [ids.movedApple],
       'nur der abgewaehlte steht noch in der Liste');
   } finally {
+    cleanup();
+  }
+});
+
+test('default-assignee-backfill - die Vorschau folgt der Kalender-Sichtbarkeit, auch fuer den Admin (#1307)', async () => {
+  const route = '/external-calendars/default-assignee-backfill';
+  const { cals, event, cleanup } = seedMovedFixture();
+  try {
+    // Kandidaten nach der Regel, aber nicht fuer den Admin sichtbar: privat von
+    // Maria, und "nur Zugewiesene" von Maria, dem Admin nicht zugewiesen.
+    const hidden = [
+      event('mv-private-maria', { refId: cals.b, primary: MARIA.id, rows: [MARIA.id], visibility: 'private', createdBy: MARIA.id }),
+      event('mv-assignees-maria', { refId: cals.b, primary: MARIA.id, rows: [MARIA.id], visibility: 'assignees', createdBy: MARIA.id }),
+    ];
+    // Gegenstueck: privat, aber vom Admin selbst angelegt - fuer ihn sichtbar.
+    const own = event('mv-private-admin', { refId: cals.b, primary: MARIA.id, rows: [MARIA.id], visibility: 'private', createdBy: ADMIN.id });
+
+    const counted = (await call('GET', route)).body.data;
+    const listed = counted.moved.map((m) => m.event_id);
+    for (const id of hidden) assert.ok(!listed.includes(id), `nicht sichtbarer Termin ${id} steht nicht in der Vorschau`);
+    assert.ok(listed.includes(own), 'der eigene private Termin steht darin');
+    assert.equal(counted.moved_total, listed.length, 'gezaehlt wird nur, was sichtbar ist');
+    assert.ok(!JSON.stringify(counted).includes('mv-private-maria'), 'kein Titel eines fremden privaten Termins');
+
+    // Und umstellen laesst er sich auch nicht.
+    const refused = await call('POST', route, { body: {
+      expected_count: counted.count, expected_token: counted.token,
+      moves: [{ event_id: hidden[0], from_user_id: MARIA.id, to_user_id: TOM.id }],
+    } });
+    assert.equal(refused.status, 409);
+    assert.deepEqual(assignmentOf(hidden[0]), { assignedTo: MARIA.id, users: [MARIA.id] });
+  } finally {
+    cleanup();
+  }
+});
+
+test('default-assignee-backfill - die Bestaetigung prueft jeden Umzug einzeln, ohne die ganze Liste zu laden (#1307)', async () => {
+  const route = '/external-calendars/default-assignee-backfill';
+  const { ids, cleanup } = seedMovedFixture();
+  const original = db.prepare;
+  const materialized = [];
+  try {
+    const counted = (await call('GET', route)).body.data;
+    const entry = counted.moved.find((m) => m.event_id === ids.moved);
+    // Jede Abfrage der Umzugsregel, die waehrend des POST ALLE Zeilen holt, wird notiert.
+    db.prepare = function prepareSpy(sql) {
+      const stmt = original.call(this, sql);
+      if (!String(sql).includes('JOIN event_assignments cur')) return stmt;
+      const all = stmt.all.bind(stmt);
+      stmt.all = (...args) => { const rows = all(...args); materialized.push(rows.length); return rows; };
+      return stmt;
+    };
+    const applied = await call('POST', route, { body: {
+      expected_count: counted.count, expected_token: counted.token, moves: [pick(entry)],
+    } });
+    db.prepare = original;
+    assert.equal(applied.status, 200);
+    assert.deepEqual(materialized, [], 'keine Kandidatenliste geladen, nur Punktabfragen');
+    assert.deepEqual(assignmentOf(ids.moved), { assignedTo: TOM.id, users: [TOM.id] });
+  } finally {
+    db.prepare = original;
+    cleanup();
+  }
+});
+
+test('default-assignee-backfill - hinter der Obergrenze wird weitergeblaettert (#1307)', async () => {
+  const route = '/external-calendars/default-assignee-backfill';
+  const { movedCandidatesLimit } = await import('../server/services/sync-assignment.js');
+  const { ids, cleanup } = seedMovedFixture();
+  const saved = movedCandidatesLimit.max;
+  const fixture = new Set(Object.values(ids));
+  try {
+    movedCandidatesLimit.max = 3;
+    const seen = [];
+    let page = (await call('GET', route)).body.data;
+    const total = page.moved_total;
+    assert.equal(page.moved_offset, 0);
+    // Nichts abhaken, nur blaettern: jeder Kandidat muss erreichbar sein.
+    for (let guard = 0; guard < 10; guard += 1) {
+      seen.push(...page.moved.map((m) => m.event_id));
+      if (!page.moved_next) break;
+      const next = await call('GET', `${route}?moved_after=${encodeURIComponent(page.moved_next)}`);
+      assert.equal(next.status, 200);
+      assert.equal(next.body.data.moved_offset, seen.length, 'die Seite weiss, wo sie steht');
+      page = next.body.data;
+    }
+    assert.equal(seen.length, total, 'jede Seite traegt neue Termine, bis alle gesehen sind');
+    assert.equal(new Set(seen).size, seen.length, 'keiner doppelt');
+    for (const key of ['moved', 'movedRows', 'movedSeries', 'movedGoogle', 'movedApple']) {
+      assert.ok(seen.includes(ids[key]), `${key} ist erreichbar`);
+    }
+    assert.ok([...fixture].some((id) => seen.includes(id)));
+    assert.equal((await call('GET', `${route}?moved_after=kaputt`)).status, 400);
+  } finally {
+    movedCandidatesLimit.max = saved;
     cleanup();
   }
 });

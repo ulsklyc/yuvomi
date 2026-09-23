@@ -2584,7 +2584,8 @@
             "backfillFillCount_one": "담당자가 없는 일정 {{count}}개",
             "backfillMovedTitle": "다른 캘린더의 기본 담당자가 지정된 일정",
             "backfillMovedHint": "이 일정에는 아직 같은 계정의 다른 캘린더의 기본 담당자가 지정되어 있습니다. 옮겨진 일정일 수도 있고, 기본 담당자가 나중에 바뀐 캘린더일 수도 있습니다. 선택한 일정만 바뀌고 나머지는 그대로 유지됩니다.",
-            "backfillMovedPartial": "{{total}}개 중 처음 {{shown}}개를 표시합니다. 적용한 뒤 다음에 열면 나머지가 표시됩니다.",
+            "backfillMovedPartial": "{{total}}개 중 {{first}}번째부터 {{last}}번째 일정입니다. “할당”은 이 페이지의 선택을 적용하고, “다음 보기”는 적용하지 않고 넘어갑니다. 선택하지 않은 일정은 그대로 유지됩니다.",
+            "backfillMovedNext": "다음 보기",
             "backfillMovedAll": "모두 선택",
             "backfillMovedChange": "{{from}}에서 {{to}}(으)로"
         },

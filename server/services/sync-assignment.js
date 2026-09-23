@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { setEventAssignments } from '../routes/calendar/helpers.js';
+import { visibilityWhere } from './visibility.js';
 
 // Die Standard-Zuweisung eines Kalenders laeuft ohne Person dahinter - ueber
 // den Auto-Sync, sobald jemand einen Termin im externen Client zwischen zwei
@@ -252,48 +253,121 @@ export function listBackfillCandidates(d) {
 }
 
 /**
- * Obergrenze der Einzelliste (#1307): so viele umgezogene Termine zeigt die
- * Vorschau hoechstens, und so viele nimmt eine Bestaetigung hoechstens an.
- * EINE Zahl fuer beide Seiten - stand sie nur an der Bestaetigung, hakte die
+ * Obergrenze der Einzelliste (#1307): so viele umgezogene Termine zeigt eine
+ * Seite der Vorschau hoechstens, und so viele nimmt eine Bestaetigung hoechstens
+ * an. EINE Zahl fuer beide Seiten - stand sie nur an der Bestaetigung, hakte die
  * Vorschau ab 5001 Kandidaten alles vor, und die Standard-Bestaetigung scheiterte
- * jedes Mal mit 400. Die uebrigen erscheinen nach dem Uebernehmen beim naechsten
- * Oeffnen. Ein Objekt statt einer Konstante, damit ein Test die Grenze fuer
- * DENSELBEN Aufrufpfad kleiner stellen kann, ohne 5001 Termine anzulegen.
+ * jedes Mal mit 400. Hinter der Grenze wird geblaettert (`after`). Ein Objekt
+ * statt einer Konstante, damit ein Test die Grenze fuer DENSELBEN Aufrufpfad
+ * kleiner stellen kann, ohne 5001 Termine anzulegen.
  */
 export const movedCandidatesLimit = { max: 5000 };
 
+// --------------------------------------------------------
+// SICHTBARKEIT: die Einzelliste nennt Titel, Datum, Kalender und Personen - sie
+// ist ein Lesepfad fuer Termine und folgt deshalb derselben Regel wie die
+// Kalender-Leseroute (visibilityWhere, #474, KEIN Admin-Bypass). Ein privater
+// oder nur fuer Zugewiesene sichtbarer Termin, den der Admin nicht sehen darf,
+// wird weder gezeigt noch gezaehlt noch umgestellt. Das Nachtragen (#1154)
+// zaehlt dagegen nur und nennt keinen Termin; es bleibt, wie es ist.
+// --------------------------------------------------------
+
+const MOVED_VISIBLE_TO_VIEWER = visibilityWhere('e', 'event_assignments', 'event_id', '@viewerId');
+
+// Blaettern: nach (start_datetime, id) des letzten gezeigten Eintrags, in
+// derselben Ordnung wie die Liste. Ein Admin, der eine ganze Seite abwaehlt,
+// erreicht so trotzdem die naechste - vorher kam jedes Mal dieselbe Seite.
+const AFTER_CURSOR = '(e.start_datetime > @afterStart OR (e.start_datetime = @afterStart AND e.id > @afterId))';
+const UP_TO_CURSOR = '(e.start_datetime < @afterStart OR (e.start_datetime = @afterStart AND e.id <= @afterId))';
+
 /**
- * Wie viele umgezogene Termine es JETZT gibt, unabhaengig von der Grenze.
- * @param {object} d better-sqlite3 Datenbank-Handle
- * @returns {number}
+ * Der Blaetter-Zeiger als Text: `<id>:<start_datetime>`. Die ID steht vorn, weil
+ * der Beginn selbst Doppelpunkte traegt.
+ * @param {{ eventId: number, startDatetime: string }} row
  */
-export function countMovedCandidates(d) {
-  return d.prepare(`SELECT COUNT(*) AS n ${MOVED_DEFAULT_EVENTS}`).get().n;
+export function movedCursorOf(row) {
+  return `${row.eventId}:${row.startDatetime}`;
 }
 
 /**
- * Die vor #1306 umgezogenen Termine (#1307), wie sie JETZT sind - fuer die
+ * @param {string} raw
+ * @returns {{ afterId: number, afterStart: string } | null} null = ungueltig
+ */
+export function parseMovedCursor(raw) {
+  if (typeof raw !== 'string') return null;
+  const cut = raw.indexOf(':');
+  if (cut <= 0) return null;
+  const afterId = Number(raw.slice(0, cut));
+  const afterStart = raw.slice(cut + 1);
+  if (!Number.isInteger(afterId) || afterId <= 0 || !afterStart || afterStart.length > 64) return null;
+  return { afterId, afterStart };
+}
+
+/**
+ * Wie viele umgezogene Termine der betrachtenden Person es JETZT gibt -
+ * insgesamt und vor dem Zeiger (fuer "Termine N bis M von X").
+ * @param {object} d better-sqlite3 Datenbank-Handle
+ * @param {{ viewerId: number, after?: { afterId: number, afterStart: string } | null }} options
+ * @returns {{ total: number, before: number }}
+ */
+export function countMovedCandidates(d, { viewerId, after = null }) {
+  return d.prepare(`
+    SELECT COUNT(*) AS total,
+           ${after ? `COALESCE(SUM(CASE WHEN ${UP_TO_CURSOR} THEN 1 ELSE 0 END), 0)` : '0'} AS before
+    ${MOVED_DEFAULT_EVENTS}
+      AND ${MOVED_VISIBLE_TO_VIEWER}
+  `).get({ viewerId, ...(after ?? {}) });
+}
+
+const MOVED_COLUMNS = `
+  e.id AS eventId, ec.default_assignee_user_id AS userId, cur.user_id AS fromUserId,
+  e.title AS title, e.start_datetime AS startDatetime, e.all_day AS allDay,
+  ec.name AS calendarName, u.display_name AS toName,
+  (SELECT fu.display_name FROM users fu WHERE fu.id = cur.user_id) AS fromName
+`;
+
+/**
+ * Die vor #1306 umgezogenen Termine (#1307), wie sie JETZT sind - eine Seite der
  * Vorschau, in der der Admin jeden einzeln abhakt. Kein Teil der pauschalen
  * Menge aus listBackfillCandidates(): umgestellt wird nur, was die Bestaetigung
  * einzeln nennt (siehe MOVED_DEFAULT_EVENTS, "WARUM EINZELN").
  *
  * @param {object} d better-sqlite3 Datenbank-Handle
- * @param {{ limit?: number }} [options] hoechstens so viele, aelteste zuerst
+ * @param {{ viewerId: number, limit: number,
+ *   after?: { afterId: number, afterStart: string } | null }} options
+ *   nur fuer `viewerId` sichtbare Termine, hoechstens `limit`, nach dem Zeiger
  * @returns {{ eventId: number, userId: number, fromUserId: number, title: string,
  *   startDatetime: string, allDay: number, calendarName: string, fromName: string,
  *   toName: string }[]} nach Beginn sortiert, bei gleichem Beginn nach ID
  */
-export function listMovedCandidates(d, { limit } = {}) {
-  const rows = d.prepare(`
-    SELECT e.id AS eventId, ec.default_assignee_user_id AS userId, cur.user_id AS fromUserId,
-           e.title AS title, e.start_datetime AS startDatetime, e.all_day AS allDay,
-           ec.name AS calendarName, u.display_name AS toName,
-           (SELECT fu.display_name FROM users fu WHERE fu.id = cur.user_id) AS fromName
+export function listMovedCandidates(d, { viewerId, limit, after = null }) {
+  return d.prepare(`
+    SELECT ${MOVED_COLUMNS}
     ${MOVED_DEFAULT_EVENTS}
+      AND ${MOVED_VISIBLE_TO_VIEWER}
+      ${after ? `AND ${AFTER_CURSOR}` : ''}
     ORDER BY e.start_datetime, e.id
-    ${limit == null ? '' : 'LIMIT @limit'}
-  `);
-  return limit == null ? rows.all() : rows.all({ limit });
+    LIMIT @limit
+  `).all({ viewerId, limit, ...(after ?? {}) });
+}
+
+/**
+ * EIN umgezogener Termin, wie er JETZT ist - die Punktabfrage, mit der die
+ * Bestaetigung jeden abgehakten Eintrag prueft, statt die ganze Liste zu laden.
+ * Dieselbe Regel und dieselbe Sichtbarkeit wie die Vorschau.
+ *
+ * @param {object} d better-sqlite3 Datenbank-Handle
+ * @param {number} eventId
+ * @param {{ viewerId: number }} options
+ * @returns {{ eventId: number, userId: number, fromUserId: number } | undefined}
+ */
+export function getMovedCandidate(d, eventId, { viewerId }) {
+  return d.prepare(`
+    SELECT e.id AS eventId, ec.default_assignee_user_id AS userId, cur.user_id AS fromUserId
+    ${MOVED_DEFAULT_EVENTS}
+      AND e.id = @eventId
+      AND ${MOVED_VISIBLE_TO_VIEWER}
+  `).get({ eventId, viewerId });
 }
 
 /**
@@ -353,13 +427,13 @@ export function backfillCandidatesToken(candidates) {
  *   `fromUserId` ist ein einzeln abgehakter umgezogener Termin (#1307): er wird
  *   nur umgestellt, wenn er beim Schreiben noch genau von dieser Person auf
  *   diese Person ginge.
- * @param {{ batchSize?: number, now?: Date }} [options]
+ * @param {{ batchSize?: number, now?: Date, viewerId?: number|null }} [options]
  * @returns {Promise<number>} Anzahl der zugewiesenen Termine
  */
 export async function applyDefaultAssigneesToExisting(
   d,
   candidates = listBackfillCandidates(d),
-  { batchSize = BACKFILL_BATCH_SIZE, now = new Date() } = {},
+  { batchSize = BACKFILL_BATCH_SIZE, now = new Date(), viewerId = null } = {},
 ) {
   // Derselbe Vergleich wie beim Zustellen (#1364): `remind_at` als Zeitpunkt.
   const nowKey = remindAtCompareKey(now);
@@ -386,10 +460,13 @@ export async function applyDefaultAssigneesToExisting(
       AND assigned_from IS NOT NULL AND ${remindAtUtcSql('remind_at')} <= ?
   `);
 
+  // Mit `viewerId` (die Route) gilt beim Schreiben auch die Sichtbarkeit wie in
+  // der Vorschau; ohne sie nur die Regel.
   const stillMoved = d.prepare(`
     SELECT ec.default_assignee_user_id AS userId, cur.user_id AS fromUserId
     ${MOVED_DEFAULT_EVENTS}
-      AND e.id = ?
+      AND e.id = @eventId
+      ${viewerId == null ? '' : `AND ${MOVED_VISIBLE_TO_VIEWER}`}
   `);
 
   let assigned = 0;
@@ -399,7 +476,7 @@ export async function applyDefaultAssigneesToExisting(
       let written = 0;
       for (const { eventId, userId, fromUserId } of batch) {
         if (fromUserId != null) {
-          const moved = stillMoved.get(eventId);
+          const moved = stillMoved.get(viewerId == null ? { eventId } : { eventId, viewerId });
           if (!moved || moved.userId !== userId || moved.fromUserId !== fromUserId) continue;
           moveDefaultAssignment(d, eventId, userId, nowKey);
           written += 1;

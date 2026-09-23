@@ -2572,7 +2572,8 @@
             "backfillFillCount_one": "{{count}} 个未分配的日程",
             "backfillMovedTitle": "带有其他日历默认分配的日程",
             "backfillMovedHint": "这些日程仍带有同一账户中另一个日历的默认分配。这可能是被移动过的日程，也可能是默认分配后来被更改的日历。只有选中的日程会更改，其余保持不变。",
-            "backfillMovedPartial": "显示 {{total}} 个中的前 {{shown}} 个。应用后，其余的会在下次打开时显示。",
+            "backfillMovedPartial": "第 {{first}} 至 {{last}} 个，共 {{total}} 个日程。“分配”应用本页的选择，“显示下一批”不应用直接翻页。未选中的日程保持不变。",
+            "backfillMovedNext": "显示下一批",
             "backfillMovedAll": "全选",
             "backfillMovedChange": "从 {{from}} 改为 {{to}}"
         },

@@ -2572,7 +2572,8 @@
             "backfillFillCount_one": "{{count}} compromisso sem atribuição",
             "backfillMovedTitle": "Compromissos com a atribuição padrão de outro calendário",
             "backfillMovedHint": "Estes compromissos ainda têm a atribuição padrão de outro calendário da mesma conta. Pode ser um compromisso que foi movido ou um calendário cuja atribuição padrão foi alterada depois. Só mudam os compromissos selecionados; os outros ficam como estão.",
-            "backfillMovedPartial": "Mostrando os primeiros {{shown}} de {{total}}. Depois de aplicar, os demais aparecem na próxima vez que você abrir.",
+            "backfillMovedPartial": "Compromissos {{first}} a {{last}} de {{total}}. “Atribuir” aplica a seleção desta página, “Mostrar próximos” avança sem aplicá-la. Compromissos não selecionados ficam como estão.",
+            "backfillMovedNext": "Mostrar próximos",
             "backfillMovedAll": "Selecionar todos",
             "backfillMovedChange": "De {{from}} para {{to}}"
         },

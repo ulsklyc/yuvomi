@@ -44,13 +44,21 @@ const MOVED = [
   },
 ];
 
-/** Beantwortet die Aktion selbst und merkt sich jeden POST-Body. */
-function interceptBackfill(page, { count, moved, movedTotal = moved.length }) {
+/**
+ * Beantwortet die Aktion selbst und merkt sich jeden POST-Body und jede
+ * angefragte Seite. `pages` bildet `moved_after` auf eine Seite ab; ohne
+ * Zeiger gilt der Schluessel ''.
+ */
+function interceptBackfill(page, { count, moved, movedTotal = moved.length, pages = null }) {
   const posts = [];
+  const gets = [];
   page.__yuvomiRequestInterceptor = (req) => {
     if (!req.url().includes(ENDPOINT)) return false;
     if (req.method() === 'GET') {
-      req.respond({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { count, token: TOKEN, moved, moved_total: movedTotal } }) });
+      const after = new URL(req.url()).searchParams.get('moved_after') ?? '';
+      gets.push(after);
+      const win = pages ? pages[after] : { moved, moved_total: movedTotal, moved_offset: 0, moved_next: null };
+      req.respond({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { count, token: TOKEN, ...win } }) });
       return true;
     }
     if (req.method() === 'POST') {
@@ -60,6 +68,7 @@ function interceptBackfill(page, { count, moved, movedTotal = moved.length }) {
     }
     return false;
   };
+  posts.gets = gets;
   return posts;
 }
 
@@ -132,11 +141,11 @@ test('eine gekuerzte Liste sagt, wie viele es insgesamt sind (#1307)', async () 
   // (movedCandidatesLimit); `moved_total` nennt den Rest.
   const page = await openPage(harness, { device: 'desktop' });
   try {
-    interceptBackfill(page, { count: 0, moved: MOVED, movedTotal: 5 });
+    interceptBackfill(page, { count: 0, moved: MOVED, pages: { '': { moved: MOVED, moved_total: 5, moved_offset: 0, moved_next: '42:2036-02-05' } } });
     await openReview(page);
     assert.equal(
       await page.$eval('.backfill-moved__partial', (p) => p.textContent.trim()),
-      'Angezeigt werden die ersten 2 von 5. Nach dem Übernehmen erscheinen die übrigen beim nächsten Öffnen.',
+      'Termine 1 bis 2 von 5. „Zuweisen“ übernimmt die Auswahl auf dieser Seite, „Nächste anzeigen“ blättert ohne Übernehmen weiter. Nicht ausgewählte Termine bleiben unverändert.',
     );
     await clickPastDeadTime(page, '#backfill-review-cancel');
     await page.waitForFunction(() => !document.querySelector('#backfill-review-form'));
@@ -146,6 +155,56 @@ test('eine gekuerzte Liste sagt, wie viele es insgesamt sind (#1307)', async () 
     await page.click('#sync-default-assignee-backfill-btn');
     await page.waitForSelector('#backfill-review-form .backfill-moved__item');
     assert.equal(await page.$('.backfill-moved__partial'), null);
+  } finally {
+    await page.close();
+  }
+});
+
+const THIRD = {
+  event_id: 43, title: 'Chor', start_datetime: '2036-02-06T18:00', all_day: 0,
+  calendar_name: 'Familie', from_user_id: 2, from_name: 'Maria', to_user_id: 3, to_name: 'Tom',
+};
+const PAGES = {
+  '': { moved: MOVED, moved_total: 3, moved_offset: 0, moved_next: '42:2036-02-05' },
+  '42:2036-02-05': { moved: [THIRD], moved_total: 3, moved_offset: 2, moved_next: null },
+};
+
+test('hinter der ersten Seite wird geblaettert, ohne sie zu uebernehmen (#1307)', async () => {
+  const page = await openPage(harness, { device: 'desktop' });
+  try {
+    const posts = interceptBackfill(page, { count: 0, moved: MOVED, pages: PAGES });
+    await openReview(page);
+    assert.match(await page.$eval('.backfill-moved__partial', (p) => p.textContent), /^Termine 1 bis 2 von 3\./);
+
+    // Die ganze Seite abwaehlen und weiterblaettern: die naechste kommt trotzdem.
+    await clickPastDeadTime(page, '#backfill-moved-all');
+    await page.click('#backfill-review-next');
+    await page.waitForFunction(() => document.querySelector('.backfill-moved__title')?.textContent === 'Chor');
+    assert.deepEqual(posts.gets, ['', '42:2036-02-05'], 'die zweite Seite mit dem Zeiger der ersten');
+    assert.equal(await page.$('#backfill-review-next'), null, 'auf der letzten Seite gibt es kein Weiter');
+    assert.equal(await page.$('.backfill-moved__partial'), null, 'die letzte Seite ist ganz zu sehen');
+    assert.equal(posts.length, 0, 'Weiterblaettern uebernimmt nichts');
+
+    await clickPastDeadTime(page, '#backfill-review-ok');
+    await page.waitForFunction(() => !document.querySelector('#backfill-review-form'));
+    assert.deepEqual(posts.map((p) => p.moves), [[{ event_id: 43, from_user_id: 2, to_user_id: 3 }]]);
+  } finally {
+    await page.close();
+  }
+});
+
+test('nach dem Uebernehmen einer Seite kommt die naechste (#1307)', async () => {
+  const page = await openPage(harness, { device: 'desktop' });
+  try {
+    const posts = interceptBackfill(page, { count: 0, moved: MOVED, pages: PAGES });
+    await openReview(page);
+    await clickPastDeadTime(page, '#backfill-review-ok');
+    await page.waitForFunction(() => document.querySelector('.backfill-moved__title')?.textContent === 'Chor');
+    assert.deepEqual(posts.map((p) => p.moves.map((m) => m.event_id)), [[41, 42]]);
+    assert.deepEqual(posts.gets, ['', '42:2036-02-05']);
+    await clickPastDeadTime(page, '#backfill-review-cancel');
+    await page.waitForFunction(() => !document.querySelector('#backfill-review-form'));
+    assert.equal(posts.length, 1, 'Abbrechen auf Seite zwei schickt nichts mehr');
   } finally {
     await page.close();
   }

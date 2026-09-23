@@ -2584,7 +2584,8 @@
             "backfillFillCount_one": "{{count}} janji temu tanpa penerima tugas",
             "backfillMovedTitle": "Janji temu dengan penerima tugas default kalender lain",
             "backfillMovedHint": "Janji temu ini masih membawa penerima tugas default dari kalender lain di akun yang sama. Itu bisa berupa janji temu yang dipindahkan, atau kalender yang penerima tugas default-nya diubah kemudian. Hanya janji temu yang dipilih yang berubah; yang lain tetap seperti semula.",
-            "backfillMovedPartial": "Menampilkan {{shown}} pertama dari {{total}}. Setelah diterapkan, sisanya muncul saat Anda membukanya lagi.",
+            "backfillMovedPartial": "Janji temu {{first}} sampai {{last}} dari {{total}}. “Tugaskan” menerapkan pilihan di halaman ini, “Tampilkan berikutnya” lanjut tanpa menerapkannya. Janji temu yang tidak dipilih tetap seperti semula.",
+            "backfillMovedNext": "Tampilkan berikutnya",
             "backfillMovedAll": "Pilih semua",
             "backfillMovedChange": "Dari {{from}} ke {{to}}"
         },

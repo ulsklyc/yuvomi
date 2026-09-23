@@ -16,8 +16,12 @@ import {
   listBackfillCandidates,
   listMovedCandidates,
   countMovedCandidates,
+  getMovedCandidate,
   movedCandidatesLimit,
+  movedCursorOf,
+  parseMovedCursor,
 } from '../../services/sync-assignment.js';
+import { getUserId } from './helpers.js';
 
 const log = createLogger('Calendar');
 const router = express.Router();
@@ -232,28 +236,38 @@ router.patch('/external-calendars', requireAdmin, (req, res) => {
 });
 
 /**
- * Die umgezogenen Termine fuer die Vorschau (#1307): je Termin Titel, Beginn,
- * Kalender und "von Person X auf Person Y". Der Admin hakt sie einzeln ab.
- * Hoechstens movedCandidatesLimit.max, aelteste zuerst - dieselbe Grenze, die
- * parseMoves() fuer die Bestaetigung zieht; `moved_total` nennt, wie viele es
- * insgesamt sind.
+ * Eine Seite der umgezogenen Termine fuer die Vorschau (#1307): je Termin Titel,
+ * Beginn, Kalender und "von Person X auf Person Y". Der Admin hakt sie einzeln ab.
+ *
+ * - Nur Termine, die die anfragende Person nach der Kalender-Sichtbarkeit sehen
+ *   darf (#474, kein Admin-Bypass) - gezeigt, gezaehlt und umgestellt.
+ * - Hoechstens movedCandidatesLimit.max je Seite, aelteste zuerst - dieselbe
+ *   Grenze, die parseMoves() fuer die Bestaetigung zieht.
+ * - `moved_total` zaehlt alle, `moved_offset` die vor dieser Seite, und
+ *   `moved_next` ist der Zeiger auf die naechste (null auf der letzten). Bestaetigt
+ *   wird je Seite; abgewaehlte Termine halten die naechste Seite nicht auf.
  */
-function movedPreviewFields(d) {
-  return { moved: movedPreview(d), moved_total: countMovedCandidates(d) };
-}
-
-function movedPreview(d) {
-  return listMovedCandidates(d, { limit: movedCandidatesLimit.max }).map((m) => ({
-    event_id: m.eventId,
-    title: m.title,
-    start_datetime: m.startDatetime,
-    all_day: m.allDay,
-    calendar_name: m.calendarName,
-    from_user_id: m.fromUserId,
-    from_name: m.fromName,
-    to_user_id: m.userId,
-    to_name: m.toName,
-  }));
+function movedPreviewFields(d, viewerId, after = null) {
+  const limit = movedCandidatesLimit.max;
+  const rows = listMovedCandidates(d, { viewerId, limit, after });
+  const { total, before } = countMovedCandidates(d, { viewerId, after });
+  const more = before + rows.length < total && rows.length > 0;
+  return {
+    moved: rows.map((m) => ({
+      event_id: m.eventId,
+      title: m.title,
+      start_datetime: m.startDatetime,
+      all_day: m.allDay,
+      calendar_name: m.calendarName,
+      from_user_id: m.fromUserId,
+      from_name: m.fromName,
+      to_user_id: m.userId,
+      to_name: m.toName,
+    })),
+    moved_total: total,
+    moved_offset: before,
+    moved_next: more ? movedCursorOf(rows.at(-1)) : null,
+  };
 }
 
 /**
@@ -290,14 +304,27 @@ function parseMoves(raw) {
  * `moved` listet dazu die vor #1306 umgezogenen Termine, die noch die Person
  * ihres alten Kalenders tragen (#1307) - einzeln, weil sie sich in den Daten
  * nicht von einem Kalender mit später umgestellter Standard-Person trennen
- * lassen. Sie zählen nicht in `count` und gehen nur abgehakt zurück.
- * Response: { data: { count, token, moved: [...], moved_total } }
+ * lassen. Sie zählen nicht in `count` und gehen nur abgehakt zurück. Die Liste
+ * kommt seitenweise (movedPreviewFields); `?moved_after=<moved_next>` holt die
+ * nächste Seite.
+ * `count` und `token` nennen keinen Termin und bleiben ohne Sichtbarkeitsfilter
+ * wie seit #1154.
+ * Response: { data: { count, token, moved: [...], moved_total, moved_offset, moved_next } }
  */
 router.get('/external-calendars/default-assignee-backfill', requireAdmin, (req, res) => {
   try {
+    let after = null;
+    if (req.query.moved_after !== undefined) {
+      after = parseMovedCursor(req.query.moved_after);
+      if (!after) return res.status(400).json({ error: 'moved_after ist ungültig.', code: 400 });
+    }
     const d = db.get();
     const candidates = listBackfillCandidates(d);
-    res.json({ data: { count: candidates.length, token: backfillCandidatesToken(candidates), ...movedPreviewFields(d) } });
+    res.json({ data: {
+      count: candidates.length,
+      token: backfillCandidatesToken(candidates),
+      ...movedPreviewFields(d, getUserId(req), after),
+    } });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
@@ -322,13 +349,17 @@ router.get('/external-calendars/default-assignee-backfill', requireAdmin, (req, 
  * Termin fuer Termin zuruecknehmbar.
  *
  * Jeder abgehakte Umzug nennt Termin, bisherige und neue Person - genau die
- * Zeile, die die Vorschau gezeigt hat. Steht er so nicht mehr in der Liste
- * (inzwischen bearbeitet, Standard-Person umgestellt, nie angeboten), ist die
- * Auswahl veraltet: 409 mit der aktuellen Vorschau, und nichts wird geschrieben.
+ * Zeile, die die Vorschau gezeigt hat. Geprueft wird jeder EINZELN per
+ * Punktabfrage gegen dieselbe Regel und dieselbe Sichtbarkeit wie die Vorschau
+ * (getMovedCandidate) - die ganze Liste wird dafuer nicht geladen, und eine
+ * Seite braucht die Bestaetigung nicht. Passt einer nicht mehr (inzwischen
+ * bearbeitet, Standard-Person umgestellt, nie angeboten, nicht sichtbar), ist die
+ * Auswahl veraltet: 409 mit der ersten Seite der Vorschau, und nichts wird
+ * geschrieben.
  * Ohne `moves` wird kein Termin umgestellt.
  * Body: { expected_count: number, expected_token?: string,
  *         moves?: { event_id, from_user_id, to_user_id }[] }
- * Response: { data: { assigned } } | 409 { data: { count, token, moved, moved_total } }
+ * Response: { data: { assigned } } | 409 { data: { count, token, moved, moved_total, moved_offset, moved_next } }
  */
 router.post('/external-calendars/default-assignee-backfill', requireAdmin, async (req, res) => {
   try {
@@ -351,19 +382,19 @@ router.post('/external-calendars/default-assignee-backfill', requireAdmin, async
     const d = db.get();
     const candidates = listBackfillCandidates(d);
     const token = backfillCandidatesToken(candidates);
-    const offered = new Map(listMovedCandidates(d).map((m) => [m.eventId, m]));
+    const viewerId = getUserId(req);
     const movesStillOffered = moves.every((m) => {
-      const current = offered.get(m.eventId);
+      const current = getMovedCandidate(d, m.eventId, { viewerId });
       return current && current.fromUserId === m.fromUserId && current.userId === m.userId;
     });
     if (candidates.length !== expected || (expectedToken && expectedToken !== token) || !movesStillOffered) {
       return res.status(409).json({
         error: 'Die Termine haben sich seit der Zählung geändert.',
         code: 409,
-        data: { count: candidates.length, token, ...movedPreviewFields(d) },
+        data: { count: candidates.length, token, ...movedPreviewFields(d, viewerId) },
       });
     }
-    res.json({ data: { assigned: await applyDefaultAssigneesToExisting(d, [...candidates, ...moves]) } });
+    res.json({ data: { assigned: await applyDefaultAssigneesToExisting(d, [...candidates, ...moves], { viewerId }) } });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });

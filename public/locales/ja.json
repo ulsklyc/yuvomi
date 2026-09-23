@@ -2572,7 +2572,8 @@
             "backfillFillCount_one": "割り当てのない予定 {{count}} 件",
             "backfillMovedTitle": "別のカレンダーの既定の割り当て先が残っている予定",
             "backfillMovedHint": "これらの予定には、同じアカウントの別のカレンダーの既定の割り当て先がまだ残っています。移動された予定の場合もあれば、既定の割り当て先が後から変更されたカレンダーの場合もあります。変更されるのは選択した予定だけで、ほかはそのままです。",
-            "backfillMovedPartial": "{{total}} 件のうち最初の {{shown}} 件を表示しています。適用すると、残りは次に開いたときに表示されます。",
+            "backfillMovedPartial": "{{total}} 件中 {{first}} 件目から {{last}} 件目。「割り当てる」はこのページの選択を適用し、「次を表示」は適用せずに先へ進みます。選択していない予定は変更されません。",
+            "backfillMovedNext": "次を表示",
             "backfillMovedAll": "すべて選択",
             "backfillMovedChange": "{{from}} から {{to}} へ"
         },
