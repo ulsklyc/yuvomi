@@ -287,16 +287,28 @@ function decideLegacyHeal(conn, accountId) {
  */
 function legacyCalendarColors(conn, accountId, serverCalendars = []) {
   const byUrl = new Map(serverCalendars.map((sc) => [sc.url, sc]));
-  const holdsEvents = (url) => !byUrl.has(url) || supportsComponent(byUrl.get(url), 'VEVENT');
+  // Meldet der Server die Sammlung, entscheiden ihre Faehigkeiten. Meldet er
+  // sie nicht mehr, weiss niemand, was sie war: die Auswahl speichert weder
+  // Komponenten noch den Grund einer Abschaltung. Eine ABGESCHALTETE Auswahl,
+  // die der Server nicht mehr listet, zaehlt deshalb nicht mit - sie kann eine
+  // frueher automatisch abgeschaltete Aufgabenliste sein. Ein auf dem Server
+  // geloeschter Kalender, der Termine fuehrte, zaehlt weiter ueber
+  // `external_calendars`: dort landen nur Sammlungen, die als Terminkalender
+  // gelesen wurden.
+  const holdsEvents = (url, enabled = true) => (byUrl.has(url)
+    ? supportsComponent(byUrl.get(url), 'VEVENT')
+    : enabled);
   const colors = new Set();
   const homes = new Set();
   const own = conn.prepare(
-    'SELECT calendar_url, calendar_color FROM caldav_calendar_selection WHERE account_id = ?'
+    'SELECT calendar_url, calendar_color, enabled FROM caldav_calendar_selection WHERE account_id = ?'
   ).all(accountId);
   for (const row of own) {
     const h = calendarHome(row.calendar_url);
     if (h) homes.add(h);
-    if (row.calendar_color && holdsEvents(row.calendar_url)) colors.add(String(row.calendar_color).toLowerCase());
+    if (row.calendar_color && holdsEvents(row.calendar_url, row.enabled === 1)) {
+      colors.add(String(row.calendar_color).toLowerCase());
+    }
   }
   const foreignRows = conn.prepare(
     'SELECT calendar_url FROM caldav_calendar_selection WHERE account_id <> ?'
@@ -412,11 +424,6 @@ async function addAccount(name, caldavUrl, username, password, { createClient } 
     `).run(name, caldavUrl, username, password);
     const accountId = result.lastInsertRowid;
 
-    // Hat das neue Konto nichts zu heilen, laeuft die Heilung dort nie (#1270).
-    // Vor der Auswahl entschieden: die Altzeilen haengen sonst scheinbar an
-    // einem lebenden Konto, dem neuen.
-    decideLegacyHeal(db.get(), accountId);
-
     // OPT-IN, NICHT OPT-OUT (#732): Ein neues Konto bringt seine Kalender
     // abgewaehlt mit. Vorher lief nach dem Verbinden sofort jeder gefundene
     // Kalender in den Haushalt - bei einem Konto mit Arbeits-, Geburtstags- und
@@ -435,6 +442,13 @@ async function addAccount(name, caldavUrl, username, password, { createClient } 
 
       calendarData.push({ url: cal.url, name: calName, color: calColor, enabled: false });
     }
+
+    // Hat das neue Konto nichts zu heilen, laeuft die Heilung dort nie (#1270).
+    // NACH der neuen Auswahl entschieden: eine hochgeladene Altzeile zaehlt nur
+    // mit der Farbe ihres Zielkalenders, und die kann allein in dieser Auswahl
+    // stehen. Die Auswahl des neuen Kontos selbst macht keine Zeile zu einer
+    // mit lebendem Konto - die Abfrage sieht nur die ANDERER Konten.
+    decideLegacyHeal(db.get(), accountId);
     return { accountId, calendarData };
   });
   const { accountId, calendarData } = insertAccount();

@@ -1915,6 +1915,40 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     assert.strictEqual(healState(d), since, 'grosser Host, Standardport');
   }));
 
+  it('eine abgeschaltete Auswahl, die der Server nicht mehr listet, liefert keine Farbe', () => withDb(async (d) => {
+    // Etwa eine frueher automatisch abgeschaltete Aufgabenliste, die es auf dem
+    // Server nicht mehr gibt: was sie war, weiss danach niemand. Lieber nicht
+    // heilen als eine gewollte Farbe verlieren.
+    const LIST = `${HOME_1}aufgaben-alt/`;
+    const COLOR_LIST = '#6B4E9A';
+    d.prepare(`INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled)
+               VALUES (1, ?, 'Aufgaben alt', ?, 0)`).run(LIST, COLOR_LIST);
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_LIST);
+
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.strictEqual(row(d).color, COLOR_LIST);
+  }));
+
+  it('beim Wiederanlegen zaehlt die Zielfarbe aus der neuen Auswahl', () => withDb(async (d) => {
+    // Eine hochgeladene Altzeile zaehlt nur mit der Farbe ihres Zielkalenders.
+    // Steht die nirgends mehr ausser in der Auswahl des neuen Kontos (hier hat
+    // external_calendars keine Farbe), muss die Entscheidung sie sehen.
+    const OWN_UID = 'oikos-9@oikos.local';
+    const ics = icsOf(['BEGIN:VEVENT', `UID:${OWN_UID}`, 'SUMMARY:Elternabend',
+      'DTSTART:20260109T170000Z', 'DTEND:20260109T180000Z', 'END:VEVENT']);
+    await sync({ createClient: rawClient({ objects: { [CAL_A]: [ics] } }) });
+    d.prepare(`UPDATE calendar_events SET color = ?, user_modified = 1, color_modified = 1,
+                 target_caldav_account_id = 1, target_caldav_calendar_url = ?
+               WHERE external_calendar_id = ?`).run(COLOR_A, CAL_A, OWN_UID);
+    d.prepare('UPDATE external_calendars SET color = NULL').run();
+    d.exec('DELETE FROM caldav_calendar_selection WHERE account_id = 1; DELETE FROM caldav_accounts WHERE id = 1; DELETE FROM sync_config;');
+
+    const { accountId } = await addAccount('Wieder', 'https://dav.example/', 'u1', 'p', { createClient: accountClient([CAL_A, CAL_B]) });
+    assert.strictEqual(healState(d, `caldav_legacy_color_heal_since_${accountId}`), null,
+      'die Zeile ist eine Altlast, die Heilung steht offen');
+  }));
+
   it('eine gewaehlte Farbe, die keine Kalenderfarbe ist, bleibt', () => withDb(async (d) => {
     // Gegenprobe: ohne sie waere der Test oben auch gruen, wenn der Inbound
     // jede lokal gefuehrte Farbe verwuerfe.
