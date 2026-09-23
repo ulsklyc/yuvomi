@@ -24,7 +24,7 @@ import fs from 'node:fs/promises';
 import { mkdirSync, existsSync, renameSync, linkSync, rmSync, copyFileSync, openSync, readSync, closeSync, statSync, readdirSync, constants as fsConstants } from 'node:fs';
 import { createLogger } from './logger.js';
 import { RESTORE_IN_PROGRESS_MESSAGE, RESTORE_IN_PROGRESS_REASON } from './utils/restore-messages.js';
-import { setRestoreRunning, waitForExternalJobs, hasActiveExternalJobs } from './utils/restore-state.js';
+import { setRestoreRunning, waitForExternalJobs, hasActiveExternalJobs, waitForWritersToFinish } from './utils/restore-state.js';
 import { decodeHtmlEntities } from './utils/html-entities.js';
 import { toE164, defaultCountryFromConfig } from './utils/phone.js';
 
@@ -10538,7 +10538,9 @@ async function restoreFromFile(sourcePath, { backupKey = null } = {}) {
     // koennen, sonst bleibt der entfernte Stand ohne Link (Codex-Befund in
     // #1431). Neue beginnen ab `setRestoreRunning(true)` nicht mehr, und
     // schreibende Requests weist `restoreWriteGate` ab derselben Zeile ab.
-    await waitForExternalJobs();
+    // Schon zugelassene schreibende Requests laufen zu Ende und landen in der
+    // alten Datenbank, nie in der eingespielten (Codex-Befund in #1431).
+    await waitForWritersToFinish();
     // Ab jetzt nimmt die laufende Verbindung keine Schreibzugriffe mehr an
     // (Codex-Befund in #1431): seit die Arbeitsdatei VOR dem Schliessen kopiert
     // wird, bleibt sie waehrenddessen offen, und ein Schreibzugriff meldete
@@ -10760,11 +10762,17 @@ async function adoptDatabaseAttributes(filePath) {
       // (TrueNAS, Entrypoint ohne chown) besteht so ueber die Gruppe; eine
       // gleichbleibende uid (SMB-Mounts melden jeder Datei dieselbe) ohnehin.
       const staged = await fs.stat(filePath);
+      // Nur im Dienst selbst (Restore aus der App) ist die eigene euid die des
+      // Dienstes. Das Restore-CLI (Handschlag gesetzt) kann root oder ein
+      // Gruppenmitglied sein, das die alte Datei schreiben darf, der Dienst
+      // die neue aber nicht - dort gelten nur Besitzer und Gruppe (Review #1431).
       let processMayWritePrevious = false;
-      try {
-        await fs.access(DB_PATH, fsConstants.W_OK);
-        processMayWritePrevious = true;
-      } catch { /* der laufende Prozess darf die bisherige Datenbank nicht schreiben */ }
+      if (globalThis[RESTORE_TARGET_HANDSHAKE] !== true) {
+        try {
+          await fs.access(DB_PATH, fsConstants.W_OK);
+          processMayWritePrevious = true;
+        } catch { /* der laufende Prozess darf die bisherige Datenbank nicht schreiben */ }
+      }
       if (!stillWritableForPreviousWriters(staged, previous, { processMayWritePrevious })) {
         throw new Error(
           `Could not give ${filePath} the owner of the current database (uid ${previous.uid}, gid `

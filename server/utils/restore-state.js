@@ -58,3 +58,42 @@ export async function waitForExternalJobs() {
     await Promise.allSettled([...activeJobs]);
   }
 }
+
+/**
+ * Schreibende Anfragen, die das Gate VOR dem Restore zugelassen hat und die
+ * noch laufen (Codex-Befund in #1431). Ein Upload etwa wartet erst auf das
+ * Ablegen der Datei und schreibt dann - ohne dieses Warten liefe er ueber den
+ * Tausch und schriebe in die gerade eingespielte Datenbank. Der Restore wartet
+ * sie ab, bevor er die Verbindung sperrt; sie landen damit bewusst in der
+ * alten Datenbank und so im Rollback-Stand.
+ * @type {Set<Promise<void>>}
+ */
+const activeWriteRequests = new Set();
+
+/**
+ * Eine zugelassene schreibende Anfrage bis zu ihrem Ende festhalten.
+ * @param {import('node:http').ServerResponse} res
+ */
+export function trackWriteRequest(res) {
+  let done;
+  const finished = new Promise((resolve) => { done = resolve; });
+  const tracked = finished.finally(() => activeWriteRequests.delete(tracked));
+  activeWriteRequests.add(tracked);
+  res.once('finish', done);
+  res.once('close', done);
+}
+
+export function hasActiveWriteRequests() {
+  return activeWriteRequests.size > 0;
+}
+
+/**
+ * Laufende Jobs UND zugelassene schreibende Anfragen abwarten. Ohne Zeitgrenze
+ * - ein haengender Anbieter oder ein Upload, der nie endet, haelt den Restore
+ * auf (Folge-Ticket).
+ */
+export async function waitForWritersToFinish() {
+  while (activeJobs.size > 0 || activeWriteRequests.size > 0) {
+    await Promise.allSettled([...activeJobs, ...activeWriteRequests]);
+  }
+}

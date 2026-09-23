@@ -210,3 +210,53 @@ test('#1431 ein OAuth-Start waehrend eines Restores bekommt 503, keinen Redirect
   assert.equal(res.status, 503, `OAuth-Start: ${res.status} ${body}`);
   assert.equal(JSON.parse(body).reason, 'restore_in_progress');
 });
+
+test('#1431 eine schreibende Anfrage, die vor dem Restore begann, wird abgewartet und landet nicht in der neuen Datenbank', async () => {
+  const me = await fetch(`${BASE}/api/v1/notes`, { headers: { Cookie: COOKIE } });
+  const csrf = me.headers.get('x-csrf-token');
+  assert.ok(csrf, 'Vorbedingung: ein CSRF-Token');
+  const backupPath = join(tempDir('yuvomi-test-restore-server-'), 'backup.db');
+  await dbmod.backupToFile(backupPath);
+  const marker = `waehrend-des-restores-${Date.now()}`;
+  const body = JSON.stringify({ title: 'Upload', content: marker });
+  const order = [];
+  const realCopyFile = fsp.copyFile;
+  fsp.copyFile = async (src, dest, mode) => {
+    if (String(src) === backupPath) order.push('Restore kopiert');
+    return realCopyFile(src, dest, mode);
+  };
+  let restore;
+  let answer;
+  try {
+    answer = await new Promise((resolve, reject) => {
+      const url = new URL(`${BASE}/api/v1/notes`);
+      const req = http.request({
+        host: url.hostname, port: url.port, path: url.pathname, method: 'POST',
+        headers: {
+          Cookie: COOKIE, 'X-CSRF-Token': csrf,
+          'Content-Type': 'application/json', 'Content-Length': String(Buffer.byteLength(body)),
+        },
+      }, (res) => {
+        let text = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => { text += chunk; });
+        res.on('end', () => { order.push('Anfrage fertig'); resolve({ status: res.statusCode, body: text }); });
+      });
+      req.on('error', reject);
+      // Kopf und die erste Haelfte: die Anfrage ist zugelassen, der Koerper
+      // (wie ein Upload) noch unterwegs.
+      req.write(body.slice(0, 10));
+      setTimeout(() => {
+        restore = dbmod.restoreFromFile(backupPath);
+        setTimeout(() => req.end(body.slice(10)), 300);
+      }, 200);
+    });
+    await restore;
+  } finally {
+    fsp.copyFile = realCopyFile;
+  }
+  assert.ok([200, 201].includes(answer.status), `die Anfrage laeuft zu Ende: ${answer.status} ${answer.body}`);
+  assert.deepEqual(order, ['Anfrage fertig', 'Restore kopiert'], 'erst die Anfrage, dann der Restore');
+  const inNewDb = dbmod.get().prepare('SELECT COUNT(*) AS n FROM notes WHERE content = ?').get(marker).n;
+  assert.equal(inNewDb, 0, 'die Notiz steht nicht in der eingespielten Datenbank');
+});

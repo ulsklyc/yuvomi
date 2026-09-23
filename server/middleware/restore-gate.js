@@ -24,7 +24,7 @@
 import {
   RESTORE_IN_PROGRESS_MESSAGE, RESTORE_IN_PROGRESS_REASON, RESTORE_WRITE_REFUSED_MESSAGE,
 } from '../utils/restore-messages.js';
-import { isRestoreRunning as restoreStateRunning } from '../utils/restore-state.js';
+import { isRestoreRunning as restoreStateRunning, trackWriteRequest } from '../utils/restore-state.js';
 
 const READING_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -54,8 +54,14 @@ function refuse(res, status, error) {
  */
 export function createRestoreWriteGate(isRestoreRunning, isDatabaseOpen = () => true) {
   return function restoreWriteGate(req, res, next) {
-    if (!isRestoreRunning()) return next();
     const pathOnly = (req.originalUrl || req.url || '').split('?')[0];
+    if (!isRestoreRunning()) {
+      // Zugelassene schreibende Anfragen festhalten, bis sie fertig sind: ein
+      // spaeter beginnender Restore wartet sie ab (Codex-Befund in #1431). Die
+      // Restore-Anfrage selbst nicht - sie wartete sonst auf sich selbst.
+      if (!READING_METHODS.has(req.method) && pathOnly !== RESTORE_PATH) trackWriteRequest(res);
+      return next();
+    }
     // Ein zweiter Restore bekommt immer 409, auch bei geschlossener Verbindung:
     // die Antwort betrifft den laufenden Restore, nicht die Datenbank (Review #1431).
     if (pathOnly === RESTORE_PATH && !READING_METHODS.has(req.method)) {

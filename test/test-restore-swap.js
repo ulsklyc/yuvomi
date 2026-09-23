@@ -1110,6 +1110,9 @@ test('#1431 restoreWriteGate: schreibende Requests bekommen waehrend eines Resto
   const gate = createRestoreWriteGate(() => running);
   const call = (method, url) => {
     const res = { statusCode: 200, body: null, headers: {},
+      // Eine zugelassene schreibende Anfrage wird bis 'finish' festgehalten -
+      // hier endet sie sofort, sonst wartete jeder spaetere Restore auf sie.
+      once(event, fn) { if (event === 'finish') queueMicrotask(fn); },
       setHeader(k, v) { this.headers[k] = v; },
       status(code) { this.statusCode = code; return this; },
       json(body) { this.body = body; return this; } };
@@ -1120,6 +1123,9 @@ test('#1431 restoreWriteGate: schreibende Requests bekommen waehrend eines Resto
   const closedGate = createRestoreWriteGate(() => true, () => false);
   const closedCall = (method, url) => {
     const res = { statusCode: 200, body: null, headers: {},
+      // Eine zugelassene schreibende Anfrage wird bis 'finish' festgehalten -
+      // hier endet sie sofort, sonst wartete jeder spaetere Restore auf sie.
+      once(event, fn) { if (event === 'finish') queueMicrotask(fn); },
       setHeader(k, v) { this.headers[k] = v; },
       status(code) { this.statusCode = code; return this; },
       json(body) { this.body = body; return this; } };
@@ -1582,3 +1588,42 @@ test('#1431 der dokumentierte Compose-Restore prueft das Backup und tauscht ein 
   assert.equal(sha256(target.dbPath), hash, 'DB_PATH ist unveraendert');
   assert.deepEqual(readdirSync(target.dir).sort(), names, 'keine Rollback-Kopie, keine Arbeitsdatei');
 });
+
+// ---------------------------------------------------------------------------
+// Elfte Runde #1431
+// ---------------------------------------------------------------------------
+
+test(
+  '#1431 das Restore-CLI als anderer Nutzer: scheitert chown, zaehlt die eigene euid nicht',
+  { skip: process.getuid?.() === 0 && 'root darf jeden Besitzer setzen' },
+  async () => {
+    const backupPath = await bigBackup(KEY, 'aus dem Backup');
+    const target = await frozenTarget(KEY, 'vor dem Restore');
+    const realStat = fsp.stat;
+    const realChown = fsp.chown;
+    // Die alte Datei gehoert dem Dienst (andere uid und gid); der laufende
+    // Prozess darf sie schreiben (hier: echt), ist aber das CLI, nicht der Dienst.
+    fsp.stat = async (filePath, options) => {
+      const stats = await realStat(filePath, options);
+      if (String(filePath) === target.dbPath) {
+        return Object.assign(Object.create(Object.getPrototypeOf(stats)), stats, { uid: stats.uid + 1, gid: stats.gid + 1 });
+      }
+      return stats;
+    };
+    fsp.chown = async () => { throw Object.assign(new Error('EPERM: operation not permitted, chown'), { code: 'EPERM' }); };
+    const handshake = Symbol.for('yuvomi.db.restoreTarget');
+    globalThis[handshake] = true;
+    try {
+      await assert.rejects(
+        () => target.mod.restoreFromFile(backupPath),
+        /Run the restore as the user Yuvomi runs as, or as root/
+      );
+    } finally {
+      delete globalThis[handshake];
+      fsp.stat = realStat;
+      fsp.chown = realChown;
+    }
+    assert.equal(target.mod.get().prepare('SELECT note FROM restore_probe').get()?.note, 'vor dem Restore');
+    target.mod.get().close();
+  }
+);
