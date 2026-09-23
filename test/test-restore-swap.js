@@ -575,9 +575,16 @@ function documentedComposeRestore() {
 }
 
 /** Den dokumentierten Befehl hier ausfuehren - mit echtem sh, cp, mv, sync. */
-function runComposeRestore(backupPath, dbPath, { killMidCopy = false } = {}) {
+function runComposeRestore(backupPath, dbPath, { killMidCopy = false, refuseChmod = false } = {}) {
   const script = documentedComposeRestore().replaceAll('/tmp/yuvomi-restore.db', backupPath);
   const env = { ...process.env, DB_PATH: dbPath };
+  if (refuseChmod) {
+    // Ein Daten-Mount, der chmod ablehnt (SMB/FUSE auf einem NAS).
+    const shimDir = tempDir('yuvomi-test-swap-chmod-');
+    writeFileSync(join(shimDir, 'chmod'), '#!/bin/sh\necho "chmod: Operation not permitted" >&2\nexit 1\n');
+    chmodSync(join(shimDir, 'chmod'), 0o755);
+    env.PATH = `${shimDir}:${process.env.PATH}`;
+  }
   if (killMidCopy) {
     // Ein cp, das beim Kopieren des Backups die Haelfte schreibt und dann die
     // Shell mit SIGKILL beendet - wie ein Container, der mittendrin stirbt.
@@ -1006,4 +1013,18 @@ test('#1431 der dokumentierte Compose-Restore mit schreibgeschuetztem Backup (04
   assert.equal(mod.get().prepare('SELECT note FROM restore_probe LIMIT 1').get()?.note, 'aus dem Backup');
   mod.get().prepare('INSERT INTO restore_probe (note) VALUES (?)').run('schreibbar');
   mod.get().close();
+});
+
+test('#1431 der dokumentierte Compose-Restore laeuft auch auf einem Mount, der chmod ablehnt', async () => {
+  const backupPath = await bigBackup(null, 'aus dem Backup');
+  const target = await frozenTarget(null, 'vor dem Restore');
+  target.mod.get().close();
+  const run = runComposeRestore(backupPath, target.dbPath, { refuseChmod: true });
+  assert.equal(run.status, 0, `der Befehl darf am chmod nicht abbrechen: ${run.stderr}`);
+  assert.equal(sha256(target.dbPath), sha256(backupPath), 'DB_PATH ist das Backup');
+  assert.deepEqual(
+    readdirSync(target.dir).filter((name) => name.includes('.restore-tmp') || name.endsWith('.partial')),
+    [],
+    'keine Arbeitsdatei bleibt liegen'
+  );
 });
