@@ -23,7 +23,7 @@ import { newNonMembers, nonMemberMessage } from '../../services/household-member
 import { documentViewer } from '../../services/document-links.js';
 import { documentClonePredicate, documentWidenPredicate } from '../../services/document-access.js';
 import { mayWriteModule } from '../../permissions.js';
-import { forgetLegacyColorSnapshot } from '../../services/legacy-color-snapshot.js';
+import { recordLocalColorChoice } from '../../services/legacy-color-snapshot.js';
 import {
   assertSuccessorHasOccurrence,
   baseOccurrenceFor,
@@ -1046,7 +1046,7 @@ router.put('/:id', async (req, res) => {
       // Eine lokale Farbwahl macht einen gespiegelten Termin dauerhaft zu
       // keiner Altlast der Farb-Heilung mehr (#1270), auch wenn er spaeter
       // wieder die alte Farbe bekommt oder die Wahl den Server nie erreicht.
-      if (colorChanged && event.external_source === 'caldav') forgetLegacyColorSnapshot(db.get(), [id]);
+      if (colorChanged && event.external_source === 'caldav') recordLocalColorChoice(db.get(), [id]);
       setEventAssignments(db.get(), id, userIds, { mayWidenAttachment: rights.mayWidenAttachment });
     };
 

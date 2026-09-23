@@ -1302,6 +1302,43 @@ test('Beleg: eine neue Verknuepfung verlangt Dokumentenzugriff und Sichtbarkeit 
   }
 });
 
+test('ein umgefaerbter gespiegelter Besuch faellt aus dem Schnappschuss der Farb-Heilung (#1270)', async () => {
+  // Die Farbe der Betreuungskraft ist eine lokale Wahl. Stand der Termin im
+  // Schnappschuss, darf die Heilung ihn danach nicht mehr fassen - auch wenn
+  // der Server die COLOR-Zeile verwirft.
+  const workerId = await freshWorker('Heila');
+  const created = await call('POST', '/work-sessions/check-in', {
+    as: ADM,
+    body: { worker_id: workerId, daily_rate: 40, local_date: '2025-08-01' },
+  });
+  const { id } = db.prepare('SELECT calendar_event_id AS id FROM housekeeping_work_sessions WHERE id = ?')
+    .get(created.body.data.id);
+  db.prepare(`
+    UPDATE calendar_events
+    SET external_source = 'caldav', external_calendar_id = ?, color = '#111111', outbound_dirty = 0
+    WHERE id = ?
+  `).run(`hk-heal-${id}@test`, id);
+  const snapshot = () => JSON.parse(db.prepare("SELECT value FROM sync_config WHERE key = 'caldav_legacy_color_heal_snapshot_9'").get().value);
+  db.prepare("INSERT INTO sync_config (key, value) VALUES ('caldav_legacy_color_heal_snapshot_9', ?)")
+    .run(JSON.stringify({ [id]: '#111111' }));
+  try {
+    const r = await call('PUT', `/visits/${created.body.data.id}`, { as: ADM, body: { date: '2025-08-02', daily_rate: 40 } });
+    assert.equal(r.status, 200);
+    assert.notEqual(db.prepare('SELECT color FROM calendar_events WHERE id = ?').get(id).color, '#111111',
+      'Vorbedingung: der Besuch hat die Farbe der Betreuungskraft');
+    assert.deepEqual(snapshot(), {}, 'raus aus dem Schnappschuss');
+
+    // Ohne Farbwechsel bleibt ein Eintrag stehen.
+    const color = db.prepare('SELECT color FROM calendar_events WHERE id = ?').get(id).color;
+    db.prepare("UPDATE sync_config SET value = ? WHERE key = 'caldav_legacy_color_heal_snapshot_9'")
+      .run(JSON.stringify({ [id]: String(color).toLowerCase() }));
+    await call('PUT', `/visits/${created.body.data.id}`, { as: ADM, body: { date: '2025-08-03', daily_rate: 40 } });
+    assert.deepEqual(snapshot(), { [id]: String(color).toLowerCase() }, 'ohne Farbwechsel keine Wahl');
+  } finally {
+    db.prepare("DELETE FROM sync_config WHERE key LIKE 'caldav_legacy_color_heal_%'").run();
+  }
+});
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });

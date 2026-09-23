@@ -43,3 +43,46 @@ export function forgetLegacyColorSnapshot(conn, eventIds) {
     if (changed) write.run(JSON.stringify(snapshot), row.key);
   }
 }
+
+/**
+ * Lokal gewaehlte Farben, die ein SPAETER angelegter Schnappschuss nicht
+ * aufnehmen darf. Ein Konto legt ihn erst bei seinem ersten Heil-Lauf an:
+ * nach dem Serverstart 10 Sekunden, fuer ein neu angelegtes, umgehaengtes
+ * oder bisher ohne aktivierte Kalender laufendes Konto aber erst beim
+ * naechsten Takt (Standard 15 Minuten) oder spaeter. Eine Farbwahl in dieser
+ * Luecke stuende sonst als Altlast im Schnappschuss.
+ */
+const CHOSEN_KEY = 'caldav_legacy_color_heal_chosen';
+
+/**
+ * Die Event-IDs mit lokaler Farbwahl, oder null, wenn der Eintrag unlesbar ist
+ * - dann nimmt ein neuer Schnappschuss gar nichts auf (fail closed).
+ */
+export function legacyColorChosenIds(conn) {
+  const raw = conn.prepare('SELECT value FROM sync_config WHERE key = ?').get(CHOSEN_KEY)?.value;
+  if (raw == null) return new Set();
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? new Set(parsed.map(Number)) : null;
+  } catch { return null; }
+}
+
+/**
+ * Eine lokale Farbwahl an einem gespiegelten CalDAV-Termin: raus aus jedem
+ * bestehenden Schnappschuss, und vorgemerkt fuer jeden, der noch entsteht.
+ * Die Vormerkliste behaelt nur Termine, die es noch gibt.
+ *
+ * @param {object} conn
+ * @param {Iterable<number>} eventIds
+ */
+export function recordLocalColorChoice(conn, eventIds) {
+  const ids = [...eventIds].map(Number);
+  if (!ids.length) return;
+  forgetLegacyColorSnapshot(conn, ids);
+  const known = legacyColorChosenIds(conn) ?? new Set();
+  for (const id of ids) known.add(id);
+  const existing = new Set(conn.prepare('SELECT id FROM calendar_events WHERE id IN (SELECT value FROM json_each(?))')
+    .all(JSON.stringify([...known])).map((r) => r.id));
+  conn.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+    .run(CHOSEN_KEY, JSON.stringify([...known].filter((id) => existing.has(id))));
+}

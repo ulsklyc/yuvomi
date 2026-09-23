@@ -2048,6 +2048,15 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     assert.strictEqual(healState(d, SNAPSHOT_KEY_1), null);
   }));
 
+  it('eine unlesbare Vormerkliste lokaler Farbwahlen fuellt keinen Schnappschuss', () => withDb(async (d) => {
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    d.prepare("INSERT INTO sync_config (key, value) VALUES ('caldav_legacy_color_heal_chosen', '{kaputt')").run();
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.deepStrictEqual(JSON.parse(healState(d, SNAPSHOT_KEY_1)), {});
+    assert.strictEqual(row(d).color, COLOR_A);
+  }));
+
   it('eine gewaehlte Farbe, die keine Kalenderfarbe ist, bleibt', () => withDb(async (d) => {
     // Gegenprobe: ohne sie waere der Test oben auch gruen, wenn der Inbound
     // jede lokal gefuehrte Farbe verwuerfe.

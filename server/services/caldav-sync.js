@@ -9,7 +9,7 @@ const log = createLogger('CalDAV');
 
 import * as db from '../db.js';
 import { upsertExternalCalendar } from './external-calendars.js';
-import { legacyColorSnapshotKey, forgetLegacyColorSnapshot } from './legacy-color-snapshot.js';
+import { legacyColorSnapshotKey, forgetLegacyColorSnapshot, legacyColorChosenIds } from './legacy-color-snapshot.js';
 import { assignDefaultToEvent, reassignDefaultOnCalendarMove } from './sync-assignment.js';
 import { pruneDeletedEvents, countMirroredEvents, deleteMirroredEvents } from './calendar-prune.js';
 import * as outbound from './calendar-outbound.js';
@@ -207,10 +207,13 @@ function legacyHealState(conn, accountId, { serverCalendars = [], cutoff = null,
     // Fristbeginn: Frist und Schnappschuss in EINER Anweisung, damit es keinen
     // Stand mit dem einen und ohne das andere gibt.
     const colors = legacyCalendarColors(conn, accountId, serverCalendars);
+    // Schon lokal umgefaerbt, bevor dieser Schnappschuss entsteht: keine
+    // Altlast. Ist die Vormerkliste unlesbar, nimmt er nichts auf.
+    const chosen = legacyColorChosenIds(conn);
     const snapshot = new Map();
-    for (const row of legacyCandidateRows(conn, cutoff)) {
+    for (const row of chosen === null ? [] : legacyCandidateRows(conn, cutoff)) {
       const color = String(row.color).toLowerCase();
-      if (colors.has(color)) snapshot.set(row.id, color);
+      if (colors.has(color) && !chosen.has(row.id)) snapshot.set(row.id, color);
     }
     conn.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?), (?, ?)').run(
       key, now.toISOString(), snapshotKey, JSON.stringify(Object.fromEntries(snapshot))
