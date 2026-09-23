@@ -221,7 +221,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   private. Such members now see the event without an attachment, in the calendar and on the
   dashboard. Adding an attachment now needs permission to add documents, and the event dialog only
   offers the upload area then; an attachment you cannot see can no longer be replaced or removed
-  by saving the event, and the dialog says "Attachment present (private)" instead. Saving an event
+  by saving the event, and the event view and the dialog say "Attachment present (private)" instead. Saving an event
   no longer makes a private attachment visible again: its visibility is carried over to the
   document only by the person who owns it (the event's creator) or an admin, and only with
   permission to edit documents; anyone else can only narrow it. The sync of connected calendars,

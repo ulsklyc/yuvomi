@@ -3847,3 +3847,18 @@ test('Termin-Dialog, Stufe read: nach dem Entfernen bleibt der Entfernen-Knopf n
   listeners.click();
   assert.equal(entfernen.hidden, true, 'nach dem Entfernen ist er weg');
 });
+
+test('Termin-Lesepopup: ein fremder privater Anhang zeigt denselben Hinweis wie der Dialog (#1358)', () => {
+  const gesperrt = {
+    id: 8, title: 'Arzt', attachment_locked: true,
+    attachment_document_id: null, attachment_name: null, attachment_data: null,
+  };
+  const node = calendar.attachmentNode(gesperrt);
+  assert.ok(node, 'die Zeile steht da');
+  assert.equal(node.textContent, 'documentAttach.lockedPrivate', 'derselbe Text wie im Dialog');
+  assert.equal(node.href, undefined, 'kein Link');
+  assert.equal(node.tagName?.toLowerCase(), 'span', 'ein Zustand, keine Handlung');
+  // Ohne Sperre und ohne Anhang bleibt die Zeile weg wie bisher.
+  assert.equal(calendar.attachmentNode({ id: 9, attachment_locked: false }), null);
+  assert.equal(calendar.attachmentNode({ id: 9, attachment_locked: null }), null);
+});

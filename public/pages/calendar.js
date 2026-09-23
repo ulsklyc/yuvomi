@@ -4163,6 +4163,7 @@ export const __test = {
   buildEventModalContent,
   calendarSaveErrorMessage,
   hasCurrentAttachment,
+  attachmentNode,
   fetchWindow,
   getWeekRange,
   getRangeForView,
@@ -4315,6 +4316,14 @@ function eventVisibilityMeta(visibility) {
 
 /** Anhang als Bildvorschau oder Download-Link - beides als DOM, nie als Markup. */
 function attachmentNode(ev) {
+  // Ein Anhang, dessen Dokument dieser Betrachter nicht sieht (#1358): derselbe
+  // ruhige Zustand wie im Bearbeiten-Dialog, ohne Name, Vorschau oder Link.
+  if (ev?.attachment_locked === true) {
+    const locked = document.createElement('span');
+    locked.className = 'detail-attachment detail-attachment--locked';
+    locked.textContent = t('documentAttach.lockedPrivate');
+    return locked;
+  }
   if (!hasAttachment(ev)) return null;
   const name = ev.attachment_name || t('calendar.attachmentFallback');
   const urls = attachmentUrls(ev);
