@@ -1522,6 +1522,48 @@ test('Kontaktzeile mit Schreibrecht: das Menue fuehrt auch Loeschen', () => {
   });
 });
 
+// Die E-Mail-Adressen eines verknuepften Kontakts fuehren zu seinem Konto
+// (Passwort-Reset, SSO); aendern duerfen sie nur die Person selbst und ein
+// Admin, der Server weist alle anderen mit 403 ab (contact-identity.js). Das
+// Formular zeigt sie den anderen deshalb nur-lesen, mit Hinweis statt
+// Hinzufuegen-Knopf. Gemessen am ERZEUGTEN Markup, immer im Paar.
+function emailGruppe(html) {
+  const start = html.indexOf('data-mv-group="email"');
+  assert.ok(start > 0, 'E-Mail-Gruppe fehlt im Formular');
+  // Bis zum ersten Feld dahinter (Adresse, im aufklappbaren Abschnitt).
+  const ende = html.indexOf('id="cm-address"', start);
+  assert.ok(ende > start, 'Adressfeld hinter der E-Mail-Gruppe fehlt');
+  return html.slice(start, ende);
+}
+
+test('Kontaktformular: E-Mail am verknuepften Kontakt eines ANDEREN ist nur-lesen', () => {
+  const vorher = contacts.state.user;
+  try {
+    const linked = { ...kontakt({ family_user_id: 7 }), emails: [{ label: 'work', value: 'a@example.org' }], phones: [] };
+    contacts.state.user = { id: 9, role: 'member' };
+    const fremd = contacts.buildContactForm({ mode: 'edit', contact: linked }).content;
+    const gruppe = emailGruppe(fremd);
+    assert.match(gruppe, /type="email"[^>]*readonly/);
+    assert.match(gruppe, /id="cm-email-locked"/);
+    assert.doesNotMatch(gruppe, /data-mv-add/);
+    assert.doesNotMatch(gruppe, /data-mv-remove/);
+    // Die uebrigen Felder bleiben offen.
+    assert.doesNotMatch(fremd.slice(0, fremd.indexOf('data-mv-group="email"')), /readonly/);
+
+    for (const user of [{ id: 7, role: 'member' }, { id: 1, role: 'admin' }]) {
+      contacts.state.user = user;
+      const offen = emailGruppe(contacts.buildContactForm({ mode: 'edit', contact: linked }).content);
+      assert.doesNotMatch(offen, /readonly/, `gesperrt fuer ${JSON.stringify(user)}`);
+      assert.match(offen, /data-mv-add/);
+    }
+    contacts.state.user = { id: 9, role: 'member' };
+    const unverknuepft = emailGruppe(contacts.buildContactForm({ mode: 'edit', contact: { ...linked, family_user_id: null } }).content);
+    assert.doesNotMatch(unverknuepft, /readonly/);
+  } finally {
+    contacts.state.user = vorher;
+  }
+});
+
 test('Kontaktzeile mit `contacts: read`: Loeschen weg, jeder Leseweg bleibt', () => {
   withAccess({ contacts: 'read' }, () => {
     const html = contacts.renderContactItem(kontakt());
@@ -1751,6 +1793,7 @@ test('Geburtstagszeile mit Schreibrecht: zwei Knoepfe und zwei Wischflaechen', (
     assert.match(html, /data-action="delete"/);
     assert.match(html, /swipe-reveal--edit/);
     assert.match(html, /swipe-reveal--delete/);
+    assert.doesNotMatch(html, /swipe-row--static/, 'mit Geste bleibt der Wisch-Chevron');
   });
 });
 
@@ -1761,6 +1804,9 @@ test('Geburtstagszeile mit `calendar: read`: beide Handlungen weg, die Auskunft 
     assert.doesNotMatch(html, /data-action="delete"/);
     assert.doesNotMatch(html, /swipe-reveal/,
       'eine Reveal-Flaeche ohne Geste kuendigt eine Bedienung an, die es nicht gibt');
+    // Ebenso der Wisch-Chevron (`.swipe-row::after`, Muster aus #1426): auf
+    // Touch stand der Pfeil an einer Zeile, die sich nicht wischen laesst.
+    assert.match(html, /class="swipe-row swipe-row--static"/, 'ohne Geste auch kein Wisch-Chevron');
     assert.doesNotMatch(html, /row-actions/);
 
     // Nichts davon war ein Zustand, der ohne die Knoepfe unlesbar wuerde - die
@@ -3518,7 +3564,7 @@ test('Beleg, den der Server nicht nennt: ein ruhiges Zeichen statt einer leeren 
   // So kommt ein Besuch an, dessen Beleg ein privates Dokument einer anderen
   // Person ist: `has_receipt` bleibt, Name und ID sind maskiert.
   const verdeckt = hkBesuch({ has_receipt: true, receipt_document_id: null, receipt_document_name: null });
-  const zeichen = /<dt>housekeeping\.receiptLabel<\/dt><dd>housekeeping\.receiptPresent<\/dd>/;
+  const zeichen = /<dt>housekeeping\.receiptLabel<\/dt><dd>documentAttach\.lockedPrivate<\/dd>/;
   for (const documents of ['write', 'read']) {
     withAccess({ housekeeping: 'write', documents }, () => {
       const feld = hk.receiptFieldHtml(verdeckt);
@@ -3744,3 +3790,121 @@ test('Aufgaben-Dokumente ohne Dokumentenrecht: keine Zahl, keine Zeile, kein Lin
 });
 
 test.after(() => miniDomAbraeumen());
+
+test('Termin-Dialog: die Anhang-Ablage steht nur mit documents-Schreibrecht (#1358, DECISIONS.md Eintrag 10)', () => {
+  // Ein neuer Anhang legt ein Dokument an - eine Uebertragung ins
+  // Dokumente-Modul. Der Server verlangt dafuer `documents: write`, der Dialog
+  // bietet die Ablage deshalb nur dann an.
+  const ohne = { id: 7, title: 'Arzt', start_datetime: '2030-05-01T10:00', end_datetime: '2030-05-01T11:00', visibility: 'all' };
+  const mit = {
+    ...ohne, attachment_document_id: 12, attachment_name: 'befund.pdf', attachment_mime: 'application/pdf',
+    attachment_preview_url: '/api/v1/documents/12/preview', attachment_download_url: '/api/v1/documents/12/download',
+  };
+  const render = (documents, event) => withAccess({ calendar: 'write', documents },
+    () => calendar.buildEventModalContent({ mode: 'edit', event }));
+  for (const event of [ohne, mit]) {
+    assert.match(render('write', event), /id="modal-attachment"/, 'write: die Ablage steht');
+    assert.doesNotMatch(render('read', event), /id="modal-attachment"/, 'read: keine Ablage');
+    assert.doesNotMatch(render('none', event), /id="modal-attachment/, 'none: gar nichts vom Anhang');
+  }
+  assert.match(render('read', mit), /id="modal-remove-attachment"/, 'read: ein sichtbarer Anhang laesst sich loesen');
+  assert.match(render('read', mit), /documents\/12\/download/, 'read: und bleibt als Vorschau');
+  assert.doesNotMatch(render('read', ohne), /calendar\.attachmentLabel/, 'read ohne Anhang: die Stelle faellt weg');
+});
+
+test('Termin-Dialog: ein fremder privater Anhang ist ein klarer Zustand, ohne Ablage und ohne Entfernen (#1358)', () => {
+  const gesperrt = {
+    id: 8, title: 'Arzt', start_datetime: '2030-05-01T10:00', end_datetime: '2030-05-01T11:00', visibility: 'all',
+    attachment_locked: true, attachment_document_id: null, attachment_name: null,
+  };
+  for (const documents of ['write', 'read']) {
+    const html = withAccess({ calendar: 'write', documents }, () => calendar.buildEventModalContent({ mode: 'edit', event: gesperrt }));
+    assert.match(html, /id="modal-attachment-locked"[^>]*>documentAttach\.lockedPrivate</, `${documents}: der Zustand steht da`);
+    assert.doesNotMatch(html, /id="modal-attachment"/, `${documents}: keine Ablage zum Ersetzen`);
+    assert.doesNotMatch(html, /id="modal-remove-attachment"/, `${documents}: kein Entfernen`);
+  }
+  const none = withAccess({ calendar: 'write', documents: 'none' }, () => calendar.buildEventModalContent({ mode: 'edit', event: gesperrt }));
+  assert.doesNotMatch(none, /modal-attachment/, 'none: gar nichts');
+});
+
+test('Termin-Dialog: Anhang-Absagen des Servers kommen uebersetzt, der Entfernen-Knopf folgt dem Zustand (#1358)', () => {
+  const fehler = (data) => ({ data });
+  assert.equal(calendar.calendarSaveErrorMessage(fehler({ error: 'Changing this attachment needs access to its document.', reason: 'ATTACHMENT_CHANGE_REFUSED' })),
+    'calendar.attachmentChangeRefused');
+  assert.equal(calendar.calendarSaveErrorMessage(fehler({ error: 'Attaching a file needs write access to documents.', reason: 'ATTACHMENT_UPLOAD_REFUSED' })),
+    'calendar.attachmentUploadRefused');
+  assert.equal(calendar.calendarSaveErrorMessage(fehler({ error: 'Titel fehlt' })), 'Titel fehlt', 'andere Meldungen wie bisher');
+  assert.equal(calendar.calendarSaveErrorMessage(new Error('x')), 'calendar.saveError');
+
+  const mit = { attachment_document_id: 12, attachment_name: 'befund.pdf' };
+  assert.equal(calendar.hasCurrentAttachment({ name: 'befund.pdf', changed: false }, mit), true);
+  assert.equal(calendar.hasCurrentAttachment({ name: null, changed: true, removed: true }, mit), false,
+    'nach dem Entfernen ist nichts mehr zu entfernen - auch ohne Ablage (Stufe read)');
+  assert.equal(calendar.hasCurrentAttachment({ name: null, changed: false }, { attachment_data: 'data:x' }), true,
+    'ein alter Anhang ohne Namen bleibt entfernbar');
+});
+
+test('Termin-Dialog, Stufe read: nach dem Entfernen bleibt der Entfernen-Knopf nicht allein stehen (#1358)', () => {
+  // Ausgefuehrt, nicht gelesen: wireEventForm() an einem Panel ohne Ablage
+  // (so rendert es die Stufe read) und ein Klick auf "Entfernen".
+  const permissiv = () => new Proxy(function stub() {}, {
+    get(target, prop) {
+      if (prop in target) return target[prop];
+      if (prop === Symbol.iterator) return function* leer() {};
+      if (prop === Symbol.toPrimitive) return () => '';
+      if (prop === 'then') return undefined;
+      if (prop === 'length') return 0;
+      if (prop === 'querySelectorAll' || prop === 'getElementsByTagName') return () => [];
+      if (prop === 'value' || prop === 'textContent') return '';
+      if (prop === 'checked' || prop === 'hidden' || prop === 'disabled') return false;
+      return permissiv();
+    },
+    apply() { return permissiv(); },
+    set(target, prop, value) { target[prop] = value; return true; },
+  });
+  const listeners = {};
+  const entfernen = {
+    hidden: false,
+    addEventListener(type, fn) { listeners[type] = fn; },
+  };
+  const fehlend = new Set(['#modal-selected-attachment', '#modal-attachment', '#modal-attachment-dropzone']);
+  const panel = new Proxy({}, {
+    get(_target, prop) {
+      if (prop === 'querySelector') {
+        return (selector) => {
+          if (fehlend.has(selector)) return null;
+          if (selector === '#modal-remove-attachment') return entfernen;
+          return permissiv();
+        };
+      }
+      if (prop === 'querySelectorAll') return () => [];
+      return permissiv()[prop];
+    },
+  });
+  const event = {
+    id: 9, title: 'Arzt', start_datetime: '2030-05-01T10:00', end_datetime: '2030-05-01T11:00', visibility: 'all',
+    attachment_document_id: 12, attachment_name: 'befund.pdf', attachment_mime: 'application/pdf',
+  };
+  withAccess({ calendar: 'write', documents: 'read' }, () => {
+    calendar.wireEventForm(panel, { mode: 'edit', event });
+  });
+  assert.equal(typeof listeners.click, 'function', 'der Knopf ist verdrahtet');
+  assert.equal(entfernen.hidden, false, 'vor dem Entfernen steht er');
+  listeners.click();
+  assert.equal(entfernen.hidden, true, 'nach dem Entfernen ist er weg');
+});
+
+test('Termin-Lesepopup: ein fremder privater Anhang zeigt denselben Hinweis wie der Dialog (#1358)', () => {
+  const gesperrt = {
+    id: 8, title: 'Arzt', attachment_locked: true,
+    attachment_document_id: null, attachment_name: null, attachment_data: null,
+  };
+  const node = calendar.attachmentNode(gesperrt);
+  assert.ok(node, 'die Zeile steht da');
+  assert.equal(node.textContent, 'documentAttach.lockedPrivate', 'derselbe Text wie im Dialog');
+  assert.equal(node.href, undefined, 'kein Link');
+  assert.equal(node.tagName?.toLowerCase(), 'span', 'ein Zustand, keine Handlung');
+  // Ohne Sperre und ohne Anhang bleibt die Zeile weg wie bisher.
+  assert.equal(calendar.attachmentNode({ id: 9, attachment_locked: false }), null);
+  assert.equal(calendar.attachmentNode({ id: 9, attachment_locked: null }), null);
+});

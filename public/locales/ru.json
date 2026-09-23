@@ -741,6 +741,8 @@
         "searchCountCapped": "{{shown}} из {{total}} результатов",
         "title": "Календарь",
         "attachmentRemove": "Удалить вложение",
+        "attachmentChangeRefused": "Это вложение нельзя изменить: документ личный или у тебя нет доступа к документам.",
+        "attachmentUploadRefused": "Добавить вложение может только тот, кому разрешено редактировать документы.",
         "newEvent": "Новое событие",
         "editEvent": "Редактировать событие",
         "addEvent": "Добавить событие",
@@ -1123,6 +1125,7 @@
         "phonePreview": "Предпросмотр: {{value}}",
         "phoneImplausible": "Этот номер выглядит неполным - он всё равно будет сохранён.",
         "emailLabel": "Email",
+        "emailLockedHint": "Эти адреса относятся к учётной записи этого участника. Изменить их может только сам участник или администратор.",
         "emailPlaceholder": "имя@пример.ру",
         "addressLabel": "Адрес",
         "addressPlaceholder": "Улица, индекс Город",
@@ -3584,8 +3587,7 @@
         "currentMonth": "Текущий",
         "noVisitReportsInMonth": "За период {{month}} визитов не записано.",
         "settledAdminOnly": "Изменить или удалить может только администратор",
-        "reportVisitsCount": "Визиты",
-        "receiptPresent": "Прикреплён"
+        "reportVisitsCount": "Визиты"
     },
     "userMultiSelect": {
         "moreUsers": "ещё",
@@ -5490,7 +5492,7 @@
         "openAction": "Открыть {{name}}",
         "limitReached": "Не более {{count}} документов.",
         "limitReached_one": "Не более {{count}} документа.",
-        "presentHidden": "Прикреплён"
+        "lockedPrivate": "Есть вложение (личное)"
     },
     "join": {
         "title": "Настройка учётной записи",

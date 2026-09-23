@@ -9,6 +9,18 @@ const apiError = (description) => ({
  * Gilt fuer POST und PUT gleich (#1364), deshalb einmal: ein Offset wird
  * umgerechnet statt abgeschnitten, und PUT speichert den geprueften Wert.
  */
+/**
+ * Ein Anhang ist ein Dokument im Dokumente-Modul (#1358, DECISIONS.md Eintrag 10).
+ */
+const ATTACHMENT_RIGHTS = ' A new attachment creates a document in the Documents module and therefore needs write access '
+  + 'there (member right, for API tokens a `documents:write` scope); without it any non-empty `attachment_data` is refused with 403 '
+  + 'before the event is looked up. Replacing or removing an attachment needs read access to the Documents module and sight of the '
+  + 'stored document; otherwise the same 403, and the attachment stays. The 403 bodies carry `reason` `ATTACHMENT_UPLOAD_REFUSED` or '
+  + '`ATTACHMENT_CHANGE_REFUSED`. Saving an event carries its visibility and assignees over to the attachment\'s document; it opens the '
+  + 'document further only for a caller with write access to documents who can see it and may manage it (its creator - for an attachment the event creator - or an admin), otherwise it only narrows. The default-assignee sync of connected calendars never changes document rights, with one exception: when the event is visible to its assignees and the document is already shared with selected members, the new assignee is added to those shares. Otherwise nothing changes - no document becomes visible to the family, none is opened, narrowed or made private, and no share is removed. A copy made on split or detach belongs to the owner of its source document. A split or a '
+  + 'detach copies the attachment for the new series or event only for such a caller; otherwise the new one has no attachment and '
+  + 'the original stays on the original series.';
+
 const DATETIME_INPUT = ' `start_datetime` and `end_datetime` take the forms of `CalendarDateOrDateTimeInput`: '
   + 'a value without offset is household wall-clock time, a value with `Z` or a numeric offset is read as an '
   + 'instant and converted into the household time zone (`2026-09-21T16:00:00Z` in a Europe/Berlin household is '
@@ -35,7 +47,7 @@ export function calendarPaths() {
         summary: 'Create calendar event',
         tag: 'Calendar',
         stateChanging: true,
-        description: 'Supports optional document-storage attachments via `attachment_name`, `attachment_mime`, `attachment_size`, and `attachment_data` (base64 data URL). New attachments are linked through `attachment_document_id`; legacy events may still return `attachment_data`. Set `target_caldav_account_id` and `target_caldav_calendar_url` to push the event to a CalDAV calendar (omit or null for a local-only event).' + DATETIME_INPUT,
+        description: 'Supports optional document-storage attachments via `attachment_name`, `attachment_mime`, `attachment_size`, and `attachment_data` (base64 data URL). New attachments are linked through `attachment_document_id`; legacy events may still return `attachment_data`. Set `target_caldav_account_id` and `target_caldav_calendar_url` to push the event to a CalDAV calendar (omit or null for a local-only event).' + ATTACHMENT_RIGHTS + DATETIME_INPUT,
         requestBody: jsonBody(null),
         responses: {
           201: {
@@ -44,6 +56,7 @@ export function calendarPaths() {
           },
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
+          403: apiError('A new attachment without write access to the Documents module.'),
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -168,7 +181,7 @@ export function calendarPaths() {
           stringPathParam('recurrenceId', 'Original occurrence date in YYYY-MM-DD format'),
         ],
         stateChanging: true,
-        description: 'Creates or updates a linked replacement for one original slot of an eligible local-only series. Scalar fields, assignments, attachments, and `reminder_offsets` are compared with the expanded series defaults. Saving no actual difference restores the normal series occurrence only when a linked replacement existed for that slot; a slot excluded by a deletion or detached replacement remains excluded.',
+        description: 'Creates or updates a linked replacement for one original slot of an eligible local-only series. Scalar fields, assignments, attachments, and `reminder_offsets` are compared with the expanded series defaults. Saving no actual difference restores the normal series occurrence only when a linked replacement existed for that slot; a slot excluded by a deletion or detached replacement remains excluded.' + ATTACHMENT_RIGHTS,
         requestBody: jsonBody('#/components/schemas/CalendarOccurrenceOnlyMutation'),
         responses: {
           200: {
@@ -210,7 +223,7 @@ export function calendarPaths() {
           stringPathParam('recurrenceId', 'Original occurrence date in YYYY-MM-DD format'),
         ],
         stateChanging: true,
-        description: 'Truncates the original series before the selected original slot, creates a successor series, transfers every later exclusion except the selected slot, and reparents later linked replacements atomically.',
+        description: 'Truncates the original series before the selected original slot, creates a successor series, transfers every later exclusion except the selected slot, and reparents later linked replacements atomically.' + ATTACHMENT_RIGHTS,
         requestBody: jsonBody('#/components/schemas/CalendarOccurrenceFollowingMutation'),
         responses: {
           200: {
@@ -271,7 +284,7 @@ export function calendarPaths() {
         tag: 'Calendar',
         params: [idParam()],
         stateChanging: true,
-        description: 'Supports document-storage attachments. Omit attachment fields to preserve the current attachment, send new `attachment_data` to create and link a document, or set `remove_attachment` to true to unlink it without deleting the library document. Legacy events may still return `attachment_data`. A recurrence-rule or anchor change that would orphan linked replacements returns 409 with `calendar_override_orphans` and the exact `orphaned_override_count`; retry with the same value in `confirmed_orphan_count` to preserve those replacements as standalone events. The same confirmation is required before assigning an outbound target to a series with linked replacements. Changing a mirrored field (title, description, location, color, all-day, start/end, recurrence) of an event synced to Google pushes the change there, and switching `target_google_calendar_id` moves it to the other Google calendar. The remote call runs after the response and is retried by the next sync run if it fails. PUT stores the validated start and end, exactly as POST does; up to v2.68.0 it wrote the raw request value. `start_datetime` may be omitted to keep it, but an empty or null start is rejected with 400; an empty or null `end_datetime` clears the end.' + DATETIME_INPUT,
+        description: 'Supports document-storage attachments. Omit attachment fields to preserve the current attachment, send new `attachment_data` to create and link a document, or set `remove_attachment` to true to unlink it without deleting the library document. Legacy events may still return `attachment_data`. A recurrence-rule or anchor change that would orphan linked replacements returns 409 with `calendar_override_orphans` and the exact `orphaned_override_count`; retry with the same value in `confirmed_orphan_count` to preserve those replacements as standalone events. The same confirmation is required before assigning an outbound target to a series with linked replacements. Changing a mirrored field (title, description, location, color, all-day, start/end, recurrence) of an event synced to Google pushes the change there, and switching `target_google_calendar_id` moves it to the other Google calendar. The remote call runs after the response and is retried by the next sync run if it fails. PUT stores the validated start and end, exactly as POST does; up to v2.68.0 it wrote the raw request value. `start_datetime` may be omitted to keep it, but an empty or null start is rejected with 400; an empty or null `end_datetime` clears the end.' + ATTACHMENT_RIGHTS + DATETIME_INPUT,
         requestBody: jsonBody(null),
         responses: {
           200: {
@@ -280,6 +293,7 @@ export function calendarPaths() {
           },
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
+          403: apiError('A new attachment without write access to the Documents module, or a change to an attachment whose document the caller cannot read.'),
           404: { description: 'Calendar event not found' },
           409: {
             description: 'Linked occurrence replacements require exact-count orphan confirmation',

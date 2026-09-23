@@ -7,7 +7,8 @@ const VISIT_CAPABILITY_NOTE = 'Each visit carries `can_edit` and `can_delete`: t
   + 'The visit list and report also carry `receipt_document_name`. ';
 
 // Beleg-Felder an jeder Sitzung (#1358): ein Urteil fuer Name und ID.
-const RECEIPT_NOTE = 'Every visit or work session carries `has_receipt` (whether a receipt is linked). `receipt_document_id` '
+const RECEIPT_NOTE = 'Every visit or work session carries `has_receipt` (whether a receipt is linked); it is `null` without access to the '
+  + 'Documents module (for API tokens a `documents:read` scope), so the visit does not even say that it has one. `receipt_document_id` '
   + '(and, where present, `receipt_document_name`) are set only when the caller may read that document: access to the Documents '
   + 'module, for API tokens a `documents:read` scope, and the document\'s own visibility. Otherwise both are `null`.';
 

@@ -249,6 +249,13 @@ function clippedRect(el, dialog) {
  * beschnitten auf seinen sichtbaren Ausschnitt. Fokus auf `body`, ausserhalb
  * der Dialoge oder auf dem Dialog selbst (openModal fokussiert das Panel)
  * zaehlt nicht: dessen Rechteck ist der ganze Dialog.
+ *
+ * EIN VISUELL VERSTECKTES FELD ZEIGT SEINEN FOKUS AM LABEL (#1429-Folge). Die
+ * Personen-Chips (`.user-ms`) verstecken ihre Checkbox als 1x1-Pixel am linken
+ * Rand; den Fokusring traegt das Label. Frei gehalten wurde nur das Pixel, und
+ * im Kalender-Editor lag bei 1280x900 jeder Chip beim Tab-Fokus unter dem
+ * Toast. Ist das Feld hoechstens einen Pixel breit oder hoch, zaehlt deshalb
+ * sein Label - das umschliessende oder das per `for` verbundene.
  */
 function focusedRect(dialogEls) {
   const active = document.activeElement;
@@ -256,7 +263,14 @@ function focusedRect(dialogEls) {
   const dialog = active.closest(DIALOG_SELECTOR);
   if (!dialog || active === dialog || !dialogEls.includes(dialog)) return null;
   if (active.getClientRects().length === 0) return null;
-  return clippedRect(active, dialog);
+  return clippedRect(visibleFocusTarget(active), dialog);
+}
+
+function visibleFocusTarget(active) {
+  const r = active.getBoundingClientRect();
+  if (r.width > 1 && r.height > 1) return active;
+  const label = active.closest('label') ?? active.labels?.[0];
+  return label && label.getClientRects().length > 0 ? label : active;
 }
 
 function visibleRects(elements, dialog) {

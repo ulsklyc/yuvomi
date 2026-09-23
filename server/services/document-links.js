@@ -19,11 +19,13 @@
  *      Datensatz (#1358). Der Pfad-Guard in server/index.js urteilt am ersten
  *      Pfadsegment (`/budget`, `/inventory`, ...) und fragt nie nach
  *      `documents`. Ohne Leserecht dort (Mitgliedsrecht `documents: none` oder
- *      ein Token ohne documents:read) kommt ein Beleg deshalb MASKIERT: die
- *      Zeile bleibt als "da ist einer", Name und ID sind `null`. Verknuepfen
+ *      ein Token ohne documents:read) kommt deshalb KEIN Beleg: die Liste ist
+ *      `null` - nicht leer, sondern "nicht gesagt", wie `document_count` bei
+ *      Aufgaben (#1425). Bis dahin kamen die Belege maskiert (Name und ID
+ *      `null`), ihre ANZAHL aber blieb lesbar. Verknuepfen
  *      ist dann fuer JEDE ID dieselbe 403 - auch fuer die schon gespeicherte
  *      und fuer eine, die es nicht gibt; unterschiedliche Antworten waeren ein
- *      Orakel fuer die maskierte ID. Eine leere Liste ist kein Verknuepfen und
+ *      Orakel fuer die verborgene ID. Eine leere Liste ist kein Verknuepfen und
  *      loest nach Regel 2 nichts, weil ohne Leserecht nichts sichtbar ist.
  *
  * Die Sichtbarkeit des einzelnen Dokuments kommt aus document-access.js, die
@@ -32,32 +34,27 @@
  * `documentViewer(req)` bekommt statt sie nachzubauen.
  */
 
-import { hiddenModulesFor } from '../permissions.js';
+import { mayReadModule } from '../permissions.js';
 import { documentVisibleSql, filterVisibleDocumentIds } from './document-access.js';
 import { assertDocumentsNotDeleting } from './document-deletion-lock.js';
 
 /** Felder, die ein Beleg preisgibt. Bewusst ohne Dateiinhalt. */
 const DOCUMENT_COLUMNS = 'd.name, d.original_name, d.mime_type, d.file_size';
 
-/** Dieselben Felder in maskierter Form: der Beleg ist da, mehr nicht. */
-const MASKED_DOCUMENT = Object.freeze({
-  document_id: null, name: null, original_name: null, mime_type: null, file_size: null,
-});
-
 /**
  * Darf diese Anfrage das Dokumente-Modul LESEN? Beide Achsen in einem Aufruf:
  * das Modulrecht des Mitglieds und der Scope eines API-Tokens
- * (`hiddenModulesFor`). Die eine Stelle fuer diese Frage bei Belegen (#1358).
+ * (`mayReadModule`). Die eine Stelle fuer diese Frage bei Belegen (#1358).
  * @param {import('express').Request} req
  * @returns {boolean}
  */
 export function mayReadDocuments(req) {
-  return !hiddenModulesFor(req, ['documents']).has('documents');
+  return mayReadModule(req, 'documents');
 }
 
 /**
  * Wer schaut, und darf er Dokumente lesen? Einmal je Anfrage gebildet und an
- * jede Funktion dieses Moduls gereicht. Ohne `viewer` gilt die maskierte Form -
+ * jede Funktion dieses Moduls gereicht. Ohne `viewer` gibt es keine Belege -
  * ein Aufrufer, der ihn vergisst, leakt deshalb nichts.
  * @param {import('express').Request} req
  * @returns {{ userId: number, readsDocuments: boolean }}
@@ -91,8 +88,9 @@ export function sendDocumentLinkRefusal(res, err) {
  *
  * Nicht sichtbare Dokumente fallen heraus, statt als leere Huelle zu
  * erscheinen: Wer den Beleg nicht sehen darf, soll auch nicht erfahren, dass
- * es ihn gibt. Ohne Leserecht auf das Dokumente-Modul kommen die sichtbaren
- * maskiert (Regel 3).
+ * es ihn gibt. Ohne Leserecht auf das Dokumente-Modul bleibt die Map leer, und
+ * es wird gar nicht erst abgefragt (Regel 3) - den Eintrag je Datensatz holt
+ * der Aufrufer ueber `documentLinksOf()`, das dann `null` liefert.
  *
  * @param {import('better-sqlite3-multiple-ciphers').Database} database
  * @param {object} options
@@ -106,7 +104,7 @@ export function sendDocumentLinkRefusal(res, err) {
 export function loadDocumentLinks(database, { table, ownerColumn, ownerIds, viewer, extraColumns = [] }) {
   const ids = [...new Set((ownerIds || []).filter((id) => Number.isInteger(id) && id > 0))];
   const byOwner = new Map();
-  if (!ids.length) return byOwner;
+  if (!ids.length || !readsDocuments(viewer)) return byOwner;
 
   const placeholders = ids.map(() => '?').join(', ');
   const extra = extraColumns.length ? `, ${extraColumns.map((c) => `a.${c}`).join(', ')}` : '';
@@ -118,21 +116,34 @@ export function loadDocumentLinks(database, { table, ownerColumn, ownerIds, view
     ORDER BY a.id ASC
   `).all(...ids, { userId: viewer?.userId ?? null });
 
-  const reads = readsDocuments(viewer);
   for (const { ownerId, ...attachment } of rows) {
     if (!byOwner.has(ownerId)) byOwner.set(ownerId, []);
-    byOwner.get(ownerId).push(reads ? attachment : { ...attachment, ...MASKED_DOCUMENT });
+    byOwner.get(ownerId).push(attachment);
   }
   return byOwner;
 }
 
 /**
- * Belege eines einzelnen Datensatzes.
- * @returns {object[]}
+ * Die Belege EINES Datensatzes aus dem Ergebnis von `loadDocumentLinks()`, wie
+ * die Antwort sie traegt: die Liste (auch leer), wenn `viewer` Dokumente lesen
+ * darf - sonst `null`. Weder die Belege noch ihre Anzahl (Regel 3).
+ * @param {Map<number, object[]>} byOwner
+ * @param {number} ownerId
+ * @param {{ userId: number, readsDocuments: boolean }} viewer
+ * @returns {object[]|null}
+ */
+export function documentLinksOf(byOwner, ownerId, viewer) {
+  if (!readsDocuments(viewer)) return null;
+  return byOwner.get(ownerId) || [];
+}
+
+/**
+ * Belege eines einzelnen Datensatzes; `null` ohne Leserecht auf die Dokumente.
+ * @returns {object[]|null}
  */
 export function documentLinksFor(database, { table, ownerColumn, ownerId, viewer, extraColumns }) {
-  return loadDocumentLinks(database, { table, ownerColumn, ownerIds: [ownerId], viewer, extraColumns })
-    .get(ownerId) || [];
+  const byOwner = loadDocumentLinks(database, { table, ownerColumn, ownerIds: [ownerId], viewer, extraColumns });
+  return documentLinksOf(byOwner, ownerId, viewer);
 }
 
 /**

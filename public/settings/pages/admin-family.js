@@ -116,7 +116,8 @@ function avatarEditorHtml(user, prefix) {
       <button type="button" class="settings-avatar-button" id="${prefix}-avatar-preview" aria-label="${t('settings.profilePictureLabel')}">
         ${avatarHtml(user, 'settings-avatar settings-avatar--lg')}
       </button>
-      <input class="sr-only" type="file" id="${prefix}-avatar-file" accept="image/png,image/jpeg,image/webp" />
+      <input class="sr-only" type="file" id="${prefix}-avatar-file" accept="image/png,image/jpeg,image/webp"
+        aria-label="${t('settings.profilePictureLabel')}" tabindex="-1" />
       <div class="settings-avatar-actions">
         <button type="button" class="settings-avatar-action" id="${prefix}-avatar-edit" aria-label="${t('settings.profilePictureLabel')}" title="${t('settings.profilePictureLabel')}">
           <i data-lucide="edit-2" aria-hidden="true"></i>
@@ -332,15 +333,32 @@ function renderPage(container) {
   `);
 }
 
+/**
+ * Leerzustand oder Fehlerkarte einer der beiden `<ul>` (Mitglieder,
+ * Einladungen). Eine Liste traegt nur `<li>`: ein `<p>` oder `<div>` direkt
+ * darin ist ungueltiges Markup, und Screenreader zaehlen die Liste falsch
+ * (axe `list`, a11y-Runde). Ein Text wird zum Hinweis, ein Knoten kommt so,
+ * wie er ist, in die Zeile.
+ * @param {string|Node} content
+ * @returns {HTMLLIElement}
+ */
+function listNotice(content) {
+  const item = document.createElement('li');
+  if (typeof content === 'string') {
+    item.className = 'form-hint';
+    item.textContent = content;
+  } else {
+    item.appendChild(content);
+  }
+  return item;
+}
+
 function renderMemberList(container, users, currentUserId) {
   const list = container.querySelector('#members-list');
   if (!list) return;
   list.replaceChildren();
   if (!users.length) {
-    const empty = document.createElement('p');
-    empty.className = 'form-hint';
-    empty.textContent = t('settings.familyEmpty');
-    list.appendChild(empty);
+    list.appendChild(listNotice(t('settings.familyEmpty')));
   } else {
     list.insertAdjacentHTML('beforeend', users.map((u) => memberHtml(u, currentUserId)).join(''));
   }
@@ -377,10 +395,7 @@ function renderInviteList(container, invites) {
   if (!list) return;
   list.replaceChildren();
   if (!invites.length) {
-    const empty = document.createElement('p');
-    empty.className = 'form-hint';
-    empty.textContent = t('settings.invites.empty');
-    list.appendChild(empty);
+    list.appendChild(listNotice(t('settings.invites.empty')));
   } else {
     list.insertAdjacentHTML('beforeend', invites.map(inviteHtml).join(''));
   }
@@ -577,10 +592,10 @@ async function loadInvites(container) {
     const res = await auth.getInvites();
     invites = res.data?.invites ?? [];
   } catch (err) {
-    list.replaceChildren(createRetryState({
+    list.replaceChildren(listNotice(createRetryState({
       message: err.message || t('common.errorGeneric'),
       onRetry: () => loadInvites(container),
-    }));
+    })));
     return;
   }
 
@@ -953,10 +968,10 @@ async function loadMembers(container, currentUser) {
     const res = await auth.getUsers();
     users = res.data ?? [];
   } catch (err) {
-    list.replaceChildren(createRetryState({
+    list.replaceChildren(listNotice(createRetryState({
       message: err.message || t('common.errorGeneric'),
       onRetry: reload,
-    }));
+    })));
     return;
   }
 

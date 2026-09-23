@@ -1,5 +1,14 @@
 import { createHash } from 'node:crypto';
 import { setEventAssignments } from '../routes/calendar/helpers.js';
+
+// Die Standard-Zuweisung eines Kalenders laeuft ohne Person dahinter - ueber
+// den Auto-Sync, sobald jemand einen Termin im externen Client zwischen zwei
+// Kalendern verschiebt, oder ueber den Backfill. Sie darf ein Anhang-Dokument
+// deshalb nicht anfassen (#1358): an einem Termin fuer Zugewiesene bekommt ein
+// schon eingeschraenktes Dokument die neue Person als Freigabe dazu, sonst
+// aendert sich an den Dokumentrechten nichts - nichts wird `family`, enger
+// oder privat, keine Freigabe faellt weg (applyDocumentAccess, `grantAssignees`).
+const FOLLOW_ASSIGNMENT = Object.freeze({ grantAssigneesOnly: true });
 import { remindAtCompareKey, remindAtUtcSql } from '../utils/reminder-schedule.js';
 
 // --------------------------------------------------------
@@ -205,7 +214,8 @@ const MOVED_DEFAULT_EVENTS = `
 /**
  * Stellt eine unangetastete Standard-Zuweisung auf eine andere Person um - der
  * eine Schreibweg fuer den Umzug zur Laufzeit (#1270) und das Nachholen (#1307).
- * Ueber setEventAssignments() (Erinnerungen, Anhangrechte); geerbte
+ * Ueber setEventAssignments() mit FOLLOW_ASSIGNMENT (Erinnerungen; ein
+ * eingeschraenkter Anhang bekommt nur die neue Person dazu, #1358); geerbte
  * Erinnerungen, deren Zeit vorbei ist, gelten als verworfen.
  *
  * @param {object} d better-sqlite3 Datenbank-Handle
@@ -215,7 +225,7 @@ const MOVED_DEFAULT_EVENTS = `
  */
 function moveDefaultAssignment(d, eventId, toUserId, nowKey) {
   d.prepare('UPDATE calendar_events SET assigned_to = ? WHERE id = ?').run(toUserId, eventId);
-  setEventAssignments(d, eventId, [toUserId]);
+  setEventAssignments(d, eventId, [toUserId], FOLLOW_ASSIGNMENT);
   d.prepare(`
     UPDATE reminders SET dismissed = 1
     WHERE entity_type = 'event' AND entity_id = ? AND created_by = ?
@@ -376,7 +386,7 @@ export async function applyDefaultAssigneesToExisting(
         if (!row || row.userId !== userId) continue;
         setPrimary.run(userId, eventId);
         if (row.documentId || (row.authorId !== null && hasFutureTemplate.get(eventId, row.authorId, nowKey))) {
-          setEventAssignments(d, eventId, [userId]);
+          setEventAssignments(d, eventId, [userId], FOLLOW_ASSIGNMENT);
           settlePastInherited.run(eventId, userId, nowKey);
         } else {
           addAssignment.run(eventId, userId);

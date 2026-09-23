@@ -218,7 +218,7 @@ export function documentsPaths() {
       get: op({
         summary: 'Preview the impact of deleting a document folder subtree',
         tag: 'Documents',
-        description: 'Returns the visible document count, exact folder count, affected-record counts grouped by module, an opaque HMAC snapshot bound to the folder identities and the visible document and collateral-link identities (changes to hidden documents never change it), and whether the caller may delete every affected document. Hidden-document totals are never returned; their presence only makes destructive deletion unavailable.',
+        description: 'Returns the visible document count, exact folder count, affected-record counts grouped by module, an opaque HMAC snapshot bound to the folder identities and the visible document and collateral-link identities (changes to hidden documents never change it), and `can_delete_documents`: whether the caller may delete every document they can see (always true for an admin). Hidden documents change nothing in this response - neither a count nor `can_delete_documents` reveals them; a destructive `DELETE` over a subtree that holds one is refused with 403 `FOLDER_DOCUMENTS_NOT_MANAGEABLE`.',
         params: [idParam()],
         responses: {
           200: { description: 'Folder deletion impact' },

@@ -4282,7 +4282,9 @@ function showToast(message, type = 'default', duration = 3000, onUndo = null) {
 
   const toast = document.createElement('div');
   toast.className = `toast ${type !== 'default' ? `toast--${type}` : ''}`;
-  toast.setAttribute('role', 'alert');
+  // Keine eigene Live-Rolle: die Region (hoeflich oder bestimmt) sagt an.
+  // `role="alert"` machte jeden Toast bestimmt, auch in der hoeflichen Region,
+  // und liess ihn je nach Screenreader doppelt ansagen.
 
   const iconEl = TOAST_ICONS[type]?.();
   if (iconEl) toast.appendChild(iconEl);

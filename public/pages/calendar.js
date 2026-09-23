@@ -53,6 +53,7 @@ import { nowFields, todayKey, zonedDateKey, zonedTimeKey } from '/utils/timezone
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
 import { moduleAccess } from '/permissions.js';
+import { pathAccess } from '/utils/module-access.js';
 import {
   applyPendingCalendarDeleteOverlay,
   createCalendarLoadCoordinator,
@@ -4160,6 +4161,9 @@ export const __test = {
   // Die Nur-lesen-Weiche (#467) und der Anlegeweg, den sie als erstes schliesst.
   readOnly, openEventModal,
   buildEventModalContent,
+  calendarSaveErrorMessage,
+  hasCurrentAttachment,
+  attachmentNode,
   fetchWindow,
   getWeekRange,
   getRangeForView,
@@ -4312,6 +4316,14 @@ function eventVisibilityMeta(visibility) {
 
 /** Anhang als Bildvorschau oder Download-Link - beides als DOM, nie als Markup. */
 function attachmentNode(ev) {
+  // Ein Anhang, dessen Dokument dieser Betrachter nicht sieht (#1358): derselbe
+  // ruhige Zustand wie im Bearbeiten-Dialog, ohne Name, Vorschau oder Link.
+  if (ev?.attachment_locked === true) {
+    const locked = document.createElement('span');
+    locked.className = 'detail-attachment detail-attachment--locked';
+    locked.textContent = t('documentAttach.lockedPrivate');
+    return locked;
+  }
   if (!hasAttachment(ev)) return null;
   const name = ev.attachment_name || t('calendar.attachmentFallback');
   const urls = attachmentUrls(ev);
@@ -5284,6 +5296,15 @@ function openEventModal({ mode, event = null, date = null, reminder = null, time
  * Orten entsteht: als eigenes Modal (neuer Termin, Desktop-Bearbeiten) und als
  * zweites Pane der Detailansicht, das erst beim Wechsel gemountet wird.
  */
+/**
+ * Hat der Termin im Dialog gerade einen Anhang? Ein gewaehlter Name zaehlt, und
+ * bis zur ersten Aenderung der gespeicherte. Danach traegt der Knopf
+ * "Entfernen" nichts mehr - in der Stufe `read` blieb er sonst allein stehen.
+ */
+function hasCurrentAttachment(attachmentState, event) {
+  return Boolean(attachmentState?.name) || (!attachmentState?.changed && hasAttachment(event));
+}
+
 function wireEventForm(panel, { mode, event = null, reminder = null }) {
   const isEdit = mode === 'edit';
   // Der Wiederholungsbaustein kennt absichtlich keine Feld-IDs des Kalenders.
@@ -5395,11 +5416,14 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
     removed: false,
   };
 
+  // Der Entfernen-Knopf folgt dem Zustand auch ohne Ablage (Stufe `read`): nach
+  // dem Entfernen blieb er dort sonst allein stehen, weil die Funktion vor ihm
+  // zurueckkehrte.
   const syncSelectedAttachment = () => {
+    if (removeAttachment) removeAttachment.hidden = !hasCurrentAttachment(attachmentState, event);
     if (!selectedAttachment) return;
     selectedAttachment.hidden = !attachmentState.name;
     selectedAttachment.textContent = attachmentState.name ? selectedAttachmentLabel(attachmentState.name) : '';
-    if (removeAttachment) removeAttachment.hidden = !attachmentState.name;
   };
 
   const syncAttachmentSelection = () => {
@@ -5709,6 +5733,76 @@ function defaultNewEventTime(dateStr) {
   return `${pad(rounded.hour)}:${pad(rounded.minute)}`;
 }
 
+/**
+ * Das Anhangsfeld im Termin-Dialog. Ein Anhang ist ein Dokument im
+ * Dokumente-Modul, das Hochladen also eine ausdrueckliche Uebertragung dorthin
+ * (docs/DECISIONS.md, Eintrag 10): die Ablage steht nur, wer dort schreiben darf
+ * - der Server verlangt dasselbe (`attachmentUploadRefused()`). Die drei Stufen
+ * wie in components/document-attach.js:
+ *   - `write`: Ablage, Vorschau, Entfernen;
+ *   - `read`: keine Ablage, ein sichtbarer Anhang bleibt mit Vorschau und
+ *     Entfernen (das Loesen legt nichts im Dokumente-Modul an);
+ *   - `none`: nichts - der Server nennt den Anhang dann gar nicht (#1358).
+ */
+function eventAttachmentFieldHtml(event) {
+  const access = pathAccess('/documents');
+  if (access === 'none') return '';
+  // Ein Anhang, dessen Dokument dieser Betrachter nicht sieht (#1358): der
+  // Server sagt nur `attachment_locked`, nichts ueber das Dokument. Stehen
+  // bleibt ein klarer Zustand - ohne Ablage und ohne Entfernen, denn beides
+  // wuerde der Server abweisen, und ein Ersetzen loeste den Anhang ab.
+  if (event?.attachment_locked === true) {
+    return `
+    <div class="form-group">
+      <span class="form-label">${t('calendar.attachmentLabel')}</span>
+      <p class="form-help" id="modal-attachment-locked">${esc(t('documentAttach.lockedPrivate'))}</p>
+    </div>`;
+  }
+  const shown = hasAttachment(event);
+  if (access !== 'write') {
+    if (!shown) return '';
+    return `
+    <div class="form-group">
+      <span class="form-label">${t('calendar.attachmentLabel')}</span>
+      <div class="event-attachment-preview" id="modal-attachment-preview">
+        ${attachmentPreviewHtml(event)}
+      </div>
+      <button class="btn btn--secondary" id="modal-remove-attachment" type="button">${t('calendar.attachmentRemove')}</button>
+    </div>`;
+  }
+  return `
+    <div class="form-group">
+      <label class="form-label" for="modal-attachment">${t('calendar.attachmentLabel')}</label>
+      <p class="document-storage-target">
+        <i data-lucide="${state.documentUploadBackend === 'webdav' ? 'cloud' : state.documentUploadBackend === 'local_folder' ? 'folder' : 'database'}" aria-hidden="true"></i>
+        <span>${t('documents.activeUploadTarget', {
+          target: state.documentUploadBackend === 'webdav'
+            ? t('documents.storageWebdav')
+            : state.documentUploadBackend === 'local_folder'
+              ? t('documents.storageLocalFolder')
+              : t('documents.storageLocal'),
+        })}</span>
+      </p>
+      <label class="document-dropzone" id="modal-attachment-dropzone" for="modal-attachment">
+        <input class="sr-only" id="modal-attachment" type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+        <span class="document-dropzone__icon">
+          <i data-lucide="file-up" aria-hidden="true"></i>
+        </span>
+        <span class="document-dropzone__title">${t('documents.dropzoneTitle')}</span>
+        <span class="document-dropzone__hint">${t('documents.dropzoneHint')}</span>
+        <span class="document-dropzone__file" id="modal-selected-attachment" ${event?.attachment_name ? '' : 'hidden'}>
+          ${event?.attachment_name ? esc(selectedAttachmentLabel(event.attachment_name)) : ''}
+        </span>
+      </label>
+      <div class="form-help">${t('calendar.attachmentHint')}</div>
+      <div class="event-attachment-preview" id="modal-attachment-preview" ${shown ? '' : 'hidden'}>
+        ${shown ? attachmentPreviewHtml(event) : ''}
+      </div>
+      <button class="btn btn--secondary" id="modal-remove-attachment" type="button"
+              ${shown ? '' : 'hidden'}>${t('calendar.attachmentRemove')}</button>
+    </div>`;
+}
+
 function buildEventModalContent({ mode, event, date, reminder = null, time = null }) {
   const isEdit = mode === 'edit';
   const today  = date || state.today;
@@ -5780,36 +5874,7 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
                 placeholder="${t('calendar.descriptionPlaceholder')}">${esc(isEdit && event.description ? event.description : '')}</textarea>
     </div>
 
-    <div class="form-group">
-      <label class="form-label" for="modal-attachment">${t('calendar.attachmentLabel')}</label>
-      <p class="document-storage-target">
-        <i data-lucide="${state.documentUploadBackend === 'webdav' ? 'cloud' : state.documentUploadBackend === 'local_folder' ? 'folder' : 'database'}" aria-hidden="true"></i>
-        <span>${t('documents.activeUploadTarget', {
-          target: state.documentUploadBackend === 'webdav'
-            ? t('documents.storageWebdav')
-            : state.documentUploadBackend === 'local_folder'
-              ? t('documents.storageLocalFolder')
-              : t('documents.storageLocal'),
-        })}</span>
-      </p>
-      <label class="document-dropzone" id="modal-attachment-dropzone" for="modal-attachment">
-        <input class="sr-only" id="modal-attachment" type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
-        <span class="document-dropzone__icon">
-          <i data-lucide="file-up" aria-hidden="true"></i>
-        </span>
-        <span class="document-dropzone__title">${t('documents.dropzoneTitle')}</span>
-        <span class="document-dropzone__hint">${t('documents.dropzoneHint')}</span>
-        <span class="document-dropzone__file" id="modal-selected-attachment" ${isEdit && event.attachment_name ? '' : 'hidden'}>
-          ${isEdit && event.attachment_name ? esc(selectedAttachmentLabel(event.attachment_name)) : ''}
-        </span>
-      </label>
-      <div class="form-help">${t('calendar.attachmentHint')}</div>
-      <div class="event-attachment-preview" id="modal-attachment-preview" ${isEdit && hasAttachment(event) ? '' : 'hidden'}>
-        ${isEdit && hasAttachment(event) ? attachmentPreviewHtml(event) : ''}
-      </div>
-      <button class="btn btn--secondary" id="modal-remove-attachment" type="button"
-              ${isEdit && hasAttachment(event) ? '' : 'hidden'}>${t('calendar.attachmentRemove')}</button>
-    </div>`;
+    ${eventAttachmentFieldHtml(isEdit ? event : null)}`;
 
   return `
     <div class="event-title-picker">
@@ -5979,6 +6044,18 @@ function confirmLocalWholeSeriesDelete(event) {
     confirmLabel: t('calendar.deleteWholeSeriesOnlyConfirm'),
     danger: true,
   });
+}
+
+/**
+ * Die Meldung zu einem abgewiesenen Speichern. Die beiden Anhang-Absagen
+ * (#1358) tragen einen `reason` und bekommen einen uebersetzten Satz statt
+ * des englischen Servertexts; alles andere wie bisher.
+ */
+function calendarSaveErrorMessage(err) {
+  const reason = err?.data?.reason;
+  if (reason === 'ATTACHMENT_CHANGE_REFUSED') return t('calendar.attachmentChangeRefused');
+  if (reason === 'ATTACHMENT_UPLOAD_REFUSED') return t('calendar.attachmentUploadRefused');
+  return err?.data?.error ?? t('calendar.saveError');
 }
 
 async function saveEvent(overlay, mode, event, existingReminder = null, attachmentState = null) {
@@ -6272,7 +6349,7 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
     // Server-Validierungsmeldung bevorzugen, sonst lokalisierter Fallback; der
     // rohe err.message-Text (Netzwerk/JS) wird nie gezeigt. Das Modal bleibt offen
     // und der Button reaktiviert — die Eingaben des Nutzers bleiben erhalten.
-    window.yuvomi?.showToast(err.data?.error ?? t('calendar.saveError'), 'danger');
+    window.yuvomi?.showToast(calendarSaveErrorMessage(err), 'danger');
     saveBtn.disabled    = false;
     saveBtn.textContent = mode === 'edit' ? t('common.save') : t('common.create');
   }

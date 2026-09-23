@@ -741,6 +741,8 @@
         "searchCountCapped": "{{shown}} de {{total}} resultados",
         "title": "Calendario",
         "attachmentRemove": "Quitar archivo adjunto",
+        "attachmentChangeRefused": "No puedes cambiar este adjunto: el documento es privado o no tienes acceso a los documentos.",
+        "attachmentUploadRefused": "Solo quien puede editar documentos puede añadir un adjunto.",
         "newEvent": "Nuevo evento",
         "editEvent": "Editar evento",
         "addEvent": "Añadir evento",
@@ -1123,6 +1125,7 @@
         "phonePreview": "Vista previa: {{value}}",
         "phoneImplausible": "Este número parece incompleto - se guardará igualmente.",
         "emailLabel": "Email",
+        "emailLockedHint": "Estas direcciones pertenecen a la cuenta de este miembro. Solo el propio miembro o un administrador puede cambiarlas.",
         "emailPlaceholder": "nombre@ejemplo.es",
         "addressLabel": "Dirección",
         "addressPlaceholder": "Calle, código postal, ciudad",
@@ -3584,8 +3587,7 @@
         "currentMonth": "Este mes",
         "noVisitReportsInMonth": "No se registró ningún servicio en {{month}}.",
         "settledAdminOnly": "Solo un administrador puede modificarlo o eliminarlo",
-        "reportVisitsCount": "Visitas",
-        "receiptPresent": "Adjunto"
+        "reportVisitsCount": "Visitas"
     },
     "userMultiSelect": {
         "moreUsers": "más",
@@ -5490,7 +5492,7 @@
         "openAction": "Abrir {{name}}",
         "limitReached": "Como máximo {{count}} documentos.",
         "limitReached_one": "Como máximo {{count}} documento.",
-        "presentHidden": "Adjunto"
+        "lockedPrivate": "Adjunto presente (privado)"
     },
     "join": {
         "title": "Configura tu cuenta",

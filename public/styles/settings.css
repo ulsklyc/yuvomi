@@ -3212,7 +3212,23 @@
    Kartenfarbe: ein Scanner braucht den Kontrast, und im dunklen Erscheinungs-
    bild waere die Karte selbst dunkel. Das Bild bleibt deshalb in jedem
    Farbschema auf Weiss.
+
+   Die Abstaende der Karte folgen "Andere Geraete" (#1427): Hinweis und Knopf
+   standen mit 0 px untereinander, der Fokusring des Knopfes lag auf dem
+   Hinweis. Jede Zeile nach der ersten bekommt den kleineren Schritt, die
+   Knopfreihe und das Formular der Rueckfrage den der `.settings-form`-Karten.
+   Eine leere Statuszeile bleibt eine Live-Region ohne Leerraum.
    -------------------------------------------------------- */
+.settings-2fa__note:not(:empty) {
+  margin-top: var(--space-2);
+  margin-bottom: 0;
+}
+
+.settings-2fa__actions,
+.settings-2fa__form {
+  margin-top: var(--space-3);
+}
+
 .settings-2fa__steps {
   /* Der Reset nimmt Listen ihre Marker. Hier gehoeren sie zurueck: die beiden
      Schritte haben eine Reihenfolge, und ohne Ziffern stehen sie als zwei
