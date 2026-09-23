@@ -1568,6 +1568,12 @@ function photoPreviewHtml(photoData) {
  */
 function buildItemForm({ mode, item = null }) {
   const isEdit = mode === 'edit';
+  // Verknuepfte Buchungen kommen aus dem Budget: ohne dessen Leserecht liefert
+  // der Server keine und antwortet auf jedes Nachschlagen mit 404. Abschnitt
+  // und Knoepfe fallen dann weg - "keine verknuepften Buchungen" waere falsch,
+  // und "Buchung hinzufuegen" endete im Fehler (Regel 1 in
+  // utils/module-access.js, Muster wie attachmentDetailEntries()).
+  const showsBookings = pathAccess('/budget') !== 'none';
   let pickedBooking = null; // nur im Anlegen-Fluss: {entry, role:'purchase'} vor dem Speichern
   let photoData = isEdit && item.photo_data ? item.photo_data : null;
 
@@ -1610,7 +1616,7 @@ function buildItemForm({ mode, item = null }) {
           <input id="inv-purchase-price" class="form-input" type="number" min="0" step="0.01" inputmode="decimal">
         </div>
       </div>
-      ${!isEdit ? `
+      ${!isEdit && showsBookings ? `
       <div class="form-group">
         <button class="btn btn--secondary btn--sm" type="button" data-action="link-booking">
           <i data-lucide="link" aria-hidden="true"></i> ${esc(t('inventory.linkBooking'))}
@@ -1621,7 +1627,7 @@ function buildItemForm({ mode, item = null }) {
         <label class="form-label" for="inv-status">${esc(t('inventory.statusLabel'))}</label>
         <select id="inv-status" class="form-input">${statusOptions}</select>
       </div>
-      ${isEdit ? `
+      ${isEdit && showsBookings ? `
       <div class="form-group">
         <span class="form-label">${esc(t('inventory.linkedBookingsLabel'))}</span>
         <div class="inventory-linked-entries" data-linked-entries></div>
@@ -1818,7 +1824,7 @@ function buildItemForm({ mode, item = null }) {
         name: panel.querySelector('#inv-name').value.trim() || file.name,
       }),
     });
-    if (isEdit) {
+    if (showsBookings && isEdit) {
       renderLinkedEntries(panel, item);
       panel.querySelector('[data-action="add-booking"]').addEventListener('click', async () => {
         const picked = await openBookingPicker(panel, {
@@ -1851,7 +1857,7 @@ function buildItemForm({ mode, item = null }) {
           window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
         }
       });
-    } else {
+    } else if (showsBookings) {
       panel.querySelector('[data-action="link-booking"]').addEventListener('click', async () => {
         const picked = await openBookingPicker(panel, { includeRole: false });
         if (!picked) return;
@@ -2084,4 +2090,5 @@ export const __test = {
   itemCategoryLabel,
   categoryOptionsHtml,
   attachmentDetailEntries,
+  buildItemForm,
 };
