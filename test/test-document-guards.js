@@ -1051,7 +1051,6 @@ const SHAPE_EXEMPT = new Map([
   ['nav-item', 'Zeile: Eintrag der Sidebar-Navigation'],
   ['settings-shell__navigation-toggle', 'Zeile: Domaenenkopf der Settings-Navigation (Akkordeon)'],
   ['note-item', 'Zeile: Notiz im Dashboard-Widget'],
-  ['rewards-widget-row', 'Zeile: Rang im Belohnungs-Widget'],
   ['rw-standing__id', 'Zeile: Oeffner einer Mitglieds-Zeile'],
   ['documents-folder-item__select', 'Zeile: Ordner in der Dokumentenliste'],
   // Der Chip traegt seit 031597b1 (Juli 2026) role="button" und dieselbe flache

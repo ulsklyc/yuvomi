@@ -26,6 +26,8 @@ import { householdTimeZone, utcToWall, todayKey, shiftDateKey } from '../utils/t
 import { isAdminUser, serializeEvents } from './calendar/helpers.js';
 import { getOccurrences as getWasteOccurrences } from '../services/waste-store.js';
 import { scheduleData } from '../services/schedule.js';
+import { isAdminRequest } from '../middleware/require-admin.js';
+import { activeCatalog } from '../services/rewards.js';
 
 const log = createLogger('Dashboard');
 
@@ -74,7 +76,7 @@ const DENIED_PAYLOAD = Object.freeze({
   // Geteilte Ausgaben gehoeren zum Budget-Modul (server/scopes.js fuehrt
   // `split-expenses` als zweiten Praefix von `budget`).
   budget: ({ month }) => ({ budget: emptyBudget(month), splitBalance: emptySplitBalance() }),
-  rewards: () => ({ rewards: { standings: [], participantCount: 0, pending: 0 } }),
+  rewards: () => ({ rewards: { view: null, standings: [], participantCount: 0, pending: 0, catalog: [], recent: [] } }),
   health: () => ({
     health: {
       hasMeds: false, dosesTotal: 0, dosesTaken: 0, dosesSkipped: 0,
@@ -739,27 +741,62 @@ router.get('/', (req, res) => {
     result.splitBalance = emptySplitBalance();
   }
 
-  // Belohnungen: Familien-Punktestand (Top 5 aktive Teilnehmer nach Ledger-Saldo)
-  // plus offene Freigaben — ein glanceable Mini-Ranking für den Familienalltag.
+  /* BELOHNUNGEN: FORTSCHRITT STATT RANGLISTE (Critique 2026-09-23, Persona Emma).
+   *
+   * Hier stand eine Top-5-Rangliste nach Punkten, fuer jeden Betrachter gleich.
+   * Ein Kind las darin "1 Leo 60 / 2 Emma 30": Wettbewerb unter Geschwistern
+   * statt des eigenen Wegs zur Praemie. Die Antwort teilt jetzt nach der Frage,
+   * die das Modul selbst stellt - wer darf FREIGEBEN (isAdminRequest, dieselbe
+   * Pruefung wie PATCH /rewards/redemptions) -, nicht nach `family_role`:
+   *
+   *   approver - jedes teilnehmende Mitglied, nach NAMEN (kein Platz), dazu alle
+   *              offenen Anfragen;
+   *   self     - wer nicht freigibt, aber selbst sammelt: NUR die eigene Zeile,
+   *              die eigenen offenen Anfragen und die zuletzt verdienten Punkte.
+   *              Die Geschwister gehen gar nicht erst ueber die Leitung - eine
+   *              Rangliste im Netzwerk-Tab ist dieselbe Rangliste;
+   *   family   - wer weder freigibt noch sammelt (Wandtablett, Grosseltern):
+   *              alle nach Namen, ohne fremde Anfragen.
+   *
+   * `catalog` ist die Zielliste fuer den Balken; welche Praemie das Ziel ist,
+   * entscheidet public/utils/reward-goal.js, dieselbe Regel wie auf der Seite. */
   if (allows('rewards')) try {
     const MEMBER_FILTER = householdMemberSql('u');
-    const standings = d.prepare(`
+    const members = d.prepare(`
       SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, u.family_role,
              COALESCE((SELECT SUM(delta) FROM reward_ledger l WHERE l.user_id = u.id), 0) AS balance
       FROM users u
       JOIN reward_participants rp ON rp.user_id = u.id AND rp.enabled = 1
       WHERE ${MEMBER_FILTER}
-      ORDER BY balance DESC, u.display_name COLLATE NOCASE ASC
-      LIMIT 5
+      ORDER BY u.display_name COLLATE NOCASE ASC, u.id ASC
     `).all();
-    // Dieselben Personen wie die Rangliste darueber (#1207): eine alte
+    const approver = isAdminRequest(req);
+    const own = members.find((m) => m.id === Number(userId));
+    const view = approver ? 'approver' : own ? 'self' : 'family';
+    const standings = view === 'self' ? [own] : members;
+    // Dieselben Personen wie die Liste darueber (#1207): eine alte
     // Einschreibung von Personal oder Gast bleibt stehen, zaehlt aber nicht.
-    const participantCount = d.prepare(`SELECT COUNT(*) AS n FROM reward_participants p JOIN users u ON u.id = p.user_id WHERE p.enabled = 1 AND ${householdMemberSql('u')}`).get().n;
-    const pending = d.prepare("SELECT COUNT(*) AS n FROM reward_redemptions WHERE status = 'pending'").get().n;
-    result.rewards = { standings, participantCount, pending };
+    const participantCount = members.length;
+    const pending = view === 'approver'
+      ? d.prepare("SELECT COUNT(*) AS n FROM reward_redemptions WHERE status = 'pending'").get().n
+      : view === 'self'
+        ? d.prepare("SELECT COUNT(*) AS n FROM reward_redemptions WHERE status = 'pending' AND user_id = ?").get(userId).n
+        : 0;
+    // Wer selbst sammelt, sieht seine letzten Gutschriften - verdient oder
+    // geschenkt. Einloesungen und Rueckbuchungen sind kein "verdient".
+    const ownRecent = own && (view === 'self' || members.length === 1)
+      ? d.prepare(`
+          SELECT delta, type, reason, created_at FROM reward_ledger
+          WHERE user_id = ? AND delta > 0 AND type IN ('earn', 'bonus')
+          ORDER BY created_at DESC, id DESC
+          LIMIT 3
+        `).all(userId)
+      : [];
+    const catalog = activeCatalog(d).map((c) => ({ id: c.id, name: c.name, cost: c.cost, remaining: c.remaining }));
+    result.rewards = { view, me: userId, standings, participantCount, pending, catalog, recent: ownRecent };
   } catch (err) {
     log.error('rewards error:', err.message);
-    result.rewards = { standings: [], participantCount: 0, pending: 0 };
+    result.rewards = { view: null, standings: [], participantCount: 0, pending: 0, catalog: [], recent: [] };
   }
 
   // Gesundheit: heute fällige Dosen der EIGENEN Medikamente (private wie familiensichtbare)
