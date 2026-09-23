@@ -348,6 +348,42 @@
   padding-block-end: calc(var(--scrollport-pad, 0px) + var(--shell-tail));
 }
 
+/* UND AM DEFAULT-PORT REITET ER AUF EINEM PLATZHALTER, NICHT AUF DEM POLSTER
+ * (Critique 2026-09-23).
+ *
+ * Das Polster oben greift an `.app-content` nur zur Haelfte. Ein Scrollport
+ * haengt sein Endpolster an das Ende seines FLUSS-Kindes, und das ist
+ * `.page-transition` - mit `height: 100%` (siehe dort), also genau so hoch wie
+ * die Inhaltsbox. Eine Seite, die laenger ist, laeuft ueber diese Box hinaus,
+ * und ihr Ueberlauf bekommt kein Polster mehr. Gemessen bei 1440x900 auf der
+ * Uebersicht: 24px statt 96px unter dem letzten Widget, der FAB lag am
+ * Seitenende auf der rechten Spalte; dasselbe auf Einstellungen (32px) und
+ * Haushaltshilfe (64px), sobald eine fixierte Flaeche einen Nachlauf verlangt.
+ * Die Regel galt nur dort, wo eine Seite zufaellig selbst genug Bodenpolster
+ * mitbrachte.
+ *
+ * Der Platzhalter steht IM Fluss der Seite, hinter ihrem Root - und der waechst
+ * in dieser Architektur mit dem Inhalt. Er reitet damit am echten Inhaltsende.
+ *
+ * DAS POLSTER BLEIBT TROTZDEM, und die beiden rechnen sich nicht doppelt. Es
+ * haelt `.page-transition` um den Nachlauf kuerzer als das Fenster; eine Seite,
+ * die nur ihren Platz fuellt (`min-height: 100%` wie Belohnungen und Entsorgung),
+ * endet deshalb mit dem Platzhalter genau an der Fensterkante statt um den
+ * Nachlauf darueber hinaus. Die Scrollhoehe ist in jedem Fall
+ * max(Fensterhoehe, Inhaltsende + Nachlauf) - das Polster zaehlt nur bis zur
+ * Kante der Box, der Platzhalter nur ab dem Inhalt.
+ *
+ * Die Hoehe des Fluss-Kindes selbst anzufassen (`min-height` statt `height`),
+ * hiesse die Bezugshoehe fuer jedes `min-height: 100%` darunter aufzugeben:
+ * eine Prozenthoehe loest sich nur gegen eine DEFINITE Hoehe auf. Seiten mit
+ * eigenem Scrollport sind ausgenommen wie oben - dort reitet der Nachlauf an
+ * ihrem Port. Gemessen: `test:dashboard-surface-browser`. */
+.app-content:not(:has(.page-scrollport)) > .page-transition::after {
+  content: "";
+  display: block;
+  block-size: var(--shell-tail);
+}
+
 /* #main-content wird nach jeder Navigation programmatisch fokussiert, damit
  * Tastatur-/Screenreader-Fokus in die neue Seite springt (Skip-Link-Muster).
  * Das ist ein Region-Fokus-Ziel, kein interaktives Element — es darf keinen
