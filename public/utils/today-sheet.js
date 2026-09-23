@@ -2,7 +2,8 @@
  * Modul: Heute-Blatt - der Beitrags-Vertrag
  * Zweck: Welche Module im Blatt „Heute wichtig" sprechen, in welcher Form, und
  *        nach welcher Regel das Blatt sortiert, deckelt und seine Coda setzt.
- * Abhaengigkeiten: /i18n.js, /permissions.js, /nav-icons.js
+ * Abhaengigkeiten: /i18n.js, /permissions.js, /nav-icons.js, /utils/timezone.js,
+ *                  /utils/pantry-status.js
  *
  * WARUM ES DIESEN VERTRAG GIBT (Dashboard-Critique 23.09.2026, P1). Das Blatt
  * las nur Termine, Aufgaben, Essen und Einkauf und schloss mit „Danach steht
@@ -24,26 +25,20 @@
  *   priority  kleiner = wichtiger; entscheidet, was unter dem Deckel bleibt
  *   open      ist hier noch etwas ZU TUN? Nur offene Zeilen halten die Coda auf
  *
- * EINE NEUE QUELLE ANDOCKEN (etwa der Vorrat, der bald ablaeuft): ein Eintrag
- * in TODAY_SHEET_SOURCES mit `module`, `widget` und `collect(data, ctx)`, der
- * aus einem Feld der /dashboard-Antwort Zeilen dieser Form macht. Modulschalter,
- * Widget-Recht und die Kein-Echo-Regel prueft `sourceSpeaks()` fuer alle gleich;
- * die Quelle muss nur ihre Daten lesen. Beispiel am Ende dieses Kopfes.
- *
- *   {
- *     id: 'pantry', module: 'pantry', widget: 'pantry',
- *     collect: (data) => (data?.pantryExpiring ?? []).map((item) => ({
- *       kind: 'pantry', objectId: item.id, sortKey: '00:01', tone: 'pantry',
- *       icon: MODULE_ICON.pantry, title: item.name, sub: '<eigener Key>',
- *       timeLabel: '', route: '/pantry', who: null, priority: 45, open: true,
- *     })),
- *   },
+ * EINE NEUE QUELLE ANDOCKEN: ein Eintrag in TODAY_SHEET_SOURCES mit `module`,
+ * `widget` und `collect(data, ctx)`, der aus einem Feld der /dashboard-Antwort
+ * Zeilen dieser Form macht, dazu die Tonklassen `today-cockpit-card--<tone>` und
+ * `wall-row--<tone>` in dashboard.css. Modulschalter, Widget-Recht und die
+ * Kein-Echo-Regel prueft `sourceSpeaks()` fuer alle gleich; die Quelle muss nur
+ * ihre Daten lesen. Das juengste Beispiel ist der Vorrat (`id: 'pantry'`,
+ * liest `pantryExpiring.todayItems`/`todayCount`).
  */
 
 import { t, formatTime } from '/i18n.js';
 import { canSeeWidget as canSeeWidgetDefault, isPermAdmin, moduleAccess } from '/permissions.js';
 import { MODULE_ICON } from '/nav-icons.js';
 import { zonedTimeKey } from '/utils/timezone.js';
+import { pantryExpiryPhrase } from '/utils/pantry-status.js';
 
 /** Zeitlose Plaetze im Tag - dieselben drei Stufen, die das Programm schon kennt. */
 export const SORT_DUE_NOW = '00:00';
@@ -65,8 +60,8 @@ const WASTE_PUT_OUT_SORT = '18:00';
  *
  * Nicht jede faellige Erinnerung ist eine Blatt-Zeile: Abfuhr und Schicht
  * haben hier eine eigene Quelle (eine zweite Zeile waere ein Echo), Zyklus und
- * Fasten sind Stupser ihrer eigenen Kacheln, und der Vorrat dockt spaeter mit
- * seiner eigenen Quelle an. Was hier nicht steht, spricht weiter ueber Toast
+ * Fasten sind Stupser ihrer eigenen Kacheln, und der Vorrat spricht ueber seine
+ * eigene Quelle (`pantry`). Was hier nicht steht, spricht weiter ueber Toast
  * und Glocke. `echo` nennt das Widget, das dasselbe Objekt schon zeigen wuerde.
  */
 const REMINDER_SHEET_ORIGINS = {
@@ -230,6 +225,39 @@ export const TODAY_SHEET_SOURCES = [
           priority: 60,
           open: false,
         }));
+    },
+  },
+  {
+    // Vorrat, der HEUTE ablaeuft (Dashboard-Critique 23.09.2026, #1448). Wie
+    // die Tonne: mehrere Chargen eines Tages sind EINE Zeile, und sie ist ein
+    // Auftrag (heute aufbrauchen), haelt also die Coda auf. Abgelaufenes und
+    // „bald" bleiben der Vorrats-Kachel - das Blatt kennt nur heute. Die
+    // Namen kommen gedeckelt (`todayItems`), die Zahl ungedeckelt
+    // (`todayCount`); was darueber hinausgeht, steht als „+N weitere" da.
+    id: 'pantry',
+    module: 'pantry',
+    widget: 'pantry',
+    collect(data) {
+      const slice = data?.pantryExpiring;
+      const items = Array.isArray(slice?.todayItems) ? slice.todayItems : [];
+      if (!items.length) return [];
+      const names = joinNames(items.map((item) => item.name));
+      const rest = Math.max(0, (Number(slice.todayCount) || 0) - items.length);
+      const phrase = pantryExpiryPhrase(0);
+      return [{
+        kind: 'pantry',
+        objectId: null,
+        sortKey: SORT_ALL_DAY,
+        timeLabel: '',
+        title: rest ? `${names} ${t('dashboard.pantryExpiringMore', { count: rest })}` : names,
+        sub: t(phrase.key),
+        icon: MODULE_ICON.pantry,
+        tone: 'pantry',
+        route: '/pantry?filter=soon',
+        who: null,
+        priority: 30,
+        open: true,
+      }];
     },
   },
   {

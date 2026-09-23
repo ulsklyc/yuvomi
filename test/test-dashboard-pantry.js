@@ -461,3 +461,89 @@ test('Vorratsseite: ?filter= öffnet den passenden Chip, Unbekanntes bleibt bei 
   const page = src('../public/pages/pantry.js');
   assert.match(page, /pantryFilterFromSearch\(window\.location\.search\)/, 'die Seite liest den Link beim Rendern');
 });
+
+// --------------------------------------------------------------------------
+// Heute-Blatt: „Läuft heute ab" dockt am Beitrags-Vertrag an (Integration)
+// --------------------------------------------------------------------------
+
+/* Was HEUTE abläuft, ist eine Sache von heute - das Heute-Blatt nannte sie
+ * nicht und sagte daneben „Danach steht heute nichts mehr an". Die Quelle
+ * spricht nach denselben drei Riegeln wie jede andere (Modul an, Widget-Recht,
+ * Kein-Echo gegen die Vorrats-Kachel) und hält die Coda auf. */
+const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+
+function withSheet(perms, fn) {
+  const prevWindow = global.window;
+  global.window = { yuvomi: { isModuleDisabled: () => false } };
+  setPermissions({ admin: false, modules: {}, widgets: {}, capabilities: {}, ...perms });
+  try {
+    return fn();
+  } finally {
+    clearPermissions();
+    global.window = prevWindow;
+  }
+}
+
+const expiringToday = (names, todayCount = names.length) => ({
+  items: [], total: todayCount, expiredCount: 0, todayCount,
+  todayItems: names.map((name, i) => ({ id: i + 1, name, quantity: 1, unit: 'l' })),
+});
+const birthdayToday = [{ id: 9, name: 'Oma Erna', days_until: 0, kind: 'birthday' }];
+const sheetRows = (model) => model.rows.filter((row) => row.kind === 'pantry');
+
+test('Heute-Blatt: was heute abläuft, steht als eine Zeile im Blatt und hält die Coda auf', () => withSheet({}, () => {
+  const model = __test.buildTodayCockpitModel(
+    { birthdays: birthdayToday, pantryExpiring: expiringToday(['Milch', 'Joghurt']) }, [],
+  );
+  const rows = sheetRows(model);
+  assert.equal(rows.length, 1, `zwei Chargen von heute sind eine Zeile, erhalten: ${model.rows.map((r) => r.kind)}`);
+  assert.match(rows[0].title, /Milch.*Joghurt/);
+  assert.match(rows[0].sub, /pantry\.badgeExpiresToday/, 'der Text ist der der Vorratsseite (pantryExpiryPhrase(0))');
+  assert.equal(rows[0].tone, 'pantry');
+  assert.match(rows[0].route, /^\/pantry\?filter=soon$/, 'die Zeile öffnet den Vorrat mit dem passenden Filter');
+  assert.equal(model.coda, null, 'solange heute etwas abläuft, keine Entwarnung');
+
+  const nothing = __test.buildTodayCockpitModel({ birthdays: birthdayToday, pantryExpiring: expiringToday([]) }, []);
+  assert.equal(sheetRows(nothing).length, 0);
+  assert.match(String(nothing.coda), /todayNothingElse/, 'Gegenprobe: ohne Ablauf fällt die Coda');
+}));
+
+test('Heute-Blatt: mehr als die gelieferten Chargen - der Rest steht als Zahl da', () => withSheet({}, () => {
+  const model = __test.buildTodayCockpitModel({ pantryExpiring: expiringToday(['A', 'B', 'C', 'D', 'E'], 7) }, []);
+  assert.match(sheetRows(model)[0].title, /pantryExpiringMore.*"count":2/, 'todayCount ist ungedeckelt, die Liste nicht');
+}));
+
+test('Heute-Blatt: Kein-Echo gegen die Vorrats-Kachel, Rechte und Modulschalter', () => {
+  const data = { pantryExpiring: expiringToday(['Milch']) };
+  withSheet({}, () => {
+    const beside = __test.buildTodayCockpitModel(data, [{ id: 'pantry', visible: true, size: '1x2' }]);
+    assert.equal(sheetRows(beside).length, 0, 'neben der sichtbaren Kachel keine zweite Zeile');
+    const hiddenTile = __test.buildTodayCockpitModel(data, [{ id: 'pantry', visible: false, size: '1x2' }]);
+    assert.equal(sheetRows(hiddenTile).length, 1, 'ausgeblendete Kachel: das Blatt spricht');
+  });
+  withSheet({ modules: { pantry: 'none' } }, () => {
+    assert.equal(sheetRows(__test.buildTodayCockpitModel(data, [])).length, 0, 'ohne Vorratsrecht keine Zeile');
+  });
+  withSheet({ widgets: { pantry: 'none' } }, () => {
+    assert.equal(sheetRows(__test.buildTodayCockpitModel(data, [])).length, 0, 'gesperrtes Widget heisst auch: keine Zeile (#467)');
+  });
+  const prevWindow = global.window;
+  try {
+    withSheet({}, () => {
+      global.window = { yuvomi: { isModuleDisabled: (m) => m === 'pantry' } };
+      assert.equal(sheetRows(__test.buildTodayCockpitModel(data, [])).length, 0, 'abgeschaltetes Modul spricht nicht');
+    });
+  } finally {
+    global.window = prevWindow;
+  }
+  withSheet({}, () => {
+    assert.equal(sheetRows(__test.buildTodayCockpitModel({ pantryExpiring: null }, [])).length, 0,
+      'ein Ladefehler (null) ist keine Zeile');
+  });
+});
+
+test('Heute-Blatt: die Vorratszeile hat ihren Ton in Cockpit und Wand', () => {
+  const css = src('../public/styles/dashboard.css');
+  assert.match(css, /\.today-cockpit-card--pantry\s*\{\s*--today-card-accent:\s*var\(--module-pantry\)/);
+  assert.match(css, /\.wall-row--pantry\s*\{\s*--wall-row-accent:\s*var\(--module-pantry\)/);
+});
