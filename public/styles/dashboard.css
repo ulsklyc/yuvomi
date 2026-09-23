@@ -729,6 +729,24 @@
   color: var(--color-accent);
 }
 
+/* Beendet heute (#1449): der Termin tritt zurueck, ueber die Farbe und nicht
+ * ueber die Deckung (#1230). Der Titel geht auf die Sekundaerstimme, das
+ * Etikett sagt „Vorbei" statt „Heute" - der Zustand haengt nicht an der Farbe
+ * allein. Die Zeile bleibt antippbar: der Termin ist vorbei, nicht weg. */
+.event-item--ended .event-item__title {
+  color: var(--color-text-secondary);
+}
+
+/* „+N frühere heute": die gefalteten beendeten Termine als ruhige Zahl ueber
+ * den zwei, die noch einzeln stehen. */
+.event-list__earlier {
+  margin: 0;
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: var(--type-caption);
+  color: var(--color-text-tertiary);
+}
+
 /* --------------------------------------------------------
  * Essen-Widget (Slot-Grid)
  * -------------------------------------------------------- */
@@ -2444,6 +2462,60 @@ svg.weather-forecast__icon {
 
 .today-cockpit-card--dinner {
   --today-card-accent: var(--module-meals);
+}
+
+/* Die Quellen des Beitrags-Vertrags (public/utils/today-sheet.js): jede Zeile
+ * spricht im Ton ihres Raums, wie die vier oben. Erinnerungen tragen den Ton
+ * ihrer Herkunft (Abo = Budget, Frist = Dokumente), nicht einen eigenen. */
+.today-cockpit-card--health       { --today-card-accent: var(--module-health); }
+.today-cockpit-card--rewards      { --today-card-accent: var(--module-rewards); }
+.today-cockpit-card--waste        { --today-card-accent: var(--module-waste); }
+.today-cockpit-card--birthdays    { --today-card-accent: var(--module-birthdays); }
+.today-cockpit-card--schedule     { --today-card-accent: var(--module-schedule); }
+.today-cockpit-card--housekeeping { --today-card-accent: var(--module-housekeeping); }
+.today-cockpit-card--budget       { --today-card-accent: var(--module-budget); }
+.today-cockpit-card--inventory    { --today-card-accent: var(--module-inventory); }
+.today-cockpit-card--documents    { --today-card-accent: var(--module-documents); }
+
+/* Die Zeilen des Programms als eigene Liste im Traeger: Mehr-Zeile, Einkauf und
+ * Coda stehen darunter ueber die volle Breite, auch wenn die Zeilen sich auf
+ * breiter Buehne in zwei Spalten teilen. */
+.today-cockpit__rows {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Die Einkaufszeile folgt der Liste, nicht einer Geschwisterzeile - dieselbe
+ * Haarlinie wie zwischen den Zeilen. */
+.today-cockpit__rows + .today-cockpit-card {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* ZWEI SPALTEN AB 720PX CONTAINERBREITE (Critique 23.09.2026). Das Blatt ist am
+ * Desktop 1140px breit; eine Zeile ueber die volle Breite hielt den Titel links
+ * und die Uhrzeit ueber 900px davon entfernt rechts - das Auge musste die Zeile
+ * absuchen. Zwei Spalten halbieren den Weg und die Hoehe. Gefuellt wird
+ * SPALTENWEISE (grid-auto-flow: column): links die fruehere, rechts die spaetere
+ * Haelfte, das Programm liest sich weiter von oben nach unten. Die Zahl der
+ * Zeilen je Spalte setzt das Markup (`--today-rows-per-column`), weil nur es sie
+ * kennt. Unter 720px - Telefon, Tablet hochkant, Desktop mit schmaler Spalte -
+ * bleibt es die eine Liste in unveraenderter Hoehe. */
+@container today-cockpit (min-width: 720px) {
+  .today-cockpit__rows--split {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: repeat(var(--today-rows-per-column, 1), auto);
+    grid-auto-flow: column;
+  }
+
+  .today-cockpit__rows--split > .today-cockpit-card--col2 {
+    border-left: 1px solid var(--color-border-subtle);
+  }
+
+  /* Die erste Zeile der rechten Spalte steht oben am Traeger - dort gehoert
+   * keine Haarlinie hin, auch wenn sie im Markup auf eine Zeile folgt. */
+  .today-cockpit__rows--split > .today-cockpit-card--col-start {
+    border-top: none;
+  }
 }
 
 /* Sehr schmale Container (iPhone-SE-Klasse): die Liste ist bereits einspaltig;
@@ -4710,6 +4782,17 @@ svg.weather-forecast__icon {
 .wall-row--event    { --wall-row-accent: var(--module-calendar); }
 .wall-row--shopping { --wall-row-accent: var(--module-shopping); }
 .wall-row--dinner   { --wall-row-accent: var(--module-meals); }
+/* Die Quellen des Beitrags-Vertrags (public/utils/today-sheet.js): derselbe
+ * Satz Raeume wie im Cockpit, damit Wand und Blatt dieselbe Herkunft zeigen. */
+.wall-row--health       { --wall-row-accent: var(--module-health); }
+.wall-row--rewards      { --wall-row-accent: var(--module-rewards); }
+.wall-row--waste        { --wall-row-accent: var(--module-waste); }
+.wall-row--birthdays    { --wall-row-accent: var(--module-birthdays); }
+.wall-row--schedule     { --wall-row-accent: var(--module-schedule); }
+.wall-row--housekeeping { --wall-row-accent: var(--module-housekeeping); }
+.wall-row--budget       { --wall-row-accent: var(--module-budget); }
+.wall-row--inventory    { --wall-row-accent: var(--module-inventory); }
+.wall-row--documents    { --wall-row-accent: var(--module-documents); }
 
 /* Überlauf („+N weitere") und Coda („danach nichts mehr") sprechen als eine
  * ruhige Fußzeile UNTER dem Träger - sie erzählen zu Ende, sie sind keine
