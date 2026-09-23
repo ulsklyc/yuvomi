@@ -228,7 +228,9 @@ export function authPaths() {
       post: op({
         summary: 'Request a password-reset link',
         description: 'Always responds 200 with a generic body to prevent account enumeration. '
-          + 'A reset email is sent only when the account exists, has a linked email, SMTP is configured, and BASE_URL is set.',
+          + 'A reset email is sent only when the account exists, has a linked email, SMTP is configured, and BASE_URL is set. '
+          + 'The response is sent before the account is looked up; the lookup and the email run afterwards in the background, so the response time does not reveal whether the account exists. '
+          + 'An email address matches regardless of surrounding whitespace and capitalisation; if it belongs to more than one account, no email is sent (guests of shared expenses do not count towards that), so such accounts reset by username.',
         tag: 'Auth',
         auth: false,
         requestBody: {

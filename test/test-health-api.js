@@ -258,6 +258,21 @@ test('Logs: POST erstellt Dosis-Eintrag (default pending)', async () => {
   logId = res.body.data.id;
 });
 
+test('Logs: POST mit pending oder skipped verwirft eine mitgeschickte Einnahmezeit', async () => {
+  // Dieselbe Regel wie PATCH und skip: die Zeit gehoert zum Status. Ein
+  // "steht aus" oder "nicht genommen" mit Einnahmezeit stuende sonst so im Export.
+  asA();
+  for (const status of ['pending', 'skipped']) {
+    const res = await call('POST', `/medications/${medId}/logs`, {
+      status, scheduled_at: '2026-06-03T08:00', taken_at: '2026-06-03T08:05',
+    });
+    assert.equal(res.status, 201);
+    assert.equal(res.body.data.status, status);
+    assert.equal(res.body.data.taken_at, null, `${status} darf keine Einnahmezeit tragen`);
+    db.prepare('DELETE FROM medication_logs WHERE id = ?').run(res.body.data.id);
+  }
+});
+
 test('Logs: take markiert genommen und setzt taken_at', async () => {
   asA();
   const res = await call('POST', `/logs/${logId}/take`, { taken_at: '2026-06-04T08:05' });

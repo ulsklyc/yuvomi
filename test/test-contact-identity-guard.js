@@ -110,6 +110,7 @@ async function tokenFor(subjectUserId, scopes) {
 /** forgot-password gegen dieselbe Datenbank, mit mitschreibendem Mailversand. */
 async function withResetRoutes(fn) {
   const sent = [];
+  const pending = [];
   const app = express();
   app.use(express.json());
   const router = express.Router();
@@ -119,6 +120,9 @@ async function withResetRoutes(fn) {
     resetService: createPasswordResetService({ db }),
     baseUrl: 'https://yuvomi.test',
     limiter: (_req, _res, next) => next(),
+    // Der Versand laeuft nach der Antwort; `post` wartet ihn ab, damit `sent`
+    // danach verlaesslich zaehlt statt vom Zufall der Ereignisschleife.
+    defer: (fn) => { pending.push(new Promise((r) => setImmediate(() => Promise.resolve(fn()).finally(r)))); },
   });
   app.use('/auth', router);
   const server = createServer(app);
@@ -126,7 +130,11 @@ async function withResetRoutes(fn) {
   const base = `http://127.0.0.1:${server.address().port}/auth`;
   const post = (path, body) => fetch(`${base}${path}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-  }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));
+  }).then(async (r) => {
+    const out = { status: r.status, body: await r.json().catch(() => null) };
+    await Promise.all(pending.splice(0));
+    return out;
+  });
   try {
     return await fn({ post, sent });
   } finally {
@@ -229,6 +237,19 @@ test('a member who only changes the letter case is not refused, and the stored s
   const other = await call(kid, 'PUT', `/contacts/${adminContactId}`, { email: 'Admin@Home.test.evil' });
   assert.equal(other.status, 403);
   assert.deepEqual(emailsOf(adminContactId), ADMIN_UNTOUCHED);
+});
+
+test('a change counts as a change exactly when the sign-in match rule sees another address', async () => {
+  // Die Pruefung muss dieselbe Regel nehmen wie die Pfade, die die Adresse
+  // lesen (server/utils/email-match.js): Leerraum und A-Z-Schreibweise sind
+  // keine Aenderung, ein Kelvin-Zeichen statt "K" dagegen schon - die
+  // Anmeldung sieht darin eine andere Adresse.
+  const { bodyChangesContactEmails } = await import('../server/services/contact-identity.js');
+  const linked = { email: '\u212Aate@home.test', family_user_id: kidId };
+  assert.equal(bodyChangesContactEmails(linked, [], { email: 'kate@home.test' }), true,
+    'Kelvin-Zeichen zu K ist fuer die Anmeldung eine andere Adresse');
+  assert.equal(bodyChangesContactEmails({ email: 'Kate@Home.test', family_user_id: kidId }, [],
+    { email: '\tkate@home.TEST\u00a0' }), false, 'Leerraum und ASCII-Schreibweise bleiben keine Aenderung');
 });
 
 test('the linked person can change their own email in a session', async () => {
