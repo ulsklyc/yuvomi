@@ -273,6 +273,8 @@
         "savingsRate": "Rasio tabungan",
         "topExpense": "Pengeluaran terbesar",
         "topExpenses": "Pengeluaran terbesar",
+        "splitYouOwe": "Anda berutang kepada {{name}}",
+        "splitOwesYou": "{{name}} berutang kepada Anda",
         "noBudgetData": "Tidak ada data anggaran bulan ini.",
         "customize": "Sesuaikan",
         "updatedAt": "Diperbarui {{time}}",

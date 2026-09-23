@@ -273,6 +273,12 @@ const TAB_CAPS = {
 // leere String, den eine Auswahl-Leiste nicht als Auswahl unterscheiden kann.
 const DEFAULT_COLOR_ID = 'default';
 
+/** Reiter aus `?tab=` - nur einer, den es gibt (TAB_CAPS ist die Liste). */
+function tabFromQuery(search) {
+  const tab = new URLSearchParams(search || '').get('tab');
+  return tab && Object.hasOwn(TAB_CAPS, tab) ? tab : null;
+}
+
 function tabCaps() {
   if (_user?.access_scope === 'split_guest') return TAB_CAPS['split-expenses'];
   return TAB_CAPS[state.activeTab] ?? TAB_CAPS.budget;
@@ -582,6 +588,10 @@ export async function render(container, { user }) {
   state.loanFilterId = null;
   state.loanStatusFilter = 'active';
   state.accountsShowArchived = false;
+  // Sprungziel von aussen (Dashboard-Kachel „Ausgleich offen"): ?tab= waehlt
+  // den Reiter. Ohne Parameter bleibt der zuletzt aktive, wie bisher.
+  const tabFromUrl = tabFromQuery(window.location.search);
+  if (tabFromUrl) state.activeTab = tabFromUrl;
   if (user?.access_scope === 'split_guest') state.activeTab = 'split-expenses';
 
   if (user?.access_scope !== 'split_guest') {
@@ -3828,6 +3838,7 @@ export const __test = {
   monthNavHtml,
   syncCurrentButton,
   tabCaps,
+  tabFromQuery,
   currentMonth,
   state,
   // #1228: Zustaendigen-Picker fuer test:people-pickers.

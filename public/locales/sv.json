@@ -261,6 +261,8 @@
         "savingsRate": "Sparandegrad",
         "topExpense": "Största utgift",
         "topExpenses": "Största utgifter",
+        "splitYouOwe": "Du är skyldig {{name}}",
+        "splitOwesYou": "{{name}} är skyldig dig",
         "noBudgetData": "Ingen budgetdata denna månad.",
         "customize": "Anpassa",
         "updatedAt": "Uppdaterad {{time}}",

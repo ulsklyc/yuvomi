@@ -261,6 +261,8 @@
         "savingsRate": "बचत दर",
         "topExpense": "सबसे बड़ा खर्च",
         "topExpenses": "सबसे बड़े खर्च",
+        "splitYouOwe": "आपको {{name}} को देना है",
+        "splitOwesYou": "{{name}} से आपको मिलना है",
         "noBudgetData": "इस महीने बजट डेटा नहीं है।",
         "customize": "अनुकूलित करें",
         "updatedAt": "अपडेट {{time}}",

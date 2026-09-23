@@ -261,6 +261,8 @@
         "savingsRate": "Míra úspor",
         "topExpense": "Nejvyšší výdaj",
         "topExpenses": "Nejvyšší výdaje",
+        "splitYouOwe": "Dlužíte osobě {{name}}",
+        "splitOwesYou": "{{name}} vám dluží",
         "noBudgetData": "Tento měsíc nejsou žádná data o rozpočtu.",
         "customize": "Přizpůsobit",
         "updatedAt": "Aktualizováno {{time}}",

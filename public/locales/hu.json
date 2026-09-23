@@ -261,6 +261,8 @@
         "savingsRate": "Megtakarítási arány",
         "topExpense": "Legnagyobb kiadás",
         "topExpenses": "Legnagyobb kiadások",
+        "splitYouOwe": "Ön tartozik neki: {{name}}",
+        "splitOwesYou": "{{name}} tartozik Önnek",
         "noBudgetData": "Nincs költségvetési adat ebben a hónapban.",
         "customize": "Testreszabás",
         "updatedAt": "Frissítve {{time}}",

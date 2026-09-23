@@ -273,6 +273,8 @@
         "savingsRate": "저축률",
         "topExpense": "최대 지출",
         "topExpenses": "주요 지출",
+        "splitYouOwe": "{{name}}님에게 줄 금액",
+        "splitOwesYou": "{{name}}님에게 받을 금액",
         "noBudgetData": "이번 달 예산 데이터가 없습니다.",
         "customize": "맞춤 설정",
         "updatedAt": "업데이트 {{time}}",

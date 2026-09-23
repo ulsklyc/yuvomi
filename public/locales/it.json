@@ -261,6 +261,8 @@
         "savingsRate": "Tasso di risparmio",
         "topExpense": "Spesa principale",
         "topExpenses": "Spese principali",
+        "splitYouOwe": "Devi a {{name}}",
+        "splitOwesYou": "{{name}} ti deve",
         "noBudgetData": "Nessun dato di budget questo mese.",
         "customize": "Personalizza",
         "updatedAt": "Aggiornato {{time}}",

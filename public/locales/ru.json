@@ -261,6 +261,8 @@
         "savingsRate": "Норма сбережений",
         "topExpense": "Крупнейший расход",
         "topExpenses": "Крупнейшие расходы",
+        "splitYouOwe": "Ваш долг: {{name}}",
+        "splitOwesYou": "Долг вам: {{name}}",
         "noBudgetData": "Нет данных бюджета за этот месяц.",
         "customize": "Настроить",
         "updatedAt": "Обновлено {{time}}",

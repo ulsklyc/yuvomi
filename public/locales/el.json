@@ -261,6 +261,8 @@
         "savingsRate": "Ποσοστό αποταμίευσης",
         "topExpense": "Μεγαλύτερο έξοδο",
         "topExpenses": "Μεγαλύτερα έξοδα",
+        "splitYouOwe": "Οφείλεις σε {{name}}",
+        "splitOwesYou": "{{name}} σου οφείλει",
         "noBudgetData": "Δεν υπάρχουν δεδομένα προϋπολογισμού αυτόν τον μήνα.",
         "customize": "Προσαρμογή",
         "updatedAt": "Ενημερώθηκε {{time}}",

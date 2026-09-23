@@ -261,6 +261,8 @@
         "savingsRate": "储蓄率",
         "topExpense": "最大支出",
         "topExpenses": "主要支出",
+        "splitYouOwe": "你欠 {{name}}",
+        "splitOwesYou": "{{name}} 欠你",
         "noBudgetData": "本月没有预算数据。",
         "customize": "自定义",
         "updatedAt": "更新于 {{time}}",

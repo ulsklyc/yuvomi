@@ -273,6 +273,8 @@
         "savingsRate": "Oszczędności",
         "topExpense": "Największy wydatek",
         "topExpenses": "Największe wydatki",
+        "splitYouOwe": "Do oddania dla {{name}}",
+        "splitOwesYou": "{{name}} ma ci oddać",
         "noBudgetData": "Brak danych budżetowych w tym miesiącu.",
         "customize": "Dostosuj",
         "updatedAt": "Zaktualizowano {{time}}",

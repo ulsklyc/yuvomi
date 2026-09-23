@@ -261,6 +261,8 @@
         "savingsRate": "معدل الادخار",
         "topExpense": "أكبر مصروف",
         "topExpenses": "أكبر المصروفات",
+        "splitYouOwe": "أنت مدين لـ {{name}}",
+        "splitOwesYou": "{{name}} مدين لك",
         "noBudgetData": "لا توجد بيانات ميزانية لهذا الشهر.",
         "customize": "تخصيص",
         "updatedAt": "آخر تحديث {{time}}",

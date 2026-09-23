@@ -19,6 +19,7 @@ import { hiddenModulesFor } from '../permissions.js';
 import { documentViewer } from '../services/document-links.js';
 import { householdMemberSql } from '../services/household-members.js';
 import { FastingError, getFastingDashboardState } from '../services/fasting.js';
+import { openBalancesForUser } from '../services/split-expenses.js';
 import { NUTRIENT_KEYS, nutritionSummaryFor } from '../services/health-nutrition.js';
 import { emptyPantryExpiring, pantryExpiringSlice } from '../services/pantry-expiring.js';
 import { householdTimeZone, utcToWall, todayKey, shiftDateKey } from '../utils/timezone.js';
@@ -70,7 +71,9 @@ const DENIED_PAYLOAD = Object.freeze({
   shopping: () => ({ shoppingLists: [], shoppingOpenCount: 0, shoppingOpenLists: 0 }),
   // Der Monat bleibt stehen: er ist keine Budgetzahl, sondern der Zeitraum, auf
   // den die Kachel beschriftet ist — und er steht ohnehin im Kalender.
-  budget: ({ month }) => ({ budget: emptyBudget(month) }),
+  // Geteilte Ausgaben gehoeren zum Budget-Modul (server/scopes.js fuehrt
+  // `split-expenses` als zweiten Praefix von `budget`).
+  budget: ({ month }) => ({ budget: emptyBudget(month), splitBalance: emptySplitBalance() }),
   rewards: () => ({ rewards: { standings: [], participantCount: 0, pending: 0 } }),
   health: () => ({
     health: {
@@ -118,6 +121,10 @@ function emptyNutritionWidget() {
   const totals = {};
   for (const key of NUTRIENT_KEYS) totals[key] = 0;
   return { date: null, target: null, totals, entryCount: 0 };
+}
+
+function emptySplitBalance() {
+  return { net: [], positions: [] };
 }
 
 function emptyBudget(month) {
@@ -717,6 +724,19 @@ router.get('/', (req, res) => {
       topExpenseAmount: 0,
       topExpenses: [],
     };
+  }
+
+  // Geteilte Ausgaben: was der Betrachter offen hat (Kennzahl „Ausgleich
+  // offen"). Keine eigene Abfrage - die Salden kommen aus derselben Funktion wie
+  // die Ausgleichs-Ansicht des Moduls, damit Uebersicht und Modul nie zwei
+  // Zahlen fuer dieselbe Schuld zeigen (und ein Fix wie #1445 beide heilt).
+  // Ein Split-Gast erreicht /dashboard gar nicht (Gate in server/index.js).
+  if (allows('budget')) try {
+    const householdCurrency = d.prepare("SELECT value FROM sync_config WHERE key = 'currency'").get()?.value || 'EUR';
+    result.splitBalance = openBalancesForUser(d, userId, { householdCurrency });
+  } catch (err) {
+    log.error('split balance error:', err.message);
+    result.splitBalance = emptySplitBalance();
   }
 
   // Belohnungen: Familien-Punktestand (Top 5 aktive Teilnehmer nach Ledger-Saldo)

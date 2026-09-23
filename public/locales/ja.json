@@ -261,6 +261,8 @@
         "savingsRate": "貯蓄率",
         "topExpense": "最大の支出",
         "topExpenses": "支出の多い項目",
+        "splitYouOwe": "{{name}}さんに支払い",
+        "splitOwesYou": "{{name}}さんから受け取り",
         "noBudgetData": "今月の予算データはありません。",
         "customize": "カスタマイズ",
         "updatedAt": "更新 {{time}}",

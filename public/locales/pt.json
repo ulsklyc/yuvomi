@@ -261,6 +261,8 @@
         "savingsRate": "Taxa de poupança",
         "topExpense": "Maior despesa",
         "topExpenses": "Maiores despesas",
+        "splitYouOwe": "Você deve a {{name}}",
+        "splitOwesYou": "{{name}} deve a você",
         "noBudgetData": "Sem dados de orçamento neste mês.",
         "customize": "Personalizar",
         "updatedAt": "Atualizado {{time}}",

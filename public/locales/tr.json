@@ -261,6 +261,8 @@
         "savingsRate": "Tasarruf oranı",
         "topExpense": "En büyük gider",
         "topExpenses": "En büyük giderler",
+        "splitYouOwe": "{{name}} kişisine borçlusun",
+        "splitOwesYou": "{{name}} sana borçlu",
         "noBudgetData": "Bu ay bütçe verisi yok.",
         "customize": "Özelleştir",
         "updatedAt": "Güncellendi {{time}}",

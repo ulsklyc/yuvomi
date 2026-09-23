@@ -273,6 +273,8 @@
         "savingsRate": "Antas ng ipon",
         "topExpense": "Pinakamalaking gastos",
         "topExpenses": "Pinakamalalaking gastos",
+        "splitYouOwe": "May utang ka kay {{name}}",
+        "splitOwesYou": "May utang sa iyo si {{name}}",
         "noBudgetData": "Walang datos ng badyet ngayong buwan.",
         "customize": "I-customize",
         "updatedAt": "Na-update noong {{time}}",

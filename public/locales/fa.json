@@ -273,6 +273,8 @@
         "savingsRate": "نرخ پس‌انداز",
         "topExpense": "بزرگ‌ترین هزینه",
         "topExpenses": "بزرگ‌ترین هزینه‌ها",
+        "splitYouOwe": "به {{name}} بدهکارید",
+        "splitOwesYou": "{{name}} به شما بدهکار است",
         "noBudgetData": "این ماه داده بودجه‌ای نیست.",
         "customize": "سفارشی‌سازی",
         "updatedAt": "به‌روزرسانی {{time}}",
