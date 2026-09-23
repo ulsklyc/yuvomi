@@ -20,7 +20,7 @@ import { CURRENCY_CODES } from '../../public/utils/currency-codes.js';
 import { syncBirthdayArtifacts } from '../services/birthdays.js';
 import { householdMemberSql, newNonMembers, staffMessage } from '../services/household-members.js';
 import { todayKey } from '../utils/timezone.js';
-import { mayReadModule } from '../permissions.js';
+import { mayReadModule, mayWriteModule } from '../permissions.js';
 
 const log = createLogger('SplitExpenses');
 const router = express.Router();
@@ -747,9 +747,11 @@ router.get('/groups/:id/member-candidates', (req, res) => {
     // DIE FELDER FOLGEN DEM RECHT IHRER QUELLE. Der Pfad gehoert `budget`,
     // Telefon und E-Mail kommen aber aus `contacts`, das Geburtsdatum eines
     // Mitglieds aus den Geburtstagen (`calendar`). Ohne das jeweilige
-    // Leserecht (Mitgliedsrecht UND Token-Scope) bleiben die Felder null, und
-    // freie Kontakte werden gar nicht erst angeboten. Die Route selbst bleibt
-    // offen: die Auswahl braucht nur Name und ID der Haushaltsmitglieder.
+    // Leserecht (Mitgliedsrecht UND Token-Scope) bleiben die Felder null. Freie
+    // Kontakte bietet die Auswahl nur mit dem SCHREIBRECHT auf `contacts` an:
+    // hinzufuegen verknuepft sie mit einem Konto (POST /groups/:id/members),
+    // ohne das Recht endete die Wahl im 403. Die Route selbst bleibt offen:
+    // die Auswahl braucht nur Name und ID der Haushaltsmitglieder.
     const readsContacts = mayReadModule(req, 'contacts');
     const readsBirthdays = mayReadModule(req, 'calendar');
     const visiblePeople = people.map((row) => ({
@@ -758,7 +760,7 @@ router.get('/groups/:id/member-candidates', (req, res) => {
       email: readsContacts ? row.email : null,
       birth_date: readsBirthdays ? row.birth_date : null,
     }));
-    const contacts = readsContacts ? db.get().prepare(`
+    const contacts = mayWriteModule(req, 'contacts') ? db.get().prepare(`
       SELECT 'contact' AS source, NULL AS user_id, c.id AS contact_id, c.name AS display_name,
              NULL AS username, '#2563EB' AS avatar_color, 'other' AS family_role,
              c.phone, c.email, c.birthday AS birth_date, 0 AS in_group, NULL AS group_role
@@ -784,8 +786,10 @@ router.post('/groups/:id/members', async (req, res) => {
     if (!vUserId.value && !vContactId.value) return res.status(400).json({ error: 'user_id or contact_id is required.', code: 400 });
     const role = GROUP_ROLES.includes(req.body.role) && req.body.role !== 'owner' ? req.body.role : 'guest';
     // Ein Kontakt ist Quelldatum aus `contacts`: ohne dessen Leserecht (beide
-    // Achsen) dieselbe Antwort wie fuer eine unbekannte ID, und angelegt wird
-    // nichts - der Gast truege Name, Telefon und E-Mail des Kontakts.
+    // Achsen) dieselbe Antwort wie fuer eine unbekannte ID, und die Route
+    // schreibt nichts - der Gast truege Name, Telefon und E-Mail des Kontakts.
+    // Ein schon verknuepfter Kontakt wird nur gelesen; ein freier wird
+    // BESCHRIEBEN (weiter unten, `mayWriteModule`).
     if (vContactId.value && !mayReadModule(req, 'contacts')) {
       return res.status(404).json({ error: 'Contact not found.', code: 404 });
     }
@@ -801,7 +805,17 @@ router.post('/groups/:id/members', async (req, res) => {
     if (vContactId.value) {
       const known = db.get().prepare('SELECT family_user_id FROM contacts WHERE id = ?').get(vContactId.value);
       if (!known) return res.status(404).json({ error: 'Contact not found.', code: 404 });
-      if (!known.family_user_id) passwordHash = await randomGuestPasswordHash();
+      if (!known.family_user_id) {
+        // Ein freier Kontakt bekommt ein Konto: `userFromContact()` setzt
+        // `family_user_id` und schreibt Name, Telefon und E-Mail ueber
+        // `syncGuestArtifacts()`; ab da spiegelt das Konto den Kontakt. Das
+        // ist ein Schreibvorgang in `contacts` und braucht dessen Schreibrecht
+        // (beide Achsen) - vor dem Hash, damit nichts angefangen wird.
+        if (!mayWriteModule(req, 'contacts')) {
+          return res.status(403).json({ error: 'Write access to contacts is required to add a contact without an account.', code: 403 });
+        }
+        passwordHash = await randomGuestPasswordHash();
+      }
     }
 
     let memberUserId;

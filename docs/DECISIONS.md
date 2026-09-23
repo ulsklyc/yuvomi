@@ -689,7 +689,8 @@ forgot to ask about.
   that merely carries fields from another module leaves them out instead: the member candidates of
   a shared-expense group (contacts, and birthdays under `calendar`), the budget bookings linked to
   an inventory item (`budgetViewer()` in `server/routes/inventory/entry-links.js`). Adding a
-  contact to a shared-expense group reads the contact, so it needs `contacts`; the birthday the
+  contact to a shared-expense group reads the contact, so it needs `contacts`, and a contact without
+  an account is linked to the new guest, which writes it and needs `contacts` write; the birthday the
   new guest gets is a follow-on entry of the guest and asks nothing of `calendar`.
 - `npm run test:cross-module-write` (`test/test-cross-module-write-rights.js`) holds those routes on
   both axes and checks the effect after each refusal, not only the status.

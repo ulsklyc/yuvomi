@@ -554,7 +554,8 @@ test('POST members via contact_id mit Geburtstag: erzeugt Nutzer + Geburtstags-A
 
 // Der Kontakt ist Quelldatum aus `contacts`: ohne dessen Leserecht (Mitglied
 // oder Token) antwortet die Route wie bei einer unbekannten ID und legt
-// nichts an - sonst verriete der angelegte Gast Name, Telefon und E-Mail.
+// nichts an - sonst verriete der angelegte Gast Name, Telefon und E-Mail. Ein
+// freier Kontakt braucht dazu das Schreibrecht, weil er verknuepft wird.
 test('POST members via contact_id: ohne Kontaktrecht 404 wie eine unbekannte ID, nichts angelegt', async () => {
   const frei = db.prepare(`INSERT INTO contacts (name, category, phone, email) VALUES ('Geheim Kontakt', 'Sonstiges', '0171', 'geheim@example.test')`).run().lastInsertRowid;
   const verknuepft = db.prepare(`INSERT INTO contacts (name, category, family_user_id) VALUES ('Geheim Verknuepft', 'Sonstiges', ?)`).run(mkUser('geheim.verknuepft')).lastInsertRowid;
@@ -580,10 +581,33 @@ test('POST members via contact_id: ohne Kontaktrecht 404 wie eine unbekannte ID,
   assert.equal(members(), vorherMitglieder, 'kein Mitglied hinzugefuegt');
   assert.equal(db.prepare('SELECT family_user_id FROM contacts WHERE id = ?').get(frei).family_user_id, null, 'Kontakt nicht verknuepft');
 
-  const lesend = await call('POST', `/groups/${OPS}/members`, {
-    actor: { id: OWNER, role: 'member', moduleAccess: { contacts: 'read' } }, body: { contact_id: frei, role: 'guest' },
+  // Ein FREIER Kontakt wird beim Hinzufuegen beschrieben: er bekommt ein
+  // Konto (`family_user_id`), und Name, Telefon und E-Mail werden danach aus
+  // dem Konto gespiegelt. Das ist ein Schreibvorgang in `contacts` und braucht
+  // dessen Schreibrecht; ein schon verknuepfter Kontakt wird nur gelesen.
+  const kontakt = () => db.prepare('SELECT name, category, phone, email, family_user_id FROM contacts WHERE id = ?').get(frei);
+  const vorherKontakt = kontakt();
+  for (const actor of [
+    { id: OWNER, role: 'member', moduleAccess: { contacts: 'read' } },
+    { id: OWNER, role: 'member', scopes: ['budget:write', 'contacts:read'] },
+  ]) {
+    const lesend = await call('POST', `/groups/${OPS}/members`, { actor, body: { contact_id: frei, role: 'guest' } });
+    assert.equal(lesend.status, 403, 'contacts: read beschreibt keinen freien Kontakt');
+  }
+  assert.deepEqual(kontakt(), vorherKontakt, 'der Kontakt ist unveraendert');
+  assert.equal(users(), vorherNutzer, 'kein Gastnutzer angelegt');
+  assert.equal(members(), vorherMitglieder, 'kein Mitglied hinzugefuegt');
+
+  const verknuepftLesend = await call('POST', `/groups/${OPS}/members`, {
+    actor: { id: OWNER, role: 'member', moduleAccess: { contacts: 'read' } }, body: { contact_id: verknuepft, role: 'guest' },
   });
-  assert.equal(lesend.status, 201, 'contacts: read reicht');
+  assert.equal(verknuepftLesend.status, 201, 'ein verknuepfter Kontakt wird nur gelesen: read reicht');
+
+  const schreibend = await call('POST', `/groups/${OPS}/members`, {
+    actor: { id: OWNER, role: 'member', moduleAccess: { contacts: 'write' } }, body: { contact_id: frei, role: 'guest' },
+  });
+  assert.equal(schreibend.status, 201, 'contacts: write verknuepft den freien Kontakt');
+  assert.ok(kontakt().family_user_id, 'jetzt mit Konto');
 });
 
 // Der Passwort-Hash ist der einzige asynchrone Schritt. Liegt er zwischen dem
@@ -984,6 +1008,8 @@ test('member-candidates: Kontakt- und Geburtstagsfelder folgen dem Leserecht', a
   const lesend = await call('GET', path, { actor: { id: OWNER, role: 'member', moduleAccess: { contacts: 'read', calendar: 'read' } } });
   assert.equal(owner(lesend.body.data).phone, '+49 111', 'read reicht');
   assert.equal(owner(lesend.body.data).birth_date, '1975-01-02');
+  assert.equal(lesend.body.data.some((r) => r.source === 'contact'), false,
+    'freie Kontakte nur mit Schreibrecht: hinzufuegen verknuepft sie');
 
   const token = await call('GET', path, { actor: { id: OWNER, role: 'member', scopes: ['budget:write'] } });
   assert.equal(token.status, 200);

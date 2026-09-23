@@ -185,12 +185,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Choosing members for a shared-expense group shows contact details only with access to
   them.** The member picker now shows phone and email only with read access to contacts, and a
-  member's birthday only with read access to the calendar, where birthdays live. Contacts are
-  offered as new members only with access to contacts, and adding one without it answers as if
-  the contact did not exist. Adding the same contact twice at the same moment now creates one
-  guest instead of failing, creating two guests with the same username at once gives one guest
-  and a clear "already taken", and a group removed while a guest is being added leaves no guest
-  account behind. An unknown contact answers 404 instead of a server error. (#1433)
+  member's birthday only with read access to the calendar, where birthdays live. A contact without
+  an account is linked to the new guest when it is added, so the picker offers such contacts, and
+  adding one is accepted, only with permission to edit contacts; without any access to contacts
+  the answer is as if the contact did not exist. Adding the same contact twice at the same moment
+  now creates one guest instead of failing, creating two guests with the same username at once
+  gives one guest and a clear "already taken", and a group removed while a guest is being added
+  leaves no guest account behind. An unknown contact answers 404 instead of a server error. (#1433)
 
 - **An inventory item shows its budget bookings only with access to the budget.** Without read
   access to the budget, an item no longer shows its linked bookings, their total or the bookings
