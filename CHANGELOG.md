@@ -7,6 +7,95 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The calendar tile shows the week ahead at 2x1.** Set to the wide size, the calendar tile on the
+  overview no longer lists three events but shows the next seven days: a dot per event in the colour
+  of the event, person or calendar, a band for all-day and multi-day events (with an open end where
+  they continue), and today highlighted. Tapping a day opens that day in the calendar. "Only mine"
+  and hidden birthdays apply as in the list; the other sizes keep the list.
+
+- **An "Expiring soon" tile for the pantry** (#1448). An optional tile shows the pantry batches whose
+  best-before date has passed or falls within the next 7 days: expired first, with quantity, storage
+  place and the days left in words. Each row opens the pantry with the matching filter. The tile is
+  hidden by default, can be shown from the customize tray, and can be restricted per member like
+  every tile.
+
+- **The overview shows what is still open in shared expenses** (#1445). A new tile in the metrics
+  row, right after the budget, shows your net balance and the largest open position ("You owe
+  Alex", plus "+N" for the rest), in the currency's own decimal places. It appears only while
+  something is open, respects budget access, and opens the settle-up view of that group. It uses
+  the module's own balance source, so it shows what the module shows.
+
+### Changed
+
+- **Rewards on the dashboard show progress, not a ranking.** A child sees only their own balance, a
+  quiet bar to the next reward, recently earned points and their own pending requests - no
+  siblings, no places. Parents see every child side by side, ordered by name. The metric tile no
+  longer names a leader. The number of pending approvals now appears in exactly one place: in the
+  rewards widget, otherwise in the today sheet, and only without either in the parents' metric tile.
+
+- **The today sheet uses wide screens:** from a sheet width of 720px its rows run in two columns.
+
+- **Dates on the overview read like people say them:** a weekday up to six days ahead, then day and
+  month, and the year only when it differs.
+
+- **Metric tiles say what they count** ("2 left", "9 this month", "Here since 08:30"), and the
+  widget titles are shortened to "Budget" and "Family".
+
+- **A calmer dashboard header on phones.** The date line carries the buttons and the greeting stays
+  on one line; at 200 % zoom the header shrinks to its date line. The "updated at" time appears only
+  on the wall display.
+
+- **The dashboard grid always packs without gaps**, with a custom order and while editing, so cards
+  no longer jump. If a gap remains, edit mode suggests a card size that closes it.
+
+- **The tall budget card lists the three largest expense categories.**
+
+- **The wall display reads better from a distance:** larger section titles, and larger rows on a
+  quiet day.
+
+### Fixed
+
+- **"Today" no longer gives a false all-clear.** Open doses, pending approvals (for the person who
+  approves them), today's bin and "put it out tonight", birthdays, your own shift, due reminders,
+  the housekeeper on site and pantry batches that expire today now appear in the sheet; "Nothing
+  else today" only shows once nothing is open. The same on the wall display.
+
+- **Finished appointments step back** (#1449). The event tile's limit of five counts only what is
+  still coming, and finished events sit stepped back above it; in the today sheet and on the wall
+  they leave at their end time without a reload. The family card shows each member's next
+  appointment instead of the first one of the day, says "Done for today" after the last one, and
+  shows an appointment shared by several members once. Event tile and family card use the same
+  rule for "finished".
+
+- **Synced events land on the right day on the overview.** Events that come from an external
+  calendar were placed on the day of the device's time zone instead of the household's, so an
+  event at 23:30 could appear on the next day - in the calendar tile, the today sheet, the family
+  tile and the link into the calendar.
+
+- **Overview badges count the whole set.** Notes, Birthdays, Tasks and Shopping show the real total
+  and name the rest as "+N more"; the Calendar badge, which only ever showed its cap of five, is
+  gone. Screen readers no longer read the counter as part of the widget title but hear it as a
+  sentence after it.
+
+- **A tap on a sleeping wall display no longer starts a kitchen timer.** The timer buttons were
+  invisible at rest but still reacted to touch; they now show quietly, the first touch on a
+  sleeping wall only wakes it, and waking no longer shifts them, so the second tap hits the button
+  you aimed at. Screen readers hear the timer start, stop and finish instead of every passing
+  second.
+
+- **The weather card's refresh button can be tapped again.** It sat underneath the card header and
+  did not respond.
+
+- **Dashboard edit mode works with a keyboard and a screen reader.** Focus stays where you were
+  after resizing, hiding, showing or moving a widget and after saving or cancelling; each change is
+  announced, and the widget area has its own heading. Header buttons keep their finger size on
+  touch tablets wider than 1024px.
+
+- **Long pages keep their full tail.** Below the last card there is room for the add button again,
+  so it no longer covers the right column at the end of the dashboard.
+
 ## [2.69.1] - 2026-09-23
 
 ### Security
