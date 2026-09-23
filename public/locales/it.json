@@ -232,6 +232,8 @@
         "metricVisits_one": "{{count}} visita",
         "savingsRate": "Tasso di risparmio",
         "topExpense": "Spesa principale",
+        "splitYouOwe": "Devi a {{name}}",
+        "splitOwesYou": "{{name}} ti deve",
         "noBudgetData": "Nessun dato di budget questo mese.",
         "customize": "Personalizza",
         "updatedAt": "Aggiornato {{time}}",

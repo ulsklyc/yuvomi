@@ -289,7 +289,10 @@ function maybeHintCustomize(container) {
 // Widget → Modul-Slug für die „Modul deaktiviert?"-Prüfung. Widgets ohne Eintrag
 // (family, weather) sind immer verfügbar. Modulweit, damit Grid-Filter und
 // Wieder-Einblenden-Leiste dieselbe Sichtbarkeitsregel teilen.
-const MODULE_FOR_WIDGET = { tasks: 'tasks', calendar: 'calendar', shopping: 'shopping', meals: 'meals', notes: 'notes', birthdays: 'birthdays', budget: 'budget', rewards: 'rewards', health: 'health', cycle: 'health', fasting: 'health', nutrition: 'health', housekeeping: 'housekeeping', schedule: 'schedule', waste: 'waste' };
+// `split-expenses` ist kein Widget, sondern eine Kachel der Kennzahlreihe -
+// steht aber hier, weil `isWidgetModuleEnabled()` auch die Kacheln filtert, und
+// die geteilten Ausgaben haengen am Budget-Modul (server/scopes.js).
+const MODULE_FOR_WIDGET = { tasks: 'tasks', calendar: 'calendar', shopping: 'shopping', meals: 'meals', notes: 'notes', birthdays: 'birthdays', budget: 'budget', 'split-expenses': 'budget', rewards: 'rewards', health: 'health', cycle: 'health', fasting: 'health', nutrition: 'health', housekeeping: 'housekeeping', schedule: 'schedule', waste: 'waste' };
 
 const WIDGETS_WITH_OPTIONS = new Set(['calendar', 'tasks', 'notes', 'waste']);
 
@@ -1684,8 +1687,15 @@ function renderBudgetWidget(budget, currency) {
  * Deshalb stehen die drei spezialisierten Module jetzt mit in der Liste. Sie
  * sind es, die im Standard-Layout kein eigenes Widget zeigen
  * (DEFAULT_HIDDEN_WIDGETS) - und genau deshalb gehoeren sie hierher. Wer sie
- * nicht nutzt, hat keine Daten und bekommt keine Kachel. */
-const METRIC_TILE_ORDER = ['tasks', 'shopping', 'budget', 'birthdays', 'meals', 'notes', 'rewards', 'health', 'housekeeping'];
+ * nicht nutzt, hat keine Daten und bekommt keine Kachel.
+ *
+ * DIE GETEILTEN AUSGABEN STEHEN DIREKT HINTER DEM BUDGET (Critique 2026-09-23).
+ * Das Modul hatte kein Element auf der Uebersicht, und die Critique wollte
+ * ausdruecklich eine Kennzahl, kein Widget - eine offene Forderung ist genau die
+ * Art Zahl, fuer die diese Reihe da ist. Vor den Opt-in-Modulen, weil eine
+ * Schuld eine Handlung verlangt und ein Punktestand nicht. Ausgeglichen gibt es
+ * keine Kachel (siehe metricTileFor). */
+const METRIC_TILE_ORDER = ['tasks', 'shopping', 'budget', 'split-expenses', 'birthdays', 'meals', 'notes', 'rewards', 'health', 'housekeeping'];
 const METRIC_TILE_COUNT = 4;
 
 function metricTileFor(id, data, currency) {
@@ -1729,6 +1739,9 @@ function metricTileFor(id, data, currency) {
         note: t('dashboard.monthlyBalance'),
         tone: neutral ? 'balance-neutral' : balance >= 0 ? 'balance-positive' : 'balance-negative',
       };
+    }
+    case 'split-expenses': {
+      return splitBalanceTile(data.splitBalance);
     }
     case 'birthdays': {
       const next = (data.birthdays ?? [])[0];
@@ -1813,6 +1826,68 @@ function metricTileFor(id, data, currency) {
     default:
       return null;
   }
+}
+
+/**
+ * Betrag aus dem Ledger in der ISO-Skala seiner Waehrung.
+ *
+ * Der Server liefert Geteilte-Ausgaben-Betraege als Dezimalstring in der
+ * Skala aus `CURRENCY_MINOR_UNITS` (ISO 4217: JPY 0, EUR 2, KWD 3). Die Stellen
+ * kommen deshalb aus dem String und nicht aus `Intl`, dessen CLDR-Konvention
+ * davon abweicht (HUF zeigt dort keine Nachkommastellen, 12,50 stuende als
+ * „13" da). Und anders als `formatCurrency()` bleiben die Stellen auch ab 1000:
+ * ein offener Betrag ist eine Forderung, keine Groessenordnung.
+ */
+function formatLedgerAmount(amount, currency) {
+  const digits = (String(amount).split('.')[1] ?? '').length;
+  return getNumberFormat({
+    style: 'currency', currency, minimumFractionDigits: digits, maximumFractionDigits: digits,
+  }).format(Number(amount) || 0);
+}
+
+/**
+ * Kachel „Ausgleich offen" der geteilten Ausgaben.
+ *
+ * WERT = NETTO, FUSSNOTE = DIE GROESSTE POSITION. Die Zahl beantwortet „wie
+ * stehe ich insgesamt", die Zeile darunter „bei wem" - mit „+N" fuer die
+ * uebrigen Positionen, statt eine Liste in eine Kachel zu zwaengen. Das Netto
+ * gehoert zur Waehrung der genannten Position; Betraege verschiedener
+ * Waehrungen addiert niemand. Vorzeichen und Farbe nach der Rolle `balance`
+ * (utils/money.js): Minus nur, wer schuldet.
+ *
+ * AUSGEGLICHEN GIBT ES KEINE KACHEL. „Alles ausgeglichen" waere wahr, verlangt
+ * aber nichts - und die Reihe hat vier Plaetze, die sonst eine Zahl tragen, die
+ * NIRGENDS steht. Dieselbe Regel wie bei den uebrigen Kandidaten: keine offene
+ * Position, keine Kennzahl.
+ *
+ * Die Saldenquelle ist die der Ausgleichs-Ansicht (server/services/
+ * split-expenses.js, groupBalanceRows) - die Kachel zeigt, was das Modul zeigt,
+ * auch dessen offenen Fehler #1445.
+ */
+function splitBalanceTile(balance) {
+  const positions = Array.isArray(balance?.positions) ? balance.positions : [];
+  const top = positions[0];
+  if (!top) return null;
+  const net = (balance.net ?? []).find((n) => n.currency === top.currency);
+  const netMinor = Number(net?.netMinor) || 0;
+  const who = top.direction === 'owe'
+    ? t('dashboard.splitYouOwe', { name: top.name })
+    : t('dashboard.splitOwesYou', { name: top.name });
+  const more = positions.length - 1;
+  // „+2" als Zahl der Format-Locale, nicht als Textbaustein: Vorzeichen und
+  // Ziffern gehoeren dem Zahlformat (RTL, arabische Ziffern).
+  const note = more > 0 ? `${who} · ${getNumberFormat({ signDisplay: 'always' }).format(more)}` : who;
+  return {
+    id: 'split-expenses',
+    // Die Ausgleichs-Ansicht liegt im Budget, Reiter „Aufteilung", in der
+    // Gruppe der genannten Position.
+    route: `/budget?tab=split-expenses&group=${encodeURIComponent(String(top.groupId))}`,
+    icon: widgetIcon('split-expenses'),
+    label: t('splitExpenses.title'),
+    value: formatLedgerAmount(net?.amount ?? '0', top.currency),
+    note,
+    tone: netMinor > 0 ? 'balance-positive' : netMinor < 0 ? 'balance-negative' : 'balance-neutral',
+  };
 }
 
 function renderMetricTile(tile) {

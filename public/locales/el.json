@@ -232,6 +232,8 @@
         "metricVisits_one": "{{count}} επίσκεψη",
         "savingsRate": "Ποσοστό αποταμίευσης",
         "topExpense": "Μεγαλύτερο έξοδο",
+        "splitYouOwe": "Οφείλεις σε {{name}}",
+        "splitOwesYou": "{{name}} σου οφείλει",
         "noBudgetData": "Δεν υπάρχουν δεδομένα προϋπολογισμού αυτόν τον μήνα.",
         "customize": "Προσαρμογή",
         "updatedAt": "Ενημερώθηκε {{time}}",

@@ -232,6 +232,8 @@
         "metricVisits_one": "{{count}} návštěva",
         "savingsRate": "Míra úspor",
         "topExpense": "Nejvyšší výdaj",
+        "splitYouOwe": "Dlužíte osobě {{name}}",
+        "splitOwesYou": "{{name}} vám dluží",
         "noBudgetData": "Tento měsíc nejsou žádná data o rozpočtu.",
         "customize": "Přizpůsobit",
         "updatedAt": "Aktualizováno {{time}}",

@@ -232,6 +232,8 @@
         "metricVisits_one": "{{count}} visita",
         "savingsRate": "Taxa de poupança",
         "topExpense": "Maior despesa",
+        "splitYouOwe": "Você deve a {{name}}",
+        "splitOwesYou": "{{name}} deve a você",
         "noBudgetData": "Sem dados de orçamento neste mês.",
         "customize": "Personalizar",
         "updatedAt": "Atualizado {{time}}",

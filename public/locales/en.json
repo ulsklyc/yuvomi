@@ -232,6 +232,8 @@
         "metricVisits_one": "{{count}} visit",
         "savingsRate": "Savings rate",
         "topExpense": "Top expense",
+        "splitYouOwe": "You owe {{name}}",
+        "splitOwesYou": "{{name}} owes you",
         "noBudgetData": "No budget data this month.",
         "customize": "Customize",
         "updatedAt": "Updated {{time}}",

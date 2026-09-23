@@ -15,7 +15,7 @@ import {
   sendDocumentLinkRefusal, visibleDocumentRef,
 } from '../services/document-links.js';
 import { sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
-import { buildSplits, decorateMoney, minorToDecimal, parseMoneyToMinor, simplifyDebts } from '../services/split-expenses.js';
+import { buildSplits, decorateMoney, groupBalanceRows, minorToDecimal, parseMoneyToMinor, simplifyDebts } from '../services/split-expenses.js';
 import { CURRENCY_CODES } from '../../public/utils/currency-codes.js';
 import { syncBirthdayArtifacts } from '../services/birthdays.js';
 import { householdMemberSql, newNonMembers, staffMessage } from '../services/household-members.js';
@@ -1143,15 +1143,9 @@ router.get('/groups/:id/balances', (req, res) => {
   try {
     const groupId = Number(req.params.id);
     if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
-    const rows = db.get().prepare(`
-      SELECT l.currency, l.user_id, u.display_name, SUM(l.amount_minor) AS net_minor
-      FROM expense_ledger_entries l
-      LEFT JOIN users u ON u.id = l.user_id
-      WHERE l.group_id = ?
-      GROUP BY l.currency, l.user_id
-      HAVING net_minor != 0
-      ORDER BY l.currency ASC, u.display_name COLLATE NOCASE ASC
-    `).all(groupId);
+    // Dieselbe Saldenquelle wie die Kennzahl auf dem Dashboard
+    // (openBalancesForUser) - ein Fix an den Salden heilt beide.
+    const rows = groupBalanceRows(db.get(), groupId);
     res.json({
       data: {
         balances: rows.map((row) => ({ ...row, net: minorToDecimal(row.net_minor, row.currency) })),

@@ -232,6 +232,8 @@
         "metricVisits_one": "{{count}} látogatás",
         "savingsRate": "Megtakarítási arány",
         "topExpense": "Legnagyobb kiadás",
+        "splitYouOwe": "Ön tartozik neki: {{name}}",
+        "splitOwesYou": "{{name}} tartozik Önnek",
         "noBudgetData": "Nincs költségvetési adat ebben a hónapban.",
         "customize": "Testreszabás",
         "updatedAt": "Frissítve {{time}}",

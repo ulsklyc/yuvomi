@@ -179,6 +179,91 @@ function simplifyDebts(balanceRows) {
   return debts;
 }
 
+/**
+ * Die Salden EINER Gruppe: je Person und Waehrung die Summe ihrer
+ * Buchungszeilen. Das ist die EINE Saldenquelle der Ausgleichs-Ansicht
+ * (`GET /groups/:id/balances`) und der Kennzahl auf dem Dashboard
+ * (`openBalancesForUser()` unten) - beide lesen sie hier, damit sie nie
+ * auseinanderlaufen.
+ *
+ * #1445 (offen): gezaehlt wird das Ledger ohne Blick auf `expenses`. Zeilen
+ * einer Ausgabe, die es nicht mehr gibt, verschieben den Saldo deshalb mit.
+ * Das Modul und die Kachel zeigen diesen Fehler bis zum Fix GEMEINSAM - wer
+ * ihn hier behebt, heilt beide.
+ */
+function groupBalanceRows(database, groupId) {
+  return database.prepare(`
+    SELECT l.currency, l.user_id, u.display_name, SUM(l.amount_minor) AS net_minor
+    FROM expense_ledger_entries l
+    LEFT JOIN users u ON u.id = l.user_id
+    WHERE l.group_id = ?
+    GROUP BY l.currency, l.user_id
+    HAVING net_minor != 0
+    ORDER BY l.currency ASC, u.display_name COLLATE NOCASE ASC
+  `).all(groupId);
+}
+
+/**
+ * Was der Betrachter ueber alle aktiven Gruppen, in denen er Mitglied ist,
+ * offen hat - fuer die Kennzahl auf dem Dashboard.
+ *
+ * `positions` sind genau die Zeilen, die die Ausgleichs-Ansicht der jeweiligen
+ * Gruppe zeigt (`simplifyDebts()` ueber `groupBalanceRows()`), gefiltert auf
+ * die, an denen der Betrachter beteiligt ist. `net` ist sein Saldo je Waehrung
+ * - dieselbe Summe, die das Kennzahlband des Moduls zeigt.
+ *
+ * MITGLIEDSCHAFT, NICHT ADMIN-RECHT: das Modul laesst einen Admin jede Gruppe
+ * oeffnen, aber „was schulde ich" hat nur in den eigenen Gruppen eine Antwort.
+ * Archivierte Gruppen zaehlen wie im Kennzahlband des Moduls nicht mit.
+ *
+ * REIHENFOLGE: die Haushaltswaehrung zuerst, darin die groesste Position -
+ * Betraege verschiedener Waehrungen lassen sich nicht der Groesse nach
+ * vergleichen, und die Kachel nennt die erste.
+ */
+function openBalancesForUser(database, userId, { householdCurrency = 'EUR' } = {}) {
+  const uid = Number(userId);
+  const groups = database.prepare(`
+    SELECT g.id, g.name
+    FROM expense_groups g
+    JOIN expense_group_members m ON m.group_id = g.id AND m.user_id = ?
+    WHERE g.status = 'active'
+    ORDER BY g.id
+  `).all(uid);
+  const netByCurrency = new Map();
+  const positions = [];
+  for (const group of groups) {
+    const rows = groupBalanceRows(database, group.id);
+    for (const row of rows) {
+      if (row.user_id !== uid) continue;
+      netByCurrency.set(row.currency, (netByCurrency.get(row.currency) ?? 0) + Number(row.net_minor));
+    }
+    for (const debt of simplifyDebts(rows)) {
+      const owe = debt.from_user_id === uid;
+      if (!owe && debt.to_user_id !== uid) continue;
+      positions.push({
+        direction: owe ? 'owe' : 'owed',
+        userId: owe ? debt.to_user_id : debt.from_user_id,
+        name: (owe ? debt.to_name : debt.from_name) ?? '',
+        groupId: group.id,
+        groupName: group.name,
+        currency: debt.currency,
+        amountMinor: debt.amount_minor,
+        amount: debt.amount,
+      });
+    }
+  }
+  const home = (currency) => (currency === householdCurrency ? 0 : 1);
+  positions.sort((a, b) => home(a.currency) - home(b.currency)
+    || a.currency.localeCompare(b.currency)
+    || b.amountMinor - a.amountMinor
+    || a.groupId - b.groupId);
+  const net = [...netByCurrency.entries()]
+    .filter(([, minor]) => minor !== 0)
+    .sort(([a], [b]) => home(a) - home(b) || a.localeCompare(b))
+    .map(([currency, netMinor]) => ({ currency, netMinor, amount: minorToDecimal(netMinor, currency) }));
+  return { net, positions };
+}
+
 function decorateMoney(row, fields = ['amount_minor']) {
   const out = { ...row };
   for (const field of fields) {
@@ -190,7 +275,9 @@ function decorateMoney(row, fields = ['amount_minor']) {
 export {
   buildSplits,
   decorateMoney,
+  groupBalanceRows,
   minorToDecimal,
+  openBalancesForUser,
   parseMoneyToMinor,
   simplifyDebts,
 };

@@ -213,8 +213,16 @@ async function loadInitial() {
   state.dashboard = dashboard.data;
   state.groups = groups.data || [];
   state.members = members?.data || [];
-  state.activeGroupId = state.groups[0]?.id || null;
+  // Sprungziel von aussen (Dashboard-Kachel „Ausgleich offen"): ?group= oeffnet
+  // die Gruppe, in der die genannte Position steht - sonst die erste wie bisher.
+  state.activeGroupId = groupFromQuery(window.location.search, state.groups) ?? state.groups[0]?.id ?? null;
   if (state.activeGroupId) await loadGroupData();
+}
+
+/** Gruppe aus `?group=` - nur eine, die in der geladenen Liste steht. */
+function groupFromQuery(search, groups) {
+  const id = Number(new URLSearchParams(search || '').get('group'));
+  return Number.isInteger(id) && id > 0 && groups.some((g) => g.id === id) ? id : null;
 }
 
 function isSplitGuest() {
@@ -1671,7 +1679,7 @@ function openGuestModal() {
  */
 export const __test = {
   readOnly, renderExpenses, state, expenseReadSections, openExpenseModal, groupMetaHtml, openGroupModal,
-  renderActivity, onActivityClick, loadGroupData, loadMoreActivity,
+  renderActivity, onActivityClick, loadGroupData, loadMoreActivity, groupFromQuery,
   renderMainForTest(container) { _container = container; renderMain(); },
   renderGroupsForTest(container) { _container = container; renderGroups(); },
 };

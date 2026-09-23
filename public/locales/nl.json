@@ -232,6 +232,8 @@
         "metricVisits_one": "{{count}} bezoek",
         "savingsRate": "Spaarquote",
         "topExpense": "Grootste uitgave",
+        "splitYouOwe": "Je bent {{name}} nog schuldig",
+        "splitOwesYou": "{{name}} is jou nog schuldig",
         "noBudgetData": "Geen budgetgegevens deze maand.",
         "customize": "Aanpassen",
         "updatedAt": "Bijgewerkt {{time}}",

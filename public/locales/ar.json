@@ -232,6 +232,8 @@
         "metricVisits_one": "{{count}} زيارة",
         "savingsRate": "معدل الادخار",
         "topExpense": "أكبر مصروف",
+        "splitYouOwe": "أنت مدين لـ {{name}}",
+        "splitOwesYou": "{{name}} مدين لك",
         "noBudgetData": "لا توجد بيانات ميزانية لهذا الشهر.",
         "customize": "تخصيص",
         "updatedAt": "آخر تحديث {{time}}",

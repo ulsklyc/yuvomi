@@ -232,6 +232,8 @@
         "metricVisits_one": "{{count}} 回の訪問",
         "savingsRate": "貯蓄率",
         "topExpense": "最大の支出",
+        "splitYouOwe": "{{name}}さんに支払い",
+        "splitOwesYou": "{{name}}さんから受け取り",
         "noBudgetData": "今月の予算データはありません。",
         "customize": "カスタマイズ",
         "updatedAt": "更新 {{time}}",

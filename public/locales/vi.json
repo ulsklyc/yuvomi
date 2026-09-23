@@ -232,6 +232,8 @@
         "metricVisits_one": "{{count}} lượt",
         "savingsRate": "Tỷ lệ tiết kiệm",
         "topExpense": "Chi phí cao nhất",
+        "splitYouOwe": "Bạn nợ {{name}}",
+        "splitOwesYou": "{{name}} nợ bạn",
         "noBudgetData": "Không có dữ liệu ngân sách trong tháng này.",
         "customize": "Tùy chỉnh",
         "updatedAt": "Cập nhật {{time}}",

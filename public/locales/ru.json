@@ -232,6 +232,8 @@
         "metricVisits_one": "{{count}} визит",
         "savingsRate": "Норма сбережений",
         "topExpense": "Крупнейший расход",
+        "splitYouOwe": "Ваш долг: {{name}}",
+        "splitOwesYou": "Долг вам: {{name}}",
         "noBudgetData": "Нет данных бюджета за этот месяц.",
         "customize": "Настроить",
         "updatedAt": "Обновлено {{time}}",

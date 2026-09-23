@@ -244,6 +244,8 @@
         "metricVisits_one": "{{count}} Besuch",
         "savingsRate": "Sparquote",
         "topExpense": "Größte Ausgabe",
+        "splitYouOwe": "Du schuldest {{name}}",
+        "splitOwesYou": "{{name}} schuldet dir",
         "noBudgetData": "Keine Budgetdaten in diesem Monat.",
         "customize": "Anpassen",
         "updatedAt": "Stand {{time}}",

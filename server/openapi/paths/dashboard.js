@@ -6,7 +6,7 @@ export function dashboardPaths() {
       get: op({
         summary: 'Get dashboard data',
         tag: 'Dashboard',
-        description: 'Aggregated data for every overview tile. Optional query parameters filter tasks, upcoming events and pinned notes before row limits and counts are computed. Task filters apply to every task slice (`urgentTasks`, `openTaskCount`, `overdueTaskCount`, `memberTodayTasks`, `tasksDoneToday`); note filters apply to both `pinnedNotes` and `pinnedNotesCount`. The browser derives these filters from per-widget `options` stored in `dashboard_widgets`.',
+        description: 'Aggregated data for every overview tile. Optional query parameters filter tasks, upcoming events and pinned notes before row limits and counts are computed. Task filters apply to every task slice (`urgentTasks`, `openTaskCount`, `overdueTaskCount`, `memberTodayTasks`, `tasksDoneToday`); note filters apply to both `pinnedNotes` and `pinnedNotesCount`. The browser derives these filters from per-widget `options` stored in `dashboard_widgets`. `splitBalance` (`{ net, positions }`) lists what the caller has open in shared expenses: net per currency and each open position from the settle-up view of the caller\'s active groups (the same balances as `GET /split-expenses/groups/{id}/balances`), household currency first; it is empty without `budget` read access.',
         params: [
           {
             name: 'notes_category',

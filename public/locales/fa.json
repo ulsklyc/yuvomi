@@ -244,6 +244,8 @@
         "metricVisits_one": "{{count}} بازدید",
         "savingsRate": "نرخ پس‌انداز",
         "topExpense": "بزرگ‌ترین هزینه",
+        "splitYouOwe": "به {{name}} بدهکارید",
+        "splitOwesYou": "{{name}} به شما بدهکار است",
         "noBudgetData": "این ماه داده بودجه‌ای نیست.",
         "customize": "سفارشی‌سازی",
         "updatedAt": "به‌روزرسانی {{time}}",

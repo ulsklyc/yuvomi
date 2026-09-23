@@ -232,6 +232,8 @@
         "metricVisits_one": "{{count}} ziyaret",
         "savingsRate": "Tasarruf oranı",
         "topExpense": "En büyük gider",
+        "splitYouOwe": "{{name}} kişisine borçlusun",
+        "splitOwesYou": "{{name}} sana borçlu",
         "noBudgetData": "Bu ay bütçe verisi yok.",
         "customize": "Özelleştir",
         "updatedAt": "Güncellendi {{time}}",

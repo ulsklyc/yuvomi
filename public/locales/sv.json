@@ -232,6 +232,8 @@
         "metricVisits_one": "{{count}} besök",
         "savingsRate": "Sparandegrad",
         "topExpense": "Största utgift",
+        "splitYouOwe": "Du är skyldig {{name}}",
+        "splitOwesYou": "{{name}} är skyldig dig",
         "noBudgetData": "Ingen budgetdata denna månad.",
         "customize": "Anpassa",
         "updatedAt": "Uppdaterad {{time}}",

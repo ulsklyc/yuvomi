@@ -244,6 +244,8 @@
         "metricVisits_one": "{{count}} wizyta",
         "savingsRate": "Oszczędności",
         "topExpense": "Największy wydatek",
+        "splitYouOwe": "Do oddania dla {{name}}",
+        "splitOwesYou": "{{name}} ma ci oddać",
         "noBudgetData": "Brak danych budżetowych w tym miesiącu.",
         "customize": "Dostosuj",
         "updatedAt": "Zaktualizowano {{time}}",
