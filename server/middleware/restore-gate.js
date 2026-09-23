@@ -32,7 +32,9 @@ const RESTORE_PATH = '/api/v1/backup/restore';
 
 /** Pfade, deren Antworten die Datenbank brauchen. Statische Dateien gehoeren nicht dazu. */
 function needsDatabase(pathOnly) {
-  return pathOnly.startsWith('/api/') || pathOnly === '/mcp' || pathOnly.startsWith('/mcp/');
+  return pathOnly.startsWith('/api/') || pathOnly === '/mcp' || pathOnly.startsWith('/mcp/')
+    // ICS-Abos lesen Termine, das OpenAPI-Dokument prueft die Sitzung (Review #1431).
+    || pathOnly.startsWith('/feed/') || pathOnly === '/openapi.json';
 }
 
 function refuse(res, status, error) {
@@ -54,11 +56,15 @@ export function createRestoreWriteGate(isRestoreRunning, isDatabaseOpen = () => 
   return function restoreWriteGate(req, res, next) {
     if (!isRestoreRunning()) return next();
     const pathOnly = (req.originalUrl || req.url || '').split('?')[0];
+    // Ein zweiter Restore bekommt immer 409, auch bei geschlossener Verbindung:
+    // die Antwort betrifft den laufenden Restore, nicht die Datenbank (Review #1431).
+    if (pathOnly === RESTORE_PATH && !READING_METHODS.has(req.method)) {
+      return refuse(res, 409, RESTORE_IN_PROGRESS_MESSAGE);
+    }
     if (!isDatabaseOpen() && needsDatabase(pathOnly)) {
       return refuse(res, 503, RESTORE_WRITE_REFUSED_MESSAGE);
     }
     if (READING_METHODS.has(req.method)) return next();
-    if (pathOnly === RESTORE_PATH) return refuse(res, 409, RESTORE_IN_PROGRESS_MESSAGE);
     return refuse(res, 503, RESTORE_WRITE_REFUSED_MESSAGE);
   };
 }

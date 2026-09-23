@@ -28,6 +28,7 @@ import fsp from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3-multiple-ciphers';
 import { tempDir } from './tmp-dir.js';
 
@@ -606,7 +607,9 @@ function runComposeRestore(backupPath, dbPath, { killMidCopy = false, refuseChmo
     env.PATH = `${shimDir}:${process.env.PATH}`;
     env.SWAP_BACKUP = backupPath;
   }
-  return spawnSync('/bin/sh', ['-c', script], { env, encoding: 'utf8' });
+  env.LOG_LEVEL = 'error';
+  // Wie im Container (WORKDIR /app): der Befehl ruft `node server/check-backup.js`.
+  return spawnSync('/bin/sh', ['-c', script], { env, encoding: 'utf8', cwd: fileURLToPath(new URL('..', import.meta.url)) });
 }
 
 test('#1431 der dokumentierte Compose-Restore: stirbt er mitten im Kopieren, bleibt die alte Datenbank heil', async () => {
@@ -1127,6 +1130,10 @@ test('#1431 restoreWriteGate: schreibende Requests bekommen waehrend eines Resto
   assert.equal(closedCall('GET', '/api/v1/auth/me').res.statusCode, 503, 'Verbindung zu: auch lesende API-Anfragen');
   assert.equal(closedCall('GET', '/mcp').res.statusCode, 503);
   assert.equal(closedCall('GET', '/manifest.json').passed, true, 'statische Dateien gehen durch');
+  assert.equal(closedCall('GET', '/feed/calendar/abc.ics').res.statusCode, 503, 'Feeds lesen die Datenbank');
+  const secondClosed = closedCall('POST', '/api/v1/backup/restore');
+  assert.equal(secondClosed.res.statusCode, 409, 'ein zweiter Restore bekommt auch bei geschlossener Verbindung 409');
+  assert.equal(secondClosed.res.body.reason, 'restore_in_progress');
   const post = call('POST', '/api/v1/tasks');
   assert.equal(post.passed, false);
   assert.equal(post.res.statusCode, 503);
@@ -1266,11 +1273,20 @@ test(
     const backupPath = await bigBackup(KEY, 'aus dem Backup');
     const target = await frozenTarget(KEY, 'vor dem Restore');
     const realStat = fsp.stat;
-    // Die bisherige Datenbank gehoert (scheinbar) einem anderen Nutzer, etwa dem Dienst.
+    const realAccess = fsp.access;
+    // Die bisherige Datenbank gehoert (scheinbar) einem anderen Nutzer, etwa
+    // dem Dienst, und der laufende Prozess darf sie nicht schreiben - er ist
+    // also nicht der Dienst.
     fsp.stat = async (filePath, options) => {
       const stats = await realStat(filePath, options);
       if (String(filePath) === target.dbPath) return Object.assign(Object.create(Object.getPrototypeOf(stats)), stats, { uid: stats.uid + 1 });
       return stats;
+    };
+    fsp.access = async (filePath, mode) => {
+      if (String(filePath) === target.dbPath && mode) {
+        throw Object.assign(new Error('EACCES: permission denied, access'), { code: 'EACCES' });
+      }
+      return realAccess(filePath, mode);
     };
     try {
       await assert.rejects(
@@ -1279,6 +1295,7 @@ test(
       );
     } finally {
       fsp.stat = realStat;
+      fsp.access = realAccess;
     }
     assert.equal(target.mod.get().prepare('SELECT note FROM restore_probe').get()?.note, 'vor dem Restore');
     target.mod.get().pragma('wal_checkpoint(TRUNCATE)');
@@ -1424,3 +1441,144 @@ test(
     target.mod.get().close();
   }
 );
+
+// ---------------------------------------------------------------------------
+// Zehnte Runde #1431
+// ---------------------------------------------------------------------------
+
+test('#1431 ICS, Feiertage, Rezepte, Abfall und Medikamente beginnen waehrend eines Restores nicht', async () => {
+  const state = await import('../server/utils/restore-state.js');
+  const ics = await import('../server/services/ics-subscription.js');
+  const holidays = await import('../server/services/holidays.js');
+  const recipes = await import('../server/services/recipe-provider-sync.js');
+  const waste = await import('../server/services/waste-source-scheduler.js');
+  const medication = await import('../server/services/medication-scheduler.js');
+  const skipped = { success: false, skipped: 'restore_in_progress' };
+  state.setRestoreRunning(true);
+  try {
+    assert.deepEqual(await ics.sync(), skipped, 'ICS-Abos');
+    assert.deepEqual(await holidays.sync(true), skipped, 'Feiertage');
+    assert.deepEqual(await recipes.sync(), skipped, 'Rezept-Anbieter');
+    assert.deepEqual(await recipes.syncOne(1), skipped, 'ein Rezept-Konto');
+    assert.deepEqual(await waste.runDueWasteSourceRefreshes(), skipped, 'Abfall-Quellen');
+    assert.deepEqual(await medication.processDueMedications(), skipped, 'Medikamente');
+  } finally {
+    state.setRestoreRunning(false);
+  }
+});
+
+test('#1431 das zurueckgelegte Journal ist dauerhaft, bevor der Rollback endet', async () => {
+  // #1282: leere Datei mit Journal, per CLI-Handschlag ohne offene Verbindung.
+  const laufend = join(tempDir('yuvomi-test-swap-'), 'laufend.db');
+  const vorher = await bootDb(laufend, null);
+  vorher.get().exec('CREATE TABLE restore_probe (note TEXT)');
+  vorher.get().pragma('wal_autocheckpoint = 0');
+  vorher.get().prepare('INSERT INTO restore_probe (note) VALUES (?)').run('nur im journal');
+  const dir = tempDir('yuvomi-test-swap-');
+  const dbPath = join(dir, 'yuvomi.db');
+  copyFileSync(`${laufend}-wal`, `${dbPath}-wal`);
+  vorher.get().close();
+  writeFileSync(dbPath, '');
+
+  const handshake = Symbol.for('yuvomi.db.restoreTarget');
+  globalThis[handshake] = true;
+  process.env.DB_PATH = dbPath;
+  delete process.env.DB_ENCRYPTION_KEY;
+  let mod;
+  try {
+    mod = await import(`../server/db.js?swap=${++scenario}`);
+  } finally {
+    delete globalThis[handshake];
+  }
+  const log = [];
+  const realRename = fsp.rename;
+  const realOpen = fsp.open;
+  fsp.rename = async (from, to) => {
+    if (String(to) === `${dbPath}-wal`) log.push('Journal zurueck');
+    return realRename(from, to);
+  };
+  fsp.open = async (filePath, flags, mode) => {
+    if (String(filePath) === dir) log.push('fsync dir');
+    return realOpen(filePath, flags, mode);
+  };
+  try {
+    await assert.rejects(() => mod.restoreFromFile(backupThatFailsAfterTheSwap()));
+  } finally {
+    fsp.rename = realRename;
+    fsp.open = realOpen;
+  }
+  const back = log.indexOf('Journal zurueck');
+  assert.ok(back >= 0, `Vorbedingung: der Rollback legt das Journal zurueck: ${log.join(', ')}`);
+  assert.ok(log.slice(back + 1).includes('fsync dir'), `nach dem Zuruecklegen ein fsync: ${log.join(', ')}`);
+});
+
+test('#1431 der Fehlerbehandler beendet eine Antwort, deren Kopf schon unterwegs ist', async () => {
+  const { createErrorHandler } = await import('../server/middleware/error-handler.js');
+  const express = (await import('express')).default;
+  const http = await import('node:http');
+  const app = express();
+  app.get('/halb', (req, res, next) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.write('angefangen');
+    next(Object.assign(new Error('Sitzung nicht speicherbar'), { reason: 'restore_in_progress' }));
+  });
+  app.use(createErrorHandler({ warn() {}, error() {} }));
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
+  try {
+    const outcome = await new Promise((resolve) => {
+      const timer = setTimeout(() => resolve('haengt'), 3000);
+      http.get(`http://127.0.0.1:${server.address().port}/halb`, (res) => {
+        res.on('data', () => {});
+        res.on('end', () => { clearTimeout(timer); resolve('beendet'); });
+        res.on('aborted', () => { clearTimeout(timer); resolve('beendet'); });
+        res.on('error', () => { clearTimeout(timer); resolve('beendet'); });
+      }).on('error', () => { clearTimeout(timer); resolve('beendet'); });
+    });
+    assert.equal(outcome, 'beendet', 'die Verbindung darf nicht offen stehen bleiben');
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+});
+
+test('#1431 gehoert die Arbeitsdatei dem laufenden Prozess, der die alte Datenbank schreiben darf, laeuft der Restore auch bei anderer uid und gid', async () => {
+  const backupPath = await bigBackup(KEY, 'aus dem Backup');
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  const realStat = fsp.stat;
+  const realChown = fsp.chown;
+  fsp.stat = async (filePath, options) => {
+    const stats = await realStat(filePath, options);
+    if (String(filePath) === target.dbPath) {
+      return Object.assign(Object.create(Object.getPrototypeOf(stats)), stats, { uid: stats.uid + 1, gid: stats.gid + 1 });
+    }
+    return stats;
+  };
+  fsp.chown = async () => { throw Object.assign(new Error('EPERM: operation not permitted, chown'), { code: 'EPERM' }); };
+  try {
+    await target.mod.restoreFromFile(backupPath);
+  } finally {
+    fsp.stat = realStat;
+    fsp.chown = realChown;
+  }
+  assert.equal(target.mod.get().prepare('SELECT note FROM restore_probe LIMIT 1').get()?.note, 'aus dem Backup');
+  target.mod.get().close();
+});
+
+test('#1431 der dokumentierte Compose-Restore prueft das Backup und tauscht ein beschaedigtes nicht ein', async () => {
+  const backupPath = await bigBackup(null, 'aus dem Backup');
+  const kaputt = join(tempDir('yuvomi-test-swap-'), 'kaputt.db');
+  const bytes = Buffer.from(readFileSync(backupPath));
+  bytes.fill(0x41, bytes.length - 3 * PAGE, bytes.length - 3 * PAGE + 16);
+  writeFileSync(kaputt, bytes);
+  const target = await frozenTarget(null, 'vor dem Restore');
+  target.mod.get().close();
+  const hash = sha256(target.dbPath);
+  const names = readdirSync(target.dir).sort();
+
+  const run = runComposeRestore(kaputt, target.dbPath);
+  assert.notEqual(run.status, 0, 'der Befehl muss abbrechen');
+  assert.match(run.stderr, /Backup check failed: Backup file is damaged/, `mit der Meldung der Pruefung: ${run.stderr}`);
+  assert.equal(sha256(target.dbPath), hash, 'DB_PATH ist unveraendert');
+  assert.deepEqual(readdirSync(target.dir).sort(), names, 'keine Rollback-Kopie, keine Arbeitsdatei');
+});

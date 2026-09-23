@@ -175,12 +175,15 @@ test('#1431 solange die Verbindung zu ist, bekommt ein Seitenaufruf 503 restore_
   let api;
   let apiBody;
   let asset;
+  let feed;
   try {
     assert.throws(() => dbmod.get(), /Not initialized/, 'Vorbedingung: die Verbindung ist zu');
     api = await fetch(`${BASE}/api/v1/auth/me`, { headers: { Cookie: COOKIE } });
     apiBody = await api.text();
     asset = await fetch(`${BASE}/manifest.json`, { headers: { Cookie: COOKIE } });
     await asset.arrayBuffer();
+    feed = await fetch(`${BASE}/feed/calendar/irgendein-token.ics`);
+    await feed.arrayBuffer();
   } finally {
     restore.release();
     await restore.done;
@@ -188,6 +191,7 @@ test('#1431 solange die Verbindung zu ist, bekommt ein Seitenaufruf 503 restore_
   assert.equal(api.status, 503, `GET /auth/me bei geschlossener Verbindung: ${api.status} ${apiBody}`);
   assert.equal(JSON.parse(apiBody).reason, 'restore_in_progress');
   assert.equal(asset.status, 200, 'statische Dateien laden weiter, auch mit Sitzungs-Cookie');
+  assert.equal(feed.status, 503, 'ein Kalender-Feed bekommt 503 statt 500');
   const after = await fetch(`${BASE}/api/v1/auth/me`, { headers: { Cookie: COOKIE } });
   assert.equal(after.status, 200, 'danach wieder normal');
 });

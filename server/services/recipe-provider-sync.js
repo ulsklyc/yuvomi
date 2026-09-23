@@ -15,6 +15,7 @@
  *
  * Dependencies: server/db.js, ./recipe-providers/index.js
  */
+import { runExternalJob } from '../utils/restore-state.js';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { getAdapter } from './recipe-providers/index.js';
@@ -206,7 +207,17 @@ function recordAccountResult(account, result) {
 }
 
 /** Sync-Durchlauf über alle aktivierten Accounts, egal welchen Providers. */
-export async function sync() {
+/**
+ * Als Job, der liest, auf einen Anbieter wartet und dann schreibt: waehrend
+ * eines Restores beginnt er nicht, ein laufender wird abgewartet - sonst
+ * schriebe er sein Ergebnis in die gerade eingespielte Datenbank (Codex-Befund
+ * in #1431, siehe server/utils/restore-state.js).
+ */
+export function sync() {
+  return runExternalJob(() => syncUntracked());
+}
+
+async function syncUntracked() {
   const accounts = getEnabledAccounts();
   if (accounts.length === 0) {
     log.debug('No enabled recipe provider accounts configured.');
@@ -235,7 +246,11 @@ export async function sync() {
 }
 
 /** Manueller Sync eines einzelnen Accounts (Settings-Seite "Sync now"). */
-export async function syncOne(accountId) {
+export function syncOne(accountId) {
+  return runExternalJob(() => syncOneUntracked(accountId));
+}
+
+async function syncOneUntracked(accountId) {
   const account = getAccountById(accountId);
   if (!account) throw new Error('Recipe provider account not found.');
 

@@ -3,6 +3,7 @@
  * Purpose: Generate due recurring shared expenses idempotently.
  */
 
+import { isRestoreRunning } from '../utils/restore-state.js';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { buildSplits } from './split-expenses.js';
@@ -104,6 +105,9 @@ function processDueRecurringExpenses(today = todayKey(db.get())) {
 
 function startScheduler() {
   setInterval(() => {
+    // Rein lokal und ohne await, aber waehrend eines Restores gesperrt: den
+    // Lauf auslassen statt am Riegel zu scheitern, der naechste holt nach.
+    if (isRestoreRunning()) return;
     try {
       processDueRecurringExpenses();
     } catch (err) {

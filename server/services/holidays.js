@@ -6,6 +6,7 @@
  * Abhängigkeiten: node-fetch, server/db.js
  */
 
+import { runExternalJob } from '../utils/restore-state.js';
 import nodeFetch from 'node-fetch';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
@@ -738,7 +739,17 @@ async function syncYearAndType(country, subdivision, year, type, langCode) {
  */
 let laufenderSync = Promise.resolve();
 
-async function sync(force = false) {
+/**
+ * Als Job, der liest, auf einen Anbieter wartet und dann schreibt: waehrend
+ * eines Restores beginnt er nicht, ein laufender wird abgewartet - sonst
+ * schriebe er sein Ergebnis in die gerade eingespielte Datenbank (Codex-Befund
+ * in #1431, siehe server/utils/restore-state.js).
+ */
+function sync(force = false) {
+  return runExternalJob(() => syncQueued(force));
+}
+
+async function syncQueued(force = false) {
   const dran = laufenderSync.then(() => syncNow(force), () => syncNow(force));
   // Der Fehler gehoert dem Aufrufer, nicht der Warteschlange - sonst risse ein
   // gescheiterter Lauf alle nachfolgenden mit.

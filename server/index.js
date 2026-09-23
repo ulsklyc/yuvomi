@@ -17,6 +17,7 @@ import { router as authRouter, sessionMiddleware, requireAuth, requireAdmin, isP
 import { csrfMiddleware } from './middleware/csrf.js';
 import idempotencyMiddleware from './middleware/idempotency.js';
 import { createRestoreWriteGate } from './middleware/restore-gate.js';
+import { createErrorHandler } from './middleware/error-handler.js';
 import { buildOpenApiSpec } from './openapi.js';
 import * as googleCalendar from './services/google-calendar.js';
 import * as appleCalendar from './services/apple-calendar.js';
@@ -736,20 +737,7 @@ app.get('/{*path}', spaLimiter, (req, res) => {
 // --------------------------------------------------------
 // Globaler Error-Handler
 // --------------------------------------------------------
-app.use((err, req, res, _next) => {
-  // Waehrend eines Restores (#1431): etwa eine Sitzung, die nicht gespeichert
-  // werden kann. Ist die Antwort schon unterwegs (express-session meldet den
-  // Fehler erst nach dem Schreiben), bleibt nur das Log.
-  if (err?.reason === 'restore_in_progress') {
-    log.warn(`Request refused during a restore: ${req.method} ${req.path}`);
-    if (res.headersSent) return undefined;
-    res.setHeader('Retry-After', '30');
-    return res.status(503).json({ error: err.message, code: 503, reason: err.reason });
-  }
-  log.error('Unhandled error:', err);
-  if (res.headersSent) return undefined;
-  res.status(500).json({ error: 'Internal server error.', code: 500 });
-});
+app.use(createErrorHandler(log));
 
 // --------------------------------------------------------
 // Auto-Sync Scheduler (Google + Apple Calendar)

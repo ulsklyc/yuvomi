@@ -8,6 +8,7 @@
  *        als Betreuer eingetragen hat (health_care_grants, #584, D#1041).
  * Abhängigkeiten: server/db.js, push.js, notification-channels.js, notifications.js.
  */
+import { runExternalJob } from '../utils/restore-state.js';
 import { createLogger } from '../logger.js';
 import * as dbModule from '../db.js';
 import { pushService as defaultPushService } from './push.js';
@@ -73,7 +74,16 @@ async function withTimeout(fn, timeoutMs = PROVIDER_TIMEOUT_MS) {
  * @param {Function} [opts.fetchImpl]
  * @returns {Promise<{ due:number, created:number, notified:number, sent:number, failed:number }>}
  */
-export async function processDueMedications({
+/**
+ * Als Job, der liest, nach aussen wartet und dann schreibt: waehrend eines
+ * Restores beginnt er nicht, ein laufender wird abgewartet (Codex-Befund in
+ * #1431, siehe server/utils/restore-state.js).
+ */
+export function processDueMedications(options) {
+  return runExternalJob(() => processDueMedicationsUntracked(options));
+}
+
+async function processDueMedicationsUntracked({
   database,
   pushService = defaultPushService,
   channelStore,

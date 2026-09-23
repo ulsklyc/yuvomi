@@ -21,7 +21,7 @@ import Database from 'better-sqlite3-multiple-ciphers';
 import path from 'path';
 import os from 'node:os';
 import fs from 'node:fs/promises';
-import { mkdirSync, existsSync, renameSync, linkSync, rmSync, copyFileSync, openSync, readSync, closeSync, statSync, readdirSync } from 'node:fs';
+import { mkdirSync, existsSync, renameSync, linkSync, rmSync, copyFileSync, openSync, readSync, closeSync, statSync, readdirSync, constants as fsConstants } from 'node:fs';
 import { createLogger } from './logger.js';
 import { RESTORE_IN_PROGRESS_MESSAGE, RESTORE_IN_PROGRESS_REASON } from './utils/restore-messages.js';
 import { setRestoreRunning, waitForExternalJobs, hasActiveExternalJobs } from './utils/restore-state.js';
@@ -10264,6 +10264,18 @@ function assertBackupIntact(candidate, encrypted) {
   );
 }
 
+/**
+ * Ein Backup pruefen, ohne es einzuspielen: dieselbe Validierung wie vor jedem
+ * Restore (lesbar mit dem eigenen Schluessel, Integritaet, Yuvomi-Schema, keine
+ * neuere Version). Liefert die Schema-Version; wirft mit derselben Meldung wie
+ * der Restore.
+ * @param {string} sourcePath
+ * @returns {number}
+ */
+function checkBackupFile(sourcePath) {
+  return validateBackupFile(sourcePath);
+}
+
 function validateBackupFile(sourcePath) {
   // Backups, die vor der Verschlüsselungs-Umstellung entstanden sind, liegen im
   // Klartext vor. Sie müssen einspielbar bleiben — würden wir ihnen den Key
@@ -10710,9 +10722,14 @@ async function stageDatabaseCopy(from, stagingPath) {
  * @param {import('node:fs').Stats} staged
  * @param {import('node:fs').Stats} previous
  */
-function stillWritableForPreviousWriters(staged, previous) {
+function stillWritableForPreviousWriters(staged, previous, { processMayWritePrevious = false } = {}) {
   const mode = staged.mode;
   if (mode & 0o002) return true;
+  // Die Arbeitsdatei gehoert immer dem laufenden Prozess. Durfte er die
+  // bisherige Datenbank schreiben, ist er der Dienst oder hat dessen Rechte -
+  // dann genuegt sein Besitzer-Schreibbit, auch bei anderer uid und gid als die
+  // alte Datei (Review #1431).
+  if (processMayWritePrevious && staged.uid === process.geteuid?.() && (mode & 0o200) !== 0) return true;
   if (staged.uid === previous.uid) return (mode & 0o200) !== 0;
   if (staged.gid === previous.gid) return (mode & 0o020) !== 0;
   return false;
@@ -10743,7 +10760,12 @@ async function adoptDatabaseAttributes(filePath) {
       // (TrueNAS, Entrypoint ohne chown) besteht so ueber die Gruppe; eine
       // gleichbleibende uid (SMB-Mounts melden jeder Datei dieselbe) ohnehin.
       const staged = await fs.stat(filePath);
-      if (!stillWritableForPreviousWriters(staged, previous)) {
+      let processMayWritePrevious = false;
+      try {
+        await fs.access(DB_PATH, fsConstants.W_OK);
+        processMayWritePrevious = true;
+      } catch { /* der laufende Prozess darf die bisherige Datenbank nicht schreiben */ }
+      if (!stillWritableForPreviousWriters(staged, previous, { processMayWritePrevious })) {
         throw new Error(
           `Could not give ${filePath} the owner of the current database (uid ${previous.uid}, gid `
           + `${previous.gid}; it belongs to uid ${staged.uid}, gid ${staged.gid}): ${err?.code ?? err}. `
@@ -10964,6 +10986,10 @@ async function restoreValidatedFile(sourcePath) {
       if (keptJournalPath) {
         await renameIfExists(keptJournalName(rollbackPath, 'wal'), `${DB_PATH}-wal`);
         await renameIfExists(keptJournalName(rollbackPath, 'shm'), `${DB_PATH}-shm`);
+        // Das zurueckgelegte Journal dauerhaft machen: sonst kann es nach einem
+        // Stromausfall wieder unter `.wal-kept` liegen, wo die Meldung zur
+        // leeren Datei es nicht nennt (Codex-Befund in #1431).
+        await syncDirectory(path.dirname(DB_PATH));
       }
       if (!db && swapped && !rollbackCreated) {
         // Vorher gab es keine Datenbank: nichts zurueckzuholen.
@@ -11083,10 +11109,19 @@ function _resetTestDatabase() {
 // pauschal aufgeschobenes init() kürzte die Kopie um nicht gecheckpointete
 // Transaktionen und löschte danach das `-wal`. Ohne Handschlag (Server, Tests,
 // andere Skripte) bricht der Leer-Fall ab wie zuvor.
-try {
-  init();
-} catch (err) {
-  if (!(err?.code === EMPTY_DATABASE_FILE && globalThis[RESTORE_TARGET_HANDSHAKE] === true)) throw err;
+// Nur pruefen, nichts oeffnen: `server/check-backup.js` (der Pruefschritt im
+// dokumentierten Compose-Restore, #1431) setzt diesen Handschlag VOR dem
+// Import. Er braucht nur `checkBackupFile()` - und die laufende Datenbank darf
+// dabei nicht angefasst werden, sie kann leer sein oder einen anderen
+// Schluessel tragen, genau die Faelle, fuer die es den manuellen Weg gibt.
+const CHECK_ONLY_HANDSHAKE = Symbol.for('yuvomi.db.checkOnly');
+
+if (globalThis[CHECK_ONLY_HANDSHAKE] !== true) {
+  try {
+    init();
+  } catch (err) {
+    if (!(err?.code === EMPTY_DATABASE_FILE && globalThis[RESTORE_TARGET_HANDSHAKE] === true)) throw err;
+  }
 }
 
-export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, isRestoreRunning, isDatabaseOpen, unknownMigrationVersions, MIGRATIONS, migrate, MIGRATION_BUSY_ATTEMPTS, reconcileCriticalSchema, _setTestDatabase, _resetTestDatabase };
+export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, checkBackupFile, isRestoreRunning, isDatabaseOpen, unknownMigrationVersions, MIGRATIONS, migrate, MIGRATION_BUSY_ATTEMPTS, reconcileCriticalSchema, _setTestDatabase, _resetTestDatabase };
