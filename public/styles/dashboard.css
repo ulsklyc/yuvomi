@@ -1237,7 +1237,13 @@
   color: var(--color-text-secondary);
   border-radius: var(--radius-full);
   cursor: pointer;
-  z-index: 1;
+  /* UEBER DEM KOPF, nicht darunter. Hier stand `z-index: 1`, und
+   * `.widget__header` traegt seit dem Kopf-Umbau `z-index: 2` ueber die volle
+   * Kartenbreite: der Knopf war zu sehen und nicht zu treffen - an seinem
+   * Zentrum lieferte elementFromPoint den Kopf (Critique 2026-09-23, gemessen
+   * 390 und 1440). Sonde 4 misst verdeckte Ziele bewusst nicht und blieb gruen;
+   * test-dashboard-a11y-browser.js prueft genau diesen Fall. */
+  z-index: 3;
   transition: background var(--transition-fast);
 }
 
@@ -2004,10 +2010,16 @@ svg.weather-forecast__icon {
   gap: var(--space-2);
 }
 
+/* Die Chips stehen in einer Reihe und duerften nach der Zielgroessen-Regel
+ * dicht sein - aber ihr Nachbar in derselben Gruppe, der Optionen-Kreis, misst
+ * --target-md, und jedes andere Bedienelement des Anpassen-Modus auch. 38,6px
+ * (gemessen 1440) waren kein Entschluss, sondern Innenabstand plus Zeilenhoehe.
+ * Am Finger hebt die (pointer: coarse)-Regel unten weiter auf --target-base. */
 .widget-restore-chip {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  min-height: var(--target-md);
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
@@ -2697,7 +2709,11 @@ svg.weather-forecast__icon {
   }
 }
 
-@media (min-width: 1024px) {
+/* Am Zeiger reichen die 40px der Desktop-Welt (--target-md, Zielgroessen-Regel
+ * in tokens.css §11b). Die Regel hing bis 2026-09-23 allein an der BREITE und
+ * nahm damit auch dem Touch-Tablet ab 1024px seine Fingergroesse - gemessen
+ * 40x40 bei 1180px. Das Kriterium ist die Zeigerfaehigkeit, nicht die Breite. */
+@media (min-width: 1024px) and (hover: hover) {
   .dashboard-icon-btn {
     width: var(--target-md);
     height: var(--target-md);
@@ -4925,11 +4941,46 @@ svg.weather-forecast__icon {
 }
 
 /* ── Fuß: Datenstand und der leise Ausstieg ── */
+/* DREI SPALTEN, DIE MITTE STEHT FEST. Hier stand `flex` mit `space-between`:
+ * die Mitte lag damit zwischen Stand und Ausstieg, nicht in der Mitte - und der
+ * Ausstieg waechst beim Wecken um seine Beschriftung. Die Startknoepfe rutschten
+ * dabei um 91px (gemessen 1440): wer die schlafende Wand auf „5 Min" antippte
+ * (das weckt nur, wall-timer.js) und an derselben Stelle nachtippte, startete
+ * „10 Min". Zwei gleich breite Aussenspalten halten die Mitte unbewegt, egal was
+ * rechts oder links waechst. */
 .wall__foot {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-4);
+}
+
+.wall__foot > :first-child {
+  justify-self: start;
+}
+
+.wall__foot > :last-child {
+  justify-self: end;
+}
+
+/* Eine Zeile braucht Platz fuer beides: fuenf Startknoepfe (340px) und je
+ * Aussenspalte einen wachen Ausstieg samt Beschriftung (220px, de). Fehlt er,
+ * werden die Aussenspalten ungleich und die Mitte rutscht wieder (gemessen: bei
+ * einer 800px breiten Flaeche um 26px). Die Bedienung bekommt dann eine eigene
+ * Zeile ueber Stand und Ausstieg; der alte Fuss lief bei 390px sogar rechts
+ * aus dem Bild (Ausstieg wach bei 356-478). Gefragt wird die FLAECHE
+ * (`container: wall`, siehe `.wall`), nicht das Fenster. */
+@container wall (max-width: 1023px) {
+  .wall__foot {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: var(--space-2);
+  }
+
+  .wall__foot > :nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    justify-self: center;
+  }
 }
 
 /* Woher man weiß, dass die Fläche lebt: eine absolute Uhrzeit, keine
@@ -5048,7 +5099,16 @@ svg.weather-forecast__icon {
 }
 
 /* Leise da, hell auf Berührung - dieselbe Grammatik wie der Fuß-Knopf daneben,
- * nur schmaler: fünf davon stehen nebeneinander. */
+ * nur schmaler: fünf davon stehen nebeneinander.
+ *
+ * LEISE HEISST SICHTBAR (Critique 2026-09-23). Hier stand `color: transparent`:
+ * fünf klickbare Flächen, von denen im Ruhezustand nichts zu sehen war - und ein
+ * Tipp auf die schlafende Wand startete einen Timer, den niemand gewählt hatte.
+ * Das ist die Defektklasse, die `.impeccable/critique/ignore.md` als
+ * „unsichtbare, klickbare Bänder" führt; Ruhe entsteht durch Kontrast, nicht
+ * durch Unsichtbarkeit. Die Beschriftung steht deshalb in Tertiärfarbe da, eine
+ * Stufe unter dem Zeichen des Ausstiegs (Sekundär), ohne Kapsel. Dass der erste
+ * Tipp auf eine schlafende Wand nur weckt, regelt wall-timer.js. */
 .wall__timer-preset {
   min-height: var(--target-lg);
   min-width: var(--target-lg);
@@ -5056,7 +5116,7 @@ svg.weather-forecast__icon {
   border: 1px solid transparent;
   border-radius: var(--radius-full);
   background: transparent;
-  color: transparent;
+  color: var(--color-text-tertiary);
   font-family: inherit;
   font-size: var(--type-secondary);
   font-variant-numeric: tabular-nums;

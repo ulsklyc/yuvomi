@@ -732,9 +732,18 @@ function widgetHeader(widgetId, title, count, linkHref, linkLabel, sealSlug = nu
   // Aufrufstellen: `0` kommt sowohl fest aus den Leerzustaenden als auch
   // gerechnet aus `totalOpen`/`badge`, und eine Allowlist deckt nur die
   // Stellen ab, die man beim Schreiben gesehen hat.
+  //
+  // DIE ZAHL STEHT NICHT IM NAMEN DER UEBERSCHRIFT (Critique 2026-09-23). Als
+  // Kind der h3 las ein Screenreader „Geburtstage 5" - eine Ueberschrift, die
+  // anders heisst als ihr Widget, und eine Zahl ohne Wort dazu. Die Badge ist
+  // deshalb aria-hidden, und derselbe Wert steht hinter der h3 als Satz.
   const numericCount = Number(count);
-  const badge = count != null && Number.isFinite(numericCount) && numericCount > 0
-    ? `<span class="widget__badge">${count}</span>`
+  const hasCount = count != null && Number.isFinite(numericCount) && numericCount > 0;
+  const badge = hasCount
+    ? `<span aria-hidden="true" class="widget__badge">${count}</span>`
+    : '';
+  const countText = hasCount
+    ? `<span class="sr-only">${esc(t('dashboard.badgeCount', { count: numericCount }))}</span>`
     : '';
   // OHNE ZIEL KEIN LINK. Jede Kachel bis #647 gehoerte genau einer Seite, und
   // „Alle" fuehrte dorthin. Der Countdown gehoert zweien: seine Zeilen kommen
@@ -776,6 +785,7 @@ function widgetHeader(widgetId, title, count, linkHref, linkLabel, sealSlug = nu
         <span class="widget__title-text">${title}</span>
         ${badge}
       </h3>
+      ${countText}
       ${link}
     </div>
   `;
@@ -1912,7 +1922,14 @@ function selectMetricTiles(data, currency, shown = new Set()) {
 function renderMetricTiles(data, currency, shown = new Set()) {
   const tiles = selectMetricTiles(data, currency, shown);
   if (!tiles.length) return '';
-  return `<div class="metric-tiles">${tiles.map(renderMetricTile).join('')}</div>`;
+  // Die Reihe war das einzige Widget ohne Ueberschrift: per H-Taste sprang man
+  // an ihr vorbei, und ihre vier Zahlen hingen unter der vorigen Kachel. Die
+  // Ueberschrift ist sr-only, weil jede Kachel ihr Modul schon sichtbar nennt -
+  // ein Etikett „Kennzahlen" ueber einer Reihe, die sich selbst erklaert, waere
+  // nur Kopfhoehe. Sie steht VOR der Reihe, nicht in ihr: `.metric-tiles` ist
+  // selbst das Raster der Kacheln.
+  return `<h3 class="sr-only">${esc(t('dashboard.metrics'))}</h3>
+    <div class="metric-tiles">${tiles.map(renderMetricTile).join('')}</div>`;
 }
 
 // --------------------------------------------------------
@@ -2822,6 +2839,50 @@ function renderDashboardOverview(user, editing = false, weather = null, scope = 
   `;
 }
 
+/**
+ * Ein Selektor, der „dasselbe" Element nach einem Neuaufbau wiederfindet.
+ *
+ * Die Flaeche wird bei jeder Anpassen-Geste per setHtml neu gebaut; Elemente
+ * ueberleben das nicht, ihre IDENTITAET schon: eine Id, oder eines der
+ * data-Attribute, mit denen die Bearbeiten-Knoepfe ihre Kachel nennen. Wo das
+ * Attribut die Kachel nicht selbst nennt (Groesse, Verschieben, Griff), grenzt
+ * die umgebende Kachel es ein.
+ */
+const FOCUS_IDENTITY_ATTRS = [
+  'data-widget-size-preset', 'data-widget-move', 'data-widget-drag-handle',
+  'data-widget-hide', 'data-widget-show', 'data-widget-options',
+  'data-glance-hide', 'data-glance-show',
+];
+
+function focusKeyOf(el) {
+  if (el.id) return `#${CSS.escape(el.id)}`;
+  const attr = FOCUS_IDENTITY_ATTRS.find((a) => el.hasAttribute(a));
+  if (!attr) return null;
+  const value = el.getAttribute(attr);
+  const own = value ? `[${attr}="${CSS.escape(value)}"]` : `[${attr}]`;
+  const tile = el.closest('.widget-wrapper[data-widget-id]')?.dataset.widgetId;
+  return tile ? `.widget-wrapper[data-widget-id="${CSS.escape(tile)}"] ${own}` : own;
+}
+
+/* EINE ANSAGE-REGION, DIE DEN NEUAUFBAU UEBERLEBT.
+ *
+ * Eine Live-Region wird nur gehoert, wenn es sie schon gab, bevor ihr Text sich
+ * aendert - eine, die mit dem Neuaufbau selbst entsteht, schweigt in der Regel.
+ * Die Seite baut aber bei jeder Anpassen-Geste und bei jedem Timer-Wechsel neu.
+ * Gesprochen wird deshalb ueber den Ansager der Shell (`#route-announcer`,
+ * router.js): hoeflich, atomar, sr-only und fuer die ganze Sitzung da. Er meldet
+ * sonst Seitenwechsel - eine Zustandsaenderung dieser Seite ist dieselbe Sorte
+ * Nachricht. Leeren und verzoegert setzen ist sein eigenes Muster: derselbe Text
+ * zweimal hintereinander waere sonst keine Aenderung. */
+let announceTimer = null;
+function announceDashboard(message) {
+  const region = typeof document === 'undefined' ? null : document.getElementById('route-announcer');
+  if (!region || !message) return;
+  clearTimeout(announceTimer);
+  region.textContent = '';
+  announceTimer = setTimeout(() => { region.textContent = message; }, 50);
+}
+
 function widgetSizeClass(size) {
   return WIDGET_SIZE_OPTIONS.includes(size) ? `widget-size--${size}` : 'widget-size--1x1';
 }
@@ -3123,8 +3184,11 @@ function renderWidgetCustomizeControls(w, index = 0, total = 1) {
       </button>`;
   }).join('');
 
+  // Die Leiste steht VOR der Ueberschrift der Kachel. Ohne eigenen Namen hoerte
+  // man per Tab je Kachel denselben Griff und dieselben Groessen - welche Kachel
+  // man anfasst, sagt erst die Gruppe.
   return `
-    <div class="widget-edit-controls" data-widget-controls>
+    <div class="widget-edit-controls" role="group" aria-label="${esc(widgetLabel(w.id))}" data-widget-controls>
       <button type="button" class="widget-edit-controls__handle" data-widget-drag-handle
               aria-label="${t('dashboard.customizeReorderHandle')}" aria-keyshortcuts="ArrowUp ArrowDown">
         <i data-lucide="grip-vertical" aria-hidden="true"></i>
@@ -3264,10 +3328,19 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
     || emptyHintHTML(t('dashboard.allWidgetsHidden'), { icon: 'layout-dashboard' });
   // Dicht gepackt in jedem Zustand (dashboard.css, `.dashboard__grid`): die
   // Reihenfolge ist die Rangfolge, kein Schalter mehr fuer umsortierte Layouts.
-  const grid = `<div class="dashboard__grid ${editing ? 'dashboard__grid--editing' : ''}" id="dashboard-widget-grid">${gridInner}</div>`;
+  /* DAS RASTER HAT SEINE EIGENE UEBERSCHRIFT (Critique 2026-09-23). Ohne sie
+   * hingen alle Widget-h3 unter der h2 „Heute wichtig" - wer per Ueberschriften
+   * navigiert, hielt Budget, Wetter und Notizen fuer Teile des Kopfbands, und
+   * wer das Kopfband ausblendet, hatte gar keine h2 mehr ueber ihnen. Sichtbar
+   * waere sie ein drittes Etikett ueber Kacheln, die ihre eigenen Koepfe tragen;
+   * gebraucht wird sie nur als Gliederungsebene. Das Wort ist dasselbe, das die
+   * Anpassen-Leiste benutzt („Widgets anpassen", „Ausgeblendete Widgets"). */
+  const heading = `<h2 class="sr-only" id="dashboard-widgets-title">${esc(t('dashboard.widgetsHeading'))}</h2>`;
+  const grid = `<div class="dashboard__grid ${editing ? 'dashboard__grid--editing' : ''}" id="dashboard-widget-grid"
+                    role="region" aria-labelledby="dashboard-widgets-title">${gridInner}</div>`;
   // Im Bearbeiten-Modus folgt die Wieder-Einblenden-Leiste dem Grid, damit
   // ausgeblendete Widgets nicht in einer Sackgasse verschwinden.
-  return editing ? `${grid}${renderHiddenWidgetsTray(cfg, glanceHidden)}` : grid;
+  return `${heading}${editing ? `${grid}${renderHiddenWidgetsTray(cfg, glanceHidden)}` : grid}`;
 }
 
 /* DAS SKELETT VERSPRICHT DAS LAYOUT, DAS GLEICH KOMMT (Critique R1, A10).
@@ -4019,8 +4092,11 @@ function renderWallError() {
  * steht er immer im DOM und ist immer per Tastatur erreichbar, traegt aber im
  * Ruhezustand nur sein Zeichen. Jede Beruehrung hebt ihn fuer ein paar Sekunden
  * auf die volle Kapsel samt Beschriftung (`data-wall-awake`, siehe
- * `wireWallSurface`). Weil sonst nichts auf der Flaeche beruehrbar ist,
- * kollidiert dieses Wecken mit nichts.
+ * `wireWallSurface`). Seit dem Kuechentimer (#844) ist der Ausstieg nicht mehr
+ * das Einzige, was man beruehren kann - dessen Startknoepfe stehen daneben und
+ * ruhen genauso leise, aber sichtbar. Damit ein Tipp, der die Wand nur wecken
+ * sollte, keinen Timer startet, weckt der erste Zeiger auf eine schlafende
+ * Wand dort nur (wall-timer.js).
  */
 function renderWallSurface(data, weather, { failed = false, loading = false, updatedAt = null } = {}) {
   const model = failed || loading ? null : buildTodayCockpitModel(data, [], { cap: WALL_ROW_CAP });
@@ -4084,7 +4160,7 @@ function wireWallSurface(container, rerender, signal) {
   }
   signal.addEventListener('abort', () => clearTimeout(awakeTimer));
 
-  wireWallTimer(wall, rerender, signal);
+  wireWallTimer(wall, rerender, signal, { announce: announceDashboard });
 }
 
 /**
@@ -4534,7 +4610,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // nach dem Laden bleibt und ersetzt diesen hier - `wireWallTimer` raeumt
   // seinen vorigen Takt selbst ab.
   if (wallMode) {
-    wireWallTimer(container.querySelector('.wall'), rerender, signal);
+    wireWallTimer(container.querySelector('.wall'), rerender, signal, { announce: announceDashboard });
     // Der Ausstieg gehoert zur selben Sorte: er haengt an nichts, was geladen
     // wird. Einmal verdrahtet, ueber den Container - er ueberlebt das zweite
     // Rendern und braucht keinen zweiten Aufruf.
@@ -5013,7 +5089,15 @@ export async function render(container, { user, signal: routeSignal = null } = {
         const size = btn.dataset.widgetSizePreset;
         if (!WIDGET_SIZE_OPTIONS.includes(size)) return;
         widgetConfig = updateWidgetConfig(widgetConfig, btn.dataset.widgetId, { size });
+        // Der Fokus bleibt auf demselben Knopf (rebuildDashboard traegt ihn
+        // hinueber), und der traegt jetzt aria-pressed - gesagt wird trotzdem,
+        // was sich geaendert hat: die Kachel ist gewachsen, nicht der Knopf.
         rebuildDashboard(widgetConfig);
+        const preset = WIDGET_SIZE_PRESETS.find((p) => p.value === size);
+        announceDashboard(t('dashboard.customizeSizeDone', {
+          widget: widgetLabel(btn.dataset.widgetId),
+          size: preset ? t(preset.labelKey) : size,
+        }));
       });
     });
 
@@ -5032,10 +5116,32 @@ export async function render(container, { user, signal: routeSignal = null } = {
       });
     });
 
+    /* WER AUSBLENDET, VERLIERT SEINEN KNOPF - UND DARF DESHALB NICHT DEN FOKUS
+     * VERLIEREN. Der Neuaufbau ersetzt das ganze Raster; der gedrueckte Knopf
+     * ist danach fort, und der Fokus fiel bis hierher auf <body> zurueck: wer
+     * per Tastatur drei Kacheln ausblenden wollte, stand nach der ersten wieder
+     * am Seitenanfang. Er geht deshalb zum gleichen Knopf der Nachbarkachel
+     * (so laesst sich eine Reihe nacheinander abraeumen), und wo es keine gibt,
+     * zum Chip, der sie zurueckholt. Beim Einblenden spiegelbildlich. */
+    const neighbourIds = (el, selector, attr) => {
+      const next = el?.nextElementSibling?.closest(selector) ? el.nextElementSibling : null;
+      const prev = el?.previousElementSibling?.closest(selector) ? el.previousElementSibling : null;
+      return [next, prev].map((n) => n?.getAttribute(attr) ?? n?.querySelector(`[${attr}]`)?.getAttribute(attr))
+        .filter(Boolean);
+    };
+
     grid.querySelectorAll('[data-widget-hide]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        widgetConfig = updateWidgetConfig(widgetConfig, btn.dataset.widgetHide, { visible: false });
+        const id = btn.dataset.widgetHide;
+        const wrapper = btn.closest('.widget-wrapper');
+        focusAfterRebuild = [
+          ...neighbourIds(wrapper, '.widget-wrapper', 'data-widget-id')
+            .map((n) => `.widget-wrapper[data-widget-id="${CSS.escape(n)}"] [data-widget-hide]`),
+          `[data-widget-show="${CSS.escape(id)}"]`,
+        ];
+        widgetConfig = updateWidgetConfig(widgetConfig, id, { visible: false });
         rebuildDashboard(widgetConfig);
+        announceDashboard(t('dashboard.customizeHiddenDone', { widget: widgetLabel(id) }));
       });
     });
 
@@ -5043,8 +5149,15 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // weit gesucht): der Gegenpart zum Ausblenden, macht den Inline-Editor komplett.
     container.querySelectorAll('[data-widget-show]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        widgetConfig = updateWidgetConfig(widgetConfig, btn.dataset.widgetShow, { visible: true });
+        const id = btn.dataset.widgetShow;
+        focusAfterRebuild = [
+          ...neighbourIds(btn.closest('.widget-restore-chip-group') ?? btn, '.widget-restore-chip-group, [data-glance-show]', 'data-widget-show')
+            .map((n) => `[data-widget-show="${CSS.escape(n)}"]`),
+          `.widget-wrapper[data-widget-id="${CSS.escape(id)}"] [data-widget-hide]`,
+        ];
+        widgetConfig = updateWidgetConfig(widgetConfig, id, { visible: true });
         rebuildDashboard(widgetConfig);
+        announceDashboard(t('dashboard.customizeShownDone', { widget: widgetLabel(id) }));
       });
     });
 
@@ -5052,11 +5165,15 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // der andere in der Tray-Leiste), deshalb container-weit gesucht.
     container.querySelector('[data-glance-hide]')?.addEventListener('click', () => {
       glanceVisible = false;
+      focusAfterRebuild = ['[data-glance-show]'];
       rebuildDashboard(widgetConfig);
+      announceDashboard(t('dashboard.customizeHiddenDone', { widget: t('dashboard.todayTitle') }));
     });
     container.querySelector('[data-glance-show]')?.addEventListener('click', () => {
       glanceVisible = true;
+      focusAfterRebuild = ['[data-glance-hide]'];
       rebuildDashboard(widgetConfig);
+      announceDashboard(t('dashboard.customizeShownDone', { widget: t('dashboard.todayTitle') }));
     });
 
     // Reorder ohne HTML5-DnD (das feuert nicht per Finger und ist nicht per
@@ -5070,6 +5187,13 @@ export async function render(container, { user, signal: routeSignal = null } = {
       if (!id || !siblingId) return false;
       widgetConfig = reorderWidgetConfig(widgetConfig, id, siblingId, dir === 'up' ? 'before' : 'after');
       rebuildDashboard(widgetConfig);
+      // Der Fokus folgt der Kachel (die Aufrufer unten), aber wohin sie
+      // gerutscht ist, sieht nur, wer hinsieht: gesagt wird der neue Platz.
+      const order = [...container.querySelectorAll('#dashboard-widget-grid > .widget-wrapper[data-widget-id]')]
+        .map((w) => w.dataset.widgetId);
+      announceDashboard(t('dashboard.customizeMovedTo', {
+        widget: widgetLabel(id), position: order.indexOf(id) + 1, total: order.length,
+      }));
       return true;
     };
 
@@ -5105,6 +5229,11 @@ export async function render(container, { user, signal: routeSignal = null } = {
 
   let disposeNoteCategories = () => {};
   let disposeFastingClock = () => {};
+  // Fokus-Nachfolger, den eine Geste fuer den naechsten Neuaufbau vormerkt
+  // (Selektoren, der erste Treffer gewinnt), und der Modus des letzten Aufbaus -
+  // null, solange noch keiner lief.
+  let focusAfterRebuild = null;
+  let renderedCustomizing = null;
   signal.addEventListener('abort', () => disposeFastingClock(), { once: true });
   signal.addEventListener('abort', () => disposeNoteCategories(), { once: true });
   function rebuildDashboard(cfg) {
@@ -5143,6 +5272,14 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // Kein Wetter-Echo: die Masthead-Zeile spricht nur, wenn die Wetter-Karte
     // nicht ohnehin im Raster sichtbar ist (Opt-in fürs Wandtablet).
     const weatherCardShown = cfg.some((w) => w.id === 'weather' && w.visible);
+    // Wer hatte den Fokus? Nach dem setHtml gibt es sein Element nicht mehr
+    // (siehe focusKeyOf / restoreFocusAfterRebuild).
+    const focused = document.activeElement;
+    const keepFocus = focused && focused !== document.body && shell.contains(focused)
+      ? focusKeyOf(focused) : null;
+    const hadFocus = !!focused && focused !== document.body && shell.contains(focused);
+    const modeChanged = renderedCustomizing !== null && renderedCustomizing !== isCustomizing;
+    renderedCustomizing = isCustomizing;
     setHtml(shell, `
       <section class="dashboard-masthead dashboard-masthead--${greetingPeriod()}${mastheadSlim}">
         ${renderDashboardOverview(user, isCustomizing, weatherCardShown ? null : weather, { followsDefault, canPublish })}
@@ -5187,6 +5324,28 @@ export async function render(container, { user, signal: routeSignal = null } = {
     container.querySelector('#dashboard-customize-publish')?.addEventListener('click', publishHouseholdDefault, { signal: signal });
     wireDashboardEditMode();
     void mountExtensionWidgets(shell, cfg, user);
+
+    /* DER FOKUS UEBERLEBT DEN NEUAUFBAU. Jede Geste im Anpassen-Modus baut die
+     * Flaeche neu - und bis hierher fiel der Fokus danach auf <body>: wer per
+     * Tastatur „Anpassen" drueckte, eine Groesse waehlte oder speicherte, stand
+     * wieder am Seitenanfang. Reihenfolge der Kandidaten: dasselbe Element
+     * (gleiche Id bzw. gleiches data-Attribut), dann das, was die Geste selbst
+     * als Nachfolger nennt (Ausblenden -> Nachbarkachel), und wenn die Geste den
+     * Modus gewechselt hat (Speichern, Abbrechen), der Anpassen-Knopf, der ihn
+     * wieder oeffnet. */
+    const candidates = [
+      keepFocus,
+      ...(focusAfterRebuild ?? []),
+      ...(hadFocus && modeChanged ? ['#dashboard-customize-btn'] : []),
+    ].filter(Boolean);
+    focusAfterRebuild = null;
+    for (const selector of candidates) {
+      const el = container.querySelector(selector);
+      if (el && !el.disabled) {
+        el.focus();
+        break;
+      }
+    }
   }
 
   rebuildDashboard(widgetConfig);
@@ -5360,7 +5519,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { loadScheduleSlice, renderUrgentTasks, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab };
+export const __test = { loadScheduleSlice, renderUrgentTasks, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

@@ -17,6 +17,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { eachRule } from './css-rules.js';
 
 // Ein localStorage, das sich wie eines verhaelt - der Timer liest und schreibt
 // nichts anderes. Muss VOR dem Import stehen: das Modul greift beim ersten
@@ -30,7 +31,7 @@ global.localStorage = {
 
 const {
   readWallTimer, startWallTimer, clearWallTimer, formatWallTimer,
-  renderWallTimer, WALL_TIMER_PRESETS,
+  renderWallTimer, WALL_TIMER_PRESETS, wireWallTimer,
 } = await import('../public/components/wall-timer.js');
 
 const SOURCE = readFileSync(new URL('../public/components/wall-timer.js', import.meta.url), 'utf8');
@@ -254,4 +255,151 @@ test('auch der Ausstieg wird verdrahtet, bevor auf die Daten gewartet wird', () 
     'delegiert am Container, damit die eine Verdrahtung beide Renders ueberlebt');
   assert.ok(!/container\.querySelector\('#wall-exit'\)\?\.addEventListener/.test(fn),
     'nicht am Knopf selbst');
+});
+
+// --------------------------------------------------------
+// Keine unsichtbare aktive Flaeche (Critique 2026-09-23, P2)
+// --------------------------------------------------------
+
+const DASH_CSS = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+
+/** Die letzte Deklaration einer Eigenschaft in den Basisregeln eines Selektors. */
+function restingValue(selector, property) {
+  let value = null;
+  let found = 0;
+  for (const rule of eachRule(DASH_CSS)) {
+    if (rule.at.length) continue;
+    if (!rule.selector.split(',').map((s) => s.trim()).includes(selector)) continue;
+    found += 1;
+    const m = [...rule.body.matchAll(new RegExp(`(?:^|;)\\s*${property}\\s*:\\s*([^;]+)`, 'g'))].pop();
+    if (m) value = m[1].trim();
+  }
+  return { value, found };
+}
+
+test('die Startknoepfe ruhen sichtbar - ein unsichtbarer Knopf ist eine Falle', () => {
+  // Im Ruhezustand waren Text, Rand und Flaeche `transparent`, klickbar blieben
+  // sie trotzdem: ein Tipp auf die schlafende Wand startete einen Timer, den
+  // niemand gesehen hatte (Critique 2026-09-23, dort passiert).
+  // `.impeccable/critique/ignore.md` nennt unsichtbare, klickbare Baender als
+  // Defektklasse dieses Repos; Ruhe entsteht durch Kontrast, nicht durch
+  // Unsichtbarkeit - der Ausstieg daneben zeigt sein Zeichen in Sekundaerfarbe.
+  const { value: color, found } = restingValue('.wall__timer-preset', 'color');
+  assert.ok(found > 0, 'Reichweite: die Basisregel von .wall__timer-preset wurde gefunden');
+  assert.ok(color, 'die Basisregel setzt eine Textfarbe');
+  assert.ok(!/transparent/.test(color), `im Ruhezustand unsichtbar: color: ${color}`);
+  assert.match(color, /var\(--color-text-(secondary|tertiary)\)/,
+    'leise heisst eine Textstufe aus tokens.css, keine erfundene Deckkraft');
+  const { value: opacity } = restingValue('.wall__timer-preset', 'opacity');
+  assert.ok(opacity == null || Number(opacity) > 0, `opacity: ${opacity} waere dieselbe Falle`);
+});
+
+// Eine Wand aus dem, was wireWallTimer anfasst - kein DOM-Nachbau, sondern die
+// Methoden, die das Modul aufruft. EventTarget ist echt (Node), damit die
+// Reihenfolge pointerdown -> click so laeuft wie im Browser.
+function fakeWall({ awake = false } = {}) {
+  const attrs = new Set(awake ? ['data-wall-awake'] : []);
+  const presets = WALL_TIMER_PRESETS.map((minutes) => {
+    const btn = new EventTarget();
+    btn.dataset = { wallTimerStart: String(minutes) };
+    return btn;
+  });
+  const wall = {
+    hasAttribute: (name) => attrs.has(name),
+    setAttribute: (name) => attrs.add(name),
+    removeAttribute: (name) => attrs.delete(name),
+    querySelectorAll: (sel) => (sel === '[data-wall-timer-start]' ? presets : []),
+    querySelector: () => null,
+  };
+  return { wall, presets };
+}
+
+function withWallGlobals(fn) {
+  const prevDoc = global.document;
+  const prevWin = global.window;
+  global.document = { documentElement: { toggleAttribute() {} } };
+  global.window = {};
+  const ctrl = new AbortController();
+  try {
+    return fn(ctrl.signal);
+  } finally {
+    ctrl.abort();
+    global.document = prevDoc;
+    global.window = prevWin;
+  }
+}
+
+/** Ein Zeiger-Klick: pointerdown, dann click (detail 1) - wie im Browser. */
+function tap(btn) {
+  btn.dispatchEvent(new Event('pointerdown'));
+  const click = new Event('click');
+  click.detail = 1;
+  btn.dispatchEvent(click);
+}
+
+test('der erste Zeiger auf einer schlafenden Wand weckt nur - er startet nichts', () => {
+  withWallGlobals((signal) => {
+    const { wall, presets } = fakeWall({ awake: false });
+    let renders = 0;
+    wireWallTimer(wall, () => { renders += 1; }, signal);
+    tap(presets[1]);
+    assert.equal(readWallTimer().state, 'idle',
+      'ein Tipp auf die schlafende Wand hat einen Timer gestartet, den niemand gesehen hat');
+    assert.equal(renders, 0, 'und nichts neu gezeichnet');
+
+    // Die Wand ist wach (das Wecken setzt das Attribut, siehe wireWallSurface):
+    // jetzt ist derselbe Tipp gemeint.
+    wall.setAttribute('data-wall-awake');
+    tap(presets[1]);
+    assert.equal(readWallTimer().state, 'running', 'auf der wachen Wand startet der Knopf');
+    assert.equal(renders, 1);
+  });
+});
+
+test('auf der wachen Wand startet der erste Tipp, per Tastatur immer', () => {
+  withWallGlobals((signal) => {
+    const { wall, presets } = fakeWall({ awake: true });
+    wireWallTimer(wall, () => {}, signal);
+    tap(presets[0]);
+    assert.equal(readWallTimer().state, 'running', 'eine wache Wand verlangt keinen zweiten Tipp');
+  });
+  store.clear();
+  withWallGlobals((signal) => {
+    // Tastatur: Enter/Leertaste erzeugen einen click OHNE pointerdown
+    // (detail 0). Wer per Tastatur fokussiert, sieht den Knopf ohnehin voll
+    // (:focus-visible) - fuer ihn gibt es nichts zu wecken.
+    const { wall, presets } = fakeWall({ awake: false });
+    wireWallTimer(wall, () => {}, signal);
+    const click = new Event('click');
+    click.detail = 0;
+    presets[2].dispatchEvent(click);
+    assert.equal(readWallTimer().state, 'running', 'die Tastatur startet auch auf der schlafenden Wand');
+  });
+});
+
+// --------------------------------------------------------
+// Screenreader: der Takt spricht nicht, die Wechsel schon
+// --------------------------------------------------------
+
+test('die laufende Anzeige ist ein timer, kein status - sie spraeche jede Sekunde', () => {
+  // `role="status"` ist eine hoefliche Live-Region: jeder Sekundentakt waere
+  // eine Ansage („09:59", „09:58", …). `role="timer"` ist die Rolle genau
+  // dafuer und hat aria-live="off".
+  for (const state of ['running', 'done']) {
+    const { display } = renderWallTimer({ state, remainingMs: 60_000 });
+    assert.match(display, /role="timer"/, `${state}: die Anzeige traegt role="timer"`);
+    assert.ok(!/role="status"|aria-live="(polite|assertive)"/.test(display),
+      `${state}: und keine Live-Region, die mitzaehlt`);
+  }
+});
+
+test('der Start wird angesagt - ueber die Region, die der Aufrufer haelt', () => {
+  withWallGlobals((signal) => {
+    const { wall, presets } = fakeWall({ awake: true });
+    const said = [];
+    wireWallTimer(wall, () => {}, signal, { announce: (msg) => said.push(msg) });
+    tap(presets[1]);
+    assert.equal(said.length, 1, 'der Start wird genau einmal angesagt');
+    assert.match(said[0], /wallTimerStarted|5/, `angesagt: ${said[0]}`);
+  });
 });
