@@ -1028,3 +1028,264 @@ test('#1431 der dokumentierte Compose-Restore laeuft auch auf einem Mount, der c
     'keine Arbeitsdatei bleibt liegen'
   );
 });
+
+// ---------------------------------------------------------------------------
+// Siebte Runde #1431 (Codex-Befunde auf 46ecf18ec)
+// ---------------------------------------------------------------------------
+
+test('#1431 waehrend der Restore die Arbeitsdatei kopiert, nimmt die Verbindung keine Schreibzugriffe an', async () => {
+  const backupPath = await bigBackup(KEY, 'aus dem Backup');
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  let reached;
+  const copying = new Promise((resolve) => { reached = resolve; });
+  const realCopyFile = fsp.copyFile;
+  fsp.copyFile = async (src, dest, mode) => {
+    if (String(src) === backupPath) {
+      reached();
+      await gate;
+    }
+    return realCopyFile(src, dest, mode);
+  };
+  let writeOutcome;
+  let runningDuring;
+  try {
+    const restore = target.mod.restoreFromFile(backupPath);
+    await copying;
+    runningDuring = target.mod.isRestoreRunning?.();
+    try {
+      target.mod.get().prepare('INSERT INTO restore_probe (note) VALUES (?)').run('waehrend des Restores');
+      writeOutcome = 'gespeichert';
+    } catch (err) {
+      writeOutcome = err.code;
+    }
+    release();
+    await restore;
+  } finally {
+    release();
+    fsp.copyFile = realCopyFile;
+  }
+  assert.equal(writeOutcome, 'SQLITE_READONLY', 'der Schreibzugriff darf keinen Erfolg melden, den der Tausch verwirft');
+  assert.equal(runningDuring, true, 'isRestoreRunning() meldet den laufenden Restore');
+  assert.equal(target.mod.isRestoreRunning(), false);
+  // Die neue Verbindung nimmt wieder Schreibzugriffe an.
+  target.mod.get().prepare('INSERT INTO restore_probe (note) VALUES (?)').run('danach');
+  target.mod.get().close();
+});
+
+test('#1431 nach einem gescheiterten Restore nimmt die alte Verbindung wieder Schreibzugriffe an', async () => {
+  const kaputt = join(tempDir('yuvomi-test-swap-'), 'kein-sqlite.db');
+  writeFileSync(kaputt, 'das ist keine Datenbank, aber lang genug fuer einen Kopf');
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  await assert.rejects(() => target.mod.restoreFromFile(kaputt));
+  target.mod.get().prepare('INSERT INTO restore_probe (note) VALUES (?)').run('danach');
+  target.mod.get().close();
+});
+
+test('#1431 ein verschluesseltes Backup (VACUUM INTO) laeuft auch waehrend eines Restores', async () => {
+  const backupPath = await bigBackup(KEY, 'aus dem Backup');
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  const snapshot = join(tempDir('yuvomi-test-swap-dl-'), 'snapshot.db');
+  target.mod.get().pragma('query_only = ON');
+  try {
+    await target.mod.backupToFile(snapshot);
+  } finally {
+    target.mod.get().pragma('query_only = OFF');
+  }
+  assert.equal(target.mod.get().pragma('query_only', { simple: true }), 0);
+  const handle = openWith(snapshot, KEY);
+  assert.equal(handle.prepare('SELECT note FROM restore_probe').get()?.note, 'vor dem Restore');
+  handle.close();
+  await target.mod.restoreFromFile(backupPath);
+  target.mod.get().close();
+});
+
+test('#1431 restoreWriteGate: schreibende Requests bekommen waehrend eines Restores 503, lesende und der Restore selbst nicht', async () => {
+  const { createRestoreWriteGate } = await import('../server/middleware/restore-gate.js');
+  let running = true;
+  const gate = createRestoreWriteGate(() => running);
+  const call = (method, url) => {
+    const res = { statusCode: 200, body: null, headers: {},
+      setHeader(k, v) { this.headers[k] = v; },
+      status(code) { this.statusCode = code; return this; },
+      json(body) { this.body = body; return this; } };
+    let passed = false;
+    gate({ method, originalUrl: url, url }, res, () => { passed = true; });
+    return { passed, res };
+  };
+  const post = call('POST', '/api/v1/tasks');
+  assert.equal(post.passed, false);
+  assert.equal(post.res.statusCode, 503);
+  assert.equal(post.res.body.reason, 'restore_in_progress');
+  assert.equal(post.res.body.code, 503);
+  for (const method of ['PUT', 'PATCH', 'DELETE']) assert.equal(call(method, '/mcp').passed, false, method);
+  assert.equal(call('GET', '/api/v1/tasks').passed, true);
+  assert.equal(call('POST', '/api/v1/backup/restore?x=1').passed, true, 'der Restore-Endpunkt antwortet selbst mit 409');
+  running = false;
+  assert.equal(call('POST', '/api/v1/tasks').passed, true);
+});
+
+test('#1431 restoreWriteGate haengt vor Sessions und Routern', () => {
+  const source = readFileSync(new URL('../server/index.js', import.meta.url), 'utf8');
+  const gate = source.indexOf('app.use(createRestoreWriteGate(db.isRestoreRunning));');
+  assert.ok(gate > 0, 'server/index.js muss den Riegel mit db.isRestoreRunning einhaengen');
+  for (const later of ['app.use(sessionMiddleware);', "app.use('/api/v1/auth', authRouter);", "app.use('/mcp'", "app.use('/api/v1/tasks', tasksRouter);"]) {
+    assert.ok(source.indexOf(later) > gate, `${later} kommt nach dem Riegel`);
+  }
+});
+
+test('#1431 Klartext-Backup, dessen Index nicht mehr zur Tabelle passt: backup_corrupt', async () => {
+  const backupPath = await bigBackup(null, 'aus dem Backup');
+  // Ein indizierter Wert, dann ein gleich langes Zeichen darin gekippt - nur in der Tabelle.
+  const marker = 'INDEXPROBE-ABCDEFGHIJ';
+  const setup = new Database(backupPath);
+  setup.exec('CREATE TABLE index_probe (v TEXT); CREATE INDEX index_probe_v ON index_probe (v)');
+  setup.prepare('INSERT INTO index_probe (v) VALUES (?)').run(marker);
+  setup.pragma('journal_mode = DELETE');
+  setup.close();
+  const original = readFileSync(backupPath);
+  const needle = Buffer.from(marker);
+  let kaputt = null;
+  for (let at = original.indexOf(needle); at !== -1; at = original.indexOf(needle, at + 1)) {
+    const bytes = Buffer.from(original);
+    bytes[at + needle.length - 1] = 'K'.charCodeAt(0);
+    const probe = join(tempDir('yuvomi-test-swap-'), 'probe.db');
+    writeFileSync(probe, bytes);
+    const handle = new Database(probe, { readonly: true });
+    const quick = handle.pragma('quick_check(1)', { simple: true });
+    const full = handle.pragma('integrity_check(1)', { simple: true });
+    handle.close();
+    if (quick === 'ok' && full !== 'ok') { kaputt = probe; break; }
+  }
+  assert.ok(kaputt, 'Vorbedingung: eine Stelle, an der quick_check ok sagt und integrity_check nicht');
+
+  const target = await frozenTarget(null, 'vor dem Restore');
+  await assert.rejects(
+    () => target.mod.restoreFromFile(kaputt),
+    (err) => err.reason === 'backup_corrupt'
+  );
+  assertUntouched(target, 'vor dem Restore');
+  target.mod.get().close();
+});
+
+test('#1431 die entfernten Nebendateien sind dauerhaft, bevor DB_PATH ersetzt wird', async () => {
+  const backupPath = await bigBackup(KEY, 'aus dem Backup');
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  const log = [];
+  const realRename = fsp.rename;
+  const realOpen = fsp.open;
+  const realUnlink = fsp.unlink;
+  fsp.unlink = async (filePath) => {
+    if (String(filePath) === `${target.dbPath}-wal` || String(filePath) === `${target.dbPath}-shm`) log.push('sidecar');
+    return realUnlink(filePath);
+  };
+  fsp.rename = async (from, to) => {
+    if (String(to) === target.dbPath) log.push('rename DB_PATH');
+    return realRename(from, to);
+  };
+  fsp.open = async (filePath, flags, mode) => {
+    if (String(filePath) === target.dir) log.push('fsync dir');
+    return realOpen(filePath, flags, mode);
+  };
+  try {
+    await target.mod.restoreFromFile(backupPath);
+  } finally {
+    fsp.rename = realRename;
+    fsp.open = realOpen;
+    fsp.unlink = realUnlink;
+  }
+  const lastSidecar = log.lastIndexOf('sidecar');
+  const swap = log.indexOf('rename DB_PATH');
+  assert.ok(lastSidecar >= 0 && swap > lastSidecar, `Reihenfolge: ${log.join(', ')}`);
+  assert.ok(log.slice(lastSidecar + 1, swap).includes('fsync dir'), `zwischen Nebendateien und Tausch ein fsync: ${log.join(', ')}`);
+  target.mod.get().close();
+});
+
+function patchDirectorySync(dir, code) {
+  const realOpen = fsp.open;
+  fsp.open = async (filePath, flags, mode) => {
+    const handle = await realOpen(filePath, flags, mode);
+    if (String(filePath) !== dir) return handle;
+    return {
+      sync: async () => { throw Object.assign(new Error(`${code}: directory fsync`), { code }); },
+      close: () => handle.close(),
+    };
+  };
+  return () => { fsp.open = realOpen; };
+}
+
+test('#1431 ein echter Fehler beim fsync des Verzeichnisses (EIO) bricht den Restore ab, vor dem Tausch', async () => {
+  const backupPath = await bigBackup(KEY, 'aus dem Backup');
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  const restore = patchDirectorySync(target.dir, 'EIO');
+  try {
+    await assert.rejects(() => target.mod.restoreFromFile(backupPath), /EIO/);
+  } finally {
+    restore();
+  }
+  assert.equal(target.mod.get().prepare('SELECT note FROM restore_probe').get()?.note, 'vor dem Restore');
+  target.mod.get().pragma('wal_checkpoint(TRUNCATE)');
+  assert.equal(sha256(target.dbPath), target.hash, 'DB_PATH ist die alte Datei');
+  target.mod.get().close();
+});
+
+test('#1431 kann das Dateisystem keinen fsync auf Verzeichnisse (EINVAL), laeuft der Restore', async () => {
+  const backupPath = await bigBackup(KEY, 'aus dem Backup');
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  const restore = patchDirectorySync(target.dir, 'EINVAL');
+  try {
+    await target.mod.restoreFromFile(backupPath);
+  } finally {
+    restore();
+  }
+  assert.equal(target.mod.get().prepare('SELECT note FROM restore_probe LIMIT 1').get()?.note, 'aus dem Backup');
+  target.mod.get().close();
+});
+
+test(
+  '#1431 laesst sich der Besitzer der bisherigen Datenbank nicht uebernehmen, wird vor dem Tausch abgebrochen',
+  { skip: process.getuid?.() === 0 && 'root darf jeden Besitzer setzen' },
+  async () => {
+    const backupPath = await bigBackup(KEY, 'aus dem Backup');
+    const target = await frozenTarget(KEY, 'vor dem Restore');
+    const realStat = fsp.stat;
+    // Die bisherige Datenbank gehoert (scheinbar) einem anderen Nutzer, etwa dem Dienst.
+    fsp.stat = async (filePath, options) => {
+      const stats = await realStat(filePath, options);
+      if (String(filePath) === target.dbPath) return Object.assign(Object.create(Object.getPrototypeOf(stats)), stats, { uid: stats.uid + 1 });
+      return stats;
+    };
+    try {
+      await assert.rejects(
+        () => target.mod.restoreFromFile(backupPath),
+        /Run the restore as the user Yuvomi runs as, or as root/
+      );
+    } finally {
+      fsp.stat = realStat;
+    }
+    assert.equal(target.mod.get().prepare('SELECT note FROM restore_probe').get()?.note, 'vor dem Restore');
+    target.mod.get().pragma('wal_checkpoint(TRUNCATE)');
+    assert.equal(sha256(target.dbPath), target.hash, 'DB_PATH ist die alte Datei');
+    target.mod.get().close();
+  }
+);
+
+test('#1431 scheitert chown, gehoert die Datei aber ohnehin demselben Nutzer (SMB), laeuft der Restore', async () => {
+  const backupPath = await bigBackup(KEY, 'aus dem Backup');
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  const realChown = fsp.chown;
+  let refused = 0;
+  fsp.chown = async () => {
+    refused++;
+    throw Object.assign(new Error('EPERM: operation not permitted, chown'), { code: 'EPERM' });
+  };
+  try {
+    await target.mod.restoreFromFile(backupPath);
+  } finally {
+    fsp.chown = realChown;
+  }
+  assert.ok(refused > 0, 'Vorbedingung: chown wurde versucht');
+  assert.equal(target.mod.get().prepare('SELECT note FROM restore_probe LIMIT 1').get()?.note, 'aus dem Backup');
+  target.mod.get().close();
+});

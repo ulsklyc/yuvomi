@@ -4331,6 +4331,8 @@ function friendlyError(err) {
   // navigator.onLine fälschlich true meldet (Netz weg, aber kein offline-Event).
   if (err?.status === 0) return t('common.errorOfflineMutation');
   if (!navigator.onLine) return t('common.errorOffline');
+  // Vor dem Status-Zweig: ein 503 waehrend eines Restores ist kein Serverfehler (#1431).
+  if (err?.data?.reason === 'restore_in_progress') return t('common.errorRestoreInProgress');
   const status = err?.status ?? err?.response?.status;
   if (status === 403) return t('common.errorForbidden');
   if (status === 404) return t('common.errorNotFound');

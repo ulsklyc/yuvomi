@@ -46,6 +46,7 @@
         "errorForbidden": "Přístup odepřen. Přihlaste se prosím znovu.",
         "errorNotFound": "Záznam nebyl nalezen.",
         "errorServer": "Chyba serveru. Zkuste to prosím později znovu.",
+        "errorRestoreInProgress": "Právě se obnovuje záloha. Vaše změna nebyla uložena, zkuste to znovu za minutu.",
         "errorTimeout": "Připojení trvalo příliš dlouho. Zkuste to prosím znovu.",
         "requiredFields": "Vyplňte prosím všechna povinná pole.",
         "invalidInput": "Neplatný vstup.",

@@ -46,6 +46,7 @@
         "errorForbidden": "Accès refusé. Veuillez vous reconnecter.",
         "errorNotFound": "L'entrée n'a pas été trouvée.",
         "errorServer": "Erreur serveur. Veuillez réessayer plus tard.",
+        "errorRestoreInProgress": "Une sauvegarde est en cours de restauration. Votre modification n'a pas été enregistrée, réessayez dans une minute.",
         "errorTimeout": "La connexion a pris trop de temps. Veuillez réessayer.",
         "requiredFields": "Veuillez remplir tous les champs obligatoires.",
         "invalidInput": "Saisie invalide.",

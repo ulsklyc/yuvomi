@@ -8,6 +8,7 @@ import { clearApiCache } from '/sw-register.js';
 import { setPermissions, clearPermissions } from '/permissions.js';
 import { setHouseholdSize, setOtherReaders, clearHouseholdSize } from '/utils/household.js';
 import { forgetLayoutHint } from '/utils/dashboard-layout-hint.js';
+import { t } from '/i18n.js';
 
 const API_BASE = '/api/v1';
 
@@ -104,7 +105,12 @@ async function apiFetch(path, options = {}, _retried = false) {
   if (data?.csrfToken) _csrfToken = data.csrfToken;
 
   if (!response.ok) {
-    const message = data?.error || `HTTP ${response.status}`;
+    // Waehrend ein Backup eingespielt wird, lehnt der Server Schreibzugriffe
+    // mit 503 ab (#1431). Die Seiten zeigen meist `err.message` - also hier
+    // uebersetzen, statt den englischen Servertext durchzureichen.
+    const message = response.status === 503 && data?.reason === 'restore_in_progress'
+      ? t('common.errorRestoreInProgress')
+      : data?.error || `HTTP ${response.status}`;
     throw new ApiError(message, response.status, data, response.headers.get('Retry-After'));
   }
 

@@ -46,6 +46,7 @@
         "errorForbidden": "Access denied. Please sign in again.",
         "errorNotFound": "The entry was not found.",
         "errorServer": "Server error. Please try again later.",
+        "errorRestoreInProgress": "A backup is being restored right now. Your change was not saved, try again in a minute.",
         "errorTimeout": "The connection took too long. Please try again.",
         "requiredFields": "Please fill in all required fields.",
         "invalidInput": "Invalid input.",

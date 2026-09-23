@@ -46,6 +46,7 @@
         "errorForbidden": "Erişim reddedildi. Lütfen tekrar giriş yapın.",
         "errorNotFound": "Kayıt bulunamadı.",
         "errorServer": "Sunucu hatası. Lütfen daha sonra tekrar deneyin.",
+        "errorRestoreInProgress": "Şu anda bir yedek geri yükleniyor. Değişikliğiniz kaydedilmedi, bir dakika sonra yeniden deneyin.",
         "errorTimeout": "Bağlantı çok uzun sürdü. Lütfen tekrar deneyin.",
         "requiredFields": "Lütfen tüm zorunlu alanları doldurun.",
         "invalidInput": "Geçersiz giriş.",

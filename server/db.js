@@ -9947,14 +9947,30 @@ async function backupToFileUntracked(destinationPath) {
     // der Quelle, das Backup ist also ebenfalls verschlüsselt. Es verlangt
     // allerdings ein noch nicht existierendes Ziel.
     await unlinkIfExists(destinationPath);
-    database.prepare('VACUUM INTO ?').run(destinationPath);
+    vacuumInto(database, destinationPath);
   } else if (typeof database.backup === 'function') {
     await database.backup(destinationPath);
   } else {
-    database.prepare('VACUUM INTO ?').run(destinationPath);
+    vacuumInto(database, destinationPath);
   }
 
   return destinationPath;
+}
+
+/**
+ * `VACUUM INTO` auch waehrend eines Restores: `query_only` (siehe
+ * `restoreFromFile()`) sperrt es sonst, obwohl es nur in eine andere Datei
+ * schreibt. Das Loesen und Wiedersetzen ist synchron - dazwischen kann kein
+ * anderer Request schreiben.
+ */
+function vacuumInto(database, destinationPath) {
+  const locked = database.pragma('query_only', { simple: true }) === 1;
+  if (locked) database.pragma('query_only = OFF');
+  try {
+    database.prepare('VACUUM INTO ?').run(destinationPath);
+  } finally {
+    if (locked) database.pragma('query_only = ON');
+  }
 }
 
 /**
@@ -10149,7 +10165,14 @@ function firstFinding(result) {
 function assertBackupIntact(candidate, encrypted) {
   let result;
   try {
-    result = candidate.pragma('quick_check(1)', { simple: true });
+    // Klartext: integrity_check. quick_check prueft nicht, ob jeder Index zu
+    // seiner Tabelle passt, und ohne Seiten-HMAC kann ein gekipptes Byte in
+    // einem indizierten Wert genau das auseinanderlaufen lassen - gemessen:
+    // quick_check „ok", integrity_check „row missing from index" (Codex-Befund
+    // in #1431). Verschluesselt: quick_check. Jede Seite traegt dort ein HMAC,
+    // eine veraenderte Seite scheitert schon beim Lesen, und integrity_check
+    // kostete fuer diesen Fall nur die doppelte Zeit.
+    result = candidate.pragma(encrypted ? 'quick_check(1)' : 'integrity_check(1)', { simple: true });
   } catch (err) {
     const code = typeof err?.code === 'string' ? err.code : '';
     if (!code.startsWith('SQLITE_CORRUPT')) throw unreadableBackupError(encrypted, err);
@@ -10426,11 +10449,25 @@ async function restoreFromFile(sourcePath, { backupKey = null } = {}) {
     );
   }
   restoreRunning = true;
+  // Ab jetzt nimmt die laufende Verbindung keine Schreibzugriffe mehr an
+  // (Codex-Befund in #1431): seit die Arbeitsdatei VOR dem Schliessen kopiert
+  // wird, bleibt sie waehrenddessen offen, und ein Schreibzugriff meldete
+  // Erfolg, den Checkpoint, Schliessen und rename danach verwarfen. Vor dem
+  // ersten await gesetzt; `restoreWriteGate` (server/middleware) beantwortet
+  // Schreib-Requests schon vorher mit 503. Die neue Verbindung nach dem Tausch
+  // beginnt ohne den Riegel, nach einem Fehlschlag wird er unten geloest.
+  try { db?.pragma('query_only = ON'); } catch { /* ohne Verbindung nichts zu sperren */ }
   try {
     return await restoreFromFileUnlocked(sourcePath, { backupKey });
   } finally {
     restoreRunning = false;
+    try { db?.pragma('query_only = OFF'); } catch { /* best effort */ }
   }
+}
+
+/** Laeuft gerade ein Restore? Fuer `restoreWriteGate`. */
+function isRestoreRunning() {
+  return restoreRunning;
 }
 
 /**
@@ -10491,14 +10528,27 @@ function restoreStagingPath() {
   return `${DB_PATH}${RESTORE_STAGING_SUFFIX}-${process.pid}-${Date.now().toString(36)}`;
 }
 
-/** Verzeichnis-Eintrag auf die Platte bringen; best effort (nicht jedes Dateisystem kann es). */
+/**
+ * Codes, mit denen ein Dateisystem sagt, dass es fsync auf ein Verzeichnis
+ * nicht kann - nicht, dass es gescheitert ist. EISDIR/EACCES/EPERM kommen beim
+ * Oeffnen eines Verzeichnisses (Windows, manche Netzfreigaben), EINVAL,
+ * ENOTSUP/EOPNOTSUPP und EBADF vom fsync selbst (FUSE, SMB, NFS-Varianten).
+ */
+const DIRECTORY_SYNC_UNSUPPORTED = new Set(['EINVAL', 'ENOTSUP', 'EOPNOTSUPP', 'EISDIR', 'EPERM', 'EACCES', 'EBADF']);
+
+/**
+ * Verzeichnis-Eintrag auf die Platte bringen. Kann das Dateisystem das nicht,
+ * bleibt es beim unteilbaren rename (nur nicht sofort dauerhaft). Ein echter
+ * Fehler (EIO, ENOSPC, ...) geht weiter: der Aufrufer bricht ab bzw. meldet,
+ * statt einen nicht bestaetigten Tausch als Erfolg auszugeben (Codex-Befund in #1431).
+ */
 async function syncDirectory(dirPath) {
   let handle;
   try {
     handle = await fs.open(dirPath, 'r');
     await handle.sync();
-  } catch {
-    /* ein Dateisystem ohne fsync auf Verzeichnisse: der rename bleibt unteilbar, nur nicht sofort dauerhaft */
+  } catch (err) {
+    if (!DIRECTORY_SYNC_UNSUPPORTED.has(err?.code)) throw err;
   } finally {
     await handle?.close().catch(() => {});
   }
@@ -10528,8 +10578,11 @@ async function syncDirectory(dirPath) {
  * @param {string} stagingPath  fertig geschriebene Arbeitsdatei oder, beim
  *   Rollback, die Rollback-Kopie
  */
-async function swapIntoDbPath(stagingPath) {
+async function swapIntoDbPath(stagingPath, onRenamed = () => {}) {
   await fs.rename(stagingPath, DB_PATH);
+  // Sofort vermerken: scheitert der fsync danach, liegt die Datei trotzdem
+  // schon an DB_PATH, und der Aufrufer muss das wissen.
+  onRenamed();
   await syncDirectory(path.dirname(DB_PATH));
 }
 
@@ -10576,7 +10629,25 @@ async function adoptDatabaseAttributes(filePath) {
     log.warn(`Could not set the mode of ${filePath} (${err?.code ?? err}); keeping the one the file system gave it.`);
   }
   if (previous) {
-    try { await fs.chown(filePath, previous.uid, previous.gid); } catch { /* nur als root oder ohne Wechsel erlaubt */ }
+    try {
+      await fs.chown(filePath, previous.uid, previous.gid);
+    } catch (err) {
+      // Nur als root oder ohne Wechsel erlaubt. Gehoert die Datei danach einem
+      // anderen Nutzer als die bisherige Datenbank, haengte das rename eine
+      // Datei ein, die der Dienst womoeglich nicht schreiben oder gar nicht
+      // oeffnen darf (Codex-Befund in #1431): abbrechen, vor dem Tausch.
+      // Mounts, die jeder Datei denselben Besitzer melden (SMB), bestehen die
+      // Pruefung von selbst.
+      const owner = (await fs.stat(filePath)).uid;
+      if (owner !== previous.uid) {
+        throw new Error(
+          `Could not give ${filePath} the owner of the current database (uid ${previous.uid}; it `
+          + `belongs to uid ${owner}): ${err?.code ?? err}. Nothing on this instance was changed. Run the `
+          + 'restore as the user Yuvomi runs as, or as root.',
+          { cause: err }
+        );
+      }
+    }
   }
 }
 
@@ -10729,8 +10800,12 @@ async function restoreValidatedFile(sourcePath) {
     }
     await unlinkIfExists(`${DB_PATH}-wal`);
     await unlinkIfExists(`${DB_PATH}-shm`);
-    await swapIntoDbPath(stagingPath);
-    swapped = true;
+    // Das Entfernen der alten Nebendateien dauerhaft machen, BEVOR DB_PATH
+    // ersetzt wird: sonst kann nach einem Stromausfall das neue DB_PATH stehen
+    // und das alte -wal wieder daneben - und SQLite wendete es auf die falsche
+    // Datei an (Codex-Befund in #1431).
+    await syncDirectory(path.dirname(DB_PATH));
+    await swapIntoDbPath(stagingPath, () => { swapped = true; });
 
     // Ohne Klartext-Sicherheitskopie: stammt das Backup aus der Zeit vor der
     // Verschlüsselung, verschlüsselt init() es jetzt — die Sicherung dafür ist
@@ -10773,8 +10848,8 @@ async function restoreValidatedFile(sourcePath) {
           // braucht keinen Platz; die Rollback-Kopie ist danach DB_PATH selbst.
           await unlinkIfExists(`${DB_PATH}-wal`);
           await unlinkIfExists(`${DB_PATH}-shm`);
-          await swapIntoDbPath(rollbackPath);
-          rolledBack = true;
+          await syncDirectory(path.dirname(DB_PATH));
+          await swapIntoDbPath(rollbackPath, () => { rolledBack = true; });
         }
       }
       // Vor dem Tausch ist DB_PATH die alte Datei geblieben, nach dem Rollback
@@ -10908,4 +10983,4 @@ try {
   if (!(err?.code === EMPTY_DATABASE_FILE && globalThis[RESTORE_TARGET_HANDSHAKE] === true)) throw err;
 }
 
-export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, unknownMigrationVersions, MIGRATIONS, migrate, MIGRATION_BUSY_ATTEMPTS, reconcileCriticalSchema, _setTestDatabase, _resetTestDatabase };
+export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, isRestoreRunning, unknownMigrationVersions, MIGRATIONS, migrate, MIGRATION_BUSY_ATTEMPTS, reconcileCriticalSchema, _setTestDatabase, _resetTestDatabase };

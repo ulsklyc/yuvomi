@@ -46,6 +46,7 @@
         "errorForbidden": "Acceso denegado. Por favor, inicia sesión de nuevo.",
         "errorNotFound": "No se encontró el registro.",
         "errorServer": "Error del servidor. Por favor, inténtalo más tarde.",
+        "errorRestoreInProgress": "Se está restaurando una copia de seguridad en este momento. Tu cambio no se ha guardado, inténtalo de nuevo en un minuto.",
         "errorTimeout": "La conexión tardó demasiado. Por favor, inténtalo de nuevo.",
         "requiredFields": "Completa todos los campos obligatorios.",
         "invalidInput": "Entrada no válida.",

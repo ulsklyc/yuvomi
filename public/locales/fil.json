@@ -46,6 +46,7 @@
         "errorForbidden": "Tinanggihan ang pag-access. Pakisign in muli.",
         "errorNotFound": "Hindi natagpuan ang entry.",
         "errorServer": "May error sa server. Pakisubukang muli mamaya.",
+        "errorRestoreInProgress": "May nire-restore na backup ngayon. Hindi na-save ang iyong pagbabago, subukang muli pagkalipas ng isang minuto.",
         "errorTimeout": "Masyadong tumagal ang koneksyon. Pakisubukang muli.",
         "requiredFields": "Pakipunan ang lahat ng kinakailangang field.",
         "invalidInput": "Hindi wastong input.",

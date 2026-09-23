@@ -46,6 +46,7 @@
         "errorForbidden": "Akses ditolak. Harap masuk kembali.",
         "errorNotFound": "Entri tidak ditemukan.",
         "errorServer": "Kesalahan server. Coba lagi nanti.",
+        "errorRestoreInProgress": "Cadangan sedang dipulihkan saat ini. Perubahan Anda tidak disimpan, coba lagi dalam satu menit.",
         "errorTimeout": "Koneksi terlalu lama. Silakan coba lagi.",
         "requiredFields": "Harap isi semua bidang wajib.",
         "invalidInput": "Masukan tidak valid.",

@@ -46,6 +46,7 @@
         "errorForbidden": "Zugriff verweigert. Bitte erneut anmelden.",
         "errorNotFound": "Der Eintrag wurde nicht gefunden.",
         "errorServer": "Serverfehler. Bitte versuche es später erneut.",
+        "errorRestoreInProgress": "Gerade wird ein Backup wiederhergestellt. Deine Änderung wurde nicht gespeichert, versuche es in einer Minute erneut.",
         "errorTimeout": "Die Verbindung hat zu lange gedauert. Bitte erneut versuchen.",
         "requiredFields": "Bitte alle Pflichtfelder ausfüllen.",
         "invalidInput": "Ungültige Eingabe.",

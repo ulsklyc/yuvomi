@@ -46,6 +46,7 @@
         "errorForbidden": "Odmowa dostępu. Zaloguj się ponownie.",
         "errorNotFound": "Wpis nie został znaleziony.",
         "errorServer": "Błąd serwera. Spróbuj ponownie później.",
+        "errorRestoreInProgress": "Trwa właśnie przywracanie kopii zapasowej. Twoja zmiana nie została zapisana, spróbuj ponownie za minutę.",
         "errorTimeout": "Połączenie trwało zbyt długo. Spróbuj ponownie.",
         "requiredFields": "Wypełnij wszystkie wymagane pola.",
         "invalidInput": "Nieprawidłowe dane.",

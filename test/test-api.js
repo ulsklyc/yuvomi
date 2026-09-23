@@ -330,3 +330,23 @@ test('auth.updateUser holt danach /auth/me, damit othersCanRead in derselben Sit
   assert.ok(patch >= 0, `PATCH fehlt: ${calls.join(', ')}`);
   assert.ok(me > patch, `nach dem PATCH fehlt GET /auth/me: ${calls.join(', ')}`);
 });
+
+// ─── #1431: 503 waehrend eines Restores ─────────────────────────────────────
+
+test('503 mit reason restore_in_progress: uebersetzte Meldung statt englischem Servertext', async () => {
+  setup();
+  _mockFetch = () => mockResponse(503, {
+    error: 'A backup is being restored right now. This change was not saved - try again in a minute.',
+    code: 503,
+    reason: 'restore_in_progress',
+  });
+  await assert.rejects(
+    () => api.post('/tasks', { title: 'x' }),
+    (err) => {
+      assert.equal(err.status, 503);
+      assert.equal(err.message, 'common.errorRestoreInProgress');
+      assert.equal(err.data.reason, 'restore_in_progress');
+      return true;
+    },
+  );
+});

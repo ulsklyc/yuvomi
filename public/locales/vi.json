@@ -46,6 +46,7 @@
         "errorForbidden": "Từ chối truy cập. Vui lòng đăng nhập lại.",
         "errorNotFound": "Không tìm thấy mục nhập.",
         "errorServer": "Lỗi máy chủ. Vui lòng thử lại sau.",
+        "errorRestoreInProgress": "Một bản sao lưu đang được khôi phục. Thay đổi của bạn chưa được lưu, hãy thử lại sau một phút.",
         "errorTimeout": "Kết nối quá lâu. Vui lòng thử lại.",
         "requiredFields": "Vui lòng điền tất cả các trường bắt buộc.",
         "invalidInput": "Đầu vào không hợp lệ.",

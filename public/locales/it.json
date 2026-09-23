@@ -46,6 +46,7 @@
         "errorForbidden": "Accesso negato. Per favore accedi di nuovo.",
         "errorNotFound": "La voce non è stata trovata.",
         "errorServer": "Errore del server. Riprova più tardi.",
+        "errorRestoreInProgress": "È in corso il ripristino di un backup. La modifica non è stata salvata, riprova tra un minuto.",
         "errorTimeout": "La connessione ha impiegato troppo tempo. Riprova.",
         "requiredFields": "Compila tutti i campi obbligatori.",
         "invalidInput": "Input non valido.",

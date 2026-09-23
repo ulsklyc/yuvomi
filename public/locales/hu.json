@@ -46,6 +46,7 @@
         "errorForbidden": "Hozzáférés megtagadva. Kérjük, jelentkezzen be újra.",
         "errorNotFound": "A bejegyzés nem található.",
         "errorServer": "Szerverhiba. Kérjük, próbálja újra később.",
+        "errorRestoreInProgress": "Éppen egy biztonsági mentés visszaállítása folyik. A módosításod nem lett mentve, próbáld újra egy perc múlva.",
         "errorTimeout": "A kapcsolódás túl hosszú ideig tartott. Kérjük, próbálja újra.",
         "requiredFields": "Kérjük, töltse ki az összes kötelező mezőt.",
         "invalidInput": "Érvénytelen bevitel.",

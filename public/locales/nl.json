@@ -46,6 +46,7 @@
         "errorForbidden": "Toegang geweigerd. Meld u opnieuw aan.",
         "errorNotFound": "De vermelding is niet gevonden.",
         "errorServer": "Serverfout. Probeer het later opnieuw.",
+        "errorRestoreInProgress": "Er wordt nu een back-up hersteld. Je wijziging is niet opgeslagen, probeer het over een minuut opnieuw.",
         "errorTimeout": "De verbinding duurde te lang. Probeer het opnieuw.",
         "requiredFields": "Vul alle verplichte velden in.",
         "invalidInput": "Ongeldige invoer.",

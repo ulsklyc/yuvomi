@@ -46,6 +46,7 @@
         "errorForbidden": "Åtkomst nekad. Logga in igen.",
         "errorNotFound": "Posten hittades inte.",
         "errorServer": "Serverfel. Försök igen senare.",
+        "errorRestoreInProgress": "En säkerhetskopia återställs just nu. Din ändring sparades inte, försök igen om en minut.",
         "errorTimeout": "Anslutningen tog för lång tid. Försök igen.",
         "requiredFields": "Fyll i alla obligatoriska fält.",
         "invalidInput": "Ogiltig inmatning.",

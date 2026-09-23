@@ -16,6 +16,7 @@ import * as db from './db.js';
 import { router as authRouter, sessionMiddleware, requireAuth, requireAdmin, isPasswordLoginEnabled } from './auth.js';
 import { csrfMiddleware } from './middleware/csrf.js';
 import idempotencyMiddleware from './middleware/idempotency.js';
+import { createRestoreWriteGate } from './middleware/restore-gate.js';
 import { buildOpenApiSpec } from './openapi.js';
 import * as googleCalendar from './services/google-calendar.js';
 import * as appleCalendar from './services/apple-calendar.js';
@@ -188,6 +189,13 @@ app.use((err, req, res, next) => {
   }
   next(err);
 });
+
+// --------------------------------------------------------
+// Schreibsperre waehrend eines Restores (#1431)
+// Vor den Sessions: auch deren Schreiben (Login, Logout) gehoert dazu, und
+// vor /mcp und allen Routern, damit kein Schreibzugriff durchrutscht.
+// --------------------------------------------------------
+app.use(createRestoreWriteGate(db.isRestoreRunning));
 
 // --------------------------------------------------------
 // Sessions

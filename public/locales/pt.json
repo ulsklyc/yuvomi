@@ -46,6 +46,7 @@
         "errorForbidden": "Acesso negado. Por favor, inicie sessão novamente.",
         "errorNotFound": "O registo não foi encontrado.",
         "errorServer": "Erro no servidor. Por favor, tente mais tarde.",
+        "errorRestoreInProgress": "Está a ser restaurado um backup neste momento. A sua alteração não foi guardada, tente novamente dentro de um minuto.",
         "errorTimeout": "A ligação demorou demasiado. Por favor, tente novamente.",
         "requiredFields": "Preencha todos os campos obrigatórios.",
         "invalidInput": "Entrada inválida.",
