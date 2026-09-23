@@ -115,9 +115,21 @@ function calendarEventRoute(event) {
   return `/calendar?${params.toString()}`;
 }
 
+/**
+ * Ein Zeitpunkt oder eine Wanduhrzeit als Stempel des Haushalts
+ * ('YYYY-MM-DDTHH:MM', Anzeigezone): Wanduhrzeit wird gelesen, ein Zeitpunkt
+ * umgerechnet. Leer, wenn der Wert keinen hergibt. Termin-Kachel, Heute-Blatt
+ * und Familienkarte vergleichen mit DIESEM Stempel.
+ */
+function householdStamp(value) {
+  const day = zonedDateKey(value);
+  const time = zonedTimeKey(value);
+  return day && time ? `${day}T${time}` : '';
+}
+
 /** Jetzt als Wanduhr-Stempel des Haushalts ('YYYY-MM-DDTHH:MM'). */
 function householdNowStamp(now = new Date()) {
-  return `${zonedDateKey(now)}T${zonedTimeKey(now)}`;
+  return householdStamp(now);
 }
 
 /**
@@ -135,10 +147,8 @@ function eventHasEnded(event, nowStamp) {
   if (!event || event.all_day) return false;
   const end = String(event.end_datetime || event.start_datetime || '');
   if (end.length <= 10) return false;
-  const endDay = zonedDateKey(end);
-  const endTime = zonedTimeKey(end);
-  if (!endDay || !endTime) return false;
-  return `${endDay}T${endTime}` <= nowStamp;
+  const endStamp = householdStamp(end);
+  return endStamp !== '' && endStamp <= nowStamp;
 }
 
 function getAppName() {
@@ -1689,35 +1699,28 @@ function renderQuickLinks(items) {
  * und ein ganztaegiger Eintrag gewann den Tag, weil er vorne sortiert war.
  * Release-Notes 2.4.0 und SPEC versprechen den NAECHSTEN.
  *
- * „Vorbei" heisst: das ENDE ist in der Wanduhr des Haushalts erreicht. Ein
- * laufender Termin liegt also noch vor einem, ein ganztaegiger endet an seinem
- * eigenen Tag nie, und ein Termin ohne Ende gilt ab seinem Beginn als vorbei.
- * Verglichen wird als Text 'YYYY-MM-DDTHH:MM' der Anzeigezone
- * (`zonedDateKey`/`zonedTimeKey`) - Wanduhrzeit wird gelesen, ein Zeitpunkt
- * umgerechnet, und das Geraet hat keine Stimme. Unter den heutigen geht ein
- * Termin mit Uhrzeit dem ganztaegigen vor.
+ * „Vorbei" ist `eventHasEnded` - DIESELBE Regel, nach der die Termin-Kachel
+ * einen Termin als „Vorbei" zuruecktreten laesst und das Heute-Blatt ihn
+ * entlaesst (seit /dashboard die heute beendeten mitliefert, #1449). Eine
+ * eigene Rechnung hier hatte in Randfaellen (Ende nur als Datum) das Gegenteil
+ * der Kachel gesagt. Verglichen wird als Stempel der Anzeigezone
+ * (`householdStamp`) - das Geraet hat keine Stimme. Unter den heutigen geht
+ * ein Termin mit Uhrzeit dem ganztaegigen vor.
  *
  * Noch offen aus #1449 und bewusst nicht hier: die Karte leiht sich weiter die
  * Liste der Kalenderkachel (fuenf Eintraege, ihr „nur meine"-Filter).
  */
-function familyWallStamp(value) {
-  const day = zonedDateKey(value);
-  const time = zonedTimeKey(value);
-  return day && time ? `${day}T${time}` : '';
-}
-
-function familyAgenda(events, shownIds, todayKey) {
-  const nowStamp = familyWallStamp(new Date());
+function familyAgenda(events, shownIds, todayKey, now = new Date()) {
+  const nowStamp = householdNowStamp(now);
   const items = events.map((event) => {
     const raw = String(event?.start_datetime || '');
     const allDay = Boolean(event?.all_day) || raw.length <= 10;
-    const day = allDay ? raw.slice(0, 10) : zonedDateKey(raw);
-    const start = allDay ? '' : familyWallStamp(raw);
-    const end = allDay ? '' : (event.end_datetime ? familyWallStamp(event.end_datetime) : start);
+    const day = allDay ? raw.slice(0, 10) : eventOccurrenceDateKey(event);
+    const start = allDay ? '' : householdStamp(raw);
     const people = new Set((Array.isArray(event?.assigned_users) ? event.assigned_users : [])
       .map((a) => Number(a.id))
       .filter((id) => shownIds.has(id)));
-    const ended = day === todayKey && !allDay && end !== '' && end <= nowStamp;
+    const ended = !allDay && eventHasEnded(event, nowStamp);
     return { event, day, allDay, start, ended, people, shared: people.size >= 2 };
   }).filter((item) => item.day && item.day >= todayKey && item.people.size > 0);
 

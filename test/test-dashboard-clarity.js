@@ -297,6 +297,35 @@ test('Familienkarte: "vorbei" entscheidet die Haushaltszone, nicht das Geraet', 
   });
 });
 
+/* EINE REGEL FUER "VORBEI" (Integration 2026-09-23, a2 x a4). Seit /dashboard
+ * die heute schon beendeten Termine mitliefert (`keepEndedToday`), filtert die
+ * Familienkarte sie selbst aus - und die Termin-Kachel stellt dieselben Termine
+ * als "Vorbei" zurueck. Beide fragen `eventHasEnded`; hatte jede ihre eigene
+ * Rechnung, sagte die Kachel "vorbei" und die Karte "als Naechstes" (oder
+ * umgekehrt), sobald ein Termin aus dem Rahmen faellt - etwa ein synchronisierter
+ * Termin mit Uhrzeit, dessen Ende nur ein Datum ist. */
+test('Familienkarte und Termin-Kachel nennen dieselben Termine "vorbei"', () => {
+  at('2026-09-23T12:00:00Z', 'Europe/Berlin', () => {
+    const cases = [
+      ev(1, 'Beendet', '2026-09-23T10:00', '2026-09-23T11:00', [ALEX]),
+      ev(2, 'Laeuft', '2026-09-23T13:30', '2026-09-23T15:00', [ALEX]),
+      ev(3, 'OhneEndeFrueh', '2026-09-23T09:00', null, [ALEX]),
+      ev(4, 'OhneEndeAbend', '2026-09-23T20:00', null, [ALEX]),
+      ev(5, 'InstantBeendet', '2026-09-23T11:00:00Z', '2026-09-23T11:30:00Z', [ALEX]),
+      ev(6, 'InstantKommt', '2026-09-23T16:00:00Z', '2026-09-23T17:00:00Z', [ALEX]),
+      ev(7, 'EndeNurDatum', '2026-09-23T09:00', '2026-09-23', [ALEX]),
+      ev(8, 'Ganztag', '2026-09-23', '2026-09-24', [ALEX], 1),
+    ];
+    for (const e of cases) {
+      const tileSaysEnded = /event-item--ended/.test(__test.renderUpcomingEvents([e]));
+      const status = rowStatus(__test.renderFamilyWidget([ALEX, LEO], { upcomingEvents: [e] }), 'Alex') ?? '';
+      const cardShowsIt = status.includes(e.title);
+      assert.equal(cardShowsIt, !tileSaysEnded,
+        `${e.title}: Kachel sagt ${tileSaysEnded ? 'vorbei' : 'kommt'}, Karte ${cardShowsIt ? 'zeigt ihn' : 'zeigt ihn nicht'} (${status})`);
+    }
+  });
+});
+
 test('Familienkarte: ein geteilter Termin steht einmal da, nicht in jeder Zeile', () => {
   at(CRITIQUE_NOW, 'Europe/Berlin', () => {
     const events = [
