@@ -116,22 +116,18 @@ function legacyColorStrandedKey(accountId) {
  * sieht, sonst 'done'. Die Faelle stehen am Statement `selLegacyCandidates`.
  */
 function legacyHealVerdict(candidates, {
-  legacy, seenWithColor, serverCalendars, fetchedCalendars, skippedCalendarUrls, accountUrls,
+  legacy, seenWithColor, serverCalendars, fetchedCalendars, skippedCalendarUrls,
 }) {
   const onServer = new Set(serverCalendars.map((sc) => sc.url));
-  const fetched = new Set(fetchedCalendars.map((c) => c.calendarUrl));
   const emptied = new Set(fetchedCalendars
     .filter((c) => c.calendarUids.size === 0 && !skippedCalendarUrls.has(c.calendarUrl))
     .map((c) => c.calendarUrl));
-  const unreadOnServer = accountUrls.some((url) => onServer.has(url) && !fetched.has(url));
   let stranded = false;
   for (const r of candidates) {
     if (!legacy.colors.has(String(r.color).toLowerCase()) || seenWithColor.has(r.id)) continue;
-    if (r.calendar_url == null) {
-      if (unreadOnServer) return 'pending';
-      stranded = true;
-      continue;
-    }
+    // Ohne Kalenderzuordnung ist nicht zu sagen, in welchem Kalender die
+    // Zeile liegt - also auch nicht, ob ein Lauf sie je sehen wird.
+    if (r.calendar_url == null) { stranded = true; continue; }
     if (!legacy.urls.has(r.calendar_url)) continue;
     if (!onServer.has(r.calendar_url) || emptied.has(r.calendar_url)) { stranded = true; continue; }
     return 'pending';
@@ -757,9 +753,20 @@ async function runSync({ createClient } = {}) {
   //     antwortet bei jedem Lauf so. Hat der Parser in dieser Sammlung etwas
   //     verworfen, ist sie nicht leer, und es wird unbegrenzt gewartet.
   // Eine Zeile ohne Kalenderzuordnung (calendar_ref_id NULL, nie gesehen,
-  // seit es die Spalte gibt) kann in jedem noch nicht gelesenen Kalender des
-  // Kontos liegen: sie wartet, solange es einen solchen auf dem Server gibt,
-  // sonst gilt sie als gestrandet.
+  // seit es die Spalte gibt) gilt ebenfalls als gestrandet: sie gehoert
+  // keinem bestimmten Kalender, und an einen beliebigen abgewaehlten Kalender
+  // des Kontos gebunden wuerde sie die Heilung unbegrenzt offen halten, auch
+  // wenn sie gar nicht dort liegt.
+  //
+  // `user_modified = 1` steht hier wie in der Heilung selbst: nur diese Zeilen
+  // hat Migration 167 als "umgefaerbt" uebernommen. Ein alter lokaler Termin,
+  // der jetzt hochgeladen wird, bleibt bei 0 und ist kein Kandidat. Bearbeitet
+  // ihn danach jemand, setzt die Route user_modified = 1 (routes/calendar/
+  // crud.js, jede Bearbeitung eines gespiegelten Termins) - dann kann er
+  // geheilt werden, sofern er zugleich vor dem Fix entstand und der Server
+  // ihn ohne COLOR-Zeile zurueckgibt. Das ist hingenommen: die Bearbeitung
+  // schickt seine Farbe als COLOR-Zeile hinaus, und behaelt der Server sie,
+  // gehoert sie dem Termin.
   // Die Farbmenge der Heilung (`legacy.colors`) bleibt davon unberuehrt: sie
   // schliesst die Farbe eines geloeschten Kalenders ein, genau die traegt
   // ein Termin, der aus ihm umgezogen ist.
@@ -1133,7 +1140,6 @@ async function runSync({ createClient } = {}) {
         const verdict = healComplete
           ? legacyHealVerdict(selLegacyCandidates.all(legacyCutoff, legacyCutoff), {
             legacy, seenWithColor, serverCalendars, fetchedCalendars, skippedCalendarUrls,
-            accountUrls: accountCalendarUrls(account.id),
           })
           : 'pending';
         if (verdict === 'done') {
