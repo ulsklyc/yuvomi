@@ -130,7 +130,7 @@ export function splitexpensesPaths() {
     '/api/v1/split-expenses/groups/{id}/activity': {
       get: op({
         summary: 'Get group activity feed',
-        description: 'Newest first (`created_at` descending, `id` ascending within the same second). Page through every entry with the cursor: pass `before_at` and `before_id` from `pagination.next_cursor` of the previous page; entries added meanwhile appear at the top and shift nothing. Without a cursor the endpoint behaves as before (`limit`, `offset`). `pagination.next_cursor` is null when `has_more` is false. Cursor and a non-zero `offset` together answer 400. Entries of type `payment_registered` carry a `settlement` object: payer, payee, amount, `reversed_at` (null while active) and `can_reverse` for the caller.',
+        description: 'Newest first (`created_at` descending, `id` ascending within the same second). Page through every entry with the cursor: pass `before_at` and `before_id` from `pagination.next_cursor` of the previous page; entries added meanwhile appear at the top and shift nothing. Without a cursor the endpoint behaves as before (`limit`, `offset`). `pagination.next_cursor` is null when `has_more` is false. Cursor and a non-zero `offset` together answer 400. Entries of type `payment_registered` carry a `settlement` object: payer, payee, amount, `reversed_at` (null while active) and `can_reverse` for the caller. Entries of type `ledger_restored` (migration v226, no actor) carry `metadata.title`, `metadata.amount_minor`, `metadata.currency` and the decimal `metadata.amount` (ISO 4217 minor units).',
         tag: 'SplitExpenses',
         params: [
           idParam(),
