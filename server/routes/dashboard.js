@@ -20,6 +20,7 @@ import { documentViewer } from '../services/document-links.js';
 import { householdMemberSql } from '../services/household-members.js';
 import { FastingError, getFastingDashboardState } from '../services/fasting.js';
 import { NUTRIENT_KEYS, nutritionSummaryFor } from '../services/health-nutrition.js';
+import { emptyPantryExpiring, pantryExpiringSlice } from '../services/pantry-expiring.js';
 import { householdTimeZone, utcToWall, todayKey } from '../utils/timezone.js';
 import { isAdminUser, serializeEvents } from './calendar/helpers.js';
 
@@ -83,6 +84,8 @@ const DENIED_PAYLOAD = Object.freeze({
       visitsThisMonth: 0, unpaidAmount: 0, lastVisit: null,
     },
   }),
+  // Vorrat „läuft bald ab": Chargennamen sind Haushaltsdaten des Moduls pantry.
+  pantry: () => ({ pantryExpiring: emptyPantryExpiring() }),
 });
 
 function emptyFastingWidget() {
@@ -767,6 +770,19 @@ router.get('/', (req, res) => {
   } catch (err) {
     log.error('housekeeping error:', err.message);
     result.housekeeping = { configured: false, present: false, presentSince: null, workerName: null, visitsThisMonth: 0, unpaidAmount: 0, lastVisit: null };
+  }
+
+  // Vorrat „läuft bald ab" (Critique 2026-09-23): Chargen mit abgelaufenem oder
+  // bald erreichtem MHD, haushaltsweit wie der Vorrat selbst (kein
+  // Eigentuemer-Gate, siehe routes/pantry.js). Der Tag ist `todayLocalKey`, also
+  // derselbe Haushaltstag wie fuer Mahlzeiten und Aufgaben dieser Antwort. Ein
+  // Fehler setzt `null` - die Kachel zeigt dann „erneut versuchen" statt einer
+  // leeren Liste, die „nichts laeuft ab" behaupten wuerde.
+  if (allows('pantry')) try {
+    result.pantryExpiring = pantryExpiringSlice(d, todayLocalKey);
+  } catch (err) {
+    log.error('pantryExpiring error:', err.message);
+    result.pantryExpiring = null;
   }
 
   // „Heute dran"-Karte: pro Mitglied die Zahl der heute fälligen oder über-

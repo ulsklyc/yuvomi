@@ -13,6 +13,7 @@ npm run test:health-fasting        # Journal: Ziele, Timer, Navigation, Schema, 
 npm run test:health-fasting-stats  # Kalenderfenster, erfasste Zeitzonen, Intervall-Streaks und Wochenwerte
 npm run test:fasting-reminders     # Opt-in-Regeln, Migration, Transaktionen, API, Browser-Payload und Verfuegbarkeit
 npm run test:dashboard-fasting     # Widget-Registrierung, Berechtigungszuordnung und Self-only-Payload
+npm run test:dashboard-pantry      # Vorrats-Kachel „Läuft bald ab": Registrierung (Opt-in, 1x2, Modul pantry, Dispatch), Payload `pantryExpiring` (abgelaufen zuerst, Horizont = EXPIRY_SOON_DAYS inklusiv, ohne MHD und leere Chargen raus, Liste gedeckelt, Zahlen nicht, `todayItems` fürs Heute-Blatt), Tagesgrenze der Haushaltszone (Berlin kurz nach, Los Angeles kurz vor Mitternacht, `Date` gemockt), Rechte (none, read, Token-Scope), Fehler-Sentinel null, Renderer (listRowCap, „+N" gegen die Server-Gesamtzahl, Ton nach Dringlichkeit, `?filter=`-Deep-Link) und `pantryFilterFromSearch` der Vorratsseite
 npm run test:display-timezone      # Explizite Zone, doppelte DST-Stunde und nicht existierende Ortszeit
 npm run test:fasting-browser       # Journal/Auswertung sowie test-fasting-reminders-browser und Dashboard im echten Browser; laeuft als eigener CI-Job (`fasting-browser` in `.github/workflows/ci.yml`, Node 24.x, parallel zu den Tests) und weiter in `test:document-guards`. Sie ist die einzige Browser-Suite in der CI, weil ihr Bruch seit 05e6ef250 unbemerkt blieb: 4 von 15 Journal-Tests waren rot, und niemand fuhr die Kette.
 ```

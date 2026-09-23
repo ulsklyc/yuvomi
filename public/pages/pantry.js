@@ -35,7 +35,9 @@ import {
   PANTRY_FILTERS,
   daysUntil,
   matchesPantryFilter,
+  pantryExpiryPhrase,
   pantryFilterCounts,
+  pantryFilterFromSearch,
   pantryItemStatus,
 } from '/utils/pantry-status.js';
 
@@ -147,16 +149,13 @@ function expiryBadge(item) {
   const { expiry } = pantryItemStatus(item, state.todayKey);
   if (!expiry) return null;
 
-  const days = daysUntil(item.expires_on, state.todayKey);
-  if (expiry === 'expired') {
-    return {
-      tone: 'danger',
-      text: days === -1 ? t('pantry.badgeExpiredYesterday') : t('pantry.badgeExpiredDays', { count: Math.abs(days) }),
-    };
-  }
-  if (days === 0) return { tone: 'warning', text: t('pantry.badgeExpiresToday') };
-  if (days === 1) return { tone: 'warning', text: t('pantry.badgeExpiresTomorrow') };
-  return { tone: 'warning', text: t('pantry.badgeExpiresDays', { count: days }) };
+  // Der Satz kommt aus pantryExpiryPhrase(), den auch die Dashboard-Kachel
+  // „Läuft bald ab" spricht - dieselbe Charge heisst an beiden Orten gleich.
+  const phrase = pantryExpiryPhrase(daysUntil(item.expires_on, state.todayKey));
+  return {
+    tone: expiry === 'expired' ? 'danger' : 'warning',
+    text: phrase.count === undefined ? t(phrase.key) : t(phrase.key, { count: phrase.count }),
+  };
 }
 
 function stockBadge(item) {
@@ -267,6 +266,11 @@ export async function render(container) {
   state.todayKey = todayKey();
   // Frische Seite: die Chip-Leiste darf beim ersten Zeichnen wieder scrollen.
   _scrolledFilter = null;
+  // Deep-Link der Dashboard-Kachel „Läuft bald ab" (`?filter=expired|soon`).
+  // Trifft der Chip gerade nichts, setzt die Chip-Leiste ohnehin auf „Alle"
+  // zurück - ein veralteter Link endet nie in einer leeren Liste.
+  const linkedFilter = pantryFilterFromSearch(window.location.search);
+  if (linkedFilter) state.filter = linkedFilter;
 
   const page = document.createElement('div');
   page.className = 'pantry-page app-page app-page--reading page-measure--narrow';

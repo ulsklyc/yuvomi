@@ -61,6 +61,9 @@ const WIDGET_LABEL_KEYS = {
   housekeeping: 'nav.housekeeping',
   schedule: 'nav.schedule',
   waste: 'nav.waste',
+  // Der Name der Kachel selbst, wie beim Countdown: „Vorrat" hiesse hier das
+  // Modul, gesperrt wird aber nur die eine Kachel darueber.
+  pantry: 'dashboard.pantryExpiringTitle',
   notes: 'nav.notes',
   family: 'settings.permWidgetFamily',
   weather: 'settings.permWidgetWeather',
