@@ -741,6 +741,8 @@
         "searchCountCapped": "{{shown}} di {{total}} risultati",
         "title": "Calendario",
         "attachmentRemove": "Rimuovi allegato",
+        "attachmentChangeRefused": "Non puoi modificare questo allegato: il documento è privato, oppure non hai accesso ai documenti.",
+        "attachmentUploadRefused": "Solo chi può modificare i documenti può aggiungere un allegato.",
         "newEvent": "Nuovo evento",
         "editEvent": "Modifica evento",
         "addEvent": "Aggiungi evento",
@@ -3579,8 +3581,7 @@
         "currentMonth": "Corrente",
         "noVisitReportsInMonth": "Nessuna visita del personale registrata per {{month}}.",
         "settledAdminOnly": "Solo un admin può modificarla o eliminarla",
-        "reportVisitsCount": "Visite",
-        "receiptPresent": "Allegato"
+        "reportVisitsCount": "Visite"
     },
     "userMultiSelect": {
         "moreUsers": "altri",
@@ -5485,7 +5486,7 @@
         "openAction": "Apri {{name}}",
         "limitReached": "Al massimo {{count}} documenti.",
         "limitReached_one": "Al massimo {{count}} documento.",
-        "presentHidden": "Allegato"
+        "lockedPrivate": "Allegato presente (privato)"
     },
     "join": {
         "title": "Configura il tuo account",

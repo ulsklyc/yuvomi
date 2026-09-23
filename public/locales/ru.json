@@ -741,6 +741,8 @@
         "searchCountCapped": "{{shown}} из {{total}} результатов",
         "title": "Календарь",
         "attachmentRemove": "Удалить вложение",
+        "attachmentChangeRefused": "Это вложение нельзя изменить: документ личный или у тебя нет доступа к документам.",
+        "attachmentUploadRefused": "Добавить вложение может только тот, кому разрешено редактировать документы.",
         "newEvent": "Новое событие",
         "editEvent": "Редактировать событие",
         "addEvent": "Добавить событие",
@@ -3579,8 +3581,7 @@
         "currentMonth": "Текущий",
         "noVisitReportsInMonth": "За период {{month}} визитов не записано.",
         "settledAdminOnly": "Изменить или удалить может только администратор",
-        "reportVisitsCount": "Визиты",
-        "receiptPresent": "Прикреплён"
+        "reportVisitsCount": "Визиты"
     },
     "userMultiSelect": {
         "moreUsers": "ещё",
@@ -5485,7 +5486,7 @@
         "openAction": "Открыть {{name}}",
         "limitReached": "Не более {{count}} документов.",
         "limitReached_one": "Не более {{count}} документа.",
-        "presentHidden": "Прикреплён"
+        "lockedPrivate": "Есть вложение (личное)"
     },
     "join": {
         "title": "Настройка учётной записи",

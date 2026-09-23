@@ -1164,9 +1164,11 @@ test('Ausgabe: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs - ohne Ha
   } finally { Object.assign(split.state, vorher); }
 });
 
-test('Beleg, den der Server nicht nennt: "Vorhanden" statt eines Links ins Leere - Buchung, Ausgabe, Inventar (#1358)', async () => {
-  // So kommt ein Beleg ohne Leserecht auf die Dokumente an: die Zeile bleibt,
-  // ID und Name sind maskiert (services/document-links.js, Regel 3).
+test('Belege ohne Dokumentenrecht: keine Zeile, kein Hinweis, kein Link ins Leere - Buchung, Ausgabe, Inventar (#1358)', async () => {
+  // Ohne Leserecht auf die Dokumente kommt `attachments: null`
+  // (services/document-links.js, Regel 3): weder Belege noch ihre Anzahl. Die
+  // Leseansicht sagt dann nichts - auch kein "Vorhanden". Eine Zeile ohne ID
+  // (aeltere Antwortform) wird nie zum Link auf /documents/null.
   const verdeckt = { id: 9, document_id: null, name: null, original_name: null, mime_type: null, file_size: null };
   const { __test: inventory } = await import('../public/pages/inventory.js');
   const vorher = { ...split.state };
@@ -1174,28 +1176,26 @@ test('Beleg, den der Server nicht nennt: "Vorhanden" statt eines Links ins Leere
     activeGroupId: 2, groups: [{ id: 2, default_currency: 'EUR' }], meta: { currencies: ['EUR', 'USD'] },
     groupMembers: [{ id: 1, display_name: 'Alex' }, { id: 3, display_name: 'Emma' }],
   });
-  const nurVorhanden = (node) => node?.childNodes?.length === 1
-    && node.childNodes[0].href === undefined
-    && node.childNodes[0].textContent === 'documentAttach.presentHidden';
   try {
-    for (const documents of ['read', 'write']) {
+    for (const documents of ['read', 'write', 'none']) {
       withAccess({ budget: 'read', documents }, () => {
-        const b = zeilen(budget.entryReadSections(buchung({ attachments: [verdeckt] })))['budget.receiptsLabel'];
-        assert.ok(nurVorhanden(b), `Buchung, documents: ${documents}: ein Zeichen, kein Link`);
-        const s = zeilen(split.expenseReadSections({ ...ausgabe, attachments: [verdeckt, verdeckt] }))['splitExpenses.receiptsLabel'];
-        assert.ok(nurVorhanden(s), `Ausgabe, documents: ${documents}: EIN Zeichen fuer alle verdeckten`);
-        const gemischt = zeilen(split.expenseReadSections({ ...ausgabe, attachments: [verdeckt, beleg] }))['splitExpenses.receiptsLabel'];
-        assert.equal(gemischt.childNodes.length, 2, 'neben einem sichtbaren Beleg steht das Zeichen zusaetzlich');
-        assert.equal(gemischt.childNodes[1].href, '/api/v1/documents/5/preview');
-        assert.deepEqual(inventory.attachmentDetailEntries([verdeckt]), [{ text: 'documentAttach.presentHidden' }],
-          `Inventar, documents: ${documents}: kein Link auf /documents/null`);
+        for (const attachments of [null, [verdeckt], [verdeckt, verdeckt]]) {
+          const label = `documents: ${documents}, attachments: ${JSON.stringify(attachments)}`;
+          assert.equal(zeilen(budget.entryReadSections(buchung({ attachments })))['budget.receiptsLabel'], undefined,
+            `Buchung, ${label}: keine Zeile`);
+          assert.equal(zeilen(split.expenseReadSections({ ...ausgabe, attachments }))['splitExpenses.receiptsLabel'], undefined,
+            `Ausgabe, ${label}: keine Zeile`);
+          assert.deepEqual(inventory.attachmentDetailEntries(attachments), [], `Inventar, ${label}: keine Zeile`);
+        }
       });
     }
+    withAccess({ budget: 'read', documents: 'read' }, () => {
+      const gemischt = zeilen(split.expenseReadSections({ ...ausgabe, attachments: [verdeckt, beleg] }))['splitExpenses.receiptsLabel'];
+      assert.equal(gemischt.childNodes.length, 1, 'neben einem sichtbaren Beleg steht kein Zeichen');
+      assert.equal(gemischt.childNodes[0].href, '/api/v1/documents/5/preview');
+      assert.deepEqual(inventory.attachmentDetailEntries([verdeckt, beleg]).map((e) => e.href), ['/api/v1/documents/5/preview']);
+    });
     withAccess({ budget: 'read', documents: 'none' }, () => {
-      assert.equal(zeilen(budget.entryReadSections(buchung({ attachments: [verdeckt] })))['budget.receiptsLabel'], undefined,
-        'bei `documents: none` bleibt die Stelle leer wie beim Beleg eines Einsatzes');
-      assert.equal(zeilen(split.expenseReadSections({ ...ausgabe, attachments: [verdeckt] }))['splitExpenses.receiptsLabel'], undefined);
-      assert.deepEqual(inventory.attachmentDetailEntries([verdeckt]), []);
       assert.deepEqual(inventory.attachmentDetailEntries([beleg]), [], 'auch ein sichtbarer Beleg: der Link ginge ins 403');
     });
   } finally { Object.assign(split.state, vorher); }

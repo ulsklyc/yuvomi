@@ -741,6 +741,8 @@
         "searchCountCapped": "{{shown}} av {{total}} resultat",
         "title": "Kalender",
         "attachmentRemove": "Ta bort bilaga",
+        "attachmentChangeRefused": "Du kan inte ändra den här bilagan: dokumentet är privat, eller så har du inte åtkomst till dokument.",
+        "attachmentUploadRefused": "Bara den som får redigera dokument kan lägga till en bilaga.",
         "newEvent": "Ny händelse",
         "editEvent": "Redigera händelse",
         "addEvent": "Lägg till händelse",
@@ -3579,8 +3581,7 @@
         "currentMonth": "Nuvarande",
         "noVisitReportsInMonth": "Inga personalbesök registrerades under {{month}}.",
         "settledAdminOnly": "Bara en admin kan ändra eller ta bort",
-        "reportVisitsCount": "Besök",
-        "receiptPresent": "Bifogat"
+        "reportVisitsCount": "Besök"
     },
     "userMultiSelect": {
         "moreUsers": "mer",
@@ -5485,7 +5486,7 @@
         "openAction": "Öppna {{name}}",
         "limitReached": "Högst {{count}} dokument.",
         "limitReached_one": "Högst {{count}} dokument.",
-        "presentHidden": "Bifogat"
+        "lockedPrivate": "Bilaga finns (privat)"
     },
     "join": {
         "title": "Skapa ditt konto",

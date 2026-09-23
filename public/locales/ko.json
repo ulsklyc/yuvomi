@@ -753,6 +753,8 @@
         "searchCountCapped": "{{total}}개 중 {{shown}}개",
         "title": "캘린더",
         "attachmentRemove": "첨부 파일 제거",
+        "attachmentChangeRefused": "이 첨부 파일은 변경할 수 없습니다. 문서가 비공개이거나 문서에 대한 권한이 없습니다.",
+        "attachmentUploadRefused": "문서를 편집할 수 있는 구성원만 첨부 파일을 추가할 수 있습니다.",
         "newEvent": "새 일정",
         "editEvent": "일정 편집",
         "addEvent": "일정 추가",
@@ -3583,8 +3585,7 @@
         "currentMonth": "이번 달",
         "noVisitReportsInMonth": "{{month}}에는 기록된 방문이 없습니다.",
         "settledAdminOnly": "관리자만 변경하거나 삭제할 수 있습니다",
-        "reportVisitsCount": "방문",
-        "receiptPresent": "첨부됨"
+        "reportVisitsCount": "방문"
     },
     "splitExpenses": {
         "title": "공동 지출",
@@ -5485,7 +5486,7 @@
         "openAction": "{{name}} 열기",
         "limitReached": "문서는 최대 {{count}}개입니다.",
         "limitReached_one": "문서는 최대 {{count}}개입니다.",
-        "presentHidden": "첨부됨"
+        "lockedPrivate": "첨부 파일 있음(비공개)"
     },
     "join": {
         "title": "계정 설정",

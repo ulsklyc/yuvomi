@@ -32,8 +32,8 @@ function idempotencyHeaderParam() {
 // Belege gehoeren dem Dokumente-Modul (#1358, server/services/document-links.js):
 // ein Text je Richtung, damit Budget, Ausgaben und Inventar dasselbe sagen.
 const DOCUMENT_LINKS_READ_NOTE = 'Linked documents follow the Documents module: a document the caller cannot see is left out, and '
-  + 'without access to the Documents module (for API tokens a `documents:read` scope) every remaining link comes masked - '
-  + '`document_id`, `name`, `original_name`, `mime_type` and `file_size` are `null`, only the link itself says that a document is attached.';
+  + 'without access to the Documents module (for API tokens a `documents:read` scope) `attachments` is `null` - neither the documents '
+  + 'nor their number are told, and a record with receipts looks the same as one without.';
 
 const BUDGET_LINKS_READ_NOTE = 'Linked budget entries follow the Budget module: without access to it (for API tokens a '
   + '`budget:read` scope) `linked_entries` is empty and `linked_entries_total` is 0, and any request that looks up a budget entry '

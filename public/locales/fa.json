@@ -753,6 +753,8 @@
         "searchCountCapped": "{{shown}} از {{total}} نتیجه",
         "title": "تقویم",
         "attachmentRemove": "حذف پیوست",
+        "attachmentChangeRefused": "نمی‌توانی این پیوست را تغییر دهی: سند خصوصی است یا به اسناد دسترسی نداری.",
+        "attachmentUploadRefused": "فقط کسی که اجازه ویرایش اسناد را دارد می‌تواند پیوست اضافه کند.",
         "newEvent": "رویداد جدید",
         "editEvent": "ویرایش رویداد",
         "addEvent": "افزودن رویداد",
@@ -3583,8 +3585,7 @@
         "currentMonth": "جاری",
         "noVisitReportsInMonth": "در {{month}} هیچ بازدیدی ثبت نشده است.",
         "settledAdminOnly": "فقط یک مدیر می‌تواند آن را تغییر دهد یا حذف کند",
-        "reportVisitsCount": "بازدیدها",
-        "receiptPresent": "پیوست شده"
+        "reportVisitsCount": "بازدیدها"
     },
     "splitExpenses": {
         "title": "هزینه‌های مشترک",
@@ -5485,7 +5486,7 @@
         "openAction": "باز کردن {{name}}",
         "limitReached": "حداکثر {{count}} سند.",
         "limitReached_one": "حداکثر {{count}} سند.",
-        "presentHidden": "پیوست شده"
+        "lockedPrivate": "پیوست موجود است (خصوصی)"
     },
     "join": {
         "title": "راه‌اندازی حساب",

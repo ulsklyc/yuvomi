@@ -753,6 +753,8 @@
         "searchCountCapped": "{{shown}} dari {{total}} hasil",
         "title": "Kalender",
         "attachmentRemove": "Hapus lampiran",
+        "attachmentChangeRefused": "Kamu tidak bisa mengubah lampiran ini: dokumennya pribadi, atau kamu tidak punya akses ke dokumen.",
+        "attachmentUploadRefused": "Hanya yang boleh mengedit dokumen yang bisa menambahkan lampiran.",
         "newEvent": "Acara baru",
         "editEvent": "Ubah acara",
         "addEvent": "Tambah acara",
@@ -3583,8 +3585,7 @@
         "currentMonth": "Saat ini",
         "noVisitReportsInMonth": "Tidak ada kunjungan tercatat pada {{month}}.",
         "settledAdminOnly": "Hanya admin yang dapat mengubah atau menghapusnya",
-        "reportVisitsCount": "Kunjungan",
-        "receiptPresent": "Terlampir"
+        "reportVisitsCount": "Kunjungan"
     },
     "splitExpenses": {
         "title": "Pengeluaran Bersama",
@@ -5485,7 +5486,7 @@
         "openAction": "Buka {{name}}",
         "limitReached": "Maksimal {{count}} dokumen.",
         "limitReached_one": "Maksimal {{count}} dokumen.",
-        "presentHidden": "Terlampir"
+        "lockedPrivate": "Ada lampiran (pribadi)"
     },
     "join": {
         "title": "Siapkan akun Anda",

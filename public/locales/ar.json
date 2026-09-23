@@ -741,6 +741,8 @@
         "searchCountCapped": "{{shown}} من {{total}} نتيجة",
         "title": "التقويم",
         "attachmentRemove": "إزالة المرفق",
+        "attachmentChangeRefused": "لا يمكنك تغيير هذا المرفق: المستند خاص، أو ليس لديك صلاحية على المستندات.",
+        "attachmentUploadRefused": "لا يمكن إضافة مرفق إلا لمن يحق له تعديل المستندات.",
         "newEvent": "حدث جديد",
         "editEvent": "تعديل الحدث",
         "addEvent": "إضافة حدث",
@@ -3579,8 +3581,7 @@
         "currentMonth": "الشهر الحالي",
         "noVisitReportsInMonth": "لم تُسجل أي زيارة في {{month}}.",
         "settledAdminOnly": "لا يمكن تعديله أو حذفه إلا بواسطة مسؤول",
-        "reportVisitsCount": "الزيارات",
-        "receiptPresent": "مرفق"
+        "reportVisitsCount": "الزيارات"
     },
     "userMultiSelect": {
         "moreUsers": "آخرون",
@@ -5485,7 +5486,7 @@
         "openAction": "فتح {{name}}",
         "limitReached": "بحد أقصى {{count}} مستندات.",
         "limitReached_one": "مستند واحد بحد أقصى.",
-        "presentHidden": "مرفق"
+        "lockedPrivate": "يوجد مرفق (خاص)"
     },
     "join": {
         "title": "إعداد حسابك",

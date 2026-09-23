@@ -753,6 +753,8 @@
         "searchCountCapped": "{{shown}} von {{total}} Treffern",
         "title": "Kalender",
         "attachmentRemove": "Anhang entfernen",
+        "attachmentChangeRefused": "Diesen Anhang kannst du nicht ändern: Das Dokument ist privat, oder dir fehlt das Recht auf Dokumente.",
+        "attachmentUploadRefused": "Einen Anhang hinzufügen darf nur, wer Dokumente bearbeiten darf.",
         "newEvent": "Neuer Termin",
         "editEvent": "Termin bearbeiten",
         "addEvent": "Termin hinzufügen",
@@ -3583,8 +3585,7 @@
         "currentMonth": "Aktuell",
         "noVisitReportsInMonth": "Im {{month}} wurden keine Einsätze erfasst.",
         "settledAdminOnly": "Ändern oder löschen nur durch einen Admin",
-        "reportVisitsCount": "Besuche",
-        "receiptPresent": "Vorhanden"
+        "reportVisitsCount": "Besuche"
     },
     "splitExpenses": {
         "title": "Gemeinsame Ausgaben",
@@ -5485,7 +5486,7 @@
         "openAction": "{{name}} öffnen",
         "limitReached": "Höchstens {{count}} Dokumente möglich.",
         "limitReached_one": "Höchstens {{count}} Dokument möglich.",
-        "presentHidden": "Vorhanden"
+        "lockedPrivate": "Anhang vorhanden (privat)"
     },
     "join": {
         "title": "Konto einrichten",

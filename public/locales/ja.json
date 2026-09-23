@@ -741,6 +741,8 @@
         "searchCountCapped": "{{total}} 件中 {{shown}} 件",
         "title": "カレンダー",
         "attachmentRemove": "添付ファイルを削除",
+        "attachmentChangeRefused": "この添付ファイルは変更できません。書類が非公開か、書類へのアクセス権がありません。",
+        "attachmentUploadRefused": "添付ファイルを追加できるのは、書類を編集できるメンバーだけです。",
         "newEvent": "新しい予定",
         "editEvent": "予定を編集",
         "addEvent": "予定を追加",
@@ -3579,8 +3581,7 @@
         "currentMonth": "今月",
         "noVisitReportsInMonth": "{{month}}の訪問記録はありません。",
         "settledAdminOnly": "変更・削除できるのは管理者だけです",
-        "reportVisitsCount": "訪問",
-        "receiptPresent": "添付あり"
+        "reportVisitsCount": "訪問"
     },
     "userMultiSelect": {
         "moreUsers": "他",
@@ -5485,7 +5486,7 @@
         "openAction": "{{name}} を開く",
         "limitReached": "書類は最大 {{count}} 件までです。",
         "limitReached_one": "書類は最大 {{count}} 件までです。",
-        "presentHidden": "添付あり"
+        "lockedPrivate": "添付ファイルあり（非公開）"
     },
     "join": {
         "title": "アカウントの設定",

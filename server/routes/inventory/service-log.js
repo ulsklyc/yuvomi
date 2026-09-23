@@ -433,9 +433,8 @@ function completeTrackedDate({ item, dateId, values, userId }) {
  * Speicher (DECISIONS.md #6) - beide Sichtbarkeitsregeln laufen ueber ihre
  * bestehenden, einzigen Stellen (DECISIONS.md #2).
  *
- * `viewer` ist `documentViewer(req)`. Ohne Leserecht auf die Dokumente kommen
- * die Belege maskiert (#1358) - eine Verlaufszeile ohne Namen und Ziel sagt
- * nichts, sie faellt deshalb ganz weg.
+ * `viewer` ist `documentViewer(req)`. Ohne Leserecht auf die Dokumente gibt es
+ * keine Belege (#1358), die Zeitleiste zeigt dann keine Dokumentzeile.
  */
 function loadHistory(itemId, budget, viewer) {
   const logRows = loadServiceLog(itemId).map((row) => ({
@@ -460,8 +459,7 @@ function loadHistory(itemId, budget, viewer) {
   }));
 
   const householdTz = householdTimeZone(db.get());
-  const documents = documentLinksFor(db.get(), { ...DOCS, ownerId: itemId, viewer })
-    .filter((doc) => doc.document_id != null);
+  const documents = documentLinksFor(db.get(), { ...DOCS, ownerId: itemId, viewer }) ?? [];
   const documentRows = documents.map((doc) => ({
     type: 'document',
     id: doc.document_id,

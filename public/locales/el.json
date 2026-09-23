@@ -741,6 +741,8 @@
         "searchCountCapped": "{{shown}} από {{total}} αποτελέσματα",
         "title": "Ημερολόγιο",
         "attachmentRemove": "Αφαίρεση συνημμένου",
+        "attachmentChangeRefused": "Δεν μπορείς να αλλάξεις αυτό το συνημμένο: το έγγραφο είναι ιδιωτικό ή δεν έχεις πρόσβαση στα έγγραφα.",
+        "attachmentUploadRefused": "Συνημμένο μπορεί να προσθέσει μόνο όποιος επιτρέπεται να επεξεργάζεται έγγραφα.",
         "newEvent": "Νέα εκδήλωση",
         "editEvent": "Επεξεργασία εκδήλωσης",
         "addEvent": "Προσθήκη εκδήλωσης",
@@ -3579,8 +3581,7 @@
         "currentMonth": "Τρέχων",
         "noVisitReportsInMonth": "Δεν καταγράφηκε καμία επίσκεψη για {{month}}.",
         "settledAdminOnly": "Μόνο ένας διαχειριστής μπορεί να την αλλάξει ή να τη διαγράψει",
-        "reportVisitsCount": "Επισκέψεις",
-        "receiptPresent": "Επισυνάπτεται"
+        "reportVisitsCount": "Επισκέψεις"
     },
     "userMultiSelect": {
         "moreUsers": "ακόμη",
@@ -5485,7 +5486,7 @@
         "openAction": "Άνοιγμα {{name}}",
         "limitReached": "Το πολύ {{count}} έγγραφα.",
         "limitReached_one": "Το πολύ {{count}} έγγραφο.",
-        "presentHidden": "Επισυνάπτεται"
+        "lockedPrivate": "Υπάρχει συνημμένο (ιδιωτικό)"
     },
     "join": {
         "title": "Ρύθμιση λογαριασμού",

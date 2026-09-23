@@ -2721,6 +2721,9 @@ test('confirmed split gives every inherited orphan an independent attachment ACL
     confirmedOrphanCount: 3,
     cloneAttachment: (sourceId) => cloneDocument('successor', sourceId),
     cloneDetachedAttachment: (childId, sourceId) => cloneDocument(`orphan-${childId}`, sourceId),
+    // Die Route reicht das nur mit Dokumente-Schreibrecht und Sicht auf das
+    // Dokument herein (#1358); ohne es wird nur verengt (Test unten).
+    mayWidenAttachment: () => true,
   });
 
   const attachmentIdFor = (eventId) => Number(database.prepare(`
@@ -3213,6 +3216,7 @@ test('following split clones inherited attachment ownership for divergent ACLs a
 
     let clonedDocumentId = null;
     const result = splitSeries(database, {
+      mayWidenAttachment: () => true, // Aufrufer mit Dokumente-Schreibrecht und Sicht (#1358)
       seriesId,
       recurrenceId: '2026-10-02',
       actorId: 1,
@@ -4063,6 +4067,7 @@ test('whole-series projection refresh synchronizes occurrence-owned attachment A
     VALUES ('Occurrence attachment', 'family', 'occurrence.txt', 'text/plain', 4, 'body', 1)
   `).run().lastInsertRowid);
   const child = upsertOccurrenceOverride(database, {
+    mayWidenAttachment: () => true, // Aufrufer mit Dokumente-Schreibrecht und Sicht (#1358)
     seriesId,
     recurrenceId: '2026-10-02',
     actorId: 1,
@@ -4083,6 +4088,7 @@ test('whole-series projection refresh synchronizes occurrence-owned attachment A
     'SELECT visibility FROM family_documents WHERE id = ?'
   ).get(documentId).visibility;
   const update = (eventVisibility, assignments) => updateSeriesWithOverrides(database, {
+    mayWidenAttachment: () => true, // Aufrufer mit Dokumente-Schreibrecht und Sicht (#1358)
     seriesId,
     actorId: 1,
     changes: { visibility: eventVisibility },

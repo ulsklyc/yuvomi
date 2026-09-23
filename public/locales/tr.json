@@ -741,6 +741,8 @@
         "searchCountCapped": "{{total}} sonuçtan {{shown}} tanesi",
         "title": "Takvim",
         "attachmentRemove": "Eki kaldır",
+        "attachmentChangeRefused": "Bu eki değiştiremezsin: belge özel veya belgelere erişimin yok.",
+        "attachmentUploadRefused": "Yalnızca belgeleri düzenleyebilenler ek ekleyebilir.",
         "newEvent": "Yeni Etkinlik",
         "editEvent": "Etkinliği Düzenle",
         "addEvent": "Etkinlik ekle",
@@ -3579,8 +3581,7 @@
         "currentMonth": "Bu Ay",
         "noVisitReportsInMonth": "{{month}} döneminde ziyaret kaydedilmedi.",
         "settledAdminOnly": "Yalnızca bir yönetici değiştirebilir veya silebilir",
-        "reportVisitsCount": "Ziyaretler",
-        "receiptPresent": "Ekli"
+        "reportVisitsCount": "Ziyaretler"
     },
     "userMultiSelect": {
         "moreUsers": "daha",
@@ -5485,7 +5486,7 @@
         "openAction": "{{name}} ögesini aç",
         "limitReached": "En fazla {{count}} belge.",
         "limitReached_one": "En fazla {{count}} belge.",
-        "presentHidden": "Ekli"
+        "lockedPrivate": "Ek mevcut (özel)"
     },
     "join": {
         "title": "Hesabını oluştur",

@@ -14,7 +14,7 @@ import {
   str, oneOf, num, date, id as idParam, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT,
 } from '../../middleware/validate.js';
 import {
-  assertDocumentLinkTargetsAvailable, documentLinksFor, documentViewer, loadDocumentLinks, replaceDocumentLinks,
+  assertDocumentLinkTargetsAvailable, documentLinksFor, documentLinksOf, documentViewer, loadDocumentLinks, replaceDocumentLinks,
   sendDocumentLinkRefusal,
 } from '../../services/document-links.js';
 import { sendDocumentDeletionConflict } from '../../services/document-deletion-lock.js';
@@ -168,7 +168,7 @@ function loadItems({ category, locationId, status, q } = {}, budget, viewer) {
     return {
       ...row,
       location_path: locationPath(row.location_id),
-      attachments: byItem.get(row.id) || [],
+      attachments: documentLinksOf(byItem, row.id, viewer),
       linked_entries: linkedEntries,
       linked_entries_total: computeTotal(linkedEntries),
       tracked_dates: datesByItem.get(row.id) || [],

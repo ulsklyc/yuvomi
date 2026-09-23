@@ -753,6 +753,8 @@
         "searchCountCapped": "{{shown}} z {{total}} wyników",
         "title": "Kalendarz",
         "attachmentRemove": "Usuń załącznik",
+        "attachmentChangeRefused": "Nie możesz zmienić tego załącznika: dokument jest prywatny albo nie masz dostępu do dokumentów.",
+        "attachmentUploadRefused": "Załącznik może dodać tylko osoba, która może edytować dokumenty.",
         "newEvent": "Nowe wydarzenie",
         "editEvent": "Edytuj wydarzenie",
         "addEvent": "Dodaj wydarzenie",
@@ -3583,8 +3585,7 @@
         "currentMonth": "Bieżący",
         "noVisitReportsInMonth": "Brak zarejestrowanych wizyt personelu w okresie {{month}}.",
         "settledAdminOnly": "Zmienić lub usunąć może tylko admin",
-        "reportVisitsCount": "Wizyty",
-        "receiptPresent": "Dołączony"
+        "reportVisitsCount": "Wizyty"
     },
     "splitExpenses": {
         "title": "Wspólne wydatki",
@@ -5485,7 +5486,7 @@
         "openAction": "Otwórz {{name}}",
         "limitReached": "Maksymalnie dokumentów: {{count}}.",
         "limitReached_one": "Maksymalnie dokumentów: {{count}}.",
-        "presentHidden": "Dołączony"
+        "lockedPrivate": "Załącznik istnieje (prywatny)"
     },
     "join": {
         "title": "Skonfiguruj konto",

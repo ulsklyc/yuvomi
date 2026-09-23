@@ -741,6 +741,8 @@
         "searchCountCapped": "{{shown}} trên {{total}} kết quả",
         "title": "Lịch",
         "attachmentRemove": "Xóa tệp đính kèm",
+        "attachmentChangeRefused": "Bạn không thể thay đổi tệp đính kèm này: tài liệu là riêng tư hoặc bạn không có quyền truy cập tài liệu.",
+        "attachmentUploadRefused": "Chỉ người được phép chỉnh sửa tài liệu mới có thể thêm tệp đính kèm.",
         "newEvent": "Sự kiện mới",
         "editEvent": "Sửa sự kiện",
         "addEvent": "Thêm sự kiện",
@@ -3579,8 +3581,7 @@
         "currentMonth": "Hiện tại",
         "noVisitReportsInMonth": "Không có lượt đến của nhân viên được ghi nhận trong {{month}}.",
         "settledAdminOnly": "Chỉ quản trị viên mới có thể sửa hoặc xoá",
-        "reportVisitsCount": "Số lượt đến",
-        "receiptPresent": "Đã đính kèm"
+        "reportVisitsCount": "Số lượt đến"
     },
     "userMultiSelect": {
         "moreUsers": "thêm",
@@ -5485,7 +5486,7 @@
         "openAction": "Mở {{name}}",
         "limitReached": "Tối đa {{count}} tài liệu.",
         "limitReached_one": "Tối đa {{count}} tài liệu.",
-        "presentHidden": "Đã đính kèm"
+        "lockedPrivate": "Có tệp đính kèm (riêng tư)"
     },
     "join": {
         "title": "Thiết lập tài khoản",

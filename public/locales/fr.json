@@ -741,6 +741,8 @@
         "searchCountCapped": "{{shown}} sur {{total}} résultats",
         "title": "Calendrier",
         "attachmentRemove": "Supprimer la pièce jointe",
+        "attachmentChangeRefused": "Tu ne peux pas modifier cette pièce jointe : le document est privé, ou tu n'as pas accès aux documents.",
+        "attachmentUploadRefused": "Seules les personnes autorisées à modifier les documents peuvent ajouter une pièce jointe.",
         "newEvent": "Nouvel événement",
         "editEvent": "Modifier l'événement",
         "addEvent": "Ajouter un événement",
@@ -3579,8 +3581,7 @@
         "currentMonth": "Actuel",
         "noVisitReportsInMonth": "Aucune intervention enregistrée en {{month}}.",
         "settledAdminOnly": "Seul un admin peut la modifier ou la supprimer",
-        "reportVisitsCount": "Visites",
-        "receiptPresent": "Joint"
+        "reportVisitsCount": "Visites"
     },
     "userMultiSelect": {
         "moreUsers": "autres",
@@ -5485,7 +5486,7 @@
         "openAction": "Ouvrir {{name}}",
         "limitReached": "{{count}} documents au maximum.",
         "limitReached_one": "{{count}} document au maximum.",
-        "presentHidden": "Joint"
+        "lockedPrivate": "Pièce jointe présente (privée)"
     },
     "join": {
         "title": "Configurer votre compte",

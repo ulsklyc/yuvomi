@@ -753,6 +753,8 @@
         "searchCountCapped": "{{shown}} sa {{total}} resulta",
         "title": "Kalendaryo",
         "attachmentRemove": "Alisin ang kalakip",
+        "attachmentChangeRefused": "Hindi mo mababago ang attachment na ito: pribado ang dokumento, o wala kang access sa mga dokumento.",
+        "attachmentUploadRefused": "Ang mga may pahintulot lang na mag-edit ng mga dokumento ang puwedeng magdagdag ng attachment.",
         "newEvent": "Bagong Kaganapan",
         "editEvent": "I-edit ang Kaganapan",
         "addEvent": "Magdagdag ng kaganapan",
@@ -3583,8 +3585,7 @@
         "currentMonth": "Kasalukuyan",
         "noVisitReportsInMonth": "Walang naitalang pagbisita ng tauhan sa {{month}}.",
         "settledAdminOnly": "Tanging admin ang maaaring baguhin o burahin ito",
-        "reportVisitsCount": "Mga pagbisita",
-        "receiptPresent": "Nakalakip"
+        "reportVisitsCount": "Mga pagbisita"
     },
     "splitExpenses": {
         "title": "Mga hinating gastos",
@@ -5485,7 +5486,7 @@
         "openAction": "Buksan ang {{name}}",
         "limitReached": "Hanggang {{count}} dokumento lang.",
         "limitReached_one": "Hanggang {{count}} dokumento lang.",
-        "presentHidden": "Nakalakip"
+        "lockedPrivate": "May attachment (pribado)"
     },
     "join": {
         "title": "I-set up ang iyong account",

@@ -741,6 +741,8 @@
         "searchCountCapped": "{{shown}} z {{total}} výsledků",
         "title": "Kalendář",
         "attachmentRemove": "Odebrat přílohu",
+        "attachmentChangeRefused": "Tuto přílohu nemůžeš změnit: dokument je soukromý, nebo nemáš přístup k dokumentům.",
+        "attachmentUploadRefused": "Přílohu může přidat jen ten, kdo smí upravovat dokumenty.",
         "newEvent": "Nová událost",
         "editEvent": "Upravit událost",
         "addEvent": "Přidat událost",
@@ -3151,8 +3153,7 @@
         "currentMonth": "Aktuální měsíc",
         "noVisitReportsInMonth": "V období {{month}} nebyly zaznamenány žádné návštěvy.",
         "settledAdminOnly": "Upravit nebo smazat ji může jen admin",
-        "reportVisitsCount": "Návštěvy",
-        "receiptPresent": "Přiložen"
+        "reportVisitsCount": "Návštěvy"
     },
     "splitExpenses": {
         "title": "Společné výdaje",
@@ -5485,7 +5486,7 @@
         "openAction": "Otevřít {{name}}",
         "limitReached": "Nejvýše dokumentů: {{count}}.",
         "limitReached_one": "Nejvýše dokumentů: {{count}}.",
-        "presentHidden": "Přiložen"
+        "lockedPrivate": "Příloha existuje (soukromá)"
     },
     "join": {
         "title": "Nastavení účtu",

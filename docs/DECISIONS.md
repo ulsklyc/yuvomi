@@ -680,7 +680,10 @@ forgot to ask about.
   `to-shopping-list` routes in `server/routes/meals.js` and `server/routes/recipes.js` for
   `shopping`, `import-meal-plan` and the undo of a meal transfer in `server/routes/shopping.js` for
   `meals`, `PUT /recipes/:id/ingredient-match` for `pantry`, because it hooks a row of the pantry
-  into a recipe, and the housekeeping supply request with #1353.
+  into a recipe, the housekeeping supply request with #1353, and a calendar attachment upload for
+  `documents` (#1358, `attachmentUploadRefused()` in `server/routes/calendar/helpers.js`): the
+  attachment lands in the Documents module as a document of its own, named on the dialog's upload
+  area.
 - `mayReadModule()` beside it for the other half: a route that reads another module's rows asks
   for read access to that module, built on `hiddenModulesFor()` so there is one rule. A transfer
   that copies rows out of a module refuses without it: `POST /pantry/import-shopping` asks for

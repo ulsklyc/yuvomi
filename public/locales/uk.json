@@ -741,6 +741,8 @@
         "searchCountCapped": "{{shown}} з {{total}} результатів",
         "title": "Календар",
         "attachmentRemove": "Видалити вкладення",
+        "attachmentChangeRefused": "Це вкладення не можна змінити: документ приватний або ти не маєш доступу до документів.",
+        "attachmentUploadRefused": "Додати вкладення може лише той, кому дозволено редагувати документи.",
         "newEvent": "Нова подія",
         "editEvent": "Редагувати подію",
         "addEvent": "Додати подію",
@@ -3579,8 +3581,7 @@
         "currentMonth": "Поточний",
         "noVisitReportsInMonth": "За період {{month}} відвідувань персоналу не зафіксовано.",
         "settledAdminOnly": "Змінити або видалити може лише адміністратор",
-        "reportVisitsCount": "Відвідування",
-        "receiptPresent": "Додано"
+        "reportVisitsCount": "Відвідування"
     },
     "userMultiSelect": {
         "moreUsers": "інші",
@@ -5485,7 +5486,7 @@
         "openAction": "Відкрити {{name}}",
         "limitReached": "Не більше ніж {{count}} документів.",
         "limitReached_one": "Не більше ніж {{count}} документ.",
-        "presentHidden": "Додано"
+        "lockedPrivate": "Є вкладення (приватне)"
     },
     "join": {
         "title": "Налаштування облікового запису",

@@ -741,6 +741,8 @@
         "searchCountCapped": "{{total}} में से {{shown}} परिणाम",
         "title": "कैलेंडर",
         "attachmentRemove": "अटैचमेंट हटाएँ",
+        "attachmentChangeRefused": "आप यह अटैचमेंट नहीं बदल सकते: दस्तावेज़ निजी है, या आपके पास दस्तावेज़ों की पहुँच नहीं है।",
+        "attachmentUploadRefused": "अटैचमेंट वही जोड़ सकता है जिसे दस्तावेज़ संपादित करने की अनुमति है।",
         "newEvent": "नया कार्यक्रम",
         "editEvent": "कार्यक्रम संपादित करें",
         "addEvent": "कार्यक्रम जोड़ें",
@@ -3579,8 +3581,7 @@
         "currentMonth": "वर्तमान",
         "noVisitReportsInMonth": "{{month}} में कोई विज़िट दर्ज नहीं हुई।",
         "settledAdminOnly": "केवल एडमिन ही इसे बदल या हटा सकता है",
-        "reportVisitsCount": "विज़िट",
-        "receiptPresent": "संलग्न"
+        "reportVisitsCount": "विज़िट"
     },
     "userMultiSelect": {
         "moreUsers": "और",
@@ -5485,7 +5486,7 @@
         "openAction": "{{name}} खोलें",
         "limitReached": "अधिकतम {{count}} दस्तावेज़।",
         "limitReached_one": "अधिकतम {{count}} दस्तावेज़।",
-        "presentHidden": "संलग्न"
+        "lockedPrivate": "अटैचमेंट मौजूद है (निजी)"
     },
     "join": {
         "title": "अपना खाता सेट करें",

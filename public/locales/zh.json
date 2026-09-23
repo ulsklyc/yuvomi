@@ -741,6 +741,8 @@
         "searchCountCapped": "{{total}} 条结果中的 {{shown}} 条",
         "title": "日历",
         "attachmentRemove": "移除附件",
+        "attachmentChangeRefused": "无法更改此附件：该文档为私密文档，或你没有文档访问权限。",
+        "attachmentUploadRefused": "只有可以编辑文档的成员才能添加附件。",
         "newEvent": "新建日程",
         "editEvent": "编辑日程",
         "addEvent": "添加日程",
@@ -3579,8 +3581,7 @@
         "currentMonth": "当前",
         "noVisitReportsInMonth": "{{month}}没有上门服务记录。",
         "settledAdminOnly": "只有管理员可以修改或删除",
-        "reportVisitsCount": "上门次数",
-        "receiptPresent": "已附上"
+        "reportVisitsCount": "上门次数"
     },
     "userMultiSelect": {
         "moreUsers": "更多",
@@ -5485,7 +5486,7 @@
         "openAction": "打开 {{name}}",
         "limitReached": "最多 {{count}} 份文档。",
         "limitReached_one": "最多 {{count}} 份文档。",
-        "presentHidden": "已附上"
+        "lockedPrivate": "有附件（私密）"
     },
     "join": {
         "title": "设置你的账户",

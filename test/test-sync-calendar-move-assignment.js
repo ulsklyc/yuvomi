@@ -579,3 +579,80 @@ describe('#1270 - ein hinausgepushter Termin behaelt seine Zuweisung', () => {
     assert.deepEqual(assignmentsOf(id), [ANNA], 'und sie ist die einzige');
   });
 });
+
+describe('#1358 - der Umzug oeffnet kein Anhang-Dokument', () => {
+  beforeEach(resetTables);
+
+  function seedWithDocument(refId, visibility, eventVisibility = 'all') {
+    const documentId = Number(db.prepare(`
+      INSERT INTO family_documents (name, original_name, mime_type, file_size, content_data, visibility, created_by)
+      VALUES ('anhang', 'anhang.txt', 'text/plain', 1, 'x', ?, ?) RETURNING id
+    `).get(visibility, OWNER).id);
+    const id = Number(db.prepare(`
+      INSERT INTO calendar_events
+        (title, start_datetime, end_datetime, external_calendar_id, external_source,
+         calendar_ref_id, created_by, assigned_to, visibility, attachment_document_id)
+      VALUES ('X', '2026-04-01T09:00', '2026-04-01T10:00', ?, 'caldav', ?, ?, ?, ?, ?)
+      RETURNING id
+    `).get(UID, refId, OWNER, ANNA, eventVisibility, documentId).id);
+    db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(id, ANNA);
+    return { id, documentId };
+  }
+  const docState = (documentId) => ({
+    visibility: db.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(documentId).visibility,
+    access: db.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id')
+      .all(documentId).map((r) => Number(r.user_id)),
+  });
+  const move = (id, refA, refB) => reassignDefaultOnCalendarMove(db, id, {
+    fromCalRefId: refA, toCalRefId: refB, toDefaultUserId: BEN,
+  });
+
+  it('ein privates Dokument bleibt privat, auch an einem Termin fuer alle', () => {
+    const refA = externalCalendar('caldav', CAL_A, 'A', ANNA);
+    const refB = externalCalendar('caldav', CAL_B, 'B', BEN);
+    for (const eventVisibility of ['all', 'assignees']) {
+      const { id, documentId } = seedWithDocument(refA, 'private', eventVisibility);
+      assert.equal(move(id, refA, refB), true);
+      assert.deepEqual(assignmentsOf(id), [BEN]);
+      assert.deepEqual(docState(documentId), { visibility: 'private', access: [] }, `Termin ${eventVisibility}`);
+    }
+  });
+
+  it('an einem Termin fuer Zugewiesene bekommt ein eingeschraenktes Dokument die neue Person dazu, family wird es nie', () => {
+    const refA = externalCalendar('caldav', CAL_A, 'A', ANNA);
+    const refB = externalCalendar('caldav', CAL_B, 'B', BEN);
+    const { id, documentId } = seedWithDocument(refA, 'restricted', 'assignees');
+    db.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(documentId, CHRIS);
+    assert.equal(move(id, refA, refB), true);
+    assert.deepEqual(docState(documentId), { visibility: 'restricted', access: [BEN, CHRIS].sort((a, b) => a - b) },
+      'Ben kommt dazu, die Freigabe an Chris bleibt, family wird es nicht');
+  });
+
+  it('an einem Termin fuer alle bleibt die Einschraenkung der Besitzerin, wie sie ist', () => {
+    const refA = externalCalendar('caldav', CAL_A, 'A', ANNA);
+    const refB = externalCalendar('caldav', CAL_B, 'B', BEN);
+    const { id, documentId } = seedWithDocument(refA, 'restricted', 'all');
+    db.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(documentId, CHRIS);
+    assert.equal(move(id, refA, refB), true);
+    assert.deepEqual(docState(documentId), { visibility: 'restricted', access: [CHRIS] },
+      'der Sync fuegt niemanden hinzu - die Entscheidung der Besitzerin geht vor');
+  });
+
+  it('an einem privaten Termin bekommt die neue Person keinen Zugriff auf das Dokument', () => {
+    const refA = externalCalendar('caldav', CAL_A, 'A', ANNA);
+    const refB = externalCalendar('caldav', CAL_B, 'B', BEN);
+    const { id, documentId } = seedWithDocument(refA, 'restricted', 'private');
+    db.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(documentId, CHRIS);
+    assert.equal(move(id, refA, refB), true);
+    assert.deepEqual(docState(documentId), { visibility: 'restricted', access: [CHRIS] },
+      'Ben kommt nicht dazu, und der Sync nimmt auch nichts weg: Chris behaelt die Freigabe der Besitzerin');
+  });
+
+  it('der Sync aendert Dokumentrechte sonst nie - ein family-Dokument an einem privaten Termin bleibt family', () => {
+    const refA = externalCalendar('caldav', CAL_A, 'A', ANNA);
+    const refB = externalCalendar('caldav', CAL_B, 'B', BEN);
+    const { id, documentId } = seedWithDocument(refA, 'family', 'private');
+    assert.equal(move(id, refA, refB), true);
+    assert.deepEqual(docState(documentId), { visibility: 'family', access: [] });
+  });
+});

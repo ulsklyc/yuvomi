@@ -13,6 +13,7 @@ import {
 import { SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN } from '../../services/calendar-events.js';
 import { buildMatchQuery, resolveEventSearchRows } from '../../services/search.js';
 import { visibilityWhere } from '../../services/visibility.js';
+import { documentViewer } from '../../services/document-links.js';
 import {
   VALID_SOURCES, ASSIGNED_USERS_SQL, getUserId, isAdminUser, serializeEvents,
 } from './helpers.js';
@@ -108,6 +109,7 @@ router.get('/', (req, res) => {
     const rawEvents = database.prepare(sql).all(...params);
     const serialization = {
       database,
+      viewer: documentViewer(req),
       actorId: getUserId(req),
       isAdmin: isAdminUser(req),
     };
@@ -137,6 +139,7 @@ router.get('/upcoming', (req, res) => {
       getUpcomingEvents(database, { userId: getUserId(req), limit }),
     ), {
       database,
+      viewer: documentViewer(req),
       actorId: getUserId(req),
       isAdmin: isAdminUser(req),
     });
@@ -232,6 +235,7 @@ router.get('/search', (req, res) => {
 
     res.json({
       data: serializeEvents(resolved, {
+        viewer: documentViewer(req),
         database,
         actorId: userId,
         isAdmin: isAdminUser(req),

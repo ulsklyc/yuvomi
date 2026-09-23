@@ -11,7 +11,7 @@ import { createLogger } from '../logger.js';
 import { collectErrors, date as validateDate, id as validateId, str, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import {
-  documentLinksFor, documentRefForViewer, documentViewer, loadDocumentLinks, replaceDocumentLinks,
+  documentLinksFor, documentLinksOf, documentRefForViewer, documentViewer, loadDocumentLinks, replaceDocumentLinks,
   sendDocumentLinkRefusal, visibleDocumentRef,
 } from '../services/document-links.js';
 import { sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
@@ -360,7 +360,7 @@ function serializeExpense(expense, prefetched, viewer) {
   // abgelegter Beleg bleibt privat, auch wenn die Ausgabe der ganzen Gruppe
   // gehört. Vorher lieferte der Join den Namen an jedes Gruppenmitglied aus.
   const attachments = prefetched
-    ? (prefetched.attachments.get(expense.id) || [])
+    ? documentLinksOf(prefetched.attachments, expense.id, viewer)
     : documentLinksFor(db.get(), { ...EXPENSE_ATTACHMENTS, ownerId: expense.id, viewer });
   return {
     ...decorateMoney(expense, ['amount_minor', 'converted_amount_minor']),
