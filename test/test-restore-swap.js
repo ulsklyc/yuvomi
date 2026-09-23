@@ -993,3 +993,17 @@ test('#1431 lehnt das Dateisystem chmod ab und bleibt die Datei schreibgeschuetz
   assertUntouched(target, 'vor dem Restore');
   target.mod.get().close();
 });
+
+test('#1431 der dokumentierte Compose-Restore mit schreibgeschuetztem Backup (0444): die Datenbank bleibt schreibbar', async () => {
+  const backupPath = await bigBackup(null, 'aus dem Backup');
+  chmodSync(backupPath, 0o444);
+  const target = await frozenTarget(null, 'vor dem Restore');
+  target.mod.get().close();
+  const run = runComposeRestore(backupPath, target.dbPath);
+  assert.equal(run.status, 0, `der Befehl muss gelingen: ${run.stderr}`);
+  assert.equal(statSync(target.dbPath).mode & 0o777, 0o600, 'die eingespielte Datei ist 0600, nicht die 0444 des Backups');
+  const mod = await bootDb(target.dbPath, null);
+  assert.equal(mod.get().prepare('SELECT note FROM restore_probe LIMIT 1').get()?.note, 'aus dem Backup');
+  mod.get().prepare('INSERT INTO restore_probe (note) VALUES (?)').run('schreibbar');
+  mod.get().close();
+});
