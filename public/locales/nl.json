@@ -2798,6 +2798,7 @@
         "backupRestoreErrorDamaged": "De back-up is beschadigd of onvolledig; de sleutel klopt. Haal het bestand opnieuw op, vergelijk grootte en sha256sum met het origineel en herstel die kopie. Hier is niets gewijzigd.",
         "backupRestoreErrorCorrupt": "De back-up is beschadigd of onvolledig. Haal het bestand opnieuw op, vergelijk grootte en sha256sum met het origineel en herstel die kopie, of gebruik een oudere back-up. Hier is niets gewijzigd.",
         "backupRestoreErrorInProgress": "Op deze installatie loopt al een herstel. Wacht tot het klaar is en controleer welke back-up actief is voordat je opnieuw herstelt. Dit verzoek heeft niets gewijzigd.",
+        "backupRestoreErrorBusy": "Yuvomi is nog bezig, bijvoorbeeld met een synchronisatie of een back-up, daarom is het herstel niet begonnen. Hier is niets gewijzigd. Probeer het zo meteen opnieuw.",
         "backupRestoreErrorUnreadable": "De back-up kon niet worden gelezen. Controleer of het bestand volledig is en probeer het opnieuw; de precieze oorzaak staat in het serverlog. Hier is niets gewijzigd.",
         "backupRestoreErrorGeneric": "Het herstel is mislukt. De precieze oorzaak staat in het serverlog.",
         "backupRestoreErrorNeverEncrypted": "Is het bestand nooit versleuteld, dan is het geen geldige Yuvomi-database.",

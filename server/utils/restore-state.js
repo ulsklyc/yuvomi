@@ -74,26 +74,73 @@ const activeWriteRequests = new Set();
  * Eine zugelassene schreibende Anfrage bis zu ihrem Ende festhalten.
  * @param {import('node:http').ServerResponse} res
  */
+const TRACKED = Symbol('yuvomi.restore.trackedWrite');
+
 export function trackWriteRequest(res) {
+  if (res[TRACKED]) return;
   let done;
   const finished = new Promise((resolve) => { done = resolve; });
   const tracked = finished.finally(() => activeWriteRequests.delete(tracked));
   activeWriteRequests.add(tracked);
+  res[TRACKED] = done;
   res.once('finish', done);
   res.once('close', done);
+}
+
+/**
+ * Eine Anfrage wieder freigeben, bevor sie endet. Die Restore-Route ruft das
+ * fuer sich selbst - der Restore wartete sonst auf seine eigene Anfrage. An
+ * der Route statt ueber einen Pfadvergleich: `/restore/` oder eine andere
+ * Schreibweise, die Express genauso annimmt, entgeht so nicht (Review #1431).
+ * @param {import('node:http').ServerResponse} res
+ */
+export function untrackWriteRequest(res) {
+  res[TRACKED]?.();
 }
 
 export function hasActiveWriteRequests() {
   return activeWriteRequests.size > 0;
 }
 
+/** Was gerade noch schreibt: laufende Jobs und zugelassene Anfragen. */
+export function activeWriters() {
+  return [...activeJobs, ...activeWriteRequests];
+}
+
 /**
- * Laufende Jobs UND zugelassene schreibende Anfragen abwarten. Ohne Zeitgrenze
- * - ein haengender Anbieter oder ein Upload, der nie endet, haelt den Restore
- * auf (Folge-Ticket).
+ * Wie lange ein Restore hoechstens auf laufende Jobs, Backups und Anfragen
+ * wartet, bevor er aufgibt (Review #1431). Ein haengender Anbieter oder ein
+ * Upload, der nie endet, haelt ihn so nicht ewig auf; er bricht dann ab, bevor
+ * er irgendetwas aendert.
  */
-export async function waitForWritersToFinish() {
-  while (activeJobs.size > 0 || activeWriteRequests.size > 0) {
-    await Promise.allSettled([...activeJobs, ...activeWriteRequests]);
+export const RESTORE_WAIT_TIMEOUT_MS = 60_000;
+let waitTimeoutMs = RESTORE_WAIT_TIMEOUT_MS;
+
+export function restoreWaitTimeoutMs() {
+  return waitTimeoutMs;
+}
+
+/** NUR FUER TESTS: die Frist kuerzer stellen; ohne Argument zurueck auf den Standard. */
+export function setRestoreWaitTimeoutForTests(ms = RESTORE_WAIT_TIMEOUT_MS) {
+  waitTimeoutMs = ms;
+}
+
+/**
+ * Warten, bis `pending()` leer ist - hoechstens bis `deadline`.
+ * @param {() => Promise<unknown>[]} pending
+ * @param {number} deadline  Zeitpunkt in ms
+ * @returns {Promise<boolean>} `true`, wenn alles fertig ist; `false` bei Fristablauf
+ */
+export async function waitUntilIdle(pending, deadline) {
+  for (let open = pending(); open.length > 0; open = pending()) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) return false;
+    let timer;
+    const expired = new Promise((resolve) => { timer = setTimeout(() => resolve(true), remaining); });
+    timer.unref?.();
+    const timedOut = await Promise.race([Promise.allSettled(open).then(() => false), expired]);
+    clearTimeout(timer);
+    if (timedOut) return false;
   }
+  return true;
 }

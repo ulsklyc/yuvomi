@@ -24,7 +24,7 @@ import fs from 'node:fs/promises';
 import { mkdirSync, existsSync, renameSync, linkSync, rmSync, copyFileSync, openSync, readSync, closeSync, statSync, readdirSync, constants as fsConstants } from 'node:fs';
 import { createLogger } from './logger.js';
 import { RESTORE_IN_PROGRESS_MESSAGE, RESTORE_IN_PROGRESS_REASON } from './utils/restore-messages.js';
-import { setRestoreRunning, waitForExternalJobs, hasActiveExternalJobs, waitForWritersToFinish } from './utils/restore-state.js';
+import { setRestoreRunning, activeWriters, restoreWaitTimeoutMs, waitUntilIdle } from './utils/restore-state.js';
 import { decodeHtmlEntities } from './utils/html-entities.js';
 import { toE164, defaultCountryFromConfig } from './utils/phone.js';
 
@@ -10540,7 +10540,9 @@ async function restoreFromFile(sourcePath, { backupKey = null } = {}) {
     // schreibende Requests weist `restoreWriteGate` ab derselben Zeile ab.
     // Schon zugelassene schreibende Requests laufen zu Ende und landen in der
     // alten Datenbank, nie in der eingespielten (Codex-Befund in #1431).
-    await waitForWritersToFinish();
+    // Hoechstens `restoreWaitTimeoutMs()` lang, dann Abbruch vor jeder
+    // Aenderung (Review #1431).
+    await waitForQuietOrGiveUp();
     // Ab jetzt nimmt die laufende Verbindung keine Schreibzugriffe mehr an
     // (Codex-Befund in #1431): seit die Arbeitsdatei VOR dem Schliessen kopiert
     // wird, bleibt sie waehrenddessen offen, und ein Schreibzugriff meldete
@@ -10554,6 +10556,26 @@ async function restoreFromFile(sourcePath, { backupKey = null } = {}) {
     setRestoreRunning(false);
     try { db?.pragma('query_only = OFF'); } catch { /* best effort */ }
   }
+}
+
+/**
+ * Auf laufende Backups, Jobs und zugelassene Anfragen warten - hoechstens
+ * `restoreWaitTimeoutMs()`. Laeuft die Frist ab, bricht der Restore ab, bevor er
+ * die Verbindung sperrt oder etwas aendert, mit einem Grund, den der Dialog
+ * uebersetzt (Review #1431).
+ */
+async function waitForQuietOrGiveUp() {
+  const quiet = await waitUntilIdle(
+    () => [...activeBackups, ...activeWriters()],
+    Date.now() + restoreWaitTimeoutMs()
+  );
+  if (quiet) return;
+  const seconds = Math.round(restoreWaitTimeoutMs() / 1000);
+  throw restoreError(
+    `Yuvomi is still busy: a sync, a backup or a request had not finished after ${seconds} seconds, `
+    + 'so the restore did not start. Nothing on this instance was changed. Try again in a moment.',
+    'restore_busy'
+  );
 }
 
 /** Laeuft gerade ein Restore? Fuer `restoreWriteGate`. */
@@ -10882,10 +10904,13 @@ async function restoreValidatedFile(sourcePath) {
     // Laufende Backups zu Ende kommen lassen. Zwischen dem letzten Blick auf
     // `activeBackups` und `db.close()` steht kein await: ein neues Backup kann
     // dort nicht mehr beginnen, und danach findet es keine Verbindung.
-    while (activeBackups.size > 0 || hasActiveExternalJobs()) {
-      await Promise.allSettled([...activeBackups]);
-      await waitForExternalJobs();
-    }
+    // Waehrend des Kopierens kann ein Download ein Backup begonnen haben.
+    // Scheitert das Warten, raeumt der catch unten die Arbeitsdatei weg - die
+    // Datenbank ist noch nicht angefasst. Die Schleife prueft nach dem letzten
+    // await noch einmal synchron - erst dann ist die Luecke zu.
+    do {
+      await waitForQuietOrGiveUp();
+    } while (activeBackups.size > 0 || activeWriters().length > 0);
     if (db) {
       try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* best effort */ }
       db.close();

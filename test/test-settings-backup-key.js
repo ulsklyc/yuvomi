@@ -46,7 +46,7 @@ test('Gruende: Schluessel gefragt zeigt das Feld, bewiesener Schluessel behaelt 
     assert.equal(keyFieldAfterError(reason), 'show', reason);
   }
   // Der Schluessel stimmte, die Datei war kaputt: nicht leeren (Review #1417).
-  for (const reason of ['backup_damaged', 'backup_unreadable', 'backup_corrupt', 'restore_in_progress']) {
+  for (const reason of ['backup_damaged', 'backup_unreadable', 'backup_corrupt', 'restore_in_progress', 'restore_busy']) {
     assert.equal(keyFieldAfterError(reason), 'keep', reason);
   }
   for (const reason of ['own_key_missing', undefined, 'irgendwas']) {
@@ -62,7 +62,7 @@ test('jeder Grund, den der Server kennt, hat im Dialog eine Regel', () => {
   const reasons = new Set([...`${db}\n${route}`.matchAll(/'((?:backup|own|restore)_[a-z_]+)'/g)].map((m) => m[1]));
   const known = {
     backup_key_required: 'show', backup_key_wrong: 'show', backup_key_invalid: 'show',
-    backup_damaged: 'keep', backup_unreadable: 'keep', backup_corrupt: 'keep', restore_in_progress: 'keep', own_key_missing: 'reset',
+    backup_damaged: 'keep', backup_unreadable: 'keep', backup_corrupt: 'keep', restore_in_progress: 'keep', restore_busy: 'keep', own_key_missing: 'reset',
   };
   assert.deepEqual([...reasons].sort(), Object.keys(known).sort(), 'Gruende im Server');
   for (const [reason, action] of Object.entries(known)) assert.equal(keyFieldAfterError(reason), action, reason);
@@ -227,6 +227,7 @@ test('Fehlertext: jeder bekannte Grund hat einen eigenen Key, ein unbekannter de
     backup_unreadable: ['settings.backupRestoreErrorUnreadable'],
     backup_corrupt: ['settings.backupRestoreErrorCorrupt'],
     restore_in_progress: ['settings.backupRestoreErrorInProgress'],
+    restore_busy: ['settings.backupRestoreErrorBusy'],
   };
   for (const [reason, keys] of Object.entries(expected)) {
     assert.equal(restoreErrorText({ message: LONG_ENGLISH, data: { reason } }), keys.join(' '), reason);

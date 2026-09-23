@@ -220,9 +220,16 @@ test('#1431 eine schreibende Anfrage, die vor dem Restore begann, wird abgewarte
   const marker = `waehrend-des-restores-${Date.now()}`;
   const body = JSON.stringify({ title: 'Upload', content: marker });
   const order = [];
+  // Der Restore darf nicht fertig werden, bevor die Anfrage beantwortet ist:
+  // sonst liefe sie ganz danach und waere schlicht eine spaetere Anfrage.
+  let answered;
+  const requestDone = new Promise((resolve) => { answered = resolve; });
   const realCopyFile = fsp.copyFile;
   fsp.copyFile = async (src, dest, mode) => {
-    if (String(src) === backupPath) order.push('Restore kopiert');
+    if (String(src) === backupPath) {
+      order.push('Restore kopiert');
+      await requestDone;
+    }
     return realCopyFile(src, dest, mode);
   };
   let restore;
@@ -240,7 +247,7 @@ test('#1431 eine schreibende Anfrage, die vor dem Restore begann, wird abgewarte
         let text = '';
         res.setEncoding('utf8');
         res.on('data', (chunk) => { text += chunk; });
-        res.on('end', () => { order.push('Anfrage fertig'); resolve({ status: res.statusCode, body: text }); });
+        res.on('end', () => { order.push('Anfrage fertig'); answered(); resolve({ status: res.statusCode, body: text }); });
       });
       req.on('error', reject);
       // Kopf und die erste Haelfte: die Anfrage ist zugelassen, der Koerper
@@ -253,10 +260,80 @@ test('#1431 eine schreibende Anfrage, die vor dem Restore begann, wird abgewarte
     });
     await restore;
   } finally {
+    answered();
     fsp.copyFile = realCopyFile;
   }
-  assert.ok([200, 201].includes(answer.status), `die Anfrage laeuft zu Ende: ${answer.status} ${answer.body}`);
-  assert.deepEqual(order, ['Anfrage fertig', 'Restore kopiert'], 'erst die Anfrage, dann der Restore');
+  // Zwei zulaessige Ausgaenge: die Anfrage war schon festgehalten und lief vor
+  // dem Restore zu Ende (landet in der alten Datenbank), oder sie las ihren
+  // Koerper noch, als der Restore begann, und wird abgewiesen. Nie: Erfolg
+  // nach dem Kopieren, also in der neuen Datenbank.
+  if ([200, 201].includes(answer.status)) {
+    assert.deepEqual(order, ['Anfrage fertig', 'Restore kopiert'], 'erst die Anfrage, dann der Restore');
+  } else {
+    assert.equal(answer.status, 503, `abgewiesen: ${answer.status} ${answer.body}`);
+    assert.equal(JSON.parse(answer.body).reason, 'restore_in_progress');
+  }
   const inNewDb = dbmod.get().prepare('SELECT COUNT(*) AS n FROM notes WHERE content = ?').get(marker).n;
   assert.equal(inNewDb, 0, 'die Notiz steht nicht in der eingespielten Datenbank');
+});
+
+/** POST mit halbem Koerper; `finish()` schickt den Rest und liefert die Antwort. */
+function slowPost(path, { cookie, csrf, body }) {
+  const url = new URL(`${BASE}${path}`);
+  let resolveAnswer;
+  const answer = new Promise((resolve) => { resolveAnswer = resolve; });
+  const headers = { 'Content-Type': 'application/json', 'Content-Length': String(Buffer.byteLength(body)) };
+  if (cookie) headers.Cookie = cookie;
+  if (csrf) headers['X-CSRF-Token'] = csrf;
+  const req = http.request({ host: url.hostname, port: url.port, path: url.pathname, method: 'POST', headers }, (res) => {
+    let text = '';
+    res.setEncoding('utf8');
+    res.on('data', (chunk) => { text += chunk; });
+    res.on('end', () => resolveAnswer({ status: res.statusCode, body: text }));
+  });
+  req.on('error', () => resolveAnswer({ status: 0, body: '' }));
+  req.write(body.slice(0, 5));
+  return { finish: () => { req.end(body.slice(5)); return answer; } };
+}
+
+function within(promise, ms) {
+  let timer;
+  return Promise.race([
+    promise.then(() => 'fertig'),
+    new Promise((resolve) => { timer = setTimeout(() => resolve('haengt'), ms); }),
+  ]).finally(() => clearTimeout(timer));
+}
+
+test('#1431 eine unangemeldete Anfrage mit langsamem Koerper haelt den Restore nicht auf', async () => {
+  const backupPath = join(tempDir('yuvomi-test-restore-server-'), 'backup.db');
+  await dbmod.backupToFile(backupPath);
+  const slow = slowPost('/api/v1/notes', { body: JSON.stringify({ content: 'von aussen' }) });
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const restore = dbmod.restoreFromFile(backupPath);
+  const outcome = await within(restore, 5000);
+  await slow.finish();
+  await restore;
+  assert.equal(outcome, 'fertig', 'der Restore darf nicht auf eine unangemeldete Anfrage warten');
+});
+
+test('#1431 ein Restore ueber /api/v1/backup/restore/ (mit Schraegstrich) wartet nicht auf sich selbst', async () => {
+  const me = await fetch(`${BASE}/api/v1/notes`, { headers: { Cookie: COOKIE } });
+  const csrf = me.headers.get('x-csrf-token');
+  const backupPath = join(tempDir('yuvomi-test-restore-server-'), 'backup.db');
+  await dbmod.backupToFile(backupPath);
+  const { readFileSync } = await import('node:fs');
+  const upload = fetch(`${BASE}/api/v1/backup/restore/`, {
+    method: 'POST',
+    headers: { Cookie: COOKIE, 'X-CSRF-Token': csrf, 'Content-Type': 'application/octet-stream' },
+    body: readFileSync(backupPath),
+    signal: AbortSignal.timeout(15000),
+  });
+  let res;
+  try {
+    res = await upload;
+  } catch (err) {
+    assert.fail(`der Restore haengt (wartet auf seine eigene Anfrage): ${err.name}`);
+  }
+  const body = await res.text();
+  assert.equal(res.status, 200, `Restore mit Schraegstrich: ${res.status} ${body}`);
 });

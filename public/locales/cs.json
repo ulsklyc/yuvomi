@@ -2798,6 +2798,7 @@
         "backupRestoreErrorDamaged": "Záloha je poškozená nebo neúplná, klíč je správný. Stáhněte soubor znovu, porovnejte velikost a sha256sum s originálem a obnovte tuto kopii. Nic zde nebylo změněno.",
         "backupRestoreErrorCorrupt": "Záloha je poškozená nebo neúplná. Stáhněte soubor znovu, porovnejte velikost a sha256sum s originálem a obnovte tuto kopii, nebo použijte starší zálohu. Nic zde nebylo změněno.",
         "backupRestoreErrorInProgress": "Na této instalaci už probíhá obnova. Počkejte, až skončí, a než obnovíte znovu, zkontrolujte, která záloha je nasazena. Tento požadavek nic nezměnil.",
+        "backupRestoreErrorBusy": "Yuvomi je ještě zaneprázdněné, například synchronizací nebo zálohou, proto obnova nezačala. Nic zde nebylo změněno. Zkuste to za chvíli znovu.",
         "backupRestoreErrorUnreadable": "Zálohu se nepodařilo přečíst. Zkontrolujte, zda je soubor úplný, a zkuste to znovu; přesná příčina je v logu serveru. Nic zde nebylo změněno.",
         "backupRestoreErrorGeneric": "Obnovení se nezdařilo. Přesná příčina je v logu serveru.",
         "backupRestoreErrorNeverEncrypted": "Pokud soubor nikdy nebyl šifrovaný, není platnou databází Yuvomi.",

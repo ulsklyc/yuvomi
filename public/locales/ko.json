@@ -2810,6 +2810,7 @@
         "backupRestoreErrorDamaged": "백업이 손상되었거나 불완전합니다. 키는 맞습니다. 파일을 다시 가져와 크기와 sha256sum을 원본과 비교한 뒤 그 사본을 복원하세요. 여기서는 아무것도 바뀌지 않았습니다.",
         "backupRestoreErrorCorrupt": "백업이 손상되었거나 불완전합니다. 파일을 다시 가져와 크기와 sha256sum을 원본과 비교한 뒤 그 사본을 복원하거나, 더 오래된 백업을 사용하세요. 여기서는 아무것도 바뀌지 않았습니다.",
         "backupRestoreErrorInProgress": "이 설치에서 이미 복원이 진행 중입니다. 끝날 때까지 기다린 뒤, 다시 복원하기 전에 어떤 백업이 적용되어 있는지 확인하세요. 이 요청은 아무것도 바꾸지 않았습니다.",
+        "backupRestoreErrorBusy": "Yuvomi가 아직 동기화나 백업 등으로 바빠서 복원이 시작되지 않았습니다. 여기서는 아무것도 바뀌지 않았습니다. 잠시 후 다시 시도하세요.",
         "backupRestoreErrorUnreadable": "백업을 읽을 수 없습니다. 파일이 완전한지 확인하고 다시 시도하세요. 정확한 원인은 서버 로그에 있습니다. 여기서는 아무것도 바뀌지 않았습니다.",
         "backupRestoreErrorGeneric": "복원에 실패했습니다. 정확한 원인은 서버 로그에 있습니다.",
         "backupRestoreErrorNeverEncrypted": "파일이 한 번도 암호화되지 않았다면 유효한 Yuvomi 데이터베이스가 아닙니다.",

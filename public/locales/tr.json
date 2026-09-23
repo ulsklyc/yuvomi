@@ -2798,6 +2798,7 @@
         "backupRestoreErrorDamaged": "Yedek hasarlı veya eksik; anahtar doğru. Dosyayı yeniden alın, boyutunu ve sha256sum değerini asılla karşılaştırın ve o kopyayı geri yükleyin. Burada hiçbir şey değiştirilmedi.",
         "backupRestoreErrorCorrupt": "Yedek hasarlı veya eksik. Dosyayı yeniden alın, boyutunu ve sha256sum değerini asılla karşılaştırın ve o kopyayı geri yükleyin ya da daha eski bir yedek kullanın. Burada hiçbir şey değiştirilmedi.",
         "backupRestoreErrorInProgress": "Bu kurulumda zaten bir geri yükleme çalışıyor. Bitmesini bekleyin, ardından yeniden geri yüklemeden önce hangi yedeğin yüklü olduğunu kontrol edin. Bu istek hiçbir şeyi değiştirmedi.",
+        "backupRestoreErrorBusy": "Yuvomi hâlâ meşgul, örneğin bir eşitleme veya yedekleme ile, bu yüzden geri yükleme başlamadı. Burada hiçbir şey değiştirilmedi. Birazdan yeniden deneyin.",
         "backupRestoreErrorUnreadable": "Yedek okunamadı. Dosyanın eksiksiz olduğunu kontrol edip yeniden deneyin; kesin neden sunucu günlüğünde. Burada hiçbir şey değiştirilmedi.",
         "backupRestoreErrorGeneric": "Geri yükleme başarısız oldu. Kesin neden sunucu günlüğünde.",
         "backupRestoreErrorNeverEncrypted": "Dosya hiç şifrelenmediyse geçerli bir Yuvomi veritabanı değildir.",

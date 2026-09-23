@@ -26,9 +26,18 @@ import {
 } from '../utils/restore-messages.js';
 import { isRestoreRunning as restoreStateRunning, trackWriteRequest } from '../utils/restore-state.js';
 
+
 const READING_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 const RESTORE_PATH = '/api/v1/backup/restore';
+
+/**
+ * Der Restore-Pfad so, wie Express ihn annimmt: ohne Beachtung von Gross- und
+ * Kleinschreibung und mit oder ohne Schraegstrich am Ende (Review #1431).
+ */
+function isRestorePath(pathOnly) {
+  return pathOnly.replace(/\/+$/, '').toLowerCase() === RESTORE_PATH;
+}
 
 /** Pfade, deren Antworten die Datenbank brauchen. Statische Dateien gehoeren nicht dazu. */
 function needsDatabase(pathOnly) {
@@ -54,17 +63,11 @@ function refuse(res, status, error) {
  */
 export function createRestoreWriteGate(isRestoreRunning, isDatabaseOpen = () => true) {
   return function restoreWriteGate(req, res, next) {
+    if (!isRestoreRunning()) return next();
     const pathOnly = (req.originalUrl || req.url || '').split('?')[0];
-    if (!isRestoreRunning()) {
-      // Zugelassene schreibende Anfragen festhalten, bis sie fertig sind: ein
-      // spaeter beginnender Restore wartet sie ab (Codex-Befund in #1431). Die
-      // Restore-Anfrage selbst nicht - sie wartete sonst auf sich selbst.
-      if (!READING_METHODS.has(req.method) && pathOnly !== RESTORE_PATH) trackWriteRequest(res);
-      return next();
-    }
     // Ein zweiter Restore bekommt immer 409, auch bei geschlossener Verbindung:
     // die Antwort betrifft den laufenden Restore, nicht die Datenbank (Review #1431).
-    if (pathOnly === RESTORE_PATH && !READING_METHODS.has(req.method)) {
+    if (isRestorePath(pathOnly) && !READING_METHODS.has(req.method)) {
       return refuse(res, 409, RESTORE_IN_PROGRESS_MESSAGE);
     }
     if (!isDatabaseOpen() && needsDatabase(pathOnly)) {
@@ -85,4 +88,21 @@ export function createRestoreWriteGate(isRestoreRunning, isDatabaseOpen = () => 
 export function refuseWhileRestoring(_req, res, next) {
   if (!restoreStateRunning()) return next();
   return refuse(res, 503, RESTORE_WRITE_REFUSED_MESSAGE);
+}
+
+/**
+ * Hinter `requireAuth`: eine zugelassene schreibende Anfrage mit fester
+ * Identitaet festhalten, bis sie endet - ein Restore, der danach beginnt,
+ * wartet sie ab (Codex-Befund in #1431). Erst hier und nicht im Gate: eine
+ * unangemeldete Anfrage mit langsamem Koerper hielte sonst jeden Restore auf
+ * (Review #1431). Hat ein Restore inzwischen begonnen - die Anfrage war vor ihm
+ * am Gate, hat aber noch ihren Koerper gelesen -, wird sie abgewiesen: sie
+ * schriebe sonst an ihm vorbei.
+ * @type {import('express').RequestHandler}
+ */
+export function trackAdmittedWrite(req, res, next) {
+  if (READING_METHODS.has(req.method)) return next();
+  if (restoreStateRunning()) return refuse(res, 503, RESTORE_WRITE_REFUSED_MESSAGE);
+  trackWriteRequest(res);
+  return next();
 }

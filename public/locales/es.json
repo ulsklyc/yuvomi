@@ -2798,6 +2798,7 @@
         "backupRestoreErrorDamaged": "La copia de seguridad está dañada o incompleta; la clave es correcta. Vuelve a obtener el archivo, compara su tamaño y sha256sum con el original y restaura esa copia. Aquí no se ha cambiado nada.",
         "backupRestoreErrorCorrupt": "La copia de seguridad está dañada o incompleta. Vuelve a obtener el archivo, compara su tamaño y sha256sum con el original y restaura esa copia, o usa una copia de seguridad anterior. Aquí no se ha cambiado nada.",
         "backupRestoreErrorInProgress": "Ya hay una restauración en curso en esta instalación. Espera a que termine y comprueba qué copia de seguridad está activa antes de restaurar de nuevo. Esta solicitud no ha cambiado nada.",
+        "backupRestoreErrorBusy": "Yuvomi todavía está ocupado, por ejemplo con una sincronización o una copia de seguridad, así que la restauración no ha empezado. Aquí no se ha cambiado nada. Inténtalo de nuevo en un momento.",
         "backupRestoreErrorUnreadable": "No se pudo leer la copia de seguridad. Comprueba que el archivo esté completo e inténtalo de nuevo; la causa exacta está en el registro del servidor. Aquí no se ha cambiado nada.",
         "backupRestoreErrorGeneric": "La restauración ha fallado. La causa exacta está en el registro del servidor.",
         "backupRestoreErrorNeverEncrypted": "Si el archivo nunca se cifró, no es una base de datos válida de Yuvomi.",

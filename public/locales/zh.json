@@ -2798,6 +2798,7 @@
         "backupRestoreErrorDamaged": "备份已损坏或不完整；密钥正确。请重新获取文件，将其大小和 sha256sum 与原件比对，然后恢复该副本。此处未做任何更改。",
         "backupRestoreErrorCorrupt": "备份已损坏或不完整。请重新获取文件，将其大小和 sha256sum 与原件比对，然后恢复该副本，或使用较早的备份。此处未做任何更改。",
         "backupRestoreErrorInProgress": "此安装上已有一个恢复正在进行。请等待其完成，并在再次恢复前检查当前使用的是哪个备份。此请求未做任何更改。",
+        "backupRestoreErrorBusy": "Yuvomi 仍在忙碌（例如同步或备份），因此恢复没有开始。此处未做任何更改。请稍后再试。",
         "backupRestoreErrorUnreadable": "无法读取备份。请检查文件是否完整后重试；确切原因记录在服务器日志中。此处未做任何更改。",
         "backupRestoreErrorGeneric": "恢复失败。确切原因记录在服务器日志中。",
         "backupRestoreErrorNeverEncrypted": "如果该文件从未加密，它就不是有效的 Yuvomi 数据库。",

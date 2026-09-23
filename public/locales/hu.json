@@ -2798,6 +2798,7 @@
         "backupRestoreErrorDamaged": "A biztonsági mentés sérült vagy hiányos; a kulcs helyes. Szerezd be újra a fájlt, vesd össze a méretét és a sha256sum értékét az eredetivel, és azt a másolatot állítsd vissza. Itt semmi sem változott.",
         "backupRestoreErrorCorrupt": "A biztonsági mentés sérült vagy hiányos. Szerezd be újra a fájlt, vesd össze a méretét és a sha256sum értékét az eredetivel, és azt a másolatot állítsd vissza, vagy használj egy régebbi biztonsági mentést. Itt semmi sem változott.",
         "backupRestoreErrorInProgress": "Ezen a telepítésen már fut egy visszaállítás. Várd meg, amíg befejeződik, majd ellenőrizd, melyik biztonsági mentés van érvényben, mielőtt újra visszaállítasz. Ez a kérés semmit sem változtatott.",
+        "backupRestoreErrorBusy": "A Yuvomi még elfoglalt, például egy szinkronizálással vagy biztonsági mentéssel, ezért a visszaállítás nem indult el. Itt semmi sem változott. Próbáld újra egy kicsit később.",
         "backupRestoreErrorUnreadable": "A biztonsági mentést nem sikerült beolvasni. Ellenőrizd, hogy a fájl teljes-e, és próbáld újra; a pontos ok a szervernaplóban van. Itt semmi sem változott.",
         "backupRestoreErrorGeneric": "A visszaállítás nem sikerült. A pontos ok a szervernaplóban van.",
         "backupRestoreErrorNeverEncrypted": "Ha a fájl soha nem volt titkosítva, akkor nem érvényes Yuvomi-adatbázis.",

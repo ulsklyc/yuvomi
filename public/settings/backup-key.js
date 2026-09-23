@@ -59,7 +59,7 @@ const SHOW_REASONS = new Set(['backup_key_required', 'backup_key_wrong', 'backup
  * Abtippen scheitert. `restore_in_progress` (ein anderer Restore laeuft noch)
  * sagt ueber Datei und Schluessel gar nichts - auch dann bleibt beides.
  */
-const KEEP_REASONS = new Set(['backup_damaged', 'backup_unreadable', 'backup_corrupt', 'restore_in_progress']);
+const KEEP_REASONS = new Set(['backup_damaged', 'backup_unreadable', 'backup_corrupt', 'restore_in_progress', 'restore_busy']);
 
 /**
  * Was nach einem gescheiterten Restore mit dem Feld geschieht.
@@ -106,6 +106,8 @@ export const REASON_TEXT = Object.freeze({
   // Ohne Satz ueber den Schluessel: auch ein Klartext-Backup kann es treffen.
   backup_corrupt: () => t('settings.backupRestoreErrorCorrupt'),
   restore_in_progress: () => t('settings.backupRestoreErrorInProgress'),
+  // Noch laufende Arbeit, der Restore hat nach seiner Frist aufgegeben (#1431).
+  restore_busy: () => t('settings.backupRestoreErrorBusy'),
 });
 
 /**

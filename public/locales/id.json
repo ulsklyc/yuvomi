@@ -2810,6 +2810,7 @@
         "backupRestoreErrorDamaged": "Cadangan rusak atau tidak lengkap; kuncinya benar. Ambil file lagi, bandingkan ukuran dan sha256sum dengan aslinya, lalu pulihkan salinan itu. Tidak ada yang diubah di sini.",
         "backupRestoreErrorCorrupt": "Cadangan rusak atau tidak lengkap. Ambil file lagi, bandingkan ukuran dan sha256sum dengan aslinya, lalu pulihkan salinan itu, atau gunakan cadangan yang lebih lama. Tidak ada yang diubah di sini.",
         "backupRestoreErrorInProgress": "Pemulihan sudah berjalan di instalasi ini. Tunggu hingga selesai, lalu periksa cadangan mana yang terpasang sebelum memulihkan lagi. Permintaan ini tidak mengubah apa pun.",
+        "backupRestoreErrorBusy": "Yuvomi masih sibuk, misalnya dengan sinkronisasi atau cadangan, jadi pemulihan belum dimulai. Tidak ada yang diubah di sini. Coba lagi sebentar lagi.",
         "backupRestoreErrorUnreadable": "Cadangan tidak dapat dibaca. Pastikan file lengkap lalu coba lagi; penyebab pastinya ada di log server. Tidak ada yang diubah di sini.",
         "backupRestoreErrorGeneric": "Pemulihan gagal. Penyebab pastinya ada di log server.",
         "backupRestoreErrorNeverEncrypted": "Jika file tidak pernah dienkripsi, file ini bukan database Yuvomi yang valid.",

@@ -1627,3 +1627,57 @@ test(
     target.mod.get().close();
   }
 );
+
+// ---------------------------------------------------------------------------
+// Letzte Runde #1431
+// ---------------------------------------------------------------------------
+
+test('#1431 haengt eine Anfrage laenger als die Frist, bricht der Restore vor jeder Aenderung ab', async () => {
+  const state = await import('../server/utils/restore-state.js');
+  const { EventEmitter } = await import('node:events');
+  const backupPath = await bigBackup(KEY, 'aus dem Backup');
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  const hanging = new EventEmitter();
+  state.trackWriteRequest(hanging);
+  state.setRestoreWaitTimeoutForTests?.(300);
+  let outcome;
+  try {
+    const restore = target.mod.restoreFromFile(backupPath).then(
+      () => 'eingespielt',
+      (err) => err.reason ?? err.message
+    );
+    let timer;
+    outcome = await Promise.race([
+      restore,
+      new Promise((resolve) => { timer = setTimeout(() => resolve('haengt'), 3000); }),
+    ]);
+    clearTimeout(timer);
+  } finally {
+    hanging.emit('finish');
+    state.setRestoreWaitTimeoutForTests?.();
+  }
+  assert.equal(outcome, 'restore_busy', 'nach der Frist ein Abbruch mit eigenem Grund');
+  assert.equal(target.mod.isRestoreRunning(), false, 'der Riegel ist wieder offen');
+  assertUntouched(target, 'vor dem Restore');
+  target.mod.get().prepare('INSERT INTO restore_probe (note) VALUES (?)').run('danach');
+  target.mod.get().close();
+});
+
+test('#1431 trackAdmittedWrite weist eine Anfrage ab, die erst nach Restore-Beginn an der Anmeldung ankommt', async () => {
+  const state = await import('../server/utils/restore-state.js');
+  const { trackAdmittedWrite } = await import('../server/middleware/restore-gate.js');
+  const res = { statusCode: 200, body: null, headers: {},
+    once() {}, setHeader(k, v) { this.headers[k] = v; },
+    status(code) { this.statusCode = code; return this; },
+    json(body) { this.body = body; return this; } };
+  let passed = false;
+  state.setRestoreRunning(true);
+  try {
+    trackAdmittedWrite({ method: 'POST' }, res, () => { passed = true; });
+  } finally {
+    state.setRestoreRunning(false);
+  }
+  assert.equal(passed, false);
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.reason, 'restore_in_progress');
+});
