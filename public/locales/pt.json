@@ -1123,6 +1123,7 @@
         "phonePreview": "Pré-visualização: {{value}}",
         "phoneImplausible": "Este número parece incompleto - será guardado mesmo assim.",
         "emailLabel": "E-mail",
+        "emailLockedHint": "Estes endereços pertencem à conta deste membro. Só o próprio membro ou um administrador pode alterá-los.",
         "emailPlaceholder": "nome@exemplo.com",
         "addressLabel": "Endereço",
         "addressPlaceholder": "Rua, Cidade",

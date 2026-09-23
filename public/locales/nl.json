@@ -1123,6 +1123,7 @@
         "phonePreview": "Voorbeeld: {{value}}",
         "phoneImplausible": "Dit nummer lijkt onvolledig - het wordt toch opgeslagen.",
         "emailLabel": "E-mail",
+        "emailLockedHint": "Deze adressen horen bij het account van dit lid. Alleen het lid zelf of een beheerder kan ze wijzigen.",
         "emailPlaceholder": "naam@voorbeeld.nl",
         "addressLabel": "Adres",
         "addressPlaceholder": "Straat, postcode Plaats",

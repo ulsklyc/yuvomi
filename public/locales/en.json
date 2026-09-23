@@ -1123,6 +1123,7 @@
         "phonePreview": "Preview: {{value}}",
         "phoneImplausible": "This number looks incomplete - it will still be saved.",
         "emailLabel": "Email",
+        "emailLockedHint": "These addresses belong to this member's account. Only the member or an admin can change them.",
         "emailPlaceholder": "name@example.com",
         "addressLabel": "Address",
         "addressPlaceholder": "Street, ZIP City",

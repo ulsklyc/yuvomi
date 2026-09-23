@@ -1123,6 +1123,7 @@
         "phonePreview": "Önizleme: {{value}}",
         "phoneImplausible": "Bu numara eksik görünüyor - yine de kaydedilecek.",
         "emailLabel": "E-posta",
+        "emailLockedHint": "Bu adresler bu üyenin hesabına aittir. Yalnızca üyenin kendisi veya bir yönetici değiştirebilir.",
         "emailPlaceholder": "ad@ornek.com.tr",
         "addressLabel": "Adres",
         "addressPlaceholder": "Sokak, Posta Kodu Şehir",

@@ -1123,6 +1123,7 @@
         "phonePreview": "पूर्वावलोकन: {{value}}",
         "phoneImplausible": "यह नंबर अधूरा लगता है - फिर भी सहेजा जाएगा।",
         "emailLabel": "ईमेल",
+        "emailLockedHint": "ये पते इस सदस्य के खाते से जुड़े हैं। इन्हें केवल वह सदस्य स्वयं या कोई एडमिन बदल सकता है।",
         "emailPlaceholder": "name@example.com",
         "addressLabel": "पता",
         "addressPlaceholder": "सड़क, शहर",

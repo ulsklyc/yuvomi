@@ -1123,6 +1123,7 @@
         "phonePreview": "プレビュー: {{value}}",
         "phoneImplausible": "この番号は不完全のようです - それでも保存されます。",
         "emailLabel": "メール",
+        "emailLockedHint": "これらのアドレスはこのメンバーのアカウントに属しています。変更できるのは本人または管理者のみです。",
         "emailPlaceholder": "name@example.com",
         "addressLabel": "住所",
         "addressPlaceholder": "町名、都市",

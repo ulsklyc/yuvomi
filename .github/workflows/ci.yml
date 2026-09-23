@@ -105,3 +105,32 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+  # DIE EINZIGE BROWSER-SUITE IN DER CI (Entscheidung vom 23.9.2026). Die uebrigen
+  # Browser-Suiten haengen an `test:document-guards` und laufen nur von Hand (rund
+  # 80 Minuten, docs/test-suites.md). test:fasting-browser lief genauso und war seit
+  # 05e6ef250 in 4 von 15 Journal-Tests rot, ohne dass es jemand sah. Sie braucht
+  # allein rund 7 Minuten und laeuft deshalb hier als eigener Job, parallel zu den
+  # Tests. Eine Node-Version reicht: die Suite misst das Dokument im Browser, nicht
+  # die Laufzeit; 24.x ist die des Images. Chromium bringt `npm ci` mit (puppeteer,
+  # freigegeben unter `allowScripts` in package.json), der Harness startet es
+  # headless mit --no-sandbox (test/document-guards-harness.js).
+  fasting-browser:
+    name: Fasting browser suite (Node.js 24.x)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js 24.x
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run the fasting browser suite
+        run: npm run test:fasting-browser

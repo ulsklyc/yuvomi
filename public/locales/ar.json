@@ -1123,6 +1123,7 @@
         "phonePreview": "معاينة: {{value}}",
         "phoneImplausible": "يبدو هذا الرقم غير مكتمل - سيتم حفظه على أي حال.",
         "emailLabel": "البريد الإلكتروني",
+        "emailLockedHint": "هذه العناوين تخص حساب هذا العضو. لا يمكن تغييرها إلا من قبل العضو نفسه أو المسؤول.",
         "emailPlaceholder": "name@example.com",
         "addressLabel": "العنوان",
         "addressPlaceholder": "الشارع، المدينة",

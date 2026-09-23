@@ -1123,6 +1123,7 @@
         "phonePreview": "Förhandsvisning: {{value}}",
         "phoneImplausible": "Det här numret verkar ofullständigt - det sparas ändå.",
         "emailLabel": "E-post",
+        "emailLockedHint": "De här adresserna hör till den här medlemmens konto. Bara medlemmen själv eller en administratör kan ändra dem.",
         "emailPlaceholder": "namn@exempel.se",
         "addressLabel": "Adress",
         "addressPlaceholder": "Gatunamn, Postnummer Stad",

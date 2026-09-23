@@ -1136,6 +1136,7 @@
         "phonePreview": "Pratinjau: {{value}}",
         "phoneImplausible": "Nomor ini tampak tidak lengkap - tetap akan disimpan.",
         "emailLabel": "Email",
+        "emailLockedHint": "Alamat ini milik akun anggota ini. Hanya anggota itu sendiri atau admin yang dapat mengubahnya.",
         "emailPlaceholder": "nama@contoh.com",
         "addressLabel": "Alamat",
         "addressPlaceholder": "Jalan, kode pos kota",

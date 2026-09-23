@@ -1123,6 +1123,7 @@
         "phonePreview": "Előnézet: {{value}}",
         "phoneImplausible": "Ez a szám hiányosnak tűnik - ennek ellenére mentésre kerül.",
         "emailLabel": "Email",
+        "emailLockedHint": "Ezek a címek ennek a tagnak a fiókjához tartoznak. Csak maga a tag vagy egy adminisztrátor módosíthatja őket.",
         "emailPlaceholder": "nev@pelda.com",
         "addressLabel": "Cím",
         "addressPlaceholder": "Utca, irányítószám Város",

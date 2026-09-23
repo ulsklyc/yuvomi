@@ -1136,6 +1136,7 @@
         "phonePreview": "Vorschau: {{value}}",
         "phoneImplausible": "Diese Nummer wirkt unvollständig - sie wird trotzdem gespeichert.",
         "emailLabel": "E-Mail",
+        "emailLockedHint": "Diese Adressen gehören zum Konto dieses Mitglieds. Ändern können sie nur die Person selbst oder ein Admin.",
         "emailPlaceholder": "name@beispiel.de",
         "addressLabel": "Adresse",
         "addressPlaceholder": "Straße, PLZ Ort",

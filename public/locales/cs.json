@@ -1123,6 +1123,7 @@
         "phonePreview": "Náhled: {{value}}",
         "phoneImplausible": "Toto číslo vypadá neúplně - přesto bude uloženo.",
         "emailLabel": "E-mail",
+        "emailLockedHint": "Tyto adresy patří k účtu tohoto člena. Změnit je může jen člen sám nebo správce.",
         "emailPlaceholder": "jmeno@example.com",
         "addressLabel": "Adresa",
         "addressPlaceholder": "Ulice, PSČ Město",

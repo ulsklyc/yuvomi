@@ -1136,6 +1136,7 @@
         "phonePreview": "پیش‌نمایش: {{value}}",
         "phoneImplausible": "این شماره ناقص به نظر می‌رسد - با این حال ذخیره می‌شود.",
         "emailLabel": "ایمیل",
+        "emailLockedHint": "این نشانی‌ها به حساب این عضو تعلق دارند. فقط خود عضو یا یک مدیر می‌تواند آن‌ها را تغییر دهد.",
         "emailPlaceholder": "name@example.com",
         "addressLabel": "نشانی",
         "addressPlaceholder": "خیابان، کد پستی شهر",

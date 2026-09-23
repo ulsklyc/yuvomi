@@ -1136,6 +1136,7 @@
         "phonePreview": "Preview: {{value}}",
         "phoneImplausible": "Mukhang hindi kumpleto ang numerong ito - mase-save pa rin ito.",
         "emailLabel": "Email",
+        "emailLockedHint": "Ang mga address na ito ay kabilang sa account ng miyembrong ito. Ang miyembro lang mismo o isang admin ang makakapagpalit ng mga ito.",
         "emailPlaceholder": "pangalan@halimbawa.com",
         "addressLabel": "Address",
         "addressPlaceholder": "Kalye, ZIP Lungsod",

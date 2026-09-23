@@ -1123,6 +1123,7 @@
         "phonePreview": "预览：{{value}}",
         "phoneImplausible": "此号码似乎不完整 - 仍会保存。",
         "emailLabel": "邮箱",
+        "emailLockedHint": "这些地址属于该成员的账户。只有成员本人或管理员可以更改。",
         "emailPlaceholder": "name@example.com",
         "addressLabel": "地址",
         "addressPlaceholder": "街道、城市",
