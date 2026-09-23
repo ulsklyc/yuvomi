@@ -1029,8 +1029,8 @@ Fundstellen). Ein 9px-Text sagt weniger als ein sauberer Punkt.
   und `dense`-Flow in JEDEM Zustand - auch mit eigener Reihenfolge und im Bearbeiten-Modus
   (2026-09-23; vorher schaltete eine Umsortierung auf die Quellordnung, 18 % Loecher bei
   1440px). Die gespeicherte Reihenfolge ist die Rangfolge; was an Loechern bleibt, liegt an den
-  Groessen, und dafuer schlaegt der Bearbeiten-Modus eine vor. Bei 240px legte ein 1440er-Fenster vier 270px-Spalten an, in denen die
-  Ellipse reihenweise echte Inhalte kappte („Familienmitg…", „Tante Claire Bec…"). Eine
+  Groessen, und dafuer schlaegt der Bearbeiten-Modus eine vor. Bei 240px legte ein
+  1440er-Fenster vier 270px-Spalten an, in denen die Ellipse reihenweise echte Inhalte kappte („Familienmitg…", „Tante Claire Bec…"). Eine
   Spalte, in der Namen nicht ganz stehen, ist keine Spalte; drei ruhige tragen dieselben
   fuenf Karten besser als vier gedraengte, und ab ~1700px kommt die vierte von selbst
   zurueck.
@@ -1236,7 +1236,8 @@ Modulen, direkt neben Kapsel-Knoepfen im selben Kopf. Der Wortlaut:
 sagt das Kasten-in-Kasten-Vokabular seit Runde 5 und die Zeilenlisten-Regel seit Runde 6.
 Ihre Hervorhebung (Hover, Auswahl, Rang) folgt der Form ihres Traegers, nicht der eines
 Knopfes; deshalb behalten `.rw-standing__id` und `.meal-slot__add-more-btn` ihre Form
-(die Rangzeile `.rewards-widget-row` ist mit der Belohnungen-Rangliste entfallen, 2026-09-23). Ein Knopf IN einer Zeile ist davon nicht gedeckt:
+(die Rangzeile `.rewards-widget-row` ist mit der Belohnungen-Rangliste entfallen,
+2026-09-23). Ein Knopf IN einer Zeile ist davon nicht gedeckt:
 `.row-action` ist rund. Wer die Kategorie nicht nennen kann, traegt die Kapsel.
 
 **Geprueft auf zwei Ebenen, weil eine sie nicht traegt.** Im Stylesheet steht weder Tag
@@ -2293,6 +2294,13 @@ Toast-Herkunft gemessen: Glyph auf Scheibe 5,1-9,8:1 in beiden Themes). Der Para
 mit ihr app-weit entfallen, ein Guard verbietet seine Rueckkehr; was den Namen weiterfuehrt,
 ist `--seal-pair-ground` am Ueberlappungszeichen, und das beantwortet eine andere Frage.
 
+**Die Badge zaehlt die Sache, und sie spricht nicht in der Ueberschrift** (2026-09-23). Sie
+nennt die Gesamtzahl aus der Antwort (`notesTotal`, `birthdayTotal`, `openTaskCount`), nicht
+die Laenge der gezeigten Liste - was nicht passt, steht als „+N weitere" darunter. Eine Liste
+ohne Gesamtzahl (die Termine, bei fuenf geschnitten) traegt keine Badge: eine Zahl, die nur
+ihre eigene Obergrenze nennt, ist keine Auskunft. Die Badge ist `aria-hidden`, dieselbe Zahl
+steht als sr-only-Satz hinter der h3 - sonst hiesse die Ueberschrift „Geburtstage 5".
+
 ### Das Tagesprogramm (Signature Component)
 Das eine Blatt, das die Uebersicht anfuehrt: EIN Traeger auf `--color-surface` mit
 `--radius-xl` und `--shadow-lg`, Zeilen als Haarlinien, je Zeile ein Siegel fuer den Raum,
@@ -2308,6 +2316,19 @@ Geraeten dieselbe.
 `--today-card-accent` schon, aus welchem Raum sie kommt - das Siegel links zeigt es -, und ein
 neutraler Hover warf diese Auskunft im Moment der Beruehrung weg. `--tint-state` (12 %) ist
 die Skalenstufe fuer genau das: Zustand auf einer ungetoenten Flaeche.
+
+**Jedes Modul, das heute etwas hat, spricht ueber EINEN Vertrag** (2026-09-23,
+`public/utils/today-sheet.js`). Eine Quelle liefert Zeilen in der Form des Blatts und einen
+Raum-Ton (`today-cockpit-card--<ton>`, `wall-row--<ton>`); ob sie spricht, entscheiden fuer
+alle dieselben drei Riegel - Modul an, Widget-Recht, eigene Kachel NICHT sichtbar (Kein-Echo:
+jede Zahl steht einmal auf dem Schirm, auch zwischen Blatt und Kennzahlreihe). **Die Coda ist
+eine Entwarnung und faellt nur, wenn sie stimmt:** keine Zeile ist mehr offen und keine
+verschwindet hinter „+N weitere". Eine Auskunft (Schicht, Geburtstag) haelt sie nicht auf, ein
+Auftrag (Dosis, Freigabe, Tonne am Morgen, Vorrat, der heute ablaeuft) schon. **Beendetes
+verlaesst das Blatt** zur Endzeit, ohne Neuladen; die Termin-Kachel behaelt es zurueckgetreten
+darueber. **Ab 720px Blattbreite laufen die Zeilen in zwei Spalten** (spaltenweise, per
+Container-Abfrage) - ein Programm von sechs Zeilen soll auf einem breiten Schirm nicht
+halbleer eine Spalte hinunterlaufen.
 
 ### Das Wetter-Widget (Signature Component)
 
@@ -2503,6 +2524,13 @@ sein Zeichen in Sekundaerfarbe (weiterhin AA, weiterhin fokussierbar, volle Ziel
 Beruehrung setzt `data-wall-awake` und hebt ihn fuer sechs Sekunden auf die volle Kapsel samt
 Beschriftung. Bewegt wird dabei nur Farbe - eine Breiten-Transition waere eine
 Layout-Animation fuer einen Zustand, den aus zwei Metern niemand beobachtet.
+
+**Die Startknoepfe der Kuechenuhr ruhen sichtbar, und die erste Beruehrung weckt nur**
+(2026-09-23). Unsichtbare Knoepfe, die trotzdem auf Beruehrung reagierten, waren eine Falle:
+wer die Wand wecken wollte, startete einen Timer. Sie ruhen jetzt in Tertiaerfarbe (AA), der
+erste Zeiger auf eine schlafende Wand setzt nur `data-wall-awake` (Tastatur ausgenommen), und
+Wecken VERSCHIEBT nichts - die Fusszeile ist ein festes Raster, damit der zweite Tipp dort
+trifft, wo der erste hinzielte. Ansagen nennen Start, Stopp und Ende, nicht jede Sekunde.
 
 **Dass die Flaeche lebt, sagt eine absolute Uhrzeit**, kein „vor 3 Minuten": eine relative
 Angabe braeuchte einen zweiten Timer, nur damit sie sich selbst aktuell haelt.
