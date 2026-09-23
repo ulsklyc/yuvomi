@@ -1691,7 +1691,8 @@ function openStaffModal(worker, content, options = {}) {
                   style="background:${esc(item.avatar_color) || 'var(--module-housekeeping)'}" aria-label="${esc(t('housekeeping.profilePicture'))}">
             ${item.avatar_data ? `<img src="${esc(item.avatar_data)}" alt="${esc(item.display_name || '')}">` : esc(initials(item.display_name || 'HK'))}
           </button>
-          <input class="sr-only" type="file" id="housekeeping-avatar-file" accept="image/png,image/jpeg,image/webp">
+          <input class="sr-only" type="file" id="housekeeping-avatar-file" accept="image/png,image/jpeg,image/webp"
+                 aria-label="${esc(t('housekeeping.profilePicture'))}" tabindex="-1">
           <div class="housekeeping-profile-editor__fields">
             <label class="housekeeping-field">
               <span>${esc(t('housekeeping.workerName'))}</span>

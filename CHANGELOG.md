@@ -174,6 +174,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Screen readers and keyboards get a few rough edges less.** Toasts no longer interrupt what a
+  screen reader is reading or get announced twice: only errors and warnings interrupt, everything
+  else waits its turn. "Edit member" now starts in the username field instead of on the hidden
+  picture upload, which showed up as a stray strip over the dialog title and had no name for
+  screen readers; the birthday and housekeeping staff dialogs had the same problem. The hidden
+  photo and file pickers in these and in the recipe, inventory and attachment dialogs now have a
+  name and no longer take an extra, invisible Tab stop next to their button. The member and
+  invite lists in Settings are valid lists again when empty or after a load error, the two-factor
+  card keeps a gap between its hint and its buttons, and with read-only access, birthday and
+  subscription rows no longer show a swipe arrow on touchscreens, since there is nothing to swipe.
+  A toast now also stays clear of a focused person chip in a dialog, not only of the chip's first
+  pixel.
+
 - **Moving items between the pantry and the shopping list now needs read access to where they
   come from.** Moving checked items from the shopping list into the pantry, and putting pantry items
   on the shopping list, were judged only by the module they write into. The import now also needs

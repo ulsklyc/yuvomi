@@ -123,7 +123,7 @@ export function renderDocumentAttachField({
         </button>
       </div>
       ${canUpload ? `<input class="sr-only" type="file" multiple accept="${ACCEPT}" data-doc-attach-input
-             aria-labelledby="doc-attach-label">` : ''}
+             aria-labelledby="doc-attach-label" tabindex="-1">` : ''}
       ${hintText ? `<p class="form-hint">${esc(hintText)}</p>` : ''}
     </div>`;
 }
