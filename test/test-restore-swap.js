@@ -23,7 +23,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, writeFileSync, chmodSync, copyFileSync, linkSync, symlinkSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, chmodSync, copyFileSync, linkSync, symlinkSync, statSync, existsSync } from 'node:fs';
 import fsp from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -770,5 +770,159 @@ test('#1431 Klartext-Backup mit kaputter Schemaseite: backup_corrupt statt „no
     (err) => err.reason === 'backup_corrupt' && /Nothing on this instance was changed/.test(err.message)
   );
   assertUntouched(target, 'vor dem Restore');
+  target.mod.get().close();
+});
+
+// ---------------------------------------------------------------------------
+// Fuenfte Runde #1431
+// ---------------------------------------------------------------------------
+
+test('#1431 Compose-Restore auf eine leere Datenbankdatei: das Journal ueberlebt das Oeffnen der Rollback-Kopie', async () => {
+  // SQLite verwirft ein -wal neben einer 0-Byte-Datei beim ersten Oeffnen,
+  // auch lesend - deshalb legt es db.js als `.wal-kept` ab (#1282).
+  const laufend = join(tempDir('yuvomi-test-swap-'), 'laufend.db');
+  const mod = await bootDb(laufend, null);
+  mod.get().exec('CREATE TABLE restore_probe (note TEXT)');
+  mod.get().pragma('wal_autocheckpoint = 0');
+  mod.get().prepare('INSERT INTO restore_probe (note) VALUES (?)').run('nur im journal');
+  const dir = tempDir('yuvomi-test-swap-');
+  const dbPath = join(dir, 'yuvomi.db');
+  copyFileSync(`${laufend}-wal`, `${dbPath}-wal`);
+  mod.get().close();
+  writeFileSync(dbPath, '');
+  const walVorher = sha256(`${dbPath}-wal`);
+  assert.ok(statSync(`${dbPath}-wal`).size > 0, 'Vorbedingung: das Journal traegt Daten');
+
+  const backupPath = await bigBackup(null, 'aus dem Backup');
+  const run = runComposeRestore(backupPath, dbPath);
+  assert.equal(run.status, 0, `der Befehl muss gelingen: ${run.stderr}`);
+  const rollback = readdirSync(dir).find((name) => IS_ROLLBACK_COPY.test(name) && !name.endsWith('-wal'));
+  assert.ok(rollback, `eine Rollback-Kopie: ${readdirSync(dir).join(', ')}`);
+  // Wer die Rollback-Kopie ansieht, oeffnet sie - der naheliegende naechste
+  // Schritt, wie `sqlite3 <kopie>` mit einer ersten Abfrage.
+  try {
+    const blick = new Database(join(dir, rollback));
+    try { blick.prepare('SELECT count(*) FROM sqlite_master').get(); } finally { blick.close(); }
+  } catch { /* leere Datei */ }
+  const bewahrt = readdirSync(dir).filter((name) => name.startsWith(rollback) && name !== rollback
+    && sha256(join(dir, name)) === walVorher);
+  assert.equal(bewahrt.length, 1, `das Journal liegt Byte fuer Byte neben der Rollback-Kopie: ${readdirSync(dir).join(', ')}`);
+  assert.ok(!bewahrt[0].endsWith('-wal'), 'nicht unter -wal, das SQLite neben der leeren Datei verwirft');
+});
+
+test('#1431 der Compose-Restore in der App ist derselbe Befehl wie in docs/installation.md', () => {
+  const source = readFileSync(new URL('../public/settings/pages/admin-backup.js', import.meta.url), 'utf8');
+  const raw = source.split('\n').find((l) => l.startsWith('docker compose run --rm -v "$BACKUP:/tmp/yuvomi-restore.db:ro"'));
+  assert.ok(raw, 'admin-backup.js muss den Compose-Restore zeigen');
+  // So, wie er auf dem Bildschirm steht: das Template-Literal wertet \${ zu ${
+  // aus, das HTML die Entities zu Zeichen.
+  assert.ok(!/(^|[^\\])\$\{/.test(raw), 'kein unmaskiertes ${ - das Template-Literal setzte dort etwas ein');
+  const shown = raw.replaceAll('\\${', '${')
+    .replaceAll('&gt;', '>').replaceAll('&lt;', '<').replaceAll('&amp;', '&');
+  const doc = readFileSync(new URL('../docs/installation.md', import.meta.url), 'utf8');
+  const documented = doc.split('\n').find((l) => l.startsWith('docker compose run --rm -v "$BACKUP:/tmp/yuvomi-restore.db:ro"'));
+  assert.equal(shown, documented, 'App und Doku zeigen denselben Befehl');
+});
+
+test('#1431 ein schreibgeschuetztes Backup (0444) laesst sich einspielen, DB_PATH behaelt seine Rechte', async () => {
+  const backupPath = await bigBackup(KEY, 'aus dem Backup');
+  chmodSync(backupPath, 0o444);
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  chmodSync(target.dbPath, 0o640);
+  await target.mod.restoreFromFile(backupPath);
+  assert.equal(target.mod.get().prepare('SELECT note FROM restore_probe LIMIT 1').get()?.note, 'aus dem Backup');
+  assert.equal(statSync(target.dbPath).mode & 0o777, 0o640, 'die Rechte der bisherigen Datenbank bleiben');
+  assert.equal(statSync(target.dbPath).uid, process.getuid(), 'und ihr Besitzer');
+  target.mod.get().close();
+});
+
+test('#1431 Reste eines Restores werden auch neben einer leeren Datenbankdatei weggeraeumt', async () => {
+  const dir = tempDir('yuvomi-test-swap-');
+  const dbPath = join(dir, 'yuvomi.db');
+  writeFileSync(dbPath, '');
+  const tot = spawnSync(process.execPath, ['-e', 'process.stdout.write(String(process.pid))'], { encoding: 'utf8' });
+  const rest = join(dir, `yuvomi.db.restore-tmp-${Number(tot.stdout)}-abc`);
+  writeFileSync(rest, 'volle Kopie eines Backups');
+  await assert.rejects(() => bootDb(dbPath, KEY), /empty/i, 'Vorbedingung: der Start bricht an der leeren Datei ab');
+  assert.ok(!existsSync(rest), `die Arbeitsdatei ist trotzdem weg: ${readdirSync(dir).join(', ')}`);
+});
+
+test('#1431 ein Backup, das waehrend des Kopierens der Arbeitsdatei beginnt, laeuft zu Ende, bevor der Restore die Verbindung schliesst', async () => {
+  const backupPath = await bigBackup(null, 'aus dem Backup');
+  const target = await frozenTarget(null, 'vor dem Restore');
+  const backupDir = tempDir('yuvomi-test-swap-dl-');
+  const snapshot = join(backupDir, 'waehrenddessen.db');
+
+  let releaseCopy;
+  const copyGate = new Promise((resolve) => { releaseCopy = resolve; });
+  let copyReached;
+  const copying = new Promise((resolve) => { copyReached = resolve; });
+  let releaseMkdir;
+  const mkdirGate = new Promise((resolve) => { releaseMkdir = resolve; });
+  let mkdirReached;
+  const inBackup = new Promise((resolve) => { mkdirReached = resolve; });
+  const realCopyFile = fsp.copyFile;
+  const realMkdir = fsp.mkdir;
+  fsp.copyFile = async (src, dest, mode) => {
+    if (String(src) === backupPath) {
+      copyReached();
+      await copyGate;
+    }
+    return realCopyFile(src, dest, mode);
+  };
+  fsp.mkdir = async (dir, options) => {
+    // Das Backup haelt nach seinem ersten Schritt an - mit der Verbindung in der Hand.
+    if (String(dir) === backupDir) {
+      mkdirReached();
+      await mkdirGate;
+    }
+    return realMkdir(dir, options);
+  };
+  try {
+    const restore = target.mod.restoreFromFile(backupPath);
+    await copying;
+    const backup = target.mod.backupToFile(snapshot);
+    await inBackup;
+    releaseCopy();
+    // Dem Restore Zeit lassen, bis zum Schliessen zu kommen, falls er nicht wartet.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    releaseMkdir();
+    await backup;
+    await restore;
+  } finally {
+    releaseCopy();
+    releaseMkdir();
+    fsp.copyFile = realCopyFile;
+    fsp.mkdir = realMkdir;
+  }
+  assert.equal(hasNote(snapshot, 'vor dem Restore'), true, 'das Backup traegt den Stand vor dem Restore');
+  assert.equal(target.mod.get().prepare('SELECT note FROM restore_probe LIMIT 1').get()?.note, 'aus dem Backup');
+  target.mod.get().close();
+});
+
+test('#1431 der Name der Rollback-Kopie ist dauerhaft, bevor DB_PATH ersetzt wird', async () => {
+  const backupPath = await bigBackup(KEY, 'aus dem Backup');
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  const log = [];
+  const realRename = fsp.rename;
+  const realOpen = fsp.open;
+  fsp.rename = async (from, to) => {
+    log.push(`rename ${String(to) === target.dbPath ? 'DB_PATH' : IS_ROLLBACK_COPY.test(String(to)) ? 'rollback' : 'other'}`);
+    return realRename(from, to);
+  };
+  fsp.open = async (filePath, flags, mode) => {
+    if (String(filePath) === target.dir) log.push('fsync dir');
+    return realOpen(filePath, flags, mode);
+  };
+  try {
+    await target.mod.restoreFromFile(backupPath);
+  } finally {
+    fsp.rename = realRename;
+    fsp.open = realOpen;
+  }
+  const rollback = log.indexOf('rename rollback');
+  const swap = log.indexOf('rename DB_PATH');
+  assert.ok(rollback >= 0 && swap > rollback, `Reihenfolge: ${log.join(', ')}`);
+  assert.ok(log.slice(rollback + 1, swap).includes('fsync dir'), `zwischen beiden ein fsync des Verzeichnisses: ${log.join(', ')}`);
   target.mod.get().close();
 });

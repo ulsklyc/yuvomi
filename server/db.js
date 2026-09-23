@@ -416,11 +416,16 @@ function init({ plaintextBackup = true } = {}) {
       `Data will be lost on container restart. Use an absolute path, e.g. DB_PATH=/data/yuvomi.db`
     );
   }
+  // Reste eines abgebrochenen Restores zuerst: auch vor der Leer-Pruefung,
+  // denn ein CLI-Restore auf eine leere Datei (#1282), der mittendrin stirbt,
+  // laesst sie neben genau so einer Datei liegen - und die Pruefung bricht ab,
+  // bevor sie sonst drankaemen (Codex-Befund in #1431). Gefahrlos: angefasst
+  // werden nur Arbeitsdateien toter Prozesse, nie die Datenbank oder ihr Journal.
+  removeRestoreStaging();
   // Vor allem anderen: eine leere Datei würde ab hier still zur frischen
   // Instanz, und ein Journal daneben ginge dabei verloren (#1282).
   assertDatabaseFileNotEmpty();
   mkdirSync(path.dirname(DB_PATH), { recursive: true });
-  removeRestoreStaging();
   migrateLegacyDbFile();
   // Scheitert die Umbenennung einer Legacy-oikos.db, faellt DB_PATH auf sie
   // zurueck - und Reste eines Restores tragen dann ihren Namen.
@@ -9913,7 +9918,24 @@ function getPath() {
   return DB_PATH;
 }
 
-async function backupToFile(destinationPath) {
+/**
+ * Laufende `backupToFile()`-Aufrufe. Der Restore wartet vor dem Schliessen der
+ * Verbindung, bis keiner mehr laeuft (Codex-Befund in #1431): seit die
+ * Arbeitsdatei VOR dem Schliessen kopiert wird, kann waehrend dieses Kopierens
+ * ein Backup (Download-Route, Zeitplan) auf der noch offenen Verbindung
+ * beginnen - und `db.close()` zoege ihm die Verbindung unter den Haenden weg.
+ * @type {Set<Promise<unknown>>}
+ */
+const activeBackups = new Set();
+
+function backupToFile(destinationPath) {
+  const running = backupToFileUntracked(destinationPath);
+  const tracked = running.finally(() => activeBackups.delete(tracked));
+  activeBackups.add(tracked);
+  return tracked;
+}
+
+async function backupToFileUntracked(destinationPath) {
   const database = get();
   await fs.mkdir(path.dirname(destinationPath), { recursive: true });
 
@@ -10420,8 +10442,10 @@ async function restoreFromFile(sourcePath, { backupKey = null } = {}) {
  */
 function isActiveDatabaseFile(sourcePath) {
   try {
-    const source = statSync(sourcePath);
-    const active = statSync(DB_PATH);
+    // bigint: grosse Inode-Nummern (manche Netz- und Overlay-Dateisysteme)
+    // passen nicht verlustfrei in eine Zahl.
+    const source = statSync(sourcePath, { bigint: true });
+    const active = statSync(DB_PATH, { bigint: true });
     return source.dev === active.dev && source.ino === active.ino;
   } catch {
     return false;
@@ -10513,11 +10537,37 @@ async function swapIntoDbPath(stagingPath) {
 async function stageDatabaseCopy(from, stagingPath) {
   await unlinkIfExists(stagingPath);
   await fs.copyFile(from, stagingPath);
-  const handle = await fs.open(stagingPath, 'r+');
+  await adoptDatabaseAttributes(stagingPath);
+  // Lesend genuegt fuer fsync - und klappt auch, wenn die Datei keine
+  // Schreibrechte traegt.
+  const handle = await fs.open(stagingPath, 'r');
   try {
     await handle.sync();
   } finally {
     await handle.close();
+  }
+}
+
+/**
+ * Rechte und, soweit erlaubt, Besitzer der bisherigen Datenbank auf die
+ * Arbeitsdatei uebertragen (Codex-Befunde in #1431).
+ *
+ * `copyFile` gibt der neuen Datei die Rechte der QUELLE und den Nutzer, der
+ * kopiert, als Besitzer - und das rename macht beides zu denen von DB_PATH.
+ * Das fruehere Kopieren UEBER DB_PATH behielt die Datei und damit beides.
+ * Gemessen wurde: ein Backup von schreibgeschuetztem Medium (0444) machte die
+ * Arbeitsdatei 0444, und ein CLI-Restore als root hinterliesse eine Datenbank,
+ * die der Dienst nach dem Neustart nicht schreiben darf. Der Besitzerwechsel
+ * gelingt nur als root oder wenn er ohnehin stimmt; sonst bleibt er, wie er
+ * ist. Ohne bisherige Datenbank: 0600, lesbar nur fuer den Dienst.
+ * @param {string} filePath
+ */
+async function adoptDatabaseAttributes(filePath) {
+  let previous = null;
+  try { previous = await fs.stat(DB_PATH); } catch { /* keine bisherige Datenbank */ }
+  await fs.chmod(filePath, previous ? previous.mode & 0o7777 : 0o600);
+  if (previous) {
+    try { await fs.chown(filePath, previous.uid, previous.gid); } catch { /* nur als root oder ohne Wechsel erlaubt */ }
   }
 }
 
@@ -10611,6 +10661,12 @@ async function restoreValidatedFile(sourcePath) {
     // ist die laufende Verbindung noch gar nicht angefasst.
     await stageDatabaseCopy(sourcePath, stagingPath);
 
+    // Laufende Backups zu Ende kommen lassen. Zwischen dem letzten Blick auf
+    // `activeBackups` und `db.close()` steht kein await: ein neues Backup kann
+    // dort nicht mehr beginnen, und danach findet es keine Verbindung.
+    while (activeBackups.size > 0) {
+      await Promise.allSettled([...activeBackups]);
+    }
     if (db) {
       try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* best effort */ }
       db.close();
@@ -10628,6 +10684,11 @@ async function restoreValidatedFile(sourcePath) {
     try {
       await stageDatabaseCopy(DB_PATH, rollbackPartialPath);
       await fs.rename(rollbackPartialPath, rollbackPath);
+      // Den Namen dauerhaft machen, BEVOR DB_PATH ersetzt wird: sonst kann nach
+      // einem Stromausfall das Backup an DB_PATH stehen, die Rollback-Kopie aber
+      // noch unter `.partial` - und die raeumt der naechste Start weg
+      // (Codex-Befund in #1431).
+      await syncDirectory(path.dirname(DB_PATH));
       rollbackCreated = true;
     } catch (err) {
       if (err?.code !== 'ENOENT') throw err;
