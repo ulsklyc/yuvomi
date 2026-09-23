@@ -223,11 +223,20 @@ function randomGuestPasswordHash() {
  * auf dem Gelesenen. `passwordHash` bringt der Aufrufer mit, gehasht VOR der
  * Transaktion (der einzige asynchrone Schritt).
  *
+ * Ein aus einem Kontakt angelegtes Konto ist IMMER ein Gast der Gruppe
+ * `groupId`, genau wie POST /groups/:id/guests es anlegt. Ohne den Eintrag in
+ * split_expense_guest_users zaehlte es als volles Haushaltsmitglied - angelegt
+ * von einem Mitglied, obwohl Haushaltskonten Admin-Sache sind, und mit der
+ * Kontakt-Adresse als Ziel des Passwort-Resets. Konto, Verknuepfung,
+ * Gast-Zeile, Aktivitaet und Artefakte entstehen in der Transaktion des
+ * Aufrufers zusammen oder gar nicht; ein Konto ohne Gast-Zeile bleibt so nie
+ * stehen.
+ *
  * Der Geburtstag aus dem Kontakt ist Kontaktdatum (wie in den
  * Mitglieds-Kandidaten) und der angelegte Geburtstag ein Folgeeintrag des
  * Gastes (docs/DECISIONS.md Abschnitt 10) - beides fragt kein Kalenderrecht.
  */
-function userFromContact(database, contactId, actorId, passwordHash) {
+function userFromContact(database, contactId, actorId, groupId, passwordHash) {
   const contact = database.prepare('SELECT * FROM contacts WHERE id = ?').get(contactId);
   if (!contact) throw new Refusal(404, 'Contact not found.');
   if (contact.family_user_id) return contact.family_user_id;
@@ -240,6 +249,9 @@ function userFromContact(database, contactId, actorId, passwordHash) {
     VALUES (?, ?, ?, ?, 'member', 'other')
   `).run(uniqueUsername(contact.name), contact.name, passwordHash, randomAvatarColor());
   database.prepare('UPDATE contacts SET family_user_id = ? WHERE id = ?').run(created.lastInsertRowid, contact.id);
+  database.prepare('INSERT OR IGNORE INTO split_expense_guest_users (user_id, group_id, created_by) VALUES (?, ?, ?)')
+    .run(created.lastInsertRowid, groupId, actorId);
+  activity(groupId, actorId, 'guest_created', 'member', created.lastInsertRowid, { display_name: contact.name });
   if (contact.birthday) {
     syncGuestArtifacts(database, created.lastInsertRowid, {
       displayName: contact.name,
@@ -823,7 +835,7 @@ router.post('/groups/:id/members', async (req, res) => {
       memberUserId = db.transaction(() => {
         assertManagesGroup(groupId, req);
         const uid = vContactId.value
-          ? userFromContact(db.get(), vContactId.value, userId(req), passwordHash)
+          ? userFromContact(db.get(), vContactId.value, userId(req), groupId, passwordHash)
           : vUserId.value;
         const exists = db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(uid);
         if (!exists) throw new Refusal(404, 'User not found.');

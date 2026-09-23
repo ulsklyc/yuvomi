@@ -1468,6 +1468,20 @@ prune apply: an addressbook that returns nothing at all, or whose fetch fails, o
 single unparsable vCard, suspends deletion entirely and logs a warning — an incomplete list of UIDs
 must never be read as "everything else was deleted".
 
+**Email addresses of a linked contact:** a contact with `family_user_id` is a person's account, and
+its addresses (`contacts.email` and every `contact_emails.value`) lead to that account: the password
+reset finds the account by `contacts.email` and sends the link there, and the SSO sign-in links an
+account by a verified address matching either column. Only the linked person or an admin may change
+them, and only in a session or with an unscoped token: a token scoped to modules (for example
+`contacts:write`) is refused even for the admin or the person themselves, because the addresses are
+the key to the account and not part of the module. `PUT /api/v1/contacts/:id` refuses anyone else
+with 403 when the request would change the primary address or the set of addresses. Addresses are
+compared without regard to letter case, as the SSO link compares them; sending them unchanged or only
+in another case is not a change, and the stored spelling is kept. The CardDAV sync
+acts for nobody and never writes them on a linked contact, whether it adopts the contact or updates
+it later. All other fields stay editable for anyone with write access to contacts, and the edit form
+shows the addresses read-only to everyone else. The rule lives in `server/services/contact-identity.js`.
+
 ### Contact Categories (migration v84)
 DB-backed, customizable category list for contacts. Replaces the old hardcoded German-named set. The seven predefined keys (`doctor`, `school`, `authority`, `insurance`, `craftsman`, `emergency`, `misc`) carry a stable slug key (which, together with `icon`, drives the list grouping), a localizing `label_key`, a Lucide `icon`, and a `color`; the pre-existing German category values (`Arzt`, `Behörde`, …) are migrated to these keys. User-added categories store their `name` and default to the `tag` icon. A "Manage categories" button in the contacts toolbar opens the shared `yuvomi-category-manager` modal to add, rename, recolor, reorder, and delete categories, with the same in-use / last-category deletion guards as Tasks and Budget.
 
@@ -3131,6 +3145,17 @@ carries two separate statements: **that** an account is confined - its mere exis
 API guard checks - and **which** group it may see. Deleting the group must only clear the second
 (migration 124); until then the `group_id` cascade removed the whole row, leaving the account
 itself untouched and thereby promoting a guest to a full household member.
+
+Both ways a split group creates an account write this row: `POST /groups/:id/guests` and adding an
+unlinked contact through `POST /groups/:id/members` with `contact_id`. The second one did not until
+the fix for the contact email rule, so the account it created counted as a full household member - an
+account created by any member, although household accounts are for admins only, with the contact's
+address as the target of its password reset. The account is prepared the same way as a directly added
+guest: the password hash first, then one transaction that checks the group and the contact again and
+writes the account, the contact link, this row and the activity together or not at all. A group
+deleted in between answers 404 and leaves nothing behind, and two simultaneous additions of the same
+contact end with one account. Such accounts created before the fix are not converted automatically;
+see CHANGELOG.
 
 | Column | Type | Constraint |
 |--------|------|-----------|
