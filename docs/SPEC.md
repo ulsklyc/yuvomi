@@ -667,7 +667,7 @@ from saving their own recipe.
 **Who may read it.** `pantry_item_id` and `pantry_item_name` name a row of the **pantry**, while the
 path `/recipes` belongs to the scope module `meals` - the global gate in `server/index.js` judges by
 the first path segment and never asks about `pantry`. Every read path therefore asks itself
-(`hiddenModulesFor(req, ['pantry'])`, both axes: member right and token scope) and reports both fields
+(`mayReadModule(req, 'pantry')`, both axes: member right and token scope) and reports both fields
 as `null` for a viewer whose pantry is `none` or whose token carries no pantry scope; the ingredient
 itself stays, unmatched. The same mixing point as the birthday import candidates
 (`server/routes/birthdays.js`, path `calendar`, content from `contacts`), closed the same way. Writing
@@ -2855,7 +2855,11 @@ Links an item to Budget entries — a purchase, a refund, a repair, an accessory
 
 Visibility follows Budget's own rules exactly: in personal budget mode a private booking stays
 invisible to other members even when linked to a household-visible item, and linking a recurring
-series' materialized instance or an `is_pending` (expected) entry is rejected. Creating an item with
+series' materialized instance or an `is_pending` (expected) entry is rejected. On top of that every
+link needs read access to the Budget module (member right and token scope, `budgetViewer()` in
+`server/routes/inventory/entry-links.js`): without it an item carries no `linked_entries` and a
+`linked_entries_total` of 0, and linking, unlinking, the `entry_id` prefill and the reverse lookup
+answer 404 as for an unknown booking. Creating an item with
 `entry_id` prefills `purchase_price` from that booking's amount — but only for the **first** item
 linked to it, so a collective receipt split across several items does not silently copy its total
 onto each one.
@@ -2921,8 +2925,8 @@ touches the cached value.
 store: service-log rows, linked budget entries with the `maintenance`/`accessory` roles (via the
 existing item↔booking links), and linked documents, merged into one dated timeline with a cost total.
 Visibility follows the existing rules unchanged - budget-entry visibility through the household's
-`shared`/`personal` budget mode (no admin bypass), document visibility through the same rule every
-other document link uses. Inventory items have no per-item visibility model of their own (they are
+`shared`/`personal` budget mode (no admin bypass), and budget rows only with read access to the
+Budget module; document visibility through the same rule every other document link uses. Inventory items have no per-item visibility model of their own (they are
 household-wide); service log rows are therefore visible to the whole household.
 
 **Odometer (`inventory_items.odometer`/`odometer_unit`/`odometer_on`, v224).** A manual reading,
@@ -4660,7 +4664,7 @@ soon" (#596).
 - **Filter chips** for expired / expiring soon / running low, each with a count. A chip is only rendered when it has hits, and the active filter resets itself when it loses its last one — a chip can never lead to an empty list. Without a filter the list groups by storage location; with one it goes flat and sorts by urgency, and the location moves into the meta line.
 - **Storage locations** are their own table, renameable, sortable and deletable through the shared category-manager component. Deleting one keeps the stock and leaves those items location-less.
 - **Two-way handover with the shopping list.** Pantry → Shopping: a per-row action on low/empty items and a bulk action in the "running low" filter; the quantity is pre-filled with the shortfall to the minimum stock, or left open when none is set. Shopping → Pantry: everything ticked off after a shop is booked in through a dialog with one shared storage location and a per-item quantity/unit, parsed from the free-text shopping quantity for the language-independent metric units (g, kg, ml, l). The number is read with the region's separators and digit system, so "1,000 g" under en-US arrives as 1000 g rather than 1 g, and a quantity typed in the region's own digits is recognised instead of falling back to one piece.
-- **Scope separation:** `POST /api/v1/pantry/import-shopping` deliberately does not clear the shopping list — the client calls the existing `DELETE /api/v1/shopping/:listId/items/checked` afterwards, so a `pantry:write` token can never delete shopping data.
+- **Scope separation:** `POST /api/v1/pantry/import-shopping` deliberately does not clear the shopping list - the client calls the existing `DELETE /api/v1/shopping/:listId/items/checked` afterwards, so a `pantry:write` token can never delete shopping data. Both imports also read the other module and therefore need its read access, on both axes: `import-shopping` needs `shopping` (a token `shopping:read`), `import-pantry` needs `pantry` (a token `pantry:read`); without it the answer is 403 before any list lookup.
 - REST API: `GET/POST /api/v1/pantry`, `PUT/PATCH/DELETE /api/v1/pantry/:itemId`, `GET/POST /api/v1/pantry/locations`, `PUT/DELETE /api/v1/pantry/locations/:locId`, `PATCH /api/v1/pantry/locations/reorder`, `POST /api/v1/pantry/import-shopping`, plus `POST /api/v1/shopping/:listId/import-pantry` on the shopping side.
 
 ### Calendar (`/calendar`)
@@ -4824,7 +4828,7 @@ finance tool that happens to track objects).
 - **Storage locations** are a two-level hierarchy (e.g. "Garage" → "Werkzeugschrank"), renameable and sortable through the shared category-manager component, same as Pantry Locations. Deleting one never blocks — items and sub-locations become location-/parent-less instead of moving.
 - **Categories** are a manageable list (five seeded defaults: Electronics, Vehicles, Household, Sports, Other), same pattern as Task Categories; deleting one reassigns its items to the protected `other` category.
 - **Linked documents:** attach receipts, warranty cards, or manuals from the Documents module, reusing the same visibility-filtered linking mechanism Budget entries already use.
-- **Linked budget entries:** connect a purchase, a refund, a repair, or an accessory bought later, with a role per link (`purchase`/`refund`/`instalment`/`maintenance`/`accessory`). Creating an item directly from a booking (the Budget entry modal's "Add to inventory" hook) prefills the purchase price automatically — but only for the first item linked to that booking, so a collective receipt split across several items doesn't copy its total onto each one. Visibility follows Budget's own rules exactly, including in personal budget mode.
+- **Linked budget entries:** connect a purchase, a refund, a repair, or an accessory bought later, with a role per link (`purchase`/`refund`/`instalment`/`maintenance`/`accessory`). Creating an item directly from a booking (the Budget entry modal's "Add to inventory" hook) prefills the purchase price automatically - but only for the first item linked to that booking, so a collective receipt split across several items doesn't copy its total onto each one. Visibility follows Budget's own rules exactly, including in personal budget mode, and without read access to the Budget module an item shows no bookings and its edit form no bookings section.
 - **Derived warranty deadline:** a proactive in-app reminder 30 days before the warranty ends, computed on the fly from the purchase date and warranty length rather than stored. Surfaced as a status badge (valid / expiring / expired) on the list and detail view.
 - **Custom tracked dates:** an item can carry up to 10 additional dates beyond the warranty — TÜV, service, insurance renewal, anything with a date — each with its own configurable reminder lead time (default 30 days, explicit `0` allowed). Replace-set semantics on save, like linked documents.
 - **Deadlines ICS feed:** a dedicated, admin-managed, subscribable read-only calendar feed (`webcal://`/`https://`) exporting both warranty end dates and custom tracked dates as VEVENTs, following the same admin-only token-rotation pattern as the calendar export feed (see Calendar). Text follows the household data language, not a fixed locale.

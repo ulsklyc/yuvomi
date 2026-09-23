@@ -3,7 +3,7 @@ import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { collectErrors, date as validateDate, oneOf, str, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
-import { hiddenModulesFor } from '../permissions.js';
+import { mayReadModule } from '../permissions.js';
 import {
   deleteBirthdayArtifacts,
   hydrateBirthday,
@@ -243,13 +243,13 @@ router.post('/', (req, res) => {
  * seine aufgeloesten Rechte melden `contacts: none`), aber die Luecke ist
  * aelter und trifft jedes gescopte API-Token genauso.
  *
- * `hiddenModulesFor()` prueft beide Achsen in einem Aufruf - Token-Scopes UND
+ * `mayReadModule()` prueft beide Achsen in einem Aufruf - Token-Scopes UND
  * die Modulrechte der Rolle. Dieselbe Klasse Befund wie die Abo-URLs in
  * #1241 Runde 1 und wie #823: eine Mischstelle braucht ihre eigene Pruefung,
  * weil die Middleware am Pfad haengt.
  */
 function contactsHidden(req) {
-  return hiddenModulesFor(req, ['contacts']).has('contacts');
+  return !mayReadModule(req, 'contacts');
 }
 
 router.get('/import/candidates', (req, res) => {
