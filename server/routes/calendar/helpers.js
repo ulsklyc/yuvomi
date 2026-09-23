@@ -320,9 +320,11 @@ export function syncAttachmentDocumentAccess(d, documentId, eventVisibility, use
 /**
  * `options.mayWidenAttachment` kommt vom Aufrufer (`documentWidenPredicate()`);
  * ohne ihn wird das Anhang-Dokument nur verengt, nie weiter geoeffnet.
- * `options.grantAssigneesOnly` (Standard-Zuweisung der Kalender-Syncs): ein
- * schon eingeschraenktes Dokument bekommt die Zugewiesenen als Freigabe dazu,
- * sonst aendert sich nichts - nichts wird `family`, nichts Privates geht auf.
+ * `options.grantAssigneesOnly` (Standard-Zuweisung der Kalender-Syncs): der
+ * Sync aendert Dokumentrechte nie, ausser dass an einem Termin fuer
+ * Zugewiesene ein schon eingeschraenktes Dokument die Zugewiesenen als
+ * Freigabe dazubekommt - nichts wird `family`, nichts Privates geht auf,
+ * nichts wird enger, keine Freigabe faellt weg.
  */
 export function setEventAssignments(d, eventId, userIds, { mayWidenAttachment, grantAssigneesOnly = false } = {}) {
   // Wer VORHER dranstand - gebraucht wird das eine Zeile weiter unten, um die

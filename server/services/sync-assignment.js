@@ -4,9 +4,10 @@ import { setEventAssignments } from '../routes/calendar/helpers.js';
 // Die Standard-Zuweisung eines Kalenders laeuft ohne Person dahinter - ueber
 // den Auto-Sync, sobald jemand einen Termin im externen Client zwischen zwei
 // Kalendern verschiebt, oder ueber den Backfill. Sie darf ein Anhang-Dokument
-// deshalb NICHT weiter oeffnen (#1358): ein schon eingeschraenktes Dokument
-// bekommt die neue Person als Freigabe dazu, mehr nicht. Nichts wird `family`,
-// ein privates Dokument bleibt zu (applyDocumentAccess, `grantAssignees`).
+// deshalb nicht anfassen (#1358): an einem Termin fuer Zugewiesene bekommt ein
+// schon eingeschraenktes Dokument die neue Person als Freigabe dazu, sonst
+// aendert sich an den Dokumentrechten nichts - nichts wird `family`, enger
+// oder privat, keine Freigabe faellt weg (applyDocumentAccess, `grantAssignees`).
 const FOLLOW_ASSIGNMENT = Object.freeze({ grantAssigneesOnly: true });
 import { remindAtCompareKey, remindAtUtcSql } from '../utils/reminder-schedule.js';
 

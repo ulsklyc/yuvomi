@@ -644,8 +644,15 @@ describe('#1358 - der Umzug oeffnet kein Anhang-Dokument', () => {
     const { id, documentId } = seedWithDocument(refA, 'restricted', 'private');
     db.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(documentId, CHRIS);
     assert.equal(move(id, refA, refB), true);
-    const state = docState(documentId);
-    assert.equal(state.access.includes(BEN), false, 'Ben sieht den Termin nicht, also auch nicht sein Dokument');
-    assert.notEqual(state.visibility, 'family');
+    assert.deepEqual(docState(documentId), { visibility: 'restricted', access: [CHRIS] },
+      'Ben kommt nicht dazu, und der Sync nimmt auch nichts weg: Chris behaelt die Freigabe der Besitzerin');
+  });
+
+  it('der Sync aendert Dokumentrechte sonst nie - ein family-Dokument an einem privaten Termin bleibt family', () => {
+    const refA = externalCalendar('caldav', CAL_A, 'A', ANNA);
+    const refB = externalCalendar('caldav', CAL_B, 'B', BEN);
+    const { id, documentId } = seedWithDocument(refA, 'family', 'private');
+    assert.equal(move(id, refA, refB), true);
+    assert.deepEqual(docState(documentId), { visibility: 'family', access: [] });
   });
 });

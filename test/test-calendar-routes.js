@@ -3930,7 +3930,7 @@ test('Anhang: weiter oeffnen darf nur, wer das Dokument verwalten darf - Sehen r
 
 test('Anhang: die Kopie beim Split behaelt die Freigaben der Quelle (#1358, Review)', async () => {
   // Eine Zugewiesene mit documents:write und Freigabe auf das eingeschraenkte
-  // Dokument teilt die Serie. Die Kopie gehoert der Terminerstellerin; ohne die
+  // Dokument teilt die Serie. Die Kopie gehoert der Besitzerin des Quelldokuments; ohne die
   // Freigaben der Quelle saehe sie am Nachfolger niemand ausser dieser.
   const created = await call('POST', '/', { actor: ADMIN, body: {
     title: 'Freigabe-Split', start_datetime: '2071-01-01T09:00:00', recurrence_rule: 'FREQ=DAILY;COUNT=5',
@@ -3959,4 +3959,45 @@ test('Anhang: die Kopie beim Split behaelt die Freigaben der Quelle (#1358, Revi
   assert.equal(db.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(cloneId).visibility, 'restricted',
     'die Kopie bleibt eingeschraenkt');
   assert.deepEqual(access(cloneId), [MARIA.id]);
+});
+
+test('Anhang: die Kopie gehoert der Besitzerin des Quelldokuments, nicht der Terminerstellerin (#1358)', async () => {
+  const created = await call('POST', '/', { actor: MARIA, body: {
+    title: 'Besitz-Split', start_datetime: '2072-01-01T09:00:00', recurrence_rule: 'FREQ=DAILY;COUNT=5',
+    attachment_data: `data:text/plain;base64,${Buffer.from('besitz').toString('base64')}`, attachment_name: 'b.txt',
+  } });
+  assert.equal(created.status, 201);
+  const sourceId = created.body.data.attachment_document_id;
+  // Das Dokument gehoert Tom, nicht Maria, die den Termin angelegt hat.
+  db.prepare("UPDATE family_documents SET created_by = ?, visibility = 'family' WHERE id = ?").run(TOM.id, sourceId);
+  const split = await call('PUT', `/${created.body.data.id}/occurrences/2072-01-03/following`, { actor: MARIA, body: { title: 'Nachfolger' } });
+  assert.equal(split.status, 201, JSON.stringify(split.body));
+  const cloneId = split.body.data.attachment_document_id;
+  assert.ok(cloneId && cloneId !== sourceId);
+  assert.equal(db.prepare('SELECT created_by FROM family_documents WHERE id = ?').get(cloneId).created_by, TOM.id,
+    'die Kopie gehoert Tom, der Besitzerin der Quelle');
+});
+
+test('Anhang: teilt eine Nicht-Besitzerin die Serie und weist neu zu, meldet der Nachfolger den Anhang als gesperrt (#1358)', async () => {
+  // Folge von "Nicht-Besitzer verengen nur": die Kopie gehoert der Besitzerin
+  // der Quelle, ihre Freigaben werden auf die neuen Zugewiesenen verengt. Wer
+  // Dokumente lesen darf, bekommt `attachment_locked` - der Dialog zeigt dann
+  // "Anhang vorhanden (privat)"; freigeben kann die Besitzerin oder ein Admin.
+  const created = await call('POST', '/', { actor: ADMIN, body: {
+    title: 'Umzug-Split', start_datetime: '2073-01-01T09:00:00', recurrence_rule: 'FREQ=DAILY;COUNT=5',
+    visibility: 'assignees', assigned_to: [MARIA.id],
+    attachment_data: `data:text/plain;base64,${Buffer.from('umzug').toString('base64')}`, attachment_name: 'u.txt',
+  } });
+  assert.equal(created.status, 201);
+  const split = await call('PUT', `/${created.body.data.id}/occurrences/2073-01-03/following`, {
+    actor: MARIA, body: { title: 'Nachfolger', assigned_to: [TOM.id] },
+  });
+  assert.equal(split.status, 201, JSON.stringify(split.body));
+  const successorId = split.body.data.id;
+  const asTom = await call('GET', `/${successorId}`, { actor: TOM });
+  assert.equal(asTom.status, 200);
+  assert.equal(asTom.body.data.attachment_document_id, null, 'Tom sieht das Dokument nicht');
+  assert.equal(asTom.body.data.attachment_locked, true, 'aber dass ein Anhang da ist - der Dialog zeigt den Hinweis');
+  const asAdmin = await call('GET', `/${successorId}`, { actor: ADMIN });
+  assert.ok(asAdmin.body.data.attachment_document_id, 'die Besitzerin sieht ihn und kann ihn freigeben');
 });
