@@ -115,6 +115,7 @@ function emptyBudget(month) {
     entryCount: 0,
     topExpenseCategory: null,
     topExpenseAmount: 0,
+    topExpenses: [],
     savingsGoal: null,
   };
 }
@@ -582,14 +583,20 @@ router.get('/', (req, res) => {
       WHERE date BETWEEN ? AND ?${ownerClause} AND is_pending = 0
     `).get(from, to, ...ownerParams);
 
-    const topExpense = d.prepare(`
+    // Die drei groessten Ausgabenkategorien, nicht nur die groesste: die hohe
+    // Budget-Kachel (1x2) fuellt damit ihre Hoehe mit Inhalt statt mit einem
+    // leeren Band ueber der Fusszeile (Critique 2026-09-23). Die erste bleibt
+    // zusaetzlich als `topExpenseCategory`/`topExpenseAmount` stehen - die
+    // flache Kachel und aeltere Clients lesen genau diese beiden Felder.
+    const topExpenses = d.prepare(`
       SELECT category, SUM(amount) AS amount
       FROM budget_entries
       WHERE amount < 0 AND date BETWEEN ? AND ?${ownerClause} AND is_pending = 0
       GROUP BY category
       ORDER BY ABS(SUM(amount)) DESC
-      LIMIT 1
-    `).get(from, to, ...ownerParams);
+      LIMIT 3
+    `).all(from, to, ...ownerParams);
+    const topExpense = topExpenses[0];
 
     // Monats-Sparziel (Budgetplan #468): eigener Guard, damit ältere/Minimal-DBs
     // ohne budget_plans-Tabelle die Budget-Aggregation nicht scheitern lassen.
@@ -607,6 +614,7 @@ router.get('/', (req, res) => {
       entryCount: totals?.entry_count || 0,
       topExpenseCategory: topExpense?.category || null,
       topExpenseAmount: Math.abs(topExpense?.amount || 0),
+      topExpenses: topExpenses.map((row) => ({ category: row.category, amount: Math.abs(row.amount || 0) })),
       savingsGoal,
     };
   } catch (err) {
@@ -619,6 +627,7 @@ router.get('/', (req, res) => {
       entryCount: 0,
       topExpenseCategory: null,
       topExpenseAmount: 0,
+      topExpenses: [],
     };
   }
 

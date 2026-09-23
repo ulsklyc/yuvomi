@@ -27,7 +27,7 @@ import { isSoloHousehold } from '/utils/household.js';
 import {
   WIDGET_SIZE_PRESETS, WIDGET_SIZE_OPTIONS,
   COCKPIT_COVERED_WIDGETS,
-  nearestPreset, isUserOrderedConfig, sameWidgetConfig,
+  nearestPreset, sameWidgetConfig, suggestGridHoleFill,
   dashboardQuery,
 } from '/utils/dashboard-widgets.js';
 import {
@@ -1599,7 +1599,39 @@ function renderBudgetSavings(budget, balance, income, savingsRate) {
     </div>` : ''}`;
 }
 
-function renderBudgetWidget(budget, currency) {
+/* DIE HOHE BUDGET-KACHEL FUELLT IHRE HOEHE MIT INHALT (Critique 2026-09-23).
+ *
+ * Als 1x2 bekommt die Karte die Hoehe zweier Rasterzeilen, ihr Inhalt reichte
+ * fuer gut eine: gemessen ~90px leeres Band zwischen „Einnahmen/Ausgaben" und
+ * der Fusszeile, die unten verankert ist (`margin-block-start: auto`, siehe
+ * „Ueberschuessige Hoehe wird Atem" in dashboard.css). Atem war das nicht mehr,
+ * sondern eine Luecke mitten in der Karte. Die hohe Fassung zeigt deshalb die
+ * DREI groessten Ausgabenkategorien statt einer - dieselbe Frage („wohin ging
+ * das Geld?"), vollstaendiger beantwortet, und genau die Hoehe, die fehlte.
+ * Die flache Kachel behaelt ihre eine Zeile; mehr trueg sie nicht. */
+function renderBudgetTopExpenses(budget, currency, size) {
+  const rows = (Array.isArray(budget?.topExpenses) && budget.topExpenses.length
+    ? budget.topExpenses
+    : budget?.topExpenseCategory ? [{ category: budget.topExpenseCategory, amount: budget.topExpenseAmount }] : [])
+    .slice(0, listRowCap(size) === LIST_ROWS_TALL ? 3 : 1);
+  if (!rows.length) return '';
+  if (rows.length === 1) {
+    return `<div class="budget-widget__footer">${t('dashboard.topExpense')}: <strong>${esc(budgetCategoryLabel(rows[0].category))}</strong> · ${formatCurrency(rows[0].amount, currency)}</div>`;
+  }
+  return `
+    <div class="budget-widget__footer budget-widget__top">
+      <p class="budget-widget__top-title">${esc(t('dashboard.topExpenses'))}</p>
+      <ul class="budget-widget__top-list">
+        ${rows.map((row) => `
+        <li class="budget-widget__top-row">
+          <span>${esc(budgetCategoryLabel(row.category))}</span>
+          <strong>${formatCurrency(row.amount, currency)}</strong>
+        </li>`).join('')}
+      </ul>
+    </div>`;
+}
+
+function renderBudgetWidget(budget, currency, size = '1x1') {
   const income = budget?.income || 0;
   const expenses = budget?.expenses || 0;
   const balance = budget?.balance || 0;
@@ -1636,9 +1668,7 @@ function renderBudgetWidget(budget, currency) {
           <strong>${formatCurrency(expenses, currency)}</strong>
         </span>
       </div>
-      ${budget?.topExpenseCategory
-        ? `<div class="budget-widget__footer">${t('dashboard.topExpense')}: <strong>${esc(budgetCategoryLabel(budget.topExpenseCategory))}</strong> · ${formatCurrency(budget.topExpenseAmount, currency)}</div>`
-        : ''}
+      ${renderBudgetTopExpenses(budget, currency, size)}
     </div>
   </div>`;
 }
@@ -2705,35 +2735,34 @@ function renderTodayCockpit(data, cfg = [], editing = false) {
 }
 
 
-/* WOHER MAN WEISS, DASS DIE FLAECHE LEBT (Critique R2, A8). Der stille Refresh
- * (15-Min-Takt plus Tab-Reaktivierung) tut seine Arbeit unsichtbar - und genau
- * das ist am Wandtablet das Problem: eine Flaeche, die sich nie erkennbar
- * bewegt, ist von einer eingefrorenen nicht zu unterscheiden. Wer daran
- * vorbeigeht, kann „heute nichts mehr" nicht glauben, ohne neu zu laden.
+/* DER KOPF DER UEBERSICHT: Datumszeile mit Werkzeugen, darunter der Large
+ * Title ueber die volle Breite (Critique 2026-09-23, P1).
  *
- * Der Anker ist deshalb absichtlich klein und absolut: eine Uhrzeit, keine
- * „vor 3 Minuten"-Angabe, die einen zweiten Timer braeuchte, nur um sich
- * selbst zu widerlegen. Er steht in der Werkzeugspalte, nicht im Gruss-Stapel
- * - der Masthead soll weiter mit Datum, Gruss und Wetter sprechen, nicht mit
- * Betriebszustand. Im Bearbeiten-Modus entfaellt er: dort wird nicht
- * aktualisiert, und die Werkzeugleiste braucht ihren Platz. */
-function renderDashboardOverview(user, editing = false, weather = null, updatedAt = null, scope = {}) {
+ * Die Werkzeuge standen als eigene Spalte NEBEN dem Grusstapel, und unter
+ * ihnen der Stand-Anker mit `flex: 0 0 100%`. Der blaehte die Spalte mobil auf
+ * 187px auf; dem Gruss blieben bei 390px 171px, er brach dreizeilig um
+ * („Guten / Abend, / Linda"), und der erste Inhalt stand bei 274 von 844px.
+ * Jetzt teilen sich Datum und Knoepfe EINE Zeile - dieselbe Bauart wie eine
+ * Large-Title-Leiste, deren Knoepfe ueber dem Titel sitzen -, und der Titel
+ * hat die ganze Breite. Das Raster dafuer steht in dashboard.css.
+ *
+ * DER STAND-ANKER („Stand 14:32", Critique R2, A8) gehoert der Wand. Dort
+ * beweist er, dass der stille Refresh laeuft, und dort steht er weiter
+ * (`.wall__updated`, renderWallSurface). Auf dem Telefon und am Schreibtisch
+ * kostete er eine Zeile Kopf fuer eine Frage, die dort niemand stellt: wer die
+ * Seite in der Hand hat, laedt sie im Zweifel selbst neu. */
+function renderDashboardOverview(user, editing = false, weather = null, scope = {}) {
   // Wer der Vorgabe des Haushalts folgt, hat nichts zurueckzusetzen; wer sie
   // setzen darf, ist Admin (#827).
   const { followsDefault = true, canPublish = false } = scope;
   const dateLabel = mastheadDateLabel();
-  const updated = !editing && updatedAt
-    ? `<p class="dashboard-overview__updated">${esc(t('dashboard.updatedAt', { time: formatTime(updatedAt) }))}</p>`
-    : '';
 
   return `
     <section class="dashboard-overview">
       <div class="dashboard-overview__header${editing ? ' dashboard-overview__header--editing' : ''}">
-        <div class="dashboard-overview__heading">
-          <span class="dashboard-overview__date">${dateLabel}</span>
-          <h2 class="dashboard-overview__title dashboard-overview__title--${greetingPeriod()}">${greeting(user.display_name)}</h2>
-          ${mastheadWeatherHtml(weather)}
-        </div>
+        <span class="dashboard-overview__date">${dateLabel}</span>
+        <h2 class="dashboard-overview__title dashboard-overview__title--${greetingPeriod()}">${greeting(user.display_name)}</h2>
+        ${mastheadWeatherHtml(weather)}
         <div class="dashboard-overview__tools">
           ${editing ? `
           <!-- Die Beruhigung stand nur im Toast NACH dem Speichern, die
@@ -2787,7 +2816,6 @@ function renderDashboardOverview(user, editing = false, weather = null, updatedA
                   aria-pressed="${editing ? 'true' : 'false'}">
             <i data-lucide="${editing ? 'x' : 'settings-2'}" aria-hidden="true"></i>
           </button>
-          ${updated}
         </div>
       </div>
     </section>
@@ -3179,7 +3207,7 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
     calendar: () => renderUpcomingEvents(data.upcomingEvents ?? []),
     birthdays: (size) => renderUpcomingBirthdays(data.birthdays ?? [], size),
     countdown: (size) => renderCountdowns(data.countdowns ?? [], size, data.countdownTotal),
-    budget: () => renderBudgetWidget(data.budget ?? {}, currency),
+    budget: (size) => renderBudgetWidget(data.budget ?? {}, currency, size),
     rewards: () => renderRewardsWidget(data.rewards ?? {}),
     health: () => renderHealthWidget(data.health ?? {}),
     cycle: () => renderCycleWidget(data.cycle),
@@ -3234,10 +3262,9 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
   // in die Anpassung (das Cockpit oben bleibt als Orientierung erhalten).
   const gridInner = tiles
     || emptyHintHTML(t('dashboard.allWidgetsHidden'), { icon: 'layout-dashboard' });
-  // Beim Bearbeiten und bei bewusst umsortierten Layouts die Quellordnung bewahren
-  // (kein dense-Umpacken); der Autor-Default darf dicht packen.
-  const preserveOrder = (editing || isUserOrderedConfig(cfg)) ? ' dashboard__grid--preserve-order' : '';
-  const grid = `<div class="dashboard__grid ${editing ? 'dashboard__grid--editing' : ''}${preserveOrder}" id="dashboard-widget-grid">${gridInner}</div>`;
+  // Dicht gepackt in jedem Zustand (dashboard.css, `.dashboard__grid`): die
+  // Reihenfolge ist die Rangfolge, kein Schalter mehr fuer umsortierte Layouts.
+  const grid = `<div class="dashboard__grid ${editing ? 'dashboard__grid--editing' : ''}" id="dashboard-widget-grid">${gridInner}</div>`;
   // Im Bearbeiten-Modus folgt die Wieder-Einblenden-Leiste dem Grid, damit
   // ausgeblendete Widgets nicht in einer Sackgasse verschwinden.
   return editing ? `${grid}${renderHiddenWidgetsTray(cfg, glanceHidden)}` : grid;
@@ -3265,7 +3292,7 @@ function renderDashboardSkeleton() {
   return `
     <section class="dashboard-overview">
       <div class="dashboard-overview__header">
-        <div class="dashboard-overview__heading">
+        <div>
           <div class="skeleton skeleton-line skeleton-line--short"></div>
           <div class="skeleton skeleton-line skeleton-line--medium"></div>
         </div>
@@ -4371,6 +4398,69 @@ function closestWidgetDrop(grid, event, draggedId) {
   return { id: nearest.item.dataset.widgetId, placement, item: nearest.item };
 }
 
+/* DER LOCH-HINWEIS IM BEARBEITEN-MODUS (Critique 2026-09-23).
+ *
+ * Das Raster packt immer dicht; was dann noch leer bleibt, liegt an den
+ * GROESSEN - drei Breitkacheln in drei Spalten lassen rechts je eine Zelle
+ * frei, weil keine spaetere Kachel hineinpasst. Das loest keine Reihenfolge,
+ * nur eine andere Groesse, und die schlaegt der Bearbeiten-Modus vor: EINE
+ * Aenderung, nach der kein Loch bleibt und das Raster nicht hoeher wird. Gibt
+ * es keine, schweigt er - ein Hinweis ohne Ausweg waere Laerm.
+ *
+ * Die Spans kommen aus dem Stylesheet, nicht aus einer zweiten Tabelle: welche
+ * Groesse in welcher Breite wie viele Spalten und Zeilen belegt, steht nur in
+ * dashboard.css. Fuer eine Kandidaten-Groesse wird die Klasse kurz getauscht
+ * und der berechnete Stil gelesen - ein Stil-Recalc, kein Layout, und der
+ * Tausch ist zurueckgenommen, bevor der Browser das naechste Bild malt. */
+function gridSpans(el) {
+  const cs = getComputedStyle(el);
+  const span = (start, end) => Number(/span (\d+)/.exec(`${start} ${end}`)?.[1] || 1);
+  return { cols: span(cs.gridColumnStart, cs.gridColumnEnd), rows: span(cs.gridRowStart, cs.gridRowEnd) };
+}
+
+function spansForSize(el, size) {
+  const current = [...el.classList].find((c) => c.startsWith('widget-size--'));
+  const probe = widgetSizeClass(size);
+  if (!current || current === probe) return gridSpans(el);
+  el.classList.replace(current, probe);
+  try {
+    return gridSpans(el);
+  } finally {
+    el.classList.replace(probe, current);
+  }
+}
+
+function gridColumnCount(grid) {
+  return getComputedStyle(grid).gridTemplateColumns.split(' ').filter((v) => v && v !== 'none').length;
+}
+
+function gridHoleSuggestion(grid) {
+  const columns = gridColumnCount(grid);
+  if (columns < 2) return null;
+  const items = [...grid.querySelectorAll(':scope > .widget-wrapper[data-widget-id]')].map((el) => ({
+    id: el.dataset.widgetId,
+    el,
+    size: [...el.classList].find((c) => c.startsWith('widget-size--'))?.slice('widget-size--'.length) ?? '1x1',
+    ...gridSpans(el),
+  }));
+  return suggestGridHoleFill(items, columns,
+    (item) => WIDGET_SIZE_PRESETS.map((p) => ({ size: p.value, ...spansForSize(item.el, p.value) })));
+}
+
+function renderGridHint(suggestion) {
+  const preset = WIDGET_SIZE_PRESETS.find((p) => p.value === suggestion.size);
+  const text = t('dashboard.gridHoleHint', {
+    widget: widgetLabel(suggestion.id),
+    size: preset ? t(preset.labelKey) : suggestion.size,
+  });
+  return `
+    <div class="dashboard-grid-hint" role="status">
+      <p class="dashboard-grid-hint__text">${esc(text)}</p>
+      <button type="button" class="btn btn--ghost" data-grid-hint-apply
+              data-widget-id="${esc(suggestion.id)}" data-size="${esc(suggestion.size)}">${esc(t('common.apply'))}</button>
+    </div>`;
+}
+
 function updateWidgetConfig(config, id, patch) {
   return config.map((w) => w.id === id ? { ...w, ...patch } : w)
     .map((w, i) => ({ ...w, order: i }));
@@ -4825,12 +4915,44 @@ export async function render(container, { user, signal: routeSignal = null } = {
     window.yuvomi?.showToast(t('dashboard.customizeSetDefaultDone'), 'success');
   }
 
+  // Beobachtet im Bearbeiten-Modus die Spaltenzahl des Rasters: ein Loch, das
+  // bei drei Spalten bleibt, gibt es bei zwei vielleicht nicht - und umgekehrt.
+  let gridHintObserver = null;
+  signal.addEventListener('abort', () => gridHintObserver?.disconnect(), { once: true });
+
+  function syncGridHint(grid) {
+    container.querySelector('.dashboard-grid-hint')?.remove();
+    const suggestion = gridHoleSuggestion(grid);
+    if (!suggestion) return;
+    // VOR dem Raster, nicht dahinter: das Loch steht oft oben, und ein Hinweis
+    // unter zwanzig Kacheln waere einer, den man erst nach dem Scrollen findet.
+    grid.insertAdjacentHTML('beforebegin', renderGridHint(suggestion));
+    container.querySelector('.dashboard-grid-hint [data-grid-hint-apply]')?.addEventListener('click', () => {
+      widgetConfig = updateWidgetConfig(widgetConfig, suggestion.id, { size: suggestion.size });
+      rebuildDashboard(widgetConfig);
+    });
+  }
+
   function wireDashboardEditMode() {
+    gridHintObserver?.disconnect();
+    gridHintObserver = null;
     if (!isCustomizing) return;
     const grid = container.querySelector('#dashboard-widget-grid');
     if (!grid) return;
     let draggedId = '';
     let currentDrop = null;
+
+    syncGridHint(grid);
+    if (typeof ResizeObserver === 'function') {
+      let columns = gridColumnCount(grid);
+      gridHintObserver = new ResizeObserver(() => {
+        const next = gridColumnCount(grid);
+        if (next === columns) return;
+        columns = next;
+        syncGridHint(grid);
+      });
+      gridHintObserver.observe(grid);
+    }
 
     const clearDropHint = () => {
       grid.querySelectorAll('.widget-wrapper--drop-before, .widget-wrapper--drop-after').forEach((el) => {
@@ -5023,7 +5145,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     const weatherCardShown = cfg.some((w) => w.id === 'weather' && w.visible);
     setHtml(shell, `
       <section class="dashboard-masthead dashboard-masthead--${greetingPeriod()}${mastheadSlim}">
-        ${renderDashboardOverview(user, isCustomizing, weatherCardShown ? null : weather, lastLoadedAt, { followsDefault, canPublish })}
+        ${renderDashboardOverview(user, isCustomizing, weatherCardShown ? null : weather, { followsDefault, canPublish })}
         ${cockpitHtml}
       </section>
       ${renderDashboardLayout(cfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes, glanceHidden: !glanceVisible })}
