@@ -139,6 +139,21 @@ function readOnly() {
 }
 
 /**
+ * Sind die E-Mail-Adressen dieses Kontakts fuer die bedienende Person gesperrt?
+ *
+ * Die Adressen eines verknuepften Kontakts fuehren zu seinem Konto
+ * (Passwort-Reset, SSO-Verknuepfung). Aendern duerfen sie nur die Person
+ * selbst und ein Admin; der Server weist alle anderen mit 403 ab
+ * (server/services/contact-identity.js). Das Formular zeigt die Adressen
+ * deshalb nur-lesen und schickt sie beim Speichern gar nicht erst mit.
+ */
+function emailsLockedFor(contact) {
+  if (!contact?.family_user_id) return false;
+  if (state.user?.role === 'admin') return false;
+  return Number(state.user?.id) !== Number(contact.family_user_id);
+}
+
+/**
  * Die Kopf-Aktionen der Seite - als eigene Funktion, damit sich messen laesst,
  * WAS bei `contacts: read` uebrig bleibt.
  *
@@ -186,6 +201,9 @@ let state = {
   // haushaltweiten Region abgeleitet; null → libphonenumber-js nutzt nur
   // explizite Ländervorwahlen (führendes +). Rein Anzeige, nie Speicher-Logik.
   defaultCountry: null,
+  // Wer die Seite bedient - fuer die Frage, wer die E-Mail-Adressen eines
+  // verknuepften Kontakts aendern darf (siehe emailsLockedFor()).
+  user:           null,
 };
 let _container = null;
 let contactsSearch = null;
@@ -196,6 +214,7 @@ let contactsSearch = null;
 
 export async function render(container, { user }) {
   _container = container;
+  state.user = user ?? null;
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <div class="contacts-page app-page app-page--reading page-measure--narrow" data-composition="reading">
@@ -1054,6 +1073,7 @@ async function openContactModal({ mode, contact = null }) {
 function buildContactForm({ mode, contact = null }) {
   const isEdit = mode === 'edit';
   const v      = (field) => esc(isEdit && contact[field] ? contact[field] : '');
+  const emailsLocked = isEdit && emailsLockedFor(contact);
 
   // Mehrwert-Zeilen: bestehende Arrays; sonst speist das Legacy-Einzelfeld die
   // erste Zeile. Mindestens eine (ggf. leere) Zeile pro Gruppe.
@@ -1066,28 +1086,31 @@ function buildContactForm({ mode, contact = null }) {
   const phoneRows = mvRows(isEdit ? contact.phones : null, isEdit ? contact.phone : '');
   const emailRows = mvRows(isEdit ? contact.emails : null, isEdit ? contact.email : '');
 
+  const mvLocked = (kind) => kind === 'email' && emailsLocked;
   const mvRow = (kind, row, isFirst) => `
     <div class="contact-mv-row" data-mv-row>
       <input type="${kind === 'phone' ? 'tel' : 'email'}" class="form-input" data-mv-value
              ${isFirst ? `id="cm-${kind}"` : ''} value="${esc(row.value)}"
              placeholder="${t(kind === 'phone' ? 'contacts.phonePlaceholder' : 'contacts.emailPlaceholder')}"
-             autocomplete="${kind === 'phone' ? 'tel' : 'email'}">
+             autocomplete="${kind === 'phone' ? 'tel' : 'email'}"${mvLocked(kind) ? ' readonly aria-describedby="cm-email-locked"' : ''}>
       <input type="text" class="form-input contact-mv-row__label" data-mv-label maxlength="50"
              value="${esc(row.label)}" placeholder="${t('contacts.mvLabelPlaceholder')}"
-             aria-label="${t('contacts.mvLabel')}">
-      <button type="button" class="row-action row-action--danger" data-mv-remove ${isFirst ? 'hidden' : ''}
+             aria-label="${t('contacts.mvLabel')}"${mvLocked(kind) ? ' readonly' : ''}>
+      ${mvLocked(kind) ? '' : `<button type="button" class="row-action row-action--danger" data-mv-remove ${isFirst ? 'hidden' : ''}
               aria-label="${t('contacts.mvRemove')}">
         <i data-lucide="x" class="icon-sm" aria-hidden="true"></i>
-      </button>
+      </button>`}
     </div>`;
 
   const mvSection = (kind, rows, labelKey, addKey) => `
     <div class="form-group" data-mv-group="${kind}">
       <label class="form-label" for="cm-${kind}">${t(labelKey)}</label>
       <div class="contact-mv-list" data-mv-list>${rows.map((r, i) => mvRow(kind, r, i === 0)).join('')}</div>
-      <button type="button" class="btn btn--ghost contact-mv-add" data-mv-add>
+      ${mvLocked(kind)
+        ? `<p class="form-hint" id="cm-email-locked">${t('contacts.emailLockedHint')}</p>`
+        : `<button type="button" class="btn btn--ghost contact-mv-add" data-mv-add>
         <i data-lucide="plus" class="icon-sm" aria-hidden="true"></i>${t(addKey)}
-      </button>
+      </button>`}
       ${kind === 'phone'
         // Unverbindliche Tipphilfe (AsYouType-Vorschau) + Plausibilitäts-Hinweis.
         // Rein visuell: die Eingabefelder werden NIE programmatisch umgeschrieben,
@@ -1280,6 +1303,8 @@ function buildContactForm({ mode, contact = null }) {
           // deckt 'other' als neutrales Default ab.
           body.phones = phoneEntries.map((r, i) => ({ label: r.label || 'other', value: r.value, isPrimary: i === 0 }));
           body.emails = emailEntries.map((r, i) => ({ label: r.label || 'other', value: r.value, isPrimary: i === 0 }));
+          // Gesperrte Adressen gehen gar nicht erst mit: der Server behaelt sie.
+          if (emailsLocked) { delete body.email; delete body.emails; }
           if (structured) { body.firstName = firstName; body.lastName = lastName; }
           // Eine unverändert gebliebene Fremd-Kategorie würde der Server (zu Recht)
           // mit 400 ablehnen; sie wird deshalb weggelassen und bleibt serverseitig
@@ -1685,7 +1710,7 @@ function showImportResult({ imported, withBirthday, failedList, lastName, lastEr
  */
 export const __test = {
   renderContactItem, contactsEmptyStateHtml, toolbarActionsHtml,
-  openContactDetail, readOnly, state,
+  openContactDetail, readOnly, state, buildContactForm,
   // Der Import-Toast und sein Sprung (#1348): die Aussage ist ein Aufruf von
   // `showToast` und ein Flag in der sessionStorage, kein Markup.
   showImportResult, openBirthdayImport,

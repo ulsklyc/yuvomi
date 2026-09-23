@@ -1522,6 +1522,48 @@ test('Kontaktzeile mit Schreibrecht: das Menue fuehrt auch Loeschen', () => {
   });
 });
 
+// Die E-Mail-Adressen eines verknuepften Kontakts fuehren zu seinem Konto
+// (Passwort-Reset, SSO); aendern duerfen sie nur die Person selbst und ein
+// Admin, der Server weist alle anderen mit 403 ab (contact-identity.js). Das
+// Formular zeigt sie den anderen deshalb nur-lesen, mit Hinweis statt
+// Hinzufuegen-Knopf. Gemessen am ERZEUGTEN Markup, immer im Paar.
+function emailGruppe(html) {
+  const start = html.indexOf('data-mv-group="email"');
+  assert.ok(start > 0, 'E-Mail-Gruppe fehlt im Formular');
+  // Bis zum ersten Feld dahinter (Adresse, im aufklappbaren Abschnitt).
+  const ende = html.indexOf('id="cm-address"', start);
+  assert.ok(ende > start, 'Adressfeld hinter der E-Mail-Gruppe fehlt');
+  return html.slice(start, ende);
+}
+
+test('Kontaktformular: E-Mail am verknuepften Kontakt eines ANDEREN ist nur-lesen', () => {
+  const vorher = contacts.state.user;
+  try {
+    const linked = { ...kontakt({ family_user_id: 7 }), emails: [{ label: 'work', value: 'a@example.org' }], phones: [] };
+    contacts.state.user = { id: 9, role: 'member' };
+    const fremd = contacts.buildContactForm({ mode: 'edit', contact: linked }).content;
+    const gruppe = emailGruppe(fremd);
+    assert.match(gruppe, /type="email"[^>]*readonly/);
+    assert.match(gruppe, /id="cm-email-locked"/);
+    assert.doesNotMatch(gruppe, /data-mv-add/);
+    assert.doesNotMatch(gruppe, /data-mv-remove/);
+    // Die uebrigen Felder bleiben offen.
+    assert.doesNotMatch(fremd.slice(0, fremd.indexOf('data-mv-group="email"')), /readonly/);
+
+    for (const user of [{ id: 7, role: 'member' }, { id: 1, role: 'admin' }]) {
+      contacts.state.user = user;
+      const offen = emailGruppe(contacts.buildContactForm({ mode: 'edit', contact: linked }).content);
+      assert.doesNotMatch(offen, /readonly/, `gesperrt fuer ${JSON.stringify(user)}`);
+      assert.match(offen, /data-mv-add/);
+    }
+    contacts.state.user = { id: 9, role: 'member' };
+    const unverknuepft = emailGruppe(contacts.buildContactForm({ mode: 'edit', contact: { ...linked, family_user_id: null } }).content);
+    assert.doesNotMatch(unverknuepft, /readonly/);
+  } finally {
+    contacts.state.user = vorher;
+  }
+});
+
 test('Kontaktzeile mit `contacts: read`: Loeschen weg, jeder Leseweg bleibt', () => {
   withAccess({ contacts: 'read' }, () => {
     const html = contacts.renderContactItem(kontakt());

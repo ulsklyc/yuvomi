@@ -756,6 +756,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Picking it came back as "invalid language". Every other language was unaffected, which is why this
   went unnoticed.
 
+## [2.68.1] - 2026-09-23
+
+### Security
+
+- **Only the linked person or an admin can now change the email addresses of a household member's
+  contact.** A contact linked to an account carries that account's email addresses, and those
+  addresses are used by the password reset and by the SSO sign-in to find the account. Any member
+  with write access to contacts could change them, on anyone's contact, and a CardDAV sync could
+  overwrite them as well. Changing the primary or an additional email address of a linked contact
+  now needs that person or an admin; anyone else is refused, and the edit form shows the addresses
+  read-only to them. The CardDAV sync no longer writes them on a linked contact. Every other field
+  of a linked contact stays editable for members as before, and contacts that are not linked to an
+  account are not affected.
+
+- **An API token limited to certain modules can no longer change the email addresses of a household
+  member's contact, not even an admin's token or the person's own.** These addresses lead to the
+  account, which is more than a module permission covers. Changing them now needs a signed-in session
+  or a token without module limits; other fields stay editable with a limited token.
+
+- **Adding a contact to a shared-expense group no longer creates a full household account.** Any
+  member could do this, and the new account counted as a household member with the contact's email
+  address as the target of its password reset, although creating household accounts is for admins.
+  Such an account is now a guest of the group, the same as a guest added directly: it sees only that
+  group's shared expenses. Accounts created this way before the update stay as they are, because
+  some of them may be in real use. Admins should look through the household members under Settings
+  for people who were only meant to share expenses, and remove or re-create them as guests.
+
 ## [2.68.0] - 2026-09-20
 
 ### Added
