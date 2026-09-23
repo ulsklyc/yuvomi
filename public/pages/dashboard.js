@@ -7,13 +7,14 @@
 import { api, auth } from '/api.js';
 import { createPageController } from '/utils/page-lifecycle.js';
 import { canSeeWidget, moduleAccess, navModuleAccess, canUseFasting } from '/permissions.js';
-import { t, formatDate, formatTime, timeSuffix, getLocale, getNumberFormat } from '/i18n.js';
+import { t, formatDate, formatDayMonth, formatTime, timeSuffix, getLocale, getNumberFormat } from '/i18n.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { resolveEventColor } from '/utils/event-color.js';
+import { buildWeekStrip } from '/utils/week-strip.js';
 import { esc, fmtLocation, renderMarkdownLight } from '/utils/html.js';
 // `todayKey` heisst hier schon ein Parameter (bzw. eine lokale Bindung), der den
 // Bezugstag traegt - der Import kommt deshalb unter eigenem Namen herein.
-import { toLocalDateKey, parseLocalDateKey, addLocalDays, todayKey as householdToday } from '/utils/date.js';
+import { parseLocalDateKey, addLocalDays, todayKey as householdToday } from '/utils/date.js';
 import { nowFields, zonedUTCProxy, zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
 import { predictCycle, PHASE } from '/utils/health-cycle.js';
 import { NUTRIENTS, nutrientProgress } from '/utils/health-nutrition.js';
@@ -71,13 +72,24 @@ const ONBOARDING_TITLE_ID = 'onboarding-step-title';
 const APP_NAME_STORAGE_KEY = 'yuvomi-app-name';
 const CUSTOMIZE_HINT_KEY = 'yuvomi-dash-customize-hint';
 
+/* DER TAG EINES TERMINS IST DER TAG DER HAUSHALTSZONE, nicht der des Browsers.
+ *
+ * Hier stand `toLocalDateKey(new Date(value))`, und das las einen
+ * synchronisierten Termin (`…Z` oder mit Offset) in der Zone des GERAETS:
+ * `toLocalDateKey` sieht die Haushaltszone bewusst nie (CLAUDE.md, Fallen).
+ * Mit Haushalt in Berlin und Telefon in Tokio stand ein Termin um 23:30 am
+ * Folgetag - in der Liste, im Tagesprogramm, im Familien-Widget und im
+ * Kalender-Link. Zonenlose Wanduhrzeit fiel nicht auf, weil der Umweg ueber
+ * `new Date()` dieselben Ziffern zurueckgibt.
+ *
+ * `zonedDateKey` ist dieselbe Antwort, die der Kalender gibt (`localDate` in
+ * pages/calendar.js): Wanduhrzeit wird gelesen, ein Zeitpunkt in die
+ * Anzeigezone umgerechnet, ohne gesetzte Zone bleibt es beim Browser. */
 function eventOccurrenceDateKey(event) {
   const value = String(event?.start_datetime || '');
   if (!value) return '';
   if (value.length <= 10) return value.slice(0, 10);
-
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value.slice(0, 10) : toLocalDateKey(date);
+  return zonedDateKey(value) || value.slice(0, 10);
 }
 
 // All-day events store start_datetime as a date-only key ("2026-07-10"). Parsing
@@ -1071,6 +1083,70 @@ function renderUpcomingEvents(events) {
     ${widgetHeader('calendar', t('nav.calendar'), events.length, '/calendar')}
     <div class="widget__body">${items}</div>
   </div>`;
+}
+
+/* „DIESE WOCHE" - DER KALENDER IN 2x1 IST EIN STREIFEN, KEINE LISTE.
+ *
+ * Eine GROESSE des bestehenden Widgets und kein eigenes: die Frage ist
+ * dieselbe (was steht an), nur der Zuschnitt ein anderer, und die Filter
+ * („nur meine", Geburtstage), die Rechte und der Kopf gehoeren schon dem
+ * Kalender-Widget. Ein zweites Widget haette sie doppelt gefuehrt und im
+ * Anpassen-Tray eine weitere Kachel neben den einundzwanzig gestellt. Auf 2x1
+ * war die Liste ohnehin die schwaechste Form - drei Zeilen in einer Breite,
+ * die sieben Tage nebeneinander traegt.
+ *
+ * Kein Titel je Termin im Bild: der Streifen sagt, wie voll die Woche ist und
+ * wer, nicht was. Wer es wissen will, tippt den Tag und landet in dessen
+ * Tagesansicht (`/calendar?date=`); die Titel stehen im Tooltip und die Zahl
+ * im zugaenglichen Namen des Tages. */
+const WEEKDAY_SHORT_KEYS = ['dayShortSunday', 'dayShortMonday', 'dayShortTuesday', 'dayShortWednesday', 'dayShortThursday', 'dayShortFriday', 'dayShortSaturday'];
+const WEEKDAY_LONG_KEYS = ['dayLongSunday', 'dayLongMonday', 'dayLongTuesday', 'dayLongWednesday', 'dayLongThursday', 'dayLongFriday', 'dayLongSaturday'];
+
+function renderWeekStrip(weekEvents) {
+  // Geburtstage tragen serverseitig einen sprachneutralen Titel (#524) - hier
+  // und nicht im Ladepfad uebersetzt, weil der Titel nur im Tagesnamen steht.
+  const events = (Array.isArray(weekEvents) ? weekEvents : []).map(localizeBirthdayEvent);
+  const strip = buildWeekStrip(events, householdToday());
+  const lanes = strip.laneCount;
+  const days = strip.days.map((day) => {
+    const column = day.index + 1;
+    const dateLabel = `${t(`calendar.${WEEKDAY_LONG_KEYS[day.weekday]}`)}, ${formatDayMonth(day.key)}`;
+    const countLabel = day.count ? t('dashboard.weekDayEvents', { count: day.count }) : t('dashboard.noEvents');
+    const label = `${dateLabel}${day.isToday ? `, ${t('common.today')}` : ''}: ${countLabel}`;
+    const route = `/calendar?date=${day.key}`;
+    const dots = day.dots.map((dot) => `<span class="week-strip__dot" style="--dot-color:${esc(dot.color)}"></span>`).join('');
+    const more = day.more ? `<span class="week-strip__more">+${day.more}</span>` : '';
+    return `
+      <a href="${route}" data-route="${route}" class="week-strip__day${day.isToday ? ' week-strip__day--today' : ''}"
+         style="grid-column:${column};grid-row:1 / span ${lanes + 2}" ${day.isToday ? 'aria-current="date"' : ''}
+         aria-label="${esc(label)}"${day.titles.length ? ` title="${esc(day.titles.join(', '))}"` : ''}></a>
+      <span class="week-strip__head${day.isToday ? ' week-strip__head--today' : ''}" style="grid-column:${column}" aria-hidden="true">
+        <span class="week-strip__weekday">${esc(t(`calendar.${WEEKDAY_SHORT_KEYS[day.weekday]}`))}</span>
+        <span class="week-strip__date">${day.dayOfMonth}</span>
+      </span>
+      <span class="week-strip__dots" style="grid-column:${column};grid-row:${lanes + 2}" aria-hidden="true">${dots}${more}</span>`;
+  }).join('');
+  const bands = strip.bands.map((band) => `
+      <span class="week-strip__band${band.continuesBefore ? ' week-strip__band--before' : ''}${band.continuesAfter ? ' week-strip__band--after' : ''}"
+            style="grid-column:${band.startIndex + 1} / ${band.endIndex + 2};grid-row:${band.lane + 2};--dot-color:${esc(band.color)}"
+            aria-hidden="true"></span>`).join('');
+  const empty = strip.days.every((day) => day.count === 0)
+    ? `<p class="week-strip__empty">${t('dashboard.weekStripEmpty')}</p>`
+    : '';
+  return `<div class="widget widget--calendar widget--week">
+    ${widgetHeader('calendar', t('dashboard.weekStripTitle'), null, '/calendar')}
+    <div class="widget__body">
+      <div class="week-strip">${days}${bands}</div>
+      ${empty}
+    </div>
+  </div>`;
+}
+
+/** Das Kalender-Widget in seiner Groesse: 2x1 ist die Woche, alles andere die Liste. */
+function renderCalendarWidget(data, size) {
+  return nearestPreset(size ?? '1x2') === '2x1'
+    ? renderWeekStrip(data?.weekEvents)
+    : renderUpcomingEvents(data?.upcomingEvents ?? []);
 }
 
 /**
@@ -3176,7 +3252,7 @@ function renderHiddenWidgetsTray(cfg, glanceHidden = false) {
 function renderDashboardLayout(cfg, data, weather, currency, { editing = false, visibleMealTypes = MEAL_ORDER, glanceHidden = false } = {}) {
   const widgetById = {
     tasks: () => renderUrgentTasks(data.urgentTasks ?? []),
-    calendar: () => renderUpcomingEvents(data.upcomingEvents ?? []),
+    calendar: (size) => renderCalendarWidget(data, size),
     birthdays: (size) => renderUpcomingBirthdays(data.birthdays ?? [], size),
     countdown: (size) => renderCountdowns(data.countdowns ?? [], size, data.countdownTotal),
     budget: () => renderBudgetWidget(data.budget ?? {}, currency),
@@ -5238,7 +5314,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { loadScheduleSlice, renderUrgentTasks, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab };
+export const __test = { renderCalendarWidget, loadScheduleSlice, renderUrgentTasks, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

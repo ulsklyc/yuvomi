@@ -6,7 +6,7 @@ export function dashboardPaths() {
       get: op({
         summary: 'Get dashboard data',
         tag: 'Dashboard',
-        description: 'Aggregated data for every overview tile. Optional query parameters filter tasks, upcoming events and pinned notes before row limits and counts are computed. Task filters apply to every task slice (`urgentTasks`, `openTaskCount`, `overdueTaskCount`, `memberTodayTasks`, `tasksDoneToday`); note filters apply to both `pinnedNotes` and `pinnedNotesCount`. The browser derives these filters from per-widget `options` stored in `dashboard_widgets`.',
+        description: 'Aggregated data for every overview tile. Optional query parameters filter tasks, upcoming events and pinned notes before row limits and counts are computed. Task filters apply to every task slice (`urgentTasks`, `openTaskCount`, `overdueTaskCount`, `memberTodayTasks`, `tasksDoneToday`); note filters apply to both `pinnedNotes` and `pinnedNotesCount`. Event filters apply to both `upcomingEvents` and `weekEvents` (the events touching the household days from yesterday to a week ahead, in a compact shape for the week strip of the calendar tile). The browser derives these filters from per-widget `options` stored in `dashboard_widgets`.',
         params: [
           {
             name: 'notes_category',
@@ -35,7 +35,7 @@ export function dashboardPaths() {
             name: 'events_birthdays',
             in: 'query',
             required: false,
-            description: '`hide` drops appointments that belong to a birthday entry from `upcomingEvents`, so a household that already shows the Birthdays tile does not read them twice. Applied before the five-item cap, so the freed rows are filled with the next real appointments. Anything else keeps them - birthdays are in by default.',
+            description: '`hide` drops appointments that belong to a birthday entry from `upcomingEvents` and `weekEvents`, so a household that already shows the Birthdays tile does not read them twice. Applied before the five-item cap, so the freed rows are filled with the next real appointments. Anything else keeps them - birthdays are in by default.',
             schema: { type: 'string', enum: ['show', 'hide'] },
           },
         ],

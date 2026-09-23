@@ -209,6 +209,7 @@ const APP_SHELL = [
   '/utils/upload-limit.js',
   '/utils/wall-mode.js',
   '/utils/web-share.js',
+  '/utils/week-strip.js',
   '/offline.html',
   // offline.html laedt theme-init.js, damit die Huelle dieselbe Farbwelt
   // trifft wie die App (gespeicherter Wunsch schlaegt Systemeinstellung).

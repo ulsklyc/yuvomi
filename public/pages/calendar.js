@@ -756,6 +756,22 @@ function validDateParam(value) {
   return DATE_KEY_RE.test(String(value || '')) ? String(value) : '';
 }
 
+/**
+ * Ein TAG als Ziel, ohne Termin: `/calendar?date=YYYY-MM-DD`.
+ *
+ * Der Wochenstreifen der Uebersicht fuehrt jeden seiner sieben Tage hierher.
+ * Bis dahin las diese Seite `date` nur zusammen mit `open` - als Vorkommen
+ * eines Termins -, und ein Tag allein oeffnete kommentarlos den heutigen
+ * Monat. Ziel ist die Tagesansicht, und zwar wie der Drill-in aus der
+ * Monatszelle als NAVIGATION, nicht als Einstellung: gespeichert wird die
+ * Ansicht nur in der Tablist (siehe switchToDayView).
+ * @returns {string} der Tag oder '' (kein Tag-Link, ungueltig oder mit `open`)
+ */
+function dayDeepLinkDate(params) {
+  if (params.get('open')) return '';
+  return validDateParam(params.get('date'));
+}
+
 function deepLinkTargetDate(initialEvent, dateParam) {
   return validDateParam(dateParam) || localDate(initialEvent?.start_datetime);
 }
@@ -1692,6 +1708,11 @@ export async function render(container, { user }) {
   const openId    = params.get('open');
   const dateParam = validDateParam(params.get('date'));
   let initialEvent = null;
+  const dayLink = dayDeepLinkDate(params);
+  if (dayLink) {
+    state.cursor = dayLink;
+    state.view = 'day';
+  }
   if (openId && /^\d+$/.test(openId)) {
     try {
       const eventRes = await api.get(`/calendar/${openId}`);
@@ -4191,6 +4212,7 @@ export const __test = {
   isAllDayLike,
   agendaSegmentKind,
   deepLinkTargetDate,
+  dayDeepLinkDate,
   findDeepLinkedOccurrence,
   validDateParam,
   hasAttachment,
