@@ -84,7 +84,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   invisible at rest but still reacted to touch; they now show quietly, the first touch on a
   sleeping wall only wakes it, and waking no longer shifts them, so the second tap hits the button
   you aimed at. Screen readers hear the timer start, stop and finish instead of every passing
-  second.
+  second. On a full day, a running timer no longer pushes its stop button and the exit below the
+  edge of the screen: the program shows one row less while it runs.
 
 - **The weather card's refresh button can be tapped again.** It sat underneath the card header and
   did not respond.

@@ -2591,6 +2591,39 @@ test('Wand-Modus: der Fehlerzustand trägt keinen Retry-Knopf, aber die Uhr', as
   });
 });
 
+/* EIN LAUFENDER TIMER NIMMT EINE ZEILE (Integration 2026-09-23, Browser-Abnahme
+ * bei 1280x800). Der Deckel von vier Zeilen ist fuer eine Flaeche OHNE die
+ * Timer-Anzeige gerechnet; die Anzeige kostet 64px plus Abstand, und an einem
+ * vollen Tag schob sie Fuss samt „Timer abbrechen" und Ausstieg auf 808-856px -
+ * unter den Bildrand einer Flaeche, die nicht scrollt. Solange der Timer steht,
+ * zeigt das Programm eine Zeile weniger, und „+N weitere" zaehlt sie mit. */
+test('Wand-Modus: ein laufender Timer nimmt dem Programm eine Zeile', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const { startWallTimer, clearWallTimer } = await import('../public/components/wall-timer.js');
+  const store = new Map();
+  const prev = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) },
+  });
+  try {
+    await withWallWindow(() => {
+      const data = { urgentTasks: wallTasks(9), users: [] };
+      const rows = (html) => (html.match(/class="wall-row /g) ?? []).length;
+      nodeAssert.equal(rows(__test.renderWallSurface(data, null, {})), __test.WALL_ROW_CAP, 'Vorbedingung: ohne Timer der volle Deckel');
+      startWallTimer(5);
+      const running = __test.renderWallSurface(data, null, {});
+      nodeAssert.match(running, /wall__timer-value/, 'Vorbedingung: die Timer-Anzeige steht');
+      nodeAssert.equal(rows(running), __test.WALL_ROW_CAP - 1, 'mit laufendem Timer eine Zeile weniger');
+      clearWallTimer();
+      nodeAssert.equal(rows(__test.renderWallSurface(data, null, {})), __test.WALL_ROW_CAP, 'nach dem Timer wieder der volle Deckel');
+    });
+  } finally {
+    if (prev) Object.defineProperty(globalThis, 'localStorage', prev);
+    else delete globalThis.localStorage;
+  }
+});
+
 test('Wand-Modus: der Deckel greift, und der Überlauf sagt die Wahrheit', async () => {
   const { __test } = await import('../public/pages/dashboard.js');
   await withWallWindow(() => {

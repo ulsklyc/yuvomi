@@ -4833,7 +4833,18 @@ function renderWallError() {
  * Wand dort nur (wall-timer.js).
  */
 function renderWallSurface(data, weather, { failed = false, loading = false, updatedAt = null, now = new Date() } = {}) {
-  const model = failed || loading ? null : buildTodayCockpitModel(data, [], { cap: WALL_ROW_CAP, now });
+  // Der Kuechentimer (#844). Er wird auch im Lade- und Fehlerzustand gebaut: er
+  // haengt an nichts, was geladen werden koennte, und ein laufender Timer, der
+  // beim naechsten Netzfehler verschwaende, waere schlimmer als gar keiner.
+  const timer = renderWallTimer();
+  // Seine Anzeige kostet eine Programmzeile Hoehe (64px plus Abstand, gemessen
+  // bei 1280x800). WALL_ROW_CAP ist fuer die Flaeche OHNE sie gerechnet: an
+  // einem vollen Tag schob sie den Fuss samt „Timer abbrechen" und Ausstieg
+  // unter den Bildrand. Solange sie steht, nimmt das Programm eine Zeile
+  // weniger, und „+N weitere" zaehlt sie mit. Der Start und das Ende rufen
+  // ohnehin `rerender()` (wall-timer.js), der Deckel folgt also von selbst.
+  const cap = timer.display ? WALL_ROW_CAP - 1 : WALL_ROW_CAP;
+  const model = failed || loading ? null : buildTodayCockpitModel(data, [], { cap, now });
 
   let main;
   if (failed) {
@@ -4850,11 +4861,6 @@ function renderWallSurface(data, weather, { failed = false, loading = false, upd
   const stamp = updatedAt
     ? `<p class="wall__updated">${esc(t('dashboard.updatedAt', { time: formatTime(updatedAt) }))}</p>`
     : '<p class="wall__updated"></p>';
-
-  // Der Kuechentimer (#844). Er wird auch im Lade- und Fehlerzustand gebaut: er
-  // haengt an nichts, was geladen werden koennte, und ein laufender Timer, der
-  // beim naechsten Netzfehler verschwaende, waere schlimmer als gar keiner.
-  const timer = renderWallTimer();
 
   return `
     <div class="wall">
