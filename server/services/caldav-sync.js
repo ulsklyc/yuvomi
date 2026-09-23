@@ -871,7 +871,7 @@ async function runSync({ createClient } = {}) {
   const healBurntInColor = conn.prepare(`
     UPDATE calendar_events SET color = NULL, color_modified = 0
     WHERE id = ? AND color_modified = 1 AND user_modified = 1
-      AND outbound_dirty = 0 AND lower(color) = lower(?)
+      AND outbound_dirty = 0 AND outbound_move_to IS NULL AND lower(color) = lower(?)
       AND ${uploadedRowRule('calendar_events.')}
       AND (? IS NULL OR datetime(created_at) <= datetime(?))
   `);
@@ -1113,7 +1113,10 @@ async function runSync({ createClient } = {}) {
       // Zwischen dem Sammeln und hier liegen die awaits der uebrigen Kalender:
       // waehlt in der Zeit jemand eine Farbe, steht der Termin auf
       // outbound_dirty und traegt eine andere Farbe. Das UPDATE prueft beides
-      // neu, sonst naehme es die gerade gewaehlte Farbe mit.
+      // neu, sonst naehme es die gerade gewaehlte Farbe mit. Ein anstehender
+      // Umzug (outbound_move_to) schuetzt ebenso: ein reiner Umzug setzt kein
+      // outbound_dirty, und danach zeigt target_caldav_calendar_url schon auf
+      // den neuen Kalender.
       for (const [eventId, { uid, color }] of healCandidates) {
         if (coloredUids.has(uid)) continue;
         if (healBurntInColor.run(eventId, color, legacyCutoff, legacyCutoff).changes > 0 && !changedIds.has(eventId)) {

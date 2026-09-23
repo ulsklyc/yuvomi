@@ -1949,6 +1949,27 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
       'die Zeile ist eine Altlast, die Heilung steht offen');
   }));
 
+  it('ein anstehender reiner Umzug schuetzt die Farbe vor der Heilung', () => withDb(async (d) => {
+    // Ein reiner Umzug setzt nur outbound_move_to, kein outbound_dirty. Bis er
+    // ausgefuehrt ist, faesst die Heilung den Termin nicht an, auch wenn der
+    // Server ihn ohne COLOR liefert.
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    d.prepare('UPDATE calendar_events SET outbound_move_to = ? WHERE external_calendar_id = ?').run(CAL_B, UID);
+
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.strictEqual(row(d).color, COLOR_A);
+  }));
+
+  it('ein waehrend des Laufs angestossener Umzug schuetzt die Farbe ebenso', () => withDb(async (d) => {
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    await sync({ createClient: clientChangingDuringB(d, () => d.prepare(
+      'UPDATE calendar_events SET outbound_move_to = ? WHERE external_calendar_id = ?'
+    ).run(CAL_B, UID)) });
+    assert.strictEqual(row(d).color, COLOR_A);
+  }));
+
   it('eine gewaehlte Farbe, die keine Kalenderfarbe ist, bleibt', () => withDb(async (d) => {
     // Gegenprobe: ohne sie waere der Test oben auch gruen, wenn der Inbound
     // jede lokal gefuehrte Farbe verwuerfe.
