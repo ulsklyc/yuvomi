@@ -158,7 +158,7 @@ function consumeOidcNotice() {
  * @param {{ enabled: boolean, pending: boolean, recovery_remaining: number, required: boolean }|null} state
  * @returns {string}
  */
-function twoFactorCardHtml(state) {
+export function twoFactorCardHtml(state) {
   if (!state) return '';
 
   const body = state.enabled
@@ -167,22 +167,22 @@ function twoFactorCardHtml(state) {
         <i data-lucide="shield-check" aria-hidden="true"></i>
         <span>${t('settings.twoFactorActive')}</span>
       </p>
-      <p class="form-hint">${t('settings.twoFactorRecoveryLeft', { count: state.recovery_remaining })}</p>
+      <p class="form-hint settings-2fa__note">${t('settings.twoFactorRecoveryLeft', { count: state.recovery_remaining })}</p>
       ${state.recovery_remaining === 0
-        ? `<p class="form-error" role="status">${t('settings.twoFactorNoRecoveryLeft')}</p>`
+        ? `<p class="form-error settings-2fa__note" role="status">${t('settings.twoFactorNoRecoveryLeft')}</p>`
         : ''}
-      <div class="settings-form-actions">
+      <div class="settings-form-actions settings-2fa__actions">
         <button type="button" class="btn btn--secondary" id="two-factor-regenerate">${t('settings.twoFactorNewCodes')}</button>
         ${state.required
           ? ''
           : `<button type="button" class="btn btn--danger-outline" id="two-factor-disable">${t('settings.twoFactorDisable')}</button>`}
       </div>
-      ${state.required ? `<p class="form-hint">${t('settings.twoFactorRequiredByHousehold')}</p>` : ''}
+      ${state.required ? `<p class="form-hint settings-2fa__note">${t('settings.twoFactorRequiredByHousehold')}</p>` : ''}
     `
     : `
       <p class="form-hint">${t('settings.twoFactorHint')}</p>
-      ${state.required ? `<p class="form-error" role="status">${t('settings.twoFactorRequiredSetUpNow')}</p>` : ''}
-      <div class="settings-form-actions">
+      ${state.required ? `<p class="form-error settings-2fa__note" role="status">${t('settings.twoFactorRequiredSetUpNow')}</p>` : ''}
+      <div class="settings-form-actions settings-2fa__actions">
         <button type="button" class="btn btn--primary" id="two-factor-start">${t('settings.twoFactorSetUp')}</button>
       </div>
     `;
@@ -191,7 +191,7 @@ function twoFactorCardHtml(state) {
     <div class="settings-card" id="two-factor-card">
       <h3 class="settings-card__title">${t('settings.twoFactorTitle')}</h3>
       ${body}
-      <div id="two-factor-error" class="form-error" role="alert" hidden></div>
+      <div id="two-factor-error" class="form-error settings-2fa__note" role="alert" hidden></div>
     </div>
   `;
 }
@@ -253,12 +253,12 @@ function renderRecoveryCodes(card, codes, onDone) {
     <ul class="settings-2fa__codes">
       ${codes.map((code) => `<li><code>${esc(code)}</code></li>`).join('')}
     </ul>
-    <div class="settings-form-actions">
+    <div class="settings-form-actions settings-2fa__actions">
       <button type="button" class="btn btn--secondary" id="two-factor-copy">${t('settings.twoFactorCopyCodes')}</button>
       <button type="button" class="btn btn--secondary" id="two-factor-download">${t('settings.twoFactorDownloadCodes')}</button>
       <button type="button" class="btn btn--primary" id="two-factor-done">${t('settings.twoFactorCodesSaved')}</button>
     </div>
-    <p class="form-hint" id="two-factor-copy-status" role="status"></p>
+    <p class="form-hint settings-2fa__note" id="two-factor-copy-status" role="status"></p>
   `);
 
   const status = card.querySelector('#two-factor-copy-status');
@@ -302,7 +302,7 @@ function askForCode(card, texts, onConfirm, onCancel) {
   card.insertAdjacentHTML('beforeend', `
     <h3 class="settings-card__title">${esc(texts.title)}</h3>
     <p class="form-hint">${esc(texts.lead)}</p>
-    <form id="two-factor-confirm-form" class="settings-form">
+    <form id="two-factor-confirm-form" class="settings-form settings-2fa__form">
       <div class="form-group">
         <label class="form-label" for="two-factor-confirm-code">${t('settings.twoFactorCodeOrRecoveryLabel')}</label>
         <input class="form-input settings-2fa__code" type="text" id="two-factor-confirm-code"

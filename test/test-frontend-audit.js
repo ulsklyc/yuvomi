@@ -14404,6 +14404,83 @@ test('ein Toast-Container hat genau einen Namensgeber', () => {
 });
 
 // --------------------------------------------------------------------------
+// EIN VERSTECKTER DATEI-INPUT OHNE LABEL IST EIN WERKZEUG, KEIN FELD
+//
+// a11y-Runde: `#edit-member-avatar-file` hatte keinen Namen (axe `label`,
+// critical) und bekam als erstes Feld des Dialogs den Erstfokus; per
+// `.sr-only:focus-visible` erschien er als Streifen ueber dem Dialogkopf. Wer
+// einen `.sr-only`-Datei-Input ueber einen eigenen Knopf oeffnet (Vorschau,
+// Stift, "Hochladen"), gibt ihm einen Namen und nimmt ihn aus der Tab-Folge:
+// der Knopf ist der Weg, und modal.js ueberspringt `tabindex="-1"` beim
+// Erstfokus. Ein Input, den ein `<label for>` bedient (Dropzonen), bleibt in
+// der Tab-Folge - dort IST er der Tastaturweg.
+// --------------------------------------------------------------------------
+// `for="id"` als eigenes Attribut, nicht als Ende von `data-for` oder `aria-for`.
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const labelledFor = (src, id) => new RegExp(`(?<![\\w-])for="${escapeRegExp(id)}"`).test(src);
+
+test('die Ausnahme fuer <label for> greift nur am echten for-Attribut', () => {
+  assert.equal(labelledFor('<label for="zz4">', 'zz4'), true);
+  assert.equal(labelledFor('<div data-for="zz4">', 'zz4'), false, 'data-for ist kein Label');
+  assert.equal(labelledFor('<label for="zz45">', 'zz4'), false);
+});
+
+test('ein versteckter Datei-Input ohne <label for> ist benannt und ausser Tab-Folge', () => {
+  const offenders = [];
+  let seen = 0;
+  for (const rel of walkJsFiles('../public/')) {
+    const src = read(rel);
+    for (const [tag] of src.matchAll(/<input\b(?=[^>]*\btype="file")(?=[^>]*\bclass="[^"]*\bsr-only\b)[^>]*>/g)) {
+      seen += 1;
+      const id = tag.match(/\bid="([^"]+)"/)?.[1];
+      if (id && labelledFor(src, id)) continue;
+      // Ein leerer Name ist keiner: `aria-label=""` zaehlt nicht.
+      const named = /\baria-label(?:ledby)?="[^"]*[^"\s][^"]*"/.test(tag);
+      const untabbable = /\btabindex="-1"/.test(tag);
+      if (!named || !untabbable) {
+        offenders.push(`${rel}: ${id ?? tag.slice(0, 60)}${named ? '' : ' ohne Namen'}${untabbable ? '' : ' in der Tab-Folge'}`);
+      }
+    }
+  }
+  assert.ok(seen >= 8, `nur ${seen} versteckte Datei-Inputs gefunden - der Scan greift nicht`);
+  assert.deepEqual(offenders, []);
+});
+
+// --------------------------------------------------------------------------
+// DIE REGION SAGT AN, NICHT DER TOAST
+//
+// a11y-Runde: jeder Toast trug `role="alert"` (implizit `aria-live="assertive"`)
+// und stand dabei in einer Region, die selbst ansagt - auch in der hoeflichen.
+// Eine Erfolgsmeldung oder Erinnerung unterbrach damit die laufende Vorlesung,
+// und je nach Screenreader kam sie zweimal (einmal fuer die Region, einmal fuer
+// die Rolle). Die Dringlichkeit waehlt die Region (utils/toast-surface.js); ein
+// Toast darin traegt keine eigene Live-Rolle.
+// --------------------------------------------------------------------------
+test('ein Toast traegt keine eigene Live-Rolle - die Region sagt an', () => {
+  const offenders = [];
+  let creators = 0;
+  for (const rel of walkJsFiles('../public/')) {
+    const src = withoutCommentsKeepingLines(read(rel));
+    if (!/\btoastSurface\s*\(/.test(src)) continue;
+    // Jede Variable, die ein Toast wird: `x.className = 'toast ...'` oder als Template.
+    const names = new Set([...src.matchAll(/\b([A-Za-z_$][\w$]*)\.className\s*=\s*['"`]toast(?:\s|['"`]|\$)/g)].map((m) => m[1]));
+    creators += names.size;
+    src.split('\n').forEach((line, i) => {
+      for (const name of names) {
+        const own = new RegExp(`\\b${escapeRegExp(name)}\\.setAttribute\\(\\s*['"](?:role|aria-live)['"]`);
+        if (own.test(line)) offenders.push(`${rel}:${i + 1} ${line.trim()}`);
+      }
+    });
+  }
+  assert.ok(creators >= 2, `nur ${creators} Toast-Bauer gefunden - Shell und Erinnerungen bauen je einen`);
+  assert.deepEqual(offenders, [], 'ein Toast in einer Live-Region traegt eine eigene Live-Rolle');
+  // Die Regionen selbst sagen weiter an, jede mit ihrer Dringlichkeit.
+  const router = read('../public/router.js');
+  assert.match(router, /toastContainerPolite\.setAttribute\('aria-live', 'polite'\)/);
+  assert.match(router, /toastContainerAssertive\.setAttribute\('aria-live', 'assertive'\)/);
+});
+
+// --------------------------------------------------------------------------
 // DIE HERKUENFTE DER ERINNERUNGEN SIND DIE DES SERVERS
 //
 // Der Erinnerungs-Toast weist seit Block 2 aus, WORAUS eine Meldung stammt

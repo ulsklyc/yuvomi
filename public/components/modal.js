@@ -217,8 +217,17 @@ const FOCUSABLE = [
 ].join(', ');
 
 // Erstes echtes Eingabefeld eines Formulars - der Ort, an den der Fokus bei
-// Dateneingabe gehört.
-const FIRST_FIELD = 'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled])';
+// Dateneingabe gehört. `tabindex="-1"` zaehlt nicht: ein Feld ausserhalb der
+// Tab-Folge ist ein Werkzeug eines anderen Bedienelements, kein Einstieg. In
+// "Mitglied bearbeiten" landete der Erstfokus sonst auf dem versteckten
+// Datei-Input der Avatar-Vorschau, und `.sr-only:focus-visible` zeigte ihn als
+// Streifen ueber dem Dialogkopf (a11y-Runde). Dasselbe gilt fuer das native
+// Feld hinter dem Datepicker (`.ydp__native`).
+const FIRST_FIELD = [
+  'input:not([type="hidden"]):not([disabled]):not([tabindex="-1"])',
+  'textarea:not([disabled]):not([tabindex="-1"])',
+  'select:not([disabled]):not([tabindex="-1"])',
+].join(', ');
 
 // --------------------------------------------------------
 // Focus-Trap (Spec §5.2)
