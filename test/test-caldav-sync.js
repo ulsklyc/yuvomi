@@ -1734,6 +1734,92 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     assert.strictEqual(marker(d, `caldav_legacy_color_heal_done_${accountId}`), '1');
   }));
 
+  // Ein von retireLegacyInstances() (google-calendar.js) abgeloestes
+  // Google-Vorkommen: lokal, user_modified = 1, color_modified = 1, altes
+  // created_at, bewusst gewaehlte Farbe - hier gleich der Farbe von A.
+  function retiredGoogleOccurrence(d) {
+    d.exec(`CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, description TEXT, applied_at TEXT NOT NULL);
+            INSERT INTO schema_migrations VALUES (166, '#891', '2026-08-27T08:00:00Z');`);
+    return d.prepare(`
+      INSERT INTO calendar_events (title, start_datetime, end_datetime, external_source, color, color_modified,
+                                   user_modified, created_by, target_caldav_account_id, target_caldav_calendar_url, created_at)
+      VALUES ('Abgeloest', '2026-01-08T17:00:00Z', '2026-01-08T18:00:00Z', 'local', ?, 1, 1, 1, 1, ?, '2026-08-01T10:00:00Z')
+    `).run(COLOR_A, CAL_A).lastInsertRowid;
+  }
+  const backWithoutColor = (d, id) => {
+    const uid = d.prepare('SELECT external_calendar_id FROM calendar_events WHERE id = ?').get(id).external_calendar_id;
+    return icsOf(['BEGIN:VEVENT', `UID:${uid}`, 'SUMMARY:Abgeloest',
+      'DTSTART:20260108T170000Z', 'DTEND:20260108T180000Z', 'END:VEVENT']);
+  };
+
+  it('ein hochgeladener Termin mit user_modified = 1 (abgeloestes Google-Vorkommen) heilt nie', () => withDb(async (d) => {
+    // Eine echte Altzeile im abgewaehlten B haelt die Heilung offen.
+    await legacyRowInB(d);
+    d.prepare('UPDATE caldav_calendar_selection SET enabled = 0 WHERE calendar_url = ?').run(CAL_B);
+    const id = retiredGoogleOccurrence(d);
+    d.prepare("UPDATE calendar_events SET created_at = '2026-08-01T09:00:00Z' WHERE external_calendar_id = ?").run(UID);
+    await sync({ createClient: rawClient({ objects: { [CAL_A]: [icsOf(otherEvent)] } }) });
+    assert.strictEqual(d.prepare('SELECT external_source FROM calendar_events WHERE id = ?').get(id).external_source, 'caldav',
+      'Vorbedingung: hochgeladen');
+
+    await sync({ createClient: rawClient({ objects: { [CAL_A]: [backWithoutColor(d, id), icsOf(otherEvent)] } }) });
+    assert.strictEqual(marker(d), null, 'Vorbedingung: die Heilung war offen');
+    assert.strictEqual(d.prepare('SELECT color FROM calendar_events WHERE id = ?').get(id).color, COLOR_A);
+  }));
+
+  it('ein hochgeladener Termin mit user_modified = 1 haelt den Merker nicht offen', () => withDb(async (d) => {
+    const id = retiredGoogleOccurrence(d);
+    await sync({ createClient: rawClient({ objects: { [CAL_A]: [icsOf(otherEvent)] } }) });
+    await sync({ createClient: rawClient({ objects: { [CAL_A]: [backWithoutColor(d, id), icsOf(otherEvent)] } }) });
+    assert.strictEqual(marker(d), '1');
+  }));
+
+  it('beim Neuanlegen zaehlt ein hochgeladener Termin mit user_modified = 1 nicht als Altlast', () => withDb(async (d) => {
+    const id = retiredGoogleOccurrence(d);
+    await sync({ createClient: rawClient({ objects: { [CAL_A]: [icsOf(otherEvent)] } }) });
+    assert.strictEqual(d.prepare('SELECT user_modified FROM calendar_events WHERE id = ?').get(id).user_modified, 1);
+    d.exec('DELETE FROM caldav_calendar_selection WHERE account_id = 1; DELETE FROM caldav_accounts WHERE id = 1;');
+    d.prepare("DELETE FROM calendar_events WHERE external_calendar_id = 'other@test'").run();
+
+    const { accountId } = await addAccount('Wieder', 'https://dav.example/', 'u1', 'p', { createClient: accountClient([CAL_B]) });
+    assert.strictEqual(marker(d, `caldav_legacy_color_heal_done_${accountId}`), '1');
+  }));
+
+  // Zurechnung verwaister Kalender: im Zweifel nicht (Thread zu :180).
+  async function orphanCase(d, orphanUrl, extraSql = '') {
+    d.exec(`INSERT INTO external_calendars (source, external_id, name, color) VALUES ('caldav', '${orphanUrl}', 'Alt', '${COLOR_C}'); ${extraSql}`);
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_C);
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    return row(d).color;
+  }
+
+  it('ein per Query adressierter verwaister Kalender wird keinem Konto zugerechnet', () => withDb(async (d) => {
+    // Der Pfad eines Query-adressierten Kalenders sagt nichts ueber seinen
+    // Besitzer; hier liegt er sogar unter dem Home von Konto 1.
+    assert.strictEqual(await orphanCase(d, `${HOME_1}dav.php?cal=fremd`), COLOR_C);
+  }));
+
+  it('ein verwaister Kalender direkt an der Wurzel wird keinem Konto zugerechnet', () => withDb(async (d) => {
+    // Konto 1 fuehrt zusaetzlich einen Kalender an der Wurzel des Servers:
+    // dieses "Home" teilen sich alle Konten dort.
+    const ROOT_OWN = 'https://dav.example/r1/';
+    assert.strictEqual(await orphanCase(d, 'https://dav.example/r3/',
+      `INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled)
+         VALUES (1, '${ROOT_OWN}', 'R1', '#111111', 0);`), COLOR_C);
+  }));
+
+  it('ein verwaister Kalender in einem Home, das auch ein anderes Konto fuehrt, wird keinem zugerechnet', () => withDb(async (d) => {
+    assert.strictEqual(await orphanCase(d, `${HOME_1}alt/`,
+      `INSERT INTO caldav_accounts (id, name, caldav_url, username, password) VALUES (2, 'Zweit', 'https://dav.example/', 'u2', 'p');
+       INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled)
+         VALUES (2, '${HOME_1}geteilt/', 'Geteilt', '#222222', 0);`), COLOR_C);
+  }));
+
+  it('Gegenprobe: derselbe verwaiste Kalender im eigenen, eindeutigen Home wird zugerechnet', () => withDb(async (d) => {
+    assert.strictEqual(await orphanCase(d, `${HOME_1}alt/`), null);
+  }));
+
   it('ein in diesem Lauf hochgeladener alter lokaler Termin ist kein Heilungskandidat', () => withDb(async (d) => {
     // Thread zu :932. Ein lokaler Termin von vor #891 mit Palettenfarbe gleich
     // der Kalenderfarbe wird jetzt nach A hochgeladen. Der Upload setzt
@@ -2373,7 +2459,7 @@ describe('CalDAV: neue Kalender sind opt-in (#732)', () => {
         calendar_ref_id INTEGER, external_source TEXT NOT NULL DEFAULT 'local',
         -- addAccount sucht hier nach Altzeilen der Farb-Heilung (#1270).
         color TEXT, color_modified INTEGER NOT NULL DEFAULT 0,
-        user_modified INTEGER NOT NULL DEFAULT 0
+        user_modified INTEGER NOT NULL DEFAULT 0, external_calendar_id TEXT
       );
     `);
     // addAccount schreibt in einer Transaktion (#1270); `node:sqlite` hat keine.

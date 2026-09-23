@@ -83,6 +83,18 @@ function buildCalDAVICS(event, householdZone = null) {
 // Helper Functions
 // --------------------------------------------------------
 
+/**
+ * UID eines Termins, den Yuvomi selbst hochgeladen hat (`oikos-<id>@oikos.local`,
+ * s. den Upload im Sync; ein `::`-Suffix fuer Einzelvorkommen folgt). Solche
+ * Zeilen sind in Yuvomi entstanden, nicht im CalDAV-Import, und kommen fuer die
+ * Farb-Heilung (#1270) nie in Frage - auch dann nicht, wenn sie
+ * `user_modified = 1` und ein altes `created_at` mitbringen, wie ein von
+ * `retireLegacyInstances()` (google-calendar.js) abgeloestes Google-Vorkommen,
+ * das danach in einen CalDAV-Kalender geht. `_` ist in LIKE ein Platzhalter,
+ * im Muster steht keiner.
+ */
+const UPLOADED_UID_PATTERN = 'oikos-%@oikos.local%';
+
 /** Migration, mit der #891 den Import aufhoeren liess, Kalenderfarben einzubrennen. */
 const LEGACY_COLOR_FIX_MIGRATION = 166;
 
@@ -99,6 +111,20 @@ function legacyColorCutoff(conn) {
   if (!hasTable) return null;
   return conn.prepare('SELECT applied_at FROM schema_migrations WHERE version = ?')
     .get(LEGACY_COLOR_FIX_MIGRATION)?.applied_at ?? null;
+}
+
+/**
+ * Das Kalender-Home einer Sammlungs-URL fuer die Zurechnung verwaister
+ * Kalender (#1270): Origin plus Pfad ohne letztes Segment, oder null, wenn es
+ * keinen Besitzer erkennen laesst - Query-adressiert oder direkt an der Wurzel.
+ */
+function calendarHome(url) {
+  let parsed;
+  try { parsed = new URL(String(url)); } catch { return null; }
+  if (parsed.search) return null;
+  const segments = parsed.pathname.split('/').filter(Boolean);
+  if (segments.length < 2) return null;
+  return `${parsed.origin}/${segments.slice(0, -1).join('/')}/`;
 }
 
 /** So viele Laeufe in Folge, in denen nur gestrandete Altzeilen ausstehen (#1270). */
@@ -156,9 +182,16 @@ function legacyColorHealKey(accountId) {
  * Segment: `/calendars/<nutzer>/` bei Nextcloud und Radicale, `/<dsid>/calendars/`
  * bei iCloud). Sonst heilte die Farbe eines fremden Kontos eine hier bewusst
  * gewaehlte.
+ *
+ * Das Home ist eine Schaetzung, und im Zweifel wird NICHT zugerechnet: bei
+ * einer Sammlung, die per Query adressiert wird (`urlParts()` in
+ * utils/caldav-client.js haelt den Query bewusst als Teil der Identitaet),
+ * sagt der Pfad nichts ueber den Besitzer; ein Home direkt an der Wurzel
+ * teilen sich alle Konten eines Servers; und ein Home, in dem auch ein anderes
+ * Konto Kalender fuehrt, gehoert keinem allein. Die Auswahl des Kontos selbst
+ * ist davon nicht betroffen - sie ist gespeicherter Besitz, keine Schaetzung.
  */
 function legacyCalendarColors(conn, accountId) {
-  const home = (url) => String(url).replace(/\/+$/, '').replace(/\/[^/]*$/, '/');
   const colors = new Set();
   const urls = new Set();
   const homes = new Set();
@@ -167,17 +200,24 @@ function legacyCalendarColors(conn, accountId) {
   ).all(accountId);
   for (const row of own) {
     urls.add(row.calendar_url);
-    homes.add(home(row.calendar_url));
+    const h = calendarHome(row.calendar_url);
+    if (h) homes.add(h);
     if (row.calendar_color) colors.add(String(row.calendar_color).toLowerCase());
   }
-  const foreign = new Set(conn.prepare(
+  const foreignRows = conn.prepare(
     'SELECT calendar_url FROM caldav_calendar_selection WHERE account_id <> ?'
-  ).all(accountId).map((row) => row.calendar_url));
+  ).all(accountId);
+  const foreign = new Set(foreignRows.map((row) => row.calendar_url));
+  // Ein Home, in dem auch ein anderes Konto Kalender fuehrt, ist nicht
+  // eindeutig: ein verwaister Kalender darin koennte jedem der beiden gehoeren.
+  const foreignHomes = new Set(foreignRows.map((row) => calendarHome(row.calendar_url)).filter(Boolean));
   const known = conn.prepare(
     "SELECT external_id, color FROM external_calendars WHERE source = 'caldav' AND color IS NOT NULL"
   ).all();
   for (const row of known) {
-    if (foreign.has(row.external_id) || !homes.has(home(row.external_id))) continue;
+    if (foreign.has(row.external_id)) continue;
+    const h = calendarHome(row.external_id);
+    if (!h || !homes.has(h) || foreignHomes.has(h)) continue;
     urls.add(row.external_id);
     colors.add(String(row.color).toLowerCase());
   }
@@ -301,6 +341,7 @@ async function addAccount(name, caldavUrl, username, password, { createClient } 
       LEFT JOIN external_calendars x ON x.id = e.calendar_ref_id
       WHERE e.external_source = 'caldav'
         AND e.color_modified = 1 AND e.user_modified = 1 AND e.color IS NOT NULL
+        AND e.external_calendar_id NOT LIKE '${UPLOADED_UID_PATTERN}'
         AND (? IS NULL OR datetime(e.created_at) < datetime(?))
         AND (x.external_id IS NULL
              OR x.external_id NOT IN (SELECT calendar_url FROM caldav_calendar_selection))
@@ -729,6 +770,7 @@ async function runSync({ createClient } = {}) {
   const healBurntInColor = conn.prepare(`
     UPDATE calendar_events SET color = NULL, color_modified = 0
     WHERE id = ? AND color_modified = 1 AND user_modified = 1
+      AND external_calendar_id NOT LIKE '${UPLOADED_UID_PATTERN}'
       AND (? IS NULL OR datetime(created_at) < datetime(?))
   `);
   // Am Laufende: gibt es noch Altzeilen dieses Kontos, die der Lauf NICHT
@@ -776,6 +818,7 @@ async function runSync({ createClient } = {}) {
     LEFT JOIN external_calendars x ON x.id = e.calendar_ref_id
     WHERE e.external_source = 'caldav'
       AND e.color_modified = 1 AND e.user_modified = 1 AND e.color IS NOT NULL
+      AND e.external_calendar_id NOT LIKE '${UPLOADED_UID_PATTERN}'
       AND (? IS NULL OR datetime(e.created_at) < datetime(?))
   `);
   const selHealMarker = conn.prepare('SELECT 1 AS done FROM sync_config WHERE key = ?');
