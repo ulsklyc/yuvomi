@@ -14,6 +14,7 @@ process.env.DB_PATH = ':memory:';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import bcrypt from 'bcrypt';
 
 const dbmod = await import('../server/db.js');
 const { default: splitRouter } = await import('../server/routes/split-expenses.js');
@@ -43,6 +44,10 @@ app.use((req, _res, next) => {
   // cookieSession: eine Sitzung, die neben einem API-Token mitkommt - requireAuth
   // setzt authUserId/authRole dann aus dem Token, req.session bleibt die Sitzung.
   req.session = actor.cookieSession ?? { userId: actor.id, role: actor.role };
+  // Beide Rechte-Achsen wie in requireAuth/applyRoleModuleAccess; ohne Angabe
+  // unbeschraenkt, damit die uebrigen Faelle unveraendert laufen.
+  req.sessionModuleAccess = actor.moduleAccess ?? null;
+  req.authScopes = actor.scopes ?? null;
   next();
 });
 app.use('/', splitRouter);
@@ -547,6 +552,158 @@ test('POST members via contact_id mit Geburtstag: erzeugt Nutzer + Geburtstags-A
   assert.equal(bday.birth_date, '1992-07-07');
 });
 
+// Der Kontakt ist Quelldatum aus `contacts`: ohne dessen Leserecht (Mitglied
+// oder Token) antwortet die Route wie bei einer unbekannten ID und legt
+// nichts an - sonst verriete der angelegte Gast Name, Telefon und E-Mail. Ein
+// freier Kontakt braucht dazu das Schreibrecht, weil er verknuepft wird.
+test('POST members via contact_id: ohne Kontaktrecht 404 wie eine unbekannte ID, nichts angelegt', async () => {
+  const frei = db.prepare(`INSERT INTO contacts (name, category, phone, email) VALUES ('Geheim Kontakt', 'Sonstiges', '0171', 'geheim@example.test')`).run().lastInsertRowid;
+  const verknuepft = db.prepare(`INSERT INTO contacts (name, category, family_user_id) VALUES ('Geheim Verknuepft', 'Sonstiges', ?)`).run(mkUser('geheim.verknuepft')).lastInsertRowid;
+  const users = () => db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
+  const members = () => db.prepare('SELECT COUNT(*) AS n FROM expense_group_members WHERE group_id = ?').get(OPS).n;
+
+  const unbekannt = await call('POST', `/groups/${OPS}/members`, { actor: { id: OWNER, role: 'member' }, body: { contact_id: 999999, role: 'guest' } });
+  assert.equal(unbekannt.status, 404, 'eine unbekannte Kontakt-ID ist 404, kein 500');
+
+  const vorherNutzer = users();
+  const vorherMitglieder = members();
+  for (const actor of [
+    { id: OWNER, role: 'member', moduleAccess: { contacts: 'none' } },
+    { id: OWNER, role: 'member', scopes: ['budget:write'] },
+  ]) {
+    for (const contactId of [frei, verknuepft]) {
+      const r = await call('POST', `/groups/${OPS}/members`, { actor, body: { contact_id: contactId, role: 'guest' } });
+      assert.equal(r.status, 404, 'dieselbe Antwort wie bei einer unbekannten ID');
+      assert.equal(r.body.error, unbekannt.body.error, 'auch derselbe Text');
+    }
+  }
+  assert.equal(users(), vorherNutzer, 'kein Gastnutzer angelegt');
+  assert.equal(members(), vorherMitglieder, 'kein Mitglied hinzugefuegt');
+  assert.equal(db.prepare('SELECT family_user_id FROM contacts WHERE id = ?').get(frei).family_user_id, null, 'Kontakt nicht verknuepft');
+
+  // Ein FREIER Kontakt wird beim Hinzufuegen beschrieben: er bekommt ein
+  // Konto (`family_user_id`), und Name, Telefon und E-Mail werden danach aus
+  // dem Konto gespiegelt. Das ist ein Schreibvorgang in `contacts` und braucht
+  // dessen Schreibrecht; ein schon verknuepfter Kontakt wird nur gelesen.
+  const kontakt = () => db.prepare('SELECT name, category, phone, email, family_user_id FROM contacts WHERE id = ?').get(frei);
+  const vorherKontakt = kontakt();
+  for (const actor of [
+    { id: OWNER, role: 'member', moduleAccess: { contacts: 'read' } },
+    { id: OWNER, role: 'member', scopes: ['budget:write', 'contacts:read'] },
+  ]) {
+    const lesend = await call('POST', `/groups/${OPS}/members`, { actor, body: { contact_id: frei, role: 'guest' } });
+    assert.equal(lesend.status, 403, 'contacts: read beschreibt keinen freien Kontakt');
+  }
+  assert.deepEqual(kontakt(), vorherKontakt, 'der Kontakt ist unveraendert');
+  assert.equal(users(), vorherNutzer, 'kein Gastnutzer angelegt');
+  assert.equal(members(), vorherMitglieder, 'kein Mitglied hinzugefuegt');
+
+  const verknuepftLesend = await call('POST', `/groups/${OPS}/members`, {
+    actor: { id: OWNER, role: 'member', moduleAccess: { contacts: 'read' } }, body: { contact_id: verknuepft, role: 'guest' },
+  });
+  assert.equal(verknuepftLesend.status, 201, 'ein verknuepfter Kontakt wird nur gelesen: read reicht');
+
+  const schreibend = await call('POST', `/groups/${OPS}/members`, {
+    actor: { id: OWNER, role: 'member', moduleAccess: { contacts: 'write' } }, body: { contact_id: frei, role: 'guest' },
+  });
+  assert.equal(schreibend.status, 201, 'contacts: write verknuepft den freien Kontakt');
+  assert.ok(kontakt().family_user_id, 'jetzt mit Konto');
+});
+
+// Der Passwort-Hash ist der einzige asynchrone Schritt. Liegt er zwischen dem
+// Lesen des Kontakts und dem Schreiben des Gastes, legen zwei gleichzeitige
+// Anfragen zwei Gaeste fuer denselben Kontakt an.
+test('POST members via contact_id: zwei gleichzeitige Anfragen legen EINEN Gast an', async () => {
+  const contactId = db.prepare(`INSERT INTO contacts (name, category) VALUES ('Parallel Kontakt', 'Sonstiges')`).run().lastInsertRowid;
+  const before = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
+  const body = { contact_id: contactId, role: 'guest' };
+  const actor = { id: OWNER, role: 'member' };
+  const [a, b] = await Promise.all([
+    call('POST', `/groups/${OPS}/members`, { actor, body }),
+    call('POST', `/groups/${OPS}/members`, { actor, body }),
+  ]);
+  assert.equal(a.status, 201);
+  assert.equal(b.status, 201);
+  assert.equal(a.body.data.user_id, b.body.data.user_id, 'beide Antworten nennen denselben Gast');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM users').get().n, before + 1, 'genau ein neuer Nutzer');
+});
+
+// WAEHREND DES HASHES AENDERT SICH DIE WELT. Der Passwort-Hash ist der einzige
+// asynchrone Schritt der Route; alles, worauf geschrieben wird - Gruppe,
+// Verwalterrecht, Kontakt -, muss NACH ihm noch einmal gelesen werden, in
+// derselben synchronen Transaktion wie das Schreiben. Sonst bleibt ein Gast
+// ohne Gruppe zurueck oder ein entzogenes Recht schreibt trotzdem.
+// Der Eingriff laeuft GENAU beim Start des Hashes: `bcrypt.hash` wird fuer
+// einen Aufruf umhuellt (server/utils/password.js liest die Methode erst beim
+// Aufruf vom geteilten Modulobjekt). Kein Timer - ein langsamer Runner liefe
+// sonst still vor der Vorpruefung in den Eingriff und maesse die Vorpruefung
+// statt der Neupruefung. Dass der Eingriff lief, prueft die Naht selbst.
+async function duringHash(action, request) {
+  const original = bcrypt.hash;
+  let ran = false;
+  bcrypt.hash = function hashWithIntervention(...args) {
+    bcrypt.hash = original;
+    ran = true;
+    action();
+    return original.apply(this, args);
+  };
+  try {
+    return await request();
+  } finally {
+    bcrypt.hash = original;
+    assert.ok(ran, 'der Eingriff lief waehrend des Hashes');
+  }
+}
+
+test('POST members via contact_id: Gruppe waehrend des Hashes geloescht -> 404, kein verwaister Gast', async () => {
+  const g = (await call('POST', '/groups', { actor: { id: OWNER, role: 'member' }, body: { name: 'Verschwindet', type: 'household', default_currency: 'EUR' } })).body.data.id;
+  const contactId = db.prepare(`INSERT INTO contacts (name, category) VALUES ('Hash Kontakt Gruppe', 'Sonstiges')`).run().lastInsertRowid;
+  const before = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
+  const r = await duringHash(
+    () => db.prepare('DELETE FROM expense_groups WHERE id = ?').run(g),
+    () => call('POST', `/groups/${g}/members`, { actor: { id: OWNER, role: 'member' }, body: { contact_id: contactId, role: 'guest' } }),
+  );
+  assert.equal(r.status, 404, 'die Gruppe gibt es nicht mehr');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM users').get().n, before, 'kein Gastnutzer ohne Gruppe');
+  assert.equal(db.prepare('SELECT family_user_id FROM contacts WHERE id = ?').get(contactId).family_user_id, null, 'Kontakt nicht verknuepft');
+});
+
+test('POST members via contact_id: Verwalterrecht waehrend des Hashes entzogen -> 403, nichts angelegt', async () => {
+  const g = (await call('POST', '/groups', { actor: { id: OWNER, role: 'member' }, body: { name: 'Entzogen', type: 'household', default_currency: 'EUR' } })).body.data.id;
+  assert.equal((await call('POST', `/groups/${g}/members`, { actor: { id: OWNER, role: 'member' }, body: { user_id: MGR, role: 'admin' } })).status, 201);
+  const contactId = db.prepare(`INSERT INTO contacts (name, category) VALUES ('Hash Kontakt Recht', 'Sonstiges')`).run().lastInsertRowid;
+  const before = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
+  const r = await duringHash(
+    () => db.prepare("UPDATE expense_group_members SET role = 'guest' WHERE group_id = ? AND user_id = ?").run(g, MGR),
+    () => call('POST', `/groups/${g}/members`, { actor: { id: MGR, role: 'member' }, body: { contact_id: contactId, role: 'guest' } }),
+  );
+  assert.equal(r.status, 403);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM users').get().n, before, 'kein Gastnutzer');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM expense_group_members WHERE group_id = ?').get(g).n, 2, 'keine neue Mitgliedschaft');
+});
+
+test('POST guests: Gruppe waehrend des Hashes geloescht -> 404, kein verwaister Gast', async () => {
+  const g = (await call('POST', '/groups', { actor: { id: OWNER, role: 'member' }, body: { name: 'Verschwindet Gast', type: 'household', default_currency: 'EUR' } })).body.data.id;
+  const before = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
+  const r = await duringHash(
+    () => db.prepare('DELETE FROM expense_groups WHERE id = ?').run(g),
+    () => call('POST', `/groups/${g}/guests`, { actor: { id: OWNER, role: 'member' }, body: { display_name: 'Waise', password: 'geheim12345' } }),
+  );
+  assert.equal(r.status, 404);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM users').get().n, before, 'kein Gastnutzer ohne Gruppe');
+});
+
+test('POST guests: zwei gleichzeitige Anfragen mit demselben Benutzernamen -> 201 und 409', async () => {
+  const body = { display_name: 'Zwilling', username: 'zwilling.gast', password: 'geheim12345' };
+  const actor = { id: OWNER, role: 'member' };
+  const results = await Promise.all([
+    call('POST', `/groups/${GROUP}/guests`, { actor, body }),
+    call('POST', `/groups/${GROUP}/guests`, { actor, body }),
+  ]);
+  assert.deepEqual(results.map((r) => r.status).sort(), [201, 409], 'der zweite ist ein Konflikt, kein Serverfehler');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM users WHERE username = 'zwilling.gast'").get().n, 1);
+});
+
 test('POST members: user_id noch contact_id -> 400', async () => {
   const r = await call('POST', `/groups/${OPS}/members`, { actor: { id: OWNER, role: 'member' }, body: { role: 'guest' } });
   assert.equal(r.status, 400);
@@ -809,6 +966,57 @@ test('verwaister Gast: Suche liefert nichts (kein Fallback auf "unbeschränkt")'
 test('verwaister Gast darf weiterhin keine Gruppe anlegen -> 403', async () => {
   const r = await call('POST', '/groups', { actor: { id: ORPHAN_ID, role: 'member' }, body: { name: 'Freigeschaltet?' } });
   assert.equal(r.status, 403);
+});
+
+// --------------------------------------------------------------------------
+// member-candidates liest Kontakte und Geburtstage: die Felder folgen deren
+// Leserecht (Kontakte = `contacts`, Geburtstage = `calendar`), auf beiden
+// Achsen. Die Route bleibt offen - die Auswahl der Haushaltsmitglieder
+// braucht nur Name und ID.
+// --------------------------------------------------------------------------
+test('member-candidates: Kontakt- und Geburtstagsfelder folgen dem Leserecht', async () => {
+  db.prepare("UPDATE contacts SET family_user_id = NULL WHERE family_user_id = ?").run(OWNER);
+  db.prepare(`INSERT INTO contacts (name, phone, email, family_user_id) VALUES ('Owner Kontakt', '+49 111', 'owner@example.test', ?)`).run(OWNER);
+  db.prepare(`INSERT INTO contacts (name, phone, email, birthday) VALUES ('Nachbarin Kandidat', '+49 222', 'nachbarin@example.test', '1980-05-06')`).run();
+  db.prepare(`INSERT INTO birthdays (name, birth_date, created_by, family_user_id) VALUES ('Owner', '1975-01-02', ?, ?)`).run(OWNER, OWNER);
+
+  const path = `/groups/${GROUP}/member-candidates`;
+  const owner = (rows) => rows.find((r) => r.source === 'user' && r.user_id === OWNER);
+  const nachbarin = (rows) => rows.find((r) => r.source === 'contact' && r.display_name === 'Nachbarin Kandidat');
+
+  // Vorbedingung: mit allen Rechten stehen die Felder da, sonst misst der Rest nichts.
+  const voll = await call('GET', path, { actor: { id: OWNER, role: 'member' } });
+  assert.equal(voll.status, 200);
+  assert.equal(owner(voll.body.data).phone, '+49 111');
+  assert.equal(owner(voll.body.data).email, 'owner@example.test');
+  assert.equal(owner(voll.body.data).birth_date, '1975-01-02');
+  assert.equal(nachbarin(voll.body.data)?.email, 'nachbarin@example.test');
+
+  const ohneKontakte = await call('GET', path, { actor: { id: OWNER, role: 'member', moduleAccess: { contacts: 'none' } } });
+  assert.equal(ohneKontakte.status, 200, 'die Auswahl der Haushaltsmitglieder bleibt');
+  assert.equal(owner(ohneKontakte.body.data).display_name, 'OWNER');
+  assert.equal(owner(ohneKontakte.body.data).phone, null, 'keine Telefonnummer ohne contacts');
+  assert.equal(owner(ohneKontakte.body.data).email, null, 'keine E-Mail ohne contacts');
+  assert.equal(owner(ohneKontakte.body.data).birth_date, '1975-01-02', 'der Geburtstag haengt am Kalender, nicht an contacts');
+  assert.equal(ohneKontakte.body.data.some((r) => r.source === 'contact'), false, 'keine Kontakte als Kandidaten');
+
+  const ohneKalender = await call('GET', path, { actor: { id: OWNER, role: 'member', moduleAccess: { calendar: 'none' } } });
+  assert.equal(owner(ohneKalender.body.data).birth_date, null, 'kein Geburtstag ohne calendar');
+  assert.equal(owner(ohneKalender.body.data).phone, '+49 111', 'Kontaktfelder bleiben mit contacts');
+  assert.equal(nachbarin(ohneKalender.body.data)?.birth_date, '1980-05-06', 'der Geburtstag eines Kontakts ist Kontaktdatum');
+
+  const lesend = await call('GET', path, { actor: { id: OWNER, role: 'member', moduleAccess: { contacts: 'read', calendar: 'read' } } });
+  assert.equal(owner(lesend.body.data).phone, '+49 111', 'read reicht');
+  assert.equal(owner(lesend.body.data).birth_date, '1975-01-02');
+  assert.equal(lesend.body.data.some((r) => r.source === 'contact'), false,
+    'freie Kontakte nur mit Schreibrecht: hinzufuegen verknuepft sie');
+
+  const token = await call('GET', path, { actor: { id: OWNER, role: 'member', scopes: ['budget:write'] } });
+  assert.equal(token.status, 200);
+  assert.equal(owner(token.body.data).phone, null, 'Token ohne contacts:read');
+  assert.equal(owner(token.body.data).email, null);
+  assert.equal(owner(token.body.data).birth_date, null, 'Token ohne calendar:read');
+  assert.equal(token.body.data.some((r) => r.source === 'contact'), false);
 });
 
 test('teardown: Server schließen', async () => {

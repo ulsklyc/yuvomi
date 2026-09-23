@@ -114,11 +114,15 @@
  *    Mitglied mit `meals: read` einen Knopf, den der Pfad-Guard abweist. Das
  *    Zielrecht gilt nur fuer AUSDRUECKLICHE Uebertraege.
  *    VORRAT UND EINKAUF (#1265 P4) sind das einfachere Paar: beide Routen
- *    lesen die Quelle nur und verlangen nichts ausser dem Pfad-Guard, der das
- *    ZIEL misst - `POST /shopping/:id/import-pantry` als `shopping`,
- *    `POST /pantry/import-shopping` als `pantry`. Also EIN Riegel je Richtung:
+ *    lesen die Quelle nur. Der Pfad-Guard misst das ZIEL -
+ *    `POST /shopping/:id/import-pantry` als `shopping`,
+ *    `POST /pantry/import-shopping` als `pantry` -, das Leserecht der QUELLE
+ *    fragt die Route selbst (`mayReadModule()` in server/permissions.js).
+ *    Am Knopf ist das keine zweite Frage: er steht auf der Seite der Quelle,
+ *    und die sieht nur, wer sie lesen darf. Also EIN Riegel je Richtung:
  *    `mayTransferPantryToShopping()` und `mayTransferShoppingToPantry()`,
- *    ebenfalls in `utils/kitchen-transfer.js`.
+ *    ebenfalls in `utils/kitchen-transfer.js`. Wandert einer dieser Knoepfe
+ *    auf eine fremde Seite, braucht er das Quellrecht als zweiten Riegel.
  *    Was eine Aktion bloss MITerzeugt (der Check-in der Haushaltshilfe legt
  *    Termin und Zahlungsaufgabe an), fragt kein Zielrecht, weder am Server
  *    noch am Knopf - die Abgrenzung steht in docs/DECISIONS.md, Abschnitt 10.

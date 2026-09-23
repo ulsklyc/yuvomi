@@ -12,7 +12,7 @@ import { normalizeRecipeMealTypes } from '../../public/utils/recipe-meal-types.j
 import { ingredientMatchKey } from '../../public/utils/ingredient-match-key.js';
 import { getAdapter } from '../services/recipe-providers/index.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
-import { hiddenModulesFor, mayWriteModule } from '../permissions.js';
+import { mayReadModule, mayWriteModule } from '../permissions.js';
 
 const log = createLogger('Recipes');
 const router = express.Router();
@@ -65,7 +65,7 @@ function attachPantryMatches(req, ingredients) {
   // nie nach `pantry`. Benannt wird hier aber eine Zeile des VORRATS, mit
   // ihrem Namen. Dieselbe Mischstelle wie die Import-Kandidaten in
   // server/routes/birthdays.js (Pfad `calendar`, Inhalt aus `contacts`), und
-  // derselbe Aufruf schliesst sie: `hiddenModulesFor` prueft beide Achsen,
+  // derselbe Aufruf schliesst sie: `mayReadModule` prueft beide Achsen,
   // Mitgliedsrecht UND Token-Scope.
   //
   // Dass `pantryMatchEl()` in public/pages/recipes.js bei `access === 'none'`
@@ -74,7 +74,7 @@ function attachPantryMatches(req, ingredients) {
   //
   // Was zurueckbleibt, ist `null` und nicht das Weglassen der Felder: die Zutat
   // ist fuer diesen Betrachter unzugeordnet, und die Antwort behaelt ihre Form.
-  if (hiddenModulesFor(req, ['pantry']).has('pantry')) {
+  if (!mayReadModule(req, 'pantry')) {
     return ingredients.map((ing) => ({ ...ing, pantry_item_id: null, pantry_item_name: null }));
   }
   const recipeIds = [...new Set(ingredients.map((i) => i.recipe_id))];

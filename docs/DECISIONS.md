@@ -681,8 +681,21 @@ forgot to ask about.
   `shopping`, `import-meal-plan` and the undo of a meal transfer in `server/routes/shopping.js` for
   `meals`, `PUT /recipes/:id/ingredient-match` for `pantry`, because it hooks a row of the pantry
   into a recipe, and the housekeeping supply request with #1353.
+- `mayReadModule()` beside it for the other half: a route that reads another module's rows asks
+  for read access to that module, built on `hiddenModulesFor()` so there is one rule. A transfer
+  that copies rows out of a module refuses without it: `POST /pantry/import-shopping` asks for
+  `shopping`, `POST /shopping/:listId/import-pantry` for `pantry`, both before the list lookup,
+  and the controls need no second check because each stands on its source's own page. A response
+  that merely carries fields from another module leaves them out instead: the member candidates of
+  a shared-expense group (contacts, and birthdays under `calendar`), the budget bookings linked to
+  an inventory item (`budgetViewer()` in `server/routes/inventory/entry-links.js`). Adding a
+  contact to a shared-expense group reads the contact, so it needs `contacts`, and a contact without
+  an account is linked to the new guest, which writes it and needs `contacts` write; the birthday the
+  new guest gets is a follow-on entry of the guest and asks nothing of `calendar`.
 - `npm run test:cross-module-write` (`test/test-cross-module-write-rights.js`) holds those routes on
   both axes and checks the effect after each refusal, not only the status.
+  `npm run test:split-expenses-routes` holds the member candidates and adding a contact,
+  `npm run test:inventory-item-entries` the budget bookings of an inventory item.
 - The follow-on entries of a visit in `server/routes/housekeeping.js`: `createVisitCalendarEvent()`
   and `createPaymentTask()` at check-in, the completed task at payment, `updateVisitLinks()` and
   `deleteVisitLinks()` on edit and delete. None of them asks for more than `housekeeping`.

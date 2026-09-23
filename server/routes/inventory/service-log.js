@@ -437,7 +437,7 @@ function completeTrackedDate({ item, dateId, values, userId }) {
  * die Belege maskiert (#1358) - eine Verlaufszeile ohne Namen und Ziel sagt
  * nichts, sie faellt deshalb ganz weg.
  */
-function loadHistory(itemId, userId, viewer) {
+function loadHistory(itemId, budget, viewer) {
   const logRows = loadServiceLog(itemId).map((row) => ({
     type: 'service_log',
     id: row.id,
@@ -448,7 +448,7 @@ function loadHistory(itemId, userId, viewer) {
     note: row.note,
   }));
 
-  const bookingLinks = loadLinkedEntries(itemId, userId)
+  const bookingLinks = loadLinkedEntries(itemId, budget)
     .filter((link) => HISTORY_ENTRY_ROLES.includes(link.role));
   const bookingRows = bookingLinks.map((link) => ({
     type: 'budget_entry',
