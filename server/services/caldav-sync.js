@@ -9,6 +9,7 @@ const log = createLogger('CalDAV');
 
 import * as db from '../db.js';
 import { upsertExternalCalendar } from './external-calendars.js';
+import { legacyColorSnapshotKey, forgetLegacyColorSnapshot } from './legacy-color-snapshot.js';
 import { assignDefaultToEvent, reassignDefaultOnCalendarMove } from './sync-assignment.js';
 import { pruneDeletedEvents, countMirroredEvents, deleteMirroredEvents } from './calendar-prune.js';
 import * as outbound from './calendar-outbound.js';
@@ -178,14 +179,6 @@ function legacyColorHealKey(accountId) {
   return `caldav_legacy_color_heal_since_${accountId}`;
 }
 
-/**
- * sync_config-Schluessel des Schnappschusses je Konto (#1270): JSON
- * `{ eventId: farbe }` der Altzeilen, deren Farbe bei Fristbeginn eine
- * Kalenderfarbe des Kontos war.
- */
-function legacyColorSnapshotKey(accountId) {
-  return `caldav_legacy_color_heal_snapshot_${accountId}`;
-}
 
 /**
  * Laeuft die Farb-Heilung fuer dieses Konto, und mit welchen Farben? null,
@@ -222,7 +215,7 @@ function legacyHealState(conn, accountId, { serverCalendars = [], cutoff = null,
     conn.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?), (?, ?)').run(
       key, now.toISOString(), snapshotKey, JSON.stringify(Object.fromEntries(snapshot))
     );
-    return { colors, snapshot, snapshotKey };
+    return { colors, snapshot };
   }
   // `never` (und jeder andere Wert, der kein Datum ist) schaltet die Heilung
   // aus. Ein Beginn in der Zukunft - die Uhr ging beim Start vor - verlaengert
@@ -241,7 +234,7 @@ function legacyHealState(conn, accountId, { serverCalendars = [], cutoff = null,
   catch { return null; }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
   const snapshot = new Map(Object.entries(parsed).map(([id, color]) => [Number(id), String(color).toLowerCase()]));
-  return { colors: legacyCalendarColors(conn, accountId, serverCalendars), snapshot, snapshotKey };
+  return { colors: legacyCalendarColors(conn, accountId, serverCalendars), snapshot };
 }
 
 /**
@@ -1168,21 +1161,19 @@ async function runSync({ createClient } = {}) {
       // Umzug (outbound_move_to) schuetzt ebenso: ein reiner Umzug setzt kein
       // outbound_dirty, und danach zeigt target_caldav_calendar_url schon auf
       // den neuen Kalender.
-      let snapshotChanged = false;
+      const healedIds = [];
       for (const [eventId, { uid, color }] of healCandidates) {
         if (coloredUids.has(uid)) continue;
         if (healBurntInColor.run(eventId, color, legacyCutoff, legacyCutoff).changes > 0) {
-          // Geheilt faellt die Zeile aus dem Schnappschuss: eine spaetere Wahl
-          // derselben Farbe ist dann eine Wahl, keine Altlast.
-          heal.snapshot.delete(eventId);
-          snapshotChanged = true;
+          healedIds.push(eventId);
           if (!changedIds.has(eventId)) accountChangedCount++;
         }
       }
-      if (snapshotChanged) {
-        conn.prepare('UPDATE sync_config SET value = ? WHERE key = ?')
-          .run(JSON.stringify(Object.fromEntries(heal.snapshot)), heal.snapshotKey);
-      }
+      // Geheilt faellt die Zeile aus dem Schnappschuss: eine spaetere Wahl
+      // derselben Farbe ist dann eine Wahl, keine Altlast. Gelesen wird der
+      // gespeicherte Stand, nicht der dieses Laufs - eine Umfaerbung ueber die
+      // Route waehrend des Laufs hat ihn womoeglich schon verkleinert.
+      forgetLegacyColorSnapshot(conn, healedIds);
 
       // Löschphase: erst nach allen Kalendern, damit `accountUids` vollständig ist
       // und ein zwischen Kalendern verschobener Termin nicht fälschlich verschwindet.
