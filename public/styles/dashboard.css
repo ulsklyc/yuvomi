@@ -293,6 +293,7 @@
 .widget--housekeeping { --widget-accent: var(--module-housekeeping); }
 .widget--schedule { --widget-accent: var(--module-schedule); }
 .widget--waste    { --widget-accent: var(--module-waste); }
+.widget--pantry   { --widget-accent: var(--module-pantry); }
 /* Wie das Wetter: eine Kachel, die keinem Modul gehoert, traegt den Ton der
  * Seite. Der Countdown (#647) sammelt aus Kalender UND Aufgaben ein - jeder
  * der beiden Toene waere fuer die andere Haelfte der Liste falsch. Ohne diese
@@ -4333,6 +4334,116 @@ svg.weather-forecast__icon {
   width: 15px;
   height: 15px;
   flex-shrink: 0;
+}
+
+/* --------------------------------------------------------
+ * Vorrat-Widget „Laeuft bald ab" (Critique 2026-09-23)
+ * Dieselbe Zeilenform wie Geburtstage und Countdown - Marke, Name mit
+ * Metazeile, rechts die Resttage, Haarlinie per +-Kombinator: alle drei
+ * beantworten „was, und wie lange noch", und zwei Formen dafuer waeren zwei
+ * Sorten Eintrag. Die Marke ist der LAGERORT (Kuehlschrank, Gefrierschrank),
+ * neutral auf der Mulde: die Farbe der Zeile gehoert der Dringlichkeit, der
+ * Modulton steht einmal im Siegel des Kopfes.
+ * -------------------------------------------------------- */
+.pantry-widget-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  /* Kein Radius: eine Zeile in EINEM Traeger ist keine Karte (Zeilenlisten-
+   * Regel, test:frontend-audit „row lists sit in exactly one carrier"). */
+  cursor: pointer;
+  touch-action: pan-y pinch-zoom;
+  transition: background-color var(--transition-fast);
+}
+
+.pantry-widget-row + .pantry-widget-row {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* Das benannte Token, kein Schatten - dieselbe Antwort wie .countdown-item. */
+.dashboard .pantry-widget-row:hover {
+  background-color: var(--color-surface-hover);
+}
+
+@media (pointer: coarse) {
+  .dashboard .pantry-widget-row {
+    min-height: var(--target-base);
+    box-sizing: border-box;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pantry-widget-row { transition: none; }
+}
+
+.pantry-widget-row__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-fill-well);
+  color: var(--color-text-secondary);
+}
+
+.pantry-widget-row__icon svg,
+.pantry-widget-row__icon i {
+  width: 16px;
+  height: 16px;
+}
+
+.pantry-widget-row__body {
+  min-width: 0;
+}
+
+.pantry-widget-row__name {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pantry-widget-row__meta {
+  margin-top: var(--space-0h);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Die Resttage sind der Grund, warum die Zeile da steht: rechts, mit Gewicht,
+ * ohne Badge-Flaeche - „Laeuft morgen ab" ist ein Satzteil, kein Etikett.
+ * Drei Raenge aus pantryExpiryTone() (utils/pantry-status.js): */
+.pantry-widget-row__days {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+/* Abgelaufen - das Einzige, das jetzt eine Entscheidung verlangt (essen,
+ * pruefen, wegwerfen). Der Gefahrenton steht nur hier, in der Schrift. */
+.pantry-widget-row__days--expired {
+  color: var(--color-danger);
+  font-weight: var(--font-weight-bold);
+}
+/* Heute und morgen - der Tag, an dem man es noch verbrauchen kann. */
+.pantry-widget-row__days--now { color: var(--color-warning); }
+/* `soon` bleibt beim Sekundaerton der Basisregel: nah genug fuer die Liste,
+ * nicht nah genug, um zu rufen. */
+
+/* Der Rest, der nicht in die Kachel passt - eine Fussnote, kein Eintrag. */
+.pantry-widget-more {
+  margin: var(--space-2) 0 0;
+  padding: 0 var(--space-2);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
 }
 
 /* --------------------------------------------------------

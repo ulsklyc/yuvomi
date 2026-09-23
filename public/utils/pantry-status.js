@@ -77,3 +77,55 @@ export function pantryFilterCounts(items, todayKey = householdToday()) {
   }
   return counts;
 }
+
+/**
+ * Wie spricht ein Ablauf? `{ key, count? }` für `t()`, aus den Resttagen.
+ *
+ * EINE FORMULIERUNG FÜR ZWEI ORTE: die Vorratsseite (`expiryBadge`) und die
+ * Dashboard-Kachel „Läuft bald ab" sagen dieselbe Sache über dieselbe Charge.
+ * Stünde der Satz zweimal da, hiesse dieselbe Milch auf der Übersicht „in 1
+ * Tag" und eine Seite weiter „Läuft morgen ab". Rein und ohne i18n-Import,
+ * dasselbe Muster wie `countdownPhrase()` in utils/countdown.js.
+ *
+ * @param {number} days - Resttage (negativ = abgelaufen)
+ * @returns {{ key: string, count?: number }}
+ */
+export function pantryExpiryPhrase(days) {
+  const d = Math.trunc(Number(days) || 0);
+  if (d === -1) return { key: 'pantry.badgeExpiredYesterday' };
+  if (d < 0) return { key: 'pantry.badgeExpiredDays', count: -d };
+  if (d === 0) return { key: 'pantry.badgeExpiresToday' };
+  if (d === 1) return { key: 'pantry.badgeExpiresTomorrow' };
+  return { key: 'pantry.badgeExpiresDays', count: d };
+}
+
+/**
+ * Dringlichkeit einer Charge für den TON ihrer Anzeige - drei Stufen, nicht
+ * die zwei des Filters: „heute/morgen" ist der Tag, an dem man noch handeln
+ * kann, und liest sich deshalb anders als „in fünf Tagen".
+ *
+ * @param {number} days - Resttage (negativ = abgelaufen)
+ * @returns {'expired'|'now'|'soon'}
+ */
+export function pantryExpiryTone(days) {
+  const d = Math.trunc(Number(days) || 0);
+  if (d < 0) return 'expired';
+  if (d <= 1) return 'now';
+  return 'soon';
+}
+
+/**
+ * Der Filter aus einem Deep-Link (`/pantry?filter=soon`), oder `null`.
+ *
+ * Nur die drei Chips aus PANTRY_FILTERS - eine Allowlist, weil der Wert aus der
+ * Adresszeile kommt und in `state.filter` landet. Die Zeilen der
+ * Dashboard-Kachel führen hierher: eine abgelaufene Charge öffnet
+ * „Abgelaufen", eine bald ablaufende „Läuft bald ab".
+ *
+ * @param {string} search - `location.search`
+ * @returns {'expired'|'soon'|'low'|null}
+ */
+export function pantryFilterFromSearch(search) {
+  const value = new URLSearchParams(String(search ?? '')).get('filter');
+  return PANTRY_FILTERS.includes(value) ? value : null;
+}

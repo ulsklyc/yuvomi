@@ -143,6 +143,12 @@ db.prepare(`
   VALUES (?, '08:00', NULL, 1)
 `).run(medId);
 
+// Vorrat „läuft bald ab": eine Charge, die heute abläuft - im Horizont, egal
+// in welcher Zone der Testlauf steht (heute ist immer ≤ heute + 7).
+db.prepare(`
+  INSERT INTO pantry_items (name, quantity, unit, expires_on, created_by) VALUES ('Sahne', 1, 'pcs', ?, ?)
+`).run(todayLocal, PARENT);
+
 const helperUser = seedUser('maria', 'member', 'other');
 const workerId = db.prepare('INSERT INTO housekeeping_workers (user_id, daily_rate) VALUES (?, 40)')
   .run(helperUser).lastInsertRowid;
@@ -345,6 +351,7 @@ const MODULE_PROBES = {
   housekeeping: (b) => (b.housekeeping.configured ? 1 : 0) + (b.housekeeping.present ? 1 : 0),
   waste: (b) => b.wastePickups.length,
   schedule: (b) => b.myShiftsToday.length,
+  pantry: (b) => b.pantryExpiring.items.length + b.pantryExpiring.total + b.pantryExpiring.todayItems.length,
 };
 
 test('Jedes gesperrte Modul verschwindet, und keins nimmt ein anderes mit', async () => {

@@ -22,6 +22,8 @@ import { NUTRIENTS, nutrientProgress } from '/utils/health-nutrition.js';
 import { startFasting, finishFasting, startFastingClock, fastingClockSwitchHtml, fastingError } from '/components/fasting-controls.js';
 import { localizeBirthdayEvent } from '/utils/birthday-event.js';
 import { countdownPhrase, countdownRank } from '/utils/countdown.js';
+import { EXPIRY_SOON_DAYS, pantryExpiryPhrase, pantryExpiryTone } from '/utils/pantry-status.js';
+import { locationLabel } from '/utils/pantry-locations.js';
 import { findPageFab } from '/utils/fab.js';
 import { openModal, closeModal, confirmModal, refocusAfterRender } from '/components/modal.js';
 import { renderAvatarStack } from '/components/user-multi-select.js';
@@ -328,7 +330,7 @@ function maybeHintCustomize(container) {
 // Widget → Modul-Slug für die „Modul deaktiviert?"-Prüfung. Widgets ohne Eintrag
 // (family, weather) sind immer verfügbar. Modulweit, damit Grid-Filter und
 // Wieder-Einblenden-Leiste dieselbe Sichtbarkeitsregel teilen.
-const MODULE_FOR_WIDGET = { tasks: 'tasks', calendar: 'calendar', shopping: 'shopping', meals: 'meals', notes: 'notes', birthdays: 'birthdays', budget: 'budget', rewards: 'rewards', health: 'health', cycle: 'health', fasting: 'health', nutrition: 'health', housekeeping: 'housekeeping', schedule: 'schedule', waste: 'waste' };
+const MODULE_FOR_WIDGET = { tasks: 'tasks', calendar: 'calendar', shopping: 'shopping', meals: 'meals', notes: 'notes', birthdays: 'birthdays', budget: 'budget', rewards: 'rewards', health: 'health', cycle: 'health', fasting: 'health', nutrition: 'health', housekeeping: 'housekeeping', schedule: 'schedule', waste: 'waste', pantry: 'pantry' };
 
 const WIDGETS_WITH_OPTIONS = new Set(['calendar', 'tasks', 'notes', 'waste']);
 
@@ -468,6 +470,7 @@ function widgetLabel(id) {
     housekeeping: () => t('nav.housekeeping'),
     schedule: () => t('nav.schedule'),
     waste:    () => t('nav.waste'),
+    pantry:   () => t('dashboard.pantryExpiringTitle'),
     family:   () => t('dashboard.familyTitle'),
     clock:    () => t('dashboard.clock'),
     metrics:  () => t('dashboard.metrics'),
@@ -2685,6 +2688,92 @@ function renderScheduleWidget(schedule, users, size) {
 }
 
 // --------------------------------------------------------
+// Vorrat-Widget „Laeuft bald ab" (Critique 2026-09-23)
+// --------------------------------------------------------
+
+/** Menge knapp: 2 bleibt "2", 2,5 wird lokalisiert - wie auf der Vorratsseite. */
+function pantryQuantityText(item) {
+  const amount = getNumberFormat({ maximumFractionDigits: 2 }).format(Number(item.quantity) || 0);
+  // Rueckfall auf den Rohwert, wie `unitLabel()` in pages/pantry.js: eine
+  // Einheit ohne Locale-Key stuende sonst als nackter Schluessel in der Zeile.
+  const key = `pantry.units.${item.unit}`;
+  const unit = t(key);
+  return `${amount} ${unit === key ? String(item.unit ?? '') : unit}`;
+}
+
+/**
+ * pantryExpiring: { items, todayItems, total, expiredCount, todayCount } aus
+ * GET /dashboard (services/pantry-expiring.js) | null (Ladefehler, rendert die
+ * geteilte Fehlerkachel ueber den try/catch in renderDashboardLayout).
+ *
+ * EINE ZEILE IST EINE CHARGE, nicht ein Produkt: zwei Packungen Milch mit zwei
+ * Daten sind zwei Zeilen, wie auf der Vorratsseite. Das Haushalts-Produkt ueber
+ * der Charge (#1448) steht noch aus, und eine Gruppierung nach Namen waere
+ * hier eine zweite, eigene Vorstellung davon.
+ *
+ * DIE RESTTAGE KOMMEN VOM SERVER (`days_left`), gerechnet am Haushaltstag
+ * derselben Antwort, aus der auch Badge und Zaehler stammen. Eine zweite
+ * Rechnung hier kippte kurz nach Mitternacht gegen die Badge daneben.
+ *
+ * Der Ton spricht nur in der Resttage-Zeile, und nur, wo es etwas zu tun gibt:
+ * abgelaufen im Gefahrenton, heute und morgen im Warnton, alles Weitere im
+ * Sekundaerton. Eine Liste, die jede Zeile rot faerbt, sagt nichts mehr.
+ *
+ * Reine Anzeige - kein Knopf, der schreibt. Wer nur lesen darf, sieht dieselbe
+ * Kachel; die Zeilen fuehren in den passend gefilterten Vorrat.
+ */
+function renderPantryWidget(pantry, size) {
+  if (pantry === null || pantry === undefined) throw new Error('pantry widget slice failed to load');
+  const title = t('dashboard.pantryExpiringTitle');
+  const items = Array.isArray(pantry.items) ? pantry.items : [];
+
+  if (!items.length) {
+    return `<div class="widget widget--pantry">
+      ${widgetHeader('pantry', title, null, '/pantry')}
+      <div class="widget__empty">
+        <i data-lucide="archive" class="empty-state__icon" aria-hidden="true"></i>
+        <div>${esc(t('dashboard.pantryExpiringEmpty', { count: EXPIRY_SOON_DAYS }))}</div>
+      </div>
+    </div>`;
+  }
+
+  const shown = items.slice(0, listRowCap(size));
+  const rows = shown.map((item) => {
+    const days = Number(item.days_left);
+    const tone = pantryExpiryTone(days);
+    const phrase = pantryExpiryPhrase(days);
+    const label = phrase.count === undefined ? t(phrase.key) : t(phrase.key, { count: phrase.count });
+    const icon = item.location_icon && hasIcon(item.location_icon) ? item.location_icon : 'package';
+    const meta = [pantryQuantityText(item), item.location_name ? locationLabel(item.location_name) : '']
+      .filter(Boolean).join(' · ');
+    const filter = tone === 'expired' ? 'expired' : 'soon';
+    return `
+      <div class="pantry-widget-row" data-route="/pantry?filter=${filter}" role="button" tabindex="0">
+        <span class="pantry-widget-row__icon" aria-hidden="true"><i data-lucide="${esc(icon)}"></i></span>
+        <div class="pantry-widget-row__body">
+          <div class="pantry-widget-row__name">${esc(item.name)}</div>
+          <div class="pantry-widget-row__meta">${esc(meta)}</div>
+        </div>
+        <div class="pantry-widget-row__days pantry-widget-row__days--${tone}">${esc(label)}</div>
+      </div>`;
+  }).join('');
+
+  // Gezaehlt gegen die SERVER-Gesamtzahl: der Server deckelt die Liste selbst,
+  // und eine Fussnote aus der geladenen Laenge verschwiege genau diesen Schnitt
+  // (dieselbe Lehre wie beim Countdown, #647).
+  const total = Number.isFinite(Number(pantry.total)) ? Number(pantry.total) : items.length;
+  const rest = Math.max(0, total - shown.length);
+  const more = rest > 0
+    ? `<p class="pantry-widget-more">${esc(t('dashboard.pantryExpiringMore', { count: rest }))}</p>`
+    : '';
+
+  return `<div class="widget widget--pantry">
+    ${widgetHeader('pantry', title, total, '/pantry')}
+    <div class="widget__body">${rows}${more}</div>
+  </div>`;
+}
+
+// --------------------------------------------------------
 // Waste-Widget (naechste Abholung je aktivem Typ)
 // --------------------------------------------------------
 
@@ -3670,6 +3759,7 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
     housekeeping: () => renderHousekeepingWidget(data.housekeeping ?? {}, currency),
     schedule: (size) => renderScheduleWidget(data.schedule, data.users ?? [], size),
     waste: (size) => renderWasteWidget(data.waste, size),
+    pantry: (size) => renderPantryWidget(data.pantryExpiring, size),
     family: () => renderFamilyWidget(data.users ?? [], data),
     meals: () => renderTodayMeals(data.todayMeals ?? [], visibleMealTypes),
     notes: (size) => renderPinnedNotes(data.pinnedNotes ?? [], size, data.notesTotal),
@@ -5970,7 +6060,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { renderCalendarWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles };
+export const __test = { renderCalendarWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

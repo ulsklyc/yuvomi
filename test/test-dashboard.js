@@ -2647,7 +2647,7 @@ function layoutOhne(missing) {
 // ergaenzen, aendern dieselbe Zeile unterschiedlich - das ist ein Konflikt, den
 // git meldet, statt ihn stillschweigend zu verschmelzen.
 const ERWARTETE_WIDGET_IDS = [
-  'tasks', 'calendar', 'meals', 'shopping', 'birthdays', 'countdown', 'budget',
+  'tasks', 'calendar', 'meals', 'shopping', 'pantry', 'birthdays', 'countdown', 'budget',
   'rewards', 'health', 'cycle', 'fasting', 'nutrition', 'housekeeping', 'schedule',
   'waste', 'family', 'notes', 'weather', 'clock', 'metrics', 'quicklinks',
 ];

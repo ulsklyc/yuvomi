@@ -90,6 +90,8 @@ export const PERMISSION_WIDGETS = Object.freeze([
   { id: 'housekeeping', module: 'housekeeping' },
   { id: 'schedule',     module: 'schedule' },
   { id: 'waste',        module: 'waste' },
+  // „Läuft bald ab" (Critique 2026-09-23): Chargen aus dem Vorrat.
+  { id: 'pantry',       module: 'pantry' },
   { id: 'notes',        module: 'notes' },
   { id: 'family',       module: null },
   { id: 'weather',      module: null },

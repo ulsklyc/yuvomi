@@ -37,7 +37,7 @@
  * unten), eine Umsortierung schaltet nichts mehr um. Die Default-Position ist
  * aber weiter der Ort, an dem ein Neuzugang erscheint, und der Guard
  * „eine fehlende Id landet an ihrer Default-Position" haelt das fest. */
-export const WIDGET_IDS = ['tasks', 'calendar', 'meals', 'shopping', 'birthdays', 'countdown', 'budget', 'rewards', 'health', 'cycle', 'fasting', 'nutrition', 'housekeeping', 'schedule', 'waste', 'family', 'notes', 'weather', 'clock', 'metrics', 'quicklinks'];
+export const WIDGET_IDS = ['tasks', 'calendar', 'meals', 'shopping', 'pantry', 'birthdays', 'countdown', 'budget', 'rewards', 'health', 'cycle', 'fasting', 'nutrition', 'housekeeping', 'schedule', 'waste', 'family', 'notes', 'weather', 'clock', 'metrics', 'quicklinks'];
 
 // Vier kuratierte Formen statt sechs: über vier Auswahlmöglichkeiten pro Widget
 // (× bis zu 12 Widgets) kippt der Anpassen-Modus in Mikro-Entscheidungs-Overhead
@@ -97,7 +97,9 @@ export function defaultWidgetSize(id) {
   // avatar, name, shift - and left at the 1x1 default it rendered 318px against
   // the 218px the size class promised, stretching whatever shared its grid row
   // (PR #930 review).
-  if (['tasks', 'calendar', 'rewards', 'budget', 'family', 'notes', 'birthdays', 'countdown', 'schedule', 'waste'].includes(id)) return '1x2';
+  // `pantry` („Laeuft bald ab") ist dieselbe Kachel wie die Geburtstage: eine
+  // nach Naehe sortierte Liste aus Name und „noch so lange".
+  if (['tasks', 'calendar', 'rewards', 'budget', 'family', 'notes', 'birthdays', 'countdown', 'schedule', 'waste', 'pantry'].includes(id)) return '1x2';
   // Die Uhr startet breit statt quadratisch: Uhrzeit und darunter der ausgeschriebene
   // Wochentag brauchen Zeile, nicht Höhe - auf 1x1 bräche das Datum um (#651).
   // `quicklinks` steht bei der Uhr und nicht bei den Listen: es ist eine ZEILE
@@ -151,7 +153,11 @@ export const COCKPIT_COVERED_WIDGETS = new Set(['tasks', 'calendar', 'shopping',
 // Kosmetik - eine Id, die in dieser Menge FEHLT, ist nach dem Update in JEDEM
 // bestehenden Haushalt eingeblendet, weil `normalizeDashboardConfig` eine neu
 // bekannte Id mit `defaultWidgetVisible(id)` einsortiert.
-export const DEFAULT_HIDDEN_WIDGETS = new Set([...COCKPIT_COVERED_WIDGETS, 'rewards', 'health', 'cycle', 'fasting', 'nutrition', 'housekeeping', 'schedule', 'waste', 'clock', 'weather', 'quicklinks']);
+// `pantry` („Laeuft bald ab", Critique 2026-09-23) aus demselben Grund: nicht
+// jeder Haushalt fuehrt Mindesthaltbarkeiten, und ein frisches Dashboard mit
+// einer Kachel „nichts laeuft ab" waere die Ueberladung, die diese Menge
+// verhindern soll.
+export const DEFAULT_HIDDEN_WIDGETS = new Set([...COCKPIT_COVERED_WIDGETS, 'rewards', 'health', 'cycle', 'fasting', 'nutrition', 'housekeeping', 'schedule', 'waste', 'pantry', 'clock', 'weather', 'quicklinks']);
 
 export function defaultWidgetVisible(id) {
   return !DEFAULT_HIDDEN_WIDGETS.has(id);
