@@ -715,9 +715,6 @@ router.get('/folders/:id/delete-impact', (req, res) => {
     const subtree = [...subtreeIds(allFolders(), id)];
     const folderParams = Object.fromEntries(subtree.map((value, i) => [`f${i}`, value]));
     const folderPlaceholders = subtree.map((_v, i) => `@f${i}`).join(',');
-    const documents = db.get()
-      .prepare(`SELECT id, created_by FROM family_documents WHERE folder_id IN (${folderPlaceholders})`)
-      .all(folderParams);
     const visibleDocuments = db.get()
       .prepare(`
         SELECT d.id, d.created_by
@@ -726,8 +723,14 @@ router.get('/folders/:id/delete-impact', (req, res) => {
           AND ${documentVisibleSql('d')}
       `)
       .all({ ...folderParams, userId: userId(req) });
-    const canDeleteDocuments = visibleDocuments.length === documents.length
-      && visibleDocuments.every((document) => mayManage(req, document));
+    // AUCH DAS URTEIL SIEHT NUR DAS SICHTBARE (#1358). `can_delete_documents`
+    // fragte, ob ALLE Dokumente im Zweig sichtbar sind - fuer einen Admin, der
+    // jedes sichtbare Dokument loeschen darf, hiess `false` genau: hier liegt
+    // ein privates Dokument, das du nicht siehst. Die Vorschau ist mit und
+    // ohne unsichtbares Dokument jetzt dieselbe. Geloescht wird trotzdem
+    // nichts Unsichtbares: das DELETE prueft den ganzen Zweig und verweigert
+    // mit FOLDER_DOCUMENTS_NOT_MANAGEABLE.
+    const canDeleteDocuments = visibleDocuments.every((document) => mayManage(req, document));
 
     // DER SNAPSHOT DECKT NUR, WAS DIE FRAGENDE PERSON SIEHT (#1355). Ueber
     // alle Dokumente gebildet, aenderte er sich mit jedem unsichtbaren

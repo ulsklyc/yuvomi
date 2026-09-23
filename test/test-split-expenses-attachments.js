@@ -191,19 +191,19 @@ test('gelöschte Ausgabe und gelöschtes Dokument räumen die Verknüpfung ab', 
 // ── Dokumentenrecht (#1358) ─────────────────────────────────────────────────────
 // Beleg und Zahlungsnachweis sind Zeilen des Dokumente-Moduls. Wer es nicht
 // lesen darf (Mitgliedsrecht `documents: none` oder ein Token ohne
-// documents:read), bekommt weder Namen noch ID, und jede ID, die er verknuepfen
+// documents:read), bekommt keinen Beleg und keine Anzahl, und jede ID, die er verknuepfen
 // will, antwortet mit derselben 403 - sonst waere die Antwort ein Orakel.
 
 const NONE = { id: OWNER, role: 'member', moduleAccess: { documents: 'none' } };
 const TOKEN = { id: OWNER, role: 'member', authMethod: 'api_token', authScopes: ['budget:write'] };
 const TOKEN_DOCS = { id: OWNER, role: 'member', authMethod: 'api_token', authScopes: ['budget:write', 'documents:read'] };
-const docFields = (list) => (list || []).map((a) => ({
+// `null` bleibt `null`: ohne Dokumentenrecht gibt es keine Liste, auch keine leere.
+const docFields = (list) => (list == null ? list : list.map((a) => ({
   document_id: a.document_id, name: a.name, original_name: a.original_name, mime_type: a.mime_type, file_size: a.file_size,
-}));
-const MASKED = { document_id: null, name: null, original_name: null, mime_type: null, file_size: null };
+})));
 const expenseBody = (extra = {}) => ({ title: 'Einkauf', amount: '30.00', currency: 'EUR', expense_date: '2030-06-01', ...extra });
 
-test('Dokumentenrecht: ohne documents-Lesen kommen Belege maskiert - Liste und PUT-Antwort (#1358)', async () => {
+test('Dokumentenrecht: ohne documents-Lesen kommen keine Belege und keine Anzahl - Liste und PUT-Antwort (#1358)', async () => {
   const doc = insertDocument({ name: 'Bon Recht' });
   const expense = await createExpense({ title: 'Rechteprobe', attachment_document_ids: [doc] });
   const listed = async (as) => {
@@ -214,13 +214,13 @@ test('Dokumentenrecht: ohne documents-Lesen kommen Belege maskiert - Liste und P
   const open = [{ document_id: doc, name: 'Bon Recht', original_name: 'Bon Recht.pdf', mime_type: 'application/pdf', file_size: 999 }];
   assert.deepEqual(await listed({ id: OWNER, role: 'member' }), open);
   assert.deepEqual(await listed({ ...NONE, moduleAccess: { documents: 'read' } }), open, 'Leserecht reicht');
-  assert.deepEqual(await listed(NONE), [MASKED], 'documents: none sieht nur, dass ein Beleg da ist');
-  assert.deepEqual(await listed(TOKEN), [MASKED], 'ein Token ohne documents-Scope ebenso');
+  assert.deepEqual(await listed(NONE), null, 'documents: none sieht keinen Beleg, auch nicht ihre Anzahl');
+  assert.deepEqual(await listed(TOKEN), null, 'ein Token ohne documents-Scope ebenso');
   assert.deepEqual(await listed(TOKEN_DOCS), open);
 
   const put = await call('PUT', `/expenses/${expense.id}`, { as: NONE, body: expenseBody({ title: 'Rechteprobe' }) });
   assert.equal(put.status, 200);
-  assert.deepEqual(docFields(put.body.data.attachments), [MASKED], 'PUT-Antwort');
+  assert.deepEqual(docFields(put.body.data.attachments), null, 'PUT-Antwort');
   assert.deepEqual(linkedDocumentIds(expense.id), [doc]);
 });
 

@@ -10,6 +10,7 @@ const log = createLogger('CardDAV');
 import * as db from '../db.js';
 import { composeDisplayName, normalizeNameParts } from '../../public/utils/contact-name.js';
 import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
+import { mayChangeContactEmails } from './contact-identity.js';
 
 // --------------------------------------------------------
 // Helper Functions
@@ -1284,7 +1285,9 @@ function updateContact(contactId, vcard, fillAll = false) {
   }
 
   maybeUpdate('phone', 'phone', scalar.phone);
-  maybeUpdate('email', 'email', scalar.email);
+  // Die E-Mail eines verknuepften Kontakts fuehrt zu seinem Konto; der Sync
+  // handelt fuer niemanden und laesst sie deshalb stehen (contact-identity.js).
+  if (mayChangeContactEmails(contact, null)) maybeUpdate('email', 'email', scalar.email);
   maybeUpdate('address', 'address', scalar.address);
   maybeUpdate('organization', 'organization', vcard.organization);
   maybeUpdate('jobTitle', 'job_title', vcard.jobTitle);
@@ -1312,6 +1315,10 @@ function updateContact(contactId, vcard, fillAll = false) {
  */
 function updateContactMultiValues(contactId, vcard) {
   const conn = db.get();
+  // Zweitadressen eines verknuepften Kontakts verknuepfen per SSO auf sein
+  // Konto; der Sync handelt fuer niemanden und fasst sie nicht an.
+  const linked = conn.prepare('SELECT family_user_id FROM contacts WHERE id = ?').get(contactId);
+  const emailsLocked = !mayChangeContactEmails(linked, null);
 
   const phones    = conn.prepare('SELECT label, value, is_primary FROM contact_phones WHERE contact_id = ? ORDER BY id').all(contactId);
   const emails    = conn.prepare('SELECT label, value, is_primary FROM contact_emails WHERE contact_id = ? ORDER BY id').all(contactId);
@@ -1333,7 +1340,9 @@ function updateContactMultiValues(contactId, vcard) {
   const incoming = {
     ...vcard,
     phones:    without(vcard.phones,    primaryKeys(phones, keyOf),           keyOf),
-    emails:    without(vcard.emails,    primaryKeys(emails, keyOf),           keyOf),
+    emails:    emailsLocked
+      ? emails.filter((r) => !r.is_primary)
+      : without(vcard.emails,    primaryKeys(emails, keyOf),           keyOf),
     addresses: without(vcard.addresses, primaryKeys(addresses, addressKeyOf), addressKeyOf),
   };
 
@@ -1353,11 +1362,11 @@ function updateContactMultiValues(contactId, vcard) {
   const transaction = conn.transaction(() => {
     // Delete non-primary entries
     conn.prepare('DELETE FROM contact_phones WHERE contact_id = ? AND is_primary = 0').run(contactId);
-    conn.prepare('DELETE FROM contact_emails WHERE contact_id = ? AND is_primary = 0').run(contactId);
+    if (!emailsLocked) conn.prepare('DELETE FROM contact_emails WHERE contact_id = ? AND is_primary = 0').run(contactId);
     conn.prepare('DELETE FROM contact_addresses WHERE contact_id = ? AND is_primary = 0').run(contactId);
 
     // Insert new entries from vCard
-    insertContactMultiValues(contactId, incoming);
+    insertContactMultiValues(contactId, emailsLocked ? { ...incoming, emails: [] } : incoming);
   });
 
   transaction();

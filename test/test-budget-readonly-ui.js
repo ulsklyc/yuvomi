@@ -389,9 +389,13 @@ test('Abo-Karte mit `budget: read`: der Koerper oeffnet die Leseansicht, Verlaen
     assert.match(html, /data-action="delete"/);
     assert.match(html, /swipe-reveal--done/);
     assert.match(html, /common\.edit/);
+    assert.doesNotMatch(html, /swipe-row--static/, 'mit Geste bleibt der Wisch-Chevron');
   });
   withAccess({ budget: 'read' }, () => {
     const html = abos.renderCard(abo());
+    // Ohne Geste auch kein Wisch-Chevron (Muster aus #1426): auf Touch stand
+    // der Pfeil sonst an einer Zeile, die sich nicht wischen laesst.
+    assert.match(html, /class="swipe-row swipe-row--static"/, 'ohne Geste auch kein Wisch-Chevron');
     assert.match(html, /<button type="button" class="subscription-card__main list-row__main--interactive"\s+data-action="view">/);
     assert.doesNotMatch(html, /data-action="(edit|renew|delete)"|swipe-reveal|common\.edit/);
     // Die Auskunft: Name, Status, Zyklus, Erinnerung, Betrag.
@@ -1160,9 +1164,11 @@ test('Ausgabe: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs - ohne Ha
   } finally { Object.assign(split.state, vorher); }
 });
 
-test('Beleg, den der Server nicht nennt: "Vorhanden" statt eines Links ins Leere - Buchung, Ausgabe, Inventar (#1358)', async () => {
-  // So kommt ein Beleg ohne Leserecht auf die Dokumente an: die Zeile bleibt,
-  // ID und Name sind maskiert (services/document-links.js, Regel 3).
+test('Belege ohne Dokumentenrecht: keine Zeile, kein Hinweis, kein Link ins Leere - Buchung, Ausgabe, Inventar (#1358)', async () => {
+  // Ohne Leserecht auf die Dokumente kommt `attachments: null`
+  // (services/document-links.js, Regel 3): weder Belege noch ihre Anzahl. Die
+  // Leseansicht sagt dann nichts - auch kein "Vorhanden". Eine Zeile ohne ID
+  // (aeltere Antwortform) wird nie zum Link auf /documents/null.
   const verdeckt = { id: 9, document_id: null, name: null, original_name: null, mime_type: null, file_size: null };
   const { __test: inventory } = await import('../public/pages/inventory.js');
   const vorher = { ...split.state };
@@ -1170,31 +1176,101 @@ test('Beleg, den der Server nicht nennt: "Vorhanden" statt eines Links ins Leere
     activeGroupId: 2, groups: [{ id: 2, default_currency: 'EUR' }], meta: { currencies: ['EUR', 'USD'] },
     groupMembers: [{ id: 1, display_name: 'Alex' }, { id: 3, display_name: 'Emma' }],
   });
-  const nurVorhanden = (node) => node?.childNodes?.length === 1
-    && node.childNodes[0].href === undefined
-    && node.childNodes[0].textContent === 'documentAttach.presentHidden';
   try {
-    for (const documents of ['read', 'write']) {
+    for (const documents of ['read', 'write', 'none']) {
       withAccess({ budget: 'read', documents }, () => {
-        const b = zeilen(budget.entryReadSections(buchung({ attachments: [verdeckt] })))['budget.receiptsLabel'];
-        assert.ok(nurVorhanden(b), `Buchung, documents: ${documents}: ein Zeichen, kein Link`);
-        const s = zeilen(split.expenseReadSections({ ...ausgabe, attachments: [verdeckt, verdeckt] }))['splitExpenses.receiptsLabel'];
-        assert.ok(nurVorhanden(s), `Ausgabe, documents: ${documents}: EIN Zeichen fuer alle verdeckten`);
-        const gemischt = zeilen(split.expenseReadSections({ ...ausgabe, attachments: [verdeckt, beleg] }))['splitExpenses.receiptsLabel'];
-        assert.equal(gemischt.childNodes.length, 2, 'neben einem sichtbaren Beleg steht das Zeichen zusaetzlich');
-        assert.equal(gemischt.childNodes[1].href, '/api/v1/documents/5/preview');
-        assert.deepEqual(inventory.attachmentDetailEntries([verdeckt]), [{ text: 'documentAttach.presentHidden' }],
-          `Inventar, documents: ${documents}: kein Link auf /documents/null`);
+        for (const attachments of [null, [verdeckt], [verdeckt, verdeckt]]) {
+          const label = `documents: ${documents}, attachments: ${JSON.stringify(attachments)}`;
+          assert.equal(zeilen(budget.entryReadSections(buchung({ attachments })))['budget.receiptsLabel'], undefined,
+            `Buchung, ${label}: keine Zeile`);
+          assert.equal(zeilen(split.expenseReadSections({ ...ausgabe, attachments }))['splitExpenses.receiptsLabel'], undefined,
+            `Ausgabe, ${label}: keine Zeile`);
+          assert.deepEqual(inventory.attachmentDetailEntries(attachments), [], `Inventar, ${label}: keine Zeile`);
+        }
       });
     }
+    withAccess({ budget: 'read', documents: 'read' }, () => {
+      const gemischt = zeilen(split.expenseReadSections({ ...ausgabe, attachments: [verdeckt, beleg] }))['splitExpenses.receiptsLabel'];
+      assert.equal(gemischt.childNodes.length, 1, 'neben einem sichtbaren Beleg steht kein Zeichen');
+      assert.equal(gemischt.childNodes[0].href, '/api/v1/documents/5/preview');
+      assert.deepEqual(inventory.attachmentDetailEntries([verdeckt, beleg]).map((e) => e.href), ['/api/v1/documents/5/preview']);
+    });
     withAccess({ budget: 'read', documents: 'none' }, () => {
-      assert.equal(zeilen(budget.entryReadSections(buchung({ attachments: [verdeckt] })))['budget.receiptsLabel'], undefined,
-        'bei `documents: none` bleibt die Stelle leer wie beim Beleg eines Einsatzes');
-      assert.equal(zeilen(split.expenseReadSections({ ...ausgabe, attachments: [verdeckt] }))['splitExpenses.receiptsLabel'], undefined);
-      assert.deepEqual(inventory.attachmentDetailEntries([verdeckt]), []);
       assert.deepEqual(inventory.attachmentDetailEntries([beleg]), [], 'auch ein sichtbarer Beleg: der Link ginge ins 403');
     });
   } finally { Object.assign(split.state, vorher); }
+});
+
+test('Inventar-Formular: verknuepfte Buchungen und ihre Knoepfe nur mit Leserecht auf das Budget (#1433)', async () => {
+  // Ohne `budget: read` liefert der Server keine verknuepften Buchungen, und
+  // jedes Nachschlagen einer Buchung antwortet 404. "Keine verknuepften
+  // Buchungen" waere dann falsch, und "Buchung hinzufuegen" endete im Fehler -
+  // Abschnitt und Knoepfe fallen weg (Regel 1 in utils/module-access.js).
+  const { __test: inventory } = await import('../public/pages/inventory.js');
+  const gegenstand = { id: 7, name: 'Kamera', category: 'other', status: 'active', condition: 'good', linked_entries: [], linked_entries_total: 0, attachments: [] };
+  const markup = (modules, mode) => withAccess(modules, () => inventory.buildItemForm({ mode, item: mode === 'edit' ? gegenstand : null }).content);
+  for (const budget of ['read', 'write']) {
+    const edit = markup({ inventory: 'write', budget }, 'edit');
+    assert.match(edit, /data-linked-entries/, `budget: ${budget}: der Abschnitt steht da`);
+    assert.match(edit, /data-action="add-booking"/);
+    assert.match(markup({ inventory: 'write', budget }, 'create'), /data-action="link-booking"/);
+  }
+  const ohne = markup({ inventory: 'write', budget: 'none' }, 'edit');
+  assert.doesNotMatch(ohne, /data-linked-entries/, 'kein "keine verknuepften Buchungen", das nicht stimmt');
+  assert.doesNotMatch(ohne, /data-action="add-booking"/, 'kein Knopf, der im Fehler endet');
+  assert.doesNotMatch(ohne, /inventory\.linkedBookingsLabel/);
+  assert.doesNotMatch(markup({ inventory: 'write', budget: 'none' }, 'create'), /data-action="link-booking"/,
+    'auch beim Anlegen keine Buchungsauswahl');
+});
+
+/**
+ * Ein Panel, das jede Abfrage beantwortet und mitschreibt, welche Selektoren
+ * gefragt wurden. Kein DOM (bewusst, siehe test/mini-dom.js): gemessen wird
+ * nur, OB die Verdrahtung nach einem Knoten greift - ein Riegel, der im
+ * Markup steht, aber nicht in der Verdrahtung, faellt so auf.
+ */
+function aufzeichnendesPanel() {
+  const gefragt = [];
+  const knoten = () => {
+    const gesetzt = {};
+    return new Proxy(function () {}, {
+      get(_t, prop) {
+        if (prop === 'then') return undefined;
+        if (prop === Symbol.toPrimitive) return () => '';
+        if (prop in gesetzt) return gesetzt[prop];
+        if (prop === 'value' || prop === 'textContent') return '';
+        if (prop === 'dataset') { gesetzt.dataset = {}; return gesetzt.dataset; }
+        if (prop === 'files' || prop === 'children' || prop === 'childNodes') return [];
+        if (prop === 'length') return 0;
+        if (prop === 'querySelector') return (sel) => { gefragt.push(sel); return knoten(); };
+        if (prop === 'querySelectorAll') return (sel) => { gefragt.push(sel); return []; };
+        if (prop === 'closest') return () => null;
+        return knoten();
+      },
+      set(_t, prop, value) { gesetzt[prop] = value; return true; },
+      apply() { return knoten(); },
+    });
+  };
+  return { panel: knoten(), gefragt };
+}
+
+test('Inventar-Formular: die Verdrahtung greift ohne Budgetrecht nicht nach den Buchungs-Knoepfen (#1433)', async () => {
+  // Das Markup allein reicht nicht: die Verdrahtung fragt `querySelector()`
+  // und haengt an das Ergebnis einen Listener. Faellt ihr Riegel, waehrend das
+  // Markup die Knoepfe weglaesst, bricht das Oeffnen im echten DOM an `null`.
+  const { __test: inventory } = await import('../public/pages/inventory.js');
+  const gegenstand = { id: 7, name: 'Kamera', category: 'other', status: 'active', condition: 'good', linked_entries: [], linked_entries_total: 0, attachments: [], tracked_dates: [] };
+  const BUCHUNG = ['[data-action="add-booking"]', '[data-linked-entries]', '[data-action="link-booking"]'];
+  const verdrahtet = (modules, mode) => {
+    const { panel, gefragt } = aufzeichnendesPanel();
+    withAccess(modules, () => inventory.buildItemForm({ mode, item: mode === 'edit' ? gegenstand : null }).wire(panel));
+    return BUCHUNG.filter((sel) => gefragt.includes(sel));
+  };
+  // Die Positivseite zuerst: sonst misst der Stub nichts.
+  assert.deepEqual(verdrahtet({ inventory: 'write', budget: 'write' }, 'edit'), ['[data-action="add-booking"]', '[data-linked-entries]']);
+  assert.deepEqual(verdrahtet({ inventory: 'write', budget: 'write' }, 'create'), ['[data-action="link-booking"]']);
+  assert.deepEqual(verdrahtet({ inventory: 'write', budget: 'none' }, 'edit'), [], 'Bearbeiten: kein Buchungs-Knoten gefragt');
+  assert.deepEqual(verdrahtet({ inventory: 'write', budget: 'none' }, 'create'), [], 'Anlegen: keine Buchungsauswahl gefragt');
 });
 
 test('das Paar dazu: mit Schreibrecht oeffnen dieselben drei Einstiege den Editor, keine Leseansicht', () => {

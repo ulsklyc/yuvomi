@@ -16,6 +16,7 @@ import {
   hasExplicitZone, householdTimeZone, shiftDateKey, storedToInstantMsPrecise, utcToWall,
 } from '../utils/timezone.js';
 import { createLogger } from '../logger.js';
+import { applyDocumentAccess } from './document-access.js';
 
 const log = createLogger('CalendarOccurrenceOverrides');
 
@@ -771,6 +772,10 @@ function detachedAttachmentCloneRequests(database, children, master) {
 }
 
 function independentAttachmentValues(database, cloned, sourceDocumentId, claimedDocumentIds) {
+  // `null`: der Aufrufer verweigert die Kopie (#1358 - ohne Sicht auf das
+  // Quelldokument oder ohne Dokumente-Schreibrecht). Der Nachfolger bekommt
+  // dann keinen Anhang, das Original bleibt an der urspruenglichen Serie.
+  if (cloned === null) return attachmentValues(null);
   const values = attachmentValues(cloned);
   const documentId = Number(values.attachment_document_id);
   if (!Number.isInteger(documentId)
@@ -784,7 +789,13 @@ function independentAttachmentValues(database, cloned, sourceDocumentId, claimed
   return values;
 }
 
-function syncOwnedAttachmentAccess(database, documentId, visibility, userIds) {
+/**
+ * Das Anhang-Dokument folgt dem Termin. Weiter oeffnen darf es nur, wem
+ * `mayWiden(documentId)` das zugesteht - der Aufrufer reicht es als
+ * `mayWidenAttachment` herein (Dokumente schreiben UND das Dokument sehen,
+ * #1358). Ohne ihn wird nur verengt: `applyDocumentAccess()`.
+ */
+function syncOwnedAttachmentAccess(database, documentId, visibility, userIds, mayWiden = () => false) {
   if (!documentId
       || !hasColumn(database, 'family_documents', 'visibility')
       || !hasColumn(database, 'family_document_access', 'document_id')
@@ -794,14 +805,11 @@ function syncOwnedAttachmentAccess(database, documentId, visibility, userIds) {
     : visibility === 'assignees'
       ? 'restricted'
       : 'family';
-  database.prepare('UPDATE family_documents SET visibility = ? WHERE id = ?')
-    .run(documentVisibility, documentId);
-  database.prepare('DELETE FROM family_document_access WHERE document_id = ?').run(documentId);
-  if (documentVisibility !== 'restricted') return;
-  const insert = database.prepare(`
-    INSERT OR IGNORE INTO family_document_access (document_id, user_id) VALUES (?, ?)
-  `);
-  for (const userId of userIds) insert.run(documentId, userId);
+  applyDocumentAccess(database, documentId, {
+    visibility: documentVisibility,
+    userIds,
+    mayWiden: mayWiden(documentId) === true,
+  });
 }
 
 /**
@@ -1076,6 +1084,7 @@ function pruneInheritedRemindersToAssignments(database, eventId, userIds) {
  * existing replacement value or continue inheriting from the master.
  */
 export function upsertOccurrenceOverride(database, {
+  mayWidenAttachment = () => false,
   seriesId,
   recurrenceId,
   actorId,
@@ -1297,6 +1306,7 @@ export function upsertOccurrenceOverride(database, {
         child.attachment_document_id,
         child.visibility,
         effectiveAssignments,
+        mayWidenAttachment,
       );
     }
     return { event: resolveOccurrence(database, child, master), restored: false };
@@ -1478,7 +1488,7 @@ function scalarDifferencesFromBase(values, base, limitedTo = SCALAR_OVERRIDE_FIE
   return limitedTo.filter((field) => !sameScalar(values[field], base[field]));
 }
 
-function refreshReparentedChild(database, child, oldResolved, successor, successorAssignments, tz) {
+function refreshReparentedChild(database, child, oldResolved, successor, successorAssignments, tz, mayWidenAttachment = () => false) {
   let newBase;
   try {
     newBase = baseOccurrenceFor(successor, child.recurrence_id);
@@ -1572,6 +1582,7 @@ function refreshReparentedChild(database, child, oldResolved, successor, success
       effectiveAttachment.attachment_document_id,
       values.visibility,
       effectiveAssignments,
+      mayWidenAttachment,
     );
   }
   return true;
@@ -1579,6 +1590,7 @@ function refreshReparentedChild(database, child, oldResolved, successor, success
 
 /** Splits a series at one original slot and reparents all later override state. */
 export function splitSeries(database, {
+  mayWidenAttachment = () => false,
   seriesId,
   recurrenceId,
   actorId,
@@ -1608,6 +1620,7 @@ export function splitSeries(database, {
         attachment,
         createAttachment,
         cloneDetachedAttachment,
+        mayWidenAttachment,
         reminderOffsets: requestedReminderOffsets,
         confirmedOrphanCount,
       });
@@ -1734,6 +1747,7 @@ export function splitSeries(database, {
         cloneDetachedAttachment,
         claimedDocumentIds,
         tz: reminderZone,
+        mayWidenAttachment,
       });
     }
     database.prepare('UPDATE calendar_events SET recurrence_rule = ? WHERE id = ?')
@@ -1783,6 +1797,7 @@ export function splitSeries(database, {
       successor.attachment_document_id,
       successor.visibility,
       successorAssignments,
+      mayWidenAttachment,
     );
     for (const child of children) {
       if (orphanIds.has(Number(child.id))) continue;
@@ -1802,6 +1817,7 @@ export function splitSeries(database, {
         successor,
         successorAssignments,
         reminderZone,
+        mayWidenAttachment,
       );
     }
     return {
@@ -1912,6 +1928,7 @@ function materializeDetachedChild(database, child, master, {
   cloneDetachedAttachment,
   claimedDocumentIds,
   tz,
+  mayWidenAttachment = () => false,
 } = {}) {
   const fields = parseOverrideFields(child.overridden_fields);
   const resolved = resolveOccurrence(database, child, master);
@@ -1974,6 +1991,7 @@ function materializeDetachedChild(database, child, master, {
       detachedAttachment.attachment_document_id,
       resolved.visibility,
       effectiveAssignments,
+      mayWidenAttachment,
     );
   }
 }
@@ -2082,7 +2100,7 @@ export function followInboundStartChange(database, eventId, oldStart, newStart, 
   }
 }
 
-function refreshInheritedChild(database, child, oldResolved, updatedMaster, tz) {
+function refreshInheritedChild(database, child, oldResolved, updatedMaster, tz, mayWidenAttachment = () => false) {
   const fields = parseOverrideFields(child.overridden_fields);
   const newBase = baseOccurrenceFor(updatedMaster, child.recurrence_id);
   const values = { ...newBase };
@@ -2142,12 +2160,14 @@ function refreshInheritedChild(database, child, oldResolved, updatedMaster, tz) 
       effectiveAttachment.attachment_document_id,
       values.visibility,
       effectiveAssignments,
+      mayWidenAttachment,
     );
   }
 }
 
 /** Applies a whole-series update with exact-count orphan confirmation. */
 export function updateSeriesWithOverrides(database, {
+  mayWidenAttachment = () => false,
   seriesId,
   actorId,
   isAdmin = false,
@@ -2204,6 +2224,7 @@ export function updateSeriesWithOverrides(database, {
         cloneDetachedAttachment,
         claimedDocumentIds,
         tz: reminderZone,
+        mayWidenAttachment,
       });
     }
     if (typeof applyUpdate === 'function') applyUpdate(database, current);
@@ -2257,6 +2278,7 @@ export function updateSeriesWithOverrides(database, {
         updated.attachment_document_id,
         updated.visibility,
         canonicalIds(assignmentIds(database, master.id)),
+        mayWidenAttachment,
       );
     }
     const orphanIds = new Set(orphans.map((child) => Number(child.id)));
@@ -2268,6 +2290,7 @@ export function updateSeriesWithOverrides(database, {
           resolvedById.get(Number(child.id)),
           updated,
           reminderZone,
+          mayWidenAttachment,
         );
       }
     }

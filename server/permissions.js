@@ -400,6 +400,24 @@ export function mayWriteModule(req, moduleKey) {
     && moduleAccessVerdict(req?.sessionModuleAccess, moduleKey, 'write') === MODULE_ACCESS_ALLOW;
 }
 
+/**
+ * Darf dieses Credential in diesem Modul LESEN? Das Gegenstueck zu
+ * `mayWriteModule()`, beide Achsen in einem Aufruf.
+ *
+ * Fuer jede Stelle, deren Pfad einem Modul gehoert und die Daten eines
+ * ANDEREN liest: die Importe zwischen Vorrat und Einkauf, die Kontakt- und
+ * Geburtstagsfelder der Split-Kandidaten, Buchungen am Inventar, Vorratszeilen
+ * am Rezept, Belege, Geburtstags-Importkandidaten. Der Pfad-Guard in
+ * server/index.js misst nur das eigene Modul.
+ *
+ * EINE REGEL: gebaut auf `hiddenModulesFor()`, damit "lesen darf" und "wird
+ * ausgeblendet" nie auseinanderlaufen. Kein Nachbau aus `tokenAllows()` und
+ * `deniedModules()` an der Aufrufstelle.
+ */
+export function mayReadModule(req, moduleKey) {
+  return !hiddenModulesFor(req, [moduleKey]).has(moduleKey);
+}
+
 // Urteil der Modulrechte-Prüfung. 'allow' = durchlassen, 'none' = Modul ganz
 // gesperrt, 'read-only' = nur Lesen erlaubt, Schreibversuch abgewiesen.
 export const MODULE_ACCESS_ALLOW = 'allow';

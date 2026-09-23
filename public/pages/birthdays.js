@@ -412,7 +412,7 @@ export function birthdayItemHtml(birthday) {
           ${birthday.notes ? `<span class="birthday-item__notes">${esc(birthday.notes)}</span>` : ''}
         </span>`;
   return `
-    <div class="swipe-row" data-swipe-id="${birthday.id}">
+    <div class="swipe-row${ro ? ' swipe-row--static' : ''}" data-swipe-id="${birthday.id}">
       ${ro ? '' : `
       <div class="swipe-reveal swipe-reveal--edit swipe-reveal--leading" aria-hidden="true">
         <i data-lucide="pencil" class="icon-md"></i>
@@ -815,7 +815,8 @@ function openBirthdayModal({ mode, birthday = null }) {
             <button type="button" class="birthday-avatar-editor" id="birthday-preview" aria-label="${t('birthdays.photoLabel')}">
               ${birthdayPreviewHtml(birthday?.name || '', photoData)}
             </button>
-            <input class="sr-only" id="bd-photo" type="file" accept="image/png,image/jpeg,image/webp">
+            <input class="sr-only" id="bd-photo" type="file" accept="image/png,image/jpeg,image/webp"
+                   aria-label="${t('birthdays.photoLabel')}" tabindex="-1">
             <div class="birthday-modal__photo-actions">
               <button type="button" class="birthday-modal__photo-action" id="bd-photo-edit" aria-label="${t('birthdays.photoLabel')}" title="${t('birthdays.photoLabel')}">
                 <i data-lucide="pencil" aria-hidden="true"></i>

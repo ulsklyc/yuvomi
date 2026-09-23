@@ -20,6 +20,7 @@ import { str, oneOf, num, date, id as idParam, collectErrors, MAX_TITLE, MAX_TEX
 import { normalizePantryUnit, normalizePantryQuantity } from '../../public/utils/pantry-units.js';
 import { syncPantryExpiryReminder, resolvePantryAccess } from '../services/pantry-reminders.js';
 import { todayKey as householdToday } from '../utils/timezone.js';
+import { mayReadModule } from '../permissions.js';
 
 const log = createLogger('Pantry');
 const router = express.Router();
@@ -305,10 +306,19 @@ router.delete('/locations/:locId', (req, res) => {
 // über das bestehende DELETE /shopping/:listId/items/checked. So bleibt ein
 // `pantry:write`-Token auf den Vorrat beschränkt und kann keine Einkaufsdaten
 // entfernen.
+//
+// LESEN BRAUCHT DAS LESERECHT DER QUELLE. Der Pfad-Guard misst diese Route als
+// `pantry`; Name und Kategorie der Einkaufsartikel stehen danach im Vorrat.
+// Deshalb fragt die Route selbst nach `shopping: read` (beide Achsen), und
+// zwar vor der Listensuche, damit ein 404 keine Listen-ID bestaetigt.
 // Response: { data: { added, merged, skipped } }
 // --------------------------------------------------------
 router.post('/import-shopping', (req, res) => {
   try {
+    if (!mayReadModule(req, 'shopping')) {
+      return res.status(403).json({ error: 'Read access to the shopping list is required.', code: 403 });
+    }
+
     const vList = idParam(req.body.list_id, 'Listen-ID');
     if (vList.error) return res.status(400).json({ error: vList.error, code: 400 });
 

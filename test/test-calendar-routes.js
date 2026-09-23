@@ -72,6 +72,9 @@ app.use((req, _res, next) => {
   // cookieSession: eine Sitzung, die neben einem API-Token mitkommt - requireAuth
   // setzt authUserId/authRole dann aus dem Token, req.session bleibt die Sitzung.
   req.session = actor.cookieSession ?? { userId: actor.id, role: actor.role };
+  // Modulrechte und Token-Scope fuer die Dokumentenrecht-Faelle (#1358).
+  req.sessionModuleAccess = actor.moduleAccess ?? null;
+  req.authScopes = actor.authScopes ?? null;
   next();
 });
 app.use(express.json({ limit: '10mb' }));
@@ -648,6 +651,40 @@ test('default-assignee-backfill - die Bestätigung bindet die Menge, nicht nur i
     const applied = await call('POST', route, { body: { expected_count: fresh.count, expected_token: fresh.token } });
     assert.equal(applied.status, 200);
     assert.equal(who(arrived), MARIA.id);
+  } finally {
+    db.prepare(`DELETE FROM calendar_events WHERE id IN (${ids.join(',')})`).run();
+    db.prepare('DELETE FROM external_calendars WHERE id = ?').run(refId);
+  }
+});
+
+test('default-assignee-backfill - oeffnet kein privates Anhang-Dokument und macht keins family (#1358)', async () => {
+  const { applyDefaultAssigneesToExisting, listBackfillCandidates } = await import('../server/services/sync-assignment.js');
+  const refId = db.prepare(`
+    INSERT INTO external_calendars (source, external_id, name, default_assignee_user_id)
+    VALUES ('caldav', 'https://dav.example/backfill-private/', 'Privat', ?)
+  `).run(TOM.id).lastInsertRowid;
+  const doc = (visibility) => db.prepare(`
+    INSERT INTO family_documents (name, original_name, mime_type, file_size, content_data, visibility, created_by)
+    VALUES ('bf-privat', 'bf-privat.txt', 'text/plain', 1, 'x', ?, ?)
+  `).run(visibility, ADMIN.id).lastInsertRowid;
+  const privateDoc = doc('private');
+  const restrictedDoc = doc('restricted');
+  const mk = (title, documentId) => db.prepare(`
+    INSERT INTO calendar_events (title, start_datetime, created_by, external_source, calendar_ref_id, visibility, attachment_document_id)
+    VALUES (?, '2035-06-01T10:00', ?, 'caldav', ?, 'all', ?)
+  `).run(title, ADMIN.id, refId, documentId).lastInsertRowid;
+  const ids = [mk('bf-private-doc', privateDoc), mk('bf-restricted-doc', restrictedDoc)];
+  const state = (id) => ({
+    visibility: db.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(id).visibility,
+    access: db.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id').all(id).map((r) => r.user_id),
+  });
+  try {
+    const snapshot = listBackfillCandidates(db).filter((c) => ids.includes(c.eventId));
+    assert.equal(snapshot.length, 2);
+    assert.equal(await applyDefaultAssigneesToExisting(db, snapshot), 2);
+    assert.deepEqual(state(privateDoc), { visibility: 'private', access: [] }, 'privat bleibt privat, auch am Termin fuer alle');
+    assert.deepEqual(state(restrictedDoc), { visibility: 'restricted', access: [] },
+      'am Termin fuer alle bleibt die Einschraenkung der Besitzerin: niemand kommt dazu, family wird es nicht');
   } finally {
     db.prepare(`DELETE FROM calendar_events WHERE id IN (${ids.join(',')})`).run();
     db.prepare('DELETE FROM external_calendars WHERE id = ?').run(refId);
@@ -3574,4 +3611,559 @@ test('PUT / — eine Serie mit eigener Zone wird an ihrem Ortstag geprueft', asy
     recurrence_rule: 'FREQ=MONTHLY;BYMONTHDAY=-1;UNTIL=20260220',
   } });
   assert.equal(res2.status, 400, `ohne Zone erwartet 400, bekommen ${res2.status}`);
+});
+
+// ── Anhang folgt dem Dokumentenrecht (#1358) ──────────────────────────────────
+// Ein Termin-Anhang liegt als Dokument im Dokumente-Modul. Wer dort nichts
+// sehen darf - Mitgliedsrecht `documents: none`, ein Token ohne documents:read
+// oder ein Dokument, das inzwischen privat ist -, bekommt den Anhang nicht:
+// ID, Vorschau- und Download-URL, Name, Typ und Groesse sind `null`, auf jedem
+// Leseweg des Kalenders.
+test('Anhang: ohne Dokumentenrecht oder Sicht aufs Dokument nennt der Termin ihn nicht (#1358)', async () => {
+  // Zehn Tage voraus in der Haushaltszone: im 90-Tage-Fenster von /upcoming.
+  const { todayKey, shiftDateKey } = await import('../server/utils/timezone.js');
+  const day = shiftDateKey(todayKey(db), 10);
+  const dataUrl = `data:text/plain;base64,${Buffer.from('Geheimer Anhang').toString('base64')}`;
+  const created = await call('POST', '/', { actor: ADMIN, body: {
+    title: 'Qzxanhangsrecht', start_datetime: `${day}T09:00`,
+    attachment_data: dataUrl, attachment_name: 'vertrag.txt',
+  } });
+  assert.equal(created.status, 201);
+  const eventId = created.body.data.id;
+  const docId = created.body.data.attachment_document_id;
+  assert.ok(docId);
+
+  const attachmentFields = (event) => ({
+    attachment_document_id: event.attachment_document_id,
+    attachment_preview_url: event.attachment_preview_url,
+    attachment_download_url: event.attachment_download_url,
+    attachment_name: event.attachment_name,
+    attachment_mime: event.attachment_mime,
+    attachment_size: event.attachment_size,
+    attachment_data: event.attachment_data,
+  });
+  const shown = {
+    attachment_document_id: docId,
+    attachment_preview_url: `/api/v1/documents/${docId}/preview`,
+    attachment_download_url: `/api/v1/documents/${docId}/download`,
+    attachment_name: 'vertrag.txt',
+    attachment_mime: 'text/plain',
+    attachment_size: Buffer.byteLength('Geheimer Anhang'),
+    attachment_data: null,
+  };
+  const hidden = Object.fromEntries(Object.keys(shown).map((key) => [key, null]));
+
+  // Jeder Leseweg: Einzelabruf, Fenster, anstehend, Suche.
+  const readAll = async (actor) => {
+    const one = await call('GET', `/${eventId}`, { actor });
+    const range = await call('GET', `/?from=${day}&to=${shiftDateKey(day, 1)}`, { actor });
+    const upcoming = await call('GET', '/upcoming?limit=20', { actor });
+    const search = await call('GET', `/search?q=${encodeURIComponent('Qzxanhangsrecht')}`, { actor });
+    for (const res of [one, range, upcoming, search]) assert.equal(res.status, 200);
+    const pick = (list) => list.find((event) => event.id === eventId);
+    return [['GET /:id', one.body.data], ['GET /', pick(range.body.data)],
+      ['GET /upcoming', pick(upcoming.body.data)], ['GET /search', pick(search.body.data)]]
+      .map(([path, event]) => { assert.ok(event, `Termin ist in ${path} da`); return attachmentFields(event); });
+  };
+
+  const NONE = { ...MARIA, moduleAccess: { documents: 'none' } };
+  const TOKEN = { ...MARIA, authScopes: ['calendar:read'] };
+  const TOKEN_DOCS = { ...MARIA, authScopes: ['calendar:read', 'documents:read'] };
+
+  for (const fields of await readAll(MARIA)) assert.deepEqual(fields, shown, 'mit Dokumentenrecht bleibt der Anhang');
+  for (const fields of await readAll({ ...MARIA, moduleAccess: { documents: 'read' } })) assert.deepEqual(fields, shown);
+  for (const fields of await readAll(TOKEN_DOCS)) assert.deepEqual(fields, shown, 'Token mit documents:read');
+  for (const fields of await readAll(NONE)) assert.deepEqual(fields, hidden, 'documents: none sieht keinen Anhang');
+  for (const fields of await readAll(TOKEN)) assert.deepEqual(fields, hidden, 'Token ohne documents:read ebenso');
+
+  // Das Dokument selbst wird privat: der Termin bleibt fuer alle sichtbar,
+  // der Anhang nur fuer den, der das Dokument sieht.
+  db.prepare("UPDATE family_documents SET visibility = 'private' WHERE id = ?").run(docId);
+  for (const fields of await readAll(MARIA)) assert.deepEqual(fields, hidden, 'privates Dokument einer anderen Person');
+  for (const fields of await readAll(ADMIN)) assert.deepEqual(fields, shown, 'wer es angelegt hat, sieht es weiter');
+
+  // `attachment_locked` sagt nur, DASS ein Anhang haengt, den der Betrachter
+  // nicht sieht - und nur, wer Dokumente lesen darf. Sonst `null`.
+  const locked = async (actor) => (await call('GET', `/${eventId}`, { actor })).body.data.attachment_locked;
+  assert.equal(await locked(MARIA), true, 'fremdes privates Dokument: gesperrt');
+  assert.equal(await locked(ADMIN), false, 'die Erstellerin: nicht gesperrt');
+  assert.equal(await locked(NONE), null, 'documents: none: nicht einmal das');
+  assert.equal(await locked(TOKEN), null, 'Token ohne documents:read: ebenso');
+
+  // Die verdeckten Antworten nennen die Nummer nirgends, auch nicht in einer URL.
+  const raw = await call('GET', `/${eventId}`, { actor: NONE });
+  assert.doesNotMatch(JSON.stringify(raw.body), new RegExp(`/documents/${docId}/`));
+});
+
+// ── Anhang hochladen ist eine Uebertragung ins Dokumente-Modul (#1358) ────────
+// docs/DECISIONS.md Eintrag 10: ein neuer Anhang legt ein Dokument an und
+// braucht deshalb das Dokumente-Schreibrecht (Mitgliedsrecht UND Token-Scope),
+// geprueft vor jeder Suche. Und wer den gespeicherten Anhang nicht sieht, loest
+// ihn weder durch Ersetzen noch durch Entfernen ab.
+test('Anhang: Hochladen braucht documents-Schreibrecht, vor der Suche und ohne Dokument anzulegen (#1358)', async () => {
+  const dataUrl = `data:text/plain;base64,${Buffer.from('Neuer Anhang').toString('base64')}`;
+  const documents = () => db.prepare('SELECT COUNT(*) AS n FROM family_documents').get().n;
+  const events = () => db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+  const READ_DOCS = { ...MARIA, moduleAccess: { documents: 'read' } };
+  const TOKEN = { ...MARIA, authScopes: ['calendar:write', 'documents:read'] };
+  const body = { title: 'Uploadprobe', start_datetime: '2041-02-01T09:00', attachment_data: dataUrl, attachment_name: 'a.txt' };
+
+  for (const [label, actor] of [['documents: read', READ_DOCS], ['Token ohne documents:write', TOKEN]]) {
+    const before = { documents: documents(), events: events() };
+    const post = await call('POST', '/', { actor, body });
+    assert.equal(post.status, 403, `${label}: POST mit Anhang`);
+    assert.equal(post.body.reason, 'ATTACHMENT_UPLOAD_REFUSED');
+    assert.deepEqual({ documents: documents(), events: events() }, before, `${label}: weder Termin noch Dokument angelegt`);
+    const unknown = await call('PUT', '/987654', { actor, body: { title: 'x', attachment_data: dataUrl } });
+    assert.deepEqual({ status: unknown.status, body: unknown.body }, { status: post.status, body: post.body },
+      `${label}: die Absage kommt vor der Suche, ein unbekannter Termin antwortet gleich`);
+  }
+  const plain = await call('POST', '/', { actor: READ_DOCS, body: { title: 'Ohne Anhang', start_datetime: '2041-02-01T09:00' } });
+  assert.equal(plain.status, 201, 'ohne Anhang reicht das Kalenderrecht');
+  const withRight = await call('POST', '/', { actor: MARIA, body });
+  assert.equal(withRight.status, 201, 'mit documents-Schreibrecht geht es');
+});
+
+test('Anhang: wer den gespeicherten nicht sieht, kann ihn weder ersetzen noch entfernen (#1358)', async () => {
+  const dataUrl = (text) => `data:text/plain;base64,${Buffer.from(text).toString('base64')}`;
+  const created = await call('POST', '/', { actor: ADMIN, body: {
+    title: 'Fremder Anhang', start_datetime: '2041-03-01T09:00',
+    attachment_data: dataUrl('privat'), attachment_name: 'privat.txt',
+  } });
+  assert.equal(created.status, 201);
+  const eventId = created.body.data.id;
+  const docId = created.body.data.attachment_document_id;
+  db.prepare("UPDATE family_documents SET visibility = 'private' WHERE id = ?").run(docId);
+  const stored = () => db.prepare('SELECT attachment_document_id FROM calendar_events WHERE id = ?').get(eventId).attachment_document_id;
+
+  const replace = await call('PUT', `/${eventId}`, { actor: MARIA, body: { attachment_data: dataUrl('neu'), attachment_name: 'neu.txt' } });
+  assert.equal(replace.status, 403, 'Ersetzen eines unsichtbaren Anhangs');
+  assert.equal(replace.body.reason, 'ATTACHMENT_CHANGE_REFUSED', 'mit einem Grund, den der Client uebersetzt');
+  const remove = await call('PUT', `/${eventId}`, { actor: MARIA, body: { remove_attachment: true } });
+  assert.equal(remove.status, 403, 'Entfernen eines unsichtbaren Anhangs');
+  const nullData = await call('PUT', `/${eventId}`, { actor: MARIA, body: { attachment_data: null } });
+  assert.equal(nullData.status, 403, 'attachment_data: null ist dasselbe Entfernen');
+  assert.equal(stored(), docId, 'der Anhang bleibt');
+
+  const edit = await call('PUT', `/${eventId}`, { actor: MARIA, body: { title: 'Nur der Titel' } });
+  assert.equal(edit.status, 200, 'eine Bearbeitung ohne Anhangsfelder geht weiter');
+  assert.equal(stored(), docId, 'und laesst den Anhang stehen');
+
+  // Ohne Leserecht auf die Dokumente ist jedes Entfernen dieselbe 403 - auch
+  // an einem Termin ohne Anhang, sonst verriete die Antwort, ob es einen gibt.
+  const NONE = { ...MARIA, moduleAccess: { documents: 'none' } };
+  const bare = await call('POST', '/', { actor: MARIA, body: { title: 'Ohne Anhang', start_datetime: '2041-03-02T09:00' } });
+  const noneWith = await call('PUT', `/${eventId}`, { actor: NONE, body: { remove_attachment: true } });
+  const noneWithout = await call('PUT', `/${bare.body.data.id}`, { actor: NONE, body: { remove_attachment: true } });
+  assert.deepEqual({ status: noneWithout.status, body: noneWithout.body }, { status: noneWith.status, body: noneWith.body });
+  assert.equal(noneWith.status, 403);
+
+  const own = await call('PUT', `/${eventId}`, { actor: ADMIN, body: { remove_attachment: true } });
+  assert.equal(own.status, 200, 'wer das Dokument sieht, darf den Anhang loesen');
+  assert.equal(stored(), null);
+});
+
+test('Anhang: auch an einem Serientermin loest ihn nur, wer ihn sieht (#1358)', async () => {
+  const created = await call('POST', '/', { actor: MARIA, body: {
+    title: 'Serie mit Anhang', start_datetime: '2055-04-01T09:00:00', recurrence_rule: 'FREQ=DAILY;COUNT=5',
+    attachment_data: `data:text/plain;base64,${Buffer.from('serie').toString('base64')}`, attachment_name: 's.txt',
+  } });
+  assert.equal(created.status, 201);
+  const seriesId = created.body.data.id;
+  const docId = created.body.data.attachment_document_id;
+  // Das Dokument gehoert jetzt einer anderen Person und ist privat.
+  db.prepare("UPDATE family_documents SET visibility = 'private', created_by = ? WHERE id = ?").run(ADMIN.id, docId);
+
+  for (const route of [`/${seriesId}/occurrences/2055-04-02`, `/${seriesId}/occurrences/2055-04-03/following`]) {
+    const remove = await call('PUT', route, { actor: MARIA, body: { remove_attachment: true } });
+    assert.equal(remove.status, 403, `${route}: Entfernen`);
+    const replace = await call('PUT', route, { actor: MARIA, body: {
+      attachment_data: `data:text/plain;base64,${Buffer.from('neu').toString('base64')}`, attachment_name: 'n.txt',
+    } });
+    assert.equal(replace.status, 403, `${route}: Ersetzen`);
+  }
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events WHERE recurrence_parent_id = ?').get(seriesId).n, 0,
+    'keine Ausnahme angelegt');
+  const upload = await call('PUT', `/987654/occurrences/2055-04-02`, { actor: { ...MARIA, moduleAccess: { documents: 'read' } }, body: {
+    attachment_data: `data:text/plain;base64,${Buffer.from('x').toString('base64')}`,
+  } });
+  assert.equal(upload.status, 403, 'Hochladen ohne Schreibrecht: 403 vor der Seriensuche');
+});
+
+// ── Das Speichern eines Termins oeffnet kein fremdes Dokument (#1358) ─────────
+// Der Anhang folgt Sichtbarkeit und Zuweisung des Termins. Weiter oeffnen darf
+// das nur, wer Dokumente schreiben darf UND das Dokument sieht; sonst wird nur
+// verengt. Und ein Split oder Abloesen kopiert den Anhang nur fuer so jemanden.
+test('Anhang: Bearbeiten durch eine Nicht-Sehende oeffnet das Dokument nicht wieder - Einzeltermin und Serie (#1358)', async () => {
+  const dataUrl = `data:text/plain;base64,${Buffer.from('privat').toString('base64')}`;
+  const docRow = (id) => ({ ...db.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(id) });
+  const access = (id) => db.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id')
+    .all(id).map((r) => r.user_id);
+  for (const recurrence_rule of [null, 'FREQ=DAILY;COUNT=3']) {
+    const created = await call('POST', '/', { actor: ADMIN, body: {
+      title: 'Sync-Probe', start_datetime: '2042-01-01T09:00', recurrence_rule,
+      attachment_data: dataUrl, attachment_name: 'p.txt',
+    } });
+    assert.equal(created.status, 201);
+    const eventId = created.body.data.id;
+    const docId = created.body.data.attachment_document_id;
+    db.prepare("UPDATE family_documents SET visibility = 'private' WHERE id = ?").run(docId);
+    const label = recurrence_rule ? 'Serie' : 'Einzeltermin';
+
+    for (const actor of [MARIA, { ...MARIA, moduleAccess: { documents: 'none' } }, { ...MARIA, authScopes: ['calendar:write'] }]) {
+      const edit = await call('PUT', `/${eventId}`, { actor, body: { title: 'Nur der Titel', visibility: 'all' } });
+      assert.equal(edit.status, 200, `${label}: Bearbeiten geht`);
+      assert.deepEqual(docRow(docId), { visibility: 'private' }, `${label}: das Dokument bleibt privat`);
+      const seen = await call('GET', `/${eventId}`, { actor: MARIA });
+      assert.equal(seen.body.data.attachment_name, null, `${label}: und bleibt fuer Maria verborgen`);
+    }
+
+    // Eingeschraenkt auf TOM: eine Nicht-Sehende fuegt sich hinzu - der Zugriff waechst nicht.
+    db.prepare("UPDATE family_documents SET visibility = 'restricted' WHERE id = ?").run(docId);
+    db.prepare('INSERT OR IGNORE INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(docId, TOM.id);
+    const widen = await call('PUT', `/${eventId}`, { actor: MARIA, body: { visibility: 'assignees', assigned_to: [TOM.id, MARIA.id] } });
+    assert.equal(widen.status, 200);
+    assert.deepEqual({ ...docRow(docId), access: access(docId) }, { visibility: 'restricted', access: [TOM.id] },
+      `${label}: Maria bekommt keinen Zugriff`);
+    // Verengen bleibt: wer herausfaellt, verliert den Zugriff.
+    const narrow = await call('PUT', `/${eventId}`, { actor: MARIA, body: { visibility: 'assignees', assigned_to: [MARIA.id] } });
+    assert.equal(narrow.status, 200);
+    assert.deepEqual(access(docId), [], `${label}: TOM faellt heraus, niemand kommt dazu`);
+
+    // Wer das Dokument sieht und schreiben darf, oeffnet es wie bisher.
+    const owner = await call('PUT', `/${eventId}`, { actor: ADMIN, body: { visibility: 'all' } });
+    assert.equal(owner.status, 200);
+    assert.deepEqual(docRow(docId), { visibility: 'family' }, `${label}: die Erstellerin darf es oeffnen`);
+  }
+});
+
+test('Anhang: Split und Abloesen kopieren kein Dokument ohne Sicht oder Schreibrecht (#1358)', async () => {
+  const dataUrl = `data:text/plain;base64,${Buffer.from('serie').toString('base64')}`;
+  const documents = () => db.prepare('SELECT COUNT(*) AS n FROM family_documents').get().n;
+  const cases = [
+    ['fremdes privates Dokument', MARIA, 'private'],
+    ['documents: none', { ...MARIA, moduleAccess: { documents: 'none' } }, 'family'],
+    ['Token nur calendar:write', { ...MARIA, authScopes: ['calendar:write'] }, 'family'],
+  ];
+  let year = 2060;
+  for (const [label, actor, docVisibility] of cases) {
+    // Split ueber /following.
+    year += 1;
+    const series = await call('POST', '/', { actor: MARIA, body: {
+      title: `Split ${label}`, start_datetime: `${year}-01-01T09:00:00`, recurrence_rule: 'FREQ=DAILY;COUNT=5',
+      attachment_data: dataUrl, attachment_name: 's.txt',
+    } });
+    assert.equal(series.status, 201);
+    const docId = series.body.data.attachment_document_id;
+    db.prepare('UPDATE family_documents SET visibility = ?, created_by = ? WHERE id = ?').run(docVisibility, ADMIN.id, docId);
+    const before = documents();
+    const split = await call('PUT', `/${series.body.data.id}/occurrences/${year}-01-03/following`, {
+      actor, body: { title: 'Nachfolger' },
+    });
+    assert.equal(split.status, 201, `${label}: der Split geht weiter`);
+    assert.equal(split.body.data.attachment_document_id, null, `${label}: der Nachfolger hat keinen Anhang`);
+    assert.equal(db.prepare('SELECT attachment_document_id FROM calendar_events WHERE id = ?').get(split.body.data.id)
+      .attachment_document_id, null, `${label}: auch gespeichert nicht`);
+    assert.equal(documents(), before, `${label}: keine Dokumentkopie`);
+    assert.equal(db.prepare('SELECT attachment_document_id FROM calendar_events WHERE id = ?').get(series.body.data.id)
+      .attachment_document_id, docId, `${label}: das Original bleibt an der alten Serie`);
+
+    // Abloesen: eine Ausnahme verwaist, weil die Regel sich aendert.
+    year += 1;
+    const detachSeries = await call('POST', '/', { actor: MARIA, body: {
+      title: `Detach ${label}`, start_datetime: `${year}-01-01T09:00:00`, recurrence_rule: 'FREQ=DAILY;COUNT=5',
+      attachment_data: dataUrl, attachment_name: 'd.txt',
+    } });
+    const seriesId = detachSeries.body.data.id;
+    const detachDoc = detachSeries.body.data.attachment_document_id;
+    const override = await call('PUT', `/${seriesId}/occurrences/${year}-01-03`, { actor: MARIA, body: { title: 'Ausnahme' } });
+    assert.equal(override.status, 200);
+    db.prepare('UPDATE family_documents SET visibility = ?, created_by = ? WHERE id = ?').run(docVisibility, ADMIN.id, detachDoc);
+    const beforeDetach = documents();
+    const rule = { recurrence_rule: 'FREQ=WEEKLY;COUNT=3' };
+    const conflict = await call('PUT', `/${seriesId}`, { actor, body: rule });
+    assert.equal(conflict.status, 409, `${label}: die verwaiste Ausnahme wird erst bestaetigt`);
+    const detached = await call('PUT', `/${seriesId}`, {
+      actor, body: { ...rule, confirmed_orphan_count: conflict.body.orphaned_override_count },
+    });
+    assert.equal(detached.status, 200, `${label}: das Abloesen geht weiter`);
+    assert.equal(db.prepare('SELECT attachment_document_id FROM calendar_events WHERE id = ?').get(override.body.data.id)
+      .attachment_document_id, null, `${label}: die abgeloeste Ausnahme hat keinen Anhang`);
+    assert.equal(documents(), beforeDetach, `${label}: keine Dokumentkopie beim Abloesen`);
+  }
+
+  // Die Gegenrichtung: mit Sicht und Schreibrecht wird wie bisher kopiert.
+  const own = await call('POST', '/', { actor: MARIA, body: {
+    title: 'Split eigen', start_datetime: '2070-01-01T09:00:00', recurrence_rule: 'FREQ=DAILY;COUNT=5',
+    attachment_data: dataUrl, attachment_name: 'e.txt',
+  } });
+  const before = documents();
+  const split = await call('PUT', `/${own.body.data.id}/occurrences/2070-01-03/following`, { actor: MARIA, body: { title: 'Nachfolger' } });
+  assert.equal(split.status, 201);
+  assert.ok(split.body.data.attachment_document_id, 'eigene Serie: der Nachfolger bekommt seine Kopie');
+  assert.equal(documents(), before + 1);
+});
+
+test('Anhang: weiter oeffnen darf nur, wer das Dokument verwalten darf - Sehen reicht nicht (#1358)', async () => {
+  // Wie im Dokumente-Modul (canManageDocument): Erstellerin oder Admin. Eine
+  // Zugewiesene mit documents:write sieht das Dokument, gehoert ihr aber nicht.
+  const created = await call('POST', '/', { actor: ADMIN, body: {
+    title: 'Verwalten-Probe', start_datetime: '2043-01-01T09:00', visibility: 'assignees', assigned_to: [MARIA.id],
+    attachment_data: `data:text/plain;base64,${Buffer.from('eng').toString('base64')}`, attachment_name: 'e.txt',
+  } });
+  assert.equal(created.status, 201);
+  const eventId = created.body.data.id;
+  const docId = created.body.data.attachment_document_id;
+  const visibility = () => db.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(docId).visibility;
+  assert.equal(visibility(), 'restricted');
+  const seen = await call('GET', `/${eventId}`, { actor: MARIA });
+  assert.equal(seen.body.data.attachment_document_id, docId, 'Maria sieht das Dokument');
+
+  const widen = await call('PUT', `/${eventId}`, { actor: MARIA, body: { visibility: 'all' } });
+  assert.equal(widen.status, 200);
+  assert.equal(visibility(), 'restricted', 'Maria macht das Dokument nicht family');
+
+  const owner = await call('PUT', `/${eventId}`, { actor: ADMIN, body: { visibility: 'all' } });
+  assert.equal(owner.status, 200);
+  assert.equal(visibility(), 'family', 'die Erstellerin darf es');
+});
+
+test('Anhang: die Kopie beim Split behaelt die Freigaben der Quelle (#1358, Review)', async () => {
+  // Eine Zugewiesene mit documents:write und Freigabe auf das eingeschraenkte
+  // Dokument teilt die Serie. Die Kopie gehoert der Besitzerin des Quelldokuments; ohne die
+  // Freigaben der Quelle saehe sie am Nachfolger niemand ausser dieser.
+  const created = await call('POST', '/', { actor: ADMIN, body: {
+    title: 'Freigabe-Split', start_datetime: '2071-01-01T09:00:00', recurrence_rule: 'FREQ=DAILY;COUNT=5',
+    visibility: 'assignees', assigned_to: [MARIA.id],
+    attachment_data: `data:text/plain;base64,${Buffer.from('frei').toString('base64')}`, attachment_name: 'f.txt',
+  } });
+  assert.equal(created.status, 201);
+  const sourceId = created.body.data.attachment_document_id;
+  const access = (id) => db.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id')
+    .all(id).map((r) => r.user_id);
+  assert.deepEqual(access(sourceId), [MARIA.id]);
+
+  const split = await call('PUT', `/${created.body.data.id}/occurrences/2071-01-03/following`, { actor: MARIA, body: { title: 'Nachfolger' } });
+  assert.equal(split.status, 201, JSON.stringify(split.body));
+  const cloneId = split.body.data.attachment_document_id;
+  assert.ok(cloneId && cloneId !== sourceId, 'Maria sieht die Kopie am Nachfolger');
+  assert.deepEqual(access(cloneId), [MARIA.id], 'die Kopie traegt die Freigabe der Quelle');
+  assert.equal(db.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(cloneId).visibility, 'restricted',
+    'und wird nicht weiter als die Quelle');
+  assert.equal(db.prepare('SELECT created_by FROM family_documents WHERE id = ?').get(cloneId).created_by, ADMIN.id,
+    'die Kopie gehoert der Besitzerin der Quelle, nicht Maria');
+
+  // Maria verwaltet die Kopie nicht: am Nachfolger weitet sie nichts.
+  const widen = await call('PUT', `/${split.body.data.id}`, { actor: MARIA, body: { visibility: 'all' } });
+  assert.equal(widen.status, 200, JSON.stringify(widen.body));
+  assert.equal(db.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(cloneId).visibility, 'restricted',
+    'die Kopie bleibt eingeschraenkt');
+  assert.deepEqual(access(cloneId), [MARIA.id]);
+});
+
+test('Anhang: die Kopie gehoert der Besitzerin des Quelldokuments, nicht der Terminerstellerin (#1358)', async () => {
+  const created = await call('POST', '/', { actor: MARIA, body: {
+    title: 'Besitz-Split', start_datetime: '2072-01-01T09:00:00', recurrence_rule: 'FREQ=DAILY;COUNT=5',
+    attachment_data: `data:text/plain;base64,${Buffer.from('besitz').toString('base64')}`, attachment_name: 'b.txt',
+  } });
+  assert.equal(created.status, 201);
+  const sourceId = created.body.data.attachment_document_id;
+  // Das Dokument gehoert Tom, nicht Maria, die den Termin angelegt hat.
+  db.prepare("UPDATE family_documents SET created_by = ?, visibility = 'family' WHERE id = ?").run(TOM.id, sourceId);
+  const split = await call('PUT', `/${created.body.data.id}/occurrences/2072-01-03/following`, { actor: MARIA, body: { title: 'Nachfolger' } });
+  assert.equal(split.status, 201, JSON.stringify(split.body));
+  const cloneId = split.body.data.attachment_document_id;
+  assert.ok(cloneId && cloneId !== sourceId);
+  assert.equal(db.prepare('SELECT created_by FROM family_documents WHERE id = ?').get(cloneId).created_by, TOM.id,
+    'die Kopie gehoert Tom, der Besitzerin der Quelle');
+});
+
+test('Anhang: teilt eine Nicht-Besitzerin die Serie und weist neu zu, meldet der Nachfolger den Anhang als gesperrt (#1358)', async () => {
+  // Folge von "Nicht-Besitzer verengen nur": die Kopie gehoert der Besitzerin
+  // der Quelle, ihre Freigaben werden auf die neuen Zugewiesenen verengt. Wer
+  // Dokumente lesen darf, bekommt `attachment_locked` - der Dialog zeigt dann
+  // "Anhang vorhanden (privat)"; freigeben kann die Besitzerin oder ein Admin.
+  const created = await call('POST', '/', { actor: ADMIN, body: {
+    title: 'Umzug-Split', start_datetime: '2073-01-01T09:00:00', recurrence_rule: 'FREQ=DAILY;COUNT=5',
+    visibility: 'assignees', assigned_to: [MARIA.id],
+    attachment_data: `data:text/plain;base64,${Buffer.from('umzug').toString('base64')}`, attachment_name: 'u.txt',
+  } });
+  assert.equal(created.status, 201);
+  const split = await call('PUT', `/${created.body.data.id}/occurrences/2073-01-03/following`, {
+    actor: MARIA, body: { title: 'Nachfolger', assigned_to: [TOM.id] },
+  });
+  assert.equal(split.status, 201, JSON.stringify(split.body));
+  const successorId = split.body.data.id;
+  const asTom = await call('GET', `/${successorId}`, { actor: TOM });
+  assert.equal(asTom.status, 200);
+  assert.equal(asTom.body.data.attachment_document_id, null, 'Tom sieht das Dokument nicht');
+  assert.equal(asTom.body.data.attachment_locked, true, 'aber dass ein Anhang da ist - der Dialog zeigt den Hinweis');
+  const asAdmin = await call('GET', `/${successorId}`, { actor: ADMIN });
+  assert.ok(asAdmin.body.data.attachment_document_id, 'die Besitzerin sieht ihn und kann ihn freigeben');
+});
+
+test('Anhang: die Kopie prueft Recht und Quelle nach dem Lesen der Datei erneut (#1358, kein await zwischen Lesen und Schreiben)', async () => {
+  // Waehrend die Quelldatei gelesen wird (entfernter Speicher, hier ein
+  // gepatchtes fs.stat), stellt Tom sein Dokument auf privat. Die Kopie darf
+  // danach nicht mehr entstehen - weder als Zeile noch als liegengebliebene Datei.
+  const fs = await import('node:fs/promises');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'yuvomi-clone-race-'));
+  const previousEnabled = process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+  const previousPath = process.env.DOCUMENT_STORAGE_LOCAL_PATH;
+  process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'true';
+  process.env.DOCUMENT_STORAGE_LOCAL_PATH = dir;
+  const fsp = fs.default;
+  const originalStat = fsp.stat;
+  const listFiles = async () => (await fs.readdir(dir, { recursive: true, withFileTypes: true }))
+    .filter((entry) => entry.isFile()).length;
+  try {
+    for (const [label, change] of [
+      ['auf privat gestellt', (docId) => db.prepare("UPDATE family_documents SET visibility = 'private' WHERE id = ?").run(docId)],
+      ['Freigabe entzogen', (docId) => db.prepare('DELETE FROM family_document_access WHERE document_id = ? AND user_id = ?').run(docId, MARIA.id)],
+    ]) {
+      const year = label === 'auf privat gestellt' ? 2074 : 2075;
+      const created = await call('POST', '/', { actor: MARIA, body: {
+        title: `Race ${label}`, start_datetime: `${year}-01-01T09:00:00`, recurrence_rule: 'FREQ=DAILY;COUNT=5',
+        attachment_data: `data:text/plain;base64,${Buffer.from('race').toString('base64')}`, attachment_name: 'r.txt',
+      } });
+      assert.equal(created.status, 201);
+      const sourceId = created.body.data.attachment_document_id;
+      // Das Dokument gehoert Tom; Maria sieht es zu Beginn (family bzw. Freigabe).
+      if (label === 'auf privat gestellt') {
+        db.prepare("UPDATE family_documents SET created_by = ?, visibility = 'family' WHERE id = ?").run(TOM.id, sourceId);
+      } else {
+        db.prepare("UPDATE family_documents SET created_by = ?, visibility = 'restricted' WHERE id = ?").run(TOM.id, sourceId);
+        db.prepare('INSERT OR IGNORE INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(sourceId, MARIA.id);
+      }
+      const documentsBefore = db.prepare('SELECT COUNT(*) AS n FROM family_documents').get().n;
+      const filesBefore = await listFiles();
+      let changed = false;
+      fsp.stat = async (...args) => {
+        if (!changed) { changed = true; change(sourceId); }
+        return originalStat.apply(fsp, args);
+      };
+      let split;
+      try {
+        split = await call('PUT', `/${created.body.data.id}/occurrences/${year}-01-03/following`, { actor: MARIA, body: { title: 'Nachfolger' } });
+      } finally {
+        fsp.stat = originalStat;
+      }
+      assert.equal(changed, true, `${label}: die Datei wurde gelesen`);
+      assert.equal(split.status, 201, `${label}: der Split geht weiter`);
+      assert.equal(split.body.data.attachment_document_id, null, `${label}: keine Kopie mehr, der Nachfolger hat keinen Anhang`);
+      assert.equal(db.prepare('SELECT COUNT(*) AS n FROM family_documents').get().n, documentsBefore, `${label}: keine neue Zeile`);
+      assert.equal(await listFiles(), filesBefore, `${label}: die bereitgestellte Datei ist wieder weg`);
+    }
+  } finally {
+    fsp.stat = originalStat;
+    if (previousEnabled === undefined) delete process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+    else process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = previousEnabled;
+    if (previousPath === undefined) delete process.env.DOCUMENT_STORAGE_LOCAL_PATH;
+    else process.env.DOCUMENT_STORAGE_LOCAL_PATH = previousPath;
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+// ── Ersetzen prueft das Recht nach dem Hochladen erneut (#1358) ──────────────
+// Zwischen der fruehen Sperrpruefung und dem Schreiben liegt das Bereitstellen
+// der neuen Datei (await). Stellt die Besitzerin das Dokument in dieser Zeit auf
+// privat oder entzieht die Freigabe, darf der Request den Anhang nicht mehr
+// abloesen: 403 wie die fruehe Pruefung, nichts geschrieben, keine Waise.
+async function withUploadRace(run) {
+  const fs = await import('node:fs/promises');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'yuvomi-replace-race-'));
+  const previousEnabled = process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+  const previousPath = process.env.DOCUMENT_STORAGE_LOCAL_PATH;
+  process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'true';
+  process.env.DOCUMENT_STORAGE_LOCAL_PATH = dir;
+  const fsp = fs.default;
+  const originalWrite = fsp.writeFile;
+  const files = async () => (await fs.readdir(dir, { recursive: true, withFileTypes: true }))
+    .filter((entry) => entry.isFile()).length;
+  let onWrite = null;
+  fsp.writeFile = async (...args) => {
+    const hook = onWrite;
+    onWrite = null;
+    if (hook) hook();
+    return originalWrite.apply(fsp, args);
+  };
+  try {
+    return await run({ files, armWrite: (hook) => { onWrite = hook; } });
+  } finally {
+    fsp.writeFile = originalWrite;
+    if (previousEnabled === undefined) delete process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+    else process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = previousEnabled;
+    if (previousPath === undefined) delete process.env.DOCUMENT_STORAGE_LOCAL_PATH;
+    else process.env.DOCUMENT_STORAGE_LOCAL_PATH = previousPath;
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+}
+
+const RACE_CASES = [
+  ['auf privat gestellt', (docId) => {
+    db.prepare("UPDATE family_documents SET created_by = ?, visibility = 'family' WHERE id = ?").run(TOM.id, docId);
+  }, (docId) => db.prepare("UPDATE family_documents SET visibility = 'private' WHERE id = ?").run(docId)],
+  ['Freigabe entzogen', (docId) => {
+    db.prepare("UPDATE family_documents SET created_by = ?, visibility = 'restricted' WHERE id = ?").run(TOM.id, docId);
+    db.prepare('INSERT OR IGNORE INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(docId, MARIA.id);
+  }, (docId) => db.prepare('DELETE FROM family_document_access WHERE document_id = ? AND user_id = ?').run(docId, MARIA.id)],
+];
+
+/** Faehrt beide Faelle und sammelt die Befunde - kein Abbruch beim ersten. */
+async function raceEachCase(route, { recurrence_rule = null, year }) {
+  const failures = [];
+  await withUploadRace(async ({ files, armWrite }) => {
+    let offset = 0;
+    for (const [label, share, revoke] of RACE_CASES) {
+      offset += 1;
+      const start = `${year + offset}-01-01T09:00:00`;
+      const created = await call('POST', '/', { actor: MARIA, body: {
+        title: `Ersetzen ${label}`, start_datetime: start, recurrence_rule,
+        attachment_data: `data:text/plain;base64,${Buffer.from('alt').toString('base64')}`, attachment_name: 'alt.txt',
+      } });
+      const eventId = created.body.data.id;
+      const docId = created.body.data.attachment_document_id;
+      share(docId);
+      const counts = () => ({
+        documents: db.prepare('SELECT COUNT(*) AS n FROM family_documents').get().n,
+        events: db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n,
+      });
+      const before = { ...counts(), files: await files() };
+      let revoked = false;
+      armWrite(() => { revoked = true; revoke(docId); });
+      const res = await call('PUT', route(eventId, year + offset), { actor: MARIA, body: {
+        attachment_data: `data:text/plain;base64,${Buffer.from('neu').toString('base64')}`, attachment_name: 'neu.txt',
+      } });
+      const after = { ...counts(), files: await files() };
+      const check = (ok, what) => { if (!ok) failures.push(`${label}: ${what}`); };
+      check(revoked, 'die neue Datei wurde nicht bereitgestellt');
+      check(res.status === 403 && res.body?.reason === 'ATTACHMENT_CHANGE_REFUSED', `403 erwartet, bekam ${res.status}`);
+      check(db.prepare('SELECT attachment_document_id FROM calendar_events WHERE id = ?').get(eventId).attachment_document_id === docId,
+        'der Anhang wurde abgeloest');
+      check(JSON.stringify(after) === JSON.stringify(before), `geschrieben oder liegengeblieben: ${JSON.stringify({ before, after })}`);
+    }
+  });
+  return failures;
+}
+
+test('Anhang ersetzen: PUT /:id prueft das Recht nach dem Hochladen erneut (#1358)', async () => {
+  assert.deepEqual(await raceEachCase((id) => `/${id}`, { year: 2080 }), []);
+});
+
+test('Anhang ersetzen: PUT /:id an einer Serie prueft das Recht nach dem Hochladen erneut (#1358)', async () => {
+  assert.deepEqual(await raceEachCase((id) => `/${id}`, { recurrence_rule: 'FREQ=DAILY;COUNT=5', year: 2083 }), []);
+});
+
+test('Anhang ersetzen: ein Vorkommen prueft das Recht nach dem Hochladen erneut (#1358)', async () => {
+  assert.deepEqual(await raceEachCase((id, y) => `/${id}/occurrences/${y}-01-03`,
+    { recurrence_rule: 'FREQ=DAILY;COUNT=5', year: 2086 }), []);
+});
+
+test('Anhang ersetzen: dieses und folgende Vorkommen pruefen das Recht nach dem Hochladen erneut (#1358)', async () => {
+  assert.deepEqual(await raceEachCase((id, y) => `/${id}/occurrences/${y}-01-03/following`,
+    { recurrence_rule: 'FREQ=DAILY;COUNT=5', year: 2089 }), []);
 });

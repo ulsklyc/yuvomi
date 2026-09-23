@@ -14,6 +14,11 @@
  *          POST /housekeeping/supply-requests -> legt shopping_items an und,
  *               wenn der Haushalt noch keine hat, eine Einkaufsliste (#1351)
  *
+ *        Dazu die Gegenfrage beim LESEN: `POST /pantry/import-shopping` liest
+ *        abgehakte Einkaufsartikel, `POST /shopping/:listId/import-pantry`
+ *        liest Vorratszeilen. Der Pfad-Guard misst jeweils nur das Ziel, die
+ *        Route fragt deshalb selbst nach dem Leserecht der Quelle.
+ *
  *        Dazu die Ruecknahme `POST /shopping/items/undo-transfer`, die dasselbe
  *        Flag zurueckdreht - aber nur fuer Artikel aus einem Mahlzeit-Uebertrag
  *        (`added_from_meal`), weshalb sie als einzige BEDINGT fragt.
@@ -46,6 +51,7 @@ const { default: mealsRouter } = await import('../server/routes/meals.js');
 const { default: recipesRouter } = await import('../server/routes/recipes.js');
 const { default: shoppingRouter } = await import('../server/routes/shopping.js');
 const { default: housekeepingRouter } = await import('../server/routes/housekeeping.js');
+const { default: pantryRouter } = await import('../server/routes/pantry.js');
 const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
 const db = dbmod.get();
 
@@ -76,6 +82,7 @@ app.use('/api/v1/meals', mealsRouter);
 app.use('/api/v1/recipes', recipesRouter);
 app.use('/api/v1/shopping', shoppingRouter);
 app.use('/api/v1/housekeeping', housekeepingRouter);
+app.use('/api/v1/pantry', pantryRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => { server.close(); });
@@ -474,4 +481,125 @@ test('Ruecknahme ohne Mahlzeit-Herkunft bleibt dem Einkauf erhalten', async () =
   const res = await call('POST', '/shopping/items/undo-transfer', { ids: uebertrag.body.data.added_ids });
   assert.equal(res.status, 200, 'kein Essensplan im Spiel, keine Frage danach');
   assert.equal(res.body.data.removed, 1);
+});
+
+// =========================================================================
+// 4. Vorrat und Einkauf: der Import LIEST die Quelle
+// =========================================================================
+
+// DIESELBE LUECKE VON DER LESESEITE. Der Pfad-Guard misst beide Importe am
+// ZIEL (`/pantry/...` als pantry, `/shopping/...` als shopping). Gelesen wird
+// aber das andere Modul: Name und Kategorie der abgehakten Einkaufsartikel
+// bzw. der Vorratszeilen landen im Ziel und sind dort lesbar. Ohne eigene
+// Frage kopierte ein Mitglied mit `shopping: none` die Einkaufsliste in den
+// Vorrat - und las sie dort.
+const pantryCount = () => db.prepare('SELECT COUNT(*) AS c FROM pantry_items').get().c;
+
+function seedCheckedItem(name) {
+  return Number(db.prepare(
+    "INSERT INTO shopping_items (list_id, name, quantity, category, is_checked) VALUES (?, ?, '1', 'Sonstiges', 1)",
+  ).run(LIST, name).lastInsertRowid);
+}
+
+test('Vorbedingung: mit vollem Recht importieren beide Richtungen', async () => {
+  asMember({});
+  const shoppingItem = seedCheckedItem('Quelle-Einkauf-voll');
+  const vorVorrat = pantryCount();
+  const r1 = await call('POST', '/pantry/import-shopping', {
+    list_id: LIST, items: [{ shopping_item_id: shoppingItem }],
+  });
+  assert.equal(r1.status, 200);
+  assert.equal(r1.body.data.added, 1);
+  assert.equal(pantryCount(), vorVorrat + 1);
+
+  const pantryItem = seedPantryItem('Quelle-Vorrat-voll');
+  const vorEinkauf = itemCount();
+  const r2 = await call('POST', `/shopping/${LIST}/import-pantry`, { items: [{ pantry_item_id: pantryItem }] });
+  assert.equal(r2.status, 200);
+  assert.equal(r2.body.data.added, 1);
+  assert.equal(itemCount(), vorEinkauf + 1);
+});
+
+test('Mitglied mit shopping: none liest die Einkaufsliste nicht ueber den Vorrat', async () => {
+  asMember({});
+  const shoppingItem = seedCheckedItem('Quelle-Einkauf-gesperrt');
+  const vorher = pantryCount();
+
+  asMember({ shopping: 'none' });
+  const res = await call('POST', '/pantry/import-shopping', {
+    list_id: LIST, items: [{ shopping_item_id: shoppingItem }],
+  });
+  assertDeniedShape(res, 'shopping: none darf keine Einkaufsartikel in den Vorrat kopieren');
+  assert.equal(pantryCount(), vorher, 'keine Vorratszeile angelegt');
+
+  // Vor jedem Nachschlagen: eine unbekannte Liste antwortet nicht mit 404,
+  // sonst bestaetigt die Antwort, welche Listen-IDs es gibt.
+  assertDeniedShape(
+    await call('POST', '/pantry/import-shopping', { list_id: 999999, items: [] }),
+    'die Rechtefrage steht vor der Listensuche',
+  );
+});
+
+test('Mitglied mit pantry: none liest den Vorrat nicht ueber den Einkauf', async () => {
+  asMember({});
+  const pantryItem = seedPantryItem('Quelle-Vorrat-gesperrt');
+  const vorher = itemCount();
+
+  asMember({ pantry: 'none' });
+  const res = await call('POST', `/shopping/${LIST}/import-pantry`, { items: [{ pantry_item_id: pantryItem }] });
+  assertDeniedShape(res, 'pantry: none darf keine Vorratszeilen auf die Einkaufsliste kopieren');
+  assert.equal(itemCount(), vorher, 'kein Artikel angelegt');
+
+  assertDeniedShape(
+    await call('POST', '/shopping/999999/import-pantry', { items: [] }),
+    'die Rechtefrage steht vor der Listensuche',
+  );
+});
+
+test('Leserecht auf die Quelle reicht: Import ist kein Schreibvorgang in der Quelle', async () => {
+  // OHNE DIESEN FALL WAERE EIN RIEGEL AUF `write` GRUEN: der Import liest die
+  // Quelle nur, loescht und aendert dort nichts.
+  asMember({});
+  const shoppingItem = seedCheckedItem('Quelle-Einkauf-lesend');
+  const pantryItem = seedPantryItem('Quelle-Vorrat-lesend');
+
+  asMember({ shopping: 'read' });
+  const r1 = await call('POST', '/pantry/import-shopping', {
+    list_id: LIST, items: [{ shopping_item_id: shoppingItem }],
+  });
+  assert.equal(r1.status, 200);
+  assert.equal(r1.body.data.added, 1);
+
+  asMember({ pantry: 'read' });
+  const r2 = await call('POST', `/shopping/${LIST}/import-pantry`, { items: [{ pantry_item_id: pantryItem }] });
+  assert.equal(r2.status, 200);
+  assert.equal(r2.body.data.added, 1);
+});
+
+test('Token ohne Scope auf die Quelle importiert nicht', async () => {
+  asMember({});
+  const shoppingItem = seedCheckedItem('Quelle-Einkauf-Token');
+  const pantryItem = seedPantryItem('Quelle-Vorrat-Token');
+  const vorVorrat = pantryCount();
+  const vorEinkauf = itemCount();
+
+  asToken(['pantry:write']);
+  assertDeniedShape(
+    await call('POST', '/pantry/import-shopping', { list_id: LIST, items: [{ shopping_item_id: shoppingItem }] }),
+    'der Pfad sagt pantry, gelesen wird der Einkauf',
+  );
+  asToken(['shopping:write']);
+  assertDeniedShape(
+    await call('POST', `/shopping/${LIST}/import-pantry`, { items: [{ pantry_item_id: pantryItem }] }),
+    'der Pfad sagt shopping, gelesen wird der Vorrat',
+  );
+  assert.equal(pantryCount(), vorVorrat);
+  assert.equal(itemCount(), vorEinkauf);
+
+  asToken(['pantry:write', 'shopping:read']);
+  const r1 = await call('POST', '/pantry/import-shopping', { list_id: LIST, items: [{ shopping_item_id: shoppingItem }] });
+  assert.equal(r1.status, 200, 'mit Lese-Scope auf die Quelle geht es durch');
+  asToken(['shopping:write', 'pantry:read']);
+  const r2 = await call('POST', `/shopping/${LIST}/import-pantry`, { items: [{ pantry_item_id: pantryItem }] });
+  assert.equal(r2.status, 200);
 });

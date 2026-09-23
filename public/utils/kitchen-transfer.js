@@ -111,9 +111,11 @@ export function mayImportMealPlan(listId) {
  * „Alles auf die Einkaufsliste" (#1265).
  *
  * EIN RIEGEL, NICHT ZWEI. Der Pfad-Guard misst `POST /shopping/:id/import-pantry`
- * als `shopping`, und die Route verlangt nichts weiter - die Vorratszeilen
- * liest sie nur. Wer die Seite sieht, hat den Vorrat ohnehin mindestens zum
- * Lesen. Mit `shopping: read` endeten beide Wege bis hierher im 403.
+ * als `shopping`; die Route fragt dazu `pantry: read`, weil sie die
+ * Vorratszeilen liest (`mayReadModule()`). Das zweite Recht muss hier niemand
+ * fragen: der Knopf steht nur auf der Vorratsseite, und wer die sieht, hat den
+ * Vorrat mindestens zum Lesen. Mit `shopping: read` endeten beide Wege bis
+ * hierher im 403.
  *
  * OHNE LISTEN-ID: beim Zeichnen steht das Ziel noch nicht fest (es wird erst
  * nach dem Tippen gewaehlt), und das Urteil haengt nur am Praefix. Der Pfad
@@ -130,7 +132,9 @@ export function mayTransferPantryToShopping() {
  * Einkauf -> Vorrat: „In den Vorrat" in der Sammel-Pille des Einkaufs (#1265).
  * Der Pfad-Guard misst `POST /pantry/import-shopping` als `pantry`; die
  * Einkaufsseite fragte bisher nur, ob das Modul abgeschaltet ist, und zeigte
- * den Weg deshalb auch bei `pantry: read`.
+ * den Weg deshalb auch bei `pantry: read`. `shopping: read` verlangt die Route
+ * zusaetzlich (sie liest die abgehakten Artikel), und das hat jeder, der die
+ * Einkaufsseite sieht - also auch hier ein Riegel.
  *
  * @returns {boolean}
  */

@@ -431,7 +431,15 @@ test('delete impact does not count a hidden private document and admins cannot d
     const impact = await h.call('GET', `/folders/${folder.body.data.id}/delete-impact`);
     assert.equal(impact.status, 200);
     assert.equal(impact.body.data.documents, 1, 'the response must not reveal the hidden document count');
-    assert.equal(impact.body.data.can_delete_documents, false);
+    // #1358: the preview must be the same with and without the hidden document -
+    // `can_delete_documents: false` told an admin exactly that one is there.
+    assert.equal(impact.body.data.can_delete_documents, true,
+      'the admin may delete every document they can see; the hidden one must not flip the verdict');
+    get().prepare('UPDATE family_documents SET folder_id = NULL WHERE id = ?').run(hiddenId);
+    const withoutHidden = await h.call('GET', `/folders/${folder.body.data.id}/delete-impact`);
+    get().prepare('UPDATE family_documents SET folder_id = ? WHERE id = ?').run(folder.body.data.id, hiddenId);
+    assert.deepEqual(impact.body.data, withoutHidden.body.data,
+      'the delete preview is identical with and without a document the caller cannot see');
 
     const del = await h.call(
       'DELETE',
