@@ -9,7 +9,7 @@
 import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
-import { getBalance, isEnrolled, postLedger } from '../services/rewards.js';
+import { getBalance, isEnrolled, postLedger, CATALOG_SELECT, activeCatalog } from '../services/rewards.js';
 import { householdMemberSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { displayActingPerson, isDisplayRequest } from '../services/display-acting.js';
@@ -73,32 +73,8 @@ function balancesOfEnrolled(d) {
   return withRanks(rows);
 }
 
-/*
- * STUECKZAHL JE PRAEMIE, UND VERBRAUCHT IST SIE BEI DER ERFUELLUNG (#1310).
- *
- * `quantity` gehoert dem HAUSHALT, nicht einem Kind: der Katalog ist
- * haushaltsweit und kennt keine Zuordnung Praemie-zu-Kind. NULL heisst
- * unbegrenzt, und das ist der Stand jeder Praemie von vor dieser Aenderung.
- *
- * GEZAEHLT WERDEN ERFUELLTE EINLOESUNGEN, KEINE OFFENEN ANFRAGEN. Eine Anfrage
- * reserviert die Punkte (die `redeem`-Buchung faellt beim Stellen), aber keine
- * Einheit - sonst waere die zuerst gestellte Anfrage schon die Entscheidung,
- * und die Eltern haetten keine mehr zu treffen. Die Folge ist gewollt: es
- * duerfen mehr Anfragen offen stehen als es Einheiten gibt, und die uebrig
- * gebliebene wird bei der Entscheidung mit Grund abgelehnt (PATCH weiter
- * unten), wobei die bestehende Gegenbuchung die Punkte zurueckgibt.
- *
- * `remaining` ist deshalb abgeleitet und nirgends gespeichert - wie der
- * Punktestand, den auch niemand fuehrt. Eine zurueckgezogene oder abgelehnte
- * Einloesung gibt ihre Einheit damit von selbst wieder frei.
- */
-const CATALOG_SELECT = `
-  SELECT c.id, c.name, c.cost, c.icon, c.description, c.is_active, c.sort_order, c.quantity,
-         CASE WHEN c.quantity IS NULL THEN NULL
-              ELSE MAX(0, c.quantity - (SELECT COUNT(*) FROM reward_redemptions r
-                                         WHERE r.catalog_id = c.id AND r.status = 'fulfilled'))
-         END AS remaining
-  FROM reward_catalog c`;
+// CATALOG_SELECT und activeCatalog() stehen in server/services/rewards.js:
+// das Dashboard-Widget waehlt sein Ziel aus derselben Liste (#1310).
 
 function catalogRow(d, id) {
   return d.prepare(`${CATALOG_SELECT} WHERE c.id = ?`).get(id);
@@ -113,13 +89,6 @@ function soldOut(d, item) {
   return used >= item.quantity;
 }
 
-function activeCatalog(d) {
-  return d.prepare(`
-    ${CATALOG_SELECT}
-    WHERE c.is_active = 1
-    ORDER BY c.sort_order ASC, c.cost ASC, c.name COLLATE NOCASE ASC
-  `).all();
-}
 
 // --------------------------------------------------------
 // GET /overview — Salden (teilnehmende Mitglieder), aktive Prämien, offene

@@ -17,6 +17,7 @@ import { wireScrollFade } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { isNavModuleReadOnly } from '/permissions.js';
+import { isRedeemable, nextRewardGoal } from '/utils/reward-goal.js';
 
 const TABS = ['overview', 'catalog', 'ledger'];
 
@@ -310,36 +311,15 @@ async function renderCurrentTab(container) {
 // Tab: Übersicht
 // --------------------------------------------------------
 
-/*
- * VERGRIFFEN IST SO GUT WIE NICHT DA - fuer alles, was auf eine Einloesung
- * zulaeuft (#1310). `remaining` kommt vom Server: `null` heisst unbegrenzt, `0`
- * heisst, jede Einheit ist vergeben. Eine Praemie mit 0 bleibt im Katalog
- * sichtbar, damit der Haushalt sieht, dass es sie gibt - aber sie taugt weder
- * als Ziel eines Fortschrittsbalkens noch als Angebot im Einloese-Dialog.
- */
-function isRedeemable(c) {
-  return c.is_active !== 0 && c.remaining !== 0;
-}
-
+// Vergriffen-Regel und Zielwahl stehen in /utils/reward-goal.js - das
+// Dashboard-Widget zeichnet denselben Balken und darf kein anderes Ziel nennen.
 function nextRewardHint(balance) {
-  // Günstigste noch nicht erreichbare einlösbare Prämie → Fortschritt dorthin.
-  const active = (state.catalog || []).filter(isRedeemable);
-  const reachableCheapestUnaffordable = active
-    .filter((c) => c.cost > balance)
-    .sort((a, b) => a.cost - b.cost)[0];
-  if (!reachableCheapestUnaffordable) {
-    const anyAffordable = active.some((c) => c.cost <= balance);
-    if (anyAffordable && active.length) {
-      return { pct: 100, label: t('rewards.canRedeemNow') };
-    }
-    return null;
-  }
-  const target = reachableCheapestUnaffordable;
-  const pct = Math.max(0, Math.min(100, Math.round((balance / target.cost) * 100)));
-  const remaining = target.cost - balance;
+  const goal = nextRewardGoal(balance, state.catalog);
+  if (!goal) return null;
+  if (goal.reached) return { pct: 100, label: t('rewards.canRedeemNow') };
   return {
-    pct,
-    label: t('rewards.remainingToReward', { points: fmtPoints(remaining), reward: target.name }),
+    pct: goal.pct,
+    label: t('rewards.remainingToReward', { points: fmtPoints(goal.missing), reward: goal.target.name }),
   };
 }
 

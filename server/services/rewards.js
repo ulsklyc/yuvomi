@@ -14,6 +14,42 @@ const REWARD_TX = `
   VALUES (@user_id, @delta, @type, @reason, @task_id, @redemption_id, @created_by)
 `;
 
+/*
+ * STUECKZAHL JE PRAEMIE, UND VERBRAUCHT IST SIE BEI DER ERFUELLUNG (#1310).
+ *
+ * `quantity` gehoert dem HAUSHALT, nicht einem Kind: der Katalog ist
+ * haushaltsweit und kennt keine Zuordnung Praemie-zu-Kind. NULL heisst
+ * unbegrenzt, und das ist der Stand jeder Praemie von vor dieser Aenderung.
+ *
+ * GEZAEHLT WERDEN ERFUELLTE EINLOESUNGEN, KEINE OFFENEN ANFRAGEN. Eine Anfrage
+ * reserviert die Punkte (die `redeem`-Buchung faellt beim Stellen), aber keine
+ * Einheit - sonst waere die zuerst gestellte Anfrage schon die Entscheidung,
+ * und die Eltern haetten keine mehr zu treffen. Die Folge ist gewollt: es
+ * duerfen mehr Anfragen offen stehen als es Einheiten gibt, und die uebrig
+ * gebliebene wird bei der Entscheidung mit Grund abgelehnt (PATCH
+ * /redemptions/:id in server/routes/rewards.js), wobei die bestehende Gegenbuchung die Punkte zurueckgibt.
+ *
+ * `remaining` ist deshalb abgeleitet und nirgends gespeichert - wie der
+ * Punktestand, den auch niemand fuehrt. Eine zurueckgezogene oder abgelehnte
+ * Einloesung gibt ihre Einheit damit von selbst wieder frei.
+ */
+export const CATALOG_SELECT = `
+  SELECT c.id, c.name, c.cost, c.icon, c.description, c.is_active, c.sort_order, c.quantity,
+         CASE WHEN c.quantity IS NULL THEN NULL
+              ELSE MAX(0, c.quantity - (SELECT COUNT(*) FROM reward_redemptions r
+                                         WHERE r.catalog_id = c.id AND r.status = 'fulfilled'))
+         END AS remaining
+  FROM reward_catalog c`;
+
+/** Aktive Praemien, wie die Uebersicht sie ordnet - vergriffene inklusive (`remaining: 0`). */
+export function activeCatalog(d) {
+  return d.prepare(`
+    ${CATALOG_SELECT}
+    WHERE c.is_active = 1
+    ORDER BY c.sort_order ASC, c.cost ASC, c.name COLLATE NOCASE ASC
+  `).all();
+}
+
 /** Aktueller Punktestand eines Mitglieds (Summe aller Ledger-Buchungen). */
 export function getBalance(d, userId) {
   const row = d.prepare('SELECT COALESCE(SUM(delta), 0) AS bal FROM reward_ledger WHERE user_id = ?').get(userId);
