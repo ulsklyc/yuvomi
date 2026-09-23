@@ -3635,61 +3635,158 @@ svg.weather-forecast__icon {
 }
 
 /* --------------------------------------------------------
- * Belohnungen-Widget (Familien-Punktestand)
- * Mini-Ranking: Rang · Avatar · Name · Punkte. Der Spitzenreiter
- * bekommt eine dezente Modul-Tönung statt Pokal/Emoji (Kinder-UI-Verbot).
+ * Belohnungen-Widget: der eigene Weg zur Praemie
+ *
+ * HIER STAND EIN MINI-RANKING (Rang · Avatar · Name · Punkte, der Spitzenreiter
+ * auf der Well-Stufe). Ein Kind las darin Wettbewerb statt Fortschritt
+ * (Critique 2026-09-23, Persona Emma). Es gibt keinen Rang und keine
+ * Auszeichnung mehr: das Kind sieht seinen Stand und einen Balken zum Ziel,
+ * Eltern sehen je Kind denselben Balken, nebeneinander.
+ *
+ * RUHIG, NICHT BUNT. Der Balken ist die einzige Farbflaeche und traegt den
+ * Modulton (--widget-accent = Familienton work); ein erreichtes Ziel ist ein
+ * voller Balken und ein Satz, kein Konfetti, keine zweite Farbe.
  * -------------------------------------------------------- */
-.rewards-widget {
+/* Der Koerper ist eine Flex-Spalte (Fusszeilen-Regel oben); der Abstand zum
+ * Freigabe-Chip kommt aus `gap`, weil dessen `margin-block-start: auto` jeden
+ * eigenen Rand ueberschreibt und ohne Ueberschuss auf 0 faellt. */
+.dashboard .rewards-widget {
+  gap: var(--space-3);
+}
+
+.rewards-goal__track {
+  height: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-3);
+  overflow: hidden;
+}
+
+.rewards-goal__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--widget-accent);
+  transform-origin: left center;
+  transform: scaleX(var(--rewards-progress, 0));
+  transition: transform var(--transition-slow);
+}
+
+[dir="rtl"] .rewards-goal__fill {
+  transform-origin: right center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rewards-goal__fill { transition: none; }
+}
+
+.rewards-goal__label {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--type-caption);
+  line-height: var(--line-height-snug);
+  overflow-wrap: anywhere;
+}
+
+.rewards-goal__label--muted {
+  color: var(--color-text-tertiary);
+}
+
+/* Die eigene Sicht: Stand, Balken, Satz - und daneben (breit) oder darunter
+ * (hoch) die zuletzt verdienten Punkte. `auto-fit` entscheidet das an der
+ * Breite der Karte, nicht an einer Groessenklasse. */
+.rewards-self {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--space-3) var(--space-5);
+  align-items: start;
+}
+
+.rewards-self__goal {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-}
-
-.rewards-widget-row {
-  display: grid;
-  grid-template-columns: 20px 32px minmax(0, 1fr) auto;
-  align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1h) var(--space-2);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  touch-action: pan-y pinch-zoom;
-  transition: background-color var(--transition-fast);
+  min-width: 0;
 }
 
-.rewards-widget-row:hover {
-  background-color: var(--color-surface-2);
-}
-
-/* DER SPITZENREITER WIRD AUSGEZEICHNET, NICHT EINGEFAERBT.
- *
- * Hier stand eine Modulton-Waschung, und die Rangziffer darauf trug denselben
- * Ton voll (Regel weiter unten) - zwei Kanaele fuer eine Aussage, und beide
- * sagten „Belohnungen" statt „vorne". Das Widget nennt seine Herkunft schon im
- * Kopf-Siegel; nach der Skalen-Regel bleibt eine Zuordnung neutral, wenn die
- * genannte Identitaet die des Raums ist. Die Auszeichnung traegt jetzt die
- * neutrale Well-Stufe, der Rang steht in der Schrift. */
-.rewards-widget-row--leader {
-  background: var(--color-fill-well);
-}
-
-.rewards-widget-row--leader:hover {
-  background: var(--color-surface-elevated-hover);
-}
-
-.rewards-widget-row__rank {
-  text-align: center;
-  font-size: var(--text-xs);
+.rewards-self__points {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-2xl);
   font-weight: var(--font-weight-bold);
-  color: var(--color-text-tertiary);
+  line-height: var(--line-height-tight);
   font-variant-numeric: tabular-nums;
 }
 
-.rewards-widget-row--leader .rewards-widget-row__rank {
-  color: var(--color-text-primary);
+.rewards-self__recent {
+  min-width: 0;
 }
 
-.rewards-widget-row__avatar {
+.rewards-self__recent-title {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-medium);
+}
+
+.rewards-recent {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rewards-recent__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding-block: var(--space-1h);
+  font-size: var(--type-secondary);
+}
+
+.rewards-recent__row + .rewards-recent__row {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.rewards-recent__delta {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.rewards-recent__reason {
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rewards-recent__when {
+  color: var(--color-text-tertiary);
+  font-size: var(--type-caption);
+  white-space: nowrap;
+}
+
+/* Die Eltern-Sicht: je Kind eine Zelle, nebeneinander, soweit die Breite
+ * reicht - auf einer breiten Karte stehen die Kinder Seite an Seite, auf einer
+ * schmalen untereinander. Nach Namen geordnet, keine Zelle hervorgehoben. */
+.rewards-widget__members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: var(--space-3) var(--space-5);
+}
+
+.rewards-member {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.rewards-member__avatar {
   width: 32px;
   height: 32px;
   border-radius: var(--radius-full);
@@ -3701,13 +3798,28 @@ svg.weather-forecast__icon {
   overflow: hidden;
 }
 
-.rewards-widget-row__avatar img {
+.rewards-member__avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.rewards-widget-row__name {
+.rewards-member__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1h);
+  min-width: 0;
+}
+
+.rewards-member__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.rewards-member__name {
   color: var(--color-text-primary);
   font-weight: var(--font-weight-medium);
   overflow: hidden;
@@ -3715,20 +3827,21 @@ svg.weather-forecast__icon {
   white-space: nowrap;
 }
 
-.rewards-widget-row__points {
-  color: var(--color-text-tertiary);
-  font-size: var(--text-xs);
+.rewards-member__points {
+  color: var(--color-text-secondary);
+  font-size: var(--type-caption);
   white-space: nowrap;
-}
-
-.rewards-widget-row__points strong {
-  color: var(--color-text-primary);
-  font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;
 }
 
-/* Der Fuss-Chip ist ein Bedienelement (role="button", er springt in die
- * Belohnungen) und war 38px hoch - unter der Zielgroesse der Geraetewelt.
+.rewards-widget__more {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--type-caption);
+}
+
+/* Der Fuss-Chip ist ein Bedienelement (ein Link, er springt in die
+ * Belohnungen, wo die Freigaben stehen) und war 38px hoch - unter der Zielgroesse der Geraetewelt.
  * Die Breite trug die Zeile ohnehin; gefehlt hat nur die Hoehe, deshalb
  * min-height statt eines groesseren Innenabstands: der Chip soll ein Chip
  * bleiben und nicht zur Schaltflaeche werden. */
@@ -3747,6 +3860,7 @@ svg.weather-forecast__icon {
   color: var(--color-text-primary);
   font-size: var(--type-secondary);
   font-weight: var(--font-weight-medium);
+  text-decoration: none;
   cursor: pointer;
   transition: background-color var(--transition-fast);
 }
@@ -3766,8 +3880,8 @@ svg.weather-forecast__icon {
 
 /* --------------------------------------------------------
  * Schedule-Widget (wer heute im Dienst oder frei ist)
- * Dieselbe Zeilen-Grammatik wie das Belohnungen-Widget (Avatar · Name ·
- * rechtsbuendiger Zustand), nur ohne Rang: eine feste Reihenfolge waere hier
+ * Zeilen-Grammatik der Mitglieder-Widgets (Avatar · Name ·
+ * rechtsbuendiger Zustand), ohne Rang: eine feste Reihenfolge waere hier
  * eine erfundene Rangfolge unter Diensten.
  * -------------------------------------------------------- */
 .schedule-widget {

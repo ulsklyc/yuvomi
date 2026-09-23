@@ -1232,8 +1232,8 @@ Modulen, direkt neben Kapsel-Knoepfen im selben Kopf. Der Wortlaut:
 **Die vierte Kategorie ist neu und keine neue Idee.** Eine ZEILE ist kein Kasten - das
 sagt das Kasten-in-Kasten-Vokabular seit Runde 5 und die Zeilenlisten-Regel seit Runde 6.
 Ihre Hervorhebung (Hover, Auswahl, Rang) folgt der Form ihres Traegers, nicht der eines
-Knopfes; deshalb behalten `.rewards-widget-row`, `.rw-standing__id` und
-`.meal-slot__add-more-btn` ihre Form. Ein Knopf IN einer Zeile ist davon nicht gedeckt:
+Knopfes; deshalb behalten `.rw-standing__id` und `.meal-slot__add-more-btn` ihre Form
+(die Rangzeile `.rewards-widget-row` ist mit der Belohnungen-Rangliste entfallen, 2026-09-23). Ein Knopf IN einer Zeile ist davon nicht gedeckt:
 `.row-action` ist rund. Wer die Kategorie nicht nennen kann, traegt die Kapsel.
 
 **Geprueft auf zwei Ebenen, weil eine sie nicht traegt.** Im Stylesheet steht weder Tag

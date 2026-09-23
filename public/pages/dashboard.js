@@ -7,7 +7,7 @@
 import { api, auth } from '/api.js';
 import { createPageController } from '/utils/page-lifecycle.js';
 import { canSeeWidget, moduleAccess, navModuleAccess, canUseFasting } from '/permissions.js';
-import { t, formatDate, formatTime, timeSuffix, getLocale, getNumberFormat } from '/i18n.js';
+import { t, formatDate, formatDayMonth, formatTime, timeSuffix, getLocale, getNumberFormat } from '/i18n.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { resolveEventColor } from '/utils/event-color.js';
 import { esc, fmtLocation, renderMarkdownLight } from '/utils/html.js';
@@ -52,6 +52,7 @@ import { attachOverlay } from '/utils/overlay-history.js';
 import { mealTypeList, primeMealTypeNames } from '/utils/meal-types.js';
 import { recipeThumbHtml, wireRecipeThumbs } from '/utils/recipe-thumb.js';
 import { wireNoteCategoryOverflow } from '/utils/note-category-overflow.js';
+import { nextRewardGoal } from '/utils/reward-goal.js';
 
 // Hält den AbortController des aktuellen FAB-Listeners - wird bei jedem render() erneuert.
 let _fabController = null;
@@ -1765,12 +1766,26 @@ function metricTileFor(id, data, currency) {
       };
     }
     case 'rewards': {
-      const leader = (data.rewards?.standings ?? [])[0];
-      if (!leader) return null;
+      // KEIN SPITZENREITER (Critique 2026-09-23). Die Kachel nannte den
+      // hoechsten Stand samt Namen - dieselbe Rangliste wie das alte Widget,
+      // nur kuerzer. Wer selbst sammelt, sieht den eigenen Stand und sein Ziel;
+      // wer freigibt, sieht nur, ob etwas auf ihn wartet.
+      const r = data.rewards ?? {};
+      const standings = Array.isArray(r.standings) ? r.standings : [];
+      const own = standings.find((m) => m.id === r.me);
+      if (own && (r.view === 'self' || standings.length === 1)) {
+        return {
+          id, route, icon: widgetIcon('rewards'), label: t('nav.rewards'),
+          value: t('dashboard.metricPoints', { count: Number(own.balance) || 0 }),
+          note: rewardGoalLabel(own.balance, r.catalog),
+        };
+      }
+      const pending = r.view === 'approver' ? Number(r.pending) || 0 : 0;
+      if (!pending) return null;
       return {
         id, route, icon: widgetIcon('rewards'), label: t('nav.rewards'),
-        value: t('dashboard.metricPoints', { count: leader.balance ?? 0 }),
-        note: leader.display_name,
+        value: t('dashboard.rewardsPending', { count: pending }),
+        note: t('rewards.pendingApprovals'),
       };
     }
     case 'health': {
@@ -1886,52 +1901,189 @@ function renderMetricTiles(data, currency, shown = new Set()) {
 }
 
 // --------------------------------------------------------
-// Belohnungen-Widget (Familien-Punktestand)
+// Belohnungen-Widget: der eigene Weg zur Praemie, kein Wettbewerb
 // --------------------------------------------------------
 
-function renderRewardsWidget(rewards) {
-  const standings = Array.isArray(rewards?.standings) ? rewards.standings : [];
-  if (!standings.length) {
+/* HIER STAND EINE RANGLISTE, UND SIE WAR FUER JEDEN DIESELBE (Critique
+ * 2026-09-23, Persona Emma, 9). "1 Leo 60 / 2 Emma 30" las ein Kind als
+ * Wettbewerb unter Geschwistern - PRODUCT.md verspricht jedem
+ * Familienmitglied den eigenen Blick. Seitdem gibt es keinen Platz und keinen
+ * hervorgehobenen Spitzenreiter mehr, und die Sicht folgt der Rolle, die das
+ * Modul selbst fuer "darf freigeben" fragt (der Server liefert sie als
+ * `view`, siehe routes/dashboard.js):
+ *
+ *   self     - das Kind sieht NUR sich: Stand, einen ruhigen Balken zur
+ *              naechsten Praemie, die zuletzt verdienten Punkte;
+ *   approver - Eltern sehen jedes Kind nebeneinander (nach Namen), je Kind
+ *              Stand und Ziel, dazu die offenen Freigaben als Sprung;
+ *   family   - Wandtablett und Mitglieder ohne eigene Punkte: wie die Eltern,
+ *              ohne Freigaben.
+ *
+ * Das Ziel waehlt /utils/reward-goal.js, dieselbe Regel wie der Balken auf der
+ * Belohnungen-Seite - zwei Balken mit zwei Zielen waeren zwei Wahrheiten. */
+
+/** So viele Mitglieder zeigt die Eltern-Sicht je Kachelhoehe; der Rest spricht als Zahl. */
+const REWARD_MEMBERS_SHORT = 2;
+const REWARD_MEMBERS_TALL = 5;
+
+function sizeSpans(size) {
+  const [cols, rows] = String(size ?? '1x2').split('x').map(Number);
+  return { cols: cols || 1, rows: rows || 1 };
+}
+
+/** Der Satz zur naechsten Praemie - fuer Balken und Kennzahlkachel derselbe. */
+function rewardGoalLabel(balance, catalog, goal = nextRewardGoal(balance, catalog)) {
+  if (!goal) return t('rewards.noRewardsYet');
+  if (goal.reached) return t('rewards.canRedeemNow');
+  return t('rewards.remainingToReward', { points: formatPoints(goal.missing), reward: goal.target.name });
+}
+
+/**
+ * Balken plus Satz zur naechsten Praemie. Die Ansage traegt den Satz
+ * (`aria-valuetext`), nicht die Prozentzahl - "noch 15 bis Kinoabend" ist die
+ * Aussage, 75 % ist nur ihre Ableitung. Ohne einloesbare Praemie gibt es
+ * keinen Balken: er behauptete einen Weg, den niemand angelegt hat.
+ *
+ * `compact` laesst den sichtbaren Satz weg und behaelt die Ansage: auf einer
+ * Kachel, die eine Rasterzeile hoch ist, trug die Eltern-Sicht mit Satz 259px
+ * gegen 183px der Nachbarkachel und dehnte deren Zeile mit (gemessen 1440px).
+ * Wer den Satz lesen will, zieht die Kachel auf 1x2 - dort steht er.
+ */
+function rewardGoalHTML(balance, catalog, who = '', { compact = false } = {}) {
+  const goal = nextRewardGoal(balance, catalog);
+  const label = rewardGoalLabel(balance, catalog, goal);
+  if (!goal) return `<p class="rewards-goal__label rewards-goal__label--muted">${esc(label)}</p>`;
+  const name = who ? `${t('rewards.progressLabel')}: ${who}` : t('rewards.progressLabel');
+  return `
+    <div class="rewards-goal__track" role="progressbar" aria-label="${esc(name)}"
+         aria-valuenow="${goal.pct}" aria-valuemin="0" aria-valuemax="100"
+         aria-valuetext="${esc(label)}"><span class="rewards-goal__fill" style="--rewards-progress:${goal.pct / 100}"></span></div>
+    ${compact ? '' : `<p class="rewards-goal__label" aria-hidden="true">${esc(label)}</p>`}`;
+}
+
+function rewardAvatarHTML(m) {
+  const color = m.avatar_color || AVATAR_FALLBACK_COLOR;
+  const inner = m.avatar_data
+    ? `<img src="${esc(m.avatar_data)}" alt="" loading="lazy">`
+    : esc(initials(m.display_name));
+  return `<span class="rewards-member__avatar" aria-hidden="true" style="background:${esc(color)};color:${getReadableTextColor(color)}">${inner}</span>`;
+}
+
+function rewardsFooterHTML(text) {
+  return `<a class="rewards-widget__footer" href="/rewards" data-route="/rewards">
+      <i data-lucide="clock" aria-hidden="true"></i>
+      <span>${esc(text)}</span>
+    </a>`;
+}
+
+/**
+ * Wann eine Gutschrift kam - rueckwaerts gelesen. `relativeDateLabel` schaut
+ * nach vorn (heute, morgen) und schrieb fuer vorgestern "21.09.2026": in einer
+ * Zeile, die ohnehin nur die letzten Tage traegt, ist das Jahr Laerm. Es steht
+ * nur, wenn es ein anderes ist.
+ */
+function earnedWhenLabel(value) {
+  const day = zonedDateKey(value);
+  if (!day) return '';
+  const today = householdToday();
+  if (day === today) return t('common.today');
+  if (day === addLocalDays(today, -1)) return t('common.yesterday');
+  return day.slice(0, 4) === today.slice(0, 4) ? formatDayMonth(value) : formatDate(value);
+}
+
+function renderRewardsSelf(me, rewards, spans) {
+  // Die kleine Kachel traegt nur den Weg zum Ziel: mit einer Verlaufszeile
+  // und dem Anfrage-Chip stand sie bei 275px gegen 183px der Nachbarn
+  // (gemessen 1440px). Breit steht der Verlauf daneben, hoch darunter.
+  const recentCap = spans.rows >= 2 ? 3 : spans.cols >= 2 ? 2 : 0;
+  const recent = (Array.isArray(rewards.recent) ? rewards.recent : []).slice(0, recentCap);
+  const recentHTML = recent.length ? `
+      <div class="rewards-self__recent">
+        <p class="rewards-self__recent-title" aria-hidden="true">${esc(t('dashboard.rewardsRecent'))}</p>
+        <ul class="rewards-recent" aria-label="${esc(t('dashboard.rewardsRecent'))}">
+          ${recent.map((row) => `
+            <li class="rewards-recent__row">
+              <span class="rewards-recent__delta">+${esc(formatPoints(row.delta))}</span>
+              <span class="rewards-recent__reason">${esc(row.reason || t(`rewards.ledgerType.${row.type}`))}</span>
+              <span class="rewards-recent__when">${esc(earnedWhenLabel(row.created_at))}</span>
+            </li>`).join('')}
+        </ul>
+      </div>` : '';
+  const pending = Number(rewards.pending) || 0;
+  return `
+    <div class="widget__body rewards-widget rewards-widget--self">
+      <div class="rewards-self">
+        <div class="rewards-self__goal">
+          <p class="rewards-self__points">${esc(t('dashboard.metricPoints', { count: Number(me.balance) || 0 }))}</p>
+          ${rewardGoalHTML(me.balance, rewards.catalog)}
+        </div>
+        ${recentHTML}
+      </div>
+      ${pending > 0 ? rewardsFooterHTML(t('dashboard.rewardsOwnPending', { count: pending })) : ''}
+    </div>`;
+}
+
+function renderRewardsFamily(members, rewards, spans) {
+  // Nach Namen, nicht nach Punkten: eine Reihenfolge nach Stand WAERE die
+  // Rangliste, nur ohne Ziffern.
+  const sorted = [...members].sort((a, b) => String(a.display_name).localeCompare(String(b.display_name), getLocale()));
+  const cap = spans.rows >= 2 ? REWARD_MEMBERS_TALL : REWARD_MEMBERS_SHORT;
+  const shown = sorted.slice(0, cap);
+  const rows = shown.map((m) => `
+      <li class="rewards-member">
+        ${rewardAvatarHTML(m)}
+        <span class="rewards-member__body">
+          <span class="rewards-member__head">
+            <span class="rewards-member__name">${esc(m.display_name)}</span>
+            <span class="rewards-member__points">${esc(t('dashboard.metricPoints', { count: Number(m.balance) || 0 }))}</span>
+          </span>
+          ${rewardGoalHTML(m.balance, rewards.catalog, m.display_name, { compact: spans.rows < 2 })}
+        </span>
+      </li>`).join('');
+  const more = sorted.length - shown.length;
+  const pending = rewards.view === 'approver' ? Number(rewards.pending) || 0 : 0;
+  return `
+    <div class="widget__body rewards-widget">
+      <ul class="rewards-widget__members">${rows}</ul>
+      ${more > 0 ? `<p class="rewards-widget__more">${esc(t('dashboard.shoppingMore', { count: more }))}</p>` : ''}
+      ${pending > 0 ? rewardsFooterHTML(t('dashboard.rewardsPending', { count: pending })) : ''}
+    </div>`;
+}
+
+function renderRewardsWidget(rewards, size) {
+  const r = rewards ?? {};
+  const standings = Array.isArray(r.standings) ? r.standings : [];
+  const own = standings.find((m) => m.id === r.me);
+  // Das Kind sieht NUR sich, auch wenn eine Antwort mehr mitbraechte.
+  const members = r.view === 'self' ? (own ? [own] : []) : standings;
+  const header = widgetHeader('rewards', t('nav.rewards'), null, '/rewards');
+
+  if (!members.length) {
+    // Praemien anlegen ist Elternsache: einem Kind einen Knopf zu zeigen, der
+    // in eine Seite fuehrt, auf der es nichts anlegen darf, waere die leere
+    // Zusage aus #700.
+    const cta = r.view === 'approver' && navModuleAccess('rewards') === 'write'
+      ? emptyStateCta('/rewards', t('rewards.addReward')) : '';
     return `<div class="widget widget--rewards">
-      ${widgetHeader('rewards', t('nav.rewards'), 0, '/rewards')}
+      ${header}
       <div class="widget__empty">
         <i data-lucide="award" class="empty-state__icon" aria-hidden="true"></i>
         <div>${t('dashboard.noRewards')}</div>
-        ${emptyStateCta('/rewards', t('rewards.addReward'))}
+        ${cta}
       </div>
     </div>`;
   }
 
-  const rows = standings.map((m, i) => {
-    const color = m.avatar_color || AVATAR_FALLBACK_COLOR;
-    const avatarInner = m.avatar_data
-      ? `<img src="${esc(m.avatar_data)}" alt="" loading="lazy">`
-      : esc(initials(m.display_name));
-    return `
-      <div class="rewards-widget-row${i === 0 ? ' rewards-widget-row--leader' : ''}" data-route="/rewards" role="button" tabindex="0">
-        <span class="rewards-widget-row__rank" aria-hidden="true">${i + 1}</span>
-        <span class="rewards-widget-row__avatar" style="background:${esc(color)};color:${getReadableTextColor(color)}">${avatarInner}</span>
-        <span class="rewards-widget-row__name">${esc(m.display_name)}</span>
-        <span class="rewards-widget-row__points"><strong>${esc(formatPoints(m.balance))}</strong> ${esc(t('rewards.pointsUnit'))}</span>
-      </div>
-    `;
-  }).join('');
-
-  const pending = Number(rewards?.pending) || 0;
-  const footer = pending > 0
-    ? `<div class="rewards-widget__footer" data-route="/rewards" role="button" tabindex="0">
-        <i data-lucide="clock" aria-hidden="true"></i>
-        <span>${t('dashboard.rewardsPending', { count: pending })}</span>
-      </div>`
-    : '';
-
-  const badge = Number(rewards?.participantCount) || standings.length;
+  const spans = sizeSpans(size);
+  // WER ALLEIN SAMMELT, SIEHT SEINEN WEG - auch als Elternteil im
+  // Ein-Personen-Haushalt. Eine Uebersicht "je Kind" mit genau einer Zeile,
+  // die man selbst ist, waere die Eltern-Sicht ohne Kinder.
+  const body = own && members.length === 1
+    ? renderRewardsSelf(own, r, spans)
+    : renderRewardsFamily(members, r, spans);
   return `<div class="widget widget--rewards">
-    ${widgetHeader('rewards', t('nav.rewards'), badge, '/rewards')}
-    <div class="widget__body">
-      <div class="rewards-widget">${rows}</div>
-      ${footer}
-    </div>
+    ${header}
+    ${body}
   </div>`;
 }
 
@@ -3180,7 +3332,7 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
     birthdays: (size) => renderUpcomingBirthdays(data.birthdays ?? [], size),
     countdown: (size) => renderCountdowns(data.countdowns ?? [], size, data.countdownTotal),
     budget: () => renderBudgetWidget(data.budget ?? {}, currency),
-    rewards: () => renderRewardsWidget(data.rewards ?? {}),
+    rewards: (size) => renderRewardsWidget(data.rewards ?? {}, size),
     health: () => renderHealthWidget(data.health ?? {}),
     cycle: () => renderCycleWidget(data.cycle),
     fasting: () => renderFastingWidget(data.fasting),
@@ -5238,7 +5390,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { loadScheduleSlice, renderUrgentTasks, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab };
+export const __test = { renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

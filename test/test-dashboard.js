@@ -1219,6 +1219,9 @@ test('Dashboard-Endpoint filtert heutige Mahlzeiten nach sichtbaren Typen', asyn
   }
 });
 
+// Die Rangfolge nach Punkten ist mit der Critique 2026-09-23 entfallen: wer
+// freigibt, sieht die Kinder nach NAMEN, und die Sicht haengt an der Rolle
+// (authRole). Die Sichten einzeln prueft test/test-dashboard-rewards.js.
 test('Dashboard-Endpoint: Belohnungen liefert Punktestand, Teilnehmerzahl und offene Freigaben', async () => {
   const { get } = await import('../server/db.js');
   const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
@@ -1248,14 +1251,15 @@ test('Dashboard-Endpoint: Belohnungen liefert Punktestand, Teilnehmerzahl und of
     VALUES (?, 'Kino', 50, 'pending')`).run(kidB);
 
   const app = express();
-  app.use((req, _res, next) => { req.authUserId = parent; req.session = { userId: parent }; next(); });
+  app.use((req, _res, next) => { req.authUserId = parent; req.authRole = 'admin'; req.session = { userId: parent }; next(); });
   app.use('/', dashboardRouter);
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
     const body = await (await fetch(`http://127.0.0.1:${server.address().port}/`)).json();
     const names = body.rewards.standings.map((s) => s.display_name);
-    nodeAssert.equal(names[0], 'Kid B', 'höchster Saldo führt das Ranking an');
+    nodeAssert.equal(body.rewards.view, 'approver');
+    nodeAssert.equal(names[0], 'Kid A', 'nach Namen, nicht nach Saldo - Kid B hat mehr und steht nicht vorn');
     nodeAssert.ok(names.includes('Kid A'), 'zweiter Teilnehmer ist enthalten');
     nodeAssert.ok(!names.includes('Rewards Parent'), 'Nicht-Teilnehmer erscheinen nicht');
     nodeAssert.equal(body.rewards.standings.find((s) => s.display_name === 'Kid B').balance, 80);
@@ -2555,7 +2559,7 @@ const METRIC_DATA = {
   // so nicht gibt (Codex-Review zu PR #754).
   pinnedNotes: [{ title: 'Urlaub', pinned: 1 }],
   pinnedNotesCount: 1,
-  rewards: { standings: [{ display_name: 'Leo', balance: 60 }] },
+  rewards: { view: 'self', me: 1, standings: [{ id: 1, display_name: 'Leo', balance: 60 }], catalog: [] },
   health: { hasMeds: true, dosesTotal: 3, dosesTaken: 1, dosesSkipped: 0, nextDose: { name: 'Vitamin D3' }, lowStockCount: 0 },
   housekeeping: { configured: true, visitsThisMonth: 4, present: true },
 };
