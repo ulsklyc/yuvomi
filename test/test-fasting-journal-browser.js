@@ -297,7 +297,11 @@ test('delete expiry and failed pagehide flush settle pending identity; stale Und
     await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
     await page.waitForSelector('[data-fast-delete]');
     assert.equal(await page.evaluate(() => window.fastingKeepalive), true);
+    // Die Rueckkehr muss neu laden: die Zeile steht schon im DOM, ein Warten auf
+    // sie allein waere auch ohne Aktualisierung sofort erfuellt.
+    const resumed = page.waitForRequest((request) => request.url().includes('/health/fasting/state'), { timeout: 10000 });
     await page.evaluate(() => { window.fastingRestoreDelete(); window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })); });
+    await resumed;
     await page.waitForSelector('[data-fast-delete]'); await settle(page);
     // The failure toast temporarily covers the mobile history button.
     await page.waitForFunction(() => !document.querySelector('.toast'));
@@ -404,7 +408,15 @@ test('family reading renders API-redacted state and remains read-only even with 
     assert.equal(await page.$('[data-fast-edit]'), null);
     assert.equal(await page.$('[data-fasting-preferences]'), null);
     await call(page, 'put', `/health/caregivers/${member.id}`, { caregiver_ids: [] });
+    // "FAMILY SHARED" steht schon vor dem Entzug im DOM (Review an #1438): die
+    // Probe wartet deshalb auf die Antwort der Aktualisierung selbst, bevor sie
+    // die eigene Anfrage stellt.
+    const resumed = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname === '/api/v1/health/fasting/state' && url.searchParams.get('user_id') === String(member.id);
+    }, { timeout: 10000 });
     await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+    assert.equal((await resumed).status(), 200, 'die Rueckkehr laedt die Familienansicht neu');
     await page.waitForFunction(() => document.querySelector('[data-fasting-history]')?.textContent.includes('FAMILY SHARED'));
     assert.equal((await call(page, 'get', `/health/fasting/state?user_id=${member.id}`)).data.settings, null);
     assert.match(await page.$eval('a[download]', (el) => el.href), new RegExp(`user_id=${member.id}`));
