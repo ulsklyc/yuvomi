@@ -1,5 +1,14 @@
 import { createHash } from 'node:crypto';
 import { setEventAssignments } from '../routes/calendar/helpers.js';
+
+// Die Standard-Zuweisung eines Kalenders laeuft ohne Person dahinter - ueber
+// den Auto-Sync, sobald jemand einen Termin im externen Client zwischen zwei
+// Kalendern verschiebt, oder ueber den Backfill. Sie darf ein Anhang-Dokument
+// deshalb nicht anfassen (#1358): an einem Termin fuer Zugewiesene bekommt ein
+// schon eingeschraenktes Dokument die neue Person als Freigabe dazu, sonst
+// aendert sich an den Dokumentrechten nichts - nichts wird `family`, enger
+// oder privat, keine Freigabe faellt weg (applyDocumentAccess, `grantAssignees`).
+const FOLLOW_ASSIGNMENT = Object.freeze({ grantAssigneesOnly: true });
 import { remindAtCompareKey, remindAtUtcSql } from '../utils/reminder-schedule.js';
 
 // --------------------------------------------------------
@@ -228,7 +237,7 @@ export async function applyDefaultAssigneesToExisting(
         if (!row || row.userId !== userId) continue;
         setPrimary.run(userId, eventId);
         if (row.documentId || (row.authorId !== null && hasFutureTemplate.get(eventId, row.authorId, nowKey))) {
-          setEventAssignments(d, eventId, [userId]);
+          setEventAssignments(d, eventId, [userId], FOLLOW_ASSIGNMENT);
           settlePastInherited.run(eventId, userId, nowKey);
         } else {
           addAssignment.run(eventId, userId);
@@ -356,7 +365,7 @@ export function reassignDefaultOnCalendarMove(
   if (!d.prepare('SELECT 1 FROM users WHERE id = ?').get(toDefaultUserId)) return false;
 
   d.prepare('UPDATE calendar_events SET assigned_to = ? WHERE id = ?').run(toDefaultUserId, eventId);
-  setEventAssignments(d, eventId, [toDefaultUserId]);
+  setEventAssignments(d, eventId, [toDefaultUserId], FOLLOW_ASSIGNMENT);
   d.prepare(`
     UPDATE reminders SET dismissed = 1
     WHERE entity_type = 'event' AND entity_id = ? AND created_by = ?

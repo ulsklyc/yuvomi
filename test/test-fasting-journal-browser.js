@@ -7,6 +7,11 @@ const call = (page, method, path, body) => page.evaluate(async ({ method, path, 
   const { api } = await import('/api.js');
   return api[method](path, body);
 }, { method, path, body });
+// Eine Rueckkehr auf die Seite ist `pageshow` mit `persisted: true` (bfcache).
+// startFastingClock() ignoriert seit 05e6ef250 das `pageshow` des ersten
+// Ladens (persisted: false), damit der Timer nicht direkt nach dem Aufbau
+// doppelt nachlaedt. Ein blosses `new Event('pageshow')` ist dieses erste Laden
+// und loest keine Aktualisierung mehr aus.
 const fill = (page, selector, value) => page.$eval(selector, (el, next) => {
   el.value = next; el.dispatchEvent(new Event('change', { bubbles: true }));
 }, value);
@@ -51,7 +56,7 @@ test('filter and preference refreshes reuse insights while page resume refreshes
     await page.select('[data-fasting-clock-default]', 'elapsed');
     await page.waitForFunction(() => window.fastingStateRequests >= 2);
     assert.equal(await page.evaluate(() => window.fastingStatsRequests), 0);
-    await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
     await page.waitForFunction(() => window.fastingStateRequests >= 3 && window.fastingStatsRequests >= 1);
     assert.equal(await page.evaluate(() => window.fastingStatsRequests), 1);
     await page.evaluate(() => window.fastingRestoreStatsGet());
@@ -77,7 +82,7 @@ test('a failed insights refresh remains retryable on the next ordinary refresh',
         return get(path, ...args);
       };
     });
-    await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
     await page.waitForFunction(() => window.fastingStatsRequests === 1);
     await page.waitForSelector('.fasting-stats [role="status"]');
     await page.click('[data-fasting-filters] [type="submit"]');
@@ -105,7 +110,7 @@ test('an ordinary refresh cannot cancel record-driven insights invalidation', as
         });
       };
     });
-    await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
     await page.waitForFunction(() => window.fastingStatsRequests === 1);
     await page.click('[data-fasting-filters] [type="submit"]');
     await page.waitForFunction(() => window.fastingStatsRequests === 2);
@@ -292,7 +297,11 @@ test('delete expiry and failed pagehide flush settle pending identity; stale Und
     await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
     await page.waitForSelector('[data-fast-delete]');
     assert.equal(await page.evaluate(() => window.fastingKeepalive), true);
-    await page.evaluate(() => { window.fastingRestoreDelete(); window.dispatchEvent(new Event('pageshow')); });
+    // Die Rueckkehr muss neu laden: die Zeile steht schon im DOM, ein Warten auf
+    // sie allein waere auch ohne Aktualisierung sofort erfuellt.
+    const resumed = page.waitForRequest((request) => request.url().includes('/health/fasting/state'), { timeout: 10000 });
+    await page.evaluate(() => { window.fastingRestoreDelete(); window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })); });
+    await resumed;
     await page.waitForSelector('[data-fast-delete]'); await settle(page);
     // The failure toast temporarily covers the mobile history button.
     await page.waitForFunction(() => !document.querySelector('.toast'));
@@ -399,7 +408,15 @@ test('family reading renders API-redacted state and remains read-only even with 
     assert.equal(await page.$('[data-fast-edit]'), null);
     assert.equal(await page.$('[data-fasting-preferences]'), null);
     await call(page, 'put', `/health/caregivers/${member.id}`, { caregiver_ids: [] });
-    await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    // "FAMILY SHARED" steht schon vor dem Entzug im DOM (Review an #1438): die
+    // Probe wartet deshalb auf die Antwort der Aktualisierung selbst, bevor sie
+    // die eigene Anfrage stellt.
+    const resumed = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname === '/api/v1/health/fasting/state' && url.searchParams.get('user_id') === String(member.id);
+    }, { timeout: 10000 });
+    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+    assert.equal((await resumed).status(), 200, 'die Rueckkehr laedt die Familienansicht neu');
     await page.waitForFunction(() => document.querySelector('[data-fasting-history]')?.textContent.includes('FAMILY SHARED'));
     assert.equal((await call(page, 'get', `/health/fasting/state?user_id=${member.id}`)).data.settings, null);
     assert.match(await page.$eval('a[download]', (el) => el.href), new RegExp(`user_id=${member.id}`));
@@ -500,7 +517,7 @@ test('family selector, offline resume and undo deletion survive route remount', 
     await page.setOfflineMode(false);
     const active = (await call(page, 'get', '/health/fasting/state')).data.active;
     await call(page, 'post', `/health/fasting/${active.id}/finish`, { expected_revision: active.revision });
-    await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
     await page.waitForFunction(() => !document.querySelector('[data-fasting-edit-start]'));
     assert.ok(await page.$('[data-fasting-earlier]'), 'Successful resume replaces stale active state');
   } finally { await harness.close(); }

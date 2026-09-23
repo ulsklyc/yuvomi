@@ -1083,11 +1083,17 @@ test('Beleg: Name und ID nur fuer wer das Dokument lesen darf - Liste und Einzel
     }
     return out;
   };
+  // `has` ist `null` ohne Dokumentenrecht: dann sagt der Besuch nicht einmal,
+  // DASS er einen Beleg hat (einheitlich mit Budget, Ausgaben, Inventar, Aufgaben).
   const expect = (...seen) => {
     const docs = [familyDoc, privateDoc, memberPrivateDoc];
     const names = ['Quittung Familie', 'Quittung privat', 'Quittung Mitglied'];
     const withName = seen.map((ok, i) => ({ id: ok ? docs[i] : null, has: true, name: ok ? names[i] : null }));
     return { list: withName, detail: withName, sessions: withName.map(({ id, has }) => ({ id, has })) };
+  };
+  const expectNoRight = () => {
+    const none = [0, 1, 2].map(() => ({ id: null, has: null, name: null }));
+    return { list: none, detail: none, sessions: none.map(({ id, has }) => ({ id, has })) };
   };
   try {
     assert.deepEqual(await receipts(ADM), expect(true, true, false),
@@ -1096,10 +1102,10 @@ test('Beleg: Name und ID nur fuer wer das Dokument lesen darf - Liste und Einzel
       'ein Mitglied sieht Familie und Eigenes, nicht das private des Admins');
     assert.deepEqual(await receipts({ ...MEM, moduleAccess: { documents: 'read' } }), expect(true, false, true),
       'Leserecht auf die Dokumente reicht');
-    assert.deepEqual(await receipts({ ...MEM, moduleAccess: { documents: 'none' } }), expect(false, false, false),
-      'documents: none bekommt weder Namen noch ID, auch nicht fuer das eigene Dokument');
-    assert.deepEqual(await receipts(TOKEN_READ), expect(false, false, false),
-      'ein Token ohne documents-Scope bekommt weder Namen noch ID');
+    assert.deepEqual(await receipts({ ...MEM, moduleAccess: { documents: 'none' } }), expectNoRight(),
+      'documents: none bekommt weder Namen noch ID noch den Hinweis, auch nicht fuer das eigene Dokument');
+    assert.deepEqual(await receipts(TOKEN_READ), expectNoRight(),
+      'ein Token ohne documents-Scope bekommt weder Namen noch ID noch den Hinweis');
     assert.deepEqual(await receipts({ ...TOKEN_READ, authScopes: ['housekeeping:read', 'documents:read'] }), expect(true, true, false),
       'mit documents:read liefert das Token, was sein Nutzer sieht');
     assert.deepEqual(await receipts({ id: MEMBER, role: 'member', authMethod: 'api_token', authScopes: ['housekeeping:read', 'documents:read'] }),
@@ -1136,6 +1142,13 @@ test('Beleg: jeder Serialisierer maskiert die ID - Arbeiter, Status, Dashboard, 
     assert.deepEqual(receiptOf(dashboard.body.data.last_visit), masked, 'last_visit im Dashboard');
     const dashWorker = dashboard.body.data.workers.find((w) => w.id === workerId);
     assert.deepEqual(receiptOf(dashWorker.current_session), masked, 'Arbeiter im Dashboard');
+
+    // Ohne Dokumentenrecht nicht einmal der Hinweis, dass es einen Beleg gibt.
+    const NONE_MEM = { ...MEM, moduleAccess: { documents: 'none' } };
+    const noneSummary = await call('GET', '/summary', { as: NONE_MEM });
+    assert.deepEqual(receiptOf(noneSummary.body.data.current_session), { id: null, has: null }, '/summary bei documents: none');
+    const noneDashboard = await call('GET', '/dashboard', { as: NONE_MEM });
+    assert.deepEqual(receiptOf(noneDashboard.body.data.last_visit), { id: null, has: null }, 'Dashboard bei documents: none');
 
     const adminView = await call('GET', '/summary', { as: ADM });
     assert.deepEqual(receiptOf(adminView.body.data.current_session), { id: privateDoc, has: true }, 'die Erstellerin sieht die ID');

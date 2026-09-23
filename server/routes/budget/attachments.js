@@ -14,7 +14,9 @@
  */
 
 import * as db from '../../db.js';
-import { documentLinksFor, loadDocumentLinks, replaceDocumentLinks } from '../../services/document-links.js';
+import {
+  documentLinksFor, documentLinksOf, loadDocumentLinks, replaceDocumentLinks,
+} from '../../services/document-links.js';
 
 const TABLE = { table: 'budget_entry_attachments', ownerColumn: 'entry_id' };
 
@@ -22,7 +24,7 @@ const TABLE = { table: 'budget_entry_attachments', ownerColumn: 'entry_id' };
  * Belege einer einzelnen Buchung.
  * @param {number} entryId
  * @param {{ userId: number, readsDocuments: boolean }} viewer
- * @returns {object[]}
+ * @returns {object[]|null} `null` ohne Leserecht auf die Dokumente (#1358)
  */
 export function attachmentsFor(entryId, viewer) {
   return documentLinksFor(db.get(), { ...TABLE, ownerId: entryId, viewer });
@@ -32,11 +34,12 @@ export function attachmentsFor(entryId, viewer) {
  * Haengt die Belege an eine Eintragsliste an (fuer GET-Antworten).
  * @param {object[]} entries
  * @param {{ userId: number, readsDocuments: boolean }} viewer
- * @returns {object[]} dieselben Eintraege, jeweils mit `attachments`
+ * @returns {object[]} dieselben Eintraege, jeweils mit `attachments` (`null`
+ *          ohne Leserecht auf die Dokumente: weder Belege noch ihre Anzahl)
  */
 export function withAttachments(entries, viewer) {
   const byEntry = loadDocumentLinks(db.get(), { ...TABLE, ownerIds: entries.map((e) => e.id), viewer });
-  return entries.map((entry) => ({ ...entry, attachments: byEntry.get(entry.id) || [] }));
+  return entries.map((entry) => ({ ...entry, attachments: documentLinksOf(byEntry, entry.id, viewer) }));
 }
 
 /**

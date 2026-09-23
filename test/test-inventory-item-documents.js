@@ -215,18 +215,18 @@ test('geloeschtes Dokument nimmt seine Verknuepfung mit', async () => {
 // ── Dokumentenrecht (#1358) ─────────────────────────────────────────────────────
 // Der Beleg ist eine Zeile des Dokumente-Moduls. Wer es nicht lesen darf
 // (Mitgliedsrecht `documents: none` oder ein Token ohne documents:read),
-// bekommt weder Namen noch ID, und jede ID, die er verknuepfen will, antwortet
+// bekommt keinen Beleg (`attachments` ist `null`, auch keine Anzahl), und jede ID, die er verknuepfen will, antwortet
 // mit derselben 403 - sonst waere die Antwort ein Orakel.
 
 const NONE = { id: A, moduleAccess: { documents: 'none' } };
 const TOKEN = { id: A, authMethod: 'api_token', authScopes: ['inventory:write'] };
 const TOKEN_DOCS = { id: A, authMethod: 'api_token', authScopes: ['inventory:write', 'documents:read'] };
-const docFields = (list) => (list || []).map((a) => ({
+// `null` bleibt `null`: ohne Dokumentenrecht gibt es keine Liste, auch keine leere.
+const docFields = (list) => (list == null ? list : list.map((a) => ({
   document_id: a.document_id, name: a.name, original_name: a.original_name, mime_type: a.mime_type, file_size: a.file_size,
-}));
-const MASKED = { document_id: null, name: null, original_name: null, mime_type: null, file_size: null };
+})));
 
-test('Dokumentenrecht: ohne documents-Lesen kommen Belege maskiert - Liste, Einzelabruf, Verlauf (#1358)', async () => {
+test('Dokumentenrecht: ohne documents-Lesen kommen keine Belege und keine Anzahl - Liste, Einzelabruf, Verlauf (#1358)', async () => {
   const doc = insertDocument({ name: 'Garantie Recht' });
   const item = await createItem({ name: 'Rechteprobe', attachment_document_ids: [doc] });
   const open = [{ document_id: doc, name: 'Garantie Recht', original_name: 'Garantie Recht.pdf', mime_type: 'application/pdf', file_size: 1234 }];
@@ -244,10 +244,10 @@ test('Dokumentenrecht: ohne documents-Lesen kommen Belege maskiert - Liste, Einz
     };
   };
   const visible = { list: open, one: open, history: [{ id: doc, label: 'Garantie Recht' }] };
-  const masked = { list: [MASKED], one: [MASKED], history: [] };
+  const masked = { list: null, one: null, history: [] };
   assert.deepEqual(await seen({ id: A }), visible);
   assert.deepEqual(await seen({ ...NONE, moduleAccess: { documents: 'read' } }), visible, 'Leserecht reicht');
-  assert.deepEqual(await seen(NONE), masked, 'documents: none sieht nur, dass ein Beleg da ist');
+  assert.deepEqual(await seen(NONE), masked, 'documents: none sieht keinen Beleg, auch nicht ihre Anzahl');
   assert.deepEqual(await seen(TOKEN), masked, 'ein Token ohne documents-Scope ebenso');
   assert.deepEqual(await seen(TOKEN_DOCS), visible);
 });

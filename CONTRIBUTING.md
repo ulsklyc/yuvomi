@@ -111,7 +111,8 @@ signal is ignored). The steps come
 from the `test` script itself, so a new suite is still registered there
 and nowhere else. Because suites run side by side, a suite takes a free port
 (`listen(0, '127.0.0.1')`) and a temp path of its own (`freshTestDbPath()`, `mkdtemp`), never a
-fixed one. CI runs `npm test`, one suite after the other.
+fixed one. CI runs `npm test`, one suite after the other, and next to it one browser suite,
+`test:fasting-browser`, as a job of its own.
 
 ---
 
@@ -462,7 +463,7 @@ This is a promise the project can keep because it is not a promise: it is a cond
 
 ### The pre-release handrail
 
-`npm run test:document-guards` is the one suite that is deliberately not in `npm test` and not in CI. It drives a real browser against a seeded server and costs around 80 minutes (82 measured on 2 September 2026), which is not a price worth paying on every push for invariants that only change in bursts. It is a handrail run once before a release instead.
+`npm run test:document-guards` is the one suite that is deliberately not in `npm test` and not in CI (only its part `test:fasting-browser` also runs in CI, as a job of its own). It drives a real browser against a seeded server and costs around 80 minutes (82 measured on 2 September 2026), which is not a price worth paying on every push for invariants that only change in bursts. It is a handrail run once before a release instead.
 
 **It is required for any release that carries the interface train**, that is, any release whose diff touches `public/pages`, `public/styles`, `public/utils`, `public/components` or `public/settings`. A release on the other track does not need it: those probes measure the rendered document, and a change that never reaches the document cannot move them.
 
