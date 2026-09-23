@@ -1026,7 +1026,10 @@ Fundstellen). Ein 9px-Text sagt weniger als ein sauberer Punkt.
   die Regel darunter wirkungslos und die Wand einspaltig, bei jeder Breite und ohne
   Fehlermeldung.
 - **Dashboard-Raster:** `auto-fill` mit Mindestspalte 280px (`minmax(min(100%, 280px), 1fr)`)
-  und `dense`-Flow. Bei 240px legte ein 1440er-Fenster vier 270px-Spalten an, in denen die
+  und `dense`-Flow in JEDEM Zustand - auch mit eigener Reihenfolge und im Bearbeiten-Modus
+  (2026-09-23; vorher schaltete eine Umsortierung auf die Quellordnung, 18 % Loecher bei
+  1440px). Die gespeicherte Reihenfolge ist die Rangfolge; was an Loechern bleibt, liegt an den
+  Groessen, und dafuer schlaegt der Bearbeiten-Modus eine vor. Bei 240px legte ein 1440er-Fenster vier 270px-Spalten an, in denen die
   Ellipse reihenweise echte Inhalte kappte („Familienmitg…", „Tante Claire Bec…"). Eine
   Spalte, in der Namen nicht ganz stehen, ist keine Spalte; drei ruhige tragen dieselben
   fuenf Karten besser als vier gedraengte, und ab ~1700px kommt die vierte von selbst
@@ -1878,6 +1881,14 @@ enthaelt. Die drei fixierten Flaechen sind Summanden (`--fab-tail`, `--bulk-pill
 meldet es als `--scrollport-pad` an, statt `padding-bottom` zu schreiben, sonst ersetzt der
 Nachlauf es.
 
+**Wo `.app-content` selbst scrollt, reitet der Nachlauf auf einem Platzhalter**
+(`.page-transition::after`, 2026-09-23). Das Polster allein griff dort nur zur Haelfte: ein
+Scrollport haengt sein Endpolster an das Ende seines Fluss-Kindes, und `.page-transition` ist
+fensterhoch (`height: 100%`). Was darueber hinauslief, bekam keins - gemessen 24px statt 96px
+unter dem letzten Widget der Uebersicht, der FAB lag am Seitenende auf der rechten Spalte. Das
+Polster bleibt und haelt die Box um den Nachlauf kuerzer; die Scrollhoehe ist damit
+max(Fenster, Inhaltsende + Nachlauf). Pruefebene: `test:dashboard-surface-browser`.
+
 **Mobil aendert die Regel nichts, und das ist per Konstruktion so:** unter 1024px ist
 `--fab-safe-zone` 0, weil der Knopf in der Nav-Kapsel sitzt. Ein Nachlauf von 0 ist dasselbe
 wie eine Marge von 0.
@@ -2460,7 +2471,10 @@ begrenzt wird; alles andere haengt an `vmin`. Mit `vh` wurden die Zeilen auf ein
 Hochformat groesser, weil dort Hoehe reichlich ist - und liefen seitlich in die Enge und unten
 aus dem Bild. `vmin` bindet die Groesse an die knappe Seite und haelt beide Lagen im Schirm.
 **An einer Wand kann niemand scrollen, das Bild muss passen.** Die Enden der Skala sind
-Tokens: hier bekommen die Display-Stufen 48/72px ihre Rolle.
+Tokens: hier bekommen die Display-Stufen 48/72px ihre Rolle. **Und ein ruhiger Tag darf
+groesser sprechen** (2026-09-23): die Skala ist fuer den vollen Tag gerechnet, bis drei
+Eintraege tritt die Programmzeile eine Stufe hoeher (Titel bis 48px, am Traeger per `:has`
+gezaehlt). Gemessen bei 1280x800 mit zwei Zeilen: leere Flaeche unter der Buehne 40 % → 28 %.
 
 **Genau EIN gefuellter Traeger** - die Programmliste - und sonst Inhalt auf der Buehne. Die
 Anti-Referenz ist die Smart-Home-Dashboard-Optik: Kacheln voller Messwerte, Ringe und Sensoren

@@ -52,6 +52,22 @@
   display: grid;
   gap: var(--space-4);
   grid-template-columns: 1fr;
+  /* IMMER DICHT, AUCH MIT EIGENER REIHENFOLGE UND IM BEARBEITEN-MODUS
+   * (Critique 2026-09-23, Entscheidung Ulas) - und in jeder Breite mit mehr
+   * als einer Spalte; bei 768px liess die Quellordnung zwei Loecher. Ab 1024px
+   * stand hier `.dashboard__grid--preserve-order` mit `grid-auto-flow: row`:
+   * wer seine Kacheln umsortiert hatte oder gerade bearbeitete, bekam die
+   * Quellordnung statt der Lueckenfuellung. Der Zweck war richtig - eine
+   * Kachel, die man nach hinten gestellt hat, soll nicht vorn auftauchen -,
+   * der Preis war zu hoch: gemessen 18 % leere Flaeche bei 1440px, und beim
+   * Umschalten in den Bearbeiten-Modus sprangen die Karten auf andere Plaetze.
+   *
+   * Was vom Zweck bleibt, traegt `dense` selbst: die gespeicherte Reihenfolge
+   * ist die RANGFOLGE, in der jede Kachel ihren fruehesten freien Platz
+   * bekommt. Nach vorn wandert nur, was in ein Loch passt, das sonst leer
+   * bliebe. Bleibt trotzdem eines, liegt es an den Groessen, und dafuer hat
+   * der Bearbeiten-Modus seinen Hinweis (`.dashboard-grid-hint`). */
+  grid-auto-flow: row dense;
 }
 
 /* Widgets füllen die gesamte Gridzeilen-Höhe, so dass alle Widgets
@@ -186,12 +202,6 @@
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
     grid-auto-rows: minmax(132px, auto);
     gap: var(--space-5);
-    grid-auto-flow: row dense;
-  }
-
-  /* Bewusst umsortiert oder im Bearbeiten-Modus: Quellordnung vor Lückenfüllung. */
-  .dashboard__grid--preserve-order {
-    grid-auto-flow: row;
   }
 
   .widget-size--2x1,
@@ -1947,6 +1957,27 @@ svg.weather-forecast__icon {
   outline-offset: var(--focus-ring-offset);
 }
 
+/* Der Loch-Hinweis im Bearbeiten-Modus (dashboard.js, `gridHoleSuggestion`).
+ * Eine Zeile Sekundaertext mit ihrem einen Knopf, ohne eigene Flaeche: er
+ * steht ueber einem Raster, das im Bearbeiten-Modus schon getoent und
+ * gestrichelt ist, und eine dritte Rahmung darueber waere Laerm. */
+.dashboard-grid-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  margin-bottom: var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: var(--type-secondary);
+}
+
+/* Der Knopf folgt dem Satz, statt am anderen Ende der Zeile zu stehen: er ist
+ * dessen zweite Haelfte, nicht eine Aktion der Seite. */
+.dashboard-grid-hint__text {
+  min-width: 0;
+  margin: 0;
+}
+
 /* --------------------------------------------------------
  * Wieder-Einblenden-Leiste (Inline-Edit-Modus)
  * Löst die Einbahnstraße des früheren Nur-Ausblenden-Inline-Modus ab; ersetzt
@@ -2460,41 +2491,98 @@ svg.weather-forecast__icon {
   container: dashboard-overview / inline-size;
 }
 
-/* Oben buendig, nicht mittig: der Grusstapel ist drei bis vier Zeilen hoch, die
- * Werkzeugspalte eine bis zwei - zentriert landete der Knopf auf halber
- * Titelhoehe und der Stand-Anker daneben im Nichts. Buendig oben steht beides
- * auf der Datumszeile. */
+/* DATUMSZEILE MIT WERKZEUGEN, DARUNTER DER TITEL UEBER DIE VOLLE BREITE
+ * (Critique 2026-09-23, P1).
+ *
+ * Hier stand eine Flex-Zeile: links der Grusstapel, rechts die Werkzeugspalte.
+ * Mobil nahm die Spalte dem Large Title die halbe Breite - bei 390px blieben
+ * ihm 171px, „Guten Abend, Linda" brach dreizeilig um, das Datum zweizeilig,
+ * und der erste Inhalt stand bei 274 von 844px. Die Knoepfe gehoeren in die
+ * Datumszeile, wie die Leistenknoepfe ueber einem Large Title; der Titel
+ * bekommt die ganze Zeile darunter. Gemessen danach: einzeilig bei 390 und 375,
+ * erster Inhalt bei rund 160px.
+ *
+ * Ab 640px Kopfbreite passt beides nebeneinander, und dort bleibt die alte
+ * Gestalt: die Werkzeuge stehen oben rechts auf Hoehe des Datums und ueberspannen
+ * die Zeilen des Grusses, statt der Datumszeile ihre 40px Hoehe aufzuzwingen.
+ * Der Desktop-Kopf wird dadurch nicht hoeher, sondern um den Stand-Anker
+ * niedriger (67 → 63px). */
 .dashboard-overview__header {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "date    tools"
+    "title   title"
+    "weather weather";
+  align-items: center;
+  column-gap: var(--space-3);
 }
 
-/* Bearbeiten-Modus: die Customize-Toolbar braucht volle Breite, daher mobil unter
- * die Begrüßung umbrechen; ab Container-Breite wieder einzeilig. Der schlanke
- * Normalzustand bleibt einzeilig (Icon rechts, vertikal zur Begrüßung zentriert). */
+@container dashboard-overview (min-width: 640px) {
+  .dashboard-overview__header {
+    grid-template-areas:
+      "date    tools"
+      "title   tools"
+      "weather tools";
+    align-items: start;
+  }
+}
+
+/* Bearbeiten-Modus: die Werkzeugleiste (Hinweis, Knoepfe, Speichern) braucht
+ * eine eigene Zeile und laeuft mobil unter dem Gruss ueber die volle Breite; ab
+ * 640px Kopfbreite steht sie wieder rechts, mittig zum Gruss. */
 .dashboard-overview__header--editing {
-  flex-direction: column;
-  align-items: stretch;
+  grid-template-areas:
+    "date    date"
+    "title   title"
+    "weather weather"
+    "tools   tools";
+  row-gap: var(--space-2);
 }
 
 @container dashboard-overview (min-width: 640px) {
   .dashboard-overview__header--editing {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
+    grid-template-areas:
+      "date    tools"
+      "title   tools"
+      "weather tools";
+    row-gap: 0;
+  }
+
+  .dashboard-overview__header--editing > .dashboard-overview__tools {
+    align-self: center;
   }
 }
 
-.dashboard-overview__heading {
-  min-width: 0;
+/* DIE KOMPAKTE HOEHENKLASSE (DESIGN.md, „Die Chrome-Regel"): unter 500px
+ * Fensterhoehe faellt der Kopf auf seine Bar-Zeile. Hier ist das die
+ * Datumszeile mit den Knoepfen - Gruss und Wetterzeile treten ab. Bei 640x400
+ * (ein 1280x800-Laptop bei 200 % Zoom) standen sonst gut 150px Kopf ueber
+ * einem Inhalt von 400. Der Gruss bleibt als Ueberschrift im Dokument, nur
+ * nicht im Bild: Screenreader finden die Seite weiter unter ihrem h2. */
+@media (max-height: 499px) {
+  .dashboard-overview__header:not(.dashboard-overview__header--editing) > .dashboard-overview__title,
+  .dashboard-overview__header:not(.dashboard-overview__header--editing) > .dashboard-overview__weather {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
 }
 
 .dashboard-overview__date {
   /* Apple-News-Muster: Datum als Versal-Footnote über dem Large Title.
    * Echte Information, kein dekorativer Kicker — Kanon-Bestandteil. */
+  grid-area: date;
+  /* Am FUSS seiner Zeile, direkt ueber dem Titel, zu dem es gehoert; die
+   * Knoepfe daneben sind hoeher (48px) und ragen nach oben. Mittig stand es
+   * 19px ueber dem Titel und las sich als Beschriftung der Knoepfe. */
+  align-self: end;
   display: block;
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
@@ -2504,6 +2592,7 @@ svg.weather-forecast__icon {
 }
 
 .dashboard-overview__title {
+  grid-area: title;
   margin: var(--space-1) 0 0;
   color: var(--color-text-primary);
   overflow-wrap: normal;
@@ -2525,6 +2614,7 @@ svg.weather-forecast__icon {
  * Gruss in der Sekundaerstimme - nie lauter als der Large Title. Ersetzt die
  * Wetter-Karte als Default; die Karte bleibt Wandtablet-Opt-in. */
 .dashboard-overview__weather {
+  grid-area: weather;
   display: flex;
   align-items: center;
   gap: var(--space-1);
@@ -2547,36 +2637,17 @@ svg.weather-forecast__icon {
   color: var(--weather-tone, currentColor);
 }
 
-/* DIE WERKZEUGE HAENGEN OBEN, SIE SCHWEBEN NICHT IN DER MITTE. `align-items:
- * center` zentrierte den Zweizeiler aus Knopf und Stand-Anker gegen einen
- * Grusstapel, der drei Zeilen hoch ist (Datum, Large Title, Wetter) und mobil
- * vier - der Anker landete auf halber Hoehe neben dem Titel, ohne Bezug zu
- * irgendetwas. Oben buendig steht er ueber der Datumszeile, also dort, wo die
- * Seite ihre Metaangaben ohnehin fuehrt. */
+/* Die Werkzeuge: Wand-Einstieg und Anpassen, im Bearbeiten-Modus davor der
+ * Hinweis und die Leiste. Sie brechen um statt zu quetschen, damit die Leiste
+ * auf schmalen Koepfen eine zweite Zeile nehmen kann. */
 .dashboard-overview__tools {
+  grid-area: tools;
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
-  /* Umbruch statt eigener Spalte: der Stand-Anker (A8) legt sich als eigene
-   * Zeile UNTER den Anpassen-Knopf, ohne dass die Bearbeiten-Werkzeugleiste
-   * daneben ihre Zeile verliert. */
   flex-wrap: wrap;
   gap: var(--space-2);
   min-width: 0;
-  flex: 0 0 auto;
-}
-
-/* „Stand 14:32" - der leiseste Text der Seite. Er beweist am Wandtablet, dass
- * der stille Refresh laeuft, und darf dafuer nichts weiter tun: Footnote-Groesse,
- * tertiaere Farbe, kein Icon, keine eigene Flaeche. Tabellenziffern, damit die
- * Zeile beim Aktualisieren nicht in der Breite zuckt. */
-.dashboard-overview__updated {
-  flex: 0 0 100%;
-  margin: 0;
-  text-align: right;
-  color: var(--color-text-tertiary);
-  font-size: var(--type-caption);
-  font-variant-numeric: tabular-nums;
 }
 
 .dashboard-icon-btn {
@@ -3634,6 +3705,48 @@ svg.weather-forecast__icon {
   line-height: 1.4;
 }
 
+/* Die drei groessten Ausgaben der hohen Kachel (renderBudgetTopExpenses). Sie
+ * bleiben die Fusszeile - unten verankert, per Haarlinie abgesetzt -, nur mit
+ * drei Zeilen statt einer. Betraege rechtsbuendig in Tabellenziffern, damit die
+ * drei untereinander vergleichbar sind; Farbe traegt hier nichts, das sagt
+ * schon die rote Ausgabensumme darueber. */
+.budget-widget__top-title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.budget-widget__top-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.budget-widget__top-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.budget-widget__top-row > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.budget-widget__top-row > strong {
+  flex: 0 0 auto;
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
 /* --------------------------------------------------------
  * Belohnungen-Widget (Familien-Punktestand)
  * Mini-Ranking: Rang · Avatar · Name · Punkte. Der Spitzenreiter
@@ -4266,7 +4379,7 @@ svg.weather-forecast__icon {
   }
 
   .dashboard-overview__header {
-    gap: var(--space-2);
+    column-gap: var(--space-2);
   }
 
   .dashboard-overview__tools {
@@ -4363,7 +4476,13 @@ svg.weather-forecast__icon {
   /* Die Distanz-Skala der Fläche - einmal hier, nirgends als Einzelwert. */
   --wall-clock:      clamp(var(--text-5xl), 9vw, var(--text-6xl));
   --wall-clock-date: clamp(var(--text-xl), 2.6vw, var(--text-4xl));
-  --wall-section:    clamp(var(--text-base), 1.6vw, var(--text-xl));
+  /* Abschnittstitel an `vmin` wie die Zeilen, nicht an `vw` (Critique
+   * 2026-09-23): an `vw` gebunden kappten sie bei 1280px auf 20px - aus zwei
+   * Metern die kleinste Schrift der Flaeche, kleiner als die Unterzeilen, die
+   * sie ueberschreiben. Jetzt 24px bei 1280x800, 28px ab rund 930px Hoehe:
+   * weiter unter dem Zeilentitel, damit die Rangfolge Uhr - Zeile - Titel
+   * haelt. */
+  --wall-section:    clamp(var(--text-xl), 3vmin, var(--text-3xl));
   --wall-row-title:  clamp(var(--text-xl), 4vmin, var(--text-4xl));
   --wall-row-sub:    clamp(var(--text-sm), 2.2vmin, var(--text-2xl));
   --wall-pad:        clamp(var(--space-4), 3vmin, var(--space-10));
@@ -4469,6 +4588,23 @@ svg.weather-forecast__icon {
 }
 
 /* ── Das Tagesprogramm ── */
+/* WENIGE ZEILEN, GROESSERE ZEILEN (Critique 2026-09-23). Der Deckel von vier
+ * Zeilen plus Einkauf ist fuer den vollen Tag gerechnet (WALL_ROW_CAP); an
+ * einem ruhigen Tag mit zwei Zeilen blieben bei 1280x800 die unteren 40 % der
+ * Wand leer, waehrend die Zeilen in der Groesse standen, die fuer fuenf
+ * gebraucht wird. Bis drei Eintraege tritt die Zeile deshalb eine Stufe auf die
+ * Display-Stufe: der Zeilentitel waechst bis 48px (5.5vmin, bei 800px Hoehe
+ * 44px), die Unterzeile mit. Drei so hohe Zeilen passen bei 1280x800 mit Uhr,
+ * Titel und Fuss ins Bild (rund 660px) - die Rechnung, die WALL_ROW_CAP fuer
+ * den vollen Tag fuehrt, gilt hier fuer den leeren. Ab der vierten Zeile gilt
+ * wieder die Grundskala, damit der volle Tag unten nicht aus dem Bild laeuft.
+ * Gezaehlt wird am Traeger selbst (`:has`), nicht im Skript: die Liste weiss,
+ * wie lang sie ist. */
+.wall-program__list:not(:has(> :nth-child(4))) {
+  --wall-row-title: clamp(var(--text-2xl), 5.5vmin, var(--text-5xl));
+  --wall-row-sub:   clamp(var(--text-base), 2.8vmin, var(--text-3xl));
+}
+
 /* Zeilenliste in EINEM Träger, getrennt per Haarlinie über den +-Kombinator -
  * dieselbe Grammatik wie das Cockpit, nur in Distanzgröße. */
 .wall-program__list {

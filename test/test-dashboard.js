@@ -2325,13 +2325,11 @@ test('Wand-Modus: das Nachtfenster läuft über Mitternacht (22:00 bis 06:00)', 
 // --------------------------------------------------------
 // Widget-Konfiguration (public/utils/dashboard-widgets.js)
 //
-// ANLASS: `normalizeDashboardConfig` und `isUserOrderedConfig` tragen zusammen
-// eine Zusicherung - ein Bestandslayout, dem eine inzwischen neu bekannte
-// Widget-Id fehlt, darf sich NICHT als Nutzer-Umsortierung lesen. Tut es das,
-// schaltet das Raster von der dichten Packung auf preserve-order und der
-// Weissraum aus Audit A1-03 ist zurueck, ohne dass jemand etwas umsortiert hat.
-// Sie war bis 2026-08-13 durch keinen Test gedeckt und hing an einer
-// Vereinbarung ueber die Reihenfolge von WIDGET_IDS.
+// ANLASS: `normalizeDashboardConfig` sortiert eine inzwischen neu bekannte
+// Widget-Id an ihrer Default-Position ein, nicht hinten. Bis 2026-09-23 hing
+// daran zusaetzlich die Packung des Rasters (`isUserOrderedConfig` schaltete
+// umsortierte Layouts auf die Quellordnung); das Raster packt seitdem immer
+// dicht, die Einsortierung bleibt der Ort, an dem ein Neuzugang erscheint.
 // --------------------------------------------------------
 
 const widgets = await import('../public/utils/dashboard-widgets.js');
@@ -2379,16 +2377,6 @@ test('Widget-Merge: eine fehlende Id landet an ihrer Default-Position, nicht hin
     `An die falsche Stelle einsortiert: ${falsch.join(', ')} - erwartet ist die Default-Position`);
 });
 
-test('Widget-Merge: ein Bestandslayout ohne eine Id ist KEINE Nutzer-Umsortierung (A1-03)', () => {
-  // Der eigentliche Punkt. Vor dem Merge-Fix ist das fuer jede Id rot, die
-  // nicht die LETZTE sichtbare in WIDGET_IDS ist - angehaengt steht sie hinter
-  // Widgets, vor denen sie im Default steht.
-  const falsch = widgets.WIDGET_IDS.filter((id) =>
-    widgets.isUserOrderedConfig(widgets.normalizeDashboardConfig(layoutOhne(id))));
-  assert(falsch.length === 0,
-    `Als umsortiert gelesen, obwohl nur eine Id fehlte: ${falsch.join(', ')} - das Raster faellt dort auf preserve-order`);
-});
-
 test('Widget-Merge: zwei fehlende Ids behalten ihre Reihenfolge zueinander', () => {
   const zwei = widgets.DEFAULT_WIDGET_CONFIG
     .filter((w) => !['meals', 'shopping'].includes(w.id))
@@ -2396,8 +2384,6 @@ test('Widget-Merge: zwei fehlende Ids behalten ihre Reihenfolge zueinander', () 
   const merged = widgets.normalizeDashboardConfig(zwei).map((w) => w.id);
   assert(merged.join(',') === widgets.WIDGET_IDS.join(','),
     `Zwei benachbarte Neuzugaenge kamen durcheinander: ${merged.join(',')}`);
-  assert(!widgets.isUserOrderedConfig(merged.map((id, i) => ({ id, visible: true, order: i, size: '1x1' }))),
-    'zwei fehlende Ids lesen sich als Umsortierung');
 });
 
 test('Widget-Merge: eine fehlende Id am Anfang der Liste landet vorn, nicht hinten', () => {
@@ -2423,8 +2409,6 @@ test('Widget-Merge: ein umsortiertes Layout laesst den Neuzugang seinem Vorgaeng
   // `birthdays`, und dorthin gehoert er - nicht ans Ende.
   assert(sichtbar.join(',') === 'weather,metrics,family,budget,birthdays,countdown,rewards,notes',
     `Neuzugang an unerwarteter Stelle: ${sichtbar.join(',')}`);
-  assert(widgets.isUserOrderedConfig(merged),
-    'ein echt umsortiertes Layout muss umsortiert bleiben - sonst packt dense es um');
 });
 
 test('Widget-Optionen reisen durch die Normalisierung, ohne dass sie jemand kennt (#814)', () => {
@@ -2483,27 +2467,77 @@ test('dashboardQuery uebersetzt Optionen in Parameter, die die Route versteht (#
   assert(widgets.dashboardQuery(null) === '/dashboard');
 });
 
-test('isUserOrderedConfig erkennt eine ECHTE Umsortierung weiterhin', () => {
-  // Gegenprobe zur Zusicherung oben: sie darf nicht dadurch halten, dass die
-  // Funktion nie mehr `true` sagt. Zwei sichtbare Widgets tauschen.
-  const sichtbar = widgets.DEFAULT_WIDGET_CONFIG.filter((w) => w.visible).map((w) => w.id);
-  assert(sichtbar.length >= 2, `Reichweite: nur ${sichtbar.length} sichtbare Widgets im Default`);
-  const getauscht = widgets.DEFAULT_WIDGET_CONFIG.map((w) => ({ ...w }));
-  const a = getauscht.findIndex((w) => w.id === sichtbar[0]);
-  const b = getauscht.findIndex((w) => w.id === sichtbar[1]);
-  [getauscht[a].order, getauscht[b].order] = [getauscht[b].order, getauscht[a].order];
-  assert(widgets.isUserOrderedConfig(getauscht),
-    `Tausch von ${sichtbar[0]} und ${sichtbar[1]} wurde nicht als Umsortierung erkannt`);
-  assert(!widgets.isUserOrderedConfig(widgets.DEFAULT_WIDGET_CONFIG),
-    'der unveraenderte Default liest sich als Umsortierung');
+// --------------------------------------------------------
+// Das dichte Raster, nachgerechnet (Critique 2026-09-23)
+//
+// `packGrid` rechnet `grid-auto-flow: row dense` fuer Kacheln mit reinen Spans
+// nach; der Loch-Hinweis im Bearbeiten-Modus schlaegt darauf eine Groesse vor.
+// Ob der Browser genauso packt, misst test:dashboard-surface-browser am
+// gerenderten Raster - hier steht die Rechnung selbst.
+// --------------------------------------------------------
+
+const kachel = (id, cols, rows, size = `${cols}x${rows}`) => ({ id, cols, rows, size });
+
+test('packGrid: dicht heisst, eine spaetere kleine Kachel fuellt das fruehere Loch', () => {
+  // calendar 2x1 laesst rechts eine Zelle frei, tasks 2x1 passt nicht hinein,
+  // notes 1x1 schon - `dense` setzt den Cursor fuer jede Kachel zurueck.
+  const cells = widgets.packGrid([kachel('calendar', 2, 1), kachel('tasks', 2, 1), kachel('notes', 1, 1)], 3);
+  assert(cells.map((r) => r.map((v) => v ?? '.').join(' ')).join(' / ')
+    === 'calendar calendar notes / tasks tasks .', `Belegung: ${JSON.stringify(cells)}`);
+  assert(widgets.gridHoleCount(cells) === 0, 'die letzte Zeile darf auslaufen, sie ist kein Loch');
 });
 
-test('isUserOrderedConfig: ein reiner Sichtbarkeits-Toggle ist keine Umsortierung', () => {
-  const versteckt = widgets.DEFAULT_WIDGET_CONFIG.map((w) => (w.id === 'notes' ? { ...w, visible: false } : w));
-  assert(!widgets.isUserOrderedConfig(versteckt), 'Ausblenden wurde als Umsortierung gelesen');
-  // Und eine abgeschaffte Id aus einem alten Stand ebenso wenig.
-  const alt = [{ id: 'ancient', visible: true, order: -1 }, ...widgets.DEFAULT_WIDGET_CONFIG];
-  assert(!widgets.isUserOrderedConfig(alt), 'eine unbekannte Alt-Id wurde als Umsortierung gelesen');
+test('packGrid: eine hohe Kachel belegt beide Zeilen, eine zu breite wird an der Kante gekappt', () => {
+  const cells = widgets.packGrid([kachel('family', 1, 2), kachel('weather', 3, 1), kachel('notes', 2, 1)], 2);
+  // weather ist breiter als das Raster: gerechnet wird mit zwei Spalten.
+  assert(cells[0][0] === 'family' && cells[1][0] === 'family', `family: ${JSON.stringify(cells)}`);
+  assert(cells[2].every((v) => v === 'weather'), `weather: ${JSON.stringify(cells)}`);
+  assert(cells[0][1] === null && cells[1][1] === null && cells[3].every((v) => v === 'notes'),
+    `notes passt nicht neben family und landet unten: ${JSON.stringify(cells)}`);
+  assert(widgets.gridHoleCount(cells) === 2);
+});
+
+test('suggestGridHoleFill: schlaegt die billigste Aenderung am Nachbarn des Lochs vor', () => {
+  // Drei Breitkacheln in drei Spalten: rechts bleibt je eine Zelle frei.
+  // Billigste Loesung ist dieselbe Flaeche in anderer Form, und zwar an der
+  // Kachel links neben dem ersten Loch.
+  const items = [kachel('calendar', 2, 1), kachel('tasks', 2, 1), kachel('notes', 2, 1)];
+  const presets = (item) => [['1x1', 1, 1], ['2x1', 2, 1], ['1x2', 1, 2], ['2x2', 2, 2]]
+    .map(([size, cols, rows]) => ({ size, cols, rows, id: item.id }));
+  const vorschlag = widgets.suggestGridHoleFill(items, 3, presets);
+  nodeAssert.deepEqual(vorschlag, { id: 'calendar', size: '1x2' });
+  const danach = widgets.packGrid(items.map((it) => (it.id === 'calendar' ? { ...it, cols: 1, rows: 2 } : it)), 3);
+  assert(widgets.gridHoleCount(danach) === 0, 'der Vorschlag schliesst das Loch nicht');
+});
+
+test('suggestGridHoleFill: waechst lieber, als Inhalt wegzunehmen', () => {
+  // Der Demo-Haushalt bei 1440px, in seiner gespeicherten Rangfolge: unter
+  // „Belohnungen" (1x1, dicht nach vorn gerueckt) bleibt ein Loch neben den
+  // Kennzahlen (2x1). Kennzahlen als 1x1 schloesse es auch - und naehme einer
+  // Kachel die Haelfte. Belohnungen als 1x2 waechst in das Loch hinein.
+  const items = [
+    kachel('family', 1, 2), kachel('budget', 1, 2), kachel('birthdays', 1, 2),
+    kachel('weather', 2, 1), kachel('metrics', 2, 1), kachel('rewards', 1, 1), kachel('notes', 2, 1),
+  ];
+  const presets = (item) => [['1x1', 1, 1], ['2x1', 2, 1], ['1x2', 1, 2], ['2x2', 2, 2]]
+    .map(([size, cols, rows]) => ({ size, cols, rows, id: item.id }));
+  assert(widgets.gridHoleCount(widgets.packGrid(items, 3)) === 1, 'Reichweite: das Ausgangsraster hat genau ein Loch');
+  nodeAssert.deepEqual(widgets.suggestGridHoleFill(items, 3, presets), { id: 'rewards', size: '1x2' });
+});
+
+test('suggestGridHoleFill: ohne Loch und ohne Ausweg schweigt er', () => {
+  const presets = (item) => [{ size: item.size, cols: item.cols, rows: item.rows }];
+  assert(widgets.suggestGridHoleFill([kachel('a', 1, 1), kachel('b', 1, 1)], 2, presets) === null,
+    'eine volle Zeile hat kein Loch');
+  // Nur die eigene Groesse im Angebot: es gibt nichts vorzuschlagen.
+  assert(widgets.suggestGridHoleFill([kachel('a', 2, 1), kachel('b', 2, 1), kachel('c', 1, 1)], 3, presets) === null,
+    'ohne Kandidaten darf kein Vorschlag entstehen');
+});
+
+test('isUserOrderedConfig gibt es nicht mehr - das Raster schaltet nach keiner Reihenfolge um', () => {
+  // Gegenprobe zur Entscheidung vom 2026-09-23 (immer dicht): ein Aufrufer,
+  // der die Unterscheidung zurueckholen wollte, faende sie hier nicht mehr.
+  assert(!('isUserOrderedConfig' in widgets), 'isUserOrderedConfig ist zurueck');
 });
 
 test('Widget-Merge: gespeicherte Reihenfolge gewinnt ueber die Array-Position', () => {
