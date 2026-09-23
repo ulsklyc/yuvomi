@@ -819,6 +819,9 @@ test('#1431 der Compose-Restore in der App ist derselbe Befehl wie in docs/insta
   assert.ok(!/(^|[^\\])\$\{/.test(raw), 'kein unmaskiertes ${ - das Template-Literal setzte dort etwas ein');
   const shown = raw.replaceAll('\\${', '${')
     .replaceAll('&gt;', '>').replaceAll('&lt;', '<').replaceAll('&amp;', '&');
+  // Im HTML muss jedes < und & eine Entity sein, sonst liest der Browser etwas anderes.
+  assert.ok(!raw.includes('<'), 'kein rohes < in der App-Zeile');
+  assert.ok(!/&(?!(gt|lt|amp);)/.test(raw), 'kein rohes & ohne Entity in der App-Zeile');
   const doc = readFileSync(new URL('../docs/installation.md', import.meta.url), 'utf8');
   const documented = doc.split('\n').find((l) => l.startsWith('docker compose run --rm -v "$BACKUP:/tmp/yuvomi-restore.db:ro"'));
   assert.equal(shown, documented, 'App und Doku zeigen denselben Befehl');
@@ -924,5 +927,69 @@ test('#1431 der Name der Rollback-Kopie ist dauerhaft, bevor DB_PATH ersetzt wir
   const swap = log.indexOf('rename DB_PATH');
   assert.ok(rollback >= 0 && swap > rollback, `Reihenfolge: ${log.join(', ')}`);
   assert.ok(log.slice(rollback + 1, swap).includes('fsync dir'), `zwischen beiden ein fsync des Verzeichnisses: ${log.join(', ')}`);
+  target.mod.get().close();
+});
+
+// ---------------------------------------------------------------------------
+// Sechste Runde #1431
+// ---------------------------------------------------------------------------
+
+test('#1431 verschwindet die halbe Rollback-Kopie unterwegs, wird NICHT getauscht', async () => {
+  // Nachgestellt: ein Server-Start in einem anderen PID-Namensraum haelt den
+  // Prozess der `.partial` fuer tot und raeumt sie weg, bevor sie ihren
+  // Endnamen bekommt. Vorher lief der Restore trotzdem durch, mit
+  // rollbackPath null - und die alte Datenbank war weg.
+  const backupPath = await bigBackup(KEY, 'aus dem Backup');
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  const realRename = fsp.rename;
+  fsp.rename = async (from, to) => {
+    if (String(from).endsWith('.partial')) {
+      await fsp.unlink(from);
+      throw Object.assign(new Error(`ENOENT: no such file or directory, rename '${from}'`), { code: 'ENOENT' });
+    }
+    return realRename(from, to);
+  };
+  try {
+    await assert.rejects(() => target.mod.restoreFromFile(backupPath), /ENOENT/);
+  } finally {
+    fsp.rename = realRename;
+  }
+  assertUntouched(target, 'vor dem Restore');
+  target.mod.get().close();
+});
+
+test('#1431 lehnt das Dateisystem chmod ab (NAS-Mount), laeuft der Restore trotzdem', async () => {
+  const backupPath = await bigBackup(KEY, 'aus dem Backup');
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  const realChmod = fsp.chmod;
+  let refused = 0;
+  fsp.chmod = async () => {
+    refused++;
+    throw Object.assign(new Error('EPERM: operation not permitted, chmod'), { code: 'EPERM' });
+  };
+  try {
+    await target.mod.restoreFromFile(backupPath);
+  } finally {
+    fsp.chmod = realChmod;
+  }
+  assert.ok(refused > 0, 'Vorbedingung: chmod wurde versucht');
+  assert.equal(target.mod.get().prepare('SELECT note FROM restore_probe LIMIT 1').get()?.note, 'aus dem Backup');
+  target.mod.get().close();
+});
+
+test('#1431 lehnt das Dateisystem chmod ab und bleibt die Datei schreibgeschuetzt, wird abgebrochen', async () => {
+  const backupPath = await bigBackup(KEY, 'aus dem Backup');
+  chmodSync(backupPath, 0o444);
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  const realChmod = fsp.chmod;
+  fsp.chmod = async () => {
+    throw Object.assign(new Error('EPERM: operation not permitted, chmod'), { code: 'EPERM' });
+  };
+  try {
+    await assert.rejects(() => target.mod.restoreFromFile(backupPath), /EPERM/);
+  } finally {
+    fsp.chmod = realChmod;
+  }
+  assertUntouched(target, 'vor dem Restore');
   target.mod.get().close();
 });

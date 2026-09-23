@@ -10565,7 +10565,16 @@ async function stageDatabaseCopy(from, stagingPath) {
 async function adoptDatabaseAttributes(filePath) {
   let previous = null;
   try { previous = await fs.stat(DB_PATH); } catch { /* keine bisherige Datenbank */ }
-  await fs.chmod(filePath, previous ? previous.mode & 0o7777 : 0o600);
+  try {
+    await fs.chmod(filePath, previous ? previous.mode & 0o7777 : 0o600);
+  } catch (err) {
+    // FUSE- und SMB-Mounts eines NAS lehnen chmod oft ab - dann gelten ihre
+    // eigenen Rechte. Abbrechen nur, wenn der Besitzer die Datei so nicht
+    // schreiben kann: sie wird gleich DB_PATH.
+    const mode = (await fs.stat(filePath)).mode;
+    if ((mode & 0o200) === 0) throw err;
+    log.warn(`Could not set the mode of ${filePath} (${err?.code ?? err}); keeping the one the file system gave it.`);
+  }
   if (previous) {
     try { await fs.chown(filePath, previous.uid, previous.gid); } catch { /* nur als root oder ohne Wechsel erlaubt */ }
   }
@@ -10581,8 +10590,11 @@ const ROLLBACK_PARTIAL_SUFFIX = '.partial';
  * Grenze: die Nummer gilt nur im selben PID-Namensraum. Ein CLI-Restore per
  * `docker compose run` laeuft in einem eigenen Container; seine Nummer kann
  * hier einen fremden Prozess treffen (dann bleibt die Datei bis zum naechsten
- * Start liegen) oder keinen (dann wird sie geloescht, und sein rename scheitert
- * - vor dem Tausch, DB_PATH bleibt die alte Datenbank).
+ * Start liegen) oder keinen (dann wird sie geloescht). Trifft das seine
+ * Arbeitsdatei, scheitert sein rename auf DB_PATH; trifft es seine halbe
+ * Rollback-Kopie, scheitert deren rename, und `restoreValidatedFile()` bricht
+ * deshalb ab (ENOENT zaehlt dort nur, wenn DB_PATH vorher fehlte). In beiden
+ * Faellen vor dem Tausch: DB_PATH bleibt die alte Datenbank.
  * @param {number} pid
  */
 function otherProcessAlive(pid) {
@@ -10681,6 +10693,12 @@ async function restoreValidatedFile(sourcePath) {
     // bis zum Tausch waeren Rollback und DB_PATH dieselbe Datei - ein
     // gescheiterter Restore, der die alte Datenbank wieder oeffnet, schriebe
     // dann in die Rollback-Kopie mit.
+    // ENOENT heisst hier nur dann „keine bisherige Datenbank", wenn DB_PATH
+    // schon vor dem Kopieren fehlte. Sonst kam es von unterwegs - etwa weil
+    // ein zweiter Prozess die `.partial` als Rest weggeraeumt hat (Review
+    // #1431) -, und ohne Rollback-Kopie darf nicht getauscht werden: die alte
+    // Datenbank waere danach weg.
+    const hadDatabase = existsSync(DB_PATH);
     try {
       await stageDatabaseCopy(DB_PATH, rollbackPartialPath);
       await fs.rename(rollbackPartialPath, rollbackPath);
@@ -10691,7 +10709,7 @@ async function restoreValidatedFile(sourcePath) {
       await syncDirectory(path.dirname(DB_PATH));
       rollbackCreated = true;
     } catch (err) {
-      if (err?.code !== 'ENOENT') throw err;
+      if (err?.code !== 'ENOENT' || hadDatabase) throw err;
     }
 
     // Ohne offene Verbindung hat niemand das Journal gecheckpointet. Ein `-wal`
