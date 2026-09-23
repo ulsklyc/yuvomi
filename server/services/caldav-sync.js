@@ -151,6 +151,21 @@ function calendarHome(url) {
   return `${parsed.origin}/${segments.slice(0, -1).join('/')}/`;
 }
 
+/**
+ * Zeigen zwei Konto-URLs auf dieselbe Adresse? Host klein, Standardport weg
+ * (beides erledigt `URL`), Schraegstriche am Ende des Pfads weg. Gespeichert
+ * wird die URL unveraendert; verglichen wird normalisiert (#1270).
+ */
+function sameAccountUrl(a, b) {
+  const norm = (raw) => {
+    try {
+      const u = new URL(String(raw).trim());
+      return `${u.protocol}//${u.host}${u.pathname.replace(/\/+$/, '')}${u.search}`;
+    } catch { return String(raw).trim(); }
+  };
+  return norm(a) === norm(b);
+}
+
 /** So lange laeuft die Farb-Heilung (#1270) je Konto, ab seinem ersten Lauf. */
 const LEGACY_HEAL_DAYS = 30;
 
@@ -180,9 +195,17 @@ function legacyHealActive(conn, accountId, now = new Date()) {
     conn.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?)').run(key, now.toISOString());
     return true;
   }
-  // `never` ist kein Datum: die Heilung ist dann von vornherein aus.
+  // `never` (und jeder andere Wert, der kein Datum ist) schaltet die Heilung
+  // aus. Ein Beginn in der Zukunft - die Uhr ging beim Start vor - verlaengert
+  // sie nicht.
+  //
+  // Bekannte Grenze: die Frist beginnt mit dem ersten Lauf, bei einem Konto,
+  // das lange nicht synchronisiert, also spaet. Das ist dasselbe Risiko wie
+  // ein frueher Beginn; eine gerade gewaehlte Farbe schuetzt die Heilung
+  // selbst (outbound_dirty und die gesehene Farbe im UPDATE).
   const since = Date.parse(value);
-  return Number.isFinite(since) && now.getTime() - since < LEGACY_HEAL_DAYS * 24 * 60 * 60 * 1000;
+  const elapsed = now.getTime() - since;
+  return Number.isFinite(since) && elapsed >= 0 && elapsed < LEGACY_HEAL_DAYS * 24 * 60 * 60 * 1000;
 }
 
 /**
@@ -508,9 +531,12 @@ async function updateAccount(accountId, { name, caldavUrl, username, password, c
 
   // Neue Adresse oder neuer Benutzer heisst: ein anderes Konto unter derselben
   // ID, das womoeglich Termine eines geloeschten uebernimmt. Die Frist der
-  // Farb-Heilung (#1270) gilt dem alten und wird neu entschieden; ein neues
-  // Passwort laesst sie stehen.
-  if ((caldavUrl && caldavUrl !== account.caldav_url) || (username && username !== account.username)) {
+  // Farb-Heilung (#1270) gilt dem alten und wird neu entschieden. Nur bei
+  // einer ECHTEN Aenderung: ein Schraegstrich am Ende, ein grossgeschriebener
+  // Host oder der Standardport sind dieselbe Adresse. Ein neues Passwort
+  // laesst die Frist stehen.
+  if ((caldavUrl && !sameAccountUrl(caldavUrl, account.caldav_url))
+      || (username && username !== account.username)) {
     decideLegacyHeal(db.get(), accountId);
   }
 
@@ -831,6 +857,7 @@ async function runSync({ createClient } = {}) {
   const healBurntInColor = conn.prepare(`
     UPDATE calendar_events SET color = NULL, color_modified = 0
     WHERE id = ? AND color_modified = 1 AND user_modified = 1
+      AND outbound_dirty = 0 AND lower(color) = lower(?)
       AND ${uploadedRowRule('calendar_events.')}
       AND (? IS NULL OR datetime(created_at) <= datetime(?))
   `);
@@ -1016,7 +1043,7 @@ async function runSync({ createClient } = {}) {
                 else if (burntInColors !== null
                   && existing.color_modified === 1 && existing.color != null
                   && burntInColors.has(String(existing.color).toLowerCase())) {
-                  healCandidates.set(existing.id, ev.uid);
+                  healCandidates.set(existing.id, { uid: ev.uid, color: existing.color });
                 }
                 changed = updEvent.run(...values, existing.id, ...values).changes > 0;
                 eventId = existing.id;
@@ -1069,9 +1096,13 @@ async function runSync({ createClient } = {}) {
 
       // Farb-Heilung (#1270): erst jetzt, nachdem jede Kopie jeder UID gesehen
       // wurde. Eine reine Heilung zaehlt als Aenderung, aber nur einmal je Termin.
-      for (const [eventId, uid] of healCandidates) {
+      // Zwischen dem Sammeln und hier liegen die awaits der uebrigen Kalender:
+      // waehlt in der Zeit jemand eine Farbe, steht der Termin auf
+      // outbound_dirty und traegt eine andere Farbe. Das UPDATE prueft beides
+      // neu, sonst naehme es die gerade gewaehlte Farbe mit.
+      for (const [eventId, { uid, color }] of healCandidates) {
         if (coloredUids.has(uid)) continue;
-        if (healBurntInColor.run(eventId, legacyCutoff, legacyCutoff).changes > 0 && !changedIds.has(eventId)) {
+        if (healBurntInColor.run(eventId, color, legacyCutoff, legacyCutoff).changes > 0 && !changedIds.has(eventId)) {
           accountChangedCount++;
         }
       }

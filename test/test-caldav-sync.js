@@ -1828,6 +1828,93 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     assert.strictEqual(row(d).color, COLOR_A, 'die Frist ist abgelaufen');
   }));
 
+  // Waehrend Kalender B abgerufen wird, aendert jemand den Termin in Yuvomi.
+  // `change` schreibt, was die Route schreiben wuerde.
+  function clientChangingDuringB(d, change) {
+    return async () => ({
+      fetchCalendars: async () => [CAL_A, CAL_B].map((url) => ({ url, displayName: url })),
+      fetchCalendarObjects: async ({ calendar }) => {
+        if (calendar.url === CAL_A) return [{ url: `${CAL_A}series-1.ics`, data: icsOf(vevent()) }];
+        change();
+        return [];
+      },
+      createCalendarObject: async () => ({}),
+    });
+  }
+
+  it('eine waehrend des Laufs gewaehlte Farbe ueberlebt die aufgeschobene Heilung', () => withDb(async (d) => {
+    // Geheilt wird erst nach allen Kalendern, also nach den awaits der
+    // uebrigen. Waehlt in der Zeit jemand eine Farbe (color, color_modified,
+    // outbound_dirty), darf die Heilung sie nicht nehmen.
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    const chosen = '#00AA00';
+    await sync({ createClient: clientChangingDuringB(d, () => d.prepare(
+      'UPDATE calendar_events SET color = ?, color_modified = 1, outbound_dirty = 1 WHERE external_calendar_id = ?'
+    ).run(chosen, UID)) });
+    assert.strictEqual(row(d).color, chosen);
+  }));
+
+  it('eine waehrend des Laufs gespeicherte Bearbeitung ohne Farbwechsel stoppt die Heilung', () => withDb(async (d) => {
+    // Die Bearbeitung geht mit ihrer Farbe als COLOR-Zeile hinaus; ab dann
+    // gehoert die Farbe dem Termin.
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    await sync({ createClient: clientChangingDuringB(d, () => d.prepare(
+      'UPDATE calendar_events SET outbound_dirty = 1 WHERE external_calendar_id = ?'
+    ).run(UID)) });
+    assert.strictEqual(row(d).color, COLOR_A);
+  }));
+
+  it('eine waehrend des Laufs geaenderte Farbe wird nicht geheilt, auch ohne Ausgangsmarke', () => withDb(async (d) => {
+    // Gegenstueck zur Probe oben: die Farbe allein muss reichen.
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    await sync({ createClient: clientChangingDuringB(d, () => d.prepare(
+      'UPDATE calendar_events SET color = ? WHERE external_calendar_id = ?'
+    ).run(COLOR_B, UID)) });
+    assert.strictEqual(row(d).color, COLOR_B);
+  }));
+
+  it('mit dem Eintrag never heilt ein Konto nie, auch einen echten Kandidaten', () => withDb(async (d) => {
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    d.prepare("INSERT INTO sync_config (key, value) VALUES (?, 'never')").run(HEAL_KEY_1);
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.strictEqual(row(d).color, COLOR_A);
+  }));
+
+  it('ein Eintrag, der kein Datum ist, schaltet die Heilung aus', () => withDb(async (d) => {
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    d.prepare("INSERT INTO sync_config (key, value) VALUES (?, 'xyz')").run(HEAL_KEY_1);
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.strictEqual(row(d).color, COLOR_A);
+  }));
+
+  it('ein Fristbeginn in der Zukunft verlaengert die Heilung nicht', () => withDb(async (d) => {
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    d.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?)').run(HEAL_KEY_1, daysAgo(-2));
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.strictEqual(row(d).color, COLOR_A);
+  }));
+
+  it('ein Lauf ohne aktivierte Kalender beginnt die Frist nicht', () => withDb(async (d) => {
+    d.prepare('UPDATE caldav_calendar_selection SET enabled = 0').run();
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.strictEqual(healState(d), null);
+  }));
+
+  it('dieselbe Adresse mit Schraegstrich oder grossem Host startet die Frist nicht neu', () => withDb(async (d) => {
+    const since = daysAgo(40);
+    d.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?)').run(HEAL_KEY_1, since);
+    await updateAccount(1, { caldavUrl: 'https://dav.example', createClient: accountClient([CAL_A]) });
+    assert.strictEqual(healState(d), since, 'ohne Schraegstrich am Ende');
+    await updateAccount(1, { caldavUrl: 'https://DAV.Example:443/', createClient: accountClient([CAL_A]) });
+    assert.strictEqual(healState(d), since, 'grosser Host, Standardport');
+  }));
+
   it('eine gewaehlte Farbe, die keine Kalenderfarbe ist, bleibt', () => withDb(async (d) => {
     // Gegenprobe: ohne sie waere der Test oben auch gruen, wenn der Inbound
     // jede lokal gefuehrte Farbe verwuerfe.

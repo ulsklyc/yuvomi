@@ -180,14 +180,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   choice, so it went on beating the colour of the assigned person, and after a move to another
   calendar it even showed the colour of the old one. For 30 days after its first sync following this
   update, each CalDAV account now removes such a colour when it meets the appointment: only on
-  appointments imported before v2.49.0 reached this installation and edited before v2.50.0, when the
-  appointment carries no colour of its own on the server and the stored one is exactly the colour of
-  a calendar of that account, including one deleted on the server since. The appointment then shows
-  the colour of its person or its calendar again. Appointments that Yuvomi uploaded itself count
-  only with the colour of the calendar they were uploaded to. A colour picked in Yuvomi that is not
-  one of that account's calendar colours stays, and so does any colour the server sets on the
-  appointment itself. An account added later does not do this, unless it takes over old appointments
-  of a deleted account. (#1270)
+  appointments that were created before v2.49.0 reached this installation and have been edited in
+  Yuvomi, when the appointment carries no colour of its own on the server and the stored one is
+  exactly the colour of a calendar of that account, including one deleted on the server since. The
+  appointment then shows the colour of its person or its calendar again. Appointments that Yuvomi
+  uploaded itself count only with the colour of the calendar they were uploaded to, and a colour
+  chosen while a sync is running stays. A colour picked in Yuvomi that is not one of that account's
+  calendar colours stays, and so does any colour the server sets on the appointment itself. An
+  account added later does not do this, unless it takes over old appointments of a deleted account;
+  the same applies when an account is pointed at a different server address or user name. (#1270)
 
 - **Screen readers and keyboards get a few rough edges less.** Toasts no longer interrupt what a
   screen reader is reading or get announced twice: only errors and warnings interrupt, everything
