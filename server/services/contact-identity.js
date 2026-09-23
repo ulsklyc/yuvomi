@@ -29,6 +29,7 @@
  */
 
 import { isAdminRequest } from '../middleware/require-admin.js';
+import { emailMatchKey } from '../utils/email-match.js';
 
 /**
  * Wer handelt - aus einem authentifizierten Request.
@@ -64,14 +65,14 @@ export function mayChangeContactEmails(contact, actor) {
   return actor.userId != null && Number(actor.userId) === Number(contact.family_user_id);
 }
 
-// Verglichen wird ohne Gross-/Kleinschreibung: dieselben Pfade, die die
-// Adresse lesen (SSO-Verknuepfung, Eindeutigkeitspruefung), vergleichen mit
-// `lower()`. Eine reine Umschreibung der Schreibweise fuehrt zu keinem anderen
-// Konto und ist deshalb keine Aenderung.
-const norm = (value) => {
-  const s = typeof value === 'string' ? value.trim().normalize('NFC').toLowerCase() : '';
-  return s || null;
-};
+// Verglichen wird mit GENAU der Regel der Pfade, die die Adresse lesen
+// (SSO-Verknuepfung, Eindeutigkeitspruefung, forgot-password):
+// `emailMatchKey()` aus server/utils/email-match.js - Leerraum am Rand weg,
+// nur A-Z klein. Was diese Regel fuer gleich haelt, fuehrt zu keinem anderen
+// Konto und ist keine Aenderung. Eine weitere Faltung hier (Unicode-
+// Kleinschreibung, NFC) hiesse eine Aenderung durchzulassen, die fuer die
+// Anmeldung eine andere Adresse ist.
+const norm = (value) => (typeof value === 'string' ? emailMatchKey(value) : '') || null;
 
 /**
  * Aendert ein PUT-Body die E-Mail-Adressen des Kontakts?
