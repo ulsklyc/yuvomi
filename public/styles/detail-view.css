@@ -226,9 +226,9 @@
   color: var(--active-module-accent, var(--color-accent));
 }
 
-/* Ein Beleg, den der Server diesem Betrachter nicht nennt (#1358): Zustand,
+/* Ein Anhang, den der Server diesem Betrachter nicht nennt (#1358): Zustand,
  * kein Link - deshalb ohne Akzentfarbe. */
-.detail-attachment--present {
+.detail-attachment--locked {
   display: inline-flex;
   align-items: center;
   min-height: var(--target-base);

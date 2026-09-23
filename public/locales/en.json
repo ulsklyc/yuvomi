@@ -741,6 +741,8 @@
         "searchCountCapped": "{{shown}} of {{total}} results",
         "title": "Calendar",
         "attachmentRemove": "Remove attachment",
+        "attachmentChangeRefused": "You can't change this attachment: the document is private, or you don't have access to documents.",
+        "attachmentUploadRefused": "Only members who may edit documents can add an attachment.",
         "newEvent": "New Event",
         "editEvent": "Edit Event",
         "addEvent": "Add event",
@@ -1123,6 +1125,7 @@
         "phonePreview": "Preview: {{value}}",
         "phoneImplausible": "This number looks incomplete - it will still be saved.",
         "emailLabel": "Email",
+        "emailLockedHint": "These addresses belong to this member's account. Only the member or an admin can change them.",
         "emailPlaceholder": "name@example.com",
         "addressLabel": "Address",
         "addressPlaceholder": "Street, ZIP City",
@@ -3578,8 +3581,7 @@
         "currentMonth": "Current",
         "noVisitReportsInMonth": "No staff visits recorded in {{month}}.",
         "settledAdminOnly": "Only an admin can change or delete it",
-        "reportVisitsCount": "Visits",
-        "receiptPresent": "Attached"
+        "reportVisitsCount": "Visits"
     },
     "userMultiSelect": {
         "moreUsers": "more",
@@ -5485,7 +5487,7 @@
         "openAction": "Open {{name}}",
         "limitReached": "At most {{count}} documents.",
         "limitReached_one": "At most {{count}} document.",
-        "presentHidden": "Attached"
+        "lockedPrivate": "Attachment present (private)"
     },
     "join": {
         "title": "Set up your account",

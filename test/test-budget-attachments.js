@@ -271,18 +271,19 @@ test('filterVisibleDocumentIds: filtert, dedupliziert und hält die Reihenfolge'
 // ── Dokumentenrecht (#1358) ─────────────────────────────────────────────────────
 // Der Beleg ist eine Zeile des Dokumente-Moduls. Wer es nicht lesen darf
 // (Mitgliedsrecht `documents: none` oder ein Token ohne documents:read),
-// bekommt weder Namen noch ID - nur, DASS ein Beleg da ist. Verknuepfen darf er
+// bekommt keinen Beleg: `attachments` ist `null`, nicht einmal die Anzahl
+// bleibt (einheitlich mit `document_count` bei Aufgaben, #1425). Verknuepfen darf er
 // nichts, und jede ID antwortet gleich: sonst waere die Antwort ein Orakel.
 
 const NONE = { id: A, role: 'member', moduleAccess: { documents: 'none' } };
 const TOKEN = { id: A, role: 'member', authMethod: 'api_token', authScopes: ['budget:write'] };
 const TOKEN_DOCS = { id: A, role: 'member', authMethod: 'api_token', authScopes: ['budget:write', 'documents:read'] };
-const docFields = (list) => (list || []).map((a) => ({
+// `null` bleibt `null`: ohne Dokumentenrecht gibt es keine Liste, auch keine leere.
+const docFields = (list) => (list == null ? list : list.map((a) => ({
   document_id: a.document_id, name: a.name, original_name: a.original_name, mime_type: a.mime_type, file_size: a.file_size,
-}));
-const MASKED = { document_id: null, name: null, original_name: null, mime_type: null, file_size: null };
+})));
 
-test('Dokumentenrecht: ohne documents-Lesen kommen Belege maskiert - Liste, POST- und PUT-Antwort (#1358)', async () => {
+test('Dokumentenrecht: ohne documents-Lesen kommen keine Belege und keine Anzahl - Liste, POST- und PUT-Antwort (#1358)', async () => {
   const doc = insertDocument({ name: 'Kassenbon Recht' });
   const entry = await createEntry({ title: 'Mit Recht', date: '2031-07-04', attachment_document_ids: [doc] });
   const listed = async (as) => {
@@ -293,13 +294,26 @@ test('Dokumentenrecht: ohne documents-Lesen kommen Belege maskiert - Liste, POST
   const open = [{ document_id: doc, name: 'Kassenbon Recht', original_name: 'Kassenbon Recht.pdf', mime_type: 'application/pdf', file_size: 1234 }];
   assert.deepEqual(await listed({ id: A, role: 'member' }), open);
   assert.deepEqual(await listed({ ...NONE, moduleAccess: { documents: 'read' } }), open, 'Leserecht reicht');
-  assert.deepEqual(await listed(NONE), [MASKED], 'documents: none sieht nur, dass ein Beleg da ist');
-  assert.deepEqual(await listed(TOKEN), [MASKED], 'ein Token ohne documents-Scope ebenso');
+  assert.deepEqual(await listed(NONE), null, 'documents: none sieht keinen Beleg, auch nicht ihre Anzahl');
+  assert.deepEqual(await listed(TOKEN), null, 'ein Token ohne documents-Scope ebenso');
   assert.deepEqual(await listed(TOKEN_DOCS), open, 'mit documents:read liefert das Token, was sein Nutzer sieht');
+
+  // Ohne Recht sieht eine Buchung ohne Beleg aus wie eine mit zweien: die
+  // Antwort sagt nicht, ob und wie viele es gibt.
+  const second = insertDocument({ name: 'Rechnung Recht' });
+  const two = await createEntry({ title: 'Zwei Belege', date: '2031-07-05', attachment_document_ids: [doc, second] });
+  const none = await createEntry({ title: 'Ohne Beleg', date: '2031-07-06' });
+  const all = await call('GET', '/?month=2031-07', { as: NONE });
+  for (const id of [entry.id, two.id, none.id]) {
+    assert.equal(all.body.data.find((e) => e.id === id).attachments, null, `Buchung ${id}: keine Anzahl`);
+  }
+  const own = await call('GET', '/?month=2031-07', { as: { id: A, role: 'member' } });
+  assert.equal(own.body.data.find((e) => e.id === two.id).attachments.length, 2, 'mit Recht bleiben beide');
+  assert.deepEqual(own.body.data.find((e) => e.id === none.id).attachments, [], 'und ohne Beleg eine leere Liste');
 
   const put = await call('PUT', `/${entry.id}`, { as: NONE, body: { amount: -26 } });
   assert.equal(put.status, 200);
-  assert.deepEqual(docFields(put.body.data.attachments), [MASKED], 'PUT-Antwort');
+  assert.deepEqual(docFields(put.body.data.attachments), null, 'PUT-Antwort');
   assert.deepEqual(linkedDocumentIds(entry.id), [doc], 'gespeichert bleibt der Beleg');
 });
 

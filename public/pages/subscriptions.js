@@ -644,7 +644,7 @@ function renderCard(subscription) {
   // Wischflaechen mit ihnen, weil die Geste nicht verdrahtet wird.
   const ro = readOnly();
   return `
-    <div class="swipe-row" data-swipe-id="${subscription.id}">
+    <div class="swipe-row${ro ? ' swipe-row--static' : ''}" data-swipe-id="${subscription.id}">
       ${ro ? '' : `<div class="swipe-reveal swipe-reveal--done swipe-reveal--leading" aria-hidden="true">
         <i data-lucide="calendar-check" class="icon-md"></i>
         <span>${t('subscriptions.markRenewed')}</span>

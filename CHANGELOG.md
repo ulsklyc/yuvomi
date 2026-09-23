@@ -184,6 +184,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The group's activity shows "Booking restored" once for each expense that was repaired, so a
   changed balance has a visible reason, and each entry names the expense and its amount. (#1382)
 
+- **Screen readers and keyboards get a few rough edges less.** Toasts no longer interrupt what a
+  screen reader is reading or get announced twice: only errors and warnings interrupt, everything
+  else waits its turn. "Edit member" now starts in the username field instead of on the hidden
+  picture upload, which showed up as a stray strip over the dialog title and had no name for
+  screen readers; the birthday and housekeeping staff dialogs had the same problem. The hidden
+  photo and file pickers in these and in the recipe, inventory and attachment dialogs now have a
+  name and no longer take an extra, invisible Tab stop next to their button. The member and
+  invite lists in Settings are valid lists again when empty or after a load error, the two-factor
+  card keeps a gap between its hint and its buttons, and with read-only access, birthday and
+  subscription rows no longer show a swipe arrow on touchscreens, since there is nothing to swipe.
+  A toast now also stays clear of a focused person chip in a dialog, not only of the chip's first
+  pixel.
+
+- **Moving items between the pantry and the shopping list now needs read access to where they
+  come from.** Moving checked items from the shopping list into the pantry, and putting pantry items
+  on the shopping list, were judged only by the module they write into. The import now also needs
+  read access to the module it copies from: the shopping list for "Into pantry", the pantry for the
+  shopping cart on a pantry row. Without it the server answers 403 and copies nothing. Both buttons
+  stand on the page of that source module, so nobody who can see them loses them. For API clients:
+  `POST /api/v1/pantry/import-shopping` also needs `shopping:read`, and
+  `POST /api/v1/shopping/{listId}/import-pantry` also needs `pantry:read`. (#1433)
+
+- **Choosing members for a shared-expense group shows contact details only with access to
+  them.** The member picker now shows phone and email only with read access to contacts, and a
+  member's birthday only with read access to the calendar, where birthdays live. A contact without
+  an account is linked to the new guest when it is added, so the picker offers such contacts, and
+  adding one is accepted, only with permission to edit contacts; without any access to contacts
+  the answer is as if the contact did not exist. Adding the same contact twice at the same moment
+  now creates one guest instead of failing, creating two guests with the same username at once
+  gives one guest and a clear "already taken", and a group removed while a guest is being added
+  leaves no guest account behind. An unknown contact answers 404 instead of a server error. (#1433)
+
+- **An inventory item shows its budget bookings only with access to the budget.** Without read
+  access to the budget, an item no longer shows its linked bookings, their total or the bookings
+  in its history, and the edit form leaves out the bookings section and its buttons instead of
+  claiming there are none. Linking, unlinking or pre-filling the purchase price from a booking
+  answers as if the booking did not exist. (#1433)
+
 - **A failed restore explains itself in your language and keeps your place.** When a backup did
   not open, the restore dialog showed the server's English explanation, up to several paragraphs
   long, also in a German interface. Each known cause now has a short translated message with the
@@ -200,27 +238,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   housekeeping module, also to members without access to documents and when the receipt was a
   private document of someone else. The page already hid the name without document access, but the
   API still returned it. Name and number now come only when you may read that document, by the same
-  rule the documents module uses; otherwise the visit only says that it has a receipt, and the edit
-  dialog shows "Attached" instead of an upload field. Saving such a visit keeps the receipt: before,
-  saving it could silently remove someone else's private receipt, and it can no longer be replaced
-  or removed by someone who cannot see it. Linking a receipt now needs access to documents. For API
-  clients every visit and work session carries `has_receipt`; `receipt_document_id` and
-  `receipt_document_name` are `null` unless you may read the document, API tokens need a
-  `documents:read` scope for them, and `PUT /api/v1/housekeeping/visits/{id}` answers 403 when it
-  would replace a receipt you cannot see or link one without access to documents. (#1358)
+  rule the documents module uses. Without access to documents the visit does not even say that it
+  has a receipt; with access but without sight of that document, the report and the edit dialog say
+  "Attachment present (private)" instead of an upload field. Saving such a visit keeps the receipt:
+  before, saving it could silently remove someone else's private receipt, and it can no longer be
+  replaced or removed by someone who cannot see it. Linking a receipt now needs access to
+  documents. For API clients every visit and work session carries `has_receipt`, which is `null`
+  without access to the documents module; `receipt_document_id` and `receipt_document_name` are
+  `null` unless you may read the document, API tokens need a `documents:read` scope for them, and
+  `PUT /api/v1/housekeeping/visits/{id}` answers 403 when it would replace a receipt you cannot see
+  or link one without access to documents. (#1358)
 
-- **Receipts on budget entries, shared expenses and inventory items no longer name documents you
-  may not read.** Their API sent the file name and document number of every linked receipt to
-  anyone who could open the budget or the inventory, also to members without access to documents
-  and to API tokens without a documents scope. Without access to documents a receipt now only says
-  that it is there: the detail view shows "Attached" where the name was, and the inventory no
-  longer shows a link that leads nowhere or lists the document in an item's history. Linking a
-  receipt or a payment proof needs access to documents, and existing receipts stay when such a
-  member saves the entry. For API clients `attachments[].document_id`, `name`, `original_name`,
-  `mime_type` and `file_size` are `null` without access to the documents module (for API tokens a
+- **Receipts on budget entries, shared expenses and inventory items no longer name or count
+  documents you may not read.** Their API sent the file name and document number of every linked
+  receipt to anyone who could open the budget or the inventory, also to members without access to
+  documents and to API tokens without a documents scope. Without access to documents an entry now
+  says nothing about its receipts - not which, not how many, and the lists show no paperclip -
+  the same as a task with linked documents. The inventory no longer shows a link that leads nowhere
+  or lists the document in an item's history. Linking a receipt or a payment proof needs access to
+  documents, and existing receipts stay when such a member saves the entry. For API clients
+  `attachments` is `null` without access to the documents module (for API tokens a
   `documents:read` scope), a settlement's `proof_document_id` is `null` unless you may read that
   document, and a non-empty `attachment_document_ids` or a `proof_document_id` is answered with the
   same 403 for every id. (#1358)
+
+- **Documents: a calendar event no longer shows its attachment to members who cannot see the
+  document.** An event's attachment is stored in the documents module, but the calendar sent its
+  name and a link to it to everyone who could see the event, also to members without access to
+  documents, to API tokens without a documents scope and when the document itself had been made
+  private. Such members now see the event without an attachment, in the calendar and on the
+  dashboard. Adding an attachment now needs permission to add documents, and the event dialog only
+  offers the upload area then; an attachment you cannot see can no longer be replaced or removed by
+  saving the event, and the event view and the dialog say "Attachment present (private)" instead.
+  Saving an event no longer makes a private attachment visible again: its visibility is carried
+  over to the document only by the person who owns it (the event's creator) or an admin, and only
+  with permission to edit documents; anyone else can only narrow it. The sync of connected
+  calendars, which reassigns an event when it moves to a calendar with another default person,
+  never changes who may see its attachment, with one exception: when the event is shown to its
+  assignees and the attachment is already shared with selected members, that person is added to
+  them. Otherwise the owner's sharing stays exactly as it is - nothing becomes visible to the whole
+  family, nothing private is opened, nothing is made private and no share is removed. A copy made
+  when a series is split keeps the original's sharing and owner. Splitting a series or detaching an
+  occurrence no longer copies an attachment for someone who cannot see it or may not edit
+  documents; the new part then has no attachment and the original stays on the series. For API
+  clients `attachment_document_id`, `attachment_preview_url`, `attachment_download_url`,
+  `attachment_name`, `attachment_mime` and `attachment_size` are `null` unless you may read that
+  document, `attachment_locked` says whether there is one you cannot see (`null` without access to
+  documents), a non-empty `attachment_data` without a `documents:write` right is answered with 403,
+  and so is replacing or removing an attachment whose document you cannot read. (#1358)
+
+- **Documents: the folder delete preview no longer hints at documents you cannot see.** Before
+  deleting a folder the app asks what the deletion would affect. That answer already counted only
+  the documents you can see, but whether it offered to delete the documents as well still depended
+  on documents hidden from you, so an administrator could tell that a folder held one. The offer
+  now depends only on the documents you can see. Deleting a folder together with its documents
+  still refuses as long as it holds a document you may not delete. (#1358)
 
 - **A task no longer names or counts documents you may not read.** The tasks API sent the linked
   documents of a task with their names, and the number of them, to everyone who could see the task,
@@ -693,6 +765,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with a pattern that required exactly two letters - and Filipino's file is `fil.json`, with three.
   Picking it came back as "invalid language". Every other language was unaffected, which is why this
   went unnoticed.
+
+## [2.68.1] - 2026-09-23
+
+### Security
+
+- **Only the linked person or an admin can now change the email addresses of a household member's
+  contact.** A contact linked to an account carries that account's email addresses, and those
+  addresses are used by the password reset and by the SSO sign-in to find the account. Any member
+  with write access to contacts could change them, on anyone's contact, and a CardDAV sync could
+  overwrite them as well. Changing the primary or an additional email address of a linked contact
+  now needs that person or an admin; anyone else is refused, and the edit form shows the addresses
+  read-only to them. The CardDAV sync no longer writes them on a linked contact. Every other field
+  of a linked contact stays editable for members as before, and contacts that are not linked to an
+  account are not affected.
+
+- **An API token limited to certain modules can no longer change the email addresses of a household
+  member's contact, not even an admin's token or the person's own.** These addresses lead to the
+  account, which is more than a module permission covers. Changing them now needs a signed-in session
+  or a token without module limits; other fields stay editable with a limited token.
+
+- **Adding a contact to a shared-expense group no longer creates a full household account.** Any
+  member could do this, and the new account counted as a household member with the contact's email
+  address as the target of its password reset, although creating household accounts is for admins.
+  Such an account is now a guest of the group, the same as a guest added directly: it sees only that
+  group's shared expenses. Accounts created this way before the update stay as they are, because
+  some of them may be in real use. Admins should look through the household members under Settings
+  for people who were only meant to share expenses, and remove or re-create them as guests.
 
 ## [2.68.0] - 2026-09-20
 

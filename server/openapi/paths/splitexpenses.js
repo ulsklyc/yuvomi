@@ -86,10 +86,10 @@ export function splitexpensesPaths() {
     },
     '/api/v1/split-expenses/groups/{id}/members': {
       get: op({ summary: 'List group members', tag: 'SplitExpenses', params: [idParam()] }),
-      post: op({ summary: 'Add member to group', tag: 'SplitExpenses', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Add member to group', description: 'Takes a `user_id`, or a `contact_id` that is turned into a guest user when the contact has none yet. A `contact_id` needs read access to the Contacts module (for API tokens `contacts:read`); without it, and for an unknown contact, the answer is the same 404 and nothing is created. A contact without an account is linked to the new guest and needs write access to Contacts (`contacts:write`); without it the answer is 403 and nothing is written.', tag: 'SplitExpenses', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/split-expenses/groups/{id}/member-candidates': {
-      get: op({ summary: 'List users and contacts that can be added to a group', tag: 'SplitExpenses', params: [idParam()] }),
+      get: op({ summary: 'List users and contacts that can be added to a group', description: 'Phone and email come only with read access to the Contacts module, a member\'s birthday only with read access to the Calendar module (for API tokens `contacts:read` and `calendar:read`); otherwise they are null. Contacts without an account are offered as candidates only with write access to Contacts (`contacts:write`), because adding one links it to the new guest.', tag: 'SplitExpenses', params: [idParam()] }),
     },
     '/api/v1/split-expenses/groups/{id}/members/{userId}': {
       delete: op({ summary: 'Remove member from group', tag: 'SplitExpenses', params: [idParam(), { name: 'userId', in: 'path', required: true, schema: { type: 'integer' } }], stateChanging: true }),

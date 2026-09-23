@@ -6,6 +6,9 @@
 
 import { StorageError } from '../../services/document-storage.js';
 import { ensureModuleFolder } from '../../services/document-folders.js';
+import { applyDocumentAccess, filterVisibleDocumentIds } from '../../services/document-access.js';
+import { documentViewer } from '../../services/document-links.js';
+import { mayWriteModule } from '../../permissions.js';
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../../utils/upload-limit.js';
 import { contentMatchesMime } from '../../utils/file-signature.js';
 import { isAdminRequest } from '../../middleware/require-admin.js';
@@ -187,8 +190,27 @@ export function createAttachmentDocument(database, attachment, staged, body, act
   return result.lastInsertRowid;
 }
 
-export function cloneAttachmentDocument(database, source, staged, actorId) {
+/**
+ * Kopie eines Anhang-Dokuments fuer einen Nachfolger oder abgeloesten Termin.
+ * Sie erbt Sichtbarkeit UND Freigaben der Quelle (#1358, Review): ohne die
+ * Freigaben saehe ein eingeschraenktes Dokument am neuen Termin niemand ausser
+ * der Besitzerin - auch nicht die Zugewiesene, die den Split ausgeloest hat.
+ * Weiter geoeffnet wird die Kopie danach nur von einer Verwalterin.
+ */
+export function cloneAttachmentDocument(database, source, staged) {
   if (!source || !staged) return null;
+  // Die Kopie gehoert IMMER der Besitzerin der Quelle - nie der Person, die den
+  // Split ausloest. Sonst koennte sie ueber die Kopie verwalten, was ihr an der
+  // Quelle nicht gehoert.
+  const cloneId = insertAttachmentClone(database, source, staged);
+  database.prepare(`
+    INSERT OR IGNORE INTO family_document_access (document_id, user_id)
+    SELECT ?, user_id FROM family_document_access WHERE document_id = ?
+  `).run(cloneId, source.id);
+  return cloneId;
+}
+
+function insertAttachmentClone(database, source, staged) {
   return database.prepare(`
     INSERT INTO family_documents
       (name, description, category, status, visibility, folder_id, original_name,
@@ -209,8 +231,48 @@ export function cloneAttachmentDocument(database, source, staged, actorId) {
     staged.storage_provider,
     staged.storage_backend,
     staged.storage_key,
-    actorId,
+    source.created_by,
   ).lastInsertRowid;
+}
+
+/* EIN ANHANG IST EIN DOKUMENT - HOCHLADEN IST EINE UEBERTRAGUNG (#1358).
+ *
+ * Ein neuer Anhang legt eine Zeile in family_documents an: das ist keine
+ * Folge des Termins, sondern eine Datei, die jemand ausdruecklich ins
+ * Dokumente-Modul schickt, benannt am eigenen Bedienelement. Nach
+ * docs/DECISIONS.md Eintrag 10 fragt die Route dafuer das Zielrecht,
+ * `mayWriteModule(req, 'documents')` (Mitgliedsrecht UND Token-Scope), und
+ * zwar als Erstes, vor jeder Suche, die mit 404 antworten koennte. Der Dialog
+ * blendet die Ablage aus demselben Grund aus (`eventAttachmentFieldHtml()`).
+ */
+export const ATTACHMENT_UPLOAD_REFUSAL = 'Attaching a file needs write access to documents.';
+
+/** Bringt der Body einen neuen Anhang mit? Jeder nicht leere Wert zaehlt. */
+function bodyUploadsAttachment(body) {
+  const value = body?.attachment_data;
+  if (value === undefined || value === null) return false;
+  return !(typeof value === 'string' && value.trim() === '');
+}
+
+/** `true`, wenn der Body hochlaedt und der Aufrufer Dokumente nicht schreiben darf. */
+export function attachmentUploadRefused(req) {
+  return bodyUploadsAttachment(req.body) && !mayWriteModule(req, 'documents');
+}
+
+/* WER DEN GESPEICHERTEN ANHANG NICHT SIEHT, LOEST IHN NICHT AB (#1358).
+ * Dieselbe Regel wie bei Belegen (services/document-links.js, Regel 2):
+ * Ersetzen und Entfernen gehen nur, wenn der Aufrufer das Dokumente-Modul
+ * lesen darf und das gespeicherte Dokument sieht. Ohne Leserecht ist jede
+ * Aenderung am Anhang dieselbe 403 - auch bei einem Termin ohne Anhang,
+ * sonst verriete die Antwort, ob es einen gibt. Ein alter Inline-Anhang ohne
+ * Dokument gehoert dem Termin und haelt niemanden mit Leserecht auf. */
+export const ATTACHMENT_CHANGE_REFUSAL = 'Changing this attachment needs access to its document.';
+
+export function storedAttachmentLocked(req, database, storedDocumentId) {
+  const viewer = documentViewer(req);
+  if (!viewer.readsDocuments) return true;
+  if (storedDocumentId == null) return false;
+  return filterVisibleDocumentIds(database, [storedDocumentId], viewer.userId).length === 0;
 }
 
 export function attachmentDataUrl(event) {
@@ -235,25 +297,36 @@ export function parseAssignedTo(val) {
   return [];
 }
 
-export function syncAttachmentDocumentAccess(d, documentId, eventVisibility, userIds) {
+/**
+ * Das Anhang-Dokument folgt Sichtbarkeit und Zuweisung des Termins - weiter
+ * oeffnen darf es aber nur, wem `mayWiden(documentId)` das zugesteht
+ * (Dokumente schreiben UND das Dokument sehen, #1358). Ohne Urteil wird nur
+ * verengt: `applyDocumentAccess()` in services/document-access.js.
+ */
+export function syncAttachmentDocumentAccess(d, documentId, eventVisibility, userIds, {
+  mayWiden = () => false, grantAssignees = false,
+} = {}) {
   if (!documentId) return;
   const visibility = eventVisibility === 'private'
     ? 'private'
     : eventVisibility === 'assignees'
       ? 'restricted'
       : 'family';
-  d.prepare('UPDATE family_documents SET visibility = ? WHERE id = ?')
-    .run(visibility, documentId);
-  d.prepare('DELETE FROM family_document_access WHERE document_id = ?').run(documentId);
-  if (visibility !== 'restricted') return;
-  const insert = d.prepare(`
-    INSERT OR IGNORE INTO family_document_access (document_id, user_id)
-    VALUES (?, ?)
-  `);
-  for (const userId of userIds) insert.run(documentId, userId);
+  applyDocumentAccess(d, documentId, {
+    visibility, userIds, mayWiden: mayWiden(documentId) === true, grantAssignees,
+  });
 }
 
-export function setEventAssignments(d, eventId, userIds) {
+/**
+ * `options.mayWidenAttachment` kommt vom Aufrufer (`documentWidenPredicate()`);
+ * ohne ihn wird das Anhang-Dokument nur verengt, nie weiter geoeffnet.
+ * `options.grantAssigneesOnly` (Standard-Zuweisung der Kalender-Syncs): der
+ * Sync aendert Dokumentrechte nie, ausser dass an einem Termin fuer
+ * Zugewiesene ein schon eingeschraenktes Dokument die Zugewiesenen als
+ * Freigabe dazubekommt - nichts wird `family`, nichts Privates geht auf,
+ * nichts wird enger, keine Freigabe faellt weg.
+ */
+export function setEventAssignments(d, eventId, userIds, { mayWidenAttachment, grantAssigneesOnly = false } = {}) {
   // Wer VORHER dranstand - gebraucht wird das eine Zeile weiter unten, um die
   // Erinnerungen derer abzuraeumen, die nicht mehr dranstehen (#921). Deshalb
   // hier und nicht erst nach dem DELETE, das die Auskunft vernichtet.
@@ -289,7 +362,8 @@ export function setEventAssignments(d, eventId, userIds) {
     d,
     event?.attachment_document_id,
     event?.visibility,
-    userIds
+    userIds,
+    { mayWiden: mayWidenAttachment, grantAssignees: grantAssigneesOnly },
   );
 }
 
@@ -370,7 +444,27 @@ export function serializeEvent(event, context = null) {
     overridden_fields,
     ...rest
   } = event;
-  const documentId = event.attachment_document_id ?? null;
+  // DER ANHANG IST EIN DOKUMENT UND FOLGT DEM DOKUMENTENRECHT (#1358). Seit
+  // er im Dokumente-Modul liegt, nannte der Termin dessen ID, Name und
+  // Vorschau-URL jedem, der den Termin sieht - auch mit `documents: none`,
+  // einem Token ohne documents:read oder wenn das Dokument selbst inzwischen
+  // privat ist. Wer es nicht sehen darf, bekommt keinen Anhang: ID, URLs,
+  // Name, Typ und Groesse sind `null`, der Client zeigt dann nichts. Ohne
+  // `context.viewer` (documentViewer(req)) gilt dieselbe verdeckte Form - ein
+  // Aufrufer, der ihn vergisst, leakt nichts. Ein alter Inline-Anhang ohne
+  // Dokument gehoert dem Termin und bleibt.
+  const storedDocumentId = event.attachment_document_id ?? null;
+  const visibleDocumentIds = context?.visibleAttachmentDocumentIds
+    ?? visibleAttachmentDocumentIds([event], context);
+  const documentId = storedDocumentId != null && visibleDocumentIds.has(Number(storedDocumentId))
+    ? storedDocumentId
+    : null;
+  const documentHidden = storedDocumentId != null && documentId == null;
+  // `attachment_locked` (#1358): wer Dokumente lesen darf, erfaehrt, DASS hier
+  // ein Anhang haengt, den er nicht sieht - ohne ID, Name oder Typ. Der Dialog
+  // bietet dann weder Ablage noch Entfernen an (der Server verweigert beides).
+  // Ohne Leserecht auf die Dokumente `null` wie die anderen Anhangsfelder.
+  const attachmentLocked = context?.viewer?.readsDocuments === true ? documentHidden : null;
   const metadata = recurrenceMetadata(event, context);
   return {
     ...rest,
@@ -381,8 +475,10 @@ export function serializeEvent(event, context = null) {
       name_day: name_day ?? null,
     } : {}),
     assigned_users,
+    ...(documentHidden ? { attachment_name: null, attachment_mime: null, attachment_size: null } : {}),
     attachment_document_id: documentId,
-    attachment_data: documentId ? null : attachmentDataUrl(event),
+    attachment_locked: attachmentLocked,
+    attachment_data: storedDocumentId ? null : attachmentDataUrl(event),
     attachment_preview_url: documentId
       ? `/api/v1/documents/${documentId}/preview`
       : null,
@@ -394,6 +490,19 @@ export function serializeEvent(event, context = null) {
   };
 }
 
+/**
+ * Die Anhang-Dokumente dieser Termine, die `context.viewer` sehen darf: das
+ * Dokumente-Modul lesen (Mitgliedsrecht und Token-Scope) UND das einzelne
+ * Dokument sehen. Eine Abfrage fuer die ganze Liste.
+ * @returns {Set<number>}
+ */
+function visibleAttachmentDocumentIds(events, context) {
+  const viewer = context?.viewer;
+  if (!context?.database || viewer?.readsDocuments !== true) return new Set();
+  const ids = events.map((event) => event?.attachment_document_id).filter((id) => id != null);
+  return new Set(filterVisibleDocumentIds(context.database, ids, viewer.userId));
+}
+
 /** Serializes a result set with one capability classification per master. */
 export function serializeEvents(events, context) {
   if (!Array.isArray(events) || events.length === 0) return [];
@@ -403,7 +512,11 @@ export function serializeEvents(events, context) {
     events,
     { actorId: context.actorId ?? null },
   );
-  const bulkContext = { ...context, capabilitiesBySeriesId };
+  const bulkContext = {
+    ...context,
+    capabilitiesBySeriesId,
+    visibleAttachmentDocumentIds: visibleAttachmentDocumentIds(events, context),
+  };
   return events.map((event) => serializeEvent(event, bulkContext));
 }
 

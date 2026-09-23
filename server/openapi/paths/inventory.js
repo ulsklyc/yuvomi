@@ -1,4 +1,4 @@
-import { op, jsonBody, idParam, stringPathParam, DOCUMENT_LINKS_READ_NOTE } from '../helpers.js';
+import { op, jsonBody, idParam, stringPathParam, DOCUMENT_LINKS_READ_NOTE, BUDGET_LINKS_READ_NOTE } from '../helpers.js';
 
 export function inventoryPaths() {
   return {
@@ -47,17 +47,18 @@ export function inventoryPaths() {
       }),
     },
     '/api/v1/inventory/items': {
-      get: op({ summary: 'List inventory items', description: `Filters: category, location_id, status, q. Each item carries \`attachments\`. ${DOCUMENT_LINKS_READ_NOTE}`, tag: 'Inventory' }),
-      post: op({ summary: 'Create an inventory item (optional `attachment_document_ids`: documents from the documents module; optional `entry_id`: prefills purchase_price from that booking if it has no existing links; optional `tracked_dates`: array of custom {label, date, reminder_offset_days, interval_months, interval_distance} entries, where `interval_months` recurs the date on completion and `interval_distance` is a distance hint only, never a reminder; optional `odometer`/`odometer_unit`/`odometer_on` for a manual reading, silently cleared unless `category` has `tracks_odometer` set)', tag: 'Inventory', description: DOCUMENT_LINKS_READ_NOTE, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
+      get: op({ summary: 'List inventory items', description: `Filters: category, location_id, status, q. Each item carries \`attachments\` and \`linked_entries\`. ${DOCUMENT_LINKS_READ_NOTE} ${BUDGET_LINKS_READ_NOTE}`, tag: 'Inventory' }),
+      post: op({ summary: 'Create an inventory item (optional `attachment_document_ids`: documents from the documents module; optional `entry_id`: prefills purchase_price from that booking if it has no existing links; optional `tracked_dates`: array of custom {label, date, reminder_offset_days, interval_months, interval_distance} entries, where `interval_months` recurs the date on completion and `interval_distance` is a distance hint only, never a reminder; optional `odometer`/`odometer_unit`/`odometer_on` for a manual reading, silently cleared unless `category` has `tracks_odometer` set)', tag: 'Inventory', description: `${DOCUMENT_LINKS_READ_NOTE} ${BUDGET_LINKS_READ_NOTE} This includes \`entry_id\`.`, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/inventory/items/{id}': {
-      get: op({ summary: 'Get an inventory item', description: `The item carries \`attachments\`. ${DOCUMENT_LINKS_READ_NOTE}`, tag: 'Inventory', params: [idParam('id', 'Item ID')] }),
-      put: op({ summary: 'Replace an inventory item (`attachment_document_ids` replaces the document links, omit to leave untouched; `tracked_dates` replaces the whole set of custom tracked dates, omit to leave untouched; `odometer`/`odometer_unit`/`odometer_on` are a full replace like every other field - omitting them clears the reading, as does switching to a `category` without `tracks_odometer` set)', tag: 'Inventory', params: [idParam('id', 'Item ID')], description: DOCUMENT_LINKS_READ_NOTE, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
+      get: op({ summary: 'Get an inventory item', description: `The item carries \`attachments\` and \`linked_entries\`. ${DOCUMENT_LINKS_READ_NOTE} ${BUDGET_LINKS_READ_NOTE}`, tag: 'Inventory', params: [idParam('id', 'Item ID')] }),
+      put: op({ summary: 'Replace an inventory item (`attachment_document_ids` replaces the document links, omit to leave untouched; `tracked_dates` replaces the whole set of custom tracked dates, omit to leave untouched; `odometer`/`odometer_unit`/`odometer_on` are a full replace like every other field - omitting them clears the reading, as does switching to a `category` without `tracks_odometer` set)', tag: 'Inventory', params: [idParam('id', 'Item ID')], description: `${DOCUMENT_LINKS_READ_NOTE} ${BUDGET_LINKS_READ_NOTE}`, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete an inventory item', tag: 'Inventory', params: [idParam('id', 'Item ID')], stateChanging: true }),
     },
     '/api/v1/inventory/items/{id}/entries': {
       post: op({
         summary: "Link a budget entry to an inventory item (role defaults to 'purchase')",
+        description: BUDGET_LINKS_READ_NOTE,
         tag: 'Inventory',
         params: [idParam('id', 'Item ID')],
         stateChanging: true,
@@ -67,6 +68,7 @@ export function inventoryPaths() {
     '/api/v1/inventory/items/{id}/entries/{entryId}': {
       delete: op({
         summary: 'Unlink a budget entry from an inventory item (removes all roles for this pair)',
+        description: BUDGET_LINKS_READ_NOTE,
         tag: 'Inventory',
         params: [idParam('id', 'Item ID'), idParam('entryId', 'Budget entry ID')],
         stateChanging: true,
@@ -75,7 +77,7 @@ export function inventoryPaths() {
     '/api/v1/inventory/items/{id}/dates/{dateId}/complete': {
       post: op({
         summary: 'Mark a tracked date as done',
-        description: "Writes a service-log entry (label/date snapshot, optional odometer/vendor/note). If the date carries `interval_months`, it rolls forward by that many months (same id, so its reminder and ICS UID stay stable) and its reminder re-syncs; otherwise the date and its reminder are removed and the completion lives on only in the service log.",
+        description: "Writes a service-log entry (label/date snapshot, optional odometer/vendor/note). If the date carries `interval_months`, it rolls forward by that many months (same id, so its reminder and ICS UID stay stable) and its reminder re-syncs; otherwise the date and its reminder are removed and the completion lives on only in the service log. Answers with the updated item. " + BUDGET_LINKS_READ_NOTE,
         tag: 'Inventory',
         params: [idParam('id', 'Item ID'), idParam('dateId', 'Tracked date ID')],
         stateChanging: true,
@@ -100,7 +102,7 @@ export function inventoryPaths() {
     '/api/v1/inventory/items/{id}/history': {
       get: op({
         summary: "Get an item's service history",
-        description: 'Read-only aggregation of service-log entries, linked budget entries (maintenance/accessory roles) and linked documents into one dated timeline, with a cost total - no separate store. Budget-entry and document visibility follow their existing rules (personal/shared budget mode, document sharing) with no admin bypass. Without access to the Documents module (for API tokens a `documents:read` scope) linked documents are left out of the timeline.',
+        description: 'Read-only aggregation of service-log entries, linked budget entries (maintenance/accessory roles) and linked documents into one dated timeline, with a cost total - no separate store. Budget-entry and document visibility follow their existing rules (personal/shared budget mode, document sharing) with no admin bypass. Without access to the Documents module (for API tokens a `documents:read` scope) linked documents are left out of the timeline, and without access to the Budget module (for API tokens a `budget:read` scope) linked budget entries are left out as well and the total is 0.',
         tag: 'Inventory',
         params: [idParam('id', 'Item ID')],
       }),
@@ -108,6 +110,7 @@ export function inventoryPaths() {
     '/api/v1/inventory/entries/{entryId}/items': {
       get: op({
         summary: 'List inventory items linked to a budget entry',
+        description: 'Needs read access to the Budget module (for API tokens a `budget:read` scope); without it the entry answers 404 like an unknown one.',
         tag: 'Inventory',
         params: [idParam('entryId', 'Budget entry ID')],
       }),
