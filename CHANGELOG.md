@@ -191,6 +191,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deleted account; the same applies when an account is pointed at a different server address or user
   name. (#1270)
 
+- **Appointments moved to another calendar before 2.68.0 can now take that calendar's person, one
+  by one.** Since 2.68.0 an appointment moved between two calendars of one account takes the new
+  calendar's default assignee along, and with it the colour. Appointments moved before that kept
+  the person of the calendar they came from, and nothing ever changed that, because the move itself
+  was long over. "Apply to existing appointments" under Settings > Sync now lists them in its
+  confirmation: every appointment whose only assignee is still the default assignee of another
+  calendar of the same account, with its title, date, calendar and "from X to Y". All are selected;
+  untick what should stay, and only the selected ones change. The list shows at most 5000 at a
+  time, oldest first; "Show next" moves on to the following ones without applying the current
+  page. Only appointments you are allowed to see are listed, so another member's private
+  appointments stay private here too. They are listed one by one because
+  the stored data cannot tell such an appointment apart from one in a calendar whose default
+  assignee was changed later, when the previous person is another calendar's default assignee - an
+  automatic repair would have changed those too. Unassigned appointments are filled as before. An
+  appointment edited in Yuvomi, assigned to more than one person or to anyone else, created in
+  Yuvomi and sent to the calendar, or in a calendar without a default assignee is not listed. For a
+  recurring appointment the whole series changes, including occurrences edited on their own that do
+  not have their own assignment. For API clients: `GET` on the backfill route returns the list as
+  `moved` in pages of at most 5000 (`moved_total`, `moved_next`, `moved_after`), and `POST` takes the picked entries as `moves`;
+  without them no existing assignment changes. (#1307)
+
 - **Shared expenses that lost their bookings to a deleted account count in the balances again.**
   Until edits stopped tying an expense to its editor, deleting the account of someone who had
   edited another member's shared expense also removed that expense's bookings: the expense stayed
