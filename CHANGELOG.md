@@ -185,10 +185,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exactly the colour of a calendar of that account, including one deleted on the server since. The
   appointment then shows the colour of its person or its calendar again. Appointments that Yuvomi
   uploaded itself count only with the colour of the calendar they were uploaded to, and a colour
-  chosen while a sync is running stays. A colour picked in Yuvomi that is not one of that account's
-  calendar colours stays, and so does any colour the server sets on the appointment itself. An
-  account added later does not do this, unless it takes over old appointments of a deleted account;
-  the same applies when an account is pointed at a different server address or user name. (#1270)
+  chosen in Yuvomi after these 30 days began stays. A colour picked in Yuvomi that is not one of
+  that account's calendar colours stays, and so does any colour the server sets on the appointment
+  itself. An account added later does not do this, unless it takes over old appointments of a
+  deleted account; the same applies when an account is pointed at a different server address or user
+  name. (#1270)
 
 - **Screen readers and keyboards get a few rough edges less.** Toasts no longer interrupt what a
   screen reader is reading or get announced twice: only errors and warnings interrupt, everything

@@ -179,8 +179,26 @@ function legacyColorHealKey(accountId) {
 }
 
 /**
- * Laeuft die Farb-Heilung fuer dieses Konto? Beim ersten Lauf nach dem Update
- * startet sie die Frist.
+ * sync_config-Schluessel des Schnappschusses je Konto (#1270): JSON
+ * `{ eventId: farbe }` der Altzeilen, deren Farbe bei Fristbeginn eine
+ * Kalenderfarbe des Kontos war.
+ */
+function legacyColorSnapshotKey(accountId) {
+  return `caldav_legacy_color_heal_snapshot_${accountId}`;
+}
+
+/**
+ * Laeuft die Farb-Heilung fuer dieses Konto, und mit welchen Farben? null,
+ * wenn nicht. Beim ersten Lauf nach dem Update startet sie die Frist und legt
+ * den Schnappschuss an.
+ *
+ * DER SCHNAPPSCHUSS haelt fest, welche Farbe eine Altzeile bei Fristbeginn
+ * trug. Geheilt wird nur, solange sie genau diese Farbe traegt: waehlt jemand
+ * innerhalb der Frist eine Farbe - auch eine Kalenderfarbe, und auch an einer
+ * schon geheilten Zeile -, ist das eine Wahl nach Fristbeginn, und die bleibt,
+ * selbst wenn der Server die COLOR-Zeile verwirft. Ein Zeitstempel, den nur
+ * eine lokale Bearbeitung setzt, gibt es nicht (`updated_at` setzt ein Trigger
+ * bei jedem UPDATE, auch beim Sync); die Farbe selbst ist der Vergleich.
  *
  * EINE FRIST STATT EINES FERTIG-MERKERS. Wann ein Konto "fertig" ist, laesst
  * sich nicht sicher sagen: eine leere Antwort, ein abgewaehlter oder kurz
@@ -188,12 +206,23 @@ function legacyColorHealKey(accountId) {
  * Heilung entweder zu frueh enden oder nie. Eine feste Zeit endet sicher und
  * gibt jedem Termin, den ein Lauf in dieser Zeit sieht, seine Heilung.
  */
-function legacyHealActive(conn, accountId, now = new Date()) {
+function legacyHealState(conn, accountId, { serverCalendars = [], cutoff = null, now = new Date() } = {}) {
   const key = legacyColorHealKey(accountId);
+  const snapshotKey = legacyColorSnapshotKey(accountId);
   const value = conn.prepare('SELECT value FROM sync_config WHERE key = ?').get(key)?.value;
   if (value == null) {
-    conn.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?)').run(key, now.toISOString());
-    return true;
+    // Fristbeginn: Frist und Schnappschuss in EINER Anweisung, damit es keinen
+    // Stand mit dem einen und ohne das andere gibt.
+    const colors = legacyCalendarColors(conn, accountId, serverCalendars);
+    const snapshot = new Map();
+    for (const row of legacyCandidateRows(conn, cutoff)) {
+      const color = String(row.color).toLowerCase();
+      if (colors.has(color)) snapshot.set(row.id, color);
+    }
+    conn.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?), (?, ?)').run(
+      key, now.toISOString(), snapshotKey, JSON.stringify(Object.fromEntries(snapshot))
+    );
+    return { colors, snapshot, snapshotKey };
   }
   // `never` (und jeder andere Wert, der kein Datum ist) schaltet die Heilung
   // aus. Ein Beginn in der Zukunft - die Uhr ging beim Start vor - verlaengert
@@ -201,11 +230,33 @@ function legacyHealActive(conn, accountId, now = new Date()) {
   //
   // Bekannte Grenze: die Frist beginnt mit dem ersten Lauf, bei einem Konto,
   // das lange nicht synchronisiert, also spaet. Das ist dasselbe Risiko wie
-  // ein frueher Beginn; eine gerade gewaehlte Farbe schuetzt die Heilung
-  // selbst (outbound_dirty und die gesehene Farbe im UPDATE).
+  // ein frueher Beginn; eine gerade gewaehlte Farbe schuetzt der Schnappschuss
+  // (und fuer den laufenden Sync die Neupruefung im UPDATE).
   const since = Date.parse(value);
   const elapsed = now.getTime() - since;
-  return Number.isFinite(since) && elapsed >= 0 && elapsed < LEGACY_HEAL_DAYS * 24 * 60 * 60 * 1000;
+  if (!(Number.isFinite(since) && elapsed >= 0 && elapsed < LEGACY_HEAL_DAYS * 24 * 60 * 60 * 1000)) return null;
+  // Fehlt der Schnappschuss oder ist er unlesbar, heilt nichts (fail closed).
+  let parsed;
+  try { parsed = JSON.parse(conn.prepare('SELECT value FROM sync_config WHERE key = ?').get(snapshotKey)?.value ?? ''); }
+  catch { return null; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const snapshot = new Map(Object.entries(parsed).map(([id, color]) => [Number(id), String(color).toLowerCase()]));
+  return { colors: legacyCalendarColors(conn, accountId, serverCalendars), snapshot, snapshotKey };
+}
+
+/**
+ * Die Altzeilen, die die Heilung ueberhaupt fassen darf, ohne die Frage nach
+ * der Farbe des Kontos: CalDAV, color_modified = 1, user_modified = 1, mit
+ * Farbe, vor dem Fix entstanden, und hochgeladene nur mit ihrer Zielfarbe.
+ */
+function legacyCandidateRows(conn, cutoff) {
+  return conn.prepare(`
+    SELECT id, color FROM calendar_events
+    WHERE external_source = 'caldav'
+      AND color_modified = 1 AND user_modified = 1 AND color IS NOT NULL
+      AND ${uploadedRowRule('calendar_events.')}
+      AND (? IS NULL OR datetime(created_at) <= datetime(?))
+  `).all(cutoff, cutoff);
 }
 
 /**
@@ -239,7 +290,7 @@ function hasOrphanedLegacyRows(conn, accountId) {
 /** Heilung fuer dieses Konto neu entscheiden: Frist verwerfen, ggf. ganz aus. */
 function decideLegacyHeal(conn, accountId) {
   const key = legacyColorHealKey(accountId);
-  conn.prepare('DELETE FROM sync_config WHERE key = ?').run(key);
+  conn.prepare('DELETE FROM sync_config WHERE key IN (?, ?)').run(key, legacyColorSnapshotKey(accountId));
   if (!hasOrphanedLegacyRows(conn, accountId)) {
     conn.prepare("INSERT INTO sync_config (key, value) VALUES (?, 'never')").run(key);
   }
@@ -593,7 +644,8 @@ function deleteAccount(accountId, { deleteEvents = false } = {}) {
     const rows = detachAccountRows(accountId);
     db.get().prepare('DELETE FROM caldav_accounts WHERE id = ?').run(accountId);
     // Die Frist der Farb-Heilung (#1270) haengt an keinem Fremdschluessel.
-    db.get().prepare('DELETE FROM sync_config WHERE key = ?').run(legacyColorHealKey(accountId));
+    db.get().prepare('DELETE FROM sync_config WHERE key IN (?, ?)')
+      .run(legacyColorHealKey(accountId), legacyColorSnapshotKey(accountId));
     return { detached: rows, removed: cleared };
   })();
 
@@ -915,9 +967,7 @@ async function runSync({ createClient } = {}) {
 
       // Heilung eingebrannter Kalenderfarben (#1270), siehe oben. Nach dem
       // Abruf der Kalender, weil deren Faehigkeiten die Farbmenge begrenzen.
-      const burntInColors = legacyHealActive(conn, account.id)
-        ? legacyCalendarColors(conn, account.id, serverCalendars)
-        : null;
+      const heal = legacyHealState(conn, account.id, { serverCalendars, cutoff: legacyCutoff });
       // Kandidaten erst sammeln, geheilt wird nach allen Kalendern: UIDs, die
       // in IRGENDEINER Kopie dieses Laufs eine COLOR-Zeile tragen, bleiben.
       const healCandidates = new Map();
@@ -1054,9 +1104,10 @@ async function runSync({ createClient } = {}) {
                 // unlesbaren Wert (etwa #RRGGBBAA) sagt, dass der Server ueber
                 // DIESEN Termin spricht.
                 if (ev.hasColor) coloredUids.add(ev.uid);
-                else if (burntInColors !== null
+                else if (heal !== null
                   && existing.color_modified === 1 && existing.color != null
-                  && burntInColors.has(String(existing.color).toLowerCase())) {
+                  && heal.colors.has(String(existing.color).toLowerCase())
+                  && heal.snapshot.get(existing.id) === String(existing.color).toLowerCase()) {
                   healCandidates.set(existing.id, { uid: ev.uid, color: existing.color });
                 }
                 changed = updEvent.run(...values, existing.id, ...values).changes > 0;
@@ -1117,11 +1168,20 @@ async function runSync({ createClient } = {}) {
       // Umzug (outbound_move_to) schuetzt ebenso: ein reiner Umzug setzt kein
       // outbound_dirty, und danach zeigt target_caldav_calendar_url schon auf
       // den neuen Kalender.
+      let snapshotChanged = false;
       for (const [eventId, { uid, color }] of healCandidates) {
         if (coloredUids.has(uid)) continue;
-        if (healBurntInColor.run(eventId, color, legacyCutoff, legacyCutoff).changes > 0 && !changedIds.has(eventId)) {
-          accountChangedCount++;
+        if (healBurntInColor.run(eventId, color, legacyCutoff, legacyCutoff).changes > 0) {
+          // Geheilt faellt die Zeile aus dem Schnappschuss: eine spaetere Wahl
+          // derselben Farbe ist dann eine Wahl, keine Altlast.
+          heal.snapshot.delete(eventId);
+          snapshotChanged = true;
+          if (!changedIds.has(eventId)) accountChangedCount++;
         }
+      }
+      if (snapshotChanged) {
+        conn.prepare('UPDATE sync_config SET value = ? WHERE key = ?')
+          .run(JSON.stringify(Object.fromEntries(heal.snapshot)), heal.snapshotKey);
       }
 
       // Löschphase: erst nach allen Kalendern, damit `accountUids` vollständig ist

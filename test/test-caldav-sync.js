@@ -1733,11 +1733,22 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
   // --- Frist statt Merker ---
 
   const daysAgo = (n) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
+  const SNAPSHOT_KEY_1 = 'caldav_legacy_color_heal_snapshot_1';
+  const rowId = (d, uid = UID) => d.prepare('SELECT id FROM calendar_events WHERE external_calendar_id = ?').get(uid).id;
+  // Eine laufende Frist samt Schnappschuss, wie der erste Lauf sie anlegt.
+  // `snapshot` als Objekt oder als roher Text (fuer den kaputten Fall).
+  function startWindow(d, since, snapshot) {
+    d.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?)').run(HEAL_KEY_1, since);
+    if (snapshot !== undefined) {
+      d.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?)')
+        .run(SNAPSHOT_KEY_1, typeof snapshot === 'string' ? snapshot : JSON.stringify(snapshot));
+    }
+  }
 
   it('die Heilung laeuft innerhalb der Frist von 30 Tagen ab dem ersten Lauf', () => withDb(async (d) => {
     await sync({ createClient: clientWith({ inCal: CAL_A }) });
     legacyState(d, COLOR_A);
-    d.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?)').run(HEAL_KEY_1, daysAgo(29));
+    startWindow(d, daysAgo(29), { [rowId(d)]: COLOR_A });
 
     await sync({ createClient: clientWith({ inCal: CAL_A }) });
     assert.strictEqual(row(d).color, null);
@@ -1968,6 +1979,73 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
       'UPDATE calendar_events SET outbound_move_to = ? WHERE external_calendar_id = ?'
     ).run(CAL_B, UID)) });
     assert.strictEqual(row(d).color, COLOR_A);
+  }));
+
+  it('der erste Lauf legt Frist und Schnappschuss gemeinsam an', () => withDb(async (d) => {
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    d.prepare('UPDATE caldav_calendar_selection SET enabled = 0 WHERE calendar_url = ?').run(CAL_A);
+    d.prepare('UPDATE caldav_calendar_selection SET enabled = 1 WHERE calendar_url = ?').run(CAL_B);
+    // Der Lauf sieht die Zeile nicht (A ist abgewaehlt): der Schnappschuss
+    // haelt sie trotzdem fest, mit ihrer Farbe von jetzt.
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.match(healState(d), ISO);
+    assert.deepStrictEqual(JSON.parse(healState(d, SNAPSHOT_KEY_1)), { [rowId(d)]: COLOR_A.toLowerCase() });
+  }));
+
+  it('eine nach der Heilung neu gewaehlte Kalenderfarbe bleibt, auch wenn der Server COLOR verwirft', () => withDb(async (d) => {
+    // Codex 4079517707: geheilt, dann in Yuvomi auf eine Kalenderfarbe des
+    // Kontos umgefaerbt; der Server nimmt den Push an und verwirft COLOR.
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.strictEqual(row(d).color, null, 'Vorbedingung: geheilt');
+    d.prepare(`UPDATE calendar_events SET color = ?, color_modified = 1, user_modified = 1, outbound_dirty = 1
+               WHERE external_calendar_id = ?`).run(COLOR_A, UID);
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    d.prepare('UPDATE calendar_events SET outbound_dirty = 0 WHERE external_calendar_id = ?').run(UID);
+
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.strictEqual(row(d).color, COLOR_A);
+  }));
+
+  it('eine noch nicht geheilte Zeile, in der Frist auf eine andere Kalenderfarbe umgefaerbt, bleibt', () => withDb(async (d) => {
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    // Die Frist laeuft, der Schnappschuss kennt die Zeile mit A.
+    startWindow(d, daysAgo(3), { [rowId(d)]: COLOR_A });
+    // Umgefaerbt auf B, gepusht, der Server hat COLOR verworfen.
+    d.prepare('UPDATE calendar_events SET color = ?, color_modified = 1, user_modified = 1 WHERE external_calendar_id = ?')
+      .run(COLOR_B, UID);
+
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.strictEqual(row(d).color, COLOR_B);
+  }));
+
+  it('ohne Schnappschuss bei laufender Frist heilt nichts', () => withDb(async (d) => {
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    startWindow(d, daysAgo(3));
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.strictEqual(row(d).color, COLOR_A);
+  }));
+
+  it('ein kaputter Schnappschuss heilt nichts', () => withDb(async (d) => {
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    legacyState(d, COLOR_A);
+    startWindow(d, daysAgo(3), '{kaputt');
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.strictEqual(row(d).color, COLOR_A, 'unlesbares JSON');
+
+    d.prepare('UPDATE sync_config SET value = ? WHERE key = ?').run(`[${rowId(d)}]`, SNAPSHOT_KEY_1);
+    await sync({ createClient: clientWith({ inCal: CAL_A }) });
+    assert.strictEqual(row(d).color, COLOR_A, 'kein Objekt');
+  }));
+
+  it('updateAccount mit neuem Benutzer raeumt den Schnappschuss mit', () => withDb(async (d) => {
+    startWindow(d, daysAgo(40), { 999: COLOR_A });
+    await updateAccount(1, { username: 'u9', createClient: accountClient([CAL_A]) });
+    assert.strictEqual(healState(d, SNAPSHOT_KEY_1), null);
   }));
 
   it('eine gewaehlte Farbe, die keine Kalenderfarbe ist, bleibt', () => withDb(async (d) => {
@@ -2430,13 +2508,14 @@ describe('CalDAV: das Aufräumen beim Abwählen ist eine Wahl (#732)', () => {
     try {
       // Frist der Farb-Heilung (#1270) von Konto 1 und einem Nachbarn.
       d.exec(`INSERT INTO sync_config (key, value) VALUES
-        ('caldav_legacy_color_heal_since_1', '2026-09-23T10:00:00.000Z'), ('caldav_legacy_color_heal_since_2', 'never')`);
+        ('caldav_legacy_color_heal_since_1', '2026-09-23T10:00:00.000Z'), ('caldav_legacy_color_heal_since_2', 'never'),
+        ('caldav_legacy_color_heal_snapshot_1', '{}')`);
       const result = deleteAccount(1);
       assert.equal(result.removed, 0);
       assert.deepEqual(
         d.prepare("SELECT key FROM sync_config WHERE key LIKE 'caldav_legacy_color_heal_%' ORDER BY key").all().map((r) => r.key),
         ['caldav_legacy_color_heal_since_2'],
-        'mit dem Konto geht seine Frist, die des Nachbarn bleibt'
+        'mit dem Konto gehen Frist und Schnappschuss, die des Nachbarn bleibt'
       );
       assert.equal(titles(d).length, 5, 'die Termine bleiben sichtbar, wie bisher');
     } finally {
