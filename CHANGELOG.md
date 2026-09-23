@@ -187,9 +187,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   repaired once the calendar is selected again. For appointments of a calendar that is missing on
   the server or that the server returns completely empty, it stops waiting after three syncs in a
   row, scheduled or started by hand, since an empty answer is usually a passing error, but a deleted
-  calendar never comes back. Appointments only uploaded from Yuvomi are left alone. A colour picked
-  in Yuvomi that is not one of that account's calendar colours stays, and so does any colour the
-  server sets on the appointment itself. After that, syncs leave colours alone, and so does an
+  calendar never comes back. Appointments that Yuvomi uploaded itself are repaired only if their
+  colour is exactly that of the calendar they were uploaded to, and only if they were edited in
+  Yuvomi before v2.50.0; an uploaded appointment that was never edited keeps its colour. A colour
+  picked in Yuvomi that is not one of that account's calendar colours stays, and so does any colour
+  the server sets on the appointment itself. After that, syncs leave colours alone, and so does an
   account added later, unless it takes over old appointments of a deleted account. (#1270)
 
 - **Moving items between the pantry and the shopping list now needs read access to where they

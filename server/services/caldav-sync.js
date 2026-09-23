@@ -85,15 +85,39 @@ function buildCalDAVICS(event, householdZone = null) {
 
 /**
  * UID eines Termins, den Yuvomi selbst hochgeladen hat (`oikos-<id>@oikos.local`,
- * s. den Upload im Sync; ein `::`-Suffix fuer Einzelvorkommen folgt). Solche
- * Zeilen sind in Yuvomi entstanden, nicht im CalDAV-Import, und kommen fuer die
- * Farb-Heilung (#1270) nie in Frage - auch dann nicht, wenn sie
- * `user_modified = 1` und ein altes `created_at` mitbringen, wie ein von
- * `retireLegacyInstances()` (google-calendar.js) abgeloestes Google-Vorkommen,
- * das danach in einen CalDAV-Kalender geht. `_` ist in LIKE ein Platzhalter,
- * im Muster steht keiner.
+ * s. den Upload im Sync; ein `::`-Suffix fuer Einzelvorkommen folgt). `_` ist in
+ * LIKE ein Platzhalter, im Muster steht keiner.
  */
 const UPLOADED_UID_PATTERN = 'oikos-%@oikos.local%';
+
+/**
+ * SQL-Bedingung der Farb-Heilung (#1270) fuer selbst hochgeladene Zeilen, mit
+ * dem Tabellenpraefix `t` (leer oder `e.`).
+ *
+ * Eine solche Zeile kann eine eingebrannte Farbe tragen: vor v2.49 angelegt,
+ * ohne COLOR hochgeladen (vor #897), und der naechste Inbound schrieb die
+ * Farbe des Kalenders hinein, in dem sie lag - ihres Zielkalenders. Wurde sie
+ * spaeter bearbeitet, fror Migration 167 diese Farbe ein. Das ist die
+ * haeufigste Gruppe von #1270, pauschal ausnehmen darf man sie nicht.
+ *
+ * Sie ist aber auch der Weg fuer Zeilen, die NIE eingebrannt wurden - etwa ein
+ * von `retireLegacyInstances()` (google-calendar.js) abgeloestes
+ * Google-Vorkommen mit user_modified = 1, altem created_at und bewusst
+ * gewaehlter Farbe. Deshalb gilt fuer sie die engere Frage: ist ihre Farbe
+ * genau die ihres EIGENEN Zielkalenders, also die, die damals eingebrannt
+ * wurde? Die Farbe eines anderen Kalenders des Kontos spricht fuer eine Wahl.
+ * Das Ziel hat der Upload seit jeher stehen lassen; eine Zeile ohne Ziel ist
+ * kein Kandidat (der Vergleich mit einem Ziel NULL findet keine Farbe).
+ */
+function uploadedRowRule(t) {
+  return `(${t}external_calendar_id NOT LIKE '${UPLOADED_UID_PATTERN}'
+       OR (lower(${t}color) IN (
+             SELECT lower(calendar_color) FROM caldav_calendar_selection
+              WHERE calendar_url = ${t}target_caldav_calendar_url AND calendar_color IS NOT NULL
+             UNION
+             SELECT lower(color) FROM external_calendars
+              WHERE source = 'caldav' AND external_id = ${t}target_caldav_calendar_url AND color IS NOT NULL)))`;
+}
 
 /** Migration, mit der #891 den Import aufhoeren liess, Kalenderfarben einzubrennen. */
 const LEGACY_COLOR_FIX_MIGRATION = 166;
@@ -190,6 +214,15 @@ function legacyColorHealKey(accountId) {
  * teilen sich alle Konten eines Servers; und ein Home, in dem auch ein anderes
  * Konto Kalender fuehrt, gehoert keinem allein. Die Auswahl des Kontos selbst
  * ist davon nicht betroffen - sie ist gespeicherter Besitz, keine Schaetzung.
+ *
+ * Bekannte Grenze: manche Server legen alle Konten unter ein gemeinsames erstes
+ * Segment ohne Nutzersegment (OX/mailbox.org: `/caldav/<base64-id>/`). Deren
+ * Home ist `/caldav/` fuer jeden. `foreignHomes` erkennt das nur, solange das
+ * andere Konto lebt und eine Auswahl hat - der Kalender eines GELOESCHTEN
+ * OX-Kontos kann dem verbliebenen zugerechnet werden. Ein Schaden entsteht dann
+ * nur bei einer exakt gleichen, bewusst gewaehlten Farbe. Von Radicale
+ * (`/<nutzer>/<kalender>/`, Home ebenfalls ein Segment tief) ist das am Pfad
+ * nicht zu unterscheiden, deshalb bleibt es bei diesem Hinweis.
  */
 function legacyCalendarColors(conn, accountId) {
   const colors = new Set();
@@ -341,7 +374,7 @@ async function addAccount(name, caldavUrl, username, password, { createClient } 
       LEFT JOIN external_calendars x ON x.id = e.calendar_ref_id
       WHERE e.external_source = 'caldav'
         AND e.color_modified = 1 AND e.user_modified = 1 AND e.color IS NOT NULL
-        AND e.external_calendar_id NOT LIKE '${UPLOADED_UID_PATTERN}'
+        AND ${uploadedRowRule('e.')}
         AND (? IS NULL OR datetime(e.created_at) < datetime(?))
         AND (x.external_id IS NULL
              OR x.external_id NOT IN (SELECT calendar_url FROM caldav_calendar_selection))
@@ -770,7 +803,7 @@ async function runSync({ createClient } = {}) {
   const healBurntInColor = conn.prepare(`
     UPDATE calendar_events SET color = NULL, color_modified = 0
     WHERE id = ? AND color_modified = 1 AND user_modified = 1
-      AND external_calendar_id NOT LIKE '${UPLOADED_UID_PATTERN}'
+      AND ${uploadedRowRule('calendar_events.')}
       AND (? IS NULL OR datetime(created_at) < datetime(?))
   `);
   // Am Laufende: gibt es noch Altzeilen dieses Kontos, die der Lauf NICHT
@@ -818,7 +851,7 @@ async function runSync({ createClient } = {}) {
     LEFT JOIN external_calendars x ON x.id = e.calendar_ref_id
     WHERE e.external_source = 'caldav'
       AND e.color_modified = 1 AND e.user_modified = 1 AND e.color IS NOT NULL
-      AND e.external_calendar_id NOT LIKE '${UPLOADED_UID_PATTERN}'
+      AND ${uploadedRowRule('e.')}
       AND (? IS NULL OR datetime(e.created_at) < datetime(?))
   `);
   const selHealMarker = conn.prepare('SELECT 1 AS done FROM sync_config WHERE key = ?');
