@@ -69,7 +69,10 @@ test('Registrierung: ein Bestandslayout ohne pantry bekommt die Kachel ausgeblen
   const pantry = merged.find((w) => w.id === 'pantry');
   assert.ok(pantry, 'die neue Id wird ergänzt');
   assert.equal(pantry.visible, false, 'und zwar AUSgeblendet');
-  assert.equal(widgets.isUserOrderedConfig(merged), false, 'die Ergänzung liest sich nicht als Umsortierung');
+  // `isUserOrderedConfig` gibt es seit dem dichten Raster nicht mehr (a1); was
+  // bleibt, ist die Default-Position des Neuzugangs: hinter dem Einkauf.
+  const ids = merged.map((w) => w.id);
+  assert.equal(ids.indexOf('pantry'), ids.indexOf('shopping') + 1, 'die Ergänzung steht an ihrer Default-Position');
 });
 
 test('Registrierung: Rechte hängen am Modul pantry', () => {
