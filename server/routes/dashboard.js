@@ -9,7 +9,7 @@ import express from 'express';
 import { hydrateNotesWithCategories } from '../services/note-categories.js';
 import * as db from '../db.js';
 import { hydrateBirthdayOccurrences } from '../services/birthdays.js';
-import { getUpcomingEvents } from '../services/calendar-event-reader.js';
+import { getEventsOverlappingDays, getUpcomingEvents } from '../services/calendar-event-reader.js';
 import { taskScopeWhere, taskCategoryWhere, categoryBindings, normalizeCategoryFilter } from '../services/task-scope.js';
 import { getCountdowns } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
@@ -59,7 +59,7 @@ const log = createLogger('Dashboard');
 const DENIED_PAYLOAD = Object.freeze({
   // Geburtstage gehören zum Kalender-Modul, nicht zu einem eigenen — dieselbe
   // Zuordnung wie in PERMISSION_MODULES (navIds) und im Client (NAV_TO_MODULE).
-  calendar: () => ({ upcomingEvents: [], birthdays: [], birthdayCount: 0, birthdayTotal: 0, birthdaySoonCount: 0 }),
+  calendar: () => ({ upcomingEvents: [], weekEvents: [], birthdays: [], birthdayCount: 0, birthdayTotal: 0, birthdaySoonCount: 0 }),
   tasks: () => ({
     urgentTasks: [], openTaskCount: 0, overdueTaskCount: 0,
     memberTodayTasks: [], tasksDoneToday: 0,
@@ -146,6 +146,31 @@ function addAssignedUsers(task) {
   return task;
 }
 
+/**
+ * Die Felder eines Termins, die der Wochenstreifen braucht: Tag(e), Farbe nach
+ * der Regel aus public/utils/event-color.js und der Titel fuer den
+ * Tagesnamen - der Geburtstag mit den Feldern, aus denen der Browser ihn
+ * uebersetzt (#524).
+ */
+function weekEventFields(event) {
+  return {
+    id: event.id,
+    title: event.title,
+    start_datetime: event.start_datetime,
+    end_datetime: event.end_datetime ?? null,
+    all_day: event.all_day ? 1 : 0,
+    color: event.color ?? null,
+    cal_color: event.cal_color ?? null,
+    assigned_to: event.assigned_to ?? null,
+    assigned_users: (event.assigned_users ?? []).map((user) => ({
+      id: user.id, display_name: user.display_name, color: user.color,
+    })),
+    birthday_name: event.birthday_name ?? null,
+    birthday_date: event.birthday_date ?? null,
+    birthday_event_kind: event.birthday_event_kind ?? null,
+  };
+}
+
 const router = express.Router();
 
 /**
@@ -156,6 +181,7 @@ const router = express.Router();
  *
  * Response: {
  *   upcomingEvents: CalendarEvent[],   // Nächste 5 Termine
+ *   weekEvents:     WeekEvent[],       // Termine, die die Woche ab heute berühren (schlank)
  *   urgentTasks:    Task[],            // High/Urgent mit Fälligkeit ≤ 48h
  *   todayMeals:     Meal[],            // Mahlzeiten für heute
  *   pinnedNotes:    Note[],            // Angepinnte Notizen (max. 3)
@@ -291,6 +317,32 @@ router.get('/', (req, res) => {
   } catch (err) {
     log.error('upcomingEvents error:', err.message);
     result.upcomingEvents = [];
+  }
+
+  /* DIE WOCHE FUER DEN STREIFEN des Kalender-Widgets (2x1). Eigene Frage neben
+   * der Liste darueber: dort „was beginnt als Naechstes", hier „was findet an
+   * den sieben Tagen ab heute statt" - auch was vorgestern begann und noch
+   * laeuft (getEventsOverlappingDays).
+   *
+   * IMMER MITGELIEFERT, nicht nur auf Anfrage: der Anpassen-Modus schaltet die
+   * Groesse als Vorschau um, ohne neu zu laden, und ein Streifen ohne Daten
+   * hiesse dort „leere Woche" - ein plausibles Falsches. Die Kosten haelt die
+   * Form klein: nur, was ein Punkt oder ein Band braucht, ohne Beschreibung,
+   * Ort und Anhaenge.
+   *
+   * Dieselben Filter wie die Liste (Sichtbarkeit, „nur meine", Geburtstage)
+   * und dieselbe Modulsperre ueber DENIED_PAYLOAD. Das Fenster hat einen Tag
+   * Rand je Seite; welcher Tag ein Termin ist, entscheidet der Browser in
+   * seiner Anzeigezone und klammert dort auf die sieben. */
+  if (allows('calendar')) try {
+    result.weekEvents = serializeEvents(getEventsOverlappingDays(d, {
+      userId, fromKey: shiftDateKey(todayLocalKey, -1), days: 9,
+      assignedTo: eventsAssignedTo, includeBirthdays,
+    }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminUser(req) })
+      .map(weekEventFields);
+  } catch (err) {
+    log.error('weekEvents error:', err.message);
+    result.weekEvents = [];
   }
 
   // Offene Aufgaben: Sortierung in SQL (overdue zuerst, dann Fälligkeit, dann Priorität).

@@ -6,7 +6,7 @@ export function dashboardPaths() {
       get: op({
         summary: 'Get dashboard data',
         tag: 'Dashboard',
-        description: 'Aggregated data for every overview tile. Optional query parameters filter tasks, upcoming events and pinned notes before row limits and counts are computed. Task filters apply to every task slice (`urgentTasks`, `openTaskCount`, `overdueTaskCount`, `memberTodayTasks`, `tasksDoneToday`); note filters apply to `pinnedNotes`, `pinnedNotesCount` and `notesTotal` alike. The browser derives these filters from per-widget `options` stored in `dashboard_widgets`. `upcomingEvents` counts only appointments that have not ended toward its five-item cap; already ended ones of today (end before now in the household time zone, never all-day ones) come along outside the cap. `wastePickups` lists the collections of today and tomorrow (Waste module), `myShiftsToday` the own shifts of the caller of today (Schedule module); both are empty when the module is denied.',
+        description: 'Aggregated data for every overview tile. Optional query parameters filter tasks, upcoming events and pinned notes before row limits and counts are computed. Task filters apply to every task slice (`urgentTasks`, `openTaskCount`, `overdueTaskCount`, `memberTodayTasks`, `tasksDoneToday`); note filters apply to `pinnedNotes`, `pinnedNotesCount` and `notesTotal` alike. Event filters apply to both `upcomingEvents` and `weekEvents` (the events touching the household days from yesterday to a week ahead, in a compact shape for the week strip of the calendar tile). The browser derives these filters from per-widget `options` stored in `dashboard_widgets`. `upcomingEvents` counts only appointments that have not ended toward its five-item cap; already ended ones of today (end before now in the household time zone, never all-day ones) come along outside the cap. `wastePickups` lists the collections of today and tomorrow (Waste module), `myShiftsToday` the own shifts of the caller of today (Schedule module); both are empty when the module is denied.',
         params: [
           {
             name: 'notes_category',
@@ -35,7 +35,7 @@ export function dashboardPaths() {
             name: 'events_birthdays',
             in: 'query',
             required: false,
-            description: '`hide` drops appointments that belong to a birthday entry from `upcomingEvents`, so a household that already shows the Birthdays tile does not read them twice. Applied before the five-item cap, so the freed rows are filled with the next real appointments. Anything else keeps them - birthdays are in by default.',
+            description: '`hide` drops appointments that belong to a birthday entry from `upcomingEvents` and `weekEvents`, so a household that already shows the Birthdays tile does not read them twice. Applied before the five-item cap, so the freed rows are filled with the next real appointments. Anything else keeps them - birthdays are in by default.',
             schema: { type: 'string', enum: ['show', 'hide'] },
           },
         ],
