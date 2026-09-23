@@ -34,7 +34,7 @@
  * `documentViewer(req)` bekommt statt sie nachzubauen.
  */
 
-import { hiddenModulesFor } from '../permissions.js';
+import { mayReadModule } from '../permissions.js';
 import { documentVisibleSql, filterVisibleDocumentIds } from './document-access.js';
 import { assertDocumentsNotDeleting } from './document-deletion-lock.js';
 
@@ -44,12 +44,12 @@ const DOCUMENT_COLUMNS = 'd.name, d.original_name, d.mime_type, d.file_size';
 /**
  * Darf diese Anfrage das Dokumente-Modul LESEN? Beide Achsen in einem Aufruf:
  * das Modulrecht des Mitglieds und der Scope eines API-Tokens
- * (`hiddenModulesFor`). Die eine Stelle fuer diese Frage bei Belegen (#1358).
+ * (`mayReadModule`). Die eine Stelle fuer diese Frage bei Belegen (#1358).
  * @param {import('express').Request} req
  * @returns {boolean}
  */
 export function mayReadDocuments(req) {
-  return !hiddenModulesFor(req, ['documents']).has('documents');
+  return mayReadModule(req, 'documents');
 }
 
 /**

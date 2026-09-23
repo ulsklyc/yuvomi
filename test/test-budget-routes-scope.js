@@ -344,9 +344,12 @@ test('#659 personal: das Inventar behandelt shared_amount wie privat', async () 
     })).json();
 
     const { visibleEntry } = await import('../server/routes/inventory/entry-links.js');
-    assert.equal(visibleEntry(created.data.id, B), undefined,
+    // Der Betrachter wie aus `budgetViewer(req)`: mit Budgetrecht, damit hier
+    // allein die Sichtbarkeitsregel urteilt.
+    const asViewer = (userId) => ({ userId, readsBudget: true });
+    assert.equal(visibleEntry(created.data.id, asViewer(B)), undefined,
       'B darf die shared_amount-Buchung im Inventar nicht sehen');
-    assert.ok(visibleEntry(shared.data.id, B), 'eine echt geteilte Buchung schon');
-    assert.ok(visibleEntry(created.data.id, A), 'der Eigentuemer sieht seine eigene');
+    assert.ok(visibleEntry(shared.data.id, asViewer(B)), 'eine echt geteilte Buchung schon');
+    assert.ok(visibleEntry(created.data.id, asViewer(A)), 'der Eigentuemer sieht seine eigene');
   } finally { await app.close(); }
 });

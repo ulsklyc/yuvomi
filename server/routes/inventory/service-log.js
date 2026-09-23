@@ -436,7 +436,7 @@ function completeTrackedDate({ item, dateId, values, userId }) {
  * `viewer` ist `documentViewer(req)`. Ohne Leserecht auf die Dokumente gibt es
  * keine Belege (#1358), die Zeitleiste zeigt dann keine Dokumentzeile.
  */
-function loadHistory(itemId, userId, viewer) {
+function loadHistory(itemId, budget, viewer) {
   const logRows = loadServiceLog(itemId).map((row) => ({
     type: 'service_log',
     id: row.id,
@@ -447,7 +447,7 @@ function loadHistory(itemId, userId, viewer) {
     note: row.note,
   }));
 
-  const bookingLinks = loadLinkedEntries(itemId, userId)
+  const bookingLinks = loadLinkedEntries(itemId, budget)
     .filter((link) => HISTORY_ENTRY_ROLES.includes(link.role));
   const bookingRows = bookingLinks.map((link) => ({
     type: 'budget_entry',
