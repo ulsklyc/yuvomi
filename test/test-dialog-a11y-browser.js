@@ -145,15 +145,18 @@ for (const device of ['desktop', 'mobile']) {
 /*
  * DIE FOTO-DIALOGE (Nachtrag zur a11y-Runde). Dasselbe Muster wie in
  * "Mitglied bearbeiten": ein `.sr-only`-Datei-Input, den eine Vorschau oder ein
- * Knopf oeffnet. Im Geburtstags-Dialog lag der Erstfokus darauf (gemessen auf
- * desktop und mobile); in Rezept, Inventar und Haushaltshilfe war er ohne
- * Namen und ein zweiter, unsichtbarer Tab-Halt neben seinem Knopf.
+ * Knopf oeffnet. In Geburtstag und Haushaltshilfe lag der Erstfokus darauf
+ * (gemessen auf desktop und mobile); in Rezept und Inventar war er ohne Namen,
+ * im Beleg-Feld des Budget-Dialogs ein zweiter, unsichtbarer Tab-Halt neben
+ * "Hochladen".
  */
 const PHOTO_DIALOGS = [
-  { name: 'Geburtstag anlegen', route: '/birthdays', open: ['#fab-new-birthday'], file: 'bd-photo', first: 'bd-name' },
-  { name: 'Rezept anlegen', route: '/recipes', open: ['#fab-new-recipe'], file: 'recipe-image' },
-  { name: 'Inventar anlegen', route: '/inventory', open: ['.page-fab'], file: 'inv-photo' },
-  { name: 'Haushaltshilfe bearbeiten', route: '/housekeeping', open: ['[data-tab-id="staff"]', '[data-edit-worker]'], file: 'housekeeping-avatar-file' },
+  { name: 'Geburtstag anlegen', route: '/birthdays', open: ['#fab-new-birthday'], file: '#bd-photo', first: 'bd-name' },
+  { name: 'Rezept anlegen', route: '/recipes', open: ['#fab-new-recipe'], file: '#recipe-image' },
+  { name: 'Inventar anlegen', route: '/inventory', open: ['.page-fab'], file: '#inv-photo' },
+  { name: 'Haushaltshilfe bearbeiten', route: '/housekeeping', open: ['[data-tab-id="staff"]', '[data-edit-worker]'], file: '#housekeeping-avatar-file' },
+  // Das Beleg-Feld (components/document-attach.js): "Hochladen" oeffnet den Input.
+  { name: 'Budget-Eintrag anlegen', route: '/budget', open: ['#budget-add'], file: '[data-doc-attach-input]' },
 ];
 
 for (const dialog of PHOTO_DIALOGS) {
@@ -166,23 +169,26 @@ for (const dialog of PHOTO_DIALOGS) {
           await page.waitForSelector(selector, { timeout: 10000 });
           await page.$eval(selector, (el) => el.click());
         }
-        await page.waitForSelector(`#${dialog.file}`, { timeout: 10000 });
+        await page.waitForSelector(dialog.file, { timeout: 10000 });
         await page.waitForFunction(
           () => document.activeElement && document.activeElement !== document.body
             && Boolean(document.activeElement.closest('.modal-overlay')),
           { timeout: 5000 },
         );
         await new Promise((r) => setTimeout(r, 150));
-        const state = await page.evaluate((fileId) => {
+        const state = await page.evaluate((selector) => {
           const el = document.activeElement;
-          const file = document.getElementById(fileId);
+          const file = document.querySelector(selector);
+          const labelledBy = file.getAttribute('aria-labelledby');
           return {
             active: el?.id || el?.getAttribute('name') || el?.tagName,
+            activeIsFile: el === file,
             fileTabIndex: file.tabIndex,
-            fileLabel: file.getAttribute('aria-label') || '',
+            fileLabel: (file.getAttribute('aria-label')
+              || (labelledBy && document.getElementById(labelledBy)?.textContent) || '').trim(),
           };
         }, dialog.file);
-        assert.notEqual(state.active, dialog.file, 'der Erstfokus liegt auf dem versteckten Datei-Input');
+        assert.equal(state.activeIsFile, false, 'der Erstfokus liegt auf dem versteckten Datei-Input');
         if (dialog.first) assert.equal(state.active, dialog.first, `der Erstfokus liegt auf ${state.active}`);
         assert.equal(state.fileTabIndex, -1, 'der Datei-Input liegt in der Tab-Folge - sein Knopf ist der Weg');
         assert.ok(state.fileLabel, 'der Datei-Input hat keinen zugaenglichen Namen');

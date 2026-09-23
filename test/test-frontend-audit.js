@@ -14415,6 +14415,16 @@ test('ein Toast-Container hat genau einen Namensgeber', () => {
 // Erstfokus. Ein Input, den ein `<label for>` bedient (Dropzonen), bleibt in
 // der Tab-Folge - dort IST er der Tastaturweg.
 // --------------------------------------------------------------------------
+// `for="id"` als eigenes Attribut, nicht als Ende von `data-for` oder `aria-for`.
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const labelledFor = (src, id) => new RegExp(`(?<![\\w-])for="${escapeRegExp(id)}"`).test(src);
+
+test('die Ausnahme fuer <label for> greift nur am echten for-Attribut', () => {
+  assert.equal(labelledFor('<label for="zz4">', 'zz4'), true);
+  assert.equal(labelledFor('<div data-for="zz4">', 'zz4'), false, 'data-for ist kein Label');
+  assert.equal(labelledFor('<label for="zz45">', 'zz4'), false);
+});
+
 test('ein versteckter Datei-Input ohne <label for> ist benannt und ausser Tab-Folge', () => {
   const offenders = [];
   let seen = 0;
@@ -14423,8 +14433,9 @@ test('ein versteckter Datei-Input ohne <label for> ist benannt und ausser Tab-Fo
     for (const [tag] of src.matchAll(/<input\b(?=[^>]*\btype="file")(?=[^>]*\bclass="[^"]*\bsr-only\b)[^>]*>/g)) {
       seen += 1;
       const id = tag.match(/\bid="([^"]+)"/)?.[1];
-      if (id && src.includes(`for="${id}"`)) continue;
-      const named = /\baria-label(?:ledby)?="/.test(tag);
+      if (id && labelledFor(src, id)) continue;
+      // Ein leerer Name ist keiner: `aria-label=""` zaehlt nicht.
+      const named = /\baria-label(?:ledby)?="[^"]*[^"\s][^"]*"/.test(tag);
       const untabbable = /\btabindex="-1"/.test(tag);
       if (!named || !untabbable) {
         offenders.push(`${rel}: ${id ?? tag.slice(0, 60)}${named ? '' : ' ohne Namen'}${untabbable ? '' : ' in der Tab-Folge'}`);
@@ -14456,7 +14467,7 @@ test('ein Toast traegt keine eigene Live-Rolle - die Region sagt an', () => {
     creators += names.size;
     src.split('\n').forEach((line, i) => {
       for (const name of names) {
-        const own = new RegExp(`\\b${name.replace(/\$/g, '\\$')}\\.setAttribute\\(\\s*['"](?:role|aria-live)['"]`);
+        const own = new RegExp(`\\b${escapeRegExp(name)}\\.setAttribute\\(\\s*['"](?:role|aria-live)['"]`);
         if (own.test(line)) offenders.push(`${rel}:${i + 1} ${line.trim()}`);
       }
     });

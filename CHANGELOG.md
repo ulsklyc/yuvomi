@@ -180,11 +180,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   picture upload, which showed up as a stray strip over the dialog title and had no name for
   screen readers; the birthday and housekeeping staff dialogs had the same problem. The hidden
   photo and file pickers in these and in the recipe, inventory and attachment dialogs now have a
-  name and no longer take an extra, invisible Tab stop next to their button. The member and invite lists in Settings are valid lists again when empty or
-  after a load error, the two-factor card keeps a gap between its hint and its buttons, and with
-  read-only access, birthday and subscription rows no longer show a swipe arrow on touchscreens,
-  since there is nothing to swipe. A toast now also stays clear of a focused person chip in a
-  dialog, not only of the chip's first pixel.
+  name and no longer take an extra, invisible Tab stop next to their button. The member and
+  invite lists in Settings are valid lists again when empty or after a load error, the two-factor
+  card keeps a gap between its hint and its buttons, and with read-only access, birthday and
+  subscription rows no longer show a swipe arrow on touchscreens, since there is nothing to swipe.
+  A toast now also stays clear of a focused person chip in a dialog, not only of the chip's first
+  pixel.
 
 - **A failed restore explains itself in your language and keeps your place.** When a backup did
   not open, the restore dialog showed the server's English explanation, up to several paragraphs
