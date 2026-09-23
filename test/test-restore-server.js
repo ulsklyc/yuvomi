@@ -56,19 +56,22 @@ function makeCookieRefreshDue() {
 }
 
 /**
- * Einen Restore starten und beim Kopieren der Arbeitsdatei anhalten.
+ * Einen Restore starten und anhalten: beim Kopieren der Arbeitsdatei
+ * (`phase: 'staging'`, Verbindung offen, aber gesperrt) oder beim Anlegen der
+ * Rollback-Kopie (`phase: 'closed'`, Verbindung zu).
  * @returns {Promise<{ release: () => void, done: Promise<unknown> }>}
  */
-async function restoreHeldWhileCopying() {
+async function restoreHeldWhileCopying({ phase = 'staging' } = {}) {
   const backupPath = join(tempDir('yuvomi-test-restore-server-'), 'backup.db');
   await dbmod.backupToFile(backupPath);
+  const holdAt = phase === 'closed' ? dbmod.getPath() : backupPath;
   let release;
   const gate = new Promise((resolve) => { release = resolve; });
   let reached;
   const copying = new Promise((resolve) => { reached = resolve; });
   const realCopyFile = fsp.copyFile;
   fsp.copyFile = async (src, dest, mode) => {
-    if (String(src) === backupPath) {
+    if (String(src) === holdAt) {
       reached();
       await gate;
     }
@@ -164,4 +167,42 @@ test('#1431 ein zweiter Restore bekommt 409, bevor sein Upload gelesen wird', as
   }
   assert.equal(answer.status, 409, `zweiter Restore: ${answer.status} ${answer.body}`);
   assert.equal(JSON.parse(answer.body).reason, 'restore_in_progress');
+});
+
+test('#1431 solange die Verbindung zu ist, bekommt ein Seitenaufruf 503 restore_in_progress statt 500', async () => {
+  // Angehalten beim Anlegen der Rollback-Kopie: die Verbindung ist dann zu.
+  const restore = await restoreHeldWhileCopying({ phase: 'closed' });
+  let api;
+  let apiBody;
+  let asset;
+  try {
+    assert.throws(() => dbmod.get(), /Not initialized/, 'Vorbedingung: die Verbindung ist zu');
+    api = await fetch(`${BASE}/api/v1/auth/me`, { headers: { Cookie: COOKIE } });
+    apiBody = await api.text();
+    asset = await fetch(`${BASE}/manifest.json`, { headers: { Cookie: COOKIE } });
+    await asset.arrayBuffer();
+  } finally {
+    restore.release();
+    await restore.done;
+  }
+  assert.equal(api.status, 503, `GET /auth/me bei geschlossener Verbindung: ${api.status} ${apiBody}`);
+  assert.equal(JSON.parse(apiBody).reason, 'restore_in_progress');
+  assert.equal(asset.status, 200, 'statische Dateien laden weiter, auch mit Sitzungs-Cookie');
+  const after = await fetch(`${BASE}/api/v1/auth/me`, { headers: { Cookie: COOKIE } });
+  assert.equal(after.status, 200, 'danach wieder normal');
+});
+
+test('#1431 ein OAuth-Start waehrend eines Restores bekommt 503, keinen Redirect ohne gespeicherten state', async () => {
+  const restore = await restoreHeldWhileCopying();
+  let res;
+  let body;
+  try {
+    res = await fetch(`${BASE}/api/v1/calendar/outlook/auth`, { headers: { Cookie: COOKIE }, redirect: 'manual' });
+    body = await res.text();
+  } finally {
+    restore.release();
+    await restore.done;
+  }
+  assert.equal(res.status, 503, `OAuth-Start: ${res.status} ${body}`);
+  assert.equal(JSON.parse(body).reason, 'restore_in_progress');
 });

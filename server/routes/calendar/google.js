@@ -3,6 +3,7 @@
  * OAuth, Sync, Kalenderauswahl, Nur-lesen, external-calendars (#459).
  */
 
+import { refuseWhileRestoring } from '../../middleware/restore-gate.js';
 import { createLogger } from '../../logger.js';
 import { integrationDetailsVisible } from '../../scopes.js';
 import express from 'express';
@@ -28,7 +29,7 @@ const router = express.Router();
  * GET /api/v1/calendar/google/auth
  * Admin only. Leitet zum Google OAuth-Consent-Screen weiter.
  */
-router.get('/google/auth', requireAdmin, (req, res) => {
+router.get('/google/auth', requireAdmin, refuseWhileRestoring, (req, res) => {
   try {
     const url = googleCalendar.getAuthUrl(req.session);
     if (!url) return res.status(503).json({ error: 'Google nicht konfiguriert.', code: 503 });
@@ -44,7 +45,7 @@ router.get('/google/auth', requireAdmin, (req, res) => {
  * OAuth-Callback von Google. Tauscht Code gegen Tokens und startet initialen Sync.
  * Query: ?code=...
  */
-router.get('/google/callback', async (req, res) => {
+router.get('/google/callback', refuseWhileRestoring, async (req, res) => {
   try {
     const { code, error, state } = req.query;
     if (error) return res.redirect('/settings?sync_error=google');

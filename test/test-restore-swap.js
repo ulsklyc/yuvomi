@@ -1114,6 +1114,19 @@ test('#1431 restoreWriteGate: schreibende Requests bekommen waehrend eines Resto
     gate({ method, originalUrl: url, url }, res, () => { passed = true; });
     return { passed, res };
   };
+  const closedGate = createRestoreWriteGate(() => true, () => false);
+  const closedCall = (method, url) => {
+    const res = { statusCode: 200, body: null, headers: {},
+      setHeader(k, v) { this.headers[k] = v; },
+      status(code) { this.statusCode = code; return this; },
+      json(body) { this.body = body; return this; } };
+    let passed = false;
+    closedGate({ method, originalUrl: url, url }, res, () => { passed = true; });
+    return { passed, res };
+  };
+  assert.equal(closedCall('GET', '/api/v1/auth/me').res.statusCode, 503, 'Verbindung zu: auch lesende API-Anfragen');
+  assert.equal(closedCall('GET', '/mcp').res.statusCode, 503);
+  assert.equal(closedCall('GET', '/manifest.json').passed, true, 'statische Dateien gehen durch');
   const post = call('POST', '/api/v1/tasks');
   assert.equal(post.passed, false);
   assert.equal(post.res.statusCode, 503);
@@ -1131,8 +1144,8 @@ test('#1431 restoreWriteGate: schreibende Requests bekommen waehrend eines Resto
 
 test('#1431 restoreWriteGate haengt vor Body-Parsern, Sessions und Routern', () => {
   const source = readFileSync(new URL('../server/index.js', import.meta.url), 'utf8');
-  const gate = source.indexOf('app.use(createRestoreWriteGate(db.isRestoreRunning));');
-  assert.ok(gate > 0, 'server/index.js muss den Riegel mit db.isRestoreRunning einhaengen');
+  const gate = source.indexOf('app.use(createRestoreWriteGate(db.isRestoreRunning, db.isDatabaseOpen));');
+  assert.ok(gate > 0, 'server/index.js muss den Riegel mit db.isRestoreRunning und db.isDatabaseOpen einhaengen');
   for (const later of ['app.use(express.json(', 'app.use(express.urlencoded(', 'app.use(sessionMiddleware);', "app.use('/api/v1/auth', authRouter);", "app.use('/mcp'", "app.use('/api/v1/tasks', tasksRouter);"]) {
     assert.ok(source.indexOf(later) > gate, `${later} kommt nach dem Riegel`);
   }
@@ -1292,3 +1305,122 @@ test('#1431 scheitert chown, gehoert die Datei aber ohnehin demselben Nutzer (SM
   assert.equal(target.mod.get().prepare('SELECT note FROM restore_probe LIMIT 1').get()?.note, 'aus dem Backup');
   target.mod.get().close();
 });
+
+// ---------------------------------------------------------------------------
+// Neunte Runde #1431
+// ---------------------------------------------------------------------------
+
+test('#1431 ein Sync-Lauf, der vor dem Restore begann, wird abgewartet und schreibt sein Ergebnis noch', async () => {
+  const { runSerialized } = await import('../server/utils/sync-lock.js');
+  const backupPath = await bigBackup(KEY, 'aus dem Backup');
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  const order = [];
+  const realCopyFile = fsp.copyFile;
+  fsp.copyFile = async (src, dest, mode) => {
+    if (String(src) === backupPath) order.push('Restore kopiert');
+    return realCopyFile(src, dest, mode);
+  };
+  let releaseProvider;
+  const provider = new Promise((resolve) => { releaseProvider = resolve; });
+  let started;
+  const running = new Promise((resolve) => { started = resolve; });
+  const job = runSerialized('test-1431-wait', 'sync', async () => {
+    started();
+    await provider; // der Anbieter antwortet noch nicht
+    target.mod.get().prepare('INSERT INTO restore_probe (note) VALUES (?)').run('Link vom Sync');
+    order.push('Sync schreibt');
+    return 'geschrieben';
+  });
+  let outcome;
+  try {
+    await running;
+    const restore = target.mod.restoreFromFile(backupPath);
+    // Dem Restore Zeit geben weiterzulaufen, falls er nicht wartet.
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    releaseProvider();
+    try {
+      outcome = await job;
+    } catch (err) {
+      outcome = err.code ?? err.message;
+    }
+    await restore;
+  } finally {
+    releaseProvider();
+    fsp.copyFile = realCopyFile;
+  }
+  assert.equal(outcome, 'geschrieben', 'der Sync schreibt sein Ergebnis noch zurueck');
+  assert.deepEqual(order, ['Sync schreibt', 'Restore kopiert'], 'erst der Sync, dann der Restore');
+  target.mod.get().close();
+});
+
+test('#1431 waehrend eines Restores beginnt kein Sync-Lauf', async () => {
+  const { runSerialized } = await import('../server/utils/sync-lock.js');
+  const backupPath = await bigBackup(KEY, 'aus dem Backup');
+  const target = await frozenTarget(KEY, 'vor dem Restore');
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  let reached;
+  const copying = new Promise((resolve) => { reached = resolve; });
+  const realCopyFile = fsp.copyFile;
+  fsp.copyFile = async (src, dest, mode) => {
+    if (String(src) === backupPath) {
+      reached();
+      await gate;
+    }
+    return realCopyFile(src, dest, mode);
+  };
+  let called = false;
+  let result;
+  try {
+    const restore = target.mod.restoreFromFile(backupPath);
+    await copying;
+    result = await runSerialized('test-1431-tick', 'sync', async () => { called = true; return 'lief'; });
+    release();
+    await restore;
+  } finally {
+    release();
+    fsp.copyFile = realCopyFile;
+  }
+  assert.equal(called, false, 'der Tick darf waehrend des Restores nicht beginnen');
+  assert.equal(result?.skipped, 'restore_in_progress');
+  target.mod.get().close();
+});
+
+test('#1431 Outlook- und CardDAV-Sync beginnen waehrend eines Restores nicht', async () => {
+  const state = await import('../server/utils/restore-state.js');
+  const outlook = await import('../server/services/outlook-calendar.js');
+  const carddav = await import('../server/services/cardav-sync.js');
+  state.setRestoreRunning?.(true);
+  try {
+    assert.deepEqual(await outlook.sync(), { success: false, skipped: 'restore_in_progress' });
+    assert.deepEqual(await carddav.sync(), { success: false, skipped: 'restore_in_progress' });
+  } finally {
+    state.setRestoreRunning?.(false);
+  }
+});
+
+test(
+  '#1431 scheitert chown, bleibt die Datei aber ueber die Gruppe schreibbar (root:node 0660), laeuft der Restore',
+  { skip: process.getuid?.() === 0 && 'root darf jeden Besitzer setzen' },
+  async () => {
+    const backupPath = await bigBackup(KEY, 'aus dem Backup');
+    const target = await frozenTarget(KEY, 'vor dem Restore');
+    chmodSync(target.dbPath, 0o660);
+    const realStat = fsp.stat;
+    // Die bisherige Datenbank gehoert (scheinbar) einem anderen Nutzer, teilt
+    // aber die Gruppe mit dem Dienst - wie root:node auf TrueNAS.
+    fsp.stat = async (filePath, options) => {
+      const stats = await realStat(filePath, options);
+      if (String(filePath) === target.dbPath) return Object.assign(Object.create(Object.getPrototypeOf(stats)), stats, { uid: stats.uid + 1 });
+      return stats;
+    };
+    try {
+      await target.mod.restoreFromFile(backupPath);
+    } finally {
+      fsp.stat = realStat;
+    }
+    assert.equal(target.mod.get().prepare('SELECT note FROM restore_probe LIMIT 1').get()?.note, 'aus dem Backup');
+    assert.equal(statSync(target.dbPath).mode & 0o777, 0o660);
+    target.mod.get().close();
+  }
+);

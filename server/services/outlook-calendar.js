@@ -11,6 +11,7 @@
  * verwaiste Link-Zeilen sind Tombstones für Remote-Deletes.
  */
 
+import { runExternalJob } from '../utils/restore-state.js';
 import { createLogger } from '../logger.js';
 const log = createLogger('Outlook');
 
@@ -735,7 +736,15 @@ async function fetchRemoteEventStates(calendarId, accessToken, fetchImpl = fetch
  * Kein Inbound. Konto-Fehler brechen nur das jeweilige Konto ab.
  * @param {{fetchImpl?: typeof fetch}} [options] - fetch injizierbar (Tests)
  */
-async function sync({ fetchImpl = fetch } = {}) {
+/**
+ * Der Sync als Job, der nach aussen schreibt: waehrend eines Restores beginnt
+ * er nicht, und ein laufender wird abgewartet (Codex-Befund in #1431).
+ */
+function sync(options = {}) {
+  return runExternalJob(() => runOutlookSync(options));
+}
+
+async function runOutlookSync({ fetchImpl = fetch } = {}) {
   const accounts = getAllAccounts();
   if (accounts.length === 0) {
     log.debug('No Outlook accounts configured.');

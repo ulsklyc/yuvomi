@@ -1,4 +1,5 @@
 import express from 'express';
+import { refuseWhileRestoring } from '../middleware/restore-gate.js';
 import { requireAdmin } from '../auth.js';
 import { createLogger } from '../logger.js';
 import * as googleDriveStorage from '../services/google-drive-storage.js';
@@ -24,7 +25,7 @@ function sendStorageError(res, error) {
   });
 }
 
-router.get('/auth', requireAdmin, (req, res) => {
+router.get('/auth', requireAdmin, refuseWhileRestoring, (req, res) => {
   try {
     res.redirect(googleDriveStorage.getAuthUrl(req.session));
   } catch (error) {
@@ -33,7 +34,7 @@ router.get('/auth', requireAdmin, (req, res) => {
   }
 });
 
-router.get('/callback', requireAdmin, async (req, res) => {
+router.get('/callback', requireAdmin, refuseWhileRestoring, async (req, res) => {
   const { code, error, state } = req.query;
   if (error || !code) {
     delete req.session.googleDriveOAuthState;

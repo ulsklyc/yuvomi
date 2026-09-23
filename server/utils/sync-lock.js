@@ -36,6 +36,8 @@
 //   pending  je Art HÖCHSTENS ein vorgemerkter Nachlauf: während eines Laufs
 //            treffen bei drei Bearbeitungen drei Sofortversuche ein, und alle
 //            drei wollen dasselbe - einmal nacharbeiten, was danach aussteht.
+import { runExternalJob } from './restore-state.js';
+
 const locks = new Map();
 
 function lockFor(key) {
@@ -60,7 +62,10 @@ async function drain(lock) {
     // dieser Lauf schon gelesen haben kann, und braucht deshalb einen eigenen.
     if (lock.pending.get(entry.kind) === entry) lock.pending.delete(entry.kind);
     try {
-      const value = await entry.run();
+      // Kalenderarbeit schreibt nach aussen und danach ihre Buchhaltung zurueck:
+      // waehrend eines Restores beginnt sie nicht, und eine laufende wartet der
+      // Restore ab, bevor er die Verbindung sperrt (Codex-Befund in #1431).
+      const value = await runExternalJob(entry.run);
       for (const w of entry.waiters) w.resolve(value);
     } catch (err) {
       for (const w of entry.waiters) w.reject(err);

@@ -8,6 +8,7 @@
  * GET /calendar/sync-targets (#618).
  */
 
+import { refuseWhileRestoring } from '../../middleware/restore-gate.js';
 import { createLogger } from '../../logger.js';
 import { integrationDetailsVisible } from '../../scopes.js';
 import express from 'express';
@@ -21,7 +22,7 @@ const router = express.Router();
  * GET /api/v1/calendar/outlook/auth
  * Admin only. Leitet zum Microsoft-Consent-Screen weiter (persönliche Konten).
  */
-router.get('/outlook/auth', requireAdmin, (req, res) => {
+router.get('/outlook/auth', requireAdmin, refuseWhileRestoring, (req, res) => {
   try {
     const url = outlookCalendar.getAuthUrl(req.session);
     res.redirect(url);
@@ -37,7 +38,7 @@ router.get('/outlook/auth', requireAdmin, (req, res) => {
  * und stößt einen initialen Push an.
  * Query: ?code=...&state=...
  */
-router.get('/outlook/callback', async (req, res) => {
+router.get('/outlook/callback', refuseWhileRestoring, async (req, res) => {
   try {
     const { code, error, state } = req.query;
     if (error) return res.redirect('/settings?sync_error=outlook');

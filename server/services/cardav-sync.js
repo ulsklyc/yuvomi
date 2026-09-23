@@ -4,6 +4,7 @@
  * Abhängigkeiten: tsdav, server/db.js
  */
 
+import { runExternalJob } from '../utils/restore-state.js';
 import { createLogger } from '../logger.js';
 const log = createLogger('CardDAV');
 
@@ -701,7 +702,15 @@ function toggleAddressbook(addressbookId, enabled) {
  *
  * @returns {Promise<{ success: boolean, syncedAccounts: number, syncedContacts: number }>}
  */
-async function sync() {
+/**
+ * Der Sync als Job, der nach aussen schreibt: waehrend eines Restores beginnt
+ * er nicht, und ein laufender wird abgewartet (Codex-Befund in #1431).
+ */
+function sync() {
+  return runExternalJob(() => runCarddavSync());
+}
+
+async function runCarddavSync() {
   const accounts = getAllAccounts();
 
   if (accounts.length === 0) {

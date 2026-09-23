@@ -180,7 +180,7 @@ app.use(compression());
 // zweiter Restore wird abgewiesen, bevor sein Upload gelesen wird. Vor den
 // Sessions: auch deren Schreiben (Login, Logout) gehoert dazu. Vor /mcp und
 // allen Routern, damit kein Schreibzugriff durchrutscht.
-app.use(createRestoreWriteGate(db.isRestoreRunning));
+app.use(createRestoreWriteGate(db.isRestoreRunning, db.isDatabaseOpen));
 app.use(express.json({ limit: BODY_LIMIT }));
 app.use(express.urlencoded({ extended: true, limit: BODY_LIMIT }));
 
@@ -737,7 +737,17 @@ app.get('/{*path}', spaLimiter, (req, res) => {
 // Globaler Error-Handler
 // --------------------------------------------------------
 app.use((err, req, res, _next) => {
+  // Waehrend eines Restores (#1431): etwa eine Sitzung, die nicht gespeichert
+  // werden kann. Ist die Antwort schon unterwegs (express-session meldet den
+  // Fehler erst nach dem Schreiben), bleibt nur das Log.
+  if (err?.reason === 'restore_in_progress') {
+    log.warn(`Request refused during a restore: ${req.method} ${req.path}`);
+    if (res.headersSent) return undefined;
+    res.setHeader('Retry-After', '30');
+    return res.status(503).json({ error: err.message, code: 503, reason: err.reason });
+  }
   log.error('Unhandled error:', err);
+  if (res.headersSent) return undefined;
   res.status(500).json({ error: 'Internal server error.', code: 500 });
 });
 

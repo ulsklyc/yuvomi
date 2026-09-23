@@ -187,9 +187,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an interrupted restore never leaves a cut-off copy under that name. A second restore started
   while one is still running, from another tab or another admin, is now refused with a message
   instead of racing the first one. Changes made while a restore is running are refused with a
-  translated note to try again in a minute, instead of seeming saved and then disappearing; pages
-  keep loading in the meantime. A restore that cannot give the restored database the owner of
-  the current one stops before replacing anything and says to run it as the user Yuvomi runs as.
+  translated note to try again in a minute, instead of seeming saved and then disappearing. Pages
+  keep loading while the backup is copied; only in the short moment the database file itself is
+  swapped does the app answer with the same note. Calendar and contact syncs, push notifications
+  and scheduled backups do not start during a restore, and one already running is finished
+  first. A restore that would leave the database unwritable for Yuvomi stops before replacing
+  anything and says to run it as the user Yuvomi runs as.
   (#1422)
 
 - **Screen readers and keyboards get a few rough edges less.** Toasts no longer interrupt what a

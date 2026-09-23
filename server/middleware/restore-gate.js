@@ -21,30 +21,56 @@
  * Test das Modul ohne Datenbank laden kann.
  */
 
-import { RESTORE_IN_PROGRESS_MESSAGE, RESTORE_IN_PROGRESS_REASON } from '../utils/restore-messages.js';
+import {
+  RESTORE_IN_PROGRESS_MESSAGE, RESTORE_IN_PROGRESS_REASON, RESTORE_WRITE_REFUSED_MESSAGE,
+} from '../utils/restore-messages.js';
+import { isRestoreRunning as restoreStateRunning } from '../utils/restore-state.js';
 
 const READING_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 const RESTORE_PATH = '/api/v1/backup/restore';
 
+/** Pfade, deren Antworten die Datenbank brauchen. Statische Dateien gehoeren nicht dazu. */
+function needsDatabase(pathOnly) {
+  return pathOnly.startsWith('/api/') || pathOnly === '/mcp' || pathOnly.startsWith('/mcp/');
+}
+
+function refuse(res, status, error) {
+  res.setHeader('Retry-After', '30');
+  // Die Verbindung schliessen: der Rest eines Uploads soll nicht mehr kommen.
+  res.setHeader('Connection', 'close');
+  return res.status(status).json({ error, code: status, reason: RESTORE_IN_PROGRESS_REASON });
+}
+
 /**
  * @param {() => boolean} isRestoreRunning
+ * @param {() => boolean} [isDatabaseOpen] waehrend eines Restores ist die
+ *   Verbindung vom Schliessen bis zum Wiederoeffnen zu. Dann beantwortet das
+ *   Gate auch LESENDE API-Anfragen mit 503, statt sie an einer fehlenden
+ *   Verbindung mit 500 scheitern zu lassen (Review #1431).
  * @returns {import('express').RequestHandler}
  */
-export function createRestoreWriteGate(isRestoreRunning) {
+export function createRestoreWriteGate(isRestoreRunning, isDatabaseOpen = () => true) {
   return function restoreWriteGate(req, res, next) {
-    if (READING_METHODS.has(req.method) || !isRestoreRunning()) return next();
-    res.setHeader('Retry-After', '30');
-    // Die Verbindung schliessen: der Rest des Uploads soll nicht mehr kommen.
-    res.setHeader('Connection', 'close');
+    if (!isRestoreRunning()) return next();
     const pathOnly = (req.originalUrl || req.url || '').split('?')[0];
-    if (pathOnly === RESTORE_PATH) {
-      return res.status(409).json({ error: RESTORE_IN_PROGRESS_MESSAGE, code: 409, reason: RESTORE_IN_PROGRESS_REASON });
+    if (!isDatabaseOpen() && needsDatabase(pathOnly)) {
+      return refuse(res, 503, RESTORE_WRITE_REFUSED_MESSAGE);
     }
-    return res.status(503).json({
-      error: 'A backup is being restored right now. This change was not saved - try again in a minute.',
-      code: 503,
-      reason: RESTORE_IN_PROGRESS_REASON,
-    });
+    if (READING_METHODS.has(req.method)) return next();
+    if (pathOnly === RESTORE_PATH) return refuse(res, 409, RESTORE_IN_PROGRESS_MESSAGE);
+    return refuse(res, 503, RESTORE_WRITE_REFUSED_MESSAGE);
   };
+}
+
+/**
+ * Fuer lesende Routen, die trotzdem etwas in die Sitzung schreiben (OAuth- und
+ * OIDC-Start legen dort ihren `state` ab): waehrend eines Restores kann der
+ * Store nichts speichern, und ein Redirect ohne gespeicherten `state` endet
+ * erst beim Anbieter-Callback - deshalb vorher 503 (Codex-Befund in #1431).
+ * @type {import('express').RequestHandler}
+ */
+export function refuseWhileRestoring(_req, res, next) {
+  if (!restoreStateRunning()) return next();
+  return refuse(res, 503, RESTORE_WRITE_REFUSED_MESSAGE);
 }

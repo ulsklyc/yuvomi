@@ -24,6 +24,7 @@ import fs from 'node:fs/promises';
 import { mkdirSync, existsSync, renameSync, linkSync, rmSync, copyFileSync, openSync, readSync, closeSync, statSync, readdirSync } from 'node:fs';
 import { createLogger } from './logger.js';
 import { RESTORE_IN_PROGRESS_MESSAGE, RESTORE_IN_PROGRESS_REASON } from './utils/restore-messages.js';
+import { setRestoreRunning, waitForExternalJobs, hasActiveExternalJobs } from './utils/restore-state.js';
 import { decodeHtmlEntities } from './utils/html-entities.js';
 import { toE164, defaultCountryFromConfig } from './utils/phone.js';
 
@@ -10446,18 +10447,25 @@ async function restoreFromFile(sourcePath, { backupKey = null } = {}) {
     throw restoreError(RESTORE_IN_PROGRESS_MESSAGE, RESTORE_IN_PROGRESS_REASON);
   }
   restoreRunning = true;
-  // Ab jetzt nimmt die laufende Verbindung keine Schreibzugriffe mehr an
-  // (Codex-Befund in #1431): seit die Arbeitsdatei VOR dem Schliessen kopiert
-  // wird, bleibt sie waehrenddessen offen, und ein Schreibzugriff meldete
-  // Erfolg, den Checkpoint, Schliessen und rename danach verwarfen. Vor dem
-  // ersten await gesetzt; `restoreWriteGate` (server/middleware) beantwortet
-  // Schreib-Requests schon vorher mit 503. Die neue Verbindung nach dem Tausch
-  // beginnt ohne den Riegel, nach einem Fehlschlag wird er unten geloest.
-  try { db?.pragma('query_only = ON'); } catch { /* ohne Verbindung nichts zu sperren */ }
+  setRestoreRunning(true);
   try {
+    // Erst die Jobs zu Ende kommen lassen, die schon nach aussen schreiben
+    // (Kalender-Sync, Push, ...): sie muessen ihr Ergebnis noch zurueckschreiben
+    // koennen, sonst bleibt der entfernte Stand ohne Link (Codex-Befund in
+    // #1431). Neue beginnen ab `setRestoreRunning(true)` nicht mehr, und
+    // schreibende Requests weist `restoreWriteGate` ab derselben Zeile ab.
+    await waitForExternalJobs();
+    // Ab jetzt nimmt die laufende Verbindung keine Schreibzugriffe mehr an
+    // (Codex-Befund in #1431): seit die Arbeitsdatei VOR dem Schliessen kopiert
+    // wird, bleibt sie waehrenddessen offen, und ein Schreibzugriff meldete
+    // Erfolg, den Checkpoint, Schliessen und rename danach verwarfen. Die neue
+    // Verbindung nach dem Tausch beginnt ohne den Riegel, nach einem
+    // Fehlschlag wird er unten geloest.
+    try { db?.pragma('query_only = ON'); } catch { /* ohne Verbindung nichts zu sperren */ }
     return await restoreFromFileUnlocked(sourcePath, { backupKey });
   } finally {
     restoreRunning = false;
+    setRestoreRunning(false);
     try { db?.pragma('query_only = OFF'); } catch { /* best effort */ }
   }
 }
@@ -10465,6 +10473,15 @@ async function restoreFromFile(sourcePath, { backupKey = null } = {}) {
 /** Laeuft gerade ein Restore? Fuer `restoreWriteGate`. */
 function isRestoreRunning() {
   return restoreRunning;
+}
+
+/**
+ * Ist die Verbindung offen? Waehrend eines Restores ist sie es vom Schliessen
+ * bis zum Wiederoeffnen nicht - dann beantwortet `restoreWriteGate` auch
+ * lesende API-Anfragen mit 503 (Review #1431).
+ */
+function isDatabaseOpen() {
+  return Boolean(db);
 }
 
 /**
@@ -10612,6 +10629,23 @@ async function stageDatabaseCopy(from, stagingPath) {
  * ist. Ohne bisherige Datenbank: 0600, lesbar nur fuer den Dienst.
  * @param {string} filePath
  */
+/**
+ * Kann, wer die bisherige Datenbank schreiben durfte, auch die neue Datei
+ * schreiben? Besitzer gleich: Besitzerbit; sonst Gruppe gleich: Gruppenbit.
+ * Wer nur ueber die Gruppe schrieb, schreibt so weiter; wer Besitzer war und
+ * es nicht mehr ist, verliert das Recht (ausser die Datei ist fuer alle
+ * schreibbar).
+ * @param {import('node:fs').Stats} staged
+ * @param {import('node:fs').Stats} previous
+ */
+function stillWritableForPreviousWriters(staged, previous) {
+  const mode = staged.mode;
+  if (mode & 0o002) return true;
+  if (staged.uid === previous.uid) return (mode & 0o200) !== 0;
+  if (staged.gid === previous.gid) return (mode & 0o020) !== 0;
+  return false;
+}
+
 async function adoptDatabaseAttributes(filePath) {
   let previous = null;
   try { previous = await fs.stat(DB_PATH); } catch { /* keine bisherige Datenbank */ }
@@ -10629,18 +10663,20 @@ async function adoptDatabaseAttributes(filePath) {
     try {
       await fs.chown(filePath, previous.uid, previous.gid);
     } catch (err) {
-      // Nur als root oder ohne Wechsel erlaubt. Gehoert die Datei danach einem
-      // anderen Nutzer als die bisherige Datenbank, haengte das rename eine
-      // Datei ein, die der Dienst womoeglich nicht schreiben oder gar nicht
-      // oeffnen darf (Codex-Befund in #1431): abbrechen, vor dem Tausch.
-      // Mounts, die jeder Datei denselben Besitzer melden (SMB), bestehen die
-      // Pruefung von selbst.
-      const owner = (await fs.stat(filePath)).uid;
-      if (owner !== previous.uid) {
+      // Nur als root oder ohne Wechsel erlaubt. Abbrechen, vor dem Tausch, nur
+      // wenn die Datei so fuer die bisherigen Schreiber der Datenbank NICHT
+      // schreibbar waere (Codex-Befund in #1431) - verglichen wird mit Besitzer
+      // UND Gruppe der bisherigen Datei, wie im chmod-Zweig ueber die
+      // Modusbits. Eine Datenbank root:node 0660 mit dem Dienst als node
+      // (TrueNAS, Entrypoint ohne chown) besteht so ueber die Gruppe; eine
+      // gleichbleibende uid (SMB-Mounts melden jeder Datei dieselbe) ohnehin.
+      const staged = await fs.stat(filePath);
+      if (!stillWritableForPreviousWriters(staged, previous)) {
         throw new Error(
-          `Could not give ${filePath} the owner of the current database (uid ${previous.uid}; it `
-          + `belongs to uid ${owner}): ${err?.code ?? err}. Nothing on this instance was changed. Run the `
-          + 'restore as the user Yuvomi runs as, or as root.',
+          `Could not give ${filePath} the owner of the current database (uid ${previous.uid}, gid `
+          + `${previous.gid}; it belongs to uid ${staged.uid}, gid ${staged.gid}): ${err?.code ?? err}. `
+          + 'Yuvomi would not be able to write the restored database. Nothing on this instance was '
+          + 'changed. Run the restore as the user Yuvomi runs as, or as root.',
           { cause: err }
         );
       }
@@ -10744,8 +10780,9 @@ async function restoreValidatedFile(sourcePath) {
     // Laufende Backups zu Ende kommen lassen. Zwischen dem letzten Blick auf
     // `activeBackups` und `db.close()` steht kein await: ein neues Backup kann
     // dort nicht mehr beginnen, und danach findet es keine Verbindung.
-    while (activeBackups.size > 0) {
+    while (activeBackups.size > 0 || hasActiveExternalJobs()) {
       await Promise.allSettled([...activeBackups]);
+      await waitForExternalJobs();
     }
     if (db) {
       try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* best effort */ }
@@ -10980,4 +11017,4 @@ try {
   if (!(err?.code === EMPTY_DATABASE_FILE && globalThis[RESTORE_TARGET_HANDSHAKE] === true)) throw err;
 }
 
-export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, isRestoreRunning, unknownMigrationVersions, MIGRATIONS, migrate, MIGRATION_BUSY_ATTEMPTS, reconcileCriticalSchema, _setTestDatabase, _resetTestDatabase };
+export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, isRestoreRunning, isDatabaseOpen, unknownMigrationVersions, MIGRATIONS, migrate, MIGRATION_BUSY_ATTEMPTS, reconcileCriticalSchema, _setTestDatabase, _resetTestDatabase };
