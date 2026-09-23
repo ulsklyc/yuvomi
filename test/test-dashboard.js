@@ -1376,6 +1376,9 @@ test('Dashboard-Geburtstagswidget lädt Geburtstage haushaltsweit (Issue #406)',
 
     nodeAssert.equal(response.status, 200);
     nodeAssert.equal(body.birthdayCount, 2);
+    // Die Kachel-Badge zaehlt Anlaesse, nicht Personen: zwei Menschen, einer
+    // davon mit Namenstag, sind drei Zeilen (Critique 2026-09-23).
+    nodeAssert.equal(body.birthdayTotal, 3);
     nodeAssert.ok(names.includes('Widget Other Today'), 'Dashboard widget must include birthdays created by other users');
     const ownerRows = body.birthdays.filter((item) => item.name === 'Widget Owner Today');
     nodeAssert.deepEqual(

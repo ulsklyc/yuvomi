@@ -107,7 +107,10 @@ const STUBS = {
     };
     export const getSupportedLocales = () => ['de', 'en'];
     export const formatDate = (d) => String(d);
-    export const formatDayMonth = (d) => String(d);
+    // Tag+Monat und volles Datum sehen im Stub gleich aus. Wer pruefen will,
+    // WELCHES von beiden gerufen wurde (relativeDateLabel), setzt
+    // globalThis.__formatDayMonth - dasselbe Muster wie __locale.
+    export const formatDayMonth = (d) => (globalThis.__formatDayMonth ?? String)(d);
     export const formatTime = (d) => String(d);
     export const getTimeFormat = () => '24h';
     export const timeSuffix = () => '';

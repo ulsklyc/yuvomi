@@ -25,7 +25,7 @@
  *   - Health (vitals, activities, medications + schedules/logs, lab reports, cycle,
  *     plus caregiver grants: both parents may record for the two children)
  *   - Rewards (participants, catalog, points ledger, fulfilled + pending redemptions)
- *   - Budget subscriptions (streaming, storage, gym — mixed billing cycles, one ending)
+ *   - Budget subscriptions (streaming, storage, gym - mixed billing cycles, one ending)
  *   - Household preferences (EUR, dd.mm.yyyy, 24h, weather = Dortmund)
  *
  * Login for all demo users: <username> / demo1234
@@ -52,7 +52,7 @@ const DB_PATH = dbIdx !== -1 ? args[dbIdx + 1] : resolve(__dirname, '..', 'yuvom
 const localeIdx = args.indexOf('--locale');
 const LOCALE = (localeIdx !== -1 ? String(args[localeIdx + 1] || '') : 'en').toLowerCase();
 if (!['en', 'de'].includes(LOCALE)) {
-  console.error(`Unknown locale "${LOCALE}" — expected "en" or "de".`);
+  console.error(`Unknown locale "${LOCALE}" - expected "en" or "de".`);
   process.exit(1);
 }
 const L = (en, de) => (LOCALE === 'de' ? de : en);
@@ -195,7 +195,7 @@ cfgSet.run('date_format', 'dmy');
 cfgSet.run('time_format', '24h');
 cfgSet.run('app_name', 'Yuvomi');
 cfgSet.run('visible_meal_types', 'breakfast,lunch,dinner,snack');
-// Weather widget — Dortmund via Open-Meteo (no API key required)
+// Weather widget - Dortmund via Open-Meteo (no API key required)
 cfgSet.run('weather_provider', 'open-meteo');
 cfgSet.run('weather_lat', '51.5136');
 cfgSet.run('weather_lon', '7.4653');
@@ -282,7 +282,7 @@ if (LOCALE === 'en') {
   ].forEach(([id, name]) => renameCat.run(name, id));
 }
 
-// Lagerorte des Vorrats — dieselbe Lage wie die Einkaufskategorien: freie Namen
+// Lagerorte des Vorrats - dieselbe Lage wie die Einkaufskategorien: freie Namen
 // aus der Migration, deutsch vorbelegt.
 const LOC = {
   pantry:  L('Pantry cupboard', 'Vorratsschrank'),
@@ -354,20 +354,20 @@ const TAG = {
 
 const tasks = [
   [L('Book dentist appointment',    'Zahnarzttermin vereinbaren'),       L('Annual check-up for the whole family',  'Jahreskontrolle für die ganze Familie'), 'health',    'high',   'open',        null,            daysFromNow(3),  alexId, alexId, [alexId],          []],
-  [L('Pay electricity bill',        'Stromrechnung bezahlen'),           L('Due end of month — online banking',     'Fällig zum Monatsende — Online-Banking'), 'finance',   'urgent', 'open',        null,            daysFromNow(2),  alexId, alexId, [alexId],          [TAG.urgent, TAG.paperwork]],
+  [L('Pay electricity bill',        'Stromrechnung bezahlen'),           L('Due end of month - online banking',     'Fällig zum Monatsende - Online-Banking'), 'finance',   'urgent', 'open',        null,            daysFromNow(2),  alexId, alexId, [alexId],          [TAG.urgent, TAG.paperwork]],
   [L('Renew car insurance',         'Kfz-Versicherung verlängern'),      L('Compare quotes first',                  'Vorher Angebote vergleichen'),            'finance',   'high',   'open',        null,            daysFromNow(10), alexId, alexId, [alexId],          [TAG.car, TAG.paperwork]],
   [L('Fix leaking bathroom faucet', 'Tropfenden Wasserhahn reparieren'), L('Replace washer, tools in the basement', 'Dichtung tauschen, Werkzeug im Keller'),  'repair',    'medium', 'open',        null,            daysFromNow(7),  lindaId, alexId, [lindaId],         []],
-  [L('Order birthday cake',         'Geburtstagstorte bestellen'),       L("Emma's birthday — chocolate cake",      'Emmas Geburtstag — Schokoladentorte'),    'household', 'high',   'open',        null,            daysFromNow(5),  lindaId, lindaId, [lindaId],        [TAG.kids]],
+  [L('Order birthday cake',         'Geburtstagstorte bestellen'),       L("Emma's birthday - chocolate cake",      'Emmas Geburtstag - Schokoladentorte'),    'household', 'high',   'open',        null,            daysFromNow(5),  lindaId, lindaId, [lindaId],        [TAG.kids]],
   [L('Clean out the garage',        'Garage ausmisten'),                 L('Donate old things to charity',          'Altes an die Kleiderkammer spenden'),     'household', 'low',    'open',        daysFromNow(7),  daysFromNow(14), alexId, alexId, [alexId, lindaId], []],
   [L('Sign school permission slip', 'Einverständnis für Schulausflug'),  L('Field trip to the science museum',      'Ausflug ins Naturkundemuseum'),           'school',    'urgent', 'open',        null,            daysFromNow(1),  lindaId, lindaId, [lindaId],        [TAG.urgent, TAG.school]],
   [L('Renew library cards',         'Büchereiausweise verlängern'),      L('All three cards expired last month',    'Alle drei sind letzten Monat abgelaufen'),'household', 'low',    'open',        null,            daysFromNow(20), alexId, alexId, [alexId],          []],
-  [L('Plan summer holiday',         'Sommerurlaub planen'),              L('Italy or Croatia — check flights',      'Italien oder Kroatien — Flüge prüfen'),   'leisure',   'medium', 'open',        daysFromNow(3),  daysFromNow(30), alexId, alexId, [alexId, lindaId], [TAG.holiday]],
+  [L('Plan summer holiday',         'Sommerurlaub planen'),              L('Italy or Croatia - check flights',      'Italien oder Kroatien - Flüge prüfen'),   'leisure',   'medium', 'open',        daysFromNow(3),  daysFromNow(30), alexId, alexId, [alexId, lindaId], [TAG.holiday]],
   [L('Tax return 2025',             'Steuererklärung 2025'),             L('Documents ready in the folder',         'Unterlagen liegen im Ordner bereit'),     'finance',   'high',   'in_progress', null,            daysFromNow(18), alexId, alexId, [alexId],          [TAG.paperwork]],
   [L('Tidy bedroom',                'Kinderzimmer aufräumen'),           L('Put away laundry & toys',               'Wäsche und Spielzeug wegräumen'),         'household', 'low',    'open',        null,            daysFromNow(1),  emmaId, lindaId, [emmaId],          [TAG.kids]],
-  [L('Practice piano',              'Klavier üben'),                     L('20 minutes — recital piece',            '20 Minuten — Stück fürs Vorspiel'),       'school',    'medium', 'open',        null,            daysFromNow(2),  leoId,  lindaId, [leoId],           [TAG.kids, TAG.school]],
+  [L('Practice piano',              'Klavier üben'),                     L('20 minutes - recital piece',            '20 Minuten - Stück fürs Vorspiel'),       'school',    'medium', 'open',        null,            daysFromNow(2),  leoId,  lindaId, [leoId],           [TAG.kids, TAG.school]],
   [L('Grocery run',                 'Wocheneinkauf erledigen'),          L('See the shopping list for details',     'Details stehen auf dem Einkaufszettel'),  'shopping',  'medium', 'done',        null,            daysFromNow(-1), lindaId, lindaId, [lindaId],        []],
   [L('Call insurance about claim',  'Versicherung wegen Schaden anrufen'),L('Reference: CLM-2025-0492',             'Vorgang: CLM-2025-0492'),                 'finance',   'high',   'done',        null,            daysFromNow(-3), alexId, alexId, [alexId],          [TAG.paperwork]],
-  [L('Oil change — VW Golf',        'Ölwechsel — VW Golf'),              L('Every 15,000 km / 12 months',           'Alle 15.000 km / 12 Monate'),             'repair',    'medium', 'open',        null,            daysFromNow(6),  alexId, alexId, [alexId],          [TAG.car]],
+  [L('Oil change - VW Golf',        'Ölwechsel - VW Golf'),              L('Every 15,000 km / 12 months',           'Alle 15.000 km / 12 Monate'),             'repair',    'medium', 'open',        null,            daysFromNow(6),  alexId, alexId, [alexId],          [TAG.car]],
   [L('Buy birthday gift for Mum',   'Geburtstagsgeschenk für Mama'),     L('Book voucher or wishlist item',         'Buchgutschein oder von der Wunschliste'), 'shopping',  'medium', 'open',        null,            daysFromNow(8),  lindaId, lindaId, [lindaId],        []],
   [L('Water the plants',            'Pflanzen gießen'),                  L('Indoor plants + balcony herbs',         'Zimmerpflanzen + Kräuter auf dem Balkon'),'household', 'none',   'done',        null,            daysFromNow(-2), leoId,  lindaId, [leoId],           [TAG.kids, TAG.garden]],
 ];
@@ -397,20 +397,20 @@ const insertEventAssign = db.prepare('INSERT OR IGNORE INTO event_assignments (e
 
 const events = [
   [L("Emma's Birthday Party",     'Emmas Geburtstagsfeier'),   L('Bouncy castle & cake at home',       'Hüpfburg und Kuchen zu Hause'),         daysFromNow(5) + 'T14:00',  daysFromNow(5) + 'T17:00',  0, L('Home', 'Zu Hause'),                           '#F59E0B', 'cake',     null,                      lindaId, lindaId, [lindaId, emmaId]],
-  [L('Dentist — Family',          'Zahnarzt — Familie'),       L('Dr. Müller, bring insurance cards',  'Dr. Müller, Versichertenkarten mitnehmen'), daysFromNow(3) + 'T10:00', daysFromNow(3) + 'T11:30', 0, L('Dental Practice Müller', 'Zahnarztpraxis Müller'), '#EF4444', 'tooth', null,                lindaId, alexId, [alexId, lindaId, emmaId, leoId]],
-  [L('Parent–Teacher Evening',    'Elternabend'),              L('Room 12, bring the report card',     'Raum 12, Zeugnis mitbringen'),          daysFromNow(9) + 'T18:30',  daysFromNow(9) + 'T20:00',  0, L('Westpark Primary School', 'Grundschule Westpark'), '#8B5CF6', 'calendar', null,               lindaId, lindaId, [lindaId, alexId]],
-  [L('Science Museum Field Trip', 'Ausflug ins Naturkundemuseum'), L('Emma — permission slip signed',  'Emma — Einverständnis unterschrieben'), daysFromNow(1) + 'T08:30',  daysFromNow(1) + 'T15:00',  0, L('Natural History Museum', 'Naturkundemuseum'),  '#06B6D4', 'calendar', null,                      emmaId, lindaId, [emmaId]],
+  [L('Dentist - Family',          'Zahnarzt - Familie'),       L('Dr. Müller, bring insurance cards',  'Dr. Müller, Versichertenkarten mitnehmen'), daysFromNow(3) + 'T10:00', daysFromNow(3) + 'T11:30', 0, L('Dental Practice Müller', 'Zahnarztpraxis Müller'), '#EF4444', 'tooth', null,                lindaId, alexId, [alexId, lindaId, emmaId, leoId]],
+  [L('Parent-Teacher Evening',    'Elternabend'),              L('Room 12, bring the report card',     'Raum 12, Zeugnis mitbringen'),          daysFromNow(9) + 'T18:30',  daysFromNow(9) + 'T20:00',  0, L('Westpark Primary School', 'Grundschule Westpark'), '#8B5CF6', 'calendar', null,               lindaId, lindaId, [lindaId, alexId]],
+  [L('Science Museum Field Trip', 'Ausflug ins Naturkundemuseum'), L('Emma - permission slip signed',  'Emma - Einverständnis unterschrieben'), daysFromNow(1) + 'T08:30',  daysFromNow(1) + 'T15:00',  0, L('Natural History Museum', 'Naturkundemuseum'),  '#06B6D4', 'calendar', null,                      emmaId, lindaId, [emmaId]],
   [L("Family BBQ at Grandma's",   'Grillen bei Oma'),          L('Bring potato salad',                 'Kartoffelsalat mitbringen'),            daysFromNow(12) + 'T13:00', daysFromNow(12) + 'T19:00', 0, L("Grandma's Garden", 'Omas Garten'),            '#F59E0B', 'calendar', null,                      alexId, alexId, [alexId, lindaId, emmaId, leoId]],
-  [L('Car Service Appointment',   'Werkstatttermin'),          L('VW Golf — oil change + tyre check',  'VW Golf — Ölwechsel + Reifencheck'),    daysFromNow(6) + 'T09:00',  daysFromNow(6) + 'T10:30',  0, 'AutoHaus König',                                '#6B7280', 'calendar', null,                      alexId, alexId, [alexId]],
-  [L('Yoga Class',                'Yoga-Kurs'),                L('Weekly — bring a mat',               'Wöchentlich — Matte mitbringen'),       daysFromNow(2) + 'T19:00',  daysFromNow(2) + 'T20:00',  0, 'FitLife Studio',                                '#10B981', 'calendar', 'FREQ=WEEKLY;BYDAY=TU',    lindaId, lindaId, [lindaId]],
+  [L('Car Service Appointment',   'Werkstatttermin'),          L('VW Golf - oil change + tyre check',  'VW Golf - Ölwechsel + Reifencheck'),    daysFromNow(6) + 'T09:00',  daysFromNow(6) + 'T10:30',  0, 'AutoHaus König',                                '#6B7280', 'calendar', null,                      alexId, alexId, [alexId]],
+  [L('Yoga Class',                'Yoga-Kurs'),                L('Weekly - bring a mat',               'Wöchentlich - Matte mitbringen'),       daysFromNow(2) + 'T19:00',  daysFromNow(2) + 'T20:00',  0, 'FitLife Studio',                                '#10B981', 'calendar', 'FREQ=WEEKLY;BYDAY=TU',    lindaId, lindaId, [lindaId]],
   [L("Mum's Birthday",            'Mamas Geburtstag'),         '',                                                                              daysFromNow(8) + 'T00:00',  daysFromNow(8) + 'T00:00',  1, '',                                              '#EC4899', 'cake',     null,                      alexId, alexId, [alexId, lindaId]],
-  [L('Company All-Hands',         'Betriebsversammlung'),      L('Q2 results + roadmap presentation',  'Quartalszahlen + Roadmap-Vorstellung'), daysFromNow(4) + 'T10:00',  daysFromNow(4) + 'T12:00',  0, L('Office — Conference Room B', 'Büro — Besprechungsraum B'), '#2563EB', 'calendar', null,          alexId, alexId, [alexId]],
-  [L('Football Training — Leo',   'Fußballtraining — Leo'),    L('Boots & water bottle',               'Schuhe und Trinkflasche'),              daysFromNow(2) + 'T17:00',  daysFromNow(2) + 'T18:30',  0, L('Sports Ground West', 'Sportplatz West'),      '#F97316', 'calendar', 'FREQ=WEEKLY;BYDAY=TU,SA', leoId, lindaId, [leoId]],
-  [L('Piano Lesson — Leo',        'Klavierstunde — Leo'),      L('Weekly lesson with Ms. Klein',       'Wöchentlich bei Frau Klein'),           daysFromNow(3) + 'T16:00',  daysFromNow(3) + 'T16:45',  0, L('Music School Dortmund', 'Musikschule Dortmund'), '#8B5CF6', 'calendar', 'FREQ=WEEKLY;BYDAY=TH', leoId, lindaId, [leoId]],
-  [L('Holiday Planning Evening',  'Urlaubsplanung'),           L('Italy vs Croatia — laptops out',     'Italien oder Kroatien — Laptops raus'), daysFromNow(3) + 'T21:00',  daysFromNow(3) + 'T22:00',  0, L('Home', 'Zu Hause'),                           '#14B8A6', 'calendar', null,                      alexId, lindaId, [alexId, lindaId]],
-  [L('GP Appointment — Alex',     'Hausarzttermin — Alex'),    L('Annual health check',                'Jährlicher Gesundheits-Check'),         daysFromNow(15) + 'T11:00', daysFromNow(15) + 'T11:30', 0, L('Dr. Weber — City Practice', 'Dr. Weber — Praxis am Markt'), '#EF4444', 'stethoscope', null,   alexId, alexId, [alexId]],
-  [L('Weekend City Break',        'Städtereise übers Wochenende'), L('Hotel booked — just pack the bags!', 'Hotel gebucht — nur noch packen!'), daysFromNow(20) + 'T00:00', daysFromNow(22) + 'T00:00', 1, 'Amsterdam',                                     '#0EA5E9', 'plane',    null,                      alexId, alexId, [alexId, lindaId]],
-  [L('Swimming — Emma',           'Schwimmen — Emma'),         L('Westbad — goggles & towel',          'Westbad — Brille und Handtuch'),        daysFromNow(4) + 'T16:00',  daysFromNow(4) + 'T17:00',  0, L('Westbad Pool', 'Westbad'),                    '#06B6D4', 'calendar', 'FREQ=WEEKLY;BYDAY=FR',    emmaId, lindaId, [emmaId]],
+  [L('Company All-Hands',         'Betriebsversammlung'),      L('Q2 results + roadmap presentation',  'Quartalszahlen + Roadmap-Vorstellung'), daysFromNow(4) + 'T10:00',  daysFromNow(4) + 'T12:00',  0, L('Office - Conference Room B', 'Büro - Besprechungsraum B'), '#2563EB', 'calendar', null,          alexId, alexId, [alexId]],
+  [L('Football Training - Leo',   'Fußballtraining - Leo'),    L('Boots & water bottle',               'Schuhe und Trinkflasche'),              daysFromNow(2) + 'T17:00',  daysFromNow(2) + 'T18:30',  0, L('Sports Ground West', 'Sportplatz West'),      '#F97316', 'calendar', 'FREQ=WEEKLY;BYDAY=TU,SA', leoId, lindaId, [leoId]],
+  [L('Piano Lesson - Leo',        'Klavierstunde - Leo'),      L('Weekly lesson with Ms. Klein',       'Wöchentlich bei Frau Klein'),           daysFromNow(3) + 'T16:00',  daysFromNow(3) + 'T16:45',  0, L('Music School Dortmund', 'Musikschule Dortmund'), '#8B5CF6', 'calendar', 'FREQ=WEEKLY;BYDAY=TH', leoId, lindaId, [leoId]],
+  [L('Holiday Planning Evening',  'Urlaubsplanung'),           L('Italy vs Croatia - laptops out',     'Italien oder Kroatien - Laptops raus'), daysFromNow(3) + 'T21:00',  daysFromNow(3) + 'T22:00',  0, L('Home', 'Zu Hause'),                           '#14B8A6', 'calendar', null,                      alexId, lindaId, [alexId, lindaId]],
+  [L('GP Appointment - Alex',     'Hausarzttermin - Alex'),    L('Annual health check',                'Jährlicher Gesundheits-Check'),         daysFromNow(15) + 'T11:00', daysFromNow(15) + 'T11:30', 0, L('Dr. Weber - City Practice', 'Dr. Weber - Praxis am Markt'), '#EF4444', 'stethoscope', null,   alexId, alexId, [alexId]],
+  [L('Weekend City Break',        'Städtereise übers Wochenende'), L('Hotel booked - just pack the bags!', 'Hotel gebucht - nur noch packen!'), daysFromNow(20) + 'T00:00', daysFromNow(22) + 'T00:00', 1, 'Amsterdam',                                     '#0EA5E9', 'plane',    null,                      alexId, alexId, [alexId, lindaId]],
+  [L('Swimming - Emma',           'Schwimmen - Emma'),         L('Westbad - goggles & towel',          'Westbad - Brille und Handtuch'),        daysFromNow(4) + 'T16:00',  daysFromNow(4) + 'T17:00',  0, L('Westbad Pool', 'Westbad'),                    '#06B6D4', 'calendar', 'FREQ=WEEKLY;BYDAY=FR',    emmaId, lindaId, [emmaId]],
 ];
 const eventIdByTitle = {};
 for (const [title, description, start, end, all_day, location, color, icon, rrule, assigned_to, created_by, assignees] of events) {
@@ -425,7 +425,7 @@ console.log('Inserting recipes…');
 const insertRecipe = db.prepare('INSERT INTO recipes (title, notes, recipe_url, created_by) VALUES (?, ?, ?, ?)');
 const insertRecipeIng = db.prepare('INSERT INTO recipe_ingredients (recipe_id, name, quantity, category) VALUES (?, ?, ?, ?)');
 const recipes = [
-  [L('Spaghetti Bolognese', 'Spaghetti Bolognese'), L('Family favourite — simmer the sauce for at least 45 minutes for the best flavour.', 'Familienklassiker — die Soße mindestens 45 Minuten ziehen lassen.'), 'https://www.bbcgoodfood.com/recipes/best-spaghetti-bolognese-recipe', [
+  [L('Spaghetti Bolognese', 'Spaghetti Bolognese'), L('Family favourite - simmer the sauce for at least 45 minutes for the best flavour.', 'Familienklassiker - die Soße mindestens 45 Minuten ziehen lassen.'), 'https://www.bbcgoodfood.com/recipes/best-spaghetti-bolognese-recipe', [
     [L('Spaghetti', 'Spaghetti'), '500 g', CAT.other], [L('Minced beef', 'Rinderhack'), '500 g', CAT.meat], [L('Onion', 'Zwiebel'), '1', CAT.produce],
     [L('Garlic', 'Knoblauch'), L('2 cloves', '2 Zehen'), CAT.produce], [L('Tomato passata', 'Passierte Tomaten'), '700 g', CAT.other], [L('Parmesan', 'Parmesan'), '50 g', CAT.dairy],
   ]],
@@ -524,7 +524,7 @@ const pizzaTemplateId = db.prepare(`
   VALUES (?, 4, 'dinner', ?, ?, ?, ?)
 `).run(
   daysFromNow(-56), pizzaTitle,
-  L('Pizza night — every Friday', 'Pizzaabend — jeden Freitag'),
+  L('Pizza night - every Friday', 'Pizzaabend - jeden Freitag'),
   recipeIdByTitle[pizzaTitle] ?? null, alexId,
 ).lastInsertRowid;
 const insertTemplateIng = db.prepare(`
@@ -598,7 +598,7 @@ const insertPantry = db.prepare(`
   [L('Passata',          'Passierte Tomaten'),    4,   'can',    LOC.pantry,  CAT.other,     300,  2,    null],
   [L('Basmati rice',     'Basmatireis'),          1.5, 'kg',     LOC.pantry,  CAT.other,     400,  1,    null],
   [L('Olive oil',        'Olivenöl'),             1,   'bottle', LOC.pantry,  CAT.other,     500,  1,    null],
-  [L('Plain flour',      'Mehl'),                 0.5, 'kg',     LOC.pantry,  CAT.other,     180,  1,    L('Running low — pizza night', 'Wird knapp — Pizzaabend')],
+  [L('Plain flour',      'Mehl'),                 0.5, 'kg',     LOC.pantry,  CAT.other,     180,  1,    L('Running low - pizza night', 'Wird knapp - Pizzaabend')],
   [L('Coffee beans',     'Kaffeebohnen'),         2,   'pkg',    LOC.pantry,  CAT.drinks,    120,  1,    null],
   [L('Tinned chickpeas', 'Kichererbsen'),         6,   'can',    LOC.pantry,  CAT.other,     540,  3,    null],
   [L('Whole milk',       'Vollmilch'),            1,   'l',      LOC.fridge,  CAT.dairy,     3,    2,    null],
@@ -641,23 +641,23 @@ const insertContact = db.prepare(`
   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `);
 [
-  ['Dr. Anna Weber',                                          'doctor',   '+49 231 445 2210', 'praxis@dr-weber.de',            'Bürgerstraße 12, Dortmund',    L('GP — appointments Mon–Thu',                 'Hausärztin — Termine Mo–Do'),               L('City Practice', 'Praxis am Markt'),                   L('General Practitioner', 'Allgemeinmedizin')],
+  ['Dr. Anna Weber',                                          'doctor',   '+49 231 445 2210', 'praxis@dr-weber.de',            'Bürgerstraße 12, Dortmund',    L('GP - appointments Mon-Thu',                 'Hausärztin - Termine Mo-Do'),               L('City Practice', 'Praxis am Markt'),                   L('General Practitioner', 'Allgemeinmedizin')],
   ['Dr. Thomas Müller',                                       'doctor',   '+49 231 887 0034', 'info@zahnarzt-mueller.de',      'Hansastraße 55, Dortmund',     L('Family dentist',                            'Zahnarzt der Familie'),                    L('Dental Practice Müller', 'Zahnarztpraxis Müller'),    L('Dentist', 'Zahnarzt')],
   [L('Grandma & Grandpa Johnson', 'Oma & Opa Johnson'),       'family',   '+49 2304 78 221',  'oma.johnson@gmail.com',         'Ahornweg 4, Castrop-Rauxel',   L("Emma & Leo's grandparents",                 'Emmas und Leos Großeltern'),               null,                                                    null],
-  [L('Westpark Primary School', 'Grundschule Westpark'),      'school',   '+49 231 556 8810', 'office@westpark-grundschule.de','Westparkstraße 20, Dortmund',  L("Emma's school — Mrs Bauer is class teacher",'Emmas Schule — Klassenlehrerin Frau Bauer'),L('Westpark Primary School', 'Grundschule Westpark'), null],
-  ['AutoHaus König',                                          'services', '+49 231 997 1100', 'service@autohaus-koenig.de',    'Industriestraße 88, Dortmund', L('VW service partner — Ref: Golf TDI 2021',   'VW-Servicepartner — Kunde: Golf TDI 2021'),'AutoHaus König',                                        L('Service Centre', 'Werkstatt')],
-  ['FitLife Studio',                                          'services', '+49 231 340 5060', 'hello@fitlife-dortmund.de',     'Rheinlanddamm 14, Dortmund',   L("Linda's yoga — Tuesdays 19:00",             'Lindas Yoga — dienstags 19:00'),           'FitLife Studio',                                        null],
-  [L('Uncle Mike Johnson', 'Onkel Mike Johnson'),             'family',   '+49 172 3340 551', 'mike.j@outlook.com',            'Hamburg',                      L("Alex's brother — lives in Hamburg",         'Alex’ Bruder — wohnt in Hamburg'),         null,                                                    null],
+  [L('Westpark Primary School', 'Grundschule Westpark'),      'school',   '+49 231 556 8810', 'office@westpark-grundschule.de','Westparkstraße 20, Dortmund',  L("Emma's school - Mrs Bauer is class teacher",'Emmas Schule - Klassenlehrerin Frau Bauer'),L('Westpark Primary School', 'Grundschule Westpark'), null],
+  ['AutoHaus König',                                          'services', '+49 231 997 1100', 'service@autohaus-koenig.de',    'Industriestraße 88, Dortmund', L('VW service partner - Ref: Golf TDI 2021',   'VW-Servicepartner - Kunde: Golf TDI 2021'),'AutoHaus König',                                        L('Service Centre', 'Werkstatt')],
+  ['FitLife Studio',                                          'services', '+49 231 340 5060', 'hello@fitlife-dortmund.de',     'Rheinlanddamm 14, Dortmund',   L("Linda's yoga - Tuesdays 19:00",             'Lindas Yoga - dienstags 19:00'),           'FitLife Studio',                                        null],
+  [L('Uncle Mike Johnson', 'Onkel Mike Johnson'),             'family',   '+49 172 3340 551', 'mike.j@outlook.com',            'Hamburg',                      L("Alex's brother - lives in Hamburg",         'Alex’ Bruder - wohnt in Hamburg'),         null,                                                    null],
   [L('Aunt Claire Becker', 'Tante Claire Becker'),            'family',   '+49 151 2234 8876','claire.becker@web.de',          'Fichtenweg 7, Bochum',         L("Linda's sister",                            'Lindas Schwester'),                        null,                                                    null],
   [L("Leo's Football Coach", 'Leos Fußballtrainer'),          'school',   '+49 176 5512 4490','trainer@svwest-dortmund.de',    'Sportplatz West, Dortmund',    L('Training Tue & Sat 17:00',                  'Training Di und Sa 17:00'),                'SV West Dortmund',                                      L('Coach', 'Trainer')],
-  [L('City Library', 'Stadtbibliothek'),                      'services', '+49 231 502 6600', 'stadtbibliothek@dortmund.de',   'Königswall 18, Dortmund',      L('Family cards — renew every 2 years',        'Familienausweise — alle 2 Jahre verlängern'), L('Dortmund City Library', 'Stadtbibliothek Dortmund'), null],
-  [L('Landlord — Mr Groß', 'Vermieter — Herr Groß'),          'services', '+49 231 112 7743', 'vermieter.gross@gmail.com',     null,                           L('Emergency maintenance: same number',        'Notfall-Hausmeisterdienst: gleiche Nummer'), null,                                                  L('Landlord', 'Vermieter')],
-  [L("Emma's friend — Lena", 'Emmas Freundin — Lena'),        'family',   '+49 231 774 3309', null,                            null,                           L('Lena Braun — mum Katrin +49 231 774 3308',  'Lena Braun — Mutter Katrin +49 231 774 3308'), null,                                                null],
+  [L('City Library', 'Stadtbibliothek'),                      'services', '+49 231 502 6600', 'stadtbibliothek@dortmund.de',   'Königswall 18, Dortmund',      L('Family cards - renew every 2 years',        'Familienausweise - alle 2 Jahre verlängern'), L('Dortmund City Library', 'Stadtbibliothek Dortmund'), null],
+  [L('Landlord - Mr Groß', 'Vermieter - Herr Groß'),          'services', '+49 231 112 7743', 'vermieter.gross@gmail.com',     null,                           L('Emergency maintenance: same number',        'Notfall-Hausmeisterdienst: gleiche Nummer'), null,                                                  L('Landlord', 'Vermieter')],
+  [L("Emma's friend - Lena", 'Emmas Freundin - Lena'),        'family',   '+49 231 774 3309', null,                            null,                           L('Lena Braun - mum Katrin +49 231 774 3308',  'Lena Braun - Mutter Katrin +49 231 774 3308'), null,                                                null],
 ].forEach(row => insertContact.run(...row));
 
 // ── Budget ───────────────────────────────────────────────────────────────────
 
-// Konten tragen die Buchungen — ohne sie ist der Konten-Tab leer und jede
+// Konten tragen die Buchungen - ohne sie ist der Konten-Tab leer und jede
 // Buchung kontolos. Die Salden entstehen aus starting_balance plus Buchungen.
 console.log('Inserting budget accounts…');
 const insertAccount = db.prepare(`
@@ -669,8 +669,8 @@ const insertAccount = db.prepare(`
 const accountId = {};
 [
   ['current',  L('Joint Current Account', 'Gemeinsames Girokonto'), 'checking',   2480.00, '#2563EB', 0, alexId],
-  ['savings',  L('Savings — Holiday',     'Sparkonto — Urlaub'),    'savings',    5200.00, '#10B981', 1, lindaId],
-  ['kids',     L('Savings — Emma & Leo',  'Sparen für Emma & Leo'), 'savings',    1850.00, '#EC4899', 2, lindaId],
+  ['savings',  L('Savings - Holiday',     'Sparkonto - Urlaub'),    'savings',    5200.00, '#10B981', 1, lindaId],
+  ['kids',     L('Savings - Emma & Leo',  'Sparen für Emma & Leo'), 'savings',    1850.00, '#EC4899', 2, lindaId],
   ['cash',     L('Housekeeping cash',     'Haushaltskasse'),        'cash',        180.00, '#F59E0B', 3, lindaId],
   ['credit',   L('Visa Credit Card',      'Visa Kreditkarte'),      'credit',     -340.00, '#8B5CF6', 4, alexId],
   ['depot',    L('Investment Account',    'Wertpapierdepot'),       'investment', 9420.00, '#0EA5E9', 5, alexId],
@@ -685,38 +685,38 @@ const insertBudget = db.prepare(`
 `);
 const budget = [
   // Income (category = income key, no subcategory)
-  [L('Alex — Monthly Salary',    'Alex — Gehalt'),               3850.00, 'Erwerbseinkommen', '',                       thisMonthDate(1),  1, 'current', alexId],
-  [L('Linda — Part-time Work',   'Linda — Teilzeit'),            1200.00, 'Erwerbseinkommen', '',                       thisMonthDate(1),  1, 'current', lindaId],
+  [L('Alex - Monthly Salary',    'Alex - Gehalt'),               3850.00, 'Erwerbseinkommen', '',                       thisMonthDate(1),  1, 'current', alexId],
+  [L('Linda - Part-time Work',   'Linda - Teilzeit'),            1200.00, 'Erwerbseinkommen', '',                       thisMonthDate(1),  1, 'current', lindaId],
   [L('Child Benefit',            'Kindergeld'),                   500.00, 'Sozialleistungen', '',                       thisMonthDate(5),  1, 'current', alexId],
   // Fixed expenses
   [L('Rent',                     'Miete'),                      -1450.00, 'housing',           'rent_mortgage',          thisMonthDate(1),  1, 'current', alexId],
-  [L('Car Insurance — VW Golf',  'Kfz-Versicherung — VW Golf'),   -89.50, 'transport',         'maintenance_insurance',  thisMonthDate(1),  1, 'current', alexId],
+  [L('Car Insurance - VW Golf',  'Kfz-Versicherung - VW Golf'),   -89.50, 'transport',         'maintenance_insurance',  thisMonthDate(1),  1, 'current', alexId],
   [L('Health Insurance',         'Krankenversicherung'),         -310.00, 'personal_health',   'health_insurance',       thisMonthDate(1),  1, 'current', alexId],
   [L('Internet & Phone Bundle',  'Internet & Telefon'),           -49.99, 'housing',           'internet_tv_phone',      thisMonthDate(5),  1, 'current', alexId],
   [L('Electricity',              'Strom'),                        -78.00, 'housing',           'utilities',              thisMonthDate(15), 1, 'current', alexId],
   [L('Netflix',                  'Netflix'),                      -17.99, 'leisure',           'streaming',              thisMonthDate(10), 1, 'credit',  alexId],
   [L('Spotify Family',           'Spotify Family'),               -16.99, 'leisure',           'streaming',              thisMonthDate(10), 1, 'credit',  alexId],
-  [L('Gym — FitLife',            'Fitnessstudio — FitLife'),      -39.00, 'personal_health',   'gym_sports',             thisMonthDate(1),  1, 'current', lindaId],
+  [L('Gym - FitLife',            'Fitnessstudio - FitLife'),      -39.00, 'personal_health',   'gym_sports',             thisMonthDate(1),  1, 'current', lindaId],
   // Variable, this month
-  [L('Weekly Groceries — Wk 1',  'Wocheneinkauf — KW 1'),        -142.30, 'food',              'groceries',              thisMonthDate(4),  0, 'current', lindaId],
-  [L('Weekly Groceries — Wk 2',  'Wocheneinkauf — KW 2'),        -118.75, 'food',              'groceries',              thisMonthDate(11), 0, 'current', lindaId],
-  [L('Weekly Groceries — Wk 3',  'Wocheneinkauf — KW 3'),        -134.20, 'food',              'groceries',              thisMonthDate(18), 0, 'cash',    lindaId],
+  [L('Weekly Groceries - Wk 1',  'Wocheneinkauf - KW 1'),        -142.30, 'food',              'groceries',              thisMonthDate(4),  0, 'current', lindaId],
+  [L('Weekly Groceries - Wk 2',  'Wocheneinkauf - KW 2'),        -118.75, 'food',              'groceries',              thisMonthDate(11), 0, 'current', lindaId],
+  [L('Weekly Groceries - Wk 3',  'Wocheneinkauf - KW 3'),        -134.20, 'food',              'groceries',              thisMonthDate(18), 0, 'cash',    lindaId],
   [L('School Trip Payment',      'Zahlung Schulausflug'),         -25.00, 'education',         'school_supplies',        thisMonthDate(3),  0, 'cash',    lindaId],
-  [L('Birthday Gift — Mum',      'Geburtstagsgeschenk — Mama'),   -60.00, 'shopping_clothing', 'gifts',                  thisMonthDate(7),  0, 'credit',  alexId],
-  [L('Restaurant — Date Night',  'Restaurant — Paarabend'),       -87.50, 'food',              'restaurants_bars',       thisMonthDate(9),  0, 'credit',  alexId],
-  [L('Fuel — VW Golf',           'Tanken — VW Golf'),             -68.00, 'transport',         'fuel',                   thisMonthDate(6),  0, 'current', alexId],
+  [L('Birthday Gift - Mum',      'Geburtstagsgeschenk - Mama'),   -60.00, 'shopping_clothing', 'gifts',                  thisMonthDate(7),  0, 'credit',  alexId],
+  [L('Restaurant - Date Night',  'Restaurant - Paarabend'),       -87.50, 'food',              'restaurants_bars',       thisMonthDate(9),  0, 'credit',  alexId],
+  [L('Fuel - VW Golf',           'Tanken - VW Golf'),             -68.00, 'transport',         'fuel',                   thisMonthDate(6),  0, 'current', alexId],
   [L('Pharmacy',                 'Apotheke'),                     -22.40, 'personal_health',   'pharmacy',               thisMonthDate(8),  0, 'cash',    lindaId],
   [L("Leo's Football Boots",     'Fußballschuhe für Leo'),        -54.99, 'shopping_clothing', 'clothes_shoes',          thisMonthDate(12), 0, 'current', lindaId],
-  [L('Tools — Home Improvement', 'Werkzeug — Heimwerken'),        -43.00, 'housing',           'renovation_maintenance', thisMonthDate(14), 0, 'current', alexId],
-  [L('Clothes — Emma',           'Kleidung — Emma'),              -38.50, 'shopping_clothing', 'clothes_shoes',          thisMonthDate(16), 0, 'credit',  lindaId],
+  [L('Tools - Home Improvement', 'Werkzeug - Heimwerken'),        -43.00, 'housing',           'renovation_maintenance', thisMonthDate(14), 0, 'current', alexId],
+  [L('Clothes - Emma',           'Kleidung - Emma'),              -38.50, 'shopping_clothing', 'clothes_shoes',          thisMonthDate(16), 0, 'credit',  lindaId],
   [L('Weekend Trip Deposit',     'Anzahlung Kurzurlaub'),        -200.00, 'leisure',           'travel',                 thisMonthDate(19), 0, 'savings', alexId],
   // Last month (trend comparison)
-  [L('Alex — Monthly Salary',    'Alex — Gehalt'),               3850.00, 'Erwerbseinkommen', '',                        lastMonthDate(1),  0, 'current', alexId],
-  [L('Linda — Part-time Work',   'Linda — Teilzeit'),            1200.00, 'Erwerbseinkommen', '',                        lastMonthDate(1),  0, 'current', lindaId],
+  [L('Alex - Monthly Salary',    'Alex - Gehalt'),               3850.00, 'Erwerbseinkommen', '',                        lastMonthDate(1),  0, 'current', alexId],
+  [L('Linda - Part-time Work',   'Linda - Teilzeit'),            1200.00, 'Erwerbseinkommen', '',                        lastMonthDate(1),  0, 'current', lindaId],
   [L('Rent',                     'Miete'),                      -1450.00, 'housing',           'rent_mortgage',          lastMonthDate(1),  0, 'current', alexId],
   [L('Weekly Groceries',         'Wocheneinkauf'),               -489.00, 'food',              'groceries',              lastMonthDate(10), 0, 'current', lindaId],
   [L('Electricity',              'Strom'),                        -82.00, 'housing',           'utilities',              lastMonthDate(15), 0, 'current', alexId],
-  [L('Fuel — VW Golf',           'Tanken — VW Golf'),             -71.00, 'transport',         'fuel',                   lastMonthDate(8),  0, 'current', alexId],
+  [L('Fuel - VW Golf',           'Tanken - VW Golf'),             -71.00, 'transport',         'fuel',                   lastMonthDate(8),  0, 'current', alexId],
 ];
 const budgetEntryIdByTitle = {};
 budget.forEach(([title, amount, category, subcategory, date, recurring, acct, by]) => {
@@ -752,7 +752,7 @@ const insertLoan = db.prepare(`
 const loanId = insertLoan.run(
   L('Loan to Uncle Mike', 'Darlehen an Onkel Mike'), L('Uncle Mike Johnson', 'Onkel Mike Johnson'),
   1200.00, 6, thisMonthKey(-2),
-  L('Helping with his car repair — €200/month', 'Hilfe bei der Autoreparatur — 200 € im Monat'),
+  L('Helping with his car repair - €200/month', 'Hilfe bei der Autoreparatur - 200 € im Monat'),
   alexId, 'none', null, null, null, null, null,
 ).lastInsertRowid;
 
@@ -762,7 +762,7 @@ const mortgage = computeLoanSchedule({
 });
 if (!mortgage.ok) throw new Error(`Mortgage schedule failed: ${mortgage.reason}`);
 const mortgageId = insertLoan.run(
-  L('Mortgage — Bürgerstraße', 'Baufinanzierung — Bürgerstraße'), L('Sparkasse Dortmund', 'Sparkasse Dortmund'),
+  L('Mortgage - Bürgerstraße', 'Baufinanzierung - Bürgerstraße'), L('Sparkasse Dortmund', 'Sparkasse Dortmund'),
   mortgage.totalRepayment, mortgage.totalMonths, thisMonthKey(-14),
   L('10-year fixed rate, 2.5% initial repayment', '10 Jahre Zinsbindung, 2,5 % Anfangstilgung'),
   alexId, 'fixed_then_variable', 180000, 3.65, 2.5, 120, 4.5,
@@ -774,7 +774,7 @@ const insertLoanPayment = db.prepare(`
 `);
 insertLoanPayment.run(loanId, 1, 200.00, lastMonthDate(2), alexId);
 insertLoanPayment.run(loanId, 2, 200.00, thisMonthDate(2), alexId);
-// 14 Monatsraten der Baufinanzierung sind bezahlt — genug für einen sichtbaren
+// 14 Monatsraten der Baufinanzierung sind bezahlt - genug für einen sichtbaren
 // Tilgungsfortschritt, weit vor dem Ende der Zinsbindung. Rate i gehört zum
 // Monat, in dem sie fällig war (Start: 14 Monate zurück).
 for (let i = 1; i <= 14; i++) {
@@ -787,26 +787,26 @@ console.log('Inserting notes…');
 const insertNote = db.prepare('INSERT INTO notes (title, content, color, pinned, created_by) VALUES (?, ?, ?, ?, ?)');
 [
   [L('Holiday Checklist 🌍', 'Urlaubs-Checkliste 🌍'),
-   L('Passports (exp. 2028)\nTravel insurance — check!\nEuro cash — €300\nBook airport parking\nAsk Mike to water the plants\nPack sunscreen SPF 50',
-     'Reisepässe (gültig bis 2028)\nAuslandskrankenschein — prüfen!\nBargeld — 300 €\nParkplatz am Flughafen buchen\nMike wegen Blumengießen fragen\nSonnencreme LSF 50 einpacken'), '#0EA5E9', 1, alexId],
+   L('Passports (exp. 2028)\nTravel insurance - check!\nEuro cash - €300\nBook airport parking\nAsk Mike to water the plants\nPack sunscreen SPF 50',
+     'Reisepässe (gültig bis 2028)\nAuslandskrankenschein - prüfen!\nBargeld - 300 €\nParkplatz am Flughafen buchen\nMike wegen Blumengießen fragen\nSonnencreme LSF 50 einpacken'), '#0EA5E9', 1, alexId],
   [L('WiFi & Smart Home', 'WLAN & Smart Home'),
    L('WiFi: Yuvomi_Home_5G (password in the router app)\nPhilips Hue: bridge 192.168.1.42\nThermostat: eco mode 18°C\nRouter admin: fritz.box',
      'WLAN: Yuvomi_Home_5G (Passwort in der Router-App)\nPhilips Hue: Bridge 192.168.1.42\nThermostat: Eco-Modus 18 °C\nRouter-Verwaltung: fritz.box'), '#F59E0B', 1, alexId],
   [L("Emma's School Info", 'Emmas Schulinfos'),
-   L('Class: 3b — Mrs Bauer\nSchool starts: 08:10\nCollection: 13:30 (Tue/Thu 15:00)\nAllergy: mild lactose intolerance\nBest friends: Lena, Sophie, Tim',
-     'Klasse: 3b — Frau Bauer\nSchulbeginn: 08:10\nAbholung: 13:30 (Di/Do 15:00)\nUnverträglichkeit: leichte Laktoseintoleranz\nBeste Freunde: Lena, Sophie, Tim'), '#EC4899', 1, lindaId],
+   L('Class: 3b - Mrs Bauer\nSchool starts: 08:10\nCollection: 13:30 (Tue/Thu 15:00)\nAllergy: mild lactose intolerance\nBest friends: Lena, Sophie, Tim',
+     'Klasse: 3b - Frau Bauer\nSchulbeginn: 08:10\nAbholung: 13:30 (Di/Do 15:00)\nUnverträglichkeit: leichte Laktoseintoleranz\nBeste Freunde: Lena, Sophie, Tim'), '#EC4899', 1, lindaId],
   [L("Leo's Activities", 'Leos Termine'),
-   L('Football: Tue & Sat 17:00 — SV West\nSwimming: Fri 16:00 — Westbad\nNeeds: boots size 35, goggles\nCoach: Herr Krüger',
-     'Fußball: Di und Sa 17:00 — SV West\nSchwimmen: Fr 16:00 — Westbad\nBraucht: Schuhe Größe 35, Schwimmbrille\nTrainer: Herr Krüger'), '#F97316', 1, lindaId],
+   L('Football: Tue & Sat 17:00 - SV West\nSwimming: Fri 16:00 - Westbad\nNeeds: boots size 35, goggles\nCoach: Herr Krüger',
+     'Fußball: Di und Sa 17:00 - SV West\nSchwimmen: Fr 16:00 - Westbad\nBraucht: Schuhe Größe 35, Schwimmbrille\nTrainer: Herr Krüger'), '#F97316', 1, lindaId],
   [L('Emergency Numbers', 'Notrufnummern'),
    L('Police: 110\nFire / Ambulance: 112\nPoison Control: 0800 192 11 10\nGP out-of-hours: 116 117\nNearest A&E: Klinikum Dortmund',
      'Polizei: 110\nFeuerwehr / Rettungsdienst: 112\nGiftnotruf: 0800 192 11 10\nÄrztlicher Bereitschaftsdienst: 116 117\nNächste Notaufnahme: Klinikum Dortmund'), '#EF4444', 1, alexId],
-  [L('Car — Important Dates', 'Auto — wichtige Termine'),
+  [L('Car - Important Dates', 'Auto - wichtige Termine'),
    L('Next service: this June (60,000 km)\nMOT due: September\nWinter tyres: stored at AutoHaus König\nInsurance renewal: October',
      'Nächste Inspektion: im Juni (60.000 km)\nTÜV fällig: September\nWinterreifen: eingelagert beim AutoHaus König\nVersicherungswechsel: Oktober'), '#6B7280', 0, alexId],
   [L('Book Recommendations', 'Buchempfehlungen'),
-   L('Reading: "Atomic Habits" — James Clear\nWishlist:\n• The Thursday Murder Club\n• Lessons in Chemistry\n• Tomorrow, and Tomorrow, and Tomorrow',
-     'Gerade dabei: „Die 1%-Methode" — James Clear\nWunschliste:\n• Der Donnerstagsmordclub\n• Eine Frage der Chemie\n• Morgen, morgen und wieder morgen'), '#8B5CF6', 0, lindaId],
+   L('Reading: "Atomic Habits" - James Clear\nWishlist:\n• The Thursday Murder Club\n• Lessons in Chemistry\n• Tomorrow, and Tomorrow, and Tomorrow',
+     'Gerade dabei: „Die 1%-Methode" - James Clear\nWunschliste:\n• Der Donnerstagsmordclub\n• Eine Frage der Chemie\n• Morgen, morgen und wieder morgen'), '#8B5CF6', 0, lindaId],
   [L('Garden To-Do', 'Garten-Aufgaben'),
    L('□ Re-pot herbs (basil, rosemary)\n□ Fix fence panel (3rd from gate)\n□ Order mulch for the flower beds\n□ Plant tulip bulbs before November',
      '□ Kräuter umtopfen (Basilikum, Rosmarin)\n□ Zaunfeld reparieren (3. vom Tor)\n□ Rindenmulch für die Beete bestellen\n□ Tulpenzwiebeln vor November setzen'), '#10B981', 0, alexId],
@@ -828,9 +828,9 @@ const DAY_BEFORE  = '1440';
 const TWO_DAYS    = '2880';
 const WEEK_BEFORE = '10080';
 [
-  ['Emma Johnson',                                    '2018-06-14', L('Turning 8 — chocolate cake & bouncy castle', 'Wird 8 — Schokotorte und Hüpfburg'), emmaId, WEEK_BEFORE, lindaId],
+  ['Emma Johnson',                                    '2018-06-14', L('Turning 8 - chocolate cake & bouncy castle', 'Wird 8 - Schokotorte und Hüpfburg'), emmaId, WEEK_BEFORE, lindaId],
   ['Leo Johnson',                                     '2016-03-22', L('Loves football & LEGO',                      'Liebt Fußball und LEGO'),            leoId,  WEEK_BEFORE, lindaId],
-  ['Margaret Johnson',                                '1958-06-19', L("Alex's mum — 'Grandma'",                     'Alex’ Mutter — „Oma"'),              null,   TWO_DAYS,    alexId],
+  ['Margaret Johnson',                                '1958-06-19', L("Alex's mum - 'Grandma'",                     'Alex’ Mutter - „Oma"'),              null,   TWO_DAYS,    alexId],
   [L('Uncle Mike Johnson', 'Onkel Mike Johnson'),     '1985-11-02', L("Alex's brother in Hamburg",                  'Alex’ Bruder in Hamburg'),           null,   DAY_BEFORE,  alexId],
   [L('Aunt Claire Becker', 'Tante Claire Becker'),    '1989-08-30', L("Linda's sister",                             'Lindas Schwester'),                  null,   DAY_BEFORE,  lindaId],
   ['Lena Braun',                                      '2018-09-12', L("Emma's best friend",                         'Emmas beste Freundin'),              null,   DAY_BEFORE,  lindaId],
@@ -856,7 +856,7 @@ for (const [slug, name] of [
 }
 // Build a base64 payload of a given byte size so file sizes look realistic.
 function payload(bytes) {
-  const text = 'OIKOS DEMO DOCUMENT — placeholder content. '.repeat(Math.ceil(bytes / 44)).slice(0, bytes);
+  const text = 'OIKOS DEMO DOCUMENT - placeholder content. '.repeat(Math.ceil(bytes / 44)).slice(0, bytes);
   const buf = Buffer.from(text, 'utf8');
   return { base64: buf.toString('base64'), size: buf.length };
 }
@@ -865,20 +865,20 @@ const insertDoc = db.prepare(`
   VALUES (@name, @description, @category, 'active', @visibility, @folder, @original, @mime, @size, @content, @created_by)
 `);
 const documents = [
-  [L('Vaccination Record — Emma',  'Impfpass — Emma'),           L('Up to date as of last check-up',       'Beim letzten Check-up aktualisiert'),  'medical',   'family',     'medical',   'emma_vaccinations.pdf',   'application/pdf', 124000, alexId],
+  [L('Vaccination Record - Emma',  'Impfpass - Emma'),           L('Up to date as of last check-up',       'Beim letzten Check-up aktualisiert'),  'medical',   'family',     'medical',   'emma_vaccinations.pdf',   'application/pdf', 124000, alexId],
   [L('Health Insurance Card',      'Versichertenkarte'),         L('Scan of the family insurance card',    'Scan der Familien-Versichertenkarte'), 'medical',   'restricted', 'medical',   'insurance_card.jpg',      'image/jpeg',      86000,  alexId],
-  [L('School Report — Emma',       'Zeugnis — Emma'),            L('Spring term report',                   'Halbjahreszeugnis'),                   'school',    'family',     'school',    'emma_report_spring.pdf',  'application/pdf', 210000, lindaId],
-  [L('Field Trip Permission Slip', 'Einverständnis Schulausflug'), L('Signed — science museum',            'Unterschrieben — Naturkundemuseum'),   'school',    'family',     'school',    'permission_slip.pdf',     'application/pdf', 48000,  lindaId],
-  [L('Tenancy Agreement',          'Mietvertrag'),               L('Signed lease — flat on Bürgerstraße',  'Unterschrieben — Wohnung Bürgerstraße'), 'home',    'restricted', 'home',      'tenancy_agreement.pdf',   'application/pdf', 320000, alexId],
+  [L('School Report - Emma',       'Zeugnis - Emma'),            L('Spring term report',                   'Halbjahreszeugnis'),                   'school',    'family',     'school',    'emma_report_spring.pdf',  'application/pdf', 210000, lindaId],
+  [L('Field Trip Permission Slip', 'Einverständnis Schulausflug'), L('Signed - science museum',            'Unterschrieben - Naturkundemuseum'),   'school',    'family',     'school',    'permission_slip.pdf',     'application/pdf', 48000,  lindaId],
+  [L('Tenancy Agreement',          'Mietvertrag'),               L('Signed lease - flat on Bürgerstraße',  'Unterschrieben - Wohnung Bürgerstraße'), 'home',    'restricted', 'home',      'tenancy_agreement.pdf',   'application/pdf', 320000, alexId],
   [L('Home Insurance Policy',      'Hausratversicherung'),       L('Policy documents 2025',                'Versicherungsunterlagen 2025'),        'insurance', 'family',     'insurance', 'home_insurance_2025.pdf', 'application/pdf', 180000, alexId],
-  [L('Car Insurance — VW Golf',    'Kfz-Versicherung — VW Golf'),L('Comprehensive cover',                  'Vollkasko'),                           'insurance', 'family',     'vehicle',   'car_insurance.pdf',       'application/pdf', 156000, alexId],
-  [L('Vehicle Registration',       'Fahrzeugschein'),            L('VW Golf TDI — registration papers',    'VW Golf TDI — Zulassungspapiere'),     'vehicle',   'restricted', 'vehicle',   'vw_golf_registration.pdf','application/pdf', 96000,  alexId],
+  [L('Car Insurance - VW Golf',    'Kfz-Versicherung - VW Golf'),L('Comprehensive cover',                  'Vollkasko'),                           'insurance', 'family',     'vehicle',   'car_insurance.pdf',       'application/pdf', 156000, alexId],
+  [L('Vehicle Registration',       'Fahrzeugschein'),            L('VW Golf TDI - registration papers',    'VW Golf TDI - Zulassungspapiere'),     'vehicle',   'restricted', 'vehicle',   'vw_golf_registration.pdf','application/pdf', 96000,  alexId],
   [L('Passports (scans)',          'Reisepässe (Scans)'),        L('All four family passports',            'Alle vier Reisepässe der Familie'),    'travel',    'private',    'travel',    'passports.pdf',           'application/pdf', 410000, alexId],
   [L('Flight Confirmation',        'Flugbestätigung'),           L('Amsterdam city break',                 'Städtereise Amsterdam'),               'travel',    'family',     'travel',    'flights_amsterdam.pdf',   'application/pdf', 64000,  alexId],
   // Belege: hängen unten an Buchungen bzw. an einer geteilten Ausgabe (#583).
-  [L('Receipt — Weekly Groceries', 'Kassenbon — Wocheneinkauf'), L('REWE — week 1',                        'REWE — KW 1'),                         'finance',     'family',     'receipts',  'receipt_rewe.jpg',        'image/jpeg',      92000,  lindaId],
-  [L('Invoice — Electricity',      'Rechnung — Strom'),          L('Monthly instalment',                   'Monatlicher Abschlag'),                'finance',     'family',     'receipts',  'invoice_electricity.pdf', 'application/pdf', 71000,  alexId],
-  [L('Receipt — Football Boots',   'Kassenbon — Fußballschuhe'), L('Sports shop — size 35',                'Sportgeschäft — Größe 35'),            'finance',     'family',     'receipts',  'receipt_boots.jpg',       'image/jpeg',      68000,  lindaId],
+  [L('Receipt - Weekly Groceries', 'Kassenbon - Wocheneinkauf'), L('REWE - week 1',                        'REWE - KW 1'),                         'finance',     'family',     'receipts',  'receipt_rewe.jpg',        'image/jpeg',      92000,  lindaId],
+  [L('Invoice - Electricity',      'Rechnung - Strom'),          L('Monthly instalment',                   'Monatlicher Abschlag'),                'finance',     'family',     'receipts',  'invoice_electricity.pdf', 'application/pdf', 71000,  alexId],
+  [L('Receipt - Football Boots',   'Kassenbon - Fußballschuhe'), L('Sports shop - size 35',                'Sportgeschäft - Größe 35'),            'finance',     'family',     'receipts',  'receipt_boots.jpg',       'image/jpeg',      68000,  lindaId],
 ];
 const documentIdByName = {};
 for (const [name, description, category, visibility, folder, original, mime, size, created_by] of documents) {
@@ -896,9 +896,9 @@ const insertEntryAttachment = db.prepare(`
   INSERT OR IGNORE INTO budget_entry_attachments (entry_id, document_id, created_by) VALUES (?, ?, ?)
 `);
 [
-  [L('Weekly Groceries — Wk 1', 'Wocheneinkauf — KW 1'), L('Receipt — Weekly Groceries', 'Kassenbon — Wocheneinkauf'), lindaId],
-  [L('Electricity',             'Strom'),                L('Invoice — Electricity',      'Rechnung — Strom'),          alexId],
-  [L("Leo's Football Boots",    'Fußballschuhe für Leo'),L('Receipt — Football Boots',   'Kassenbon — Fußballschuhe'), lindaId],
+  [L('Weekly Groceries - Wk 1', 'Wocheneinkauf - KW 1'), L('Receipt - Weekly Groceries', 'Kassenbon - Wocheneinkauf'), lindaId],
+  [L('Electricity',             'Strom'),                L('Invoice - Electricity',      'Rechnung - Strom'),          alexId],
+  [L("Leo's Football Boots",    'Fußballschuhe für Leo'),L('Receipt - Football Boots',   'Kassenbon - Fußballschuhe'), lindaId],
 ].forEach(([entryTitle, docName, by]) => {
   const entryId = budgetEntryIdByTitle[entryTitle];
   const docId = documentIdByName[docName];
@@ -966,7 +966,7 @@ const insertMaint = db.prepare('INSERT INTO housekeeping_maintenance_log (descri
 [
   [L('Reported a dripping tap in the main bathroom',      'Tropfenden Wasserhahn im Bad gemeldet'),             mariaId],
   [L('Replaced the kitchen sponge and refilled hand soap','Küchenschwamm getauscht und Seife nachgefüllt'),     mariaId],
-  [L('Living-room blind is sticking — needs a look',      'Rollo im Wohnzimmer klemmt — sollte jemand ansehen'), mariaId],
+  [L('Living-room blind is sticking - needs a look',      'Rollo im Wohnzimmer klemmt - sollte jemand ansehen'), mariaId],
 ].forEach(row => insertMaint.run(...row));
 
 // ── Split Expenses ───────────────────────────────────────────────────────────
@@ -1011,7 +1011,7 @@ function addExpense(groupId, payerId, memberIds, title, description, euros, cate
   insertLedger.run(groupId, expId, payerId, null, amount, title, payerId);
   for (const s of shares) insertLedger.run(groupId, expId, s.uid, payerId, -s.amount_minor, title, payerId);
   // Typ muss exakt einer der Typen sein, die server/routes/split-expenses.js
-  // schreibt — der Feed übersetzt über splitExpenses.activityType.<type>, ein
+  // schreibt - der Feed übersetzt über splitExpenses.activityType.<type>, ein
   // erfundener Typ rendert als roher Key.
   insertActivity.run(groupId, payerId, 'expense_created', 'expense', expId, JSON.stringify({ title, amount_minor: amount }));
   return expId;
@@ -1042,12 +1042,12 @@ insertMember.run(tripGroup, alexId, 'owner', alexId);
 insertMember.run(tripGroup, lindaId, 'admin', alexId);
 insertActivity.run(tripGroup, alexId, 'group_created', 'group', tripGroup, JSON.stringify({ name: tripGroupName }));
 addExpense(tripGroup, alexId,  [alexId, lindaId], L('Flights (×4)',      'Flüge (×4)'),          L('Dortmund → Naples',   'Dortmund → Neapel'),        648.00, 'travel',  thisMonthDate(2));
-addExpense(tripGroup, lindaId, [alexId, lindaId], L('Apartment deposit', 'Anzahlung Ferienwohnung'), L('Sorrento — 7 nights', 'Sorrent — 7 Nächte'),   400.00, 'travel',  thisMonthDate(6));
+addExpense(tripGroup, lindaId, [alexId, lindaId], L('Apartment deposit', 'Anzahlung Ferienwohnung'), L('Sorrento - 7 nights', 'Sorrent - 7 Nächte'),   400.00, 'travel',  thisMonthDate(6));
 addExpense(tripGroup, alexId,  [alexId, lindaId], L('Travel insurance',  'Reiseversicherung'),   L('Family annual policy','Jahrespolice für die Familie'), 96.00, 'general', thisMonthDate(8));
 
 // Beleg + Kommentar an einer geteilten Ausgabe: beides gab es im Seed nie, und
 // beide Ansichten (Beleg-Chip, Kommentarfaden) blieben dadurch unsichtbar.
-const receiptDocId = documentIdByName[L('Receipt — Weekly Groceries', 'Kassenbon — Wocheneinkauf')];
+const receiptDocId = documentIdByName[L('Receipt - Weekly Groceries', 'Kassenbon - Wocheneinkauf')];
 if (receiptDocId) {
   db.prepare(`
     INSERT INTO expense_attachments (expense_id, document_id, kind, created_by) VALUES (?, ?, 'receipt', ?)
@@ -1056,7 +1056,7 @@ if (receiptDocId) {
 const insertExpenseComment = db.prepare(`
   INSERT INTO expense_comments (expense_id, user_id, comment) VALUES (?, ?, ?)
 `);
-insertExpenseComment.run(dinnerExpenseId, lindaId, L('Worth every cent — let us go again.', 'Jeden Cent wert — da gehen wir wieder hin.'));
+insertExpenseComment.run(dinnerExpenseId, lindaId, L('Worth every cent - let us go again.', 'Jeden Cent wert - da gehen wir wieder hin.'));
 insertExpenseComment.run(dinnerExpenseId, alexId,  L('Agreed. Next time we book a table.',  'Finde ich auch. Nächstes Mal reservieren wir.'));
 
 // Wiederkehrende geteilte Ausgabe: der Mietanteil läuft monatlich weiter.
@@ -1102,7 +1102,7 @@ const insertVital = db.prepare(`
   INSERT INTO health_vitals (user_id, type, value_num, value_num2, value_num3, unit, measured_at, note)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `);
-// Weight trend (kg) — a gentle downward trend over ~8 weeks
+// Weight trend (kg) - a gentle downward trend over ~8 weeks
 [[-56, 66.9], [-49, 66.6], [-42, 66.4], [-35, 66.1], [-28, 65.9], [-21, 65.6], [-14, 65.4], [-7, 65.2], [-1, 65.0]]
   .forEach(([d, kg]) => insertVital.run(lindaId, 'weight', kg, null, null, 'kg', dateTimeFromNow(d, 7, 30), null));
 // Blood pressure (systolic / diastolic / pulse)
@@ -1118,7 +1118,7 @@ insertVital.run(lindaId, 'temp', 36.7, null, null, '°C', dateTimeFromNow(-5, 20
 [[-13, 7.5], [-12, 6.75], [-11, 7.25], [-10, 8.0], [-9, 6.5], [-8, 7.0], [-7, 7.75],
  [-6, 7.25], [-5, 6.25], [-4, 7.5], [-3, 8.25], [-2, 7.0], [-1, 7.5]]
   .forEach(([d, hours]) => insertVital.run(lindaId, 'sleep', hours, null, null, 'h', dateTimeFromNow(d, 7, 0), null));
-// Mood on the 1-5 scale — no unit, the number is a step
+// Mood on the 1-5 scale - no unit, the number is a step
 [[-13, 4], [-11, 3], [-9, 2], [-7, 4], [-5, 3], [-3, 5], [-1, 4]]
   .forEach(([d, step]) => insertVital.run(lindaId, 'mood', step, null, null, null, dateTimeFromNow(d, 20, 30), null));
 
@@ -1173,11 +1173,11 @@ const vitDId = insertMed.run(lindaId, L('Vitamin D3', 'Vitamin D3'), L('1000 IU'
   L('tablets', 'Tabletten'), 10, L('With breakfast', 'Zum Frühstück')).lastInsertRowid;
 const vitDSched = insertMedSched.run(vitDId, '08:00', 127, 1, daysFromNow(-40)).lastInsertRowid;
 const ironId = insertMed.run(lindaId, L('Iron (Ferrous bisglycinate)', 'Eisen (Eisenbisglycinat)'), '25 mg', 'capsule', 1, 0, 18,
-  L('capsules', 'Kapseln'), 14, L('Low ferritin — evening, away from dairy', 'Niedriges Ferritin — abends, nicht mit Milchprodukten')).lastInsertRowid;
+  L('capsules', 'Kapseln'), 14, L('Low ferritin - evening, away from dairy', 'Niedriges Ferritin - abends, nicht mit Milchprodukten')).lastInsertRowid;
 const ironSched = insertMedSched.run(ironId, '20:00', 127, 1, daysFromNow(-25)).lastInsertRowid;
 // As-needed medication (no schedule)
 insertMed.run(lindaId, 'Ibuprofen', '400 mg', 'tablet', 1, 1, 20,
-  L('tablets', 'Tabletten'), 5, L('For headaches — max 3/day', 'Bei Kopfschmerzen — höchstens 3 pro Tag'));
+  L('tablets', 'Tabletten'), 5, L('For headaches - max 3/day', 'Bei Kopfschmerzen - höchstens 3 pro Tag'));
 // Adherence logs: last 6 days taken, today pending
 for (let d = -6; d <= 0; d++) {
   const status = d === 0 ? 'pending' : 'taken';
@@ -1298,7 +1298,7 @@ const insertRedemption = db.prepare(`
   INSERT INTO reward_redemptions (user_id, catalog_id, reward_name, reward_icon, cost, status, note, requested_by, decided_by, decided_at, created_at)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
-// Emma: fulfilled ice cream trip (catalog id 2) — creates a matching spend in the ledger
+// Emma: fulfilled ice cream trip (catalog id 2) - creates a matching spend in the ledger
 const emmaRedemptionId = insertRedemption.run(
   emmaId, 2, REWARD_ICE_CREAM, '🍦', 25, 'fulfilled', null, emmaId, alexId, isoFromNow(-3, 19, 0), isoFromNow(-3, 16, 0)
 ).lastInsertRowid;
@@ -1416,5 +1416,5 @@ db.pragma('wal_checkpoint(TRUNCATE)');
 db.close();
 console.log('\n✓ Demo data inserted successfully!');
 console.log('  Admin login:  alex  / demo1234   (dad)');
-console.log('  Admin login:  linda / demo1234   (mom — screenshot persona, has health/cycle data)');
+console.log('  Admin login:  linda / demo1234   (mom - screenshot persona, has health/cycle data)');
 console.log('  Member login: emma, leo, maria   / demo1234');

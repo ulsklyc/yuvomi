@@ -308,7 +308,6 @@ const PLURAL_EXCEPTIONS = {
 
   // --- echte Luecken, eingefroren statt behoben ---------------------------
   // Alle unten sind bei n=1 grammatisch falsch und n=1 ist erreichbar.
-  'dashboard.housekeepingVisitsMonth': 'TODO_ONE',  // dashboard.js:2138, `visits` ungefiltert
   // Diese drei standen faelschlich unter PARENTHETICAL: die Klammer ist neutral, das
   // Substantiv davor nicht. renderFolderUploadPreview zeigt sie ab EINEM Konflikt.
   'documents.folderUpload.fileConflictsTitle': 'TODO_ONE',

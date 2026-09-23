@@ -8,7 +8,7 @@ import { api, auth } from '/api.js';
 import { createPageController } from '/utils/page-lifecycle.js';
 import { canSeeWidget, moduleAccess, navModuleAccess, canUseFasting } from '/permissions.js';
 import { todaySheetContext, collectSourceRows, composeTodaySheet, codaAllowed } from '/utils/today-sheet.js';
-import { t, formatDate, formatTime, timeSuffix, getLocale, getNumberFormat } from '/i18n.js';
+import { t, formatDate, formatDayMonth, formatTime, timeSuffix, getLocale, getNumberFormat } from '/i18n.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { resolveEventColor } from '/utils/event-color.js';
 import { esc, fmtLocation, renderMarkdownLight } from '/utils/html.js';
@@ -456,7 +456,7 @@ function widgetLabel(id) {
     housekeeping: () => t('nav.housekeeping'),
     schedule: () => t('nav.schedule'),
     waste:    () => t('nav.waste'),
-    family:   () => t('dashboard.familyMembers'),
+    family:   () => t('dashboard.familyTitle'),
     clock:    () => t('dashboard.clock'),
     metrics:  () => t('dashboard.metrics'),
     countdown: () => t('dashboard.countdownTitle'),
@@ -567,6 +567,28 @@ function mastheadDateLabel(now = new Date()) {
  * Vorher stand hier `d.toDateString() === new Date().toDateString()` - beide
  * Seiten in der Browser-Zone, also fuer jeden Betrachter ein anderes „heute".
  */
+/*
+ * NACH „MORGEN" KOMMT DER WOCHENTAG, NICHT DAS JAHR. Hier sprang das Label
+ * direkt auf „26.09.2026" - drei Tage voraus mit Jahreszahl, wo ein Mensch
+ * „Sa." sagt (Critique 2026-09-23). Die Stufen: heute, morgen, bis sechs Tage
+ * voraus der kurze Wochentag (ab sieben waere er mehrdeutig: „Mi." hiesse
+ * heute oder in einer Woche), danach Tag und Monat, das Jahr nur, wenn es
+ * nicht das laufende ist. Vergangenes bekommt nie einen Wochentag - „Mo." fuer
+ * letzten Montag liest sich als der naechste.
+ *
+ * Gerechnet wird auf den KEYS der Haushaltszone, nie auf einem `Date`: der
+ * Abstand kommt aus `Date.UTC` ueber Jahr/Monat/Tag (zonenfrei und
+ * sommerzeitfest), der Name aus demselben UTC-Mittag mit `timeZone: 'UTC'` -
+ * die Technik von `zonedUTCProxy`. Der Name folgt der App-Sprache
+ * (`getLocale`), Tag und Monat der Datumsschreibweise der Region.
+ */
+const WEEKDAY_LABEL_DAYS = 6;
+
+function dayKeyNoonUtc(key) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+  return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12) : NaN;
+}
+
 function relativeDateLabel(value) {
   if (value === null || value === undefined || value === '') return '';
   const day = zonedDateKey(value);
@@ -574,7 +596,14 @@ function relativeDateLabel(value) {
   const today = householdToday();
   if (day === today) return t('common.today');
   if (day === addLocalDays(today, 1)) return t('common.tomorrow');
-  return formatDate(value);
+  const dayNoon = dayKeyNoonUtc(day);
+  const ahead = Math.round((dayNoon - dayKeyNoonUtc(today)) / 86400000);
+  if (ahead > 1 && ahead <= WEEKDAY_LABEL_DAYS) {
+    return new Intl.DateTimeFormat(getLocale(), { weekday: 'short', timeZone: 'UTC' }).format(new Date(dayNoon));
+  }
+  // Der KEY geht an die Formatierer, nicht `value`: ein Zeitpunkt ist oben
+  // schon in die Anzeigezone umgerechnet, ein zweites Mal waere doppelt.
+  return day.slice(0, 4) === today.slice(0, 4) ? formatDayMonth(day) : formatDate(day);
 }
 
 function formatDateTime(isoString) {
@@ -663,7 +692,11 @@ function formatDueDate(dateStr, timeStr) {
     return { text: dueTime ? `${t('dashboard.dueTomorrow')} – ${formatTime(dueStamp)}` : t('dashboard.dueTomorrow'), overdue: false };
   }
 
-  return { text: fullLabel, overdue: false };
+  // Weiter voraus dieselbe Stufung wie am Termin daneben (relativeDateLabel):
+  // „Sa, 10:00" statt „26.09.2026, 10:00". Ueberfaelliges und „bald" oben
+  // behalten das volle Datum - dort ist es die Auskunft.
+  const dayLabel = relativeDateLabel(dayKey);
+  return { text: dueTime ? `${dayLabel}, ${formatTime(dueStamp)}` : dayLabel, overdue: false };
 }
 
 const PRIORITY_LABELS = () => ({
@@ -1033,7 +1066,7 @@ function skeletonWidget(lines = 3) {
 
 const TASK_STATUS_IN_PROGRESS = () => t('tasks.statusInProgress');
 
-function renderUrgentTasks(tasks) {
+function renderUrgentTasks(tasks, openTotal = null) {
   if (!tasks.length) {
     return `<div class="widget widget--tasks">
       ${widgetHeader('tasks', t('nav.tasks'), 0, '/tasks')}
@@ -1069,9 +1102,12 @@ function renderUrgentTasks(tasks) {
     `;
   }).join('');
 
+  // `urgentTasks` sind die fuenf dringendsten, `openTaskCount` alle offenen
+  // (siehe listTotal).
+  const total = listTotal(openTotal, tasks.length);
   return `<div class="widget widget--tasks">
-    ${widgetHeader('tasks', t('nav.tasks'), tasks.length, '/tasks')}
-    <div class="widget__body">${items}</div>
+    ${widgetHeader('tasks', t('nav.tasks'), total, '/tasks')}
+    <div class="widget__body">${items}${listMoreLine('dashboard.tasksMore', total - tasks.length)}</div>
   </div>`;
 }
 
@@ -1146,10 +1182,12 @@ function renderUpcomingEvents(allEvents, { now = new Date() } = {}) {
   const earlier = folded > 0
     ? `<p class="event-list__earlier">${esc(t('dashboard.eventsEndedMore', { count: folded }))}</p>`
     : '';
-  // Die Zahl im Kopf ist das Kommende: „3 Termine" neben zwei vorbeien und
-  // drei kommenden hiesse sonst mal dies, mal das.
+  // KEINE BADGE: die Liste ist nach vorn offen und bei fuenf Kommenden
+  // geschnitten, eine Gesamtzahl gibt es nicht. „5" stuende genau so lange da,
+  // wie mindestens fuenf Termine kommen - eine Zahl, die nur ihre eigene
+  // Obergrenze nennt. Beendete zaehlen ohnehin nie mit (#1449).
   return `<div class="widget widget--calendar">
-    ${widgetHeader('calendar', t('nav.calendar'), ahead.length, '/calendar')}
+    ${widgetHeader('calendar', t('nav.calendar'), null, '/calendar')}
     <div class="widget__body">${earlier}${items}</div>
   </div>`;
 }
@@ -1175,11 +1213,39 @@ function listRowCap(size) {
   return Number(String(size ?? '1x1').split('x')[1]) >= 2 ? LIST_ROWS_TALL : LIST_ROWS_SHORT;
 }
 
-export function renderUpcomingBirthdays(allBirthdays, size) {
+/*
+ * DIE BADGE ZAEHLT DIE SACHE, NICHT DIE ZEILEN (Critique 2026-09-23).
+ *
+ * Bis hierher trugen Notizen, Geburtstage, Aufgaben und Einkauf die Laenge der
+ * GEZEIGTEN Liste im Kopf: „Notizen 3" bei fuenf angehefteten, „Geburtstage 5"
+ * bei acht, „Aufgaben 5" bei zwoelf offenen - eine Zahl, die genau bis zur
+ * Obergrenze der Liste stimmt und darueber still luegt. Die Kennzahlkacheln
+ * hatten dieselbe Lehre schon gezogen (`openTaskCount` statt `urgentTasks`);
+ * die Kachelkoepfe daneben nicht.
+ *
+ * Die Gesamtzahl kommt vom Server, neben der Liste (`notesTotal`,
+ * `birthdayTotal`, `openTaskCount`, `shoppingOpenCount`) - wie `countdownTotal`
+ * beim Countdown. Fehlt sie (aelterer Server, Fehlerpfad), faellt die Badge auf
+ * die geladene Laenge zurueck; nie unter die gezeigten Zeilen, denn eine Badge
+ * kleiner als die Liste darunter waere derselbe Widerspruch andersherum.
+ *
+ * Was nicht in die Kachel passt, wird genannt: eine ruhige Fusszeile „+N
+ * weitere", dieselbe Form wie beim Countdown und bei der Entsorgung.
+ */
+function listTotal(total, loaded) {
+  const n = total === null || total === undefined || total === '' ? NaN : Number(total);
+  return Number.isFinite(n) ? Math.max(n, loaded) : loaded;
+}
+
+function listMoreLine(key, rest) {
+  return rest > 0 ? `<p class="widget-list-more">${esc(t(key, { count: rest }))}</p>` : '';
+}
+
+export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
   // Der Vorrat kommt fuer die groesste Fassung vom Server (routes/dashboard.js);
-  // was davon erscheint, entscheidet die Kachel. Die Badge zaehlt weiter die
-  // gezeigten Zeilen - sie sagt „so viele stehen hier", nicht „so viele hat der
-  // Haushalt", und das war schon vor dem Nachschub ihre Bedeutung.
+  // was davon erscheint, entscheidet die Kachel. Die Badge zaehlte hier die
+  // gezeigten Zeilen und sagte damit „5" bei acht anstehenden Anlaessen - jetzt
+  // nennt sie `birthdayTotal`, und der Rest steht als Fusszeile da (listTotal).
   const birthdays = allBirthdays.slice(0, listRowCap(size));
   if (!birthdays.length) {
     return `<div class="widget widget--birthdays">
@@ -1225,9 +1291,10 @@ export function renderUpcomingBirthdays(allBirthdays, size) {
     `;
   }).join('');
 
+  const gesamt = listTotal(total, allBirthdays.length);
   return `<div class="widget widget--birthdays">
-    ${widgetHeader('birthdays', t('nav.birthdays'), birthdays.length, '/birthdays')}
-    <div class="widget__body">${items}</div>
+    ${widgetHeader('birthdays', t('nav.birthdays'), gesamt, '/birthdays')}
+    <div class="widget__body">${items}${listMoreLine('dashboard.birthdaysMore', gesamt - birthdays.length)}</div>
   </div>`;
 }
 
@@ -1361,7 +1428,7 @@ function renderTodayMeals(meals, visibleMealTypes = MEAL_ORDER) {
   </div>`;
 }
 
-function renderPinnedNotes(allNotes, size) {
+function renderPinnedNotes(allNotes, size, total = null) {
   /* WIE VIELE ZEILEN, ENTSCHEIDET DIE KACHEL - wie bei jeder anderen
    * Listenkachel (`listRowCap`). Die Notizen waren die einzige, die ihre Groesse
    * gar nicht las: der Server schnitt bei drei, und drei war damit die
@@ -1415,9 +1482,15 @@ function renderPinnedNotes(allNotes, size) {
   // Breite kommt aus dem Größenklassen-System am .widget-wrapper (widget-size--2x1);
   // die frühere .widget--wide war in keinem CSS definiert und damit tot — entfernt,
   // damit Notizen wie jedes andere Widget genau ein Größen-Vokabular trägt (Critique P2).
+  // „Notizen 3" stand hier auch bei fuenf angehefteten: die Badge zaehlte die
+  // gezeigten Karten. Die Vorschau ist Angeheftetes zuerst, dann Neuestes -
+  // gezaehlt wird deshalb die Menge, aus der sie schoepft (`notesTotal`, mit
+  // demselben Kategoriefilter), nicht nur die angehefteten (listTotal).
+  const gesamt = listTotal(total, allNotes.length);
   return `<div class="widget widget--notes">
-    ${widgetHeader('notes', t('nav.notes'), notes.length, '/notes')}
+    ${widgetHeader('notes', t('nav.notes'), gesamt, '/notes')}
     <div class="notes-grid-widget">${items}</div>
+    ${listMoreLine('dashboard.notesMore', gesamt - notes.length)}
   </div>`;
 }
 
@@ -1525,6 +1598,79 @@ function renderQuickLinks(items) {
   </div>`;
 }
 
+/*
+ * DIE TAGESLAGE DER FAMILIENKARTE (#1449, Critique 2026-09-23).
+ *
+ * Die Karte nahm den ERSTEN Termin des Tages, den sie fuer eine Person fand,
+ * und verglich ihn nie mit der Uhr: 06:30 stand dort den ganzen Nachmittag,
+ * und ein ganztaegiger Eintrag gewann den Tag, weil er vorne sortiert war.
+ * Release-Notes 2.4.0 und SPEC versprechen den NAECHSTEN.
+ *
+ * „Vorbei" heisst: das ENDE ist in der Wanduhr des Haushalts erreicht. Ein
+ * laufender Termin liegt also noch vor einem, ein ganztaegiger endet an seinem
+ * eigenen Tag nie, und ein Termin ohne Ende gilt ab seinem Beginn als vorbei.
+ * Verglichen wird als Text 'YYYY-MM-DDTHH:MM' der Anzeigezone
+ * (`zonedDateKey`/`zonedTimeKey`) - Wanduhrzeit wird gelesen, ein Zeitpunkt
+ * umgerechnet, und das Geraet hat keine Stimme. Unter den heutigen geht ein
+ * Termin mit Uhrzeit dem ganztaegigen vor.
+ *
+ * Noch offen aus #1449 und bewusst nicht hier: die Karte leiht sich weiter die
+ * Liste der Kalenderkachel (fuenf Eintraege, ihr „nur meine"-Filter).
+ */
+function familyWallStamp(value) {
+  const day = zonedDateKey(value);
+  const time = zonedTimeKey(value);
+  return day && time ? `${day}T${time}` : '';
+}
+
+function familyAgenda(events, shownIds, todayKey) {
+  const nowStamp = familyWallStamp(new Date());
+  const items = events.map((event) => {
+    const raw = String(event?.start_datetime || '');
+    const allDay = Boolean(event?.all_day) || raw.length <= 10;
+    const day = allDay ? raw.slice(0, 10) : zonedDateKey(raw);
+    const start = allDay ? '' : familyWallStamp(raw);
+    const end = allDay ? '' : (event.end_datetime ? familyWallStamp(event.end_datetime) : start);
+    const people = new Set((Array.isArray(event?.assigned_users) ? event.assigned_users : [])
+      .map((a) => Number(a.id))
+      .filter((id) => shownIds.has(id)));
+    const ended = day === todayKey && !allDay && end !== '' && end <= nowStamp;
+    return { event, day, allDay, start, ended, people, shared: people.size >= 2 };
+  }).filter((item) => item.day && item.day >= todayKey && item.people.size > 0);
+
+  const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  items.sort((a, b) => cmp(a.day, b.day) || (Number(a.allDay) - Number(b.allDay)) || cmp(a.start, b.start));
+  const ahead = items.filter((item) => !item.ended);
+
+  const byPerson = new Map();
+  for (const id of shownIds) {
+    const own = ahead.filter((item) => !item.shared && item.people.has(id));
+    byPerson.set(id, {
+      nextToday: own.find((item) => item.day === todayKey) ?? null,
+      hadToday: items.some((item) => item.day === todayKey && item.people.has(id)),
+      sharedToday: ahead.some((item) => item.shared && item.day === todayKey && item.people.has(id)),
+      nextLater: own.find((item) => item.day > todayKey) ?? null,
+    });
+  }
+  return { nextShared: ahead.find((item) => item.shared) ?? null, byPerson };
+}
+
+/** „10:00 Zahnarzt" heute, „Sa. · Zahnarzt" an einem spaeteren Tag (escaped). */
+function familyEventLabel(item, todayKey) {
+  const title = esc(item.event.title);
+  if (item.day === todayKey) return item.allDay ? title : `${esc(formatTime(item.event.start_datetime))} ${title}`;
+  return `${esc(relativeDateLabel(item.day))} · ${title}`;
+}
+
+/** „Alex und Linda" in der Grammatik der App-Sprache. */
+function familyNameList(names) {
+  try {
+    return new Intl.ListFormat(getLocale(), { style: 'long', type: 'conjunction' }).format(names);
+  } catch {
+    return names.join(', ');
+  }
+}
+
 function renderFamilyWidget(users, data) {
   // IM SOLO-HAUSHALT GIBT ES DIESES WIDGET NICHT - entschieden in
   // `isWidgetModuleEnabled`, damit es auch aus der „Anpassen"-Ablage faellt.
@@ -1551,15 +1697,39 @@ function renderFamilyWidget(users, data) {
   // Zeile unveraendert wie zuvor.
   const scheduleEntriesToday = Array.isArray(data?.schedule?.entries) ? data.schedule.entries : [];
 
-  const rows = users.slice(0, 6).map((u) => {
-    const assignedTo = (e) => (Array.isArray(e.assigned_users) ? e.assigned_users : []).some((a) => a.id === u.id);
-    const nextEvent = events.find((e) => eventOccurrenceDateKey(e) === todayKey && assignedTo(e));
+  const shown = users.slice(0, 6);
+  const shownIds = new Set(shown.map((u) => Number(u.id)));
+  const agenda = familyAgenda(events, shownIds, todayKey);
+
+  // DER GETEILTE TERMIN STEHT EINMAL DA. Ein Termin fuer drei Personen stand in
+  // drei Zeilen („26.09.2026 · Zahnarzt - Familie" bei Alex, Leo und Linda) -
+  // die Karte wiederholte dieselbe Auskunft, statt zu sagen, dass es EIN
+  // gemeinsamer Termin ist (Critique 2026-09-23). Geteilt heisst: zwei oder
+  // mehr der gezeigten Personen sind zugewiesen. Der naechste solche Termin
+  // bekommt eine eigene Zeile oben, die Personenzeilen zeigen nur Eigenes.
+  const sharedNext = agenda.nextShared;
+  let sharedRow = '';
+  if (sharedNext) {
+    const who = shown.filter((u) => sharedNext.people.has(Number(u.id)));
+    const label = who.length === users.length
+      ? t('dashboard.familyEveryone')
+      : familyNameList(who.map((u) => u.display_name));
+    sharedRow = `
+      <div class="family-member family-member--shared">
+        <span class="family-widget-avatar family-widget-avatar--group" aria-hidden="true">
+          <i data-lucide="users"></i>
+        </span>
+        <span class="family-member__body">
+          <span class="family-member__name">${esc(label)}</span>
+          <span class="family-member__status">${familyEventLabel(sharedNext, todayKey)}</span>
+        </span>
+      </div>`;
+  }
+
+  const rows = shown.map((u) => {
+    const mine = agenda.byPerson.get(Number(u.id)) ?? { nextToday: null, hadToday: false, sharedToday: false, nextLater: null };
     const parts = [];
-    if (nextEvent) {
-      const start = eventStartDate(nextEvent);
-      const timed = !nextEvent.all_day && start && String(nextEvent.start_datetime).length > 10;
-      parts.push(timed ? `${esc(formatTime(start))} ${esc(nextEvent.title)}` : esc(nextEvent.title));
-    }
+    if (mine.nextToday) parts.push(familyEventLabel(mine.nextToday, todayKey));
     const myShift = scheduleEntriesToday.find((entry) => Number(entry.user_id) === Number(u.id) && entry.shift_type);
     if (myShift) {
       const type = myShift.shift_type;
@@ -1572,18 +1742,25 @@ function renderFamilyWidget(users, data) {
     // dasselbe „Heute frei" zu stapeln (Critique P5: die größte Karte des
     // Boards mit einem Bit Information). Erst wer auch im Ausblick nichts
     // hat, ist wirklich frei - und das darf dann leise dastehen.
+    //
+    // Davor zwei Zustaende, die „frei" sonst falsch benannt haette (#1449):
+    // wer heute nur noch den gemeinsamen Termin oben vor sich hat, ist nicht
+    // frei; und wer heute Termine HATTE und keiner mehr kommt, ist „fuer heute
+    // durch" - nicht frei und nicht mit dem Termin von 06:30 beschriftet.
     let status;
     let free = false;
     if (parts.length) {
       status = parts.join(' · ');
+    } else if (mine.sharedToday) {
+      status = esc(t('dashboard.familyOnlyShared'));
+    } else if (mine.hadToday) {
+      status = esc(t('dashboard.familyDoneToday'));
+      free = true;
+    } else if (mine.nextLater) {
+      status = familyEventLabel(mine.nextLater, todayKey);
     } else {
-      const upcoming = events.find((e) => eventOccurrenceDateKey(e) > todayKey && assignedTo(e));
-      if (upcoming) {
-        status = `${esc(relativeDateLabel(eventOccurrenceDateKey(upcoming)))} · ${esc(upcoming.title)}`;
-      } else {
-        status = esc(t('dashboard.todayFree'));
-        free = true;
-      }
+      status = esc(t('dashboard.todayFree'));
+      free = true;
     }
     return `
       <div class="family-member">
@@ -1620,9 +1797,10 @@ function renderFamilyWidget(users, data) {
     : esc(t('dashboard.familyDayCalm'));
 
   return `<div class="widget widget--family">
-    ${widgetHeader('family', t('dashboard.familyMembers'), null, '/settings', t('dashboard.manage'), 'contacts')}
+    ${widgetHeader('family', t('dashboard.familyTitle'), null, '/settings', t('dashboard.manage'), 'contacts')}
     <div class="family-widget">
       <div class="family-widget__list">
+        ${sharedRow}
         ${rows}
         ${moreCount > 0 ? `<div class="family-member family-member--more">${esc(t('dashboard.shoppingMore', { count: moreCount }))}</div>` : ''}
       </div>
@@ -1722,7 +1900,7 @@ function renderBudgetWidget(budget, currency, size = '1x1') {
 
   if (!hasData) {
     return `<div class="widget widget--budget">
-      ${widgetHeader('budget', t('dashboard.budgetOverview'), null, '/budget')}
+      ${widgetHeader('budget', t('nav.budget'), null, '/budget')}
       <div class="widget__empty">
         <i data-lucide="wallet" class="empty-state__icon" aria-hidden="true"></i>
         <div>${t('dashboard.noBudgetData')}</div>
@@ -1732,7 +1910,7 @@ function renderBudgetWidget(budget, currency, size = '1x1') {
   }
 
   return `<div class="widget widget--budget">
-    ${widgetHeader('budget', t('dashboard.budgetOverview'), null, '/budget')}
+    ${widgetHeader('budget', t('nav.budget'), null, '/budget')}
     <div class="budget-widget">
       <div class="budget-widget__headline">
         <span>${t('dashboard.monthlyBalance')}</span>
@@ -1894,13 +2072,20 @@ function metricTileFor(id, data, currency) {
       const offen = h.dosesTotal - (h.dosesTaken ?? 0) - (h.dosesSkipped ?? 0);
       return {
         id, route, icon: widgetIcon('health'), label: t('nav.health'),
+        // „2 Dosen" liess offen, ob offen oder genommen (Critique 2026-09-23,
+        // Persona Grosseltern) - der Wert nennt jetzt den Zustand („2 offen",
+        // wie „12 offen" bei den Aufgaben; „2 Dosen offen" passte mobil nicht
+        // in die nicht umbrechende Wertzeile), und die Zweitzeile nennt die
+        // naechste Dosis mit Uhrzeit statt nur dem Namen.
         value: t('dashboard.metricDoses', { count: Math.max(0, offen) }),
         // Die Nachbestellung schlaegt die naechste Uhrzeit: eine leere Packung
         // ist der Zustand, der eine Handlung braucht, eine faellige Dosis der,
         // der von selbst kommt.
         note: h.lowStockCount > 0
           ? t('dashboard.healthRefill', { count: h.lowStockCount })
-          : offen <= 0 ? t('dashboard.healthAllTaken') : (h.nextDose?.name || t('dashboard.healthAllTaken')),
+          : offen <= 0 || !h.nextDose?.name
+            ? t('dashboard.healthAllTaken')
+            : `${h.nextDose.time ? `${formatTime(h.nextDose.time)} ` : ''}${h.nextDose.name}`,
         noteTone: h.lowStockCount > 0 ? 'danger' : null,
       };
     }
@@ -1909,11 +2094,20 @@ function metricTileFor(id, data, currency) {
       if (!hk.configured) return null;
       return {
         id, route, icon: widgetIcon('housekeeping'), label: t('nav.housekeeping'),
-        value: t('dashboard.metricVisits', { count: hk.visitsThisMonth ?? 0 }),
+        // „9 Besuche" ohne Zeitraum - gezaehlt werden die abgeschlossenen
+        // Besuche des laufenden Monats (routes/dashboard.js), und das sagt der
+        // Wert jetzt. Kurz („9 im Monat"), weil der Wert nicht umbricht: die
+        // Kachel ist mobil 152px breit, „9 Besuche diesen Monat" wurde dort
+        // abgeschnitten (gemessen). Das Substantiv steht im Kachelnamen.
+        value: t('dashboard.metricVisitsMonth', { count: hk.visitsThisMonth ?? 0 }),
         // Drei Zustaende, ein Rang: wer gerade da ist, ist die Nachricht; sonst
-        // zaehlt offenes Geld; sonst der letzte Besuch.
+        // zaehlt offenes Geld; sonst der letzte Besuch. „Gerade im Haus" um
+        // 21:18 las sich wie ein Fehler - mit „seit 08:00" ist es eine Auskunft
+        // (und eine vergessene Abmeldung von gestern sieht man am Datum).
         note: hk.present
-          ? t('dashboard.housekeepingPresent')
+          ? (hk.presentSince
+            ? t('dashboard.housekeepingPresentSince', { time: housekeepingSinceLabel(hk.presentSince) })
+            : t('dashboard.housekeepingPresent'))
           : hk.unpaidAmount > 0
             ? t('dashboard.housekeepingUnpaid', { amount: formatCurrency(hk.unpaidAmount, currency) })
             : hk.lastVisit
@@ -2520,6 +2714,14 @@ function renderWasteWidget(waste, size) {
 // Haushaltshilfe-Widget (Anwesenheit + offene Zahlung)
 // --------------------------------------------------------
 
+/** „08:00" fuer einen Beginn heute, „22.09., 08:00" fuer einen aelteren -
+ * eine offene Sitzung von gestern ist eine vergessene Abmeldung, keine
+ * Anwesenheit, und die blosse Uhrzeit verschwiege genau das. */
+function housekeepingSinceLabel(since) {
+  const time = formatTime(since);
+  return zonedDateKey(since) === householdToday() ? time : `${relativeDateLabel(since)}, ${time}`;
+}
+
 function renderHousekeepingWidget(hk, currency) {
   if (!hk?.configured) {
     return `<div class="widget widget--housekeeping">
@@ -2541,7 +2743,7 @@ function renderHousekeepingWidget(hk, currency) {
         <span class="housekeeping-widget__dot" aria-hidden="true"></span>
         <div class="housekeeping-widget__lines">
           <div class="housekeeping-widget__state">${t('dashboard.housekeepingPresent')}</div>
-          <div class="housekeeping-widget__sub">${hk.workerName ? `${esc(hk.workerName)} · ` : ''}${hk.presentSince ? t('dashboard.housekeepingSince', { time: formatTime(new Date(hk.presentSince)) }) : ''}</div>
+          <div class="housekeeping-widget__sub">${hk.workerName ? `${esc(hk.workerName)} · ` : ''}${hk.presentSince ? t('dashboard.housekeepingSince', { time: housekeepingSinceLabel(hk.presentSince) }) : ''}</div>
         </div>
       </div>`
     : `<div class="housekeeping-widget__status">
@@ -3379,9 +3581,9 @@ function renderHiddenWidgetsTray(cfg, glanceHidden = false) {
 
 function renderDashboardLayout(cfg, data, weather, currency, { editing = false, visibleMealTypes = MEAL_ORDER, glanceHidden = false } = {}) {
   const widgetById = {
-    tasks: () => renderUrgentTasks(data.urgentTasks ?? []),
+    tasks: () => renderUrgentTasks(data.urgentTasks ?? [], data.openTaskCount),
     calendar: () => renderUpcomingEvents(data.upcomingEvents ?? []),
-    birthdays: (size) => renderUpcomingBirthdays(data.birthdays ?? [], size),
+    birthdays: (size) => renderUpcomingBirthdays(data.birthdays ?? [], size, data.birthdayTotal),
     countdown: (size) => renderCountdowns(data.countdowns ?? [], size, data.countdownTotal),
     budget: (size) => renderBudgetWidget(data.budget ?? {}, currency, size),
     rewards: () => renderRewardsWidget(data.rewards ?? {}),
@@ -3394,8 +3596,8 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
     waste: (size) => renderWasteWidget(data.waste, size),
     family: () => renderFamilyWidget(data.users ?? [], data),
     meals: () => renderTodayMeals(data.todayMeals ?? [], visibleMealTypes),
-    notes: (size) => renderPinnedNotes(data.pinnedNotes ?? [], size),
-    shopping: () => renderShoppingLists(data.shoppingLists ?? []),
+    notes: (size) => renderPinnedNotes(data.pinnedNotes ?? [], size, data.notesTotal),
+    shopping: () => renderShoppingLists(data.shoppingLists ?? [], data.shoppingOpenCount, data.shoppingOpenLists),
     weather: () => (weather ? renderWeatherWidget(weather) : ''),
     clock: () => renderClockWidget(),
     quicklinks: () => renderQuickLinks(data.quicklinks ?? []),
@@ -3535,7 +3737,7 @@ function renderWidgetError(id) {
 // Shopping-Widget
 // --------------------------------------------------------
 
-function renderShoppingLists(lists) {
+function renderShoppingLists(lists, openTotal = null, openListTotal = null) {
   if (!lists.length) {
     return `<div class="widget widget--shopping">
       ${widgetHeader('shopping', t('nav.shopping'), 0, '/shopping')}
@@ -3547,7 +3749,11 @@ function renderShoppingLists(lists) {
     </div>`;
   }
 
-  const totalOpen = lists.reduce((sum, l) => sum + l.open_count, 0);
+  // Der Server liefert hoechstens drei Listen; `shoppingOpenCount` und
+  // `shoppingOpenLists` zaehlen ueber alle (listTotal). Ohne sie bleibt es bei
+  // der Summe der geladenen Listen.
+  const totalOpen = listTotal(openTotal, lists.reduce((sum, l) => sum + l.open_count, 0));
+  const moreLists = listTotal(openListTotal, lists.length) - lists.length;
 
   const listsHtml = lists.map((list) => {
     const progress = list.total_count > 0
@@ -3583,7 +3789,7 @@ function renderShoppingLists(lists) {
 
   return `<div class="widget widget--shopping">
     ${widgetHeader('shopping', t('nav.shopping'), totalOpen, '/shopping')}
-    <div class="widget__body">${listsHtml}</div>
+    <div class="widget__body">${listsHtml}${listMoreLine('dashboard.shoppingMoreLists', moreLists)}</div>
   </div>`;
 }
 
@@ -5750,3 +5956,8 @@ function wireWeatherRefresh(container, onUpdated = null, signal) {
 // Die CSS-Seite davon hält test-frontend-audit.js als Regel fest: keine Regel,
 // die `.page-fab` trifft, darf `opacity: 0` oder `pointer-events: none`
 // schreiben - und seit der Dial eine `.page-fab-group` ist, trifft das auch ihn.
+
+// Test-Tor fuer die Klarheits-Runde (test/test-dashboard-clarity.js): eigene
+// Zeile statt Verlaengerung der langen `__test`-Liste oben, damit parallele
+// Aenderungen an beiden nicht in derselben Zeile kollidieren.
+Object.assign(__test, { renderUpcomingEvents, renderShoppingLists, renderDashboardLayout });

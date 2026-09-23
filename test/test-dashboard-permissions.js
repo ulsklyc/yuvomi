@@ -334,10 +334,10 @@ test('Aufgaben auf `none`: weder Liste noch Zählstände noch die Pro-Mitglied-L
 // Je Modul eine Zahl, die nur dann größer null ist, wenn sein Teil der Antwort
 // etwas trägt. Geteilt von der Rollen- und der Token-Achse weiter unten.
 const MODULE_PROBES = {
-  calendar: (b) => b.upcomingEvents.length + b.birthdays.length + b.birthdayCount,
+  calendar: (b) => b.upcomingEvents.length + b.birthdays.length + b.birthdayCount + b.birthdayTotal,
   tasks: (b) => b.urgentTasks.length + b.openTaskCount + b.overdueTaskCount + b.tasksDoneToday,
   meals: (b) => b.todayMeals.length,
-  notes: (b) => b.pinnedNotes.length + b.pinnedNotesCount,
+  notes: (b) => b.pinnedNotes.length + b.pinnedNotesCount + b.notesTotal,
   shopping: (b) => b.shoppingLists.length + b.shoppingOpenCount + b.shoppingOpenLists,
   budget: (b) => b.budget.income + b.budget.expenses + b.budget.entryCount,
   rewards: (b) => b.rewards.standings.length + b.rewards.participantCount,

@@ -59,13 +59,13 @@ const log = createLogger('Dashboard');
 const DENIED_PAYLOAD = Object.freeze({
   // Geburtstage gehören zum Kalender-Modul, nicht zu einem eigenen — dieselbe
   // Zuordnung wie in PERMISSION_MODULES (navIds) und im Client (NAV_TO_MODULE).
-  calendar: () => ({ upcomingEvents: [], birthdays: [], birthdayCount: 0, birthdaySoonCount: 0 }),
+  calendar: () => ({ upcomingEvents: [], birthdays: [], birthdayCount: 0, birthdayTotal: 0, birthdaySoonCount: 0 }),
   tasks: () => ({
     urgentTasks: [], openTaskCount: 0, overdueTaskCount: 0,
     memberTodayTasks: [], tasksDoneToday: 0,
   }),
   meals: () => ({ todayMeals: [] }),
-  notes: () => ({ pinnedNotes: [], pinnedNotesCount: 0 }),
+  notes: () => ({ pinnedNotes: [], pinnedNotesCount: 0, notesTotal: 0 }),
   shopping: () => ({ shoppingLists: [], shoppingOpenCount: 0, shoppingOpenLists: 0 }),
   // Der Monat bleibt stehen: er ist keine Budgetzahl, sondern der Zeitraum, auf
   // den die Kachel beschriftet ist — und er steht ohnehin im Kalender.
@@ -444,10 +444,21 @@ router.get('/', (req, res) => {
       SELECT COUNT(*) AS n FROM notes n
       WHERE n.pinned = 1 ${noteCategoryAnd}
     `).get({ me: userId, ...noteCategoryBinds }).n;
+    /* UND DIE MENGE, AUS DER DIE VORSCHAU SCHOEPFT - fuer die Badge und das
+     * „+N weitere" der Kachel. `pinnedNotesCount` ist dafuer die falsche Zahl:
+     * die Vorschau fuellt nach den angehefteten mit den neuesten auf, eine Badge
+     * „1" ueber drei Karten waere derselbe Widerspruch wie vorher die „3" bei
+     * fuenf angehefteten. Derselbe Kategoriefilter wie Liste und Pin-Zahl
+     * (#814: Filter vor Schnitt UND Zahl). */
+    result.notesTotal = d.prepare(`
+      SELECT COUNT(*) AS n FROM notes n
+      WHERE 1 = 1 ${noteCategoryAnd}
+    `).get({ me: userId, ...noteCategoryBinds }).n;
   } catch (err) {
     log.error('pinnedNotes error:', err.message);
     result.pinnedNotes = [];
     result.pinnedNotesCount = 0;
+    result.notesTotal = 0;
   }
 
   // Einkaufslisten mit offenen Artikeln (max. 3 Listen, je bis zu 6 offene Items)
@@ -527,10 +538,16 @@ router.get('/', (req, res) => {
       // Server liefert nur den Vorrat fuer die groesste Fassung.
       .slice(0, 5);
     result.birthdayCount = rows.length;
+    // Die Liste zaehlt ANLAESSE (Geburtstag und Namenstag je eine Zeile),
+    // `birthdayCount` die Personen. Badge und „+N weitere" der Kachel brauchen
+    // die Menge, aus der die Liste geschnitten ist - sonst stimmt der Rest nur,
+    // solange niemand einen Namenstag hat.
+    result.birthdayTotal = hydrated.length;
   } catch (err) {
     log.error('birthdays error:', err.message);
     result.birthdays = [];
     result.birthdayCount = 0;
+    result.birthdayTotal = 0;
     result.birthdaySoonCount = 0;
   }
 

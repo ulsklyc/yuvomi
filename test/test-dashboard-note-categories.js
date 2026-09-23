@@ -71,6 +71,17 @@ test('another user personal category id cannot reveal matching notes', async () 
   const body = await response.json();
   assert.deepEqual(body.pinnedNotes, []);
   assert.equal(body.pinnedNotesCount, 0);
+  assert.equal(body.notesTotal, 0, 'auch die Gesamtzahl der Kachel verraet nichts');
+});
+
+test('notesTotal counts the set the preview draws from, behind the same filter', async () => {
+  // Die Kachel-Badge nennt diese Zahl (Critique 2026-09-23): ohne Filter alle
+  // neun Notizen, nicht die fuenf der Vorschau; mit Filter nur die Treffer.
+  const all = await (await fetch(`${baseUrl}/`)).json();
+  assert.equal(all.pinnedNotes.length, 5, 'Vorbedingung: die Vorschau ist geschnitten');
+  assert.equal(all.notesTotal, 9);
+  const homeOnly = await (await fetch(`${baseUrl}/?notes_category=${home}`)).json();
+  assert.equal(homeOnly.notesTotal, 2);
 });
 
 test.after(() => server.close());
