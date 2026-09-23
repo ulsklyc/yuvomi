@@ -1642,7 +1642,8 @@ function buildItemForm({ mode, item = null }) {
             <button type="button" class="inventory-photo-editor" id="inv-photo-preview" aria-label="${esc(t('inventory.photoLabel'))}">
               ${photoPreviewHtml(photoData)}
             </button>
-            <input class="sr-only" id="inv-photo" type="file" accept="image/png,image/jpeg,image/webp">
+            <input class="sr-only" id="inv-photo" type="file" accept="image/png,image/jpeg,image/webp"
+                   aria-label="${esc(t('inventory.photoLabel'))}" tabindex="-1">
             <div class="inventory-photo-actions">
               <button type="button" class="inventory-photo-action" id="inv-photo-edit"
                       aria-label="${esc(t('inventory.photoLabel'))}" title="${esc(t('inventory.photoLabel'))}">

@@ -629,3 +629,51 @@ test('#1160 375x812 - Mitglied bearbeiten: jedes Feld, auf dem der Tab-Fokus lan
   }
 });
 
+
+/*
+ * DER FOKUS EINES CHIPS IST DER CHIP (#1429-Folge). Die Personenauswahl
+ * (`.user-ms`) versteckt ihre Checkbox als 1x1-Pixel am linken Rand des Chips;
+ * den Fokusring zeichnet das Label (`:has(:focus-visible)`). Die Platzierung
+ * hielt nur dieses eine Pixel frei, und die Sonde oben fragt nur die Mitte des
+ * fokussierten Elements - beide sahen den Chip nicht. Gemessen im Kalender-
+ * Editor bei 1280x900 mit einer Erinnerung: jeder der fuenf Chips lag beim
+ * Tab-Fokus unter dem Toast, das Pixel nie. Die Sonde misst deshalb die
+ * Flaeche des sichtbaren Chips gegen die sichtbaren Toasts.
+ */
+test('#1429 1280x900 - Kalender-Editor: ein fokussierter Personen-Chip liegt ganz frei, nicht nur sein 1px-Input', async () => {
+  const page = await openPage(harness, { device: 'desktop', locale: 'de' });
+  try {
+    const eventId = await seedDueReminder(page, { count: 1, refresh: false });
+    await gotoRoute(page, '/calendar');
+    await waitForToasts(page, 1);
+    await openEventEditor(page, eventId);
+    await page.addStyleTag({ content: '*, *::before, *::after { transition: none !important; }' });
+
+    const covered = [];
+    let chips = 0;
+    for (let i = 0; i < 40 && chips < 5; i += 1) {
+      await page.keyboard.press('Tab');
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      await settleAnimations(page);
+      const probe = await page.evaluate(() => {
+        const el = document.activeElement;
+        if (!el?.classList.contains('user-ms__checkbox')) return null;
+        const chip = el.closest('label').getBoundingClientRect();
+        const toasts = [...document.querySelectorAll('.shell-bottom-stack .toast')]
+          .filter((t) => !t.classList.contains('toast--tucked') && t.getClientRects().length > 0)
+          .map((t) => t.getBoundingClientRect());
+        const overlap = toasts.some((t) => t.left < chip.right && t.right > chip.left && t.top < chip.bottom && t.bottom > chip.top);
+        return { chip: el.closest('label').textContent.replace(/\s+/g, ' ').trim(), top: Math.round(chip.top), bottom: Math.round(chip.bottom), overlap };
+      });
+      if (!probe) continue;
+      chips += 1;
+      if (probe.overlap) covered.push(probe);
+    }
+    assert.ok(chips >= 2, `zu wenige Personen-Chips per Tab erreicht (${chips}) - so misst die Sonde nichts`);
+    const measured = await measureDialog(page);
+    assert.equal(measured.toast, true, 'der Erinnerungs-Toast ist verschwunden - so misst die Sonde nichts');
+    assert.deepEqual(covered, [], 'ein fokussierter Personen-Chip liegt unter dem Toast');
+  } finally {
+    await page.close();
+  }
+});
