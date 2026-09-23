@@ -3367,3 +3367,84 @@
   gap: var(--space-2);
   width: fit-content;
 }
+
+/* --------------------------------------------------------
+ * Zuweisung nachtragen: Rückfrage mit Einzelliste (#1307)
+ *
+ * Umgezogene Termine stehen einzeln zur Wahl, je Zeile Titel, Datum mit
+ * Kalender und "von X zu Y". Die Liste scrollt in sich, damit die Knöpfe
+ * auch bei vielen Terminen sichtbar bleiben.
+ * -------------------------------------------------------- */
+
+.backfill-review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.backfill-review__part {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.backfill-review__heading {
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.backfill-moved__all {
+  margin-bottom: var(--space-2);
+}
+
+.backfill-moved__list {
+  display: flex;
+  flex-direction: column;
+  max-height: 50vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.backfill-moved__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: var(--target-md);
+  padding: var(--space-2) var(--space-1);
+  cursor: pointer;
+}
+
+.backfill-moved__item + .backfill-moved__item {
+  border-top: var(--space-px) solid var(--color-border-subtle);
+}
+
+.backfill-moved__item input[type="checkbox"] {
+  width: var(--space-5);
+  height: var(--space-5);
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.backfill-moved__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.backfill-moved__title {
+  overflow-wrap: anywhere;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+}
+
+.backfill-moved__meta,
+.backfill-moved__change {
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}

@@ -16,6 +16,7 @@ import {
   createToggleRow,
 } from '/settings/components.js';
 import { withBusy } from '/utils/ux.js';
+import { esc } from '/utils/html.js';
 import { loadFamilyUsers } from '/settings/family-users.js';
 
 const MORE_PROVIDERS_ID = 'sync-more-providers';
@@ -118,55 +119,203 @@ function renderPage(container, user) {
  * Zahl kommt vor der Rückfrage vom Server, weil sich die Aktion nur Termin
  * für Termin zurücknehmen lässt. Die Rückfrage steht AUSSERHALB von withBusy:
  * sonst gäbe der Dialog den Fokus an einen deaktivierten Knopf zurück.
+ *
+ * Dazu Termine, die vor #1306 in einen anderen Kalender desselben Kontos
+ * umgezogen sind und noch dessen Person tragen (#1307). Sie lassen sich in den
+ * Daten nicht von einem Kalender trennen, dessen Standard-Person später
+ * umgestellt wurde - deshalb listet die Rückfrage sie einzeln ("Titel, Datum,
+ * X -> Y"), der Admin wählt ab, was bleiben soll, und nur die abgehakten
+ * gehen mit der Bestätigung zurück.
  */
 function bindDefaultAssigneeBackfill(container) {
   const btn = container.querySelector('#sync-default-assignee-backfill-btn');
   if (!btn) return;
   const endpoint = '/calendar/external-calendars/default-assignee-backfill';
 
-  btn.addEventListener('click', async () => {
-    // Wer während der Zählung wegnavigiert, bekommt die Rückfrage nicht über
-    // eine fremde Seite gelegt - bestätigt würde sonst eine Aktion, deren Seite
-    // gar nicht mehr offen ist.
+  // Eine Seite der Vorschau holen. Wer währenddessen wegnavigiert, bekommt die
+  // Rückfrage nicht über eine fremde Seite gelegt - bestätigt würde sonst eine
+  // Aktion, deren Seite gar nicht mehr offen ist.
+  const loadPage = async (after) => {
     const context = captureModalContext();
-    let count = 0;
-    let token = null;
+    let data = null;
     try {
       await withBusy(btn, async () => {
-        const res = await api.get(endpoint);
-        count = res.data?.count ?? 0;
-        token = res.data?.token ?? null;
+        const query = after ? `?moved_after=${encodeURIComponent(after)}` : '';
+        data = (await api.get(`${endpoint}${query}`)).data ?? {};
       });
     } catch (err) {
       if (isModalContextCurrent(context)) showToast(err.message || t('common.errorGeneric'), 'danger');
-      return;
+      return null;
     }
-    if (!isModalContextCurrent(context)) return;
+    if (!isModalContextCurrent(context)) return null;
+    const moved = Array.isArray(data.moved) ? data.moved : [];
+    return {
+      count: data.count ?? 0,
+      token: data.token ?? null,
+      moved,
+      total: Number.isInteger(data.moved_total) ? data.moved_total : moved.length,
+      offset: Number.isInteger(data.moved_offset) ? data.moved_offset : 0,
+      next: typeof data.moved_next === 'string' ? data.moved_next : null,
+    };
+  };
 
-    if (count === 0) {
-      showToast(t('settings.sync.backfillNone'));
-      return;
-    }
-
-    const confirmed = await confirmModal(t('settings.sync.backfillQuestion', { count }), {
-      confirmLabel: t('settings.sync.backfillConfirm'),
-      detail: t('settings.sync.backfillDetail'),
-    });
-    if (!confirmed) return;
-
+  // Zahl und Fingerabdruck der gezählten Menge gehen mit: hat sich die Menge
+  // seit der Zählung geändert - auch bei gleicher Größe (#1171) -, weist der
+  // Server mit 409 ab, statt mehr oder andere Termine zu füllen, als die
+  // Rückfrage genannt hat. Jeder abgehakte Umzug nennt Termin, bisherige und
+  // neue Person, so wie die Liste ihn gezeigt hat (#1307).
+  const apply = async (page, moves) => {
+    let ok = false;
     await withBusy(btn, async () => {
       try {
-        // Zahl und Fingerabdruck der gezählten Menge gehen mit: hat sich die
-        // Menge seit der Zählung geändert - auch bei gleicher Größe (#1171) -,
-        // weist der Server mit 409 ab, statt mehr oder andere Termine zu füllen,
-        // als die Rückfrage genannt hat.
-        const res = await api.post(endpoint, { expected_count: count, expected_token: token });
-        const assigned = res.data?.assigned ?? 0;
-        showToast(t('settings.sync.backfillDone', { count: assigned }), 'success');
+        const res = await api.post(endpoint, { expected_count: page.count, expected_token: page.token, moves });
+        showToast(t('settings.sync.backfillDone', { count: res.data?.assigned ?? 0 }), 'success');
+        ok = true;
       } catch (err) {
         if (err.status === 409) showToast(t('settings.sync.backfillChanged'), 'warning');
         else showToast(err.message || t('common.errorGeneric'), 'danger');
       }
+    });
+    return ok;
+  };
+
+  btn.addEventListener('click', async () => {
+    let page = await loadPage(null);
+    if (!page) return;
+    if (page.count === 0 && page.moved.length === 0) {
+      showToast(t('settings.sync.backfillNone'));
+      return;
+    }
+    if (page.moved.length === 0) {
+      const confirmed = await confirmModal(t('settings.sync.backfillQuestion', { count: page.count }), {
+        confirmLabel: t('settings.sync.backfillConfirm'),
+        detail: t('settings.sync.backfillDetail'),
+      });
+      if (confirmed) await apply(page, []);
+      return;
+    }
+
+    // Seite für Seite (#1307): bestätigt wird je Seite, "Nächste anzeigen"
+    // blättert ohne Übernehmen weiter. Der Zeiger zeigt hinter den letzten
+    // gezeigten Termin - abgewählte bleiben davor liegen und halten die nächste
+    // Seite nicht auf.
+    for (;;) {
+      const choice = await pickMovedCandidates(page);
+      if (!choice) return;
+      if (choice.action === 'apply' && !(await apply(page, choice.moves))) return;
+      if (!page.next) return;
+      page = await loadPage(page.next);
+      if (!page || page.moved.length === 0) return;
+    }
+  });
+}
+
+function movedCandidateMeta(entry) {
+  const value = String(entry.start_datetime || '');
+  const timed = !entry.all_day && value.length > 10;
+  const when = timed ? `${formatDate(value)} ${formatTime(value)}`.trim() : formatDate(value);
+  return [when, entry.calendar_name].filter(Boolean).join(' · ');
+}
+
+/**
+ * Die Rückfrage mit Einzelliste (#1307), eine Seite. Alle umgezogenen Termine
+ * sind vorausgewählt; abgewählt bleibt ein Termin, wie er ist.
+ *
+ * @param {{ count: number, moved: object[], total: number, offset: number,
+ *   next: string|null }} page eine Seite der Vorschau: `count` Termine ohne
+ *   Zuweisung (werden pauschal gefüllt), `moved` die Einträge dieser Seite,
+ *   `total`/`offset` für "Termine N bis M von X", `next` gibt es eine weitere
+ * @returns {Promise<{ action: 'apply', moves: {event_id: number, from_user_id: number,
+ *   to_user_id: number}[] } | { action: 'next' } | null>} null bei Abbruch
+ */
+function pickMovedCandidates({ count, moved, total, offset, next }) {
+  return new Promise((resolve) => {
+    let resolved = false;
+    const finish = (value) => {
+      if (resolved) return;
+      resolved = true;
+      closeModal({ force: true });
+      resolve(value);
+    };
+    // Der Hinweis nennt die Seite und die beiden Knöpfe - nur, solange es eine
+    // nächste Seite gibt. Die letzte Seite zeigt den Rest ohne ihn.
+    const paged = Boolean(next) && total > moved.length;
+
+    const rows = moved.map((entry, index) => `
+      <label class="backfill-moved__item">
+        <input type="checkbox" data-index="${index}" checked>
+        <span class="backfill-moved__body">
+          <span class="backfill-moved__title">${esc(entry.title || '')}</span>
+          <span class="backfill-moved__meta">${esc(movedCandidateMeta(entry))}</span>
+          <span class="backfill-moved__change">${esc(t('settings.sync.backfillMovedChange', { from: entry.from_name ?? '', to: entry.to_name ?? '' }))}</span>
+        </span>
+      </label>`).join('');
+
+    openModal({
+      pointerDeadTime: true,
+      title: t('settings.sync.backfillTitle'),
+      size: 'md',
+      content: `
+        <form id="backfill-review-form" class="backfill-review" novalidate>
+          ${count > 0 ? `
+            <section class="backfill-review__part">
+              <h3 class="backfill-review__heading">${esc(t('settings.sync.backfillFillCount', { count }))}</h3>
+              <p class="modal-confirm__detail">${esc(t('settings.sync.backfillDetail'))}</p>
+            </section>` : ''}
+          <fieldset class="backfill-review__part backfill-moved" aria-describedby="backfill-moved-hint">
+            <legend class="backfill-review__heading">${esc(t('settings.sync.backfillMovedTitle'))}</legend>
+            <p class="modal-confirm__detail" id="backfill-moved-hint">${esc(t('settings.sync.backfillMovedHint'))}</p>
+            ${paged ? `
+              <p class="modal-confirm__detail backfill-moved__partial">${esc(t('settings.sync.backfillMovedPartial', { first: offset + 1, last: offset + moved.length, total }))}</p>` : ''}
+            ${moved.length > 1 ? `
+              <label class="form-check backfill-moved__all">
+                <input type="checkbox" id="backfill-moved-all" checked>
+                <span>${esc(t('settings.sync.backfillMovedAll'))}</span>
+              </label>` : ''}
+            <div class="backfill-moved__list">${rows}</div>
+          </fieldset>
+          <div class="modal-actions">
+            <button type="button" class="btn btn--secondary" id="backfill-review-cancel">${esc(t('common.cancel'))}</button>
+            ${next ? `<button type="button" class="btn btn--secondary" id="backfill-review-next">${esc(t('settings.sync.backfillMovedNext'))}</button>` : ''}
+            <button type="submit" class="btn btn--primary" id="backfill-review-ok">${esc(t('settings.sync.backfillConfirm'))}</button>
+          </div>
+        </form>`,
+      onClose: () => finish(null),
+      onSave(panel) {
+        const form = panel.querySelector('#backfill-review-form');
+        const all = panel.querySelector('#backfill-moved-all');
+        const ok = panel.querySelector('#backfill-review-ok');
+        const boxes = [...panel.querySelectorAll('.backfill-moved__list input[type="checkbox"]')];
+
+        // Ohne leere Termine und ohne Haken gäbe es nichts zu tun.
+        const sync = () => {
+          const checked = boxes.filter((b) => b.checked).length;
+          if (all) {
+            all.checked = checked === boxes.length;
+            all.indeterminate = checked > 0 && checked < boxes.length;
+          }
+          ok.disabled = count === 0 && checked === 0;
+        };
+        all?.addEventListener('change', () => {
+          for (const box of boxes) box.checked = all.checked;
+          sync();
+        });
+        panel.querySelector('.backfill-moved__list').addEventListener('change', sync);
+        panel.querySelector('#backfill-review-cancel').addEventListener('click', () => finish(null));
+        panel.querySelector('#backfill-review-next')?.addEventListener('click', () => finish({ action: 'next' }));
+        form.addEventListener('submit', (event) => {
+          event.preventDefault();
+          if (ok.disabled) return;
+          finish({
+            action: 'apply',
+            moves: boxes.filter((b) => b.checked).map((b) => {
+              const entry = moved[Number(b.dataset.index)];
+              return { event_id: entry.event_id, from_user_id: entry.from_user_id, to_user_id: entry.to_user_id };
+            }),
+          });
+        });
+        sync();
+      },
     });
   });
 }
