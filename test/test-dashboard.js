@@ -949,6 +949,31 @@ test('Heute-Blatt: ohne Gesundheitsrecht keine Dosen, abgeschaltetes Modul spric
   });
 });
 
+/* Review #1450: die Erinnerungs-Quelle hat keine eigene Kachel und lief deshalb
+ * am Widget-Riegel von sourceSpeaks() vorbei. Ein gesperrtes Gesundheits-Widget
+ * hielt die Dosen stumm, eine faellige Vorsorge-Erinnerung stand trotzdem
+ * mit ihrem Titel im Blatt; ebenso Abo (budget), Aufgabe und Termin. */
+test('Heute-Blatt: eine Erinnerung folgt dem Widget-Recht ihres Moduls', async () => {
+  const reminders = [
+    { id: 1, entity_type: 'health_prevention_due', entity_id: 7, entity_title: 'Darmkrebs-Vorsorge' },
+    { id: 2, entity_type: 'subscription', entity_id: 8, entity_title: 'Streaming-Abo' },
+    { id: 3, entity_type: 'task', entity_id: 9, entity_title: 'Steuer abgeben' },
+    { id: 4, entity_type: 'event', entity_id: 10, entity_title: 'Zahnarzt' },
+    { id: 5, entity_type: 'document_expiry', entity_id: 11, entity_title: 'Reisepass' },
+  ];
+  const titles = (model) => model.rows.filter((r) => r.kind === 'reminder').map((r) => r.title).sort();
+  await withSheetEnv({ perms: { admin: false } }, (__test) => {
+    const model = __test.buildTodayCockpitModel({ pendingReminders: reminders }, [], { now: todayAt(9) });
+    nodeAssert.deepEqual(titles(model), ['Darmkrebs-Vorsorge', 'Reisepass', 'Steuer abgeben', 'Streaming-Abo', 'Zahnarzt'],
+      'Vorbedingung: mit allen Rechten spricht jede Erinnerung');
+  });
+  await withSheetEnv({ perms: { admin: false, widgets: { health: 'none', budget: 'none', tasks: 'none', calendar: 'none' } } }, (__test) => {
+    const model = __test.buildTodayCockpitModel({ pendingReminders: reminders }, [], { now: todayAt(9) });
+    nodeAssert.deepEqual(titles(model), ['Reisepass'],
+      'gesperrte Widgets heissen: keine Erinnerung aus ihrem Modul; ohne eigene Kachel (Dokumente) bleibt nur das Modulrecht');
+  });
+});
+
 test('Heute-Blatt: unter dem Deckel bleibt, was offen ist', () => withSheetEnv({}, (__test) => {
   const today = toLocalDateKey(new Date());
   const events = Array.from({ length: 7 }, (_, i) => ({

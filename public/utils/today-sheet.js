@@ -62,16 +62,18 @@ const WASTE_PUT_OUT_SORT = '18:00';
  * haben hier eine eigene Quelle (eine zweite Zeile waere ein Echo), Zyklus und
  * Fasten sind Stupser ihrer eigenen Kacheln, und der Vorrat spricht ueber seine
  * eigene Quelle (`pantry`). Was hier nicht steht, spricht weiter ueber Toast
- * und Glocke. `echo` nennt das Widget, das dasselbe Objekt schon zeigen wuerde.
+ * und Glocke. `echo` nennt das Widget, das dasselbe Objekt schon zeigen wuerde;
+ * `widget` das Widget, dessen Sperre die Erinnerung stumm schaltet (nur wo das
+ * Modul eine Kachel hat - sonst gilt allein das Modulrecht).
  */
 const REMINDER_SHEET_ORIGINS = {
-  task:                   { module: 'tasks',     tone: 'task',      icon: MODULE_ICON.tasks,     route: '/tasks',     kind: 'task',  echo: 'tasks' },
-  event:                  { module: 'calendar',  tone: 'event',     icon: MODULE_ICON.calendar,  route: '/calendar',  kind: 'event', echo: 'calendar' },
-  subscription:           { module: 'budget',    tone: 'budget',    icon: MODULE_ICON.budget,    route: '/budget' },
-  inventory_item:         { module: 'inventory', tone: 'inventory', icon: MODULE_ICON.inventory, route: '/inventory' },
-  inventory_tracked_date: { module: 'inventory', tone: 'inventory', icon: MODULE_ICON.inventory, route: '/inventory' },
-  document_expiry:        { module: 'documents', tone: 'documents', icon: MODULE_ICON.documents, route: '/documents' },
-  health_prevention_due:  { module: 'health',    tone: 'health',    icon: MODULE_ICON.health,    route: '/health' },
+  task:                   { module: 'tasks',     widget: 'tasks',    tone: 'task',      icon: MODULE_ICON.tasks,     route: '/tasks',     kind: 'task',  echo: 'tasks' },
+  event:                  { module: 'calendar',  widget: 'calendar', tone: 'event',     icon: MODULE_ICON.calendar,  route: '/calendar',  kind: 'event', echo: 'calendar' },
+  subscription:           { module: 'budget',    widget: 'budget',   tone: 'budget',    icon: MODULE_ICON.budget,    route: '/budget' },
+  inventory_item:         { module: 'inventory',                     tone: 'inventory', icon: MODULE_ICON.inventory, route: '/inventory' },
+  inventory_tracked_date: { module: 'inventory',                     tone: 'inventory', icon: MODULE_ICON.inventory, route: '/inventory' },
+  document_expiry:        { module: 'documents',                     tone: 'documents', icon: MODULE_ICON.documents, route: '/documents' },
+  health_prevention_due:  { module: 'health',    widget: 'health',   tone: 'health',    icon: MODULE_ICON.health,    route: '/health' },
 };
 
 function openDoseCount(health) {
@@ -302,6 +304,9 @@ export const TODAY_SHEET_SOURCES = [
       for (const reminder of list) {
         const origin = REMINDER_SHEET_ORIGINS[reminder.entity_type];
         if (!origin || ctx.moduleOff(origin.module)) continue;
+        // Die Quelle selbst hat kein Widget, ihre Herkunft schon: ein gesperrtes
+        // Gesundheits-Widget schweigt auch ueber die faellige Vorsorge (#467).
+        if (origin.widget && !ctx.canSeeWidget(origin.widget)) continue;
         if (origin.echo && ctx.widgetShown(origin.echo)) continue;
         if (origin.kind && ctx.existing.some((row) => row.kind === origin.kind
           && String(row.objectId) === String(reminder.entity_id))) continue;
