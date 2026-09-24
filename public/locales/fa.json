@@ -297,6 +297,7 @@
         "widgetSizeTall": "بلند (1×2)",
         "widgetSizeStandard": "استاندارد (۲×۲)",
         "gridHoleHint": "یک جای خالی در شبکه مانده است - {{widget}} در اندازهٔ «{{size}}» آن را پر می‌کند.",
+        "gridHoleApply": "استفاده از این اندازه",
         "widgetSizeLarge": "بزرگ (۳×۲)",
         "widgetSizeFull": "کامل (۴×۲)",
         "noShoppingLists": "بدون فهرست خرید",

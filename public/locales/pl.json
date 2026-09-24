@@ -297,6 +297,7 @@
         "widgetSizeTall": "Wysoki (1×2)",
         "widgetSizeStandard": "Standardowy (2×2)",
         "gridHoleHint": "W siatce zostaje luka - {{widget}} w rozmiarze „{{size}}” ją wypełni.",
+        "gridHoleApply": "Użyj tego rozmiaru",
         "widgetSizeLarge": "Duży (3×2)",
         "widgetSizeFull": "Pełny (4×2)",
         "noShoppingLists": "Brak list zakupów",

@@ -285,6 +285,7 @@
         "widgetSizeTall": "Ψηλό (1×2)",
         "widgetSizeStandard": "Τυπικό (2×2)",
         "gridHoleHint": "Μένει ένα κενό στο πλέγμα - το {{widget}} σε μέγεθος «{{size}}» το γεμίζει.",
+        "gridHoleApply": "Χρήση αυτού του μεγέθους",
         "widgetSizeLarge": "Μεγάλο (3×2)",
         "widgetSizeFull": "Πλήρες (4×2)",
         "noShoppingLists": "Δεν υπάρχουν λίστες αγορών",

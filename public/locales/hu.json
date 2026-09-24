@@ -285,6 +285,7 @@
         "widgetSizeTall": "Magas (1×2)",
         "widgetSizeStandard": "Normál (2×2)",
         "gridHoleHint": "Egy rés marad a rácsban - a(z) {{widget}} „{{size}}” méretben kitölti.",
+        "gridHoleApply": "Ez a méret legyen",
         "widgetSizeLarge": "Nagy (3×2)",
         "widgetSizeFull": "Teljes (4×2)",
         "noShoppingLists": "Nincsenek bevásárlólisták",

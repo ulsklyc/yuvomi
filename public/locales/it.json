@@ -285,6 +285,7 @@
         "widgetSizeTall": "Alto (1×2)",
         "widgetSizeStandard": "Standard (2×2)",
         "gridHoleHint": "Nella griglia resta un vuoto - {{widget}} in formato «{{size}}» lo riempie.",
+        "gridHoleApply": "Usa questa dimensione",
         "widgetSizeLarge": "Grande (3×2)",
         "widgetSizeFull": "Pieno (4×2)",
         "noShoppingLists": "Nessuna lista della spesa",

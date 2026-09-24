@@ -285,6 +285,7 @@
         "widgetSizeTall": "Высокий (1×2)",
         "widgetSizeStandard": "Стандартный (2×2)",
         "gridHoleHint": "В сетке остаётся пустое место - {{widget}} в размере «{{size}}» его заполнит.",
+        "gridHoleApply": "Использовать этот размер",
         "widgetSizeLarge": "Большой (3×2)",
         "widgetSizeFull": "Полный (4×2)",
         "noShoppingLists": "Нет списков покупок",

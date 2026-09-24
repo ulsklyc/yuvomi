@@ -285,6 +285,7 @@
         "widgetSizeTall": "Vysoký (1×2)",
         "widgetSizeStandard": "Standardní (2×2)",
         "gridHoleHint": "V mřížce zůstává mezera - {{widget}} ve velikosti „{{size}}“ ji zaplní.",
+        "gridHoleApply": "Použít tuto velikost",
         "widgetSizeLarge": "Velký (3×2)",
         "widgetSizeFull": "Plná šířka (4×2)",
         "noShoppingLists": "Žádné nákupní seznamy",

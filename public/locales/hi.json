@@ -285,6 +285,7 @@
         "widgetSizeTall": "लंबा (1×2)",
         "widgetSizeStandard": "मानक (2×2)",
         "gridHoleHint": "ग्रिड में एक खाली जगह बची है - {{widget}} को “{{size}}” आकार में रखने से वह भर जाएगी।",
+        "gridHoleApply": "यह आकार इस्तेमाल करें",
         "widgetSizeLarge": "बड़ा (3×2)",
         "widgetSizeFull": "पूर्ण (4×2)",
         "noShoppingLists": "कोई खरीदारी सूची नहीं",

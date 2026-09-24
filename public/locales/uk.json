@@ -285,6 +285,7 @@
         "widgetSizeTall": "Високий (1×2)",
         "widgetSizeStandard": "Стандартний (2×2)",
         "gridHoleHint": "У сітці лишається порожнє місце - {{widget}} у розмірі «{{size}}» його заповнить.",
+        "gridHoleApply": "Використати цей розмір",
         "widgetSizeLarge": "Великий (3×2)",
         "widgetSizeFull": "Повний (4×2)",
         "noShoppingLists": "Немає списків покупок",

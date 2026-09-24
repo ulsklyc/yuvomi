@@ -362,3 +362,12 @@ test('Familienkarte: wer heute nur einen gemeinsamen Termin hat, ist nicht "frei
     assert.equal(rowStatus(html, 'Linda'), 'dashboard.todayFree');
   });
 });
+
+test('Raster-Hinweis: der Knopf sagt, was er tut - die Groesse uebernehmen, nicht "Hinzufuegen"', () => {
+  // `common.apply` heisst ausserhalb von de "Add"/"Ajouter"/"Añadir" (Rezepte, Einkauf, Aufgaben);
+  // der Knopf aendert aber die Groesse einer vorhandenen Kachel.
+  const html = __test.renderGridHint({ id: 'budget', size: 'wide' });
+  const label = html.match(/data-grid-hint-apply[^>]*>([^<]*)</)?.[1];
+  assert.ok(label, 'Reichweite: der Knopf wird gerendert');
+  assert.equal(label, 'dashboard.gridHoleApply');
+});

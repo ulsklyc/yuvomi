@@ -297,6 +297,7 @@
         "widgetSizeTall": "Hoch (1×2)",
         "widgetSizeStandard": "Standard (2×2)",
         "gridHoleHint": "Im Raster bleibt eine Lücke - {{widget}} in der Größe „{{size}}“ schließt sie.",
+        "gridHoleApply": "Größe übernehmen",
         "widgetSizeLarge": "Groß (3×2)",
         "widgetSizeFull": "Voll (4×2)",
         "noShoppingLists": "Keine Einkaufslisten",

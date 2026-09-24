@@ -285,6 +285,7 @@
         "widgetSizeTall": "高 (1×2)",
         "widgetSizeStandard": "标准 (2×2)",
         "gridHoleHint": "网格中还留有空位 - 将{{widget}}设为“{{size}}”即可填满。",
+        "gridHoleApply": "使用此尺寸",
         "widgetSizeLarge": "大 (3×2)",
         "widgetSizeFull": "全宽 (4×2)",
         "noShoppingLists": "暂无购物清单",

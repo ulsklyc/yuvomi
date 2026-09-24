@@ -297,6 +297,7 @@
         "widgetSizeTall": "Tinggi (1×2)",
         "widgetSizeStandard": "Standar (2×2)",
         "gridHoleHint": "Masih ada celah di kisi - {{widget}} dengan ukuran “{{size}}” akan mengisinya.",
+        "gridHoleApply": "Gunakan ukuran ini",
         "widgetSizeLarge": "Besar (3×2)",
         "widgetSizeFull": "Penuh (4×2)",
         "noShoppingLists": "Tidak ada daftar belanja",

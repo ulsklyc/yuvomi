@@ -285,6 +285,7 @@
         "widgetSizeTall": "縦長 (1×2)",
         "widgetSizeStandard": "標準 (2×2)",
         "gridHoleHint": "グリッドに空きがあります - {{widget}}を「{{size}}」にすると埋まります。",
+        "gridHoleApply": "このサイズにする",
         "widgetSizeLarge": "大 (3×2)",
         "widgetSizeFull": "全幅 (4×2)",
         "noShoppingLists": "買い物リストがありません",

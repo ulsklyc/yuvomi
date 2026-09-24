@@ -285,6 +285,7 @@
         "widgetSizeTall": "Tall (1×2)",
         "widgetSizeStandard": "Standard (2×2)",
         "gridHoleHint": "A gap remains in the grid - {{widget}} at size “{{size}}” fills it.",
+        "gridHoleApply": "Use this size",
         "widgetSizeLarge": "Large (3×2)",
         "widgetSizeFull": "Full (4×2)",
         "noShoppingLists": "No shopping lists",

@@ -285,6 +285,7 @@
         "widgetSizeTall": "Hög (1×2)",
         "widgetSizeStandard": "Standard (2×2)",
         "gridHoleHint": "Det finns en lucka kvar i rutnätet - {{widget}} i storleken ”{{size}}” fyller den.",
+        "gridHoleApply": "Använd den här storleken",
         "widgetSizeLarge": "Stor (3×2)",
         "widgetSizeFull": "Hel (4×2)",
         "noShoppingLists": "Inga inköpslistor",

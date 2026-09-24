@@ -297,6 +297,7 @@
         "widgetSizeTall": "Mataas (1×2)",
         "widgetSizeStandard": "Karaniwan (2×2)",
         "gridHoleHint": "May natitirang puwang sa grid - pupunuin ito ng {{widget}} sa laking “{{size}}”.",
+        "gridHoleApply": "Gamitin ang laking ito",
         "widgetSizeLarge": "Malaki (3×2)",
         "widgetSizeFull": "Buo (4×2)",
         "noShoppingLists": "Walang listahan ng pamimili",

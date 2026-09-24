@@ -297,6 +297,7 @@
         "widgetSizeTall": "세로형 (1×2)",
         "widgetSizeStandard": "표준 (2×2)",
         "gridHoleHint": "그리드에 빈칸이 남아 있습니다 - {{widget}}을(를) ‘{{size}}’ 크기로 바꾸면 채워집니다.",
+        "gridHoleApply": "이 크기 사용",
         "widgetSizeLarge": "크게 (3×2)",
         "widgetSizeFull": "전체 (4×2)",
         "noShoppingLists": "장보기 목록 없음",

@@ -285,6 +285,7 @@
         "widgetSizeTall": "Alto (1×2)",
         "widgetSizeStandard": "Padrão (2×2)",
         "gridHoleHint": "Fica um espaço vazio na grade - {{widget}} no tamanho “{{size}}” o preenche.",
+        "gridHoleApply": "Usar este tamanho",
         "widgetSizeLarge": "Grande (3×2)",
         "widgetSizeFull": "Completo (4×2)",
         "noShoppingLists": "Nenhuma lista de compras",

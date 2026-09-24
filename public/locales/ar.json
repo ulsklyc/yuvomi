@@ -285,6 +285,7 @@
         "widgetSizeTall": "طويل (1×2)",
         "widgetSizeStandard": "قياسي (2×2)",
         "gridHoleHint": "تبقى فجوة في الشبكة - {{widget}} بحجم «{{size}}» يملؤها.",
+        "gridHoleApply": "استخدام هذا الحجم",
         "widgetSizeLarge": "كبير (3×2)",
         "widgetSizeFull": "كامل (4×2)",
         "noShoppingLists": "لا توجد قوائم تسوق",

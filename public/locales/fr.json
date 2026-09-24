@@ -285,6 +285,7 @@
         "widgetSizeTall": "Haut (1×2)",
         "widgetSizeStandard": "Standard (2×2)",
         "gridHoleHint": "Il reste un trou dans la grille - {{widget}} en taille « {{size}} » le comble.",
+        "gridHoleApply": "Utiliser cette taille",
         "widgetSizeLarge": "Grand (3×2)",
         "widgetSizeFull": "Plein (4×2)",
         "noShoppingLists": "Aucune liste de courses",

@@ -285,6 +285,7 @@
         "widgetSizeTall": "Hoog (1×2)",
         "widgetSizeStandard": "Standaard (2×2)",
         "gridHoleHint": "Er blijft een gat in het raster - {{widget}} in formaat ‘{{size}}’ vult het.",
+        "gridHoleApply": "Deze grootte gebruiken",
         "widgetSizeLarge": "Groot (3×2)",
         "widgetSizeFull": "Volledig (4×2)",
         "noShoppingLists": "Geen boodschappenlijsten",
