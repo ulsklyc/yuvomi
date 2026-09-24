@@ -545,18 +545,13 @@
 .rw-switch input { accent-color: var(--color-accent); width: 18px; height: 18px; }
 .rw-switch--compact { margin-left: auto; }
 
-/* Kleine Button-Variante (global additiv, für dichte Aktionsreihen) */
-.btn--sm {
-  min-height: var(--target-sm);
-  padding: var(--space-1) var(--space-3);
-  font-size: var(--text-sm);
-  gap: var(--space-1);
-}
-.btn--sm i { width: 15px; height: 15px; }
+/* `.btn--sm` STEHT IN layout.css (2026-09-24), samt seiner Touch-Hoehe.
+ * Hier lebte die Variante als „global additiv", aber der Router laedt dieses
+ * Blatt nur auf /rewards - in Einstellungen, Aufgaben, Gesundheit, Kalender
+ * und rund zwanzig weiteren Stellen war der kleine Knopf ein normaler. */
 
 /* Touch-Geräte: dichte Aktionsreihen brauchen 44-pt-Trefferflächen. */
 @media (pointer: coarse) {
-  .btn--sm,
   .rw-setup-step__go { min-height: var(--target-base); }
   .rw-pending__actions { gap: var(--space-3); }
 }
@@ -572,7 +567,6 @@
   .rewards-content__inner { gap: var(--space-6); padding-top: var(--space-4); }
   .rw-reward-grid { grid-template-columns: 1fr; }
   /* Schmaler Viewport ⇒ mit hoher Wahrscheinlichkeit Touch: 44-pt-Ziele. */
-  .btn--sm,
   .rw-setup-step__go { min-height: var(--target-base); }
   /* Nur die Spaltenzahl: der Abstand ist seit dem Umzug auf `.list-row`
    * derselbe Wert wie dort, und ihn hier zu wiederholen wäre ein Nachbau. */

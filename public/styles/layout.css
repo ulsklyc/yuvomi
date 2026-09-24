@@ -5074,6 +5074,39 @@ p.field-hint--warn[hidden] {
   border-color: transparent;
 }
 
+/* DER KLEINE KNOPF fuer dichte Aktionsreihen (Kartenfuss, Zeilenaktion,
+ * Hinzufuegen unter einer Liste). Er stand bis 2026-09-24 in rewards.css,
+ * und das laedt der Router nur auf /rewards: an rund hundert Stellen in
+ * Einstellungen, Aufgaben, Gesundheit, Inventar, Dokumenten und Kalender
+ * trug `btn--sm` nichts, und der Knopf war ein normaler - derselbe Fehler wie
+ * `.form-hint` in settings.css (test-frontend-audit: „global geladen").
+ *
+ * KLEIN HEISST SCHMALER, NICHT UNTER DIE ZIELGROESSE. In rewards.css stand
+ * `min-height: var(--target-sm)` (32px) - ein Token, das tokens.css selbst
+ * „kein Touch-Target" nennt. Solange die Regel nur auf /rewards galt, fiel
+ * das nicht auf; global haette sie die Einnehmen-Knoepfe der Gesundheit, die
+ * in schmalen Karten nur ihr Symbol zeigen, auf 36x32px gedrueckt - ein
+ * freistehendes Ziel unter den 40px am Zeiger (Zielgroessen-Regel). Der
+ * kleine Knopf spart deshalb Polsterung, Luecke und die 48px, die `.btn`
+ * unter 1024px nach der BREITE traegt; die Hoehe haelt die Zielgroesse der
+ * Geraetewelt (`--target-md` am Zeiger, `--target-base` am Finger).
+ *
+ * VOR `.btn--icon`, nicht dahinter: `btn--icon btn--sm` steht an einem
+ * Dutzend Stellen, und der Icon-Knopf behaelt dort seine quadratische
+ * 44px-Flaeche - der kleine Knopf verdichtet Text, kein Symbol. */
+.btn--sm {
+  min-height: var(--target-md);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  gap: var(--space-1);
+}
+
+@media (pointer: coarse), (max-width: 639px) {
+  .btn--sm {
+    min-height: var(--target-base);
+  }
+}
+
 .btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;

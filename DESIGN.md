@@ -1207,6 +1207,14 @@ blind nach innen kopieren.
   lokale Ueberschreibungen blieben wirkungslos. `--focus-ring-offset-inset` (-2px) ist nur
   fuer Elemente an einer geclippten Kante da.
 
+- **Klein (`.btn--sm`):** fuer dichte Aktionsreihen - Polsterung 4px 12px, Luecke 4px, die
+  Hoehe bleibt die Zielgroesse der Geraetewelt (`--target-md` am Zeiger, `--target-base` am
+  Finger). Klein heisst schmaler, nicht unter die Zielgroesse. Steht seit 2026-09-24 in
+  `layout.css`; vorher in rewards.css, und damit trug die Klasse an rund hundert Stellen
+  ausserhalb von /rewards nichts. Mit `.btn--icon` kombiniert behaelt der Icon-Knopf seine
+  quadratische Flaeche (die Regel steht davor). Guard: „.btn--sm steht in einem global
+  geladenen Blatt" und „haelt die Zielgroesse der Geraetewelt" (test-frontend-audit).
+
 **Die Eine-Buttonform-Regel.** Es gibt genau eine Buttonform, und sie steht genau an einer
 Stelle. Der Guard `one button shape app-wide` prueft die Kapsel in der `.btn`-Basisregel und
 verbietet JEDER weiteren Regel mit einer `.btn`-Variante im Selektor, einen border-radius zu

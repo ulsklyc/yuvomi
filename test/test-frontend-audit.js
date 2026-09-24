@@ -10726,41 +10726,68 @@ test('settings.css haelt Zeilenlaenge, Token-Disziplin und keine toten Regeln', 
 });
 
 /*
- * `.form-hint` STEHT IN EINEM BLATT, DAS JEDE ROUTE LAEDT (Critique 2026-09-24).
+ * GETEILTE KLASSEN STEHEN IN EINEM BLATT, DAS JEDE ROUTE LAEDT (Critique 2026-09-24).
  *
- * Die Regel lebte in settings.css. Der Router laedt pro Route genau EIN
- * Seiten-Blatt, und die Klasse steht in fast jedem Modul: ausserhalb der
- * Einstellungen fiel jede Hinweiszeile auf den Koerpertext zurueck (16px,
- * volle Primaertinte), im Termin-Dialog an sieben Stellen. Kalender, Budget,
- * Kontakte, Dokumente und die Fasten-Bausteine trugen dafuer Kopien oder
- * Ersatzklassen.
+ * `.form-hint` lebte in settings.css, `.btn--sm` in rewards.css. Der Router
+ * laedt pro Route genau EIN Seiten-Blatt, und beide Klassen stehen in fast
+ * jedem Modul: ausserhalb ihrer Heimatroute fiel jede Hinweiszeile auf den
+ * Koerpertext zurueck (16px, volle Primaertinte; im Termin-Dialog an sieben
+ * Stellen), und jeder kleine Knopf war ein normaler (rund hundert Stellen).
+ * Kalender, Budget, Kontakte, Dokumente und die Fasten-Bausteine trugen fuer
+ * den Hinweis Kopien oder Ersatzklassen.
  *
- * Zwei Fragen: Steht die Basisregel genau einmal, und zwar in einem Blatt, das
- * index.html verlinkt? Und traegt kein anderes Blatt eine Kopie davon - eine
- * Regel, deren letztes Glied `.form-hint` ist und die Groesse oder Farbe setzt?
- * Die Zeilenlaenge der Einstellungen (`.settings-page .form-hint`) setzt
- * keines von beiden und bleibt erlaubt.
+ * Zwei Fragen je Klasse: Steht die Basisregel genau einmal, und zwar in einem
+ * Blatt, das index.html verlinkt? Und traegt kein anderes Blatt eine Kopie
+ * davon - eine Regel, deren letztes Glied die Klasse ist und die eine ihrer
+ * tragenden Eigenschaften setzt? Eine Anpassung im Kontext, die keine davon
+ * setzt (`.settings-page .form-hint { max-width }`, `.caldav-account-actions
+ * .btn--sm:first-child { flex }`), bleibt erlaubt.
  */
-test('.form-hint steht in einem global geladenen Blatt, und kein Modul traegt eine Kopie', () => {
-  const html = withoutHtmlComments(read('../public/index.html'));
-  const globals = new Set([...html.matchAll(/<link rel="stylesheet" href="\/styles\/([\w-]+\.css)"/g)].map((m) => m[1]));
-  assert.ok(globals.has('layout.css'), 'index.html nennt layout.css nicht mehr - die globalen Blaetter sind nicht mehr lesbar');
-  const homes = [];
-  const copies = [];
-  for (const { file, css } of stylesheetFiles()) {
-    for (const { selector, body, at } of eachRule(css)) {
-      for (const sel of selector.split(',').map((x) => x.trim())) {
-        if (sel === '.form-hint' && at.length === 0) homes.push(file);
-        else if (/(?:^|[\s>+~])\.form-hint$/.test(sel) && /(?:^|[;{\s])(?:font-size|color)\s*:/.test(body)) {
-          copies.push(`${file}: ${sel}`);
+const SHARED_CLASSES = [
+  { cls: 'form-hint', props: ['font-size', 'color'] },
+  { cls: 'btn--sm', props: ['min-height', 'padding', 'font-size'] },
+];
+
+for (const { cls, props } of SHARED_CLASSES) {
+  test(`.${cls} steht in einem global geladenen Blatt, und kein Modul traegt eine Kopie`, () => {
+    const html = withoutHtmlComments(read('../public/index.html'));
+    const globals = new Set([...html.matchAll(/<link rel="stylesheet" href="\/styles\/([\w-]+\.css)"/g)].map((m) => m[1]));
+    assert.ok(globals.has('layout.css'), 'index.html nennt layout.css nicht mehr - die globalen Blaetter sind nicht mehr lesbar');
+    const own = new RegExp(`(?:^|[\\s>+~])\\.${cls}$`);
+    const sets = new RegExp(`(?:^|[;{\\s])(?:${props.join('|')})\\s*:`);
+    const homes = [];
+    const copies = [];
+    for (const { file, css } of stylesheetFiles()) {
+      for (const { selector, body, at } of eachRule(css)) {
+        for (const sel of selector.split(',').map((x) => x.trim())) {
+          if (sel === `.${cls}` && at.length === 0) homes.push(file);
+          else if (sel !== `.${cls}` && own.test(sel) && sets.test(body)) copies.push(`${file}: ${sel}`);
+          else if (sel === `.${cls}` && !globals.has(file)) copies.push(`${file}: ${sel} (in ${at.join(' ')})`);
         }
       }
     }
+    assert.equal(homes.length, 1, `die Basisregel .${cls} steht ${homes.length}x: ${homes.join(', ')}`);
+    assert.ok(globals.has(homes[0]),
+      `.${cls} steht in ${homes[0]} - das laedt der Router nur auf seiner Route, ueberall sonst traegt die Klasse nichts`);
+    assert.deepEqual(copies, [], `eine Kopie von .${cls} in einem Seiten-Blatt - die Regel ist global, die Kopie verdeckt, wenn sie fehlt`);
+  });
+}
+
+// KLEIN HEISST SCHMALER, NICHT UNTER DIE ZIELGROESSE (2026-09-24). Der kleine
+// Knopf stand in rewards.css auf `--target-sm` (32px, laut tokens.css „kein
+// Touch-Target"); global haette das die Einnehmen-Knoepfe der Gesundheit, die
+// in schmalen Karten nur ihr Symbol zeigen, auf 36x32px gedrueckt.
+test('.btn--sm haelt die Zielgroesse der Geraetewelt, auch am Zeiger', () => {
+  const css = read('../public/styles/layout.css');
+  const rules = [...eachRule(css)].filter((r) => r.selector.split(',').map((x) => x.trim()).includes('.btn--sm'));
+  const base = rules.find((r) => r.at.length === 0);
+  assert.ok(base, '.btn--sm hat keine Basisregel in layout.css');
+  assert.match(base.body, /min-height:\s*var\(--target-md\)/, 'am Zeiger unter 40px - ein freistehender kleiner Knopf faellt unter die Zielgroessen-Regel');
+  for (const r of rules) {
+    assert.doesNotMatch(r.body, /--target-sm/, `.btn--sm liest --target-sm (${r.at.join(' ') || 'Basis'}) - das Token ist keine Zielgroesse`);
   }
-  assert.equal(homes.length, 1, `die Basisregel .form-hint steht ${homes.length}x: ${homes.join(', ')}`);
-  assert.ok(globals.has(homes[0]),
-    `.form-hint steht in ${homes[0]} - das laedt der Router nur auf seiner Route, ueberall sonst rendert der Hinweis als Koerpertext`);
-  assert.deepEqual(copies, [], 'eine Kopie von .form-hint in einem Seiten-Blatt - die Regel ist global, die Kopie verdeckt, wenn sie fehlt');
+  const touch = rules.find((r) => r.at.some((a) => /pointer:\s*coarse/.test(a)));
+  assert.ok(touch && /min-height:\s*var\(--target-base\)/.test(touch.body), 'am Finger fehlt --target-base');
 });
 
 // Avatare tragen die Farbe, die sich das Mitglied selbst aussucht; die
