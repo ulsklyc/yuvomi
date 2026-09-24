@@ -816,7 +816,7 @@
         "viewDay": "Tag",
         "viewAgenda": "Agenda",
         "allDay": "Ganztägig",
-        "allDayShort": "ganztg.",
+        "allDayShort": "ganz­tägig",
         "moreEvents": "+{{count}} weitere",
         "monthDayEntries": "{{count}} Einträge",
         "monthDayEntries_one": "{{count}} Eintrag",

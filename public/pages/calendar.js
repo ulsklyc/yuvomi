@@ -574,7 +574,7 @@ function openIconPickerDialog(selectedIcon, onSelect, onClose = () => {}) {
  * Gibt eine einzelne CSS-Füllfarbe zurück (nie ein Gradient).
  * Eine Farbachse: 1. eigene Terminfarbe, 2. erster Assignee, 3. Kalenderfarbe, 4. Grau.
  * Mehrere Zugewiesene werden über den Avatar-Stack kommuniziert, nicht über eine
- * diagonal geteilte Füllung — die wirkte wie ein Render-Artefakt und blieb bei der
+ * diagonal geteilte Füllung - die wirkte wie ein Render-Artefakt und blieb bei der
  * zweiten Farbe ungeprüft im Kontrast.
  */
 function resolveEventBackground(ev) {
@@ -606,7 +606,7 @@ function chipAssigneeStack(ev, { size, maxVisible }) {
 /**
  * Textalternative der Zuweisung, z. B. „Zugewiesen an: Linda, Marco". Trägt die
  * „Wer"-Information, die der Avatar-Stack nur visuell kommuniziert, in title-/
- * aria-label-Attribute — damit Screenreader sie im Gitter mitbekommen.
+ * aria-label-Attribute - damit Screenreader sie im Gitter mitbekommen.
  * Leerstring, wenn niemand zugewiesen ist.
  */
 function chipAssigneeLabel(ev) {
@@ -805,7 +805,7 @@ function addDays(dateStr, n) {
 }
 
 // Erster Tag der Woche, die `dateStr` enthält, gemäß haushaltweitem Wochenstart
-// (state.weekStart als getDay()-Index). Standard Montag – wie zuvor getMondayOf.
+// (state.weekStart als getDay()-Index). Standard Montag - wie zuvor getMondayOf.
 function startOfWeekOf(dateStr, weekStart = state.weekStart) {
   const d = new Date(dateStr + 'T00:00:00');
   const diff = (d.getDay() - weekStart + 7) % 7;
@@ -864,12 +864,15 @@ function eventIconName(icon) {
  *
  * 'calendar' ist der Datenbank-Default der Spalte und zugleich der Rueckfall
  * von eventIconName() fuer alles Unbekannte: ein Termin, an dem nie jemand ein
- * Icon gewaehlt hat, traegt es trotzdem. Im Monat und in der Woche stoert das
- * nicht, dort steht der Chip in einem Raster voller Fremdherkunft. Im
- * Tagesraster waere es ein generisches Kalender-Glyph an jeder Zeile INNERHALB
- * des Kalenders - es sagt nichts (Herkunfts-Regel: im eigenen Raum ist die
- * Herkunft selbstverstaendlich) und kostet die Titelspalte 20px, die bei 16px
- * hohen Balken fehlen. Die Zugehoerigkeit traegt dort der Spine.
+ * Icon gewaehlt hat, traegt es trotzdem. Ein generisches Kalender-Glyph an
+ * jedem Termin INNERHALB des Kalenders sagt nichts (Herkunfts-Regel: im
+ * eigenen Raum ist die Herkunft selbstverstaendlich) und kostet den Titel
+ * Platz. Die Zugehoerigkeit traegt die Farbkante.
+ *
+ * DIE REGEL GILT IN JEDER ANSICHT (Critique 2026-09-24, P2). Bis dahin fragte
+ * nur das Tagesraster; Woche, Ganztag und Agenda setzten das Standardglyph als
+ * Fuellsel, der Monat gar keins - vier Antworten auf eine Frage. Jetzt geht
+ * jeder Termin durch eventGlyphsHtml().
  */
 function hasEventIcon(icon) {
   return eventIconName(icon) !== 'calendar';
@@ -896,6 +899,22 @@ function calendarMetaIconHtml(icon) {
 function calendarRepeatIconHtml(event) {
   if (!event?.recurrence_rule && !event?.is_recurring_instance) return '';
   return `<span class="calendar-repeat-icon" role="img" aria-label="${esc(t('calendar.recurringEvent'))}"><i data-lucide="repeat" class="icon-sm" aria-hidden="true"></i></span>`;
+}
+
+/**
+ * Die Glyphen vor einem Termintitel, in JEDER Ansicht dieselben: das Icon nur,
+ * wenn jemand eines gewaehlt hat (hasEventIcon()), die Serienmarke immer bei
+ * einer Serie. Beide in der Tinte des Titels (calendar.css), nicht im Vollton
+ * der Terminfarbe - eine freie Nutzerfarbe als Vordergrund haelt keinen
+ * Kontrast zu (User-Farben-Regel), und die Farbe steht schon in der Kante.
+ * `compact` (12px) im Raster, 16px in der Listenzeile neben dem groesseren
+ * Titel.
+ */
+function eventGlyphsHtml(ev, { compact = true } = {}) {
+  const icon = hasEventIcon(ev.icon)
+    ? eventIconHtml(ev.icon, compact ? 'event-icon event-icon--compact' : 'event-icon')
+    : '';
+  return `${icon}${calendarRepeatIconHtml(ev)}`;
 }
 
 function eventIconElement(icon, className = 'event-icon') {
@@ -1424,7 +1443,7 @@ function isAllDayLike(ev) {
  * Einordnung eines Events für einen bestimmten Tag in der Agenda:
  *   'all-day' | 'single' | 'start' | 'middle' | 'end'.
  * Mehrtägige Events liefern je nach Tag start/middle/end, damit die Uhrzeit den
- * durchgehenden Zeitraum widerspiegelt statt auf jedem Tag start–end (#225).
+ * durchgehenden Zeitraum widerspiegelt statt auf jedem Tag start-end (#225).
  */
 function agendaSegmentKind(ev, dayStr) {
   if (ev.all_day || !ev.start_datetime.includes('T')) return 'all-day';
@@ -3113,15 +3132,17 @@ function renderMonthDay(date, inMonth, { selected = false, selWeek = false, spli
 
   const wasteHtml = dayWaste.map((occ) => renderWasteChip(occ, { className: 'month-day__holiday', icon: false })).join('');
 
-  // Monatsgrid-Kanon (Apple Kalender / Fantastical): flache getönte Bar mit nur
-  // dem Titel. Icon und Avatar-Stack leben in der Tages-/Detailansicht; die
-  // "Wer"-Information bleibt für Tooltip/Screenreader im title-Attribut erhalten.
+  // Monatsgrid-Kanon (Apple Kalender / Fantastical): flache getönte Bar mit dem
+  // Titel und denselben Glyphen wie jede andere Ansicht (eventGlyphsHtml). Der
+  // Avatar-Stack lebt in Woche, Tag und Liste; die "Wer"-Information bleibt für
+  // Tooltip/Screenreader im title-Attribut erhalten. Der Titel bleibt das
+  // LETZTE Kind (document-guards liest ihn als `span:last-child`).
   const evHtml = evShown.map((ev) => `
     <div class="month-day__event"
          data-id="${ev.id}"
          style="${eventSurfaceStyle(ev)}"
          title="${esc(ev.title)}${ev.cal_name ? ' · ' + esc(ev.cal_name) : ''}${chipAssigneeTitleSuffix(ev)}"
-    >${calendarRepeatIconHtml(ev)}<span>${esc(ev.title)}</span></div>
+    >${eventGlyphsHtml(ev)}<span>${esc(ev.title)}</span></div>
   `).join('');
 
   const taskHtml = taskShown.map((tk) => renderTaskChip(tk, { interactive: false, icon: false })).join('');
@@ -3280,11 +3301,14 @@ function scheduleIsFullDayShift(entry) {
   return Boolean(type?.start_time && type?.end_time && type.start_time === type.end_time);
 }
 
-function scheduleTimeLabel(type) {
+// Die Schichtspanne im Zeitformat des Kalenders (timeSpanText): vorher stand
+// sie als rohe 24-Stunden-Zeichenkette mit Gedankenstrich da, auch fuer wen
+// 12 Stunden eingestellt hat. `suffix: false` im Raster, wie bei Terminen.
+function scheduleTimeLabel(type, { suffix = true } = {}) {
   if (!type.start_time || !type.end_time) return "";
   const crossesDay = type.end_time <= type.start_time;
   const fullDay = type.end_time === type.start_time;
-  return type.start_time + "–" + type.end_time + (crossesDay ? " +1" : "") + (fullDay ? " · 24 h" : "");
+  return timeSpanText(type.start_time, type.end_time, { suffix }) + (crossesDay ? " +1" : "") + (fullDay ? " · 24 h" : "");
 }
 
 // Additiv zu Muster/Override, nie ein Ersatz (server/routes/schedule-extras.js)
@@ -3318,7 +3342,7 @@ function renderScheduleChip(entry, className = 'allday-holiday', { showFullRange
   const type = entry.shift_type;
   const label = scheduleEntryLabel(entry);
   const start = type.start_time
-    ? '<small class="schedule-entry__start">' + esc(showFullRange ? scheduleTimeLabel(type) : type.start_time) + '</small>'
+    ? '<small class="schedule-entry__start">' + esc(showFullRange ? scheduleTimeLabel(type, { suffix: false }) : formatTime(type.start_time)) + '</small>'
     : '';
   const detailAttrs = clickable
     ? ` role="button" tabindex="0" data-action="view-schedule-entry" data-schedule-key="${esc(scheduleEntryMatchKey(entry))}"`
@@ -3461,7 +3485,7 @@ function renderScheduleTimeBlock(entry, className, layout = null) {
   // Uhrzeit-Zeile mit, statt eine eigene zu brauchen, und wird selbst dort per
   // Ellipse gekuerzt statt spurlos unter der Blockkante zu verschwinden.
   const overlay = scheduleOverlayMeta(entry);
-  const time = esc(scheduleTimeLabel(type));
+  const time = esc(scheduleTimeLabel(type, { suffix: false }));
   const timeLine = overlay ? `${time} · ${esc(overlay)}` : time;
   // S-17: der Block selbst bleibt `pointer-events:none` (calendar.css) - die
   // Spalte darunter muss weiter fuer "neuen Termin anlegen" klickbar bleiben.
@@ -3504,7 +3528,7 @@ function monthDayAriaLabel(date, total, events = [], { tasks = [], others = [], 
 
 function renderWeekView(container) {
   const isMobile = window.matchMedia(MOBILE_MEDIA_QUERY).matches;
-  // Auf Mobile: 3-Tage-Fenster zentriert um state.cursor statt vollem Mo–So
+  // Auf Mobile: 3-Tage-Fenster zentriert um state.cursor statt vollem Mo-So
   const days = isMobile
     ? Array.from({ length: 3 }, (_, i) => addDays(state.cursor, i - 1))
     : (() => {
@@ -3554,14 +3578,7 @@ function renderWeekView(container) {
             `).join('')}
             ${scheduleChips[i].map((entry) => renderScheduleChip(entry, 'allday-holiday', { showFullRange: true, clickable: true })).join('')}
             ${waste[i].map((occ) => renderWasteChip(occ)).join('')}
-            ${alldayEvs[i].map((ev) => {
-              const timeText = allDayChipTimeText(ev, d);
-              return `
-              <div class="allday-event" data-id="${ev.id}"
-                   style="${eventSurfaceStyle(ev)}"${eventBlockAttrs(ev, timeText || t('calendar.allDay'))}
-                   title="${allDayChipTitle(ev, timeText)}">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}${calendarRepeatIconHtml(ev)}<span class="allday-event__label"><span>${esc(ev.title)}</span>${allDayChipTimeHtml(timeText)}</span>${chipAssigneeStack(ev, { size: 16, maxVisible: 3 })}</div>
-            `;
-            }).join('')}
+            ${alldayEvs[i].map((ev) => renderAllDayEvent(ev, d)).join('')}
             ${tasksOnDay(d).map(renderTaskChip).join('')}
           </div>
         `).join('')}
@@ -3711,15 +3728,61 @@ function scrollToHour(scroll, body) {
 }
 
 /**
+ * EIN ZEITFORMAT FUER DEN GANZEN KALENDER (Critique 2026-09-24, P2).
+ *
+ * Hier standen drei: im Raster ohne Leerzeichen mit Gedankenstrich, in der
+ * Agenda mit Gedankenstrich und „Uhr", in der Detailansicht „10:00 Uhr -
+ * 11:30 Uhr" - dieselbe Spanne in drei Schreibweisen, zwei davon mit dem
+ * Gedankenstrich, den die Projektregel nicht kennt (test-calendar.js prueft,
+ * dass er in dieser Datei nicht zurueckkommt). Jetzt gibt es eine: „17:00 - 18:30", der Trenner aus
+ * `calendar.dayRangeLabel` (derselbe Key wie der Zeitraum im Tageskopf), die
+ * Uhrzeiten aus formatTime() (12 Stunden, Ziffern und Trenner der Locale).
+ *
+ * Das Suffix („Uhr" im Deutschen, leer in den meisten Sprachen und im
+ * 12-Stunden-Format) steht EINMAL am Ende der Spanne, nicht an jeder Uhrzeit.
+ * `suffix: false` ist die Rasterfassung: im Zeitraster steht der Block an
+ * seiner Uhrzeit, und jedes Zeichen fehlt dem Titel daneben. Liste,
+ * Detailansicht, Schichtdetail und die gesprochenen Namen der Bloecke tragen
+ * es - ein Termin klingt in jeder Ansicht gleich.
+ */
+function withTimeSuffix(text) {
+  return `${text} ${timeSuffix()}`.trimEnd();
+}
+
+function clockText(value, { suffix = true } = {}) {
+  const time = formatTime(value);
+  return suffix ? withTimeSuffix(time) : time;
+}
+
+function timeSpanText(start, end, { suffix = true } = {}) {
+  if (!end) return clockText(start, { suffix });
+  const span = t('calendar.dayRangeLabel', { from: formatTime(start), to: formatTime(end) });
+  return suffix ? withTimeSuffix(span) : span;
+}
+
+/**
+ * Die Uhrzeit eines Termins fuer den Tag, auf dem er steht - in Raster
+ * (`suffix: false`) und Liste dieselbe Antwort.
+ *
+ * Dieselbe Frage, die die Agenda laengst stellte: agendaSegmentKind() sagt, ob
+ * dieser Tag der Anfang, das Ende oder der ganze Termin ist. 'start' bekommt
+ * `calendar.spanFrom` mit der START zeit, 'end' `calendar.spanUntil` mit der
+ * END zeit, alles andere den vollen Bereich. 'all-day' und 'middle' fragt die
+ * Liste vorher selbst ab (dort steht „Ganztaegig"); im Raster kommen sie nicht
+ * an (siehe gridTimeText()).
+ */
+function eventTimeText(ev, dayStr, { suffix = true } = {}) {
+  const kind = dayStr ? agendaSegmentKind(ev, dayStr) : 'single';
+  if (kind === 'start') return t('calendar.spanFrom',  { time: clockText(ev.start_datetime, { suffix }) });
+  if (kind === 'end')   return t('calendar.spanUntil', { time: clockText(ev.end_datetime, { suffix }) });
+  return timeSpanText(ev.start_datetime, ev.end_datetime, { suffix });
+}
+
+/**
  * Der Zeit-Text eines Blocks im Zeitraster - fuer den Tag, auf dem er steht.
+ * eventTimeText() in der Rasterfassung (ohne Suffix).
  *
- * Dieselbe Frage, die renderAgendaEvent() laengst beantwortet, und deshalb
- * dieselbe Antwort: agendaSegmentKind() sagt, ob dieser Tag der Anfang, das
- * Ende oder der ganze Termin ist. 'start' bekommt `calendar.spanFrom` mit der
- * START zeit, 'end' `calendar.spanUntil` mit der END zeit, alles andere den
- * vollen Bereich.
- *
- * Ohne das trug ein Nacht-Termin in BEIDEN Spalten "22:00-01:30", obwohl er in
+ * Ohne die Tagesfrage trug ein Nacht-Termin in BEIDEN Spalten "22:00-01:30", obwohl er in
  * der zweiten um Mitternacht beginnt und um 01:30 vorbei ist - der Text nannte
  * dort einen Abend, den dieser Tag nicht hat (#1313, aus dem PR-Review).
  * Raster und Agenda beantworten damit dieselbe Frage ueber denselben Tag
@@ -3731,10 +3794,7 @@ function scrollToHour(scroll, body) {
  * dasselbe, was ohne `dayStr` gilt.
  */
 function gridTimeText(ev, dayStr) {
-  const kind = dayStr ? agendaSegmentKind(ev, dayStr) : 'single';
-  if (kind === 'start') return t('calendar.spanFrom',  { time: formatTime(ev.start_datetime) });
-  if (kind === 'end')   return t('calendar.spanUntil', { time: formatTime(ev.end_datetime) });
-  return `${formatTime(ev.start_datetime)}${ev.end_datetime ? '–' + formatTime(ev.end_datetime) : ''}`;
+  return eventTimeText(ev, dayStr, { suffix: false });
 }
 
 /**
@@ -3757,9 +3817,9 @@ function gridTimeText(ev, dayStr) {
  * bekommen nichts. 'single' erreicht die Ganztags-Zeile nicht - was dort als
  * Zeit-Termin landet, beruehrt mehrere Kalendertage.
  */
-function allDayChipTimeText(ev, dayStr) {
+function allDayChipTimeText(ev, dayStr, { suffix = false } = {}) {
   const kind = agendaSegmentKind(ev, dayStr);
-  return (kind === 'start' || kind === 'end') ? gridTimeText(ev, dayStr) : '';
+  return (kind === 'start' || kind === 'end') ? eventTimeText(ev, dayStr, { suffix }) : '';
 }
 
 /**
@@ -3783,6 +3843,20 @@ function allDayChipTimeHtml(timeText) {
   return timeText ? `<small class="allday-event__time">${esc(timeText)}</small>` : '';
 }
 
+/**
+ * Ein Ganztags-Balken in Woche und Tag - EIN Baustein fuer beide Ansichten
+ * (vorher zwei zeichengleiche Kopien). Sichtbar steht die Rasterfassung der
+ * Uhrzeit, Tooltip und gesprochener Name tragen die Listenfassung.
+ */
+function renderAllDayEvent(ev, dayStr) {
+  const timeText = allDayChipTimeText(ev, dayStr);
+  const spoken = allDayChipTimeText(ev, dayStr, { suffix: true });
+  return `
+    <div class="allday-event" data-id="${ev.id}"
+         style="${eventSurfaceStyle(ev)}"${eventBlockAttrs(ev, spoken || t('calendar.allDay'))}
+         title="${allDayChipTitle(ev, spoken)}">${eventGlyphsHtml(ev)}<span class="allday-event__label"><span>${esc(ev.title)}</span>${allDayChipTimeHtml(timeText)}</span>${chipAssigneeStack(ev, { size: 16, maxVisible: 3 })}</div>`;
+}
+
 function renderWeekEvent(ev, layout = null, dayStr = null) {
   const { start, end } = timeRangeForEvent(ev, dayStr);
   const duration = Math.max(end - start, 30);
@@ -3790,13 +3864,15 @@ function renderWeekEvent(ev, layout = null, dayStr = null) {
   const top    = hourOffset(start);
   const height = `calc(${hourOffset(duration)} - 2px)`;
   const left = layout ? `calc(${(layout.colIndex / layout.totalCols) * 100}% + 2px)` : '2px';
-  const width = layout ? `calc(${100 / layout.totalCols}% - 4px)` : 'auto';
+  // Nie `auto`: der Block ist ein Groessen-Container (calendar.css, `container:
+  // ev-block / size`) und haette ohne feste Breite keine.
+  const width = layout ? `calc(${100 / layout.totalCols}% - 4px)` : 'calc(100% - 4px)';
 
   return `
     <div class="week-event" data-id="${ev.id}"
          style="top:${top};height:${height};left:${left};width:${width};${eventSurfaceStyle(ev)}"
-         title="${esc(ev.title)}${chipAssigneeTitleSuffix(ev)}"${eventBlockAttrs(ev, gridTimeText(ev, dayStr))}>
-      <div class="week-event__title">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}${calendarRepeatIconHtml(ev)}<span>${esc(ev.title)}</span>${chipAssigneeStack(ev, { size: 14, maxVisible: 2 })}</div>
+         title="${esc(ev.title)}${chipAssigneeTitleSuffix(ev)}"${eventBlockAttrs(ev, eventTimeText(ev, dayStr))}>
+      <div class="week-event__title">${eventGlyphsHtml(ev)}<span>${esc(ev.title)}</span>${chipAssigneeStack(ev, { size: 14, maxVisible: 2 })}</div>
       <div class="week-event__time">${gridTimeText(ev, dayStr)}</div>
     </div>
   `;
@@ -3991,13 +4067,7 @@ function renderDayView(container) {
           `).join('')}
           ${scheduleChips.map((entry) => renderScheduleChip(entry, 'allday-holiday', { showFullRange: true, clickable: true })).join('')}
           ${dayWaste.map((occ) => renderWasteChip(occ)).join('')}
-          ${allday.map((ev) => {
-            const timeText = allDayChipTimeText(ev, state.cursor);
-            return `
-            <div class="allday-event" data-id="${ev.id}"
-                 style="${eventSurfaceStyle(ev)}"${eventBlockAttrs(ev, timeText || t('calendar.allDay'))}
-                 title="${allDayChipTitle(ev, timeText)}">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}${calendarRepeatIconHtml(ev)}<span class="allday-event__label"><span>${esc(ev.title)}</span>${allDayChipTimeHtml(timeText)}</span>${chipAssigneeStack(ev, { size: 16, maxVisible: 3 })}</div>`;
-          }).join('')}
+          ${allday.map((ev) => renderAllDayEvent(ev, state.cursor)).join('')}
           ${tasksOnDay(state.cursor).map(renderTaskChip).join('')}
         </div>
       </div>` : ''}
@@ -4080,16 +4150,24 @@ function renderDayView(container) {
 }
 
 /**
- * Ein Termin im Tagesraster: flacher Tint-Balken mit Farbspine.
+ * Ein Termin im Tagesraster: derselbe Block wie in der Woche - Toenung,
+ * Vollton-Kante, Titel oben, Zeit darunter (DESIGN.md „Event-Bloecke").
  *
  * DIE GRAMMATIK GILT FUER JEDEN TERMIN ODER FUER KEINEN. Im Mockup trug genau
- * ein Event weder Spine noch Toenung (Screenshot 05) - hier kann das nicht
+ * ein Event weder Kante noch Toenung (Screenshot 05) - hier kann das nicht
  * passieren, weil beide aus derselben `--ev-color` fallen, die
  * `resolveEventColor()` immer beantwortet (Ebene, Kalender oder App-Akzent).
  *
- * Die Zeit-/Ortszeile erscheint erst ab einer Stunde Dauer: darunter bleibt im
- * 40px-Raster nur Platz fuer den Titel, und eine angeschnittene zweite Zeile
- * ist schlechter als keine.
+ * Hier stand bis 2026-09-24 eine eigene Kante als Element
+ * (ein eigenes Spine-Span) NEBEN der `border-inline-start`, die der Block
+ * inzwischen auch trug - zwei Farbstriche an einem Termin, und eine zweite
+ * Bauart derselben Aussage. Jetzt traegt ihn die Kante allein.
+ *
+ * Die Zeit-/Ortszeile steht immer im Markup; ob sie Platz hat, entscheidet
+ * die Hoehe des Blocks (Container-Query in calendar.css), nicht eine Dauer in
+ * Minuten - die Stunde ist im Tag 40px, in der Woche 56px hoch. Eine
+ * angeschnittene zweite Zeile ist schlechter als keine. Die Zugewiesenen
+ * erscheinen erst ab einer Stunde.
  */
 function renderDayEvent(ev, layout = null, dayStr = null) {
   const { start, end } = timeRangeForEvent(ev, dayStr);
@@ -4111,11 +4189,10 @@ function renderDayEvent(ev, layout = null, dayStr = null) {
   return `
     <div class="day-event${roomy ? '' : ' day-event--tight'}" data-id="${ev.id}"
          style="top:${top};height:${height};left:${left};width:${width};${eventSurfaceStyle(ev)}"
-         title="${esc(ev.title)}${ev.location ? ' · ' + esc(fmtLocation(ev.location)) : ''}${chipAssigneeTitleSuffix(ev)}"${eventBlockAttrs(ev, timeText)}>
-      <span class="day-event__spine" aria-hidden="true"></span>
+         title="${esc(ev.title)}${ev.location ? ' · ' + esc(fmtLocation(ev.location)) : ''}${chipAssigneeTitleSuffix(ev)}"${eventBlockAttrs(ev, eventTimeText(ev, dayStr))}>
       <span class="day-event__text">
-        <span class="day-event__title">${hasEventIcon(ev.icon) ? eventIconHtml(ev.icon, 'event-icon event-icon--compact') : ''}${calendarRepeatIconHtml(ev)}<span class="day-event__name">${esc(ev.title)}</span></span>
-        ${roomy ? `<span class="day-event__meta">${timeText}${place}</span>` : ''}
+        <span class="day-event__title">${eventGlyphsHtml(ev)}<span class="day-event__name">${esc(ev.title)}</span></span>
+        <span class="day-event__meta">${timeText}${place}</span>
       </span>
       ${roomy ? chipAssigneeStack(ev, { size: 20, maxVisible: 2 }) : ''}
     </div>
@@ -4857,7 +4934,7 @@ function renderCalendarSearchResults(body) {
     activateResult(evEl);
   });
 
-  // Auf den nächsten kommenden Treffer scrollen — Vergangenes bleibt darüber
+  // Auf den nächsten kommenden Treffer scrollen - Vergangenes bleibt darüber
   // erreichbar, aber der Blick startet beim relevantesten (heute/zukünftig).
   const upcoming = groups.find((g) => g.date >= state.today);
   if (upcoming) {
@@ -4992,45 +5069,38 @@ export const __test = {
   chronological,
   CAL_SHORTCUT_KEYS,
   periodArrowKeys,
+  // Eine Termingrammatik, ein Zeitformat (Critique 2026-09-24, Schritt 4).
+  timeSpanText,
+  eventTimeText,
+  eventGlyphsHtml,
+  hasEventIcon,
+  renderWeekEvent,
+  renderDayEvent,
+  renderAllDayEvent,
+  renderAgendaEvent,
+  scheduleTimeLabel,
 };
 
 function renderAgendaEvent(ev, dayStr) {
-  const kind = agendaSegmentKind(ev, dayStr ?? localDate(ev.start_datetime));
-  let timeStr;
-  switch (kind) {
-    case 'all-day':
-    case 'middle':
-      timeStr = t('calendar.allDay');
-      break;
-    case 'start':
-      timeStr = t('calendar.spanFrom', { time: formatTime(ev.start_datetime) });
-      break;
-    case 'end':
-      timeStr = t('calendar.spanUntil', { time: formatTime(ev.end_datetime) });
-      break;
-    default: // single
-      timeStr = formatTime(ev.start_datetime)
-        + (ev.end_datetime ? ` – ${formatTime(ev.end_datetime)} ${timeSuffix()}`.trimEnd() : ` ${timeSuffix()}`.trimEnd());
-  }
-
-  const displayBg     = resolveEventBackground(ev);
+  const day  = dayStr ?? localDate(ev.start_datetime);
+  const kind = agendaSegmentKind(ev, day);
+  const timeStr = (kind === 'all-day' || kind === 'middle') ? t('calendar.allDay') : eventTimeText(ev, day);
   const assignedUsers = ev.assigned_users ?? [];
   // `data-date` macht die Zeile eindeutig: ein Serientermin und ein mehrtaegiger
   // Termin stehen mit derselben id an mehreren Tagen. Ohne das Datum findet
   // `renderKeepingFocus()` nach dem Neuaufbau mehrere Kandidaten und weicht auf
   // die Seitenwurzel aus, statt auf der Zeile zu bleiben (#1083).
   return `
-    <div class="list-row agenda-event" data-id="${ev.id}" data-date="${esc(dayStr ?? localDate(ev.start_datetime))}" role="button" tabindex="0"
-         aria-label="${esc(agendaEventAriaLabel(ev, timeStr))}">
-      <div class="agenda-event__color" style="background:${esc(displayBg)};"></div>
+    <div class="list-row agenda-event" data-id="${ev.id}" data-date="${esc(day)}" role="button" tabindex="0"
+         style="${eventSurfaceStyle(ev)}" aria-label="${esc(agendaEventAriaLabel(ev, timeStr))}">
       <div class="agenda-event__body">
-        <div class="agenda-event__title">${eventIconHtml(ev.icon)}${calendarRepeatIconHtml(ev)}<span>${esc(ev.title)}</span></div>
+        <div class="agenda-event__title">${eventGlyphsHtml(ev, { compact: false })}<span>${esc(ev.title)}</span></div>
         <div class="agenda-event__meta">
           <span class="calendar-meta-item calendar-meta-item--time">${calendarMetaIconHtml('clock')}<span>${esc(timeStr)}</span></span>
           ${ev.location ? `<span class="calendar-meta-item calendar-meta-item--place">${calendarMetaIconHtml('map-pin')}<span>${esc(fmtLocation(ev.location))}</span></span>` : ''}
           ${ev.cal_name ? `<span class="calendar-meta-item calendar-meta-item--cal">${calendarMetaIconHtml('calendar-days')}<span>${esc(ev.cal_name)}</span></span>` : ''}
           ${eventVisibilityMeta(ev.visibility)}
-          ${assignedUsers.length ? `<span class="agenda-event__assigned">${renderAvatarStack(assignedUsers, { size: 20, maxVisible: 3 })}</span>` : ''}
+          ${assignedUsers.length ? `<span class="agenda-event__assigned">${renderAvatarStack(assignedUsers, { size: 22, maxVisible: 3, minFont: 12 })}</span>` : ''}
         </div>
       </div>
     </div>
@@ -5061,7 +5131,7 @@ function eventBlockAttrs(ev, timeText) {
 }
 
 // Sichtbarkeits-Indikator (#474): nur bei eingeschränkten Terminen ein dezentes
-// Icon mit Label — „Alle" bleibt icon-los.
+// Icon mit Label - „Alle" bleibt icon-los.
 function eventVisibilityMeta(visibility) {
   if (!visibility || visibility === 'all') return '';
   const icon  = visibility === 'private' ? 'lock' : 'users';
@@ -5169,17 +5239,22 @@ function eventWhenText(ev) {
       : startDate;
     return `${dates} · ${t('calendar.allDay')}`;
   }
-  const start = formatDateTime(ev.start_datetime);
-  if (!ev.end_datetime) return start;
+  if (!ev.end_datetime) return formatDateTime(ev.start_datetime);
+  const startDate = formatDate(localDate(ev.start_datetime));
+  // Ein Tag: das Datum einmal, dann die Spanne im EINEN Zeitformat des
+  // Kalenders (timeSpanText) - „24.09.2026 10:00 - 11:30 Uhr", nicht mehr
+  // „10:00 Uhr - 11:30 Uhr".
+  if (!multiDay) return `${startDate} ${timeSpanText(ev.start_datetime, ev.end_datetime)}`;
   // Das Ende ist der ZEITPUNKT, nicht der letzte Rastertag. Ein Termin vom 1.
   // 14:00 bis zum 3. 00:00 steht im Raster am 1. und 2., endet aber am 3. um
   // 00:00 - und genau das steht hier. Das Datum aus `eventEndDate` mit der
   // rohen Uhrzeit ergaebe "2. 00:00", einen Tag zu frueh; rastertreu waere nur
   // "2. 24:00", und das kann keine Locale formatieren (Review auf #1114).
-  const end = multiDay
-    ? formatDateTime(ev.end_datetime)
-    : `${formatTime(ev.end_datetime)} ${timeSuffix()}`.trimEnd();
-  return t('calendar.dayRangeLabel', { from: start, to: end });
+  // Das Suffix steht auch hier nur einmal, am Ende.
+  return withTimeSuffix(t('calendar.dayRangeLabel', {
+    from: `${startDate} ${formatTime(ev.start_datetime)}`,
+    to: `${formatDate(localDate(ev.end_datetime))} ${formatTime(ev.end_datetime)}`,
+  }));
 }
 
 /**
@@ -5307,7 +5382,7 @@ async function openEventDetail(ev, anchor = null) {
           window.yuvomi?.showToast(t('calendar.ics.resetToast'), 'success');
         } catch (err) {
           // Server-Meldung bevorzugen (nutzerorientiert), sonst lokalisierter
-          // Fallback — nie den rohen JS-/Netzwerk-Fehlertext zeigen.
+          // Fallback - nie den rohen JS-/Netzwerk-Fehlertext zeigen.
           window.yuvomi?.showToast(err.data?.error ?? t('calendar.saveError'), 'danger');
         }
       },
@@ -5370,7 +5445,7 @@ function reminderOwnerId(event) {
   return Number(event?.reminder_owner_id ?? event?.id);
 }
 
-// Obergrenze für mehrere Erinnerungen je Termin — muss mit dem Server-Cap
+// Obergrenze für mehrere Erinnerungen je Termin - muss mit dem Server-Cap
 // (MAX_REMINDERS_PER_ENTITY in server/routes/reminders.js) übereinstimmen.
 const MAX_CALENDAR_REMINDERS = 5;
 
@@ -6017,7 +6092,7 @@ function applyDefaultSyncTarget(selectElement) {
 // --------------------------------------------------------
 
 // Blendet einen Hinweis ein, wenn „Nur Zugewiesene" gewählt ist, aber niemand
-// zugewiesen wurde — dann sieht faktisch nur der Ersteller den Termin (#474 Guard).
+// zugewiesen wurde - dann sieht faktisch nur der Ersteller den Termin (#474 Guard).
 function wireVisibilityWarning(panel, selectSel, msName, warnSel) {
   const select = panel.querySelector(selectSel);
   const warn   = panel.querySelector(warnSel);
@@ -7113,7 +7188,7 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
   } catch (err) {
     // Server-Validierungsmeldung bevorzugen, sonst lokalisierter Fallback; der
     // rohe err.message-Text (Netzwerk/JS) wird nie gezeigt. Das Modal bleibt offen
-    // und der Button reaktiviert — die Eingaben des Nutzers bleiben erhalten.
+    // und der Button reaktiviert - die Eingaben des Nutzers bleiben erhalten.
     window.yuvomi?.showToast(calendarSaveErrorMessage(err), 'danger');
     saveBtn.disabled    = false;
     saveBtn.textContent = mode === 'edit' ? t('common.save') : t('common.create');

@@ -6,7 +6,7 @@
  */
 
 import { DatabaseSync } from 'node:sqlite';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 import { eachRule } from './css-rules.js';
 const { __test: calendarHelpers } = await import('../public/pages/calendar.js');
@@ -518,24 +518,71 @@ test('Wiederholungsmarke ist nur bei Serien sichtbar und für Screenreader benan
   );
 });
 
-test('Wiederholungsmarke steht vor dem Titel in allen Kalenderansichten mit ausgeschriebenem Titel', () => {
-  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
-  const regions = [
-    ['Monat', 'function renderMonthDay', 'function renderWeekView', 1],
-    ['Woche', 'function renderWeekView', 'function renderDayView', 2],
-    ['Tagesansicht', 'function renderDayView', 'function renderAgendaView', 2],
-    ['Agenda', 'function renderAgendaEvent', 'function applyDefaultSyncTarget', 1],
-  ];
+// --------------------------------------------------------
+// DIE ICON-REGEL (Critique 2026-09-24, P2): ein Termin zeigt vor seinem Titel
+// in JEDER Ansicht dieselben Glyphen - sein Icon nur, wenn jemand eines gewaehlt
+// hat (hasEventIcon), die Serienmarke bei jeder Serie. Vorher fragte nur das
+// Tagesraster; Woche, Ganztag und Agenda setzten das Standardglyph als
+// Fuellsel, der Monat gar keins.
+//
+// Gemessen am gerenderten Markup der FUENF Bausteine, nicht am Quelltext: ein
+// Textguard zaehlte Aufrufe und sah nicht, welches Icon am Ende dasteht.
+// --------------------------------------------------------
+function glyphsBeforeTitle(html, title) {
+  const at = html.indexOf(`>${title}<`);
+  assert(at !== -1, `Vorbedingung: der Titel ${title} steht im Markup`);
+  const head = html.slice(0, at);
+  return {
+    calendarGlyph: /data-lucide="calendar"/.test(head),
+    ownIcon: /data-lucide="stethoscope"/.test(head),
+    repeat: /class="calendar-repeat-icon"/.test(head),
+  };
+}
 
-  for (const [name, from, to, expected] of regions) {
-    const body = src.slice(src.indexOf(from), src.indexOf(to));
-    const markers = body.match(/calendarRepeatIconHtml\(ev\)/g) ?? [];
-    assert(markers.length === expected,
-      `${name}: erwartet ${expected} Serienmarken vor ausgeschriebenen Titeln, gefunden ${markers.length}`);
-    assert(
-      /calendarRepeatIconHtml\(ev\)[\s\S]{0,180}esc\(ev\.title\)/.test(body),
-      `${name}: Serienmarke muss vor dem ausgeschriebenen Titel stehen`
-    );
+function everyEventView(ev) {
+  const out = {};
+  withMonthState({ events: [ev] }, () => {
+    out.Monat = calendarHelpers.renderMonthDay('2026-09-24', true, { focusable: true });
+    out.Woche = calendarHelpers.renderWeekEvent(ev, null, '2026-09-24');
+    out.Tag = calendarHelpers.renderDayEvent(ev, null, '2026-09-24');
+    out.Ganztag = calendarHelpers.renderAllDayEvent(ev, '2026-09-24');
+    out.Agenda = calendarHelpers.renderAgendaEvent(ev, '2026-09-24');
+  });
+  return out;
+}
+
+const glyphEvent = (extra) => ({
+  id: 5101, title: 'Zahnarzt', all_day: 0, assigned_users: [],
+  start_datetime: '2026-09-24T09:00', end_datetime: '2026-09-24T10:30', ...extra,
+});
+
+test('Icon-Regel: das Standardglyph steht in KEINER Ansicht vor dem Titel', () => {
+  for (const [view, html] of Object.entries(everyEventView(glyphEvent({ icon: 'calendar' })))) {
+    assert(!glyphsBeforeTitle(html, 'Zahnarzt').calendarGlyph,
+      `${view}: ein Termin ohne eigenes Icon traegt das Kalenderglyph als Fuellsel`);
+  }
+});
+
+test('Icon-Regel: ein gewaehltes Icon steht in JEDER Ansicht vor dem Titel', () => {
+  for (const [view, html] of Object.entries(everyEventView(glyphEvent({ icon: 'stethoscope' })))) {
+    assert(glyphsBeforeTitle(html, 'Zahnarzt').ownIcon, `${view}: das gewaehlte Icon fehlt`);
+  }
+});
+
+test('Icon-Regel: die Serienmarke steht in JEDER Ansicht vor dem Titel', () => {
+  for (const [view, html] of Object.entries(everyEventView(glyphEvent({ recurrence_rule: 'FREQ=WEEKLY' })))) {
+    assert(glyphsBeforeTitle(html, 'Zahnarzt').repeat, `${view}: die Serienmarke fehlt`);
+  }
+});
+
+test('Icon-Regel: kein Baustein ruft das Icon an eventGlyphsHtml() vorbei', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const helper = src.slice(src.indexOf('function eventGlyphsHtml('), src.indexOf('function eventIconElement('));
+  assert(/hasEventIcon\(ev\.icon\)/.test(helper) && /calendarRepeatIconHtml\(ev\)/.test(helper),
+    'eventGlyphsHtml() muss hasEventIcon fragen und die Serienmarke setzen');
+  for (const call of ['eventIconHtml(ev.icon', 'calendarRepeatIconHtml(ev)']) {
+    const hits = src.split(call).length - 1;
+    assert(hits === 1, `${call} steht ${hits}-mal im Quelltext - ausserhalb von eventGlyphsHtml() ist es eine zweite Icon-Regel`);
   }
 });
 
@@ -720,8 +767,24 @@ const whenRange = (text) => JSON.parse(text.slice(text.indexOf('{'), text.lastIn
 
 test('eventWhenText: eintägiges Zeit-Event nennt vom Ende nur die Uhrzeit', () => {
   const text = eventWhenText({ start_datetime: '2026-09-10T14:00', end_datetime: '2026-09-10T15:30', all_day: 0 });
-  assert(text.startsWith('calendar.dayRangeLabel'), `Zeitraum über den Locale-Key: ${text}`);
+  // Das Datum EINMAL vorn, dann die Spanne im einen Zeitformat (timeSpanText).
+  assert(text.startsWith('2026-09-10 calendar.dayRangeLabel'), `Datum, dann der Zeitraum über den Locale-Key: ${text}`);
+  assert(whenRange(text).from === '2026-09-10T14:00', `Start ohne zweites Datum: ${text}`);
   assert(whenRange(text).to === '2026-09-10T15:30', `Ende ohne vorangestelltes Datum: ${text}`);
+});
+
+test('eventWhenText: das Uhrzeit-Suffix steht einmal, am Ende', () => {
+  globalThis.__timeSuffix = 'Uhr';
+  try {
+    const one = eventWhenText({ start_datetime: '2026-09-10T14:00', end_datetime: '2026-09-10T15:30', all_day: 0 });
+    const multi = eventWhenText({ start_datetime: '2026-09-10T14:00', end_datetime: '2026-09-12T11:00', all_day: 0 });
+    for (const text of [one, multi]) {
+      assert(text.split('Uhr').length === 2 && text.endsWith(' Uhr'),
+        `„10:00 Uhr - 11:30 Uhr" war die alte Form, erwartet genau ein Suffix am Ende: ${text}`);
+    }
+  } finally {
+    delete globalThis.__timeSuffix;
+  }
 });
 
 test('eventWhenText: mehrtägiges Zeit-Event nennt Enddatum und Enduhrzeit', () => {
@@ -3429,15 +3492,122 @@ test('Aufgaben-Chip: Trefferflaeche in der Liste auf --target-base, im Ganztags-
   const before = rules.find((r) => r.selector.trim() === '.agenda-tasks .cal-task-chip::before');
   assert(before && /inset-block:\s*calc\(-1 \* var\(--task-hit-grow\)\)/.test(before.body), 'die Liste dehnt die Aufgabe nicht per ::before');
   const list = rules.find((r) => r.selector.trim() === '.agenda-tasks');
-  assert(list && /--task-hit-grow:\s*calc\(\(var\(--target-base\) - var\(--space-6\)\) \/ 2\)/.test(list.body)
-    && /row-gap:\s*calc\(var\(--task-hit-grow\) \* 2\)/.test(list.body),
-    'Dehnung und Zeilenabstand muessen aus derselben Rechnung kommen, sonst ueberlappen sich die Flaechen');
+  assert(list && /--task-hit-grow:\s*calc\(\(var\(--target-base\) - var\(--space-6\)\) \/ 2\)/.test(list.body),
+    'die Dehnung muss aus --target-base kommen');
+  // Seit 2026-09-24 duerfen sich die Dehnungen zweier Aufgaben ueberlappen
+  // (8px Zeilenabstand statt 20-24px) - aber nur UNTER den Chips: die sichtbare
+  // Bar trifft immer sich selbst.
+  assert(/row-gap:\s*var\(--space-2\)/.test(list.body), 'der Zeilenabstand der Aufgaben ist wieder die doppelte Dehnung (48px-Takt)');
+  assert(/isolation:\s*isolate/.test(list.body) && /z-index:\s*-1/.test(before.body),
+    'ueberlappende Dehnungen muessen unter den Chips liegen, sonst trifft ein Tipp auf die untere Bar die obere Aufgabe');
   const chip = rules.find((r) => r.selector.trim() === '.agenda-tasks .cal-task-chip');
   assert(chip && /overflow:\s*visible/.test(chip.body), 'der Chip schneidet sein eigenes ::before ab (overflow)');
   const stack = rules.find((r) => r.selector.trim() === '.allday-cell .cal-task-chip');
   assert(stack && /min-height:\s*var\(--space-6\)/.test(stack.body), 'im Ganztags-Stapel bleibt die Aufgabe unter 24px');
   const focus = rules.find((r) => /\.week-event:focus-visible/.test(r.selector) && /\.day-event:focus-visible/.test(r.selector));
   assert(focus && /outline:\s*var\(--focus-ring-width\) solid var\(--focus-ring-color\)/.test(focus.body), 'Terminbloecke haben keinen Fokusring');
+});
+
+// --------------------------------------------------------
+// EIN ZEITFORMAT (Critique 2026-09-24, P2). Drei Schreibweisen derselben
+// Spanne standen im Kalender: Raster ohne Leerzeichen mit Gedankenstrich,
+// Agenda mit Gedankenstrich und „Uhr", Detail „10:00 Uhr - 11:30 Uhr". Jetzt
+// eine: `calendar.dayRangeLabel` („{{from}} - {{to}}") ueber formatTime(), das
+// Suffix einmal am Ende - im Raster ohne, sonst mit.
+// --------------------------------------------------------
+test('timeSpanText: Spanne ueber den Locale-Trenner, Suffix einmal am Ende', () => {
+  globalThis.__timeSuffix = 'Uhr';
+  try {
+    const span = calendarHelpers.timeSpanText('2026-09-24T17:00', '2026-09-24T18:30');
+    assert(span === 'calendar.dayRangeLabel{"from":"2026-09-24T17:00","to":"2026-09-24T18:30"} Uhr',
+      `erwartet Trenner aus der Locale und ein Suffix am Ende: ${span}`);
+    const grid = calendarHelpers.timeSpanText('2026-09-24T17:00', '2026-09-24T18:30', { suffix: false });
+    assert(!grid.includes('Uhr'), `die Rasterfassung traegt kein Suffix: ${grid}`);
+    const open = calendarHelpers.timeSpanText('2026-09-24T17:00', null);
+    assert(open === '2026-09-24T17:00 Uhr', `ohne Ende nur der Start mit Suffix: ${open}`);
+  } finally {
+    delete globalThis.__timeSuffix;
+  }
+});
+
+test('Zeitformat: Raster, Liste, gesprochener Name und Schicht gehen durch denselben Helfer', () => {
+  globalThis.__timeSuffix = 'Uhr';
+  try {
+    const ev = glyphEvent({});
+    const range = 'calendar.dayRangeLabel{"from":"2026-09-24T09:00","to":"2026-09-24T10:30"}';
+    const html = {};
+    withMonthState({ events: [ev] }, () => {
+      html.week = calendarHelpers.renderWeekEvent(ev, null, '2026-09-24');
+      html.day = calendarHelpers.renderDayEvent(ev, null, '2026-09-24');
+      html.agenda = calendarHelpers.renderAgendaEvent(ev, '2026-09-24');
+    });
+    const esc = (text) => escStub(text);
+    assert(html.week.includes(`class="week-event__time">${range}<`), `Woche: Rasterfassung erwartet: ${html.week}`);
+    assert(html.day.includes(`class="day-event__meta">${range}<`), `Tag: Rasterfassung erwartet: ${html.day}`);
+    assert(html.agenda.includes(`<span>${esc(`${range} Uhr`)}</span>`), `Agenda: Listenfassung mit Suffix erwartet: ${html.agenda}`);
+    for (const [view, markup] of Object.entries(html)) {
+      assert(markup.includes(esc(`Zahnarzt, ${range} Uhr`)),
+        `${view}: der gesprochene Name nennt die Zeit in der Listenfassung - ein Termin klingt ueberall gleich`);
+    }
+    const shift = calendarHelpers.scheduleTimeLabel({ start_time: '22:00', end_time: '06:00' });
+    assert(shift === 'calendar.dayRangeLabel{"from":"22:00","to":"06:00"} Uhr +1',
+      `die Schichtspanne geht durch formatTime() (12 Stunden!) und denselben Trenner: ${shift}`);
+  } finally {
+    delete globalThis.__timeSuffix;
+  }
+});
+
+test('calendar.js enthaelt keinen Gedankenstrich - weder im UI-Text noch im Kommentar', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const hits = src.split('\n').map((line, i) => [i + 1, line]).filter(([, line]) => /[\u2013\u2014]/.test(line));
+  assert(hits.length === 0,
+    `Projektregel: "-" statt Em-/En-Dash (CLAUDE.md). Fundstellen: ${hits.map(([n]) => n).join(', ')}`);
+  for (const file of readdirSync(new URL('../public/locales/', import.meta.url)).filter((n) => n.endsWith('.json'))) {
+    const range = JSON.parse(readFileSync(new URL(`../public/locales/${file}`, import.meta.url), 'utf8')).calendar.dayRangeLabel;
+    assert(!/[\u2013\u2014]/.test(range), `${file}: calendar.dayRangeLabel traegt einen Gedankenstrich: ${range}`);
+  }
+});
+
+// --------------------------------------------------------
+// EINE BLOCKGRAMMATIK (Critique 2026-09-24, P2): Monat, Woche, Tag, Ganztag und
+// die Listenzeile nennen die Terminfarbe mit derselben Kante, die Bloecke mit
+// demselben Ink-Rezept. Vorher: Tag mit eigenem Spine-Element NEBEN der Kante
+// (zwei Striche), Woche 38 % statt 35 %, Liste mit 8px-Punkt, Icons im Vollton.
+// --------------------------------------------------------
+test('Blockgrammatik: eine Kante, ein Ink-Rezept, Titel oben, Glyphen in der Tinte', () => {
+  const rules = [...eachRule(calendarCss)];
+  const body = (selector) => rules.filter((r) => r.selector.trim() === selector).map((r) => r.body).join(';');
+  for (const selector of ['.month-day__event', '.week-event', '.day-event', '.allday-event', '.agenda-event__body']) {
+    assert(/border-inline-start:\s*var\(--cal-event-edge\) solid var\(--ev-color/.test(body(selector)),
+      `${selector}: die Terminfarbe steht nicht als Kante aus --cal-event-edge`);
+  }
+  const inks = ['.month-day__event', '.week-event', '.day-event', '.allday-event']
+    .map((selector) => body(selector).match(/(?:^|;)\s*color:\s*color-mix\(in srgb, var\(--ev-color\) (\d+)%/)?.[1]);
+  assert(new Set(inks).size === 1 && inks[0] === '35', `ein Ink-Rezept fuer alle Bloecke erwartet, gefunden: ${inks.join(', ')}`);
+  assert(!/(?:^|;)\s*border:/.test(body('.week-event') + body('.allday-event')),
+    'Woche und Ganztag tragen wieder einen Rahmen, den Monat und Tag nicht haben');
+  assert(!rules.some((r) => /day-event__spine/.test(r.selector)), 'das zweite Kanten-Element des Tags ist zurueck');
+  assert(!/day-event__spine/.test(readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8')),
+    'renderDayEvent zeichnet wieder ein eigenes Spine-Element');
+  assert(/align-items:\s*flex-start/.test(body('.day-event')), 'der Tagesblock zentriert seinen Titel wieder senkrecht');
+  assert(!rules.some((r) => /event-icon/.test(r.selector) && /(?:^|;)\s*color:\s*var\(--ev-color\)/.test(r.body)),
+    'ein Terminicon steht wieder im Vollton der Nutzerfarbe statt in der Tinte');
+  assert(!rules.some((r) => r.selector.trim() === '.agenda-event__color'), 'der Farbpunkt der Listenzeile ist zurueck');
+});
+
+test('Blockgrammatik: die Zeitzeile erscheint nach der Hoehe des Blocks, nicht halb abgeschnitten', () => {
+  assert(/container:\s*ev-block \/ size/.test(calendarCss.slice(calendarCss.indexOf('\n.week-event {'))),
+    'der Wochenblock ist kein Groessen-Container');
+  const query = /@container ev-block \(height < ([\d.]+)rem\)\s*\{([^}]*)\}/.exec(calendarCss);
+  assert(query && /\.week-event__time/.test(query[2]) && /\.day-event__meta/.test(query[2]),
+    'Woche und Tag muessen ihre Zeitzeile ueber dieselbe Hoehenfrage ausblenden');
+});
+
+test('Ganztags-Beschriftung bricht um, statt aus der 44px-Spalte zu ragen', () => {
+  const label = [...eachRule(calendarCss)].find((r) => r.selector.trim() === '.calendar-all-day-label');
+  assert(/overflow-wrap:\s*anywhere/.test(label.body), 'ein Wort ohne Bruchstelle ragt wieder aus der Spalte');
+  const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8')).calendar.allDayShort;
+  assert(de.includes('\u00ad'), `„ganztg." war 42,5px breit in 44px - das deutsche Wort braucht eine Trennstelle: ${de}`);
 });
 
 // --------------------------------------------------------

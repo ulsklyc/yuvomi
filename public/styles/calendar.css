@@ -474,8 +474,8 @@
 }
 
 /* Flache getönte Event-Bar nach Monatsgrid-Kanon (Apple Kalender, Fantastical):
- * Tint-Hintergrund + kräftige Tinte derselben Farbfamilie, ohne Border, ohne
- * Icon/Avatar. Beides per color-mix aus --ev-color (Inline) abgeleitet;
+ * Tint-Hintergrund + kräftige Tinte derselben Farbfamilie, ohne Rahmen und
+ * ohne Avatar; Glyphen nur nach der Icon-Regel (eventGlyphsHtml). Beides per color-mix aus --ev-color (Inline) abgeleitet;
  * --color-surface-work + --color-text-primary kippen im Dark Mode, daher bleibt
  * der WCAG-Kontrast in beiden Themes erhalten. Nachgemessen (Finish-Verdict
  * Fundament-Phase, 12 Seed-Layer-Farben): 7.2-9.5:1 light / 7.8-8.9:1 dark,
@@ -503,26 +503,19 @@
    * Ganztag umgestellt, Monat und Tag ausgelassen - ein Termin sprach damit
    * zwei Sprachen, je nachdem welchen Ansichtsknopf man gedrueckt hatte.
    *
-   * ES GIBT JETZT ZWEI FORMEN FUER EINE EREIGNISFARBE, nicht vier: die Kante am
-   * BALKEN (Woche, Tag, Ganztag, Monat) und den 8px-Punkt an der ZEILE
-   * (.agenda-event__color). Auf der Mobil-Monatszelle wird der Balken selbst
-   * zum Punkt - die Regel bleibt dieselbe, nur der Traeger wechselt. */
-  border-inline-start: 3px solid var(--ev-color);
+   * EINE FORM FUER EINE EREIGNISFARBE (Critique 2026-09-24, P2): die Kante,
+   * am BALKEN (Woche, Tag, Ganztag, Monat) wie an der ZEILE der Agenda und der
+   * Tagesliste (.agenda-event__body). Der 8px-Punkt, den die Zeile bis dahin
+   * trug, war die vierte Mundart. Nur auf der Mobil-Monatszelle wird der
+   * Balken selbst zum Punkt - dort gibt es keinen Titel, neben dem eine Kante
+   * stehen koennte. */
+  border-inline-start: var(--cal-event-edge) solid var(--ev-color);
   transition: background-color var(--transition-fast);
 }
 
 
 .month-day__event:hover {
   background: color-mix(in srgb, var(--ev-color) var(--tint-raised), var(--color-surface-work));
-}
-
-/* Voll gesättigtes Icon trägt das Farbsignal (der "Dot") in Woche/Tag, während
- * der Titel in ruhiger, lesbarer Tinte bleibt. Die Monats-Bars sind nach Kanon
- * icon-frei; dort trägt die Tönung selbst die Farbfamilie. */
-.allday-event .event-icon,
-.week-event .event-icon {
-  color: var(--ev-color);
-  opacity: 1;
 }
 
 .month-day__event span,
@@ -552,11 +545,17 @@
   margin-left: calc(-1 * var(--space-1));
 }
 
+/* DIE GLYPHEN TRAGEN DIE TINTE DES TITELS, nicht den Vollton der Terminfarbe
+ * (Critique 2026-09-24, P2). In Woche und Ganztag standen sie in `--ev-color`:
+ * eine frei gewaehlte Farbe als Vordergrund auf ihrer eigenen Toenung - Amber
+ * auf hellem Amber -, genau der Textfall, den die User-Farben-Regel verbietet,
+ * und dritter Traeger einer Farbe, die die Kante schon nennt. Jetzt erben Icon
+ * und Serienmarke `currentColor`, also das gemessene Ink-Rezept, ohne eine
+ * Opacity, die den Kontrast wieder ins Ungewisse schoebe. */
 .event-icon {
   width: var(--space-4);
   height: var(--space-4);
   flex: 0 0 auto;
-  opacity: 0.9;
 }
 
 .event-icon--compact {
@@ -569,7 +568,6 @@
   flex: 0 0 auto;
   align-items: center;
   margin-inline-end: var(--space-0h);
-  opacity: 0.7;
 }
 
 .month-day__more {
@@ -757,8 +755,12 @@
   font-size: var(--text-xs);
   font-weight: var(--font-weight-medium);
   background: color-mix(in srgb, var(--ev-color) var(--tint-surface), var(--color-surface-work));
-  color: color-mix(in srgb, var(--ev-color) 38%, var(--color-text-primary));
-  border: var(--space-px) solid color-mix(in srgb, var(--ev-color) var(--tint-hint), transparent);
+  /* 35 % wie Monat, Ganztag und Tag: EIN Ink-Rezept fuer jeden Block. Die 38 %
+   * der Woche waren das zweite, und naeher an der Nutzerfarbe - also nie der
+   * bessere Kontrast. Der 1px-Rahmen in `--tint-hint`, den nur Woche und Ganztag
+   * trugen, ist entfallen: Monat und Tag kamen immer ohne ihn aus, die Lanes
+   * trennt ihr 2px-Abstand. */
+  color: color-mix(in srgb, var(--ev-color) 35%, var(--color-text-primary));
   /* DIE VOLLTON-KANTE IST DAS FARBSIGNAL DES BLOCKS (Etappe 3, 2026-08-17).
    * Im Dark war der Block eine entsaettigte Nebelflaeche: 16-%-Fuellung plus
    * eine 1px-Kante auf halber Deckung - dieselbe Beimischungs-Falle, die
@@ -768,7 +770,7 @@
    * die Nutzerfarbe ausdruecklich als BORDER. Die Fuellung bleibt beim
    * gemessenen 16-%-Rezept, die Tinte beim 38-%-Mix - beide Zusagen gelten
    * unveraendert, die Kante traegt die Farbe. */
-  border-inline-start: 3px solid var(--ev-color);
+  border-inline-start: var(--cal-event-edge) solid var(--ev-color);
   /* `clip` STATT `hidden`, DAMIT DER TITEL KLEBEN KANN.
    *
    * `overflow: hidden` macht aus jedem Element einen Scroll-Container - und
@@ -782,7 +784,10 @@
   overflow: clip;
   cursor: pointer;
   z-index: 1;
-  line-height: 1.4;
+  line-height: var(--line-height-tight);
+  /* Der Block ist sein eigener Groessen-Container: ob die Zeitzeile Platz hat,
+   * fragt die Container-Query unten nach seiner HOEHE (siehe dort). */
+  container: ev-block / size;
   transition: background-color var(--transition-fast);
 }
 
@@ -813,6 +818,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
+  /* Titel halbfett, Zeitzeile normal - dieselbe Rangfolge wie am Tagesblock. */
+  font-weight: var(--font-weight-semibold);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -823,10 +830,29 @@
   top: 0;
 }
 
+/* Die Zeitzeile tritt ueber das GEWICHT zurueck wie am Tagesblock, nicht ueber
+ * eine Opacity auf getoenter Tinte. */
 .week-event__time {
   font-size: var(--text-xs);
-  opacity: 0.85;
+  font-weight: var(--font-weight-regular);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ZEIT ALS ZWEITE ZEILE, WENN PLATZ IST (Critique 2026-09-24, P2). Titel und
+ * Zeitzeile brauchen zusammen 2 x 12px x 1.21 plus 4px Polster, rund 33px. Ein
+ * Block darunter zeigte die Uhrzeit halb abgeschnitten - in der Woche jeder
+ * 30-Minuten-Termin. Gefragt wird die Hoehe des Blocks, nicht seine Dauer: die
+ * Stunde ist in der Woche 56px, im Tag 40px hoch, und eine Minutenschwelle
+ * waere in einer der beiden Ansichten falsch. Uhrzeit und Ort bleiben im
+ * gesprochenen Namen und im Tooltip. */
+@container ev-block (height < 2.125rem) {
+  .week-event__time,
+  .day-event__meta {
+    display: none;
+  }
 }
 
 .event-attachment-preview {
@@ -966,22 +992,24 @@
   position: relative;
 }
 
-/* ── Termin im Tagesraster: flacher Tint-Balken mit Farbspine ──
+/* ── Termin im Tagesraster: derselbe Block wie in der Woche ──
  *
- * Keine Kante: die Tönung IST das Element (--tint-surface, Objekt-Sprosse), die
- * Zugehörigkeit trägt der Spine im Vollton. Eine Haarlinie in Layer-Farbe wäre
- * genau der Kanal, den DESIGN.md als Absenderband ausschließt - ein 3px-Spine
+ * Kein Rahmen: die Tönung IST das Element (--tint-surface, Objekt-Sprosse), die
+ * Zugehörigkeit trägt die Vollton-Kante. Eine Haarlinie in Layer-Farbe wäre
+ * genau der Kanal, den DESIGN.md als Absenderband ausschließt - eine 3px-Kante
  * ist eine Fläche und liest in beiden Themes.
  *
- * DIE TINTE BLEIBT BEI 38 %, NICHT --tint-ink (70 %), WIE DER HANDOFF SAGT -
+ * DIE TINTE BLEIBT EIN MIX UM 35 %, NICHT --tint-ink (70 %), WIE DER HANDOFF SAGT -
  * und der Grund ist nicht der Dark Mode, sondern WESSEN Farbe das hier ist.
  * --tint-ink ist auf die neun kuratierten Familientöne geeicht und hält für sie
  * mühelos (5.6-8.0:1). --ev-color ist dagegen eine FREI GEWÄHLTE Nutzerfarbe:
  * die Farbe eines Kalenders, einer Ebene, eines Termins. Über 332 gesampelte
  * Nutzerfarben (Hue-Sweep plus die Demo-Palette) fallen bei 70 % **182 unter
  * AA**, im schlimmsten Fall auf 2.01:1 - ein helles Gelb bei 70 % auf seiner
- * eigenen 16-%-Tönung ist schlicht nicht lesbar. Bei 38 % reisst **keine
- * einzige** (schlechtester Wert 4.96:1 hell, 6.00:1 dunkel).
+ * eigenen 16-%-Tönung ist schlicht nicht lesbar. Bei 38 % riss **keine
+ * einzige** (schlechtester Wert 4.96:1 hell, 6.00:1 dunkel); seit 2026-09-24
+ * steht der Tag wie jeder Block auf 35 %, naeher an der Primaertinte, also
+ * mit mehr Abstand.
  *
  * Genau das meint DESIGN.md mit „Don't User-/Layer-Farben als Textfarbe
  * verwenden; nur die gemessenen 16-%/35-%-Mix-Rezepte". Das Paket konnte es
@@ -991,18 +1019,22 @@
   --ev-color: var(--color-accent);
   position: absolute;
   display: flex;
-  align-items: center;
+  /* TITEL OBEN, wie in der Woche und bei Apple Kalender: ein langer Termin
+   * zeigte seinen Namen vorher in der Mitte des Blocks, eine Hand breit unter
+   * der Uhrzeit, an der er beginnt. */
+  align-items: flex-start;
   gap: var(--space-1h);
   padding: var(--space-0h) var(--space-2);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-xs);
   background: color-mix(in srgb, var(--ev-color) var(--tint-surface), var(--color-surface));
-  color: color-mix(in srgb, var(--ev-color) 38%, var(--color-text-primary));
+  color: color-mix(in srgb, var(--ev-color) 35%, var(--color-text-primary));
   /* Dieselbe Vollton-Kante wie .week-event (Begruendung dort): die Tagesansicht
    * zeichnet DENSELBEN Block, nur mit einer Spalte. Etappe 3 hat Woche und
    * Ganztag umgestellt und diese beiden Ansichten ausgelassen; damit sprach ein
    * Termin in derselben Woche zwei Sprachen, je nachdem welchen Knopf man
-   * gedrueckt hatte. */
-  border-inline-start: 3px solid var(--ev-color);
+   * gedrueckt hatte. Seit 2026-09-24 ist sie die EINZIGE Kante: das Element
+   * `.day-event__spine` daneben zog einen zweiten Farbstrich. */
+  border-inline-start: var(--cal-event-edge) solid var(--ev-color);
   /* `clip` statt `hidden` - dieselbe Begruendung wie an `.week-event`: nur so
      kann der Text darin kleben. Die Tagesansicht zeichnet DENSELBEN Block,
      und eine Regel, die nur in einer der beiden Ansichten gilt, laesst
@@ -1010,12 +1042,11 @@
   overflow: clip;
   cursor: pointer;
   z-index: 1;
+  container: ev-block / size;
   transition: background-color var(--transition-fast);
 }
 
-/* Der Text bleibt an der sichtbaren Oberkante seines Blocks. `align-self`
-   hebt die zentrierte Ausrichtung des Flex-Containers nur fuer den Textteil
-   auf - die Spine daneben bleibt gestreckt, die Avatare bleiben mittig. */
+/* Der Text bleibt an der sichtbaren Oberkante seines Blocks. */
 .day-event__text {
   position: sticky;
   top: 0;
@@ -1026,20 +1057,11 @@
   background: color-mix(in srgb, var(--ev-color) var(--tint-raised), var(--color-surface));
 }
 
-.day-event__spine {
-  width: 3px;
-  align-self: stretch;
-  flex-shrink: 0;
-  border-radius: var(--radius-full);
-  background-color: var(--ev-color);
-}
-
 .day-event__text {
   min-width: 0;
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
 }
 
 .day-event__title {
@@ -1322,7 +1344,7 @@
  * Arbeitsflächen-Token, derselbe, den `.list-rows` jetzt als Trägerfläche
  * trägt. Er trug hier KEINE Semantik (kein Zustand, keine Kalenderfarbe),
  * deshalb braucht das Entkarten keinen Zweitkanal: die Kalenderfarbe hängt
- * seit jeher am Punkt (.agenda-event__color). */
+ * an der Kante des Textes (.agenda-event__body), nicht an der Zeile. */
 /* SIE TRAEGT `.list-row` (Critique 2026-08-13, P2). Hier standen sieben
  * Deklarationen, die zeichengleich in list-row.css stehen - dieselbe
  * Anzeigeart, dieselbe Polsterung, derselbe Uebergang, derselbe Hover, derselbe
@@ -1332,8 +1354,8 @@
  * `.filter-chip` stand.
  *
  * Was BLEIBT, ist die Abweichung und nur sie: die Zeile richtet ihre Kinder
- * gestreckt aus, weil der Farbstreifen die volle Hoehe nimmt, und ihr Abstand
- * ist kleiner, weil links kein Bedienelement steht, sondern ein 8px-Punkt. */
+ * gestreckt aus, damit die Farbkante am Text die volle Hoehe nimmt, und ihr
+ * Abstand ist kleiner, weil links kein Bedienelement steht. */
 .agenda-event {
   align-items: stretch;
   gap: var(--space-2);
@@ -1390,19 +1412,24 @@
   max-width: 12rem;
 }
 
-/* Kalenderfarbe als Dot statt vollhohem Seitenstreifen — konsistent mit den
- * Status-Dots der Aufgabenliste und dem Dashboard-Kalenderwidget. */
-.agenda-event__color {
-  width: var(--space-2);
-  height: var(--space-2);
-  align-self: center;
-  border-radius: var(--radius-full);
-  flex-shrink: 0;
-}
-
+/* DIE ZEILE TRAEGT DIESELBE KANTE WIE DER BLOCK (Critique 2026-09-24, P2).
+ *
+ * Hier stand ein 8px-Punkt vor dem Text - die vierte Form, in der ein Termin
+ * seine Farbe nannte (Balken mit Kante im Monat, Block mit Kante in der Woche,
+ * Karte mit eigenem Spine im Tag, Punkt in der Liste). Jetzt spricht die Zeile
+ * die Grammatik der Bloecke: die Vollton-Kante an der Inline-Start-Seite des
+ * TEXTES, so hoch wie Titel und Metazeile. Die Flaeche bleibt die des Traegers
+ * (`.list-rows`, Zeilen-Regel oben) - eine getoente Zeile in einer Liste waere
+ * eine Karte in der Karte. Die Zugehoerigkeit traegt die Kante, nicht ein Punkt.
+ *
+ * Craft-Floor-Verbot „farbige Seitenkante an Listenzeilen" bewusst gebrochen:
+ * die Kante ist hier keine Dekoration, sondern DIE Kalenderfarbe, dieselbe wie
+ * am Block, und sie steht neben dem Inhalt statt darunter (Vollton-Regel). */
 .agenda-event__body {
   flex: 1;
   min-width: 0;
+  border-inline-start: var(--cal-event-edge) solid var(--ev-color, var(--color-accent));
+  padding-inline-start: var(--space-2);
 }
 
 .agenda-event__title {
@@ -1629,7 +1656,7 @@
   }
 
   /* Nur die Polsterung, und die ist eine Abweichung: 8px rundum statt der 8/12
-   * der geteilten Zeile, weil links ein 8px-Punkt steht und kein Bedienelement.
+   * der geteilten Zeile, weil links die Farbkante steht und kein Bedienelement.
    * Die `min-height` stand hier ein zweites Mal mit demselben Wert - sie kommt
    * von `.list-row` und ist entfallen, nicht vergessen. */
   .agenda-event {
@@ -1772,24 +1799,42 @@
  * darin blieb auf --space-12: sie ist rechtsbündig, endete also 16px zu früh
  * und stand damit weiter neben den Stundenzahlen, die genau darunter beginnen.
  * Ihr padding-right ist deshalb dasselbe wie in .week-view__time-slot - beide
- * Texte enden auf derselben senkrechten Kante. */
+ * Texte enden auf derselben senkrechten Kante.
+ *
+ * DIE BESCHRIFTUNG DARF UMBRECHEN (Critique 2026-09-24). „ganztg." war 42,5px
+ * breit und stand in der 44px-Spalte des Telefons buendig an der
+ * Bildschirmkante, ueber den eigenen Innenabstand hinaus - und war obendrein
+ * eine Abkuerzung, die man entziffern muss. Jetzt steht das ganze Wort mit
+ * weichem Trennstrich in der Locale („ganz\u00adtaegig"): breit genug bleibt es
+ * eine Zeile, in der schmalen Spalte bricht es als „ganz-/taegig" um. Andere
+ * Sprachen brechen am Leerzeichen („all / day"); was gar keine Stelle hat,
+ * bricht zur Not im Wort (`overflow-wrap`), statt aus der Spalte zu ragen.
+ * Zeilenhoehe knapp, damit zwei Zeilen nicht doppelt so hoch werden wie der
+ * Balken daneben. */
 .calendar-all-day-label {
   width: var(--cal-gutter-width);
-  padding: var(--space-0h) var(--space-2) var(--space-0h) 0;
+  padding: var(--space-1h) var(--space-2) var(--space-1h) var(--space-1);
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
   text-align: right;
-  line-height: var(--space-6);
+  line-height: var(--line-height-tight);
+  overflow-wrap: anywhere;
 }
 
 /* In der 44px-Spalte (mobil) rueckt die Beschriftung 4px vom Raster ab statt
  * 8px: „08:00" braucht 34px, und mit 8px Abstand klebte die Ziffer 2px an der
  * Bildschirmkante. Stundenzahl und Ganztags-Beschriftung behalten dieselbe
- * rechte Kante (test-calendar.js), also aendern sich beide zusammen. */
+ * rechte Kante (test-calendar.js), also aendern sich beide zusammen. Die
+ * Beschriftung haelt zusaetzlich 2px Abstand zur Bildschirmkante: ein Wort,
+ * das die Spalte fuellt, bricht vorher um (am Desktop 4px, hier 2px). */
 @media (max-width: 639px) {
   .week-view__time-slot,
   .calendar-all-day-label {
     padding-inline-end: var(--space-1);
+  }
+
+  .calendar-all-day-label {
+    padding-inline-start: var(--space-0h);
   }
 }
 
@@ -1809,10 +1854,10 @@
   font-weight: var(--font-weight-medium);
   padding: var(--space-px) var(--space-1);
   border-radius: var(--radius-xs);
-  border: var(--space-px) solid color-mix(in srgb, var(--ev-color) var(--tint-hint), transparent);
   /* Dieselbe Vollton-Kante wie .week-event (Begruendung dort): der
-   * Ganztages-Balken ist derselbe Block, nur ohne Zeitachse. */
-  border-inline-start: 3px solid var(--ev-color);
+   * Ganztages-Balken ist derselbe Block, nur ohne Zeitachse - und wie dort
+   * ohne den 1px-Rahmen, den der Monatsbalken nie trug. */
+  border-inline-start: var(--cal-event-edge) solid var(--ev-color);
   background: color-mix(in srgb, var(--ev-color) var(--tint-surface), var(--color-surface-work));
   color: color-mix(in srgb, var(--ev-color) 35%, var(--color-text-primary));
   white-space: nowrap;
@@ -2010,18 +2055,29 @@
  * freistehendes Ziel, das seine Zielgroesse halten muss (Zielgroessen-Regel,
  * tokens.css). Sichtbar bleibt er die flache Bar neben den Termin-Balken; die
  * Flaeche dehnt ein ::before senkrecht auf --target-base (44px am Zeiger,
- * 48px am Finger). Damit sich zwei Dehnungen nie ueberlappen, ist der
- * Zeilenabstand genau die Dehnung zweier Chips und die Polsterung oben und
- * unten die eines - ein Treffer knapp neben der Aufgabe landet nie im Termin
- * darueber. `overflow: visible`, weil der Chip sein eigenes Pseudo sonst
- * abschnitte; die Ellipse traegt ohnehin der Titel-span. */
+ * 48px am Finger). Die Polsterung oben und unten ist die Dehnung eines
+ * Chips - ein Treffer knapp neben der Aufgabe landet nie im Termin darueber.
+ * `overflow: visible`, weil der Chip sein eigenes Pseudo sonst abschnitte; die
+ * Ellipse traegt ohnehin der Titel-span.
+ *
+ * ZWISCHEN ZWEI AUFGABEN DUERFEN SICH DIE DEHNUNGEN UEBERLAPPEN (2026-09-24).
+ * Der Zeilenabstand war die Dehnung zweier Chips, 20-24px Luft zwischen 24px-
+ * Bars - eine Liste mit 48px Takt, die luftiger stand als die Terminzeilen
+ * darueber. Jetzt 8px. Dass ein Tipp in der Luecke dann der unteren Aufgabe
+ * gehoert, ist hinnehmbar; dass er die SICHTBARE Bar der oberen trifft, nicht.
+ * Deshalb liegen die Dehnungen unter den Chips (`z-index: -1` im eigenen
+ * Stapelkontext, `isolation`): gemalt und getroffen wird zuerst der Chip,
+ * seine Flaeche gehoert immer ihm, die Dehnung nur die Luft daneben. Je Bar
+ * bleiben 24px Ziel mit 8px Abstand - die Spacing-Ausnahme von WCAG 2.5.8
+ * haelt auch ohne die Dehnung. */
 .agenda-tasks {
   --task-hit-grow: calc((var(--target-base) - var(--space-6)) / 2);
   display: flex;
   flex-wrap: wrap;
   column-gap: var(--space-1);
-  row-gap: calc(var(--task-hit-grow) * 2);
+  row-gap: var(--space-2);
   padding: var(--task-hit-grow) var(--space-3);
+  isolation: isolate;
 }
 
 .agenda-tasks .cal-task-chip {
@@ -2036,6 +2092,7 @@
   position: absolute;
   inset-inline: 0;
   inset-block: calc(-1 * var(--task-hit-grow));
+  z-index: -1;
 }
 
 /* In der Ganztags-Zeile von Woche und Tag stehen Aufgaben als STAPEL - eine
@@ -2233,6 +2290,14 @@
    * der Ellipsis. Sie bleibt die Kante, nicht ein Rahmen. */
   .month-view--titles .month-day .month-day__event {
     border-inline-start-width: var(--space-0h);
+  }
+
+  /* Die EINE Stelle ohne Glyphen: in der Titelfassung hat der Titel auf
+   * ~44px Spaltenbreite sieben Zeichen, und ein 12px-Glyph naehme ihm zwei
+   * davon. Icon und Serienmarke stehen einen Tipp weiter in der Tagesliste. */
+  .month-view--titles .month-day__event .event-icon,
+  .month-view--titles .month-day__event .calendar-repeat-icon {
+    display: none;
   }
 
   /* Der Prioritaetspunkt bleibt die Rangmarke der Aufgabe (Skalen-Regel), nur

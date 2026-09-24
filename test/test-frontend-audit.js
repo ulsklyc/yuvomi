@@ -6826,7 +6826,7 @@ test('calendar month view uses tinted event surfaces derived from --ev-color', (
 test('calendar agenda events and task chips keep readable contrast in mobile agenda', () => {
   const calendar = read('../public/styles/calendar.css');
   const eventBody = cssRuleBody(calendar, '.agenda-event');
-  const colorBody = cssRuleBody(calendar, '.agenda-event__color');
+  const edgeBody = cssRuleBody(calendar, '.agenda-event__body');
   const taskBody = cssRuleBody(calendar, '.cal-task-chip');
   const metaBody = cssRuleBody(calendar, '.agenda-event__meta');
 
@@ -6840,11 +6840,11 @@ test('calendar agenda events and task chips keep readable contrast in mobile age
   assert.doesNotMatch(eventBody, /border:|box-shadow:/, 'the agenda row is a row: no own edge, no own shadow');
   assert.match(read('../public/pages/calendar.js'), /<div class="list-rows">\$\{events/,
     'agenda events must sit in exactly one carrier (.list-rows), which carries surface and hairlines');
-  // Kalenderfarbe ist ein zentrierter Dot (kein vollhoher Seitenstreifen) —
-  // tokenisiert und sichtbar, konsistent mit den Status-Dots der Aufgabenliste.
-  assert.match(colorBody, /width:\s*var\(--space-2\)/, 'agenda color dot should use a spacing token for its width');
-  assert.match(colorBody, /height:\s*var\(--space-2\)/, 'agenda color dot should be a fixed-size dot, not a full-height rail');
-  assert.match(colorBody, /border-radius:\s*var\(--radius-full\)/, 'agenda color dot should be round');
+  // Die Kalenderfarbe ist seit 2026-09-24 die Kante der Bloecke, nicht mehr ein
+  // 8px-Punkt (Critique P2, eine Termingrammatik): am TEXT der Zeile, nicht an
+  // der Zeile, damit die Zeile eine Zeile bleibt (die Zusage oben).
+  assert.match(edgeBody, /border-inline-start:\s*var\(--cal-event-edge\) solid var\(--ev-color/, 'the agenda row names its calendar colour with the block edge');
+  assert.doesNotMatch(calendar, /\.agenda-event__color\s*\{/, 'the retired colour dot must not come back as a second form');
   // Die Toenung IST der zweite Kanal neben der Textfarbe. Kante und Schatten
   // waren ein dritter und vierter Traeger derselben Information - dieselbe
   // Zusage, die `.month-day__event` seit dem HIG-Rollout flach haelt, und der
@@ -13432,8 +13432,8 @@ test('jede Stufe der Toenungsskala hat mindestens einen Nutzer', () => {
  *   2. KANTE, RING ODER PUNKT. Eine FREI GEWAEHLTE Nutzerfarbe kann keine
  *      Flaeche tragen, weil ihre Helligkeit unbestimmt ist (ein schwarzer
  *      Termin lag bei 1.22:1). Sie steht deshalb NEBEN dem Inhalt statt
- *      darunter: `border-inline-start: 3px solid` am Kalenderblock, der
- *      Inset-Ring an der Countdown-Scheibe, der 8px-Punkt an der Agendazeile.
+ *      darunter: `border-inline-start: 3px solid` am Kalenderblock und an der
+ *      Agendazeile, der Inset-Ring an der Countdown-Scheibe.
  *      Dort braucht sie keine Tinte, also auch keine Zusicherung ueber sie.
  *
  * WER NICHTS NENNT, FAELLT NICHT UNTER DIE REGEL. Ein Platzhalter - die

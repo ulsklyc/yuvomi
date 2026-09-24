@@ -113,7 +113,11 @@ const STUBS = {
     export const formatDayMonth = (d) => (globalThis.__formatDayMonth ?? String)(d);
     export const formatTime = (d) => String(d);
     export const getTimeFormat = () => '24h';
-    export const timeSuffix = () => '';
+    // Das Uhrzeit-Suffix der Locale („Uhr"): leer wie in den meisten Sprachen,
+    // ausser ein Test setzt globalThis.__timeSuffix - dasselbe Muster wie
+    // __locale. So laesst sich pruefen, WO es steht, nicht nur, dass nichts
+    // steht.
+    export const timeSuffix = () => globalThis.__timeSuffix ?? '';
     export const dateInputPlaceholder = () => 'YYYY-MM-DD';
     export const formatDateInput = (d) => String(d ?? '');
     export const parseDateInput = (d) => String(d ?? '');

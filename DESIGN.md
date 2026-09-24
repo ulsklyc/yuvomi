@@ -990,7 +990,10 @@ Textrolle, die die App ueberhaupt kennt (Verhaeltnis <= 0.55 statt der freien Pr
 Darunter IST die Scheibe der Kanal: die Nutzerfarbe traegt per Identitaetsfarben-Regel
 ohnehin das Signal, der Name steht im `title`. Vorher stand hier eine 9px-Untergrenze, und
 die Kalender-Gitter riefen mit `size` 14-16 genau hinein (Sonde `undersized-ui-text`, 13
-Fundstellen). Ein 9px-Text sagt weniger als ein sauberer Punkt.
+Fundstellen). Ein 9px-Text sagt weniger als ein sauberer Punkt. Wo der Stapel neben
+Fliesstext steht statt in einem Chip, hebt `minFont` die Untergrenze (Agenda-Zeile seit
+2026-09-24: 12px auf 22px Scheibe, neben der 14px-Metazeile) - die Scheibe waechst mit, damit
+das Verhaeltnis haelt.
 
 ## Layout
 
@@ -1375,11 +1378,15 @@ gross und dehnt seine Flaeche per `::before` auf `--target-base` aus; eine Box-M
 ihn als Verstoss, obwohl der Finger 44px findet. Das ist zugleich das Rezept fuer „kompakt
 aussehen, voll treffen".
 
-**Wo gedehnt wird, kommt der Abstand aus derselben Rechnung** (2026-09-24). Die Aufgabe in
-Agenda und Tagesliste (`.agenda-tasks .cal-task-chip`) bleibt die 24px-Bar und dehnt ihre
-Flaeche per `::before` senkrecht auf `--target-base`; Zeilenabstand und Polsterung der Liste
-sind genau diese Dehnung (`--task-hit-grow`), sonst griffe die Flaeche in den Termin darueber -
-eine Ueberlappung ist ein Treffer fuer das falsche Ziel. Traegt das Ziel selbst
+**Wo gedehnt wird, gehoert die sichtbare Flaeche immer dem eigenen Ziel** (2026-09-24). Die
+Aufgabe in Agenda und Tagesliste (`.agenda-tasks .cal-task-chip`) bleibt die 24px-Bar und dehnt
+ihre Flaeche per `::before` senkrecht auf `--target-base`; die Polsterung der Liste ist genau
+diese Dehnung (`--task-hit-grow`), sonst griffe die Flaeche in den Termin darueber. Zwischen zwei
+Aufgaben duerfen sich die Dehnungen ueberlappen (8px Zeilenabstand statt 20-24px, sonst stand
+die Liste im 48px-Takt luftiger als die Terminzeilen) - aber UNTER den Chips: `z-index: -1` im
+eigenen Stapelkontext (`isolation: isolate`), damit ein Tipp auf eine sichtbare Bar nie die
+Nachbarin trifft. Eine Ueberlappung auf der sichtbaren Flaeche ist ein Treffer fuer das
+falsche Ziel, eine in der Luft dazwischen nicht. Traegt das Ziel selbst
 `overflow: hidden`, schneidet es sein Pseudo ab: dann `overflow: visible` und die Ellipse ans
 Kind. Im Ganztags-Stapel der Woche bleibt die Aufgabe ein Reihen-Bauteil (24px, Spacing-
 Ausnahme) - dort kann keiner wachsen, ohne den Nachbarn zu verdecken.
@@ -2477,25 +2484,29 @@ einen Akzent erst recht, weil das Violett dunkler ist als das gemessene Tasks-Gr
 **Im Monatsraster** flache Tint-Bars statt satter Farbfelder: Flaeche auf `--tint-surface`
 (Layer-Farbe auf `--color-surface-work`, Hover eine Sprosse hoeher auf `--tint-raised`),
 Tinte `color-mix(in srgb, var(--ev-color) 35%, var(--color-text-primary))`; gemessen
-7.2-9.5:1 ueber die Layer-Farben. Keine Borders, Icons oder Avatar-Stacks im Monat (das
-"wer" traegt das title-Attribut). "Heute" ist NUR ein gefuellter Akzent-Kreis auf der Ziffer;
+7.2-9.5:1 ueber die Layer-Farben. Kein Rahmen und kein Avatar-Stack im Monat (das "wer"
+traegt das title-Attribut); Glyphen nach der Icon-Regel unten, wie in jeder Ansicht - hier
+stand bis 2026-09-24 „keine Icons im Monat", waehrend die Monatsbalken die Serienmarke laengst
+trugen. "Heute" ist NUR ein gefuellter Akzent-Kreis auf der Ziffer;
 Nachbarmonatstage dimmen ueber Flaeche UND Ziffer (AA-fest), nie ueber blosse Opacity auf
 Text allein.
 
 **Die Vollton-Kanten-Regel** (2026-08-17, Etappe 3). Wo ein Block GROSS genug ist, ihn zu
-tragen, sagt eine Kante im Vollton, zu wem er gehoert - 3px an der Inline-Start-Seite, der
-Zeitleisten-Kanon der Messlatte (Apple Kalender, Fantastical). Der Tagesspalten-Block hatte
-sie als eigenes Element (`.day-event__spine`) laengst; Wochen- und Ganztages-Bloecke bekamen
+tragen, sagt eine Kante im Vollton, zu wem er gehoert - 3px (`--cal-event-edge`) an der
+Inline-Start-Seite, der Zeitleisten-Kanon der Messlatte (Apple Kalender, Fantastical). Der
+Tagesspalten-Block hatte sie als eigenes Element (`.day-event__spine`, seit 2026-09-24
+entfallen) laengst; Wochen- und Ganztages-Bloecke bekamen
 sie als `border-inline-start`, weil sie ohne sie im Dark entsaettigter Nebel waren: 16 %
 Fuellung plus eine 1px-Kante auf halber Deckung ist dieselbe Beimischungs-Falle, an der das
 Absenderband zerbrochen ist - **eine Waschung hellt auf, sie faerbt nicht.** Fuellung
-(`--tint-surface`) und Tinte (38 % im Wochen- und Tagesblock, 35 % im Ganztages-Balken und
-im Monat) bleiben bei ihren gemessenen Rezepten unveraendert; die Farbe wandert in die Kante,
-wo die User-Farben-Regel sie ausdruecklich zulaesst.
+(`--tint-surface`) und Tinte (damals 38 % im Wochen- und Tagesblock, 35 % im Ganztages-Balken
+und im Monat; seit 2026-09-24 ueberall 35 %) bleiben bei ihren gemessenen Rezepten; die Farbe
+wandert in die Kante, wo die User-Farben-Regel sie ausdruecklich zulaesst.
 
 **Hier stand bis 2026-08-28 „Das Monatsraster bleibt kantenlos", und das war seit der
-Umsetzung falsch.** Alle VIER Blockarten tragen die Kante - `.month-day__event` genauso wie
-`.week-event`, `.day-event` und `.allday-event`; im Quelltext ist sie am Monatschip
+Umsetzung falsch.** Alle vier Blockarten tragen die Kante - `.month-day__event` genauso wie
+`.week-event`, `.day-event` und `.allday-event`, seit 2026-09-24 auch die Listenzeile (siehe
+„Eine Termingrammatik" unten); im Quelltext ist sie am Monatschip
 begruendet, nur hier war die Ausnahme stehengeblieben. Zwei Wahrheiten in zwei Dateien, und
 die Datei mit dem Anspruch, die Quelle zu sein, war die falsche. Der befuerchtete Effekt
 („bei 20px Chiphoehe waere die Kante ein Viertel des Blocks") ist gemessen nicht
@@ -2527,6 +2538,48 @@ beide dieselbe Fassung (`--color-text-tertiary`, die Ring-Regel oben), und die A
 FORM: Termin rund, Aufgabe ein Quadrat mit `--radius-2xs` - das Kaestchen, das sie in der Liste
 als Checkbox-Glyph fuehrt. Eine Unterscheidung, die an einer zweiten Farbe haengt, haelt in
 einem Theme und faellt im anderen; eine Form haelt in beiden.
+
+**Eine Termingrammatik** (Critique 2026-09-24, P2). Ein Termin sprach vier Mundarten: im Monat
+Balken mit Kante, in der Woche Block mit Kante, 1px-Rahmen und Standardglyph, im Tag Karte mit
+Kante UND eigenem Spine-Element (zwei Farbstriche) und senkrecht zentriertem Titel, in der
+Liste weisse Zeile mit 8px-Farbpunkt. Die Monatsbalken sind die Referenz, alle anderen folgen:
+
+- **Der Block** (Monat, Woche, Tag, Ganztag): Flaeche `--tint-surface` in der Terminfarbe auf
+  dem Grund, auf dem er steht (`--color-surface-work`, im Tag `--color-surface`), Hover eine
+  Sprosse hoeher; Tinte EIN Rezept, 35 % Terminfarbe in `--color-text-primary`; Kante
+  `--cal-event-edge` im Vollton an Inline-Start; kein Rahmen, `--radius-xs`. Gemessen ueber
+  die zwoelf Seed-/Kalenderfarben (Amber, Cyan, Teal eingeschlossen): Ruhe mindestens 7,22:1
+  light / 6,96:1 dark, Hover 6,83 / 6,47. Die 38 % der Woche waren naeher an der Nutzerfarbe,
+  also nie der bessere Kontrast.
+- **Titel oben, Zeit darunter, wenn Platz ist.** Zeitbloecke richten den Titel an der
+  Oberkante aus (klebend, wenn der Block oben aus dem Scrollport ragt), halbfett; die Zeitzeile
+  tritt ueber das Gewicht zurueck, nie ueber Opacity. Ob sie Platz hat, fragt eine
+  Container-Query nach der HOEHE des Blocks (`container: ev-block / size`, unter 2.125rem
+  entfaellt sie) - eine Minutenschwelle waere bei 56px-Stunden (Woche) und 40px-Stunden (Tag)
+  in einer der beiden Ansichten falsch; angeschnitten ist schlechter als weg.
+- **Die Listenzeile** (Agenda, Tagesliste des Telefon-Monats) bleibt eine Zeile auf der
+  Traegerflaeche - eine getoente Zeile waere eine Karte in der Karte -, aber die Zugehoerigkeit
+  traegt dieselbe Kante, am TEXT (`.agenda-event__body`), so hoch wie Titel und Metazeile.
+  Das Craft-Verbot „farbige Seitenkante an Listenzeilen" ist hier bewusst gebrochen: die Kante
+  ist die Kalenderfarbe selbst, dieselbe wie am Block, keine Dekoration.
+- **Die Icon-Regel.** Ein Terminicon erscheint nur, wenn jemand eines gewaehlt hat
+  (`hasEventIcon()`: 'calendar' ist Spalten-Default und Rueckfall, ein Kalenderglyph im
+  Kalender sagt nichts); die Serienmarke bei jeder Serie. Beides in JEDER Ansicht gleich, ueber
+  einen Baustein (`eventGlyphsHtml()`), 12px im Block, 16px in der Listenzeile. Die Glyphen
+  tragen die Tinte des Titels (`currentColor`), nie den Vollton der Terminfarbe: Amber auf
+  hellem Amber ist der Textfall, den die User-Farben-Regel verbietet, und die Farbe steht schon
+  in der Kante. Einzige Ausnahme: die Titelfassung des Telefon-Monats (~44px Spalte, der Titel
+  hat sieben Zeichen) laesst die Glyphen weg; die Tagesliste darunter zeigt sie.
+- **Ein Zeitformat.** Jede Spanne geht durch `timeSpanText()`: „17:00 - 18:30", der Trenner
+  aus `calendar.dayRangeLabel`, die Uhrzeiten aus `formatTime()` (12 Stunden, Ziffern der
+  Locale), das Suffix der Locale („Uhr") EINMAL am Ende. Im Raster ohne Suffix (der Block steht
+  an seiner Uhrzeit), in Liste, Detailansicht, Schichtdetail, Tooltip und gesprochenem Namen
+  mit - ein Termin klingt in jeder Ansicht gleich. „ab"/„bis" am ersten und letzten Tag eines
+  Mehrtagestermins bleiben. Vorher: drei Schreibweisen, zwei mit Gedankenstrich, Schichtzeiten
+  als rohe 24-Stunden-Zeichenkette auch fuer wen 12 Stunden eingestellt hat.
+- **Die Ganztags-Beschriftung** der Zeitspalte steht als ganzes Wort mit weichem Trennstrich in
+  der Locale („ganz-/taegig"), bricht in der 44px-Spalte um und haelt Abstand zur Kante;
+  „ganztg." war 42,5px breit in 40px Innenmass und eine Abkuerzung zum Entziffern.
 
 ### Mobil-Monat: Raster oben, der gewaehlte Tag darunter (Critique 2026-09-24, P2)
 Unter 640px ist der Monat geteilt, nach der Messlatte (Apple Kalender „Liste", Fantastical,

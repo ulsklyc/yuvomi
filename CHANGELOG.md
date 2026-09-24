@@ -52,6 +52,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **An event looks the same in every calendar view, and every time reads "17:00 - 18:30".** The
+  month showed a tinted bar with a coloured edge, the week a block with an extra frame and a
+  generic calendar icon, the day a card with two colour strokes and its title floating in the
+  middle, the agenda a white row with a coloured dot. Now all of them follow the month: tinted
+  surface, one coloured edge, the title at the top and the time underneath when there is room;
+  agenda rows and the day list under the phone month carry the same edge instead of the dot.
+  An event shows its icon only when you picked one, in every view, and the repeat mark on every
+  series. Icons take the colour of the title instead of the raw event colour, which was hard to
+  read on light colours such as amber. Times use one format everywhere, with "Uhr" once at the
+  end in German instead of after each time, and shift times now follow the 12-hour setting. The
+  "ganztg." label next to the all-day row is now the full word and wraps in the narrow phone
+  column instead of running into the screen edge, tasks in the agenda sit closer together, and
+  the initials in the agenda's avatar stack are 12px.
+
 - **Edit sits at the bottom of an event on a phone, Delete no longer does.** The sheet that opens
   for an event put Edit at the top, out of reach of the thumb, and Delete at the bottom, where the
   thumb rests. Edit is now the main button at the bottom right; Delete stays in red at the start

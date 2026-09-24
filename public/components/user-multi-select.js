@@ -14,9 +14,10 @@ import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
  * @param {object} opts
  * @param {number} [opts.size=28]      Avatar-Größe in px
  * @param {number} [opts.maxVisible=3] Maximale Avatare vor "+N"-Anzeige
+ * @param {number} [opts.minFont=11]   Untergrenze der Initialen in px
  * @returns {string} HTML-String
  */
-export function renderAvatarStack(users, { size = 28, maxVisible = 3 } = {}) {
+export function renderAvatarStack(users, { size = 28, maxVisible = 3, minFont = 11 } = {}) {
   if (!users?.length) return '';
   const visible = users.slice(0, maxVisible);
   const overflow = users.length - visible.length;
@@ -28,7 +29,11 @@ export function renderAvatarStack(users, { size = 28, maxVisible = 3 } = {}) {
   // (Verhaeltnis <= 0.55); darunter ist die Scheibe der Kanal - die Nutzerfarbe
   // ist per User-Farben-Regel ohnehin das Identitaetssignal, und der Name
   // steht weiter im title. Ein 9px-Text sagt weniger als ein sauberer Punkt.
-  const fs = Math.max(11, Math.round(size * 0.4));
+  // `minFont` hebt die Untergrenze dort, wo der Stapel neben Fliesstext steht
+  // (Agenda-Zeile: 12px neben 14px-Metazeile, Critique 2026-09-24). Wer sie
+  // hebt, gibt die Scheibe mit: 12px brauchen 22px, damit das Verhaeltnis
+  // <= 0.55 bleibt.
+  const fs = Math.max(minFont, Math.round(size * 0.4));
   const showText = size >= 20;
   const avatars = visible.map((u) => {
     const initials = (u.display_name ?? '')

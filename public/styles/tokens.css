@@ -1333,6 +1333,10 @@
   /* Mobil (<640px) 44px (Critique 2026-09-24): 64px von 375 waren ein
    * Sechstel der Breite fuer eine Beschriftung, bei nur drei Tagesspalten. */
   --cal-gutter-width-compact: 44px;
+  /* Die Vollton-Kante eines Termins (DESIGN.md „Event-Bloecke"): Monat, Woche,
+   * Tag, Ganztag und Listenzeile tragen sie gleich breit. Die Titelfassung des
+   * Telefon-Monats nimmt 2px (--space-0h), eine Geometrie, keine zweite Kante. */
+  --cal-event-edge: 3px;
   --sub-tabs-height: 52px;
   --kitchen-tabs-height: 56px;
 
