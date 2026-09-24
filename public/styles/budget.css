@@ -1548,14 +1548,12 @@ button.budget-entry__title {
 }
 
 /* Zins-Darlehen (#569): Live-Vorschau + Variabel-Hinweis unter den Zinsfeldern.
- * .form-hint lebt in settings.css, und der Router lädt nur ein Page-CSS pro
- * Seite - im Budget-Modal blieben die Zeilen sonst auf Body-Größe und -Farbe.
- * Nicht auf .modal-panel scopen: der Umrechnungshinweis der Summenkarte (#582)
- * steht direkt auf der Seite und liefe sonst in dieselbe Falle. */
+ * Groesse und Farbe bringt `.form-hint` (layout.css, global); hier steht nur
+ * der Abstand, den diese Zeilen zusaetzlich brauchen. Bis 2026-09-24 trug die
+ * Klasse auch Groesse und Farbe - `.form-hint` lebte in settings.css und war
+ * auf /budget nicht geladen. */
 .budget-loan-hint {
   margin-top: var(--space-1);
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
 }
 
 .budget-field-header {

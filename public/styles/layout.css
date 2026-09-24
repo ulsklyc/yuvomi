@@ -5267,6 +5267,29 @@ textarea::placeholder {
   color: var(--color-text-tertiary);
 }
 
+/* DIE HINWEISZEILE UNTER EINEM FELD - global, weil sie global benutzt wird.
+ *
+ * Die Regel lebte bis 2026-09-24 in settings.css. Der Router laedt aber genau
+ * EIN Seiten-Blatt pro Route, und `.form-hint` steht in fast jedem Modul:
+ * ueberall ausser in den Einstellungen fiel sie auf den geerbten Koerpertext
+ * zurueck (16px, volle Primaertinte) - lauter als das Label und das Feld, zu
+ * denen sie gehoert (Critique 2026-09-24, P2, gemessen im Termin-Dialog).
+ * Kalender, Budget, Kontakte, Dokumente, Inventar und die Fasten-Bausteine
+ * trugen dafuer eine eigene Kopie oder eine Ersatzklasse. Die Regel
+ * steht deshalb hier; `test:frontend-audit` haelt sie in einem Blatt, das
+ * index.html fuer jede Route verlinkt. Nur die Zeilenlaenge der
+ * Einstellungen (`.settings-page .form-hint`) bleibt in settings.css. */
+.form-hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Tonlagen für Hinweistexte. Vorher setzte `admin-backup.js` die Farbe des
+   Verbindungstests inline (`style.color = 'var(--color-success)'`), was den
+   Wert am Token vorbei ins Markup schrieb. */
+.form-hint--success { color: var(--color-success); }
+.form-hint--danger { color: var(--color-danger); }
+
 .required-marker {
   color: var(--color-danger);
   margin-left: var(--space-0h);

@@ -1117,7 +1117,7 @@ function buildContactForm({ mode, contact = null }) {
         // gespeichert wird ausschließlich der rohe Feldinhalt.
         // Zwei Zonen: Vorschau ist STILL (keine Live-Region, sonst würde jeder
         // Tastendruck vorgelesen); nur die Warnung wird per aria-live angesagt.
-        ? `<p class="contact-phone-hint" id="cm-phone-hint" data-mv-hint>
+        ? `<p class="form-hint contact-phone-hint" id="cm-phone-hint" data-mv-hint>
              <span class="contact-phone-hint__preview" data-mv-preview></span>
              <span class="contact-phone-hint__warn" data-mv-warn aria-live="polite"></span>
            </p>`

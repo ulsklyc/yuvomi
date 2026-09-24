@@ -482,8 +482,9 @@
 }
 
 /* --------------------------------------------------------
- * Garantiestatus-Zeile (Stufe 4) - eigene Klasse statt .form-hint, das nur in
- * der page-scoped settings.css gestylt ist und hier fehlt.
+ * Garantiestatus-Zeile (Stufe 4) - eigene Klasse, weil sie drei Tonlagen
+ * kennt (gueltig, laeuft ab, abgelaufen). Die Groesse ist die von `.form-hint`
+ * (layout.css); die Klasse entstand, als diese nur in settings.css lebte.
  * -------------------------------------------------------- */
 
 .inventory-warranty-status {

@@ -111,6 +111,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Hints under form fields are small and grey in every module.** Outside the settings, the
+  explanatory line under a field showed in full-size, full-contrast body text - in the event
+  dialog, in budget, contacts, meals, shopping and elsewhere - and read louder than the field it
+  belonged to, because its style was only loaded on the settings pages.
+
 - **Events in the week and day view can be reached by keyboard and screen reader.** They could only
   be clicked: Tab skipped them and a screen reader did not offer them. Every event, all-day bar
   and day heading is now a button named like the agenda row (title, time, place, people), in the

@@ -1654,16 +1654,9 @@
   margin-bottom: var(--space-3);
 }
 
-/* .form-hint ist nur in der page-scoped settings.css gestylt und fehlt hier
-   (Dokumente-Seite lädt sie nicht). Ohne diese Regel fielen der ASN-Hinweis und
-   die „Keine Treffer"-Meldungen im DMS-Modal auf den schwarzen Browser-Default
-   zurück. Kein display setzen, damit [hidden] am Hinweis weiter greift. */
-.dms-search-hint,
-.dms-results .form-hint {
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-}
-
+/* Der ASN-Hinweis und die „Keine Treffer"-Meldungen im DMS-Modal tragen
+   `.form-hint` (layout.css, global); bis 2026-09-24 stand hier eine Kopie
+   davon, weil die Regel nur in settings.css lebte. */
 .dms-search-hint {
   margin: var(--space-2) 0 0;
 }

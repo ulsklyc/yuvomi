@@ -3536,7 +3536,7 @@ function openLoanModal(loan = null) {
       <label class="form-label" for="lm-paid">${t('budget.loanPaidInstallmentsLabel')}</label>
       <input type="number" class="form-input" id="lm-paid" step="1" min="0"
              inputmode="numeric" value="0">
-      <p class="budget-loan-hint">${t('budget.loanPaidInstallmentsHint')}</p>
+      <p class="form-hint budget-loan-hint">${t('budget.loanPaidInstallmentsHint')}</p>
     </div>`}
     <div class="form-group">
       <label class="form-label" for="lm-notes">${t('budget.loanNotesLabel')}</label>

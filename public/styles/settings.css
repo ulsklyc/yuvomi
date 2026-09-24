@@ -1158,16 +1158,9 @@
   border-radius: var(--radius-sm);
 }
 
-.form-hint {
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-}
-
-/* Tonlagen für Hinweistexte. Vorher setzte `admin-backup.js` die Farbe des
-   Verbindungstests inline (`style.color = 'var(--color-success)'`), was den
-   Wert am Token vorbei ins Markup schrieb. */
-.form-hint--success { color: var(--color-success); }
-.form-hint--danger { color: var(--color-danger); }
+/* `.form-hint` samt `--success`/`--danger` steht seit 2026-09-24 in
+   layout.css: fast jedes Modul benutzt sie, und dieses Blatt laedt nur auf
+   den Einstellungen. Hier bleibt nur ihre Zeilenlaenge weiter unten. */
 
 /* Gesperrte Eingabefelder sahen aus wie bediente: es gab keine
    :disabled-Regel, und `admin-backup.js` half sich mit einem hartkodierten
@@ -1189,9 +1182,9 @@
    verbreitete 65ch-Faustregel ergäbe hier 104 Zeichen; 50ch sind 512px und
    damit rund 76.
 
-   Auf die Settings-Fläche begrenzt: `.form-hint` gehört zwar dieser Datei,
-   wird aber von acht weiteren Modulen benutzt, deren Spalten hier niemand
-   gemessen hat. */
+   Auf die Settings-Fläche begrenzt: `.form-hint` steht global in
+   layout.css und wird in fast jedem Modul benutzt, deren Spalten hier
+   niemand gemessen hat. */
 .settings-page .form-hint,
 .settings-page .settings-card-description,
 .settings-page .settings-leaf-header__description {

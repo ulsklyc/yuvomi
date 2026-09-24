@@ -745,17 +745,12 @@ html:has(.contacts-page.is-selecting) {
 }
 
 /* Telefon-Tipphilfe (AsYouType-Vorschau / Plausibilitäts-Hinweis). Rein visuell,
-   nie blockierend; leer, solange kein Telefonfeld aktiv ist. Selbst-gestylt, da
-   .form-hint page-scoped in settings.css liegt und hier nicht geladen wird. */
+   nie blockierend; leer, solange kein Telefonfeld aktiv ist. Groesse und die
+   gedaempfte Farbe der Vorschau bringt `.form-hint` (layout.css, global) mit;
+   hier stehen nur Abstand, Mindesthoehe und der Warnton. */
 .contact-phone-hint {
   margin-top: var(--space-2);
   min-height: 1.25em; /* kein Sprung, wenn der Hinweis erscheint/verschwindet */
-  font-size: var(--text-sm);
-}
-
-/* Vorschau gedämpft (Hinweis-Charakter), Warnung im Warnton. */
-.contact-phone-hint__preview {
-  color: var(--color-text-secondary);
 }
 
 .contact-phone-hint__warn {

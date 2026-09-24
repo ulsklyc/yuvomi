@@ -10696,11 +10696,50 @@ test('settings.css haelt Zeilenlaenge, Token-Disziplin und keine toten Regeln', 
     assert.ok(shell.includes(cls), `${cls} muss im Markup vorkommen, sonst ist die CSS-Regel tot`);
   }
 
-  // Design-Werte gehoeren nicht ins JS.
+  // Design-Werte gehoeren nicht ins JS. Die Tonlagen stehen seit 2026-09-24
+  // mit `.form-hint` in layout.css (siehe den Guard darunter).
   const backup = read('../public/settings/pages/admin-backup.js');
   assert.ok(!/\.style\.(opacity|color)\s*=/.test(backup), 'Tone/Opazitaet ueber Klassen, nicht inline');
-  assert.match(css, /\.form-hint--success \{ color: var\(--color-success\); \}/);
+  assert.match(read('../public/styles/layout.css'), /\.form-hint--success \{ color: var\(--color-success\); \}/);
   assert.match(css, /\.settings-page \.form-input:disabled \{/);
+});
+
+/*
+ * `.form-hint` STEHT IN EINEM BLATT, DAS JEDE ROUTE LAEDT (Critique 2026-09-24).
+ *
+ * Die Regel lebte in settings.css. Der Router laedt pro Route genau EIN
+ * Seiten-Blatt, und die Klasse steht in fast jedem Modul: ausserhalb der
+ * Einstellungen fiel jede Hinweiszeile auf den Koerpertext zurueck (16px,
+ * volle Primaertinte), im Termin-Dialog an sieben Stellen. Kalender, Budget,
+ * Kontakte, Dokumente und die Fasten-Bausteine trugen dafuer Kopien oder
+ * Ersatzklassen.
+ *
+ * Zwei Fragen: Steht die Basisregel genau einmal, und zwar in einem Blatt, das
+ * index.html verlinkt? Und traegt kein anderes Blatt eine Kopie davon - eine
+ * Regel, deren letztes Glied `.form-hint` ist und die Groesse oder Farbe setzt?
+ * Die Zeilenlaenge der Einstellungen (`.settings-page .form-hint`) setzt
+ * keines von beiden und bleibt erlaubt.
+ */
+test('.form-hint steht in einem global geladenen Blatt, und kein Modul traegt eine Kopie', () => {
+  const html = withoutHtmlComments(read('../public/index.html'));
+  const globals = new Set([...html.matchAll(/<link rel="stylesheet" href="\/styles\/([\w-]+\.css)"/g)].map((m) => m[1]));
+  assert.ok(globals.has('layout.css'), 'index.html nennt layout.css nicht mehr - die globalen Blaetter sind nicht mehr lesbar');
+  const homes = [];
+  const copies = [];
+  for (const { file, css } of stylesheetFiles()) {
+    for (const { selector, body, at } of eachRule(css)) {
+      for (const sel of selector.split(',').map((x) => x.trim())) {
+        if (sel === '.form-hint' && at.length === 0) homes.push(file);
+        else if (/(?:^|[\s>+~])\.form-hint$/.test(sel) && /(?:^|[;{\s])(?:font-size|color)\s*:/.test(body)) {
+          copies.push(`${file}: ${sel}`);
+        }
+      }
+    }
+  }
+  assert.equal(homes.length, 1, `die Basisregel .form-hint steht ${homes.length}x: ${homes.join(', ')}`);
+  assert.ok(globals.has(homes[0]),
+    `.form-hint steht in ${homes[0]} - das laedt der Router nur auf seiner Route, ueberall sonst rendert der Hinweis als Koerpertext`);
+  assert.deepEqual(copies, [], 'eine Kopie von .form-hint in einem Seiten-Blatt - die Regel ist global, die Kopie verdeckt, wenn sie fehlt');
 });
 
 // Avatare tragen die Farbe, die sich das Mitglied selbst aussucht; die

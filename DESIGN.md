@@ -1599,6 +1599,12 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   Kanonisch fuer neuen Code ist `.form-input` - der Name, den `.form-group`/`.form-field`/
   `.form-label` schon fuehren. Bestand bleibt unangetastet, Umbenennen aller Fundstellen ist
   keine Migration wert.
+- **Hinweiszeile:** `.form-hint` (14px, Sekundaertext, Tonlagen `--success`/`--danger`) steht
+  in layout.css, weil fast jedes Modul sie benutzt - bis 2026-09-24 lebte sie in settings.css
+  und renderte ueberall sonst als 16px-Koerpertext. Eine geteilte Klasse gehoert in ein Blatt,
+  das index.html verlinkt; eine Kopie oder Ersatzklasse im Seiten-Blatt ist der Fehler, nicht
+  die Loesung (`test:frontend-audit`). `.task-field-hint` (12px, tertiaer) ist die leisere
+  Bestandsstimme der Aufgaben und Erinnerungen.
 
 ### Nur lesen: das Zeichen statt des Knopfs (#1252, #1265)
 Wer ein Modul nur lesen darf, sieht den ZUSTAND, aber keine Handlung. Der Server weist
