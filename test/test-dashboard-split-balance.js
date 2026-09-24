@@ -409,3 +409,38 @@ test('Sprungziel: die geteilten Ausgaben waehlen die Gruppe aus ?group=, wenn de
   assert.equal(split.groupFromQuery('?group=99', groups), null, 'eine fremde oder archivierte Gruppe wird nicht erraten');
   assert.equal(split.groupFromQuery('', groups), null);
 });
+
+/* Review #1450: das Netto summiert ueber alle Gruppen und laesst eine Waehrung
+ * mit Summe 0 weg, die Positionen bleiben je Gruppe stehen. Die Kachel hing
+ * nur an den Positionen und fiel ohne passendes Netto auf "0" zurueck - also
+ * "0,00 €" neben "Du schuldest Alex", oder ein offenes Netto in einer anderen
+ * Waehrung blieb versteckt. */
+const pos = (direction, name, groupId, currency, amountMinor) => ({
+  direction, userId: groupId, name, groupId, groupName: `G${groupId}`, currency, amountMinor,
+  amount: (amountMinor / 100).toFixed(2),
+});
+
+test('Kachel: gleicht sich das Netto ueber Gruppen aus, gibt es keine Kachel - nie "0,00"', async () => {
+  const __test = await dashboardTest();
+  const tile = splitTile(__test.selectMetricTiles({
+    ...BASE_DATA,
+    splitBalance: { net: [], positions: [pos('owe', 'Alex', 4, 'EUR', 5000), pos('owed', 'Bob', 7, 'EUR', 5000)] },
+  }, 'EUR', new Set()));
+  assert.equal(tile, undefined, `insgesamt ausgeglichen ist die Regel "ausgeglichen, keine Kachel" - erhalten: ${tile && nbsp(tile.value)}`);
+});
+
+test('Kachel: Wert und Position kommen aus der Waehrung, in der wirklich etwas offen ist', async () => {
+  const __test = await dashboardTest();
+  const tile = splitTile(__test.selectMetricTiles({
+    ...BASE_DATA,
+    splitBalance: {
+      net: [{ currency: 'USD', netMinor: -2000, amount: '-20.00' }],
+      positions: [pos('owe', 'Alex', 4, 'EUR', 5000), pos('owed', 'Bob', 7, 'EUR', 5000), pos('owe', 'Cleo', 9, 'USD', 2000)],
+    },
+  }, 'EUR', new Set()));
+  assert.ok(tile, 'das offene USD-Netto bekommt eine Kachel');
+  assert.match(nbsp(tile.value), /-20,00/, `der Wert ist das offene Netto, nicht "0": ${nbsp(tile.value)}`);
+  assert.equal(tile.tone, 'balance-negative');
+  assert.match(tile.note, /Cleo/, 'die genannte Position gehoert zur Waehrung des Werts');
+  assert.equal(tile.route, '/budget?tab=split-expenses&group=9');
+});

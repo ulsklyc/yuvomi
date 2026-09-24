@@ -2264,7 +2264,8 @@ function formatLedgerAmount(amount, currency) {
  * Waehrungen addiert niemand. Vorzeichen und Farbe nach der Rolle `balance`
  * (utils/money.js): Minus nur, wer schuldet.
  *
- * AUSGEGLICHEN GIBT ES KEINE KACHEL. „Alles ausgeglichen" waere wahr, verlangt
+ * AUSGEGLICHEN GIBT ES KEINE KACHEL, auch wenn sich zwei Gruppen nur
+ * gegenseitig aufheben. „Alles ausgeglichen" waere wahr, verlangt
  * aber nichts - und die Reihe hat vier Plaetze, die sonst eine Zahl tragen, die
  * NIRGENDS steht. Dieselbe Regel wie bei den uebrigen Kandidaten: keine offene
  * Position, keine Kennzahl.
@@ -2275,10 +2276,15 @@ function formatLedgerAmount(amount, currency) {
  */
 function splitBalanceTile(balance) {
   const positions = Array.isArray(balance?.positions) ? balance.positions : [];
-  const top = positions[0];
+  // Das Netto entscheidet, nicht die Positionen: es summiert ueber alle
+  // Gruppen und laesst eine Waehrung mit Summe 0 weg, die Positionen bleiben je
+  // Gruppe stehen. Offen ist also nur, wo ein Netto steht - und die genannte
+  // Position gehoert zu dessen Waehrung.
+  const net = (balance?.net ?? []).find((n) => Number(n.netMinor) !== 0);
+  if (!net) return null;
+  const top = positions.find((p) => p.currency === net.currency);
   if (!top) return null;
-  const net = (balance.net ?? []).find((n) => n.currency === top.currency);
-  const netMinor = Number(net?.netMinor) || 0;
+  const netMinor = Number(net.netMinor);
   const who = top.direction === 'owe'
     ? t('dashboard.splitYouOwe', { name: top.name })
     : t('dashboard.splitOwesYou', { name: top.name });
@@ -2293,7 +2299,7 @@ function splitBalanceTile(balance) {
     route: `/budget?tab=split-expenses&group=${encodeURIComponent(String(top.groupId))}`,
     icon: widgetIcon('split-expenses'),
     label: t('splitExpenses.title'),
-    value: formatLedgerAmount(net?.amount ?? '0', top.currency),
+    value: formatLedgerAmount(net.amount, net.currency),
     note,
     tone: netMinor > 0 ? 'balance-positive' : netMinor < 0 ? 'balance-negative' : 'balance-neutral',
   };
