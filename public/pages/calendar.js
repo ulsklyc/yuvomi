@@ -1472,12 +1472,33 @@ function holidaysOnDay(dateStr) {
  *  sonst entsteht ein fokussierbarer Button im Zellen-Button (Audit P1).
  *  icon:false lässt das check-square-Icon weg: die Monats-Bars sind nach Kanon
  *  icon-frei, Woche/Tag/Agenda behalten es als Termin/Aufgabe-Unterscheidung. */
+const TASK_PRIORITY_KEYS = {
+  urgent: 'tasks.priorityUrgent', high: 'tasks.priorityHigh',
+  medium: 'tasks.priorityMedium', low: 'tasks.priorityLow',
+};
+
+/**
+ * Der zugaengliche Name einer Aufgabe im Kalender: Titel, Prioritaet, Uhrzeit.
+ * Die Prioritaet stand nur im Punkt, und der ist `aria-hidden` - ein
+ * Screenreader hoerte „Aufgabe: Steuererklaerung" und nie „dringend". „Ohne"
+ * sagt nichts, wie der Punkt auch keinen zeigt.
+ */
+function taskChipAriaLabel(task) {
+  const priority = TASK_PRIORITY_KEYS[task.priority];
+  return [
+    t('calendar.taskChipAriaLabel', { title: task.title }),
+    priority ? `${t('tasks.priorityLabel')}: ${t(priority)}` : '',
+    // Reine Wanduhrzeit: formatTime faengt sie vor jeder Zonenrechnung ab.
+    task.due_time ? formatTime(task.due_time.slice(0, 5)) : '',
+  ].filter(Boolean).join(', ');
+}
+
 function renderTaskChip(task, { interactive = true, icon = true } = {}) {
   const priority = task.priority || 'none';
   const label    = esc(task.title);
   const timeStr  = task.due_time ? ` · ${task.due_time.slice(0, 5)}` : '';
   const button   = interactive
-    ? ` role="button" tabindex="0" aria-label="${esc(t('calendar.taskChipAriaLabel', { title: task.title }))}"`
+    ? ` role="button" tabindex="0" aria-label="${esc(taskChipAriaLabel(task))}"`
     : '';
   // Die Prioritaet steht als Rangmarke im Punkt (list-row.css), nicht mehr als
   // getoentes Feld mit getoenter Schrift: dieselbe Stufe, die die Aufgabenliste
@@ -1762,6 +1783,10 @@ export async function render(container, { user }) {
   container.insertAdjacentHTML('beforeend', `
     <div class="calendar-page app-page app-page--full" id="calendar-page" data-composition="full">
       <div class="page-toolbar page-toolbar--wrap cal-toolbar" id="cal-toolbar"></div>
+      <!-- Ansage der Tagesliste im Telefon-Monat (announceMonthDay). Ausserhalb
+           von #cal-body, damit sie einen Neuaufbau der Ansicht ueberlebt: eine
+           Live-Region, die mit ihrem Inhalt zusammen entsteht, sagt nichts an. -->
+      <span id="cal-live" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></span>
       <div id="cal-body" style="flex:1;display:flex;flex-direction:column;overflow:hidden;"></div>
       ${/* Die CSS-Regel html[data-module-readonly] .page-fab (layout.css) blendet
             ihn ohnehin aus; hier faellt er ganz weg, damit `findPageFab` unten
@@ -1886,16 +1911,44 @@ export async function render(container, { user }) {
  * Reihenfolge prueft (test-calendar.js), statt Quelltext zu lesen.
  */
 function periodNavHtml() {
+  const keys = periodArrowKeys();
   return `
-      <button class="btn btn--icon" id="cal-prev" aria-label="${t('calendar.back')}">
+      <button class="btn btn--icon" id="cal-prev" aria-label="${t('calendar.back')}"
+              aria-keyshortcuts="${CAL_SHORTCUT_KEYS.prev} ${keys.prev}">
         <i data-lucide="chevron-left" aria-hidden="true"></i>
       </button>
       <span class="cal-toolbar__label" id="cal-label"></span>
-      <button class="btn btn--icon" id="cal-next" aria-label="${t('calendar.forward')}">
+      <button class="btn btn--icon" id="cal-next" aria-label="${t('calendar.forward')}"
+              aria-keyshortcuts="${CAL_SHORTCUT_KEYS.next} ${keys.next}">
         <i data-lucide="chevron-right" aria-hidden="true"></i>
       </button>
-      <button class="btn btn--secondary cal-toolbar__today" id="cal-today">${t('calendar.today')}</button>
+      <button class="btn btn--secondary cal-toolbar__today" id="cal-today"
+              aria-keyshortcuts="${CAL_SHORTCUT_KEYS.today}">${t('calendar.today')}</button>
   `;
+}
+
+/**
+ * DIE KUERZEL DES KALENDERS (Critique 2026-09-24, P1, Persona Alex).
+ *
+ * Die Tasten folgen Google Kalender, der verbreitetsten Tastaturschule fuer
+ * genau diese Handgriffe: t heute, k zurueck, j vor, m/w/d/a die Ansicht. Sie
+ * stehen hier, weil die Knoepfe sie per `aria-keyshortcuts` ansagen; AUSGELOEST
+ * werden sie im EINEN Tastatur-Dispatcher der Shell (router.js, SHORTCUTS mit
+ * `route: '/calendar'`). Ein zweiter keydown-Listener hier saehe den Akkord
+ * „g d" nicht und schaltete beim „d" auf den Tag, waehrend die Shell zum
+ * Dashboard geht.
+ */
+const CAL_SHORTCUT_KEYS = {
+  today: 't', prev: 'k', next: 'j',
+  views: { month: 'm', week: 'w', day: 'd', agenda: 'a' },
+};
+
+/**
+ * Welche Pfeiltaste zurueck und welche vor heisst: die, die auf den Knopf
+ * zeigt. In einer RTL-Locale steht „zurueck" rechts.
+ */
+function periodArrowKeys(rtl = typeof document !== 'undefined' && document.documentElement?.dir === 'rtl') {
+  return rtl ? { prev: 'ArrowRight', next: 'ArrowLeft' } : { prev: 'ArrowLeft', next: 'ArrowRight' };
 }
 
 /**
@@ -1929,10 +1982,13 @@ function toolbarHtml({ filterCount = 0, scheduleWarningHtml = '' } = {}) {
          auf seine 7ch-Untergrenze. Der neutrale Wrapper haelt das Well des
          Segments auf intrinsischer Breite; die Zeile gehoert trotzdem ihm. -->
     <div class="page-toolbar__bar cal-toolbar__bar">
-      <div class="cal-toolbar__views" role="tablist" aria-label="${t('nav.calendar')}">
+      <!-- „Ansicht", nicht „Kalender": die Tablist hiess wie die H1 darueber, und
+           ein Screenreader kuendigte zweimal hintereinander „Kalender" an. -->
+      <div class="cal-toolbar__views" role="tablist" aria-label="${t('calendar.viewSwitcher')}">
         ${VIEWS.map((v) => `
           <button class="cal-toolbar__view-btn ${v === state.view ? 'cal-toolbar__view-btn--active' : ''}"
                   role="tab" id="cal-view-tab-${v}" data-tab-id="${v}"
+                  aria-keyshortcuts="${CAL_SHORTCUT_KEYS.views[v]}"
                   aria-selected="${v === state.view ? 'true' : 'false'}"
                   ${v === state.view ? 'aria-controls="cal-body"' : ''}
                   tabindex="${v === state.view ? '0' : '-1'}">${VIEW_LABELS()[v]}</button>
@@ -2146,6 +2202,8 @@ function getWeekNumber(dateStr) {
 
 async function navigate(dir) {
   if (searchActive) closeCalendarSearch({ restoreView: false });
+  const gridFocus = monthGridHasFocus();
+  _monthFocusDate = null;
   if (state.view === 'month') {
     state.cursor = monthStepCursor(state.cursor, dir);
   } else if (state.view === 'week') {
@@ -2159,15 +2217,47 @@ async function navigate(dir) {
   await reloadForView();
   updateLabel();
   renderView();
+  if (gridFocus) focusMonthCell(state.cursor);
 }
 
 async function goToday() {
   if (searchActive) closeCalendarSearch({ restoreView: false });
+  const gridFocus = monthGridHasFocus();
+  _monthFocusDate = null;
   state.cursor = state.today;
   await reloadForView();
   updateLabel();
   renderView();
+  if (gridFocus) focusMonthCell(state.cursor);
+  else if (state.view === 'month') announceMonthDay(state.cursor);
 }
+
+/**
+ * Stand der Fokus im Monatsraster, als ein Kuerzel (t, j, k) den Zeitraum
+ * wechselte? Dann geht er nach dem Neuaufbau zurueck ins Raster - sonst
+ * landete er auf <body>, und der naechste Pfeil taete nichts.
+ */
+function monthGridHasFocus() {
+  const active = typeof document !== 'undefined' ? document.activeElement : null;
+  return Boolean(active?.closest?.('#month-grid'));
+}
+
+/**
+ * Die Kuerzel des Kalenders kommen aus dem Tastatur-Dispatcher der Shell
+ * (router.js, SHORTCUTS mit `route: '/calendar'`) als Ereignis - die Seite
+ * entscheidet, was „heute" oder „vor" in ihrer Ansicht heisst. Auf
+ * Modulebene gebunden wie `_monthSplitQuery`: in render() gebunden
+ * verdoppelte sich der Listener mit jedem Besuch.
+ */
+function onCalendarCommand(e) {
+  if (!_container?.isConnected) return;
+  const { command, view } = e.detail ?? {};
+  if (command === 'today') goToday();
+  else if (command === 'prev') navigate(-1);
+  else if (command === 'next') navigate(1);
+  else if (command === 'view' && VIEWS.includes(view) && view !== state.view) viewTabs?.setActive(view);
+}
+if (typeof document !== 'undefined') document.addEventListener?.('yuvomi:calendar-command', onCalendarCommand);
 
 /**
  * Drill-in aus einer Tageszelle - EINE NAVIGATION, KEINE EINSTELLUNG.
@@ -2469,18 +2559,30 @@ function renderMonthView(container) {
   });
   const selWeek = Math.floor(days.findIndex((d) => d.date === state.cursor) / 7);
 
+  const focusDate = monthRovingDate(days.map((d) => d.date), days.find((d) => d.inMonth)?.date);
+
   container.replaceChildren();
+  // EIN ARIA-GRID MIT EINEM TAB-STOPP (Critique 2026-09-24, P1). Vorher war
+  // jede der 35-42 Zellen ein eigener role="button"-Tab-Stopp ohne Pfeiltasten.
+  // Jetzt: role=grid an der Monatsflaeche, die Wochentagsleiste als Kopfzeile,
+  // je Woche eine role=row, der Tag als gridcell mit roving tabindex - die
+  // Pfeile bewegen den Tag, Tab verlaesst das Raster (wireMonthGridKeys).
   container.insertAdjacentHTML('beforeend', `
-    <div class="${monthViewClasses(state.monthTitles, { split, collapsed: split && _monthCollapsed })}" style="--month-weeks:${weeks}">
-      <div class="month-weekdays">
-        ${weekdayOrder(state.weekStart).map((idx) => `<div class="month-weekday">${DAY_NAMES_SHORT()[idx]}</div>`).join('')}
+    <div class="${monthViewClasses(state.monthTitles, { split, collapsed: split && _monthCollapsed })}" style="--month-weeks:${weeks}"
+         role="grid" aria-labelledby="cal-label" aria-readonly="true">
+      <div class="month-weekdays" role="row">
+        ${weekdayOrder(state.weekStart).map((idx) => `<div class="month-weekday" role="columnheader" aria-label="${esc(DAY_NAMES_LONG()[idx])}">${DAY_NAMES_SHORT()[idx]}</div>`).join('')}
       </div>
-      <div class="month-grid${split ? '' : ' page-scrollport'}" id="month-grid">
-        ${days.map(({ date, inMonth }, i) => renderMonthDay(date, inMonth, {
-          selected: split && date === state.cursor,
-          selWeek:  split && Math.floor(i / 7) === selWeek,
-          split,
-        })).join('')}
+      <div class="month-grid${split ? '' : ' page-scrollport'}" id="month-grid" role="rowgroup">
+        ${Array.from({ length: weeks }, (_, w) => `
+        <div class="month-grid__row" role="row">
+          ${days.slice(w * 7, w * 7 + 7).map(({ date, inMonth }) => renderMonthDay(date, inMonth, {
+            selected: split && date === state.cursor,
+            selWeek:  split && w === selWeek,
+            split,
+            focusable: date === focusDate,
+          })).join('')}
+        </div>`).join('')}
       </div>
     </div>
     ${split ? monthListHtml() : ''}
@@ -2521,16 +2623,7 @@ function renderMonthView(container) {
     activateMonthDay(dayEl.dataset.date, { split });
   });
 
-  // Tastatur-Aktivierung der Tageszelle (role="button"): Enter/Space tut
-  // dasselbe wie der Tipp. Nur wenn der Fokus auf der Zelle selbst liegt;
-  // innere Chips tragen desktop ihre eigene Semantik (Audit P1).
-  grid.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter' && e.key !== ' ') return;
-    const dayEl = e.target.closest('.month-day');
-    if (!dayEl || e.target !== dayEl) return;
-    e.preventDefault();
-    activateMonthDay(dayEl.dataset.date, { split, fromKeyboard: true });
-  });
+  wireMonthGridKeys(grid, { split });
 
   if (split) wireMonthList(container.querySelector('.month-view'), container.querySelector('#month-list'));
 
@@ -2545,7 +2638,11 @@ function renderMonthView(container) {
 async function activateMonthDay(date, { split = false, fromKeyboard = false } = {}) {
   const action = monthDayTapAction(date, state.cursor, { split });
   if (action === 'open-day') {
-    switchToDayView(date);
+    await switchToDayView(date);
+    // Mit der Tastatur geht der Fokus mit in den Tag - auf seinen ersten
+    // Eintrag, sonst auf den Tag-Reiter. Ohne das stand er nach dem Neuaufbau
+    // auf <body>, und der naechste Tab begann wieder oben im Kopf.
+    if (fromKeyboard) focusFirstDayEntry();
     return;
   }
   if (action === 'select') {
@@ -2553,14 +2650,24 @@ async function activateMonthDay(date, { split = false, fromKeyboard = false } = 
     return;
   }
   // Nachbarmonat: blättern und dort denselben Tag wählen.
+  await jumpToMonthDay(date, { focus: fromKeyboard });
+  announceMonthDay(date);
+}
+
+/**
+ * Den Monat wechseln und dort `date` zum Cursor machen - der Weg fuer den
+ * Tipp auf einen Nachbarmonatstag und fuer Pfeil/Bild auf/ab ueber den Rand.
+ * Im geteilten Monat ist der Cursor die Auswahl: der Tag, auf dem der Fokus
+ * landet, ist zugleich der gewaehlte (DESIGN.md, Mobil-Monat).
+ */
+async function jumpToMonthDay(date, { focus = false } = {}) {
   if (searchActive) closeCalendarSearch({ restoreView: false });
   state.cursor = date;
+  _monthFocusDate = date;
   await reloadForView();
   updateLabel();
   renderView();
-  if (fromKeyboard) {
-    _container?.querySelector(`.month-day[data-date="${CSS.escape(date)}"]`)?.focus();
-  }
+  if (focus) focusMonthCell(date);
 }
 
 /**
@@ -2571,6 +2678,7 @@ async function activateMonthDay(date, { split = false, fromKeyboard = false } = 
 function selectMonthDay(date) {
   if (date === state.cursor) return;
   state.cursor = date;
+  _monthFocusDate = date;
   const view = _container?.querySelector('.month-view--split');
   if (!view) return;
   const cells = [...view.querySelectorAll('.month-day')];
@@ -2579,10 +2687,156 @@ function selectMonthDay(date) {
     const selected = cell.dataset.date === date;
     cell.classList.toggle('month-day--selected', selected);
     cell.classList.toggle('month-day--selweek', Math.floor(i / 7) === selWeek);
-    cell.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    cell.setAttribute('aria-selected', selected ? 'true' : 'false');
   });
   renderMonthList();
   syncTodayButton();
+  announceMonthDay(date);
+}
+
+// --------------------------------------------------------
+// Monatsraster: Tastatur (ARIA-Grid, roving tabindex)
+// --------------------------------------------------------
+
+// Der Tag, der im Raster den EINEN Tab-Stopp traegt. Er ueberlebt einen
+// Neuaufbau (Monatswechsel per Pfeil, Titel-Schalter), damit der Fokus nach
+// dem Wechsel dort weitermacht, wo er war - und nicht auf dem Cursor, den der
+// Monatsschritt auf „heute oder den 1." setzt.
+let _monthFocusDate = null;
+
+/** Welcher Tag im gezeichneten Raster den Tab-Stopp bekommt. */
+function monthRovingDate(dates, firstInMonth = dates[0]) {
+  if (_monthFocusDate && dates.includes(_monthFocusDate)) return _monthFocusDate;
+  if (dates.includes(state.cursor)) return state.cursor;
+  return firstInMonth;
+}
+
+/**
+ * Wohin eine Taste im Monatsraster fuehrt - als reine Entscheidung, damit
+ * Rand, Wochenstart, RTL und der Monatsueberlauf ohne Browser pruefbar sind.
+ *
+ *   Pfeil links/rechts  ein Tag (RTL gespiegelt: „vor" zeigt nach links)
+ *   Pfeil hoch/runter   eine Woche
+ *   Pos1 / Ende         Anfang / Ende DIESER Woche (nach dem Wochenstart des
+ *                       Haushalts, nicht nach der Spalte)
+ *   Bild auf / ab       ein Monat, Tageszahl geklemmt (31. Jan -> 28. Feb)
+ *
+ * Liefert den Zieltag oder null fuer eine Taste, die das Raster nicht nimmt.
+ * Ob der Zieltag noch im gezeichneten Raster steht oder den Monat wechselt,
+ * entscheidet der Aufrufer - die Rechnung ist fuer beide Faelle dieselbe.
+ */
+function monthGridKeyTarget(date, key, { weekStart = state.weekStart, rtl = false } = {}) {
+  switch (key) {
+    case 'ArrowLeft':  return addDays(date, rtl ? 1 : -1);
+    case 'ArrowRight': return addDays(date, rtl ? -1 : 1);
+    case 'ArrowUp':    return addDays(date, -7);
+    case 'ArrowDown':  return addDays(date, 7);
+    case 'Home':       return startOfWeekOf(date, weekStart);
+    case 'End':        return addDays(startOfWeekOf(date, weekStart), 6);
+    case 'PageUp':     return addMonthsClamped(date, -1);
+    case 'PageDown':   return addMonthsClamped(date, 1);
+    default:           return null;
+  }
+}
+
+/** Monatsschritt mit geklemmter Tageszahl: der 31. wird zum Monatsletzten. */
+function addMonthsClamped(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + n);
+  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(day, last));
+  return isoDate(d);
+}
+
+/** Den Tab-Stopp auf `date` legen und die Zelle fokussieren, falls sie steht. */
+function focusMonthCell(date) {
+  const grid = _container?.querySelector('#month-grid');
+  const cell = grid?.querySelector(`.month-day[data-date="${CSS.escape(date)}"]`);
+  if (!cell) return false;
+  grid.querySelectorAll('.month-day[tabindex="0"]').forEach((c) => { if (c !== cell) c.tabIndex = -1; });
+  cell.tabIndex = 0;
+  _monthFocusDate = date;
+  cell.focus();
+  return true;
+}
+
+/**
+ * Tastatur im Raster. Termine IN der Zelle sind bewusst keine eigenen
+ * Tab-Stopps: die Zelle ist das Ziel, Enter oeffnet am Desktop den Tag (dort
+ * ist jeder Termin ein Knopf) und waehlt am Telefon den Tag fuer die Liste
+ * darunter (dort ebenso). Warum dieses Muster, steht in DESIGN.md
+ * („Mobil-Monat", Tastatur).
+ */
+function wireMonthGridKeys(grid, { split }) {
+  grid.addEventListener('keydown', async (e) => {
+    const dayEl = e.target.closest('.month-day');
+    if (!dayEl || e.target !== dayEl) return;
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    const date = dayEl.dataset.date;
+
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      activateMonthDay(date, { split, fromKeyboard: true });
+      return;
+    }
+
+    const rtl = document.documentElement?.dir === 'rtl';
+    const target = monthGridKeyTarget(date, e.key, { rtl });
+    if (!target) return;
+    e.preventDefault();
+
+    // Eingeklappt steht nur die gewaehlte Woche - eine Zeile hoeher oder
+    // tiefer liegt auf Hoehe null. Der Fokus darf nicht in eine unsichtbare
+    // Zelle gehen: das Raster klappt dafuer auf.
+    const targetCell = grid.querySelector(`.month-day[data-date="${CSS.escape(target)}"]`);
+    if (targetCell && _monthCollapsed && !targetCell.classList.contains('month-day--selweek')) {
+      _monthCollapsed = false;
+      const view = grid.closest('.month-view');
+      const list = _container?.querySelector('#month-list');
+      if (view && list) syncMonthCollapse(view, list);
+    }
+
+    // Bild auf/ab wechselt immer den Monat, auch wenn der Zieltag als
+    // Nachbarmonatstag schon im Raster steht - sonst blaetterte die Taste
+    // „naechster Monat" nur bis zur letzten Rasterzeile.
+    if (targetCell && e.key !== 'PageUp' && e.key !== 'PageDown') {
+      focusMonthCell(target);
+      return;
+    }
+    await jumpToMonthDay(target, { focus: true });
+    if (split) announceMonthDay(target);
+  });
+}
+
+/**
+ * Nach dem Wechsel in die Tagesansicht per Tastatur: Fokus auf den ersten
+ * Eintrag des Tages (Ganztags-Zeile, dann das Raster), sonst auf den Reiter.
+ */
+function focusFirstDayEntry() {
+  const body = _container?.querySelector('#cal-body');
+  const first = body?.querySelector('.day-view [role="button"][tabindex="0"]');
+  (first ?? _container?.querySelector('#cal-view-tab-day'))?.focus();
+}
+
+/**
+ * Die Ansage beim Wechsel der Tagesliste: „Mittwoch, 24.09.2026, 3 Einträge".
+ * NUR bei einer Auswahl - nicht bei jedem Neuaufbau, sonst redete die Seite
+ * bei jedem Filterwechsel dazwischen. Der Leerlauf vor dem Setzen laesst den
+ * Screenreader denselben Text ein zweites Mal ansagen (derselbe Tag, erneut
+ * gewaehlt nach einem Monatswechsel).
+ */
+function announceMonthDay(date) {
+  const live = _container?.querySelector('#cal-live');
+  if (!live || !isMonthSplit()) return;
+  const group = dayGroup(date);
+  const count = group.events.length + group.tasks.length + group.holidays.length
+    + group.schedule.length + group.waste.length;
+  const text = `${formatDate(date, { long: true, weekday: true })}, ${count
+    ? t('calendar.monthDayEntries', { count }) : t('calendar.agendaDayEmpty')}`;
+  live.textContent = '';
+  requestAnimationFrame(() => { live.textContent = text; });
 }
 
 // Eingeklappt (nur die Woche des gewählten Tags) gilt für die Sitzung auf
@@ -2827,7 +3081,7 @@ function monthDayClasses(date, inMonth, todayKey = state.today, { selected = fal
   ].filter(Boolean).join(' ');
 }
 
-function renderMonthDay(date, inMonth, { selected = false, selWeek = false, split = false } = {}) {
+function renderMonthDay(date, inMonth, { selected = false, selWeek = false, split = false, focusable = false } = {}) {
   const evs      = eventsOnDay(date);
   const dayTasks = tasksOnDay(date);
   const dayHols  = holidaysOnDay(date);
@@ -2872,10 +3126,13 @@ function renderMonthDay(date, inMonth, { selected = false, selWeek = false, spli
 
   const taskHtml = taskShown.map((tk) => renderTaskChip(tk, { interactive: false, icon: false })).join('');
 
+  // gridcell mit roving tabindex (wireMonthGridKeys): genau EINE Zelle ist
+  // Tab-Stopp. `aria-selected` nur im geteilten Monat - dort gibt es eine
+  // Auswahl, am Desktop oeffnet die Zelle den Tag.
   return `
     <div class="${classes}" data-date="${date}" data-total="${total}"
-         role="button" tabindex="0"
-         aria-label="${esc(monthDayAriaLabel(date, total, evs))}"${isToday ? ' aria-current="date"' : ''}${split ? ` aria-pressed="${selected ? 'true' : 'false'}"` : ''}>
+         role="gridcell" tabindex="${focusable ? '0' : '-1'}"
+         aria-label="${esc(monthDayAriaLabel(date, total, evs, { tasks: dayTasks, others: [...dayHols.map((h) => h.name), ...daySchedule.map(scheduleEntryLabel)], isToday }))}"${isToday ? ' aria-current="date"' : ''}${split ? ` aria-selected="${selected ? 'true' : 'false'}"` : ''}>
       <div class="month-day__number">${new Date(date + 'T00:00:00').getDate()}</div>
       ${holHtml}
       ${scheduleHtml}
@@ -3216,20 +3473,28 @@ function renderScheduleTimeBlock(entry, className, layout = null) {
   return `<div class="${className} schedule-time-block" style="top:${hourOffset(start)};height:calc(${hourOffset(duration)} - 4px);left:${left};width:${width};--ev-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}" role="button" tabindex="0" data-action="view-schedule-entry" data-schedule-key="${esc(scheduleEntryMatchKey(entry))}"><span class="schedule-time-block__title">${esc(scheduleEntryLabel(entry))}${scheduleEntryExtraBadge(entry)}</span><small class="schedule-time-block__time">${timeLine}</small></div>`;
 }
 
-// aria-label der Tageszelle: lokalisiertes Datum + (falls vorhanden) Zahl der
-// Einträge und die Serieninformation, die das Label sonst an seinen als
-// praesentational behandelten Kind-Chips verschlucken würde. Leere Tage tragen
-// nur das Datum (die role sagt "Schaltfläche"). P1.
-function monthDayAriaLabel(date, total, events = []) {
-  const d = formatPreferredDate(date);
-  const recurringTitles = events
-    .filter((event) => event?.recurrence_rule || event?.is_recurring_instance)
-    .map((event) => event.title)
-    .filter(Boolean);
+/**
+ * Der zugaengliche Name einer Monatszelle: Wochentag und Datum, „Heute", die
+ * Zahl der Eintraege und die ersten drei Titel - „Mittwoch, 24.09.2026, Heute,
+ * 3 Einträge: Zahnarzt, Fußball, Training". Vorher nannte er nur Datum und
+ * Anzahl; wer das Raster mit den Pfeilen abfuhr, erfuhr nie, WAS an einem Tag
+ * steht. Die Reihenfolge ist die der Zelle (Feiertag, Schicht, Termin,
+ * Aufgabe), ein Serientermin traegt seine Bedeutung vor dem Titel, weil die
+ * Marke in der Zelle nur ein Icon ist.
+ */
+const MONTH_DAY_LABEL_TITLES = 3;
+function monthDayAriaLabel(date, total, events = [], { tasks = [], others = [], isToday = false } = {}) {
+  const titles = [
+    ...others,
+    ...events.map((event) => ((event?.recurrence_rule || event?.is_recurring_instance) && event.title
+      ? `${t('calendar.recurringEvent')}: ${event.title}` : event?.title)),
+    ...tasks.map((task) => task?.title),
+  ].filter(Boolean).slice(0, MONTH_DAY_LABEL_TITLES);
+  const entries = total > 0 ? t('calendar.monthDayEntries', { count: total }) : '';
   return [
-    d,
-    total > 0 ? t('calendar.monthDayEntries', { count: total }) : '',
-    ...recurringTitles.map((title) => `${t('calendar.recurringEvent')}: ${title}`),
+    formatDate(date, { long: true, weekday: true }),
+    isToday ? t('calendar.today') : '',
+    entries && titles.length ? `${entries}: ${titles.join(', ')}` : entries,
   ].filter(Boolean).join(', ');
 }
 
@@ -3269,7 +3534,9 @@ function renderWeekView(container) {
         <div class="week-view__time-gutter"></div>
         ${days.map((d) => {
           const dt = new Date(d + 'T00:00:00');
-          return `<div class="week-view__day-header" data-date="${d}">
+          // Der Kopf fuehrt in den Tag - als Knopf, nicht nur als Klickflaeche.
+          return `<div class="week-view__day-header" data-date="${d}" role="button" tabindex="0"
+               aria-label="${esc(t('calendar.monthOpenDay', { date: formatDate(d, { long: true, weekday: true }) }))}"${d === state.today ? ' aria-current="date"' : ''}>
             <div class="week-view__day-name">${DAY_NAMES_SHORT()[dt.getDay()]}</div>
             <div class="week-view__day-num ${d === state.today ? 'week-view__day-num--today' : ''}">${dt.getDate()}</div>
           </div>`;
@@ -3291,7 +3558,7 @@ function renderWeekView(container) {
               const timeText = allDayChipTimeText(ev, d);
               return `
               <div class="allday-event" data-id="${ev.id}"
-                   style="${eventSurfaceStyle(ev)}"
+                   style="${eventSurfaceStyle(ev)}"${eventBlockAttrs(ev, timeText || t('calendar.allDay'))}
                    title="${allDayChipTitle(ev, timeText)}">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}${calendarRepeatIconHtml(ev)}<span class="allday-event__label"><span>${esc(ev.title)}</span>${allDayChipTimeHtml(timeText)}</span>${chipAssigneeStack(ev, { size: 16, maxVisible: 3 })}</div>
             `;
             }).join('')}
@@ -3315,8 +3582,10 @@ function renderWeekView(container) {
                 ${Array.from({ length: 24 }, (_, h) => `
                   <div class="week-view__hour-line" style="top:${hourOffset(h * 60)};"></div>
                 `).join('')}
-                ${scheduleBlocks[i].map((entry) => renderScheduleTimeBlock(entry, 'week-event', scheduleLayouts[i].get(entry))).join('')}
-                ${timedEvs[i].map((ev) => renderWeekEvent(ev, layouts[i].get(ev), d)).join('')}
+                ${chronological([
+                  ...scheduleBlocks[i].map((entry) => ({ range: scheduleBlockTimeRange(entry), html: () => renderScheduleTimeBlock(entry, 'week-event', scheduleLayouts[i].get(entry)) })),
+                  ...timedEvs[i].map((ev) => ({ range: timeRangeForEvent(ev, d), html: () => renderWeekEvent(ev, layouts[i].get(ev), d) })),
+                ])}
                 ${d === state.today ? `<div class="week-view__now-line" id="now-line" style="top:${hourOffset(nowMinutes())};"></div>` : ''}
               </div>
             `).join('')}
@@ -3382,20 +3651,53 @@ function renderWeekView(container) {
     }
   });
 
-  // S-17: Tastaturaktivierung der als role="button" ausgezeichneten
-  // Schichtplan-Chips/-Bloecke (Enter/Space) - dasselbe Muster wie die
-  // Agenda-Ansicht weiter unten fuer ihre eigenen role="button"-Zeilen.
-  container.querySelector('.week-view').addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter' && e.key !== ' ') return;
-    const target = e.target.closest('[data-action="view-schedule-entry"]');
-    if (!target) return;
-    e.preventDefault();
-    const entry = findScheduleEntryByKey(target.dataset.scheduleKey);
-    if (entry) openScheduleEntryDetailModal(entry);
-  });
+  container.querySelector('.week-view').addEventListener('keydown', handleGridKeydown);
 
   // Scrollen zu aktueller Zeit
   scrollToHour(container.querySelector('#week-scroll'), container.querySelector('.week-view__body'));
+}
+
+/**
+ * Blöcke einer Rasterspalte in der Reihenfolge ihrer Uhrzeit - Schichten und
+ * Termine gemischt. Die DOM-Reihenfolge IST die Tab-Reihenfolge: vorher
+ * standen erst alle Schichten, dann die Termine in Ladereihenfolge, und Tab
+ * sprang im Tag vor und zurück.
+ */
+function chronological(items) {
+  return [...items]
+    .sort((a, b) => a.range.start - b.range.start || a.range.end - b.range.end)
+    .map((item) => item.html())
+    .join('');
+}
+
+/**
+ * Enter/Leertaste in Woche und Tag - fuer jedes Ziel mit role="button" im
+ * Raster: Terminblock, Ganztags-Balken, Aufgabe, Schicht, Tageskopf. Vorher
+ * nahm der keydown-Listener nur Schichten an; eine Aufgabe in der
+ * Ganztags-Zeile war Tab-Stopp und tat auf Enter nichts.
+ */
+function handleGridKeydown(e) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const target = e.target.closest?.('[role="button"]');
+  if (!target || target !== e.target) return;
+  e.preventDefault();
+  if (target.matches('[data-action="view-schedule-entry"]')) {
+    const entry = findScheduleEntryByKey(target.dataset.scheduleKey);
+    if (entry) openScheduleEntryDetailModal(entry);
+    return;
+  }
+  if (target.matches('.cal-task-chip')) {
+    openTaskFromCalendar(target.dataset.taskId);
+    return;
+  }
+  if (target.matches('.week-view__day-header')) {
+    switchToDayView(target.dataset.date).then(focusFirstDayEntry);
+    return;
+  }
+  if (target.matches('.week-event, .day-event, .allday-event')) {
+    const ev = state.events.find((x) => x.id === parseInt(target.dataset.id, 10));
+    if (ev) openEventDetail(ev, target);
+  }
 }
 
 /**
@@ -3493,7 +3795,7 @@ function renderWeekEvent(ev, layout = null, dayStr = null) {
   return `
     <div class="week-event" data-id="${ev.id}"
          style="top:${top};height:${height};left:${left};width:${width};${eventSurfaceStyle(ev)}"
-         title="${esc(ev.title)}${chipAssigneeTitleSuffix(ev)}">
+         title="${esc(ev.title)}${chipAssigneeTitleSuffix(ev)}"${eventBlockAttrs(ev, gridTimeText(ev, dayStr))}>
       <div class="week-event__title">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}${calendarRepeatIconHtml(ev)}<span>${esc(ev.title)}</span>${chipAssigneeStack(ev, { size: 14, maxVisible: 2 })}</div>
       <div class="week-event__time">${gridTimeText(ev, dayStr)}</div>
     </div>
@@ -3693,7 +3995,7 @@ function renderDayView(container) {
             const timeText = allDayChipTimeText(ev, state.cursor);
             return `
             <div class="allday-event" data-id="${ev.id}"
-                 style="${eventSurfaceStyle(ev)}"
+                 style="${eventSurfaceStyle(ev)}"${eventBlockAttrs(ev, timeText || t('calendar.allDay'))}
                  title="${allDayChipTitle(ev, timeText)}">${eventIconHtml(ev.icon, 'event-icon event-icon--compact')}${calendarRepeatIconHtml(ev)}<span class="allday-event__label"><span>${esc(ev.title)}</span>${allDayChipTimeHtml(timeText)}</span>${chipAssigneeStack(ev, { size: 16, maxVisible: 3 })}</div>`;
           }).join('')}
           ${tasksOnDay(state.cursor).map(renderTaskChip).join('')}
@@ -3712,8 +4014,10 @@ function renderDayView(container) {
             ${Array.from({ length: 24 }, (_, h) => `
               <div class="week-view__hour-line" style="top:${hourOffset(h * 60)};"></div>
             `).join('')}
-            ${scheduleBlocks.map((entry) => renderScheduleTimeBlock(entry, 'day-event', scheduleLayout.get(entry))).join('')}
-            ${timed.map((ev) => renderDayEvent(ev, layout.get(ev), state.cursor)).join('')}
+            ${chronological([
+              ...scheduleBlocks.map((entry) => ({ range: scheduleBlockTimeRange(entry), html: () => renderScheduleTimeBlock(entry, 'day-event', scheduleLayout.get(entry)) })),
+              ...timed.map((ev) => ({ range: timeRangeForEvent(ev, state.cursor), html: () => renderDayEvent(ev, layout.get(ev), state.cursor) })),
+            ])}
             ${dayEvs.length === 0 && schedule.length === 0 ? `<div class="day-view__empty-hint" style="top:calc(${hourOffset(state.cursor === state.today ? nowMinutes() : 9 * 60)} + 16px)">${t('calendar.dayEmptyHint')}</div>` : ''}
           </div>
           ${state.cursor === state.today ? `
@@ -3770,16 +4074,7 @@ function renderDayView(container) {
     openEventModal({ mode: 'create', date: state.cursor, time });
   });
 
-  // S-17: Tastaturaktivierung der als role="button" ausgezeichneten
-  // Schichtplan-Chips/-Bloecke (Enter/Space).
-  container.querySelector('.day-view').addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter' && e.key !== ' ') return;
-    const target = e.target.closest('[data-action="view-schedule-entry"]');
-    if (!target) return;
-    e.preventDefault();
-    const entry = findScheduleEntryByKey(target.dataset.scheduleKey);
-    if (entry) openScheduleEntryDetailModal(entry);
-  });
+  container.querySelector('.day-view').addEventListener('keydown', handleGridKeydown);
 
   scrollToHour(container.querySelector('#day-scroll'), container.querySelector('.day-view__body'));
 }
@@ -3816,7 +4111,7 @@ function renderDayEvent(ev, layout = null, dayStr = null) {
   return `
     <div class="day-event${roomy ? '' : ' day-event--tight'}" data-id="${ev.id}"
          style="top:${top};height:${height};left:${left};width:${width};${eventSurfaceStyle(ev)}"
-         title="${esc(ev.title)}${ev.location ? ' · ' + esc(fmtLocation(ev.location)) : ''}${chipAssigneeTitleSuffix(ev)}">
+         title="${esc(ev.title)}${ev.location ? ' · ' + esc(fmtLocation(ev.location)) : ''}${chipAssigneeTitleSuffix(ev)}"${eventBlockAttrs(ev, timeText)}>
       <span class="day-event__spine" aria-hidden="true"></span>
       <span class="day-event__text">
         <span class="day-event__title">${hasEventIcon(ev.icon) ? eventIconHtml(ev.icon, 'event-icon event-icon--compact') : ''}${calendarRepeatIconHtml(ev)}<span class="day-event__name">${esc(ev.title)}</span></span>
@@ -4686,6 +4981,17 @@ export const __test = {
   hourGutterLabel,
   compactHourLabel,
   syncTodayButton,
+  // Tastatur und Screenreader (Critique 2026-09-24, Schritt 3).
+  renderMonthDay,
+  monthRovingDate,
+  monthGridKeyTarget,
+  addMonthsClamped,
+  taskChipAriaLabel,
+  renderTaskChip,
+  handleGridKeydown,
+  chronological,
+  CAL_SHORTCUT_KEYS,
+  periodArrowKeys,
 };
 
 function renderAgendaEvent(ev, dayStr) {
@@ -4736,9 +5042,22 @@ function agendaEventAriaLabel(ev, timeStr) {
     (ev.recurrence_rule || ev.is_recurring_instance) ? t('calendar.recurringEvent') : '',
     ev.title,
     timeStr,
+    ev.location ? fmtLocation(ev.location) : '',
     ev.cal_name,
     chipAssigneeLabel(ev),
   ].filter(Boolean).join(', ');
+}
+
+/**
+ * Ein Terminblock im Zeitraster oder in der Ganztags-Zeile ist ein Knopf
+ * (Critique 2026-09-24, P1): vorher trug er `cursor: pointer` und sonst
+ * nichts - per Tastatur und Screenreader war kein Termin der Woche zu
+ * oeffnen. Der Name ist derselbe wie an der Agenda-Zeile (Serie, Titel,
+ * Zeit, Ort, Kalender, Personen), damit ein Termin in jeder Ansicht gleich
+ * klingt. Enter/Leertaste: handleGridKeydown.
+ */
+function eventBlockAttrs(ev, timeText) {
+  return ` role="button" tabindex="0" aria-label="${esc(agendaEventAriaLabel(ev, timeText))}"`;
 }
 
 // Sichtbarkeits-Indikator (#474): nur bei eingeschränkten Terminen ein dezentes
@@ -5006,6 +5325,10 @@ async function openEventDetail(ev, anchor = null) {
     edit: readOnly() ? undefined : {
       label: t('common.edit'),
       title: t('calendar.editEvent'),
+      // Im Sheet ist Bearbeiten die Hauptaktion und steht unten in der
+      // Daumenzone; Löschen bleibt zurückgenommen am Anfang (Critique
+      // 2026-09-24, Persona Casey).
+      primary: true,
       // Das Formular wartet auf die Erinnerungen, die Leseansicht nicht. Ohne
       // diese Sperre baute ein sofortiger Klick auf „Bearbeiten" das Formular
       // ohne Erinnerungszeilen auf - und saveEvent löscht die Erinnerungen des

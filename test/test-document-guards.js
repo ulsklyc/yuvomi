@@ -1036,7 +1036,8 @@ const SHAPE_EXEMPT = new Map([
   ['more-sheet__search', 'Griff: Suchfeld des More-Sheets, traegt Feldkante'],
   ['theme-toggle__btn', 'Zustandsschalter: Segment der Farbwelt-Wahl'],
   // 3. Zellen eines Rasters
-  ['month-day', 'Rasterzelle: Tag im Kalender-Monat'],
+  // `.month-day` stand hier, bis die Monatszelle 2026-09-24 vom role="button" zur
+  // gridcell eines ARIA-Grids wurde - Sonde 3 misst sie seitdem nicht mehr.
   ['more-action', 'Rasterzelle: Kachel im More-Sheet-Raster'],
   ['metric-card--select', 'Rasterzelle: waehlbare Kennzahlkachel (.metric-card, Block-2-Konsolidierung)'],
   // Die Zyklus-Kachel ist seit #1181 ein <button>, der als GANZE Kachel zum
@@ -1047,6 +1048,14 @@ const SHAPE_EXEMPT = new Map([
   // Nachbarn - dieselbe Begruendung wie bei .cal-task-chip. Gefunden vom
   // Handlauf des Releases v2.67.0, dem ersten vollen Lauf seit dem Merge.
   ['health-overview__card--link', 'Rasterzelle: klickbare Kachel der Health-Uebersicht, gleiche Optik wie die Nachbarkacheln (.health-overview__card)'],
+  // Terminbloecke sind seit der Kalender-Critique 2026-09-24 (P1) Knoepfe:
+  // vorher trugen sie nur `cursor: pointer`, per Tastatur war kein Termin der
+  // Woche zu oeffnen. Ihre Form ist die des Zeitrasters, in dem sie stehen -
+  // ein Block ueber seine Dauer, die Kante im Vollton (DESIGN.md, Event-Bloecke).
+  // Eine Kapsel ueber 90 Minuten waere keine Buttonform, sondern ein Fehler.
+  ['week-event', 'Rasterzelle: Terminblock im Zeitraster der Woche, Hoehe = Dauer'],
+  ['day-event', 'Rasterzelle: Terminblock im Zeitraster des Tages, Hoehe = Dauer'],
+  ['allday-event', 'Rasterzelle: Ganztags-Balken der Woche/des Tages, gleiche Bar wie .month-day__event'],
   // 4. Zeilen einer Zeilenliste
   ['nav-item', 'Zeile: Eintrag der Sidebar-Navigation'],
   ['settings-shell__navigation-toggle', 'Zeile: Domaenenkopf der Settings-Navigation (Akkordeon)'],

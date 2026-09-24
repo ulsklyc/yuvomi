@@ -2486,7 +2486,52 @@ const SHORTCUTS = [
   // bevor sich ein unmerkbares Schema festsetzt (Critique 2026-08-31, Alex).
   { key: 'g b', description: () => t('nav.budget'),   action: () => navigate('/budget') },
   { key: 'g e', description: () => t('nav.settings'), action: () => navigate('/settings') },
+  // KALENDER (Critique 2026-09-24, P1, Persona Alex): die Handgriffe von Google
+  // Kalender. Nur auf /calendar (`route`) - anderswo sind die Buchstaben frei
+  // und die Hilfe zeigt sie nicht. Die Seite entscheidet, was „heute" oder
+  // „vor" in ihrer Ansicht heisst (calendar.js, onCalendarCommand); hier steht
+  // nur, WELCHE Taste es ist, damit der Akkord „g d" nie zugleich „d" ist.
+  // Die Pfeile nur ohne Fokus auf einem Bedienelement (`bareFocusOnly`): im
+  // Raster, in der Tablist und in jedem Feld gehoeren sie dem Element.
+  { key: 't', route: '/calendar', description: () => t('shortcuts.calToday'), action: () => calendarCommand('today') },
+  { key: 'k', route: '/calendar', label: () => `k / ${arrowGlyph('prev')}`, aliases: () => [arrowKey('prev')], bareFocusOnly: true,
+    description: () => t('shortcuts.calPrev'), action: () => calendarCommand('prev') },
+  { key: 'j', route: '/calendar', label: () => `j / ${arrowGlyph('next')}`, aliases: () => [arrowKey('next')], bareFocusOnly: true,
+    description: () => t('shortcuts.calNext'), action: () => calendarCommand('next') },
+  { key: 'm', route: '/calendar', description: () => t('calendar.viewMonth'),  action: () => calendarCommand('view', 'month') },
+  { key: 'w', route: '/calendar', description: () => t('calendar.viewWeek'),   action: () => calendarCommand('view', 'week') },
+  { key: 'd', route: '/calendar', description: () => t('calendar.viewDay'),    action: () => calendarCommand('view', 'day') },
+  { key: 'a', route: '/calendar', description: () => t('calendar.viewAgenda'), action: () => calendarCommand('view', 'agenda') },
 ];
+
+function calendarCommand(command, view) {
+  document.dispatchEvent(new CustomEvent('yuvomi:calendar-command', { detail: { command, view } }));
+}
+
+// „Zurueck" ist die Pfeiltaste, die auf den Zurueck-Knopf zeigt - in RTL rechts.
+function arrowKey(dir) {
+  const rtl = document.documentElement.dir === 'rtl';
+  return (dir === 'prev') !== rtl ? 'arrowleft' : 'arrowright';
+}
+function arrowGlyph(dir) {
+  return arrowKey(dir) === 'arrowleft' ? '\u2190' : '\u2192';
+}
+
+/**
+ * Welche Einzeltaste-Kuerzel hier und jetzt gelten: die globalen immer, die
+ * einer Seite nur auf ihrer Route. Geteilt von Dispatcher und Hilfe, damit
+ * die Hilfe nie eine Taste nennt, die an dieser Stelle nichts tut.
+ */
+function shortcutApplies(s, path = location.pathname) {
+  return !s.route || s.route === path;
+}
+
+/** Fokus auf „nichts": <body>, oder ein Knopf der Zeitraum-Navigation. */
+function focusIsBare() {
+  const el = document.activeElement;
+  if (!el || el === document.body || el === document.documentElement) return true;
+  return Boolean(el.closest?.('.cal-toolbar__month'));
+}
 
 let _pendingKey = null;
 let _pendingTimer = null;
@@ -2544,7 +2589,8 @@ function initKeyboardShortcuts() {
       return;
     }
 
-    const shortcut = SHORTCUTS.find((s) => s.key === key && !s.key.includes(' '));
+    const shortcut = SHORTCUTS.find((s) => !s.key.includes(' ') && shortcutApplies(s)
+      && (s.key === key || (s.aliases?.().includes(key) && (!s.bareFocusOnly || focusIsBare()))));
     if (shortcut) { e.preventDefault(); shortcut.action(); }
   });
 }
@@ -2553,7 +2599,7 @@ function showHelpModal() {
   // Mirrors the CSS sidebar↔bottom-nav breakpoint (sidebar is min-width:1024px):
   // without a keyboard, shortcut rows are useless — show a plain-language guide.
   const coarsePointer = window.matchMedia('(max-width: 1023px)').matches;
-  const helpRows = buildHelpRows({ coarsePointer, shortcuts: SHORTCUTS, t });
+  const helpRows = buildHelpRows({ coarsePointer, shortcuts: SHORTCUTS.filter((s) => shortcutApplies(s)), t });
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';

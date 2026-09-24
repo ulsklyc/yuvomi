@@ -1856,8 +1856,13 @@ test('Monatszelle am Telefon: ein Tipp WAEHLT den Tag, statt in die Tagesansicht
 // switchToDayView() direkt - fuer jede Breite.
 test('Monatszelle: Klick und Enter laufen ueber monthDayTapAction, nicht direkt in den Tag', () => {
   const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
-  const view = src.slice(src.indexOf('function renderMonthView('), src.indexOf('async function activateMonthDay('));
-  assert(view.length > 0, 'renderMonthView/activateMonthDay nicht gefunden');
+  const render = src.slice(src.indexOf('function renderMonthView('), src.indexOf('async function activateMonthDay('));
+  // Die Tastatur des Rasters wohnt seit dem ARIA-Grid (Schritt 3 der Critique
+  // 2026-09-24) in wireMonthGridKeys - renderMonthView muss sie verdrahten.
+  const keys = src.slice(src.indexOf('function wireMonthGridKeys('), src.indexOf('function focusFirstDayEntry('));
+  assert(render.length > 0 && keys.length > 0, 'renderMonthView/wireMonthGridKeys nicht gefunden');
+  assert(/wireMonthGridKeys\(grid/.test(render), 'renderMonthView verdrahtet die Rastertastatur nicht');
+  const view = render + keys;
   assert(!/switchToDayView\(/.test(view),
     'renderMonthView ruft switchToDayView() direkt - der Tipp am Telefon wuerde wieder springen');
   assert((view.match(/activateMonthDay\(/g) ?? []).length >= 2,
@@ -3212,6 +3217,227 @@ test('Zeitraum-Wisch: Schwelle, Richtungssperre, Systemrand und RTL', () => {
   assert(swipe.startsAtScreenEdge(10, 375) && swipe.startsAtScreenEdge(365, 375),
     'ein Kontakt naeher als 20px an der Kante gehoert dem System');
   assert(!swipe.startsAtScreenEdge(40, 375), 'ein Kontakt im Inhalt gehoert der Geste');
+});
+
+// --------------------------------------------------------
+// Tastatur und Screenreader (Critique 2026-09-24, P1, Schritt 3)
+//
+// Vorher: Terminbloecke in Woche und Tag trugen `cursor: pointer` und sonst
+// nichts, das Monatsraster war 35-42 einzelne role="button"-Tab-Stopps ohne
+// Pfeiltasten, die Prioritaet einer Aufgabe stand nur im aria-hidden-Punkt und
+// die Ansichts-Tablist hiess wie die H1. Gemessen wird am GERENDERTEN Markup.
+// --------------------------------------------------------
+
+function withMonthState(extra, fn) {
+  const hadWindow = Object.prototype.hasOwnProperty.call(globalThis, 'window');
+  const previousWindow = globalThis.window;
+  const hadRO = Object.prototype.hasOwnProperty.call(globalThis, 'ResizeObserver');
+  const previousRO = globalThis.ResizeObserver;
+  try {
+    globalThis.ResizeObserver = class { observe() {} disconnect() {} };
+    withOvernightState({ cursor: '2026-09-24', today: '2026-09-24', weekStart: 1, ...extra }, fn);
+  } finally {
+    if (hadRO) globalThis.ResizeObserver = previousRO; else delete globalThis.ResizeObserver;
+    if (hadWindow) globalThis.window = previousWindow;
+  }
+}
+
+test('Monatsraster ist EIN ARIA-Grid mit EINEM Tab-Stopp: grid > row > gridcell, roving tabindex', () => {
+  withMonthState({}, () => {
+    const container = fakeContainer();
+    calendarHelpers.renderMonthView(container);
+    const html = container.html;
+    assert(/class="month-view[^"]*"[^>]*role="grid"/.test(html), 'die Monatsflaeche traegt kein role="grid"');
+    assert(/role="grid" aria-labelledby="cal-label"/.test(html), 'das Grid muss nach dem Zeitraum-Label heissen');
+    const weeks = calendarHelpers.monthGridSpan('2026-09-24').weeks;
+    const rows = (html.match(/class="month-grid__row" role="row"/g) ?? []).length;
+    assert(rows === weeks, `je Woche eine role=row erwartet (${weeks}), gefunden ${rows}`);
+    const cells = [...html.matchAll(/class="month-day[^"]*" data-date="([^"]+)"[^>]*role="gridcell" tabindex="(0|-1)"/g)];
+    assert(cells.length === weeks * 7, `alle Tage muessen gridcells sein: ${cells.length} von ${weeks * 7}`);
+    const stops = cells.filter((m) => m[2] === '0').map((m) => m[1]);
+    assert(stops.length === 1 && stops[0] === '2026-09-24',
+      `genau EIN Tab-Stopp, auf dem Cursor - gefunden: ${stops.join(', ') || 'keiner'}`);
+    assert(!/class="month-day[^"]*"[^>]*role="button"/.test(html), 'eine Monatszelle ist noch role="button"');
+    assert((html.match(/role="columnheader"/g) ?? []).length === 7, 'die Wochentagsleiste muss die Spaltenkoepfe tragen');
+  });
+});
+
+test('Monatszelle: Auswahl im Telefon-Monat ist aria-selected, nicht aria-pressed; am Desktop keine Auswahl', () => {
+  withMonthState({}, () => {
+    const split = calendarHelpers.renderMonthDay('2026-09-24', true, { selected: true, split: true, focusable: true });
+    assert(/aria-selected="true"/.test(split), 'der gewaehlte Tag muss aria-selected="true" tragen');
+    assert(!/aria-pressed/.test(split), 'aria-pressed ist die Semantik eines Umschalters, nicht einer Grid-Auswahl');
+    const other = calendarHelpers.renderMonthDay('2026-09-23', true, { split: true });
+    assert(/aria-selected="false"/.test(other) && /tabindex="-1"/.test(other), 'ein anderer Tag: nicht gewaehlt, kein Tab-Stopp');
+    const desk = calendarHelpers.renderMonthDay('2026-09-24', true, { focusable: true });
+    assert(!/aria-selected|aria-pressed/.test(desk), 'am Desktop oeffnet die Zelle den Tag - dort gibt es keine Auswahl');
+    const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+    const sel = src.slice(src.indexOf('function selectMonthDay('), src.indexOf('let _monthFocusDate'));
+    assert(/aria-selected/.test(sel) && !/aria-pressed/.test(sel), 'selectMonthDay() muss aria-selected nachziehen');
+  });
+});
+
+test('Monatszelle: der Name nennt Wochentag, heute, Anzahl und die ersten drei Titel', () => {
+  const label = calendarHelpers.monthDayAriaLabel('2026-09-24', 5, [
+    { title: 'Zahnarzt' }, { title: 'Training', recurrence_rule: 'FREQ=WEEKLY' },
+  ], { tasks: [{ title: 'Steuer' }, { title: 'Muell' }], others: ['Feiertag'], isToday: true });
+  assert(label.startsWith('calendar.dayLongThursday, '), `der Wochentag fehlt vorn: ${label}`);
+  assert(label.includes(', calendar.today, '), `„heute" fehlt: ${label}`);
+  assert(label.endsWith('calendar.monthDayEntries{"count":5}: Feiertag, Zahnarzt, calendar.recurringEvent: Training'),
+    `Anzahl und die ersten drei Titel in Zellreihenfolge erwartet: ${label}`);
+  const empty = calendarHelpers.monthDayAriaLabel('2026-09-25', 0, []);
+  assert(!/today|monthDayEntries/.test(empty), `ein leerer Tag nennt nur sein Datum: ${empty}`);
+});
+
+test('Monatsraster: Pfeile, Pos1/Ende und Bild auf/ab fuehren zum richtigen Tag (Rand, Wochenstart, RTL)', () => {
+  const k = calendarHelpers.monthGridKeyTarget;
+  assert(k('2026-09-30', 'ArrowRight', { weekStart: 1 }) === '2026-10-01', 'rechts ueber den Monatsrand');
+  assert(k('2026-09-01', 'ArrowLeft', { weekStart: 1 }) === '2026-08-31', 'links ueber den Monatsrand');
+  assert(k('2026-09-01', 'ArrowLeft', { weekStart: 1, rtl: true }) === '2026-09-02', 'RTL: links ist vor');
+  assert(k('2026-09-24', 'ArrowDown', { weekStart: 1 }) === '2026-10-01', 'runter eine Woche');
+  assert(k('2026-09-24', 'ArrowUp', { weekStart: 1 }) === '2026-09-17', 'hoch eine Woche');
+  assert(k('2026-09-24', 'Home', { weekStart: 1 }) === '2026-09-21', 'Pos1: Montag bei Wochenstart Montag');
+  assert(k('2026-09-24', 'Home', { weekStart: 0 }) === '2026-09-20', 'Pos1: Sonntag bei Wochenstart Sonntag');
+  assert(k('2026-09-24', 'End', { weekStart: 1 }) === '2026-09-27', 'Ende: Sonntag bei Wochenstart Montag');
+  assert(k('2026-01-31', 'PageDown', { weekStart: 1 }) === '2026-02-28', 'Bild ab vom 31.01. auf den 28.02., nicht in den Maerz');
+  assert(k('2026-03-31', 'PageUp', { weekStart: 1 }) === '2026-02-28', 'Bild auf klemmt genauso');
+  assert(k('2026-09-24', 'a', { weekStart: 1 }) === null, 'eine fremde Taste gehoert nicht dem Raster');
+});
+
+test('Monatsraster: der Tab-Stopp bleibt nach dem Neuaufbau auf dem zuletzt fokussierten Tag', () => {
+  withMonthState({}, () => {
+    const dates = ['2026-08-31', '2026-09-01', '2026-09-24'];
+    assert(calendarHelpers.monthRovingDate(dates, '2026-09-01') === '2026-09-24', 'ohne Fokusmerker: der Cursor');
+    calendarHelpers.state.cursor = '2026-12-01';
+    assert(calendarHelpers.monthRovingDate(dates, '2026-09-01') === '2026-09-01', 'Cursor nicht im Raster: der erste Monatstag');
+  });
+});
+
+test('Woche und Tag: jeder Terminblock ist ein Knopf mit Namen wie die Agenda-Zeile', () => {
+  const ev = { ...morningEvent(), location: 'Praxis Dr. Weber', cal_name: 'Familie' };
+  const allDay = { id: 4133, title: 'Ausflug', all_day: 1, assigned_users: [], start_datetime: '2026-06-15T00:00', end_datetime: '2026-06-15T00:00' };
+  withOvernightState({ events: [ev, allDay] }, () => {
+    for (const [name, render] of [['Woche', calendarHelpers.renderWeekView], ['Tag', calendarHelpers.renderDayView]]) {
+      const container = fakeContainer();
+      render(container);
+      const html = container.html;
+      const block = new RegExp(`class="(?:week|day)-event[^"]*" data-id="4132"[^>]*>`).exec(html)?.[0] ?? '';
+      assert(/role="button"/.test(block) && /tabindex="0"/.test(block), `${name}: der Zeitblock ist kein Knopf: ${block.slice(0, 120)}`);
+      const aria = /aria-label="([^"]*)"/.exec(block)?.[1] ?? '';
+      assert(aria.startsWith('Fruehstueck, ') && aria.includes('Praxis Dr. Weber') && aria.includes('Familie'),
+        `${name}: der Name muss Titel, Zeit, Ort und Kalender tragen: ${aria}`);
+      const chip = /class="allday-event" data-id="4133"[^>]*>/.exec(html)?.[0] ?? '';
+      assert(/role="button"/.test(chip) && /tabindex="0"/.test(chip) && /aria-label="Ausflug, calendar.allDay/.test(chip),
+        `${name}: der Ganztags-Balken ist kein benannter Knopf: ${chip.slice(0, 160)}`);
+    }
+  });
+});
+
+test('Woche: der Tageskopf ist ein Knopf in den Tag; Enter oeffnet Termin, Aufgabe und Tag', () => {
+  withOvernightState({}, () => {
+    const container = fakeContainer();
+    calendarHelpers.renderWeekView(container);
+    const headers = [...container.html.matchAll(/class="week-view__day-header" data-date="[^"]+" role="button" tabindex="0"\s+aria-label="calendar\.monthOpenDay/g)];
+    assert(headers.length === 7, `alle sieben Tageskoepfe muessen benannte Knoepfe sein, gefunden ${headers.length}`);
+  });
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  for (const [name, from, to] of [['Woche', 'function renderWeekView(', 'function chronological('], ['Tag', 'function renderDayView(', 'function renderDayEvent(']]) {
+    const body = src.slice(src.indexOf(from), src.indexOf(to));
+    assert(/addEventListener\('keydown', handleGridKeydown\)/.test(body), `${name}: Enter/Leertaste ist nicht verdrahtet`);
+  }
+  const handler = src.slice(src.indexOf('function handleGridKeydown('), src.indexOf('function scrollToHour('));
+  for (const sel of ['.cal-task-chip', '.week-view__day-header', '.week-event, .day-event, .allday-event', 'view-schedule-entry']) {
+    assert(handler.includes(sel), `handleGridKeydown kennt ${sel} nicht - der Tab-Stopp taete auf Enter nichts`);
+  }
+});
+
+test('Woche und Tag: Tab laeuft in Uhrzeit-Reihenfolge, Schichten und Termine gemischt', () => {
+  const order = calendarHelpers.chronological([
+    { range: { start: 600, end: 660 }, html: () => 'C' },
+    { range: { start: 480, end: 540 }, html: () => 'A' },
+    { range: { start: 480, end: 600 }, html: () => 'B' },
+  ]);
+  assert(order === 'ABC', `erwartet A, B, C (Beginn, dann Ende) - gerendert ${order}`);
+  const late = { ...morningEvent(), id: 4140, title: 'Spaet', start_datetime: '2026-06-15T18:00', end_datetime: '2026-06-15T19:00' };
+  withOvernightState({ events: [late, morningEvent()] }, () => {
+    const container = fakeContainer();
+    calendarHelpers.renderDayView(container);
+    const ids = timedBlocks(container.html).map((b) => b.id);
+    assert(JSON.stringify(ids) === JSON.stringify([4132, 4140]), `der fruehe Termin muss zuerst im DOM stehen: ${ids.join(', ')}`);
+  });
+});
+
+test('Aufgabe im Kalender: der Name nennt die Prioritaet und die Uhrzeit, nicht nur den Titel', () => {
+  const label = calendarHelpers.taskChipAriaLabel({ title: 'Steuer', priority: 'urgent', due_time: '14:30:00' });
+  assert(label.includes('tasks.priorityLabel: tasks.priorityUrgent'), `die Prioritaet fehlt im Namen: ${label}`);
+  assert(/14:30/.test(label), `die Uhrzeit fehlt im Namen: ${label}`);
+  const none = calendarHelpers.taskChipAriaLabel({ title: 'Steuer', priority: 'none' });
+  assert(!/priority/.test(none), `„ohne Prioritaet" sagt nichts, wie der Punkt: ${none}`);
+  const html = calendarHelpers.renderTaskChip({ id: 1, title: 'Steuer', priority: 'high' });
+  assert(/aria-label="calendar\.taskChipAriaLabel\{[^"]*\}, tasks\.priorityLabel: tasks\.priorityHigh"/.test(html),
+    `der gerenderte Chip traegt die Prioritaet nicht im aria-label: ${html.slice(0, 200)}`);
+});
+
+test('Kopf: die Tablist heisst „Ansicht", die Knoepfe nennen ihre Kuerzel', () => {
+  const html = calendarHelpers.toolbarHtml();
+  assert(/role="tablist" aria-label="calendar\.viewSwitcher"/.test(html), 'die Tablist muss „Ansicht" heissen, nicht wie die H1');
+  assert(!/role="tablist" aria-label="nav\.calendar"/.test(html), 'die Tablist heisst noch „Kalender"');
+  for (const [view, key] of Object.entries({ month: 'm', week: 'w', day: 'd', agenda: 'a' })) {
+    assert(new RegExp(`id="cal-view-tab-${view}"[^>]*aria-keyshortcuts="${key}"`).test(html), `Reiter ${view} nennt „${key}" nicht`);
+  }
+  const nav = calendarHelpers.periodNavHtml();
+  assert(/id="cal-prev"[^>]*aria-keyshortcuts="k ArrowLeft"/.test(nav), 'zurueck nennt k und Pfeil links nicht');
+  assert(/id="cal-next"[^>]*aria-keyshortcuts="j ArrowRight"/.test(nav), 'vor nennt j und Pfeil rechts nicht');
+  assert(/id="cal-today"[^>]*aria-keyshortcuts="t"/.test(nav), 'heute nennt t nicht');
+  assert(calendarHelpers.periodArrowKeys(true).prev === 'ArrowRight', 'RTL: zurueck ist Pfeil rechts');
+});
+
+test('Kuerzel: t, j/k und m/w/d/a gelten nur auf /calendar und gehen an die Seite, nicht an den DOM', () => {
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  const { CAL_SHORTCUT_KEYS } = calendarHelpers;
+  const keys = [CAL_SHORTCUT_KEYS.today, CAL_SHORTCUT_KEYS.prev, CAL_SHORTCUT_KEYS.next, ...Object.values(CAL_SHORTCUT_KEYS.views)];
+  for (const key of keys) {
+    assert(new RegExp(`\\{ key: '${key}', route: '/calendar'`).test(router), `SHORTCUTS fuehrt „${key}" nicht als Kalender-Kuerzel`);
+  }
+  const dispatch = router.slice(router.indexOf('function initKeyboardShortcuts('), router.indexOf('function showHelpModal('));
+  assert(/shortcutApplies\(s\)/.test(dispatch), 'der Dispatcher prueft die Route eines Kuerzels nicht - „d" schaltete ueberall');
+  assert(/bareFocusOnly/.test(dispatch) && /focusIsBare\(\)/.test(dispatch),
+    'die Pfeile duerfen nur ohne Fokus auf einem Bedienelement blaettern (Raster, Tablist, Felder)');
+  // Der Akkord „g d" wird VOR der Einzeltaste entschieden.
+  assert(dispatch.indexOf("_pendingKey === 'g'") < dispatch.indexOf('shortcutApplies(s)'), 'der g-Akkord muss vor den Einzeltasten stehen');
+  const help = router.slice(router.indexOf('function showHelpModal('));
+  assert(/SHORTCUTS\.filter\(\(s\) => shortcutApplies\(s\)\)/.test(help), 'die Hilfe zeigt Kuerzel, die hier nichts tun');
+  const cal = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  assert(/addEventListener\?\.\('yuvomi:calendar-command', onCalendarCommand\)/.test(cal), 'die Seite hoert die Kuerzel nicht');
+});
+
+test('Telefon-Monat: die Auswahl wird angesagt - aus einer Live-Region, die den Neuaufbau ueberlebt', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const page = src.slice(src.indexOf('export async function render('), src.indexOf('// Lade-Skeleton sofort'));
+  assert(/id="cal-live"[^>]*aria-live="polite"/.test(page), 'die Seite hat keine polite Live-Region');
+  assert(page.indexOf('id="cal-live"') < page.indexOf('id="cal-body"') || !/id="cal-body"[\s\S]*id="cal-live"/.test(page),
+    'die Live-Region muss AUSSERHALB von #cal-body stehen, sonst entsteht sie mit ihrem Inhalt');
+  const sel = src.slice(src.indexOf('function selectMonthDay('), src.indexOf('let _monthFocusDate'));
+  assert(/announceMonthDay\(date\)/.test(sel), 'die Auswahl eines Tages wird nicht angesagt');
+  const view = src.slice(src.indexOf('function renderView('), src.indexOf('function syncHeadToScrollport('));
+  assert(!/announceMonthDay/.test(view), 'renderView() darf nicht ansagen - sonst redet jeder Filterwechsel');
+});
+
+test('Aufgaben-Chip: Trefferflaeche in der Liste auf --target-base, im Ganztags-Stapel mindestens 24px', () => {
+  const css = readFileSync(new URL('../public/styles/calendar.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const before = rules.find((r) => r.selector.trim() === '.agenda-tasks .cal-task-chip::before');
+  assert(before && /inset-block:\s*calc\(-1 \* var\(--task-hit-grow\)\)/.test(before.body), 'die Liste dehnt die Aufgabe nicht per ::before');
+  const list = rules.find((r) => r.selector.trim() === '.agenda-tasks');
+  assert(list && /--task-hit-grow:\s*calc\(\(var\(--target-base\) - var\(--space-6\)\) \/ 2\)/.test(list.body)
+    && /row-gap:\s*calc\(var\(--task-hit-grow\) \* 2\)/.test(list.body),
+    'Dehnung und Zeilenabstand muessen aus derselben Rechnung kommen, sonst ueberlappen sich die Flaechen');
+  const chip = rules.find((r) => r.selector.trim() === '.agenda-tasks .cal-task-chip');
+  assert(chip && /overflow:\s*visible/.test(chip.body), 'der Chip schneidet sein eigenes ::before ab (overflow)');
+  const stack = rules.find((r) => r.selector.trim() === '.allday-cell .cal-task-chip');
+  assert(stack && /min-height:\s*var\(--space-6\)/.test(stack.body), 'im Ganztags-Stapel bleibt die Aufgabe unter 24px');
+  const focus = rules.find((r) => /\.week-event:focus-visible/.test(r.selector) && /\.day-event:focus-visible/.test(r.selector));
+  assert(focus && /outline:\s*var\(--focus-ring-width\) solid var\(--focus-ring-color\)/.test(focus.body), 'Terminbloecke haben keinen Fokusring');
 });
 
 // --------------------------------------------------------

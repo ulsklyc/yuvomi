@@ -197,6 +197,29 @@ test('der Kopf-Button im Formular verspricht kein Speichern', async () => {
   assert.doesNotMatch(form, /common\.done/, '„Fertig" verspricht ein Speichern, das nicht stattfindet');
 });
 
+test('im Sheet steht Bearbeiten als Hauptaktion unten, Löschen zurückgenommen am Anfang (Critique 2026-09-24)', async () => {
+  const src = await detailJs();
+  const sheet = src.slice(src.indexOf('function openAsSheet'), src.indexOf('// Präsentation: Popover'));
+  // Der Knopf entsteht in der FUSSZEILE, als Primaerknopf, NACH den Aktionen
+  // des Aufrufers - also am Ende, in der Daumenzone.
+  assert.match(sheet, /\[\.\.\.\(opts\.actions \?\? \[\]\), \{\s*id: 'detail-view-edit',[\s\S]{0,120}variant: 'primary'/,
+    'mit edit.primary gehört Bearbeiten als Primärknopf ans Ende der Fußzeile');
+  // Oben bleibt kein zweites Bearbeiten stehen; der Kopfknopf erscheint erst im
+  // Formular, als „Zurück".
+  assert.match(sheet, /hidden: primaryEdit/, 'der Kopfknopf muss in der Leseansicht verborgen sein');
+  const back = src.slice(src.indexOf('function switchToDetail'), src.indexOf('// Kopf-Aktion'));
+  assert.match(back, /hidden: state\.primaryEdit/, 'zurück in der Leseansicht muss der Kopfknopf wieder verschwinden');
+  // Löschen steht am ANFANG - logisch, damit RTL es nicht an das Ende schiebt.
+  const css = await detailCss();
+  assert.match(css, /\.detail-view__action--start \{\s*margin-inline-end: auto;/, 'Löschen muss am Anfang stehen, auch in RTL');
+  // Der Kalender nimmt die Option; sein Löschen bleibt zurückgenommen.
+  const cal = await calendarJs();
+  const detail = cal.slice(cal.indexOf('async function openEventDetail('), cal.indexOf('async function loadReminderForEvent('));
+  assert.match(detail, /primary: true,/, 'der Termin-Sheet setzt Bearbeiten nicht als Hauptaktion');
+  assert.match(detail, /id: 'detail-delete',[\s\S]{0,80}variant: 'danger-ghost',[\s\S]{0,40}align: 'start'/,
+    'Löschen bleibt destruktiv gestylt und am Anfang, nicht an der Primärposition');
+});
+
 test('beide Fußzeilen werden aufbewahrt statt verworfen', async () => {
   const src = await detailJs();
   assert.match(src, /function detachFooter\(/, 'Fußzeilen werden abgehängt, nicht entfernt');

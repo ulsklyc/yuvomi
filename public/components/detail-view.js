@@ -422,10 +422,11 @@ function switchToDetail(panel, opts, state) {
 
   setPanelTitle(panel, opts.title ?? '');
   const btn = updateHeaderAction(panel, {
-    label: opts.edit.label ?? t('common.edit'),
+    label: state.primaryEdit ? t('common.back') : (opts.edit.label ?? t('common.edit')),
     onClick: () => switchToForm(panel, opts, state),
+    hidden: state.primaryEdit,
   });
-  btn?.focus();
+  (state.primaryEdit ? state.detailFooter?.querySelector('#detail-view-edit') : btn)?.focus();
   state.mode = 'detail';
 }
 
@@ -438,8 +439,18 @@ function openAsSheet(opts, token) {
     mode: 'detail',
     detailPane: null, formPane: null,
     detailFooter: null, formFooter: null,
+    primaryEdit: Boolean(opts.edit?.primary),
   };
   let panelRef = null;
+  // BEARBEITEN ALS HAUPTAKTION UNTEN (Critique 2026-09-24, Persona Casey).
+  // Im Sheet stand „Bearbeiten" oben im Kopf, ausser Reichweite des Daumens,
+  // und „Löschen" unten in der Fusszeile - die riskanteste Aktion war die
+  // erreichbarste. Mit `edit.primary` wandert Bearbeiten als Primaerknopf an
+  // das Ende der Fusszeile (Daumenzone), Löschen bleibt zurueckgenommen am
+  // Anfang, und der Kopfknopf erscheint erst im Formular - als „Zurück".
+  // Opt-in, weil nicht jedes Blatt Bearbeiten als Hauptabsicht hat: in der
+  // Aufgabe ist es das Erledigen.
+  const { primaryEdit } = state;
 
   openModal({
     title: opts.title,
@@ -454,7 +465,11 @@ function openAsSheet(opts, token) {
       if (activeViewToken === token) activeViewToken = 0;
       opts.onClose?.();
     },
-    headerAction: opts.edit ? { label: opts.edit.label ?? t('common.edit'), id: 'detail-view-edit' } : null,
+    headerAction: opts.edit
+      ? (primaryEdit
+        ? { label: t('common.back'), id: 'detail-view-back' }
+        : { label: opts.edit.label ?? t('common.edit'), id: 'detail-view-edit' })
+      : null,
     onSave(panel) {
       panelRef = panel;
       const body = panel.querySelector('.modal-panel__body');
@@ -465,7 +480,15 @@ function openAsSheet(opts, token) {
       body.replaceChildren(pane);
       state.detailPane = pane;
 
-      const footer = detailFooterEl(opts.actions);
+      const footer = detailFooterEl(primaryEdit
+        ? [...(opts.actions ?? []), {
+          id: 'detail-view-edit',
+          label: opts.edit.label ?? t('common.edit'),
+          variant: 'primary',
+          icon: 'pencil',
+          onClick: () => switchToForm(panel, opts, state),
+        }]
+        : opts.actions);
       if (footer) {
         body.appendChild(footer);
         // Die Fußzeile entstand erst jetzt, nach dem Umzug in openModal - also
@@ -476,8 +499,8 @@ function openAsSheet(opts, token) {
       renderIcons(panel);
 
       if (opts.edit) {
-        updateHeaderAction(panel, { onClick: () => switchToForm(panel, opts, state) });
-        panel.querySelector('.modal-panel__action')?.focus();
+        updateHeaderAction(panel, { onClick: () => switchToForm(panel, opts, state), hidden: primaryEdit });
+        (primaryEdit ? panel.querySelector('#detail-view-edit') : panel.querySelector('.modal-panel__action'))?.focus();
       } else {
         panel.querySelector('.modal-panel__close')?.focus();
       }
@@ -643,7 +666,8 @@ function openAsPopover(opts) {
  * @param {HTMLElement} [opts.anchor]    - Auslöser; ab 768px wird daran verankert
  * @param {Array}  [opts.sections]       - Metazeilen, siehe detailRowEl
  * @param {Array}  [opts.actions]        - Objektaktionen in der Fußzeile
- * @param {Object} [opts.edit]           - { label?, title?, ready?, mount(panel, pane), standalone() }
+ * @param {Object} [opts.edit]           - { label?, title?, ready?, primary?, mount(panel, pane), standalone() }
+ *                                         `primary`: im Sheet als Primaerknopf am Ende der Fusszeile statt im Kopf
  *                                         `ready` ist ein Promise, auf das der
  *                                         Wechsel ins Formular wartet
  * @param {string} [opts.size]           - Panel-Breite wie bei openModal

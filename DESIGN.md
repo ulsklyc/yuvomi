@@ -1375,6 +1375,15 @@ gross und dehnt seine Flaeche per `::before` auf `--target-base` aus; eine Box-M
 ihn als Verstoss, obwohl der Finger 44px findet. Das ist zugleich das Rezept fuer „kompakt
 aussehen, voll treffen".
 
+**Wo gedehnt wird, kommt der Abstand aus derselben Rechnung** (2026-09-24). Die Aufgabe in
+Agenda und Tagesliste (`.agenda-tasks .cal-task-chip`) bleibt die 24px-Bar und dehnt ihre
+Flaeche per `::before` senkrecht auf `--target-base`; Zeilenabstand und Polsterung der Liste
+sind genau diese Dehnung (`--task-hit-grow`), sonst griffe die Flaeche in den Termin darueber -
+eine Ueberlappung ist ein Treffer fuer das falsche Ziel. Traegt das Ziel selbst
+`overflow: hidden`, schneidet es sein Pseudo ab: dann `overflow: visible` und die Ellipse ans
+Kind. Im Ganztags-Stapel der Woche bleibt die Aufgabe ein Reihen-Bauteil (24px, Spacing-
+Ausnahme) - dort kann keiner wachsen, ohne den Nachbarn zu verdecken.
+
 **Die Groesse des Icon-Knopfs gehoert der Shell.** `.btn--icon` nimmt `--target-base` und
 schaltet damit ueber `(hover: none)`. Vorher schaltete es ueber `@media (min-width: 1024px)`,
 also nach der Breite - ein Tablet ab 1024px bekam 40px, und Aufgaben wie Abonnements hatten
@@ -2552,6 +2561,53 @@ einen Tag in die Tagesansicht - wer lesen wollte, was am Dienstag steht, verlies
 **Das Raster hat so viele Zeilen, wie der Monat braucht** (vier bis sechs, alle Breiten).
 Ladefenster und Zeichnung lesen dieselbe Rechnung (`monthGridSpan`); fest 42 Tage zeigten im
 September 2026 eine ganze Zeile Oktober.
+
+### Der Kalender per Tastatur und Screenreader (Critique 2026-09-24, P1)
+**Wer den Kalender nicht sieht oder nicht anfasst, erreicht jeden Termin, den der Finger
+erreicht.** Vorher trugen die Bloecke in Woche und Tag nur `cursor: pointer`, und der Monat war
+35-42 einzelne Tab-Stopps ohne Pfeiltasten.
+
+- **Der Monat ist EIN ARIA-Grid mit EINEM Tab-Stopp.** `role=grid` an `.month-view` (Name: das
+  Zeitraum-Label), die Wochentagsleiste als Kopfzeile, je Woche ein `.month-grid__row`
+  (`role=row`, selbst ein 7-Spalten-Raster mit `minmax(0, 1fr)` und `min-height: 0`, sonst
+  verschoebe ein voller Tag seine Woche), der Tag als `gridcell` mit roving tabindex. Pfeile
+  bewegen den Tag und wechseln am Rand den Monat, Pos1/Ende springen an Anfang und Ende der
+  Woche nach dem Wochenstart des Haushalts, Bild auf/ab um einen Monat mit geklemmter
+  Tageszahl. Enter/Leertaste tut, was der Tipp tut: am Telefon waehlen (`aria-selected`, nicht
+  `aria-pressed` - das ist die Semantik eines Umschalters), am Desktop den Tag oeffnen, und der
+  Fokus geht mit auf dessen ersten Eintrag. Der Name der Zelle sagt, was dort steht:
+  „Donnerstag, 24.09.2026, Heute, 3 Einträge: Zahnarzt, Fußball, Training".
+- **Termine in der Zelle sind keine eigenen Tab-Stopps.** Das APG-Grid kennt Widgets in Zellen
+  nur ueber einen zweiten Modus (Enter hinein, Escape heraus), den niemand findet; ausserdem
+  zeigt die Zelle nur, was hineinpasst („+N"). Der Weg fuehrt ueber die Zelle in den Tag, wo
+  JEDER Eintrag ein Knopf ist - vollstaendig statt zur Haelfte.
+- **Jeder Block ist ein Knopf** (`.week-event`, `.day-event`, `.allday-event`, der Tageskopf der
+  Woche) und heisst wie die Agenda-Zeile: Serie, Titel, Zeit, Ort, Kalender, Personen. Die
+  DOM-Reihenfolge einer Spalte ist die Uhrzeit (`chronological()`), Schichten eingemischt, denn
+  sie ist die Tab-Reihenfolge. Eine Aufgabe nennt ihre Prioritaet im Namen - der Punkt ist
+  `aria-hidden`.
+- **Der Fokusring liegt aussen, wo Platz ist, innen, wo geschnitten wird.** Auf den getoenten
+  Bloecken aussen (`--focus-ring-offset`, `z-index` ueber die Nachbar-Lanes): innen laege der
+  Akzent auf einer Toenung und schnitte die Vollton-Kante. In `.allday-cell` (schneidet ab)
+  und an der Monatszelle innen (`--focus-ring-offset-inset`).
+- **Die Auswahl im Telefon-Monat wird angesagt, das Zeichnen nicht.** Eine polite Live-Region
+  (`#cal-live`) ausserhalb von `#cal-body` - eine Region, die mit ihrem Inhalt entsteht, sagt
+  nichts - meldet „Freitag, 25.09.2026, 2 Einträge" nur bei einer Auswahl, nie bei einem
+  Neuaufbau.
+- **Kuerzel nach Google Kalender, nur auf /calendar:** `t` heute, `k`/`j` zurueck/vor (dazu die
+  Pfeile, wenn kein Bedienelement den Fokus hat; RTL gespiegelt), `m`/`w`/`d`/`a` die Ansicht.
+  Sie stehen in `SHORTCUTS` der Shell mit `route` - EIN Dispatcher, damit „g d" nie zugleich
+  „d" ist -, die Hilfe (`?`) zeigt sie nur dort, und die Knoepfe tragen `aria-keyshortcuts`.
+  Die Tablist heisst „Ansicht", nicht wie die H1.
+
+### Das Leseblatt: die Hauptaktion in die Daumenzone (Critique 2026-09-24, Persona Casey)
+Im Sheet der Detailansicht stand „Bearbeiten" oben im Kopf und „Löschen" unten in der
+Fusszeile - die riskanteste Aktion war die erreichbarste. Mit `edit.primary` steht Bearbeiten
+als Primaerknopf am ENDE der Fusszeile, Löschen bleibt `danger-ghost` am Anfang
+(`margin-inline-end: auto`, in RTL gespiegelt), und der Kopfknopf erscheint erst im Formular,
+als „Zurück". Opt-in, weil die Hauptabsicht dem Objekt gehoert: im Termin ist es Bearbeiten, in
+der Aufgabe das Erledigen. Die Rueckfrage beim Löschen bleibt. Der Kalender nimmt es; Kontakte
+und Inventar haben dieselbe Fusszeile und sind die naechsten Kandidaten.
 
 ### Der Wand-Modus (Signature Component)
 **Der WACHE Zustand des Dashboards - keine zweite Seite, sondern dieselbe Flaeche in anderer

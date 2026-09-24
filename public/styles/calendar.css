@@ -353,11 +353,32 @@
   --month-day-max-visible: 0;
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   grid-auto-rows: 1fr;
   gap: var(--space-px);
   background-color: var(--color-border-subtle);
   overflow-y: auto;
+}
+
+/* JE WOCHE EINE ZEILE (ARIA-Grid, Critique 2026-09-24): der Screenreader
+ * braucht role=row um sieben gridcells, sonst gibt es keine Zeile, in der
+ * Pfeil hoch/runter landen koennte. Die Zeile ist selbst ein Raster mit
+ * denselben sieben Spalten; `minmax(0, 1fr)` statt `1fr`, weil jede Zeile ihre
+ * Spalten jetzt ALLEIN rechnet - ein Inhalt mit Mindestbreite verschoebe sonst
+ * nur seine Woche gegen die anderen. Die Fugen bleiben 1px wie vorher, senkrecht
+ * aus dem gap der Zeile, waagrecht aus dem des Rasters.
+ *
+ * `min-height: 0` und die eine `minmax(0, 1fr)`-Zeile: die Zellen schneiden
+ * ab (overflow: hidden) und trugen deshalb nie eine Mindesthoehe ins 1fr-
+ * Raster - die Zeile dagegen ist sichtbar und reichte die Hoehe ihres
+ * vollsten Tages durch. Gemessen standen die Wochen dann bei 121 und 127px
+ * statt gleich hoch. */
+.month-grid__row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--space-px);
+  min-height: 0;
 }
 
 .month-day {
@@ -379,9 +400,10 @@
   background-color: var(--color-surface-hover);
 }
 
-/* Die Tageszelle ist jetzt ein Drill-in-Button (role="button", P1): sichtbarer
- * Fokusring im Modul-Akzent. outline-offset negativ, weil overflow:hidden einen
- * außenliegenden Ring clippen würde; z-index hebt ihn über die Nachbar-Borders. */
+/* Die Tageszelle ist eine gridcell mit roving tabindex (ARIA-Grid, Critique
+ * 2026-09-24): sichtbarer Fokusring im App-Akzent. outline-offset negativ, weil
+ * overflow:hidden einen außenliegenden Ring clippen würde; z-index hebt ihn
+ * über die Nachbar-Borders. */
 .month-day:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset-inset);
@@ -766,6 +788,25 @@
 
 .week-event:hover {
   background: color-mix(in srgb, var(--ev-color) var(--tint-raised), var(--color-surface-work));
+}
+
+/* DER FOKUS AUF EINEM TERMINBLOCK (Critique 2026-09-24, P1). Seit die Bloecke
+ * Knoepfe sind, brauchen sie den Ring der App - AUSSEN, mit Luft: innen laege
+ * er auf der Toenung und schnitte die Vollton-Kante an, und im Dark hielte der
+ * Akzent gegen eine violette Toenung keine 3:1. z-index ueber die Nachbarn in
+ * derselben Spalte (Lanes liegen 2px auseinander) und ueber die Jetzt-Linie. */
+.week-event:focus-visible,
+.day-event:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  z-index: 3;
+}
+
+/* Der Tageskopf der Woche fuehrt in den Tag (role=button). Ring innen: der
+ * Kopf stoesst an Nachbarkoepfe und an die Ganztags-Zeile. */
+.week-view__day-header:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset-inset);
 }
 
 .week-event__title {
@@ -1786,6 +1827,15 @@
   background: color-mix(in srgb, var(--ev-color) var(--tint-raised), var(--color-surface-work));
 }
 
+/* Ganztags-Balken und Aufgaben stehen in `.allday-cell`, und die schneidet ab
+ * (overflow: hidden, 2px Polsterung) - ein Ring aussen waere seitlich halb
+ * weg. Hier also innen, auf der Flaeche des Balkens. */
+.allday-event:focus-visible,
+.allday-cell .cal-task-chip:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset-inset);
+}
+
 /* Die Uhrzeit am ersten und letzten Tag eines Termins ab 24 Stunden (#1350).
  * DER TITEL GEWINNT: er behaelt eine Mindestbreite, und passt die Uhrzeit
  * daneben nicht mehr, faellt sie auf diesem Chip ganz weg - kein Stumpf, keine
@@ -1952,16 +2002,48 @@
   padding: var(--space-0h) var(--space-1);
 }
 
-/* Aufgaben-Sektion in Agenda-Ansicht */
+/* Aufgaben-Sektion in Agenda-Ansicht (und in der Tagesliste des
+ * Telefon-Monats, die dieselben Zeilen baut).
+ *
+ * DIE TREFFERFLAECHE WAECHST, DER CHIP NICHT (Critique 2026-09-24, P1). Der
+ * Chip war 23,6px hoch und in der Liste das einzige Ziel seiner Zeile - ein
+ * freistehendes Ziel, das seine Zielgroesse halten muss (Zielgroessen-Regel,
+ * tokens.css). Sichtbar bleibt er die flache Bar neben den Termin-Balken; die
+ * Flaeche dehnt ein ::before senkrecht auf --target-base (44px am Zeiger,
+ * 48px am Finger). Damit sich zwei Dehnungen nie ueberlappen, ist der
+ * Zeilenabstand genau die Dehnung zweier Chips und die Polsterung oben und
+ * unten die eines - ein Treffer knapp neben der Aufgabe landet nie im Termin
+ * darueber. `overflow: visible`, weil der Chip sein eigenes Pseudo sonst
+ * abschnitte; die Ellipse traegt ohnehin der Titel-span. */
 .agenda-tasks {
+  --task-hit-grow: calc((var(--target-base) - var(--space-6)) / 2);
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-3);
+  column-gap: var(--space-1);
+  row-gap: calc(var(--task-hit-grow) * 2);
+  padding: var(--task-hit-grow) var(--space-3);
 }
 
 .agenda-tasks .cal-task-chip {
   margin-bottom: 0;
+  position: relative;
+  min-height: var(--space-6);
+  overflow: visible;
+}
+
+.agenda-tasks .cal-task-chip::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  inset-block: calc(-1 * var(--task-hit-grow));
+}
+
+/* In der Ganztags-Zeile von Woche und Tag stehen Aufgaben als STAPEL - eine
+ * Reihe, die ihre Dichte gemeinsam traegt (WCAG 2.5.8, Spacing-Ausnahme).
+ * Wachsen kann dort keiner, ohne den Nachbarn zu verdecken; die 24px halten
+ * sie trotzdem, statt 23,6. */
+.allday-cell .cal-task-chip {
+  min-height: var(--space-6);
 }
 
 /* --------------------------------------------------------

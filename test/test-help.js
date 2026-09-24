@@ -42,3 +42,18 @@ test('Touch-Zeilen verwenden vorhandene Lucide-Iconnamen', () => {
     ['navigation', 'plus-circle', 'search', 'layout-grid', 'settings']
   );
 });
+
+test('Desktop: eine Zweitbelegung erscheint im Label, ohne Label die Taste selbst', () => {
+  const rows = buildHelpRows({
+    coarsePointer: false,
+    shortcuts: [
+      { key: 'k', label: () => 'k / \u2190', description: () => 'shortcuts.calPrev' },
+      { key: 't', description: () => 'shortcuts.calToday' },
+    ],
+    t,
+  });
+  assert.deepEqual(rows, [
+    { key: 'k / \u2190', desc: 'shortcuts.calPrev' },
+    { key: 't', desc: 'shortcuts.calToday' },
+  ]);
+});

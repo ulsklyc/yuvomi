@@ -24,6 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of a ring that was hard to see in dark mode, and the "Event titles" switch moved from the
   filter sheet to the month itself.
 
+- **The calendar can be driven from the keyboard.** In the calendar, `t` jumps to today, `k` and `j`
+  (or the arrow keys when nothing is focused) move to the previous and next period, and `m`, `w`, `d`
+  and `a` switch to month, week, day and agenda - the keys Google Calendar uses. The help dialog
+  (`?`) lists them while you are in the calendar. The month grid is now a single tab stop: the
+  arrow keys move through the days and across into the next month, Home and End go to the start
+  and end of the week, Page Up and Page Down move a month, and Enter opens the day (on a phone it
+  selects it for the list below).
+
 - **The calendar tile shows the week ahead at 2x1.** Set to the wide size, the calendar tile on the
   overview no longer lists three events but shows the next seven days: a dot per event in the colour
   of the event, person or calendar, a band for all-day and multi-day events (with an open end where
@@ -43,6 +51,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the module's own balance source, so it shows what the module shows.
 
 ### Changed
+
+- **Edit sits at the bottom of an event on a phone, Delete no longer does.** The sheet that opens
+  for an event put Edit at the top, out of reach of the thumb, and Delete at the bottom, where the
+  thumb rests. Edit is now the main button at the bottom right; Delete stays in red at the start
+  of the row and still asks before it deletes.
 
 - **The month grid has only as many rows as the month needs.** It used to show six weeks every
   time, so a month like September 2026 ended with a full row of October; it now shows four to six.
@@ -83,6 +96,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   quiet day.
 
 ### Fixed
+
+- **Events in the week and day view can be reached by keyboard and screen reader.** They could only
+  be clicked: Tab skipped them and a screen reader did not offer them. Every event, all-day bar
+  and day heading is now a button named like the agenda row (title, time, place, people), in the
+  order of the day, and Enter opens it. Tasks in the calendar now say their priority, and the
+  month's days say what is on them ("Thursday, 24.09.2026, today, 3 entries: ...") instead of
+  only how much. Tasks in the agenda are easier to hit: the touch area around them is 44px (48px
+  on touch screens) while they look the same.
 
 - **"Today" no longer gives a false all-clear.** Open doses, pending approvals (for the person who
   approves them), today's bin and "put it out tonight", birthdays, your own shift, due reminders,

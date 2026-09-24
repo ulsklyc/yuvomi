@@ -239,10 +239,12 @@
  * Fußzeile: Objektaktionen
  * -------------------------------------------------------- */
 
-/* Eine Aktion, die links steht (Löschen), schiebt den Rest nach rechts -
- * dasselbe Muster wie in den Formular-Fußzeilen der Module. */
+/* Eine Aktion, die am Anfang steht (Löschen), schiebt den Rest ans Ende -
+ * dasselbe Muster wie in den Formular-Fußzeilen der Module. Logisch statt
+ * `margin-right`: in RTL steht der Anfang rechts. Am Ende, in der Daumenzone,
+ * steht mit `edit.primary` die Hauptaktion (detail-view.js, openAsSheet). */
 .detail-view__action--start {
-  margin-right: auto;
+  margin-inline-end: auto;
 }
 
 /* --------------------------------------------------------
