@@ -24,11 +24,23 @@ const { widgetHeader, renderDashboardLayout, renderMetricTiles } = __test;
 
 /** Der Text, den ein Screenreader aus einem Markup-Stueck liest: ohne aria-hidden und ohne Tags. */
 function accessibleText(html) {
-  let s = html;
-  // aria-hidden-Teilbaeume entfernen (nicht verschachtelt genug, um einen Parser zu brauchen:
-  // gesucht sind <span ... aria-hidden="true">…</span> ohne weitere spans darin).
-  s = s.replace(/<(span|i)\b[^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/\1>/g, '');
-  return s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  // Tag fuer Tag statt per Ersetzung: ein Teilbaum unter aria-hidden="true" bleibt stumm,
+  // auch verschachtelt, und aus den Resten kann kein neues Tag zusammenwachsen.
+  const VOID = new Set(['br', 'hr', 'img', 'input', 'meta', 'link', 'wbr']);
+  const hidden = [];
+  const parts = [];
+  for (const [token, closing, name] of html.matchAll(/<(\/?)([a-zA-Z][\w-]*)\b[^>]*>|[^<]+|</g)) {
+    const muted = hidden.length > 0 && hidden[hidden.length - 1];
+    if (name === undefined) {
+      if (!muted) parts.push(token);
+    } else if (closing) {
+      hidden.pop();
+    } else if (!VOID.has(name.toLowerCase()) && !token.endsWith('/>')) {
+      hidden.push(muted || /\baria-hidden="true"/.test(token));
+    }
+    if (name !== undefined) parts.push(' ');
+  }
+  return parts.join('').replace(/\s+/g, ' ').trim();
 }
 
 function h3Of(html) {
