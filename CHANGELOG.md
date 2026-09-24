@@ -15,6 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   back gesture at the screen edge keep working; with reduced motion the new period appears without
   sliding in. The arrow buttons stay for mouse and keyboard.
 
+- **The month on a phone shows the day you pick below the grid.** Tapping a day in the month view
+  now selects it instead of jumping to the day view, and its events and tasks appear as a list
+  under the grid, in the same rows as the agenda; the date above the list opens the day view. Drag
+  the list up or scroll it and the grid shrinks to the selected week, drag down to bring the month
+  back, or use the button next to the date. A free day offers to add an event for that day, and
+  "+" adds to the selected day. Tasks and events are now told apart by shape (square and round)
+  instead of a ring that was hard to see in dark mode, and the "Event titles" switch moved from the
+  filter sheet to the month itself.
+
 - **The calendar tile shows the week ahead at 2x1.** Set to the wide size, the calendar tile on the
   overview no longer lists three events but shows the next seven days: a dot per event in the colour
   of the event, person or calendar, a band for all-day and multi-day events (with an open end where
@@ -34,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the module's own balance source, so it shows what the module shows.
 
 ### Changed
+
+- **The month grid has only as many rows as the month needs.** It used to show six weeks every
+  time, so a month like September 2026 ended with a full row of October; it now shows four to six.
 
 - **The calendar gives phones more room for events.** Filter and search moved next to the view
   switcher, so the calendar header on a phone is 166px instead of 230px, and when you scroll the

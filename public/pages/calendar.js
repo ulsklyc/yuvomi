@@ -983,20 +983,61 @@ function readDateInput(root, selector) {
   return parseDateInput(root.querySelector(selector)?.value || '');
 }
 
-function getMonthRange(dateStr) {
+/**
+ * Das Monatsraster: wo es beginnt, wo es endet und wie viele Wochenzeilen der
+ * Monat BRAUCHT - vier bis sechs, nicht immer sechs.
+ *
+ * Hier standen fest 42 Tage. Im September 2026 (Wochenstart Montag) war die
+ * sechste Zeile damit komplett Oktober: 103px Nachbarmonat auf dem Desktop, am
+ * Telefon eine Zeile Raster, die der Tagesliste darunter fehlte (Critique
+ * 2026-09-24). Ladefenster und Zeichnung lesen BEIDE diese eine Rechnung -
+ * zoege nur eine nach, fehlten der letzten Zeile ihre Termine oder das
+ * Fenster luede eine Woche, die niemand sieht.
+ */
+function monthGridSpan(dateStr, weekStart = state.weekStart) {
   const d     = new Date(dateStr + 'T00:00:00');
   const year  = d.getFullYear();
   const month = d.getMonth();
-  // Start des Monats, dann bis auf den Montag zurückgehen (Kalenderraster)
   const firstOfMonth = new Date(year, month, 1);
+  const daysInMonth  = new Date(year, month + 1, 0).getDate();
   // Bis zum gewählten Wochenstart zurückgehen (Kalenderraster).
-  const startOffset = (firstOfMonth.getDay() - state.weekStart + 7) % 7;
-  const gridStart = new Date(firstOfMonth);
-  gridStart.setDate(gridStart.getDate() - startOffset);
+  const startOffset = (firstOfMonth.getDay() - weekStart + 7) % 7;
+  const weeks = Math.ceil((startOffset + daysInMonth) / 7);
+  const gridStart = new Date(year, month, 1 - startOffset);
   const from = isoDate(gridStart);
-  // 42 Tage (6 Wochen) abdecken
-  const to   = addDays(from, 41);
+  return { from, to: addDays(from, weeks * 7 - 1), weeks };
+}
+
+function getMonthRange(dateStr, weekStart = state.weekStart) {
+  const { from, to } = monthGridSpan(dateStr, weekStart);
   return { from, to };
+}
+
+/**
+ * Der gewählte Tag nach einem Monatsschritt: heute, wenn der neue Monat heute
+ * enthält, sonst dessen Erster - dieselbe Hausregel wie der Vorschlag für
+ * einen neuen Eintrag (defaultDateInPeriod, #737).
+ *
+ * Seit der Monat am Telefon einen Tag WÄHLT (Tagesliste unter dem Raster),
+ * ist der Cursor dort sichtbar, und „gleiche Tageszahl" hätte vom 31. aus
+ * über setMonth() still in den übernächsten Monat gerechnet. Gerechnet wird
+ * deshalb vom Monatsersten aus, nie vom Cursor-Tag.
+ */
+function monthStepCursor(cursor, dir, today = state.today) {
+  const { from, to } = monthPeriodKeys(addMonths(`${String(cursor).slice(0, 7)}-01`, dir));
+  return defaultDateInPeriod(from, to, today);
+}
+
+/**
+ * Was ein Tipp auf eine Monatszelle tut. Am Telefon (geteilter Monat: Raster
+ * oben, Tagesliste unten) WÄHLT er den Tag - die Liste darunter zeigt ihn, in
+ * die Tagesansicht führt ihr Kopf. Ein Tag aus dem Nachbarmonat blättert
+ * dorthin und wählt ihn. Auf dem Desktop bleibt der Drill-in in den Tag.
+ */
+function monthDayTapAction(date, cursor, { split = false } = {}) {
+  if (!split) return 'open-day';
+  if (String(date).slice(0, 7) !== String(cursor).slice(0, 7)) return 'change-month';
+  return 'select';
 }
 
 /**
@@ -1030,7 +1071,7 @@ function getAgendaRange(dateStr) {
 /**
  * Der Zeitraum, den eine Ansicht gerade zeigt - als Zeitraum für einen neuen
  * Termin, nicht als Ladespanne. Deshalb nicht getRangeForView(): dessen
- * Monatsspanne ist das 42-Tage-Raster und begänne im Vormonat.
+ * Monatsspanne ist das Wochenraster und begänne im Vormonat.
  */
 function visibleDayRange(view, cursor, weekStart = 1) {
   if (view === 'month')  return monthPeriodKeys(cursor);
@@ -1055,7 +1096,16 @@ function newEventDefaultDate(view, cursor, today, weekStart = 1) {
 
 /** newEventDefaultDate() für den aktuellen State - der Normalfall an den Aufrufstellen. */
 function newEventDate() {
+  // Am Telefon WÄHLT der Monat einen Tag, und die Liste darunter zeigt ihn:
+  // „+" legt dann für diesen Tag an, nicht für den Monatsersten. Auf dem
+  // Desktop ist der Cursor im Monat unsichtbar, dort gilt die Zeitraumregel.
+  if (state.view === 'month' && isMonthSplit()) return state.cursor;
   return newEventDefaultDate(state.view, state.cursor, state.today, state.weekStart);
+}
+
+/** Der geteilte Monat (Raster oben, Tagesliste unten) - die Telefonbreite. */
+function isMonthSplit() {
+  return typeof window !== 'undefined' && (window.matchMedia?.(MOBILE_MEDIA_QUERY).matches ?? false);
 }
 
 // Per-Render-Pass Day-Buckets. Vermeidet, dass jede der 42 Monats-Zellen die
@@ -1706,6 +1756,7 @@ export async function render(container, { user }) {
   state.today  = todayKey();
   state.cursor = state.today;
   state.view   = defaultCalendarView();
+  _monthCollapsed = false;
 
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
@@ -2063,7 +2114,11 @@ function syncTodayButton(root = _container) {
   const btn = root?.querySelector('#cal-today');
   if (!btn) return;
   const { from, to } = getRangeForView(state.view, state.cursor);
-  const isCurrent = state.today >= from && state.today <= to;
+  // Im geteilten Monat ist „heute" ein TAG, nicht der Monat: steht die Auswahl
+  // auf einem anderen Tag, führt der Reset zu heute zurück und bleibt sichtbar.
+  const isCurrent = (state.view === 'month' && isMonthSplit())
+    ? state.cursor === state.today
+    : state.today >= from && state.today <= to;
   // `typeof document` statt eines nackten Bezeichners: Testumgebungen ohne
   // DOM stubben `document` nicht immer, und ein nackter Bezeichner wirft dort
   // schon beim Werteauswerten, bevor `isCurrent` ihn kurzschliessen kann.
@@ -2092,7 +2147,7 @@ function getWeekNumber(dateStr) {
 async function navigate(dir) {
   if (searchActive) closeCalendarSearch({ restoreView: false });
   if (state.view === 'month') {
-    state.cursor = addMonths(state.cursor, dir);
+    state.cursor = monthStepCursor(state.cursor, dir);
   } else if (state.view === 'week') {
     const isMobile = window.matchMedia(MOBILE_MEDIA_QUERY).matches;
     state.cursor = addDays(state.cursor, dir * (isMobile ? 3 : 7));
@@ -2384,36 +2439,51 @@ function syncHeadToScrollport(body) {
 // Monatsansicht
 // --------------------------------------------------------
 
+/**
+ * DER MONAT AM TELEFON IST GETEILT: RASTER OBEN, DER GEWÄHLTE TAG DARUNTER
+ * (Critique 2026-09-24, P2).
+ *
+ * Vorher war er ein Punkteraster, und ein Tipp auf einen Tag sprang in die
+ * Tagesansicht - um zu lesen, was am Dienstag steht, verliess man den Monat.
+ * Die Messlatte (Apple Kalender „Liste", Fantastical, Outlook) trennt die zwei
+ * Fragen: das Raster sagt, WO etwas ist, die Liste sagt, WAS. Ein Tipp WÄHLT
+ * deshalb den Tag (`state.cursor` ist der gewählte Tag), und in die
+ * Tagesansicht führt der Kopf der Liste.
+ *
+ * Die Liste spricht die Zeilensprache der Agenda (`dayGroupHtml`, dieselben
+ * Zeilen, dieselben Handler) - eine dritte Termindarstellung wäre die fünfte
+ * Mundart, gegen die Schritt 4 der Critique antritt.
+ *
+ * Auf dem Desktop bleibt der Monat, was er ist: Balken im Raster, Klick auf
+ * einen Tag öffnet ihn. Welche Fassung gilt, entscheidet die Breite beim
+ * Zeichnen; ein Drehen über die Schwelle zeichnet neu (`_monthSplitQuery`).
+ */
 function renderMonthView(container) {
-  const d      = new Date(state.cursor + 'T00:00:00');
-  const year   = d.getFullYear();
-  const month  = d.getMonth();
+  const split = isMonthSplit();
+  const { from, weeks } = monthGridSpan(state.cursor);
+  const month = new Date(state.cursor + 'T00:00:00').getMonth();
 
-  // Erster Tag des Monats
-  const firstDay  = new Date(year, month, 1);
-  // Bis zum gewählten Wochenstart zurückgehen.
-  const startOffset = (firstDay.getDay() - state.weekStart + 7) % 7;
-
-  // 42 Tage anzeigen (6 Wochen)
-  const startDate = new Date(firstDay);
-  startDate.setDate(startDate.getDate() - startOffset);
-
-  const days = Array.from({ length: 42 }, (_, i) => {
-    const dt = new Date(startDate);
-    dt.setDate(startDate.getDate() + i);
-    return { date: isoDate(dt), inMonth: dt.getMonth() === month };
+  const days = Array.from({ length: weeks * 7 }, (_, i) => {
+    const date = addDays(from, i);
+    return { date, inMonth: new Date(date + 'T00:00:00').getMonth() === month };
   });
+  const selWeek = Math.floor(days.findIndex((d) => d.date === state.cursor) / 7);
 
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <div class="${monthViewClasses(state.monthTitles)}">
+    <div class="${monthViewClasses(state.monthTitles, { split, collapsed: split && _monthCollapsed })}" style="--month-weeks:${weeks}">
       <div class="month-weekdays">
         ${weekdayOrder(state.weekStart).map((idx) => `<div class="month-weekday">${DAY_NAMES_SHORT()[idx]}</div>`).join('')}
       </div>
-      <div class="month-grid page-scrollport" id="month-grid">
-        ${days.map(({ date, inMonth }) => renderMonthDay(date, inMonth)).join('')}
+      <div class="month-grid${split ? '' : ' page-scrollport'}" id="month-grid">
+        ${days.map(({ date, inMonth }, i) => renderMonthDay(date, inMonth, {
+          selected: split && date === state.cursor,
+          selWeek:  split && Math.floor(i / 7) === selWeek,
+          split,
+        })).join('')}
       </div>
     </div>
+    ${split ? monthListHtml() : ''}
   `);
 
   const grid = container.querySelector('#month-grid');
@@ -2421,16 +2491,13 @@ function renderMonthView(container) {
     const dayEl = e.target.closest('.month-day');
     if (!dayEl) return;
 
-    // Mobil ist die ganze Zelle EIN Drill-in-Ziel, und das bleibt es auch mit
-    // Titelzeilen. DER GRUND IST DIE TAP-GROESSE, nicht die Chip-Form: hier
-    // stand "die Chips sind dort zu Punkten reduziert", was ab dem
-    // Titel-Schalter nur noch die halbe Wahrheit waere - eine 13px hohe
-    // Titelzeile ist genauso weit unter den 44px, die ein Ziel am Finger
-    // braucht, wie es der 10px-Punkt war. Ein Tap darf nie in einem
-    // Event-Popup enden statt in der handlungsfaehigen Tagesansicht (P1).
+    // Mobil ist die ganze Zelle EIN Ziel, und das bleibt es auch mit
+    // Titelzeilen. DER GRUND IST DIE TAP-GROESSE, nicht die Chip-Form: eine
+    // 13px hohe Titelzeile ist genauso weit unter den 44px, die ein Ziel am
+    // Finger braucht, wie es der 10px-Punkt war. Was das Ziel TUT, sagt
+    // monthDayTapAction(): am Telefon wählen, auf dem Desktop in den Tag.
     // Desktop behält die feinere Interaktion: Chip -> Ziel, Zelle -> Tag.
-    const isMobile = window.matchMedia(MOBILE_MEDIA_QUERY).matches;
-    if (!isMobile) {
+    if (!split) {
       const taskChip = e.target.closest('.cal-task-chip');
       if (taskChip) {
         e.stopPropagation();
@@ -2451,19 +2518,21 @@ function renderMonthView(container) {
         return;
       }
     }
-    switchToDayView(dayEl.dataset.date);
+    activateMonthDay(dayEl.dataset.date, { split });
   });
 
-  // Tastatur-Aktivierung der Tageszelle (role="button"): Enter/Space -> Tag.
-  // Nur wenn der Fokus auf der Zelle selbst liegt; innere Chips tragen desktop
-  // ihre eigene Semantik und werden hier nicht abgefangen (Audit P1).
+  // Tastatur-Aktivierung der Tageszelle (role="button"): Enter/Space tut
+  // dasselbe wie der Tipp. Nur wenn der Fokus auf der Zelle selbst liegt;
+  // innere Chips tragen desktop ihre eigene Semantik (Audit P1).
   grid.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     const dayEl = e.target.closest('.month-day');
     if (!dayEl || e.target !== dayEl) return;
     e.preventDefault();
-    switchToDayView(dayEl.dataset.date);
+    activateMonthDay(dayEl.dataset.date, { split, fromKeyboard: true });
   });
+
+  if (split) wireMonthList(container.querySelector('.month-view'), container.querySelector('#month-list'));
 
   // Sichtbare Kapazität je Zelle aus der realen Höhe ableiten und bei Viewport-
   // Änderungen (Fenster-Resize, Sidebar-Toggle) neu rechnen (Audit P2). Der
@@ -2472,6 +2541,253 @@ function renderMonthView(container) {
   _monthGridResizeObserver = new ResizeObserver(() => scheduleMonthFit(grid));
   _monthGridResizeObserver.observe(grid);
 }
+
+async function activateMonthDay(date, { split = false, fromKeyboard = false } = {}) {
+  const action = monthDayTapAction(date, state.cursor, { split });
+  if (action === 'open-day') {
+    switchToDayView(date);
+    return;
+  }
+  if (action === 'select') {
+    selectMonthDay(date);
+    return;
+  }
+  // Nachbarmonat: blättern und dort denselben Tag wählen.
+  if (searchActive) closeCalendarSearch({ restoreView: false });
+  state.cursor = date;
+  await reloadForView();
+  updateLabel();
+  renderView();
+  if (fromKeyboard) {
+    _container?.querySelector(`.month-day[data-date="${CSS.escape(date)}"]`)?.focus();
+  }
+}
+
+/**
+ * Einen Tag im selben Monat wählen: nur die Auswahl und die Liste ändern sich.
+ * Das Raster wird NICHT neu gezeichnet - die Zelle, auf der Finger oder Fokus
+ * gerade liegt, bleibt dasselbe Element.
+ */
+function selectMonthDay(date) {
+  if (date === state.cursor) return;
+  state.cursor = date;
+  const view = _container?.querySelector('.month-view--split');
+  if (!view) return;
+  const cells = [...view.querySelectorAll('.month-day')];
+  const selWeek = Math.floor(cells.findIndex((c) => c.dataset.date === date) / 7);
+  cells.forEach((cell, i) => {
+    const selected = cell.dataset.date === date;
+    cell.classList.toggle('month-day--selected', selected);
+    cell.classList.toggle('month-day--selweek', Math.floor(i / 7) === selWeek);
+    cell.setAttribute('aria-pressed', selected ? 'true' : 'false');
+  });
+  renderMonthList();
+  syncTodayButton();
+}
+
+// Eingeklappt (nur die Woche des gewählten Tags) gilt für die Sitzung auf
+// dieser Seite: ein Monatswechsel zeichnet neu und behält den Zustand, ein
+// neuer Seitenaufruf beginnt ausgeklappt (render()).
+let _monthCollapsed = false;
+// Eigene Scroll-Folgen (neuer Tag in der Liste, Umklappen) sind keine Geste.
+let _monthListQuietUntil = 0;
+
+/** Die Tagesliste unter dem Raster: fester Kopf, darunter der Scrollport. */
+function monthListHtml() {
+  return `
+    <section class="month-list" id="month-list" aria-labelledby="month-open-day">
+      <div class="month-list__head">
+        <h2 class="month-list__title">
+          <button type="button" class="month-list__open" id="month-open-day"></button>
+        </h2>
+        <div class="month-list__tools">
+          <button type="button" class="btn btn--icon month-list__tool" id="month-titles-toggle"
+                  aria-pressed="${state.monthTitles ? 'true' : 'false'}"
+                  aria-label="${esc(t('calendar.toggleMonthTitles'))}" title="${esc(t('calendar.toggleMonthTitles'))}">
+            <i data-lucide="letter-text" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="btn btn--icon month-list__tool" id="month-collapse" aria-controls="month-grid"></button>
+        </div>
+      </div>
+      <div class="agenda-view month-list__rows page-scrollport" id="month-list-rows"></div>
+    </section>
+  `;
+}
+
+/**
+ * Kopf und Zeilen der Liste für den gewählten Tag (state.cursor).
+ *
+ * Die Liste steht NEBEN `.month-view`, nicht darin: die Punkt- und
+ * Titelregeln des Rasters sind an `.month-view` geschnitten
+ * (`.month-view:not(.month-view--titles) .cal-task-chip` macht jeden
+ * Aufgaben-Chip zum 10px-Quadrat), und in der Liste hätten sie die Aufgaben
+ * zu Punkten ohne Titel geschrumpft. Die Wischgeste bewegt ausserdem nur das
+ * erste Kind von #cal-body - das Raster wechselt den Monat, die Liste steht.
+ */
+function renderMonthList(list = _container?.querySelector('#month-list')) {
+  if (!list) return;
+  const date = state.cursor;
+  const weekday = DAY_NAMES_LONG()[new Date(date + 'T00:00:00').getDay()];
+
+  const open = list.querySelector('#month-open-day');
+  open.classList.toggle('month-list__open--today', date === state.today);
+  open.setAttribute('aria-label', t('calendar.monthOpenDay', { date: `${weekday}, ${formatDate(date)}` }));
+  open.replaceChildren();
+  open.insertAdjacentHTML('beforeend', `
+    <span class="agenda-day__date">${esc(formatDate(date))}</span>
+    <span class="agenda-day__weekday">${esc(weekday)}</span>
+    <i data-lucide="chevron-right" class="icon-sm month-list__chevron" aria-hidden="true"></i>
+  `);
+
+  const group = dayGroup(date);
+  const rows = list.querySelector('#month-list-rows');
+  rows.replaceChildren();
+  rows.insertAdjacentHTML('beforeend', dayGroupIsEmpty(group)
+    ? emptyStateHTML({
+      compact: true,
+      className: 'month-list__empty',
+      title: t('calendar.agendaDayEmpty'),
+      // Ruhig: ein freier Tag ist kein Fehlerfall, die Aktion ist ein Angebot.
+      action: readOnly() ? undefined : { label: t('calendar.addEvent'), tone: 'secondary', icon: 'plus', attrs: { id: 'month-list-cta' } },
+    })
+    : `<div class="agenda-day" data-date="${esc(date)}">${dayGroupHtml(group)}</div>`);
+  _monthListQuietUntil = performance.now() + 250;
+  rows.scrollTop = 0;
+  if (window.lucide) lucide.createIcons({ el: list });
+}
+
+function syncMonthCollapse(view, list) {
+  view.classList.toggle('month-view--collapsed', _monthCollapsed);
+  const btn = list.querySelector('#month-collapse');
+  if (!btn) return;
+  const label = t(_monthCollapsed ? 'calendar.monthShowMonth' : 'calendar.monthShowWeek');
+  btn.setAttribute('aria-expanded', _monthCollapsed ? 'false' : 'true');
+  btn.setAttribute('aria-label', label);
+  btn.title = label;
+  btn.replaceChildren();
+  btn.insertAdjacentHTML('beforeend',
+    `<i data-lucide="${_monthCollapsed ? 'chevrons-up-down' : 'chevrons-down-up'}" aria-hidden="true"></i>`);
+  if (window.lucide) lucide.createIcons({ el: btn });
+}
+
+/**
+ * Wann die Liste das Raster auf die Woche einklappt - als reine Entscheidung,
+ * damit die zwei Fallen ohne Browser prüfbar sind:
+ *
+ * EINKLAPPEN nur beim Scrollen nach unten UND nur, wenn die Liste danach noch
+ * scrollen kann. Sonst wächst sie um die eingeklappten Zeilen, ihr scrollTop
+ * klemmt auf 0 - und genau das ist das Signal zum Ausklappen: das Raster
+ * pumpte auf und zu.
+ *
+ * AUSKLAPPEN, wenn die Liste an ihren Anfang zurückkommt (scrollTop 0 nach
+ * einer Bewegung nach oben). Nach einem ausdrücklichen Ausklappen per Knopf
+ * mitten in der Liste klappt erst der nächste Weg über den Anfang wieder ein,
+ * sonst nähme der nächste Wisch die Entscheidung des Nutzers zurück.
+ */
+function monthCollapseStep({ collapsed, top, lastTop, room, hold }) {
+  const THRESHOLD = 12;
+  if (!collapsed) {
+    if (hold) return top <= 0 ? 'release' : 'stay';
+    return (top > THRESHOLD && top > lastTop && room > THRESHOLD) ? 'collapse' : 'stay';
+  }
+  return (top <= 0 && lastTop > 0) ? 'expand' : 'stay';
+}
+
+function wireMonthList(view, list) {
+  const rows = list.querySelector('#month-list-rows');
+  const grid = view.querySelector('#month-grid');
+  syncMonthCollapse(view, list);
+  renderMonthList(list);
+
+  let lastTop = 0;
+  let hold = false;
+  const setCollapsed = (value) => {
+    _monthCollapsed = value;
+    syncMonthCollapse(view, list);
+    // Die Umstellung aendert die Listenhoehe und damit scrollTop - die eigene
+    // Folge darf nicht als naechste Geste gelesen werden.
+    _monthListQuietUntil = performance.now() + 320;
+  };
+
+  rows.addEventListener('scroll', () => {
+    const top = rows.scrollTop;
+    if (performance.now() < _monthListQuietUntil) { lastTop = top; return; }
+    // Wie viel die Liste nach dem Einklappen noch scrollen koennte: ihr
+    // Ueberlauf minus der Zeilen, die ihr zuwachsen.
+    const weeks = Number(view.style.getPropertyValue('--month-weeks')) || 5;
+    const room = rows.scrollHeight - rows.clientHeight - grid.offsetHeight * (weeks - 1) / weeks;
+    const step = monthCollapseStep({ collapsed: _monthCollapsed, top, lastTop, room, hold });
+    if (step === 'collapse') setCollapsed(true);
+    else if (step === 'expand') setCollapsed(false);
+    else if (step === 'release') hold = false;
+    lastTop = top;
+  }, { passive: true });
+
+  // DIE GESTE AM FINGER, NICHT NUR DAS SCROLL-EREIGNIS. Ein Tag mit drei
+  // Terminen ueberlaeuft die Liste um ein paar Pixel oder gar nicht - dann
+  // kommt nie ein Scroll, der einklappen duerfte, und am Listenanfang nie
+  // einer, der aufklappt. Hochziehen klappt deshalb auf die Woche ein,
+  // Herunterziehen am Listenanfang klappt auf. Die Pump-Falle oben gibt es
+  // hier nicht: aufgeklappt wird nur vom Finger oder vom Listenanfang NACH
+  // einer Bewegung, nie vom Klemmen.
+  let pullStart = null;
+  let pullAtTop = false;
+  rows.addEventListener('touchstart', (e) => {
+    pullStart = e.touches.length === 1 ? e.touches[0].clientY : null;
+    pullAtTop = rows.scrollTop <= 0;
+  }, { passive: true });
+  rows.addEventListener('touchmove', (e) => {
+    if (pullStart == null) return;
+    const dy = e.touches[0].clientY - pullStart;
+    if (_monthCollapsed && pullAtTop && dy > 32) {
+      pullStart = null;
+      setCollapsed(false);
+    } else if (!_monthCollapsed && !hold && dy < -32) {
+      pullStart = null;
+      setCollapsed(true);
+    }
+  }, { passive: true });
+
+  list.querySelector('#month-collapse').addEventListener('click', () => {
+    const next = !_monthCollapsed;
+    hold = !next && rows.scrollTop > 0;
+    setCollapsed(next);
+  });
+
+  list.querySelector('#month-titles-toggle').addEventListener('click', () => {
+    state.monthTitles = !state.monthTitles;
+    try { localStorage.setItem(MONTH_TITLES_KEY, state.monthTitles ? 'true' : 'false'); } catch {}
+    renderView();
+    _container?.querySelector('#month-titles-toggle')?.focus();
+  });
+
+  list.querySelector('#month-open-day').addEventListener('click', () => switchToDayView(state.cursor));
+
+  rows.addEventListener('click', (e) => {
+    if (e.target.closest('#month-list-cta')) {
+      openEventModal({ mode: 'create', date: state.cursor });
+      return;
+    }
+    handleDayRowActivation(e);
+  });
+  rows.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    handleDayRowActivation(e, { keyboard: true });
+  });
+}
+
+/**
+ * Ein Drehen ueber die 640er-Schwelle wechselt die Fassung des Monats (geteilt
+ * oder Raster) - neu zeichnen, sonst stuende am Desktop die Telefonliste.
+ * Gehaltene MediaQueryList auf Modulebene wie in meals.js: ohne Referenz darf
+ * die Engine sie einsammeln, und in render() gebunden verdoppelte sich der
+ * Listener mit jedem Besuch.
+ */
+function onMonthSplitQueryChange() {
+  if (_container?.isConnected && state.view === 'month' && !searchActive) renderView();
+}
+const _monthSplitQuery = typeof window !== 'undefined' ? window.matchMedia?.(MOBILE_MEDIA_QUERY) ?? null : null;
+_monthSplitQuery?.addEventListener?.('change', onMonthSplitQueryChange);
 
 /**
  * Klassen einer Monatszelle - eigene Funktion, weil hier der Wochentag über den
@@ -2491,27 +2807,34 @@ function renderMonthView(container) {
  * die beiden auseinander, und genau diese Doppelung hat der Kalender 2026-08
  * schon einmal bezahlt (siehe MOBILE_MEDIA_QUERY).
  */
-function monthViewClasses(monthTitles) {
-  return ['month-view', monthTitles ? 'month-view--titles' : ''].filter(Boolean).join(' ');
-}
-
-function monthDayClasses(date, inMonth, todayKey = state.today) {
+function monthViewClasses(monthTitles, { split = false, collapsed = false } = {}) {
   return [
-    'month-day',
-    !inMonth            ? 'month-day--outside' : '',
-    date === todayKey   ? 'month-day--today'   : '',
-    isWeekendKey(date)  ? 'month-day--weekend' : '',
+    'month-view',
+    monthTitles ? 'month-view--titles'    : '',
+    split       ? 'month-view--split'     : '',
+    collapsed   ? 'month-view--collapsed' : '',
   ].filter(Boolean).join(' ');
 }
 
-function renderMonthDay(date, inMonth) {
+function monthDayClasses(date, inMonth, todayKey = state.today, { selected = false, selWeek = false } = {}) {
+  return [
+    'month-day',
+    !inMonth            ? 'month-day--outside'  : '',
+    date === todayKey   ? 'month-day--today'    : '',
+    isWeekendKey(date)  ? 'month-day--weekend'  : '',
+    selected            ? 'month-day--selected' : '',
+    selWeek             ? 'month-day--selweek'  : '',
+  ].filter(Boolean).join(' ');
+}
+
+function renderMonthDay(date, inMonth, { selected = false, selWeek = false, split = false } = {}) {
   const evs      = eventsOnDay(date);
   const dayTasks = tasksOnDay(date);
   const dayHols  = holidaysOnDay(date);
   const daySchedule = scheduleEntriesOnDay(date);
   const dayWaste = wasteOccurrencesOnDay(date);
   const isToday  = date === state.today;
-  const classes  = monthDayClasses(date, inMonth);
+  const classes  = monthDayClasses(date, inMonth, state.today, { selected, selWeek });
 
   // Alle Chips (Feiertagsband, Termine, Aufgaben) bis zu einem großzügigen Puffer
   // ins DOM rendern; welche sichtbar bleiben, entscheidet fitMonthDayCells aus der
@@ -2552,7 +2875,7 @@ function renderMonthDay(date, inMonth) {
   return `
     <div class="${classes}" data-date="${date}" data-total="${total}"
          role="button" tabindex="0"
-         aria-label="${esc(monthDayAriaLabel(date, total, evs))}"${isToday ? ' aria-current="date"' : ''}>
+         aria-label="${esc(monthDayAriaLabel(date, total, evs))}"${isToday ? ' aria-current="date"' : ''}${split ? ` aria-pressed="${selected ? 'true' : 'false'}"` : ''}>
       <div class="month-day__number">${new Date(date + 'T00:00:00').getDate()}</div>
       ${holHtml}
       ${scheduleHtml}
@@ -3508,6 +3831,65 @@ function renderDayEvent(ev, layout = null, dayStr = null) {
 // Agenda-Ansicht
 // --------------------------------------------------------
 
+/**
+ * Was an einem Tag steht - Termine, Aufgaben und die drei Nebenebenen. EIN
+ * Baustein fuer die Agenda und die Tagesliste des Telefon-Monats, damit beide
+ * dieselbe Zeile zeigen (Critique 2026-09-24, P2).
+ */
+function dayGroup(date) {
+  return {
+    date,
+    events:   eventsOnDay(date),
+    tasks:    tasksOnDay(date),
+    holidays: holidaysOnDay(date),
+    schedule: scheduleEntriesOnDay(date),
+    waste:    wasteOccurrencesOnDay(date),
+  };
+}
+
+function dayGroupIsEmpty({ events, tasks, holidays, schedule, waste }) {
+  return !events.length && !tasks.length && !holidays.length && !schedule.length && !waste.length;
+}
+
+/** Die Zeilen eines Tages ohne Kopf: Nebenebenen, Termine (Farbkante), Aufgaben (Checkbox). */
+function dayGroupHtml({ date, events, tasks, holidays, schedule, waste }) {
+  return `
+    ${holidays.length ? `<div class="agenda-holidays">${holidays.map((h) => `
+      <div class="agenda-holiday" style="--holi-color:${esc(h.color)}">
+        <span class="agenda-holiday__dot"></span>
+        <span>${esc(h.name)}</span>
+      </div>`).join('')}</div>` : ''}
+    ${schedule.length ? `<div class="agenda-holidays">${schedule.map((entry) => renderScheduleChip(entry, 'agenda-holiday')).join('')}</div>` : ''}
+    ${waste.length ? `<div class="agenda-holidays">${waste.map((occ) => renderWasteChip(occ, { className: 'agenda-holiday', interactive: true })).join('')}</div>` : ''}
+    ${events.length ? `<div class="list-rows">${events.map((ev) => renderAgendaEvent(ev, date)).join('')}</div>` : ''}
+    ${tasks.length ? `<div class="agenda-tasks">${tasks.map((tk) => renderTaskChip(tk)).join('')}</div>` : ''}
+  `;
+}
+
+/**
+ * Klick oder Enter/Space auf eine Tageszeile: Aufgabe, Abholung, Termin. Geteilt
+ * von Agenda und Telefon-Monat - dieselbe Zeile oeffnet dasselbe Ziel.
+ */
+function handleDayRowActivation(e, { keyboard = false } = {}) {
+  const taskChip = e.target.closest('.cal-task-chip');
+  if (taskChip) {
+    if (keyboard) e.preventDefault();
+    openTaskFromCalendar(taskChip.dataset.taskId);
+    return;
+  }
+  const wasteEl = e.target.closest('.waste-occurrence-chip');
+  if (wasteEl) {
+    if (keyboard) e.preventDefault();
+    navigateToWasteOccurrence(wasteEl.dataset.deepLink);
+    return;
+  }
+  const evEl = e.target.closest('.agenda-event');
+  if (!evEl) return;
+  if (keyboard) e.preventDefault();
+  const ev = state.events.find((x) => x.id === parseInt(evEl.dataset.id, 10));
+  if (ev) openEventDetail(ev, evEl);
+}
+
 function renderAgendaView(container) {
   const { from, to } = getAgendaRange(state.cursor);
   const days = Array.from({ length: 31 }, (_, i) => addDays(from, i));
@@ -3528,9 +3910,8 @@ function renderAgendaView(container) {
   const todayInRange = state.today >= from && state.today <= to;
 
   const groups = days
-    .map((d) => ({ date: d, events: eventsOnDay(d), tasks: tasksOnDay(d), holidays: holidaysOnDay(d), schedule: scheduleEntriesOnDay(d), waste: wasteOccurrencesOnDay(d) }))
-    .filter((g) => g.events.length > 0 || g.tasks.length > 0 || g.holidays.length > 0 || g.schedule.length > 0 || g.waste.length > 0
-      || (todayInRange && g.date === state.today));
+    .map(dayGroup)
+    .filter((g) => !dayGroupIsEmpty(g) || (todayInRange && g.date === state.today));
 
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
@@ -3541,25 +3922,16 @@ function renderAgendaView(container) {
           title: t('calendar.agendaEmpty'),
           action: readOnly() ? undefined : { label: t('calendar.newEvent'), attrs: { id: 'agenda-empty-cta' } },
         })
-        : groups.map(({ date, events, tasks, holidays, schedule, waste }) => `
+        : groups.map((group) => `
           <div class="agenda-day">
             <!-- Tageskopf als echte Ueberschrift (Critique 2026-08-10):
                  /calendar hatte genau EIN h-Element im ganzen Dokument. -->
-            <h2 class="agenda-day__header ${date === state.today ? 'agenda-day__header--today' : ''}">
-              <span class="agenda-day__date">${formatDate(date)}</span>
-              <span class="agenda-day__weekday">${DAY_NAMES_LONG()[new Date(date + 'T00:00:00').getDay()]}</span>
+            <h2 class="agenda-day__header ${group.date === state.today ? 'agenda-day__header--today' : ''}">
+              <span class="agenda-day__date">${formatDate(group.date)}</span>
+              <span class="agenda-day__weekday">${DAY_NAMES_LONG()[new Date(group.date + 'T00:00:00').getDay()]}</span>
             </h2>
-            ${holidays.length ? `<div class="agenda-holidays">${holidays.map((h) => `
-              <div class="agenda-holiday" style="--holi-color:${esc(h.color)}">
-                <span class="agenda-holiday__dot"></span>
-                <span>${esc(h.name)}</span>
-              </div>`).join('')}</div>` : ''}
-            ${schedule.length ? `<div class="agenda-holidays">${schedule.map((entry) => renderScheduleChip(entry, 'agenda-holiday')).join('')}</div>` : ''}
-            ${waste.length ? `<div class="agenda-holidays">${waste.map((occ) => renderWasteChip(occ, { className: 'agenda-holiday', interactive: true })).join('')}</div>` : ''}
-            ${events.length ? `<div class="list-rows">${events.map((ev) => renderAgendaEvent(ev, date)).join('')}</div>` : ''}
-            ${tasks.length ? `<div class="agenda-tasks">${tasks.map(renderTaskChip).join('')}</div>` : ''}
-            ${(!events.length && !tasks.length && !holidays.length && !schedule.length && !waste.length)
-              ? `<p class="agenda-day__empty">${t('calendar.agendaDayEmpty')}</p>` : ''}
+            ${dayGroupHtml(group)}
+            ${dayGroupIsEmpty(group) ? `<p class="agenda-day__empty">${t('calendar.agendaDayEmpty')}</p>` : ''}
           </div>
         `).join('')
       }
@@ -3568,42 +3940,19 @@ function renderAgendaView(container) {
 
   stagger(container.querySelectorAll('.agenda-event'));
 
-  container.querySelector('#agenda-view').addEventListener('click', (e) => {
+  const agenda = container.querySelector('#agenda-view');
+  agenda.addEventListener('click', (e) => {
     if (e.target.closest('#agenda-empty-cta')) {
       openEventModal({ mode: 'create', date: newEventDate() });
       return;
     }
-    const taskChip = e.target.closest('.cal-task-chip');
-    if (taskChip) {
-      openTaskFromCalendar(taskChip.dataset.taskId);
-      return;
-    }
-    const wasteEl = e.target.closest('.waste-occurrence-chip');
-    if (wasteEl) {
-      navigateToWasteOccurrence(wasteEl.dataset.deepLink);
-      return;
-    }
-    const evEl = e.target.closest('.agenda-event');
-    if (evEl) {
-      const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
-      if (ev) openEventDetail(ev, evEl);
-    }
+    handleDayRowActivation(e);
   });
 
   // Tastaturaktivierung der als role="button" ausgezeichneten Zeilen (Enter/Space).
-  container.querySelector('#agenda-view').addEventListener('keydown', (e) => {
+  agenda.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
-    const wasteEl = e.target.closest('.waste-occurrence-chip');
-    if (wasteEl) {
-      e.preventDefault();
-      navigateToWasteOccurrence(wasteEl.dataset.deepLink);
-      return;
-    }
-    const evEl = e.target.closest('.agenda-event');
-    if (!evEl) return;
-    e.preventDefault();
-    const ev = state.events.find((x) => x.id === parseInt(evEl.dataset.id, 10));
-    if (ev) openEventDetail(ev, evEl);
+    handleDayRowActivation(e, { keyboard: true });
   });
 }
 
@@ -3755,18 +4104,6 @@ function openCalendarFilters() {
     }) + `<p class="cal-field-hint">${t('schedule.fullBlocksHint')}</p>`
     : '';
 
-  // NUR AM TELEFON, denn nur dort gibt es die zweite Fassung: ab 640px zeigt
-  // die Monatszelle ohnehin Titel, und der Schalter waere ein Bedienelement
-  // ohne Wirkung - die Zeile wuerde etwas versprechen, das die Ansicht schon
-  // tut. Das Blatt wird beim Oeffnen gebaut, die Zeile richtet sich also nach
-  // der Breite in diesem Moment; wer waehrend des offenen Blattes dreht,
-  // sieht sie beim naechsten Oeffnen.
-  const monthTitlesRow = window.matchMedia(MOBILE_MEDIA_QUERY).matches ? toggleRowHtml({
-    label: t('calendar.toggleMonthTitles'),
-    checked: state.monthTitles,
-    attrs: { 'data-filter-month-titles': 'true' },
-  }) : '';
-
   const meRow = (people.length > 1 && state.currentUserId != null)
     ? toggleRowHtml({
       label: t('calendar.assignedToMe'),
@@ -3822,11 +4159,10 @@ function openCalendarFilters() {
           ${unassignedRow}
         </section>
       ` : ''}
-      ${(scheduleDisplayRow || monthTitlesRow) ? `
+      ${scheduleDisplayRow ? `
         <section class="cal-filters__group">
           <h3 class="cal-filters__heading">${t('calendar.filtersDisplay')}</h3>
           ${scheduleDisplayRow}
-          ${monthTitlesRow}
         </section>
       ` : ''}
       <button type="button" class="btn btn--secondary cal-filters__reset" id="cal-filters-reset">
@@ -3889,9 +4225,6 @@ function openCalendarFilters() {
     } else if (input.dataset.filterScheduleDisplay) {
       state.scheduleDisplay = input.checked ? 'blocks' : 'compact';
       try { localStorage.setItem(SCHEDULE_DISPLAY_KEY, state.scheduleDisplay); } catch {}
-    } else if (input.dataset.filterMonthTitles) {
-      state.monthTitles = input.checked;
-      try { localStorage.setItem(MONTH_TITLES_KEY, input.checked ? 'true' : 'false'); } catch {}
     } else if (input.dataset.filterMine) {
       state.assignedToMe = input.checked;
       try { localStorage.setItem(ASSIGNED_TO_ME_KEY, input.checked ? '1' : '0'); } catch {}
@@ -4302,6 +4635,13 @@ export const __test = {
   monthDayClasses,
   monthViewClasses,
   monthDayVisibleCap,
+  monthGridSpan,
+  getMonthRange,
+  monthStepCursor,
+  monthDayTapAction,
+  monthCollapseStep,
+  monthListHtml,
+  newEventDate,
   pickerColors,
   colorToSave,
   eventIconName,

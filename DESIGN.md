@@ -2511,6 +2511,48 @@ Fassung.** Die User-Farben-Regel kannte bis dahin den Textfall (verboten) und de
 Flaechenfall (gemessene Mix-Rezepte); fuer den Punkt, der zur einzigen Auskunft wird, gab es
 kein Rezept. Jetzt gibt es eines.
 
+**Die Form sagt, WAS es ist, der Ring, DASS es da ist** (2026-09-24). Aufgabe und Termin
+unterschied im Punkteraster bis dahin nur ein Ring in `--color-surface-work` um den
+Aufgabenpunkt - die Farbe der Flaeche, auf der er steht, im Dark unsichtbar. Jetzt tragen
+beide dieselbe Fassung (`--color-text-tertiary`, die Ring-Regel oben), und die Art traegt die
+FORM: Termin rund, Aufgabe ein Quadrat mit `--radius-2xs` - das Kaestchen, das sie in der Liste
+als Checkbox-Glyph fuehrt. Eine Unterscheidung, die an einer zweiten Farbe haengt, haelt in
+einem Theme und faellt im anderen; eine Form haelt in beiden.
+
+### Mobil-Monat: Raster oben, der gewaehlte Tag darunter (Critique 2026-09-24, P2)
+Unter 640px ist der Monat geteilt, nach der Messlatte (Apple Kalender „Liste", Fantastical,
+Outlook): **das Raster sagt, WO etwas ist, die Liste sagt, WAS.** Vorher sprang ein Tipp auf
+einen Tag in die Tagesansicht - wer lesen wollte, was am Dienstag steht, verliess den Monat.
+
+- **Ein Tipp WAEHLT den Tag.** Die Auswahl ist ein 2px-Ring in `--color-text-primary` mit
+  2px Luft (`outline-offset`) um die Ziffer; heute bleibt der gefuellte Akzentkreis, und am
+  gewaehlten Heute stehen beide. Ring statt zweiter Fuellung, weil zwei gefuellte Kreise
+  (Akzent und Neutral) nicht sagen, welcher der gewaehlte ist. Ein Tag aus dem Nachbarmonat
+  blaettert dorthin und waehlt ihn. In die Tagesansicht fuehrt der Kopf der Liste (Datum mit
+  Chevron) - Doppeltipp ist kein Weg.
+- **Die Liste spricht die Zeilensprache der Agenda** (dieselben Zeilen, derselbe Kopf: Datum
+  fett, Wochentag sekundaer). Eine eigene Monatszeile waere eine weitere Termin-Mundart. Sie
+  steht NEBEN `.month-view`, nicht darin: die Punktregeln sind an `.month-view` geschnitten und
+  haetten die Aufgaben der Liste zu Quadraten ohne Titel geschrumpft. Ein freier Tag sagt es
+  ruhig (kompakter Leerzustand, Aktion `btn--secondary`) - er ist kein Fehlerfall.
+- **Die Punkte sagen nur noch, wo.** Zentriert unter der Ziffer, hoechstens vier, ohne „+N" -
+  wie viel es ist, sagt die Liste. Zeilen fest 48px (Punkte) bzw. 80px (Titel), damit das
+  Einklappen eine animierbare Strecke hat.
+- **Einklappen auf die Woche.** Hochziehen oder Scrollen der Liste klappt das Raster auf die
+  Woche des gewaehlten Tags zusammen (die Zeile bleibt stehen, die anderen gehen auf null),
+  Herunterziehen oder Zurueckscrollen an den Listenanfang klappt auf; der Knopf im Listenkopf
+  (`aria-expanded`) tut dasselbe ohne Geste. Die Scroll-Regel klappt nur ein, wenn die Liste
+  danach noch scrollen kann - sonst klemmt scrollTop auf 0, und genau das ist das Signal zum
+  Aufklappen: das Raster pumpte. Unter `prefers-reduced-motion` ohne Uebergang.
+- **Termintitel wohnt am Monat**, als Umschalter im Listenkopf (`aria-pressed`, an = Fuellung
+  UND Akzent-Glyph), nicht mehr im Filterblatt unter „Darstellung": ein Schalter, der die
+  Ansicht aendert, gehoert an die Ansicht. Die Titelfassung ist die dichtere Stufe, drei
+  Zeilen je Zelle; die Liste darunter wird dafuer kuerzer, das Einklappen gibt sie zurueck.
+
+**Das Raster hat so viele Zeilen, wie der Monat braucht** (vier bis sechs, alle Breiten).
+Ladefenster und Zeichnung lesen dieselbe Rechnung (`monthGridSpan`); fest 42 Tage zeigten im
+September 2026 eine ganze Zeile Oktober.
+
 ### Der Wand-Modus (Signature Component)
 **Der WACHE Zustand des Dashboards - keine zweite Seite, sondern dieselbe Flaeche in anderer
 Gangart.** Gelesen wird sie aus zwei Metern und ohne Beruehrung; alles Weitere folgt aus

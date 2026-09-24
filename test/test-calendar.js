@@ -440,15 +440,34 @@ test('Wochenberechnung: Montag korrekt', () => {
   assert(getMondayOf('2026-03-22') === '2026-03-16', 'So → Mo der Vorwoche');
 });
 
-test('Monatsbereich: 42 Tage für Kalenderraster', () => {
-  function addDays(dateStr, n) {
-    const d = new Date(dateStr + 'T00:00:00');
-    d.setDate(d.getDate() + n);
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+// DAS RASTER HAT SO VIELE ZEILEN, WIE DER MONAT BRAUCHT (Critique 2026-09-24).
+// Hier stand ein Test ueber eine TESTEIGENE addDays-Kopie ("42 Tage") - er
+// pruefte die Arithmetik seiner selbst, nicht die Seite. Geprueft wird jetzt
+// das echte Ladefenster: im September 2026 (Wochenstart Montag) war die
+// sechste Zeile komplett Oktober und wurde trotzdem geladen und gezeichnet.
+test('Monatsraster: vier bis sechs Wochenzeilen, und das Ladefenster endet mit der letzten', () => {
+  const { getMonthRange, getRangeForView, state } = calendarHelpers;
+  const cases = [
+    // [Cursor, Wochenstart, from, to] - Sep 2026 beginnt Di, Feb 2027 Mo, Aug 2026 Sa
+    ['2026-09-24', 1, '2026-08-31', '2026-10-04'], // 5 Zeilen, nicht 6
+    ['2027-02-10', 1, '2027-02-01', '2027-02-28'], // 4 Zeilen: 28 Tage ab Montag
+    ['2026-08-15', 1, '2026-07-27', '2026-09-06'], // 6 Zeilen bleiben 6
+    ['2026-09-24', 0, '2026-08-30', '2026-10-03'], // Sonntag-Start: 5 Zeilen
+  ];
+  for (const [cursor, weekStart, from, to] of cases) {
+    const r = getMonthRange(cursor, weekStart);
+    assert(r.from === from && r.to === to,
+      `${cursor} (Start ${weekStart}): erwartet ${from}..${to}, erhalten ${r.from}..${r.to}`);
   }
-  const from = '2026-03-01';
-  const to   = addDays(from, 41);
-  assert(to === '2026-04-11', `Erwartet 2026-04-11, erhalten ${to}`);
+  // Der echte Aufrufer (Ladefenster der Ansicht) liest dieselbe Rechnung.
+  const zuvor = state.weekStart;
+  try {
+    state.weekStart = 1;
+    const v = getRangeForView('month', '2026-09-24');
+    assert(v.to === '2026-10-04', `das Ladefenster des Monats laedt eine Zeile Oktober zu viel: ${v.to}`);
+  } finally {
+    state.weekStart = zuvor;
+  }
 });
 
 test('Deep-Link-Datum: gültiger date-Parameter gewinnt vor Serien-Masterdatum', () => {
@@ -1814,6 +1833,124 @@ test('Der Klipp-Guard steht ueber jeder Fassungsregel, die display setzt', () =>
       `.is-clipped traegt ${classes(clip.selector)} Klassen, ${rule.selector.trim()} `
       + `traegt ${classes(rule.selector)} - bei Gleichstand gewinnt die spaetere Regel, `
       + 'und das ist die Fassung');
+  }
+});
+
+// --------------------------------------------------------
+// Der geteilte Monat am Telefon (Critique 2026-09-24, P2): Raster oben, der
+// gewaehlte Tag als Liste darunter.
+// --------------------------------------------------------
+
+test('Monatszelle am Telefon: ein Tipp WAEHLT den Tag, statt in die Tagesansicht zu springen', () => {
+  const { monthDayTapAction } = calendarHelpers;
+  assert(monthDayTapAction('2026-09-10', '2026-09-24', { split: true }) === 'select',
+    'ein Tag im selben Monat wird am Telefon gewaehlt');
+  assert(monthDayTapAction('2026-10-02', '2026-09-24', { split: true }) === 'change-month',
+    'ein Tag aus dem Nachbarmonat blaettert dorthin');
+  assert(monthDayTapAction('2026-09-10', '2026-09-24', { split: false }) === 'open-day',
+    'auf dem Desktop bleibt der Drill-in in den Tag');
+});
+
+// Die Entscheidung allein beweist nichts, wenn der Klick sie umgeht (Merker
+// „Optionstest muss den Aufrufer lesen"). Vorher rief der Zellen-Handler
+// switchToDayView() direkt - fuer jede Breite.
+test('Monatszelle: Klick und Enter laufen ueber monthDayTapAction, nicht direkt in den Tag', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const view = src.slice(src.indexOf('function renderMonthView('), src.indexOf('async function activateMonthDay('));
+  assert(view.length > 0, 'renderMonthView/activateMonthDay nicht gefunden');
+  assert(!/switchToDayView\(/.test(view),
+    'renderMonthView ruft switchToDayView() direkt - der Tipp am Telefon wuerde wieder springen');
+  assert((view.match(/activateMonthDay\(/g) ?? []).length >= 2,
+    'Klick UND Enter/Space muessen ueber activateMonthDay() laufen');
+  const act = src.slice(src.indexOf('async function activateMonthDay('));
+  assert(/monthDayTapAction\(/.test(act.slice(0, act.indexOf('\n}\n'))),
+    'activateMonthDay() entscheidet nicht ueber monthDayTapAction()');
+});
+
+test('Monatswechsel: gewaehlt ist heute, wenn der Monat heute enthaelt, sonst der Erste', () => {
+  const { monthStepCursor } = calendarHelpers;
+  const TODAY = '2026-09-24';
+  assert(monthStepCursor('2026-08-12', 1, TODAY) === TODAY, 'in den laufenden Monat: heute');
+  assert(monthStepCursor('2026-09-24', 1, TODAY) === '2026-10-01', 'in einen anderen Monat: der Erste');
+  assert(monthStepCursor('2026-01-31', 1, TODAY) === '2026-02-01',
+    'vom 31. aus nicht per setMonth() in den Maerz rechnen');
+  assert(monthStepCursor('2026-03-31', -1, TODAY) === '2026-02-01', 'rueckwaerts genauso');
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const nav = src.slice(src.indexOf('async function navigate('), src.indexOf('async function goToday('));
+  assert(/monthStepCursor\(/.test(nav), 'navigate() blaettert den Monat nicht ueber monthStepCursor()');
+});
+
+test('Einklappen auf die Woche: nur nach unten, nur mit Platz, auf am Listenanfang', () => {
+  const { monthCollapseStep: step } = calendarHelpers;
+  assert(step({ collapsed: false, top: 40, lastTop: 20, room: 200, hold: false }) === 'collapse',
+    'nach unten gescrollt, und die Liste kann danach weiter scrollen');
+  assert(step({ collapsed: false, top: 40, lastTop: 20, room: 4, hold: false }) === 'stay',
+    'ohne Platz nach dem Einklappen klemmte scrollTop auf 0 und das Raster pumpte auf und zu');
+  assert(step({ collapsed: false, top: 20, lastTop: 40, room: 200, hold: false }) === 'stay',
+    'nach oben scrollen klappt nicht ein');
+  assert(step({ collapsed: true, top: 0, lastTop: 30, room: 0, hold: false }) === 'expand',
+    'zurueck am Listenanfang klappt auf');
+  assert(step({ collapsed: true, top: 0, lastTop: 0, room: 0, hold: false }) === 'stay',
+    'ohne Bewegung (per Knopf eingeklappt, Liste oben) bleibt es zu');
+  assert(step({ collapsed: false, top: 80, lastTop: 60, room: 200, hold: true }) === 'stay',
+    'nach ausdruecklichem Aufklappen nimmt der naechste Wisch die Entscheidung nicht zurueck');
+  assert(step({ collapsed: false, top: 0, lastTop: 10, room: 200, hold: true }) === 'release',
+    'erst der Weg ueber den Listenanfang gibt das Einklappen wieder frei');
+});
+
+// AUFGABE UND TERMIN UNTERSCHEIDET DIE FORM. Vorher war der einzige Unterschied
+// ein Ring in --color-surface-work - der Farbe der Flaeche, auf der er steht,
+// im Dark unsichtbar (calendar.css ~1931).
+test('Punktfassung: Aufgabe ist ein abgerundetes Quadrat, Termin rund, beide im Tertiaer-Ring', () => {
+  const inPhone = (r) => r.at.some((a) => /max-width:\s*639px/.test(a));
+  const rules = [...eachRule(calendarCss)].filter(inPhone);
+  const task = rules.filter((r) => r.selector.includes(':not(.month-view--titles) .cal-task-chip')
+    && !r.selector.includes(','));
+  const own = task.find((r) => /border-radius/.test(r.body));
+  assert(own, 'der Aufgabenpunkt hat keine eigene Form - er erbt den Kreis des Terminpunkts');
+  assert(!/radius-full/.test(own.body), 'der Aufgabenpunkt ist rund und damit vom Termin nicht zu unterscheiden');
+  for (const r of task) {
+    assert(!/--color-surface-work/.test(r.body),
+      `${r.selector.trim()}: ein Ring in der Flaechenfarbe ist im Dark unsichtbar`);
+  }
+  assert(task.some((r) => /box-shadow:[^;]*--color-text-tertiary/.test(r.body)),
+    'der Aufgabenpunkt braucht die Tertiaer-Fassung der Ring-Regel (3:1)');
+  const ev = rules.find((r) => r.selector.trim() === '.month-view:not(.month-view--titles) .month-day__event');
+  assert(ev && /--color-text-tertiary/.test(ev.body), 'der Terminpunkt verliert seinen Ring');
+});
+
+test('Der Titel-Schalter wohnt am Monat, nicht mehr im Filterblatt', () => {
+  const html = calendarHelpers.monthListHtml();
+  assert(/id="month-titles-toggle"[^>]*aria-pressed="(true|false)"/.test(html),
+    'der Listenkopf traegt keinen Titel-Schalter mit aria-pressed');
+  assert(/id="month-collapse"[^>]*aria-controls="month-grid"/.test(html),
+    'der Einklapp-Knopf fehlt oder nennt das Raster nicht');
+  assert(/id="month-open-day"/.test(html), 'der Weg in die Tagesansicht fehlt im Listenkopf');
+  assert(/class="[^"]*page-scrollport[^"]*" id="month-list-rows"/.test(html),
+    'die Liste ist nicht der Scrollport - das Raster wuerde wieder scrollen');
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  assert(!/data-filter-month-titles/.test(src), 'das Filterblatt fuehrt den Titel-Schalter noch');
+});
+
+test('Telefon-Monat: „+" legt fuer den gewaehlten Tag an, der Reset fuehrt zu heute zurueck', () => {
+  const { state, newEventDate, syncTodayButton } = calendarHelpers;
+  const hadWindow = Object.prototype.hasOwnProperty.call(globalThis, 'window');
+  const previousWindow = globalThis.window;
+  const zuvor = { view: state.view, cursor: state.cursor, today: state.today };
+  try {
+    Object.assign(state, { view: 'month', cursor: '2026-09-10', today: '2026-09-24' });
+    globalThis.window = { matchMedia: () => ({ matches: true }) };
+    assert(newEventDate() === '2026-09-10', `am Telefon muss der gewaehlte Tag kommen, war ${newEventDate()}`);
+    const btn = fakeResetButton();
+    syncTodayButton({ querySelector: (sel) => (sel === '#cal-today' ? btn : null) });
+    assert(btn.classList.contains('is-current') === false,
+      'ein anderer Tag ist gewaehlt - „Heute" muss erreichbar sein');
+    globalThis.window = { matchMedia: () => ({ matches: false }) };
+    assert(newEventDate() === '2026-09-24', 'auf dem Desktop gilt weiter die Zeitraumregel (#737)');
+  } finally {
+    Object.assign(state, zuvor);
+    if (hadWindow) globalThis.window = previousWindow;
+    else delete globalThis.window;
   }
 });
 

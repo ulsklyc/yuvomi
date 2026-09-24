@@ -2083,10 +2083,19 @@
    * Größe ausgeblendet (`> * { display: none }` oben), seine Aufgabe übernimmt
    * die Fläche.
    *
-   * Der dünne Ring bleibt: er unterscheidet Aufgaben- von Terminpunkten. */
+   * AUFGABE UND TERMIN UNTERSCHEIDET DIE FORM, NICHT EINE RINGFARBE (Critique
+   * 2026-09-24, P2). Hier stand ein Ring in `--color-surface-work`, und der war
+   * die einzige Unterscheidung - ein Ring in der Farbe der Flaeche, auf der er
+   * steht: im Light kaum, im Dark gar nicht zu sehen, und auf dem Wochenende
+   * ein zweiter Ton. Jetzt ist die Aufgabe ein Quadrat mit 2px-Rundung (das
+   * Kaestchen, das sie in der Liste darunter als Checkbox-Glyph traegt), der
+   * Termin bleibt rund. Der Ring ist fuer beide derselbe: `--color-text-tertiary`,
+   * die Fassung aus der Ring-Regel oben - er haelt die 3:1, die Form sagt, was
+   * es ist. */
   .month-view:not(.month-view--titles) .cal-task-chip {
     background: var(--prio-color, var(--color-text-secondary));
-    box-shadow: inset 0 0 0 var(--space-px) var(--color-surface-work);
+    border-radius: var(--radius-2xs);
+    box-shadow: inset 0 0 0 var(--space-px) var(--color-text-tertiary);
   }
 
   .month-view:not(.month-view--titles) .month-day__event > *,
@@ -2109,31 +2118,12 @@
    * nicht mehr die Farbflaeche allein traegt die Information, sondern der
    * Text darauf. */
 
+  /* DREI ZEILEN, NICHT MEHR VIER (2026-09-24). Seit unter dem Raster die
+   * Tagesliste steht, liest niemand den Tag mehr aus der Zelle - die Titel
+   * sagen, WAS ungefaehr ansteht, die Liste sagt es ganz. Die Zeilenhoehe
+   * dazu steht beim geteilten Monat weiter unten (--month-row-h, 80px). */
   .month-view--titles .month-grid {
-    --month-day-max-visible: 4;
-  }
-
-  /* DIE ZAHL IST GERECHNET, NICHT GESCHAETZT - sie ist die Bedingung dafuer,
-   * dass "vier Zeilen" ueberhaupt eintreten kann: fitMonthDayCells zeigt nur,
-   * was in die REALE Zellhoehe passt, ein zu knapper Wert liefert also still
-   * drei Zeilen und "+N", ohne dass etwas kaputt aussieht.
-   *
-   * box-sizing ist border-box (reset.css), min-height deckt also alles:
-   *     Ziffer      20 (--space-5) + 2 Abstand               = 22
-   *     4 Zeilen    4 x (13 Text + 2 Polsterung + 1 Abstand) = 64
-   *     "+N"        13 + 1 Abstand                           = 14
-   *     Polsterung  2 + 2, Rahmen unten 1                    =  5
-   *                                                          ---
-   *                                                          105
-   * 108 laesst drei Pixel fuer das Aufrunden der Zeilenboxen.
-   *
-   * Sechs Reihen kosten damit ~650px, das Gitter scrollt am Telefon -
-   * .month-grid ist dafuer gebaut (overflow-y:auto). Nach OBEN deckelt die
-   * Hoehe nichts: grid-auto-rows:1fr laesst die Reihen auf einem hohen Geraet
-   * wachsen, und dort begrenzt --month-day-max-visible. Beide Enden brauchen
-   * ihre eigene Grenze. */
-  .month-view--titles .month-day {
-    min-height: 108px;
+    --month-day-max-visible: 3;
   }
 
   /* Die Ziffer gibt Platz zurueck: das 24px-Badge plus 4px Abstand kostete
@@ -2175,6 +2165,204 @@
     line-height: 1.3;
     padding: 0 var(--space-0h);
     margin-top: var(--space-px);
+  }
+}
+
+/* --------------------------------------------------------
+ * Der geteilte Monat am Telefon: Raster oben, der gewaehlte Tag darunter
+ * (Critique 2026-09-24, P2; DESIGN.md „Mobil-Monat").
+ *
+ * Das Raster sagt, WO etwas ist, die Liste sagt, WAS. Ein Tipp waehlt den Tag
+ * (calendar.js, monthDayTapAction), die Liste darunter zeigt ihn in der
+ * Zeilensprache der Agenda, ihr Kopf fuehrt in die Tagesansicht. Beim
+ * Scrollen der Liste klappt das Raster auf die Woche des gewaehlten Tags
+ * zusammen; der Knopf im Listenkopf tut dasselbe ohne Geste.
+ *
+ * Die Liste ist erst eine Komponente und dann schmal: ihre Grundregeln stehen
+ * hier ohne Query, weil es sie nur im geteilten Monat gibt (calendar.js
+ * zeichnet sie nur unter 640px); was das RASTER dafuer anders macht, steht
+ * in der 639er-Query darunter.
+ * -------------------------------------------------------- */
+.month-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: var(--space-px) solid var(--color-border);
+  background-color: var(--color-bg);
+}
+
+/* Fester Kopf ueber dem Scrollport: Datum (fuehrt in den Tag) und die zwei
+ * Werkzeuge des Monats. Er scrollt nicht mit, damit Umklappen und Titel-
+ * Schalter immer erreichbar sind - wie der Tageskopf der Agenda, nur dass
+ * hier nur EIN Tag darunter steht. */
+.month-list__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+  min-height: var(--target-base);
+  padding-inline: var(--space-3) var(--space-1);
+  border-bottom: var(--space-px) solid var(--color-border-subtle);
+}
+
+.month-list__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: inherit;
+}
+
+/* Der Tag als Knopf: dieselbe Datumszeile wie der Agenda-Kopf (Datum fett,
+ * Wochentag sekundaer), dahinter der Chevron als Zeichen „hier geht es
+ * weiter". Volle Zielhoehe, die Breite folgt dem Text. */
+.month-list__open {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  min-height: var(--target-base);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.month-list__open .agenda-day__weekday {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.month-list__open--today .agenda-day__date {
+  color: var(--color-accent);
+}
+
+.month-list__chevron {
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+}
+
+.month-list__open:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-xs);
+}
+
+.month-list__tools {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+/* An heisst: Fuellung UND Akzent-Glyph, zwei Kanaele - der Zustand haengt
+ * nicht an der Farbe allein. */
+.month-list__tool[aria-pressed="true"] {
+  background-color: var(--color-fill-well);
+  color: var(--color-accent);
+}
+
+.month-list__rows {
+  min-height: 0;
+}
+
+.month-list__empty {
+  padding-block: var(--space-6);
+}
+
+@media (max-width: 639px) {
+  /* Das Raster ist nicht mehr der Scrollport - die Liste ist es. Es nimmt die
+   * Hoehe seiner Zeilen und keinen Pixel mehr; der Rest gehoert dem Tag. */
+  /* Raster und Liste sind Geschwister in #cal-body (calendar.js,
+   * renderMonthList): die Monatsflaeche nimmt nur ihre Zeilen, die Liste den
+   * Rest. */
+  .month-view--split {
+    flex: 0 0 auto;
+  }
+
+  .month-view--split .month-grid {
+    flex: 0 0 auto;
+    grid-auto-rows: auto;
+    row-gap: 0;
+    overflow: hidden;
+  }
+
+  /* FESTE ZEILENHOEHE, damit das Einklappen eine Strecke hat, die sich
+   * animieren laesst (height, nicht 1fr). 48px in der Punktfassung:
+   *     Polsterung oben 4, Ziffer 24, Abstand 4, Punktzeile 10,
+   *     Polsterung unten 2, Rahmen 1                          = 45
+   * und damit zugleich die Zielgroesse am Finger. 80px in der Titelfassung:
+   *     4 + Ziffer 20 + 2, drei Zeilen 3 x 16, 2 + 1           = 77. */
+  .month-view--split .month-day {
+    --month-row-h: var(--space-12);
+    height: var(--month-row-h);
+    min-height: 0;
+    padding: var(--space-1) var(--space-0h) var(--space-0h);
+    transition:
+      height var(--duration-lg) var(--ease-out),
+      padding var(--duration-lg) var(--ease-out);
+  }
+
+  .month-view--split.month-view--titles .month-day {
+    --month-row-h: calc(var(--space-16) + var(--space-4));
+  }
+
+  /* Eingeklappt bleibt die Woche des gewaehlten Tags stehen, die anderen
+   * Zeilen gehen auf null - ohne Polsterung und Rahmen, sonst blieben vier
+   * Pixel-Streifen uebereinander liegen. */
+  .month-view--split.month-view--collapsed .month-day:not(.month-day--selweek) {
+    height: 0;
+    padding-block: 0;
+    border-bottom-width: 0;
+  }
+
+  /* Die Punkte sagen nur noch, WO etwas ist: zentriert unter der Ziffer wie
+   * bei der Messlatte, hoechstens vier, und ohne „+N" - wie viel es ist, sagt
+   * die Liste. */
+  .month-view--split:not(.month-view--titles) .month-grid {
+    --month-day-max-visible: 4;
+  }
+
+  /* line-height auf die Punkthoehe: sonst ist die Punktzeile so hoch wie
+   * eine Textzeile (~20px), der Punkt sitzt in ihrer Mitte und die 48px-Zeile
+   * schneidet ihn unten an. */
+  .month-view--split:not(.month-view--titles) .month-day {
+    text-align: center;
+    line-height: var(--space-2h);
+  }
+
+  .month-view--split:not(.month-view--titles) .month-day__number {
+    margin-inline: auto;
+  }
+
+  .month-view--split:not(.month-view--titles) .month-day__more {
+    display: none;
+  }
+
+  /* Der Titel-Ring braucht links Luft: die Ziffer sitzt dort sonst auf der
+   * Zellkante, und der Auswahlring (unten) wuerde abgeschnitten. */
+  .month-view--split.month-view--titles .month-day__number {
+    margin-inline-start: var(--space-0h);
+  }
+
+  /* AUSWAHL IST EIN RING, HEUTE BLEIBT DIE FUELLUNG. Beide koennen am selben
+   * Tag stehen, und dann muessen beide lesbar sein: der gefuellte Akzentkreis
+   * sagt „heute", der Ring mit 2px Luft sagt „gewaehlt". `--color-text-primary`
+   * haelt gegen jede Zellflaeche weit ueber 3:1 (light und dark), und die
+   * Luft kommt von outline-offset - kein zweiter Ring in einer Flaechenfarbe,
+   * die auf dem Wochenende eine andere waere. */
+  .month-view--split .month-day--selected .month-day__number {
+    outline: var(--space-0h) solid var(--color-text-primary);
+    outline-offset: var(--space-0h);
+    font-weight: var(--font-weight-bold);
+  }
+}
+
+@media (max-width: 639px) and (prefers-reduced-motion: reduce) {
+  .month-view--split .month-day {
+    transition: none;
   }
 }
 
