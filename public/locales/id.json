@@ -994,7 +994,7 @@
         "syncTargetOutlookGroup": "Outlook",
         "syncTargetHint": "Pilih kalender untuk menyinkronkan acara ini.",
         "attachmentLabel": "Lampiran",
-        "attachmentHint": "Lampirkan gambar, PDF, atau dokumen lokal. Gambar ditampilkan di pop-up acara.",
+        "attachmentHint": "Gambar, PDF, atau dokumen. Gambar ditampilkan di detail acara.",
         "attachmentFallback": "Lampiran",
         "attachmentReadError": "Lampiran tidak dapat dibaca.",
         "attachmentTooLarge": "Lampiran maksimal {{size}} MB.",
@@ -3475,7 +3475,7 @@
         }
     },
     "userMultiSelect": {
-        "nobody": "- Tidak ada -",
+        "nobody": "Tidak ada",
         "moreUsers": "lagi"
     },
     "housekeeping": {

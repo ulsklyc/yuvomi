@@ -994,7 +994,7 @@
         "syncTargetOutlookGroup": "Outlook",
         "syncTargetHint": "Wybierz kalendarz, z którym ma być synchronizowane to wydarzenie.",
         "attachmentLabel": "Załącznik",
-        "attachmentHint": "Dołącz lokalny obraz, PDF lub dokument. Obrazy będą wyświetlane w podglądzie wydarzenia.",
+        "attachmentHint": "Obraz, PDF lub dokument. Obrazy pojawiają się w szczegółach wydarzenia.",
         "attachmentFallback": "Załącznik",
         "attachmentReadError": "Nie udało się odczytać załącznika.",
         "attachmentTooLarge": "Załącznik może mieć maksymalnie {{size}} MB.",
@@ -3475,7 +3475,7 @@
         }
     },
     "userMultiSelect": {
-        "nobody": "– Nikt –",
+        "nobody": "Nikt",
         "moreUsers": "więcej"
     },
     "housekeeping": {

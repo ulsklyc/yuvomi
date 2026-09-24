@@ -2083,13 +2083,20 @@ export function btnError(btn) {
  * @param {Object} [opts]
  * @param {string} [opts.label]     - Aufklapper-Beschriftung (Default: t('modal.moreSettings'))
  * @param {boolean} [opts.open=false] - Initial geöffnet (z. B. wenn Sekundärfelder bereits befüllt sind)
+ * @param {string} [opts.hint]      - Zweite Zeile unter der Beschriftung: was hinter dem
+ *   Aufklapper liegt (Klartext, wird escaped). Ohne sie findet ein Feld dort nur, wer
+ *   schon weiss, dass es existiert.
  * @returns {string} HTML-String
  */
-export function advancedSection(innerHtml, { label, open = false } = {}) {
+export function advancedSection(innerHtml, { label, open = false, hint = '' } = {}) {
+  const text = esc(label ?? t('modal.moreSettings'));
+  const labelHtml = hint
+    ? `<span class="form-advanced__label"><span>${text}</span><span class="form-advanced__hint">${esc(hint)}</span></span>`
+    : `<span>${text}</span>`;
   return `
     <details class="form-advanced"${open ? ' open' : ''}>
       <summary class="form-advanced__summary">
-        <span>${esc(label ?? t('modal.moreSettings'))}</span>
+        ${labelHtml}
         <i data-lucide="chevron-down" class="form-advanced__chevron" aria-hidden="true"></i>
       </summary>
       <div class="form-advanced__body">

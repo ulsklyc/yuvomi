@@ -963,7 +963,7 @@
         "invalidDate": "選択した形式で有効な日付を入力してください。",
         "endBeforeStart": "終了日を開始日より前にはできません。",
         "attachmentLabel": "添付ファイル",
-        "attachmentHint": "ローカルの画像、PDF、書類を添付できます。画像は予定のポップアップに表示されます。",
+        "attachmentHint": "画像、PDF、書類を添付できます。画像は予定の詳細に表示されます。",
         "attachmentFallback": "Attachment",
         "attachmentReadError": "添付ファイルを読み込めませんでした。",
         "attachmentTooLarge": "添付ファイルは最大 {{size}} MB までです。",
@@ -3654,7 +3654,7 @@
     },
     "userMultiSelect": {
         "moreUsers": "他",
-        "nobody": "- なし -"
+        "nobody": "なし"
     },
     "splitExpenses": {
         "title": "共有費用",

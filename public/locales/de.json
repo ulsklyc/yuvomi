@@ -994,7 +994,7 @@
         "syncTargetOutlookGroup": "Outlook",
         "syncTargetHint": "Wähle einen Kalender, mit dem dieser Termin synchronisiert wird.",
         "attachmentLabel": "Anhang",
-        "attachmentHint": "Lokales Bild, PDF oder Dokument anhängen. Bilder werden im Ereignis-Popup angezeigt.",
+        "attachmentHint": "Bild, PDF oder Dokument. Bilder erscheinen in den Termindetails.",
         "attachmentFallback": "Anhang",
         "attachmentReadError": "Der Anhang konnte nicht gelesen werden.",
         "attachmentTooLarge": "Der Anhang darf höchstens {{size}} MB groß sein.",
@@ -3475,7 +3475,7 @@
         }
     },
     "userMultiSelect": {
-        "nobody": "- Niemand -",
+        "nobody": "Niemand",
         "moreUsers": "weitere"
     },
     "housekeeping": {

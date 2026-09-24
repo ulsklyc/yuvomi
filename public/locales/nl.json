@@ -972,7 +972,7 @@
         "syncTargetOutlookGroup": "Outlook",
         "syncTargetHint": "Kies een agenda om dit evenement mee te synchroniseren.",
         "attachmentLabel": "Bijlage",
-        "attachmentHint": "Voeg een lokale afbeelding, PDF of document toe. Afbeeldingen worden getoond in het evenementenpopup.",
+        "attachmentHint": "Afbeelding, PDF of document. Afbeeldingen verschijnen in de details van de afspraak.",
         "attachmentFallback": "Bijlage",
         "attachmentReadError": "De bijlage kon niet worden gelezen.",
         "attachmentTooLarge": "Bijlage mag maximaal {{size}} MB zijn.",
@@ -3654,7 +3654,7 @@
     },
     "userMultiSelect": {
         "moreUsers": "meer",
-        "nobody": "- Niemand -"
+        "nobody": "Niemand"
     },
     "splitExpenses": {
         "title": "Gedeelde uitgaven",

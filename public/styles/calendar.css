@@ -1441,36 +1441,74 @@
   text-overflow: ellipsis;
 }
 
-.event-title-picker {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
+/* --------------------------------------------------------
+ * Termin-Dialog: EIN Takt fuer alle Felder (Critique 2026-09-24, P2).
+ *
+ * Die Felder standen direkt im Modal-Rumpf, und der ist eine Flex-Spalte mit
+ * 16px Luecke - dazu kam die 16px-Marge jeder `.form-group`: 32px zwischen je
+ * zwei Feldern, doppelt so viel wie im Aufgaben-Dialog (dort steht ein
+ * <form> dazwischen). Im Leseblatt (Telefon, Bearbeiten) steht dasselbe
+ * Markup in einem Block ohne Luecke; dort klebten Wiederholung, Erinnerung
+ * und Aufklapper aneinander. Der Wrapper gibt beiden Orten denselben Takt.
+ * -------------------------------------------------------- */
+.cal-event-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cal-event-form > .form-group,
+.cal-event-form .rrule-fields > .form-group,
+.cal-event-form .form-advanced__body > .form-group {
+  margin-bottom: 0;
+}
+
+/* Wiederholung und Erinnerung sind hier Felder in der Reihe, keine eigenen
+ * Abschnitte: ihre Trennlinien (layout.css, reminders.css) fallen weg. Die
+ * einzige Linie im Formular bleibt die ueber „Weitere Einstellungen" - sie
+ * trennt, was jeder Termin braucht, von dem, was wenige brauchen. */
+.cal-event-form .rrule-fields,
+.cal-event-form .reminder-section {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.cal-event-form .reminder-section {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-3);
-  align-items: end;
+}
+
+.cal-event-form .reminder-section__header {
+  margin-bottom: 0;
+}
+
+/* Von und Bis: je eine Zeile, Beschriftung vorn, Datum und Uhrzeit dahinter.
+ * Die Beschriftungsspalte ist so breit wie das laengste der beiden Woerter
+ * (`max-content` in EINEM Raster fuer beide Zeilen), damit die Felder in
+ * jeder Sprache buendig stehen - „Von/Bis" wie „Başlangıç/Bitiş". Das Datum
+ * bekommt etwas mehr Platz als die Uhrzeit: auf 375px braucht „09/24/2026"
+ * samt Kalenderknopf 141px und „11:30 PM" 120px - 7:6 bei 8px Spaltenluecke
+ * traegt beides auch neben „Hanggang" (fil, 12h), gemessen an der Schrift
+ * des Feldes. */
+.cal-when {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 7fr) minmax(0, 6fr);
+  align-items: center;
+  gap: var(--space-3) var(--space-2);
+}
+
+.cal-when__label {
+  margin-bottom: 0;
+}
+
+.cal-when--dates > yuvomi-datepicker {
+  grid-column: span 2;
 }
 
 .event-icon-picker {
   position: relative;
-}
-
-.event-title-picker__title {
-  min-width: 0;
-}
-
-/* HINWEISZEILE IM TERMIN-DIALOG (#647, Critique 2026-08-17).
- *
- * Dieselben drei Werte wie `.task-field-hint` in tasks.css - derselbe Satz in
- * derselben Rolle darf nicht zweimal verschieden aussehen. Sie steht HIER und
- * nicht als `.form-hint`, weil die Regel dafuer in settings.css liegt und der
- * Router pro Seite genau ein Page-CSS laedt: auf /calendar ist sie nicht
- * geladen, und der Hinweis fiel auf den geerbten Koerpertext zurueck (16px,
- * volle Primaertinte). Er war damit lauter als sein eigener Schalter.
- *
- * Der eigentliche Fehler sitzt eine Ebene hoeher - `.form-hint` gehoert nicht
- * in ein Page-CSS, wenn elf Module sie benutzen. Das ist ein eigener Umzug. */
-.cal-field-hint {
-  margin-top: var(--space-1);
-  font-size: var(--text-xs);
-  color: var(--color-text-tertiary);
 }
 
 .event-icon-picker__trigger {
@@ -1932,12 +1970,6 @@
   font: inherit;
   font-weight: var(--font-weight-regular);
   font-variant-numeric: tabular-nums;
-}
-
-@media (max-width: 639px) {
-  .event-title-picker {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* --------------------------------------------------------

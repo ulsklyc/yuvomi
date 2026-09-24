@@ -963,7 +963,7 @@
         "invalidDate": "Använd ett giltigt datum i det valda datumformatet.",
         "endBeforeStart": "Slutdatumet får inte vara före startdatumet.",
         "attachmentLabel": "Bilaga",
-        "attachmentHint": "Bifoga en lokal bild, PDF eller dokument. Bilder kommer att visas i evenemangets popup.",
+        "attachmentHint": "Bild, PDF eller dokument. Bilder visas i händelsens detaljer.",
         "attachmentFallback": "Bilaga",
         "attachmentReadError": "Bilagan kunde inte läsas.",
         "attachmentTooLarge": "Bilaga får vara högst {{size}} MB.",
@@ -3654,7 +3654,7 @@
     },
     "userMultiSelect": {
         "moreUsers": "mer",
-        "nobody": "- Ingen -"
+        "nobody": "Ingen"
     },
     "splitExpenses": {
         "title": "Delade utgifter",

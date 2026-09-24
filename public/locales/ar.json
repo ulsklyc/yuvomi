@@ -963,7 +963,7 @@
         "invalidDate": "استخدم تاريخًا صالحًا بالتنسيق المحدد.",
         "endBeforeStart": "لا يمكن أن يسبق تاريخ الانتهاء تاريخ البدء.",
         "attachmentLabel": "مرفق",
-        "attachmentHint": "أرفق صورة أو PDF أو مستندًا محليًا. تظهر الصور في نافذة الحدث.",
+        "attachmentHint": "صورة أو PDF أو مستند. تظهر الصور في تفاصيل الحدث.",
         "attachmentFallback": "Attachment",
         "attachmentReadError": "تعذر قراءة المرفق.",
         "attachmentTooLarge": "يجب ألا يتجاوز حجم المرفق {{size}} ميغابايت.",
@@ -3654,7 +3654,7 @@
     },
     "userMultiSelect": {
         "moreUsers": "آخرون",
-        "nobody": "- لا أحد -"
+        "nobody": "لا أحد"
     },
     "splitExpenses": {
         "title": "المصاريف المشتركة",

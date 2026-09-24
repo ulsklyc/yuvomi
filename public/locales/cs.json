@@ -972,7 +972,7 @@
         "syncTargetOutlookGroup": "Outlook",
         "syncTargetHint": "Vyber kalendář, se kterým se má tato událost synchronizovat.",
         "attachmentLabel": "Příloha",
-        "attachmentHint": "Připojte lokální obrázek, PDF nebo dokument. Obrázky se zobrazí v detailu události.",
+        "attachmentHint": "Obrázek, PDF nebo dokument. Obrázky se zobrazí v detailu události.",
         "attachmentFallback": "Příloha",
         "attachmentReadError": "Přílohu nelze načíst.",
         "attachmentTooLarge": "Příloha může mít velikost maximálně {{size}} MB.",
@@ -3043,7 +3043,7 @@
         "stepProgress": "Krok {{current}} z {{total}}"
     },
     "userMultiSelect": {
-        "nobody": "- Nikdo -",
+        "nobody": "Nikdo",
         "moreUsers": "další"
     },
     "housekeeping": {

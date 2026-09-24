@@ -1605,6 +1605,9 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   das index.html verlinkt; eine Kopie oder Ersatzklasse im Seiten-Blatt ist der Fehler, nicht
   die Loesung (`test:frontend-audit`). `.task-field-hint` (12px, tertiaer) ist die leisere
   Bestandsstimme der Aufgaben und Erinnerungen.
+- **„Weitere Einstellungen" nennt, was dahinter liegt:** `advancedSection(..., { hint })` setzt
+  unter die Beschriftung eine Caption-Zeile mit den Feldnamen. Ein Feld, das nur hinter dem
+  Aufklapper steht, findet sonst nur, wer schon weiss, dass es existiert.
 
 ### Nur lesen: das Zeichen statt des Knopfs (#1252, #1265)
 Wer ein Modul nur lesen darf, sieht den ZUSTAND, aber keine Handlung. Der Server weist
@@ -2667,6 +2670,28 @@ als Primaerknopf am ENDE der Fusszeile, Löschen bleibt `danger-ghost` am Anfang
 als „Zurück". Opt-in, weil die Hauptabsicht dem Objekt gehoert: im Termin ist es Bearbeiten, in
 der Aufgabe das Erledigen. Die Rueckfrage beim Löschen bleibt. Der Kalender nimmt es; Kontakte
 und Inventar haben dieselbe Fusszeile und sind die naechsten Kandidaten.
+
+### Der Termin-Dialog: Haeufiges oben, Seltenes benannt (Critique 2026-09-24, P2)
+Der Dialog war mobil drei Bildschirme lang (1559px bei 523 sichtbar), und Sichtbarkeit und
+Stichtag standen VOR Wiederholung und Erinnerung. Die Reihenfolge folgt jetzt der Haeufigkeit:
+Titel, Ganztaegig, Von, Bis, Wer, Wiederholung, Erinnerung, Ort, Beschreibung; hinter
+„Weitere Einstellungen" Sichtbarkeit, Stichtag, Farbe, Icon, Sync-Ziel, Anhang - und die
+Zeile des Aufklappers nennt sie.
+- **Von und Bis sind je eine Zeile** (`.cal-when`): EINE Beschriftung, Datum und Uhrzeit
+  daneben, die Beschriftungsspalte `max-content` in einem Raster fuer beide Zeilen. Das Datum
+  heisst wie seine Zeile, die Uhrzeit bringt ihren Namen ueber `label` mit.
+- **Ein Takt:** `.cal-event-form` ist eine Flex-Spalte mit 16px, Gruppen ohne eigene Marge -
+  im Modal wie im Leseblatt (dort fehlte die Luecke, im Modal war sie doppelt). Wiederholung und
+  Erinnerung sind Felder in der Reihe, keine Abschnitte: keine eigenen Trennlinien, der
+  Erinnerungsschalter spricht wie „Ganztaegig". Die einzige Linie trennt „Weitere
+  Einstellungen" ab.
+- **Beim Bearbeiten klappt nur Unsichtbares auf:** eingeschraenkte Sichtbarkeit, Stichtag,
+  Anhang. Farbe und Icon zeigt der Termin selbst. Eine Warnung, die im zugeklappten Teil
+  erscheint, oeffnet ihn - aufklappen, nie zuklappen.
+- **„Niemand" ist ein ruhiger Eintrag, keine Person:** kein Avatar, keine Striche um das Wort
+  (`.user-ms__option--none`, gilt fuer jede Personenwahl). Doppelte Initialen (Leo und Linda
+  Johnson, beide „LJ") sind offen: rund ein Dutzend Kopien der Initialen-Regel, eine
+  Kollisionsregel gehoert in EINE geteilte Funktion.
 
 ### Der Wand-Modus (Signature Component)
 **Der WACHE Zustand des Dashboards - keine zweite Seite, sondern dieselbe Flaeche in anderer

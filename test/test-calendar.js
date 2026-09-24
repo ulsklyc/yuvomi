@@ -3611,6 +3611,182 @@ test('Ganztags-Beschriftung bricht um, statt aus der 44px-Spalte zu ragen', () =
 });
 
 // --------------------------------------------------------
+// Termin-Dialog: Reihenfolge, Aufklapper, Hinweiszeilen (Critique 2026-09-24, P2)
+// --------------------------------------------------------
+
+/**
+ * Rendert den Dialog wie im Browser und haelt fest, was `advancedSection()`
+ * bekommt: der Loader stubt modal.js, der Aufklapper waere sonst unsichtbar.
+ */
+function renderEventDialog({ mode = 'create', event = null, users = [{ id: 1, display_name: 'Anna Berg' }, { id: 2, display_name: 'Ben Berg' }] } = {}) {
+  const vorher = { users: calendarHelpers.state.users, hook: globalThis.__advancedSection, ms: globalThis.__renderUserMultiSelect };
+  let advanced = null;
+  globalThis.__renderUserMultiSelect = (_people, _ids, name) => `<div class="user-ms" data-ms-name="${name}"></div>`;
+  globalThis.__advancedSection = (inner, opts) => {
+    advanced = { inner: String(inner), opts };
+    return `<details class="form-advanced"${opts?.open ? ' open' : ''}><summary class="form-advanced__summary"></summary><div class="form-advanced__body">${inner}</div></details>`;
+  };
+  calendarHelpers.state.users = users;
+  try {
+    const html = calendarHelpers.buildEventModalContent({ mode, event, date: '2030-05-01', reminder: [] });
+    return { html, advanced };
+  } finally {
+    calendarHelpers.state.users = vorher.users;
+    if (vorher.hook === undefined) delete globalThis.__advancedSection;
+    else globalThis.__advancedSection = vorher.hook;
+    if (vorher.ms === undefined) delete globalThis.__renderUserMultiSelect;
+    else globalThis.__renderUserMultiSelect = vorher.ms;
+  }
+}
+
+const EDIT_BASE = {
+  id: 9, title: 'Elternabend', start_datetime: '2030-05-01T19:00', end_datetime: '2030-05-01T20:30',
+  visibility: 'all', created_by: 1,
+};
+
+test('Termin-Dialog: die Felder stehen nach Haeufigkeit, Seltenes hinter „Weitere Einstellungen"', () => {
+  const { html, advanced } = renderEventDialog();
+  assert(advanced, 'der Dialog baut „Weitere Einstellungen" nicht mehr ueber advancedSection()');
+  // Titel, Wann, Wer, Wiederholung, Erinnerung, Ort, Beschreibung - dann der Aufklapper.
+  const main = ['id="modal-title"', 'id="modal-allday"', 'id="modal-start-date"', 'data-ms-name="cal_assigned"',
+    'id="modal-reminder-toggle"', 'id="modal-location"', 'id="modal-description"',
+    '<details class="form-advanced"'];
+  const at = main.map((m) => html.indexOf(m));
+  assert(at.every((i) => i >= 0), `nicht gerendert: ${main.filter((_, i) => at[i] < 0).join(', ')}`);
+  assert(at.every((i, k) => k === 0 || at[k - 1] < i),
+    `Reihenfolge ist ${main.slice().sort((a, b) => html.indexOf(a) - html.indexOf(b)).join(' < ')}`);
+  for (const m of main.slice(0, -1)) {
+    assert(!advanced.inner.includes(m), `${m} steht hinter dem Aufklapper - es gehoert in den Hauptteil`);
+  }
+  // Die Wiederholung rendert der Loader als Stub (''), ihre Stelle steht im
+  // Aufruf: zwischen der Personenwahl und der Erinnerung, ausserhalb des
+  // Aufklappers.
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const body = src.slice(src.indexOf('function buildEventModalContent('), src.indexOf('\nfunction confirmCalendarOverrideOrphans('));
+  const ret = body.slice(body.indexOf('return `'));
+  const [who, rrule, remind] = ["renderUserMultiSelect(", "renderRRuleFields('event'", 'renderCalendarReminderSection('].map((m) => ret.indexOf(m));
+  assert(who > 0 && who < rrule && rrule < remind, `Wiederholung steht nicht zwischen Wer und Erinnerung (${who}/${rrule}/${remind})`);
+  // Sichtbarkeit, Stichtag, Farbe, Icon, Sync-Ziel, Anhang - in dieser Folge.
+  const rare = ['id="modal-visibility"', 'id="modal-countdown"', 'id="event-color-picker"', 'id="modal-icon-trigger"',
+    'id="event-sync-target"', 'id="modal-attachment"'];
+  const inner = rare.map((m) => advanced.inner.indexOf(m));
+  assert(inner.every((i) => i >= 0), `nicht hinter dem Aufklapper: ${rare.filter((_, i) => inner[i] < 0).join(', ')}`);
+  assert(inner.every((i, k) => k === 0 || inner[k - 1] < i), 'die seltenen Felder stehen in anderer Folge');
+  // Der Aufklapper nennt, was hinter ihm liegt - aus den Beschriftungen der Felder.
+  assert(advanced.opts?.hint === calendarHelpers.eventAdvancedTopics({ visibilityOffered: true, attachment: true }),
+    `der Aufklapper nennt seinen Inhalt nicht: ${JSON.stringify(advanced.opts)}`);
+  for (const key of ['common.visibility.label', 'calendar.colorLabel', 'calendar.iconLabel', 'calendar.syncTargetLabel', 'calendar.attachmentLabel']) {
+    assert(advanced.inner.includes(key), `${key} steht in der Zeile des Aufklappers, aber kein Feld dahinter traegt es`);
+  }
+  assert(advanced.opts.open === false, 'ein neuer Termin oeffnet „Weitere Einstellungen"');
+});
+
+test('Termin-Dialog: der Aufklapper nennt nur, was er zeigt', () => {
+  const alle = calendarHelpers.eventAdvancedTopics({ visibilityOffered: true, attachment: true });
+  const ohne = calendarHelpers.eventAdvancedTopics({ visibilityOffered: false, attachment: false });
+  assert(alle.includes('common.visibility.label') && alle.includes('calendar.attachmentLabel'), alle);
+  assert(!ohne.includes('common.visibility.label'), `Sichtbarkeit genannt, obwohl das Feld verborgen ist: ${ohne}`);
+  assert(!ohne.includes('calendar.attachmentLabel'), `Anhang genannt ohne Dokumente-Zugriff: ${ohne}`);
+  assert(ohne.includes('dashboard.countdownTitle'), 'der Stichtag fehlt in der Zeile - genau ihn faende sonst niemand (#647)');
+  // Der Aufrufer liest dieselbe Bedingung wie das Feld: ein Haushalt ohne weitere Leser.
+  const solo = renderEventDialog({ users: [{ id: 1, display_name: 'Anna Berg' }] });
+  assert(!solo.advanced.opts.hint.includes('common.visibility.label'),
+    `im Haushalt ohne weitere Leser nennt der Aufklapper eine verborgene Sichtbarkeit: ${solo.advanced.opts.hint}`);
+});
+
+test('Termin-Dialog: beim Bearbeiten geht der Aufklapper nur fuer Unsichtbares auf', () => {
+  const open = (event) => renderEventDialog({ mode: 'edit', event: { ...EDIT_BASE, ...event } }).advanced.opts.open;
+  assert(open({}) === false, 'ein schlichter Termin oeffnet „Weitere Einstellungen"');
+  assert(open({ color: '#3B82F6', icon: 'star' }) === false, 'Farbe und Icon zeigt der Termin selbst - kein Grund aufzuklappen');
+  assert(open({ description: 'Mitbringen: Stifte' }) === false, 'die Beschreibung steht im Hauptteil und oeffnet nichts mehr');
+  assert(open({ countdown: 1 }) === true, 'ein Stichtag bleibt zugeklappt versteckt');
+  assert(open({ visibility: 'private' }) === true, 'eine eingeschraenkte Sichtbarkeit bleibt zugeklappt versteckt');
+  assert(open({ attachment_document_id: 3, attachment_name: 'a.pdf' }) === true, 'ein Anhang bleibt zugeklappt versteckt');
+  const solo = renderEventDialog({ mode: 'edit', event: { ...EDIT_BASE, visibility: 'private' }, users: [{ id: 1, display_name: 'Anna Berg' }] });
+  assert(solo.advanced.opts.open === false, 'fuer ein verborgenes Sichtbarkeitsfeld klappt der Dialog auf');
+});
+
+test('Termin-Dialog: Von und Bis sind je eine Zeile, jedes Feld behaelt seinen Namen', () => {
+  const { html } = renderEventDialog();
+  const row = /<div class="cal-when" id="time-fields">([\s\S]*?)<\/div>/.exec(html)?.[1] ?? '';
+  const labels = [...row.matchAll(/<label[^>]*for="([\w-]+)"[^>]*>([^<]*)<\/label>/g)].map((m) => `${m[1]}=${m[2]}`);
+  assert(JSON.stringify(labels) === JSON.stringify(['modal-start-date=calendar.fromLabel', 'modal-end-date=calendar.toLabel']),
+    `Zeilenbeschriftungen: ${labels.join(', ')}`);
+  // Das Datum heisst wie seine Zeile (sichtbarer Name im zugaenglichen), die
+  // Uhrzeit bringt ihren eigenen mit - sie hat keine sichtbare Beschriftung.
+  assert(!/id="modal-start-date"[^>]*\blabel="/.test(row), 'das Datumsfeld ueberschreibt die sichtbare Zeilenbeschriftung „Von"');
+  assert(/id="modal-start-time"[^>]*\blabel="calendar\.startTimeLabel"/.test(row), 'das Zeitfeld hat keinen eigenen Namen');
+  assert(/id="modal-end-time"[^>]*\blabel="calendar\.endTimeLabel"/.test(row), 'das Endzeitfeld hat keinen eigenen Namen');
+  const grid = [...eachRule(calendarCss)].find((r) => r.selector.trim() === '.cal-when');
+  assert(grid && /grid-template-columns:\s*max-content\b/.test(grid.body),
+    'die Beschriftungsspalte ist nicht mehr EINE Spalte fuer beide Zeilen');
+});
+
+test('Termin-Dialog: die Sichtbarkeitswarnung klappt ihren Abschnitt auf', () => {
+  // Die Sichtbarkeit steht hinter „Weitere Einstellungen". Wer oben die letzte
+  // Person abwaehlt, waehrend „Nur Zugewiesene" gilt, bekaeme die Warnung sonst
+  // in einem geschlossenen <details>.
+  const listeners = {};
+  const details = { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; } };
+  const select = { value: 'assignees', addEventListener: (type, fn) => { listeners.select = fn; } };
+  const warn = { hidden: true, closest: (sel) => (sel === 'details' ? details : null) };
+  const ms = { addEventListener: (type, fn) => { listeners.ms = fn; } };
+  const panel = { querySelector: (sel) => ({ '#vis': select, '#warn': warn, '.user-ms[data-ms-name="cal_assigned"]': ms })[sel] ?? null };
+  const vorher = globalThis.__getSelectedUserIds;
+  globalThis.__getSelectedUserIds = () => [1];
+  try {
+    calendarHelpers.wireVisibilityWarning(panel, '#vis', 'cal_assigned', '#warn');
+    assert(warn.hidden === true && !('open' in details.attrs), 'mit einer Person gibt es nichts zu warnen und nichts aufzuklappen');
+    globalThis.__getSelectedUserIds = () => [];
+    listeners.select();
+    assert(warn.hidden === false, 'ohne Person bei „Nur Zugewiesene" fehlt die Warnung');
+    assert(details.attrs.open === '', 'die Warnung steht in einem geschlossenen Abschnitt');
+  } finally {
+    if (vorher === undefined) delete globalThis.__getSelectedUserIds;
+    else globalThis.__getSelectedUserIds = vorher;
+  }
+});
+
+/*
+ * JEDE KLASSE IM TERMIN-DIALOG HAT EINE REGEL IN EINEM BLATT, DAS /calendar
+ * LAEDT. `.form-hint` lebte in settings.css, der Router laedt pro Route genau
+ * ein Seiten-Blatt - im Dialog standen sieben Hinweise in 16px Primaertinte,
+ * und `.form-help` (Anhang) hatte nirgends eine Regel. Geprueft wird das
+ * gerenderte Markup gegen die Blaetter, die auf /calendar wirklich geladen
+ * sind: index.html, calendar.css und reminders.css (router.js laedt es fuer
+ * jede angemeldete Sitzung).
+ */
+test('Termin-Dialog: jede Klasse im Markup hat eine Regel in einem Blatt, das /calendar laedt', () => {
+  const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
+  const sheets = [...read('../public/index.html').matchAll(/<link rel="stylesheet" href="\/styles\/([\w-]+\.css)"/g)]
+    .map((m) => m[1]).concat('calendar.css', 'reminders.css');
+  const styled = new Set();
+  for (const file of sheets) {
+    for (const { selector } of eachRule(read(`../public/styles/${file}`))) {
+      for (const m of selector.matchAll(/\.([\w-]+)/g)) styled.add(m[1]);
+    }
+  }
+  // Klassen, die KEINE Regel brauchen - mit Grund, nicht als Sammelbecken.
+  const HOOKS = new Map([
+    ['event-icon-picker__trigger-icon', 'traegt das Icon; gestaltet ueber `.event-icon-picker__trigger svg`'],
+    ['btn--sm', 'Restpunkt 2026-09-24: steht nur in rewards.css - eigener Umzug wie `.form-hint`'],
+  ]);
+  const event = {
+    ...EDIT_BASE, recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', countdown: 1, visibility: 'assignees',
+    attachment_document_id: 3, attachment_name: 'a.pdf', attachment_mime: 'application/pdf',
+  };
+  const unstyled = new Set();
+  for (const { html } of [renderEventDialog(), renderEventDialog({ mode: 'edit', event })]) {
+    for (const m of html.matchAll(/class="([^"$]*)"/g)) {
+      for (const cls of m[1].split(/\s+/).filter(Boolean)) {
+        if (!cls.startsWith('js-') && !styled.has(cls) && !HOOKS.has(cls)) unstyled.add(cls);
+      }
+    }
+  }
+  assert(unstyled.size === 0, `ohne Regel auf /calendar (faellt auf den Koerpertext zurueck): ${[...unstyled].join(', ')}`);
+});
+
+// --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
 console.log(`\n[Calendar-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);

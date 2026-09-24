@@ -963,7 +963,7 @@
         "invalidDate": "Seçili biçimde geçerli bir tarih kullanın.",
         "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz.",
         "attachmentLabel": "Ek",
-        "attachmentHint": "Yerel bir görsel, PDF veya belge ekleyin. Görseller etkinlik penceresinde gösterilir.",
+        "attachmentHint": "Görsel, PDF veya belge. Görseller etkinlik ayrıntılarında gösterilir.",
         "attachmentFallback": "Attachment",
         "attachmentReadError": "Ek okunamadı.",
         "attachmentTooLarge": "Ek en fazla {{size}} MB olabilir.",
@@ -3654,7 +3654,7 @@
     },
     "userMultiSelect": {
         "moreUsers": "daha",
-        "nobody": "- Kimse -"
+        "nobody": "Kimse"
     },
     "splitExpenses": {
         "title": "Paylaşılan giderler",

@@ -963,7 +963,7 @@
         "invalidDate": "请使用所选格式的有效日期。",
         "endBeforeStart": "结束日期不能早于开始日期。",
         "attachmentLabel": "附件",
-        "attachmentHint": "添加本地图片、PDF 或文档。图片会显示在日程弹窗中。",
+        "attachmentHint": "图片、PDF 或文档。图片会显示在日程详情中。",
         "attachmentFallback": "Attachment",
         "attachmentReadError": "无法读取附件。",
         "attachmentTooLarge": "附件最大 {{size}} MB。",
@@ -3654,7 +3654,7 @@
     },
     "userMultiSelect": {
         "moreUsers": "更多",
-        "nobody": "- 无人 -"
+        "nobody": "无人"
     },
     "splitExpenses": {
         "title": "共享支出",

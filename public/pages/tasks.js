@@ -1470,8 +1470,9 @@ function renderReminderSection(task = null, reminder = null) {
   //
   // Die Hinweiszeile traegt `.task-field-hint` aus tasks.css und KEINE eigene
   // Klasse: derselbe Satz in derselben Rolle darf nicht dreimal verschieden
-  // aussehen, und die Warnung davor steht schon an `.cal-field-hint` in
-  // calendar.css. Tragfaehig ist das, weil BEIDE Wege in dieses Markup
+  // aussehen. (Der Kalender-Dialog hatte dafuer `.cal-field-hint`; seit
+  // `.form-hint` global in layout.css steht, nimmt er diese.) Tragfaehig ist
+  // das, weil BEIDE Wege in dieses Markup
   // tasks.css mitbringen - die Route /tasks laedt es als Seiten-Blatt, und
   // `openTaskById()` (Dashboard, Kalender) awaitet vorher `ensureTaskStyles()`.
   const locked = access === 'read';

@@ -52,6 +52,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The event dialog asks the common things first.** Title, time, people, recurrence, reminders,
+  location and description now come first; visibility, the countdown switch, colour, icon, sync
+  target and attachment moved behind "More settings", which now names what it holds. Start and
+  end each take one row with date and time side by side, so the dialog on a phone is about a
+  third shorter. When you edit an event with a restricted visibility, a countdown or an
+  attachment, the section opens by itself. The "Nobody" choice in every people picker is now a
+  plain chip instead of a grey placeholder avatar with dashes around the word.
+
 - **An event looks the same in every calendar view, and every time reads "17:00 - 18:30".** The
   month showed a tinted bar with a coloured edge, the week a block with an extra frame and a
   generic calendar icon, the day a card with two colour strokes and its title floating in the

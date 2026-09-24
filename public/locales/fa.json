@@ -994,7 +994,7 @@
         "syncTargetOutlookGroup": "Outlook",
         "syncTargetHint": "تقویمی را برای همگام‌سازی این رویداد انتخاب کنید.",
         "attachmentLabel": "پیوست",
-        "attachmentHint": "تصویر، PDF یا سند محلی پیوست کنید. تصاویر در پنجره رویداد نمایش داده می‌شوند.",
+        "attachmentHint": "تصویر، PDF یا سند. تصاویر در جزئیات رویداد نمایش داده می‌شوند.",
         "attachmentFallback": "پیوست",
         "attachmentReadError": "پیوست خوانده نشد.",
         "attachmentTooLarge": "پیوست حداکثر می‌تواند {{size}} مگابایت باشد.",
@@ -3475,7 +3475,7 @@
         }
     },
     "userMultiSelect": {
-        "nobody": "- هیچ‌کس -",
+        "nobody": "هیچ‌کس",
         "moreUsers": "بیشتر"
     },
     "housekeeping": {

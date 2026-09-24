@@ -963,7 +963,7 @@
         "invalidDate": "Utilisez une date valide dans le format sélectionné.",
         "endBeforeStart": "La date de fin ne peut pas précéder la date de début.",
         "attachmentLabel": "Pièce jointe",
-        "attachmentHint": "Joignez une image, un PDF ou un document local. Les images s’affichent dans la fenêtre de l’événement.",
+        "attachmentHint": "Image, PDF ou document. Les images s’affichent dans le détail de l’événement.",
         "attachmentFallback": "Attachment",
         "attachmentReadError": "La pièce jointe n’a pas pu être lue.",
         "attachmentTooLarge": "La pièce jointe ne doit pas dépasser {{size}} Mo.",
@@ -3654,7 +3654,7 @@
     },
     "userMultiSelect": {
         "moreUsers": "autres",
-        "nobody": "- Personne -"
+        "nobody": "Personne"
     },
     "splitExpenses": {
         "title": "Dépenses partagées",

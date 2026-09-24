@@ -361,8 +361,29 @@ test('English and French user multi-select none labels are localized', () => {
   const en = JSON.parse(read('../public/locales/en.json'));
   const fr = JSON.parse(read('../public/locales/fr.json'));
 
-  assert.equal(en.userMultiSelect.nobody, '- No one -');
-  assert.equal(fr.userMultiSelect.nobody, '- Personne -');
+  assert.equal(en.userMultiSelect.nobody, 'No one');
+  assert.equal(fr.userMultiSelect.nobody, 'Personne');
+});
+
+// „NIEMAND" IST EIN RUHIGER EINTRAG, KEINE PERSON (Critique 2026-09-24). Der
+// Chip trug einen grauen Kreis mit einem Gedankenstrich, und das Wort stand in
+// Strichen („- Niemand -") - ein Platzhalter-Gesicht neben echten Initialen.
+// Geprueft am gerenderten Markup der Komponente und am Wortlaut jeder Sprache.
+test('user multi-select: „Niemand" ohne Avatar und ohne Strich-Dekoration', () => {
+  const src = read('../public/components/user-multi-select.js');
+  const start = src.indexOf('export function renderUserMultiSelect(');
+  const body = src.slice(start, src.indexOf('\n}', start));
+  const none = /<label class="([^"]*)">\s*<input[^>]*user-ms__none[^>]*>([\s\S]*?)<\/label>/.exec(body);
+  assert.ok(none, 'die „Niemand"-Option ist nicht mehr als eigene Zeile gerendert');
+  assert.doesNotMatch(none[2], /user-ms__avatar/, '„Niemand" traegt wieder einen Avatar');
+  assert.match(none[1], /\buser-ms__option--none\b/, 'ohne Avatar braucht der Chip sein eigenes Polster');
+  assert.match(read('../public/styles/user-multi-select.css'), /\.user-ms__option--none\s*\{[^}]*padding-inline-start/);
+  const offenders = [];
+  for (const file of readdirSync(new URL('../public/locales/', import.meta.url)).filter((f) => f.endsWith('.json'))) {
+    const value = JSON.parse(read(`../public/locales/${file}`)).userMultiSelect?.nobody ?? '';
+    if (/^[-\u2013\u2014]\s|\s[-\u2013\u2014]$/.test(value)) offenders.push(`${file}: ${value}`);
+  }
+  assert.deepEqual(offenders, [], '„Niemand" steht wieder in Strichen');
 });
 
 test('dynamic frontend translation key domains exist in every locale', () => {

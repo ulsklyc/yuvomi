@@ -972,7 +972,7 @@
         "syncTargetOutlookGroup": "Outlook",
         "syncTargetHint": "Choose a calendar to sync this event to.",
         "attachmentLabel": "Attachment",
-        "attachmentHint": "Attach a local image, PDF, or document. Images will be shown in the event popup.",
+        "attachmentHint": "Image, PDF or document. Images show in the event details.",
         "attachmentFallback": "Attachment",
         "attachmentReadError": "The attachment could not be read.",
         "attachmentTooLarge": "Attachment may be at most {{size}} MB.",
@@ -3654,7 +3654,7 @@
     },
     "userMultiSelect": {
         "moreUsers": "more",
-        "nobody": "- No one -"
+        "nobody": "No one"
     },
     "splitExpenses": {
         "title": "Shared expenses",

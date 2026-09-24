@@ -972,7 +972,7 @@
         "syncTargetOutlookGroup": "Outlook",
         "syncTargetHint": "Chọn lịch để đồng bộ sự kiện này.",
         "attachmentLabel": "Tệp đính kèm",
-        "attachmentHint": "Đính kèm hình ảnh cục bộ, PDF hoặc tài liệu. Hình ảnh sẽ được hiển thị trong cửa sổ bật lên của sự kiện.",
+        "attachmentHint": "Hình ảnh, PDF hoặc tài liệu. Hình ảnh hiển thị trong chi tiết sự kiện.",
         "attachmentFallback": "Tệp đính kèm",
         "attachmentReadError": "Không thể đọc tệp đính kèm.",
         "attachmentTooLarge": "Tệp đính kèm tối đa là {{size}} MB.",
@@ -3654,7 +3654,7 @@
     },
     "userMultiSelect": {
         "moreUsers": "thêm",
-        "nobody": "- Không ai -"
+        "nobody": "Không ai"
     },
     "splitExpenses": {
         "title": "Chi phí chung",

@@ -1810,10 +1810,11 @@
      * (Critique 2026-07-29). Mit der Flaechen-Kur eine knappe Stufe
      * mitgerueckt, damit die Sichtbarkeit auf der helleren Surface haelt
      * (subtle 1.28:1, border 1.47:1 gegen #2B2825 - vorher 1.23 / 1.51).
-     * Die Standardkante bleibt dabei unter #48423C: zwei Bestandsstellen
-     * fuellen mit --color-border eine Flaeche UNTER Sekundaertext
-     * (.md-toolbar__sep:hover, .user-ms__avatar--none), und der Guard
-     * verlangt dort zu Recht 4.5 - #47423B traegt 4.52. */
+     * Die Standardkante bleibt dabei unter #48423C: eine Bestandsstelle
+     * fuellt mit --color-border eine Flaeche UNTER Sekundaertext
+     * (.md-toolbar__sep:hover; der zweite Fall, der Avatar von „Niemand",
+     * ist 2026-09-24 entfallen), und der Guard verlangt dort zu Recht 4.5 -
+     * #47423B traegt 4.52. */
     --color-border-subtle: #3E3933;  /* Trenner, ruhige Kartenkante */
     --color-border:        #47423B;  /* Standardkante (Karten, Gruppen); Feldkanten: --color-border-control */
     --color-border-strong: #6F6A61;  /* Hover, betonte Rahmen (~2.7:1) */

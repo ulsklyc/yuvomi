@@ -95,15 +95,18 @@ export function renderUserMultiSelect(allUsers, selectedIds, inputName, labelKey
       </label>`;
   });
 
+  // „Niemand" ist ein ruhiger Eintrag, keine Person: kein Avatar und keine
+  // Striche um das Wort. Hier stand ein grauer Kreis mit einem Gedankenstrich
+  // und „- Niemand -" daneben - ein Platzhalter-Gesicht, das neben echten
+  // Initialen wie ein weiteres Mitglied aussah (Critique 2026-09-24).
   const noneLabel = t(noneLabelKey);
   return `
     <div class="user-ms" data-ms-name="${esc(inputName)}">
       <label class="label">${t(labelKey)}</label>
       <div class="user-ms__options">
-        <label class="user-ms__option">
+        <label class="user-ms__option user-ms__option--none">
           <input type="checkbox" class="user-ms__checkbox user-ms__none" value=""
                  data-ms-input="${esc(inputName)}" ${selectedSet.size === 0 ? 'checked' : ''}>
-          <span class="user-ms__avatar user-ms__avatar--none">–</span>
           <span class="user-ms__name">${noneLabel}</span>
         </label>
         ${items.join('')}

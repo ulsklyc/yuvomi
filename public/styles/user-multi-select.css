@@ -125,9 +125,10 @@
   object-fit: cover;
 }
 
-.user-ms__avatar--none {
-  background-color: var(--color-border);
-  color: var(--color-text-secondary);
+/* Ohne Avatar sitzt der Text sonst am linken Rand: die Option ist fuer die
+ * Scheibe links knapp gepolstert. „Niemand" bekommt beidseitig dasselbe. */
+.user-ms__option--none {
+  padding-inline-start: var(--space-3);
 }
 
 .user-ms__name {

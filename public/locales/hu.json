@@ -972,7 +972,7 @@
         "syncTargetOutlookGroup": "Outlook",
         "syncTargetHint": "Válasszon egy naptárt az esemény szinkronizálásához.",
         "attachmentLabel": "Melléklet",
-        "attachmentHint": "Csatoljon egy helyi képet, PDF-et vagy dokumentumot. A képek megjelennek az esemény felugró ablakában.",
+        "attachmentHint": "Kép, PDF vagy dokumentum. A képek az esemény részleteinél jelennek meg.",
         "attachmentFallback": "Melléklet",
         "attachmentReadError": "A mellékletet nem lehetett beolvasni.",
         "attachmentTooLarge": "A melléklet legfeljebb {{size}} MB lehet.",
@@ -3654,7 +3654,7 @@
     },
     "userMultiSelect": {
         "moreUsers": "továbbiak",
-        "nobody": "- Senki -"
+        "nobody": "Senki"
     },
     "splitExpenses": {
         "title": "Megosztott költségek",

@@ -994,7 +994,7 @@
         "syncTargetOutlookGroup": "Outlook",
         "syncTargetHint": "이 일정을 동기화할 캘린더를 선택하세요.",
         "attachmentLabel": "첨부 파일",
-        "attachmentHint": "로컬 이미지, PDF 또는 문서를 첨부하세요. 이미지는 일정 팝업에 표시됩니다.",
+        "attachmentHint": "이미지, PDF 또는 문서. 이미지는 일정 상세에 표시됩니다.",
         "attachmentFallback": "첨부 파일",
         "attachmentReadError": "첨부 파일을 읽을 수 없습니다.",
         "attachmentTooLarge": "첨부 파일은 최대 {{size}}MB까지 가능합니다.",
@@ -3475,7 +3475,7 @@
         }
     },
     "userMultiSelect": {
-        "nobody": "- 없음 -",
+        "nobody": "없음",
         "moreUsers": "더"
     },
     "housekeeping": {

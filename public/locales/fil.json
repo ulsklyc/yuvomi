@@ -994,7 +994,7 @@
         "syncTargetOutlookGroup": "Outlook",
         "syncTargetHint": "Pumili ng kalendaryong pagsi-sync-an ng kaganapang ito.",
         "attachmentLabel": "Kalakip",
-        "attachmentHint": "Maglakip ng lokal na larawan, PDF o dokumento. Ipapakita ang mga larawan sa popup ng kaganapan.",
+        "attachmentHint": "Larawan, PDF o dokumento. Makikita ang mga larawan sa detalye ng kaganapan.",
         "attachmentFallback": "Kalakip",
         "attachmentReadError": "Hindi mabasa ang kalakip.",
         "attachmentTooLarge": "Dapat hindi hihigit sa {{size}} MB ang kalakip.",
@@ -3475,7 +3475,7 @@
         }
     },
     "userMultiSelect": {
-        "nobody": "- Wala -",
+        "nobody": "Wala",
         "moreUsers": "pa"
     },
     "housekeeping": {

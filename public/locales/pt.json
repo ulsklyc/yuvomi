@@ -963,7 +963,7 @@
         "invalidDate": "Use uma data válida no formato selecionado.",
         "endBeforeStart": "A data de término não pode ser anterior à de início.",
         "attachmentLabel": "Anexo",
-        "attachmentHint": "Anexe uma imagem, PDF ou documento local. Imagens aparecem no pop-up do evento.",
+        "attachmentHint": "Imagem, PDF ou documento. As imagens aparecem nos detalhes do evento.",
         "attachmentFallback": "Anexo",
         "attachmentReadError": "Não foi possível ler o anexo.",
         "attachmentTooLarge": "O anexo pode ter no máximo {{size}} MB.",
@@ -3654,7 +3654,7 @@
     },
     "userMultiSelect": {
         "moreUsers": "mais",
-        "nobody": "- Ninguém -"
+        "nobody": "Ninguém"
     },
     "splitExpenses": {
         "title": "Despesas compartilhadas",

@@ -4691,6 +4691,22 @@ p.field-hint--warn[hidden] {
 }
 
 /* Default-Disclosure-Dreieck entfernen (Cross-Browser) */
+/* Mit `hint`: die Beschriftung und darunter, was hinter ihr liegt. Die zweite
+ * Zeile ist eine Stufe leiser (Caption-Groesse, tertiaer) und bricht um, statt
+ * den Chevron aus der Zeile zu schieben. */
+.form-advanced__label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0h);
+  min-width: 0;
+}
+
+.form-advanced__hint {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-tertiary);
+}
+
 .form-advanced__summary::-webkit-details-marker { display: none; }
 .form-advanced__summary::marker { content: ''; }
 

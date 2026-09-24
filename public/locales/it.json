@@ -963,7 +963,7 @@
         "invalidDate": "Usa una data valida nel formato selezionato.",
         "endBeforeStart": "La data di fine non può essere precedente alla data di inizio.",
         "attachmentLabel": "Allegato",
-        "attachmentHint": "Allega un'immagine locale, un PDF o un documento. Le immagini saranno mostrate nel popup dell'evento.",
+        "attachmentHint": "Immagine, PDF o documento. Le immagini compaiono nei dettagli dell'evento.",
         "attachmentFallback": "Allegato",
         "attachmentReadError": "Impossibile leggere l'allegato.",
         "attachmentTooLarge": "L'allegato non può superare i {{size}} MB.",
@@ -3654,7 +3654,7 @@
     },
     "userMultiSelect": {
         "moreUsers": "altri",
-        "nobody": "- Nessuno -"
+        "nobody": "Nessuno"
     },
     "splitExpenses": {
         "title": "Spese condivise",

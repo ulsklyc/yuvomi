@@ -10,7 +10,7 @@ import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModa
 import { attachOverlay } from '/utils/overlay-history.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
-import { t, formatDate as formatPreferredDate, formatDayMonth, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
+import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation } from '/utils/html.js';
 import { shiftEndDateKey, isEndBeforeStart, weekStartIndex, weekdayOrder,
          monthPeriodKeys, startOfLocalWeekKey, addLocalDays, defaultDateInPeriod,
@@ -4465,15 +4465,12 @@ function openCalendarFilters() {
   // der WIRKUNG umbenannt; eine eigene Hinweiszeile darunter nennt zusaetzlich
   // den AUS-Zustand explizit (das ist der Vorgabewert - S-16 aendert ihn
   // nicht), damit der Schalter vorhersagbar ist, ohne ihn erst umzulegen.
-  // `.cal-field-hint` statt `.form-hint`: die Regel dafuer lebt in settings.css,
-  // der Router laedt auf /calendar nur calendar.css (siehe die Begruendung an
-  // `.cal-field-hint` selbst weiter oben in dieser Datei).
   const scheduleDisplayRow = scheduleEnabled()
     ? toggleRowHtml({
       label: t('schedule.fullBlocks'),
       checked: state.scheduleDisplay === 'blocks',
       attrs: { 'data-filter-schedule-display': 'true' },
-    }) + `<p class="cal-field-hint">${t('schedule.fullBlocksHint')}</p>`
+    }) + `<p class="form-hint">${t('schedule.fullBlocksHint')}</p>`
     : '';
 
   const meRow = (people.length > 1 && state.currentUserId != null)
@@ -4963,7 +4960,7 @@ async function openFoundEvent(ev) {
 export const __test = {
   // Die Nur-lesen-Weiche (#467) und der Anlegeweg, den sie als erstes schliesst.
   readOnly, openEventModal,
-  buildEventModalContent,
+  buildEventModalContent, eventAdvancedTopics, wireVisibilityWarning,
   calendarSaveErrorMessage,
   hasCurrentAttachment,
   attachmentNode,
@@ -5800,13 +5797,17 @@ function renderCalendarReminderSection(reminders = [], event = null, defaultOffs
    * der halbe Haushalt eine Meldung bekommt, weil ein Einzelner sich etwas
    * notiert hat. Ein neuer Termin gehoert dem, der ihn gerade anlegt. */
   const sharesReminder = !event || event.created_by === state.currentUserId;
+  // Der Schalter spricht wie „Ganztägig" ueber ihm, nicht wie eine
+  // Abschnittsueberschrift: seit der Critique 2026-09-24 ist die Erinnerung
+  // ein Feld in der Reihe des Termin-Dialogs, kein eigener Abschnitt mehr
+  // (die Aufgaben behalten `.reminder-section__title`).
   return `
     <div class="reminder-section">
       <div class="reminder-section__header">
         <label class="toggle" style="margin:0">
           <input type="checkbox" id="modal-reminder-toggle" ${enabled ? 'checked' : ''}>
           <span class="toggle__track"></span>
-          <span class="reminder-section__title">${t('reminders.enableLabel')}</span>
+          <span>${t('reminders.enableLabel')}</span>
         </label>
       </div>
       <div id="modal-reminder-fields" class="reminder-fields" ${enabled ? '' : 'style="display:none"'}>
@@ -6101,6 +6102,10 @@ function wireVisibilityWarning(panel, selectSel, msName, warnSel) {
   const update = () => {
     const count = getSelectedUserIds(panel, msName).length;
     warn.hidden = !(select.value === 'assignees' && count === 0);
+    // Die Sichtbarkeit steht unter „Weitere Einstellungen". Wer oben die
+    // letzte Person abwaehlt, bekommt die Warnung sonst in einem geschlossenen
+    // <details> - aufklappen, nie zuklappen (wie die Hinweise der Zielwahl).
+    if (!warn.hidden) warn.closest('details')?.setAttribute('open', '');
   };
   select.addEventListener('change', update);
   ms?.addEventListener('click', () => setTimeout(update, 0));
@@ -6595,7 +6600,7 @@ function eventAttachmentFieldHtml(event) {
     return `
     <div class="form-group">
       <span class="form-label">${t('calendar.attachmentLabel')}</span>
-      <p class="form-help" id="modal-attachment-locked">${esc(t('documentAttach.lockedPrivate'))}</p>
+      <p class="form-hint" id="modal-attachment-locked">${esc(t('documentAttach.lockedPrivate'))}</p>
     </div>`;
   }
   const shown = hasAttachment(event);
@@ -6629,18 +6634,40 @@ function eventAttachmentFieldHtml(event) {
           <i data-lucide="file-up" aria-hidden="true"></i>
         </span>
         <span class="document-dropzone__title">${t('documents.dropzoneTitle')}</span>
-        <span class="document-dropzone__hint">${t('documents.dropzoneHint')}</span>
         <span class="document-dropzone__file" id="modal-selected-attachment" ${event?.attachment_name ? '' : 'hidden'}>
           ${event?.attachment_name ? esc(selectedAttachmentLabel(event.attachment_name)) : ''}
         </span>
       </label>
-      <div class="form-help">${t('calendar.attachmentHint')}</div>
+      <p class="form-hint">${t('calendar.attachmentHint')}</p>
       <div class="event-attachment-preview" id="modal-attachment-preview" ${shown ? '' : 'hidden'}>
         ${shown ? attachmentPreviewHtml(event) : ''}
       </div>
       <button class="btn btn--secondary" id="modal-remove-attachment" type="button"
               ${shown ? '' : 'hidden'}>${t('calendar.attachmentRemove')}</button>
     </div>`;
+}
+
+/**
+ * Was hinter „Weitere Einstellungen" im Termin-Dialog liegt, als eine Zeile
+ * („Sichtbarkeit, Stichtage, Farbe, Icon, Sync-Ziel und Anhang"). Aus den
+ * Beschriftungen der Felder selbst, und nur die, die der Dialog wirklich
+ * zeigt: die Sichtbarkeit fehlt, wo niemand sonst den Kalender liest, der
+ * Anhang, wo das Dokumente-Modul zu ist.
+ */
+function eventAdvancedTopics({ visibilityOffered = true, attachment = true } = {}) {
+  const topics = [
+    visibilityOffered ? t('common.visibility.label') : null,
+    t('dashboard.countdownTitle'),
+    t('calendar.colorLabel'),
+    t('calendar.iconLabel'),
+    t('calendar.syncTargetLabel'),
+    attachment ? t('calendar.attachmentLabel') : null,
+  ].filter(Boolean);
+  try {
+    return new Intl.ListFormat(getLocale(), { style: 'long', type: 'conjunction' }).format(topics);
+  } catch {
+    return topics.join(', ');
+  }
 }
 
 function buildEventModalContent({ mode, event, date, reminder = null, time = null }) {
@@ -6666,13 +6693,66 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
     : (state.defaultAssignMe && state.currentUserId != null ? [state.currentUserId] : []);
   const visibility = (isEdit ? event.visibility : null) || 'all';
 
-  // Sekundärfelder: wandern hinter „Weitere Einstellungen". Beim Bearbeiten
-  // automatisch geöffnet, falls bereits Werte gesetzt sind. Der Ort steht als
-  // Alltagsfeld im Hauptbereich (Audit A1-11), nicht mehr hier.
-  const advancedFieldsOpen = isEdit
-    && (!!event.description || hasAttachment(event));
+  // WAS OFT GEBRAUCHT WIRD, STEHT OBEN (Critique 2026-09-24, P2). Die
+  // Reihenfolge folgt der Haeufigkeit: Titel, Wann, Wer, Wiederholung,
+  // Erinnerung, Ort, Beschreibung. Sichtbarkeit, Stichtag, Farbe, Icon,
+  // Sync-Ziel und Anhang sind Entscheidungen fuer wenige Termine - sie standen
+  // vorher VOR Wiederholung und Erinnerung, und der Dialog war mobil drei
+  // Bildschirme lang (1559px bei 523 sichtbar, 23 sichtbare Eingaben).
+  //
+  // Beim Bearbeiten geht „Weitere Einstellungen" auf, sobald darin etwas steht,
+  // das der Termin sonst nirgends zeigt: eine eingeschraenkte Sichtbarkeit,
+  // der Stichtag, ein Anhang. Farbe und Icon traegt der Termin im Raster
+  // selbst, dafuer muss niemand aufklappen.
+  const visibilityOffered = state.users.length > 1 || othersCanRead('calendar');
+  const attachmentHtml = eventAttachmentFieldHtml(isEdit ? event : null);
+  const advancedFieldsOpen = isEdit && (
+    (visibilityOffered && visibility !== 'all')
+    || !!event.countdown
+    || hasAttachment(event)
+    || event.attachment_locked === true
+  );
+  // Der Aufklapper nennt, was hinter ihm liegt - sonst faende den Stichtag
+  // nur, wer schon weiss, dass es ihn gibt (#647). Aus denselben Beschriftungen
+  // wie die Felder, damit Liste und Inhalt nicht auseinanderlaufen.
+  const advancedTopics = eventAdvancedTopics({ visibilityOffered, attachment: Boolean(attachmentHtml) });
 
   const advancedFieldsHtml = `
+    <!-- Verborgen, nicht entfernt: der Speicherpfad liest
+         "#modal-visibility?.value || 'all'". Ohne den Knoten machte jedes
+         Speichern einen privaten Termin fuer alle sichtbar, sobald die Liste
+         hoechstens ein Mitglied hat - ein Haushalt aus einer Person und einer
+         Haushaltshilfe genauso. Das Aufgabenformular macht es ebenso.
+         Sichtbar bleibt es, solange ein anderes Konto den Kalender lesen kann -
+         auch Hauspersonal mit Zugriff: sonst bliebe jeder neue Termin bei
+         "alle" und waere fuer genau dieses Konto lesbar. -->
+    <div class="form-group"${visibilityOffered ? '' : ' hidden'}>
+      <label class="form-label" for="modal-visibility">${t('common.visibility.label')}</label>
+      <select class="input" id="modal-visibility" name="visibility">
+        <option value="all"       ${visibility === 'all'       ? 'selected' : ''}>${t('common.visibility.all')}</option>
+        <option value="assignees" ${visibility === 'assignees' ? 'selected' : ''}>${t('common.visibility.assignees')}</option>
+        <option value="private"   ${visibility === 'private'   ? 'selected' : ''}>${t('common.visibility.private')}</option>
+      </select>
+      <p class="form-hint">${t('common.visibility.hint')}</p>
+      <p class="form-hint field-hint--warn" id="modal-visibility-warning" role="status" hidden><i data-lucide="alert-triangle" aria-hidden="true"></i><span>${t('common.visibility.assigneesNobodyHint')}</span></p>
+    </div>
+
+    <!-- #647: der Schalter, den @Kyrodan beschrieben hat - „einen Termin als
+         Countdown markieren" statt eines zweiten Systems daneben. Er steht
+         seit der Critique 2026-09-24 hier und nicht mehr im Hauptbereich: der
+         Aufklapper nennt ihn in seiner Zeile (eventAdvancedTopics), damit er
+         trotzdem gefunden wird, ohne dass jeder Termin ihn vor Wiederholung
+         und Erinnerung vorgelegt bekommt. -->
+    <div class="form-group">
+      <label class="toggle">
+        <input type="checkbox" id="modal-countdown" aria-describedby="modal-countdown-hint"
+               ${isEdit && event.countdown ? 'checked' : ''}>
+        <span class="toggle__track"></span>
+        <span>${t('calendar.countdownToggle')}</span>
+      </label>
+      <p class="form-hint" id="modal-countdown-hint">${t('calendar.countdownHint')}</p>
+    </div>
+
     <div class="form-group">
       <label class="form-label" id="event-color-label">${t('calendar.colorLabel')}</label>
       <div class="color-picker" id="event-color-picker" role="radiogroup" aria-labelledby="event-color-label">
@@ -6697,6 +6777,20 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
       </div>
     </div>
 
+    <div class="form-group event-icon-picker">
+      <label class="form-label" for="modal-icon-trigger">${t('calendar.iconLabel')}</label>
+      <input type="hidden" id="modal-icon" value="${selectedIcon}">
+      <button type="button"
+              class="event-icon-picker__trigger"
+              id="modal-icon-trigger"
+              data-icon="${selectedIcon}"
+              aria-haspopup="true"
+              aria-expanded="false"
+              aria-label="${t('calendar.iconLabel')}">
+        ${eventIconHtml(selectedIcon, 'event-icon-picker__trigger-icon')}
+      </button>
+    </div>
+
     <div class="form-group">
       <label class="form-label" for="event-sync-target">${t('calendar.syncTargetLabel')}</label>
       <select class="form-input" id="event-sync-target">
@@ -6708,35 +6802,22 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
       <small class="form-hint" id="event-sync-target-several-hint" hidden></small>
     </div>
 
-    <div class="form-group">
-      <label class="form-label" for="modal-description">${t('calendar.descriptionLabel')}</label>
-      <textarea class="form-input" id="modal-description" rows="2"
-                placeholder="${t('calendar.descriptionPlaceholder')}">${esc(isEdit && event.description ? event.description : '')}</textarea>
-    </div>
+    ${attachmentHtml}`;
 
-    ${eventAttachmentFieldHtml(isEdit ? event : null)}`;
-
+  // Von und Bis sind je EINE Zeile: Datum und Uhrzeit nebeneinander unter
+  // einer Beschriftung. Vorher trug jedes der vier Felder ein eigenes Label
+  // (Startdatum, Startzeit, Enddatum, Endzeit), und mobil stand jedes auf
+  // einer eigenen Zeile - vier Zeilen fuer zwei Zeitpunkte. Das Datumsfeld
+  // heisst wie seine Zeile („Von"), damit der sichtbare Name im zugaenglichen
+  // steckt; das Zeitfeld bringt seinen eigenen Namen mit (`label`).
   return `
-    <div class="event-title-picker">
-      <div class="form-group event-icon-picker">
-        <label class="form-label" for="modal-icon-trigger">${t('calendar.iconLabel')}</label>
-        <input type="hidden" id="modal-icon" value="${selectedIcon}">
-        <button type="button"
-                class="event-icon-picker__trigger"
-                id="modal-icon-trigger"
-                data-icon="${selectedIcon}"
-                aria-haspopup="true"
-                aria-expanded="false"
-                aria-label="${t('calendar.iconLabel')}">
-          ${eventIconHtml(selectedIcon, 'event-icon-picker__trigger-icon')}
-        </button>
-      </div>
-      <div class="form-group event-title-picker__title">
-        <label class="form-label" for="modal-title">${t('calendar.titleLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
-        <input type="text" class="form-input" id="modal-title" required
-               placeholder="${t('calendar.titlePlaceholder')}" value="${esc(isEdit ? event.title : '')}">
-      </div>
+    <div class="cal-event-form">
+    <div class="form-group">
+      <label class="form-label" for="modal-title">${t('calendar.titleLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
+      <input type="text" class="form-input" id="modal-title" required
+             placeholder="${t('calendar.titlePlaceholder')}" value="${esc(isEdit ? event.title : '')}">
     </div>
+
     <div class="form-group">
       <label class="toggle">
         <input type="checkbox" id="modal-allday" ${isEdit && event.all_day ? 'checked' : ''}>
@@ -6745,95 +6826,25 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
       </label>
     </div>
 
-    <div id="time-fields">
-      <div class="modal-grid modal-grid--2">
-        <div class="form-group">
-          <label class="form-label" for="modal-start-date">${t('calendar.startDateLabel')}</label>
-          <yuvomi-datepicker type="date" id="modal-start-date" value="${esc(formatDateInput(startDate))}" label="${esc(t('calendar.startDateLabel'))}"></yuvomi-datepicker>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="modal-start-time">${t('calendar.startTimeLabel')}</label>
-          <yuvomi-datepicker type="time" id="modal-start-time" value="${esc(formatTimeInput(startTime))}" label="${esc(t('calendar.startTimeLabel'))}"></yuvomi-datepicker>
-        </div>
-      </div>
-      <div class="modal-grid modal-grid--2">
-        <div class="form-group">
-          <label class="form-label" for="modal-end-date">${t('calendar.endDateLabel')}</label>
-          <yuvomi-datepicker type="date" id="modal-end-date" value="${esc(formatDateInput(endDate))}" label="${esc(t('calendar.endDateLabel'))}"></yuvomi-datepicker>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="modal-end-time">${t('calendar.endTimeLabel')}</label>
-          <yuvomi-datepicker type="time" id="modal-end-time" value="${esc(formatTimeInput(endTime))}" label="${esc(t('calendar.endTimeLabel'))}"></yuvomi-datepicker>
-        </div>
-      </div>
+    <div class="cal-when" id="time-fields">
+      <label class="form-label cal-when__label" for="modal-start-date">${t('calendar.fromLabel')}</label>
+      <yuvomi-datepicker type="date" id="modal-start-date" value="${esc(formatDateInput(startDate))}"></yuvomi-datepicker>
+      <yuvomi-datepicker type="time" id="modal-start-time" value="${esc(formatTimeInput(startTime))}" label="${esc(t('calendar.startTimeLabel'))}"></yuvomi-datepicker>
+      <label class="form-label cal-when__label" for="modal-end-date">${t('calendar.toLabel')}</label>
+      <yuvomi-datepicker type="date" id="modal-end-date" value="${esc(formatDateInput(endDate))}"></yuvomi-datepicker>
+      <yuvomi-datepicker type="time" id="modal-end-time" value="${esc(formatTimeInput(endTime))}" label="${esc(t('calendar.endTimeLabel'))}"></yuvomi-datepicker>
     </div>
 
-    <div id="allday-fields" style="display:none;">
-      <div class="modal-grid modal-grid--2">
-        <div class="form-group">
-          <label class="form-label" for="modal-allday-start">${t('calendar.fromLabel')}</label>
-          <yuvomi-datepicker type="date" id="modal-allday-start" value="${esc(formatDateInput(startDate))}" label="${esc(t('calendar.fromLabel'))}"></yuvomi-datepicker>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="modal-allday-end">${t('calendar.toLabel')}</label>
-          <yuvomi-datepicker type="date" id="modal-allday-end" value="${esc(formatDateInput(endDate))}" label="${esc(t('calendar.toLabel'))}"></yuvomi-datepicker>
-        </div>
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label class="form-label" for="modal-location">${t('calendar.locationLabel')}</label>
-      <input type="text" class="form-input" id="modal-location"
-             placeholder="${t('calendar.locationPlaceholder')}" value="${esc(isEdit && event.location ? event.location : '')}">
+    <div class="cal-when cal-when--dates" id="allday-fields" style="display:none;">
+      <label class="form-label cal-when__label" for="modal-allday-start">${t('calendar.fromLabel')}</label>
+      <yuvomi-datepicker type="date" id="modal-allday-start" value="${esc(formatDateInput(startDate))}"></yuvomi-datepicker>
+      <label class="form-label cal-when__label" for="modal-allday-end">${t('calendar.toLabel')}</label>
+      <yuvomi-datepicker type="date" id="modal-allday-end" value="${esc(formatDateInput(endDate))}"></yuvomi-datepicker>
     </div>
 
     <div class="form-group">
       ${renderUserMultiSelect(withChosenPeople(state.users, isEdit ? event.assigned_users : []), selectedUserIds, 'cal_assigned', 'calendar.assignedLabel')}
     </div>
-
-    <!-- Verborgen, nicht entfernt: der Speicherpfad liest
-         "#modal-visibility?.value || 'all'". Ohne den Knoten machte jedes
-         Speichern einen privaten Termin fuer alle sichtbar, sobald die Liste
-         hoechstens ein Mitglied hat - ein Haushalt aus einer Person und einer
-         Haushaltshilfe genauso. Das Aufgabenformular macht es ebenso.
-         Sichtbar bleibt es, solange ein anderes Konto den Kalender lesen kann -
-         auch Hauspersonal mit Zugriff: sonst bliebe jeder neue Termin bei
-         "alle" und waere fuer genau dieses Konto lesbar. -->
-    <div class="form-group"${state.users.length > 1 || othersCanRead('calendar') ? '' : ' hidden'}>
-      <label class="form-label" for="modal-visibility">${t('common.visibility.label')}</label>
-      <select class="input" id="modal-visibility" name="visibility">
-        <option value="all"       ${visibility === 'all'       ? 'selected' : ''}>${t('common.visibility.all')}</option>
-        <option value="assignees" ${visibility === 'assignees' ? 'selected' : ''}>${t('common.visibility.assignees')}</option>
-        <option value="private"   ${visibility === 'private'   ? 'selected' : ''}>${t('common.visibility.private')}</option>
-      </select>
-      <p class="form-hint">${t('common.visibility.hint')}</p>
-      <p class="form-hint field-hint--warn" id="modal-visibility-warning" role="status" hidden><i data-lucide="alert-triangle" aria-hidden="true"></i><span>${t('common.visibility.assigneesNobodyHint')}</span></p>
-    </div>
-
-    <!-- #647: der Schalter, den @Kyrodan beschrieben hat - „einen Termin als
-         Countdown markieren" statt eines zweiten Systems daneben. Er steht im
-         Hauptbereich und nicht hinter „Weitere Einstellungen", weil er der
-         einzige Weg zu diesem Feature ist: hinter dem Aufklapper gaebe es die
-         Kachel fuer niemanden, der nicht danach sucht. -->
-    <div class="form-group">
-      <label class="toggle">
-        <input type="checkbox" id="modal-countdown" aria-describedby="modal-countdown-hint"
-               ${isEdit && event.countdown ? 'checked' : ''}>
-        <span class="toggle__track"></span>
-        <span>${t('calendar.countdownToggle')}</span>
-      </label>
-      <!-- cal-field-hint UND NICHT form-hint: die Regel fuer form-hint steht in
-           settings.css, und der Router laedt genau ein Page-CSS pro Seite - auf
-           /calendar ist sie schlicht nicht geladen. Der Hinweis rendert dort in
-           16px voller Primaertinte und war damit lauter als der Schalter, zu dem
-           er gehoert (gemessen 4 Zeilen / 94px).
-           Die uebrigen fuenf form-hint dieses Dialogs haben dasselbe Problem und
-           app-weit noch 34 weitere in elf Modulen - das ist ein eigener Umzug
-           und keine Beifang-Aenderung dieses Features. -->
-      <p class="cal-field-hint" id="modal-countdown-hint">${t('calendar.countdownHint')}</p>
-    </div>
-
-    ${advancedSection(advancedFieldsHtml, { open: advancedFieldsOpen })}
 
     ${renderRRuleFields('event', isEdit ? event.recurrence_rule : null, {
       allowCount: true,
@@ -6844,12 +6855,27 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
     })}
 
     ${isEdit && requiresWholeSeriesConfirmation(event) ? `
-      <p class="cal-field-hint field-hint--warn" id="modal-whole-series-only" role="status">
+      <p class="form-hint field-hint--warn" id="modal-whole-series-only" role="status">
         <i data-lucide="alert-triangle" aria-hidden="true"></i>
         <span>${t('calendar.wholeSeriesOnlyNotice')}</span>
       </p>` : ''}
 
     ${renderCalendarReminderSection(reminder, event, isEdit ? [] : state.defaultReminders)}
+
+    <div class="form-group">
+      <label class="form-label" for="modal-location">${t('calendar.locationLabel')}</label>
+      <input type="text" class="form-input" id="modal-location"
+             placeholder="${t('calendar.locationPlaceholder')}" value="${esc(isEdit && event.location ? event.location : '')}">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="modal-description">${t('calendar.descriptionLabel')}</label>
+      <textarea class="form-input" id="modal-description" rows="2"
+                placeholder="${t('calendar.descriptionPlaceholder')}">${esc(isEdit && event.description ? event.description : '')}</textarea>
+    </div>
+
+    ${advancedSection(advancedFieldsHtml, { open: advancedFieldsOpen, hint: advancedTopics })}
+    </div>
 
     <div class="modal-panel__footer modal-panel__footer--plain">
       ${isEdit ? `<button class="btn btn--danger-outline" id="modal-delete">

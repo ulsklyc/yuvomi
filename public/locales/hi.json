@@ -963,7 +963,7 @@
         "invalidDate": "चयनित प्रारूप में मान्य तारीख का उपयोग करें।",
         "endBeforeStart": "समाप्ति तिथि आरंभ तिथि से पहले नहीं हो सकती।",
         "attachmentLabel": "अनुलग्नक",
-        "attachmentHint": "स्थानीय छवि, PDF या दस्तावेज़ जोड़ें। छवियाँ कार्यक्रम पॉपअप में दिखती हैं।",
+        "attachmentHint": "छवि, PDF या दस्तावेज़। छवियाँ कार्यक्रम के विवरण में दिखती हैं।",
         "attachmentFallback": "Attachment",
         "attachmentReadError": "अनुलग्नक पढ़ा नहीं जा सका।",
         "attachmentTooLarge": "अनुलग्नक अधिकतम {{size}} MB का हो सकता है।",
@@ -3654,7 +3654,7 @@
     },
     "userMultiSelect": {
         "moreUsers": "और",
-        "nobody": "- कोई नहीं -"
+        "nobody": "कोई नहीं"
     },
     "splitExpenses": {
         "title": "साझा खर्च",
