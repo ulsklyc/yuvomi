@@ -392,6 +392,14 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // blieb es bis zum naechsten senkrechten Scroll. Wer waagerecht Reserve
     // hat und senkrecht keine, ist nicht gemeint.
     if (reserve <= 0 && port.scrollWidth > port.clientWidth) return;
+    // EINKLAPPEN KANN NUR EIN VERMESSENER KOPF. `--capped` setzt `update()`,
+    // sobald es eine Lead-Zone gemessen hat; davor ist `lead` 0. Kam ein
+    // Scroll-Ereignis vor der ersten Messung an (der Kalender stellt seine
+    // Woche beim ersten Render auf „jetzt"), setzte es `is-collapsed` auf einen
+    // unvermessenen Kopf - und `update()` misst einen eingeklappten Kopf nie
+    // (siehe dort). Der Kopf blieb dann ausgeklappt sichtbar, aber als
+    // eingeklappt markiert, ohne Lead-Zone, bis zum Neuladen.
+    if (!toolbar.classList.contains('page-toolbar--capped')) return;
     // Nur kollabieren, wenn der Port das Ausklappen danach auch verkraftet -
     // sonst schiebt die zurückkehrende Kopfhöhe den Scroll auf 0, der Kopf
     // klappt wieder aus und beides pendelt gegeneinander.
