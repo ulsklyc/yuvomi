@@ -3978,6 +3978,21 @@ svg.weather-forecast__icon {
   font-weight: var(--font-weight-medium);
 }
 
+/* DIE HOHE KARTE VERTEILT IHREN RAUM, STATT EIN LOCH ZU OEFFNEN (Integration
+ * 2026-09-23). Die Zeilenhoehe kommt von den Nachbarn: seit Geburtstage und
+ * Aufgaben unter ihrer Liste „+N weitere" nennen, ist die Zeile eine Textzeile
+ * hoeher, und die unten verankerte Fusszeile riss dasselbe Band wieder auf, das
+ * die Top-3-Liste geschlossen hatte (44px statt 19px bei 1280px). Die Fusszeile
+ * bleibt der letzte Block der Karte; der freie Raum faellt jetzt gleichmaessig
+ * zwischen Saldo, Sparquote, Ein-/Ausgaben und Liste statt in eine Luecke. */
+.dashboard .budget-widget:has(> .budget-widget__top) {
+  justify-content: space-between;
+}
+
+.dashboard .budget-widget:has(> .budget-widget__top) > .budget-widget__top {
+  margin-block-start: var(--space-3);
+}
+
 .budget-widget__top-list {
   display: flex;
   flex-direction: column;
