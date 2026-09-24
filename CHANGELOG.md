@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Swipe between months, weeks and days in the calendar.** On a touch screen a horizontal swipe
+  over the month, week or day view moves to the next or previous period, with the same distance and
+  vibration as the swipe actions in lists. Vertical scrolling, the hour grid and the system's
+  back gesture at the screen edge keep working; with reduced motion the new period appears without
+  sliding in. The arrow buttons stay for mouse and keyboard.
+
 - **The calendar tile shows the week ahead at 2x1.** Set to the wide size, the calendar tile on the
   overview no longer lists three events but shows the next seven days: a dot per event in the colour
   of the event, person or calendar, a band for all-day and multi-day events (with an open end where
@@ -28,6 +34,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the module's own balance source, so it shows what the module shows.
 
 ### Changed
+
+- **The calendar gives phones more room for events.** Filter and search moved next to the view
+  switcher, so the calendar header on a phone is 166px instead of 230px, and when you scroll the
+  week, day or agenda, the page title folds away completely and leaves only the date navigation
+  and the view switcher (121px). The month now shows 65 % of the screen instead of 56 %, the week
+  nine hours instead of six and a half. The week's day headings sit in one line with the date and
+  the hour column is narrower. The period label keeps its width, so the arrows no longer jump
+  when you switch views, and on wide screens they sit next to the label instead of at the far
+  ends of the header.
 
 - **Rewards on the dashboard show progress, not a ranking.** A child sees only their own balance, a
   quiet bar to the next reward, recently earned points and their own pending requests - no

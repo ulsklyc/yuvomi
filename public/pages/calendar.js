@@ -37,6 +37,7 @@ import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderA
 import { withChosenPeople } from '/utils/people-picker.js';
 import { othersCanRead } from '/utils/household.js';
 import { wireTablist } from '/utils/tablist.js';
+import { wirePeriodSwipe } from '/utils/period-swipe.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 // EINE Schalterform, auch hier. Das Primitiv liegt unter `/settings/`, weil
 // dort sein Anlass lag (vier Schalterformen nebeneinander, Critique
@@ -412,6 +413,8 @@ const UNASSIGNED = 'none';
  * Stylesheet. Zwei Zahlen fuer dieselbe Schwelle sind genau die Bauart, an der
  * dieser Fehler zweimal entstanden ist. */
 const MOBILE_MEDIA_QUERY = '(max-width: 639px)';
+// Ansichten, zwischen deren Zeitraeumen gewischt wird (wirePeriodSwipe).
+const PERIOD_SWIPE_VIEWS = new Set(['month', 'week', 'day']);
 
 const HOLIDAY_PUBLIC_FALLBACK = '#FF3B30';
 const HOLIDAY_SCHOOL_FALLBACK = '#34C759';
@@ -817,6 +820,28 @@ function formatDate(dateStr, { long = false, weekday = false } = {}) {
     return `${wd}, ${formatPreferredDate(dateStr)}`;
   }
   return formatPreferredDate(dateStr);
+}
+
+/**
+ * Die Beschriftung der Stundenspalte - volle Stunden, also ohne „:00" im
+ * 12-Stunden-Format („8 AM" statt „8:00 AM").
+ *
+ * Die Spalte ist mobil 44px breit (--cal-gutter-width, Critique 2026-09-24:
+ * 64px von 375 waren ein Sechstel der Breite fuer eine Beschriftung).
+ * „12:00 PM" braucht bei 12px rund 50px und passt dort nicht hinein; „12 PM"
+ * ist die Form, die Apple Kalender und Fantastical in ihrer Stundenleiste
+ * fuehren. Im 24-Stunden-Format bleibt es bei formatTime: „08:00" passt, und
+ * die Schreibweise der Locale (Punkt in `id`, persische Ziffern in `fa`)
+ * kommt nur von dort.
+ */
+function hourGutterLabel(hour) {
+  return compactHourLabel(formatTime(`${pad(hour)}:00`));
+}
+
+/** „8:00 AM" -> „8 AM"; alles andere (24-Stunden-Schreibweisen) bleibt. */
+function compactHourLabel(full) {
+  const twelve = String(full).match(/^(\d{1,2}):00 ([AP]M)$/);
+  return twelve ? `${twelve[1]} ${twelve[2]}` : full;
 }
 
 function formatDateTime(datetimeStr) {
@@ -1769,6 +1794,15 @@ export async function render(container, { user }) {
 
   findPageFab('fab-new-event')?.addEventListener('click', () => openEventModal({ mode: 'create', date: newEventDate() }));
 
+  // Wischen zwischen Zeitraeumen (utils/period-swipe.js). Monat, Woche und Tag
+  // sind Zeitraeume mit Nachbarn; die Agenda ist eine fortlaufende Liste, die
+  // senkrecht gelesen wird, und die Suche hat gar keinen Zeitraum. Die
+  // Pfeilknoepfe bleiben der Weg fuer Tastatur und Maus.
+  wirePeriodSwipe(bodyEl, {
+    enabled: () => !searchActive && PERIOD_SWIPE_VIEWS.has(state.view),
+    onStep: (step) => navigate(step),
+  });
+
   if (initialEvent) {
     const targetDate = deepLinkTargetDate(initialEvent, dateParam);
     const occurrence = findDeepLinkedOccurrence(state.events, initialEvent, targetDate);
@@ -1813,6 +1847,69 @@ function periodNavHtml() {
   `;
 }
 
+/**
+ * Das Markup des Kalenderkopfs - als eigener Baustein, damit der Verhaltenstest
+ * die GERENDERTE Anordnung prueft (test-calendar.js), nicht den Quelltext.
+ *
+ * FILTER UND SUCHE STEHEN IN DER BAR-ZEILE, hinter dem Ansichts-Segment
+ * (Critique 2026-09-24, P1). Im Aktions-Slot bildeten sie mobil eine EIGENE
+ * Kopfzeile: gemessen 56px fuer zwei 48px-Knoepfe, 100 von 343px belegt, und
+ * je nach Kollaps-Zustand standen sie links (ausgeklappt, Monat) oder rechts
+ * (eingeklappt, Woche/Tag/Agenda). Die Bar-Zeile hat daneben ~98px frei und
+ * steht in jeder Ansicht und jedem Zustand gleich - also stehen sie dort, an
+ * ihrem Ende, auf jeder Breite an derselben Stelle. Die Ueberlappungswarnung
+ * bleibt im Aktions-Slot: sie ist eine Meldung, kein Werkzeug.
+ */
+function toolbarHtml({ filterCount = 0, scheduleWarningHtml = '' } = {}) {
+  return `
+    <h1 class="page-toolbar__title">${t('calendar.title')}</h1>
+    <div class="page-toolbar__center cal-toolbar__month">${periodNavHtml()}</div>
+    <div class="page-toolbar__actions">
+      ${scheduleWarningHtml}
+      ${readOnly() ? '' : `
+      <button class="btn btn--primary toolbar-new-btn" id="cal-add" aria-label="${t('calendar.addEvent')}">
+        <i data-lucide="plus" aria-hidden="true"></i>
+        <span class="toolbar-new-btn__label">${t('newLabel.calendar')}</span>
+      </button>`}
+    </div>
+    <!-- Bar-Zeile des Kopfs (Werkzeugzeilen-Regel, layout.css): das Ansichts-
+         Segment hatte im Actions-Slot bei 1280px 212px fuer 245px Inhalt -
+         "Agenda" lag hinter dem Fade und das Monatslabel daneben ellipsierte
+         auf seine 7ch-Untergrenze. Der neutrale Wrapper haelt das Well des
+         Segments auf intrinsischer Breite; die Zeile gehoert trotzdem ihm. -->
+    <div class="page-toolbar__bar cal-toolbar__bar">
+      <div class="cal-toolbar__views" role="tablist" aria-label="${t('nav.calendar')}">
+        ${VIEWS.map((v) => `
+          <button class="cal-toolbar__view-btn ${v === state.view ? 'cal-toolbar__view-btn--active' : ''}"
+                  role="tab" id="cal-view-tab-${v}" data-tab-id="${v}"
+                  aria-selected="${v === state.view ? 'true' : 'false'}"
+                  ${v === state.view ? 'aria-controls="cal-body"' : ''}
+                  tabindex="${v === state.view ? '0' : '-1'}">${VIEW_LABELS()[v]}</button>
+        `).join('')}
+      </div>
+      <div class="cal-toolbar__tools">
+        <button class="btn btn--icon cal-toolbar__filter-btn ${filterCount ? 'cal-toolbar__filter-btn--active' : ''}"
+                id="cal-filters" aria-label="${filterCount ? esc(t('calendar.filtersActive', { count: filterCount })) : t('calendar.filtersOpen')}"
+                title="${t('calendar.filters')}" aria-haspopup="dialog">
+          <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
+          ${filterCount ? `<span class="cal-toolbar__filter-count" aria-hidden="true">${filterCount}</span>` : ''}
+        </button>
+        <!-- KEIN aria-controls im geschlossenen Zustand: die Suchleiste entsteht
+             erst beim Öffnen (openCalendarSearch), und ein Verweis auf eine ID, die
+             es noch nicht gibt, kündigt einem Screenreader ein Ziel an, das nicht
+             existiert. Gesetzt wird es dort, wo die Leiste entsteht, und beim
+             Schließen wieder entfernt - dieselbe Regel wie in utils/sub-tabs.js:
+             ohne aufgelöstes Ziel bleibt das Attribut weg. -->
+        <button class="btn btn--icon cal-toolbar__search-btn" id="cal-search"
+                aria-label="${t('calendar.searchOpen')}" title="${t('calendar.searchOpen')}"
+                aria-expanded="false">
+          <i data-lucide="search" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
 function renderToolbar() {
   const bar = _container.querySelector('#cal-toolbar');
   if (!bar) return;
@@ -1839,56 +1936,8 @@ function renderToolbar() {
     </span>
   ` : '';
 
-  const filterBtnHtml = `
-    ${scheduleWarningHtml}
-    <button class="btn btn--icon cal-toolbar__filter-btn ${filterCount ? 'cal-toolbar__filter-btn--active' : ''}"
-            id="cal-filters" aria-label="${filterCount ? esc(t('calendar.filtersActive', { count: filterCount })) : t('calendar.filtersOpen')}"
-            title="${t('calendar.filters')}" aria-haspopup="dialog">
-      <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
-      ${filterCount ? `<span class="cal-toolbar__filter-count" aria-hidden="true">${filterCount}</span>` : ''}
-    </button>
-  `;
-
   bar.replaceChildren();
-  bar.insertAdjacentHTML('beforeend', `
-    <h1 class="page-toolbar__title">${t('calendar.title')}</h1>
-    <div class="page-toolbar__center cal-toolbar__month">${periodNavHtml()}</div>
-    <div class="page-toolbar__actions">
-      ${filterBtnHtml}
-      <!-- KEIN aria-controls im geschlossenen Zustand: die Suchleiste entsteht
-           erst beim Öffnen (openCalendarSearch), und ein Verweis auf eine ID, die
-           es noch nicht gibt, kündigt einem Screenreader ein Ziel an, das nicht
-           existiert. Gesetzt wird es dort, wo die Leiste entsteht, und beim
-           Schließen wieder entfernt - dieselbe Regel wie in utils/sub-tabs.js:
-           ohne aufgelöstes Ziel bleibt das Attribut weg. -->
-      <button class="btn btn--icon cal-toolbar__search-btn" id="cal-search"
-              aria-label="${t('calendar.searchOpen')}" title="${t('calendar.searchOpen')}"
-              aria-expanded="false">
-        <i data-lucide="search" aria-hidden="true"></i>
-      </button>
-      ${readOnly() ? '' : `
-      <button class="btn btn--primary toolbar-new-btn" id="cal-add" aria-label="${t('calendar.addEvent')}">
-        <i data-lucide="plus" aria-hidden="true"></i>
-        <span class="toolbar-new-btn__label">${t('newLabel.calendar')}</span>
-      </button>`}
-    </div>
-    <!-- Bar-Zeile des Kopfs (Werkzeugzeilen-Regel, layout.css): das Ansichts-
-         Segment hatte im Actions-Slot bei 1280px 212px fuer 245px Inhalt -
-         "Agenda" lag hinter dem Fade und das Monatslabel daneben ellipsierte
-         auf seine 7ch-Untergrenze. Der neutrale Wrapper haelt das Well des
-         Segments auf intrinsischer Breite; die Zeile gehoert trotzdem ihm. -->
-    <div class="page-toolbar__bar">
-      <div class="cal-toolbar__views" role="tablist" aria-label="${t('nav.calendar')}">
-        ${VIEWS.map((v) => `
-          <button class="cal-toolbar__view-btn ${v === state.view ? 'cal-toolbar__view-btn--active' : ''}"
-                  role="tab" id="cal-view-tab-${v}" data-tab-id="${v}"
-                  aria-selected="${v === state.view ? 'true' : 'false'}"
-                  ${v === state.view ? 'aria-controls="cal-body"' : ''}
-                  tabindex="${v === state.view ? '0' : '-1'}">${VIEW_LABELS()[v]}</button>
-        `).join('')}
-      </div>
-    </div>
-  `);
+  bar.insertAdjacentHTML('beforeend', toolbarHtml({ filterCount, scheduleWarningHtml }));
 
   if (window.lucide) lucide.createIcons({ el: bar });
 
@@ -1941,7 +1990,11 @@ function updateLabel() {
       ? t('calendar.dayRangeLabel', { from: formatDayMonth(addDays(state.cursor, -1)), to: formatPreferredDate(addDays(state.cursor, 1)) })
       : t('calendar.weekNumberLabel', { week: getWeekNumber(state.cursor), month: mon, year });
   }
-  if (state.view === 'day')    lbl.textContent = formatDate(state.cursor, { weekday: true, long: true });
+  // Mobil der kurze Wochentag: „Donnerstag, 24.09.2026" brauchte 186px und
+  // lief damit ueber die feste Breite des Labels hinaus - der Weiter-Pfeil
+  // stand in der Tagesansicht 30px weiter rechts als in den drei anderen
+  // (Critique 2026-09-24). „Do, 24.09.2026" traegt dieselbe Auskunft.
+  if (state.view === 'day')    lbl.textContent = formatDate(state.cursor, { weekday: true, long: !window.matchMedia(MOBILE_MEDIA_QUERY).matches });
   if (state.view === 'agenda') lbl.textContent = t('calendar.agendaFrom', { date: formatDate(state.cursor) });
 
   syncTodayButton();
@@ -2301,6 +2354,30 @@ function renderView() {
   }
   if (window.lucide) lucide.createIcons({ el: body });
   updateOfflineNotice();
+  syncHeadToScrollport(body);
+}
+
+/**
+ * DER KOPF FOLGT DEM NEUEN SCROLLPORT, NICHT DEM ALTEN.
+ *
+ * Ob die Titelzeile eingeklappt ist, entscheidet der Kopf-Helfer der Shell
+ * (utils/ux.js) an Scroll-Ereignissen. Ein Ansichtswechsel ersetzt den
+ * Scrollport aber, ohne dass einer scrollt: aus der eingeklappten Woche kam
+ * man in einen Monat, der oben steht und gar nicht scrollen kann - und der
+ * Kopf blieb eingeklappt, bis zum naechsten Ansichtswechsel. Ein
+ * synthetisches `scroll` am neuen Port laesst die Shell mit IHRER Regel
+ * (Schwelle, Hysterese, Reserve) neu urteilen; eine zweite Regel hier waere
+ * die naechste, die auseinanderlaeuft.
+ */
+function syncHeadToScrollport(body) {
+  const port = body.querySelector('.page-scrollport');
+  if (!port || typeof Event !== 'function' || typeof requestAnimationFrame !== 'function') return;
+  // Einen Frame spaeter: der Kopf wird im selben Durchlauf neu gebaut
+  // (renderToolbar), und die Shell misst ihn per MutationObserver erst
+  // danach. Ein Urteil vor der Messung haette keine Lead-Zone.
+  requestAnimationFrame(() => {
+    if (port.isConnected) port.dispatchEvent(new Event('scroll'));
+  });
 }
 
 // --------------------------------------------------------
@@ -2904,7 +2981,7 @@ function renderWeekView(container) {
           <div class="week-view__times">
             ${Array.from({ length: 24 }, (_, h) => `
               <div class="week-view__time-slot">
-                <span class="week-view__time-label">${h === 0 ? '' : formatTime(`${pad(h)}:00`)}</span>
+                <span class="week-view__time-label">${h === 0 ? '' : hourGutterLabel(h)}</span>
               </div>
             `).join('')}
           </div>
@@ -3304,7 +3381,7 @@ function renderDayView(container) {
           <div class="day-view__times">
             ${Array.from({ length: 24 }, (_, h) => `
               <div class="week-view__time-slot">
-                <span class="week-view__time-label">${h === 0 ? '' : formatTime(`${pad(h)}:00`)}</span>
+                <span class="week-view__time-label">${h === 0 ? '' : hourGutterLabel(h)}</span>
               </div>
             `).join('')}
           </div>
@@ -4265,6 +4342,9 @@ export const __test = {
   restoreWasteTypeFilter,
   buildLayerRowsHtml,
   periodNavHtml,
+  toolbarHtml,
+  hourGutterLabel,
+  compactHourLabel,
   syncTodayButton,
 };
 

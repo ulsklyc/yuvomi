@@ -1668,7 +1668,12 @@ seiner 7ch-Untergrenze ellipsiert); mobil zeigte Gesundheit 3 von 6, die Haushal
 
 Traeger: die Klasse sitzt direkt an einer Pillen-Leiste (budget-tabs, sub-tabs-bar im Kopf,
 housekeeping-/rewards-tabs) oder als neutraler Wrapper um einen Segment-Traeger, dessen
-Well nicht die ganze Zeile faerben darf (Kalender-Views). Der fruehere Rail-Pad-
+Well nicht die ganze Zeile faerben darf (Kalender-Views). **Die Werkzeuge der Ansicht stehen
+am Ende derselben Zeile** (Kalender: Filter und Suche, Critique 2026-09-24): im Aktions-Slot
+bauten sie mobil eine eigene Kopfzeile und standen je nach Kollaps-Zustand links oder
+rechts. In der Bar-Zeile stehen sie in jeder Ansicht, jedem Zustand und jeder Breite an
+derselben Stelle. Wird es eng, gibt das Segment nach (es scrollt mit Fade), nie die
+Werkzeuge: die haben kein Label zum Anschneiden, nur ihre Trefferflaeche. Der fruehere Rail-Pad-
 Ausnahmeeintrag fuer Tab-Innenabstaende ist mit dem Subjekt-Scan des #577-Guards entfallen:
 ein Selektor, dessen letztes Compound nicht die Rail ist, polstert ein KIND der Rail.
 
@@ -1954,6 +1959,21 @@ Die MECHANIK richtet sich nach der Scrollport-Architektur des Moduls, die Regel 
   Titelzeile wirklich ein - gefahrlos, weil der Hoehenwechsel nur den inneren Port
   verlaengert, ohne dessen Offset anzufassen.
 
+**Im Kalender klappt die Titelzeile GANZ ein, nicht nur auf den Inline-Schnitt**
+(Critique 2026-09-24, P1). Der Inline-Titel sollte neben den Zeitraum ruecken - der fuellt
+mobil aber die ganze Zeile, also blieb der Titel auf seiner eigenen, und der Kollaps sparte
+5-14px. Eingeklappt verlaesst der Titel jetzt das Bild (geclippt wie `.sr-only`, das `<h1>`
+bleibt die Seitenueberschrift), sein Siegel geht mit; Zeitraum und Bar-Zeile bleiben. Den
+Modulnamen fuehrt dann die Tab-Leiste unten. Das gilt nur, wo ein Zeitraum den Kopf weiter
+verankert - Notizen und Kontakte haetten danach nichts mehr, was sagt, wo man ist. Gemessen
+bei 375px: Kopf 230 -> 166px ausgeklappt, 121px eingeklappt; Inhalt Monat 56 -> 65 %, Woche
+46 -> 62 % (6,5 -> 9 Stunden), Tag 54 -> 67 %, Agenda 62 -> 69 %. **Ein Ansichtswechsel ist
+ein neuer Scrollport, kein Scroll:** der Kalender laesst die Shell danach an seinem neuen Port
+neu urteilen, sonst erbte der Monat, der gar nicht scrollen kann, den eingeklappten Kopf der
+Woche. Und **einklappen kann nur ein vermessener Kopf** - ein Scroll-Ereignis vor der ersten
+Messung (die Woche springt beim ersten Render auf „jetzt") markierte den Kopf sonst ohne
+Lead-Zone als eingeklappt, und `update()` misst einen eingeklappten Kopf nie wieder.
+
 Der Kopf bleibt in ZEILENRICHTUNG - kein Modul setzt eine eigene Flex-Richtung auf einer
 Kopf-Klasse. Eine Tab-Leiste im Kopf ist eine eigene, horizontal scrollende Zeile UNTER dem
 Large Title; die Shell erkennt sie an `[role="tablist"]`, nicht an einem Klassennamen (die
@@ -2162,6 +2182,22 @@ hinausgeflogene Karte behauptet, die Sache sei erledigt, waehrend das Undo-Fenst
 offen steht. Die Geste selbst - Schwellwert 80px, Daempfung darueber, Scroll-Erkennung,
 Haptik am Schwellwert, Ausnahme fuer den Sortiergriff, der einmalige Hinweis nach dem
 Seitentausch - liegt geteilt in `utils/swipe-row.js`.
+
+**Der Zeitraum-Wisch ist dieselbe Geste auf einer Flaeche statt einer Zeile** (Critique
+2026-09-24, P1). Waagerecht ueber Monat, Woche oder Tag blaettert einen Zeitraum weiter
+(`utils/period-swipe.js`); die Agenda ist eine fortlaufende Liste ohne Nachbarn und bleibt
+aussen vor. Schwelle, Richtungssperre und Haptik sind die der Wischzeilen, damit der Weg
+derselbe ist, den die Hand schon kennt. Drei Grenzen, alle gemessen statt vermutet: **der
+Rand gehoert dem System** (ein Kontakt in den aeusseren 20px ist die Zurueck-Geste von iOS
+und Android und wird gar nicht angenommen), **senkrecht gewinnt** (wer zuerst senkrecht zieht,
+scrollt das Zeitraster, und die Geste ist fuer diesen Kontakt vorbei), und **ein offener
+Dialog nimmt sie der Flaeche darunter** - geprueft am Modal-Overlay, NICHT an
+`[aria-modal]`: das „Mehr"-Blatt und das Such-Overlay tragen es auch geschlossen und
+schalteten die Geste beim Bau still ab. Die Zeit laeuft in Leserichtung, in `ar`/`fa`
+gespiegelt. Der Inhalt folgt dem Finger und der neue Zeitraum gleitet von der Seite herein,
+aus der er geholt wurde; unter reduzierter Bewegung beides nicht, die Geste bleibt. Die
+Pfeilknoepfe bleiben der Weg fuer Maus und Tastatur. Die Flaeche traegt
+`touch-action: pan-y pinch-zoom` - ohne `pinch-zoom` verwirft Chromium das Aufziehen.
 
 **Geprueft auf zwei Ebenen, weil jede etwas anderes sehen kann.** Ebene 3 (statisch, in
 `test-frontend-audit.js`) folgt von jeder Wischrichtung mit `--delete` der Kante zu der

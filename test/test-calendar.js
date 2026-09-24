@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 import { eachRule } from './css-rules.js';
 const { __test: calendarHelpers } = await import('../public/pages/calendar.js');
+const periodSwipe = await import('../public/utils/period-swipe.js');
 
 let passed = 0;
 let failed = 0;
@@ -2975,6 +2976,105 @@ test('scheduleEnabled() verlangt zusaetzlich moduleAccess(\'schedule\') !== \'no
   assert(/moduleAccess\('schedule'\) !== 'none'/.test(fnBody),
     'scheduleEnabled() muss wie wasteEnabled() auch die Leserechte pruefen, nicht nur die Abschaltung - '
     + 'sonst sieht ein Mitglied ohne Schedule-Recht weiter die Ebenen-Zeile und loest bei jedem Laden ein 403 aus');
+});
+
+// --------------------------------------------------------
+// Mobile Inhaltsflaeche (Critique 2026-09-24, P1)
+// --------------------------------------------------------
+
+/* FILTER UND SUCHE WOHNEN IN DER BAR-ZEILE, NICHT IM AKTIONS-SLOT.
+ *
+ * Im Aktions-Slot bildeten sie mobil eine eigene Kopfzeile (56px fuer zwei
+ * Knoepfe) und standen je nach Kollaps-Zustand links oder rechts. Geprueft
+ * wird das GERENDERTE Markup des Kopfs: beide Knoepfe stehen in
+ * `.page-toolbar__bar`, HINTER der Tab-Leiste, und der Aktions-Slot enthaelt
+ * keinen von beiden. */
+test('Kalenderkopf: Filter und Suche stehen in der Bar-Zeile hinter dem Ansichts-Segment, nicht im Aktions-Slot', () => {
+  const html = calendarHelpers.toolbarHtml({ filterCount: 0, scheduleWarningHtml: '' });
+  const at = (needle) => html.indexOf(needle);
+  const actions = at('class="page-toolbar__actions"');
+  const bar = at('class="page-toolbar__bar');
+  const tablist = at('role="tablist"');
+  const filters = at('id="cal-filters"');
+  const search = at('id="cal-search"');
+  assert(actions >= 0 && bar >= 0 && tablist >= 0, 'Kopf ohne Aktions-Slot, Bar-Zeile oder Tab-Leiste gerendert');
+  assert(filters >= 0 && search >= 0, 'Filter- oder Suchknopf fehlt im Kopf');
+  assert(bar > actions, 'die Bar-Zeile muss nach dem Aktions-Slot stehen');
+  assert(filters > bar && search > bar,
+    `Filter (${filters}) und Suche (${search}) muessen IN der Bar-Zeile stehen (ab ${bar}), `
+    + 'nicht im Aktions-Slot - dort bauten sie mobil eine eigene Kopfzeile');
+  assert(filters > tablist && search > tablist,
+    'Filter und Suche gehoeren HINTER das Ansichts-Segment, ans Ende der Bar-Zeile');
+  const actionsHtml = html.slice(actions, bar);
+  assert(!actionsHtml.includes('cal-filters') && !actionsHtml.includes('cal-search'),
+    'der Aktions-Slot darf Filter oder Suche nicht (auch nicht zusaetzlich) tragen');
+});
+
+/* EINGEKLAPPT VERLAESST DER TITEL DAS BILD, NICHT DEN BAUM.
+ *
+ * Vorher fiel er nur auf den Inline-Schnitt und blieb auf seiner eigenen
+ * Zeile: der Kollaps sparte 5-14px. Die Regel muss den Titel aus dem Fluss
+ * nehmen und klippen (das <h1> bleibt fuer Screenreader), sonst bleibt die
+ * Zeile stehen. */
+test('Kalenderkopf: eingeklappt klappt die Titelzeile ganz ein (Titel geclippt, Siegel weg)', () => {
+  const rules = [...eachRule(calendarCss)];
+  const title = rules.find((r) => r.selector.split(',').map((x) => x.trim())
+    .includes('.cal-toolbar.page-toolbar--capped.is-collapsed > .page-toolbar__title'));
+  assert(title, 'keine Regel fuer den eingeklappten Kalendertitel');
+  assert(/position:\s*absolute/.test(title.body) && /clip-path:\s*inset\(50%\)/.test(title.body),
+    'der eingeklappte Titel muss aus dem Fluss (position: absolute) und geclippt sein - '
+    + 'display: none nimmt der Seite ihre Ueberschrift');
+  assert(!/display:\s*none/.test(title.body), 'das <h1> darf nicht per display: none verschwinden');
+  const seal = rules.find((r) => r.selector.trim()
+    === '.cal-toolbar.page-toolbar--capped.is-collapsed > .module-seal--head');
+  assert(seal && /display:\s*none/.test(seal.body), 'das Absender-Siegel muss mit dem Titel einklappen');
+});
+
+/* DAS LABEL HAT EINE FESTE BREITE. Mit `flex-basis: auto` brachte es seine
+ * Textbreite mit (Monat 156px, Tag 186px), und der Weiter-Pfeil sprang beim
+ * Ansichtswechsel 30px. */
+test('Zeitraum-Label: Basis 0 statt Textbreite, damit die Pfeile nicht springen', () => {
+  const label = [...eachRule(calendarCss)].find((r) => r.selector.trim() === '.cal-toolbar__label');
+  assert(label, '.cal-toolbar__label fehlt');
+  assert(/flex:\s*1 1 0(?:px|%)?\s*(;|$)/.test(label.body),
+    `das Label muss flex: 1 1 0 tragen (feste Breite aus dem Rest der Zeile), hat: ${label.body.match(/flex:[^;]+/)?.[0]}`);
+});
+
+/* DIE STUNDENLEISTE PASST IN 44px. „12:00 PM" braucht ~50px; im
+ * 12-Stunden-Format beschriftet sie volle Stunden ohne „:00". */
+test('Stundenleiste: volle Stunden, im 12-Stunden-Format ohne „:00"', () => {
+  // Die Schreibweise, die formatTime im 12-Stunden-Format liefert (i18n.js):
+  // `${h % 12 || 12}:${mm} ${AM|PM}`. Der Browser-Loader stubbt formatTime,
+  // deshalb wird die Kuerzung hier an ihrer eigenen Funktion geprueft.
+  assert(calendarHelpers.compactHourLabel('8:00 AM') === '8 AM', calendarHelpers.compactHourLabel('8:00 AM'));
+  assert(calendarHelpers.compactHourLabel('12:00 PM') === '12 PM', calendarHelpers.compactHourLabel('12:00 PM'));
+  assert(calendarHelpers.compactHourLabel('08:00') === '08:00', '24-Stunden-Schreibweise bleibt unveraendert');
+  assert(calendarHelpers.compactHourLabel('08.00') === '08.00', 'die Locale-Schreibweise (id) bleibt unveraendert');
+  // Und die Stundenleiste benutzt sie - in Woche UND Tag.
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const uses = src.match(/<span class="week-view__time-label">\$\{h === 0 \? '' : hourGutterLabel\(h\)\}<\/span>/g) ?? [];
+  assert(uses.length === 2, `Woche und Tag muessen hourGutterLabel verwenden, gefunden: ${uses.length}`);
+});
+
+/* WISCHEN ZWISCHEN ZEITRAEUMEN: die Entscheidungen der Geste als reine
+ * Funktionen - Schwelle, Richtungssperre, Rand, Leserichtung. Dass die Geste
+ * im Dokument verdrahtet ist, sieht nur der Browser (gemessen beim Bau). */
+test('Zeitraum-Wisch: Schwelle, Richtungssperre, Systemrand und RTL', () => {
+  const swipe = periodSwipe;
+  // Schwelle: dieselbe wie die Wischzeilen (80px).
+  assert(swipe.periodSwipeStep(-79) === 0, 'unter 80px blaettert nichts');
+  assert(swipe.periodSwipeStep(-80) === 1, 'LTR: nach links = naechster Zeitraum');
+  assert(swipe.periodSwipeStep(120) === -1, 'LTR: nach rechts = vorheriger Zeitraum');
+  assert(swipe.periodSwipeStep(-120, { rtl: true }) === -1, 'RTL: nach links = vorheriger Zeitraum');
+  assert(swipe.periodSwipeStep(120, { rtl: true }) === 1, 'RTL: nach rechts = naechster Zeitraum');
+  // Richtungssperre: senkrecht gewinnt, sobald es mehr senkrecht ist.
+  assert(swipe.periodSwipeLock(5, 5) === null, 'innerhalb der Toleranz ist noch nichts entschieden');
+  assert(swipe.periodSwipeLock(10, 40) === 'scroll', 'ueberwiegend senkrecht ist Scrollen');
+  assert(swipe.periodSwipeLock(30, 10) === 'swipe', 'ueberwiegend waagerecht ist die Geste');
+  // Der Rand gehoert der Zurueck-Geste des Systems.
+  assert(swipe.startsAtScreenEdge(10, 375) && swipe.startsAtScreenEdge(365, 375),
+    'ein Kontakt naeher als 20px an der Kante gehoert dem System');
+  assert(!swipe.startsAtScreenEdge(40, 375), 'ein Kontakt im Inhalt gehoert der Geste');
 });
 
 // --------------------------------------------------------

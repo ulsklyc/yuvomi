@@ -48,6 +48,51 @@
  * der Desktop-Grenze zieht die gemeinsame Content-Spalte. */
 #cal-body {
   padding-bottom: var(--space-4);
+  /* Waagerecht gehoert der Kontakt der Zeitraum-Geste (utils/period-swipe.js),
+   * senkrecht dem Scrollen. `pan-y` haelt die waagerechte Bewegung vom Browser
+   * fern, damit die Geste ihr touchmove abbrechen darf; `pinch-zoom` MUSS
+   * mit, sonst verwirft Chromium das Aufziehen und den Zwei-Finger-Bildlauf
+   * (#1276, test:mobile-scroll-layout). */
+  touch-action: pan-y pinch-zoom;
+}
+
+/* Der neue Zeitraum gleitet von der Seite herein, aus der ihn der Finger
+ * geholt hat - kurz und ohne Ueberschwingen: er antwortet auf eine Geste,
+ * er fuehrt keine vor. Die Seite ist LOGISCH (Leserichtung), in `ar`/`fa`
+ * gespiegelt. Unter reduzierter Bewegung setzt period-swipe.js die Klasse gar
+ * nicht erst; die Regel unten ist das Netz dafuer. */
+.period-swipe-in--next,
+.period-swipe-in--prev {
+  animation: period-swipe-in var(--duration-md) var(--ease-out);
+}
+
+.period-swipe-in--next { --period-swipe-from: var(--space-8); }
+.period-swipe-in--prev { --period-swipe-from: calc(-1 * var(--space-8)); }
+
+[dir="rtl"] .period-swipe-in--next { --period-swipe-from: calc(-1 * var(--space-8)); }
+[dir="rtl"] .period-swipe-in--prev { --period-swipe-from: var(--space-8); }
+
+@keyframes period-swipe-in {
+  from {
+    transform: translateX(var(--period-swipe-from));
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .period-swipe-in--next,
+  .period-swipe-in--prev {
+    animation: none;
+  }
+}
+
+/* Mobil liegt unter dem Raster die schwebende Tab-Kapsel mit ihrer eigenen
+ * Luft (8px ueber dem Glas); ein zweiter Abstand von 16px darueber war totes
+ * Band zwischen der letzten Rasterzeile und der Kapsel. */
+@media (max-width: 639px) {
+  #cal-body {
+    padding-bottom: var(--space-2);
+  }
 }
 
 @media (min-width: 1024px) {
@@ -57,19 +102,6 @@
 
   .calendar-page {
     height: 100%;
-  }
-
-  .week-view__day-header {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-2);
-  }
-
-  .week-view__day-num {
-    width: var(--target-sm);
-    height: var(--target-sm);
-    margin: 0;
   }
 }
 
@@ -92,13 +124,17 @@
 .cal-toolbar__label {
   font-size: var(--text-base);
   font-weight: var(--font-weight-semibold);
-  /* `flex: 1` hiess Basis 0: das Label lebte allein vom Wachstum in freien
-   * Raum. In einer Zeile ohne freien Raum blieb es bei 0px und verschwand ganz
-   * (gemessen bei 1024px, nachdem der Kopf nicht mehr umbrach) - ausgerechnet
-   * die Angabe, um die herum die ganze Navigation gebaut ist. Mit Basis `auto`
-   * bringt es seine Textbreite mit und gibt von dort nach, gedeckelt durch die
-   * Ellipse darunter (#882). */
-  flex: 1 1 auto;
+  /* BASIS 0, ALSO EINE FESTE BREITE (Critique 2026-09-24). Mit Basis `auto`
+   * brachte das Label seine Textbreite mit, und die ist je Ansicht eine andere:
+   * mobil 156px im Monat, 186px im Tag - der Weiter-Pfeil sprang beim
+   * Ansichtswechsel 30px, und in der Tagesansicht schob er „Heute" ueber die
+   * Kante. Mit Basis 0 bekommt das Label genau den Rest der Zeile, egal was
+   * darin steht; die Pfeile stehen damit in allen vier Ansichten fest. Den
+   * Fall, gegen den `auto` einmal eingefuehrt wurde (#882: ein Label in einer
+   * Zeile OHNE freien Raum fiel auf 0px), faengt die 7ch-Untergrenze darunter -
+   * und der Center-Slot selbst waechst per Basis 0 in allen Restplatz seiner
+   * Zeile (layout.css), ist also nie die Zeile ohne Raum. */
+  flex: 1 1 0;
   /* Untergrenze statt 0: gekuerzt darf das Label werden, verschwinden nicht.
    * 7ch traegt "Aug 2026" - der kuerzeste Stand, aus dem noch hervorgeht, wo
    * man im Kalender steht. */
@@ -107,6 +143,19 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* AB 768px EINE FESTE BREITE STATT DES GANZEN RESTS. Mit Basis 0 fuellte das
+ * Label bei 1280px die ganze Mitte der Titelzeile (571px), und die Pfeile
+ * standen 630px auseinander - fuer jeden Zeitraumwechsel mit der Maus ein
+ * Weg quer ueber den Kopf (Critique 2026-09-24, Persona Alex). 15rem tragen
+ * das laengste deutsche Label („Mittwoch, 30.09.2026", „KW 39 · September
+ * 2026": 192px) mit Luft; laengere Locales kuerzt die Ellipse. Die Breite
+ * haengt nicht am Text - die Pfeile springen auch hier nicht. */
+@media (min-width: 768px) {
+  .cal-toolbar__label {
+    flex: 0 1 15rem;
+  }
 }
 
 /* „Heute" ist eine Aktion, keine Selektion - und stand als getönte Fläche neben
@@ -173,6 +222,87 @@
   }
 }
 
+/* DIE BAR-ZEILE TRAEGT SEGMENT UND WERKZEUGE (Critique 2026-09-24, P1).
+ *
+ * Filter und Suche standen im Aktions-Slot und bildeten mobil eine eigene
+ * Kopfzeile: 56px fuer zwei Knoepfe, und je nach Kollaps-Zustand links
+ * (Monat, ausgeklappt) oder rechts (Woche/Tag/Agenda, eingeklappt). Hier
+ * stehen sie am Ende der Bar-Zeile - auf jeder Breite, in jeder Ansicht und
+ * jedem Zustand an derselben Stelle.
+ *
+ * `gap: 0` IST GEMESSEN, nicht Geschmack: das Segment braucht bei 375px in
+ * `de` 245px, die Werkzeuge 2 x 48px, die Zeile hat 343px. Mit dem 4px-Gap der
+ * Bar-Basis fehlten 2px, und das Segment waere in den Scroll-Fade gerutscht.
+ * Die Knoepfe haben ihre Luft ohnehin in der eigenen Trefferflaeche.
+ *
+ * Wird es in einer langen Locale doch zu eng, gibt das SEGMENT nach (es
+ * scrollt mit Fade, Werkzeugzeilen-Regel), nie die Werkzeuge: die haben kein
+ * Label, das man anschneiden koennte, nur eine Trefferflaeche. */
+.cal-toolbar__bar {
+  gap: 0;
+  flex-wrap: nowrap;
+}
+
+.cal-toolbar__views {
+  min-width: 0;
+}
+
+.cal-toolbar__tools {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-inline-start: auto;
+}
+
+/* DIE TITELZEILE KLAPPT GANZ EIN (Critique 2026-09-24, P1; DESIGN.md, Die
+ * Chrome-Regel). Die gedeckelte Architektur liess den Large Title beim
+ * Scrollen nur auf den Inline-Schnitt fallen und neben den Zeitraum ruecken -
+ * der aber fuellt mobil die ganze Zeile, also blieb der Titel auf seiner
+ * eigenen Zeile und der Kollaps sparte 5-14px. Eingeklappt verlaesst der Titel
+ * jetzt das Bild (nicht den Baum: das <h1> bleibt die Seitenueberschrift fuer
+ * Screenreader, geclippt wie `.sr-only`), sein Siegel geht mit. Stehen bleibt,
+ * was „wo bin ich" beantwortet: der Zeitraum mit Vor/Zurueck und die
+ * Bar-Zeile. Den Modulnamen fuehrt dort die Tab-Leiste unten.
+ *
+ * Nur im Kalender: die anderen gedeckelten Koepfe (Budget, Notizen, Kontakte)
+ * haben neben dem Titel keinen Zeitraum, der sie weiter verankerte. */
+@media (max-width: 1023px) {
+  .cal-toolbar.page-toolbar--capped.is-collapsed > .page-toolbar__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .cal-toolbar.page-toolbar--capped.is-collapsed > .module-seal--head {
+    display: none;
+  }
+
+  /* Ein leerer Aktions-Slot ist keine Zeile. Unter 1024px wohnt „Neu" im FAB
+   * (.toolbar-new-btn ist dort `display: none`), und ohne
+   * Ueberlappungswarnung steht nichts mehr darin - der Slot brach trotzdem als
+   * hoehenlose Flex-Zeile um und kostete ihren Zeilenabstand (gemessen 8px in
+   * der Woche) oder verengte die Zeitraum-Zeile um seinen Gap. */
+  .cal-toolbar > .page-toolbar__actions:not(:has(.cal-toolbar__schedule-warning)) {
+    display: none;
+  }
+}
+
+/* Mobil liegen Titel, Zeitraum und Bar-Zeile mit halbem Zeilenabstand
+ * uebereinander: jede Zeile bringt ihre Luft in 48px-Trefferflaechen (Zeitraum,
+ * Segment) oder in der Zeilenhoehe des Large Title schon mit. Zusammen mit dem
+ * Umzug der Werkzeuge in die Bar-Zeile baut der Kopf ausgeklappt 166 statt
+ * 230px, eingeklappt 121px (Critique 2026-09-24: Monat 56 -> 65 % Inhalt). */
+@media (max-width: 767px) {
+  /* Selektorform der Large-Title-Regel in layout.css plus die Modulklasse -
+   * mit blossem `.cal-toolbar` verlor der Wert dort still gegen 0,3,0. */
+  .page-toolbar.cal-toolbar:not(.page-toolbar--in-group):has(> .page-toolbar__title) {
+    row-gap: var(--space-1);
+  }
+}
+
 /* --------------------------------------------------------
  * Monatsansicht
  * -------------------------------------------------------- */
@@ -199,6 +329,14 @@
   color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: var(--tracking-label);
+}
+
+/* Mobil ist die Wochentagsleiste eine Beschriftung, keine Zeile mit Luft:
+ * 6px statt 8px oben und unten geben dem Raster 4px zurueck. */
+@media (max-width: 639px) {
+  .month-weekday {
+    padding-block: var(--space-1h);
+  }
 }
 
 .month-grid {
@@ -458,8 +596,18 @@
   flex-shrink: 0;
 }
 
+/* WOCHENTAG UND ZIFFER STEHEN NEBENEINANDER, auf jeder Breite (Critique
+ * 2026-09-24). Gestapelt baute der Kopf mobil 71px - bei 3-Tage-Spalten von
+ * ~110px Breite stand der Kuerzel mit 12px ueber einer 36px-Ziffer, und die
+ * Woche zeigte darunter nur noch 6,5 Stunden. Nebeneinander sind es 44px:
+ * eine 32px-Ziffer plus 6px Luft oben und unten. Ab 1024px stand es schon so;
+ * jetzt gilt EINE Form statt zwei. */
 .week-view__day-header {
-  padding: var(--space-2) var(--space-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1h);
+  padding: var(--space-1h) var(--space-1);
   text-align: center;
   border-left: 1px solid var(--color-border-subtle);
   cursor: pointer;
@@ -479,16 +627,16 @@
 }
 
 .week-view__day-num {
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
-  width: 36px;
-  height: 36px;
+  width: var(--target-sm);
+  height: var(--target-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-full);
-  margin: 0 auto;
+  font-variant-numeric: tabular-nums;
 }
 
 .week-view__day-num--today {
@@ -1591,6 +1739,17 @@
   color: var(--color-text-secondary);
   text-align: right;
   line-height: var(--space-6);
+}
+
+/* In der 44px-Spalte (mobil) rueckt die Beschriftung 4px vom Raster ab statt
+ * 8px: „08:00" braucht 34px, und mit 8px Abstand klebte die Ziffer 2px an der
+ * Bildschirmkante. Stundenzahl und Ganztags-Beschriftung behalten dieselbe
+ * rechte Kante (test-calendar.js), also aendern sich beide zusammen. */
+@media (max-width: 639px) {
+  .week-view__time-slot,
+  .calendar-all-day-label {
+    padding-inline-end: var(--space-1);
+  }
 }
 
 .allday-cell {

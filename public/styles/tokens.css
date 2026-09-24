@@ -1324,10 +1324,15 @@
    * stapeln muss. `.day-view` überschreibt damit --cal-hour-height für alles in
    * seinem Träger; die Zahl steht deshalb genau hier und nirgends sonst. */
   --cal-hour-height-day: 40px;
-  /* Breite der Zeitspalte in Wochen-/Tagesansicht. Muss 12-Stunden-Labels
-   * („12:00 PM") aufnehmen. Header-Gutter + Body-Zeitspalte teilen diesen
-   * Wert, damit die Spalten fluchten. */
+  /* Breite der Zeitspalte in Wochen-/Tagesansicht. Header-Gutter +
+   * Body-Zeitspalte teilen diesen Wert, damit die Spalten fluchten. Die
+   * Stundenleiste beschriftet volle Stunden („08:00", im 12-Stunden-Format
+   * „12 PM", siehe hourGutterLabel in pages/calendar.js); 64px sind die
+   * Breite mit Luft, die schmale Stufe darunter ist das Mass fuer 375px. */
   --cal-gutter-width: 64px;
+  /* Mobil (<640px) 44px (Critique 2026-09-24): 64px von 375 waren ein
+   * Sechstel der Breite fuer eine Beschriftung, bei nur drei Tagesspalten. */
+  --cal-gutter-width-compact: 44px;
   --sub-tabs-height: 52px;
   --kitchen-tabs-height: 56px;
 
@@ -1657,6 +1662,12 @@
  * `.contact-more-menu` unerreichbar (gemessen 2026-08-10). Der Unterschied
  * ist nicht die Zone, sondern wo der Knopf steht.
  * ================================================================ */
+@media (max-width: 639px) {
+  :root {
+    --cal-gutter-width: var(--cal-gutter-width-compact);
+  }
+}
+
 @media (max-width: 1023px) {
   :root {
     --fab-safe-zone: 0px;
