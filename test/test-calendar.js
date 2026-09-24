@@ -1948,6 +1948,116 @@ test('Monatswechsel: gewaehlt ist heute, wenn der Monat heute enthaelt, sonst de
   assert(/monthStepCursor\(/.test(nav), 'navigate() blaettert den Monat nicht ueber monthStepCursor()');
 });
 
+// EINGEKLAPPT GEHT DER TELEFON-MONAT WOCHENWEISE (Critique 2026-09-24, Rest 1).
+// Vorher sprang Wischen/Pfeil auch eingeklappt einen Monat, und die Auswahl
+// riss vom 24.09. auf den 01.10. - weg aus der einen Woche, die man sah.
+test('Schrittweite: eingeklappter Telefon-Monat geht eine Woche, sonst gilt die Ansicht', () => {
+  const { periodStepOf: step } = calendarHelpers;
+  assert(step('month', { mobile: true, monthCollapsed: true }).unit === 'week', 'eingeklappt: Woche');
+  assert(step('month', { mobile: true, monthCollapsed: true }).days === 7, 'eingeklappt: sieben Tage');
+  assert(step('month', { mobile: true, monthCollapsed: false }).unit === 'month', 'aufgeklappt: Monat');
+  assert(step('month', { mobile: false, monthCollapsed: true }).unit === 'month',
+    'auf dem Desktop gibt es kein Einklappen - ein liegengebliebener Zustand nach dem Drehen zaehlt nicht');
+  assert(step('week', { mobile: true }).days === 3 && step('week', { mobile: false }).days === 7, 'Woche: 3 Tage mobil, 7 sonst');
+  assert(step('day').days === 1 && step('agenda').days === 30, 'Tag 1, Agenda 30');
+
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const nav = src.slice(src.indexOf('async function navigate('), src.indexOf('async function goToday('));
+  assert(/currentPeriodStep\(\)/.test(nav), 'navigate() liest die Schrittweite nicht aus currentPeriodStep()');
+  assert(!/dir \* 30|dir \* \(isMobile/.test(nav), 'navigate() rechnet eine eigene Schrittweite neben periodStepOf()');
+  const cur = src.slice(src.indexOf('function currentPeriodStep('), src.indexOf('function periodArrowLabels('));
+  assert(/monthCollapsed:\s*_monthCollapsed/.test(cur), 'currentPeriodStep() fragt den Einklapp-Zustand nicht');
+  const sync = src.slice(src.indexOf('function syncMonthCollapse('), src.indexOf('function syncMonthCollapse(') + 400);
+  assert(/syncPeriodArrows\(\)/.test(sync), 'Einklappen benennt die Pfeile nicht um - sie hiessen weiter „Monat"');
+});
+
+// DIE PFEILE SAGEN, WAS SIE TUN (Critique 2026-09-24, Rest 8): in jeder
+// Ansicht hiessen sie „Zurueck"/„Weiter", und in der Agenda sprang „Weiter"
+// dreissig Tage, ohne dass es irgendwo stand.
+test('Pfeilnamen folgen der Schrittweite, die Agenda nennt ihre Spanne', () => {
+  const { periodArrowLabels: labels, periodStepOf: step } = calendarHelpers;
+  assert(labels(step('month')).next === 'calendar.nextMonth', 'Monat');
+  assert(labels(step('month', { mobile: true, monthCollapsed: true })).prev === 'calendar.prevWeek', 'eingeklappter Monat: Woche');
+  assert(labels(step('week')).next === 'calendar.nextWeek', 'Woche am Desktop');
+  assert(labels(step('week', { mobile: true })).next === 'calendar.nextDays{"count":3}', 'Drei-Tage-Fenster am Telefon');
+  assert(labels(step('day')).prev === 'calendar.prevDay', 'Tag');
+  assert(labels(step('agenda')).next === 'calendar.nextDays{"count":30}', 'Agenda: dreissig Tage');
+
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const nav = src.slice(src.indexOf('function periodNavHtml('), src.indexOf('const CAL_SHORTCUT_KEYS'));
+  assert(!/calendar\.(back|forward)/.test(nav), 'die Pfeile tragen wieder das allgemeine Zurueck/Weiter');
+  const upd = src.slice(src.indexOf('function updateLabel('), src.indexOf('function updateLabel(') + 2200);
+  assert(/syncPeriodArrows\(\)/.test(upd), 'updateLabel() benennt die Pfeile nach einem Ansichtswechsel nicht um');
+  assert(!/agendaFrom/.test(src), 'die Agenda nennt wieder nur ihren Anfang („Ab ...")');
+  assert(/view === 'agenda'\)[\s\S]{0,200}getAgendaRange\(state\.cursor\)[\s\S]{0,200}dayRangeLabel/.test(upd),
+    'das Agenda-Label nennt nicht die Spanne, die getAgendaRange() laedt');
+});
+
+// DIE TITELFASSUNG LAESST DER TAGESLISTE PLATZ (Critique 2026-09-24, Rest 2):
+// mit 80px je Woche blieben der Liste bei 375x812 genau 81px, im Sechs-
+// Wochen-Monat nichts. Die Wochen teilen sich jetzt ein festes Budget.
+test('Titelfassung am Telefon: die Wochen teilen sich 320px, keine Zeile unter 48px', () => {
+  const tokens = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+  const px = (name) => Number(new RegExp(`--${name}:\\s*(\\d+)px`).exec(tokens)?.[1]);
+  const rule = [...eachRule(calendarCss)].find((r) => r.at.some((a) => /max-width:\s*639px/.test(a))
+    && r.selector.trim() === '.month-view--split.month-view--titles .month-day');
+  assert(rule, 'Zeilenregel der Titelfassung im geteilten Monat nicht gefunden');
+  const decl = /--month-row-h:\s*([^;]+);/.exec(rule.body)?.[1];
+  assert(decl && /var\(--month-weeks/.test(decl), 'die Zeilenhoehe haengt nicht an der Wochenzahl');
+  const rowFor = (weeks) => Function(`return ${decl
+    .replace(/var\(--month-weeks(?:,\s*\d+)?\)/g, String(weeks))
+    .replace(/var\(--([\w-]+)\)/g, (_, n) => String(px(n)))
+    .replace(/\bmin\(/g, 'Math.min(').replace(/\bcalc\(/g, '(')}`)();
+  for (const weeks of [4, 5, 6]) {
+    const row = rowFor(weeks);
+    assert(row * weeks <= 320 + 0.5, `${weeks} Wochen belegen ${row * weeks}px - die Liste darunter schrumpft wieder`);
+    assert(row >= 48, `${weeks} Wochen: ${row}px je Zeile - unter der Zielgroesse am Finger`);
+  }
+  assert(rowFor(4) === 80, 'vier Wochen behalten ihre drei Titelzeilen (80px)');
+  const fit = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const body = fit.slice(fit.indexOf('function fitMonthDayCells('), fit.indexOf('function scheduleMonthFit('));
+  assert(/closest\('\.month-view--split'\)/.test(body) && (body.match(/calendar\.moreEvents/g) ?? []).length === 1
+    && /moreText\(total\)/.test(body) && /moreText\(hiddenCount\)/.test(body),
+    'die Zelle im Telefon-Monat schreibt wieder „+N weitere" - bei ~50px Breite bricht das um und wird abgeschnitten');
+});
+
+// EINE KANTE FUER DEN TAG (Critique 2026-09-24, Konsistenz): Datum und
+// Terminkarte standen bei x=12, Aufgaben- und Feiertags-Chips mit eigenem
+// 12px-Einzug bei x=24 - eine dritte Fluchtlinie, weder Karte noch Text.
+test('Agenda und Tagesliste: Aufgaben und Feiertage ruecken nicht ein', () => {
+  const rules = [...eachRule(calendarCss)].filter((r) => r.at.length === 0);
+  for (const sel of ['.agenda-tasks', '.agenda-holidays']) {
+    const rule = rules.find((r) => r.selector.trim() === sel);
+    assert(rule, `${sel} fehlt`);
+    const pad = /(?:^|[;\s{])padding:\s*([^;]+);/.exec(rule.body)?.[1]?.trim().split(/\s+/);
+    assert(pad && pad.length === 2 && pad[1] === '0', `${sel} rueckt mit ${pad?.[1]} ein - die Chips stehen nicht an der Kante von Datum und Karte`);
+  }
+});
+
+// DAS AUFHEBEN LIEGT OHNE SCROLLEN IM BLICK (Critique 2026-09-24, Rest 4).
+test('Filterblatt: „Alle Filter aufheben" steht in der Fusszeile des Blatts', () => {
+  let opened = null;
+  const prevOpen = globalThis.__openModal;
+  const prevDoc = globalThis.document;
+  const hadWindow = 'window' in globalThis;
+  const prevWindow = globalThis.window;
+  globalThis.__openModal = (opts) => { opened = opts; };
+  globalThis.document = { ...(prevDoc ?? {}), querySelector: () => null };
+  globalThis.window = { matchMedia: () => ({ matches: false }) };
+  try {
+    calendarHelpers.openCalendarFilters();
+  } finally {
+    globalThis.__openModal = prevOpen;
+    globalThis.document = prevDoc;
+    if (hadWindow) globalThis.window = prevWindow; else delete globalThis.window;
+  }
+  assert(opened, 'das Filterblatt oeffnet kein Modal');
+  const footer = /<div class="modal-panel__footer">([\s\S]*?)<\/div>/.exec(opened.content);
+  assert(footer && /id="cal-filters-reset"/.test(footer[1]),
+    'der Aufheben-Knopf steht nicht in .modal-panel__footer - mountFooter() hebt ihn nicht an den Rand, er liegt unter der Falz');
+  assert((opened.content.match(/id="cal-filters-reset"/g) ?? []).length === 1, 'der Knopf steht doppelt');
+});
+
 test('Einklappen auf die Woche: nur nach unten, nur mit Platz, auf am Listenanfang', () => {
   const { monthCollapseStep: step } = calendarHelpers;
   assert(step({ collapsed: false, top: 40, lastTop: 20, room: 200, hold: false }) === 'collapse',
@@ -3769,7 +3879,6 @@ test('Termin-Dialog: jede Klasse im Markup hat eine Regel in einem Blatt, das /c
   // Klassen, die KEINE Regel brauchen - mit Grund, nicht als Sammelbecken.
   const HOOKS = new Map([
     ['event-icon-picker__trigger-icon', 'traegt das Icon; gestaltet ueber `.event-icon-picker__trigger svg`'],
-    ['btn--sm', 'Restpunkt 2026-09-24: steht nur in rewards.css - eigener Umzug wie `.form-hint`'],
   ]);
   const event = {
     ...EDIT_BASE, recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', countdown: 1, visibility: 'assignees',

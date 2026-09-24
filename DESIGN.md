@@ -1928,6 +1928,15 @@ unter dem letzten Widget der Uebersicht, der FAB lag am Seitenende auf der recht
 Polster bleibt und haelt die Box um den Nachlauf kuerzer; die Scrollhoehe ist damit
 max(Fenster, Inhaltsende + Nachlauf). Pruefebene: `test:dashboard-surface-browser`.
 
+**Ein Toast ist kein Summand** (2026-09-24). Der Erinnerungs-Toast liegt 30 Sekunden ueber
+dem unteren Rand - am Desktop ueber der letzten Monatszeile, mobil ueber der Tagesliste - und
+laesst sich verwerfen. Als vierter Summand haette er den Nachlauf nur fuer diese Zeit
+verlaengert: in scrollenden Flaechen harmlos, im Desktop-Monat aber, der den Scrollport ohne
+Ueberlauf fuellt, haette er jede Zeile um ~16px gestaucht und beim Verschwinden wieder
+gestreckt - ein Raster, das mit jeder Meldung springt. Erreichbar bleibt darunter alles: die
+Zelle zeigt ueber dem Toast Ziffer und ersten Eintrag und oeffnet den Tag, und der Toast
+geht. Die Invariante der Regel gilt fuer DAUERHAFTE Flaechen (FAB, Pille, Banner).
+
 **Mobil aendert die Regel nichts, und das ist per Konstruktion so:** unter 1024px ist
 `--fab-safe-zone` 0, weil der Knopf in der Nav-Kapsel sitzt. Ein Nachlauf von 0 ist dasselbe
 wie eine Marge von 0.
@@ -2615,18 +2624,32 @@ einen Tag in die Tagesansicht - wer lesen wollte, was am Dienstag steht, verlies
   haetten die Aufgaben der Liste zu Quadraten ohne Titel geschrumpft. Ein freier Tag sagt es
   ruhig (kompakter Leerzustand, Aktion `btn--secondary`) - er ist kein Fehlerfall.
 - **Die Punkte sagen nur noch, wo.** Zentriert unter der Ziffer, hoechstens vier, ohne „+N" -
-  wie viel es ist, sagt die Liste. Zeilen fest 48px (Punkte) bzw. 80px (Titel), damit das
-  Einklappen eine animierbare Strecke hat.
+  wie viel es ist, sagt die Liste. Zeilen fest 48px (Punkte), damit das Einklappen eine
+  animierbare Strecke hat. **Die Titelfassung hat ein Budget von 320px, nicht 80px je Woche**
+  (vier Wochen 80px, fuenf 64px, sechs 53px): mit 80px fest blieben der Liste bei 375x812
+  81px, im Sechs-Wochen-Monat nichts; jetzt ist sie in jedem Monat gleich hoch (170px Zeilen).
+  Was nicht passt, zeigt die Zelle als nackte Zahl („+2") - „+2 weitere" brach auf ~50px um
+  und wurde angeschnitten, und was die weiteren sind, sagt die Liste.
 - **Einklappen auf die Woche.** Hochziehen oder Scrollen der Liste klappt das Raster auf die
   Woche des gewaehlten Tags zusammen (die Zeile bleibt stehen, die anderen gehen auf null),
   Herunterziehen oder Zurueckscrollen an den Listenanfang klappt auf; der Knopf im Listenkopf
   (`aria-expanded`) tut dasselbe ohne Geste. Die Scroll-Regel klappt nur ein, wenn die Liste
   danach noch scrollen kann - sonst klemmt scrollTop auf 0, und genau das ist das Signal zum
   Aufklappen: das Raster pumpte. Unter `prefers-reduced-motion` ohne Uebergang.
+- **Eingeklappt geht der Monat wochenweise**, wie in Apples Kalender: Wischen, Pfeile und
+  j/k ruecken die Auswahl um sieben Tage, der Monat folgt ihr ueber die Grenze. Ein
+  Monatssprung haette die Auswahl vom 24.09. auf den 01.10. gerissen - weg aus der einen Woche,
+  die man sieht. Aufgeklappt bleibt es der Monat. Die Schrittweite steht EINMAL
+  (`periodStepOf`) und benennt auch die Pfeile.
 - **Termintitel wohnt am Monat**, als Umschalter im Listenkopf (`aria-pressed`, an = Fuellung
   UND Akzent-Glyph), nicht mehr im Filterblatt unter „Darstellung": ein Schalter, der die
   Ansicht aendert, gehoert an die Ansicht. Die Titelfassung ist die dichtere Stufe, drei
   Zeilen je Zelle; die Liste darunter wird dafuer kuerzer, das Einklappen gibt sie zurueck.
+
+**Die Pfeile sagen, was sie tun.** „Vorheriger Monat", „Naechste Woche", „Naechste 3 Tage"
+(Telefon-Woche), „Naechste 30 Tage" (Agenda) als Name und Tooltip - vorher hiessen sie in
+jeder Ansicht „Zurueck"/„Weiter", und in der Agenda sprang „Weiter" still dreissig Tage. Die
+Agenda nennt im Kopf dazu ihre Spanne („24.09. - 24.10.2026") statt nur ihren Anfang.
 
 **Das Raster hat so viele Zeilen, wie der Monat braucht** (vier bis sechs, alle Breiten).
 Ladefenster und Zeichnung lesen dieselbe Rechnung (`monthGridSpan`); fest 42 Tage zeigten im

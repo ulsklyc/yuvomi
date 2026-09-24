@@ -150,6 +150,13 @@ button.toast__reminder-text:focus-visible {
   align-items: end;
 }
 
+/* „Erinnerung hinzufuegen" ist eine Aktion unter der Liste, keine Zeile von
+ * ihr: in der Spalte zog `align-items: stretch` den Knopf auf die volle
+ * Breite des Dialogs und liess ihn lauter wirken als „Speichern". */
+.reminder-fields > .btn {
+  align-self: flex-start;
+}
+
 .reminder-custom {
   margin-top: var(--space-3);
 }

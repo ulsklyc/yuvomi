@@ -1048,6 +1048,55 @@ function monthStepCursor(cursor, dir, today = state.today) {
 }
 
 /**
+ * Wie weit „vor" und „zurueck" in einer Ansicht gehen - EINE Antwort fuer
+ * Pfeilknoepfe, Wischen und die Kuerzel k/j, und dieselbe fuer ihre Namen
+ * (periodArrowLabels). Vorher stand die Schrittweite nur in navigate(), und
+ * die Knoepfe hiessen in jeder Ansicht „Zurueck"/„Weiter": in der Agenda
+ * sprang „Weiter" 30 Tage, ohne dass es irgendwo stand (Critique 2026-09-24).
+ *
+ * DER EINGEKLAPPTE TELEFON-MONAT GEHT WOCHENWEISE, wie der Monat in Apples
+ * Kalender: eingeklappt steht nur die Woche des gewaehlten Tags, und ein
+ * Monatssprung darunter risse die Auswahl vom 24.09. auf den 01.10. - weg aus
+ * der Zeile, die man gerade liest. Die Auswahl rueckt um sieben Tage, der
+ * Monat folgt ihr, wenn sie die Grenze ueberschreitet. Aufgeklappt bleibt es
+ * der Monat.
+ *
+ * @returns {{ unit: 'month'|'week'|'day'|'days', days: number }} `days` ist
+ *   die Schrittweite in Tagen (0 beim Monat - der rechnet monthStepCursor).
+ */
+function periodStepOf(view, { mobile = false, monthCollapsed = false } = {}) {
+  if (view === 'month')  return monthCollapsed && mobile ? { unit: 'week', days: 7 } : { unit: 'month', days: 0 };
+  if (view === 'week')   return mobile ? { unit: 'days', days: 3 } : { unit: 'week', days: 7 };
+  if (view === 'agenda') return { unit: 'days', days: 30 };
+  return { unit: 'day', days: 1 };
+}
+
+/** Die Schrittweite der aktuellen Ansicht (periodStepOf mit dem Zustand der Seite). */
+function currentPeriodStep() {
+  const mobile = typeof window !== 'undefined' && (window.matchMedia?.(MOBILE_MEDIA_QUERY).matches ?? false);
+  return periodStepOf(state.view, { mobile, monthCollapsed: _monthCollapsed });
+}
+
+/** Die Namen der Pfeilknoepfe: was der Knopf tut, nicht nur die Richtung. */
+function periodArrowLabels({ unit, days }) {
+  if (unit === 'month') return { prev: t('calendar.prevMonth'), next: t('calendar.nextMonth') };
+  if (unit === 'week')  return { prev: t('calendar.prevWeek'), next: t('calendar.nextWeek') };
+  if (unit === 'day')   return { prev: t('calendar.prevDay'), next: t('calendar.nextDay') };
+  return { prev: t('calendar.prevDays', { count: days }), next: t('calendar.nextDays', { count: days }) };
+}
+
+/** Name und Tooltip der Pfeile an die aktuelle Schrittweite angleichen. */
+function syncPeriodArrows() {
+  const labels = periodArrowLabels(currentPeriodStep());
+  for (const [id, label] of [['#cal-prev', labels.prev], ['#cal-next', labels.next]]) {
+    const btn = _container?.querySelector(id);
+    if (!btn) continue;
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+  }
+}
+
+/**
  * Was ein Tipp auf eine Monatszelle tut. Am Telefon (geteilter Monat: Raster
  * oben, Tagesliste unten) WÄHLT er den Tag - die Liste darunter zeigt ihn, in
  * die Tagesansicht führt ihr Kopf. Ein Tag aus dem Nachbarmonat blättert
@@ -1931,13 +1980,14 @@ export async function render(container, { user }) {
  */
 function periodNavHtml() {
   const keys = periodArrowKeys();
+  const labels = periodArrowLabels(currentPeriodStep());
   return `
-      <button class="btn btn--icon" id="cal-prev" aria-label="${t('calendar.back')}"
+      <button class="btn btn--icon" id="cal-prev" aria-label="${esc(labels.prev)}" title="${esc(labels.prev)}"
               aria-keyshortcuts="${CAL_SHORTCUT_KEYS.prev} ${keys.prev}">
         <i data-lucide="chevron-left" aria-hidden="true"></i>
       </button>
       <span class="cal-toolbar__label" id="cal-label"></span>
-      <button class="btn btn--icon" id="cal-next" aria-label="${t('calendar.forward')}"
+      <button class="btn btn--icon" id="cal-next" aria-label="${esc(labels.next)}" title="${esc(labels.next)}"
               aria-keyshortcuts="${CAL_SHORTCUT_KEYS.next} ${keys.next}">
         <i data-lucide="chevron-right" aria-hidden="true"></i>
       </button>
@@ -2121,8 +2171,16 @@ function updateLabel() {
   // stand in der Tagesansicht 30px weiter rechts als in den drei anderen
   // (Critique 2026-09-24). „Do, 24.09.2026" traegt dieselbe Auskunft.
   if (state.view === 'day')    lbl.textContent = formatDate(state.cursor, { weekday: true, long: !window.matchMedia(MOBILE_MEDIA_QUERY).matches });
-  if (state.view === 'agenda') lbl.textContent = t('calendar.agendaFrom', { date: formatDate(state.cursor) });
+  // DIE AGENDA NENNT IHRE SPANNE, nicht nur ihren Anfang. „Ab 24.09.2026"
+  // sagte nicht, wie weit die Liste reicht, und „Weiter" sprang dann still
+  // auf „Ab 24.10.2026" (Critique 2026-09-24). Die Spanne ist die, die
+  // getAgendaRange() laedt und renderAgendaView() zeigt.
+  if (state.view === 'agenda') {
+    const { from, to } = getAgendaRange(state.cursor);
+    lbl.textContent = t('calendar.dayRangeLabel', { from: formatDayMonth(from), to: formatPreferredDate(to) });
+  }
 
+  syncPeriodArrows();
   syncTodayButton();
   syncViewPanel();
 }
@@ -2223,20 +2281,17 @@ async function navigate(dir) {
   if (searchActive) closeCalendarSearch({ restoreView: false });
   const gridFocus = monthGridHasFocus();
   _monthFocusDate = null;
-  if (state.view === 'month') {
-    state.cursor = monthStepCursor(state.cursor, dir);
-  } else if (state.view === 'week') {
-    const isMobile = window.matchMedia(MOBILE_MEDIA_QUERY).matches;
-    state.cursor = addDays(state.cursor, dir * (isMobile ? 3 : 7));
-  } else if (state.view === 'day') {
-    state.cursor = addDays(state.cursor, dir);
-  } else if (state.view === 'agenda') {
-    state.cursor = addDays(state.cursor, dir * 30);
-  }
+  const step = currentPeriodStep();
+  state.cursor = step.unit === 'month'
+    ? monthStepCursor(state.cursor, dir)
+    : addDays(state.cursor, dir * step.days);
   await reloadForView();
   updateLabel();
   renderView();
   if (gridFocus) focusMonthCell(state.cursor);
+  // Eingeklappt waehlt der Schritt einen anderen Tag - die Liste darunter
+  // wechselt, und das sagt die Ansage wie beim Tipp (announceMonthDay).
+  else if (step.unit === 'week' && state.view === 'month') announceMonthDay(state.cursor);
 }
 
 async function goToday() {
@@ -2391,6 +2446,12 @@ function fitMonthDayCells(grid) {
   // NACH den Chips und verschiebt deren Unterkanten nicht, und ihre Höhe ist
   // einzeilig textunabhängig - die Endzustände sind mit der alten Fassung
   // identisch (leer/fitsAll → Zeile versteckt und geleert).
+  // AM TELEFON NUR DIE ZAHL. Die Zelle ist dort ~50px breit, und „+2 weitere"
+  // brach in der Titelfassung auf zwei Zeilen und wurde unten angeschnitten.
+  // Was die weiteren sind, sagt die Tagesliste unter dem Raster; die Zelle
+  // sagt nur, DASS es mehr gibt (ihr aria-label nennt die Anzahl ohnehin).
+  const shortMore = Boolean(grid.closest('.month-view--split'));
+  const moreText = (count) => (shortMore ? `+${count}` : t('calendar.moreEvents', { count }));
   const cells = [];
   for (const cell of grid.querySelectorAll('.month-day')) {
     const chips   = [...cell.querySelectorAll('.month-day__holiday, .month-day__event, .cal-task-chip')];
@@ -2401,7 +2462,7 @@ function fitMonthDayCells(grid) {
     // Reset auf vollständig sichtbar für eine stabile Messung.
     chips.forEach((c) => c.classList.remove('is-clipped'));
     moreRow.hidden = !chips.length;
-    moreRow.textContent = chips.length ? t('calendar.moreEvents', { count: total }) : '';
+    moreRow.textContent = chips.length ? moreText(total) : '';
     if (chips.length) cells.push({ cell, chips, moreRow, total });
   }
 
@@ -2446,7 +2507,7 @@ function fitMonthDayCells(grid) {
     chips.forEach((chip, i) => chip.classList.toggle('is-clipped', i >= visible));
     const hiddenCount = total - visible;
     if (hiddenCount > 0) {
-      moreRow.textContent = t('calendar.moreEvents', { count: hiddenCount });
+      moreRow.textContent = moreText(hiddenCount);
     } else {
       moreRow.hidden = true;
       moreRow.textContent = '';
@@ -2931,6 +2992,8 @@ function renderMonthList(list = _container?.querySelector('#month-list')) {
 
 function syncMonthCollapse(view, list) {
   view.classList.toggle('month-view--collapsed', _monthCollapsed);
+  // Eingeklappt gehen die Pfeile wochenweise (periodStepOf) - ihr Name folgt.
+  syncPeriodArrows();
   const btn = list.querySelector('#month-collapse');
   if (!btn) return;
   const label = t(_monthCollapsed ? 'calendar.monthShowMonth' : 'calendar.monthShowWeek');
@@ -4534,7 +4597,15 @@ function openCalendarFilters() {
           ${scheduleDisplayRow}
         </section>
       ` : ''}
-      <button type="button" class="btn btn--secondary cal-filters__reset" id="cal-filters-reset">
+    </div>
+    <!-- DAS AUFHEBEN STEHT IN DER FUSSZEILE, nicht unter der letzten Gruppe
+         (Critique 2026-09-24). Am Ende des Koerpers lag es bei 1280x800 unter
+         der Falz des 752px hohen Blatts: wer alles zuruecknehmen wollte, musste
+         erst an allen Schaltern vorbeiscrollen. mountFooter() hebt die Zeile
+         aus dem scrollenden Koerper an den Rand des Blatts - auf jeder Breite
+         sichtbar, ohne zu scrollen. -->
+    <div class="modal-panel__footer">
+      <button type="button" class="btn btn--secondary" id="cal-filters-reset">
         ${t('calendar.filtersReset')}
       </button>
     </div>
@@ -4960,6 +5031,7 @@ async function openFoundEvent(ev) {
 export const __test = {
   // Die Nur-lesen-Weiche (#467) und der Anlegeweg, den sie als erstes schliesst.
   readOnly, openEventModal,
+  periodStepOf, periodArrowLabels, openCalendarFilters,
   buildEventModalContent, eventAdvancedTopics, wireVisibilityWarning,
   calendarSaveErrorMessage,
   hasCurrentAttachment,

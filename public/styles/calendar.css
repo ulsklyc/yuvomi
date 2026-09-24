@@ -2108,7 +2108,10 @@
   flex-wrap: wrap;
   column-gap: var(--space-1);
   row-gap: var(--space-2);
-  padding: var(--task-hit-grow) var(--space-3);
+  /* Keine eigene Einrueckung (2026-09-24): Datum, Terminkarte und Chips
+   * stehen an EINER Kante. Mit 12px Einzug lagen die Chips auf einer dritten
+   * Fluchtlinie - weder an der Karte noch an deren Text. */
+  padding: var(--task-hit-grow) 0;
   isolation: isolate;
 }
 
@@ -2292,7 +2295,7 @@
   /* DREI ZEILEN, NICHT MEHR VIER (2026-09-24). Seit unter dem Raster die
    * Tagesliste steht, liest niemand den Tag mehr aus der Zelle - die Titel
    * sagen, WAS ungefaehr ansteht, die Liste sagt es ganz. Die Zeilenhoehe
-   * dazu steht beim geteilten Monat weiter unten (--month-row-h, 80px). */
+   * dazu steht beim geteilten Monat weiter unten (--month-row-h, bis 80px). */
   .month-view--titles .month-grid {
     --month-day-max-visible: 3;
   }
@@ -2484,8 +2487,22 @@
       padding var(--duration-lg) var(--ease-out);
   }
 
+  /* DIE TITELFASSUNG HAT EIN FESTES BUDGET VON 320px, nicht 80px je Zeile
+   * (2026-09-24). Mit 80px fest nahm ein Fuenf-Wochen-Monat 400px, und der
+   * Tagesliste blieben bei 375x812 genau 81px - eine Terminzeile; ein
+   * Sechs-Wochen-Monat liess ihr gar nichts. Jetzt teilen sich die Wochen die
+   * 320px: vier Wochen behalten 80px (drei Titel), fuenf bekommen 64px (zwei
+   * Titel oder einer und „+N"), sechs 53px (einer). Was nicht in die Zelle
+   * passt, zaehlt fitMonthDayCells() als „+N", und ganz sagt es die Liste -
+   * die ist damit in JEDEM Monat gleich hoch (gemessen 170px Zeilen statt 81).
+   * Verworfen: automatisch einklappen (der Monat verschwaende beim Einschalten
+   * seiner eigenen Titel) und eine Mindesthoehe fuer die Liste (sie schnitte
+   * die feste Zeilenhoehe des Rasters an, und die braucht das Einklappen). */
   .month-view--split.month-view--titles .month-day {
-    --month-row-h: calc(var(--space-16) + var(--space-4));
+    --month-row-h: min(
+      calc(var(--space-16) + var(--space-4)),
+      calc(var(--space-16) * 5 / var(--month-weeks, 5))
+    );
   }
 
   /* Eingeklappt bleibt die Woche des gewaehlten Tags stehen, die anderen
@@ -2576,7 +2593,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1);
-  padding: var(--space-1) var(--space-3);
+  /* An der Kante von Datum und Karte, wie die Aufgaben (.agenda-tasks). */
+  padding: var(--space-1) 0;
 }
 
 .agenda-holiday {
@@ -2697,11 +2715,6 @@
   text-transform: uppercase;
   color: var(--color-text-tertiary);
   margin: 0 0 var(--space-2);
-}
-
-.cal-filters__reset {
-  margin-top: var(--space-5);
-  width: 100%;
 }
 
 /* Per-Typ-Unterliste unter der Waste-Ebene (#1063 Phase 10) - die einzige
