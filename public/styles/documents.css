@@ -633,18 +633,22 @@
   overflow-wrap: anywhere;
 }
 
+/* Dasselbe Rezept wie .filter-chip__count: die Fuellung mischt die eigene
+ * Tinte. --color-surface-2 lag in Dark UNTER der Buehne und las sich als Loch
+ * (Re-Critique 2026-09-25); aus currentColor gemischt steht der Zaehler auf
+ * jeder Zeilenflaeche - Ruhe, Hover, aktiv - einen Hauch ueber ihr. */
 .documents-folder-item__count {
   min-width: 24px;
   padding: 2px var(--space-2);
   border-radius: var(--radius-full);
-  background: var(--color-surface-2);
+  background: color-mix(in srgb, currentColor var(--tint-state), transparent);
   color: var(--color-text-tertiary);
   font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
   text-align: center;
 }
 
 .documents-folder-item--active .documents-folder-item__count {
-  background: color-mix(in srgb, var(--module-accent) var(--tint-surface), var(--color-surface));
   color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
 }
 

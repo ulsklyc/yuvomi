@@ -116,7 +116,9 @@
   min-width: 1.25em;
   padding: 0 var(--space-1);
   border-radius: var(--radius-full);
-  background: color-mix(in srgb, currentColor 12%, transparent);
+  /* Die Stufe aus der Toenungsskala, nicht die Zahl: dieselbe Fuellung traegt der
+   * Ordnerzaehler der Dokumente (documents.css). */
+  background: color-mix(in srgb, currentColor var(--tint-state), transparent);
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
   text-align: center;

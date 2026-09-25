@@ -1620,3 +1620,19 @@ test('die Sichtbarkeit steht nur an Dokumenten, die vom Standard abweichen', () 
   assert.match(meta, /showsVisibility\(doc\.visibility\)/);
   assert.match(page, /\(doc\?\.visibility \|\| DOCUMENT_DEFAULT_VISIBILITY\) === 'family'/);
 });
+
+test('Ordner- und Chip-Zaehler folgen EINEM Rezept, das in Dark nicht unter die Buehne sinkt', () => {
+  // Der Ordnerzaehler lag auf --color-surface-2, in Dark dunkler als die Buehne
+  // ("schwarze Loecher"), waehrend die Chip-Zaehler currentColor mischen: zwei
+  // Rezepte fuer dieselbe Sache (Re-Critique 2026-09-25).
+  const bg = (source, selector) => {
+    const rule = [...eachRule(source)].find((r) => r.at.length === 0 && r.selector === selector);
+    assert.ok(rule, `${selector} fehlt`);
+    return (/(?:^|;)\s*background:\s*([^;]+);/.exec(rule.body) || [])[1]?.trim();
+  };
+  const recipe = 'color-mix(in srgb, currentColor var(--tint-state), transparent)';
+  assert.equal(bg(chipCss, '.filter-chip__count'), recipe, 'der Chip-Zaehler nennt die Stufe, nicht die Zahl');
+  assert.equal(bg(css, '.documents-folder-item__count'), recipe, 'der Ordnerzaehler mischt wie der Chip-Zaehler');
+  const active = [...eachRule(css)].find((r) => r.at.length === 0 && r.selector === '.documents-folder-item--active .documents-folder-item__count');
+  assert.ok(!active || !/background/.test(active.body), 'aktiv toent die Tinte, die Fuellung folgt ihr von selbst');
+});
