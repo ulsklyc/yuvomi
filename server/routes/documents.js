@@ -1393,9 +1393,10 @@ router.get('/:id/preview', async (req, res) => {
     res.setHeader('Content-Type', rawMime);
     res.setHeader('Content-Length', String(content.buffer.length));
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-    res.setHeader('Cache-Control', doc.storage_backend === 'dms'
-      ? 'private, max-age=60'
-      : 'private, max-age=300');
+    // no-store statt private, max-age: der Viewer zeigt Arztbriefe und Ausweise,
+    // und der Browser-Cache ueberlebt das Abmelden. Ein Dokument soll nach dem
+    // Schliessen nicht als Kopie auf dem Geraet liegen bleiben.
+    res.setHeader('Cache-Control', 'no-store');
     // Defense-in-Depth: MIME-Sniffing unterbinden und jegliche Skriptausführung im
     // Antwortdokument verbieten, falls ein Inhalt je fehlklassifiziert würde.
     res.setHeader('X-Content-Type-Options', 'nosniff');
