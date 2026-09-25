@@ -2628,6 +2628,45 @@ Liste weisse Zeile mit 8px-Farbpunkt. Die Monatsbalken sind die Referenz, alle a
   der Locale („ganz-/taegig"), bricht in der 44px-Spalte um und haelt Abstand zur Kante;
   „ganztg." war 42,5px breit in 40px Innenmass und eine Abkuerzung zum Entziffern.
 
+**Mehrtaegige Termine** (Re-Kritik 2026-09-25, P2). Ein Termin ueber mehrere Tage ist EIN Band
+je Wochenzeile, kein Chip je Tag - in der Ganztagszeile der Woche und im Monat ab 640px, nach
+dem Muster, das der Wochenstreifen der Uebersicht (`.week-strip__band`) laengst zeichnete.
+Vorher stand „Staedtereise" 13.-15.10. als drei gleiche Chips a 128px, jeder mit Icon und
+Avataren, und der Screenreader hoerte dreimal „Ganztaegig"; gemessen danach: ein Balken, 395px,
+der Titel ganz.
+
+- **Band ist, was die Ganztagszeile traegt und mehrere Tage beruehrt** (`isBandEvent()`:
+  ganztaegig oder ab 24 Stunden, dieselbe Regel wie der Wochenstreifen). Ein kurzer
+  Nachttermin bleibt an beiden Tagen ein eigener Eintrag (#1313).
+- **Die Grammatik ist die des Blocks, neu sind nur die ENDEN.** Toenung, Tinte 35 % und
+  Kante wie `.allday-event`/`.month-day__event` (gemessen 7,22-8,08:1 light, 7,51-7,65:1 dark
+  mit Amber, Cyan, Teal). Die Kante und die Rundung stehen nur am ECHTEN Anfang bzw. Ende;
+  laeuft der Termin ueber die Zeile hinaus, ist das Ende offen - keine Kante, keine Rundung,
+  bis an den Spaltenrand - und traegt ein Chevron in der Tinte des Titels (`.cal-band--before`
+  / `--after`, `.cal-band__cont`). Die offene Kante allein ist bei 4px Radius zu leise. Alles
+  logisch: in RTL oeffnet sich die andere Seite, das Chevron dreht mit.
+- **Titel und Glyphen einmal**, am Anfang bzw. am Zeilenanfang der Fortsetzung. In der Woche
+  gilt die Zeile „Titel vor dem Wer" (oben): Titel mit „ab", dann „bis" am Ende des Bands, dann
+  die Zugewiesenen - alle in DERSELBEN umbrechenden Zeile, was neben dem ganzen Titel nicht
+  passt, faellt weg. Mobil hatte das „bis" den Titel sonst auf „Te…" gekuerzt. Im Monat kein
+  Stack (Monatskanon), das „Wer" steht im title.
+- **Spuren** vergibt `packLanes()` (utils/week-strip.js), EINE Packung fuer Uebersicht und
+  Kalender: stabil nach echtem Anfang, bei Gleichstand der laengere zuerst, jeder in die
+  niedrigste freie Spur. Einzeltages-Chips stehen darunter. Im Monat liegt eine Schicht
+  `.month-bands` ueber den sieben Zellen einer Woche; die Zelle haelt so viele Spuren frei,
+  wie an ihrem Tag belegt sind (`.month-day__lanes`). Welche Spuren stehen bleiben,
+  entscheidet `fitMonthDayCells()` fuer die ganze ZEILE - ein Band ueber drei Zellen kann nicht
+  in einer davon weichen -, und das „+N" zaehlt die verborgenen Baender mit.
+- **Tastatur und Screenreader.** In der Woche ist das Band ein Knopf wie jeder Block; im Monat
+  bleibt die Zelle der eine Tab-Stopp (#1460), die Schicht ist `aria-hidden`, und die Zelle
+  nennt das Band mit „(Tag 2 von 3)". Der Name eines Bands nennt die Spanne („13. bis 15.
+  Oktober", verdichtet ueber `formatRangeToParts`, Bindewort aus der Locale statt des
+  Gedankenstrichs der Locale) und bei einer Fortsetzung „Fortsetzung". Nennt eine Zelle drei von
+  vier Titeln, sagt sie „und 1 weiterer".
+- **Punkt und Liste bleiben je Tag.** Im Telefon-Monat heisst der Punkt „hier ist etwas";
+  Agenda und Tagesliste behalten eine Zeile je Tag, sagen aber „Tag 2 von 3" hinter der
+  Uhrzeit. Die Tagesansicht zeigt das Stueck des Tages mit offenen Enden.
+
 ### Mobil-Monat: Raster oben, der gewaehlte Tag darunter (Critique 2026-09-24, P2)
 Unter 640px ist der Monat geteilt, nach der Messlatte (Apple Kalender „Liste", Fantastical,
 Outlook): **das Raster sagt, WO etwas ist, die Liste sagt, WAS.** Vorher sprang ein Tipp auf
