@@ -1839,6 +1839,7 @@ async function loadUsers() {
 
 export async function render(container, { user }) {
   _container = container;
+  bindPageListeners();
   // Die Uhr des Haushalts: state.today markiert die Heute-Zelle, die Jetzt-Linie
   // und den Vorschlag fuer einen neuen Termin - alle drei muessen denselben Tag
   // meinen wie die Termine daneben (#829 Teil 3).
@@ -2319,9 +2320,8 @@ function monthGridHasFocus() {
 /**
  * Die Kuerzel des Kalenders kommen aus dem Tastatur-Dispatcher der Shell
  * (router.js, SHORTCUTS mit `route: '/calendar'`) als Ereignis - die Seite
- * entscheidet, was „heute" oder „vor" in ihrer Ansicht heisst. Auf
- * Modulebene gebunden wie `_monthSplitQuery`: in render() gebunden
- * verdoppelte sich der Listener mit jedem Besuch.
+ * entscheidet, was „heute" oder „vor" in ihrer Ansicht heisst. Angehaengt
+ * in bindPageListeners(), einmal pro Sitzung.
  */
 function onCalendarCommand(e) {
   if (!_container?.isConnected) return;
@@ -2331,7 +2331,6 @@ function onCalendarCommand(e) {
   else if (command === 'next') navigate(1);
   else if (command === 'view' && VIEWS.includes(view) && view !== state.view) viewTabs?.setActive(view);
 }
-if (typeof document !== 'undefined') document.addEventListener?.('yuvomi:calendar-command', onCalendarCommand);
 
 /**
  * Drill-in aus einer Tageszelle - EINE NAVIGATION, KEINE EINSTELLUNG.
@@ -2768,6 +2767,9 @@ function selectMonthDay(date) {
     cell.classList.toggle('month-day--selected', selected);
     cell.classList.toggle('month-day--selweek', Math.floor(i / 7) === selWeek);
     cell.setAttribute('aria-selected', selected ? 'true' : 'false');
+    // Der Tipp zeichnet nicht neu - also wandert der EINE Tab-Stopp hier mit,
+    // wie in focusMonthCell(), nur ohne den Fokus zu verschieben (PR #1460).
+    cell.tabIndex = selected ? 0 : -1;
   });
   renderMonthList();
   syncTodayButton();
@@ -3115,15 +3117,29 @@ function wireMonthList(view, list) {
 /**
  * Ein Drehen ueber die 640er-Schwelle wechselt die Fassung des Monats (geteilt
  * oder Raster) - neu zeichnen, sonst stuende am Desktop die Telefonliste.
- * Gehaltene MediaQueryList auf Modulebene wie in meals.js: ohne Referenz darf
- * die Engine sie einsammeln, und in render() gebunden verdoppelte sich der
- * Listener mit jedem Besuch.
+ * Die MediaQueryList haelt eine Variable auf Modulebene (wie in meals.js),
+ * sonst darf die Engine sie einsammeln; angehaengt wird in bindPageListeners().
  */
 function onMonthSplitQueryChange() {
   if (_container?.isConnected && state.view === 'month' && !searchActive) renderView();
 }
-const _monthSplitQuery = typeof window !== 'undefined' ? window.matchMedia?.(MOBILE_MEDIA_QUERY) ?? null : null;
-_monthSplitQuery?.addEventListener?.('change', onMonthSplitQueryChange);
+let _monthSplitQuery = null;
+
+/**
+ * Die beiden Listener der Seite (Kuerzel aus router.js, 640er-Schwelle) haengen
+ * sich im ersten render() an und bleiben dann: in jedem render() gebunden
+ * verdoppelten sie sich mit jedem Besuch, beim Import gebunden waeren sie der
+ * Seiteneffekt, den CONTRIBUTING.md fuer Seiten ausschliesst („no side effects
+ * on import"). Beide pruefen selbst, ob die Seite noch steht.
+ */
+let _pageListenersBound = false;
+function bindPageListeners() {
+  if (_pageListenersBound) return;
+  _pageListenersBound = true;
+  document.addEventListener?.('yuvomi:calendar-command', onCalendarCommand);
+  _monthSplitQuery = window.matchMedia?.(MOBILE_MEDIA_QUERY) ?? null;
+  _monthSplitQuery?.addEventListener?.('change', onMonthSplitQueryChange);
+}
 
 /**
  * Klassen einer Monatszelle - eigene Funktion, weil hier der Wochentag über den

@@ -3620,6 +3620,40 @@ test('Kuerzel: t, j/k und m/w/d/a gelten nur auf /calendar und gehen an die Seit
   assert(/addEventListener\?\.\('yuvomi:calendar-command', onCalendarCommand\)/.test(cal), 'die Seite hoert die Kuerzel nicht');
 });
 
+/* PR #1460, Review: der Tipp auf einen Tag zeichnet das Raster bewusst NICHT
+ * neu - also muss selectMonthDay() den einen Tab-Stopp selbst mitnehmen, sonst
+ * landet Tab von aussen auf dem alten Tag und die Pfeile starten dort. */
+test('Telefon-Monat: der Tipp auf einen Tag nimmt den Tab-Stopp mit', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const sel = src.slice(src.indexOf('function selectMonthDay('), src.indexOf('let _monthFocusDate'));
+  assert(/cell\.tabIndex\s*=\s*selected\s*\?\s*0\s*:\s*-1/.test(sel),
+    'selectMonthDay() muss tabindex 0 auf den gewaehlten Tag und -1 auf alle anderen setzen');
+  assert(!/\.focus\(/.test(sel), 'ein Tipp darf den Fokus nicht verschieben');
+});
+
+/* CONTRIBUTING.md: „Pages export a render() function, no side effects on
+ * import". Die beiden Listener dieser Seite (Kuerzel, 640er-Schwelle) haengen
+ * sich deshalb erst im ersten render() an - einmal, nicht je Besuch. */
+const importListeners = await (async () => {
+  const zuvor = { window: globalThis.window, document: globalThis.document };
+  const angehaengt = [];
+  try {
+    globalThis.document = { addEventListener: (type) => angehaengt.push(`document:${type}`) };
+    globalThis.window = { matchMedia: () => ({ matches: false, addEventListener: (type) => angehaengt.push(`matchMedia:${type}`) }) };
+    await import(`../public/pages/calendar.js?import-probe=${Date.now()}`);
+  } finally {
+    globalThis.window = zuvor.window;
+    globalThis.document = zuvor.document;
+  }
+  return angehaengt;
+})();
+test('Kalender-Seite: der Import haengt keine Listener an', () => {
+  assert(importListeners.length === 0, `der Import haengt an: ${importListeners.join(', ')}`);
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const page = src.slice(src.indexOf('export async function render('), src.indexOf('// Lade-Skeleton sofort'));
+  assert(/bindPageListeners\(\)/.test(page), 'render() muss die Listener der Seite anhaengen');
+});
+
 test('Telefon-Monat: die Auswahl wird angesagt - aus einer Live-Region, die den Neuaufbau ueberlebt', () => {
   const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
   const page = src.slice(src.indexOf('export async function render('), src.indexOf('// Lade-Skeleton sofort'));
