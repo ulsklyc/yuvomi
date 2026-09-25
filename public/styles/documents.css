@@ -693,6 +693,12 @@
 .document-row__icon {
   width: 42px;
   height: 42px;
+  /* QUADRATISCH BLEIBEN (Critique 2026-09-25). In der Zeile ist die Kachel ein
+   * Flex-Item neben `.list-row__main`, und deren Basis ist die Breite ihres
+   * Inhalts - mit einer vollen Meta-Zeile weit mehr als die Zeile hat. Beim
+   * Schrumpfen gab die Kachel anteilig mit ab: gemessen bei 375px 28x42, mit
+   * langem Titel 14x42. Die Breite ist eine Zusage, keine Verhandlungsmasse. */
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -806,9 +812,51 @@
   margin-top: var(--space-3);
 }
 
+/* EINE ZEILE, UND WAS NICHT PASST, FAELLT GANZ (Critique 2026-09-25).
+ *
+ * Vorher `flex-wrap: nowrap` plus `overflow: hidden`. Das liess zwei Fehler
+ * zu: der Ablauf-Chip stand zuletzt und war bei 375px 0px sichtbar, und die
+ * Eintraege schrumpften als Flex-Items auf ihre Mindestbreite und brachen IN
+ * SICH um ("Ganze / Familie") - die Meta wurde 35-69px hoch, die Zeilen
+ * sprangen zwischen 76 und 159px.
+ *
+ * Jetzt dieselbe Mechanik wie `.allday-event__label` im Kalender: eine
+ * umbrechende Flex-Zeile, genau eine Zeile hoch, der Rest abgeschnitten.
+ * Flexbox bricht nach der vollen Breite eines Eintrags um, also steht ein
+ * Eintrag ganz in Zeile eins oder ganz in der unsichtbaren zweiten - kein
+ * Stumpf, keine Ellipse, in jeder Sprache ohne Schwellwert. Welche fallen,
+ * entscheidet die Reihenfolge in renderMeta(): der Ablauf steht vorn.
+ * `+ 2px` ist die Polsterung des .doc-badge (1px oben und unten), die ueber
+ * die Zeilenhoehe hinausragt; der Zeilenabstand (--space-2) haelt Zeile zwei
+ * sicher unterhalb. Screenreader lesen alle Eintraege weiter. */
 .document-row__meta {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  align-items: center;
+  height: calc(1lh + 2px);
   overflow: hidden;
+}
+
+.document-row__meta > * {
+  white-space: nowrap;
+}
+
+/* Der vorderste Eintrag steht allein in Zeile eins, wenn er breiter ist als
+ * die Spalte - gemessen "Seit 10 Tagen abgelaufen" 165px in 153px bei 375px.
+ * Dann kuerzt der Chip mit Ellipse, statt mitten im Buchstaben abgeschnitten
+ * zu werden. Block statt inline-flex, weil `text-overflow` an einem
+ * Flex-Container nicht greift (sein Text ist ein anonymes Flex-Item); das
+ * Glyph steht dafuer inline auf der Mittellinie. */
+.document-row__meta > .doc-badge {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.document-row__meta > .doc-badge svg {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-inline-end: var(--space-1);
 }
 
 .document-card__meta span,

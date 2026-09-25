@@ -774,3 +774,89 @@ test('der Upload hat EINEN Weg zur Dateiwahl, einen Nebenweg zum Ordner und EINE
   assert.equal(typeof de.documents.folderUpload.chooseFolder, 'string');
   assert.match(de.documents.folderUpload.chooseFolder, /^oder /);
 });
+
+// --------------------------------------------------------
+// Critique 2026-09-25, Entscheidung 3 - Ablauf mobil
+// --------------------------------------------------------
+
+const expiry = await import('../public/utils/document-expiry.js').catch(() => null);
+
+test('der Ablauf-Chip steht als ERSTES Meta-Element', () => {
+  // Er stand zuletzt, und die Zeilen-Meta ist einzeilig mit overflow: hidden:
+  // bei 375px war "Laeuft in 5 Tagen ab" 0px sichtbar (Critique P1) - genau
+  // die Angabe, fuer die ein Ablaufdatum eingetragen wird.
+  const meta = page.slice(page.indexOf('function renderMeta('), page.indexOf('function documentStorageBackend'));
+  const chip = meta.indexOf('${expiryChipHtml(doc)}');
+  const category = meta.indexOf('CATEGORY_ICONS[doc.category]');
+  assert.ok(chip > 0, 'renderMeta zeigt den Ablauf-Chip');
+  assert.ok(category > 0);
+  assert.ok(chip < category, 'der Chip steht vor der Kategorie');
+  assert.equal((meta.match(/expiryChipHtml\(doc\)/g) || []).length, 1, 'genau einmal');
+});
+
+test('die Zeilen-Meta laesst ganze Eintraege fallen statt sie in sich umzubrechen', () => {
+  // Gemessen bei 375px: die Meta-Spans schrumpften als Flex-Items auf ihre
+  // Mindestbreite und brachen INNEN um ("Ganze / Familie"), die Meta wurde
+  // 35-69px hoch und die Zeilen sprangen zwischen 76 und 159px.
+  const rules = [...eachRule(css)].filter((rule) => rule.at.length === 0);
+  const meta = rules.find((rule) => rule.selector === '.document-row__meta');
+  assert.ok(meta, '.document-row__meta fehlt');
+  assert.match(meta.body, /flex-wrap:\s*wrap/);
+  assert.match(meta.body, /overflow:\s*hidden/);
+  assert.match(meta.body, /height:\s*calc\(1lh/, 'eine Zeile hoch, der Umbruch landet unsichtbar in Zeile zwei');
+  const items = rules.find((rule) => rule.selector === '.document-row__meta > *');
+  assert.ok(items, '.document-row__meta > * fehlt');
+  assert.match(items.body, /white-space:\s*nowrap/);
+  // Ist der Chip allein breiter als die Spalte ("Seit 10 Tagen abgelaufen"
+  // 165px in 153px), kuerzt er mit Ellipse statt mitten im Buchstaben.
+  const chip = rules.find((rule) => rule.selector === '.document-row__meta > .doc-badge');
+  assert.ok(chip, '.document-row__meta > .doc-badge fehlt');
+  assert.match(chip.body, /max-width:\s*100%/);
+  assert.match(chip.body, /text-overflow:\s*ellipsis/);
+  assert.match(chip.body, /display:\s*block/, 'text-overflow greift an keinem Flex-Container');
+});
+
+test('das Zeilen-Icon bleibt quadratisch', () => {
+  // Mobil 28x42 (bis 14x42): die Kachel schrumpfte als Flex-Item mit, weil
+  // die Textspalte ihre Basis aus der Meta-Zeile nimmt.
+  const icon = [...eachRule(css)].find((rule) => rule.at.length === 0
+    && rule.selector.split(',').map((s) => s.trim()).includes('.document-row__icon')
+    && /width:\s*42px/.test(rule.body));
+  assert.ok(icon, 'Icon-Regel fehlt');
+  assert.match(icon.body, /flex-shrink:\s*0/);
+});
+
+test('Zeile und Viewer lesen den Ablauf aus EINER Regel (als Programm)', () => {
+  assert.ok(expiry, 'public/utils/document-expiry.js fehlt');
+  const status = (state, days) => ({ state, days, endDateKey: '2026-09-30' });
+  // Zeile: nur wenn es Aufmerksamkeit braucht.
+  assert.equal(expiry.expiryChipSpec(null), null);
+  assert.equal(expiry.expiryChipSpec(status('valid', 200)), null);
+  assert.deepEqual(expiry.expiryChipSpec(status('expiring', 5)),
+    { tone: 'expiring', key: 'documents.expiringInDays', params: { count: 5 } });
+  assert.deepEqual(expiry.expiryChipSpec(status('expired', -10)),
+    { tone: 'unavailable', key: 'documents.expiredDays', params: { count: 10 } });
+  // Viewer: immer, wenn ein Datum gesetzt ist - auch weit in der Zukunft.
+  assert.equal(expiry.expiryViewerSpec(null), null);
+  assert.deepEqual(expiry.expiryViewerSpec(status('valid', 200)),
+    { tone: null, key: 'documents.expiryValidUntil', dateKey: '2026-09-30' });
+  assert.deepEqual(expiry.expiryViewerSpec(status('expiring', 5)),
+    { tone: 'expiring', key: 'documents.expiryEndsOn', dateKey: '2026-09-30' });
+  assert.deepEqual(expiry.expiryViewerSpec(status('expired', -10)),
+    { tone: 'unavailable', key: 'documents.expiryEndedOn', dateKey: '2026-09-30' });
+  for (const key of ['expiryValidUntil', 'expiryEndsOn', 'expiryEndedOn']) {
+    assert.match(de.documents[key] || '', /\{\{date\}\}/, `documents.${key} traegt {{date}}`);
+  }
+});
+
+test('der Viewer nennt das Ablaufdatum in seiner Meta-Zeile', () => {
+  const viewer = page.slice(page.indexOf('<div class="document-viewer__meta">'), page.indexOf('<span class="document-viewer__actions">'));
+  assert.match(viewer, /\$\{expiryViewerHtml\(doc\)\}/);
+  const fn = page.slice(page.indexOf('function expiryViewerHtml('), page.indexOf('function storageBadgeHtml'));
+  assert.match(fn, /expiryViewerSpec\(dateStatus\(doc\.expires_at\)\)/);
+  // Das Datum ist ein Tagesschluessel: formatDate() liest ihn als Wanduhrzeit,
+  // ein Umweg ueber new Date()/toISOString() kippte je nach Zone auf den Vortag.
+  assert.match(fn, /formatDate\(spec\.dateKey\)/);
+  assert.doesNotMatch(fn, /new Date|toISOString/);
+  assert.match(fn, /esc\(/);
+});

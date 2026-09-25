@@ -25,6 +25,7 @@ import { maxUploadBytes } from '/utils/upload-limit.js';
 import { mountEmptyState } from '/utils/empty-state.js';
 import { subtreeIds, folderPath, flattenFolderTree } from '/utils/folder-tree.js';
 import { dateStatus } from '/utils/date-status.js';
+import { expiryChipSpec, expiryViewerSpec } from '/utils/document-expiry.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { wireTablist } from '/utils/tablist.js';
 import {
@@ -1435,13 +1436,18 @@ function renderMeta(doc, { showSize = true } = {}) {
   // Nutzerentscheidung und bleibt sichtbar.
   const folderDuplicatesCategory = doc.folder_name
     && doc.folder_name.trim().toLowerCase() === String(categoryLabel).trim().toLowerCase();
+  // DER ABLAUF STEHT VORN (Critique 2026-09-25, P1). Die Zeilen-Meta ist
+  // einzeilig und laesst hinten fallen, was nicht passt (documents.css,
+  // .document-row__meta) - als letztes Element war "Laeuft in 5 Tagen ab"
+  // bei 375px 0px sichtbar, genau die Angabe, die Handeln verlangt. Die
+  // Reihenfolge ist damit die Rangfolge: Ablauf, Art, Ablageort, Sichtbarkeit.
   return `
+    ${expiryChipHtml(doc)}
     <span><i data-lucide="${CATEGORY_ICONS[doc.category] || 'folder'}" aria-hidden="true"></i>${categoryLabel}</span>
     ${doc.folder_name && !folderDuplicatesCategory ? `<span><i data-lucide="folder" aria-hidden="true"></i>${esc(doc.folder_name)}</span>` : ''}
     ${hidesPrivacyControls('documents') ? '' : `<span><i data-lucide="${doc.visibility === 'family' ? 'users' : doc.visibility === 'private' ? 'lock' : 'user-check'}" aria-hidden="true"></i>${t(`documents.visibility.${doc.visibility}`)}</span>`}
     ${showSize ? `<span>${formatFileSize(doc.file_size)}</span>` : ''}
     ${storageBadgeHtml(doc)}
-    ${expiryChipHtml(doc)}
   `;
 }
 
@@ -1509,22 +1515,32 @@ function uploadTargetIcon(backend) {
 }
 
 /**
- * Ablauf-Chip auf der Zeile/Karte, gleiches Muster wie pantry.js#expiryBadge -
- * bewusst nur bei "bald ab" oder "abgelaufen": ein Chip auf jeder Zeile mit
- * Ablaufdatum waere Ornament und wuerde genau die Zeilen entwerten, die
- * wirklich Aufmerksamkeit brauchen.
+ * Ablauf-Chip auf der Zeile/Karte, gleiches Muster wie pantry.js#expiryBadge.
+ * Wann er steht und in welchem Ton, entscheidet expiryChipSpec()
+ * (utils/document-expiry.js) - dieselbe Regel, aus der der Viewer liest.
  */
 function expiryChipHtml(doc) {
-  const status = dateStatus(doc.expires_at);
-  if (!status || status.state === 'valid') return '';
-  // "expired" teilt sich bewusst die Gefahr-Farbe mit dem bestehenden
-  // .doc-badge--unavailable statt einer eigenen, identisch aussehenden Regel
-  // (DESIGN.md, Colors: die Skalen-Regel).
-  const tone = status.state === 'expired' ? 'unavailable' : 'expiring';
-  const text = status.state === 'expired'
-    ? t('documents.expiredDays', { count: Math.abs(status.days) })
-    : t('documents.expiringInDays', { count: status.days });
-  return `<span class="doc-badge doc-badge--${tone}"><i data-lucide="calendar-clock" aria-hidden="true"></i>${esc(text)}</span>`;
+  const spec = expiryChipSpec(dateStatus(doc.expires_at));
+  if (!spec) return '';
+  return `<span class="doc-badge doc-badge--${spec.tone}"><i data-lucide="calendar-clock" aria-hidden="true"></i>${esc(t(spec.key, spec.params))}</span>`;
+}
+
+/**
+ * Ablaufdatum in der Viewer-Meta - immer, wenn eines gesetzt ist, auch weit in
+ * der Zukunft ("Gueltig bis 13.04.2027"). Die Zeile schweigt bei "gueltig";
+ * ohne diese Angabe war das eingetragene Datum nach dem Speichern nur im
+ * Bearbeiten-Dialog wiederzufinden. formatDate() liest den Tagesschluessel als
+ * Wanduhrzeit (utils/timezone.js#zonedFields) - kein Umweg ueber einen
+ * Zeitpunkt, der je nach Zone auf den Vortag kippt.
+ */
+function expiryViewerHtml(doc) {
+  const spec = expiryViewerSpec(dateStatus(doc.expires_at));
+  if (!spec) return '';
+  const text = esc(t(spec.key, { date: formatDate(spec.dateKey) }));
+  const icon = '<i data-lucide="calendar-clock" aria-hidden="true"></i>';
+  return spec.tone
+    ? `<span class="doc-badge doc-badge--${spec.tone}">${icon}${text}</span>`
+    : `<span>${icon}${text}</span>`;
 }
 
 function storageBadgeHtml(doc) {
@@ -3068,6 +3084,7 @@ function openDocumentViewer(doc) {
           <span><i data-lucide="${CATEGORY_ICONS[doc.category] || 'folder'}" aria-hidden="true"></i>${labels[doc.category] || doc.category}</span>
           ${doc.folder_name ? `<span><i data-lucide="folder" aria-hidden="true"></i>${esc(doc.folder_name)}</span>` : ''}
           <span>${formatFileSize(doc.file_size)}</span>
+          ${expiryViewerHtml(doc)}
           <span class="document-viewer__actions">
             ${externalUrl ? `
             <a class="btn btn--ghost btn--sm doc-viewer__dms-link" href="${esc(externalUrl)}" target="_blank" rel="noopener noreferrer">
