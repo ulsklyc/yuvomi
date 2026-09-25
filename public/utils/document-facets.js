@@ -156,3 +156,19 @@ export function folderRowLead(item, treeHasFolders) {
   if (item.managed) return item.branch ? 'toggle' : 'slot';
   return treeHasFolders ? 'slot' : 'none';
 }
+
+/**
+ * Die Sichtbarkeit, die ein neues Dokument ohne Zutun traegt. EINE Stelle fuer
+ * das Formular und die Frage, ob eine Zeile die Sichtbarkeit nennt.
+ */
+export const DOCUMENT_DEFAULT_VISIBILITY = 'family';
+
+/**
+ * Nennt eine Zeile die Sichtbarkeit? Nur, wenn sie vom Standard abweicht.
+ * "Ganze Familie" stand auf jeder Zeile (Re-Critique 2026-09-25) - eine Angabe,
+ * die ueberall gleich ist, sagt nichts und verdeckt die Ausnahmen, die zaehlen:
+ * privat und ausgewaehlte Personen.
+ */
+export function showsVisibility(visibility) {
+  return (visibility || DOCUMENT_DEFAULT_VISIBILITY) !== DOCUMENT_DEFAULT_VISIBILITY;
+}

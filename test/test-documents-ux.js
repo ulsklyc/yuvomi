@@ -1605,3 +1605,18 @@ test('die festen Ordnerzeilen fluchten mit dem Baum: derselbe Platz vor dem Symb
   assert.match(tree, /folderRowLead\(item, /);
   assert.doesNotMatch(tree, /!item\.managed \? ''/, 'die alte Sonderregel fuer feste Zeilen ist weg');
 });
+
+test('die Sichtbarkeit steht nur an Dokumenten, die vom Standard abweichen', () => {
+  // "Ganze Familie" stand auf JEDER Zeile (Re-Critique 2026-09-25) - der
+  // Standard als Rauschen, das die Ausnahmen (privat, ausgewaehlte Personen)
+  // unsichtbar machte. Eine Angabe, die ueberall gleich ist, sagt nichts.
+  assert.equal(facets?.DOCUMENT_DEFAULT_VISIBILITY, 'family', 'der Standard steht an EINER Stelle');
+  assert.equal(typeof facets?.showsVisibility, 'function', 'showsVisibility fehlt in document-facets.js');
+  assert.equal(facets.showsVisibility('family'), false);
+  assert.equal(facets.showsVisibility('private'), true);
+  assert.equal(facets.showsVisibility('restricted'), true);
+  // Die Zeile fragt die Regel wirklich, und das Formular setzt denselben Standard.
+  const meta = fnBody('renderMeta', 'docSupportsThumbnail');
+  assert.match(meta, /showsVisibility\(doc\.visibility\)/);
+  assert.match(page, /\(doc\?\.visibility \|\| DOCUMENT_DEFAULT_VISIBILITY\) === 'family'/);
+});

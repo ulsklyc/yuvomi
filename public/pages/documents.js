@@ -38,6 +38,7 @@ import { wireTablist } from '/utils/tablist.js';
 import { firstRovingStop, repairRovingStops, wireRovingToolbars } from '/utils/roving-toolbar.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import {
+  DOCUMENT_DEFAULT_VISIBILITY,
   DOCUMENT_SORTS,
   categoryFacetCounts,
   defaultSortDirection,
@@ -46,6 +47,7 @@ import {
   folderRowLead,
   matchesDocumentQuery,
   normalizeDocumentQuery,
+  showsVisibility,
   sortDocuments as sortDocumentList,
 } from '/utils/document-facets.js';
 import {
@@ -1524,12 +1526,13 @@ function renderMeta(doc, { showSize = true } = {}) {
   // einzeilig und laesst hinten fallen, was nicht passt (documents.css,
   // .document-row__meta) - als letztes Element war "Laeuft in 5 Tagen ab"
   // bei 375px 0px sichtbar, genau die Angabe, die Handeln verlangt. Die
-  // Reihenfolge ist damit die Rangfolge: Ablauf, Art, Ablageort, Sichtbarkeit.
+  // Reihenfolge ist damit die Rangfolge: Ablauf, Art, Ablageort, Sichtbarkeit -
+  // letztere nur, wenn sie vom Standard abweicht (showsVisibility).
   return `
     ${expiryChipHtml(doc)}
     <span><i data-lucide="${CATEGORY_ICONS[doc.category] || 'folder'}" aria-hidden="true"></i>${categoryLabel}</span>
     ${!folderDuplicatesCategory && doc.folder_name ? `<span><i data-lucide="folder" aria-hidden="true"></i>${esc(doc.folder_name)}</span>` : ''}
-    ${hidesPrivacyControls('documents') ? '' : `<span><i data-lucide="${doc.visibility === 'family' ? 'users' : doc.visibility === 'private' ? 'lock' : 'user-check'}" aria-hidden="true"></i>${t(`documents.visibility.${doc.visibility}`)}</span>`}
+    ${hidesPrivacyControls('documents') || !showsVisibility(doc.visibility) ? '' : `<span><i data-lucide="${doc.visibility === 'private' ? 'lock' : 'user-check'}" aria-hidden="true"></i>${t(`documents.visibility.${doc.visibility}`)}</span>`}
     ${showSize ? `<span>${formatFileSize(doc.file_size)}</span>` : ''}
     ${storageBadgeHtml(doc)}
   `;
@@ -2077,7 +2080,7 @@ function documentVisibilityFieldHtml(doc) {
   return `<div class="form-group"${hidesPrivacyControls('documents') ? ' hidden' : ''}>
             <label class="label" for="document-visibility">${t('documents.visibilityLabel')}</label>
             <select class="input" id="document-visibility">
-              <option value="family" ${(doc?.visibility || 'family') === 'family' ? 'selected' : ''}>${t('documents.visibility.family')}</option>
+              <option value="family" ${(doc?.visibility || DOCUMENT_DEFAULT_VISIBILITY) === 'family' ? 'selected' : ''}>${t('documents.visibility.family')}</option>
               <option value="restricted" ${doc?.visibility === 'restricted' ? 'selected' : ''}>${t('documents.visibility.restricted')}</option>
               <option value="private" ${doc?.visibility === 'private' ? 'selected' : ''}>${t('documents.visibility.private')}</option>
             </select>
