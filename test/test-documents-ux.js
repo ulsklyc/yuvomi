@@ -1713,3 +1713,21 @@ test('im gewaehlten Ordner nennt die Zeile den Ordner nicht noch einmal', () => 
   const meta = fnBody('renderMeta', 'docSupportsThumbnail');
   assert.match(meta, /showsFolderChip\(doc, categoryLabel, state\.folderId\)/, 'die Zeile fragt die Regel wirklich');
 });
+
+test('in der schmalen Rasterkarte passt der Titel: Subheadline und bis zu drei Zeilen', () => {
+  // Re-Critique 2026-09-25: bei 375px (zwei Spalten, 140px Titelbreite) stand
+  // der Titel in Headline-Groesse (17px) und brach nach zwei Zeilen ab - vier
+  // von vierzehn Titeln endeten in "...". Gemessen: 15px und drei Zeilen lassen
+  // nur noch einen 62-Zeichen-Titel abschneiden; die Karte waechst dabei um
+  // hoechstens 14px. Breit bleibt es bei Headline und zwei Zeilen.
+  const narrow = [...eachRule(css)].find((r) => r.at.some((a) => a.includes('@container document-card (max-width: 12rem)'))
+    && r.selector === '.document-card__title');
+  assert.ok(narrow, 'die schmale Karte braucht eine eigene Titelregel');
+  assert.match(narrow.body, /font-size:\s*var\(--type-secondary\)/);
+  assert.match(narrow.body, /-webkit-line-clamp:\s*3/);
+  assert.match(narrow.body, /(^|[^-])line-clamp:\s*3/);
+  const base = [...eachRule(css)].find((r) => r.at.length === 0 && r.selector === '.document-card__title');
+  assert.match(base.body, /-webkit-line-clamp:\s*2/, 'breit bleiben es zwei Zeilen');
+  assert.ok(css.indexOf('@container document-card (max-width: 12rem) {\n  .document-card__title') > css.indexOf('.document-card__title {\n  hyphens: auto;'),
+    'die Container-Regel steht HINTER der Basisregel, sonst gewinnt die Basis');
+});

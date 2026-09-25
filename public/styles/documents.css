@@ -1016,8 +1016,19 @@
 }
 
 /* Schmale Karte (zwei Spalten am Telefon): das Datum weicht der Leiste, der
- * Ablauf-Chip nimmt seine Kurzform (Regel bei .doc-badge__short). */
+ * Ablauf-Chip nimmt seine Kurzform (Regel bei .doc-badge__short), und der
+ * Titel geht auf Subheadline mit bis zu drei Zeilen. In Headline-Groesse
+ * (17px) passten in die 140px-Spalte rund zwoelf Zeichen je Zeile, vier von
+ * vierzehn Titeln endeten nach zwei Zeilen in "..." (Re-Critique 2026-09-25).
+ * Gemessen mit 15px und drei Zeilen: einer, ein 62-Zeichen-Titel; die Karte
+ * waechst um hoechstens 14px. Der ganze Name steht im title und im Betrachter. */
 @container document-card (max-width: 12rem) {
+  .document-card__title {
+    font-size: var(--type-secondary);
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+
   .document-card__date {
     display: none;
   }
