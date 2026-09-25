@@ -343,9 +343,10 @@
 /* Die Einrueckung je Ebene. 14px und nicht --space-4: der Pfeil davor ist
  * 20px breit, zusammen ergibt das die Stufe, an der das Auge die Ebene liest,
  * ohne dass bei fuenf Ebenen (der Grenze) auf einer 280px-Leiste weniger als
- * die halbe Breite fuer den Namen bleibt. */
+ * die halbe Breite fuer den Namen bleibt. Die Stufe kommt AUF das Polster von
+ * `.list-row` (--space-3), sonst klebt Tiefe 0 an der Kante der Leiste. */
 .documents-folder-item {
-  padding-inline-start: calc(var(--folder-depth, 0) * 14px);
+  padding-inline-start: calc(var(--space-3) + var(--folder-depth, 0) * 14px);
 }
 
 /* Aufklappen ist ein EIGENER Knopf neben dem Namen, nicht die Zeile - die

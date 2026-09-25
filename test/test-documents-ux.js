@@ -1399,3 +1399,17 @@ test('der immer sichtbare Ordner-Kebab traegt am Zeiger die volle Zielgroesse', 
   assert.match(base.body, /height:\s*var\(--target-md\)/);
   assert.doesNotMatch(base.body, /--target-sm/);
 });
+
+test('die Ordnerzeile behaelt das Zeilenpolster und rueckt je Ebene darauf ein', () => {
+  // Vorher `calc(var(--folder-depth, 0) * 14px)`: die Regel ueberschrieb das
+  // `padding-inline` von `.list-row`, und die Zeilen der Tiefe 0 ("Alle
+  // Dokumente", "Kein Ordner", jeder Wurzelordner) klebten mit Icon bzw. Pfeil
+  // an der linken Kante der Ordnerleiste.
+  const rules = [...eachRule(css)].filter((rule) => rule.at.length === 0
+    && rule.selector.split(',').map((x) => x.trim()).includes('.documents-folder-item')
+    && /padding-inline-start/.test(rule.body));
+  assert.equal(rules.length, 1, 'genau eine Einrueckregel');
+  const value = /padding-inline-start:\s*([^;]+);/.exec(rules[0].body)[1];
+  assert.match(value, /var\(--space-3\)/, 'Tiefe 0 startet beim Polster von .list-row (--space-3), nicht bei 0');
+  assert.match(value, /var\(--folder-depth, 0\) \* 14px/, 'die Stufe je Ebene bleibt 14px');
+});
