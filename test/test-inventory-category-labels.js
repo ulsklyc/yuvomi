@@ -113,6 +113,16 @@ test('mindestens die drei bekannten Seiten mit lokalisierten Kategorien werden e
  * alarmiert; die Regel gilt fuer beide Schluesselarten. */
 const CATEGORY_CONTROL_RE = /value="\$\{(?:esc\((\w+)\.key\)|(\w+)\.id)\}"([\s\S]*?)<\/(?:option|label)>/g;
 
+/* DIE AUSWAHL STEHT NICHT IMMER ALS MARKUP IM MAP (Budget-Critique 2026-09-25).
+ * Das Abo-Filterblatt baut seine Selects ueber einen Helfer, der Paare
+ * `[wert, beschriftung]` bekommt; der Verwalten-Dialog uebergibt Objekte
+ * `{ value, label }`. Das `<option>` entsteht dann im Helfer, weit weg von der
+ * Liste - und der Guard fand in subscriptions.js "keine Auswahl mehr", obwohl
+ * die Regel dieselbe ist: die Beschriftung einer Seed-Kategorie darf nicht aus
+ * `.name` kommen. Gesucht wird deshalb auch die ZUORDNUNG von Schluessel zu
+ * Beschriftung, wo immer sie steht. Gruppe 1 = Liste, 2 = Variable, 3/4 = Label. */
+const CATEGORY_PAIR_RE = /([\w.]+)\s*\.\s*map\(\((\w+)\)\s*=>\s*(?:\[\s*\2\.(?:id|key)\s*,([^\]]*)\]|\(\{\s*value:\s*\2\.(?:id|key)\s*,\s*label:\s*([^}]*)\}\))/g;
+
 /* WAS EINE KATEGORIE-AUSWAHL IST, WIRD ABGELEITET - aus den Tabellen in
  * server/db.js, die eine `label_key`-Spalte fuehren. Ohne diese Einschraenkung
  * traefe das erweiterte `.id`-Muster auch die Lagerort-Auswahl im Inventar
@@ -169,10 +179,15 @@ for (const { file, src } of localizedPages) {
         const naechste = bindungen.reduce((a, b) => (a.index > b.index ? a : b));
         return LABEL_KEY_COLLECTIONS.some((c) => new RegExp(`\\b${c}$`).test(naechste[1]));
       });
-    assert.ok(controls.length > 0, `keine Kategorie-Auswahl in ${file} gefunden - das Muster greift nicht mehr`);
-    for (const m of controls) {
-      const variable = m[1] ?? m[2];
-      const label = m[3];
+    const pairs = [...src.matchAll(CATEGORY_PAIR_RE)]
+      .filter((m) => LABEL_KEY_COLLECTIONS.some((c) => new RegExp(`\\b${c}$`).test(m[1])))
+      .map((m) => ({ variable: m[2], label: m[3] ?? m[4] }));
+    const alle = [
+      ...controls.map((m) => ({ variable: m[1] ?? m[2], label: m[3] })),
+      ...pairs,
+    ];
+    assert.ok(alle.length > 0, `keine Kategorie-Auswahl in ${file} gefunden - das Muster greift nicht mehr`);
+    for (const { variable, label } of alle) {
       assert.ok(!new RegExp(`\\b${variable}\\.name\\b`).test(label),
         `${file}: die Auswahl liest ihr Label direkt aus ${variable}.name - bei einer Seed-Kategorie `
         + 'ist name NULL und die Beschriftung bleibt leer (#783). Ueber den Label-Resolver gehen.');
