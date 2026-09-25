@@ -3007,6 +3007,47 @@ html.fab-anim-done .page-fab {
   }
 }
 
+/* EIN KOPF MIT ZEITRAUM KLAPPT DIE TITELZEILE GANZ EIN (Kalender-Critique
+ * 2026-09-24, P1; Budget-Critique 2026-09-25; DESIGN.md, Die Chrome-Regel).
+ *
+ * `--period` traegt ein Kopf, dessen Center-Slot den Zeitraum der Seite fuehrt
+ * (Kalender: Tag/Woche/Monat, Budget: Monat). Dort beantwortet der Zeitraum
+ * mit Vor/Zurueck beim Scrollen weiter „wo bin ich", die Tab-Leiste darunter
+ * den Modulnamen - der Large Title hat eingeklappt nichts mehr zu sagen, was
+ * nicht schon dasteht. Fiel er nur auf den Inline-Schnitt, blieb er auf seiner
+ * eigenen Zeile, weil der Zeitraum mobil die ganze Zeile fuellt: der Kollaps
+ * sparte im Kalender 5-14px, im Budget 14px (170 -> 156px).
+ *
+ * Eingeklappt verlaesst der Titel deshalb das Bild, nicht den Baum: das <h1>
+ * bleibt die Seitenueberschrift fuer Screenreader, geclippt wie `.sr-only`.
+ * Das Siegel geht mit. Koepfe ohne Zeitraum (Notizen, Kontakte) behalten den
+ * Inline-Schnitt - bei ihnen verankert nichts anderes die Seite. */
+@media (max-width: 1023px) {
+  .page-toolbar--period.page-toolbar--capped.is-collapsed > .page-toolbar__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .page-toolbar--period.page-toolbar--capped.is-collapsed > .module-seal--head {
+    display: none;
+  }
+}
+
+/* Mobil liegen Titel, Zeitraum und Bar-Zeile mit halbem Zeilenabstand
+ * uebereinander: Zeitraum und Tab-Leiste bringen ihre Luft in 48px-
+ * Trefferflaechen mit, der Large Title in seiner Zeilenhoehe. Selektorform der
+ * Large-Title-Regel oben plus die Modifier-Klasse - mit blossem
+ * `.page-toolbar--period` verlor der Wert still gegen 0,3,0. */
+@media (max-width: 767px) {
+  .page-toolbar.page-toolbar--period:not(.page-toolbar--in-group):has(> .page-toolbar__title) {
+    row-gap: var(--space-1);
+  }
+}
+
 /* --------------------------------------------------------
  * KOMPAKTE HÖHENKLASSE: der Kopf trägt EINE Zeile.
  *
@@ -3366,6 +3407,12 @@ html.fab-anim-done .page-fab {
   .popover-menu__item {
     min-height: var(--target-lg);
   }
+}
+
+/* Ein Eintrag darf ein Link sein (Budget: CSV-Export) - dann ohne Unterstrich,
+ * sonst sieht er anders aus als seine Knopf-Nachbarn. */
+a.popover-menu__item {
+  text-decoration: none;
 }
 
 .popover-menu__item:hover,

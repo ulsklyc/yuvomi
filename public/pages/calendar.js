@@ -2007,7 +2007,7 @@ export async function render(container, { user }) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <div class="calendar-page app-page app-page--full" id="calendar-page" data-composition="full">
-      <div class="page-toolbar page-toolbar--wrap cal-toolbar" id="cal-toolbar"></div>
+      <div class="page-toolbar page-toolbar--wrap page-toolbar--period cal-toolbar" id="cal-toolbar"></div>
       <!-- Ansage der Tagesliste im Telefon-Monat (announceMonthDay). Ausserhalb
            von #cal-body, damit sie einen Neuaufbau der Ansicht ueberlebt: eine
            Live-Region, die mit ihrem Inhalt zusammen entsteht, sagt nichts an. -->

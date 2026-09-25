@@ -3358,17 +3358,24 @@ test('Kalenderkopf: Filter und Suche stehen in der Bar-Zeile hinter dem Ansichts
  * nehmen und klippen (das <h1> bleibt fuer Screenreader), sonst bleibt die
  * Zeile stehen. */
 test('Kalenderkopf: eingeklappt klappt die Titelzeile ganz ein (Titel geclippt, Siegel weg)', () => {
-  const rules = [...eachRule(calendarCss)];
+  // Die Regel ist seit der Budget-Critique 2026-09-25 geteilt: layout.css
+  // fuehrt sie fuer jeden Kopf mit Zeitraum (`.page-toolbar--period`), und der
+  // Kalenderkopf muss die Klasse tragen - sonst gilt sie fuer ihn nicht.
+  const layoutCss = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(layoutCss)];
   const title = rules.find((r) => r.selector.split(',').map((x) => x.trim())
-    .includes('.cal-toolbar.page-toolbar--capped.is-collapsed > .page-toolbar__title'));
-  assert(title, 'keine Regel fuer den eingeklappten Kalendertitel');
+    .includes('.page-toolbar--period.page-toolbar--capped.is-collapsed > .page-toolbar__title'));
+  assert(title, 'keine geteilte Regel fuer den eingeklappten Titel eines Zeitraum-Kopfs');
   assert(/position:\s*absolute/.test(title.body) && /clip-path:\s*inset\(50%\)/.test(title.body),
     'der eingeklappte Titel muss aus dem Fluss (position: absolute) und geclippt sein - '
     + 'display: none nimmt der Seite ihre Ueberschrift');
   assert(!/display:\s*none/.test(title.body), 'das <h1> darf nicht per display: none verschwinden');
   const seal = rules.find((r) => r.selector.trim()
-    === '.cal-toolbar.page-toolbar--capped.is-collapsed > .module-seal--head');
+    === '.page-toolbar--period.page-toolbar--capped.is-collapsed > .module-seal--head');
   assert(seal && /display:\s*none/.test(seal.body), 'das Absender-Siegel muss mit dem Titel einklappen');
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  assert(/<div class="page-toolbar[^"]*\bpage-toolbar--period\b[^"]*\bcal-toolbar\b[^"]*" id="cal-toolbar">/.test(src),
+    'der Kalenderkopf muss `page-toolbar--period` tragen, sonst klappt sein Titel nicht ganz ein');
 });
 
 /* DAS LABEL HAT EINE FESTE BREITE. Mit `flex-basis: auto` brachte es seine

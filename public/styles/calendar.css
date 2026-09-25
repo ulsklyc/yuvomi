@@ -254,32 +254,15 @@
   margin-inline-start: auto;
 }
 
-/* DIE TITELZEILE KLAPPT GANZ EIN (Critique 2026-09-24, P1; DESIGN.md, Die
- * Chrome-Regel). Die gedeckelte Architektur liess den Large Title beim
- * Scrollen nur auf den Inline-Schnitt fallen und neben den Zeitraum ruecken -
- * der aber fuellt mobil die ganze Zeile, also blieb der Titel auf seiner
- * eigenen Zeile und der Kollaps sparte 5-14px. Eingeklappt verlaesst der Titel
- * jetzt das Bild (nicht den Baum: das <h1> bleibt die Seitenueberschrift fuer
- * Screenreader, geclippt wie `.sr-only`), sein Siegel geht mit. Stehen bleibt,
- * was „wo bin ich" beantwortet: der Zeitraum mit Vor/Zurueck und die
- * Bar-Zeile. Den Modulnamen fuehrt dort die Tab-Leiste unten.
- *
- * Nur im Kalender: die anderen gedeckelten Koepfe (Budget, Notizen, Kontakte)
- * haben neben dem Titel keinen Zeitraum, der sie weiter verankerte. */
+/* DIE TITELZEILE KLAPPT GANZ EIN - die Regel steht seit der Budget-Critique
+ * 2026-09-25 geteilt in layout.css (`.page-toolbar--period`), zusammen mit dem
+ * halben Zeilenabstand mobil. Hier stand sie vorher als Kalender-Sonderfall mit
+ * der Begruendung, das Budget habe neben dem Titel keinen Zeitraum - das war
+ * falsch: sein Monatsstepper verankert die Seite genauso, und sein Kopf sparte
+ * mit dem blossen Inline-Schnitt ebenfalls nur 14px. Der Kopf traegt die
+ * Klasse im Markup (calendar.js). Gemessen im Kalender: ausgeklappt 166 statt
+ * 230px, eingeklappt 121px (Critique 2026-09-24: Monat 56 -> 65 % Inhalt). */
 @media (max-width: 1023px) {
-  .cal-toolbar.page-toolbar--capped.is-collapsed > .page-toolbar__title {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  .cal-toolbar.page-toolbar--capped.is-collapsed > .module-seal--head {
-    display: none;
-  }
-
   /* Ein leerer Aktions-Slot ist keine Zeile. Unter 1024px wohnt „Neu" im FAB
    * (.toolbar-new-btn ist dort `display: none`), und ohne
    * Ueberlappungswarnung steht nichts mehr darin - der Slot brach trotzdem als
@@ -287,19 +270,6 @@
    * der Woche) oder verengte die Zeitraum-Zeile um seinen Gap. */
   .cal-toolbar > .page-toolbar__actions:not(:has(.cal-toolbar__schedule-warning)) {
     display: none;
-  }
-}
-
-/* Mobil liegen Titel, Zeitraum und Bar-Zeile mit halbem Zeilenabstand
- * uebereinander: jede Zeile bringt ihre Luft in 48px-Trefferflaechen (Zeitraum,
- * Segment) oder in der Zeilenhoehe des Large Title schon mit. Zusammen mit dem
- * Umzug der Werkzeuge in die Bar-Zeile baut der Kopf ausgeklappt 166 statt
- * 230px, eingeklappt 121px (Critique 2026-09-24: Monat 56 -> 65 % Inhalt). */
-@media (max-width: 767px) {
-  /* Selektorform der Large-Title-Regel in layout.css plus die Modulklasse -
-   * mit blossem `.cal-toolbar` verlor der Wert dort still gegen 0,3,0. */
-  .page-toolbar.cal-toolbar:not(.page-toolbar--in-group):has(> .page-toolbar__title) {
-    row-gap: var(--space-1);
   }
 }
 
