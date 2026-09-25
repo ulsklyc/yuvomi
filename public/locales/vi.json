@@ -1060,7 +1060,13 @@
         "syncTargetAssigneeAmbiguous": "Nhiều lịch đặt người này làm người được giao mặc định. Hãy tự chọn đích.",
         "syncTargetSeveralAssignees": "Có nhiều người được giao, nên việc giao không chọn lịch nào. Thay vào đó dùng: {{target}}.",
         "filtersSources": "Lịch",
-        "filterUnassigned": "Chưa được giao"
+        "filterUnassigned": "Chưa được giao",
+        "dateSpanSpoken": "từ {{from}} đến {{to}}",
+        "multiDayPosition": "Ngày {{day}}/{{total}}",
+        "bandContinued": "tiếp theo",
+        "monthDayMoreTitles": "và {{count}} mục khác",
+        "monthDayMoreTitles_one": "và {{count}} mục khác",
+        "monthDayMoreTitles_other": "và {{count}} mục khác"
     },
     "noteCategories": {
         "categories": "Danh mục",

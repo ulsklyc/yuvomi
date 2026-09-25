@@ -1060,7 +1060,13 @@
         "syncTargetAssigneeAmbiguous": "複数のカレンダーでこの人が既定の割り当てになっています。保存先を自分で選んでください。",
         "syncTargetSeveralAssignees": "複数の人が割り当てられているため、割り当てではカレンダーを選びません。代わりに使用: {{target}}",
         "filtersSources": "カレンダー",
-        "filterUnassigned": "割り当てなし"
+        "filterUnassigned": "割り当てなし",
+        "dateSpanSpoken": "{{from}}から{{to}}まで",
+        "multiDayPosition": "{{total}}日間の{{day}}日目",
+        "bandContinued": "続き",
+        "monthDayMoreTitles": "他{{count}}件",
+        "monthDayMoreTitles_one": "他{{count}}件",
+        "monthDayMoreTitles_other": "他{{count}}件"
     },
     "noteCategories": {
         "categories": "カテゴリー",

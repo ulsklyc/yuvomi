@@ -1060,7 +1060,13 @@
         "syncTargetAssigneeAmbiguous": "Több naptárnak is ez a személy az alapértelmezett hozzárendelése. Válaszd ki magad a célt.",
         "syncTargetSeveralAssignees": "Több személy van hozzárendelve, ezért a hozzárendelés nem választ naptárat. Helyette ez érvényes: {{target}}.",
         "filtersSources": "Naptárak",
-        "filterUnassigned": "Senkihez sincs rendelve"
+        "filterUnassigned": "Senkihez sincs rendelve",
+        "dateSpanSpoken": "{{from}} és {{to}} között",
+        "multiDayPosition": "{{day}}. nap ({{total}} napból)",
+        "bandContinued": "folytatás",
+        "monthDayMoreTitles": "és még {{count}}",
+        "monthDayMoreTitles_one": "és még {{count}}",
+        "monthDayMoreTitles_other": "és még {{count}}"
     },
     "noteCategories": {
         "categories": "Kategóriák",

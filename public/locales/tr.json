@@ -1060,7 +1060,13 @@
         "syncTargetAssigneeAmbiguous": "Birden fazla takvimde bu kişi varsayılan atama olarak ayarlı. Hedefi kendin seç.",
         "syncTargetSeveralAssignees": "Birden fazla kişi atanmış, bu yüzden atama bir takvim seçmez. Bunun yerine kullanılan: {{target}}.",
         "filtersSources": "Takvimler",
-        "filterUnassigned": "Atanmamış"
+        "filterUnassigned": "Atanmamış",
+        "dateSpanSpoken": "{{from}} ile {{to}} arası",
+        "multiDayPosition": "Gün {{day}}/{{total}}",
+        "bandContinued": "devamı",
+        "monthDayMoreTitles": "ve {{count}} tane daha",
+        "monthDayMoreTitles_one": "ve {{count}} tane daha",
+        "monthDayMoreTitles_other": "ve {{count}} tane daha"
     },
     "noteCategories": {
         "categories": "Kategoriler",

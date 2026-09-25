@@ -31,6 +31,7 @@ import {
 } from '/utils/recurrence-scope.js';
 import { getReadableTextColor } from '/utils/color.js';
 import { resolveEventColor } from '/utils/event-color.js';
+import { packLanes } from '/utils/week-strip.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { parseRemindAtAsUtc, naiveUtc } from '/utils/reminder-offset.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
@@ -1504,6 +1505,161 @@ function agendaSegmentKind(ev, dayStr) {
   return 'middle';
 }
 
+// --------------------------------------------------------
+// Mehrtaegige Termine als Baender (Re-Kritik 2026-09-25, P2)
+//
+// „Städtereise" 13.-15.10. stand im Monat als drei gleiche Chips und in der
+// Ganztagszeile der Woche als drei Chips a 128px, jeder mit Icon und Avataren,
+// ohne Anschluss; der Screenreader hoerte dreimal „Ganztaegig". Die
+// Uebersichtskachel (utils/week-strip.js) zeichnete dieselben Termine laengst
+// als Baender. Jetzt tut es der Kalender auch, mit derselben Spurpackung
+// (packLanes()): EIN Balken je Wochenzeile, Titel und Glyphen einmal, am echten
+// Anfang die Kante, ueber die Zeile hinaus ein offenes Ende.
+// --------------------------------------------------------
+
+/**
+ * Wird dieser Termin als Band gezeichnet? Dieselbe Regel wie die Ganztagszeile
+ * (isAllDayLike()) und der Wochenstreifen der Uebersicht: mehrere Kalendertage
+ * UND ganztaegig oder mindestens 24 Stunden. Ein kurzer Nachttermin
+ * (22:00-01:30) bleibt an beiden Tagen ein eigener Eintrag (#1313).
+ */
+function isBandEvent(ev) {
+  return Boolean(ev?.start_datetime) && isMultiDayEvent(ev) && isAllDayLike(ev);
+}
+
+/**
+ * Der wievielte Tag eines mehrtaegigen Termins ist `dayStr`? `{ day, count }`
+ * (1-basiert), oder null fuer eintaegige Termine und Tage ausserhalb. Gezaehlt
+ * werden die Tage, auf denen der Termin im Raster steht (eventEndDate(), #804).
+ */
+function multiDayPosition(ev, dayStr) {
+  if (!isMultiDayEvent(ev)) return null;
+  const start = localDate(ev.start_datetime);
+  const count = daysBetween(start, eventEndDate(ev)) + 1;
+  const day = daysBetween(start, dayStr) + 1;
+  return day >= 1 && day <= count ? { day, count } : null;
+}
+
+/** „Tag 2 von 3", oder '' - Tagesliste, Agenda, Monatszelle und Tagesansicht. */
+function multiDayPositionText(ev, dayStr) {
+  const pos = multiDayPosition(ev, dayStr);
+  return pos ? t('calendar.multiDayPosition', { day: pos.day, total: pos.count }) : '';
+}
+
+/**
+ * Eine Tagesspanne zum Vorlesen: „13. bis 15. Oktober", „30. Oktober bis
+ * 2. November", ueber den Jahreswechsel mit Jahr.
+ *
+ * Die Verdichtung (Monat nur einmal) kommt aus `Intl.DateTimeFormat`
+ * `formatRangeToParts`, das Bindewort aus der Locale: der Bereichstrenner der
+ * Locale ist ein Gedankenstrich, und den liest nicht jeder Screenreader als
+ * „bis" - und in UI-Text gehoert er ohnehin nicht (CLAUDE.md). Gregorianisch,
+ * weil das Raster gregorianisch ist (`fa` formatierte sonst persische Monate
+ * neben gregorianischen Ziffern); in UTC, weil ein Tagesschluessel ein
+ * Kalendertag ist und kein Zeitpunkt.
+ */
+const RANGE_DASH = /^(.*?)\s*[\u2012\u2013\u2014\u2015~\uff5e-]\s*(.*)$/s;
+function spokenDateSpan(fromKey, toKey) {
+  const utc = (key) => {
+    const [y, m, d] = String(key).split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, d));
+  };
+  const opts = { day: 'numeric', month: 'long', timeZone: 'UTC', calendar: 'gregory' };
+  if (String(fromKey).slice(0, 4) !== String(toKey).slice(0, 4)) opts.year = 'numeric';
+  let fmt;
+  try { fmt = new Intl.DateTimeFormat(getLocale(), opts); }
+  catch { fmt = new Intl.DateTimeFormat(undefined, opts); }
+  const a = utc(fromKey);
+  const b = utc(toKey);
+  if (typeof fmt.formatRangeToParts === 'function') {
+    const parts = fmt.formatRangeToParts(a, b);
+    const sep = parts.findIndex((part, i) => part.type === 'literal' && part.source === 'shared'
+      && parts.slice(0, i).some((p) => p.source === 'startRange')
+      && parts.slice(i + 1).some((p) => p.source === 'endRange'));
+    const split = sep === -1 ? null : RANGE_DASH.exec(parts[sep].value);
+    if (split) {
+      const text = (list) => list.map((p) => p.value).join('');
+      return t('calendar.dateSpanSpoken', {
+        from: `${text(parts.slice(0, sep))}${split[1]}`.trim(),
+        to: `${split[2]}${text(parts.slice(sep + 1))}`.trim(),
+      });
+    }
+  }
+  return t('calendar.dateSpanSpoken', { from: fmt.format(a), to: fmt.format(b) });
+}
+
+/**
+ * Die Baender einer Zeile aufeinanderfolgender Tage - eine Wochenzeile des
+ * Monats oder die Spalten der Woche.
+ *
+ * Je Termin ein Segment mit seinen Spalten (`first`/`last`, inklusiv, auf die
+ * Zeile geklammert) und seinen offenen Enden (`continuesBefore`/`After`: der
+ * Termin laeuft ueber die Zeile hinaus). Die Spur vergibt packLanes(), stabil
+ * nach dem ECHTEN Anfang und bei Gleichstand der echten Laenge - nicht nach
+ * der geklammerten Spalte, damit zwei Termine, die aus der Vorwoche kommen,
+ * in jeder Zeile dieselbe Reihenfolge haben.
+ *
+ * `depth[i]` ist die Zahl der Spuren, die an Tag i belegt sind (hoechste Spur
+ * plus eins): so viel Platz haelt die Monatszelle ueber ihren eigenen Chips
+ * frei. `events` sind die Termin-OBJEKTE der Baender - die Zelle laesst sie aus
+ * ihren Chips weg, zaehlt und nennt sie aber weiter.
+ */
+function bandSegments(days, eventsFor = eventsOnDay) {
+  const rowStart = days[0];
+  const rowEnd = days[days.length - 1];
+  const events = new Set();
+  for (const day of days) {
+    for (const ev of eventsFor(day)) if (isBandEvent(ev)) events.add(ev);
+  }
+  const entries = [...events].map((ev) => {
+    const startKey = localDate(ev.start_datetime);
+    const endKey = eventEndDate(ev);
+    return {
+      ev, startKey, endKey,
+      first: Math.max(0, daysBetween(rowStart, startKey)),
+      last: Math.min(days.length - 1, daysBetween(rowStart, endKey)),
+      continuesBefore: startKey < rowStart,
+      continuesAfter: endKey > rowEnd,
+    };
+  });
+  entries.sort((x, y) => x.startKey.localeCompare(y.startKey)
+    || daysBetween(y.startKey, y.endKey) - daysBetween(x.startKey, x.endKey));
+  const { lanes, laneCount } = packLanes(entries);
+  const bands = entries.map((entry, i) => ({ ...entry, lane: lanes[i] }));
+  const depth = days.map((_, col) => bands.reduce(
+    (max, band) => (band.first <= col && col <= band.last ? Math.max(max, band.lane + 1) : max), 0));
+  return { bands, laneCount, depth, events };
+}
+
+/**
+ * Was ein Band zum Vorlesen sagt, nach dem Zeitteil der Agenda-Zeile: die
+ * Spanne („13. bis 15. Oktober"), bei einem Zeittermin Anfang und Ende, und
+ * „Fortsetzung", wenn dieses Stueck nicht am Anfang des Termins steht.
+ */
+function bandSpokenWhen(ev, { continued = false } = {}) {
+  const timed = !ev.all_day && ev.start_datetime.includes('T');
+  return [
+    spokenDateSpan(localDate(ev.start_datetime), eventEndDate(ev)),
+    timed ? t('calendar.spanFrom', { time: clockText(ev.start_datetime) }) : '',
+    timed && ev.end_datetime ? t('calendar.spanUntil', { time: clockText(ev.end_datetime) }) : '',
+    continued ? t('calendar.bandContinued') : '',
+  ].filter(Boolean).join(', ');
+}
+
+/**
+ * Das dezente Fortsetzungszeichen am offenen Ende eines Bands. Ein Chevron in
+ * der Tinte des Titels, gespiegelt in RTL (calendar.css) - die offene Kante
+ * allein ist bei 3px Radius zu leise, das Zeichen allein waere es ohne sie.
+ */
+function bandContinuationHtml(side) {
+  return `<i data-lucide="${side === 'before' ? 'chevron-left' : 'chevron-right'}" class="cal-band__cont cal-band__cont--${side}" aria-hidden="true"></i>`;
+}
+
+function bandClasses(base, { continuesBefore, continuesAfter }) {
+  return [base, 'cal-band', continuesBefore ? 'cal-band--before' : '', continuesAfter ? 'cal-band--after' : '']
+    .filter(Boolean).join(' ');
+}
+
 /**
  * Filtert Tasks: nur open/in_progress mit due_date werden angezeigt.
  * Abgelegte bleiben draußen - der Server liefert sie hier ohnehin nicht mehr mit
@@ -2451,18 +2607,42 @@ function fitMonthDayCells(grid) {
   // sagt nur, DASS es mehr gibt (ihr aria-label nennt die Anzahl ohnehin).
   const shortMore = Boolean(grid.closest('.month-view--split'));
   const moreText = (count) => (shortMore ? `+${count}` : t('calendar.moreEvents', { count }));
+
+  // BAENDER GELTEN FUER DIE GANZE ZEILE (Re-Kritik 2026-09-25). Ein Band
+  // laeuft ueber mehrere Zellen, also entscheidet nicht eine Zelle, ob seine
+  // Spur steht, sondern die Zeile: alle Zellen einer Woche sind gleich hoch,
+  // und eine Spur, die in einer Zelle fuer das „+N" weichen muss, weicht in
+  // allen. Die Zelle haelt ihre Spuren ueber `--lanes-shown` frei.
+  const rows = new Map();
+  for (const row of grid.querySelectorAll('.month-grid__row--bands')) {
+    row.style.removeProperty('--lanes-shown');
+    const bars = [...row.querySelectorAll('.month-bands .cal-band')];
+    bars.forEach((bar) => bar.classList.remove('is-clipped'));
+    rows.set(row, { bars, lanes: bars.map((bar) => Number(bar.dataset.lane)) });
+  }
+
   const cells = [];
   for (const cell of grid.querySelectorAll('.month-day')) {
     const chips   = [...cell.querySelectorAll('.month-day__holiday, .month-day__event, .cal-task-chip')];
     const moreRow = cell.querySelector('.month-day__more');
     if (!moreRow) continue;
     const total = Number(cell.dataset.total) || chips.length;
+    const row = rows.get(cell.parentElement) ?? null;
+    const spacer = row ? cell.querySelector('.month-day__lanes') : null;
+    const depth = spacer ? parseInt(spacer.style.getPropertyValue('--lanes'), 10) || 0 : 0;
+    // Die Baender, die an DIESEM Tag stehen: Spalte der Zelle gegen die
+    // Spalten jedes Bands.
+    const col = row ? [...cell.parentElement.children].indexOf(cell) : -1;
+    const bandLanes = row
+      ? row.bars.flatMap((bar, i) => (
+        col >= Number(bar.dataset.first) && col <= Number(bar.dataset.last) ? [row.lanes[i]] : []))
+      : [];
 
     // Reset auf vollständig sichtbar für eine stabile Messung.
     chips.forEach((c) => c.classList.remove('is-clipped'));
-    moreRow.hidden = !chips.length;
-    moreRow.textContent = chips.length ? moreText(total) : '';
-    if (chips.length) cells.push({ cell, chips, moreRow, total });
+    moreRow.hidden = !total;
+    moreRow.textContent = total ? moreText(total) : '';
+    if (total) cells.push({ cell, chips, moreRow, total, row, spacer, depth, bandLanes });
   }
 
   // Der Deckel kommt aus dem Stylesheet, nicht aus einer zweiten Breitenabfrage
@@ -2480,15 +2660,47 @@ function fitMonthDayCells(grid) {
     item.cellBottom = item.cell.getBoundingClientRect().bottom - parseFloat(cs.paddingBottom);
     item.reserved   = item.cellBottom - item.moreRow.getBoundingClientRect().height;
     item.bottoms    = item.chips.map((c) => c.getBoundingClientRect().bottom);
+    if (item.spacer) {
+      const box = item.spacer.getBoundingClientRect();
+      item.laneTop  = box.top;
+      item.laneStep = item.depth ? box.height / item.depth : 0;
+    }
   }
 
-  for (const { chips, moreRow, total, bottoms, cellBottom, reserved } of cells) {
+  // Zeilenentscheid: alle Spuren, wenn jede Zelle der Zeile alles fasst;
+  // sonst so viele, wie ueber dem „+N" Platz haben.
+  for (const [row, info] of rows) {
+    const inRow = cells.filter((item) => item.row === info);
+    const fits = (item) => item.total <= maxVisible
+      && (item.chips.length ? item.bottoms[item.bottoms.length - 1] <= item.cellBottom
+        : !item.spacer || item.laneTop + item.depth * item.laneStep <= item.cellBottom);
+    const laneCount = Math.max(0, ...info.lanes) + 1;
+    let shown = laneCount;
+    if (!inRow.every(fits)) {
+      for (const item of inRow) {
+        if (!item.laneStep) continue;
+        shown = Math.min(shown, Math.max(0, Math.floor((item.reserved - item.laneTop) / item.laneStep)));
+      }
+    }
+    info.shown = shown;
+    info.bars.forEach((bar, i) => bar.classList.toggle('is-clipped', info.lanes[i] >= shown));
+    if (shown < laneCount) row.style.setProperty('--lanes-shown', String(shown));
+  }
+
+  for (const { chips, moreRow, total, bottoms, cellBottom, reserved, row, depth, laneStep, bandLanes } of cells) {
+    // Weicht eine Spur, ruecken die Chips darunter um ihre Hoehe nach oben.
+    const shown = row ? row.shown : 0;
+    const lift = row ? (depth - Math.min(depth, shown)) * (laneStep || 0) : 0;
+    const lifted = bottoms.map((bottom) => bottom - lift);
+    const bandsShown = bandLanes.filter((lane) => lane < shown).length;
+    const bandsHidden = bandLanes.length - bandsShown;
+
     // Passt alles rein (inkl. evtl. nicht gerenderter Überzähliger) UND unter den
     // Deckel? Dann fertig. Ohne die zweite Frage traete der Fall "fuenf Termine,
     // Zelle hoch genug fuer fuenf" hier durch und zeigte fuenf Zeilen ohne "+N" -
     // der Deckel muss auf BEIDEN Wegen greifen, nicht nur im Klipp-Zweig.
-    const fitsAll = total <= chips.length && total <= maxVisible
-      && bottoms[bottoms.length - 1] <= cellBottom;
+    const fitsAll = !bandsHidden && total <= bandsShown + chips.length && total <= maxVisible
+      && (!lifted.length || lifted[lifted.length - 1] <= cellBottom);
     if (fitsAll) {
       moreRow.hidden = true;
       moreRow.textContent = '';
@@ -2497,14 +2709,15 @@ function fitMonthDayCells(grid) {
 
     // Platz für die "+N"-Zeile freihalten (einzeilig, Höhe unabhängig von N).
     let visible = 0;
-    for (const bottom of bottoms) {
+    for (const bottom of lifted) {
       if (bottom <= reserved) visible += 1;
       else break;
     }
-    visible = Math.max(1, Math.min(visible, maxVisible)); // nie ganz leer wirken lassen
+    // nie ganz leer wirken lassen - ein Band zaehlt als Inhalt
+    visible = Math.max(bandsShown || !chips.length ? 0 : 1, Math.min(visible, maxVisible - bandsShown));
 
     chips.forEach((chip, i) => chip.classList.toggle('is-clipped', i >= visible));
-    const hiddenCount = total - visible;
+    const hiddenCount = total - bandsShown - visible;
     if (hiddenCount > 0) {
       moreRow.textContent = moreText(hiddenCount);
     } else {
@@ -2659,15 +2872,23 @@ function renderMonthView(container) {
         ${weekdayOrder(state.weekStart).map((idx) => `<div class="month-weekday" role="columnheader" aria-label="${esc(DAY_NAMES_LONG()[idx])}">${DAY_NAMES_SHORT()[idx]}</div>`).join('')}
       </div>
       <div class="month-grid${split ? '' : ' page-scrollport'}" id="month-grid" role="rowgroup">
-        ${Array.from({ length: weeks }, (_, w) => `
-        <div class="month-grid__row" role="row">
-          ${days.slice(w * 7, w * 7 + 7).map(({ date, inMonth }) => renderMonthDay(date, inMonth, {
+        ${Array.from({ length: weeks }, (_, w) => {
+          const week = days.slice(w * 7, w * 7 + 7);
+          // Baender nur am Desktop: am Telefon sagt der Punkt je Tag „hier ist
+          // etwas", und die Tagesliste darunter nennt „Tag 2 von 3".
+          const band = split ? null : bandSegments(week.map((d) => d.date));
+          return `
+        <div class="month-grid__row${band?.laneCount ? ' month-grid__row--bands' : ''}" role="row">
+          ${week.map(({ date, inMonth }, i) => renderMonthDay(date, inMonth, {
             selected: split && date === state.cursor,
             selWeek:  split && w === selWeek,
             split,
             focusable: date === focusDate,
+            band: band ? { depth: band.depth[i], events: band.events } : null,
           })).join('')}
-        </div>`).join('')}
+          ${band?.laneCount ? monthBandsHtml(band) : ''}
+        </div>`;
+        }).join('')}
       </div>
     </div>
     ${split ? monthListHtml() : ''}
@@ -2675,6 +2896,14 @@ function renderMonthView(container) {
 
   const grid = container.querySelector('#month-grid');
   grid.addEventListener('click', (e) => {
+    // Ein Band liegt UEBER den Zellen (`.month-bands`), nicht in einer: es
+    // oeffnet seinen Termin, wie ein Chip in der Zelle.
+    const bandEl = e.target.closest('.month-bands .cal-band');
+    if (bandEl) {
+      const ev = state.events.find((x) => x.id === parseInt(bandEl.dataset.id, 10));
+      if (ev) openEventDetail(ev, bandEl);
+      return;
+    }
     const dayEl = e.target.closest('.month-day');
     if (!dayEl) return;
 
@@ -3185,8 +3414,36 @@ function monthDayClasses(date, inMonth, todayKey = state.today, { selected = fal
   ].filter(Boolean).join(' ');
 }
 
-function renderMonthDay(date, inMonth, { selected = false, selWeek = false, split = false, focusable = false } = {}) {
+/**
+ * Die Baender einer Monatswoche: EINE Schicht ueber den sieben Zellen, mit
+ * denselben sieben Spalten, je Spur eine Rasterzeile (calendar.css,
+ * `.month-bands`). Die Zellen halten darunter so viele Spuren frei, wie an
+ * ihrem Tag belegt sind (`.month-day__lanes`); wie viele Spuren stehen
+ * bleiben, entscheidet fitMonthDayCells() fuer die ganze Zeile.
+ *
+ * KEIN NEUER TAB-STOPP (Muster aus #1460): die Zelle ist das Ziel der
+ * Tastatur und nennt die Baender in ihrem Namen; die Schicht ist aria-hidden,
+ * ein Band ist fuer die Maus da wie der Chip in der Zelle. Kein Avatar-Stack
+ * (Monatskanon), das „Wer" steht im title.
+ */
+function monthBandsHtml({ bands }) {
+  return `<div class="month-bands" aria-hidden="true">${bands.map((band) => {
+    const { ev, first, last, lane, continuesBefore, continuesAfter } = band;
+    const title = [ev.title, bandSpokenWhen(ev), ev.cal_name].filter(Boolean).map((part) => esc(part)).join(' · ')
+      + chipAssigneeTitleSuffix(ev);
+    return `<div class="${bandClasses('month-day__event', band)}" data-id="${ev.id}" data-start="${esc(band.startKey)}" data-end="${esc(band.endKey)}"
+         data-lane="${lane}" data-first="${first}" data-last="${last}"
+         style="grid-column:${first + 1} / span ${last - first + 1};grid-row:${lane + 1};${eventSurfaceStyle(ev)}"
+         title="${title}">${continuesBefore ? bandContinuationHtml('before') : ''}${eventGlyphsHtml(ev)}<span>${esc(ev.title)}</span>${continuesAfter ? bandContinuationHtml('after') : ''}</div>`;
+  }).join('')}</div>`;
+}
+
+function renderMonthDay(date, inMonth, { selected = false, selWeek = false, split = false, focusable = false, band = null } = {}) {
   const evs      = eventsOnDay(date);
+  // Mehrtaegige Termine stehen als Band ueber der Zeile (monthBandsHtml), nicht
+  // als Chip in jeder ihrer Zellen. Gezaehlt (data-total) und genannt
+  // (aria-label) werden sie hier weiter - die Zelle traegt den Tab-Stopp.
+  const chipEvs  = band ? evs.filter((ev) => !band.events.has(ev)) : evs;
   const dayTasks = tasksOnDay(date);
   const dayHols  = holidaysOnDay(date);
   const daySchedule = scheduleEntriesOnDay(date);
@@ -3204,7 +3461,7 @@ function renderMonthDay(date, inMonth, { selected = false, selWeek = false, spli
   // Schichtplan ungekappt (typischerweise 0-2 Abholungen je Tag).
   const total     = dayHols.length + daySchedule.length + dayWaste.length + evs.length + dayTasks.length;
   const holShown  = dayHols.slice(0, MONTH_DAY_MAX_CHIPS);
-  const evShown   = evs.slice(0, Math.max(0, MONTH_DAY_MAX_CHIPS - holShown.length));
+  const evShown   = chipEvs.slice(0, Math.max(0, MONTH_DAY_MAX_CHIPS - holShown.length));
   const taskShown = dayTasks.slice(0, Math.max(0, MONTH_DAY_MAX_CHIPS - holShown.length - evShown.length));
 
   const holHtml = holShown.map((h) => `
@@ -3240,6 +3497,7 @@ function renderMonthDay(date, inMonth, { selected = false, selWeek = false, spli
          role="gridcell" tabindex="${focusable ? '0' : '-1'}"
          aria-label="${esc(monthDayAriaLabel(date, total, evs, { tasks: dayTasks, others: [...dayHols.map((h) => h.name), ...daySchedule.map(scheduleEntryLabel)], isToday }))}"${isToday ? ' aria-current="date"' : ''}${split ? ` aria-selected="${selected ? 'true' : 'false'}"` : ''}>
       <div class="month-day__number">${new Date(date + 'T00:00:00').getDate()}</div>
+      ${band?.depth ? `<div class="month-day__lanes" style="--lanes:${band.depth}" aria-hidden="true"></div>` : ''}
       ${holHtml}
       ${scheduleHtml}
       ${wasteHtml}
@@ -3593,17 +3851,29 @@ function renderScheduleTimeBlock(entry, className, layout = null) {
  */
 const MONTH_DAY_LABEL_TITLES = 3;
 function monthDayAriaLabel(date, total, events = [], { tasks = [], others = [], isToday = false } = {}) {
+  const eventTitle = (event) => {
+    if (!event?.title) return '';
+    const title = (event.recurrence_rule || event.is_recurring_instance)
+      ? `${t('calendar.recurringEvent')}: ${event.title}` : event.title;
+    const position = multiDayPositionText(event, date);
+    return position ? `${title} (${position})` : title;
+  };
   const titles = [
     ...others,
-    ...events.map((event) => ((event?.recurrence_rule || event?.is_recurring_instance) && event.title
-      ? `${t('calendar.recurringEvent')}: ${event.title}` : event?.title)),
+    ...events.map(eventTitle),
     ...tasks.map((task) => task?.title),
   ].filter(Boolean).slice(0, MONTH_DAY_LABEL_TITLES);
   const entries = total > 0 ? t('calendar.monthDayEntries', { count: total }) : '';
+  // „4 Eintraege: A, B, C" hiess vorher, es seien drei (Re-Kritik
+  // 2026-09-25): wer nur zuhoert, hoert den Rest jetzt als Zahl.
+  const rest = total - titles.length;
+  const named = titles.length
+    ? `${titles.join(', ')}${rest > 0 ? ` ${t('calendar.monthDayMoreTitles', { count: rest })}` : ''}`
+    : '';
   return [
     formatDate(date, { long: true, weekday: true }),
     isToday ? t('calendar.today') : '',
-    entries && titles.length ? `${entries}: ${titles.join(', ')}` : entries,
+    entries && named ? `${entries}: ${named}` : entries,
   ].filter(Boolean).join(', ');
 }
 
@@ -3622,8 +3892,11 @@ function renderWeekView(container) {
       })();
   const colCount = days.length;
 
+  // Mehrtaegige Termine laufen als EIN Band ueber ihre Spalten (bandSegments),
+  // die Zellen darunter tragen nur noch, was an einem Tag steht.
+  const band = bandSegments(days);
   const alldayEvs = days.map((d) =>
-    eventsOnDay(d).filter(isAllDayLike)
+    eventsOnDay(d).filter((ev) => isAllDayLike(ev) && !band.events.has(ev))
   );
   const timedEvs = days.map((d) =>
     eventsOnDay(d).filter((e) => !isAllDayLike(e))
@@ -3652,10 +3925,12 @@ function renderWeekView(container) {
         }).join('')}
       </div>
       <!-- Ganztägige Ereignisse -->
-      <div class="allday-row" style="display:grid;grid-template-columns:var(--cal-gutter-width) repeat(${colCount},1fr);">
-        <div class="calendar-all-day-label">${t('calendar.allDayShort')}</div>
+      <div class="allday-row allday-row--week" style="display:grid;grid-template-columns:var(--cal-gutter-width) repeat(${colCount},1fr);grid-template-rows:repeat(${band.laneCount + 1},auto);">
+        <div class="calendar-all-day-label" style="grid-row:1 / -1">${t('calendar.allDayShort')}</div>
+        ${days.map((d, i) => `<div class="allday-col" style="grid-column:${i + 2};grid-row:1 / -1" aria-hidden="true"></div>`).join('')}
+        ${band.bands.map(renderWeekBand).join('')}
         ${days.map((d, i) => `
-          <div class="allday-cell">
+          <div class="allday-cell" style="grid-column:${i + 2};grid-row:${band.laneCount + 1}">
             ${holidaysOnDay(d).map((h) => `
               <div class="allday-holiday" style="--holi-color:${esc(h.color)};--holi-ink:${esc(getReadableTextColor(h.color))}" title="${esc(h.name)}">
                 <span>${esc(h.name)}</span>
@@ -3935,16 +4210,24 @@ function allDayChipTimeHtml(timeText) {
  */
 function renderAllDayEvent(ev, dayStr) {
   const timeText = allDayChipTimeText(ev, dayStr);
-  const spoken = allDayChipTimeText(ev, dayStr, { suffix: true });
+  // Ein mehrtaegiger Termin ist in der Tagesansicht ein STUECK seines Bands:
+  // offene Kante zu den Nachbartagen, im Namen Spanne, „Tag 2 von 3" und
+  // „Fortsetzung" ab Tag zwei (Re-Kritik 2026-09-25).
+  const segment = isBandEvent(ev)
+    ? { continuesBefore: localDate(ev.start_datetime) < dayStr, continuesAfter: eventEndDate(ev) > dayStr }
+    : null;
+  const spoken = segment
+    ? [bandSpokenWhen(ev, { continued: segment.continuesBefore }), multiDayPositionText(ev, dayStr)].filter(Boolean).join(', ')
+    : allDayChipTimeText(ev, dayStr, { suffix: true });
   // DER TITEL VOR DEM „WER" (Re-Kritik 2026-09-25, P2): die Zugewiesenen
   // stehen mit Titel und Uhrzeit in EINER umbrechenden Zeile und erscheinen
   // nur, wenn beide daneben GANZ passen - sonst fallen sie in die
   // abgeschnittene zweite Zeile (calendar.css, `.allday-event__line`). Name im
   // title-Attribut und im gesprochenen Namen bleibt.
   return `
-    <div class="allday-event" data-id="${ev.id}"
+    <div class="${segment ? bandClasses('allday-event', segment) : 'allday-event'}" data-id="${ev.id}"
          style="${eventSurfaceStyle(ev)}"${eventBlockAttrs(ev, spoken || t('calendar.allDay'))}
-         title="${allDayChipTitle(ev, spoken)}">${eventGlyphsHtml(ev)}<span class="allday-event__line"><span class="allday-event__label"><span>${esc(ev.title)}</span>${allDayChipTimeHtml(timeText)}</span>${chipAssigneeStack(ev, { size: 14, maxVisible: 2 })}</span></div>`;
+         title="${allDayChipTitle(ev, allDayChipTimeText(ev, dayStr, { suffix: true }))}">${segment?.continuesBefore ? bandContinuationHtml('before') : ''}${eventGlyphsHtml(ev)}<span class="allday-event__line"><span class="allday-event__label"><span>${esc(ev.title)}</span>${allDayChipTimeHtml(timeText)}</span>${chipAssigneeStack(ev, { size: 14, maxVisible: 2 })}</span>${segment?.continuesAfter ? bandContinuationHtml('after') : ''}</div>`;
 }
 
 /**
@@ -3955,6 +4238,33 @@ function renderAllDayEvent(ev, dayStr) {
  * Zeitzeile ist, und nur, wenn sie neben die Uhrzeit passen (calendar.css,
  * `.week-event__time`). Wer zugewiesen ist, sagen title und gesprochener Name.
  */
+/**
+ * Ein Band der Ganztagszeile in der Woche (Re-Kritik 2026-09-25, P2): EIN
+ * Balken ueber die Spalten seiner Tage statt eines Chips je Tag. Er spricht
+ * die Grammatik des Ganztags-Balkens (`.allday-event`: Toenung, Tinte 35 %,
+ * Kante nur am ECHTEN Anfang) und dessen Zeile Titel-vor-Wer
+ * (`.allday-event__line`, Schritt 1): Titel und „ab" am Anfang, das „bis" am
+ * Ende des Balkens, wo der Termin endet, die Zugewiesenen dahinter. Alle drei
+ * stehen in DERSELBEN umbrechenden Zeile, in der Rangfolge Titel, Uhrzeit,
+ * Wer: was neben dem ganzen Titel nicht mehr passt, faellt in die
+ * abgeschnittene zweite Zeile, statt den Titel auf zwei Buchstaben zu kuerzen
+ * (gemessen mobil: „Te… bis 11:00"). Laeuft er ueber die Woche hinaus, ist die
+ * Kante offen und traegt das Fortsetzungszeichen.
+ *
+ * Ein Knopf wie jeder Block der Woche (role=button, tabindex=0); sein Name
+ * nennt die Spanne und bei einem Stueck aus der Vorwoche „Fortsetzung".
+ */
+function renderWeekBand(band) {
+  const { ev, first, last, lane, continuesBefore, continuesAfter, startKey, endKey } = band;
+  const from = continuesBefore ? '' : allDayChipTimeText(ev, startKey);
+  const until = continuesAfter ? '' : allDayChipTimeText(ev, endKey);
+  const spoken = bandSpokenWhen(ev, { continued: continuesBefore });
+  return `
+    <div class="${bandClasses('allday-event', band)}" data-id="${ev.id}" data-start="${esc(startKey)}" data-end="${esc(endKey)}"
+         style="grid-column:${first + 2} / span ${last - first + 1};grid-row:${lane + 1};${eventSurfaceStyle(ev)}"${eventBlockAttrs(ev, spoken)}
+         title="${[ev.title, bandSpokenWhen(ev), ev.cal_name].filter(Boolean).map((part) => esc(part)).join(' · ')}${chipAssigneeTitleSuffix(ev)}">${continuesBefore ? bandContinuationHtml('before') : ''}${eventGlyphsHtml(ev)}<span class="allday-event__line"><span class="allday-event__label"><span>${esc(ev.title)}</span>${allDayChipTimeHtml(from)}</span>${until ? `<small class="allday-event__time cal-band__until">${esc(until)}</small>` : ''}${chipAssigneeStack(ev, { size: 14, maxVisible: 2 })}</span>${continuesAfter ? bandContinuationHtml('after') : ''}</div>`;
+}
+
 function renderWeekEvent(ev, layout = null, dayStr = null) {
   const { start, end } = timeRangeForEvent(ev, dayStr);
   const duration = Math.max(end - start, 30);
@@ -5181,6 +5491,16 @@ export const __test = {
   renderWeekEvent,
   renderDayEvent,
   renderAllDayEvent,
+  // Mehrtaegige Termine als Baender (Re-Kritik 2026-09-25).
+  isBandEvent,
+  bandSegments,
+  multiDayPosition,
+  multiDayPositionText,
+  spokenDateSpan,
+  bandSpokenWhen,
+  renderWeekBand,
+  monthBandsHtml,
+  fitMonthDayCells,
   renderAgendaEvent,
   scheduleTimeLabel,
 };
@@ -5189,6 +5509,10 @@ function renderAgendaEvent(ev, dayStr) {
   const day  = dayStr ?? localDate(ev.start_datetime);
   const kind = agendaSegmentKind(ev, day);
   const timeStr = (kind === 'all-day' || kind === 'middle') ? t('calendar.allDay') : eventTimeText(ev, day);
+  // „Tag 2 von 3" (Re-Kritik 2026-09-25): eine Zeile je Tag darf bleiben,
+  // aber sie sagt, welcher Tag des Termins es ist - vorher stand dreimal
+  // dieselbe „Ganztaegig"-Zeile.
+  const position = multiDayPositionText(ev, day);
   const assignedUsers = ev.assigned_users ?? [];
   // `data-date` macht die Zeile eindeutig: ein Serientermin und ein mehrtaegiger
   // Termin stehen mit derselben id an mehreren Tagen. Ohne das Datum findet
@@ -5196,11 +5520,11 @@ function renderAgendaEvent(ev, dayStr) {
   // die Seitenwurzel aus, statt auf der Zeile zu bleiben (#1083).
   return `
     <div class="list-row agenda-event" data-id="${ev.id}" data-date="${esc(day)}" role="button" tabindex="0"
-         style="${eventSurfaceStyle(ev)}" aria-label="${esc(agendaEventAriaLabel(ev, timeStr))}">
+         style="${eventSurfaceStyle(ev)}" aria-label="${esc(agendaEventAriaLabel(ev, [timeStr, position].filter(Boolean).join(', ')))}">
       <div class="agenda-event__body">
         <div class="agenda-event__title">${eventGlyphsHtml(ev, { compact: false })}<span>${esc(ev.title)}</span></div>
         <div class="agenda-event__meta">
-          <span class="calendar-meta-item calendar-meta-item--time">${calendarMetaIconHtml('clock')}<span>${esc(timeStr)}</span></span>
+          <span class="calendar-meta-item calendar-meta-item--time">${calendarMetaIconHtml('clock')}<span>${esc(timeStr)}</span>${position ? `<span class="calendar-meta-item__day">${esc(position)}</span>` : ''}</span>
           ${ev.location ? `<span class="calendar-meta-item calendar-meta-item--place">${calendarMetaIconHtml('map-pin')}<span>${esc(fmtLocation(ev.location))}</span></span>` : ''}
           ${ev.cal_name ? `<span class="calendar-meta-item calendar-meta-item--cal">${calendarMetaIconHtml('calendar-days')}<span>${esc(ev.cal_name)}</span></span>` : ''}
           ${eventVisibilityMeta(ev.visibility)}

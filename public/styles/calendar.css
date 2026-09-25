@@ -2015,6 +2015,142 @@
 }
 
 /* --------------------------------------------------------
+ * Mehrtaegige Termine als Baender (Re-Kritik 2026-09-25, P2)
+ *
+ * EIN Balken je Wochenzeile statt eines Chips je Tag - in der Ganztagszeile
+ * der Woche und im Desktop-Monat, nach dem Muster des Wochenstreifens der
+ * Uebersicht (`.week-strip__band`, dieselbe Spurpackung). Er spricht die
+ * Termingrammatik des Blocks, an dem er haengt (`.allday-event` bzw.
+ * `.month-day__event`: Toenung, Tinte 35 %, gemessen >= 7,2:1); neu sind nur
+ * seine ENDEN:
+ *   - am echten Anfang die Vollton-Kante und die Rundung, wie jeder Block;
+ *   - wo er ueber die Zeile hinauslaeuft, eine OFFENE Kante: keine Kante,
+ *     keine Rundung, bis an den Rand der Spalte, dazu ein Chevron in der Tinte
+ *     des Titels. Die offene Kante allein ist bei 4px Radius zu leise, das
+ *     Zeichen allein saehe aus wie ein Knopf.
+ * Alles in logischen Eigenschaften: in RTL oeffnet sich die andere Seite, und
+ * das Chevron dreht mit.
+ * -------------------------------------------------------- */
+.cal-band--before {
+  border-inline-start-width: 0;
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+}
+
+.cal-band--after {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.cal-band__cont {
+  flex: none;
+  width: var(--space-3);
+  height: var(--space-3);
+}
+
+.cal-band__cont--after,
+.cal-band__until {
+  margin-inline-start: auto;
+}
+
+/* Steht das „bis" in der Zeile, schiebt ES ans Ende; die Zugewiesenen folgen
+ * ihm, statt mit einem zweiten auto-Rand den freien Platz zu teilen. */
+.cal-band__until + .cal-chip__assigned {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+[dir="rtl"] .cal-band__cont {
+  transform: scaleX(-1);
+}
+
+/* Woche: die Ganztagszeile ist ein Raster aus Spuren (je Band eine Zeile)
+ * und einer letzten Zeile fuer das, was an EINEM Tag steht. Die Spalten-
+ * fugen zeichnet `.allday-col` ueber die ganze Hoehe, damit ein Band sie
+ * ueberdecken kann - in der Zelle waeren sie unter den Spuren abgerissen. */
+.allday-col {
+  border-inline-start: var(--space-px) solid var(--color-border-subtle);
+}
+
+.allday-row--week .allday-cell {
+  border-left: 0;
+}
+
+.allday-row--week > .cal-band {
+  min-width: 0;
+  margin: var(--space-0h) var(--space-0h) 0;
+}
+
+.allday-row--week > .cal-band--before {
+  margin-inline-start: 0;
+}
+
+.allday-row--week > .cal-band--after {
+  margin-inline-end: 0;
+}
+
+/* Monat: eine Schicht ueber den sieben Zellen einer Woche, mit denselben
+ * sieben Spalten und je Spur einer Zeile in der Hoehe eines Monatschips. Sie
+ * beginnt unter der Tagesziffer (Zellpolster + Ziffer + deren Abstand), und
+ * die Zelle haelt darunter so viele Spuren frei, wie an ihrem Tag belegt
+ * sind (`.month-day__lanes`). Wie viele Spuren die Zeile zeigt, setzt
+ * fitMonthDayCells() als `--lanes-shown`; ein Band darueber faellt mit
+ * `is-clipped` und zaehlt ins „+N". Die Schicht nimmt keine Zeiger an, nur
+ * ihre Baender - ein Klick daneben trifft die Zelle darunter. */
+.month-grid {
+  --month-band-h: calc(var(--text-xs) * 1.4 + 2 * var(--space-0h));
+}
+
+.month-grid__row--bands {
+  position: relative;
+}
+
+.month-bands {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-rows: var(--month-band-h);
+  column-gap: var(--space-px);
+  row-gap: var(--space-0h);
+  align-content: start;
+  padding-top: calc(2 * var(--space-1) + var(--space-6));
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.month-bands > .cal-band {
+  min-width: 0;
+  height: var(--month-band-h);
+  margin: 0 var(--space-1);
+  pointer-events: auto;
+}
+
+.month-bands > .cal-band--before {
+  margin-inline-start: 0;
+}
+
+.month-bands > .cal-band--after {
+  margin-inline-end: 0;
+}
+
+.month-bands > .cal-band.is-clipped {
+  display: none;
+}
+
+.month-day__lanes {
+  height: calc(min(var(--lanes), var(--lanes-shown, 99)) * (var(--month-band-h) + var(--space-0h)));
+}
+
+/* „Tag 2 von 3" in Agenda und Tagesliste, hinter der Uhrzeit derselben
+ * Metaangabe - der Punkt trennt, das Gewicht bleibt das der Zeit. */
+.calendar-meta-item__day::before {
+  content: '·';
+  margin-inline-end: var(--space-1);
+}
+
+/* --------------------------------------------------------
  * Kalender-Name-Label (Agenda, Popup)
  * -------------------------------------------------------- */
 .event-cal-label {

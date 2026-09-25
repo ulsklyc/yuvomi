@@ -1060,7 +1060,13 @@
         "syncTargetAssigneeAmbiguous": "Meerdere agenda's hebben deze persoon als standaardtoewijzing. Kies het doel zelf.",
         "syncTargetSeveralAssignees": "Er zijn meerdere personen toegewezen, dus de toewijzing kiest geen agenda. In plaats daarvan geldt: {{target}}.",
         "filtersSources": "Agenda's",
-        "filterUnassigned": "Niet toegewezen"
+        "filterUnassigned": "Niet toegewezen",
+        "dateSpanSpoken": "{{from}} tot en met {{to}}",
+        "multiDayPosition": "Dag {{day}} van {{total}}",
+        "bandContinued": "vervolg",
+        "monthDayMoreTitles": "en nog {{count}}",
+        "monthDayMoreTitles_one": "en nog {{count}}",
+        "monthDayMoreTitles_other": "en nog {{count}}"
     },
     "noteCategories": {
         "categories": "Categorieën",

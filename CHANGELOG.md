@@ -81,6 +81,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   column instead of running into the screen edge, tasks in the agenda sit closer together and line up with the
   date and the event rows, and the initials in the agenda's avatar stack are 12px.
 
+- **A trip over several days is one bar in the calendar, not a chip on every day.** In the week's
+  all-day row and in the month on a computer, an event that spans several days is now drawn as a
+  single bar across its days, with its title, icon and people once, as the calendar tile on the
+  overview already did. Where it runs on past the end of the week, the bar stays open with a small
+  arrow, and it picks up with the same arrow at the start of the next week. Overlapping trips stack
+  in rows without covering each other, above the events of a single day, and "+2 more" in the
+  month counts the bars it had to hide. An event over 24 hours shows "from 14:00" at its start and
+  "until 11:00" at its end. The agenda and the day list under the phone month keep one row per
+  day but say which day it is ("Day 2 of 3"). Screen readers hear a bar as one event with its dates
+  ("13 to 15 October") and a continued piece as "continued", and a month day that names three of
+  four entries now adds "and 1 more".
+
 - **The calendar's arrows say where they go.** They are named "Previous month", "Next week",
   "Next 3 days" or "Next 30 days", depending on the view, instead of "Back" and "Forward", and
   show that name as a tooltip. The agenda's heading names the span it lists ("24.09. -

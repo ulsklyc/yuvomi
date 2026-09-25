@@ -1060,7 +1060,13 @@
         "syncTargetAssigneeAmbiguous": "Plusieurs calendriers ont cette personne comme attribution par défaut. Choisis toi-même la destination.",
         "syncTargetSeveralAssignees": "Plusieurs personnes sont assignées, l'attribution ne choisit donc aucun calendrier. Utilisé à la place : {{target}}.",
         "filtersSources": "Calendriers",
-        "filterUnassigned": "Non attribués"
+        "filterUnassigned": "Non attribués",
+        "dateSpanSpoken": "du {{from}} au {{to}}",
+        "multiDayPosition": "Jour {{day}} sur {{total}}",
+        "bandContinued": "suite",
+        "monthDayMoreTitles": "et {{count}} autres",
+        "monthDayMoreTitles_one": "et {{count}} autre",
+        "monthDayMoreTitles_other": "et {{count}} autres"
     },
     "noteCategories": {
         "categories": "Catégories",

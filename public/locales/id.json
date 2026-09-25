@@ -1072,7 +1072,13 @@
         "syncTargetAssigneeAmbiguous": "Beberapa kalender memiliki orang ini sebagai penugasan default. Pilih sendiri tujuannya.",
         "syncTargetSeveralAssignees": "Beberapa orang ditugaskan, jadi penugasan tidak memilih kalender. Yang digunakan sebagai gantinya: {{target}}.",
         "filtersSources": "Kalender",
-        "filterUnassigned": "Belum ditugaskan"
+        "filterUnassigned": "Belum ditugaskan",
+        "dateSpanSpoken": "{{from}} sampai {{to}}",
+        "multiDayPosition": "Hari {{day}} dari {{total}}",
+        "bandContinued": "lanjutan",
+        "monthDayMoreTitles": "dan {{count}} lainnya",
+        "monthDayMoreTitles_one": "dan {{count}} lainnya",
+        "monthDayMoreTitles_other": "dan {{count}} lainnya"
     },
     "noteCategories": {
         "categories": "Kategori",

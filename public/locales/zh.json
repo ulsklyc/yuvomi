@@ -1060,7 +1060,13 @@
         "syncTargetAssigneeAmbiguous": "多个日历将此人设为默认分配对象。请自行选择目标。",
         "syncTargetSeveralAssignees": "已分配多人，因此不会根据分配选择日历。改为使用：{{target}}",
         "filtersSources": "日历",
-        "filterUnassigned": "未分配"
+        "filterUnassigned": "未分配",
+        "dateSpanSpoken": "{{from}}至{{to}}",
+        "multiDayPosition": "第{{day}}天，共{{total}}天",
+        "bandContinued": "续",
+        "monthDayMoreTitles": "及另外{{count}}项",
+        "monthDayMoreTitles_one": "及另外{{count}}项",
+        "monthDayMoreTitles_other": "及另外{{count}}项"
     },
     "noteCategories": {
         "categories": "分类",

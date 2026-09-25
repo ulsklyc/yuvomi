@@ -1060,7 +1060,13 @@
         "syncTargetAssigneeAmbiguous": "Tuto osobu má jako výchozí přiřazení více kalendářů. Vyber cíl sám.",
         "syncTargetSeveralAssignees": "Je přiřazeno více osob, proto přiřazení nevybírá žádný kalendář. Místo toho platí: {{target}}.",
         "filtersSources": "Kalendáře",
-        "filterUnassigned": "Nepřiřazeno"
+        "filterUnassigned": "Nepřiřazeno",
+        "dateSpanSpoken": "od {{from}} do {{to}}",
+        "multiDayPosition": "Den {{day}} z {{total}}",
+        "bandContinued": "pokračování",
+        "monthDayMoreTitles": "a ještě {{count}}",
+        "monthDayMoreTitles_one": "a ještě {{count}}",
+        "monthDayMoreTitles_other": "a ještě {{count}}"
     },
     "noteCategories": {
         "categories": "Kategorie",

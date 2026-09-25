@@ -1060,7 +1060,13 @@
         "syncTargetAssigneeAmbiguous": "Кілька календарів мають цю особу як призначення за замовчуванням. Обери ціль сам.",
         "syncTargetSeveralAssignees": "Призначено кількох осіб, тому призначення не вибирає календар. Замість цього діє: {{target}}.",
         "filtersSources": "Календарі",
-        "filterUnassigned": "Не призначені"
+        "filterUnassigned": "Не призначені",
+        "dateSpanSpoken": "з {{from}} по {{to}}",
+        "multiDayPosition": "День {{day}} з {{total}}",
+        "bandContinued": "продовження",
+        "monthDayMoreTitles": "і ще {{count}}",
+        "monthDayMoreTitles_one": "і ще {{count}}",
+        "monthDayMoreTitles_other": "і ще {{count}}"
     },
     "noteCategories": {
         "categories": "Категорії",

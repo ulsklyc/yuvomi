@@ -1072,7 +1072,13 @@
         "syncTargetAssigneeAmbiguous": "Kilka kalendarzy ma tę osobę jako domyślne przypisanie. Wybierz cel samodzielnie.",
         "syncTargetSeveralAssignees": "Przypisano kilka osób, więc przypisanie nie wybiera kalendarza. Zamiast tego obowiązuje: {{target}}.",
         "filtersSources": "Kalendarze",
-        "filterUnassigned": "Nieprzypisane"
+        "filterUnassigned": "Nieprzypisane",
+        "dateSpanSpoken": "od {{from}} do {{to}}",
+        "multiDayPosition": "Dzień {{day}} z {{total}}",
+        "bandContinued": "kontynuacja",
+        "monthDayMoreTitles": "i jeszcze {{count}}",
+        "monthDayMoreTitles_one": "i jeszcze {{count}}",
+        "monthDayMoreTitles_other": "i jeszcze {{count}}"
     },
     "noteCategories": {
         "categories": "Kategorie",

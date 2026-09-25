@@ -1072,7 +1072,13 @@
         "syncTargetAssigneeAmbiguous": "Ilang kalendaryo ang may taong ito bilang default na nakatalaga. Piliin mismo ang target.",
         "syncTargetSeveralAssignees": "Maraming tao ang nakatalaga, kaya walang kalendaryong pinipili ang pagtatalaga. Ginagamit sa halip: {{target}}.",
         "filtersSources": "Mga kalendaryo",
-        "filterUnassigned": "Walang nakatalaga"
+        "filterUnassigned": "Walang nakatalaga",
+        "dateSpanSpoken": "{{from}} hanggang {{to}}",
+        "multiDayPosition": "Araw {{day}} ng {{total}}",
+        "bandContinued": "karugtong",
+        "monthDayMoreTitles": "at {{count}} pa",
+        "monthDayMoreTitles_one": "at {{count}} pa",
+        "monthDayMoreTitles_other": "at {{count}} pa"
     },
     "noteCategories": {
         "categories": "Mga kategorya",

@@ -2827,21 +2827,10 @@ function longTimedEvent(extra = {}) {
   };
 }
 
-// Die Ganztags-Zellen der Wochenansicht, je Tag. Die Zellen selbst tragen kein
-// Datum; sie stehen in derselben Reihenfolge wie die Tageskoepfe darueber.
-function weekAlldayCellsByDay(html) {
-  const days = [...html.matchAll(/class="week-view__day-header" data-date="([^"]+)"/g)].map((m) => m[1]);
-  const row = html.slice(html.indexOf('class="allday-row"'), html.indexOf('week-view__scroll'));
-  const cells = row.split('<div class="allday-cell">').slice(1);
-  assert(days.length === 7 && cells.length === 7,
-    `Vorbedingung: sieben Tageskoepfe und sieben Ganztags-Zellen: ${days.length} / ${cells.length}`);
-  return new Map(days.map((d, i) => [d, cells[i]]));
-}
-
 // Der Ganztags-Chip eines Termins in einem Stueck Markup: sein title-Attribut
 // und seine sichtbare Uhrzeit ('' ohne), oder null, wenn er dort nicht steht.
 function alldayChip(html, id) {
-  const m = new RegExp(`<div class="allday-event" data-id="${id}"[^>]*?title="([^"]*)">([\\s\\S]*?)</div>`).exec(html);
+  const m = new RegExp(`<div class="allday-event(?: cal-band[^"]*)?" data-id="${id}"[^>]*?title="([^"]*)">([\\s\\S]*?)</div>`).exec(html);
   if (!m) return null;
   const time = /class="allday-event__time">([^<]*)</.exec(m[2]);
   return { title: m[1], time: time ? time[1] : '' };
@@ -2870,14 +2859,51 @@ function assertChipTime(chip, erwartet, wo) {
   assert(chip.title.includes(erwartet), `${wo}: der title muss "${erwartet}" tragen: ${chip.title}`);
 }
 
-function weekChips(events, id) {
-  let cells;
+// DIE WOCHE ZEICHNET DEN TERMIN ALS EIN BAND (Re-Kritik 2026-09-25): statt
+// eines Chips je Tag steht EIN Balken ueber seinen Spalten, das „ab" vorne,
+// das „bis" am Ende. Die Tagesfrage bleibt dieselbe - was steht an Tag X? -,
+// gelesen am Band: an seiner ersten Spalte das „ab", an seiner letzten das
+// „bis", dazwischen nichts, ausserhalb kein Termin. Zusaetzlich gilt: genau
+// EIN Band, und in keiner Tageszelle ein Chip desselben Termins.
+function weekBand(events, id) {
+  let html = '';
   withOvernightState({ events }, () => {
     const container = fakeContainer();
     calendarHelpers.renderWeekView(container);
-    cells = weekAlldayCellsByDay(container.html);
+    html = container.html;
   });
-  return (day) => alldayChip(cells.get(day) ?? '', id);
+  const row = html.slice(html.indexOf('class="allday-row'), html.indexOf('week-view__scroll'));
+  const bars = [...row.matchAll(new RegExp(`<div class="allday-event cal-band[^"]*" data-id="${id}" data-start="([^"]+)" data-end="([^"]+)"[^>]*?title="([^"]*)">([\\s\\S]*?)</div>`, 'g'))];
+  const cellChips = row.split(/<div class="allday-cell"/).slice(1).filter((cell) => cell.includes(`data-id="${id}"`)).length;
+  assert(bars.length === 1, `genau EIN Band erwartet, gefunden: ${bars.length}`);
+  assert(cellChips === 0, `neben dem Band darf keine Tageszelle den Termin als Chip tragen: ${cellChips}`);
+  const [, start, end, title, inner] = bars[0];
+  const from = /class="allday-event__time">([^<]*)</.exec(inner);
+  const until = /cal-band__until">([^<]*)</.exec(inner);
+  return { start, end, title, from: from ? from[1] : '', until: until ? until[1] : '' };
+}
+
+function weekChips(events, id) {
+  const band = weekBand(events, id);
+  return (day) => {
+    if (day < band.start || day > band.end) return null;
+    if (day === band.start) return { time: band.from, title: band.title };
+    if (day === band.end) return { time: band.until, title: band.title };
+    return { time: '', title: band.title };
+  };
+}
+
+// Wie assertChipTime, am Band gelesen: der title des Bands nennt die ganze
+// Spanne (Anfang UND Ende), deshalb prueft er hier nur, dass die sichtbare
+// Uhrzeit darin vorkommt.
+function assertBandTime(chip, erwartet, wo) {
+  if (erwartet === null) {
+    assert(chip === null, `${wo}: an diesem Tag darf das Band nicht stehen: ${JSON.stringify(chip)}`);
+    return;
+  }
+  assert(chip !== null, `${wo}: an diesem Tag muss das Band stehen`);
+  assert(chip.time === erwartet, `${wo}: sichtbar muss "${erwartet}" stehen: "${chip.time}"`);
+  if (erwartet) assert(chip.title.includes(erwartet), `${wo}: der title muss "${erwartet}" tragen: ${chip.title}`);
 }
 
 function dayChip(events, id, day) {
@@ -2890,14 +2916,14 @@ function dayChip(events, id, day) {
   return chip;
 }
 
-test('renderWeekView: ein Termin ab 24 Stunden sagt "ab" am ersten und "bis" am letzten Tag, dazwischen nichts (#1350)', () => {
+test('renderWeekView: ein Termin ab 24 Stunden ist EIN Band - "ab" an seiner ersten, "bis" an seiner letzten Spalte (#1350, Re-Kritik 2026-09-25)', () => {
   const ev = longTimedEvent();
   assert(isAllDayLike(ev) === true, 'Vorbedingung: 45 Stunden stehen in der Ganztags-Zeile');
   const chipAm = weekChips([longTimedEvent()], ev.id);
-  assertChipTime(chipAm('2026-06-14'), abZeit(ev),  'Woche, Tag 1');
-  assertChipTime(chipAm('2026-06-15'), '',          'Woche, Tag 2');
-  assertChipTime(chipAm('2026-06-16'), bisZeit(ev), 'Woche, Tag 3');
-  assertChipTime(chipAm('2026-06-17'), null,        'Woche, Tag nach dem Ende');
+  assertBandTime(chipAm('2026-06-14'), abZeit(ev),  'Woche, Tag 1');
+  assertBandTime(chipAm('2026-06-15'), '',          'Woche, Tag 2');
+  assertBandTime(chipAm('2026-06-16'), bisZeit(ev), 'Woche, Tag 3');
+  assertBandTime(chipAm('2026-06-17'), null,        'Woche, Tag nach dem Ende');
 });
 
 test('renderDayView: ein Termin ab 24 Stunden sagt "ab" am ersten und "bis" am letzten Tag, dazwischen nichts (#1350)', () => {
@@ -2918,7 +2944,7 @@ test('Ganztags-Chip: ein echter Ganztags-Termin bekommt an keinem Tag eine Uhrze
   for (const ev of formen) {
     const chipAm = weekChips([{ ...ev }], ev.id);
     for (const day of ['2026-06-14', '2026-06-15', '2026-06-16']) {
-      assertChipTime(chipAm(day), '', `Woche, ${ev.start_datetime}, ${day}`);
+      assertBandTime(chipAm(day), '', `Woche, ${ev.start_datetime}, ${day}`);
       assertChipTime(dayChip([{ ...ev }], ev.id, day), '', `Tag, ${ev.start_datetime}, ${day}`);
     }
   }
@@ -2930,10 +2956,10 @@ test('Ganztags-Chip: endet der Termin exakt um Mitternacht, steht das "bis" am V
   const ev = longTimedEvent({ id: 4304, end_datetime: '2026-06-17T00:00' });
   assert(calendarHelpers.eventEndDate(ev) === '2026-06-16', 'Vorbedingung: der letzte Tag ist der 16.');
   const chipAm = weekChips([{ ...ev }], ev.id);
-  assertChipTime(chipAm('2026-06-14'), abZeit(ev),  'Woche, Starttag');
-  assertChipTime(chipAm('2026-06-15'), '',          'Woche, dazwischen');
-  assertChipTime(chipAm('2026-06-16'), bisZeit(ev), 'Woche, Vortag der Mitternacht');
-  assertChipTime(chipAm('2026-06-17'), null,        'Woche, der Tag, an dem um 00:00 Schluss ist');
+  assertBandTime(chipAm('2026-06-14'), abZeit(ev),  'Woche, Starttag');
+  assertBandTime(chipAm('2026-06-15'), '',          'Woche, dazwischen');
+  assertBandTime(chipAm('2026-06-16'), bisZeit(ev), 'Woche, Vortag der Mitternacht');
+  assertBandTime(chipAm('2026-06-17'), null,        'Woche, der Tag, an dem um 00:00 Schluss ist');
   assertChipTime(dayChip([{ ...ev }], ev.id, '2026-06-16'), bisZeit(ev), 'Tag, Vortag der Mitternacht');
   assertChipTime(dayChip([{ ...ev }], ev.id, '2026-06-17'), null,        'Tag, der Tag, an dem um 00:00 Schluss ist');
 });
@@ -2954,7 +2980,7 @@ test('Ganztags-Chip: welcher Tag "ab" und welcher "bis" sagt, folgt der ANZEIGEZ
     withDisplayTimeZone(zone, () => {
       const chipAm = weekChips([longTimedEvent(instants)], ev.id);
       for (const [day, soll] of Object.entries(tage)) {
-        assertChipTime(chipAm(day), soll, `${zone}, Woche, ${day}`);
+        assertBandTime(chipAm(day), soll, `${zone}, Woche, ${day}`);
         assertChipTime(dayChip([longTimedEvent(instants)], ev.id, day), soll, `${zone}, Tag, ${day}`);
       }
     });
@@ -3492,8 +3518,10 @@ test('Monatszelle: der Name nennt Wochentag, heute, Anzahl und die ersten drei T
   ], { tasks: [{ title: 'Steuer' }, { title: 'Muell' }], others: ['Feiertag'], isToday: true });
   assert(label.startsWith('calendar.dayLongThursday, '), `der Wochentag fehlt vorn: ${label}`);
   assert(label.includes(', calendar.today, '), `„heute" fehlt: ${label}`);
-  assert(label.endsWith('calendar.monthDayEntries{"count":5}: Feiertag, Zahnarzt, calendar.recurringEvent: Training'),
-    `Anzahl und die ersten drei Titel in Zellreihenfolge erwartet: ${label}`);
+  // „5 Eintraege" mit drei Titeln nennt den Rest als Zahl (Re-Kritik
+  // 2026-09-25): vorher klang die Zelle, als seien es drei.
+  assert(label.endsWith('calendar.monthDayEntries{"count":5}: Feiertag, Zahnarzt, calendar.recurringEvent: Training calendar.monthDayMoreTitles{"count":2}'),
+    `Anzahl, die ersten drei Titel in Zellreihenfolge und „und 2 weitere" erwartet: ${label}`);
   const empty = calendarHelpers.monthDayAriaLabel('2026-09-25', 0, []);
   assert(!/today|monthDayEntries/.test(empty), `ein leerer Tag nennt nur sein Datum: ${empty}`);
 });
@@ -4009,6 +4037,155 @@ test('Termin-Dialog: jede Klasse im Markup hat eine Regel in einem Blatt, das /c
     }
   }
   assert(unstyled.size === 0, `ohne Regel auf /calendar (faellt auf den Koerpertext zurueck): ${[...unstyled].join(', ')}`);
+});
+
+// --------------------------------------------------------
+// MEHRTAEGIGE TERMINE ALS BAENDER (Re-Kritik 2026-09-25, P2)
+//
+// „Städtereise" 13.-15.10. stand im Monat als drei gleiche Chips und in der
+// Woche als drei Chips a 128px; der Screenreader hoerte dreimal „Ganztaegig".
+// Jetzt: EIN Band je Wochenzeile, gepackt in Spuren (packLanes aus
+// utils/week-strip.js, dieselbe Packung wie die Uebersichtskachel), mit
+// offenem Ende, wo der Termin ueber die Zeile hinauslaeuft.
+// --------------------------------------------------------
+const { packLanes } = await import('../public/utils/week-strip.js');
+const bandDays = (from, n = 7) => Array.from({ length: n }, (_, i) => {
+  const d = new Date(`${from}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + i);
+  return d.toISOString().slice(0, 10);
+});
+const bandEvent = (id, start, end, extra = {}) => ({
+  id, title: `T${id}`, all_day: 1, assigned_users: [],
+  start_datetime: `${start}T00:00`, end_datetime: `${end}T00:00`, ...extra,
+});
+function segmentsFor(events, days) {
+  const byDay = (day) => events.filter((ev) => ev.start_datetime.slice(0, 10) <= day
+    && calendarHelpers.eventEndDate(ev) >= day);
+  return calendarHelpers.bandSegments(days, byDay);
+}
+
+test('packLanes: ueberlappende Spannen bekommen verschiedene Spuren, eine freie Spur wird wiederverwendet', () => {
+  const { lanes, laneCount } = packLanes([
+    { first: 1, last: 3 }, { first: 3, last: 5 }, { first: 4, last: 6 }, { first: 6, last: 6 },
+  ]);
+  assert(JSON.stringify(lanes) === '[0,1,0,1]', `Spuren erwartet [0,1,0,1]: ${JSON.stringify(lanes)}`);
+  assert(laneCount === 2, `zwei Spuren reichen: ${laneCount}`);
+  const capped = packLanes([{ first: 0, last: 2 }, { first: 1, last: 1 }, { first: 1, last: 3 }], { maxLanes: 2 });
+  assert(JSON.stringify(capped.lanes) === '[0,1,-1]', `ueber dem Deckel -1: ${JSON.stringify(capped.lanes)}`);
+});
+
+test('Baender: Spurvergabe nach echtem Anfang und Laenge, ueberlappend in verschiedenen Spuren', () => {
+  // Woche Mo 26.10. - So 01.11.2026. A 27.-29., B 29.-31. (ueberlappt A am
+  // 29.), C 30.10.-02.11. (beginnt nach A: Spur von A wieder frei), D ein
+  // einzelner Ganztag (kein Band).
+  const days = bandDays('2026-10-26');
+  const events = [
+    bandEvent(1, '2026-10-27', '2026-10-29'),
+    bandEvent(2, '2026-10-29', '2026-10-31'),
+    bandEvent(3, '2026-10-30', '2026-11-02'),
+    bandEvent(4, '2026-10-28', '2026-10-28'),
+  ];
+  const { bands, laneCount, depth, events: bandSet } = segmentsFor(events, days);
+  const lane = Object.fromEntries(bands.map((b) => [b.ev.id, b.lane]));
+  assert(bands.length === 3, `drei Baender, der Eintagestermin ist keins: ${bands.map((b) => b.ev.id)}`);
+  assert(!bandSet.has(events[3]), 'ein eintaegiger Ganztag bleibt ein Chip in seiner Zelle');
+  assert(lane[1] === 0 && lane[2] === 1 && lane[3] === 0, `Spuren A0 B1 C0 erwartet: ${JSON.stringify(lane)}`);
+  assert(laneCount === 2, `zwei Spuren: ${laneCount}`);
+  assert(JSON.stringify(depth) === '[0,1,1,2,2,2,1]', `belegte Spuren je Tag: ${JSON.stringify(depth)}`);
+  // Stabil: zwei Termine mit gleichem Anfang - der laengere zuerst.
+  const same = segmentsFor([bandEvent(5, '2026-10-27', '2026-10-28'), bandEvent(6, '2026-10-27', '2026-10-30')], days);
+  const sameLane = Object.fromEntries(same.bands.map((b) => [b.ev.id, b.lane]));
+  assert(sameLane[6] === 0 && sameLane[5] === 1, `gleicher Anfang: der laengere in Spur 0: ${JSON.stringify(sameLane)}`);
+});
+
+test('Baender: Wochenumbruch - offene Enden an Zeilengrenze, Kante nur am echten Anfang', () => {
+  const ev = bandEvent(7, '2026-10-30', '2026-11-02');
+  const first = segmentsFor([ev], bandDays('2026-10-26')).bands[0];
+  const second = segmentsFor([ev], bandDays('2026-11-02')).bands[0];
+  assert(first.first === 4 && first.last === 6, `Woche 1: Fr bis So: ${first.first}-${first.last}`);
+  assert(!first.continuesBefore && first.continuesAfter, 'Woche 1: echter Anfang, offenes Ende');
+  assert(second.first === 0 && second.last === 0, `Woche 2: nur der Montag: ${second.first}-${second.last}`);
+  assert(second.continuesBefore && !second.continuesAfter, 'Woche 2: Fortsetzung, echtes Ende');
+
+  // Am gerenderten Band: die Klassen, die Kante und Rundung oeffnen, und das
+  // Fortsetzungszeichen - Monat und Woche aus denselben Segmenten.
+  const month1 = calendarHelpers.monthBandsHtml({ bands: [first] });
+  const month2 = calendarHelpers.monthBandsHtml({ bands: [second] });
+  assert(/class="month-day__event cal-band cal-band--after"/.test(month1) && !/cal-band--before/.test(month1),
+    `Monat Woche 1: nur das Ende offen: ${month1}`);
+  assert(/class="month-day__event cal-band cal-band--before"/.test(month2) && !/cal-band--after/.test(month2),
+    `Monat Woche 2: nur der Anfang offen: ${month2}`);
+  assert(/cal-band__cont--after/.test(month1) && /cal-band__cont--before/.test(month2), 'das Fortsetzungszeichen steht am offenen Ende');
+  assert(/grid-column:5 \/ span 3/.test(month1) && /grid-column:1 \/ span 1/.test(month2), 'Spalten aus den Segmenten');
+  const week = calendarHelpers.renderWeekBand(first);
+  assert(/class="allday-event cal-band cal-band--after"/.test(week), `Woche: dieselben Enden: ${week}`);
+  assert(/grid-column:6 \/ span 3/.test(week), 'Woche: Spalte 1 ist die Zeitleiste, Fr ist Spalte 6');
+  assert(/role="button" tabindex="0"/.test(week), 'das Band der Woche ist ein Knopf wie jeder Block');
+  assert(/aria-hidden="true"/.test(month1) && !/tabindex/.test(month1), 'im Monat kein neuer Tab-Stopp: die Zelle traegt');
+
+  // Die Kante: sie oeffnet sich per Klasse, und die Regel dafuer muss es geben.
+  const before = [...eachRule(calendarCss)].find((r) => r.selector.trim() === '.cal-band--before');
+  assert(before && /border-inline-start-width:\s*0/.test(before.body) && /border-start-start-radius:\s*0/.test(before.body),
+    'die Fortsetzung traegt keine Kante und keine Rundung am Anfang');
+});
+
+test('Baender: der gesprochene Name nennt Titel, Zeitraum und bei Fortsetzung „Fortsetzung"', () => {
+  const span = calendarHelpers.spokenDateSpan('2026-10-13', '2026-10-15');
+  assert(span === 'calendar.dateSpanSpoken{"from":"13.","to":"15. Oktober"}', `verdichtet „13. bis 15. Oktober": ${span}`);
+  const across = calendarHelpers.spokenDateSpan('2026-12-30', '2027-01-02');
+  assert(/"from":"30\. Dezember 2026","to":"2\. Januar 2027"/.test(across), `ueber den Jahreswechsel mit Jahr: ${across}`);
+  assert(!/[\u2013\u2014]/.test(span + across), 'kein Gedankenstrich im gesprochenen Zeitraum');
+
+  const ev = bandEvent(8, '2026-10-30', '2026-11-02', { title: 'Reise' });
+  const [first] = segmentsFor([ev], bandDays('2026-10-26')).bands;
+  const [second] = segmentsFor([ev], bandDays('2026-11-02')).bands;
+  const label = (html) => (/aria-label="([^"]*)"/.exec(html)?.[1] ?? '').replaceAll('&quot;', '"');
+  const a = label(calendarHelpers.renderWeekBand(first));
+  const b = label(calendarHelpers.renderWeekBand(second));
+  assert(a.startsWith('Reise, calendar.dateSpanSpoken') && !a.includes('calendar.bandContinued'),
+    `Anfang: Titel und Zeitraum, keine Fortsetzung: ${a}`);
+  assert(b.includes('calendar.dateSpanSpoken') && b.includes('calendar.bandContinued'),
+    `Folgewoche: Zeitraum und „Fortsetzung": ${b}`);
+  // Die Tagesansicht zeigt dasselbe Stueck einzeln: Name mit Zeitraum und Tag.
+  const day = label(calendarHelpers.renderAllDayEvent(ev, '2026-10-31'));
+  assert(day.includes('calendar.dateSpanSpoken') && day.includes('calendar.bandContinued')
+    && day.includes('calendar.multiDayPosition{"day":2,"total":4}'), `Tagesansicht, Tag 2: ${day}`);
+});
+
+test('Monatszelle und Liste: „Tag 2 von 3" und „und N weitere" (Re-Kritik 2026-09-25)', () => {
+  const ev = bandEvent(9, '2026-10-13', '2026-10-15', { title: 'Städtereise' });
+  assert(JSON.stringify(calendarHelpers.multiDayPosition(ev, '2026-10-14')) === '{"day":2,"count":3}', 'Tag 2 von 3');
+  assert(calendarHelpers.multiDayPosition(ev, '2026-10-16') === null, 'ausserhalb: nichts');
+  assert(calendarHelpers.multiDayPosition(bandEvent(10, '2026-10-13', '2026-10-13'), '2026-10-13') === null, 'eintaegig: nichts');
+  const cell = calendarHelpers.monthDayAriaLabel('2026-10-14', 4,
+    [ev, { title: 'A' }, { title: 'B' }, { title: 'C' }]);
+  assert(cell.endsWith('Städtereise (calendar.multiDayPosition{"day":2,"total":3}), A, B calendar.monthDayMoreTitles{"count":1}'),
+    `vier Eintraege, drei Titel, der Rest als Zahl: ${cell}`);
+  const all = calendarHelpers.monthDayAriaLabel('2026-10-14', 2, [{ title: 'A' }, { title: 'B' }]);
+  assert(!all.includes('monthDayMoreTitles'), `alle genannt, kein Rest: ${all}`);
+  const row = calendarHelpers.renderAgendaEvent(ev, '2026-10-14');
+  assert(/class="calendar-meta-item__day">calendar\.multiDayPosition\{&quot;day&quot;:2,&quot;total&quot;:3\}</.test(row),
+    `die Listenzeile nennt den Tag sichtbar: ${row}`);
+});
+
+test('Monatszelle: ein Band ist kein Chip in seinen Zellen, zaehlt aber mit', () => {
+  const ev = bandEvent(11, '2026-10-13', '2026-10-15', { title: 'Städtereise' });
+  const previous = { ...calendarHelpers.state };
+  try {
+    Object.assign(calendarHelpers.state, {
+      events: [ev], tasks: [], holidays: [], scheduleEntries: [], people: new Set(), hiddenSources: new Set(),
+      assignedToMe: false, layerBirthdays: true, layerSchedule: false, layerWaste: false,
+    });
+    const band = segmentsFor([ev], bandDays('2026-10-12'));
+    const html = calendarHelpers.renderMonthDay('2026-10-14', true, { band: { depth: band.depth[2], events: band.events } });
+    assert(!/class="month-day__event"/.test(html), `kein Chip des Bands in der Zelle: ${html}`);
+    assert(/data-total="1"/.test(html), 'die Zelle zaehlt das Band mit');
+    assert(/class="month-day__lanes" style="--lanes:1"/.test(html), 'die Zelle haelt die Spur frei');
+    const phone = calendarHelpers.renderMonthDay('2026-10-14', true, { split: true });
+    assert(/class="month-day__event"/.test(phone), 'am Telefon bleibt es beim Punkt je Tag');
+  } finally {
+    Object.assign(calendarHelpers.state, previous);
+  }
 });
 
 // --------------------------------------------------------

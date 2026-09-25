@@ -1072,7 +1072,13 @@
         "syncTargetAssigneeAmbiguous": "چند تقویم این فرد را به‌عنوان واگذاری پیش‌فرض دارند. مقصد را خودت انتخاب کن.",
         "syncTargetSeveralAssignees": "چند نفر واگذار شده‌اند، پس واگذاری هیچ تقویمی را انتخاب نمی‌کند. به‌جای آن استفاده می‌شود: {{target}}.",
         "filtersSources": "تقویم‌ها",
-        "filterUnassigned": "واگذارنشده"
+        "filterUnassigned": "واگذارنشده",
+        "dateSpanSpoken": "{{from}} تا {{to}}",
+        "multiDayPosition": "روز {{day}} از {{total}}",
+        "bandContinued": "ادامه",
+        "monthDayMoreTitles": "و {{count}} مورد دیگر",
+        "monthDayMoreTitles_one": "و {{count}} مورد دیگر",
+        "monthDayMoreTitles_other": "و {{count}} مورد دیگر"
     },
     "noteCategories": {
         "categories": "دسته‌بندی‌ها",

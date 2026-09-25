@@ -1060,7 +1060,13 @@
         "syncTargetAssigneeAmbiguous": "Flera kalendrar har den här personen som standardtilldelning. Välj målet själv.",
         "syncTargetSeveralAssignees": "Flera personer är tilldelade, så tilldelningen väljer ingen kalender. I stället gäller: {{target}}.",
         "filtersSources": "Kalendrar",
-        "filterUnassigned": "Ej tilldelade"
+        "filterUnassigned": "Ej tilldelade",
+        "dateSpanSpoken": "{{from}} till {{to}}",
+        "multiDayPosition": "Dag {{day}} av {{total}}",
+        "bandContinued": "fortsättning",
+        "monthDayMoreTitles": "och {{count}} till",
+        "monthDayMoreTitles_one": "och {{count}} till",
+        "monthDayMoreTitles_other": "och {{count}} till"
     },
     "noteCategories": {
         "categories": "Kategorier",

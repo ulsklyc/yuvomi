@@ -1060,7 +1060,13 @@
         "syncTargetAssigneeAmbiguous": "Several calendars have this person as their default assignee. Choose the target yourself.",
         "syncTargetSeveralAssignees": "Several people are assigned, so the assignment does not pick a calendar. Used instead: {{target}}.",
         "filtersSources": "Calendars",
-        "filterUnassigned": "Unassigned"
+        "filterUnassigned": "Unassigned",
+        "dateSpanSpoken": "{{from}} to {{to}}",
+        "multiDayPosition": "Day {{day}} of {{total}}",
+        "bandContinued": "continued",
+        "monthDayMoreTitles": "and {{count}} more",
+        "monthDayMoreTitles_one": "and {{count}} more",
+        "monthDayMoreTitles_other": "and {{count}} more"
     },
     "noteCategories": {
         "categories": "Categories",
