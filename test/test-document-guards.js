@@ -1035,6 +1035,11 @@ const SHAPE_EXEMPT = new Map([
   ['ydp__trigger', 'Griff: Feld-Oeffner des Datepickers, traegt Feldkante'],
   ['more-sheet__search', 'Griff: Suchfeld des More-Sheets, traegt Feldkante'],
   ['theme-toggle__btn', 'Zustandsschalter: Segment der Farbwelt-Wahl'],
+  // Das Kanon-Segment (panel.css, DESIGN.md: konzentrisch eingesetzte
+  // .segmented__item im radius-md-Traeger). Es stand bis 2026-09-25 auf keiner
+  // gemessenen Route im Bild; seit der Dokumente-Critique traegt der Status
+  // Aktiv/Archiviert es direkt auf /documents.
+  ['segmented__item', 'Zustandsschalter: Segment des geteilten Segmented Controls (panel.css)'],
   // 3. Zellen eines Rasters
   // `.month-day` stand hier, bis die Monatszelle 2026-09-24 vom role="button" zur
   // gridcell eines ARIA-Grids wurde - Sonde 3 misst sie seitdem nicht mehr.
