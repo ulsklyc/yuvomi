@@ -144,6 +144,19 @@ export function folderRepeatsCategory(folderName, categoryLabel) {
 }
 
 /**
+ * Traegt die Zeile den Ordner-Chip? Nicht, wenn der Ordner die Kategorie
+ * wiederholt (folderRepeatsCategory), und nicht im gewaehlten Ordner selbst:
+ * dort sagte "Belege" auf jeder Zeile, was die Breadcrumb schon sagt
+ * (Re-Critique 2026-09-25). Dokumente aus Unterordnern - der Ordnerfilter
+ * zeigt sie mit - behalten ihren Ordner, er ist dort Auskunft.
+ */
+export function showsFolderChip(doc, categoryLabel, selectedFolderId) {
+  if (!doc?.folder_name || doc.folder_id == null) return false;
+  if (String(doc.folder_id) === String(selectedFolderId ?? '')) return false;
+  return !folderRepeatsCategory(doc.folder_name, categoryLabel);
+}
+
+/**
  * Was vor dem Ordnersymbol einer Zeile der Ordnerleiste steht: der Pfeil
  * (`toggle`), ein leerer Platz in Pfeilbreite (`slot`) oder nichts (`none`).
  * Die festen Zeilen ("Alle Dokumente", "Kein Ordner") sind keine Ordner und

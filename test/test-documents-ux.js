@@ -1292,7 +1292,10 @@ test('Ordner gleich Kategorie steht einmal da - in Zeile, Karte UND Betrachter (
   assert.equal(facets.folderRepeatsCategory(null, 'Schule'), false);
   assert.equal(facets.folderRepeatsCategory('', ''), false, 'kein Ordner ist keine Dopplung');
   // Der Betrachter zeigte "Schule Schule", renderMeta nicht: zwei Regeln fuer eine Frage.
-  assert.match(fnBody('renderMeta', 'docSupportsThumbnail'), /folderRepeatsCategory\(doc\.folder_name, categoryLabel\)/);
+  // Die Zeile fragt seit der Re-Critique showsFolderChip, das die Dopplungsregel
+  // einschliesst - als Programm belegt: dieselbe Dopplung faellt dort heraus.
+  assert.match(fnBody('renderMeta', 'docSupportsThumbnail'), /showsFolderChip\(doc, categoryLabel, state\.folderId\)/);
+  assert.equal(facets.showsFolderChip({ folder_id: 1, folder_name: 'Schule' }, 'Schule', ''), false);
   const viewer = page.slice(page.indexOf('<div class="document-viewer__meta">'), page.indexOf('<span class="document-viewer__actions">'));
   assert.match(viewer, /doc\.folder_name && !folderRepeatsCategory\(doc\.folder_name, categoryLabel\)/);
 });
@@ -1692,4 +1695,21 @@ test('gesperrte Sammelaktionen treten zurueck, statt zu warnen', () => {
   const layout = read('../public/styles/layout.css');
   const muted = [...eachRule(layout)].find((r) => r.at.length === 0 && r.selector === ".btn[aria-disabled='true']");
   assert.ok(muted && /background-color:\s*transparent/.test(muted.body), 'das gedeckte Rezept deckt auch die Gefahrfarbe ab');
+});
+
+test('im gewaehlten Ordner nennt die Zeile den Ordner nicht noch einmal', () => {
+  // Re-Critique 2026-09-25: im Ordner "Belege" trug jede Zeile den Chip
+  // "Belege" - das sagt die Breadcrumb schon. Dokumente aus UNTERordnern
+  // (der Ordnerfilter zeigt sie mit) behalten ihren Ordner: das ist dort Auskunft.
+  assert.equal(typeof facets?.showsFolderChip, 'function', 'showsFolderChip fehlt in document-facets.js');
+  const { showsFolderChip } = facets;
+  const doc = { folder_id: 7, folder_name: 'Belege' };
+  assert.equal(showsFolderChip(doc, 'Finanzen', ''), true, 'in "Alle Dokumente" steht der Ordner');
+  assert.equal(showsFolderChip(doc, 'Finanzen', '7'), false, 'im eigenen Ordner nicht');
+  assert.equal(showsFolderChip(doc, 'Finanzen', 7), false, 'Zahl oder Text - dieselbe Auswahl');
+  assert.equal(showsFolderChip({ folder_id: 9, folder_name: 'Kassenbons' }, 'Finanzen', '7'), true, 'Unterordner bleibt sichtbar');
+  assert.equal(showsFolderChip({ folder_id: 3, folder_name: 'Versicherungen' }, 'Versicherung', ''), false, 'die Dopplungsregel gilt weiter');
+  assert.equal(showsFolderChip({ folder_id: null, folder_name: null }, 'Finanzen', '__none'), false, 'ohne Ordner kein Chip');
+  const meta = fnBody('renderMeta', 'docSupportsThumbnail');
+  assert.match(meta, /showsFolderChip\(doc, categoryLabel, state\.folderId\)/, 'die Zeile fragt die Regel wirklich');
 });

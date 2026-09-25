@@ -47,6 +47,7 @@ import {
   folderRowLead,
   matchesDocumentQuery,
   normalizeDocumentQuery,
+  showsFolderChip,
   showsVisibility,
   sortDocuments as sortDocumentList,
 } from '/utils/document-facets.js';
@@ -1531,9 +1532,9 @@ async function handleFolderDeleteError(err, folder, { delayed = false } = {}) {
 function renderMeta(doc, { showSize = true } = {}) {
   const labels = categoryLabels();
   const categoryLabel = labels[doc.category] || doc.category;
-  // Der Ordner-Chip entfaellt, wenn der Ordner woertlich wie die Kategorie
-  // heisst (utils/document-facets.js, dieselbe Regel wie im Betrachter).
-  const folderDuplicatesCategory = folderRepeatsCategory(doc.folder_name, categoryLabel);
+  // Der Ordner-Chip entfaellt, wenn der Ordner die Kategorie wiederholt, und im
+  // gewaehlten Ordner selbst (showsFolderChip, utils/document-facets.js).
+  const folderChip = showsFolderChip(doc, categoryLabel, state.folderId);
   // DER ABLAUF STEHT VORN (Critique 2026-09-25, P1). Die Zeilen-Meta ist
   // einzeilig und laesst hinten fallen, was nicht passt (documents.css,
   // .document-row__meta) - als letztes Element war "Laeuft in 5 Tagen ab"
@@ -1543,7 +1544,7 @@ function renderMeta(doc, { showSize = true } = {}) {
   return `
     ${expiryChipHtml(doc)}
     <span><i data-lucide="${CATEGORY_ICONS[doc.category] || 'folder'}" aria-hidden="true"></i>${categoryLabel}</span>
-    ${!folderDuplicatesCategory && doc.folder_name ? `<span><i data-lucide="folder" aria-hidden="true"></i>${esc(doc.folder_name)}</span>` : ''}
+    ${folderChip ? `<span><i data-lucide="folder" aria-hidden="true"></i>${esc(doc.folder_name)}</span>` : ''}
     ${hidesPrivacyControls('documents') || !showsVisibility(doc.visibility) ? '' : `<span><i data-lucide="${doc.visibility === 'private' ? 'lock' : 'user-check'}" aria-hidden="true"></i>${t(`documents.visibility.${doc.visibility}`)}</span>`}
     ${showSize ? `<span>${formatFileSize(doc.file_size)}</span>` : ''}
     ${storageBadgeHtml(doc)}
