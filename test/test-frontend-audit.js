@@ -10264,6 +10264,24 @@ test('demo seed writes only reminder offsets the birthday form offers', () => {
   assert.deepEqual(invalid, [], `Seed-Vorlauf ausserhalb der Formularwerte (${offered.join(', ')})`);
 });
 
+// Darlehen im Demo-Seed: die Spalte direction (#638) hat den Default 'lent'.
+// Der Seed liess sie weg, und die Baufinanzierung bei der Sparkasse stand in
+// der Demo als „Verliehen" - mit Raten als Einnahme. Jede Zeile nennt ihre
+// Richtung deshalb selbst; ein aufgenommener Kredit ist 'borrowed'.
+test('demo seed names the direction of every loan, the mortgage is borrowed', () => {
+  const seed = read('../scripts/seed-demo.js');
+  const insert = seed.match(/const insertLoan = db\.prepare\(`([\s\S]*?)`\);/);
+  assert.ok(insert, 'insertLoan im Seed nicht gefunden');
+  assert.match(insert[1], /\bdirection\b/, 'INSERT INTO budget_loans ohne direction faellt auf den Default lent');
+  const calls = [...seed.matchAll(/insertLoan\.run\(([\s\S]*?)\)\.lastInsertRowid/g)].map((m) => m[1]);
+  assert.ok(calls.length >= 2, `erwartet mindestens 2 Darlehen, gefunden: ${calls.length}`);
+  const directions = calls.map((args) => args.trim().replace(/,\s*$/, '').match(/'(lent|borrowed)'$/)?.[1]);
+  assert.ok(directions.every(Boolean), 'jedes insertLoan.run endet auf eine Richtung (lent/borrowed)');
+  const mortgage = calls.findIndex((args) => /Mortgage/.test(args));
+  assert.ok(mortgage >= 0, 'Baufinanzierung im Seed nicht gefunden');
+  assert.equal(directions[mortgage], 'borrowed', 'die Baufinanzierung ist ein aufgenommener Kredit');
+});
+
 // ============================================================
 // Konsistenz-Audit (UX/UI): Invarianten, die der Audit hergestellt hat.
 // Jeder Guard hier hält genau einen Befund geschlossen — die Befunde

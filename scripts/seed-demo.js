@@ -739,21 +739,23 @@ const insertPlan = db.prepare('INSERT INTO budget_plans (category, amount, creat
   ['education',           80],
 ].forEach(([cat, amount]) => insertPlan.run(cat, amount, String(alexId)));
 
-// Darlehen: eines ohne Zinsen (privat geliehenes Geld) und eines als
-// Annuität mit Zinsbindung (#569). total_amount/installment_count sind bei
+// Darlehen: eines ohne Zinsen (privat verliehenes Geld) und eines als
+// Annuität mit Zinsbindung (#569). Die Richtung steht ausdrücklich da: der
+// Spalten-Default 'lent' (#638) zeigte die Baufinanzierung als „Verliehen". total_amount/installment_count sind bei
 // verzinsten Darlehen abgeleitete Größen - sie kommen aus derselben Rechnung,
 // die auch der Route-Handler nutzt, statt aus einer Schätzung hier.
 console.log('Inserting budget loans…');
 const insertLoan = db.prepare(`
   INSERT INTO budget_loans (title, borrower, total_amount, installment_count, start_month, notes, status, created_by,
-                            interest_mode, principal, fixed_rate, initial_repayment_rate, fixed_period_months, followup_rate)
-  VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)
+                            interest_mode, principal, fixed_rate, initial_repayment_rate, fixed_period_months, followup_rate,
+                            direction)
+  VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 const loanId = insertLoan.run(
   L('Loan to Uncle Mike', 'Darlehen an Onkel Mike'), L('Uncle Mike Johnson', 'Onkel Mike Johnson'),
   1200.00, 6, thisMonthKey(-2),
   L('Helping with his car repair - €200/month', 'Hilfe bei der Autoreparatur - 200 € im Monat'),
-  alexId, 'none', null, null, null, null, null,
+  alexId, 'none', null, null, null, null, null, 'lent',
 ).lastInsertRowid;
 
 const mortgage = computeLoanSchedule({
@@ -765,7 +767,7 @@ const mortgageId = insertLoan.run(
   L('Mortgage - Bürgerstraße', 'Baufinanzierung - Bürgerstraße'), L('Sparkasse Dortmund', 'Sparkasse Dortmund'),
   mortgage.totalRepayment, mortgage.totalMonths, thisMonthKey(-14),
   L('10-year fixed rate, 2.5% initial repayment', '10 Jahre Zinsbindung, 2,5 % Anfangstilgung'),
-  alexId, 'fixed_then_variable', 180000, 3.65, 2.5, 120, 4.5,
+  alexId, 'fixed_then_variable', 180000, 3.65, 2.5, 120, 4.5, 'borrowed',
 ).lastInsertRowid;
 
 const insertLoanPayment = db.prepare(`
