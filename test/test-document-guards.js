@@ -2060,7 +2060,16 @@ async function headDocking(page) {
   });
 }
 
-/** Scrollt jeden Port bis ans Ende und meldet die groesste gefundene Reserve. */
+/**
+ * Scrollt jeden Port bis ans Ende und meldet die groesste gefundene Reserve.
+ *
+ * MIT DER GESTE DAVOR: seit der Re-Kritik 2026-09-25 klappt ein gedeckelter
+ * Kopf (Budget, Kalender, Notizen, Kontakte) nur auf einen Scroll ein, dem
+ * eine Nutzergeste im selben Port vorausging (`wireCollapsingHeader`,
+ * utils/ux.js) - sonst klappte der Sprung der Woche auf „jetzt" ihn ein. Ein
+ * blosses `scrollTop` ist fuer die Shell genau so ein Sprung; das Rad-Ereignis
+ * davor macht daraus den Nutzer-Scroll, den diese Sonde nachstellen will.
+ */
 async function scrollEveryPort(page) {
   return page.evaluate(() => {
     let most = 0;
@@ -2068,6 +2077,7 @@ async function scrollEveryPort(page) {
       const oy = getComputedStyle(el).overflowY;
       const reserve = el.scrollHeight - el.clientHeight;
       if ((oy === 'auto' || oy === 'scroll') && reserve > 8) {
+        el.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: reserve }));
         el.scrollTop = reserve;
         most = Math.max(most, reserve);
       }
