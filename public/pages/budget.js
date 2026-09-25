@@ -318,7 +318,7 @@ const READ_SAFE_ACTIONS = new Set(['loan-filter']);
 // Die schreibenden Bedienhaken OHNE `data-action` - Konten, Leerzustaende und
 // der Kategorie-Verwalter sind einzeln verdrahtet, nicht ueber einen Verteiler.
 const WRITE_HOOKS = [
-  '[data-edit]', '#budget-add-account', '#budget-add-account-empty',
+  '[data-edit]', '#budget-add-account-empty',
   '#budget-empty-loan', '#budget-manage-categories', '#empty-cta-budget',
 ].join(', ');
 
@@ -1737,15 +1737,13 @@ function renderAccountsPage() {
   // Der Titel ist ein <h2> fuer die Gliederung, aber UNSICHTBAR: sichtbar
   // wiederholte er nur den gewaehlten Tab „Konten" - als 12px-Versal-Label
   // zugleich die zweite Ueberschriftsgrammatik des Moduls (Critique 2026-09-25).
+  // Angelegt wird ueber den Kopfknopf (TAB_CAPS.accounts.add) - ein zweiter,
+  // dauerhafter „Konto hinzufuegen"-Knopf hier war ein zweiter Weg fuer dieselbe
+  // Handlung. Nur der Leerzustand traegt ihn noch, als Aufforderung (CTA).
   const header = `
     <div class="panel-head">
       <h2 class="panel-head__title sr-only">${t('budget.accountsTab')}</h2>
-      <div class="panel-head__actions">
-        ${archiveToggle}
-        ${ro ? '' : `<button class="btn btn--secondary" id="budget-add-account" type="button">
-          <i data-lucide="plus" class="icon-sm" aria-hidden="true"></i>${t('budget.addAccount')}
-        </button>`}
-      </div>
+      ${archiveToggle ? `<div class="panel-head__actions">${archiveToggle}</div>` : ''}
     </div>
     <div class="metric-grid">
       <div class="metric-card ${netWorth.className}">
@@ -1810,7 +1808,6 @@ function renderAccountsPage() {
 }
 
 function wireAccountsPage() {
-  _container.querySelector('#budget-add-account')?.addEventListener('click', () => openAccountModal());
   _container.querySelector('#budget-add-account-empty')?.addEventListener('click', () => openAccountModal());
   _container.querySelector('#budget-toggle-archived')?.addEventListener('click', () => {
     state.accountsShowArchived = !state.accountsShowArchived;

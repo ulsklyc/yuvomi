@@ -113,7 +113,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   has a full-size target, an empty month shows one sentence and its button instead of three
   sentences and three zeros, and each loan offers "Mark as paid" as a secondary button, leaving
   one primary button on the tab. The accounts tab says "All accounts, as of today" like the other
-  tabs say which items they cover.
+  tabs say which items they cover, and new accounts are added with the "+" in the header like on
+  every other tab - the "Add account" button only appears while there are no accounts yet.
 
 - **The calendar gives phones more room for events.** Filter and search moved next to the view
   switcher, so the calendar header on a phone is 166px instead of 230px, and when you scroll the

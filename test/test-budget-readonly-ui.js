@@ -225,7 +225,10 @@ test('Konten mit `budget: read`: Anlegen und Bearbeiten weg, Saldo und Kontoausz
   mitKonten([konto(), konto({ id: 5, name: 'Altkonto', archived: 1 })], () => {
     withAccess({ budget: 'write' }, () => {
       const html = budget.renderAccountsPage();
-      assert.match(html, /id="budget-add-account"/);
+      // EIN Anlegeweg: der Kopfknopf (TAB_CAPS.accounts.add). Der Panel-Knopf
+      // „Konto hinzufuegen" steht nur noch im Leerzustand (Critique 2026-09-25).
+      assert.doesNotMatch(html, /budget-add-account/, 'mit Konten kein zweiter Anlegeknopf im Panel');
+      assert.match(BUDGET_CODE, /'accounts':\s*\{[^}]*add: 'budget\.addAccount'/, 'der Kopfknopf legt Konten an');
       assert.match(html, /data-edit="4"/);
     });
     withAccess({ budget: 'read' }, () => {
@@ -773,7 +776,7 @@ test('READ_SAFE_ACTIONS ist eine Positivliste und enthaelt nur lesende Aktionen'
 
 test('WRITE_HOOKS nennt jeden schreibenden Bedienhaken ohne `data-action`', () => {
   const genannt = budget.WRITE_HOOKS.split(',').map((s) => s.trim()).sort();
-  const erwartet = ['[data-edit]', '#budget-add-account', '#budget-add-account-empty',
+  const erwartet = ['[data-edit]', '#budget-add-account-empty',
     '#budget-empty-loan', '#budget-manage-categories', '#empty-cta-budget'].sort();
   assert.deepEqual(genannt, erwartet);
   for (const hook of erwartet) {
