@@ -131,6 +131,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Event titles in the week keep their room.** The people assigned to an event sat next to its
+  title and never shrank, so on a phone "Dentist - family" showed four letters. They now sit
+  after the time on the second line of a block, and in all-day bars behind the title, and they
+  only appear where they fit next to the full time or title. The names are still in the tooltip
+  and read out by screen readers; the day view shows them as before.
+
 - **The event popover on a desktop puts Delete and Edit apart.** Edit stood first and Delete 8px
   next to it, and "Open in Maps" dropped onto a line of its own. The popover now follows the phone
   sheet: Delete at the start, Edit as the main button at the end, below the other actions.

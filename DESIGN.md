@@ -2525,6 +2525,19 @@ trugen. "Heute" ist NUR ein gefuellter Akzent-Kreis auf der Ziffer;
 Nachbarmonatstage dimmen ueber Flaeche UND Ziffer (AA-fest), nie ueber blosse Opacity auf
 Text allein.
 
+**Der Titel vor dem „Wer"** (Re-Kritik 2026-09-25, P2). In Woche und Ganztag darf der
+Avatar-Stack dem Titel keinen Platz nehmen; er schrumpfte nie und liess mobil von „Zahnarzt -
+Familie" 44 von 112px, am Desktop vom Ganztagsbalken „Städtereise übers Wochenende" 73 von
+181px. Im Wochenblock steht er deshalb in der ZEITZEILE hinter der Uhrzeit, nie in der
+Titelzeile; im Ganztagsbalken teilt er sich mit dem Label (Titel plus Uhrzeit) eine Zeile.
+Beide Zeilen sind umbrechend, eine Zeilenhoehe hoch und schneiden den Rest ab - der Stack
+erscheint nur, wenn er neben die Uhrzeit bzw. das GANZE Label passt, sonst faellt er als
+Ganzes in die unsichtbare zweite Zeile. Die Mindestbreite ist damit gemessen, nicht als rem-Wert
+geschaetzt; ist der Block zu flach fuer die Zeitzeile (`ev-block`-Hoehenfrage), geht er mit ihr.
+Rangfolge: Titel, Uhrzeit, Wer. Das „Wer" bleibt im title-Attribut und im gesprochenen Namen,
+die Tagesansicht zeigt ihn ab einer Stunde (`roomy`), der Monat nie. Gemessen danach: mobil
+Zahnarzt 44 -> 78px (Stack faellt), Desktop 67 -> 101px mit Stack, Städtereise 73 -> 101px.
+
 **Die Vollton-Kanten-Regel** (2026-08-17, Etappe 3). Wo ein Block GROSS genug ist, ihn zu
 tragen, sagt eine Kante im Vollton, zu wem er gehoert - 3px (`--cal-event-edge`) an der
 Inline-Start-Seite, der Zeitleisten-Kanon der Messlatte (Apple Kalender, Fantastical). Der

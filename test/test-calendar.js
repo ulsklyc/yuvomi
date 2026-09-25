@@ -2713,7 +2713,7 @@ const { esc: escStub } = await import('/utils/html.js');
 
 // Der Text der Zeit-Zeile eines Zeitblocks, je Spalte/Ansicht.
 function weekEventTimeTexts(html) {
-  return [...html.matchAll(/class="week-event__time">([^<]*)</g)].map((m) => m[1].trim());
+  return [...html.matchAll(/class="week-event__when">([^<]*)</g)].map((m) => m[1].trim());
 }
 
 function dayEventTimeText(html, id) {
@@ -3006,8 +3006,8 @@ test('Ganztags-Chip: der Kalendername im title ist escaped (#1350)', () => {
 // max-content, damit ein kurzer Titel keine Uhrzeit blockiert, die neben ihn
 // passt), und die Uhrzeit kann nicht schrumpfen und nicht gekuerzt werden -
 // sie steht ganz in Zeile eins oder ganz in der unsichtbaren zweiten. Die
-// Zugewiesenen stehen ausserhalb, sonst braechen sie mit der Uhrzeit um und
-// verschwaenden mit.
+// Zugewiesenen stehen ausserhalb dieser Zeile; wann sie weichen, regelt seit
+// der Re-Kritik 2026-09-25 die Zeile darum (Test unten).
 test('Ganztags-Chip: der Titel gewinnt - die Uhrzeit steht ganz da oder gar nicht (PR #1360)', () => {
   // (a) Markup: Titel und Uhrzeit in derselben Zeile, die Zugewiesenen dahinter.
   const ev = longTimedEvent({ assigned_users: [{ id: 1, display_name: 'Linda' }] });
@@ -3021,7 +3021,7 @@ test('Ganztags-Chip: der Titel gewinnt - die Uhrzeit steht ganz da oder gar nich
   assert(label, 'Titel und Uhrzeit muessen zusammen in .allday-event__label stehen, die Uhrzeit direkt hinter dem Titel');
   const nachLabel = html.slice(label.index + label[0].length);
   assert(nachLabel.trimStart().startsWith('<span class="cal-chip__assigned">'),
-    'die Zugewiesenen stehen HINTER der Zeile, nicht in ihr - sonst braechen sie mit der Uhrzeit um');
+    'die Zugewiesenen stehen HINTER dem Label, nicht in ihm - sonst braechen sie mit der Uhrzeit um');
 
   // (b) Stylesheet: die Mechanik, die im Browser gemessen ist.
   const regeln = [...eachRule(calendarCss)];
@@ -3722,7 +3722,7 @@ test('Zeitformat: Raster, Liste, gesprochener Name und Schicht gehen durch dense
       html.agenda = calendarHelpers.renderAgendaEvent(ev, '2026-09-24');
     });
     const esc = (text) => escStub(text);
-    assert(html.week.includes(`class="week-event__time">${range}<`), `Woche: Rasterfassung erwartet: ${html.week}`);
+    assert(html.week.includes(`class="week-event__when">${range}<`), `Woche: Rasterfassung erwartet: ${html.week}`);
     assert(html.day.includes(`class="day-event__meta">${range}<`), `Tag: Rasterfassung erwartet: ${html.day}`);
     assert(html.agenda.includes(`<span>${esc(`${range} Uhr`)}</span>`), `Agenda: Listenfassung mit Suffix erwartet: ${html.agenda}`);
     for (const [view, markup] of Object.entries(html)) {
@@ -3781,6 +3781,52 @@ test('Blockgrammatik: die Zeitzeile erscheint nach der Hoehe des Blocks, nicht h
   const query = /@container ev-block \(height < ([\d.]+)rem\)\s*\{([^}]*)\}/.exec(calendarCss);
   assert(query && /\.week-event__time/.test(query[2]) && /\.day-event__meta/.test(query[2]),
     'Woche und Tag muessen ihre Zeitzeile ueber dieselbe Hoehenfrage ausblenden');
+});
+
+// DER TITEL VOR DEM „WER" (Re-Kritik 2026-09-25, P2). Im Wochenblock standen
+// die Zugewiesenen in der Titelzeile und schrumpften nie: mobil blieben von
+// „Zahnarzt - Familie" 44 von 112px, am Desktop vom Ganztagsbalken
+// „Städtereise übers Wochenende" 73 von 181px. Gemessen im Browser (Uebergabe);
+// hier steht, was die Messung traegt.
+test('Blockgrammatik: die Zugewiesenen stehen in der Zeitzeile, nie in der Titelzeile', () => {
+  const ev = glyphEvent({ assigned_users: [{ id: 1, display_name: 'Linda' }, { id: 2, display_name: 'Leo' }] });
+  let html = '';
+  withMonthState({ events: [ev] }, () => { html = calendarHelpers.renderWeekEvent(ev, null, '2026-09-24'); });
+  const title = /<div class="week-event__title">([\s\S]*?)<\/div>/.exec(html);
+  assert(title && !title[1].includes('cal-chip__assigned'), `die Titelzeile gehoert dem Titel: ${html}`);
+  const time = /<div class="week-event__time"><span class="week-event__when">[^<]*<\/span>(<span class="cal-chip__assigned">)/.exec(html);
+  assert(time, `die Zugewiesenen stehen HINTER der Uhrzeit in der Zeitzeile: ${html}`);
+  assert(/title="[^"]*Linda, Leo/.test(html), 'das „Wer" bleibt im title-Attribut');
+
+  // Die Zeitzeile bricht um und schneidet ab: passt der Stack nicht neben die
+  // Uhrzeit, faellt er als Ganzes in die unsichtbare zweite Zeile. Die
+  // Hoehenfrage (ev-block) blendet ihn mit der Zeitzeile aus.
+  const rule = [...eachRule(calendarCss)].find((r) => r.selector.trim() === '.week-event__time');
+  assert(rule && /display:\s*flex/.test(rule.body) && /flex-wrap:\s*wrap/.test(rule.body),
+    `die Zeitzeile muss umbrechen: ${rule?.body}`);
+  assert(/(?:^|[\s;])height:\s*1lh/.test(rule.body) && /overflow:\s*hidden/.test(rule.body),
+    `die Zeitzeile ist eine Zeilenhoehe hoch und schneidet Zeile zwei ab: ${rule.body}`);
+});
+
+test('Ganztags-Chip: die Zugewiesenen erscheinen nur neben dem GANZEN Label (Re-Kritik 2026-09-25)', () => {
+  const ev = longTimedEvent({ assigned_users: [{ id: 1, display_name: 'Linda' }] });
+  let html = '';
+  withOvernightState({ cursor: '2026-06-14', events: [ev] }, () => {
+    const container = fakeContainer();
+    calendarHelpers.renderDayView(container);
+    html = container.html;
+  });
+  assert(/<span class="allday-event__line"><span class="allday-event__label">[\s\S]*?<\/span><span class="cal-chip__assigned">/.test(html),
+    `Label und Zugewiesene teilen sich EINE umbrechende Zeile, der Stack hinter dem Label: ${html}`);
+  const regeln = [...eachRule(calendarCss)];
+  const zeile = regeln.find((r) => r.selector.trim() === '.allday-event__line');
+  assert(zeile && /flex-wrap:\s*wrap/.test(zeile.body) && /(?:^|[\s;])height:\s*1lh/.test(zeile.body)
+    && /overflow:\s*hidden/.test(zeile.body), `die Zeile muss umbrechen und Zeile zwei abschneiden: ${zeile?.body}`);
+  // Das Label bricht mit seiner VOLLEN Breite um. Mit Basis 0 waere seine
+  // hypothetische Groesse null, der Stack passte immer daneben und naehme dem
+  // Titel wieder den Platz.
+  const label = regeln.find((r) => r.selector.trim() === '.allday-event__label');
+  assert(/flex:\s*0\s+1\s+auto/.test(label.body), `das Label bricht mit seiner vollen Breite um: ${label.body}`);
 });
 
 test('Ganztags-Beschriftung bricht um, statt aus der 44px-Spalte zu ragen', () => {

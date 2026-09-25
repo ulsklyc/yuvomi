@@ -537,10 +537,10 @@
 }
 
 /* Im kompakten Gitter-Kontext (Woche/Tag) trägt ein dünnerer Ring die
- * Überlappung - die 2px-Trennung der Agenda wäre bei 14-16px-Avataren zu
+ * Überlappung - die 2px-Trennung der Agenda wäre bei 14px-Avataren zu
  * schwer. Die Monats-Bars rendern keinen Avatar-Stack mehr (Kanon). */
 .allday-event .avatar-stack__item,
-.week-event__title .avatar-stack__item {
+.week-event__time .avatar-stack__item {
   border-width: 1.5px;
   margin-left: calc(-1 * var(--space-1));
 }
@@ -831,11 +831,32 @@
 }
 
 /* Die Zeitzeile tritt ueber das GEWICHT zurueck wie am Tagesblock, nicht ueber
- * eine Opacity auf getoenter Tinte. */
+ * eine Opacity auf getoenter Tinte.
+ *
+ * SIE TRAEGT AUCH DIE ZUGEWIESENEN (Re-Kritik 2026-09-25, P2) - hinter der
+ * Uhrzeit, nicht mehr in der Titelzeile. Dieselbe Mechanik wie die Uhrzeit im
+ * Ganztags-Chip (#1350): eine umbrechende Zeile von genau einer Zeilenhoehe,
+ * der Rest abgeschnitten. Passen Uhrzeit und Stack nebeneinander, stehen beide
+ * in Zeile eins; sonst rutscht der Stack als Ganzes in die unsichtbare zweite.
+ * Die Mindestbreite ist damit gemessen statt geschaetzt - fuer 12- und 24-h-
+ * Format und jede Sprache. Mobil (Spalte 105px) faellt er so weg, am Desktop
+ * steht er. Ist der Block zu flach fuer die Zeitzeile (Container-Query unten),
+ * geht er mit ihr. */
 .week-event__time {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-1);
+  height: 1lh;
+  overflow: hidden;
   font-size: var(--text-xs);
   font-weight: var(--font-weight-regular);
   font-variant-numeric: tabular-nums;
+}
+
+/* Allein auf der Zeile kuerzt die Uhrzeit per Ellipse wie bisher. */
+.week-event__when {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1932,14 +1953,35 @@
  * waechst in den Rest; sonst rutscht die ganze Uhrzeit in die abgeschnittene
  * zweite Zeile. Das gilt fuer jede Sprache und beide Zeitformate, weil die
  * Breite der Uhrzeit gemessen und nicht geschaetzt wird. Die Zugewiesenen
- * stehen AUSSERHALB dieser Zeile und brechen nie mit um.
+ * stehen ausserhalb dieser Zeile, in `.allday-event__line` darunter.
  *
- * Die Zeile fuellt den Platz zwischen Icons und Zugewiesenen (Basis 0), damit
- * ihre Breite nicht an der intrinsischen Groesse einer umbrechenden Zeile
- * haengt. */
+ * Basis `auto` (bis 2026-09-25: 0): die aeussere Zeile fragt nach der VOLLEN
+ * Breite des Labels, um zu entscheiden, ob der Stack daneben passt. Steht der
+ * Stack in der unsichtbaren zweiten Zeile, schrumpft das Label auf die
+ * Zeilenbreite, und die Regel hier gilt wie zuvor. */
 .allday-event__label {
   display: flex;
   flex-wrap: wrap;
+  column-gap: var(--space-1);
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 1lh;
+  overflow: hidden;
+}
+
+/* DER TITEL VOR DEM „WER" (Re-Kritik 2026-09-25, P2). Die Zugewiesenen
+ * standen neben der Zeile und schrumpften nie - am Desktop blieb von
+ * „Städtereise übers Wochenende" 73 von 181px. Jetzt teilen sie sich eine
+ * zweite umbrechende Zeile mit dem Label, nach derselben Mechanik: das Label
+ * bricht mit seiner VOLLEN Breite um (Titel ganz plus Uhrzeit), und nur wenn
+ * der Stack daneben noch passt, steht er in Zeile eins. Sonst faellt er in die
+ * abgeschnittene zweite, und das Label steht allein und kuerzt nach der Regel
+ * oben (Titel vor Uhrzeit). Die Zeile fuellt den Platz hinter den Icons
+ * (Basis 0), damit ihre Breite nicht an einer umbrechenden Zeile haengt. */
+.allday-event__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   column-gap: var(--space-1);
   flex: 1 1 0;
   min-width: 0;

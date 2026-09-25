@@ -3936,12 +3936,25 @@ function allDayChipTimeHtml(timeText) {
 function renderAllDayEvent(ev, dayStr) {
   const timeText = allDayChipTimeText(ev, dayStr);
   const spoken = allDayChipTimeText(ev, dayStr, { suffix: true });
+  // DER TITEL VOR DEM „WER" (Re-Kritik 2026-09-25, P2): die Zugewiesenen
+  // stehen mit Titel und Uhrzeit in EINER umbrechenden Zeile und erscheinen
+  // nur, wenn beide daneben GANZ passen - sonst fallen sie in die
+  // abgeschnittene zweite Zeile (calendar.css, `.allday-event__line`). Name im
+  // title-Attribut und im gesprochenen Namen bleibt.
   return `
     <div class="allday-event" data-id="${ev.id}"
          style="${eventSurfaceStyle(ev)}"${eventBlockAttrs(ev, spoken || t('calendar.allDay'))}
-         title="${allDayChipTitle(ev, spoken)}">${eventGlyphsHtml(ev)}<span class="allday-event__label"><span>${esc(ev.title)}</span>${allDayChipTimeHtml(timeText)}</span>${chipAssigneeStack(ev, { size: 16, maxVisible: 3 })}</div>`;
+         title="${allDayChipTitle(ev, spoken)}">${eventGlyphsHtml(ev)}<span class="allday-event__line"><span class="allday-event__label"><span>${esc(ev.title)}</span>${allDayChipTimeHtml(timeText)}</span>${chipAssigneeStack(ev, { size: 14, maxVisible: 2 })}</span></div>`;
 }
 
+/**
+ * Ein Zeitblock der Woche. DIE TITELZEILE GEHOERT DEM TITEL (Re-Kritik
+ * 2026-09-25, P2): die Zugewiesenen standen darin und liessen mobil von
+ * „Zahnarzt - Familie" 44 von 112px uebrig. Sie stehen jetzt in der Zeitzeile
+ * hinter der Uhrzeit - erscheinen also nur, wo der Block hoch genug fuer die
+ * Zeitzeile ist, und nur, wenn sie neben die Uhrzeit passen (calendar.css,
+ * `.week-event__time`). Wer zugewiesen ist, sagen title und gesprochener Name.
+ */
 function renderWeekEvent(ev, layout = null, dayStr = null) {
   const { start, end } = timeRangeForEvent(ev, dayStr);
   const duration = Math.max(end - start, 30);
@@ -3957,8 +3970,8 @@ function renderWeekEvent(ev, layout = null, dayStr = null) {
     <div class="week-event" data-id="${ev.id}"
          style="top:${top};height:${height};left:${left};width:${width};${eventSurfaceStyle(ev)}"
          title="${esc(ev.title)}${chipAssigneeTitleSuffix(ev)}"${eventBlockAttrs(ev, eventTimeText(ev, dayStr))}>
-      <div class="week-event__title">${eventGlyphsHtml(ev)}<span>${esc(ev.title)}</span>${chipAssigneeStack(ev, { size: 14, maxVisible: 2 })}</div>
-      <div class="week-event__time">${gridTimeText(ev, dayStr)}</div>
+      <div class="week-event__title">${eventGlyphsHtml(ev)}<span>${esc(ev.title)}</span></div>
+      <div class="week-event__time"><span class="week-event__when">${gridTimeText(ev, dayStr)}</span>${chipAssigneeStack(ev, { size: 14, maxVisible: 2 })}</div>
     </div>
   `;
 }
