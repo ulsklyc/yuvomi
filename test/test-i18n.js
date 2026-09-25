@@ -472,6 +472,8 @@ test('kein Locale-Wert traegt einen Gedankenstrich ausser den begruendeten Sprac
       if (rule.keys?.has(key)) continue;
       const rest = rule.allLocale ? value.replace(rule.allLocale, '') : value;
       if (/[\u2013\u2014]/.test(rest)) hits.push(`${locale}: ${key}`);
+      // Der chinesische Strich steht ohne Leerzeichen zwischen den Zeichen.
+      if (rule.allLocale && / ——|—— /.test(value)) hits.push(`${locale}: ${key} (Leerzeichen am ——)`);
     }
   }
   assert.deepEqual(hits, []);
