@@ -43,6 +43,7 @@ import {
   defaultSortDirection,
   folderFacetCounts,
   folderRepeatsCategory,
+  folderRowLead,
   matchesDocumentQuery,
   normalizeDocumentQuery,
   sortDocuments as sortDocumentList,
@@ -1065,6 +1066,7 @@ function renderFolderBrowser() {
       open: state.expanded.has(row.folder.id),
     })),
   ];
+  const treeHasFolders = items.some((item) => item.managed);
   browser.replaceChildren();
   /* Die geteilte Zeilen-Grammatik statt einer nachgebauten: `.documents-folder-item`
    * mass 44px min-height, 8px gap, 10px Radius und kappte den Namen mit Ellipse,
@@ -1082,8 +1084,10 @@ function renderFolderBrowser() {
      *
      * Ordner ohne Kinder bekommen einen leeren Platzhalter statt gar nichts -
      * sonst springen die Namen einer Geschwisterreihe um die Pfeilbreite
-     * gegeneinander, je nachdem wer Kinder hat. */
-    const twisty = !item.managed ? '' : (item.branch
+     * gegeneinander, je nachdem wer Kinder hat. Die festen Zeilen bekommen
+     * denselben Platz, sobald ein Baum da ist (folderRowLead). */
+    const lead = folderRowLead(item, treeHasFolders);
+    const twisty = lead === 'none' ? '' : (lead === 'toggle'
       ? `<button class="documents-folder-item__twisty" type="button" data-folder-toggle="${esc(item.id)}"
                  aria-expanded="${item.open ? 'true' : 'false'}"
                  aria-label="${esc(item.open ? t('documents.folderCollapse', { name: item.name }) : t('documents.folderExpand', { name: item.name }))}">

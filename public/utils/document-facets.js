@@ -128,3 +128,17 @@ export function folderRepeatsCategory(folderName, categoryLabel) {
   const folder = String(folderName ?? '').trim().toLowerCase();
   return folder !== '' && folder === String(categoryLabel ?? '').trim().toLowerCase();
 }
+
+/**
+ * Was vor dem Ordnersymbol einer Zeile der Ordnerleiste steht: der Pfeil
+ * (`toggle`), ein leerer Platz in Pfeilbreite (`slot`) oder nichts (`none`).
+ * Die festen Zeilen ("Alle Dokumente", "Kein Ordner") sind keine Ordner und
+ * bekommen nie einen Pfeil, aber denselben Platz, sobald ein Baum neben ihnen
+ * steht - sonst standen ihre Symbole 32px links von denen der eigenen Ordner
+ * (Re-Critique 2026-09-25). Ohne eigene Ordner gibt es keine Spalte, mit der
+ * sie fluchten muessten, und damit keinen Grund einzuruecken.
+ */
+export function folderRowLead(item, treeHasFolders) {
+  if (item.managed) return item.branch ? 'toggle' : 'slot';
+  return treeHasFolders ? 'slot' : 'none';
+}

@@ -1581,3 +1581,18 @@ test('der Kategorie-Hinweis nennt echte Kategorien als Beispiele, in jeder Sprac
     }
   }
 });
+
+test('die festen Ordnerzeilen fluchten mit dem Baum: derselbe Platz vor dem Symbol', () => {
+  // "Alle Dokumente" und "Kein Ordner" hatten keinen Pfeil-Platz, ihre Symbole
+  // standen 32px links von denen der eigenen Ordner (Re-Critique 2026-09-25).
+  assert.equal(typeof facets?.folderRowLead, 'function', 'folderRowLead fehlt in utils/document-facets.js');
+  const { folderRowLead } = facets;
+  assert.equal(folderRowLead({ managed: false }, true), 'slot', 'feste Zeile neben einem Baum bekommt den Platzhalter');
+  assert.equal(folderRowLead({ managed: false }, false), 'none', 'ohne eigene Ordner ruecken die festen Zeilen nicht ein');
+  assert.equal(folderRowLead({ managed: true, branch: true }, true), 'toggle');
+  assert.equal(folderRowLead({ managed: true, branch: false }, true), 'slot');
+  // Und die Seite fragt die Regel wirklich - ein Helfer, den niemand ruft, misst nichts.
+  const tree = page.slice(page.indexOf('function renderFolderBrowser()'), page.indexOf('// Der Auslöser trägt den Ordner, in dem man steht'));
+  assert.match(tree, /folderRowLead\(item, /);
+  assert.doesNotMatch(tree, /!item\.managed \? ''/, 'die alte Sonderregel fuer feste Zeilen ist weg');
+});
