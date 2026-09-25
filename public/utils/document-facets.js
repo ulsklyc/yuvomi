@@ -116,17 +116,31 @@ export function sortDocuments(docs, { sort = 'updated', direction, locale } = {}
 }
 
 /**
- * Wiederholt der Ordnername die Kategorie woertlich? Dann steht die Angabe nur
- * einmal da - "Schule · Schule" sagte dasselbe zweimal (Critique 2026-08-27,
- * P3). Nur exakte Gleichheit (ohne Gross/Klein und Randleerzeichen): ein
- * Ordner "Versicherungen" unter der Kategorie "Versicherung" ist eine
- * Nutzerentscheidung und bleibt sichtbar. EINE Regel fuer Zeile, Karte und
- * Betrachter - der Betrachter zeigte die Dopplung noch, als die Zeile sie
- * laengst unterdrueckte (Critique 2026-09-25).
+ * Wiederholt der Ordnername die Kategorie? Dann steht die Angabe nur einmal da -
+ * "Schule · Schule" sagte dasselbe zweimal (Critique 2026-08-27, P3), und
+ * "Versicherung · Versicherungen" tat es auch, nur im Plural (Re-Critique
+ * 2026-09-25). EINE Regel fuer Zeile, Karte und Betrachter - der Betrachter
+ * zeigte die Dopplung noch, als die Zeile sie laengst unterdrueckte.
+ *
+ * Singular und Plural erkennt die Regel sprachneutral: das kuerzere Wort ist
+ * Anfang des laengeren, und es fehlt nur eine Endung von hoechstens drei
+ * Zeichen (de -n/-en/-e, en/es/fr -s/-es/-x, tr -lar/-ler). Der Stamm braucht
+ * mindestens drei Zeichen, sonst traegt der Vergleich keine Aussage. Ein
+ * eigenes Wort ("Arbeitsvertrag" unter "Arbeit", "Schulbus" unter "Schule")
+ * bleibt eine Nutzerentscheidung und bleibt sichtbar.
  */
+const PLURAL_SUFFIX_MAX = 3;
+const PLURAL_STEM_MIN = 3;
+
 export function folderRepeatsCategory(folderName, categoryLabel) {
   const folder = String(folderName ?? '').trim().toLowerCase();
-  return folder !== '' && folder === String(categoryLabel ?? '').trim().toLowerCase();
+  const category = String(categoryLabel ?? '').trim().toLowerCase();
+  if (folder === '' || category === '') return false;
+  if (folder === category) return true;
+  const [shorter, longer] = folder.length < category.length ? [folder, category] : [category, folder];
+  return shorter.length >= PLURAL_STEM_MIN
+    && longer.length - shorter.length <= PLURAL_SUFFIX_MAX
+    && longer.startsWith(shorter);
 }
 
 /**

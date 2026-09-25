@@ -1274,7 +1274,16 @@ test('Ordner gleich Kategorie steht einmal da - in Zeile, Karte UND Betrachter (
   assert.equal(typeof facets?.folderRepeatsCategory, 'function', 'folderRepeatsCategory fehlt in document-facets.js');
   assert.equal(facets.folderRepeatsCategory('Schule', 'Schule'), true);
   assert.equal(facets.folderRepeatsCategory(' schule ', 'Schule'), true);
-  assert.equal(facets.folderRepeatsCategory('Versicherungen', 'Versicherung'), false, 'nur exakte Gleichheit');
+  // Die Pluralform der Kategorie sagt dasselbe (Re-Critique 2026-09-25:
+  // "Versicherung · Versicherungen"). Sprachneutral ueber eine kurze Endung.
+  assert.equal(facets.folderRepeatsCategory('Versicherungen', 'Versicherung'), true, 'Plural der Kategorie');
+  assert.equal(facets.folderRepeatsCategory('Reise', 'Reisen'), true, 'Singular der Kategorie');
+  assert.equal(facets.folderRepeatsCategory('Tax', 'Taxes'), true);
+  assert.equal(facets.folderRepeatsCategory('Okullar', 'Okul'), true, 'tr: -lar');
+  assert.equal(facets.folderRepeatsCategory('Steuererklaerungen', 'Steuern'), false, 'ein eigenes Wort bleibt sichtbar');
+  assert.equal(facets.folderRepeatsCategory('Schulbus', 'Schule'), false, 'kein Praefix, keine Dopplung');
+  assert.equal(facets.folderRepeatsCategory('Arbeitsvertrag', 'Arbeit'), false, 'lange Endung = anderes Wort');
+  assert.equal(facets.folderRepeatsCategory('Ev', 'Evler'), false, 'zu kurzer Stamm traegt keine Aussage');
   assert.equal(facets.folderRepeatsCategory('', 'Schule'), false);
   assert.equal(facets.folderRepeatsCategory(null, 'Schule'), false);
   assert.equal(facets.folderRepeatsCategory('', ''), false, 'kein Ordner ist keine Dopplung');
