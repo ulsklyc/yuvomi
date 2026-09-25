@@ -1387,3 +1387,15 @@ test('der Betrachter schiebt ein zu hohes PDF nicht nach oben ueber die Meta-Zei
   assert.equal(values.at(-1), 'safe center', 'die letzte align-items-Deklaration ist safe center');
   assert.ok(values.includes('center'), 'davor steht center als Rueckfall fuer Browser ohne safe');
 });
+
+test('der immer sichtbare Ordner-Kebab traegt am Zeiger die volle Zielgroesse', () => {
+  // Solange er per Hover erschien (opacity 0 + pointer-events: none), mass Sonde 4
+  // ihn gar nicht. Seit er immer sichtbar ist, steht er als EINZELZIEL da - die
+  // Ordnerzeilen liegen weiter als 16px auseinander - und 32x32 (--target-sm)
+  // reisst am Desktop die 40px (Gesamtpruefung 2026-09-25, test:document-guards).
+  const base = topRules(css).find((rule) => rule.selector === '.documents-folder-item__menu');
+  assert.ok(base, '.documents-folder-item__menu fehlt');
+  assert.match(base.body, /width:\s*var\(--target-md\)/);
+  assert.match(base.body, /height:\s*var\(--target-md\)/);
+  assert.doesNotMatch(base.body, /--target-sm/);
+});

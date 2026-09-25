@@ -484,13 +484,18 @@
  * Er erschien erst bei Hover/Fokus - gegen die eine Sichtbarkeitsregel der
  * Zeilenaktionen (list-row.css, Bedienzone), und auf Tablet/Trackpad ohne
  * verlaessliches hover-Signal war er gar nicht zu finden. Ruhe kommt aus der
- * Tertiaerfarbe; Hover und Fokus hellen ihn auf. */
+ * Tertiaerfarbe; Hover und Fokus hellen ihn auf.
+ *
+ * --target-md und nicht --target-sm: sichtbar heisst gemessen. Die Ordnerzeilen
+ * liegen mehr als 16px auseinander, der Kebab ist also ein EINZELZIEL und
+ * braucht am Zeiger 40px (Sonde 4, test-document-guards.js). Solange er
+ * unsichtbar und ohne pointer-events war, fiel das nicht auf. */
 .documents-folder-item__menu {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--target-sm);
-  height: var(--target-sm);
+  width: var(--target-md);
+  height: var(--target-md);
   margin-right: var(--space-0h);
   flex-shrink: 0;
   border-radius: var(--radius-full);
@@ -508,9 +513,8 @@
   background: color-mix(in srgb, var(--module-accent) var(--tint-state), transparent);
 }
 
-/* Touch: den Kebab auf Finger-Maße heben. Er ist ein REIHEN-Ziel (je Ordnerzeile
- * einer, 8px Abstand zum nächsten) und hält damit am Zeiger schon mit 32x32 die
- * Regel - am Finger fehlt ihm die Fläche trotzdem. Der Ordner-Hinzufügen-Knopf
+/* Touch: den Kebab auf Finger-Maße heben (am Zeiger trägt er --target-md,
+ * siehe oben). Der Ordner-Hinzufügen-Knopf
  * steht hier nicht mehr: er trägt seit Phase 3c --target-base und bekommt seine
  * 48px damit aus demselben Token wie alle anderen. */
 @media (hover: none) {
