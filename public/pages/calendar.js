@@ -2592,6 +2592,12 @@ function renderView() {
  * synthetisches `scroll` am neuen Port laesst die Shell mit IHRER Regel
  * (Schwelle, Hysterese, Reserve) neu urteilen; eine zweite Regel hier waere
  * die naechste, die auseinanderlaeuft.
+ *
+ * Ohne Nutzergeste urteilt die Shell dabei NUR ueber die Reserve (Re-Kritik
+ * 2026-09-25): traegt der neue Port den eingeklappten Kopf nicht, klappt er
+ * auf; einklappen tut ihn nur ein Scroll, den der Nutzer fuehrt. Sonst
+ * klappte dieses Ereignis - der Port steht nach `scrollToHour` schon auf
+ * „jetzt" - den Titel beim Tipp auf „Woche" ein und die Tabs sprangen.
  */
 function syncHeadToScrollport(body) {
   const port = body.querySelector('.page-scrollport');

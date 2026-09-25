@@ -379,6 +379,27 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     }
   };
 
+  // NUR EIN SCROLL, DEN DER NUTZER FUEHRT, KLAPPT DEN KOPF EIN (Re-Kritik
+  // 2026-09-25, P2). Der Kalender stellt Woche und Tag beim Rendern auf
+  // „jetzt" und laesst die Shell nach jedem Ansichtswechsel per
+  // synthetischem `scroll` am neuen Port neu urteilen - beides kommt hier als
+  // ganz gewoehnliches Scroll-Ereignis an. Gewertet wie ein Nutzer-Scroll,
+  // klappte ein Tipp auf „Tag" den Titel ein und zog die Ansichts-Tabs mobil
+  // um 45px nach oben; der Finger lag danach auf dem ersten Termin. Ein
+  // Scroll-Ereignis sagt nicht, wer es ausgeloest hat - die Geste davor schon.
+  // Gemerkt wird deshalb das Ziel der letzten Geste im Modul; als Nutzer-
+  // Scroll zaehlt nur, was einen Port bewegt, in dem diese Geste lag. Der Tipp
+  // auf einen Tab liegt im Kopf, nicht im Port, und ein neu gerenderter Port
+  // enthaelt das alte Ziel nicht mehr. Nachlaufender Schwung (iOS) kommt nach
+  // dem Loslassen, aber vom selben Port, und zaehlt weiter mit.
+  // Ein Scroll OHNE Geste darf genau eines: die Reserve-Regel unten. Kann der
+  // neue Port den eingeklappten Kopf nicht tragen (der Monat scrollt gar
+  // nicht), klappt er auf - sonst bliebe er dort eingeklappt, ohne dass ein
+  // Scroll ihn je zurueckholt. Alles andere haelt der Kopf ueber den Wechsel.
+  let gestureTarget = null;
+  const onGesture = (e) => { gestureTarget = e.target; };
+  const GESTURES = ['wheel', 'touchstart', 'pointerdown', 'keydown'];
+
   // Hysterese, damit der Kopf nicht um seine eigene Schwelle flattert.
   const onInnerScroll = (e) => {
     const port = e.target;
@@ -404,6 +425,8 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // sonst schiebt die zurückkehrende Kopfhöhe den Scroll auf 0, der Kopf
     // klappt wieder aus und beides pendelt gegeneinander.
     if (reserve < lead + 48) { toolbar.classList.remove('is-collapsed', 'is-docked'); return; }
+    // Ab hier nur noch der Nutzer (siehe `gestureTarget` oben).
+    if (!gestureTarget || !port.contains(gestureTarget)) return;
     const top = port.scrollTop;
     if (top > 24) toolbar.classList.add('is-collapsed', 'is-docked');
     else if (top < 8) toolbar.classList.remove('is-collapsed', 'is-docked');
@@ -567,6 +590,7 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
   // Capture-Phase am Modul-Root gelauscht. Damit ist jede innere Liste erfasst,
   // auch die eines Tabs, den es beim Verdrahten noch nicht gab.
   capped?.addEventListener('scroll', onInnerScroll, { capture: true, passive: true });
+  for (const type of GESTURES) capped?.addEventListener(type, onGesture, { capture: true, passive: true });
   update();
 
   return {
@@ -576,6 +600,8 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
       ro.disconnect();
       mo.disconnect();
       capped?.removeEventListener('scroll', onInnerScroll, { capture: true });
+      for (const type of GESTURES) capped?.removeEventListener(type, onGesture, { capture: true });
+      gestureTarget = null;
       dockTitle?.remove();
       dockTitle = null;
       headSeal?.remove();

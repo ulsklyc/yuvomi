@@ -131,6 +131,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Switching the calendar view no longer moves the view tabs on a phone.** Week and day scroll to
+  the current hour when they open, and the header took that for your own scrolling: it folded the
+  title away, and the tabs jumped 45px up under your finger. Only scrolling you do yourself folds
+  the header now, in every module that has one (budget, calendar, notes, contacts). Once folded, it
+  stays folded when you switch to week, day or agenda; the month, which cannot scroll, unfolds it.
+
 - **Events in the week and day view can be reached by keyboard and screen reader.** They could only
   be clicked: Tab skipped them and a screen reader did not offer them. Every event, all-day bar
   and day heading is now a button named like the agenda row (title, time, place, people), in the

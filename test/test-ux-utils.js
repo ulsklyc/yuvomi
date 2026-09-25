@@ -8,7 +8,7 @@ import { existsSync, globSync, readFileSync } from 'node:fs';
 import { eachRule } from './css-rules.js';
 
 // Minimales Window/Navigator-Mock für Node
-const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss } = await (async () => {
+const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader } = await (async () => {
   global.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
@@ -559,4 +559,138 @@ test('showToast verdrahtet die Geste über den geteilten Helfer', () => {
     !router.includes('setPointerCapture'),
     'die Shell darf keinen eigenen Wisch-Zwilling mit Pointer-Capture halten',
   );
+});
+
+/* DER KOPF KLAPPT NUR AUF EINEN SCROLL, DEN DER NUTZER FUEHRT (Re-Kritik
+ * Kalender 2026-09-25, P2). Woche und Tag stellen ihr Raster beim Rendern auf
+ * „jetzt"; gewertet wie ein Nutzer-Scroll, klappte der Tipp auf „Tag" den
+ * Titel ein und zog die Ansichts-Tabs mobil von y 105 auf y 60. Die Attrappe
+ * baut die gedeckelte Architektur nach: Shell (scrollt) > Modul-Root
+ * (overflow hidden, traegt den Lauscher) > Kopf mit zwei Zeilen + innerer
+ * Port. */
+function collapsingStub() {
+  class FakeEl {
+    constructor(name, { overflowY = 'visible', rect = null } = {}) {
+      this.name = name;
+      this.cs = { overflowY, paddingBlockStart: '0', paddingInlineStart: '0', paddingInlineEnd: '0', columnGap: '0' };
+      this.rect = rect;
+      this.children = [];
+      this.parentElement = null;
+      this.dataset = {};
+      this.style = { setProperty() {}, removeProperty() {} };
+      this.handlers = {};
+      this.scrollTop = 0;
+      this.scrollHeight = 0;
+      this.clientHeight = 0;
+      this.scrollWidth = 0;
+      this.clientWidth = 360;
+      const set = new Set();
+      this.classList = {
+        add: (...c) => c.forEach((x) => set.add(x)),
+        remove: (...c) => c.forEach((x) => set.delete(x)),
+        toggle: (c, on) => { if (on === undefined ? !set.has(c) : on) set.add(c); else set.delete(c); },
+        contains: (c) => set.has(c),
+      };
+    }
+    append(...kids) { for (const k of kids) { k.parentElement = this; this.children.push(k); } return this; }
+    contains(n) { for (let x = n; x; x = x.parentElement) if (x === this) return true; return false; }
+    querySelector() { return null; }
+    addEventListener(type, fn) { (this.handlers[type] ??= []).push(fn); }
+    removeEventListener() {}
+    getBoundingClientRect() { const r = this.rect ?? { top: 0, bottom: 0 }; return { ...r, height: r.bottom - r.top, width: 100 }; }
+    getClientRects() { return this.rect ? [this.rect] : []; }
+    get offsetParent() { return this.rect ? this.parentElement : null; }
+  }
+  const saved = {};
+  for (const k of ['Element', 'getComputedStyle', 'ResizeObserver', 'MutationObserver', 'IntersectionObserver']) saved[k] = global[k];
+  global.Element = FakeEl;
+  global.getComputedStyle = (el) => el.cs;
+  global.ResizeObserver = class { observe() {} disconnect() {} };
+  global.MutationObserver = class { observe() {} disconnect() {} };
+  global.IntersectionObserver = class { observe() {} disconnect() {} };
+  const restore = () => { for (const [k, v] of Object.entries(saved)) global[k] = v; };
+
+  const shell = new FakeEl('shell', { overflowY: 'auto' });
+  const root = new FakeEl('root', { overflowY: 'hidden' });
+  const toolbar = new FakeEl('toolbar', { rect: { top: 0, bottom: 90 } });
+  const titleRow = new FakeEl('title', { rect: { top: 0, bottom: 40 } });
+  const tab = new FakeEl('tab', { rect: { top: 50, bottom: 90 } });
+  toolbar.append(titleRow, tab);
+  const port = new FakeEl('port', { overflowY: 'auto' });
+  const cell = new FakeEl('cell');
+  port.append(cell);
+  port.scrollHeight = 1600;
+  port.clientHeight = 500;
+  shell.append(root);
+  root.append(toolbar, port);
+  const fire = (type, target) => { for (const fn of root.handlers[type] ?? []) fn({ target }); };
+  const scrollTo = (p, top) => { p.scrollTop = top; fire('scroll', p); };
+  return { FakeEl, root, toolbar, tab, port, cell, fire, scrollTo, restore };
+}
+
+test('wireCollapsingHeader: ein Scroll, den die Seite selbst setzt, klappt den Kopf nicht ein', () => {
+  const s = collapsingStub();
+  try {
+    wireCollapsingHeader(s.toolbar);
+    assert.ok(s.toolbar.classList.contains('page-toolbar--capped'), 'Attrappe muss die gedeckelte Architektur ergeben');
+    // Der Tipp auf den Tab liegt im Kopf, danach stellt die Seite „jetzt" ein.
+    s.fire('pointerdown', s.tab);
+    s.scrollTo(s.port, 424);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), false,
+      'der Scroll auf „jetzt" ist keine Nutzergeste und darf die Tabs nicht verschieben');
+    // Ganz ohne Geste (erster Render) ebenso.
+    s.scrollTo(s.port, 500);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), false);
+  } finally { s.restore(); }
+});
+
+test('wireCollapsingHeader: der Nutzer-Scroll klappt weiter ein und aus', () => {
+  const s = collapsingStub();
+  try {
+    wireCollapsingHeader(s.toolbar);
+    s.fire('touchstart', s.cell);
+    s.scrollTo(s.port, 120);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), true, 'Wisch im Port klappt ein');
+    s.scrollTo(s.port, 0);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), false, 'zurueck oben klappt aus');
+    s.fire('wheel', s.port);
+    s.scrollTo(s.port, 200);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), true, 'Mausrad/Scrollbalken im Port klappt ein');
+  } finally { s.restore(); }
+});
+
+test('wireCollapsingHeader: ein Ansichtswechsel haelt den eingeklappten Kopf, wo der neue Port ihn tragen kann', () => {
+  const s = collapsingStub();
+  try {
+    wireCollapsingHeader(s.toolbar);
+    s.fire('touchstart', s.cell);
+    s.scrollTo(s.port, 300);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), true);
+    // Tipp auf „Tag": neuer Port mit Reserve, die Seite stellt ihn auf „jetzt"
+    // und nahe an den Anfang (frueher Morgen) - beides ohne Geste.
+    s.fire('pointerdown', s.tab);
+    const dayPort = new s.FakeEl('day-scroll', { overflowY: 'auto' });
+    dayPort.scrollHeight = 1600;
+    dayPort.clientHeight = 500;
+    s.root.append(dayPort);
+    s.scrollTo(dayPort, 4);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), true,
+      'ein Scroll ohne Geste darf den Kopf nicht aufklappen, wenn der Port ihn traegt');
+  } finally { s.restore(); }
+});
+
+test('wireCollapsingHeader: ein Port, der den Kollaps nicht traegt, klappt auch ohne Geste auf', () => {
+  // Die Gegenseite (Critique 2026-09-24): der Monat scrollt nicht. Bliebe der
+  // Kopf der Woche dort eingeklappt, holte ihn kein Scroll mehr zurueck.
+  const s = collapsingStub();
+  try {
+    wireCollapsingHeader(s.toolbar);
+    s.fire('touchstart', s.cell);
+    s.scrollTo(s.port, 300);
+    s.fire('pointerdown', s.tab);
+    const monthRows = new s.FakeEl('month-rows', { overflowY: 'auto' });
+    s.root.append(monthRows);
+    s.scrollTo(monthRows, 0);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), false);
+  } finally { s.restore(); }
 });

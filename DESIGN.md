@@ -2015,6 +2015,14 @@ neu urteilen, sonst erbte der Monat, der gar nicht scrollen kann, den eingeklapp
 Woche. Und **einklappen kann nur ein vermessener Kopf** - ein Scroll-Ereignis vor der ersten
 Messung (die Woche springt beim ersten Render auf „jetzt") markierte den Kopf sonst ohne
 Lead-Zone als eingeklappt, und `update()` misst einen eingeklappten Kopf nie wieder.
+**Einklappen darf nur ein Scroll, den der Nutzer fuehrt** (Re-Kritik 2026-09-25, P2): die
+Shell merkt sich das Ziel der letzten Geste (Rad, Beruehrung, Zeiger, Taste) und wertet einen
+Scroll nur, wenn diese Geste im bewegten Port lag. Der Sprung der Woche auf „jetzt" und das
+Neu-Urteilen nach dem Ansichtswechsel sind keine Geste - gewertet wie eine, klappten sie beim
+Tipp auf „Woche" oder „Tag" den Titel ein und zogen die Tabs mobil von y 105 auf y 60, unter
+den Finger. Ein Scroll ohne Geste darf nur die Reserve-Regel: traegt der neue Port den
+eingeklappten Kopf nicht (Monat), klappt er auf; sonst haelt der Kopf seinen Zustand ueber den
+Wechsel.
 
 Der Kopf bleibt in ZEILENRICHTUNG - kein Modul setzt eine eigene Flex-Richtung auf einer
 Kopf-Klasse. Eine Tab-Leiste im Kopf ist eine eigene, horizontal scrollende Zeile UNTER dem
