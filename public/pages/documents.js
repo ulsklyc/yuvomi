@@ -1008,6 +1008,11 @@ function renderCategoryChips() {
   const visible = CATEGORIES.filter((category) => present.get(category) || category === state.category);
   const labels = categoryLabels();
   host.replaceChildren();
+  // Eine Ansicht ohne ein einziges Dokument (das leere Archiv) bekommt keine
+  // Facette: "Alle Kategorien 0" allein in der Spur sagte nur, was der
+  // Leerzustand darunter schon sagt (Re-Critique 2026-09-25). Eine aktive
+  // Kategorie bleibt stehen, damit man sie loesen kann.
+  if (!state.allDocuments.length && !state.category) return;
   host.insertAdjacentHTML('beforeend', `
     <button type="button" class="filter-chip filter-chip--sm" data-category="" aria-pressed="${!state.category}">
       ${t('documents.allCategories')}<span class="filter-chip__count">${counts.get('') || 0}</span>
@@ -1047,6 +1052,9 @@ function renderFolderBrowser() {
   const browser = _container.querySelector('#documents-folder-browser');
   if (!browser) return;
   const counts = folderCounts();
+  // Neun Nullen im leeren Archiv waren Rauschen (Re-Critique 2026-09-25): ohne
+  // ein Dokument in dieser Ansicht traegt keine Zeile einen Zaehler.
+  const showCounts = state.allDocuments.length > 0;
   /* Zwei feste Zeilen, dann der Baum (#785).
    *
    * `depth` ruecken die Zeilen ein, `branch` sagt, ob ein Pfeil davorsteht.
@@ -1104,7 +1112,7 @@ function renderFolderBrowser() {
       <button class="documents-folder-item__select list-row__main--interactive" type="button" data-folder-select="${esc(item.id)}" aria-current="${active ? 'true' : 'false'}">
         <span class="documents-folder-item__icon"><i data-lucide="${esc(item.icon)}" aria-hidden="true"></i></span>
         <span class="list-row__name documents-folder-item__name" title="${esc(item.name)}">${esc(item.name)}</span>
-        <span class="documents-folder-item__count">${counts.get(item.id) || 0}</span>
+        ${showCounts ? `<span class="documents-folder-item__count">${counts.get(item.id) || 0}</span>` : ''}
       </button>
       ${item.managed ? `
       <button class="documents-folder-item__menu" type="button" data-folder-menu="${esc(item.id)}" aria-label="${esc(t('documents.folderActionsFor', { name: item.name }))}" title="${esc(t('documents.folderActionsFor', { name: item.name }))}"

@@ -1636,3 +1636,18 @@ test('Ordner- und Chip-Zaehler folgen EINEM Rezept, das in Dark nicht unter die 
   const active = [...eachRule(css)].find((r) => r.at.length === 0 && r.selector === '.documents-folder-item--active .documents-folder-item__count');
   assert.ok(!active || !/background/.test(active.body), 'aktiv toent die Tinte, die Fuellung folgt ihr von selbst');
 });
+
+test('eine Ansicht ohne ein einziges Dokument zeigt keine Facetten-Moebel', () => {
+  // Das leere Archiv zeigte "Alle Kategorien 0" allein in der Spur und neun
+  // Ordner mit 0 (Re-Critique 2026-09-25) - Zaehler, die nur sagen, dass es
+  // nichts gibt, was der Leerzustand darunter schon sagt.
+  const chips = fnBody('renderCategoryChips', 'renderExpiringChip');
+  assert.match(chips, /if \(!state\.allDocuments\.length && !state\.category\) return;/,
+    'ohne Dokumente in dieser Ansicht keine Kategorie-Chips (ausser eine Kategorie ist aktiv)');
+  const tree = page.slice(page.indexOf('function renderFolderBrowser()'), page.indexOf('// Der Auslöser trägt den Ordner, in dem man steht'));
+  assert.match(tree, /const showCounts = state\.allDocuments\.length > 0;/);
+  assert.match(tree, /\$\{showCounts \? `<span class="documents-folder-item__count">/);
+  // Und die Spur verschwindet samt Haarlinie, wenn keine Gruppe einen Chip traegt.
+  const spur = [...eachRule(css)].find((r) => r.at.length === 0 && r.selector === '.documents-filters__chips:not(:has(.filter-chip))');
+  assert.ok(spur && /display:\s*none/.test(spur.body), 'leere Chip-Spur ausblenden');
+});

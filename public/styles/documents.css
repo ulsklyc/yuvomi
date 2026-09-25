@@ -126,6 +126,13 @@
 
 .documents-filters__chips::-webkit-scrollbar { display: none; }
 
+/* Traegt keine Gruppe einen Chip (leere Ansicht, documents.js
+ * renderCategoryChips), geht die Spur samt Haarlinie: ein Strich neben dem
+ * Segment, hinter dem nichts kommt, waere Moebel ohne Zweck. */
+.documents-filters__chips:not(:has(.filter-chip)) {
+  display: none;
+}
+
 .documents-filter-chips {
   display: flex;
   gap: var(--space-2);
