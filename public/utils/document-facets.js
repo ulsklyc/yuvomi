@@ -114,3 +114,17 @@ export function sortDocuments(docs, { sort = 'updated', direction, locale } = {}
     return sign * ascending(a, b);
   });
 }
+
+/**
+ * Wiederholt der Ordnername die Kategorie woertlich? Dann steht die Angabe nur
+ * einmal da - "Schule · Schule" sagte dasselbe zweimal (Critique 2026-08-27,
+ * P3). Nur exakte Gleichheit (ohne Gross/Klein und Randleerzeichen): ein
+ * Ordner "Versicherungen" unter der Kategorie "Versicherung" ist eine
+ * Nutzerentscheidung und bleibt sichtbar. EINE Regel fuer Zeile, Karte und
+ * Betrachter - der Betrachter zeigte die Dopplung noch, als die Zeile sie
+ * laengst unterdrueckte (Critique 2026-09-25).
+ */
+export function folderRepeatsCategory(folderName, categoryLabel) {
+  const folder = String(folderName ?? '').trim().toLowerCase();
+  return folder !== '' && folder === String(categoryLabel ?? '').trim().toLowerCase();
+}

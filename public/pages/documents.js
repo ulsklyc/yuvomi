@@ -35,11 +35,13 @@ import {
   documentThumbKind,
 } from '/utils/document-thumbs.js';
 import { wireTablist } from '/utils/tablist.js';
+import { repairRovingStops, wireRovingToolbars } from '/utils/roving-toolbar.js';
 import {
   DOCUMENT_SORTS,
   categoryFacetCounts,
   defaultSortDirection,
   folderFacetCounts,
+  folderRepeatsCategory,
   matchesDocumentQuery,
   normalizeDocumentQuery,
   sortDocuments as sortDocumentList,
@@ -136,7 +138,10 @@ let state = {
   // eigener Roundtrip.
   expiringSoon: false,
   folderId: '',
+  // `query` ist die Vergleichsform (normalizeDocumentQuery), `queryText` die
+  // Eingabe, wie sie getippt wurde - die Leermeldung zitiert die Eingabe.
   query: '',
+  queryText: '',
   selectMode: false,
   selected: new Set(),
   /* Welche Ordner aufgeklappt sind (#785).
@@ -239,12 +244,12 @@ export async function render(container, context = {}) {
           }).join('')}
         </div>
         <div class="documents-filters__chips">
-          <div class="documents-filter-chips" id="documents-category" role="group" aria-label="${t('documents.categoryLabel')}"></div>
+          <div class="documents-filter-chips" id="documents-category" role="group" aria-label="${t('documents.categoryFilterLabel')}"></div>
           <div class="documents-filter-chips" id="documents-expiring-filter" role="group" aria-label="${t('documents.expiringFilterLabel')}"></div>
         </div>
       </div>
       <div class="documents-browser-layout">
-        <aside class="documents-folder-browser" aria-labelledby="documents-folder-browser-title">
+        <aside class="documents-folder-browser" aria-label="${t('documents.folderFilterLabel')}">
           <div class="documents-folder-browser__head">
             <h2 class="documents-folder-browser__title" id="documents-folder-browser-title">${t('documents.folderBrowserTitle')}</h2>
             ${/* KEIN `aria-label` hier. Es trug "Ordner durchsuchen", waehrend der
@@ -252,8 +257,9 @@ export async function render(container, context = {}) {
                 damit nicht im zugaenglichen Namen (WCAG 2.5.3 - Sprachsteuerung
                 kann den Knopf nicht ansprechen), und der gewaehlte Ordner, unter
                 1024px die einzige Zustandsangabe der Auswahl, wurde nie angesagt.
-                Den Bereich benennt bereits das <h2> ueber `aria-labelledby` am
-                <aside>; das Label doppelte es und verdeckte den Namen
+                Den Bereich benennt bereits das `aria-label` am <aside> ("Ordner
+                (Ablageort)", seit 2026-09-25 mit der Rolle der Achse); das Label
+                doppelte es und verdeckte den Namen
                 (PR-Review #754). Die Beschriftung startet mit dem Standardordner,
                 damit der Knopf nie namenlos ist - `renderFolderBrowser` schreibt
                 sie danach bei jedem Rendern fort. */ ''}
@@ -570,6 +576,7 @@ function bindPageEvents() {
     id: 'documents-search',
     onQuery: (value) => {
       state.query = normalizeDocumentQuery(value);
+      state.queryText = String(value ?? '').trim();
       renderFacets();
       renderDocuments();
     },
@@ -739,7 +746,9 @@ async function selectStatus(status) {
 // muss hier explizit passieren, sonst bliebe die leere Liste stehen.
 function clearSearch() {
   state.query = '';
+  state.queryText = '';
   _search?.clear();
+  renderFacets();
   renderDocuments();
   _search?.input.focus();
 }
@@ -803,7 +812,7 @@ function emptyStateFor() {
       variant: 'no-results',
       icon: 'search-x',
       title: t('documents.emptySearchTitle'),
-      description: t('documents.emptySearchDescription', { query: state.query }),
+      description: t('documents.emptySearchDescription', { query: state.queryText }),
       actions: [
         { id: 'documents-empty-clear-search', label: t('common.searchClear'), icon: 'x', variant: 'primary' },
         ...(hasActiveFilter()
@@ -889,6 +898,8 @@ function renderDocuments() {
   list.replaceChildren();
   list.insertAdjacentHTML('beforeend', docs.map((doc) => state.view === 'list' ? renderListItem(doc) : renderGridCard(doc)).join(''));
   if (window.lucide) lucide.createIcons({ el: list });
+  wireRovingToolbars(list);
+  repairRovingStops(list);
   wireThumbnails(list);
   wireLocalThumbs(list);
   stagger(list.querySelectorAll('.document-card, .document-row'));
@@ -1047,7 +1058,7 @@ function renderFolderBrowser() {
       ${twisty}
       <button class="documents-folder-item__select list-row__main--interactive" type="button" data-folder-select="${esc(item.id)}" aria-current="${active ? 'true' : 'false'}">
         <span class="documents-folder-item__icon"><i data-lucide="${esc(item.icon)}" aria-hidden="true"></i></span>
-        <span class="list-row__name documents-folder-item__name">${esc(item.name)}</span>
+        <span class="list-row__name documents-folder-item__name" title="${esc(item.name)}">${esc(item.name)}</span>
         <span class="documents-folder-item__count">${counts.get(item.id) || 0}</span>
       </button>
       ${item.managed ? `
@@ -1177,6 +1188,7 @@ function openFolderMenu(folder, anchorBtn) {
     <button class="documents-context-menu__item" type="button" role="menuitem" data-menu-action="move">
       <i data-lucide="folder-input" aria-hidden="true"></i><span>${t('documents.moveFolder')}</span>
     </button>
+    <div class="popover-menu__separator" role="separator"></div>
     <button class="documents-context-menu__item documents-context-menu__item--danger" type="button" role="menuitem" data-menu-action="delete">
       <i data-lucide="trash-2" aria-hidden="true"></i><span>${t('documents.deleteFolder')}</span>
     </button>
@@ -1242,6 +1254,7 @@ function openDocumentMenu(doc, anchorBtn) {
     <button class="documents-context-menu__item" type="button" role="menuitem" data-menu-action="push-dms">
       <i data-lucide="upload" aria-hidden="true"></i><span>${t('documents.pushToDms')}</span>
     </button>` : ''}
+    <div class="popover-menu__separator" role="separator"></div>
     <button class="documents-context-menu__item documents-context-menu__item--danger" type="button" role="menuitem" data-menu-action="delete">
       <i data-lucide="trash-2" aria-hidden="true"></i><span>${t('common.delete')}</span>
     </button>
@@ -1451,12 +1464,8 @@ function renderMeta(doc, { showSize = true } = {}) {
   const labels = categoryLabels();
   const categoryLabel = labels[doc.category] || doc.category;
   // Der Ordner-Chip entfaellt, wenn der Ordner woertlich wie die Kategorie
-  // heisst: „Schule · Schule" sagte dasselbe zweimal auf jeder Karte
-  // (Critique 2026-08-27, P3). Nur exakte Gleichheit - ein Ordner
-  // „Versicherungen" unter der Kategorie „Versicherung" ist eine
-  // Nutzerentscheidung und bleibt sichtbar.
-  const folderDuplicatesCategory = doc.folder_name
-    && doc.folder_name.trim().toLowerCase() === String(categoryLabel).trim().toLowerCase();
+  // heisst (utils/document-facets.js, dieselbe Regel wie im Betrachter).
+  const folderDuplicatesCategory = folderRepeatsCategory(doc.folder_name, categoryLabel);
   // DER ABLAUF STEHT VORN (Critique 2026-09-25, P1). Die Zeilen-Meta ist
   // einzeilig und laesst hinten fallen, was nicht passt (documents.css,
   // .document-row__meta) - als letztes Element war "Laeuft in 5 Tagen ab"
@@ -1465,7 +1474,7 @@ function renderMeta(doc, { showSize = true } = {}) {
   return `
     ${expiryChipHtml(doc)}
     <span><i data-lucide="${CATEGORY_ICONS[doc.category] || 'folder'}" aria-hidden="true"></i>${categoryLabel}</span>
-    ${doc.folder_name && !folderDuplicatesCategory ? `<span><i data-lucide="folder" aria-hidden="true"></i>${esc(doc.folder_name)}</span>` : ''}
+    ${!folderDuplicatesCategory && doc.folder_name ? `<span><i data-lucide="folder" aria-hidden="true"></i>${esc(doc.folder_name)}</span>` : ''}
     ${hidesPrivacyControls('documents') ? '' : `<span><i data-lucide="${doc.visibility === 'family' ? 'users' : doc.visibility === 'private' ? 'lock' : 'user-check'}" aria-hidden="true"></i>${t(`documents.visibility.${doc.visibility}`)}</span>`}
     ${showSize ? `<span>${formatFileSize(doc.file_size)}</span>` : ''}
     ${storageBadgeHtml(doc)}
@@ -1611,10 +1620,18 @@ function uploadTargetIcon(backend) {
  * Wann er steht und in welchem Ton, entscheidet expiryChipSpec()
  * (utils/document-expiry.js) - dieselbe Regel, aus der der Viewer liest.
  */
+/* ZWEI FASSUNGEN, EINE SICHTBAR (Critique 2026-09-25). In der schmalen Zeile
+ * kuerzte "Seit 10 Tagen abgelaufen" zu "Seit 10 Tagen abge..." - die Zahl
+ * blieb, die Aussage fiel. Unter 30rem Zeilen- bzw. 12rem Kartenbreite zeigt
+ * der Chip die Kurzform ("Abgelaufen", "Noch 5 Tage"); die Langform bleibt
+ * fuer Screenreader im Text und fuer den Zeiger im title (documents.css,
+ * .doc-badge__full). */
 function expiryChipHtml(doc) {
   const spec = expiryChipSpec(dateStatus(doc.expires_at));
   if (!spec) return '';
-  return `<span class="doc-badge doc-badge--${spec.tone}"><i data-lucide="calendar-clock" aria-hidden="true"></i>${esc(t(spec.key, spec.params))}</span>`;
+  const full = esc(t(spec.key, spec.params));
+  const short = esc(t(spec.shortKey, spec.params));
+  return `<span class="doc-badge doc-badge--${spec.tone}" title="${full}"><i data-lucide="calendar-clock" aria-hidden="true"></i><span class="doc-badge__full">${full}</span><span class="doc-badge__short" aria-hidden="true">${short}</span></span>`;
 }
 
 /**
@@ -1635,25 +1652,31 @@ function expiryViewerHtml(doc) {
     : `<span>${icon}${text}</span>`;
 }
 
+/* ORTSETIKETTEN SPRECHEN NEUTRAL, NICHT MIT EINER STATUSSTIMME (Critique
+ * 2026-09-25). Google Drive trug das Violett der App-Stimme, WebDAV das
+ * Erfolgs-Gruen - fuer eine Angabe, WO eine Datei liegt, nicht wie es ihr
+ * geht. Jetzt teilen sich alle Orte eine neutrale Kapsel und unterscheiden
+ * sich an Glyphe und Text. Farbe behaelt nur, was einen Zustand meldet: "DMS
+ * nicht verfuegbar" in Gefahr-Ton. */
 function storageBadgeHtml(doc) {
   const backend = documentStorageBackend(doc);
   if (backend === 'webdav') {
-    return `<span class="doc-badge doc-badge--webdav">${t('documents.storageWebdav')}</span>`;
+    return `<span class="doc-badge doc-badge--webdav"><i data-lucide="server" aria-hidden="true"></i>${t('documents.storageWebdav')}</span>`;
   }
   if (backend === 'google_drive') {
-    return `<span class="doc-badge doc-badge--google-drive">${t('documents.storageGoogleDrive')}</span>`;
+    return `<span class="doc-badge doc-badge--google-drive"><i data-lucide="cloud" aria-hidden="true"></i>${t('documents.storageGoogleDrive')}</span>`;
   }
   if (backend === 'dms' && !doc.dms_account_id) {
-    return `<span class="doc-badge doc-badge--unavailable">${t('documents.storageDmsUnavailable')}</span>`;
+    return `<span class="doc-badge doc-badge--unavailable"><i data-lucide="unplug" aria-hidden="true"></i>${t('documents.storageDmsUnavailable')}</span>`;
   }
   if (backend === 'dms') {
-    return `<span class="doc-badge doc-badge--dms">${t('documents.storageDms')}</span>`;
+    return `<span class="doc-badge doc-badge--dms"><i data-lucide="archive" aria-hidden="true"></i>${t('documents.storageDms')}</span>`;
   }
   // Folder-backed local documents carry a storage_key; they are a non-default
   // target and earn a badge. The in-DB BLOB default (no key) stays badge-less so
   // a badge remains a meaningful signal.
   if (backend === 'local' && doc.storage_key) {
-    return `<span class="doc-badge doc-badge--folder">${t('documents.storageLocalFolder')}</span>`;
+    return `<span class="doc-badge doc-badge--folder"><i data-lucide="hard-drive" aria-hidden="true"></i>${t('documents.storageLocalFolder')}</span>`;
   }
   return '';
 }
@@ -1662,15 +1685,21 @@ function storageBadgeHtml(doc) {
 // (bearbeiten, archivieren, DMS, löschen) liegt hinter dem Kebab-Overflow.
 // „Ansehen" wird für ALLE Typen gerendert — auch nicht darstellbare öffnen die
 // Detailansicht (mit Download-Fallback) und sind so per Tastatur erreichbar.
+//
+// EIN TAB-STOPP JE DOKUMENT (Critique 2026-09-25, Sam: 27 Tab-Stopps bei neun
+// Dokumenten). Die drei Aktionen sind eine Symbolleiste mit rovingem tabindex
+// (utils/roving-toolbar.js): Tab springt von Dokument zu Dokument und landet
+// auf „Ansehen", Pfeil links/rechts laeuft durch die Leiste. Sichtbar und
+// klickbar bleiben alle drei - versteckt wird nichts, nur die Tab-Kette kuerzer.
 function renderActions(doc) {
   return `
-    <button class="btn btn--ghost btn--icon btn--icon-sm" data-action="view" data-id="${doc.id}" title="${t('documents.viewAction')}" aria-label="${t('documents.viewAction')}">
+    <button class="btn btn--ghost btn--icon btn--icon-sm" data-action="view" data-id="${doc.id}" tabindex="0" title="${t('documents.viewAction')}" aria-label="${t('documents.viewAction')}">
       <i data-lucide="eye" class="icon-md" aria-hidden="true"></i>
     </button>
-    <a class="btn btn--ghost btn--icon btn--icon-sm" href="/api/v1/documents/${doc.id}/download" download title="${t('documents.downloadAction')}" aria-label="${t('documents.downloadAction')}">
+    <a class="btn btn--ghost btn--icon btn--icon-sm" href="/api/v1/documents/${doc.id}/download" download tabindex="-1" title="${t('documents.downloadAction')}" aria-label="${t('documents.downloadAction')}">
       <i data-lucide="download" class="icon-md" aria-hidden="true"></i>
     </a>
-    <button class="btn btn--ghost btn--icon btn--icon-sm" data-action="menu" data-id="${doc.id}" title="${t('nav.more')}" aria-label="${t('nav.more')}" aria-haspopup="menu" aria-expanded="false">
+    <button class="btn btn--ghost btn--icon btn--icon-sm" data-action="menu" data-id="${doc.id}" tabindex="-1" title="${t('nav.more')}" aria-label="${t('nav.more')}" aria-haspopup="menu" aria-expanded="false">
       <i data-lucide="more-vertical" class="icon-md" aria-hidden="true"></i>
     </button>
   `;
@@ -1688,21 +1717,29 @@ function renderSelectBox(doc) {
     </label>`;
 }
 
+/* DIE KARTE IST VORSCHAU, NAME, EINE META-ZEILE UND DIE LEISTE (Critique
+ * 2026-09-25). Mit der Vorschau aus Entscheidung 2 stand sie bei 451px, zwei
+ * Spalten bei 1280px und eine auf dem Telefon. Was ging: die Kopfzeile aus
+ * Dateityp und Datum (Datum und Groesse fuehrt die Listenansicht als eigene
+ * Spalte, den Typ zeigt die Vorschau selbst), der Dateiname als Ersatz einer
+ * fehlenden Beschreibung (er wiederholte Titel und Typ) und der Mindest-
+ * Leerraum dafuer. Die Beschreibung steht, wenn es eine gibt. Das Datum steht
+ * links neben der Leiste, solange die Karte breit genug ist (documents.css,
+ * .document-card__foot). */
 function renderGridCard(doc) {
   const selected = state.selectMode && state.selected.has(doc.id);
   return `
     <article class="document-card${selected ? ' is-selected' : ''}" data-id="${doc.id}">
       ${renderThumbSlot(doc, 'document-card__media')}
-      <div class="document-card__header">
-        ${state.selectMode ? renderSelectBox(doc) : `<span class="document-card__type">${esc(fileTypeLabel(doc.original_name))}</span>`}
-        <span class="document-card__date">${formatDate(doc.updated_at)}</span>
-      </div>
       <div class="document-card__body">
-        <h2 class="document-card__title">${esc(doc.name)}</h2>
-        <p class="document-card__description">${esc(doc.description || doc.original_name)}</p>
+        <h2 class="document-card__title" title="${esc(doc.name)}">${esc(doc.name)}</h2>
+        ${doc.description ? `<p class="document-card__description">${esc(doc.description)}</p>` : ''}
         <div class="document-card__meta">${renderMeta(doc)}</div>
       </div>
-      ${state.selectMode ? '' : `<div class="document-card__actions">${renderActions(doc)}</div>`}
+      <div class="document-card__foot">
+        <span class="document-card__date">${formatDate(doc.updated_at)}</span>
+        ${state.selectMode ? renderSelectBox(doc) : `<div class="document-card__actions" role="toolbar" aria-label="${esc(t('documents.actionsFor', { name: doc.name }))}">${renderActions(doc)}</div>`}
+      </div>
     </article>
   `;
 }
@@ -1723,7 +1760,7 @@ function renderListItem(doc) {
         <span class="document-row__date">${formatDate(doc.updated_at)}</span>
         <span class="document-row__size">${formatFileSize(doc.file_size)}</span>
       </div>
-      ${state.selectMode ? '' : `<div class="document-row__actions">${renderActions(doc)}</div>`}
+      ${state.selectMode ? '' : `<div class="document-row__actions" role="toolbar" aria-label="${esc(t('documents.actionsFor', { name: doc.name }))}">${renderActions(doc)}</div>`}
     </article>
   `;
 }
@@ -1775,11 +1812,17 @@ async function runDocumentAction(action, doc) {
     state.selected.clear();
     return;
   }
+  // Wie archiveSelected(): ein abgewiesener Schreibvorgang wird gemeldet,
+  // nicht als unbehandelte Rejection verschluckt, und die Liste bleibt, wie sie war.
   if (action === 'archive') {
-    await api.patch(`/documents/${doc.id}/archive`, { archived: doc.status !== 'archived' });
-    window.yuvomi?.showToast(doc.status === 'archived' ? t('documents.restoredToast') : t('documents.archivedToast'), 'success');
-    await loadDocuments();
-    renderAll();
+    try {
+      await api.patch(`/documents/${doc.id}/archive`, { archived: doc.status !== 'archived' });
+      window.yuvomi?.showToast(doc.status === 'archived' ? t('documents.restoredToast') : t('documents.archivedToast'), 'success');
+      await loadDocuments();
+      renderAll();
+    } catch (err) {
+      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    }
   }
   if (action === 'push-dms') {
     if (!state.dmsAccounts.length) return;
@@ -2084,16 +2127,18 @@ function openDocumentModal(doc = null) {
           </div>
           <div class="form-group">
             <label class="label" for="document-category">${t('documents.categoryLabel')}</label>
-            <select class="input" id="document-category">
+            <select class="input" id="document-category" aria-describedby="document-category-hint">
               ${CATEGORIES.map((category) => `<option value="${category}" ${(doc?.category || 'other') === category ? 'selected' : ''}>${categoryLabels()[category]}</option>`).join('')}
             </select>
+            <p class="document-form__hint" id="document-category-hint">${t('documents.categoryHint')}</p>
           </div>
           <div class="form-group">
             <label class="label" for="document-folder">${t('documents.folderLabel')}</label>
-            <select class="input" id="document-folder">
+            <select class="input" id="document-folder" aria-describedby="document-folder-hint">
               <option value="">${t('documents.noFolder')}</option>
               ${state.folders.map((folder) => `<option value="${folder.id}" ${presetFolderId === String(folder.id) ? 'selected' : ''}>${esc(folder.name)}</option>`).join('')}
             </select>
+            <p class="document-form__hint" id="document-folder-hint">${t('documents.folderHint')}</p>
           </div>
           ${documentVisibilityFieldHtml(doc)}
         </div>
@@ -3141,7 +3186,7 @@ function formatFileSize(bytes) {
 // --------------------------------------------------------
 
 function openDocumentViewer(doc) {
-  const labels = categoryLabels();
+  const categoryLabel = categoryLabels()[doc.category] || doc.category;
   const previewUrl = `/api/v1/documents/${doc.id}/preview`;
   const downloadUrl = `/api/v1/documents/${doc.id}/download`;
   // Defense-in-Depth: nur http(s)-Deep-Links rendern, niemals javascript:/data:-Schemata
@@ -3174,8 +3219,8 @@ function openDocumentViewer(doc) {
     content: `
       <div class="document-viewer">
         <div class="document-viewer__meta">
-          <span><i data-lucide="${CATEGORY_ICONS[doc.category] || 'folder'}" aria-hidden="true"></i>${labels[doc.category] || doc.category}</span>
-          ${doc.folder_name ? `<span><i data-lucide="folder" aria-hidden="true"></i>${esc(doc.folder_name)}</span>` : ''}
+          <span><i data-lucide="${CATEGORY_ICONS[doc.category] || 'folder'}" aria-hidden="true"></i>${categoryLabel}</span>
+          ${doc.folder_name && !folderRepeatsCategory(doc.folder_name, categoryLabel) ? `<span><i data-lucide="folder" aria-hidden="true"></i>${esc(doc.folder_name)}</span>` : ''}
           <span>${formatFileSize(doc.file_size)}</span>
           ${expiryViewerHtml(doc)}
           <span class="document-viewer__actions">

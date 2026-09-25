@@ -195,6 +195,7 @@ const APP_SHELL = [
   '/utils/recurrence-scope.js',
   '/utils/reminder-offset.js',
   '/utils/reward-goal.js',
+  '/utils/roving-toolbar.js',
   '/utils/schedule-tabs.js',
   '/utils/scroll-restore.js',
   '/utils/seal-pair.js',

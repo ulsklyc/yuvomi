@@ -313,9 +313,12 @@ test('Mehrfachauswahl ist opt-in und standardmäßig verborgen', () => {
 test('Google Drive has a distinct upload label, icon and storage badge', () => {
   assert.match(page, /backend === 'google_drive'\) return t\('documents\.storageGoogleDrive'\)/);
   assert.match(page, /backend === 'google_drive'\) return 'cloud-upload'/);
-  assert.match(page, /doc-badge--google-drive/);
-  assert.match(css, /\.doc-badge--google-drive\s*\{/);
-  assert.doesNotMatch(css, /\.doc-badge--google-drive\s*\{[^}]*#[0-9a-f]{3,8}/i);
+  // Unterscheidbar ueber Glyphe und Text, nicht ueber eine eigene Farbe
+  // (Ortsetiketten teilen seit 2026-09-25 den records-Ton, Test weiter unten).
+  assert.match(page, /doc-badge--google-drive"><i data-lucide="cloud"/);
+  const rule = [...eachRule(css)].find((r) => r.selector.split(',').map((x) => x.trim()).includes('.doc-badge--google-drive'));
+  assert.ok(rule, '.doc-badge--google-drive fehlt');
+  assert.doesNotMatch(rule.body, /#[0-9a-f]{3,8}/i);
 });
 
 test('Upload-Ziel nutzt die lesbare gemeinsame Formularsteuerung', () => {
@@ -799,17 +802,19 @@ test('die Zeilen-Meta laesst ganze Eintraege fallen statt sie in sich umzubreche
   // Mindestbreite und brachen INNEN um ("Ganze / Familie"), die Meta wurde
   // 35-69px hoch und die Zeilen sprangen zwischen 76 und 159px.
   const rules = [...eachRule(css)].filter((rule) => rule.at.length === 0);
-  const meta = rules.find((rule) => rule.selector === '.document-row__meta');
+  // Seit 2026-09-25 teilt die Rasterkarte diese Regeln (Selektorliste).
+  const own = (selector) => (rule) => rule.selector.split(',').map((s) => s.trim()).includes(selector);
+  const meta = rules.find((rule) => own('.document-row__meta')(rule) && /overflow/.test(rule.body));
   assert.ok(meta, '.document-row__meta fehlt');
   assert.match(meta.body, /flex-wrap:\s*wrap/);
   assert.match(meta.body, /overflow:\s*hidden/);
   assert.match(meta.body, /height:\s*calc\(1lh/, 'eine Zeile hoch, der Umbruch landet unsichtbar in Zeile zwei');
-  const items = rules.find((rule) => rule.selector === '.document-row__meta > *');
+  const items = rules.find(own('.document-row__meta > *'));
   assert.ok(items, '.document-row__meta > * fehlt');
   assert.match(items.body, /white-space:\s*nowrap/);
   // Ist der Chip allein breiter als die Spalte ("Seit 10 Tagen abgelaufen"
   // 165px in 153px), kuerzt er mit Ellipse statt mitten im Buchstaben.
-  const chip = rules.find((rule) => rule.selector === '.document-row__meta > .doc-badge');
+  const chip = rules.find(own('.document-row__meta > .doc-badge'));
   assert.ok(chip, '.document-row__meta > .doc-badge fehlt');
   assert.match(chip.body, /max-width:\s*100%/);
   assert.match(chip.body, /text-overflow:\s*ellipsis/);
@@ -833,9 +838,9 @@ test('Zeile und Viewer lesen den Ablauf aus EINER Regel (als Programm)', () => {
   assert.equal(expiry.expiryChipSpec(null), null);
   assert.equal(expiry.expiryChipSpec(status('valid', 200)), null);
   assert.deepEqual(expiry.expiryChipSpec(status('expiring', 5)),
-    { tone: 'expiring', key: 'documents.expiringInDays', params: { count: 5 } });
+    { tone: 'expiring', key: 'documents.expiringInDays', params: { count: 5 }, shortKey: 'documents.expiringShort' });
   assert.deepEqual(expiry.expiryChipSpec(status('expired', -10)),
-    { tone: 'unavailable', key: 'documents.expiredDays', params: { count: 10 } });
+    { tone: 'unavailable', key: 'documents.expiredDays', params: { count: 10 }, shortKey: 'documents.expiredShort' });
   // Viewer: immer, wenn ein Datum gesetzt ist - auch weit in der Zukunft.
   assert.equal(expiry.expiryViewerSpec(null), null);
   assert.deepEqual(expiry.expiryViewerSpec(status('valid', 200)),
@@ -1092,5 +1097,280 @@ test('die Rasterkarte traegt eine feste Vorschauflaeche, das Bild fuellt sie ohn
   for (const rule of fade) {
     assert.ok(rule.at.some((at) => /prefers-reduced-motion:\s*no-preference/.test(at)), `${rule.selector} blendet auch bei reduzierter Bewegung ein`);
     assert.match(rule.selector, /\[data-thumb-fresh\]/);
+  }
+});
+
+// --------------------------------------------------------
+// Critique 2026-09-25, Entscheidungen 4 und 5 - Rollen, Kanon, Polish
+// --------------------------------------------------------
+
+const roving = await import('../public/utils/roving-toolbar.js').catch(() => null);
+const topRules = (source) => [...eachRule(source)].filter((rule) => rule.at.length === 0);
+const rulesFor = (source, selector) => [...eachRule(source)]
+  .filter((rule) => rule.selector.split(',').map((s) => s.trim()).includes(selector));
+const fnBody = (name, next) => page.slice(page.indexOf(`function ${name}(`), page.indexOf(`function ${next}(`));
+const LOCALES = readdirSync(resolve(HERE, '../public/locales')).filter((f) => f.endsWith('.json'));
+
+test('Kategorie und Ordner sagen, wofuer sie stehen - im Dialog und im Filter', () => {
+  // Zwei Ordnungsachsen nebeneinander ("Versicherung" und "Versicherungen"),
+  // und nirgends stand, wann welche gilt (Critique H10). Option A: beide
+  // bleiben, die Rolle steht dabei - Art des Dokuments gegen Ablageort.
+  const modal = fnBody('openDocumentModal', 'bindDropzone');
+  assert.match(modal, /<select class="input" id="document-category" aria-describedby="document-category-hint">/);
+  assert.match(modal, /<p class="document-form__hint" id="document-category-hint">\$\{t\('documents\.categoryHint'\)\}<\/p>/);
+  assert.match(modal, /<select class="input" id="document-folder" aria-describedby="document-folder-hint">/);
+  assert.match(modal, /<p class="document-form__hint" id="document-folder-hint">\$\{t\('documents\.folderHint'\)\}<\/p>/);
+  assert.match(page, /id="documents-category" role="group" aria-label="\$\{t\('documents\.categoryFilterLabel'\)\}"/);
+  assert.match(page, /<aside class="documents-folder-browser" aria-label="\$\{t\('documents\.folderFilterLabel'\)\}">/);
+  assert.match(de.documents.categoryHint, /Art/);
+  assert.match(de.documents.folderHint, /Ablageort/);
+  assert.match(de.documents.categoryFilterLabel, /Art des Dokuments/);
+  assert.match(de.documents.folderFilterLabel, /Ablageort/);
+});
+
+test('die Rasterkarte folgt dem Kartenkanon: randlos, --radius-md, shadow-sm', () => {
+  // DESIGN.md, Cards: 12px, randlos auf dem Grouped-Grund, die Trennung leistet
+  // der Schatten. Die Karte trug eine Kante und --radius-lg (16px).
+  const card = rulesFor(css, '.document-card').filter((rule) => rule.at.length === 0);
+  assert.ok(card.length > 0);
+  for (const rule of card) {
+    assert.doesNotMatch(rule.body, /(^|[;\s])border(-color)?:\s*(?!none)/, `${rule.selector} traegt eine Kante`);
+    assert.doesNotMatch(rule.body, /--radius-lg/);
+  }
+  assert.ok(card.some((rule) => /border-radius:\s*var\(--radius-md\)/.test(rule.body)), 'Radius --radius-md');
+  assert.ok(card.some((rule) => /box-shadow:\s*var\(--shadow-sm\)/.test(rule.body)), 'Ruhe-Schatten --shadow-sm');
+  // Die Auswahl ist ein Ring aus box-shadow, keine Kantenfarbe an einer Karte ohne Kante.
+  const selected = topRules(css).find((rule) => rule.selector === '.document-card.is-selected');
+  assert.ok(selected);
+  assert.doesNotMatch(selected.body, /border-color/);
+  assert.match(selected.body, /box-shadow:\s*0 0 0 2px var\(--module-accent\)/);
+});
+
+test('das Raster hat mobil zwei Spalten und bei 1280px drei statt zwei', () => {
+  // Gemessen vorher: 1280px -> 2 Spalten a 362px (Liste 740px), 375px -> eine
+  // Spalte, Karte 443-451px hoch. minmax(min(N, 50% - gap/2)) haelt beides:
+  // nie weniger als zwei Spalten, und ab 3N + 2 gaps eine dritte.
+  const grid = topRules(css).find((rule) => rule.selector === '.documents-list--grid');
+  const m = grid.body.match(/grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(min\((\d+)px,\s*calc\(50% - var\(--space-4\) \/ 2\)\),\s*1fr\)\)/);
+  assert.ok(m, `Spaltenformel: ${grid.body}`);
+  const n = Number(m[1]);
+  assert.ok(3 * n + 2 * 16 <= 740, `bei 740px Listenbreite passen drei Spalten a ${n}px`);
+  assert.ok(n >= 180, 'die Karte behaelt ihre Aktionszeile');
+  assert.match(grid.body, /gap:\s*var\(--space-4\)/);
+});
+
+test('die Karte ist kompakt: 4:3-Vorschau, Titel zweizeilig, Meta einzeilig, kein Mindest-Leerraum', () => {
+  const rules = topRules(css);
+  const media = rules.find((rule) => rule.selector === '.document-card__media');
+  assert.match(media.body, /aspect-ratio:\s*4\s*\/\s*3/, 'ehrliche feste Form, flacher als 16/10 zu hoch war es nicht - 4:3 ist der Kanon-Rahmen');
+  const title = rules.find((rule) => rule.selector === '.document-card__title');
+  assert.ok(title, '.document-card__title fehlt als eigene Regel');
+  assert.match(title.body, /-webkit-line-clamp:\s*2/);
+  const meta = rules.find((rule) => rule.selector.split(',').map((s) => s.trim()).includes('.document-card__meta')
+    && /height:\s*calc\(1lh/.test(rule.body));
+  assert.ok(meta, 'die Kartenmeta nutzt die Einzeilen-Mechanik der Zeile');
+  assert.match(meta.body, /overflow:\s*hidden/);
+  assert.match(meta.body, /flex-wrap:\s*wrap/);
+  assert.ok(!rules.some((rule) => rule.selector === '.document-card__description' && /min-height/.test(rule.body)),
+    'kein fester Leerraum fuer eine fehlende Beschreibung');
+  // Die Beschreibung erscheint nur, wenn es eine gibt - der Dateiname als
+  // Ersatz wiederholte, was Titel und Vorschau schon sagen.
+  const card = fnBody('renderGridCard', 'renderListItem');
+  assert.doesNotMatch(card, /doc\.description \|\| doc\.original_name/);
+  assert.match(card, /doc\.description \? `<p class="document-card__description">\$\{esc\(doc\.description\)\}<\/p>` : ''/);
+});
+
+test('der Kopf hat EINE Hoehe: Ansichtsumschalter so hoch wie Suche und Knoepfe', () => {
+  // Gemessen vorher bei 1280px: Suche 44, Umschalter 48, Menueknopf 44; mobil
+  // 48 / 52 / 48. Der Umschalter ist ein Well mit 2px Rand - seine Knoepfe
+  // muessen um genau diesen Rand kleiner sein als --target-base.
+  const toggle = topRules(css).find((rule) => rule.selector === '.documents-view-toggle');
+  assert.match(toggle.body, /padding:\s*var\(--space-0h\)/);
+  const btn = topRules(css).find((rule) => rule.selector === '.documents-view-toggle__btn');
+  assert.match(btn.body, /width:\s*calc\(var\(--target-base\) - 2 \* var\(--space-0h\)\)/);
+  assert.match(btn.body, /height:\s*calc\(var\(--target-base\) - 2 \* var\(--space-0h\)\)/);
+});
+
+test('der Ordner-Kebab ist immer sichtbar, ruhig in Tertiaerfarbe', () => {
+  // list-row.css: EINE Sichtbarkeitsregel, immer sichtbar - Ruhe durch Kontrast.
+  // Hier stand opacity: 0 bis Hover, und der Name verlor trotzdem den Platz.
+  const all = [...eachRule(css)].filter((rule) => rule.selector.includes('.documents-folder-item__menu'));
+  assert.ok(all.length > 0);
+  for (const rule of all) {
+    assert.doesNotMatch(rule.body, /opacity:\s*0/, `${rule.selector} blendet den Kebab aus`);
+    assert.doesNotMatch(rule.body, /pointer-events:\s*none/, `${rule.selector} macht ihn unklickbar`);
+  }
+  const base = topRules(css).find((rule) => rule.selector === '.documents-folder-item__menu');
+  assert.match(base.body, /color:\s*var\(--color-text-tertiary\)/);
+});
+
+test('lange Ordnernamen brechen zweizeilig um und tragen den ganzen Namen im title', () => {
+  // "Versicheru..." ohne title: der Name war nirgends ganz zu lesen.
+  const name = topRules(css).find((rule) => rule.selector === '.documents-folder-item__name');
+  assert.match(name.body, /-webkit-line-clamp:\s*2/);
+  assert.doesNotMatch(name.body, /white-space:\s*nowrap/);
+  assert.match(page, /<span class="list-row__name documents-folder-item__name" title="\$\{esc\(item\.name\)\}">/);
+});
+
+test('die Karte hebt sich beim Hover wie jede interaktive Karte - leise und nie bei reduzierter Bewegung', () => {
+  // DESIGN.md: Hover-Anhebung nur fuer interaktive Karten. Die Dokumentkarte
+  // oeffnet den Betrachter, darf also - im Mass der Notizkarte (1px, shadow-md),
+  // nicht mit 2px plus Flaechenwechsel plus 6 % Zoom der Vorschau.
+  const hover = [...eachRule(css)].filter((rule) => rule.selector === '.document-card:hover');
+  const base = hover.find((rule) => rule.at.length === 0);
+  assert.match(base.body, /transform:\s*translateY\(-1px\)/);
+  assert.match(base.body, /box-shadow:\s*var\(--shadow-md\)/);
+  assert.doesNotMatch(base.body, /background/);
+  assert.ok(hover.some((rule) => rule.at.some((at) => /prefers-reduced-motion:\s*reduce/.test(at))
+    && /transform:\s*none/.test(rule.body)), 'reduzierte Bewegung: keine Anhebung');
+  // Der Zoom bleibt der kleinen Zeilenkachel; auf der grossen Vorschau schnitte er den Briefkopf an.
+  const zoom = [...eachRule(css)].filter((rule) => /scale\(1\.06\)/.test(rule.body));
+  assert.ok(zoom.length > 0);
+  for (const rule of zoom) assert.match(rule.selector, /^\.document-row__icon\.document-thumb--ready:hover/);
+});
+
+test('Speicher-Badges sind Ortsetiketten: neutral, Kapsel, unterschieden durch Glyphe und Text', () => {
+  // Violett ist die Stimme der App, Gruen heisst "erledigt" - beides trugen
+  // hier Ortsangaben (Google Drive, WebDAV). Neutral statt records-Waschung:
+  // die waere der Modulton zweimal blass im eigenen Raum (Skalen-Regel).
+  const rules = topRules(css);
+  const badge = rules.find((rule) => rule.selector === '.doc-badge');
+  assert.match(badge.body, /border-radius:\s*var\(--radius-full\)/);
+  for (const mod of ['dms', 'webdav', 'google-drive', 'folder']) {
+    const own = rules.filter((rule) => rule.selector.split(',').map((s) => s.trim()).includes(`.doc-badge--${mod}`));
+    assert.ok(own.length > 0, `.doc-badge--${mod} fehlt`);
+    for (const rule of own) {
+      assert.doesNotMatch(rule.body, /--color-(accent|success|info)/, `.doc-badge--${mod} spricht mit einer Statusstimme`);
+      assert.match(rule.body, /background:\s*var\(--color-fill-well\)/, `.doc-badge--${mod} steht auf der neutralen Well-Flaeche`);
+      assert.match(rule.body, /color:\s*var\(--color-text-secondary\)/);
+    }
+  }
+  const fn = fnBody('storageBadgeHtml', 'renderActions');
+  const icons = [...fn.matchAll(/doc-badge--(dms|webdav|google-drive|folder)"><i data-lucide="([a-z-]+)"/g)].map((m) => m[2]);
+  assert.equal(icons.length, 4, 'jedes Ortsetikett traegt seine Glyphe');
+  assert.equal(new Set(icons).size, 4, 'vier verschiedene Glyphen');
+});
+
+test('der Hinweis im Betrachter hat ein Lesemass', () => {
+  // Gemessen 153 Zeichen auf 926px (Critique, Detektor line-length).
+  const note = topRules(css).find((rule) => rule.selector === '.document-viewer__note');
+  // Die volle Basis bricht den Hinweis in seine eigene Zeile; ein max-width
+  // kappte sie mit, und er rueckte neben die Aktionen. Das Mass kommt deshalb
+  // ueber die Polsterung jenseits von N ch.
+  assert.match(note.body, /flex-basis:\s*100%/);
+  assert.doesNotMatch(note.body, /max-width/);
+  const m = note.body.match(/padding-inline-end:\s*max\(0px,\s*calc\(100% - (\d+)ch\)\)/);
+  assert.ok(m, 'Lesemass in ch ueber padding-inline-end');
+  assert.ok(Number(m[1]) <= 60);
+  assert.match(note.body, /box-sizing:\s*border-box/);
+});
+
+test('Ordner gleich Kategorie steht einmal da - in Zeile, Karte UND Betrachter (als Programm)', () => {
+  assert.equal(typeof facets?.folderRepeatsCategory, 'function', 'folderRepeatsCategory fehlt in document-facets.js');
+  assert.equal(facets.folderRepeatsCategory('Schule', 'Schule'), true);
+  assert.equal(facets.folderRepeatsCategory(' schule ', 'Schule'), true);
+  assert.equal(facets.folderRepeatsCategory('Versicherungen', 'Versicherung'), false, 'nur exakte Gleichheit');
+  assert.equal(facets.folderRepeatsCategory('', 'Schule'), false);
+  assert.equal(facets.folderRepeatsCategory(null, 'Schule'), false);
+  assert.equal(facets.folderRepeatsCategory('', ''), false, 'kein Ordner ist keine Dopplung');
+  // Der Betrachter zeigte "Schule Schule", renderMeta nicht: zwei Regeln fuer eine Frage.
+  assert.match(fnBody('renderMeta', 'docSupportsThumbnail'), /folderRepeatsCategory\(doc\.folder_name, categoryLabel\)/);
+  const viewer = page.slice(page.indexOf('<div class="document-viewer__meta">'), page.indexOf('<span class="document-viewer__actions">'));
+  assert.match(viewer, /doc\.folder_name && !folderRepeatsCategory\(doc\.folder_name, categoryLabel\)/);
+});
+
+test('Einzel-Archivieren meldet einen Fehler statt ihn zu verschlucken', () => {
+  // archiveSelected hatte ein catch, die Einzelaktion nicht: ein 403/500 lief
+  // als unbehandelte Rejection durch, ohne Meldung, mit Erfolgs-Annahme.
+  const run = fnBody('runDocumentAction', 'deleteDocuments');
+  const branch = run.slice(run.indexOf("if (action === 'archive')"), run.indexOf("if (action === 'push-dms')"));
+  assert.match(branch, /try \{[\s\S]*api\.patch\(`\/documents\/\$\{doc\.id\}\/archive`[\s\S]*\} catch \(err\) \{[\s\S]*showToast\(err\.data\?\.error \?\? t\('common\.unknownError'\), 'danger'\)/);
+});
+
+test('die Leermeldung nennt den Suchbegriff so, wie er getippt wurde', () => {
+  // Gesucht "Kassenbon", gemeldet "kassenbon": die Seite zitierte ihre
+  // normalisierte Vergleichsform statt der Eingabe.
+  const empty = fnBody('emptyStateFor', 'renderEmptyState');
+  assert.match(empty, /t\('documents\.emptySearchDescription', \{ query: state\.queryText \}\)/);
+  assert.match(page, /state\.queryText = String\(value \?\? ''\)\.trim\(\);/);
+  assert.match(fnBody('clearSearch', 'resetFilters'), /state\.queryText = '';/);
+  // Leeren zeichnet auch die Zaehler neu: sie zaehlen unter der Suche, und
+  // `_search.clear()` ruft onQuery nicht - die Chips blieben auf dem Suchstand.
+  assert.match(fnBody('clearSearch', 'resetFilters'), /renderFacets\(\);/);
+});
+
+test('vor "Loeschen" steht in beiden Kontextmenues ein Trenner', () => {
+  const sep = /<div class="popover-menu__separator" role="separator"><\/div>\s*<button class="documents-context-menu__item documents-context-menu__item--danger"/;
+  assert.match(fnBody('openDocumentMenu', 'renameFolder'), sep);
+  assert.match(fnBody('openFolderMenu', 'moveFolder'), sep);
+  // Der Trenner ist kein Eintrag: die Pfeiltasten laufen nur ueber [data-menu-action].
+  assert.match(fnBody('openContextMenu', 'positionContextMenu'), /querySelectorAll\('\[data-menu-action\]'\)/);
+});
+
+test('ein Dokument ist EIN Tab-Stopp, seine Aktionen bleiben sichtbar und per Pfeil erreichbar (als Programm)', () => {
+  // Sam: 3 Tab-Stopps je Dokument, 27 bei neun Dokumenten. Die Aktionsleiste
+  // ist jetzt eine Symbolleiste mit rovingem tabindex (APG toolbar).
+  assert.ok(roving, 'public/utils/roving-toolbar.js fehlt');
+  const { rovingIndex } = roving;
+  assert.equal(rovingIndex('ArrowRight', 0, 3), 1);
+  assert.equal(rovingIndex('ArrowRight', 2, 3), 0, 'am Ende zurueck an den Anfang');
+  assert.equal(rovingIndex('ArrowLeft', 0, 3), 2);
+  assert.equal(rovingIndex('Home', 2, 3), 0);
+  assert.equal(rovingIndex('End', 0, 3), 2);
+  assert.equal(rovingIndex('ArrowDown', 0, 3), null, 'Hoch/Runter bleibt dem Scrollen');
+  assert.equal(rovingIndex('Tab', 0, 3), null);
+  assert.equal(rovingIndex('ArrowRight', 0, 0), null);
+  // Ausgeblendete Aktionen (Herunterladen unter 30rem) zaehlen nicht mit -
+  // sonst liefe der Pfeil auf ein unsichtbares Ziel und der Fokus verschwaende.
+  const item = (name, shown) => ({ name, getClientRects: () => (shown ? [{}] : []) });
+  const bar = { querySelectorAll: () => [item('view', true), item('download', false), item('menu', true)] };
+  assert.deepEqual(roving.toolbarItems(bar).map((el) => el.name), ['view', 'menu']);
+  const actions = fnBody('renderActions', 'renderSelectBox');
+  assert.equal((actions.match(/tabindex="0"/g) || []).length, 1, 'genau ein Einstieg je Dokument');
+  assert.equal((actions.match(/tabindex="-1"/g) || []).length, 2);
+  for (const cls of ['document-card__actions', 'document-row__actions']) {
+    assert.match(page, new RegExp(`<div class="${cls}" role="toolbar" aria-label="\\$\\{esc\\(t\\('documents\\.actionsFor', \\{ name: doc\\.name \\}\\)\\)\\}">`));
+  }
+  assert.match(fnBody('renderDocuments', 'visibleFolderRows'), /wireRovingToolbars\(list\)/);
+  assert.match(de.documents.actionsFor, /\{\{name\}\}/);
+});
+
+test('der Ablauf-Chip hat eine Kurzform fuer schmale Zeilen und Karten (als Programm)', () => {
+  // Mobil stand "Seit 10 Tagen abge..." - die Zahl, um die es geht, fiel weg.
+  const status = (state, days) => ({ state, days, endDateKey: '2026-09-30' });
+  assert.deepEqual(expiry.expiryChipSpec(status('expiring', 5)),
+    { tone: 'expiring', key: 'documents.expiringInDays', params: { count: 5 }, shortKey: 'documents.expiringShort' });
+  assert.deepEqual(expiry.expiryChipSpec(status('expired', -10)),
+    { tone: 'unavailable', key: 'documents.expiredDays', params: { count: 10 }, shortKey: 'documents.expiredShort' });
+  const chip = fnBody('expiryChipHtml', 'expiryViewerHtml');
+  assert.match(chip, /<span class="doc-badge__full">\$\{full\}<\/span><span class="doc-badge__short" aria-hidden="true">\$\{short\}<\/span>/);
+  assert.match(chip, /title="\$\{full\}"/);
+  const rules = [...eachRule(css)];
+  const short = rules.find((rule) => rule.at.length === 0 && rule.selector === '.doc-badge__short');
+  assert.match(short.body, /display:\s*none/);
+  // Schmal heisst: die Zeile unter 30rem (Container list-rows) und jede Karte
+  // unter 12rem Inhaltsbreite (eigener Container). Die Langform bleibt fuer Screenreader da.
+  for (const container of [/@container list-rows \(max-width: 30rem\)/, /@container document-card \(max-width: 12rem\)/]) {
+    const inQuery = rules.filter((rule) => rule.at.some((at) => container.test(at)));
+    assert.ok(inQuery.some((rule) => /\.doc-badge__short/.test(rule.selector) && /display:\s*inline/.test(rule.body)), `${container} zeigt die Kurzform`);
+    const full = inQuery.find((rule) => /\.doc-badge__full/.test(rule.selector));
+    assert.ok(full, `${container} blendet die Langform aus`);
+    assert.doesNotMatch(full.body, /display:\s*none/, 'visuell weg, fuer Screenreader da');
+    assert.match(full.body, /clip-path:\s*inset\(50%\)/);
+  }
+  assert.match(topRules(css).find((rule) => rule.selector === '.document-card' && /container/.test(rule.body))?.body || '',
+    /container:\s*document-card \/ inline-size/);
+  assert.equal(de.documents.expiredShort, 'Abgelaufen');
+  assert.match(de.documents.expiringShort, /\{\{count\}\}/);
+});
+
+test('kein Gedankenstrich in den Dokument- und Beleg-Texten, in keiner Sprache', () => {
+  for (const file of LOCALES) {
+    const data = JSON.parse(read(`../public/locales/${file}`));
+    const name = data.inventory?.attachmentDocumentName ?? '';
+    assert.doesNotMatch(name, /[\u2013\u2014]/, `${file}: inventory.attachmentDocumentName`);
+    for (const [key, value] of Object.entries(data.documents || {})) {
+      if (typeof value === 'string') assert.doesNotMatch(value, /[\u2013\u2014]/, `${file}: documents.${key}`);
+    }
   }
 });

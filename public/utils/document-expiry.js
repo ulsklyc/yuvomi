@@ -13,14 +13,18 @@
  * Zeilen, die Aufmerksamkeit brauchen. "expired" teilt sich die Gefahr-Farbe
  * mit .doc-badge--unavailable (DESIGN.md, Colors: die Skalen-Regel).
  *
+ * `shortKey` ist die Kurzform fuer schmale Zeilen und Karten ("Abgelaufen",
+ * "Noch 5 Tage") - mit denselben Parametern, damit beide Fassungen dieselbe
+ * Zahl nennen.
+ *
  * @param {{ state: 'valid'|'expiring'|'expired', days: number } | null} status
- * @returns {{ tone: string, key: string, params: { count: number } } | null}
+ * @returns {{ tone: string, key: string, params: { count: number }, shortKey: string } | null}
  */
 export function expiryChipSpec(status) {
   if (!status || status.state === 'valid') return null;
   return status.state === 'expired'
-    ? { tone: 'unavailable', key: 'documents.expiredDays', params: { count: Math.abs(status.days) } }
-    : { tone: 'expiring', key: 'documents.expiringInDays', params: { count: status.days } };
+    ? { tone: 'unavailable', key: 'documents.expiredDays', params: { count: Math.abs(status.days) }, shortKey: 'documents.expiredShort' }
+    : { tone: 'expiring', key: 'documents.expiringInDays', params: { count: status.days }, shortKey: 'documents.expiringShort' };
 }
 
 /**
