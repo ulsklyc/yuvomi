@@ -53,6 +53,16 @@ test('Deutsch: Singular und Plural je nach count', async () => {
   assert.equal(t('settings.enabledReminderListCount', { count: 0 }), '0 Erinnerungslisten aktiviert');
 });
 
+test('Abos: „1 Tag überfällig", nicht „1 Tage" (Critique 2026-09-25)', async () => {
+  await setLocale('de');
+  assert.equal(t('subscriptions.overdueDays', { count: 1 }), '1 Tag überfällig');
+  assert.equal(t('subscriptions.overdueDays', { count: 3 }), '3 Tage überfällig');
+  assert.equal(t('subscriptions.listCount', { count: 1 }), '1 Abonnement');
+  assert.equal(t('subscriptions.reminderMeta', { count: 1 }), '1 Tag vorher');
+  await setLocale('en');
+  assert.equal(t('subscriptions.overdueDays', { count: 1 }), '1 day overdue');
+});
+
 test('Englisch: Singular und Plural je nach count', async () => {
   await setLocale('en');
   assert.equal(t('settings.enabledReminderListCount', { count: 1 }), '1 reminder list enabled');
@@ -336,9 +346,6 @@ const PLURAL_EXCEPTIONS = {
   'health.cycle.status.overdue': 'TODO_ONE',
   'inventory.navLabelAttention': 'TODO_ONE',        // router-Badge, Guard ist `> 0`
   'tasks.navLabelOverdue': 'TODO_ONE',              // router.js:1151, Guard ist `> 0`
-  'subscriptions.listCount': 'TODO_ONE',
-  'subscriptions.overdueDays': 'TODO_ONE',
-  'subscriptions.reminderMeta': 'TODO_ONE',
   'subscriptions.metaInUseWarning': 'TODO_ONE',     // umgeht den Plural im String: „Abonnement(s)"
   'settings.recipeProviderDeleteAccountConfirm': 'TODO_ONE',
 

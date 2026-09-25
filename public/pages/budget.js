@@ -14,7 +14,7 @@ import { wireTablist } from '/utils/tablist.js';
 import { t, formatDate, formatDayMonth, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
-import { render as renderSplitExpenses, prefillSplitExpense } from '/pages/split-expenses.js';
+import { render as renderSplitExpenses, prefillSplitExpense, canAddSplitExpense, openNewSplitExpense } from '/pages/split-expenses.js';
 import { openSubscriptionModal, render as renderSubscriptions } from '/pages/subscriptions.js';
 import { renderStats } from '/pages/budget-stats.js';
 import { renderPlans } from '/pages/budget-plans.js';
@@ -254,22 +254,22 @@ let _asideFit = null;  // ResizeObserver der Uebersicht-Seitenleiste (watchAside
 // anderer Position, in anderem Format und mit eigenem, nicht synchronisiertem
 // Anker: Budget auf März gestellt, Wechsel auf Berichte zeigte Juli.
 const TAB_CAPS = {
-  'budget':         { month: true,  add: 'budget.newEntryFabLabel' },
+  'budget':         { month: true,  add: 'budget.newEntryFabLabel', label: 'newLabel.budget' },
   'plan':           { month: true,  add: 'budget.planAddBudget' },
   'accounts':       { month: false, note: 'budget.periodNoteAccounts',      add: 'budget.addAccount' },
   'subscriptions':  { month: false, note: 'budget.periodNoteSubscriptions', add: 'subscriptions.add' },
   'loans':          { month: false, note: 'budget.periodNoteLoans',         add: 'budget.newLoan' },
   'reports':        { month: true,  range: true, add: null },
-  // `add: null` wie Berichte: Split-Ausgaben bringt seine eigene Primaeraktion
-  // mit (Kopfknopf + FAB in split-expenses.js). Vorher stand hier derselbe
-  // Aktionsname wie im eingebetteten Kopf, und der generische Kopfknopf UND
-  // der generische FAB dieser Seite delegierten beide per Klick an
-  // #split-add-expense - macht mit dem eigenen Kopfknopf und dem eigenen FAB
-  // der Unterseite VIER Ausloeser fuer dieselbe Handlung (Cross-Modul-Review:
-  // "drei violette Add-Knoepfe zugleich"). Split-Ausgaben ist das einzige
-  // Sub-Tab mit eigenem Primaerknopf/-FAB; die anderen sechs teilen sich
-  // Budgets generische Knoepfe, weil sie keinen eigenen mitbringen.
-  'split-expenses': { month: false, note: 'budget.periodNoteSplit',         add: null },
+  // EINE Neu-Aktion, und sie wohnt im Budget-Kopf wie auf jedem anderen Tab
+  // (Critique 2026-09-25). Bis dahin stand hier `add: null`, und die Unterseite
+  // brachte einen eigenen Sekundaerknopf und einen eigenen FAB mit - der
+  // schwebte am Desktop ueber „87,50 €", weil die geteilte Regel „wo ein
+  // beschrifteter Kopfknopf steht, schwebt keiner" (.toolbar-new-btn) ihn nicht
+  // kannte. Jetzt ist es derselbe Weg wie ueberall: Kopfknopf am Desktop, FAB
+  // mobil, beide oeffnen den Ausgaben-Dialog der Unterseite (openNewSplitExpense).
+  // Im Archiv blendet syncAddAction() beide aus - die Regel dafuer fragt die
+  // Unterseite selbst (canAddSplitExpense).
+  'split-expenses': { month: false, note: 'budget.periodNoteSplit',         add: 'splitExpenses.addExpense', label: 'newLabel.splitExpenses' },
 };
 
 // Sentinel für „keine eigene Farbe" im Kontofarb-Wähler: der echte Wert ist der
@@ -755,6 +755,7 @@ function wireNav() {
       case 'plan':           _container.querySelector('#budget-plan-add')?.click(); return;
       case 'accounts':       openAccountModal(); return;
       case 'loans':          openLoanModal(); return;
+      case 'split-expenses': openNewSplitExpense(); return;
       case 'reports':        return;
       default:               openBudgetModal({ mode: 'create' });
     }
@@ -931,7 +932,7 @@ function renderBody() {
     // Fehlermeldung stand darunter als Beschreibung - ein Leerzustand, der
     // aussieht, als sei nichts angelegt. Titel ist jetzt der Fehler selbst,
     // und es gibt einen Weg zurueck.
-    const loadSplitExpenses = () => renderSplitExpenses(panel, { embedded: true, user: _user })
+    const loadSplitExpenses = () => renderSplitExpenses(panel, { embedded: true, user: _user, onAddableChange: syncAddAction })
       .catch((err) => {
         console.error('[Budget] split expenses render error:', err);
         mountLoadError(panel, {
@@ -1186,16 +1187,27 @@ function updateTabs() {
     if (caps.note) note.textContent = t(caps.note);
   }
 
-  // Toolbar-„+" und FAB zeigen dieselbe Aktion mit demselben Label — oder beide
-  // gar nichts (Berichte hat keine Neu-Aktion).
-  const addLabel = caps.add ? t(caps.add) : '';
-  const addBtn = _container.querySelector('#budget-add');
+  syncAddAction();
+}
+
+/**
+ * Toolbar-„+" und FAB zeigen dieselbe Aktion mit demselben Label - oder beide
+ * gar nichts (Berichte hat keine Neu-Aktion; die Aufteilung im Archiv auch
+ * nicht). Eigene Funktion, weil die eingebettete Aufteilung sie bei jedem
+ * Archiv-Wechsel erneut ruft (onAddableChange), ohne den ganzen Tab-Abgleich.
+ */
+function syncAddAction() {
+  const caps = tabCaps();
+  const splitBlocked = caps === TAB_CAPS['split-expenses'] && !canAddSplitExpense();
+  const add = splitBlocked ? null : caps.add;
+  const addLabel = add ? t(add) : '';
+  const addBtn = _container?.querySelector('#budget-add');
   if (addBtn) {
-    addBtn.hidden = !caps.add;
-    if (caps.add) {
+    addBtn.hidden = !add;
+    if (add) {
       addBtn.setAttribute('aria-label', addLabel);
       addBtn.setAttribute('title', addLabel);
-      /* DAS SICHTBARE WORT GILT NUR FUER DEN EINTRAG.
+      /* DAS SICHTBARE WORT STEHT NUR, WO ES EIN NOMEN GIBT (`label`).
        *
        * Der Kopfknopf trug fest `newLabel.budget` ("Eintrag"), waehrend diese
        * Funktion seine Aktion je Tab umstellt: auf "Konten" stand sichtbar
@@ -1205,18 +1217,22 @@ function updateTabs() {
        * den Knopf nicht ansprechen; Codex-Review zu PR #754).
        *
        * Das Wort faellt dort weg, statt ein falsches zu behalten: `newLabel`
-       * fuehrt Nomen je MODUL, nicht je Untertab, und die vier fehlenden
-       * ("Budget", "Konto", "Abo", "Darlehen") waeren vier neue Schluessel in
-       * 24 Sprachen - eine eigene Runde, keine Zeile in einem Fix. Ohne Text
-       * benennt das `aria-label` den Knopf allein, und das tut es korrekt. */
+       * fuehrt Nomen je MODUL, nicht je Untertab. Zwei Tabs haben eins - der
+       * Eintrag (`newLabel.budget`) und die Aufteilung (`newLabel.splitExpenses`,
+       * „Ausgabe"); fuer "Konto", "Abo" und "Darlehen" waeren es drei neue
+       * Schluessel in 24 Sprachen. Ohne Text benennt das `aria-label` den Knopf
+       * allein, und das tut es korrekt. */
       const labelSpan = addBtn.querySelector('.toolbar-new-btn__label');
-      if (labelSpan) labelSpan.hidden = caps.add !== 'budget.newEntryFabLabel';
+      if (labelSpan) {
+        labelSpan.hidden = !caps.label;
+        if (caps.label) labelSpan.textContent = t(caps.label);
+      }
     }
   }
   const fab = findPageFab('fab-new-budget');
   if (fab) {
-    fab.hidden = !caps.add;
-    if (caps.add) fab.setAttribute('aria-label', addLabel);
+    fab.hidden = !add;
+    if (add) fab.setAttribute('aria-label', addLabel);
   }
 }
 

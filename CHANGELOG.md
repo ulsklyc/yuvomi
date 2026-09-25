@@ -81,6 +81,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   menu next to "Transactions" instead of buttons that wrapped over two lines. When you scroll, the
   "Budget" title folds away like the calendar's and the header shrinks from 162 to 117px.
 
+- **Budget: subscriptions and splitting speak the same language as the rest of the module.**
+  Subscriptions: the four filter drop-downs became one "Filters" button with the number of active
+  filters; it opens a sheet, and each active filter shows as a chip below the search that you can
+  remove with one tap. Sorting and the two management dialogs are in one menu. The list comes
+  before the charts and its rows are compact - on a phone about 74px instead of 173px, the first
+  subscription moved from y=1123 to y=478 - and "Active" and "per month" only appear where they
+  add something. "By category" is a bar list with amount and share instead of a pie chart without
+  values, the renewal forecast names its peak month, and the charts no longer overflow on a
+  1024px screen. "Over budget" is a warning instead of an alarm and offers "Most expensive first";
+  the yearly projection no longer repeats the currency, and "1 day overdue" is singular. Split:
+  the tab no longer repeats a second title and description, "Add expense" is the button in the
+  budget header (on a phone the usual "+"), so no floating button covers amounts on a desktop, and
+  group actions besides "Settle" are in one menu. At 1024px the groups sit above the group
+  instead of beside a column twice the screen height. Amounts on all budget tabs use digits of
+  equal width, so columns of amounts line up.
+
 - **The calendar gives phones more room for events.** Filter and search moved next to the view
   switcher, so the calendar header on a phone is 166px instead of 230px, and when you scroll the
   week, day or agenda, the page title folds away completely and leaves only the date navigation

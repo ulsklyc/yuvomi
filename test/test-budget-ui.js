@@ -327,9 +327,12 @@ test('das Modul führt genau eine Zeitachse', () => {
 });
 
 test('Toolbar-Aktion und FAB teilen sich Sichtbarkeit und Label', () => {
-  assert.match(budget, /const addLabel = caps\.add \? t\(caps\.add\) : ''/);
-  assert.match(budget, /addBtn\.hidden = !caps\.add/);
-  assert.match(budget, /fab\.hidden = !caps\.add/);
+  // Beide lesen DIESELBE Variable `add` (TAB_CAPS plus Archiv-Sperre der
+  // Aufteilung, syncAddAction) - nicht jeder seine eigene Bedingung.
+  assert.match(budget, /const add = splitBlocked \? null : caps\.add;/);
+  assert.match(budget, /const addLabel = add \? t\(add\) : ''/);
+  assert.match(budget, /addBtn\.hidden = !add;/);
+  assert.match(budget, /fab\.hidden = !add;/);
   // Kein Rückfall auf die alten Ausschluss-Listen.
   assert.doesNotMatch(budget, /splitActive \|\| subscriptionsActive/);
 });
@@ -1763,47 +1766,49 @@ test('Serien-Speichern reicht ein leeres Konto einer kontolosen Instanz nicht we
 });
 
 // --------------------------------------------------------
-// Split-Ausgaben: eine Primäraktion statt vier (Cross-Modul-Review)
+// Split-Ausgaben: EINE Neu-Aktion, und sie wohnt im Budget-Kopf
 // --------------------------------------------------------
 
 /**
- * Split-Ausgaben bringt seinen eigenen Kopfknopf UND seinen eigenen FAB mit
- * (split-expenses.js). Solange TAB_CAPS['split-expenses'].add einen Aktionsnamen
- * trug, zeigte Budgets EIGENER Toolbar-Knopf (#budget-add) und Budgets EIGENER
- * FAB (#fab-new-budget) auf diesem Tab ZUSAETZLICH auf, beide per Klick an
- * #split-add-expense delegiert - macht mit dem Unterseiten-eigenen Kopfknopf
- * und dessen eigenem FAB vier Ausloeser fuer dieselbe Handlung, gemessen als
- * "drei violette Add-Knoepfe zugleich" im UX-Review. `add: null` (wie Berichte)
- * haelt Budgets generische Knoepfe auf diesem Tab unsichtbar.
+ * Bis zur Critique 2026-09-25 brachte die eingebettete Aufteilung einen eigenen
+ * Sekundaerknopf und einen eigenen FAB mit (`add: null` in TAB_CAPS, damit
+ * Budgets generische Knoepfe nicht ZUSAETZLICH auftauchten - das waren einmal
+ * vier Ausloeser fuer dieselbe Handlung). Der eigene FAB kannte aber die
+ * geteilte Regel „wo ein beschrifteter Kopfknopf steht, schwebt keiner"
+ * (`.toolbar-new-btn`, layout.css) nicht und schwebte am Desktop ueber
+ * „87,50 €". Jetzt gilt dieselbe Grammatik wie auf jedem anderen Tab: der Kopf
+ * traegt die Aktion, mobil der FAB des Budgets - und die Unterseite rendert
+ * eingebettet KEINEN eigenen Ausloeser mehr. Es bleibt bei genau zwei (Kopf und
+ * FAB), die CSS nie gleichzeitig zeigt.
  */
-test('Split-Ausgaben bietet keine zweite, generische Neu-Aktion aus dem Budget-Kopf', () => {
+test('Split-Ausgaben legt ueber den Budget-Kopf an, nicht ueber eigene Knoepfe', () => {
   const table = budget.match(/const TAB_CAPS = \{[\s\S]*?\n\};/);
   assert.ok(table, 'TAB_CAPS-Tabelle fehlt');
-  assert.match(table[0], /'split-expenses':\s*\{[^}]*add:\s*null/,
-    'Split-Ausgaben bringt seinen eigenen Kopfknopf/FAB mit - Budgets generischer ' +
-    '#budget-add/#fab-new-budget-Knopf darf hier keine zweite Aktion anbieten');
-  // Der Kontext-Schalter darf die Unterseite nicht mehr direkt anklicken -
-  // sonst bliebe der alte Vierfach-Ausloeser ueber einen zweiten Codepfad stehen.
-  assert.doesNotMatch(withoutComments(budget), /case 'split-expenses':/,
-    'addHandler darf für Split-Ausgaben keinen eigenen Zweig mehr brauchen - ' +
-    'der Tab hat keine generische Neu-Aktion mehr');
+  assert.match(table[0], /'split-expenses':\s*\{[^}]*add:\s*'splitExpenses\.addExpense'/,
+    'die Aufteilung braucht die Neu-Aktion im Kopf wie jeder andere Tab');
+  assert.match(withoutComments(budget), /case 'split-expenses':\s*openNewSplitExpense\(\); return;/,
+    'Kopfknopf und FAB oeffnen den Ausgaben-Dialog der Unterseite');
+  // Im Archiv gibt es keine neue Ausgabe - die Sperre fragt die Unterseite.
+  assert.match(budget, /const splitBlocked = caps === TAB_CAPS\['split-expenses'\] && !canAddSplitExpense\(\);/);
+  assert.match(budget, /onAddableChange: syncAddAction/, 'ein Archiv-Wechsel muss den Kopf nachziehen');
+  // Die Unterseite rendert eingebettet weder Knopf noch FAB.
+  const render = splitExpenses.slice(splitExpenses.indexOf('export async function render('), splitExpenses.indexOf('async function loadInitial('));
+  assert.match(render, /const fab = embedded \? '' :/, 'eingebettet kein eigener #split-fab');
+  assert.match(render, /const head = embedded\s*\? `<h2 class="sr-only">\$\{t\('splitExpenses\.tabLabel'\)\}<\/h2>`/,
+    'eingebettet kein eigener Kopf mit Knopf - nur die Gliederungs-Ueberschrift');
 });
 
 /**
- * Eingebettet (der einzige heute erreichte Fall - budget.js ruft immer mit
- * embedded:true) darf Split-Ausgaben keine zweite Seiten-Ueberschrift unter
- * Budgets eigenem <h1> führen, und sein Kopfknopf darf nicht als zweiter
- * Primärknopf neben dem FAB (#split-fab) auftreten.
+ * Eingebettet traegt das Panel keinen zweiten Seitentitel („Gemeinsame
+ * Ausgaben") und keine Beschreibung mehr unter dem Tab „Aufteilung": EIN
+ * Begriff, der Tab-Name. Fuer die Gliederung (Budget > Aufteilung > Gruppe >
+ * Abschnitt) bleibt eine sr-only-<h2>, wie an Konten und Darlehen.
  */
-test('eingebettete Split-Ausgaben tragen keine zweite <h1> und keinen zweiten Primärknopf', () => {
-  assert.match(splitExpenses, /const TitleTag = embedded \? 'h2' : 'h1'/,
-    'die Überschrift muss im eingebetteten Fall eine Bereichs-Überschrift sein, kein zweites <h1>');
-  assert.match(splitExpenses, /const addExpenseBtnVariant = embedded \? 'btn--secondary' : 'btn--primary'/,
-    'der Kopfknopf muss im eingebetteten Fall zurücktreten - die Primäraktion ist der FAB');
-  assert.match(splitExpenses, /<\$\{TitleTag\} class="split-title">/,
-    'die Überschrift muss über TitleTag gerendert werden, nicht fest als <h1>');
-  assert.match(splitExpenses, /<button class="btn \$\{addExpenseBtnVariant\}" id="split-add-expense">/,
-    'der Kopfknopf muss über addExpenseBtnVariant gerendert werden, nicht fest als --primary');
+test('eingebettete Split-Ausgaben tragen keinen zweiten sichtbaren Titel und kein <h1>', () => {
+  const render = withoutComments(splitExpenses.slice(splitExpenses.indexOf('export async function render('), splitExpenses.indexOf('async function loadInitial(')));
+  const embeddedHead = render.match(/const head = embedded\s*\?\s*(`[^`]*`)/)?.[1] ?? '';
+  assert.match(embeddedHead, /class="sr-only"/, 'die eingebettete Ueberschrift ist nur fuer die Gliederung da');
+  assert.doesNotMatch(embeddedHead, /splitExpenses\.(title|subtitle)|<h1/, 'kein zweiter Seitentitel, keine Beschreibung');
 });
 
 /**
@@ -1825,7 +1830,10 @@ test('eingebettete Split-Ausgaben gliedern Gruppe und Karten eine Stufe tiefer',
     'der Gruppenname muss über GroupTag gerendert werden');
   assert.equal((src.match(/<\$\{SectionTag\} class="split-card-title">/g) ?? []).length, 3,
     'Salden, letzte Ausgaben und Verlauf müssen über SectionTag gerendert werden');
-  assert.doesNotMatch(src, /<h[1-6][\s>]/,
+  // Fest geschriebene Ueberschriften nur im Kopf von render(), und dort je
+  // Zweig genau passend: eingebettet die sr-only-<h2>, eigenstaendig die <h1>.
+  const outsideHead = src.replace(/const head = embedded[\s\S]*?<\/header>`;/, '');
+  assert.doesNotMatch(outsideHead, /<h[1-6][\s>]/,
     'eine fest geschriebene Überschrift folgt der Einbettung nicht - über eine Tag-Variable rendern');
 
   const byTag = [];
@@ -1842,16 +1850,22 @@ test('eingebettete Split-Ausgaben gliedern Gruppe und Karten eine Stufe tiefer',
 /**
  * Löschen einer Gruppe ist unumkehrbar (die Gruppe fällt mitsamt ihrer
  * Ausgaben), Bearbeiten/Archivieren nicht - dieselbe Kapsel für alle drei
- * verwischte den Unterschied (UX-Review).
+ * verwischte den Unterschied (UX-Review). Seit der Critique 2026-09-25 stehen
+ * die drei samt „Mitglied hinzufuegen" im Werkzeug-Menue der Gruppe; die Regel
+ * bleibt: Loeschen im Gefahrenton, als letzter Eintrag hinter einem Trenner.
  */
 test('Gruppe löschen trägt eine andere Gewichtung als bearbeiten/archivieren', () => {
-  assert.match(splitExpenses, /id="split-edit-group"[^>]*>/);
-  assert.match(splitExpenses, /class="btn btn--secondary btn--icon" id="split-edit-group"/,
-    'Bearbeiten bleibt eine gewöhnliche Sekundäraktion');
-  assert.match(splitExpenses, /class="btn btn--secondary btn--icon" id="split-archive-group"/,
-    'Archivieren bleibt eine gewöhnliche Sekundäraktion');
-  assert.match(splitExpenses, /class="btn btn--icon btn--danger-outline" id="split-delete-group"/,
-    'Löschen muss sich sichtbar von Bearbeiten/Archivieren abheben, ohne die Zeile zu dominieren');
+  const menu = splitExpenses.slice(splitExpenses.indexOf('function groupToolsMenuHtml('), splitExpenses.indexOf('function renderMain('));
+  assert.match(menu, /item\('split-edit-group', 'pencil', t\('splitExpenses\.editGroup'\)\)/,
+    'Bearbeiten bleibt eine gewöhnliche Aktion');
+  assert.match(menu, /item\('split-archive-group', 'archive', t\('splitExpenses\.archiveGroup'\)\)/,
+    'Archivieren bleibt eine gewöhnliche Aktion');
+  assert.match(menu, /popover-menu__separator[\s\S]*item\('split-delete-group', 'trash-2', t\('splitExpenses\.deleteGroup'\), true\)\}\s*<\/div>/,
+    'Löschen steht zuletzt, hinter einem Trenner, im Gefahrenton');
+  // Sichtbar bleibt die haeufige Handlung, nicht fuenf Knoepfe.
+  const main = splitExpenses.slice(splitExpenses.indexOf('function renderMain('), splitExpenses.indexOf('// So viele Namen stehen'));
+  assert.match(main, /id="split-settle"[\s\S]*\$\{groupToolsMenuHtml\(\)\}/);
+  assert.doesNotMatch(main, /id="split-(edit|archive|delete)-group"/, 'die Gruppenverwaltung steht im Menue, nicht als Icon-Knopfreihe');
 });
 
 // --------------------------------------------------------
@@ -1965,4 +1979,64 @@ test('Kennzahlen mobil: Saldo als Kopfwert vor Einnahmen/Ausgaben, Trend sichtba
     && r.selector.trim() === '.budget-overview .metric-grid:not(.metric-grid--expenses-only)');
   assert(rows && /grid-auto-rows:\s*auto/.test(rows.body),
     'ohne auto zoege die geteilte 1fr-Regel den flachen Kopfwert auf Kartenhoehe auf');
+});
+
+// --------------------------------------------------------
+// Betraege mit gleich breiten Ziffern (Critique 2026-09-25, Schritt 3)
+// --------------------------------------------------------
+
+/**
+ * Jeder Betrag des Budget-Moduls steht in `tabular-nums`: sonst springen
+ * Spalten von Betraegen je nach Ziffernform („1,11 €" schmaler als „8,88 €"),
+ * und untereinander stehende Summen fluchten nicht. Gemessen fehlte die Regel
+ * an Konten, Darlehen, Statistik, Abos und Aufteilung.
+ *
+ * ZWEI QUELLEN, damit der Guard nicht an einer Liste erblindet: die benannten
+ * Betragsklassen aus der Critique UND jede Klasse, deren Element im Markup
+ * direkt einen Betrag rendert (`${money(`, `${formatAmount(`, ...). Gedeckt
+ * ist eine Klasse, wenn eine Regel mit `tabular-nums` sie im letzten Glied
+ * ihres Selektors nennt - `font-variant-numeric` erbt, also deckt auch der
+ * Traeger (`.split-debt`) sein `<strong>`.
+ */
+test('Betraege im Budget-Modul stehen in tabular-nums (benannt und aus dem Markup)', () => {
+  const sheets = ['budget', 'subscriptions', 'split-expenses', 'panel', 'layout', 'list-row', 'typography']
+    .map((name) => read(`../public/styles/${name}.css`));
+  const tabular = [];
+  for (const src of sheets) {
+    for (const rule of eachRule(src)) {
+      if (/font-variant-numeric:\s*tabular-nums/.test(rule.body)) {
+        tabular.push(...rule.selector.split(',').map((part) => part.trim()));
+      }
+    }
+  }
+  const lastCompound = (selector) => selector.split(/[\s>+~]+/).filter(Boolean).pop() ?? '';
+  const classesOf = (selector) => [...selector.matchAll(/\.([\w-]+)/g)].map((m) => m[1]);
+  const covered = (selector) => tabular.includes(selector)
+    || classesOf(selector).some((cls) => tabular.some((tab) => classesOf(lastCompound(tab)).includes(cls)));
+
+  const named = [
+    '.budget-account__balance', '.budget-account__starting', '.subscriptions-chart-row > strong',
+    '.subscription-card__cost', '.subscriptions-chart__figure strong', '.split-expense__amount',
+    '.split-debt strong', '.budget-loan-card__amounts span', '.budget-loans__summary',
+    '.budget-stats__readout', '.budget-stats__legend-item', '.metric-card__trend',
+  ];
+
+  const pages = ['budget.js', 'budget-stats.js', 'budget-plans.js', 'subscriptions.js', 'split-expenses.js'];
+  const amountFn = String.raw`\$\{\s*(?:money|fmt|formatAmount|formatMoney)\(`;
+  const direct = new RegExp(String.raw`<\w+\s+class="([^"]*)"[^>]*>[^<]{0,160}?` + amountFn, 'g');
+  const wrapped = new RegExp(String.raw`<\w+\s+class="([^"]*)"[^>]*>\s*<\w+[^>]*>\s*` + amountFn, 'g');
+  const derived = new Set();
+  for (const page of pages) {
+    const src = read(`../public/pages/${page}`);
+    for (const re of [direct, wrapped]) {
+      for (const m of src.matchAll(re)) {
+        const first = m[1].split(/\s+/).find((cls) => cls && !cls.includes('$'));
+        if (first) derived.add(`.${first}`);
+      }
+    }
+  }
+  assert.ok(derived.size >= 6, `nur ${derived.size} Betragsklassen im Markup gefunden - misst der Scanner noch?`);
+
+  const missing = [...new Set([...named, ...derived])].filter((selector) => !covered(selector));
+  assert.deepEqual(missing, [], `Betraege ohne tabular-nums: ${missing.join(', ')}`);
 });

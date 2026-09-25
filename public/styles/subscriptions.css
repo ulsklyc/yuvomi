@@ -11,6 +11,10 @@
   /* Die frühere modul-getönte Kopfwäsche (9 % über 280px) kannten nur zwei der
    * 17 Module - ein Alt-Welt-Rest. Der Seitengrund ist überall derselbe. */
   background: var(--color-bg);
+  /* Die Seite misst sich selbst (Container Queries unten): als Budget-Tab
+   * ist sie 740px breit, waehrend der Viewport 1024 sagt - an der Fensterbreite
+   * gemessen liefen die Analytik-Spalten dort ueber (scrollWidth 773 > 740). */
+  container: subscriptions-page / inline-size;
 }
 
 /* Eingebettet als Budget-Tab: Seitenfläche und Rand gehören dem Panel, nicht
@@ -25,51 +29,72 @@
   min-height: 0;
 }
 
+/* EINE ZEILE: Suche, Filterknopf, Werkzeug-Menue (Critique 2026-09-25, P2).
+ * Vorher ein Raster aus Suche, vier beschrifteten Selects, Zuruecksetzen und
+ * zwei Icon-Knoepfen - mobil 213px hoch. Die Suche waechst, aber nicht ueber
+ * eine Lesebreite hinaus; das Menue steht am Zeilenende, wie in der
+ * Buchungsliste und den Dokumenten. */
 .subscriptions-toolbar {
-  display: grid;
-  /* Suche · 4 beschriftete Filter · Zurücksetzen · 2 Icon-Aktionen
-   * Die Filterspalten stehen auf minmax(0, …): mit `auto` wuchsen sie auf die
-   * längste Option und schoben die Leiste bei 1280px über die Content-Breite.
-   * Die Anteile sind aber NICHT gleich - die drei Neutral-Filter zeigen „Alle"
-   * und ein paar Kategorienamen, die Sortierung „Nächstes Fälligkeitsdatum".
-   * Gleiche Anteile hätten den einzigen Wert gekappt, der Platz braucht. */
-  grid-template-columns:
-    minmax(160px, 1.3fr) repeat(3, minmax(0, 0.85fr)) minmax(0, 1.7fr) auto auto auto;
+  display: flex;
+  align-items: center;
   gap: var(--space-2);
-  /* An der Unterkante ausrichten: die Filterfelder tragen jetzt eine Labelzeile
-   * über dem Select, die Suche nicht — sonst stünden die Eingaben versetzt. */
-  align-items: end;
   margin-bottom: var(--space-3);
 }
 
-/* Sichtbares Label statt reinem aria-label: vier gleich aussehende Selects sind
- * ohne Beschriftung nicht auseinanderzuhalten, sobald ein Wert gewählt ist. */
-.subscriptions-filter-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-width: 0;
+.subscriptions-toolbar .subscriptions-tools {
+  margin-inline-start: auto;
 }
 
-.subscriptions-filter-field__label {
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-}
-
-.subscriptions-filter-reset {
+.subscriptions-filter-btn {
+  flex: 0 0 auto;
   min-height: var(--target-base);
-  white-space: nowrap;
 }
 
-/* Desktop: Wrapper ist transparent — die beiden Icon-Buttons bleiben direkte
- * Grid-Items in den letzten zwei auto-Spalten. */
-.subscriptions-toolbar__actions {
-  display: contents;
+/* Die Zahl der aktiven Filter - dieselbe Plakette wie an den Filter-Chips
+ * (`.filter-chip__count`): getoent aus der Schrift, nicht als Alarmpunkt. */
+.subscriptions-filter-btn__count {
+  min-width: 1.25em;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, currentColor var(--tint-state), transparent);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.subscriptions-filter-btn--active {
+  color: color-mix(in srgb, var(--module-accent) var(--tint-ink), var(--color-text-primary));
+}
+
+/* Nur die AKTIVEN Filter, und nur wenn es welche gibt (`hidden` sonst). */
+.subscriptions-active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.subscriptions-active-filters[hidden] {
+  display: none;
+}
+
+.subscriptions-filter-chip > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 16rem;
+}
+
+.subscriptions-filter-sheet {
+  display: grid;
+  gap: var(--space-3);
 }
 
 .subscriptions-search {
   position: relative;
+  flex: 1 1 12rem;
+  min-width: 0;
+  max-width: 28rem;
 }
 
 .subscriptions-search svg {
@@ -110,11 +135,6 @@
   display: none;
 }
 
-.subscriptions-filter {
-  min-height: 44px;
-  margin: 0;
-}
-
 /* Die Kennzahl-Zeile ist .metric-grid (budget.css) mit --summary-cards: 4.
  * Die frühere eigene .subscriptions-summary-card war die zweite von fünf
  * Kartenbauarten im selben Modul (Critique 2026-07-30, P0) - sie ist ersatzlos
@@ -138,9 +158,35 @@
 
 .subscriptions-analytics {
   display: grid;
-  grid-template-columns: minmax(240px, 1.1fr) minmax(220px, 0.85fr) minmax(240px, 1fr);
+  /* Einspaltig ist die sichere Vorgabe; die Container Queries unten geben
+   * Spalten erst dazu, wenn die Seite selbst breit genug ist. Die Spuren
+   * stehen auf minmax(0, 1fr): feste Mindestbreiten (240/220/240) summierten
+   * sich auf 724px und liefen bei 740px Seitenbreite samt Luecken ueber. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
   margin-bottom: var(--space-3);
+}
+
+@container subscriptions-page (min-width: 640px) {
+  .subscriptions-analytics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Zwei Spalten, drei Karten: die Prognose nimmt die ganze erste Zeile,
+   * statt die dritte Karte halb breit mit einem Loch daneben stehen zu lassen. */
+  .subscriptions-chart--area {
+    grid-column: 1 / -1;
+  }
+}
+
+@container subscriptions-page (min-width: 960px) {
+  .subscriptions-analytics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .subscriptions-chart--area {
+    grid-column: auto;
+  }
 }
 
 .subscriptions-chart {
@@ -149,15 +195,27 @@
 
 .subscriptions-chart__head {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: var(--space-2);
   align-items: baseline;
   margin-bottom: var(--space-2);
 }
 
-.subscriptions-chart__head strong {
-  font-size: var(--text-sm);
+/* Die Zahl im Kopf traegt ihr Label sichtbar davor („Hoechster Monat: Nov"). */
+.subscriptions-chart__figure {
+  display: flex;
+  gap: var(--space-1);
+  align-items: baseline;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
   white-space: nowrap;
+}
+
+.subscriptions-chart__figure strong {
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
 }
 
 .subscriptions-chart h2,
@@ -200,76 +258,65 @@
   text-align: center;
 }
 
-.subscriptions-pie-layout {
+/* Eine Balkenzeile: Name | Balken | Betrag | Anteil. Name und Balken teilen
+ * sich den Rest, Betrag und Anteil nehmen, was sie brauchen - keine festen
+ * Mindestbreiten, die in einer schmalen Karte ueberlaufen. */
+.subscriptions-chart-rows {
   display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
-  gap: var(--space-3);
-  align-items: center;
-}
-
-.subscriptions-pie {
-  width: 96px;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 10px color-mix(in srgb, var(--color-surface) 78%, transparent);
-}
-
-.subscriptions-pie-legend {
-  display: grid;
-  gap: var(--space-1);
-  min-width: 0;
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
-}
-
-.subscriptions-pie-legend span {
-  display: flex;
+  grid-template-columns: minmax(0, 1.2fr) minmax(2.5rem, 1fr) auto auto;
   gap: var(--space-2);
-  align-items: center;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.subscriptions-pie-legend i {
-  width: 10px;
-  height: 10px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-}
-
+/* subgrid: die Spalten gehoeren der LISTE, nicht jeder Zeile - sonst misst
+ * jede Zeile ihren Betrag selbst, und Balken und Betraege stehen je Zeile an
+ * einer anderen Kante. */
 .subscriptions-chart-row {
   display: grid;
-  grid-template-columns: minmax(90px, 0.8fr) minmax(100px, 1fr) auto;
-  gap: var(--space-2);
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
-  margin-top: var(--space-2);
   font-size: var(--text-sm);
 }
 
-.subscriptions-chart-row > span {
+.subscriptions-chart-row__label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.subscriptions-chart-row > div {
+.subscriptions-chart-row__track {
+  display: block;
   height: 8px;
   overflow: hidden;
   border-radius: var(--radius-full);
   background: var(--color-surface-3);
 }
 
-.subscriptions-chart-row i {
+.subscriptions-chart-row__track i {
   display: block;
   height: 100%;
   border-radius: inherit;
   background: var(--module-accent);
 }
 
+.subscriptions-chart-row > strong {
+  text-align: end;
+  white-space: nowrap;
+}
+
+.subscriptions-chart-row__share {
+  min-width: 3.5ch;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  text-align: end;
+}
+
 .subscriptions-list-section {
   padding: var(--space-3);
+  margin-bottom: var(--space-3);
 }
 
 .subscriptions-section-head {
@@ -305,6 +352,7 @@
  * gegen solche Zwischenebenen immun). */
 .subscriptions-list {
   display: grid;
+  container: subscriptions-list / inline-size;
 }
 
 /* KEINE eigene Flaeche, KEIN Radius: das leistet der Traeger. Waehrend der Geste
@@ -383,9 +431,9 @@
 
 .subscription-card__title-row {
   display: flex;
-  justify-content: space-between;
   gap: var(--space-2);
-  align-items: center;
+  align-items: baseline;
+  min-width: 0;
 }
 
 /* Name und Beschreibung sind SPANs, keine Überschrift und kein Absatz: der
@@ -395,6 +443,21 @@
 .subscription-card__desc {
   display: block;
   margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* EINE Titelzeile: der Name behaelt Vorrang, die Beschreibung steht leise
+ * dahinter und kuerzt sich zuerst. Vorher war sie eine eigene Zeile. */
+.subscription-card__name {
+  flex: 0 1 auto;
+  font-weight: var(--font-weight-semibold);
+}
+
+.subscription-card__desc {
+  flex: 1 1 0;
 }
 
 .subscription-card__desc,
@@ -404,7 +467,8 @@
 }
 
 .subscription-status {
-  align-self: flex-start;
+  flex: 0 0 auto;
+  align-self: center;
   padding: 2px var(--space-2);
   border-radius: var(--radius-full);
   background: var(--color-surface-3);
@@ -434,8 +498,8 @@
 .subscription-card__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-1) var(--space-3);
-  margin-top: var(--space-1);
+  gap: 0 var(--space-3);
+  margin-top: var(--space-0h);
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
 }
@@ -444,11 +508,29 @@
   display: inline-flex;
   gap: var(--space-1);
   align-items: center;
+  /* Eine Angabe bricht als Ganzes um, nicht mitten in „Faellig in 6 | Tagen". */
+  white-space: nowrap;
 }
 
 .subscription-card__meta svg {
+  flex: 0 0 auto;
   width: 14px;
   height: 14px;
+}
+
+/* Schmale Liste: Zahlungsart und Erinnerung weichen (siehe renderCard) -
+ * mobil stand die Metazeile sonst auf drei bis vier Zeilen. */
+@container subscriptions-list (max-width: 559px) {
+  .subscription-card__meta .subscription-card__meta-extra {
+    display: none;
+  }
+}
+
+/* Ueberfaellig: Warnton UND Symbol (Dreieck statt Kalender) - die Bedeutung
+ * haengt nicht an der Farbe allein, und der Text sagt es ohnehin. */
+.subscription-card__due--overdue {
+  color: var(--color-warning-ink);
+  font-weight: var(--font-weight-medium);
 }
 
 .subscription-card__cost {
@@ -461,6 +543,48 @@
 .subscription-card__actions {
   display: flex;
   gap: var(--space-1);
+}
+
+/* „Ueber Budget" nennt sich im Label und traegt das Warnsymbol davor. */
+.subscriptions-page .metric-card--warning .metric-card__label svg {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-inline-end: var(--space-1);
+  color: var(--color-warning);
+}
+
+/* Der Weg aus „Ueber Budget" heraus: ein Textknopf IN der Fussnote, hinter
+ * „126 % genutzt" - eine eigene Knopfzeile machte die ganze Kennzahlreihe um
+ * 36px hoeher. Sichtbar ist nur das Wort; die Treffflaeche reicht per
+ * ::before auf --target-base (Hit-Test, nicht Border-Box - dieselbe Loesung
+ * wie „Nur Ausgaben" in budget.css). */
+.subscriptions-over-budget-action {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-warning-ink);
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.subscriptions-over-budget-action::before {
+  content: "";
+  position: absolute;
+  inset-block: calc((var(--target-base) - 100%) / -2);
+  inset-inline: calc(var(--space-2) * -1);
+}
+
+.subscriptions-over-budget-action:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
 }
 
 /* Hier stand `width/min-height: var(--target-md)` - 40px fest, also auch am
@@ -927,65 +1051,17 @@
   font-size: var(--text-xs);
 }
 
-@media (max-width: 1023px) {
-  .subscriptions-toolbar {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .subscriptions-search {
-    grid-column: 1 / -1;
-  }
-
-  /* Dritte Zeile: Zurücksetzen links, die beiden Icon-Aktionen rechts in ihrer
-   * natürlichen Breite — als Grid-Items würden sie sich sonst über je eine
-   * volle Spalte spannen und als überbreite leere Pillen erscheinen. */
-  .subscriptions-filter-reset {
-    grid-column: 1 / 3;
-    justify-self: start;
-  }
-
-  /* KEIN Umbruch, anders als bei den Fusszeilen (#872): das hier sind zwei
-   * Icon-Knoepfe ohne Text - sie koennen nicht zu lang werden, und ein
-   * Umbruch machte aus der letzten Rasterspalte zwei Zeilen. Die Ansage steht
-   * ausdruecklich da, damit sie als Entscheidung lesbar ist. */
-  .subscriptions-toolbar__actions {
-    display: flex;
-    flex-wrap: nowrap;
-    gap: var(--space-2);
-    grid-column: 3 / -1;
-    justify-content: flex-end;
-  }
-
-  /* Der Umbruch der Kennzahl-Zeile liegt jetzt an .metric-grid--quad
-     (budget.css) als Container-Query. */
-
-  .subscriptions-analytics {
-    grid-template-columns: 1fr;
-  }
-
-  /* Unter 1024px stapelt der Zeilenkörper Betrag und Text: die Spalten
-     gehören seit Runde 6 ihm, nicht der Karte - die trägt nur noch Körper
-     und Aktionen nebeneinander. */
-  .subscription-card__main {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .subscription-card__cost {
-    grid-column: 2 / -1;
-    align-items: flex-start;
-  }
-
-  .subscription-card__actions {
-    justify-content: flex-end;
-  }
-}
+/* HIER STAND EIN `@media (max-width: 1023px)`-Block: Werkzeug-Raster in vier
+ * Spalten, Analytik einspaltig, und der Zeilenkoerper stapelte den Betrag
+ * unter den Text. Die Werkzeugzeile ist heute eine Flexzeile, die Analytik
+ * misst die Seite (Container Queries oben), und der Betrag bleibt rechts -
+ * gestapelt kostete er mobil zwei Zeilen je Abo. */
 
 @media (max-width: 639px) {
   .subscriptions-page {
     padding: var(--space-3);
   }
 
-  .subscriptions-toolbar,
   .subscriptions-metadata {
     grid-template-columns: 1fr;
   }
@@ -1000,17 +1076,6 @@
 
   .subscriptions-notifications li .btn {
     grid-column: span 1;
-  }
-
-  /* Mobile: die beiden Aktions-Icons teilen sich eine kompakte Zeile statt je
-   * eine vollbreite leere Pille zu bilden (Audit F8). */
-  .subscriptions-toolbar__actions {
-    display: flex;
-    gap: var(--space-2);
-  }
-
-  .subscriptions-toolbar__actions .btn--icon {
-    flex: 1;
   }
 
   .subscription-card__actions .btn {

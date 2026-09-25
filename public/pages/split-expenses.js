@@ -9,6 +9,7 @@ import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode
 import { openDetailView } from '/components/detail-view.js';
 import { t, formatDate, getLocale, getNumberFormat, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { installPopoverMenus } from '/utils/popover-menu.js';
 import { stagger } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { formatMoney, amountPlaceholder, toDecimalString, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
@@ -69,6 +70,9 @@ export function prefillSplitExpense(data) {
   _pendingPrefill = data ?? null;
 }
 let _statusTablist = null;   // wireTablist-Handle des Statusfilters (sync ohne onChange)
+// Eingebettet meldet die Seite dem Budget-Kopf, wenn sich aendert, ob eine neue
+// Ausgabe gerade moeglich ist (Archiv an/aus) - der Kopfknopf gehoert budget.js.
+let _onAddableChange = null;
 
 /**
  * Darf dieser Nutzer hier schreiben? (#467, #1265 P7)
@@ -115,9 +119,10 @@ function groupIcon(type) {
   }[type] || 'users';
 }
 
-export async function render(container, { user, embedded = false } = {}) {
+export async function render(container, { user, embedded = false, onAddableChange = null } = {}) {
   _container = container;
   _embedded = embedded;
+  _onAddableChange = onAddableChange;
   state.user = user || null;
   // `split`, nicht `reading`: Kopf und Kennzahlenband stehen ueber einem
   // zweispaltigen .split-layout (Gruppen links, Detail rechts) - das IST die
@@ -126,30 +131,36 @@ export async function render(container, { user, embedded = false } = {}) {
   // das Shell-Raster wirkt nur auf .app-page__body, den es hier nicht gibt.
   //
   // EINGEBETTET (budget.js ruft immer mit embedded:true - es gibt heute keine
-  // eigenstaendige Route) TRAEGT DIE UEBERSCHRIFT KEIN ZWEITES <h1>: der
-  // Modulkopf sagt bereits "Budget" (Cross-Modul-Review). Die Budget-Seiten-
-  // CSS behandelte den Split-Titel dort eingebettet schon laenger als
-  // Bereichs-Ueberschrift (typography.css) - das Element selbst blieb bis
-  // hierher ein <h1> und widersprach damit seiner eigenen Rolle. Aus demselben
-  // Grund traegt der Knopf hier --secondary statt --primary: die Primaeraktion ist der FAB
-  // (#split-fab, siehe unten), nicht zwei violette Knoepfe fuer dieselbe
-  // Handlung. Unveraendert bleibt die (heute nicht erreichte) eigenstaendige
-  // Zukunft: <h1> plus Primaerknopf, falls Split-Ausgaben je eine eigene
-  // Navigationsebene bekommt (DESIGN.md, Q-3).
-  const TitleTag = embedded ? 'h2' : 'h1';
-  const addExpenseBtnVariant = embedded ? 'btn--secondary' : 'btn--primary';
-  setHtml(container, `
-    <div class="split-page app-page app-page--split" data-composition="split">
-      <header class="panel-head split-topbar">
+  // eigenstaendige Route) TRAEGT DAS PANEL KEINEN EIGENEN KOPF MEHR
+  // (Critique 2026-09-25): hier standen ein zweiter Seitentitel („Gemeinsame
+  // Ausgaben"), eine Beschreibung und ein Sekundaerknopf, obwohl der Tab
+  // „Aufteilung" heisst und der Budget-Kopf die Seite schon benennt. Der Tab-
+  // Name bleibt der EINE Begriff; die Ueberschrift steht fuer die Gliederung
+  // als sr-only-<h2> (Budget > Aufteilung > Gruppe > Abschnitt), wie Konten und
+  // Darlehen. „Ausgabe hinzufuegen" wohnt im Budget-Kopf (#budget-add, TAB_CAPS)
+  // und mobil in dessen FAB - am Desktop blendet die geteilte
+  // `.toolbar-new-btn`-Regel den FAB aus, statt dass ein eigener #split-fab
+  // ueber „87,50 €" schwebt. Unveraendert bleibt die (heute nicht erreichte)
+  // eigenstaendige Zukunft: <h1>, Beschreibung, Primaerknopf und eigener FAB.
+  const head = embedded
+    ? `<h2 class="sr-only">${t('splitExpenses.tabLabel')}</h2>`
+    : `<header class="panel-head split-topbar">
         <div>
-          <${TitleTag} class="split-title">${t('splitExpenses.title')}</${TitleTag}>
+          <h1 class="split-title">${t('splitExpenses.title')}</h1>
           <p class="split-subtitle">${t('splitExpenses.subtitle')}</p>
         </div>
-        ${readOnly() ? '' : `<button class="btn ${addExpenseBtnVariant}" id="split-add-expense">
+        ${readOnly() ? '' : `<button class="btn btn--primary" id="split-add-expense">
           <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
           ${t('splitExpenses.addExpense')}
         </button>`}
-      </header>
+      </header>`;
+  const fab = embedded ? '' : `
+      <button class="page-fab" id="split-fab" aria-label="${t('splitExpenses.addExpense')}" data-dock-label="${t('newLabel.splitExpenses')}">
+        <i data-lucide="plus" class="icon-xl" aria-hidden="true"></i>
+      </button>`;
+  setHtml(container, `
+    <div class="split-page app-page app-page--split" data-composition="split">
+      ${head}
       <section class="metric-grid" id="split-summary"></section>
       <div class="split-layout">
         <aside class="split-groups-panel">
@@ -181,13 +192,12 @@ export async function render(container, { user, embedded = false } = {}) {
           <div class="split-groups" id="split-groups"></div>
         </aside>
         <main class="split-main" id="split-main" aria-busy="true">${renderSkeletonList({ rows: 5, lines: 2 })}</main>
-      </div>
-      <button class="page-fab" id="split-fab" aria-label="${t('splitExpenses.addExpense')}" data-dock-label="${t('newLabel.splitExpenses')}">
-        <i data-lucide="plus" class="icon-xl" aria-hidden="true"></i>
-      </button>
+      </div>${fab}
     </div>
   `);
   if (window.lucide) lucide.createIcons({ el: _container });
+  // Eingebettet verdrahtet budget.js die Menues an seiner Seitenwurzel.
+  if (!embedded) installPopoverMenus(_container);
   await loadInitial();
   bindShell();
   renderAll();
@@ -428,6 +438,23 @@ function renderStatusFilter() {
   if (addExpense) addExpense.hidden = isArchivedView();
   const fab = findPageFab('split-fab');
   if (fab) fab.hidden = isArchivedView();
+  _onAddableChange?.();
+}
+
+/**
+ * Darf der Budget-Kopf gerade „Ausgabe hinzufuegen" anbieten? Nicht bei
+ * `budget: read` und nicht im Archiv - eine neue Ausgabe liefe dort in eine
+ * archivierte Gruppe. Dieselbe Regel, die den eigenstaendigen Knopf und FAB
+ * oben ausblendet; budget.js fragt sie, statt sie nachzubauen.
+ */
+export function canAddSplitExpense() {
+  return !readOnly() && !isArchivedView();
+}
+
+/** Der Anlegen-Weg aus dem Budget-Kopf (#budget-add, #fab-new-budget). */
+export function openNewSplitExpense() {
+  if (!canAddSplitExpense()) return;
+  openExpenseModal();
 }
 
 function renderSummary() {
@@ -485,6 +512,39 @@ function renderGroups() {
   `).join(''));
 }
 
+/**
+ * EIN Werkzeug-Menue fuer die Gruppe (Critique 2026-09-25, Muster „one tools
+ * menu" aus den Dokumenten und der Buchungsliste). Hier standen drei Icon-
+ * Knoepfe (Bearbeiten, Archivieren, Loeschen) und zwei Textknoepfe
+ * (Ausgleichen, Mitglied hinzufuegen) - bei 1440px zwei Zeilen im Gruppenkopf.
+ * Sichtbar bleibt die haeufige Handlung (Ausgleichen); der Rest traegt im Menue
+ * sein Label, Loeschen im Gefahrenton und als letzter Eintrag hinter einem
+ * Trenner. Die ids bleiben, die Verdrahtung in renderMain() haengt an ihnen.
+ * Ein Gast bekommt nur „Ausgleichen": die vier Eintraege hier verwalten die
+ * Gruppe, und das darf er nicht - dann faellt das Menue ganz.
+ */
+function groupToolsMenuHtml() {
+  if (isSplitGuest()) return '';
+  const label = t('common.moreActions');
+  const item = (id, icon, text, danger = false) => `
+      <button type="button" role="menuitem" class="popover-menu__item${danger ? ' popover-menu__item--danger' : ''}" id="${id}">
+        <i data-lucide="${icon}" class="icon-md" aria-hidden="true"></i><span>${esc(text)}</span>
+      </button>`;
+  return `
+    <button type="button" class="btn btn--secondary btn--icon split-group-tools popover-menu__trigger"
+            popovertarget="split-group-tools-menu" aria-haspopup="menu" aria-expanded="false"
+            aria-label="${esc(label)}" title="${esc(label)}">
+      <i data-lucide="ellipsis" class="icon-md" aria-hidden="true"></i>
+    </button>
+    <div class="popover-menu split-group-tools-menu" id="split-group-tools-menu" popover role="menu" aria-label="${esc(label)}">
+      ${item('split-invite', 'user-plus', t('splitExpenses.addMember'))}
+      ${item('split-edit-group', 'pencil', t('splitExpenses.editGroup'))}
+      ${item('split-archive-group', 'archive', t('splitExpenses.archiveGroup'))}
+      <div class="popover-menu__separator" role="separator"></div>
+      ${item('split-delete-group', 'trash-2', t('splitExpenses.deleteGroup'), true)}
+    </div>`;
+}
+
 function renderMain() {
   const main = _container.querySelector('#split-main');
   main.removeAttribute('aria-busy');
@@ -528,29 +588,11 @@ function renderMain() {
           <i data-lucide="archive-restore" class="icon-md" aria-hidden="true"></i>
           ${t('splitExpenses.restoreGroup')}
         </button>` : `
-        ${isSplitGuest() ? '' : `
-        <button class="btn btn--secondary btn--icon" id="split-edit-group" aria-label="${t('splitExpenses.editGroup')}">
-          <i data-lucide="pencil" aria-hidden="true"></i>
-        </button>
-        <button class="btn btn--secondary btn--icon" id="split-archive-group" aria-label="${t('splitExpenses.archiveGroup')}">
-          <i data-lucide="archive" aria-hidden="true"></i>
-        </button>
-        <!-- Loeschen ist unumkehrbar (die Gruppe faellt mitsamt ihrer Ausgaben),
-             Bearbeiten/Archivieren nicht - dieselbe Kapsel fuer alle drei
-             verwischte den Unterschied. --danger-outline hebt sich ab, ohne die
-             Zeile zu dominieren; confirmModal({danger:true}) haengt schon
-             darunter (deleteGroup()). -->
-        <button class="btn btn--icon btn--danger-outline" id="split-delete-group" aria-label="${t('splitExpenses.deleteGroup')}">
-          <i data-lucide="trash-2" aria-hidden="true"></i>
-        </button>`}
         <button class="btn btn--secondary" id="split-settle">
           <i data-lucide="hand-coins" class="icon-md" aria-hidden="true"></i>
           ${t('splitExpenses.settle')}
         </button>
-        <button class="btn btn--secondary" id="split-invite" ${isSplitGuest() ? 'hidden' : ''}>
-          <i data-lucide="user-plus" class="icon-md" aria-hidden="true"></i>
-          ${t('splitExpenses.addMember')}
-        </button>`}
+        ${groupToolsMenuHtml()}`}
       </div>`}
     </section>
     <div class="split-content-grid">
@@ -1678,7 +1720,7 @@ function openGuestModal() {
  * den Seitencontainer; der Griff laesst den echten Pfad laufen.
  */
 export const __test = {
-  readOnly, renderExpenses, state, expenseReadSections, openExpenseModal, groupMetaHtml, openGroupModal,
+  readOnly, canAddSplitExpense, groupToolsMenuHtml, renderExpenses, state, expenseReadSections, openExpenseModal, groupMetaHtml, openGroupModal,
   renderActivity, onActivityClick, loadGroupData, loadMoreActivity, groupFromQuery,
   renderMainForTest(container) { _container = container; renderMain(); },
   renderGroupsForTest(container) { _container = container; renderGroups(); },

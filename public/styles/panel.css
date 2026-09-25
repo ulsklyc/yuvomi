@@ -422,7 +422,10 @@
   transition: transform var(--transition-base);
 }
 
-.metric-card__progress--over > span { background: var(--color-danger); }
+/* Ueber 100 % kippt er auf den WARNTON, nicht auf Danger (Critique
+ * 2026-09-25): ein ueberzogenes Abo-Budget ist ein Hinweis mit Handlungsweg,
+ * kein Kontominus. Dieselbe Stimme traegt `.metric-card--warning` daneben. */
+.metric-card__progress--over > span { background: var(--color-warning); }
 
 @media (prefers-reduced-motion: reduce) {
   .metric-card__progress > span { transition: none; }
@@ -438,6 +441,18 @@
 .metric-card--expenses .metric-card__value { color: var(--color-danger);  }
 .metric-card--balance  .metric-card__value { color: var(--color-text-primary); }
 .metric-card--balance-positive .metric-card__value { color: var(--color-success); }
+
+/* Ein Hinweis, kein Urteil: die Karte nennt ihren Zustand im Label (Text
+ * traegt die Aussage, nicht nur die Farbe) und tont sich am reservierten
+ * Warnton. Stand bis 2026-09-25 in schedule.css - die Abos brauchen ihn auch,
+ * und eine Kartenvariante gehoert zur Karte, nicht zu einem ihrer Nutzer. */
+.metric-card--warning {
+  border-color: color-mix(in oklch, var(--color-warning) 40%, transparent);
+}
+
+.metric-card--warning .metric-card__value {
+  color: var(--color-warning);
+}
 .metric-card--balance-negative .metric-card__value { color: var(--color-danger);  }
 /* Reines Ausgaben-Tracking (keine Einnahmen im Monat): Saldo = -Ausgaben ist eine
    Tautologie, die rote Zahl wird als „im Minus" fehlgelesen (#504). Neutral statt rot. */

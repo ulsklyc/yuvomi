@@ -528,17 +528,7 @@
   --summary-cards: 3;
 }
 
-/* Ein Hinweis, kein Urteil: die Karte nennt sich selbst "Ueberstunden" im
- * Label (Text traegt die Aussage, nicht nur die Farbe) und tont sich am
- * reservierten Warnton, denselben, den Budget und Gesundheit fuer ihre
- * eigenen Schwellenwerte schon verwenden. */
-.metric-card--warning {
-  border-color: color-mix(in oklch, var(--color-warning) 40%, transparent);
-}
-
-.metric-card--warning .metric-card__value {
-  color: var(--color-warning);
-}
+/* `.metric-card--warning` steht seit 2026-09-25 in panel.css (geteilt mit den Abos). */
 
 .schedule-stat-card > div > h2 {
   margin-bottom: var(--space-1);

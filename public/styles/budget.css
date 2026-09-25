@@ -2159,3 +2159,30 @@ button.budget-entry__title {
   font-variant-numeric: tabular-nums;
   color: var(--color-text-tertiary);
 }
+
+/* BETRAEGE STEHEN IN GLEICH BREITEN ZIFFERN - im ganzen Modul, an EINER Stelle
+ * (Critique 2026-09-25). Einzelne Klassen trugen `tabular-nums` schon
+ * (Buchungsbetrag, Plan, Kennzahlwert), Konten, Darlehen, Statistik, Abos und
+ * Aufteilung nicht: dort sprangen untereinander stehende Summen je nach
+ * Ziffernform. Die Liste nennt die Traeger, `font-variant-numeric` erbt auf
+ * ihre Kinder. Abos und Aufteilung stehen mit drin, weil sie nur als
+ * Budget-Tabs erscheinen. test-budget-ui.js haelt die Regel: jede Klasse, die
+ * im Markup direkt einen Betrag rendert, muss hier (oder an einer eigenen
+ * tabular-Regel) gedeckt sein. */
+.budget-account__balance,
+.budget-account__starting,
+.budget-account__meta,
+.budget-account__figures,
+.budget-loan-card__amounts span,
+.budget-loans__summary,
+.budget-stats__readout,
+.budget-stats__legend-item,
+.metric-card__trend,
+.subscription-card__cost,
+.subscriptions-chart-row > strong,
+.subscriptions-chart-row__share,
+.subscriptions-chart__figure strong,
+.split-expense__amount,
+.split-debt strong {
+  font-variant-numeric: tabular-nums;
+}

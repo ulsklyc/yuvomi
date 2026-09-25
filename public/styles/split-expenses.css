@@ -104,6 +104,9 @@
 .split-groups-panel {
   padding: var(--space-3);
   min-height: 0;
+  /* So hoch wie seine Gruppen, nicht wie der Hauptbereich daneben: gestreckt
+   * stand bei 1440 unter zwei Gruppen eine leere Flaeche von ueber 1000px. */
+  align-self: start;
   /* Träger der Zeilenliste (tokens.css): die Zeilen laufen bis an die Kante,
    * also muss der Träger sie an seinem Radius beschneiden. */
   overflow: hidden;
@@ -194,15 +197,22 @@
  * Jetzt trägt ihn die Fläche allein, wie die Sidebar-Pille. */
 .split-groups {
   margin-top: var(--space-3);
+  /* Die LISTE laeuft bis an die Traegerkante, nicht jede Zeile einzeln ueber
+   * ihre Liste hinaus: vorher trug `.split-group` die negativen Raender samt
+   * `width: calc(100% + 2 * space-3)`, und #split-groups meldete scrollWidth
+   * 306 bei 294 Breite - 12px Ueberstand, den nur das `overflow: hidden` des
+   * Panels verdeckte (Critique 2026-09-25). Jetzt ist die Box so breit wie ihre
+   * Zeilen; Treffflaeche und Flaeche bis zur Kante bleiben gleich. */
+  margin-inline: calc(var(--space-3) * -1);
 }
 
 .split-group {
   /* Die Zeile läuft bis an die Trägerkante: das Panel trägt --space-3 Polster,
    * und eine Zeile ohne Radius, die davor stehenbleibt, wäre ein rechtwinkliges
    * Farbrechteck in einer runden Karte - der Kasten im Kasten in neuer Form.
-   * Das Textpolster kommt deshalb aus der Zeile selbst zurück. */
-  width: calc(100% + var(--space-3) * 2);
-  margin-inline: calc(var(--space-3) * -1);
+   * Den Weg bis zur Kante geht die Liste (.split-groups oben), das
+   * Textpolster kommt aus der Zeile selbst zurück. */
+  width: 100%;
   min-height: 64px;
   padding: var(--space-2) var(--space-3);
   display: flex;
@@ -528,8 +538,14 @@ button.split-expense:hover {
  *   split-main  → .split-content-grid (Karten hinter dem Gruppen-Panel)
  * -------------------------------------------------------- */
 
-/* Zweispaltig braucht das Panel (max. 320px) + Gap + rund 380px Rest. */
-@container split-page (max-width: 719px) {
+/* NEBENEINANDER NUR, WENN DER HAUPTBEREICH DANEBEN ZWEISPALTIG BLEIBT
+ * (Critique 2026-09-25). Die Grenze lag bei 720px: bei 1024x768 (Seite 740px)
+ * stand das Gruppen-Panel mit 320px neben einem 404px-Hauptbereich, dessen
+ * Karten sich dort einspaltig stapelten - eine Spalte von 194% Viewporthoehe.
+ * Die Rechnung: Panel 320 + Gap 16 + 640 (ab da ist .split-content-grid
+ * zweispaltig, siehe split-main unten) = 976. Darunter steht die kurze
+ * Gruppenliste oben, und der Hauptbereich bekommt die volle Breite. */
+@container split-page (max-width: 975px) {
   .split-layout {
     grid-template-columns: minmax(0, 1fr);
   }

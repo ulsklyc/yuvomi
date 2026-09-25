@@ -398,9 +398,12 @@ test('Abo-Karte mit `budget: read`: der Koerper oeffnet die Leseansicht, Verlaen
     assert.match(html, /class="swipe-row swipe-row--static"/, 'ohne Geste auch kein Wisch-Chevron');
     assert.match(html, /<button type="button" class="subscription-card__main list-row__main--interactive"\s+data-action="view">/);
     assert.doesNotMatch(html, /data-action="(edit|renew|delete)"|swipe-reveal|common\.edit/);
-    // Die Auskunft: Name, Status, Zyklus, Erinnerung, Betrag.
+    // Die Auskunft: Name, Zyklus, Erinnerung, Betrag. Der Status steht, wo er
+    // etwas unterscheidet (Critique 2026-09-25): „aktiv" ist der Normalfall der
+    // Liste und traegt keine Pille mehr, „pausiert" schon - bei jedem Recht.
     assert.match(html, /Streamingdienst/);
-    assert.match(html, /subscriptions\.active/);
+    assert.doesNotMatch(html, /subscription-status/);
+    assert.match(abos.renderCard(abo({ enabled: false, status: 'paused' })), /class="subscription-status [^"]*">\s*subscriptions\.disabled/);
     assert.match(html, /subscriptions\.cycle\.monthly/);
     assert.match(html, /subscriptions\.reminderMeta/);
     assert.match(html, /12[.,]99/);
@@ -437,8 +440,21 @@ test('Abo-Kennzahlen ohne Monatsbudget: bei `budget: read` keine Aufforderung, e
 });
 
 test('Abos: Kopfaktionen, Listen-Riegel und Wischgeste haengen am Recht', () => {
-  // Werkzeugleiste: Kategorien/Zahlungsarten und die Einstellungen schreiben beide.
-  assert.match(ABOS_CODE, /\$\{readOnly\(\) \? '' : `<div class="subscriptions-toolbar__actions">/);
+  // Werkzeug-Menue: Kategorien/Zahlungsarten und die Einstellungen schreiben
+  // beide und fallen bei `read`; die Sortierung liest und bleibt. Filterblatt
+  // und Filterknopf sind Lesen und stehen bei jedem Recht.
+  withAccess({ budget: 'write' }, () => {
+    const menu = abos.toolsMenuHtml();
+    assert.match(menu, /id="subscriptions-manage"/);
+    assert.match(menu, /id="subscriptions-settings"/);
+    assert.match(menu, /data-sort="cost-desc"/);
+  });
+  withAccess({ budget: 'read' }, () => {
+    const menu = abos.toolsMenuHtml();
+    assert.doesNotMatch(menu, /subscriptions-manage|subscriptions-settings/);
+    assert.match(menu, /role="menuitemradio"[^>]*data-sort="due"/, 'Sortieren ist Lesen');
+  });
+  assert.doesNotMatch(fn(ABOS_CODE, 'render'), /readOnly\(\)[^\n]*subscriptions-filters/, 'der Filterknopf haengt an keinem Recht');
   assert.deepEqual([...abos.READ_SAFE_ACTIONS], ['view'], 'edit, renew und delete schreiben; nur `view` liest');
   const bind = fn(ABOS_CODE, 'bindContent');
   const riegel = bind.indexOf('if (readOnly() && !READ_SAFE_ACTIONS.has(action.dataset.action)) return;');
@@ -683,7 +699,18 @@ test('Keine Gruppe mit `budget: read`: der Titel bleibt, „Erstelle eine Gruppe
 
 test('Geteilte Ausgaben: Kopfknopf und Gruppe-Anlegen haengen am Recht', () => {
   const render = fn(SPLIT_CODE, 'render');
-  assert.match(render, /\$\{readOnly\(\) \? '' : `<button class="btn \$\{addExpenseBtnVariant\}" id="split-add-expense">/);
+  // Eingebettet steht „Ausgabe hinzufuegen" im Budget-Kopf (#budget-add), den
+  // CSS und addHandler bei `read` sperren; der Kopf fragt canAddSplitExpense().
+  // Der Knopf der (heute nicht erreichten) eigenstaendigen Seite haengt weiter
+  // am Recht.
+  assert.match(render, /\$\{readOnly\(\) \? '' : `<button class="btn btn--primary" id="split-add-expense">/);
+  withAccess({ budget: 'write' }, () => assert.equal(split.canAddSplitExpense(), true));
+  withAccess({ budget: 'read' }, () => assert.equal(split.canAddSplitExpense(), false));
+  const status = split.state.groupStatus;
+  try {
+    split.state.groupStatus = 'archived';
+    withAccess({ budget: 'write' }, () => assert.equal(split.canAddSplitExpense(), false, 'im Archiv keine neue Ausgabe'));
+  } finally { split.state.groupStatus = status; }
   assert.match(render, /\$\{readOnly\(\) \? '' : `<button class="btn btn--icon" id="split-add-group"/);
 });
 
