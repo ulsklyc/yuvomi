@@ -157,7 +157,8 @@ router.get('/thumbnail', async (req, res) => {
     res.setHeader('Content-Type', mime);
     res.setHeader('Content-Length', String(thumb.buffer.length));
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Cache-Control', 'private, max-age=300');
+    // Vorschaubild = Dokumentinhalt: kein Rest im HTTP-Cache des Geraets.
+    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'");
     res.end(thumb.buffer);
   } catch (err) {

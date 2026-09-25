@@ -506,6 +506,8 @@ test('GET /dms/thumbnail (Picker): Admin bekommt Bild mit nosniff + enger CSP', 
   assert.equal(res.headers.get('content-type'), 'image/png');
   assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
   assert.match(res.headers.get('content-security-policy'), /default-src 'none'/);
+  // Ein Vorschaubild zeigt Dokumentinhalt - kein Rest im HTTP-Cache des Geraets.
+  assert.equal(res.headers.get('cache-control'), 'no-store');
   assert.deepEqual(Buffer.from(await res.arrayBuffer()), PNG);
 });
 
@@ -553,6 +555,7 @@ test('GET /:id/thumbnail: verlinktes DMS-Dokument liefert Bild', async () => {
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('content-type'), 'image/png');
   assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(res.headers.get('cache-control'), 'no-store');
 });
 
 test('GET /:id/thumbnail: lokales Dokument → 415 (nur DMS)', async () => {

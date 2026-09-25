@@ -320,11 +320,13 @@ async function resolveDmsThumbnail(account, storageKey) {
   return { buffer: thumb.buffer, mime };
 }
 
-function sendThumbnail(res, thumb, cacheSeconds) {
+// no-store wie beim Viewer: ein Vorschaubild zeigt die erste Seite eines
+// Dokuments, und der Browser-Cache ueberlebt das Abmelden.
+function sendThumbnail(res, thumb) {
   res.setHeader('Content-Type', thumb.mime);
   res.setHeader('Content-Length', String(thumb.buffer.length));
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Cache-Control', `private, max-age=${cacheSeconds}`);
+  res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'");
   res.end(thumb.buffer);
 }
@@ -1367,7 +1369,7 @@ router.get('/:id/thumbnail', async (req, res) => {
     const account = loadDmsAccount(doc.dms_account_id);
     if (!account) return res.status(404).json({ error: 'Linked DMS account is gone.', code: 404 });
     const thumb = await resolveDmsThumbnail(account, doc.storage_key);
-    sendThumbnail(res, thumb, 300);
+    sendThumbnail(res, thumb);
   } catch (err) {
     if (err instanceof ThumbnailUnavailableError) {
       return res.status(415).json({ error: 'Thumbnail not available for this document.', code: 415 });
