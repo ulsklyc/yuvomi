@@ -44,24 +44,32 @@ export function isShareableMime(mime) {
  * Warum Teilen für dieses Dokument (nicht) geht.
  * @param {{ name?: string, mime_type?: string }} doc
  * @param {{ navigator?: object, secure?: boolean, FileCtor?: typeof File }} [env] nur für Tests
- * @returns {'ok'|'type'|'unavailable'}
- *   'ok'          - Browser kann eine Datei dieses Typs teilen
- *   'type'        - der Typ steht nicht auf der Liste der Web Share API
- *   'unavailable' - kein sicherer Kontext, kein navigator.share/canShare, oder
- *                   der Browser lehnt die Probe-Datei ab
+ * @returns {'ok'|'type'|'insecure'|'browser'}
+ *   'ok'       - Browser kann eine Datei dieses Typs teilen
+ *   'type'     - der Typ steht nicht auf der Liste der Web Share API
+ *   'insecure' - kein sicherer Kontext (http:// im LAN): dort gibt es
+ *                navigator.share() gar nicht, HTTPS wuerde es aendern
+ *   'browser'  - sicherer Kontext, aber kein navigator.share/canShare, oder
+ *                der Browser lehnt die Probe-Datei ab: HTTPS aendert nichts
+ *
+ * ZWEI ANTWORTEN STATT EINER (Re-Critique 2026-09-25). Bis dahin hiess beides
+ * 'unavailable', und der Hinweis musste beide Ursachen nennen - er schickte
+ * Nutzer eines Desktop-Firefox, der ueber HTTPS kommt, auf die Suche nach
+ * einer sicheren Verbindung, die sie laengst hatten.
  */
 export function fileShareSupport(doc, env = {}) {
   if (!isShareableMime(doc?.mime_type)) return 'type';
   const nav = env.navigator ?? globalThis.navigator;
   const secure = env.secure ?? globalThis.isSecureContext === true;
   const FileCtor = env.FileCtor ?? globalThis.File;
-  if (!secure || !nav || typeof nav.share !== 'function' || typeof nav.canShare !== 'function' || typeof FileCtor !== 'function') {
-    return 'unavailable';
+  if (!secure) return 'insecure';
+  if (!nav || typeof nav.share !== 'function' || typeof nav.canShare !== 'function' || typeof FileCtor !== 'function') {
+    return 'browser';
   }
   try {
     const probe = new FileCtor([], doc?.name || 'document', { type: baseMime(doc?.mime_type) });
-    return nav.canShare({ files: [probe] }) ? 'ok' : 'unavailable';
+    return nav.canShare({ files: [probe] }) ? 'ok' : 'browser';
   } catch {
-    return 'unavailable';
+    return 'browser';
   }
 }

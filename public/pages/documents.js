@@ -35,7 +35,8 @@ import {
   documentThumbKind,
 } from '/utils/document-thumbs.js';
 import { wireTablist } from '/utils/tablist.js';
-import { repairRovingStops, wireRovingToolbars } from '/utils/roving-toolbar.js';
+import { firstRovingStop, repairRovingStops, wireRovingToolbars } from '/utils/roving-toolbar.js';
+import { isNavModuleReadOnly } from '/permissions.js';
 import {
   DOCUMENT_SORTS,
   categoryFacetCounts,
@@ -60,6 +61,14 @@ import {
   handleFolderDeleteFailure,
   scheduleFolderDeleteWithUndo,
 } from '/utils/document-folder-delete.js';
+
+// Warum Teilen fuer ein Dokument nicht geht - je Antwort von fileShareSupport()
+// genau EIN Satz, der die zutreffende Ursache nennt (Re-Critique 2026-09-25).
+const SHARE_NOTE_KEYS = {
+  type: 'documents.shareUnsupportedType',
+  insecure: 'documents.shareInsecure',
+  browser: 'documents.shareBrowserUnsupported',
+};
 
 const CATEGORIES = ['medical', 'school', 'identity', 'insurance', 'finance', 'home', 'vehicle', 'legal', 'travel', 'pets', 'warranty', 'taxes', 'work', 'other'];
 
@@ -198,6 +207,11 @@ export async function render(container, context = {}) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <div class="documents-page app-page app-page--full" data-composition="full">
+      ${/* SPRUNGMARKE (Re-Critique 2026-09-25, Sam): 33 Tab-Stopps bis zum
+           ersten Dokument, 16 davon in der Ordnerliste. Dasselbe Muster wie
+           "Zum Inhalt springen" der Shell (router.js): `.sr-only`, sichtbar
+           nur bei Tastaturfokus (layout.css, .sr-only:focus-visible). */ ''}
+      <a class="sr-only documents-skip" href="#documents-list" data-documents-skip>${t('documents.skipToDocuments')}</a>
       <div class="page-toolbar page-toolbar--wrap documents-toolbar">
         <h1 class="page-toolbar__title">${t('documents.title')}</h1>
         ${renderPageSearch({ id: 'documents-search', label: t('documents.searchPlaceholder'), placeholder: t('documents.searchPlaceholder'), value: state.query, clearLabel: t('common.searchClear'), className: 'documents-toolbar__search page-toolbar__center' })}
@@ -243,9 +257,14 @@ export async function render(container, context = {}) {
                     role="radio" data-tab-id="${id}" aria-checked="${on}" tabindex="${on ? '0' : '-1'}">${t(key)}</button>`;
           }).join('')}
         </div>
+        ${/* FRISTEN VORN (Re-Critique 2026-09-25, P1). Am Ende der Spur lag
+             der Ablauf-Chip bei 1280px ~400px hinter der sichtbaren Kante und
+             bei 375px ganz ausserhalb - der dringlichste Filter war der am
+             schwersten erreichbare. Er steht nur, wenn er etwas findet, und
+             eine Haarlinie trennt ihn von der Kategoriegruppe. */ ''}
         <div class="documents-filters__chips">
+          <div class="documents-filter-chips documents-filter-chips--deadlines" id="documents-expiring-filter" role="group" aria-label="${t('documents.expiringFilterGroupLabel')}"></div>
           <div class="documents-filter-chips" id="documents-category" role="group" aria-label="${t('documents.categoryFilterLabel')}"></div>
-          <div class="documents-filter-chips" id="documents-expiring-filter" role="group" aria-label="${t('documents.expiringFilterLabel')}"></div>
         </div>
       </div>
       <div class="documents-browser-layout">
@@ -398,6 +417,25 @@ async function loadMetaOptions() {
     state.maxFileSize = maxUploadBytes();
     state.allowedMimeTypes = [];
   }
+}
+
+/**
+ * Die Sprungmarke: auf den Einstieg des ersten Dokuments, sonst auf die Liste
+ * selbst (Leerzustand, Skelett). Ohne Hash in der Adresse - der Sprung ist
+ * ein Fokuswechsel, kein Ort, zu dem Zurueck fuehren soll.
+ */
+function skipToDocuments(event) {
+  event.preventDefault();
+  const list = _container?.querySelector('#documents-list');
+  if (!list) return;
+  repairRovingStops(list);
+  const stop = firstRovingStop(list);
+  if (stop) {
+    stop.focus();
+    return;
+  }
+  list.setAttribute('tabindex', '-1');
+  list.focus();
 }
 
 // Der Button liegt fest im Markup (hidden) und wird hier nur freigeschaltet —
@@ -568,6 +606,7 @@ function renderFacets() {
 }
 
 function bindPageEvents() {
+  _container.querySelector('[data-documents-skip]')?.addEventListener('click', skipToDocuments);
   _container.querySelector('#documents-folder-add')?.addEventListener('click', () => openFolderModal());
   findPageFab('fab-new-document')?.addEventListener('click', () => openDocumentModal());
   bindToolsMenu();
@@ -994,7 +1033,7 @@ function renderExpiringChip() {
   const present = state.allDocuments.some((doc) => matchesCategory(doc) && matchesFolder(doc) && isExpiringOrOverdue(doc));
   if (!present && !state.expiringSoon) return;
   host.insertAdjacentHTML('beforeend', `
-    <button type="button" class="filter-chip filter-chip--sm${state.expiringSoon ? ' filter-chip--active' : ''}" data-expiring-toggle aria-pressed="${state.expiringSoon}">
+    <button type="button" class="filter-chip filter-chip--sm${state.expiringSoon ? ' filter-chip--active' : ''}" data-expiring-toggle aria-pressed="${state.expiringSoon}" title="${t('documents.expiringFilterGroupLabel')}">
       <i data-lucide="calendar-clock" class="icon-md" aria-hidden="true"></i>${t('documents.expiringFilterLabel')}<span class="filter-chip__count">${count}</span>
     </button>
   `);
@@ -1062,7 +1101,7 @@ function renderFolderBrowser() {
         <span class="documents-folder-item__count">${counts.get(item.id) || 0}</span>
       </button>
       ${item.managed ? `
-      <button class="documents-folder-item__menu" type="button" data-folder-menu="${esc(item.id)}" aria-label="${t('documents.folderActions')}" title="${t('documents.folderActions')}"
+      <button class="documents-folder-item__menu" type="button" data-folder-menu="${esc(item.id)}" aria-label="${esc(t('documents.folderActionsFor', { name: item.name }))}" title="${esc(t('documents.folderActionsFor', { name: item.name }))}"
               aria-haspopup="menu" aria-expanded="false">
         <i data-lucide="more-vertical" aria-hidden="true"></i>
       </button>` : ''}
@@ -1240,7 +1279,18 @@ async function moveFolder(folder) {
 function openDocumentMenu(doc, anchorBtn) {
   const archived = doc.status === 'archived';
   const canPushDms = documentStorageBackend(doc) !== 'dms' && state.dmsAccounts.length > 0;
+  // ANSEHEN STEHT HIER, WENN DIE LEISTE ES NICHT ZEIGT. Die kompakte Zeile
+  // (unter 30rem) traegt kein Auge mehr - ein Tipp auf die Zeile oeffnet den
+  // Betrachter (Re-Critique 2026-09-25). Die Zeile ist aber kein Tab-Stopp;
+  // wer per Tastatur kommt, landet auf dem Kebab, und ohne diesen Eintrag
+  // waere das Dokument ohne Maus nicht zu oeffnen (Codex-Review zu PR #754).
+  const eye = anchorBtn.closest('[role="toolbar"]')?.querySelector('[data-action="view"]');
+  const viewShown = eye?.getClientRects().length > 0;
   openContextMenu(anchorBtn, `
+    ${viewShown ? '' : `
+    <button class="documents-context-menu__item" type="button" role="menuitem" data-menu-action="view">
+      <i data-lucide="eye" aria-hidden="true"></i><span>${t('documents.viewAction')}</span>
+    </button>`}
     <button class="documents-context-menu__item" type="button" role="menuitem" data-menu-action="edit">
       <i data-lucide="pencil" aria-hidden="true"></i><span>${t('common.edit')}</span>
     </button>
@@ -2030,7 +2080,7 @@ function documentVisibilityFieldHtml(doc) {
           </div>`;
 }
 
-export const __test = { memberOptions, loadMembers, documentVisibilityFieldHtml };
+export const __test = { memberOptions, loadMembers, documentVisibilityFieldHtml, openDocumentViewer };
 
 function openDocumentModal(doc = null) {
   const isEdit = !!doc;
@@ -3185,6 +3235,11 @@ function formatFileSize(bytes) {
 // Document Viewer
 // --------------------------------------------------------
 
+/** Nur-lesen-Regel (#467): eine Handlung, die am Server im 403 endete, steht nicht da. */
+function canEditDocuments() {
+  return !isNavModuleReadOnly('documents');
+}
+
 function openDocumentViewer(doc) {
   const categoryLabel = categoryLabels()[doc.category] || doc.category;
   const previewUrl = `/api/v1/documents/${doc.id}/preview`;
@@ -3212,6 +3267,8 @@ function openDocumentViewer(doc) {
   const shareSupport = fileShareSupport(doc);
   const shareAbort = new AbortController();
   let shareFile = null;
+  // Der Ausloeser des Betrachters - fuer den Wechsel nach "Bearbeiten" (unten).
+  const opener = document.activeElement;
 
   openSharedModal({
     title: doc.name,
@@ -3234,6 +3291,11 @@ function openDocumentViewer(doc) {
                title="${t('documents.viewerOpenInTab')}" aria-label="${t('documents.viewerOpenInTab')}">
               <i data-lucide="external-link" class="icon-md" aria-hidden="true"></i>
             </a>` : ''}
+            ${canEditDocuments() ? `
+            <button type="button" class="btn btn--ghost btn--icon btn--icon-sm" data-action="edit-document"
+               title="${t('common.edit')}" aria-label="${t('common.edit')}">
+              <i data-lucide="pencil" class="icon-md" aria-hidden="true"></i>
+            </button>` : ''}
             ${shareSupport === 'ok' ? `
             <button type="button" class="btn btn--ghost btn--icon btn--icon-sm" data-action="share" disabled aria-busy="true"
                title="${t('documents.sharePreparing')}" aria-label="${t('documents.sharePreparing')}">
@@ -3244,7 +3306,7 @@ function openDocumentViewer(doc) {
               <i data-lucide="download" class="icon-md" aria-hidden="true"></i>
             </a>
           </span>
-          ${shareSupport !== 'ok' ? `<p class="document-viewer__note">${t(shareSupport === 'type' ? 'documents.shareUnsupportedType' : 'documents.shareUnavailable')}</p>` : ''}
+          ${shareSupport !== 'ok' ? `<p class="document-viewer__note">${t(SHARE_NOTE_KEYS[shareSupport])}</p>` : ''}
         </div>
         <div class="document-viewer__body" id="document-viewer-body">
           ${renderViewerContent(doc, previewUrl, downloadUrl)}
@@ -3259,6 +3321,18 @@ function openDocumentViewer(doc) {
     onSave(panel) {
       if (window.lucide) window.lucide.createIcons({ el: panel });
       if (shareSupport === 'ok') prepareShare(panel);
+      // BEARBEITEN AUS DEM BETRACHTER (Re-Critique 2026-09-25, Alex). Kein
+      // eigenes closeModal(): openModal() ersetzt den offenen Dialog selbst -
+      // derselbe Weg wie jeder Modal-zu-Modal-Wechsel, und er haelt EINEN
+      // History-Marker (modal.js, #871). Den Fokus vorher an den Ausloeser des
+      // Betrachters zurueck: der neue Dialog merkt sich document.activeElement
+      // als seinen Ausloeser, und mobil stuende der Fokus sonst noch auf diesem
+      // Knopf, der mit der Schliessanimation aus dem DOM faellt - nach dem
+      // Speichern landete er dann auf der Seitenwurzel statt an der Zeile.
+      panel.querySelector('[data-action="edit-document"]')?.addEventListener('click', () => {
+        if (opener?.isConnected && opener !== document.body) opener.focus();
+        openDocumentModal(doc);
+      });
       // PDFs ohne nativen Inline-Viewer (mobile Browser): mit pdf.js auf Canvas rendern
       if (previewKind(doc.mime_type) === 'pdf' && !canRenderPdfNatively()) {
         const container = panel.querySelector('[data-pdf-pages]');

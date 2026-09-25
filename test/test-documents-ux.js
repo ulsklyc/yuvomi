@@ -567,6 +567,9 @@ test('die Teilbarkeit eines Typs wohnt in web-share.js und ist eine Teilmenge de
 });
 
 test('fileShareSupport unterscheidet Typ, Kontext und Browser - und fragt canShare mit einer leeren Probe', () => {
+  // Seit der Re-Critique 2026-09-25 (P2) sind "kein sicherer Kontext" und "der
+  // Browser kann es nicht" zwei Antworten: der Hinweis nannte in einem
+  // sicheren Kontext ohne navigator.share HTTPS als moegliche Ursache.
   const seen = [];
   const nav = { share() {}, canShare(data) { seen.push(data); return true; } };
   class FakeFile {
@@ -574,16 +577,18 @@ test('fileShareSupport unterscheidet Typ, Kontext und Browser - und fragt canSha
   }
   const pdf = { name: 'pass.pdf', mime_type: 'application/pdf' };
   assert.equal(fileShareSupport({ name: 'x.docx', mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }, { navigator: nav, secure: true, FileCtor: FakeFile }), 'type');
-  assert.equal(fileShareSupport(pdf, { navigator: nav, secure: false, FileCtor: FakeFile }), 'unavailable', 'ohne sicheren Kontext gibt es navigator.share() nicht');
-  assert.equal(fileShareSupport(pdf, { navigator: { share() {} }, secure: true, FileCtor: FakeFile }), 'unavailable', 'share ohne canShare reicht nicht');
-  assert.equal(fileShareSupport(pdf, { navigator: { canShare: () => true }, secure: true, FileCtor: FakeFile }), 'unavailable', "'share' in navigator ist nicht die Frage");
-  assert.equal(fileShareSupport(pdf, { navigator: { share() {}, canShare: () => false }, secure: true, FileCtor: FakeFile }), 'unavailable', 'der Browser hat das letzte Wort');
+  assert.equal(fileShareSupport(pdf, { navigator: nav, secure: false, FileCtor: FakeFile }), 'insecure', 'ohne sicheren Kontext gibt es navigator.share() nicht');
+  assert.equal(fileShareSupport(pdf, { navigator: { share() {} }, secure: true, FileCtor: FakeFile }), 'browser', 'share ohne canShare reicht nicht');
+  assert.equal(fileShareSupport(pdf, { navigator: { canShare: () => true }, secure: true, FileCtor: FakeFile }), 'browser', "'share' in navigator ist nicht die Frage");
+  assert.equal(fileShareSupport(pdf, { navigator: { share() {}, canShare: () => false }, secure: true, FileCtor: FakeFile }), 'browser', 'der Browser hat das letzte Wort');
   assert.equal(fileShareSupport(pdf, { navigator: nav, secure: true, FileCtor: FakeFile }), 'ok');
   // Die Probe traegt den Typ und keinen Inhalt: gefragt wird, BEVOR geladen ist.
   const probe = seen.at(-1).files[0];
   assert.equal(probe.type, 'application/pdf');
   assert.deepEqual(probe.parts, []);
-  assert.equal(fileShareSupport(pdf, { navigator: { share() {}, canShare() { throw new TypeError('nope'); } }, secure: true, FileCtor: FakeFile }), 'unavailable', 'ein werfendes canShare ist ein Nein, kein Absturz');
+  assert.equal(fileShareSupport(pdf, { navigator: { share() {}, canShare() { throw new TypeError('nope'); } }, secure: true, FileCtor: FakeFile }), 'browser', 'ein werfendes canShare ist ein Nein, kein Absturz');
+  // Ohne sicheren Kontext entscheidet der Kontext, auch wenn der Browser es koennte.
+  assert.equal(fileShareSupport(pdf, { navigator: { share() {}, canShare: () => false }, secure: false, FileCtor: FakeFile }), 'insecure');
 });
 
 test('Teilen gibt es nur im Viewer, gated ueber die eine Probe, nie ueber "share in navigator"', () => {
@@ -593,7 +598,7 @@ test('Teilen gibt es nur im Viewer, gated ueber die eine Probe, nie ueber "share
   assert.doesNotMatch(page, /navigator\.share\b[^(]/, 'navigator.share wird aufgerufen, nicht abgefragt');
   // Der Knopf existiert nur bei 'ok'; sonst steht die Erklaerung, kein toter Knopf.
   assert.match(page, /\$\{shareSupport === 'ok' \? `\s*<button type="button"[^>]*data-action="share"/);
-  assert.match(page, /shareSupport !== 'ok' \? `<p class="document-viewer__note">\$\{t\(shareSupport === 'type' \? 'documents\.shareUnsupportedType' : 'documents\.shareUnavailable'\)\}<\/p>`/);
+  assert.match(page, /shareSupport !== 'ok' \? `<p class="document-viewer__note">\$\{t\(SHARE_NOTE_KEYS\[shareSupport\]\)\}<\/p>`/);
   // Die Zeile bleibt bei Ansehen/Download/Kebab.
   const actions = page.slice(page.indexOf('function renderActions(doc)'), page.indexOf('function renderSelectBox'));
   assert.doesNotMatch(actions, /share/i, 'kein Teilen in der Zeile - dort zaehlt der Klick sofort und die Datei ist noch nicht da');
@@ -616,7 +621,7 @@ test('die Datei wird beim Oeffnen geholt, der Klick muendet ohne await in naviga
   // Der Knopf startet gesperrt und beschaeftigt, bis die Datei da ist.
   assert.match(page, /data-action="share" disabled aria-busy="true"/);
   assert.match(prep, /btn\.disabled = false;\s*btn\.removeAttribute\('aria-busy'\)/);
-  for (const key of ['shareAction', 'sharePreparing', 'shareUnsupportedType', 'shareUnavailable', 'shareFailed']) {
+  for (const key of ['shareAction', 'sharePreparing', 'shareUnsupportedType', 'shareInsecure', 'shareBrowserUnsupported', 'shareFailed']) {
     assert.equal(typeof de.documents[key], 'string', `de.json: documents.${key} fehlt`);
   }
 });
@@ -1412,4 +1417,167 @@ test('die Ordnerzeile behaelt das Zeilenpolster und rueckt je Ebene darauf ein',
   const value = /padding-inline-start:\s*([^;]+);/.exec(rules[0].body)[1];
   assert.match(value, /var\(--space-3\)/, 'Tiefe 0 startet beim Polster von .list-row (--space-3), nicht bei 0');
   assert.match(value, /var\(--folder-depth, 0\) \* 14px/, 'die Stufe je Ebene bleibt 14px');
+});
+
+// --------------------------------------------------------
+// Runde 2 nach der Re-Critique 2026-09-25 (30/40)
+// --------------------------------------------------------
+
+const localeData = (file) => JSON.parse(read(`../public/locales/${file}`));
+
+test('Fristen: der Ablauf-Chip steht VOR den Kategorien, abgesetzt, und heisst nach dem, was er zaehlt', () => {
+  // Re-Critique P1: am Ende der Spur lag er bei 1280px hinter der sichtbaren
+  // Kante (x=1646 bei 1248), bei 375px sah man nur "Alle Kategorien". Und
+  // "Laeuft bald ab 4" zaehlte ein abgelaufenes Dokument mit.
+  const track = page.slice(page.indexOf('<div class="documents-filters__chips">'), page.indexOf('<div class="documents-browser-layout">'));
+  const deadlines = track.indexOf('id="documents-expiring-filter"');
+  const categories = track.indexOf('id="documents-category"');
+  assert.ok(deadlines > 0 && categories > 0, 'beide Gruppen stehen in der Spur');
+  assert.ok(deadlines < categories, 'Fristen vor den Kategorien');
+  assert.match(track, /<div class="documents-filter-chips documents-filter-chips--deadlines" id="documents-expiring-filter" role="group" aria-label="\$\{t\('documents\.expiringFilterGroupLabel'\)\}"><\/div>/);
+  // Abgesetzt mit derselben Haarlinie wie Segment und Spur - kein neuer Ton -
+  // und nur, wenn der Chip steht (die leere Gruppe ist display: none).
+  const sep = topRules(css).find((rule) => rule.selector === '.documents-filter-chips--deadlines:not(:empty)');
+  assert.ok(sep, 'Trennregel fehlt');
+  assert.match(sep.body, /border-inline-end:\s*1px solid var\(--color-border\)/);
+  assert.match(sep.body, /padding-inline-end:\s*var\(--space-2\)/);
+  const chip = fnBody('renderExpiringChip', 'renderFolderBrowser');
+  assert.match(chip, /if \(!present && !state\.expiringSoon\) return;/, 'nur bei Treffern oder aktivem Filter');
+  assert.match(chip, /title="\$\{t\('documents\.expiringFilterGroupLabel'\)\}"/);
+  assert.equal(de.documents.expiringFilterLabel, 'Fristen');
+  assert.notEqual(localeData('en.json').documents.expiringFilterLabel, 'Expiring soon', 'en sagt nicht mehr "bald"');
+  for (const file of LOCALES) {
+    const docs = localeData(file).documents;
+    assert.ok(docs.expiringFilterGroupLabel?.trim(), `${file}: documents.expiringFilterGroupLabel fehlt`);
+    if (file !== 'de.json') assert.notEqual(docs.expiringFilterGroupLabel, de.documents.expiringFilterGroupLabel, `${file}: uebersetzt`);
+  }
+});
+
+test('kompakte Zeile: kein Auge, die Zeile oeffnet, und das Menue traegt Ansehen fuer die Tastatur', () => {
+  // Re-Critique P2: mobil blieben dem Titel 153px, weil Auge und Kebab je 48px
+  // standen - und ein Tipp auf die Zeile oeffnet ohnehin den Betrachter.
+  const compact = [...eachRule(css)].filter((rule) => rule.at.some((a) => /@container list-rows \(max-width: 30rem\)/.test(a)));
+  const hides = compact.find((rule) => rule.selector.split(',').map((x) => x.trim()).includes('.document-row__actions [data-action="view"]'));
+  assert.ok(hides, 'das Auge faellt unter 30rem weg');
+  assert.match(hides.body, /display:\s*none/);
+  // Raster und breite Liste behalten es: sonst blendet es keine Regel aus.
+  const elsewhere = [...eachRule(css)].filter((rule) => /\[data-action="view"\]/.test(rule.selector)
+    && /display:\s*none/.test(rule.body) && !rule.at.some((a) => /list-rows \(max-width: 30rem\)/.test(a)));
+  assert.deepEqual(elsewhere.map((rule) => rule.selector), []);
+  assert.match(fnBody('handleDocumentAction', 'runDocumentAction'), /if \(doc\) openDocumentViewer\(doc\);/, 'die Zeile oeffnet den Betrachter');
+  // Die Zeile ist kein Tab-Stopp. Wer per Tastatur kommt, landet auf dem Kebab
+  // (erster SICHTBARER Eintrag), und dort muss Ansehen stehen - sonst waere das
+  // Dokument ohne Maus nicht zu oeffnen (Codex-Review zu PR #754).
+  const menu = fnBody('openDocumentMenu', 'renameFolder');
+  assert.match(menu, /const viewShown = eye\?\.getClientRects\(\)\.length > 0;/);
+  assert.match(menu, /\$\{viewShown \? '' : `\s*<button class="documents-context-menu__item" type="button" role="menuitem" data-menu-action="view">/);
+  assert.match(fnBody('runDocumentAction', 'deleteDocuments'), /if \(action === 'view'\) openDocumentViewer\(doc\);/);
+});
+
+test('der Tab-Stopp einer Leiste liegt nie auf einem ausgeblendeten Knopf - auch nach einer Groessenaenderung (als Programm)', () => {
+  // Das Auge traegt im Markup den Einstieg. Unter 30rem ist es ausgeblendet,
+  // und ein Einstieg auf display: none nimmt die ganze Leiste aus der Tab-Kette.
+  const item = (name, shown, tabIndex) => ({ name, shown, tabIndex, getClientRects() { return this.shown ? [{}] : []; } });
+  const view = item('view', false, 0);
+  const download = item('download', false, -1);
+  const kebab = item('menu', true, -1);
+  const items = [view, download, kebab];
+  const toolbar = {
+    querySelector: (sel) => (sel === '[tabindex="0"]' ? items.find((el) => el.tabIndex === 0) ?? null : null),
+    querySelectorAll: () => items,
+  };
+  const root = () => ({ dataset: {}, addEventListener() {}, querySelectorAll: () => [toolbar] });
+  roving.repairRovingStops(root());
+  assert.deepEqual(items.map((el) => el.tabIndex), [-1, -1, 0], 'der Kebab ist der erste sichtbare Eintrag');
+  assert.equal(roving.firstRovingStop(root()), kebab, 'die Sprungmarke findet genau diesen Einstieg');
+  assert.equal(roving.firstRovingStop({ querySelectorAll: () => [] }), null);
+
+  // Breit angefangen, dann schmal geworden (Drehen, Fenster, Ordnerleiste):
+  // die Leiste muss ihren Einstieg nachziehen, ohne neu gezeichnet zu werden.
+  view.shown = true;
+  view.tabIndex = 0;
+  kebab.tabIndex = -1;
+  const observed = [];
+  let onResize = null;
+  const before = globalThis.ResizeObserver;
+  globalThis.ResizeObserver = class { constructor(fn) { onResize = fn; } observe(el) { observed.push(el); } disconnect() {} };
+  try {
+    const list = root();
+    roving.wireRovingToolbars(list);
+    assert.deepEqual(observed, [list], 'die Liste wird beobachtet');
+    view.shown = false;
+    onResize([]);
+    assert.deepEqual(items.map((el) => el.tabIndex), [-1, -1, 0]);
+  } finally {
+    globalThis.ResizeObserver = before;
+  }
+});
+
+test('der Ordner-Kebab nennt seinen Ordner', () => {
+  // Re-Critique P2: sieben Mal "Ordneraktionen" ohne Namen hintereinander.
+  const tree = page.slice(page.indexOf('function renderFolderBrowser()'), page.indexOf('// Der Auslöser trägt den Ordner, in dem man steht'));
+  assert.match(tree, /data-folder-menu="\$\{esc\(item\.id\)\}" aria-label="\$\{esc\(t\('documents\.folderActionsFor', \{ name: item\.name \}\)\)\}" title="\$\{esc\(t\('documents\.folderActionsFor', \{ name: item\.name \}\)\)\}"/);
+  assert.doesNotMatch(page, /t\('documents\.folderActions'\)/);
+  for (const file of LOCALES) {
+    const docs = localeData(file).documents;
+    assert.match(docs.folderActionsFor ?? '', /\{\{name\}\}/, `${file}: documents.folderActionsFor mit {{name}}`);
+    assert.equal(docs.folderActions, undefined, `${file}: der namenlose Schluessel ist weg`);
+  }
+});
+
+test('eine Sprungmarke fuehrt an Werkzeugen, Filtern und Ordnern vorbei zum ersten Dokument', () => {
+  // Re-Critique P2: 33 Tab-Stopps bis Dokument 1, 16 davon in der Ordnerliste.
+  // Das Muster ist das der Shell (router.js, `.sr-only` + `:focus-visible` in
+  // layout.css) - nur bei Fokus sichtbar, kein eigenes CSS.
+  const head = page.slice(page.indexOf('<div class="documents-page'), page.indexOf('<div class="page-toolbar'));
+  assert.match(head, /<a class="sr-only documents-skip" href="#documents-list" data-documents-skip>\$\{t\('documents\.skipToDocuments'\)\}<\/a>/);
+  const skip = fnBody('skipToDocuments', 'renderDmsHeaderBtn');
+  assert.match(skip, /event\.preventDefault\(\);/, 'kein Hash in der Adresse, kein Router-Lauf');
+  assert.match(skip, /firstRovingStop\(list\)/);
+  assert.match(skip, /list\.setAttribute\('tabindex', '-1'\)/, 'ohne Dokument faengt der Listencontainer den Fokus');
+  assert.match(skip, /\.focus\(\)/);
+  assert.match(page, /querySelector\('\[data-documents-skip\]'\)\?\.addEventListener\('click', skipToDocuments\)/);
+  assert.match(read('../public/styles/layout.css'), /\.sr-only:focus-visible\s*\{/);
+  for (const file of LOCALES) assert.ok(localeData(file).documents.skipToDocuments?.trim(), `${file}: documents.skipToDocuments`);
+});
+
+test('der Teilen-Hinweis nennt die Ursache, die zutrifft - HTTPS nur, wenn es an der Verbindung liegt', () => {
+  const viewer = fnBody('openDocumentViewer', 'renderViewerContent');
+  assert.match(page, /const SHARE_NOTE_KEYS = \{\s*type: 'documents\.shareUnsupportedType',\s*insecure: 'documents\.shareInsecure',\s*browser: 'documents\.shareBrowserUnsupported',\s*\};/);
+  assert.match(viewer, /t\(SHARE_NOTE_KEYS\[shareSupport\]\)/);
+  for (const file of LOCALES) {
+    const docs = localeData(file).documents;
+    assert.match(docs.shareInsecure ?? '', /HTTPS/, `${file}: shareInsecure nennt die Verbindung`);
+    assert.ok(docs.shareBrowserUnsupported?.trim(), `${file}: shareBrowserUnsupported fehlt`);
+    assert.doesNotMatch(docs.shareBrowserUnsupported, /HTTPS|HTTP/, `${file}: der Browser-Fall schickt niemanden zu HTTPS`);
+    assert.equal(docs.shareUnavailable, undefined, `${file}: der Sammel-Schluessel ist weg`);
+  }
+});
+
+test('der Betrachter bietet Bearbeiten an, schliesst sich dafuer und gibt den Ausloeser weiter', () => {
+  // Re-Critique (Alex): im Betrachter sah man den Fehler im Titel, musste aber
+  // schliessen, die Zeile wiederfinden und ueber den Kebab gehen.
+  const viewer = fnBody('openDocumentViewer', 'renderViewerContent');
+  const actions = viewer.slice(viewer.indexOf('<span class="document-viewer__actions">'), viewer.indexOf('document-viewer__note'));
+  assert.match(actions, /\$\{canEditDocuments\(\) \? `\s*<button type="button" class="btn btn--ghost btn--icon btn--icon-sm" data-action="edit-document"\s*title="\$\{t\('common\.edit'\)\}" aria-label="\$\{t\('common\.edit'\)\}">\s*<i data-lucide="pencil" class="icon-md" aria-hidden="true"><\/i>/);
+  assert.match(page, /function canEditDocuments\(\) \{\s*return !isNavModuleReadOnly\('documents'\);\s*\}/);
+  // Der Ausloeser des Betrachters wird VOR dem Oeffnen gemerkt; beim Wechsel
+  // bekommt er den Fokus zurueck, damit der Bearbeiten-Dialog ihn als seinen
+  // Ausloeser merkt (modal.js merkt document.activeElement). Mobil schliesst
+  // der Betrachter animiert, und der Fokus stuende sonst auf einem Knopf, der
+  // gleich aus dem DOM faellt.
+  assert.match(viewer.slice(0, viewer.indexOf('openSharedModal({')), /const opener = document\.activeElement;/);
+  const edit = viewer.slice(viewer.indexOf("querySelector('[data-action=\"edit-document\"]')"));
+  assert.match(edit, /if \(opener\?\.isConnected && opener !== document\.body\) opener\.focus\(\);\s*openDocumentModal\(doc\);/);
+  assert.doesNotMatch(edit.slice(0, edit.indexOf('openDocumentModal(doc)')), /closeModal\(/, 'kein eigenes Schliessen: openModal ersetzt den Betrachter, EIN History-Marker');
+});
+
+test('der Kategorie-Hinweis nennt echte Kategorien als Beispiele, in jeder Sprache ihre eigenen', () => {
+  // Re-Critique P3: "Rechnung, Vertrag oder Ausweis" sind keine Kategorien.
+  for (const file of LOCALES) {
+    const docs = localeData(file).documents;
+    for (const category of ['finance', 'insurance', 'school']) {
+      assert.ok(docs.categoryHint.includes(docs.category[category]), `${file}: categoryHint nennt "${docs.category[category]}"`);
+    }
+  }
 });

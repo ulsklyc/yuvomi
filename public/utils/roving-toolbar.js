@@ -67,6 +67,15 @@ export function wireRovingToolbars(root) {
     if (!toolbar || !root.contains(toolbar) || !event.target.matches('[tabindex]')) return;
     setStop(toolbar, event.target);
   });
+  // WAS SICHTBAR IST, ENTSCHEIDET DIE BREITE, NICHT DAS ZEICHNEN. Unter 30rem
+  // blenden die Dokumentzeilen Auge und Herunterladen aus (Re-Critique
+  // 2026-09-25). Wer breit anfaengt und schmal wird - Drehen, Fenster, die
+  // Ordnerleiste klappt auf -, hat den Einstieg noch auf dem Auge, und ein
+  // Einstieg auf display: none nimmt die ganze Leiste aus der Tab-Kette. Der
+  // Traeger aendert dabei seine Groesse, also zieht das der Beobachter nach.
+  if (typeof ResizeObserver === 'function') {
+    new ResizeObserver(() => repairRovingStops(root)).observe(root);
+  }
 }
 
 /**
@@ -80,4 +89,19 @@ export function repairRovingStops(root) {
     const first = toolbarItems(toolbar)[0];
     if (first) setStop(toolbar, first);
   }
+}
+
+/**
+ * Der Einstieg der ersten Leiste unter `root`, sofern er sichtbar ist - das
+ * Ziel der Sprungmarke "Zu den Dokumenten". Vorher `repairRovingStops`
+ * gelaufen, ist das der erste sichtbare Eintrag des ersten Dokuments.
+ *
+ * @returns {HTMLElement|null}
+ */
+export function firstRovingStop(root) {
+  for (const toolbar of root?.querySelectorAll('[role="toolbar"]') ?? []) {
+    const stop = toolbar.querySelector('[tabindex="0"]');
+    if (stop && stop.getClientRects().length > 0) return stop;
+  }
+  return null;
 }
