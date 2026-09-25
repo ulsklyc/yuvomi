@@ -1374,3 +1374,16 @@ test('kein Gedankenstrich in den Dokument- und Beleg-Texten, in keiner Sprache',
     }
   }
 });
+
+test('der Betrachter schiebt ein zu hohes PDF nicht nach oben ueber die Meta-Zeile', () => {
+  // Gemessen 375x812 (Gesamtpruefung 2026-09-25): der Rumpf ist flex:1 und zentriert,
+  // der iframe fest 65vh. Wird der Rumpf kuerzer als 65vh (Ablaufzeile + Teilen-Hinweis
+  // machen die Meta-Zeile hoch), laeuft der iframe zentriert nach BEIDEN Seiten ueber
+  // und deckt den Hinweis ab (iframe-Oberkante 340px, Hinweis bis 392px). `safe center`
+  // laesst den Ueberlauf nur nach unten zu, der Modal-Rumpf scrollt dann.
+  const body = topRules(css).find((rule) => rule.selector === '.document-viewer__body');
+  assert.ok(body, '.document-viewer__body fehlt');
+  const values = [...body.body.matchAll(/align-items:\s*([^;]+);/g)].map((m) => m[1].trim());
+  assert.equal(values.at(-1), 'safe center', 'die letzte align-items-Deklaration ist safe center');
+  assert.ok(values.includes('center'), 'davor steht center als Rueckfall fuer Browser ohne safe');
+});

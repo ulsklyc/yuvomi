@@ -1592,11 +1592,17 @@
   margin: 0;
 }
 
+/* `safe center`: ist der Rumpf kuerzer als der Inhalt (iframe fest 65vh,
+ * Meta-Zeile mit Ablaufzeile und Teilen-Hinweis hoch), laeuft der Inhalt nur
+ * nach UNTEN ueber und der Modal-Rumpf scrollt. Mit `center` lief er nach
+ * beiden Seiten und deckte am Telefon den Hinweis ab (gemessen 375x812).
+ * `center` davor ist der Rueckfall fuer Browser ohne `safe`. */
 .document-viewer__body {
   flex: 1;
   min-height: 0;
   display: flex;
   align-items: center;
+  align-items: safe center;
   justify-content: center;
   padding-top: var(--space-4);
 }
