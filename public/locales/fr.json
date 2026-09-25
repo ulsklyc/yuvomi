@@ -2341,7 +2341,7 @@
         "holidayPublicLabel": "Afficher les jours fériés",
         "holidaySchoolLabel": "Afficher les vacances scolaires",
         "holidaySchoolUnavailable": "Aucune donnée de vacances scolaires n'est disponible pour ce pays.",
-        "holidayAustraliaObservanceHint": "Pour l'Australie, les jours fériés apparaissent à leur date réelle – les jours de remplacement des fériés tombant un week-end varient selon l'État et ne sont pas affichés.",
+        "holidayAustraliaObservanceHint": "Pour l'Australie, les jours fériés apparaissent à leur date réelle - les jours de remplacement des fériés tombant un week-end varient selon l'État et ne sont pas affichés.",
         "holidayPublicColor": "Couleur des jours fériés",
         "holidaySchoolColor": "Couleur des vacances scolaires",
         "holidaySaveBtn": "Enregistrer",

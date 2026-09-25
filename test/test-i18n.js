@@ -447,3 +447,19 @@ test('die Serverliste traegt jede Locale-Datei des Ordners', async () => {
     'Die Serverliste ist kuerzer als der Ordner - eine Datei faellt aus dem Muster.');
   assert.ok(getSupportedLocales().includes('fil'), 'fil fehlt - der Code aus #1322');
 });
+
+// CLAUDE.md: ueberall `-` statt Gedankenstrich, auch in UI-Texten. Diese zwei
+// Schluessel trugen ihn in zwanzig Sprachen (Kritik 2026-09-25); der Guard haelt
+// sie in JEDER Locale sauber, damit eine neue Uebersetzung ihn nicht zurueckbringt.
+test('Feiertags-Hinweis und Benutzername-Fehler tragen in keiner Locale einen Gedankenstrich', () => {
+  const watched = /\.(holidayAustraliaObservanceHint|errorUsernameInvalid)$/;
+  let seen = 0;
+  for (const locale of LOCALES) {
+    for (const [key, value] of flatten(JSON.parse(readLocale(locale)))) {
+      if (!watched.test(key)) continue;
+      seen += 1;
+      assert.doesNotMatch(value, /[–—]/, `${locale}: ${key}`);
+    }
+  }
+  assert.equal(seen, LOCALES.length * 2, 'beide Schluessel muessen in jeder Locale gefunden werden');
+});
