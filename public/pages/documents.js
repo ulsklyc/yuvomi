@@ -656,7 +656,9 @@ function bindPageEvents() {
   // das Segment davor bleibt stehen.
   wireScrollFade(_container.querySelector('.documents-filters__chips'));
   _container.querySelector('#documents-selectbar')?.addEventListener('click', (e) => {
-    const action = e.target.closest('[data-action]')?.dataset.action;
+    const button = e.target.closest('[data-action]');
+    if (button?.getAttribute('aria-disabled') === 'true') return;
+    const action = button?.dataset.action;
     if (action === 'select-cancel') exitSelectMode();
     else if (action === 'select-all') toggleSelectAll();
     else if (action === 'select-move') moveSelected();
@@ -1988,7 +1990,12 @@ function updateSelectUI() {
   if (countEl) countEl.textContent = t('documents.selectCount', { count: n });
   _container.querySelectorAll('#documents-selectbar [data-action^="select-"]').forEach((btn) => {
     if (btn.dataset.action === 'select-cancel' || btn.dataset.action === 'select-all') return;
-    btn.disabled = n === 0;
+    // `aria-disabled` statt `disabled` (Re-Critique 2026-09-25): das native
+    // disabled machte das rote Loeschen per Opazitaet zur rosa Flaeche. Das
+    // Projektmuster `.btn[aria-disabled='true']` (layout.css) deckt die Farbe
+    // ab, und der Knopf bleibt in der Tab-Ordnung; den Klick verwirft der
+    // Verteiler der Leiste.
+    btn.setAttribute('aria-disabled', String(n === 0));
   });
 }
 

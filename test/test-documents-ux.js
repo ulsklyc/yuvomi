@@ -1676,3 +1676,20 @@ test('der Dokument-Dialog fuehrt das Ablaufdatum offen und hat ein Abbrechen im 
   // Der Fuss: Abbrechen ueber den Schliessweg des Modals, dann der Primaerknopf.
   assert.match(modal, /<button type="button" class="btn btn--secondary" data-action="close-modal">\$\{t\('common\.cancel'\)\}<\/button>\s*<button type="submit" class="btn btn--primary" id="document-submit">/);
 });
+
+test('gesperrte Sammelaktionen treten zurueck, statt zu warnen', () => {
+  // Re-Critique 2026-09-25: `disabled` auf .btn--danger ergab ueber
+  // `.btn:disabled { opacity: 0.4 }` eine laute rosa Flaeche, solange nichts
+  // gewaehlt war. Das Projektmuster "inaktiv, aber erreichbar"
+  // (`.btn[aria-disabled='true']`, layout.css) deckt die Farbe ab und laesst
+  // den Knopf in der Tab-Ordnung.
+  const update = fnBody('updateSelectUI', 'selectedDocuments');
+  assert.match(update, /btn\.setAttribute\('aria-disabled', String\(n === 0\)\)/);
+  assert.doesNotMatch(update, /btn\.disabled\s*=/, 'kein natives disabled mehr an den Sammelaktionen');
+  // Ein gesperrter Knopf nimmt Klicks an - der Verteiler muss sie verwerfen.
+  const bar = page.slice(page.indexOf("_container.querySelector('#documents-selectbar')?.addEventListener('click'"), page.indexOf("if (action === 'select-cancel') exitSelectMode();"));
+  assert.match(bar, /if \(button\?\.getAttribute\('aria-disabled'\) === 'true'\) return;/);
+  const layout = read('../public/styles/layout.css');
+  const muted = [...eachRule(layout)].find((r) => r.at.length === 0 && r.selector === ".btn[aria-disabled='true']");
+  assert.ok(muted && /background-color:\s*transparent/.test(muted.body), 'das gedeckte Rezept deckt auch die Gefahrfarbe ab');
+});
