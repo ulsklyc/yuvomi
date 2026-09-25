@@ -402,14 +402,27 @@
 
 /* Die Tageszelle ist eine gridcell mit roving tabindex (ARIA-Grid, Critique
  * 2026-09-24): sichtbarer Fokusring im App-Akzent. outline-offset negativ, weil
- * overflow:hidden einen außenliegenden Ring clippen würde; z-index hebt ihn
- * über die Nachbar-Borders. */
+ * overflow:hidden einen außenliegenden Ring clippen würde.
+ *
+ * Der Ring sitzt auf einem ::after, nicht auf der Zelle (Re-Kritik
+ * 2026-09-25): ein mehrtaegiges Band liegt in `.month-bands` (z-index 1) UEBER
+ * den Zellen und deckte die Seiten des Rings. Die Zelle selbst bekommt keinen
+ * z-index - hoebe sie sich ueber die Schicht, verschwaende das Band unter
+ * ihrer Flaeche -, nur der Ring steigt darueber. */
 .month-day:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: var(--focus-ring-offset-inset);
+  outline: none;
   background-color: var(--color-surface-hover);
   position: relative;
-  z-index: 1;
+}
+
+.month-day:focus-visible::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset-inset);
+  pointer-events: none;
 }
 
 /* Nachbarmonat: gedimmt über die FLÄCHE (Grouped-Bg statt Arbeitsweiß) und
@@ -2121,18 +2134,51 @@
 }
 
 .month-bands > .cal-band {
+  --band-ms: var(--space-1);
+  --band-me: var(--space-1);
   min-width: 0;
   height: var(--month-band-h);
-  margin: 0 var(--space-1);
+  margin-block: 0;
+  margin-inline: var(--band-ms) var(--band-me);
   pointer-events: auto;
 }
 
+/* `0px`, nicht `0`: die Raender rechnen unten in calc() mit Prozent. */
 .month-bands > .cal-band--before {
-  margin-inline-start: 0;
+  --band-ms: 0px;
 }
 
 .month-bands > .cal-band--after {
-  margin-inline-end: 0;
+  --band-me: 0px;
+}
+
+/* Nachbarmonat im Band: dieselbe Zuruecknahme wie der Chip der Nachbarzelle
+ * (`.month-day--outside .month-day__event`) - die Toenung faellt auf
+ * --tint-wash, Text und Kante bleiben, also nie ueber Opacity. Die Schicht
+ * kennt die Zellen nicht; darum zeichnet ein Verlauf mit harten Stopps die
+ * Spaltengrenzen nach. --band-col ist Spaltenbreite plus Fuge, aus der
+ * Breite des Bands zurueckgerechnet (Spanne mal Spalte, weniger eine Fuge
+ * und die eigenen Raender); die Grenze liegt mitten in der Fuge. Wie viele
+ * Spalten am Anfang und am Ende draussen liegen, setzt monthBandsHtml(). */
+.month-bands > .cal-band--outside {
+  --band-in: color-mix(in srgb, var(--ev-color) var(--tint-surface), var(--color-surface-work));
+  --band-out: color-mix(in srgb, var(--ev-color) var(--tint-wash), var(--color-surface-work));
+  --band-col: calc((100% + var(--band-ms) + var(--band-me) + var(--space-px)) / var(--band-span));
+  --band-a: calc(var(--band-out-start) * var(--band-col) - var(--space-px) / 2 - var(--band-ms));
+  --band-b: calc((var(--band-span) - var(--band-out-end)) * var(--band-col) - var(--space-px) / 2 - var(--band-ms));
+  background: linear-gradient(to var(--band-to, right),
+    var(--band-out) var(--band-a), var(--band-in) var(--band-a),
+    var(--band-in) var(--band-b), var(--band-out) var(--band-b));
+  background-origin: border-box;
+}
+
+.month-bands > .cal-band--outside:hover {
+  --band-in: color-mix(in srgb, var(--ev-color) var(--tint-raised), var(--color-surface-work));
+  --band-out: var(--band-in);
+}
+
+[dir="rtl"] .month-bands > .cal-band--outside {
+  --band-to: left;
 }
 
 .month-bands > .cal-band.is-clipped {

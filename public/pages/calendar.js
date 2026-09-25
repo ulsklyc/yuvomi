@@ -2886,7 +2886,7 @@ function renderMonthView(container) {
             focusable: date === focusDate,
             band: band ? { depth: band.depth[i], events: band.events } : null,
           })).join('')}
-          ${band?.laneCount ? monthBandsHtml(band) : ''}
+          ${band?.laneCount ? monthBandsHtml(band, week.map((d) => d.inMonth)) : ''}
         </div>`;
         }).join('')}
       </div>
@@ -3425,15 +3425,29 @@ function monthDayClasses(date, inMonth, todayKey = state.today, { selected = fal
  * Tastatur und nennt die Baender in ihrem Namen; die Schicht ist aria-hidden,
  * ein Band ist fuer die Maus da wie der Chip in der Zelle. Kein Avatar-Stack
  * (Monatskanon), das „Wer" steht im title.
+ *
+ * NACHBARMONAT: `inMonth[i]` sagt, ob Spalte i zum Monat gehoert. Die Tage
+ * davor und danach stehen in einer Zeile immer am Rand, im Band also als
+ * Anfangs- und Endstueck; deren Zahl geht als --band-out-start/-end an das
+ * Band, und calendar.css toent genau diese Spalten wie die Chips der
+ * Nachbarzelle zurueck - ueber die Flaeche, nie ueber den Text.
  */
-function monthBandsHtml({ bands }) {
+function monthBandsHtml({ bands }, inMonth = []) {
+  const outside = (col) => inMonth[col] === false;
   return `<div class="month-bands" aria-hidden="true">${bands.map((band) => {
     const { ev, first, last, lane, continuesBefore, continuesAfter } = band;
     const title = [ev.title, bandSpokenWhen(ev), ev.cal_name].filter(Boolean).map((part) => esc(part)).join(' · ')
       + chipAssigneeTitleSuffix(ev);
-    return `<div class="${bandClasses('month-day__event', band)}" data-id="${ev.id}" data-start="${esc(band.startKey)}" data-end="${esc(band.endKey)}"
+    const span = last - first + 1;
+    let outStart = 0;
+    while (outStart < span && outside(first + outStart)) outStart++;
+    let outEnd = 0;
+    while (outEnd < span - outStart && outside(last - outEnd)) outEnd++;
+    const out = outStart > 0 || outEnd > 0;
+    const classes = bandClasses('month-day__event', band) + (out ? ' cal-band--outside' : '');
+    return `<div class="${classes}" data-id="${ev.id}" data-start="${esc(band.startKey)}" data-end="${esc(band.endKey)}"
          data-lane="${lane}" data-first="${first}" data-last="${last}"
-         style="grid-column:${first + 1} / span ${last - first + 1};grid-row:${lane + 1};${eventSurfaceStyle(ev)}"
+         style="grid-column:${first + 1} / span ${span};grid-row:${lane + 1};${out ? `--band-span:${span};--band-out-start:${outStart};--band-out-end:${outEnd};` : ''}${eventSurfaceStyle(ev)}"
          title="${title}">${continuesBefore ? bandContinuationHtml('before') : ''}${eventGlyphsHtml(ev)}<span>${esc(ev.title)}</span>${continuesAfter ? bandContinuationHtml('after') : ''}</div>`;
   }).join('')}</div>`;
 }

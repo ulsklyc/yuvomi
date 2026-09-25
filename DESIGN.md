@@ -2657,6 +2657,12 @@ der Titel ganz.
   wie an ihrem Tag belegt sind (`.month-day__lanes`). Welche Spuren stehen bleiben,
   entscheidet `fitMonthDayCells()` fuer die ganze ZEILE - ein Band ueber drei Zellen kann nicht
   in einer davon weichen -, und das „+N" zaehlt die verborgenen Baender mit.
+- **Nachbarmonat und Fokus gelten auch unter dem Band.** Ueber Tagen aus dem Nachbarmonat
+  faellt die Toenung des Bands auf `--tint-wash` wie beim Chip der Zelle, Text und Kante
+  bleiben (`.cal-band--outside`: ein Verlauf mit harten Stopps mitten in der Spaltenfuge, die
+  Zahl der Spalten aussen setzt `monthBandsHtml()`). Der Fokusring der Monatszelle sitzt auf
+  ihrem `::after` UEBER der Schicht; die Zelle selbst hebt sich nicht, sonst verschwaende das
+  Band unter ihrer Flaeche - vorher deckte ein kreuzendes Band die Seiten des Rings.
 - **Tastatur und Screenreader.** In der Woche ist das Band ein Knopf wie jeder Block; im Monat
   bleibt die Zelle der eine Tab-Stopp (#1460), die Schicht ist `aria-hidden`, und die Zelle
   nennt das Band mit „(Tag 2 von 3)". Der Name eines Bands nennt die Spanne („13. bis 15.
@@ -2742,7 +2748,7 @@ erreicht.** Vorher trugen die Bloecke in Woche und Tag nur `cursor: pointer`, un
 - **Der Fokusring liegt aussen, wo Platz ist, innen, wo geschnitten wird.** Auf den getoenten
   Bloecken aussen (`--focus-ring-offset`, `z-index` ueber die Nachbar-Lanes): innen laege der
   Akzent auf einer Toenung und schnitte die Vollton-Kante. In `.allday-cell` (schneidet ab)
-  und an der Monatszelle innen (`--focus-ring-offset-inset`).
+  und an der Monatszelle innen (`--focus-ring-offset-inset`, auf `::after` ueber den Baendern).
 - **Die Auswahl im Telefon-Monat wird angesagt, das Zeichnen nicht.** Eine polite Live-Region
   (`#cal-live`) ausserhalb von `#cal-body` - eine Region, die mit ihrem Inhalt entsteht, sagt
   nichts - meldet „Freitag, 25.09.2026, 2 Einträge" nur bei einer Auswahl, nie bei einem

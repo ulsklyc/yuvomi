@@ -4129,6 +4129,59 @@ test('Baender: Wochenumbruch - offene Enden an Zeilengrenze, Kante nur am echten
     'die Fortsetzung traegt keine Kante und keine Rundung am Anfang');
 });
 
+test('Baender: im Nachbarmonat toent das Band zurueck wie der Chip der Zelle, nie ueber Opacity', () => {
+  // Woche Mo 26.10. - So 01.11.2026 im Monat Oktober: So 01.11. liegt draussen.
+  // Band A 30.10.-02.11. (Fr-So, letzte Spalte draussen), Band B 27.-29.10.
+  // (ganz im Monat), Band C nur im Nachbarmonat.
+  const days = bandDays('2026-10-26');
+  const inMonth = days.map((d) => d < '2026-11-01');
+  const { bands } = segmentsFor([
+    bandEvent(11, '2026-10-30', '2026-11-02'),
+    bandEvent(12, '2026-10-27', '2026-10-29'),
+  ], days);
+  const html = calendarHelpers.monthBandsHtml({ bands }, inMonth);
+  const barOf = (id) => new RegExp(`<div class="[^"]*"[^>]*data-id="${id}"[\\s\\S]*?style="[^"]*"`).exec(html)?.[0] ?? '';
+  const a = barOf(11);
+  assert(/cal-band--outside/.test(a), `A laeuft in den November: ${a}`);
+  assert(/--band-span:3;--band-out-start:0;--band-out-end:1;/.test(a), `A: drei Spalten, die letzte draussen: ${a}`);
+  assert(!/cal-band--outside|--band-out/.test(barOf(12)), `B liegt ganz im Monat: ${barOf(12)}`);
+  const prev = segmentsFor([bandEvent(13, '2026-09-29', '2026-10-01')], bandDays('2026-09-28')).bands;
+  const c = calendarHelpers.monthBandsHtml({ bands: prev }, bandDays('2026-09-28').map((d) => d >= '2026-10-01'));
+  assert(/--band-span:3;--band-out-start:2;--band-out-end:0;/.test(c), `Anfangsstueck aus dem September: ${c}`);
+
+  // Die Regel: dieselbe Stufe wie `.month-day--outside .month-day__event`
+  // (--tint-wash), ueber die Flaeche - keine Opacity, kein Filter.
+  const rules = [...eachRule(calendarCss)];
+  const chip = rules.find((r) => r.selector.trim() === '.month-day--outside .month-day__event');
+  const band = rules.find((r) => r.selector.trim() === '.month-bands > .cal-band--outside');
+  assert(chip && /var\(--tint-wash\)/.test(chip.body), 'der Chip im Nachbarmonat toent ueber --tint-wash');
+  assert(band && /--band-out:\s*color-mix\(in srgb, var\(--ev-color\) var\(--tint-wash\), var\(--color-surface-work\)\)/.test(band.body),
+    'das Band im Nachbarmonat nimmt dieselbe Stufe');
+  assert(/background:\s*linear-gradient\(/.test(band.body) && /var\(--band-out-start\)/.test(band.body) && /var\(--band-out-end\)/.test(band.body),
+    'der Verlauf setzt die Stopps an die Spaltengrenzen');
+  assert(!/opacity|filter/.test(band.body), 'nie ueber Opacity auf Text');
+});
+
+test('Monatszelle: der Fokusring liegt ueber der Band-Schicht, die Zelle nicht', () => {
+  // Ein Band liegt in `.month-bands` (z-index 1) ueber den Zellen. Hob sich die
+  // fokussierte Zelle mit z-index 1 an, malte die spaetere Schicht trotzdem
+  // darueber und deckte die Seiten des Rings. Hoebe sie sich hoeher, verschwaende
+  // das Band unter ihrer Flaeche. Also: Ring auf ::after ueber der Schicht.
+  const rules = [...eachRule(calendarCss)].filter((r) => r.at.length === 0);
+  const zOf = (body) => Number(/(?:^|;|\s)z-index:\s*(-?\d+)/.exec(body)?.[1] ?? NaN);
+  const layer = rules.find((r) => r.selector.trim() === '.month-bands');
+  const cell = rules.find((r) => r.selector.trim() === '.month-day:focus-visible');
+  const ring = rules.find((r) => r.selector.trim() === '.month-day:focus-visible::after');
+  assert(layer && Number.isFinite(zOf(layer.body)), 'die Band-Schicht hebt sich per z-index');
+  assert(cell && !/z-index/.test(cell.body), `die Zelle bildet keinen eigenen Stapel: ${cell?.body}`);
+  assert(cell && /position:\s*relative/.test(cell.body), 'die Zelle ist Bezug fuer den Ring');
+  assert(ring && zOf(ring.body) > zOf(layer.body), `der Ring steht ueber der Schicht: ${ring?.body}`);
+  assert(/outline:\s*var\(--focus-ring-width\) solid var\(--focus-ring-color\)/.test(ring.body)
+    && /outline-offset:\s*var\(--focus-ring-offset-inset\)/.test(ring.body), 'der Ring liest die Tokens, innen');
+  assert(/position:\s*absolute/.test(ring.body) && /inset:\s*0/.test(ring.body) && /pointer-events:\s*none/.test(ring.body),
+    'der Ring deckt die Zelle und faengt keinen Klick');
+});
+
 test('Baender: der gesprochene Name nennt Titel, Zeitraum und bei Fortsetzung „Fortsetzung"', () => {
   const span = calendarHelpers.spokenDateSpan('2026-10-13', '2026-10-15');
   assert(span === 'calendar.dateSpanSpoken{"from":"13.","to":"15. Oktober"}', `verdichtet „13. bis 15. Oktober": ${span}`);
