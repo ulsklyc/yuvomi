@@ -53,6 +53,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   something is open, respects budget access, and opens the settle-up view of that group. It uses
   the module's own balance source, so it shows what the module shows.
 
+- **Documents show a preview of the file itself.** Images and PDFs stored in Yuvomi appear in the
+  grid as a picture of their first page, anchored at the top; other files and documents from
+  Paperless or a cloud keep their icon. The preview is drawn in the browser when a card scrolls into
+  view, kept only in the page's memory and gone when you leave the page.
+
+- **A document can be edited from the viewer.** A pencil button next to Share and Download closes
+  the viewer and opens the edit dialog. It only appears for people who may change documents.
+
 ### Changed
 
 - **The calendar gives phones more room for events.** Filter and search moved next to the view
@@ -142,6 +150,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The wall display reads better from a distance:** larger section titles, and larger rows on a
   quiet day.
 
+- **Documents have one menu for sorting and selecting.** Sort order, direction and "Select
+  several" moved into one button in the header, Active and Archive became a segmented control, and
+  upload has one path: the drop zone, with "or choose a folder" underneath and one size hint.
+
+- **"Deadlines" leads the document filters.** The chip for documents that expire soon or have
+  already expired now stands first, before the categories, and is named for both. It still only
+  appears while something is due.
+
+- **Document cards and rows are calmer.** Cards follow the card style of the other modules, with
+  the description only when there is one and the details on one line. The expiry date comes first
+  in a row and on a card, with a short form where the card is narrow. Storage labels are neutral
+  with an icon per place, the visibility is named only when it is not "Entire family", a folder chip
+  no longer shows inside the folder it names, and a folder named like its category's plural is not
+  repeated. On a phone, grid titles are a size smaller and may take three lines.
+
+- **On a phone a document row opens with a tap, without the eye button.** "View" is the first entry
+  in the row's menu instead; the grid and wide lists keep the button.
+
+- **The new document dialog shows the expiry date right away**, next to its reminder, which appears
+  once a date is set, and has a Cancel button.
+
+- **Bulk actions without a selection step back instead of warning.** Archive and Delete stay in the
+  selection bar, dimmed, until a document is picked.
+
+- **A search that finds nothing offers the other view.** When the archive holds matches for a search
+  among active documents, or the other way round, the empty result offers to search there.
+
+- **A view without documents leaves out the filters**, so an empty archive shows only its message.
+
 ### Fixed
 
 - **Event titles in the week keep their room.** The people assigned to an event sat next to its
@@ -217,6 +254,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Long pages keep their full tail.** Below the last card there is room for the add button again,
   so it no longer covers the right column at the end of the dashboard.
+
+- **Documents can be used with a keyboard and a screen reader.** Each document is one tab stop and
+  the arrow keys move through its actions, a skip link jumps to the documents, and folder menus are
+  named after their folder. Focusing the upload area no longer shows a stray strip.
+
+- **The expiry date of a document stays in view on a phone.** It stood last in the row and was cut
+  off; the row icon was squeezed to half its width.
+
+- **The viewer says why sharing a file is not offered.** It blamed a missing HTTPS connection even
+  when the browser simply cannot share files; the note now names the actual reason.
+
+- **Folder counts in documents are readable in dark mode** and have the fill of the chip counts,
+  and the fixed folder entries line up with the folder tree.
+
+- **A tall document preview no longer covers the details below it in the viewer.**
+
+- **Texts in every language use a hyphen where a dash stood**, except where a language needs its
+  own dash; Chinese sets it without spaces.
+
+### Security
+
+- **Documents and images are no longer kept in the browser's cache.** A document opened in the
+  viewer stayed there for five minutes, and document thumbnails, Paperless thumbnails, recipe
+  images, screensaver photos and weather icons were marked as cacheable, so signing out left copies
+  on the device. They are now sent with `no-store`.
 
 ## [2.69.1] - 2026-09-23
 
