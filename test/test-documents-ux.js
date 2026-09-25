@@ -1655,3 +1655,24 @@ test('eine Ansicht ohne ein einziges Dokument zeigt keine Facetten-Moebel', () =
   const spur = [...eachRule(css)].find((r) => r.at.length === 0 && r.selector === '.documents-filters__chips:not(:has(.filter-chip))');
   assert.ok(spur && /display:\s*none/.test(spur.body), 'leere Chip-Spur ausblenden');
 });
+
+test('der Dokument-Dialog fuehrt das Ablaufdatum offen und hat ein Abbrechen im Fuss', () => {
+  // Re-Critique 2026-09-25: das Datum, das Erinnerung und Fristen-Filter
+  // treibt, lag hinter "Weitere Einstellungen", und der Fuss hatte nur den
+  // Primaerknopf - anders als die Dialoge von Inventar und Haushaltshilfe.
+  const modal = page.slice(page.indexOf('function openDocumentModal('), page.indexOf('    onClose() {\n      requestFolderUploadCancel'));
+  const advanced = modal.slice(modal.indexOf('const advancedFieldsHtml = `'), modal.indexOf('`;', modal.indexOf('const advancedFieldsHtml = `')));
+  assert.doesNotMatch(advanced, /document-expires-at|document-expiry-reminder-days/, 'Ablauf gehoert nicht ins Akkordeon');
+  assert.match(modal, /\$\{expiryFieldsHtml\}\s*\$\{advancedSection\(/, 'das Ablaufdatum steht vor dem Akkordeon');
+  // Das zweite Raster haelt die Zeilenluft des ersten (12px), statt an dessen Hinweis zu stossen.
+  const expiryGrid = [...eachRule(css)].find((r) => r.at.length === 0 && r.selector === '.document-expiry-grid');
+  assert.ok(expiryGrid && /margin-top:\s*var\(--space-3\)/.test(expiryGrid.body), '.document-expiry-grid braucht den Rasterabstand');
+  assert.match(modal, /class="modal-grid modal-grid--2 document-expiry-grid"/);
+  assert.doesNotMatch(modal, /const advancedOpen = [^;]*expires_at/, 'das Datum oeffnet das Akkordeon nicht mehr');
+  // Die Erinnerungstage erscheinen erst mit einem Datum - ohne Datum gibt es nichts zu erinnern.
+  assert.match(modal, /id="document-expiry-reminder" \$\{doc\?\.expires_at \? '' : 'hidden'\}/);
+  assert.match(page, /reminderGroup\.hidden = !expiresInput\.value/);
+  assert.match(page, /expiry_reminder_days: expiresAt && form\.querySelector\('#document-expiry-reminder-days'\)\.value !== ''/);
+  // Der Fuss: Abbrechen ueber den Schliessweg des Modals, dann der Primaerknopf.
+  assert.match(modal, /<button type="button" class="btn btn--secondary" data-action="close-modal">\$\{t\('common\.cancel'\)\}<\/button>\s*<button type="submit" class="btn btn--primary" id="document-submit">/);
+});

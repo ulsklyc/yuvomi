@@ -2113,7 +2113,7 @@ function openDocumentModal(doc = null) {
   // Nur noch echte Sekundärfelder liegen im Akkordeon. Die Sichtbarkeit ist das
   // beworbene Kernversprechen des Moduls („steuere, wer jede Datei sehen darf")
   // und steht deshalb offen im Formular, nicht zugeklappt darunter.
-  const advancedOpen = isEdit && (!!doc.description || doc.status === 'archived' || !!doc.expires_at);
+  const advancedOpen = isEdit && (!!doc.description || doc.status === 'archived');
 
   const advancedFieldsHtml = `
         <div class="form-group">
@@ -2126,17 +2126,27 @@ function openDocumentModal(doc = null) {
             <option value="active" ${doc?.status !== 'archived' ? 'selected' : ''}>${t('documents.statusActive')}</option>
             <option value="archived" ${doc?.status === 'archived' ? 'selected' : ''}>${t('documents.statusArchived')}</option>
           </select>
-        </div>
-        <div class="modal-grid modal-grid--2">
+        </div>`;
+
+  // DAS ABLAUFDATUM STEHT OFFEN IM FORMULAR (Re-Critique 2026-09-25). Es treibt
+  // die Erinnerung, den Fristen-Filter und die Gueltigkeit im Betrachter und lag
+  // trotzdem hinter "Weitere Einstellungen". Die Erinnerungstage erscheinen erst
+  // mit einem Datum - ohne Datum gibt es nichts zu erinnern, und das Formular
+  // bleibt so kurz wie vorher. Der Huelle `.document-expiry-reminder` setzt
+  // keine display-Regel, damit `hidden` greift.
+  const expiryFieldsHtml = `
+        <div class="modal-grid modal-grid--2 document-expiry-grid">
           <div class="form-group">
             <label class="label" for="document-expires-at">${t('documents.expiresAtLabel')}</label>
             <input class="input" id="document-expires-at" type="date" value="${esc(doc?.expires_at || '')}">
           </div>
-          <div class="form-group">
-            <label class="label" for="document-expiry-reminder-days">${t('documents.expiryReminderLabel')}</label>
-            <input class="input" id="document-expiry-reminder-days" type="number" min="0" max="365" step="1"
-                   value="${esc(doc?.expiry_reminder_days ?? '')}" placeholder="${esc(t('documents.expiryReminderPlaceholder'))}">
-            <p class="document-form__hint">${t('documents.expiryReminderHint')}</p>
+          <div class="document-expiry-reminder" id="document-expiry-reminder" ${doc?.expires_at ? '' : 'hidden'}>
+            <div class="form-group">
+              <label class="label" for="document-expiry-reminder-days">${t('documents.expiryReminderLabel')}</label>
+              <input class="input" id="document-expiry-reminder-days" type="number" min="0" max="365" step="1"
+                     value="${esc(doc?.expiry_reminder_days ?? '')}" placeholder="${esc(t('documents.expiryReminderPlaceholder'))}">
+              <p class="document-form__hint">${t('documents.expiryReminderHint')}</p>
+            </div>
           </div>
         </div>`;
 
@@ -2213,9 +2223,11 @@ function openDocumentModal(doc = null) {
           <div class="label">${t('documents.allowedMembersLabel')}</div>
           <div class="document-member-picker__grid">${memberOptions(doc?.allowed_member_ids || [])}</div>
         </div>
+        ${expiryFieldsHtml}
         ${advancedSection(advancedFieldsHtml, { open: advancedOpen })}
         <div id="document-error" class="form-error" role="alert" hidden></div>
         <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="button" class="btn btn--secondary" data-action="close-modal">${t('common.cancel')}</button>
           <button type="submit" class="btn btn--primary" id="document-submit">${isEdit ? t('common.save') : t('documents.uploadAction')}</button>
         </div>
       </form>
@@ -2226,6 +2238,9 @@ function openDocumentModal(doc = null) {
     onSave(panel) {
       modalPanel = panel;
       const form = panel.querySelector('#document-form');
+      const expiresInput = panel.querySelector('#document-expires-at');
+      const reminderGroup = panel.querySelector('#document-expiry-reminder');
+      expiresInput.addEventListener('input', () => { reminderGroup.hidden = !expiresInput.value; });
       const visibility = panel.querySelector('#document-visibility');
       const picker = panel.querySelector('#document-member-picker');
       const syncVisibility = () => { picker.hidden = visibility.value !== 'restricted'; };
@@ -2737,6 +2752,7 @@ async function saveDocument(event, doc, panel) {
   submit.disabled = true;
   try {
     const visibility = form.querySelector('#document-visibility').value;
+    const expiresAt = form.querySelector('#document-expires-at').value || null;
     const payload = {
       name: form.querySelector('#document-name').value.trim(),
       description: form.querySelector('#document-description').value.trim() || null,
@@ -2744,8 +2760,9 @@ async function saveDocument(event, doc, panel) {
       folder_id: form.querySelector('#document-folder').value || null,
       visibility,
       status: form.querySelector('#document-status').value,
-      expires_at: form.querySelector('#document-expires-at').value || null,
-      expiry_reminder_days: form.querySelector('#document-expiry-reminder-days').value !== ''
+      expires_at: expiresAt,
+      // Ohne Datum keine Erinnerung: das versteckte Feld darf keinen alten Wert mitschicken.
+      expiry_reminder_days: expiresAt && form.querySelector('#document-expiry-reminder-days').value !== ''
         ? Number(form.querySelector('#document-expiry-reminder-days').value)
         : null,
       allowed_member_ids: visibility === 'restricted'

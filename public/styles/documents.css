@@ -1111,6 +1111,21 @@
   color: var(--color-danger);
 }
 
+/* Die Erinnerungstage liegen in einer Huelle, damit `hidden` sie ohne Datum
+ * ausblendet. `.modal-grid > .form-group` (layout.css) erreicht das Feld darin
+ * nicht mehr - dieselbe Zuruecknahme des Abstands hier, sonst stuende es tiefer
+ * als das Datum daneben. */
+.document-expiry-reminder > .form-group {
+  margin-bottom: 0;
+}
+
+/* Der Ablaufblock ist ein zweites Raster unter dem Hauptraster; ohne eigenen
+ * Abstand stiess "Laeuft ab am" an den Ordner-Hinweis darueber (0px statt der
+ * 12px Zeilenluft innerhalb des Rasters). */
+.document-expiry-grid {
+  margin-top: var(--space-3);
+}
+
 .document-form__hint {
   margin-top: var(--space-1);
   color: var(--color-text-tertiary);
