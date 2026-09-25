@@ -64,33 +64,21 @@
   color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
 }
 
-/* Folder upload is a separate page action, not a hidden second choice in the
- * document form. On narrow displays it remains a 44px icon next to the view
- * toggle, while its aria-label preserves the accessible name. */
-.documents-upload-folder-btn {
+/* Kopf-Menue fuer Sortierung und Auswahl (documentsToolsMenuHtml). Die
+ * Groesse des Icon-Knopfs gehoert der Shell (.btn--icon); hier steht nur,
+ * dass er in der Aktionszeile nicht schrumpft. */
+.documents-tools-btn {
   flex-shrink: 0;
 }
 
-@media (max-width: 767px) {
-  .documents-upload-folder-btn {
-    width: var(--target-base);
-    min-width: var(--target-base);
-    height: var(--target-base);
-    min-height: var(--target-base);
-    padding-inline: 0;
-  }
-
-  .documents-upload-folder-btn__label {
-    display: none;
-  }
-}
-
-/* Eigene Filterzeile unter dem Kopf (wie Kontakte): Status- + Kategorie-Chips
- * scrollen gemeinsam horizontal, statt in die Kopfzeile gequetscht zu werden.
- * Das behebt das Überlappen/Abschneiden auf Desktop (Issue #506). */
-/* Die Filterzeile selbst scrollt NICHT — nur ihre Kategorie-Facette tut das
- * (siehe .documents-filter-chips). Ein einziger Scroller statt verschachtelter
- * hält Status-Umschalter, Sortierung und Auswahl immer sichtbar. */
+/* Eigene Filterzeile unter dem Kopf (wie Kontakte), statt in die Kopfzeile
+ * gequetscht (Issue #506). Sie traegt seit der Critique 2026-09-25 nur noch
+ * zwei Dinge: das Status-Segment und die Spur der Facetten-Chips.
+ *
+ * Die Filterzeile selbst scrollt NICHT, auf keiner Breite - nur die Chip-Spur
+ * (.documents-filters__chips) tut das. Mobil scrollte bis dahin die ganze
+ * Zeile, 1267px Inhalt auf 375px, und Sortierung und Auswahl lagen am Ende
+ * ausserhalb des Bilds. Die stehen jetzt im Kopf-Menue. */
 .documents-filters {
   display: flex;
   align-items: center;
@@ -102,18 +90,23 @@
   flex-shrink: 0;
 }
 
-.documents-filter-group {
-  display: inline-flex;
-  gap: var(--space-2);
+/* Aktiv/Archiviert ist das Segment der Shell (.segmented, panel.css) - eine
+ * Einfachauswahl, keine Facette. Es steht fest; nur die Chips daneben
+ * scrollen. */
+.documents-status {
   flex-shrink: 0;
 }
 
-/* Die Kategorie-Facette scrollt horizontal in EINER Zeile — auf jedem Gerät.
- * Vorher brach sie auf Desktop um und wuchs unbegrenzt: bei schmalem Fenster
- * stapelten sich 15 Chips auf 8 Zeilen (461px), das erste Dokument lag unter der
- * Falz. Eine Zeile plus Rand-Fade hält die Kopfzone konstant hoch. */
-.documents-filter-chips {
+/* Die Chip-Spur scrollt horizontal in EINER Zeile - auf jedem Geraet und als
+ * EINZIGER Scroller der Zeile. Vorher brach die Facette auf Desktop um und wuchs
+ * unbegrenzt: bei schmalem Fenster stapelten sich 15 Chips auf 8 Zeilen
+ * (461px), das erste Dokument lag unter der Falz. Eine Zeile plus Rand-Fade
+ * haelt die Kopfzone konstant hoch. Kategorie- und Ablauf-Chip liegen in
+ * derselben Spur: zwei Scroller nebeneinander waeren zwei Gesten fuer eine
+ * Reihe. */
+.documents-filters__chips {
   display: flex;
+  align-items: center;
   gap: var(--space-2);
   min-width: 0;
   flex: 1 1 auto;
@@ -124,22 +117,16 @@
   border-inline-start: 1px solid var(--color-border);
 }
 
-.documents-filter-chips::-webkit-scrollbar { display: none; }
+.documents-filters__chips::-webkit-scrollbar { display: none; }
 
-.documents-filters__end {
+.documents-filter-chips {
   display: flex;
-  align-items: center;
   gap: var(--space-2);
   flex-shrink: 0;
-  margin-inline-start: auto;
-  padding-inline-start: var(--space-3);
-  border-inline-start: 1px solid var(--color-border);
 }
 
-.documents-sort {
-  width: auto;
-  min-height: var(--target-md);
-  font-size: var(--text-sm);
+.documents-filter-chips:empty {
+  display: none;
 }
 
 /* Rand-Fade für horizontal scrollende Leisten (Kategorie-Chips + Ordner-Chips):
@@ -933,22 +920,60 @@
   font-size: var(--text-xs);
 }
 
-/* Folder upload stays within one form: the file or folder choice sits above a
- * controllable plan that expands in the same area. */
-.document-upload-choices {
+/* Folder upload stays within one form: the drop zone picks files, a secondary
+ * link picks a folder, and the plan expands in the same area below. */
+.document-upload-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  column-gap: var(--space-3);
+  min-width: 0;
 }
 
-.document-upload-choice {
-  flex: 1 1 auto;
+.document-upload-meta .document-form__hint {
+  flex: 1 1 16rem;
+  min-width: 0;
 }
 
-.document-upload-choice.is-disabled {
-  opacity: 0.55;
-  pointer-events: none;
+/* Der Nebenweg zum Ordner (Critique 2026-09-25): ein Textknopf in der Stimme,
+ * keine zweite Knopfreihe ueber der Drop-Zone. Die Zeile misst die Zielgroesse
+ * ueber `min-height`, die Schrift bleibt die des Hinweises daneben. */
+.document-folder-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-md);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.document-folder-link[hidden] {
+  display: none;
+}
+
+.document-folder-link:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+.document-folder-link:disabled {
+  color: var(--color-text-tertiary);
+  cursor: default;
+}
+
+@media (hover: none) {
+  .document-folder-link {
+    min-height: var(--target-lg);
+  }
 }
 
 .folder-upload-preview {
@@ -975,7 +1000,6 @@
 }
 
 .folder-upload-preview__summary span,
-.folder-upload-preview__limit,
 .folder-upload-progress {
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
@@ -1071,10 +1095,6 @@
 }
 
 @media (max-width: 639px) {
-  .document-upload-choices {
-    flex-direction: column;
-  }
-
   .folder-upload-preview__summary {
     align-items: stretch;
     flex-direction: column;
@@ -1203,55 +1223,28 @@
   /* Chip-Höhe kommt aus .filter-chip--sm (an `hover: none` gekoppelt, nicht an
    * der Breite) — deckt damit auch Tablets zwischen 768 und 1023px ab. */
 
-  /* EINE Bedienzeile, die seitlich scrollt (2026-08-10).
+  /* EINE Bedienzeile - und seit der Critique 2026-09-25 scrollt nicht mehr
+   * SIE, sondern nur ihre Chip-Spur.
    *
-   * Hier stand `flex-wrap: wrap` mit `order: 3` und `flex-basis: 100%` fuer die
-   * Chips - Sortierung und Auswahl in Zeile 1, Chips in Zeile 2. Gemessen auf
-   * 375x812 waren das 177px Filterzeile unter einem 174px hohen Kopf: 351px
-   * Chrome, bevor der erste Ordner kam. Die Chrome-Regel (DESIGN.md) laesst
-   * Kopf plus EINE Bedienzeile.
-   *
-   * Die Antwort ist dieselbe wie in der kompakten Hoehe (Block darunter, der
-   * damit nur noch die Hoehen-Not abdeckt): eine Zeile, die seitlich scrollt,
-   * so wie sie es in der Kueche schon tut. Was die BREITE hier weiter regelt,
-   * sind die Naehte - die Trennlinien zwischen den Gruppen fallen weg, weil
-   * eine scrollende Zeile keine Spalten hat. */
+   * Bis dahin stand hier `overflow-x: auto` auf der ganzen Zeile (2026-08-10):
+   * Status, Chips, Sortierung und Auswahl in einem Streifen, gemessen 1267px
+   * Inhalt auf 375px, die Werkzeuge bei x=1020 und x=1203. Die Zeile blieb
+   * einzeilig (Chrome-Regel, DESIGN.md: Kopf plus EINE Bedienzeile), aber was
+   * am Ende lag, war nur per Wischen ins Ungewisse erreichbar. Jetzt stehen die
+   * Werkzeuge im Kopf-Menue, das Segment steht fest, und der Rest der Breite
+   * gehoert der Chip-Spur mit ihrem Fade. Mobil faellt nur die Naht zwischen
+   * Segment und Spur schmaler aus, und das Segment rueckt enger zusammen,
+   * damit neben "Archiviert" noch ein Chip ins Bild passt. */
   .documents-filters {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
+    gap: var(--space-2);
   }
 
-  .documents-filters::-webkit-scrollbar {
-    display: none;
+  .documents-status .segmented__item {
+    padding-inline: var(--space-2);
   }
 
-  .documents-filters > * {
-    flex-shrink: 0;
-  }
-
-  .documents-filters__end {
-    margin-inline-start: 0;
-    padding-inline-start: 0;
-    border-inline-start: none;
-  }
-
-  .documents-filter-chips {
-    order: 0;
-    flex-basis: auto;
-    padding-inline-start: 0;
-    border-inline-start: none;
-    /* KEIN eigener Scroller mehr, wo die ganze Zeile schon einer ist. Der
-     * Block oben sagt „eine Bedienzeile, die seitlich scrollt" - und
-     * `.documents-filters > * { flex-shrink: 0 }` zwei Absätze weiter oben
-     * lässt diesen Streifen auf seine Inhaltsbreite wachsen. Sein geerbtes
-     * `overflow-x: auto` kann damit nie greifen: gemessen bei 390px stand er
-     * auf 802px Breite bei 802px Scrollbreite, also ein Scroll-Kontext, in dem
-     * nichts zu scrollen war, verschachtelt in den, der die Arbeit tut (390px
-     * sichtbar, 1242px Inhalt). Zwei ineinander liegende Scroller sind genau
-     * das, was die Regel oben ausschliesst. */
-    overflow-x: visible;
+  .documents-filters__chips {
+    padding-inline-start: var(--space-2);
   }
 
   /* HIER STAND EIN VERSCHACHTELTER `max-height: 499px`-BLOCK mit genau den

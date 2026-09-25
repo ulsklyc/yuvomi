@@ -62,7 +62,7 @@ test('Kategorie-Chips sind Facetten mit Trefferzahl statt 15 fester Filter', () 
   assert.match(page, /function categoryCounts\(\)/);
   assert.match(page, /function renderCategoryChips\(\)/);
   // Nur belegte Kategorien (oder die gerade aktive) werden gerendert.
-  assert.match(page, /CATEGORIES\.filter\(\(category\) => counts\.get\(category\) \|\| category === state\.category\)/);
+  assert.match(page, /CATEGORIES\.filter\(\(category\) => present\.get\(category\) \|\| category === state\.category\)/);
   assert.match(page, /filter-chip__count/);
   assert.match(chipCss, /\.filter-chip__count\s*\{/);
 });
@@ -70,8 +70,10 @@ test('Kategorie-Chips sind Facetten mit Trefferzahl statt 15 fester Filter', () 
 test('Kategorie und Ordner zählen sich gegenseitig heraus (echte Facetten)', () => {
   // Ein Zähler darf nie ins Leere führen: jede Achse zählt unter der jeweils
   // anderen, aber nicht unter sich selbst.
-  assert.match(page, /function folderCounts\(\)[\s\S]{0,120}state\.allDocuments\.filter\(matchesCategory\)/);
-  assert.match(page, /function categoryCounts\(\)[\s\S]{0,120}state\.allDocuments\.filter\(matchesFolder\)/);
+  // Seit 2026-09-25 rechnet utils/document-facets.js; die Seite reicht die
+  // jeweils andere Achse als `inScope` hinein.
+  assert.match(page, /function folderCounts\(\)[\s\S]{0,200}inScope: matchesCategory/);
+  assert.match(page, /function categoryCounts\(\)[\s\S]{0,200}inScope: matchesFolder/);
 });
 
 test('der Kategoriefilter läuft client-seitig ohne Netzwerk-Roundtrip', () => {
@@ -88,7 +90,7 @@ test('der Kategoriefilter läuft client-seitig ohne Netzwerk-Roundtrip', () => {
 test('die Kategorie-Facette bleibt einzeilig statt unbegrenzt zu wachsen', () => {
   // Bei 375px Fensterbreite stapelten sich 15 Chips auf 8 Zeilen (461px hoch),
   // das erste Dokument lag damit unter der Falz.
-  assert.match(css, /\.documents-filter-chips\s*\{[^}]*overflow-x:\s*auto/);
+  assert.match(css, /\.documents-filters__chips\s*\{[^}]*overflow-x:\s*auto/);
   // Die tote Desktop-Override-Regel (stand VOR der Basisregel und verlor daher)
   // darf nicht zurückkommen.
   assert.doesNotMatch(css, /@media \(hover: hover\) and \(pointer: fine\)[\s\S]{0,200}border-inline-start:\s*none/);
@@ -197,8 +199,10 @@ test('die Listenansicht trägt Datum und Größe als eigene Spalten', () => {
 });
 
 test('die Liste ist sortierbar und merkt sich die Wahl', () => {
-  assert.match(page, /const SORTS = \['updated', 'name', 'size', 'expiring'\]/);
-  assert.match(page, /localStorage\.setItem\('yuvomi-documents-sort'/);
+  assert.match(read('../public/utils/document-facets.js'), /export const DOCUMENT_SORTS = \['updated', 'name', 'size', 'expiring'\]/);
+  assert.match(page, /const SORTS = DOCUMENT_SORTS/);
+  assert.match(page, /localStorage\.setItem\('yuvomi-documents-sort', state\.sort\)/);
+  assert.match(page, /localStorage\.setItem\('yuvomi-documents-sort-dir', state\.sortDirection\)/);
   assert.match(page, /function sortDocuments\(/);
 });
 
@@ -407,15 +411,19 @@ test('folder upload is a separate choice and does not change the regular multi-f
   assert.match(page, /supportsDirectoryUpload,/);
   assert.match(page, /function canPickDirectory\(\)/);
   assert.match(page, /navigator\.maxTouchPoints/);
-  assert.ok(page.includes("t('documents.folderUpload.unsupportedBrowser')"));
 });
 
-test('folder upload shows its page action only when the browser supports it', () => {
-  const toolbar = page.slice(page.indexOf('export async function render'), page.indexOf('function renderBreadcrumb'));
-  assert.match(toolbar, /canPickDirectory\(\)[\s\S]*id="documents-upload-folder"/);
-  assert.ok(page.includes("t('documents.folderUpload.openAction')"));
-  assert.match(page, /#documents-upload-folder[\s\S]*openDocumentModal\(null, \{ initialUpload: 'folder' \}\)/);
-  assert.match(page, /initialUpload === 'folder'[\s\S]*folderInput\.click\(\)/);
+test('folder upload offers its secondary link only when the browser supports it', () => {
+  // Since the 2026-09-25 critique the page head no longer carries a folder
+  // action: the link below the drop zone is the one way, and it opens the
+  // native picker within the same click (no timeout - browsers may block a
+  // delayed programmatic click).
+  const binding = page.slice(page.indexOf('function bindFolderUpload'), page.indexOf('function updateFolderUploadProgress'));
+  assert.match(binding, /const directorySupported = canPickDirectory\(\)/);
+  assert.match(binding, /folderChoice\.hidden = !directorySupported/);
+  assert.match(binding, /folderChoice\?\.addEventListener\('click', \(\) => folderInput\.click\(\)\)/);
+  assert.doesNotMatch(page, /initialUpload/);
+  assert.ok(page.includes("t('documents.folderUpload.chooseFolder')"));
 });
 
 test('folder upload shows one preview with conflicts and rejected files before writing', () => {
@@ -479,7 +487,7 @@ test('running folder uploads freeze plan controls, cancel on modal close, and su
 });
 
 test('folder preview avoids horizontal overflow on mobile', () => {
-  assert.match(css, /\.document-upload-choices\s*\{[^}]*display:\s*flex[^}]*flex-wrap:\s*wrap/);
+  assert.match(css, /\.document-upload-meta\s*\{[^}]*display:\s*flex[^}]*flex-wrap:\s*wrap/);
   assert.match(css, /\.folder-upload-preview\s*\{[^}]*min-width:\s*0[^}]*overflow-wrap:\s*anywhere/);
   assert.match(css, /\.folder-upload-tree__item\s*\{[^}]*min-width:\s*0[^}]*padding-inline-start:\s*calc\(/);
   const mobileConflictRule = [...eachRule(css)].find((rule) =>
@@ -608,4 +616,161 @@ test('die Datei wird beim Oeffnen geholt, der Klick muendet ohne await in naviga
   for (const key of ['shareAction', 'sharePreparing', 'shareUnsupportedType', 'shareUnavailable', 'shareFailed']) {
     assert.equal(typeof de.documents[key], 'string', `de.json: documents.${key} fehlt`);
   }
+});
+
+// --------------------------------------------------------
+// Critique 2026-09-25 - Werkzeug-Last (Entscheidung 1)
+// --------------------------------------------------------
+
+const facets = await import('../public/utils/document-facets.js').catch(() => null);
+
+/** Der Markup-Block der Filterzeile - von ihrem Oeffnen bis zum Browser-Layout. */
+function filterRowMarkup() {
+  const start = page.indexOf('<div class="documents-filters">');
+  const end = page.indexOf('<div class="documents-browser-layout">');
+  assert.ok(start > 0 && end > start, 'Filterzeile oder Browser-Layout nicht gefunden');
+  return page.slice(start, end);
+}
+
+test('die Facetten-Zaehler zaehlen unter der aktiven Suche (als Programm)', () => {
+  // Bei "Keine Treffer" zaehlten Kategorien und Ordner weiter 9 - ein Zaehler,
+  // der auf eine Liste zeigt, die es unter dieser Suche nicht gibt.
+  assert.ok(facets, 'public/utils/document-facets.js fehlt');
+  const docs = [
+    { id: 1, name: 'Police Hausrat', category: 'insurance', folder_id: 10, original_name: 'a.pdf' },
+    { id: 2, name: 'Kfz-Schein', category: 'vehicle', folder_id: 11, original_name: 'b.pdf' },
+    { id: 3, name: 'Arztbrief', description: 'Hausarzt Befund', category: 'medical', folder_id: null, original_name: 'c.pdf' },
+    { id: 4, name: 'Police Kfz', category: 'insurance', folder_id: 11, original_name: 'd.pdf' },
+  ];
+  const folders = [{ id: 10, parent_id: null }, { id: 11, parent_id: 10 }];
+  const subtreeOf = (id) => new Set(id === 10 ? [10, 11] : [id]);
+
+  const cat = facets.categoryFacetCounts(docs, { query: 'police' });
+  assert.equal(cat.get(''), 2);
+  assert.equal(cat.get('insurance'), 2);
+  assert.equal(cat.get('vehicle'), undefined, 'Kfz-Schein trifft "police" nicht');
+
+  const none = facets.categoryFacetCounts(docs, { query: 'gibt es nicht' });
+  assert.equal(none.get(''), 0, 'eine Suche ohne Treffer zaehlt 0, nicht den Bestand');
+
+  const fold = facets.folderFacetCounts(docs, folders, { query: 'haus', subtreeOf });
+  assert.equal(fold.get(''), 2, 'Name UND Beschreibung zaehlen');
+  assert.equal(fold.get('__none'), 1);
+  assert.equal(fold.get('10'), 1, 'Teilbaum: nur der Treffer in 10 selbst');
+  assert.equal(fold.get('11'), 0);
+
+  // Die andere Achse greift weiter zusammen mit der Suche.
+  const scoped = facets.folderFacetCounts(docs, folders, {
+    query: 'police', inScope: (doc) => doc.category === 'insurance', subtreeOf,
+  });
+  assert.equal(scoped.get('10'), 2, 'Ordner 10 zaehlt die Police aus seinem Unterordner mit');
+});
+
+test('die Seite zaehlt Kategorie, Ordner und Ablauf unter der Suche und zeichnet sie beim Tippen neu', () => {
+  assert.match(page, /from '\/utils\/document-facets\.js'/);
+  const cat = page.slice(page.indexOf('function categoryCounts()'), page.indexOf('function renderCategoryChips'));
+  assert.match(cat, /categoryFacetCounts\(state\.allDocuments, \{ query: state\.query, inScope: matchesFolder \}\)/);
+  const fold = page.slice(page.indexOf('function folderCounts()'), page.indexOf('function categoryCounts()'));
+  assert.match(fold, /folderFacetCounts\(state\.allDocuments, state\.folders, \{[^}]*query: state\.query[^}]*inScope: matchesCategory/);
+  const exp = page.slice(page.indexOf('function expiringCount()'), page.indexOf('function applyFilters'));
+  assert.match(exp, /matchesDocumentQuery\(doc, state\.query\)/);
+  // Die Liste nutzt dieselbe Suchregel wie die Zaehler - EINE Regel, zwei Leser.
+  const list = page.slice(page.indexOf('function filteredDocuments()'), page.indexOf('function listClasses'));
+  assert.match(list, /matchesDocumentQuery\(doc, state\.query\)/);
+  // Die Suche zeichnet die Facetten mit, nicht nur die Liste.
+  const onQuery = page.slice(page.indexOf("id: 'documents-search'", page.indexOf('function bindPageEvents')), page.indexOf("_container.querySelector('#documents-status')"));
+  assert.match(onQuery, /renderFacets\(\)/);
+});
+
+test('die Sortierung ist umkehrbar und kennt je Schluessel ihre natuerliche Richtung (als Programm)', () => {
+  assert.ok(facets, 'public/utils/document-facets.js fehlt');
+  const docs = [
+    { name: 'b', updated_at: '2026-01-02', file_size: 5, expires_at: '2026-03-01' },
+    { name: 'a', updated_at: '2026-01-03', file_size: 1, expires_at: null },
+    { name: 'c', updated_at: '2026-01-01', file_size: 9, expires_at: '2026-02-01' },
+  ];
+  const names = (list) => list.map((d) => d.name).join('');
+  assert.equal(names(facets.sortDocuments(docs, { sort: 'name' })), 'abc');
+  assert.equal(names(facets.sortDocuments(docs, { sort: 'name', direction: 'desc' })), 'cba');
+  assert.equal(names(facets.sortDocuments(docs, { sort: 'updated' })), 'abc', 'Neueste zuerst');
+  assert.equal(names(facets.sortDocuments(docs, { sort: 'updated', direction: 'asc' })), 'cba');
+  assert.equal(names(facets.sortDocuments(docs, { sort: 'size' })), 'cba', 'Groesste zuerst');
+  assert.equal(names(facets.sortDocuments(docs, { sort: 'expiring' })), 'cba');
+  assert.equal(names(facets.sortDocuments(docs, { sort: 'expiring', direction: 'desc' })), 'bca',
+    'ohne Ablaufdatum bleibt in beiden Richtungen am Ende');
+  assert.equal(facets.defaultSortDirection('name'), 'asc');
+  assert.equal(facets.defaultSortDirection('updated'), 'desc');
+});
+
+test('die Filterzeile traegt keine Werkzeuge mehr - Sortierung und Auswahl stehen im Kopf-Menue', () => {
+  // Mobil lag die Filterzeile bei 1267px auf 375px Viewport, Sortierung bei
+  // x=1020 und Auswahl bei x=1203 - erreichbar nur per Wischen ins Ungewisse.
+  const row = filterRowMarkup();
+  assert.doesNotMatch(row, /<select/, 'keine Sortier-Auswahl in der Filterzeile');
+  assert.doesNotMatch(row, /documents-select-btn|documents-filters__end/, 'kein Auswahl-Knopf in der Filterzeile');
+  assert.doesNotMatch(row, /class="btn\b/, 'kein Knopf ausser Segment und Chips');
+
+  const toolbar = page.slice(page.indexOf('<div class="page-toolbar'), page.indexOf('<div class="documents-selectbar"'));
+  assert.match(toolbar, /documentsToolsMenuHtml\(\)/, 'das Menue sitzt im Kopf');
+  const menu = page.slice(page.indexOf('function documentsToolsMenuHtml'), page.indexOf('function bindPageEvents'));
+  assert.match(menu, /class="popover-menu documents-tools-menu" id="documents-tools-menu" popover role="menu"/);
+  assert.match(menu, /popovertarget="documents-tools-menu" aria-haspopup="menu" aria-expanded="false"/);
+  assert.match(menu, /role="menuitemradio" aria-checked="\$\{on\}"[\s\S]*data-sort="/);
+  assert.match(menu, /data-sort-direction="/, 'die Richtung ist umkehrbar');
+  assert.match(menu, /role="menuitem"[^>]*data-action="enter-select"/);
+  assert.match(page, /installPopoverMenus\(_container\)/, 'Pfeiltasten und Fokus kommen aus dem geteilten Menue');
+  for (const key of ['toolsMenuLabel', 'sortDirectionLabel', 'sortAscending', 'sortDescending']) {
+    assert.ok(page.includes(`t('documents.${key}')`), `documents.${key} wird nicht benutzt`);
+    assert.equal(typeof de.documents[key], 'string', `de.json: documents.${key} fehlt`);
+  }
+  assert.doesNotMatch(de.documents.sortName, /\(|\u2013/, 'mit umkehrbarer Richtung ist "(A-Z)" eine Falschauskunft');
+});
+
+test('Aktiv/Archiviert ist ein Segment, und im Ruhezustand ist kein Filter getoent', () => {
+  const row = filterRowMarkup();
+  assert.match(row, /class="segmented documents-status" id="documents-status" role="radiogroup"/);
+  assert.match(row, /class="segmented__item\$\{on \? ' is-active' : ''\}"[\s\S]{0,120}role="radio"/);
+  assert.doesNotMatch(row, /data-status="[^"]*"[^>]*filter-chip|filter-chip[^>]*data-status=/, 'der Status ist kein Chip mehr');
+  assert.match(page, /wireTablist\(_container\.querySelector\('#documents-status'\), \{[\s\S]{0,200}mode: 'select'/);
+  // "Alle Kategorien" ist die Abwesenheit eines Filters - getoent sah es aus
+  // wie ein aktiver Filter, der Grundzustand trug zwei getoente Chips.
+  const chips = page.slice(page.indexOf('function renderCategoryChips'), page.indexOf('function renderExpiringChip'));
+  const allChip = chips.slice(chips.indexOf('data-category=""') - 200, chips.indexOf('data-category=""') + 80);
+  assert.doesNotMatch(allChip, /filter-chip--active/, '"Alle Kategorien" traegt nie die Tonung');
+});
+
+test('mobil scrollt nur die Chip-Spur, nicht die Filterzeile', () => {
+  const mobile = [...eachRule(css)].filter((rule) => rule.at.includes('@media (max-width: 767px)'));
+  const rowRule = mobile.find((rule) => rule.selector === '.documents-filters');
+  assert.ok(!rowRule || !/overflow-x:\s*auto/.test(rowRule.body), 'die Filterzeile selbst darf mobil nicht scrollen');
+  const base = [...eachRule(css)].find((rule) => rule.selector === '.documents-filters' && rule.at.length === 0);
+  assert.match(base.body, /overflow:\s*hidden/);
+  const track = [...eachRule(css)].find((rule) => rule.selector === '.documents-filters__chips' && rule.at.length === 0);
+  assert.ok(track, '.documents-filters__chips fehlt');
+  assert.match(track.body, /overflow-x:\s*auto/);
+  assert.match(track.body, /min-width:\s*0/);
+  assert.match(page, /wireScrollFade\(_container\.querySelector\('\.documents-filters__chips'\)\)/);
+});
+
+test('der Upload hat EINEN Weg zur Dateiwahl, einen Nebenweg zum Ordner und EINEN Groessenhinweis', () => {
+  // Vorher vier Wege (Kopf "Ordner hochladen", "Dateien auswaehlen", "Ordner
+  // auswaehlen", Drop-Zone) und zwei 5-MB-Hinweise untereinander.
+  assert.doesNotMatch(page, /id="documents-upload-folder"/, 'kein Kopfknopf "Ordner hochladen"');
+  assert.doesNotMatch(page, /document-upload-choices|document-upload-choice\b/, 'keine zwei Wahlknoepfe ueber der Drop-Zone');
+  const modal = page.slice(page.indexOf('function openDocumentModal'), page.indexOf('function bindDropzone'));
+  assert.equal((modal.match(/<label class="document-dropzone"[^>]*for="document-file"/g) || []).length, 1);
+  assert.match(modal, /<button type="button" class="document-folder-link" id="document-folder-choice"[^>]*hidden>/);
+  assert.equal((modal.match(/id="document-size-hint"/g) || []).length, 1);
+  const sizeHints = (page.match(/t\('documents\.(fileHint|folderUpload\.limitHint|folderUpload\.adminLimitHint)'/g) || []);
+  assert.ok(sizeHints.length >= 2, 'Datei- und Ordnermodus haben je ihren Text');
+  assert.doesNotMatch(modal, /documents\.fileHint[\s\S]{0,200}documents\.folderUpload\.limitHint/, 'nicht beide Hinweise nebeneinander');
+  const preview = page.slice(page.indexOf('function renderFolderUploadPreview'), page.indexOf('function canPickDirectory'));
+  assert.doesNotMatch(preview, /folder-upload-preview__limit/, 'die Vorschau wiederholt den Hinweis nicht');
+  const binding = page.slice(page.indexOf('function bindFolderUpload'), page.indexOf('function updateFolderUploadProgress'));
+  assert.match(binding, /folderChoice\.hidden = !directorySupported/, 'ohne Ordnerwahl im Browser kein Nebenlink');
+  assert.match(binding, /folderChoice\?\.addEventListener\('click', \(\) => folderInput\.click\(\)\)/);
+  assert.match(binding, /setSizeHint\(panel, 'folder'/);
+  assert.match(binding, /setSizeHint\(panel, 'files'\)/);
+  assert.equal(typeof de.documents.folderUpload.chooseFolder, 'string');
+  assert.match(de.documents.folderUpload.chooseFolder, /^oder /);
 });

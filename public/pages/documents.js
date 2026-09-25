@@ -25,6 +25,17 @@ import { maxUploadBytes } from '/utils/upload-limit.js';
 import { mountEmptyState } from '/utils/empty-state.js';
 import { subtreeIds, folderPath, flattenFolderTree } from '/utils/folder-tree.js';
 import { dateStatus } from '/utils/date-status.js';
+import { installPopoverMenus } from '/utils/popover-menu.js';
+import { wireTablist } from '/utils/tablist.js';
+import {
+  DOCUMENT_SORTS,
+  categoryFacetCounts,
+  defaultSortDirection,
+  folderFacetCounts,
+  matchesDocumentQuery,
+  normalizeDocumentQuery,
+  sortDocuments as sortDocumentList,
+} from '/utils/document-facets.js';
 import {
   buildFolderUploadPlan,
   executeFolderUploadPlan,
@@ -77,9 +88,22 @@ function friendlyError(err) {
     || t('common.unknownError');
 }
 
-// Sortierschlüssel der Liste. `updated` spiegelt die Server-Reihenfolge
-// (ORDER BY updated_at DESC) und bleibt daher der Default.
-const SORTS = ['updated', 'name', 'size', 'expiring'];
+// Sortierschlüssel der Liste (utils/document-facets.js). `updated` spiegelt
+// die Server-Reihenfolge (ORDER BY updated_at DESC) und bleibt daher der Default.
+const SORTS = DOCUMENT_SORTS;
+
+function readStoredSort() {
+  const sort = localStorage.getItem('yuvomi-documents-sort');
+  return SORTS.includes(sort) ? sort : 'updated';
+}
+
+/* Die Richtung ist umkehrbar (Critique 2026-09-25, P2) und wird mit dem
+ * Schluessel gemerkt. Fehlt sie oder ist sie kaputt, gilt die natuerliche
+ * Richtung des Schluessels - nie eine Richtung, die zu einem ANDEREN gehoerte. */
+function readStoredSortDirection(sort) {
+  const direction = localStorage.getItem('yuvomi-documents-sort-dir');
+  return direction === 'asc' || direction === 'desc' ? direction : defaultSortDirection(sort);
+}
 
 let state = {
   allDocuments: [],
@@ -95,9 +119,8 @@ let state = {
   // Mobile-Grenze (tokens.css §11c).
   view: localStorage.getItem('yuvomi-documents-view')
     || (typeof matchMedia !== 'undefined' && matchMedia('(max-width: 639px)').matches ? 'list' : 'grid'),
-  sort: SORTS.includes(localStorage.getItem('yuvomi-documents-sort'))
-    ? localStorage.getItem('yuvomi-documents-sort')
-    : 'updated',
+  sort: readStoredSort(),
+  sortDirection: readStoredSortDirection(readStoredSort()),
   status: 'active',
   category: '',
   // Erledigt ODER laeuft bald ab (dateStatus() != 'valid') - dieselbe Facette
@@ -142,10 +165,10 @@ function persistExpandedFolders() {
 }
 let _container = null;
 let _search = null;
+let _statusTablist = null;
 
 export async function render(container) {
   _container = container;
-  const directoryUploadSupported = canPickDirectory();
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <div class="documents-page app-page app-page--full" data-composition="full">
@@ -166,11 +189,7 @@ export async function render(container) {
               <i data-lucide="list" aria-hidden="true"></i>
             </button>
           </div>
-          ${directoryUploadSupported ? `<button class="btn btn--secondary documents-upload-folder-btn" id="documents-upload-folder" type="button"
-                  title="${t('documents.folderUpload.openAction')}" aria-label="${t('documents.folderUpload.openAction')}">
-            <i data-lucide="folder-up" class="icon-md" aria-hidden="true"></i>
-            <span class="documents-upload-folder-btn__label">${t('documents.folderUpload.openAction')}</span>
-          </button>` : ''}
+          ${documentsToolsMenuHtml()}
         </div>
       </div>
       <div class="documents-selectbar" id="documents-selectbar" role="toolbar" aria-label="${t('documents.selectLabel')}" hidden>
@@ -183,25 +202,24 @@ export async function render(container) {
           <button class="btn btn--danger" type="button" data-action="select-delete">${t('common.delete')}</button>
         </div>
       </div>
+      ${/* ZWEI FILTERSPRACHEN WAREN EINE ZU VIEL (Critique 2026-09-25, P1/P2).
+           Aktiv/Archiviert sah aus wie ein Chip und verhielt sich wie ein
+           Segment - genau eins ist immer gewaehlt. Jetzt IST es das Segment
+           der Shell; die Chips daneben sind nur noch Facetten, die man an-
+           und abwaehlt. Sortierung und Auswahl stehen im Kopf-Menue: mobil
+           lagen sie bei x=1020 und x=1203 auf einer 375px-Zeile. Was hier
+           seitlich scrollt, ist allein die Chip-Spur. */ ''}
       <div class="documents-filters">
-        <div class="documents-filter-group" id="documents-status" role="group" aria-label="${t('documents.statusLabel')}">
-          <button type="button" class="filter-chip filter-chip--sm${state.status === 'active' ? ' filter-chip--active' : ''}" data-status="active" aria-pressed="${state.status === 'active'}">${t('documents.statusActive')}</button>
-          <button type="button" class="filter-chip filter-chip--sm${state.status === 'archived' ? ' filter-chip--active' : ''}" data-status="archived" aria-pressed="${state.status === 'archived'}">${t('documents.statusArchived')}</button>
+        <div class="segmented documents-status" id="documents-status" role="radiogroup" aria-label="${t('documents.statusLabel')}">
+          ${[['active', 'documents.statusActive'], ['archived', 'documents.statusArchived']].map(([id, key]) => {
+            const on = state.status === id;
+            return `<button type="button" class="segmented__item${on ? ' is-active' : ''}"
+                    role="radio" data-tab-id="${id}" aria-checked="${on}" tabindex="${on ? '0' : '-1'}">${t(key)}</button>`;
+          }).join('')}
         </div>
-        <div class="documents-filter-chips" id="documents-category" role="group" aria-label="${t('documents.categoryLabel')}"></div>
-        <div class="documents-filter-chips" id="documents-expiring-filter" role="group" aria-label="${t('documents.expiringFilterLabel')}"></div>
-        <div class="documents-filters__end">
-          <label class="sr-only" for="documents-sort">${t('documents.sortLabel')}</label>
-          <select class="input documents-sort" id="documents-sort">
-            <option value="updated" ${state.sort === 'updated' ? 'selected' : ''}>${t('documents.sortUpdated')}</option>
-            <option value="name" ${state.sort === 'name' ? 'selected' : ''}>${t('documents.sortName')}</option>
-            <option value="size" ${state.sort === 'size' ? 'selected' : ''}>${t('documents.sortSize')}</option>
-            <option value="expiring" ${state.sort === 'expiring' ? 'selected' : ''}>${t('documents.sortExpiring')}</option>
-          </select>
-          <button class="btn btn--secondary btn--icon btn--icon-sm" type="button" id="documents-select-btn"
-                  aria-pressed="false" title="${t('documents.selectLabel')}" aria-label="${t('documents.selectLabel')}">
-            <i data-lucide="list-checks" class="icon-md" aria-hidden="true"></i>
-          </button>
+        <div class="documents-filters__chips">
+          <div class="documents-filter-chips" id="documents-category" role="group" aria-label="${t('documents.categoryLabel')}"></div>
+          <div class="documents-filter-chips" id="documents-expiring-filter" role="group" aria-label="${t('documents.expiringFilterLabel')}"></div>
         </div>
       </div>
       <div class="documents-browser-layout">
@@ -394,28 +412,11 @@ function matchesExpiringSoon(doc) {
 
 function expiringCount() {
   return state.allDocuments.filter((doc) => matchesCategory(doc) && matchesFolder(doc)
-    && isExpiringOrOverdue(doc)).length;
+    && matchesDocumentQuery(doc, state.query) && isExpiringOrOverdue(doc)).length;
 }
 
 function sortDocuments(docs) {
-  const sorted = [...docs];
-  if (state.sort === 'name') {
-    sorted.sort((a, b) => a.name.localeCompare(b.name, getLocale()));
-  } else if (state.sort === 'size') {
-    sorted.sort((a, b) => (b.file_size || 0) - (a.file_size || 0));
-  } else if (state.sort === 'expiring') {
-    // Kein Ablaufdatum steht ans Ende - Sortierung nach etwas, das nicht
-    // existiert, waere sonst Zufall (Einfuegereihenfolge des Servers).
-    sorted.sort((a, b) => {
-      if (!a.expires_at && !b.expires_at) return 0;
-      if (!a.expires_at) return 1;
-      if (!b.expires_at) return -1;
-      return a.expires_at.localeCompare(b.expires_at);
-    });
-  } else {
-    sorted.sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
-  }
-  return sorted;
+  return sortDocumentList(docs, { sort: state.sort, direction: state.sortDirection, locale: getLocale() });
 }
 
 function applyFilters() {
@@ -424,22 +425,139 @@ function applyFilters() {
   );
 }
 
+/**
+ * Das Kopf-Menue fuer Sortierung und Auswahl (Critique 2026-09-25, P1).
+ *
+ * WARUM EIN MENUE UND NICHT DIE FILTERZEILE: Sortieren und Auswaehlen sind
+ * Werkzeuge, keine Filter - sie aendern nicht, WELCHE Dokumente man sieht. In
+ * der Filterzeile standen sie mobil ausserhalb des Bilds (x=1020 und x=1203
+ * auf 375px). Im Kopf stehen sie auf jeder Breite an derselben Stelle.
+ *
+ * Das geteilte popover-menu-Vokabular (utils/popover-menu.js) bringt Top-Layer,
+ * Light-Dismiss, Esc, Pfeiltasten und den Fokus aufs gewaehlte Element mit.
+ * Die Sortierung ist eine Einfachauswahl mit Haken (menuitemradio) wie der
+ * Rezepte-Quellenfilter; die Richtung eine zweite, weil "Name" absteigend
+ * etwas anderes ist als "Name" - der alte Zusatz "(A-Z)" war damit eine
+ * Falschauskunft und ist aus dem Label gewichen.
+ */
+function documentsToolsMenuHtml() {
+  const label = t('documents.toolsMenuLabel');
+  const sortLabels = {
+    updated: t('documents.sortUpdated'),
+    name: t('documents.sortName'),
+    size: t('documents.sortSize'),
+    expiring: t('documents.sortExpiring'),
+  };
+  const check = (on) => `<i data-lucide="check" class="icon-md popover-menu__item-check${on ? '' : ' popover-menu__item-check--hidden'}" aria-hidden="true"></i>`;
+  const directions = [
+    ['asc', t('documents.sortAscending'), 'arrow-up-narrow-wide'],
+    ['desc', t('documents.sortDescending'), 'arrow-down-wide-narrow'],
+  ];
+  return `
+    <button type="button" class="btn btn--secondary btn--icon documents-tools-btn popover-menu__trigger"
+            popovertarget="documents-tools-menu" aria-haspopup="menu" aria-expanded="false"
+            aria-label="${esc(label)}" title="${esc(label)}">
+      <i data-lucide="arrow-up-down" class="icon-md" aria-hidden="true"></i>
+    </button>
+    <div class="popover-menu documents-tools-menu" id="documents-tools-menu" popover role="menu" aria-label="${esc(label)}">
+      <div class="popover-menu__group" role="group" aria-labelledby="documents-tools-sort-label">
+        <div class="popover-menu__label" id="documents-tools-sort-label">${esc(t('documents.sortLabel'))}</div>
+        ${SORTS.map((sort) => {
+          const on = state.sort === sort;
+          return `
+        <button type="button" role="menuitemradio" aria-checked="${on}" class="popover-menu__item" data-sort="${sort}">
+          ${check(on)}<span>${esc(sortLabels[sort])}</span>
+        </button>`;
+        }).join('')}
+      </div>
+      <div class="popover-menu__separator" role="separator"></div>
+      <div class="popover-menu__group" role="group" aria-labelledby="documents-tools-direction-label">
+        <div class="popover-menu__label" id="documents-tools-direction-label">${esc(t('documents.sortDirectionLabel'))}</div>
+        ${directions.map(([direction, text, icon]) => {
+          const on = state.sortDirection === direction;
+          return `
+        <button type="button" role="menuitemradio" aria-checked="${on}" class="popover-menu__item" data-sort-direction="${direction}">
+          ${check(on)}<span>${esc(text)}</span><i data-lucide="${icon}" class="icon-md popover-menu__item-trail" aria-hidden="true"></i>
+        </button>`;
+        }).join('')}
+      </div>
+      <div class="popover-menu__separator" role="separator"></div>
+      <button type="button" role="menuitem" class="popover-menu__item" data-action="enter-select">
+        <i data-lucide="list-checks" class="icon-md" aria-hidden="true"></i><span>${esc(t('documents.selectLabel'))}</span>
+      </button>
+    </div>`;
+}
+
+/** Haken und aria-checked im offenen Menue nachziehen, ohne es neu zu bauen. */
+function syncToolsMenu() {
+  const menu = _container?.querySelector('#documents-tools-menu');
+  if (!menu) return;
+  const paint = (item, on) => {
+    item.setAttribute('aria-checked', String(on));
+    item.querySelector('.popover-menu__item-check')?.classList.toggle('popover-menu__item-check--hidden', !on);
+  };
+  menu.querySelectorAll('[data-sort]').forEach((item) => paint(item, item.dataset.sort === state.sort));
+  menu.querySelectorAll('[data-sort-direction]').forEach((item) => paint(item, item.dataset.sortDirection === state.sortDirection));
+  const select = menu.querySelector('[data-action="enter-select"]');
+  if (select) select.disabled = state.selectMode;
+}
+
+function setSort(sort, direction) {
+  state.sort = SORTS.includes(sort) ? sort : 'updated';
+  state.sortDirection = direction === 'asc' || direction === 'desc' ? direction : defaultSortDirection(state.sort);
+  try {
+    localStorage.setItem('yuvomi-documents-sort', state.sort);
+    localStorage.setItem('yuvomi-documents-sort-dir', state.sortDirection);
+  } catch {
+    // Voller oder gesperrter Speicher: die Wahl gilt bis zum naechsten Laden.
+  }
+  syncToolsMenu();
+  applyFilters();
+  renderDocuments();
+}
+
+function bindToolsMenu() {
+  installPopoverMenus(_container);
+  const menu = _container.querySelector('#documents-tools-menu');
+  menu?.addEventListener('click', (e) => {
+    const item = e.target.closest('.popover-menu__item');
+    if (!item || item.disabled) return;
+    if (item.dataset.sort) {
+      // Ein neuer Schluessel beginnt in seiner natuerlichen Richtung.
+      if (item.dataset.sort !== state.sort) setSort(item.dataset.sort);
+    } else if (item.dataset.sortDirection) {
+      if (item.dataset.sortDirection !== state.sortDirection) setSort(state.sort, item.dataset.sortDirection);
+    } else if (item.dataset.action === 'enter-select') {
+      enterSelectMode();
+    }
+  });
+}
+
+/** Zaehler an Kategorien, Ablauf-Chip und Ordnern - sie haengen alle an der Suche. */
+function renderFacets() {
+  renderCategoryChips();
+  renderExpiringChip();
+  renderFolderBrowser();
+}
+
 function bindPageEvents() {
   _container.querySelector('#documents-folder-add')?.addEventListener('click', () => openFolderModal());
-  _container.querySelector('#documents-upload-folder')?.addEventListener('click', () => openDocumentModal(null, { initialUpload: 'folder' }));
   findPageFab('fab-new-document')?.addEventListener('click', () => openDocumentModal());
+  bindToolsMenu();
 
   _search = wirePageSearch(_container, {
     id: 'documents-search',
     onQuery: (value) => {
-      state.query = value.trim().toLowerCase();
+      state.query = normalizeDocumentQuery(value);
+      renderFacets();
       renderDocuments();
     },
   });
-  _container.querySelector('#documents-status')?.addEventListener('click', (e) => {
-    const chip = e.target.closest('[data-status]');
-    if (!chip || chip.dataset.status === state.status) return;
-    selectStatus(chip.dataset.status);
+  _statusTablist = wireTablist(_container.querySelector('#documents-status'), {
+    activeId: state.status,
+    activeClass: 'is-active',
+    mode: 'select',
+    onChange: (id) => selectStatus(id),
   });
   // Kategorie ist eine reine Client-Facette: kein Netzwerk-Roundtrip, keine
   // Skeleton-Zwischenstufe — der Filter greift im selben Frame.
@@ -457,34 +575,16 @@ function bindPageEvents() {
     applyFilters();
     renderAll();
   });
-  // Rand-Fade der Kategorie-Chips: geteiltes Utility (Audit F-06) — deckt
-  // anders als der frühere Scroll-Listener auch Resize und Re-Render ab.
+  // Rand-Fade der Chip-Spur: geteiltes Utility (Audit F-06), deckt auch Resize
+  // und Re-Render ab.
   //
-  // ZWEI KANDIDATEN, WEIL DER SCROLLER MIT DER BREITE WECHSELT: unterhalb des
-  // Breakpoints scrollt nicht die Chip-Reihe, sondern die ganze Bedienzeile
-  // (documents.css: `.documents-filters { overflow-x: auto }`), und
-  // `#documents-category` berechnet dort `overflow-x: visible`. Der Fade hing
-  // bis zum Critique 2026-08-28 allein am inneren Element und war damit genau
-  // dort weg, wo er gebraucht wird: gemessen 1246px Inhalt auf 390px Viewport
-  // ohne jedes Signal, dass es seitlich weitergeht. Auf /contacts liegt
-  // dieselbe Konstruktion richtig herum - dort IST die Filterzeile der
-  // Scroller, und sie trägt den Helfer.
-  //
-  // Beide zu verdrahten ist gefahrlos: `update()` vergleicht scrollWidth gegen
-  // clientWidth, und ein Element, das nicht überläuft, bekommt keine
-  // `has-fade-*`-Klasse. Es gewinnt also immer der, der gerade scrollt.
-  wireScrollFade(_container.querySelector('#documents-category'));
-  wireScrollFade(_container.querySelector('.documents-filters'));
-  _container.querySelector('#documents-sort')?.addEventListener('change', (e) => {
-    state.sort = SORTS.includes(e.target.value) ? e.target.value : 'updated';
-    localStorage.setItem('yuvomi-documents-sort', state.sort);
-    applyFilters();
-    renderDocuments();
-  });
-  _container.querySelector('#documents-select-btn')?.addEventListener('click', () => {
-    if (state.selectMode) exitSelectMode();
-    else enterSelectMode();
-  });
+  // EIN SCROLLER AUF JEDER BREITE (Critique 2026-09-25). Bis dahin wechselte er
+  // mit dem Breakpoint: am Desktop scrollte die Kategorie-Reihe, mobil die ganze
+  // Bedienzeile samt Sortierung und Auswahl - 1267px Inhalt auf 375px, die
+  // Werkzeuge am Ende ausserhalb des Bilds. Seit die Werkzeuge im Kopf-Menue
+  // stehen, scrollt ueberall nur die Spur aus Kategorie- und Ablauf-Chips;
+  // das Segment davor bleibt stehen.
+  wireScrollFade(_container.querySelector('.documents-filters__chips'));
   _container.querySelector('#documents-selectbar')?.addEventListener('click', (e) => {
     const action = e.target.closest('[data-action]')?.dataset.action;
     if (action === 'select-cancel') exitSelectMode();
@@ -598,15 +698,15 @@ function selectFolder(id) {
   renderAll();
 }
 
+/**
+ * Status wechseln. Das Segment zeichnet sich selbst (wireTablist); wer den
+ * Status von anderswo aendert (Leerzustand "Aktive zeigen"), geht ueber
+ * `_statusTablist.setActive`, damit Segment und Liste nie auseinanderlaufen.
+ */
 async function selectStatus(status) {
   if (state.status === status) return;
   state.status = status;
   exitSelectMode();
-  _container.querySelectorAll('#documents-status [data-status]').forEach((chip) => {
-    const on = chip.dataset.status === status;
-    chip.classList.toggle('filter-chip--active', on);
-    chip.setAttribute('aria-pressed', String(on));
-  });
   showDocumentsLoading();
   await loadDocuments();
   renderAll();
@@ -633,11 +733,7 @@ function resetFilters() {
 
 function filteredDocuments() {
   if (!state.query) return state.documents;
-  return state.documents.filter((doc) =>
-    doc.name.toLowerCase().includes(state.query) ||
-    (doc.description || '').toLowerCase().includes(state.query) ||
-    doc.original_name.toLowerCase().includes(state.query)
-  );
+  return state.documents.filter((doc) => matchesDocumentQuery(doc, state.query));
 }
 
 /**
@@ -752,7 +848,7 @@ function renderEmptyState(list) {
   list.querySelector('#documents-empty-folder')?.addEventListener('click', () => openFolderModal());
   list.querySelector('#documents-empty-clear-search')?.addEventListener('click', () => clearSearch());
   list.querySelector('#documents-empty-reset')?.addEventListener('click', () => resetFilters());
-  list.querySelector('#documents-empty-active')?.addEventListener('click', () => selectStatus('active'));
+  list.querySelector('#documents-empty-active')?.addEventListener('click', () => _statusTablist?.setActive('active', { focus: true }));
 }
 
 function renderDocuments() {
@@ -798,52 +894,47 @@ function folderSubtree(folderId) {
   return subtreeIds(state.folders, folderId);
 }
 
+/* Beide Achsen zaehlen auch unter der Suche (Critique 2026-09-25, P2): bei
+ * "Keine Treffer" standen links weiter die vollen Zahlen. Die Rechnung selbst
+ * wohnt in utils/document-facets.js und laeuft dort als Programm. */
 function folderCounts() {
-  const scope = state.allDocuments.filter(matchesCategory);
-  const counts = new Map();
-  counts.set('', scope.length);
-  counts.set('__none', scope.filter((doc) => !doc.folder_id).length);
-
-  // Erst die eigenen Dokumente je Ordner ...
-  const own = new Map();
-  scope.forEach((doc) => {
-    if (!doc.folder_id) return;
-    own.set(doc.folder_id, (own.get(doc.folder_id) || 0) + 1);
+  return folderFacetCounts(state.allDocuments, state.folders, {
+    query: state.query,
+    inScope: matchesCategory,
+    subtreeOf: folderSubtree,
   });
-
-  /* ... dann die Summe ueber den Teilbaum. DIE ZAHL MUSS DASSELBE MEINEN WIE
-   * DIE ANSICHT DAHINTER: ein Klick auf "Wohnung" zeigt seit dem Baum auch die
-   * Dokumente aus "Wohnung/Miete", also darf die Zahl daneben nicht nur die
-   * direkt darin liegenden zaehlen. Eine 0 neben einem Ordner, der beim Oeffnen
-   * zwoelf Dokumente zeigt, ist schlimmer als gar keine Zahl. */
-  state.folders.forEach((folder) => {
-    let total = 0;
-    for (const id of folderSubtree(folder.id)) total += own.get(id) || 0;
-    counts.set(String(folder.id), total);
-  });
-  return counts;
 }
 
 function categoryCounts() {
-  const scope = state.allDocuments.filter(matchesFolder);
-  const counts = new Map();
-  counts.set('', scope.length);
-  scope.forEach((doc) => counts.set(doc.category, (counts.get(doc.category) || 0) + 1));
-  return counts;
+  return categoryFacetCounts(state.allDocuments, { query: state.query, inScope: matchesFolder });
+}
+
+/* WELCHE Chips stehen, entscheidet der Bestand, nicht die Suche: sonst sprangen
+ * die Chips bei jedem Tastendruck heraus und herein, und die Zeile unter dem
+ * Finger ordnete sich neu. Die ZAHL daran folgt der Suche (categoryCounts). */
+function presentCategories() {
+  return categoryFacetCounts(state.allDocuments, { inScope: matchesFolder });
 }
 
 // Nur belegte Kategorien werden zu Chips — 15 permanent sichtbare Filter, von
 // denen die meisten ins Leere führen, sind Rauschen. Die gerade aktive Kategorie
 // bleibt auch bei 0 stehen, damit sie einem beim Ansehen nicht wegspringt.
+//
+// "ALLE KATEGORIEN" IST NIE GETOENT (Critique 2026-09-25, P2). Es ist die
+// Abwesenheit eines Filters, und der Grundzustand trug damit zwei getoente
+// Chips ("Aktiv" und "Alle") - getoent heisst in der Shell "hier filtert
+// etwas". Ohne Filter ist nichts getoent. `aria-pressed` bleibt: fuer den
+// Screenreader ist "Alle" die gewaehlte Option der Gruppe.
 function renderCategoryChips() {
   const host = _container?.querySelector('#documents-category');
   if (!host) return;
   const counts = categoryCounts();
-  const visible = CATEGORIES.filter((category) => counts.get(category) || category === state.category);
+  const present = presentCategories();
+  const visible = CATEGORIES.filter((category) => present.get(category) || category === state.category);
   const labels = categoryLabels();
   host.replaceChildren();
   host.insertAdjacentHTML('beforeend', `
-    <button type="button" class="filter-chip filter-chip--sm${!state.category ? ' filter-chip--active' : ''}" data-category="" aria-pressed="${!state.category}">
+    <button type="button" class="filter-chip filter-chip--sm" data-category="" aria-pressed="${!state.category}">
       ${t('documents.allCategories')}<span class="filter-chip__count">${counts.get('') || 0}</span>
     </button>
     ${visible.map((category) => `
@@ -866,7 +957,9 @@ function renderExpiringChip() {
   if (!host) return;
   const count = expiringCount();
   host.replaceChildren();
-  if (!count && !state.expiringSoon) return;
+  // Sichtbar nach Bestand, gezaehlt unter der Suche - wie die Kategorien.
+  const present = state.allDocuments.some((doc) => matchesCategory(doc) && matchesFolder(doc) && isExpiringOrOverdue(doc));
+  if (!present && !state.expiringSoon) return;
   host.insertAdjacentHTML('beforeend', `
     <button type="button" class="filter-chip filter-chip--sm${state.expiringSoon ? ' filter-chip--active' : ''}" data-expiring-toggle aria-pressed="${state.expiringSoon}">
       <i data-lucide="calendar-clock" class="icon-md" aria-hidden="true"></i>${t('documents.expiringFilterLabel')}<span class="filter-chip__count">${count}</span>
@@ -1649,7 +1742,7 @@ function deleteDocuments(docs) {
 function enterSelectMode() {
   state.selectMode = true;
   state.selected.clear();
-  _container.querySelector('#documents-select-btn')?.setAttribute('aria-pressed', 'true');
+  syncToolsMenu();
   const bar = _container.querySelector('#documents-selectbar');
   if (bar) bar.hidden = false;
   renderDocuments();
@@ -1660,10 +1753,14 @@ function exitSelectMode() {
   if (!state.selectMode) return;
   state.selectMode = false;
   state.selected.clear();
-  _container.querySelector('#documents-select-btn')?.setAttribute('aria-pressed', 'false');
+  syncToolsMenu();
   const bar = _container.querySelector('#documents-selectbar');
+  // Der Fokus stand auf "Abbrechen", das gleich verschwindet: zurueck an den
+  // Menue-Knopf, ueber den man hineingekommen ist - sonst faellt er auf <body>.
+  const refocus = bar?.contains(document.activeElement);
   if (bar) bar.hidden = true;
   renderDocuments();
+  if (refocus) _container.querySelector('.documents-tools-btn')?.focus();
 }
 
 function updateSelectUI() {
@@ -1783,7 +1880,7 @@ function documentVisibilityFieldHtml(doc) {
 
 export const __test = { memberOptions, loadMembers, documentVisibilityFieldHtml };
 
-function openDocumentModal(doc = null, { initialUpload = 'files' } = {}) {
+function openDocumentModal(doc = null) {
   const isEdit = !!doc;
   let modalPanel = null;
 
@@ -1826,21 +1923,18 @@ function openDocumentModal(doc = null, { initialUpload = 'files' } = {}) {
 
   // Beim Anlegen kommt die Datei zuerst: sie ist das Objekt der Handlung und
   // liefert den Namen. Beim Bearbeiten gibt es keine Datei, dort führt der Name.
+  //
+  // EIN WEG ZUR DATEIWAHL (Critique 2026-09-25, P2). Es waren vier: der
+  // Kopfknopf "Ordner hochladen", die Knoepfe "Dateien auswaehlen" und "Ordner
+  // auswaehlen" und die Drop-Zone - die selbst schon "hier ablegen oder
+  // klicken" sagte. Jetzt IST die Drop-Zone die Dateiwahl, der Ordner ein
+  // Nebenweg darunter, und es steht genau EIN Groessenhinweis da, der zum
+  // gewaehlten Modus spricht (`setSizeHint`). Der Nebenlink ist ein Knopf und
+  // kein <label>: er liegt ausserhalb der Drop-Zone, ist selbst fokussierbar
+  // und oeffnet den Picker im selben Klick - die Nutzeraktivierung bleibt.
   const fileFieldHtml = `
         <div class="form-group">
           <label class="label" for="document-file">${t('documents.fileLabel')}</label>
-          <div class="document-upload-choices" role="group" aria-label="${esc(t('documents.folderUpload.choiceLabel'))}">
-            <label class="btn btn--secondary document-upload-choice" for="document-file">
-              <i data-lucide="files" aria-hidden="true"></i>
-              <span>${t('documents.folderUpload.chooseFiles')}</span>
-            </label>
-            <label class="btn btn--secondary document-upload-choice" id="document-folder-choice" for="document-folder-input">
-              <i data-lucide="folder-up" aria-hidden="true"></i>
-              <span>${t('documents.folderUpload.chooseFolder')}</span>
-            </label>
-            <input class="sr-only" id="document-folder-input" type="file" webkitdirectory>
-          </div>
-          <p class="document-form__hint" id="document-folder-unsupported" hidden>${t('documents.folderUpload.unsupportedBrowser')}</p>
           <label class="document-dropzone" id="document-dropzone" for="document-file">
             <input class="sr-only" id="document-file" type="file" multiple
                    ${state.allowedMimeTypes?.length ? `accept="${esc(state.allowedMimeTypes.join(','))}"` : ''}>
@@ -1848,11 +1942,14 @@ function openDocumentModal(doc = null, { initialUpload = 'files' } = {}) {
               <i data-lucide="file-up" aria-hidden="true"></i>
             </span>
             <span class="document-dropzone__title">${t('documents.dropzoneTitle')}</span>
-            <span class="document-dropzone__hint">${t('documents.dropzoneHint')}</span>
             <span class="document-dropzone__file" id="document-selected-file" hidden></span>
           </label>
-          <p class="document-form__hint">${t('documents.fileHint', { size: effectiveUploadMb() })}</p>
-          <p class="document-form__hint">${t('documents.folderUpload.limitHint', { size: effectiveUploadMb() })}</p>
+          <input class="sr-only" id="document-folder-input" type="file" webkitdirectory tabindex="-1"
+                 aria-label="${esc(t('documents.folderUpload.chooseFolder'))}">
+          <div class="document-upload-meta">
+            <p class="document-form__hint" id="document-size-hint">${t('documents.fileHint', { size: effectiveUploadMb() })}</p>
+            <button type="button" class="document-folder-link" id="document-folder-choice" hidden>${t('documents.folderUpload.chooseFolder')}</button>
+          </div>
           <p class="document-storage-target">
             <i data-lucide="${uploadTargetIcon(state.activeUploadBackend)}" aria-hidden="true"></i>
             <span>${t('documents.activeUploadTarget', {
@@ -1914,15 +2011,8 @@ function openDocumentModal(doc = null, { initialUpload = 'files' } = {}) {
       visibility.addEventListener('change', syncVisibility);
       syncVisibility();
       bindDropzone(panel);
-      const directorySupported = bindFolderUpload(panel);
+      bindFolderUpload(panel);
       form.addEventListener('submit', (event) => saveDocument(event, doc, panel));
-      // Die sichtbare Seitenaktion „Ordner hochladen" bewahrt die direkte
-      // Nutzeraktivierung bis zum nativen Verzeichnis-Picker. Kein Timeout:
-      // Browser dürfen einen verzögerten programmatic click als Popup blockieren.
-      if (!isEdit && initialUpload === 'folder' && directorySupported) {
-        const folderInput = panel.querySelector('#document-folder-input');
-        folderInput.click();
-      }
     },
   });
 }
@@ -2122,7 +2212,6 @@ function renderFolderUploadPreview(panel) {
           ${plan.rejected.map((file) => `<li><span>${esc(file.relativePath)}</span><span>${esc(folderUploadReason(file.reason))}</span></li>`).join('')}
         </ul>
       </details>` : ''}
-    <p class="folder-upload-preview__limit">${esc(t('documents.folderUpload.adminLimitHint', { size: effectiveUploadMb() }))}</p>
     <div class="folder-upload-progress" id="folder-upload-progress" aria-live="polite"></div>
     <button class="btn btn--secondary" type="button" data-folder-upload-cancel hidden>${t('common.cancel')}</button>
   `);
@@ -2130,7 +2219,28 @@ function renderFolderUploadPreview(panel) {
 
   const submit = panel.querySelector('#document-submit');
   if (submit) submit.textContent = t('documents.folderUpload.uploadAction', { count: plan.counts.upload });
+  setSizeHint(panel, 'folder', plan);
   return plan;
+}
+
+/**
+ * Der EINE Groessenhinweis unter der Drop-Zone, passend zum Modus.
+ *
+ * Dateien: welche Arten und wie gross. Ordner: die Grenze je Datei plus der
+ * Satz ueber leere Ordner. Hat die Vorschau Dateien wegen ihrer Groesse
+ * abgelehnt, sagt er stattdessen, dass ein Administrator die Grenze anheben
+ * kann - vorher stand dieser Satz als dritter Hinweis in der Vorschau.
+ */
+function setSizeHint(panel, mode, plan = null) {
+  const hint = panel.querySelector('#document-size-hint');
+  if (!hint) return;
+  const size = effectiveUploadMb();
+  const tooLarge = plan?.rejected?.some((file) => file.reason === 'too-large');
+  hint.textContent = mode !== 'folder'
+    ? t('documents.fileHint', { size })
+    : tooLarge
+      ? t('documents.folderUpload.adminLimitHint', { size })
+      : t('documents.folderUpload.limitHint', { size });
 }
 
 function canPickDirectory() {
@@ -2150,6 +2260,7 @@ function setFolderUploadControlsDisabled(panel, disabled) {
   for (const selector of [
     '#document-file',
     '#document-folder-input',
+    '#document-folder-choice',
     '#document-folder',
     '[data-folder-conflict-default]',
     '[data-file-conflict-default]',
@@ -2178,7 +2289,6 @@ function bindFolderUpload(panel) {
   const fileInput = panel.querySelector('#document-file');
   const folderInput = panel.querySelector('#document-folder-input');
   const folderChoice = panel.querySelector('#document-folder-choice');
-  const unsupported = panel.querySelector('#document-folder-unsupported');
   const preview = panel.querySelector('#document-folder-upload-preview');
   const selected = panel.querySelector('#document-selected-file');
   const nameGroup = panel.querySelector('#document-name')?.closest('.form-group');
@@ -2198,11 +2308,12 @@ function bindFolderUpload(panel) {
     completed: false,
   };
 
+  // Kann der Browser keine Ordner waehlen, gibt es den Nebenweg nicht - statt
+  // eines gesperrten Knopfs mit einer Erklaerung, warum er nicht geht.
   const directorySupported = canPickDirectory();
   folderInput.disabled = !directorySupported;
-  folderChoice?.classList.toggle('is-disabled', !directorySupported);
-  folderChoice?.setAttribute('aria-disabled', String(!directorySupported));
-  if (unsupported) unsupported.hidden = directorySupported;
+  if (folderChoice) folderChoice.hidden = !directorySupported;
+  folderChoice?.addEventListener('click', () => folderInput.click());
 
   fileInput.addEventListener('change', () => {
     if (panel._folderUpload.running) return;
@@ -2212,6 +2323,7 @@ function bindFolderUpload(panel) {
     panel._folderUpload.plan = null;
     panel._folderUpload.ready = false;
     preview.hidden = true;
+    setSizeHint(panel, 'files');
     const submit = panel.querySelector('#document-submit');
     if (submit) {
       submit.disabled = false;
@@ -2232,6 +2344,7 @@ function bindFolderUpload(panel) {
     const submit = panel.querySelector('#document-submit');
     if (submit) submit.disabled = true;
     if (nameGroup) nameGroup.hidden = true;
+    setSizeHint(panel, 'folder');
     if (selected) {
       const root = String(files[0].webkitRelativePath || '').split('/')[0];
       selected.hidden = false;

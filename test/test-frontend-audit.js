@@ -6218,7 +6218,7 @@ test('responsive adaptation uses tablet space without crowding module toolbars',
   assert.match(documentsPageSrc, /<div class="documents-filters">/);
   assert.match(
     documents,
-    /\.documents-filter-chips\s*\{[^}]*overflow-x:\s*auto/
+    /\.documents-filters__chips\s*\{[^}]*overflow-x:\s*auto/
   );
   // Die Settings-Uebersicht war auf Tablets zweispaltig. Mit der
   // Zeilenlisten-Regel (HIG-Rollout Runde 3, tokens.css) ist sie EINE
@@ -9200,14 +9200,14 @@ test('documents and navigation settings use progressive disclosure instead of st
   // einem <details>-Slider in die Kopfzeile gequetscht.
   assert.doesNotMatch(documentsPage, /documents-secondary-controls/);
   assert.match(documentsPage, /<div class="documents-filters">/);
-  assert.match(documentsPage, /class="documents-filter-group" id="documents-status"/);
+  assert.match(documentsPage, /class="segmented documents-status" id="documents-status"/);
   assert.match(documentsPage, /class="documents-filter-chips" id="documents-category"/);
-  // Nur die Kategorie-Facette scrollt; die Filterzeile selbst nicht. Das hält
-  // Status, Sortierung und Auswahl immer sichtbar und verhindert verschachtelte
-  // Scroller. Vorher brach die Facette um und wuchs unbegrenzt in die Höhe.
+  // Nur die Chip-Spur scrollt; die Filterzeile selbst nicht. Das hält das
+  // Status-Segment immer sichtbar und verhindert verschachtelte Scroller.
+  // Sortierung und Auswahl stehen seit 2026-09-25 im Kopf-Menue.
   assert.match(
     documentsCss,
-    /\.documents-filter-chips\s*\{[^}]*overflow-x:\s*auto/,
+    /\.documents-filters__chips\s*\{[^}]*overflow-x:\s*auto/,
   );
   assert.match(documentsCss, /\.documents-filters\s*\{[^}]*overflow:\s*hidden/);
   assert.doesNotMatch(documentsCss, /documents-secondary-controls/);

@@ -3400,6 +3400,35 @@ html.fab-anim-done .page-fab {
   visibility: hidden;
 }
 
+/* Gruppen mit Ueberschrift und Trenner - fuer ein Menue, das mehr als eine
+ * Frage stellt (Dokumente: Sortierung, Richtung, Auswahl; Critique
+ * 2026-09-25). Die Ueberschrift ist kein Eintrag: sie traegt keine
+ * `.popover-menu__item`-Klasse und faellt damit aus Pfeiltasten und Fokus
+ * heraus; die Gruppe verweist per `aria-labelledby` auf sie. */
+.popover-menu__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0h);
+}
+
+.popover-menu__label {
+  padding: var(--space-1) var(--space-3) 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.popover-menu__separator {
+  height: 1px;
+  margin: var(--space-1) var(--space-2);
+  background: var(--color-border);
+}
+
+/* Ein Zeichen am Zeilenende (etwa die Richtungspfeile), rechtsbuendig. */
+.popover-menu__item-trail {
+  margin-inline-start: auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .popover-menu,
   .popover-menu__item {
