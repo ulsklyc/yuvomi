@@ -384,6 +384,21 @@
   }
 }
 
+/* EINSPALTIG ZAEHLT JEDE ZEILE UEBER DEM FALZ (Critique 2026-09-25, P1): dort
+ * stehen Bilanz und Diagramm VOR den Buchungen. Die Kopfzeilen von Bilanz und
+ * Diagramm sind so hoch wie ein volles Ziel und bringen ihre Luft damit schon
+ * mit - die Kennzahl-Zeile braucht darueber keine eigene mehr. Der Listenkopf
+ * traegt nur noch den Titel und EINEN Menueknopf, also keine Umbruch-Reserve. */
+@container budget-page (width < 960px) {
+  .budget-overview .metric-grid {
+    padding-block: 0 var(--space-2);
+  }
+
+  .budget-overview .budget-list-header {
+    padding-block: var(--space-2) var(--space-1);
+  }
+}
+
 /* --------------------------------------------------------
  * Konten (#495)
  * -------------------------------------------------------- */
@@ -753,9 +768,49 @@
    * Title 3 als Untergrenze (panel.css). Zwei Hosts unterboten sie lokal
    * auf Fussnotengroesse - genau die Drift, gegen die das geteilte Bauteil
    * gebaut wurde. Die Polsterung bleibt: sie ist eine Platzfrage, keine
-   * Typo-Entscheidung. */
+   * Typo-Entscheidung.
+   *
+   * Der Vormonats-Trend stand hier bis 2026-09-25 auf `display: none` - auf
+   * dem Telefon fehlte damit die einzige Einordnung der Zahlen. Er bleibt
+   * jetzt stehen: in einer halben Zeile (Einnahmen, Ausgaben) passt er, im
+   * Saldo-Kopfwert unten steht er unter dem Label. */
   .metric-card { padding: var(--space-2); }
-  .metric-card__trend { display: none; }
+}
+
+/* SALDO ALS KOPFWERT, EINNAHMEN UND AUSGABEN DARUNTER (Critique 2026-09-25,
+ * P1). Unter 640px bricht die Dreierreihe in zwei Spalten (panel.css), und
+ * die Saldo-Karte bekam eine volle Zeile fuer sich - 149px Kennzahlen, ohne
+ * Trends. Drei Karten in EINER Zeile gehen nicht: bei 390px bleiben je Karte
+ * 98px, „5.550,00 €" braucht in Title 3 schon 104px, und kleiner darf die
+ * Kennzahl nicht werden (Untergrenze, panel.css). Also wird die volle Zeile
+ * zum Kopfwert: Label und Trend links, der Betrag rechts auf derselben Hoehe,
+ * und sie steht VOR den beiden Karten, weil der Saldo die Aussage des Monats
+ * ist und die beiden anderen seine Herleitung. Vorlesereihenfolge und Desktop
+ * (Saldo als Summe darunter) bleiben unberuehrt.
+ *
+ * `grid-auto-rows: auto`: die geteilte Zeile macht alle Rasterzeilen gleich
+ * hoch (1fr) - der flache Kopfwert zoege sonst auf Kartenhoehe auf. Gleich
+ * hoch bleiben die Karten INNERHALB einer Zeile (stretch). */
+@media (max-width: 639px) {
+  .budget-overview .metric-grid:not(.metric-grid--expenses-only) {
+    grid-auto-rows: auto;
+  }
+
+  .budget-overview .metric-grid:not(.metric-grid--expenses-only) > .metric-card:last-child {
+    order: -1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "label value"
+      "trend value";
+    align-items: center;
+    column-gap: var(--space-3);
+    row-gap: var(--space-0h);
+  }
+
+  .budget-overview .metric-grid:not(.metric-grid--expenses-only) > .metric-card:last-child > .metric-card__label { grid-area: label; }
+  .budget-overview .metric-grid:not(.metric-grid--expenses-only) > .metric-card:last-child > .metric-card__value { grid-area: value; }
+  .budget-overview .metric-grid:not(.metric-grid--expenses-only) > .metric-card:last-child > .metric-card__trend { grid-area: trend; }
 }
 
 /* --------------------------------------------------------
@@ -771,6 +826,15 @@
  * Satzschreibung und Label-Farbe (Abgrenzung in typography.css). */
 .budget-chart-section__title {
   color: var(--color-text-primary);
+}
+
+/* Kopfzeile des Diagramms: Titel links, „Alle Kategorien (N)" rechts (nur
+ * einspaltig, siehe unten) - dieselbe Bauart wie `.budget-summary-head`. */
+.budget-chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
   margin-bottom: var(--space-2);
 }
 
@@ -785,6 +849,96 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
+}
+
+/* TOP 3 SOLANGE EINSPALTIG, VOLL IN DER SEITENLEISTE (Critique 2026-09-25,
+ * P1; budget.js `chartLeadIndexes`). Einspaltig stand das Diagramm mit allen
+ * Kategorien VOR den Buchungen: 483px bei 390x844, die erste Buchung bei
+ * y=986; auf 1024x768 mit Sidebar (740px Container) keine einzige ueber dem
+ * Falz. Die Grenze ist dieselbe wie die des Zweispalters - daneben hat das
+ * Diagramm seine eigene Spalte und nimmt den Buchungen nichts weg.
+ *
+ * Die Zeilen bleiben im Markup; ausgeblendet werden nur die unmarkierten.
+ * Die erste sichtbare Zeile verliert ihre Haarlinie: vor ihr steht eine
+ * ausgeblendete Geschwisterzeile, und `+` fragt den Baum, nicht das Bild. */
+.budget-chart-more {
+  display: none;
+}
+
+@container budget-page (width < 960px) {
+  .budget-chart:not(.is-expanded) > .budget-bar-row:not(.budget-bar-row--lead) {
+    display: none;
+  }
+
+  .budget-chart:not(.is-expanded) > .budget-bar-row--lead:nth-child(1 of .budget-bar-row--lead) {
+    border-top: 0;
+  }
+
+  /* „Alle Kategorien (N)" steht in der Titelzeile, die der Titel ohnehin
+   * belegt - als Fusszeile unter den Balken kostete er eine eigene Zeile
+   * (47px). Die Zeile ist so hoch wie ein volles Ziel, damit die
+   * Treffflaeche (::before) nicht in die Balken ragt; die Luft ueber den
+   * Balken bringt sie damit selbst mit. */
+  .budget-chart-head:has(> .budget-chart-more) {
+    min-height: var(--target-base);
+    margin-bottom: 0;
+  }
+
+  .budget-chart-more {
+    position: relative;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-height: var(--target-sm);
+    /* Ohne Polster an den Seiten: der Text schliesst an der Kante der Karten
+     * darunter ab wie der Titel links. Ein negativer Rand dafuer liess den
+     * Knopf 8px aus dem Scrollport ragen (waagerechter Ueberlauf). */
+    padding: var(--space-1) 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: var(--font-weight-medium);
+    color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .budget-chart-more::before {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    top: 50%;
+    height: var(--target-base);
+    transform: translateY(-50%);
+  }
+
+  .budget-chart-more:hover .budget-chart-more__label {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  .budget-chart-more:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  .budget-chart-more__icon {
+    flex-shrink: 0;
+    transition: transform var(--transition-fast);
+  }
+
+  .budget-chart-more[aria-expanded="true"] .budget-chart-more__icon {
+    transform: rotate(180deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .budget-chart-more__icon {
+    transition: none;
+  }
 }
 
 /* SCHMAL ZWEI ZEILEN, BREIT DREI SPALTEN.
@@ -1325,8 +1479,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .budget-list-header__filter {
@@ -1339,13 +1492,11 @@
   color: var(--color-text-primary);
 }
 
-.budget-csv-export,
-.budget-manage-categories {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: var(--text-sm);
-  padding: var(--space-1) var(--space-3);
+/* Kopf-Menue der Buchungsliste (listToolsMenuHtml in budget.js). Die Groesse
+ * des Icon-Knopfs gehoert der Shell (.btn--icon); hier steht nur, dass er neben
+ * dem Titel nicht schrumpft. Die Eintraege sind das geteilte popover-menu. */
+.budget-list-tools {
+  flex-shrink: 0;
 }
 
 .budget-recur-mark {

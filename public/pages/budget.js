@@ -24,6 +24,7 @@ import { toLocalDateKey, parseLocalDateKey, addLocalDays,
 import { formatMoney, formatSignedAmount, amountPlaceholder, amountStep, amountMin, applyAmountFormat, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { trendMarkup } from '/utils/metric-card.js';
+import { installPopoverMenus } from '/utils/popover-menu.js';
 import { intervalUnitLabel } from '/rrule-ui.js';
 import { appendCurrencyOptions } from '/settings/currency.js';
 import '/components/category-manager.js';
@@ -217,6 +218,7 @@ let state = {
   groupByResponsible: false,  // Liste nach Zustaendigem gruppieren (#1057)
   scope:       'mine',        // Ansichts-Filter im personal-Modus: 'mine' | 'household'
   expensesOnly: false,        // Anzeige „Nur Ausgaben" (#504): Einnahmen+Saldo ausblenden
+  categoriesExpanded: false,  // Kategorie-Diagramm einspaltig ganz aufgeklappt (sonst Top 3)
   meta:        { expenseCategories: [], incomeCategories: [], subcategories: {} },
   // Zeitachse der Berichte: dieselbe Kopfleiste wie der Monat, nur mit
   // umschaltbarer Auflösung. Der Anker lebt hier statt in budget-stats.js, damit
@@ -616,7 +618,7 @@ export async function render(container, { user }) {
 
   setHtml(container, `
     <div class="budget-page app-page app-page--reading page-measure--narrow" data-composition="reading">
-      <div class="page-toolbar page-toolbar--wrap page-toolbar--narrow budget-nav">
+      <div class="page-toolbar page-toolbar--wrap page-toolbar--narrow page-toolbar--period budget-nav">
         <h1 class="page-toolbar__title">${t('budget.title')}</h1>
         <!-- Der Kopf-Slot bleibt auf jedem Tab besetzt: entweder Stepper oder
              ein ruhiger Kontexttext. Eine Lücke machte jeden Tabwechsel zur
@@ -668,6 +670,9 @@ export async function render(container, { user }) {
   // `#budget-body` bleibt ueber jeden renderBody() hinweg dasselbe Element -
   // nur seine Kinder werden ersetzt -, also genuegt EIN Riegel pro Seitenaufbau.
   container.querySelector('#budget-body')?.addEventListener('click', readOnlyLatch, true);
+  // Werkzeug-Menue der Buchungsliste (listToolsMenuHtml): Position, Schliessen
+  // und Pfeiltasten haengen an der stabilen Wurzel, nicht am ersetzten Panel.
+  installPopoverMenus(container);
 
   // Vor dem ersten Laden synchronisieren, nicht erst danach: `state.month` und
   // `state.activeTab` stehen schon, also kann „Aktuell" seinen Zielzustand VOR
@@ -1030,9 +1035,20 @@ function renderBody() {
     <!-- Kategorie-Balken -->
     ${s.byCategory.length ? `
     <div class="budget-chart-section">
-      <h2 class="budget-chart-section__title u-section-title">${t('budget.byCategory')}</h2>
+      <!-- Kopfzeile wie die der Bilanz: Titel links, das Aufklappen rechts -
+           in der Zeile, die der Titel ohnehin belegt, statt als eigene
+           Fusszeile unter den Balken. -->
+      <div class="budget-chart-head">
+        <h2 class="budget-chart-section__title u-section-title">${t('budget.byCategory')}</h2>
+        ${s.byCategory.length > CHART_LEAD ? `
+        <button type="button" class="budget-chart-more" id="budget-chart-more"
+                aria-expanded="${state.categoriesExpanded ? 'true' : 'false'}" aria-controls="budget-chart">
+          <span class="budget-chart-more__label">${esc(chartMoreLabel(s.byCategory.length))}</span>
+          <i data-lucide="chevron-down" class="icon-sm budget-chart-more__icon" aria-hidden="true"></i>
+        </button>` : ''}
+      </div>
       <p class="sr-only">${esc(chartSummary(s.byCategory))}</p>
-      <div class="budget-chart">
+      <div class="budget-chart${state.categoriesExpanded ? ' is-expanded' : ''}" id="budget-chart">
         ${renderCategoryBars(s.byCategory)}
       </div>
     </div>` : ''}
@@ -1059,23 +1075,7 @@ function renderBody() {
             <i data-lucide="x" class="icon-sm" aria-hidden="true"></i>
           </button>` : ''}
         </div>
-        <div class="budget-list-header__actions">
-        ${state.entries.some((e) => e.responsible_users?.length) ? `
-        <button class="btn btn--secondary${state.groupByResponsible ? ' is-active' : ''}" id="budget-group-responsible"
-          type="button" aria-pressed="${state.groupByResponsible ? 'true' : 'false'}"
-          title="${esc(t('budget.groupByResponsible'))}">
-          <i data-lucide="users" class="icon-sm" aria-hidden="true"></i>${esc(t('budget.groupByResponsible'))}
-        </button>` : ''}
-        ${readOnly() ? '' : `
-        <button class="btn btn--secondary budget-manage-categories" id="budget-manage-categories"
-          title="${t('budget.manageCategories')}">
-          <i data-lucide="tags" class="icon-sm" aria-hidden="true"></i>${t('budget.manageCategories')}
-        </button>`}
-        ${state.entries.length ? `
-        <a href="/api/v1/budget/export?month=${state.month}${state.budgetMode === 'personal' ? `&scope=${state.scope}` : ''}" class="btn btn--secondary budget-csv-export">
-          <i data-lucide="download" class="icon-sm" aria-hidden="true"></i>CSV
-        </a>` : ''}
-        </div>
+        <div class="budget-list-header__actions">${listToolsMenuHtml()}</div>
       </div>
       <div class="budget-list" id="budget-list">
         ${renderEntries()}
@@ -1096,6 +1096,7 @@ function renderBody() {
     vibrate(10);
     renderBody();
   });
+  _container.querySelector('#budget-chart-more')?.addEventListener('click', toggleCategoryChart);
   _container.querySelector('#budget-manage-categories')?.addEventListener('click', openCategoryManager);
   _container.querySelector('#budget-clear-account-filter')?.addEventListener('click', async () => {
     state.accountFilterId = null;
@@ -1113,6 +1114,9 @@ function renderBody() {
     try { localStorage.setItem(GROUP_RESPONSIBLE_KEY, state.groupByResponsible ? '1' : '0'); } catch (_) { /* Private-Mode */ }
     vibrate(10);
     renderBody();
+    // Der Eintrag lag im Menue, das mit dem Neuaufbau verschwindet - der Fokus
+    // geht an dessen Knopf zurueck statt auf <body>.
+    _container.querySelector('.budget-list-tools')?.focus();
   });
   stagger(_container.querySelector('#budget-list')?.querySelectorAll('.budget-entry') ?? []);
 
@@ -1230,10 +1234,103 @@ function chartSummary(byCategory) {
   });
 }
 
+/* EINSPALTIG ZEIGT DAS DIAGRAMM DIE DREI GROESSTEN AUSGABEN (Critique
+ * 2026-09-25, P1). Neun Kategorien kosteten mobil 483px - die erste Buchung
+ * stand bei y=986, unter dem Falz, und auf 1024x768 (Sidebar, 740px Container)
+ * ebenso. Die Frage „wohin ging das Geld" beantworten die groessten Ausgaben;
+ * die Einnahmen stehen schon in ihrer Karte darueber. Reichen die Ausgaben
+ * nicht fuer drei Zeilen, fuellen die groessten Einnahmen auf.
+ *
+ * Die Auswahl ist eine Markierung, keine Kuerzung der Daten: alle Zeilen
+ * stehen im Markup, in ihrer Reihenfolge, und budget.css blendet nur die
+ * unmarkierten aus - und nur, solange die Uebersicht einspaltig ist (dieselbe
+ * 960px-Container-Grenze wie der Zweispalter). Neben den Buchungen hat das
+ * Diagramm seine eigene Spalte und bleibt voll. Aufgeklappt gilt fuer den
+ * ganzen Besuch, auch ueber den Monatswechsel. */
+const CHART_LEAD = 3;
+
+function chartLeadIndexes(byCategory) {
+  return new Set(byCategory
+    .map((c, i) => ({ i, expense: c.total < 0 ? 1 : 0, abs: Math.abs(c.total) }))
+    .sort((a, b) => (b.expense - a.expense) || (b.abs - a.abs))
+    .slice(0, CHART_LEAD)
+    .map((r) => r.i));
+}
+
+function chartMoreLabel(count) {
+  return state.categoriesExpanded
+    ? t('budget.showFewerCategories')
+    : t('budget.showAllCategories', { count });
+}
+
+/* Auf- und Zuklappen ohne Neuaufbau: der Knopf behaelt Fokus und Position,
+ * nur Klasse, aria-expanded und Beschriftung ziehen nach. */
+function toggleCategoryChart() {
+  state.categoriesExpanded = !state.categoriesExpanded;
+  const chart = _container?.querySelector('#budget-chart');
+  const btn = _container?.querySelector('#budget-chart-more');
+  chart?.classList.toggle('is-expanded', state.categoriesExpanded);
+  if (!btn) return;
+  btn.setAttribute('aria-expanded', state.categoriesExpanded ? 'true' : 'false');
+  const label = btn.querySelector('.budget-chart-more__label');
+  if (label) label.textContent = chartMoreLabel(state.summary?.byCategory?.length ?? 0);
+}
+
+/* EIN WERKZEUG-MENUE FUER DIE BUCHUNGSLISTE (Critique 2026-09-25, P1; Muster
+ * „one tools menu" der Dokumente, #1469). Kategorien verwalten, CSV-Export und
+ * die Gruppierung nach Zustaendigen standen als bis zu drei beschriftete
+ * Knoepfe neben „Transaktionen" und brachen mobil in eine zweite und dritte
+ * Zeile um (Listenkopf 124px). Sie aendern nicht, WELCHE Buchungen man sieht -
+ * sie sind Werkzeuge, und die stehen auf jeder Breite an derselben Stelle.
+ *
+ * Die Gruppierung ist ein Umschalter (menuitemcheckbox mit Haken), der Export
+ * ein Link: der Server liefert die Datei, das Menue schliesst beim Klick
+ * (popover-menu.js). Ohne einen einzigen Eintrag (Nur-lesen, leerer Monat,
+ * niemand zustaendig) gibt es auch keinen Knopf. */
+function listToolsMenuHtml() {
+  const items = [];
+  if (state.entries.some((e) => e.responsible_users?.length)) {
+    const on = state.groupByResponsible;
+    items.push(`
+      <button type="button" role="menuitemcheckbox" aria-checked="${on ? 'true' : 'false'}"
+              class="popover-menu__item" id="budget-group-responsible">
+        <i data-lucide="check" class="icon-md popover-menu__item-check${on ? '' : ' popover-menu__item-check--hidden'}" aria-hidden="true"></i>
+        <span>${esc(t('budget.groupByResponsible'))}</span>
+      </button>`);
+  }
+  if (!readOnly()) {
+    items.push(`
+      <button type="button" role="menuitem" class="popover-menu__item budget-manage-categories" id="budget-manage-categories">
+        <i data-lucide="tags" class="icon-md" aria-hidden="true"></i>
+        <span>${esc(t('budget.manageCategories'))}</span>
+      </button>`);
+  }
+  if (state.entries.length) {
+    const href = `/api/v1/budget/export?month=${encodeURIComponent(state.month)}${state.budgetMode === 'personal' ? `&scope=${encodeURIComponent(state.scope)}` : ''}`;
+    items.push(`
+      <a role="menuitem" class="popover-menu__item budget-csv-export" href="${esc(href)}">
+        <i data-lucide="download" class="icon-md" aria-hidden="true"></i>
+        <span>${esc(t('budget.csvExport'))}</span>
+      </a>`);
+  }
+  if (!items.length) return '';
+  const label = t('common.moreActions');
+  return `
+    <button type="button" class="btn btn--secondary btn--icon budget-list-tools popover-menu__trigger"
+            popovertarget="budget-list-tools-menu" aria-haspopup="menu" aria-expanded="false"
+            aria-label="${esc(label)}" title="${esc(label)}">
+      <i data-lucide="ellipsis" class="icon-md" aria-hidden="true"></i>
+    </button>
+    <div class="popover-menu budget-list-tools-menu" id="budget-list-tools-menu" popover role="menu" aria-label="${esc(label)}">
+      ${items.join('')}
+    </div>`;
+}
+
 function renderCategoryBars(byCategory) {
   const maxAbs = Math.max(...byCategory.map((c) => Math.abs(c.total)), 1);
+  const lead = chartLeadIndexes(byCategory);
 
-  return byCategory.map((c) => {
+  return byCategory.map((c, i) => {
     const isExpense = c.total < 0;
     /* DER ANTEIL IST DER ANTEIL. Hier stand `Math.max(6, Math.round(rawPct))`.
      * Der Boden war selbst einmal ein Audit-Fix (P3): eine winzige Kategorie
@@ -1253,7 +1350,7 @@ function renderCategoryBars(byCategory) {
     // derselben Nulllinie in dieselbe Richtung, die Richtung steckte allein im
     // Farbton. Jetzt spiegeln beide um eine gemeinsame Mittelachse.
     return `
-      <div class="budget-bar-row budget-bar-row--mirrored">
+      <div class="budget-bar-row budget-bar-row--mirrored${lead.has(i) ? ' budget-bar-row--lead' : ''}">
         <div class="budget-bar-row__label" title="${esc(categoryLabel(c.category))}">${esc(categoryLabel(c.category))}</div>
         <div class="budget-bar-row__track">
           <div class="budget-bar-row__fill ${cls}" style="--bar-scale:${scale.toFixed(4)};--bar-visible:${c.total !== 0 ? 1 : 0}"></div>
@@ -3881,6 +3978,12 @@ async function deleteEntrySeries(id) {
 // statt Quelltext-Regex.
 export const __test = {
   monthNavHtml,
+  // Critique 2026-09-25, Mobil: Top-3-Auswahl des Diagramms und das EINE
+  // Werkzeug-Menue der Buchungsliste, als Programm statt als Quelltext.
+  chartLeadIndexes,
+  renderCategoryBars,
+  listToolsMenuHtml,
+  CHART_LEAD,
   syncCurrentButton,
   tabCaps,
   tabFromQuery,

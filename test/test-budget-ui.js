@@ -1853,3 +1853,116 @@ test('Gruppe löschen trägt eine andere Gewichtung als bearbeiten/archivieren',
   assert.match(splitExpenses, /class="btn btn--icon btn--danger-outline" id="split-delete-group"/,
     'Löschen muss sich sichtbar von Bearbeiten/Archivieren abheben, ohne die Zeile zu dominieren');
 });
+
+// --------------------------------------------------------
+// Mobil: Inhalt ueber den Falz (Critique 2026-09-25, Schritt 2)
+// --------------------------------------------------------
+
+/* DER BUDGETKOPF KLAPPT WIE DER KALENDER GANZ EIN. Mit dem blossen
+ * Inline-Schnitt blieb der Titel auf seiner Zeile (Monatsstepper fuellt sie
+ * mobil), der Kollaps sparte 14px (170 -> 156). Die Regel steht geteilt in
+ * layout.css an `.page-toolbar--period`; ohne die Klasse gilt sie nicht. */
+test('Budgetkopf traegt page-toolbar--period: eingeklappt verlaesst der Titel das Bild', () => {
+  assert.match(budget, /<div class="page-toolbar[^"]*\bpage-toolbar--period\b[^"]*\bbudget-nav\b[^"]*">/,
+    'der Budgetkopf fuehrt den Monat im Center-Slot und muss `page-toolbar--period` tragen');
+  const rules = [...eachRule(layoutCss)];
+  const title = rules.find((r) => r.selector.trim()
+    === '.page-toolbar--period.page-toolbar--capped.is-collapsed > .page-toolbar__title');
+  assert(title && /clip-path:\s*inset\(50%\)/.test(title.body) && /position:\s*absolute/.test(title.body),
+    'die geteilte Regel muss den eingeklappten Titel aus dem Fluss nehmen und klippen');
+  assert(title.at.some((a) => /max-width:\s*1023px/.test(a)), 'nur unterhalb der Desktop-Breite');
+  const calendarCss = read('../public/styles/calendar.css');
+  assert.doesNotMatch(calendarCss.replace(/\/\*[\s\S]*?\*\//g, ''), /\.cal-toolbar\.page-toolbar--capped\.is-collapsed/,
+    'keine zweite, kalendereigene Kopie der Regel');
+});
+
+test('Kategorie-Diagramm: die drei groessten AUSGABEN fuehren, Einnahmen fuellen nur auf', () => {
+  const cats = (...totals) => totals.map((total, i) => ({ category: `k${i}`, total }));
+  const pick = (list) => [...budgetUi.chartLeadIndexes(list)].sort((a, b) => a - b);
+  // Reihenfolge wie vom Server (nach Betrag): Einnahme, Ausgabe, Einnahme, Ausgabe ...
+  assert.deepEqual(pick(cats(5050, -1620.99, 500, -482.75, -371.4, -234.98)), [1, 3, 4],
+    'die groesste Einnahme darf keinen der drei Plaetze belegen, solange es drei Ausgaben gibt');
+  assert.deepEqual(pick(cats(5050, -100, 500, 20)), [0, 1, 2],
+    'mit nur einer Ausgabe fuellen die groessten Einnahmen auf');
+  assert.equal(budgetUi.CHART_LEAD, 3);
+
+  const html = budgetUi.renderCategoryBars(cats(5050, -1620.99, 500, -482.75, -371.4, -234.98));
+  assert.equal((html.match(/budget-bar-row--lead/g) ?? []).length, 3, 'genau drei Zeilen tragen die Markierung');
+  assert.equal((html.match(/class="budget-bar-row /g) ?? []).length, 6,
+    'alle Zeilen bleiben im Markup - die Kuerzung ist eine Darstellung, keine Datenkuerzung');
+});
+
+test('Kategorie-Diagramm: gekuerzt nur einspaltig, mit „Alle Kategorien (N)" im Kopf', () => {
+  const rules = [...eachRule(budgetCss)];
+  const single = (r) => r.at.some((a) => /@container budget-page \(width < 960px\)/.test(a));
+  const hide = rules.find((r) => single(r)
+    && r.selector.trim() === '.budget-chart:not(.is-expanded) > .budget-bar-row:not(.budget-bar-row--lead)');
+  assert(hide && /display:\s*none/.test(hide.body),
+    'einspaltig (unter 960px Container, dieselbe Grenze wie der Zweispalter) blenden die unmarkierten Zeilen aus');
+  assert(!rules.some((r) => !single(r) && /budget-bar-row--lead\)/.test(r.selector) && /display:\s*none/.test(r.body)),
+    'ausserhalb der einspaltigen Lage wird nichts gekuerzt - neben den Buchungen bleibt das Diagramm voll');
+  const base = rules.find((r) => r.at.length === 0 && r.selector.trim() === '.budget-chart-more');
+  assert(base && /display:\s*none/.test(base.body), 'im Zweispalter gibt es nichts aufzuklappen');
+  const shown = rules.find((r) => single(r) && r.selector.trim() === '.budget-chart-more');
+  assert(shown && !/display:\s*none/.test(shown.body), 'einspaltig steht der Knopf da');
+
+  const src = withoutHtmlComments(budget);
+  assert.match(src, /\$\{s\.byCategory\.length > CHART_LEAD \? `\s*<button type="button" class="budget-chart-more" id="budget-chart-more"\s*aria-expanded="\$\{state\.categoriesExpanded \? 'true' : 'false'\}" aria-controls="budget-chart">/,
+    'der Knopf erscheint erst ab vier Kategorien und meldet seinen Zustand (aria-expanded, aria-controls)');
+  const head = src.match(/<div class="budget-chart-head">([\s\S]*?)<\/div>\s*<p class="sr-only">/);
+  assert(head && head[1].includes('id="budget-chart-more"'), 'der Knopf steht in der Titelzeile, nicht als eigene Zeile');
+});
+
+/* EIN WERKZEUG-MENUE: Kategorien verwalten, CSV und die Gruppierung standen
+ * als bis zu drei beschriftete Knoepfe im Listenkopf und brachen mobil um
+ * (124px). Jetzt ein Knopf, die Werkzeuge im geteilten popover-menu. */
+test('Listenkopf: Kategorien verwalten und CSV stehen in EINEM Menue, nicht als Knoepfe', () => {
+  const vorher = { ...budgetUi.state };
+  try {
+    Object.assign(budgetUi.state, {
+      month: '2026-09', budgetMode: 'shared', groupByResponsible: true,
+      entries: [{ id: 1, total: -5, responsible_users: [{ id: 3, display_name: 'Linda' }] }],
+    });
+    const html = budgetUi.listToolsMenuHtml();
+    assert.equal((html.match(/popovertarget="budget-list-tools-menu"/g) ?? []).length, 1, 'genau ein Ausloeser');
+    assert.equal((html.match(/<button\b/g) ?? []).length, 3, 'Ausloeser + Gruppierung + Kategorien, nichts sonst als Knopf');
+    const menu = html.slice(html.indexOf('<div class="popover-menu'));
+    assert.match(menu, /role="menu"/);
+    assert.match(menu, /id="budget-manage-categories"[\s\S]*budget\.manageCategories/, 'Kategorien verwalten im Menue');
+    assert.match(menu, /<a role="menuitem" class="popover-menu__item budget-csv-export" href="\/api\/v1\/budget\/export\?month=2026-09"/,
+      'der CSV-Export ist ein Menue-Link auf denselben Endpunkt');
+    assert.match(menu, /role="menuitemcheckbox" aria-checked="true"[^>]*id="budget-group-responsible"/,
+      'die Gruppierung ist ein Umschalter mit Zustand');
+    assert.doesNotMatch(html, /class="btn btn--secondary budget-(manage-categories|csv-export)/,
+      'kein beschrifteter Einzelknopf mehr im Listenkopf');
+
+    Object.assign(budgetUi.state, { entries: [] });
+    const leer = budgetUi.listToolsMenuHtml();
+    assert.doesNotMatch(leer, /budget-csv-export|budget-group-responsible/, 'leerer Monat: kein Export, keine Gruppierung');
+  } finally {
+    Object.assign(budgetUi.state, vorher);
+  }
+  const src = withoutHtmlComments(budget);
+  assert.match(src, /<div class="budget-list-header__actions">\$\{listToolsMenuHtml\(\)\}<\/div>/,
+    'der Listenkopf rendert nur das Menue');
+  assert.match(src, /installPopoverMenus\(container\)/, 'Position, Schliessen und Pfeiltasten an der stabilen Wurzel');
+});
+
+/* SALDO ALS KOPFWERT, TRENDS WIEDER DA. Unter 640px stand die Saldo-Karte
+ * allein in einer vollen Zeile unter zwei halben, und der Vormonatstrend war
+ * unter 480px Container ausgeblendet. */
+test('Kennzahlen mobil: Saldo als Kopfwert vor Einnahmen/Ausgaben, Trend sichtbar', () => {
+  const rules = [...eachRule(budgetCss)];
+  const hidden = rules.filter((r) => /\.metric-card__trend\b/.test(r.selector) && /display:\s*none/.test(r.body));
+  assert.deepEqual(hidden.map((r) => r.selector), [], 'der Vormonatstrend darf auf keiner Breite ausgeblendet sein');
+  const band = rules.find((r) => r.at.some((a) => /max-width:\s*639px/.test(a))
+    && r.selector.trim() === '.budget-overview .metric-grid:not(.metric-grid--expenses-only) > .metric-card:last-child');
+  assert(band, 'keine Kopfwert-Regel fuer die Saldo-Karte unter 640px');
+  assert.match(band.body, /order:\s*-1/, 'der Saldo steht vor seiner Herleitung');
+  assert.match(band.body, /grid-template-areas:\s*"label value"\s*"trend value"/,
+    'Label und Trend links, der Betrag rechts - eine flache Zeile statt einer vollen Karte');
+  const rows = rules.find((r) => r.at.some((a) => /max-width:\s*639px/.test(a))
+    && r.selector.trim() === '.budget-overview .metric-grid:not(.metric-grid--expenses-only)');
+  assert(rows && /grid-auto-rows:\s*auto/.test(rows.body),
+    'ohne auto zoege die geteilte 1fr-Regel den flachen Kopfwert auf Kartenhoehe auf');
+});

@@ -329,6 +329,7 @@ const PLURAL_EXCEPTIONS = {
   'documents.bulkUploadedToast': 'TODO_ONE',
   'documents.selectedFilesLabel': 'TODO_ONE',
   'budget.chartSummary': 'TODO_ONE',
+  'budget.showAllCategories': 'TODO_ONE',        // Knopf erst ab 4 Kategorien (CHART_LEAD), Zahl in Klammern
   'budget.statsDonutSummary': 'TODO_ONE',
   'health.labs.analyteCount': 'TODO_ONE',
   'health.cycle.status.inDays': 'TODO_ONE',

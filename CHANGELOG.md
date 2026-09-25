@@ -72,6 +72,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Expenses only" sits in the heading of the month summary instead of a line of its own, with a
   larger target.
 
+- **Budget: bookings above the fold on a phone.** On a 390x844 phone the first booking used to sit
+  below the screen; now two are visible straight away. The balance leads the month summary in one
+  flat row with the income and expense cards below it, and the change against the previous month
+  is shown again on every card. Wherever the overview has a single column (phones, and laptops
+  with the sidebar open) the category chart shows the three largest expenses, with "All categories"
+  in its heading to expand it. "Manage categories", the CSV export and grouping by person are one
+  menu next to "Transactions" instead of buttons that wrapped over two lines. When you scroll, the
+  "Budget" title folds away like the calendar's and the header shrinks from 162 to 117px.
+
 - **The calendar gives phones more room for events.** Filter and search moved next to the view
   switcher, so the calendar header on a phone is 166px instead of 230px, and when you scroll the
   week, day or agenda, the page title folds away completely and leaves only the date navigation
