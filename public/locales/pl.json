@@ -3386,6 +3386,8 @@
         "emptyArchivedDescription": "Zarchiwizowane dokumenty są zachowywane, ale znikają z listy aktywnych.",
         "resetFiltersAction": "Wyczyść filtry",
         "showActiveAction": "Pokaż aktywne dokumenty",
+        "searchArchivedAction": "Szukaj w archiwum",
+        "searchActiveAction": "Szukaj w aktywnych dokumentach",
         "sortLabel": "Sortowanie",
         "sortUpdated": "Ostatnia zmiana",
         "sortName": "Nazwa",

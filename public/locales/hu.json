@@ -3386,6 +3386,8 @@
         "emptyArchivedDescription": "Az archivált dokumentumok megmaradnak, de eltűnnek az aktív listából.",
         "resetFiltersAction": "Szűrők törlése",
         "showActiveAction": "Aktív dokumentumok megjelenítése",
+        "searchArchivedAction": "Keresés az archívumban",
+        "searchActiveAction": "Keresés az aktív dokumentumokban",
         "sortLabel": "Rendezés",
         "sortUpdated": "Utoljára módosítva",
         "sortName": "Név",

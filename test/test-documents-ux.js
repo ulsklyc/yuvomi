@@ -1731,3 +1731,26 @@ test('in der schmalen Rasterkarte passt der Titel: Subheadline und bis zu drei Z
   assert.ok(css.indexOf('@container document-card (max-width: 12rem) {\n  .document-card__title') > css.indexOf('.document-card__title {\n  hyphens: auto;'),
     'die Container-Regel steht HINTER der Basisregel, sonst gewinnt die Basis');
 });
+
+test('eine leere Suche bietet die andere Ansicht an - aber nur, wenn sie dort etwas findet', () => {
+  // Re-Critique 2026-09-25 (Alex): "in dieser Ansicht" stand da, ein Weg ins
+  // Archiv nicht. Der Knopf erscheint nur mit Treffern drueben - ein Weg in
+  // den naechsten Leerzustand waere schlechter als keiner.
+  const empty = fnBody('emptyStateFor', 'renderEmptyState');
+  assert.match(empty, /otherStatusHits\(\) > 0/, 'der Weg haengt an echten Treffern der anderen Ansicht');
+  assert.match(empty, /id: 'documents-empty-other-status'/);
+  assert.match(empty, /state\.status === 'active' \? 'documents\.searchArchivedAction' : 'documents\.searchActiveAction'/);
+  const render = fnBody('renderEmptyState', 'renderDocuments');
+  assert.match(render, /if \(state\.query\) probeOtherStatusSearch\(\);/, 'der Leerzustand der Suche fragt die andere Ansicht');
+  assert.match(render, /#documents-empty-other-status'\)\?\.addEventListener\('click', \(\) => _statusTablist\?\.setActive\(otherStatus\(\), \{ focus: true \}\)\)/);
+  // Die Probe verwirft veraltete Antworten und schluckt keine Programmierfehler.
+  const probe = page.slice(page.indexOf('async function probeOtherStatusSearch()'), page.indexOf('function emptyStateFor()'));
+  assert.match(probe, /if \(token !== otherStatusProbe \|\| state\.query !== query \|\| state\.status !== status\) return;/);
+  assert.match(probe, /if \(err\?\.name !== 'ApiError'\) throw err;/);
+  for (const file of readdirSync(new URL('../public/locales/', import.meta.url)).filter((f) => f.endsWith('.json'))) {
+    const locale = JSON.parse(read(`../public/locales/${file}`));
+    for (const key of ['searchArchivedAction', 'searchActiveAction']) {
+      assert.equal(typeof locale.documents?.[key], 'string', `${file}: documents.${key} fehlt`);
+    }
+  }
+});

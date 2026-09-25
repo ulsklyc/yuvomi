@@ -3386,6 +3386,8 @@
         "emptyArchivedDescription": "Nananatili ang mga naka-archive na dokumento pero nawawala sila sa aktibong listahan.",
         "resetFiltersAction": "I-reset ang mga filter",
         "showActiveAction": "Ipakita ang mga aktibong dokumento",
+        "searchArchivedAction": "Maghanap sa archive",
+        "searchActiveAction": "Maghanap sa mga aktibong dokumento",
         "sortLabel": "Pag-uuri",
         "sortUpdated": "Huling binago",
         "sortName": "Pangalan",

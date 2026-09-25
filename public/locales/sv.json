@@ -3326,6 +3326,8 @@
         "emptyArchivedDescription": "Arkiverade dokument sparas men försvinner från den aktiva listan.",
         "resetFiltersAction": "Återställ filter",
         "showActiveAction": "Visa aktiva dokument",
+        "searchArchivedAction": "Sök i arkivet",
+        "searchActiveAction": "Sök bland aktiva dokument",
         "sortLabel": "Sortering",
         "sortUpdated": "Senast ändrad",
         "sortName": "Namn",

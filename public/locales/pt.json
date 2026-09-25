@@ -3326,6 +3326,8 @@
         "emptyArchivedDescription": "Os documentos arquivados são mantidos, mas desaparecem da lista ativa.",
         "resetFiltersAction": "Repor filtros",
         "showActiveAction": "Mostrar documentos ativos",
+        "searchArchivedAction": "Pesquisar no arquivo",
+        "searchActiveAction": "Pesquisar nos documentos ativos",
         "sortLabel": "Ordenação",
         "sortUpdated": "Última alteração",
         "sortName": "Nome",

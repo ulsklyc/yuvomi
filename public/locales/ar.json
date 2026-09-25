@@ -3326,6 +3326,8 @@
         "emptyArchivedDescription": "تُحفظ المستندات المؤرشفة لكنها تختفي من القائمة النشطة.",
         "resetFiltersAction": "إعادة ضبط عوامل التصفية",
         "showActiveAction": "عرض المستندات النشطة",
+        "searchArchivedAction": "البحث في الأرشيف",
+        "searchActiveAction": "البحث في المستندات النشطة",
         "sortLabel": "الترتيب",
         "sortUpdated": "آخر تعديل",
         "sortName": "الاسم",

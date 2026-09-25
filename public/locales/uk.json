@@ -3326,6 +3326,8 @@
         "emptyArchivedDescription": "Архівовані документи зберігаються, але зникають з активного списку.",
         "resetFiltersAction": "Скинути фільтри",
         "showActiveAction": "Показати активні документи",
+        "searchArchivedAction": "Шукати в архіві",
+        "searchActiveAction": "Шукати в активних документах",
         "sortLabel": "Сортування",
         "sortUpdated": "Остання зміна",
         "sortName": "Назва",

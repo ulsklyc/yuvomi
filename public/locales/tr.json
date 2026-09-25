@@ -3326,6 +3326,8 @@
         "emptyArchivedDescription": "Arşivlenen belgeler saklanır ama etkin listeden kaybolur.",
         "resetFiltersAction": "Filtreleri sıfırla",
         "showActiveAction": "Etkin belgeleri göster",
+        "searchArchivedAction": "Arşivde ara",
+        "searchActiveAction": "Etkin belgelerde ara",
         "sortLabel": "Sıralama",
         "sortUpdated": "Son değiştirilme",
         "sortName": "Ad",

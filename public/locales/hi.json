@@ -3326,6 +3326,8 @@
         "emptyArchivedDescription": "संग्रहित दस्तावेज़ सुरक्षित रहते हैं पर सक्रिय सूची से हट जाते हैं।",
         "resetFiltersAction": "फ़िल्टर रीसेट करें",
         "showActiveAction": "सक्रिय दस्तावेज़ दिखाएँ",
+        "searchArchivedAction": "संग्रह में खोजें",
+        "searchActiveAction": "सक्रिय दस्तावेज़ों में खोजें",
         "sortLabel": "क्रमबद्ध करें",
         "sortUpdated": "अंतिम बदलाव",
         "sortName": "नाम",

@@ -3326,6 +3326,8 @@
         "emptyArchivedDescription": "Τα αρχειοθετημένα έγγραφα διατηρούνται αλλά εξαφανίζονται από την ενεργή λίστα.",
         "resetFiltersAction": "Επαναφορά φίλτρων",
         "showActiveAction": "Εμφάνιση ενεργών εγγράφων",
+        "searchArchivedAction": "Αναζήτηση στο αρχείο",
+        "searchActiveAction": "Αναζήτηση στα ενεργά έγγραφα",
         "sortLabel": "Ταξινόμηση",
         "sortUpdated": "Τελευταία τροποποίηση",
         "sortName": "Όνομα",

@@ -131,6 +131,9 @@ function readStoredSortDirection(sort) {
 let state = {
   allDocuments: [],
   documents: [],
+  // Treffer der leeren Suche in der ANDEREN Ansicht: { status, query, count }
+  // (probeOtherStatusSearch). Gilt nur fuer genau diesen Status und Begriff.
+  otherStatusHits: null,
   folders: [],
   members: [],
   dmsAccounts: [],
@@ -851,6 +854,40 @@ function hasActiveFilter() {
 // behauptete „Noch keine Dokumente", während der Ordner-Browser daneben 6 zählte,
 // und bot mit „Hochladen" die falsche Reparatur an. Jeder Zustand nennt jetzt die
 // tatsächliche Ursache und die Aktion, die sie auflöst.
+/* DIE ANDERE ANSICHT FUER EINE LEERE SUCHE (Re-Critique 2026-09-25). Findet die
+ * Suche in "Aktiv" nichts, kann das Gesuchte im Archiv liegen - und umgekehrt.
+ * Die Probe fragt die andere Ansicht einmal je Suchbegriff und Status ab und
+ * zaehlt nur ueber den Suchbegriff (Kategorie und Ordner gelten drueben nicht
+ * automatisch). Der Weg erscheint nur mit Treffern: ein Knopf in den naechsten
+ * Leerzustand waere schlechter als keiner. Veraltete Antworten fallen weg. */
+let otherStatusProbe = 0;
+
+function otherStatus() {
+  return state.status === 'active' ? 'archived' : 'active';
+}
+
+function otherStatusHits() {
+  const hits = state.otherStatusHits;
+  return hits && hits.status === state.status && hits.query === state.query ? hits.count : 0;
+}
+
+async function probeOtherStatusSearch() {
+  const { query, status } = state;
+  const hits = state.otherStatusHits;
+  if (hits && hits.status === status && hits.query === query) return;
+  const token = ++otherStatusProbe;
+  let docs;
+  try {
+    docs = (await api.get(`/documents?status=${encodeURIComponent(otherStatus())}`)).data || [];
+  } catch (err) {
+    if (err?.name !== 'ApiError') throw err;
+    return;
+  }
+  if (token !== otherStatusProbe || state.query !== query || state.status !== status) return;
+  state.otherStatusHits = { status, query, count: docs.filter((doc) => matchesDocumentQuery(doc, query)).length };
+  if (state.otherStatusHits.count && !filteredDocuments().length) renderDocuments();
+}
+
 function emptyStateFor() {
   if (state.query) {
     return {
@@ -860,6 +897,14 @@ function emptyStateFor() {
       description: t('documents.emptySearchDescription', { query: state.queryText }),
       actions: [
         { id: 'documents-empty-clear-search', label: t('common.searchClear'), icon: 'x', variant: 'primary' },
+        ...(otherStatusHits() > 0
+          ? [{
+            id: 'documents-empty-other-status',
+            label: t(state.status === 'active' ? 'documents.searchArchivedAction' : 'documents.searchActiveAction'),
+            icon: state.status === 'active' ? 'archive' : 'corner-up-left',
+            variant: 'secondary',
+          }]
+          : []),
         ...(hasActiveFilter()
           ? [{ id: 'documents-empty-reset', label: t('documents.resetFiltersAction'), icon: 'filter-x', variant: 'secondary' }]
           : []),
@@ -924,6 +969,8 @@ function renderEmptyState(list) {
   list.querySelector('#documents-empty-clear-search')?.addEventListener('click', () => clearSearch());
   list.querySelector('#documents-empty-reset')?.addEventListener('click', () => resetFilters());
   list.querySelector('#documents-empty-active')?.addEventListener('click', () => _statusTablist?.setActive('active', { focus: true }));
+  list.querySelector('#documents-empty-other-status')?.addEventListener('click', () => _statusTablist?.setActive(otherStatus(), { focus: true }));
+  if (state.query) probeOtherStatusSearch();
 }
 
 function renderDocuments() {

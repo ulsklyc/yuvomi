@@ -3326,6 +3326,8 @@
         "emptyArchivedDescription": "アーカイブした文書は保持されますが、アクティブな一覧からは消えます。",
         "resetFiltersAction": "フィルターをリセット",
         "showActiveAction": "アクティブな文書を表示",
+        "searchArchivedAction": "アーカイブを検索",
+        "searchActiveAction": "アクティブな文書を検索",
         "sortLabel": "並べ替え",
         "sortUpdated": "最終更新",
         "sortName": "名前",

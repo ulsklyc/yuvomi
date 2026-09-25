@@ -3326,6 +3326,8 @@
         "emptyArchivedDescription": "已归档的文档会保留，但不再出现在活动列表中。",
         "resetFiltersAction": "重置筛选",
         "showActiveAction": "查看活动文档",
+        "searchArchivedAction": "在归档中搜索",
+        "searchActiveAction": "在活动文档中搜索",
         "sortLabel": "排序",
         "sortUpdated": "最近修改",
         "sortName": "名称",

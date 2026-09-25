@@ -3326,6 +3326,8 @@
         "emptyArchivedDescription": "Архивные документы сохраняются, но исчезают из активного списка.",
         "resetFiltersAction": "Сбросить фильтры",
         "showActiveAction": "Показать активные документы",
+        "searchArchivedAction": "Искать в архиве",
+        "searchActiveAction": "Искать в активных документах",
         "sortLabel": "Сортировка",
         "sortUpdated": "Последнее изменение",
         "sortName": "Имя",

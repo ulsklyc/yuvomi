@@ -3386,6 +3386,8 @@
         "emptyArchivedDescription": "보관한 문서는 유지되지만 활성 목록에서는 사라집니다.",
         "resetFiltersAction": "필터 초기화",
         "showActiveAction": "활성 문서 보기",
+        "searchArchivedAction": "보관함에서 검색",
+        "searchActiveAction": "활성 문서에서 검색",
         "sortLabel": "정렬",
         "sortUpdated": "최근 수정순",
         "sortName": "이름",

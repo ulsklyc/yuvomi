@@ -3386,6 +3386,8 @@
         "emptyArchivedDescription": "Dokumen yang diarsipkan tetap tersimpan tetapi hilang dari daftar aktif.",
         "resetFiltersAction": "Atur ulang filter",
         "showActiveAction": "Tampilkan dokumen aktif",
+        "searchArchivedAction": "Cari di arsip",
+        "searchActiveAction": "Cari di dokumen aktif",
         "sortLabel": "Urutan",
         "sortUpdated": "Terakhir diubah",
         "sortName": "Nama",

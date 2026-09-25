@@ -3386,6 +3386,8 @@
         "emptyArchivedDescription": "Tài liệu đã lưu trữ vẫn được giữ lại nhưng biến mất khỏi danh sách đang hoạt động.",
         "resetFiltersAction": "Đặt lại bộ lọc",
         "showActiveAction": "Hiện tài liệu đang hoạt động",
+        "searchArchivedAction": "Tìm trong kho lưu trữ",
+        "searchActiveAction": "Tìm trong tài liệu đang hoạt động",
         "sortLabel": "Sắp xếp",
         "sortUpdated": "Sửa lần cuối",
         "sortName": "Tên",

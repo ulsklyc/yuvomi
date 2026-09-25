@@ -3517,6 +3517,8 @@
         "emptyArchivedDescription": "Archivované dokumenty zůstávají zachovány, ale mizí z aktivního seznamu.",
         "resetFiltersAction": "Zrušit filtry",
         "showActiveAction": "Zobrazit aktivní dokumenty",
+        "searchArchivedAction": "Hledat v archivu",
+        "searchActiveAction": "Hledat v aktivních dokumentech",
         "sortLabel": "Řazení",
         "sortUpdated": "Poslední změna",
         "sortName": "Název",

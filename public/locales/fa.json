@@ -3386,6 +3386,8 @@
         "emptyArchivedDescription": "سندهای بایگانی‌شده نگه داشته می‌شوند اما از فهرست فعال ناپدید می‌شوند.",
         "resetFiltersAction": "بازنشانی فیلترها",
         "showActiveAction": "نمایش سندهای فعال",
+        "searchArchivedAction": "جستجو در بایگانی",
+        "searchActiveAction": "جستجو در سندهای فعال",
         "sortLabel": "مرتب‌سازی",
         "sortUpdated": "آخرین تغییر",
         "sortName": "نام",

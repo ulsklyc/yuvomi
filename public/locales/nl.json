@@ -3386,6 +3386,8 @@
         "emptyArchivedDescription": "Gearchiveerde documenten blijven bewaard, maar verdwijnen uit de actieve lijst.",
         "resetFiltersAction": "Filters wissen",
         "showActiveAction": "Actieve documenten tonen",
+        "searchArchivedAction": "Zoeken in het archief",
+        "searchActiveAction": "Zoeken in actieve documenten",
         "sortLabel": "Sortering",
         "sortUpdated": "Laatst gewijzigd",
         "sortName": "Naam",
