@@ -27,6 +27,13 @@ import { subtreeIds, folderPath, flattenFolderTree } from '/utils/folder-tree.js
 import { dateStatus } from '/utils/date-status.js';
 import { expiryChipSpec, expiryViewerSpec } from '/utils/document-expiry.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
+import { createPageController } from '/utils/page-lifecycle.js';
+import {
+  browserThumbRenderers,
+  createDocumentThumbs,
+  documentStorageBackend,
+  documentThumbKind,
+} from '/utils/document-thumbs.js';
 import { wireTablist } from '/utils/tablist.js';
 import {
   DOCUMENT_SORTS,
@@ -167,9 +174,22 @@ function persistExpandedFolders() {
 let _container = null;
 let _search = null;
 let _statusTablist = null;
+// Seitenleben (utils/page-lifecycle.js): faellt mit dem Router-Signal, wenn die
+// Route wechselt. Daran haengen die Vorschaubilder - ihr Speicher, ihre Abrufe
+// und der pdf.js-Worker enden mit der Seite, nicht irgendwann.
+let _pageController = null;
+let _thumbs = null;
+let _thumbObserver = null;
 
-export async function render(container) {
+export async function render(container, context = {}) {
   _container = container;
+  _pageController?.abort();
+  _pageController = createPageController(context.signal);
+  _thumbs = createDocumentThumbs({ signal: _pageController.signal, renderers: browserThumbRenderers() });
+  _pageController.signal.addEventListener('abort', () => {
+    _thumbObserver?.disconnect();
+    _thumbObserver = null;
+  }, { once: true });
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <div class="documents-page app-page app-page--full" data-composition="full">
@@ -870,6 +890,7 @@ function renderDocuments() {
   list.insertAdjacentHTML('beforeend', docs.map((doc) => state.view === 'list' ? renderListItem(doc) : renderGridCard(doc)).join(''));
   if (window.lucide) lucide.createIcons({ el: list });
   wireThumbnails(list);
+  wireLocalThumbs(list);
   stagger(list.querySelectorAll('.document-card, .document-row'));
 }
 
@@ -1451,11 +1472,6 @@ function renderMeta(doc, { showSize = true } = {}) {
   `;
 }
 
-function documentStorageBackend(doc) {
-  if (doc.storage_backend) return doc.storage_backend;
-  return doc.storage_provider === 'external' ? 'dms' : 'local';
-}
-
 // Kompaktes Vorschaubild (Issue #533): nur DMS-Dokumente mit vorhandenem Konto,
 // deren Provider Thumbnails liefert. Papra hat keinen Thumb-Endpoint -> gar nicht
 // erst anfragen, damit keine ins Leere laufenden 415-Requests entstehen.
@@ -1467,13 +1483,89 @@ function docSupportsThumbnail(doc) {
 
 // Icon-Slot einer Karte: Kategorie-Glyph, plus (bei Thumbnail-Support) ein Bild,
 // das nach erfolgreichem Laden das Glyph ersetzt. Schlägt das Laden fehl, bleibt
-// das Glyph stehen (Fallback auf die bisherige Darstellung).
+// das Glyph stehen (Fallback auf die bisherige Darstellung). Lokale Bilder und
+// PDFs bringen ihr Bild erst mit wireLocalThumbs() - hier steht nur die Glyphe,
+// die es verdecken kann.
 function renderDocIconSlot(doc) {
   const icon = `<i data-lucide="${CATEGORY_ICONS[doc.category] || 'file'}" aria-hidden="true"></i>`;
-  if (!docSupportsThumbnail(doc)) return icon;
-  return `<span class="document-thumb__glyph" data-thumb-icon>${icon}</span>`
+  const dms = docSupportsThumbnail(doc);
+  if (!dms && !documentThumbKind(doc)) return icon;
+  const glyph = `<span class="document-thumb__glyph" data-thumb-icon>${icon}</span>`;
+  if (!dms) return glyph;
+  return glyph
     + `<img class="document-thumb__img" data-thumb="clickable" src="/api/v1/documents/${doc.id}/thumbnail"`
     + ` alt="" loading="lazy" width="42" height="42" hidden>`;
+}
+
+/* Der Rahmen eines Vorschaubilds, in Zeile (42px-Kachel) und Karte (grosse
+ * Flaeche oben). `data-local-thumb` meldet ihn bei wireLocalThumbs() an. */
+function renderThumbSlot(doc, className) {
+  const local = documentThumbKind(doc) ? ' data-local-thumb' : '';
+  return `<div class="${className} document-thumb"${local}>${renderDocIconSlot(doc)}</div>`;
+}
+
+/* HANDSCHRIFT DES MODULS (Critique 2026-09-25, Entscheidung 2): ein lokales
+ * Bild zeigt sich selbst, ein lokales PDF seine erste Seite. Geladen wird erst,
+ * wenn der Rahmen in die Naehe des Blicks kommt; was diese Seite schon einmal
+ * gerendert hat, steht beim naechsten Neuzeichnen (Filter, Suche, Ansicht)
+ * sofort wieder da. Speicher, Warteschlange und Grenzen: utils/document-thumbs.js. */
+function wireLocalThumbs(root) {
+  _thumbObserver?.disconnect();
+  _thumbObserver = null;
+  if (!_thumbs || _pageController?.signal.aborted) return;
+  const waiting = [];
+  root.querySelectorAll('[data-local-thumb]').forEach((slot) => {
+    const doc = documentForThumbSlot(slot);
+    if (!doc) return;
+    const known = _thumbs.peek(doc);
+    if (known) showLocalThumb(slot, known, { fresh: false });
+    else if (known === undefined) waiting.push(slot);
+  });
+  if (!waiting.length) return;
+  _thumbObserver = new IntersectionObserver((entries, observer) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      observer.unobserve(entry.target);
+      const doc = documentForThumbSlot(entry.target);
+      if (!doc) continue;
+      _thumbs.load(doc).then((url) => {
+        if (url) showLocalThumb(entry.target, url, { fresh: true });
+      });
+    }
+  }, { root: scrollRootOf(root), rootMargin: '240px 0px' });
+  waiting.forEach((slot) => _thumbObserver.observe(slot));
+}
+
+/* Der Vorlauf (rootMargin) wirkt nur am Wurzel-Element des Observers. Die
+ * Dokumentenseite scrollt nicht im Fenster, sondern in der Shell (am Desktop
+ * `.app-content`) - mit dem Fenster als Wurzel schnitte der Scroller den
+ * Vorlauf ab, und eine Karte laedt erst, wenn sie schon im Bild steht. */
+function scrollRootOf(el) {
+  for (let node = el.parentElement; node && node !== document.body; node = node.parentElement) {
+    if (/(auto|scroll)/.test(getComputedStyle(node).overflowY)) return node;
+  }
+  return null;
+}
+
+function documentForThumbSlot(slot) {
+  const id = Number(slot.closest('[data-id]')?.dataset.id);
+  return state.allDocuments.find((doc) => doc.id === id) || null;
+}
+
+function showLocalThumb(slot, url, { fresh }) {
+  // Ein Rahmen, den ein Neuzeichnen inzwischen ersetzt hat, bekommt nichts mehr.
+  if (!slot.isConnected || slot.querySelector('.document-thumb__img')) return;
+  const img = document.createElement('img');
+  img.className = 'document-thumb__img';
+  img.alt = '';
+  img.decoding = 'async';
+  // Nur ein Bild, das gerade erst angekommen ist, blendet ein - eines aus dem
+  // Speicher stand schon da und soll beim Filtern nicht jedes Mal aufflackern.
+  if (fresh) img.dataset.thumbFresh = '';
+  img.src = url;
+  slot.append(img);
+  slot.querySelector('[data-thumb-icon]')?.setAttribute('hidden', '');
+  slot.classList.add('document-thumb--ready');
 }
 
 function fileTypeLabel(filename) {
@@ -1600,8 +1692,9 @@ function renderGridCard(doc) {
   const selected = state.selectMode && state.selected.has(doc.id);
   return `
     <article class="document-card${selected ? ' is-selected' : ''}" data-id="${doc.id}">
+      ${renderThumbSlot(doc, 'document-card__media')}
       <div class="document-card__header">
-        ${state.selectMode ? renderSelectBox(doc) : `<div class="document-card__icon document-thumb">${renderDocIconSlot(doc)}</div>`}
+        ${state.selectMode ? renderSelectBox(doc) : `<span class="document-card__type">${esc(fileTypeLabel(doc.original_name))}</span>`}
         <span class="document-card__date">${formatDate(doc.updated_at)}</span>
       </div>
       <div class="document-card__body">
@@ -1621,7 +1714,7 @@ function renderListItem(doc) {
   const selected = state.selectMode && state.selected.has(doc.id);
   return `
     <article class="list-row document-row${selected ? ' is-selected' : ''}" data-id="${doc.id}">
-      ${state.selectMode ? renderSelectBox(doc) : `<div class="document-row__icon document-thumb">${renderDocIconSlot(doc)}</div>`}
+      ${state.selectMode ? renderSelectBox(doc) : renderThumbSlot(doc, 'document-row__icon')}
       <div class="list-row__main document-row__body">
         <h2 class="list-row__name document-row__title">${esc(doc.name)}</h2>
         <div class="list-row__meta document-row__meta">${renderMeta(doc, { showSize: false })}</div>

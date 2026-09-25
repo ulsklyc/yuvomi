@@ -153,6 +153,14 @@ const IMPORT_EXCEPTIONS = [
       + '(21.09.2026) sichtbar; die Entscheidung liegt beim Maintainer.',
     stillValid: () => !API_CACHE_WHITELIST.some((p) => p === '/documents' || p.startsWith('/documents/')),
   },
+  {
+    dep: '/vendor/pdfjs/pdf.min.mjs',
+    from: '/utils/document-thumbs.js',
+    reason: 'Dieselbe Lage fuer die Vorschaubilder der Dokumentenseite (Critique 2026-09-25): '
+      + 'sie rendern die erste Seite aus derselben /preview-Datei, die offline nicht kommt - '
+      + 'und sie DARF nicht kommen, die Datei soll in keinem Cache des Geraets liegen.',
+    stillValid: () => !API_CACHE_WHITELIST.some((p) => p === '/documents' || p.startsWith('/documents/')),
+  },
 ];
 
 test('Leser: jede Importform zaehlt, Kommentar und Literaltext nicht (erfundene Faelle)', () => {

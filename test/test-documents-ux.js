@@ -785,7 +785,7 @@ test('der Ablauf-Chip steht als ERSTES Meta-Element', () => {
   // Er stand zuletzt, und die Zeilen-Meta ist einzeilig mit overflow: hidden:
   // bei 375px war "Laeuft in 5 Tagen ab" 0px sichtbar (Critique P1) - genau
   // die Angabe, fuer die ein Ablaufdatum eingetragen wird.
-  const meta = page.slice(page.indexOf('function renderMeta('), page.indexOf('function documentStorageBackend'));
+  const meta = page.slice(page.indexOf('function renderMeta('), page.indexOf('function docSupportsThumbnail'));
   const chip = meta.indexOf('${expiryChipHtml(doc)}');
   const category = meta.indexOf('CATEGORY_ICONS[doc.category]');
   assert.ok(chip > 0, 'renderMeta zeigt den Ablauf-Chip');
@@ -859,4 +859,238 @@ test('der Viewer nennt das Ablaufdatum in seiner Meta-Zeile', () => {
   assert.match(fn, /formatDate\(spec\.dateKey\)/);
   assert.doesNotMatch(fn, /new Date|toISOString/);
   assert.match(fn, /esc\(/);
+});
+
+// --------------------------------------------------------
+// Critique 2026-09-25, Entscheidung 2 - Vorschaubilder lokaler Dokumente
+// --------------------------------------------------------
+
+const thumbs = await import('../public/utils/document-thumbs.js').catch(() => null);
+const thumbsSrc = (() => {
+  try { return read('../public/utils/document-thumbs.js'); } catch { return ''; }
+})();
+
+const MB = 1024 * 1024;
+const localDoc = (over = {}) => ({
+  id: 1, updated_at: '2026-09-25 10:00:00', storage_backend: 'local',
+  mime_type: 'application/pdf', file_size: 120000, ...over,
+});
+
+test('eine Vorschau bekommen nur lokale Bilder und PDFs bis 10 MB (als Programm)', () => {
+  assert.ok(thumbs, 'public/utils/document-thumbs.js fehlt');
+  const kind = thumbs.documentThumbKind;
+  assert.equal(kind(localDoc()), 'pdf');
+  for (const mime of ['image/jpeg', 'image/png', 'image/webp', 'IMAGE/JPEG; charset=binary']) {
+    assert.equal(kind(localDoc({ mime_type: mime })), 'image', mime);
+  }
+  // Andere Typen: nichts zu zeigen, und kein Abruf.
+  for (const mime of ['text/plain', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/svg+xml', '', null]) {
+    assert.equal(kind(localDoc({ mime_type: mime })), null, String(mime));
+  }
+  // Nur lokal: Paperless hat seinen eigenen Thumbnail-Pfad, WebDAV/Drive
+  // kaemen ueber das Netz eines Dritten.
+  for (const backend of ['dms', 'webdav', 'google_drive']) {
+    assert.equal(kind(localDoc({ storage_backend: backend })), null, backend);
+  }
+  assert.equal(kind(localDoc({ storage_backend: undefined, storage_provider: 'external' })), null, 'Altzeile eines DMS-Links');
+  assert.equal(kind(localDoc({ storage_backend: undefined, storage_provider: 'local' })), 'pdf', 'Altzeile lokal');
+  // Grenze: 10 MB gerade noch, darueber die Glyphe; unbekannte Groesse nie.
+  assert.equal(kind(localDoc({ file_size: 10 * MB })), 'pdf');
+  assert.equal(kind(localDoc({ file_size: 10 * MB + 1 })), null);
+  for (const size of [0, -1, null, undefined, 'viel']) {
+    assert.equal(kind(localDoc({ file_size: size })), null, `Groesse ${size}`);
+  }
+  assert.equal(kind(null), null);
+});
+
+/** Ein Abruf, der erst auf Zuruf antwortet - so laesst sich die Nebenlaeufigkeit zaehlen. */
+function deferredFetch() {
+  const calls = [];
+  const fetchImpl = (url, init) => new Promise((resolve, reject) => {
+    calls.push({ url, init, resolve, reject });
+  });
+  const ok = (size = 1000) => ({ ok: true, status: 200, blob: async () => ({ size, type: 'application/pdf', arrayBuffer: async () => new ArrayBuffer(8) }) });
+  return { calls, fetchImpl, ok };
+}
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+test('Vorschauen laden hoechstens zwei gleichzeitig und ohne HTTP-Cache (als Programm)', async () => {
+  assert.ok(thumbs, 'public/utils/document-thumbs.js fehlt');
+  const net = deferredFetch();
+  const ac = new AbortController();
+  const store = thumbs.createDocumentThumbs({
+    signal: ac.signal,
+    fetchImpl: net.fetchImpl,
+    renderers: { pdf: async () => 'data:image/jpeg;base64,AA', image: async () => 'data:image/webp;base64,AA' },
+  });
+  const loads = [1, 2, 3, 4, 5].map((id) => store.load(localDoc({ id })));
+  await tick();
+  assert.equal(net.calls.length, 2, 'zwei Abrufe, drei warten');
+  assert.equal(store.queued, 3);
+  // Jede Datei wird ohne HTTP-Cache geholt: keine Kopie auf der Platte.
+  for (const call of net.calls) {
+    assert.equal(call.init.cache, 'no-store');
+    assert.equal(call.init.credentials, 'same-origin');
+    assert.equal(call.init.signal, ac.signal, 'der Abruf faellt mit der Seite');
+    assert.match(call.url, /^\/api\/v1\/documents\/\d+\/preview$/);
+  }
+  net.calls[0].resolve(net.ok());
+  await tick(); await tick(); await tick();
+  assert.equal(net.calls.length, 3, 'ein freier Platz zieht genau einen nach');
+  net.calls.slice(1).forEach((call) => call.resolve(net.ok()));
+  await tick(); await tick(); await tick();
+  net.calls.slice(3).forEach((call) => call.resolve(net.ok()));
+  assert.deepEqual(await Promise.all(loads), Array(5).fill('data:image/jpeg;base64,AA'));
+  assert.equal(net.calls.length, 5);
+  // Zweiter Blick: aus dem Seitenspeicher, ohne neuen Abruf.
+  assert.equal(store.peek(localDoc({ id: 3 })), 'data:image/jpeg;base64,AA');
+  assert.equal(await store.load(localDoc({ id: 3 })), 'data:image/jpeg;base64,AA');
+  assert.equal(net.calls.length, 5);
+  // Eine ersetzte Datei (neues updated_at) ist eine neue Vorschau.
+  assert.equal(store.peek(localDoc({ id: 3, updated_at: '2026-09-26 08:00:00' })), undefined);
+  // Ohne Anspruch kein Abruf.
+  assert.equal(await store.load(localDoc({ id: 9, file_size: 11 * MB })), null);
+  assert.equal(net.calls.length, 5);
+});
+
+test('der Vorschau-Speicher lebt nur im Seitenspeicher', () => {
+  // Arztbriefe und Ausweise: eine Kopie in IndexedDB, localStorage oder der
+  // Cache-API laege unverschluesselt auf dem Geraet und ueberlebte die Abmeldung.
+  assert.ok(thumbsSrc, 'public/utils/document-thumbs.js fehlt');
+  const code = thumbsSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  for (const store of [/\blocalStorage\b/, /\bsessionStorage\b/, /\bindexedDB\b/, /\bcaches\s*\./, /\bCacheStorage\b/, /navigator\.storage/]) {
+    assert.doesNotMatch(code, store, `document-thumbs.js benutzt ${store}`);
+  }
+  assert.match(code, /cache:\s*'no-store'/);
+  assert.match(code, /new Map\(\)/, 'der Speicher ist eine Map');
+  // Die Seite reicht den Speicher an nichts Persistentes weiter.
+  const wiring = page.slice(page.indexOf('function wireLocalThumbs('), page.indexOf('function showLocalThumb('));
+  assert.ok(wiring.length > 0, 'wireLocalThumbs fehlt');
+  assert.doesNotMatch(wiring, /localStorage|sessionStorage|indexedDB|caches\./);
+});
+
+test('beim Verlassen der Seite faellt der Vorschau-Speicher (als Programm)', async () => {
+  assert.ok(thumbs, 'public/utils/document-thumbs.js fehlt');
+  const net = deferredFetch();
+  const ac = new AbortController();
+  let disposed = 0;
+  const store = thumbs.createDocumentThumbs({
+    signal: ac.signal,
+    fetchImpl: net.fetchImpl,
+    renderers: { pdf: async () => 'data:image/jpeg;base64,AA', image: async () => 'x', dispose: () => { disposed += 1; } },
+  });
+  const first = store.load(localDoc({ id: 1 }));
+  await tick();
+  net.calls[0].resolve(net.ok());
+  assert.equal(await first, 'data:image/jpeg;base64,AA');
+  assert.equal(store.size, 1);
+  // Zwei laufen, zwei warten - dann verlaesst man die Seite.
+  const running = [2, 3].map((id) => store.load(localDoc({ id })));
+  const waiting = store.load(localDoc({ id: 4 }));
+  const late = store.load(localDoc({ id: 5 }));
+  await tick();
+  assert.equal(store.queued, 2);
+  ac.abort();
+  assert.equal(store.size, 0, 'nichts bleibt im Speicher');
+  assert.equal(store.queued, 0, 'die Warteschlange ist leer');
+  assert.equal(disposed, 1, 'der pdf.js-Worker wird beendet');
+  assert.equal(await waiting, null, 'ein wartender Auftrag haengt nicht ewig');
+  assert.equal(await late, null);
+  // Der abgebrochene Abruf endet still, auch wenn er noch eine Datei liefert.
+  net.calls[1].reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+  net.calls[2].resolve(net.ok());
+  assert.deepEqual(await Promise.all(running), [null, null]);
+  assert.equal(store.size, 0, 'was nach dem Verlassen ankommt, wird nicht mehr gespeichert');
+  // Und danach loest nichts mehr einen Abruf aus.
+  const calls = net.calls.length;
+  assert.equal(await store.load(localDoc({ id: 6 })), null);
+  assert.equal(net.calls.length, calls);
+});
+
+test('kaputte und geschuetzte Dateien enden in der Glyphe, Programmierfehler nicht (als Programm)', async () => {
+  assert.ok(thumbs, 'public/utils/document-thumbs.js fehlt');
+  const pdfError = (name) => Object.assign(new Error(name), { name });
+  const behaviours = {
+    1: () => { throw pdfError('PasswordException'); },
+    2: () => { throw pdfError('InvalidPDFException'); },
+    3: () => { throw new TypeError('renderer is broken'); },
+  };
+  let fetches = 0;
+  const store = thumbs.createDocumentThumbs({
+    signal: new AbortController().signal,
+    fetchImpl: async (url) => {
+      fetches += 1;
+      if (url.includes('/7/')) return { ok: false, status: 415 };
+      if (url.includes('/8/')) throw new TypeError('Failed to fetch');
+      return { ok: true, status: 200, blob: async () => ({ size: url.includes('/9/') ? 11 * MB : 10, arrayBuffer: async () => new ArrayBuffer(8) }) };
+    },
+    renderers: { pdf: async () => behaviours[currentId](), image: async () => 'x' },
+  });
+  let currentId = 0;
+  for (const id of [1, 2]) {
+    currentId = id;
+    assert.equal(await store.load(localDoc({ id })), null, `Fall ${id} -> Glyphe`);
+    assert.equal(store.peek(localDoc({ id })), null, 'gemerkt: kein zweiter Versuch');
+  }
+  assert.equal(await store.load(localDoc({ id: 7 })), null, 'HTTP 415');
+  assert.equal(await store.load(localDoc({ id: 8 })), null, 'offline');
+  assert.equal(await store.load(localDoc({ id: 9 })), null, 'Antwort groesser als angegeben');
+  const before = fetches;
+  await store.load(localDoc({ id: 1 }));
+  assert.equal(fetches, before, 'ein gescheitertes Dokument wird nicht erneut geholt');
+  currentId = 3;
+  await assert.rejects(store.load(localDoc({ id: 3 })), /renderer is broken/, 'ein TypeError im eigenen Code wird nicht verschluckt');
+  assert.equal(thumbs.isExpectedThumbError(new ReferenceError('x')), false);
+  assert.equal(thumbs.isExpectedThumbError(pdfError('UnknownErrorException')), true);
+});
+
+test('die Dokumentenseite haengt die Vorschauen an das Seitenleben', () => {
+  assert.match(page, /import \{ createPageController \} from '\/utils\/page-lifecycle\.js'/);
+  const render = page.slice(page.indexOf('export async function render('), page.indexOf('container.replaceChildren();', page.indexOf('export async function render(')));
+  assert.match(render, /export async function render\(container, context = \{\}\)/);
+  assert.match(render, /_pageController = createPageController\(context\.signal\)/);
+  assert.match(render, /createDocumentThumbs\(\{ signal: _pageController\.signal/);
+  assert.match(render, /_thumbObserver\?\.disconnect\(\)/, 'der Observer faellt mit der Seite');
+  // Lazy: erst im Blick, und die Liste zeichnet nach jedem Rendern neu an.
+  const wiring = page.slice(page.indexOf('function wireLocalThumbs('), page.indexOf('function showLocalThumb('));
+  assert.match(wiring, /new IntersectionObserver\(/);
+  assert.match(wiring, /_thumbs\.peek\(doc\)/, 'Gerendertes kommt sofort aus dem Seitenspeicher');
+  assert.match(wiring, /_thumbs\.load\(doc\)/);
+  const list = page.slice(page.indexOf('function renderDocuments('), page.indexOf('function visibleFolderRows('));
+  assert.match(list, /wireLocalThumbs\(list\)/);
+  // Zeile und Karte tragen denselben Rahmen; nur Kandidaten melden sich an.
+  assert.match(page, /renderThumbSlot\(doc, 'document-row__icon'\)/);
+  assert.match(page, /renderThumbSlot\(doc, 'document-card__media'\)/);
+  assert.match(page, /const local = documentThumbKind\(doc\) \? ' data-local-thumb' : ''/);
+});
+
+test('der Paperless-Pfad bleibt, wie er war', () => {
+  const fn = page.slice(page.indexOf('function docSupportsThumbnail('), page.indexOf('function renderDocIconSlot('));
+  assert.match(fn, /documentStorageBackend\(doc\) === 'dms'/);
+  assert.match(fn, /doc\.dms_provider === 'paperless'/);
+  const slot = page.slice(page.indexOf('function renderDocIconSlot('), page.indexOf('function renderThumbSlot('));
+  assert.match(slot, /src="\/api\/v1\/documents\/\$\{doc\.id\}\/thumbnail"/);
+  assert.match(slot, /data-thumb="clickable"/);
+});
+
+test('die Rasterkarte traegt eine feste Vorschauflaeche, das Bild fuellt sie ohne Verzerrung', () => {
+  const rules = [...eachRule(css)];
+  const top = rules.filter((rule) => rule.at.length === 0);
+  const media = top.find((rule) => rule.selector === '.document-card__media');
+  assert.ok(media, '.document-card__media fehlt');
+  assert.match(media.body, /aspect-ratio:\s*\d+\s*\/\s*\d+/, 'feste Form: ein spaet ankommendes Bild schiebt nichts');
+  assert.match(media.body, /border-radius:\s*var\(--radius-/);
+  assert.match(media.body, /background:\s*var\(--color-/);
+  const img = top.find((rule) => rule.selector === '.document-thumb__img');
+  assert.match(img.body, /object-fit:\s*cover/);
+  const frame = top.find((rule) => rule.selector === '.document-thumb--ready::after');
+  assert.ok(frame, 'der Rahmen liegt ueber dem Bild');
+  assert.match(frame.body, /var\(--color-border-subtle\)/);
+  // Einblenden nur ohne abbestellte Bewegung, und nur frisch angekommene Bilder.
+  const fade = rules.filter((rule) => /animation:\s*document-thumb-in/.test(rule.body));
+  assert.ok(fade.length > 0, 'Einblend-Regel fehlt');
+  for (const rule of fade) {
+    assert.ok(rule.at.some((at) => /prefers-reduced-motion:\s*no-preference/.test(at)), `${rule.selector} blendet auch bei reduzierter Bewegung ein`);
+    assert.match(rule.selector, /\[data-thumb-fresh\]/);
+  }
 });
