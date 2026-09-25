@@ -5,7 +5,7 @@
  *        und mehrtaegigen Termine mit ihrer Spur. Rein: kein DOM, kein t(),
  *        damit die Tageszuordnung ohne Browser pruefbar ist.
  * Abhaengigkeiten: ./timezone.js, ./event-color.js
- * Guards: test/test-dashboard-week.js
+ * Guards: test/test-dashboard-week.js, test/test-calendar.js (packLanes)
  *
  * DER TAG KOMMT AUS DER ANZEIGEZONE, nie aus dem Geraet. In `start_datetime`
  * liegen zwei Formen in einer Spalte (zonenlose Wanduhrzeit und Instants mit
@@ -173,18 +173,17 @@ export function buildWeekStrip(events, fromKey, {
   }
 
   // Baender: das frueheste und bei Gleichstand das laengste zuerst in die
-  // niedrigste freie Spur - dieselbe Packung wie die Ganztagszeile im Kalender.
+  // niedrigste freie Spur - dieselbe Packung wie die Ganztagszeile und der
+  // Monat im Kalender (packLanes()).
   bandCandidates.sort((a, b) => a.first - b.first || (b.last - b.first) - (a.last - a.first));
-  const laneEnds = [];
+  const { lanes, laneCount } = packLanes(bandCandidates, { maxLanes });
   const bands = [];
-  for (const entry of bandCandidates) {
-    let lane = laneEnds.findIndex((end) => end < entry.first);
-    if (lane === -1 && laneEnds.length < maxLanes) lane = laneEnds.length;
+  bandCandidates.forEach((entry, index) => {
+    const lane = lanes[index];
     if (lane === -1) {
       for (let i = entry.first; i <= entry.last; i++) dayList[i].more++;
-      continue;
+      return;
     }
-    laneEnds[lane] = entry.last;
     bands.push({
       id: entry.id,
       color: entry.color,
@@ -195,7 +194,34 @@ export function buildWeekStrip(events, fromKey, {
       continuesAfter: entry.endKey > lastKey,
       lane,
     });
-  }
+  });
 
-  return { days: dayList, bands, laneCount: laneEnds.length };
+  return { days: dayList, bands, laneCount };
+}
+
+/**
+ * DIE EINE SPURPACKUNG FUER BAENDER - Wochenstreifen der Uebersicht, die
+ * Ganztagszeile der Woche und der Monat im Kalender (Re-Kritik 2026-09-25).
+ * Vorher stand sie nur hier; der Kalender zeichnete mehrtaegige Termine als
+ * Einzelstuecke je Tag und brauchte keine.
+ *
+ * Nimmt Spannen `{ first, last }` (Spaltenindizes, inklusiv) in der
+ * Reihenfolge, in der sie Vorrang haben - die Sortierung ist Sache des
+ * Aufrufers - und legt jede in die niedrigste Spur, deren letzte Spanne vor
+ * ihr endet. Rein und stabil: gleiche Eingabe, gleiche Spuren.
+ *
+ * @param {{first:number,last:number}[]} spans
+ * @param {{maxLanes?:number}} [opts]  mehr Spuren gibt es nicht; wer keinen
+ *   Platz findet, bekommt -1 (der Aufrufer zaehlt ihn als „weitere")
+ * @returns {{lanes:number[], laneCount:number}}
+ */
+export function packLanes(spans, { maxLanes = Infinity } = {}) {
+  const laneEnds = [];
+  const lanes = spans.map(({ first, last }) => {
+    let lane = laneEnds.findIndex((end) => end < first);
+    if (lane === -1 && laneEnds.length < maxLanes) lane = laneEnds.length;
+    if (lane !== -1) laneEnds[lane] = last;
+    return lane;
+  });
+  return { lanes, laneCount: laneEnds.length };
 }
