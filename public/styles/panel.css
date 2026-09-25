@@ -422,10 +422,12 @@
   transition: transform var(--transition-base);
 }
 
-/* Ueber 100 % kippt er auf den WARNTON, nicht auf Danger (Critique
- * 2026-09-25): ein ueberzogenes Abo-Budget ist ein Hinweis mit Handlungsweg,
- * kein Kontominus. Dieselbe Stimme traegt `.metric-card--warning` daneben. */
-.metric-card__progress--over > span { background: var(--color-warning); }
+/* Dieselben Stufen wie der Budgetplan (budget-plans.js `toneForRatio`): ab
+ * 85 % der Warnton, ueber 100 % Danger - eine Ueberschreitung ist eine
+ * Tatsache, kein Hinweis. `.metric-card--over` traegt dieselbe Stimme an der
+ * Karte daneben. */
+.metric-card__progress--near > span { background: var(--color-warning); }
+.metric-card__progress--over > span { background: var(--color-danger); }
 
 @media (prefers-reduced-motion: reduce) {
   .metric-card__progress > span { transition: none; }
@@ -437,15 +439,19 @@
 .metric-card--negative .metric-card__value { color: var(--color-danger); }
 .metric-card--neutral  .metric-card__value { color: var(--color-text-primary); }
 
-.metric-card--income   .metric-card__value { color: var(--color-success); }
-.metric-card--expenses .metric-card__value { color: var(--color-danger);  }
+/* Einnahmen und Ausgaben in Label-Farbe (Critique 2026-09-25): drei Betraege
+ * in 28px Rot und Gruen nebeneinander waren konkurrierender Alarm - jede Zahl
+ * rief. Die Richtung steht im Label, die Bewertung im Trend darunter; Farbe
+ * traegt nur noch der Saldo, und nur nach seiner Richtung. */
+.metric-card--income   .metric-card__value { color: var(--color-text-primary); }
+.metric-card--expenses .metric-card__value { color: var(--color-text-primary); }
 .metric-card--balance  .metric-card__value { color: var(--color-text-primary); }
 .metric-card--balance-positive .metric-card__value { color: var(--color-success); }
 
 /* Ein Hinweis, kein Urteil: die Karte nennt ihren Zustand im Label (Text
  * traegt die Aussage, nicht nur die Farbe) und tont sich am reservierten
- * Warnton. Stand bis 2026-09-25 in schedule.css - die Abos brauchen ihn auch,
- * und eine Kartenvariante gehoert zur Karte, nicht zu einem ihrer Nutzer. */
+ * Warnton. Stand bis 2026-09-25 in schedule.css - eine Kartenvariante gehoert
+ * zur Karte, nicht zu einem ihrer Nutzer. */
 .metric-card--warning {
   border-color: color-mix(in oklch, var(--color-warning) 40%, transparent);
 }
@@ -453,10 +459,24 @@
 .metric-card--warning .metric-card__value {
   color: var(--color-warning);
 }
+
+/* Eine tatsaechliche Ueberschreitung (Abo-Budget): derselbe Danger-Ton wie die
+ * ueberzogene Plan-Kategorie (budget.css `--tone-over`). Das Label nennt den
+ * Zustand samt Symbol - die Farbe ist nicht der einzige Traeger. */
+.metric-card--over {
+  border-color: color-mix(in oklch, var(--color-danger) 40%, transparent);
+}
+
+.metric-card--over .metric-card__value {
+  color: var(--color-danger);
+}
 .metric-card--balance-negative .metric-card__value { color: var(--color-danger);  }
 /* Reines Ausgaben-Tracking (keine Einnahmen im Monat): Saldo = -Ausgaben ist eine
    Tautologie, die rote Zahl wird als „im Minus" fehlgelesen (#504). Neutral statt rot. */
 .metric-card--balance-neutral  .metric-card__value { color: var(--color-text-primary); }
+/* Ein Monat, der noch kommt (budget.js `isForecastMonth`): der Saldo ist eine
+ * Prognose aus Serien, keine Tatsache - gedaempft, der Titel sagt es als Text. */
+.metric-card--forecast .metric-card__value { color: var(--color-text-secondary); }
 
 .metric-card__trend {
   font-size: var(--text-xs);

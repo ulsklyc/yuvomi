@@ -24,6 +24,10 @@ import { attachOverlay } from '/utils/overlay-history.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { openDetailView } from '/components/detail-view.js';
 
+// Auslastung, ab der ein Budget „knapp" ist - dieselbe Zahl wie im Plan
+// (budget-plans.js `toneForRatio`), damit beide Tabs dieselbe Grenze ziehen.
+const PLAN_NEAR_RATIO = 0.85;
+
 let state = {
   subscriptions: [],
   summary: null,
@@ -568,16 +572,20 @@ function renderSummary() {
   const realPercentage = hasBudget ? Math.round((used / budget) * 100) : 0;
   const percentage = Math.min(100, realPercentage);
   const isOverBudget = hasBudget && summary.remaining_budget < 0;
+  // Dieselbe Schwelle wie der Plan (budget-plans.js `toneForRatio`): ab 85 %
+  // Auslastung der Warnton, darueber hinaus die Tatsache.
+  const isNearBudget = hasBudget && !isOverBudget && used / budget > PLAN_NEAR_RATIO;
   // Geteilte Kennzahl-Zeile und -Karte des Budget-Moduls (budget.css). Die
   // frühere eigene .subscriptions-summary-card war die zweite von fünf
   // Bauarten im selben Modul (Critique 2026-07-30, P0).
   // Rolle `plain`: Abo-Kosten sind Rechnungsbeträge ohne Kontorichtung.
   //
-  // UEBER BUDGET IST EIN HINWEIS, KEIN ALARM (Critique 2026-09-25): die Karte
-  // stand rot wie ein Kontominus, ohne Weg zur Handlung. Jetzt traegt sie den
-  // reservierten Warnton samt Symbol (Bedeutung nicht nur ueber Farbe) und
-  // fuehrt dorthin, wo man etwas tun kann: zur Liste, teuerste zuerst. Das ist
-  // Lesen, kein Schreiben - der Weg steht bei jedem Recht.
+  // UEBER BUDGET SAGT DASSELBE WIE IM PLAN (Critique 2026-09-25). Eine
+  // tatsaechliche Ueberschreitung ist eine Tatsache und traegt den Danger-Ton
+  // wie die ueberzogene Plan-Kategorie (`.metric-card--over`, Symbol und
+  // Label als Text); die Annaeherung ab 85 % traegt den Warnton am Balken -
+  // wie im Plan. Neu ist der Weg zur Handlung: zur Liste, teuerste zuerst.
+  // Das ist Lesen, kein Schreiben - der Weg steht bei jedem Recht.
   //
   // DIE WAEHRUNG STEHT EINMAL: die Jahresprognose trug unter „1.363,20 €"
   // noch „EUR". Die Fussnote sagt jetzt, woraus die Zahl entsteht.
@@ -591,13 +599,13 @@ function renderSummary() {
       <article class="metric-card">
         <div class="metric-card__label">${t('subscriptions.monthlyBudget')}</div>
         <div class="metric-card__value">${money(budget)}</div>
-        <div class="metric-card__progress${isOverBudget ? ' metric-card__progress--over' : ''}"
+        <div class="metric-card__progress${isOverBudget ? ' metric-card__progress--over' : isNearBudget ? ' metric-card__progress--near' : ''}"
              role="progressbar" aria-label="${esc(t('subscriptions.monthlyBudget'))}"
              aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percentage}" aria-valuetext="${realPercentage}%">
           <span style="--fill:${percentage / 100}"></span>
         </div>
       </article>
-      <article class="metric-card${isOverBudget ? ' metric-card--warning' : ''}">
+      <article class="metric-card${isOverBudget ? ' metric-card--over' : ''}">
         <div class="metric-card__label">${isOverBudget ? '<i data-lucide="triangle-alert" class="icon-sm" aria-hidden="true"></i>' : ''}${hasBudget ? (isOverBudget ? t('subscriptions.overBudget') : t('subscriptions.remainingBudget')) : t('subscriptions.noBudgetLimit')}</div>
         <div class="metric-card__value">${hasBudget ? money(Math.abs(summary.remaining_budget)) : t('subscriptions.unlimited')}</div>
         <div class="metric-card__note">${hasBudget ? `${realPercentage}% ${t('subscriptions.budgetUsed')}` : (readOnly() ? '' : t('subscriptions.setBudgetHint'))}${isOverBudget ? ` <button type="button" class="subscriptions-over-budget-action" id="subscriptions-over-budget-action">${t('subscriptions.overBudgetAction')}</button>` : ''}</div>

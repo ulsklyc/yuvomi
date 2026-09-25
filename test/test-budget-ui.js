@@ -1397,7 +1397,9 @@ test('„Nur Ausgaben" steht in der Kopfzeile der Bilanz und trifft voll', () =>
   // Treffhöhe 28px.
   const head = budget.match(/<div class="budget-summary-head">[\s\S]*?<\/div>/);
   assert.ok(head, '.budget-summary-head fehlt');
-  assert.match(head[0], /<h2 class="u-section-title" id="budget-summary-title">\$\{t\('budget\.summaryTitle'\)\}<\/h2>/);
+  // Der Titel nennt einen Zukunftsmonat eine Prognose (Critique 2026-09-25) -
+  // es bleibt EIN h2 an derselben Stelle.
+  assert.match(head[0], /<h2 class="u-section-title" id="budget-summary-title">\$\{t\(forecast \? 'budget\.summaryTitleForecast' : 'budget\.summaryTitle'\)\}<\/h2>/);
   assert.match(head[0], /id="budget-expenses-only"/);
   assert.doesNotMatch(budget, /budget-summary-bar/);
   assert.doesNotMatch(budgetCss, /\.budget-summary-bar\b/);
@@ -1890,41 +1892,97 @@ test('Budgetkopf traegt page-toolbar--period: eingeklappt verlaesst der Titel da
     'keine zweite, kalendereigene Kopie der Regel');
 });
 
-test('Kategorie-Diagramm: die drei groessten AUSGABEN fuehren, Einnahmen fuellen nur auf', () => {
-  const cats = (...totals) => totals.map((total, i) => ({ category: `k${i}`, total }));
-  const pick = (list) => [...budgetUi.chartLeadIndexes(list)].sort((a, b) => a - b);
-  // Reihenfolge wie vom Server (nach Betrag): Einnahme, Ausgabe, Einnahme, Ausgabe ...
-  assert.deepEqual(pick(cats(5050, -1620.99, 500, -482.75, -371.4, -234.98)), [1, 3, 4],
-    'die groesste Einnahme darf keinen der drei Plaetze belegen, solange es drei Ausgaben gibt');
-  assert.deepEqual(pick(cats(5050, -100, 500, 20)), [0, 1, 2],
-    'mit nur einer Ausgabe fuellen die groessten Einnahmen auf');
-  assert.equal(budgetUi.CHART_LEAD, 3);
+/* ZWEI SKALEN (Critique 2026-09-25, P2): eine gemeinsame Skala liess das
+ * Gehalt die Ausgaben auf 2-68px druecken. Geprueft wird am gerenderten
+ * Markup: die groesste AUSGABE fuellt ihre Bahn, egal wie gross das Gehalt ist,
+ * und jede Richtung steht in einem eigenen, benannten Block. */
+const kategorien = () => [
+  { category: 'salary', income: 5050, expenses: 0, total: 5050 },
+  { category: 'housing', income: 0, expenses: -1620.99, total: -1620.99 },
+  { category: 'benefits', income: 500, expenses: 0, total: 500 },
+  { category: 'food', income: 0, expenses: -482.75, total: -482.75 },
+  { category: 'health', income: 0, expenses: -371.4, total: -371.4 },
+  { category: 'leisure', income: 0, expenses: -234.98, total: -234.98 },
+];
+const scalesIn = (html, kind) => {
+  const block = html.match(new RegExp(`<section class="budget-chart-block budget-chart-block--${kind}[\\s\\S]*?</section>`));
+  assert.ok(block, `Block ${kind} fehlt`);
+  return [...block[0].matchAll(/--bar-scale:([\d.]+)/g)].map((m) => Number(m[1]));
+};
 
-  const html = budgetUi.renderCategoryBars(cats(5050, -1620.99, 500, -482.75, -371.4, -234.98));
-  assert.equal((html.match(/budget-bar-row--lead/g) ?? []).length, 3, 'genau drei Zeilen tragen die Markierung');
-  assert.equal((html.match(/class="budget-bar-row /g) ?? []).length, 6,
-    'alle Zeilen bleiben im Markup - die Kuerzung ist eine Darstellung, keine Datenkuerzung');
+test('Kategorie-Diagramm: Einnahmen und Ausgaben je nach EIGENEM Maximum', () => {
+  const html = budgetUi.renderCategoryBars(kategorien());
+  const expenses = scalesIn(html, 'expenses');
+  const income = scalesIn(html, 'income');
+  assert.deepEqual(expenses.length, 4);
+  assert.equal(expenses[0], 1, 'die groesste Ausgabe fuellt ihre Bahn - das Gehalt setzt nicht mehr die Skala');
+  assert.equal(income[0], 1);
+  assert.equal(income[1], Number((500 / 5050).toFixed(4)), 'innerhalb des Blocks bleibt der Anteil ehrlich');
+  assert.equal(expenses[3], Number((234.98 / 1620.99).toFixed(4)));
+  assert.match(html, /<h3 class="budget-chart-block__title" id="budget-chart-expenses-title">/,
+    'die Richtung steht als Text im Gruppenlabel des Blocks');
+  assert.match(html, /aria-labelledby="budget-chart-income-title"/);
+  // Eine Kategorie mit Ein- UND Ausgaben steht in beiden Bloecken mit ihrer
+  // eigenen Summe, nicht mit dem Saldo.
+  const both = budgetUi.categoryBlocks([{ category: 'misc', income: 50, expenses: -200, total: -150 }]);
+  assert.deepEqual(both.expenses.map((r) => r.amount), [-200]);
+  assert.deepEqual(both.income.map((r) => r.amount), [50]);
+  const summary = budgetUi.chartSummary(kategorien());
+  assert.match(summary, /^budget\.expenses: /, 'die Textalternative spricht je Block');
+  assert.match(summary, /\. budget\.income: /);
 });
 
-test('Kategorie-Diagramm: gekuerzt nur einspaltig, mit „Alle Kategorien (N)" im Kopf', () => {
+test('Kategorie-Diagramm: einspaltig fuehren die drei groessten Ausgaben, die Einnahmen stehen als Summe im Titel', () => {
+  const html = budgetUi.renderCategoryBars(kategorien());
+  const expensesBlock = html.match(/<section class="budget-chart-block budget-chart-block--expenses[^"]*"/)[0];
+  assert.match(expensesBlock, /budget-chart-block--lead/, 'der Ausgaben-Block fuehrt');
+  assert.equal((html.match(/budget-bar-row--lead/g) ?? []).length, 3, 'genau drei Zeilen tragen die Markierung');
+  const incomeBlock = html.match(/<section class="budget-chart-block budget-chart-block--income[\s\S]*?<\/section>/)[0];
+  assert.doesNotMatch(incomeBlock, /budget-bar-row--lead|budget-chart-block--lead/, 'Einnahmen fuellen nicht mehr auf');
+  assert.equal((html.match(/class="budget-bar-row[ "]/g) ?? []).length, 6,
+    'alle Zeilen bleiben im Markup - die Kuerzung ist eine Darstellung, keine Datenkuerzung');
+  // Ohne Ausgaben fuehrt der Einnahmen-Block; ohne Verborgenes kein Knopf.
+  const nurEinnahmen = budgetUi.renderCategoryBars([{ category: 'salary', income: 10, expenses: 0, total: 10 }]);
+  assert.match(nurEinnahmen, /budget-chart-block--income budget-chart-block--lead/);
+  assert.equal(budgetUi.chartHasMore(budgetUi.categoryBlocks(kategorien())), true);
+  assert.equal(budgetUi.chartHasMore(budgetUi.categoryBlocks(kategorien().filter((c) => c.expenses && c.category !== 'leisure'))), false,
+    'drei Ausgaben ohne Einnahmen: nichts verborgen, kein Knopf');
+  assert.equal(budgetUi.CHART_LEAD, 3);
+
   const rules = [...eachRule(budgetCss)];
   const single = (r) => r.at.some((a) => /@container budget-page \(width < 960px\)/.test(a));
-  const hide = rules.find((r) => single(r)
-    && r.selector.trim() === '.budget-chart:not(.is-expanded) > .budget-bar-row:not(.budget-bar-row--lead)');
-  assert(hide && /display:\s*none/.test(hide.body),
-    'einspaltig (unter 960px Container, dieselbe Grenze wie der Zweispalter) blenden die unmarkierten Zeilen aus');
+  const hide = rules.find((r) => single(r) && /\.budget-chart-section:not\(\.is-expanded\) \.budget-bar-row:not\(\.budget-bar-row--lead\)/.test(r.selector));
+  // Die Statistik baut dieselben Bloecke OHNE Markierung - gekuerzt wird nur
+  // in der Uebersicht, sonst verschwaende dort der ganze Vergleich (gemessen
+  // bei 390px: „Nach Kategorie" ohne eine einzige Zeile).
+  for (const sel of hide.selector.split(',')) {
+    assert.match(sel.trim(), /^\.budget-overview /, `"${sel.trim()}" kuerzt auch die Statistik`);
+  }
+  assert(hide && /display:\s*none/.test(hide.body), 'einspaltig blenden die unmarkierten Zeilen aus');
+  assert(/\.budget-chart-section:not\(\.is-expanded\) \.budget-chart-block:not\(\.budget-chart-block--lead\)/.test(hide.selector),
+    '... und den Block, der nicht fuehrt');
+  const incomeLine = rules.find((r) => single(r) && r.selector.trim() === '.budget-overview .budget-chart-section:not(.is-expanded) .budget-chart-head__income');
+  assert(incomeLine && /display:\s*flex/.test(incomeLine.body), 'eingeklappt steht die Einnahmen-Summe unter dem Titel');
+  const baseLine = rules.find((r) => r.at.length === 0 && r.selector.trim() === '.budget-chart-head__income');
+  assert(baseLine && /display:\s*none/.test(baseLine.body), 'im Zweispalter steht der Block selbst - keine zweite Summe');
   assert(!rules.some((r) => !single(r) && /budget-bar-row--lead\)/.test(r.selector) && /display:\s*none/.test(r.body)),
-    'ausserhalb der einspaltigen Lage wird nichts gekuerzt - neben den Buchungen bleibt das Diagramm voll');
+    'ausserhalb der einspaltigen Lage wird nichts gekuerzt');
+});
+
+test('Kategorie-Diagramm: „Alle Kategorien (N)" steht im Kopf und meldet seinen Zustand', () => {
+  const rules = [...eachRule(budgetCss)];
+  const single = (r) => r.at.some((a) => /@container budget-page \(width < 960px\)/.test(a));
   const base = rules.find((r) => r.at.length === 0 && r.selector.trim() === '.budget-chart-more');
   assert(base && /display:\s*none/.test(base.body), 'im Zweispalter gibt es nichts aufzuklappen');
   const shown = rules.find((r) => single(r) && r.selector.trim() === '.budget-chart-more');
   assert(shown && !/display:\s*none/.test(shown.body), 'einspaltig steht der Knopf da');
 
   const src = withoutHtmlComments(budget);
-  assert.match(src, /\$\{s\.byCategory\.length > CHART_LEAD \? `\s*<button type="button" class="budget-chart-more" id="budget-chart-more"\s*aria-expanded="\$\{state\.categoriesExpanded \? 'true' : 'false'\}" aria-controls="budget-chart">/,
-    'der Knopf erscheint erst ab vier Kategorien und meldet seinen Zustand (aria-expanded, aria-controls)');
-  const head = src.match(/<div class="budget-chart-head">([\s\S]*?)<\/div>\s*<p class="sr-only">/);
+  assert.match(src, /\$\{chartHasMore\(chartBlocks\) \? `\s*<button type="button" class="budget-chart-more" id="budget-chart-more"\s*aria-expanded="\$\{state\.categoriesExpanded \? 'true' : 'false'\}" aria-controls="budget-chart">/,
+    'der Knopf erscheint nur, wenn einspaltig etwas verborgen ist, und meldet seinen Zustand');
+  const head = src.match(/<div class="budget-chart-head">([\s\S]*?)<p class="sr-only">/);
   assert(head && head[1].includes('id="budget-chart-more"'), 'der Knopf steht in der Titelzeile, nicht als eigene Zeile');
+  assert(head[1].includes('chartIncomeLine(chartBlocks)'), 'die Einnahmen-Summe teilt sich die Titelzeile');
 });
 
 /* EIN WERKZEUG-MENUE: Kategorien verwalten, CSV und die Gruppierung standen
@@ -2039,4 +2097,162 @@ test('Betraege im Budget-Modul stehen in tabular-nums (benannt und aus dem Marku
 
   const missing = [...new Set([...named, ...derived])].filter((selector) => !covered(selector));
   assert.deepEqual(missing, [], `Betraege ohne tabular-nums: ${missing.join(', ')}`);
+});
+
+// --------------------------------------------------------
+// Critique 2026-09-25, Schritt 4: Aussage, Statistik, Kleinbefunde
+// --------------------------------------------------------
+
+/** Laesst den echten Render-Pfad der Uebersicht laufen und gibt ihr Markup zurueck. */
+function uebersicht(extra = {}) {
+  const vorher = { ...budgetUi.state };
+  Object.assign(budgetUi.state, {
+    activeTab: 'budget', loadError: null, prevSummary: null, entries: [],
+    summary: { income: 0, expenses: 0, balance: 0, byCategory: [], pending: { count: 0 } },
+    responsibleFilterId: null, groupByResponsible: false, accountFilterId: null, expensesOnly: false,
+    ...extra,
+  });
+  let html = '';
+  const body = {
+    replaceChildren() { html = ''; },
+    insertAdjacentHTML(_pos, markup) { html += markup; },
+    setAttribute() {}, querySelector: () => null,
+  };
+  const container = {
+    querySelector: (sel) => (sel === '#budget-body' ? body : null),
+    querySelectorAll: () => [],
+    classList: { toggle() {} },
+  };
+  try {
+    budgetUi.renderBodyForTest(container);
+  } finally {
+    Object.assign(budgetUi.state, vorher);
+  }
+  return html;
+}
+
+const monthKey = (offset) => {
+  const [y, m] = todayKey().split('-').map(Number);
+  const d = new Date(y, m - 1 + offset, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+const zeile = (over = {}) => ({
+  id: 41, title: 'Miete', amount: -950, date: `${monthKey(0)}-01`, category: 'housing',
+  account_id: null, is_recurring: 0, attachments: [], is_pending: 0, responsible_users: [], ...over,
+});
+const summe = { income: 3000, expenses: -950, balance: 2050, byCategory: [], pending: { count: 0 } };
+
+test('Zukunftsmonat: die Bilanz heisst Prognose, der Saldo verliert den Ton der Tatsache', () => {
+  const zukunft = uebersicht({ month: monthKey(1), entries: [zeile({ date: `${monthKey(1)}-01` })], summary: summe });
+  assert.match(zukunft, /id="budget-summary-title">budget\.summaryTitleForecast</, 'der Titel sagt es als Text');
+  assert.match(zukunft, /class="metric-card metric-card--forecast"/);
+  assert.doesNotMatch(zukunft, /metric-card--balance-positive/, 'kein gruener Saldo fuer Geld, das nicht geflossen ist');
+  const jetzt = uebersicht({ month: monthKey(0), entries: [zeile()], summary: summe });
+  assert.match(jetzt, /id="budget-summary-title">budget\.summaryTitle</);
+  assert.match(jetzt, /metric-card--balance-positive/, 'der laufende Monat bleibt eine Bilanz');
+  const rule = [...eachRule(panelCss)].find((r) => r.selector.trim() === '.metric-card--forecast .metric-card__value');
+  assert(rule && /--color-text-secondary/.test(rule.body));
+});
+
+test('Zeilen nach heute: Ring statt Punkt, im laufenden Monat mit benanntem Symbol', () => {
+  const morgen = todayKey() < `${monthKey(0)}-28` ? `${monthKey(0)}-28` : null;
+  if (morgen) {
+    const html = uebersicht({ month: monthKey(0), entries: [zeile({ date: morgen }), zeile({ id: 42, date: `${monthKey(0)}-01` })], summary: summe });
+    assert.equal((html.match(/budget-entry--upcoming/g) ?? []).length, 1, 'nur die Zeile nach heute');
+    assert.match(html, /role="img" aria-label="budget\.upcomingLabel"/);
+  }
+  const zukunft = uebersicht({ month: monthKey(1), entries: [zeile({ date: `${monthKey(1)}-02` })], summary: summe });
+  assert.match(zukunft, /budget-entry--upcoming/);
+  assert.doesNotMatch(zukunft, /budget\.upcomingLabel/, 'im Prognose-Monat sagt es der Titel, nicht jede Zeile');
+  const erwartet = uebersicht({ month: monthKey(1), entries: [zeile({ date: `${monthKey(1)}-02`, is_pending: 1 })], summary: summe });
+  assert.doesNotMatch(erwartet, /budget-entry--upcoming/, 'eine erwartete Buchung hat ihre eigene Markierung');
+  const ring = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-entry--upcoming .budget-entry__indicator');
+  assert(ring && /background-color:\s*transparent/.test(ring.body) && /box-shadow/.test(ring.body), 'Form statt Farbe');
+});
+
+test('Kennzahlen: Einnahmen und Ausgaben in Label-Farbe, Farbe nur am Saldo und am Trend', () => {
+  for (const kind of ['income', 'expenses']) {
+    const rule = [...eachRule(panelCss)].find((r) => r.selector.trim() === `.metric-card--${kind}   .metric-card__value`
+      || r.selector.trim() === `.metric-card--${kind} .metric-card__value`);
+    assert.ok(rule, `.metric-card--${kind} fehlt`);
+    assert.match(rule.body, /var\(--color-text-primary\)/);
+    assert.doesNotMatch(rule.body, /--color-(success|danger)/, `${kind}: 28px Rot/Gruen ist konkurrierender Alarm`);
+  }
+  const bar = [...eachRule(budgetCss)].filter((r) => r.at.length === 0 && r.selector.trim() === '.budget-bar-row__amount');
+  assert.ok(bar.some((r) => /color:\s*var\(--color-text-primary\)/.test(r.body)), 'Kategoriebetraege in Label-Farbe, den Ton traegt der Balken');
+  assert.doesNotMatch(budget, /class="budget-bar-row__amount" style="color:/);
+});
+
+test('Loeschknoepfe nennen, WAS sie loeschen', () => {
+  const vorher = { ...budgetUi.state };
+  try {
+    Object.assign(budgetUi.state, { entries: [zeile(), zeile({ id: 42, title: 'Strom' })], responsibleFilterId: null, groupByResponsible: false });
+    const html = budgetUi.renderEntries();
+    const names = [...html.matchAll(/data-action="delete"[^>]*aria-label="([^"]*)"/g)].map((m) => m[1]);
+    assert.equal(names.length, 2);
+    assert.notEqual(names[0], names[1], '23 gleichnamige „Eintrag loeschen" waren nicht unterscheidbar');
+  } finally { Object.assign(budgetUi.state, vorher); }
+  assert.match(budget, /data-action="delete" data-id="\$\{e\.id\}" aria-label="\$\{esc\(t\('budget\.deleteLabel', \{ title: e\.title \}\)\)\}"/);
+  assert.match(budget, /id="bm-delete" aria-label="\$\{esc\(t\('budget\.deleteLabel', \{ title: entry\.title \}\)\)\}"/);
+  const de = JSON.parse(read('../public/locales/de.json'));
+  assert.match(de.budget.deleteLabel, /\{\{title\}\}/);
+});
+
+test('der Titel-Knopf einer Buchung trifft auf seiner ganzen Hoehe', () => {
+  // Gemessen 34-35px von 44px: die Meta-Zeile malte sich ueber das Polster.
+  const title = [...eachRule(budgetCss)].find((r) => r.selector.trim() === 'button.budget-entry__title');
+  assert.match(title.body, /position:\s*relative/);
+  assert.match(title.body, /z-index:\s*1/);
+  const chip = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-responsible-chip');
+  assert.match(chip.body, /z-index:\s*2/, 'der Zustaendigen-Chip in der Meta-Zeile bleibt treffbar');
+});
+
+test('Buchungsdialog: Betrag zuerst und gross, Seltenes hinter „Weitere Angaben", Formularbreite', () => {
+  const start = budget.indexOf('function openBudgetModal(');
+  const modal = budget.slice(start, budget.indexOf('\nfunction ', start + 10));
+  const pos = (needle) => { const i = modal.indexOf(needle); assert.ok(i >= 0, `${needle} fehlt`); return i; };
+  assert.ok(pos('id="bm-amount"') < pos('id="bm-title"'), 'der Betrag steht vor dem Titel - und bekommt als erstes Feld den Erstfokus');
+  assert.ok(pos('id="bm-title"') < pos('id="bm-category"'));
+  assert.ok(pos('id="bm-category"') < pos('id="bm-date"'));
+  assert.match(modal, /class="form-input budget-amount-input" id="bm-amount"/);
+  assert.match(modal, /inputmode="decimal"/);
+  const adv = pos('${advancedSection(`');
+  for (const rare of ['${accountField}', 'id="bm-visibility"', 'responsiblePickerHtml(', 'id="bm-recurring"', 'renderDocumentAttachField(']) {
+    assert.ok(pos(rare) > adv, `${rare} gehoert hinter „Weitere Angaben"`);
+  }
+  assert.ok(pos('id="bm-date"') < adv);
+  assert.match(modal, /label: t\('budget\.moreDetails'\)/);
+  assert.match(modal, /entry\.responsible_users\?\.length/, 'eine gesetzte Zustaendigkeit oeffnet den Riegel beim Bearbeiten');
+  assert.match(modal, /size: 'md'/, '400px fuer zehn Felder waren schmaler als jeder andere Formulardialog');
+  const input = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-amount-input');
+  assert.match(input.body, /font-variant-numeric:\s*tabular-nums/);
+  assert.match(input.body, /font-size:\s*var\(--text-xl\)/);
+  const add = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-inline-add::before');
+  assert.ok(add && /height:\s*var\(--target-base\)/.test(add.body), '„+ Kategorie" traf nur 25px');
+  const head = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-field-header');
+  assert.match(head.body, /min-height:\s*var\(--target-base\)/, 'die Zeile fasst die Treffflaeche, ohne sie ins Feld darunter ragen zu lassen');
+});
+
+test('Darlehen: hoechstens ein Primaerknopf - die Rate buchen ist sekundaer', () => {
+  const card = budgetUi.renderLoanCard({
+    id: 1, title: 'Auto', borrower: 'Mike', direction: 'lent', paid_amount: 200, total_amount: 1200,
+    remaining_amount: 1000, paid_installments: 1, installment_count: 6, next_due_month: monthKey(1), currency: 'EUR',
+  });
+  assert.match(card, /data-action="loan-pay"/);
+  assert.doesNotMatch(card, /btn--primary/, 'drei Darlehen zeigten drei violette Primaerknoepfe');
+});
+
+test('Statistik wiederholt die Uebersicht nicht: Vergleich je Kategorie und aufsummierter Verlauf', () => {
+  const src = withoutHtmlComments(stats);
+  assert.doesNotMatch(src, /class="metric-grid"|metric-card--income|metric-card--expenses/,
+    'die drei Kennzahl-Karten der Uebersicht standen hier 1:1 noch einmal');
+  assert.match(src, /api\.get\(`\/budget\/stats\?range=\$\{view\.range\}&anchor=\$\{addLocalDays\(data\.from, -1\)\}/,
+    'der Vorzeitraum kommt vom selben Endpunkt, verankert am Tag davor');
+  assert.match(src, /trendMarkup\(\{ delta, betterWhen/, 'die Veraenderung spricht die Trend-Sprache der Karten');
+  assert.match(src, /budgetMaxOwn|const max = Math\.max\(\.\.\.rows\.map/, 'jeder Block nach seinem eigenen Maximum');
+  assert.match(src, /const cumulative = s\.length > 0 && /);
+  assert.match(src, /cumulative \? running\(rawIncomes\) : rawIncomes/);
+  assert.match(src, /statsTrendTitleCumulative/);
+  const wiring = src.match(/function wireTrendPoints[\s\S]*?\n\}/)[0];
+  assert.match(wiring, /addEventListener\('pointermove'/, 'die ganze Flaeche waehlt den naechsten Tag - ein Punkt war 10-24px breit');
 });

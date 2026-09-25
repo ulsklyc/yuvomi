@@ -370,7 +370,9 @@
    * ~380px nur ~86px Bahn, auf denen kein Vergleich stattfindet. */
   .budget-overview__aside .budget-bar-row {
     grid-template-columns: minmax(0, 1fr) auto;
-    row-gap: var(--space-1h);
+    /* Eine Stufe enger als gestapelt einspaltig: die Leiste traegt seit den
+     * getrennten Bloecken zwei Gruppenlabel mehr und soll angeheftet bleiben. */
+    row-gap: var(--space-1);
   }
 
   .budget-overview__aside .budget-bar-row__label  { grid-area: 1 / 1; }
@@ -835,20 +837,72 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-1);
 }
 
-/* Ein Träger für die Kategoriezeilen (Zeilenlisten-Regel, tokens.css) - sie
- * lagen vorher direkt auf dem Grouped-Grund. Die Bereichs-Überschrift
- * (.budget-chart-section__title) bleibt darüber auf dem Grund. */
+/* ZWEI BLOECKE, ZWEI SKALEN (Critique 2026-09-25, P2; budget.js
+ * `categoryBlocks`). Jeder Block ist ein Traeger fuer seine Kategoriezeilen
+ * (Zeilenlisten-Regel, tokens.css) mit einem Gruppenlabel darueber: Name und
+ * Summe des Blocks, Versal wie die Kennzahl-Labels - ein Gruppenlabel UNTER der
+ * Bereichs-Ueberschrift „Nach Kategorie", nicht ihr Ersatz. */
+/* Knapp gesetzt, weil die Seitenleiste nur angeheftet bleibt, solange sie in
+ * den Scrollport passt (budget.js `watchAsideFit`): die zwei Gruppenlabel
+ * kosten zusammen nicht mehr als die eine Mittelachse vorher. */
 .budget-chart {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.budget-chart-block__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1h);
+  padding-inline: var(--space-4);
+  color: var(--color-text-secondary);
+}
+
+.budget-chart-block__total {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.budget-chart-block__rows {
   display: flex;
   flex-direction: column;
   background: var(--color-surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
+}
+
+/* Titel und die Summe des eingeklappten Einnahmen-Blocks teilen sich die
+ * Titelzeile: 26px Titel + 16px Summe passen in die Zielhoehe, die die Zeile
+ * fuer „Alle Kategorien" ohnehin hat - die Summe kostet keine eigene Zeile.
+ * Sichtbar nur, solange der Block selbst verborgen ist (einspaltig, unten). */
+.budget-chart-head__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.budget-chart-head__income {
+  display: none;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: var(--line-height-tight);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.budget-chart-head__income-amount {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
 }
 
 /* TOP 3 SOLANGE EINSPALTIG, VOLL IN DER SEITENLEISTE (Critique 2026-09-25,
@@ -866,12 +920,29 @@
 }
 
 @container budget-page (width < 960px) {
-  .budget-chart:not(.is-expanded) > .budget-bar-row:not(.budget-bar-row--lead) {
+  /* Nur die Uebersicht kuerzt: die Statistik baut dieselben Bloecke ohne
+   * Markierung und zeigt sie immer ganz. */
+  .budget-overview .budget-chart-section:not(.is-expanded) .budget-chart-block:not(.budget-chart-block--lead),
+  .budget-overview .budget-chart-section:not(.is-expanded) .budget-bar-row:not(.budget-bar-row--lead) {
     display: none;
   }
 
-  .budget-chart:not(.is-expanded) > .budget-bar-row--lead:nth-child(1 of .budget-bar-row--lead) {
-    border-top: 0;
+  /* Eingeklappt benennt der Titel „Nach Kategorie" die drei Zeilen schon; das
+   * Gruppenlabel „Ausgaben" bleibt fuer Screenreader stehen, kostet aber keine
+   * Zeile. Die Einnahmen stehen als Summe unter dem Titel. */
+  .budget-overview .budget-chart-section:not(.is-expanded) .budget-chart-block__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .budget-overview .budget-chart-section:not(.is-expanded) .budget-chart-head__income {
+    display: flex;
   }
 
   /* „Alle Kategorien (N)" steht in der Titelzeile, die der Titel ohnehin
@@ -1019,60 +1090,32 @@
 .budget-bar-row__fill--income   { background-color: var(--color-success); }
 .budget-bar-row__fill--expenses { background-color: var(--color-danger);  }
 
-/* Mittelachsen-Spiegelung (Critique 2026-08-10, P0): Einnahmen und Ausgaben
- * wuchsen von derselben Nulllinie in dieselbe Richtung - die Richtung steckte
- * allein im Farbton und kollabierte bei Rot-Gruen-Schwaeche zu identischen
- * Balken. Im gespiegelten Chart teilen sich beide eine Mittelachse: Einnahmen
- * wachsen zum Zeilenende, Ausgaben zum Zeilenanfang (logische Kanten, spiegelt
- * in RTL). Die Fills laufen hier ueber width statt scaleX: transform-origin
- * kennt keine logischen Keywords, und die Balken stehen beim Rendern fest -
- * eine Layout-Transition entsteht nicht (transition: none). */
-.budget-bar-row--mirrored .budget-bar-row__track {
-  overflow: visible;
-}
-.budget-bar-row--mirrored .budget-bar-row__track::before {
+/* Die Richtung steht im Namen des Blocks, nicht in der Achse. Bis 2026-09-25
+ * spiegelten Einnahmen und Ausgaben um eine gemeinsame Mittelachse (Critique
+ * 2026-08-10, P0: die Richtung steckte sonst allein im Farbton) - auf EINER
+ * Skala, die das Gehalt setzte. Seit den getrennten Bloecken benennen
+ * Gruppenlabel und Vorzeichen die Richtung als Text, und jede Bahn gehoert
+ * ganz dem Vergleich innerhalb ihres Blocks.
+ *
+ * Der Mindestbalken ist eine LAENGE, kein Anteil: ein Stummel am Bahnanfang
+ * in der Farbe des Blocks (der Fuell-Balken skaliert per transform und kennt
+ * keine Mindestbreite). Er stand bis 2026-08-13 als `Math.max(6, …)` im JS
+ * und machte vier Kategorien mit dem 9,4-Fachen Abstand gleich lang. */
+.budget-chart-block--expenses { --bar-stub-color: var(--color-danger); }
+.budget-chart-block--income   { --bar-stub-color: var(--color-success); }
+
+/* `--bar-visible` setzt das JS am Track: 0 fuer eine Kategorie ohne Betrag
+ * im Zeitraum (Statistik: nur im Vorzeitraum gebucht) - die bekommt keinen
+ * Stummel, sonst behauptete er Bewegung, wo keine war. */
+.budget-chart-block .budget-bar-row__track::after {
   content: '';
   position: absolute;
-  top: -2px;
-  bottom: -2px;
-  inset-inline-start: 50%;
-  width: 2px;
-  margin-inline-start: -1px;
-  border-radius: var(--radius-full);
-  background-color: var(--color-text-quaternary);
-}
-/* Der Mindestbalken ist eine LAENGE, kein Anteil.
- * Er stand bis 2026-08-13 als `Math.max(6, …)` im JS und machte aus vier
- * Kategorien mit dem 9,4-Fachen Abstand vier gleich lange Balken (gemessen
- * viermal 25,9px auf 862px Bahn). Als min-inline-size kostet er nichts an
- * Aussage: die Laengen bleiben proportional, und der Zwerg bleibt sichtbar.
- * `--bar-visible` kommt aus dem JS und ist 0 fuer eine Kategorie mit Saldo
- * null - die soll keinen Stummel bekommen, sonst behauptet ein Balken
- * Bewegung, wo keine war. */
-.budget-bar-row--mirrored .budget-bar-row__fill {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: calc(var(--bar-scale, 0) * 50%);
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 0;
   min-inline-size: calc(var(--bar-visible, 0) * var(--space-0h));
-  transform: none;
-  transition: none;
-}
-.budget-bar-row--mirrored .budget-bar-row__fill--income {
-  inset-inline-start: 50%;
-  border-start-start-radius: 0;
-  border-end-start-radius: 0;
-}
-.budget-bar-row--mirrored .budget-bar-row__fill--expenses {
-  inset-inline-end: 50%;
-  border-start-end-radius: 0;
-  border-end-end-radius: 0;
-}
-/* Budgetplan-Ziel im gespiegelten Chart: Ausgaben laufen von der Mitte zum
- * Zeilenanfang, ein Ziel von x (Anteil am Maximum) liegt also bei 50% - x/2. */
-.budget-bar-row--mirrored .budget-bar-row__target {
-  left: auto;
-  inset-inline-start: calc(50% - var(--target-pos, 0) * 50%);
+  border-radius: var(--radius-full);
+  background-color: var(--bar-stub-color);
 }
 
 /* Breite in ch statt px: 64px fassten den formatierten Betrag nicht — gemessen
@@ -1084,6 +1127,10 @@
   font-size: var(--text-xs);
   font-weight: var(--font-weight-medium);
   font-variant-numeric: tabular-nums;
+  /* Label-Farbe statt Rot/Gruen je Zeile (Critique 2026-09-25): neun farbige
+   * Betraege untereinander waren konkurrierender Alarm. Die Richtung steht im
+   * Vorzeichen und im Gruppenlabel, die Farbe traegt der Balken. */
+  color: var(--color-text-primary);
   width: 10ch;
   text-align: right;
 }
@@ -1599,6 +1646,16 @@
 .budget-entry__indicator--income   { background-color: var(--color-success); }
 .budget-entry__indicator--expenses { background-color: var(--color-danger);  }
 
+/* Noch nicht passiert (Datum nach heute): der Punkt wird zum Ring - Form statt
+ * Farbe, der Betrag behaelt seinen Ton (#1230 fuer erwartete Buchungen). */
+.budget-entry--upcoming .budget-entry__indicator {
+  background-color: transparent;
+  box-shadow: inset 0 0 0 var(--space-0h) currentColor;
+}
+
+.budget-entry--upcoming .budget-entry__indicator--income   { color: var(--color-success); }
+.budget-entry--upcoming .budget-entry__indicator--expenses { color: var(--color-danger);  }
+
 /* Siehe Abweichung 1 über `.budget-entry`. */
 .budget-entry__title {
   white-space: nowrap;
@@ -1621,7 +1678,15 @@ button.budget-entry__title {
    * hinausragendes Pseudo-Element; die Sonde tastete dann zu Recht nur 24px.
    * Die größere Box überlappt die Meta-Zeile darunter, und das darf sie: ein
    * Klick dort öffnet über die Zeilen-Delegation dasselbe Edit-Modal, und
-   * die row-actions liegen rechts außerhalb der Button-Box. */
+   * die row-actions liegen rechts außerhalb der Button-Box.
+   *
+   * UND SIE LIEGT OBEN (Critique 2026-09-25). Die Meta-Zeile steht im Baum
+   * spaeter und malte sich ueber das untere Polster: getroffen wurde der
+   * Titel nur auf 34-35px der 44px-Box. `z-index` hebt ihn ueber die Zeile;
+   * das einzige Bedienelement darin, der Zustaendigen-Chip, steht eine Stufe
+   * hoeher und bleibt treffbar. */
+  position: relative;
+  z-index: 1;
   padding: calc((var(--target-base) - 1lh) / 2) 0;
   margin-block: calc((var(--target-base) - 1lh) / -2);
   font: inherit;
@@ -1764,7 +1829,10 @@ button.budget-entry__title {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  margin-bottom: var(--space-1);
+  /* Die Zeile ist so hoch wie ein volles Ziel: „+ Kategorie" traf nur 25px
+   * (Critique 2026-09-25). Seine Treffflaeche (::before) fuellt die Zeilen-
+   * hoehe, ohne ueber das Auswahlfeld darunter zu ragen. */
+  min-height: var(--target-base);
 }
 
 .budget-field-header .form-label {
@@ -1772,9 +1840,28 @@ button.budget-entry__title {
 }
 
 .budget-inline-add {
+  position: relative;
   min-height: auto;
   padding: 2px var(--space-2);
   font-size: var(--text-xs);
+}
+
+.budget-inline-add::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 50%;
+  height: var(--target-base);
+  transform: translateY(-50%);
+}
+
+/* Der Betrag ist die Buchung (Critique 2026-09-25): gross, Ziffern gleicher
+ * Breite, erstes Feld und Erstfokus des Dialogs. */
+.budget-amount-input {
+  min-height: var(--target-lg);
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
 }
 
 .budget-inline-modal {
@@ -1893,6 +1980,40 @@ button.budget-entry__title {
 .budget-stats__swatch { display:inline-block; width:16px; height:0; border-top:2px solid transparent; margin-right:var(--space-1); vertical-align:middle; }
 .budget-stats__swatch--income { border-top-color:var(--color-success); }
 .budget-stats__swatch--expense { border-top-style:dashed; border-top-color:var(--color-danger); }
+/* Die Veraenderung gegenueber dem Vorzeitraum steht in der Zeile ihres
+ * Betrags - die geteilte Trend-Zeile ist sonst ein Block. */
+.budget-stats__legend .metric-card__trend { display:inline-flex; margin-inline-start:var(--space-1); }
+.budget-stats__legend { flex-wrap:wrap; row-gap:var(--space-1); }
+
+/* Kategorievergleich (budget-stats.js renderCatBars): der Satz nennt den
+ * Vorzeitraum EINMAL, die Zeilen tragen nur noch die Differenz. */
+.budget-stats__compare-note {
+  margin: calc(-1 * var(--space-1)) 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Vergleichszeile: die Differenz unter dem Betrag, rechtsbuendig - schmal
+ * als dritte Zeile nach Name/Betrag und Bahn. */
+.budget-bar-row--compare .budget-bar-row__delta {
+  grid-area: 3 / 1 / 4 / 3;
+  justify-self: end;
+}
+
+.budget-bar-row--compare .budget-bar-row__delta .metric-card__trend {
+  white-space: nowrap;
+}
+
+@container budget-page (min-width: 480px) {
+  .budget-bar-row--compare {
+    row-gap: var(--space-0h);
+  }
+
+  .budget-bar-row--compare .budget-bar-row__delta {
+    grid-area: 2 / 3;
+  }
+}
+
 .budget-stats__donut-wrap { display:flex; gap:var(--space-4); align-items:center; flex-wrap:wrap; }
 .budget-stats__donut { width:160px; height:160px; }
 .budget-stats__export { margin-top:var(--space-4); }
@@ -2127,6 +2248,9 @@ button.budget-entry__title {
    Dekoration; die Flaeche bleibt so klein wie die Avatare, deshalb kein
    Knopf-Aussehen. */
 .budget-responsible-chip {
+  /* Ueber dem Treffpolster des Titels (button.budget-entry__title). */
+  position: relative;
+  z-index: 2;
   display: inline-flex;
   align-items: center;
   padding: 0;

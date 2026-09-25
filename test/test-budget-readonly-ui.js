@@ -192,7 +192,9 @@ test('Leere Buchungsliste mit `budget: read`: nur der Titel, kein CTA und keine 
   withAccess({ budget: 'write' }, () => {
     const html = budget.renderEntries();
     assert.match(html, /id="empty-cta-budget"/);
-    assert.match(html, /budget\.emptyDescription/);
+    // Seit der Critique 2026-09-25 auch mit Schreibrecht EIN Satz und der
+    // Knopf - die Anleitung „ueber den + Button" ist ganz entfallen.
+    assert.doesNotMatch(html, /budget\.emptyDescription|emptyHint\.budget/);
   });
   withAccess({ budget: 'read' }, () => {
     const html = budget.renderEntries();
@@ -291,6 +293,19 @@ test('Darlehensrate mit `budget: read`: die Zeile bleibt, Bearbeiten und Loesche
     assert.match(html, /500/);
     assert.match(html, /budget\.loanInstallmentNumber/);
   });
+});
+
+test('leerer Monat: ein Satz und der Knopf, keine dreifache Null (Critique 2026-09-25)', () => {
+  withAccess({ budget: 'write' }, () => {
+    const leer = { income: 0, expenses: 0, balance: 0, byCategory: [], pending: { count: 0 } };
+    const html = buchungsTab([], { summary: leer });
+    assert.doesNotMatch(html, /metric-grid|budget-overview__aside/, 'ohne Buchung keine Bilanz aus drei Nullen');
+    assert.match(html, /budget\.emptyTitle/);
+    assert.match(html, /id="empty-cta-budget"/);
+    const erwartet = buchungsTab([], { summary: { ...leer, pending: { count: 1, income: 0, expenses: -20 } } });
+    assert.match(erwartet, /budget-overview__aside/, 'eine erwartete Buchung ist kein leerer Monat');
+  });
+  assert.doesNotMatch(BUDGET_CODE, /budget\.loansEmptyDescription/, 'auch der Darlehen-Leerzustand verweist nicht mehr auf die +-Schaltflaeche');
 });
 
 test('Keine Darlehen mit `budget: read`: kein Anlegen-CTA und keine Anleitung dazu', () => {
@@ -437,6 +452,32 @@ test('Abo-Kennzahlen ohne Monatsbudget: bei `budget: read` keine Aufforderung, e
       assert.match(html, /subscriptions\.unlimited/, 'der Zustand „kein Limit" bleibt');
     });
   } finally { abos.state.summary = vorher; }
+});
+
+test('Abo-Budget spricht wie der Plan: ab 85 % Warnton, ueberschritten Danger (Critique 2026-09-25)', () => {
+  const vorher = abos.state.summary;
+  const summe = (used) => ({ active_count: 3, monthly_total: used, monthly_budget: 100, remaining_budget: 100 - used, base_currency: 'EUR' });
+  try {
+    abos.state.summary = summe(123.6);
+    const over = abos.renderSummary();
+    assert.match(over, /class="metric-card metric-card--over"/, 'eine Ueberschreitung ist eine Tatsache - dieselbe Stimme wie die Plan-Kategorie');
+    assert.doesNotMatch(over, /metric-card--warning/);
+    assert.match(over, /metric-card__progress metric-card__progress--over/);
+    assert.match(over, /id="subscriptions-over-budget-action"/, 'der Handlungsweg bleibt');
+    abos.state.summary = summe(90);
+    const near = abos.renderSummary();
+    assert.match(near, /metric-card__progress--near/, 'ab 85 % der Warnton, wie im Plan');
+    assert.doesNotMatch(near, /metric-card--over|progress--over/);
+    abos.state.summary = summe(50);
+    assert.doesNotMatch(abos.renderSummary(), /progress--(near|over)|metric-card--over/);
+  } finally { abos.state.summary = vorher; }
+  const panel = readFileSync(new URL('../public/styles/panel.css', import.meta.url), 'utf8');
+  const rule = (sel) => [...eachRule(panel)].find((r) => r.selector.trim() === sel)?.body ?? '';
+  assert.match(rule('.metric-card__progress--over > span'), /--color-danger/);
+  assert.match(rule('.metric-card__progress--near > span'), /--color-warning/);
+  assert.match(rule('.metric-card--over .metric-card__value'), /--color-danger/);
+  const plansCss = readFileSync(new URL('../public/styles/budget.css', import.meta.url), 'utf8');
+  assert.match(plansCss, /\.budget-plan-row--tone-over \{ --plan-tone-color: var\(--color-danger\);/, 'der Plan ist die Referenz');
 });
 
 test('Abos: Kopfaktionen, Listen-Riegel und Wischgeste haengen am Recht', () => {

@@ -545,12 +545,13 @@
   gap: var(--space-1);
 }
 
-/* „Ueber Budget" nennt sich im Label und traegt das Warnsymbol davor. */
-.subscriptions-page .metric-card--warning .metric-card__label svg {
+/* „Ueber Budget" nennt sich im Label und traegt das Warnsymbol davor - im
+ * Ton der Ueberschreitung (Danger, wie im Plan). */
+.subscriptions-page .metric-card--over .metric-card__label svg {
   display: inline-block;
   vertical-align: -2px;
   margin-inline-end: var(--space-1);
-  color: var(--color-warning);
+  color: var(--color-danger);
 }
 
 /* Der Weg aus „Ueber Budget" heraus: ein Textknopf IN der Fussnote, hinter
@@ -566,7 +567,9 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--color-warning-ink);
+  /* Ein Weg, kein Zustand: die Tinte der Textknoepfe des Moduls (wie „Alle
+   * Kategorien" der Uebersicht), nicht der Ton der Ueberschreitung daneben. */
+  color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
   font: inherit;
   font-weight: var(--font-weight-semibold);
   text-decoration: underline;

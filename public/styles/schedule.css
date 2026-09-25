@@ -528,7 +528,7 @@
   --summary-cards: 3;
 }
 
-/* `.metric-card--warning` steht seit 2026-09-25 in panel.css (geteilt mit den Abos). */
+/* `.metric-card--warning` steht seit 2026-09-25 in panel.css - eine Variante der geteilten Karte. */
 
 .schedule-stat-card > div > h2 {
   margin-bottom: var(--space-1);

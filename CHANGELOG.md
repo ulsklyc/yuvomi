@@ -89,13 +89,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   subscription moved from y=1123 to y=478 - and "Active" and "per month" only appear where they
   add something. "By category" is a bar list with amount and share instead of a pie chart without
   values, the renewal forecast names its peak month, and the charts no longer overflow on a
-  1024px screen. "Over budget" is a warning instead of an alarm and offers "Most expensive first";
-  the yearly projection no longer repeats the currency, and "1 day overdue" is singular. Split:
+  1024px screen. "Over budget" now offers "Most expensive first" and speaks like the plan: amber
+  from 85 %, red once the budget is actually exceeded; the yearly projection no longer repeats the
+  currency, and "1 day overdue" is singular. Split:
   the tab no longer repeats a second title and description, "Add expense" is the button in the
   budget header (on a phone the usual "+"), so no floating button covers amounts on a desktop, and
   group actions besides "Settle" are in one menu. At 1024px the groups sit above the group
   instead of beside a column twice the screen height. Amounts on all budget tabs use digits of
   equal width, so columns of amounts line up.
+
+- **Budget: charts and figures say what they mean.** The category chart has a scale for income
+  and one for expenses, so the salary no longer squeezes every expense into a sliver; where the
+  overview has a single column, income shows as one total under the chart title. A month that has
+  not started yet is labelled "Month forecast" and its balance is no longer green, and bookings
+  dated after today get a ring instead of a dot. Income and expense totals are shown in the text
+  colour - colour stays with the balance and the change against last month. Statistics no longer
+  repeat the overview: the trend adds up over the month, the categories show the change against
+  the previous week, month or year, and the whole chart can be scrubbed instead of hitting a
+  10-24px column. The booking dialog starts on a large amount field, asks for amount, title,
+  category and date, keeps account, visibility, people, repetition and receipts behind "More
+  details" (open when editing a booking that uses them), and is as wide as the other forms.
+  Delete buttons name the booking they delete, the whole title line opens a booking, "+ Category"
+  has a full-size target, an empty month shows one sentence and its button instead of three
+  sentences and three zeros, and each loan offers "Mark as paid" as a secondary button, leaving
+  one primary button on the tab. The accounts tab says "All accounts, as of today" like the other
+  tabs say which items they cover.
 
 - **The calendar gives phones more room for events.** Filter and search moved next to the view
   switcher, so the calendar header on a phone is 166px instead of 230px, and when you scroll the
