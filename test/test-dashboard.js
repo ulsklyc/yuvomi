@@ -2181,7 +2181,25 @@ test('getUpcomingEvents: fromToday=true zeigt heutige vergangene Termine (Issue 
 test('getUpcomingEvents: das Limit zaehlt nur Kommendes, Beendetes von heute kommt ausserhalb mit (#1449)', () => {
   cdb.exec('SAVEPOINT ended_today');
   try {
-    const day = '2091-03-10';
+    // EIN TAG OHNE FIXTURE-TERMINE: die Wochenserie "Sofia Field Trip" beginnt
+    // relativ zur echten Uhr und traf so jede Woche einen Tag lang genau diesen
+    // Tag (samt Vortag, windowDays 1) - der Test war dann rot, ohne dass sich
+    // am Code etwas geaendert hatte. Gesucht wird ab 2091-03-10 der erste Tag,
+    // an dem ohne die eigenen Termine nichts ansteht.
+    const eveningOf = (key) => {
+      const [y, m, d] = key.split('-').map(Number);
+      return new Date(y, m - 1, d, 19, 28);
+    };
+    const nothingDue = (key) => getUpcomingEvents(cdb, {
+      userId: cuTheo, limit: 20, fromToday: true, windowDays: 1, now: eveningOf(key), keepEndedToday: 20,
+    }).length === 0;
+    let day = '2091-03-10';
+    for (let tries = 0; !nothingDue(day); tries++) {
+      nodeAssert.ok(tries < 14, 'in zwei Wochen ab 2091-03-10 muss ein Tag ohne Fixture-Termine liegen');
+      const next = eveningOf(day);
+      next.setDate(next.getDate() + 1);
+      day = localDateKey(next);
+    }
     const ended = ['06:00', '07:00', '08:00', '09:00', '10:00'].map((time, index) => insertEvent({
       title: `Vorbei ${index + 1}`, start_datetime: `${day}T${time}:00`,
       end_datetime: `${day}T${time.slice(0, 2)}:30:00`, created_by: cuTheo,
@@ -2191,7 +2209,7 @@ test('getUpcomingEvents: das Limit zaehlt nur Kommendes, Beendetes von heute kom
     });
     const evening = insertEvent({ title: 'Abendtermin', start_datetime: `${day}T21:00:00`, created_by: cuTheo });
     const allDay = insertEvent({ title: 'Ganztags', start_datetime: day, all_day: 1, created_by: cuTheo });
-    const now = new Date(2091, 2, 10, 19, 28);
+    const now = eveningOf(day);
 
     const plain = getUpcomingEvents(cdb, { userId: cuTheo, limit: 5, fromToday: true, windowDays: 1, now });
     nodeAssert.ok(!plain.some((e) => Number(e.id) === Number(evening)),
