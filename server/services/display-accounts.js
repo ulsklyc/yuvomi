@@ -76,14 +76,14 @@ export const DISPLAY_COOKIE_MAX_AGE = 365 * 24 * 60 * 60 * 1000;
  * Wie selten das Cookie neu datiert wird - und warum ueberhaupt selten.
  *
  * DAS CREDENTIAL STEHT IM KLARTEXT IM `Set-Cookie`-KOPF. Bei jedem Request neu
- * zu setzen hiess, es an JEDE Antwort zu heften - auch an die eine, die hinter
- * `requireAuth` bewusst oeffentlich cachebar ist: `GET /weather/icon/:code`
- * antwortet mit `Cache-Control: public, max-age=86400`, und ein Display hat
- * `weather:read`. nginx und Cloudflare cachen eine Antwort mit `Set-Cookie`
- * zwar von Haus aus nicht, aber `proxy_ignore_headers Set-Cookie` steht in
- * genug Selfhosting-Anleitungen, und dann liegt das Credential im Cache fuer
- * den naechsten Abholer. Dazu landet es in jedem Proxy-Log, das Antwortkoepfe
- * mitschreibt.
+ * zu setzen hiess, es an JEDE Antwort zu heften, und damit in jedes Proxy-Log,
+ * das Antwortkoepfe mitschreibt. Bis 2026-09-25 kam ein Cache dazu:
+ * `GET /weather/icon/:code` antwortete hinter `requireAuth` mit
+ * `Cache-Control: public, max-age=86400`, und ein Proxy mit
+ * `proxy_ignore_headers Set-Cookie` haette das Credential fuer den naechsten
+ * Abholer aufbewahrt. Die Route sendet seitdem `no-store`; die Drossel bleibt
+ * wegen der Logs und als Schutz, falls je wieder eine cachebare Antwort hinter
+ * dem Guard entsteht.
  *
  * Zwoelf Stunden halten beides zusammen: die Ein-Jahres-Zusage bleibt (ein
  * Tablett an der Wand meldet sich vielfach oefter), und das Cookie steht nur

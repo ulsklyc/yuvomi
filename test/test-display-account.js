@@ -604,8 +604,7 @@ test('das Geraete-Cookie wird nachdatiert, aber nicht bei jedem Zugriff', async 
   // geschriebene Zehnjahresfrist ist damit keine - ein Tablett an der Wand
   // waere nach gut einem Jahr von selbst leer gewesen, ohne Widerruf. An JEDE
   // Antwort gehoert das Credential aber auch nicht: es steht im Klartext im
-  // Set-Cookie-Kopf, und hinter diesem Guard liegt mit /weather/icon eine
-  // oeffentlich cachebare Antwort.
+  // Set-Cookie-Kopf und damit in jedem Proxy-Log, das Antwortkoepfe mitschreibt.
   const created = await admin('POST', '/displays', { display_name: 'Nachdatiert' });
   const issued = await admin('POST', `/displays/${created.body.data.id}/pairing-code`, {});
   const token = (await pair(issued.body.data.code)).token;

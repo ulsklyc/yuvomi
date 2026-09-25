@@ -902,9 +902,9 @@ function requireAuth(req, res, next) {
       // Tablett an der Wand waere irgendwann von selbst leer, ohne dass jemand
       // etwas widerrufen haette. Warum trotzdem gedrosselt: das Credential
       // steht im Klartext im Set-Cookie-Kopf, und an jede Antwort geheftet
-      // landet es auch an der einen oeffentlich cachebaren hinter diesem Guard
-      // (`/weather/icon/:code`). Beide Begruendungen samt Zahlen stehen bei
-      // `DISPLAY_COOKIE_MAX_AGE` und `DISPLAY_COOKIE_REFRESH_AFTER_MS`.
+      // landet es in jedem Proxy-Log, das Antwortkoepfe mitschreibt. Beide
+      // Begruendungen samt Zahlen stehen bei `DISPLAY_COOKIE_MAX_AGE` und
+      // `DISPLAY_COOKIE_REFRESH_AFTER_MS`.
       if (device.refreshCookie) {
         res.cookie(DISPLAY_COOKIE, displayToken, displayCookieOptions());
         // Erst JETZT ist die Frist verbraucht - hier geht das Cookie wirklich

@@ -346,12 +346,15 @@ export function buildRouter({ cfgGet: cfgGetFn = cfgGet, fetchFn = null } = {}) 
     }
     try {
       const url = `https://openweathermap.org/img/wn/${code}@2x.png`;
-      const upstream = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      const upstream = await doFetch(url, { signal: AbortSignal.timeout(5000) });
       if (!upstream.ok) {
         return res.status(502).json({ error: 'Icon nicht verfügbar.', code: 502 });
       }
       res.setHeader('Content-Type', 'image/png');
-      res.setHeader('Cache-Control', 'public, max-age=86400'); // 24 Stunden
+      // no-store wie jede Medienroute: die Antwort liegt hinter der Anmeldung,
+      // und eine oeffentlich cachebare Fassung nahm dort einen Set-Cookie-Kopf mit
+      // in fremde Caches (services/display-accounts.js).
+      res.setHeader('Cache-Control', 'no-store');
       // Natives fetch liefert einen Web-Stream; einmalig puffern und senden (Icons
       // sind wenige KB). Kein body.pipe wie bei node-fetch (dessen Node-Stream fehlt).
       res.end(Buffer.from(await upstream.arrayBuffer()));

@@ -471,3 +471,22 @@ test('OWM: die Tagesbuckets folgen dem Ortstag, nicht dem UTC-Tag', async () => 
     assert.equal(entry.desc, 'sonnig');
   } finally { await close(); }
 });
+
+test('GET /icon/:code: das Icon landet nicht im HTTP-Cache', async () => {
+  // Hinter derselben Anmeldung wie jede andere Route; eine oeffentlich
+  // cachebare Antwort nahm dort einen Set-Cookie-Kopf mit in fremde Caches
+  // (services/display-accounts.js, DISPLAY_COOKIE_REFRESH_AFTER_MS).
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+  const { baseUrl, close } = await startApp({
+    fetchFn: async (url) => {
+      assert.equal(new URL(String(url)).hostname, 'openweathermap.org');
+      return { ok: true, arrayBuffer: async () => PNG };
+    },
+  });
+  try {
+    const res = await fetch(`${baseUrl}/icon/01d`);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('content-type'), 'image/png');
+    assert.equal(res.headers.get('cache-control'), 'no-store');
+  } finally { await close(); }
+});
