@@ -131,6 +131,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The event popover on a desktop puts Delete and Edit apart.** Edit stood first and Delete 8px
+  next to it, and "Open in Maps" dropped onto a line of its own. The popover now follows the phone
+  sheet: Delete at the start, Edit as the main button at the end, below the other actions.
+
 - **Switching the calendar view no longer moves the view tabs on a phone.** Week and day scroll to
   the current hour when they open, and the header took that for your own scrolling: it folded the
   title away, and the tabs jumped 45px up under your finger. Only scrolling you do yourself folds

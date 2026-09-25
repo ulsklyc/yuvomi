@@ -2709,6 +2709,12 @@ als Primaerknopf am ENDE der Fusszeile, Löschen bleibt `danger-ghost` am Anfang
 als „Zurück". Opt-in, weil die Hauptabsicht dem Objekt gehoert: im Termin ist es Bearbeiten, in
 der Aufgabe das Erledigen. Die Rueckfrage beim Löschen bleibt. Der Kalender nimmt es; Kontakte
 und Inventar haben dieselbe Fusszeile und sind die naechsten Kandidaten.
+**Das Popover am Desktop folgt derselben Ordnung** (Re-Kritik 2026-09-25, P2): es setzte
+Bearbeiten als Sekundaerknopf VOR alle Aktionen, Löschen stand 8px daneben, sein `--start` schob
+nichts mehr auseinander, und „In Maps öffnen" rutschte allein in eine zweite Zeile. Mit
+`edit.primary` gilt jetzt auch dort: Aufruferaktionen zuerst, Bearbeiten primaer am Ende. In
+286px Innenbreite teilen sich Löschen und Maps die erste Zeile, Bearbeiten steht unten am Ende -
+dasselbe Bild wie im Sheet, und kein Aktionsknopf verliert seine Beschriftung.
 
 ### Der Termin-Dialog: Haeufiges oben, Seltenes benannt (Critique 2026-09-24, P2)
 Der Dialog war mobil drei Bildschirme lang (1559px bei 523 sichtbar), und Sichtbarkeit und

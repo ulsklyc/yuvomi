@@ -220,6 +220,22 @@ test('im Sheet steht Bearbeiten als Hauptaktion unten, Löschen zurückgenommen 
     'Löschen bleibt destruktiv gestylt und am Anfang, nicht an der Primärposition');
 });
 
+test('im Popover gilt dieselbe Ordnung wie im Sheet: Löschen am Anfang, Bearbeiten primär am Ende (Re-Kritik 2026-09-25)', async () => {
+  const src = await detailJs();
+  const popover = src.slice(src.indexOf('function openAsPopover'), src.indexOf('const footer = detailFooterEl(actions)'));
+  // Mit edit.primary kommt Bearbeiten NACH den Aktionen des Aufrufers - sonst
+  // steht Löschen direkt daneben und sein `--start` wirkt nicht, weil es nicht
+  // mehr das erste Element ist.
+  assert.match(popover, /opts\.edit\?\.primary\s*\?\s*\[\.\.\.\(opts\.actions \?\? \[\]\), edit\]/,
+    'mit edit.primary gehört Bearbeiten ans Ende der Popover-Fußzeile');
+  assert.match(popover, /opts\.edit\.primary \? \{ variant: 'primary'/,
+    'mit edit.primary ist Bearbeiten auch im Popover der Primärknopf');
+  // Ohne die Option bleibt alles wie bisher (Kontakte, Inventar, Budget ...).
+  assert.match(popover, /:\s*\[edit, \.\.\.\(opts\.actions \?\? \[\]\)\]/,
+    'ohne edit.primary steht Bearbeiten weiter vorne');
+  assert.match(popover, /: \{ variant: 'secondary' \}/, 'ohne edit.primary bleibt Bearbeiten sekundär');
+});
+
 test('beide Fußzeilen werden aufbewahrt statt verworfen', async () => {
   const src = await detailJs();
   assert.match(src, /function detachFooter\(/, 'Fußzeilen werden abgehängt, nicht entfernt');

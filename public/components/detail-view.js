@@ -567,16 +567,25 @@ function openAsPopover(opts) {
   // Im Popover führt „Bearbeiten" ins reguläre Formular-Modal statt in einen
   // Pane-Wechsel: ein 320px-Kärtchen ist kein Ort für sieben Selects, und der
   // Weg ist derselbe, den der Desktop schon immer ging.
-  const actions = [];
-  if (opts.edit?.standalone) {
-    actions.push({
-      label: opts.edit.label ?? t('common.edit'),
-      variant: 'secondary',
-      id: 'detail-popover-edit',
-      onClick: () => { closeDetailView(); opts.edit.standalone(); },
-    });
-  }
-  (opts.actions ?? []).forEach((a) => actions.push(a));
+  //
+  // DIESELBE ORDNUNG WIE IM SHEET (Re-Kritik 2026-09-25, P2). Mit
+  // `edit.primary` steht Bearbeiten dort als Primaerknopf am Ende und Löschen
+  // zurueckgenommen am Anfang. Das Popover setzte Bearbeiten weiter VOR alle
+  // Aktionen: Löschen stand 8px daneben, sein `--start` schob nichts mehr
+  // auseinander (es war nicht mehr das erste), und „In Maps öffnen" rutschte
+  // allein in eine zweite Zeile. Jetzt folgt es derselben Reihenfolge - in
+  // 286px Innenbreite teilen sich Löschen und Maps die erste Zeile, Bearbeiten
+  // steht als Hauptaktion unten am Ende, so weit von Löschen weg wie im Sheet.
+  // Ohne `edit.primary` bleibt Bearbeiten der Sekundaerknopf vorne.
+  const edit = opts.edit?.standalone ? {
+    label: opts.edit.label ?? t('common.edit'),
+    id: 'detail-popover-edit',
+    onClick: () => { closeDetailView(); opts.edit.standalone(); },
+    ...(opts.edit.primary ? { variant: 'primary', icon: 'pencil' } : { variant: 'secondary' }),
+  } : null;
+  const actions = opts.edit?.primary
+    ? [...(opts.actions ?? []), edit]
+    : [edit, ...(opts.actions ?? [])];
 
   const footer = detailFooterEl(actions);
   if (footer) {
@@ -667,7 +676,8 @@ function openAsPopover(opts) {
  * @param {Array}  [opts.sections]       - Metazeilen, siehe detailRowEl
  * @param {Array}  [opts.actions]        - Objektaktionen in der Fußzeile
  * @param {Object} [opts.edit]           - { label?, title?, ready?, primary?, mount(panel, pane), standalone() }
- *                                         `primary`: im Sheet als Primaerknopf am Ende der Fusszeile statt im Kopf
+ *                                         `primary`: im Sheet als Primaerknopf am Ende der Fusszeile statt im Kopf,
+ *                                         im Popover ebenso am Ende statt als Sekundaerknopf vorne
  *                                         `ready` ist ein Promise, auf das der
  *                                         Wechsel ins Formular wartet
  * @param {string} [opts.size]           - Panel-Breite wie bei openModal
