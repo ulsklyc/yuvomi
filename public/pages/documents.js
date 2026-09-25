@@ -995,11 +995,13 @@ function presentCategories() {
 // denen die meisten ins Leere führen, sind Rauschen. Die gerade aktive Kategorie
 // bleibt auch bei 0 stehen, damit sie einem beim Ansehen nicht wegspringt.
 //
-// "ALLE KATEGORIEN" IST NIE GETOENT (Critique 2026-09-25, P2). Es ist die
-// Abwesenheit eines Filters, und der Grundzustand trug damit zwei getoente
-// Chips ("Aktiv" und "Alle") - getoent heisst in der Shell "hier filtert
-// etwas". Ohne Filter ist nichts getoent. `aria-pressed` bleibt: fuer den
-// Screenreader ist "Alle" die gewaehlte Option der Gruppe.
+// "ALLE KATEGORIEN" TOENT, WENN ES GEWAEHLT IST. Die Reihe ist eine
+// Einfachauswahl, und "Alle" ist darin eine Option wie jede andere: der aktive
+// Chip beantwortet "wo bin ich" (DESIGN.md), und Toenung und `aria-pressed`
+// folgen derselben Bedingung. Zwischen dem 2026-09-25 (Critique, P2) und der
+// Angleichung am selben Abend war "Alle" hier ungetoent - optisch "aus",
+// fuer den Screenreader "an", und als einzige Chipreihe der App anders als
+// Notizen, Inventar, Kontakte und Vorrat.
 function renderCategoryChips() {
   const host = _container?.querySelector('#documents-category');
   if (!host) return;
@@ -1014,7 +1016,7 @@ function renderCategoryChips() {
   // Kategorie bleibt stehen, damit man sie loesen kann.
   if (!state.allDocuments.length && !state.category) return;
   host.insertAdjacentHTML('beforeend', `
-    <button type="button" class="filter-chip filter-chip--sm" data-category="" aria-pressed="${!state.category}">
+    <button type="button" class="filter-chip filter-chip--sm${!state.category ? ' filter-chip--active' : ''}" data-category="" aria-pressed="${!state.category}">
       ${t('documents.allCategories')}<span class="filter-chip__count">${counts.get('') || 0}</span>
     </button>
     ${visible.map((category) => `

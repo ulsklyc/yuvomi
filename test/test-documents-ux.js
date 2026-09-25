@@ -734,17 +734,21 @@ test('die Filterzeile traegt keine Werkzeuge mehr - Sortierung und Auswahl stehe
   assert.doesNotMatch(de.documents.sortName, /\(|\u2013/, 'mit umkehrbarer Richtung ist "(A-Z)" eine Falschauskunft');
 });
 
-test('Aktiv/Archiviert ist ein Segment, und im Ruhezustand ist kein Filter getoent', () => {
+test('Aktiv/Archiviert ist ein Segment, und "Alle Kategorien" zeigt die Auswahl wie jede Chipreihe der App', () => {
   const row = filterRowMarkup();
   assert.match(row, /class="segmented documents-status" id="documents-status" role="radiogroup"/);
   assert.match(row, /class="segmented__item\$\{on \? ' is-active' : ''\}"[\s\S]{0,120}role="radio"/);
   assert.doesNotMatch(row, /data-status="[^"]*"[^>]*filter-chip|filter-chip[^>]*data-status=/, 'der Status ist kein Chip mehr');
   assert.match(page, /wireTablist\(_container\.querySelector\('#documents-status'\), \{[\s\S]{0,200}mode: 'select'/);
-  // "Alle Kategorien" ist die Abwesenheit eines Filters - getoent sah es aus
-  // wie ein aktiver Filter, der Grundzustand trug zwei getoente Chips.
+  // "Alle Kategorien" ist in einer Einfachauswahl eine echte Auswahl: es traegt
+  // aria-pressed="true", und DESIGN.md sagt, der aktive Chip beantwortet
+  // "wo bin ich". Ungetoent sagte er optisch "aus" und dem Screenreader "an".
+  // Notizen, Inventar, Kontakte und Vorrat toenen ihr "Alle" ebenso; die
+  // ungetoente Fassung vom 2026-09-25 war die Ausnahme (Entscheidung Betreiber).
   const chips = page.slice(page.indexOf('function renderCategoryChips'), page.indexOf('function renderExpiringChip'));
   const allChip = chips.slice(chips.indexOf('data-category=""') - 200, chips.indexOf('data-category=""') + 80);
-  assert.doesNotMatch(allChip, /filter-chip--active/, '"Alle Kategorien" traegt nie die Tonung');
+  assert.match(allChip, /\$\{!state\.category \? ' filter-chip--active' : ''\}/, '"Alle Kategorien" toent wie jede gewaehlte Option');
+  assert.match(allChip, /aria-pressed="\$\{!state\.category\}"/, 'Tonung und aria-pressed folgen derselben Bedingung');
 });
 
 test('mobil scrollt nur die Chip-Spur, nicht die Filterzeile', () => {
