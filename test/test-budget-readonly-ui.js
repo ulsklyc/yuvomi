@@ -244,6 +244,20 @@ test('Konten mit `budget: read`: Anlegen und Bearbeiten weg, Saldo und Kontoausz
   });
 });
 
+test('Konten ohne Archiv: keine leere Kopfleiste ueber der Kennzahl', () => {
+  // Ohne Anlegeknopf und ohne Archiv-Umschalter hatte .panel-head keinen
+  // sichtbaren Inhalt mehr und stand nur als 16px-Abstand da. Die Ueberschrift
+  // bleibt fuer Screenreader, die Leiste kommt erst mit dem Umschalter.
+  mitKonten([konto()], () => withAccess({ budget: 'write' }, () => {
+    const html = budget.renderAccountsPage();
+    assert.doesNotMatch(html, /class="panel-head"/);
+    assert.match(html, /<h2 class="panel-head__title sr-only">/);
+  }));
+  mitKonten([konto(), konto({ id: 5, archived: 1 })], () => withAccess({ budget: 'write' }, () => {
+    assert.match(budget.renderAccountsPage(), /class="panel-head"[\s\S]*id="budget-toggle-archived"/);
+  }));
+});
+
 test('Keine Konten mit `budget: read`: kein Anlegen-CTA', () => {
   mitKonten([], () => {
     withAccess({ budget: 'write' }, () => assert.match(budget.renderAccountsPage(), /id="budget-add-account-empty"/));

@@ -1740,11 +1740,14 @@ function renderAccountsPage() {
   // Angelegt wird ueber den Kopfknopf (TAB_CAPS.accounts.add) - ein zweiter,
   // dauerhafter „Konto hinzufuegen"-Knopf hier war ein zweiter Weg fuer dieselbe
   // Handlung. Nur der Leerzustand traegt ihn noch, als Aufforderung (CTA).
+  // Ohne Archiv-Umschalter bleibt keine sichtbare Aktion - die Kopfleiste
+  // faellt dann weg, sonst stuende ihr Abstand als 16px-Luecke ueber der Kennzahl.
+  const title = `<h2 class="panel-head__title sr-only">${t('budget.accountsTab')}</h2>`;
   const header = `
-    <div class="panel-head">
-      <h2 class="panel-head__title sr-only">${t('budget.accountsTab')}</h2>
-      ${archiveToggle ? `<div class="panel-head__actions">${archiveToggle}</div>` : ''}
-    </div>
+    ${archiveToggle ? `<div class="panel-head">
+      ${title}
+      <div class="panel-head__actions">${archiveToggle}</div>
+    </div>` : title}
     <div class="metric-grid">
       <div class="metric-card ${netWorth.className}">
         <div class="metric-card__label">${t('budget.netWorth')}</div>
