@@ -2684,7 +2684,7 @@
         "documentStorageGoogleDriveOAuthError": "Připojení ke službě Google Drive se nezdařilo. Předchozí připojení, pokud existovalo, zůstalo zachováno.",
         "documentStorageGoogleDrivePrivacy": "Nastavení viditelnosti v Yuvomi řídí pouze přístup přes Yuvomi. Každý, kdo má přístup k připojené složce na Disku Google, může zobrazit všechny soubory, které jsou v ní uložené.",
         "recipeProvidersTitle": "Poskytovatelé receptů",
-        "recipeProvidersDescription": "Zrcadlí recepty ze samostatně hostované instance Mealie nebo Tandoor. Zdroj zůstává zdrojem pravdy – recepty jsou zde pouze pro čtení a automaticky se aktualizují.",
+        "recipeProvidersDescription": "Zrcadlí recepty ze samostatně hostované instance Mealie nebo Tandoor. Zdroj zůstává zdrojem pravdy - recepty jsou zde pouze pro čtení a automaticky se aktualizují.",
         "recipeProviderAddAccount": "Přidat poskytovatele receptů",
         "recipeProviderTypeLabel": "Poskytovatel",
         "recipeProviderNameLabel": "Název",

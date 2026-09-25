@@ -1899,7 +1899,7 @@
         "apiTokenLastUsed": "Último uso",
         "apiTokenNeverUsed": "Nunca usado",
         "apiTokenScopes": "Permisos",
-        "apiTokenScopeHint": "Sin una selección, el token tiene acceso completo, igual que la cuenta que lo creó. Elige módulos para limitarlo —por ejemplo, para un cliente de IA/MCP— a áreas concretas y a permiso de lectura o escritura.",
+        "apiTokenScopeHint": "Sin una selección, el token tiene acceso completo, igual que la cuenta que lo creó. Elige módulos para limitarlo - por ejemplo, para un cliente de IA/MCP - a áreas concretas y a permiso de lectura o escritura.",
         "apiTokenScopeFull": "Acceso completo (sin restricciones)",
         "apiTokenScopeLimit": "Limitar a los módulos seleccionados",
         "apiTokenScopeRead": "Lectura",

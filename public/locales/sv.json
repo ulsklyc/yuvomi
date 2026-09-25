@@ -2684,7 +2684,7 @@
         "documentStorageGoogleDriveOAuthError": "Det gick inte att ansluta till Google Drive. Den tidigare anslutningen behölls, om det fanns någon.",
         "documentStorageGoogleDrivePrivacy": "Yuvomis synlighetsinställningar styr endast åtkomsten via Yuvomi. Alla som har åtkomst till den anslutna Google Drive-mappen kan se alla filer som lagras där.",
         "recipeProvidersTitle": "Receptleverantörer",
-        "recipeProvidersDescription": "Speglar recept från en självhostad Mealie- eller Tandoor-instans. Källan förblir sanningskällan – recepten här är skrivskyddade och uppdateras automatiskt.",
+        "recipeProvidersDescription": "Speglar recept från en självhostad Mealie- eller Tandoor-instans. Källan förblir sanningskällan - recepten här är skrivskyddade och uppdateras automatiskt.",
         "recipeProviderAddAccount": "Lägg till receptleverantör",
         "recipeProviderTypeLabel": "Leverantör",
         "recipeProviderNameLabel": "Namn",

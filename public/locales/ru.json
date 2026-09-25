@@ -1317,7 +1317,7 @@
         "savedToast": "Запись сохранена",
         "deletedToast": "Запись удалена",
         "loadError": "Не удалось загрузить бюджет.",
-        "trendNeutral": "— как в {{month}}",
+        "trendNeutral": "- как в {{month}}",
         "validAmountRequired": "Введите корректную сумму",
         "dateRequired": "Дата обязательна",
         "catFood": "Продукты",

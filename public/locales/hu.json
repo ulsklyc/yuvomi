@@ -2684,7 +2684,7 @@
         "documentStorageGoogleDriveOAuthError": "Nem sikerült csatlakozni a Google Drive-hoz. A korábbi kapcsolat, ha volt, megmaradt.",
         "documentStorageGoogleDrivePrivacy": "A Yuvomi láthatósági beállításai csak a Yuvomin keresztüli hozzáférést szabályozzák. A csatlakoztatott Google Drive-mappához hozzáférő személyek az ott tárolt összes fájlt megtekinthetik.",
         "recipeProvidersTitle": "Receptszolgáltatók",
-        "recipeProvidersDescription": "Recepteket tükröz egy saját üzemeltetésű Mealie- vagy Tandoor-példányból. A forrás marad a hiteles forrás – a receptek itt csak olvashatók, és automatikusan frissülnek.",
+        "recipeProvidersDescription": "Recepteket tükröz egy saját üzemeltetésű Mealie- vagy Tandoor-példányból. A forrás marad a hiteles forrás - a receptek itt csak olvashatók, és automatikusan frissülnek.",
         "recipeProviderAddAccount": "Receptszolgáltató hozzáadása",
         "recipeProviderTypeLabel": "Szolgáltató",
         "recipeProviderNameLabel": "Név",
