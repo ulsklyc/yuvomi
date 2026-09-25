@@ -3392,6 +3392,42 @@ test('Zeitraum-Wisch: Schwelle, Richtungssperre, Systemrand und RTL', () => {
   assert(!swipe.startsAtScreenEdge(40, 375), 'ein Kontakt im Inhalt gehoert der Geste');
 });
 
+/* Ein zweiter Finger MITTEN im Wisch (PR #1460, Review): sein touchstart kam
+ * zuerst und setzte die Sperre auf 'off' - damit erreichte onMove seinen
+ * Mehrfinger-Zweig nie, onEnd stieg ohne reset aus, und der Inhalt blieb bis
+ * zum naechsten Rendern um den Wischweg verschoben stehen. */
+test('Zeitraum-Wisch: ein zweiter Finger mitten im Wisch setzt den Inhalt zurueck', () => {
+  const zuvor = { window: globalThis.window, document: globalThis.document };
+  try {
+    globalThis.window = { matchMedia: () => ({ matches: false }), innerWidth: 375 };
+    globalThis.document = { getElementById: () => null, documentElement: { dir: '' } };
+    const handlers = {};
+    const child = { style: {}, isConnected: true, classList: { add() {}, remove() {} } };
+    const surface = {
+      firstElementChild: child,
+      addEventListener: (type, fn) => { handlers[type] = fn; },
+      removeEventListener() {},
+      closest: () => null,
+    };
+    let steps = 0;
+    periodSwipe.wirePeriodSwipe(surface, { enabled: () => true, onStep: () => { steps++; } });
+    const target = { closest: () => null };
+    const at = (x, y) => ({ clientX: x, clientY: y });
+
+    handlers.touchstart({ touches: [at(200, 300)], target });
+    handlers.touchmove({ touches: [at(150, 302)], cancelable: true, preventDefault() {} });
+    assert(child.style.transform, 'Vorbedingung: der Inhalt folgt dem Finger');
+
+    handlers.touchstart({ touches: [at(150, 302), at(300, 400)], target });
+    assert(!child.style.transform, `der zweite Finger muss den Wisch abbrechen, Transform: ${child.style.transform}`);
+    handlers.touchend({ touches: [] });
+    assert(steps === 0, 'ein abgebrochener Wisch blaettert nicht');
+  } finally {
+    globalThis.window = zuvor.window;
+    globalThis.document = zuvor.document;
+  }
+});
+
 // --------------------------------------------------------
 // Tastatur und Screenreader (Critique 2026-09-24, P1, Schritt 3)
 //

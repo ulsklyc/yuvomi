@@ -130,6 +130,10 @@ export function wirePeriodSwipe(surface, { enabled, onStep, ignore } = {}) {
   };
 
   const onStart = (e) => {
+    // Ein weiterer Finger mitten im Wisch bricht ihn HIER ab: nach dem
+    // lock = 'off' darunter erreicht onMove seinen Mehrfinger-Zweig nie mehr,
+    // und der Inhalt bliebe verschoben stehen (PR #1460, Review).
+    if (moving) reset(true);
     lock = 'off';
     if (e.touches.length !== 1) return;
     if (enabled && !enabled()) return;
