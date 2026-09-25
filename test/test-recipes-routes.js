@@ -481,6 +481,7 @@ function registerMirrorTests(provider) {
     recipeProviders._setAdapterFactory(null);
     assert.equal(res.status, 200);
     assert.equal(res.headers.get('content-type'), 'image/png');
+    assert.equal(res.headers.get('cache-control'), 'no-store');
     const buf = Buffer.from(await res.arrayBuffer());
     assert.equal(buf.length, png1x1.length);
   });
@@ -589,6 +590,8 @@ test('GET /recipes/:id/image liefert das Bild als Datei', async () => {
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('content-type'), 'image/png');
   assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+  // Das Bild steht im Browser-Cache sonst bis zu einer Stunde - auch nach dem Abmelden.
+  assert.equal(res.headers.get('cache-control'), 'no-store');
   const buf = Buffer.from(await res.arrayBuffer());
   assert.ok(buf.length > 0, 'die Datei darf nicht leer sein');
 });

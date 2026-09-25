@@ -355,10 +355,10 @@ router.get('/:id/image', (req, res) => {
     res.setHeader('Content-Type', match[1]);
     res.setHeader('Content-Length', String(buffer.length));
     // Dieselben Kopfzeilen wie der Provider-Proxy: der Browser soll den Typ
-    // nicht raten, und ein Bild aus der eigenen Datenbank gehoert niemandem
-    // sonst in den Cache.
+    // nicht raten, und ein Bild aus der eigenen Datenbank bleibt nicht als
+    // Kopie im Browser-Cache liegen - der ueberlebt das Abmelden.
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'");
     res.end(buffer);
   } catch (err) {
@@ -422,7 +422,7 @@ router.get('/:id/provider-thumbnail', async (req, res) => {
     res.setHeader('Content-Type', mime);
     res.setHeader('Content-Length', String(thumb.buffer.length));
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'");
     res.end(thumb.buffer);
   } catch (err) {
