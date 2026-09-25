@@ -1272,6 +1272,7 @@
         "income": "Bevétel",
         "expenses": "Kiadás",
         "balance": "Egyenleg",
+        "summaryTitle": "Havi összesítő",
         "expensesOnly": "Csak kiadások",
         "expensesOnlyHint": "Csak a kiadások megjelenítése, a bevételek és az egyenleg elrejtése",
         "byCategory": "Kategóriák szerint",

@@ -1272,6 +1272,7 @@
         "income": "Gelir",
         "expenses": "Gider",
         "balance": "Bakiye",
+        "summaryTitle": "Aylık özet",
         "expensesOnly": "Yalnızca giderler",
         "expensesOnlyHint": "Yalnızca giderleri göster, geliri ve bakiyeyi gizle",
         "byCategory": "Kategoriye göre",

@@ -1272,6 +1272,7 @@
         "income": "Доходы",
         "expenses": "Расходы",
         "balance": "Баланс",
+        "summaryTitle": "Итоги месяца",
         "expensesOnly": "Только расходы",
         "expensesOnlyHint": "Показывать только расходы, скрыть доходы и баланс",
         "byCategory": "По категориям",

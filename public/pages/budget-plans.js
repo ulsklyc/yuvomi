@@ -97,7 +97,7 @@ function renderBody(body) {
     ${renderSavingsCard(d.savings)}
     <div class="budget-plan__section">
       <div class="budget-plan__section-head">
-        <h3 class="budget-plan__section-title">${t('budget.planCategoryBudgets')}</h3>
+        <h2 class="budget-plan__section-title u-section-title">${t('budget.planCategoryBudgets')}</h2>
         ${readOnly() ? '' : `<button class="btn btn--secondary btn--sm" id="budget-plan-add">
           <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>${t('budget.planAddBudget')}
         </button>`}

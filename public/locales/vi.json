@@ -1272,6 +1272,7 @@
         "income": "Thu nhập",
         "expenses": "Chi phí",
         "balance": "Số dư",
+        "summaryTitle": "Tóm tắt tháng",
         "expensesOnly": "Chỉ chi tiêu",
         "expensesOnlyHint": "Chỉ hiển thị chi tiêu, ẩn thu nhập và số dư",
         "byCategory": "Theo danh mục",

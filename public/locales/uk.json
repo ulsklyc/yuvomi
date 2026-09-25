@@ -1272,6 +1272,7 @@
         "income": "Доходи",
         "expenses": "Витрати",
         "balance": "Баланс",
+        "summaryTitle": "Підсумки місяця",
         "expensesOnly": "Лише витрати",
         "expensesOnlyHint": "Показувати лише витрати, приховати доходи та баланс",
         "byCategory": "За категоріями",

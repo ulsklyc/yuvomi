@@ -1272,6 +1272,7 @@
         "income": "Revenus",
         "expenses": "Dépenses",
         "balance": "Solde",
+        "summaryTitle": "Bilan du mois",
         "expensesOnly": "Dépenses uniquement",
         "expensesOnlyHint": "Afficher uniquement les dépenses, masquer les revenus et le solde",
         "byCategory": "Par catégorie",

@@ -1284,6 +1284,7 @@
         "income": "Pemasukan",
         "expenses": "Pengeluaran",
         "balance": "Saldo",
+        "summaryTitle": "Ringkasan bulan",
         "expensesOnly": "Hanya pengeluaran",
         "expensesOnlyHint": "Tampilkan hanya pengeluaran, sembunyikan pemasukan dan saldo",
         "byCategory": "Menurut kategori",

@@ -1272,6 +1272,7 @@
         "income": "Έσοδα",
         "expenses": "Έξοδα",
         "balance": "Υπόλοιπο",
+        "summaryTitle": "Σύνοψη μήνα",
         "expensesOnly": "Μόνο έξοδα",
         "expensesOnlyHint": "Εμφάνιση μόνο εξόδων, απόκρυψη εσόδων και υπολοίπου",
         "byCategory": "Ανά κατηγορία",

@@ -130,6 +130,7 @@
  * Liste, ist er versal; benennt er einen eigenen Bereich, ist er Überschrift.
  * ------------------------------------------------------------------------ */
 .u-section-title,
+.panel-head__title,
 .budget-page .split-title,
 .budget-chart-section__title,
 .budget-list-header__title,
@@ -175,8 +176,11 @@
  * Überschrift in Satzschreibung (Block darüber); einer, der sich mit
  * wechselndem Wert über eine Liste wiederholt, ist ein Versal-Mikro-Label
  * (dieser Block). Was ein Kopf benennt, ist keine Eigenschaft seines Markups -
- * `.panel-head__title` und `.settings-section__title` sind strukturell
- * dasselbe Element und stehen absichtlich in verschiedenen Blöcken.
+ * `.panel-head__title` stand bis 2026-09-25 in DIESEM Block, obwohl es
+ * einen Bereich benennt (Konten, Darlehen) - als einziger Titel eines Panels
+ * war das Versal-Label die zweite Ueberschriftsgrammatik des Budgets neben
+ * „Nach Kategorie" (Critique 2026-09-25). Es ist jetzt ein <h2> im Block
+ * darueber.
  *
  * Ein Guard darüber wäre deshalb ein Guard über DIESE LISTE, nicht über die
  * Regel - genau die Bauart, die dieses Repo bei der Küche und beim Budget schon
@@ -190,7 +194,6 @@
 .event-icon-picker__category-label,
 .metric-card__label,
 .loan-report__section-title,
-.panel-head__title,
 .contact-group__header,
 .day-header__name,
 .meal-slot__type-label,

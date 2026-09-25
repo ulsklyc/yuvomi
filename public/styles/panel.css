@@ -57,6 +57,9 @@
 }
 
 .panel-head__actions {
+  /* Rechtsbuendig auch dann, wenn der Titel nur fuer Screenreader da ist
+   * (sr-only ist absolut positioniert und belegt keinen Flex-Platz). */
+  margin-inline-start: auto;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -65,10 +68,13 @@
 
 /* Sektionsüberschrift des Panels. Eine Auszeichnung für alle Tabs statt der
  * bisherigen sechs (__eyebrow, __section-title, blankes h2, blankes h3, span).
- * Größe, Gewicht, Laufweite und Versalsatz kommen aus der app-weiten
- * Eyebrow-Klasse in typography.css - hier steht nur die Farbe. */
+ * Größe, Gewicht und Laufweite kommen aus der Bereichs-Überschrift in
+ * typography.css (dieselbe Rolle wie „Nach Kategorie"), das Element ist ein
+ * <h2>. Bis 2026-09-25 war es ein 12px-Versal-Label in Sekundärfarbe - als
+ * EINZIGER Titel eines Panels die zweite Überschriftsgrammatik des Budgets
+ * (Critique 2026-09-25). Versal bleibt Gruppenlabeln UNTER einer Überschrift. */
 .panel-head__title {
-  color: var(--color-text-secondary);
+  color: var(--color-text-primary);
 }
 
 /* --------------------------------------------------------

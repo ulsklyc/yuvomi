@@ -1272,6 +1272,7 @@
         "income": "Inkomsten",
         "expenses": "Uitgaven",
         "balance": "Saldo",
+        "summaryTitle": "Maandoverzicht",
         "expensesOnly": "Alleen uitgaven",
         "expensesOnlyHint": "Alleen uitgaven tonen, inkomsten en saldo verbergen",
         "byCategory": "Per categorie",

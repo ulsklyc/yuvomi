@@ -1272,6 +1272,7 @@
         "income": "Ingresos",
         "expenses": "Gastos",
         "balance": "Saldo",
+        "summaryTitle": "Resumen del mes",
         "expensesOnly": "Solo gastos",
         "expensesOnlyHint": "Mostrar solo los gastos y ocultar los ingresos y el saldo",
         "byCategory": "Por categoría",

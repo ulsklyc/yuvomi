@@ -1272,6 +1272,7 @@
         "income": "Income",
         "expenses": "Expenses",
         "balance": "Balance",
+        "summaryTitle": "Month summary",
         "expensesOnly": "Expenses only",
         "expensesOnlyHint": "Show only expenses, hide income and balance",
         "byCategory": "By category",

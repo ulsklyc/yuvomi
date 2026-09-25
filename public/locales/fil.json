@@ -1284,6 +1284,7 @@
         "income": "Kita",
         "expenses": "Gastos",
         "balance": "Balanse",
+        "summaryTitle": "Buod ng buwan",
         "expensesOnly": "Gastos lamang",
         "expensesOnlyHint": "Ipakita lamang ang mga gastos, itago ang kita at balanse",
         "byCategory": "Ayon sa kategorya",

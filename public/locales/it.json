@@ -1272,6 +1272,7 @@
         "income": "Entrate",
         "expenses": "Uscite",
         "balance": "Saldo",
+        "summaryTitle": "Riepilogo del mese",
         "expensesOnly": "Solo spese",
         "expensesOnlyHint": "Mostra solo le spese, nascondi entrate e saldo",
         "byCategory": "Per categoria",

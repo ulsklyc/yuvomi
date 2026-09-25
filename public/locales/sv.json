@@ -1272,6 +1272,7 @@
         "income": "Inkomst",
         "expenses": "Utgifter",
         "balance": "Balans",
+        "summaryTitle": "Månadsöversikt",
         "expensesOnly": "Endast utgifter",
         "expensesOnlyHint": "Visa endast utgifter, dölj inkomster och saldo",
         "byCategory": "Efter kategori",

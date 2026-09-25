@@ -63,6 +63,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Budget: bookings are the main content on wide screens.** On a wide window the overview now
+  shows the bookings on the left and the month summary with the categories on the right, where
+  they stay in view while you scroll (as long as they fit the window). The list no longer scrolls
+  inside a small box of its own: at 1440x900 you see 11 bookings instead of 3, at 1280x800 9
+  instead of 1, and the page has one scroll bar instead of two. All seven tabs now start and end
+  at the same edges - the plan is no longer centred - and every section title has the same size.
+  "Expenses only" sits in the heading of the month summary instead of a line of its own, with a
+  larger target.
+
 - **The calendar gives phones more room for events.** Filter and search moved next to the view
   switcher, so the calendar header on a phone is 166px instead of 230px, and when you scroll the
   week, day or agenda, the page title folds away completely and leaves only the date navigation

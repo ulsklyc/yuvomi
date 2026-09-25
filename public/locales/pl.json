@@ -1284,6 +1284,7 @@
         "income": "Przychody",
         "expenses": "Wydatki",
         "balance": "Saldo",
+        "summaryTitle": "Podsumowanie miesiąca",
         "expensesOnly": "Tylko wydatki",
         "expensesOnlyHint": "Pokaż tylko wydatki, ukryj przychody i saldo",
         "byCategory": "Według kategorii",

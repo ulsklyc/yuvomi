@@ -1272,6 +1272,7 @@
         "income": "Receita",
         "expenses": "Despesas",
         "balance": "Saldo",
+        "summaryTitle": "Resumo do mês",
         "expensesOnly": "Apenas despesas",
         "expensesOnlyHint": "Mostrar apenas as despesas, ocultar receitas e saldo",
         "byCategory": "Por categoria",

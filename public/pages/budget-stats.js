@@ -211,7 +211,7 @@ function renderCatBars() {
   host.replaceChildren();
   host.insertAdjacentHTML('beforeend', `
     <div class="budget-chart-section">
-      <div class="budget-chart-section__title">${t('budget.statsCategoryTitle')}</div>
+      <h2 class="budget-chart-section__title">${t('budget.statsCategoryTitle')}</h2>
       <div class="budget-chart">${rows}</div>
     </div>`);
 }
@@ -265,7 +265,7 @@ function renderDonut() {
   host.replaceChildren();
   host.insertAdjacentHTML('beforeend', `
     <div class="budget-chart-section">
-      <div class="budget-chart-section__title">${t('budget.statsDonutTitle')}</div>
+      <h2 class="budget-chart-section__title">${t('budget.statsDonutTitle')}</h2>
       <p class="sr-only">${view.ctx.esc(summary)}</p>
       <div class="budget-stats__donut-wrap">
         <svg viewBox="0 0 160 160" class="budget-stats__donut" aria-hidden="true">${segs}</svg>
@@ -338,7 +338,7 @@ function renderTrendChart() {
   host.replaceChildren();
   host.insertAdjacentHTML('beforeend', `
     <div class="budget-chart-section">
-      <div class="budget-chart-section__title">${t('budget.statsTrendTitle')}</div>
+      <h2 class="budget-chart-section__title">${t('budget.statsTrendTitle')}</h2>
       <p class="sr-only">${view.ctx.esc(summary)}</p>
       <div class="budget-stats__trend-wrap">
         <div class="budget-stats__plot">

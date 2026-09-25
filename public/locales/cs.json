@@ -1272,6 +1272,7 @@
         "income": "Příjmy",
         "expenses": "Výdaje",
         "balance": "Bilance",
+        "summaryTitle": "Měsíční přehled",
         "expensesOnly": "Pouze výdaje",
         "expensesOnlyHint": "Zobrazit pouze výdaje, skrýt příjmy a zůstatek",
         "byCategory": "Podle kategorií",

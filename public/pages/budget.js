@@ -234,6 +234,7 @@ let _container = null;
 let _user = null;
 let _tablist = null;   // wireTablist-Handle: erlaubt programmatische Tab-Wechsel (sync)
 let _scopeTablist = null;
+let _asideFit = null;  // ResizeObserver der Uebersicht-Seitenleiste (watchAsideFit)
 
 // Fähigkeiten je Untertab — EINE Quelle für Monatsnavigation, Toolbar-„+" und FAB.
 // Vorher lagen diese drei Entscheidungen in getrennten Ausschluss-Listen, was sich
@@ -799,12 +800,40 @@ function updateLabel() {
 }
 
 // --------------------------------------------------------
+// Uebersicht: Seitenleiste nur anheften, wenn sie ganz hineinpasst
+// --------------------------------------------------------
+
+/* STICKY NUR, WENN DIE LEISTE IN DEN SCROLLPORT PASST.
+ * Ab ~960px Container steht die Bilanz samt Kategorien rechts neben den
+ * Buchungen und bleibt beim Scrollen stehen (budget.css, .budget-overview).
+ * Eine angeheftete Leiste, die hoeher ist als der Scrollport, zeigte ihr
+ * unteres Ende aber erst am Listenende - mit vielen Kategorien oder auf einem
+ * niedrigen Fenster waeren die letzten Kategorien dann fast unerreichbar. Die
+ * Hoehe der Leiste haengt an den Daten (Kategorienzahl, Hinweiszeile), nicht am
+ * Fenster, deshalb misst ein ResizeObserver statt einer Media-Query. Ohne
+ * Klasse scrollt die Leiste einfach mit - derselbe EINE Scrollport. */
+function watchAsideFit(panel) {
+  _asideFit?.disconnect();
+  _asideFit = null;
+  const aside = panel?.querySelector('.budget-overview__aside');
+  if (!aside || typeof ResizeObserver === 'undefined') return;
+  const check = () => {
+    if (!aside.isConnected) { _asideFit?.disconnect(); _asideFit = null; return; }
+    aside.classList.toggle('budget-overview__aside--pinned', aside.offsetHeight <= panel.clientHeight);
+  };
+  _asideFit = new ResizeObserver(check);
+  _asideFit.observe(panel);
+  _asideFit.observe(aside);
+}
+
+// --------------------------------------------------------
 // Body
 // --------------------------------------------------------
 
 function renderBody() {
   const body = _container.querySelector('#budget-body');
   if (!body) return;
+  watchAsideFit(null);
   updateLabel();
 
   // Vor jedem Tab-Zweig: nach einem Ladefehler sind Eintraege UND Summen leer,
@@ -973,8 +1002,17 @@ function renderBody() {
 
   setHtml(body, `
     <div class="budget-tab-panel page-scrollport budget-tab-panel--budget">
-    <!-- Anzeige-Umschalter: nur Ausgaben vs. volle Zusammenfassung -->
-    <div class="budget-summary-bar">
+    <!-- EIN Scrollport (das Panel). Ab ~960px Container zwei Spalten: links die
+         Buchungen als Hauptinhalt, rechts Bilanz und Kategorien, sticky. Die
+         Seitenleiste steht im Markup VORN, damit Lese- und Tab-Reihenfolge
+         einspaltig dieselbe bleibt (Bilanz, Kategorien, Buchungen). -->
+    <div class="budget-overview">
+    <div class="budget-overview__aside">
+    <!-- Kopfzeile der Bilanz: Titel links, "Nur Ausgaben" rechts - der
+         Umschalter wirkt nur auf die Karten darunter und steht deshalb in
+         deren Kopf statt in einer eigenen Zeile ueber der Seite. -->
+    <div class="budget-summary-head">
+      <h2 class="u-section-title" id="budget-summary-title">${t('budget.summaryTitle')}</h2>
       <button class="budget-expenses-toggle${expensesOnly ? ' budget-expenses-toggle--active' : ''}"
               id="budget-expenses-only" type="button" role="switch"
               aria-checked="${expensesOnly ? 'true' : 'false'}"
@@ -992,18 +1030,19 @@ function renderBody() {
     <!-- Kategorie-Balken -->
     ${s.byCategory.length ? `
     <div class="budget-chart-section">
-      <div class="budget-chart-section__title u-section-title">${t('budget.byCategory')}</div>
+      <h2 class="budget-chart-section__title u-section-title">${t('budget.byCategory')}</h2>
       <p class="sr-only">${esc(chartSummary(s.byCategory))}</p>
       <div class="budget-chart">
         ${renderCategoryBars(s.byCategory)}
       </div>
     </div>` : ''}
+    </div>
 
     <!-- Transaktionsliste -->
     <div class="budget-list-section">
       <div class="budget-list-header">
         <div>
-          <span class="budget-list-header__title u-section-title">${t('budget.transactions')}</span>
+          <h2 class="budget-list-header__title u-section-title" >${t('budget.transactions')}</h2>
           ${state.accountFilterId ? `
           <button class="budget-account-chip" id="budget-clear-account-filter" type="button"
                   aria-label="${t('budget.clearAccountFilter')}">
@@ -1038,14 +1077,16 @@ function renderBody() {
         </a>` : ''}
         </div>
       </div>
-      <div class="budget-list page-scrollport" id="budget-list">
+      <div class="budget-list" id="budget-list">
         ${renderEntries()}
       </div>
+    </div>
     </div>
     </div>
   `);
 
   if (window.lucide) lucide.createIcons({ el: body });
+  watchAsideFit(body.querySelector('.budget-tab-panel--budget'));
   _container.querySelector('#empty-cta-budget')?.addEventListener('click', () => {
     document.querySelector('.page-fab')?.click();
   });
@@ -1474,9 +1515,12 @@ function renderAccountsPage() {
   // Kopfleiste = Aktionen, Kennzahl = Karte in der geteilten Kennzahl-Zeile.
   // Vorher stand das Nettovermögen als Label-plus-Wert direkt im Kopf und war
   // damit die vierte Kartenbauart des Moduls (Critique 2026-07-30, P0).
+  // Der Titel ist ein <h2> fuer die Gliederung, aber UNSICHTBAR: sichtbar
+  // wiederholte er nur den gewaehlten Tab „Konten" - als 12px-Versal-Label
+  // zugleich die zweite Ueberschriftsgrammatik des Moduls (Critique 2026-09-25).
   const header = `
     <div class="panel-head">
-      <span class="panel-head__title">${t('budget.accountsTab')}</span>
+      <h2 class="panel-head__title sr-only">${t('budget.accountsTab')}</h2>
       <div class="panel-head__actions">
         ${archiveToggle}
         ${ro ? '' : `<button class="btn btn--secondary" id="budget-add-account" type="button">
@@ -1783,7 +1827,8 @@ function renderLoansDashboard() {
     <section class="budget-loans">
       <div class="panel-head budget-loans__header">
         <div>
-          <div class="panel-head__title">${t('budget.loansTitle')}</div>
+          <!-- Unsichtbar wie bei den Konten: sichtbar wiederholte der Titel nur den Tab. -->
+          <h2 class="panel-head__title sr-only">${t('budget.loansTitle')}</h2>
           <div class="budget-loans__summary">${t('budget.loansSummary', {
             count: summary.active_count ?? 0,
             amount: formatAmount(summary.remaining_principal ?? summary.remaining_amount ?? 0),

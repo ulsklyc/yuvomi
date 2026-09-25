@@ -1284,6 +1284,7 @@
         "income": "درآمد",
         "expenses": "هزینه‌ها",
         "balance": "مانده",
+        "summaryTitle": "خلاصه ماه",
         "expensesOnly": "فقط هزینه‌ها",
         "expensesOnlyHint": "فقط هزینه‌ها نمایش داده شود، درآمد و مانده پنهان شود",
         "byCategory": "بر اساس دسته",

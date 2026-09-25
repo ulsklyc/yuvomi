@@ -1276,73 +1276,159 @@ test('Panel-Fläche und Kopfleiste sind geteilt, nicht pro Tab gebaut', () => {
   }
 });
 
-test('die Transaktionsliste bleibt auf kurzen Desktop-Viewports erreichbar (#904)', () => {
-  // Der feste Teil des Budget-Tabs (Zusammenfassung + Kategorie-Chart) wächst
-  // mit den Kategorien. Zwei Regeln zusammen hielten die Liste gefangen: das
-  // Panel clippte mit `overflow: hidden`, und die Sektion durfte per
-  // `min-height: 0` bis auf Kopfzeilenhöhe kollabieren - bei neun Kategorien
-  // auf 1512x747 lag die Liste vollständig unterhalb des Viewports, und weil
-  // das Panel nicht scrollte, führte kein Weg zu ihr (#904, gemessen: Sektion
-  // 32px hoch, Liste ab y=648 bei 620px Viewport). Beide Hälften einzeln
-  // gepinnt: jede allein genügt, um den Defekt wiederzubeleben.
-  // Vier Fluchtwege aus dem Review, jeder mit Gegenprobe belegt:
-  // 1. Ausgenommen ist NUR der benannte Mobil-Reflow (max-width: 639px), nicht
-  //    jeder At-Block - #904 ist ein Kurz-Viewport-Defekt, eine max-height-
-  //    Query wäre der wahrscheinlichste Rückweg gewesen und blieb unsichtbar.
-  // 2. Geprüft wird jede Regel, deren SUBJEKT (letzter Compound) das Element
-  //    trifft - `.budget-page .budget-tab-panel--budget` clippt genauso, war
-  //    aber am exakten Selektorvergleich vorbei.
-  // 3. Bei min-height zählt die LETZTE Deklaration der Regel (Kaskade
-  //    innerhalb des Blocks; die Falle aus dem css-rules.js-Kopf).
-  // 4. Die Untergrenze muss eine nutzbare px-Länge tragen: die Sektion clippt
-  //    (`overflow: hidden`), ihr automatisches Minimum ist damit 0 - ein
-  //    `min-height: auto` oder `1px` kollabiert exakt wie das alte `0`,
-  //    bestand aber den reinen Nicht-Null-Test.
+test('die Übersicht hat EINEN Scrollport, und die Liste ist keiner (#904, Critique 2026-09-25)', () => {
+  // Zwei Fassungen desselben Defekts. #904: das Panel clippte, und die
+  // Listensektion kollabierte neben dem inhaltshohen Kategorie-Chart - die
+  // Liste war auf kurzen Viewports unerreichbar. Die Antwort damals war eine
+  // 280px-Untergrenze für einen INNEREN Listen-Scroller; gemessen bei
+  // 1440x900 wurde daraus ein Guckloch von 220px für 1494px Buchungen, 3
+  // Zeilen sichtbar, und zwei Scroller ineinander (Panel + Liste). Jetzt
+  // scrollt nur das Panel, und die Liste wächst mit ihrem Inhalt - damit ist
+  // sie auf jedem Viewport erreichbar, ohne Untergrenze.
+  //
+  // Geprüft wird jede Regel, deren SUBJEKT (letzter Compound) das Element
+  // trifft, in JEDEM At-Block - eine Container- oder Höhen-Query wäre der
+  // wahrscheinlichste Rückweg für den inneren Scroller.
   const subjectIs = (selector, cls) => selector.split(',').some((einzel) => {
     const compounds = einzel.trim().split(/[\s>+~]+/).filter(Boolean);
-    return compounds.length > 0 && compounds[compounds.length - 1].includes(cls);
+    return compounds.length > 0 && new RegExp(`${cls.replace(/[.-]/g, '\\$&')}(?![\\w-])`).test(compounds[compounds.length - 1]);
   });
+  const overflowDecls = (body) => [...body.matchAll(/(?:^|;)\s*(overflow(?:-y|-block)?)\s*:\s*([^;]+)/g)];
 
   let panelSeen = false;
-  let floorSeen = false;
+  let listSeen = false;
   for (const { selector, body, at } of eachRule(budgetCss)) {
-    if (at.some((a) => /max-width:\s*639px/.test(a))) continue;
     if (subjectIs(selector, '.budget-tab-panel--budget')) {
       panelSeen = true;
-      // `clip` kappt wie `hidden`, nur ohne Scrollport - und die Block-Achse
-      // lässt sich auch als Langform oder als zweiter Shorthand-Wert setzen.
-      // Der Grund für die Zusicherung ist das Abschneiden, nicht die eine
-      // Schreibweise dafür (dieselbe Regel wie in test-frontend-audit.js).
-      for (const [, prop, value] of body.matchAll(/(?:^|;)\s*(overflow(?:-y|-block)?)\s*:\s*([^;]+)/g)) {
+      for (const [, prop, value] of overflowDecls(body)) {
         assert.ok(
           !/\b(?:hidden|clip)\b/.test(value),
-          `"${selector.trim()}" clippt das Budget-Panel (${prop}: ${value.trim()}): wächst `
-          + 'der feste Teil über den Viewport, ist die Transaktionsliste '
-          + 'unerreichbar (#904) - die Scroll-Achse der Basisregel muss offen bleiben',
+          `"${selector.trim()}" clippt das Budget-Panel (${prop}: ${value.trim()}) - es ist `
+          + 'der EINE Scrollport der Übersicht, seine Scroll-Achse muss offen bleiben (#904)',
         );
       }
     }
-    if (subjectIs(selector, '.budget-list-section')) {
-      const decls = [...body.matchAll(/min-height\s*:\s*([^;]+)/g)];
-      if (decls.length === 0) continue;
-      const value = decls[decls.length - 1][1].trim();
-      const px = value.match(/(\d+(?:\.\d+)?)px/);
-      assert.ok(
-        px && Number(px[1]) >= 200,
-        `"${selector.trim()}" setzt min-height: ${value} - die Sektion braucht eine `
-        + 'nutzbare px-Untergrenze (>= 200px, ggf. per min() ans Panel gekappt): '
-        + 'auto, 0 oder Kleinstwerte kollabieren sie neben dem inhaltshohen '
-        + 'Kategorie-Chart wieder auf Kopfzeilenhöhe (#904)',
+    for (const cls of ['.budget-list', '.budget-list-section']) {
+      if (!subjectIs(selector, cls)) continue;
+      if (cls === '.budget-list') listSeen = true;
+      const where = at.length ? ` in ${at.join(' / ')}` : '';
+      for (const [, prop, value] of overflowDecls(body)) {
+        assert.ok(
+          !/\b(?:auto|scroll)\b/.test(value),
+          `"${selector.trim()}"${where} macht die Liste wieder zum Scroller (${prop}: ${value.trim()}) - `
+          + 'das war das 220px-Guckloch neben einem zweiten Scroller (Critique 2026-09-25)',
+        );
+      }
+      assert.doesNotMatch(
+        body,
+        /(?:^|;)\s*(?:min-height|max-height|height|flex)\s*:/,
+        `"${selector.trim()}"${where} gibt der Liste eine feste Höhe oder ein Scrollfenster - `
+        + 'sie wächst mit ihrem Inhalt, das Panel scrollt',
       );
-      floorSeen = true;
     }
   }
   assert.ok(panelSeen, '.budget-tab-panel--budget fehlt in budget.css');
-  assert.ok(
-    floorSeen,
-    '.budget-list-section deklariert ausserhalb des Mobil-Reflows keine '
-    + 'min-height-Untergrenze mehr (#904)',
-  );
+  assert.ok(listSeen, '.budget-list fehlt in budget.css');
+  // Die Rolle „ich bin der Scrollport meiner Seite" trägt nur noch das Panel -
+  // eine Liste mit der Rolle bekäme den Nachlauf, obwohl sie nicht scrollt.
+  assert.doesNotMatch(budget, /class="budget-list page-scrollport"/);
+  assert.match(budget, /class="budget-list" id="budget-list"/);
+});
+
+test('die Übersicht wird ab 960px Container zweispaltig: Buchungen links, Bilanz sticky rechts', () => {
+  // Vorher lag rechts der 720px-Bahn 436px (1440) bzw. 276px (1280) leere
+  // Fläche, während die Liste im Guckloch scrollte. Container- statt Viewport-
+  // Query: die Sidebar zieht ~220px ab.
+  const grid = [...eachRule(budgetCss)].find(({ selector, body, at }) => selector.trim() === '.budget-overview'
+    && /display:\s*grid/.test(body)
+    && at.some((a) => /@container\s+budget-page\s*\(\s*min-width:\s*\d+px\s*\)/.test(a)));
+  assert.ok(grid, '.budget-overview wird unter @container budget-page (min-width) nicht zum Raster');
+  assert.match(grid.body, /grid-template-columns:[^;]*var\(--page-measure[^;]*var\(--budget-rail-max\)/,
+    'links das Lesemass, rechts die Seitenleiste bis --budget-rail-max');
+  const width = Number(grid.at.join(' ').match(/min-width:\s*(\d+)px/)[1]);
+  assert.ok(width >= 900 && width <= 1100, `Schwelle ${width}px: neben ~640px Liste muss die Seitenleiste Platz haben`);
+
+  // Sticky NUR über die Klasse, die budget.js setzt, solange die Leiste in den
+  // Scrollport passt - eine höhere angeheftete Leiste zeigte ihr Ende erst am
+  // Listenende.
+  for (const { selector, body } of eachRule(budgetCss)) {
+    if (!/position:\s*sticky/.test(body) || !/budget-overview__aside/.test(selector)) continue;
+    assert.match(selector, /budget-overview__aside--pinned/, `"${selector.trim()}" heftet die Leiste ohne Passprüfung an`);
+  }
+  assert.ok([...eachRule(budgetCss)].some(({ selector, body }) => /\.budget-overview__aside--pinned/.test(selector) && /position:\s*sticky/.test(body)),
+    'die angeheftete Seitenleiste ist nicht sticky');
+  const fit = budget.match(/function watchAsideFit\(panel\) \{[\s\S]*?\n\}/);
+  assert.ok(fit, 'watchAsideFit fehlt');
+  assert.match(fit[0], /new ResizeObserver/);
+  assert.match(fit[0], /classList\.toggle\('budget-overview__aside--pinned', aside\.offsetHeight <= panel\.clientHeight\)/);
+  assert.match(fit[0], /_asideFit\?\.disconnect\(\)/, 'der alte Beobachter wird beim Neuzeichnen nicht getrennt');
+  assert.match(budget, /watchAsideFit\(body\.querySelector\('\.budget-tab-panel--budget'\)\)/);
+
+  // Die Seitenleiste steht im Markup VOR der Liste: einspaltig bleibt die Lese-
+  // und Tab-Reihenfolge Bilanz -> Kategorien -> Buchungen.
+  const aside = budget.indexOf('<div class="budget-overview__aside">');
+  const list = budget.indexOf('<div class="budget-list-section">');
+  assert.ok(aside > 0 && list > aside, 'Seitenleiste muss im Markup vor der Liste stehen');
+});
+
+test('alle Tabs teilen EINE Bahn: gleiche linke Kante, gleiches Mass, der Plan nicht zentriert', () => {
+  // Drei Bahnen vorher: Übersicht 720 links, Plan 640 ZENTRIERT, Rest 1156.
+  const lane = [...eachRule(budgetCss)].find(({ selector, at }) => selector.trim() === '.budget-tab-panel > *' && at.length === 0);
+  assert.ok(lane, '.budget-tab-panel > * setzt kein gemeinsames Mass');
+  assert.match(lane.body, /max-width:\s*var\(--budget-lane\)/);
+  assert.match(budgetCss, /--budget-lane:\s*calc\(var\(--page-measure[^;]*var\(--budget-rail-max\)\)/,
+    'die Bahn ist Lesemass + Abstand + Seitenleiste - genau die Breite der Zweispalte');
+  for (const { selector, body } of eachRule(budgetCss)) {
+    if (!/budget-tab-panel/.test(selector)) continue;
+    assert.doesNotMatch(body, /margin-inline:\s*auto|margin:\s*[^;]*\bauto\b/,
+      `"${selector.trim()}" zentriert ein Panel - jeder Tab beginnt an der Kante von Kopf und Tabs`);
+    if (/^\.budget-tab-panel(?:--[\w-]+)?$/.test(selector.trim())) {
+      assert.doesNotMatch(body, /max-width/,
+        `"${selector.trim()}" kappt den Scrollport selbst - das Mass gehört an seine Kinder`);
+    }
+  }
+});
+
+test('„Nur Ausgaben" steht in der Kopfzeile der Bilanz und trifft voll', () => {
+  // Vorher eigene 40px-Zeile rechtsbündig über der Seite, 312px neben der Bahn,
+  // Treffhöhe 28px.
+  const head = budget.match(/<div class="budget-summary-head">[\s\S]*?<\/div>/);
+  assert.ok(head, '.budget-summary-head fehlt');
+  assert.match(head[0], /<h2 class="u-section-title" id="budget-summary-title">\$\{t\('budget\.summaryTitle'\)\}<\/h2>/);
+  assert.match(head[0], /id="budget-expenses-only"/);
+  assert.doesNotMatch(budget, /budget-summary-bar/);
+  assert.doesNotMatch(budgetCss, /\.budget-summary-bar\b/);
+  const hit = [...eachRule(budgetCss)].find(({ selector }) => selector.trim() === '.budget-expenses-toggle::before');
+  assert.ok(hit, 'die Pille dehnt ihre Treffflaeche nicht aus');
+  assert.match(hit.body, /height:\s*var\(--target-base\)/);
+  const row = [...eachRule(budgetCss)].find(({ selector }) => selector.trim() === '.budget-summary-head');
+  assert.match(row.body, /min-height:\s*var\(--target-base\)/, 'die Kopfzeile muss die Treffflaeche fassen');
+  assert.match(row.body, /max-width:\s*var\(--page-measure/, 'der Umschalter endet an der Bahn');
+});
+
+test('Abschnittstitel aller Budget-Panels sind h2 in EINEM Stil', () => {
+  // Vorher: „Nach Kategorie" 20px/600, daneben 12px-Versal als EINZIGER Titel
+  // (Konten, Darlehen), der Plan sprang von h1 auf ein 16px-h3.
+  for (const [file, src, cls] of [
+    ['budget.js', budget, 'budget-chart-section__title'],
+    ['budget.js', budget, 'budget-list-header__title'],
+    ['budget.js', budget, 'panel-head__title'],
+    ['budget-stats.js', stats, 'budget-chart-section__title'],
+    ['budget-plans.js', plans, 'budget-plan__section-title'],
+  ]) {
+    const tags = [...src.matchAll(new RegExp(`<(\\w+)\\b[^>]*class="[^"]*\\b${cls}\\b`, 'g'))].map((m) => m[1]);
+    assert.ok(tags.length > 0, `${file}: .${cls} nicht gefunden`);
+    for (const tag of tags) assert.equal(tag, 'h2', `${file}: .${cls} ist ein <${tag}>, kein <h2>`);
+  }
+  assert.doesNotMatch(plans, /<h3\b/, 'budget-plans.js: <h3> direkt unter dem <h1> der Seite');
+  const typography = read('../public/styles/typography.css');
+  const blockOf = (sel) => [...eachRule(typography)].find(({ selector }) => selector.split(',').map((x) => x.trim()).includes(sel));
+  const section = blockOf('.u-section-title');
+  assert.ok(section.selector.split(',').map((x) => x.trim()).includes('.panel-head__title'),
+    '.panel-head__title gehört zur Bereichs-Überschrift, nicht zum Versal-Label');
+  const eyebrow = blockOf('.metric-card__label');
+  assert.ok(!eyebrow.selector.split(',').map((x) => x.trim()).includes('.panel-head__title'),
+    '.panel-head__title steht noch im Versal-Block');
 });
 
 test('Trendpfeile sind Icons, keine Textglyphen', () => {

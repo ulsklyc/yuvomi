@@ -257,32 +257,131 @@
   padding-block-start: var(--space-3);
 }
 
-/* Der Budget-Tab hält seine eigene Scroll-Region: Zusammenfassung und
- * Kategoriebalken bleiben stehen, nur die Transaktionsliste scrollt - solange
- * der feste Teil in den Viewport passt. Die Scroll-Achse kommt aus der
- * Basisregel (.budget-tab-panel, overflow-y: auto) und wird hier bewusst
- * NICHT mehr überschrieben: das frühere `overflow: hidden` schnitt die Liste
- * auf kurzen Desktop-Viewports unerreichbar ab (#904). Im Normalfall läuft
- * nichts über und das Panel scrollt nicht; erst wenn die Untergrenze von
- * .budget-list-section das Panel überlaufen lässt, scrollen Zusammenfassung
- * und Balken mit. Mit dem Shorthand entfiel auch `overflow-x: hidden` - die
- * x-Achse steht damit auf `auto`, gemessen ohne horizontalen Überlauf
- * (scrollWidth == clientWidth bei 641/900/1512px Breite). Der Abstand kommt
- * aus .budget-summary-bar. */
-.budget-tab-panel--budget {
-  display: flex;
-  flex-direction: column;
-  -webkit-overflow-scrolling: touch;
-  padding-block-start: 0;
+/* EINE BAHN FUER ALLE SIEBEN TABS (Critique 2026-09-25, P2).
+ *
+ * Vorher standen drei Inhaltsbahnen nebeneinander: die Uebersicht auf dem
+ * Lesemass (720px) links, der Plan auf 640px ZENTRIERT, alle anderen Tabs auf
+ * der vollen Content-Spalte (1156px bei 1440). Jeder Tabwechsel liess damit
+ * die rechte Kante springen und der Plan sogar die linke. Jetzt beginnt jeder
+ * Tab an derselben Kante wie Kopf und Tabs, und die Bahn endet ueberall am
+ * selben Mass: Lesemass + Abstand + Seitenleiste der Uebersicht. Das ist genau
+ * die Breite der Uebersicht-Zweispalte (unten), damit auch sie nicht springt.
+ *
+ * Das Mass steht an den KINDERN des Panels, nicht am Panel: das Panel ist der
+ * Scrollport, und ein gekappter Scroller liesse das Mausrad rechts von seiner
+ * Kante ins Leere greifen (dieselbe Begruendung wie bei `.list-scroller`). */
+#budget-body {
+  --budget-rail-min: 18.75rem;
+  --budget-rail-max: 23.75rem;
+  --budget-column-gap: var(--space-6);
+  --budget-lane: calc(var(--page-measure, var(--layout-reading)) + var(--budget-column-gap) + var(--budget-rail-max));
 }
 
-/* Lesespalte für formularartige Tabs (Plan). Als Modifier statt als stille
- * max-width auf einem einzigen Tab: so ist die Ausnahme benannt und für den
- * nächsten Formular-Tab wiederverwendbar. */
-.budget-tab-panel--reading {
-  max-width: 640px;
-  margin-inline: auto;
-  width: 100%;
+.budget-tab-panel > * {
+  max-width: var(--budget-lane);
+}
+
+/* Die Uebersicht hat EINEN Scrollport: das Panel. Vorher hielt sie eine eigene
+ * Scroll-Region fuer die Liste (`.budget-list` mit overflow-y, darueber eine
+ * 280px-Untergrenze gegen #904) - gemessen bei 1440x900 ein Guckloch von 220px
+ * fuer 1494px Buchungen, 3 Zeilen sichtbar, und weil das Panel zusaetzlich
+ * scrollte, zwei Scroller ineinander. Jetzt waechst die Liste mit ihrem Inhalt
+ * und das Panel scrollt als Ganzes - auf jeder Breite, wie vorher schon mobil.
+ * #904 (Liste auf kurzen Viewports unerreichbar) kann so nicht wiederkommen:
+ * es gibt keinen festen Teil mehr, der die Liste aus dem Bild draengt, und die
+ * Scroll-Achse der Basisregel bleibt offen. */
+.budget-tab-panel--budget {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Lesespalte fuer formularartige Tabs (Plan): schmal, aber BUENDIG LINKS an
+ * der Bahn - vorher 640px mit `margin-inline: auto` und damit als einziger Tab
+ * zentriert. Das Mass ist das Lesemass der Seite, dieselbe Kante, an der Kopf
+ * und Buchungsliste enden. Wie oben an den Kindern, nicht am Scrollport. */
+.budget-tab-panel--reading > * {
+  max-width: var(--page-measure, var(--layout-reading));
+}
+
+/* --------------------------------------------------------
+ * Uebersicht: Buchungen als Hauptinhalt
+ *
+ * Einspaltig (schmaler Container) stehen Bilanz, Kategorien und Buchungen
+ * untereinander auf dem Lesemass. Ab 960px Container ZWEI Spalten: links die
+ * Buchungsliste auf dem Lesemass - ihre rechte Kante ist die des Kopfes -,
+ * rechts Bilanz und Kategorien als Seitenleiste. Vorher lag rechts der 720px-
+ * Bahn 436px (1440) bzw. 276px (1280) leere Flaeche, waehrend die Liste in
+ * einem 220px-Guckloch scrollte.
+ *
+ * Container- statt Viewport-Query: die ausgeklappte Sidebar zieht rund 220px
+ * ab, gemessen wird die echte Inhaltsbreite (`#budget-body`, budget-page).
+ * 960px ist die Breite, ab der neben einer ~640px-Liste die Seitenleiste in
+ * ihrer Mindestbreite Platz hat; 1280er-Fenster (996px Container) sind damit
+ * dabei. Die Seitenleiste steht im Markup VORN (Lese- und Tab-Reihenfolge wie
+ * einspaltig) und wird hier nur in die zweite Spalte gesetzt.
+ * -------------------------------------------------------- */
+@container budget-page (min-width: 960px) {
+  .budget-overview {
+    display: grid;
+    /* Rechts: so breit, wie neben dem vollen Lesemass bleibt - zwischen
+     * Mindest- und Hoechstbreite. Links: der Rest, hoechstens das Lesemass. */
+    grid-template-columns:
+      minmax(0, var(--page-measure, var(--layout-reading)))
+      clamp(
+        var(--budget-rail-min),
+        calc(100% - var(--page-measure, var(--layout-reading)) - var(--budget-column-gap)),
+        var(--budget-rail-max)
+      );
+    column-gap: var(--budget-column-gap);
+    align-items: start;
+  }
+
+  .budget-overview__aside {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .budget-overview .budget-list-section {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  /* Sticky nur mit Klasse: budget.js setzt sie, solange die Leiste ganz in den
+   * Scrollport passt (watchAsideFit). Hoeher als der Scrollport angeheftet,
+   * zeigte sie ihr Ende erst am Listenende. */
+  .budget-overview__aside--pinned {
+    position: sticky;
+    top: 0;
+  }
+
+  /* In der Seitenleiste zwei Karten je Zeile, der Saldo als Summe darunter
+   * ueber die volle Breite - drei Karten in ~380px liessen keinem Betrag
+   * genug Platz. „Nur Ausgaben" bleibt bei seiner einen Karte. */
+  .budget-overview__aside .metric-grid:not(.metric-grid--expenses-only) {
+    --summary-cards: 2;
+  }
+
+  .budget-overview__aside .metric-grid:not(.metric-grid--expenses-only) > .metric-card:last-child {
+    grid-column: 1 / -1;
+  }
+
+  /* Die Kategoriezeilen stapeln in der Seitenleiste wieder (Name und Betrag
+   * oben, Bahn darunter ueber die volle Breite). Die Dreispalten-Stufe fragt
+   * den SEITEN-Container, und der ist hier breit - nebeneinander blieben in
+   * ~380px nur ~86px Bahn, auf denen kein Vergleich stattfindet. */
+  .budget-overview__aside .budget-bar-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: var(--space-1h);
+  }
+
+  .budget-overview__aside .budget-bar-row__label  { grid-area: 1 / 1; }
+  .budget-overview__aside .budget-bar-row__amount { grid-area: 1 / 2; }
+  .budget-overview__aside .budget-bar-row__track  { grid-area: 2 / 1 / 3 / 3; }
+
+  /* Die Kopfzeile der Liste steht auf derselben Hoehe wie die der Bilanz. */
+  .budget-overview .budget-list-header {
+    min-height: var(--target-base);
+    padding-block-start: 0;
+  }
 }
 
 /* --------------------------------------------------------
@@ -573,19 +672,33 @@
   .metric-grid--quad { --summary-cards: 2; }
 }
 
-/* Anzeige-Umschalter über der Zusammenfassung. Der Toggle steht rechtsbündig,
-   damit die Monats-Zusammenfassung darunter die visuelle Hauptzeile bleibt. */
-.budget-summary-bar {
+/* Kopfzeile der Monatsbilanz: Titel links, „Nur Ausgaben" rechts.
+ *
+ * Der Umschalter stand vorher in einer eigenen 40px-Zeile rechtsbuendig ueber
+ * der ganzen Seite - gemessen 312px rechts neben der Bahn, mit 28px Treffhoehe.
+ * Er wirkt nur auf die Karten darunter und gehoert deshalb in deren Kopf. Die
+ * Zeile ist so hoch wie ein volles Ziel, damit dessen Treffflaeche (::before
+ * unten) nicht in die Karten ragt. */
+.budget-summary-head {
   display: flex;
-  justify-content: flex-end;
-  padding-block: var(--space-3) 0;
-  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--target-base);
+  max-width: var(--page-measure, none);
 }
 
+/* Kompakt aussehen, voll treffen (Zielgroessen-Regel, tokens.css): die Pille
+ * bleibt 32px hoch, ihre Treffflaeche waechst per ::before auf --target-base
+ * (44px am Zeiger, 48px am Finger). Freistehend - kein gleichartiges Ziel
+ * daneben -, also gilt die volle Zielgroesse. */
 .budget-expenses-toggle {
+  position: relative;
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
+  min-height: var(--target-sm);
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-full);
   border: 1px solid var(--color-border-subtle);
@@ -596,6 +709,15 @@
   cursor: pointer;
   white-space: nowrap;
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.budget-expenses-toggle::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 50%;
+  height: var(--target-base);
+  transform: translateY(-50%);
 }
 
 .budget-expenses-toggle:hover {
@@ -1180,30 +1302,10 @@
 /* Die Haarlinie zwischen Kategoriebalken und Transaktionsliste ist mit der
  * Zeilenlisten-Regel entfallen: beide Sektionen tragen jetzt ihre eigene Karte,
  * die Trennung liegt in den Rändern statt in einer zusätzlichen Linie. */
+/* Die Sektion waechst mit ihrem Inhalt - sie ist kein Scrollfenster mehr (siehe
+ * `.budget-tab-panel--budget`). Das Lesemass steht an der SEKTION, nicht an
+ * `.budget-list`: so fluchten Ueberschrift und Liste an derselben Kante. */
 .budget-list-section {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  /* Untergrenze statt `min-height: 0`: als flex:1-Kind neben dem inhaltshohen
-   * Kategorie-Chart kollabierte die Sektion auf kurzen Desktop-Viewports bis
-   * auf Kopfzeilenhöhe, und das Panel (damals `overflow: hidden`) ließ sie
-   * unerreichbar (#904). 280px = Kopfzeile (60px) + drei Buchungszeilen (64px)
-   * + eine angeschnittene vierte, die das interne Scrollen sichtbar macht.
-   * Das `min(…, 100%)` kappt die Untergrenze am Panel-Viewport: auf einer
-   * Kompakthöhe (Panel < 280px) erzwänge der harte Wert sonst einen Überlauf,
-   * bei dem selbst am Scroll-Ende die Kopfzeile angeschnitten bliebe.
-   * Unterhalb von 640px setzt der Mobil-Reflow sie zurück - dort scrollt das
-   * Panel als Ganzes und die Sektion wächst mit ihrem Inhalt. */
-  min-height: min(280px, 100%);
-  /* Das Lesemaß steht an der SEKTION, nicht an `.budget-list` darunter, und
-   * zwar aus zwei Gründen. Erstens fluchten so Kopf und Liste an derselben
-   * Kante - läge es an der Liste, stünde die Überschrift „Transaktionen" über
-   * einer schmaleren Karte. Zweitens ist `.budget-list` zugleich der Scroller
-   * des Tabs, und ein gekappter Scroller lässt das Mausrad rechts von seiner
-   * Kante ins Leere greifen (derselbe Fall, den `.list-scroller` in
-   * list-row.css ausdrücklich vermeidet). So bleibt der Scroller so breit wie
-   * die Sektion, und die Sektion trägt die eine Zahl der App. */
   max-width: var(--page-measure, var(--layout-reading));
 }
 
@@ -1253,14 +1355,11 @@
   color: var(--color-text-tertiary);
 }
 
-/* Ein Träger für die Transaktionszeilen (Zeilenlisten-Regel, tokens.css). Die
- * Liste ist zugleich der Scrollport des Panels: overflow-y clippt mit dem
- * Radius, ein zweiter Wrapper wäre nur eine Ebene ohne Aufgabe. */
+/* Ein Träger für die Transaktionszeilen (Zeilenlisten-Regel, tokens.css). Kein
+ * Scroller mehr: die Zeilen scrollen mit dem Panel, dem EINEN Scrollport des
+ * Tabs. `overflow: clip` haelt nur die Zeilenflaechen im Radius. */
 .budget-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: clip;
   background: var(--color-surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
@@ -1269,24 +1368,15 @@
 /* Trennlinie am TRÄGER, nicht an der Zeile - dieselbe Form und derselbe Grund
  * wie `.list-rows > * + *` (list-row.css): `> * + *` zieht keine Linie unter
  * die letzte Zeile und bleibt gültig, wenn zwischen Träger und Zeile einmal ein
- * Wrapper liegt.
- *
- * Der Träger heisst hier nicht `.list-rows`, und das ist Absicht: `.budget-list`
- * ist der SCROLLER des Tabs (flex:1, min-height:0, overflow-y:auto) und trägt
- * die Trägerform der Zeilenlisten-Regel in ihrer vollständigen Fassung
- * (`--radius-lg` plus `--shadow-sm`, wie `.row-carrier`). `.list-rows` ist eine
- * Gruppe INNERHALB eines Scrollers, dehnt sich per `align-self: start` auf
- * Inhaltshöhe und hat weder Schatten noch diesen Radius. */
+ * Wrapper liegt. Der Träger heisst trotzdem nicht `.list-rows`: er traegt die
+ * Trägerform in ihrer vollständigen Fassung (`--radius-lg` plus `--shadow-sm`,
+ * wie `.row-carrier`). */
 .budget-list > * + * {
   border-top: 1px solid var(--color-border-subtle);
 }
 
-/* Seit #904 kann auch das Budget-Panel selbst scrollen (Untergrenze der
- * Transaktionssektion laesst es ueberlaufen) - es gehoert deshalb wie
- * --loans in die Gruppe der duennen Modul-Scrollbars, sonst stuende auf
- * Plattformen mit klassischen Scrollbalken ein System-Balken direkt
- * neben dem 10px-Akzentbalken der Liste. */
-.budget-list,
+/* Das Budget-Panel ist der Scrollport der Uebersicht und gehoert wie --loans
+ * in die Gruppe der duennen Modul-Scrollbars. */
 .budget-loans__list,
 .budget-tab-panel--loans,
 .budget-tab-panel--budget {
@@ -1294,21 +1384,18 @@
   scrollbar-color: var(--module-accent) transparent;
 }
 
-.budget-list::-webkit-scrollbar,
 .budget-loans__list::-webkit-scrollbar,
 .budget-tab-panel--loans::-webkit-scrollbar,
 .budget-tab-panel--budget::-webkit-scrollbar {
   width: 10px;
 }
 
-.budget-list::-webkit-scrollbar-track,
 .budget-loans__list::-webkit-scrollbar-track,
 .budget-tab-panel--loans::-webkit-scrollbar-track,
 .budget-tab-panel--budget::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.budget-list::-webkit-scrollbar-thumb,
 .budget-loans__list::-webkit-scrollbar-thumb,
 .budget-tab-panel--loans::-webkit-scrollbar-thumb,
 .budget-tab-panel--budget::-webkit-scrollbar-thumb {
@@ -1442,41 +1529,6 @@ button.budget-entry__title {
 /* Zeilen-Aktionen (Bearbeiten/Löschen) nutzen die geteilte .row-action-
  * Grammatik aus layout.css (Audit F1) — immer sichtbar (auch Desktop), 48px
  * Touch-Fläche, Löschen als row-action--danger. */
-
-/* --------------------------------------------------------
- * Mobil-Reflow (≤640px)
- * - Budget-Tab scrollt als Ganzes (Summary + Chart + Liste), damit der
- *   schwebende FAB keine Kategorie-/Transaktionszeile mehr verdeckt und das
- *   9-zeilige Kategorie-Chart nicht abgeschnitten wird.
- * -------------------------------------------------------- */
-@media (max-width: 639px) {
-  /* Die frühere 100vw-Kappung der Tab-Leiste ist mit der Bar-Zeile entfallen:
-   * als .page-toolbar__bar begrenzt der Kopf selbst (flex-basis 100% +
-   * min-width 0), viewport-relativ war nur der Actions-Slot-Notbehelf. */
-
-  /* `overflow-y: auto` + Momentum stehen seit #904 an der Basisregel des
-   * Panels - hier bleibt nur der Reflow: Sektion und Liste geben ihre eigene
-   * Scroll-Achse ab und wachsen mit ihrem Inhalt, das Panel scrollt als
-   * Ganzes. `min-height: 0` nimmt der Sektion die 280px-Untergrenze der
-   * Desktop-Fassung wieder ab - hier ist sie kein Scrollfenster mehr. */
-  .budget-tab-panel--budget .budget-list-section,
-  .budget-tab-panel--budget .budget-list {
-    flex: 0 0 auto;
-    overflow: visible;
-    min-height: 0;
-  }
-
-  /* HIER STAND `.budget-tab-panel--budget .budget-list { padding-bottom: 0 }`
-   * gegen doppelte FAB-Clearance. Seit `.page-scrollport` (layout.css) den
-   * Nachlauf an genau EINEN Scrollport je Kette gibt - den innersten, per
-   * `:not(:has(.page-scrollport))` - kann er nicht mehr doppelt entstehen.
-   *
-   * Die Liste trägt ihn in beiden Zuständen: über 640px, weil sie hier scrollt,
-   * und darunter, weil sie das letzte Element des Panels ist, das dann scrollt.
-   * Bliebe die Nullung, hätte der Budget-Tab am Finger gar keinen Nachlauf und
-   * die Sammelaktions-Pille verdeckte wieder die letzten Buchungen. */
-}
-
 
 /* --------------------------------------------------------
  * Budget-Modal Content-Styles (Overlay/Panel via shared modal.js)
@@ -1721,6 +1773,15 @@ button.budget-entry__title {
   gap: var(--space-5);
 }
 
+/* Der Abstand zwischen Sparziel-Karte, Hinweis und Abschnitt gehoert dem
+ * KOERPER: `.budget-plan` hat nur ihn als Kind, sein `gap` griff nie, und die
+ * Ueberschrift „Kategorie-Budgets" klebte an der Karte darueber. */
+#budget-plan-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
 /* Sparziel-Karte */
 .budget-plan-savings {
   --plan-tone-color: var(--module-budget);
@@ -1817,12 +1878,14 @@ button.budget-entry__title {
   gap: var(--space-3);
   margin-bottom: var(--space-3);
 }
-.budget-plan__section-title { font-size: var(--text-base); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); }
+/* Groesse und Gewicht aus der Bereichs-Ueberschrift (u-section-title) - vorher
+ * ein <h3> in 16px direkt unter dem <h1> der Seite (Sprung h1 -> h3). */
+.budget-plan__section-title { color: var(--color-text-primary); }
 /* Vergangener Monat: der Plan von heute galt damals nicht, deshalb steht statt eines
    Urteils ein Hinweis (#1005). Ruhiger Ton - eine Erklaerung, keine Warnung. */
 .budget-plan__historic-note {
   display: flex; align-items: flex-start; gap: var(--space-2);
-  margin: 0 0 var(--space-4);
+  margin: 0;
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
   background: var(--color-surface-raised);

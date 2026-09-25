@@ -1272,6 +1272,7 @@
         "income": "आय",
         "expenses": "व्यय",
         "balance": "शेष",
+        "summaryTitle": "मासिक सारांश",
         "expensesOnly": "केवल व्यय",
         "expensesOnlyHint": "केवल व्यय दिखाएँ, आय और शेष छिपाएँ",
         "byCategory": "श्रेणी द्वारा",

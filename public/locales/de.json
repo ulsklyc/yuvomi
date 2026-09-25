@@ -1284,6 +1284,7 @@
         "income": "Einnahmen",
         "expenses": "Ausgaben",
         "balance": "Saldo",
+        "summaryTitle": "Monatsbilanz",
         "expensesOnly": "Nur Ausgaben",
         "expensesOnlyHint": "Nur Ausgaben anzeigen, Einnahmen und Saldo ausblenden",
         "byCategory": "Nach Kategorie",

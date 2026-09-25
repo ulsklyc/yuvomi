@@ -1272,6 +1272,7 @@
         "income": "الدخل",
         "expenses": "المصروفات",
         "balance": "الرصيد",
+        "summaryTitle": "ملخص الشهر",
         "expensesOnly": "المصروفات فقط",
         "expensesOnlyHint": "عرض المصروفات فقط وإخفاء الدخل والرصيد",
         "byCategory": "حسب الفئة",
