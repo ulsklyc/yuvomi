@@ -15,6 +15,8 @@ import {
   migrateLegacySettingsTab,
   readStoredSettingsDestination,
   resolveSettingsDestination,
+  searchSettings,
+  settingsOptionUrl,
   settingsOverviewUrl,
 } from '../public/settings/registry.js';
 import {
@@ -701,15 +703,80 @@ test('ungespeicherte Eingaben gehen beim Blattwechsel nicht still verloren', asy
 
 test('die Navigation laesst sich ueber alle Blaetter durchsuchen', async () => {
   const source = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  const registry = await readFile(new URL('../public/settings/registry.js', import.meta.url), 'utf8');
   // Bei 23 Blaettern in vier Domaenen war die Taxonomie der einzige Weg zu
   // einer Einstellung, deren Domaene man nicht kennt (Critique 2026-07-27).
-  assert.match(source, /type\s*=\s*'search'/, 'die Suche braucht ein echtes Suchfeld');
-  assert.match(source, /descriptionKey/, 'gefiltert wird ueber Label UND Beschreibung');
-  assert.match(source, /searchNormalize/, 'die Suche muss Gross-/Kleinschreibung und Diakritika ignorieren');
-  assert.match(source, /normalize\('NFD'\)/);
-  assert.match(source, /setAttribute\('role',\s*'status'\)/, 'die Trefferzahl gehoert in eine Live-Region');
+  // Seit 2026-09-26 ist es das geteilte Suchfeld der Shell (gefuellte Kapsel)
+  // und dieselbe Suche wie in der Wurzel - searchSettings() aus der Registry,
+  // die Label, Beschreibung, Bereich UND die einzelnen Optionen durchsucht
+  // (Verhalten: der Test "die Suche findet einzelne Optionen" weiter unten).
+  const navSearch = source.slice(source.indexOf('function createNavigationSearch'), source.indexOf('function createNavigation('));
+  assert.match(navSearch, /renderPageSearch\(\{\s*id: 'settings-navigation-search'/, 'die Seitenleiste nimmt das geteilte Suchfeld');
+  assert.doesNotMatch(navSearch, /form-input/, 'kein eigenes Suchfeld neben der Kapsel');
+  assert.match(navSearch, /searchSettings\(query, \{ user, translate: t \}\)/);
+  assert.match(registry, /descriptionKey/, 'gefiltert wird ueber Label UND Beschreibung');
+  assert.match(registry, /normalize\('NFD'\)/, 'die Suche muss Gross-/Kleinschreibung und Diakritika ignorieren');
+  assert.match(navSearch, /setAttribute\('role',\s*'status'\)/, 'die Trefferzahl gehoert in eine Live-Region');
   // Ohne Treffer greift der bestehende Leerzustand, statt stumm zu bleiben.
-  assert.match(source, /t\('search\.noResults'\)/);
+  assert.match(navSearch, /t\('search\.noResults'\)/);
+});
+
+/**
+ * DIE SUCHE FINDET EINZELNE OPTIONEN (Critique 2026-09-26, A7 P1). Gemessen
+ * lieferten "Zeitzone", "Dunkel", "Einladung", "Mealie" und "Zwei-Faktor"
+ * null Treffer, "Wand" nur die Wandtabletts statt des Wand-Modus: die Suche
+ * kannte nur Blatt-Titel und -Beschreibung. Gefahren wird die echte Suche mit
+ * dem deutschen Locale - dieselbe Funktion, die Wurzel und Seitenleiste rufen.
+ */
+test('die Suche findet einzelne Optionen, nicht nur Blaetter', async () => {
+  const de = JSON.parse(await readFile(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  const translate = (key) => key.split('.').reduce((value, segment) => value?.[segment], de) ?? key;
+  const admin = { role: 'admin' };
+  const optionOn = (query, leafId, user = admin) => searchSettings(query, { user, translate })
+    .options.some((hit) => hit.leaf.id === leafId);
+
+  assert.ok(optionOn('Zeitzone', 'personal-appearance'), 'Zeitzone -> Darstellung');
+  assert.ok(optionOn('dunkel', 'personal-appearance'), 'ein Theme-Wert findet das Design-Segment');
+  assert.ok(optionOn('Einladung', 'admin-family'));
+  assert.ok(optionOn('mealie', 'modules-kitchen'), 'Produktnamen stehen als terms im Index');
+  assert.ok(optionOn('Zwei-Faktor', 'personal-account'));
+  assert.ok(optionOn('Wand', 'personal-appearance'), 'Wand findet den Wand-Modus, nicht nur die Wandtabletts');
+  // Diakritika und Gross-/Kleinschreibung zaehlen nicht.
+  assert.ok(optionOn('wahrung', 'personal-appearance'), 'waehrung ohne Umlaut findet Waehrung');
+
+  // Die Rechte gelten auch fuer Treffer: ein Mitglied findet keine Option
+  // eines adminOnly-Blatts, wohl aber seine eigenen.
+  const member = { role: 'member' };
+  assert.equal(optionOn('Einladung', 'admin-family', member), false);
+  assert.ok(optionOn('Wand', 'personal-appearance', member));
+
+  // Blatt-Treffer bleiben, und eine leere Eingabe findet nichts.
+  assert.ok(searchSettings('Wetter', { user: admin, translate }).leaves.some((leaf) => leaf.id === 'personal-weather'));
+  assert.deepEqual(searchSettings('  ', { user: admin, translate }), { leaves: [], options: [] });
+
+  // Der Sprung traegt die Option als Anker, die Shell zeigt sie im Blatt.
+  const [hit] = searchSettings('Zeitzone', { user: admin, translate }).options;
+  assert.equal(settingsOptionUrl(hit.leaf, hit.key), '/settings/personal/appearance?option=settings.timezoneLabel');
+  const shell = await settingsShellSource();
+  assert.match(shell, /revealSettingsOption\(leafContainer, query\?\.get\?\.\('option'\)\)/);
+});
+
+/**
+ * FAST JEDER BLATTAUFRUF KOMMT OHNE `?option=`. Die erste Fassung von
+ * revealSettingsOption() rief `t(key)` vor der Pruefung, und das echte t()
+ * wirft bei `null` (i18n.js, resolveExtensionTranslation) - gemessen fiel
+ * dadurch JEDES Blatt ohne Suchtreffer in den Fehlerzustand "Einstellungen
+ * konnten nicht geladen werden". Der Stub des Test-Loaders wirft nicht, ein
+ * Aufruf hier waere also gruen gegen den Fehler; deshalb die Reihenfolge im
+ * Quelltext: die Schluesselpruefung steht vor dem ersten t().
+ */
+test('ein Blatt ohne Suchtreffer ruft t() nicht mit einem leeren Schluessel', async () => {
+  const shell = await settingsShellSource();
+  const body = shell.slice(shell.indexOf('function revealSettingsOption('), shell.indexOf('async function renderLeafContent'));
+  const guard = body.search(/if \(typeof key !== 'string' \|\| !key\) return false;/);
+  const firstT = body.search(/\bt\(key\)/);
+  assert.ok(guard > 0, 'revealSettingsOption() prueft den Schluessel nicht');
+  assert.ok(firstT > guard, 't(key) laeuft vor der Schluesselpruefung');
 });
 
 test('der Blattwechsel zeigt einen Ladezustand statt eines leeren Kastens', async () => {
@@ -1598,7 +1665,51 @@ test('die Wurzel sucht ueber das Such-Icon im geteilten Kopf, in jeder Breite', 
   assert.match(shell, /className: 'settings-toolbar__search page-toolbar__center'/);
   // Die Suche filtert die Liste der Wurzel, nicht nur die Desktop-Seitenleiste.
   assert.match(shell, /onQuery: \(value\) => filterOverview\(content, value\)/);
-  assert.match(shell, /function filterOverview[\s\S]*?searchNormalize\([\s\S]*?section\.hidden = visible === 0/);
-  // Label, Beschreibung und Bereich sind der Suchgrund, wie in der Seitenleiste.
-  assert.match(shell, /link\.dataset\.search = searchNormalize\(`\$\{t\(entry\.labelKey\)\} \$\{t\(entry\.descriptionKey\)\} \$\{domainLabel\}`\)/);
+  // Dieselbe Suche wie in der Seitenleiste (searchSettings: Label, Beschreibung,
+  // Bereich und einzelne Optionen); ein Abschnitt ohne Treffer faellt weg, und
+  // die Optionen bekommen einen eigenen Abschnitt.
+  assert.match(shell, /function filterOverview[\s\S]*?searchSettings\(query[\s\S]*?section\.hidden = visible === 0[\s\S]*?hits\.options\.map\(createOptionRow\)/);
+});
+
+/**
+ * KEIN GRUENES „AKTIVIERT" NEBEN EINEM SCHALTER (Critique 2026-09-26, A7 P2).
+ * Auf `Aktive Module` standen vierzehn gruene Badges neben vierzehn gehakten
+ * Kaestchen - dieselbe Aussage zweimal, und die eine abweichende Zeile ging
+ * darin unter. Das Statuswort steht nur noch fuer die Abweichung (aus,
+ * Fehler, nicht im Menue). Geprueft an beiden Blaettern, die das Wort bauen,
+ * und am Stylesheet: eine Regel fuer den Normalzustand waere die Einladung,
+ * ihn wieder zu beschriften.
+ */
+test('Modulzeilen beschriften nur die Abweichung, nicht den Normalzustand', async () => {
+  const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
+  for (const path of ['../public/settings/pages/modules-active.js', '../public/settings/pages/modules-navigation.js']) {
+    assert.doesNotMatch(await read(path), /settings-module-status--enabled/, `${path} baut wieder ein Aktiviert-Badge`);
+  }
+  const rules = await settingsCssRules();
+  assert.deepEqual(rules.filter((rule) => rule.selector.includes('settings-module-status--enabled')).map((rule) => rule.selector), []);
+  // Die Abweichung behaelt ihr Wort.
+  assert.match(await read('../public/settings/pages/modules-active.js'), /settings-module-status--disabled[\s\S]*thirdPartyModulesStatusDisabled/);
+});
+
+/**
+ * EIN WERT AUS DREI IST DAS SEGMENT DER SHELL (Komponenten-Kanon 2026-09-26,
+ * DESIGN.md "Segmented Controls"). Theme und Wochenstart waren drei getrennte
+ * Rahmenknoepfe (`.theme-toggle`) ohne Well, mit aria-pressed statt einer
+ * Auswahl - die Pille war kein Zustand in einer Leiste. Beide nehmen jetzt
+ * `.segmented` (panel.css) als radiogroup mit der geteilten Verhaltensschicht
+ * (Pfeiltasten, Roving-Tabindex, aria-checked), und die eigene Optik ist weg.
+ */
+test('Theme und Wochenstart sind das Segment der Shell, kein eigener Umschalter', async () => {
+  const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
+  for (const [path, id] of [
+    ['../public/settings/pages/personal-appearance.js', 'theme-toggle'],
+    ['../public/settings/pages/modules-calendar.js', 'week-start-toggle'],
+  ]) {
+    const source = await read(path);
+    assert.match(source, new RegExp(`class="segmented settings-segmented" id="${id}" role="radiogroup"`), `${path}: #${id} ist kein .segmented`);
+    assert.match(source, /wireTablist\([\s\S]{0,120}?\{\s*activeId:[\s\S]{0,80}?activeClass: 'is-active',\s*mode: 'select'/, `${path}: ohne geteilte Verhaltensschicht`);
+    assert.doesNotMatch(source, /theme-toggle__btn/, `${path}: die alte Knopfreihe ist zurueck`);
+  }
+  const rules = await settingsCssRules();
+  assert.deepEqual(rules.filter((rule) => /\.theme-toggle/.test(rule.selector)).map((rule) => rule.selector), []);
 });

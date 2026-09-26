@@ -10,6 +10,21 @@ export const SETTINGS_DOMAINS = freezeEntries([
   { id: 'admin', labelKey: 'settings.domainAdministration', icon: 'shield', adminOnly: true },
 ]);
 
+/**
+ * `options` - DIE EINZELNEN EINSTELLUNGEN EINES BLATTS fuer die Stichwortsuche
+ * (Critique 2026-09-26, A7 P1). Die Suche kannte nur Blatt-Titel und
+ * -Beschreibung: „Zeitzone", „Dunkel", „Einladung", „Mealie", „Zwei-Faktor"
+ * fanden nichts, „Wand" nur die Wandtabletts statt des Wand-Modus. Jede Option
+ * ist der i18n-Schluessel ihrer SICHTBAREN Beschriftung auf dem Blatt - daraus
+ * entsteht der Treffer, und dieselbe Beschriftung sucht die Shell nach dem
+ * Sprung im Blatt, um die Stelle zu zeigen (shell.js, revealSettingsOption).
+ * Als Objekt: `also` sind weitere Schluessel, die nur mitgesucht werden (die
+ * drei Werte des Theme-Segments), `terms` Produktnamen, die in keiner Sprache
+ * uebersetzt werden (Mealie, CalDAV) und deshalb kein Schluessel sind.
+ * `test:settings-copy` haelt, dass jeder Schluessel auf SEINEM Blatt
+ * gerendert wird - sonst fuehrte ein Treffer auf ein Blatt, das die Option
+ * gar nicht zeigt.
+ */
 export const SETTINGS_LEAVES = freezeEntries([
   {
     id: 'personal-account',
@@ -18,6 +33,15 @@ export const SETTINGS_LEAVES = freezeEntries([
     labelKey: 'settings.pageAccount',
     descriptionKey: 'settings.pageAccountDescription',
     icon: 'circle-user',
+    options: [
+      'settings.displayNameLabel',
+      'settings.colorLabel',
+      { key: 'settings.contactDetailsLegend', also: ['settings.memberPhoneLabel', 'settings.memberEmailLabel', 'settings.memberBirthDateLabel'] },
+      'settings.changePassword',
+      { key: 'settings.twoFactorTitle', terms: ['2FA', 'TOTP'] },
+      'settings.otherSessionsTitle',
+      { key: 'settings.oidcLinkTitle', terms: ['SSO', 'OIDC'] },
+    ],
     adminOnly: false,
     loader: () => import('/settings/pages/personal-account.js'),
   },
@@ -28,6 +52,17 @@ export const SETTINGS_LEAVES = freezeEntries([
     labelKey: 'settings.pageAppearance',
     descriptionKey: 'settings.pageAppearanceDescription',
     icon: 'palette',
+    options: [
+      { key: 'settings.sectionDesign', also: ['settings.themeSystem', 'settings.themeLight', 'settings.themeDark'] },
+      'settings.wallModeLabel',
+      'settings.localeLabel',
+      'settings.dataLanguageLabel',
+      'settings.regionLabel',
+      'settings.currencyLabel',
+      'settings.timezoneLabel',
+      'settings.dateFormatLabel',
+      'settings.timeFormatLabel',
+    ],
     adminOnly: false,
     loader: () => import('/settings/pages/personal-appearance.js'),
   },
@@ -38,6 +73,9 @@ export const SETTINGS_LEAVES = freezeEntries([
     labelKey: 'settings.pageDevice',
     descriptionKey: 'settings.pageDeviceDescription',
     icon: 'smartphone',
+    options: [
+      { key: 'settings.pwaInstallTitle', terms: ['PWA'] },
+    ],
     adminOnly: false,
     loader: () => import('/settings/pages/personal-device.js'),
   },
@@ -48,6 +86,10 @@ export const SETTINGS_LEAVES = freezeEntries([
     labelKey: 'settings.pageNotifications',
     descriptionKey: 'settings.pageNotificationsDescription',
     icon: 'bell',
+    options: [
+      'settings.pushToggleTitle',
+      { key: 'settings.notificationChannelsTitle', terms: ['ntfy', 'Gotify', 'Webhook'] },
+    ],
     adminOnly: false,
     loader: () => import('/settings/pages/notifications.js'),
   },
@@ -63,6 +105,11 @@ export const SETTINGS_LEAVES = freezeEntries([
     descriptionKey: 'settings.pageCalendarDefaultsDescription',
     icon: 'calendar-clock',
     module: 'calendar',
+    options: [
+      'settings.calendarAssignMeLabel',
+      'settings.calendarDefaultTargetLabel',
+      'settings.calendarDefaultRemindersLabel',
+    ],
     adminOnly: false,
     loader: () => import('/settings/pages/personal-calendar.js'),
   },
@@ -78,6 +125,9 @@ export const SETTINGS_LEAVES = freezeEntries([
     descriptionKey: 'settings.pageTaskDefaultsDescription',
     icon: 'list-checks',
     module: 'tasks',
+    options: [
+      'settings.tasksDefaultTargetLabel',
+    ],
     adminOnly: false,
     loader: () => import('/settings/pages/personal-tasks.js'),
   },
@@ -93,6 +143,11 @@ export const SETTINGS_LEAVES = freezeEntries([
     descriptionKey: 'settings.pageHealthPersonalDescription',
     icon: 'heart-pulse',
     module: 'health',
+    options: [
+      'settings.healthCyclePersonalLabel',
+      'settings.healthPreventionNotifyCaregiversLabel',
+      'settings.healthVisibilityTitle',
+    ],
     adminOnly: false,
     loader: () => import('/settings/pages/personal-health.js'),
   },
@@ -103,6 +158,10 @@ export const SETTINGS_LEAVES = freezeEntries([
     labelKey: 'settings.pageWeather',
     descriptionKey: 'settings.pageWeatherDescription',
     icon: 'cloud-sun',
+    options: [
+      'settings.personalWeatherTitle',
+      'settings.weatherAutoLocateLabel',
+    ],
     adminOnly: false,
     loader: () => import('/settings/pages/personal-weather.js'),
   },
@@ -117,6 +176,10 @@ export const SETTINGS_LEAVES = freezeEntries([
     labelKey: 'settings.pageNavigation',
     descriptionKey: 'settings.pageNavigationDescription',
     icon: 'panel-left',
+    options: [
+      'settings.desktopNavigationTitle',
+      'settings.mobileNavigationTitle',
+    ],
     adminOnly: false,
     loader: () => import('/settings/pages/modules-navigation.js'),
   },
@@ -133,6 +196,14 @@ export const SETTINGS_LEAVES = freezeEntries([
     labelKey: 'settings.pageFeeds',
     descriptionKey: 'settings.pageFeedsDescription',
     icon: 'rss',
+    options: [
+      { key: 'settings.feedExportTitle', terms: ['ICS', 'iCal'] },
+      'settings.feedExportShowAssignees',
+      'settings.inventoryFeedTitle',
+      'settings.cycleFeedTitle',
+      'settings.scheduleFeedTitle',
+      'settings.wasteFeedTitle',
+    ],
     adminOnly: false,
     loader: () => import('/settings/pages/personal-feeds.js'),
   },
@@ -153,6 +224,10 @@ export const SETTINGS_LEAVES = freezeEntries([
     descriptionKey: 'settings.pageCalendarSubscriptionsDescription',
     icon: 'calendar-plus',
     module: 'calendar',
+    options: [
+      { key: 'settings.ics.title', terms: ['ICS', 'iCal'] },
+      'settings.calendarImport.title',
+    ],
     adminOnly: false,
     loader: () => import('/settings/pages/personal-calendar-subscriptions.js'),
   },
@@ -168,6 +243,9 @@ export const SETTINGS_LEAVES = freezeEntries([
     labelKey: 'settings.pageActiveModules',
     descriptionKey: 'settings.pageActiveModulesDescription',
     icon: 'toggle-right',
+    options: [
+      'settings.activeModulesTitle',
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/modules-active.js'),
   },
@@ -179,6 +257,11 @@ export const SETTINGS_LEAVES = freezeEntries([
     descriptionKey: 'settings.pageKitchenDescription',
     icon: 'utensils',
     module: 'kitchen',
+    options: [
+      'settings.mealTypesLabel',
+      'settings.mealTypeNamesLabel',
+      { key: 'settings.recipeProvidersTitle', terms: ['Mealie', 'Tandoor'] },
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/modules-kitchen.js'),
   },
@@ -190,6 +273,12 @@ export const SETTINGS_LEAVES = freezeEntries([
     descriptionKey: 'settings.pageCalendarModuleDescription',
     icon: 'calendar-days',
     module: 'calendar',
+    options: [
+      'settings.calendarDurationTitle',
+      'settings.weekStartTitle',
+      'settings.holidayPublicLabel',
+      'settings.holidaySchoolLabel',
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/modules-calendar.js'),
   },
@@ -203,6 +292,13 @@ export const SETTINGS_LEAVES = freezeEntries([
     labelKey: 'settings.pageModuleOptions',
     descriptionKey: 'settings.pageModuleOptionsDescription',
     icon: 'sliders-horizontal',
+    options: [
+      'settings.budgetModePersonalLabel',
+      'settings.healthCycleEnableLabel',
+      'settings.housekeepingPaymentTasksLabel',
+      'settings.tasksSubtasksExpandedLabel',
+      'settings.scheduleTemplatesTitle',
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/modules-options.js'),
   },
@@ -214,6 +310,11 @@ export const SETTINGS_LEAVES = freezeEntries([
     descriptionKey: 'settings.pageRewardsModuleDescription',
     icon: 'award',
     module: 'rewards',
+    options: [
+      'settings.rewardsEnableLabel',
+      'settings.rewardsApprovalLabel',
+      'settings.rewardsDefaultPointsLabel',
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/modules-rewards.js'),
   },
@@ -228,6 +329,9 @@ export const SETTINGS_LEAVES = freezeEntries([
     descriptionKey: 'settings.pageHealthModuleDescription',
     icon: 'syringe',
     module: 'health',
+    options: [
+      'settings.healthPreventionTypesTitle',
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/modules-health.js'),
   },
@@ -240,6 +344,9 @@ export const SETTINGS_LEAVES = freezeEntries([
     labelKey: 'settings.pageCountdownsModule',
     descriptionKey: 'settings.pageCountdownsModuleDescription',
     icon: 'hourglass',
+    options: [
+      'settings.countdownGraceDaysTitle',
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/modules-countdowns.js'),
   },
@@ -251,6 +358,11 @@ export const SETTINGS_LEAVES = freezeEntries([
     descriptionKey: 'settings.pageSyncCalendarDescription',
     icon: 'calendar-sync',
     module: 'calendar',
+    options: [
+      { key: 'settings.caldavTitle', terms: ['CalDAV', 'Nextcloud'] },
+      { key: 'settings.moreProviders', terms: ['Google', 'Apple', 'iCloud', 'Outlook'] },
+      'settings.sync.backfillTitle',
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/sync-calendar.js'),
   },
@@ -262,6 +374,9 @@ export const SETTINGS_LEAVES = freezeEntries([
     descriptionKey: 'settings.pageSyncContactsDescription',
     icon: 'contact-round',
     module: 'contacts',
+    options: [
+      { key: 'settings.cardavTitle', terms: ['CardDAV', 'Nextcloud'] },
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/sync-contacts.js'),
   },
@@ -273,6 +388,9 @@ export const SETTINGS_LEAVES = freezeEntries([
     descriptionKey: 'settings.pageSyncRemindersDescription',
     icon: 'list-checks',
     module: 'tasks',
+    options: [
+      'settings.caldavSyncReminders',
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/sync-reminders.js'),
   },
@@ -287,6 +405,10 @@ export const SETTINGS_LEAVES = freezeEntries([
     descriptionKey: 'settings.pageDocumentStorageDescription',
     icon: 'hard-drive',
     module: 'documents',
+    options: [
+      { key: 'settings.documentStorageWebdavTitle', terms: ['Nextcloud'] },
+      'settings.documentStorageGoogleDriveTitle',
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/documents-storage.js'),
   },
@@ -298,6 +420,9 @@ export const SETTINGS_LEAVES = freezeEntries([
     descriptionKey: 'settings.pageDocumentDmsDescription',
     icon: 'archive',
     module: 'documents',
+    options: [
+      { key: 'settings.dmsTitle', terms: ['Paperless'] },
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/documents-dms.js'),
   },
@@ -308,6 +433,11 @@ export const SETTINGS_LEAVES = freezeEntries([
     labelKey: 'settings.pageFamilyRoles',
     descriptionKey: 'settings.pageFamilyRolesDescription',
     icon: 'users',
+    options: [
+      'settings.sectionFamily',
+      'settings.invites.title',
+      { key: 'settings.twoFactorTitle', also: ['settings.twoFactorRequireLabel'], terms: ['2FA'] },
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/admin-family.js'),
   },
@@ -318,6 +448,9 @@ export const SETTINGS_LEAVES = freezeEntries([
     labelKey: 'settings.pagePermissions',
     descriptionKey: 'settings.pagePermissionsDescription',
     icon: 'shield-check',
+    options: [
+      'settings.permCapabilitiesHeading',
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/admin-permissions.js'),
   },
@@ -332,6 +465,9 @@ export const SETTINGS_LEAVES = freezeEntries([
     labelKey: 'settings.pageHouseholdWeather',
     descriptionKey: 'settings.pageHouseholdWeatherDescription',
     icon: 'cloud-sun',
+    options: [
+      'settings.weatherTitle',
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/admin-weather.js'),
   },
@@ -342,6 +478,9 @@ export const SETTINGS_LEAVES = freezeEntries([
     labelKey: 'settings.pageDisplays',
     descriptionKey: 'settings.pageDisplaysDescription',
     icon: 'tablet-smartphone',
+    options: [
+      'settings.displayPairingCodeLabel',
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/admin-displays.js'),
   },
@@ -352,6 +491,9 @@ export const SETTINGS_LEAVES = freezeEntries([
     labelKey: 'settings.pageApiAccess',
     descriptionKey: 'settings.pageApiAccessDescription',
     icon: 'key-round',
+    options: [
+      'settings.apiTokensTitle',
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/admin-api.js'),
   },
@@ -362,6 +504,12 @@ export const SETTINGS_LEAVES = freezeEntries([
     labelKey: 'settings.pageBackupRestore',
     descriptionKey: 'settings.pageBackupRestoreDescription',
     icon: 'database-backup',
+    options: [
+      'settings.backupDownloadTitle',
+      'settings.backupRestoreTitle',
+      'settings.backupSchedulerTitle',
+      'settings.backupWebdavEnabled',
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/admin-backup.js'),
   },
@@ -372,6 +520,9 @@ export const SETTINGS_LEAVES = freezeEntries([
     labelKey: 'settings.pageEmail',
     descriptionKey: 'settings.pageEmailDescription',
     icon: 'mail',
+    options: [
+      { key: 'email.host', terms: ['SMTP'] },
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/admin-email.js'),
   },
@@ -382,6 +533,9 @@ export const SETTINGS_LEAVES = freezeEntries([
     labelKey: 'settings.pageImmich',
     descriptionKey: 'settings.pageImmichDescription',
     icon: 'images',
+    options: [
+      'settings.immichServerUrl',
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/admin-immich.js'),
   },
@@ -392,6 +546,10 @@ export const SETTINGS_LEAVES = freezeEntries([
     labelKey: 'settings.pageSystem',
     descriptionKey: 'settings.pageSystemDescription',
     icon: 'info',
+    options: [
+      'settings.appNameLabel',
+      'settings.systemVersionLabel',
+    ],
     adminOnly: true,
     loader: () => import('/settings/pages/admin-system.js'),
   },
@@ -497,4 +655,62 @@ export function readStoredSettingsDestination(user, storage = sessionStorage) {
   // wortlos im Konto-Formular, und die Übersicht war über die App-Navigation
   // gar nicht erreichbar (Critique 2026-07-27). Der Aufrufer entscheidet.
   return null;
+}
+
+/**
+ * Vergleichsform der Suche: Kleinschreibung, Diakritika weg, damit „wetter"
+ * auch „Wetter" findet und „prazdniny" auch „prázdniny".
+ */
+export function normalizeSettingsSearch(value) {
+  return String(value ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '');
+}
+
+/** Eine Option aus `options` in einheitlicher Form. */
+function optionEntry(option) {
+  return typeof option === 'string'
+    ? { key: option, also: [], terms: [] }
+    : { key: option.key, also: option.also ?? [], terms: option.terms ?? [] };
+}
+
+/**
+ * Stichwortsuche ueber die Blaetter UND ihre einzelnen Optionen - die EINE
+ * Suche der Einstellungen, von der Wurzel (Kopf-Suche) und der Seitenleiste
+ * (Desktop-Blatt) gleich benutzt.
+ *
+ * Ein Blatt trifft ueber Titel, Beschreibung und Bereich; eine Option ueber
+ * ihre Beschriftung, ihre `also`-Schluessel und ihre `terms`. Rein und ohne
+ * DOM: `translate` kommt vom Aufrufer (im Browser `t`, im Test das de-Locale).
+ *
+ * @param {string} query
+ * @param {{ user?: object, translate: (key: string) => string }} opts
+ * @returns {{ leaves: object[], options: { leaf: object, key: string, label: string }[] }}
+ */
+export function searchSettings(query, { user, translate }) {
+  const needle = normalizeSettingsSearch(String(query ?? '').trim());
+  if (!needle) return { leaves: [], options: [] };
+  const domainLabels = new Map(filterSettingsDomains(user).map((domain) => [domain.id, translate(domain.labelKey)]));
+  const visible = SETTINGS_LEAVES.filter((leaf) => domainLabels.has(leaf.domainId)
+    && (!leaf.adminOnly || user?.role === 'admin'));
+
+  const leaves = visible.filter((leaf) => normalizeSettingsSearch(
+    `${translate(leaf.labelKey)} ${translate(leaf.descriptionKey)} ${domainLabels.get(leaf.domainId)}`,
+  ).includes(needle));
+
+  const options = [];
+  for (const leaf of visible) {
+    for (const option of (leaf.options ?? []).map(optionEntry)) {
+      const label = translate(option.key);
+      const haystack = [label, ...option.also.map(translate), ...option.terms].join(' ');
+      if (normalizeSettingsSearch(haystack).includes(needle)) options.push({ leaf, key: option.key, label });
+    }
+  }
+  return { leaves, options };
+}
+
+/** Sprungziel eines Options-Treffers: das Blatt, mit der Option als Anker. */
+export function settingsOptionUrl(leaf, key) {
+  return `${leaf.path}?option=${encodeURIComponent(key)}`;
 }

@@ -113,3 +113,45 @@ test('jedes Substantiv einer Leaf-Description kommt im Blatt-Inhalt vor', () => 
   }
   assert.deepEqual(failures, []);
 });
+
+/**
+ * DIE SUCH-OPTIONEN STEHEN AUF IHREM BLATT (Stichwortsuche, 2026-09-26).
+ *
+ * `options` in der Registry ist eine Liste von Beschriftungen, die die Suche
+ * als Treffer anbietet und die Shell nach dem Sprung im Blatt wiederfindet
+ * (shell.js, revealSettingsOption). Eine Option, deren Schluessel das Blatt
+ * nicht rendert, ist ein Treffer, der auf ein Blatt ohne diese Einstellung
+ * fuehrt - dieselbe Beschriftungsluege wie die veraltete Description oben,
+ * nur einen Klick tiefer. Geprueft wird der Schluessel im Quelltext des
+ * Blatts (plus geteilte Bausteine unter /settings/, eine Ebene), nicht der
+ * Wert: zwei Blaetter duerfen dieselbe Beschriftung tragen.
+ */
+test('jede Such-Option einer Leaf wird auf genau dieser Leaf gerendert', () => {
+  const failures = [];
+  let seen = 0;
+  for (const leaf of SETTINGS_LEAVES) {
+    const source = readFileSync(leafSourcePath(leaf), 'utf8');
+    // `t('x')` UND der Schluessel als Literal: Werte-Listen wie das Theme-
+    // Segment tragen `labelKey: 'settings.themeDark'` und uebersetzen spaeter.
+    const keysIn = (text) => [
+      ...translationKeysIn(text),
+      ...[...text.matchAll(/['"]([a-z][\w]*\.[\w.]+)['"]/g)].map((m) => m[1]),
+    ];
+    const keys = new Set(keysIn(source));
+    for (const match of source.matchAll(/from\s+'\/settings\/([\w/-]+\.js)'/g)) {
+      const shared = new URL(`../public/settings/${match[1]}`, import.meta.url);
+      for (const key of keysIn(readFileSync(shared, 'utf8'))) keys.add(key);
+    }
+    for (const option of leaf.options ?? []) {
+      const entry = typeof option === 'string' ? { key: option, also: [] } : { also: [], ...option };
+      for (const key of [entry.key, ...entry.also]) {
+        seen += 1;
+        if (typeof translate(key) !== 'string') failures.push(`${leaf.id}: ${key} fehlt in de.json`);
+        else if (!keys.has(key)) failures.push(`${leaf.id}: Option ${key} wird auf dem Blatt nicht gerendert`);
+      }
+    }
+  }
+  // Eine Zusicherung ueber eine leere Liste ist keine.
+  assert.ok(seen >= 60, `nur ${seen} Such-Optionen gefunden - liest der Test die Registry noch?`);
+  assert.deepEqual(failures, []);
+});

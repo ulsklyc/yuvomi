@@ -61,6 +61,10 @@
    Blatt-Suche in der Navigation
    -------------------------------------------------------- */
 
+/* Das geteilte Suchfeld der Shell (renderPageSearch, gefuellte Kapsel) - bis
+ * 2026-09-26 ein eigenes `form-input`, dessen Platzhalter im 196px-Traeger
+ * abgeschnitten stand (Critique A7). Hier nur der Abstand; das Aussehen
+ * gehoert page-search.css. */
 .settings-shell__navigation-search {
   margin-bottom: var(--space-3);
 }
@@ -414,6 +418,15 @@
   line-height: var(--line-height-snug);
 }
 
+/* Der Ort eines Options-Treffers (Suche): das Blatt, in dem die Option steht.
+ * Anders als die Beschreibung bleibt er auch mobil stehen - ohne ihn waere
+ * „Farbe" ein Treffer ohne Adresse. */
+.settings-overview__row-context {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--line-height-snug);
+}
+
 .settings-overview__row-chevron {
   width: var(--space-4);
   height: var(--space-4);
@@ -461,6 +474,35 @@
 
   .settings-overview__row-description {
     display: none;
+  }
+}
+
+/* --------------------------------------------------------
+   Die angesprungene Option (Suchtreffer, shell.js revealSettingsOption)
+
+   Der Traeger der Option leuchtet kurz im Akzent-Ton auf und blendet dann
+   aus: der Blick soll die Stelle finden, ohne dass sie danach anders aussieht
+   als ihre Nachbarn. Der Fokus liegt dabei schon im Bedienelement - die
+   Markierung ist fuer das Auge, der Fokus fuer Tastatur und Screenreader.
+   -------------------------------------------------------- */
+
+.settings-search-target {
+  border-radius: var(--radius-md);
+  background-color: color-mix(in srgb, var(--color-accent) var(--tint-state), transparent);
+  box-shadow: 0 0 0 var(--space-1) color-mix(in srgb, var(--color-accent) var(--tint-state), transparent);
+}
+
+.settings-search-target--fading {
+  background-color: transparent;
+  box-shadow: 0 0 0 var(--space-1) transparent;
+  transition:
+    background-color var(--transition-slow),
+    box-shadow var(--transition-slow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-search-target--fading {
+    transition: none;
   }
 }
 

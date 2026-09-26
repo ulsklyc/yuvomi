@@ -9,6 +9,8 @@ import {
   SETTINGS_LEAVES,
   filterSettingsDomains,
   findSettingsLeaf,
+  searchSettings,
+  settingsOptionUrl,
   settingsOverviewUrl,
 } from './registry.js';
 
@@ -129,15 +131,6 @@ function createDomainToggle(domain, panelId, expanded) {
   return toggle;
 }
 
-// Vergleichsform für die Blatt-Suche: Diakritika weg, damit "wetter" auch
-// "Wetter" findet und "prazdniny" auch "prázdniny".
-function searchNormalize(value) {
-  return String(value ?? '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '');
-}
-
 function createNavigationLink(entry, activeLeaf) {
   const link = createLink(entry.path, 'settings-shell__navigation-link');
   link.dataset.leafId = entry.id;
@@ -153,27 +146,52 @@ function createNavigationLink(entry, activeLeaf) {
 }
 
 /**
- * Suchfeld über alle sichtbaren Blätter. Bei 23 Blättern in vier Domänen ist
- * die Taxonomie sonst der einzige Weg zu einer Einstellung, deren Domäne man
- * nicht kennt (Critique 2026-07-27). Gefiltert wird über Label UND Beschreibung,
- * damit "Zeitzone" auch ein Blatt findet, das anders heisst.
+ * Ein Treffer der Seitenleisten-Suche: Zeichen des Blatts, der Name und darunter
+ * der Ort. Fuer ein Blatt ist der Ort sein Bereich, fuer eine Option ihr Blatt -
+ * ohne die Gruppen fehlt sonst, WO der Treffer liegt. Label und Ort stehen in
+ * einer Spalte neben dem Icon, damit ein langer Name das Icon nicht in eine
+ * eigene Zeile draengt.
+ */
+function createNavigationResult({ entry, href, label, context, activeLeaf, option = false }) {
+  const item = document.createElement('li');
+  const link = createLink(href, 'settings-shell__navigation-link settings-shell__navigation-result');
+  link.dataset.leafId = entry.id;
+  if (!option && entry.id === activeLeaf?.id) {
+    link.classList.add('settings-shell__navigation-link--active');
+    link.setAttribute('aria-current', 'page');
+  }
+  const text = document.createElement('span');
+  text.className = 'settings-shell__navigation-result-text';
+  const name = document.createElement('span');
+  name.textContent = label;
+  const hint = document.createElement('span');
+  hint.className = 'settings-shell__navigation-result-domain';
+  hint.textContent = context;
+  text.append(name, hint);
+  link.append(createLeafMark(entry, 'settings-shell__navigation-link-icon'), text);
+  item.appendChild(link);
+  return item;
+}
+
+/**
+ * Suchfeld der Seitenleiste (Desktop-Blatt). Bei 32 Blaettern in vier Bereichen
+ * ist die Taxonomie sonst der einzige Weg zu einer Einstellung, deren Bereich
+ * man nicht kennt (Critique 2026-07-27). Seit 2026-09-26 findet sie auch die
+ * EINZELNE Option (registry.js `options`, searchSettings) und ist das geteilte
+ * Suchfeld der Shell (renderPageSearch, gefuellte Kapsel) statt eines eigenen
+ * `form-input` - dieselbe Suche wie in der Wurzel, in anderer Anordnung.
  */
 function createNavigationSearch(navigation, domains, user, activeLeaf) {
-  const leaves = domains.flatMap((domain) => allowedLeavesForDomain(domain.id, user)
-    .map((entry) => ({
-      entry,
-      domainLabel: t(domain.labelKey),
-      haystack: searchNormalize(`${t(entry.labelKey)} ${t(entry.descriptionKey)} ${t(domain.labelKey)}`),
-    })));
+  const domainLabels = new Map(domains.map((domain) => [domain.id, t(domain.labelKey)]));
 
-  const field = document.createElement('div');
-  field.className = 'settings-shell__navigation-search';
-  const input = document.createElement('input');
-  input.type = 'search';
-  input.className = 'form-input settings-shell__navigation-search-input';
-  input.placeholder = t('settings.searchLabel');
-  input.setAttribute('aria-label', t('settings.searchLabel'));
-  field.appendChild(input);
+  navigation.insertAdjacentHTML('afterbegin', renderPageSearch({
+    id: 'settings-navigation-search',
+    label: t('settings.searchLabel'),
+    placeholder: t('search.placeholder'),
+    clearLabel: t('common.searchClear'),
+    className: 'settings-shell__navigation-search',
+  }));
+  const field = navigation.firstElementChild;
 
   const results = document.createElement('ul');
   results.className = 'settings-shell__navigation-list settings-shell__navigation-results';
@@ -186,8 +204,8 @@ function createNavigationSearch(navigation, domains, user, activeLeaf) {
 
   const groups = () => navigation.querySelectorAll('.settings-shell__navigation-group');
 
-  const applyFilter = () => {
-    const query = searchNormalize(input.value.trim());
+  const applyFilter = (value) => {
+    const query = String(value ?? '').trim();
     const searching = query.length > 0;
 
     for (const group of groups()) group.hidden = searching;
@@ -200,43 +218,32 @@ function createNavigationSearch(navigation, domains, user, activeLeaf) {
       return;
     }
 
-    const hits = leaves.filter((leaf) => leaf.haystack.includes(query));
-    results.replaceChildren(...hits.map(({ entry, domainLabel }) => {
-      const item = document.createElement('li');
-      const link = createLink(entry.path, 'settings-shell__navigation-link settings-shell__navigation-result');
-      link.dataset.leafId = entry.id;
-      if (entry.id === activeLeaf?.id) {
-        link.classList.add('settings-shell__navigation-link--active');
-        link.setAttribute('aria-current', 'page');
-      }
-
-      // Ohne die Gruppen fehlt der Ort: die Domäne wandert unter den Treffer.
-      // Label und Domäne stehen zusammen in einer Spalte neben dem Icon, damit
-      // ein langer Name nicht das Icon in eine eigene Zeile drängt.
-      const text = document.createElement('span');
-      text.className = 'settings-shell__navigation-result-text';
-      const label = document.createElement('span');
-      label.textContent = t(entry.labelKey);
-      const domainHint = document.createElement('span');
-      domainHint.className = 'settings-shell__navigation-result-domain';
-      domainHint.textContent = domainLabel;
-      text.append(label, domainHint);
-
-      link.append(createLeafMark(entry, 'settings-shell__navigation-link-icon'), text);
-      item.appendChild(link);
-      return item;
-    }));
+    const hits = searchSettings(query, { user, translate: t });
+    results.replaceChildren(
+      ...hits.leaves.map((entry) => createNavigationResult({
+        entry,
+        href: entry.path,
+        label: t(entry.labelKey),
+        context: domainLabels.get(entry.domainId) ?? '',
+        activeLeaf,
+      })),
+      ...hits.options.map(({ leaf, key, label }) => createNavigationResult({
+        entry: leaf,
+        href: settingsOptionUrl(leaf, key),
+        label,
+        context: t(leaf.labelKey),
+        activeLeaf,
+        option: true,
+      })),
+    );
     hydrateIcons(results);
 
-    status.textContent = hits.length
-      ? t('settings.searchResults', { count: hits.length })
-      : t('search.noResults');
+    const count = hits.leaves.length + hits.options.length;
+    status.textContent = count ? t('settings.searchResults', { count }) : t('search.noResults');
   };
 
-  input.addEventListener('input', applyFilter);
-  input.addEventListener('search', applyFilter);
-
-  navigation.prepend(field, status, results);
+  field.after(status, results);
+  wirePageSearch(navigation, { id: 'settings-navigation-search', delay: 0, onQuery: applyFilter });
 }
 
 function createNavigation(domains, user, activeLeaf) {
@@ -357,12 +364,9 @@ function updateNavigationActiveState(navigation, activeLeaf) {
  * (Breadcrumb, Rueckweg aus dem Blatt, alte Lesezeichen) landet auf derselben
  * Liste, gescrollt auf den Abschnitt - der Ort bleibt, die Zwischenseite geht.
  */
-function createOverviewRow(entry, domainLabel) {
+function createOverviewRow(entry) {
   const link = createLink(entry.path, 'settings-overview__row');
   link.dataset.leafId = entry.id;
-  // Suchgrund der Zeile: Label, Beschreibung und Bereich - dieselbe Menge, die
-  // die Blatt-Suche der Seitenleiste durchsucht.
-  link.dataset.search = searchNormalize(`${t(entry.labelKey)} ${t(entry.descriptionKey)} ${domainLabel}`);
   link.appendChild(createLeafMark(entry, 'settings-overview__row-mark'));
 
   const copy = document.createElement('span');
@@ -423,42 +427,95 @@ function renderOverview(content, domains, user) {
 
     const list = document.createElement('div');
     list.className = 'settings-overview__list';
-    for (const entry of leaves) list.appendChild(createOverviewRow(entry, domainLabel));
+    for (const entry of leaves) list.appendChild(createOverviewRow(entry));
 
     section.append(heading, list);
     overview.appendChild(section);
   }
 
+  // Treffer auf EINZELNE Optionen (registry.js `options`). Ein eigener
+  // Abschnitt unter den Blaettern, gefuellt nur waehrend der Suche: die Zeile
+  // nennt die Option und darunter ihr Blatt, der Sprung landet an der Stelle.
+  const optionsSection = document.createElement('section');
+  optionsSection.className = 'settings-overview__section settings-overview__section--options';
+  optionsSection.hidden = true;
+  const optionsHeading = document.createElement('h2');
+  optionsHeading.className = 'settings-overview__heading';
+  optionsHeading.id = 'settings-overview-options-heading';
+  optionsHeading.append(
+    createIcon('sliders-horizontal', 'settings-overview__heading-icon'),
+    document.createTextNode(t('settings.searchOptionsHeading')),
+  );
+  optionsSection.setAttribute('aria-labelledby', optionsHeading.id);
+  const optionsList = document.createElement('div');
+  optionsList.className = 'settings-overview__list';
+  optionsSection.append(optionsHeading, optionsList);
+  overview.appendChild(optionsSection);
+
+  overviewUsers.set(overview, user);
   content.replaceChildren(overview);
   return overview;
+}
+
+/** Nutzer der gerenderten Wurzel - die Suche filtert nach seinen Rechten. */
+const overviewUsers = new WeakMap();
+
+/** Treffer auf eine Option: ihre Beschriftung, darunter ihr Blatt. */
+function createOptionRow({ leaf, key, label }) {
+  const link = createLink(settingsOptionUrl(leaf, key), 'settings-overview__row settings-overview__row--option');
+  link.dataset.leafId = leaf.id;
+  link.appendChild(createLeafMark(leaf, 'settings-overview__row-mark'));
+  const copy = document.createElement('span');
+  copy.className = 'settings-overview__row-copy';
+  const title = document.createElement('span');
+  title.className = 'settings-overview__row-title';
+  title.textContent = label;
+  const context = document.createElement('span');
+  context.className = 'settings-overview__row-context';
+  context.textContent = t(leaf.labelKey);
+  copy.append(title, context);
+  link.append(copy, createIcon('chevron-right', 'settings-overview__row-chevron'));
+  return link;
 }
 
 /**
  * Filtert die Liste der Wurzel nach der Kopf-Suche. Ein Abschnitt ohne Treffer
  * faellt mit weg, damit keine leeren Ueberschriften stehen bleiben; die Zahl
  * geht in die Live-Region, ein leeres Ergebnis nennt der geteilte Leerzustand.
+ * Gesucht wird ueber dieselbe Funktion wie in der Seitenleiste (searchSettings):
+ * Blaetter UND einzelne Optionen.
  */
 function filterOverview(content, value) {
   const overview = content.querySelector('.settings-overview');
   if (!overview) return;
-  const query = searchNormalize(String(value ?? '').trim());
+  const query = String(value ?? '').trim();
+  const hits = searchSettings(query, { user: overviewUsers.get(overview), translate: t });
+  const leafIds = new Set(hits.leaves.map((leaf) => leaf.id));
   const status = overview.querySelector('.settings-overview__status');
-  let hits = 0;
-  for (const section of overview.querySelectorAll('.settings-overview__section')) {
+  for (const section of overview.querySelectorAll('.settings-overview__section:not(.settings-overview__section--options)')) {
     let visible = 0;
     for (const row of section.querySelectorAll('.settings-overview__row')) {
-      const match = !query || row.dataset.search.includes(query);
+      const match = !query || leafIds.has(row.dataset.leafId);
       row.hidden = !match;
       if (match) visible += 1;
     }
     section.hidden = visible === 0;
-    hits += visible;
   }
+
+  const optionsSection = overview.querySelector('.settings-overview__section--options');
+  if (optionsSection) {
+    const list = optionsSection.querySelector('.settings-overview__list');
+    list.replaceChildren(...hits.options.map(createOptionRow));
+    optionsSection.hidden = hits.options.length === 0;
+    hydrateIcons(list);
+  }
+
   if (!status) return;
+  const count = hits.leaves.length + hits.options.length;
   status.hidden = !query;
   status.textContent = !query
     ? ''
-    : (hits ? t('settings.searchResults', { count: hits }) : t('search.noResults'));
+    : (count ? t('settings.searchResults', { count }) : t('search.noResults'));
 }
 
 /**
@@ -592,6 +649,102 @@ function createLeafHeader(leaf) {
   return header;
 }
 
+// Wie lange die angesprungene Option markiert bleibt, und wie lange ihre
+// Markierung ausblendet (--transition-slow, settings.css).
+const OPTION_MARK_MS = 2000;
+const OPTION_FADE_MS = 400;
+// Solange darf ein Blatt brauchen, um die gesuchte Option nachzuladen (Konten,
+// Kanaele und Abos kommen erst nach einer zweiten Anfrage ins Blatt).
+const OPTION_WAIT_MS = 3000;
+
+const collapseText = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
+
+/** Das Element, das die Beschriftung einer Option traegt - oder null. */
+function findOptionLabel(root, text) {
+  const wanted = collapseText(text);
+  if (!wanted) return null;
+  const candidates = root.querySelectorAll(
+    'h2, h3, h4, legend, label, .toggle-row__label, .form-label, .settings-card__title, strong, span, summary, button',
+  );
+  for (const el of candidates) {
+    // Eigener Text zaehlt vor dem ganzen: ein Label mit Pflicht-Sternchen
+    // (`Kontoname<span> *</span>`) traegt die Beschriftung nur als Textknoten.
+    const own = collapseText([...el.childNodes]
+      .filter((node) => node.nodeType === 3)
+      .map((node) => node.textContent)
+      .join(' '));
+    if (own === wanted || collapseText(el.textContent) === wanted) return el;
+  }
+  return null;
+}
+
+/**
+ * Zeigt die Option, auf die ein Suchtreffer zeigt (`?option=<key>`, registry.js
+ * `options`): scrollt sie in die Mitte, markiert ihren Traeger kurz und legt
+ * den Fokus auf ihr Bedienelement - fuer Sam soll der Sprung dort enden, wo
+ * die Einstellung IST, nicht an der Blatt-Ueberschrift.
+ *
+ * Gesucht wird die SICHTBARE Beschriftung (t(key)) im gerenderten Blatt: kein
+ * Blatt muss dafuer Anker pflegen, und test:settings-copy haelt, dass die
+ * Beschriftung auf ihrem Blatt vorkommt. Laedt das Blatt einen Teil nach,
+ * wartet die Suche bis OPTION_WAIT_MS; findet sie nichts, bleibt es bei der
+ * Ueberschrift - der Sprung ist dann ein Sprung aufs Blatt, kein Fehler.
+ *
+ * NACH DEM ROUTER, NICHT IM RENDER: derselbe Grund wie bei
+ * revealOverviewSection - ein Soft-Update setzt den Scrollport erst danach
+ * zurueck.
+ *
+ * @returns {boolean} true, wenn die Option sofort gefunden wurde
+ */
+function revealSettingsOption(leafContainer, key) {
+  // ERST der Schluessel, DANN t(): fast jeder Blattaufruf kommt ohne
+  // `?option=`, und t(null) wirft in i18n.js (resolveExtensionTranslation) -
+  // gemessen riss das JEDES Blatt ohne Suchtreffer in den Fehlerzustand.
+  if (typeof key !== 'string' || !key) return false;
+  const text = t(key);
+  if (text === key) return false;
+
+  const reveal = (label) => {
+    const heading = label.matches('h2, h3, h4, legend, .settings-card__title');
+    const target = heading
+      ? (label.closest('fieldset, .settings-card, .settings-section') ?? label)
+      : (label.closest('.toggle-row, .form-group, .form-field, .settings-setting-row, fieldset, .settings-card') ?? label);
+    setTimeout(() => {
+      if (!target.isConnected) return;
+      const calm = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      target.scrollIntoView({ block: 'center', behavior: calm ? 'auto' : 'smooth' });
+      const control = heading
+        ? null
+        : target.querySelector('input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])');
+      // Ein Textfeld bekommt den Fokus NICHT: am Telefon oeffnete das die
+      // Tastatur ueber genau der Stelle, die der Sprung zeigen soll. Dann traegt
+      // die Beschriftung den Fokus, der naechste Tab-Schritt ist das Feld.
+      const typing = control?.matches('textarea, input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="color"]):not([type="range"])');
+      const focusTarget = (typing ? null : control) ?? label;
+      if (focusTarget === label && label.tabIndex < 0 && !label.hasAttribute('tabindex')) label.tabIndex = -1;
+      focusTarget.focus({ preventScroll: true });
+      target.classList.add('settings-search-target');
+      setTimeout(() => target.classList.add('settings-search-target--fading'), OPTION_MARK_MS);
+      setTimeout(() => target.classList.remove('settings-search-target', 'settings-search-target--fading'), OPTION_MARK_MS + OPTION_FADE_MS);
+    }, 0);
+  };
+
+  const found = findOptionLabel(leafContainer, text);
+  if (found) {
+    reveal(found);
+    return true;
+  }
+  const observer = new MutationObserver(() => {
+    const late = findOptionLabel(leafContainer, text);
+    if (!late) return;
+    observer.disconnect();
+    reveal(late);
+  });
+  observer.observe(leafContainer, { childList: true, subtree: true });
+  setTimeout(() => observer.disconnect(), OPTION_WAIT_MS);
+  return false;
+}
+
 async function renderLeafContent(content, leaf, domain, user, query) {
   // Der mobile Rueckweg steht nicht mehr hier, sondern im klebenden Kopf
   // (renderToolbar): als Textlink im Inhalt scrollte er mit weg.
@@ -630,11 +783,15 @@ async function renderLeafContent(content, leaf, domain, user, query) {
       leafContainer.removeAttribute('aria-busy');
       watchLeafForms(leafContainer);
 
-      heading.tabIndex = -1;
-      requestAnimationFrame(() => {
-        heading.focus({ preventScroll: true });
-      });
       hydrateIcons(content);
+      // Ein Suchtreffer auf eine Option endet an der Option, sonst an der
+      // Ueberschrift des Blatts.
+      heading.tabIndex = -1;
+      if (!revealSettingsOption(leafContainer, query?.get?.('option'))) {
+        requestAnimationFrame(() => {
+          if (!leafContainer.contains(document.activeElement)) heading.focus({ preventScroll: true });
+        });
+      }
     } catch (error) {
       console.error(`[Settings] Failed to render ${leaf.id}:`, error);
       clearTimeout(skeletonTimer);
