@@ -6034,30 +6034,62 @@ test('phase 3 high-frequency controls use tokenized touch targets', () => {
   assert.match(notes, /\.note-card__delete[\s\S]*width:\s*var\(--target-base\)/);
 });
 
-test('Tasks toolbar keeps secondary controls visible instead of an overflow slider', () => {
+test('Tasks toolbar follows the mobile header rule: one tools menu, "Filter (n)", no chip row', () => {
   const tasksPage = read('../public/pages/tasks.js');
   const tasksCss = read('../public/styles/tasks.css');
 
   // Das frühere <details>-Overflow-Panel versteckte Ansicht/Gruppierung hinter
   // einem Klick und zeigte deren Zustand nicht — dasselbe Muster wurde in
-  // Dokumente (#506) verworfen. Aufgaben nutzt jetzt die geteilte Grammatik:
-  // umbrechender Kopf plus sichtbare Filterzeile.
+  // Dokumente (#506) verworfen. Die Antwort darauf ist NICHT, alles lose in den
+  // Kopf zu stellen: das waren bis 2026-09-26 sechs Knoepfe plus Chipzeile,
+  // Kopf 176px, erste Aufgabe bei y=287 (A3 P1-2). Die Kopfregel mobil
+  // (DESIGN.md) verlangt EIN beschriftetes Werkzeugmenue und einen Filterknopf
+  // mit Zahl; ihr Zustand bleibt sichtbar (Haken im Menue, Zahl am Knopf).
   assert.doesNotMatch(tasksPage, /<details class="tasks-toolbar__secondary"/);
   assert.doesNotMatch(tasksCss, /tasks-toolbar__secondary/);
-  // Auf die ABSICHT prüfen, nicht auf die wörtliche Klassenkette: die stand
-  // hier als ein String und schlug fehl, sobald der Kopf einen weiteren
-  // Modifier bekam (`--narrow`, Critique 2026-08-13) - eine Zusicherung, die
-  // eine Reihenfolge festnagelt, prüft die Reihenfolge, nicht die Sache.
+  // Auf die ABSICHT prüfen, nicht auf die wörtliche Klassenkette (`--narrow`,
+  // Critique 2026-08-13).
   assert.match(tasksPage, /class="page-toolbar[^"]*\bpage-toolbar--wrap\b[^"]*\btasks-toolbar\b/);
 
-  // Ansichtswechsel bleibt im Kopf, Gruppierung wandert in die Filterzeile.
-  assert.match(tasksPage, /<div class="page-toolbar__actions">[\s\S]*id="view-toggle"[\s\S]*id="btn-bulk-select"/);
-  assert.match(tasksPage, /<div class="tasks-filters-row">[\s\S]*id="filter-bar"[\s\S]*id="group-mode-toggle"/);
-  assert.match(tasksCss, /\.tasks-filters-row\s*\{[\s\S]*display:\s*flex/);
+  const markup = tasksPage.slice(tasksPage.indexOf('class="page-toolbar page-toolbar--wrap tasks-toolbar"'),
+    tasksPage.indexOf('<div class="tasks-body">'));
+  assert.ok(markup.length > 200, 'der Aufgabenkopf ist nicht mehr auffindbar - der Guard misst nichts');
+  const actions = markup.slice(markup.indexOf('<div class="page-toolbar__actions">'));
+  // Ansicht, Filter und Menue stehen in DERSELBEN Zeile wie die Suche.
+  assert.match(actions, /id="view-toggle"[\s\S]*filterButtonHtml\(\{ id: 'tasks-filter-btn'[\s\S]*pageToolsMenuHtml\(\{ id: 'tasks-tools-menu'/);
+  // Keine losen Verwaltungsknoepfe mehr im Kopf - sie sind Menue-Eintraege.
+  for (const id of ['btn-bulk-select', 'btn-manage-categories', 'btn-manage-tags']) {
+    assert.doesNotMatch(tasksPage, new RegExp(`id="${id}"`), `#${id} steht wieder lose im Kopf`);
+  }
+  for (const action of ['bulk-select', 'toggle-history', 'manage-categories', 'manage-tags']) {
+    assert.match(tasksPage, new RegExp(`action: '${action}'`), `das Werkzeugmenue bietet "${action}" nicht an`);
+  }
+  assert.doesNotMatch(markup, /data-view="history"/, 'der Verlauf ist ein Menue-Schalter, keine dritte Ansicht im Segment');
+  // Die Chipzeile unter dem Kopf ist weg - ins Blatt, nicht versteckt.
+  assert.doesNotMatch(tasksPage, /tasks-filters-row|id="filter-panel"|id="filter-bar"/);
+  assert.doesNotMatch(tasksCss, /\.tasks-filters-row|\.filter-toggle-btn|\.filter-panel:not/);
+  assert.match(tasksPage, /openFilterSheet\(\{/, 'die Filter stehen im geteilten Filterblatt');
 
-  // [hidden] muss gegen display:flex/inline-flex gewinnen, sonst bleiben die in
-  // der Kanban-Ansicht ausgeblendeten Controls sichtbar.
-  assert.match(tasksCss, /\.tasks-filters-row \[hidden\]\s*\{[\s\S]*display:\s*none/);
+  // [hidden] muss gegen display:flex/inline-flex gewinnen, sonst bleiben die im
+  // Verlauf ausgeblendeten Controls (Suche, Filterknopf) sichtbar.
+  assert.match(tasksCss, /\.tasks-toolbar \[hidden\]\s*\{[\s\S]*display:\s*none/);
+});
+
+test('Notes follow the mobile header rule: chips inside the port, category management in the menu', () => {
+  const notesPage = read('../public/pages/notes.js');
+  // Die Chipreihe stand fest zwischen Kopf und Port und kostete dauerhaft 65px
+  // (A8). Sie ist jetzt das erste Kind des Ports und scrollt mit weg.
+  const port = notesPage.indexOf('<div class="notes-scroll page-scrollport">');
+  const chips = notesPage.indexOf('id="notes-filters"');
+  const grid = notesPage.indexOf('<div id="notes-grid"');
+  assert.ok(port > -1 && chips > port && grid > chips,
+    'die Chipreihe steht nicht als erstes Kind im Scrollport');
+  assert.match(notesPage, /class="notes-filters page-chip-row" id="notes-filters"/);
+  // „Kategorien verwalten" ist ein Menue-Eintrag, kein Kopfknopf.
+  assert.doesNotMatch(notesPage, /<button[^>]*notes-manage-categories/);
+  assert.match(notesPage, /pageToolsMenuHtml\(\{ id: 'notes-tools-menu'[\s\S]{0,160}action: 'manage-categories'/);
+  // Der Traeger behaelt die Klasse, an der die Shell bei Nur-lesen ausblendet.
+  assert.match(notesPage, /class="notes-manage-categories[^"]*"[\s\S]{0,60}pageToolsMenuHtml/);
 });
 
 test('Tasks and Notes expose every click target as a real control', () => {
@@ -6066,9 +6098,10 @@ test('Tasks and Notes expose every click target as a real control', () => {
 
   // Filter-Chips waren <span> ohne Tastaturzugang, während Dokumente und
   // Kontakte dieselbe .filter-chip-Klasse als <button aria-pressed> rendern.
-  assert.match(tasksPage, /function makeChip\(/);
-  assert.match(tasksPage, /chip\s*=\s*document\.createElement\('button'\)/);
-  assert.doesNotMatch(tasksPage, /className\s*=\s*'filter-chip[^']*';?[\s\S]{0,80}createElement\('span'\)/);
+  // Seit der Kopfregel mobil stehen sie im Filterblatt - als Buttons.
+  assert.match(tasksPage, /function filterChipHtml\(/);
+  assert.match(tasksPage, /return `<button type="button" class="filter-chip[\s\S]{0,160}aria-pressed="\$\{active\}"/);
+  assert.doesNotMatch(tasksPage, /<span[^>]*class="filter-chip/);
 
   // Titel öffnet die Aufgabe, Fortschrittsbalken klappt die Unteraufgaben auf,
   // Kanban-Titel öffnet die Karte — alle drei waren Divs.
@@ -6081,7 +6114,8 @@ test('Tasks and Notes expose every click target as a real control', () => {
 
   // Umschalter melden ihren Zustand nicht nur über Farbe.
   assert.match(tasksPage, /data-view="list"[\s\S]*aria-pressed=/);
-  assert.match(tasksPage, /data-mode="category" aria-pressed="true"/);
+  // Die Gruppierung ist eine Einfachauswahl im Blatt: radio mit aria-checked.
+  assert.match(tasksPage, /role="radiogroup"[\s\S]{0,400}role="radio"[\s\S]{0,120}aria-checked="\$\{on\}"/);
 });
 
 test('showToast is never called with an unsupported variant', () => {
@@ -6379,9 +6413,8 @@ test('hardening uses logical alignment for RTL-sensitive adapted controls', () =
   assert.match(pageSearch, /\.page-search__icon\s*\{[\s\S]*inset-inline-start:/);
   assert.match(notes, /\.note-card__pin\s*\{[\s\S]*inset-inline-end:/);
   // Das absolut positionierte Overflow-Panel (mit eigenen RTL-Insets) ist
-  // entfallen; die Filterzeile richtet ihre Gruppierungswahl jetzt über eine
-  // logische Property aus und braucht deshalb keine [dir=rtl]-Sonderregel.
-  assert.match(tasks, /\.tasks-filters__end\s*\{[\s\S]*margin-inline-start:\s*auto/);
+  // entfallen, seit 2026-09-26 auch die Filterzeile: Aufgaben richtet nichts
+  // mehr physisch aus und braucht deshalb keine [dir=rtl]-Sonderregel.
   assert.doesNotMatch(tasks, /margin-(left|right):\s*auto/);
 });
 
@@ -6437,7 +6470,9 @@ test('phase 3 Tasks bulk actions stay de-emphasized until tasks are selected', (
 
   assert.match(tasksPage, /bar\.hidden\s*=\s*!\(state\.bulkSelectMode && selected > 0\)/);
   assert.match(tasksPage, /bar\.classList\.toggle\('bulk-actions-bar--active',\s*selected > 0\)/);
-  assert.match(tasksPage, /toggleBtn\.setAttribute\('aria-pressed',\s*String\(state\.bulkSelectMode\)\)/);
+  // Der Schalter steht im Werkzeugmenue und meldet seinen Zustand als Haken
+  // (menuitemcheckbox), nicht mehr als aria-pressed eines Kopfknopfs.
+  assert.match(tasksPage, /syncPopoverMenuItem\([^;]*'bulk-select',\s*state\.bulkSelectMode\)/);
   assert.match(tasksCss, /\.bulk-actions-bar\[hidden\]\s*\{[\s\S]*display:\s*none/);
   assert.match(tasksCss, /\.bulk-actions-bar--active\s*\{/);
 });
@@ -9119,8 +9154,12 @@ test('remaining audited mobile controls use 48px touch targets', () => {
   // Regel diesen Knopf nicht und der Guard bliebe grün, während das Ziel
   // schrumpft.
   assertRuleUsesToken(read('../public/styles/filter-chip.css'), '.filter-chip', 'min-height', '--target-lg', '../public/styles/filter-chip.css');
-  assert.match(read('../public/pages/tasks.js'), /toggleBtn\.className\s*=\s*`filter-chip filter-toggle-btn/);
-  assert.doesNotMatch(tasks, /\.filter-toggle-btn\s*\{[^}]*min-height/);
+  // Seit der Kopfregel mobil (2026-09-26) ist der Filterknopf der geteilte
+  // `.page-filter-btn` - ein `.btn`, dessen Zielhoehe die Shell traegt. Die
+  // Kette dorthin: der Knopf kommt aus dem Helfer, und tasks.css setzt ihm
+  // keine eigene Hoehe.
+  assert.match(read('../public/pages/tasks.js'), /filterButtonHtml\(\{ id: 'tasks-filter-btn'/);
+  assert.doesNotMatch(tasks, /\.(?:filter-toggle-btn|page-filter-btn|tasks-toolbar__filter)\s*\{[^}]*(?:min-)?height/);
   // „Heute" (Kalender) holt seine 48px aus .btn - siehe die Begruendung beim
   // Budget-Zwilling im Guard darueber.
   assert.doesNotMatch(calendar, /\.cal-toolbar__today\s*\{[^}]*min-height/);

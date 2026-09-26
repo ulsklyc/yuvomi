@@ -5127,7 +5127,9 @@ test('Sonde 24 - spaeter Umbenennungskonflikt ersetzt keinen neuen Notizeditor',
     }, { firstName: renamedCategory, secondName: conflictingCategory });
     await gotoRoute(page, '/notes');
 
-    await page.click('#notes-manage-categories');
+    // Seit der Kopfregel mobil (2026-09-26) ein Eintrag im Werkzeugmenue.
+    await page.click('.notes-toolbar .page-tools-btn');
+    await page.click('#notes-tools-menu [data-action="manage-categories"]');
     await page.waitForSelector(`yuvomi-category-manager .cat-row[data-key="${categoryIds[0]}"]`);
     await page.click(`yuvomi-category-manager .cat-row[data-key="${categoryIds[0]}"] .cat-row__name`);
     await page.waitForSelector('#prompt-modal-input');

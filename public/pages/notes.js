@@ -14,6 +14,7 @@ import { splitKeepingLineEndings } from '/utils/markdown-checklist.js';
 import { renderMarkdownToolbar, wireMarkdownToolbar } from '/utils/markdown-toolbar.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
+import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { findPageFab } from '/utils/fab.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
 import { AVATAR_FALLBACK_COLOR } from '/utils/color.js';
@@ -237,17 +238,30 @@ export async function render(container, { user, signal }) {
       <div class="page-toolbar notes-toolbar">
         <h1 class="page-toolbar__title">${t('notes.title')}</h1>
         ${renderPageSearch({ id: 'notes-search', label: t('notes.searchPlaceholder'), placeholder: t('notes.searchPlaceholder'), value: state.filterQuery, clearLabel: t('common.searchClear'), className: 'notes-toolbar__search' })}
-        <button class="btn btn--secondary notes-manage-categories" id="notes-manage-categories" aria-label="${t('category.manageTitle')}">
-          <i data-lucide="tags" class="icon-md" aria-hidden="true"></i>
-          <span>${t('noteCategories.categories')}</span>
-        </button>
+        ${/* KATEGORIEN VERWALTEN STEHT IM WERKZEUGMENUE (Kopfregel mobil,
+              2026-09-26): am Desktop war es ein 131px-Textknopf neben der
+              Suche, mobil ein loses Icon - Verwaltung, die im Kopf so laut
+              stand wie die Suche (A8). Der Traeger behaelt die Klasse
+              `notes-manage-categories`: an ihr blendet die Shell den
+              Verwaltungsweg bei Nur-lesen aus (layout.css), auch wenn sich das
+              Recht ohne Neuladen aendert. */ ''}
+        ${readOnly() ? '' : `
+        <div class="notes-manage-categories notes-toolbar__tools">
+          ${pageToolsMenuHtml({ id: 'notes-tools-menu', label: t('common.moreActions'), items: [
+            { action: 'manage-categories', label: t('category.manageTitle'), icon: 'tags' },
+          ] })}
+        </div>`}
         <button class="btn btn--primary toolbar-new-btn" id="notes-add-btn" aria-label="${t('notes.addNoteLabel')}">
           <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
           <span class="toolbar-new-btn__label">${t('newLabel.notes')}</span>
         </button>
       </div>
-      <div class="notes-filters" id="notes-filters" hidden></div>
       <div class="notes-scroll page-scrollport">
+        <!-- DIE CHIPREIHE IST DAS ERSTE KIND DES PORTS (Kopfregel mobil,
+             2026-09-26). Zwischen Kopf und Port kostete sie dauerhaft 65px
+             (Port ab y=179 statt 114), die auch der Kopf-Kollaps nicht
+             zurueckholte (A8); hier scrollt sie mit dem Raster weg. -->
+        <div class="notes-filters page-chip-row" id="notes-filters" hidden></div>
         <div id="notes-grid" class="notes-grid" aria-busy="true">${renderSkeletonList({ rows: 5, lines: 3 })}</div>
       </div>
       <button class="page-fab" id="fab-new-note" aria-label="${t('notes.addNoteLabel')}" data-dock-label="${t('newLabel.notes')}">
@@ -317,8 +331,17 @@ export async function render(container, { user, signal }) {
   // #notes-add-btn ist per .toolbar-new-btn global ausgeblendet (FAB übernimmt),
   // bleibt aber als einheitliches Modul-Muster erhalten (frontend-audit 1.9).
   _container.querySelector('#notes-add-btn').addEventListener('click', addHandler);
-  _container.querySelector('#notes-manage-categories').addEventListener('click', () => {
-    if (!readOnly()) openNoteCategoryManager();
+  // Das Werkzeugmenue: Positionierung, Light-Dismiss und Pfeiltasten aus der
+  // geteilten Popover-Mechanik, der Klick ueber `data-action` am Kopf.
+  installPopoverMenus(_container);
+  _container.querySelector('.notes-toolbar')?.addEventListener('click', (e) => {
+    if (e.target.closest('.popover-menu__item[data-action="manage-categories"]') && !readOnly()) {
+      // Der Fokus steht auf einem Eintrag, den das Menue gerade versteckt hat;
+      // der Dialog gaebe ihn beim Schliessen dorthin zurueck und er fiele aufs
+      // Dokument. Also vorher auf den Knopf, der das Menue geoeffnet hat.
+      _container.querySelector('.notes-toolbar .page-tools-btn')?.focus();
+      openNoteCategoryManager();
+    }
   });
   findPageFab('fab-new-note').addEventListener('click', addHandler);
 

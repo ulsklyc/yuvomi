@@ -25,7 +25,10 @@ import '/components/tag-manager.js';
 import { findPageFab } from '/utils/fab.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { isSoloHousehold, hidesPrivacyControls } from '/utils/household.js';
-import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
+import { popoverMenuHtml, installPopoverMenus, pageToolsMenuHtml, syncPopoverMenuItem } from '/utils/popover-menu.js';
+import { filterButtonHtml, syncFilterButton, openFilterSheet } from '/utils/filter-sheet.js';
+import { toggleRowHtml } from '/settings/components.js';
+import { wireTablist } from '/utils/tablist.js';
 import { todayKey, parseLocalDateKey } from '/utils/date.js';
 import { makeSortable } from '/utils/sortable.js';
 import { zonedDateKey } from '/utils/timezone.js';
@@ -1259,7 +1262,14 @@ let state = {
   // nach Status, und ein gemeinsamer Speicher haette den Status "done" der
   // einen Ansicht in der anderen verschwinden lassen.
   collapsedKanbanCols: new Set(),
-  filterPanelOpen: false,
+  // Das offene Filterblatt (Modal-Panel), damit ein Filterwechsel von aussen
+  // - Tag an der Karte, geloeschte Kategorie - seine Chips nachzieht. `null`,
+  // solange keins offen ist; ein geschlossenes erkennt renderFilters am
+  // fehlenden isConnected.
+  filterSheet:     null,
+  // Aus welcher Ansicht der Verlauf geoeffnet wurde - das Menue schaltet ihn
+  // als Schalter, und „aus" fuehrt dorthin zurueck statt immer in die Liste.
+  viewBeforeHistory: 'list',
   bulkSelectMode:  false,
   selectedTaskIds: new Set(),
   searchQuery:     '',
@@ -3093,398 +3103,280 @@ function renderTaskList(container) {
   });
 }
 
-function makeRemoveSpan() {
-  const rm = document.createElement('span');
-  rm.className = 'filter-chip__remove';
-  rm.setAttribute('aria-hidden', 'true');
-  const icon = document.createElement('i');
-  icon.setAttribute('data-lucide', 'x');
-  icon.className = 'icon-sm';
-  rm.appendChild(icon);
-  return rm;
-}
-
 /**
- * Ein Filter-Chip. Immer ein <button> — die Chips schalten Filter, sind also
- * Bedienelemente und müssen fokussierbar sein und ihren Zustand melden.
- * Dokumente und Kontakte rendern dieselbe .filter-chip-Klasse ebenfalls als
- * Button mit aria-pressed; hier lag zuvor ein <span> ohne Tastaturzugang.
+ * Wie viele Filter gerade wirken - die ZAHL am Knopf „Filter (n)".
  *
- * pressed === null markiert Aktions-Chips (zuletzt verwendete Filter), die
- * keinen Ein/Aus-Zustand haben und daher kein aria-pressed tragen dürfen.
+ * Sie ersetzt die Chipzeile, die bis zur Kopfregel mobil (2026-09-26) unter
+ * dem Kopf stand und dort 54px kostete: der Zustand ist jetzt eine Zahl am
+ * Knopf, die Filter selbst stehen beschriftet im Blatt (Kalender-Muster).
+ *
+ * Im Kanban zaehlt der Statusfilter nicht mit: die Spalten SIND der Status,
+ * er wird dort weder gesendet noch angeboten, und eine Zahl, die ihn mitzaehlt,
+ * behauptete einen unsichtbaren Filter (Audit P3). „Geplante anzeigen" zaehlt
+ * dagegen mit, obwohl es die Liste erweitert statt sie einzuengen: auch das ist
+ * ein gesetzter Zustand, den man von aussen sehen muss - vorher trug ihn ein
+ * eigener Chip, jetzt nur noch diese Zahl.
  */
-function makeChip({ label, active = false, extraClass = '', pressed = undefined, withRemove = false }) {
-  const chip = document.createElement('button');
-  chip.type = 'button';
-  chip.className = `filter-chip${active ? ' filter-chip--active' : ''}${extraClass ? ` ${extraClass}` : ''}`;
-  if (pressed !== null) chip.setAttribute('aria-pressed', String(pressed ?? active));
-  // Das Entfernen-X ist aria-hidden (Dekor im selben Button); die Entfernen-
-  // Aktion muss deshalb in den Accessible Name des Chips selbst.
-  if (withRemove && label != null) {
-    chip.setAttribute('aria-label', t('tasks.removeFilter', { label }));
-  }
-  if (label != null) chip.appendChild(document.createTextNode(label));
-  if (withRemove) chip.appendChild(makeRemoveSpan());
-  return chip;
-}
-
-function renderFilters(container) {
-  const bar   = container.querySelector('#filter-bar');
-  const panel = container.querySelector('#filter-panel');
-  const toggleSlot = container.querySelector('#filter-toggle-slot');
-  if (!bar || !panel || !toggleSlot) return;
-
-  // Jedes Rendern tauscht die Chips aus. Stand der Fokus auf einem davon, fiele
-  // er danach aufs Dokument - und Escape erreichte das Panel nicht mehr, genau
-  // nachdem jemand darin einen Filter gewaehlt hat (#1373, Review). Also merken,
-  // WELCHER Chip es war, und ihn nach dem Rendern auf dem neuen Knoten setzen.
-  const focusBefore = rememberFilterFocus(document.activeElement, { bar, panel, toggleSlot });
-
-  const statusLabels   = STATUS_LABELS();
-  const priorityLabels = PRIORITY_LABELS();
-  // Im Kanban ist der Statusfilter unwirksam (die Spalten SIND der Status) und
-  // wird nicht als Chip gezeigt - daher auch nicht mitzählen, sonst behauptet
-  // "Filter N" einen unsichtbaren Filter (Audit P3).
-  const activeCount    = (state.viewMode === 'kanban' ? 0 : state.filters.status.length)
+function activeFilterCount() {
+  return (state.viewMode === 'kanban' ? 0 : state.filters.status.length)
     + state.filters.priority.length
     + state.filters.assigned_to.length
     + state.filters.category.length
-    + state.filters.tags.length;
+    + state.filters.tags.length
+    + (state.showFuture ? 1 : 0);
+}
 
-  // ---- Chip-Leiste: nur aktive Filter + Toggle-Button ----
-  bar.replaceChildren();
-
-  // Ein Chip je gewähltem Wert, in jeder Achse. Jeder trägt seinen eigenen
-  // Wert, damit das Entfernen genau diesen einen löst und nicht die ganze
-  // Auswahl (#671) - vorher gab es je Achse nur einen Wert und damit einen Chip.
-  if (state.viewMode !== 'kanban') {
-    state.filters.status.forEach((value) => {
-      const chip = makeChip({ label: statusLabels[value] ?? value, active: true, withRemove: true });
-      chip.dataset.filter = 'status';
-      chip.dataset.value = value;
-      bar.appendChild(chip);
-    });
+/**
+ * Die Eintraege des EINEN Werkzeugmenues im Kopf.
+ *
+ * Die Mehrfachauswahl gibt es nur in der Liste: im Brett ist ein Eintrag
+ * `disabled` statt weg, damit das Menue beim Ansichtswechsel nicht umspringt.
+ * Nur-lesen (#467) nimmt die schreibenden Eintraege ganz heraus - Auswahl
+ * fuehrt nur zur Sammelaktionsleiste, und die schreibt in jeder Spalte.
+ */
+function toolsMenuItems() {
+  const isList = state.viewMode === 'list';
+  const items = [];
+  if (!readOnly()) {
+    items.push({ action: 'bulk-select', label: t('tasks.bulkSelect'), icon: 'list-checks',
+      checked: state.bulkSelectMode, disabled: !isList });
   }
-  state.filters.priority.forEach((value) => {
-    const chip = makeChip({ label: priorityLabels[value] ?? value, active: true, withRemove: true });
-    chip.dataset.filter = 'priority';
-    chip.dataset.value = value;
-    bar.appendChild(chip);
-  });
-  // Aktive Personen-Filter — außer der eigenen ID, die deckt der dedizierte
-  // „Mir zugewiesen"-Chip ab (keine Doppel-Anzeige).
-  state.filters.assigned_to.forEach((value) => {
-    if (state.currentUserId != null && Number(value) === Number(state.currentUserId)) return;
-    const u = state.users.find((user) => user.id === Number(value));
-    const chip = makeChip({
-      label: u?.display_name ?? t('tasks.filterGroupPerson'),
-      active: true,
-      withRemove: true,
-    });
-    chip.dataset.filter = 'assigned_to';
-    chip.dataset.value = value;
-    bar.appendChild(chip);
-  });
-  // Ein Chip je gewähltem Tag. Jeder trägt seinen eigenen Wert, damit das
-  // Entfernen genau diesen einen löst und nicht die ganze Auswahl.
-  state.filters.category.forEach((value) => {
-    const chip = makeChip({ label: catLabel(value), active: true, withRemove: true });
-    chip.dataset.filter = 'category';
-    chip.dataset.value = value;
-    bar.appendChild(chip);
-  });
-  state.filters.tags.forEach((tag) => {
-    const chip = makeChip({ label: tag, active: true, withRemove: true });
-    chip.dataset.filter = 'tag';
-    chip.dataset.value = tag;
-    bar.appendChild(chip);
-  });
-
-  // "Mir zugewiesen" Schnellzugriff — nur sinnvoll bei mehreren Familienmitgliedern.
-  // Icon+Label bewusst identisch zum Kalender-Toggle (gleiche Fähigkeit, eine Gestalt).
-  if (state.users.length > 1 && state.currentUserId != null) {
-    const meActive = isAssignedToMe();
-    const meChip = makeChip({ label: null, active: meActive, extraClass: 'filter-chip--toggle' });
-    meChip.id = 'filter-assigned-me';
-    const meIcon = document.createElement('i');
-    meIcon.setAttribute('data-lucide', 'user');
-    meIcon.className = 'icon-sm';
-    meIcon.setAttribute('aria-hidden', 'true');
-    const meLabel = document.createElement('span');
-    meLabel.textContent = t('tasks.assignedToMe');
-    meChip.append(meIcon, meLabel);
-    if (meActive) meChip.appendChild(makeRemoveSpan());
-    bar.appendChild(meChip);
+  items.push({ action: 'toggle-history', label: t('tasks.historyView'), icon: 'history',
+    checked: state.viewMode === 'history' });
+  if (!readOnly()) {
+    items.push(
+      { separator: true },
+      { action: 'manage-categories', label: t('tasks.manageCategories'), icon: 'folder-tree' },
+      // Das Etiketten-Icon fuer die Tags, der Ordnerbaum fuer die Kategorien:
+      // die beiden Achsen sind bewusst getrennt, dieselbe Bildsprache haette
+      // sie wieder eingeebnet.
+      { action: 'manage-tags', label: t('tasks.manageTags'), icon: 'tags' },
+    );
   }
+  return items;
+}
 
-  // "Geplante anzeigen" Toggle-Chip — Icon+Label wie „Mir zugewiesen" (beide Toggles).
-  const futureChip = makeChip({ label: null, active: state.showFuture, extraClass: 'filter-chip--toggle' });
-  futureChip.id = 'filter-show-future';
-  const futureIcon = document.createElement('i');
-  futureIcon.setAttribute('data-lucide', 'calendar-clock');
-  futureIcon.className = 'icon-sm';
-  futureIcon.setAttribute('aria-hidden', 'true');
-  const futureLabel = document.createElement('span');
-  futureLabel.textContent = t('tasks.showFuture');
-  futureChip.append(futureIcon, futureLabel);
-  if (state.showFuture) {
-    futureChip.appendChild(makeRemoveSpan());
-  }
-  bar.appendChild(futureChip);
+/** Ein Filter-Chip im Blatt: Button mit aria-pressed, Wert am Knoten. */
+function filterChipHtml({ filter, value, label, active }) {
+  return `<button type="button" class="filter-chip filter-chip--sm${active ? ' filter-chip--active' : ''}"
+    data-filter="${esc(filter)}" data-value="${esc(String(value))}" aria-pressed="${active}">${esc(label)}</button>`;
+}
 
-  const toggleBtn = document.createElement('button');
-  toggleBtn.id = 'filter-toggle-btn';
-  // `filter-chip` trägt die Form, `filter-toggle-btn` nur noch die Abweichung:
-  // der Knopf stand mit einer eigenen, zeichengleichen Kopie derselben vierzehn
-  // Deklarationen daneben (siehe tasks.css) und war damit der vierte Chip, den
-  // die geteilte Datei eigentlich abgelöst hat.
-  toggleBtn.className = `filter-chip filter-toggle-btn${state.filterPanelOpen ? ' filter-toggle-btn--open' : ''}${activeCount > 0 ? ' filter-toggle-btn--active' : ''}`;
-  toggleBtn.setAttribute('aria-expanded', String(state.filterPanelOpen));
-  toggleBtn.setAttribute('aria-controls', 'filter-panel');
+/**
+ * Die Gruppen des Filterblatts, als `{ heading, html }` fuer openFilterSheet.
+ *
+ * Eine reine Funktion des Zustands: gemessen wird, WAS das Blatt anbietet,
+ * nicht wie es aufgeht (test:task-filters).
+ *
+ * - Zuletzt verwendet: die gemerkten Sets als Aktions-Chips (kein Ein/Aus,
+ *   deshalb ohne aria-pressed), zuerst, weil sie die schnellste Wahl sind.
+ * - Anzeigen: „Mir zugewiesen" und „Geplante anzeigen" als Schalter - die
+ *   beiden Chips, die vorher dauerhaft in der Zeile unter dem Kopf standen.
+ * - Gruppieren nach: nur in der Liste; das Brett gruppiert nach Status.
+ * - Status (nicht im Kanban, Audit A1-07), Prioritaet, Person, Kategorie
+ *   (D#1017), Tag: je Wert ein Chip, Mehrfachauswahl je Achse (#671).
+ */
+function filterSheetGroups() {
+  const groups = [];
+  const chipsHtml = (key, label, items) => `
+    <div class="filter-panel__chips" role="group" aria-label="${esc(label)}">
+      ${items.map((item) => filterChipHtml({
+        filter: key, value: item.value, label: item.label,
+        active: key === 'tag' ? hasTagFilter(item.value) : hasFilter(key, item.value),
+      })).join('')}
+    </div>`;
 
-  const iconWrap = document.createElement('i');
-  iconWrap.setAttribute('data-lucide', 'sliders-horizontal');
-  iconWrap.className = 'icon-sm';
-  iconWrap.setAttribute('aria-hidden', 'true');
-  toggleBtn.appendChild(iconWrap);
-
-  const label = document.createElement('span');
-  label.textContent = t('tasks.filterBtn');
-  toggleBtn.appendChild(label);
-
-  if (activeCount > 0) {
-    const badge = document.createElement('span');
-    badge.className = 'filter-toggle-btn__count';
-    badge.textContent = String(activeCount);
-    toggleBtn.appendChild(badge);
-  }
-
-  // In den festen Platz VOR der Leiste, nicht ans Ende der scrollenden Leiste
-  // (#1373): dort schob jeder gewaehlte Filter den Knopf weiter nach rechts aus
-  // dem sichtbaren Streifen, und das offene Panel hatte keinen Rueckweg mehr.
-  toggleSlot.replaceChildren(toggleBtn);
-
-  // ---- Zuletzt verwendete Filter als Quick-Chips ----
-  const statusLabelsMap   = STATUS_LABELS();
-  const priorityLabelsMap = PRIORITY_LABELS();
-  const recent = getRecentFilters();
-  recent.forEach((f) => {
+  const statusLabels = STATUS_LABELS();
+  const priorityLabels = PRIORITY_LABELS();
+  const recent = getRecentFilters().map((f) => {
     const parts = [];
     // Jeder Wert jeder Achse wird benannt: seit #671 kann ein gemerktes Set
     // "Hoch" UND "Mittel" enthalten, und ein Chip, der nur den ersten nennt,
-    // schaltete beim Klick mehr, als er behauptet.
-    f.status.forEach((v) => parts.push(statusLabelsMap[v] ?? v));
-    f.priority.forEach((v) => parts.push(priorityLabelsMap[v] ?? v));
+    // schaltete beim Klick mehr, als er behauptet. Die Tags gehoeren dazu,
+    // weil der Chip sie mitsetzt (#586).
+    f.status.forEach((v) => parts.push(statusLabels[v] ?? v));
+    f.priority.forEach((v) => parts.push(priorityLabels[v] ?? v));
     f.assigned_to.forEach((v) => {
       const u = state.users.find((user) => user.id === Number(v));
       if (u) parts.push(u.display_name);
     });
     f.category.forEach((v) => parts.push(catLabel(v)));
-    // Die Tags gehören in die Beschriftung, weil der Chip sie beim Klick
-    // mitsetzt: ohne sie hieße ein Chip „Offen" und schaltete zusätzlich
-    // Tag-Filter, die niemand am Chip ablesen kann (#586).
     parts.push(...f.tags);
-    if (!parts.length) return;
-    // Aktions-Chip (wendet ein Filter-Set an), kein Ein/Aus-Zustand → pressed:null.
-    const chip = makeChip({ label: parts.join(' · '), extraClass: 'filter-chip--recent', pressed: null });
-    chip.dataset.recentFilter = JSON.stringify(f);
-    bar.appendChild(chip);
-  });
-
-  if (window.lucide) {
-    window.lucide.createIcons({ el: bar });
-    window.lucide.createIcons({ el: toggleSlot });
-  }
-
-  // ---- Filter-Panel: Gruppen mit allen Optionen ----
-  panel.hidden = !state.filterPanelOpen;
-  panel.replaceChildren();
-
-  if (state.filterPanelOpen) {
-    // Im Kanban entfällt die Status-Gruppe: die Spalten übernehmen diese
-    // Achse bereits (Audit A1-07).
-    const groups = [
-      ...(state.viewMode !== 'kanban' ? [{
-        key: 'status',
-        label: t('tasks.filterGroupStatus'),
-        items: FILTER_STATUSES().map((s) => ({ value: s.value, label: s.label })),
-      }] : []),
-      {
-        key: 'priority',
-        label: t('tasks.filterGroupPriority'),
-        items: PRIORITIES().map((p) => ({ value: p.value, label: p.label })),
-      },
-    ];
-    if (state.users.length > 1) {
-      groups.push({
-        key: 'assigned_to',
-        label: t('tasks.filterGroupPerson'),
-        items: state.users.map((u) => ({ value: String(u.id), label: u.display_name })),
-      });
-    }
-    // Kategorie in beiden Ansichten: die Liste kann danach gruppieren, das
-    // Board nicht, weil seine Spalten schon der Status sind (D#1017). Die
-    // Beschriftung ist dieselbe wie im Formular, nicht ein fuenfter Wortlaut.
-    if (state.categories.length) {
-      groups.push({
-        key: 'category',
-        label: t('tasks.categoryLabel'),
-        items: state.categories.map((c) => ({ value: c.key, label: catLabel(c.key) })),
-      });
-    }
-    // Tags nur anbieten, wenn welche vergeben sind — ohne CalDAV-Spiegel und ohne
-    // eigene Vergabe bleibt die Gruppe sonst als leere Zeile stehen (#586).
-    if (state.allTags.length) {
-      groups.push({
-        key: 'tag',
-        label: t('tasks.filterGroupTag'),
-        items: state.allTags.map((entry) => ({ value: entry.tag, label: entry.tag })),
-      });
-    }
-
-    groups.forEach((group) => {
-      const section = document.createElement('div');
-      section.className = 'filter-panel__group';
-      section.setAttribute('role', 'group');
-      section.setAttribute('aria-label', group.label);
-
-      const heading = document.createElement('div');
-      heading.className = 'filter-panel__label';
-      heading.textContent = group.label;
-      section.appendChild(heading);
-
-      const row = document.createElement('div');
-      row.className = 'filter-panel__chips';
-
-      group.items.forEach((item) => {
-        // Jede Gruppe erlaubt Mehrfachauswahl (#671); die Tags unterscheiden
-        // sich nur darin, dass ihre Zugehörigkeit die Schreibweise ignoriert.
-        const isActive = group.key === 'tag'
-          ? hasTagFilter(item.value)
-          : hasFilter(group.key, item.value);
-        const chip = makeChip({ label: item.label, active: isActive, withRemove: isActive });
-        chip.dataset.filter = group.key;
-        chip.dataset.value = item.value;
-        row.appendChild(chip);
-      });
-
-      section.appendChild(row);
-      panel.appendChild(section);
+    return parts.length ? { set: f, label: parts.join(' · ') } : null;
+  }).filter(Boolean);
+  if (recent.length) {
+    groups.push({
+      heading: t('tasks.filterGroupRecent'),
+      html: `<div class="filter-panel__chips">${recent.map((r) => `
+        <button type="button" class="filter-chip filter-chip--sm filter-chip--recent"
+                data-recent-filter="${esc(JSON.stringify(r.set))}">${esc(r.label)}</button>`).join('')}</div>`,
     });
-
-    // Fusszeile: „Alle zuruecksetzen" am Anfang, das Schliessen am Ende.
-    const footer = document.createElement('div');
-    footer.className = 'filter-panel__footer';
-    if (activeCount > 0) {
-      const clearBtn = document.createElement('button');
-      clearBtn.className = 'filter-panel__clear';
-      clearBtn.id = 'filter-clear-all';
-      clearBtn.textContent = t('tasks.filterClearAll');
-      footer.appendChild(clearBtn);
-    }
-
-    // Ein Schliessen AM ENDE des Panels (#1373). Der Knopf oben ist der eine
-    // Ort, der das Panel oeffnet; mit vielen Personen, Kategorien und Tags
-    // wird es aber hoeher als der Bildschirm, und wer unten waehlt, sieht ihn
-    // nicht mehr. Kein Uebernehmen: jeder Chip wirkt sofort, der Knopf klappt
-    // nur zu.
-    const doneBtn = document.createElement('button');
-    doneBtn.type = 'button';
-    doneBtn.className = 'btn btn--secondary btn--sm filter-panel__done';
-    doneBtn.id = 'filter-panel-done';
-    doneBtn.textContent = t('tasks.filterPanelDone');
-    footer.appendChild(doneBtn);
-    panel.appendChild(footer);
-
-    if (window.lucide) window.lucide.createIcons({ el: panel });
   }
 
-  wireFilterChips(container);
-  wireFilterPanelDismiss(container, panel, toggleSlot);
-  restoreFilterFocus(focusBefore, { bar, panel, toggleSlot });
-}
-
-/**
- * Wo in Filterleiste, Knopfplatz oder Panel der Fokus stand, als Beschreibung
- * statt als Knoten - der Knoten ist nach dem Rendern weg. `null`, wenn er
- * woanders stand: dann faesst das Rendern ihn auch nicht an.
- */
-function rememberFilterFocus(active, { bar, panel, toggleSlot }) {
-  if (!active || typeof active !== 'object') return null;
-  const zone = [['panel', panel], ['bar', bar], ['slot', toggleSlot]]
-    .find(([, el]) => el.contains(active) && el !== active)?.[0];
-  if (!zone) return null;
-  return {
-    zone,
-    id: active.id || null,
-    filter: active.dataset?.filter ?? null,
-    value: active.dataset?.value ?? null,
-  };
-}
-
-/**
- * Setzt den Fokus auf den Nachfolger des gemerkten Chips. Gibt es ihn nicht mehr
- * (ein entfernter Filter-Chip der Leiste, ein zugeklapptes Panel), geht er an
- * den Filterknopf - der steht immer da und oeffnet und schliesst das Panel.
- */
-function restoreFilterFocus(before, { bar, panel, toggleSlot }) {
-  if (!before) return;
-  const root = { panel, bar, slot: toggleSlot }[before.zone];
-  let match = null;
-  if (before.filter) {
-    match = [...root.querySelectorAll('[data-filter]')]
-      .find((el) => el.dataset.filter === before.filter && el.dataset.value === before.value) ?? null;
-  } else if (before.id) {
-    match = root.querySelector(`#${before.id}`);
+  const showRows = [];
+  if (state.users.length > 1 && state.currentUserId != null) {
+    showRows.push(toggleRowHtml({ label: t('tasks.assignedToMe'), icon: 'user', checked: isAssignedToMe(),
+      attrs: { 'data-filter-mine': 'true' } }));
   }
-  (match ?? toggleSlot.querySelector('#filter-toggle-btn'))?.focus();
+  showRows.push(toggleRowHtml({ label: t('tasks.showFuture'), icon: 'calendar-clock', checked: state.showFuture,
+    attrs: { 'data-filter-future': 'true' } }));
+  groups.push({ heading: t('tasks.filterGroupShow'), html: showRows.join('') });
+
+  if (state.viewMode === 'list') {
+    const modes = [['category', 'tasks.categoryLabel', 'folder'], ['due', 'tasks.dueDateLabel', 'calendar-clock']];
+    groups.push({
+      heading: t('tasks.groupToggleLabel'),
+      html: `
+        <div class="segmented tasks-group-mode" id="group-mode-toggle" role="radiogroup" aria-label="${esc(t('tasks.groupToggleLabel'))}">
+          ${modes.map(([mode, key, icon]) => {
+            const on = state.groupMode === mode;
+            return `<button type="button" class="segmented__item${on ? ' is-active' : ''}" role="radio"
+                    data-tab-id="${mode}" aria-checked="${on}" tabindex="${on ? '0' : '-1'}">
+              <i data-lucide="${icon}" aria-hidden="true"></i>${esc(t(key))}</button>`;
+          }).join('')}
+        </div>`,
+    });
+  }
+
+  if (state.viewMode !== 'kanban') {
+    groups.push({ heading: t('tasks.filterGroupStatus'),
+      html: chipsHtml('status', t('tasks.filterGroupStatus'), FILTER_STATUSES().map((s) => ({ value: s.value, label: s.label }))) });
+  }
+  groups.push({ heading: t('tasks.filterGroupPriority'),
+    html: chipsHtml('priority', t('tasks.filterGroupPriority'), PRIORITIES().map((p) => ({ value: p.value, label: p.label }))) });
+  if (state.users.length > 1) {
+    groups.push({ heading: t('tasks.filterGroupPerson'),
+      html: chipsHtml('assigned_to', t('tasks.filterGroupPerson'), state.users.map((u) => ({ value: String(u.id), label: u.display_name }))) });
+  }
+  if (state.categories.length) {
+    groups.push({ heading: t('tasks.categoryLabel'),
+      html: chipsHtml('category', t('tasks.categoryLabel'), state.categories.map((c) => ({ value: c.key, label: catLabel(c.key) }))) });
+  }
+  // Tags nur, wenn welche vergeben sind - sonst stuende eine leere Gruppe da (#586).
+  if (state.allTags.length) {
+    groups.push({ heading: t('tasks.filterGroupTag'),
+      html: chipsHtml('tag', t('tasks.filterGroupTag'), state.allTags.map((entry) => ({ value: entry.tag, label: entry.tag }))) });
+  }
+  return groups;
 }
 
 /**
- * Schliesst das Filter-Panel und gibt den Fokus an den Knopf zurueck, der es
- * geoeffnet hat. `renderFilters` baut den Knopf neu, also muss der Fokus auf
- * den NEUEN - der alte haengt nach dem Rendern nirgends mehr.
- */
-function closeFilterPanel(container) {
-  if (!state.filterPanelOpen) return;
-  state.filterPanelOpen = false;
-  renderFilters(container);
-  container.querySelector('#filter-toggle-btn')?.focus();
-}
-
-/* Welche Panels ihre Escape-Verdrahtung schon tragen. Das Panel und der
- * Knopfplatz ueberleben jedes `renderFilters` (nur ihre Kinder werden
- * getauscht); ein Listener je Rendern stapelte sich also mit jedem Chip-Klick. */
-const filterPanelDismissWired = new WeakSet();
-
-/**
- * Escape schliesst das Panel, solange der Fokus in ihm oder auf seinem Knopf
- * steht (#1373) - wie die Suchleiste des Kalenders, das andere Bedienfeld, das
- * an Ort und Stelle aufklappt.
+ * Zieht den Zustand eines OFFENEN Blatts nach, ohne es neu zu bauen.
  *
- * KEIN SCHLIESSEN PER TIPP DANEBEN, obwohl der Melder es vorschlug. Die App
- * schliesst so nur SCHWEBENDE Ebenen (Popover-Menues, Datumswahl,
- * Schnellaktionen, Detail-Popover): sie verdecken, was darunter liegt, und
- * verschwinden, ohne dass sich etwas verschiebt. Dieses Panel steht IM Fluss
- * und schiebt die Liste nach unten. Ginge es beim Tipp auf eine Aufgabe zu,
- * rutschte die Liste unter dem Finger um die Panelhoehe nach oben, und der
- * Tipp traefe eine andere Zeile als die gemeinte. Die Zurueck-Geste bleibt aus
- * demselben Grund bei den Overlays (utils/overlay-history.js).
+ * Neu bauen hiesse: der gerade getippte Chip ist danach ein anderer Knoten,
+ * und der Fokus fiele aufs Dokument - genau der Fehler, den #1373 im alten
+ * Inline-Panel zweimal hatte. Also nur Klassen, `aria-pressed` und Haken.
  */
-function wireFilterPanelDismiss(container, panel, toggleSlot) {
-  if (filterPanelDismissWired.has(panel)) return;
-  filterPanelDismissWired.add(panel);
-  const onKeydown = (e) => {
-    if (e.key !== 'Escape' || !state.filterPanelOpen) return;
-    e.preventDefault();
-    e.stopPropagation();
-    closeFilterPanel(container);
-  };
-  panel.addEventListener('keydown', onKeydown);
-  toggleSlot.addEventListener('keydown', onKeydown);
-  panel.addEventListener('click', (e) => {
-    if (e.target.closest('#filter-panel-done')) closeFilterPanel(container);
+function syncFilterSheet(panel) {
+  if (!panel?.isConnected) return;
+  panel.querySelectorAll('[data-filter]').forEach((chip) => {
+    const on = chip.dataset.filter === 'tag'
+      ? hasTagFilter(chip.dataset.value)
+      : hasFilter(chip.dataset.filter, chip.dataset.value);
+    chip.classList.toggle('filter-chip--active', on);
+    chip.setAttribute('aria-pressed', String(on));
   });
+  const mine = panel.querySelector('[data-filter-mine]');
+  if (mine) mine.checked = isAssignedToMe();
+  const future = panel.querySelector('[data-filter-future]');
+  if (future) future.checked = state.showFuture;
+}
+
+/**
+ * Knopf und offenes Blatt auf den Filterzustand ziehen.
+ *
+ * Der Name bleibt aus der Zeit der Chipzeile: jeder Pfad, der einen Filter
+ * aendert (Tag an der Karte, Kategorie geloescht, gemerktes Set), ruft ihn
+ * schon. Er baut nichts mehr, er gleicht ab.
+ */
+function renderFilters(container) {
+  syncFilterButton(container?.querySelector?.('#tasks-filter-btn'), activeFilterCount());
+  if (state.filterSheet && !state.filterSheet.isConnected) state.filterSheet = null;
+  syncFilterSheet(state.filterSheet);
+}
+
+/**
+ * Das Filterblatt oeffnen - EIN Knopf im Kopf statt einer Chipzeile darunter.
+ *
+ * Ein Ansichtsblatt, kein Formular: jeder Chip und jeder Schalter wirkt sofort
+ * (utils/filter-sheet.js). Das alte Inline-Panel stand im Fluss, schob die
+ * Liste um seine Hoehe nach unten und lief am Desktop 1156px ueber einer
+ * 720px-Liste (A3 P2-8); Schliessen per Esc, Tipp daneben und Zurueck-Geste
+ * bringt das Blatt jetzt von der Modal-Schicht mit, den Fokus gibt sie an den
+ * Knopf zurueck.
+ */
+function openTaskFilters(container) {
+  const panel = openFilterSheet({
+    groups: filterSheetGroups(),
+    onChange: (input) => onFilterSheetChange(input, container),
+    onReset: () => { resetTaskFilters(container); },
+  });
+  if (!panel) return null;
+  state.filterSheet = panel;
+  panel.addEventListener('click', (e) => onFilterSheetClick(e, container));
+  const groupMode = panel.querySelector('#group-mode-toggle');
+  if (groupMode) {
+    wireTablist(groupMode, {
+      activeId: state.groupMode,
+      activeClass: 'is-active',
+      mode: 'select',
+      onChange: (mode) => {
+        state.groupMode = mode;
+        renderTaskList(container);
+      },
+    });
+  }
+  return panel;
+}
+
+/** Schalter im Blatt (Checkboxen der toggle-rows). */
+async function onFilterSheetChange(input, container) {
+  if (input.matches('[data-filter-mine]')) {
+    // „Mir zugewiesen" nimmt die eigene ID in den Personenfilter auf bzw.
+    // wieder heraus. Seit #671 eine Achse mit mehreren Werten: eine bereits
+    // gewaehlte zweite Person bleibt dabei stehen.
+    await toggleValueFilter('assigned_to', state.currentUserId, container);
+    return;
+  }
+  if (input.matches('[data-filter-future]')) {
+    state.showFuture = input.checked;
+    try { localStorage.setItem(SHOW_FUTURE_KEY, state.showFuture ? '1' : '0'); } catch {}
+    renderFilters(container);
+    await loadTasks(container);
+  }
+}
+
+/** Chips im Blatt: ein Wert je Achse an/aus, oder ein gemerktes Set. */
+async function onFilterSheetClick(e, container) {
+  const recent = e.target.closest('[data-recent-filter]');
+  if (recent) {
+    try {
+      state.filters = normalizeFilterSet(JSON.parse(recent.dataset.recentFilter));
+    } catch { return; }
+    renderFilters(container);
+    await loadTasks(container);
+    return;
+  }
+  const chip = e.target.closest('[data-filter]');
+  if (!chip) return;
+  if (chip.dataset.filter === 'tag') {
+    await toggleTagFilter(chip.dataset.value, container);
+    return;
+  }
+  await toggleValueFilter(chip.dataset.filter, chip.dataset.value, container);
+}
+
+/**
+ * „Alle Filter aufheben": alle Achsen leer, und auch „Geplante anzeigen" aus -
+ * sonst bliebe nach dem Aufheben eine Zahl am Knopf stehen, die das Blatt
+ * gerade weggenommen haben will.
+ */
+async function resetTaskFilters(container) {
+  state.filters = { status: [], priority: [], assigned_to: [], category: [], tags: [] };
+  state.showFuture = false;
+  try { localStorage.setItem(SHOW_FUTURE_KEY, '0'); } catch {}
+  renderFilters(container);
+  await loadTasks(container);
 }
 
 /* DIESES MODUL FUEHRT DIE ZAHL NICHT MEHR (#868).
@@ -3814,61 +3706,6 @@ function wireSwipeGestures(container) {
 // Event-Verdrahtung
 // --------------------------------------------------------
 
-function wireFilterChips(container) {
-  // Toggle-Button öffnet/schließt das Panel
-  container.querySelector('#filter-toggle-btn')?.addEventListener('click', () => {
-    state.filterPanelOpen = !state.filterPanelOpen;
-    renderFilters(container);
-    // Der Knopf ist gerade neu gebaut worden; ohne das stuende der Fokus
-    // danach auf dem Dokument statt auf dem Knopf, der ihn hatte.
-    container.querySelector('#filter-toggle-btn')?.focus();
-  });
-
-  // Alle Filter zurücksetzen
-  container.querySelector('#filter-clear-all')?.addEventListener('click', async () => {
-    state.filters = { status: [], priority: [], assigned_to: [], category: [], tags: [] };
-    renderFilters(container);
-    await loadTasks(container);
-  });
-
-  // "Geplante anzeigen" Toggle
-  container.querySelector('#filter-show-future')?.addEventListener('click', async () => {
-    state.showFuture = !state.showFuture;
-    try { localStorage.setItem(SHOW_FUTURE_KEY, state.showFuture ? '1' : '0'); } catch {}
-    renderFilters(container);
-    await loadTasks(container);
-  });
-
-  // "Mir zugewiesen" Toggle — nimmt die eigene ID in den Personen-Filter auf
-  // bzw. wieder heraus. Seit #671 eine Achse mit mehreren Werten: eine bereits
-  // gewählte zweite Person bleibt dabei stehen, statt still zu verschwinden.
-  container.querySelector('#filter-assigned-me')?.addEventListener('click', async () => {
-    await toggleValueFilter('assigned_to', state.currentUserId, container);
-  });
-
-  // Chip-Klicks (in Bar + Panel)
-  container.querySelectorAll('[data-filter]').forEach((chip) => {
-    chip.addEventListener('click', async () => {
-      const filter = chip.dataset.filter;
-      if (filter === 'tag') {
-        await toggleTagFilter(chip.dataset.value, container);
-        return;
-      }
-      await toggleValueFilter(filter, chip.dataset.value, container);
-    });
-  });
-
-  // Recent-Filter-Chips anwenden
-  container.querySelectorAll('[data-recent-filter]').forEach((chip) => {
-    chip.addEventListener('click', async () => {
-      try {
-        state.filters = normalizeFilterSet(JSON.parse(chip.dataset.recentFilter));
-      } catch { return; }
-      renderFilters(container);
-      await loadTasks(container);
-    });
-  });
-}
 
 /**
  * Alles am Seitenkopf, was von der gewaehlten Ansicht abhaengt - an EINER
@@ -3900,36 +3737,34 @@ function syncViewChrome(container) {
   // Wechsel - genau das, was @Kyrodan gemeldet hat. Das Lesemass haengt jetzt
   // wie im Kalender an der SEITE: die Wurzel ist `app-page--full` (kein Mass),
   // Liste und Verlauf holen sich die Lesebahn per `is-reading-measure` zurueck,
-  // ihre Zeilen und die Filterzeile kappen sich selbst daran (layout.css,
-  // `.app-page :is(.tasks-filters-row, ...)`), das Board bleibt ungekappt.
+  // ihre Zeilen kappen sich selbst daran (layout.css, Lesemass-Liste), das
+  // Board bleibt ungekappt. Das gilt auch fuer die Kopfregel mobil
+  // (2026-09-26): der Kopf wird NICHT --narrow, obwohl die Liste bei 720px
+  // endet - ein Kopf, der mit der Ansicht die Breite wechselt, ist genau der
+  // Sprung aus #1012 (DECISIONS.md §3).
   // Die Gegenrichtung - Seite auf Lesemass, Kopf freigeben - gibt es nicht:
   // PAGE-016 verlangt, dass ein Mass, das etwas kappt, im Kopf sichtbar ist.
   container.querySelector('.tasks-page')?.classList.toggle('is-reading-measure', !isKanbanMode());
 
-  // Suche, Filterleiste, Gruppierung und Sammelauswahl fragen alle nach
-  // AUFGABEN. Der Verlauf zeigt Vorgaenge - ein Statusfilter darueber waere
-  // eine Auswahl, die nichts veraendern kann.
+  // Suche, Filter und Sammelauswahl fragen alle nach AUFGABEN. Der Verlauf
+  // zeigt Vorgaenge - ein Statusfilter darueber waere eine Auswahl, die nichts
+  // veraendern kann. Die Gruppierung steht im Filterblatt und fragt dort beim
+  // Oeffnen selbst nach der Ansicht.
   const search = container.querySelector('.tasks-toolbar__search');
   if (search) search.hidden = isHistory;
-  const filtersRow = container.querySelector('.tasks-filters-row');
-  if (filtersRow) filtersRow.hidden = isHistory;
-  // Das aufgeklappte Filter-Panel ist ein GESCHWISTER der Zeile, kein Kind -
-  // die Zeile zu verstecken laesst es stehen, und dann schwebten Status- und
-  // Prioritaets-Chips ueber einer Liste von Vorgaengen.
-  const filterPanel = container.querySelector('#filter-panel');
-  if (filterPanel && isHistory) filterPanel.hidden = true;
-  const groupToggle = container.querySelector('#group-mode-toggle');
-  if (groupToggle) groupToggle.hidden = !isList;
-  const bulkSelectBtn = container.querySelector('#btn-bulk-select');
-  if (bulkSelectBtn) {
-    bulkSelectBtn.hidden = !isList;
-    if (!isList) {
-      state.bulkSelectMode = false;
-      state.selectedTaskIds.clear();
-      bulkSelectBtn.classList.remove('btn--active');
-      bulkSelectBtn.setAttribute('aria-pressed', 'false');
-    }
+  const filterBtn = container.querySelector('#tasks-filter-btn');
+  if (filterBtn) filterBtn.hidden = isHistory;
+  if (!isList) {
+    state.bulkSelectMode = false;
+    state.selectedTaskIds.clear();
   }
+  // Das Menue wird nicht neu gebaut (Fokus, offener Zustand): Haken und
+  // Sperre der beiden Eintraege, die an der Ansicht haengen, zieht es nach.
+  const menu = container.querySelector('#tasks-tools-menu');
+  syncPopoverMenuItem(menu, 'toggle-history', isHistory);
+  syncPopoverMenuItem(menu, 'bulk-select', state.bulkSelectMode);
+  const bulkItem = menu?.querySelector('.popover-menu__item[data-action="bulk-select"]');
+  if (bulkItem) bulkItem.disabled = !isList;
   // Die Auswahl zu LEEREN raeumt die Leiste nicht weg: sie haengt an
   // `bar.hidden`, das nur updateBulkActionsBar setzt. Ohne diesen Aufruf blieb
   // „Als erledigt markieren / Ablegen / Loeschen" ueber dem Verlauf stehen -
@@ -3947,53 +3782,83 @@ function wireViewToggle(container) {
   if (!toggle) return;
   syncViewChrome(container);
   toggle.querySelectorAll('[data-view]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      state.viewMode = btn.dataset.view;
-      localStorage.setItem('yuvomi-tasks-view', state.viewMode);
-      renderFilters(container);
-      syncViewChrome(container);
+    btn.addEventListener('click', () => setViewMode(container, btn.dataset.view));
+  });
+}
 
-      // Skeleton-Flash: einen Frame Render-Feedback geben, dann Ansicht aufbauen
-      const listEl = container.querySelector('#task-list');
-      if (listEl) listEl.style.opacity = '0.4';
-      const restore = () => {
-        const el = container.querySelector('#task-list');
-        if (el) { el.style.transition = 'opacity 0.15s'; el.style.opacity = ''; }
-      };
-      requestAnimationFrame(() => {
-        // Der Verlauf holt Vorgaenge, die beiden anderen Ansichten Aufgaben -
-        // zwei Abfragen, und der Umschalter darf nicht die falsche fahren. Ein
-        // gemeinsames loadTasks() haette den Verlauf mit einer Aufgabenliste
-        // befuellt, die er gar nicht anzeigt.
-        if (state.viewMode === 'history') {
-          loadHistory(container).finally(restore);
-          return;
-        }
-        // Task-Menge neu laden: der Kanban lädt alle Stati (kein status-Param),
-        // die Liste wendet den Statusfilter wieder an (Audit A1-07/P3). Fällt bei
-        // Netzfehler auf ein reines Re-Render der vorhandenen Aufgaben zurück.
-        loadTasks(container).catch(() => renderTaskList(container)).finally(() => {
-          updateBulkActionsBar(container);
-          restore();
-        });
-      });
+/**
+ * Ansicht wechseln - aus dem Segment (Liste/Kanban) und aus dem Menue
+ * (Verlauf), ueber EINEN Weg, damit Merker, Kopf und Abfrage nie auseinander-
+ * laufen.
+ */
+function setViewMode(container, mode) {
+  if (mode === state.viewMode) return;
+  if (mode === 'history') state.viewBeforeHistory = state.viewMode;
+  state.viewMode = mode;
+  localStorage.setItem('yuvomi-tasks-view', state.viewMode);
+  renderFilters(container);
+  syncViewChrome(container);
+
+  // Skeleton-Flash: einen Frame Render-Feedback geben, dann Ansicht aufbauen
+  const listEl = container.querySelector('#task-list');
+  if (listEl) listEl.style.opacity = '0.4';
+  const restore = () => {
+    const el = container.querySelector('#task-list');
+    if (el) { el.style.transition = 'opacity 0.15s'; el.style.opacity = ''; }
+  };
+  requestAnimationFrame(() => {
+    // Der Verlauf holt Vorgaenge, die beiden anderen Ansichten Aufgaben -
+    // zwei Abfragen, und der Umschalter darf nicht die falsche fahren. Ein
+    // gemeinsames loadTasks() haette den Verlauf mit einer Aufgabenliste
+    // befuellt, die er gar nicht anzeigt.
+    if (state.viewMode === 'history') {
+      loadHistory(container).finally(restore);
+      return;
+    }
+    // Task-Menge neu laden: der Kanban lädt alle Stati (kein status-Param),
+    // die Liste wendet den Statusfilter wieder an (Audit A1-07/P3). Fällt bei
+    // Netzfehler auf ein reines Re-Render der vorhandenen Aufgaben zurück.
+    loadTasks(container).catch(() => renderTaskList(container)).finally(() => {
+      updateBulkActionsBar(container);
+      restore();
     });
   });
 }
 
-function wireGroupToggle(container) {
-  const toggle = container.querySelector('#group-mode-toggle');
-  if (!toggle) return;
-  toggle.querySelectorAll('.group-toggle__btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      state.groupMode = btn.dataset.mode;
-      toggle.querySelectorAll('.group-toggle__btn').forEach((b) => {
-        const on = b.dataset.mode === state.groupMode;
-        b.classList.toggle('group-toggle__btn--active', on);
-        b.setAttribute('aria-pressed', String(on));
-      });
-      renderTaskList(container);
-    });
+/**
+ * Das Werkzeugmenue und der Filterknopf im Kopf. Die Menue-Eintraege tragen
+ * `data-action`; ein Listener am Kopf reicht (das Panel liegt im Top-Layer,
+ * haengt im DOM aber im Kopf - ein Klick darin steigt dorthin auf).
+ */
+function wireToolbar(container) {
+  const toolbar = container.querySelector('.tasks-toolbar');
+  if (!toolbar) return;
+  toolbar.addEventListener('click', (e) => {
+    if (e.target.closest('#tasks-filter-btn')) {
+      openTaskFilters(container);
+      return;
+    }
+    const item = e.target.closest('.popover-menu__item[data-action]');
+    if (!item || item.disabled) return;
+    // Der Fokus steht auf einem Eintrag, den das Menue gerade versteckt hat.
+    // Ein Dialog (Kategorien, Tags) gaebe ihn beim Schliessen dorthin zurueck,
+    // und er fiele aufs Dokument - also vorher auf den Menueknopf.
+    toolbar.querySelector('.page-tools-btn')?.focus();
+    switch (item.dataset.action) {
+      case 'toggle-history':
+        setViewMode(container, state.viewMode === 'history' ? (state.viewBeforeHistory || 'list') : 'history');
+        break;
+      case 'bulk-select':
+        toggleBulkSelect(container);
+        break;
+      case 'manage-categories':
+        if (!readOnly()) openTaskCategoryManager(container);
+        break;
+      case 'manage-tags':
+        if (!readOnly()) openTagManager(container);
+        break;
+      default:
+    }
   });
 }
 
@@ -4029,23 +3894,22 @@ function updateBulkActionsBar(container) {
   }
 }
 
-function wireBulkSelect(container) {
-  const toggleBtn = container.querySelector('#btn-bulk-select');
-  if (!toggleBtn) return;
+/**
+ * Mehrfachauswahl an/aus - ein Schalter im Werkzeugmenue (menuitemcheckbox),
+ * vorher ein loser Kopfknopf mit aria-pressed. Den Zustand traegt der Haken im
+ * Menue; sichtbar ist er ausserdem an den Auswahlkaestchen jeder Zeile.
+ */
+function toggleBulkSelect(container) {
   // Die Mehrfachauswahl existiert nur fuer die Sammelaktionsleiste, und die
   // schreibt in jeder ihrer sechs Spalten. Ohne sie waere sie eine Auswahl
   // ohne Verb.
-  if (readOnly()) return;
-
-  toggleBtn.addEventListener('click', () => {
-    state.bulkSelectMode = !state.bulkSelectMode;
-    if (!state.bulkSelectMode) {
-      state.selectedTaskIds.clear();
-    }
-    toggleBtn.classList.toggle('btn--active', state.bulkSelectMode);
-    toggleBtn.setAttribute('aria-pressed', String(state.bulkSelectMode));
-    loadTasks(container);
-  });
+  if (readOnly() || state.viewMode !== 'list') return;
+  state.bulkSelectMode = !state.bulkSelectMode;
+  if (!state.bulkSelectMode) {
+    state.selectedTaskIds.clear();
+  }
+  syncPopoverMenuItem(container.querySelector('#tasks-tools-menu'), 'bulk-select', state.bulkSelectMode);
+  loadTasks(container);
 }
 
 function wireBulkCheckboxes(container) {
@@ -4602,21 +4466,17 @@ export async function render(container, { user }) {
           className: 'tasks-toolbar__search page-toolbar__center',
         })}
         <div class="page-toolbar__actions">
-          <!-- ICON PLUS LABEL, wie beim Geschwister-Umschalter in der Filterreihe
-               (#group-mode-toggle, ~60 Zeilen tiefer). tasks.css:143 sagt ueber
-               den Label-Verlust ausdruecklich „Der Ansichts-Umschalter im Kopf
-               bekommt sie mit; er ist dasselbe Bauteil" - nur trug er gar kein
-               Label, das haette fallen koennen. Die Regel lief hier ins Leere,
-               und uebrig blieben drei stumme Glyphen (Critique 2026-08-28, P1:
-               ein Kanban-Rechteck und ein Verlaufs-Pfeil sind kein geteiltes
-               Vokabular). Unter 640px faellt das Label ueber die vorhandene
-               Regel weg, mobil bleibt also die Icon-Form - iOS-Kanon.
-               Die drei EINZELNEN Knoepfe daneben behalten ihre reine Icon-Form:
-               ihre Namen sind Verben („Kategorien verwalten"), und ein
-               aria-label als sichtbaren Text weiterzureichen verbietet
-               DESIGN.md. Damit trennt jetzt auch der Text, was vorher nur die
-               Behaelterform andeutete: benannte Ansichten in der Gruppe,
-               unbenannte Werkzeuge daneben. -->
+          <!-- KOPFREGEL MOBIL (2026-09-26): unter dem Large Title EINE Zeile -
+               Such-Icon, Ansicht, „Filter (n)" und EIN Werkzeugmenue, wie in
+               den Dokumenten. Vorher standen hier sechs lose Knoepfe (Liste,
+               Kanban, Verlauf, Mehrfachauswahl, Kategorien, Tags), die Suche
+               fiel dadurch allein in eine dritte Zeile, und darunter kam noch
+               eine Chipzeile: Kopf 176px, erste Aufgabe bei y=287 (A3 P1-2).
+               Die Chipzeile ist ins Filterblatt gewandert - "Offen", "Mir
+               zugewiesen", "Geplante" und die Gruppierung stehen dort
+               beschriftet, die ZAHL am Knopf sagt, dass etwas gesetzt ist
+               (Kalender-Muster). Der Verlauf ist keine dritte Ansicht der
+               Aufgaben, sondern eine Liste von Vorgaengen: er steht im Menue. -->
           <div class="group-toggle group-toggle--icons" id="view-toggle" role="group" aria-label="${t('tasks.viewToggleLabel')}">
             <button type="button" class="group-toggle__btn ${isKanban || isHistory ? '' : 'group-toggle__btn--active'}" data-view="list"
                     title="${t('tasks.listView')}" aria-label="${t('tasks.listView')}" aria-pressed="${!isKanban && !isHistory}">
@@ -4628,35 +4488,13 @@ export async function render(container, { user }) {
               <i data-lucide="columns" class="icon-md group-toggle__icon" aria-hidden="true"></i>
               <span class="group-toggle__label">${t('tasks.kanbanView')}</span>
             </button>
-            <button type="button" class="group-toggle__btn ${isHistory ? 'group-toggle__btn--active' : ''}" data-view="history"
-                    title="${t('tasks.historyView')}" aria-label="${t('tasks.historyView')}" aria-pressed="${isHistory}">
-              <i data-lucide="history" class="icon-md group-toggle__icon" aria-hidden="true"></i>
-              <span class="group-toggle__label">${t('tasks.historyView')}</span>
-            </button>
           </div>
-          ${/* DREI WERKZEUGE, DIE ALLE SCHREIBEN (#467). Sammelauswahl fuehrt
-                zur Sammelaktionsleiste, die beiden Verwalter legen Kategorien
-                und Etiketten an, benennen um und loeschen. Keins davon zeigt
-                einen Zustand an, den ein Nur-lesen-Nutzer vermissen wuerde -
-                Kategorien und Etiketten stehen als Filter im Blatt und an den
-                Karten. */ ''}
+          ${filterButtonHtml({ id: 'tasks-filter-btn', count: activeFilterCount(), showLabel: true, className: 'tasks-toolbar__filter' })}
+          ${/* Alles, was die Seite VERWALTET statt zeigt, steht beschriftet
+                im Menue (documents-tools-btn). Die schreibenden Eintraege
+                fehlen bei Nur-lesen (#467), der Verlauf bleibt: er zeigt nur. */ ''}
+          ${pageToolsMenuHtml({ id: 'tasks-tools-menu', label: t('common.moreActions'), items: toolsMenuItems() })}
           ${readOnly() ? '' : `
-          <button class="btn btn--ghost btn--icon" id="btn-bulk-select"
-                  title="${t('tasks.bulkSelect')}" aria-label="${t('tasks.bulkSelect')}" aria-pressed="false">
-            <i data-lucide="list-checks" class="icon-lg" aria-hidden="true"></i>
-          </button>
-          <button class="btn btn--icon btn--ghost" id="btn-manage-categories"
-                  aria-label="${t('tasks.manageCategories')}" title="${t('tasks.manageCategories')}">
-            <i data-lucide="folder-tree" class="icon-lg" aria-hidden="true"></i>
-          </button>`}
-          <!-- Der Tag-Verwalter bekommt das Etiketten-Icon, die Kategorien den
-               Ordnerbaum: die beiden Achsen sind bewusst getrennt, und dieselbe
-               Bildsprache für beide hätte genau das wieder eingeebnet. -->
-          ${readOnly() ? '' : `
-          <button class="btn btn--icon btn--ghost" id="btn-manage-tags"
-                  aria-label="${t('tasks.manageTags')}" title="${t('tasks.manageTags')}">
-            <i data-lucide="tags" class="icon-lg" aria-hidden="true"></i>
-          </button>
           <button class="btn btn--primary toolbar-new-btn" id="btn-new-task" style="gap:var(--space-1)"
                   aria-label="${t('tasks.newTask')}">
             <i data-lucide="plus" class="icon-lg" aria-hidden="true"></i> <span class="toolbar-new-btn__label">${t('newLabel.tasks')}</span>
@@ -4665,36 +4503,6 @@ export async function render(container, { user }) {
       </div>
 
       <div class="tasks-body">
-        <div class="tasks-filters-row">
-          <!-- Der Filterknopf steht VOR der Chip-Leiste, nicht in ihr (#1373):
-               die Leiste scrollt auf dem Telefon seitlich, und jeder gewaehlte
-               Filter schob den Knopf als letztes Kind aus dem sichtbaren
-               Streifen - das offene Panel liess sich nicht mehr schliessen. -->
-          <div class="tasks-filters__start" id="filter-toggle-slot"></div>
-          <div class="tasks-filters" id="filter-bar" role="group" aria-label="${t('tasks.filterBtn')}"></div>
-          <div class="tasks-filters__end">
-            <!-- Icon PLUS Label, nicht Icon ODER Label: unter 640px faellt das
-                 Label weg (Label-Verlust-Regel, tasks.css), und dann traegt das
-                 Icon allein. Das aria-label steht deshalb IMMER da - der
-                 zugaengliche Name darf nicht an einer Media-Query haengen. -->
-            <div class="group-toggle" id="group-mode-toggle" role="group"
-                 aria-label="${t('tasks.groupToggleLabel')}">
-              <button type="button" class="group-toggle__btn group-toggle__btn--active"
-                      data-mode="category" aria-pressed="true"
-                      aria-label="${t('tasks.categoryLabel')}">
-                <i data-lucide="folder" class="group-toggle__icon" aria-hidden="true"></i>
-                <span class="group-toggle__label">${t('tasks.categoryLabel')}</span>
-              </button>
-              <button type="button" class="group-toggle__btn"
-                      data-mode="due" aria-pressed="false"
-                      aria-label="${t('tasks.dueDateLabel')}">
-                <i data-lucide="calendar-clock" class="group-toggle__icon" aria-hidden="true"></i>
-                <span class="group-toggle__label">${t('tasks.dueDateLabel')}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-        <div class="filter-panel" id="filter-panel" hidden></div>
         ${readOnly() ? '' : `
         <div class="bulk-actions-bar" id="bulk-actions-bar" hidden>
           <span class="bulk-actions-bar__count" id="bulk-count"></span>
@@ -4805,18 +4613,14 @@ export async function render(container, { user }) {
   }
 
   // UI verdrahten
+  installPopoverMenus(container);
   wireViewToggle(container);
-  wireGroupToggle(container);
+  wireToolbar(container);
   wireNewTaskBtn(container);
   wireTaskList(container);
-  wireBulkSelect(container);
   wireBulkCheckboxes(container);
   wireBulkActions(container);
   wireTagBadgeFilter(container);
-  container.querySelector('#btn-manage-categories')
-    ?.addEventListener('click', () => openTaskCategoryManager(container));
-  container.querySelector('#btn-manage-tags')
-    ?.addEventListener('click', () => openTagManager(container));
   renderFilters(container);
   // Im Verlauf holt renderTaskList den Bestand selbst nach - er steckt nicht in
   // `/tasks`, und sein Ladefehler ist ein eigener.
@@ -4894,10 +4698,13 @@ export const __test = {
   // Gemerkte Filter: der Vertrag ist, dass Lesen und Schreiben AUSEINANDER
   // gehen - sonst schriebe das Bereinigen sich fest (siehe getRecentFilters).
   getRecentFilters, storedRecentFilters, saveRecentFilter,
-  // Filterleiste und -panel als Verhalten (#1373): wo der Knopf landet, und
-  // dass Escape und „Fertig" das Panel wirklich schliessen - samt der
-  // Verdrahtung, die `renderFilters` selbst anhaengt.
-  renderFilters,
+  // Kopf und Filterblatt (Kopfregel mobil, 2026-09-26): was das Menue und
+  // das Blatt anbieten, welche Zahl der Knopf zeigt, und dass ein Filter-
+  // wechsel ein OFFENES Blatt nachzieht, ohne seine Knoten zu tauschen (der
+  // Fokus bleibt auf dem getippten Chip - die Lehre aus #1373). Der Klick-
+  // und Schalterweg im Blatt steht mit hier, weil er die Verdrahtung ist.
+  renderFilters, activeFilterCount, toolsMenuItems, filterSheetGroups, syncFilterSheet,
+  onFilterSheetClick, onFilterSheetChange, resetTaskFilters,
   // Die Frische der Referenzlisten ist nur verhaltensgetrieben pruefbar: sie
   // haengt daran, WIE die Antwort kam, nicht daran, dass eine kam.
   refreshTags,
