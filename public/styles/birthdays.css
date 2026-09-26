@@ -360,6 +360,17 @@
 /* --------------------------------------------------------
  * Modal
  * -------------------------------------------------------- */
+/* DIE DIALOGE HAENGEN UNTER document.body, NICHT UNTER .birthdays-page
+ * (components/modal.js). --module-accent stand nur an der Seitenwurzel; im
+ * Dialog war es leer, jedes color-mix() darauf ungueltig - die Bildflaeche
+ * des Editors stand ohne Hintergrund da (Critique 2026-09-26, Beifang), die
+ * Initialen in reinem Primaertext, die Haken des Imports im Systemblau.
+ * Dasselbe Muster wie `.document-form` in documents.css. */
+.birthday-modal,
+.bd-import {
+  --module-accent: var(--module-birthdays);
+}
+
 .birthday-avatar-editor {
   width: 84px;
   height: 84px;
@@ -491,14 +502,6 @@
   font-size: var(--text-sm);
 }
 
-.birthday-modal__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
-}
-
 .birthday-modal__footer-actions {
   display: flex;
   gap: var(--space-3);
@@ -536,13 +539,6 @@
 /* --------------------------------------------------------
  * Import aus Kontakten (#518)
  * -------------------------------------------------------- */
-.birthdays-toolbar__import {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  white-space: nowrap;
-}
-
 .bd-import__intro {
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
@@ -625,6 +621,13 @@
   color: var(--module-accent, var(--module-birthdays));
 }
 
+/* Wie `.vcard-import-row__bday svg` in contacts.css: das `<svg>` bringt 24px
+ * mit, die fruehere `i`-Regel griff nie. */
+.bd-import-row__check svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
 /* DER IMPORT-DIALOG HAENGT UNTER document.body, NICHT UNTER .birthdays-page
  * (components/modal.js). --module-accent ist nur an der Seitenwurzel gesetzt,
  * im Dialog also leer: das Badge hatte keine Flaeche, und seine Tinte stand
@@ -672,32 +675,3 @@
   font-size: var(--text-sm);
 }
 
-.bd-import__footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  /* Umbruch statt Quetschen - Begruendung an `.modal-panel__footer`
-   * (layout.css, #872). */
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
-}
-
-@media (max-width: 639px) {
-  /* Icon-only: der Button trägt sein Label via aria-label weiter.
-   * DIE LABEL-VERLUST-REGEL (Runde 6, Phase 3b): er wechselt dabei in die
-   * Icon-Form seiner Familie - quadratisch auf `--target-base`, die Kapsel wird
-   * damit zum Kreis. Das bloße Zusammenziehen des Innenabstands ließ ihn als
-   * 50x48-Oval zurück, also in einer Form, die es sonst nirgends gibt. */
-  .birthdays-toolbar__import span {
-    display: none;
-  }
-
-  .birthdays-toolbar__import {
-    width: var(--target-base);
-    height: var(--target-base);
-    padding: 0;
-    flex-shrink: 0;
-    justify-content: center;
-  }
-}

@@ -10,6 +10,7 @@ import { wireCategoryScopeHelp } from '/components/category-manager.js';
 import { stagger, vibrate, scheduleUndoableDelete, wireScrollFade } from '/utils/ux.js';
 import { t } from '/i18n.js';
 import { esc, renderMarkdownLight } from '/utils/html.js';
+import { rowActionHtml } from '/utils/row-action.js';
 import { splitKeepingLineEndings } from '/utils/markdown-checklist.js';
 import { renderMarkdownToolbar, wireMarkdownToolbar } from '/utils/markdown-toolbar.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -557,6 +558,21 @@ function notesEmptyStateHtml(isFiltered) {
   });
 }
 
+/**
+ * Wie der Screenreader eine Notiz an ihren Kartenknoepfen nennt: der Titel,
+ * sonst die erste Textzeile ohne Markdown-Zeichen, sonst "Notiz". Zwanzig
+ * Knoepfe, die alle "Notiz loeschen" heissen, sind fuer ihn einer.
+ */
+export function noteName(note) {
+  const title = String(note?.title || '').trim();
+  if (title) return title;
+  const line = String(note?.content || '').split('\n')
+    .map((l) => l.replace(/^\s*(?:#{1,6}\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+|>\s*)/, '').replace(/[*_`~]/g, '').trim())
+    .find(Boolean);
+  if (!line) return t('notes.viewNote');
+  return line.length > 40 ? `${line.slice(0, 40).trimEnd()}…` : line;
+}
+
 function renderNoteCard(note) {
   // KEINE INITIALEN AUF EINER 16px-SCHEIBE (Initialen-Schwelle-Regel).
   //
@@ -595,14 +611,11 @@ function renderNoteCard(note) {
                fokussierbar. Ohne diesen Button gäbe es für Tastatur- und
                Screenreader-Nutzung keinen Weg, eine Notiz zu öffnen. Analog zur
                Inline-Aktion auf der Aufgaben-Karte. -->
-          <button class="note-card__open" data-action="open" data-id="${note.id}"
-                  aria-label="${t('notes.openNote')}">
+          <button type="button" class="note-card__open" data-action="open" data-id="${note.id}"
+                  aria-label="${esc(t('notes.openNamed', { name: noteName(note) }))}">
             <i data-lucide="maximize-2" class="icon-sm" aria-hidden="true"></i>
           </button>
-          ${readOnly() ? '' : `
-          <button class="note-card__delete" data-action="delete" data-id="${note.id}" aria-label="${t('notes.deleteLabel')}">
-            <i data-lucide="trash-2" class="icon-sm" aria-hidden="true"></i>
-          </button>`}
+          ${readOnly() ? '' : rowActionHtml({ icon: 'trash-2', tone: 'danger', action: 'delete', className: 'note-card__delete', label: t('common.deleteNamed', { name: noteName(note) }), attrs: { 'data-id': note.id } })}
         </div>
       </div>
     </div>
@@ -821,9 +834,12 @@ function openNoteModal({ mode, note = null }) {
       </div>
 
       <div class="modal-panel__footer modal-panel__footer--plain note-modal__footer">
-        ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="note-modal-delete" style="margin-right:auto">${t('common.delete')}</button>` : ''}
+        ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="note-modal-delete" style="margin-right:auto">
+          <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
+        </button>` : ''}
         <button type="button" class="btn btn--secondary" id="note-modal-cancel" data-editor-only>${t('common.cancel')}</button>
         <button type="button" class="btn btn--primary" id="note-modal-save" data-editor-only>${isEdit ? t('common.save') : t('common.create')}</button>
+        ${isEdit ? `<button type="button" class="btn btn--primary" id="note-modal-edit" data-reader-only>${t('common.edit')}</button>` : ''}
       </div>
     </div>`;
 
@@ -851,11 +867,17 @@ function openNoteModal({ mode, note = null }) {
       const readPane    = panel.querySelector('[data-pane="read"]');
       const editPane    = panel.querySelector('[data-pane="edit"]');
       const editorOnly  = [...panel.querySelectorAll('[data-editor-only]')];
+      const readerOnly  = [...panel.querySelectorAll('[data-reader-only]')];
       const titleEl     = document.getElementById('shared-modal-title');
       const modeTabs    = [...panel.querySelectorAll('.note-mode-switch .sub-tab')];
       const viewTitle   = panel.querySelector('#note-title');
       const viewContent = panel.querySelector('#note-content');
       const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function syncFooter(view) {
+        editorOnly.forEach((el) => { el.style.display = view === 'read' ? 'none' : ''; });
+        readerOnly.forEach((el) => { el.style.display = view === 'read' ? '' : 'none'; });
+      }
 
       function animatePane(pane) {
         if (reduceMotion) return;
@@ -879,7 +901,10 @@ function openNoteModal({ mode, note = null }) {
         // beiden Modi stehen: zuvor verschwand die Fußzeile im Lese-Modus
         // komplett, wodurch die geöffnete Notiz keine einzige Objektaktion mehr
         // anbot — anders als das Aufgaben-Modal, das Löschen inline führt.
-        editorOnly.forEach((el) => { el.style.display = view === 'read' ? 'none' : ''; });
+        // Im Lese-Modus steht rechts "Bearbeiten" als Primaerknopf: sonst war
+        // "Loeschen" die einzige und damit lauteste Fussaktion (Critique
+        // 2026-09-26) - die zerstoerende Handlung als Hauptweg.
+        syncFooter(view);
         modeTabs.forEach((b) => {
           const on = b.dataset.view === view;
           b.classList.toggle('sub-tab--active', on);
@@ -928,7 +953,10 @@ function openNoteModal({ mode, note = null }) {
       });
 
       // Initialen Footer-Zustand an die Startansicht angleichen.
-      editorOnly.forEach((el) => { el.style.display = initialView === 'read' ? 'none' : ''; });
+      syncFooter(initialView);
+      panel.querySelector('#note-modal-edit')?.addEventListener('click', () => {
+        setView('edit', { focusField: true });
+      });
       viewTitle.addEventListener('input', syncHeaderTitle);
 
       panel.querySelector('#note-modal-delete')?.addEventListener('click', () => {

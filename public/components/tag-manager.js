@@ -21,6 +21,7 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { rowActionHtml } from '/utils/row-action.js';
 
 /**
  * Haengt an die Erfolgsmeldung an, was liegen blieb (#830).
@@ -117,7 +118,7 @@ class TagManagerElement extends HTMLElement {
                    value="${esc(tag)}" maxlength="64" autocomplete="off"
                    aria-label="${esc(t('tasks.tagRenameLabel', { tag }))}">
             <button type="submit" class="btn btn--primary btn--sm">${esc(t('common.save'))}</button>
-            <button type="button" class="btn btn--ghost btn--sm" data-cancel>${esc(t('common.cancel'))}</button>
+            <button type="button" class="btn btn--secondary btn--sm" data-cancel>${esc(t('common.cancel'))}</button>
           </form>
         </li>`;
     }
@@ -130,7 +131,7 @@ class TagManagerElement extends HTMLElement {
             <button type="button" class="btn btn--danger btn--sm" data-delete-confirm="${esc(tag)}">
               ${esc(t('common.delete'))}
             </button>
-            <button type="button" class="btn btn--ghost btn--sm" data-cancel>${esc(t('common.cancel'))}</button>
+            <button type="button" class="btn btn--secondary btn--sm" data-cancel>${esc(t('common.cancel'))}</button>
           </div>
         </li>`;
     }
@@ -142,14 +143,8 @@ class TagManagerElement extends HTMLElement {
                 title="${esc(t('tasks.tagRenameLabel', { tag }))}">${esc(tag)}</button>
         <span class="cat-row__count">${esc(t('tasks.tagUsageCount', { count }))}</span>
         <div class="cat-row__actions">
-          <button type="button" class="btn btn--icon btn--ghost btn--sm" data-rename-start="${esc(tag)}"
-                  aria-label="${esc(t('tasks.tagRenameLabel', { tag }))}">
-            <i data-lucide="pencil" class="icon-sm" aria-hidden="true"></i>
-          </button>
-          <button type="button" class="btn btn--icon btn--ghost btn--sm" data-delete-start="${esc(tag)}"
-                  aria-label="${esc(t('tasks.tagDeleteLabel', { tag }))}">
-            <i data-lucide="trash-2" class="icon-sm" aria-hidden="true"></i>
-          </button>
+          ${rowActionHtml({ icon: 'pencil', label: t('tasks.tagRenameLabel', { tag }), attrs: { 'data-rename-start': tag } })}
+          ${rowActionHtml({ icon: 'trash-2', tone: 'danger', label: t('tasks.tagDeleteLabel', { tag }), attrs: { 'data-delete-start': tag } })}
         </div>
       </li>`;
   }

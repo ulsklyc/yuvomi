@@ -4,6 +4,8 @@ import { stagger, scheduleUndoableDelete } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { t, formatDate, parseDateInput, isDateInputValid, getLocale, formatUnit } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { rowActionHtml } from '/utils/row-action.js';
+import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { todayKey } from '/utils/date.js';
 import { setNavBadge, BIRTHDAY_BADGE_DAYS } from '/utils/nav-badges.js';
@@ -437,12 +439,8 @@ export function birthdayItemHtml(birthday) {
         : `<div class="list-row__main">${hauptspalte}</div>`}
       ${ro ? '' : `
       <div class="row-actions birthday-item__actions">
-        <button class="row-action" type="button" data-action="edit" data-id="${birthday.id}" aria-label="${t('common.edit')}">
-          <i data-lucide="pencil" aria-hidden="true"></i>
-        </button>
-        <button class="row-action row-action--danger" type="button" data-action="delete" data-id="${birthday.id}" aria-label="${t('common.delete')}">
-          <i data-lucide="trash-2" aria-hidden="true"></i>
-        </button>
+        ${rowActionHtml({ icon: 'pencil', action: 'edit', label: t('common.editNamed', { name: birthday.name }), attrs: { 'data-id': birthday.id } })}
+        ${rowActionHtml({ icon: 'trash-2', tone: 'danger', action: 'delete', label: t('common.deleteNamed', { name: birthday.name }), attrs: { 'data-id': birthday.id } })}
       </div>`}
     </article>
     </div>`;
@@ -548,8 +546,15 @@ function wireBirthdaySwipe(host) {
 }
 
 /**
- * Der Import-Knopf im Kopf - als eigene Funktion, weil er ZWEI Rechtefragen
- * traegt und nur eine davon bisher gestellt wurde.
+ * Das Werkzeugmenue im Kopf mit dem Import - als eigene Funktion, weil der
+ * Import ZWEI Rechtefragen traegt und nur eine davon bisher gestellt wurde.
+ *
+ * EIN MENUE STATT EINES TEXTKNOPFS (Critique 2026-09-26, Runde 5): am Desktop
+ * stand "Aus Kontakten importieren" als 219px-Sekundaerknopf neben dem 139px
+ * breiten Primaerknopf - die Gewichtung stand kopf -, mobil als loses
+ * Download-Icon. Verwalten gehoert ins EINE Werkzeugmenue des Kopfs
+ * (`pageToolsMenuHtml`, Vorbild Dokumente), wie in Kontakten und Notizen.
+ * Ohne Import gibt es nichts zu verwalten und damit kein Menue.
  *
  * `POST /birthdays/import` LEGT GEBURTSTAGE AN UND LIEST KONTAKTE. Der
  * Pfad-Guard des Servers misst den Pfad als `calendar`
@@ -564,10 +569,13 @@ function wireBirthdaySwipe(host) {
  */
 function importActionHtml() {
   if (readOnly() || moduleAccess('contacts') === 'none') return '';
-  return `
-          <button class="btn btn--secondary birthdays-toolbar__import" id="birthdays-import-btn" type="button" aria-label="${t('birthdays.importButton')}">
-            <i data-lucide="download" aria-hidden="true"></i><span>${t('birthdays.importButton')}</span>
-          </button>`;
+  return pageToolsMenuHtml({
+    id: 'birthdays-tools-menu',
+    label: t('common.moreActions'),
+    items: [
+      { action: 'import-contacts', label: t('birthdays.importButton'), icon: 'download' },
+    ],
+  });
 }
 
 function renderPage() {
@@ -622,8 +630,12 @@ function bindEvents() {
   // Den FAB blendet CSS aus (html[data-module-readonly]); der Handler bleibt
   // trotzdem gesperrt - ausgeblendet ist nicht unerreichbar.
   findPageFab('fab-new-birthday').addEventListener('click', () => openBirthdayModal({ mode: 'create' }));
-  _container.querySelector('#birthdays-import-btn')?.addEventListener('click', () => {
-    if (!readOnly()) openImportModal();
+  // Werkzeugmenue: der Eintrag laeuft ueber data-action (popover-menu.js
+  // schliesst das Panel in der Capture-Phase, bevor der Dialog aufgeht).
+  installPopoverMenus(_container);
+  _container.querySelector('.birthdays-toolbar')?.addEventListener('click', (e) => {
+    const item = e.target.closest('.popover-menu__item[data-action="import-contacts"]');
+    if (item && !readOnly()) openImportModal();
   });
 
   // Deep-Link aus dem Kontakt-Import („Zu Geburtstagen"): Kandidaten-Modal direkt
@@ -858,8 +870,10 @@ function openBirthdayModal({ mode, birthday = null }) {
           ${renderBirthdayReminderSection(birthday)}`,
           { open: isEdit && (!!birthday?.name_day || !!birthday?.notes || reminderOpensAdvanced(birthday)) })}
         <div class="birthday-modal__hint">${t('birthdays.calendarHint')}</div>
-        <div class="birthday-modal__footer">
-          ${isEdit ? `<button class="btn btn--danger" id="bd-delete">${t('common.delete')}</button>` : '<div></div>'}
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="bd-delete" style="margin-right:auto">
+            <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
+          </button>` : '<div></div>'}
           <div class="birthday-modal__footer-actions">
             <button class="btn btn--secondary" type="button" id="bd-cancel">${t('common.cancel')}</button>
             <button class="btn btn--primary" type="button" id="bd-save">${isEdit ? t('common.save') : t('common.create')}</button>
@@ -1083,7 +1097,7 @@ async function openImportModal() {
         <span class="sr-only" role="status" aria-live="polite" id="bd-import-status"></span>
         ${listHtml}
         ${withoutHtml}
-        <div class="bd-import__footer">
+        <div class="modal-panel__footer modal-panel__footer--plain">
           <button class="btn btn--secondary" type="button" id="bd-import-cancel">${t('common.cancel')}</button>
           <button class="btn btn--primary" type="button" id="bd-import-submit" disabled>${t('birthdays.importSubmit', { count: 0 })}</button>
         </div>

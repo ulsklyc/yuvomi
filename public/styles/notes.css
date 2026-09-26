@@ -584,6 +584,10 @@
 .note-card__delete {
   width: var(--target-base);
   height: var(--target-base);
+  /* Loeschen traegt seit Runde 5 die geteilte `.row-action` (48px-Minimum);
+   * auf der Karte gilt fuer beide Knoepfe dasselbe Mass wie fuer die Nadel. */
+  min-width: var(--target-base);
+  min-height: var(--target-base);
   border-radius: var(--radius-full);
   background: var(--note-action-bg);
   border: none;

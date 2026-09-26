@@ -671,11 +671,11 @@ function taskRowHtml(task) {
       ${ro ? '' : `
       <div class="list-row__actions housekeeping-task__actions">
         <button class="row-action" type="button" data-edit-task="${esc(task.id)}"
-                aria-label="${esc(t('housekeeping.editTask'))}">
+                aria-label="${esc(t('common.editNamed', { name: task.name }))}">
           <i data-lucide="edit-2" class="icon-md" aria-hidden="true"></i>
         </button>
         <button class="row-action row-action--danger" type="button" data-delete-task="${esc(task.id)}"
-                aria-label="${esc(t('housekeeping.deleteTask'))}">
+                aria-label="${esc(t('common.deleteNamed', { name: task.name }))}">
           <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
         </button>
       </div>`}
@@ -1331,7 +1331,7 @@ function openVisitReportModal(visit, content = null, { onRefresh = null } = {}) 
         </dl>
         ${footerAction ? `
         <div class="modal-panel__footer modal-panel__footer--plain">
-          <button class="btn btn--ghost" type="button" data-action="close-modal">${esc(t('common.cancel'))}</button>
+          <button class="btn btn--secondary" type="button" data-action="close-modal">${esc(t('common.cancel'))}</button>
           ${footerAction}
         </div>` : ''}
       </div>
@@ -1372,11 +1372,11 @@ function renderStaff(content) {
         <span>${esc(item.phone || item.email || '')}</span>
       </button>
       ${readOnly() ? `
-      <button class="btn btn--secondary btn--icon" type="button" data-open-worker="${item.id}"
+      <button class="row-action" type="button" data-open-worker="${item.id}"
               aria-label="${esc(t('housekeeping.openWorkerProfile'))}: ${esc(item.display_name)}">
         <i data-lucide="id-card" aria-hidden="true"></i>
       </button>` : `
-      <button class="btn btn--secondary btn--icon" type="button" data-edit-worker="${item.id}" aria-label="${esc(t('common.edit'))}">
+      <button class="row-action" type="button" data-edit-worker="${item.id}" aria-label="${esc(t('common.editNamed', { name: item.display_name }))}">
         <i data-lucide="edit-2" aria-hidden="true"></i>
       </button>`}
     </article>

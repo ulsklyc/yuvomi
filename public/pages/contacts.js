@@ -809,8 +809,10 @@ function renderContactItem(c) {
   }
 
   // Primäre, stets sichtbare Zeilenaktion: Anrufen (falls Telefon vorhanden).
+  // Der Name nennt die Person: zwoelf Zeilen, die alle "Anrufen" heissen, sind
+  // fuer einen Screenreader eine Zeile.
   const callBtn = c.phone
-    ? `<a href="tel:${esc(c.phone)}" data-phone-raw="${esc(c.phone)}" class="row-action row-action--success" aria-label="${t('contacts.callLabel')}">
+    ? `<a href="tel:${esc(c.phone)}" data-phone-raw="${esc(c.phone)}" class="row-action row-action--success" aria-label="${esc(t('contacts.callNamed', { name: c.name }))}">
          <i data-lucide="phone" aria-hidden="true"></i>
        </a>`
     : '';
@@ -849,7 +851,7 @@ function renderContactItem(c) {
       <div class="row-actions contact-item__actions">
         ${callBtn}
         <button type="button" class="row-action contact-more-menu__trigger"
-                popovertarget="${menuId}" aria-label="${t('contacts.moreActions')}">
+                popovertarget="${menuId}" aria-label="${esc(t('common.moreActionsNamed', { name: c.name }))}">
           <i data-lucide="more-horizontal" aria-hidden="true"></i>
         </button>
         <div class="contact-more-menu__panel" id="${menuId}" popover role="menu">
@@ -1293,7 +1295,7 @@ function buildContactForm({ mode, contact = null }) {
              value="${esc(row.label)}" placeholder="${t('contacts.mvLabelPlaceholder')}"
              aria-label="${t('contacts.mvLabel')}"${mvLocked(kind) ? ' readonly' : ''}>
       ${mvLocked(kind) ? '' : `<button type="button" class="row-action row-action--danger" data-mv-remove ${isFirst ? 'hidden' : ''}
-              aria-label="${t('contacts.mvRemove')}">
+              aria-label="${esc(t('common.removeNamed', { name: t(kind === 'phone' ? 'contacts.phoneLabel' : 'contacts.emailLabel') }))}">
         <i data-lucide="x" class="icon-sm" aria-hidden="true"></i>
       </button>`}
     </div>`;
@@ -1395,8 +1397,8 @@ function buildContactForm({ mode, contact = null }) {
     ${advancedSection(advancedFieldsHtml, { open: advancedOpen })}
 
     <div class="modal-panel__footer contact-modal__footer">
-      ${isEdit && !contact.family_user_id ? `<button class="btn btn--danger btn--icon" id="cm-delete" aria-label="${t('contacts.deleteLabel')}">
-        <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
+      ${isEdit && !contact.family_user_id ? `<button type="button" class="btn btn--danger-outline" id="cm-delete" style="margin-right:auto">
+        <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
       </button>` : '<div></div>'}
       <div class="contact-modal__footer-actions">
         <button class="btn btn--secondary" id="cm-cancel">${t('common.cancel')}</button>
@@ -1761,7 +1763,7 @@ function openImportSelectionModal(named, skipped) {
         </div>
         <div class="vcard-import__list">${named.map(importSelectionRowHtml).join('')}</div>
         ${skippedHtml}
-        <div class="vcard-import__footer">
+        <div class="modal-panel__footer modal-panel__footer--plain">
           <button class="btn btn--secondary" type="button" id="vcard-import-cancel">${t('common.cancel')}</button>
           <button class="btn btn--primary" type="button" id="vcard-import-submit">${t('contacts.importSubmit', { count: 0 })}</button>
         </div>

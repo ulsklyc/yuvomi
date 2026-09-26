@@ -649,6 +649,14 @@ html:has(.contacts-page.is-selecting) {
   color: var(--module-birthdays, var(--module-accent));
 }
 
+/* Das Icon selbst: Lucide ersetzt das `<i>` durch ein `<svg>` mit 24px aus
+ * seinen Attributen - die fruehere Regel `.vcard-import-row__bday i` griff nie,
+ * und die Torte stand 6px ueber ihren 18px-Rahmen hinaus. */
+.vcard-import-row__bday svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
 /* Schon vorhanden: Zuruecknehmen-Muster (tokens.css, #1230) statt
  * `opacity: 0.72`. Das Badge sagt den Zustand; auf der vertieften Flaeche
  * nimmt es die naechste Stufe, sonst verschwaende seine Pille im Grund. */
@@ -684,17 +692,6 @@ html:has(.contacts-page.is-selecting) {
   border-top: 1px solid var(--color-border-subtle);
   color: var(--color-text-tertiary);
   font-size: var(--text-sm);
-}
-
-.vcard-import__footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  /* Umbruch statt Quetschen - Begruendung an `.modal-panel__footer`
-   * (layout.css, #872). */
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
 }
 
 /* Mehrwert-Editor im Kontakt-Modal (Audit R2, A2-11): Wert + optionales Label
