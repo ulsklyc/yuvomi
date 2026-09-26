@@ -643,6 +643,10 @@ async function seite(modules, { search = '', items = [artikel()], lists = [LISTE
   };
   const c = {
     replaceChildren() { html = ''; },
+    // Nach den Daten raeumt render() alles ausser der Kuechen-Leiste einzeln
+    // ab (die Leiste bleibt fuer die View Transition eingehaengt); das
+    // Skelett traegt keinen FAB, das gesammelte Markup bleibt aussagekraeftig.
+    children: [],
     insertAdjacentHTML(_pos, markup) { html += markup; },
     querySelector: (sel) => { gefragt.push(sel); return knoten[sel] ?? null; },
     querySelectorAll: () => [],

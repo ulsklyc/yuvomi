@@ -21,6 +21,11 @@
  *  4. DIE SHEET-EINFAHRT HEBT 24px, NICHT 40 %.
  *  5. swapPage (utils/view-transition.js): Tausch im Callback, Kopf benannt
  *     und danach wieder frei, ohne API ein direkter Tausch.
+ *  6. DIE KUECHEN-LEISTE STEHT IM NEUEN BILD. Der Browser nimmt das neue Bild
+ *     gleich nach dem synchronen Teil von render() auf. Setzt eine Kuechen-
+ *     Seite ihre Leiste erst nach einem `await` ein, fehlt sie dort: die
+ *     Leiste blendete beim Wechsel Mahlzeiten -> Einkauf aus und kam nach den
+ *     Daten zurueck (in der sichtbaren Pane gemessen, Integration Runde 3).
  *
  * Ausfuehren: node --test test/test-motion.js
  */
@@ -299,4 +304,24 @@ test('swapPage: ohne API, verdeckt, unter reduzierter Bewegung oder beim Kaltsta
       delete globalThis.matchMedia;
     }
   }
+});
+
+/** Quelltext ohne Kommentare - ein "Daten-await" in einem Kommentar ist kein Warten. */
+function stripComments(src) {
+  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+}
+
+test('jede Kuechen-Seite setzt ihre Leiste vor dem ersten await ein', () => {
+  const offenders = [];
+  for (const page of ['meals', 'recipes', 'shopping', 'pantry']) {
+    const src = stripComments(readFileSync(new URL(`../public/pages/${page}.js`, import.meta.url), 'utf8'));
+    const start = src.indexOf('export async function render(');
+    assert.ok(start >= 0, `${page}.js: render() nicht gefunden - der Guard liest nichts mehr`);
+    const body = src.slice(start);
+    const bar = body.indexOf('renderKitchenTabsBar(');
+    const wait = body.search(/(^|[^\w-])await\s/m);
+    assert.ok(bar >= 0, `${page}.js: render() setzt keine Kuechen-Leiste ein`);
+    if (wait >= 0 && wait < bar) offenders.push(`${page}.js: erstes await vor renderKitchenTabsBar()`);
+  }
+  assert.deepEqual(offenders, [], offenders.join('\n'));
 });

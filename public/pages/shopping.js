@@ -3544,6 +3544,12 @@ export async function render(container, { user, signal: routeSignal = null } = {
       </div>
     </div>
   `);
+  // Die Kuechen-Leiste gehoert in den SYNCHRONEN Teil des Aufbaus: das neue
+  // Bild der View Transition wird direkt nach ihm aufgenommen (router.js,
+  // swap). Kam sie erst nach den Daten, fehlte sie dort - die Leiste blendete
+  // beim Wechsel Mahlzeiten -> Einkauf aus und sprang nach dem Laden zurueck,
+  // statt zu stehen wie in den drei Geschwister-Tabs (Integration Runde 3).
+  const kitchenBar = renderKitchenTabsBar(container, '/shopping');
   state.itemsError = null;
   try {
     // loadCategories() und loadLists() fangen selbst; der äußere catch ist das
@@ -3569,7 +3575,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
     state.listsError = err;
   }
 
-  container.replaceChildren();
+  // Alles ausser der Leiste abraeumen: sie bleibt eingehaengt, damit ihre
+  // Kapsel weitergleitet und der waagrechte Scrollstand nicht zurueckspringt.
+  [...container.children].forEach((child) => { if (child !== kitchenBar) child.remove(); });
   container.insertAdjacentHTML('beforeend', `
     <div class="shopping-page page-measure--narrow">
       <h1 class="sr-only">${t('nav.shopping')}</h1>
@@ -3603,7 +3611,6 @@ export async function render(container, { user, signal: routeSignal = null } = {
     </div>
   `);
 
-  renderKitchenTabsBar(container, '/shopping');
   renderTabs(container);
   wireTabBar(container);
   renderListContent(container);
