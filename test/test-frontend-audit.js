@@ -6755,6 +6755,69 @@ test('phase 4 opens search from More sheet in a single handoff', () => {
   assert.match(routerSource, /requestAnimationFrame\(\(\) => \{\s*openSearch\(\);/);
 });
 
+test('⌘K bei offener Suche: kein zweiter Focus-Trap, und Schliessen gibt den Fokus an den Ausloeser zurueck', () => {
+  // Das Kuerzel gilt auch aus einem Eingabefeld heraus - also auch aus dem
+  // Suchfeld selbst. Lief openSearch() dann ein zweites Mal, merkte es sich
+  // das Suchfeld als Ausloeser und haengte einen zweiten Trap an, den
+  // closeSearch() nie mehr abnimmt. Gefahren werden die ECHTEN Funktionen aus
+  // router.js (initSearch), mit Attrappen fuer das, was sie anfassen.
+  const routerSource = read('../public/router.js');
+  const fn = (name) => {
+    const start = routerSource.indexOf(`  function ${name}(`);
+    assert.ok(start > 0, `${name} nicht gefunden - der Test liest router.js nicht mehr`);
+    return routerSource.slice(start, routerSource.indexOf('\n  }\n', start) + 4);
+  };
+  const listeners = [];
+  const classes = new Set();
+  const overlay = {
+    classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c) },
+    addEventListener: (type, h) => listeners.push({ type, h }),
+    removeEventListener: (type, h) => {
+      const i = listeners.findIndex((l) => l.type === type && l.h === h);
+      if (i >= 0) listeners.splice(i, 1);
+    },
+  };
+  const doc = { activeElement: null };
+  const input = { value: '', focus() { doc.activeElement = input; }, select() {} };
+  const trigger = { name: 'Suche in der Seitenleiste' };
+  const returned = [];
+  let pushes = 0;
+  const env = {
+    overlay, input, document: doc,
+    results: { replaceChildren() {}, removeAttribute() {} },
+    window: {},
+    setTimeout: (f) => f(),
+    clearTimeout: () => {},
+    pushOverlay: () => { pushes += 1; return pushes; },
+    dropOverlay: () => {},
+    setOverlayInteractive: () => {},
+    renderSearchHint: () => {},
+    setStatus: () => {},
+    createFocusTrap: () => () => {},
+    returnFocus: (el) => returned.push(el),
+  };
+  const make = new Function(...Object.keys(env), `
+    let _searchTrapHandler = null;
+    let lastFocusedBeforeSearch = null;
+    let searchOverlayToken = null;
+    let searchTimer = null;
+    ${fn('openSearch')}
+    ${fn('closeSearch')}
+    return { openSearch, closeSearch };`);
+  const { openSearch, closeSearch } = make(...Object.values(env));
+
+  doc.activeElement = trigger;
+  openSearch();
+  assert.equal(doc.activeElement, input, 'die Suche fokussiert ihr Feld');
+  openSearch(); // ⌘K aus dem Suchfeld heraus
+  assert.equal(listeners.filter((l) => l.type === 'keydown').length, 1, 'genau ein Focus-Trap');
+  assert.equal(pushes, 1, 'ein Marker fuer die Zurueck-Geste');
+  assert.equal(doc.activeElement, input, 'der Fokus bleibt im Suchfeld');
+  closeSearch();
+  assert.equal(listeners.length, 0, 'nach dem Schliessen haengt kein Trap mehr am Overlay');
+  assert.deepEqual(returned, [trigger], 'der Fokus geht an den Ausloeser zurueck, nicht ins versteckte Suchfeld');
+});
+
 test('settings cutover: the controller is a thin shell delegate without the legacy monolith', () => {
   const settingsPage = read('../public/pages/settings.js');
 

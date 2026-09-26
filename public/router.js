@@ -3433,6 +3433,15 @@ function initSearch(container) {
   let searchOverlayToken = null;
 
   function openSearch() {
+    // SCHON OFFEN: nur zurueck ins Feld. ⌘K gilt auch aus Eingabefeldern,
+    // also auch aus dem Suchfeld selbst - ein zweiter Durchlauf merkte sich
+    // das Suchfeld als Ausloeser (Fokus ginge beim Schliessen ins Leere) und
+    // haengte einen zweiten Focus-Trap an, den closeSearch() nie abnimmt.
+    if (overlay.classList.contains('search-overlay--visible')) {
+      input.focus();
+      input.select();
+      return;
+    }
     if (window._closeMoreSheet) window._closeMoreSheet({ restoreFocus: false });
     lastFocusedBeforeSearch = document.activeElement;
     if (searchOverlayToken === null) searchOverlayToken = pushOverlay(() => closeSearch());
