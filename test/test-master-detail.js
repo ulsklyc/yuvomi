@@ -215,6 +215,33 @@ test('unter der Schwelle oeffnet ein Klick den bisherigen Weg und laesst die Adr
   handle.destroy();
 });
 
+test('unter der Schwelle mit gemerkter Auswahl: ein anderer Eintrag uebernimmt Auswahl und Adresse', () => {
+  // Auswahl A (Spalte oder Deep-Link), dann schmal, dann B antippen: das Blatt
+  // zeigt B. Blieben Auswahl und `?open=` bei A, nennte die Adresse den
+  // falschen Eintrag, und beim Verbreitern stuende A in der Spalte.
+  const p = makePage({ path: '/contacts?open=2', split: false });
+  const handle = p.mount();
+  assert.equal(handle.selectedId(), '2');
+  historyLog.length = 0;
+  handle.open('4', p.focusOf(3));
+  assert.deepEqual(p.calls.narrow, ['4']);
+  assert.equal(handle.selectedId(), '4', 'die Auswahl folgt dem geoeffneten Eintrag');
+  assert.equal(location.search, '?open=4', 'die Adresse ebenso');
+  assert.deepEqual(historyLog, [['replace', '/contacts?open=4']],
+    'ersetzt, nicht gestapelt: das Blatt fuehrt seinen eigenen Zurueck-Schritt');
+  handle.open('4', p.focusOf(3));
+  assert.equal(historyLog.length, 1, 'derselbe Eintrag noch einmal schreibt nichts');
+  handle.destroy();
+
+  // Ohne gemerkte Auswahl bleibt es beim bisherigen Weg: die Adresse ruht.
+  const q = makePage({ split: false });
+  const h2 = q.mount();
+  h2.open('4', q.focusOf(3));
+  assert.equal(h2.selectedId(), null);
+  assert.deepEqual(historyLog, []);
+  h2.destroy();
+});
+
 test('andere Adress-Parameter bleiben stehen', () => {
   const p = makePage({ path: '/tasks?view=list' });
   const handle = p.mount();

@@ -350,8 +350,19 @@ export function mountMasterDetail({
    * aus, darunter oeffnet er den bisherigen Weg.
    */
   function open(id, trigger) {
-    if (isSplit()) select(id, { history: 'push' });
-    else callNarrow(id, trigger);
+    if (isSplit()) { select(id, { history: 'push' }); return; }
+    // Unter der Schwelle waehlt ein Klick nichts aus - AUSSER es gibt schon
+    // eine gemerkte Auswahl (Spalte vor dem Schmalerwerden, Deep-Link). Dann
+    // folgen Auswahl und `?open=` dem geoeffneten Eintrag, sonst nennte die
+    // Adresse den alten, und beim Verbreitern stuende er in der Spalte.
+    // ERSETZT statt gestapelt: das Blatt legt seinen eigenen Zurueck-Schritt
+    // an (overlay-history); ein zweiter fuehrte nach dem Schliessen auf den
+    // alten Eintrag und oeffnete bei `deepLinkNarrow` dessen Blatt erneut.
+    if (selected != null && String(selected) !== String(id)) {
+      selected = String(id);
+      writeHistory('replace', param, selected);
+    }
+    callNarrow(id, trigger);
   }
 
   /** Nach einem Neuaufbau der Liste: Markierung neu setzen, Verschwundenes raeumen. */
