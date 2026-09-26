@@ -371,3 +371,78 @@ test('Raster-Hinweis: der Knopf sagt, was er tut - die Groesse uebernehmen, nich
   assert.ok(label, 'Reichweite: der Knopf wird gerendert');
   assert.equal(label, 'dashboard.gridHoleApply');
 });
+
+// --------------------------------------------------------
+// 4. Anpassen-Modus: die Kacheln gleiten (FLIP), das Raster zeigt nur eine Kante
+//    (Critique 2026-09-26, A7 P2)
+// --------------------------------------------------------
+
+function flipTile(id, rect) {
+  const tile = {
+    dataset: { widgetId: id }, rect, calls: [],
+    getBoundingClientRect: () => tile.rect,
+    animate(keyframes, timing) { tile.calls.push({ keyframes, timing }); return { keyframes, timing }; },
+  };
+  return tile;
+}
+const box = (left, top, width, height) => ({ left, top, width, height });
+
+test('FLIP: jede Kachel laeuft von ihrer alten Lage in die neue, statt zu springen', () => {
+  const before = new Map([
+    ['moved', box(0, 0, 100, 100)],
+    ['grown', box(200, 0, 100, 100)],
+    ['shrunk', box(0, 200, 200, 100)],
+    ['still', box(400, 0, 100, 100)],
+  ]);
+  const tiles = [
+    flipTile('moved', box(100, 0, 100, 100)),
+    flipTile('grown', box(200, 0, 200, 100)),
+    flipTile('shrunk', box(0, 200, 100, 100)),
+    flipTile('still', box(400, 0, 100, 100)),
+    flipTile('shown', box(0, 400, 100, 100)),
+  ];
+  const root = { querySelectorAll: (sel) => (sel === '#dashboard-widget-grid > .widget-wrapper[data-widget-id]' ? tiles : []) };
+  const timing = { duration: 250, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' };
+  const played = __test.playTileFlip(root, before, { reduced: false, timing });
+  const [moved, grown, shrunk, still, shown] = tiles;
+
+  assert.equal(played.length, 4, 'die ruhende Kachel bewegt sich nicht');
+  assert.deepEqual(moved.calls[0].keyframes.map((k) => k.transform), ['translate(-100px, 0px)', 'none']);
+  assert.equal(moved.calls[0].timing.duration, 250);
+  assert.match(grown.calls[0].keyframes[0].clipPath, /^inset\(0px 100px 0px 0px/, 'wer waechst, deckt seine neue Flaeche von der alten Groesse aus auf');
+  assert.match(grown.calls[0].keyframes[1].clipPath, /^inset\(0px 0px 0px 0px/);
+  assert.equal(shrunk.calls[0].keyframes[0].opacity, 0.6, 'wer schrumpft, blendet den umgebrochenen Inhalt auf');
+  assert.equal(still.calls.length, 0);
+  assert.equal(shown.calls[0].keyframes[0].opacity, 0, 'eine wieder eingeblendete Kachel hat keine Vorlage und blendet ein');
+
+  // Reduzierte Bewegung: es bleibt beim Sprung - und ohne Vorher-Messung auch.
+  for (const t of tiles) t.calls = [];
+  assert.deepEqual(__test.playTileFlip(root, before, { reduced: true, timing }), []);
+  assert.deepEqual(__test.playTileFlip(root, null, { reduced: false, timing }), []);
+  assert.ok(tiles.every((t) => t.calls.length === 0));
+});
+
+test('FLIP haengt am Neuaufbau: vorher messen, nach dem setHtml abspielen - nur innerhalb des Anpassen-Modus', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const body = src.match(/function rebuildDashboard\(cfg\) \{[\s\S]*?\n {2}\}\n/)?.[0];
+  assert.ok(body, 'rebuildDashboard() nicht gefunden - die Signatur greift nicht mehr');
+  const capture = body.search(/const tileRectsBefore = isCustomizing && renderedCustomizing === true \? captureTileRects\(shell\) : null;/);
+  const rebuild = body.search(/setHtml\(shell, `\s*<section class="dashboard-masthead/);
+  const play = body.search(/playTileFlip\(shell, tileRectsBefore\)/);
+  assert.ok(capture > -1 && rebuild > -1 && play > -1, 'Messen, Neuaufbau und Abspielen stehen alle drei im Neuaufbau');
+  assert.ok(capture < rebuild && rebuild < play, 'erst messen, dann neu bauen, dann abspielen');
+  assert.ok(capture < body.indexOf('renderedCustomizing = isCustomizing;'),
+    'gemessen wird, bevor der Modus des letzten Aufbaus ueberschrieben ist - sonst gleitet auch das Betreten des Modus');
+});
+
+test('Anpassen-Modus: das Raster traegt eine Kante, keine Toenung ueber allen Kacheln', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)].filter((r) => r.selector.split(',').some((s) => s.trim().startsWith('.dashboard__grid--editing')));
+  assert.ok(rules.length > 0, 'die Regel fuer das Raster im Anpassen-Modus fehlt');
+  assert.ok(rules.some((r) => /border:\s*1px dashed/.test(r.body)), 'die Kante bleibt');
+  assert.deepEqual(rules.filter((r) => /background(-color|-image)?\s*:/.test(r.body)).map((r) => r.selector), [],
+    'keine Flaeche ueber dem ganzen Raster');
+});
