@@ -700,7 +700,7 @@ test('Gruppenkopf ist eine echte Disclosure (h2 > button[aria-expanded])', () =>
     'die Kategorie-Ueberschrift muss ein h2 mit echtem Umschalt-Knopf sein (Tasks-Muster, #812)');
   assert(/aria-expanded="\$\{collapsed \? 'false' : 'true'\}" aria-controls=/.test(source),
     'der Knopf muss aria-expanded/aria-controls tragen');
-  assert(/class="list-rows" id="\$\{rowsId\}" \$\{collapsed \? 'hidden' : ''\}/.test(source),
+  assert(/class="row-carrier" id="\$\{rowsId\}" \$\{collapsed \? 'hidden' : ''\}/.test(source),
     'die Zeilen bleiben im DOM und werden nur per [hidden] gefaltet - kein Rerender, keine verlorenen Sortable-Instanzen');
 });
 

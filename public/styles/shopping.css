@@ -595,7 +595,7 @@
  * eigenen Rechnung hier. */
 
 /* Gruppenkopf und Gruppenfläche kommen aus .list-group__title /
- * .list-rows. Das eigene .item-category__icon entfällt: der Kopf nutzt jetzt
+ * .row-carrier. Das eigene .item-category__icon entfällt: der Kopf nutzt jetzt
  * die geteilte .icon-sm-Größe wie die Geschwistertabs. */
 
 /* Engerer Gruppen-Rhythmus, NUR im Einkauf (#1039). Die geteilten Werte
@@ -879,7 +879,7 @@
 
 /* Kein Margin mehr am shopping-item selbst (übernimmt swipe-row).
  *
- * KEIN border-radius mehr: den trägt jetzt die Gruppe (.list-rows, 12px, mit
+ * KEIN border-radius mehr: den trägt jetzt die Gruppe (.row-carrier, --radius-lg, mit
  * overflow: hidden), und die klippt die Swipe-Fläche mit. Ein eigener Radius auf
  * der Zeile war der letzte Rest des Karten-Paradigmas im Einkauf und hätte
  * innerhalb der Gruppenfläche als doppelte Rundung gelesen. */

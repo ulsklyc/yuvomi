@@ -250,9 +250,12 @@ function occurrenceRowHtml(occurrence) {
   // URL-Quelle. Die Zeile versprach damit Aktionen, die es fuer sie nicht gibt,
   // und der Nutzer suchte den Fehler bei sich („ich kann die Optionen nicht
   // sehen"). Dieselbe Bedingung traegt deshalb jetzt beides: Knopf und Menue.
+  // Der Name des Menueknopfs nennt Art UND Tag: dieselbe Abfallart steht in
+  // der aufgeklappten Liste mehrfach.
+  const occurrenceName = `${occurrence.type_name ?? ''}, ${formatDate(occurrence.date_key)}`;
   const actions = (readOnly() || !menuItems) ? '' : `
       <div class="row-actions">
-        <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('waste.moreActions'))}">
+        <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('common.moreActionsNamed', { name: occurrenceName }))}">
           <i data-lucide="more-horizontal" aria-hidden="true"></i>
         </button>
         <!-- Das geteilte .popover-menu (utils/popover-menu.js + layout.css), nicht
@@ -352,7 +355,7 @@ function renderUpcoming() {
         <i data-lucide="chevron-down" class="waste-upcoming-toggle__icon" aria-hidden="true"></i>
         <span>${esc(expanded ? t('waste.upcomingShowLess') : t('waste.upcomingShowMore', { count: rest.length }))}</span>
       </button>
-      <div class="list-rows" id="waste-upcoming-rest"${expanded ? '' : ' hidden'}>
+      <div class="row-divided" id="waste-upcoming-rest"${expanded ? '' : ' hidden'}>
         ${rest.map(occurrenceRowHtml).join('')}
       </div>
     `);
@@ -363,6 +366,15 @@ function renderUpcoming() {
 // -------------------------------------------------------------------------
 // Types & schedules
 // -------------------------------------------------------------------------
+
+// Der Screenreader-Name der Serienzeile: Abfallart UND Rhythmus. Der Rhythmus
+// allein („Jeden Montag") steht unter jeder Abfallart gleich da; erst die Art
+// macht die Zeile unterscheidbar.
+function scheduleRowName(schedule) {
+  const summary = recurrenceSummary(schedule);
+  const typeName = typeById(schedule.type_id)?.name;
+  return typeName ? `${typeName}, ${summary}` : summary;
+}
 
 function recurrenceSummary(schedule) {
   if (schedule.recurrence_kind === 'weekly') {
@@ -417,7 +429,7 @@ function scheduleRowHtml(schedule) {
       </div>
       ${ro ? '' : `
         <div class="row-actions">
-          <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('waste.moreActions'))}">
+          <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('common.moreActionsNamed', { name: scheduleRowName(schedule) }))}">
             <i data-lucide="more-horizontal" aria-hidden="true"></i>
           </button>
           <div class="popover-menu" id="${menuId}" popover role="menu">
@@ -458,7 +470,7 @@ function typeCardHtml(type, index, total) {
         </div>
         ${ro ? '' : `
           <div class="row-actions">
-            <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('waste.moreActions'))}">
+            <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('common.moreActionsNamed', { name: type.name }))}">
               <i data-lucide="more-horizontal" aria-hidden="true"></i>
             </button>
             <div class="popover-menu" id="${menuId}" popover role="menu">
@@ -548,7 +560,7 @@ function sourceRowHtml(source) {
       </div>
       ${readOnly() ? '' : `
         <div class="row-actions">
-          <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('waste.moreActions'))}">
+          <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('common.moreActionsNamed', { name: source.name }))}">
             <i data-lucide="more-horizontal" aria-hidden="true"></i>
           </button>
           <div class="popover-menu" id="${menuId}" popover role="menu">
@@ -788,15 +800,14 @@ function openTypeModal(type = null) {
       </div>
     </div>
     <div class="modal-panel__footer modal-panel__footer--plain">
-      <div style="display:flex;gap:var(--space-2)">
-        ${isEdit ? `
-          <button class="btn btn--danger btn--icon" id="wtm-delete" aria-label="${esc(t('common.delete'))}"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i></button>
-          <button class="btn btn--secondary btn--icon" id="wtm-archive" aria-label="${esc(type.archived ? t('waste.restoreAction') : t('waste.archiveAction'))}"><i data-lucide="${type.archived ? 'archive-restore' : 'archive'}" class="icon-md" aria-hidden="true"></i></button>
-        ` : '<div></div>'}
-      </div>
+      ${isEdit ? `
+      <div style="display:flex;gap:var(--space-2);margin-inline-end:auto">
+          <button type="button" class="btn btn--danger-outline" id="wtm-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}</button>
+          <button type="button" class="btn btn--secondary btn--icon" id="wtm-archive" aria-label="${esc(type.archived ? t('waste.restoreAction') : t('waste.archiveAction'))}"><i data-lucide="${type.archived ? 'archive-restore' : 'archive'}" class="icon-md" aria-hidden="true"></i></button>
+      </div>` : ''}
       <div style="display:flex;gap:var(--space-3)">
-        <button class="btn btn--secondary" id="wtm-cancel">${t('common.cancel')}</button>
-        <button class="btn btn--primary" id="wtm-save">${isEdit ? t('common.save') : t('common.add')}</button>
+        <button type="button" class="btn btn--secondary" id="wtm-cancel">${t('common.cancel')}</button>
+        <button type="button" class="btn btn--primary" id="wtm-save">${isEdit ? t('common.save') : t('common.add')}</button>
       </div>
     </div>`;
 
@@ -976,10 +987,10 @@ function openScheduleModal(type, schedule = null) {
       </label>
     </div>
     <div class="modal-panel__footer modal-panel__footer--plain">
-      <div>${isEdit ? `<button class="btn btn--danger btn--icon" id="wsm-delete" aria-label="${esc(t('common.delete'))}"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i></button>` : ''}</div>
+      ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="wsm-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}</button>` : ''}
       <div style="display:flex;gap:var(--space-3)">
-        <button class="btn btn--secondary" id="wsm-cancel">${t('common.cancel')}</button>
-        <button class="btn btn--primary" id="wsm-save">${isEdit ? t('common.save') : t('common.add')}</button>
+        <button type="button" class="btn btn--secondary" id="wsm-cancel">${t('common.cancel')}</button>
+        <button type="button" class="btn btn--primary" id="wsm-save">${isEdit ? t('common.save') : t('common.add')}</button>
       </div>
     </div>`;
 
@@ -1086,10 +1097,10 @@ function openPickupModal(pickup = null) {
       <textarea class="form-input" id="wpm-note" maxlength="500">${esc(pickup?.note ?? '')}</textarea>
     </div>
     <div class="modal-panel__footer modal-panel__footer--plain">
-      <div>${isEdit ? `<button class="btn btn--danger btn--icon" id="wpm-delete" aria-label="${esc(t('common.delete'))}"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i></button>` : ''}</div>
+      ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="wpm-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}</button>` : ''}
       <div style="display:flex;gap:var(--space-3)">
-        <button class="btn btn--secondary" id="wpm-cancel">${t('common.cancel')}</button>
-        <button class="btn btn--primary" id="wpm-save">${isEdit ? t('common.save') : t('common.add')}</button>
+        <button type="button" class="btn btn--secondary" id="wpm-cancel">${t('common.cancel')}</button>
+        <button type="button" class="btn btn--primary" id="wpm-save">${isEdit ? t('common.save') : t('common.add')}</button>
       </div>
     </div>`;
 
@@ -1509,11 +1520,11 @@ function openSourceModal(source) {
     </h3>
     <div id="wsrc-mappings">${source.mappings.map(sourceMappingRowHtml).join('')}</div>
     <div class="modal-panel__footer modal-panel__footer--plain">
-      <div><button class="btn btn--danger btn--icon" id="wsrc-delete" aria-label="${esc(t('common.delete'))}"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i></button></div>
+      <button type="button" class="btn btn--danger-outline" id="wsrc-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}</button>
       <div style="display:flex;gap:var(--space-3)">
-        <button class="btn btn--secondary" id="wsrc-reimport">${t(primaryActionKey)}</button>
-        <button class="btn btn--secondary" id="wsrc-cancel">${t('common.cancel')}</button>
-        <button class="btn btn--primary" id="wsrc-save">${t('common.save')}</button>
+        <button type="button" class="btn btn--secondary" id="wsrc-reimport">${t(primaryActionKey)}</button>
+        <button type="button" class="btn btn--secondary" id="wsrc-cancel">${t('common.cancel')}</button>
+        <button type="button" class="btn btn--primary" id="wsrc-save">${t('common.save')}</button>
       </div>
     </div>`;
 
@@ -1920,7 +1931,7 @@ function renderPage() {
       content: [
         renderListSection({
           className: 'waste-upcoming-section',
-          content: `<h2 class="waste-section-title u-section-title">${t('waste.upcomingSectionTitle')}</h2><div class="list-rows" id="waste-upcoming-list"></div>`,
+          content: `<h2 class="waste-section-title u-section-title">${t('waste.upcomingSectionTitle')}</h2><div class="row-carrier" id="waste-upcoming-list"></div>`,
         }),
         renderListSection({
           className: 'waste-types-section',
@@ -1928,7 +1939,7 @@ function renderPage() {
         }),
         renderListSection({
           className: 'waste-sources-section',
-          content: `<h2 class="waste-section-title u-section-title">${t('waste.sourcesSectionTitle')}</h2><div class="list-rows" id="waste-sources-list"></div>`,
+          content: `<h2 class="waste-section-title u-section-title">${t('waste.sourcesSectionTitle')}</h2><div class="row-carrier" id="waste-sources-list"></div>`,
         }),
       ].join('\n'),
     }),

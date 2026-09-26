@@ -3818,7 +3818,7 @@ async function openExtensionWidgetOptions(id, meta, current = {}) {
       content: `
         <form id="widget-options-form" class="widget-options">
           ${fields || `<p class="widget-options__hint">${t('dashboard.optionExtensionEmpty')}</p>`}
-          <div class="modal-actions">
+          <div class="modal-panel__footer modal-panel__footer--plain">
             <button type="button" class="btn btn--secondary" data-action="cancel">${t('common.cancel')}</button>
             <button type="submit" class="btn btn--primary">${t('common.save')}</button>
           </div>
@@ -3937,7 +3937,7 @@ async function openWidgetOptions(id, current = {}, { loadNotes = loadNoteCategor
       content: `
         <form id="widget-options-form" class="widget-options">
           ${body}
-          <div class="modal-actions">
+          <div class="modal-panel__footer modal-panel__footer--plain">
             <button type="button" class="btn btn--secondary" data-action="cancel">${t('common.cancel')}</button>
             <button type="submit" class="btn btn--primary">${t('common.save')}</button>
           </div>

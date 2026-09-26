@@ -39,6 +39,13 @@ const DAY_NAMES = () => [
   t('meals.dayFr'), t('meals.daySa'), t('meals.daySo'),
 ];
 
+// Der VOLLE Wochentagsname fuer Screenreader-Namen (`meals.addMealOnDay`): die
+// Spaltenkoepfe tragen nur das Kuerzel („Mo"), und sieben Knoepfe, die alle
+// „Mahlzeit hinzufuegen" heissen, sind vorgelesen EIN Knopf (Persona Sam).
+// Index = zonedWeekday() (0 = Sonntag), dieselben Keys wie calendar.js.
+const DAY_LONG_KEYS = ['dayLongSunday', 'dayLongMonday', 'dayLongTuesday', 'dayLongWednesday', 'dayLongThursday', 'dayLongFriday', 'dayLongSaturday'];
+const dayLongName = (dateKey) => t(`calendar.${DAY_LONG_KEYS[zonedWeekday(dateKey)]}`);
+
 const EXCLUDED_MEAL_CATEGORY_NAMES = new Set(['Haushalt', 'Drogerie']);
 
 // --------------------------------------------------------
@@ -626,7 +633,7 @@ function renderWeekGrid() {
         <div class="day-slots">
           ${visibleTypes.map((type, ti) => renderSlot(date, type, mealsForDay, dayCol, ti + 2)).join('')}
         </div>
-        <button class="day-add" data-action="add-meal" data-date="${date}" data-type="${firstType}" aria-label="${t('meals.addMealTitle')}">
+        <button class="day-add" data-action="add-meal" data-date="${date}" data-type="${firstType}" aria-label="${esc(t('meals.addMealOnDay', { day: dayLongName(date) }))}">
           <i data-lucide="plus" class="icon-sm" aria-hidden="true"></i>
           <span>${t('meals.addMealTitle')}</span>
         </button>
@@ -817,7 +824,7 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
           data-action="add-meal"
           data-date="${date}"
           data-type="${type.key}"
-          aria-label="${t('meals.addMeal', { type: type.label })}"
+          aria-label="${esc(t('meals.addMealTypeOnDay', { type: type.label, day: dayLongName(date) }))}"
         >
           <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
         </button>
@@ -890,24 +897,24 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
             data-action="open-linked-recipe"
             href="/recipes?open=${encodeURIComponent(meal.recipe_id)}"
             aria-label="${esc(t('meals.viewRecipeNamed', { title: meal.title }))}"
-          ><i data-lucide="chef-hat" class="icon-sm" aria-hidden="true"></i></a>`
+          ><i data-lucide="chef-hat" class="icon-md" aria-hidden="true"></i></a>`
           : meal.recipe_url ? `<a class="meal-card__action-btn meal-card__action-btn--recipe"
             data-action="open-recipe"
             href="${esc(meal.recipe_url)}"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="${esc(t('meals.openRecipeNamed', { title: meal.title }))}"
-          ><i data-lucide="link" class="icon-sm" aria-hidden="true"></i></a>` : ''}
+          ><i data-lucide="link" class="icon-md" aria-hidden="true"></i></a>` : ''}
           ${canTransfer ? `<button class="meal-card__action-btn meal-card__action-btn--shopping"
             data-action="transfer-meal"
             data-meal-id="${meal.id}"
             aria-label="${esc(t('common.toShoppingListNamed', { title: meal.title }))}"
-          ><i data-lucide="shopping-cart" class="icon-sm" aria-hidden="true"></i></button>` : ''}
+          ><i data-lucide="shopping-cart" class="icon-md" aria-hidden="true"></i></button>` : ''}
           <button class="meal-card__action-btn"
             data-action="delete-meal"
             data-meal-id="${meal.id}"
             aria-label="${esc(t('meals.deleteMealNamed', { title: meal.title }))}"
-          ><i data-lucide="trash-2" class="icon-sm" aria-hidden="true"></i></button>
+          ><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i></button>
         </div>
       </div>
     `;
@@ -922,7 +929,7 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
         data-action="add-meal"
         data-date="${date}"
         data-type="${type.key}"
-        aria-label="${t('meals.addMeal', { type: type.label })}"
+        aria-label="${esc(t('meals.addMealTypeOnDay', { type: type.label, day: dayLongName(date) }))}"
       ><i data-lucide="plus" class="icon-sm" aria-hidden="true"></i></button>
     </div>
   `;

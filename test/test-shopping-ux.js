@@ -107,7 +107,7 @@ function makeCategoryGroup(key, { collapsed = false } = {}) {
   const groupEl = {
     _sel: '.list-group',
     querySelector(sel) {
-      if (sel === '.list-rows') return rowsEl;
+      if (sel === '.row-carrier') return rowsEl;
       return null;
     },
   };

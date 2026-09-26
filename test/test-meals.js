@@ -1594,6 +1594,38 @@ test('A4 P1: mit gemerkter offener Spalte holt das Board „heute" NACH der Ents
   });
 });
 
+test('Critique 2026-09-26: die Anlege-Knoepfe nennen ihren Tag, sieben Tage sind sieben Namen', () => {
+  // 2026-09-21 ist ein Montag. Ein leerer Slot (Plus im Board) und ein belegter
+  // (Plus unter der Karte) - beide Anlegewege je Tag.
+  const type = { key: 'breakfast', label: 'Frühstück' };
+  const labelsOf = (html) => [...html.matchAll(/data-action="add-meal"[\s\S]*?aria-label="([^"]*)"/g)].map((m) => m[1]);
+  const week = ['2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24', '2026-09-25', '2026-09-26', '2026-09-27'];
+  const empty = week.map((date) => labelsOf(mealsUi.renderSlot(date, type, [], 2, 2))[0]);
+  assert(new Set(empty).size === 7, `sieben Tage, aber ${new Set(empty).size} verschiedene Namen: ${empty.join(' | ')}`);
+  const monday = pageEsc(pageT('meals.addMealTypeOnDay', { type: type.label, day: pageT('calendar.dayLongMonday') }));
+  assert(empty[0] === monday, `Montag heisst „${empty[0]}", erwartet „${monday}"`);
+  const filled = labelsOf(mealsUi.renderSlot('2026-09-27', type,
+    [{ id: 3, date: '2026-09-27', meal_type: 'breakfast', title: 'Porridge', ingredients: [] }], 2, 2));
+  assert(filled.length === 1 && filled[0].includes(pageT('calendar.dayLongSunday')),
+    `das Plus unter der Karte nennt seinen Tag nicht: ${filled.join(' | ')}`);
+  // Der Tagesknopf (mobil) zieht denselben Namen, nur ohne Mahlzeittyp.
+  assert(/class="day-add"[^>]*aria-label="\$\{esc\(t\('meals\.addMealOnDay', \{ day: dayLongName\(date\) \}\)\)\}"/.test(mealsSource),
+    'der Tagesknopf .day-add muss meals.addMealOnDay mit dem Tagesnamen tragen');
+});
+
+test('Critique 2026-09-26: die Kartenaktionen tragen mobil die Stufe der Zeilenaktionen, nicht 12px', () => {
+  const html = mealsUi.renderSlot('2026-09-21', { key: 'dinner', label: 'Abendessen' },
+    [{ id: 9, date: '2026-09-21', meal_type: 'dinner', title: 'Suppe', ingredients: [] }], 2, 2);
+  const actions = html.slice(html.indexOf('class="meal-card__actions"'), html.indexOf('meal-slot__add-more-btn'));
+  assert(/data-lucide="trash-2"/.test(actions), 'kein Loeschen-Zeichen in der Aktionsleiste gefunden - der Test liest die Karte nicht mehr');
+  assert(!/class="icon-sm"/.test(actions), 'ein Kartenaktions-Zeichen steht noch auf --icon-sm (12px)');
+  const css = readFileSync(new URL('../public/styles/meals.css', import.meta.url), 'utf8');
+  const touch = [...eachRule(css)].find((r) => r.selector.trim() === '.meal-card__action-btn svg'
+    && r.at?.join(' ').includes('max-width: 639px'));
+  assert(touch && /width:\s*var\(--icon-lg\)/.test(touch.body) && /height:\s*var\(--icon-lg\)/.test(touch.body),
+    'im 48px-Knopf (hover: none / schmal) muss das Zeichen --icon-lg tragen');
+});
+
 test('A4 P1: bei 1440px passen sieben Tage ohne Querscroll (116 Gutter + 7 Spalten + 7 Luecken <= 1156)', () => {
   const css = readFileSync(new URL('../public/styles/meals.css', import.meta.url), 'utf8');
   const rule = [...eachRule(css)].find((r) => r.selector.trim() === '.week-grid' && /grid-template-columns/.test(r.body));

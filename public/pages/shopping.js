@@ -160,7 +160,7 @@ function pruneCollapsedCategories(groups) {
 /** Klappt eine Kategorie in-place um (kein Listen-Rerender, siehe renderItems). */
 function toggleCategoryCollapse(button) {
   const key = button.dataset.categoryToggle;
-  const rowsEl = button.closest('.list-group')?.querySelector('.list-rows');
+  const rowsEl = button.closest('.list-group')?.querySelector('.row-carrier');
   const chevron = button.querySelector('.list-group__chevron');
   const nowCollapsed = !state.collapsedCategories.has(key);
 
@@ -1175,13 +1175,13 @@ function renderItems() {
   const groups = groupItemsByCategory(state.items);
   pruneCollapsedCategories(groups);
   // Geteilte Gruppen-Grammatik (styles/list-row.css): .list-group ordnet,
-  // .list-rows trägt die weiße Fläche und die Trennlinien. Die Zeilen selbst
+  // .row-carrier trägt die Fläche und die Trennlinien. Die Zeilen selbst
   // sind flächenlos - vorher war Einkaufen eine Trennlinien-Liste und der Vorrat
   // eine Kartenliste, dieselbe Sache in zwei Paradigmen (Critique 2026-07-30).
   //
   // Gruppenkopf als echter Knopf im h2 (#1039, Muster aus tasks.js/#812): nur
   // ein <button> kennt die Tastatur und traegt aria-expanded ueberhaupt. Die
-  // Zeilen (.list-rows) bleiben bei [hidden] im DOM - ein Rerender wuerde
+  // Zeilen (.row-carrier) bleiben bei [hidden] im DOM - ein Rerender wuerde
   // Sortable-Instanzen und Swipe-Closures verwerfen, nur um eine Gruppe
   // zuzuklappen.
   return groups.map(([cat, items], idx) => {
@@ -1200,7 +1200,7 @@ function renderItems() {
         </button>
         <span class="list-group__count">${items.length}</span>
       </h2>
-      <div class="list-rows" id="${rowsId}" ${collapsed ? 'hidden' : ''}>
+      <div class="row-carrier" id="${rowsId}" ${collapsed ? 'hidden' : ''}>
         ${items.map(renderItem).join('')}
       </div>
     </div>`;
@@ -1699,7 +1699,7 @@ const orderRuns = new Map();
  * in der alten Liste, und dorthin gehört er auch gesichert.
  */
 async function sendItemOrder(groupEl, container, listId) {
-  const rowsEl   = groupEl.querySelector('.list-rows');
+  const rowsEl   = groupEl.querySelector('.row-carrier');
   const category = groupEl.dataset.category;
   if (!rowsEl) return true;
 
@@ -1753,7 +1753,7 @@ function persistItemOrder(groupEl, container, movedRow) {
   const category = groupEl?.dataset.category;
   if (!groupEl || !category) return;
 
-  refreshHandleLabels(groupEl.querySelector('.list-rows'));
+  refreshHandleLabels(groupEl.querySelector('.row-carrier'));
   announceItemMove(container, movedRow);
 
   const running = orderRuns.get(category);
@@ -1808,7 +1808,7 @@ function wireItemReorder(container) {
   destroyItemSortables();
 
   listEl.querySelectorAll('.list-group').forEach((groupEl) => {
-    const rowsEl = groupEl.querySelector('.list-rows');
+    const rowsEl = groupEl.querySelector('.row-carrier');
     if (!rowsEl) return;
     refreshHandleLabels(rowsEl);
 
@@ -1914,7 +1914,7 @@ function updateItemRow(container, item) {
 
   // Der Sortiergriff hängt am Erledigt-Zustand (#678): abgehaktes sortiert sich
   // nicht, und die Positionsangaben der Gruppe verschieben sich mit.
-  refreshHandleLabels(row.closest('.list-rows'));
+  refreshHandleLabels(row.closest('.row-carrier'));
 
   // Swipe-Affordance (links) spiegelt den neuen Status
   const reveal = row.querySelector('.swipe-reveal--done');
@@ -2149,7 +2149,7 @@ function openItemDetails(itemId, container) {
           <textarea class="form-input" id="item-details-notes" rows="4"
                     placeholder="${t('shopping.notesPlaceholder')}">${esc(item.notes || '')}</textarea>
         </div>
-        <div class="modal-actions">
+        <div class="modal-panel__footer modal-panel__footer--plain">
           <button type="button" class="btn btn--secondary" id="item-details-cancel">${t('common.cancel')}</button>
           <button type="submit" class="btn btn--primary">${t('common.save')}</button>
         </div>
@@ -2679,7 +2679,7 @@ function openMealPlanImport(container) {
           <yuvomi-datepicker type="date" id="shopping-import-to" value="${esc(defaultTo)}"></yuvomi-datepicker>
         </div>
         <p class="form-hint" id="shopping-import-preview" role="status" aria-live="polite"></p>
-        <div class="modal-actions">
+        <div class="modal-panel__footer modal-panel__footer--plain">
           <button type="button" class="btn btn--secondary" id="shopping-import-cancel">${t('common.cancel')}</button>
           <!-- Startet deaktiviert und wird von updatePreview() freigeschaltet, sobald
                der Zeitraum Zutaten enthaelt. Die Schwesteraktion „Plan zufaellig
@@ -3651,7 +3651,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       // Steht der Treffer in einer eingeklappten Kategorie, bleibt er bei
       // [hidden] unsichtbar, obwohl der Selektor ihn findet - ein globaler
       // Suchtreffer darf nie hinter persistiertem Zustand verschwinden.
-      const rowsEl = el.closest('.list-rows');
+      const rowsEl = el.closest('.row-carrier');
       if (rowsEl?.hidden) {
         const toggleBtn = rowsEl.closest('.list-group')?.querySelector('[data-category-toggle]');
         if (toggleBtn) toggleCategoryCollapse(toggleBtn);

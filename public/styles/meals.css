@@ -1058,6 +1058,15 @@
   .meal-card__action-btn::before {
     inset: 0;
   }
+
+  /* Im 48px-Knopf der Zeile traegt das Zeichen die Stufe der Zeilenaktionen
+   * (Einkauf, Vorrat), nicht die Board-Stufe --icon-md: gemessen standen hier
+   * 12px-Glyphen neben 18px-Zeichen der Nachbartabs (Critique 2026-09-26). Die
+   * Ausnahme bleibt die 24px-Box im 148px-Wochenslot des Boards. */
+  .meal-card__action-btn svg {
+    width: var(--icon-lg);
+    height: var(--icon-lg);
+  }
 }
 
 /* --------------------------------------------------------

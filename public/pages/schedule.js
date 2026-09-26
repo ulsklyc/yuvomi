@@ -6,6 +6,7 @@ import { openModal, closeModal, confirmModal, confirmOverModal, advancedSection,
 import { makeSortable } from '/utils/sortable.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
+import { rowActionHtml } from '/utils/row-action.js';
 import { wireScrollFade } from '/utils/ux.js';
 import { wireTablist } from '/utils/tablist.js';
 import { toggleRowHtml } from '/settings/components.js';
@@ -914,7 +915,7 @@ function shiftTypeFieldRow(field) {
     + '<label class="toggle schedule-type-field-row__overlay"><input type="checkbox" data-show-in-overlay' + (field.show_in_overlay ? ' checked' : '') + '><span class="toggle__track"></span>' + esc(t('schedule.showInOverlay')) + '</label>'
     + '<button type="button" class="btn btn--secondary btn--icon" data-action="move-type-field" data-direction="up" aria-label="' + esc(t('schedule.moveUp')) + '"><i data-lucide="chevron-up" aria-hidden="true"></i></button>'
     + '<button type="button" class="btn btn--secondary btn--icon" data-action="move-type-field" data-direction="down" aria-label="' + esc(t('schedule.moveDown')) + '"><i data-lucide="chevron-down" aria-hidden="true"></i></button>'
-    + '<button type="button" class="btn btn--secondary btn--icon" data-action="remove-type-field" aria-label="' + esc(t('common.delete')) + '"><i data-lucide="x" aria-hidden="true"></i></button>'
+    + rowActionHtml({ icon: 'x', action: 'remove-type-field', label: t('common.removeNamed', { name: field.name }) })
     + '</div>';
 }
 
@@ -965,7 +966,7 @@ function emptyCustomFieldsState() {
 function customFieldsSection() {
   return '<section class="schedule-library schedule-library--custom-fields"><div class="schedule-library__head"><h2 class="u-section-title">' + esc(t('schedule.customFields')) + '</h2>'
     + (state.customFields.length && !readOnly() ? '<button type="button" class="btn btn--secondary" data-action="open-create-custom-field"><i data-lucide="plus" aria-hidden="true"></i>' + esc(t('schedule.createCustomField')) + '</button>' : '') + '</div>'
-    + (state.customFields.length ? '<div class="list-rows">' + state.customFields.map(customFieldRow).join('') + '</div>' : emptyCustomFieldsState())
+    + (state.customFields.length ? '<div class="row-carrier">' + state.customFields.map(customFieldRow).join('') + '</div>' : emptyCustomFieldsState())
     + '</section>';
 }
 
@@ -995,7 +996,7 @@ function dayRowFieldsHtml(shiftTypeId, fieldValues = {}, writable = true) {
 }
 
 function dayRowHtml(position, shiftTypeId, writable, fieldValues = {}) {
-  const remove = writable ? '<button type="button" class="btn btn--secondary btn--icon" data-action="remove-pattern-day-row" aria-label="' + esc(t('common.delete')) + '"><i data-lucide="x" aria-hidden="true"></i></button>' : '';
+  const remove = writable ? rowActionHtml({ icon: 'x', action: 'remove-pattern-day-row', label: t('schedule.removeCycleDayShift', { day: position + 1 }) }) : '';
   const disabledAttr = writable ? '' : ' disabled';
   return '<div class="schedule-day-row" data-day-row>'
     + '<div class="schedule-day-row__main"><select class="input" data-day="' + position + '"' + disabledAttr + '>' + typeOptions(shiftTypeId) + '</select>' + remove + '</div>'
@@ -1113,7 +1114,7 @@ function emptyOverrideState() {
 function overrideRows() {
   const groups = overrideGroups();
   if (!groups.length) return emptyOverrideState();
-  return '<div class="list-rows">' + groups.map((group) => {
+  return '<div class="row-carrier">' + groups.map((group) => {
     const type = state.types.find((item) => Number(item.id) === Number(group.shift_type_id));
     const swatchColor = type ? type.color : 'var(--color-border)';
     const typeLabel = type ? (type.short_code ? `${type.short_code} · ${type.name}` : type.name) : t('schedule.freeDay');
@@ -1181,7 +1182,7 @@ function extraGroups(extras = state.extras) {
 function extraRows() {
   const groups = extraGroups();
   if (!groups.length) return emptyExtraShiftsState();
-  return '<div class="list-rows">' + groups.map((group) => {
+  return '<div class="row-carrier">' + groups.map((group) => {
     const type = state.types.find((item) => Number(item.id) === Number(group.shift_type_id));
     const swatchColor = type ? type.color : 'var(--color-border)';
     const typeLabel = type ? (type.short_code ? `${type.short_code} · ${type.name}` : type.name) : '';
@@ -1378,7 +1379,7 @@ function openScheduleEntryDetailModal(entry) {
 
 function renderToday() {
   if (!state.entries.length) return `<p>${esc(t('schedule.empty'))}</p>`;
-  return `<div class="list-rows">${state.entries.map((entry) => {
+  return `<div class="row-carrier">${state.entries.map((entry) => {
     const type = entry.shift_type;
     const swatchColor = type ? type.color : 'var(--color-border)';
     const name = type ? esc(type.short_code ? `${type.short_code} · ${type.name}` : type.name) : esc(t('schedule.freeDay'));
@@ -2059,7 +2060,7 @@ function openOverrideEditModal(group) {
     + formField(t('schedule.shiftType'), '<select class="input" name="shift_type_id">' + typeOptions(type?.id ?? null) + '</select>')
     + formField(t('schedule.note'), '<input class="input" name="note" maxlength="5000" value="' + esc(group.note ?? '') + '">')
     + dayRowFieldsHtml(type?.id ?? null, group.field_values)
-    + '<div class="modal-actions"><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button></div></form>';
+    + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button></div></form>';
   openModal({
     title: t('schedule.editOverride'),
     size: 'md',
@@ -2117,7 +2118,7 @@ function openExtraGroupEditModal(group) {
     + formField(t('schedule.note'), '<input class="input" name="note" maxlength="5000" value="' + esc(group.note ?? '') + '">')
     + reminderOffsetField(group.reminder_offset_minutes)
     + dayRowFieldsHtml(group.shift_type_id, group.field_values)
-    + '<div class="modal-actions"><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button></div></form>';
+    + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button></div></form>';
   openModal({
     title: t('schedule.editExtraShift'),
     size: 'md',
@@ -2141,7 +2142,7 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
     content = '<form id="schedule-create-form" class="form-stack schedule-modal-form" data-form="shift-create">'
       + formField(t('schedule.preset'), '<select class="input" name="shift_preset">' + shiftPresetOptions() + '</select>')
       + shiftFields()
-      + '<div class="modal-actions"><button type="submit" class="btn btn--primary">' + esc(t('common.create')) + '</button></div></form>';
+      + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t('common.create')) + '</button></div></form>';
   } else if (view === 'patterns') {
     // EIN Formular fuer drei Faelle statt drei getrennter Modale: eine
     // wiederkehrende Rotation (Muster), eine einmalige ERSETZUNG eines Tages
@@ -2212,7 +2213,7 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
         ? formField(t('schedule.shiftType'), '<select class="input" required name="shift_type_id">' + typeOptions(null, false) + '</select>')
         : '<p class="form-hint schedule-no-types-hint">' + esc(t('schedule.noShiftTypesHint')) + '</p>')
       + reminderOffsetField(null) + dayRowFieldsHtml(state.types[0]?.id ?? null) + '</fieldset>'
-      + '<div class="modal-actions"><button type="submit" class="btn btn--primary" data-role="save-entry">' + esc(t('schedule.save')) + '</button></div></form>';
+      + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary" data-role="save-entry">' + esc(t('schedule.save')) + '</button></div></form>';
   }
   openModal({
     title,
@@ -2233,8 +2234,10 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
       // "Extra" aktiv ist UND kein Schichttyp existiert - dieselbe Bedingung,
       // unter der die Fieldset oben den Hinweis statt eines leeren <select>
       // zeigt. Jeder andere Modus/Zustand bleibt unberuehrt.
+      // Der Knopf steht im Fuss, und den hebt mountFooter() aus dem <form> ans
+      // Panel - `form.querySelector` faende ihn nicht mehr.
       const updateAddModeAvailability = () => {
-        const saveButton = form.querySelector('[data-role="save-entry"]');
+        const saveButton = modal.querySelector('[data-role="save-entry"]');
         if (!saveButton) return;
         const currentMode = form.querySelector('[name="mode"]')?.value;
         saveButton.disabled = currentMode === 'add' && !state.types.length;
@@ -2448,7 +2451,7 @@ function openCustomFieldModal(field = null) {
     size: 'sm',
     content: '<form id="schedule-custom-field-form" class="form-stack schedule-modal-form">'
       + formField(t('schedule.fieldName'), '<input class="input" required name="name" maxlength="100" value="' + esc(field?.name ?? '') + '">')
-      + '<div class="modal-actions"><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button></div></form>',
+      + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button></div></form>',
     onSave: (modal) => {
       modal.querySelector('#schedule-custom-field-form')?.addEventListener('submit', (event) => saveCustomField(event, field?.id ?? null));
     },
