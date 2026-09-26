@@ -5207,12 +5207,9 @@ function openCalendarSearch() {
 
   renderCalendarSearchState('hint');
 
-  let timer = null;
-  input.addEventListener('input', () => {
-    const q = input.value;
-    clearTimeout(timer);
-    timer = setTimeout(() => runCalendarSearch(q), 220);
-  });
+  // Die geteilte Verdrahtung: sie blendet den Loeschen-Knopf der Kapsel ein und
+  // leert mit ihm die Suche (page-search.css unterdrueckt das native Kreuz).
+  wirePageSearch(bar, { id: 'cal-search-input', onQuery: runCalendarSearch, delay: 220 });
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { e.preventDefault(); closeCalendarSearch(); }
   });

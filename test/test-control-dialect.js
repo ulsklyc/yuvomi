@@ -730,3 +730,21 @@ for (const rule of Object.keys(RULES)) {
     assert.deepEqual(stale, [], `PENDING['${rule}'] nachziehen:\n  ${stale.join('\n  ')}`);
   });
 }
+
+test('jedes Suchfeld aus renderPageSearch ist verdrahtet: wirePageSearch mit derselben id in derselben Datei', () => {
+  // Die Kapsel bringt einen Loeschen-Knopf mit, der `hidden` startet; nur
+  // wirePageSearch blendet ihn beim Tippen ein und leert damit die Suche.
+  // page-search.css unterdrueckt das native Kreuz. Ein Feld mit eigenem
+  // `input`-Listener hat also KEIN Loeschen (Kalender-Suche, Codex an #1478).
+  const idOf = (m) => m[1].trim();
+  const offenders = [];
+  for (const { file, src } of JS) {
+    if (file.endsWith('page-search.js')) continue;
+    const rendered = [...src.matchAll(/renderPageSearch\(\{[\s\S]*?\bid:\s*([^,\n}]+)/g)].map(idOf);
+    if (!rendered.length) continue;
+    const wired = new Set([...src.matchAll(/wirePageSearch\([^,]+,\s*\{[\s\S]*?\bid:\s*([^,\n}]+)/g)].map(idOf));
+    for (const id of rendered) if (!wired.has(id)) offenders.push(`${file}: ${id}`);
+  }
+  assert.ok(JS.some(({ src }) => src.includes('renderPageSearch(')), 'Vorbedingung: der Scanner findet Suchfelder');
+  assert.deepEqual(offenders, []);
+});
