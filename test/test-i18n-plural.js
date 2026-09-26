@@ -627,3 +627,18 @@ test("zaehlende Schluessel tragen _few in jeder Sprache mit der CLDR-Kategorie f
   const stale = [...FEW_GAPS_LEGACY].filter((k) => !missing.has(k));
   assert.deepEqual(stale, [], "erfuellte Eintraege aus FEW_GAPS_LEGACY streichen");
 });
+
+// Arabisch hat fuer ganze Zahlen die Kategorien zero, one, two, few, many, other:
+// der Basisschluessel traegt dort die few-Form (3-10, "أيام"), die fuer 2 (Dual)
+// und 11-99 ("يومًا") falsch ist. Die zwei Tageszaehler dieses Umbaus tragen
+// deshalb `_two` und `_many` (Codex-Review #1472). Der Bestand ist Teil der
+// Nachpflege aus FEW_GAPS_LEGACY und hier bewusst nicht mitgeprueft.
+test('Arabisch: die neuen Tageszaehler waehlen Dual und many statt der few-Form', async () => {
+  await setLocale('ar');
+  for (const key of ['birthdays.inDays', 'inventory.deadlineChipInDays']) {
+    const few = t(key, { count: 5, label: 'X' });
+    assert.notEqual(t(key, { count: 2, label: 'X' }).replace('2', '5'), few, `${key}: 2 braucht den Dual`);
+    assert.notEqual(t(key, { count: 11, label: 'X' }).replace('11', '5'), few, `${key}: 11 braucht die many-Form`);
+  }
+  await setLocale('de');
+});
