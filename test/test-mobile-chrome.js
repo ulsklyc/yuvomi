@@ -105,6 +105,17 @@ test('(2) der Chipreihen-Baustein selbst ist kein fester Streifen', () => {
   assert.equal(row.length, 1, '.page-chip-row steht einmal in layout.css (global), nicht im Modul');
   assert.equal(decl(row[0].body, 'position'), null);
   assert.equal(decl(row[0].body, 'overflow-x'), 'auto', 'die Reihe scrollt waagerecht selbst');
+  // Im Grid-Port (`.list-scroller`) ist der Mindestbeitrag eines waagerechten
+  // Scroll-Containers NULL: ohne feste Hoehe stand die Reihe 16px hoch, die
+  // Chips ragten in die erste Gruppe (Vorrat). Die Hoehe gehoert dem Baustein,
+  // nicht jedem Modul einzeln.
+  assert.match(decl(row[0].body, 'min-height') || '', /var\(--target-lg\)/,
+    '.page-chip-row braucht eine Mindesthoehe aus der Chiphoehe - sonst kollabiert sie im Grid-Port');
+  assert.equal(decl(row[0].body, 'flex-shrink'), '0', 'in einem Flex-Port darf die Reihe nicht schrumpfen');
+  const moduleCopies = sheets.filter((s) => s.file !== 'layout.css').flatMap(({ file, css }) => rules(css)
+    .filter((r) => /pantry-filters|notes-filters|contacts-filters/.test(r.selector) && decl(r.body, 'min-height'))
+    .map((r) => `${file}: ${r.selector}`));
+  assert.deepEqual(moduleCopies, [], 'die Chipreihen der Module tragen keine eigene Kopie der Mindesthoehe');
 });
 
 test('(3) nichts im Inhalt klebt mit bottom: 0 an der Unterkante - dort liegt die Kapsel', () => {

@@ -176,7 +176,7 @@
  * UMBENENNEN unerreichbar: `rename-list` hängt ausschließlich an diesem Titel.
  * Erst wenn die Aktion einen zweiten Weg hat (etwa im Überlaufmenü), ist das
  * eine Option." Genau das ist jetzt der Fall: Umbenennen ist der erste Eintrag
- * im Menü von `.list-tabs-bar__actions`, zusammen mit den drei übrigen
+ * im Listenmenü des Kopfes (`#shopping-tools`), zusammen mit den drei übrigen
  * Aktionen. Damit entfällt auch die responsive Doppelfassung - eine Darstellung
  * auf allen Breiten, ein Ort. */
 

@@ -44,16 +44,9 @@
  * Kopf und Filterzeile per Grid auf eine Zeile legte: ueber dem Port steht nur
  * noch der Kopf.
  *
- * Die Mindesthoehe steht als Zahl, weil der Port ein Grid ist, das hoeher
- * waechst als er selbst: eine Spur ohne Groesse bekommt dort nur den
- * Mindestbeitrag ihres Elements, und der ist bei einem Scroll-Container (die
- * Reihe scrollt waagerecht) NULL. Gemessen stand die Reihe 16px hoch - nur ihr
- * Polster -, die Chips ragten in die erste Gruppe. `min-content`/`fit-content`
- * aendern daran in Chrome nichts (gemessen); die Chiphoehe (`--target-lg`,
- * filter-chip.css) plus das Polster der Reihe schon. Shell-Wunsch: dasselbe an
- * `.page-chip-row`, samt `flex-shrink: 0` fuer Ports, die Flex-Spalten sind. */
+ * Die Mindesthoehe, die die Reihe im Grid-Port braucht, traegt der Baustein
+ * selbst (`.page-chip-row`, layout.css). */
 .pantry-filters {
-  min-height: calc(var(--target-lg) + 2 * var(--space-2));
   /* Die Reihe gehoert zur ersten Gruppe, nicht zwischen zwei: statt des
    * Gruppen-Abstands des Ports (--space-5, .list-scroller in list-row.css)
    * steht unter ihr nur ihr eigenes Polster plus --space-2. */

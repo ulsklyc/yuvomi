@@ -93,7 +93,8 @@
  *    nicht selbst. Jeder `basePath` gehoert dem Modul der Seite, die ihn
  *    oeffnet (der Guard in der Suite haelt das), also ist die Frage dieselbe,
  *    die die Seite fuer ihre anderen Knoepfe ohnehin stellt. Vorbild:
- *    `tasks.js` (`#btn-manage-categories` hinter `readOnly()`).
+ *    `tasks.js` (Menue-Eintrag `manage-categories` im Werkzeugmenue hinter
+ *    `readOnly()`).
  *
  * 8. KREUZTRANSFER DER KUECHE, ENTSCHIEDEN (#1290): `POST /meals/:id/to-shopping-list`,
  *    `/meals/week-to-shopping-list` und `/recipes/:id/to-shopping-list`

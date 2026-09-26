@@ -39,8 +39,7 @@
  * bleibt stabil"). Ein Kommentar, der zwei Groessen nennt, wo eine steht, laesst
  * die naechste Suche im falschen Stylesheet anfangen.
  * ------------------------------------------------------------------------ */
-.u-page-title,
-.page__title {
+.u-page-title {
   font-size: var(--type-page-title-mobile);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-tight);
@@ -67,10 +66,6 @@
  * `.page-toolbar__title` an, an ihm geht er vorbei. */
 .page-toolbar__dock-title,
 .settings-leaf-header__title,
-/* Die Settings-Übersicht lief als .page__title auf 22px mobil / 28px Desktop,
- * während jedes andere Modul seinen Seitentitel mit 20px rendert - zwei
- * h1-Größen für denselben Seitentyp (Critique 2026-07-27). */
-.settings-shell-header__title,
 .split-title {
   font-size: var(--type-toolbar-title);
   font-weight: var(--font-weight-bold);
@@ -142,7 +137,6 @@
 .today-cockpit__header h2,
 .settings-section__title,
 .settings-navigation-panel__title,
-.settings-mobile-overview__title,
 .split-group-name,
 .housekeeping-card h2,
 .subscriptions-chart h2,
@@ -226,8 +220,7 @@
 .nav-section-label,
 .settings-shell__navigation-heading,
 .settings-shell__navigation-toggle,
-.kanban-col__title,
-.filter-panel__label {
+.kanban-col__title {
   font-size: var(--text-xs);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-tight);
@@ -327,8 +320,7 @@
     font-size: var(--type-hero-desktop);
   }
 
-  .u-page-title,
-  .page__title {
+  .u-page-title {
     font-size: var(--type-page-title-desktop);
   }
 }

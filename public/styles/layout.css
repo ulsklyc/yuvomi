@@ -2648,19 +2648,20 @@ html.fab-anim-done .page-fab {
  * gemacht. Was er braucht, ist ein Begriff von "Seitenblock", der Zeileninterna
  * strukturell ausschliesst - das ist eigene Arbeit, kein Anhang an einen Fix.
  * Bis dahin bleibt diese Liste eine Liste, die man von Hand pflegt. */
-/* NICHT in dieser Liste: `.list-tabs-bar` (shopping.css) und
- * `.contacts-filters` (contacts.css). Beide polstern sich selbst mit
- * `--page-inline-pad`, und bei `box-sizing: border-box` zieht dieses Polster
- * von der Kappung ab statt zu ihr zu addieren: gemessen bei 1907px blieben von
- * 720px genau 313px fuer die Chips uebrig, waehrend der Koerper darunter die
- * vollen 720px fuehrte - die Reiter brachen also mitten im Namen ab (#758).
- * Ihre Kappung steht deshalb in ihrer eigenen Datei und rechnet das Polster
- * ein. Wer hier ein Element eintraegt, das anderswo horizontal polstert, macht
- * es genauso. Guard: `die Lesemass-Liste kappt kein selbstpolsterndes Element`
- * in test/test-frontend-audit.js - er liest beide Seiten aus dem Stylesheet und
- * findet die Ueberschneidung von allein. */
+/* NICHT in diese Liste gehoert ein Element, das sich selbst horizontal mit
+ * `--page-inline-pad` polstert: bei `box-sizing: border-box` zieht dieses
+ * Polster von der Kappung ab statt zu ihr zu addieren. Gemessen bei 1907px
+ * blieben von 720px genau 313px fuer die Chips uebrig, waehrend der Koerper
+ * darunter die vollen 720px fuehrte - die Reiter brachen mitten im Namen ab
+ * (#758). Die beiden Faelle von damals (`.list-tabs-bar`, `.contacts-filters`)
+ * polstern seit der Kopfregel mobil (2026-09-26) nicht mehr selbst: die
+ * Listenleiste steht im __center-Slot des Einkaufskopfs, die Kontakt-Chips im
+ * Port, und Kontakte kappt seine Reihe in contacts.css. Wer hier ein Element
+ * eintraegt, das anderswo horizontal polstert, kappt es stattdessen in seiner
+ * eigenen Datei und rechnet das Polster ein. Guard: `die Lesemass-Liste kappt
+ * kein selbstpolsterndes Element` in test/test-frontend-audit.js - er liest
+ * beide Seiten aus dem Stylesheet und findet die Ueberschneidung von allein. */
 .page-measure--narrow :is(
-  .tasks-filters-row,
   .rewards-tabs,
   /* Die Karten der Hauswirtschaft, deren Zeilen per Bleed an ihrer Kante
    * fluchten: die Liste selbst hat keine eigene Flaeche, die Karte hat sie,
@@ -2680,7 +2681,6 @@ html.fab-anim-done .page-fab {
   .housekeeping-worker-strip
 ),
 .app-page :is(
-  .tasks-filters-row,
   .rewards-tabs,
   .housekeeping-card,
   .contact-group__header,
@@ -3655,6 +3655,31 @@ a.popover-menu__item {
   scrollbar-width: none;
   /* Luft fuer den Fokusring: ein waagerechter Scroller clippt senkrecht mit. */
   padding-block: var(--space-2);
+  /* DIE HOEHE STEHT ALS ZAHL, weil ein Port auch ein Grid sein kann, das hoeher
+   * waechst als er selbst (`.list-scroller`, Vorrat): eine Spur ohne Groesse
+   * bekommt dort nur den Mindestbeitrag ihres Elements, und der ist bei einem
+   * Scroll-Container (die Reihe scrollt waagerecht) NULL. Gemessen stand die
+   * Reihe 16px hoch - nur ihr Polster -, die Chips ragten in die erste Gruppe;
+   * `min-content`/`fit-content` aendern daran in Chrome nichts. Chiphoehe
+   * (`.filter-chip`, filter-chip.css) plus Polster schon. `flex-shrink: 0`
+   * gilt fuer Ports, die Flex-Spalten sind. */
+  flex-shrink: 0;
+  min-height: calc(var(--target-lg) + 2 * var(--space-2));
+}
+
+/* Dieselben Stufen wie `.filter-chip` im Querformat (filter-chip.css): die
+ * Reihe folgt ihrer Chiphoehe, sonst stuende im flachen Fenster ein leerer
+ * Streifen unter den Chips. */
+@media (max-height: 499px) {
+  .page-chip-row {
+    min-height: calc(var(--target-md) + 2 * var(--space-2));
+  }
+}
+
+@media (max-height: 499px) and (hover: none) {
+  .page-chip-row {
+    min-height: calc(var(--target-base) + 2 * var(--space-2));
+  }
 }
 
 .page-chip-row::-webkit-scrollbar {
@@ -4306,48 +4331,6 @@ p.field-hint--warn[hidden] {
   }
 }
 
-
-/* --------------------------------------------------------
- * Seiten-Container
- * -------------------------------------------------------- */
-.page {
-  padding: var(--space-4);
-  max-width: var(--content-max-width);
-  margin: 0 auto;
-}
-
-.page__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-6);
-  padding-bottom: var(--space-4);
-  gap: var(--space-4);
-  border-bottom: 1px solid var(--color-border-subtle);
-}
-
-.page__title {
-  /* HIER STEHT KEINE GROESSE, UND DER KOMMENTAR, DER HIER STAND, NANNTE ZWEI.
-   *
-   * Er sagte „Mobil --text-2xl (24px), Desktop --text-3xl (30px)" - drei Fehler
-   * in einem Satz: die Tokens messen 22 und 28px, die Regel setzt seit dem
-   * HIG-Rollout gar keine Schriftgroesse mehr, und der Seitentitel ist dort
-   * Large Title (34px, mobil wie Desktop). Der Schnitt gehoert der
-   * Seitentitel-Rolle in typography.css; hier bleibt der Umbruch. */
-  text-wrap: balance;
-}
-
-@media (min-width: 1024px) {
-  .page {
-    padding: var(--space-8) var(--space-8);
-  }
-}
-
-@media (min-width: 1440px) {
-  .page {
-    padding: var(--space-8) var(--space-10);
-  }
-}
 
 /* --------------------------------------------------------
  * Cards
