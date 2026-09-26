@@ -32,6 +32,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
+import { eachRule } from './css-rules.js';
 
 /* ===========================================================================
  * DOM-Doppel
@@ -406,23 +407,53 @@ function routerFabFunctions(doc, win) {
 const recipe = (id, source) => ({ id, title: `Rezept ${id}`, source, ingredients: [], notes: '', meal_types: [] });
 
 /**
+ * Adresse und History, soweit Liste + Detail sie liest (utils/master-detail.js
+ * schreibt `?open=` per pushState/replaceState und liest `location`).
+ * `window.location` und `location` sind derselbe Gegenstand, wie im Browser.
+ */
+function fakeAddress(path) {
+  const loc = { url: new URL(path, 'http://yuvomi.test') };
+  for (const key of ['href', 'pathname', 'search', 'hash']) {
+    Object.defineProperty(loc, key, { get: () => loc.url[key], enumerable: true });
+  }
+  const history = {
+    state: null,
+    length: 1,
+    pushState(state, _title, to) { loc.url = new URL(to, loc.url); this.state = state; this.length += 1; },
+    replaceState(state, _title, to) { loc.url = new URL(to, loc.url); this.state = state; },
+  };
+  return { location: loc, history };
+}
+
+/**
  * Rendert die Rezepte-Seite in ein frisches Doppel und dockt den FAB an wie
  * `renderPage()`: `adoptPageFab()` nach dem synchronen Teil von `render()`,
  * dann `await render`, dann `adoptPageFab()` noch einmal. Liefert das Doppel.
+ *
+ * `split` steht fuer die Container Query in layout.css: ab der Schwelle ist die
+ * Detailspalte `display: flex`, darunter `none` - und genau das fragt der
+ * Baustein ab (`getComputedStyle`), statt eine eigene Schwelle zu fuehren.
  */
-async function renderRecipesPage(recipes) {
+async function renderRecipesPage(recipes, { split = false, path = '/recipes', meals = [] } = {}) {
   const doc = new FakeDocument();
+  const { location, history } = fakeAddress(path);
   const win = {
-    location: { search: '' },
+    location,
     matchMedia: () => ({ matches: true, addEventListener() {}, removeEventListener() {} }),
     yuvomi: { showToast() {}, navigate() {}, isModuleDisabled: () => false },
   };
   globalThis.document = doc;
   globalThis.window = win;
+  globalThis.location = location;
+  globalThis.history = history;
+  globalThis.CSS ??= { escape: (value) => String(value).replace(/["\\]/g, '\\$&') };
+  globalThis.getComputedStyle = (el) => ({
+    display: el.classList.contains('split-view__detail') ? (split ? 'flex' : 'none') : 'block',
+  });
   globalThis.HTMLElement ??= class {};
   globalThis.customElements ??= { get: () => undefined, define() {} };
   globalThis.__apiStub = {
-    get: async (url) => ({ data: url === '/recipes' ? recipes : [] }),
+    get: async (url) => ({ data: url === '/recipes' ? recipes : url === '/meals' ? meals : [] }),
   };
 
   // Die Shell, soweit das Andocken sie liest: die FAB-Ebene und der Scrollport.
@@ -536,3 +567,146 @@ for (const [label, recipes] of [
     }
   });
 }
+
+/* ===========================================================================
+ * Liste + Detail (Breitenregel, Regime 2 - DESIGN.md)
+ *
+ * Dasselbe echte render() im selben Doppel, jetzt mit der Frage, was eine
+ * Zeile TUT: ab der Schwelle waehlt sie aus und das Rezept steht rechts in der
+ * Detailspalte, darunter klappt sie auf wie bisher. Beide Darstellungen haengen
+ * an derselben Adresse `?open=<id>` - dem Deep-Link, den die Essenskarten
+ * setzen (#936). Die Schwelle selbst ist CSS (layout.css, PAGE-019); hier legt
+ * `split` um, was `getComputedStyle` fuer die Spalte meldet.
+ * ======================================================================== */
+
+const dish = (id, source = 'native') => ({
+  id,
+  title: `Gericht ${id}`,
+  source,
+  ingredients: [{ name: `Zutat ${id}`, quantity: '1' }],
+  notes: '',
+  meal_types: [],
+});
+const DISHES = [dish(1), dish(2), dish(3, 'mealie')];
+
+/** Klick mit Bubbling bis zur Wurzel: die Zeilen haengen an EINEM delegierten Listener. */
+function clickBubbling(el) {
+  const event = { type: 'click', target: el, preventDefault() {}, stopPropagation() {} };
+  for (let n = el; n; n = n.parentNode) {
+    for (const fn of n.listeners?.click ?? []) fn({ ...event, currentTarget: n });
+  }
+}
+
+/** Die paint()-Kette des Bausteins ist async - einmal die Mikrotasks leeren. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+/**
+ * `state` der Seite ueberlebt einen Seitenwechsel (recipes.js) - und damit auch
+ * die Filterwahl aus dem FAB-Test oben. Jeder Fall hier beginnt ungefiltert.
+ */
+async function renderFresh(recipes, opts) {
+  const { __test } = await import('../public/pages/recipes.js');
+  __test.state.query = '';
+  __test.state.sourceFilter = 'all';
+  return renderRecipesPage(recipes, opts);
+}
+
+const paneTitle = (doc) => doc.querySelector('#recipes-detail [data-md-body] .split-view__detail-title')?.textContent ?? null;
+const toggleOf = (doc, id) => doc.querySelector(`.recipe-row__toggle[data-id="${id}"]`);
+
+test('Liste + Detail: die Seite traegt das Regime und die Spalte neben der Liste', async () => {
+  const doc = await renderFresh(DISHES, { split: true });
+  const page = doc.querySelector('.recipes-page');
+  assert.ok(page?.classList.contains('app-page--list-detail'), 'die Seitenwurzel ist nicht der Container der Schwelle');
+  const split = doc.querySelector('.recipes-page > .split-view');
+  assert.ok(split !== null, 'keine .split-view an der Stelle des Scrollports');
+  assert.ok(doc.querySelector('.split-view > #recipes-list.split-view__list') !== null, 'die Liste ist nicht die linke Spalte');
+  assert.equal(doc.querySelector('.split-view > #recipes-detail')?.getAttribute('aria-label'), 'recipes.detailPaneLabel',
+    'die Detailspalte hat keinen zugaenglichen Namen');
+  assert.equal(doc.querySelectorAll('.recipe-row-item[data-md-id]').length, 3, 'nicht jede Zeile ist auswaehlbar');
+  assert.equal(doc.querySelectorAll('.recipe-row__toggle[data-md-focus]').length, 3, 'die Pfeiltasten finden keinen Hauptknopf');
+});
+
+test('Liste + Detail, ab der Schwelle: ?open= waehlt aus, das Rezept steht rechts, die Zeile klappt nicht auf', async () => {
+  const doc = await renderFresh(DISHES, { split: true, path: '/recipes?open=2' });
+  await settle();
+  assert.equal(paneTitle(doc), 'Gericht 2', 'der Deep-Link zeichnet das Rezept nicht in die Spalte');
+  assert.equal(doc.querySelector('[data-md-empty]').hidden, true, 'der Leerzustand steht noch');
+  assert.ok(doc.querySelector('.recipe-row-item[data-md-id="2"]').classList.contains('is-selected'), 'die Zeile ist nicht markiert');
+  assert.equal(doc.querySelector('#recipe-detail-2').hidden, true, 'in der Spalte darf der Aufklapper nicht aufgehen');
+  // Der Inhalt ist der des Aufklappers - dieselbe Quelle, dieselben Aktionen.
+  assert.ok(doc.querySelector('#recipes-detail .recipe-detail--pane [data-action="add-to-meals"][data-id="2"]') !== null,
+    'der Kreislauf-Ausgang fehlt in der Spalte');
+  assert.ok(doc.querySelector('#recipes-detail #recipes-detail-edit') !== null, 'ein eigenes Rezept braucht Bearbeiten im Kopf');
+
+  clickBubbling(toggleOf(doc, 1));
+  await settle();
+  assert.equal(location.search, '?open=1', 'die Auswahl steht nicht in der Adresse');
+  assert.equal(history.length, 2, 'ein Klick ist ein Schritt fuer die Zurueck-Taste (pushState)');
+  assert.equal(paneTitle(doc), 'Gericht 1');
+  assert.equal(doc.querySelector('#recipe-detail-1').hidden, true, 'der Klick klappte auf, statt auszuwaehlen');
+});
+
+test('Liste + Detail, ab der Schwelle: der Hauptknopf sagt nicht "eingeklappt", wenn er auswaehlt', async () => {
+  const doc = await renderFresh(DISHES, { split: true });
+  const toggle = toggleOf(doc, 1);
+  assert.equal(toggle.getAttribute('aria-expanded'), null, 'aria-expanded an einem Knopf, der nie aufklappt');
+  assert.equal(toggle.getAttribute('aria-controls'), 'recipes-detail', 'der Knopf steuert die Detailspalte');
+  assert.ok(doc.querySelector('#recipes-list').classList.contains('recipes-list--split'),
+    'ohne die Klasse bleiben Aufklapper und Chevron im Stylesheet stehen');
+});
+
+test('Liste + Detail, ab der Schwelle: ein gespiegeltes Rezept ist schreibgeschuetzt, auch im Kopf', async () => {
+  const doc = await renderFresh(DISHES, { split: true, path: '/recipes?open=3' });
+  await settle();
+  assert.equal(paneTitle(doc), 'Gericht 3');
+  assert.equal(doc.querySelector('#recipes-detail #recipes-detail-edit') === null, true, 'Bearbeiten an einem Mealie-Rezept - der Server weist es ab');
+  const labels = doc.querySelectorAll('#recipes-detail .split-view__detail-actions button')
+    .map((b) => b.getAttribute('aria-label') ?? b.textContent);
+  assert.deepEqual(labels, ['recipes.duplicate'], 'gespiegelt bleibt nur Duplizieren');
+});
+
+test('Liste + Detail: eine unbekannte ID faellt auf den Leerzustand zurueck und raeumt die Adresse', async () => {
+  const doc = await renderFresh(DISHES, { split: true, path: '/recipes?open=99' });
+  await settle();
+  assert.equal(doc.querySelector('[data-md-empty]').hidden, false, 'der Leerzustand fehlt');
+  assert.equal(location.search, '', 'die Adresse nennt ein Rezept, das es nicht gibt');
+});
+
+test('Liste + Detail, unter der Schwelle: alles wie bisher - ?open= klappt auf, ein Klick klappt auf', async () => {
+  const doc = await renderFresh(DISHES, { split: false, path: '/recipes?open=2' });
+  await settle();
+  assert.equal(doc.querySelector('#recipe-detail-2').hidden, false, 'der Deep-Link klappt das Rezept nicht mehr auf (#936)');
+  assert.equal(toggleOf(doc, 2).getAttribute('aria-expanded'), 'true');
+  assert.equal(toggleOf(doc, 2).getAttribute('aria-controls'), 'recipe-detail-2');
+  assert.equal(paneTitle(doc), null, 'unter der Schwelle wird in die (unsichtbare) Spalte nichts gezeichnet');
+  assert.equal(doc.querySelector('#recipes-list').classList.contains('recipes-list--split'), false);
+
+  clickBubbling(toggleOf(doc, 1));
+  await settle();
+  assert.equal(doc.querySelector('#recipe-detail-1').hidden, false, 'der Klick klappt nicht mehr auf');
+  assert.equal(toggleOf(doc, 1).getAttribute('aria-expanded'), 'true');
+  assert.equal(location.search, '?open=2', 'unter der Schwelle schreibt ein Aufklappen keine Adresse');
+  assert.equal(history.length, 1);
+});
+
+test('Liste + Detail: in der schmalen Zeile stehen Zutatenzahl und "Diese Woche geplant" zusammen unter dem Namen', async () => {
+  // Die Listenbahn der Detailspalte ist 420-520px breit, die Zeile darin
+  // ~424px - also immer in der Schmalfassung (`@container list-rows` bis 30rem).
+  // Dort rueckte nur die Zutatenzahl unter den Namen, und "· Diese Woche
+  // geplant" blieb mit fuehrendem Mittelpunkt allein neben dem Namen stehen
+  // (gemessen 1440x900, 2026-09-26). Der Slot haelt beide Angaben zusammen.
+  const doc = await renderFresh(DISHES, { split: true, meals: [{ id: 7, recipe_id: 1 }] });
+  const sub = doc.querySelector('.recipe-row-item[data-md-id="1"] .recipe-row__toggle > .recipe-row__sub');
+  assert.ok(sub !== null, 'kein gemeinsamer Slot fuer die zweite Zeile');
+  assert.equal(sub.querySelectorAll('.list-row__meta').length, 1, 'die Zutatenzahl steht nicht im Slot');
+  assert.equal(sub.querySelectorAll('.recipe-row__planned').length, 1, 'die Planungsangabe steht nicht im Slot');
+
+  const css = readFileSync(new URL('../public/styles/recipes.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)].filter(({ selector }) => selector.trim() === '.recipe-row__sub');
+  const base = rules.find(({ at }) => at.length === 0);
+  const narrow = rules.find(({ at }) => at.join(' ').includes('@container list-rows (max-width: 30rem)'));
+  assert.match(base?.body ?? '', /display:\s*contents/, 'breit muss der Slot unsichtbar sein - sonst aendert sich die breite Zeile');
+  assert.match(narrow?.body ?? '', /display:\s*block/, 'schmal muss der Slot die Angaben als Text hintereinander setzen');
+  assert.match(narrow?.body ?? '', /flex:\s*1 0 100%/, 'schmal muss der Slot eine eigene Zeile unter dem Namen sein');
+});

@@ -1113,14 +1113,23 @@
    * Silbentrennung in den Gerichtenamen, gegen die die Mindestbreite überhaupt
    * eingeführt wurde. Die 8px bei 1440 gegen ein Regressionsrisiko bei 1280 zu
    * tauschen, ist eine Struktur-, keine Feinschliff-Entscheidung: die eigentliche
-   * Frage ist, ob eine 7-Tage-Ansicht auf Laptop-Breite die richtige Ansicht ist. */
+   * Frage ist, ob eine 7-Tage-Ansicht auf Laptop-Breite die richtige Ansicht ist.
+   *
+   * ENTSCHIEDEN 2026-09-26 (Critique A4 P1, Ulas): 140px. Die 1440er-Breite mit
+   * ausgeklappter Seitenleiste ist die verbreitetste Desktop-Breite, und dort
+   * lag der Montag angeschnitten unter der Gutter-Spalte. 140px brechen
+   * Gerichtenamen noch an Wortgrenzen (die Silbentrennung kam bei ~117px);
+   * 1280px bleibt ein Scroll-Fenster wie zuvor.
+   *
+   *   Bedarf   116 Gutter + 7 × 140 Spalte + 7 × 8 Gap = 1152px
+   *   1440px   1156 verfügbar → passt, 7/7 sichtbar (Rezept-Spalte eingeklappt) */
   .week-grid {
     display: grid;
     /* Breit genug für das längste deutsche Typ-Label („Mittagessen" ≈ 84px
      * bei text-sm/medium) plus Punkt, Lücke und Innenabstand — sonst chopt
      * der break-word-Backstop das Label wortmittig. */
     --meal-gutter-width: 116px;
-    grid-template-columns: var(--meal-gutter-width) repeat(7, minmax(148px, 1fr));
+    grid-template-columns: var(--meal-gutter-width) repeat(7, minmax(140px, 1fr));
     column-gap: var(--space-2);
     row-gap: var(--space-2);
     align-items: stretch;
@@ -1357,7 +1366,7 @@
 
   /* Karten-Titel im Board: zwei Zeilen statt Einzeiler-Ellipse nach ~5
    * Zeichen ("Tomat…") — Wiedererkennung vor Kompaktheit. Keine
-   * Auto-Silbentrennung mehr: die Mindest-Spaltenbreite (148px) lässt
+   * Auto-Silbentrennung mehr: die Mindest-Spaltenbreite (140px) lässt
    * Gerichtenamen an Wortgrenzen umbrechen; break-word bleibt Backstop
    * für Einzelwörter jenseits der Spaltenbreite (Critique P1). */
   .meal-card__title-text {
@@ -1382,8 +1391,8 @@
  * Die Spalte kostet 272-320px. Genau die fehlen dem Board für den sechsten und
  * siebten Tag: mit ihr sind Samstag und Sonntag nur über horizontales Scrollen
  * erreichbar - ausgerechnet die Tage, an denen am meisten gekocht wird. Ohne
- * sie passen alle sieben Spalten in voller Breite, ohne dass die 148px-
- * Mindestbreite angetastet werden muss.
+ * sie passen ab 1440px alle sieben Spalten in voller Breite (140px-
+ * Mindestbreite, siehe .week-grid).
  * -------------------------------------------------------- */
 /* Der Schalter steht seit der Kopfregel mobil (2026-09-26) als Eintrag im
  * Werkzeugmenue. Die Spalte gibt es erst ab 1024px (.meals-layout oben),

@@ -39,6 +39,75 @@
 }
 
 /* --------------------------------------------------------
+ * Liste + Detail (Breitenregel, DESIGN.md; utils/master-detail.js)
+ *
+ * Nur in der Listenansicht (tasks.js, syncViewChrome). Die Geometrie der
+ * Spalten gehoert der Shell (`.split-view` in layout.css); hier steht nur,
+ * was DIESE Seite dafuer mitbringen muss.
+ * -------------------------------------------------------- */
+
+/* Der Baustein steht in `.tasks-body`, und der polstert schon beide Kanten -
+ * die Detailspalte endet deshalb an ihm statt ein zweites Polster zu nehmen. */
+.tasks-split {
+  --split-view-end-pad: 0px;
+}
+
+/* UNTER DER SCHWELLE BLEIBT DIE LISTE IM BLOCKFLUSS. Die Shell legt
+ * `.split-view` als Flex-Spalte an (fuer Seiten mit eigenem Scrollport); hier
+ * scrollt `.app-content`, und ein Flex-Item ist ein eigener Formatierungs-
+ * kontext: die Aussenabstaende der ersten und letzten Gruppe kollabierten
+ * nicht mehr durch die Liste, und jede Zeile stand 8px tiefer (gemessen
+ * 1280x800, Liste 1329 -> 1353px). Ab der Schwelle gilt das Raster der Shell. */
+.tasks-page:not(.tasks-page--split) .tasks-split {
+  display: block;
+}
+
+/* DIE HOEHENKETTE DER SPALTENFORM. Aufgaben scrollt sonst als ganze Seite in
+ * `.app-content`; zwei Spalten, die jede fuer sich scrollen, brauchen aber
+ * eine feste Hoehe. Die Klasse setzt tasks.js (syncSplitHeight), sobald die
+ * Detailspalte steht - eine Container-Abfrage kann ihre eigene Wurzel nicht
+ * gestalten. Unter der Schwelle fehlt sie, und die Seite waechst wie bisher
+ * mit ihrem Inhalt (Kopf-Kollaps, Nachlauf ueber der Tab-Kapsel). */
+.tasks-page--split {
+  height: 100%;
+}
+
+.tasks-page--split > .tasks-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+
+/* Das Bodenpolster wandert mit dem Scrollen in die Liste - als Summand der
+ * Scrollport-Rolle, die tasks.js dort in der Spaltenform setzt; den Nachlauf
+ * der Shell legt `.page-scrollport` darauf (layout.css). */
+.tasks-page--split .split-view__list {
+  --scrollport-pad: var(--space-6);
+}
+
+/* DIE LISTENBAHN FUEHRT KEINE INLINE-AKTIONEN - dasselbe Reminders-Muster wie
+ * unter 640px (Regel weiter unten). In der 420-520px-Bahn quetschten die drei
+ * 44px-Knoepfe den Titel auf 116px (gemessen 1440x900, „Kinderzimmer…");
+ * Bearbeiten, Ablegen und Teilaufgabe stehen im Detail direkt daneben, und
+ * der Stift waere dort ein zweiter Weg zu demselben Formular. Ausgeblendet
+ * per `display: none`, nicht per Deckkraft (ignore.md: Aktionen werden
+ * weniger, nicht unsichtbar-klickbar). An der Klasse der Hoehenkette statt an
+ * einer zweiten Container-Abfrage: EINE Schwelle, die in layout.css steht. */
+.tasks-page--split .task-card__inline-action {
+  display: none;
+}
+
+/* Platzhalter, solange eine Aufgabe fuer die Spalte laedt (tasks.js,
+ * renderTaskPane) - erst nach 150ms, ein schneller Wechsel blinkt nicht. */
+.tasks-pane-skeleton {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+}
+
+/* --------------------------------------------------------
  * Header + Toolbar
  * -------------------------------------------------------- */
 /* Gerüst (Shell, Titel, Actions, Bar-Zeile) geteilt via .page-toolbar in

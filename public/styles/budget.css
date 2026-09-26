@@ -2020,6 +2020,38 @@ button.budget-entry__title {
 .budget-stats__donut { width:160px; height:160px; }
 .budget-stats__export { margin-top:var(--space-4); }
 
+/* Statistik auf der Budget-Bahn (Critique 2026-09-26, A5 P2-5): ab 960px
+ * Modulflaeche dieselbe Zweispalte wie die Uebersicht - links Verlauf und
+ * Kategorievergleich auf dem Lesemass, rechts die Ausgaben-Anteile in der
+ * Breite der Seitenleiste. Dieselbe Container-Abfrage (`budget-page`) und
+ * dieselben Spaltenmasse wie `.budget-overview`, damit die rechte Kante beim
+ * Reiterwechsel nicht springt. Darunter bleibt alles untereinander. */
+@container budget-page (min-width: 960px) {
+  .budget-stats__grid {
+    display: grid;
+    grid-template-columns:
+      minmax(0, var(--page-measure, var(--layout-reading)))
+      clamp(
+        var(--budget-rail-min),
+        calc(100% - var(--page-measure, var(--layout-reading)) - var(--budget-column-gap)),
+        var(--budget-rail-max)
+      );
+    column-gap: var(--budget-column-gap);
+    align-items: start;
+  }
+
+  .budget-stats__main {
+    grid-column: 1;
+  }
+
+  /* Neben Verlauf UND Vergleich: die Anteile sind die zweite Sicht auf
+   * dieselben Kategorien, die links als Balken stehen. */
+  .budget-stats__aside {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+
 /* Ziel-Marker im Reports-Tab: kleine Tick-Linie auf dem Kategorie-Balken beim
  * geplanten Monatswert (nur bei range='month'). */
 .budget-bar-row__track { position: relative; }

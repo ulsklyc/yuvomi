@@ -8,12 +8,14 @@
  *                 i18n.js (t), detail-view.css
  *
  * API:
- *   openDetailView({ title, accentColor, anchor, sections, actions, edit, size, onClose })
+ *   openDetailView({ title, accentColor, anchor, pane, sections, actions, edit, size, onClose })
  *   closeDetailView({ force, fokus }) → Promise<void>
  *
- * Zwei Präsentationen, eine Aufrufer-API: ab 768px UND mit Anker erscheint die
- * Ansicht als verankertes Popover am Auslöser, sonst als Bottom-Sheet über
- * openModal(). Der Inhalt kommt in beiden Fällen aus demselben Renderer.
+ * Drei Präsentationen, eine Aufrufer-API: mit `pane` (die Detailspalte aus
+ * Liste + Detail, utils/master-detail.js) steht die Ansicht in der Spalte;
+ * sonst ab 768px UND mit Anker als verankertes Popover am Auslöser, sonst als
+ * Bottom-Sheet über openModal(). Der Inhalt kommt in allen drei Fällen aus
+ * demselben Renderer.
  */
 
 import { t } from '/i18n.js';
@@ -22,6 +24,7 @@ import {
   focusFirstField, updateHeaderAction, rememberFocus, restoreFocusAfterClose,
 } from '/components/modal.js';
 import { pushOverlay, dropOverlay } from '/utils/overlay-history.js';
+import { detailPaneHeaderEl } from '/utils/master-detail.js';
 
 // Ab dieser Breite ist ein Popover am Auslöser die bessere Präsentation: Der
 // Auslöser bleibt sichtbar, der Weg ist kurz. Darunter deckt ein 320px-Kärtchen
@@ -40,6 +43,14 @@ let activePopover = null;
 // Ansicht, die der Nutzer inzwischen geöffnet hat.
 let viewSeq = 0;
 let activeViewToken = 0;
+
+// Das offene Blatt und WESSEN Leseansicht es zeigt (`opts.key`, z.B.
+// `contact:42`). Wird dieselbe Auswahl in die Detailspalte befoerdert
+// (Fenster breiter, utils/master-detail.js), geht genau dieses Blatt zu -
+// sonst stuende das Detail doppelt da, und das Overlay blockierte die Spalte.
+// Der Schluessel ist die Grenze: ein Blatt eines anderen Eintrags oder eines
+// fremden Moduls bleibt stehen.
+let activeSheet = null;
 
 function reduceMotion() {
   return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -181,7 +192,7 @@ function detailBodyEl({ accentColor, sections = [] }) {
  * Sheet-Modus vom Fußzeilen-Umzug in modal.js erfasst wird und unter der Falz
  * stehen bleibt statt mitzuscrollen.
  */
-function detailFooterEl(actions = []) {
+function detailFooterEl(actions = [], close = closeDetailView) {
   const visible = actions.filter((a) => a && !a.hidden);
   if (!visible.length) return null;
 
@@ -203,7 +214,7 @@ function detailFooterEl(actions = []) {
     }
     btn.append(document.createTextNode(action.label ?? ''));
     if (typeof action.onClick === 'function') {
-      btn.addEventListener('click', () => action.onClick({ close: closeDetailView, button: btn }));
+      btn.addEventListener('click', () => action.onClick({ close, button: btn }));
     }
     footer.appendChild(btn);
   });
@@ -463,6 +474,7 @@ function openAsSheet(opts, token) {
       // Auch das X, Escape, der Backdrop und die Wischgeste enden hier - nur so
       // weiß ein nachgereichtes update(), dass seine Ansicht fort ist.
       if (activeViewToken === token) activeViewToken = 0;
+      if (activeSheet?.token === token) activeSheet = null;
       opts.onClose?.();
     },
     headerAction: opts.edit
@@ -663,6 +675,62 @@ function openAsPopover(opts) {
 }
 
 // --------------------------------------------------------
+// Präsentation: Detailspalte (Liste + Detail)
+// --------------------------------------------------------
+
+/**
+ * Die Ansicht in der rechten Spalte von Liste + Detail.
+ *
+ * Kein Overlay: sie liegt in der Seite, hat keinen Marker in der History und
+ * schliesst nicht - die Auswahl in der Liste entscheidet, was hier steht
+ * (utils/master-detail.js). Deshalb ist `close` fuer die Aktionen hier ein
+ * reines Abmelden der Ansicht, KEIN `closeModal()`: das schloesse sonst ein
+ * fremdes, gerade offenes Modal.
+ *
+ * Kopf wie in Mail: Titel links, „Bearbeiten" rechts. „Bearbeiten" fuehrt ins
+ * regulaere Formular-Modal (`edit.standalone`), wie aus dem Popover - eine
+ * Spalte neben der Liste ist ein Leseort, und das Formular hat im Modal seine
+ * Fusszeile, seinen Dirty-Check und seine Fokusfuehrung.
+ */
+function openInPane(opts, token) {
+  const pane = opts.pane;
+  const close = () => {
+    if (activeViewToken === token) activeViewToken = 0;
+    opts.onClose?.();
+    return Promise.resolve();
+  };
+  const edit = opts.edit?.standalone ? {
+    label: opts.edit.label ?? t('common.edit'),
+    id: 'detail-pane-edit',
+    icon: 'pencil',
+    onClick: () => opts.edit.standalone(),
+  } : null;
+
+  const view = document.createElement('div');
+  view.className = 'detail-view__pane detail-view--in-pane';
+  view.appendChild(detailPaneHeaderEl({ title: opts.title ?? '', actions: edit ? [edit] : [] }));
+  let bodyEl = detailBodyEl(opts);
+  view.appendChild(bodyEl);
+  const footer = detailFooterEl(opts.actions, close);
+  if (footer) {
+    // In der Spalte ist die Fusszeile Teil des Inhalts, kein Modal-Fuss: die
+    // Klassen des Modal-Fusses holte sonst dessen Umzug- und Sticky-Logik an.
+    footer.className = 'detail-view__footer split-view__detail-footer';
+    view.appendChild(footer);
+  }
+  pane.replaceChildren(view);
+  renderIcons(pane);
+
+  return (sections) => {
+    if (!view.isConnected) return;
+    const next = detailBodyEl({ ...opts, sections });
+    view.replaceChild(next, bodyEl);
+    bodyEl = next;
+    renderIcons(next);
+  };
+}
+
+// --------------------------------------------------------
 // Öffentliche API
 // --------------------------------------------------------
 
@@ -673,6 +741,7 @@ function openAsPopover(opts) {
  * @param {string} opts.title            - Kopfzeile (Titel der Entität)
  * @param {string} [opts.accentColor]    - Farbstreifen oben (Kalenderfarbe o. Ä.)
  * @param {HTMLElement} [opts.anchor]    - Auslöser; ab 768px wird daran verankert
+ * @param {HTMLElement} [opts.pane]      - Koerper der Detailspalte (Liste + Detail); hat Vorrang
  * @param {Array}  [opts.sections]       - Metazeilen, siehe detailRowEl
  * @param {Array}  [opts.actions]        - Objektaktionen in der Fußzeile
  * @param {Object} [opts.edit]           - { label?, title?, ready?, primary?, mount(panel, pane), standalone() }
@@ -682,12 +751,15 @@ function openAsPopover(opts) {
  *                                         Wechsel ins Formular wartet
  * @param {string} [opts.size]           - Panel-Breite wie bei openModal
  * @param {Function} [opts.onClose]
+ * @param {string} [opts.key]            - Wessen Leseansicht (z.B. `contact:42`). Oeffnet
+ *                                         dieselbe in der Detailspalte, geht ihr offenes Blatt zu.
  * @returns {{update: (sections: Array) => boolean, isOpen: () => boolean}}
  *          Handle zum Nachreichen von Zeilen, die beim Öffnen noch nicht da
  *          waren. Siehe `update`.
  */
 export function openDetailView(opts = {}) {
-  const usePopover = window.innerWidth >= POPOVER_MIN_WIDTH && !!opts.anchor;
+  const usePane = Boolean(opts.pane);
+  const usePopover = !usePane && window.innerWidth >= POPOVER_MIN_WIDTH && !!opts.anchor;
 
   // Ein offenes Popover weicht zuerst - auch wenn die neue Ansicht ein Sheet
   // wird, denn openModal räumt nur Modals weg, kein Popover. Das muss VOR der
@@ -697,11 +769,29 @@ export function openDetailView(opts = {}) {
   // rufen und ein fremdes, offenes Modal schließen.
   // Ohne Fokus-Rueckgabe: die neue Ansicht nimmt den Fokus selbst.
   if (activePopover) closeDetailView({ fokus: false });
+  // In die Spalte befoerdert: das Blatt DIESES Eintrags weicht. `activeSheet`
+  // steht nur, solange das Blatt offen ist - X, Escape und ein Modal, das es
+  // ersetzt, raeumen es im onClose ab; ein fremdes Modal wird so nie getroffen.
+  //
+  // DAS ERGEBNIS ZAEHLT. closeDetailView() fragt bei ungespeicherten
+  // Aenderungen nach; wer „nicht verwerfen" sagt, behaelt das Blatt (`false`).
+  // Dann bleibt es verfolgt, und die naechste Befoerderung fragt erneut -
+  // vergessen stuende es ungefuehrt ueber der Spalte. Die Spalte darunter wird
+  // trotzdem gefuellt: sie ist, was nach dem Schliessen stehen soll.
+  if (usePane && opts.key && activeSheet?.key === opts.key) {
+    const sheet = activeSheet;
+    Promise.resolve(closeDetailView({ fokus: false })).then((closed) => {
+      if (closed !== false && activeSheet === sheet) activeSheet = null;
+    });
+  }
 
   const token = ++viewSeq;
   activeViewToken = token;
+  if (!usePane && !usePopover) activeSheet = { token, key: opts.key ?? null };
 
-  const applySections = usePopover ? openAsPopover(opts, token) : openAsSheet(opts, token);
+  const applySections = usePane
+    ? openInPane(opts, token)
+    : (usePopover ? openAsPopover(opts, token) : openAsSheet(opts, token));
 
   return {
     isOpen: () => activeViewToken === token,

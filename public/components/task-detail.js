@@ -10,7 +10,7 @@
  *
  * API:
  *   openTaskDetail({ task, reminder, users, currentUserId, isAdmin,
- *                    categories, container, onChanged, edit })
+ *                    categories, container, onChanged, edit, pane, onClose })
  *   deleteTaskWithUndo(id, { container, onChanged })
  *   addSubtask(parentId, { onChanged })
  *
@@ -952,8 +952,22 @@ async function toggleDescriptionCheck(task, box) {
  *   categories?: object[],
  *   container?: HTMLElement|null,
  *   onChanged?: () => (void|Promise<void>),
- *   edit?: {mount: (panel: HTMLElement, pane: HTMLElement) => void}|null,
+ *   edit?: {mount?: (panel: HTMLElement, pane: HTMLElement) => void,
+ *           standalone?: () => void}|null,
+ *   pane?: HTMLElement|null,
+ *   onClose?: () => void,
+ *   onStale?: () => void,
  * }} options
+ *
+ * `pane` ist der Koerper der Detailspalte (Liste + Detail). Dort schliesst die
+ * Ansicht nicht - die Auswahl in der Liste entscheidet, was dasteht -, und
+ * `onClose` meldet nur, dass eine Aktion der Ansicht (Status, Ablage, Loeschen)
+ * sie abgemeldet hat: die Umgebung zeichnet dann neu oder waehlt weiter.
+ *
+ * `onStale` ruft die Ansicht, wenn ein Schreibvorgang BESTAETIGT ist, aber das
+ * Nachladen danach scheiterte: was dasteht, ist veraltet. Die Umgebung zeichnet
+ * neu (in der Spalte: frisch vom Server oder der Fehlerzustand mit „Erneut
+ * versuchen", utils/master-detail.js) - die alten Aktionen kommen nie zurueck.
  */
 export function openTaskDetail({
   task,
@@ -965,8 +979,11 @@ export function openTaskDetail({
   container = null,
   onChanged = () => {},
   edit = null,
+  pane = null,
+  onClose = null,
+  onStale = null,
 }) {
-  const ctx = { users, currentUserId, isAdmin, categories, container, onChanged };
+  const ctx = { users, currentUserId, isAdmin, categories, container, onChanged, onStale, inPane: Boolean(pane) };
   const archived = isArchived(task);
   const statusActions = archived ? [] : (STATUS_ACTIONS[task.status] ?? []);
   // Gesperrte Aufgabe (#830): der Weiterschalt-Knopf bleibt, Loeschen, Ablegen
@@ -1003,7 +1020,7 @@ export function openTaskDetail({
         label: t(step.labelKey),
         variant: step.variant,
         icon: step.icon,
-        onClick: ({ button }) => advanceTaskStatus(task, step.status, button, ctx),
+        onClick: ({ button, close }) => advanceTaskStatus(task, step.status, button, ctx, close),
       });
     });
   }
@@ -1016,19 +1033,27 @@ export function openTaskDetail({
       label: archived ? t('tasks.unarchiveButton') : t('tasks.archiveButton'),
       variant: 'ghost',
       icon: archived ? 'archive-restore' : 'archive',
-      onClick: ({ button }) => toggleTaskArchive(task, button, ctx),
+      onClick: ({ button, close }) => toggleTaskArchive(task, button, ctx, close),
     });
   }
 
   openDetailView({
     title: task.title,
+    key: `task:${task.id}`,
     size: 'lg',
+    // DIE DETAILSPALTE (Liste + Detail, utils/master-detail.js): dieselbe
+    // Ansicht, nur in der rechten Spalte statt im Sheet. Bearbeiten fuehrt dort
+    // ins eigene Formular-Modal (`edit.standalone`), weil die Spalte ein
+    // Leseort ist; ohne `standalone` bleibt der Knopf weg.
+    pane: pane ?? undefined,
+    onClose: onClose ?? undefined,
     sections: renderTaskDetail(task, reminder, ctx),
     actions,
     edit: canEdit && edit ? {
       label: t('common.edit'),
       title: t('tasks.editTask'),
-      mount: (panel, pane) => edit.mount(panel, pane),
+      mount: (panel, formPane) => edit.mount?.(panel, formPane),
+      standalone: edit.standalone,
     } : undefined,
   });
 }
@@ -1065,7 +1090,7 @@ function statusActionButtons() {
     .filter(Boolean);
 }
 
-async function advanceTaskStatus(task, status, button, ctx) {
+async function advanceTaskStatus(task, status, button, ctx, close = closeDetailView) {
   const previous = task.status;
   const stop = btnLoading(button);
   // Die Geschwister werden nur gesperrt, nicht in den Ladezustand versetzt: der
@@ -1074,12 +1099,6 @@ async function advanceTaskStatus(task, status, button, ctx) {
   siblings.forEach((el) => { el.disabled = true; });
   try {
     await api.patch(`/tasks/${task.id}/status`, { status });
-    task.status = status;
-    // Der Status steht bereits beim Server - eine Verwerfen-Frage danach böte
-    // an, etwas rückgängig zu machen, was gar nicht mehr aussteht (#625).
-    await closeDetailView({ force: true });
-    await ctx.onChanged();
-    refocusAfterRender();
   } catch (err) {
     task.status = previous;
     stop();
@@ -1087,6 +1106,40 @@ async function advanceTaskStatus(task, status, button, ctx) {
     // Gescheitert ist ein Schreibvorgang, kein Laden - tasks.loadError („Aufgabe
     // konnte nicht geladen werden") beschriebe den falschen Vorgang.
     window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+    return;
+  }
+  task.status = status;
+  await afterConfirmedWrite(ctx, close);
+}
+
+/**
+ * Nach einem BESTAETIGTEN Schreibvorgang: Ansicht abmelden, Umgebung nachladen.
+ *
+ * GETRENNT VOM SCHREIBEN, weil ein Fehler hier etwas anderes heisst. Stand
+ * beides in einem catch, stellte ein gescheitertes Nachladen den alten Status
+ * wieder her und gab die alten Knoepfe frei - in der Spalte, wo `close()` das
+ * DOM nicht entfernt, stand dann nach einem erledigten Serientermin „Starten"
+ * bedienbar da, und der Server haette die Erledigung umgekehrt und die
+ * Folgeinstanz verworfen. Hier bleibt der neue Stand, die alten Aktionen
+ * bleiben gesperrt, und die Umgebung zeichnet neu (`onStale`).
+ */
+async function afterConfirmedWrite(ctx, close) {
+  try {
+    // Der Stand steht bereits beim Server - eine Verwerfen-Frage danach böte
+    // an, etwas rückgängig zu machen, was gar nicht mehr aussteht (#625).
+    //
+    // `close` ist das Schliessen DIESER Ansicht, nicht das globale der
+    // Detailansicht: in der Detailspalte meldet es die Ansicht nur ab - das
+    // globale ginge blind an das Modal und schloesse dort ein fremdes.
+    await close({ force: true });
+    await ctx.onChanged();
+    // Der Fokus-Merker gehoert zu einem geschlossenen Dialog. In der Spalte hat
+    // es keinen gegeben - ein Nachfassen setzte den Fokus in einen fremden
+    // Zusammenhang; dort fuehrt die Umgebung ihn selbst.
+    if (!ctx.inPane) refocusAfterRender();
+  } catch {
+    window.yuvomi.showToast(t('tasks.listLoadError'), 'danger');
+    ctx.onStale?.();
   }
 }
 
@@ -1095,20 +1148,21 @@ async function advanceTaskStatus(task, status, button, ctx) {
  * die Ansicht danach: die Aufgabe wechselt die Liste, und ein Panel, das über
  * einem verschwundenen Eintrag stehen bleibt, hat nichts mehr zu zeigen.
  */
-async function toggleTaskArchive(task, button, ctx) {
+async function toggleTaskArchive(task, button, ctx, close = closeDetailView) {
   const stop = btnLoading(button);
   const archived = isArchived(task);
   try {
     await setTaskArchived(task.id, !archived);
-    task.archived_at = archived ? null : new Date().toISOString();
-    await closeDetailView({ force: true });
-    window.yuvomi.showToast(archived ? t('tasks.unarchivedToast') : t('tasks.archivedToast'), 'success');
-    await ctx.onChanged();
-    refocusAfterRender();
   } catch (err) {
     stop();
     window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+    return;
   }
+  task.archived_at = archived ? null : new Date().toISOString();
+  window.yuvomi.showToast(archived ? t('tasks.unarchivedToast') : t('tasks.archivedToast'), 'success');
+  // Derselbe Grund wie beim Status: ein gescheitertes Nachladen gibt den
+  // Ablage-Knopf nicht frei - er zeigte den alten Stand und schaltete zurueck.
+  await afterConfirmedWrite(ctx, close);
 }
 
 /**

@@ -119,6 +119,16 @@
   display: contents;
 }
 
+/* Derselbe Kniff fuer Zutatenzahl und „Diese Woche geplant": breit sind beide
+ * Flex-Items der Zeile wie zuvor, schmal (Query unten) ist der Slot die zweite
+ * Zeile und haelt beide Angaben zusammen. Ohne ihn rueckte nur die Zahl unter
+ * den Namen, und „· Diese Woche geplant" blieb mit fuehrendem Mittelpunkt
+ * allein neben dem Namen stehen - gemessen in der Listenbahn der Detailspalte
+ * (Zeile 424px, 26,5rem, 2026-09-26), vorher jede Zeile zwischen 26 und 30rem. */
+.recipe-row__sub {
+  display: contents;
+}
+
 /* Vorschaubild aus Mealie (server/routes/recipes.js proxied die Bytes, siehe
  * dortigen Kommentar - kein direkter <img src> auf Mealie möglich, der
  * Bearer-Token darf den Client nie erreichen). Feste Größe statt intrinsischer:
@@ -241,6 +251,19 @@
     display: flex;
     flex: 1 0 100%;
     order: 1;
+  }
+
+  /* Der Slot ist die zweite Zeile; darin laufen Zahl und Planungsangabe als
+   * Text hintereinander (Block, kein Flex - die beiden Angaben sind ein Satz). */
+  .recipe-row__sub {
+    display: block;
+    flex: 1 0 100%;
+    order: 2;
+    min-width: 0;
+    /* Die Schrift der beiden Angaben auch am Block: sonst setzt die Zeile den
+     * Strut der groesseren Namensschrift an und wird 1-2px hoeher als die
+     * Meta allein (gemessen 390px: 65/66 statt 64px). */
+    font-size: var(--text-sm);
   }
 
   .recipe-row__toggle .list-row__meta {
@@ -554,3 +577,30 @@ button.recipe-detail__ingredient-match:hover {
   object-fit: cover;
 }
 
+/* --------------------------------------------------------
+ * Liste + Detail (Breitenregel, Regime 2 - DESIGN.md)
+ *
+ * Ab der Schwelle steht das ausgewaehlte Rezept rechts in der Detailspalte
+ * (utils/master-detail.js, Geometrie in layout.css `.split-view`). Die Zeile
+ * waehlt dort aus, statt aufzuklappen - also fallen Aufklapper und Chevron in
+ * der Liste weg.
+ *
+ * KEINE EIGENE `@container`-ABFRAGE. Die Schwelle steht einmal in layout.css
+ * (PAGE-019 haelt sie am Token); ein zweites `75rem` hier liefe ihr bei der
+ * naechsten Aenderung still davon. `.recipes-list--split` setzt recipes.js
+ * nach der gerechneten Darstellung der Spalte (syncRowMode).
+ * -------------------------------------------------------- */
+
+.recipes-list--split .recipe-detail,
+.recipes-list--split .recipe-row__chevron {
+  display: none;
+}
+
+/* Derselbe Inhalt wie der Aufklapper, aber mit dem Polster der Spalte: der
+ * Aufklapper haengt unter einer Zeile und rueckt nur um die Zeilenkante ein,
+ * die Spalte ist eine eigene Flaeche mit dem Polster ihres Kopfs
+ * (`.split-view__detail-head`, --space-5). */
+.recipe-detail--pane {
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}

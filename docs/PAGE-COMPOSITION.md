@@ -48,10 +48,17 @@ Application
 | Mode | Purpose | Width token |
 |------|---------|-------------|
 | `reading` | contacts, recipes, tasks list, forms | `--layout-reading` (~720px) |
-| `data` | tables, inventory, large datasets | `--layout-content` (~960px) |
+| `data` | extension manifests only - no core page (width rule, DESIGN.md) | `--layout-content` (~960px) |
 | `dashboard` | KPI grids, health, analytics | `--layout-wide` (~1200px) |
 | `form` | complex forms inside reading column | `--layout-reading` |
 | `split` | master/detail; stacks on mobile | split rails |
+
+The composition modes are the implementation of three **width regimes** (DESIGN.md, "Die
+Breitenregel", 2026-09-26): *Lesemass* (`reading`, `form`), *Liste + Detail*
+(`.app-page--list-detail` on a reading or full root plus `public/utils/master-detail.js`; the
+detail column appears once the page itself is at least `--layout-split-threshold` wide) and
+*Flaeche* (`full`, `dashboard`). Every page behind the shell is assigned to exactly one of them
+in the table in DESIGN.md; PAGE-017 to PAGE-019 hold table and code together.
 | `full` | calendar month, kanban, notes masonry, schedule, documents browser, immersive | usable width |
 
 Arbitrary values such as `max-width: 843px` are prohibited.
@@ -229,6 +236,9 @@ Enforced in [`test/test-frontend-audit.js`](../test/test-frontend-audit.js):
 | PAGE-014 | The page-layout helpers escape every attribute they emit |
 | PAGE-015 | A tab panel inside a page declares the mode of that page |
 | PAGE-016 | A page whose header runs full width puts nothing on the measure |
+| PAGE-017 | Every page stands in exactly one of the three width regimes of DESIGN.md, and its code matches the regime |
+| PAGE-018 | No core page declares the retired 960px measure (`data`) |
+| PAGE-019 | The list + detail block queries the module surface at the threshold from tokens.css |
 
 **Scope: every page behind the app shell.** The audit derives that set from
 `public/router.js` rather than from a list somebody has to remember: a route with
@@ -311,7 +321,7 @@ overflow checks. Not wired into CI yet.
 |------|------|---------|-------------------|
 | Reference | `reading` | **birthdays** | **Done (helpers + CSS)** |
 | A | `reading` | contacts, rewards, pantry, recipes | Mode declared |
-| B | `data` | inventory, housekeeping | Mode declared |
+| B | `data` -> `reading` | inventory, housekeeping | Moved to `reading` on 2026-09-26 when the width rule retired the 960px measure for core pages (DESIGN.md, "Die Breitenregel"); inventory joins `list-detail` once the master/detail block is wired (PAGE-017) |
 | B' | `full` | schedule, documents | Mode declared. Both were `data` until the seventh review round: their headers run full width (no `--narrow`), so the 960px measure was visible only on the primitives that happen to consume it - the KPI band of the schedule statistics ended at 960 while the filter card and the result cards beside it did not. `full` sets the measure to 100% and caps nothing, which is what these pages looked like before this PR. PAGE-016 keeps it that way: a measured mode needs a narrow header, or nothing on the page may consume the measure |
 | C | budget family | budget + stats/plans | Mode declared (`reading`); stats and plans are tab panels inside the Budget page and inherit its measure. A per-tab mode (reports as `dashboard`) also means switching the shared header per tab - an open design decision, not done here |
 | C' | `full` / `split` | subscriptions (`full`), split-expenses (`split`) | Mode declared; content not on a measure yet (analytics grid / two-column layout own their width) |

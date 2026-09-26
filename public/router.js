@@ -48,6 +48,9 @@ import {
   forgetScrollPositions,
 } from '/utils/scroll-restore.js';
 import { openModal, confirmModal } from '/components/modal.js';
+import { installPopoverMenus } from '/utils/popover-menu.js';
+import { prefersInkText } from '/utils/contrast.js';
+import { handleMasterDetailPopstate } from '/utils/master-detail.js';
 import '/components/datepicker.js';
 import { NAV_ICONS, MODULE_ICON, moduleIconEl } from '/nav-icons.js';
 import { RENAMED_SETTINGS_SOURCE_PATHS, SETTINGS_LEAVES } from '/settings/registry.js';
@@ -1065,6 +1068,146 @@ function sidebarActionEl({ labelKey, icon, className, onClick }) {
   return button;
 }
 
+/** Apple-Tastatur? Entscheidet nur, welches Kuerzel die Suche NENNT. */
+function isApplePlatform() {
+  const platform = navigator.userAgentData?.platform || navigator.platform || '';
+  return /mac|iphone|ipad|ipod/i.test(platform);
+}
+
+/** Das Kuerzel der globalen Suche, wie es die Plattform schreibt. */
+function searchShortcutLabel() {
+  return isApplePlatform() ? '\u2318K' : 'Ctrl+K';
+}
+
+/** Initialen fuer die Avatar-Scheibe ohne Bild (wie in den Einstellungen). */
+function accountInitials(name) {
+  return String(name || '').trim().split(/\s+/).map((w) => w[0] ?? '').join('').toUpperCase().slice(0, 2);
+}
+
+/**
+ * Die Kontozeile am Fuss der Seitenleiste: Avatar, Name, und dahinter das
+ * Konto-Menue (Hilfe, Aenderungen, Abmelden).
+ *
+ * Gebaut per DOM-API, weil Name und Bild Nutzerdaten sind; Farbe und Bild
+ * setzt `syncSidebarAccount()`, das auch nach einer Profil-Aenderung laeuft.
+ * Der Punkt fuer ein verfuegbares Update haengt am Avatar (applyUpdateBadge),
+ * sonst verschwaende der Hinweis hinter einem geschlossenen Menue.
+ */
+function sidebarAccountEl({ isDisplayShell = false } = {}) {
+  const wrap = document.createElement('div');
+  wrap.className = 'nav-sidebar__account';
+
+  const trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'nav-item nav-sidebar__account-trigger popover-menu__trigger';
+  trigger.setAttribute('popovertarget', 'nav-account-menu');
+  trigger.setAttribute('aria-haspopup', 'menu');
+  trigger.setAttribute('aria-expanded', 'false');
+
+  const iconWrap = document.createElement('span');
+  iconWrap.className = 'nav-item__icon-wrap';
+  const avatar = document.createElement('span');
+  avatar.className = 'nav-sidebar__avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+  iconWrap.appendChild(avatar);
+
+  const name = document.createElement('span');
+  name.className = 'nav-item__label nav-sidebar__account-name';
+
+  const chevron = document.createElement('i');
+  chevron.dataset.lucide = 'chevrons-up-down';
+  chevron.className = 'nav-sidebar__account-chevron';
+  chevron.setAttribute('aria-hidden', 'true');
+
+  trigger.append(iconWrap, name, chevron);
+
+  const menu = document.createElement('div');
+  menu.className = 'popover-menu nav-sidebar__account-menu';
+  menu.id = 'nav-account-menu';
+  menu.setAttribute('popover', '');
+  menu.setAttribute('role', 'menu');
+  // Ueber dem Ausloeser und an seiner linken Kante - er steht am Fuss der
+  // Leiste, nach unten ist kein Platz (popover-menu.js, `placement`).
+  menu.dataset.placement = 'top-start';
+
+  const item = (action, icon, labelKey, extraClass = '') => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.setAttribute('role', 'menuitem');
+    btn.className = `popover-menu__item${extraClass ? ` ${extraClass}` : ''}`;
+    btn.dataset.action = action;
+    const i = document.createElement('i');
+    i.dataset.lucide = icon;
+    i.className = 'icon-md';
+    i.setAttribute('aria-hidden', 'true');
+    const span = document.createElement('span');
+    span.textContent = t(labelKey);
+    btn.append(i, span);
+    return btn;
+  };
+  menu.append(
+    item('help', 'circle-help', 'nav.help', 'nav-account__help'),
+    // `nav-item--changelog` traegt den Update-Hinweis im Namen (applyUpdateBadge).
+    item('changelog', 'history', 'nav.changelog', 'nav-item--changelog'),
+  );
+  // FUER EIN DISPLAY GIBT ES KEIN ABMELDEN (#1208). Ein Tablett meldet sich
+  // nicht ab, es wird widerrufen - und `POST /auth/logout` beantwortet der
+  // Server ihm mit 403. Der Eintrag haette eine Abmeldung versprochen, die nie
+  // stattfindet. Monochrom wie die Geschwister: Danger-Rot erst im Confirm.
+  if (!isDisplayShell) {
+    const sep = document.createElement('div');
+    sep.className = 'popover-menu__separator';
+    sep.setAttribute('role', 'separator');
+    menu.append(sep, item('logout', 'log-out', 'settings.logout', 'nav-account__logout'));
+  }
+  menu.addEventListener('click', (event) => {
+    const action = event.target.closest?.('.popover-menu__item')?.dataset.action;
+    if (action === 'help') showHelpModal();
+    else if (action === 'changelog') showChangelogModal();
+    else if (action === 'logout') confirmAndLogout();
+  });
+
+  wrap.append(trigger, menu);
+  syncSidebarAccount(wrap);
+  return wrap;
+}
+
+/**
+ * Name, Farbe und Bild der Kontozeile aus dem angemeldeten Nutzer. Laeuft beim
+ * Aufbau, beim Sprachwechsel und nach einer Profil-Aenderung
+ * (`yuvomi:profile-changed`, personal-account.js).
+ */
+function syncSidebarAccount(root = document.querySelector('.nav-sidebar__account')) {
+  if (!root) return;
+  const trigger = root.querySelector('.nav-sidebar__account-trigger');
+  const avatar = root.querySelector('.nav-sidebar__avatar');
+  const nameEl = root.querySelector('.nav-sidebar__account-name');
+  const displayName = currentUser?.display_name || currentUser?.username || '';
+  nameEl.textContent = displayName;
+  const color = currentUser?.avatar_color || '';
+  avatar.style.backgroundColor = color;
+  const ink = Boolean(color) && prefersInkText(color);
+  avatar.classList.toggle('nav-sidebar__avatar--ink', ink);
+  avatar.classList.toggle('nav-sidebar__avatar--on-color', Boolean(color) && !ink);
+  if (currentUser?.avatar_data) {
+    const img = document.createElement('img');
+    img.src = currentUser.avatar_data;
+    img.alt = '';
+    avatar.replaceChildren(img);
+  } else {
+    avatar.textContent = accountInitials(displayName);
+  }
+  const label = displayName ? t('nav.accountMenu', { name: displayName }) : t('nav.accountMenuAnonymous');
+  trigger.dataset.baseLabel = label;
+  trigger.setAttribute('aria-label', withUpdateHint(label, pendingUpdateVersion()));
+  trigger.setAttribute('title', label);
+  for (const btn of root.querySelectorAll('.popover-menu__item')) {
+    const key = { help: 'nav.help', changelog: 'nav.changelog', logout: 'settings.logout' }[btn.dataset.action];
+    const span = btn.querySelector('span');
+    if (key && span) span.textContent = t(key);
+  }
+}
+
 // System-/Utility-Zeilen unter dem App-Launcher-Grid: Einstellungen (Route),
 // Hilfe und Änderungen (Overlays). Vollbreite Listenzeilen — der ruhige,
 // monochrome System-Cluster, klar abgesetzt vom farbigen Modul-Grid.
@@ -1884,25 +2027,41 @@ function renderAppShell(container) {
     document.documentElement.classList.remove('sidebar-collapse-pointer-lock');
   });
 
-  sidebar.appendChild(sidebarLogo);
-  sidebar.appendChild(sidebarToggle);
-
-  // Sichtbarer Desktop-Einstieg in die globale Suche (Audit R2, A1-01): vor den
-  // Modul-Items, bleibt im eingeklappten Modus als Lupe erreichbar. Kein
-  // data-route, damit Delegation/Indikator das Item ignorieren.
-  const sidebarSearch = sidebarActionEl({
-    labelKey: 'nav.search',
-    icon: 'search',
-    className: 'nav-item--search',
-    onClick: () => _openSearch?.(),
-  });
-  sidebarSearch.setAttribute('aria-keyshortcuts', '/');
-  sidebarSearch.setAttribute('title', `${t('nav.search')} (/)`);
+  // DIE LOGO-ZEILE TRAEGT SUCHE UND EINKLAPPEN (Critique 2026-09-26, P1-2).
+  //
+  // Beide standen in eigenen 40px-Zeilen unter dem Logo, und zusammen mit
+  // dem Fuss (Hilfe, Aenderungen, Abmelden: 104px) blieben auf 1440x900 580px
+  // fuer 750px Module - Geburtstage, Gesundheit und Budget lagen unter der
+  // Falz, auf 1280x800 rund 270px. Apples Mac-Seitenleiste stellt dieselben
+  // zwei Werkzeuge als Icons neben den Titel; die Suche nennt ihr Kuerzel im
+  // Namen (⌘K / Ctrl+K, dazu weiter `/`).
+  //
+  // Kein data-route an beiden: Delegation und Aktiv-Pille ignorieren sie.
+  const sidebarLogoActions = document.createElement('div');
+  sidebarLogoActions.className = 'nav-sidebar__logo-actions';
   // Die Suche greift ueber alle Module und ist fuer ein Wandtablett nicht
   // freigegeben (`search` steht nicht in DISPLAY_SCOPES) - sie antwortete dort
   // mit 403. Ein Knopf, der nur scheitern kann, gehoert nicht an die Wand.
-  if (!isDisplayShell) sidebar.appendChild(sidebarSearch);
+  if (!isDisplayShell) {
+    const sidebarSearch = document.createElement('button');
+    sidebarSearch.type = 'button';
+    sidebarSearch.className = 'nav-sidebar__tool nav-sidebar__search';
+    const searchLabel = `${t('nav.search')} (${searchShortcutLabel()})`;
+    sidebarSearch.setAttribute('aria-label', searchLabel);
+    sidebarSearch.setAttribute('title', searchLabel);
+    sidebarSearch.setAttribute('aria-keyshortcuts', `${isApplePlatform() ? 'Meta' : 'Control'}+K /`);
+    const searchIcon = document.createElement('i');
+    searchIcon.dataset.lucide = 'search';
+    searchIcon.setAttribute('aria-hidden', 'true');
+    sidebarSearch.appendChild(searchIcon);
+    sidebarSearch.addEventListener('click', () => _openSearch?.());
+    sidebarLogoActions.appendChild(sidebarSearch);
+  }
+  sidebarToggle.classList.add('nav-sidebar__tool');
+  sidebarLogoActions.appendChild(sidebarToggle);
+  sidebarLogo.appendChild(sidebarLogoActions);
 
+  sidebar.appendChild(sidebarLogo);
   sidebar.appendChild(sidebarItems);
 
   // Der gepinnte Eintrag steht zwischen Liste und Fuss-Aktionen: er IST eine
@@ -1910,40 +2069,15 @@ function renderAppShell(container) {
   // darunter, aber auch nicht mehr in den Scroller darueber.
   pinnedSidebarItems.forEach((el) => sidebar.appendChild(el));
 
-  // Footer-Aktionen (keine Routen → kein data-route, damit Delegation/Indikator
-  // sie ignorieren): Hilfe und Live-Changelog.
-  const sidebarFooter = document.createElement('div');
-  sidebarFooter.className = 'nav-sidebar__footer-actions';
-  sidebarFooter.append(
-    sidebarActionEl({
-      labelKey: 'nav.help',
-      icon: 'circle-help',
-      className: 'nav-item--help',
-      onClick: () => showHelpModal(),
-    }),
-    sidebarActionEl({
-      labelKey: 'nav.changelog',
-      icon: 'history',
-      className: 'nav-item--changelog',
-      onClick: () => showChangelogModal(),
-    }),
-    // Abmelden als terminale Aktion: bricht in eine eigene, volle Zeile unter
-    // Hilfe/Änderungen (CSS: flex-wrap + border-top). Monochrom wie die
-    // Geschwister — Danger-Rot erscheint erst im Confirm.
-    //
-    // FUER EIN DISPLAY GIBT ES SIE NICHT (#1208). Ein Tablett meldet sich nicht
-    // ab, es wird widerrufen - und `POST /auth/logout` beantwortet der Server
-    // ihm mit 403. Der Knopf haette eine Abmeldung versprochen, die nie
-    // stattfindet, und den Bildschirm im Zweifel in einem Fehlerdialog stehen
-    // lassen.
-    ...(isDisplayShell ? [] : [sidebarActionEl({
-      labelKey: 'settings.logout',
-      icon: 'log-out',
-      className: 'nav-item--logout',
-      onClick: () => confirmAndLogout(),
-    })]),
-  );
-  sidebar.appendChild(sidebarFooter);
+  // HILFE, AENDERUNGEN UND ABMELDEN STEHEN HINTER DEM AVATAR (Critique
+  // 2026-09-26, P1-2). Als Fussleiste kosteten sie 104px Hoehe fuer drei
+  // Handgriffe, die man selten braucht - genau die Hoehe, die den Modulen auf
+  // Laptop-Hoehen fehlte. Das Konto-Menue ist das geteilte popover-menu (Rollen,
+  // Pfeiltasten, Esc und Fokusrueckgabe wie im Werkzeugmenue der Dokumente);
+  // die Zeile selbst nennt, WER angemeldet ist, was die Leiste vorher nirgends
+  // sagte.
+  sidebar.appendChild(sidebarAccountEl({ isDisplayShell }));
+  installPopoverMenus(sidebar);
 
   if (window.lucide) window.lucide.createIcons({ el: sidebar });
 
@@ -2462,7 +2596,9 @@ const SIDEBAR_COLLAPSED_KEY = 'yuvomi.sidebar.collapsed';
 const SHORTCUTS = [
   // Direkt auf die Overlay-Funktion — der alte Umweg über einen Klick auf die
   // Suchleiste im (geschlossenen, inerten) Mehr-Sheet war eine fragile Kette.
-  { key: '/',   description: () => t('shortcuts.search'),  action: () => _openSearch?.() },
+  // ⌘K / Ctrl+K oeffnet dieselbe Suche (Seitenleiste, Critique 2026-09-26);
+  // der Dispatcher faengt die Kombination vor der Modifikator-Weiche ab.
+  { key: '/',   label: () => `/ \u00b7 ${searchShortcutLabel()}`, description: () => t('shortcuts.search'),  action: () => _openSearch?.() },
   // Ein Selektor reicht: der Schnellaktionen-FAB des Dashboards war der einzige
   // Grund für den früheren Zweitweg über `#fab-main` (Audit A1-12), und er ist
   // seit dem Folgevorgang zu #634 selbst ein `.page-fab`.
@@ -2553,6 +2689,16 @@ let _openSearch = null;
 
 function initKeyboardShortcuts() {
   document.addEventListener('keydown', (e) => {
+    // ⌘K / Ctrl+K: das Kuerzel, das die Suche in der Seitenleiste nennt. Es
+    // gilt auch aus einem Eingabefeld heraus (so kennt man es aus jeder App
+    // mit Befehlssuche), aber nicht ueber einem offenen Dialog, und nie mit
+    // Alt oder Umschalt - die gehoeren dem Browser.
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
+      if (document.querySelector('.modal-overlay') || !_openSearch) return;
+      e.preventDefault();
+      _openSearch();
+      return;
+    }
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     if (document.activeElement?.isContentEditable) return;
@@ -2740,9 +2886,13 @@ function withUpdateHint(label, version) {
 
 function applyUpdateBadge() {
   const version = pendingUpdateVersion();
-  for (const el of document.querySelectorAll('.nav-item--changelog, .more-item--changelog, #more-btn')) {
+  // Die Kontozeile traegt den Punkt fuer das Menue, in dem „Aenderungen" jetzt
+  // steht - hinter einem geschlossenen Menue waere der Hinweis sonst unsichtbar.
+  for (const el of document.querySelectorAll('.nav-sidebar__account-trigger, .nav-sidebar__account-menu .nav-item--changelog, .more-item--changelog, #more-btn')) {
     toggleUpdateDot(el, Boolean(version));
   }
+  const account = document.querySelector('.nav-sidebar__account-trigger');
+  if (account?.dataset.baseLabel) account.setAttribute('aria-label', withUpdateHint(account.dataset.baseLabel, version));
   // Den Namen des „Mehr"-Buttons setzt setMoreButtonState bei jeder Navigation
   // neu; sein Zusatz gehört deshalb dorthin und nicht hierher, sonst wäre er
   // nach dem ersten Seitenwechsel wieder weg.
@@ -3283,6 +3433,15 @@ function initSearch(container) {
   let searchOverlayToken = null;
 
   function openSearch() {
+    // SCHON OFFEN: nur zurueck ins Feld. ⌘K gilt auch aus Eingabefeldern,
+    // also auch aus dem Suchfeld selbst - ein zweiter Durchlauf merkte sich
+    // das Suchfeld als Ausloeser (Fokus ginge beim Schliessen ins Leere) und
+    // haengte einen zweiten Focus-Trap an, den closeSearch() nie abnimmt.
+    if (overlay.classList.contains('search-overlay--visible')) {
+      input.focus();
+      input.select();
+      return;
+    }
     if (window._closeMoreSheet) window._closeMoreSheet({ restoreFocus: false });
     lastFocusedBeforeSearch = document.activeElement;
     if (searchOverlayToken === null) searchOverlayToken = pushOverlay(() => closeSearch());
@@ -4470,7 +4629,12 @@ if ('serviceWorker' in navigator) {
 // beantwortet die Frage erst danach.
 window.addEventListener('popstate', (e) => {
   const target = e.state?.path || location.pathname;
-  handleBackNavigation().then((handled) => {
+  handleBackNavigation().then((overlay) => {
+    // Eine Auswahl in Liste + Detail (`?open=`) ist ein Zustand DERSELBEN Seite:
+    // der Baustein stellt ihn aus der Adresse wieder her, statt die Seite neu
+    // zu zeichnen (utils/master-detail.js). Erst NACH den Dialogen gefragt -
+    // ueber einem offenen Dialog meint die Geste den Dialog (#871).
+    const handled = overlay || handleMasterDetailPopstate();
     if (!handled) navigate(target, false);
   });
 });
@@ -4564,6 +4728,7 @@ function rebuildNavigation({ updateLabels = true } = {}) {
     if (navSidebar)   navSidebar.setAttribute('aria-label', t('nav.main'));
     if (navBottom)    navBottom.setAttribute('aria-label', t('nav.navigation'));
     if (moreBtnLabel) moreBtnLabel.textContent = t('nav.more');
+    syncSidebarAccount();
   }
 
   if (navSidebarItems) {
@@ -4624,6 +4789,15 @@ function rebuildNavigation({ updateLabels = true } = {}) {
   // Und was gerade aus der Navigation gefallen ist, verliert seine Zahl.
   dropBadgesForRemovedRoutes();
 }
+
+// Profil geaendert (Name, Farbe, Bild): die Kontozeile der Seitenleiste zieht
+// nach, ohne Neuaufbau der Shell. personal-account.js meldet den neuen Stand.
+window.addEventListener('yuvomi:profile-changed', (e) => {
+  if (currentUser && e.detail && typeof e.detail === 'object') {
+    currentUser = { ...currentUser, ...e.detail };
+  }
+  syncSidebarAccount();
+});
 
 // Sprache geändert: Navigation und aktuelle Seite gemeinsam neu rendern.
 window.addEventListener('locale-changed', () => {

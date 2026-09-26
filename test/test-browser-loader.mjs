@@ -146,7 +146,9 @@ const STUBS = {
     export const openModal = (...args) => globalThis.__openModal?.(...args);
     // Suiten, die pruefen wollen, OB und WANN ein Handler schliesst (das
     // Formular bleibt nach einem Abbrechen offen), setzen globalThis.__closeModal.
-    export const closeModal = (...args) => { globalThis.__closeModal?.(...args); };
+    // Liefert, was der Haken liefert: das Original sagt mit false, dass das
+    // Verwerfen abgelehnt wurde und der Dialog stehen bleibt.
+    export const closeModal = async (...args) => globalThis.__closeModal?.(...args);
     // Wer die Rueckfrage selbst sehen will (Titel, Optionen, Antwort), setzt
     // globalThis.__confirmModal - dasselbe Muster wie __apiStub in /api.js.
     export const confirmModal = async (...args) => (
@@ -203,6 +205,9 @@ const STUBS = {
     export const refocusAfterRender = () => {};
     export const renderKeepingFocus = (render) => { render(); return null; };
     export const forgetRestore = () => {};
+    // Die Fokus-Merker der Detailansicht (Popover): ohne Browser nichts zu merken.
+    export const rememberFocus = () => null;
+    export const restoreFocusAfterClose = () => {};
   `,
   '/components/detail-view.js': `
     // Tests, die pruefen wollen, WELCHE Bedienelemente ein Aufrufer anbietet -

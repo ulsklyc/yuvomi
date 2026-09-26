@@ -686,6 +686,13 @@ function bindEvents(container, user, profileState) {
         Object.assign(user, response.user);
         profileState.avatarData = response.user.avatar_data ?? null;
         updatePreview();
+        // Die Kontozeile der Seitenleiste zeigt Name und Avatar (router.js,
+        // syncSidebarAccount) und zieht mit, ohne dass die Shell neu baut.
+        window.dispatchEvent(new CustomEvent('yuvomi:profile-changed', { detail: {
+          display_name: response.user.display_name,
+          avatar_color: response.user.avatar_color,
+          avatar_data: response.user.avatar_data ?? null,
+        } }));
       }
       window.yuvomi?.showToast(t('settings.profileSavedToast'), 'success');
     } catch (error) {

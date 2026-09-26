@@ -2317,3 +2317,34 @@ test('Abo-Zeile: Metaangaben brechen um statt unter den Betrag zu laufen', async
   const loose = due.split(/<span[^>]*>[^<]*<\/span>|<i[^>]*><\/i>/).filter((teil) => teil.trim() !== '');
   assert.deepEqual(loose, [], 'ausserhalb der beiden Einheiten steht kein loser Text');
 });
+
+test('die Statistik steht ab 960px Container auf der Budget-Bahn: Verlauf und Vergleich links, Anteile rechts (A5 P2-5)', () => {
+  // Die drei Diagramme standen untereinander auf 720px und endeten 404px vor
+  // der Bahn, an der jeder andere Reiter endet (Critique 2026-09-26). Die
+  // Statistik nimmt dieselbe Zweispalte wie die Uebersicht - dieselbe Abfrage,
+  // dieselben Spalten, sonst springt die rechte Kante beim Reiterwechsel.
+  const cellOf = (id) => stats.match(new RegExp(`<div id="${id}" class="([^"]+)"`))?.[1];
+  const gridAt = stats.indexOf('class="budget-stats__grid"');
+  assert.ok(gridAt > 0, 'budget-stats.js baut kein .budget-stats__grid');
+  for (const id of ['budget-stats-trend', 'budget-stats-cat', 'budget-stats-donut']) {
+    assert.ok(stats.indexOf(`id="${id}"`) > gridAt, `#${id} steht nicht im Raster`);
+  }
+  assert.equal(cellOf('budget-stats-trend'), 'budget-stats__main');
+  assert.equal(cellOf('budget-stats-cat'), 'budget-stats__main');
+  assert.equal(cellOf('budget-stats-donut'), 'budget-stats__aside');
+
+  const rules = [...eachRule(budgetCss)];
+  const inQuery = (sel, re) => rules.find(({ selector, body, at }) => selector.trim() === sel && re.test(body)
+    && at.some((a) => /@container\s+budget-page\s*\(\s*min-width:\s*960px\s*\)/.test(a)));
+  const statsGrid = inQuery('.budget-stats__grid', /display:\s*grid/);
+  assert.ok(statsGrid, '.budget-stats__grid wird unter @container budget-page (min-width: 960px) nicht zum Raster');
+  const overview = inQuery('.budget-overview', /display:\s*grid/);
+  const columns = (body) => body.match(/grid-template-columns:([^;]+);/)?.[1].replace(/\s+/g, ' ').trim();
+  assert.ok(columns(statsGrid.body), 'das Raster der Statistik nennt keine Spalten');
+  assert.equal(columns(statsGrid.body), columns(overview.body),
+    'Statistik und Uebersicht teilen dieselben Spalten - sonst endet die Bahn je Reiter woanders');
+  const aside = inQuery('.budget-stats__aside', /grid-column:\s*2/);
+  assert.ok(aside, 'die Ausgaben-Anteile stehen ab 960px nicht in der zweiten Spalte');
+  const main = inQuery('.budget-stats__main', /grid-column:\s*1/);
+  assert.ok(main, 'Verlauf und Vergleich stehen ab 960px nicht in der ersten Spalte');
+});

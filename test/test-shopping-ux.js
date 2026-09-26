@@ -2099,3 +2099,23 @@ test('wireQuickAdd: der Submit-Handler ruft den Kategorie-Rueckfall wirklich auf
   assert.match(submitBlock, /resetQuickAddCategory\(catSelect\);/,
     'der Submit-Handler muss resetQuickAddCategory(catSelect) aufrufen.');
 });
+
+// Desktop-Kopf auf dem Referenzmass (Critique 2026-09-26, R1-Folge): seit die
+// Listenleiste im __center-Slot des Kuechenkopfs steht, bestimmt ihr hoechstes
+// Kind die Zeile. Der Neu-Knopf mit 48px machte den Einkaufskopf 4px hoeher
+// als Essensplan, Rezepte, Vorrat und Dokumente (73 statt 69px). Am Desktop
+// baut er nicht hoeher als die Kapseln daneben; mobil bleibt die Touch-Hoehe.
+test('der Neu-Knopf der Listenleiste baut am Desktop nicht hoeher als die Kapseln', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/shopping.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const minHeight = (rule) => rule?.body.match(/min-height:\s*([^;]+);/)?.[1].trim();
+  const tab = rules.find((r) => r.selector.trim() === '.list-tab' && r.at.length === 0);
+  assert.ok(minHeight(tab), '.list-tab nennt keine Mindesthoehe - der Test liest shopping.css nicht mehr');
+  const desktop = rules.filter((r) => r.selector.trim() === '.list-tab__new'
+    && r.at.some((a) => /min-width:\s*1024px/.test(a)) && minHeight(r));
+  assert.equal(desktop.length, 1, 'am Desktop (min-width: 1024px) setzt genau eine Regel die Hoehe des Neu-Knopfs');
+  assert.equal(minHeight(desktop[0]), minHeight(tab), 'Neu-Knopf und Kapsel bauen am Desktop gleich hoch');
+  const base = rules.find((r) => r.selector.trim() === '.list-tab__new' && r.at.length === 0);
+  assert.equal(minHeight(base), 'var(--target-lg)', 'mobil bleibt der Neu-Knopf auf der Touch-Hoehe');
+});

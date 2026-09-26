@@ -349,3 +349,19 @@
     transition: none;
   }
 }
+
+/* --------------------------------------------------------
+ * Präsentation: Detailspalte (Liste + Detail, utils/master-detail.js)
+ *
+ * Kopf und Fußzeile bringt die Spalte mit (layout.css, `.split-view__*`);
+ * hier nur der Innenabstand des Lese-Körpers, damit er mit Titel und
+ * Aktionen darüber fluchtet.
+ * -------------------------------------------------------- */
+.detail-view--in-pane {
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-view--in-pane > .detail-view {
+  padding: var(--space-4) var(--space-5) 0;
+}

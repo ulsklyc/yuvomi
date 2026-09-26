@@ -436,6 +436,23 @@ test('shiftMonth ueber Jahresgrenzen', () => {
   assert.equal(hk.shiftMonth('2026-03', -14), '2025-01');
 });
 
+// Desktop-Kopf auf dem Referenzmass (Critique 2026-09-26, R1-Folge): die
+// Reiterleiste trug am Desktop die Kuechenhoehe (56px) um 44px-Reiter, der
+// Kopf stand bei 133px statt wie Budget (gleiche Bauart: Titelzeile + Reiter)
+// bei 121. Am Desktop baut die Leiste so hoch wie ihre Reiter; mobil bleibt sie.
+test('die Reiterleiste der Haushaltshilfe baut am Desktop nicht die Kuechenhoehe', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/housekeeping.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)].filter((r) => r.selector.trim() === '.housekeeping-tabs' && /(^|[\s;])height:/.test(r.body));
+  const heightOf = (r) => r.body.match(/(?:^|[\s;])height:\s*([^;]+);/)?.[1].trim();
+  const base = rules.find((r) => r.at.length === 0);
+  assert.match(heightOf(base) ?? '', /--kitchen-tabs-height/, 'mobil bleibt die Leiste auf der Touch-Hoehe');
+  const desktop = rules.filter((r) => r.at.some((a) => /min-width:\s*1024px/.test(a)));
+  assert.equal(desktop.length, 1, 'genau eine Desktop-Regel (min-width: 1024px) setzt die Hoehe der Leiste');
+  assert.equal(heightOf(desktop[0]), 'auto', 'am Desktop baut die Leiste so hoch wie ihre Reiter');
+});
+
 // ---------------------------------------------------------------------------
 // Review zu #1475: Rueckgaengig waehrend das Neuladen nach dem Erledigen laeuft
 // ---------------------------------------------------------------------------

@@ -136,6 +136,18 @@
   min-height: var(--target-lg);
 }
 
+/* DESKTOP-KOPF AUF DEM REFERENZMASS (Critique 2026-09-26, R1-Folge). Seit
+ * die Listenleiste im __center-Slot des Kuechenkopfs steht, bestimmt ihr
+ * hoechstes Kind die Zeile: der Neu-Knopf mit 48px machte den Einkaufskopf 4px
+ * hoeher als Essensplan, Rezepte, Vorrat und Dokumente (Zeile 73 statt 69px),
+ * und er stand als 44x48-Oval neben 44px-Kapseln. Am Desktop hat er die Hoehe
+ * der Kapseln; mobil bleibt die Touch-Hoehe. */
+@media (min-width: 1024px) {
+  .list-tab__new {
+    min-height: var(--target-base);
+  }
+}
+
 .list-tab__new:hover {
   border-color: var(--color-accent);
   color: var(--color-accent);
