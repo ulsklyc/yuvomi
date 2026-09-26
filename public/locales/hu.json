@@ -5617,8 +5617,8 @@
         "historyOdometerValue_one": "{{value}} {{unit}}",
         "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Kilométeróra időbeli alakulása",
-        "detailPaneLabel": "Tárgy",
-        "pickOneTitle": "Válassz egy tárgyat",
+        "detailPaneLabel": "Tárgy részletei",
+        "pickOne": "Válassz egy tárgyat",
         "pickOneHint": "Az adatok, határidők és az előzmények itt jelennek meg."
     },
     "documentAttach": {

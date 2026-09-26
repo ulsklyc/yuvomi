@@ -5617,8 +5617,8 @@
         "historyOdometerValue_one": "{{value}} {{unit}}",
         "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Пробіг у часі",
-        "detailPaneLabel": "Предмет",
-        "pickOneTitle": "Виберіть предмет",
+        "detailPaneLabel": "Відомості про предмет",
+        "pickOne": "Виберіть предмет",
         "pickOneHint": "Тут з’являться дані, терміни та історія."
     },
     "documentAttach": {

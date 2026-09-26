@@ -2112,7 +2112,7 @@ export async function render(container, { signal } = {}) {
   split.insertAdjacentHTML('beforeend', splitViewDetailHtml({
     id: 'inventory',
     label: t('inventory.detailPaneLabel'),
-    empty: { icon: 'package', title: t('inventory.pickOneTitle'), hint: t('inventory.pickOneHint') },
+    empty: { icon: 'package', title: t('inventory.pickOne'), hint: t('inventory.pickOneHint') },
   }));
 
   const fab = document.createElement('button');

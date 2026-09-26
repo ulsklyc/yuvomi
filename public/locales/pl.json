@@ -5617,8 +5617,8 @@
         "historyOdometerValue_one": "{{value}} {{unit}}",
         "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Przebieg w czasie",
-        "detailPaneLabel": "Przedmiot",
-        "pickOneTitle": "Wybierz przedmiot",
+        "detailPaneLabel": "Szczegóły przedmiotu",
+        "pickOne": "Wybierz przedmiot",
         "pickOneHint": "Tutaj pojawią się szczegóły, terminy i historia."
     },
     "documentAttach": {

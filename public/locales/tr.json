@@ -5617,8 +5617,8 @@
         "historyOdometerValue_one": "{{value}} {{unit}}",
         "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Zaman içinde kilometre sayacı",
-        "detailPaneLabel": "Eşya",
-        "pickOneTitle": "Bir eşya seçin",
+        "detailPaneLabel": "Eşya ayrıntıları",
+        "pickOne": "Bir eşya seçin",
         "pickOneHint": "Ayrıntılar, süreler ve geçmiş burada görünür."
     },
     "documentAttach": {

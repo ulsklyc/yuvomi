@@ -5617,8 +5617,8 @@
         "historyOdometerValue_one": "{{value}} {{unit}}",
         "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "走行距離の推移",
-        "detailPaneLabel": "持ち物",
-        "pickOneTitle": "持ち物を選択",
+        "detailPaneLabel": "持ち物の詳細",
+        "pickOne": "持ち物を選択",
         "pickOneHint": "詳細・期限・履歴がここに表示されます。"
     },
     "documentAttach": {

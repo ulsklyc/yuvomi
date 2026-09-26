@@ -5617,8 +5617,8 @@
         "historyOdometerValue_one": "{{value}} {{unit}}",
         "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Vägmätare över tid",
-        "detailPaneLabel": "Sak",
-        "pickOneTitle": "Välj en sak",
+        "detailPaneLabel": "Detaljer om saken",
+        "pickOne": "Välj en sak",
         "pickOneHint": "Uppgifter, tidsfrister och historik visas här."
     },
     "documentAttach": {

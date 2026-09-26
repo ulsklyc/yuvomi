@@ -5617,8 +5617,8 @@
         "historyOdometerValue_one": "{{value}} {{unit}}",
         "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Odometer sa paglipas ng panahon",
-        "detailPaneLabel": "Gamit",
-        "pickOneTitle": "Pumili ng gamit",
+        "detailPaneLabel": "Detalye ng gamit",
+        "pickOne": "Pumili ng gamit",
         "pickOneHint": "Dito lalabas ang mga detalye, deadline at kasaysayan."
     },
     "documentAttach": {

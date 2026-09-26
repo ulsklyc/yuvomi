@@ -5617,8 +5617,8 @@
         "historyOdometerValue_one": "{{value}} {{unit}}",
         "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "کیلومتر شمار در طول زمان",
-        "detailPaneLabel": "وسیله",
-        "pickOneTitle": "یک وسیله انتخاب کنید",
+        "detailPaneLabel": "جزئیات وسیله",
+        "pickOne": "یک وسیله انتخاب کنید",
         "pickOneHint": "جزئیات، مهلت‌ها و سابقه اینجا نمایش داده می‌شوند."
     },
     "documentAttach": {

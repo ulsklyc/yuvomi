@@ -5617,8 +5617,8 @@
         "historyOdometerValue_one": "{{value}} {{unit}}",
         "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "里程随时间变化",
-        "detailPaneLabel": "物品",
-        "pickOneTitle": "选择一个物品",
+        "detailPaneLabel": "物品详情",
+        "pickOne": "选择一个物品",
         "pickOneHint": "详细信息、期限和历史记录会显示在这里。"
     },
     "documentAttach": {

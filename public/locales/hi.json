@@ -5617,8 +5617,8 @@
         "historyOdometerValue_one": "{{value}} {{unit}}",
         "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "समय के साथ ओडोमीटर",
-        "detailPaneLabel": "वस्तु",
-        "pickOneTitle": "कोई वस्तु चुनें",
+        "detailPaneLabel": "वस्तु का विवरण",
+        "pickOne": "कोई वस्तु चुनें",
         "pickOneHint": "विवरण, समय-सीमाएँ और इतिहास यहाँ दिखेंगे।"
     },
     "documentAttach": {

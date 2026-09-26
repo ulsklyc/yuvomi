@@ -5617,8 +5617,8 @@
         "historyOdometerValue_one": "{{value}} {{unit}}",
         "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Stav tachometru v čase",
-        "detailPaneLabel": "Předmět",
-        "pickOneTitle": "Vyberte předmět",
+        "detailPaneLabel": "Podrobnosti předmětu",
+        "pickOne": "Vyberte předmět",
         "pickOneHint": "Údaje, termíny a historie se zobrazí zde."
     },
     "documentAttach": {

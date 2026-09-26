@@ -5617,8 +5617,8 @@
         "historyOdometerValue_one": "{{value}} {{unit}}",
         "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Odometer dari waktu ke waktu",
-        "detailPaneLabel": "Barang",
-        "pickOneTitle": "Pilih barang",
+        "detailPaneLabel": "Detail barang",
+        "pickOne": "Pilih barang",
         "pickOneHint": "Detail, tenggat, dan riwayat muncul di sini."
     },
     "documentAttach": {

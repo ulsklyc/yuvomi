@@ -5617,8 +5617,8 @@
         "historyOdometerValue_one": "{{value}} {{unit}}",
         "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "عداد المسافة عبر الزمن",
-        "detailPaneLabel": "الغرض",
-        "pickOneTitle": "اختر غرضًا",
+        "detailPaneLabel": "تفاصيل الغرض",
+        "pickOne": "اختر غرضًا",
         "pickOneHint": "تظهر هنا التفاصيل والمواعيد والسجل."
     },
     "documentAttach": {

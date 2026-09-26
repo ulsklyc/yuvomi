@@ -5617,8 +5617,8 @@
         "historyOdometerValue_one": "{{value}} {{unit}}",
         "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Χιλιόμετρα με την πάροδο του χρόνου",
-        "detailPaneLabel": "Αντικείμενο",
-        "pickOneTitle": "Επίλεξε ένα αντικείμενο",
+        "detailPaneLabel": "Λεπτομέρειες αντικειμένου",
+        "pickOne": "Επίλεξε ένα αντικείμενο",
         "pickOneHint": "Τα στοιχεία, οι προθεσμίες και το ιστορικό εμφανίζονται εδώ."
     },
     "documentAttach": {

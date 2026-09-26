@@ -5617,8 +5617,8 @@
         "historyOdometerValue_one": "{{value}} {{unit}}",
         "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Compteur kilométrique dans le temps",
-        "detailPaneLabel": "Objet",
-        "pickOneTitle": "Choisissez un objet",
+        "detailPaneLabel": "Détails de l'objet",
+        "pickOne": "Choisissez un objet",
         "pickOneHint": "Les détails, échéances et l’historique s’affichent ici."
     },
     "documentAttach": {

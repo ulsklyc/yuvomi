@@ -5617,8 +5617,8 @@
         "historyOdometerValue_one": "{{value}} {{unit}}",
         "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Kilometerstand über die Zeit",
-        "detailPaneLabel": "Gegenstand",
-        "pickOneTitle": "Wähle einen Gegenstand",
+        "detailPaneLabel": "Gegenstandsdetails",
+        "pickOne": "Wähle einen Gegenstand",
         "pickOneHint": "Angaben, Fristen und Verlauf erscheinen hier."
     },
     "documentAttach": {
