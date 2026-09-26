@@ -111,10 +111,17 @@ test('category-manager: Drag-Handle nutzt grip-vertical (Lucide)', () => {
 });
 
 test('category-manager: Tastatur-Fallback (Auf/Ab-Buttons) bleibt erhalten, Drag ist nie der einzige Weg', () => {
-  assert.match(comp, /data-action="up"/);
-  assert.match(comp, /data-action="down"/);
-  assert.match(comp, /data-action="sub-up"/);
-  assert.match(comp, /data-action="sub-down"/);
+  // Seit dem Komponenten-Kanon (2026-09-26) baut `_rowActionsHtml()` die
+  // Knoepfe ueber rowActionHtml({ action: `${prefix}up` }), prefix 'sub-' fuer
+  // Unterkategorien. Geprueft wird die Regel - beide Ebenen haben Auf/Ab im
+  // Markup UND im Klick-Verteiler -, nicht die Schreibweise des Attributs.
+  const markup = (a) => new RegExp(`data-action="${a}"`).test(comp);
+  const viaHelper = /const prefix = sub \? 'sub-' : '';/.test(comp)
+    && /action: `\$\{prefix\}up`/.test(comp) && /action: `\$\{prefix\}down`/.test(comp);
+  for (const a of ['up', 'down', 'sub-up', 'sub-down']) {
+    assert.ok(markup(a) || viaHelper, `kein Knopf mit data-action="${a}"`);
+    assert.match(comp, new RegExp(`action === '${a}'`), `der Klick-Verteiler kennt "${a}" nicht`);
+  }
   assert.match(comp, /async _move\(key, delta\)/);
   assert.match(comp, /async _subMove\(parent, subKey, delta\)/);
 });
