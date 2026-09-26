@@ -344,7 +344,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   button on a Kanban card has a full-size tap area, and the meal card icons are larger on phones.
   The titles on the join, password reset and pairing pages have their own style. The offline
   banner in the installed app stays clear of the status bar. The health disclaimer keeps a reading
-  width. Subtask marks in the task detail are quiet again and turn green when done. Settings
+  width. Subtask marks in the task detail are quiet again and turn green when done, "Add subtask"
+  there fits on one line, and edit and delete on a comment are always visible instead of only on
+  hover. Prevention types in the settings show their icon beside the name. Settings
   sidebar labels are no longer cut off, and the switches under the kitchen settings stay inside
   their card.
 
