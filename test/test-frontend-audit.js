@@ -18542,3 +18542,36 @@ test('die Achsenschrift einer CHART-Flaeche skaliert nicht mit dem Diagramm', ()
   const budgetCss = [...eachRule(read('../public/styles/budget.css'))].find((rule) => rule.selector === '.budget-stats__point');
   assert.match(budgetCss.body, /left:\s*calc\(var\(--chart-inset\)/, 'die Budget-Punkte muessen hinter dem Polster beginnen');
 });
+
+/* "Mitglied hinzufuegen" verlor den Fokus (Critique 2026-09-26): der Knopf
+ * verschwand, das Formular erschien UNTER der Zwei-Faktor-Karte, der Fokus
+ * fiel auf BODY. Die Einladung derselben Seite macht es richtig - Formular am
+ * Ort, erstes Feld fokussiert. Geprueft wird Ort UND Fokusweg in beide
+ * Richtungen, fuer beide Formulare der Seite. */
+test('Familie: Mitglied- und Einladungsformular erscheinen am Knopf und geben den Fokus zurueck', () => {
+  const src = read('../public/settings/pages/admin-family.js');
+  const at = (needle) => {
+    const i = src.indexOf(needle);
+    assert.ok(i >= 0, `${needle} fehlt`);
+    return i;
+  };
+  const membersCard = at('id="members-card"');
+  const formCard = at('id="add-member-form-card"');
+  const twoFactor = at('id="two-factor-household-card"');
+  assert.ok(membersCard < formCard && formCard < twoFactor,
+    'das Formular steht direkt unter der Mitgliederliste, nicht hinter der Zwei-Faktor-Karte');
+
+  const handler = (openNeedle) => {
+    const start = at(openNeedle);
+    return src.slice(start, src.indexOf('});', start) + 3);
+  };
+  assert.match(handler("addMemberBtn.addEventListener('click'"), /#new-username'\)\??\.focus\(/,
+    'Oeffnen setzt den Fokus ins erste Feld');
+  assert.match(handler("cancelAddMember.addEventListener('click'"), /#add-member-btn'\)\??\.focus\(\)|addMemberBtn\??\.focus\(\)/,
+    'Abbrechen gibt den Fokus an den wieder sichtbaren Knopf zurueck');
+  const submit = src.slice(at("addMemberForm.addEventListener('submit'"), at('bindDeleteButtons(container);\n  bindEditButtons(container, currentUser, users);\n}'));
+  assert.match(submit, /#add-member-btn'\)\??\.focus\(\)|addMemberBtn\??\.focus\(\)/,
+    'nach dem Anlegen verschwindet das Formular - der Fokus geht an den Knopf, nicht an BODY');
+  assert.match(handler("container.querySelector('#cancel-add-invite')?.addEventListener('click'"), /addBtn\.focus\(\)/,
+    'auch das Einladungsformular gibt beim Abbrechen den Fokus zurueck');
+});

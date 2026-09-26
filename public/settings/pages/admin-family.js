@@ -190,18 +190,6 @@ function renderPage(container) {
         <button class="btn btn--primary settings-add-btn" id="add-member-btn" hidden>${t('settings.addMember')}</button>
       </div>
 
-      <div class="settings-card" id="two-factor-household-card">
-        <h3 class="settings-card__title">${t('settings.twoFactorTitle')}</h3>
-        <p class="form-hint">${t('settings.twoFactorHouseholdHint')}</p>
-        ${toggleRowHtml({
-          label: t('settings.twoFactorRequireLabel'),
-          attrs: { id: 'two-factor-require' },
-          disabled: true,
-        })}
-        <ul class="settings-2fa__members" id="two-factor-members"></ul>
-        <div id="two-factor-household-error" class="form-error" role="alert" hidden></div>
-      </div>
-
       <div class="settings-card settings-card--hidden" id="add-member-form-card">
         <h3 class="settings-card__title">${t('settings.newMemberTitle')}</h3>
         <form id="add-member-form" class="settings-form">
@@ -262,6 +250,18 @@ function renderPage(container) {
             <button type="button" class="btn btn--secondary" id="cancel-add-member">${t('settings.cancelAddMember')}</button>
           </div>
         </form>
+      </div>
+
+      <div class="settings-card" id="two-factor-household-card">
+        <h3 class="settings-card__title">${t('settings.twoFactorTitle')}</h3>
+        <p class="form-hint">${t('settings.twoFactorHouseholdHint')}</p>
+        ${toggleRowHtml({
+          label: t('settings.twoFactorRequireLabel'),
+          attrs: { id: 'two-factor-require' },
+          disabled: true,
+        })}
+        <ul class="settings-2fa__members" id="two-factor-members"></ul>
+        <div id="two-factor-household-error" class="form-error" role="alert" hidden></div>
       </div>
 
       <div class="settings-card" id="invites-card">
@@ -504,6 +504,7 @@ function bindInviteEvents(container, initialInvites) {
     updatePresetHint();
     errorEl.hidden = true;
     output.hidden = true;
+    addBtn.focus();
   });
 
   form.addEventListener('submit', async (event) => {
@@ -882,9 +883,13 @@ function bindEvents(container, currentUser, users) {
   const addMemberBtn = container.querySelector('#add-member-btn');
   if (addMemberBtn) {
     addMemberBtn.hidden = false;
+    // Wie die Einladung: das Formular steht direkt unter der Liste (renderPage),
+    // und der Fokus geht ins erste Feld - der Knopf verschwindet, und ohne
+    // Ziel fiel der Fokus auf BODY (Critique 2026-09-26).
     addMemberBtn.addEventListener('click', () => {
       container.querySelector('#add-member-form-card').classList.remove('settings-card--hidden');
       addMemberBtn.hidden = true;
+      container.querySelector('#new-username')?.focus();
     });
   }
 
@@ -897,6 +902,7 @@ function bindEvents(container, currentUser, users) {
       syncSsoOnlyField(container);
       container.querySelector('#new-avatar-color').value = randomAvatarColor();
       container.querySelector('#member-error').hidden = true;
+      container.querySelector('#add-member-btn').focus();
     });
   }
 
@@ -942,6 +948,7 @@ function bindEvents(container, currentUser, users) {
         container.querySelector('#new-avatar-color').value = randomAvatarColor();
         container.querySelector('#add-member-form-card').classList.add('settings-card--hidden');
         container.querySelector('#add-member-btn').hidden = false;
+        container.querySelector('#add-member-btn').focus();
         window.yuvomi?.showToast(t('settings.memberAddedToast', { name: res.user.display_name }), 'success');
         bindDeleteButtons(container);
         bindEditButtons(container, currentUser, users);
