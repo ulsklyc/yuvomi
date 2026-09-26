@@ -431,8 +431,15 @@ test('jeder Weg zu einer bestehenden Aufgabe führt in die Detailansicht', async
   // Die Zahl steht hier als BUCHFÜHRUNG, nicht als Obergrenze: ein neuer
   // Einstieg soll diesen Test rot machen, damit jemand entscheidet, wohin er
   // führt. Beim Verlauf (#791) hat er genau das getan.
+  //
+  // Liste + Detail (2026-09-26): Listenzeile, Stift und Deep-Link laufen unter
+  // der Schwelle ueber EINEN Weg (`openTaskSheet`, zugleich `openNarrow` des
+  // Bausteins); ab der Schwelle zeichnet `renderTaskPane` dieselbe Ansicht in
+  // die Detailspalte - mit `{ pane }`, also nicht als Sheet.
   const detailCalls = [...src.matchAll(/^\s+openTaskView\(task, reminder, container\);$/gm)];
-  assert.equal(detailCalls.length, 5, 'Listenzeile/Stift, Kanban, Wischen, Deep-Link und Verlauf');
+  assert.equal(detailCalls.length, 4, 'Kanban, Verlauf, Wischen und openTaskSheet (Listenzeile/Stift/Deep-Link)');
+  assert.match(src, /openTaskView\(task, reminder, container, \{ pane: body \}\)/,
+    'die Detailspalte zeigt dieselbe Leseansicht, nicht eine eigene');
 
   // Übrig bleibt genau ein openTaskModal-Aufruf: der FAB für neue Aufgaben.
   // Die Definition darüber trägt Defaults (`= {}`) und zählt nicht mit.

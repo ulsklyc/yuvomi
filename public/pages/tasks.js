@@ -31,6 +31,7 @@ import { toggleRowHtml } from '/settings/components.js';
 import { wireTablist } from '/utils/tablist.js';
 import { todayKey, parseLocalDateKey } from '/utils/date.js';
 import { makeSortable } from '/utils/sortable.js';
+import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
 import { zonedDateKey } from '/utils/timezone.js';
 import { historyDayLabel } from '/utils/day-label.js';
 import {
@@ -534,7 +535,7 @@ function renderTaskCard(task, opts = {}) {
     : '';
 
   return `
-    <div class="task-card ${isDone ? 'task-card--done' : ''} ${archived ? 'task-card--archived' : ''}" data-task-id="${task.id}">
+    <div class="task-card ${isDone ? 'task-card--done' : ''} ${archived ? 'task-card--archived' : ''}" data-task-id="${task.id}" data-md-id="${task.id}">
       <div class="list-row list-row--roomy task-card__main">
         ${showCheckbox ? `
         <input type="checkbox" class="task-bulk-checkbox" data-task-id="${task.id}"
@@ -569,7 +570,7 @@ function renderTaskCard(task, opts = {}) {
         ${renderDoerPicker(task, isDone, archived)}
 
         <div class="task-card__body">
-          <button type="button" class="task-card__title u-card-title u-compact" data-action="open-task" data-id="${task.id}">
+          <button type="button" class="task-card__title u-card-title u-compact" data-action="open-task" data-id="${task.id}" data-md-focus>
             ${esc(task.title)}
           </button>
           <div class="task-card__meta">
@@ -1325,7 +1326,7 @@ function taskQuery() {
   return params.toString() ? `?${params}` : '';
 }
 
-async function loadTasks(container) {
+async function loadTasks(container, renderOpts = {}) {
   // Ohne Container steht diese Seite gar nicht - die Aufgabe wurde von der
   // Uebersicht oder aus dem Kalender geoeffnet (#918), und dort frischt der
   // Aufrufer seine eigene Ansicht auf.
@@ -1333,7 +1334,7 @@ async function loadTasks(container) {
   persistAssignedToMe();
   const data  = await api.get(`/tasks${taskQuery()}`);
   state.tasks = data.data ?? [];
-  renderTaskList(container);
+  renderTaskList(container, renderOpts);
 }
 
 /**
@@ -3055,7 +3056,7 @@ async function loadHistory(container, { append = false } = {}) {
 // Partielle DOM-Updates
 // --------------------------------------------------------
 
-function renderTaskList(container) {
+function renderTaskList(container, { paneQuiet = false } = {}) {
   // VOR dem Ladefehler der Aufgaben: der Verlauf hat seinen eigenen Bestand und
   // seinen eigenen Fehler. Ein gescheitertes `/tasks` sagt nichts darüber, ob
   // die Vorgänge zu haben sind - stünde die Weiche danach, zeigte der Verlauf
@@ -3091,9 +3092,13 @@ function renderTaskList(container) {
   }
   const listEl = container.querySelector('#task-list');
   if (!listEl) return;
+  // Die Reihenfolge VOR dem Neuzeichnen: verlaesst die ausgewaehlte Zeile die
+  // Ansicht, rueckt die Auswahl auf ihre Nachbarin (syncPaneAfterRender).
+  const orderBefore = mdRowIds(listEl);
   listEl.replaceChildren();
   listEl.insertAdjacentHTML('beforeend', renderTaskGroups(filteredTasks(), state.groupMode));
   if (window.lucide) window.lucide.createIcons({ el: listEl });
+  syncPaneAfterRender(listEl, orderBefore, { quiet: paneQuiet });
   stagger(listEl.querySelectorAll('.swipe-row, .kanban-card'));
   updateBulkActionsBar(container);
   wireSwipeGestures(container);
@@ -3686,6 +3691,9 @@ function wireSwipeGestures(container) {
       reveal: '.swipe-reveal--edit',
       run: async (row) => {
         const taskId = row.dataset.swipeId;
+        // In der Spaltenform ist „Ansehen" das Auswaehlen - das Detail steht
+        // daneben, ein Sheet darueber verdeckte es.
+        if (taskMd?.isSplit()) { taskMd.select(taskId); return; }
         try {
           const [task, reminder] = await Promise.all([
             loadTaskForEdit(taskId),
@@ -3745,6 +3753,14 @@ function syncViewChrome(container) {
   // Die Gegenrichtung - Seite auf Lesemass, Kopf freigeben - gibt es nicht:
   // PAGE-016 verlangt, dass ein Mass, das etwas kappt, im Kopf sichtbar ist.
   container.querySelector('.tasks-page')?.classList.toggle('is-reading-measure', !isKanbanMode());
+  // LISTE + DETAIL NUR IN DER LISTE. Das Brett ist Flaeche, der Verlauf zeigt
+  // Vorgaenge - dort gibt es keine Zeile, deren Detail rechts stehen koennte.
+  // Ohne die Klasse ist die Wurzel auch kein Container: die Detailspalte
+  // bleibt verborgen, und nichts im Brett bezieht sich auf einen neuen
+  // Containing Block (Drag-Ghosts, fixierte Ebenen).
+  container.querySelector('.tasks-page')?.classList.toggle('app-page--list-detail', isList);
+  if (!isList && taskMd?.selectedId() != null) taskMd.clear({ history: 'replace' });
+  syncSplitHeight(container);
 
   // Suche, Filter und Sammelauswahl fragen alle nach AUFGABEN. Der Verlauf
   // zeigt Vorgaenge - ein Statusfilter darueber waere eine Auswahl, die nichts
@@ -4200,17 +4216,16 @@ function wireTaskList(container) {
       }
     }
 
-    if (action === 'edit-task' || action === 'open-task') {
-      try {
-        const [task, reminder] = await Promise.all([
-          loadTaskForEdit(id),
-          loadReminderForTask(id),
-        ]);
-        openTaskView(task, reminder, container);
-      } catch (err) {
-        window.yuvomi.showToast(t('tasks.loadError'), 'danger');
-      }
+    // LISTE + DETAIL: ab der Schwelle waehlt der Titel die Zeile aus, und das
+    // Detail steht rechts daneben; darunter oeffnet er wie bisher das Sheet.
+    // Der Stift steht in der Spaltenform nicht (tasks.css), er fuehrt deshalb
+    // weiter den Weg unter der Schwelle.
+    if (action === 'open-task') {
+      if (taskMd) taskMd.open(id, target);
+      else await openTaskSheet(id, container);
     }
+
+    if (action === 'edit-task') await openTaskSheet(id, container);
 
     if (action === 'archive-task' || action === 'unarchive-task') {
       const archive = action === 'archive-task';
@@ -4249,7 +4264,7 @@ function wireTaskList(container) {
  * sie ohne Mounter oeffnet, bekommt eine ohne Bearbeiten-Knopf statt einen,
  * der ins Leere fuehrt.
  */
-function openTaskView(task, reminder, container) {
+function openTaskView(task, reminder, container, { pane = null } = {}) {
   openTaskDetail({
     task,
     reminder,
@@ -4258,7 +4273,12 @@ function openTaskView(task, reminder, container) {
     isAdmin: state.isAdmin,
     categories: state.categories,
     container,
-    onChanged: () => loadTasks(container),
+    // In der Spalte zeigt die Ansicht ihre eigene Aenderung (Teilaufgabe,
+    // Kommentar) schon selbst - die Liste zieht nach, ohne das Detail neu zu
+    // malen und dabei den Fokus aus dem Knopf zu reissen, der ihn gerade hat.
+    onChanged: pane ? () => loadTasks(container, { paneQuiet: true }) : () => loadTasks(container),
+    pane,
+    onClose: pane ? () => onPaneActionClosed(container) : undefined,
     // Ohne Mounter baut die geteilte Ansicht keinen Bearbeiten-Knopf (#918) -
     // besser als einer, der ins Leere fuehrt. openTaskDetail zieht denselben
     // Schluss ohnehin noch einmal ueber canEditTaskDefinition(); der Verzicht
@@ -4272,8 +4292,254 @@ function openTaskView(task, reminder, container) {
         pane.insertAdjacentHTML('beforeend', renderModalContent({ task, users: state.users, reminder }));
         wireTaskForm(panel, { task, container });
       },
+      // Aus der Detailspalte: das regulaere Formular-Modal, mit Fusszeile,
+      // Verwerfen-Frage und Fokusfuehrung (detail-view.js, openInPane).
+      standalone: pane ? () => openTaskModal({ task, users: state.users, reminder }, container) : undefined,
     },
   });
+}
+
+// --------------------------------------------------------
+// Liste + Detail (Breitenregel, DESIGN.md; utils/master-detail.js)
+//
+// Ab der Schwelle steht rechts neben der Liste das Detail der AUSGEWAEHLTEN
+// Aufgabe - wie in Erinnerungen auf dem Mac. Nur in der Listenansicht: das
+// Brett braucht die ganze Flaeche, und der Verlauf zeigt Vorgaenge, keine
+// Aufgaben. Die Wurzel traegt `.app-page--list-detail` deshalb nur dort
+// (syncViewChrome), darunter und im Brett bleibt alles, wie es war.
+//
+// Die Adresse ist `?open=<id>` und nicht `?id=`: diesen Deep-Link gibt es seit
+// der globalen Suche (router.js), und EIN Parameter fuer beide Regime heisst,
+// dass derselbe Link am Handy das Sheet oeffnet und am Desktop die Zeile waehlt.
+// --------------------------------------------------------
+
+/** Handle des Bausteins, solange die Seite steht; sonst null. */
+let taskMd = null;
+/** Stand der ausgewaehlten Aufgabe beim letzten Zeichnen des Details. */
+let paneTaskSig = null;
+/** Eine Aktion der Spalte (Status, Ablage) hat sie abgemeldet - neu malen. */
+let paneRepaintDue = false;
+
+const TASK_DETAIL_PARAM = 'open';
+
+/** Alle Zeilen-IDs in Dokumentreihenfolge (auch verborgene). */
+function mdRowIds(listEl) {
+  return [...listEl.querySelectorAll('[data-md-id]')].map((row) => row.dataset.mdId);
+}
+
+/** Die IDs der Zeilen, die gerade zu sehen sind. */
+function visibleMdIds(listEl) {
+  return new Set([...listEl.querySelectorAll('[data-md-id]')]
+    .filter((row) => !row.hidden && row.getClientRects().length > 0)
+    .map((row) => row.dataset.mdId));
+}
+
+/**
+ * Die Nachbarin einer Zeile, die gegangen ist: zuerst die naechste darunter,
+ * dann die darueber - wie Mail nach dem Loeschen einer Nachricht. `null`, wenn
+ * keine mehr steht (dann Leerzustand).
+ */
+function neighborMdId(order, goneId, visible) {
+  const index = order.indexOf(String(goneId));
+  if (index < 0) return null;
+  for (let i = index + 1; i < order.length; i += 1) if (visible.has(order[i])) return order[i];
+  for (let i = index - 1; i >= 0; i -= 1) if (visible.has(order[i])) return order[i];
+  return null;
+}
+
+/** Fingerabdruck einer Aufgabe aus der Liste - aendert er sich, ist das Detail alt. */
+function taskSig(id) {
+  const task = state.tasks.find((x) => String(x.id) === String(id));
+  return task ? JSON.stringify(task) : null;
+}
+
+/**
+ * Nach jedem Neuzeichnen der Liste: Auswahl halten, nachziehen oder weiterruecken.
+ *
+ * - Die Zeile steht noch: Auswahl bleibt (Abhaken, Filter, Suche). Hat sich
+ *   die Aufgabe geaendert (Status aus der Liste, gespeichertes Formular),
+ *   malt das Detail neu - ausser die Aenderung kam aus dem Detail selbst.
+ * - Die Aufgabe ist noch da, nur nicht gezeichnet (Gruppe eingeklappt): die
+ *   Auswahl bleibt stehen, bis die Zeile zurueckkommt.
+ * - Sie hat die Ansicht verlassen (abgehakt unter „Offen", abgelegt,
+ *   geloescht, weggefiltert): die Auswahl rueckt auf die Nachbarin, sonst
+ *   Leerzustand. Die Adresse wird ersetzt, nicht gestapelt - das Weiterruecken
+ *   ist keine Navigation, die ein Zurueck verdiente.
+ */
+function syncPaneAfterRender(listEl, orderBefore, { quiet = false } = {}) {
+  if (!taskMd) return;
+  const selected = taskMd.selectedId();
+  if (selected == null) { taskMd.refresh(); return; }
+  const row = listEl.querySelector(`[data-md-id="${CSS.escape(selected)}"]`);
+  if (row) {
+    const sig = taskSig(selected);
+    const repaint = paneRepaintDue || (!quiet && paneTaskSig != null && sig !== paneTaskSig);
+    paneRepaintDue = false;
+    paneTaskSig = sig;
+    taskMd.refresh({ repaint });
+    return;
+  }
+  if (filteredTasks().some((task) => String(task.id) === selected)) return;
+  moveSelectionOn(listEl, orderBefore, selected);
+}
+
+/** Die ausgewaehlte Zeile ist weg: auf die Nachbarin oder in den Leerzustand. */
+function moveSelectionOn(listEl, order, goneId) {
+  paneRepaintDue = false;
+  const next = taskMd.isSplit() ? neighborMdId(order, goneId, visibleMdIds(listEl)) : null;
+  // Stand der Fokus auf der gegangenen Zeile, faellt er mit ihr auf <body>.
+  // Dann geht er mit der Auswahl - Tastaturbedienung verliert sonst ihren Ort.
+  const focusLost = !document.activeElement || document.activeElement === document.body;
+  if (next) taskMd.select(next, { history: 'replace', focus: focusLost ? 'row' : false });
+  else taskMd.clear({ history: 'replace' });
+}
+
+/**
+ * Eine Aktion im Detail hat die Ansicht abgemeldet (detail-view.js ruft
+ * `onClose` aus `close()`). Status und Ablage laden danach die Liste nach -
+ * dort entscheidet syncPaneAfterRender. Das Loeschen blendet die Zeile sofort
+ * aus und laedt erst nach dem Rueckgaengig-Fenster; die Auswahl rueckt deshalb
+ * gleich weiter, statt fuenf Sekunden eine geloeschte Aufgabe zu zeigen.
+ */
+function onPaneActionClosed(container) {
+  paneRepaintDue = true;
+  setTimeout(() => {
+    const listEl = container.querySelector('#task-list');
+    const selected = taskMd?.selectedId();
+    if (!listEl || selected == null || !taskMd.isSplit()) return;
+    if (visibleMdIds(listEl).has(selected)) return;
+    if (!listEl.querySelector(`[data-md-id="${CSS.escape(selected)}"]`)) return;
+    moveSelectionOn(listEl, mdRowIds(listEl), selected);
+  }, 0);
+}
+
+/** Das Sheet bzw. Popover einer Aufgabe - der Weg unter der Schwelle. */
+async function openTaskSheet(id, container) {
+  try {
+    const [task, reminder] = await Promise.all([
+      loadTaskForEdit(id),
+      loadReminderForTask(id),
+    ]);
+    openTaskView(task, reminder, container);
+  } catch (err) {
+    window.yuvomi.showToast(t('tasks.loadError'), 'danger');
+  }
+}
+
+/**
+ * Das Detail einer Aufgabe in die Spalte zeichnen.
+ *
+ * Geladen wird die volle Aufgabe wie fuer das Sheet: die Listenzeile traegt
+ * weder Beschreibung noch Dokumente. Dauert es, weicht der alte Inhalt einem
+ * Skelett - sonst stuende die vorige Aufgabe neben der neuen Auswahl.
+ */
+async function renderTaskPane(id, body, signal, container) {
+  const slow = setTimeout(() => {
+    if (signal.aborted) return;
+    body.replaceChildren();
+    body.insertAdjacentHTML('beforeend', `
+      <div class="tasks-pane-skeleton" aria-hidden="true">
+        <div class="skeleton skeleton-line skeleton-line--medium"></div>
+        <div class="skeleton skeleton-line skeleton-line--full"></div>
+        <div class="skeleton skeleton-line skeleton-line--short"></div>
+      </div>`);
+  }, 150);
+  let task = null;
+  let reminder = null;
+  try {
+    [task, reminder] = await Promise.all([loadTaskForEdit(id), loadReminderForTask(id)]);
+  } catch (err) {
+    clearTimeout(slow);
+    if (signal.aborted) return undefined;
+    // Weg oder nicht (mehr) sichtbar: still in den Leerzustand. Alles andere
+    // ist ein Ladefehler und wird gesagt.
+    if (err?.status !== 404 && err?.status !== 403) window.yuvomi.showToast(t('tasks.loadError'), 'danger');
+    return false;
+  }
+  clearTimeout(slow);
+  if (signal.aborted) return undefined;
+  if (!task) return false;
+  paneTaskSig = taskSig(id);
+  openTaskView(task, reminder, container, { pane: body });
+  return undefined;
+}
+
+/**
+ * Die Hoehenkette der Spaltenform. Beide Spalten scrollen fuer sich - dafuer
+ * braucht `.split-view` eine feste Hoehe, und die bekommt sie nur, wenn die
+ * Seite die Hauptspalte fuellt statt mit ihrem Inhalt zu wachsen. Eine
+ * Container-Abfrage kann ihren eigenen Container nicht gestalten, also setzt
+ * diese Funktion die Klasse - gefragt wird dabei das CSS (steht die
+ * Detailspalte?), nicht eine zweite Schwelle.
+ */
+function syncSplitHeight(container) {
+  const page = container.querySelector('.tasks-page');
+  const detail = page?.querySelector('.split-view__detail');
+  if (!page || !detail) return;
+  const split = getComputedStyle(detail).display !== 'none';
+  page.classList.toggle('tasks-page--split', split);
+  // In der Spaltenform scrollt die Liste selbst, nicht mehr `.app-content` -
+  // sie traegt dann die Rolle, damit der Nachlauf der Shell-Flaechen (FAB,
+  // Banner, Pille) an IHREM Ende reitet (layout.css, „Der Nachlauf gehoert an
+  // das, was wirklich scrollt"). Darunter faellt die Rolle weg, und die Seite
+  // scrollt wie bisher als Ganzes.
+  page.querySelector('#task-list')?.classList.toggle('page-scrollport', split);
+}
+
+function mountTaskSplit(container, signal) {
+  const root = container.querySelector('.tasks-split');
+  const page = container.querySelector('.tasks-page');
+  if (!root || !page || signal?.aborted) return;
+
+  // Ein Deep-Link auf eine Aufgabe, die in dieser Liste nicht steht (erledigt,
+  // abgelegt, weggefiltert - die globale Suche findet alle): keine Auswahl
+  // ohne Zeile, sondern das Sheet wie bisher.
+  const initial = new URLSearchParams(location.search).get(TASK_DETAIL_PARAM);
+  let sheetFor = null;
+  if (initial && !root.querySelector(`[data-md-id="${CSS.escape(initial)}"]`)) {
+    sheetFor = initial;
+    const url = new URL(location.href);
+    url.searchParams.delete(TASK_DETAIL_PARAM);
+    history.replaceState({ ...(history.state ?? {}), path: `${url.pathname}${url.search}${url.hash}` }, '',
+      `${url.pathname}${url.search}${url.hash}`);
+  }
+
+  taskMd = mountMasterDetail({
+    root,
+    param: TASK_DETAIL_PARAM,
+    signal,
+    deepLinkNarrow: true,
+    renderDetail: (id, body, ctx) => renderTaskPane(id, body, ctx.signal, container),
+    openNarrow: (id) => openTaskSheet(id, container),
+    // Enter auf der gewaehlten Zeile: Bearbeiten, wie der Knopf im Kopf der
+    // Spalte - ohne Schreibrecht steht dort keiner, dann fuehrt Enter ins
+    // Detail.
+    onEnter: () => {
+      const edit = root.querySelector('#detail-pane-edit');
+      if (edit) edit.click();
+      else root.querySelector('.split-view__detail')?.focus();
+    },
+  });
+  const handle = taskMd;
+  signal?.addEventListener('abort', () => {
+    if (taskMd === handle) taskMd = null;
+    paneTaskSig = null;
+    paneRepaintDue = false;
+  }, { once: true });
+
+  if (typeof ResizeObserver === 'function') {
+    const ro = new ResizeObserver(() => syncSplitHeight(container));
+    ro.observe(page);
+    signal?.addEventListener('abort', () => ro.disconnect(), { once: true });
+  }
+  syncSplitHeight(container);
+  // Ein Deep-Link weiter unten in der Liste: die gewaehlte Zeile ins Bild,
+  // sonst steht rechts ein Detail, dessen Zeile niemand sieht.
+  const chosen = taskMd.isSplit() && taskMd.selectedId() != null
+    ? root.querySelector(`[data-md-id="${CSS.escape(taskMd.selectedId())}"]`)
+    : null;
+  chosen?.scrollIntoView?.({ block: 'nearest' });
+  if (sheetFor) openTaskSheet(sheetFor, container);
 }
 
 /**
@@ -4416,7 +4682,13 @@ export async function openTaskById(taskId, { user = null, container = null, onCh
   });
 }
 
-export async function render(container, { user }) {
+export async function render(container, { user, signal } = {}) {
+  // Ein Neuaufbau (auch der Wiederholen-Weg des Ladefehlers) haengt die
+  // Detailspalte frisch ein; die alte Instanz gehoert zur alten Wurzel.
+  taskMd?.destroy();
+  taskMd = null;
+  paneTaskSig = null;
+  paneRepaintDue = false;
   state.user = user ?? null;
   state.currentUserId = user?.id ?? null;
   loadCollapsedGroups();
@@ -4454,7 +4726,7 @@ export async function render(container, { user }) {
   // Initiales Skeleton (all values are from i18n keys or hardcoded constants, no user data)
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <div class="tasks-page app-page app-page--full" data-composition="full">
+    <div class="tasks-page app-page app-page--full${state.viewMode === 'list' ? ' app-page--list-detail' : ''}" data-composition="full">
       <div class="page-toolbar page-toolbar--wrap tasks-toolbar">
         <h1 class="page-toolbar__title">${t('tasks.title')}</h1>
         ${renderPageSearch({
@@ -4538,13 +4810,20 @@ export async function render(container, { user }) {
           </div>
         </div>`}
 
-        <div id="task-list">
+        <div class="split-view tasks-split">
+        <div id="task-list" class="split-view__list">
           ${[1,2,3].map(() => `
             <div class="widget-skeleton" style="margin-bottom:var(--space-2)">
               <div class="skeleton skeleton-line skeleton-line--medium" style="height:18px;margin-bottom:var(--space-3)"></div>
               <div class="skeleton skeleton-line skeleton-line--full" style="height:14px;margin-bottom:var(--space-2)"></div>
               <div class="skeleton skeleton-line skeleton-line--short" style="height:12px"></div>
             </div>`).join('')}
+        </div>
+        ${splitViewDetailHtml({
+          id: 'tasks',
+          label: t('tasks.detailPaneLabel'),
+          empty: { icon: 'list-checks', title: t('tasks.pickOne'), hint: t('tasks.pickOneHint') },
+        })}
         </div>
         ${readOnly() ? '' : `
         <button class="page-fab" id="fab-new-task" aria-label="${t('tasks.newTask')}" data-dock-label="${t('newLabel.tasks')}">
@@ -4555,6 +4834,8 @@ export async function render(container, { user }) {
   `);
 
   if (window.lucide) window.lucide.createIcons({ el: container });
+  // Schon das Skelett steht in der Spaltenform, nicht erst die Liste.
+  syncSplitHeight(container);
 
   // Daten laden (Filter-State aus vorheriger Session berücksichtigen)
   try {
@@ -4634,17 +4915,10 @@ export async function render(container, { user }) {
     },
   });
 
-  // Deep-Link: ?open=<id> öffnet die Detailansicht
-  const openId = new URLSearchParams(window.location.search).get('open');
-  if (openId) {
-    try {
-      const [task, reminder] = await Promise.all([
-        loadTaskForEdit(openId),
-        loadReminderForTask(openId),
-      ]);
-      openTaskView(task, reminder, container);
-    } catch { /* Task existiert nicht oder kein Zugriff */ }
-  }
+  // Liste + Detail einhaengen - erst jetzt, weil die Zeilen stehen muessen:
+  // der Deep-Link `?open=<id>` waehlt ab der Schwelle seine Zeile aus und
+  // oeffnet darunter (und im Brett) die Detailansicht wie bisher.
+  mountTaskSplit(container, signal);
 }
 
 // Testfläche: nur reine Funktionen, deren Vertrag außerhalb dieser Datei zählt.
@@ -4713,6 +4987,11 @@ export const __test = {
   // entscheidet, ob eine Anfrage rausgeht. Ein Textguard kann das nicht sehen:
   // er liest den Aufruf, nicht das Ausbleiben. Deshalb steht der Handler hier.
   handleFormSubmit, reminderAccess,
+  // Liste + Detail: was nach einem Neuzeichnen mit der Auswahl geschieht
+  // (bleiben, nachziehen, weiterruecken) - ein Verhalten, das kein Textguard
+  // sieht. `useTaskMd` setzt den Baustein ein, wie mountTaskSplit es tut.
+  syncPaneAfterRender, neighborMdId, onPaneActionClosed,
+  useTaskMd: (md) => { taskMd = md; paneTaskSig = null; paneRepaintDue = false; },
   // Der Lader steht hier, weil die PRAEMISSE des gesperrten Zweigs an ihm
   // haengt: dass `calendar: read` die Erinnerung wirklich bekommt. War das nur
   // Prosa, liess sich das `none` still zu `!== write` verengen und der ganze
