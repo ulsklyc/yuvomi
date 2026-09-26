@@ -4132,6 +4132,42 @@ test('die Scrollport-Rolle sitzt an einer Box mit Ueberlauf', () => {
     + `Scroll-Achse - die Rolle legt dort einen Nachlauf ins Leere: ${blind.join(' | ')}`);
 });
 
+/* Ein Scrollport clippt nur, wessen Containing Block er ist. Ein absolut
+ * positioniertes Kind ohne Versatz (`.sr-only`) steht an seiner statischen
+ * Stelle, gehoert aber dem naechsten POSITIONIERTEN Vorfahren - war der
+ * Scrollport `position: static`, entkam es seinem Clipping und blaehte den
+ * Vorfahren auf. Gemessen im Vorrat (Critique 2026-09-26): 21 "Bearbeiten"-
+ * Spans unten in der Liste machten #main-content zu einem zweiten Scroller
+ * (scrollHeight 1766 bei 768), eine Wischgeste neben der Liste schob Kopf und
+ * Liste weg. Budget trug dieselbe Anlage, nur zufaellig ohne Folgen. */
+test('die Scrollport-Rolle ist Containing Block ihrer absoluten Nachfahren', () => {
+  const styleDir = new URL('../public/styles/', import.meta.url);
+  const layoutRules = [...eachRule(read('../public/styles/layout.css'))].filter((rule) => rule.at.length === 0);
+  const rolle = layoutRules.filter((rule) => rule.selector.split(',').some((s) => /\.page-scrollport\s*$/.test(s.trim())
+    && !/:has\(/.test(s)));
+  assert.ok(rolle.some((rule) => /(^|[;\s])position\s*:\s*(relative|absolute|sticky|fixed)\b/.test(rule.body)),
+    'layout.css muss der Rolle .page-scrollport eine Positionierung geben - sonst entkommen .sr-only-Nachfahren dem Clipping des Scrollports');
+
+  // Und keine Modulregel nimmt sie einem markierten Scrollport wieder weg.
+  const markiert = new Set();
+  for (const file of walkJsFiles('../public/pages/')) {
+    for (const m of read(file).matchAll(/["'`]([^"'`]*\bpage-scrollport\b[^"'`]*)["'`]/g)) {
+      for (const cls of m[1].split(/\s+/)) {
+        if (cls && cls !== 'page-scrollport' && /^[a-z][\w-]*$/.test(cls)) markiert.add(cls);
+      }
+    }
+  }
+  const statisch = [];
+  for (const file of readdirSync(styleDir).filter((f) => f.endsWith('.css'))) {
+    for (const rule of eachRule(read(`../public/styles/${file}`))) {
+      if (!/(^|[;\s])position\s*:\s*static\b/.test(rule.body)) continue;
+      const letztes = rule.selector.trim().split(/\s+/).pop() || '';
+      if ([...letztes.matchAll(/\.([a-z][\w-]*)/g)].some((m) => markiert.has(m[1]))) statisch.push(`${file}: ${rule.selector.trim()}`);
+    }
+  }
+  assert.deepStrictEqual(statisch, [], `diese Regeln setzen einen Scrollport auf position: static: ${statisch.join(' | ')}`);
+});
+
 test('die Pillenzone steht nur am markierten Scrollport', () => {
   const layout = read('../public/styles/layout.css').replace(/\/\*[\s\S]*?\*\//g, '');
 

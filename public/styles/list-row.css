@@ -63,7 +63,10 @@
    * die Liste blieb so hoch wie ihre Zeilen (1500px im Vorrat), statt auf den
    * verfügbaren Platz zu fallen. Sichtbar war das nicht, weil .pantry-page
    * `overflow: hidden` trägt; die Höhe propagierte aber nach oben und machte
-   * .app-content zu einem zweiten Scroller neben der Liste. */
+   * .app-content zu einem zweiten Scroller neben der Liste. Die zweite
+   * Ursache desselben Symptoms - absolut positionierte Nachfahren (.sr-only),
+   * die dem Clipping entkommen - behebt die Rolle .page-scrollport, die den
+   * Scroller zum Containing Block macht (layout.css). */
   min-height: 0;
   overflow-y: auto;
   /* Gruppen stapeln über gap, nicht über margin-bottom am Gruppen-Element: der
