@@ -367,14 +367,26 @@ test('save confirmations preserve the same editor across repeated gates and keep
     }), true);
 
     // Delete callers omit the new option and still close on confirmation.
+    // Seit dem echten Ausgang (Critique 2026-09-26, P1-1) loest die Rueckfrage
+    // auf, sobald das Schliessen BEGINNT; abgehaengt wird das Overlay erst am
+    // Ende der Animation (Netz: MODAL_EXIT_FALLBACK_MS = 400). Gemessen wird
+    // die Regel, nicht der Zeitpunkt: beim Aufloesen laeuft der Ausgang schon
+    // (oder ist durch), und danach ist der Editor binnen zwei Sekunden weg. Ein
+    // Editor, der nie schliesst, bleibt damit rot.
     await page.evaluate(() => {
       window.saveGateTest.pending = window.saveGateTest.modal.confirmOverModal('Delete this event?');
     });
     await clickPastDeadTime(page, '#confirm-modal-ok');
     assert.deepEqual(await page.evaluate(async () => {
       const confirmed = await window.saveGateTest.pending;
-      return { confirmed, closeCount: window.saveGateTest.closeCount(), editorConnected: window.saveGateTest.editor.isConnected };
-    }), { confirmed: true, closeCount: 1, editorConnected: false });
+      const { editor } = window.saveGateTest;
+      return {
+        confirmed,
+        closeCount: window.saveGateTest.closeCount(),
+        closing: !editor.isConnected || editor.classList.contains('modal-overlay--closing'),
+      };
+    }), { confirmed: true, closeCount: 1, closing: true });
+    await page.waitForFunction(() => !window.saveGateTest.editor.isConnected, { timeout: 2000 });
   } finally {
     await page.close();
   }
