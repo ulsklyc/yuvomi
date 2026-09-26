@@ -30,6 +30,7 @@ import { renderDocumentAttachField, bindDocumentAttachField } from '/components/
 import { pathAccess } from '/utils/module-access.js';
 import { warrantyStatus, hasUpcomingDeadline, dateStatus, countUpcomingDeadlines, deadlineChipSpec } from '/utils/inventory-warranty.js';
 import { openDetailView, closeDetailView } from '/components/detail-view.js';
+import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
 import { wireScrollFade } from '/utils/ux.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { setNavBadge } from '/utils/nav-badges.js';
@@ -38,6 +39,8 @@ import { CHART, chartScales, chartX, chartY, chartGridMarkup, chartXLabelsMarkup
 let _container = null;
 let _search = null;
 let _householdCurrency = 'EUR';
+/** Liste + Detail (utils/master-detail.js); null vor dem ersten Laden. */
+let _md = null;
 
 const state = {
   items: [],
@@ -83,7 +86,7 @@ async function openLocationManager() {
       // server-seitig - die Liste muss neu geladen werden, sonst zeigt sie
       // veraltete location_path-Werte bis zum naechsten vollen Reload.
       await loadItems();
-      renderList();
+      renderList({ repaint: true });
       updateAttentionBadge();
       refocusAfterRender();
     } catch (err) {
@@ -135,7 +138,7 @@ async function openCategoryManager() {
       // 'other' zu - die Liste muss neu geladen werden, sonst zeigt sie
       // veraltete category_name-Werte bis zum naechsten vollen Reload.
       await loadItems();
-      renderList();
+      renderList({ repaint: true });
       updateAttentionBadge();
       refocusAfterRender();
     } catch (err) {
@@ -442,8 +445,8 @@ function renderItemRow(item) {
   const hasAttachments = (item.attachments?.length ?? 0) > 0;
   const hasBookings = (item.linked_entries?.length ?? 0) > 0;
   return `
-    <div class="list-row" data-id="${item.id}">
-      <button type="button" class="list-row__main list-row__main--interactive" data-action="open-detail">
+    <div class="list-row" data-id="${item.id}" data-md-id="${item.id}">
+      <button type="button" class="list-row__main list-row__main--interactive" data-action="open-detail" data-md-focus>
         <span class="inventory-row__headline">
           <span class="list-row__name">${esc(item.name)}</span>
           ${hasAttachments ? `<i data-lucide="paperclip" class="icon-sm" aria-hidden="true"></i><span class="sr-only">${esc(t('inventory.hasAttachmentsLabel'))}</span>` : ''}
@@ -534,12 +537,29 @@ function wireItemRows(list) {
     button.addEventListener('click', () => {
       const id = Number(button.closest('.list-row')?.dataset.id);
       const item = state.items.find((i) => i.id === id);
-      if (item) openItemDetail(item);
+      if (!item) return;
+      // Ab der Schwelle waehlt der Klick aus (Detailspalte), darunter oeffnet
+      // er das Sheet wie bisher - das entscheidet der Baustein, nicht wir.
+      if (_md) _md.open(String(item.id), button);
+      else openItemDetail(item);
     });
   });
 }
 
-function renderList() {
+/**
+ * @param {{repaint?: boolean}} [opts] `repaint` nach einer Datenaenderung
+ *   (Speichern, Loeschen, Frist erledigt): die Detailspalte zeichnet den
+ *   ausgewaehlten Gegenstand neu. Ohne (Suche, Filter, Ebenenwechsel) bleibt
+ *   sie stehen - jeder Tastendruck in der Suche holte sonst den Verlauf neu.
+ */
+function renderList({ repaint = false } = {}) {
+  renderListBody();
+  // Wie in Mail: verschwindet die ausgewaehlte Zeile aus der Liste (anderer
+  // Ordner, Suche, geloescht), faellt die Spalte auf den Leerzustand zurueck.
+  _md?.refresh({ repaint });
+}
+
+function renderListBody() {
   const list = _container?.querySelector('#inventory-list');
   if (!list) return;
 
@@ -1063,7 +1083,7 @@ function odometerDetailValue(item) {
  * reine Aggregation, kein Teil des Item-Datensatzes) und wird deshalb separat
  * nachgeladen, bevor die Ansicht aufgeht.
  */
-async function openItemDetail(item) {
+async function openItemDetail(item, { pane = null, signal = null } = {}) {
   let history = null;
   let historyLoadFailed = false;
   try {
@@ -1073,8 +1093,23 @@ async function openItemDetail(item) {
     console.error('[Inventory] Verlauf konnte nicht geladen werden:', err);
     historyLoadFailed = true;
   }
+  // In der Detailspalte kann waehrend des Ladens schon eine andere Zeile
+  // gewaehlt sein - dann gehoert die Spalte ihr, nicht diesem Gegenstand.
+  if (signal?.aborted) return;
 
   const onDoneTrackedDate = async (trackedDate) => {
+    if (pane) {
+      // In der Spalte liegt kein Overlay offen: die Abschluss-Karte geht direkt
+      // auf, und ein closeDetailView() schloesse hier ein fremdes Modal. Nach
+      // dem Abschluss zeichnet der Baustein die Spalte neu (repaint).
+      const completed = await openCompletionSheet(item, trackedDate);
+      if (completed) {
+        await loadItems();
+        renderList({ repaint: true });
+        updateAttentionBadge();
+      }
+      return;
+    }
     // Die Detailansicht MUSS zu sein, BEVOR die Abschluss-Karte aufgeht: beide
     // sind openModal()-Overlays, und ein zweiter Overlay ueber einem noch
     // offenen zwingt dessen erzwungenes Schliessen (modal.js#openModal) - das
@@ -1085,7 +1120,7 @@ async function openItemDetail(item) {
     const completed = await openCompletionSheet(item, trackedDate);
     if (completed) {
       await loadItems();
-      renderList();
+      renderList({ repaint: true });
       updateAttentionBadge();
     }
     // Ein voller Neu-Öffnen ist einfacher und robuster als ein In-Place-Update
@@ -1108,6 +1143,7 @@ async function openItemDetail(item) {
     title: item.name,
     accentColor: 'var(--module-inventory)',
     size: 'md',
+    pane,
     sections: renderItemDetail(item, history, onDoneTrackedDate, historyLoadFailed),
     actions: [{
       id: 'inventory-detail-delete',
@@ -1123,11 +1159,14 @@ async function openItemDetail(item) {
     edit: {
       label: t('common.edit'),
       title: t('common.editItem'),
-      mount: (panel, pane) => {
+      mount: (panel, editPane) => {
         const form = buildItemForm({ mode: 'edit', item });
-        pane.insertAdjacentHTML('beforeend', form.content);
+        editPane.insertAdjacentHTML('beforeend', form.content);
         form.wire(panel);
       },
+      // Aus der Detailspalte: das regulaere Formular-Modal (detail-view.js,
+      // openInPane) - dasselbe Formular, das „Neu" oeffnet.
+      standalone: () => openItemModal('edit', item),
     },
   });
 }
@@ -1864,7 +1903,7 @@ function buildItemForm({ mode, item = null }) {
           item = res.data;
           renderLinkedEntries(panel, item);
           await loadItems();
-          renderList();
+          renderList({ repaint: true });
         } catch (err) {
           window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
         }
@@ -1877,7 +1916,7 @@ function buildItemForm({ mode, item = null }) {
           item = res.data;
           renderLinkedEntries(panel, item);
           await loadItems();
-          renderList();
+          renderList({ repaint: true });
         } catch (err) {
           window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
         }
@@ -1978,7 +2017,7 @@ async function saveItem(panel, mode, item, attachments, pickedBooking, photoData
     else await api.put(`/inventory/items/${item.id}`, payload);
     await loadItems();
     closeSharedModal({ force: true });
-    renderList();
+    renderList({ repaint: true });
     updateAttentionBadge();
     window.yuvomi?.showToast(mode === 'create' ? t('inventory.created') : t('inventory.updated'), 'success');
   } catch (err) {
@@ -1996,7 +2035,7 @@ async function removeItem(item) {
   try {
     await api.delete(`/inventory/items/${item.id}`);
     await loadItems();
-    renderList();
+    renderList({ repaint: true });
     refocusAfterRender();
     updateAttentionBadge();
     window.yuvomi?.showToast(t('inventory.deleted'), 'success');
@@ -2005,17 +2044,19 @@ async function removeItem(item) {
   }
 }
 
-export async function render(container) {
+export async function render(container, { signal } = {}) {
   _container = container;
+  _md = null;
 
   const page = document.createElement('div');
   // Breitenregel (DESIGN.md, 2026-09-26): Inventar gehoert zu Liste + Detail,
-  // weil es eine Leseansicht hat (openDetailView). Bis der Baustein
-  // (utils/master-detail.js) eingehaengt ist, steht es auf dem Lesemass - das
+  // weil es eine Leseansicht hat (openDetailView). Unter der Schwelle steht es
+  // auf dem Lesemass (`reading` bleibt die Modusrolle), ab der Schwelle stehen
+  // Liste und Detailspalte nebeneinander (utils/master-detail.js). Das
   // fruehere 960er-Mass (`data`) ist abgeschafft. Die Zeilentraeger lesen das
   // Mass der Seite (Guard in test-frontend-audit.js); ohne die Rolle enden Kopf
   // und Bedienzeilen neben ihrem eigenen Koerper.
-  page.className = 'inventory-page app-page app-page--reading';
+  page.className = 'inventory-page app-page app-page--reading app-page--list-detail';
   page.dataset.composition = 'reading';
 
   // Sichtbarer Seitentitel statt sr-only: nur ein echtes .page-toolbar__title
@@ -2058,9 +2099,21 @@ export async function render(container) {
   filters.hidden = true;
 
   const list = document.createElement('div');
-  list.className = 'inventory-list';
+  list.className = 'inventory-list split-view__list';
   list.id = 'inventory-list';
   list.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 4, lines: 2 }));
+
+  // Liste + Detail: die Liste bleibt, wie sie war, und bekommt rechts die
+  // Detailspalte. Unter der Schwelle ist die Spalte `display: none` und die
+  // Huelle ein unsichtbarer Block (layout.css, `.split-view`).
+  const split = document.createElement('div');
+  split.className = 'split-view';
+  split.append(list);
+  split.insertAdjacentHTML('beforeend', splitViewDetailHtml({
+    id: 'inventory',
+    label: t('inventory.detailPaneLabel'),
+    empty: { icon: 'package', title: t('inventory.pickOneTitle'), hint: t('inventory.pickOneHint') },
+  }));
 
   const fab = document.createElement('button');
   fab.className = 'page-fab';
@@ -2074,7 +2127,7 @@ export async function render(container) {
   fab.dataset.dockLabel = t('newLabel.inventory');
   fab.insertAdjacentHTML('beforeend', '<i data-lucide="plus" aria-hidden="true"></i>');
 
-  page.append(toolbar, filters, list, fab);
+  page.append(toolbar, filters, split, fab);
   container.replaceChildren(page);
 
   if (window.lucide) window.lucide.createIcons({ el: container });
@@ -2104,6 +2157,18 @@ export async function render(container) {
 
   fab.addEventListener('click', () => openItemModal('create'));
 
+  // Die Detailspalte klebt unter dem Kopf, waehrend die Liste mit der Seite
+  // scrollt (inventory.css). Inventar hat keinen eigenen Scrollport - der Kopf
+  // klebt in #main-content -, also braucht die Spalte seine Hoehe als Versatz.
+  // Gemessen statt als Token, weil der Kopf in langen Locales umbricht.
+  const syncHeadBlock = () => page.style.setProperty('--inventory-head-block', `${toolbar.offsetHeight}px`);
+  syncHeadBlock();
+  if (typeof ResizeObserver === 'function') {
+    const headRo = new ResizeObserver(syncHeadBlock);
+    headRo.observe(toolbar);
+    signal?.addEventListener('abort', () => headRo.disconnect(), { once: true });
+  }
+
   try {
     await Promise.all([
       loadLocations(),
@@ -2111,7 +2176,27 @@ export async function render(container) {
       loadItems(),
       api.get('/preferences').then((res) => { _householdCurrency = res.data?.currency ?? 'EUR'; }).catch(() => {}),
     ]);
+    if (signal?.aborted) return;
+    openDeepLinkedCategory(split);
     renderList();
+    _md = mountMasterDetail({
+      root: split,
+      signal,
+      renderDetail: (id, body, ctx) => {
+        const item = state.items.find((i) => String(i.id) === id);
+        if (!item) return false;
+        return openItemDetail(item, { pane: body, signal: ctx.signal });
+      },
+      openNarrow: (id) => {
+        const item = state.items.find((i) => String(i.id) === id);
+        if (item) openItemDetail(item);
+      },
+      onEnter: (id) => {
+        const item = state.items.find((i) => String(i.id) === id);
+        if (item) openItemModal('edit', item);
+      },
+    });
+    signal?.addEventListener('abort', () => { _md = null; }, { once: true });
     updateAttentionBadge();
   } catch (err) {
     window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
@@ -2119,7 +2204,29 @@ export async function render(container) {
   }
 }
 
+/**
+ * Deep-Link `?id=` in der Spaltenform: die Zeile des Gegenstands muss in der
+ * Liste stehen, sonst waere die Auswahl ohne Markierung und fiele beim
+ * naechsten Neuaufbau weg (master-detail.js#refresh). Die Startseite zeigt nur
+ * Kategorien - also die Kategorie des Gegenstands oeffnen, wie ein Klick es
+ * getan haette. Unter der Schwelle loest niemand den Link ein (kein Sheet, das
+ * beim Laden aufspringt), und die Seite bleibt auf der Startseite.
+ */
+function openDeepLinkedCategory(split) {
+  const id = new URLSearchParams(location.search).get('id');
+  if (!id) return;
+  const detail = split.querySelector('.split-view__detail');
+  if (!detail || getComputedStyle(detail).display === 'none') return;
+  const item = state.items.find((i) => String(i.id) === id);
+  if (!item) return;
+  state.view = 'category';
+  state.activeCategory = item.category;
+}
+
 export const __test = {
+  state,
+  renderItemRow,
+  openDeepLinkedCategory,
   categoryLabel,
   itemCategoryLabel,
   categoryOptionsHtml,

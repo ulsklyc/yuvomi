@@ -638,3 +638,35 @@
 .inventory-tracked-date-detail-row__done {
   margin-left: auto;
 }
+
+/* --------------------------------------------------------
+ * Liste + Detail (Breitenregel, DESIGN.md; Baustein utils/master-detail.js)
+ *
+ * Die Geometrie der Spalten gehoert der Shell (layout.css `.split-view`). Hier
+ * steht nur, was Inventar anders macht: es hat keinen eigenen Scrollport, die
+ * Liste scrollt mit #main-content wie unter der Schwelle. Statt die Seite in
+ * eine gedeckelte Flex-Spalte umzubauen (das aenderte mobil Kopf-Kollaps und
+ * Filterzeile), klebt die Detailspalte unter dem Kopf und scrollt fuer sich.
+ * Den Versatz setzt inventory.js (`--inventory-head-block`, gemessene
+ * Kopfhoehe). Schwelle = `--layout-split-threshold` (75rem), `@container`
+ * kann keine Variable lesen.
+ * -------------------------------------------------------- */
+@container module-surface (min-width: 75rem) {
+  .inventory-page .split-view {
+    align-items: start;
+  }
+
+  /* Die Liste waechst mit ihrem Inhalt; ein Scrollport hier waere ohne
+   * feste Hoehe wirkungslos und finge nur die klebenden Gruppentitel ein. */
+  .inventory-page .split-view__list {
+    overflow: visible;
+  }
+
+  .inventory-page .split-view__detail {
+    position: sticky;
+    /* Dieselbe Luft unter dem Kopf, ob die Spalte ruht oder klebt. */
+    top: calc(var(--inventory-head-block, 0px) + var(--space-3));
+    max-height: calc(100dvh - var(--inventory-head-block, 0px) - var(--space-3) - var(--space-4));
+    margin-block-start: var(--space-3);
+  }
+}
