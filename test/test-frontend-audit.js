@@ -9161,8 +9161,11 @@ test('contacts bulk selection is opt-in and hidden by default', () => {
   const contactsPage = read('../public/pages/contacts.js');
   const contactsCss = read('../public/styles/contacts.css');
 
-  // Toggle in der Toolbar; der Auswahlmodus startet aus.
-  assert.match(contactsPage, /id="contacts-select-btn"/);
+  // Einstieg im Werkzeugmenue des Kopfs (Kopfregel mobil, 2026-09-26), der
+  // Ausstieg sichtbar als „Abbrechen" im Kopf; der Auswahlmodus startet aus.
+  assert.match(contactsPage, /pageToolsMenuHtml\(\{[\s\S]*?action: 'select-mode'/);
+  assert.match(contactsPage, /id="contacts-select-cancel" hidden/);
+  assert.match(contactsPage, /cancel\.hidden = !state\.selectMode/);
   assert.match(contactsPage, /selectMode:\s*false/);
 
   /* DIE AUSWAHL-LEISTE IST DIE GETEILTE PILLE (Critique 2026-08-13).
@@ -9187,6 +9190,33 @@ test('contacts bulk selection is opt-in and hidden by default', () => {
   assert.match(contactsPage, /bulkDeletedToast/);
   // Familien-Kontakte bleiben nicht wählbar (deaktivierte Checkbox)
   assert.match(contactsPage, /c\.family_user_id \? ' disabled' : ''/);
+});
+
+test('Inventar und Kontakte folgen der Kopfregel mobil: ein Werkzeugmenue, Suche als Slot, Chips im Port', () => {
+  const inventoryPage = read('../public/pages/inventory.js');
+  const contactsPage = read('../public/pages/contacts.js');
+  const contactsCss = read('../public/styles/contacts.css');
+
+  // Inventar: die Suche IST der Slot. In einem `div.page-toolbar__center`
+  // geschachtelt blieb sie mobil ein 248px-Feld und die zwei Verwalten-Icons
+  // bekamen eine eigene Kopfzeile (170px statt 114, A6 P1-1).
+  assert.doesNotMatch(inventoryPage, /<div class="page-toolbar__center">\s*\$\{renderPageSearch/,
+    'die Inventar-Suche steckt nicht in einem Wrapper-Slot');
+  assert.match(inventoryPage, /className: 'inventory-search page-toolbar__center'/);
+  // Lagerorte und Kategorien stehen im EINEN Werkzeugmenue, nicht als lose Icons.
+  assert.match(inventoryPage, /pageToolsMenuHtml\(\{[\s\S]*?action: 'manage-locations'[\s\S]*?action: 'manage-categories'/);
+  assert.doesNotMatch(inventoryPage, /class="btn btn--ghost btn--icon" data-action="manage-/,
+    'keine losen Verwalten-Icons im Inventar-Kopf');
+
+  // Kontakte: Kategorien, Auswahl und Import im Werkzeugmenue ...
+  assert.match(contactsPage, /pageToolsMenuHtml\(\{[\s\S]*?action: 'select-mode'[\s\S]*?action: 'import-vcard'[\s\S]*?action: 'manage-categories'/);
+  assert.doesNotMatch(contactsPage, /id="contacts-manage-cats"|id="contacts-select-btn"/,
+    'keine losen Werkzeugknoepfe im Kontakte-Kopf');
+  // ... und die Kategorie-Chips als erstes Kind IM Port: fest ueber dem Port
+  // begann die Liste bei y179 statt 114 (A8).
+  assert.match(contactsPage, /id="contacts-list" class="contacts-list page-scrollport"[^>]*>\s*<div class="contacts-filters page-chip-row"/);
+  assert.doesNotMatch(contactsCss, /\.contacts-filters\s*\{[^}]*border-bottom/,
+    'kein Trennstrich mehr zwischen festem Chrome und Port');
 });
 
 test('documents and navigation settings use progressive disclosure instead of stacked control cards', () => {

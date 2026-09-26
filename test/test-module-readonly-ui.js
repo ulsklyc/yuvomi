@@ -1584,23 +1584,29 @@ test('Kontaktzeile mit `contacts: read`: Loeschen weg, jeder Leseweg bleibt', ()
 });
 
 test('Kontakte-Kopf mit `contacts: read`: Kategorien, Auswahl und Import fallen weg', () => {
+  // Seit der Kopfregel mobil (2026-09-26) stehen die drei als Eintraege im
+  // EINEN Werkzeugmenue - geprueft wird dieselbe Frage an ihrem neuen Ort.
   withAccess({ contacts: 'write' }, () => {
     const html = contacts.toolbarActionsHtml();
-    assert.match(html, /id="contacts-manage-cats"/);
-    assert.match(html, /id="contacts-select-btn"/);
+    assert.match(html, /data-action="manage-categories"/);
+    assert.match(html, /data-action="select-mode"/);
+    assert.match(html, /data-action="import-vcard"/);
     assert.match(html, /id="contacts-import-input"/);
+    assert.match(html, /page-tools-btn/);
   });
   withAccess({ contacts: 'read' }, () => {
     const html = contacts.toolbarActionsHtml();
-    assert.doesNotMatch(html, /contacts-manage-cats/,
+    assert.doesNotMatch(html, /manage-categories/,
       'der Kategorie-Verwalter legt an und loescht - keine CSS-Regel hat ihn je erfasst');
-    assert.doesNotMatch(html, /contacts-select-btn/,
+    assert.doesNotMatch(html, /select-mode|contacts-select-cancel/,
       'der Auswahlmodus hat als einzige Aktion „Loeschen"');
-    assert.doesNotMatch(html, /contacts-import-input/,
+    assert.doesNotMatch(html, /import-vcard|contacts-import-input/,
       'und der Import legt Kontakte an');
+    assert.doesNotMatch(html, /page-tools-btn/,
+      'ein Werkzeugmenue ohne Eintraege waere ein Knopf, der ins Leere oeffnet');
     // Der Primaerknopf bleibt im Markup: ihn blendet `html[data-module-readonly]`
     // schon per `.toolbar-new-btn` aus (layout.css). Waere er hier weg, prueften
-    // die drei Zeilen darueber eine leere Zeichenkette.
+    // die Zeilen darueber eine leere Zeichenkette.
     assert.match(html, /toolbar-new-btn/);
   });
 });

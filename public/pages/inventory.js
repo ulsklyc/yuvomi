@@ -22,6 +22,7 @@ import {
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateEl } from '/utils/empty-state.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
+import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { formatMoney } from '/utils/money.js';
 import { todayKey } from '/utils/date.js';
 import { formatDate, getLocale, getNumberFormat } from '/i18n.js';
@@ -1995,26 +1996,28 @@ export async function render(container) {
   // Name, direkt vor dem Titel, aus derselben Quelle wie der Sidebar-Eintrag.
   const toolbar = document.createElement('div');
   toolbar.className = 'page-toolbar page-toolbar--narrow page-toolbar--wrap';
+  // Kopfregel mobil (DESIGN.md, 2026-09-26): Lagerorte und Kategorien sind
+  // Verwaltung, nicht Ansicht - sie stehen im EINEN Werkzeugmenue mit Icon UND
+  // Text statt als zwei unbeschriftete Icons in einer eigenen Kopfzeile. Die
+  // Suche ist selbst der Slot (`page-toolbar__center`), nicht in einen Wrapper
+  // geschachtelt: so greift ihre Icon-Form mobil wie in den Dokumenten (A6 P1-1).
   toolbar.insertAdjacentHTML('beforeend', `
+    ${renderPageSearch({
+      id: 'inventory-search',
+      label: t('inventory.searchPlaceholder'),
+      placeholder: t('inventory.searchPlaceholder'),
+      value: state.query,
+      clearLabel: t('common.searchClear'),
+      className: 'inventory-search page-toolbar__center',
+    })}
     <div class="page-toolbar__actions">
-      <button class="btn btn--ghost btn--icon" data-action="manage-locations"
-              aria-label="${esc(t('inventory.manageLocations'))}" title="${esc(t('inventory.manageLocations'))}">
-        <i data-lucide="map-pin" class="icon-md" aria-hidden="true"></i>
-      </button>
-      <button class="btn btn--ghost btn--icon" data-action="manage-categories"
-              aria-label="${esc(t('inventory.manageCategories'))}" title="${esc(t('inventory.manageCategories'))}">
-        <i data-lucide="tags" class="icon-md" aria-hidden="true"></i>
-      </button>
-    </div>`);
-  toolbar.insertAdjacentHTML('afterbegin', `
-    <div class="page-toolbar__center">
-      ${renderPageSearch({
-        id: 'inventory-search',
-        label: t('inventory.searchPlaceholder'),
-        placeholder: t('inventory.searchPlaceholder'),
-        value: state.query,
-        clearLabel: t('common.searchClear'),
-        className: 'inventory-search',
+      ${pageToolsMenuHtml({
+        id: 'inventory-tools-menu',
+        label: t('common.moreActions'),
+        items: [
+          { action: 'manage-locations', label: t('inventory.manageLocations'), icon: 'map-pin' },
+          { action: 'manage-categories', label: t('inventory.manageCategories'), icon: 'tags' },
+        ],
       })}
     </div>`);
   toolbar.insertAdjacentHTML('afterbegin', `<h1 class="page-toolbar__title">${esc(t('nav.inventory'))}</h1>`);
@@ -2048,8 +2051,13 @@ export async function render(container) {
 
   if (window.lucide) window.lucide.createIcons({ el: container });
 
-  toolbar.querySelector('[data-action="manage-locations"]').addEventListener('click', openLocationManager);
-  toolbar.querySelector('[data-action="manage-categories"]').addEventListener('click', openCategoryManager);
+  installPopoverMenus(container);
+  toolbar.addEventListener('click', (e) => {
+    const item = e.target.closest('.popover-menu__item[data-action]');
+    if (!item || item.disabled) return;
+    if (item.dataset.action === 'manage-locations') openLocationManager();
+    else if (item.dataset.action === 'manage-categories') openCategoryManager();
+  });
 
   _search = wirePageSearch(toolbar, {
     id: 'inventory-search',
