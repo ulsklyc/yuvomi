@@ -71,3 +71,52 @@ test('eine unbekannte ID laesst die Startseite stehen', () => {
   withEnv({ search: '?open=999', display: 'flex' }, () => inventory.openDeepLinkedCategory(split));
   assert.equal(inventory.state.view, 'browse');
 });
+
+// ---------------------------------------------------------------------------
+// Die Detailspalte steht in Ruhe ganz im Fenster (Runde 5, 2026-09-26)
+// ---------------------------------------------------------------------------
+// Ihre Hoehe rechnete nur den Kopf; in Ruhe steht darunter aber die Filterzeile,
+// und die Spalte ragte um deren Hoehe unter den Falz (1440x900: Oberkante 133,
+// Hoehe 803, Unterkante 936). Jetzt misst die Seite die Oberkante der Spalte,
+// und die CSS rechnet von dort.
+
+function fakePage() {
+  const props = new Map();
+  return { props, style: { setProperty: (k, v) => props.set(k, v) } };
+}
+const fakeDetail = (top, shown = true) => ({
+  getClientRects: () => (shown ? [{}] : []),
+  getBoundingClientRect: () => ({ top }),
+});
+
+test('syncDetailTop setzt die gemessene Oberkante der Spalte (Ruhe und Klebestand)', () => {
+  const page = fakePage();
+  inventory.syncDetailTop(page, fakeDetail(133.4));
+  assert.equal(page.props.get('--inventory-detail-top'), '133px', 'Ruhe: unter Kopf UND Filterzeile');
+  inventory.syncDetailTop(page, fakeDetail(81));
+  assert.equal(page.props.get('--inventory-detail-top'), '81px', 'Klebestand: unter dem Kopf');
+});
+
+test('syncDetailTop laesst eine ausgeblendete Spalte (unter der Schwelle) und fehlende Knoten in Ruhe', () => {
+  const page = fakePage();
+  inventory.syncDetailTop(page, fakeDetail(0, false));
+  inventory.syncDetailTop(page, null);
+  inventory.syncDetailTop(null, fakeDetail(10));
+  assert.equal(page.props.size, 0);
+});
+
+test('die Hoehe der klebenden Spalte rechnet ab ihrer gemessenen Oberkante bis zur Luft ueber dem Fensterrand', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/inventory.css', import.meta.url), 'utf8');
+  const rule = [...eachRule(css)].find((r) => r.selector === '.inventory-page .split-view__detail'
+    && r.at.some((a) => /module-surface/.test(a)));
+  assert.ok(rule, 'Regel der klebenden Detailspalte fehlt');
+  assert.match(rule.body, /position:\s*sticky/);
+  const maxHeight = rule.body.match(/max-height:\s*([^;]+);/)?.[1] ?? '';
+  // Die Oberkante ist der Messwert; ohne ihn (erster Frame) der Klebestand.
+  assert.match(maxHeight, /^calc\(var\(--viewport-height\) - var\(--inventory-detail-top, calc\(var\(--inventory-head-block, 0px\) \+ var\(--space-3\)\)\) - var\(--space-4\)\)$/);
+  // Rechnung am gemessenen Fall: 900 - 133 - 16 = 751, Unterkante 884 < 900.
+  const top = 133; const vh = 900; const space4 = 16;
+  assert.ok(top + (vh - top - space4) <= vh);
+});

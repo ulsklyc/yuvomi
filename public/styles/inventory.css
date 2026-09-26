@@ -1,7 +1,7 @@
 /**
  * Modul: Inventar (Inventory)
  * Zweck: Seiten-Layout, Statusbadges und Detailansicht. Die Liste selbst
- *        traegt KEINE eigene Zeilen-Geometrie mehr: .list-group/.list-rows/
+ *        traegt KEINE eigene Zeilen-Geometrie mehr: .list-group/.row-carrier/
  *        .list-row/.list-row__main--interactive/.list-row__name/
  *        .list-row__meta (styles/list-row.css) sind dasselbe geteilte
  *        Vokabular, das Vorrat und Einkauf schon nutzen - Inventar soll
@@ -17,7 +17,8 @@
 
 /* display:grid (nicht flex-column) aus demselben Grund wie .list-scroller
  * (list-row.css, dessen Rolle diese Klasse fuer Inventar uebernimmt): jedes
- * `.list-rows`-Kind (list-row.css) traegt `align-self: start`, das NUR in
+ * `.row-carrier`-Kind (list-row.css; bis Runde 5 `.list-rows`) traegt
+ * `align-self: start`, das NUR in
  * einem Grid-Elternteil ausschliesslich die Block-Achse (Hoehe) betrifft. In
  * einer Flex-Spalte waere `align-self` stattdessen die Quer-Achse (Breite)
  * und schrumpfte die Zeilenliste auf ihre Inhaltsbreite zusammen - genau das
@@ -666,7 +667,12 @@
     position: sticky;
     /* Dieselbe Luft unter dem Kopf, ob die Spalte ruht oder klebt. */
     top: calc(var(--inventory-head-block, 0px) + var(--space-3));
-    max-height: calc(var(--viewport-height) - var(--inventory-head-block, 0px) - var(--space-3) - var(--space-4));
+    /* Von der GEMESSENEN Oberkante bis zur Luft ueber dem Fensterrand
+     * (inventory.js, syncDetailTop): in Ruhe steht die Filterzeile zwischen
+     * Kopf und Spalte, beim Kleben nicht mehr - die alte Rechnung ab dem Kopf
+     * liess die Spalte in Ruhe um die Filterzeile unter den Falz ragen. Ohne
+     * Messwert (erster Frame) gilt der Klebestand. */
+    max-height: calc(var(--viewport-height) - var(--inventory-detail-top, calc(var(--inventory-head-block, 0px) + var(--space-3))) - var(--space-4));
     margin-block-start: var(--space-3);
   }
 }

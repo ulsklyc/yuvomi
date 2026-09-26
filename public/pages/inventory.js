@@ -399,7 +399,7 @@ function renderGroupedItems(groups) {
         ${esc(g.name)}
         <span class="list-group__count">${g.items.length}</span>
       </div>
-      <div class="list-rows">
+      <div class="row-carrier">
         ${g.items.map(renderItemRow).join('')}
       </div>
     </div>`).join('');
@@ -510,7 +510,7 @@ function renderCategoryList() {
     }),
   ];
   return `
-    <div class="list-rows">
+    <div class="row-carrier">
       ${rows.join('')}
     </div>`;
 }
@@ -557,6 +557,30 @@ function renderList({ repaint = false } = {}) {
   // Wie in Mail: verschwindet die ausgewaehlte Zeile aus der Liste (anderer
   // Ordner, Suche, geloescht), faellt die Spalte auf den Leerzustand zurueck.
   _md?.refresh({ repaint });
+  // Die Filterzeile kommt und geht mit der Ebene - die Spalte darunter misst neu.
+  const page = _container?.querySelector('.inventory-page');
+  syncDetailTop(page, page?.querySelector('.split-view__detail'));
+}
+
+/**
+ * DIE DETAILSPALTE MISST, WO SIE STEHT (Runde 5, 2026-09-26).
+ *
+ * Ihre Hoehe rechnete nur den Kopf (`--inventory-head-block`). In Ruhe steht
+ * unter dem Kopf aber noch die Filterzeile der Kategorie-Ebene, und die Spalte
+ * ragte um deren Hoehe unter den Falz - gemessen bei 1440x900: Oberkante 133,
+ * Hoehe 803, Unterkante 936. Beim Kleben ist die Filterzeile weggescrollt und
+ * die alte Rechnung stimmt; dazwischen liegt jeder Zwischenstand. Statt die
+ * Zustaende zu raten, setzt die Seite die gemessene Oberkante der Spalte als
+ * `--inventory-detail-top`, und inventory.css rechnet die Hoehe von dort bis
+ * zur Luft ueber dem Fensterrand. Eine ausgeblendete Spalte (unter der
+ * Schwelle) misst nichts und laesst den Wert stehen.
+ *
+ * @param {HTMLElement|null|undefined} page    `.inventory-page`
+ * @param {HTMLElement|null|undefined} detail  `.split-view__detail`
+ */
+function syncDetailTop(page, detail) {
+  if (!page || !detail || !detail.getClientRects().length) return;
+  page.style.setProperty('--inventory-detail-top', `${Math.round(detail.getBoundingClientRect().top)}px`);
 }
 
 function renderListBody() {
@@ -2161,8 +2185,21 @@ export async function render(container, { signal } = {}) {
   // scrollt (inventory.css). Inventar hat keinen eigenen Scrollport - der Kopf
   // klebt in #main-content -, also braucht die Spalte seine Hoehe als Versatz.
   // Gemessen statt als Token, weil der Kopf in langen Locales umbricht.
-  const syncHeadBlock = () => page.style.setProperty('--inventory-head-block', `${toolbar.offsetHeight}px`);
+  const syncHeadBlock = () => {
+    page.style.setProperty('--inventory-head-block', `${toolbar.offsetHeight}px`);
+    syncDetailTop(page, split.querySelector('.split-view__detail'));
+  };
   syncHeadBlock();
+  // Beim Scrollen wandert die Oberkante der Spalte vom Ruhe- zum Klebestand
+  // (syncDetailTop); ein Messwert je Frame reicht.
+  let detailTopFrame = 0;
+  document.getElementById('main-content')?.addEventListener('scroll', () => {
+    if (detailTopFrame) return;
+    detailTopFrame = requestAnimationFrame(() => {
+      detailTopFrame = 0;
+      syncDetailTop(page, split.querySelector('.split-view__detail'));
+    });
+  }, { passive: true, signal });
   if (typeof ResizeObserver === 'function') {
     const headRo = new ResizeObserver(syncHeadBlock);
     headRo.observe(toolbar);
@@ -2227,6 +2264,7 @@ export const __test = {
   state,
   renderItemRow,
   openDeepLinkedCategory,
+  syncDetailTop,
   categoryLabel,
   itemCategoryLabel,
   categoryOptionsHtml,
