@@ -18575,3 +18575,31 @@ test('Familie: Mitglied- und Einladungsformular erscheinen am Knopf und geben de
   assert.match(handler("container.querySelector('#cancel-add-invite')?.addEventListener('click'"), /addBtn\.focus\(\)/,
     'auch das Einladungsformular gibt beim Abbrechen den Fokus zurueck');
 });
+
+/* Lucide ersetzt `<i data-lucide>` durch ein `<svg>` - eine Regel auf `… i`
+ * greift danach ins Leere. Im Praemienkatalog stand die Groesse der Glyphen
+ * nur in solchen Regeln (`.rw-reward-card__icon i`, `.rw-cost i`), die SVGs
+ * blieben ungemessen und schrumpften in der 243px-Karte als Flex-Kinder auf
+ * 0-4px: das Geschenk im "Einloesen"-Knopf war ein Punkt (Critique
+ * 2026-09-26). Jede Glyphe der Karte hat deshalb eine Groesse, die das SVG
+ * erreicht, und schrumpft nicht. */
+test('Praemienkarte: jede Glyphe ist bemessen und schrumpft nicht', () => {
+  const src = read('../public/pages/rewards.js');
+  const card = src.slice(src.indexOf('function renderRewardCard('), src.indexOf('function renderCatalog('));
+  assert.ok(card.length > 100, 'renderRewardCard nicht gefunden');
+  const rules = [...eachRule(read('../public/styles/rewards.css'))];
+  const svgRule = (container) => rules.find((rule) => rule.selector.split(',').map((s) => s.trim()).includes(`${container} svg`));
+  const ungemessen = [];
+  for (const m of card.matchAll(/<i data-lucide=\\?"([a-z-]+)\\?"([^>]*)>/g)) {
+    if (/class="icon-(?:sm|md|lg|xl)"/.test(m[2])) continue; // .icon-* bringt Groesse und flex-shrink: 0 mit
+    // Sonst traegt der Behaelter eine svg-Regel: die Kachel-Glyphe ohne eigenes Zeichen.
+    const before = card.slice(0, m.index);
+    const container = before.match(/class="([\w-]+)"[^<]*$/)?.[1];
+    const rule = container && svgRule(`.${container}`);
+    if (!rule || !/width:/.test(rule.body) || !/flex-shrink:\s*0/.test(rule.body)) ungemessen.push(m[1]);
+  }
+  assert.deepStrictEqual(ungemessen, [], `ungemessene Glyphen in der Praemienkarte: ${ungemessen.join(', ')}`);
+  const tot = rules.flatMap((rule) => rule.selector.split(',').map((s) => s.trim()))
+    .filter((s) => /^\.rw-(?:reward-card__icon|cost) i$/.test(s));
+  assert.deepStrictEqual(tot, [], 'Regeln auf das ersetzte <i> sind tot');
+});

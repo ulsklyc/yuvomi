@@ -552,12 +552,12 @@ function renderRewardCard(item) {
         ${unitsLine}
       </div>
       <div class="rw-reward-card__foot">
-        <span class="rw-cost"><i data-lucide="coins" aria-hidden="true"></i>${esc(pointsLabel(item.cost))}</span>
+        <span class="rw-cost"><i data-lucide="coins" class="icon-md" aria-hidden="true"></i>${esc(pointsLabel(item.cost))}</span>
         <div class="rw-reward-card__actions">
           ${isAdmin() && !readOnly() ? `
-            <button class="btn btn--icon btn--sm" type="button" data-edit="${item.id}" aria-label="${esc(t('common.edit'))}"><i data-lucide="pencil" aria-hidden="true"></i></button>
+            <button class="btn btn--icon btn--sm" type="button" data-edit="${item.id}" aria-label="${esc(t('common.edit'))}"><i data-lucide="pencil" class="icon-md" aria-hidden="true"></i></button>
           ` : ''}
-          ${canRedeemBtn ? `<button class="btn btn--secondary btn--sm" type="button" data-redeem-item="${item.id}"><i data-lucide="gift" aria-hidden="true"></i>${esc(redeemVerb())}</button>` : shortHint}
+          ${canRedeemBtn ? `<button class="btn btn--secondary btn--sm" type="button" data-redeem-item="${item.id}"><i data-lucide="gift" class="icon-md" aria-hidden="true"></i>${esc(redeemVerb())}</button>` : shortHint}
         </div>
       </div>
     </article>`;
