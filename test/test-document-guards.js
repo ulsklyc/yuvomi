@@ -523,6 +523,16 @@ async function openCalendarSaveGateEditor(page, { wholeSeriesOnly = false } = {}
   }, wholeSeriesOnly);
   await page.evaluate((path) => window.yuvomi.navigate(path), `/calendar?open=${seriesId}&date=2048-04-03`);
   await page.waitForSelector('#detail-popover-edit, #detail-view-edit');
+  // ERST NACH DEM SEITENWECHSEL KLICKEN (Critique 2026-09-26, P2-1). Der Wechsel
+  // laeuft seit R3 als View Transition, und solange sie laeuft, trifft Chromium
+  // jeden Klick auf <html> - trotz `::view-transition { pointer-events: none }`
+  // (gemessen: elementsFromPoint liefert nur HTML). Der Deep-Link oeffnet das
+  // Popover schon ~170ms nach dem Start, die Transition endet ~250ms spaeter;
+  // ein sofortiger Klick schloss das Popover als Aussenklick, und der Editor kam
+  // nie. Das Fenster ist kuerzer als eine menschliche Reaktion, und die Sonde
+  // misst das Speichern-Tor, nicht den Seitenwechsel. `navigating` faellt mit
+  // `finished` der Transition (router.js).
+  await page.waitForFunction(() => !document.documentElement.classList.contains('navigating'));
   await page.click('#detail-popover-edit, #detail-view-edit');
   await page.waitForSelector('#modal-title');
   await page.evaluate(() => {
