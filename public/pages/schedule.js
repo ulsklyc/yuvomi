@@ -206,7 +206,7 @@ const clockLabel = (shiftType) => {
   if (!shiftType?.start_time || !shiftType?.end_time) return t('schedule.allDay');
   const crossesDay = shiftType.end_time <= shiftType.start_time;
   const fullDay = shiftType.end_time === shiftType.start_time;
-  return `${shiftType.start_time}–${shiftType.end_time}${crossesDay ? ' +1' : ''}${fullDay ? ' · 24 h' : ''}`;
+  return `${shiftType.start_time}-${shiftType.end_time}${crossesDay ? ' +1' : ''}${fullDay ? ' · 24 h' : ''}`;
 };
 
 // S-02: der Server antwortet mit technischen Validierungs-/Konflikttexten
@@ -1118,7 +1118,7 @@ function overrideRows() {
     const swatchColor = type ? type.color : 'var(--color-border)';
     const typeLabel = type ? (type.short_code ? `${type.short_code} · ${type.name}` : type.name) : t('schedule.freeDay');
     const meta = [userName(group.user_id), typeLabel, group.note].filter(Boolean).join(' · ');
-    const label = group.from === group.to ? formatDate(group.from) : `${formatDate(group.from)} – ${formatDate(group.to)}`;
+    const label = group.from === group.to ? formatDate(group.from) : `${formatDate(group.from)} - ${formatDate(group.to)}`;
     const actions = canWrite(group.user_id)
       ? '<span class="schedule-override-actions"><button type="button" class="btn btn--secondary" data-action="edit-override" data-from="' + esc(group.from) + '" data-user-id="' + group.user_id + '">' + esc(t('common.edit')) + '</button><button type="button" class="btn btn--danger-outline" data-action="delete-override-range" data-from="' + esc(group.from) + '" data-to="' + esc(group.to) + '" data-user-id="' + group.user_id + '">' + esc(t('schedule.delete')) + '</button></span>'
       : '';
@@ -1186,7 +1186,7 @@ function extraRows() {
     const swatchColor = type ? type.color : 'var(--color-border)';
     const typeLabel = type ? (type.short_code ? `${type.short_code} · ${type.name}` : type.name) : '';
     const meta = [userName(group.user_id), typeLabel, group.note].filter(Boolean).join(' · ');
-    const label = group.from === group.to ? formatDate(group.from) : `${formatDate(group.from)} – ${formatDate(group.to)}`;
+    const label = group.from === group.to ? formatDate(group.from) : `${formatDate(group.from)} - ${formatDate(group.to)}`;
     const icon = type?.icon ? '<i data-lucide="' + esc(type.icon) + '" class="schedule-type-icon" aria-hidden="true"></i>' : '';
     const ids = esc(group.ids.join(','));
     const actions = canWrite(group.user_id)
@@ -1613,7 +1613,7 @@ function renderOverview() {
   const weekDays = overviewVisibleDays();
   const weekLabel = overview.viewMode === 'day'
     ? formatDayMonth(weekDays[0])
-    : `${formatDayMonth(weekDays[0])} – ${formatDayMonth(weekDays[weekDays.length - 1])}`;
+    : `${formatDayMonth(weekDays[0])} - ${formatDayMonth(weekDays[weekDays.length - 1])}`;
   const viewToggle = `<div class="segmented" role="group" aria-label="${esc(t('calendar.viewWeek'))}/${esc(t('calendar.viewDay'))}">
     <button type="button" class="segmented__item${overview.viewMode === 'week' ? ' is-active' : ''}" data-action="overview-view-mode" data-mode="week" aria-pressed="${overview.viewMode === 'week' ? 'true' : 'false'}">${esc(t('calendar.viewWeek'))}</button>
     <button type="button" class="segmented__item${overview.viewMode === 'day' ? ' is-active' : ''}" data-action="overview-view-mode" data-mode="day" aria-pressed="${overview.viewMode === 'day' ? 'true' : 'false'}">${esc(t('calendar.viewDay'))}</button>

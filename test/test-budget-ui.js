@@ -499,7 +499,8 @@ test('Trendkurve und Donut haben eine Textalternative mit Werten', () => {
   assert.match(stats, /statsDonutSummary/);
   assert.match(stats, /<p class="sr-only">\$\{view\.ctx\.esc\(summary\)\}<\/p>/);
   // Die SVGs selbst sind dann dekorativ und dürfen nicht doppelt angesagt werden.
-  assert.match(stats, /class="budget-stats__trend"[\s\S]{0,120}aria-hidden="true"/);
+  // Die Klassenliste darf wachsen (`chart` seit 2026-09-26), geprueft wird aria-hidden.
+  assert.match(stats, /class="(?:[^"]*\s)?budget-stats__trend"[\s\S]{0,120}aria-hidden="true"/);
   assert.match(stats, /class="budget-stats__donut" aria-hidden="true"/);
 });
 

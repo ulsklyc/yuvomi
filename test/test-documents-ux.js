@@ -1243,7 +1243,10 @@ test('Speicher-Badges sind Ortsetiketten: neutral, Kapsel, unterschieden durch G
   // hier Ortsangaben (Google Drive, WebDAV). Neutral statt records-Waschung:
   // die waere der Modulton zweimal blass im eigenen Raum (Skalen-Regel).
   const rules = topRules(css);
-  const badge = rules.find((rule) => rule.selector === '.doc-badge');
+  // Die Kapsel selbst steht seit der Critique 2026-09-26 in list-row.css (global
+  // geladen, auch die Inventar-Frist nutzt sie); die Ortsetiketten bleiben hier.
+  const badge = topRules(read('../public/styles/list-row.css')).find((rule) => rule.selector === '.doc-badge');
+  assert.ok(badge, '.doc-badge fehlt in list-row.css');
   assert.match(badge.body, /border-radius:\s*var\(--radius-full\)/);
   for (const mod of ['dms', 'webdav', 'google-drive', 'folder']) {
     const own = rules.filter((rule) => rule.selector.split(',').map((s) => s.trim()).includes(`.doc-badge--${mod}`));

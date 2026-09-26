@@ -4132,6 +4132,42 @@ test('die Scrollport-Rolle sitzt an einer Box mit Ueberlauf', () => {
     + `Scroll-Achse - die Rolle legt dort einen Nachlauf ins Leere: ${blind.join(' | ')}`);
 });
 
+/* Ein Scrollport clippt nur, wessen Containing Block er ist. Ein absolut
+ * positioniertes Kind ohne Versatz (`.sr-only`) steht an seiner statischen
+ * Stelle, gehoert aber dem naechsten POSITIONIERTEN Vorfahren - war der
+ * Scrollport `position: static`, entkam es seinem Clipping und blaehte den
+ * Vorfahren auf. Gemessen im Vorrat (Critique 2026-09-26): 21 "Bearbeiten"-
+ * Spans unten in der Liste machten #main-content zu einem zweiten Scroller
+ * (scrollHeight 1766 bei 768), eine Wischgeste neben der Liste schob Kopf und
+ * Liste weg. Budget trug dieselbe Anlage, nur zufaellig ohne Folgen. */
+test('die Scrollport-Rolle ist Containing Block ihrer absoluten Nachfahren', () => {
+  const styleDir = new URL('../public/styles/', import.meta.url);
+  const layoutRules = [...eachRule(read('../public/styles/layout.css'))].filter((rule) => rule.at.length === 0);
+  const rolle = layoutRules.filter((rule) => rule.selector.split(',').some((s) => /\.page-scrollport\s*$/.test(s.trim())
+    && !/:has\(/.test(s)));
+  assert.ok(rolle.some((rule) => /(^|[;\s])position\s*:\s*(relative|absolute|sticky|fixed)\b/.test(rule.body)),
+    'layout.css muss der Rolle .page-scrollport eine Positionierung geben - sonst entkommen .sr-only-Nachfahren dem Clipping des Scrollports');
+
+  // Und keine Modulregel nimmt sie einem markierten Scrollport wieder weg.
+  const markiert = new Set();
+  for (const file of walkJsFiles('../public/pages/')) {
+    for (const m of read(file).matchAll(/["'`]([^"'`]*\bpage-scrollport\b[^"'`]*)["'`]/g)) {
+      for (const cls of m[1].split(/\s+/)) {
+        if (cls && cls !== 'page-scrollport' && /^[a-z][\w-]*$/.test(cls)) markiert.add(cls);
+      }
+    }
+  }
+  const statisch = [];
+  for (const file of readdirSync(styleDir).filter((f) => f.endsWith('.css'))) {
+    for (const rule of eachRule(read(`../public/styles/${file}`))) {
+      if (!/(^|[;\s])position\s*:\s*static\b/.test(rule.body)) continue;
+      const letztes = rule.selector.trim().split(/\s+/).pop() || '';
+      if ([...letztes.matchAll(/\.([a-z][\w-]*)/g)].some((m) => markiert.has(m[1]))) statisch.push(`${file}: ${rule.selector.trim()}`);
+    }
+  }
+  assert.deepStrictEqual(statisch, [], `diese Regeln setzen einen Scrollport auf position: static: ${statisch.join(' | ')}`);
+});
+
 test('die Pillenzone steht nur am markierten Scrollport', () => {
   const layout = read('../public/styles/layout.css').replace(/\/\*[\s\S]*?\*\//g, '');
 
@@ -18454,4 +18490,147 @@ test('.week-nav__today bleibt unter 640px pfeilbreit (icon-only), statt eine eig
   assert.ok(weekNavBaseRule, '.week-nav-Basisregel (ausserhalb jeder @media) nicht gefunden');
   assert.doesNotMatch(weekNavBaseRule.body, /flex-wrap:\s*wrap/,
     '.week-nav darf auch in seiner Basisregel kein flex-wrap:wrap tragen - das waere derselbe Umbruch, nur ungeschuetzt durch die Breitenschwelle');
+});
+
+/* Die Achsenschrift einer Auswertungsflaeche rendert in EINER Groesse, egal wie
+ * breit das Diagramm steht (Critique 2026-09-26). Die geteilte Geometrie
+ * (utils/chart.js) skaliert proportional: 12 Einheiten Schrift im viewBox
+ * 600x200 waren bei 390px Breite ~6,5px und bei 1440px ~22px - groesser als
+ * der Kartentitel. Jedes SVG dieser Geometrie traegt deshalb `.chart`: es ist
+ * sein eigener Container, und `.chart__axis` teilt die Schrift durch den
+ * Massstab 100cqi / CHART.W. */
+test('die Achsenschrift einer CHART-Flaeche skaliert nicht mit dem Diagramm', () => {
+  const chartSrc = read('../public/utils/chart.js');
+  const W = Number(chartSrc.match(/export const CHART = Object\.freeze\(\{ W: (\d+), H: (\d+)/)?.[1]);
+  const H = Number(chartSrc.match(/export const CHART = Object\.freeze\(\{ W: (\d+), H: (\d+)/)?.[2]);
+  assert.ok(W > 0 && H > 0, 'CHART.W/H nicht gefunden');
+
+  const ohneKlasse = [];
+  let gefunden = 0;
+  for (const file of walkJsFiles('../public/pages/')) {
+    for (const m of read(file).matchAll(/<svg class="([^"]*)" viewBox="0 0 \$\{(?:CHART\.)?W\} \$\{(?:CHART\.)?H\}"([^>]*)>/g)) {
+      if (/preserveAspectRatio="none"/.test(m[2])) continue; // gestreckte Sparklines tragen keine Achse
+      gefunden += 1;
+      if (!m[1].split(/\s+/).includes('chart')) ohneKlasse.push(`${file}: ${m[1]}`);
+    }
+  }
+  assert.ok(gefunden >= 8, `zu wenige CHART-Flaechen gefunden: ${gefunden}`);
+  assert.deepStrictEqual(ohneKlasse, [], `diese Diagramme skalieren ihre Achsenschrift mit: ${ohneKlasse.join(' | ')}`);
+
+  const panel = [...eachRule(read('../public/styles/panel.css'))].filter((rule) => rule.at.length === 0);
+  const body = (selector) => panel.filter((rule) => rule.selector.split(',').map((s) => s.trim()).includes(selector)).map((rule) => rule.body).join('\n');
+  const chart = body('.chart');
+  assert.match(chart, /container-type:\s*inline-size/, '.chart muss sein eigener Container sein, sonst misst 100cqi etwas anderes');
+  // Inline-size-Containment nimmt einem SVG sein Seitenverhaeltnis aus dem viewBox.
+  assert.match(chart, new RegExp(`aspect-ratio:\\s*${W}\\s*/\\s*${H}`), `.chart braucht aspect-ratio ${W} / ${H} (= CHART.W / CHART.H)`);
+  assert.match(chart, new RegExp(`--chart-scale:\\s*tan\\(atan2\\(100cqi,\\s*${W}px\\)\\)`), '.chart traegt den Massstab 100cqi / CHART.W');
+  assert.match(body('.chart__axis'), /font-size:\s*calc\(var\(--text-xs\)\s*\/\s*var\(--chart-scale/,
+    '.chart__axis teilt die Schrift durch den Massstab');
+
+  // Feste Schrift braucht einen Gutter mit Mindestbreite in Pixeln: der
+  // proportionale (CHART.PAD_L) schrumpfte bei 358px auf 30px, und "5.550 €"
+  // ragte 12px links aus dem Bild. Die Formel rechnet mit CHART.W und PAD_L.
+  const PAD_L = Number(chartSrc.match(/PAD_L: (\d+)/)?.[1]);
+  assert.match(body(':root'), new RegExp(`--chart-inset:\\s*max\\(0px,\\s*calc\\(\\(var\\(--space-\\d+\\)\\s*\\*\\s*${W}\\s*-\\s*100%\\s*\\*\\s*${PAD_L}\\)\\s*/\\s*${W - PAD_L}\\)\\)`),
+    `--chart-inset muss (G * ${W} - 100% * ${PAD_L}) / ${W - PAD_L} rechnen`);
+  const svgChart = body('svg.chart');
+  // PHYSISCH links, nicht inline-start: die SVG-Geometrie legt die Y-Achse bei PAD_L an die physische
+  // linke Kante, und die Budget-Punkte rechnen `left` - unter RTL laege ein logisches Polster rechts.
+  assert.match(svgChart, /padding-left:\s*var\(--chart-inset\)/, 'das Polster gehoert physisch nach links (Y-Achse bei PAD_L)');
+  assert.doesNotMatch(svgChart, /padding-inline-start/, 'kein logisches Polster: unter RTL laege es rechts');
+  assert.match(svgChart, /width:\s*calc\(100%\s*-\s*var\(--chart-inset\)\)/);
+  assert.match(svgChart, /box-sizing:\s*content-box/, 'aspect-ratio muss die Zeichenflaeche meinen, nicht das Polster');
+  assert.match(svgChart, /overflow:\s*visible/, 'ein SVG clippt an seiner Content-Box - die Werte muessen ins Polster ragen duerfen');
+  // Was ueber der Flaeche positioniert wird, rechnet gegen dieselbe Zeichenbreite.
+  const budgetCss = [...eachRule(read('../public/styles/budget.css'))].find((rule) => rule.selector === '.budget-stats__point');
+  assert.match(budgetCss.body, /left:\s*calc\(var\(--chart-inset\)/, 'die Budget-Punkte muessen hinter dem Polster beginnen');
+});
+
+/* "Mitglied hinzufuegen" verlor den Fokus (Critique 2026-09-26): der Knopf
+ * verschwand, das Formular erschien UNTER der Zwei-Faktor-Karte, der Fokus
+ * fiel auf BODY. Die Einladung derselben Seite macht es richtig - Formular am
+ * Ort, erstes Feld fokussiert. Geprueft wird Ort UND Fokusweg in beide
+ * Richtungen, fuer beide Formulare der Seite. */
+test('Familie: Mitglied- und Einladungsformular erscheinen am Knopf und geben den Fokus zurueck', () => {
+  const src = read('../public/settings/pages/admin-family.js');
+  const at = (needle) => {
+    const i = src.indexOf(needle);
+    assert.ok(i >= 0, `${needle} fehlt`);
+    return i;
+  };
+  const membersCard = at('id="members-card"');
+  const formCard = at('id="add-member-form-card"');
+  const twoFactor = at('id="two-factor-household-card"');
+  assert.ok(membersCard < formCard && formCard < twoFactor,
+    'das Formular steht direkt unter der Mitgliederliste, nicht hinter der Zwei-Faktor-Karte');
+
+  const handler = (openNeedle) => {
+    const start = at(openNeedle);
+    return src.slice(start, src.indexOf('});', start) + 3);
+  };
+  assert.match(handler("addMemberBtn.addEventListener('click'"), /#new-username'\)\??\.focus\(/,
+    'Oeffnen setzt den Fokus ins erste Feld');
+  assert.match(handler("cancelAddMember.addEventListener('click'"), /#add-member-btn'\)\??\.focus\(\)|addMemberBtn\??\.focus\(\)/,
+    'Abbrechen gibt den Fokus an den wieder sichtbaren Knopf zurueck');
+  const submit = src.slice(at("addMemberForm.addEventListener('submit'"), at('bindDeleteButtons(container);\n  bindEditButtons(container, currentUser, users);\n}'));
+  assert.match(submit, /#add-member-btn'\)\??\.focus\(\)|addMemberBtn\??\.focus\(\)/,
+    'nach dem Anlegen verschwindet das Formular - der Fokus geht an den Knopf, nicht an BODY');
+  assert.match(handler("container.querySelector('#cancel-add-invite')?.addEventListener('click'"), /addBtn\.focus\(\)/,
+    'auch das Einladungsformular gibt beim Abbrechen den Fokus zurueck');
+});
+
+/* Lucide ersetzt `<i data-lucide>` durch ein `<svg>` - eine Regel auf `… i`
+ * greift danach ins Leere. Im Praemienkatalog stand die Groesse der Glyphen
+ * nur in solchen Regeln (`.rw-reward-card__icon i`, `.rw-cost i`), die SVGs
+ * blieben ungemessen und schrumpften in der 243px-Karte als Flex-Kinder auf
+ * 0-4px: das Geschenk im "Einloesen"-Knopf war ein Punkt (Critique
+ * 2026-09-26). Jede Glyphe der Karte hat deshalb eine Groesse, die das SVG
+ * erreicht, und schrumpft nicht. */
+test('Praemienkarte: jede Glyphe ist bemessen und schrumpft nicht', () => {
+  const src = read('../public/pages/rewards.js');
+  const card = src.slice(src.indexOf('function renderRewardCard('), src.indexOf('function renderCatalog('));
+  assert.ok(card.length > 100, 'renderRewardCard nicht gefunden');
+  const rules = [...eachRule(read('../public/styles/rewards.css'))];
+  const svgRule = (container) => rules.find((rule) => rule.selector.split(',').map((s) => s.trim()).includes(`${container} svg`));
+  const ungemessen = [];
+  for (const m of card.matchAll(/<i data-lucide=\\?"([a-z-]+)\\?"([^>]*)>/g)) {
+    if (/class="icon-(?:sm|md|lg|xl)"/.test(m[2])) continue; // .icon-* bringt Groesse und flex-shrink: 0 mit
+    // Sonst traegt der Behaelter eine svg-Regel: die Kachel-Glyphe ohne eigenes Zeichen.
+    const before = card.slice(0, m.index);
+    const container = before.match(/class="([\w-]+)"[^<]*$/)?.[1];
+    const rule = container && svgRule(`.${container}`);
+    if (!rule || !/width:/.test(rule.body) || !/flex-shrink:\s*0/.test(rule.body)) ungemessen.push(m[1]);
+  }
+  assert.deepStrictEqual(ungemessen, [], `ungemessene Glyphen in der Praemienkarte: ${ungemessen.join(', ')}`);
+  const tot = rules.flatMap((rule) => rule.selector.split(',').map((s) => s.trim()))
+    .filter((s) => /^\.rw-(?:reward-card__icon|cost) i$/.test(s));
+  assert.deepStrictEqual(tot, [], 'Regeln auf das ersetzte <i> sind tot');
+});
+
+/* Projektregel "-" statt Em-/En-Dash gilt fuer UI-Texte (CLAUDE.md) - in den
+ * Locales haelt sie die i18n-Kette, in den Seiten stand sie nirgends: Zeitraeume
+ * ("21.09. – 27.09."), Referenzbereiche und Leerwerte kamen als Literal aus dem
+ * Code (Critique 2026-09-26). Geprueft wird jedes String- und Template-Literal
+ * einer Seite, Kommentare nicht.
+ *
+ * AUSNAHME MIT VERFALL: meals.js gehoert in dieser Runde dem Kuechen-Umbau
+ * (Runde 1), der seinen Wochenbereich selbst umstellt. Der Eintrag muss fallen,
+ * sobald die Datei sauber ist - der Test meldet einen verwaisten Eintrag rot. */
+const DASH_PENDING = new Map([
+  ['../public/pages/meals.js', 'Runde 1 (Kueche) stellt den Wochenbereich um'],
+]);
+test('Seiten geben keinen Em- oder En-Dash als UI-Text aus', () => {
+  const funde = [];
+  const verwaist = [];
+  for (const file of walkJsFiles('../public/pages/')) {
+    const code = withoutCommentsKeepingLines(read(file));
+    const lines = code.split('\n').map((line, i) => [i + 1, line]).filter(([, line]) => /[–—]/.test(line));
+    if (DASH_PENDING.has(file)) {
+      if (!lines.length) verwaist.push(file);
+      continue;
+    }
+    for (const [n, line] of lines) funde.push(`${file}:${n} ${line.trim().slice(0, 80)}`);
+  }
+  assert.deepStrictEqual(funde, [], `"-" statt Em-/En-Dash (CLAUDE.md):\n  ${funde.join('\n  ')}`);
+  assert.deepStrictEqual(verwaist, [], 'diese Ausnahmen sind erledigt - Eintrag aus DASH_PENDING streichen');
 });

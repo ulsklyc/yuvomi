@@ -27,7 +27,7 @@ import { todayKey } from '/utils/date.js';
 import { formatDate, getLocale, getNumberFormat } from '/i18n.js';
 import { renderDocumentAttachField, bindDocumentAttachField } from '/components/document-attach.js';
 import { pathAccess } from '/utils/module-access.js';
-import { warrantyStatus, hasUpcomingDeadline, dateStatus, countUpcomingDeadlines } from '/utils/inventory-warranty.js';
+import { warrantyStatus, hasUpcomingDeadline, dateStatus, countUpcomingDeadlines, deadlineChipSpec } from '/utils/inventory-warranty.js';
 import { openDetailView, closeDetailView } from '/components/detail-view.js';
 import { wireScrollFade } from '/utils/ux.js';
 import { attachOverlay } from '/utils/overlay-history.js';
@@ -402,6 +402,33 @@ function renderGroupedItems(groups) {
 }
 
 /**
+ * Fristen-Chip der Zeile - derselbe Baustein wie der Ablauf-Chip in Dokumente
+ * (`.doc-badge`, list-row.css), damit eine Frist app-weit gleich aussieht.
+ * Vorher stand hier ein 12px-`shield-alert` mit einem sr-only-Satz, der weder
+ * Frist noch Datum nannte (Critique 2026-09-26). Welche Frist er zeigt und in
+ * welchem Ton, entscheidet deadlineChipSpec() - dieselbe Regel, aus der Filter,
+ * Kennzahl und Nav-Badge zaehlen. Die Garantie nennt ihr Enddatum ("bis"),
+ * eine getrackte Frist den Abstand ("TUeV in 12 Tagen"); das Datum steht
+ * zusaetzlich im title.
+ */
+function deadlineChipHtml(item) {
+  const spec = deadlineChipSpec(item);
+  if (!spec) return '';
+  const date = formatDate(spec.endDateKey);
+  let text;
+  if (spec.kind === 'warranty') {
+    text = spec.state === 'expired' ? t('inventory.warrantyChipExpired') : t('inventory.warrantyChipUntil', { date });
+  } else if (spec.state === 'expired') {
+    text = t('inventory.deadlineChipOverdue', { label: spec.label });
+  } else {
+    text = spec.days === 0
+      ? t('inventory.deadlineChipToday', { label: spec.label })
+      : t('inventory.deadlineChipInDays', { label: spec.label, count: spec.days });
+  }
+  return `<span class="doc-badge doc-badge--${spec.tone}" title="${esc(date)}"><i data-lucide="calendar-clock" aria-hidden="true"></i>${esc(text)}</span>`;
+}
+
+/**
  * Zeile ueber die geteilte Grammatik (styles/list-row.css) statt eigener
  * Geometrie: .list-row traegt Flaeche/Trennlinie/Hoehe, .list-row__main
  * (--interactive) den Klickbereich, .list-row__name/.list-row__meta Name und
@@ -413,7 +440,6 @@ function renderGroupedItems(groups) {
 function renderItemRow(item) {
   const hasAttachments = (item.attachments?.length ?? 0) > 0;
   const hasBookings = (item.linked_entries?.length ?? 0) > 0;
-  const deadlineAlert = hasUpcomingDeadline(item);
   return `
     <div class="list-row" data-id="${item.id}">
       <button type="button" class="list-row__main list-row__main--interactive" data-action="open-detail">
@@ -421,8 +447,8 @@ function renderItemRow(item) {
           <span class="list-row__name">${esc(item.name)}</span>
           ${hasAttachments ? `<i data-lucide="paperclip" class="icon-sm" aria-hidden="true"></i><span class="sr-only">${esc(t('inventory.hasAttachmentsLabel'))}</span>` : ''}
           ${hasBookings ? `<i data-lucide="receipt" class="icon-sm" aria-hidden="true"></i><span class="sr-only">${esc(t('inventory.hasBookingsLabel'))}</span>` : ''}
-          ${deadlineAlert ? `<i data-lucide="shield-alert" class="icon-sm" aria-hidden="true"></i><span class="sr-only">${esc(t('inventory.warrantyAlertLabel'))}</span>` : ''}
           <span class="inventory-status-badge inventory-status-badge--${esc(item.status)}">${esc(statusLabel(item.status))}</span>
+          ${deadlineChipHtml(item)}
         </span>
         ${item.location_path ? `<span class="list-row__meta">${esc(item.location_path)}</span>` : ''}
       </button>
@@ -869,7 +895,7 @@ function odometerChartMarkup(points, unit) {
   return `
     <div class="inventory-chart-section">
       <div class="inventory-chart-section__title">${esc(titleText)}</div>
-      <svg class="inventory-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titleText)}">
+      <svg class="chart inventory-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titleText)}">
         ${grid}
         ${area}
         <polyline fill="none" stroke="var(--module-inventory)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="${spine}" />

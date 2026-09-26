@@ -519,7 +519,7 @@ function sourceRowHtml(source) {
   const badge = sourceHealthBadgeInfo(source);
   const isUrl = source.kind === 'url';
   const coverage = source.coverage_start
-    ? `${esc(formatDate(source.coverage_start))} – ${esc(formatDate(source.coverage_end))}`
+    ? `${esc(formatDate(source.coverage_start))} - ${esc(formatDate(source.coverage_end))}`
     : esc(t('waste.sourceNoCoverage'));
   // A URL source's own row action is a manual refresh (fetch now) or, once
   // needs_mapping is set, a review action that opens the same mapping wizard
@@ -1495,7 +1495,7 @@ function openSourceModal(source) {
     </div>
     <div class="waste-source-detail__meta">
       ${isUrl && source.url ? `<p>${esc(t('waste.sourceUrlLabel'))}: ${esc(source.url)}</p>` : ''}
-      ${source.coverage_start ? `<p>${esc(t('waste.sourceCoverageLabel'))}: ${esc(formatDate(source.coverage_start))} – ${esc(formatDate(source.coverage_end))}</p>` : ''}
+      ${source.coverage_start ? `<p>${esc(t('waste.sourceCoverageLabel'))}: ${esc(formatDate(source.coverage_start))} - ${esc(formatDate(source.coverage_end))}</p>` : ''}
       ${source.last_success_at ? `<p>${esc(t('waste.sourceLastImportedLabel'))}: ${esc(formatDate(source.last_success_at.slice(0, 10)))}</p>` : ''}
       ${source.last_error ? `<p class="waste-source-detail__error">${esc(source.last_error)}</p>` : ''}
       ${badge ? `<span class="waste-badge waste-badge--${badge.code}">${esc(t(badge.labelKey))}</span>` : ''}

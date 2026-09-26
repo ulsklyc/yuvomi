@@ -348,6 +348,22 @@
   padding-block-end: calc(var(--scrollport-pad, 0px) + var(--shell-tail));
 }
 
+/* DER SCROLLPORT IST AUCH CONTAINING BLOCK (Critique 2026-09-26).
+ *
+ * Ein Scrollport clippt nur die absolut positionierten Nachfahren, deren
+ * Containing Block er ist. `.sr-only` steht ohne Versatz an seiner statischen
+ * Stelle, gehoert aber dem naechsten POSITIONIERTEN Vorfahren - im Vorrat war
+ * das `#main-content`: 21 "Bearbeiten"-Spans unten in der Liste entkamen dem
+ * Clipping und machten den Hauptbereich zu einem zweiten Scroller (1766px bei
+ * 768px Hoehe); eine Wischgeste neben der Liste schob Kopf und Liste weg. Die
+ * Rolle bringt die Positionierung deshalb selbst mit, statt sie jedem Modul
+ * einzeln abzuverlangen. Gemessen auf allen Seiten mit eigenem Scrollport
+ * (Kalender in allen vier Ansichten, 390 und 1440): kein Element verschiebt
+ * sich. Guard: test-frontend-audit.js. */
+.page-scrollport {
+  position: relative;
+}
+
 /* UND AM DEFAULT-PORT REITET ER AUF EINEM PLATZHALTER, NICHT AUF DEM POLSTER
  * (Critique 2026-09-23).
  *

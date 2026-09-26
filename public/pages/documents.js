@@ -3314,7 +3314,7 @@ function readFileAsDataUrl(file) {
 function formatFileSize(bytes) {
   // Fehlende/unbekannte Größe (z. B. DMS-verknüpfte Dokumente) → „—" statt „0 KB",
   // das wie ein leeres Dokument aussähe.
-  if (bytes == null) return '—';
+  if (bytes == null) return '-';
   if (!bytes) return '0 KB';
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
