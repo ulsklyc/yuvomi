@@ -378,7 +378,7 @@
  * -------------------------------------------------------- */
 
 /* KEIN eigener Radius, KEIN eigener Abstand: beides gehört dem Träger
- * (.list-rows), der die Wischfläche mit seinem overflow: hidden klippt.
+ * (.row-carrier), der die Wischfläche mit seinem overflow: hidden klippt.
  * Das Touch-Feedback während der Geste trägt die geteilte Bühne
  * (.swipe-row--swiping > :first-child in layout.css).
  *
@@ -402,8 +402,8 @@
  * Task-Card
  * -------------------------------------------------------- */
 /* Zeile, keine Karte: KEINE eigene Fläche, KEIN Radius, KEIN Schatten, KEIN
- * eigener Abstand. Das leistet alles der Träger (.list-rows), die Trennung
- * seine Haarlinie `.list-rows > * + *`. Vorher war jede Aufgabe eine weiße
+ * eigener Abstand. Das leistet alles der Träger (.row-carrier), die Trennung
+ * seine Haarlinie `.row-carrier > * + *`. Vorher war jede Aufgabe eine weiße
  * Karte auf dem Grouped-Grund - das Karten-Paradigma, das der Einkauf in
  * Runde 3 abgelegt hat und die Aufgaben behielten, weil der Zeilenlisten-Guard
  * nur fand, wer die Regel schon befolgt. */
@@ -1191,6 +1191,12 @@
   text-align: left;
   margin-top: var(--space-2);
   min-height: var(--target-lg);
+  /* Plus-Glyph und Text in einer Zeile - das "+" stand bis zur Critique
+   * 2026-09-26 im Locale-Text, und neben dem Icon der Detailansicht stand es
+   * doppelt ("+ + Teilaufgabe hinzufuegen"). */
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   transition: border-color var(--transition-fast), color var(--transition-fast);
 }
 
@@ -1419,6 +1425,23 @@
   transition: background-color var(--transition-fast), color var(--transition-fast),
               border-color var(--transition-fast);
   flex-shrink: 0;
+  position: relative;
+}
+
+/* KOMPAKT AUSSEHEN, VOLL TREFFEN (Rezept aus tokens.css, Musterfall
+ * `.weather-widget__refresh`): der Kreis bleibt 24px, weil er in der
+ * Kartenfusszeile neben dem Avatarstapel steht, aber die Trefferflaeche
+ * dehnt sich per ::before auf --target-base (44px Zeiger, 48px Finger). Bis
+ * zur Critique 2026-09-26 war die 24px-Box die ganze Flaeche - die kleinste
+ * Handlung auf dem Brett. Das Pseudo-Element wird nicht geclippt: weder der
+ * Knopf noch die Karte tragen `overflow` (die Falle aus
+ * reference-overflow-clips-target-pseudo), und die 12px Kartenpolsterung
+ * nehmen den Ueberstand von 10-12px auf. */
+.kanban-card__status-btn::before {
+  content: '';
+  position: absolute;
+  inset: calc((100% - var(--target-base)) / 2);
+  border-radius: var(--radius-full);
 }
 
 .kanban-card__status-btn:hover {
@@ -1720,34 +1743,6 @@
 
 @media (hover: none) {
   .task-comment__actions { opacity: 1; pointer-events: auto; }
-}
-
-.task-comment__action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-full);
-  color: var(--color-text-tertiary);
-  cursor: pointer;
-}
-
-.task-comment__action:hover {
-  background: var(--color-surface-2);
-  color: var(--color-text-primary);
-}
-
-.task-comment__action--danger:hover {
-  color: var(--color-danger);
-}
-
-.task-comment__action:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: var(--focus-ring-offset);
 }
 
 /* Zeilenumbrüche des Verfassers bleiben stehen: ein Kommentar mit drei

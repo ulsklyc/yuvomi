@@ -520,12 +520,12 @@ function renderTaskCard(task, opts = {}) {
           <span class="subtask-item__title">${esc(s.title)}</span>
           ${canEditTaskDefinition(s, task) ? `
           <div class="subtask-item__actions">
-            <button class="btn btn--ghost btn--icon btn--icon-sm subtask-item__action"
+            <button type="button" class="row-action subtask-item__action"
                     data-action="rename-subtask" data-id="${s.id}" data-title="${esc(s.title)}"
                     aria-label="${t('tasks.subtaskRename', { title: esc(s.title) })}">
               <i data-lucide="pencil" aria-hidden="true"></i>
             </button>
-            <button class="btn btn--ghost btn--icon btn--icon-sm subtask-item__action"
+            <button type="button" class="row-action row-action--danger subtask-item__action"
                     data-action="delete-subtask" data-id="${s.id}" data-title="${esc(s.title)}"
                     aria-label="${t('tasks.subtaskDelete', { title: esc(s.title) })}">
               <i data-lucide="trash-2" aria-hidden="true"></i>
@@ -599,18 +599,18 @@ function renderTaskCard(task, opts = {}) {
               Einstieg nach der ersten, und der zweite Einstieg lag am Ende der
               eingeklappten Liste - gelesen als "nur eine Unteraufgabe je Aufgabe". */ ''}
         ${canEdit && !archived && !task.parent_task_id ? `
-        <button class="btn btn--ghost btn--icon btn--icon-sm task-card__inline-action" data-action="add-subtask" data-parent="${task.id}"
-                aria-label="${t('tasks.subtaskAdd')}" title="${t('tasks.subtaskAdd')}">
+        <button type="button" class="row-action task-card__inline-action" data-action="add-subtask" data-parent="${task.id}"
+                aria-label="${esc(t('tasks.subtaskAddNamed', { title: task.title }))}" title="${t('tasks.subtaskAdd')}">
           <i data-lucide="list-plus" class="icon-md" aria-hidden="true"></i>
         </button>` : ''}
         ${canEdit ? `
-        <button class="btn btn--ghost btn--icon btn--icon-sm task-card__inline-action" data-action="edit-task" data-id="${task.id}"
-                aria-label="${t('tasks.editButton')}">
+        <button type="button" class="row-action task-card__inline-action" data-action="edit-task" data-id="${task.id}"
+                aria-label="${esc(t('common.editNamed', { name: task.title }))}">
           <i data-lucide="pencil" class="icon-md" aria-hidden="true"></i>
         </button>
-        <button class="btn btn--ghost btn--icon btn--icon-sm task-card__inline-action"
+        <button type="button" class="row-action task-card__inline-action"
                 data-action="${archived ? 'unarchive-task' : 'archive-task'}" data-id="${task.id}"
-                aria-label="${archived ? t('tasks.unarchiveButton') : t('tasks.archiveButton')}"
+                aria-label="${esc(t(archived ? 'tasks.unarchiveNamed' : 'tasks.archiveNamed', { title: task.title }))}"
                 title="${archived ? t('tasks.unarchiveButton') : t('tasks.archiveButton')}">
           <i data-lucide="${archived ? 'archive-restore' : 'archive'}" class="icon-md" aria-hidden="true"></i>
         </button>` : ''}
@@ -631,8 +631,8 @@ function renderTaskCard(task, opts = {}) {
              id="subtasks-${task.id}">
           ${subtasksHtml}
           ${canEdit ? `
-          <button class="subtask-item__add" data-action="add-subtask" data-parent="${task.id}">
-            ${t('tasks.subtaskAdd')}
+          <button type="button" class="subtask-item__add" data-action="add-subtask" data-parent="${task.id}">
+            <i data-lucide="plus" class="icon-sm" aria-hidden="true"></i><span>${t('tasks.subtaskAdd')}</span>
           </button>` : ''}
         </div>` : ''}
     </div>`;
@@ -718,7 +718,7 @@ function renderTaskGroups(tasks, groupMode) {
         </button>
         <span class="list-group__count">${groupTasks.length}</span>
       </h2>
-      ${collapsed ? '' : `<div class="list-rows">
+      ${collapsed ? '' : `<div class="row-carrier">
         ${sorted.map((t) => renderSwipeRow(t, renderTaskCard(t, {
           showCheckbox: state.bulkSelectMode,
           isChecked: state.selectedTaskIds.has(t.id),
@@ -892,7 +892,7 @@ function wireTagBadgeFilter(container) {
   // Gruppenkopf auf- und zuklappen (#812).
   //
   // DIE ZEILEN KLAPPEN, STATT ZU SPRINGEN (Critique 2026-09-26, A3 P1-4). Die
-  // Liste zeichnet eine zugeklappte Gruppe ohne `.list-rows` - also klappt
+  // Liste zeichnet eine zugeklappte Gruppe ohne `.row-carrier` - also klappt
   // beim Zuklappen erst die alte Zeilenflaeche weg und danach wird neu
   // gezeichnet; beim Aufklappen wird erst gezeichnet und die neue Flaeche von
   // null aufgezogen. Der Winkel dreht dabei ueber seine eigene Transition
@@ -910,7 +910,7 @@ function wireTagBadgeFilter(container) {
       toggle.dataset.moving = '1';
       toggle.setAttribute('aria-expanded', 'false');
       toggle.querySelector('.list-group__chevron')?.classList.add('list-group__chevron--collapsed');
-      await collapseOut(toggle.closest('.list-group')?.querySelector('.list-rows'));
+      await collapseOut(toggle.closest('.list-group')?.querySelector('.row-carrier'));
     }
     toggleGroup(state.groupMode, id);
     renderTaskList(container);
@@ -932,7 +932,7 @@ function wireTagBadgeFilter(container) {
         chevron.style.transition = '';
         chevron.classList.remove('list-group__chevron--collapsed');
       }
-      expandIn(fresh.closest('.list-group')?.querySelector('.list-rows'));
+      expandIn(fresh.closest('.list-group')?.querySelector('.row-carrier'));
     }
   });
 }
@@ -1226,8 +1226,10 @@ ${syncTargetFieldHtml(task)}
       <div class="modal-panel__footer modal-panel__footer--plain">
         ${isEdit ? `
           <button type="button" class="btn btn--danger-outline" data-action="delete-task"
-                  data-id="${task.id}" style="margin-right:auto">${t('common.delete')}</button>` : ''}
-        <button type="button" class="btn btn--ghost" data-action="close-modal">${t('common.cancel')}</button>
+                  data-id="${task.id}" style="margin-right:auto">
+            <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
+          </button>` : ''}
+        <button type="button" class="btn btn--secondary" data-action="close-modal">${t('common.cancel')}</button>
         <button type="submit" class="btn btn--primary" id="task-submit-btn">
           ${isEdit ? t('common.save') : t('common.create')}
         </button>
@@ -1749,12 +1751,30 @@ function wireCountdownGate(panel) {
   const due    = panel.querySelector('#task-due-date');
   const warn   = panel.querySelector('#task-countdown-warning');
   if (!toggle || !due) return;
+  // DIE WARNUNG ANTWORTET AUF EINEN VERSUCH, sie kuendigt keinen an (Critique
+  // 2026-09-26): sie stand orange auf jedem frischen Formular, bevor jemand
+  // irgendetwas eingegeben hatte - eine Fehlermeldung ohne Fehler. Sie
+  // erscheint jetzt, wenn jemand den gesperrten Schalter antippt, oder wenn
+  // das Entfernen der Faelligkeit einen gesetzten Haken mitnimmt; beides ist
+  // ein Moment, in dem jemand wissen will, warum. Der gesperrte Schalter
+  // selbst und die Hilfszeile darunter bleiben die stille Auskunft.
+  let asked = false;
   const update = () => {
     const hasDue = !!parseDateInput(due.value || '');
-    if (!hasDue && toggle.checked) toggle.checked = false;
+    if (!hasDue && toggle.checked) {
+      toggle.checked = false;
+      asked = true;
+    }
     toggle.disabled = !hasDue;
-    if (warn) warn.hidden = hasDue;
+    if (warn) warn.hidden = hasDue || !asked;
   };
+  // Ein gesperrtes Feld meldet keinen Klick, sein Label schon - der Tipp auf
+  // Bahn oder Text landet dort.
+  toggle.closest?.('label')?.addEventListener('click', () => {
+    if (!toggle.disabled) return;
+    asked = true;
+    update();
+  });
   due.addEventListener('change', update);
   due.addEventListener('input', update);
   update();
@@ -2016,7 +2036,8 @@ function openBulkTagDialog(taskIds, mode, container) {
           </datalist>
           <p class="task-field-hint">${t('tasks.bulkTagHint', { count: taskIds.length })}</p>
         </div>
-        <div class="modal-actions">
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="button" class="btn btn--secondary" data-action="close-modal">${t('common.cancel')}</button>
           <button type="submit" class="btn btn--primary">${t('common.apply')}</button>
         </div>
       </form>`,
@@ -3048,7 +3069,7 @@ function renderHistory(container) {
             <span>${esc(historyDayLabel(day))}</span>
             <span class="list-group__count">${dayEntries.length}</span>
           </h2>
-          <div class="list-rows">${dayEntries.map(renderHistoryEntry).join('')}</div>
+          <div class="row-carrier">${dayEntries.map(renderHistoryEntry).join('')}</div>
         </div>`).join('')
     // Ein Leerzustand ohne Anlegen-Knopf: „erledige etwas" ist keine Handlung,
     // die dieser Bildschirm anbieten kann, und der Hinweis erklärt stattdessen,
@@ -5052,6 +5073,9 @@ export const __test = {
   // Die Verdrahtung steht mit hier: die Regel allein zu messen hiesse, den
   // haeufigsten Ausfall auszulassen - einen Listener, den niemand anhaengt.
   syncReminderAfterDue, wireReminderAfterDue,
+  // Der Countdown-Riegel und WANN er sich erklaert (Critique 2026-09-26: die
+  // Warnung stand auf jedem leeren Formular).
+  wireCountdownGate,
   // Und der AUFRUFER dazu: eine Regel, die richtig ist und die niemand ruft,
   // ist derselbe Ausfall wie eine falsche Regel.
   wireTaskForm,

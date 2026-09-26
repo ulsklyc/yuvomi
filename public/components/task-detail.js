@@ -35,6 +35,7 @@ import { openDetailView, closeDetailView, visibilityRow, assignedRow } from '/co
 import { closeModal, promptModal, btnLoading, refocusAfterRender } from '/components/modal.js';
 import { recurrenceRow } from '/rrule-ui.js';
 import { scheduleUndoableDelete } from '/utils/ux.js';
+import { rowActionEl } from '/utils/row-action.js';
 import { renderMarkdownLight } from '/utils/html.js';
 import { splitKeepingLineEndings } from '/utils/markdown-checklist.js';
 import { splitMentions, applyMention } from '/utils/mentions.js';
@@ -471,31 +472,25 @@ function commentRowNode(comment, { onChanged, ctx }) {
     actions.className = 'task-comment__actions';
 
     // Ändern darf nur der Autor - ein Admin moderiert, er schreibt nicht um.
+    // Die geteilte Zeilenaktion (utils/row-action.js, DESIGN.md
+    // "Komponenten-Kanon"): hier standen 28px-Eigenbauten, die kleinste
+    // Handlung der ganzen Detailansicht.
     if (mine) {
-      const edit = document.createElement('button');
-      edit.type = 'button';
-      edit.className = 'task-comment__action';
-      edit.setAttribute('aria-label', t('tasks.commentEdit'));
-      edit.title = t('tasks.commentEdit');
-      const editIcon = document.createElement('i');
-      editIcon.dataset.lucide = 'pencil';
-      editIcon.className = 'icon-sm';
-      editIcon.setAttribute('aria-hidden', 'true');
-      edit.appendChild(editIcon);
-      edit.addEventListener('click', () => startCommentEdit(row, comment, { onChanged, ctx }));
+      const edit = rowActionEl({
+        icon: 'pencil',
+        label: t('tasks.commentEdit'),
+        attrs: { title: t('tasks.commentEdit') },
+        onClick: () => startCommentEdit(row, comment, { onChanged, ctx }),
+      });
       actions.appendChild(edit);
     }
 
-    const del = document.createElement('button');
-    del.type = 'button';
-    del.className = 'task-comment__action task-comment__action--danger';
-    del.setAttribute('aria-label', t('tasks.commentDelete'));
-    del.title = t('tasks.commentDelete');
-    const delIcon = document.createElement('i');
-    delIcon.dataset.lucide = 'trash-2';
-    delIcon.className = 'icon-sm';
-    delIcon.setAttribute('aria-hidden', 'true');
-    del.appendChild(delIcon);
+    const del = rowActionEl({
+      icon: 'trash-2',
+      tone: 'danger',
+      label: t('tasks.commentDelete'),
+      attrs: { title: t('tasks.commentDelete') },
+    });
     // Kein Bestätigungsdialog, sondern der Rückgängig-Toast, den diese Seite
     // schon fürs Löschen einer Aufgabe benutzt. Zwei Gründe: Eine Rückfrage
     // wäre hier ein Modal über einem Modal - `confirmModal` verdrängt die
@@ -541,7 +536,7 @@ function startCommentEdit(row, comment, { onChanged, ctx }) {
   actions.className = 'task-comment__edit-actions';
   const cancel = document.createElement('button');
   cancel.type = 'button';
-  cancel.className = 'btn btn--ghost btn--sm';
+  cancel.className = 'btn btn--secondary btn--sm';
   cancel.textContent = t('common.cancel');
   const save = document.createElement('button');
   save.type = 'submit';

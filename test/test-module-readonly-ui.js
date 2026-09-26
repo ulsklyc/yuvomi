@@ -1855,8 +1855,11 @@ test('Wischgeste der Geburtstage: bei `calendar: read` wird keine Seite verdraht
 test('Import-Knopf der Geburtstage: er braucht BEIDE Rechte', () => {
   // Er schreibt Geburtstage (`calendar`) und liest Kontakte (`contacts`) -
   // server/routes/birthdays.js prueft beides, also fragt der Knopf beides.
+  // Seit Runde 5 (2026-09-26) steht der Import als Eintrag im EINEN
+  // Werkzeugmenue des Kopfs statt als Textknopf daneben; die Rechtefrage ist
+  // dieselbe, und ohne Import gibt es kein Menue.
   withAccess({ calendar: 'write', contacts: 'read' }, () => {
-    assert.match(birthdays.importActionHtml(), /id="birthdays-import-btn"/,
+    assert.match(birthdays.importActionHtml(), /data-action="import-contacts"/,
       'Kontakte LESEN reicht fuer die Quelle');
   });
   withAccess({ calendar: 'write', contacts: 'none' }, () => {
@@ -4015,4 +4018,168 @@ test('Dokument-Betrachter: Bearbeiten nur mit Schreibrecht auf die Dokumente', (
   } finally {
     abbau();
   }
+});
+
+// -------------------------------------------------------------------------
+// Komponenten-Kanon, Runde 5 (Critique 2026-09-26): Menschen-Module
+//
+// Die Ratchet-Suite (test:control-dialect) zaehlt nur, OB eine Zeilenaktion
+// ihr Objekt nennt; hier steht, WELCHES sie nennt - an den Renderern selbst,
+// mit dem Namen des Datensatzes, den die Zeile zeigt. Dazu die Beifang-Fixes,
+// deren Wirkung kein Textguard sieht (Warnung erst auf den Versuch, der
+// Lesedialog der Notiz mit "Bearbeiten").
+// -------------------------------------------------------------------------
+
+test('Kanon R5: Kontaktzeile nennt die Person an Anrufen und am Mehr-Menue', () => {
+  withAccess({ contacts: 'write' }, () => {
+    const html = contacts.renderContactItem(kontakt());
+    assert.match(html, /href="tel:[^"]*"[^>]*aria-label="contacts\.callNamed\{&quot;name&quot;:&quot;Dr\. Meier&quot;\}"/,
+      'zwoelf Zeilen, die alle "Anrufen" heissen, sind fuer den Screenreader eine');
+    assert.match(html, /contact-more-menu__trigger"[^>]*aria-label="common\.moreActionsNamed\{&quot;name&quot;:&quot;Dr\. Meier&quot;\}"/);
+  });
+});
+
+test('Kanon R5: Geburtstagszeile nennt die Person an Bearbeiten und Loeschen', () => {
+  withAccess({ calendar: 'write' }, () => {
+    const html = birthdays.birthdayItemHtml({
+      id: 5, name: 'Oma Ingrid', birth_date: '1955-03-01', next_birthday: '2027-03-01',
+      days_until: 156, age_next: 72,
+    });
+    assert.match(html, /class="row-action" data-action="edit" aria-label="common\.editNamed\{&quot;name&quot;:&quot;Oma Ingrid&quot;\}"/);
+    assert.match(html, /class="row-action row-action--danger" data-action="delete" aria-label="common\.deleteNamed\{&quot;name&quot;:&quot;Oma Ingrid&quot;\}"/);
+  });
+});
+
+test('Kanon R5: Haushaltshilfe nennt Aufgabe und Person an ihren Zeilenaktionen', () => {
+  const abbau = installMiniDom();
+  try {
+    hkState({
+      tasks: [{ id: 3, name: 'Fenster putzen', area: 'Wohnzimmer', frequency_days: 14, urgency_status: 'ok', last_completed: '2026-07-01' }],
+    });
+    const aufgaben = hkContainer();
+    withAccess({ housekeeping: 'write' }, () => hk.renderTasks(aufgaben));
+    assert.match(aufgaben.html, /data-edit-task="3"\s+aria-label="common\.editNamed\{&quot;name&quot;:&quot;Fenster putzen&quot;\}"/);
+    assert.match(aufgaben.html, /data-delete-task="3"\s+aria-label="common\.deleteNamed\{&quot;name&quot;:&quot;Fenster putzen&quot;\}"/);
+
+    hkState({ tab: 'staff', workers: [{ id: 7, display_name: 'Ana', phone: '0151 000' }] });
+    const personal = hkContainer();
+    withAccess({ housekeeping: 'write' }, () => hk.renderStaff(personal));
+    assert.match(personal.html, /class="row-action" type="button" data-edit-worker="7" aria-label="common\.editNamed\{&quot;name&quot;:&quot;Ana&quot;\}"/,
+      'die geteilte Zeilenaktion statt eines violetten Sekundaerkreises, mit Namen');
+  } finally {
+    abbau();
+  }
+});
+
+test('Kanon R5: Aufgabenkarte nennt die Aufgabe an Bearbeiten, Ablegen und Teilaufgabe', () => {
+  withAccess({ tasks: 'write' }, () => {
+    const html = tasks.renderTaskCard(aufgabe({ title: 'Muell rausbringen' }));
+    const titel = '\\{&quot;title&quot;:&quot;Muell rausbringen&quot;\\}';
+    assert.match(html, new RegExp(`class="row-action task-card__inline-action" data-action="edit-task"[^>]*aria-label="common\\.editNamed\\{&quot;name&quot;:&quot;Muell rausbringen&quot;\\}"`));
+    assert.match(html, new RegExp(`data-action="archive-task"[^>]*aria-label="tasks\\.archiveNamed${titel}"`));
+    assert.match(html, new RegExp(`data-action="add-subtask"[^>]*aria-label="tasks\\.subtaskAddNamed${titel}"`));
+  });
+});
+
+test('Kanon R5: "Teilaufgabe hinzufuegen" traegt kein "+" im Text - beide Knoepfe bringen das Plus-Icon mit', async () => {
+  // In der Detailansicht (task-detail.js) stand das Icon neben einem Text, der
+  // selbst mit "+ " begann: "+ + Teilaufgabe hinzufuegen".
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const dir = new URL('../public/locales/', import.meta.url);
+  const mitPlus = readdirSync(dir).filter((f) => f.endsWith('.json'))
+    .filter((f) => /^\s*\+/.test(JSON.parse(readFileSync(new URL(f, dir), 'utf8')).tasks.subtaskAdd));
+  assert.deepEqual(mitPlus, []);
+  withAccess({ tasks: 'write' }, () => {
+    const html = tasks.renderTaskCard(aufgabe({ subtasks: [{ id: 8, title: 'Tonne', status: 'open' }] }));
+    assert.match(html, /class="subtask-item__add"[^>]*>\s*<i data-lucide="plus"/, 'die Kartenliste bringt ihr Plus jetzt als Icon');
+  });
+});
+
+test('Kanon R5: die Countdown-Warnung antwortet auf einen Versuch, nicht auf ein leeres Formular', () => {
+  const el = (extra = {}) => ({
+    listeners: {},
+    addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); },
+    fire(type) { for (const fn of this.listeners[type] ?? []) fn(); },
+    ...extra,
+  });
+  const label = el();
+  const toggle = el({ checked: false, disabled: false, closest: (sel) => (sel === 'label' ? label : null) });
+  const due = el({ value: '' });
+  const warn = { hidden: true };
+  const nodes = { '#task-countdown': toggle, '#task-due-date': due, '#task-countdown-warning': warn };
+  tasks.wireCountdownGate({ querySelector: (sel) => nodes[sel] ?? null });
+
+  assert.equal(toggle.disabled, true, 'ohne Faelligkeit bleibt der Schalter gesperrt');
+  assert.equal(warn.hidden, true, 'auf dem frischen Formular steht keine Warnung');
+
+  label.fire('click');
+  assert.equal(warn.hidden, false, 'wer den gesperrten Schalter antippt, erfaehrt warum');
+
+  due.value = '26.09.2026';
+  due.fire('change');
+  assert.equal(toggle.disabled, false);
+  assert.equal(warn.hidden, true, 'mit Faelligkeit ist die Frage beantwortet');
+
+  // Wer den Haken setzt und die Faelligkeit dann wieder entfernt, verliert ihn -
+  // das ist der zweite Moment, in dem die Erklaerung gebraucht wird.
+  const frischLabel = el();
+  const frischToggle = el({ checked: true, disabled: false, closest: () => frischLabel });
+  const frischDue = el({ value: '26.09.2026' });
+  const frischWarn = { hidden: true };
+  const frisch = { '#task-countdown': frischToggle, '#task-due-date': frischDue, '#task-countdown-warning': frischWarn };
+  tasks.wireCountdownGate({ querySelector: (sel) => frisch[sel] ?? null });
+  assert.equal(frischWarn.hidden, true);
+  frischDue.value = '';
+  frischDue.fire('input');
+  assert.equal(frischToggle.checked, false);
+  assert.equal(frischWarn.hidden, false);
+});
+
+test('Kanon R5: der Lesedialog einer Notiz fuehrt "Bearbeiten" als Primaerknopf, nicht nur "Loeschen"', () => {
+  const abbau = installMiniDom();
+  try {
+    const offen = mitEchtemMarkdown(() => withAccess({ notes: 'write' }, () => (
+      modalOptionen(() => notes.openNoteModal({ mode: 'edit', note: notiz() }))
+    )));
+    assert.match(offen.content, /<button type="button" class="btn btn--primary" id="note-modal-edit" data-reader-only>common\.edit<\/button>/);
+    assert.match(offen.content, /id="note-modal-delete"[^>]*>\s*<i data-lucide="trash-2"/, 'Loeschen als Textknopf mit Icon, links');
+    const neu = withAccess({ notes: 'write' }, () => modalOptionen(() => notes.openNoteModal({ mode: 'create' })));
+    assert.doesNotMatch(neu.content, /note-modal-edit/, 'eine neue Notiz oeffnet im Editor - dort gibt es nichts umzuschalten');
+  } finally {
+    abbau();
+  }
+});
+
+test('Kanon R5: Notizkarte nennt die Notiz an Oeffnen und Loeschen', () => {
+  mitEchtemMarkdown(() => withAccess({ notes: 'write' }, () => {
+    const html = notes.renderNoteCard(notiz({ title: '' }));
+    // Ohne Titel nennt sie die erste Zeile, ohne Markdown-Zeichen.
+    assert.match(html, /class="note-card__open"[^>]*aria-label="notes\.openNamed\{&quot;name&quot;:&quot;Milch&quot;\}"/);
+    assert.match(html, /class="row-action row-action--danger note-card__delete"[^>]*aria-label="common\.deleteNamed\{&quot;name&quot;:&quot;Milch&quot;\}"/);
+  }));
+});
+
+test('Kanon R5: die Geburtstagsdialoge tragen den Modulton selbst - sie haengen nicht unter der Seite', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../public/styles/birthdays.css', import.meta.url), 'utf8');
+  const setzt = (sel) => [...eachRule(css)].some((r) => r.selector.split(',').map((s) => s.trim()).includes(sel)
+    && /--module-accent\s*:\s*var\(--module-birthdays\)/.test(r.body) && r.at.length === 0);
+  // Ohne das war `--module-accent` im Dialog leer und jedes color-mix() darauf
+  // ungueltig: die Bildflaeche des Editors stand ohne Hintergrund.
+  assert.ok(setzt('.birthday-modal'), '.birthday-modal setzt --module-accent');
+  assert.ok(setzt('.bd-import'), '.bd-import setzt --module-accent');
+});
+
+test('Kanon R5: der Kanban-Statusknopf trifft auf --target-base, obwohl er 24px zeigt', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../public/styles/tasks.css', import.meta.url), 'utf8');
+  const regeln = [...eachRule(css)];
+  const knopf = regeln.find((r) => r.selector === '.kanban-card__status-btn');
+  const flaeche = regeln.find((r) => r.selector === '.kanban-card__status-btn::before');
+  assert.ok(knopf && /position:\s*relative/.test(knopf.body), 'der Knopf ist Bezugsrahmen seines ::before');
+  assert.doesNotMatch(knopf.body, /overflow\s*:/, 'overflow am Knopf clippte das eigene ::before (die Falle am Budget-Titel)');
+  assert.ok(flaeche, 'ohne ::before ist die 24px-Box die ganze Trefferflaeche');
+  assert.match(flaeche.body, /content:\s*''/);
+  assert.match(flaeche.body, /position:\s*absolute/);
+  assert.match(flaeche.body, /inset:\s*calc\(\(100% - var\(--target-base\)\) \/ 2\)/);
 });
