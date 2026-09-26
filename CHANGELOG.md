@@ -63,6 +63,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **On wide screens, contacts, tasks, recipes and inventory show the selected entry next to the
+  list.** From a main column of about 1200px (1440px windows with the sidebar open, or smaller
+  ones with it collapsed) the list stays on the left and the entry you pick opens on the right,
+  with its own title and actions, and scrolls on its own - as in Apple Mail. The arrow keys move
+  the selection, Enter edits, Escape goes back to the list, and the back button returns to the
+  previous entry. Every selection has an address (`?open=<id>`), the same one global search and
+  the meal cards already used, so a link opens the entry beside the list on a desktop and as
+  before on a phone. Contacts get a card at the top of the column with call, email and map
+  shortcuts. Below that width and on phones nothing changes. On very wide screens the two
+  columns line up with the page header instead of running to the window edges.
+
+- **The sidebar fits every module at 1280x800 and 1440x900 without scrolling.** The collapse
+  button and search sit in the logo row (search now also opens with Cmd+K or Ctrl+K), rows and
+  section labels are more compact, and Help, Changelog and Sign out moved into a menu behind
+  your avatar at the bottom, with a dot on the avatar when an update is waiting.
+
+- **Budget statistics use the width of the budget lane.** From about 960px the expense shares sit
+  beside the trend and category charts, on the same columns as the overview, instead of below
+  them.
+
+- **Household help keeps the reading width of the other lists instead of a wider measure of its
+  own, and the shopping and household help headers are back to the height of their neighbours
+  on the desktop.**
+
 - **Budget puts the bookings first and speaks one language across its seven tabs.** A pass over
   the whole module from the 2026-09-25 critique; the tabs themselves stay as they are.
 
@@ -269,6 +293,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stays at the top while you scroll. Links to an area open the list at that area.
 
 ### Fixed
+
+- **The week plan starts on Monday and shows all seven days at 1440px.** On opening, the board
+  sometimes scrolled Monday half out of view; at 1440x900 the seven days now fit without
+  scrolling sideways.
 
 - **Undoing a finished housekeeping task restores its previous date.** "Done" now offers Undo for
   five seconds, which puts back the date the task was last done; the old button next to the row
