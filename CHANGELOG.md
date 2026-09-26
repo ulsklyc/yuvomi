@@ -268,11 +268,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of behind an extra level, with search in the header; inside a setting the way back
   stays at the top while you scroll. Links to an area open the list at that area.
 
+- **Changing pages keeps the navigation still.** The content cross-fades while the sidebar, the
+  tab bar on a phone, the header toolbar and the kitchen tabs stay where they are, and the old
+  page stays in view until the new one is ready, so there is no empty frame in between. Browsers
+  without view transitions get a plain fade instead of the sliding, springy entrance.
+
+- **The kitchen tabs stay put when you switch between them.** The highlight slides to the tab you
+  tapped, and the counts show at once in the room kept for them.
+
+- **Lists fade in once, when they first appear**, instead of again after every search, filter or
+  update.
+
+- **A checked-off task leaves the list gently.** When it no longer belongs in the current view,
+  it stays checked for a moment, then folds away and the rows below move up; Undo folds it back
+  in. Collapsing a group in Tasks or a category in Shopping folds the rows instead of making them
+  jump.
+
+- **Finishing a housekeeping task answers like checking off a task**, with a short vibration and
+  the check mark at the tap.
+
+- **Tiles glide to their new place while you customize the overview**, when you move or resize
+  them, and the grid shows a dashed edge instead of a violet tint.
+
+- **The fasting ring is easier to read.** Its track is thicker with round ends and moves smoothly
+  as time passes instead of being redrawn; before the first fast the clock shows no zeros, no day
+  and no switch.
+
 ### Fixed
 
 - **Undoing a finished housekeeping task restores its previous date.** "Done" now offers Undo for
   five seconds, which puts back the date the task was last done; the old button next to the row
   cleared it instead.
+
+- **Sheets and dialogs close with a real exit.** On a phone a closing sheet played its opening
+  animation again instead of sliding down; now it slides down from where you let go and the
+  backdrop fades out, and on a desktop a dialog shrinks slightly and fades. When it opens, the
+  sheet no longer shoots past its resting place.
+
+- **The date picker and switches animate again.** Two transitions were written in a form browsers
+  ignore, so the date picker popped open and the switch knob jumped.
 
 - **Shift types line up on a desktop.** The heading and the empty state of the shift types took
   the first column of the two-column grid, so the first card stood next to the heading and every
