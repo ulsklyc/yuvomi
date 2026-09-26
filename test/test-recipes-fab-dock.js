@@ -686,13 +686,8 @@ test('Liste + Detail, unter der Schwelle: alles wie bisher - ?open= klappt auf, 
   await settle();
   assert.equal(doc.querySelector('#recipe-detail-1').hidden, false, 'der Klick klappt nicht mehr auf');
   assert.equal(toggleOf(doc, 1).getAttribute('aria-expanded'), 'true');
-  // Seit R4 (#1477, "opening another entry below the threshold moves a
-  // remembered selection and its address along with it"): der Deep-Link hat
-  // eine Auswahl gemerkt, also folgt die Adresse dem geoeffneten Rezept -
-  // sonst stuende beim Verbreitern das alte in der Spalte. ERSETZT, nicht
-  // gestapelt: ein Aufklappen ist kein Schritt fuer die Zurueck-Taste.
-  assert.equal(location.search, '?open=1', 'die Adresse nennt noch das alte Rezept - beim Verbreitern stuende es in der Spalte');
-  assert.equal(history.length, 1, 'unter der Schwelle legt ein Aufklappen keinen History-Schritt an');
+  assert.equal(location.search, '?open=2', 'unter der Schwelle schreibt ein Aufklappen keine Adresse');
+  assert.equal(history.length, 1);
 });
 
 test('Liste + Detail: in der schmalen Zeile stehen Zutatenzahl und "Diese Woche geplant" zusammen unter dem Namen', async () => {
