@@ -4169,6 +4169,50 @@ test('Baender: im Nachbarmonat toent das Band zurueck wie der Chip der Zelle, ni
   assert(!/opacity|filter/.test(band.body), 'nie ueber Opacity auf Text');
 });
 
+test('Baender in RTL: offene Kante, Chevron und Nachbarmonat-Toenung kippen mit der Schreibrichtung (#1467)', () => {
+  // Das Raster kippt in RTL selbst: Spalte 1 steht rechts, `first` und
+  // --band-out-start zaehlen vom Zeilenanfang. Was an einer SEITE des Bands
+  // haengt, muss darum logisch sein oder unter [dir="rtl"] eigens kippen.
+  const rules = [...eachRule(calendarCss)].filter((r) => r.at.length === 0);
+  const rule = (sel) => rules.find((r) => r.selector.trim() === sel);
+  const physical = /(?:^|[;\s])(?:margin|padding|border)-(?:left|right)\b|border-(?:top|bottom)-(?:left|right)-radius|(?:^|[;\s])(?:left|right)\s*:|translateX/;
+
+  // (1) Offene Kante und Rundung: nur logische Eigenschaften.
+  for (const sel of ['.cal-band--before', '.cal-band--after', '.month-bands > .cal-band',
+    '.month-bands > .cal-band--before', '.month-bands > .cal-band--after',
+    '.allday-row--week > .cal-band--before', '.allday-row--week > .cal-band--after']) {
+    const r = rule(sel);
+    assert(r && !physical.test(r.body), `${sel} haengt an einer physischen Seite: ${r?.body}`);
+  }
+  const after = rule('.cal-band--after');
+  assert(/border-start-end-radius:\s*0/.test(after.body) && /border-end-end-radius:\s*0/.test(after.body),
+    'das offene Ende verliert die Rundung am Zeilenende');
+
+  // (2) Das Zeichen: vorn ein Chevron nach links, hinten nach rechts, beide
+  // unter RTL gespiegelt, das hintere per logischem auto-Rand am Zeilenende.
+  const ev = bandEvent(21, '2026-10-30', '2026-11-02');
+  const html = ['2026-10-26', '2026-11-02']
+    .map((monday) => calendarHelpers.monthBandsHtml(segmentsFor([ev], bandDays(monday)))).join('');
+  assert(/data-lucide="chevron-left" class="cal-band__cont cal-band__cont--before"/.test(html)
+    && /data-lucide="chevron-right" class="cal-band__cont cal-band__cont--after"/.test(html),
+    `vorn chevron-left, hinten chevron-right: ${html}`);
+  const mirror = rule('[dir="rtl"] .cal-band__cont');
+  assert(mirror && /transform:\s*scaleX\(-1\)/.test(mirror.body), 'in RTL zeigt das Zeichen zur anderen Seite');
+  const toEnd = rules.find((r) => r.selector.split(',').map((s) => s.trim()).includes('.cal-band__cont--after'));
+  assert(toEnd && /margin-inline-start:\s*auto/.test(toEnd.body), 'das hintere Zeichen steht am Zeilenende');
+
+  // (3) Die Toenung: die Stopps messen vom Anfang des Bands (--band-ms, die
+  // Spalten ab `first`); physisch ist nur die Richtung des Verlaufs, und die
+  // kippt unter RTL mit, sonst laege die Grenze in der gespiegelten Spalte.
+  const tint = rule('.month-bands > .cal-band--outside');
+  assert(tint && /linear-gradient\(to var\(--band-to, right\),/.test(tint.body), `Richtung ueber --band-to: ${tint?.body}`);
+  assert(/--band-a:[^;]*var\(--band-out-start\)[^;]*var\(--band-ms\)/.test(tint.body)
+    && /--band-b:[^;]*var\(--band-out-end\)[^;]*var\(--band-ms\)/.test(tint.body),
+    'beide Stopps messen vom Anfang des Bands');
+  const rtl = rule('[dir="rtl"] .month-bands > .cal-band--outside');
+  assert(rtl && /--band-to:\s*left/.test(rtl.body), 'in RTL laeuft der Verlauf von rechts nach links');
+});
+
 test('Monatszelle: der Fokusring liegt ueber der Band-Schicht, die Zelle nicht', () => {
   // Ein Band liegt in `.month-bands` (z-index 1) ueber den Zellen. Hob sich die
   // fokussierte Zelle mit z-index 1 an, malte die spaetere Schicht trotzdem
