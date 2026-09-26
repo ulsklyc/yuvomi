@@ -854,7 +854,7 @@ function renderCard(subscription) {
             ${status.badgeClass === 'subscription-status--active' ? '' : `<span class="subscription-status ${status.badgeClass}">${status.label}</span>`}
           </span>
           <span class="subscription-card__meta">
-            <span class="subscription-card__due${overdue ? ' subscription-card__due--overdue' : ''}"><i data-lucide="${overdue ? 'triangle-alert' : 'calendar-clock'}" aria-hidden="true"></i>${formatDate(subscription.next_payment_date)} · ${dueLabel(subscription)}</span>
+            <span class="subscription-card__due${overdue ? ' subscription-card__due--overdue' : ''}"><i data-lucide="${overdue ? 'triangle-alert' : 'calendar-clock'}" aria-hidden="true"></i><span>${formatDate(subscription.next_payment_date)} ·</span> <span>${dueLabel(subscription)}</span></span>
             <span>${cycleLabel(subscription)}</span>
             <span class="subscription-card__meta-extra">${esc(rowPaymentMethodLabel(subscription))}</span>
             <span class="subscription-card__meta-extra"><i data-lucide="bell" aria-hidden="true"></i>${t('subscriptions.reminderMeta', { count: subscription.reminder_days })}</span>

@@ -2256,3 +2256,61 @@ test('Statistik wiederholt die Uebersicht nicht: Vergleich je Kategorie und aufs
   const wiring = src.match(/function wireTrendPoints[\s\S]*?\n\}/)[0];
   assert.match(wiring, /addEventListener\('pointermove'/, 'die ganze Flaeche waehlt den naechsten Tag - ein Punkt war 10-24px breit');
 });
+
+/**
+ * Abo-Zeile: die Metaangaben ueberdecken den Betrag nie (Re-Critique 2026-09-25).
+ * Die Zeile steht NEBEN dem Betrag - die Textspalte darf schrumpfen, der Betrag
+ * nicht. Mit `white-space: nowrap` an jeder Metaangabe war „24.09.2026 · 2 Tage
+ * ueberfaellig" EIN unzerbrechliches Stueck: breiter als die Textspalte (390px,
+ * de) ragte es 6px unter den Betrag. Die Regel: keine Angabe in der Metazeile ist
+ * unzerbrechlich, Datum und Relativangabe sind getrennte Einheiten in einem
+ * umbrechenden Traeger - die Zeile bricht ZWISCHEN ihnen um, und eine Einheit,
+ * die allein breiter ist als die Spalte, bricht in sich statt zu ueberlaufen.
+ * Der Ueberfaellig-Hinweis ist eine Warnung und wird nie abgeschnitten.
+ */
+test('Abo-Zeile: Metaangaben brechen um statt unter den Betrag zu laufen', async () => {
+  const rules = [...eachRule(subscriptionsCss)];
+  const parts = (selector) => selector.split(',').map((part) => part.trim());
+  const meta = rules.filter(({ selector }) => parts(selector)
+    .some((sel) => /\.subscription-card__(?:meta|due)\b/.test(sel)));
+  assert.ok(meta.length >= 3, 'Regeln der Metazeile nicht gefunden');
+  for (const { selector, body } of meta) {
+    assert.doesNotMatch(body, /white-space:\s*(?:nowrap|pre)\b/,
+      `${selector}: ein unzerbrechliches Stueck in der Metazeile laeuft unter den Betrag`);
+    assert.doesNotMatch(body, /text-overflow:\s*ellipsis|overflow:\s*hidden/,
+      `${selector}: der Ueberfaellig-Hinweis ist eine Warnung und wird nicht abgeschnitten`);
+  }
+  const base = (sel) => rules.find(({ selector, at }) => at.length === 0 && parts(selector).includes(sel))?.body ?? '';
+  assert.match(base('.subscription-card__meta'), /flex-wrap:\s*wrap/);
+  assert.match(base('.subscription-card__due'), /flex-wrap:\s*wrap/,
+    'Datum und Relativangabe umbrechen als zwei Einheiten');
+  assert.match(base('.subscription-card__body'), /min-width:\s*0/, 'die Textspalte darf schrumpfen');
+  const columns = base('.subscription-card__main').match(/grid-template-columns:\s*([^;]+)/)?.[1] ?? '';
+  assert.match(columns, /^auto\s+minmax\(0,\s*1fr\)\s+auto$/, 'Marke fest, Text schrumpft, Betrag als eigene Spalte');
+  assert.match(base('.subscription-card__cost'), /white-space:\s*nowrap/, 'der Betrag schrumpft nicht');
+
+  const { __test: abos } = await import('../public/pages/subscriptions.js');
+  const html = abos.renderCard({
+    id: 7, name: 'Streaming', description: '', status: 'active', enabled: 1, amount: 39, currency: 'EUR',
+    monthly_base: 39, next_payment_date: '2020-01-01', billing_cycle: 'monthly', cycle_interval: 1,
+    reminder_days: 3, end_type: 'never',
+  });
+  // Inhalt des Faelligkeits-Elements ueber die Verschachtelung, nicht bis zum ersten `</span>`.
+  const open = '<span class="subscription-card__due subscription-card__due--overdue">';
+  const start = html.indexOf(open);
+  let due;
+  if (start >= 0) {
+    const tags = /<\/?span\b[^>]*>/g;
+    tags.lastIndex = start + open.length;
+    for (let depth = 1, m; (m = tags.exec(html));) {
+      depth += m[0].startsWith('</') ? -1 : 1;
+      if (depth === 0) { due = html.slice(start + open.length, m.index); break; }
+    }
+  }
+  assert.ok(due, 'ueberfaellige Faelligkeit nicht gefunden');
+  const units = [...due.matchAll(/<span[^>]*>([^<]*)<\/span>/g)].map((m) => m[1].trim());
+  assert.equal(units.length, 2, `Datum und Relativangabe sind getrennte Einheiten: ${due}`);
+  assert.match(units[1], /overdueDays/, 'die zweite Einheit ist der Ueberfaellig-Hinweis');
+  assert.equal(due.replace(/<span[^>]*>[^<]*<\/span>|<i[^>]*><\/i>/g, '').trim(), '',
+    'ausserhalb der beiden Einheiten steht kein loser Text');
+});

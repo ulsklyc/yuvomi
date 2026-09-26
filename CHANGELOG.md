@@ -85,9 +85,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Subscriptions:** the four filter drop-downs became one "Filters" button with the number of
   active filters; it opens a sheet, and each active filter shows as a removable chip below the
   search. Sorting and the two management dialogs are in one menu. The list comes before the charts
-  and its rows are compact - on a phone about 74px instead of 173px. "By category" is a bar list
-  with amount and share instead of a pie chart without values, the renewal forecast names its peak
-  month, and the charts no longer overflow on a 1024px screen. "Over budget" offers "Most
+  and its rows are compact - on a phone 74 to 109px instead of 173px, with the due date wrapping
+  between date and "2 days overdue" instead of running under the amount. "By category" is a bar
+  list with amount and share instead of a pie chart without values, the renewal forecast names its
+  peak month, and the charts no longer overflow on a 1024px screen. "Over budget" offers "Most
   expensive first" and speaks like the plan: amber from 85 %, red once the budget is exceeded. The
   yearly projection no longer repeats the currency, and "1 day overdue" is singular.
 

@@ -429,6 +429,11 @@
   object-fit: contain;
 }
 
+/* Die Textspalte (minmax(0, 1fr)) darf schrumpfen, der Betrag daneben nicht. */
+.subscription-card__body {
+  min-width: 0;
+}
+
 .subscription-card__title-row {
   display: flex;
   gap: var(--space-2);
@@ -504,12 +509,24 @@
   font-size: var(--text-xs);
 }
 
-.subscription-card__meta span {
+/* Eine Angabe bricht als Ganzes um, nicht mitten in „Faellig in 6 | Tagen" -
+ * das leistet flex-wrap: jede Angabe ist ein Flex-Element und wandert mit ihrer
+ * vollen Breite in die naechste Zeile. KEIN `white-space: nowrap`: die Zeile
+ * steht NEBEN dem Betrag, und eine unzerbrechliche Angabe, die allein breiter
+ * ist als die Textspalte, lief unter ihn („24.09.2026 · 2 Tage ueberfaellig",
+ * 390px, 6px ueber „39,00 €"). Ohne nowrap bricht sie dann in sich um. */
+.subscription-card__meta > span {
   display: inline-flex;
-  gap: var(--space-1);
+  column-gap: var(--space-1);
   align-items: center;
-  /* Eine Angabe bricht als Ganzes um, nicht mitten in „Faellig in 6 | Tagen". */
-  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Faelligkeit = Symbol, Datum, Relativangabe: drei Einheiten, die Zeile bricht
+ * zwischen Datum und „2 Tage ueberfaellig" um statt abzuschneiden - der
+ * Hinweis ist eine Warnung. */
+.subscription-card__due {
+  flex-wrap: wrap;
 }
 
 .subscription-card__meta svg {
