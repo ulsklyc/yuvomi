@@ -895,7 +895,7 @@ function odometerChartMarkup(points, unit) {
   return `
     <div class="inventory-chart-section">
       <div class="inventory-chart-section__title">${esc(titleText)}</div>
-      <svg class="inventory-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titleText)}">
+      <svg class="chart inventory-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titleText)}">
         ${grid}
         ${area}
         <polyline fill="none" stroke="var(--module-inventory)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="${spine}" />

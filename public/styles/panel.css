@@ -582,15 +582,67 @@
   stroke-width: 1;
 }
 
+/* DIE FLAECHE IST IHR EIGENER CONTAINER (Critique 2026-09-26).
+ *
+ * Die Geometrie skaliert proportional (viewBox CHART.W x CHART.H, Breite 100%),
+ * und mit ihr jede Schrift darin: 12 Einheiten waren bei 390px Breite ~6,5px,
+ * bei 1440px ~22px - groesser als der Kartentitel. `.chart__axis` rechnet den
+ * Massstab deshalb heraus, und dafuer muss 100cqi die Breite GENAU dieses SVG
+ * sein. Inline-size-Containment nimmt einem SVG sein Seitenverhaeltnis aus dem
+ * viewBox (die Hoehe fiel auf 150px) - `aspect-ratio` gibt es ihm zurueck.
+ * 600 / 200 = CHART.W / CHART.H (utils/chart.js); test-frontend-audit.js
+ * haelt beide Stellen gleich. */
+.chart {
+  container-type: inline-size;
+  aspect-ratio: 600 / 200;
+  /* Massstab SVG-Breite / CHART.W als reine Zahl - erst in `.chart__axis`
+   * eingesetzt und aufgeloest, also gegen DIESES SVG als Container. */
+  --chart-scale: tan(atan2(100cqi, 600px));
+}
+
+/* UND DER LINKE GUTTER HAT EINE MINDESTBREITE IN PIXELN. Er ist CHART.PAD_L =
+ * 56 Einheiten und schrumpft mit - bei 358px Breite auf 30px, in die ein
+ * Budget-Wert wie "5.550 €" in fester 12px-Schrift nicht passt (12px ragten
+ * links aus dem Bild). Unter 600px Breite legt `--chart-inset` so viel Polster
+ * vor die Flaeche, dass Polster plus Gutter var(--space-16) ergeben:
+ *   inset = (G * W - P * PAD_L) / (W - PAD_L),  P = Breite des Elternteils.
+ * Darueber ist er 0 und alles bleibt, wie es war. Das `100%` loest sich erst
+ * dort auf, wo die Variable benutzt wird - im Polster des SVG und in der
+ * Position der Budget-Punkte, beide gegen dieselbe Elternbreite. Content-box,
+ * damit `aspect-ratio` die Zeichenflaeche meint und nicht das Polster; die
+ * Y-Werte ragen ueber `overflow: visible` ins Polster. */
+:root {
+  --chart-inset: max(0px, calc((var(--space-16) * 600 - 100% * 56) / 544));
+}
+
+svg.chart {
+  box-sizing: content-box;
+  width: calc(100% - var(--chart-inset));
+  padding-inline-start: var(--chart-inset);
+  /* Ein SVG clippt an seiner Content-Box - ohne `visible` bliebe das Polster
+   * leer und die Werte waeren weiter angeschnitten. */
+  overflow: visible;
+}
+
+/* Schrift in fester Bildschirmgroesse: `tan(atan2(a, b))` ist a / b als reine
+ * Zahl (die Laenge-durch-Laenge-Division, die calc() allein nicht kann), hier
+ * also der Massstab SVG-Breite / CHART.W (`--chart-scale` an `.chart`). Durch
+ * ihn geteilt, rendert var(--text-xs) bei jeder Breite als var(--text-xs).
+ * Die erste Deklaration ist der Rueckfall fuer Browser ohne Trigonometrie in
+ * calc(). */
 .chart__axis {
   font-size: var(--text-xs);
+  font-size: calc(var(--text-xs) / var(--chart-scale, 1));
   fill: var(--color-text-secondary);
 }
 
 /* Die Y-Werte stehen dezenter als die X-Achse: die Kurve behaelt die Hauptrolle,
- * und die Werteachse ist Nachschlagewerk, nicht Aussage. */
+ * und die Werteachse ist Nachschlagewerk, nicht Aussage. Mittig auf ihrer
+ * Gitterlinie statt ueber einen festen Versatz im viewBox - der passte nur zu
+ * einer Schrift, die mitskaliert. */
 .chart__axis--y {
   fill: var(--color-text-tertiary);
+  dominant-baseline: central;
 }
 
 /* Mini-Trendlinie zum Wert der Karte.

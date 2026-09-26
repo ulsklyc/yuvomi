@@ -18491,3 +18491,54 @@ test('.week-nav__today bleibt unter 640px pfeilbreit (icon-only), statt eine eig
   assert.doesNotMatch(weekNavBaseRule.body, /flex-wrap:\s*wrap/,
     '.week-nav darf auch in seiner Basisregel kein flex-wrap:wrap tragen - das waere derselbe Umbruch, nur ungeschuetzt durch die Breitenschwelle');
 });
+
+/* Die Achsenschrift einer Auswertungsflaeche rendert in EINER Groesse, egal wie
+ * breit das Diagramm steht (Critique 2026-09-26). Die geteilte Geometrie
+ * (utils/chart.js) skaliert proportional: 12 Einheiten Schrift im viewBox
+ * 600x200 waren bei 390px Breite ~6,5px und bei 1440px ~22px - groesser als
+ * der Kartentitel. Jedes SVG dieser Geometrie traegt deshalb `.chart`: es ist
+ * sein eigener Container, und `.chart__axis` teilt die Schrift durch den
+ * Massstab 100cqi / CHART.W. */
+test('die Achsenschrift einer CHART-Flaeche skaliert nicht mit dem Diagramm', () => {
+  const chartSrc = read('../public/utils/chart.js');
+  const W = Number(chartSrc.match(/export const CHART = Object\.freeze\(\{ W: (\d+), H: (\d+)/)?.[1]);
+  const H = Number(chartSrc.match(/export const CHART = Object\.freeze\(\{ W: (\d+), H: (\d+)/)?.[2]);
+  assert.ok(W > 0 && H > 0, 'CHART.W/H nicht gefunden');
+
+  const ohneKlasse = [];
+  let gefunden = 0;
+  for (const file of walkJsFiles('../public/pages/')) {
+    for (const m of read(file).matchAll(/<svg class="([^"]*)" viewBox="0 0 \$\{(?:CHART\.)?W\} \$\{(?:CHART\.)?H\}"([^>]*)>/g)) {
+      if (/preserveAspectRatio="none"/.test(m[2])) continue; // gestreckte Sparklines tragen keine Achse
+      gefunden += 1;
+      if (!m[1].split(/\s+/).includes('chart')) ohneKlasse.push(`${file}: ${m[1]}`);
+    }
+  }
+  assert.ok(gefunden >= 8, `zu wenige CHART-Flaechen gefunden: ${gefunden}`);
+  assert.deepStrictEqual(ohneKlasse, [], `diese Diagramme skalieren ihre Achsenschrift mit: ${ohneKlasse.join(' | ')}`);
+
+  const panel = [...eachRule(read('../public/styles/panel.css'))].filter((rule) => rule.at.length === 0);
+  const body = (selector) => panel.filter((rule) => rule.selector.split(',').map((s) => s.trim()).includes(selector)).map((rule) => rule.body).join('\n');
+  const chart = body('.chart');
+  assert.match(chart, /container-type:\s*inline-size/, '.chart muss sein eigener Container sein, sonst misst 100cqi etwas anderes');
+  // Inline-size-Containment nimmt einem SVG sein Seitenverhaeltnis aus dem viewBox.
+  assert.match(chart, new RegExp(`aspect-ratio:\\s*${W}\\s*/\\s*${H}`), `.chart braucht aspect-ratio ${W} / ${H} (= CHART.W / CHART.H)`);
+  assert.match(chart, new RegExp(`--chart-scale:\\s*tan\\(atan2\\(100cqi,\\s*${W}px\\)\\)`), '.chart traegt den Massstab 100cqi / CHART.W');
+  assert.match(body('.chart__axis'), /font-size:\s*calc\(var\(--text-xs\)\s*\/\s*var\(--chart-scale/,
+    '.chart__axis teilt die Schrift durch den Massstab');
+
+  // Feste Schrift braucht einen Gutter mit Mindestbreite in Pixeln: der
+  // proportionale (CHART.PAD_L) schrumpfte bei 358px auf 30px, und "5.550 €"
+  // ragte 12px links aus dem Bild. Die Formel rechnet mit CHART.W und PAD_L.
+  const PAD_L = Number(chartSrc.match(/PAD_L: (\d+)/)?.[1]);
+  assert.match(body(':root'), new RegExp(`--chart-inset:\\s*max\\(0px,\\s*calc\\(\\(var\\(--space-\\d+\\)\\s*\\*\\s*${W}\\s*-\\s*100%\\s*\\*\\s*${PAD_L}\\)\\s*/\\s*${W - PAD_L}\\)\\)`),
+    `--chart-inset muss (G * ${W} - 100% * ${PAD_L}) / ${W - PAD_L} rechnen`);
+  const svgChart = body('svg.chart');
+  assert.match(svgChart, /padding-inline-start:\s*var\(--chart-inset\)/);
+  assert.match(svgChart, /width:\s*calc\(100%\s*-\s*var\(--chart-inset\)\)/);
+  assert.match(svgChart, /box-sizing:\s*content-box/, 'aspect-ratio muss die Zeichenflaeche meinen, nicht das Polster');
+  assert.match(svgChart, /overflow:\s*visible/, 'ein SVG clippt an seiner Content-Box - die Werte muessen ins Polster ragen duerfen');
+  // Was ueber der Flaeche positioniert wird, rechnet gegen dieselbe Zeichenbreite.
+  const budgetCss = [...eachRule(read('../public/styles/budget.css'))].find((rule) => rule.selector === '.budget-stats__point');
+  assert.match(budgetCss.body, /left:\s*calc\(var\(--chart-inset\)/, 'die Budget-Punkte muessen hinter dem Polster beginnen');
+});

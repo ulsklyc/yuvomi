@@ -1185,7 +1185,7 @@ function chartMarkup(metric, series) {
   const xLabels = chartXLabels(dataPoints.map((p) => p.date));
 
   return `
-    <svg class="health-chart" viewBox="0 0 ${W} ${H}" role="img"
+    <svg class="chart health-chart" viewBox="0 0 ${W} ${H}" role="img"
          aria-label="${esc(t(metric.labelKey))}">
       ${grid}
       ${area}
@@ -3025,7 +3025,7 @@ function labTrendChart(points, analyteName) {
   const xLabels = chartXLabels(points.map((p) => p.date));
 
   return `
-    <svg class="health-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(ariaLabel)}">
+    <svg class="chart health-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(ariaLabel)}">
       ${grid}
       ${band}
       <polyline fill="none" stroke="var(--module-health)" stroke-width="2"
@@ -3556,7 +3556,7 @@ function activityChartMarkup(summary) {
   );
 
   return `
-    <svg class="health-chart health-activity-chart" viewBox="0 0 ${W} ${H}" role="img"
+    <svg class="chart health-chart health-activity-chart" viewBox="0 0 ${W} ${H}" role="img"
          aria-label="${esc(t('health.activity.chartTitle'))}">
       ${grid}
       ${bars}
@@ -6377,7 +6377,7 @@ function simpleLineChartMarkup({ points, titleText, formatPointTooltip, formatTa
   return `
     <div class="health-chart-section">
       <div class="health-chart-section__head"><div class="health-chart-section__title">${esc(titleText)}</div></div>
-      <svg class="health-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titleText)}">
+      <svg class="chart health-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titleText)}">
         ${grid}
         ${area}
         ${polylines}
@@ -6479,7 +6479,7 @@ function cycleLengthTrendChartMarkup(trend) {
     <div class="health-chart-section">
       <div class="health-chart-section__head"><div class="health-chart-section__title">${esc(titleText)}</div></div>
       <p class="health-chart-section__caption">${esc(t('health.cycle.trends.typicalRangeLabel', { min: TYPICAL_CYCLE_RANGE.min, max: TYPICAL_CYCLE_RANGE.max }))}</p>
-      <svg class="health-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titleText)}">
+      <svg class="chart health-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titleText)}">
         ${grid}
         ${band}
         ${bars}
@@ -6737,7 +6737,7 @@ function flowLoadTrendChartMarkup(trend) {
     <div class="health-chart-section">
       <div class="health-chart-section__head"><div class="health-chart-section__title">${esc(titleText)}</div></div>
       <p class="health-chart-section__caption">${esc(t('health.cycle.trends.flowLoadCaption'))}</p>
-      <svg class="health-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titleText)}">
+      <svg class="chart health-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titleText)}">
         ${grid}
         ${bars}
         ${xLabels}

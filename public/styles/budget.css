@@ -1936,8 +1936,10 @@ button.budget-entry__title {
   position:absolute;
   top:0;
   bottom:0;
-  left:calc(var(--point-x) * 100%);
-  width:calc(100% / var(--point-slots));
+  /* Die Flaeche beginnt hinter `--chart-inset` (panel.css, svg.chart) - der
+   * Punkt rechnet sein Bruchteil gegen dieselbe Zeichenbreite. */
+  left:calc(var(--chart-inset) + var(--point-x) * (100% - var(--chart-inset)));
+  width:calc((100% - var(--chart-inset)) / var(--point-slots));
   transform:translateX(-50%);
   padding:0;
   border:none;
