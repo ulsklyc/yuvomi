@@ -629,6 +629,41 @@ test('formatWeekLabel() befragt tatsaechlich matchMedia fuer den schmalen Umscha
   }
 });
 
+// Projektregel „- statt Em-/En-Dash, auch in UI-Texten" (A4 P3, 2026-09-26):
+// das Wochenlabel trug als einziger Zeitraum-Kopf einen Halbgeviertstrich,
+// der Kalender schreibt „27.08. - 29.08.". Der Browser-Loader stubbt die
+// Datumsformate auf `String(d)`; der Trenner ist das Einzige, was die
+// Funktion selbst beitraegt, und genau der wird hier geprueft.
+test('formatWeekLabel() trennt mit Bindestrich, nicht mit Halbgeviertstrich', () => {
+  const zuvorWindow = globalThis.window;
+  for (const narrow of [false, true]) {
+    globalThis.window = { matchMedia: () => ({ matches: narrow }) };
+    try {
+      const label = mealsUi.formatWeekLabel('2026-09-14');
+      assert(!/[\u2013\u2014]/.test(label), `Wochenlabel (${narrow ? 'schmal' : 'breit'}) enthaelt einen Gedankenstrich: ${label}`);
+      assert(/ - /.test(label), 'die beiden Enden trennt „ - "');
+    } finally {
+      globalThis.window = zuvorWindow;
+    }
+  }
+});
+
+// Kuechenkopf (Kopfregel mobil, 2026-09-26): Zufallsplan und Rezept-Spalte
+// standen als loser Textknopf und loses Icon im Kopf; mobil brach der
+// Textknopf auf eine eigene Zeile um (Kopf 177px). Jetzt sind beide Eintraege
+// des EINEN Werkzeugmenues - mit Label, und die Spalte als Schalter mit Haken.
+test('Wochenplan: Zufallsplan und Rezept-Spalte stehen im Werkzeugmenue', () => {
+  const html = mealsUi.mealsToolsMenuHtml();
+  assert(/class="[^"]*page-tools-btn[^"]*popover-menu__trigger"/.test(html), 'der Trigger ist das geteilte Werkzeugmenue');
+  const panel = html.slice(html.indexOf('<div class="popover-menu"'));
+  assert(/role="menuitem"[^>]*data-action="randomize-plan"/.test(panel), 'Zufallsplan ist ein Menueeintrag');
+  assert(/role="menuitemcheckbox" aria-checked="true"[^>]*data-action="toggle-rail"/.test(panel),
+    'die Rezept-Spalte ist ein Schalter mit Zustand');
+  // Der Kopf selbst traegt keine losen Knoepfe mehr dafuer.
+  assert(!/id="week-randomize"|id="rail-toggle"/.test(mealsSource),
+    'Zufallsplan und Spalten-Schalter duerfen nicht als lose Kopfknoepfe zurueckkommen');
+});
+
 // --------------------------------------------------------
 // Rezept skalieren: Zutatenmengen (Umschrift nach Region)
 // --------------------------------------------------------

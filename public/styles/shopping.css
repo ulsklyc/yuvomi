@@ -40,29 +40,26 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  /* Schlanker als die Modul-Tabs darüber: liest sich als sekundäre Sub-Leiste,
-   * nicht als zweite gleichrangige Navigation. */
-  padding-block: var(--space-1);
-  padding-inline: var(--page-inline-pad);
-  border-bottom: 1px solid var(--color-border);
-  background-color: var(--color-surface);
+  /* KONTEXTZEILE DES KUECHENKOPFS (Kopfregel mobil, 2026-09-26). Die Leiste
+   * steht im __center-Slot einer .page-toolbar und bringt deshalb weder Rand,
+   * Grund noch Seitenpolster mit - die Kopfzeile traegt alle drei, wie in den
+   * drei Geschwister-Tabs. Vorher war sie selbst die Zeile, mit eigenem Grund,
+   * eigener Unterkante und einem klebenden Menue am Ende. */
+  flex: 1 1 auto;
+  min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
-  flex-shrink: 0;
+  /* Luft fuer den Fokusring: ein waagerechter Scroller clippt senkrecht mit.
+   * Der negative Rand gibt sie der Kopfzeile zurueck, die Hoehe bleibt. */
+  padding: var(--space-1);
+  margin: calc(-1 * var(--space-1));
 }
 
 .list-tabs-bar::-webkit-scrollbar { display: none; }
 
-/* Kategorie-Marker: bleibt links stehen (scrollt nicht mit den Chips weg). */
-.list-tabs-bar__marker {
-  position: sticky;
-  left: 0;
-  flex-shrink: 0;
-  width: var(--space-4);
-  height: var(--space-4);
-  color: var(--color-text-tertiary);
-  background-color: var(--color-surface);
-}
+/* Der fuehrende Listen-Marker ist entfallen: ein nicht tippbares `list`-Glyph
+ * vor den Kapseln sah aus wie ein Menue (A4, P3). Die Kapseln sagen selbst,
+ * dass sie Listen sind, und die Kopfzeile grenzt sie von der Kuechen-Leiste ab. */
 
 .list-tab {
   display: inline-flex;
@@ -144,33 +141,19 @@
   color: var(--color-accent);
 }
 
-/* Aktionen der GEWÄHLTEN Liste am hinteren Ende der Leiste.
- *
- * Gegenstück zum Marker links: der Trigger klebt am Rand, während die Chips
- * darunter durchscrollen. Er braucht denselben opaken Grund wie der Marker -
- * gemessen laufen am linken Scrollanschlag zwei Chips unter die Zone, und der
- * Grund ist das Einzige, was sie verdeckt.
- *
- * DIE KANTE IST `--color-border`, NICHT `--color-border-subtle`: sie grenzt an
- * Scrollgut, nicht an eine ruhige Kartenkante, und nimmt deshalb dieselbe Linie,
- * die die Leiste selbst als Unterkante trägt. Eine dritte Stufe wäre hier kein
- * Gewinn - alle drei Linien-Tokens liegen bewusst unter 3:1 (1.20 / 1.32 / 1.65
- * auf --color-surface), die Kante erklärt die Überlappung, sie ruft sie nicht
- * aus. Was den Chip wirklich abschneidet, ist der opake Grund.
- *
- * `right: 0` statt `inset-inline-end`: `position: sticky` löst logische
- * Eigenschaften zwar korrekt auf, aber die Leiste scrollt physisch, und der
- * Marker gegenüber steht aus demselben Grund auf `left: 0`. */
-.list-tabs-bar__actions {
-  position: sticky;
-  right: 0;
+/* Aktionen der GEWAEHLTEN Liste: das Werkzeugmenue im __actions-Slot des
+ * Kopfs (`.page-tools-btn`, layout.css). Hier stand bis 2026-09-26 eine
+ * klebende Aktionszone am Ende der Chip-Leiste mit eigenem opaken Grund und
+ * Trennkante - im Kopf-Slot scrollt nichts mehr darunter durch. Der Traeger
+ * selbst ist nur ein Flex-Rahmen, damit der Router den Primaerknopf daneben
+ * andocken kann, ohne ihn hinauszuwerfen. */
+.shopping-tools {
   display: flex;
   align-items: center;
-  flex-shrink: 0;
-  margin-inline-start: auto;
-  padding-inline-start: var(--space-2);
-  border-inline-start: 1px solid var(--color-border);
-  background-color: var(--color-surface);
+}
+
+.shopping-tools:empty {
+  display: none;
 }
 
 /* --------------------------------------------------------
@@ -193,7 +176,7 @@
  * UMBENENNEN unerreichbar: `rename-list` hängt ausschließlich an diesem Titel.
  * Erst wenn die Aktion einen zweiten Weg hat (etwa im Überlaufmenü), ist das
  * eine Option." Genau das ist jetzt der Fall: Umbenennen ist der erste Eintrag
- * im Menü von `.list-tabs-bar__actions`, zusammen mit den drei übrigen
+ * im Listenmenü des Kopfes (`#shopping-tools`), zusammen mit den drei übrigen
  * Aktionen. Damit entfällt auch die responsive Doppelfassung - eine Darstellung
  * auf allen Breiten, ein Ort. */
 
@@ -593,31 +576,11 @@
  * .item-category braucht keine eigene Kappung mehr: es liegt in der gekappten
  * .items-list. Einen Listenkopf gibt es seit 2026-08-11 gar nicht mehr - die
  * Chip-Leiste trägt Name und Aktionen (siehe „Liste-Header" oben). */
-@media (min-width: 1024px) {
-  /* Die Leiste beginnt an der Rail-Kante und endet an der Lesekante, wie jeder
-   * andere Block der Seite („Blocks on one page end at one right edge", v2.8.0).
-   *
-   * DIE KAPPUNG RECHNET DAS EIGENE POLSTER EIN, und das ist der ganze Punkt:
-   * `box-sizing` ist `border-box`, also zieht `padding-inline` von einer
-   * max-width ab, statt sie zu verlaengern. Mit dem generischen Lesemass aus
-   * layout.css (720px) und 2x203.5px Polster blieben bei 1907px genau 313px
-   * fuer die Chips - ein Haushalt mit sieben Listen sah sie mitten im Namen
-   * abbrechen (#758). Das rechte Polster faellt weg, damit die sichtbare
-   * Flaeche samt Trenner dort endet, wo `.quick-add` und die Zeilentraeger
-   * enden, und nicht 203px spaeter.
-   *
-   * Unterhalb 1024px gilt die Regel bewusst nicht: dort polstert die Basisregel
-   * symmetrisch, die Kappung greift ohnehin nicht, und der Chip-Streifen
-   * braucht seinen rechten Auslauf zum Scrollen. */
-  .shopping-page .list-tabs-bar {
-    padding-inline: var(--page-inline-pad);
-  }
-
-  .page-measure--narrow .list-tabs-bar {
-    max-width: calc(var(--page-measure) + var(--page-inline-pad));
-    padding-inline-end: 0;
-  }
-}
+/* Die Desktop-Kappung der Leiste (#758) ist mit dem Kopf-Umbau entfallen: die
+ * Leiste steht im __center-Slot einer `.page-toolbar--narrow`, und deren
+ * Lesemass-Slot beendet die Zeile an derselben Kante wie `.quick-add` und die
+ * Zeilentraeger - fuer alle vier Kuechen-Koepfe dieselbe Regel statt einer
+ * eigenen Rechnung hier. */
 
 /* Gruppenkopf und Gruppenfläche kommen aus .list-group__title /
  * .list-rows. Das eigene .item-category__icon entfällt: der Kopf nutzt jetzt

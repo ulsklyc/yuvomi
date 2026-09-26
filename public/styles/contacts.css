@@ -43,34 +43,27 @@
 
 /* --------------------------------------------------------
  * Kategorie-Filter (horizontal scroll)
+ *
+ * DIE REIHE STEHT IM PORT (Kopfregel mobil, 2026-09-26). Sie ist das erste
+ * Kind von `#contacts-list`, traegt `.page-chip-row` (layout.css: waagerechter
+ * Scroller, Fokusluft, kein sticky) und scrollt mit der Liste weg. Fest ueber
+ * dem Port kostete sie dauerhaft 65px - der Port begann bei y179 statt 114,
+ * und kein Kopf-Kollaps holte sie zurueck (A8). Mit ihr gingen der Trennstrich
+ * (er trennte festes Chrome vom Scroller, den es hier nicht mehr gibt), das
+ * eigene Seitenpolster (die Reihe steht in der Inhaltsspalte des Ports, die
+ * es schon traegt) und die Desktop-Kappung, die genau dieses Polster
+ * gegenrechnete.
  * -------------------------------------------------------- */
-.contacts-filters {
-  display: flex;
-  gap: var(--space-2);
-  padding-block: var(--space-2);
-  padding-inline: var(--page-inline-pad);
-  border-bottom: 1px solid var(--color-border);
-  overflow-x: auto;
-  scrollbar-width: none;
-  flex-shrink: 0;
+.contacts-filters:empty {
+  display: none;
 }
 
-.contacts-filters::-webkit-scrollbar { display: none; }
-
-/* Dieselbe Rechnung wie bei `.list-tabs-bar` im Einkauf (#758): Die Leiste
- * polstert sich mit `--page-inline-pad`, und bei `box-sizing: border-box` zieht
- * dieses Polster von einer Kappung ab, statt sie zu verlaengern. Mit dem
- * generischen Lesemass blieben bei 1907px von 720px genau 313px fuer die
- * Kategorie-Chips uebrig - gemessen abgeschnitten, nur nie gemeldet. Die
- * Kappung steht deshalb hier, wo auch das Polster steht, und rechnet es ein;
- * das rechte Polster faellt weg, damit die Flaeche an der Lesekante endet.
- * Unterhalb 1024px greift sie nicht: dort polstert die Basisregel symmetrisch
- * und der Chip-Streifen braucht seinen Auslauf zum Scrollen. */
-@media (min-width: 1024px) {
-  .page-measure--narrow .contacts-filters {
-    max-width: calc(var(--page-measure) + var(--page-inline-pad));
-    padding-inline-end: 0;
-  }
+/* Die Reihe endet an der Lesekante wie die Gruppen darunter: im Port ist sie
+ * so breit wie der Port (1156px bei 1440), die Traeger aber kappen aufs
+ * Lesemass (list-row.css). Ohne eigenes Polster rechnet die Kappung nichts
+ * mehr gegen (vgl. die Liste in layout.css, „NICHT in dieser Liste"). */
+.page-measure--narrow .contacts-filters {
+  max-width: var(--page-measure, none);
 }
 
 /* ER TRÄGT `.filter-chip` (Critique 2026-08-13). Hier stand ein Nachbau, der

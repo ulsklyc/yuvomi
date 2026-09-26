@@ -81,7 +81,7 @@
 
 /* --------------------------------------------------------
  * Zurueck-Link + Titel der Kategorie-Detailansicht - abgeleitet von
- * .settings-leaf-back-link (settings.css), aber als Button statt Link (kein
+ * dem frueheren Zurueck-Link der Einstellungen, aber als Button statt Link (kein
  * echter Routenwechsel, siehe Global Constraints) und ohne dessen
  * responsive Ausblendung: Inventar hat keine parallele Desktop-Sidebar, die
  * den Zurueck-Weg sonst schon anbietet.

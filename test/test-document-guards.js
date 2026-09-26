@@ -3764,6 +3764,13 @@ async function fabAtScrollEnd(page) {
     res.unterFab = [];
     for (const el of document.querySelectorAll(SEL)) {
       if (el === fab || fab.contains(el) || el.contains(fab)) continue;
+      // DER SCROLLPORT UND WAS IHN UMSCHLIESST IST KEIN ZIEL UNTER DEM KNOPF,
+      // sondern die Flaeche, auf der alles scrollt. Seit der Inhalt mobil unter die
+      // Glas-Kapsel laeuft (Kopfregel mobil, 2026-09-26), reicht der Port bis zur
+      // Unterkante und liegt damit immer auch unter dem FAB. Budget legt um seinen
+      // Port ein fokussierbares Tabpanel (`#budget-body`, tabindex=0) und wurde
+      // deshalb mit „div (1 %)" gemeldet. Was IM Port liegt, prueft die Sonde weiter.
+      if (scroller && (el === scroller || el.contains(scroller))) continue;
       const cs = getComputedStyle(el);
       if (cs.display === 'none' || cs.visibility === 'hidden' || cs.pointerEvents === 'none') continue;
       const b = el.getBoundingClientRect();
@@ -3870,9 +3877,11 @@ describe('Sonde 18 - am Scroll-Ende liegt nichts Bedienbares unter dem FAB', () 
          * der Zahl der Einstellungsseiten, nicht am FAB. Ein Modul, das seinen
          * FAB verliert, faellt trotzdem auf: es fehlt dann in einem der beiden
          * Toepfe hier. */
-        assert.deepEqual({ angedockt, eingeklappt }, { angedockt: 5, eingeklappt: 6 },
-          'Erwartet auf dem Zeiger: 5 FABs in der Kopfleiste (Vorrat, Mahlzeiten, Rezepte, '
-          + 'Geburtstage, Dokumente) und 6 eingeklappte (dort traegt der Modulkopf seinen eigenen '
+        /* Einkauf dockt seit der Kopfregel mobil (2026-09-26) an: vorher hatte er am
+         * Desktop gar keine Kopfaktion und zaehlte als eingeklappt. */
+        assert.deepEqual({ angedockt, eingeklappt }, { angedockt: 6, eingeklappt: 5 },
+          'Erwartet auf dem Zeiger: 6 FABs in der Kopfleiste (Vorrat, Mahlzeiten, Rezepte, Einkauf, '
+          + 'Geburtstage, Dokumente) und 5 eingeklappte (dort traegt der Modulkopf seinen eigenen '
           + `Knopf). Gezaehlt wurden ${angedockt} und ${eingeklappt}, dazu ${ohneFab} Seiten ohne FAB. `
           + 'Aendert sich das, aendert sich die Reichweite dieser Sonde.');
       } else {
@@ -5127,7 +5136,9 @@ test('Sonde 24 - spaeter Umbenennungskonflikt ersetzt keinen neuen Notizeditor',
     }, { firstName: renamedCategory, secondName: conflictingCategory });
     await gotoRoute(page, '/notes');
 
-    await page.click('#notes-manage-categories');
+    // Seit der Kopfregel mobil (2026-09-26) ein Eintrag im Werkzeugmenue.
+    await page.click('.notes-toolbar .page-tools-btn');
+    await page.click('#notes-tools-menu [data-action="manage-categories"]');
     await page.waitForSelector(`yuvomi-category-manager .cat-row[data-key="${categoryIds[0]}"]`);
     await page.click(`yuvomi-category-manager .cat-row[data-key="${categoryIds[0]}"] .cat-row__name`);
     await page.waitForSelector('#prompt-modal-input');

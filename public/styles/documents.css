@@ -231,7 +231,9 @@
   align-items: start;
   gap: var(--space-4);
   padding-inline: var(--page-inline-pad);
-  padding-bottom: calc(var(--nav-bottom-height) + var(--space-8));
+  /* Nur der eigene Abstand: Tab-Leiste und FAB rechnet die Shell als
+   * Nachlauf (`--shell-tail`, layout.css, Kopfregel mobil 2026-09-26). */
+  padding-bottom: var(--space-8);
 }
 
 /* NUR NOCH POSITION, KEINE FLAECHE MEHR.

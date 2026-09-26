@@ -19,8 +19,9 @@
  *          - ein Set ohne Rest verschwindet ganz
  *          - der Speicher wird nicht umgeschrieben
  *          - nach einem Ladefehler wird NICHT gefiltert
- *          - #1373: das Filter-Panel laesst sich schliessen, egal wie viele
- *            Filter gewaehlt sind (Knopfplatz, Escape, „Fertig")
+ *          - Kopfregel mobil: „Filter (n)" zaehlt, das Blatt bietet an, was
+ *            vorher in der Chipzeile stand, und zieht sich nach, ohne seine
+ *            Knoten zu tauschen (die Lehre aus #1373); das Werkzeugmenue
  * Ausführen: node --loader ./test/test-browser-loader.mjs --test test/test-task-filters.js
  */
 import test from 'node:test';
@@ -253,176 +254,195 @@ test('derselbe Filter verdraengt sich weiterhin selbst', () => {
 });
 
 // ---------------------------------------------------------------------------
-// #1373: Das Filter-Panel muss sich schliessen lassen, egal wie viele Filter
-// gewaehlt sind.
+// Kopfregel mobil (2026-09-26): „Filter (n)" im Kopf, die Filter im Blatt.
 //
-// Auf dem Telefon scrollt `#filter-bar` seitlich. Der Filterknopf war ihr
-// LETZTES Kind: jeder gewaehlte Filter setzte einen Chip davor und schob den
-// Knopf weiter aus dem sichtbaren Streifen (gemessen auf 375x812: von x=122 auf
-// x=437, Streifen endet bei 243). Das Panel hatte keinen zweiten Schliessweg.
+// Unter dem Kopf stand eine Chipzeile (aktive Filter, „Mir zugewiesen",
+// „Geplante", Gruppierung) und darunter ein Inline-Panel. Mobil kostete das
+// 54px unter einem 176px-Kopf, die erste Aufgabe stand bei y=287 (A3 P1-2);
+// am Desktop lief das Panel 1156px ueber einer 720px-Liste (A3 P2-8). Jetzt
+// traegt der Kopf EINEN Knopf mit der ZAHL der wirkenden Filter, und alles
+// andere steht beschriftet im Filterblatt (utils/filter-sheet.js).
 //
-// Gemessen wird das VERHALTEN von `renderFilters` auf einem kleinen DOM-Stub:
-// wo der Knopf nach dem Waehlen steht, und dass Escape und „Fertig" das Panel
-// wirklich zuklappen - ueber die Verdrahtung, die `renderFilters` selbst
-// anhaengt, nicht ueber eine direkt gerufene Hilfsfunktion.
+// Gemessen wird, WAS Knopf und Blatt anbieten und dass ein Filterwechsel ein
+// offenes Blatt nachzieht, ohne seine Knoten zu tauschen - der Fokus bleibt
+// auf dem getippten Chip. Das ist die Lehre aus #1373: dort fiel er nach jedem
+// Rendern aufs Dokument, und Escape erreichte das Panel nicht mehr.
 // ---------------------------------------------------------------------------
 
-class StubEl {
-  constructor(tag) {
-    this.tagName = tag.toUpperCase();
-    this.children = [];
-    this.parent = null;
+const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+
+/** Ausgangslage: Liste, zwei Personen, Standardfilter „Offen". */
+function baseState(overrides = {}) {
+  withKnown({ users: [1, 2], categories: ['haushalt'], tags: ['garten'] });
+  Object.assign(tasks.state, {
+    viewMode: 'list',
+    currentUserId: 1,
+    showFuture: false,
+    groupMode: 'category',
+    bulkSelectMode: false,
+    filterSheet: null,
+    filters: { status: ['open'], priority: [], assigned_to: [], category: [], tags: [] },
+    ...overrides,
+  });
+}
+
+test('Filter (n): die Zahl nennt jeden wirkenden Filter, im Kanban ohne den Status', () => {
+  baseState();
+  assert.equal(tasks.activeFilterCount(), 1, 'der Standardfilter „Offen" ist ein Filter - vorher stand er als Chip da');
+  tasks.state.filters.priority = ['high', 'urgent'];
+  tasks.state.filters.tags = ['garten'];
+  assert.equal(tasks.activeFilterCount(), 4, 'jeder Wert jeder Achse zaehlt (#671)');
+  tasks.state.showFuture = true;
+  assert.equal(tasks.activeFilterCount(), 5,
+    '„Geplante anzeigen" hatte einen eigenen Chip - ohne ihn traegt allein die Zahl, dass er an ist');
+  tasks.state.viewMode = 'kanban';
+  assert.equal(tasks.activeFilterCount(), 4,
+    'im Brett wirkt der Status nicht (die Spalten SIND er) - mitgezaehlt behauptete die Zahl einen unsichtbaren Filter');
+});
+
+test('das Blatt bietet an, was vorher in der Chipzeile stand - je nach Ansicht', () => {
+  baseState();
+  const headingsOf = () => tasks.filterSheetGroups().map((g) => g.heading);
+  const htmlOf = (heading) => tasks.filterSheetGroups().find((g) => g.heading === heading)?.html ?? '';
+
+  assert.deepEqual(headingsOf(), [
+    'tasks.filterGroupShow', 'tasks.groupToggleLabel', 'tasks.filterGroupStatus', 'tasks.filterGroupPriority',
+    'tasks.filterGroupPerson', 'tasks.categoryLabel', 'tasks.filterGroupTag',
+  ]);
+  const show = htmlOf('tasks.filterGroupShow');
+  assert.match(show, /type="checkbox"[^>]*data-filter-mine/, '„Mir zugewiesen" ist ein Schalter im Blatt');
+  assert.match(show, /type="checkbox"[^>]*data-filter-future/, '„Geplante anzeigen" ist ein Schalter im Blatt');
+  const group = htmlOf('tasks.groupToggleLabel');
+  assert.match(group, /role="radiogroup"/, 'die Gruppierung ist EINE Wahl aus zwei, kein Paar von Schaltern');
+  assert.match(group, /data-tab-id="category"[^>]*aria-checked="true"|aria-checked="true"[^>]*data-tab-id="category"/);
+  assert.match(htmlOf('tasks.filterGroupStatus'), /data-filter="status" data-value="open" aria-pressed="true"/,
+    'der gewaehlte Status traegt seinen Zustand als aria-pressed');
+
+  // Das Brett: kein Status (die Spalten sind er), keine Gruppierung.
+  tasks.state.viewMode = 'kanban';
+  assert.ok(!headingsOf().includes('tasks.filterGroupStatus'));
+  assert.ok(!headingsOf().includes('tasks.groupToggleLabel'));
+
+  // Allein im Haushalt: keine Personenachse und kein „Mir zugewiesen".
+  baseState();
+  tasks.state.users = [{ id: 1, display_name: 'U1' }];
+  assert.ok(!headingsOf().includes('tasks.filterGroupPerson'));
+  assert.doesNotMatch(htmlOf('tasks.filterGroupShow'), /data-filter-mine/);
+  assert.match(htmlOf('tasks.filterGroupShow'), /data-filter-future/, '„Geplante" bleibt - es haengt an niemandem');
+});
+
+test('gemerkte Sets stehen zuerst im Blatt, als Aktion ohne Ein/Aus-Zustand', () => {
+  baseState();
+  put({ priority: ['high'], tags: ['garten'] });
+  const [first] = tasks.filterSheetGroups();
+  assert.equal(first.heading, 'tasks.filterGroupRecent');
+  assert.match(first.html, /data-recent-filter="/);
+  assert.doesNotMatch(first.html, /aria-pressed/, 'ein Set anwenden ist eine Aktion, kein Schalter');
+  assert.match(first.html, /garten/, 'die Tags gehoeren in die Beschriftung, weil der Chip sie mitsetzt (#586)');
+});
+
+/** Ein Knoten mit genau dem, was das Blatt anfasst. */
+class SheetEl {
+  constructor({ dataset = {}, checked = false } = {}) {
+    this.dataset = dataset;
+    this.checked = checked;
     this.attrs = new Map();
-    this.dataset = {};
-    this.listeners = new Map();
-    this.hidden = false;
-    this.text = '';
+    this.cls = new Set();
+    this.classList = {
+      toggle: (c, on) => { if (on) this.cls.add(c); else this.cls.delete(c); },
+      contains: (c) => this.cls.has(c),
+    };
   }
-  set id(v) { this.attrs.set('id', String(v)); }
-  get id() { return this.attrs.get('id') ?? ''; }
-  set className(v) { this.attrs.set('class', String(v)); }
-  get className() { return this.attrs.get('class') ?? ''; }
-  set textContent(v) { this.children = []; this.text = String(v); }
-  get textContent() { return this.text + this.children.map((c) => c.textContent ?? '').join(''); }
-  setAttribute(k, v) { this.attrs.set(k, String(v)); if (k === 'id') this.id = v; }
+  setAttribute(k, v) { this.attrs.set(k, String(v)); }
   getAttribute(k) { return this.attrs.get(k) ?? null; }
-  appendChild(n) { n.parent = this; this.children.push(n); return n; }
-  append(...ns) { ns.forEach((n) => this.appendChild(n)); }
-  replaceChildren(...ns) { this.children.forEach((c) => { c.parent = null; }); this.children = []; this.append(...ns); }
-  contains(n) { for (let x = n; x; x = x.parent) if (x === this) return true; return false; }
-  *walk() { for (const c of this.children) { if (c instanceof StubEl) { yield c; yield* c.walk(); } } }
   matches(sel) {
-    if (sel.startsWith('#')) return this.id === sel.slice(1);
     const m = sel.match(/^\[data-([a-z-]+)\]$/);
-    if (m) {
-      const key = m[1].replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-      return this.dataset[key] !== undefined;
-    }
-    throw new Error(`stub kennt den Selektor nicht: ${sel}`);
+    const key = m?.[1].replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    return key !== undefined && this.dataset[key] !== undefined;
   }
-  querySelector(sel) { for (const e of this.walk()) if (e.matches(sel)) return e; return null; }
-  querySelectorAll(sel) { return [...this.walk()].filter((e) => e.matches(sel)); }
-  closest(sel) { for (let x = this; x instanceof StubEl; x = x.parent) if (x.matches(sel)) return x; return null; }
-  addEventListener(type, fn) {
-    if (!this.listeners.has(type)) this.listeners.set(type, []);
-    this.listeners.get(type).push(fn);
-  }
-  dispatch(type, init = {}) {
-    const ev = { type, target: this, key: init.key, defaultPrevented: false, stopped: false,
-      preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.stopped = true; } };
-    for (let x = this; x && !ev.stopped; x = x.parent) (x.listeners.get(type) ?? []).forEach((fn) => fn(ev));
-    return ev;
-  }
-  click() { return this.dispatch('click'); }
-  focus() { globalThis.document.activeElement = this; }
+  closest(sel) { return this.matches(sel) ? this : null; }
 }
 
-function mountFilterDom() {
-  globalThis.document = {
-    createElement: (tag) => new StubEl(tag),
-    createTextNode: (text) => ({ textContent: String(text), parent: null }),
-    activeElement: null,
+function mountSheet() {
+  const chips = [
+    new SheetEl({ dataset: { filter: 'status', value: 'open' } }),
+    new SheetEl({ dataset: { filter: 'priority', value: 'high' } }),
+    new SheetEl({ dataset: { filter: 'tag', value: 'Garten' } }),
+  ];
+  const mine = new SheetEl({ dataset: { filterMine: 'true' } });
+  const future = new SheetEl({ dataset: { filterFuture: 'true' } });
+  const panel = {
+    isConnected: true,
+    querySelectorAll: (sel) => (sel === '[data-filter]' ? chips : []),
+    querySelector: (sel) => ({ '[data-filter-mine]': mine, '[data-filter-future]': future })[sel] ?? null,
   };
-  globalThis.window = globalThis.window ?? {};
-  const container = new StubEl('div');
-  const row = container.appendChild(new StubEl('div'));
-  row.className = 'tasks-filters-row';
-  for (const id of ['filter-toggle-slot', 'filter-bar']) row.appendChild(new StubEl('div')).id = id;
-  container.appendChild(new StubEl('div')).id = 'filter-panel';
-  return container;
+  // Kein Seiten-DOM: Knopf und Liste fehlen, renderFilters und loadTasks
+  // laufen dann nur ueber den Zustand und das offene Blatt.
+  const container = { querySelector: () => null, querySelectorAll: () => [] };
+  tasks.state.filterSheet = panel;
+  return { chips, mine, future, panel, container };
 }
 
-/** Die Ausgangslage aus dem Issue: Panel offen, mehrere Filter gewaehlt. */
-function openWithFilters(container) {
-  withKnown({ users: [1, 2] });
-  tasks.state.viewMode = 'list';
-  tasks.state.currentUserId = 1;
-  tasks.state.filters = { status: ['open'], priority: ['high', 'urgent', 'medium'], assigned_to: ['2'], category: [], tags: [] };
-  tasks.state.filterPanelOpen = true;
+test('ein Chip im Blatt schaltet seinen Wert und bleibt DERSELBE Knoten (Lehre aus #1373)', async () => {
+  baseState();
+  const { chips, container } = mountSheet();
+  const high = chips[1];
+  await tasks.onFilterSheetClick({ target: high }, container);
+  assert.deepEqual(tasks.state.filters.priority, ['high']);
+  assert.equal(high.getAttribute('aria-pressed'), 'true', 'der getippte Knoten traegt den neuen Zustand selbst');
+  assert.equal(high.classList.contains('filter-chip--active'), true);
+  assert.equal(chips[0].getAttribute('aria-pressed'), 'true', 'die anderen Chips werden mit abgeglichen');
+
+  // Tags vergleichen ohne Schreibweise - der Chip heisst „Garten", der Filter „garten".
+  tasks.state.filters.tags = ['garten'];
   tasks.renderFilters(container);
-}
+  assert.equal(chips[2].getAttribute('aria-pressed'), 'true');
 
-test('#1373: der Filterknopf scrollt nicht mit der Chip-Leiste weg, egal wie viele Filter', () => {
-  const container = mountFilterDom();
-  openWithFilters(container);
-  const bar = container.querySelector('#filter-bar');
-  const toggle = container.querySelector('#filter-toggle-btn');
-  assert.ok(toggle, 'der Knopf wird gerendert');
-  assert.ok(bar.querySelectorAll('[data-filter]').length >= 5, 'Gegenprobe: die Leiste traegt die gewaehlten Chips');
-  assert.equal(bar.contains(toggle), false,
-    'der Knopf steht nicht in der seitlich scrollenden Leiste, sonst schieben ihn die Chips hinaus');
-  assert.equal(container.querySelector('#filter-toggle-slot').contains(toggle), true,
-    'der Knopf steht in seinem festen Platz vor der Leiste');
+  await tasks.onFilterSheetClick({ target: high }, container);
+  assert.deepEqual(tasks.state.filters.priority, [], 'ein zweiter Tipp nimmt den Wert wieder heraus');
+  assert.equal(high.getAttribute('aria-pressed'), 'false');
 });
 
-test('#1373: Escape im offenen Panel klappt es zu und gibt den Fokus an den Knopf', () => {
-  const container = mountFilterDom();
-  openWithFilters(container);
-  const panel = container.querySelector('#filter-panel');
-  assert.equal(panel.hidden, false, 'Ausgangslage: das Panel ist offen');
-  const chip = panel.querySelector('[data-filter]');
-  const ev = chip.dispatch('keydown', { key: 'Escape' });
-  assert.equal(tasks.state.filterPanelOpen, false);
-  assert.equal(panel.hidden, true, 'das Panel ist zu');
-  assert.equal(ev.defaultPrevented, true);
-  assert.equal(globalThis.document.activeElement, container.querySelector('#filter-toggle-btn'),
-    'der Fokus steht auf dem NEU gebauten Knopf');
+test('die Schalter im Blatt: „Mir zugewiesen" ist die eigene ID in der Personenachse', async () => {
+  baseState({ filters: { status: ['open'], priority: [], assigned_to: ['2'], category: [], tags: [] } });
+  const { mine, future, container } = mountSheet();
+  await tasks.onFilterSheetChange(mine, container);
+  assert.deepEqual(tasks.state.filters.assigned_to, ['2', '1'],
+    'eine schon gewaehlte zweite Person bleibt stehen (#671)');
+  assert.equal(mine.checked, true, 'der Schalter wird aus dem Zustand nachgezogen');
 
-  // Andere Tasten schliessen nicht - sonst waere das Panel mit jeder Taste zu.
-  openWithFilters(container);
-  panel.querySelector('[data-filter]').dispatch('keydown', { key: 'Enter' });
-  assert.equal(tasks.state.filterPanelOpen, true);
+  future.checked = true;
+  await tasks.onFilterSheetChange(future, container);
+  assert.equal(tasks.state.showFuture, true);
+  assert.equal(store.get('yuvomi:taskShowFuture'), '1', 'pro Geraet gemerkt wie vorher der Chip');
 });
 
-test('#1373: „Fertig" am Ende des Panels klappt es zu, ohne die Filter anzufassen', () => {
-  const container = mountFilterDom();
-  openWithFilters(container);
-  const panel = container.querySelector('#filter-panel');
-  const done = panel.querySelector('#filter-panel-done');
-  assert.ok(done, 'das Panel traegt einen eigenen Schliessweg');
-  assert.equal(done.textContent, 'tasks.filterPanelDone');
-  done.click();
-  assert.equal(panel.hidden, true);
-  assert.equal(tasks.state.filterPanelOpen, false);
-  assert.deepEqual(tasks.state.filters.priority, ['high', 'urgent', 'medium'], 'die Auswahl bleibt');
+test('„Alle Filter aufheben" laesst keine Zahl am Knopf stehen', async () => {
+  baseState({ showFuture: true });
+  tasks.state.filters.priority = ['high'];
+  const { container } = mountSheet();
+  await tasks.resetTaskFilters(container);
+  assert.equal(tasks.activeFilterCount(), 0);
 });
 
-test('#1373: die Escape-Verdrahtung stapelt sich nicht mit jedem Rendern', () => {
-  const container = mountFilterDom();
-  openWithFilters(container);
-  for (let i = 0; i < 5; i++) tasks.renderFilters(container);
-  const panel = container.querySelector('#filter-panel');
-  assert.equal(panel.listeners.get('keydown').length, 1, 'ein Listener, nicht einer je Rendern');
-});
+test('das Werkzeugmenue: Verwalten nur mit Schreibrecht, Auswahl nur in der Liste', () => {
+  baseState();
+  const byAction = () => Object.fromEntries(tasks.toolsMenuItems().filter((i) => i.action).map((i) => [i.action, i]));
+  assert.deepEqual(Object.keys(byAction()), ['bulk-select', 'toggle-history', 'manage-categories', 'manage-tags'],
+    'alles, was vorher als loses Icon im Kopf stand, steht beschriftet im Menue');
+  assert.equal(byAction()['bulk-select'].disabled, false);
+  assert.equal(byAction()['toggle-history'].checked, false);
 
-test('#1373: nach dem Waehlen eines Chips im Panel schliesst Escape es weiterhin', () => {
-  // Review zu #1385: das Rendern tauscht den fokussierten Chip aus, der Fokus
-  // fiel aufs Dokument, und Escape erreichte das Panel nie - genau in dem
-  // Zustand mit mehreren gewaehlten Filtern, um den es im Issue geht.
-  const container = mountFilterDom();
-  openWithFilters(container);
-  const panel = container.querySelector('#filter-panel');
-  const low = () => panel.querySelectorAll('[data-filter]')
-    .find((el) => el.dataset.filter === 'priority' && el.dataset.value === 'low');
-  const before = low();
-  before.focus();
-  // Was der Klick-Handler tut: Zustand aendern, neu rendern.
-  tasks.state.filters.priority.push('low');
-  tasks.renderFilters(container);
-  const after = low();
-  assert.notEqual(after, before, 'Gegenprobe: der Chip ist wirklich ein neuer Knoten');
-  assert.equal(globalThis.document.activeElement, after, 'der Fokus steht auf dem Nachfolger des Chips');
-  globalThis.document.activeElement.dispatch('keydown', { key: 'Escape' });
-  assert.equal(tasks.state.filterPanelOpen, false, 'Escape schliesst das Panel');
-});
+  tasks.state.viewMode = 'kanban';
+  assert.equal(byAction()['bulk-select'].disabled, true, 'im Brett gibt es keine Mehrfachauswahl');
+  tasks.state.viewMode = 'history';
+  assert.equal(byAction()['toggle-history'].checked, true, 'der Verlauf ist ein Schalter mit Haken');
 
-test('#1373: verschwindet der fokussierte Chip, geht der Fokus an den Filterknopf', () => {
-  const container = mountFilterDom();
-  openWithFilters(container);
-  const bar = container.querySelector('#filter-bar');
-  const chip = bar.querySelectorAll('[data-filter]').find((el) => el.dataset.value === 'urgent');
-  chip.focus();
-  tasks.state.filters.priority = tasks.state.filters.priority.filter((v) => v !== 'urgent');
-  tasks.renderFilters(container);
-  assert.equal(globalThis.document.activeElement, container.querySelector('#filter-toggle-btn'));
+  setPermissions({ admin: false, modules: { tasks: 'read' }, widgets: {}, capabilities: {} });
+  try {
+    assert.deepEqual(Object.keys(byAction()), ['toggle-history'],
+      'bei Nur-lesen bleibt nur, was zeigt (#467) - Auswahl fuehrt nur zu schreibenden Sammelaktionen');
+  } finally {
+    clearPermissions();
+  }
 });

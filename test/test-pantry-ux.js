@@ -414,3 +414,36 @@ test('eine aeltere Auffrischung ueberschreibt keine juengere', async () => {
   assert.equal(__test.state.items[0].quantity, 9,
     'die ueberholte Antwort darf den juengeren Stand nicht ersetzen');
 });
+
+// --------------------------------------------------------
+// Kopfregel mobil (2026-09-26): die Chipreihe steht IM Port
+// --------------------------------------------------------
+
+// Die Filter-Chips waren eine feste Zeile zwischen Kopf und Liste und hielten
+// den Port mobil bei y181 fest. Jetzt sind sie das erste Kind von #pantry-list
+// und scrollen mit weg - das geht nur, wenn der Neuaufbau der Liste sie stehen
+// laesst. `renderList()` laeuft bei jedem Filter, jeder Suche und jedem
+// ±-Schritt; ein nacktes `replaceChildren()` warf die Reihe beim ersten Mal
+// aus dem DOM, und die Filter waeren danach verschwunden.
+test('renderList() laesst die Chipreihe als erstes Kind des Ports stehen', () => {
+  resetPantry();
+  const chipRow = makeNode();
+  const list = makeNode();
+  list.querySelector = (sel) => (sel === ':scope > #pantry-filters' ? chipRow : null);
+  list.replaceChildren = (...kids) => { list.children = [...kids]; };
+  list.children = [chipRow, makeNode(), makeNode()];
+  __test.setContainerForTest({ querySelector: (sel) => (sel === '#pantry-list' ? list : null) });
+
+  // Der Leerzustand baut Text-Knoten; der generische Knoten reicht dafuer.
+  const zuvor = global.document.createTextNode;
+  global.document.createTextNode = () => makeNode();
+  try {
+    __test.renderList();
+  } finally {
+    global.document.createTextNode = zuvor;
+  }
+
+  assert.equal(list.children[0], chipRow, 'die Chipreihe muss den Neuaufbau als erstes Kind ueberleben');
+  assert.equal(list.children.filter((c) => c === chipRow).length, 1, 'und genau einmal');
+  assert.ok(list.children.length >= 2, 'Gegenprobe: hinter der Reihe steht der neue Inhalt (hier der Leerzustand)');
+});

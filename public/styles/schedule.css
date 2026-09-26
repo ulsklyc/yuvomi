@@ -348,7 +348,9 @@
 @media (max-width: 639px) {
   .schedule-page {
     gap: var(--space-3);
-    padding-bottom: calc(var(--nav-bottom-height) + var(--space-6));
+    /* Die Kapselzone traegt der Shell-Nachlauf (--nav-tail, layout.css);
+     * hier steht nur das eigene Ende der Seite. */
+    padding-bottom: var(--space-6);
   }
 
   .schedule-toolbar {

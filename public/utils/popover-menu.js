@@ -39,7 +39,12 @@ import { esc } from '/utils/html.js';
  * @param {object}   opts
  * @param {string}   opts.id             Eindeutige Panel-ID (popovertarget).
  * @param {string}   opts.label          Zugänglicher Name des Triggers.
- * @param {Array<{action: string, label: string, icon: string, id?: string|number, danger?: boolean}>} opts.items
+ * @param {Array<{action: string, label: string, icon: string, id?: string|number, danger?: boolean,
+ *   checked?: boolean, disabled?: boolean} | {separator: true}>} opts.items
+ *        `checked` macht aus dem Eintrag einen Schalter (`menuitemcheckbox`,
+ *        Haken am Ende) - fuer Ansichts-Schalter wie „Verlauf zeigen", die im
+ *        Werkzeugmenue stehen statt als loses Icon im Kopf. `{ separator: true }`
+ *        trennt Gruppen (Ansicht | Verwalten | Destruktiv).
  * @param {string}   [opts.triggerClass] Zusätzliche Klassen für den Trigger.
  * @param {string}   [opts.icon]         Lucide-Name für den Trigger. Standard
  *        `ellipsis` - das Überlaufmenü, für das diese Datei gebaut wurde. Ein
@@ -49,13 +54,22 @@ import { esc } from '/utils/html.js';
  * @returns {string}
  */
 export function popoverMenuHtml({ id, label, items = [], triggerClass = 'btn btn--ghost btn--icon', icon = 'ellipsis' }) {
-  const entries = items.map((item) => `
-    <button type="button" role="menuitem"
+  const entries = items.map((item) => {
+    if (item.separator) return '\n    <div class="popover-menu__separator" role="separator"></div>';
+    const checkable = typeof item.checked === 'boolean';
+    const role = checkable ? 'menuitemcheckbox' : 'menuitem';
+    const checkedAttr = checkable ? ` aria-checked="${item.checked}"` : '';
+    const trail = checkable
+      ? `<i data-lucide="check" class="icon-md popover-menu__item-trail popover-menu__item-check${item.checked ? '' : ' popover-menu__item-check--hidden'}" aria-hidden="true"></i>`
+      : '';
+    return `
+    <button type="button" role="${role}"${checkedAttr}${item.disabled ? ' disabled' : ''}
             class="popover-menu__item${item.danger ? ' popover-menu__item--danger' : ''}"
             data-action="${esc(item.action)}"${item.id == null ? '' : ` data-id="${esc(String(item.id))}"`}>
       <i data-lucide="${esc(item.icon)}" class="icon-md" aria-hidden="true"></i>
-      <span>${esc(item.label)}</span>
-    </button>`).join('');
+      <span>${esc(item.label)}</span>${trail}
+    </button>`;
+  }).join('');
 
   return `
     <button type="button" class="${triggerClass} popover-menu__trigger"
@@ -64,6 +78,54 @@ export function popoverMenuHtml({ id, label, items = [], triggerClass = 'btn btn
       <i data-lucide="${esc(icon)}" class="icon-md" aria-hidden="true"></i>
     </button>
     <div class="popover-menu" id="${esc(id)}" popover role="menu">${entries}</div>`;
+}
+
+/**
+ * Das EINE Werkzeugmenue eines Modulkopfs (Kopfregel mobil, 2026-09-26).
+ *
+ * Zeile 1 eines Modulkopfs traegt Titel, Such-Icon und genau EINEN
+ * „..."-Knopf; alles, was ein Modul verwaltet statt zeigt (Kategorien, Tags,
+ * Lagerorte, Mehrfachauswahl, Import, Verlauf, „Plan zufaellig fuellen"),
+ * steht darin als Eintrag mit Icon UND Text - nie als loses Icon daneben.
+ * Vorbild ist das Kopf-Menue der Dokumente (`documents-tools-btn`).
+ *
+ * Der Trigger ist ein `.btn--secondary.btn--icon` wie dort, mit der
+ * Kennklasse `page-tools-btn`: an ihr erkennt der Guard (test:mobile-chrome)
+ * das Werkzeugmenue, und die Shell muss ihn nicht per Modulname suchen.
+ * Verdrahtung wie jedes popover-menu: `installPopoverMenus(root)` einmal an
+ * der Modulwurzel, die Klicks laufen ueber `data-action` in den delegierten
+ * Handler der Seite. Einen Schalter (`checked`) zieht die Seite nach dem
+ * Umlegen per `syncPopoverMenuItem()` nach, ohne das Menue neu zu bauen.
+ *
+ * @param {object} opts
+ * @param {string} opts.id     Eindeutige Panel-ID, z.B. `tasks-tools-menu`.
+ * @param {string} opts.label  Zugaenglicher Name, meist t('common.moreActions').
+ * @param {Array}  opts.items  Eintraege wie bei popoverMenuHtml.
+ * @returns {string}
+ */
+export function pageToolsMenuHtml({ id, label, items = [] }) {
+  return popoverMenuHtml({
+    id,
+    label,
+    items,
+    triggerClass: 'btn btn--secondary btn--icon page-tools-btn',
+    icon: 'ellipsis',
+  });
+}
+
+/**
+ * Zieht Haken und `aria-checked` eines Schalter-Eintrags nach.
+ *
+ * @param {ParentNode} root
+ * @param {string} action   Der `data-action`-Wert des Eintrags.
+ * @param {boolean} checked
+ */
+export function syncPopoverMenuItem(root, action, checked) {
+  const item = root?.querySelector?.(`.popover-menu__item[data-action="${CSS.escape(action)}"]`);
+  if (!item) return;
+  item.setAttribute('aria-checked', String(Boolean(checked)));
+  item.querySelector('.popover-menu__item-check')
+    ?.classList.toggle('popover-menu__item-check--hidden', !checked);
 }
 
 /** Verhindert das Aufblitzen an der Standardposition, bevor die Rechnung greift. */
@@ -108,7 +170,11 @@ function onToggle(event) {
   // erreicht - und in einem Menue fuehrt Tab hinaus, nicht hindurch.
   const items = itemsOf(panel);
   if (!items.length) return;
-  const checked = items.findIndex((item) => item.getAttribute('aria-checked') === 'true');
+  // Nur eine EINFACHAUSWAHL zieht den Fokus auf ihren gewaehlten Eintrag -
+  // bei Schaltern (menuitemcheckbox) waere der erste angehakte eine
+  // zufaellige Stelle mitten im Menue.
+  const checked = items.findIndex((item) => item.getAttribute('role') !== 'menuitemcheckbox'
+    && item.getAttribute('aria-checked') === 'true');
   focusItem(items, checked === -1 ? 0 : checked);
 }
 

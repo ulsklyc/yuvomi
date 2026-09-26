@@ -232,7 +232,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **A view without documents leaves out the filters**, so an empty archive shows only its message.
 
+- **On a phone the content runs under the glass tab bar.** The tab bar now floats over the list
+  instead of taking its own strip at the bottom, so every module shows about 70px more content,
+  and the glass shows what scrolls beneath it. At the end of a list there is enough room for the
+  last row to stop above the bar; focused fields and toasts stay clear of it as before. Desktop is
+  unchanged.
+
+- **Module headers on a phone have at most two rows.** The first row holds the title, search as a
+  magnifier that opens into a field, and one "..." menu; the second, where there is one, holds
+  the view switch, the period, the tabs or a "Filter" button with the number of active filters.
+  Managing categories, tags and storage locations, selecting several items, importing and the
+  history view moved from loose buttons into that menu in Tasks, Notes, Inventory, Contacts,
+  Pantry and the meal plan. The Tasks header shrank from three rows to two, so the first task
+  starts about 120px higher; the Inventory header lost its extra row.
+
+- **Tasks keep their filters in a sheet.** "Filter" opens a sheet with recently used sets,
+  "Assigned to me" and "Show scheduled", grouping, status, priority, person, category and tag; a
+  change applies at once and the number on the button shows how many are active.
+
+- **Filter chips scroll away with the list** in Notes, Contacts and the pantry instead of
+  standing fixed above it, where they took about 65px on every screen.
+
+- **The four kitchen tabs share one header.** Below the kitchen tabs every tab has the same row:
+  the week in the meal plan, the lists in Shopping, then search and one "..." menu, all four the
+  same height. "Randomize plan" and "Show recipes" moved into the meal plan's menu. On a
+  desktop Shopping now has its "Item" button in the header like the other tabs.
+
+- **Housekeeping shows the task list first.** Adding a task, with the templates as quick picks
+  above the form, sits behind the add button, and templates that already exist as a task are
+  not offered again. Tasks and visits use the list rows of the other modules, so on a phone the
+  list starts at the top of the screen instead of below the templates, and the report month sits
+  in the header like in Budget.
+
+- **Settings on a phone are one list.** All settings appear grouped by area on the first screen
+  instead of behind an extra level, with search in the header; inside a setting the way back
+  stays at the top while you scroll. Links to an area open the list at that area.
+
 ### Fixed
+
+- **Undoing a finished housekeeping task restores its previous date.** "Done" now offers Undo for
+  five seconds, which puts back the date the task was last done; the old button next to the row
+  cleared it instead.
 
 - **Shift types line up on a desktop.** The heading and the empty state of the shift types took
   the first column of the two-column grid, so the first card stood next to the heading and every

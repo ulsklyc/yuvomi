@@ -5,14 +5,14 @@
  */
 
 import { api, auth } from '/api.js';
-import { t, formatDate, formatTime, getLocale, getNumberFormat } from '/i18n.js';
+import { t, formatDate, formatDayMonth, formatTime, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { wireTablist } from '/utils/tablist.js';
-import { wireScrollFade } from '/utils/ux.js';
+import { wireScrollFade, vibrate } from '/utils/ux.js';
 import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { isNavModuleReadOnly } from '/permissions.js';
@@ -271,31 +271,52 @@ function renderTabButton(tab, icon, label) {
   `;
 }
 
-// Kontext-FAB: folgt dem aktiven Tab. Nur „Personal" hat eine Modal-Erstellung;
-// „Aufgaben" nutzt ein dauerhaftes Inline-Formular, „Übersicht"/„Berichte" haben
-// keine Erstellen-Aktion → FAB dort ausgeblendet.
+// Kontext-FAB: folgt dem aktiven Tab. „Aufgaben" legt eine Aufgabe an (Dialog
+// mit Vorlagen und Formular), „Personal" eine Person; „Übersicht"/„Berichte"
+// haben keine Erstellen-Aktion → FAB dort ausgeblendet.
+//
+// DAS NOMEN FUER DEN DESKTOP-KOPF STEHT SCHON BEIM ANLEGEN AM KNOPF. Der
+// Router dockt ihn genau einmal an (dockFabIntoToolbar, nach dem Rendern) und
+// nur, wenn `data-dock-label` da ist - ein Tab ohne Aktion, der beim ersten
+// Bild offen ist, darf es deshalb nicht loeschen, sonst schwebte der Knopf am
+// Desktop fuer den Rest des Besuchs.
 let fab = null;
 
 function updateHousekeepingFab() {
   if (!fab) return;
   // Bei `read` blendet layout.css den FAB schon aus; hier faellt auch seine
   // Aktion weg - ausgeblendet ist nicht unerreichbar.
-  if (state.tab === 'staff' && !readOnly()) {
+  const content = () => document.querySelector('#housekeeping-content');
+  if (state.tab === 'tasks' && !readOnly()) {
+    setPageFabAction(fab, {
+      label: t('housekeeping.addTask'),
+      dockLabel: t('newLabel.tasks'),
+      onClick: () => openTaskCreateModal(content()),
+    });
+  } else if (state.tab === 'staff' && !readOnly()) {
     setPageFabAction(fab, {
       label: t('housekeeping.addWorker'),
-      onClick: () => openStaffModal(null, document.querySelector('#housekeeping-content')),
+      dockLabel: t('newLabel.housekeepingWorker'),
+      onClick: () => openStaffModal(null, content()),
     });
   } else {
-    setPageFabAction(fab, { hidden: true });
+    setPageFabAction(fab, { hidden: true, dockLabel: fab.dataset?.dockLabel || t('newLabel.tasks') });
   }
 }
 
 function renderShell(container) {
   container.replaceChildren();
+  // Kopf nach der Kopfregel (DESIGN.md): Zeile 1 Titel, Zeile 2 die Reiter.
+  // Der Zeitraum des Berichte-Tabs steht im Center-Slot wie im Budget
+  // (`page-toolbar--period`) - am Desktop in der Titelzeile, mobil als eigene
+  // Zeile ueber den Reitern; auf den anderen Tabs ist der Slot leer und
+  // verborgen (syncReportPeriod()).
   container.insertAdjacentHTML('beforeend', `
     <section class="housekeeping-page app-page app-page--data" data-composition="data" aria-labelledby="housekeeping-title">
-      <header class="page-toolbar page-toolbar--narrow housekeeping-toolbar">
+      <header class="page-toolbar page-toolbar--narrow page-toolbar--wrap page-toolbar--period housekeeping-toolbar">
         <h1 class="page-toolbar__title" id="housekeeping-title">${esc(t('housekeeping.title'))}</h1>
+        <div class="page-toolbar__center housekeeping-period" id="housekeeping-period" hidden></div>
+        <div class="page-toolbar__actions"></div>
         <nav class="housekeeping-tabs page-toolbar__bar" role="tablist" aria-label="${esc(t('housekeeping.bottomNav'))}">
           ${renderTabButton('dashboard', 'layout-dashboard', t('housekeeping.dashboard'))}
           ${renderTabButton('tasks', 'list-checks', t('housekeeping.tasks'))}
@@ -307,12 +328,12 @@ function renderShell(container) {
     </section>
   `);
 
-  fab = createPageFab({ id: 'housekeeping-fab' });
+  fab = createPageFab({ id: 'housekeeping-fab', dockLabel: t('newLabel.tasks') });
   const page = container.querySelector('.housekeeping-page');
   page.appendChild(fab);
   // Der Riegel fuer jeden Knopf der Seite (siehe readOnlyLatch()). Er haengt an
-  // der Seite, die hier jedes Mal neu entsteht - auch nach einem Check-in, der
-  // die ganze Schale neu baut.
+  // der Seite, die hier jedes Mal neu entsteht, und damit auch am Kopf mit dem
+  // Monats-Stepper des Berichte-Tabs.
   page.addEventListener('click', readOnlyLatch, true);
   page.addEventListener('submit', readOnlyLatch, true);
 
@@ -335,6 +356,8 @@ function renderCurrentTab(container) {
   else if (state.tab === 'reports') renderReports(content);
   else if (state.tab === 'staff') renderStaff(content);
   else renderDashboard(content);
+  // Der Zeitraum gehoert nur dem Berichte-Tab; renderReports() setzt ihn selbst.
+  if (state.tab !== 'reports') syncReportPeriod(content);
   updateHousekeepingFab();
   if (window.lucide) window.lucide.createIcons({ el: container });
 }
@@ -366,7 +389,11 @@ async function toggleSession(container, workerId) {
       window.yuvomi?.showToast(t('housekeeping.checkedInToast'), 'success');
     }
     await loadData();
-    renderShell(container);
+    // Nur den Tab neu zeichnen, nicht die Schale: ein neuer Kopf verloere den
+    // FAB, den der Router einmal nach dem Rendern aus der Seite in die Shell
+    // (bzw. am Desktop in den Kopf) gehoben hat - der neu angelegte bliebe im
+    // Scrollport liegen, der alte mit veralteter Aktion in der Shell.
+    renderCurrentTab(container);
   } catch (err) {
     window.yuvomi?.showToast(err.message, 'danger');
   }
@@ -567,59 +594,70 @@ function renderDashboard(content) {
   });
 }
 
+/**
+ * Legt eine Aufgabe an. Gibt zurueck, ob es geklappt hat - der Anlegedialog
+ * schliesst nur dann; scheitert es, bleibt er mit der Eingabe stehen.
+ */
 async function createTask(payload, content) {
-  if (readOnly()) return;
+  if (readOnly()) return false;
   try {
     await api.post('/housekeeping/decay-tasks', payload);
     window.yuvomi?.showToast(t('housekeeping.taskCreatedToast'), 'success');
     await loadData();
-    renderTasks(content);
+    if (content?.isConnected && state.tab === 'tasks') renderTasks(content);
+    return true;
   } catch (err) {
     window.yuvomi?.showToast(err.message, 'danger');
+    return false;
   }
 }
 
 /**
- * Eine Aufgabenzeile. Bei `housekeeping: read` bleibt die AUSKUNFT - Name,
+ * Eine Aufgabenzeile in der Listengrammatik (list-row.css): Kreis | Titel +
+ * Meta | Aktionen. Bei `housekeeping: read` bleibt die AUSKUNFT - Name,
  * Bereich, Rhythmus und die Dringlichkeit (Toenung und Beschriftung) -, und
- * alle Bedienelemente fallen weg: der Kreis links, das Zuruecknehmen, das
- * Bearbeiten und das Loeschen.
+ * alle Bedienelemente fallen weg: der Kreis links, das Bearbeiten und das
+ * Loeschen.
  *
  * DER KREIS IST KEIN ZUSTAND. Anders als der Haken einer Aufgabe
  * (`.task-status-btn--static`) sieht er an jeder Zeile gleich aus - er heisst
  * „jetzt erledigt" und setzt die Frist zurueck, sagt aber nicht, ob etwas
- * erledigt ist. Den Zustand der Zeile traegt die Dringlichkeit, und die bleibt.
- * Ein Zeichen an seiner Stelle haette also nichts zu nennen. Ohne Kreis faellt
- * seine Spalte weg (`.housekeeping-task--readonly`).
+ * erledigt ist. Deshalb ist er ein LEERER Ring: der gefuellte Kreis mit Haken
+ * las sich an jeder Zeile wie „schon erledigt" (Critique 2026-09-26, A3). Den
+ * Zustand der Zeile traegt die Dringlichkeit, und die bleibt. Ohne Kreis rueckt
+ * der Text an die Kante; eine reservierte Spalte gibt es in der Flex-Zeile nicht.
+ *
+ * „OK" STEHT NICHT IN DER ZEILE. Nur ein faelliger Zustand hat etwas zu sagen
+ * (heute, ueberfaellig) - ein Wort an jeder ruhigen Zeile war Rauschen.
+ *
+ * KEIN ZURUECKNEHMEN-KNOPF MEHR IN DER ZEILE. Er setzte `last_completed` auf
+ * leer statt auf den Stand davor und nahm dem Titel mobil 48px. Das Erledigen
+ * meldet sich jetzt mit einem Toast samt „Rueckgaengig", der den vorherigen
+ * Zeitpunkt wiederherstellt (completeTask()).
  */
 function taskRowHtml(task) {
   const ro = readOnly();
+  const due = task.urgency_status === 'overdue' || task.urgency_status === 'today';
   return `
-    <article class="housekeeping-task housekeeping-task--${esc(task.urgency_status)}${ro ? ' housekeeping-task--readonly' : ''}">
+    <article class="list-row housekeeping-task housekeeping-task--${esc(task.urgency_status)}${ro ? ' housekeeping-task--readonly' : ''}">
       ${ro ? '' : `
       <button class="housekeeping-task__check" type="button" data-complete-task="${esc(task.id)}"
               aria-label="${esc(t('housekeeping.completeTask', { name: task.name }))}">
         <i data-lucide="check" aria-hidden="true"></i>
       </button>`}
-      <div class="housekeeping-task__body">
-        <h2>${esc(task.name)}</h2>
-        <p>${esc(task.area)} · ${esc(t('housekeeping.everyDays', { days: task.frequency_days }))}</p>
-        <span>${esc(urgencyLabel(task.urgency_status))}</span>
+      <div class="list-row__main housekeeping-task__body">
+        <h2 class="list-row__name">${esc(task.name)}</h2>
+        <p class="list-row__meta">${due ? `<span class="housekeeping-task__status">${esc(urgencyLabel(task.urgency_status))}</span> · ` : ''}${esc(task.area)} · ${esc(t('housekeeping.everyDays', { days: task.frequency_days }))}</p>
       </div>
       ${ro ? '' : `
-      <div class="housekeeping-task__actions row-actions">
-        ${task.last_completed ? `
-          <button class="row-action" type="button" data-undo-task="${esc(task.id)}"
-                  aria-label="${esc(t('housekeeping.undoTask'))}">
-            <i data-lucide="rotate-ccw" aria-hidden="true"></i>
-          </button>` : ''}
+      <div class="list-row__actions housekeeping-task__actions">
         <button class="row-action" type="button" data-edit-task="${esc(task.id)}"
                 aria-label="${esc(t('housekeeping.editTask'))}">
-          <i data-lucide="edit-2" aria-hidden="true"></i>
+          <i data-lucide="edit-2" class="icon-md" aria-hidden="true"></i>
         </button>
         <button class="row-action row-action--danger" type="button" data-delete-task="${esc(task.id)}"
                 aria-label="${esc(t('housekeeping.deleteTask'))}">
-          <i data-lucide="trash-2" aria-hidden="true"></i>
+          <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
         </button>
       </div>`}
     </article>
@@ -627,110 +665,167 @@ function taskRowHtml(task) {
 }
 
 /**
- * Die beiden Anlegewege des Aufgaben-Tabs: die Vorlagen und das eigene
- * Formular. Beide tun nichts anderes als anlegen, also fallen bei
- * `housekeeping: read` beide Karten ganz weg: eine Vorlage ist ein Knopf, und
- * er legt eine Aufgabe an.
+ * Der Anlegedialog des Aufgaben-Tabs, hinter dem FAB (mobil) bzw. der
+ * Kopf-Pille (Desktop).
+ *
+ * VORHER standen Vorlagen-Karussell und Formular dauerhaft VOR der Liste: mobil
+ * lag die erste Aufgabe bei y=758 von 844, also unter dem Falz - Anlegen (selten)
+ * verdraengte Abhaken (haeufig) (Critique 2026-09-26, A3 P1-1). Jetzt ist die
+ * Liste der Tab, und das Anlegen ein Dialog: oben die Vorlagen als
+ * Schnellauswahl - ein Tipp legt die Aufgabe an, wie vorher im Karussell -,
+ * darunter das eigene Formular.
+ *
+ * Beide Wege legen nur an; bei `housekeeping: read` oeffnet der Dialog gar
+ * nicht (der FAB ist dann ohnehin weg, und der `n`-Kurzbefehl fragt dasselbe).
  */
-function taskCreateHtml() {
-  if (readOnly()) return '';
-  const templateButtons = state.templates.map((template, index) => `
-    <button class="housekeeping-template" type="button" data-template-index="${index}">
-      <span>${esc(templateLabel(template, 'name'))}</span>
-      <small>${esc(templateLabel(template, 'area'))} · ${esc(t('housekeeping.everyDays', { days: template.frequency_days }))}</small>
-    </button>
-  `).join('');
-  return `
-    <section class="housekeeping-card">
-      <h2>${esc(t('housekeeping.taskTemplates'))}</h2>
-      <div class="housekeeping-template-list">${templateButtons}</div>
-    </section>
-    <section class="housekeeping-card">
-      <h2>${esc(t('housekeeping.addCustomTask'))}</h2>
-      <form id="housekeeping-task-form" class="housekeeping-task-form">
-        <div class="housekeeping-form-grid housekeeping-form-grid--wide">
+function openTaskCreateModal(content) {
+  if (readOnly()) return;
+  // Eine Vorlage, die schon als Aufgabe in der Liste steht, schlaegt nichts
+  // mehr vor: in einem eingerichteten Haushalt standen sonst alle acht
+  // Vorschlaege da, und das eigene Formular lag unter dem Falz des Dialogs.
+  // Der Index bleibt der in `state.templates` - der Klick liest ihn dort.
+  const existing = new Set(state.tasks.map((task) => String(task.name || '').trim().toLocaleLowerCase()));
+  const templateButtons = state.templates.map((template, index) => (
+    existing.has(templateLabel(template, 'name').trim().toLocaleLowerCase()) ? '' : `
+          <button class="housekeeping-template" type="button" data-template-index="${index}">
+            <span class="housekeeping-template__name">${esc(templateLabel(template, 'name'))}</span>
+            <small>${esc(templateLabel(template, 'area'))} · ${esc(t('housekeeping.everyDays', { days: template.frequency_days }))}</small>
+          </button>`)).join('');
+  openModal({
+    title: t('housekeeping.addTask'),
+    size: 'md',
+    content: `
+      <div class="housekeeping-create">
+        ${templateButtons ? `
+        <section class="housekeeping-create__templates" aria-labelledby="housekeeping-templates-title">
+          <h3 class="housekeeping-create__heading" id="housekeeping-templates-title">${esc(t('housekeeping.taskTemplates'))}</h3>
+          <div class="housekeeping-template-list">${templateButtons}
+          </div>
+        </section>` : ''}
+        <form id="housekeeping-task-form" class="housekeeping-task-form" aria-labelledby="housekeeping-custom-title">
+          <h3 class="housekeeping-create__heading" id="housekeeping-custom-title">${esc(t('housekeeping.addCustomTask'))}</h3>
           <label class="housekeeping-field">
             <span>${esc(t('housekeeping.taskName'))}</span>
-            <input name="name" required maxlength="200" autocomplete="off">
+            <input name="name" required maxlength="200" autocomplete="off" placeholder="${esc(t('housekeeping.taskNamePlaceholder'))}">
           </label>
-          <label class="housekeeping-field">
-            <span>${esc(t('housekeeping.taskArea'))}</span>
-            <input name="area" required maxlength="100" autocomplete="off">
-          </label>
-          <label class="housekeeping-field">
-            <span>${esc(t('housekeeping.taskFrequency'))}</span>
-            <input name="frequency_days" required inputmode="numeric" type="number" min="1" step="1" value="7">
-          </label>
-        </div>
-        <button class="btn btn--primary housekeeping-form-submit" type="submit">
-          <i data-lucide="plus" aria-hidden="true"></i>
-          <span>${esc(t('housekeeping.createTask'))}</span>
-        </button>
-      </form>
-    </section>`;
+          <div class="housekeeping-form-grid housekeeping-form-grid--pair">
+            <label class="housekeeping-field">
+              <span>${esc(t('housekeeping.taskArea'))}</span>
+              <input name="area" required maxlength="100" autocomplete="off" placeholder="${esc(t('housekeeping.taskAreaPlaceholder'))}">
+            </label>
+            <label class="housekeeping-field">
+              <span>${esc(t('housekeeping.taskFrequency'))}</span>
+              <input name="frequency_days" required inputmode="numeric" type="number" min="1" step="1" value="7">
+            </label>
+          </div>
+          <div class="modal-panel__footer">
+            <button class="btn btn--secondary" type="button" data-create-cancel>${esc(t('common.cancel'))}</button>
+            <button class="btn btn--primary" type="submit">${esc(t('housekeeping.createTask'))}</button>
+          </div>
+        </form>
+      </div>
+    `,
+    // Die Vorlagen stehen zuerst; der Fokus springt trotzdem nicht ins
+    // Namensfeld, sonst ginge mobil die Tastatur ueber die Schnellauswahl auf.
+    initialFocus: 'none',
+    onSave: (panel) => {
+      let busy = false;
+      const run = async (payload) => {
+        // Doppeltipp auf eine Vorlage legte sie zweimal an.
+        if (busy || readOnly()) return;
+        busy = true;
+        const ok = await createTask(payload, content);
+        busy = false;
+        if (ok) closeModal({ force: true });
+      };
+      panel.querySelectorAll('[data-template-index]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const template = state.templates[Number(btn.dataset.templateIndex)];
+          if (!template) return;
+          run({
+            name: templateLabel(template, 'name'),
+            area: templateLabel(template, 'area'),
+            frequency_days: template.frequency_days,
+          });
+        });
+      });
+      panel.querySelector('[data-create-cancel]')?.addEventListener('click', () => closeModal());
+      panel.querySelector('#housekeeping-task-form')?.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const fields = event.currentTarget.elements;
+        const frequencyDays = Number(fields.frequency_days.value);
+        if (!fields.name.value.trim() || !fields.area.value.trim() || !Number.isInteger(frequencyDays) || frequencyDays < 1) return;
+        run({
+          name: fields.name.value.trim(),
+          area: fields.area.value.trim(),
+          frequency_days: frequencyDays,
+        });
+      });
+    },
+  });
 }
 
+/**
+ * Erledigen mit Rueckweg: der Toast traegt „Rueckgaengig", und das stellt den
+ * Zeitpunkt der VORHERIGEN Erledigung wieder her (`last_completed` zurueck auf
+ * den alten Wert, bei einer nie erledigten Aufgabe auf leer). Der Server nimmt
+ * beide gespeicherten Formen unveraendert an (Instant mit `Z` bleibt Instant,
+ * zonenlose Wanduhrzeit bleibt Wanduhrzeit, validate.js `to: 'instant'`).
+ */
+async function completeTask(task, content) {
+  if (readOnly()) return;
+  const previous = task.last_completed ?? null;
+  try {
+    await api.post(`/housekeeping/decay-tasks/${task.id}/complete`, {});
+    vibrate(15);
+    window.yuvomi?.showToast(t('housekeeping.taskDoneToast'), 'success', 5000, () => undoCompleteTask(task.id, previous, content));
+    await loadData();
+    if (content?.isConnected && state.tab === 'tasks') renderTasks(content);
+  } catch (err) {
+    window.yuvomi?.showToast(err.message, 'danger');
+  }
+}
+
+async function undoCompleteTask(taskId, previous, content) {
+  if (readOnly()) return;
+  try {
+    await api.patch(`/housekeeping/decay-tasks/${taskId}`, { last_completed: previous });
+    window.yuvomi?.showToast(t('housekeeping.taskUndoneToast'), 'success');
+    await loadData();
+    if (content?.isConnected && state.tab === 'tasks') renderTasks(content);
+  } catch (err) {
+    window.yuvomi?.showToast(err.message, 'danger');
+  }
+}
+
+/**
+ * Der Aufgaben-Tab ist die LISTE, sonst nichts: Anlegen sitzt hinter dem FAB
+ * (openTaskCreateModal()). Der Leerzustand bietet denselben Weg an.
+ */
 function renderTasks(content) {
   content.replaceChildren();
   const taskRows = state.tasks.map(taskRowHtml).join('');
+  const empty = emptyStateHTML({
+    icon: 'list-checks',
+    title: t('housekeeping.noTasks'),
+    ...(readOnly() ? {} : { action: { label: t('housekeeping.addTask'), icon: 'plus', attrs: { 'data-create-task': '' } } }),
+  });
 
   content.insertAdjacentHTML('beforeend', `
-    ${taskCreateHtml()}
-    <section class="housekeeping-task-list row-carrier">
-      ${taskRows || emptyStateHTML({ icon: 'list-checks', title: t('housekeeping.noTasks') })}
+    <section class="housekeeping-task-list row-carrier" aria-label="${esc(t('housekeeping.tasks'))}">
+      ${taskRows || empty}
     </section>
   `);
   if (window.lucide) window.lucide.createIcons({ el: content });
   // Jede Verdrahtung darunter schreibt - bei `read` haengt keine.
   if (readOnly()) return;
 
-  content.querySelectorAll('[data-template-index]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const template = state.templates[Number(btn.dataset.templateIndex)];
-      if (template) {
-        createTask({
-          name: templateLabel(template, 'name'),
-          area: templateLabel(template, 'area'),
-          frequency_days: template.frequency_days,
-        }, content);
-      }
-    });
-  });
-  content.querySelector('#housekeeping-task-form')?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const fields = form.elements;
-    const frequencyDays = Number(fields.frequency_days.value);
-    if (!fields.name.value.trim() || !fields.area.value.trim() || !Number.isInteger(frequencyDays) || frequencyDays < 1) return;
-    createTask({
-      name: fields.name.value.trim(),
-      area: fields.area.value.trim(),
-      frequency_days: frequencyDays,
-    }, content);
-  });
-  content.querySelectorAll('[data-complete-task]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      try {
-        await api.post(`/housekeeping/decay-tasks/${btn.dataset.completeTask}/complete`, {});
-        window.yuvomi?.showToast(t('housekeeping.taskDoneToast'), 'success');
-        await loadData();
-        renderTasks(content);
-      } catch (err) {
-        window.yuvomi?.showToast(err.message, 'danger');
-      }
-    });
-  });
+  content.querySelector('[data-create-task]')?.addEventListener('click', () => openTaskCreateModal(content));
 
-  content.querySelectorAll('[data-undo-task]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      try {
-        await api.patch(`/housekeeping/decay-tasks/${btn.dataset.undoTask}`, { last_completed: null });
-        window.yuvomi?.showToast(t('housekeeping.taskUndoneToast'), 'success');
-        await loadData();
-        renderTasks(content);
-      } catch (err) {
-        window.yuvomi?.showToast(err.message, 'danger');
-      }
+  content.querySelectorAll('[data-complete-task]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const task = state.tasks.find((it) => String(it.id) === btn.dataset.completeTask);
+      if (task) completeTask(task, content);
     });
   });
 
@@ -880,10 +975,19 @@ function applyVisitReport(data) {
  * vorgibt und #1164 fuer Kalender und Mahlzeiten uebernimmt: Pfeil, Monat,
  * Pfeil, dahinter der Reset, und der Reset ist im laufenden Monat verborgen.
  * Die Pfeile beschreiben sich ueber den Monat, damit ein Screenreader nach dem
- * Schritt auch sagt, wo er gelandet ist. */
+ * Schritt auch sagt, wo er gelandet ist.
+ *
+ * IM KOPF, NICHT IN DER KARTE (Critique 2026-09-26, A3 P2-4). Der Zeitraum
+ * beantwortet beim Scrollen weiter „welcher Monat", wie im Budget; in der Karte
+ * scrollte er mit der Kennzahl-Zeile weg. Er steht im Center-Slot des Kopfs
+ * (#housekeeping-period, renderShell()).
+ *
+ * VERBORGEN PER `.is-current` + `inert`, NICHT PER `hidden` - dieselbe Regel
+ * wie Budget und Kalender (#1200): `hidden` nahm den Reset aus dem Fluss, das
+ * Label wuchs in den freien Platz, und der Weiter-Pfeil ruckte um die
+ * Knopfbreite, sobald man den laufenden Monat verliess. */
 function reportMonthNavHtml(shownMonth, isCurrentMonth) {
   return `
-        <div class="housekeeping-month-nav">
           <button class="btn btn--icon" type="button" id="housekeeping-report-prev"
                   aria-label="${esc(t('housekeeping.prevMonth'))}" aria-describedby="housekeeping-report-month">
             <i data-lucide="chevron-left" aria-hidden="true"></i>
@@ -893,9 +997,54 @@ function reportMonthNavHtml(shownMonth, isCurrentMonth) {
                   aria-label="${esc(t('housekeeping.nextMonth'))}" aria-describedby="housekeeping-report-month">
             <i data-lucide="chevron-right" aria-hidden="true"></i>
           </button>
-          <button class="btn btn--secondary housekeeping-month-nav__current" type="button"
-                  id="housekeeping-report-current"${isCurrentMonth ? ' hidden' : ''}>${esc(t('housekeeping.currentMonth'))}</button>
-        </div>`;
+          <button class="btn btn--secondary housekeeping-month-nav__current${isCurrentMonth ? ' is-current' : ''}" type="button"
+                  id="housekeeping-report-current"${isCurrentMonth ? ' inert' : ''}>${esc(t('housekeeping.currentMonth'))}</button>`;
+}
+
+/** Der Zeitraum-Slot im Kopf der Seite, zu der `content` gehoert. */
+function reportPeriodSlot(content) {
+  return content?.closest?.('.housekeeping-page')?.querySelector('#housekeeping-period') ?? null;
+}
+
+/**
+ * Stellt den Zeitraum im Kopf auf den Tab ein: im Berichte-Tab der Stepper
+ * des angezeigten Monats, sonst ein leerer, verborgener Slot.
+ *
+ * Steht der Stepper schon, werden nur Label und Reset nachgezogen, nicht die
+ * Knoepfe neu gebaut: sonst verloere der Pfeil, auf dem jemand gerade den Monat
+ * schaltet, nach jedem Schritt den Fokus.
+ */
+function syncReportPeriod(content) {
+  const slot = reportPeriodSlot(content);
+  if (!slot) return null;
+  if (state.tab !== 'reports') {
+    slot.replaceChildren();
+    slot.hidden = true;
+    return slot;
+  }
+  const shownMonth = state.visitReport?.month || currentMonthKey();
+  const isCurrentMonth = shownMonth === currentMonthKey();
+  const label = slot.querySelector('#housekeeping-report-month');
+  const reset = slot.querySelector('#housekeeping-report-current');
+  if (label && reset) {
+    label.textContent = formatMonthLabel(shownMonth);
+    // Hatte der Reset den Fokus, holt ihn vorher der Zurueck-Pfeil - `inert`
+    // wirft ihn sonst auf <body>.
+    if (isCurrentMonth && document.activeElement === reset) slot.querySelector('#housekeeping-report-prev')?.focus();
+    reset.classList.toggle('is-current', isCurrentMonth);
+    reset.inert = isCurrentMonth;
+  } else {
+    slot.replaceChildren();
+    slot.insertAdjacentHTML('beforeend', reportMonthNavHtml(shownMonth, isCurrentMonth));
+    slot.querySelector('#housekeeping-report-prev')?.addEventListener('click', () => stepReportMonth(content, -1));
+    slot.querySelector('#housekeeping-report-next')?.addEventListener('click', () => stepReportMonth(content, 1));
+    slot.querySelector('#housekeeping-report-current')?.addEventListener('click', () => (
+      showReportMonth(content, currentMonthKey(), 'housekeeping-report-current')
+    ));
+    if (window.lucide) window.lucide.createIcons({ el: slot });
+  }
+  slot.hidden = false;
+  return slot;
 }
 
 let reportMonthRequest = 0;
@@ -935,9 +1084,10 @@ async function showReportMonth(content, monthValue, focusId = null) {
     if (!content?.isConnected || state.tab !== 'reports') return;
     renderReports(content);
     // Der Reset verschwindet im laufenden Monat - dann bleibt der Fokus am
-    // vorherigen Pfeil statt auf <body> zu fallen.
-    const target = focusId ? content.querySelector(`#${focusId}`) : null;
-    (target && !target.hidden ? target : content.querySelector('#housekeeping-report-prev'))
+    // vorherigen Pfeil statt auf <body> zu fallen. Der Stepper steht im Kopf.
+    const head = reportPeriodSlot(content) ?? content;
+    const target = focusId ? head.querySelector(`#${focusId}`) : null;
+    (target && !target.inert ? target : head.querySelector('#housekeeping-report-prev'))
       ?.focus({ preventScroll: true });
   } catch (err) {
     if (request !== reportMonthRequest) return;
@@ -958,6 +1108,24 @@ function stepReportMonth(content, dir) {
     dir < 0 ? 'housekeeping-report-prev' : 'housekeeping-report-next');
 }
 
+/**
+ * Der Berichte-Tab: die drei Kennzahlen des Monats, darunter die Besuche als
+ * Zeilen. Den Monat waehlt der Stepper im Kopf (syncReportPeriod()).
+ *
+ * DIE KENNZAHLEN SIND DIE DER UEBERSICHT (`.metric-card`), nicht mehr die
+ * graue `--inset`-Fassung in einer Karte: zwei KPI-Looks im selben Modul
+ * (Critique 2026-09-26, A3 P2-4), und die Karte trug nur noch Ueberschrift und
+ * Stepper, seit der Stepper im Kopf steht.
+ *
+ * DIE BESUCHSZEILE IST EINE `.list-row` wie im Personal-Protokoll: Avatar |
+ * Name + Datum, Betrag, Status | Aktionen. Vorher stand „Als bezahlt
+ * markieren" als beschrifteter Knopf in der Zeile und der Bericht-Knopf
+ * darunter in einer eigenen - mobil 197px pro Besuch. Bezahlen ist jetzt
+ * dieselbe `.row-action` wie im Protokoll (`badge-dollar-sign`), beschriftet
+ * per `aria-label` mit dem Datum der Zeile. Sichtbar steht das Datum ohne
+ * Jahr: den Monat samt Jahr nennt der Stepper im Kopf, und mit Jahr brach die
+ * Metazeile mobil um. Das `aria-label` behaelt das volle Datum.
+ */
 function renderReports(content) {
   content.replaceChildren();
   const totals = state.visitReport?.totals || {};
@@ -966,60 +1134,54 @@ function renderReports(content) {
   const isCurrentMonth = shownMonth === currentMonthKey();
   const rows = visits.map((visit) => {
     const paid = !!visit.paid_at;
+    const visitDate = formatDate(visit.check_in);
     return `
-    <article class="housekeeping-report-item housekeeping-report-item--visit">
-      <div class="housekeeping-avatar" style="background:${esc(visit.worker_avatar_color) || 'var(--module-housekeeping)'}">
+    <article class="list-row list-row--tight housekeeping-report-item housekeeping-report-item--visit">
+      <div class="housekeeping-avatar housekeeping-avatar--row" style="background:${esc(visit.worker_avatar_color) || 'var(--module-housekeeping)'}">
         ${visit.worker_avatar_data ? `<img src="${esc(visit.worker_avatar_data)}" alt="${esc(visit.worker_name || '')}">` : esc(initials(visit.worker_name || 'HK'))}
       </div>
-      <div>
-        <strong>${esc(visit.worker_name || t('housekeeping.staff'))}</strong>
-        <span>${esc(formatDate(visit.check_in))} · ${esc(money(visit.total_amount))} · ${esc(paid ? t('housekeeping.paymentPaid') : t('housekeeping.paymentPending'))}</span>
+      <div class="list-row__main">
+        <div class="list-row__name">${esc(visit.worker_name || t('housekeeping.staff'))}</div>
+        <div class="list-row__meta">${esc(formatDayMonth(visit.check_in))} · ${esc(money(visit.total_amount))} · ${esc(paid ? t('housekeeping.paymentPaid') : t('housekeeping.paymentPending'))}</div>
       </div>
-      ${!visit.can_mark_paid || readOnly() ? '' : `
-      <button class="btn btn--secondary" type="button" data-pay-report="${visit.id}">
-        <i data-lucide="check" class="icon-sm" aria-hidden="true"></i>${esc(t('housekeeping.markPaid'))}
-      </button>`}
-      <button class="btn btn--secondary btn--icon" type="button" data-visit-report="${visit.id}" aria-label="${esc(t('housekeeping.openVisitReport'))}">
-        <i data-lucide="file-text" aria-hidden="true"></i>
-      </button>
+      <div class="list-row__actions">
+        ${!visit.can_mark_paid || readOnly() ? '' : `
+        <button class="row-action" type="button" data-pay-report="${visit.id}"
+                aria-label="${esc(t('housekeeping.markPaid'))}: ${esc(visitDate)}">
+          <i data-lucide="badge-dollar-sign" class="icon-md" aria-hidden="true"></i>
+        </button>`}
+        <button class="row-action" type="button" data-visit-report="${visit.id}"
+                aria-label="${esc(t('housekeeping.openVisitReport'))}: ${esc(visitDate)}">
+          <i data-lucide="file-text" class="icon-md" aria-hidden="true"></i>
+        </button>
+      </div>
     </article>
   `;
   }).join('');
 
   content.insertAdjacentHTML('beforeend', `
-    <section class="housekeeping-card">
-      <div class="housekeeping-section-heading">
-        <h2>${esc(t('housekeeping.visitReports'))}</h2>
-        ${reportMonthNavHtml(shownMonth, isCurrentMonth)}
-      </div>
-      <section class="metric-grid">
-        <article class="metric-card metric-card--inset">
-          <div class="metric-card__label">${esc(t('housekeeping.reportVisitsCount'))}</div>
-          <div class="metric-card__value">${esc(visits.length)}</div>
-        </article>
-        <article class="metric-card metric-card--inset">
-          <div class="metric-card__label">${esc(t('housekeeping.pendingPayments'))}</div>
-          <div class="metric-card__value">${esc(money(totals.pending || 0))}</div>
-        </article>
-        <article class="metric-card metric-card--inset">
-          <div class="metric-card__label">${esc(t('housekeeping.paymentPaid'))}</div>
-          <div class="metric-card__value">${esc(money(totals.paid || 0))}</div>
-        </article>
-      </section>
+    <section class="metric-grid" aria-label="${esc(t('housekeeping.visitReports'))}">
+      <article class="metric-card">
+        <div class="metric-card__label">${esc(t('housekeeping.reportVisitsCount'))}</div>
+        <div class="metric-card__value">${esc(visits.length)}</div>
+      </article>
+      <article class="metric-card">
+        <div class="metric-card__label">${esc(t('housekeeping.pendingPayments'))}</div>
+        <div class="metric-card__value">${esc(money(totals.pending || 0))}</div>
+      </article>
+      <article class="metric-card">
+        <div class="metric-card__label">${esc(t('housekeeping.paymentPaid'))}</div>
+        <div class="metric-card__value">${esc(money(totals.paid || 0))}</div>
+      </article>
     </section>
-    <section class="housekeeping-reports" aria-label="${esc(t('housekeeping.recentReports'))}">
+    <section class="housekeeping-reports${rows ? ' row-carrier' : ''}" aria-label="${esc(t('housekeeping.recentReports'))}">
       ${rows || `<p class="housekeeping-muted">${esc(isCurrentMonth
     ? t('housekeeping.noVisitReports')
     : t('housekeeping.noVisitReportsInMonth', { month: formatMonthLabel(shownMonth) }))}</p>`}
     </section>
   `);
   if (window.lucide) window.lucide.createIcons({ el: content });
-
-  content.querySelector('#housekeeping-report-prev')?.addEventListener('click', () => stepReportMonth(content, -1));
-  content.querySelector('#housekeeping-report-next')?.addEventListener('click', () => stepReportMonth(content, 1));
-  content.querySelector('#housekeeping-report-current')?.addEventListener('click', () => (
-    showReportMonth(content, currentMonthKey(), 'housekeeping-report-current')
-  ));
+  syncReportPeriod(content);
 
   content.querySelectorAll('[data-visit-report]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -1030,7 +1192,7 @@ function renderReports(content) {
 
   // Bezahlen direkt an der Ausstehend-Zeile (Audit R2, A2-14): derselbe Flow
   // wie im Personal-Einsatzlog, hier gegen die Berichtsliste. Bei `read`
-  // haengt er nicht - Monatswahl und Bericht darueber lesen nur.
+  // haengt er nicht - Monatswahl und Bericht lesen nur.
   if (readOnly()) return;
   content.querySelectorAll('[data-pay-report]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -2006,6 +2168,10 @@ export const __test = {
   renderDashboard,
   renderWorkerSummary,
   renderTasks,
+  openTaskCreateModal,
+  completeTask,
+  reportMonthNavHtml,
+  syncReportPeriod,
   renderStaff,
   staffLogPayHtml,
   receiptFieldHtml,

@@ -1,6 +1,7 @@
 import { t } from '/i18n.js';
 import { moduleAccentVar } from '/utils/module-accent.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
+import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { createRetryState } from './components.js';
 import { clearLeafEdits, confirmLeafExit, watchLeafForms } from './dirty-guard.js';
 import { resetPreferencesCache } from './preferences-cache.js';
@@ -341,157 +342,195 @@ function updateNavigationActiveState(navigation, activeLeaf) {
   }
 }
 
-function createOverviewLink({ href, icon, title, description, entry }) {
-  const link = createLink(href, 'settings-overview-link');
-  // Eine Domaenen-Zeile hat kein Blatt und damit kein Modul: sie bekommt ihr
-  // Zeichen ohne Marke, wie bisher.
-  link.appendChild(entry
-    ? createLeafMark(entry, 'settings-overview-link__icon')
-    : createIcon(icon, 'settings-overview-link__icon'));
+/**
+ * EINE gruppierte Liste aller Blaetter - die Wurzel der Einstellungen in jeder
+ * Breite (Kopfregel mobil, 2026-09-26; Critique A7 P1).
+ *
+ * Mobil gab es drei Ebenen: vier Bereichszeilen, dann die Bereichsseite mit
+ * 88px hohen Zeilen und einem Zurueck-Link, dann das Blatt. Inhalt begann bei
+ * y=198, sichtbar waren 5,5 Zeilen. Apples Einstellungen zeigen EINE Liste mit
+ * Abschnitten, und der Desktop zeigte sie hier schon - nur mobil fehlte sie.
+ * Jetzt rendert die Wurzel ueberall dieselbe Liste; was mobil anders ist
+ * (Zeilenhoehe, Markengroesse, keine Beschreibung), entscheidet settings.css.
+ *
+ * DIE BEREICHSEBENE GIBT ES NICHT MEHR. Ein Deep-Link `?view=domain&domain=x`
+ * (Breadcrumb, Rueckweg aus dem Blatt, alte Lesezeichen) landet auf derselben
+ * Liste, gescrollt auf den Abschnitt - der Ort bleibt, die Zwischenseite geht.
+ */
+function createOverviewRow(entry, domainLabel) {
+  const link = createLink(entry.path, 'settings-overview__row');
+  link.dataset.leafId = entry.id;
+  // Suchgrund der Zeile: Label, Beschreibung und Bereich - dieselbe Menge, die
+  // die Blatt-Suche der Seitenleiste durchsucht.
+  link.dataset.search = searchNormalize(`${t(entry.labelKey)} ${t(entry.descriptionKey)} ${domainLabel}`);
+  link.appendChild(createLeafMark(entry, 'settings-overview__row-mark'));
 
   const copy = document.createElement('span');
-  copy.className = 'settings-overview-link__copy';
+  copy.className = 'settings-overview__row-copy';
 
   const label = document.createElement('span');
-  label.className = 'settings-overview-link__title';
-  label.textContent = title;
-  copy.appendChild(label);
-
-  if (description) {
-    const detail = document.createElement('span');
-    detail.className = 'settings-overview-link__description';
-    detail.textContent = description;
-    copy.appendChild(detail);
-  }
-
-  link.append(
-    copy,
-    createIcon('chevron-right', 'settings-overview-link__chevron'),
-  );
-  return link;
-}
-
-function createOverviewHeader(title, description = null) {
-  const header = document.createElement('header');
-  header.className = 'settings-mobile-overview__header';
-
-  const heading = document.createElement('h2');
-  heading.className = 'settings-mobile-overview__title';
-  heading.textContent = title;
-  header.appendChild(heading);
-
-  if (description) {
-    const detail = document.createElement('p');
-    detail.className = 'settings-mobile-overview__description';
-    detail.textContent = description;
-    header.appendChild(detail);
-  }
-
-  return header;
-}
-
-function createDesktopLeafLink(entry) {
-  const link = createLink(entry.path, 'settings-desktop-overview__leaf');
-  link.appendChild(createLeafMark(entry, 'settings-desktop-overview__leaf-icon'));
-
-  const copy = document.createElement('span');
-  copy.className = 'settings-desktop-overview__leaf-copy';
-
-  const label = document.createElement('span');
-  label.className = 'settings-desktop-overview__leaf-title';
+  label.className = 'settings-overview__row-title';
   label.textContent = t(entry.labelKey);
 
   const description = document.createElement('span');
-  description.className = 'settings-desktop-overview__leaf-description';
+  description.className = 'settings-overview__row-description';
   description.textContent = t(entry.descriptionKey);
 
   copy.append(label, description);
   link.append(
     copy,
-    createIcon('chevron-right', 'settings-desktop-overview__leaf-chevron'),
+    createIcon('chevron-right', 'settings-overview__row-chevron'),
   );
   return link;
 }
 
-function renderDomainsOverview(content, domains, user) {
+/** Id des Abschnitts eines Bereichs - Sprungziel der Deep-Links. */
+function overviewSectionId(domainId) {
+  return `settings-domain-${domainId}`;
+}
+
+function renderOverview(content, domains, user) {
   const overview = document.createElement('section');
-  overview.className = 'settings-mobile-overview settings-mobile-overview--domains';
+  overview.className = 'settings-overview';
+  overview.setAttribute('aria-label', t('settings.navigationLabel'));
 
-  const description = document.createElement('p');
-  description.className = 'settings-mobile-overview__description';
-  description.textContent = t('settings.mobileOverviewDescription');
-  overview.appendChild(description);
-
-  const links = document.createElement('div');
-  links.className = 'settings-mobile-overview__links';
-  for (const domain of domains) {
-    links.appendChild(createOverviewLink({
-      href: settingsOverviewUrl(domain.id),
-      icon: domain.icon,
-      title: t(domain.labelKey),
-    }));
-  }
-
-  overview.appendChild(links);
-
-  const desktopOverview = document.createElement('section');
-  desktopOverview.className = 'settings-desktop-overview';
+  // Trefferzahl der Kopf-Suche (Live-Region). Leer und versteckt, solange
+  // nicht gesucht wird.
+  const status = document.createElement('p');
+  status.className = 'settings-overview__status';
+  status.setAttribute('role', 'status');
+  status.hidden = true;
+  overview.appendChild(status);
 
   for (const domain of domains) {
     const leaves = allowedLeavesForDomain(domain.id, user);
     if (!leaves.length) continue;
 
-    const domainSection = document.createElement('section');
-    domainSection.className = 'settings-desktop-overview__domain';
+    const domainLabel = t(domain.labelKey);
+    const section = document.createElement('section');
+    section.className = 'settings-overview__section';
+    section.id = overviewSectionId(domain.id);
+    section.dataset.domainId = domain.id;
 
     const heading = document.createElement('h2');
-    heading.className = 'settings-desktop-overview__domain-title';
+    heading.className = 'settings-overview__heading';
+    heading.id = `${section.id}-heading`;
     heading.append(
-      createIcon(domain.icon, 'settings-desktop-overview__domain-icon'),
-      document.createTextNode(t(domain.labelKey)),
+      createIcon(domain.icon, 'settings-overview__heading-icon'),
+      document.createTextNode(domainLabel),
     );
+    section.setAttribute('aria-labelledby', heading.id);
 
-    const leafList = document.createElement('div');
-    leafList.className = 'settings-desktop-overview__leaf-list';
-    for (const entry of leaves) {
-      leafList.appendChild(createDesktopLeafLink(entry));
-    }
+    const list = document.createElement('div');
+    list.className = 'settings-overview__list';
+    for (const entry of leaves) list.appendChild(createOverviewRow(entry, domainLabel));
 
-    domainSection.append(heading, leafList);
-    desktopOverview.appendChild(domainSection);
+    section.append(heading, list);
+    overview.appendChild(section);
   }
 
-  content.replaceChildren(overview, desktopOverview);
+  content.replaceChildren(overview);
+  return overview;
 }
 
-function renderDomainOverview(content, domain, user) {
-  const overview = document.createElement('section');
-  overview.className = 'settings-mobile-overview settings-domain-overview';
-  overview.appendChild(createOverviewHeader(
-    t('settings.mobileDomainTitle', { domain: t(domain.labelKey) }),
-  ));
+/**
+ * Filtert die Liste der Wurzel nach der Kopf-Suche. Ein Abschnitt ohne Treffer
+ * faellt mit weg, damit keine leeren Ueberschriften stehen bleiben; die Zahl
+ * geht in die Live-Region, ein leeres Ergebnis nennt der geteilte Leerzustand.
+ */
+function filterOverview(content, value) {
+  const overview = content.querySelector('.settings-overview');
+  if (!overview) return;
+  const query = searchNormalize(String(value ?? '').trim());
+  const status = overview.querySelector('.settings-overview__status');
+  let hits = 0;
+  for (const section of overview.querySelectorAll('.settings-overview__section')) {
+    let visible = 0;
+    for (const row of section.querySelectorAll('.settings-overview__row')) {
+      const match = !query || row.dataset.search.includes(query);
+      row.hidden = !match;
+      if (match) visible += 1;
+    }
+    section.hidden = visible === 0;
+    hits += visible;
+  }
+  if (!status) return;
+  status.hidden = !query;
+  status.textContent = !query
+    ? ''
+    : (hits ? t('settings.searchResults', { count: hits }) : t('search.noResults'));
+}
 
-  const backLink = createLink(settingsOverviewUrl(), 'settings-overview-back-link');
-  backLink.append(
-    createIcon('arrow-left', 'settings-overview-back-link__icon'),
-    document.createTextNode(t('settings.backToSettings')),
-  );
-  overview.appendChild(backLink);
+/**
+ * Scrollt die Wurzel auf den Abschnitt eines Bereichs (Deep-Link).
+ *
+ * NACH DEM ROUTER, NICHT IM RENDER: der Router setzt den Scrollport nach einer
+ * Soft-Navigation erst NACH `update()` zurueck (router.js, Soft-Update) - ein
+ * Sprung im Render waere sofort wieder kassiert. Der Abstand zum klebenden
+ * Kopf steht als `scroll-margin` am Abschnitt (settings.css).
+ */
+function revealOverviewSection(content, domainId) {
+  if (!domainId) return;
+  setTimeout(() => {
+    const section = content.querySelector(`#${overviewSectionId(domainId)}`);
+    if (section?.isConnected) section.scrollIntoView({ block: 'start' });
+  }, 0);
+}
 
-  const links = document.createElement('div');
-  links.className = 'settings-mobile-overview__links';
-  for (const entry of allowedLeavesForDomain(domain.id, user)) {
-    links.appendChild(createOverviewLink({
-      href: entry.path,
-      icon: entry.icon,
-      title: t(entry.labelKey),
-      description: t(entry.descriptionKey),
-      entry,
-    }));
+/**
+ * Der Seitenkopf der Einstellungen ist der geteilte Modulkopf (`.page-toolbar`,
+ * vom Router verdrahtet: Siegel, Large Title, Andocken) - bis 2026-09-26 war er
+ * ein eigener `settings-shell-header` ohne Siegel und ohne Suche (Critique A7,
+ * Konsistenz). Er kennt zwei Zustaende:
+ *
+ *   WURZEL: Titel + Suche. Die Suche war nur im Desktop-Blatt erreichbar
+ *     (Seitenleiste, unter 1024px ausgeblendet); jetzt steht sie mobil als
+ *     Such-Icon im Kopf, das zum Feld aufgeht (Kopfregel mobil, Regel 4).
+ *   BLATT: nur der Rueckweg. Er lag als Textlink IM Inhalt und scrollte auf
+ *     einem 1950px langen Blatt mit weg (A7, Casey). Im klebenden Kopf bleibt
+ *     er stehen - Apples Navigationsleiste mit „< Einstellungen". Ab 768px
+ *     traegt der Breadcrumb den Rueckweg; dort blendet settings.css den Kopf
+ *     auf Blaettern aus.
+ *
+ * Neu gebaut wird nur beim Zustandswechsel: eine getippte Suche ueberlebt den
+ * Deep-Link-Sprung innerhalb der Wurzel.
+ */
+function renderToolbar(toolbar, content, { activeLeaf, domain }) {
+  if (activeLeaf && domain) {
+    const back = createLink(settingsOverviewUrl(domain.id), 'settings-toolbar__back');
+    back.setAttribute('aria-label', t('settings.backToSettings'));
+    const label = document.createElement('span');
+    label.className = 'settings-toolbar__back-label';
+    label.textContent = t('settings.title');
+    back.append(createIcon('chevron-left', 'settings-toolbar__back-icon'), label);
+    toolbar.dataset.mode = 'leaf';
+    toolbar.replaceChildren(back);
+    hydrateIcons(toolbar);
+    return;
   }
 
-  overview.appendChild(links);
-  content.replaceChildren(overview);
+  if (toolbar.dataset.mode === 'root') {
+    filterOverview(content, toolbar.querySelector('#settings-search')?.value);
+    return;
+  }
+
+  const title = document.createElement('h1');
+  title.className = 'page-toolbar__title';
+  title.textContent = t('settings.title');
+  toolbar.dataset.mode = 'root';
+  toolbar.replaceChildren(title);
+  toolbar.insertAdjacentHTML('beforeend', renderPageSearch({
+    id: 'settings-search',
+    label: t('settings.searchLabel'),
+    clearLabel: t('common.searchClear'),
+    className: 'settings-toolbar__search page-toolbar__center',
+  }));
+  wirePageSearch(toolbar, {
+    id: 'settings-search',
+    delay: 0,
+    onQuery: (value) => filterOverview(content, value),
+  });
+  hydrateIcons(toolbar);
 }
 
 function createBreadcrumb(domain, leaf) {
@@ -554,19 +593,9 @@ function createLeafHeader(leaf) {
 }
 
 async function renderLeafContent(content, leaf, domain, user, query) {
+  // Der mobile Rueckweg steht nicht mehr hier, sondern im klebenden Kopf
+  // (renderToolbar): als Textlink im Inhalt scrollte er mit weg.
   const breadcrumb = createBreadcrumb(domain, leaf);
-  // Nach dem Ziel benannt, nicht nach der Wurzel: der Link führt auf die
-  // Domänen-Übersicht, hiess aber "Zurück zu Einstellungen" - genau wie der
-  // Link eine Ebene höher, der woanders hinführt (Critique 2026-07-27).
-  // Mobil ist das die einzige Rückwärts-Affordance.
-  const backLink = createLink(
-    settingsOverviewUrl(domain.id),
-    'settings-leaf-back-link',
-  );
-  backLink.append(
-    createIcon('arrow-left', 'settings-leaf-back-link__icon'),
-    document.createTextNode(t('settings.backToDomain', { domain: t(domain.labelKey) })),
-  );
 
   // Der Leaf-Header wird zentral aus der Registry gerendert (Prio 5/B1): die
   // Blätter liefern nur noch Content. Der Header liegt als Geschwister *über*
@@ -577,7 +606,7 @@ async function renderLeafContent(content, leaf, domain, user, query) {
 
   const leafContainer = document.createElement('div');
   leafContainer.className = 'settings-leaf';
-  content.replaceChildren(breadcrumb, backLink, header, leafContainer);
+  content.replaceChildren(breadcrumb, header, leafContainer);
 
   const loadAndRender = async ({ focusRetry = false } = {}) => {
     leafContainer.replaceChildren();
@@ -662,18 +691,17 @@ export async function renderSettingsShell(container, {
     // wurde (z. B. die Widget-Konfiguration im Dashboard), ist damit weg.
     resetPreferencesCache();
 
+    // Kopf und Koerper sind Geschwister: der Kopf ist full-bleed und polstert
+    // sich ueber --page-inline-pad selbst (#577), der Koerper traegt dieselbe
+    // Kante. Die Seite selbst polstert nichts - sonst addierten sich die Raender.
     const page = document.createElement('div');
-    page.className = 'page settings-page';
+    page.className = 'settings-page';
 
-    const pageHeader = document.createElement('header');
-    pageHeader.className = 'page__header settings-shell-header';
-    const pageTitle = document.createElement('h1');
-    // Nicht `page__title` (22/28px): jedes andere Modul rendert seinen
-    // Seitentitel mit 20px, und der Settings-Leaf-Titel tut es auch. Zwei
-    // h1-Größen für dieselbe Ebene (Critique 2026-07-27).
-    pageTitle.className = 'settings-shell-header__title';
-    pageTitle.textContent = t('settings.title');
-    pageHeader.appendChild(pageTitle);
+    const toolbar = document.createElement('div');
+    toolbar.className = 'page-toolbar settings-shell-header';
+
+    const body = document.createElement('div');
+    body.className = 'settings-page__body';
 
     shell = document.createElement('div');
     shell.className = 'settings-shell';
@@ -681,7 +709,8 @@ export async function renderSettingsShell(container, {
     content = document.createElement('div');
     content.className = 'settings-shell__content';
     shell.append(navigation, content);
-    page.append(pageHeader, shell);
+    body.appendChild(shell);
+    page.append(toolbar, body);
     container.replaceChildren(page);
     // Sidebar-Icons einmalig bei der Montage hydrieren; die Detail-Icons werden
     // pro Render separat (nur im Content-Bereich) hydriert.
@@ -690,27 +719,29 @@ export async function renderSettingsShell(container, {
 
   const page = shell.closest('.settings-page');
   page?.classList.toggle('settings-page--leaf', Boolean(activeLeaf));
+  const toolbar = page?.querySelector(':scope > .page-toolbar');
 
-  if (activeLeaf) {
-    const domain = domains.find((entry) => entry.id === activeLeaf.domainId);
-    if (!domain) {
-      console.error(
-        `[Settings] Cannot render ${activeLeaf.id}: domain "${activeLeaf.domainId}" is not available.`,
-      );
-      renderDomainsOverview(content, domains, user);
-      hydrateIcons(content);
-    } else {
-      await renderLeafContent(content, activeLeaf, domain, user, query);
-    }
-  } else {
-    const domain = view === 'domain'
-      ? domains.find((entry) => entry.id === domainId)
-      : null;
-    if (domain) {
-      renderDomainOverview(content, domain, user);
-    } else {
-      renderDomainsOverview(content, domains, user);
-    }
-    hydrateIcons(content);
+  const leafDomain = activeLeaf
+    ? domains.find((entry) => entry.id === activeLeaf.domainId)
+    : null;
+  if (activeLeaf && !leafDomain) {
+    console.error(
+      `[Settings] Cannot render ${activeLeaf.id}: domain "${activeLeaf.domainId}" is not available.`,
+    );
   }
+
+  if (activeLeaf && leafDomain) {
+    // Kopf zuerst: der Rueckweg steht, bevor das Blatt geladen ist.
+    if (toolbar) renderToolbar(toolbar, content, { activeLeaf, domain: leafDomain });
+    await renderLeafContent(content, activeLeaf, leafDomain, user, query);
+    return;
+  }
+
+  renderOverview(content, domains, user);
+  hydrateIcons(content);
+  if (toolbar) renderToolbar(toolbar, content, {});
+  const focusDomain = view === 'domain'
+    ? domains.find((entry) => entry.id === domainId)
+    : null;
+  revealOverviewSection(content, focusDomain?.id);
 }

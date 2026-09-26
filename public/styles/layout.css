@@ -259,6 +259,7 @@
   --install-prompt-tail: 0px;
   --fab-tail: 0px;
   --bulk-pill-tail: 0px;
+  --nav-tail: 0px;
 }
 
 /* AM ZUSTAND, NICHT AN DER ANWESENHEIT - und das ist gemessen, nicht
@@ -289,11 +290,36 @@
   --bulk-pill-tail: var(--bulk-pill-safe-zone);
 }
 
-/* Die Summe. AN .app-content UND NICHT AN :root - sie liest die drei Summanden
- * an der Stelle, an der sie deklariert wird (siehe :root oben), und alle drei
+/* DER VIERTE SUMMAND IST DIE TAB-LEISTE SELBST (Kopfregel mobil, 2026-09-26).
+ *
+ * Bis hierher war die Leiste ein Flex-Kind der Shell und nahm dem Scrollport
+ * ihre Zone ab: unter dem Glas lief nie Inhalt, 76px (plus Safe-Area) waren
+ * tote Buehne unter einer Kapsel, deren Material genau das zeigen soll, was
+ * darunter liegt (Critique 2026-09-26, A1 P1-3 / A8). Jetzt liegt sie ueber
+ * dem Inhalt (siehe `.nav-bottom`), der Scrollport reicht bis zur Unterkante,
+ * und damit die letzte Zeile trotzdem UEBER der Kapsel endet, ist ihre Zone
+ * ein Nachlauf wie FAB, Pille und Banner - dieselbe Invariante: nichts ist
+ * unerreichbar, und mitten im Scrollen darf Inhalt unter dem Glas laufen.
+ *
+ * NUR, WO DIE LEISTE STEHT: unter 1024px und nicht im Wand-Modus, der sie
+ * ausblendet (dashboard.css). Die Summanden von Pille und Banner rechnen
+ * weiter ab der Oberkante der Leiste - sie haengen ueber ihr, und der
+ * Nachlauf addiert jetzt, was darunter liegt, statt es wegzuschneiden. */
+@media (max-width: 1023px) {
+  .app-shell {
+    --nav-tail: var(--nav-bottom-height);
+  }
+
+  [data-wall-mode] .app-shell {
+    --nav-tail: 0px;
+  }
+}
+
+/* Die Summe. AN .app-content UND NICHT AN :root - sie liest die Summanden
+ * an der Stelle, an der sie deklariert wird (siehe :root oben), und alle
  * sind erst hier fertig. */
 .app-content {
-  --shell-tail: calc(var(--fab-tail) + var(--bulk-pill-tail) + var(--install-prompt-tail));
+  --shell-tail: calc(var(--nav-tail) + var(--fab-tail) + var(--bulk-pill-tail) + var(--install-prompt-tail));
 }
 
 /* --------------------------------------------------------
@@ -346,6 +372,11 @@
 .app-content:not(:has(.page-scrollport)),
 .app-shell .page-scrollport:not(:has(.page-scrollport)) {
   padding-block-end: calc(var(--scrollport-pad, 0px) + var(--shell-tail));
+  /* Fokus und scrollIntoView landen nie unter der Kapsel (WCAG 2.4.11): wer
+   * per Tastatur ans Seitenende tabbt, bekommt das Ziel ueber dem Glas statt
+   * dahinter. Nur die Leiste, nicht der ganze Nachlauf - der Desktop-FAB
+   * schwebt seitlich und verdeckt keine volle Zeile. */
+  scroll-padding-block-end: var(--nav-tail);
 }
 
 /* DER SCROLLPORT IST AUCH CONTAINING BLOCK (Critique 2026-09-26).
@@ -508,17 +539,29 @@
  * Leichter Blur-Effekt für Glassmorphismus.
  * -------------------------------------------------------- */
 .nav-bottom {
-  /* Flex-Kind von .app-shell statt position: fixed - zuverlässiger auf iOS PWA.
-   * position: fixed kann durch will-change: transform in iOS-Compositor-Layern
-   * falsch referenziert werden. Als Flex-Kind am Ende der 100dvh-App-Shell ist
-   * die Position garantiert am Viewport-Bottom.
+  /* Absolut an der Unterkante von .app-shell statt position: fixed -
+   * zuverlässiger auf iOS PWA. position: fixed kann durch will-change:
+   * transform in iOS-Compositor-Layern falsch referenziert werden. Die Shell
+   * ist 100dvh hoch und `position: relative`, ihre Unterkante IST der
+   * Viewport-Bottom - dieselbe Garantie wie als Flex-Kind.
+   *
+   * UEBER DEM INHALT, NICHT DARUNTER (Kopfregel mobil, 2026-09-26). Bis dahin
+   * stand hier ein Flex-Kind (`position: relative; flex-shrink: 0`): es nahm
+   * dem Scrollport seine Zone ab, unter dem Glas lief nie Inhalt, und die
+   * Kapsel war Glas ueber leerem Grund (A1 P1-3, A8). Aus dem Fluss genommen
+   * reicht `.app-content` bis zur Unterkante, die Kapsel schwebt ueber dem,
+   * was darunter scrollt, und `--nav-tail` (oben bei den Summanden) haelt das
+   * Seitenende ueber ihr. FAB, Toasts und Mehr-Blatt rechnen weiter mit
+   * `--nav-bottom-height` ab dem Viewport-Bottom und stehen unveraendert.
+   * Guard: test:mobile-chrome.
    *
    * Liquid Glass: die Bar selbst ist eine transparente Zone; das
    * Glas-Material trägt die schwebende Kapsel .nav-bottom__items. Der
    * gleitende Indikator bleibt Kind von .nav-bottom und misst echte Rects
    * (positionTabIndicator) — die Kapsel-Margins rechnen sich automatisch ein. */
-  position: relative;
-  flex-shrink: 0;
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
   width: 100%;
   background: transparent;
   display: flex;
@@ -529,6 +572,10 @@
    * wie 12 - sie sind nur nicht mehr da, wo die Labels sie brauchen. */
   padding: var(--space-2) var(--nav-bar-gutter) calc(var(--safe-area-inset-bottom) + var(--space-2));
   z-index: var(--z-nav);
+  /* Die Zone ist Luft, keine Flaeche: seit Inhalt unter ihr laeuft, gehoert
+   * ein Tipp auf den Streifen neben oder ueber der Kapsel der Zeile darunter.
+   * Treffer nimmt nur die Kapsel an (`.nav-bottom__items`). */
+  pointer-events: none;
 }
 
 /* ── Items-Reihe: die schwebende Glas-Kapsel ── */
@@ -557,6 +604,7 @@
    * --space-2 (8px) raeumt genau diese Sehne frei. Hinten braucht es nichts:
    * dort deckt die FAB-Reserve die Kurve laengst ab. */
   padding-inline-start: var(--space-2);
+  pointer-events: auto;
 }
 
 /* NUR WO ES EINEN FAB GIBT. Die Frage stellt dieselbe `:has()`-Bedingung, die
@@ -2616,19 +2664,20 @@ html.fab-anim-done .page-fab {
  * gemacht. Was er braucht, ist ein Begriff von "Seitenblock", der Zeileninterna
  * strukturell ausschliesst - das ist eigene Arbeit, kein Anhang an einen Fix.
  * Bis dahin bleibt diese Liste eine Liste, die man von Hand pflegt. */
-/* NICHT in dieser Liste: `.list-tabs-bar` (shopping.css) und
- * `.contacts-filters` (contacts.css). Beide polstern sich selbst mit
- * `--page-inline-pad`, und bei `box-sizing: border-box` zieht dieses Polster
- * von der Kappung ab statt zu ihr zu addieren: gemessen bei 1907px blieben von
- * 720px genau 313px fuer die Chips uebrig, waehrend der Koerper darunter die
- * vollen 720px fuehrte - die Reiter brachen also mitten im Namen ab (#758).
- * Ihre Kappung steht deshalb in ihrer eigenen Datei und rechnet das Polster
- * ein. Wer hier ein Element eintraegt, das anderswo horizontal polstert, macht
- * es genauso. Guard: `die Lesemass-Liste kappt kein selbstpolsterndes Element`
- * in test/test-frontend-audit.js - er liest beide Seiten aus dem Stylesheet und
- * findet die Ueberschneidung von allein. */
+/* NICHT in diese Liste gehoert ein Element, das sich selbst horizontal mit
+ * `--page-inline-pad` polstert: bei `box-sizing: border-box` zieht dieses
+ * Polster von der Kappung ab statt zu ihr zu addieren. Gemessen bei 1907px
+ * blieben von 720px genau 313px fuer die Chips uebrig, waehrend der Koerper
+ * darunter die vollen 720px fuehrte - die Reiter brachen mitten im Namen ab
+ * (#758). Die beiden Faelle von damals (`.list-tabs-bar`, `.contacts-filters`)
+ * polstern seit der Kopfregel mobil (2026-09-26) nicht mehr selbst: die
+ * Listenleiste steht im __center-Slot des Einkaufskopfs, die Kontakt-Chips im
+ * Port, und Kontakte kappt seine Reihe in contacts.css. Wer hier ein Element
+ * eintraegt, das anderswo horizontal polstert, kappt es stattdessen in seiner
+ * eigenen Datei und rechnet das Polster ein. Guard: `die Lesemass-Liste kappt
+ * kein selbstpolsterndes Element` in test/test-frontend-audit.js - er liest
+ * beide Seiten aus dem Stylesheet und findet die Ueberschneidung von allein. */
 .page-measure--narrow :is(
-  .tasks-filters-row,
   .rewards-tabs,
   /* Die Karten der Hauswirtschaft, deren Zeilen per Bleed an ihrer Kante
    * fluchten: die Liste selbst hat keine eigene Flaeche, die Karte hat sie,
@@ -2648,7 +2697,6 @@ html.fab-anim-done .page-fab {
   .housekeeping-worker-strip
 ),
 .app-page :is(
-  .tasks-filters-row,
   .rewards-tabs,
   .housekeeping-card,
   .contact-group__header,
@@ -3169,8 +3217,21 @@ html.fab-anim-done .page-fab {
  *
  * Die Media-Liste nennt beide Faelle EINMAL, statt den Block zu verdoppeln:
  * eine zweite Kopie waere die zweite Handschrift derselben Regel.
+ *
+ * DIE GRENZE IST 768, NICHT 640 (Kopfregel mobil, 2026-09-26): die Regel
+ * gilt fuer jeden Modulkopf der kompakten Klasse unter --bp-tablet, und
+ * zwischen 640 und 767px stand das volle Feld neben Titel und Aktionen und
+ * brach den Kopf in eine dritte Zeile.
+ *
+ * UND SIE FRAGT NACH DEM KOPF, NICHT NACH DEM ELTERNTEIL. Hier stand
+ * `.page-toolbar > .page-search`: eine Suche in einem Wrapper-Slot
+ * (`div.page-toolbar__center` im Inventar) blieb damit ein 248px-Feld und
+ * baute die dritte Zeile (A6 P1-1). Der bevorzugte Weg bleibt, die Suche
+ * SELBST zum Slot zu machen (`renderPageSearch({ className: '...
+ * page-toolbar__center' })`); ein Wrapper, der nur die Suche traegt,
+ * schrumpft unten mit ihr.
  * -------------------------------------------------------- */
-@media (max-width: 639px), (max-width: 1023px) and (max-height: 499px) {
+@media (max-width: 767px), (max-width: 1023px) and (max-height: 499px) {
   /* Die Bauart ist die Label-Verlust-Regel: ein Bedienelement, dem der Platz
    * ausgeht, wird zum Einstieg seiner Familie und behaelt --target-base. Kein
    * neues Markup und kein JS - `.page-search` IST ein `<label for>`, ein Klick
@@ -3181,7 +3242,7 @@ html.fab-anim-done .page-fab {
    * die einem beim Scrollen der eigenen Treffer unter den Haenden
    * verschwindet, waere der falsche Gehorsam gegenueber der Regel. Also nur
    * ohne Fokus UND ohne Wert. */
-  .page-toolbar > .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))) {
+  .page-toolbar .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))) {
     flex: 0 0 auto;
     width: var(--target-base);
     max-width: var(--target-base);
@@ -3195,7 +3256,7 @@ html.fab-anim-done .page-fab {
   }
 
   .page-toolbar
-    > .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
+    .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
     .page-search__input {
     padding-inline: 0;
     /* Der Text ist leer (kein Wert, sonst griffe die Regel nicht), unsichtbar
@@ -3212,7 +3273,7 @@ html.fab-anim-done .page-fab {
   }
 
   .page-toolbar
-    > .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
+    .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
     .page-search__input::placeholder {
     color: transparent;
   }
@@ -3227,16 +3288,28 @@ html.fab-anim-done .page-fab {
    * `inset-inline: 0` plus `margin-inline: auto` zentriert in beiden
    * Richtungen und braucht die X-Achse des Translates gar nicht. */
   .page-toolbar
-    > .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
+    .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
     .page-search__icon {
     inset-inline: 0;
     margin-inline: auto;
     transform: translateY(-50%);
   }
 
+  /* Ein Slot, der NUR die Suche traegt, gibt ihre Breite mit ab - sonst
+   * stuende das Icon in einem leeren, flex-wachsenden Kasten. Dieselbe
+   * Bedingung wie oben (ohne Fokus, ohne Wert), aber ohne `:has()` im
+   * `:has()`: verschachtelt ist der Selektor ungueltig, und der Browser
+   * verwirft die ganze Regel lautlos. */
+  .page-toolbar > :not(.page-search):not(:focus-within):has(> .page-search:only-child input:placeholder-shown) {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+  }
+
   /* Im aufgeklappten Zustand nimmt die Suche die Zeile, die sie braucht - sie
    * ist dann das, was der Nutzer gerade tut. */
-  .page-toolbar > .page-search:focus-within {
+  .page-toolbar .page-search:focus-within {
     flex: 1 1 auto;
   }
 }
@@ -3497,6 +3570,140 @@ a.popover-menu__item {
   .popover-menu__item {
     transition: none;
   }
+}
+
+/* --------------------------------------------------------
+ * KOPFREGEL MOBIL - DIE GETEILTEN BAUSTEINE (2026-09-26)
+ *
+ * Die Regel steht in DESIGN.md („Kopfregel mobil"): hoechstens zwei
+ * Kopfzeilen, keine losen Verwaltungs-Icons, Filter nicht fest ueber dem
+ * Port, Suche als Icon, Inhalt unter der Kapsel. Was die Module dafuer
+ * brauchen, steht hier und nicht im Modul-Stylesheet - der Router laedt je
+ * Seite genau eines, und eine Form, deren Regeln dort wohnen, gilt nur in
+ * diesem einen Modul (Lehre von `.toggle-row`, oben).
+ *
+ *   `.page-tools-btn`  das EINE Werkzeugmenue („..."), utils/popover-menu.js
+ *                      `pageToolsMenuHtml()`. Braucht keine eigene Geometrie:
+ *                      `.btn--secondary.btn--icon` wie `documents-tools-btn`.
+ *   `.page-filter-btn` „Filter (n)", utils/filter-sheet.js. Vorbild ist der
+ *                      Filterknopf des Kalenders (calendar.css).
+ *   `.filter-sheet`    das Blatt dazu: benannte Gruppen.
+ *   `.page-chip-row`   eine Chipreihe IM Scrollport - sie scrollt mit weg.
+ * -------------------------------------------------------- */
+
+/* Der aktive Knopf traegt den Modulton als Tinte; die Zahl ist der Zustand
+ * (Begruendung am Kalender-Vorbild). */
+.page-filter-btn {
+  position: relative;
+}
+
+.page-filter-btn--active {
+  color: var(--module-accent, var(--color-accent));
+}
+
+.page-filter-btn--labeled {
+  gap: var(--space-1);
+}
+
+.page-filter-btn__count {
+  position: absolute;
+  top: var(--space-1);
+  inset-inline-end: var(--space-1);
+  min-width: var(--space-4);
+  height: var(--space-4);
+  padding-inline: var(--space-0h);
+  border-radius: var(--radius-full);
+  background: var(--module-accent, var(--color-accent));
+  color: var(--color-ink-on-vivid);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--space-4);
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Mit Wort steht die Zahl IN der Zeile statt als Ecke - eine Ecke ueber
+ * Text liest sich als Fussnote, nicht als Zustand. */
+.page-filter-btn--labeled .page-filter-btn__count {
+  position: static;
+}
+
+.page-filter-btn__count[hidden] {
+  display: none;
+}
+
+.filter-sheet__group + .filter-sheet__group {
+  margin-top: var(--space-5);
+}
+
+.filter-sheet__heading {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+  margin: 0 0 var(--space-2);
+}
+
+/* DIE CHIPREIHE IM SCROLLPORT.
+ *
+ * Sie ist das ERSTE Kind des `.page-scrollport` (oder, wo die Seite selbst
+ * scrollt, das erste Kind nach dem Kopf) und scrollt senkrecht mit dem
+ * Inhalt weg - Apples Suchleiste in einer Liste. Fest ueber dem Port kostete
+ * sie in Notizen, Kontakten und Vorrat dauerhaft 60-65px, die kein
+ * Kopf-Kollaps zurueckholte (A8). Deshalb hier bewusst KEIN `position:
+ * sticky`: eine klebende Reihe waere dieselbe feste Zeile mit einem Umweg,
+ * und der Guard (test:mobile-chrome) sagt nein dazu.
+ *
+ * Waagerecht scrollt sie selbst; `wireScrollFade(row)` (utils/ux.js) setzt
+ * die Fade-Klassen aus filter-chip.css. Der Kopf-Kollaps ignoriert ihren
+ * waagerechten Scroll (ux.js `onInnerScroll`: kein senkrechter Ueberlauf,
+ * also nicht der Port der Seite). Seitenrand: keiner - sie steht in der
+ * Inhaltsspalte ihres Ports, die das Polster schon traegt (#577, genau
+ * einmal pro Ahnenkette). */
+.page-chip-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  /* Luft fuer den Fokusring: ein waagerechter Scroller clippt senkrecht mit. */
+  padding-block: var(--space-2);
+  /* DIE HOEHE STEHT ALS ZAHL, weil ein Port auch ein Grid sein kann, das hoeher
+   * waechst als er selbst (`.list-scroller`, Vorrat): eine Spur ohne Groesse
+   * bekommt dort nur den Mindestbeitrag ihres Elements, und der ist bei einem
+   * Scroll-Container (die Reihe scrollt waagerecht) NULL. Gemessen stand die
+   * Reihe 16px hoch - nur ihr Polster -, die Chips ragten in die erste Gruppe;
+   * `min-content`/`fit-content` aendern daran in Chrome nichts. Chiphoehe
+   * (`.filter-chip`, filter-chip.css) plus Polster schon. `flex-shrink: 0`
+   * gilt fuer Ports, die Flex-Spalten sind. */
+  flex-shrink: 0;
+  min-height: calc(var(--target-lg) + 2 * var(--space-2));
+}
+
+/* Dieselben Stufen wie `.filter-chip` im Querformat (filter-chip.css): die
+ * Reihe folgt ihrer Chiphoehe, sonst stuende im flachen Fenster ein leerer
+ * Streifen unter den Chips. */
+@media (max-height: 499px) {
+  .page-chip-row {
+    min-height: calc(var(--target-md) + 2 * var(--space-2));
+  }
+}
+
+@media (max-height: 499px) and (hover: none) {
+  .page-chip-row {
+    min-height: calc(var(--target-base) + 2 * var(--space-2));
+  }
+}
+
+.page-chip-row::-webkit-scrollbar {
+  display: none;
+}
+
+.page-chip-row > * {
+  flex-shrink: 0;
 }
 
 /* Toolbar-"Neu"-Buttons: auf dem Handy übernimmt der FAB, auf dem Desktop der
@@ -4140,48 +4347,6 @@ p.field-hint--warn[hidden] {
   }
 }
 
-
-/* --------------------------------------------------------
- * Seiten-Container
- * -------------------------------------------------------- */
-.page {
-  padding: var(--space-4);
-  max-width: var(--content-max-width);
-  margin: 0 auto;
-}
-
-.page__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-6);
-  padding-bottom: var(--space-4);
-  gap: var(--space-4);
-  border-bottom: 1px solid var(--color-border-subtle);
-}
-
-.page__title {
-  /* HIER STEHT KEINE GROESSE, UND DER KOMMENTAR, DER HIER STAND, NANNTE ZWEI.
-   *
-   * Er sagte „Mobil --text-2xl (24px), Desktop --text-3xl (30px)" - drei Fehler
-   * in einem Satz: die Tokens messen 22 und 28px, die Regel setzt seit dem
-   * HIG-Rollout gar keine Schriftgroesse mehr, und der Seitentitel ist dort
-   * Large Title (34px, mobil wie Desktop). Der Schnitt gehoert der
-   * Seitentitel-Rolle in typography.css; hier bleibt der Umbruch. */
-  text-wrap: balance;
-}
-
-@media (min-width: 1024px) {
-  .page {
-    padding: var(--space-8) var(--space-8);
-  }
-}
-
-@media (min-width: 1440px) {
-  .page {
-    padding: var(--space-8) var(--space-10);
-  }
-}
 
 /* --------------------------------------------------------
  * Cards

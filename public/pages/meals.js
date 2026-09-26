@@ -19,6 +19,7 @@ import { normalizeRecipeMealTypes, recipeSupportsMealType, recipeAllowsMealType 
 import { mountEmptyState, mountLoadError, emptyStateEl } from '/utils/empty-state.js';
 import { mealPayloadFromRecipe } from '/utils/recipe-to-meal.js';
 import { findPageFab } from '/utils/fab.js';
+import { pageToolsMenuHtml, installPopoverMenus, syncPopoverMenuItem } from '/utils/popover-menu.js';
 import { zonedWeekday } from '/utils/timezone.js';
 import { mealTypeList, primeMealTypeNames } from '/utils/meal-types.js';
 import { recipeThumbHtml, wireRecipeThumbs } from '/utils/recipe-thumb.js';
@@ -105,7 +106,7 @@ function formatWeekLabel(monday) {
   // Seite, die ohnehin "diese Woche" zeigt.
   const from = narrow ? formatDayMonth(monday) : formatDate(monday);
   const to = narrow ? formatDayMonth(sunday) : formatDate(sunday);
-  return `${from} – ${to}`;
+  return `${from} - ${to}`;
 }
 
 /**
@@ -352,6 +353,28 @@ function syncTodayButton(root = _container) {
   }
 }
 
+/**
+ * Das EINE Werkzeugmenue des Wochenplans (Kopfregel mobil, DESIGN.md).
+ *
+ * „Plan zufaellig fuellen" kann 28 Slots umschreiben und ist eine seltene
+ * Handlung - im Menue steht sie mit Label, statt als Textknopf eine eigene
+ * Kopfzeile zu kosten. Der Schalter der Rezept-Spalte ist ein
+ * `menuitemcheckbox`: der Haken zeigt, ob die Spalte steht. Die Spalte gibt es
+ * nur ab 1024px, darunter blendet meals.css den Eintrag aus (dieselbe
+ * Schwelle wie `.meals-layout`); der Anfangszustand wird von
+ * `wireRailToggle()` nachgezogen, sobald die Messung steht.
+ */
+function mealsToolsMenuHtml() {
+  return pageToolsMenuHtml({
+    id: 'meals-tools-menu',
+    label: t('common.moreActions'),
+    items: [
+      { action: 'randomize-plan', label: t('meals.randomizePlan'), icon: 'shuffle' },
+      { action: 'toggle-rail', label: t('meals.showRecipes'), icon: 'panel-right', checked: true },
+    ],
+  });
+}
+
 export async function render(container, { user }) {
   _container = container;
   container.replaceChildren();
@@ -367,21 +390,16 @@ export async function render(container, { user }) {
            standen „<" und „>" an den beiden Enden der Zeile, mit dem gesamten
            Aktionsblock dazwischen - mobil gemessen 80px und 705px, einhändig
            also nie beide erreichbar. -->
-      <div class="page-toolbar page-toolbar--in-group page-toolbar--wrap">
+      <div class="page-toolbar page-toolbar--in-group meals-toolbar">
         <div class="page-toolbar__center week-nav">${weekNavHtml()}</div>
         <div class="page-toolbar__actions">
-          <!-- Nur Desktop: klappt die Rezept-Spalte weg, damit alle sieben
-               Tagesspalten in voller Breite ins Board passen. -->
-          <button class="btn btn--icon week-nav__rail-toggle" id="rail-toggle"
-                  aria-expanded="true" aria-controls="recipe-sidebar"
-                  aria-label="${t('meals.hideRecipes')}" title="${t('meals.hideRecipes')}">
-            <i data-lucide="panel-right-close" class="icon-md" aria-hidden="true"></i>
-          </button>
-          <!-- Zuletzt und als Ghost: der Zufallsplan kann 28 Slots umschreiben,
-               stand aber im teuersten Pixel des Kopfes direkt neben „Heute" -
-               in der Gewichtung eines Datumssprungs (Critique 2026-07-29). Er
-               bleibt erreichbar, führt den Kopf aber nicht mehr an. -->
-          <button class="btn btn--ghost week-nav__randomize" id="week-randomize">${t('meals.randomizePlan')}</button>
+          <!-- KUECHENKOPF (Kopfregel mobil, 2026-09-26): Zeile 1 ist die
+               Kuechen-Leiste, Zeile 2 der Kontext des Tabs - hier der
+               Wochenstepper - und am Ende EIN Werkzeugmenue. Zufallsplan und
+               Rezept-Spalte standen hier als loser Textknopf und loses Icon;
+               mobil brach der Textknopf auf eine eigene 48px-Zeile um (Kopf
+               177px). Den Primaerknopf dockt der Router am Desktop dahinter an. -->
+          ${mealsToolsMenuHtml()}
         </div>
       </div>
       <div class="meals-layout">
@@ -398,6 +416,7 @@ export async function render(container, { user }) {
 
   if (window.lucide) lucide.createIcons({ el: container });
   renderKitchenTabsBar(container, '/meals');
+  installPopoverMenus(container.querySelector('.meals-toolbar'));
 
   const today  = todayKey();
   const monday = getMondayOf(today);
@@ -439,23 +458,17 @@ const RAIL_STORAGE_KEY = 'yuvomi-meals-rail';
  * wieder silbenweise brechen (siehe Kommentar an .week-grid in meals.css).
  */
 function wireRailToggle() {
-  const btn = _container.querySelector('#rail-toggle');
+  // Der Schalter ist ein Eintrag im Werkzeugmenue (Kopfregel mobil) - vorher
+  // ein loses Icon im Kopf. Der Haken traegt den Zustand, den dort das
+  // Icon-Paar panel-right-open/-close trug.
+  const item = _container.querySelector('.popover-menu__item[data-action="toggle-rail"]');
   const layout = _container.querySelector('.meals-layout');
-  if (!btn || !layout) return;
+  if (!item || !layout) return;
+  const toolbar = _container.querySelector('.meals-toolbar');
 
   const apply = (hidden) => {
     layout.classList.toggle('meals-layout--rail-hidden', hidden);
-    btn.setAttribute('aria-expanded', String(!hidden));
-    const label = hidden ? t('meals.showRecipes') : t('meals.hideRecipes');
-    btn.setAttribute('aria-label', label);
-    btn.title = label;
-    const icon = btn.querySelector('i, svg');
-    if (icon) {
-      icon.remove();
-      btn.insertAdjacentHTML('afterbegin',
-        `<i data-lucide="${hidden ? 'panel-right-open' : 'panel-right-close'}" class="icon-md" aria-hidden="true"></i>`);
-      if (window.lucide) lucide.createIcons({ el: btn });
-    }
+    syncPopoverMenuItem(toolbar, 'toggle-rail', !hidden);
   };
 
   // Default: gemessen, nicht per Breakpoint.
@@ -480,7 +493,7 @@ function wireRailToggle() {
   }
   apply(hidden);
 
-  btn.addEventListener('click', () => {
+  item.addEventListener('click', () => {
     hidden = !layout.classList.contains('meals-layout--rail-hidden');
     apply(hidden);
     try { localStorage.setItem(RAIL_STORAGE_KEY, hidden ? 'hidden' : 'shown'); } catch { /* ignore */ }
@@ -912,7 +925,7 @@ function wireNav() {
     renderWeekGrid();
   });
 
-  _container.querySelector('#week-randomize')?.addEventListener('click', openRandomizeModal);
+  _container.querySelector('[data-action="randomize-plan"]')?.addEventListener('click', openRandomizeModal);
 }
 
 function wireGrid(grid) {
@@ -1999,6 +2012,8 @@ async function transferMeal(mealId, btn) {
 
 export const __test = {
   buildRandomMealAssignments,
+  // Kuechenkopf (Kopfregel mobil): das EINE Werkzeugmenue (test-meals.js).
+  mealsToolsMenuHtml,
   mealPayloadFromRecipe,
   // Skalierte Zutatenmenge: haengt an der Format-Locale und ist deshalb nur
   // verhaltensgetrieben pruefbar (siehe test-meals.js).

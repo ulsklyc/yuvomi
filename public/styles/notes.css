@@ -71,21 +71,33 @@
   flex: 0 0 auto;
 }
 
+/* Traeger des Werkzeugmenues: haelt nur den Knopf in der Zeile (das Panel
+ * liegt im Top-Layer). Er existiert fuer die Nur-lesen-Regel der Shell. */
+.notes-toolbar__tools {
+  display: flex;
+  flex-shrink: 0;
+}
+
 /* --------------------------------------------------------
  * Masonry-Grid
  * -------------------------------------------------------- */
-/* Ersteller-Filter: eigene Zeile zwischen Kopf und Raster, gleiche Grammatik
- * wie .documents-filters. Erscheint nur ab zwei Autorinnen/Autoren (JS setzt
- * [hidden]) — die Regel darunter sorgt dafür, dass das Attribut gegen den
- * display:flex dieser Zeile gewinnt. */
+/* Ersteller- und Kategorie-Filter: die Chipreihe im Scrollport
+ * (`.page-chip-row`, layout.css) - das erste Kind von `.notes-scroll`, sie
+ * scrollt mit dem Raster weg. Bis zur Kopfregel mobil (2026-09-26) stand sie
+ * fest zwischen Kopf und Port und kostete dauerhaft 65px (A8). Kein eigenes
+ * Seitenpolster mehr und keine Trennlinie: der Port traegt die Inhaltsspalte
+ * (#577), und eine Linie unter einer Reihe, die wegscrollt, trennte nichts.
+ * Erscheint nur, wenn es etwas zu waehlen gibt (JS setzt [hidden]) - die
+ * Regel darunter sorgt dafür, dass das Attribut gegen den display:flex
+ * dieser Zeile gewinnt.
+ *
+ * Sichtbare duenne Scrollleiste statt der versteckten des Bausteins: am
+ * Desktop wischt niemand, und die Reihe laeuft mit vielen Kategorien ueber. */
 .notes-filters {
   display: flex;
   flex-wrap: nowrap;
   gap: var(--space-2);
   padding-block: var(--space-2);
-  padding-inline: var(--page-inline-pad);
-  border-bottom: 1px solid var(--color-border-subtle);
-  flex-shrink: 0;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
@@ -93,7 +105,10 @@
   -webkit-overflow-scrolling: touch;
 }
 
-.notes-filters::-webkit-scrollbar { height: 10px; }
+/* `display: block` holt die Leiste gegen das `display: none` des Bausteins
+ * (`.page-chip-row::-webkit-scrollbar`) zurueck - gleiche Spezifitaet, diese
+ * Datei laedt spaeter. */
+.notes-filters::-webkit-scrollbar { display: block; height: 10px; }
 .notes-filters::-webkit-scrollbar-track { background: transparent; }
 .notes-filters::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--module-accent) var(--tint-hint), transparent);
@@ -126,10 +141,11 @@
   /* Scroll + Einrückung liegen jetzt auf .notes-scroll; hier bleibt nur das
    * Raster selbst (Guard: bewusst CSS-Grid, keine CSS-Columns). */
   padding-top: var(--space-4);
-  /* Der FAB schwebt über dieser scrollenden Fläche. Ohne eigene Reserve lag die
-   * letzte Kartenreihe dauerhaft darunter — .tasks-body rechnet denselben
-   * Freiraum bereits ein. */
-  padding-bottom: calc(var(--space-16) + var(--space-8));
+  /* Nur der eigene Abstand. Die Reserve fuer den FAB (hier stand 96px) rechnet
+   * die Shell als Nachlauf an `.notes-scroll` (`--shell-tail`: Tab-Kapsel,
+   * FAB, Sammelpille; layout.css) - doppelt gerechnet endete die letzte
+   * Kartenreihe mobil 116px ueber der Kapsel (Kopfregel mobil, 2026-09-26). */
+  padding-bottom: var(--space-6);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-content: start;
@@ -507,11 +523,6 @@
 .note-category-editor__create[hidden] { display: none; }
 
 @media (max-width: 639px) {
-  .notes-manage-categories {
-    width: var(--target-base);
-    height: var(--target-base);
-  }
-  .notes-manage-categories span { display: none; }
   .notes-filter-group + .notes-filter-group {
     padding-inline-start: 0;
     border-inline-start: 0;

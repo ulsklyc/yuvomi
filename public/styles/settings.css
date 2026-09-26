@@ -13,13 +13,20 @@
    Seiten-Layout
    -------------------------------------------------------- */
 
-.settings-page {
-  max-width: var(--content-max-width);
-  margin: 0 auto;
+/* Die Seite polstert nichts: der Kopf (.page-toolbar) ist full-bleed und
+ * rueckt ueber --page-inline-pad selbst ein, der Koerper traegt dieselbe Kante
+ * (#577, Vertrag in tokens.css). Bis 2026-09-26 lag hier `.page` mit 16/32/40px
+ * Polster und eigener Breite - der geteilte Kopf haette darin doppelt
+ * eingerueckt. */
+.settings-page__body {
+  padding-block: var(--space-4) var(--space-8);
+  padding-inline: var(--page-inline-pad);
 }
 
-.settings-page--leaf .settings-shell-header {
-  display: none;
+@media (min-width: 1024px) {
+  .settings-page__body {
+    padding-block-start: var(--space-8);
+  }
 }
 
 /* --------------------------------------------------------
@@ -257,18 +264,6 @@
   font-weight: var(--font-weight-semibold);
 }
 
-.settings-mobile-overview {
-  display: grid;
-  gap: var(--space-5);
-  min-width: 0;
-}
-
-.settings-mobile-overview__header {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.settings-mobile-overview__title,
 .settings-leaf-header__title {
   margin: 0;
   color: var(--color-text-primary);
@@ -283,7 +278,6 @@
   outline: none;
 }
 
-.settings-mobile-overview__description,
 .settings-leaf-header__description {
   margin: 0;
   color: var(--color-text-secondary);
@@ -291,114 +285,227 @@
   line-height: var(--line-height-relaxed);
 }
 
-/* EIN Träger für die Übersichtszeilen (Zeilenlisten-Regel, tokens.css). Vorher
- * war jede Zeile eine eigene Karte in einem Grid mit Abstand - genau die Form,
- * die Apples Einstellungen als EINE gruppierte Liste zeigt. */
-.settings-mobile-overview__links {
+/* --------------------------------------------------------
+   Die Wurzel: EINE gruppierte Liste aller Blaetter (2026-09-26)
+
+   In jeder Breite dieselbe Liste - Bereiche als Abschnittsueberschriften,
+   ihre Blaetter in EINEM Traeger je Abschnitt (Zeilenlisten-Regel,
+   tokens.css). Mobil gab es davor eine eigene Bereichsebene (vier Zeilen, dann
+   eine Bereichsseite mit 88px-Zeilen); sie ist entfallen, Deep-Links springen
+   auf den Abschnitt (shell.js, revealOverviewSection). Was mobil anders ist,
+   steht im Media-Block darunter: niedrigere Zeilen, kleinere Marke, keine
+   Beschreibung - Apples Einstellungen.
+   -------------------------------------------------------- */
+
+.settings-overview {
+  display: grid;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.settings-overview__status {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.settings-overview__section {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  /* Der Deep-Link-Sprung landet unter dem klebenden Kopf, nicht darunter
+   * versteckt: angedockt bleibt die Bar-Zeile stehen (Such-Icon, 44/48px
+   * plus ihr Polster). */
+  scroll-margin-block-start: calc(var(--target-base) + var(--space-8));
+}
+
+/* Der Bereichs-Titel steht auf dem Grund, seine Blaetter liegen im Traeger
+ * darunter. Vorher trennten Haarlinien die Bereiche auf dem Grund - eine
+ * Liste ohne Rand, an dem sie als ein Objekt fassbar waere. */
+.settings-overview__heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-lg);
+}
+
+.settings-overview__heading-icon {
+  width: var(--space-5);
+  height: var(--space-5);
+  color: var(--module-settings);
+}
+
+.settings-overview__list {
+  display: grid;
   background: var(--color-surface-work);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
 
-.settings-desktop-overview {
-  display: none;
-  min-width: 0;
-}
-
-.settings-overview-link {
+.settings-overview__row {
   display: grid;
-  grid-template-columns: var(--target-base) minmax(0, 1fr) auto;
+  grid-template-columns: var(--target-md) minmax(0, 1fr) auto;
   gap: var(--space-3);
   align-items: center;
-  width: 100%;
   min-width: 0;
   min-height: var(--target-lg);
-  padding: var(--space-3) var(--space-4);
-  /* Zeile im Träger: keine eigene Fläche, keine Kante, kein Radius. */
-  border: none;
-  background: none;
-  transition: background-color var(--transition-fast);
+  padding: var(--space-2) var(--space-4);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 /* Rahmenbreite aus --space-px: Token-Disziplin dieser Datei (Guard
- * `settings.css haelt Zeilenlaenge, Token-Disziplin und keine toten Regeln`). */
-.settings-overview-link + .settings-overview-link {
+ * `settings.css haelt Zeilenlaenge, Token-Disziplin und keine toten Regeln`).
+ * Die Linie haengt am SICHTBAREN Vorgaenger: eine weggefilterte Zeile
+ * (`hidden`) darf keine Doppellinie und keine Linie an der Oberkante lassen. */
+.settings-overview__row:not([hidden]) ~ .settings-overview__row:not([hidden]) {
   border-top: var(--space-px) solid var(--color-border-subtle);
 }
 
-.settings-overview-link:hover {
-  background-color: var(--color-surface-hover);
+.settings-overview__row:hover {
+  background: var(--color-surface-hover);
 }
 
-.settings-overview-link__icon {
+.settings-overview__row-mark {
   display: grid;
   place-items: center;
-  width: var(--target-base);
-  height: var(--target-base);
-  flex: 0 0 auto;
+  width: var(--target-md);
+  height: var(--target-md);
   border-radius: var(--radius-sm);
 }
 
-.settings-overview-link__icon:not(.vivid-mark) {
+.settings-overview__row-mark:not(.vivid-mark) {
   color: var(--module-settings);
   background: var(--color-surface-2);
 }
 
-.settings-overview-link__icon-glyph {
+.settings-overview__row-mark-glyph {
   width: var(--space-5);
   height: var(--space-5);
 }
 
-.settings-overview-link__copy {
+.settings-overview__row-copy {
   display: grid;
   gap: var(--space-1);
   min-width: 0;
 }
 
-.settings-overview-link__title {
+.settings-overview__row-title {
   color: var(--color-text-primary);
   font-weight: var(--font-weight-semibold);
 }
 
-.settings-overview-link__description {
+.settings-overview__row-description {
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
   line-height: var(--line-height-snug);
 }
 
-.settings-overview-link__chevron,
-.settings-overview-back-link__icon,
-.settings-leaf-back-link__icon {
+.settings-overview__row-chevron {
   width: var(--space-4);
   height: var(--space-4);
-  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
 }
 
-.settings-overview-back-link,
-.settings-leaf-back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: fit-content;
-  min-height: var(--target-base);
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
+/* MOBIL die Zeile der Systemeinstellungen: 44/48px hoch (`--target-base`
+ * waechst am Finger mit), 32px-Marke, nur der Name. Die Beschreibung trug die
+ * Zeile auf 88px und liess 5,5 Zeilen im ersten Bildschirm (Critique A7); sie
+ * steht weiter im Blatt-Kopf und bleibt in der Suche durchsuchbar. Der Titel
+ * faellt auf das Normalgewicht, wie Apples Zeilen - fett war er nur, um sich
+ * von der Beschreibung abzusetzen. */
+@media (max-width: 767px) {
+  .settings-overview {
+    gap: var(--space-5);
+  }
+
+  .settings-overview__section {
+    gap: var(--space-2);
+  }
+
+  .settings-overview__heading {
+    font-size: var(--text-base);
+  }
+
+  .settings-overview__row {
+    grid-template-columns: var(--target-sm) minmax(0, 1fr) auto;
+    min-height: var(--target-base);
+    padding-block: var(--space-1);
+  }
+
+  .settings-overview__row-mark {
+    width: var(--target-sm);
+    height: var(--target-sm);
+  }
+
+  .settings-overview__row-mark-glyph {
+    width: var(--icon-lg);
+    height: var(--icon-lg);
+  }
+
+  .settings-overview__row-title {
+    font-weight: var(--font-weight-regular);
+  }
+
+  .settings-overview__row-description {
+    display: none;
+  }
 }
 
-/* Ein Rückweg pro Viewport (Audit A2-25a): Desktop navigiert über den
- * Breadcrumb, Mobil über den Zurück-Link - nie beide gleichzeitig. */
+/* --------------------------------------------------------
+   Rueckweg im Blatt (mobil)
+
+   Der Kopf traegt auf einem Blatt nur „< Einstellungen" und klebt - der
+   Rueckweg scrollt nicht mehr mit weg (shell.js, renderToolbar). Ab 768px
+   fuehrt der Breadcrumb zurueck; ein Rueckweg pro Viewport (Audit A2-25a).
+   Die Regel darunter haelt zugleich die Titelhierarchie: auf einem Blatt ist
+   der Blatt-Titel die einzige sichtbare Hauptueberschrift (test:typography).
+   -------------------------------------------------------- */
+
 @media (min-width: 768px) {
-  .settings-leaf-back-link { display: none; }
+  .settings-page--leaf .settings-shell-header {
+    display: none;
+  }
 }
 
 @media (max-width: 767px) {
   .settings-breadcrumb { display: none; }
 }
 
-.settings-overview-back-link:hover,
-.settings-leaf-back-link:hover,
+/* Die Suche der Wurzel: am Zeilenende und gedeckelt, wie in Notizen. Mobil
+ * nimmt die Shell beides zurueck und macht sie zum Icon (layout.css,
+ * Kopfregel mobil Regel 4). Layout only - das Aussehen gehoert page-search. */
+.settings-toolbar__search {
+  flex: 1 1 0;
+  max-width: 320px;
+  margin-inline-start: auto;
+}
+
+.settings-toolbar__back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--target-base);
+  /* Die Treffflaeche reicht bis an die Kante, das Zeichen steht auf der
+   * Fluchtlinie des Inhalts (Apples Zurueck-Knopf). */
+  margin-inline-start: calc(-1 * var(--space-2));
+  padding-inline: var(--space-2);
+  border-radius: var(--radius-full);
+  color: var(--color-accent);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+}
+
+.settings-toolbar__back-icon {
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+  flex: 0 0 auto;
+}
+
+.settings-toolbar__back:hover,
 .settings-breadcrumb__link:hover {
   color: var(--color-accent);
 }
@@ -462,6 +569,12 @@
   gap: var(--space-2);
   margin-top: var(--space-5);
   margin-bottom: var(--space-6);
+}
+
+/* Der Abstand oben gilt dem Breadcrumb darueber; mobil ist der ausgeblendet
+ * und der Rueckweg steht im Kopf - das Blatt beginnt direkt unter ihm. */
+@media (max-width: 767px) {
+  .settings-leaf-header { margin-top: 0; }
 }
 
 .settings-setting-row {
@@ -676,117 +789,11 @@
     max-height: calc(100vh - var(--space-8));
     overflow-y: auto;
   }
-
-  .settings-mobile-overview--domains {
-    display: none;
-  }
-
-  .settings-desktop-overview {
-    display: grid;
-    gap: var(--space-6);
-  }
-
-  /* Der Domänen-Titel steht auf dem Grund, seine Blätter liegen in EINEM
-   * Träger (Zeilenlisten-Regel, tokens.css). Vorher trennten Haarlinien die
-   * Domänen auf dem Grund - eine Liste ohne Rand, an dem sie als ein Objekt
-   * fassbar wäre. */
-  .settings-desktop-overview__domain {
-    display: grid;
-    gap: var(--space-3);
-  }
-
-  .settings-desktop-overview__domain-title {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin: 0;
-    color: var(--color-text-primary);
-    font-size: var(--text-lg);
-  }
-
-  .settings-desktop-overview__domain-icon {
-    width: var(--space-5);
-    height: var(--space-5);
-    color: var(--module-settings);
-  }
-
-  .settings-desktop-overview__leaf-list {
-    display: grid;
-    background: var(--color-surface-work);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    overflow: hidden;
-  }
-
-  .settings-desktop-overview__leaf {
-    display: grid;
-    grid-template-columns: var(--target-md) minmax(0, 1fr) auto;
-    gap: var(--space-3);
-    align-items: center;
-    min-height: var(--target-lg);
-    padding: var(--space-2) var(--space-4);
-    transition:
-      background-color var(--transition-fast),
-      color var(--transition-fast);
-  }
-
-  .settings-desktop-overview__leaf + .settings-desktop-overview__leaf {
-    border-top: var(--space-px) solid var(--color-border-subtle);
-  }
-
-  .settings-desktop-overview__leaf:hover {
-    background: var(--color-surface-hover);
-  }
-
-  .settings-desktop-overview__leaf-icon {
-    display: grid;
-    place-items: center;
-    width: var(--target-md);
-    height: var(--target-md);
-    border-radius: var(--radius-sm);
-  }
-
-  .settings-desktop-overview__leaf-icon:not(.vivid-mark) {
-    color: var(--module-settings);
-    background: var(--color-surface-2);
-  }
-
-  .settings-desktop-overview__leaf-icon-glyph {
-    width: var(--space-5);
-    height: var(--space-5);
-  }
-
-  .settings-desktop-overview__leaf-copy {
-    display: grid;
-    gap: var(--space-1);
-    min-width: 0;
-  }
-
-  .settings-desktop-overview__leaf-title {
-    color: var(--color-text-primary);
-    font-weight: var(--font-weight-semibold);
-  }
-
-  .settings-desktop-overview__leaf-description {
-    color: var(--color-text-secondary);
-    font-size: var(--text-sm);
-    line-height: var(--line-height-snug);
-  }
-
-  .settings-desktop-overview__leaf-chevron {
-    width: var(--space-4);
-    height: var(--space-4);
-    color: var(--color-text-tertiary);
-  }
 }
 
 @media (max-width: 1023px) {
   .settings-shell__navigation {
     display: none;
-  }
-
-  .settings-mobile-overview {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .settings-setting-row {
@@ -800,8 +807,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .settings-shell__navigation-link,
-  .settings-overview-link,
-  .settings-desktop-overview__leaf,
+  .settings-overview__row,
   .settings-breadcrumb__link,
   .settings-module-row,
   .settings-module-move,
@@ -3040,7 +3046,10 @@
 
 .perm-actions {
   position: sticky;
-  bottom: 0;
+  /* Ueber der Tab-Kapsel, nicht unter ihr: seit der Inhalt bis zur
+   * Unterkante laeuft, klebte `bottom: 0` hinter dem Glas (Kopfregel mobil,
+   * 2026-09-26). `--nav-tail` ist 0, wo keine Leiste steht. */
+  bottom: var(--nav-tail);
   z-index: var(--z-sticky, 10);
   display: flex;
   align-items: center;

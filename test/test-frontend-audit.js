@@ -430,10 +430,6 @@ test('settings information-architecture keys exist in every locale', () => {
     'settings.backToSettings',
     'settings.loadError',
     'settings.retry',
-    // Domain + mobile overview labels.
-    'settings.mobileOverviewTitle',
-    'settings.mobileOverviewDescription',
-    'settings.mobileDomainTitle',
     // Status-first integration copy + progressive disclosure.
     'settings.providerSpecific',
     'settings.moreProviders',
@@ -2297,7 +2293,9 @@ test('Meals page adds a recipe sidebar and randomize planner controls', () => {
   const mealsPage = read('../public/pages/meals.js');
   const mealsCss = read('../public/styles/meals.css');
 
-  assert.match(mealsPage, /id="week-randomize"/);
+  // Seit der Kopfregel mobil (2026-09-26) ein Eintrag im Werkzeugmenue des
+  // Wochenplans statt eines losen Kopfknopfs (Verhalten: test-meals.js).
+  assert.match(mealsPage, /action: 'randomize-plan', label: t\('meals\.randomizePlan'\)/);
   assert.match(mealsPage, /id="recipe-sidebar"/);
   assert.match(mealsPage, /recipes\.dragToMealsHint/);
   assert.match(mealsPage, /function renderRecipeSidebar/);
@@ -2307,7 +2305,6 @@ test('Meals page adds a recipe sidebar and randomize planner controls', () => {
   assert.match(mealsPage, /recipeSupportsMealType/);
   assert.match(mealsCss, /\.meals-layout\s*\{/);
   assert.match(mealsCss, /\.recipe-sidebar\s*\{/);
-  assert.match(mealsCss, /\.week-nav__randomize\s*\{/);
   assertKeysExistInEveryLocale([
     'meals.randomizePlan',
     'meals.randomizeTitle',
@@ -2437,9 +2434,12 @@ test('responsive settings shell defines desktop and mobile navigation layouts', 
     source,
     /@media \(min-width:\s*1024px\)[\s\S]*\.settings-shell__navigation\s*\{[\s\S]*position:\s*sticky/,
   );
+  // Mobil ist die Wurzel dieselbe gruppierte Liste wie am Desktop, nur
+  // dichter: die Beschreibung faellt weg, die Zeile schrumpft (Kopfregel mobil,
+  // 2026-09-26). Eine eigene mobile Bereichsebene gibt es nicht mehr.
   assert.match(
     source,
-    /@media \(max-width:\s*1023px\)[\s\S]*\.settings-mobile-overview\s*\{/,
+    /@media \(max-width:\s*767px\)\s*\{[^@]*\.settings-overview__row-description\s*\{\s*display:\s*none;/,
   );
 });
 
@@ -2522,8 +2522,10 @@ test('settings retry focus only moves to a connected replacement button after re
 test('settings shell falls back to the domains overview for orphaned active leaves', () => {
   const source = read('../public/settings/shell.js');
 
-  assert.match(source, /if \(!domain\)\s*\{[\s\S]*console\.error\([\s\S]*renderDomainsOverview\(content,\s*domains(?:,\s*user)?\)/);
-  assert.match(source, /else\s*\{[\s\S]*await renderLeafContent\(content,\s*activeLeaf,\s*domain,\s*user,\s*query\)/);
+  // Ein Blatt ohne verfuegbaren Bereich meldet sich und faellt auf die Wurzel
+  // (die gruppierte Liste) zurueck, statt ein Blatt ohne Rueckweg zu rendern.
+  assert.match(source, /if \(activeLeaf && !leafDomain\)\s*\{[\s\S]*?console\.error\(/);
+  assert.match(source, /if \(activeLeaf && leafDomain\)\s*\{[\s\S]*?await renderLeafContent\(content,\s*activeLeaf,\s*leafDomain,\s*user,\s*query\)[\s\S]*?return;\s*\}\s*renderOverview\(content,\s*domains,\s*user\)/);
 });
 
 test('router hides inactive overlays from keyboard focus', () => {
@@ -4774,8 +4776,8 @@ test('der Einkaufs-Kopf trägt mobil keine unbeschrifteten Aktionen', () => {
   const layout = read('../public/styles/layout.css');
 
   // Das Menü ist der geteilte Baustein, keine vierte private Kopie.
-  assert.match(page, /import \{ popoverMenuHtml, installPopoverMenus \} from '\/utils\/popover-menu\.js'/,
-    'shopping.js muss das geteilte Überlaufmenü nutzen');
+  assert.match(page, /import \{[^}]*\bpageToolsMenuHtml\b[^}]*\binstallPopoverMenus\b[^}]*\} from '\/utils\/popover-menu\.js'/,
+    'shopping.js muss das geteilte Werkzeugmenü nutzen (Kopfregel mobil: pageToolsMenuHtml)');
   assert.match(layout, /^\.popover-menu \{/m, '.popover-menu muss in layout.css stehen, nicht im Modul-CSS');
   assert.match(layout, /\.popover-menu:popover-open\s*\{\s*display:\s*flex/,
     'das Panel braucht display erst bei :popover-open, sonst schlägt es das UA-display:none');
@@ -4813,12 +4815,15 @@ test('der Einkaufs-Kopf trägt mobil keine unbeschrifteten Aktionen', () => {
   assert.doesNotMatch(page, /list-header__(more|inline-actions)/,
     'die responsive Doppelfassung der Listen-Aktionen ist entfallen - eine Darstellung auf allen Breiten');
 
-  // Der Trigger klebt am Rand, während die Chips durchscrollen: ohne opaken
-  // Grund liefe ein Chip sichtbar durch das Icon.
-  assert.match(cssNoComments, /\.list-tabs-bar__actions\s*\{[^}]*position:\s*sticky/,
-    'die Aktionszone muss am Rand der scrollenden Chip-Leiste stehenbleiben');
-  assert.match(cssNoComments, /\.list-tabs-bar__actions\s*\{[^}]*background-color:/,
-    'die sticky Aktionszone braucht einen opaken Grund, sonst scrollen Chips sichtbar darunter durch');
+  // Seit der Kopfregel mobil (2026-09-26) steht das Menü im __actions-Slot
+  // des Kopfs (#shopping-tools) statt klebend am Ende der Chip-Leiste - dort
+  // scrollt nichts mehr darunter durch, die opake Zone entfällt. Geprüft wird,
+  // dass der Träger im Slot steht und die Kapsel-Leiste ihn nicht mehr trägt
+  // (Verhalten: test-shopping-readonly-ui.js).
+  assert.match(page, /<div class="page-toolbar__actions">\s*<div class="shopping-tools" id="shopping-tools"><\/div>/,
+    'das Listenmenü steht im Aktions-Slot des Kopfs');
+  assert.doesNotMatch(cssNoComments, /\.list-tabs-bar__actions\s*\{/,
+    'keine zweite, klebende Aktionszone in der Kapsel-Leiste');
 
   // Das Icon-only-Import-Label darf nicht zurückkommen: es war der Grund, warum
   // drei unbeschriftete Glyphen nebeneinander standen.
@@ -6061,30 +6066,62 @@ test('phase 3 high-frequency controls use tokenized touch targets', () => {
   assert.match(notes, /\.note-card__delete[\s\S]*width:\s*var\(--target-base\)/);
 });
 
-test('Tasks toolbar keeps secondary controls visible instead of an overflow slider', () => {
+test('Tasks toolbar follows the mobile header rule: one tools menu, "Filter (n)", no chip row', () => {
   const tasksPage = read('../public/pages/tasks.js');
   const tasksCss = read('../public/styles/tasks.css');
 
   // Das frühere <details>-Overflow-Panel versteckte Ansicht/Gruppierung hinter
   // einem Klick und zeigte deren Zustand nicht — dasselbe Muster wurde in
-  // Dokumente (#506) verworfen. Aufgaben nutzt jetzt die geteilte Grammatik:
-  // umbrechender Kopf plus sichtbare Filterzeile.
+  // Dokumente (#506) verworfen. Die Antwort darauf ist NICHT, alles lose in den
+  // Kopf zu stellen: das waren bis 2026-09-26 sechs Knoepfe plus Chipzeile,
+  // Kopf 176px, erste Aufgabe bei y=287 (A3 P1-2). Die Kopfregel mobil
+  // (DESIGN.md) verlangt EIN beschriftetes Werkzeugmenue und einen Filterknopf
+  // mit Zahl; ihr Zustand bleibt sichtbar (Haken im Menue, Zahl am Knopf).
   assert.doesNotMatch(tasksPage, /<details class="tasks-toolbar__secondary"/);
   assert.doesNotMatch(tasksCss, /tasks-toolbar__secondary/);
-  // Auf die ABSICHT prüfen, nicht auf die wörtliche Klassenkette: die stand
-  // hier als ein String und schlug fehl, sobald der Kopf einen weiteren
-  // Modifier bekam (`--narrow`, Critique 2026-08-13) - eine Zusicherung, die
-  // eine Reihenfolge festnagelt, prüft die Reihenfolge, nicht die Sache.
+  // Auf die ABSICHT prüfen, nicht auf die wörtliche Klassenkette (`--narrow`,
+  // Critique 2026-08-13).
   assert.match(tasksPage, /class="page-toolbar[^"]*\bpage-toolbar--wrap\b[^"]*\btasks-toolbar\b/);
 
-  // Ansichtswechsel bleibt im Kopf, Gruppierung wandert in die Filterzeile.
-  assert.match(tasksPage, /<div class="page-toolbar__actions">[\s\S]*id="view-toggle"[\s\S]*id="btn-bulk-select"/);
-  assert.match(tasksPage, /<div class="tasks-filters-row">[\s\S]*id="filter-bar"[\s\S]*id="group-mode-toggle"/);
-  assert.match(tasksCss, /\.tasks-filters-row\s*\{[\s\S]*display:\s*flex/);
+  const markup = tasksPage.slice(tasksPage.indexOf('class="page-toolbar page-toolbar--wrap tasks-toolbar"'),
+    tasksPage.indexOf('<div class="tasks-body">'));
+  assert.ok(markup.length > 200, 'der Aufgabenkopf ist nicht mehr auffindbar - der Guard misst nichts');
+  const actions = markup.slice(markup.indexOf('<div class="page-toolbar__actions">'));
+  // Ansicht, Filter und Menue stehen in DERSELBEN Zeile wie die Suche.
+  assert.match(actions, /id="view-toggle"[\s\S]*filterButtonHtml\(\{ id: 'tasks-filter-btn'[\s\S]*pageToolsMenuHtml\(\{ id: 'tasks-tools-menu'/);
+  // Keine losen Verwaltungsknoepfe mehr im Kopf - sie sind Menue-Eintraege.
+  for (const id of ['btn-bulk-select', 'btn-manage-categories', 'btn-manage-tags']) {
+    assert.doesNotMatch(tasksPage, new RegExp(`id="${id}"`), `#${id} steht wieder lose im Kopf`);
+  }
+  for (const action of ['bulk-select', 'toggle-history', 'manage-categories', 'manage-tags']) {
+    assert.match(tasksPage, new RegExp(`action: '${action}'`), `das Werkzeugmenue bietet "${action}" nicht an`);
+  }
+  assert.doesNotMatch(markup, /data-view="history"/, 'der Verlauf ist ein Menue-Schalter, keine dritte Ansicht im Segment');
+  // Die Chipzeile unter dem Kopf ist weg - ins Blatt, nicht versteckt.
+  assert.doesNotMatch(tasksPage, /tasks-filters-row|id="filter-panel"|id="filter-bar"/);
+  assert.doesNotMatch(tasksCss, /\.tasks-filters-row|\.filter-toggle-btn|\.filter-panel:not/);
+  assert.match(tasksPage, /openFilterSheet\(\{/, 'die Filter stehen im geteilten Filterblatt');
 
-  // [hidden] muss gegen display:flex/inline-flex gewinnen, sonst bleiben die in
-  // der Kanban-Ansicht ausgeblendeten Controls sichtbar.
-  assert.match(tasksCss, /\.tasks-filters-row \[hidden\]\s*\{[\s\S]*display:\s*none/);
+  // [hidden] muss gegen display:flex/inline-flex gewinnen, sonst bleiben die im
+  // Verlauf ausgeblendeten Controls (Suche, Filterknopf) sichtbar.
+  assert.match(tasksCss, /\.tasks-toolbar \[hidden\]\s*\{[\s\S]*display:\s*none/);
+});
+
+test('Notes follow the mobile header rule: chips inside the port, category management in the menu', () => {
+  const notesPage = read('../public/pages/notes.js');
+  // Die Chipreihe stand fest zwischen Kopf und Port und kostete dauerhaft 65px
+  // (A8). Sie ist jetzt das erste Kind des Ports und scrollt mit weg.
+  const port = notesPage.indexOf('<div class="notes-scroll page-scrollport">');
+  const chips = notesPage.indexOf('id="notes-filters"');
+  const grid = notesPage.indexOf('<div id="notes-grid"');
+  assert.ok(port > -1 && chips > port && grid > chips,
+    'die Chipreihe steht nicht als erstes Kind im Scrollport');
+  assert.match(notesPage, /class="notes-filters page-chip-row" id="notes-filters"/);
+  // „Kategorien verwalten" ist ein Menue-Eintrag, kein Kopfknopf.
+  assert.doesNotMatch(notesPage, /<button[^>]*notes-manage-categories/);
+  assert.match(notesPage, /pageToolsMenuHtml\(\{ id: 'notes-tools-menu'[\s\S]{0,160}action: 'manage-categories'/);
+  // Der Traeger behaelt die Klasse, an der die Shell bei Nur-lesen ausblendet.
+  assert.match(notesPage, /class="notes-manage-categories[^"]*"[\s\S]{0,60}pageToolsMenuHtml/);
 });
 
 test('Tasks and Notes expose every click target as a real control', () => {
@@ -6093,9 +6130,10 @@ test('Tasks and Notes expose every click target as a real control', () => {
 
   // Filter-Chips waren <span> ohne Tastaturzugang, während Dokumente und
   // Kontakte dieselbe .filter-chip-Klasse als <button aria-pressed> rendern.
-  assert.match(tasksPage, /function makeChip\(/);
-  assert.match(tasksPage, /chip\s*=\s*document\.createElement\('button'\)/);
-  assert.doesNotMatch(tasksPage, /className\s*=\s*'filter-chip[^']*';?[\s\S]{0,80}createElement\('span'\)/);
+  // Seit der Kopfregel mobil stehen sie im Filterblatt - als Buttons.
+  assert.match(tasksPage, /function filterChipHtml\(/);
+  assert.match(tasksPage, /return `<button type="button" class="filter-chip[\s\S]{0,160}aria-pressed="\$\{active\}"/);
+  assert.doesNotMatch(tasksPage, /<span[^>]*class="filter-chip/);
 
   // Titel öffnet die Aufgabe, Fortschrittsbalken klappt die Unteraufgaben auf,
   // Kanban-Titel öffnet die Karte — alle drei waren Divs.
@@ -6108,7 +6146,8 @@ test('Tasks and Notes expose every click target as a real control', () => {
 
   // Umschalter melden ihren Zustand nicht nur über Farbe.
   assert.match(tasksPage, /data-view="list"[\s\S]*aria-pressed=/);
-  assert.match(tasksPage, /data-mode="category" aria-pressed="true"/);
+  // Die Gruppierung ist eine Einfachauswahl im Blatt: radio mit aria-checked.
+  assert.match(tasksPage, /role="radiogroup"[\s\S]{0,400}role="radio"[\s\S]{0,120}aria-checked="\$\{on\}"/);
 });
 
 test('showToast is never called with an unsupported variant', () => {
@@ -6262,13 +6301,15 @@ test('responsive adaptation uses tablet space without crowding module toolbars',
   // Zeile wieder ihren eigenen Rand und waere damit wieder eine Karte pro
   // Zeile. Der Guard haelt jetzt die Zusage „ein Traeger, keine Spalten"
   // statt der abgeloesten Zweispaltigkeit.
+  // Seit 2026-09-26 ist das die EINE Liste der Wurzel in jeder Breite
+  // (`.settings-overview__list`, ein Traeger je Bereich).
   assert.match(
     settings,
-    /\.settings-mobile-overview__links\s*\{[^}]*background:\s*var\(--color-surface-work\)[^}]*overflow:\s*hidden/
+    /\.settings-overview__list\s*\{[^}]*background:\s*var\(--color-surface-work\)[^}]*overflow:\s*hidden/
   );
   assert.doesNotMatch(
     settings,
-    /\.settings-mobile-overview__links\s*\{[^}]*grid-template-columns/
+    /\.settings-overview__list\s*\{[^}]*grid-template-columns/
   );
 });
 
@@ -6404,9 +6445,8 @@ test('hardening uses logical alignment for RTL-sensitive adapted controls', () =
   assert.match(pageSearch, /\.page-search__icon\s*\{[\s\S]*inset-inline-start:/);
   assert.match(notes, /\.note-card__pin\s*\{[\s\S]*inset-inline-end:/);
   // Das absolut positionierte Overflow-Panel (mit eigenen RTL-Insets) ist
-  // entfallen; die Filterzeile richtet ihre Gruppierungswahl jetzt über eine
-  // logische Property aus und braucht deshalb keine [dir=rtl]-Sonderregel.
-  assert.match(tasks, /\.tasks-filters__end\s*\{[\s\S]*margin-inline-start:\s*auto/);
+  // entfallen, seit 2026-09-26 auch die Filterzeile: Aufgaben richtet nichts
+  // mehr physisch aus und braucht deshalb keine [dir=rtl]-Sonderregel.
   assert.doesNotMatch(tasks, /margin-(left|right):\s*auto/);
 });
 
@@ -6462,7 +6502,9 @@ test('phase 3 Tasks bulk actions stay de-emphasized until tasks are selected', (
 
   assert.match(tasksPage, /bar\.hidden\s*=\s*!\(state\.bulkSelectMode && selected > 0\)/);
   assert.match(tasksPage, /bar\.classList\.toggle\('bulk-actions-bar--active',\s*selected > 0\)/);
-  assert.match(tasksPage, /toggleBtn\.setAttribute\('aria-pressed',\s*String\(state\.bulkSelectMode\)\)/);
+  // Der Schalter steht im Werkzeugmenue und meldet seinen Zustand als Haken
+  // (menuitemcheckbox), nicht mehr als aria-pressed eines Kopfknopfs.
+  assert.match(tasksPage, /syncPopoverMenuItem\([^;]*'bulk-select',\s*state\.bulkSelectMode\)/);
   assert.match(tasksCss, /\.bulk-actions-bar\[hidden\]\s*\{[\s\S]*display:\s*none/);
   assert.match(tasksCss, /\.bulk-actions-bar--active\s*\{/);
 });
@@ -9144,8 +9186,12 @@ test('remaining audited mobile controls use 48px touch targets', () => {
   // Regel diesen Knopf nicht und der Guard bliebe grün, während das Ziel
   // schrumpft.
   assertRuleUsesToken(read('../public/styles/filter-chip.css'), '.filter-chip', 'min-height', '--target-lg', '../public/styles/filter-chip.css');
-  assert.match(read('../public/pages/tasks.js'), /toggleBtn\.className\s*=\s*`filter-chip filter-toggle-btn/);
-  assert.doesNotMatch(tasks, /\.filter-toggle-btn\s*\{[^}]*min-height/);
+  // Seit der Kopfregel mobil (2026-09-26) ist der Filterknopf der geteilte
+  // `.page-filter-btn` - ein `.btn`, dessen Zielhoehe die Shell traegt. Die
+  // Kette dorthin: der Knopf kommt aus dem Helfer, und tasks.css setzt ihm
+  // keine eigene Hoehe.
+  assert.match(read('../public/pages/tasks.js'), /filterButtonHtml\(\{ id: 'tasks-filter-btn'/);
+  assert.doesNotMatch(tasks, /\.(?:filter-toggle-btn|page-filter-btn|tasks-toolbar__filter)\s*\{[^}]*(?:min-)?height/);
   // „Heute" (Kalender) holt seine 48px aus .btn - siehe die Begruendung beim
   // Budget-Zwilling im Guard darueber.
   assert.doesNotMatch(calendar, /\.cal-toolbar__today\s*\{[^}]*min-height/);
@@ -9197,8 +9243,11 @@ test('contacts bulk selection is opt-in and hidden by default', () => {
   const contactsPage = read('../public/pages/contacts.js');
   const contactsCss = read('../public/styles/contacts.css');
 
-  // Toggle in der Toolbar; der Auswahlmodus startet aus.
-  assert.match(contactsPage, /id="contacts-select-btn"/);
+  // Einstieg im Werkzeugmenue des Kopfs (Kopfregel mobil, 2026-09-26), der
+  // Ausstieg sichtbar als „Abbrechen" im Kopf; der Auswahlmodus startet aus.
+  assert.match(contactsPage, /pageToolsMenuHtml\(\{[\s\S]*?action: 'select-mode'/);
+  assert.match(contactsPage, /id="contacts-select-cancel" hidden/);
+  assert.match(contactsPage, /cancel\.hidden = !state\.selectMode/);
   assert.match(contactsPage, /selectMode:\s*false/);
 
   /* DIE AUSWAHL-LEISTE IST DIE GETEILTE PILLE (Critique 2026-08-13).
@@ -9223,6 +9272,33 @@ test('contacts bulk selection is opt-in and hidden by default', () => {
   assert.match(contactsPage, /bulkDeletedToast/);
   // Familien-Kontakte bleiben nicht wählbar (deaktivierte Checkbox)
   assert.match(contactsPage, /c\.family_user_id \? ' disabled' : ''/);
+});
+
+test('Inventar und Kontakte folgen der Kopfregel mobil: ein Werkzeugmenue, Suche als Slot, Chips im Port', () => {
+  const inventoryPage = read('../public/pages/inventory.js');
+  const contactsPage = read('../public/pages/contacts.js');
+  const contactsCss = read('../public/styles/contacts.css');
+
+  // Inventar: die Suche IST der Slot. In einem `div.page-toolbar__center`
+  // geschachtelt blieb sie mobil ein 248px-Feld und die zwei Verwalten-Icons
+  // bekamen eine eigene Kopfzeile (170px statt 114, A6 P1-1).
+  assert.doesNotMatch(inventoryPage, /<div class="page-toolbar__center">\s*\$\{renderPageSearch/,
+    'die Inventar-Suche steckt nicht in einem Wrapper-Slot');
+  assert.match(inventoryPage, /className: 'inventory-search page-toolbar__center'/);
+  // Lagerorte und Kategorien stehen im EINEN Werkzeugmenue, nicht als lose Icons.
+  assert.match(inventoryPage, /pageToolsMenuHtml\(\{[\s\S]*?action: 'manage-locations'[\s\S]*?action: 'manage-categories'/);
+  assert.doesNotMatch(inventoryPage, /class="btn btn--ghost btn--icon" data-action="manage-/,
+    'keine losen Verwalten-Icons im Inventar-Kopf');
+
+  // Kontakte: Kategorien, Auswahl und Import im Werkzeugmenue ...
+  assert.match(contactsPage, /pageToolsMenuHtml\(\{[\s\S]*?action: 'select-mode'[\s\S]*?action: 'import-vcard'[\s\S]*?action: 'manage-categories'/);
+  assert.doesNotMatch(contactsPage, /id="contacts-manage-cats"|id="contacts-select-btn"/,
+    'keine losen Werkzeugknoepfe im Kontakte-Kopf');
+  // ... und die Kategorie-Chips als erstes Kind IM Port: fest ueber dem Port
+  // begann die Liste bei y179 statt 114 (A8).
+  assert.match(contactsPage, /id="contacts-list" class="contacts-list page-scrollport"[^>]*>\s*<div class="contacts-filters page-chip-row"/);
+  assert.doesNotMatch(contactsCss, /\.contacts-filters\s*\{[^}]*border-bottom/,
+    'kein Trennstrich mehr zwischen festem Chrome und Port');
 });
 
 test('documents and navigation settings use progressive disclosure instead of stacked control cards', () => {
@@ -12675,7 +12751,8 @@ test('der Modulkopf gehoert der Shell - kein Modul setzt seine Richtung oder sei
  *   unter den Large Title in den kanonischen `page-toolbar`-Kopf (Gesundheit,
  *   Budget, Belohnungen, Haushaltshilfe).
  *   Sektionen mit eigener Shell (Einstellungen) fuehren ihren Titel in ihrem
- *   eigenen Kopf.
+ *   eigenen Kopf - seit 2026-09-26 (Kopfregel mobil) ist das der geteilte
+ *   kanonische Kopf, den die Shell selbst baut.
  *
  * DER DRITTE FALL IST EINE REGEL, KEINE AUSNAHME. Die Einstellungen tragen
  * `module: 'settings'` auf allen Blaettern und fielen nach Fall 2 unter „Titel
@@ -12687,7 +12764,12 @@ test('der Modulkopf gehoert der Shell - kein Modul setzt seine Richtung oder sei
  * die Shell ihre eigene Navigation und ihren eigenen Kopf baut. Eine blosse
  * Pfadliste (`HEALTH_ROUTES`) tut das nicht. Der Fall wird deshalb nicht
  * uebersprungen, sondern anders geprueft: die Sektion MUSS einen eigenen
- * sichtbaren Titel fuehren und darf keinen `page-toolbar__title` tragen.
+ * sichtbaren Titel fuehren, und zwar in EINEM Kopf. Traegt sie einen
+ * `page-toolbar__title`, dann im kanonischen Kopf und ohne einen zweiten
+ * Seitenkopf (`page__header`) daneben - das waren die zwei Koepfe fuer einen
+ * Titel, gegen die diese Pruefung stand. Bis 2026-09-26 hiess sie „kein
+ * `page-toolbar__title`"; sie pruefte damit die Schreibweise statt der Regel
+ * und sperrte die Einstellungen aus dem Large Title aller Module aus.
  *
  * WARUM DIE ROUTE UND NICHT DER HELFERNAME: `renderSubTabs` gegen
  * `wireTablist` ist eine Implementierungswahl, keine Regel. Sie faellt bei der
@@ -12838,7 +12920,8 @@ test('ob ein Seitentitel ueber einer Leiste steht, entscheidet der module:-Wert 
       if (!ownTitle) {
         offenders.push(`${mod}: Sektion mit eigener Shell, fuehrt aber keinen eigenen sichtbaren Titel`);
       }
-      if (hasTitle) {
+      const secondHead = sources.some((src) => /\bpage__header\b/.test(stripComments(src)));
+      if (hasTitle && (!hasCanonicalHead || secondHead)) {
         offenders.push(`${mod}: Sektion mit eigener Shell traegt zusaetzlich einen page-toolbar__title - zwei Koepfe fuer einen Titel`);
       }
       continue;
@@ -15587,7 +15670,7 @@ test('die Lesemass-Liste kappt kein selbstpolsterndes Element (#758)', () => {
   assert.deepEqual(clash, [],
     `diese Selektoren stehen in der Lesemass-Liste UND polstern sich selbst mit --page-inline-pad: ${clash.join(', ')}. `
     + 'Bei box-sizing: border-box frisst das Polster die Kappung auf. Die Kappung gehoert dorthin, wo auch das '
-    + 'Polster steht, und muss es einrechnen (siehe .list-tabs-bar in shopping.css).');
+    + 'Polster steht, und muss es einrechnen (siehe den Kommentar ueber der Liste in layout.css).');
 });
 
 test('ein Teilschritt lässt sich korrigieren und entfernen, nicht nur abhaken (#748)', () => {
@@ -18616,9 +18699,7 @@ test('Praemienkarte: jede Glyphe ist bemessen und schrumpft nicht', () => {
  * AUSNAHME MIT VERFALL: meals.js gehoert in dieser Runde dem Kuechen-Umbau
  * (Runde 1), der seinen Wochenbereich selbst umstellt. Der Eintrag muss fallen,
  * sobald die Datei sauber ist - der Test meldet einen verwaisten Eintrag rot. */
-const DASH_PENDING = new Map([
-  ['../public/pages/meals.js', 'Runde 1 (Kueche) stellt den Wochenbereich um'],
-]);
+const DASH_PENDING = new Map([]);
 test('Seiten geben keinen Em- oder En-Dash als UI-Text aus', () => {
   const funde = [];
   const verwaist = [];

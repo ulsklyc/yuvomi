@@ -12,6 +12,7 @@ import { t, formatDate } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
+import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { setBulkPill, clearBulkPill } from '/utils/bulk-pill.js';
 import { parseVCards } from '/utils/vcard.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
@@ -163,21 +164,33 @@ function emailsLockedFor(contact) {
  * Import legt Kontakte an. Nur der Primaerknopf traegt `.toolbar-new-btn`, und
  * genau der ist der einzige, den `html[data-module-readonly]` schon erfasst hat
  * (layout.css) - er bleibt deshalb im Markup stehen.
+ *
+ * DIE DREI STEHEN IM EINEN WERKZEUGMENUE (Kopfregel mobil, DESIGN.md,
+ * 2026-09-26). Als Kategorien-Icon, „Auswaehlen" (130px) und „Import" (103px)
+ * fuellten sie mobil eine eigene Kopfzeile (A5 P2-4); im Menue tragen sie Icon
+ * UND Text. Bei `contacts: read` bliebe das Menue leer - dann gibt es gar
+ * keinen Knopf, nicht einen, der ins Leere oeffnet.
+ *
+ * Der AUSSTIEG aus dem Auswahlmodus bleibt sichtbar: „Abbrechen" steht,
+ * solange ausgewaehlt wird, im Kopf (wie in den Dokumenten und in Apples
+ * Fotos) - ein Modus, den man nur ueber ein Menue verlassen kann, waere eine
+ * Falle. Die Datei-Auswahl des Imports bleibt ein verstecktes `<input>`; der
+ * Menue-Eintrag loest es aus.
  */
 function toolbarActionsHtml() {
   return `${readOnly() ? '' : `
-          <button class="btn btn--icon btn--ghost" id="contacts-manage-cats" aria-label="${t('contacts.manageCategories')}" title="${t('contacts.manageCategories')}">
-            <i data-lucide="tags" class="icon-md" aria-hidden="true"></i>
-          </button>
-          <button class="btn btn--secondary" id="contacts-select-btn" aria-pressed="false">
-            <i data-lucide="list-checks" class="icon-md" aria-hidden="true"></i>
-            ${t('contacts.selectButton')}
-          </button>
-          <label class="btn btn--secondary" title="${t('contacts.importTooltip')}" aria-label="${t('contacts.importLabel')}">
-            <i data-lucide="upload" class="icon-md" aria-hidden="true"></i>
-            ${t('contacts.importButton')}
-            <input type="file" id="contacts-import-input" accept=".vcf,text/vcard" style="display:none">
-          </label>`}
+          <button type="button" class="btn btn--secondary" id="contacts-select-cancel" hidden>${esc(t('common.cancel'))}</button>
+          ${pageToolsMenuHtml({
+            id: 'contacts-tools-menu',
+            label: t('common.moreActions'),
+            items: [
+              { action: 'select-mode', label: t('contacts.selectButton'), icon: 'list-checks' },
+              { action: 'import-vcard', label: t('contacts.importTooltip'), icon: 'upload' },
+              { separator: true },
+              { action: 'manage-categories', label: t('contacts.manageCategories'), icon: 'tags' },
+            ],
+          })}
+          <input type="file" id="contacts-import-input" accept=".vcf,text/vcard" hidden>`}
           <button class="btn btn--primary toolbar-new-btn" id="contacts-add-btn" aria-label="${t('contacts.newContactLabel')}">
             <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
             <span class="toolbar-new-btn__label">${t('newLabel.contacts')}</span>
@@ -223,9 +236,11 @@ export async function render(container, { user }) {
         ${renderPageSearch({ id: 'contacts-search', label: t('contacts.searchPlaceholder'), placeholder: t('contacts.searchPlaceholder'), value: state.searchQuery, clearLabel: t('common.searchClear'), className: 'contacts-toolbar__search page-toolbar__center' })}
         <div class="page-toolbar__actions">${toolbarActionsHtml()}</div>
       </div>
-      <div class="contacts-filters" id="contacts-filters" role="group" aria-label="${t('contacts.filterAll')}"></div>
       <div id="contacts-status" class="sr-only" role="status" aria-live="polite"></div>
-      <div id="contacts-list" class="contacts-list page-scrollport" aria-busy="true">${renderSkeletonList({ rows: 6, lines: 2 })}</div>
+      <div id="contacts-list" class="contacts-list page-scrollport" aria-busy="true">
+        <div class="contacts-filters page-chip-row" id="contacts-filters" role="group" aria-label="${t('contacts.filterAll')}"></div>
+        <div id="contacts-rows" class="contacts-rows">${renderSkeletonList({ rows: 6, lines: 2 })}</div>
+      </div>
       <button class="page-fab" id="fab-new-contact" aria-label="${t('contacts.newContactLabel')}" data-dock-label="${t('newLabel.contacts')}">
         <i data-lucide="plus" class="icon-xl" aria-hidden="true"></i>
       </button>
@@ -304,8 +319,19 @@ export async function render(container, { user }) {
   renderCategoryFilters();
   renderList({ animate: true });
 
-  _container.querySelector('#contacts-manage-cats')
-    ?.addEventListener('click', () => { if (!readOnly()) openContactCategoryManager(); });
+  // Werkzeugmenue: die Eintraege laufen ueber data-action (popover-menu.js
+  // schliesst das Panel in der Capture-Phase, bevor ein Dialog aufgeht).
+  installPopoverMenus(_container);
+  const toolbar = _container.querySelector('.contacts-toolbar');
+  toolbar.addEventListener('click', (e) => {
+    const item = e.target.closest('.popover-menu__item[data-action]');
+    if (!item || item.disabled || readOnly()) return;
+    const action = item.dataset.action;
+    if (action === 'manage-categories') openContactCategoryManager();
+    else if (action === 'select-mode') enterSelectMode();
+    // Der Klick auf den Eintrag ist die Nutzergeste, die der Datei-Dialog braucht.
+    else if (action === 'import-vcard') _container.querySelector('#contacts-import-input')?.click();
+  });
 
   // Deep-Link: ?open=<id> öffnet die Detailansicht. Aus der globalen Suche
   // kommend will man den Treffer zuerst sehen, nicht bearbeiten - derselbe
@@ -348,11 +374,9 @@ export async function render(container, { user }) {
   _container.querySelector('#contacts-add-btn').addEventListener('click', addHandler);
   findPageFab('fab-new-contact').addEventListener('click', addHandler);
 
-  // Auswahl-Modus (opt-in): Toggle in der Toolbar + Aktionen in der Auswahl-Leiste.
-  _container.querySelector('#contacts-select-btn')?.addEventListener('click', () => {
-    if (readOnly()) return;
-    if (state.selectMode) exitSelectMode(); else enterSelectMode();
-  });
+  // Auswahl-Modus (opt-in): Einstieg im Werkzeugmenue, Ausstieg per
+  // „Abbrechen" im Kopf oder Escape; die Aktionen stehen in der Pille.
+  _container.querySelector('#contacts-select-cancel')?.addEventListener('click', () => exitSelectMode());
 
   // vCard-Import: parsen, dann eine Auswahl-Vorstufe zeigen (nichts wird
   // ungefragt angelegt). Die eigentliche Anlage passiert in openImportSelectionModal.
@@ -543,9 +567,11 @@ function contactsEmptyStateHtml(filtered) {
 }
 
 function renderList({ animate = false } = {}) {
-  const container = _container.querySelector('#contacts-list');
+  // Die Zeilen stehen in `#contacts-rows`, damit die Chipreihe davor im Port
+  // (`#contacts-list`) bei jedem Render stehen bleibt und mit wegscrollt.
+  const container = _container.querySelector('#contacts-rows');
   if (!container) return;
-  container.removeAttribute('aria-busy');
+  _container.querySelector('#contacts-list')?.removeAttribute('aria-busy');
 
   const contacts = filterContacts();
 
@@ -1367,7 +1393,7 @@ function buildContactForm({ mode, contact = null }) {
 function enterSelectMode() {
   state.selectMode = true;
   state.selected.clear();
-  _container.querySelector('#contacts-select-btn')?.setAttribute('aria-pressed', 'true');
+  syncSelectChrome();
   _container.querySelector('.contacts-page')?.classList.add('is-selecting');
   renderList();
   updateSelectUI();
@@ -1376,10 +1402,25 @@ function enterSelectMode() {
 function exitSelectMode() {
   state.selectMode = false;
   state.selected.clear();
-  _container.querySelector('#contacts-select-btn')?.setAttribute('aria-pressed', 'false');
+  // Der Fokus stand auf „Abbrechen", das gleich verschwindet: zurueck an den
+  // Menue-Knopf, ueber den man hineingekommen ist - sonst faellt er auf <body>.
+  const refocus = _container.querySelector('#contacts-select-cancel')?.contains(document.activeElement);
+  syncSelectChrome();
+  if (refocus) _container.querySelector('.contacts-toolbar .page-tools-btn')?.focus();
   _container.querySelector('.contacts-page')?.classList.remove('is-selecting');
   clearBulkPill();
   renderList();
+}
+
+/**
+ * Kopf im Auswahlmodus: „Abbrechen" sichtbar, der Menue-Eintrag „Auswaehlen"
+ * gesperrt (man ist schon drin) - dieselbe Paarung wie in den Dokumenten.
+ */
+function syncSelectChrome() {
+  const cancel = _container?.querySelector('#contacts-select-cancel');
+  if (cancel) cancel.hidden = !state.selectMode;
+  const item = _container?.querySelector('#contacts-tools-menu [data-action="select-mode"]');
+  if (item) item.disabled = state.selectMode;
 }
 
 function updateSelectUI() {

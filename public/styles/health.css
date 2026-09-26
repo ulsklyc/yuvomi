@@ -23,7 +23,9 @@
    * Content-Spalte kommt über --page-inline-pad auf den Kindern (Kopf aus der
    * Shell-Regel, Panels hier darunter). Vorher hing die Tab-Leiste außerhalb
    * des Roots im Router-Wrapper, da war das Padding hier richtig. */
-  padding-bottom: calc(var(--nav-bottom-height) + var(--space-6));
+  /* Nur der eigene Abstand: Tab-Leiste und FAB rechnet die Shell als
+   * Nachlauf (`--shell-tail`, layout.css, Kopfregel mobil 2026-09-26). */
+  padding-bottom: var(--space-6);
 }
 
 /* Der 3px-Akzentstreifen über der Tabs-Leiste ist mit dem HIG-Rollout entfallen
