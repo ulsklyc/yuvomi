@@ -10,7 +10,7 @@
  *          list-rows           Listentraeger = `.row-carrier`; `.list-rows` laeuft aus
  *          floating-fab        Primaeraktion = `page-fab` MIT Nomen (dockt am Desktop an)
  *          body-actions        Dialogknoepfe = `.modal-panel__footer`, nicht `.modal-actions`
- *          cancel-ghost        Abbrechen im Dialog = `btn--ghost`
+ *          cancel-ghost        Abbrechen im Dialog = `btn--secondary`, nie `btn--ghost`
  *          footer-icon-delete  Loeschen im Dialog = Textknopf `btn--danger-outline`
  *          settings-checkbox   Boolean in den Einstellungen = Schalter
  *          dead-i-rule         keine CSS-Regel zielt nur auf `<i>` (Lucide ersetzt es)
@@ -322,19 +322,20 @@ export function scanBodyActions(src) {
 }
 
 /**
- * Punkt 5b: "Abbrechen" (`common.cancel`) als Knopf, der nicht `btn--ghost` ist.
- * OFFENE ENTSCHEIDUNG (2026-09-26): der Brief der Runde 5 setzt ghost (Vorbild
- * Kalender, Aufgaben); test:frontend-audit haelt seit der Critique 2026-07-30
- * das Gegenteil fuer die drei geteilten Dialoge in modal.js ("kein Abbrechen
- * darf als Ghost zurueckkommen" - im Loeschen-Confirm am wichtigsten). Bis das
- * entschieden ist, zaehlt dieser Scanner nur und niemand stellt um; faellt die
- * Entscheidung auf secondary, dreht die Integration die Regel um.
+ * Punkt 5b: "Abbrechen" (`common.cancel`) als `btn--ghost`.
+ * ENTSCHIEDEN (2026-09-26, Runde 5): Abbrechen ist `btn--secondary`. Der Brief
+ * der Runde nannte ghost; test:frontend-audit haelt seit der Critique
+ * 2026-07-30 fuer die drei geteilten Dialoge in modal.js das Gegenteil ("kein
+ * Abbrechen darf als Ghost zurueckkommen" - im Loeschen-Confirm am
+ * wichtigsten: ein Ghost-Abbrechen neben dem roten Loeschen liest sich wie
+ * Text, nicht wie der sichere Ausweg). Der Code schlug den Brief; Abweichler
+ * ist deshalb der ghost-Abbrechen.
  */
 export function scanCancelGhost(src) {
   const found = [];
   for (const c of templateControls(src)) {
     if (c.tag !== 'button' || !/common\.cancel/.test(c.body)) continue;
-    if (!/\bbtn--ghost\b/.test(c.cls)) found.push({ line: lineOf(src, c.index), what: c.cls || '(ohne Klasse)' });
+    if (/\bbtn--ghost\b/.test(c.cls)) found.push({ line: lineOf(src, c.index), what: c.cls });
   }
   return found;
 }
@@ -356,7 +357,16 @@ export function scanFooterIconDelete(src) {
  * rendert jede Schalterzeile `toggleRowHtml({ ..., control: 'switch' })`; eine
  * rohe `type="checkbox"` ausserhalb von `.toggle` zaehlt ebenso. Nur fuer die
  * Einstellungen - Filterblaetter (Kalender, Aufgaben) behalten die Haken-Zeile.
+ * Benannte Ausnahmen (AUSWAHL aus einer Menge, keine Einstellung - dieselbe
+ * Grenze wie bei den Filterblaettern, Entscheidung 2026-09-26):
+ *  - `api-token-scopes__cell`: Lesen/Schreiben je Modul in der Scope-Matrix
+ *    eines API-Tokens (admin-api.js);
+ *  - `reminder-preset`: Standard-Erinnerungen als Mehrfachauswahl-Chips
+ *    (personal-calendar.js);
+ *  - `backfill-moved__`: Auswahl der verschobenen Termine im Nachtrag-Dialog
+ *    samt "alle" (sync-calendar.js).
  */
+const SETTINGS_SELECTION = /class="(?:[^"]*\s)?(?:api-token-scopes__cell|reminder-preset|backfill-moved__[\w-]+)(?:\s[^"]*)?"[^<]*$/;
 export function scanSettingsCheckbox(src, file) {
   const found = [];
   if (!file.startsWith('public/settings/') || file === 'public/settings/components.js') return found;
@@ -373,6 +383,7 @@ export function scanSettingsCheckbox(src, file) {
     if (inComment(src, m.index)) continue;
     const before = src.slice(Math.max(0, m.index - 160), m.index);
     if (/class="toggle"|class="toggle /.test(before) || /role="switch"/.test(m[0])) continue;
+    if (SETTINGS_SELECTION.test(before)) continue;
     found.push({ line: lineOf(src, m.index), what: (m[0].match(/\b(?:id|name|class)="[^"]*"/) || ['<input type=checkbox>'])[0] });
   }
   return found;
@@ -485,7 +496,7 @@ test('Scanner: floating-fab faengt die Primaeraktion ohne Nomen und laesst den K
   assert.deepEqual(scanFloatingFab(good), []);
 });
 
-test('Scanner: Dialogregeln faengen Koerper-Knopfzeile, Abbrechen ohne ghost und Icon-Loeschen', () => {
+test('Scanner: Dialogregeln faengen Koerper-Knopfzeile, Abbrechen als ghost und Icon-Loeschen', () => {
   const src = `
     <div class="modal-actions"><button type="submit" class="btn btn--primary">\${t('common.save')}</button></div>
     <div class="modal-actions modal-actions--stack"></div>
@@ -494,7 +505,7 @@ test('Scanner: Dialogregeln faengen Koerper-Knopfzeile, Abbrechen ohne ghost und
     <button class="btn btn--danger btn--icon" id="wtm-delete" aria-label="\${t('x')}"><i data-lucide="trash-2"></i></button>
     <button class="btn btn--danger-outline" id="modal-delete"><i data-lucide="trash-2"></i>\${t('common.delete')}</button>`;
   assert.equal(scanBodyActions(src).length, 1);
-  assert.equal(scanCancelGhost(src).length, 1);
+  assert.deepEqual(scanCancelGhost(src).map((f) => f.what), ['btn btn--ghost']);
   assert.equal(scanFooterIconDelete(src).length, 1);
 });
 
@@ -503,8 +514,20 @@ test('Scanner: settings-checkbox gilt nur in den Einstellungen und laesst den Sc
     \${toggleRowHtml({ label: t('a'), checked: true })}
     \${toggleRowHtml({ label: t('b'), control: 'switch' })}
     <input type="checkbox" id="raw">
-    <label class="toggle"><input type="checkbox" id="ok"><span class="toggle__track"></span></label>`;
-  assert.equal(scanSettingsCheckbox(src, 'public/settings/pages/x.js').length, 2);
+    <label class="toggle"><input type="checkbox" id="ok"><span class="toggle__track"></span></label>
+    <label class="api-token-scopes__cell"><input type="checkbox" data-scope="x:read" /></label>
+    <label class="reminder-preset">
+      <input type="checkbox" class="js-default-reminder" value="10">
+    </label>
+    <label class="form-check backfill-moved__all">
+      <input type="checkbox" id="backfill-moved-all" checked>
+    </label>
+    <label class="backfill-moved__item"><span>x</span></label>
+    <input type="checkbox" id="raw-after-selection">`;
+  // Die Auswahl-Ausnahme gilt nur fuer die Checkbox IN ihrem Label - die rohe
+  // Checkbox danach zaehlt wieder.
+  assert.deepEqual(scanSettingsCheckbox(src, 'public/settings/pages/x.js').map((f) => f.what),
+    ["toggleRowHtml ohne control: 'switch'", 'id="raw"', 'id="raw-after-selection"']);
   assert.deepEqual(scanSettingsCheckbox(src, 'public/pages/calendar.js'), []);
 });
 
@@ -579,131 +602,30 @@ test('Beifang: das Offline-Banner (fixed, top 0) haelt die Statusleiste frei', (
 // ---------------------------------------------------------------------------
 
 /**
- * Bestand vom 2026-09-26 (Runde 5, Schritt 1). Nur nach UNTEN aendern: sinkt
- * eine Zahl, weil ein Modul umgestellt ist, streicht die Integration (i5) die
- * Zeile bzw. setzt die neue Zahl. Waechst eine, ist das ein neuer Dialekt und
- * kein Grund, die Zahl zu erhoehen.
+ * Bestand vom 2026-09-26 (Runde 5, Schritt 1), nachgezogen nach Schritt 2
+ * (Integration i5): die Module sind umgestellt, jede Regel steht auf null.
+ * Nur nach UNTEN aendern; waechst eine Zahl, ist das ein neuer Dialekt und
+ * kein Grund, sie zu erhoehen.
  */
 const PENDING = {
-  'row-action': {
-    'public/components/category-manager.js': 4,
-    'public/components/quick-links-manager.js': 1,
-    'public/components/tag-manager.js': 2,
-    'public/components/task-detail.js': 2,
-    'public/pages/budget.js': 3,
-    'public/pages/documents.js': 3,
-    'public/pages/health.js': 6,
-    'public/pages/housekeeping.js': 1,
-    'public/pages/notes.js': 1,
-    'public/pages/rewards.js': 1,
-    'public/pages/schedule.js': 2,
-    'public/pages/subscriptions.js': 3,
-    'public/pages/tasks.js': 3,
-    'public/settings/pages/modules-health.js': 1,
-    'public/settings/pages/personal-calendar-subscriptions.js': 2,
-    'public/utils/ingredient-row.js': 1,
-  },
-  'row-action-name': {
-    'public/pages/birthdays.js': 2,
-    'public/pages/budget.js': 1,
-    'public/pages/contacts.js': 3,
-    'public/pages/health.js': 1,
-    'public/pages/housekeeping.js': 2,
-    'public/pages/waste.js': 4,
-  },
-  'search-field': {
-    'public/components/document-attach.js': 1,
-    'public/components/icon-picker.js': 1,
-    'public/pages/calendar.js': 2,
-    'public/pages/documents.js': 1,
-    'public/pages/split-expenses.js': 1,
-    'public/pages/subscriptions.js': 2,
-    'public/settings/shell.js': 1,
-  },
+  'row-action': {},
+  'row-action-name': {},
+  'search-field': {},
   'list-rows': {
-    'public/pages/calendar.js': 2,
-    'public/pages/inventory.js': 2,
-    'public/pages/pantry.js': 1,
-    'public/pages/recipes.js': 1,
-    'public/pages/schedule.js': 4,
-    'public/pages/shopping.js': 7,
-    'public/pages/tasks.js': 4,
-    'public/pages/waste.js': 3,
-    'public/settings/pages/modules-health.js': 1,
+    // Die drei Selektoren von `.list-rows` selbst. Kein Markup rendert die
+    // Klasse mehr (JS-Zaehler null); die Regeln bleiben, bis
+    // test:frontend-audit seine Zusagen (Flaeche, Lesemass, Container,
+    // align-self) vom alten Traeger auf `.row-carrier` umgezogen hat.
     'public/styles/list-row.css': 3,
   },
-  'floating-fab': {
-    'public/pages/health.js': 8,
-    'public/pages/rewards.js': 3,
-  },
-  'body-actions': {
-    'public/pages/dashboard.js': 2,
-    'public/pages/health.js': 12,
-    'public/pages/schedule.js': 5,
-    'public/pages/shopping.js': 2,
-    'public/pages/split-expenses.js': 5,
-    'public/pages/tasks.js': 1,
-    'public/settings/pages/modules-health.js': 1,
-    'public/settings/pages/modules-kitchen.js': 2,
-    'public/settings/pages/sync-calendar.js': 2,
-    'public/settings/pages/sync-contacts.js': 1,
-  },
-  'cancel-ghost': {
-    'public/components/document-attach.js': 1,
-    'public/components/fasting-controls.js': 1,
-    'public/components/icon-picker.js': 1,
-    'public/components/modal.js': 3,
-    'public/components/quick-links-manager.js': 1,
-    'public/pages/birthdays.js': 2,
-    'public/pages/budget-plans.js': 2,
-    'public/pages/budget.js': 5,
-    'public/pages/contacts.js': 3,
-    'public/pages/dashboard.js': 3,
-    'public/pages/documents.js': 3,
-    'public/pages/housekeeping.js': 1,
-    'public/pages/inventory.js': 2,
-    'public/pages/meals.js': 2,
-    'public/pages/notes.js': 1,
-    'public/pages/pantry.js': 1,
-    'public/pages/recipes.js': 3,
-    'public/pages/shopping.js': 5,
-    'public/pages/split-expenses.js': 5,
-    'public/pages/subscriptions.js': 2,
-    'public/pages/waste.js': 9,
-    'public/settings/pages/admin-family.js': 1,
-    'public/settings/pages/personal-account.js': 2,
-    'public/settings/pages/personal-calendar-subscriptions.js': 1,
-    'public/settings/pages/sync-calendar.js': 1,
-  },
-  'footer-icon-delete': {
-    'public/pages/budget-plans.js': 1,
-    'public/pages/budget.js': 2,
-    'public/pages/contacts.js': 1,
-    'public/pages/waste.js': 4,
-  },
-  'settings-checkbox': {
-    'public/settings/pages/admin-api.js': 3,
-    'public/settings/pages/admin-backup.js': 1,
-    'public/settings/pages/admin-family.js': 7,
-    'public/settings/pages/documents-storage.js': 1,
-    'public/settings/pages/modules-active.js': 2,
-    'public/settings/pages/modules-calendar.js': 2,
-    'public/settings/pages/modules-kitchen.js': 1,
-    'public/settings/pages/modules-options.js': 5,
-    'public/settings/pages/modules-rewards.js': 2,
-    'public/settings/pages/notifications.js': 2,
-    'public/settings/pages/personal-appearance.js': 1,
-    'public/settings/pages/personal-calendar-subscriptions.js': 2,
-    'public/settings/pages/personal-calendar.js': 2,
-    'public/settings/pages/personal-feeds.js': 2,
-    'public/settings/pages/personal-health.js': 2,
-    'public/settings/pages/sync-calendar.js': 2,
-    'public/settings/weather-location.js': 1,
-  },
+  'floating-fab': {},
+  'body-actions': {},
+  'cancel-ghost': {},
+  'footer-icon-delete': {},
+  'settings-checkbox': {},
   // Leer seit Runde 5, Schritt 1: die 38 Regeln sind entfernt (je belegt,
   // dass dort kein <i> gerendert wird). Ab hier ist jede neue rot.
   'dead-i-rule': {},
-
 };
 
 const RULES = {
@@ -713,7 +635,7 @@ const RULES = {
   'list-rows': { files: [...JS, ...CSS], scan: (s, f) => (f.endsWith('.css') ? scanListRowsCss(s) : scanListRowsJs(s)), canon: '`.row-carrier` (list-row.css)' },
   'floating-fab': { files: JS, scan: (s) => scanFloatingFab(s), canon: '`page-fab` mit `dockLabel` (utils/fab.js)' },
   'body-actions': { files: JS, scan: (s) => scanBodyActions(s), canon: '`.modal-panel__footer` (mountFooter hebt sie an den Blattrand)' },
-  'cancel-ghost': { files: JS, scan: (s) => scanCancelGhost(s), canon: 'Abbrechen = `btn btn--ghost`' },
+  'cancel-ghost': { files: JS, scan: (s) => scanCancelGhost(s), canon: 'Abbrechen = `btn btn--secondary` (nie ghost)' },
   'footer-icon-delete': { files: JS, scan: (s) => scanFooterIconDelete(s), canon: 'Loeschen im Dialogfuss = `btn btn--danger-outline` mit Text, links' },
   'settings-checkbox': { files: JS, scan: (s, f) => scanSettingsCheckbox(s, f), canon: '`toggleRowHtml({ ..., control: \'switch\' })`' },
   'dead-i-rule': { files: CSS, scan: (s) => scanDeadIRules(s), canon: 'keine Regel auf `<i>` - Lucide rendert `<svg>`; auf `svg` zielen' },

@@ -1249,9 +1249,13 @@ test('jede Sub-Tab-Leiste erklärt ihre Semantik, und zwar die, die ihre Routen 
 });
 
 test('settings theme toggle exposes pressed state', () => {
+  // Seit dem Komponenten-Kanon (2026-09-26) ist das Theme ein Segment: genau
+  // einer gilt, also radiogroup mit aria-checked (wireTablist mode 'select'
+  // pflegt es) statt drei unabhaengiger aria-pressed-Knoepfe.
   const source = read('../public/settings/pages/personal-appearance.js');
-  assert.match(source, /aria-pressed/);
-  assert.match(source, /setAttribute\('aria-pressed'/);
+  assert.match(source, /role="radiogroup"/);
+  assert.match(source, /role="radio"[\s\S]*aria-checked=/);
+  assert.match(source, /mode: 'select'/);
 });
 
 test('personal settings leaves exist and export async render functions', () => {
@@ -1432,11 +1436,12 @@ test('personal appearance leaf owns theme, locale, and regional preferences', ()
   assert.match(source, /await getPreferences\(\)/);
   assert.match(source, /getSupportedLocales\(\)/);
   assert.match(source, /setLocale\(/);
-  assert.match(source, /aria-pressed/);
-  assert.match(source, /setAttribute\('aria-pressed'/);
-  assert.match(source, /data-lucide="monitor"/);
-  assert.match(source, /data-lucide="sun"/);
-  assert.match(source, /data-lucide="moon"/);
+  assert.match(source, /role="radiogroup"/);
+  assert.match(source, /mode: 'select'/);
+  assert.match(source, /icon: 'monitor'/);
+  assert.match(source, /icon: 'sun'/);
+  assert.match(source, /icon: 'moon'/);
+  assert.match(source, /data-lucide="\$\{icon\}"/);
   assert.match(source, /date_format/);
   assert.match(source, /time_format/);
   assert.match(source, /savePreferences\(\{/);
@@ -3413,10 +3418,12 @@ test('die Küchen-Listen teilen eine Zeilen-Grammatik', () => {
     }
   }
 
-  // Alle drei Listen-Tabs benutzen die geteilten Klassen im Markup.
+  // Alle drei Listen-Tabs benutzen die geteilten Klassen im Markup. Der
+  // Traeger ist seit dem Komponenten-Kanon (2026-09-26) `.row-carrier`;
+  // `.list-rows` laeuft aus (test:control-dialect haelt den Ratchet).
   for (const page of ['shopping', 'pantry', 'recipes']) {
     const src = read(`../public/pages/${page}.js`);
-    for (const cls of ['list-scroller', 'list-rows', 'list-row', 'list-row__main', 'list-row__name', 'list-row__actions']) {
+    for (const cls of ['list-scroller', 'row-carrier', 'list-row', 'list-row__main', 'list-row__name', 'list-row__actions']) {
       assert.ok(src.includes(cls), `${page}.js muss ${cls} verwenden`);
     }
   }
@@ -6743,9 +6750,11 @@ test('phase 4 settings theme toggle uses Lucide placeholders instead of inline S
   const settings = read('../public/settings/pages/personal-appearance.js');
 
   assert.doesNotMatch(settings, /<svg\s+width="18"\s+height="18"[\s\S]*?data-theme-value=/);
-  assert.match(settings, /data-lucide="monitor"/);
-  assert.match(settings, /data-lucide="sun"/);
-  assert.match(settings, /data-lucide="moon"/);
+  assert.doesNotMatch(settings, /<svg\b[\s\S]*?data-tab-id=/);
+  assert.match(settings, /icon: 'monitor'/);
+  assert.match(settings, /icon: 'sun'/);
+  assert.match(settings, /icon: 'moon'/);
+  assert.match(settings, /<i data-lucide="\$\{icon\}"/);
 });
 
 test('phase 4 opens search from More sheet in a single handoff', () => {
@@ -7008,8 +7017,9 @@ test('calendar agenda events and task chips keep readable contrast in mobile age
   // eine Ebene hoeher eingeloest.
   assert.doesNotMatch(eventBody, /background(-color)?:/, 'the agenda row is a row: its surface belongs to the carrier');
   assert.doesNotMatch(eventBody, /border:|box-shadow:/, 'the agenda row is a row: no own edge, no own shadow');
-  assert.match(read('../public/pages/calendar.js'), /<div class="list-rows">\$\{events/,
-    'agenda events must sit in exactly one carrier (.list-rows), which carries surface and hairlines');
+  // Der Traeger heisst seit dem Komponenten-Kanon (2026-09-26) `.row-carrier`.
+  assert.match(read('../public/pages/calendar.js'), /<div class="row-carrier">\$\{events/,
+    'agenda events must sit in exactly one carrier (.row-carrier), which carries surface and hairlines');
   // Die Kalenderfarbe ist seit 2026-09-24 die Kante der Bloecke, nicht mehr ein
   // 8px-Punkt (Critique P2, eine Termingrammatik): am TEXT der Zeile, nicht an
   // der Zeile, damit die Zeile eine Zeile bleibt (die Zusage oben).
@@ -7820,7 +7830,7 @@ test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrun
   const offenders = [];
   const unnamed = [];
   const usedExceptions = new Set();
-  let controlEdges = 0;
+  const controlEdges = new Set();
   for (const file of readdirSync(styles).filter((entry) => entry.endsWith('.css') && entry !== 'tokens.css')) {
     for (const rule of eachRule(readFileSync(new URL(file, styles), 'utf8'))) {
       const parts = rule.selector.split(',').map((s) => s.trim().replace(/\s+/g, ' '));
@@ -7829,7 +7839,7 @@ test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrun
       const edges = [...rule.body.matchAll(/(?:^|;)\s*border(?:-color|-top|-bottom|-left|-right)?\s*:\s*([^;]+)/g)].map((m) => m[1]);
       const cardEdge = edges.some((v) => /var\(\s*--color-border(?:-subtle|-strong)?\s*[,)]/.test(v));
       if (fieldParts.length) {
-        if (edges.some((v) => /var\(\s*--color-border-control\s*\)/.test(v))) controlEdges += 1;
+        if (edges.some((v) => /var\(\s*--color-border-control\s*\)/.test(v))) fieldParts.forEach((part) => controlEdges.add(`${file} ${part}`));
         if (cardEdge) offenders.push(`${file}: ${fieldParts.join(', ')}${rule.at.length ? `  [${rule.at.join(' ')}]` : ''}`);
       }
       if (!cardEdge) continue;
@@ -7840,8 +7850,12 @@ test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrun
       }
     }
   }
-  assert.ok(controlEdges >= 10,
-    `Nur ${controlEdges} Feldregeln mit --color-border-control gefunden - der Selektor-Scan greift nicht mehr, der Guard misst nichts.`);
+  // Die Probe, dass der Scan greift, ist das kanonische Feld selbst - keine
+  // Mindestzahl. Bis 2026-09-26 stand hier `>= 10`; der Komponenten-Kanon
+  // loeschte eigene Suchfeld-Regeln (Abos, Ausgleich), die Zahl sank zu Recht,
+  // und ein Literal haette jede weitere Konsolidierung rot gemacht.
+  assert.ok(controlEdges.has('layout.css .form-input'),
+    `Die Feldregel .form-input (layout.css) mit --color-border-control wurde nicht gefunden - der Selektor-Scan greift nicht mehr, der Guard misst nichts. Gefunden: ${[...controlEdges].join(', ')}`);
   assert.deepEqual(offenders, [],
     'Feldregeln, die ihre Ruhekante aus der Kartenkante ziehen (--color-border*). Ein Eingabefeld nimmt '
     + '--color-border-control (3:1, WCAG 1.4.11); --color-border bleibt Trennlinien und Kartenkanten.');
@@ -8913,8 +8927,9 @@ test('Budget places Subscriptions between Budget and Loans with secure rendering
 test('search fields keep visible labels after users enter a query', () => {
   // The shared page-search building block renders the label+input pair once;
   // page-toolbar modules opt in by calling renderPageSearch with their field id.
-  // Split-expenses keeps its own sidebar-filter markup (visible label above the
-  // control, server-side reload) as a documented, distinct pattern.
+  // Split-expenses and subscriptions joined in the component canon (2026-09-26):
+  // a server-side reload is a debounce setting of wirePageSearch, not a reason
+  // for a sixth field.
   const pageSearch = read('../public/utils/page-search.js');
   assert.match(pageSearch, /<label[^>]*for="\$\{esc\(id\)\}"/);
   assert.match(pageSearch, /<input[^>]*id="\$\{esc\(id\)\}"/);
@@ -8927,6 +8942,8 @@ test('search fields keep visible labels after users enter a query', () => {
     ['../public/pages/tasks.js', 'tasks-search'],
     ['../public/pages/pantry.js', 'pantry-search'],
     ['../public/pages/recipes.js', 'recipes-search'],
+    ['../public/pages/split-expenses.js', 'split-group-search'],
+    ['../public/pages/subscriptions.js', 'subscriptions-search'],
   ];
   for (const [file, id] of viaComponent) {
     const source = read(file);
@@ -8952,16 +8969,6 @@ test('search fields keep visible labels after users enter a query', () => {
     // Kalender: schwergewichtige Server-FTS-Ergebnisansicht mit eigener
     // Icon-Reveal-Leiste, kein Client-Filter (siehe utils/page-search.js).
     'calendar.js',
-    // Split-Expenses: sichtbares Label über dem Feld, Server-Reload. Der
-    // inlineLabel-Block unten prüft es separat.
-    'split-expenses.js',
-    // Abos: eigenes Markup, aber die Substanz stimmt - Lupe, `<label>` mit
-    // sr-only-Text, autocomplete="off" und eine 250ms-Debounce um einen
-    // SERVER-Filter (`?q=`), nicht um einen Client-Filter. Damit liegt es näher
-    // am Kalender als an der Küche und ist kein Fall der Defektklasse, die
-    // dieser Guard fängt. Offen bleibt allein der Leeren-Knopf; eine
-    // Konsolidierung wäre Aufräumen, keine Fehlerbehebung.
-    'subscriptions.js',
   ]);
   const pagesDir = new URL('../public/pages/', import.meta.url);
   for (const entry of readdirSync(pagesDir)) {
@@ -8973,18 +8980,6 @@ test('search fields keep visible labels after users enter a query', () => {
       /renderPageSearch\(\{/,
       `${entry} builds a search input by hand; use renderPageSearch() from `
       + 'utils/page-search.js or add it to documentedExceptions with a reason',
-    );
-  }
-
-  const inlineLabel = [
-    ['../public/pages/split-expenses.js', 'split-group-search'],
-  ];
-  for (const [file, id] of inlineLabel) {
-    const source = read(file);
-    assert.match(
-      source,
-      new RegExp(`<label[^>]*for="${id}"[^>]*>[\\s\\S]*?<input[^>]*id="${id}"|<label[^>]*>[\\s\\S]*?<input[^>]*id="${id}"`),
-      `${file} must expose a persistent visible label for #${id}`,
     );
   }
 });
@@ -9271,8 +9266,13 @@ test('remaining audited mobile controls use 48px touch targets', () => {
   // nimmt --target-base (44px Zeiger / 48px Finger) statt --target-lg fest: das
   // Kriterium ist die Zeigerfähigkeit, nicht die Viewport-Breite (tokens.css).
   assertRuleUsesToken(read('../public/styles/panel.css'), '.segmented__item', 'min-height', '--target-base', '../public/styles/panel.css');
-  assertRuleUsesToken(budget, '.budget-loan-card__filter', 'width', '--target-lg', '../public/styles/budget.css');
-  assertRuleUsesToken(budget, '.budget-loan-card__filter', 'height', '--target-lg', '../public/styles/budget.css');
+  // Der Raten-Filter der Darlehenskarte ist seit dem Komponenten-Kanon
+  // (2026-09-26) eine Zeilenaktion: die 48px traegt `.row-action`
+  // (--target-lg), und die Kette dorthin ist die Klasse am Knopf.
+  assert.match(read('../public/pages/budget.js'), /rowActionHtml\(\{\s*icon: 'filter', action: 'loan-filter'/);
+  assertRuleUsesToken(read('../public/styles/layout.css'), '.row-action', 'width', '--target-lg', '../public/styles/layout.css');
+  assertRuleUsesToken(read('../public/styles/layout.css'), '.row-action', 'height', '--target-lg', '../public/styles/layout.css');
+  assert.doesNotMatch(budget, /\.budget-loan-card__filter\s*\{[^}]*(?:width|height)\s*:/);
   assert.match(
     settings,
     /@media \(max-width:\s*767px\)[\s\S]*\.settings-breadcrumb__link\s*\{[\s\S]*min-height:\s*var\(--target-lg\)/,
