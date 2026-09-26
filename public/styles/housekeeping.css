@@ -124,20 +124,6 @@
   padding: var(--space-4);
 }
 
-/* Zeilen INNERHALB einer Karte: Haarlinien statt eigener Kästen.
- * „Letzte Besuche" und das Einsatz-Protokoll rahmten jede Zeile in einer schon
- * gerahmten Karte - genestete umrandete Rows, die DESIGN.md ausdrücklich
- * ausschließt (Inset-Grouped-Liste ist die Kernform). */
-.housekeeping-report-item {
-  background-color: transparent;
-  border: 0;
-  border-radius: 0;
-}
-
-.housekeeping-report-item + .housekeeping-report-item {
-  border-top: 1px solid var(--color-border-subtle);
-}
-
 .housekeeping-card h2 {
   margin: 0 0 var(--space-3);
 }
@@ -226,34 +212,43 @@
   margin: 0;
 }
 
-/* Monats-Stepper des Berichte-Tabs (#1137): Pfeil, Monat, Pfeil, dahinter der
- * Reset - dieselbe Reihenfolge wie Budget (.budget-nav__month). */
-/* Umbruch erlaubt: auf schmalen Karten passen Pfeile, Monat und ein laengeres
- * lokalisiertes "Aktuell" nicht in eine Zeile. Der Reset rutscht dann als
- * letztes Glied in die naechste Zeile, der Stepper bleibt beisammen. */
-.housekeeping-month-nav {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1);
+/* Monats-Stepper des Berichte-Tabs (#1137) im Center-Slot des Kopfs
+ * (#housekeeping-period, Critique 2026-09-26): Pfeil, Monat, Pfeil, dahinter
+ * der Reset - dieselbe Reihenfolge und dieselben Masse wie Budget
+ * (.budget-nav__label, .budget-nav__today). Umbruch, Zeile und Position kommen
+ * aus der Shell (`.page-toolbar--wrap`, `.page-toolbar--period`).
+ *
+ * `[hidden]` durchsetzen: `.page-toolbar__center` setzt `display: flex` mit
+ * hoeherer Spezifitaet als das UA-`[hidden]` - der leere Slot stand sonst auf
+ * den anderen Tabs als Luecke im Kopf. */
+.housekeeping-period[hidden] {
+  display: none;
 }
 
-/* [hidden] durchsetzen: .btn setzt display mit gleicher Spezifitaet, der Reset
- * blieb sonst im laufenden Monat sichtbar (dieselbe Falle wie in budget.css). */
-.housekeeping-month-nav [hidden] { display: none !important; }
-
-/* Der Monat ist der Wert des Steppers, kein Nebentext: die Regel fuer den
- * Abschnittskopf faerbt jedes span sekundaer. Die Mindestbreite haelt den
- * naechsten Pfeil an seinem Platz, waehrend der Monatsname kuerzer oder laenger wird. */
-.housekeeping-section-heading .housekeeping-month-nav__label {
-  min-width: 9.5rem;
+.housekeeping-month-nav__label {
+  flex: 1;
   text-align: center;
+  font-size: var(--text-base);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
+  white-space: nowrap;
 }
 
 .housekeeping-month-nav__current {
   padding: var(--space-1) var(--space-3);
+}
+
+/* EINE TITELZEILE, EINE HOEHE. Am Desktop traegt die Titelzeile je Tab etwas
+ * anderes: die angedockte Kopf-Pille (Aufgaben, Personal), den Stepper
+ * (Berichte) oder nur den Titel (Uebersicht). Gemessen 116 / 129 / 133px Kopf
+ * - der Inhalt ruckte bei jedem Tabwechsel. Der Aktions-Slot haelt die Zeile
+ * deshalb auf der Hoehe eines Kopf-Bedienelements, auch wenn er leer ist.
+ * Nur mit angedocktem Knopf (ab 1024px, dockFabIntoToolbar in router.js):
+ * darunter steht der Slot leer und darf keine Zeile oeffnen. */
+@media (min-width: 1024px) {
+  .housekeeping-toolbar > .page-toolbar__actions {
+    min-height: var(--target-base);
+  }
 }
 
 .housekeeping-chart {
@@ -380,6 +375,13 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+/* Bereich und Rhythmus im Anlegedialog: zwei kurze Felder nebeneinander, auch
+ * mobil - der Name steht darueber in voller Breite. Doppelte Klasse, weil die
+ * Mobil-Regel unten jedes `.housekeeping-form-grid` einspaltig stellt. */
+.housekeeping-form-grid.housekeeping-form-grid--pair {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
 .housekeeping-form-submit {
   min-height: var(--target-lg);
   align-self: flex-start;
@@ -388,27 +390,59 @@
   gap: var(--space-2);
 }
 
-.housekeeping-template-list {
-  display: flex;
-  gap: var(--space-2);
-  overflow-x: auto;
-  padding-bottom: var(--space-1);
+/* DER ANLEGEDIALOG (Critique 2026-09-26, A3 P1-1): oben die Vorlagen als
+ * Schnellauswahl, darunter das eigene Formular. Vorher standen beide als
+ * Karten dauerhaft vor der Liste; das Karussell lief seitlich aus dem Bild,
+ * im Dialog brechen die Vorlagen stattdessen als Raster um - alle auf einen
+ * Blick, kein verstecktes Ende. */
+.housekeeping-create {
+  display: grid;
+  gap: var(--space-5);
 }
 
-.housekeeping-template {
-  min-width: 180px;
-  border: 1.5px dashed var(--color-border);
-  border-radius: var(--radius-md);
-  background-color: var(--color-surface);
-  color: var(--color-text-primary);
-  padding: var(--space-3);
-  text-align: left;
+.housekeeping-create__heading {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+}
+
+.housekeeping-template-list {
   display: grid;
-  gap: var(--space-1);
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: var(--space-2);
+}
+
+/* Eine Vorlage ist ein Knopf, der sofort anlegt - Flaeche in der Kontrollfarbe
+ * statt gestrichelter Kante: die Strichelung sagte „hier ablegen". */
+.housekeeping-template {
+  min-height: var(--target-lg);
+  border: 0;
+  border-radius: var(--radius-md);
+  background-color: var(--color-fill-well);
+  color: var(--color-text-primary);
+  padding: var(--space-2) var(--space-3);
+  text-align: start;
+  display: grid;
+  align-content: center;
+  gap: var(--space-0h);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.housekeeping-template:hover {
+  background-color: var(--color-surface-hover);
+}
+
+.housekeeping-template__name {
+  font-weight: var(--font-weight-semibold);
 }
 
 .housekeeping-template small {
   color: var(--color-text-secondary);
+  font-size: var(--text-xs);
 }
 
 /* Nur das Layout - die Trägergrammatik kommt aus `.row-carrier` (list-row.css).
@@ -419,10 +453,12 @@
   flex-direction: column;
 }
 
+/* Die Besuche des Monats: ein `.row-carrier` wie die Aufgabenliste (die
+ * Klasse setzt renderReports() nur, wenn es Zeilen gibt - ein Leersatz bekommt
+ * keine Flaeche). */
 .housekeeping-reports {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
 }
 
 /* Eine ZEILE, keine Karte: KEINE eigene Fläche, KEIN Radius, KEINE Kante - das
@@ -435,20 +471,25 @@
  * Stylesheet lädt später - ein `border: none` hier hätte sie gelöscht. Gemessen
  * im Dokument als `border-top-width: 0px` über alle Zeilen (der Budget-Plan lag
  * genau so daneben). */
+/* DIE ZEILE IST EINE `.list-row` (Critique 2026-09-26, A3 P1-1): Kreis |
+ * Titel + Meta | Aktionen, Geometrie aus list-row.css. Vorher stand hier ein
+ * Grid `56px 1fr` mit DREI Kindern - die Aktionen brachen in eine dritte Zeile
+ * unter den Kreis, und die Zeile mass mobil 161px. Ohne Kreis (`read`) rueckt
+ * der Text an die Kante, eine reservierte Spalte gibt es nicht mehr.
+ *
+ * Der Platz fuer den Titel ist mobil das Mass der Zeile: 334px Inhalt minus
+ * Kreis und zwei Aktionen liessen 162px, und „Bettwaesche wechseln" brach um.
+ * Kreis und Aktionen tragen ihre Luft deshalb IN ihrer 48px-Flaeche und
+ * reichen mit ihr in die Zeilenpolsterung hinein (der Ring steht damit auf der
+ * Inhaltskante); der Zeilenabstand faellt auf 4px, sichtbar bleiben zwischen
+ * Ring und Titel 16px. */
 .housekeeping-task {
-  display: grid;
-  grid-template-columns: 56px 1fr;
-  gap: var(--space-3);
-  align-items: center;
-  min-height: 88px;
-  padding: var(--space-3);
+  gap: var(--space-1);
 }
 
-/* Bei `housekeeping: read` hat die Zeile keinen Erledigt-Kreis (#1265 P6,
- * `taskRowHtml()`): ohne ihn laege die Auskunft in der 56px-Spalte, die fuer
- * den Kreis reserviert ist. Gleiche Spezifitaet, spaeter - gewinnt. */
-.housekeeping-task--readonly {
-  grid-template-columns: minmax(0, 1fr);
+.housekeeping-task > .list-row__actions,
+.housekeeping-report-item > .list-row__actions {
+  margin-inline-end: calc(-1 * var(--space-2));
 }
 
 /* BEIDE Zustände tragen ihre Tönung allein. Die früher zusätzliche
@@ -466,33 +507,75 @@
   background-color: color-mix(in srgb, var(--color-danger) var(--tint-wash), transparent);
 }
 
+/* DER KREIS: ein LEERER Ring in 48px Trefferflaeche (Bauart `.item-check`,
+ * shopping.css). Der gefuellte Kreis mit Haken las sich an jeder Zeile wie
+ * „schon erledigt" (A3, Persona Oma Ingrid) - er heisst aber „jetzt erledigen".
+ * Der Haken erscheint erst als Einladung unter Zeiger und Fokus. */
 .housekeeping-task__check {
-  width: 52px;
-  height: 52px;
-  border: 2px solid var(--module-accent);
+  position: relative;
+  flex-shrink: 0;
+  margin-inline-start: calc(-1 * var(--space-3));
+  width: var(--target-lg);
+  height: var(--target-lg);
+  border: 0;
   border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--module-accent) var(--tint-surface), var(--color-surface));
-  color: var(--module-accent);
+  background: none;
+  color: transparent;
   display: grid;
   place-items: center;
+  cursor: pointer;
+  transition: color var(--transition-fast);
 }
 
-.housekeeping-task__body h2 {
+.housekeeping-task__check::before {
+  content: '';
+  position: absolute;
+  width: var(--space-6);
+  height: var(--space-6);
+  border: 2px solid var(--module-accent);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  transition: background-color var(--transition-fast);
+}
+
+.housekeeping-task__check svg {
+  position: relative;
+  width: var(--space-4);
+  height: var(--space-4);
+}
+
+.housekeeping-task__check:hover,
+.housekeeping-task__check:focus-visible {
+  color: var(--module-accent);
+}
+
+.housekeeping-task__check:hover::before {
+  background: color-mix(in srgb, var(--module-accent) var(--tint-surface), var(--color-surface));
+}
+
+.housekeeping-task__check:active::before {
+  transform: scale(0.92);
+}
+
+/* Titel als Zeilenname: die h2 behaelt ihre Rolle fuer die Ueberschriften-
+ * Navigation, Groesse und Gewicht kommen aus `.list-row__name`. */
+.housekeeping-task__body h2,
+.housekeeping-task__body p {
   margin: 0;
 }
 
-.housekeeping-task__body p {
-  margin: var(--space-1) 0;
-  color: var(--color-text-secondary);
+/* Nur ein faelliger Zustand steht in der Metazeile (taskRowHtml()), in seiner
+ * Signalfarbe - dieselbe Sprache wie `.due-date--overdue` in den Aufgaben. */
+.housekeeping-task__status {
+  font-weight: var(--font-weight-semibold);
 }
 
-.housekeeping-task__body span {
-  font-weight: var(--font-weight-bold);
+.housekeeping-task--overdue .housekeeping-task__status {
+  color: var(--color-danger);
 }
 
-.housekeeping-task__actions {
-  display: flex;
-  gap: var(--space-2);
+.housekeeping-task--today .housekeeping-task__status {
+  color: var(--color-warning);
 }
 
 .housekeeping-loading {
@@ -530,16 +613,21 @@
   border: 1px solid var(--color-border-subtle);
 }
 
-.housekeeping-report-item {
-  display: grid;
-  grid-template-columns: 56px 1fr;
-  gap: var(--space-3);
-  align-items: center;
-  padding: var(--space-3);
+/* Die Besuchszeile im Berichte-Tab ist eine `.list-row` (renderReports());
+ * hier steht nur der Avatar in Zeilengroesse. Vorher trug sie ein eigenes Grid
+ * mit 56px-Bildspalte, und der Bericht-Knopf brach in eine eigene Zeile. */
+.housekeeping-avatar--row {
+  width: var(--target-sm);
+  height: var(--target-sm);
+  font-size: var(--text-xs);
 }
 
-.housekeeping-report-item--visit {
-  grid-template-columns: 48px minmax(0, 1fr) auto;
+/* Die Metazeile „23.09. · 45,00 € · Ausstehend" braucht mobil 191px; mit
+ * 40px-Avatar und vollen Abstaenden blieben 186, und jede offene Zeile brach
+ * auf 84px um. Die Aktionen ruecken deshalb wie in der Aufgabenzeile naeher -
+ * ihre 48px-Flaechen tragen die Luft selbst. */
+.housekeeping-report-item > .list-row__actions {
+  margin-inline-start: calc(-1 * var(--space-1));
 }
 
 .housekeeping-report-item--visit .housekeeping-avatar img {
@@ -547,31 +635,6 @@
   height: 100%;
   border-radius: inherit;
   background: transparent;
-}
-
-.housekeeping-report-item img,
-.housekeeping-report-item > svg {
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius-sm);
-  object-fit: cover;
-  /* NENNT NICHTS: ein Platzhalter, kein Absenderzeichen. Er trug den Modulton
-   * als Waschung und sagte damit „Haushaltshilfe" auf einer Seite, die das schon
-   * beantwortet. Neutral ist hier die Aussage, nicht der Rückzug - siehe die
-   * Vollton-Regel in DESIGN.md (Colors): entweder es nennt etwas, dann im
-   * Vollton, oder es nennt nichts, dann neutral. */
-  color: var(--color-text-secondary);
-  background: var(--color-fill-well);
-}
-
-.housekeeping-report-item div {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.housekeeping-report-item span {
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
 }
 
 .housekeeping-report-modal {
@@ -805,6 +868,12 @@
   .housekeeping-section-heading {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  /* Der Kopf-Stepper hat mobil seine eigene Zeile (.page-toolbar--wrap) und
+   * steht dort mittig wie im Budget, nicht an den Titel gedrueckt. */
+  .housekeeping-period {
+    justify-content: center;
   }
 
 }

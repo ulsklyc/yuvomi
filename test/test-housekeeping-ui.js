@@ -34,14 +34,30 @@ globalThis.window.yuvomi = { showToast: (...args) => toasts.push(args) };
 
 const { __test: hk } = await import('../public/pages/housekeeping.js');
 
-function fakeContainer() {
+function fakeNode() {
   return {
     html: '',
-    isConnected: true,
+    hidden: true,
     replaceChildren() { this.html = ''; },
     insertAdjacentHTML(_position, markup) { this.html += markup; },
     querySelector() { return null; },
     querySelectorAll() { return []; },
+  };
+}
+
+/**
+ * Der Inhalt eines Tabs samt dem Zeitraum-Slot im Kopf seiner Seite
+ * (`#housekeeping-period`, Critique 2026-09-26): der Monats-Stepper steht
+ * dort, nicht mehr im Inhalt. `content.period.html` ist, was im Kopf steht.
+ */
+function fakeContainer() {
+  const period = fakeNode();
+  const page = { querySelector: (sel) => (sel === '#housekeeping-period' ? period : null) };
+  return {
+    ...fakeNode(),
+    isConnected: true,
+    period,
+    closest: (sel) => (sel === '.housekeeping-page' ? page : null),
   };
 }
 
@@ -152,13 +168,44 @@ async function freshReports() {
 
 test('Startzustand: laufender Monat, Reset verborgen', async () => {
   const content = await freshReports();
-  assert.match(content.html, /id="housekeeping-report-month">September 2026</);
-  assert.match(content.html, /id="housekeeping-report-current" hidden>/, 'Reset im laufenden Monat verborgen');
-  assert.ok(content.html.indexOf('housekeeping-report-prev') < content.html.indexOf('housekeeping-report-month')
-    && content.html.indexOf('housekeeping-report-month') < content.html.indexOf('housekeeping-report-next')
-    && content.html.indexOf('housekeeping-report-next') < content.html.indexOf('id="housekeeping-report-current"'),
+  const head = content.period.html;
+  assert.match(head, /id="housekeeping-report-month">September 2026</);
+  // `.is-current` + `inert` wie Budget und Kalender (#1200), nicht `hidden`:
+  // der Reset behaelt seinen Platz, und der Weiter-Pfeil ruckt nicht.
+  assert.match(head, /class="btn btn--secondary housekeeping-month-nav__current is-current" type="button"\s+id="housekeeping-report-current" inert>/,
+    'Reset im laufenden Monat verborgen, sein Platz bleibt');
+  assert.ok(head.indexOf('housekeeping-report-prev') < head.indexOf('housekeeping-report-month')
+    && head.indexOf('housekeeping-report-month') < head.indexOf('housekeeping-report-next')
+    && head.indexOf('housekeeping-report-next') < head.indexOf('id="housekeeping-report-current"'),
   'Reihenfolge: zurueck, Monat, vor, Reset');
   assert.equal(requests.filter((u) => u.includes('?month=')).length, 0, 'ohne Wahl kein Monatsparameter');
+});
+
+test('der Monats-Stepper steht im Kopf, nicht im Inhalt (Critique 2026-09-26)', async () => {
+  const content = await freshReports();
+  assert.equal(content.period.hidden, false, 'im Berichte-Tab ist der Zeitraum-Slot sichtbar');
+  assert.match(content.period.html, /id="housekeeping-report-prev"/);
+  assert.doesNotMatch(content.html, /housekeeping-report-(prev|next|month|current)/,
+    'in der Karte scrollte der Monat mit der Kennzahl-Zeile weg');
+  hk.state().tab = 'tasks';
+  hk.syncReportPeriod(content);
+  assert.equal(content.period.hidden, true, 'auf anderen Tabs ist der Slot verborgen');
+  assert.equal(content.period.html, '', 'und leer');
+  hk.state().tab = 'reports';
+});
+
+test('die Besuchszeile ist eine list-row mit Bezahlen als row-action - kein beschrifteter Knopf in eigener Zeile', async () => {
+  const content = await freshReports();
+  await hk.stepReportMonth(content, -1);
+  const rows = content.html.split('<article').slice(1).filter((row) => row.includes('housekeeping-report-item'));
+  assert.equal(rows.length, 2);
+  for (const row of rows) assert.match(row, /^ class="list-row /, 'Zeile in der Listengrammatik');
+  const offen = rows.find((row) => row.includes('data-pay-report'));
+  assert.ok(offen, 'der offene Besuch bietet Bezahlen an');
+  assert.match(offen, /<button class="row-action" type="button" data-pay-report="12"\s+aria-label="housekeeping\.markPaid: /);
+  assert.doesNotMatch(offen, /btn--secondary/, 'kein beschrifteter Knopf mehr in der Zeile');
+  assert.match(content.html, /class="housekeeping-reports row-carrier"/);
+  assert.doesNotMatch(content.html, /metric-card--inset/, 'dieselben Kennzahlkarten wie die Uebersicht');
 });
 
 test('die Besuchs-Kachel im Berichte-Tab behauptet keinen laufenden Monat', async () => {
@@ -189,9 +236,9 @@ test('Schritt zurueck laedt den Vormonat mit seinen Summen und zeigt den Reset',
   const content = await freshReports();
   await hk.stepReportMonth(content, -1);
   assert.equal(requests.at(-1), '/housekeeping/visits?month=2026-08');
-  assert.match(content.html, /id="housekeeping-report-month">August 2026</);
+  assert.match(content.period.html, /id="housekeeping-report-month">August 2026</);
   assert.equal(count(content.html, 'housekeeping-report-item--visit'), 2, 'beide Besuche des August');
-  assert.doesNotMatch(content.html, /id="housekeeping-report-current" hidden>/);
+  assert.doesNotMatch(content.period.html, /is-current|inert/, 'der Reset ist da, sobald ein anderer Monat steht');
   assert.equal(hk.state().visitReport.totals.paid, 60);
 });
 
@@ -213,7 +260,7 @@ test('Neuladen nach einer Aktion behaelt den gewaehlten Monat', async () => {
   await hk.loadData();
   hk.renderReports(content);
   assert.ok(requests.includes('/housekeeping/visits?month=2026-08'), 'loadData fragt den gewaehlten Monat an');
-  assert.match(content.html, /id="housekeeping-report-month">August 2026</);
+  assert.match(content.period.html, /id="housekeeping-report-month">August 2026</);
   assert.equal(hk.state().recentVisits[0].id, 21, 'die Uebersicht bleibt beim laufenden Monat');
 });
 
@@ -239,7 +286,7 @@ test('eine ueberholte Antwort ueberschreibt den spaeteren Monat nicht', async ()
   pending['2026-08']();
   await first;
   assert.equal(hk.state().visitReport.month, '2026-07');
-  assert.match(content.html, /id="housekeeping-report-month">Juli 2026</);
+  assert.match(content.period.html, /id="housekeeping-report-month">Juli 2026</);
 });
 
 test('ein Fehler setzt den Monat zurueck und meldet ihn', async () => {
@@ -317,7 +364,7 @@ test('eine vor der Aktion gestartete Monatsantwort ueberschreibt das spaetere Ne
   await step;
   assert.equal(hk.state().visitReport.month, '2026-08');
   assert.equal(hk.state().visitReport.totals.paid, 100, 'der Stand von vor der Aktion bleibt verworfen');
-  assert.match(content.html, /id="housekeeping-report-month">August 2026</, 'der Schritt rendert trotzdem');
+  assert.match(content.period.html, /id="housekeeping-report-month">August 2026</, 'der Schritt rendert trotzdem');
 });
 
 test('kommt nach einem gescheiterten Schritt ein Neuladen mit anderem Monat an, rechnet der Stepper von dessen Monat (#1174)', async () => {
@@ -374,10 +421,10 @@ test('das Monatslabel folgt der Sprache', async () => {
     globalThis.__locale = 'fr';
     const content = await freshReports();
     await hk.stepReportMonth(content, -1);
-    assert.match(content.html, /id="housekeeping-report-month">août 2026</);
+    assert.match(content.period.html, /id="housekeeping-report-month">août 2026</);
     globalThis.__locale = 'ja';
     hk.renderReports(content);
-    assert.match(content.html, /id="housekeeping-report-month">2026年8月</);
+    assert.match(content.period.html, /id="housekeeping-report-month">2026年8月</);
   } finally {
     delete globalThis.__locale;
   }

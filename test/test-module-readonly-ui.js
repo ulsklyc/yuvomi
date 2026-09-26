@@ -3273,11 +3273,68 @@ test('Aufgaben-Tab mit `housekeeping: read`: kein Anlegen, kein Abhaken, keine Z
 
   const schreiben = hkContainer();
   withAccess({ housekeeping: 'write' }, () => hk.renderTasks(schreiben));
-  for (const da of ['data-template-index="0"', 'id="housekeeping-task-form"', 'data-complete-task="3"', 'data-undo-task="3"', 'data-edit-task="3"', 'data-delete-task="3"']) {
+  for (const da of ['data-complete-task="3"', 'data-edit-task="3"', 'data-delete-task="3"']) {
     assert.ok(schreiben.html.includes(da), `mit Schreibrecht steht ${da} da`);
+  }
+  // Die Liste ZUERST (Critique 2026-09-26): Vorlagen und Formular sitzen im
+  // Anlegedialog hinter dem FAB, nicht mehr vor der Liste. Das Zuruecknehmen
+  // ist der Toast nach dem Erledigen, kein Zeilenknopf mehr.
+  for (const weg of ['data-template-index', 'housekeeping-task-form', 'data-undo-task']) {
+    assert.doesNotMatch(schreiben.html, new RegExp(weg), `${weg} steht nicht mehr im Tab`);
   }
   assert.doesNotMatch(schreiben.html, /housekeeping-task--readonly/);
   assert.ok(schreiben.gefragt.includes('[data-complete-task]'));
+
+  // Der Anlegedialog: bei `read` geht er gar nicht auf, mit Schreibrecht traegt
+  // er die Vorlagen und das Formular.
+  assert.deepEqual(mitModal(() => withAccess({ housekeeping: 'read' }, () => hk.openTaskCreateModal(schreiben))), [],
+    'bei read oeffnet kein Anlegedialog');
+  const [dialog] = mitModal(() => withAccess({ housekeeping: 'write' }, () => hk.openTaskCreateModal(schreiben)));
+  assert.ok(dialog, 'mit Schreibrecht oeffnet er');
+  for (const da of ['data-template-index="0"', 'id="housekeeping-task-form"']) {
+    assert.ok(dialog.content.includes(da), `der Dialog traegt ${da}`);
+  }
+});
+
+test('Anlegedialog: eine Vorlage, die schon als Aufgabe dasteht, schlaegt nichts mehr vor', () => {
+  hkState({
+    templates: [
+      { key: 'a', name: 'Fenster putzen', area: 'Wohnzimmer', frequency_days: 14 },
+      { key: 'b', name: 'Bad putzen', area: 'Bad', frequency_days: 7 },
+    ],
+    tasks: [{ id: 3, name: 'fenster putzen ', area: 'Wohnzimmer', frequency_days: 14, urgency_status: 'ok' }],
+  });
+  const [dialog] = mitModal(() => withAccess({ housekeeping: 'write' }, () => hk.openTaskCreateModal(hkContainer())));
+  assert.doesNotMatch(dialog.content, /data-template-index="0"/, 'Fenster putzen steht schon in der Liste');
+  assert.match(dialog.content, /data-template-index="1"/, 'der Index bleibt der der Vorlagenliste');
+  hkState({ templates: [{ key: 'a', name: 'Fenster putzen', area: 'Wohnzimmer', frequency_days: 14 }],
+    tasks: [{ id: 3, name: 'Fenster putzen', area: 'Wohnzimmer', frequency_days: 14, urgency_status: 'ok' }] });
+  const [leer] = mitModal(() => withAccess({ housekeeping: 'write' }, () => hk.openTaskCreateModal(hkContainer())));
+  assert.doesNotMatch(leer.content, /housekeeping-templates-title/, 'ohne Vorschlag faellt der Abschnitt weg');
+  assert.match(leer.content, /id="housekeeping-task-form"/, 'das Formular bleibt');
+});
+
+test('Erledigen: der Toast nimmt es zurueck - auf den VORHERIGEN Zeitpunkt, nicht auf leer', async () => {
+  const toasts = [];
+  hkState({ tab: 'dashboard' });
+  const anfragen = await mitHkApi(async () => {
+    globalThis.window.yuvomi.showToast = (...args) => toasts.push(args);
+    await withAccess({ housekeeping: 'write' }, () => hk.completeTask({ id: 3, last_completed: '2026-09-07T07:00:00Z' }, hkContainer()));
+    const undo = toasts.find((args) => args[0] === 'housekeeping.taskDoneToast')?.[3];
+    assert.equal(typeof undo, 'function', 'der Erledigt-Toast traegt einen Rueckweg');
+    await withAccess({ housekeeping: 'write' }, () => undo());
+  });
+  assert.ok(anfragen.includes('POST /housekeeping/decay-tasks/3/complete'));
+  assert.ok(anfragen.includes('PATCH /housekeeping/decay-tasks/3'));
+  // Der Stub reicht den Body als `body` zurueck - hier die Probe darauf.
+  let body = null;
+  await mitHkApi(async () => {
+    globalThis.__apiStub.patch = async (_url, b) => { body = b; return { data: null }; };
+    globalThis.window.yuvomi.showToast = (...args) => toasts.push(args);
+    await withAccess({ housekeeping: 'write' }, () => hk.completeTask({ id: 3, last_completed: '2026-09-07T07:00:00Z' }, hkContainer()));
+    await withAccess({ housekeeping: 'write' }, () => toasts.at(-1)[3]?.());
+  });
+  assert.deepEqual(body, { last_completed: '2026-09-07T07:00:00Z' });
 });
 
 // -------------------------------------------------------------------------
@@ -3287,10 +3344,13 @@ test('Aufgaben-Tab mit `housekeeping: read`: kein Anlegen, kein Abhaken, keine Z
 test('Berichte-Tab mit `housekeeping: read`: kein Bezahlen, Monat und Bericht bleiben', () => {
   hkState({ tab: 'reports', visitReport: { month: '2026-08', visits: [hkBesuch()], totals: { pending: 40 } }, reports: [hkBesuch()] });
   const lesen = hkContainer();
+  // Der Monat steht im Kopf der Seite (Critique 2026-09-26), nicht im Inhalt.
+  const kopf = hkContainer();
+  lesen.closest = (sel) => (sel === '.housekeeping-page' ? { querySelector: (s) => (s === '#housekeeping-period' ? kopf : null) } : null);
   withAccess({ housekeeping: 'read' }, () => hk.renderReports(lesen));
   assert.doesNotMatch(lesen.html, /data-pay-report/, 'auch nicht mit veraltetem `can_mark_paid: true`');
   assert.match(lesen.html, /data-visit-report="12"/, 'der Bericht bleibt');
-  assert.match(lesen.html, /id="housekeeping-report-prev"/, 'die Monatswahl bleibt');
+  assert.match(kopf.html, /id="housekeeping-report-prev"/, 'die Monatswahl bleibt');
   assert.ok(!lesen.gefragt.includes('[data-pay-report]'), 'das Bezahlen wird nicht verdrahtet');
   assert.ok(lesen.gefragt.includes('[data-visit-report]'));
 
@@ -3754,11 +3814,18 @@ test('das Zeichen „gerade im Haus" traegt keinen Zeiger und keine Hover-Quittu
     'Status statt Disabled-Grau (Audit F9) - die Farben der frueheren :disabled-Regel');
 });
 
-test('die Aufgabenzeile ohne Kreis gibt dessen Spalte frei', () => {
-  const zeile = ['housekeeping-task', 'housekeeping-task--overdue'];
-  assert.equal(effektiverWert(HK_CSS, zeile, 'grid-template-columns'), '56px 1fr');
-  assert.equal(effektiverWert(HK_CSS, [...zeile, 'housekeeping-task--readonly'], 'grid-template-columns'), 'minmax(0, 1fr)',
-    'sonst laege die Auskunft in der 56px-Spalte des Kreises');
+test('die Aufgabenzeile ohne Kreis reserviert keine Spalte fuer ihn', () => {
+  // Seit 2026-09-26 eine `.list-row` (Flex): Kreis | Text | Aktionen. Eine feste
+  // Kreisspalte wie das fruehere Grid `56px 1fr` gibt es nicht mehr - fehlt der
+  // Kreis (`read`), steht der Text an der Kante.
+  const zeile = ['list-row', 'housekeeping-task', 'housekeeping-task--overdue'];
+  assert.equal(effektiverWert(HK_CSS, zeile, 'grid-template-columns'), null);
+  assert.equal(effektiverWert(HK_CSS, [...zeile, 'housekeeping-task--readonly'], 'grid-template-columns'), null);
+  assert.equal(effektiverWert(HK_CSS, zeile, 'display'), null, 'die Geometrie kommt aus list-row.css');
+  hkState({ tasks: [{ id: 3, name: 'Fenster putzen', area: 'Wohnzimmer', frequency_days: 14, urgency_status: 'overdue' }] });
+  const lesen = hkContainer();
+  withAccess({ housekeeping: 'read' }, () => hk.renderTasks(lesen));
+  assert.match(lesen.html, /<article class="list-row housekeeping-task /);
 });
 
 // -------------------------------------------------------------------------
