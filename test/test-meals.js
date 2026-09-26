@@ -1507,6 +1507,107 @@ test('#1317: touch-action: none sitzt am Griff der schmalen Zeile und NUR dort, 
 });
 
 // --------------------------------------------------------
+// Montag (Critique 2026-09-26, A4 P1)
+//
+// Bei 1440px lag der Montag beim Laden unter der Gutter-Spalte: renderWeekGrid()
+// fragte „heute verdeckt?" bei OFFENER Rezept-Spalte, zentrierte den Samstag, und
+// erst danach klappte wireRailToggle() die Spalte zu - scrollLeft klemmte auf
+// 52px. Die Probe faehrt die ECHTEN Funktionen gegen ein Board, dessen Breite an
+// der Rezept-Spalte haengt, wie im Browser: offen laeuft die Woche ueber, zu
+// passt sie.
+// --------------------------------------------------------
+
+function mondayBoard({ stored = null } = {}) {
+  const layoutClasses = new Set();
+  const calls = [];
+  const railOpen = () => !layoutClasses.has('meals-layout--rail-hidden');
+  const todayHeader = {
+    // Samstag: bei offener Spalte rechts hinter der Kante, zu im Blick.
+    getBoundingClientRect: () => (railOpen() ? { left: 1300, right: 1440 } : { left: 1104, right: 1252 }),
+    scrollIntoView: (opts) => calls.push(opts),
+    closest: () => null,
+  };
+  const grid = {
+    get scrollWidth() { return railOpen() ? 1208 : 1152; },
+    get clientWidth() { return railOpen() ? 836 : 1156; },
+    getBoundingClientRect: () => ({ left: 252, right: railOpen() ? 1088 : 1408 }),
+    querySelector: (sel) => {
+      if (sel === '.day-header--today') return todayHeader;
+      if (sel === '.week-gutter-label') return { getBoundingClientRect: () => ({ width: 116 }) };
+      return null;
+    },
+  };
+  const layout = { classList: {
+    toggle: (c, force) => (force ? layoutClasses.add(c) : layoutClasses.delete(c)),
+    contains: (c) => layoutClasses.has(c),
+  } };
+  const item = { addEventListener() {} };
+  const container = {
+    querySelector: (sel) => {
+      if (sel === '#week-grid') return grid;
+      if (sel === '.meals-layout') return layout;
+      if (sel === '.popover-menu__item[data-action="toggle-rail"]') return item;
+      return null;
+    },
+  };
+  return { container, grid, calls, railOpen, stored };
+}
+
+function withBoardEnv(stored, fn) {
+  const zuvorWindow = globalThis.window;
+  const zuvorStorage = globalThis.localStorage;
+  globalThis.window = { matchMedia: () => ({ matches: false }) };
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true, writable: true,
+    value: { getItem: () => stored, setItem() {} },
+  });
+  try { return fn(); } finally {
+    globalThis.window = zuvorWindow;
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, writable: true, value: zuvorStorage });
+  }
+}
+
+test('A4 P1: vor der Entscheidung der Rezept-Spalte scrollt das Board nicht zu „heute"', () => {
+  withBoardEnv(null, () => {
+    const b = mondayBoard();
+    mealsUi.setContainerForTest(b.container);
+    // Erster Bildaufbau: Spalte offen, die Woche laeuft ueber, heute liegt rechts
+    // hinter der Kante - frueher der Moment, in dem der Samstag zentriert wurde.
+    mealsUi.revealToday(b.grid);
+    assert(b.calls.length === 0, `das Board scrollte bei offener Spalte zu heute (${b.calls.length}x) - danach klappt die Spalte zu und der Montag liegt unter der Gutter`);
+    mealsUi.wireRailToggle();
+    assert(!b.railOpen(), 'ohne Merker klappt die Spalte zu, wenn die Woche mit ihr nicht passt');
+    assert(b.calls.length === 0, 'mit zugeklappter Spalte passt die Woche - kein Scroll, der Montag bleibt stehen');
+  });
+});
+
+test('A4 P1: mit gemerkter offener Spalte holt das Board „heute" NACH der Entscheidung in den Blick', () => {
+  withBoardEnv('shown', () => {
+    const b = mondayBoard();
+    mealsUi.setContainerForTest(b.container);
+    mealsUi.revealToday(b.grid);
+    assert(b.calls.length === 0, 'vor der Entscheidung kein Scroll');
+    mealsUi.wireRailToggle();
+    assert(b.railOpen(), 'der Merker haelt die Spalte offen');
+    assert(b.calls.length === 1 && b.calls[0].inline === 'center',
+      `heute ist verdeckt und muss genau einmal in den Blick (${b.calls.length}x)`);
+  });
+});
+
+test('A4 P1: bei 1440px passen sieben Tage ohne Querscroll (116 Gutter + 7 Spalten + 7 Luecken <= 1156)', () => {
+  const css = readFileSync(new URL('../public/styles/meals.css', import.meta.url), 'utf8');
+  const rule = [...eachRule(css)].find((r) => r.selector.trim() === '.week-grid' && /grid-template-columns/.test(r.body));
+  assert(rule, 'keine .week-grid-Regel mit grid-template-columns gefunden - der Test liest meals.css nicht mehr');
+  const gutter = Number(rule.body.match(/--meal-gutter-width:\s*(\d+)px/)?.[1]);
+  const col = Number(rule.body.match(/repeat\(7,\s*minmax\((\d+)px/)?.[1]);
+  assert(gutter > 0 && col > 0, `Gutter/Spalte nicht lesbar (${gutter}/${col})`);
+  // Gap --space-2 = 8px (tokens.css); 1156px = Hauptspalte bei 1440 mit
+  // ausgeklappter Seitenleiste (1220) minus Seitenpolster.
+  const need = gutter + 7 * col + 7 * 8;
+  assert(need <= 1156, `Bedarf ${need}px > 1156px - bei 1440 laeuft die Woche ueber, der Montag wird angeschnitten`);
+});
+
+// --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
 console.log(`\n[Meals-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);

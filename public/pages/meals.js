@@ -61,6 +61,11 @@ let state = {
 
 // Container-Referenz für Hilfsfunktionen (wird in render() gesetzt)
 let _container = null;
+/**
+ * Steht die Rezept-Spalte schon (ein- oder ausgeklappt)? Erst dann darf das
+ * Board entscheiden, ob „heute" verdeckt ist - siehe revealToday().
+ */
+let _railSettled = false;
 let _dragRecipeId = null;
 
 // --------------------------------------------------------
@@ -377,6 +382,7 @@ function mealsToolsMenuHtml() {
 
 export async function render(container, { user }) {
   _container = container;
+  _railSettled = false;
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <div class="meals-page">
@@ -463,7 +469,12 @@ function wireRailToggle() {
   // Icon-Paar panel-right-open/-close trug.
   const item = _container.querySelector('.popover-menu__item[data-action="toggle-rail"]');
   const layout = _container.querySelector('.meals-layout');
-  if (!item || !layout) return;
+  if (!item || !layout) {
+    // Ohne Schalter keine Entscheidung - die Breite steht trotzdem fest.
+    _railSettled = true;
+    revealToday(_container.querySelector('#week-grid'));
+    return;
+  }
   const toolbar = _container.querySelector('.meals-toolbar');
 
   const apply = (hidden) => {
@@ -492,6 +503,10 @@ function wireRailToggle() {
     hidden = Boolean(desktop && grid && grid.scrollWidth > grid.clientWidth + 1);
   }
   apply(hidden);
+  // Jetzt steht die Breite des Boards fest - erst jetzt die Frage, ob „heute"
+  // verdeckt ist (revealToday).
+  _railSettled = true;
+  revealToday(_container.querySelector('#week-grid'));
 
   item.addEventListener('click', () => {
     hidden = !layout.classList.contains('meals-layout--rail-hidden');
@@ -636,6 +651,25 @@ function renderWeekGrid() {
     wireScrollFade(grid);
   }
 
+  revealToday(grid);
+}
+
+
+/**
+ * Holt den heutigen Tag in den Blick - schmal per Stapel-Scroll, am Board nur,
+ * wenn er verdeckt ist.
+ *
+ * ERST NACH DER REZEPT-SPALTE (Critique 2026-09-26, A4 P1). Die Spalte kostet
+ * 272-320px, und ob sie steht, entscheidet wireRailToggle() GEMESSEN am schon
+ * gezeichneten Board. Lief die Frage „heute verdeckt?" vorher, sah sie das
+ * Board bei offener Spalte (~820px), zentrierte den Samstag, und erst danach
+ * klappte die Spalte zu - `scrollLeft` klemmte bei 1440px auf 52px, und der
+ * Montag lag unter der Gutter-Spalte, ohne dass jemand gescrollt hatte. Vor
+ * der Entscheidung tut diese Funktion deshalb nichts; wireRailToggle() ruft
+ * sie danach selbst.
+ */
+function revealToday(grid) {
+  if (!_railSettled || !grid) return;
   // Auf schmalen Viewports (gestapelte Tage) den heutigen Tag in den Blick scrollen.
   if (window.matchMedia?.('(max-width: 639px)').matches) {
     grid.querySelector('.day-header--today')?.closest('.day-column')
@@ -2043,6 +2077,11 @@ export const __test = {
   // gepinnt (test-meals.js, „Ziehgriff").
   renderSlot,
   wireDragDrop,
+  // A4 P1 (Critique 2026-09-26): die Reihenfolge Rezept-Spalte -> „heute in den
+  // Blick" wird als Programm gefahren (test-meals.js, „Montag").
+  revealToday,
+  wireRailToggle,
+  setContainerForTest(container) { _container = container; _railSettled = false; },
   // #1290: der Transfer in den Einkauf braucht BEIDE Schreibrechte - Markup
   // (Kachel und Dialog) und der Handler werden als Programm gefahren
   // (test-kitchen-transfer-ui.js).
