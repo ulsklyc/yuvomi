@@ -374,7 +374,10 @@ export function mountMasterDetail({
     // ERSETZT statt gestapelt: das Blatt legt seinen eigenen Zurueck-Schritt
     // an (overlay-history); ein zweiter fuehrte nach dem Schliessen auf den
     // alten Eintrag und oeffnete bei `deepLinkNarrow` dessen Blatt erneut.
-    if (selected != null && String(selected) !== String(id)) {
+    // Nur auf Seiten, deren Adresse auch schmal etwas oeffnet (`deepLinkNarrow`,
+    // Kontakte, Aufgaben): ein Aufklapp-Akkordeon wie die Rezepte schreibt unter
+    // der Schwelle keine Adresse, dort ist `?open=` nur der Einstieg.
+    if (deepLinkNarrow && selected != null && String(selected) !== String(id)) {
       selected = String(id);
       writeHistory('replace', param, selected);
     }
