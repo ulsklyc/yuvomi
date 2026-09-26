@@ -4608,7 +4608,7 @@ if ('serviceWorker' in navigator) {
 window.addEventListener('popstate', (e) => {
   const target = e.state?.path || location.pathname;
   handleBackNavigation().then((overlay) => {
-    // Eine Auswahl in Liste + Detail (`?id=`) ist ein Zustand DERSELBEN Seite:
+    // Eine Auswahl in Liste + Detail (`?open=`) ist ein Zustand DERSELBEN Seite:
     // der Baustein stellt ihn aus der Adresse wieder her, statt die Seite neu
     // zu zeichnen (utils/master-detail.js). Erst NACH den Dialogen gefragt -
     // ueber einem offenen Dialog meint die Geste den Dialog (#871).

@@ -12,7 +12,7 @@
  *     Container Query auf die Modulflaeche entscheidet, ob die Detailspalte
  *     steht. Ein Modul setzt keine Breite und keinen Breakpoint.
  *   - Der ZUSTAND gehoert diesem Baustein: welche Zeile ausgewaehlt ist, die
- *     Adresse (`?id=`), Zurueck-Taste, Pfeiltasten, Enter/Esc, Leerzustand.
+ *     Adresse (`?open=`), Zurueck-Taste, Pfeiltasten, Enter/Esc, Leerzustand.
  *   - Der INHALT gehoert dem Modul: `renderDetail()` zeichnet das Detail in
  *     den Koerper der Spalte - am besten ueber `openDetailView({ pane })` aus
  *     components/detail-view.js, dasselbe Markup wie im Popover und im Sheet.
@@ -143,7 +143,10 @@ function writeHistory(mode, param, id) {
  * @param {object} opts
  * @param {HTMLElement} opts.root         `.split-view`
  * @param {HTMLElement} [opts.list]       Ereignis-Wurzel der Tastatur; Standard `.split-view__list`
- * @param {string} [opts.param='id']      Name des Adress-Parameters
+ * @param {string} [opts.param='open']    Name des Adress-Parameters. EIN Name fuer
+ *        alle Liste-+-Detail-Seiten: `?open=<id>` ist der Deep-Link, den globale
+ *        Suche und Essenskarten schon setzten - ein zweiter hiesse zwei Adressen
+ *        fuer dieselbe Sache.
  * @param {(id: string, body: HTMLElement, ctx: {signal: AbortSignal}) => (void|false|Promise<void|false>)} opts.renderDetail
  *        Zeichnet das Detail in `body`. `false` heisst: diese ID gibt es nicht
  *        (mehr) - die Auswahl faellt dann auf den Leerzustand zurueck.
@@ -153,13 +156,13 @@ function writeHistory(mode, param, id) {
  *        Enter auf der ausgewaehlten Zeile in der Spalte (z.B. Bearbeiten);
  *        ohne Angabe fokussiert Enter das Detail.
  * @param {boolean} [opts.deepLinkNarrow=false]
- *        `?id=` auch unter der Schwelle einloesen (oeffnet `openNarrow`).
+ *        `?open=` auch unter der Schwelle einloesen (oeffnet `openNarrow`).
  * @param {AbortSignal} [opts.signal]     Router-Signal; Abbruch baut ab.
  * @returns {{open: Function, select: Function, clear: Function, selectedId: Function,
  *   isSplit: Function, refresh: Function, destroy: Function}}
  */
 export function mountMasterDetail({
-  root, list, param = 'id', renderDetail, openNarrow, onEnter,
+  root, list, param = 'open', renderDetail, openNarrow, onEnter,
   deepLinkNarrow = false, signal,
 } = {}) {
   if (!root) throw new TypeError('mountMasterDetail: root fehlt');
@@ -384,7 +387,7 @@ export function mountMasterDetail({
   active?.destroy();
   active = handle;
 
-  // Deep-Link: `?id=` beim Aufbau einloesen.
+  // Deep-Link: `?open=` beim Aufbau einloesen.
   lastSplit = isSplit();
   const initial = new URLSearchParams(location.search).get(param);
   if (initial) {

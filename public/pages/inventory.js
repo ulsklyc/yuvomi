@@ -2205,7 +2205,7 @@ export async function render(container, { signal } = {}) {
 }
 
 /**
- * Deep-Link `?id=` in der Spaltenform: die Zeile des Gegenstands muss in der
+ * Deep-Link `?open=` in der Spaltenform: die Zeile des Gegenstands muss in der
  * Liste stehen, sonst waere die Auswahl ohne Markierung und fiele beim
  * naechsten Neuaufbau weg (master-detail.js#refresh). Die Startseite zeigt nur
  * Kategorien - also die Kategorie des Gegenstands oeffnen, wie ein Klick es
@@ -2213,7 +2213,7 @@ export async function render(container, { signal } = {}) {
  * beim Laden aufspringt), und die Seite bleibt auf der Startseite.
  */
 function openDeepLinkedCategory(split) {
-  const id = new URLSearchParams(location.search).get('id');
+  const id = new URLSearchParams(location.search).get('open');
   if (!id) return;
   const detail = split.querySelector('.split-view__detail');
   if (!detail || getComputedStyle(detail).display === 'none') return;

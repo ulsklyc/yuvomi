@@ -110,6 +110,22 @@ test('die Seite haengt Liste + Detail ein: Klick ueber den Baustein, Signal des 
     'beide Ausgaenge von renderList (leer und gefuellt) melden sich beim Baustein');
 });
 
+test('Deep-Link ?open= (globale Suche): EIN Leser, der Baustein, in beiden Regimen', () => {
+  const src = read('../public/pages/contacts.js');
+  const mount = src.slice(src.indexOf('mountMasterDetail({'));
+  const opts = mount.slice(0, mount.indexOf('\n    });'));
+  // Kein eigener Parameter: `open` ist der Standard des Bausteins und die
+  // Adresse, die die globale Suche setzt. Ein `param: 'id'` hiesse zwei
+  // Adressen fuer denselben Kontakt.
+  assert.doesNotMatch(opts, /\bparam:/, 'Kontakte nutzen den Standard-Parameter des Bausteins (open)');
+  // Unter der Schwelle oeffnet der Link die Leseansicht wie auf main.
+  assert.match(opts, /deepLinkNarrow:\s*true/, 'unter der Schwelle loest der Baustein den Link ein (Leseansicht)');
+  // Kein zweiter Leser neben dem Baustein, der `?open=` umschreibt oder ein
+  // Modal zusaetzlich zur Spalte oeffnet.
+  assert.doesNotMatch(src, /searchParams\)?\.get\('open'\)|search\)\.get\('open'\)/,
+    'contacts.js liest ?open= nicht selbst');
+});
+
 test('die Suche nennt dieselbe Schwelle wie layout.css und deckelt auf die Listenbahn', () => {
   const tokens = read('../public/styles/tokens.css');
   const threshold = Number(tokens.match(/--layout-split-threshold:\s*([0-9.]+)rem/)?.[1]);

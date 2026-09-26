@@ -340,13 +340,20 @@ export async function render(container, { user, signal } = {}) {
   renderCategoryFilters();
   renderList({ animate: true });
 
-  // Liste + Detail einhaengen, sobald die Zeilen stehen: ein `?id=` in der
+  // Liste + Detail einhaengen, sobald die Zeilen stehen: ein `?open=` in der
   // Adresse (Deep-Link, Zurueck-Taste) findet seine Zeile nur dann. Eine
   // Seite, die waehrend der Abrufe schon verlassen wurde, haengt nichts mehr an.
+  //
+  // Deep-Link `?open=<id>` (globale Suche): EIN Parameter fuer beide Regime
+  // und fuer alle Liste-+-Detail-Seiten (Standard des Bausteins). In der
+  // Spalte waehlt er den Kontakt aus, darunter oeffnet er die Leseansicht
+  // (`deepLinkNarrow`) - aus der Suche kommend will man den Treffer zuerst
+  // sehen, nicht bearbeiten, derselbe Grund wie beim Antippen in der Liste.
   if (!signal?.aborted) {
     md = mountMasterDetail({
       root: _container.querySelector('.contacts-split'),
       signal,
+      deepLinkNarrow: true,
       renderDetail: (id, body) => {
         const contact = contactById(id);
         if (!contact) return false;
@@ -378,24 +385,6 @@ export async function render(container, { user, signal } = {}) {
     // Der Klick auf den Eintrag ist die Nutzergeste, die der Datei-Dialog braucht.
     else if (action === 'import-vcard') _container.querySelector('#contacts-import-input')?.click();
   });
-
-  // Deep-Link: ?open=<id> öffnet die Detailansicht. Aus der globalen Suche
-  // kommend will man den Treffer zuerst sehen, nicht bearbeiten - derselbe
-  // Grund wie beim Antippen in der Liste.
-  // In der Spalte wird der Treffer AUSGEWAEHLT: `?open=` weicht dem `?id=` des
-  // Bausteins, damit Zurueck-Taste und Neuladen denselben Kontakt zeigen und
-  // nicht zusaetzlich die Leseansicht als Modal aufgeht.
-  const openId = new URLSearchParams(window.location.search).get('open');
-  if (openId) {
-    const contact = contactById(openId);
-    if (contact && md?.isSplit()) {
-      const url = new URL(location.href);
-      url.searchParams.delete('open');
-      const path = `${url.pathname}${url.search}${url.hash}`;
-      history.replaceState({ ...(history.state ?? {}), path }, '', path);
-      md.select(contact.id, { history: 'replace' });
-    } else if (contact) openContactDetail(contact);
-  }
 
   // Suche
   contactsSearch = wirePageSearch(_container, {

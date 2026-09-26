@@ -4,7 +4,7 @@
  *        Der Baustein findet seine Zeilen NUR ueber `data-md-id` und fokussiert
  *        bei Pfeiltasten das Element mit `data-md-focus` - fehlt eines, steht
  *        die Detailspalte, aber keine Zeile ist waehlbar und die Pfeiltasten
- *        tun nichts. Und ein Deep-Link `?id=` in der Spaltenform muss die
+ *        tun nichts. Und ein Deep-Link `?open=` in der Spaltenform muss die
  *        Kategorie des Gegenstands oeffnen, sonst steht seine Zeile nicht in
  *        der Liste (die Startseite zeigt nur Kategorien) und der erste
  *        Neuaufbau raeumt die Auswahl wieder ab (master-detail.js#refresh).
@@ -52,22 +52,22 @@ function resetState() {
   inventory.state.activeCategory = null;
 }
 
-test('Deep-Link ?id= in der Spaltenform oeffnet die Kategorie des Gegenstands', () => {
+test('Deep-Link ?open= in der Spaltenform oeffnet die Kategorie des Gegenstands', () => {
   resetState();
-  withEnv({ search: '?id=7', display: 'flex' }, () => inventory.openDeepLinkedCategory(split));
+  withEnv({ search: '?open=7', display: 'flex' }, () => inventory.openDeepLinkedCategory(split));
   assert.equal(inventory.state.view, 'category');
   assert.equal(inventory.state.activeCategory, 'vehicles');
 });
 
 test('unter der Schwelle bleibt die Startseite - kein Link springt beim Laden auf', () => {
   resetState();
-  withEnv({ search: '?id=7', display: 'none' }, () => inventory.openDeepLinkedCategory(split));
+  withEnv({ search: '?open=7', display: 'none' }, () => inventory.openDeepLinkedCategory(split));
   assert.equal(inventory.state.view, 'browse');
   assert.equal(inventory.state.activeCategory, null);
 });
 
 test('eine unbekannte ID laesst die Startseite stehen', () => {
   resetState();
-  withEnv({ search: '?id=999', display: 'flex' }, () => inventory.openDeepLinkedCategory(split));
+  withEnv({ search: '?open=999', display: 'flex' }, () => inventory.openDeepLinkedCategory(split));
   assert.equal(inventory.state.view, 'browse');
 });

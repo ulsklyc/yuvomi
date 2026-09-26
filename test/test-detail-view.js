@@ -723,7 +723,13 @@ test('beide Kontakt-Einstiege führen in die Leseansicht', async () => {
   // Listenzeile und Deep-Link (?open=<id> aus der globalen Suche) landeten
   // beide direkt im Formular - genau der Fall, den die Komponente ablöst.
   assert.match(src, /if \(c\) openContactDetail\(c\)/, 'Antippen in der Liste');
-  assert.match(src, /if \(contact\) openContactDetail\(contact\)/, 'Deep-Link ?open=<id>');
+  // Den Deep-Link loest seit R4 der Liste-+-Detail-Baustein ein (EIN Leser fuer
+  // `?open=`): in der Spalte waehlt er aus, darunter ruft er `openNarrow` - und
+  // der ist derselbe Weg wie das Antippen, also die Leseansicht.
+  const mount = src.slice(src.indexOf('mountMasterDetail({'));
+  const opts = mount.slice(0, mount.indexOf('\n    });'));
+  assert.match(opts, /deepLinkNarrow:\s*true/, 'Deep-Link ?open=<id> auch unter der Schwelle');
+  assert.match(opts, /openNarrow:\s*\(id\)\s*=>\s*openContactById\(id\)/, 'Deep-Link ?open=<id> in die Leseansicht');
 
   // Die Neuanlage bleibt im Formular: dort ist Tippen die Absicht.
   assert.match(src, /openContactModal\(\{ mode: 'create'/, 'Neuanlage weiterhin direkt ins Formular');

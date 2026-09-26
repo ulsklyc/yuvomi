@@ -492,8 +492,9 @@ function renderRecipeList({ repaint = false } = {}) {
  * Darunter bleibt alles, wie es war: die Zeile klappt auf, und ein Rezept
  * ohne Detail oeffnet das Formular.
  *
- * DER PARAMETER IST `open`, NICHT `id`. `/recipes?open=<id>` ist der
- * Deep-Link, den die Essenskarten schon setzen (#936). Die Auswahl schreibt
+ * DER PARAMETER IST `open` (Standard des Bausteins, hier ausdruecklich).
+ * `/recipes?open=<id>` ist der Deep-Link, den die Essenskarten schon setzen
+ * (#936). Die Auswahl schreibt
  * dieselbe Schreibweise, damit ein Rezept genau EINE Adresse hat - ein
  * zweiter Parameter hiesse zwei Adressen fuer dieselbe Sache und einen Link
  * aus dem Essensplan, der rechts nichts auswaehlt.

@@ -193,8 +193,8 @@ test('in der Spalte waehlt ein Klick aus: Markierung, Adresse, Detail statt Leer
   assert.deepEqual(p.calls.narrow, [], 'in der Spalte oeffnet kein Modal');
   assert.equal(p.rows[1].classList.contains('is-selected'), true);
   assert.equal(p.focusOf(1).getAttribute('aria-current'), 'true', 'der Screenreader hoert, welche Zeile rechts steht');
-  assert.equal(location.search, '?id=2');
-  assert.deepEqual(historyLog, [['push', '/contacts?id=2']], 'ein Klick ist ein Schritt fuer die Zurueck-Taste');
+  assert.equal(location.search, '?open=2');
+  assert.deepEqual(historyLog, [['push', '/contacts?open=2']], 'ein Klick ist ein Schritt fuer die Zurueck-Taste');
   assert.equal(p.empty.hidden, true);
   assert.equal(p.body.hidden, false);
   handle.open('4');
@@ -219,7 +219,7 @@ test('andere Adress-Parameter bleiben stehen', () => {
   const p = makePage({ path: '/tasks?view=list' });
   const handle = p.mount();
   handle.open('5');
-  assert.equal(location.search, '?view=list&id=5');
+  assert.equal(location.search, '?view=list&open=5');
   handle.clear();
   assert.equal(location.search, '?view=list');
   handle.destroy();
@@ -321,20 +321,20 @@ test('eine ueberholte, langsame Antwort raeumt die neuere Auswahl nicht ab', asy
   handle.destroy();
 });
 
-test('Deep-Link: ?id= waehlt in der Spalte ohne History-Eintrag; darunter nur auf Wunsch', () => {
-  let p = makePage({ path: '/contacts?id=4' });
+test('Deep-Link: ?open= waehlt in der Spalte ohne History-Eintrag; darunter nur auf Wunsch', () => {
+  let p = makePage({ path: '/contacts?open=4' });
   let handle = p.mount();
   assert.equal(handle.selectedId(), '4');
   assert.deepEqual(p.calls.render, ['4']);
   assert.deepEqual(historyLog, [], 'der Aufbau schreibt keine Geschichte');
   handle.destroy();
 
-  p = makePage({ path: '/contacts?id=4', split: false });
+  p = makePage({ path: '/contacts?open=4', split: false });
   handle = p.mount();
   assert.deepEqual(p.calls.narrow, [], 'ein Modal beim Seitenaufbau oeffnet nur, wer es verlangt');
   handle.destroy();
 
-  p = makePage({ path: '/contacts?id=4', split: false });
+  p = makePage({ path: '/contacts?open=4', split: false });
   handle = p.mount({ deepLinkNarrow: true });
   assert.deepEqual(p.calls.narrow, ['4']);
   handle.destroy();
@@ -347,7 +347,7 @@ test('Zurueck/Vor innerhalb der Seite loest der Baustein, nicht der Router', () 
   setUrl('/contacts');
   assert.equal(md.handleMasterDetailPopstate(), true, 'dieselbe Seite: kein Neuzeichnen');
   assert.equal(handle.selectedId(), null);
-  setUrl('/contacts?id=5');
+  setUrl('/contacts?open=5');
   assert.equal(md.handleMasterDetailPopstate(), true);
   assert.equal(handle.selectedId(), '5');
   setUrl('/tasks');
