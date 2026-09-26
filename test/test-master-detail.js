@@ -218,13 +218,14 @@ test('unter der Schwelle oeffnet ein Klick den bisherigen Weg und laesst die Adr
 test('unter der Schwelle mit gemerkter Auswahl: ein anderer Eintrag uebernimmt Auswahl und Adresse', () => {
   // Auswahl A (Spalte oder Deep-Link), dann schmal, dann B antippen: das Blatt
   // zeigt B. Blieben Auswahl und `?open=` bei A, nennte die Adresse den
-  // falschen Eintrag, und beim Verbreitern stuende A in der Spalte.
+  // falschen Eintrag, und beim Verbreitern stuende A in der Spalte. Gilt fuer
+  // Seiten, deren Adresse auch schmal ein Blatt oeffnet (`deepLinkNarrow`).
   const p = makePage({ path: '/contacts?open=2', split: false });
-  const handle = p.mount();
+  const handle = p.mount({ deepLinkNarrow: true });
   assert.equal(handle.selectedId(), '2');
   historyLog.length = 0;
   handle.open('4', p.focusOf(3));
-  assert.deepEqual(p.calls.narrow, ['4']);
+  assert.deepEqual(p.calls.narrow, ['2', '4'], 'der Deep-Link oeffnete schmal sein Blatt, dann der Klick das naechste');
   assert.equal(handle.selectedId(), '4', 'die Auswahl folgt dem geoeffneten Eintrag');
   assert.equal(location.search, '?open=4', 'die Adresse ebenso');
   assert.deepEqual(historyLog, [['replace', '/contacts?open=4']],
@@ -235,11 +236,23 @@ test('unter der Schwelle mit gemerkter Auswahl: ein anderer Eintrag uebernimmt A
 
   // Ohne gemerkte Auswahl bleibt es beim bisherigen Weg: die Adresse ruht.
   const q = makePage({ split: false });
-  const h2 = q.mount();
+  const h2 = q.mount({ deepLinkNarrow: true });
   h2.open('4', q.focusOf(3));
   assert.equal(h2.selectedId(), null);
   assert.deepEqual(historyLog, []);
   h2.destroy();
+
+  // Ein Akkordeon (Rezepte, ohne `deepLinkNarrow`) schreibt unter der Schwelle
+  // nie eine Adresse - dort ist `?open=` nur der Einstieg, und mehrere Eintraege
+  // stehen gleichzeitig offen (CI an #1477, test-recipes-fab-dock).
+  const r = makePage({ path: '/recipes?open=2', split: false });
+  const h3 = r.mount();
+  historyLog.length = 0;
+  h3.open('4', r.focusOf(3));
+  assert.deepEqual(r.calls.narrow, ['4']);
+  assert.equal(location.search, '?open=2', 'das Akkordeon schreibt keine Adresse');
+  assert.deepEqual(historyLog, []);
+  h3.destroy();
 });
 
 test('andere Adress-Parameter bleiben stehen', () => {
