@@ -2291,3 +2291,19 @@ test('Shift types grid: the section head and the empty state span both desktop c
   assert.ok(spanning.includes('.schedule-library--shifts > ' + headSelector), `the rendered head (${headSelector}) must span the 2-column grid, got: ${spanning.join(' | ')}`);
   assert.ok(spanning.includes('.schedule-library--shifts > .empty-state'), 'the empty state must span the grid instead of sitting in column 2 next to the heading');
 });
+
+test('Compare tab on phones: the section track and the week nav may shrink below their content, so nothing pushes the page sideways', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const scheduleCss = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(scheduleCss)].filter((rule) => rule.at.length === 0);
+  const bodyOf = (selector) => rules
+    .filter((rule) => rule.selector.split(',').map((s) => s.trim()).includes(selector))
+    .map((rule) => rule.body).join('\n');
+  // `.schedule-content > section` makes every tab section a grid; without an
+  // explicit column the implicit track is `auto` (max-content) and the
+  // toolbar's natural width (441px at 390) sets the whole section's width.
+  assert.match(bodyOf('.schedule-overview'), /grid-template-columns:\s*minmax\(0,\s*1fr\)/, 'the compare section needs a shrinkable column');
+  const nav = bodyOf('.schedule-overview__week-nav');
+  assert.match(nav, /flex-wrap:\s*wrap/, 'toggle, arrows and the range label must wrap instead of running off screen');
+  assert.match(nav, /min-width:\s*0/, 'the nav must be allowed to shrink inside the wrapping toolbar');
+});
