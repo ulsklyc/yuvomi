@@ -198,6 +198,7 @@ const APP_SHELL = [
   '/utils/reminder-offset.js',
   '/utils/reward-goal.js',
   '/utils/roving-toolbar.js',
+  '/utils/row-action.js',
   '/utils/schedule-tabs.js',
   '/utils/scroll-restore.js',
   '/utils/seal-pair.js',

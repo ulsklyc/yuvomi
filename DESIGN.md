@@ -1274,6 +1274,46 @@ blind nach innen kopieren.
 
 ## Components
 
+### Komponenten-Kanon: ein Dialekt je Bedienfrage (Runde 5, 2026-09-26)
+
+Anlass: die Critique vom 2026-09-26 (P1 "Bedienelemente sprechen mehrere Dialekte") zaehlte
+allein im Budget vier Stile fuer Zeilenaktionen, app-weit fuenf Suchfelder, zwei
+Listentraeger, vier Arten der Primaeraktion und Dialoge mit und ohne gehobenen Fuss. Wer
+Loeschen in einem Tab gelernt hat, erkennt es im Nachbartab nicht wieder. Die Regel: **jede
+Bedienfrage hat genau EINE Antwort, und sie ist ein vorhandener Baustein** - die Referenzen
+sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der Budget-Kopf.
+
+| Frage | Die EINE Antwort | Baustein | Nicht mehr |
+|---|---|---|---|
+| Bearbeiten/Loeschen/Mehr an einer Zeile | `.row-action`, Loeschen `.row-action--danger`, dauerhaft sichtbar (ignore.md) | `rowActionHtml()` / `rowActionEl()` (utils/row-action.js); Mehr-Menue: `popoverMenuHtml({ triggerClass: 'row-action' })` | `btn--secondary btn--icon` (violett umrandet), `btn--danger-outline` als Ring, eigene Stiftzellen, `btn--icon btn--sm` |
+| Name der Zeilenaktion | nennt das OBJEKT: "Anna anrufen", "Kategorie Obst loeschen" | `t('common.editNamed' / 'deleteNamed' / 'removeNamed' / 'moreActionsNamed', { name })` oder ein Modul-Key mit `{{name}}` | zwoelfmal "Anrufen", fuenfmal "Loeschen" |
+| Suchen | EIN Suchfeld: gefuellte Kapsel (`--color-fill-field`, `--radius-full`, Kante transparent, Fokus = Akzentkante + Ring), mobil im Kopf die Icon-Form | `renderPageSearch()` + `wirePageSearch()` (utils/page-search.js); die globale Suche teilt die Regel per Selektorliste | eigene Felder mit 10/12/16px-Ecke, randlose Leisten, `form-input type=search` |
+| Folge gleichartiger Zeilen | `.row-carrier` (Surface, `--radius-lg`, `--shadow-sm`, Haarlinien `> * + *`); liegt die Liste schon in einer Karte: `.row-divided` | list-row.css | `.list-rows` (12px, ohne Schatten) - laeuft aus, danach faellt die Regel |
+| Anlegen | `page-fab` MIT Nomen: mobil in der Kapsel, am Desktop angedockt als Kopf-Pille "+ Nomen"; ein Kontext-FAB nennt je Tab sein Nomen | `createPageFab({ dockLabel })`, `setPageFabAction(fab, { label, dockLabel, onClick })` (utils/fab.js) | schwebender FAB ohne Nomen, dessen Bedeutung mit dem Tab wechselt; Inline-Anlegeformulare ueber der Liste |
+| Dialogknoepfe | `.modal-panel__footer`: [Loeschen `btn--danger-outline` MIT Text, links] ... [Abbrechen] [Primaer `btn--primary`]; `mountFooter()` hebt ihn an den Blattrand, mobil ueber die Falz - auch die geteilten Rueckfragen (confirm/prompt/select) | modal.js; Vorbild Kalender-Termin, Aufgabe | `.modal-actions` im scrollenden Koerper, Loeschen als rotes Icon |
+| Boolean in den Einstellungen | Schalter (`.toggle`-Bahn, `role="switch"`), Label links, Zustand rechts | `toggleRowHtml({ ..., control: 'switch' })` (settings/components.js) | native 18px-Checkbox, "Aktiviert"-Badge neben dem Haken |
+| Auswahl aus 2-4 Werten (Theme) | `.segmented` im Well (Abschnitt "Segmented Controls") | panel.css | drei getrennte Rahmenknoepfe |
+| Icon stylen | auf `svg` (oder eine Klasse) zielen - Lucide ersetzt `<i data-lucide>` durch `<svg>` | - | Regeln auf `... i`: sie trafen nie (38 entfernt) |
+
+**Benannte Ausnahmen, je mit Grund an der Stelle:** die Essenskarte (`.meal-card__action-btn`,
+bis zu drei Aktionen in einem 148px-Slot, Trefferflaeche per `::before`, meals.css);
+Foto- und Avatar-Overlays (`*-photo-action`, `settings-avatar-action`: die Aktion liegt auf
+einem Bild, nicht in einer Zeile); die Schnellaktionen des Dashboards (`fab-main`: ein Menue
+ueber alle Module, kein Nomen); Filterblaetter (Kalender, Aufgaben) behalten die Haken-Zeile
+von `toggleRowHtml()` - ob auch dort Schalter stehen, ist offen; Auswahllisten
+`modal-actions--stack` (Serien-Umfang) sind kein Fuss.
+
+**Offen: die Optik von "Abbrechen".** Der Brief dieser Runde setzt `btn--ghost` (wie Kalender und
+Aufgaben); seit der Critique 2026-07-30 haelt `test:frontend-audit` fuer die drei geteilten
+Rueckfragen das Gegenteil fest (`btn--secondary`, "im Loeschen-Confirm, wo Abbrechen am
+wichtigsten ist, am unauffaelligsten"), und 61 Seiten-Dialoge folgen ihm, 27 dem Kalender. Bis
+das entschieden ist, zaehlt `cancel-ghost` nur.
+
+**Gehalten als Ratchet** (`test:control-dialect`): zehn Scanner zaehlen je Datei die
+Abweichler; die Ausnahmeliste `PENDING` (Stand 2026-09-26) darf nur sinken. Ein NEUER
+Abweichler ist rot, ebenso eine Zahl, die gesunken ist, ohne dass die Liste nachzieht - so
+bleibt die Liste ein Arbeitsvorrat und wird keine Allowlist.
+
 ### Buttons
 - **Shape:** die Kapsel (`--radius-full`) in der `.btn`-Basisregel, min-height 48px, Padding
   8px 16px, Label 14px medium. EINE Form fuer ALLE Varianten - primary, secondary, ghost,
@@ -1686,7 +1726,9 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   Padding 8px 12px, min-height 48px (Desktop 40px), Schriftgroesse nie unter 16px,
   Placeholder `--color-text-placeholder` (= Tertiaer, gethemt; NIE die Disabled-Farbe, und
   als Elementselektor auf `input`/`textarea`, damit kein Feld auf Chromes UA-Default
-  zurueckfaellt).
+  zurueckfaellt). **Das Suchfeld ist davon ausgenommen:** es ist ein Bedienelement und
+  traegt die gefuellte Kapsel des Komponenten-Kanons (`--color-fill-field`, Kante
+  transparent, Platzhalter in Sekundaertext), nicht die Formularkante.
 - **Feldkanon:** ein `select` bekommt zusaetzlich 32px Innenpolster rechts
   (`padding-inline-end: var(--space-8)`) plus `text-overflow: ellipsis`, weil sein Chevron
   INNERHALB der Box sitzt und lange Optionstexte sonst mittendrin gekappt werden. Das ist
