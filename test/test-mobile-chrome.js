@@ -118,6 +118,25 @@ test('(2) der Chipreihen-Baustein selbst ist kein fester Streifen', () => {
   assert.deepEqual(moduleCopies, [], 'die Chipreihen der Module tragen keine eigene Kopie der Mindesthoehe');
 });
 
+test('(1) kein Modul rechnet die Kapselzone ein zweites Mal in sein Bodenpolster', () => {
+  // Die Zone traegt der Shell-Nachlauf (`--nav-tail` in `--shell-tail`). Ein Modul, das
+  // `--nav-bottom-height` zusaetzlich in padding/margin unten rechnet, laesst am Listenende
+  // eine zweite, leere Kapselhoehe stehen (Schichtplan, Geburtstage, Gesundheit, Dokumente).
+  const SHELL = new Set(['layout.css', 'glass.css', 'tokens.css']);
+  const offenders = [];
+  for (const { file, css } of sheets) {
+    if (SHELL.has(file)) continue;
+    for (const r of rules(css)) {
+      for (const prop of ['padding-bottom', 'padding-block-end', 'margin-bottom', 'margin-block-end']) {
+        const v = decl(r.body, prop);
+        if (v && v.includes('--nav-bottom-height')) offenders.push(`${file}: ${r.selector} { ${prop}: ${v} }`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, [],
+    'die Kapselzone steht schon im Shell-Nachlauf - ein Modul polstert nur sein eigenes Ende (z.B. var(--space-6))');
+});
+
 test('(3) nichts im Inhalt klebt mit bottom: 0 an der Unterkante - dort liegt die Kapsel', () => {
   const offenders = [];
   for (const { file, css } of sheets) {
