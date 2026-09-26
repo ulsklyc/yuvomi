@@ -160,11 +160,21 @@ function renderBodyContent(body) {
    * aufbaut (kumulierter Verlauf) und was sich gegenueber dem Vorzeitraum
    * je Kategorie veraendert hat. Die Summen stehen in der Legende des
    * Verlaufs, samt Veraenderung. */
+  /* EINE BAHN WIE DIE UEBRIGEN REITER (Critique 2026-09-26, A5 P2-5). Die
+   * drei Diagramme standen untereinander auf dem Lesemass und endeten 404px
+   * vor der Bahn, an der Uebersicht, Konten, Abos, Darlehen und Aufteilung
+   * enden. Ab 960px Modulflaeche steht die Statistik in derselben Zweispalte
+   * wie die Uebersicht (budget.css, Container der Budget-Seite): links Verlauf und
+   * Kategorievergleich auf dem Lesemass, rechts die Ausgaben-Anteile als
+   * Seitenleiste. Der Verlauf bleibt links, weil sein SVG mit der Breite auch
+   * in der Hoehe und in der Schrift waechst. */
   body.replaceChildren();
   body.insertAdjacentHTML('beforeend', `
-    <div id="budget-stats-trend"></div>
-    <div id="budget-stats-cat"></div>
-    <div id="budget-stats-donut"></div>
+    <div class="budget-stats__grid">
+      <div id="budget-stats-trend" class="budget-stats__main"></div>
+      <div id="budget-stats-cat" class="budget-stats__main"></div>
+      <div id="budget-stats-donut" class="budget-stats__aside"></div>
+    </div>
     <div class="budget-stats__export"></div>
   `);
   renderTrendChart();
