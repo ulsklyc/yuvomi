@@ -4621,22 +4621,18 @@ function mountTaskSplit(container, signal) {
 
   // Ein Deep-Link auf eine Aufgabe, die in dieser Liste nicht steht (erledigt,
   // abgelegt, weggefiltert - die globale Suche findet alle): keine Auswahl
-  // ohne Zeile, sondern das Sheet wie bisher.
+  // ohne Zeile, sondern das Sheet wie bisher. Der Link BLEIBT in der Adresse
+  // (Kopieren, Neuladen, Vor - Codex an #1477); der Baustein laesst nur diese
+  // Anfangsauswahl liegen, statt sie ohne Zeile zu beanspruchen.
   const initial = new URLSearchParams(location.search).get(TASK_DETAIL_PARAM);
-  let sheetFor = null;
-  if (initial && !root.querySelector(`[data-md-id="${CSS.escape(initial)}"]`)) {
-    sheetFor = initial;
-    const url = new URL(location.href);
-    url.searchParams.delete(TASK_DETAIL_PARAM);
-    history.replaceState({ ...(history.state ?? {}), path: `${url.pathname}${url.search}${url.hash}` }, '',
-      `${url.pathname}${url.search}${url.hash}`);
-  }
+  const sheetFor = initial && !root.querySelector(`[data-md-id="${CSS.escape(initial)}"]`) ? initial : null;
 
   taskMd = mountMasterDetail({
     root,
     param: TASK_DETAIL_PARAM,
     signal,
     deepLinkNarrow: true,
+    claimInitial: sheetFor == null,
     renderDetail: (id, body, ctx) => renderTaskPane(id, body, ctx.signal, container),
     openNarrow: (id, _trigger, { signal }) => openTaskSheet(id, container, signal),
     // Enter auf der gewaehlten Zeile: Bearbeiten, wie der Knopf im Kopf der
@@ -5133,6 +5129,9 @@ export const __test = {
   // Das Blatt unter der Schwelle und die Spalte: beide laden erst, dann
   // entscheidet, ob das Ergebnis noch gilt.
   openTaskSheet, renderTaskPane,
+  // Der Aufbau von Liste + Detail samt Rueckfall fuer `?open=` ausserhalb
+  // der Liste: was er mit der Adresse tut, ist Verhalten (Codex an #1477).
+  mountTaskSplit,
   // Der Lader steht hier, weil die PRAEMISSE des gesperrten Zweigs an ihm
   // haengt: dass `calendar: read` die Erinnerung wirklich bekommt. War das nur
   // Prosa, liess sich das `none` still zu `!== write` verengen und der ganze

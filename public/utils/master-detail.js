@@ -192,13 +192,18 @@ function inertHandle() {
  *        hier, damit Markierung und `refresh()` sie finden.
  * @param {boolean} [opts.deepLinkNarrow=false]
  *        `?open=` auch unter der Schwelle einloesen (oeffnet `openNarrow`).
+ * @param {boolean} [opts.claimInitial=true]
+ *        `false`: den `?open=` beim Aufbau NICHT einloesen und die Adresse
+ *        stehen lassen - die Seite hat den Link schon selbst eingeloest
+ *        (Aufgaben: ein Blatt fuer eine Aufgabe, die in der Liste keine Zeile
+ *        hat). Kopieren und Neuladen tragen den Link dann weiter.
  * @param {AbortSignal} [opts.signal]     Router-Signal; Abbruch baut ab.
  * @returns {{open: Function, select: Function, clear: Function, selectedId: Function,
  *   isSplit: Function, refresh: Function, destroy: Function}}
  */
 export function mountMasterDetail({
   root, list, param = 'open', renderDetail, openNarrow, onEnter, onModeChange,
-  deepLinkNarrow = false, signal,
+  deepLinkNarrow = false, claimInitial = true, signal,
 } = {}) {
   if (!root) throw new TypeError('mountMasterDetail: root fehlt');
   const listEl = list ?? root.querySelector('.split-view__list');
@@ -515,7 +520,7 @@ export function mountMasterDetail({
 
   // Deep-Link: `?open=` beim Aufbau einloesen.
   lastSplit = isSplit();
-  const initial = new URLSearchParams(location.search).get(param);
+  const initial = claimInitial ? new URLSearchParams(location.search).get(param) : null;
   if (initial) {
     if (lastSplit) select(initial, { history: 'none' });
     else {

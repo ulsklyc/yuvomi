@@ -340,3 +340,76 @@ test('Wiederholen nach dem Ladefehler baut mit dem Seiten-Signal neu auf', () =>
     'ein Neuaufbau fuer eine verlassene Seite bricht ab, bevor er die lebende Instanz abraeumt');
   assert.match(head, /pageSignal = signal \?\? null;/, 'render merkt sich das Signal fuer den Wiederholen-Weg');
 });
+
+// ── Der Rueckfall fuer ?open= ausserhalb der Liste behaelt die Adresse ─────
+
+test('?open= auf eine Aufgabe ausserhalb der Liste: das Blatt geht auf, die Adresse behaelt den Link, die Spalte waehlt nichts', async () => {
+  // Codex an #1477 (Thread 4112556721): der Rueckfall nahm `?open=` VOR dem
+  // Blatt aus der Adresse, damit der Baustein die Zeile nicht beansprucht, die
+  // es nicht gibt. Die Adresse hiess danach `/tasks` - Kopieren, Neuladen und
+  // Vor oeffneten die Aufgabe nicht mehr. Jetzt bleibt der Link stehen, und
+  // der Baustein laesst genau diese Anfangsauswahl liegen (claimInitial).
+  const node = (extra = {}) => ({
+    hidden: false,
+    isConnected: true,
+    classList: { toggle() {}, add() {}, remove() {}, contains: () => false },
+    addEventListener() {},
+    removeEventListener() {},
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    getAttribute: () => null,
+    setAttribute() {},
+    removeAttribute() {},
+    getClientRects: () => [1],
+    ...extra,
+  });
+  const list = node();
+  const detail = node({ display: 'flex' });
+  const empty = node();
+  const body = node();
+  const root = node({
+    querySelector: (sel) => ({
+      '.split-view__list': list, '.split-view__detail': detail, '[data-md-empty]': empty, '[data-md-body]': body,
+    })[sel] ?? null,
+  });
+  const page = node({ querySelector: (sel) => (sel === '.split-view__detail' ? detail : null) });
+  const container = node({ querySelector: (sel) => ({ '.tasks-split': root, '.tasks-page': page })[sel] ?? null });
+
+  const url = { current: new URL('http://yuvomi.test/tasks?open=7') };
+  const writes = [];
+  const saved = { location: globalThis.location, history: globalThis.history, gcs: globalThis.getComputedStyle };
+  globalThis.location = {
+    get href() { return url.current.href; },
+    get pathname() { return url.current.pathname; },
+    get search() { return url.current.search; },
+    get hash() { return url.current.hash; },
+  };
+  globalThis.history = {
+    state: null,
+    replaceState(state, _t, to) { writes.push(['replace', to]); url.current = new URL(to, url.current); },
+    pushState(state, _t, to) { writes.push(['push', to]); url.current = new URL(to, url.current); },
+  };
+  globalThis.getComputedStyle = (el) => ({ display: el.display ?? 'block' });
+  const opened = [];
+  globalThis.__apiStub = {
+    get: (path) => Promise.resolve({ data: String(path).startsWith('/tasks/') ? { ...BASIS, status: 'done' } : null }),
+  };
+  globalThis.__openDetailView = (options) => opened.push({ title: options.title, pane: options.pane ?? null });
+  const page$ = new AbortController();
+  try {
+    tasks.mountTaskSplit(container, page$.signal);
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(location.search, '?open=7', 'der Rueckfall hat den Link aus der Adresse genommen - Kopieren und Neuladen oeffnen die Aufgabe nicht mehr');
+    assert.deepEqual(writes, [], 'weder Rueckfall noch Baustein schreiben die Adresse');
+    assert.deepEqual(opened, [{ title: 'Tisch decken', pane: null }],
+      'genau das Blatt geht auf - kein Detail in der Spalte fuer eine Aufgabe ohne Zeile');
+  } finally {
+    page$.abort();
+    globalThis.location = saved.location;
+    globalThis.history = saved.history;
+    globalThis.getComputedStyle = saved.gcs;
+    delete globalThis.__apiStub;
+    delete globalThis.__openDetailView;
+  }
+});
