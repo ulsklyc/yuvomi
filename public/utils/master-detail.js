@@ -190,6 +190,11 @@ function inertHandle() {
  *        der Baustein eine gemerkte Auswahl in die Spalte zeichnet - ein Modul,
  *        das die Zeile erst zeigen muss (Inventar: Kategorie oeffnen), tut das
  *        hier, damit Markierung und `refresh()` sie finden.
+ * @param {'sheet'|'accordion'} [opts.narrow='sheet']
+ *        Was der bisherige Weg unter der Schwelle IST. Ein Blatt zeigt genau
+ *        einen Eintrag - dann folgen gemerkte Auswahl und `?open=` dem, der
+ *        geoeffnet wird. Ein Akkordeon (Rezepte) haelt mehrere offen und
+ *        schreibt keine Adresse; `?open=` ist dort nur der Einstieg.
  * @param {boolean} [opts.deepLinkNarrow=false]
  *        `?open=` auch unter der Schwelle einloesen (oeffnet `openNarrow`).
  * @param {AbortSignal} [opts.signal]     Router-Signal; Abbruch baut ab.
@@ -198,7 +203,7 @@ function inertHandle() {
  */
 export function mountMasterDetail({
   root, list, param = 'open', renderDetail, openNarrow, onEnter, onModeChange,
-  deepLinkNarrow = false, signal,
+  narrow = 'sheet', deepLinkNarrow = false, signal,
 } = {}) {
   if (!root) throw new TypeError('mountMasterDetail: root fehlt');
   const listEl = list ?? root.querySelector('.split-view__list');
@@ -374,10 +379,10 @@ export function mountMasterDetail({
     // ERSETZT statt gestapelt: das Blatt legt seinen eigenen Zurueck-Schritt
     // an (overlay-history); ein zweiter fuehrte nach dem Schliessen auf den
     // alten Eintrag und oeffnete bei `deepLinkNarrow` dessen Blatt erneut.
-    // Nur auf Seiten, deren Adresse auch schmal etwas oeffnet (`deepLinkNarrow`,
-    // Kontakte, Aufgaben): ein Aufklapp-Akkordeon wie die Rezepte schreibt unter
+    // Nur wo schmal ein BLATT aufgeht (Kontakte, Aufgaben, Inventar - auch ohne
+    // `deepLinkNarrow`): ein Aufklapp-Akkordeon wie die Rezepte schreibt unter
     // der Schwelle keine Adresse, dort ist `?open=` nur der Einstieg.
-    if (deepLinkNarrow && selected != null && String(selected) !== String(id)) {
+    if (narrow === 'sheet' && selected != null && String(selected) !== String(id)) {
       selected = String(id);
       writeHistory('replace', param, selected);
     }
