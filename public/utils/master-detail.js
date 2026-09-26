@@ -402,7 +402,11 @@ export function mountMasterDetail({
     const all = rows();
     const index = all.indexOf(row);
     let next = null;
-    if (event.key === 'ArrowDown') next = all[Math.min(all.length - 1, index + 1)];
+    // Ohne Auswahl nimmt der erste Pfeil die Zeile, auf der der Fokus steht -
+    // wie Mail nach Tab in die Liste. Sonst sprang er an ihr vorbei, und
+    // rechts stand nie, worauf der Fokus lag.
+    if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && selected == null) next = row;
+    else if (event.key === 'ArrowDown') next = all[Math.min(all.length - 1, index + 1)];
     else if (event.key === 'ArrowUp') next = all[Math.max(0, index - 1)];
     else if (event.key === 'Home') next = all[0];
     else if (event.key === 'End') next = all[all.length - 1];

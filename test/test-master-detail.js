@@ -274,6 +274,30 @@ test('Pfeil runter/hoch bewegt Auswahl und Fokus, ueberspringt Ausgeblendetes, e
   handle.destroy();
 });
 
+test('der erste Pfeil ohne Auswahl waehlt die fokussierte Zeile, nicht erst die naechste', () => {
+  // Wie in Mail: wer per Tab in die Liste kommt, steht auf der ersten Zeile,
+  // ohne dass etwas gewaehlt ist. Der erste Pfeil waehlte bis 2026-09-26 die
+  // NAECHSTE Zeile - die fokussierte war nur ueber den Umweg Pfeil hoch zu
+  // erreichen, und rechts stand nie, worauf der Fokus gerade lag (R4, #1477).
+  const p = makePage();
+  const handle = p.mount();
+  historyLog.length = 0;
+  p.focusOf(0).focus();
+  assert.equal(key(p.focusOf(0), 'ArrowDown'), true);
+  assert.equal(handle.selectedId(), '1', 'der erste Pfeil ist an der fokussierten Zeile vorbeigesprungen');
+  assert.equal(document.activeElement, p.focusOf(0));
+  assert.deepEqual(historyLog.map(([mode]) => mode), ['push'], 'die erste Auswahl ist ein Schritt fuer die Zurueck-Taste');
+  assert.equal(key(p.focusOf(0), 'ArrowDown'), true);
+  assert.equal(handle.selectedId(), '2', 'ab jetzt bewegt der Pfeil die Auswahl');
+  handle.clear();
+  assert.equal(key(p.focusOf(3), 'ArrowUp'), true);
+  assert.equal(handle.selectedId(), '4', 'auch Pfeil hoch nimmt zuerst die fokussierte Zeile');
+  handle.clear();
+  assert.equal(key(p.focusOf(1), 'End'), true);
+  assert.equal(handle.selectedId(), '5', 'Pos1/Ende springen weiter an die Enden');
+  handle.destroy();
+});
+
 test('Pfeile aus einem Bedienelement IN der Zeile gehoeren dem Element, und unter der Schwelle gar nichts', () => {
   const p = makePage();
   const handle = p.mount();
