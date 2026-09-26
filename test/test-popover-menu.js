@@ -24,7 +24,7 @@ import assert from 'node:assert/strict';
 // `panel instanceof HTMLElement` steht als Typwaechter in onToggle.
 global.HTMLElement = class HTMLElement {};
 
-const { installPopoverMenus } = await import('../public/utils/popover-menu.js');
+const { installPopoverMenus, pageToolsMenuHtml } = await import('../public/utils/popover-menu.js');
 
 /** Kleinstes Element, das die Selektorwege des Moduls bedient. */
 function el(selector, attrs = {}) {
@@ -193,3 +193,36 @@ test('ein keydown ausserhalb eines Panels laeuft ins Leere', () => {
   const outside = el('.something-else');
   assert.equal(keydown(root, outside, 'ArrowDown'), false);
 });
+
+test('ein Schalter-Eintrag (menuitemcheckbox) zieht den Fokus beim Oeffnen NICHT an sich', () => {
+  // Kopfregel mobil: Ansichts-Schalter wie „Verlauf zeigen" stehen als
+  // menuitemcheckbox im Werkzeugmenue. Der erste angehakte waere eine
+  // zufaellige Stelle mitten im Menue - der Fokus beginnt oben. Rot, solange
+  // onToggle jedes aria-checked wie eine Einfachauswahl behandelt.
+  const root = makeRoot();
+  const panel = makeMenu({ checkedIndex: 2 });
+  panel.children[2].setAttribute('role', 'menuitemcheckbox');
+  open(root, panel);
+  assert.equal(focusedIndex(panel), 0);
+});
+
+test('das Werkzeugmenue eines Modulkopfs: ein „..."-Knopf, Eintraege mit Text, Trenner, Schalter', () => {
+  const html = pageToolsMenuHtml({
+    id: 'tasks-tools-menu',
+    label: 'Weitere Aktionen',
+    items: [
+      { action: 'toggle-history', label: 'Verlauf', icon: 'history', checked: false },
+      { separator: true },
+      { action: 'manage-tags', label: 'Tags <b>', icon: 'tag' },
+    ],
+  });
+  assert.match(html, /class="btn btn--secondary btn--icon page-tools-btn popover-menu__trigger"/);
+  assert.match(html, /data-lucide="ellipsis"/, 'der Trigger ist das Ueberlaufzeichen');
+  assert.match(html, /popovertarget="tasks-tools-menu"/);
+  assert.match(html, /role="menuitemcheckbox" aria-checked="false"[\s\S]*data-action="toggle-history"/);
+  assert.match(html, /popover-menu__item-check--hidden/, 'ein aus-Schalter zeigt keinen Haken');
+  assert.match(html, /<div class="popover-menu__separator" role="separator"><\/div>/);
+  assert.match(html, /role="menuitem"\s[\s\S]*data-action="manage-tags"/);
+  assert.match(html, /<span>Tags &lt;b&gt;<\/span>/, 'Labels laufen durch esc()');
+});
+
