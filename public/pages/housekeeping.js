@@ -216,7 +216,19 @@ async function loadStaffVisits(workerId = state.selectedStaffId, monthValue = st
   state.staffVisits = res.data?.visits || [];
 }
 
+/* NUR DIE JUENGSTE ANTWORT SCHREIBT DEN SEITENZUSTAND (Review zu #1475).
+ * Jede Aktion laedt ueber loadData() nach, und zwei davon koennen sich
+ * ueberholen: Erledigen laedt nach der Quittung nach, und tippt jemand
+ * derweil auf „Rueckgaengig", startet dessen Neuladen spaeter, kommt aber
+ * womoeglich frueher an. Die aeltere Antwort traegt dann den erledigten
+ * Stand und schrieb ihn ueber den zurueckgenommenen. Wie beim Bericht (#1174)
+ * entscheidet der START des Abrufs: eine Antwort, die frueher gestartet ist
+ * als die zuletzt angewandte, wird verworfen. */
+let loadDataSeq = 0;
+let appliedLoadDataSeq = 0;
+
 async function loadData() {
+  const loadSeq = ++loadDataSeq;
   const dayParams = localDayParams();
   // Waehrend dieses Neuladens kann jemand schon den naechsten Monat gewaehlt
   // haben (#1137): kommt dessen Bericht zuerst an, darf die Antwort hier ihn
@@ -236,6 +248,8 @@ async function loadData() {
     api.get(`/housekeeping/workers?${dayParams.toString()}`),
     api.get('/preferences'),
   ]);
+  if (loadSeq < appliedLoadDataSeq) return;
+  appliedLoadDataSeq = loadSeq;
   state.dashboard = dashboard.data;
   state.tasks = tasks.data || [];
   const currentReport = current.data || { visits: [], totals: {} };

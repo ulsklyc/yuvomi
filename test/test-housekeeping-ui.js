@@ -435,3 +435,47 @@ test('shiftMonth ueber Jahresgrenzen', () => {
   assert.equal(hk.shiftMonth('2025-12', 1), '2026-01');
   assert.equal(hk.shiftMonth('2026-03', -14), '2025-01');
 });
+
+// ---------------------------------------------------------------------------
+// Review zu #1475: Rueckgaengig waehrend das Neuladen nach dem Erledigen laeuft
+// ---------------------------------------------------------------------------
+
+test('eine vor dem Rueckgaengig gestartete Neulade-Antwort ueberschreibt den zurueckgenommenen Stand nicht', async () => {
+  const task = { id: 5, name: 'Bad', area: 'Bad', frequency_days: 7, last_completed: '2026-09-01T08:00:00Z' };
+  const done = { ...task, last_completed: '2026-09-26T09:00:00Z' };
+  const writes = [];
+  let taskReads = 0;
+  let releaseStale;
+  globalThis.__apiStub = {
+    get: async (url) => {
+      if (url === '/housekeeping/visits') return { data: REPORTS['2026-09'] };
+      if (url === '/housekeeping/decay-tasks') {
+        taskReads += 1;
+        // Das Neuladen nach dem Erledigen haengt und liefert spaeter den
+        // erledigten Stand; das Neuladen nach dem Rueckgaengig kommt sofort.
+        if (taskReads === 1) return new Promise((resolve) => { releaseStale = () => resolve({ data: [done] }); });
+        return { data: [task] };
+      }
+      return { data: null };
+    },
+    post: async (url) => { writes.push(['post', url]); return { data: null }; },
+    patch: async (url, body) => { writes.push(['patch', url, body]); return { data: null }; },
+  };
+  toasts.length = 0;
+  const state = hk.state();
+  state.tab = 'tasks';
+  state.tasks = [task];
+  const content = fakeContainer();
+  const completing = hk.completeTask(task, content, null);
+  while (!releaseStale) await new Promise((resolve) => setImmediate(resolve));
+  const undo = toasts.find((args) => typeof args[3] === 'function')?.[3];
+  assert.ok(undo, 'der Erledigt-Toast traegt Rueckgaengig');
+  await undo();
+  assert.deepEqual(writes.at(-1), ['patch', '/housekeeping/decay-tasks/5', { last_completed: task.last_completed }]);
+  assert.equal(state.tasks[0].last_completed, task.last_completed, 'nach dem Rueckgaengig steht der alte Zeitpunkt');
+  releaseStale();                                        // jetzt erst die aeltere Antwort
+  await completing;
+  assert.equal(state.tasks[0].last_completed, task.last_completed,
+    'die vor dem Rueckgaengig gestartete Antwort ist ueberholt und darf state.tasks nicht schreiben');
+  delete globalThis.__apiStub;
+});
