@@ -2195,6 +2195,7 @@ export async function render(container, { signal } = {}) {
         const item = state.items.find((i) => String(i.id) === id);
         if (item) openItemModal('edit', item);
       },
+      onModeChange: onInventoryModeChange,
     });
     signal?.addEventListener('abort', () => { _md = null; }, { once: true });
     updateAttentionBadge();
@@ -2217,23 +2218,48 @@ function openDeepLinkedCategory(split) {
   if (!id) return;
   const detail = split.querySelector('.split-view__detail');
   if (!detail || getComputedStyle(detail).display === 'none') return;
-  const item = state.items.find((i) => String(i.id) === id);
-  if (!item) return;
-  // Wie ein Klick (openCategory): auch Suche und Fristen-Filter fallen weg.
-  // Beide ueberleben den Seitenwechsel; stuende ein alter davon noch, fehlte
-  // die Zeile in der geoeffneten Kategorie, und rechts stuende ein Detail,
-  // das der naechste Listenaufbau samt Adresse abraeumt.
+  showItemCategory(id);
+}
+
+/**
+ * Die Kategorie eines Gegenstands zeigen, damit seine Zeile in der Liste steht.
+ * Wie ein Klick (openCategory): auch Suche und Fristen-Filter fallen weg.
+ * Beide ueberleben den Seitenwechsel; stuende ein alter davon noch, fehlte
+ * die Zeile in der geoeffneten Kategorie, und rechts stuende ein Detail, das
+ * der naechste Listenaufbau samt Adresse abraeumt.
+ * @returns {boolean} ob es den Gegenstand gibt
+ */
+function showItemCategory(id) {
+  const item = state.items.find((i) => String(i.id) === String(id));
+  if (!item) return false;
   state.view = 'category';
   state.activeCategory = item.category;
   state.query = '';
   state.filterAttention = false;
   _search?.clear();
+  return true;
+}
+
+/**
+ * Die Darstellung hat gewechselt (utils/master-detail.js, `onModeChange`).
+ *
+ * Ein `?open=` vom Telefon laesst die Startseite stehen (kein Blatt beim
+ * Laden), der Baustein merkt sich die ID. Wird das Fenster breiter, zeichnet
+ * er das Detail - vorher muss links die Zeile stehen, also die Kategorie des
+ * Gegenstands, wie beim Deep-Link in der Spaltenform.
+ */
+function onInventoryModeChange({ split, selectedId }) {
+  if (!split || selectedId == null) return;
+  const list = _container?.querySelector('#inventory-list');
+  if (list?.querySelector(`[data-md-id="${CSS.escape(String(selectedId))}"]`)) return;
+  if (showItemCategory(selectedId)) renderList();
 }
 
 export const __test = {
   state,
   renderItemRow,
   openDeepLinkedCategory,
+  onInventoryModeChange,
   categoryLabel,
   itemCategoryLabel,
   categoryOptionsHtml,

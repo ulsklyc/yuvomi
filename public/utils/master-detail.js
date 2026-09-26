@@ -166,6 +166,11 @@ function writeHistory(mode, param, id) {
  * @param {(id: string) => void} [opts.onEnter]
  *        Enter auf der ausgewaehlten Zeile in der Spalte (z.B. Bearbeiten);
  *        ohne Angabe fokussiert Enter das Detail.
+ * @param {(state: {split: boolean, selectedId: string|null}) => void} [opts.onModeChange]
+ *        Die Darstellung hat gewechselt (Fenster, Seitenleiste). Gerufen BEVOR
+ *        der Baustein eine gemerkte Auswahl in die Spalte zeichnet - ein Modul,
+ *        das die Zeile erst zeigen muss (Inventar: Kategorie oeffnen), tut das
+ *        hier, damit Markierung und `refresh()` sie finden.
  * @param {boolean} [opts.deepLinkNarrow=false]
  *        `?open=` auch unter der Schwelle einloesen (oeffnet `openNarrow`).
  * @param {AbortSignal} [opts.signal]     Router-Signal; Abbruch baut ab.
@@ -173,7 +178,7 @@ function writeHistory(mode, param, id) {
  *   isSplit: Function, refresh: Function, destroy: Function}}
  */
 export function mountMasterDetail({
-  root, list, param = 'open', renderDetail, openNarrow, onEnter,
+  root, list, param = 'open', renderDetail, openNarrow, onEnter, onModeChange,
   deepLinkNarrow = false, signal,
 } = {}) {
   if (!root) throw new TypeError('mountMasterDetail: root fehlt');
@@ -375,6 +380,7 @@ export function mountMasterDetail({
       const split = isSplit();
       if (split === lastSplit) return;
       lastSplit = split;
+      onModeChange?.({ split, selectedId: selected });
       if (split && selected != null) {
         markSelection();
         paint(selected);

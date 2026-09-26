@@ -438,6 +438,42 @@ test('Deep-Link unter der Schwelle merkt die Auswahl: wird das Fenster breiter, 
   }
 });
 
+test('onModeChange: beim Wechsel der Darstellung fragt der Baustein das Modul, BEVOR er zeichnet', () => {
+  // Inventar: unter der Schwelle steht die Kategorien-Startseite, die Zeile
+  // des Gegenstands aus `?open=` gibt es dort nicht. Beim Breiterwerden muss
+  // das Modul sie erst zeigen koennen - sonst malt die Spalte ein Detail ohne
+  // Zeile, und der naechste refresh() raeumt Auswahl und Adresse ab.
+  const observers = [];
+  global.ResizeObserver = class { constructor(cb) { this.cb = cb; observers.push(this); } observe() {} disconnect() {} };
+  try {
+    const p = makePage({ path: '/inventory?open=6', split: false });
+    const seen = [];
+    const handle = p.mount({
+      onModeChange: ({ split, selectedId }) => {
+        seen.push([split, selectedId, p.calls.render.length]);
+        if (split) {
+          const row = new Node('list-row', { 'data-md-id': '6' });
+          row.append(new Node('list-row__main', { 'data-md-focus': '' }));
+          p.list.append(row);
+        }
+      },
+    });
+    for (const o of observers) o.cb(); // der erste Aufruf nach observe(): kein Wechsel
+    assert.deepEqual(seen, [], 'ohne Wechsel kein Aufruf');
+    p.setSplit(true);
+    for (const o of observers) o.cb();
+    assert.deepEqual(seen, [[true, '6', 0]], 'das Modul hoert den Wechsel samt Auswahl, vor dem Zeichnen');
+    assert.deepEqual(p.calls.render, ['6']);
+    assert.equal(p.list.children.at(-1).classList.contains('is-selected'), true, 'die gezeigte Zeile ist markiert');
+    p.setSplit(false);
+    for (const o of observers) o.cb();
+    assert.deepEqual(seen.at(-1), [false, '6', 1], 'auch schmaler wird gemeldet');
+    handle.destroy();
+  } finally {
+    delete global.ResizeObserver;
+  }
+});
+
 test('Zurueck/Vor mit einem anderen Parameter als der Auswahl gehoert dem Router', () => {
   // Aufgaben: `?view=list|kanban|history`. Aendert Zurueck die Ansicht, muss
   // die Seite neu zeichnen - sonst zeigt die Adresse die Liste und der
