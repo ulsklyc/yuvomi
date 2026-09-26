@@ -16996,6 +16996,172 @@ test('PAGE-016: a page whose header runs full width puts nothing on the measure'
     'PAGE-016: no measured page with a full-width header left - drop this guard or its scope changed');
 });
 
+/* ============================================================
+ * DIE BREITENREGEL - PAGE-017 ... PAGE-019 (DESIGN.md, "Die Breitenregel")
+ *
+ * Drei Regime, jede Seite in genau einem: Lesemass, Liste + Detail, Flaeche.
+ * Die Messmatrix vom 2026-09-26 fand drei Breiten ohne Regel (720, 960,
+ * 1124-1156px); die Tabelle in DESIGN.md ist seitdem die Zuordnung, und diese
+ * Guards halten Tabelle und Code beieinander.
+ * ============================================================ */
+
+const WIDTH_REGIMES = ['Lesemass', 'Liste + Detail', 'Flaeche'];
+
+/**
+ * LISTE + DETAIL, NOCH NICHT EINGEHAENGT - DIESE LISTE DARF NUR SCHRUMPFEN.
+ *
+ * Die Tabelle nennt das Ziel-Regime, der Baustein kommt Modul fuer Modul.
+ * Einhaengen heisst: Zeile loeschen. PAGE-017 wird rot, wenn ein Eintrag den
+ * Baustein schon traegt (dann haelt eine tote Zeile nichts mehr offen) oder
+ * wenn er nicht als Liste + Detail in der Tabelle steht.
+ */
+const LIST_DETAIL_PENDING = new Set([
+  'contacts.js',
+  'tasks.js',
+  'recipes.js',
+  'inventory.js',
+]);
+
+/** Die Zuordnungstabelle aus DESIGN.md: Datei -> Regime. */
+function widthRegimeTable() {
+  const design = read('../DESIGN.md');
+  const start = design.indexOf('### Die Breitenregel');
+  assert.ok(start >= 0, 'DESIGN.md: Abschnitt "### Die Breitenregel" fehlt');
+  const end = design.indexOf('\n## ', start);
+  const section = design.slice(start, end < 0 ? undefined : end);
+  const rows = [...section.matchAll(/^\|\s*`([\w-]+\.js)`[^|]*\|\s*([^|]+?)\s*\|/gm)]
+    .map((m) => ({ file: m[1], regime: m[2] }));
+  return { section, rows };
+}
+
+/** Deklarierte Kompositionsmodi einer Seitenquelle (Bauart PAGE-001). */
+function declaredCompositionModes(src) {
+  const found = COMPOSITION_MODES.filter((mode) =>
+    new RegExp(`app-page--${mode}(?![\\w-])|data-composition="${mode}"|mode:\\s*'${mode}'`).test(src));
+  if (/page-measure--narrow/.test(src) && !found.includes('reading')) found.push('reading');
+  return found;
+}
+
+const usesListDetail = (src) => /app-page--list-detail/.test(src)
+  && /from\s+'\/utils\/master-detail\.js'/.test(src);
+
+test('PAGE-017: jede Seite steht in genau einem der drei Breitenregime', () => {
+  const { section, rows } = widthRegimeTable();
+  // Die drei Namen sind die Regel - ein viertes Regime in der Tabelle waere
+  // genau die Drift, gegen die sie steht.
+  for (const regime of WIDTH_REGIMES) {
+    assert.ok(section.includes(`**${regime}**`), `DESIGN.md: Regime "${regime}" ist nicht definiert`);
+  }
+  assert.ok(rows.length >= 20, `DESIGN.md: nur ${rows.length} Zeilen gelesen - der Tabellenausdruck ist blind`);
+  for (const { file, regime } of rows) {
+    assert.ok(WIDTH_REGIMES.includes(regime),
+      `PAGE-017 ${file}: "${regime}" ist keines der drei Regime (${WIDTH_REGIMES.join(', ')})`);
+  }
+  // Vollstaendig in BEIDE Richtungen: jede Seite hinter der Shell hat eine
+  // Zeile (eine neue Seite faellt am Tag ihrer Route auf), und keine Zeile
+  // zeigt auf eine Datei, die es nicht gibt.
+  const scope = pagesBehindAppShell();
+  const byFile = new Map();
+  for (const row of rows) {
+    assert.ok(!byFile.has(row.file), `PAGE-017 ${row.file}: steht zweimal in der Tabelle`);
+    byFile.set(row.file, row.regime);
+  }
+  for (const name of scope) {
+    assert.ok(byFile.has(name), `PAGE-017 ${name}: fehlt in der Breitenregel-Tabelle (DESIGN.md) - welches Regime?`);
+  }
+  for (const file of byFile.keys()) {
+    assert.ok(scope.includes(file), `PAGE-017 ${file}: steht in der Tabelle, ist aber keine Seite hinter der Shell`);
+  }
+
+  for (const name of scope) {
+    const regime = byFile.get(name);
+    const src = withoutBlockComments(withoutHtmlComments(read(`../public/pages/${name}`)));
+    const modes = declaredCompositionModes(src);
+    const pendingComposition = COMPOSITION_PENDING.has(name);
+    if (regime === 'Lesemass') {
+      assert.ok(!/app-page--list-detail/.test(src),
+        `PAGE-017 ${name}: steht als Lesemass in der Tabelle, traegt aber den Liste-+-Detail-Baustein`);
+      if (!pendingComposition) {
+        assert.ok(modes.some((m) => m === 'reading' || m === 'form'),
+          `PAGE-017 ${name}: Lesemass verlangt reading/form, deklariert ist ${modes.join(',') || 'nichts'}`);
+      }
+    } else if (regime === 'Liste + Detail') {
+      const wired = usesListDetail(src) || modes.includes('split');
+      if (LIST_DETAIL_PENDING.has(name)) {
+        assert.ok(!wired,
+          `PAGE-017 ${name}: der Baustein ist eingehaengt - Zeile aus LIST_DETAIL_PENDING loeschen`);
+      } else {
+        assert.ok(wired,
+          `PAGE-017 ${name}: Liste + Detail verlangt .app-page--list-detail plus utils/master-detail.js (oder split)`);
+      }
+    } else {
+      assert.ok(!/app-page--list-detail/.test(src),
+        `PAGE-017 ${name}: steht als Flaeche in der Tabelle, traegt aber den Liste-+-Detail-Baustein`);
+    }
+  }
+  for (const name of LIST_DETAIL_PENDING) {
+    assert.equal(byFile.get(name), 'Liste + Detail',
+      `PAGE-017 ${name}: steht auf LIST_DETAIL_PENDING, in der Tabelle aber nicht als Liste + Detail`);
+  }
+});
+
+test('PAGE-018: keine Kernseite fuehrt das abgeschaffte 960er-Mass (data)', () => {
+  // `data` (--layout-content) war das vierte Regime: Haushaltshilfe und
+  // Inventar liessen damit bei 1440px 228px leer, ohne dass die Flaeche etwas
+  // trug. Fuer Erweiterungs-Manifeste bleibt die Klasse (PAGE-012), fuer
+  // Kernseiten nicht.
+  let seen = 0;
+  for (const name of pagesBehindAppShell()) {
+    const src = withoutBlockComments(withoutHtmlComments(read(`../public/pages/${name}`)));
+    seen += 1;
+    assert.ok(!declaredCompositionModes(src).includes('data'),
+      `PAGE-018 ${name}: deklariert data (960px) - Lesemass, Liste + Detail oder Flaeche (DESIGN.md, Breitenregel)`);
+  }
+  assert.ok(seen >= 20, `PAGE-018: nur ${seen} Seiten gelesen - der Geltungsbereich ist blind`);
+});
+
+test('PAGE-019: der Liste-+-Detail-Baustein misst die Modulflaeche an der Schwelle aus tokens.css', () => {
+  const tokens = read('../public/styles/tokens.css');
+  const layout = read('../public/styles/layout.css');
+  const rem = (name) => {
+    const m = tokens.match(new RegExp(`${name}:\\s*([0-9.]+)rem`));
+    assert.ok(m, `tokens.css: ${name} fehlt oder steht nicht in rem`);
+    return Number(m[1]);
+  };
+  const threshold = rem('--layout-split-threshold');
+  const listMin = rem('--layout-list-min') * 16;
+  const listMax = rem('--layout-list-max') * 16;
+  // Die Listenbahn liegt im Lesemass-Band der Entscheidung (420-520px): breit
+  // genug fuer zweizeilige Zeilen, schmal genug, dass das Detail liest.
+  assert.ok(listMin >= 420 && listMax <= 520 && listMin < listMax,
+    `PAGE-019: Listenbahn ${listMin}-${listMax}px liegt nicht in 420-520px`);
+
+  let containerRule = null;
+  let hiddenOutside = false;
+  let shownInside = false;
+  let gridInside = null;
+  for (const { selector, body, at } of eachRule(layout)) {
+    const sel = selector.trim();
+    const chain = at.join(' ');
+    if (sel === '.app-page--list-detail' && !chain) containerRule = body;
+    if (sel === '.split-view__detail' && !chain && /display\s*:\s*none/.test(body)) hiddenOutside = true;
+    if (!/@container\s+module-surface/.test(chain)) continue;
+    const width = chain.match(/min-width:\s*([0-9.]+)rem/);
+    assert.ok(width, `PAGE-019: @container module-surface ohne min-width in rem (${chain})`);
+    assert.equal(Number(width[1]), threshold,
+      `PAGE-019: Schwelle in layout.css ${width[1]}rem, tokens.css --layout-split-threshold ${threshold}rem - `
+      + '@container kann keine Variable lesen, beide Stellen muessen gleich stehen');
+    if (sel === '.split-view__detail' && /display\s*:\s*flex/.test(body)) shownInside = true;
+    if (sel === '.split-view') gridInside = body;
+  }
+  assert.ok(containerRule && /container\s*:\s*module-surface\s*\/\s*inline-size/.test(containerRule),
+    'PAGE-019: .app-page--list-detail muss der benannte Container module-surface sein - die Abfrage misst die Seitenwurzel');
+  assert.ok(hiddenOutside, 'PAGE-019: unter der Schwelle muss die Detailspalte fehlen (display: none)');
+  assert.ok(shownInside, 'PAGE-019: ab der Schwelle muss die Detailspalte stehen');
+  assert.ok(gridInside && /--layout-list-min/.test(gridInside) && /--layout-list-max/.test(gridInside),
+    'PAGE-019: die Listenbahn muss aus --layout-list-min/-max kommen, nicht aus einer Zahl');
+});
+
 test('PAGE-010: full-bleed is an explicit --bleed declaration', () => {
   const layout = read('../public/styles/layout.css');
   assert.match(layout, /\.page-section--bleed\s*\{[\s\S]*?padding-inline:\s*var\(--page-inline-pad\)/,
@@ -17205,6 +17371,102 @@ test('Seitenmenue: der Scrollbalken ist am Desktop sichtbar (#970)', () => {
     'ohne scrollbar-color nimmt der Balken die Systemfarbe statt der Token-Farbe');
   assert.doesNotMatch(itemsRule.body, /#[0-9a-fA-F]{3,8}\b|\brgba?\(/,
     'Farbwerte kommen aus tokens.css, nicht als Literal');
+});
+
+/* DIE SEITENLEISTE ZEIGT JEDES MODUL OHNE SCROLLEN (Critique 2026-09-26, P1-2).
+ *
+ * Gemessen vorher: auf 1440x900 brauchte die Modulliste 750px und sah 580 -
+ * Geburtstage, Gesundheit und Budget lagen unter der Falz, auf 1280x800 rund
+ * 270px. Die Ursache war der Rahmen, nicht die Liste: eine eigene Zeile fuer
+ * den Einklapp-Knopf (40), eine fuer die Suche (40), ein Fuss mit Hilfe,
+ * Aenderungen und Abmelden (104), 40px-Zeilen und 27px-Sektionslabels.
+ *
+ * Der Guard rechnet die Hoehe aus DENSELBEN Werten, aus denen der Browser sie
+ * rechnet (tokens.css und die Regeln in layout.css), fuer die 15 Module des
+ * Standardhaushalts - vier Sektionen, die Uebersicht ohne Label. Ein Fenster
+ * ist 800px hoch; die Rechnung ist gegen den Browser nachgemessen (771px bei
+ * 1280x800 im Pane, 2026-09-26). Aendert jemand eine Zeile, ein Label oder den
+ * Rahmen, stimmt die Summe nicht mehr, und der Guard sagt, um wie viel.
+ */
+test('SHELL: die Seitenleiste fasst 15 Module ohne Scrollen auf 800px Fensterhoehe', () => {
+  const tokens = read('../public/styles/tokens.css');
+  const layout = read('../public/styles/layout.css');
+  const tok = (name) => {
+    const m = tokens.match(new RegExp(`^\\s*${name}:\\s*([^;]+);`, 'm'));
+    assert.ok(m, `tokens.css: ${name} fehlt`);
+    const v = m[1].trim();
+    if (/^var\(/.test(v)) return tok(v.match(/var\((--[\w-]+)\)/)[1]);
+    if (/rem$/.test(v)) return parseFloat(v) * 16;
+    if (/px$/.test(v)) return parseFloat(v);
+    return parseFloat(v);
+  };
+  const val = (expr) => {
+    const e = String(expr).trim();
+    if (e === '0') return 0;
+    const v = e.match(/^var\((--[\w-]+)\)$/);
+    if (v) return tok(v[1]);
+    if (/^[0-9.]+px$/.test(e)) return parseFloat(e);
+    assert.fail(`Seitenleisten-Rechnung: "${e}" ist weder Token noch px - der Guard kennt nur var(--x) und Npx`);
+  };
+  const rule = (selector, inMedia = true) => {
+    for (const r of eachRule(layout)) {
+      if (r.selector.trim() === selector && (!inMedia || r.at.some((a) => /min-width:\s*1024px/.test(a)))) return r.body;
+    }
+    assert.fail(`layout.css: Regel ${selector} nicht gefunden`);
+  };
+  const prop = (body, name) => {
+    const m = body.match(new RegExp(`(?:^|[;{\\s])${name}\\s*:\\s*([^;]+);`));
+    assert.ok(m, `Seitenleisten-Rechnung: ${name} fehlt`);
+    return m[1].trim();
+  };
+  const box = (shorthand) => {
+    const parts = shorthand.split(/\s+(?![^(]*\))/).map(val);
+    const [top, right = top, bottom = top] = parts;
+    return { top, right, bottom };
+  };
+
+  const row = val(prop(rule('.nav-sidebar .nav-item'), 'min-height'));
+  const labelPad = box(prop(rule('.nav-section-label', false), 'padding'));
+  const label = tok('--text-xs') * tok('--line-height-tight') + labelPad.top + labelPad.bottom;
+  const gap = val(prop(rule('.nav-sidebar__items'), 'gap'));
+  const groupGap = val(prop(rule('.nav-sidebar__group', false), 'gap'));
+  const itemsPad = box(prop(rule('.nav-sidebar__items'), 'padding'));
+  const sidebarPad = box(prop(rule('.nav-sidebar'), 'padding'));
+  const logo = rule('.nav-sidebar__logo');
+  const pinned = rule('.nav-sidebar > .nav-item--pinned-end');
+  const account = rule('.nav-sidebar__account');
+  const accountRow = val(prop(rule('.nav-sidebar .nav-item.nav-sidebar__account-trigger'), 'min-height'));
+
+  // 15 Ziele: Uebersicht allein, dann vier Gruppen (Label + 14 Zeilen).
+  // Gruppenluecken: je Zeile eine hinter dem Label; zwischen den fuenf
+  // Kindern des Containers vier.
+  const list = 15 * row + 4 * label + 14 * groupGap + 4 * gap + itemsPad.bottom;
+  const frame = sidebarPad.top + sidebarPad.bottom
+    + val(prop(logo, 'height')) + val(prop(logo, 'margin-bottom'))
+    + row + val(prop(pinned, 'margin-top'))
+    + val(prop(account, 'padding-top')) + val(prop(account, 'margin-top')) + 1 + accountRow;
+  const total = list + frame;
+  assert.ok(total <= 800,
+    `Seitenleiste: ${Math.round(list)}px Module + ${Math.round(frame)}px Rahmen = ${Math.round(total)}px - `
+    + `auf 1280x800 fehlen ${Math.round(total - 800)}px, Budget und Gesundheit rutschen unter die Falz`);
+  assert.ok(row >= 24, `Seitenleiste: ${row}px Zeilen unterschreiten WCAG 2.5.8 (24px)`);
+
+  // Der Rahmen hat keine Zeilen mehr fuer Werkzeuge und Fuss-Aktionen: Suche
+  // und Einklappen stehen IN der Logo-Zeile, Hilfe/Aenderungen/Abmelden im
+  // Konto-Menue. Ein Rueckbau in eigene Zeilen waere die alte Rechnung.
+  const router = read('../public/router.js');
+  const shell = router.slice(router.indexOf('function renderAppShell('), router.indexOf('const main = document.createElement(\'main\')'));
+  assert.ok(shell.length > 1000, 'renderAppShell nicht gefunden - der Guard ist blind');
+  assert.doesNotMatch(shell, /nav-sidebar__footer-actions/, 'die Fussleiste mit Hilfe/Aenderungen/Abmelden ist zurueck');
+  assert.match(shell, /sidebarLogoActions\.appendChild\(sidebarToggle\)/, 'Einklappen steht nicht in der Logo-Zeile');
+  assert.match(shell, /sidebarLogoActions\.appendChild\(sidebarSearch\)/, 'die Suche steht nicht in der Logo-Zeile');
+  assert.match(shell, /installPopoverMenus\(sidebar\)/, 'das Konto-Menue braucht die geteilte Menue-Bedienung');
+  const accountEl = router.slice(router.indexOf('function sidebarAccountEl('), router.indexOf('function syncSidebarAccount('));
+  for (const action of ['help', 'changelog', 'logout']) {
+    assert.match(accountEl, new RegExp(`item\\('${action}'`), `Konto-Menue ohne Eintrag ${action}`);
+  }
+  assert.match(accountEl, /setAttribute\('role', 'menu'\)/);
+  assert.match(accountEl, /setAttribute\('popovertarget', 'nav-account-menu'\)/);
 });
 
 // ---------------------------------------------------------------------------

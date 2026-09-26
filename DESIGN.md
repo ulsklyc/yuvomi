@@ -1082,6 +1082,81 @@ das Verhaeltnis haelt.
   `wireScrollFade`) und 24px `scroll-padding-inline`, damit das erste sichtbare Element nicht
   an der Kante klebt.
 
+### Die Breitenregel: drei Regime (2026-09-26, Critique A8)
+
+Die Messmatrix vom 26.09. fand drei Breiten ohne erkennbare Regel: 720px (acht Module), 960px
+(Haushaltshilfe, Inventar) und 1124-1156px (sechs Module). Bei 1440px liessen die 720er-Listen
+468px (38 %) leere Buehne stehen. Das Lesemass war sanktioniert, die leere rechte Haelfte nicht.
+Seitdem steht jede Seite hinter der Shell in **genau einem von drei Regimen**:
+
+- **Lesemass** - eine Spalte auf `--layout-reading` (720px), Kopfzeile `--narrow` bis zur
+  Listenkante. Fuer reine Listen und Formulare ohne Detail, das daneben stehen koennte.
+  Umsetzung: Kompositionsmodus `reading` oder `form`.
+- **Liste + Detail** - unter der Schwelle exakt wie Lesemass (die Zeile oeffnet Modal, Sheet
+  oder Aufklapper). Ab einer Modulflaeche von `--layout-split-threshold` (75rem) steht links
+  die Liste auf einer Bahn zwischen `--layout-list-min` und `--layout-list-max` (420-520px),
+  rechts das Detail der ausgewaehlten Zeile mit eigenem Kopf (Titel, Aktionen), das fuer sich
+  scrollt. Die Auswahl steht in der Adresse (`?id=`, Zurueck-Taste), Pfeil hoch/runter
+  bewegt sie, Enter oeffnet, Esc im Detail fuehrt zur Zeile zurueck und in der Liste hebt es
+  die Auswahl auf; ohne Auswahl ein ruhiger Leerzustand. Vorbild ist Apples Mail. Umsetzung:
+  `.app-page--list-detail` an der Seitenwurzel (Container `module-surface`) plus der Baustein
+  `utils/master-detail.js` (`.split-view` in layout.css); die Aufteilung (`split`) war das
+  erste Modul dieser Art und fuehrt ihre eigene Geometrie.
+- **Flaeche** - die volle Hauptspalte fuer Seiten, deren Inhalt selbst zweidimensional ist:
+  Raster, Board, Masonry, Kacheln, Diagramme. Umsetzung: `full` oder `dashboard`; das Budget
+  fuehrt als `reading` seine eigene Bahn (Lesemass-Liste plus Seitenleiste, `--budget-lane`),
+  die die Hauptspalte fuellt.
+
+**Die Schwelle misst die Modulflaeche, nicht den Viewport.** Neben der ausgeklappten
+Seitenleiste hat ein 1440er-Fenster 1220px Hauptspalte (Detailspalte da), ein 1280er 1060px
+(Lesemass), mit eingeklappter Leiste 1224px (Detailspalte da). Bei 1440 nimmt die Listenspur
+488px (40 %, samt Seitenpolster), das Detail 676px bis zur Kopfkante (gemessen 2026-09-26).
+
+**Das vierte Mass ist abgeschafft.** 960px (`data`) war ein Zwischenstand, keine Entscheidung:
+es liess 228px leer, ohne dass die Flaeche etwas trug. Zugeordnet am 2026-09-26:
+
+- **Inventar -> Liste + Detail**, weil es ein Detail-Markup hat (`openDetailView`, dieselbe
+  Leseansicht wie Kontakte). Bis der Baustein eingehaengt ist, steht es auf dem Lesemass.
+- **Haushaltshilfe -> Lesemass.** Ihre vier Reiter sind Listen und Karten, die auf 720px
+  zweispaltig bleiben. Die Berichte waeren als Flaeche besser gelesen, aber ein Regime je
+  Reiter hiesse den geteilten Kopf je Reiter umzuschalten - dieselbe offene Frage wie beim
+  Budget (PAGE-COMPOSITION.md, Welle C). Bis sie entschieden ist, gilt das Lesemass.
+
+`.app-page--data` bleibt nur fuer Erweiterungs-Manifeste, die `data` erklaeren; keine
+Kernseite fuehrt es. Die Zuordnung aller Seiten:
+
+| Seite | Regime | Umsetzung |
+|---|---|---|
+| `birthdays.js` Geburtstage | Lesemass | `reading` |
+| `rewards.js` Belohnungen | Lesemass | `reading` |
+| `pantry.js` Vorrat | Lesemass | `reading` |
+| `waste.js` Entsorgung | Lesemass | `reading` |
+| `shopping.js` Einkauf | Lesemass | `page-measure--narrow` (Kompositions-Ausnahme) |
+| `housekeeping.js` Haushaltshilfe | Lesemass | `reading` (vorher `data`) |
+| `settings.js` Einstellungen | Lesemass | eigene Shell (Kompositions-Ausnahme) |
+| `contacts.js` Kontakte | Liste + Detail | `reading` + `list-detail` |
+| `tasks.js` Aufgaben | Liste + Detail | `full` + `list-detail` in der Liste; Kanban ist Flaeche |
+| `recipes.js` Rezepte | Liste + Detail | `reading` + `list-detail` |
+| `inventory.js` Inventar | Liste + Detail | `reading` + `list-detail` (vorher `data`) |
+| `split-expenses.js` Aufteilung | Liste + Detail | `split`, eigene Geometrie |
+| `dashboard.js` Uebersicht | Flaeche | `dashboard` |
+| `calendar.js` Kalender | Flaeche | `full` |
+| `notes.js` Notizen | Flaeche | `full` |
+| `meals.js` Mahlzeiten | Flaeche | Wochenraster (Kompositions-Ausnahme) |
+| `documents.js` Dokumente | Flaeche | `full` |
+| `health.js` Gesundheit | Flaeche | `dashboard` |
+| `health-fasting.js` Fasten | Flaeche | Reiter der Gesundheit |
+| `schedule.js` Schichtplan | Flaeche | `full` |
+| `budget.js` Budget | Flaeche | `reading` mit eigener Bahn |
+| `budget-stats.js` Budget-Statistik | Flaeche | Reiter des Budgets |
+| `budget-plans.js` Budget-Plan | Flaeche | Reiter des Budgets |
+| `subscriptions.js` Abos | Flaeche | `full` |
+
+Guard: PAGE-017 bis PAGE-019 in `test/test-frontend-audit.js` - jede Seite steht genau einmal in
+dieser Tabelle, keine Kernseite fuehrt `data`, eine Lesemass-Seite fuehrt `reading`/`form`, eine
+Liste-+-Detail-Seite haengt den Baustein ein (Ausnahmeliste, die nur schrumpft, bis die Module
+ihn eingehaengt haben), und die Schwelle in layout.css ist die aus tokens.css.
+
 ## Elevation & Depth
 
 Hybrid aus zurueckhaltenden iOS-Schatten fuer opake Inhalte und Glas-Material fuer
@@ -1653,6 +1728,16 @@ Gemessen am echten Markup: `test:module-readonly-ui`, `test:budget-readonly-ui`,
   radius-full) mit gleitendem Aktiv-Indikator.
 - **Desktop:** Glas-Sidebar mit gleitender Aktiv-Pille; Toolbar ohne Akzentstreifen, Titel in
   Title 2.
+- **Die Seitenleiste zeigt jedes Modul ohne Scrollen - auf 1440x900 UND 1280x800**
+  (Critique 2026-09-26, P1-2). Vorher lagen auf 1440x900 Geburtstage, Gesundheit und Budget
+  unter der Falz, auf 1280x800 rund 270px. Die Rechnung: Zeilen `--sidebar-row-height` (32px,
+  ein Reihen-Bauteil nach der Zielgroessen-Regel, Apples Mac-Dichte), Sektionslabels 22px,
+  Suche (⌘K / Ctrl+K, dazu `/`) und Einklappen als Werkzeuge IN der Logo-Zeile, Hilfe /
+  Aenderungen / Abmelden in einem Konto-Menue hinter dem Avatar (geteiltes `popover-menu`,
+  Rollen und Pfeiltasten wie das Werkzeugmenue, oeffnet nach oben). Gemessen mit 15 Modulen:
+  Modulliste 614px, fester Rahmen 157px - 771px von 800. Die Kontozeile nennt, wer angemeldet
+  ist, und traegt den Update-Punkt, solange „Aenderungen" etwas Neues hat. Eingeklappt stapelt
+  die Logo-Zeile (Logo, Einklappen, Suche) auf der Icon-Flucht X=28.
 - Labels in 12px; lange Locales duerfen die Kapsel wachsen lassen, nie clippen.
 - **Filled Variant, app-weit:** JEDER ausgewaehlte Zustand traegt sein Icon gefuellt
   (`fill: color-mix(in srgb, currentColor 30%, transparent)`) - Tab-Bar, Sub-Tabs,

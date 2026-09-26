@@ -4028,7 +4028,7 @@ describe('Sonde 19 - in der regulaeren Groessenklasse traegt der Modulkopf eine 
                   // aus und nimmt `--content-max-width-narrow` NUR als
                   // Rueckfall fuer Seiten, die keins erklaeren. Diese Sonde las
                   // den Rueckfall von :root und meldete damit jede Seite mit
-                  // eigener Komposition als defekt - housekeeping ist
+                  // eigener Komposition als defekt - housekeeping war damals
                   // `app-page--data` (--layout-content, 60rem), sein Kopf endete
                   // korrekt bei 960px und wurde gegen 720px geprueft.
                   //

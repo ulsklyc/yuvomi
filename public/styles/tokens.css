@@ -1292,12 +1292,29 @@
   --viewport-height: 100vh;
   --sidebar-width: 56px;             /* Fallback (mobile: sidebar hidden) */
   --sidebar-width-expanded: 220px;   /* full sidebar (≥1024px), max 240px laut Spec */
+  /* Zeilenhoehe der Seitenleiste (Critique 2026-09-26, P1-2): 15 Module,
+   * vier Sektionslabels, Einstellungen und das Konto muessen auf 1280x800
+   * ohne Scrollen stehen - mit 40px-Zeilen fehlten dort ~270px. Die Zeilen
+   * sind ein REIHEN-Bauteil (gleichartige Ziele im 2px-Abstand), fuer das die
+   * Zielgroessen-Regel (DESIGN.md) WCAG 2.5.8 ansetzt, nicht --target-md;
+   * Apples Mac-Seitenleiste fuehrt dieselbe Dichte. */
+  --sidebar-row-height: 32px;
   --content-max-width: 1280px;
   --content-max-width-narrow: 720px;
   /* Page Composition System width tokens (PAGE-COMPOSITION.md) */
   --layout-reading: var(--content-max-width-narrow);
   --layout-content: 60rem;
   --layout-wide: 75rem;
+  /* Regime „Liste + Detail" (DESIGN.md, Breitenregel): die Liste steht auf
+   * einer schmaleren Bahn als das Lesemass, weil rechts das Detail liest. Die
+   * Bahn waechst zwischen den beiden Grenzen mit der Flaeche mit. Die Schwelle,
+   * ab der die Detailspalte erscheint, steht als Wert hier, damit sie einen
+   * Namen hat - `@container` kann keine Variable lesen, die Regel in
+   * layout.css schreibt sie deshalb aus, und test:frontend-audit (PAGE-019)
+   * haelt beide gleich. */
+  --layout-list-min: 26.25rem;
+  --layout-list-max: 32.5rem;
+  --layout-split-threshold: 75rem;
   /* Kanonisches horizontales Seiten-Padding. Ein Wert für den Gutter aller
    * Modul-Roots. Ab 1024px auf --space-8 angehoben (siehe Media-Query unter
    * :root), damit Kopf und Inhalt dieselbe Fluchtlinie haben (Issue #577). */

@@ -226,3 +226,22 @@ test('das Werkzeugmenue eines Modulkopfs: ein „..."-Knopf, Eintraege mit Text,
   assert.match(html, /<span>Tags &lt;b&gt;<\/span>/, 'Labels laufen durch esc()');
 });
 
+
+test('top-start: ein Menue am Fuss einer linken Leiste oeffnet ueber dem Ausloeser, an seiner linken Kante', () => {
+  // Konto-Menue der Seitenleiste (Critique 2026-09-26, P1-2). Rechtsbuendig
+  // am Ausloeser hinge es halb ueber dem Inhalt neben der Leiste, und nach
+  // unten ist am Fuss nie Platz. Der Trigger-Stub steht bei left 200, top 100,
+  // bottom 140; das Panel ist 200 x 48 gross.
+  const root = makeRoot();
+  const panel = makeMenu();
+  panel.dataset = { placement: 'top-start' };
+  open(root, panel);
+  assert.equal(panel.style.left, '200px', 'linke Kante am Ausloeser, nicht rechte');
+  assert.equal(panel.style.top, '48px', 'ueber dem Ausloeser: 100 - 48 - 4');
+
+  // Ohne Angabe bleibt es beim bisherigen Verhalten: rechtsbuendig darunter.
+  const plain = makeMenu();
+  open(root, plain);
+  assert.equal(plain.style.left, '100px');
+  assert.equal(plain.style.top, '144px');
+});

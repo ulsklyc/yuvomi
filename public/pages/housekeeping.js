@@ -311,8 +311,12 @@ function renderShell(container) {
   // (`page-toolbar--period`) - am Desktop in der Titelzeile, mobil als eigene
   // Zeile ueber den Reitern; auf den anderen Tabs ist der Slot leer und
   // verborgen (syncReportPeriod()).
+  // Breitenregel (DESIGN.md, 2026-09-26): Lesemass statt des abgeschafften
+  // 960er-Masses (`data`). Die Berichte waeren als Flaeche besser gelesen - ein
+  // Regime je Reiter hiesse aber den geteilten Kopf umzuschalten, dieselbe
+  // offene Frage wie beim Budget.
   container.insertAdjacentHTML('beforeend', `
-    <section class="housekeeping-page app-page app-page--data" data-composition="data" aria-labelledby="housekeeping-title">
+    <section class="housekeeping-page app-page app-page--reading" data-composition="reading" aria-labelledby="housekeeping-title">
       <header class="page-toolbar page-toolbar--narrow page-toolbar--wrap page-toolbar--period housekeeping-toolbar">
         <h1 class="page-toolbar__title" id="housekeeping-title">${esc(t('housekeeping.title'))}</h1>
         <div class="page-toolbar__center housekeeping-period" id="housekeeping-period" hidden></div>
@@ -2117,7 +2121,7 @@ async function openVisitFromDeepLink(editVisitId, container, signal) {
 export async function render(container, { signal } = {}) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <section class="housekeeping-page app-page app-page--data housekeeping-page--loading" data-composition="data" aria-busy="true">
+    <section class="housekeeping-page app-page app-page--reading housekeeping-page--loading" data-composition="reading" aria-busy="true">
       ${renderSkeletonList({ rows: 6, lines: 2 })}
     </section>
   `);
@@ -2134,7 +2138,7 @@ export async function render(container, { signal } = {}) {
     // sprachneutralen Statuscode und erzwingt den Wiederholen-CTA.
     container.replaceChildren();
     container.insertAdjacentHTML('beforeend',
-      '<section class="housekeeping-page app-page app-page--data" data-composition="data"></section>');
+      '<section class="housekeeping-page app-page app-page--reading" data-composition="reading"></section>');
     mountLoadError(container.querySelector('.housekeeping-page'), {
       title: t('housekeeping.loadError'),
       description: t('common.loadErrorDescription'),

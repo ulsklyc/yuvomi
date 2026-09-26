@@ -152,12 +152,19 @@ function onToggle(event) {
     const width = panel.offsetWidth || 200;
     const height = panel.offsetHeight || 48;
     const gap = 4;
+    // `data-placement="top-start"`: ueber dem Trigger, an seiner LINKEN Kante.
+    // Fuer einen Ausloeser am Fuss einer linken Leiste (Konto-Menue der
+    // Seitenleiste) - rechtsbuendig haenge das Menue sonst halb ueber dem
+    // Inhalt daneben, und nach unten ist dort nie Platz.
+    const topStart = panel.dataset?.placement === 'top-start';
     // Rechtskante am Trigger, aber niemals außerhalb des Viewports.
-    const left = Math.min(Math.max(8, rect.right - width), window.innerWidth - width - 8);
-    let top = rect.bottom + gap;
+    const left = Math.min(Math.max(8, topStart ? rect.left : rect.right - width), window.innerWidth - width - 8);
+    let top = topStart ? rect.top - height - gap : rect.bottom + gap;
     // Nach oben kippen, wenn unten kein Platz ist - der Kopf der Einkaufsliste
-    // sitzt oben, das Zeilenmenü kann überall stehen.
-    if (top + height > window.innerHeight - 8) top = rect.top - height - gap;
+    // sitzt oben, das Zeilenmenü kann überall stehen. Die obere Variante kippt
+    // umgekehrt nach unten, wenn ueber ihr kein Platz ist.
+    if (topStart && top < 8) top = rect.bottom + gap;
+    else if (!topStart && top + height > window.innerHeight - 8) top = rect.top - height - gap;
     panel.style.left = `${Math.round(left)}px`;
     panel.style.top = `${Math.round(Math.max(8, top))}px`;
   }

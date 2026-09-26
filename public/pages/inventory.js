@@ -2009,12 +2009,14 @@ export async function render(container) {
   _container = container;
 
   const page = document.createElement('div');
-  // app-page--data: die Seite setzt --layout-content; die Zeilentraeger lesen
-  // es (Guard in test-frontend-audit.js). Ohne die Rolle enden Kopf und
-  // Bedienzeilen neben ihrem eigenen Koerper. Die Regel kam mit v2.8.0, also
-  // nach der Basis, auf der dieser Zweig gebaut wurde.
-  page.className = 'inventory-page app-page app-page--data';
-  page.dataset.composition = 'data';
+  // Breitenregel (DESIGN.md, 2026-09-26): Inventar gehoert zu Liste + Detail,
+  // weil es eine Leseansicht hat (openDetailView). Bis der Baustein
+  // (utils/master-detail.js) eingehaengt ist, steht es auf dem Lesemass - das
+  // fruehere 960er-Mass (`data`) ist abgeschafft. Die Zeilentraeger lesen das
+  // Mass der Seite (Guard in test-frontend-audit.js); ohne die Rolle enden Kopf
+  // und Bedienzeilen neben ihrem eigenen Koerper.
+  page.className = 'inventory-page app-page app-page--reading';
+  page.dataset.composition = 'reading';
 
   // Sichtbarer Seitentitel statt sr-only: nur ein echtes .page-toolbar__title
   // loest das Absender-Siegel der Shell aus (router.js#wireToolbar,
