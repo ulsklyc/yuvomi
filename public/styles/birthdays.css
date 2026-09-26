@@ -543,11 +543,6 @@
   white-space: nowrap;
 }
 
-.birthdays-toolbar__import i {
-  width: 16px;
-  height: 16px;
-}
-
 .bd-import__intro {
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
@@ -628,11 +623,6 @@
   height: 18px;
   /* Rueckfall wie beim Badge darunter: der Dialog liegt ausserhalb von .birthdays-page. */
   color: var(--module-accent, var(--module-birthdays));
-}
-
-.bd-import-row__check i {
-  width: 16px;
-  height: 16px;
 }
 
 /* DER IMPORT-DIALOG HAENGT UNTER document.body, NICHT UNTER .birthdays-page

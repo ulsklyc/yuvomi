@@ -23,7 +23,6 @@
   color: var(--color-warning-ink);
   font-size: var(--text-xs);
 }
-.cal-offline-notice i { flex: 0 0 auto; }
 
 /* --------------------------------------------------------
  * Seiten-Layout

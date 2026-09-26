@@ -1431,10 +1431,6 @@
   to { transform: rotate(360deg); }
 }
 
-.weather-widget__refresh--spinning i {
-  animation: spin 0.7s linear infinite;
-}
-
 .weather-widget__inner {
   display: flex;
   flex-direction: column;
@@ -2969,11 +2965,6 @@ svg.weather-forecast__icon {
  * (Desktop). Der frühere Override auf --target-md (40px) schrumpfte die Toolbar-
  * Buttons auch mobil unter das 44px-iOS-Minimum (Assessment B). */
 
-.dashboard-customize-toolbar .btn i {
-  width: 16px;
-  height: 16px;
-}
-
 /* Der Modus zeigt sich an der KANTE, nicht an einer Flaeche: die violette
  * Toenung ueber dem ganzen Raster (Critique 2026-09-26) faerbte jede Kachel
  * mit ein und machte den Bearbeiten-Zustand lauter als den Inhalt. Die
@@ -3541,11 +3532,6 @@ svg.weather-forecast__icon {
    * 35 % liegt derselbe schwarze Fall bei 6.2:1, und die Farbfamilie bleibt
    * lesbar. Die 16-%-Toenung der Flaeche darunter traegt sie mit. */
   color: color-mix(in srgb, var(--countdown-accent, var(--color-accent)) 35%, var(--color-text-primary));
-}
-
-.countdown-item__icon i {
-  width: 16px;
-  height: 16px;
 }
 
 .countdown-item__body {

@@ -153,12 +153,6 @@
   display: none;
 }
 
-.auth-capslock i {
-  width: var(--text-base, 1rem);
-  height: var(--text-base, 1rem);
-  flex-shrink: 0;
-}
-
 /* Nach falschen Zugangsdaten wird der Recovery-Link betont, damit der Nutzer
  * einen Ausweg sieht statt es blind erneut zu versuchen. */
 .auth-form__forgot--emphasis a {
@@ -262,12 +256,6 @@
 .password-toggle:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset-inset);
-}
-
-.password-toggle i {
-  width: var(--text-lg, 1.125rem);
-  height: var(--text-lg, 1.125rem);
-  pointer-events: none;
 }
 
 /* Feld-Fehler-Zustand */

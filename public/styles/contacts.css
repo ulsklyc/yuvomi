@@ -649,11 +649,6 @@ html:has(.contacts-page.is-selecting) {
   color: var(--module-birthdays, var(--module-accent));
 }
 
-.vcard-import-row__bday i {
-  width: 16px;
-  height: 16px;
-}
-
 /* Schon vorhanden: Zuruecknehmen-Muster (tokens.css, #1230) statt
  * `opacity: 0.72`. Das Badge sagt den Zustand; auf der vertieften Flaeche
  * nimmt es die naechste Stufe, sonst verschwaende seine Pille im Grund. */

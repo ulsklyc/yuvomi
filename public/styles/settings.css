@@ -2753,8 +2753,6 @@
   transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
-.perm-modeswitch__btn i { width: 16px; height: 16px; }
-
 /* Aktiv: gefülltes Segment statt erhabener Kachel (DESIGN.md „Segmented
  * Controls"). */
 /* Aktiv = erhabene Surface-Pille, Ton in der Tinte (tokens.css, Abschnitt 6c). */
@@ -2858,8 +2856,6 @@
   font-weight: var(--font-weight-medium);
 }
 
-.perm-summary--full i { width: 16px; height: 16px; }
-
 .perm-summary__lead {
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
@@ -2881,7 +2877,6 @@
   font-weight: var(--font-weight-medium);
 }
 
-.perm-summary__chip i { width: 12px; height: 12px; color: var(--color-warning); }
 .perm-summary__dot { width: 7px; height: 7px; border-radius: var(--radius-full); flex-shrink: 0; }
 
 /* Liste: Modul-Gruppen, jede mit eingerückten Widgets darunter. */
@@ -2950,8 +2945,6 @@
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);
 }
-
-.perm-row__label i { width: 18px; height: 18px; color: var(--color-text-secondary); flex-shrink: 0; }
 
 .perm-row__dot {
   width: 8px;
@@ -3028,7 +3021,6 @@
   transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
-.perm-seg__opt i { width: 16px; height: 16px; }
 .perm-seg__opt:disabled { cursor: not-allowed; }
 /* Die Fläche liefert der gleitende Daumen; das Glyph darauf trägt den Modulton
  * als Tinte - dieselbe Mischung wie jedes andere aktive Segment. */
@@ -3075,11 +3067,6 @@
   font-weight: var(--font-weight-medium);
 }
 
-.perm-actions__status i {
-  width: 14px;
-  height: 14px;
-}
-
 .perm-adminnote {
   display: flex;
   align-items: center;
@@ -3092,7 +3079,6 @@
   color: var(--color-text-secondary);
 }
 
-.perm-adminnote i { width: 22px; height: 22px; color: var(--color-accent); flex-shrink: 0; }
 .perm-adminnote p { margin: 0; font-size: var(--text-sm); }
 
 /* Rechtevergabe war die schlechteste Touch-Fläche in Settings - bei der Aufgabe

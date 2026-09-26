@@ -450,7 +450,6 @@
   margin-inline-start: auto;
 }
 
-.health-dose__status i { width: 16px; height: 16px; }
 .health-dose__status--taken { color: var(--color-success); }
 .health-dose__status--skipped { color: var(--color-text-secondary); }
 
@@ -627,8 +626,6 @@ button.health-med-card:hover {
 
 /* Der Nachfüll-Chip rutscht bei Enge sauber in eine eigene Zeile, statt die
  * Bestandszeile mitten im Text umbrechen zu lassen. */
-.health-med-card__stock i { width: 14px; height: 14px; flex: 0 0 auto; }
-
 .health-med-card__stock.is-warn {
   color: var(--color-warning);
 }
@@ -641,8 +638,6 @@ button.health-med-card:hover {
   color: var(--color-warning);
   font-weight: var(--font-weight-medium, 500);
 }
-
-.health-med-card__refill i { width: 14px; height: 14px; }
 
 /* Modal: Checkbox-Zeile + Einnahmeplan-Editor */
 .health-check {
@@ -848,8 +843,6 @@ button.health-med-card:hover {
   flex: 0 0 auto;
 }
 
-.health-lab-badge i { width: 12px; height: 12px; }
-
 .health-lab-badge--warn {
   background: var(--color-warning-light);
   color: var(--color-warning-ink);
@@ -951,8 +944,6 @@ button.health-med-card:hover {
   font-weight: var(--font-weight-medium, 500);
   white-space: nowrap;
 }
-
-.health-lab-flag i { width: 14px; height: 14px; }
 
 .health-lab-flag--low    { color: var(--color-info); }
 .health-lab-flag--normal { color: var(--color-success); }
@@ -1155,11 +1146,6 @@ button.health-med-card:hover {
   border-radius: var(--radius-full);
   background: var(--color-surface-2);
   color: var(--module-accent);
-}
-
-.health-activity-row__icon i {
-  width: 18px;
-  height: 18px;
 }
 
 .health-activity-row__body {
@@ -1647,12 +1633,6 @@ button.health-med-card:hover {
   font-size: var(--text-sm);
 }
 
-.health-readonly-banner i {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 auto;
-}
-
 /* Medizinischer Disclaimer — bewusst leise (kein Diagnose-Anspruch). */
 .health-disclaimer {
   margin: 0;
@@ -2058,7 +2038,6 @@ button.health-med-card:hover {
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
 }
-.cycle-stat--note i { width: var(--icon-sm); height: var(--icon-sm); flex: 0 0 auto; color: var(--color-text-tertiary); }
 
 .cycle-stat__pair-row {
   display: flex;

@@ -1285,11 +1285,6 @@
   background: var(--module-accent, var(--color-accent));
 }
 
-.budget-loan-card__filter i {
-  width: 15px;
-  height: 15px;
-}
-
 .budget-loan-card__amounts {
   text-align: right;
 }
@@ -2162,7 +2157,6 @@ button.budget-entry__title {
 /* Sparziel „noch nicht gesetzt" */
 .budget-plan-savings--empty { justify-content: space-between; }
 .budget-plan-savings__prompt { display: flex; align-items: center; gap: var(--space-3); }
-.budget-plan-savings__prompt > i { width: 32px; height: 32px; color: var(--module-budget); flex-shrink: 0; }
 .budget-plan-savings__prompt-title { font-weight: var(--font-weight-semibold); color: var(--color-text-primary); }
 .budget-plan-savings__prompt-desc { font-size: var(--text-sm); color: var(--color-text-secondary); }
 .budget-plan-savings__prompt-cta {
@@ -2174,7 +2168,6 @@ button.budget-entry__title {
   color: var(--module-accent, var(--color-accent));
   white-space: nowrap;
 }
-.budget-plan-savings__prompt-cta i { width: 16px; height: 16px; }
 
 /* Kategorie-Plan-Abschnitt */
 .budget-plan__section-head {
@@ -2198,8 +2191,6 @@ button.budget-entry__title {
   color: var(--color-text-secondary);
   font-size: var(--text-sm); line-height: var(--line-height-base);
 }
-.budget-plan__historic-note i { flex: none; margin-top: 0.1em; color: var(--color-text-tertiary); }
-.budget-plan__section-head .btn i { width: 16px; height: 16px; }
 .budget-plan__empty { padding: var(--space-6) var(--space-4); }
 
 /* Nur das Layout - Fläche, Radius, Schatten und Trennlinien kommen aus

@@ -1003,12 +1003,6 @@
   font-size: var(--text-sm);
 }
 
-.meal-recurrence-note i {
-  color: var(--module-meals);
-  flex: none;
-  margin-top: var(--space-0h);
-}
-
 /* Leere Slots tragen keinen „Kein Essen geplant"-Text mehr (Rauschen auf dem
  * Planer-Raster) — nur noch Typ-Label + Plus-Affordanz. */
 

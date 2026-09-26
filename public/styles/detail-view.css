@@ -165,18 +165,9 @@
   cursor: default;
 }
 
-.detail-subtask i {
-  flex-shrink: 0;
-  color: var(--color-text-tertiary);
-}
-
 .detail-subtask--done {
   color: var(--color-text-tertiary);
   text-decoration: line-through;
-}
-
-.detail-subtask--done i {
-  color: var(--color-success);
 }
 
 /* Der Einstieg steht IN der Liste, nicht daneben: die Karte blendet ihre
@@ -194,10 +185,6 @@
   border-color: var(--color-accent);
   color: var(--color-accent);
   background: none;
-}
-
-.detail-subtask--add:hover i {
-  color: var(--color-accent);
 }
 
 /* --------------------------------------------------------
