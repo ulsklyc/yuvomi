@@ -152,7 +152,7 @@ function openTypeModal(type) {
           <input type="hidden" id="hpt-icon" value="${esc(type?.icon || 'syringe')}">
         </div>
         <div class="modal-panel__footer modal-panel__footer--plain">
-          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="delete" style="margin-right:auto">
+          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="delete" style="margin-inline-end:auto">
             <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}
           </button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>

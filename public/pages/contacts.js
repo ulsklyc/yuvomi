@@ -1419,7 +1419,7 @@ function buildContactForm({ mode, contact = null }) {
     ${advancedSection(advancedFieldsHtml, { open: advancedOpen })}
 
     <div class="modal-panel__footer contact-modal__footer">
-      ${isEdit && !contact.family_user_id ? `<button type="button" class="btn btn--danger-outline" id="cm-delete" style="margin-right:auto">
+      ${isEdit && !contact.family_user_id ? `<button type="button" class="btn btn--danger-outline" id="cm-delete" style="margin-inline-end:auto">
         <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
       </button>` : '<div></div>'}
       <div class="contact-modal__footer-actions">

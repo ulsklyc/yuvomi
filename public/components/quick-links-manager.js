@@ -204,7 +204,7 @@ function formHtml(state, isEdit) {
     </div>
     <div class="modal-panel__footer modal-panel__footer--plain">
       ${isEdit
-    ? `<button type="button" class="btn btn--danger-outline" id="quick-link-delete" style="margin-right:auto">${esc(t('common.delete'))}</button>`
+    ? `<button type="button" class="btn btn--danger-outline" id="quick-link-delete" style="margin-inline-end:auto">${esc(t('common.delete'))}</button>`
     : ''}
       <button type="button" class="btn btn--secondary" id="quick-link-cancel">${esc(t('common.cancel'))}</button>
       <button type="button" class="btn btn--primary" id="quick-link-save">${esc(isEdit ? t('common.save') : t('common.create'))}</button>

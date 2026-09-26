@@ -748,3 +748,18 @@ test('jedes Suchfeld aus renderPageSearch ist verdrahtet: wirePageSearch mit der
   assert.ok(JS.some(({ src }) => src.includes('renderPageSearch(')), 'Vorbedingung: der Scanner findet Suchfelder');
   assert.deepEqual(offenders, []);
 });
+
+test('Dialog-Fussleisten schieben mit logischem Rand: kein Inline-Stil setzt margin-left/right: auto (RTL)', () => {
+  // Der Loeschen-Knopf links in `.modal-panel__footer` rueckt per Auto-Rand von
+  // Abbrechen/Speichern ab. `margin-right: auto` ist in ar/fa der Rand VOR dem
+  // Knopf - er klebte dort neben der Primaeraktion (Codex an #1478). Budget und
+  // Muell nutzten schon `margin-inline-end: auto`.
+  const offenders = [];
+  for (const { file, src } of JS) {
+    src.split('\n').forEach((line, i) => {
+      if (/style="[^"]*margin-(?:left|right)\s*:\s*auto/.test(line)) offenders.push(`${file}:${i + 1}`);
+    });
+  }
+  assert.ok(JS.some(({ src }) => /style="[^"]*margin-inline-end\s*:\s*auto/.test(src)), 'Vorbedingung: der Scanner sieht Inline-Stile');
+  assert.deepEqual(offenders, []);
+});

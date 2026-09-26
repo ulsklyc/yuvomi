@@ -871,7 +871,7 @@ function openBirthdayModal({ mode, birthday = null }) {
           { open: isEdit && (!!birthday?.name_day || !!birthday?.notes || reminderOpensAdvanced(birthday)) })}
         <div class="birthday-modal__hint">${t('birthdays.calendarHint')}</div>
         <div class="modal-panel__footer modal-panel__footer--plain">
-          ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="bd-delete" style="margin-right:auto">
+          ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="bd-delete" style="margin-inline-end:auto">
             <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
           </button>` : '<div></div>'}
           <div class="birthday-modal__footer-actions">
