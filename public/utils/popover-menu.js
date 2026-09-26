@@ -178,9 +178,23 @@ function onToggle(event) {
   focusItem(items, checked === -1 ? 0 : checked);
 }
 
-/** Die bedienbaren Eintraege eines Panels in DOM-Reihenfolge. */
+/**
+ * Die bedienbaren Eintraege eines Panels in DOM-Reihenfolge - nur die, die
+ * GERENDERT sind (Review zu #1475). Ein Modul darf einen Eintrag per CSS
+ * ausblenden, der unter einer Breite nichts bewirkt (Mahlzeiten: der
+ * Rezeptspalten-Schalter unter 1024px, meals.css). Im DOM steht er weiter,
+ * und als Ziel von End/ArrowUp nahm er den Fokus nicht an - die Tastatur hing
+ * am Menueende. Die Frage gehoert hierher und nicht in jedes Modul: welche
+ * Regel einen Eintrag verbirgt, weiss nur das Rendering.
+ */
 function itemsOf(panel) {
-  return [...panel.querySelectorAll('.popover-menu__item:not([disabled])')];
+  return [...panel.querySelectorAll('.popover-menu__item:not([disabled])')].filter(isRendered);
+}
+
+function isRendered(item) {
+  if (typeof item.checkVisibility === 'function') return item.checkVisibility();
+  if (typeof item.getClientRects === 'function') return item.getClientRects().length > 0;
+  return true;
 }
 
 /**
