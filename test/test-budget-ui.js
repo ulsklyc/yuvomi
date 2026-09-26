@@ -483,8 +483,10 @@ test('Einfachauswahl-Leisten melden ihren Zustand über aria-checked', () => {
   assert.match(budget, /role="radio" data-tab-id="\$\{id\}" aria-checked="\$\{on\}"/, 'Darlehensstatus');
   assert.match(splitExpenses, /role="radio" data-tab-id="\$\{id\}" aria-checked="\$\{on\}"/, 'Gruppenstatus');
   assert.match(budget, /role="radio"[\s\S]{0,200}aria-checked="\$\{on\}"/, 'Kontofarbe');
-  // Der Filter-Trichter je Darlehenszeile bleibt ein einzelner Toggle-Button.
-  assert.match(budget, /data-action="loan-filter"[\s\S]{0,160}aria-pressed=/);
+  // Der Filter-Trichter je Darlehenszeile bleibt ein einzelner Toggle-Button -
+  // seit dem Komponenten-Kanon (2026-09-26) als Zeilenaktion aus rowActionHtml();
+  // gerendert prueft ihn test-budget-readonly-ui (Darlehenskarte).
+  assert.match(budget, /action: 'loan-filter'[\s\S]{0,200}'aria-pressed': String\(/);
 });
 
 // --------------------------------------------------------

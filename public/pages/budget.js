@@ -25,6 +25,7 @@ import { formatMoney, formatSignedAmount, amountPlaceholder, amountStep, amountM
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { trendMarkup } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
+import { rowActionHtml } from '/utils/row-action.js';
 import { intervalUnitLabel } from '/rrule-ui.js';
 import { appendCurrencyOptions } from '/settings/currency.js';
 import '/components/category-manager.js';
@@ -1798,9 +1799,9 @@ function renderAccountsPage() {
             <span class="budget-account__starting">${t('budget.startingBalanceShort')} ${formatAmount(a.starting_balance)}</span>
           </span>
         </button>
-        ${ro ? '' : `<button class="budget-account__edit" type="button" data-edit="${a.id}" aria-label="${t('budget.editAccount')}">
-          <i data-lucide="pencil" class="icon-sm" aria-hidden="true"></i>
-        </button>`}
+        ${ro ? '' : `<div class="row-actions budget-account__actions">${rowActionHtml({
+          icon: 'pencil', label: t('common.editNamed', { name: a.name }), attrs: { 'data-edit': a.id },
+        })}</div>`}
       </div>`;
   }).join('');
 
@@ -1833,7 +1834,7 @@ function wireAccountsPage() {
       _container.querySelector('#budget-body')?.focus();
     });
   });
-  _container.querySelectorAll('.budget-account__edit[data-edit]').forEach((el) => {
+  _container.querySelectorAll('.budget-account [data-edit]').forEach((el) => {
     el.addEventListener('click', () => {
       const account = state.accounts.find((a) => a.id === parseInt(el.dataset.edit, 10));
       if (account) openAccountModal(account);
@@ -1908,9 +1909,9 @@ function openAccountModal(account = null) {
     </div>
 
     <div class="modal-panel__footer modal-panel__footer--plain">
-      <div style="display:flex;gap:var(--space-2)">
-      ${isEdit ? `<button class="btn btn--danger btn--icon" id="am-delete" aria-label="${t('budget.deleteAccount')}">
-        <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
+      <div style="display:flex;gap:var(--space-2);margin-inline-end:auto">
+      ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="am-delete">
+        <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
       </button>
       <button class="btn btn--secondary btn--icon" id="am-archive"
               aria-label="${account.archived ? t('budget.unarchiveAccount') : t('budget.archiveAccount')}"
@@ -2182,6 +2183,7 @@ function renderLoanPaymentEntry(loan, payment) {
   const rowTitle = payment.entry_title || t('budget.loanPaymentTitle', { borrower: loan.borrower });
   // Alle Raten tragen denselben Titel - der Name des Loeschknopfs nennt die Rate mit.
   const deleteName = t('budget.deleteLabel', { title: `${rowTitle} · ${installment}` });
+  const editName = t('common.editNamed', { name: `${rowTitle} · ${installment}` });
   const borrowed = isBorrowedLoan(loan);
   const flow = borrowed ? 'expenses' : 'income';
   // Rolle `flow` wie in der Einträge-Liste: das Vorzeichen kommt aus dem Zahlformat,
@@ -2202,10 +2204,10 @@ function renderLoanPaymentEntry(loan, payment) {
       <div class="budget-entry__amount budget-entry__amount--${flow}">${amountText}</div>
       ${readOnly() ? '' : `<div class="list-row__actions">
         ${entry ? `
-        <button class="row-action" data-action="loan-payment-edit" data-loan-id="${loan.id}" data-payment-id="${payment.id}" data-entry-id="${entry.id}" aria-label="${t('common.edit')}">
+        <button type="button" class="row-action" data-action="loan-payment-edit" data-loan-id="${loan.id}" data-payment-id="${payment.id}" data-entry-id="${entry.id}" aria-label="${esc(editName)}">
           <i data-lucide="pencil" class="icon-md" aria-hidden="true"></i>
         </button>` : ''}
-        <button class="row-action row-action--danger" data-action="loan-payment-delete" data-loan-id="${loan.id}" data-payment-id="${payment.id}" data-entry-id="${entry?.id ?? ''}" aria-label="${esc(deleteName)}">
+        <button type="button" class="row-action row-action--danger" data-action="loan-payment-delete" data-loan-id="${loan.id}" data-payment-id="${payment.id}" data-entry-id="${entry?.id ?? ''}" aria-label="${esc(deleteName)}">
           <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
         </button>
       </div>`}
@@ -2478,11 +2480,11 @@ function renderLoanCard(loan) {
       <div class="budget-loan-card__main">
         <div class="budget-loan-card__title-row">
           <div class="budget-loan-card__title">${esc(loan.title)}</div>
-          <button class="budget-loan-card__filter ${state.loanFilterId === loan.id ? 'budget-loan-card__filter--active' : ''}"
-                  type="button" data-action="loan-filter" data-id="${loan.id}"
-                  aria-pressed="${state.loanFilterId === loan.id}" aria-label="${t('budget.filterLoanTransactions')}">
-            <i data-lucide="filter" aria-hidden="true"></i>
-          </button>
+          ${rowActionHtml({
+    icon: 'filter', action: 'loan-filter', className: 'budget-loan-card__filter',
+    label: t('budget.filterLoanNamed', { name: loan.title }),
+    attrs: { 'data-id': loan.id, 'aria-pressed': String(state.loanFilterId === loan.id) },
+  })}
         </div>
         <div class="budget-loan-card__meta">${t(isBorrowedLoan(loan)
           ? 'budget.loanDirectionBorrowedBadge'
@@ -2511,12 +2513,10 @@ function renderLoanCard(loan) {
             * Buchen einer Rate schreiben. Faelligkeit, Fortschritt und der
             * Bericht hinter der Karte bleiben - sie sind die Auskunft. */ ''}
         ${readOnly() ? '' : `<div class="budget-loan-card__actions">
-          <button class="btn btn--secondary btn--icon" data-action="loan-edit" data-id="${loan.id}" aria-label="${t('budget.editLoan')}">
-            <i data-lucide="pencil" aria-hidden="true"></i>
-          </button>
-          <button class="btn btn--secondary btn--icon" data-action="loan-delete" data-id="${loan.id}" aria-label="${t('budget.deleteLoan')}">
-            <i data-lucide="trash-2" aria-hidden="true"></i>
-          </button>
+          <div class="row-actions">
+            ${rowActionHtml({ icon: 'pencil', action: 'loan-edit', label: t('common.editNamed', { name: loan.title }), attrs: { 'data-id': loan.id } })}
+            ${rowActionHtml({ icon: 'trash-2', tone: 'danger', action: 'loan-delete', label: t('common.deleteNamed', { name: loan.title }), attrs: { 'data-id': loan.id } })}
+          </div>
           ${/* Sekundaer, nicht primaer (Critique 2026-09-25): drei Darlehen
               * zeigten drei violette Primaerknoepfe nebeneinander, und keiner
               * war der Weg der Seite. Der steht im Kopf („+ Darlehen"). */ ''}
@@ -2955,8 +2955,8 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
     </div>
 
     <div class="modal-panel__footer modal-panel__footer--plain">
-      ${isEdit ? `<button class="btn btn--danger btn--icon" id="bm-delete" aria-label="${esc(t('budget.deleteLabel', { title: entry.title }))}">
-        <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
+      ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="bm-delete" aria-label="${esc(t('budget.deleteLabel', { title: entry.title }))}" style="margin-inline-end:auto">
+        <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
       </button>` : '<div></div>'}
       <div style="display:flex;gap:var(--space-3)">
         <button class="btn btn--secondary" id="bm-cancel">${t('common.cancel')}</button>
@@ -4080,7 +4080,7 @@ function recurringChoiceModal({ title, thisLabel, seriesLabel, seriesDanger = fa
         <div class="modal-actions modal-actions--stack">
           <button type="button" class="btn btn--secondary" id="rcs-this">${thisLabel}</button>
           <button type="button" class="btn ${seriesDanger ? 'btn--danger' : 'btn--primary'}" id="rcs-series">${seriesLabel}</button>
-          <button type="button" class="btn btn--ghost" id="rcs-cancel">${t('common.cancel')}</button>
+          <button type="button" class="btn btn--secondary" id="rcs-cancel">${t('common.cancel')}</button>
         </div>`,
       onClose: () => finish(null),
       onSave(panel) {

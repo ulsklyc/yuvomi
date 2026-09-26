@@ -590,23 +590,20 @@
  * bei den Kontaktzeilen: letztes Kind des Öffnen-Knopfes, Bearbeiten-Knopf als
  * Geschwister daneben. Regel und Guard stehen bei den Kontakten. */
 
-.budget-account__edit {
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-left: 1px solid var(--color-border-subtle);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: color var(--transition-fast), background var(--transition-fast);
+/* Bearbeiten ist die geteilte Zeilenaktion (`.row-action`, Komponenten-Kanon
+ * DESIGN.md), keine eigene Stiftzelle mehr: vorher eine 44px-Spalte ueber die
+ * volle Kartenhoehe mit Trennlinie und Kontofarbe im Hover - der vierte
+ * Zeilenaktions-Stil des Budgets (Critique 2026-09-26 P1). Die Karte streckt
+ * ihre Kinder (align-items: stretch fuer die Zeile davor), die Aktion sitzt
+ * mittig. Sie greift um --space-2 in das Endpolster der Zeile davor und haelt
+ * --space-1 zum Kartenrand: zusammen dieselben 60px wie die alte Stiftzelle
+ * (16 Polster + 44 Zelle), damit Name und Saldo mobil nicht enger werden -
+ * der Kreis der Aktion bringt seinen Abstand selbst mit. */
+.budget-account__actions {
+  align-self: center;
+  margin-inline-start: calc(var(--space-2) * -1);
+  padding-inline-end: var(--space-1);
 }
-
-.budget-account__edit:hover { color: var(--account-accent); background: var(--color-surface-hover); }
-/* AUSNAHME wie .budget-account__main: Konto-Farbe statt Modul-Akzent. */
-.budget-account__edit:focus-visible { --focus-ring-color: var(--account-accent); outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: var(--focus-ring-offset-inset); }
 
 .budget-entry__account {
   display: inline-flex;
@@ -1260,28 +1257,14 @@
   min-width: 0;
 }
 
-.budget-loan-card__filter {
-  width: var(--target-lg);
-  height: var(--target-lg);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  background: var(--color-surface-2);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-}
-
-.budget-loan-card__filter:hover {
-  color: var(--module-accent);
-  border-color: var(--module-accent);
-}
-
-.budget-loan-card__filter--active {
+/* Der Raten-Filter ist eine Zeilenaktion (`.row-action`, 48px aus
+ * --target-lg) und kein eigener Kreis mit Kante mehr. Nur sein ZUSTAND ist
+ * eigen, weil er ein Umschalter ist (aria-pressed): gedrueckt fuellt ihn der
+ * Modulton - dieselbe Aussage wie vorher `--active`, jetzt am Attribut, das
+ * der Screenreader ansagt, statt an einer zweiten Klasse. */
+.budget-loan-card__filter[aria-pressed="true"],
+.budget-loan-card__filter[aria-pressed="true"]:hover {
   color: var(--color-ink-on-vivid);
-  border-color: var(--module-accent, var(--color-accent));
   background: var(--module-accent, var(--color-accent));
 }
 
@@ -2157,6 +2140,10 @@ button.budget-entry__title {
 /* Sparziel „noch nicht gesetzt" */
 .budget-plan-savings--empty { justify-content: space-between; }
 .budget-plan-savings__prompt { display: flex; align-items: center; gap: var(--space-3); }
+/* Die Absicht der frueheren `> i`-Regel (32px im Modulton), jetzt auf das
+ * <svg>, das Lucide an die Stelle des <i> setzt - die alte Regel griff nie
+ * (R5 p-kit, tote i-Regeln), das Sparschwein stand in 24px und Textfarbe. */
+.budget-plan-savings__prompt > svg { width: 32px; height: 32px; color: var(--module-accent, var(--color-accent)); flex-shrink: 0; }
 .budget-plan-savings__prompt-title { font-weight: var(--font-weight-semibold); color: var(--color-text-primary); }
 .budget-plan-savings__prompt-desc { font-size: var(--text-sm); color: var(--color-text-secondary); }
 .budget-plan-savings__prompt-cta {
@@ -2168,6 +2155,7 @@ button.budget-entry__title {
   color: var(--module-accent, var(--color-accent));
   white-space: nowrap;
 }
+.budget-plan-savings__prompt-cta svg { width: 16px; height: 16px; flex: none; }
 
 /* Kategorie-Plan-Abschnitt */
 .budget-plan__section-head {
@@ -2191,6 +2179,7 @@ button.budget-entry__title {
   color: var(--color-text-secondary);
   font-size: var(--text-sm); line-height: var(--line-height-base);
 }
+.budget-plan__historic-note svg { flex: none; margin-top: 0.1em; color: var(--color-text-tertiary); }
 .budget-plan__empty { padding: var(--space-6) var(--space-4); }
 
 /* Nur das Layout - Fläche, Radius, Schatten und Trennlinien kommen aus

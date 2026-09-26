@@ -274,8 +274,8 @@ function openPlanEditor({ category, savings = false }) {
       ${savings ? `<p class="form-hint" style="margin-bottom:var(--space-3)">${t('budget.planSavingsHint')}</p>` : ''}
       ${amountFieldHtml(hasCurrent ? current : '')}
       <div class="modal-panel__footer modal-panel__footer--plain">
-        ${hasCurrent ? `<button class="btn btn--danger btn--icon" id="plan-delete" aria-label="${t('common.delete')}">
-          <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
+        ${hasCurrent ? `<button type="button" class="btn btn--danger-outline" id="plan-delete" style="margin-inline-end:auto">
+          <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
         </button>` : '<div></div>'}
         <div style="display:flex;gap:var(--space-3)">
           <button class="btn btn--secondary" data-action="close-modal">${t('common.cancel')}</button>

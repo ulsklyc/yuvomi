@@ -291,6 +291,9 @@ test('Darlehenskarte mit `budget: read`: Bearbeiten, Loeschen und Rate buchen we
     assert.doesNotMatch(html, /loan-edit|loan-delete|loan-pay/);
     assert.doesNotMatch(html, /budget-loan-card__actions/);
     assert.match(html, /data-action="loan-filter"/, 'der Raten-Filter liest nur');
+    // Ein Umschalter, der seinen Zustand ansagt, als geteilte Zeilenaktion mit
+    // dem Darlehen im Namen (Komponenten-Kanon 2026-09-26).
+    assert.match(html, /<button type="button" class="row-action budget-loan-card__filter" data-action="loan-filter" aria-label="budget\.filterLoanNamed\{&quot;name&quot;:&quot;Autokredit&quot;\}" data-id="9" aria-pressed="false">/);
     assert.match(html, /role="progressbar"/);
     assert.match(html, /Autokredit/);
     assert.match(html, /budget\.loanNextDue/);
@@ -798,7 +801,7 @@ test('WRITE_HOOKS nennt jeden schreibenden Bedienhaken ohne `data-action`', () =
     // emptyStateHTML(), der Rest als Markup-Attribut.
     const needle = hook.startsWith('#')
       ? new RegExp(`id(?:="|: ')${hook.slice(1)}['"]`)
-      : /data-edit="/;
+      : /data-edit="|'data-edit':/;
     assert.match(BUDGET_CODE, needle, `${hook} steht im Riegel, aber nicht mehr im Markup`);
   }
   // Lesende Haken gehoeren NICHT hinein - der Riegel sperrte sonst den Berechtigten.
