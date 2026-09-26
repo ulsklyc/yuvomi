@@ -479,3 +479,42 @@ test('eine vor dem Rueckgaengig gestartete Neulade-Antwort ueberschreibt den zur
     'die vor dem Rueckgaengig gestartete Antwort ist ueberholt und darf state.tasks nicht schreiben');
   delete globalThis.__apiStub;
 });
+
+test('scheitert das Neuladen nach dem Rueckgaengig, schreibt die davor gestartete Antwort trotzdem nicht', async () => {
+  // Codex an #1476: bis hierhin galt eine aeltere Antwort, solange keine
+  // juengere ANGEWANDT war. Scheitert die juengere, gewann die aeltere und
+  // zeigte den erledigten Stand ueber dem erfolgreich zurueckgenommenen.
+  const task = { id: 6, name: 'Kueche', area: 'Kueche', frequency_days: 7, last_completed: '2026-09-01T08:00:00Z' };
+  const done = { ...task, last_completed: '2026-09-26T09:00:00Z' };
+  let taskReads = 0;
+  let releaseStale;
+  globalThis.__apiStub = {
+    get: async (url) => {
+      if (url === '/housekeeping/visits') return { data: REPORTS['2026-09'] };
+      if (url === '/housekeeping/decay-tasks') {
+        taskReads += 1;
+        if (taskReads === 1) return new Promise((resolve) => { releaseStale = () => resolve({ data: [done] }); });
+        throw new Error('offline');                      // das Neuladen nach dem Rueckgaengig scheitert
+      }
+      return { data: null };
+    },
+    post: async () => ({ data: null }),
+    patch: async () => ({ data: null }),
+  };
+  toasts.length = 0;
+  const state = hk.state();
+  state.tab = 'tasks';
+  state.tasks = [task];
+  const content = fakeContainer();
+  const completing = hk.completeTask(task, content, null);
+  while (!releaseStale) await new Promise((resolve) => setImmediate(resolve));
+  const undo = toasts.find((args) => typeof args[3] === 'function')?.[3];
+  assert.ok(undo, 'der Erledigt-Toast traegt Rueckgaengig');
+  await undo();
+  assert.equal(state.tasks[0].last_completed, task.last_completed, 'Vorbedingung: der alte Zeitpunkt steht');
+  releaseStale();
+  await completing;
+  assert.equal(state.tasks[0].last_completed, task.last_completed,
+    'die vor dem Rueckgaengig gestartete Antwort ist ueberholt, auch wenn das juengere Neuladen scheitert');
+  delete globalThis.__apiStub;
+});

@@ -131,13 +131,18 @@ function applyBadges(data) {
 }
 
 async function loadBadges() {
-  if (!_bar?.isConnected) return;
+  // Die Antwort gehoert der Leiste, die sie angefragt hat. Wer die Kueche
+  // verlaesst und wieder betritt (auch ueber Ab- und Anmelden), bekommt eine
+  // neue - eine Antwort, die ueber diesen Tausch hinweg ankommt, schriebe
+  // sonst fremde Zahlen in Cache und Leiste (Codex an #1476).
+  const bar = _bar;
+  if (!bar?.isConnected) return;
   try {
     // `today` kommt vom Client: „abgelaufen" hängt am lokalen Kalendertag, und der
     // Server rechnet in UTC (siehe server/routes/kitchen.js).
     const res = await api.get(`/kitchen/summary?today=${encodeURIComponent(todayKey())}`);
     const data = res.data ?? {};
-    if (!_bar?.isConnected) return;
+    if (bar !== _bar || !bar.isConnected) return;
     _lastSummary = data;
     applyBadges(data);
     // Die Zahlen machen die Leiste breiter (je 22px gemessen). Bei 320px läuft sie
