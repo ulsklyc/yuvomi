@@ -62,7 +62,7 @@ function typesListMarkup() {
       ${_types.map((type) => `
         <div class="list-row" data-type-id="${esc(type.id)}">
           <div class="list-row__main">
-            <div class="list-row__name">
+            <div class="list-row__name settings-prevention-type__name">
               <i data-lucide="${esc(type.icon || 'syringe')}" class="icon-sm" aria-hidden="true"></i>
               ${esc(type.name)}
             </div>

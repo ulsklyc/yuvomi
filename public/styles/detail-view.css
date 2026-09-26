@@ -188,6 +188,12 @@
    Sekundaerfarbe wie sein Gegenstueck in der aufgeklappten Kartenliste
    (.subtask-item__add) - er ist eine Einladung, kein Teilschritt. */
 .detail-subtask--add {
+  /* Nach Inhalt breit, ohne den Negativrand der Zeilen: die Liste ist in der
+   * Detailzeile nur so breit wie ihr Inhalt, und `width: 100%` plus -8px Rand
+   * je Seite machte den Knopf 16px schmaler als seinen Text - "Teilaufgabe /
+   * hinzufuegen" brach auf 60px Hoehe um (Sichtpruefung 2026-09-26). */
+  width: auto;
+  margin-inline: 0;
   color: var(--color-text-secondary);
   border: var(--space-px) dashed var(--color-border);
   transition: border-color var(--transition-fast), color var(--transition-fast);

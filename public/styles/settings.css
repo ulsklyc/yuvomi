@@ -3377,6 +3377,15 @@
   font-size: var(--text-sm);
 }
 
+/* Das Symbol der Vorsorge-Art steht VOR dem Namen, nicht darueber: Lucide
+ * rendert ein block-SVG, und `.list-row__name` ist ein Block - ohne diese
+ * Regel stand das Symbol auf einer eigenen Zeile (Sichtpruefung 2026-09-26). */
+.settings-prevention-type__name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 /* Ein Knopf, der ein Icon neben seinem eigenen Icon+Label zeigt (z.B. den
  * Icon-Picker-Trigger) - war inline style="", Tokens waren richtig, nur nicht
  * am richtigen Ort (Review #1256, modules-health.js). */

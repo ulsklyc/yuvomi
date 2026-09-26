@@ -1727,22 +1727,10 @@
   display: flex;
   gap: var(--space-1);
   margin-inline-start: auto;
-  opacity: 0;
-  /* Unsichtbar heißt auch unerreichbar: ein Knopf mit opacity:0, der weiter
-   * Klicks annimmt, löscht einen Kommentar, den niemand angefasst zu haben
-   * glaubt. Tastaturfokus bringt ihn über :focus-within zurück. */
-  pointer-events: none;
-  transition: opacity var(--duration-sm) var(--ease-out);
-}
-
-.task-comment:hover .task-comment__actions,
-.task-comment:focus-within .task-comment__actions {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-@media (hover: none) {
-  .task-comment__actions { opacity: 1; pointer-events: auto; }
+  /* Dauerhaft sichtbar wie jede Zeilenaktion (ignore.md, Komponenten-Kanon):
+   * bis 2026-09-26 stand der Traeger auf opacity 0 und erschien erst beim
+   * Ueberfahren - Ruhe kommt hier aus dem tertiaeren Ruhezustand von
+   * `.row-action`, nicht aus Unsichtbarkeit. */
 }
 
 /* Zeilenumbrüche des Verfassers bleiben stehen: ein Kommentar mit drei
