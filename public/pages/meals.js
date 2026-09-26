@@ -624,7 +624,7 @@ function renderWeekGrid() {
   // Vorschaubilder brauchen ihren Platzhalter-Ruecksturz per Listener (#1059) -
   // ein `onerror` im Markup waere ein Inline-Handler und CSP-verboten.
   wireRecipeThumbs(grid);
-  stagger(grid.querySelectorAll('.meal-card'));
+  stagger(grid.querySelectorAll('.meal-card'), { host: grid });
   wireGrid(grid);
 
   // Scroll-Affordance des Desktop-Boards: End-Anriss signalisiert verborgene

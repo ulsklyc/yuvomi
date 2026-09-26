@@ -638,7 +638,7 @@ function renderMain() {
     if (btn.dataset.expenseView) openExpenseReadView(expense);
     else openExpenseModal(expense);
   });
-  stagger(main.querySelectorAll('.split-expense, .split-debt, .split-activity-item'));
+  stagger(main.querySelectorAll('.split-expense, .split-debt, .split-activity-item'), { host: main });
 }
 
 // So viele Namen stehen in der Kopfzeile einer Gruppe, der Rest als „+N".

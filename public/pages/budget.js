@@ -1149,7 +1149,8 @@ function renderBody() {
     // geht an dessen Knopf zurueck statt auf <body>.
     _container.querySelector('.budget-list-tools')?.focus();
   });
-  stagger(_container.querySelector('#budget-list')?.querySelectorAll('.budget-entry') ?? []);
+  // Traeger ist `#budget-body`: `#budget-list` baut jeder renderBody() neu.
+  stagger(_container.querySelector('#budget-list')?.querySelectorAll('.budget-entry') ?? [], { host: _container.querySelector('#budget-body') });
 
   _container.querySelector('#budget-list')?.addEventListener('click', async (e) => {
     // Der Riegel vor der ersten Aktion (siehe READ_SAFE_ACTIONS): das Markup

@@ -8,7 +8,7 @@ import { existsSync, globSync, readFileSync } from 'node:fs';
 import { eachRule } from './css-rules.js';
 
 // Minimales Window/Navigator-Mock für Node
-const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader } = await (async () => {
+const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader, collapseOut, expandIn } = await (async () => {
   global.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
@@ -105,6 +105,92 @@ test('stagger: tut nichts bei prefers-reduced-motion', () => {
   stagger(els);
   assert.equal(els[0].style.opacity, undefined); // unverändert
   global.window.matchMedia = () => ({ matches: false }); // reset
+});
+
+/*
+ * DAS EINBLENDEN GEHOERT ZUM ERSTEN AUFBAU (Critique 2026-09-26, A3 P1-4).
+ *
+ * renderTaskList() rief stagger() bei jedem Neuzeichnen - nach dem Abhaken,
+ * jedem Filter, jedem Tastendruck -, und die ganze Liste fuhr jedes Mal neu
+ * ein. Die Zeilen sind nach dem Neuzeichnen neue Knoten; was bleibt, ist ihr
+ * Traeger. Deshalb die Zeilen hier FRISCH je Aufruf, der Traeger derselbe.
+ */
+function fakeRows(host, n = 3) {
+  return Array.from({ length: n }, () => ({ style: {}, parentElement: host }));
+}
+
+test('stagger: blendet je Listentraeger nur beim ersten Aufbau ein, nicht bei jedem Neuzeichnen', () => {
+  const host = { contains: () => true, parentElement: null };
+  const first = fakeRows(host);
+  stagger(first, { host, delay: 0, duration: 0 });
+  assert.equal(first[0].style.opacity, '0', 'Vorbedingung: der erste Aufbau blendet ein');
+  const again = fakeRows(host);
+  stagger(again, { host, delay: 0, duration: 0 });
+  assert.equal(again[0].style.opacity, undefined,
+    'das Neuzeichnen derselben Liste hat wieder eingeblendet - die Liste faehrt nach jedem Abhaken neu ein');
+});
+
+test('stagger: ohne host gilt der gemeinsame Vorfahr der Zeilen als Traeger', () => {
+  const host = { contains: () => true, parentElement: null };
+  stagger(fakeRows(host), { delay: 0, duration: 0 });
+  const again = fakeRows(host);
+  stagger(again, { delay: 0, duration: 0 });
+  assert.equal(again[0].style.opacity, undefined, 'zweiter Aufruf am selben Vorfahr hat wieder eingeblendet');
+});
+
+test('stagger: ein Aufruf ohne Zeilen verbraucht den ersten Aufbau nicht (Skelett, Leerzustand)', () => {
+  const host = { contains: () => true, parentElement: null };
+  stagger([], { host });
+  const rows = fakeRows(host);
+  stagger(rows, { host, delay: 0, duration: 0 });
+  assert.equal(rows[0].style.opacity, '0', 'die erste echte Liste nach einem leeren Aufruf blendet nicht mehr ein');
+});
+
+test('stagger: ein neuer Traeger (Seite neu aufgebaut) blendet wieder ein', () => {
+  const a = { contains: () => true, parentElement: null };
+  const b = { contains: () => true, parentElement: null };
+  stagger(fakeRows(a), { host: a, delay: 0, duration: 0 });
+  const rows = fakeRows(b);
+  stagger(rows, { host: b, delay: 0, duration: 0 });
+  assert.equal(rows[0].style.opacity, '0');
+});
+
+/*
+ * Jeder Aufrufer nennt seinen Traeger. Der Rueckfall (gemeinsamer Vorfahr)
+ * trifft bei gruppierten Listen die Gruppe - und die ist nach jedem
+ * Neuzeichnen neu, also blendete die Liste wieder bei jedem Aufruf ein.
+ */
+test('stagger: jeder Aufruf in public/ nennt seinen Listentraeger (host)', () => {
+  const offenders = [];
+  for (const file of globSync('public/**/*.js', { cwd: new URL('..', import.meta.url).pathname })) {
+    if (file.includes('vendor') || file.endsWith('utils/ux.js')) continue;
+    const src = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+    for (const m of src.matchAll(/\bstagger\(/g)) {
+      // Bis zur schliessenden Klammer des Aufrufs: Klammern zaehlen.
+      let depth = 0; let end = m.index + 'stagger'.length;
+      for (; end < src.length; end++) {
+        if (src[end] === '(') depth++;
+        else if (src[end] === ')' && --depth === 0) break;
+      }
+      const call = src.slice(m.index, end + 1);
+      // `stagger()` ohne Argument ist kein Aufruf, sondern die Nennung in einem Kommentar.
+      if (call === 'stagger()') continue;
+      if (!/\bhost\b/.test(call)) offenders.push(`${file}: ${call.replace(/\s+/g, ' ').slice(0, 90)}`);
+    }
+  }
+  assert.deepEqual(offenders, [], `stagger() ohne host:\n${offenders.join('\n')}`);
+});
+
+test('collapseOut/expandIn: loesen ohne Animation sofort auf (reduzierte Bewegung, kein animate)', async () => {
+  await collapseOut(null);
+  await expandIn({ style: {} });
+  global.window.matchMedia = () => ({ matches: true });
+  let animated = false;
+  const el = { style: {}, animate: () => { animated = true; } };
+  await collapseOut(el);
+  await expandIn(el);
+  global.window.matchMedia = () => ({ matches: false });
+  assert.equal(animated, false, 'unter prefers-reduced-motion darf keine Hoehe animieren');
 });
 
 test('vibrate: tut nichts wenn API nicht vorhanden', () => {

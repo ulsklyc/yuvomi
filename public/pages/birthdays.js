@@ -496,7 +496,7 @@ function renderList() {
   host.insertAdjacentHTML('beforeend', list.map(birthdayItemHtml).join(''));
 
   if (window.lucide) window.lucide.createIcons({ el: host });
-  stagger(host.querySelectorAll('.birthday-item'));
+  stagger(host.querySelectorAll('.birthday-item'), { host });
   // Der Nudge-Hinweis gehoert zur GESTE und steht deshalb in deren Verdrahtung:
   // bei `calendar: read` gibt es keine Geste, und der Hinweis wuerde eine
   // Bedienung ankuendigen, die es nicht gibt - dazu einen der drei Hinweis-

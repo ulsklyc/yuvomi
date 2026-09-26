@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { stagger, vibrate, scheduleUndoableDelete } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, collapseOut, expandIn } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
@@ -169,7 +169,26 @@ function toggleCategoryCollapse(button) {
 
   button.setAttribute('aria-expanded', String(!nowCollapsed));
   chevron?.classList.toggle('list-group__chevron--collapsed', nowCollapsed);
-  if (rowsEl) rowsEl.hidden = nowCollapsed;
+  // Die Zeilen klappen, statt zu springen (Critique 2026-09-26, A3 P1-4), wie
+  // in den Aufgaben. `hidden` faellt erst NACH dem Einklappen - vorher gaebe es
+  // nichts mehr zu bewegen. Ein Gegenklick waehrend der Bewegung bricht sie ab
+  // und zieht von der aktuellen Stelle wieder auf; das spaete `then` sieht am
+  // Zustand, dass es nicht mehr gemeint ist.
+  if (rowsEl) {
+    rowsEl.getAnimations?.().forEach((anim) => anim.cancel());
+    rowsEl.style.overflow = '';
+    if (nowCollapsed) {
+      collapseOut(rowsEl).then(() => {
+        if (!state.collapsedCategories.has(key)) return;
+        rowsEl.hidden = true;
+        rowsEl.getAnimations?.().forEach((anim) => anim.cancel());
+        rowsEl.style.overflow = '';
+      });
+    } else {
+      rowsEl.hidden = false;
+      expandIn(rowsEl);
+    }
+  }
 
   saveCollapsedCategories(state.currentUserId, state.activeListId, state.collapsedCategories);
 }
@@ -2250,7 +2269,7 @@ function updateItemsList(container) {
     // nachgelagerte #empty-cta-shopping-Listener entfällt damit.
     mountItems(listEl, container);
     if (window.lucide) window.lucide.createIcons({ el: listEl });
-    stagger(listEl.querySelectorAll('.shopping-item'));
+    stagger(listEl.querySelectorAll('.shopping-item'), { host: listEl });
     // Regel 3 in utils/module-access.js: Wischen und Ziehen haben kein Markup,
     // das man wegnehmen koennte - bei `read` bleibt die VERDRAHTUNG aus. Ein
     // Riegel im Ende-Handler kaeme zu spaet, die Zeile waere schon weggewischt.

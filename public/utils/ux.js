@@ -5,23 +5,66 @@
  */
 
 /**
- * Gestaffeltes Einblenden einer NodeList oder eines Arrays von Elementen.
+ * Listen, deren erster Aufbau schon eingeblendet hat (Critique 2026-09-26, A3 P1-4).
+ *
+ * DAS EINBLENDEN GEHOERT ZUM ERSTEN AUFBAU, NICHT ZU JEDEM NEUZEICHNEN. Die
+ * Aufgabenliste rief stagger() bei jedem renderTaskList() - nach dem Abhaken,
+ * jedem Filterwechsel, jedem Tastendruck in der Suche. Die abgehakte Zeile
+ * verschwand ohne Austritt, und der ganze Rest fuhr von 8px unten neu ein: die
+ * Liste behauptete, neu geladen zu sein, obwohl sich eine Zeile geaendert hatte.
+ *
+ * Der Merker haengt am TRAEGER der Liste (`host`), nicht an den Zeilen: die
+ * sind nach jedem Neuzeichnen neue Knoten, der Traeger ueberlebt es. Baut der
+ * Router die Seite neu, ist auch der Traeger neu - und die Liste blendet beim
+ * naechsten Besuch wieder ein. Eine WeakSet haelt keinen abgehaengten Traeger am
+ * Leben.
+ */
+const staggeredHosts = new WeakSet();
+
+/** Der tiefste gemeinsame Vorfahr - nur der Rueckfall, wenn kein `host` kommt. */
+function commonHost(els) {
+  let host = els[0]?.parentElement ?? null;
+  while (host && !els.every((el) => host.contains?.(el))) host = host.parentElement;
+  return host;
+}
+
+/**
+ * Gestaffeltes Einblenden einer NodeList oder eines Arrays von Elementen -
+ * EINMAL je Listentraeger (siehe `staggeredHosts`).
  * Maximal MAX_STAGGER Elemente werden verzögert, der Rest sofort eingeblendet.
+ *
+ * `host` ist der Traeger, der das Neuzeichnen ueberlebt (`#task-list`, nicht
+ * die Gruppen darin). Ohne ihn gilt der gemeinsame Vorfahr der Zeilen - der ist
+ * bei gruppierten Listen aber oft selbst neu, deshalb uebergibt jeder Aufrufer
+ * ihn ausdruecklich (test:ux-utils prueft das).
+ *
+ * Ein Aufruf ohne Zeilen verbraucht den Merker nicht: das Skelett oder der
+ * Leerzustand ist nicht der erste Aufbau der Liste.
  *
  * @param {NodeList|Element[]} elements
  * @param {Object} [opts]
+ * @param {Element} [opts.host]        - Traeger der Liste, der das Neuzeichnen ueberlebt
  * @param {number} [opts.delay=30]     - ms zwischen jedem Element
- * @param {number} [opts.duration=180] - ms pro Element
+ * @param {number} [opts.duration=200] - ms pro Element (--duration-md)
  * @param {number} [opts.max=5]        - Maximale Anzahl gestaffelter Elemente
  */
-export function stagger(elements, { delay = 30, duration = 180, max = 5 } = {}) {
+export function stagger(elements, { host = null, delay = 30, duration = 200, max = 5 } = {}) {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const els = Array.from(elements);
+  const els = Array.from(elements ?? []);
+  if (!els.length) return;
+  const root = host ?? commonHost(els);
+  if (root) {
+    if (staggeredHosts.has(root)) return;
+    staggeredHosts.add(root);
+  }
   els.forEach((el, i) => {
     const itemDelay = i < max ? i * delay : max * delay;
     el.style.opacity = '0';
     el.style.transform = 'translateY(8px)';
-    el.style.transition = `opacity ${duration}ms ease, transform ${duration}ms ease`;
+    // 200ms = --duration-md, die Kurve aus den Token: der Inline-Wert darf auf
+    // eine Custom Property zeigen, der Rueckleser unten vergleicht, was der
+    // Browser daraus serialisiert.
+    el.style.transition = `opacity ${duration}ms var(--ease-out), transform ${duration}ms var(--ease-out)`;
     // Zurückgelesen statt als Literal verglichen: der Browser serialisiert
     // Inline-Werte selbst, und nur so erkennt das Aufräumen seine eigenen.
     const own = { opacity: el.style.opacity, transform: el.style.transform, transition: el.style.transition };
@@ -94,6 +137,98 @@ export function animationSettled(el, { fallback = 260 } = {}) {
     };
     el.addEventListener('animationend', finish, { once: true });
     setTimeout(finish, fallback);
+  });
+}
+
+/**
+ * Wert eines Dauer-Tokens (`--duration-*`) in ms, fuer die Web Animations API.
+ * Die kennt keine Custom Properties in `duration` - die Skala bleibt trotzdem
+ * die in tokens.css, der Rueckfall greift nur ohne Stylesheet (Node-Tests).
+ */
+export function durationToken(name, fallback) {
+  const raw = typeof getComputedStyle === 'function' && typeof document !== 'undefined'
+    ? getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+    : '';
+  const ms = raw.endsWith('ms') ? parseFloat(raw) : raw.endsWith('s') ? parseFloat(raw) * 1000 : NaN;
+  return Number.isFinite(ms) ? ms : fallback;
+}
+
+/** Wert eines Kurven-Tokens (`--ease-*`); WAAPI nimmt `cubic-bezier(...)` direkt. */
+export function easingToken(name, fallback = 'ease-out') {
+  const raw = typeof getComputedStyle === 'function' && typeof document !== 'undefined'
+    ? getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+    : '';
+  return raw || fallback;
+}
+
+/** Die Blockmasse, die beim Einklappen mit auf null gehen: Hoehe, Innen- und Aussenabstand, Rahmen. */
+const BLOCK_PROPS = ['height', 'paddingTop', 'paddingBottom', 'marginTop', 'marginBottom', 'borderTopWidth', 'borderBottomWidth'];
+
+function blockFrame(el) {
+  const cs = getComputedStyle(el);
+  const frame = { height: `${el.getBoundingClientRect().height}px`, opacity: cs.opacity };
+  for (const p of BLOCK_PROPS.slice(1)) frame[p] = cs[p];
+  return frame;
+}
+
+function closedFrame() {
+  const frame = { opacity: '0' };
+  for (const p of BLOCK_PROPS) frame[p] = '0px';
+  return frame;
+}
+
+/**
+ * Hoehe einer Zeile oder Gruppe weich auf null nehmen - der Austritt, nach dem
+ * die Nachbarn nachruecken statt zu springen (Critique 2026-09-26, A3 P1-4).
+ *
+ * WARUM WEB ANIMATIONS UND NICHT `interpolate-size` ODER `grid-template-rows`:
+ * `height: auto -> 0` per `interpolate-size` kann Safari nicht (dort spraenge
+ * die Zeile), und der `1fr -> 0fr`-Trick braucht einen Wrapper um jede Zeile -
+ * in Listen, deren Markup drei Module teilen. Gemessen wird die echte Hoehe in
+ * px, von dort geht es auf 0; das kann jede Engine.
+ *
+ * Das Element bleibt danach auf null stehen (`fill: 'forwards'`) - der Aufrufer
+ * zeichnet die Liste neu oder entfernt es. Unter `prefers-reduced-motion`
+ * springt es wie bisher. Das Promise loest auch ohne `finish` auf: im verdeckten
+ * Tab und an einem abgehaengten Element kommt das Ereignis nicht zuverlaessig.
+ *
+ * @param {Element} el
+ * @param {Object} [opts]
+ * @param {number} [opts.duration] - ms, Standard `--duration-lg`
+ * @returns {Promise<void>}
+ */
+export function collapseOut(el, { duration = durationToken('--duration-lg', 250) } = {}) {
+  if (!el || typeof el.animate !== 'function') return Promise.resolve();
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return Promise.resolve();
+  el.style.overflow = 'hidden';
+  const anim = el.animate([blockFrame(el), closedFrame()], {
+    duration, easing: easingToken('--ease-out'), fill: 'forwards',
+  });
+  return settleAnimation(anim, duration);
+}
+
+/**
+ * Das Gegenstueck: ein gerade eingesetztes Element von null auf seine Hoehe
+ * aufziehen (aufgeklappte Gruppe, eine per „Rueckgaengig" zurueckgekehrte
+ * Zeile). Ohne `fill` - am Ende gilt wieder das Stylesheet.
+ */
+export function expandIn(el, { duration = durationToken('--duration-lg', 250) } = {}) {
+  if (!el || typeof el.animate !== 'function') return Promise.resolve();
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return Promise.resolve();
+  const prevOverflow = el.style.overflow;
+  el.style.overflow = 'hidden';
+  const anim = el.animate([closedFrame(), blockFrame(el)], {
+    duration, easing: easingToken('--ease-out'),
+  });
+  return settleAnimation(anim, duration).then(() => { el.style.overflow = prevOverflow; });
+}
+
+function settleAnimation(anim, duration) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    anim.finished.then(finish, finish);
+    setTimeout(finish, duration + 60);
   });
 }
 
