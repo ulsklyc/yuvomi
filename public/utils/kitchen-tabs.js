@@ -109,6 +109,8 @@ const BADGES = [
 
 /** Aktuelle Leiste; der Zustand wird nachgeladen, nachdem sie schon steht. */
 let _bar = null;
+/** Der ResizeObserver der stehenden Leiste - einer, nie mehr. */
+let _indicatorObserver = null;
 let _activeRoute = null;
 let _refreshTimer = null;
 /**
@@ -267,18 +269,30 @@ function wireIndicator(bar) {
   // Schrift nachgeladen, Badge dazu, Breakpoint gewechselt: die Tabs aendern
   // Breite oder Lage, und die Kapsel zieht mit - mitten in einer Bewegung
   // gleitend, sonst ohne.
+  // Es gibt nur EINE Leiste: der Beobachter der vorigen geht mit ihr, sonst
+  // hielte jeder Eintritt in die Kueche einen weiteren samt abgehaengter Knoten.
+  _indicatorObserver?.disconnect();
+  _indicatorObserver = null;
   if (typeof ResizeObserver === 'function') {
-    const observer = new ResizeObserver(() => {
+    _indicatorObserver = new ResizeObserver(() => {
       placeIndicator(bar, { glide: indicator._glide?.playState === 'running' });
     });
-    observer.observe(bar);
-    bar.querySelectorAll('.sub-tab').forEach((tab) => observer.observe(tab));
+    _indicatorObserver.observe(bar);
+    bar.querySelectorAll('.sub-tab').forEach((tab) => _indicatorObserver.observe(tab));
   }
 }
 
+/**
+ * Passt die stehende Leiste noch? Ziele UND Beschriftungen: nach einem
+ * Sprachwechsel zeichnet der Router dieselbe Route neu, und eine nur nach
+ * Zielen verglichene Leiste bliebe in der alten Sprache stehen.
+ */
 function sameTabs(bar, tabs) {
-  const ids = [...bar.querySelectorAll('[data-tab-id]')].map((el) => el.dataset.tabId);
-  return ids.length === tabs.length && tabs.every(({ route }, i) => ids[i] === route);
+  if (bar.getAttribute('aria-label') !== t('nav.kitchen')) return false;
+  const els = [...bar.querySelectorAll('[data-tab-id]')];
+  return els.length === tabs.length && tabs.every(({ route, labelKey }, i) =>
+    els[i].dataset.tabId === route
+    && els[i].querySelector('.sub-tab__label')?.textContent === t(labelKey));
 }
 
 /** Tipp auf einen Tab: Zahlen und Kapsel ziehen sofort, die Seite folgt. */

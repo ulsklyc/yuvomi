@@ -281,6 +281,41 @@ test('swapPage: tauscht im Callback der View Transition und benennt den Kopf nur
   }
 });
 
+test('swapPage: ein zweiter Wechsel vor dem Ende des ersten behaelt den Kopfnamen', async () => {
+  // Zwei Tipps innerhalb der Transition: der Browser verwirft die erste, ihr
+  // `finished` loest auf, waehrend die zweite ihr altes Bild noch nicht
+  // aufgenommen hat. Bleibt der Kopf ueber den Wechsel derselbe Knoten, darf das
+  // Aufraeumen der ersten ihm den Namen nicht mitten in der zweiten nehmen.
+  const { swapPage } = await import('../public/utils/view-transition.js');
+  const env = stubDocument();
+  const finishers = [];
+  const start = env.doc.startViewTransition;
+  env.doc.startViewTransition = (callback) => {
+    const tr = start(callback);
+    let resolve;
+    tr.finished = new Promise((r) => { resolve = r; });
+    finishers.push(resolve);
+    return tr;
+  };
+  globalThis.document = env.doc;
+  globalThis.matchMedia = () => ({ matches: false });
+  try {
+    // Derselbe Kopf-Knoten in beiden Wechseln (Seite ersetzt ihn nicht).
+    const first = await swapPage(() => {}, { content: env.content, from: '/meals', animate: true });
+    const second = await swapPage(() => {}, { content: env.content, from: '/recipes', animate: true });
+    finishers[0]();
+    await first.finished;
+    assert.equal(env.toolbarOld.style.viewTransitionName, 'page-toolbar',
+      'das Ende des ersten Wechsels nimmt dem laufenden zweiten den Namen');
+    finishers[1]();
+    await second.finished;
+    assert.equal(env.toolbarOld.style.viewTransitionName, '', 'nach dem letzten Wechsel ist der Name frei');
+  } finally {
+    delete globalThis.document;
+    delete globalThis.matchMedia;
+  }
+});
+
 test('swapPage: ohne API, verdeckt, unter reduzierter Bewegung oder beim Kaltstart tauscht es direkt', async () => {
   const { swapPage } = await import('../public/utils/view-transition.js');
   const cases = [

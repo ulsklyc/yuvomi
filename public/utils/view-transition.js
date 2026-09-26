@@ -35,6 +35,8 @@ const TOOLBAR_NAME = 'page-toolbar';
 
 /** Pfad, von dem der laufende Seitenwechsel kommt - null beim Kaltstart. */
 let _from = null;
+/** Zaehlt die Wechsel; nur der juengste raeumt den Kopfnamen ab. */
+let _generation = 0;
 
 /**
  * Woher die gerade gerenderte Seite kam. Fuer Bauteile, die ueber den Wechsel
@@ -86,6 +88,7 @@ export async function swapPage(update, { content, from = null, animate = true } 
     return { transition: false, finished: Promise.resolve() };
   }
 
+  const generation = ++_generation;
   const oldToolbar = nameToolbar(content);
   let newToolbar = null;
   const transition = document.startViewTransition(() => {
@@ -103,8 +106,11 @@ export async function swapPage(update, { content, from = null, animate = true } 
     .catch(() => {})
     .finally(() => {
       // Temporaer: ein stehengebliebener Name kollidierte beim naechsten
-      // Wechsel mit einem zweiten Kopf derselben Seite.
-      if (newToolbar) newToolbar.style.viewTransitionName = '';
+      // Wechsel mit einem zweiten Kopf derselben Seite. Nur der juengste
+      // Wechsel raeumt auf: verwirft ein zweiter Tipp diese Transition, loest
+      // `finished` auf, bevor der zweite sein altes Bild aufnimmt - und derselbe
+      // Kopf-Knoten traegt dann schon dessen Namen.
+      if (newToolbar && generation === _generation) newToolbar.style.viewTransitionName = '';
     });
   // Wirft, wenn `update` wirft - der Router faengt es in seinem catch.
   await transition.updateCallbackDone;
