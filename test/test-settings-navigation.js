@@ -73,9 +73,6 @@ const registryTranslationKeys = [
 ];
 const sharedTranslationKeys = [
   'settings.navigationLabel',
-  'settings.mobileOverviewTitle',
-  'settings.mobileOverviewDescription',
-  'settings.mobileDomainTitle',
   'settings.breadcrumbLabel',
   'settings.backToSettings',
   'settings.retry',

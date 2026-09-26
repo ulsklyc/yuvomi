@@ -430,10 +430,6 @@ test('settings information-architecture keys exist in every locale', () => {
     'settings.backToSettings',
     'settings.loadError',
     'settings.retry',
-    // Domain + mobile overview labels.
-    'settings.mobileOverviewTitle',
-    'settings.mobileOverviewDescription',
-    'settings.mobileDomainTitle',
     // Status-first integration copy + progressive disclosure.
     'settings.providerSpecific',
     'settings.moreProviders',
@@ -15638,7 +15634,7 @@ test('die Lesemass-Liste kappt kein selbstpolsterndes Element (#758)', () => {
   assert.deepEqual(clash, [],
     `diese Selektoren stehen in der Lesemass-Liste UND polstern sich selbst mit --page-inline-pad: ${clash.join(', ')}. `
     + 'Bei box-sizing: border-box frisst das Polster die Kappung auf. Die Kappung gehoert dorthin, wo auch das '
-    + 'Polster steht, und muss es einrechnen (siehe .list-tabs-bar in shopping.css).');
+    + 'Polster steht, und muss es einrechnen (siehe den Kommentar ueber der Liste in layout.css).');
 });
 
 test('ein Teilschritt lässt sich korrigieren und entfernen, nicht nur abhaken (#748)', () => {
