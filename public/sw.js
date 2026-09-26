@@ -137,6 +137,7 @@ const APP_SHELL = [
   '/utils/extension-i18n.js',
   '/utils/extension-widgets.js',
   '/utils/fab.js',
+  '/utils/filter-sheet.js',
   '/utils/folder-upload.js',
   '/utils/folder-tree.js',
   '/utils/health-activity.js',
