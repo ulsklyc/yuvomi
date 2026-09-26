@@ -318,7 +318,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as time passes instead of being redrawn; before the first fast the clock shows no zeros, no day
   and no switch.
 
+- **Buttons speak one language across the app.** Edit, delete and more-actions on a row are the
+  same round icon button in every module (Budget alone had four styles), and a screen reader hears
+  what they act on: "Call Anna Weber", "Delete category Fruit", "Add a meal on Monday" instead of
+  twelve rows all called "Call". Every search field is the same filled capsule with a clear
+  button - subscriptions, shared expenses, the document and icon pickers, the settings sidebar and
+  the field inside the calendar's search bar included. Lists sit on one carrier. Dialog buttons
+  live in the footer at the edge of the sheet, so "Create" in the shift plan and "Save" elsewhere
+  are no longer below the fold on a phone; Delete is a text button on the left, and Cancel always
+  looks like the safe way out. In Health and Rewards the add button names what it adds on each tab
+  and docks in the header on a desktop. A note opens with Edit as its main action instead of
+  Delete alone, and the birthday import moved into the tools menu.
+
+- **Settings use switches and find single options.** Every on/off setting is a switch with the
+  label on the left, theme and week start are a segmented control, and the module list only marks
+  what differs (off, failing, not in the menu) instead of fourteen green "Enabled" badges. The
+  settings search finds individual options, not only pages, and jumps to the option and highlights
+  it. The calendar sync page now says what it connects: Google, Apple, Outlook and CalDAV.
+
 ### Fixed
+
+- **Small things from the component review.** The first day of a fast reads "Day 1", not "Day 0".
+  The avatar in the birthday dialog has its colour again. "Add subtask" no longer shows two plus
+  signs. A new task no longer warns about the countdown before you try to turn it on. The status
+  button on a Kanban card has a full-size tap area, and the meal card icons are larger on phones.
+  The titles on the join, password reset and pairing pages have their own style. The offline
+  banner in the installed app stays clear of the status bar. The health disclaimer keeps a reading
+  width. Subtask marks in the task detail are quiet again and turn green when done. Settings
+  sidebar labels are no longer cut off, and the switches under the kitchen settings stay inside
+  their card.
+
+- **The inventory detail column stays inside the window** on a desktop at rest instead of running
+  below the bottom edge when the filter row is shown.
+
+- **A copied or new recipe under a filter it does not match shows up in the list.** Duplicating a
+  Mealie recipe while the list was filtered to Mealie showed the copy on the right without its row
+  on the left; the filter now resets, as it does for a link to a recipe.
+
+- **Back and forward onto a recipe on a narrow window open it.** The address changed, but the
+  recipe stayed folded.
+
+- **A link to a finished or filtered-out task keeps its address.** The task opens as a sheet as
+  before, and the link in the address bar still opens it after copying or reloading.
+
+- **The first arrow key in a list selects the row you are on.** With nothing selected it used to
+  jump to the next row.
+
+- **Search and collapse in the sidebar follow a language change.** Their names and tooltips stayed
+  in the previous language until the next reload.
 
 - **The week plan starts on Monday and shows all seven days at 1440px.** On opening, the board
   sometimes scrolled Monday half out of view; at 1440x900 the seven days now fit without
