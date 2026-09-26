@@ -232,6 +232,10 @@ const STUBS = {
     // Im Test gibt es keine Animation, die ausspielen koennte - der Aufrufer
     // awaitet das Ergebnis, also loest der Stub sofort auf.
     export const animationSettled = () => Promise.resolve();
+    // Austritt und Aufziehen (Abhaken, Gruppen) - ohne Layout gibt es nichts
+    // zu bewegen, der Aufrufer wartet nur auf das Ende.
+    export const collapseOut = () => Promise.resolve();
+    export const expandIn = () => Promise.resolve();
   `,
   '/utils/html.js': `
     export const esc = (value) => String(value ?? '')

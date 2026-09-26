@@ -73,7 +73,12 @@ test('mobile bottom navigation reserves safe-area space without scroll-time root
     /padding(-bottom)?:[^;]*var\(--safe-area-inset-bottom\)/,
     'die Bar muss die Safe-Area selbst reservieren',
   );
-  assert.match(tokensCss, /--nav-bottom-height:\s*calc\(var\(--nav-height-mobile\)[^;]*var\(--safe-area-inset-bottom\)\)/);
+  // Die Zone rechnet mit der gemessenen Kapselhoehe und der Token-Hoehe als
+  // Rueckfall (Review zu #1475, test:mobile-chrome); die Zusage hier ist nur,
+  // dass die Safe-Area in der Zone steckt.
+  const zone = tokensCss.match(/--nav-bottom-height:\s*([^;]+);/)?.[1] ?? '';
+  assert.match(zone, /var\(--nav-height-mobile\)/);
+  assert.match(zone, /var\(--safe-area-inset-bottom\)\)$/);
   assert.equal(rootRule.includes('nav-bottom--hidden'), false);
 });
 
@@ -118,10 +123,18 @@ test('cold dashboard load does not transform the scroll surface', () => {
     /const shouldAnimate = Boolean\(previousPath\);/,
     'the router must distinguish a cold load from an in-app navigation',
   );
+  // Seit 2026-09-26 blendet der Wechsel per View Transition; nur der Rueckfall
+  // ohne API setzt noch eine Klasse, und auch die nur nach einer bestehenden
+  // Route. Eine Blende ohne Versatz transformiert ohnehin nichts (test-motion.js).
   assert.match(
     routerJs,
-    /if \(shouldAnimate\) \{\s*pageWrapper\.classList\.add\(inClass\);/,
-    'the slide class must only be applied after an existing route',
+    /animate: shouldAnimate,/,
+    'the view transition must only run after an existing route',
+  );
+  assert.match(
+    routerJs,
+    /if \(shouldAnimate && !transition\) \{\s*pageWrapper\.classList\.add\('page-transition--in'\);/,
+    'the fallback fade must only be applied after an existing route',
   );
 });
 

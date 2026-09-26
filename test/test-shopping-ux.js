@@ -95,7 +95,9 @@ function resetShoppingState() {
 
 /** Kleinstes DOM, das toggleCategoryCollapse bedient: closest + ein Kind je Selektor. */
 function makeCategoryGroup(key, { collapsed = false } = {}) {
-  const rowsEl = { hidden: collapsed };
+  // `style` wie am echten Element: das Einklappen setzt waehrend der Bewegung
+  // overflow und raeumt es danach (collapseOut() in utils/ux.js).
+  const rowsEl = { hidden: collapsed, style: {} };
   const chevron = {
     _collapsed: collapsed,
     classList: {
@@ -206,11 +208,14 @@ test('pruneCollapsedCategories: ruehrt nichts an, wenn alles noch gueltig ist (k
 // Kategorie-Einklappen: der Umschalter selbst
 // --------------------------------------------------------
 
-test('toggleCategoryCollapse: klappt zu, meldet aria-expanded/hidden/Chevron und speichert', () => {
+test('toggleCategoryCollapse: klappt zu, meldet aria-expanded/hidden/Chevron und speichert', async () => {
   resetShoppingState();
   const { button, rowsEl, chevron } = makeCategoryGroup('id:1', { collapsed: false });
 
   __test.toggleCategoryCollapse(button);
+  // `hidden` faellt erst NACH dem Einklappen (Critique 2026-09-26, A3 P1-4) -
+  // ohne Layout gibt es keine Bewegung, das Ende kommt im naechsten Tick.
+  await new Promise((r) => setTimeout(r, 0));
 
   assert.equal(rowsEl.hidden, true, 'die Zeilen bleiben im DOM, werden aber ausgeblendet');
   assert.equal(button.getAttribute('aria-expanded'), 'false');

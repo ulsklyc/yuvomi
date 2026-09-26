@@ -28,11 +28,17 @@
 .fasting-dial--segmented::after { display: none; }
 [data-fasting-segments] { position: absolute; inset: 0; }
 .fasting-dial__svg { width: 100%; height: 100%; overflow: visible; }
-.fasting-dial__svg circle { fill: none; stroke-width: 3; }
-.fasting-dial__track { stroke: var(--color-fill-well); }
-.fasting-dial__trace { stroke: var(--module-health); }
-.fasting-dial__svg .fasting-dial__goal { stroke: var(--color-text-primary); stroke-width: 6; }
-.fasting-dial__svg .fasting-dial__zone { stroke-width: 2; }
+/* Ring 10/120 mit runden Enden statt einer 3/120-Haarlinie (A6 P2-3); die
+ * Spur laeuft per Transition, weil updateFastingDial() nur ihre Laenge setzt.
+ * Eine leere Spur zeigte mit runden Enden einen Punkt - sie bleibt unsichtbar. */
+.fasting-dial__svg circle { fill: none; stroke-width: 10; stroke-linecap: round; }
+/* Die Bahn ist der Ring in seinem eigenen Ton, gedimmt - das graue Well allein
+ * lag im Dark bei 55/51/46 auf 43/40/37 und verschwand als breiter Strich. */
+.fasting-dial__track { stroke: color-mix(in srgb, var(--module-health) var(--tint-state), var(--color-fill-well)); }
+.fasting-dial__trace { stroke: var(--module-health); transition: stroke-dasharray var(--duration-2xl) var(--ease-out); }
+.fasting-dial__trace--empty { stroke-opacity: 0; }
+.fasting-dial__svg .fasting-dial__goal { stroke: var(--color-text-primary); stroke-width: 14; stroke-linecap: butt; }
+.fasting-dial__svg .fasting-dial__zone { stroke-width: 2; stroke-linecap: butt; }
 .fasting-dial__zone--0 { stroke: var(--chart-series-1); }
 .fasting-dial__zone--1 { stroke: var(--chart-series-2); }
 .fasting-dial__zone--2 { stroke: var(--chart-series-3); }
@@ -47,6 +53,13 @@ yuvomi-fasting-help { display: inline-flex; flex-shrink: 0; }
 .fasting-help__button > svg { width: var(--icon-lg); height: var(--icon-lg); }
 .fasting-help__tooltip { position: fixed; inset: auto; margin: 0; width: min(300px, calc(100vw - var(--space-6))); max-height: calc(var(--viewport-height) - var(--space-6)); overflow: auto; padding: var(--space-3); border: 0; border-radius: var(--radius-sm); background: var(--color-text-primary); color: var(--color-bg); text-align: start; font-size: var(--text-sm); font-weight: var(--font-weight-regular); line-height: var(--line-height-relaxed); box-shadow: var(--shadow-md); }
 .fasting-help__tooltip > span { display: block; margin-block-start: var(--space-2); }
+/* Ruhezustand: updateFastingClock() blendet Zeit, Fastentag und Umschalter per
+ * `hidden` aus - die Anzeigeregeln der Traeger (display: block/inline-flex)
+ * schluegen das UA-[hidden] sonst. */
+.fasting-clock-switch[hidden], [data-fasting-timer][hidden], [data-fasting-days][hidden] { display: none; }
 @media (max-width: 639px) {
   .fasting-editor-grid { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fasting-dial__trace { transition: none; }
 }

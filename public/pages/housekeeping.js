@@ -12,7 +12,7 @@ import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { wireTablist } from '/utils/tablist.js';
-import { wireScrollFade, vibrate } from '/utils/ux.js';
+import { wireScrollFade, vibrate, animationSettled } from '/utils/ux.js';
 import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { isNavModuleReadOnly } from '/permissions.js';
@@ -216,7 +216,19 @@ async function loadStaffVisits(workerId = state.selectedStaffId, monthValue = st
   state.staffVisits = res.data?.visits || [];
 }
 
+/* NUR DIE JUENGSTE ANTWORT SCHREIBT DEN SEITENZUSTAND (Review zu #1475).
+ * Jede Aktion laedt ueber loadData() nach, und zwei davon koennen sich
+ * ueberholen: Erledigen laedt nach der Quittung nach, und tippt jemand
+ * derweil auf „Rueckgaengig", startet dessen Neuladen spaeter, kommt aber
+ * womoeglich frueher an. Die aeltere Antwort traegt dann den erledigten
+ * Stand und schrieb ihn ueber den zurueckgenommenen. Wie beim Bericht (#1174)
+ * entscheidet der START des Abrufs: eine Antwort, die frueher gestartet ist
+ * als die zuletzt angewandte, wird verworfen. */
+let loadDataSeq = 0;
+let appliedLoadDataSeq = 0;
+
 async function loadData() {
+  const loadSeq = ++loadDataSeq;
   const dayParams = localDayParams();
   // Waehrend dieses Neuladens kann jemand schon den naechsten Monat gewaehlt
   // haben (#1137): kommt dessen Bericht zuerst an, darf die Antwort hier ihn
@@ -236,6 +248,8 @@ async function loadData() {
     api.get(`/housekeeping/workers?${dayParams.toString()}`),
     api.get('/preferences'),
   ]);
+  if (loadSeq < appliedLoadDataSeq) return;
+  appliedLoadDataSeq = loadSeq;
   state.dashboard = dashboard.data;
   state.tasks = tasks.data || [];
   const currentReport = current.data || { visits: [], totals: {} };
@@ -776,16 +790,31 @@ function openTaskCreateModal(content) {
  * beide gespeicherten Formen unveraendert an (Instant mit `Z` bleibt Instant,
  * zonenlose Wanduhrzeit bleibt Wanduhrzeit, validate.js `to: 'instant'`).
  */
-async function completeTask(task, content) {
+async function completeTask(task, content, button = null) {
   if (readOnly()) return;
+  if (button?.getAttribute('aria-busy') === 'true') return;
   const previous = task.last_completed ?? null;
+  // DIESELBE RUECKMELDUNG WIE DAS ABHAKEN EINER AUFGABE (Critique 2026-09-26,
+  // A3 P1-4): Haptik und `check-pop` im Moment des Tipps, nicht erst nach dem
+  // Roundtrip - vorher quittierte nur der Toast, ohne Bewegung und ohne
+  // Haptik. Der Ring fuellt sich fuer diesen Moment (`--done`); das
+  // Neuzeichnen danach setzt ihn zurueck, denn der Kreis ist kein Zustand
+  // (taskRowHtml()). Wie in tasks.js laeuft die Quittung NEBEN dem Roundtrip,
+  // und erst danach wird neu gezeichnet - sonst ersetzte das Neuzeichnen den
+  // Knopf, bevor sie einen Frame bekam (animationSettled()).
+  vibrate(15);
+  button?.classList.add('housekeeping-task__check--done');
+  button?.setAttribute('aria-busy', 'true');
+  const settled = animationSettled(button);
   try {
     await api.post(`/housekeeping/decay-tasks/${task.id}/complete`, {});
-    vibrate(15);
     window.yuvomi?.showToast(t('housekeeping.taskDoneToast'), 'success', 5000, () => undoCompleteTask(task.id, previous, content));
+    await settled;
     await loadData();
     if (content?.isConnected && state.tab === 'tasks') renderTasks(content);
   } catch (err) {
+    button?.classList.remove('housekeeping-task__check--done');
+    button?.removeAttribute('aria-busy');
     window.yuvomi?.showToast(err.message, 'danger');
   }
 }
@@ -829,7 +858,7 @@ function renderTasks(content) {
   content.querySelectorAll('[data-complete-task]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const task = state.tasks.find((it) => String(it.id) === btn.dataset.completeTask);
-      if (task) completeTask(task, content);
+      if (task) completeTask(task, content, btn);
     });
   });
 

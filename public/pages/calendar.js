@@ -4732,7 +4732,7 @@ function renderAgendaView(container) {
     </div>
   `);
 
-  stagger(container.querySelectorAll('.agenda-event'));
+  stagger(container.querySelectorAll('.agenda-event'), { host: container });
 
   const agenda = container.querySelector('#agenda-view');
   agenda.addEventListener('click', (e) => {
@@ -5343,7 +5343,8 @@ function renderCalendarSearchResults(body) {
   `);
 
   const results = body.querySelector('#cal-search-results');
-  stagger(results.querySelectorAll('.agenda-event'));
+  // Traeger ist `#cal-body`: `#cal-search-results` entsteht mit jedem Tastendruck neu.
+  stagger(results.querySelectorAll('.agenda-event'), { host: body });
 
   const activateResult = (evEl) => {
     const ev = searchResults.find((x) => String(x.id) === evEl.dataset.id);

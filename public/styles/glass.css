@@ -230,21 +230,13 @@
  * doppelt und mit einem zweiten Farbwert danebenstand. */
 
 /* ================================================================
- * 5. FAB — Specular Highlight
+ * 5. FAB - entfallen (2026-09-26)
+ *
+ * Hier standen Specular-Kanten fuer `.fab`. Diese Klasse vergibt seit dem
+ * Umbau auf `.page-fab` (utils/fab.js) niemand mehr; der FAB traegt seine
+ * Kanten in Abschnitt 1b an `.page-fab`. Abschnitt 23 (Ring-Pulse) fiel aus
+ * demselben Grund - er lief nie.
  * ================================================================ */
-.fab {
-  box-shadow:
-    var(--shadow-lg),
-    var(--glass-inset-elevated),
-    var(--glass-inset-bottom-base);
-}
-
-.fab:hover {
-  box-shadow:
-    var(--shadow-lg),
-    var(--glass-inset-strong),
-    var(--glass-inset-bottom-hover);
-}
 
 /* ================================================================
  * 6. Cards — Glass auf hover (nur interaktive Cards)
@@ -290,9 +282,7 @@
   }
 
   .btn--primary,
-  .btn--primary:hover,
-  .fab,
-  .fab:hover {
+  .btn--primary:hover {
     box-shadow: var(--shadow-sm);
   }
 }
@@ -307,7 +297,6 @@
   .nav-item,
   .nav-sidebar .nav-item,
   .btn,
-  .fab,
   .card--interactive {
     transition-duration: 0.01ms !important;
   }
@@ -509,7 +498,12 @@ textarea.form-input {
 @keyframes glass-sheet-in {
   from {
     opacity: 0.6;
-    transform: translateY(40%);
+    /* 24px wie `modal-sheet-in` in layout.css, NICHT 40 %. Mit 40 % Hub warf die
+     * Feder die Tafel gemessen 28,5px ueber ihre Ruhelage (Bodenluft 12 -> 41px),
+     * und genau dieser Block schlug die dort als "dezent, 24px" begruendete
+     * Einfahrt. Die Kurve bleibt die Feder (Glas-Element, ignore.md), der Hub
+     * nicht: 24px mal Ueberschwinger sind knapp 3px. */
+    transform: translateY(24px);
   }
   to {
     opacity: 1;
@@ -517,32 +511,35 @@ textarea.form-input {
   }
 }
 
+/* `:not(.modal-panel--closing)`, und das ist die ganze Reparatur (Critique
+ * 2026-09-26, P1-1): diese Datei laedt nach layout.css, und bei gleicher
+ * Spezifitaet schlug `.modal-panel { animation: glass-sheet-in }` die
+ * Schliess-Regel `.modal-panel--closing { animation: sheet-out }`. Die Tafel
+ * stand beim Schliessen 400ms still (die Einfahrt war laengst durch) und
+ * verschwand dann hart, weil `animationend` nie kam und der Timer in modal.js
+ * abraeumte. Die Einfahrt gilt nur, solange die Tafel NICHT schliesst - dann
+ * haengt der Ausgang an keiner Ladereihenfolge. Guard: test-motion.js. */
 @media (min-width: 768px) {
-  .modal-panel {
-    animation: glass-modal-scale-in 0.32s var(--ease-glass) forwards;
+  .modal-panel:not(.modal-panel--closing) {
+    animation: glass-modal-scale-in var(--duration-xl) var(--ease-glass) forwards;
   }
 }
 
 @media (max-width: 767px) {
-  .modal-panel {
-    animation: glass-sheet-in 0.30s var(--ease-glass) forwards;
+  .modal-panel:not(.modal-panel--closing) {
+    animation: glass-sheet-in var(--duration-xl) var(--ease-glass) forwards;
   }
 }
 
 /* ================================================================
- * 19. Seitentransitionen — Spring Easing
+ * 19. Seitentransitionen - entfallen (2026-09-26)
+ *
+ * Hier gab die Feder `--ease-glass` dem Seiteninhalt einen Ueberschwinger
+ * (gemessen x = -1,95px bei 148ms) - Feder gehoert dem Glas, nicht dem Inhalt
+ * (DESIGN.md, Motion). Der Seitenwechsel ist jetzt eine View Transition
+ * (utils/view-transition.js, Regeln in layout.css); die `--out-*`-Klassen,
+ * die hier auch noch standen, vergab nie jemand.
  * ================================================================ */
-.page-transition--in-right,
-.page-transition--in-left {
-  animation-duration: 0.20s;
-  animation-timing-function: var(--ease-glass);
-}
-
-.page-transition--out-left,
-.page-transition--out-right {
-  animation-duration: var(--duration-xs);
-  animation-timing-function: var(--ease-out);
-}
 
 /* Blank-Screen-on-Scroll Prevention (iOS 26+ WebKit + Android Blink):
  * Jedes Element mit backdrop-filter ODER filter innerhalb von overflow:auto wird
@@ -567,14 +564,6 @@ html.navigating .app-content *::before,
 html.navigating .app-content *::after {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-}
-
-/* ================================================================
- * 20. List-Stagger — Spring Timing
- * ================================================================ */
-.list-stagger > * {
-  animation-duration: 280ms;
-  animation-timing-function: var(--ease-glass);
 }
 
 /* ================================================================
@@ -607,21 +596,6 @@ html.navigating .app-content *::after {
 }
 
 /* ================================================================
- * 23. FAB — Attention Pulse
- * ================================================================ */
-@keyframes fab-ring-pulse {
-  0%   { box-shadow: var(--shadow-lg), var(--glass-inset-elevated), 0 0 0 0 color-mix(in srgb, var(--color-accent) 50%, transparent); }
-  60%  { box-shadow: var(--shadow-lg), var(--glass-inset-elevated), 0 0 0 10px transparent; }
-  100% { box-shadow: var(--shadow-lg), var(--glass-inset-elevated), 0 0 0 0 transparent; }
-}
-
-.fab {
-  animation:
-    fab-in 420ms var(--ease-out) backwards,
-    fab-ring-pulse 600ms var(--ease-out) 450ms 1 backwards;
-}
-
-/* ================================================================
  * 24. Accessibility — Phase 3
  * ================================================================ */
 @media (prefers-reduced-motion: reduce) {
@@ -629,22 +603,7 @@ html.navigating .app-content *::after {
     transition: none;
   }
 
-  .modal-panel {
-    animation: none;
-  }
-
-  .page-transition--in-right,
-  .page-transition--in-left,
-  .page-transition--out-left,
-  .page-transition--out-right {
-    animation-duration: 0.01ms !important;
-  }
-
-  .list-stagger > * {
-    animation-duration: 0.01ms !important;
-  }
-
-  .fab {
+  .modal-panel:not(.modal-panel--closing) {
     animation: none;
   }
 }

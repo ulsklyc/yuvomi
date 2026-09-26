@@ -569,6 +569,42 @@
   transform: scale(0.92);
 }
 
+/* Die Quittung des Tipps (completeTask()), dieselbe wie beim Abhaken einer
+ * Aufgabe (`.task-status-btn--done`, tasks.css): der Ring fuellt sich in der
+ * Erfolgsfarbe, der Haken steht darauf, und `check-pop` quittiert die
+ * Beruehrung. Kein Zustand - das Neuzeichnen nach dem Roundtrip nimmt die
+ * Klasse wieder weg, der Kreis heisst weiter „jetzt erledigt".
+ *
+ * ZWEI KLASSEN IM SELEKTOR: der Finger (oder Zeiger) steht nach dem Tipp noch
+ * auf dem Knopf, und `:hover` hat (0,2,0) bzw. (0,2,1) - mit einer Klasse
+ * gewaenne die Hover-Toenung ueber die Fuellung. */
+.housekeeping-task__check.housekeeping-task__check--done {
+  animation: check-pop var(--duration-md) var(--ease-out);
+}
+
+.housekeeping-task__check.housekeeping-task__check--done::before {
+  border-color: var(--color-success);
+}
+
+/* Die Fuellung traegt der Haken selbst (16px + 2 x 4px = der 24px-Ring), damit
+ * Tinte und Untergrund in EINER Regel stehen - so prueft der Kontrast-Guard
+ * genau dieses Paar (Tinte auf Gruen) und nicht Tinte auf der Seitenflaeche. */
+.housekeeping-task__check.housekeeping-task__check--done svg {
+  box-sizing: content-box;
+  padding: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--color-success);
+  color: var(--color-ink-on-vivid);
+}
+
+/* Unter reduzierter Bewegung traegt der Farbwechsel die Quittung allein
+ * (wie tasks.css, Audit F-07). */
+@media (prefers-reduced-motion: reduce) {
+  .housekeeping-task__check.housekeeping-task__check--done {
+    animation: none;
+  }
+}
+
 /* Titel als Zeilenname: die h2 behaelt ihre Rolle fuer die Ueberschriften-
  * Navigation, Groesse und Gewicht kommen aus `.list-row__name`. */
 .housekeeping-task__body h2,

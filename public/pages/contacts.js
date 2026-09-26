@@ -670,7 +670,7 @@ function renderList({ animate = false } = {}) {
   if (window.lucide) lucide.createIcons({ el: container });
   // Entrance-Stagger nur beim echten Erst-Load — nicht bei jedem Such-/Filter-
   // Render (sonst flackert die Liste bei jeder Tastatureingabe).
-  if (animate) stagger(container.querySelectorAll('.contact-item'));
+  if (animate) stagger(container.querySelectorAll('.contact-item'), { host: container });
   enhancePhones(container);
   // Die Markierung der ausgewaehlten Zeile neu setzen. Ist ihr Kontakt weg
   // (geloescht) oder weggefiltert, faellt die Spalte auf den Leerzustand -

@@ -3615,6 +3615,89 @@ function announceDashboard(message) {
   announceTimer = setTimeout(() => { region.textContent = message; }, 50);
 }
 
+/* DIE KACHELN GLEITEN, STATT ZU SPRINGEN (FLIP, Critique 2026-09-26).
+ *
+ * Jede Anpassen-Geste baut die Flaeche per setHtml neu; bis hierher sprang das
+ * Raster dabei in einem Frame auf den neuen Stand - wer eine Kachel eine Stelle
+ * hoch schob oder breiter machte, musste sie danach suchen. Jetzt: vor dem
+ * Neuaufbau die Lage jeder Kachel merken (First), danach die neue messen (Last),
+ * die Kachel per transform auf die alte Stelle zuruecksetzen (Invert) und per
+ * Web Animations nach Hause laufen lassen (Play). Die Identitaet traegt die
+ * Widget-Id - die Elemente selbst ueberleben den Neuaufbau nicht.
+ *
+ * Eine Kachel, die waechst, deckt ihre neue Flaeche per clip-path von der alten
+ * Groesse aus auf; eine, die schrumpft, kann nicht ueber ihren Rand hinaus
+ * zeigen und blendet ihren umgebrochenen Inhalt kurz auf. Eine wieder
+ * eingeblendete Kachel kommt ohne Vorlage und blendet ein. Die Kachel ist ein
+ * Glas-Element: Dauer und Kurve aus den Token (`--duration-lg`, `--ease-glass`).
+ * Unter reduzierter Bewegung bleibt es beim Sprung.
+ *
+ * Gemessen wird in Viewport-Koordinaten: scrollt der Fokus-Nachfolger die Seite
+ * mit, ist genau das der Weg, den das Auge gesehen hat. Laeuft noch eine
+ * Animation, liefert getBoundingClientRect ihre momentane Lage mit - die
+ * naechste Geste setzt dort an, wo die Kachel gerade IST. */
+const DASHBOARD_TILE_SELECTOR = '#dashboard-widget-grid > .widget-wrapper[data-widget-id]';
+
+function captureTileRects(root) {
+  const rects = new Map();
+  root.querySelectorAll(DASHBOARD_TILE_SELECTOR).forEach((tile) => {
+    rects.set(tile.dataset.widgetId, tile.getBoundingClientRect());
+  });
+  return rects;
+}
+
+function prefersReducedMotion() {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function motionTiming() {
+  const styles = typeof document !== 'undefined' && typeof getComputedStyle === 'function'
+    ? getComputedStyle(document.documentElement) : null;
+  const raw = styles?.getPropertyValue('--duration-lg').trim() ?? '';
+  const ms = /ms$/.test(raw) ? parseFloat(raw) : /s$/.test(raw) ? parseFloat(raw) * 1000 : NaN;
+  return {
+    duration: Number.isFinite(ms) ? ms : 250,
+    easing: styles?.getPropertyValue('--ease-glass').trim() || 'ease-out',
+  };
+}
+
+function playTileFlip(root, before, options = {}) {
+  const reduced = options.reduced ?? prefersReducedMotion();
+  if (!before || reduced) return [];
+  const timing = { ...motionTiming(), ...options.timing };
+  const played = [];
+  root.querySelectorAll(DASHBOARD_TILE_SELECTOR).forEach((tile) => {
+    if (typeof tile.animate !== 'function') return;
+    const from = before.get(tile.dataset.widgetId);
+    if (!from) {
+      played.push(tile.animate([
+        { opacity: 0, transform: 'scale(0.96)' },
+        { opacity: 1, transform: 'none' },
+      ], timing));
+      return;
+    }
+    const to = tile.getBoundingClientRect();
+    const dx = from.left - to.left;
+    const dy = from.top - to.top;
+    const dw = to.width - from.width;
+    const dh = to.height - from.height;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(dw) < 1 && Math.abs(dh) < 1) return;
+    const first = { transform: `translate(${dx}px, ${dy}px)` };
+    const last = { transform: 'none' };
+    if (dw >= 1 || dh >= 1) {
+      const radius = typeof getComputedStyle === 'function' ? getComputedStyle(tile).borderTopLeftRadius || '0px' : '0px';
+      first.clipPath = `inset(0px ${Math.max(0, dw)}px ${Math.max(0, dh)}px 0px round ${radius})`;
+      last.clipPath = `inset(0px 0px 0px 0px round ${radius})`;
+    } else if (dw <= -1 || dh <= -1) {
+      first.opacity = 0.6;
+      last.opacity = 1;
+    }
+    played.push(tile.animate([first, last], timing));
+  });
+  return played;
+}
+
 function widgetSizeClass(size) {
   return WIDGET_SIZE_OPTIONS.includes(size) ? `widget-size--${size}` : 'widget-size--1x1';
 }
@@ -6028,6 +6111,10 @@ export async function render(container, { user, signal: routeSignal = null } = {
       ? focusKeyOf(focused) : null;
     const hadFocus = !!focused && focused !== document.body && shell.contains(focused);
     const modeChanged = renderedCustomizing !== null && renderedCustomizing !== isCustomizing;
+    // Nur eine Geste IM Anpassen-Modus gleitet (playTileFlip): beim Betreten
+    // und Verlassen wachsen und schwinden die Bearbeiten-Leisten aller Kacheln,
+    // da waere jede Bewegung nur Unruhe.
+    const tileRectsBefore = isCustomizing && renderedCustomizing === true ? captureTileRects(shell) : null;
     renderedCustomizing = isCustomizing;
     setHtml(shell, `
       <section class="dashboard-masthead dashboard-masthead--${greetingPeriod()}${mastheadSlim}">
@@ -6095,6 +6182,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
         break;
       }
     }
+    playTileFlip(shell, tileRectsBefore);
   }
 
   rebuildDashboard(widgetConfig);
@@ -6322,7 +6410,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint };
+export const __test = { renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

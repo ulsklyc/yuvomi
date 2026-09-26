@@ -177,6 +177,39 @@ test('ein deaktivierter Eintrag ist kein Ziel der Pfeiltasten', () => {
   assert.equal(focusedIndex(panel), 2, 'der deaktivierte Eintrag wurde uebersprungen');
 });
 
+test('ein per CSS verborgener Eintrag ist kein Ziel der Pfeiltasten (Review zu #1475)', () => {
+  // Mahlzeiten blendet den Rezeptspalten-Schalter unter 1024px per
+  // `display: none` aus (meals.css) - im DOM steht er weiter. Als Ziel von
+  // End/ArrowUp bekam er den Fokus, den ein nicht gerendertes Element nicht
+  // annimmt: der Fokus blieb stehen, und die Tastatur hing am Menueende.
+  const root = makeRoot();
+  const panel = makeMenu({ count: 3 });
+  panel.children[2].checkVisibility = () => false;
+  panel.children[0].checkVisibility = () => true;
+  open(root, panel);
+
+  clearFocus(panel);
+  keydown(root, panel.children[0], 'End');
+  assert.equal(focusedIndex(panel), 1, 'End landet auf dem letzten SICHTBAREN Eintrag');
+
+  clearFocus(panel);
+  keydown(root, panel.children[1], 'ArrowDown');
+  assert.equal(focusedIndex(panel), 0, 'hinter dem letzten sichtbaren laeuft es auf den Anfang um');
+
+  clearFocus(panel);
+  keydown(root, panel.children[0], 'ArrowUp');
+  assert.equal(focusedIndex(panel), 1, 'rueckwaerts ueber den Anfang auf den letzten sichtbaren');
+});
+
+test('ohne Rendering-Auskunft (kein checkVisibility, keine Rects) zaehlt ein Eintrag als sichtbar', () => {
+  const root = makeRoot();
+  const panel = makeMenu({ count: 2 });
+  open(root, panel);
+  clearFocus(panel);
+  keydown(root, panel.children[0], 'End');
+  assert.equal(focusedIndex(panel), 1);
+});
+
 test('aria-expanded am Trigger folgt dem Zustand des Panels', () => {
   // Die Popover-API kennt nur `popovertarget`, kein ARIA - ohne diese
   // Verdrahtung meldet der Screenreader ein Menue, das nie aufgeht.

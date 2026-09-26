@@ -7,7 +7,7 @@
 import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues } from '/rrule-ui.js';
 import { openModal as openSharedModal, closeModal, wireBlurValidation, validateAll, btnSuccess, btnError, btnLoading, promptModal, confirmModal, advancedSection, refocusAfterRender } from '/components/modal.js';
-import { stagger, vibrate, scheduleUndoableDelete, animationSettled } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, animationSettled, collapseOut, expandIn } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { t, getLocale, formatDate, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc } from '/utils/html.js';
@@ -890,11 +890,50 @@ function wireTagBadgeFilter(container) {
   }, true);
 
   // Gruppenkopf auf- und zuklappen (#812).
-  container.addEventListener('click', (e) => {
+  //
+  // DIE ZEILEN KLAPPEN, STATT ZU SPRINGEN (Critique 2026-09-26, A3 P1-4). Die
+  // Liste zeichnet eine zugeklappte Gruppe ohne `.list-rows` - also klappt
+  // beim Zuklappen erst die alte Zeilenflaeche weg und danach wird neu
+  // gezeichnet; beim Aufklappen wird erst gezeichnet und die neue Flaeche von
+  // null aufgezogen. Der Winkel dreht dabei ueber seine eigene Transition
+  // (list-row.css), auch am frisch gezeichneten Knopf. Der Fokus bleibt auf dem
+  // Kopf: das Neuzeichnen ersetzt den Knopf, und ohne Rueckgabe landete er auf
+  // <body>.
+  container.addEventListener('click', async (e) => {
     const toggle = e.target.closest('[data-group-toggle]');
     if (!toggle || !container.contains(toggle)) return;
-    toggleGroup(state.groupMode, toggle.dataset.groupToggle);
+    if (toggle.dataset.moving) return;
+    const id = toggle.dataset.groupToggle;
+    const collapsing = !isGroupCollapsed(state.groupMode, id);
+    const hadFocus = document.activeElement === toggle;
+    if (collapsing) {
+      toggle.dataset.moving = '1';
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.querySelector('.list-group__chevron')?.classList.add('list-group__chevron--collapsed');
+      await collapseOut(toggle.closest('.list-group')?.querySelector('.list-rows'));
+    }
+    toggleGroup(state.groupMode, id);
     renderTaskList(container);
+    const fresh = [...container.querySelectorAll('[data-group-toggle]')]
+      .find((btn) => btn.dataset.groupToggle === id);
+    if (!fresh) return;
+    if (hadFocus) fresh.focus();
+    if (!collapsing) {
+      const chevron = fresh.querySelector('.list-group__chevron');
+      if (chevron) {
+        // Vom zugeklappten Winkel aus starten, damit die Transition etwas hat,
+        // wovon sie ausgeht - das Neuzeichnen setzt ihn sonst ohne Uebergang.
+        // Der Hinweg OHNE Transition: `focus()` oben hat den Stil des neuen
+        // Winkels schon berechnet, und ein Hinweg mit Transition kehrte sich
+        // beim Entfernen der Klasse sofort um - gemessen: keine Drehung.
+        chevron.style.transition = 'none';
+        chevron.classList.add('list-group__chevron--collapsed');
+        void getComputedStyle(chevron).transform;
+        chevron.style.transition = '';
+        chevron.classList.remove('list-group__chevron--collapsed');
+      }
+      expandIn(fresh.closest('.list-group')?.querySelector('.list-rows'));
+    }
   });
 }
 
@@ -1331,10 +1370,56 @@ async function loadTasks(container, renderOpts = {}) {
   // Uebersicht oder aus dem Kalender geoeffnet (#918), und dort frischt der
   // Aufrufer seine eigene Ansicht auf.
   if (!container) return;
+  await fetchTasks();
+  renderTaskList(container, renderOpts);
+}
+
+/** Nur der Bestand, ohne Neuzeichnen - fuer Wege, die dazwischen noch eine Bewegung spielen. */
+async function fetchTasks() {
   persistAssignedToMe();
   const data  = await api.get(`/tasks${taskQuery()}`);
   state.tasks = data.data ?? [];
-  renderTaskList(container, renderOpts);
+}
+
+/*
+ * AUSTRITT BEIM ABHAKEN (Critique 2026-09-26, A3 P1-4).
+ *
+ * Vorher: die abgehakte Zeile verschwand ohne Uebergang, und weil jedes
+ * Neuzeichnen stagger() rief, fuhr der ganze Rest von 8px unten neu ein. Jetzt
+ * bleibt die Zeile einen Moment im Erledigt-Zustand stehen - man SIEHT, was man
+ * getan hat -, dann klappt ihre Hoehe weg und die Nachbarn ruecken nach. Erst
+ * danach zeichnet die Liste neu, und die ist dann schon so hoch wie das Bild.
+ *
+ * NUR WENN DIE ZEILE DIE ANSICHT WIRKLICH VERLAESST. Ob sie das tut, weiss erst
+ * der neue Bestand (Statusfilter, Suche): die Frage geht an `filteredTasks()`
+ * NACH dem Laden. Bleibt sie stehen - „Erledigt" im Filter, Liste ohne
+ * Statusfilter -, wird nur neu gezeichnet. Ist sie die letzte ihrer Gruppe,
+ * geht die ganze Gruppe mit, sonst stuende ein leerer Kopf bis zum Neuzeichnen.
+ *
+ * Der umgekehrte Weg („Rueckgaengig" im Toast) zieht eine zurueckgekehrte Zeile
+ * auf, statt sie hineinspringen zu lassen.
+ */
+const EXIT_HOLD_MS = 450;
+
+function taskRowEl(container, taskId) {
+  return [...(container.querySelectorAll?.('#task-list .swipe-row') ?? [])]
+    .find((row) => row.dataset.swipeId === String(taskId)) ?? null;
+}
+
+async function reloadWithRowMotion(container, taskId, { holdUntil = 0 } = {}) {
+  if (!container) return;
+  await fetchTasks();
+  const row = state.viewMode === 'list' ? taskRowEl(container, taskId) : null;
+  const staysInView = filteredTasks().some((task) => String(task.id) === String(taskId));
+  if (row && row.isConnected && !staysInView) {
+    const wait = holdUntil - performance.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    const group = row.closest('.task-group');
+    const lastInGroup = group && group.querySelectorAll('.swipe-row').length === 1;
+    await collapseOut(lastInGroup ? group : row);
+  }
+  renderTaskList(container);
+  if (!row && staysInView && state.viewMode === 'list') expandIn(taskRowEl(container, taskId));
 }
 
 /**
@@ -2988,7 +3073,7 @@ function renderHistory(container) {
     </div>` : ''}
   `);
   if (window.lucide) window.lucide.createIcons({ el: listEl });
-  stagger(listEl.querySelectorAll('.history-row'));
+  stagger(listEl.querySelectorAll('.history-row'), { host: listEl });
 
   wireHistoryPeople(listEl, container);
   listEl.querySelector('#history-more')?.addEventListener('click', (e) => {
@@ -3099,7 +3184,7 @@ function renderTaskList(container, { paneQuiet = false } = {}) {
   listEl.insertAdjacentHTML('beforeend', renderTaskGroups(filteredTasks(), state.groupMode));
   if (window.lucide) window.lucide.createIcons({ el: listEl });
   syncPaneAfterRender(listEl, orderBefore, { quiet: paneQuiet });
-  stagger(listEl.querySelectorAll('.swipe-row, .kanban-card'));
+  stagger(listEl.querySelectorAll('.swipe-row, .kanban-card'), { host: listEl });
   updateBulkActionsBar(container);
   wireSwipeGestures(container);
   maybeShowSwipeHint(container);
@@ -3663,9 +3748,16 @@ function wireSwipeGestures(container) {
         const taskId = row.dataset.swipeId;
         const capturedStatus = row.dataset.swipeStatus;
         const nextStatus = capturedStatus === 'done' ? 'open' : 'done';
+        // Die Karte ist hinausgeflogen, und `resetCard(false)` hat sie eben
+        // ohne Uebergang zurueckgesetzt: unsichtbar halten, bis die Liste neu
+        // steht - sonst blitzt sie fuer den Roundtrip wieder auf, und der
+        // Austritt klappte eine Zeile zusammen, die gerade zurueckkam. Das
+        // Neuzeichnen (auch im Fehlerfall) bringt eine frische Karte.
+        const card = row.querySelector('.task-card');
+        if (card) card.style.visibility = 'hidden';
         try {
           await toggleTaskStatus(taskId, capturedStatus);
-          await loadTasks(container);
+          await reloadWithRowMotion(container, taskId);
           window.yuvomi.showToast(
             t(nextStatus === 'done' ? 'tasks.swipedDoneToast' : 'tasks.swipedOpenToast'),
             'default',
@@ -3673,7 +3765,7 @@ function wireSwipeGestures(container) {
             async () => {
               try {
                 await toggleTaskStatus(taskId, nextStatus);
-                await loadTasks(container);
+                await reloadWithRowMotion(container, taskId);
               } catch (err) {
                 window.yuvomi.showToast(err.message, 'danger');
               }
@@ -4092,7 +4184,7 @@ async function completeTaskFor(container, taskId, userId) {
   const person = quelle.find((u) => u.id === userId);
   try {
     await toggleTaskStatus(taskId, 'open', userId);
-    await loadTasks(container);
+    await reloadWithRowMotion(container, taskId);
     window.yuvomi.showToast(
       t('tasks.doneByToast', { name: person?.display_name ?? '' }),
       'default',
@@ -4100,7 +4192,7 @@ async function completeTaskFor(container, taskId, userId) {
       actingAsDisplay() ? null : async () => {
         try {
           await toggleTaskStatus(taskId, 'done');
-          await loadTasks(container);
+          await reloadWithRowMotion(container, taskId);
         } catch (err) {
           window.yuvomi.showToast(err.message, 'danger');
         }
@@ -4150,10 +4242,13 @@ function wireTaskList(container) {
       // `loadTasks()` ersetzt den Knopf, und ohne dieses Warten war `check-pop`
       // (tasks.css:703) in 0 von 6 Messungen zu sehen. Siehe animationSettled().
       const settled = animationSettled(target);
+      // Die Haltezeit laeuft ab dem Tipp, neben dem Roundtrip - ein langsames
+      // Netz verlaengert sie nicht noch einmal (EXIT_HOLD_MS).
+      const holdUntil = performance.now() + EXIT_HOLD_MS;
       try {
         await toggleTaskStatus(id, status);
         await settled;
-        await loadTasks(container);
+        await reloadWithRowMotion(container, id, { holdUntil });
         // Derselbe Rückweg wie beim Wischen. Die Geste hatte hier zwei
         // Endpunkte mit zwei Antworten: der Wisch bot Undo an, der Tipp - die
         // häufigere Bedienung - liess den Eintrag kommentarlos aus dem
@@ -4170,7 +4265,7 @@ function wireTaskList(container) {
           async () => {
             try {
               await toggleTaskStatus(id, nextStatus);
-              await loadTasks(container);
+              await reloadWithRowMotion(container, id);
             } catch (err) {
               window.yuvomi.showToast(err.message, 'danger');
             }

@@ -8,7 +8,7 @@ import { existsSync, globSync, readFileSync } from 'node:fs';
 import { eachRule } from './css-rules.js';
 
 // Minimales Window/Navigator-Mock für Node
-const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader } = await (async () => {
+const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader, collapseOut, expandIn, watchNavCapsuleHeight } = await (async () => {
   global.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
@@ -105,6 +105,131 @@ test('stagger: tut nichts bei prefers-reduced-motion', () => {
   stagger(els);
   assert.equal(els[0].style.opacity, undefined); // unverändert
   global.window.matchMedia = () => ({ matches: false }); // reset
+});
+
+/*
+ * DAS EINBLENDEN GEHOERT ZUM ERSTEN AUFBAU (Critique 2026-09-26, A3 P1-4).
+ *
+ * renderTaskList() rief stagger() bei jedem Neuzeichnen - nach dem Abhaken,
+ * jedem Filter, jedem Tastendruck -, und die ganze Liste fuhr jedes Mal neu
+ * ein. Die Zeilen sind nach dem Neuzeichnen neue Knoten; was bleibt, ist ihr
+ * Traeger. Deshalb die Zeilen hier FRISCH je Aufruf, der Traeger derselbe.
+ */
+function fakeRows(host, n = 3) {
+  return Array.from({ length: n }, () => ({ style: {}, parentElement: host }));
+}
+
+test('stagger: blendet je Listentraeger nur beim ersten Aufbau ein, nicht bei jedem Neuzeichnen', () => {
+  const host = { contains: () => true, parentElement: null };
+  const first = fakeRows(host);
+  stagger(first, { host, delay: 0, duration: 0 });
+  assert.equal(first[0].style.opacity, '0', 'Vorbedingung: der erste Aufbau blendet ein');
+  const again = fakeRows(host);
+  stagger(again, { host, delay: 0, duration: 0 });
+  assert.equal(again[0].style.opacity, undefined,
+    'das Neuzeichnen derselben Liste hat wieder eingeblendet - die Liste faehrt nach jedem Abhaken neu ein');
+});
+
+test('stagger: ohne host gilt der gemeinsame Vorfahr der Zeilen als Traeger', () => {
+  const host = { contains: () => true, parentElement: null };
+  stagger(fakeRows(host), { delay: 0, duration: 0 });
+  const again = fakeRows(host);
+  stagger(again, { delay: 0, duration: 0 });
+  assert.equal(again[0].style.opacity, undefined, 'zweiter Aufruf am selben Vorfahr hat wieder eingeblendet');
+});
+
+test('stagger: ein Aufruf ohne Zeilen verbraucht den ersten Aufbau nicht (Skelett, Leerzustand)', () => {
+  const host = { contains: () => true, parentElement: null };
+  stagger([], { host });
+  const rows = fakeRows(host);
+  stagger(rows, { host, delay: 0, duration: 0 });
+  assert.equal(rows[0].style.opacity, '0', 'die erste echte Liste nach einem leeren Aufruf blendet nicht mehr ein');
+});
+
+test('stagger: ein neuer Traeger (Seite neu aufgebaut) blendet wieder ein', () => {
+  const a = { contains: () => true, parentElement: null };
+  const b = { contains: () => true, parentElement: null };
+  stagger(fakeRows(a), { host: a, delay: 0, duration: 0 });
+  const rows = fakeRows(b);
+  stagger(rows, { host: b, delay: 0, duration: 0 });
+  assert.equal(rows[0].style.opacity, '0');
+});
+
+/*
+ * Jeder Aufrufer nennt seinen Traeger. Der Rueckfall (gemeinsamer Vorfahr)
+ * trifft bei gruppierten Listen die Gruppe - und die ist nach jedem
+ * Neuzeichnen neu, also blendete die Liste wieder bei jedem Aufruf ein.
+ */
+test('stagger: jeder Aufruf in public/ nennt seinen Listentraeger (host)', () => {
+  const offenders = [];
+  for (const file of globSync('public/**/*.js', { cwd: new URL('..', import.meta.url).pathname })) {
+    if (file.includes('vendor') || file.endsWith('utils/ux.js')) continue;
+    const src = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+    for (const m of src.matchAll(/\bstagger\(/g)) {
+      // Bis zur schliessenden Klammer des Aufrufs: Klammern zaehlen.
+      let depth = 0; let end = m.index + 'stagger'.length;
+      for (; end < src.length; end++) {
+        if (src[end] === '(') depth++;
+        else if (src[end] === ')' && --depth === 0) break;
+      }
+      const call = src.slice(m.index, end + 1);
+      // `stagger()` ohne Argument ist kein Aufruf, sondern die Nennung in einem Kommentar.
+      if (call === 'stagger()') continue;
+      if (!/\bhost\b/.test(call)) offenders.push(`${file}: ${call.replace(/\s+/g, ' ').slice(0, 90)}`);
+    }
+  }
+  assert.deepEqual(offenders, [], `stagger() ohne host:\n${offenders.join('\n')}`);
+});
+
+test('collapseOut/expandIn: loesen ohne Animation sofort auf (reduzierte Bewegung, kein animate)', async () => {
+  await collapseOut(null);
+  await expandIn({ style: {} });
+  global.window.matchMedia = () => ({ matches: true });
+  let animated = false;
+  const el = { style: {}, animate: () => { animated = true; } };
+  await collapseOut(el);
+  await expandIn(el);
+  global.window.matchMedia = () => ({ matches: false });
+  assert.equal(animated, false, 'unter prefers-reduced-motion darf keine Hoehe animieren');
+});
+
+/**
+ * Einklappen und Aufziehen laufen auf der SYMMETRISCHEN Kurve `--ease-in-out`
+ * (Runde 3, Entscheid 26.09.): `--ease-out` nahm 80 % der Hoehe in den ersten
+ * 60ms, die Nachbarn sprangen hinterher - ein Ruck statt eines Nachrueckens.
+ * Gemessen wird ueber den AUFRUF (collapseOut/expandIn mit gestubtem
+ * `animate`), die Kurve selbst aus tokens.css (x1 + x2 = 1, y1 + y2 = 1).
+ */
+test('collapseOut/expandIn: Hoehe laeuft auf der symmetrischen Kurve --ease-in-out', async () => {
+  const tokens = { '--ease-out': 'cubic-bezier(0.16, 1, 0.3, 1)', '--ease-in-out': 'cubic-bezier(0.42, 0, 0.58, 1)', '--duration-lg': '250ms' };
+  const docEl = {};
+  const prevDoc = global.document;
+  const prevGcs = global.getComputedStyle;
+  global.document = { documentElement: docEl };
+  global.getComputedStyle = (node) => (node === docEl
+    ? { getPropertyValue: (name) => tokens[name] ?? '' }
+    : { opacity: '1', paddingTop: '4px', paddingBottom: '4px', marginTop: '0px', marginBottom: '0px', borderTopWidth: '0px', borderBottomWidth: '0px' });
+  const easings = [];
+  const el = {
+    style: {},
+    getBoundingClientRect: () => ({ height: 40 }),
+    animate: (_frames, opts) => { easings.push(opts.easing); return { finished: Promise.resolve() }; },
+  };
+  try {
+    await collapseOut(el);
+    await expandIn(el);
+  } finally {
+    global.document = prevDoc;
+    global.getComputedStyle = prevGcs;
+  }
+  assert.deepEqual(easings, [tokens['--ease-in-out'], tokens['--ease-in-out']]);
+
+  const css = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+  const m = css.match(/--ease-in-out:\s*cubic-bezier\(([^)]*)\)/);
+  assert.ok(m, 'tokens.css definiert --ease-in-out nicht als cubic-bezier');
+  const [x1, y1, x2, y2] = m[1].split(',').map(Number);
+  assert.ok(Math.abs(x1 + x2 - 1) < 1e-9 && Math.abs(y1 + y2 - 1) < 1e-9,
+    `--ease-in-out ist nicht symmetrisch: ${m[1]}`);
 });
 
 test('vibrate: tut nichts wenn API nicht vorhanden', () => {
@@ -693,4 +818,45 @@ test('wireCollapsingHeader: ein Port, der den Kollaps nicht traegt, klappt auch 
     s.scrollTo(monthRows, 0);
     assert.equal(s.toolbar.classList.contains('is-collapsed'), false);
   } finally { s.restore(); }
+});
+
+test('watchNavCapsuleHeight: die gemessene Kapselhoehe steht am Root, eine verborgene Kapsel raeumt sie (Review zu #1475)', () => {
+  // Die Kapsel waechst mit umbrechenden Labels ueber 60px (lange Sprachen,
+  // 320px). Der Nachlauf rechnete fest mit der Token-Hoehe, und die letzte
+  // Zeile lag teilweise unter dem Glas. Gemessen, nicht gerechnet - wie das
+  // Installationsbanner (`--install-prompt-height`).
+  const saved = globalThis.ResizeObserver;
+  const observers = [];
+  globalThis.ResizeObserver = class {
+    constructor(cb) { this.cb = cb; this.targets = []; this.disconnected = false; observers.push(this); }
+    observe(target) { this.targets.push(target); }
+    disconnect() { this.disconnected = true; }
+  };
+  const props = new Map();
+  const root = { style: {
+    setProperty: (k, v) => props.set(k, v),
+    removeProperty: (k) => props.delete(k),
+  } };
+  const items = { isConnected: true };
+  try {
+    watchNavCapsuleHeight(items, root);
+    assert.equal(observers.length, 1);
+    assert.deepEqual(observers[0].targets, [items], 'beobachtet wird die Kapsel selbst');
+    const fire = (blockSize) => observers[0].cb([{ target: items, borderBoxSize: [{ blockSize }] }]);
+    fire(60);
+    assert.equal(props.get('--nav-capsule-height'), '60px');
+    fire(72.1875);
+    assert.equal(props.get('--nav-capsule-height'), '72.1875px', 'zweizeilige Labels: die echte Hoehe, ungerundet');
+    fire(0);
+    assert.equal(props.has('--nav-capsule-height'), false,
+      'ohne gerenderte Kapsel (Desktop, Wand-Modus) gilt wieder die Token-Hoehe');
+    fire(74);
+    items.isConnected = false;
+    fire(0);
+    assert.equal(props.get('--nav-capsule-height'), '74px',
+      'eine ersetzte, abgehaengte Kapsel raeumt den Wert ihrer Nachfolgerin nicht');
+    assert.equal(observers[0].disconnected, true, 'und ihr Beobachter endet');
+  } finally {
+    globalThis.ResizeObserver = saved;
+  }
 });

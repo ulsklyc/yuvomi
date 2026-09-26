@@ -172,3 +172,109 @@ test('running and idle clocks use their own anchors and expose remaining goal ti
   assert.equal(fastingClockModel(null, null, now).hasAnchor, false);
   assert.equal(fastingClockModel({ ...active, goal_minutes: 60 }, null, now).reached, true);
 });
+
+/* DER FASTEN-RING (Critique 2026-09-26, A6 P2-3): einmal gebaut, danach wandert
+ * nur die Laenge der Spur - frueher schrieb der Takt jede Minute das ganze SVG
+ * neu, eine Transition konnte so nie greifen. Gemessen wird ueber den AUFRUFER
+ * (updateFastingClock), nicht ueber den Helfer allein: der Takt ist es, der
+ * neu baut oder nicht. Die Stubs zaehlen, wie oft der Ring-Traeger geleert wird. */
+function dialHost() {
+  const host = {
+    dataset: {}, rebuilds: 0, traces: [],
+    replaceChildren() { host.rebuilds += 1; host.traces = []; },
+    insertAdjacentHTML(_where, html) {
+      host.html = html;
+      host.traces = [...html.matchAll(/<circle class="(fasting-dial__trace[^"]*)"[^>]*stroke-dasharray="([^"]+)"/g)]
+        .map(([, cls, dash]) => {
+          const classes = new Set(cls.split(' '));
+          const attrs = new Map([['stroke-dasharray', dash]]);
+          return {
+            getAttribute: (n) => attrs.get(n) ?? null,
+            setAttribute: (n, v) => { attrs.set(n, String(v)); },
+            classList: { toggle: (c, on) => { if (on) classes.add(c); else classes.delete(c); }, contains: (c) => classes.has(c) },
+          };
+        });
+    },
+    querySelectorAll: (sel) => (sel === '.fasting-dial__trace' ? host.traces : []),
+  };
+  return host;
+}
+
+function clockRoot(dial) {
+  const node = () => ({ hidden: false, textContent: '00:00:00', dataset: {}, style: { setProperty() {} } });
+  const parts = {
+    '[data-fasting-timer]': node(), '[data-fasting-clock-label]': node(), '[data-fasting-days]': node(),
+    '[data-fasting-announcement]': node(), '.fasting-clock-switch': node(), '[data-fasting-progress]': node(),
+    '[data-fasting-segments]': dial,
+  };
+  return { parts, querySelector: (sel) => parts[sel] ?? null, querySelectorAll: () => [] };
+}
+
+test('the fasting dial is built once and only its trace length moves with the clock', async () => {
+  {
+    const { updateFastingClock } = await import('../public/components/fasting-controls.js');
+    const dial = dialHost();
+    const root = clockRoot(dial);
+    const start = Date.parse('2026-09-26T00:00:00Z');
+    const active = { start_at: new Date(start).toISOString(), goal_minutes: 960 };
+    const RealNow = Date.now;
+    try {
+      Date.now = () => start + 2 * 3600e3;
+      updateFastingClock(root, active, null, {});
+      assert.equal(dial.rebuilds, 1, 'the first tick builds the dial');
+      const first = dial.traces[0].getAttribute('stroke-dasharray');
+      Date.now = () => start + 2 * 3600e3 + 1000;
+      updateFastingClock(root, active, null, {});
+      Date.now = () => start + 3 * 3600e3;
+      updateFastingClock(root, active, null, {});
+      assert.equal(dial.rebuilds, 1, 'later ticks of the same shape do not rewrite the SVG');
+      assert.notEqual(dial.traces[0].getAttribute('stroke-dasharray'), first, 'the trace length follows the clock');
+      assert.match(dial.traces[0].getAttribute('stroke-dasharray'), /^12\.5 87\.5$/, '3 h of a one-day dial');
+    } finally { Date.now = RealNow; }
+  }
+});
+
+test('a resting fasting clock shows no zeros, no day and no elapsed/remaining switch', async () => {
+  {
+    const { updateFastingClock } = await import('../public/components/fasting-controls.js');
+    const root = clockRoot(dialHost());
+    updateFastingClock(root, null, null, {});
+    assert.equal(root.parts['[data-fasting-timer]'].hidden, true, 'no fast ever: no 00:00:00');
+    assert.equal(root.parts['[data-fasting-days]'].hidden, true, 'no running fast: no "day 0"');
+    assert.equal(root.parts['.fasting-clock-switch'].hidden, true, 'nothing to switch while resting');
+    assert.equal(root.parts['[data-fasting-announcement]'].textContent, '', 'no "since last fast: 00:00:00"');
+    assert.ok(!/00:00:00/.test(root.parts['[data-fasting-timer]'].textContent));
+    // Gegenprobe: laeuft ein Fasten, ist alles wieder da.
+    const running = clockRoot(dialHost());
+    updateFastingClock(running, { start_at: new Date(Date.now() - 3600e3).toISOString(), goal_minutes: 960 }, null, {});
+    assert.equal(running.parts['[data-fasting-timer]'].hidden, false);
+    assert.equal(running.parts['[data-fasting-days]'].hidden, false);
+    assert.equal(running.parts['.fasting-clock-switch'].hidden, false);
+    // Nach einem Fasten zaehlt die Zeit seitdem, aber es gibt keinen Fastentag.
+    const since = clockRoot(dialHost());
+    updateFastingClock(since, null, { end_at: new Date(Date.now() - 3600e3).toISOString() }, {});
+    assert.equal(since.parts['[data-fasting-timer]'].hidden, false);
+    assert.match(since.parts['[data-fasting-timer]'].textContent, /^01:00:0\d$/);
+    assert.equal(since.parts['[data-fasting-days]'].hidden, true);
+  }
+});
+
+test('the fasting ring is a real stroke with round ends whose trace moves by transition', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/fasting-controls.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const base = rules.find((r) => r.selector === '.fasting-dial__svg circle' && !r.at.length);
+  assert.ok(base, 'the dial stroke rule is gone');
+  assert.ok(Number(/stroke-width:\s*(\d+)/.exec(base.body)?.[1]) >= 8, 'stroke of about 10/120, not a 3/120 hairline');
+  assert.match(base.body, /stroke-linecap:\s*round/);
+  const trace = rules.find((r) => r.selector === '.fasting-dial__trace' && !r.at.length);
+  assert.match(trace?.body ?? '', /transition:\s*stroke-dasharray\s+var\(--duration-[a-z0-9]+\)\s+var\(--ease-[a-z-]+\)/);
+  const reduced = rules.find((r) => r.selector === '.fasting-dial__trace' && r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a)));
+  assert.match(reduced?.body ?? '', /transition:\s*none/, 'reduced motion: the trace jumps');
+  // `hidden` muss gegen die display-Regeln der Traeger gewinnen, sonst bleibt
+  // der Ruhezustand bei Nullen stehen, obwohl das Attribut gesetzt ist.
+  for (const sel of ['.fasting-clock-switch[hidden]', '[data-fasting-timer][hidden]', '[data-fasting-days][hidden]']) {
+    assert.ok(rules.some((r) => r.selector.split(',').map((s) => s.trim()).includes(sel) && /display:\s*none/.test(r.body)), `${sel} hides`);
+  }
+});
