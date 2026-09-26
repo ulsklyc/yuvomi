@@ -202,7 +202,7 @@ export function collapseOut(el, { duration = durationToken('--duration-lg', 250)
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return Promise.resolve();
   el.style.overflow = 'hidden';
   const anim = el.animate([blockFrame(el), closedFrame()], {
-    duration, easing: easingToken('--ease-out'), fill: 'forwards',
+    duration, easing: easingToken('--ease-in-out', 'ease-in-out'), fill: 'forwards',
   });
   return settleAnimation(anim, duration);
 }
@@ -218,7 +218,7 @@ export function expandIn(el, { duration = durationToken('--duration-lg', 250) } 
   const prevOverflow = el.style.overflow;
   el.style.overflow = 'hidden';
   const anim = el.animate([closedFrame(), blockFrame(el)], {
-    duration, easing: easingToken('--ease-out'),
+    duration, easing: easingToken('--ease-in-out', 'ease-in-out'),
   });
   return settleAnimation(anim, duration).then(() => { el.style.overflow = prevOverflow; });
 }

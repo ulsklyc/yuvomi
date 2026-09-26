@@ -1446,6 +1446,11 @@
   --duration-2xl: 400ms;   /* = slow (Layout-Umbauten, Sidebar) */
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Symmetrische Kurve fuer Hoehenwechsel (Einklappen/Aufziehen von Zeilen und
+   * Gruppen): `--ease-out` nimmt 80 % der Hoehe in den ersten 60ms und wirkt
+   * dort wie ein Ruck; eine Hoehe, der die Nachbarn folgen, braucht Anlauf
+   * UND Auslauf (Critique 2026-09-26, Runde 3). */
+  --ease-in-out: cubic-bezier(0.42, 0, 0.58, 1);
 
   /* --------------------------------------------------------
    * 15. Z-Indizes

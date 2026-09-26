@@ -196,9 +196,9 @@
 }
 
 /* Der Winkel dreht im Takt der Zeilen, die darunter weg- oder aufklappen
- * (collapseOut()/expandIn() in utils/ux.js: --duration-lg, --ease-out). */
+ * (collapseOut()/expandIn() in utils/ux.js: --duration-lg, --ease-in-out). */
 .list-group__chevron {
-  transition: transform var(--duration-lg) var(--ease-out);
+  transition: transform var(--duration-lg) var(--ease-in-out);
 }
 
 /* Zugeklappt zeigt der Winkel zur Seite - die Richtung, in die sich die Gruppe

@@ -193,6 +193,45 @@ test('collapseOut/expandIn: loesen ohne Animation sofort auf (reduzierte Bewegun
   assert.equal(animated, false, 'unter prefers-reduced-motion darf keine Hoehe animieren');
 });
 
+/**
+ * Einklappen und Aufziehen laufen auf der SYMMETRISCHEN Kurve `--ease-in-out`
+ * (Runde 3, Entscheid 26.09.): `--ease-out` nahm 80 % der Hoehe in den ersten
+ * 60ms, die Nachbarn sprangen hinterher - ein Ruck statt eines Nachrueckens.
+ * Gemessen wird ueber den AUFRUF (collapseOut/expandIn mit gestubtem
+ * `animate`), die Kurve selbst aus tokens.css (x1 + x2 = 1, y1 + y2 = 1).
+ */
+test('collapseOut/expandIn: Hoehe laeuft auf der symmetrischen Kurve --ease-in-out', async () => {
+  const tokens = { '--ease-out': 'cubic-bezier(0.16, 1, 0.3, 1)', '--ease-in-out': 'cubic-bezier(0.42, 0, 0.58, 1)', '--duration-lg': '250ms' };
+  const docEl = {};
+  const prevDoc = global.document;
+  const prevGcs = global.getComputedStyle;
+  global.document = { documentElement: docEl };
+  global.getComputedStyle = (node) => (node === docEl
+    ? { getPropertyValue: (name) => tokens[name] ?? '' }
+    : { opacity: '1', paddingTop: '4px', paddingBottom: '4px', marginTop: '0px', marginBottom: '0px', borderTopWidth: '0px', borderBottomWidth: '0px' });
+  const easings = [];
+  const el = {
+    style: {},
+    getBoundingClientRect: () => ({ height: 40 }),
+    animate: (_frames, opts) => { easings.push(opts.easing); return { finished: Promise.resolve() }; },
+  };
+  try {
+    await collapseOut(el);
+    await expandIn(el);
+  } finally {
+    global.document = prevDoc;
+    global.getComputedStyle = prevGcs;
+  }
+  assert.deepEqual(easings, [tokens['--ease-in-out'], tokens['--ease-in-out']]);
+
+  const css = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+  const m = css.match(/--ease-in-out:\s*cubic-bezier\(([^)]*)\)/);
+  assert.ok(m, 'tokens.css definiert --ease-in-out nicht als cubic-bezier');
+  const [x1, y1, x2, y2] = m[1].split(',').map(Number);
+  assert.ok(Math.abs(x1 + x2 - 1) < 1e-9 && Math.abs(y1 + y2 - 1) < 1e-9,
+    `--ease-in-out ist nicht symmetrisch: ${m[1]}`);
+});
+
 test('vibrate: tut nichts wenn API nicht vorhanden', () => {
   Object.defineProperty(global, 'navigator', { value: { vibrate: null }, writable: true, configurable: true });
   assert.doesNotThrow(() => vibrate(10));
