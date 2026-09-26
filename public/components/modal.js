@@ -1141,6 +1141,18 @@ function _doClose(overlayEl) {
     // Focus-Restore
     const merkzettel = previouslyFocused;
     previouslyFocused = null;
+    // HAT DER AUFRUFER SCHON FOKUSSIERT, BLEIBT ES DABEI. closeModal() loest mit
+    // dem START des Ausgangs auf (seit 2026-09-26 auch am Desktop); wer darauf
+    // wartet, neu zeichnet und ein Steuerelement fokussiert, verloere es sonst
+    // ~150 ms spaeter an den alten Ausloeser. Im Dialog selbst kann der Fokus
+    // hier nicht mehr stehen - das Overlay ist schon entfernt, der Browser hat
+    // ihn auf <body> fallen lassen.
+    const aktiv = document.activeElement;
+    if (aktiv && aktiv !== document.body && aktiv !== document.documentElement && !target.contains?.(aktiv)) {
+      if (window.yuvomi?.restoreThemeColor) window.yuvomi.restoreThemeColor();
+      _releaseCloseWaiters(target);
+      return;
+    }
     const restoreTarget = focusRestoreTarget(merkzettel);
     // Das TATSAECHLICH fokussierte Element merken, nicht das gewuenschte: nimmt
     // der Ersatz den Fokus nicht an, steht danach die Wurzel dort, und die

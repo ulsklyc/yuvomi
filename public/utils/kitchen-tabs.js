@@ -295,12 +295,29 @@ function sameTabs(bar, tabs) {
     && els[i].querySelector('.sub-tab__label')?.textContent === t(labelKey));
 }
 
+/**
+ * Die stehende Leiste auf die Route ziehen, auf der die App wirklich steht.
+ * Der Router nimmt waehrend einer laufenden Navigation keine zweite an; die
+ * Leiste hat den zweiten Tipp dann schon markiert, und niemand zeichnete sie
+ * danach neu - Einkauf offen, Vorrat aktiv und als letzte Kuechen-Route gemerkt.
+ */
+function syncToLocation() {
+  const path = location.pathname;
+  if (!_bar?.isConnected || !isKitchenRoute(path) || path === _activeRoute) return;
+  _activeRoute = path;
+  selectSubTab(_bar, path);
+  applyBadges(_lastSummary);
+  placeIndicator(_bar, { glide: true });
+}
+
 /** Tipp auf einen Tab: Zahlen und Kapsel ziehen sofort, die Seite folgt. */
 function onTabChosen(route) {
   _activeRoute = route;
   applyBadges(_lastSummary);
   placeIndicator(_bar, { glide: true });
-  window.yuvomi?.navigate(route);
+  // Abgelehnt loest das Promise sofort auf, angenommen nach dem Render - beide
+  // Male steht danach fest, wo die App ist.
+  Promise.resolve(window.yuvomi?.navigate(route)).finally(syncToLocation);
 }
 
 export function renderKitchenTabsBar(container, activeRoute) {
@@ -322,6 +339,11 @@ export function renderKitchenTabsBar(container, activeRoute) {
     return _bar;
   }
 
+  // Eine frische Leiste zeichnet ihre Zahlen nur aus einem frischen Abruf. Der
+  // letzte Stand dient allein dem Gleiten innerhalb der Kueche; von aussen
+  // koennte er einem anderen Konto gehoeren (Abmelden, Anmelden ohne Neuladen)
+  // und bliebe bei einem gescheiterten Abruf fuer immer stehen.
+  _lastSummary = null;
   _bar = renderSubTabs(container, {
     // Zielorte, keine Sichten: die vier Küchen-Routen sind vier eigenständige
     // Module (eigener `module:`-Wert in router.js, eigene Seitendatei, einzeln
