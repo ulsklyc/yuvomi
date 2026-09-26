@@ -224,3 +224,39 @@ test('in die Spalte befoerdert: das offene Blatt DIESES Eintrags geht zu, ein fr
     assert.match(read(file), pattern, `${file}: die Leseansicht nennt ihren Eintrag (key)`);
   }
 });
+
+test('in die Spalte befoerdert, aber das Verwerfen abgelehnt: das Blatt bleibt verfolgt', async () => {
+  // Ungespeicherte Aenderungen im Blatt: closeModal() fragt, und wer „nicht
+  // verwerfen" sagt, behaelt das Blatt. Wurde es dabei schon vergessen, schloss
+  // die naechste Befoerderung es nie mehr - es stand ungefuehrt ueber der Spalte.
+  const dv = await import('../public/components/detail-view.js');
+  let sheet = null;
+  let answer = false;
+  const asked = [];
+  globalThis.__openModal = (o) => { sheet = o; };
+  globalThis.__closeModal = (opts) => {
+    asked.push(opts?.force ?? false);
+    if (!answer) return false;
+    const s = sheet; sheet = null; s?.onClose?.();
+    return true;
+  };
+  const pane = () => globalThis.document.createElement('div');
+  try {
+    dv.openDetailView({ title: 'Anna', key: 'contact:42', sections: [] });
+    dv.openDetailView({ title: 'Anna', key: 'contact:42', sections: [], pane: pane() });
+    await new Promise((r) => setTimeout(r, 0));
+    assert.deepEqual(asked, [false], 'gefragt wird, nicht erzwungen - ungespeicherte Aenderungen zaehlen');
+    assert.ok(sheet, 'abgelehnt: das Blatt steht noch');
+    answer = true;
+    dv.openDetailView({ title: 'Anna', key: 'contact:42', sections: [], pane: pane() });
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(asked.length, 2, 'die naechste Befoerderung fragt erneut - das Blatt ist noch verfolgt');
+    assert.equal(sheet, null, 'diesmal geht es zu');
+    dv.openDetailView({ title: 'Anna', key: 'contact:42', sections: [], pane: pane() });
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(asked.length, 2, 'danach ist nichts mehr zu schliessen');
+  } finally {
+    delete globalThis.__openModal;
+    delete globalThis.__closeModal;
+  }
+});

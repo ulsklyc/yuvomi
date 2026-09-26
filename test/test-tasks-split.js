@@ -413,3 +413,107 @@ test('?open= auf eine Aufgabe ausserhalb der Liste: das Blatt geht auf, die Adre
     delete globalThis.__openDetailView;
   }
 });
+
+test('Status in der Spalte bestaetigt, Nachladen scheitert: die alten Knoepfe kommen nie zurueck', async () => {
+  // Bei einer Serie ist das ein Datenrisiko: nach einem bestaetigten Erledigen
+  // stuende „Starten" wieder bedienbar da, und der Server kehrte die
+  // Erledigung um und verwarf die Folgeinstanz.
+  const task = { ...BASIS, status: 'open' };
+  let options = null;
+  globalThis.__openDetailView = (o) => { options = o; };
+  const start = { id: 'task-detail-start', disabled: false };
+  const savedGet = globalThis.document.getElementById;
+  globalThis.document.getElementById = (id) => (id === 'task-detail-start' ? start : null);
+  const toasts = [];
+  const savedToast = globalThis.window.yuvomi.showToast;
+  globalThis.window.yuvomi.showToast = (msg, tone) => toasts.push([msg, tone]);
+  let stale = 0;
+  globalThis.__apiStub = { patch: async () => ({ data: {} }) };
+  try {
+    openTaskDetail({
+      task, currentUserId: 2, categories: [{ key: 'household' }], pane: { isPane: true },
+      onChanged: async () => { throw Object.assign(new Error('offline'), { status: 0 }); },
+      onStale: () => { stale += 1; },
+    });
+    const finish = options.actions.find((a) => a.id === 'task-detail-finish');
+    await finish.onClick({ button: { id: 'task-detail-finish' }, close: async () => {} });
+    assert.equal(task.status, 'done', 'der Server hat erledigt - die Ansicht behauptet nichts anderes');
+    assert.equal(start.disabled, true, '„Starten" bleibt gesperrt');
+    assert.equal(stale, 1, 'die Umgebung erfaehrt, dass die Spalte veraltet ist (neu zeichnen oder Erneut versuchen)');
+    assert.deepEqual(toasts.map(([, tone]) => tone), ['danger'], 'das gescheiterte Nachladen wird gesagt');
+    assert.notEqual(toasts[0][0], 'offline', 'als Ladefehler, nicht als gescheiterter Schreibvorgang');
+
+    // Scheitert der SCHREIBVORGANG, bleibt alles wie vorher bedienbar.
+    toasts.length = 0;
+    const t2 = { ...BASIS, status: 'open' };
+    globalThis.__apiStub = { patch: async () => { throw new Error('Serverfehler'); } };
+    openTaskDetail({ task: t2, currentUserId: 2, categories: [{ key: 'household' }], pane: { isPane: true }, onStale: () => { stale += 1; } });
+    start.disabled = false;
+    await options.actions.find((a) => a.id === 'task-detail-finish').onClick({ button: {}, close: async () => {} });
+    assert.equal(t2.status, 'open');
+    assert.equal(start.disabled, false);
+    assert.equal(stale, 1);
+  } finally {
+    delete globalThis.__openDetailView;
+    delete globalThis.__apiStub;
+    globalThis.document.getElementById = savedGet;
+    globalThis.window.yuvomi.showToast = savedToast;
+  }
+  // Die Aufgaben-Seite gibt der Spalte den Weg zurueck: neu zeichnen (frisch
+  // vom Server oder der Fehlerzustand mit Erneut versuchen, master-detail.js).
+  const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  assert.match(src, /onStale: pane \? \(\) => taskMd\?\.refresh\(\{ repaint: true \}\) : undefined/,
+    'openTaskView reicht onStale fuer die Spalte durch');
+});
+
+test('Sammel-Loeschen mit der angezeigten Aufgabe: die Spalte rueckt sofort weiter, Rueckgaengig holt sie zurueck', () => {
+  // Die Zeilen werden nur ausgeblendet, geloescht wird erst nach dem
+  // Rueckgaengig-Fenster. Bis dahin standen Bearbeiten, Status, Ablage und
+  // Loeschen der geloeschten Aufgabe fuenf Sekunden bedienbar in der Spalte.
+  const rows = [1, 2, 3, 4].map((id) => {
+    const row = { dataset: { mdId: String(id) }, hidden: false, style: { display: '' } };
+    row.getClientRects = () => (row.style.display === 'none' ? [] : [{}]);
+    return row;
+  });
+  const list = {
+    querySelectorAll: () => rows,
+    querySelector: (sel) => rows.find((r) => sel === `[data-md-id="${r.dataset.mdId}"]`) ?? null,
+  };
+  const container = {
+    querySelector: (sel) => {
+      if (sel === '#task-list') return list;
+      const m = sel.match(/^\[data-task-id="(\d+)"\]$/);
+      return m ? rows.find((r) => r.dataset.mdId === m[1]) ?? null : null;
+    },
+  };
+  let undo = null;
+  globalThis.__undoStub = (opts) => { undo = opts; };
+  try {
+    withTasks([T(1), T(2), T(3), T(4)], () => {
+      const { md, calls } = fakeMd('2');
+      tasks.useTaskMd(md);
+      tasks.handleBulkDelete(['2', '3'], container);
+      assert.deepEqual(calls.map(([op, id, o]) => [op, id, o?.history]), [['select', '4', 'replace']],
+        'die Spalte zeigt sofort die naechste stehende Aufgabe, nicht die geloeschte');
+      calls.length = 0;
+      undo.restore();
+      assert.deepEqual(calls, [['select', '2', { history: 'replace' }]], 'Rueckgaengig: die Aufgabe steht wieder rechts');
+
+      // Hat der Nutzer inzwischen selbst gewaehlt, bleibt seine Wahl.
+      rows.forEach((r) => { r.style.display = ''; });
+      tasks.handleBulkDelete(['2'], container);
+      md.select('1');
+      calls.length = 0;
+      undo.restore();
+      assert.deepEqual(calls, [], 'Rueckgaengig reisst eine neue Wahl nicht um');
+
+      // Steht die angezeigte Aufgabe nicht in der Loeschung, bleibt die Spalte.
+      rows.forEach((r) => { r.style.display = ''; });
+      calls.length = 0;
+      tasks.handleBulkDelete(['3'], container);
+      assert.deepEqual(calls, []);
+    });
+  } finally {
+    delete globalThis.__undoStub;
+  }
+});

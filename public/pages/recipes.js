@@ -509,6 +509,9 @@ function mountRecipeDetail(root, signal) {
     // Unter der Schwelle loest openRecipeFromQuery() den Link ein, NACH dem
     // Listenbau - beim Einhaengen gibt es noch keine Zeile zum Aufklappen.
     deepLinkNarrow: false,
+    // Darunter ist die Zeile ein Aufklapper, kein Blatt: mehrere Rezepte
+    // stehen offen, und Aufklappen schreibt keine Adresse.
+    narrow: 'accordion',
     // Und bei Zurueck/Vor auf `?open=` (Eintraege aus der Spalte, Fenster
     // inzwischen schmal) dieselbe Einloesung: die Zeilen stehen, der
     // Aufklapper geht auf (Codex an #1477).

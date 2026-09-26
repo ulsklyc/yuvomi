@@ -4158,7 +4158,25 @@ function handleBulkDelete(taskIds, container) {
   state.selectedTaskIds.clear();
   updateBulkActionsBar(container);
 
-  const restore = () => els.forEach(el => { el.style.display = prevDisplay.get(el) ?? ''; });
+  // DIE SPALTE FOLGT SOFORT, nicht erst nach dem Rueckgaengig-Fenster. Stand
+  // die angezeigte Aufgabe in der Loeschung, blieben ihre Aktionen (Bearbeiten,
+  // Status, Ablage, Loeschen) sonst fuenf Sekunden bedienbar neben einer Liste,
+  // in der sie schon fehlt. Dieselbe Regel wie beim Austritt einer einzelnen
+  // Zeile: weiter auf die Nachbarin, sonst Leerzustand.
+  const listEl = container.querySelector('#task-list');
+  const shown = taskMd?.selectedId() ?? null;
+  const shownGoes = shown != null && listEl && taskIds.some((id) => String(id) === String(shown));
+  if (shownGoes) moveSelectionOn(listEl, mdRowIds(listEl), shown);
+  const movedTo = shownGoes ? (taskMd?.selectedId() ?? null) : null;
+
+  const restore = () => {
+    els.forEach(el => { el.style.display = prevDisplay.get(el) ?? ''; });
+    // Rueckgaengig: die Aufgabe kommt auch rechts zurueck - ausser der Nutzer
+    // hat in der Zwischenzeit selbst etwas anderes gewaehlt.
+    if (shownGoes && taskMd && taskMd.selectedId() === movedTo && taskMd.isSplit()) {
+      taskMd.select(shown, { history: 'replace' });
+    }
+  };
 
   scheduleUndoableDelete({
     message: t('tasks.bulkDeleted'),
@@ -4395,6 +4413,9 @@ function openTaskView(task, reminder, container, { pane = null } = {}) {
     onChanged: pane ? () => loadTasks(container, { paneQuiet: true }) : () => loadTasks(container),
     pane,
     onClose: pane ? () => onPaneActionClosed(container) : undefined,
+    // Bestaetigt geschrieben, Nachladen gescheitert: die Spalte neu zeichnen -
+    // frisch vom Server oder als Fehlerzustand mit „Erneut versuchen".
+    onStale: pane ? () => taskMd?.refresh({ repaint: true }) : undefined,
     // Ohne Mounter baut die geteilte Ansicht keinen Bearbeiten-Knopf (#918) -
     // besser als einer, der ins Leere fuehrt. openTaskDetail zieht denselben
     // Schluss ohnehin noch einmal ueber canEditTaskDefinition(); der Verzicht
@@ -5132,6 +5153,8 @@ export const __test = {
   // Der Aufbau von Liste + Detail samt Rueckfall fuer `?open=` ausserhalb
   // der Liste: was er mit der Adresse tut, ist Verhalten (Codex an #1477).
   mountTaskSplit,
+  // Sammel-Loeschen: was die Spalte tut, waehrend das Rueckgaengig-Fenster laeuft.
+  handleBulkDelete,
   // Der Lader steht hier, weil die PRAEMISSE des gesperrten Zweigs an ihm
   // haengt: dass `calendar: read` die Erinnerung wirklich bekommt. War das nur
   // Prosa, liess sich das `none` still zu `!== write` verengen und der ganze

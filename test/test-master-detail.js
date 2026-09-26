@@ -242,11 +242,23 @@ test('unter der Schwelle mit gemerkter Auswahl: ein anderer Eintrag uebernimmt A
   assert.deepEqual(historyLog, []);
   h2.destroy();
 
-  // Ein Akkordeon (Rezepte, ohne `deepLinkNarrow`) schreibt unter der Schwelle
+  // Inventar oeffnet schmal ebenfalls ein BLATT, loest den Deep-Link dort aber
+  // nicht ein (`deepLinkNarrow` aus). Die Wanderung haengt am Blatt, nicht am
+  // Deep-Link: sonst stuende nach dem Verbreitern A in der Spalte und B's
+  // Blatt darueber.
+  const inv = makePage({ path: '/inventory?open=2', split: false });
+  const h4 = inv.mount();
+  historyLog.length = 0;
+  h4.open('4', inv.focusOf(3));
+  assert.equal(h4.selectedId(), '4', 'Blatt ohne deepLinkNarrow: die Auswahl folgt');
+  assert.deepEqual(historyLog, [['replace', '/inventory?open=4']]);
+  h4.destroy();
+
+  // Ein Akkordeon (Rezepte, `narrow: 'accordion'`) schreibt unter der Schwelle
   // nie eine Adresse - dort ist `?open=` nur der Einstieg, und mehrere Eintraege
   // stehen gleichzeitig offen (CI an #1477, test-recipes-fab-dock).
   const r = makePage({ path: '/recipes?open=2', split: false });
-  const h3 = r.mount();
+  const h3 = r.mount({ narrow: 'accordion' });
   historyLog.length = 0;
   h3.open('4', r.focusOf(3));
   assert.deepEqual(r.calls.narrow, ['4']);
