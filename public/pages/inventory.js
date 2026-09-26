@@ -1141,6 +1141,7 @@ async function openItemDetail(item, { pane = null, signal = null } = {}) {
 
   openDetailView({
     title: item.name,
+    key: `inventory:${item.id}`,
     accentColor: 'var(--module-inventory)',
     size: 'md',
     pane,

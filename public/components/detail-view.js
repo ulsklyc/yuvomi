@@ -44,6 +44,14 @@ let activePopover = null;
 let viewSeq = 0;
 let activeViewToken = 0;
 
+// Das offene Blatt und WESSEN Leseansicht es zeigt (`opts.key`, z.B.
+// `contact:42`). Wird dieselbe Auswahl in die Detailspalte befoerdert
+// (Fenster breiter, utils/master-detail.js), geht genau dieses Blatt zu -
+// sonst stuende das Detail doppelt da, und das Overlay blockierte die Spalte.
+// Der Schluessel ist die Grenze: ein Blatt eines anderen Eintrags oder eines
+// fremden Moduls bleibt stehen.
+let activeSheet = null;
+
 function reduceMotion() {
   return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
@@ -466,6 +474,7 @@ function openAsSheet(opts, token) {
       // Auch das X, Escape, der Backdrop und die Wischgeste enden hier - nur so
       // weiß ein nachgereichtes update(), dass seine Ansicht fort ist.
       if (activeViewToken === token) activeViewToken = 0;
+      if (activeSheet?.token === token) activeSheet = null;
       opts.onClose?.();
     },
     headerAction: opts.edit
@@ -742,6 +751,8 @@ function openInPane(opts, token) {
  *                                         Wechsel ins Formular wartet
  * @param {string} [opts.size]           - Panel-Breite wie bei openModal
  * @param {Function} [opts.onClose]
+ * @param {string} [opts.key]            - Wessen Leseansicht (z.B. `contact:42`). Oeffnet
+ *                                         dieselbe in der Detailspalte, geht ihr offenes Blatt zu.
  * @returns {{update: (sections: Array) => boolean, isOpen: () => boolean}}
  *          Handle zum Nachreichen von Zeilen, die beim Öffnen noch nicht da
  *          waren. Siehe `update`.
@@ -758,9 +769,17 @@ export function openDetailView(opts = {}) {
   // rufen und ein fremdes, offenes Modal schließen.
   // Ohne Fokus-Rueckgabe: die neue Ansicht nimmt den Fokus selbst.
   if (activePopover) closeDetailView({ fokus: false });
+  // In die Spalte befoerdert: das Blatt DIESES Eintrags weicht. Nur solange es
+  // noch die aktive Ansicht ist - sonst hat es schon ein anderes Modal ersetzt,
+  // und closeDetailView() schloesse dieses fremde.
+  if (usePane && opts.key && activeSheet?.key === opts.key && activeViewToken === activeSheet.token) {
+    activeSheet = null;
+    closeDetailView({ fokus: false });
+  }
 
   const token = ++viewSeq;
   activeViewToken = token;
+  if (!usePane && !usePopover) activeSheet = { token, key: opts.key ?? null };
 
   const applySections = usePane
     ? openInPane(opts, token)

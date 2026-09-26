@@ -1133,6 +1133,7 @@ function openContactDetail(contact, { inPane = null } = {}) {
 
   view = openDetailView({
     title: contact.name,
+    key: `contact:${contact.id}`,
     size: 'md',
     pane: inPane ?? undefined,
     sections: renderContactDetail(full, { inPane: Boolean(inPane) }),

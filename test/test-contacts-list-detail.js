@@ -179,3 +179,48 @@ test('die Suche nennt dieselbe Schwelle wie layout.css und deckelt auf die Liste
   }
   assert.ok(seen, 'die Suche ist ab der Schwelle nicht gedeckelt - sie liefe quer ueber das Detail');
 });
+
+test('in die Spalte befoerdert: das offene Blatt DIESES Eintrags geht zu, ein fremdes bleibt', async () => {
+  // Deep-Link unter der Schwelle oeffnet das Blatt; wird das Fenster breiter,
+  // zeichnet der Baustein dieselbe Auswahl in die Spalte. Ohne Abgleich stand
+  // das Detail doppelt da, und das Overlay blockierte die breite Ansicht.
+  const dv = await import('../public/components/detail-view.js');
+  let sheet = null;
+  let closes = 0;
+  globalThis.__openModal = (o) => { sheet = o; };
+  globalThis.__closeModal = () => { closes += 1; const s = sheet; sheet = null; s?.onClose?.(); };
+  const pane = () => globalThis.document.createElement('div');
+  try {
+    dv.openDetailView({ title: 'Anna', key: 'contact:42', sections: [] });
+    assert.ok(sheet, 'unter der Schwelle: ein Blatt');
+    dv.openDetailView({ title: 'Anna', key: 'contact:42', sections: [], pane: pane() });
+    assert.equal(closes, 1, 'dieselbe Auswahl in der Spalte: das Blatt geht zu');
+
+    dv.openDetailView({ title: 'Ben', key: 'contact:7', sections: [] });
+    dv.openDetailView({ title: 'Anna', key: 'contact:42', sections: [], pane: pane() });
+    assert.equal(closes, 1, 'ein Blatt eines ANDEREN Eintrags bleibt stehen');
+    globalThis.__closeModal();
+
+    dv.openDetailView({ title: 'Termin', sections: [] });
+    dv.openDetailView({ title: 'Anna', key: 'contact:42', sections: [], pane: pane() });
+    assert.equal(closes, 2, 'ein Blatt ohne Schluessel (fremdes Modul) bleibt stehen');
+    globalThis.__closeModal();
+
+    dv.openDetailView({ title: 'Anna', key: 'contact:42', sections: [] });
+    sheet.onClose(); // X, Escape oder ein fremdes Modal hat es schon ersetzt
+    sheet = { title: 'Fremd' };
+    dv.openDetailView({ title: 'Anna', key: 'contact:42', sections: [], pane: pane() });
+    assert.equal(closes, 3, 'ist das Blatt schon zu, schliesst die Spalte kein fremdes Modal');
+  } finally {
+    delete globalThis.__openModal;
+    delete globalThis.__closeModal;
+  }
+  // Die drei Leseansichten mit Blatt UND Spalte nennen ihren Schluessel.
+  for (const [file, pattern] of [
+    ['../public/pages/contacts.js', /openDetailView\(\{[\s\S]{0,200}?key: `contact:\$\{contact\.id\}`/],
+    ['../public/components/task-detail.js', /openDetailView\(\{[\s\S]{0,200}?key: `task:\$\{task\.id\}`/],
+    ['../public/pages/inventory.js', /openDetailView\(\{[\s\S]{0,200}?key: `inventory:\$\{item\.id\}`/],
+  ]) {
+    assert.match(read(file), pattern, `${file}: die Leseansicht nennt ihren Eintrag (key)`);
+  }
+});

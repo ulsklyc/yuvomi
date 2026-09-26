@@ -1032,6 +1032,7 @@ export function openTaskDetail({
 
   openDetailView({
     title: task.title,
+    key: `task:${task.id}`,
     size: 'lg',
     // DIE DETAILSPALTE (Liste + Detail, utils/master-detail.js): dieselbe
     // Ansicht, nur in der rechten Spalte statt im Sheet. Bearbeiten fuehrt dort
