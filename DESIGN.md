@@ -1038,7 +1038,8 @@ das Verhaeltnis haelt.
   fuenf Karten besser als vier gedraengte, und ab ~1700px kommt die vierte von selbst
   zurueck.
 - **Navigation:** mobil eine schwebende Glas-Tab-Bar-Kapsel (60px hoch plus 8px Luft und
-  safe-area; die Bar-Zone selbst ist transparent, das Glas traegt die Kapsel). Ab 1024px
+  safe-area; die Bar-Zone selbst ist transparent, das Glas traegt die Kapsel), die UEBER dem
+  Inhalt liegt - der Scrollport reicht bis zur Unterkante (Kopfregel mobil). Ab 1024px
   Glas-Sidebar (56px kollabiert / 220px expandiert) mit gleitender Aktiv-Pille.
 - **Touch-Targets:** `--target-base` 44px auf Zeigergeraeten, waechst via
   `@media (hover: none)` auf 48px. Das Kriterium ist die Zeigerfaehigkeit, nicht die Breite;
@@ -1873,6 +1874,47 @@ fallen, sie muss ihren MECHANISMUS wechseln. Was hier als „so weit, wie sie ka
 ist, war ein Kompromiss zwischen Flaeche und Erreichbarkeit - und der war nur noetig, solange
 die Reserve den Scrollport verkuerzte.
 
+### Kopfregel mobil (2026-09-26, Critique A1 P1-3 / A8)
+
+Die Chrome-Regel oben sagt, WIEVIEL ueber dem Inhalt stehen darf; die Kopfregel sagt, WIE
+ein Modulkopf unter 768px gebaut ist. Anlass: dieselbe Frage hatte sechs Antworten - Kopf
+114px in der Mehrheit, 170-176px in Aufgaben und Inventar, feste Filterreihen in Notizen,
+Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie Inhalt.
+
+1. **Hoechstens zwei Kopfzeilen.** Zeile 1: Large Title (34/700), trailing das Such-Icon
+   (wo das Modul sucht) und genau EIN Werkzeugmenue „..." (`pageToolsMenuHtml`,
+   utils/popover-menu.js, Vorbild `documents-tools-btn`). Die Primaeraktion bleibt mobil der
+   FAB in der Kapsel, am Desktop die angedockte Kopf-Pille. Zeile 2, optional und genau
+   eine: die Kontext-Steuerung (Ansichts-Segment, Zeitraum-Stepper, Sub-Tabs,
+   Listen-Kapseln, „Filter (n)"). Ziel ausgeklappt <= 114px, mit Stepper <= 122px.
+2. **Keine losen Verwaltungs-Icons oder Textknoepfe im Kopf.** Kategorien, Tags, Lagerorte,
+   Mehrfachauswahl, Import, Verlauf stehen im Werkzeugmenue - mit Icon UND Text; ein
+   Ansichts-Schalter dort ist ein `menuitemcheckbox` mit Haken.
+3. **Filter stehen nicht fest ueber dem Port.** Entweder als `.page-chip-row` als erstes
+   Element IM Scrollport (scrollt weg) oder hinter „Filter (n)" mit Blatt
+   (utils/filter-sheet.js, Vorbild Kalender). Aktive Filter bleiben sichtbar: die Zahl am
+   Knopf oder die Chips im Port. Nie beides fuer dieselbe Achse.
+4. **Die Suche ist mobil ein Icon**, das zum Feld aufgeht (`.page-search`, Label-Verlust-Regel
+   oben). Die Icon-Form fragt nach dem Kopf, nicht nach dem Elternteil: sie greift auch in
+   einem Wrapper-Slot, und ein Slot, der nur die Suche traegt, schrumpft mit ihr. Der
+   bevorzugte Weg bleibt, die Suche selbst zum Slot zu machen (`className: '...
+   page-toolbar__center'`).
+5. **Der Inhalt laeuft unter die Glas-Kapsel.** `.nav-bottom` liegt absolut an der Unterkante
+   der Shell, nicht im Flex-Fluss; der Scrollport reicht bis zum Rand, und das Glas zeigt,
+   was darunter scrollt. Die Zone der Kapsel ist der vierte Summand des Nachlaufs
+   (`--nav-tail`, nur unter 1024px und nicht im Wand-Modus) - die letzte Zeile endet damit
+   am Scroll-Ende ueber der Kapsel, auch in Modulen mit eigenem Port. Die transparente Zone
+   um die Kapsel ist klickdurchlaessig (`pointer-events`), `scroll-padding-block-end` haelt
+   Fokusziele ueber dem Glas, und was im Inhalt unten klebt, klebt an `var(--nav-tail)`,
+   nie an `bottom: 0`. FAB, Toasts und Mehr-Blatt rechnen weiter ab `--nav-bottom-height`
+   und stehen, wo sie standen.
+
+Pruefebene: **Struktur** (`test:mobile-chrome` - Kapsel ausser Fluss, `--nav-tail` im
+Nachlauf, keine klebende Chipreihe, kein `sticky; bottom: 0`, Icon-Form im Wrapper, die
+Bausteine an einer Stelle) plus **Messung** je Modul (Kopfhoehe ausgeklappt, erste Zeile y,
+letzte Zeile ueber der Kapsel; Sonde in der Rezeptkarte der Umsetzung). Desktop bleibt
+unberuehrt: dort gibt es keine Kapsel, `--nav-tail` ist 0.
+
 ### Die Nachlauf-Regel (2026-08-12)
 
 **Die Reserve des FAB ist ein NACHLAUF am Inhaltsende, keine Verkuerzung des Scrollports.**
@@ -1937,9 +1979,10 @@ gestreckt - ein Raster, das mit jeder Meldung springt. Erreichbar bleibt darunte
 Zelle zeigt ueber dem Toast Ziffer und ersten Eintrag und oeffnet den Tag, und der Toast
 geht. Die Invariante der Regel gilt fuer DAUERHAFTE Flaechen (FAB, Pille, Banner).
 
-**Mobil aendert die Regel nichts, und das ist per Konstruktion so:** unter 1024px ist
+**Mobil aendert die Regel am FAB nichts, und das ist per Konstruktion so:** unter 1024px ist
 `--fab-safe-zone` 0, weil der Knopf in der Nav-Kapsel sitzt. Ein Nachlauf von 0 ist dasselbe
-wie eine Marge von 0.
+wie eine Marge von 0. Seit der Kopfregel mobil (2026-09-26) traegt dort aber die Kapsel
+selbst einen Summanden (`--nav-tail`): sie liegt ueber dem Inhalt statt unter ihm.
 
 Pruefebene: **Dokument** (`Sonde 18 - am Scroll-Ende liegt nichts Bedienbares unter dem FAB`,
 test-document-guards.js, beide Geraetewelten) plus **Struktur** (`der FAB weicht der Zeile,
