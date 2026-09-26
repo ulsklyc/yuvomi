@@ -4644,7 +4644,9 @@ function mountTaskSplit(container, signal) {
     ? root.querySelector(`[data-md-id="${CSS.escape(taskMd.selectedId())}"]`)
     : null;
   chosen?.scrollIntoView?.({ block: 'nearest' });
-  if (sheetFor) openTaskSheet(sheetFor, container);
+  // Mit dem Signal der Seite: verlaesst der Nutzer sie waehrend der Anfragen,
+  // geht kein Blatt ueber der Zielseite auf.
+  if (sheetFor) openTaskSheet(sheetFor, container, signal);
 }
 
 /**

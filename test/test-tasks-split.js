@@ -315,3 +315,14 @@ test('renderTaskPane: nur 404/403 heisst „gibt es nicht"; ein Netz- oder Serve
     delete globalThis.__apiStub;
   }
 });
+
+test('der Rueckfall fuer ?open= auf eine Aufgabe ausserhalb der Liste haengt am Seiten-Signal', () => {
+  // Archiviert oder weggefiltert: das Blatt statt einer Auswahl. Es laedt erst -
+  // verlaesst der Nutzer die Seite vorher, darf es nicht ueber der Zielseite
+  // aufgehen (openTaskSheet prueft das Signal nach dem Laden, Test oben).
+  const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  const mount = src.slice(src.indexOf('function mountTaskSplit('));
+  const body = mount.slice(0, mount.indexOf('\n}\n'));
+  assert.match(body, /if \(sheetFor\) openTaskSheet\(sheetFor, container, signal\)/,
+    'mountTaskSplit reicht das Signal der Seite an den Rueckfall weiter');
+});
