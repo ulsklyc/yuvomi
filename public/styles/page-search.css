@@ -30,18 +30,55 @@
   pointer-events: none;
 }
 
+/* EIN SUCHFELD, UND ES IST EINE GEFUELLTE KAPSEL (Komponenten-Kanon,
+ * Critique 2026-09-26 P1). Vorher standen fuenf Varianten nebeneinander: dieses
+ * Feld mit 10px-Ecke und Kante, das Mehr-Blatt mit 16px, die Abos mit 12px und
+ * 1px, der Kalender randlos, der Ausgleich mit eigener Regel. Die Suche ist ein
+ * Bedienelement, kein Formularfeld - sie traegt die Form der Kapsel-Controls
+ * und statt einer Kante eine Flaeche (--color-fill-field, tokens.css), wie
+ * Apples Suchfeld. Die Kante bleibt als transparente 1.5px da, damit Fokus
+ * (Akzentkante) und erhoehter Kontrast (`prefers-contrast: more`, unten) sie
+ * einfaerben koennen, ohne dass das Feld springt.
+ * Die globale Suche (`.search-overlay__input`, router.js) teilt diese Regel,
+ * statt eine sechste Handschrift zu fuehren; sie hat keine Lupe, nur ihr
+ * Innenabstand weicht ab (layout.css). */
+.page-search__input,
+.search-overlay__input {
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-full);
+  background: var(--color-fill-field);
+  color: var(--color-text-primary);
+}
+
+.page-search__input::placeholder,
+.search-overlay__input::placeholder {
+  color: var(--color-text-secondary);
+}
+
+.page-search__input:hover,
+.search-overlay__input:hover {
+  border-color: var(--color-border-control);
+}
+
+.page-search__input:focus,
+.search-overlay__input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) var(--tint-shadow), transparent);
+}
+
+@media (prefers-contrast: more) {
+  .page-search__input,
+  .search-overlay__input {
+    border-color: var(--color-border-control);
+  }
+}
+
 .page-search__input {
   width: 100%;
   min-height: var(--target-base);
   padding-block: var(--space-2);
   padding-inline: 36px calc(var(--space-2) + 24px);
-  /* Feldkanon aus DESIGN.md: 1.5px --color-border-control auf Surface-Grund. Die
-   * frühere surface-2-Fläche lag im Dark unter dem Seitengrund und ließ das
-   * Feld mit seiner subtilen Kante fast verschwinden. */
-  border: 1.5px solid var(--color-border-control);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
   font-size: var(--text-base);
   /* Strip the native search chrome (WebKit draws its own leading magnifier for
    * type=search) so only the explicit .page-search__icon shows — avoids two
@@ -61,13 +98,6 @@
   -webkit-appearance: none;
   appearance: none;
   display: none;
-}
-
-.page-search__input:focus {
-  outline: none;
-  border-color: var(--color-accent);
-  background: var(--color-surface);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) var(--tint-shadow), transparent);
 }
 
 .page-search__clear {

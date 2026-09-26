@@ -7739,8 +7739,9 @@ test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrun
   // hier - mit dem Grund, warum sie kein Eingabefeld ist.
   const FIELD_WORD = /search|input|field|select|textarea/i;
   const NOT_A_FIELD = new Map([
-    ['.more-sheet__search', 'Knopf im Feld-Look: oeffnet die Suche, nimmt keine Eingabe an; bewusst unveraendert (#1230)'],
-    ['.more-sheet__search:hover', 'Hover desselben Knopfs'],
+    // `.more-sheet__search` stand hier bis 2026-09-26: seit dem Komponenten-
+    // Kanon traegt der Knopf die gefuellte Kapsel des EINEN Suchfelds, in Ruhe
+    // ohne Kante und im Hover mit --color-border-control - keine Kartenkante mehr.
     ['.cal-search', 'Leiste der Kalendersuche; die Kante ist die Trennlinie unter der Leiste, nicht die des Feldes'],
     ['.search-overlay__header', 'Kopf des Such-Overlays; Trennlinie zur Trefferliste'],
     ['.search-overlay__panel', 'Flaeche des Such-Overlays ab Tablet-Breite; Kartenkante'],

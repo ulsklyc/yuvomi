@@ -222,6 +222,16 @@
    * Rahmen, kein Well - sonst muesste jeder Leerzustand seinen Traeger kennen. */
   --color-fill-well:          var(--color-surface-3);
 
+  /* DAS GEFUELLTE FELD (Komponenten-Kanon, 2026-09-26): die Flaeche des EINEN
+   * Suchfelds (`.page-search__input`, gefuellte Kapsel wie Apples Suchfeld).
+   * Nicht der Well: der liegt fuer Kacheln IN einer Karte und haelt auf dem
+   * Grouped-Grund nur 1.06:1 (#EDEAE3 auf #F5F3ED) - ein Suchfeld im Kopf steht
+   * aber auf dem Grund. neutral-200 haelt dort 1.19:1 hell / 1.42:1 dunkel
+   * (Apples tertiaere Fuellung liegt bei rund 1.13:1), und die Kennung als Feld
+   * tragen Lupe und Platzhalter. Der Platzhalter steht darauf in
+   * --color-text-secondary (tertiaer faellt hell auf 4.27:1). */
+  --color-fill-field:         var(--neutral-200);
+
   /* DIE ZEILENLISTEN-REGEL (HIG-Rollout Runde 3, 2026-08-06).
    * Die Kasten-in-Kasten-Regel sagt, wie eine Zeile INNEN aussieht. Diese hier
    * sagt, worauf sie liegt - drei Vokabulare koexistierten (Zeile-in-Karte,

@@ -91,9 +91,20 @@ export function toggleRowHtml({
   // sie mit Initialen, wenn sie groß genug dafür ist.
   swatchColor = null,
   swatchLabel = '',
+  // SCHALTER ODER HAKEN (Komponenten-Kanon, 2026-09-26). Eine Boolean-
+  // EINSTELLUNG ist ein Schalter wie in Apples Einstellungen: der Zustand
+  // steht rechts, das Label links, und das Umlegen wirkt sofort. Die native
+  // 18px-Checkbox bleibt der Default, weil dieselbe Zeile auch Filterblaetter
+  // traegt (Kalender, Aufgaben), deren Zeilen eine AUSWAHL sind - die Frage,
+  // ob auch dort Schalter stehen, ist offen und nicht Teil dieser Runde.
+  // `'switch'` rendert die geteilte `.toggle`-Bahn und `role="switch"`; der
+  // Knoten bleibt eine `input[type=checkbox]`, Leser (`.checked`, `change`)
+  // aendern sich nicht. Ratchet: test:control-dialect "settings-checkbox".
+  control = 'checkbox',
   attrs = {},
 }) {
-  const rowClass = ['toggle-row', className].filter(Boolean).join(' ');
+  const isSwitch = control === 'switch';
+  const rowClass = ['toggle-row', isSwitch ? 'toggle-row--switch' : '', className].filter(Boolean).join(' ');
   const iconHtml = icon ? moduleIconHTML(icon) : '';
   // DIE TINTE WIRD GERECHNET, NICHT GESETZT. `--color-ink-on-vivid` gilt fuer
   // KURATIERTE Toene, deren Helligkeit bekannt ist. Eine frei gewaehlte Farbe
@@ -106,6 +117,18 @@ export function toggleRowHtml({
       + `${esc(String(swatchLabel ?? ''))}</span>`
     : '';
   const labelClass = labelVisible ? '' : ' class="sr-only"';
+  if (isSwitch) {
+    const textClass = labelVisible ? 'toggle-row__label' : 'toggle-row__label sr-only';
+    return `<label class="${rowClass}">`
+      + iconHtml
+      + swatchHtml
+      + `<span class="${textClass}">${esc(String(label ?? ''))}</span>`
+      + '<span class="toggle">'
+      + `<input type="checkbox" role="switch"${attrsHtml({ ...attrs, checked, disabled })}>`
+      + '<span class="toggle__track" aria-hidden="true"></span>'
+      + '</span>'
+      + '</label>';
+  }
   return `<label class="${rowClass}">`
     + `<input type="checkbox"${attrsHtml({ ...attrs, checked, disabled })}>`
     + iconHtml
