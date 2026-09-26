@@ -35,7 +35,8 @@
   padding-block-start: var(--space-4);
 }
 
-/* Der Stretch-und-Clip-Fix für lange, ungruppierte .list-rows-Listen sitzt
+/* Der Stretch-und-Clip-Fix für lange, ungruppierte Zeilenlisten (.row-carrier,
+ * bis Runde 5 .list-rows) sitzt
  * jetzt in list-row.css selbst (align-self: start) - er galt hier zuerst
  * nur für Rezepte, betrifft aber jede Küchenliste, deren Filter sie auf eine
  * einzige flache Gruppe reduziert (z. B. Vorrat unter "fast leer"). Siehe

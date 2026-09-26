@@ -8,6 +8,7 @@
 
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { rowActionHtml } from '/utils/row-action.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 
 /**
@@ -41,9 +42,14 @@ export function ingredientRowHTML({
       <input type="text" class="form-input ingredient-row__name" placeholder="${t('meals.ingredientNamePlaceholder')}" value="${esc(name)}">
       <input type="text" class="form-input ingredient-row__qty" placeholder="${t('meals.ingredientQtyPlaceholder')}" value="${esc(quantity)}">
       <select class="form-input ingredient-row__cat" aria-label="${t('meals.ingredientCategoryLabel')}">${catOptions}</select>
-      <button class="ingredient-row__remove" data-action="remove-ingredient" type="button" aria-label="${t('meals.removeIngredient')}">
-        <i data-lucide="x" class="icon-sm" aria-hidden="true"></i>
-      </button>
+      ${rowActionHtml({
+        icon: 'x',
+        tone: 'danger',
+        action: 'remove-ingredient',
+        // Name MIT Objekt ("Mehl entfernen"); eine neue, noch leere Zeile hat
+        // keins und heisst wie bisher "Zutat entfernen".
+        label: String(name ?? '').trim() ? t('common.removeNamed', { name: String(name).trim() }) : t('meals.removeIngredient'),
+      })}
     </div>
   `;
 }

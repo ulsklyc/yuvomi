@@ -613,7 +613,7 @@ function renderList() {
     }
 
     const rows = document.createElement('ul');
-    rows.className = 'list-rows pantry-rows';
+    rows.className = 'row-carrier pantry-rows';
     for (const item of group.items) rows.appendChild(rowEl(withIntent(item)));
     section.appendChild(rows);
     list.appendChild(section);

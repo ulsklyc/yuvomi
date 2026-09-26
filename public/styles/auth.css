@@ -111,6 +111,22 @@
   gap: var(--space-2);
 }
 
+/* Der Kartentitel der Seiten ohne Hero (/join, /forgot-password,
+ * /reset-password, /pair). Er hatte KEINE Regel (Critique 2026-09-26, Minor
+ * Observations): das <h1> fiel auf die Reset-Basis zurueck, 17px halbfett -
+ * so gross wie der Fliesstext darunter, und die Seite hatte keinen Titel, der
+ * als Titel las. Title 2 wie der Modul-Kopf (--type-toolbar-title, 22px, fett),
+ * nicht der Large Title des /login-Heros: der steht ueber der Karte, dieser
+ * Titel in ihr. */
+.auth-card__title {
+  font-size: var(--type-toolbar-title);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  color: var(--color-text-primary);
+  text-wrap: balance;
+  margin-bottom: var(--space-2);
+}
+
 /* Einleitungstext unter dem Kartentitel (/join). */
 .auth-card__intro {
   color: var(--color-text-secondary);

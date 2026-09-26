@@ -20,6 +20,7 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { rowActionHtml } from '/utils/row-action.js';
 import { AVATAR_COLORS } from '/utils/color.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { openModal, closeModal, confirmOverModal, reportFieldError, btnError, refocusAfterRender } from '/components/modal.js';
@@ -430,9 +431,7 @@ function listRowHtml(s, canEdit) {
     ? `<i data-lucide="lock" class="quick-link-manage-row__private" aria-label="${esc(t('quickLinks.privateBadge'))}"></i>`
     : ''}
       ${canEdit
-    ? `<button type="button" class="btn-icon" data-edit="${s.id}" aria-label="${esc(t('quickLinks.editOne', { name: s.name }))}">
-             <i data-lucide="pencil"></i>
-           </button>`
+    ? rowActionHtml({ icon: 'pencil', label: t('quickLinks.editOne', { name: s.name }), attrs: { 'data-edit': s.id } })
     // EINE FREMDE KACHEL IST SICHTBAR, ABER NICHT BEARBEITBAR, und das steht
     // hier auch so da. Ein Knopf, den der Server mit 403 beantwortet, wäre die
     // schlechtere Auskunft als gar keiner.

@@ -107,7 +107,8 @@
 
 /* Gruppe, Gruppenkopf, Gruppenfläche und Zähler kommen aus der geteilten
  * Grammatik (styles/list-row.css): .list-group, .list-group__title,
- * .list-group__count, .list-rows. Der Vorrat war hier der Ausreißer -
+ * .list-group__count und der Träger .row-carrier (bis Runde 5 .list-rows).
+ * Der Vorrat war hier der Ausreißer -
  * 14px/text-transform:none gegen 12px/uppercase in den beiden Geschwistertabs. */
 
 /* --------------------------------------------------------

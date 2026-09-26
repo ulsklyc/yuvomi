@@ -702,7 +702,7 @@ function buildRecipeList() {
   // 48px Bodenversatz in derselben Rasterzeile). Als Zeile teilt es Fläche,
   // Trennlinie, Textspalte und Bedienzone mit Einkauf und Vorrat.
   const rows = document.createElement('ul');
-  rows.className = 'list-rows';
+  rows.className = 'row-carrier';
 
   for (const recipe of visible) {
     // Mirror-Rezepte sind read-only (der Provider bleibt Quelle der Wahrheit); steuert
