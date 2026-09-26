@@ -683,7 +683,7 @@ async function openRedeemModal(memberId, presetItemId = null) {
     <div class="form-group">
       <label class="label" for="rw-redeem-item">${esc(t('rewards.reward'))}</label>
       <select class="input" id="rw-redeem-item">
-        ${affordable.map((c) => `<option value="${c.id}" data-cost="${c.cost}" ${c.id === presetItemId ? 'selected' : ''}>${esc(c.icon ? `${c.icon} ` : '')}${esc(c.name)} — ${esc(pointsLabel(c.cost))}</option>`).join('')}
+        ${affordable.map((c) => `<option value="${c.id}" data-cost="${c.cost}" ${c.id === presetItemId ? 'selected' : ''}>${esc(c.icon ? `${c.icon} ` : '')}${esc(c.name)} - ${esc(pointsLabel(c.cost))}</option>`).join('')}
       </select>
     </div>`;
 

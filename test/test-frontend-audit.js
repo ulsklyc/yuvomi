@@ -18603,3 +18603,31 @@ test('Praemienkarte: jede Glyphe ist bemessen und schrumpft nicht', () => {
     .filter((s) => /^\.rw-(?:reward-card__icon|cost) i$/.test(s));
   assert.deepStrictEqual(tot, [], 'Regeln auf das ersetzte <i> sind tot');
 });
+
+/* Projektregel "-" statt Em-/En-Dash gilt fuer UI-Texte (CLAUDE.md) - in den
+ * Locales haelt sie die i18n-Kette, in den Seiten stand sie nirgends: Zeitraeume
+ * ("21.09. – 27.09."), Referenzbereiche und Leerwerte kamen als Literal aus dem
+ * Code (Critique 2026-09-26). Geprueft wird jedes String- und Template-Literal
+ * einer Seite, Kommentare nicht.
+ *
+ * AUSNAHME MIT VERFALL: meals.js gehoert in dieser Runde dem Kuechen-Umbau
+ * (Runde 1), der seinen Wochenbereich selbst umstellt. Der Eintrag muss fallen,
+ * sobald die Datei sauber ist - der Test meldet einen verwaisten Eintrag rot. */
+const DASH_PENDING = new Map([
+  ['../public/pages/meals.js', 'Runde 1 (Kueche) stellt den Wochenbereich um'],
+]);
+test('Seiten geben keinen Em- oder En-Dash als UI-Text aus', () => {
+  const funde = [];
+  const verwaist = [];
+  for (const file of walkJsFiles('../public/pages/')) {
+    const code = withoutCommentsKeepingLines(read(file));
+    const lines = code.split('\n').map((line, i) => [i + 1, line]).filter(([, line]) => /[–—]/.test(line));
+    if (DASH_PENDING.has(file)) {
+      if (!lines.length) verwaist.push(file);
+      continue;
+    }
+    for (const [n, line] of lines) funde.push(`${file}:${n} ${line.trim().slice(0, 80)}`);
+  }
+  assert.deepStrictEqual(funde, [], `"-" statt Em-/En-Dash (CLAUDE.md):\n  ${funde.join('\n  ')}`);
+  assert.deepStrictEqual(verwaist, [], 'diese Ausnahmen sind erledigt - Eintrag aus DASH_PENDING streichen');
+});

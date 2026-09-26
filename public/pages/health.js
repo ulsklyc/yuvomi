@@ -330,7 +330,7 @@ const chartGridFor = (min, max, metric) => chartGridMarkup(min, max, (val, whole
 function axisTickText(metric, value, wholeTicks) {
   if (metric?.format === 'duration') {
     const parts = splitDuration(value);
-    if (!parts) return '–';
+    if (!parts) return '-';
     return `${fmtNum(parts.hours, { maximumFractionDigits: 0 })}:${String(parts.minutes).padStart(2, '0')}`;
   }
   // Die Stimmungs-Skala kennt nur ganze Stufen; Zwischenwerte an der Achse
@@ -935,7 +935,7 @@ function cardMarkup(metric, series) {
         <span>${esc(formatDate(String(latest.measured_at).slice(0, 10)))}</span>
       </span>`;
   } else {
-    valueHtml = '<span class="metric-card__value metric-card__value--empty">–</span>';
+    valueHtml = '<span class="metric-card__value metric-card__value--empty">-</span>';
   }
 
   return `
@@ -1011,7 +1011,7 @@ function renderDetail() {
         <div class="health-chart-section__title">${esc(t(metric.labelKey))}</div>
         <div class="health-vitals__stepper">
           <button class="btn btn--icon" data-step="-1" aria-label="${esc(t('health.vitals.prevPeriod'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
-          <span class="health-vitals__period">${esc(`${formatDate(series.from)} – ${formatDate(series.to)}`)}</span>
+          <span class="health-vitals__period">${esc(`${formatDate(series.from)} - ${formatDate(series.to)}`)}</span>
           <button class="btn btn--icon" data-step="1" aria-label="${esc(t('health.vitals.nextPeriod'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
         </div>
       </div>
@@ -1462,7 +1462,7 @@ async function reloadAfterSave(savedType) {
 // --------------------------------------------------------
 
 function fmtNum(value, opts) {
-  if (value === null || value === undefined || !Number.isFinite(Number(value))) return '–';
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return '-';
   return getNumberFormat({ maximumFractionDigits: 1, ...opts }).format(Number(value));
 }
 
@@ -1482,7 +1482,7 @@ function fmtDelta(value) {
 /** Dezimalstunden als „7 h 30 min". */
 function fmtDuration(value) {
   const parts = splitDuration(value);
-  if (!parts) return '–';
+  if (!parts) return '-';
   const hours = fmtNum(parts.hours, { maximumFractionDigits: 0 });
   const minutes = fmtNum(parts.minutes, { maximumFractionDigits: 0 });
   if (parts.hours && parts.minutes) return t('health.duration.hm', { hours, minutes });
@@ -1492,7 +1492,7 @@ function fmtDuration(value) {
 
 /** Ein einzelner Kanalwert (Chart-Punkt, Screenreader-Tabelle). */
 function fmtChannelValue(metric, value) {
-  if (value === null || value === undefined) return '–';
+  if (value === null || value === undefined) return '-';
   if (metric?.format === 'duration') return fmtDuration(value);
   if (metric?.format === 'scale') return t(moodStep(value)?.labelKey || 'health.vitals.noValue');
   return fmtNum(value);
@@ -1500,7 +1500,7 @@ function fmtChannelValue(metric, value) {
 
 /** Der Wert einer ganzen Messung, wie er auf Karte und Verlaufszeile steht. */
 function vitalValueText(metric, row) {
-  if (!row) return '–';
+  if (!row) return '-';
   if (metric?.format === 'pair') return `${fmtNum(row.value_num)}/${fmtNum(row.value_num2)}`;
   return fmtChannelValue(metric, row.value_num);
 }
@@ -2904,15 +2904,15 @@ function resultRowMarkup(r) {
 function referenceLabel(refLow, refHigh) {
   const low = refLow == null ? null : fmtNum(refLow);
   const high = refHigh == null ? null : fmtNum(refHigh);
-  if (low !== null && high !== null) return `${low} – ${high}`;
+  if (low !== null && high !== null) return `${low} - ${high}`;
   if (low !== null) return `≥ ${low}`;
   if (high !== null) return `≤ ${high}`;
-  return '–';
+  return '-';
 }
 
 function flagIndicatorMarkup(flag) {
   if (!flag || !LAB_FLAGS.includes(flag)) {
-    return '<span class="health-lab-flag health-lab-flag--none">–</span>';
+    return '<span class="health-lab-flag health-lab-flag--none">-</span>';
   }
   const icon = flag === 'low' ? 'arrow-down' : (flag === 'high' ? 'arrow-up' : 'check');
   return `
@@ -3004,16 +3004,16 @@ function labTrendChart(points, analyteName) {
   // Screenreader-Tabelle: Datum, Wert, Referenz, Einordnung — dieselben Daten wie
   // die Punkt-Farben, aber vorlesbar.
   const refText = (lo, hi) => {
-    if (lo != null && hi != null) return `${fmtNum(lo)}–${fmtNum(hi)}`;
+    if (lo != null && hi != null) return `${fmtNum(lo)}-${fmtNum(hi)}`;
     if (lo != null) return `≥ ${fmtNum(lo)}`;
     if (hi != null) return `≤ ${fmtNum(hi)}`;
-    return '–';
+    return '-';
   };
   const tableRows = points.map((p) => [
     formatDate(p.date),
     unit ? `${fmtNum(p.value)} ${unit}` : fmtNum(p.value),
     refText(p.refLow, p.refHigh),
-    p.flag ? t(LAB_FLAG_LABEL_KEYS[p.flag]) : '–',
+    p.flag ? t(LAB_FLAG_LABEL_KEYS[p.flag]) : '-',
   ]);
   const table = chartTableMarkup(
     ariaLabel,
@@ -3486,7 +3486,7 @@ function renderActivityShell() {
     <div class="health-activity__toolbar">
       <div class="health-activity__stepper">
         <button class="btn btn--icon" data-step="-1" aria-label="${esc(t('health.activity.prevWeek'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
-        <span class="health-activity__period">${esc(`${formatDate(summary.from)} – ${formatDate(summary.to)}`)}</span>
+        <span class="health-activity__period">${esc(`${formatDate(summary.from)} - ${formatDate(summary.to)}`)}</span>
         <button class="btn btn--icon" data-step="1" aria-label="${esc(t('health.activity.nextWeek'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
       </div>
     </div>
@@ -5132,7 +5132,7 @@ function overviewVitalCardMarkup(metric, series) {
         <span>${esc(formatDate(String(latest.measured_at).slice(0, 10)))}</span>
       </span>`;
   } else {
-    valueHtml = '<span class="metric-card__value metric-card__value--empty">–</span>';
+    valueHtml = '<span class="metric-card__value metric-card__value--empty">-</span>';
   }
 
   // --inset: die Kachel liegt IN der Übersichtskarte (Kasten-in-Kasten,
@@ -5896,7 +5896,7 @@ function cycleStatsMarkup(prediction) {
     tiles.push(cycleStatCardMarkup({
       icon: 'sparkles',
       labelKey: 'health.cycle.status.fertileWindow',
-      value: `${formatDate(prediction.fertileStart)} – ${formatDate(prediction.fertileEnd)}`,
+      value: `${formatDate(prediction.fertileStart)} - ${formatDate(prediction.fertileEnd)}`,
       sub: `${ovulationLabel}: ${formatDate(prediction.ovulationDate)}`,
     }));
   } else if (prediction.fertilitySuppressed === 'contraception') {
@@ -6904,7 +6904,7 @@ function cycleHistoryMarkup(canEdit) {
       <ul class="cycle-history__list">${rows.map((p) => {
         const start = String(p.start_date).slice(0, 10);
         const end = p.end_date ? String(p.end_date).slice(0, 10) : null;
-        const rangeLabel = end ? `${formatDate(start)} – ${formatDate(end)}` : formatDate(start);
+        const rangeLabel = end ? `${formatDate(start)} - ${formatDate(end)}` : formatDate(start);
         const lenDays = end ? (Math.round((Date.parse(`${end}T00:00Z`) - Date.parse(`${start}T00:00Z`)) / 86400000) + 1) : null;
         const nextStart = nextStartById.get(p.id);
         const cycleLen = nextStart ? Math.round((Date.parse(`${String(nextStart).slice(0, 10)}T00:00Z`) - Date.parse(`${start}T00:00Z`)) / 86400000) : null;

@@ -703,22 +703,22 @@ function formatDueDate(dateStr, timeStr) {
     : formatDate(dayKey);
 
   if (overdue) {
-    return { text: `${t('dashboard.overdue')} – ${fullLabel}`, overdue: true };
+    return { text: `${t('dashboard.overdue')} - ${fullLabel}`, overdue: true };
   }
 
   if (calDayDiff === 1 && Number(dueTime?.slice(0, 2)) >= 22 && diffH < 24) {
-    return { text: `${t('dashboard.dueSoon')} – ${fullLabel}`, overdue: false, soon: true };
+    return { text: `${t('dashboard.dueSoon')} - ${fullLabel}`, overdue: false, soon: true };
   }
 
   if (calDayDiff === 0) {
-    return { text: dueTime ? `${t('dashboard.dueToday')} – ${formatTime(dueStamp)}` : t('dashboard.dueToday'), overdue: false, soon: true };
+    return { text: dueTime ? `${t('dashboard.dueToday')} - ${formatTime(dueStamp)}` : t('dashboard.dueToday'), overdue: false, soon: true };
   }
 
   if (calDayDiff === 1) {
     // Nur eine ECHTE Uhrzeit anhängen: ohne due_time ist 23:59:59 die interne
     // Sortier-Krücke - „Morgen fällig – 23:59" behauptete eine Deadline, die
     // niemand gesetzt hat (Critique P1). Der Heute-Zweig darüber macht es vor.
-    return { text: dueTime ? `${t('dashboard.dueTomorrow')} – ${formatTime(dueStamp)}` : t('dashboard.dueTomorrow'), overdue: false };
+    return { text: dueTime ? `${t('dashboard.dueTomorrow')} - ${formatTime(dueStamp)}` : t('dashboard.dueTomorrow'), overdue: false };
   }
 
   // Weiter voraus dieselbe Stufung wie am Termin daneben (relativeDateLabel):
@@ -1508,7 +1508,7 @@ function renderTodayMeals(meals, visibleMealTypes = MEAL_ORDER) {
               hasOwnImage: meal.recipe_has_own_image,
               className: 'meal-slot__thumb',
             }) : ''}<span class="meal-slot__title-text">${esc(meal.title)}</span>`
-          : '—'}</div>
+          : '-'}</div>
       </div>
     `;
   }).join('');
@@ -1936,7 +1936,7 @@ function renderBudgetSavings(budget, balance, income, savingsRate) {
   return `
     <div class="budget-widget__savings">
       <span>${t('dashboard.savingsRate')}</span>
-      <strong>${income > 0 ? `${savingsRate}%` : '–'}</strong>
+      <strong>${income > 0 ? `${savingsRate}%` : '-'}</strong>
     </div>
     ${income > 0 ? `
     <div class="budget-widget__share" aria-hidden="true">
