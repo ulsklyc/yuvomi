@@ -625,6 +625,37 @@ test('das Router-Signal baut ab: danach haelt keine Instanz mehr die Zurueck-Tas
   assert.equal(md.handleMasterDetailPopstate(), false);
 });
 
+test('abgehaengte Wurzel oder abgebrochenes Signal: kein Einhaengen, die lebende Instanz bleibt', () => {
+  // Ein spaeter Neuaufbau (Wiederholen nach Ladefehler) gegen einen Baum, den
+  // der Router schon weggeraeumt hat, ersetzte sonst die Instanz der Seite,
+  // auf der der Nutzer jetzt steht - Zurueck und Fensterwechsel liefen ins Leere.
+  const live = makePage();
+  const liveHandle = live.mount();
+  liveHandle.open('2');
+
+  const stale = makePage({ path: '/contacts?open=2' });
+  stale.root.isConnected = false;
+  const dead = stale.mount();
+  assert.deepEqual(stale.calls.render, [], 'ein abgehaengter Baum zeichnet nichts');
+  assert.equal(dead.selectedId(), null);
+  assert.equal(dead.isSplit(), false);
+  dead.open('3');
+  assert.deepEqual(stale.calls.narrow, [], 'und oeffnet nichts');
+  setUrl('/contacts');
+  assert.equal(md.handleMasterDetailPopstate(), true, 'die lebende Instanz haelt die Zurueck-Taste weiter');
+  assert.equal(liveHandle.selectedId(), null);
+
+  const aborted = new AbortController();
+  aborted.abort();
+  const late = makePage();
+  late.mount({ signal: aborted.signal }).open('1');
+  assert.deepEqual(late.calls.render, [], 'ein abgebrochenes Signal haengt ebenso nichts ein');
+  setUrl('/contacts?open=4');
+  assert.equal(md.handleMasterDetailPopstate(), true);
+  assert.equal(liveHandle.selectedId(), '4', 'die Geste erreicht weiter die lebende Seite');
+  liveHandle.destroy();
+});
+
 test('der Router fragt den Baustein, BEVOR er bei popstate neu zeichnet', () => {
   // Verdrahtung, die kein Einheitentest der Funktion sieht: ohne den Aufruf im
   // Router zeichnete jedes Zurueck die ganze Seite neu (Skelett, Uebergang,

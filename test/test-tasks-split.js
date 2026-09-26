@@ -326,3 +326,17 @@ test('der Rueckfall fuer ?open= auf eine Aufgabe ausserhalb der Liste haengt am 
   assert.match(body, /if \(sheetFor\) openTaskSheet\(sheetFor, container, signal\)/,
     'mountTaskSplit reicht das Signal der Seite an den Rueckfall weiter');
 });
+
+test('Wiederholen nach dem Ladefehler baut mit dem Seiten-Signal neu auf', () => {
+  // Ohne Signal haengte ein Wiederholen, dessen Antwort erst nach dem
+  // Wegnavigieren kommt, den Baustein gegen den alten Baum ein - und
+  // raeumte die Instanz der Zielseite ab.
+  const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  assert.match(src, /onRetry: \(\) => render\(container, \{ user: state\.user, signal: pageSignal \}\)/,
+    'der Wiederholen-Weg reicht das Signal der Seite weiter');
+  const render = src.slice(src.indexOf('export async function render('));
+  const head = render.slice(0, render.indexOf('taskMd?.destroy();'));
+  assert.match(head, /if \(signal\?\.aborted\) return;/,
+    'ein Neuaufbau fuer eine verlassene Seite bricht ab, bevor er die lebende Instanz abraeumt');
+  assert.match(head, /pageSignal = signal \?\? null;/, 'render merkt sich das Signal fuer den Wiederholen-Weg');
+});

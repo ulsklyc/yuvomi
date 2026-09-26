@@ -3166,7 +3166,7 @@ function renderTaskList(container, { paneQuiet = false } = {}) {
         description: t('common.loadErrorDescription'),
         error: state.loadError,
         retryLabel: t('common.retry'),
-        onRetry: () => render(container, { user: state.user }),
+        onRetry: () => render(container, { user: state.user, signal: pageSignal }),
       });
     }
     return;
@@ -4410,6 +4410,8 @@ function openTaskView(task, reminder, container, { pane = null } = {}) {
 
 /** Handle des Bausteins, solange die Seite steht; sonst null. */
 let taskMd = null;
+/** Das Router-Signal der Seite - der Wiederholen-Weg des Ladefehlers baut damit neu auf. */
+let pageSignal = null;
 /** Stand der ausgewaehlten Aufgabe beim letzten Zeichnen des Details. */
 let paneTaskSig = null;
 /** Eine Aktion der Spalte (Status, Ablage) hat sie abgemeldet - neu malen. */
@@ -4790,6 +4792,11 @@ export async function openTaskById(taskId, { user = null, container = null, onCh
 }
 
 export async function render(container, { user, signal } = {}) {
+  // Ein Wiederholen, das erst nach dem Wegnavigieren ankommt, baut nichts mehr:
+  // es raeumte sonst unten die Instanz ab, die eine NEUE Aufgaben-Seite schon
+  // eingehaengt hat.
+  if (signal?.aborted) return;
+  pageSignal = signal ?? null;
   // Ein Neuaufbau (auch der Wiederholen-Weg des Ladefehlers) haengt die
   // Detailspalte frisch ein; die alte Instanz gehoert zur alten Wurzel.
   taskMd?.destroy();

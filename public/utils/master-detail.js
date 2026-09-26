@@ -138,6 +138,16 @@ function writeHistory(mode, param, id) {
   else history.replaceState({ ...(history.state ?? {}), path }, '', path);
 }
 
+/** Das Handle eines Aufbaus, der nicht stattfindet: jede Frage „nichts". */
+function inertHandle() {
+  const noop = () => {};
+  return {
+    open: noop, select: noop, clear: noop, refresh: noop, destroy: noop,
+    isSplit: () => false,
+    selectedId: () => null,
+  };
+}
+
 /**
  * Haengt Liste + Detail an eine Seite.
  *
@@ -198,6 +208,12 @@ export function mountMasterDetail({
   if (!listEl || !detailEl || !emptyEl || !bodyEl) {
     throw new TypeError('mountMasterDetail: .split-view braucht __list und die Spalte aus splitViewDetailHtml()');
   }
+  // EIN VERSPAETETER AUFBAU HAENGT NICHTS EIN. Es gibt je Seite eine Instanz
+  // (`active`), und jede neue ersetzt die alte. Ein Neuaufbau gegen einen Baum,
+  // den der Router schon weggeraeumt hat (Wiederholen nach Ladefehler, Antwort
+  // nach dem Wegnavigieren), raeumte sonst die Instanz der Seite ab, auf der
+  // der Nutzer jetzt steht - Zurueck und Fensterwechsel liefen ins Leere.
+  if (!root.isConnected || signal?.aborted) return inertHandle();
 
   let selected = null;
   let renderSeq = 0;
