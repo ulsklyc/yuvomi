@@ -1664,7 +1664,7 @@ export function promptModal(label, defaultValue = '') {
             <input class="form-input" id="prompt-modal-input" type="text"
                    value="${esc(defaultValue)}" autocomplete="off">
           </div>
-          <div class="modal-actions">
+          <div class="modal-panel__footer">
             <button type="button" class="btn btn--secondary" id="prompt-modal-cancel">${t('common.cancel')}</button>
             <button type="submit" class="btn btn--primary" id="prompt-modal-ok">${t('common.save')}</button>
           </div>
@@ -1720,7 +1720,7 @@ export function selectModal(label, options) {
             <label class="sr-only" for="select-modal-input">${esc(label)}</label>
             <select class="form-input" id="select-modal-input">${optionsHtml}</select>
           </div>
-          <div class="modal-actions">
+          <div class="modal-panel__footer">
             <button type="button" class="btn btn--secondary" id="select-modal-cancel">${t('common.cancel')}</button>
             <button type="submit" class="btn btn--primary" id="select-modal-ok">${t('common.save')}</button>
           </div>
@@ -1775,7 +1775,7 @@ export function confirmModal(message, { confirmLabel, cancelLabel, danger = fals
       size: 'sm',
       content: `
         ${detail ? `<p class="modal-confirm__detail">${esc(detail)}</p>` : ''}
-        <div class="modal-actions">
+        <div class="modal-panel__footer">
           <button type="button" class="btn btn--secondary" id="confirm-modal-cancel">${cancelLabel ?? t('common.cancel')}</button>
           <button type="button" class="btn ${danger ? 'btn--danger' : 'btn--primary'}" id="confirm-modal-ok">
             ${confirmLabel ?? t('common.confirm')}
