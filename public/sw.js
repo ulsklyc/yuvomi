@@ -165,6 +165,7 @@ const APP_SHELL = [
   '/utils/live-feed.js',
   '/utils/markdown-checklist.js',
   '/utils/markdown-toolbar.js',
+  '/utils/master-detail.js',
   '/utils/meal-types.js',
   '/utils/mentions.js',
   '/utils/module-accent.js',
