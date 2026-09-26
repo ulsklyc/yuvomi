@@ -956,12 +956,18 @@ async function toggleDescriptionCheck(task, box) {
  *           standalone?: () => void}|null,
  *   pane?: HTMLElement|null,
  *   onClose?: () => void,
+ *   onStale?: () => void,
  * }} options
  *
  * `pane` ist der Koerper der Detailspalte (Liste + Detail). Dort schliesst die
  * Ansicht nicht - die Auswahl in der Liste entscheidet, was dasteht -, und
  * `onClose` meldet nur, dass eine Aktion der Ansicht (Status, Ablage, Loeschen)
  * sie abgemeldet hat: die Umgebung zeichnet dann neu oder waehlt weiter.
+ *
+ * `onStale` ruft die Ansicht, wenn ein Schreibvorgang BESTAETIGT ist, aber das
+ * Nachladen danach scheiterte: was dasteht, ist veraltet. Die Umgebung zeichnet
+ * neu (in der Spalte: frisch vom Server oder der Fehlerzustand mit „Erneut
+ * versuchen", utils/master-detail.js) - die alten Aktionen kommen nie zurueck.
  */
 export function openTaskDetail({
   task,
@@ -975,8 +981,9 @@ export function openTaskDetail({
   edit = null,
   pane = null,
   onClose = null,
+  onStale = null,
 }) {
-  const ctx = { users, currentUserId, isAdmin, categories, container, onChanged, inPane: Boolean(pane) };
+  const ctx = { users, currentUserId, isAdmin, categories, container, onChanged, onStale, inPane: Boolean(pane) };
   const archived = isArchived(task);
   const statusActions = archived ? [] : (STATUS_ACTIONS[task.status] ?? []);
   // Gesperrte Aufgabe (#830): der Weiterschalt-Knopf bleibt, Loeschen, Ablegen
@@ -1092,8 +1099,33 @@ async function advanceTaskStatus(task, status, button, ctx, close = closeDetailV
   siblings.forEach((el) => { el.disabled = true; });
   try {
     await api.patch(`/tasks/${task.id}/status`, { status });
-    task.status = status;
-    // Der Status steht bereits beim Server - eine Verwerfen-Frage danach böte
+  } catch (err) {
+    task.status = previous;
+    stop();
+    siblings.forEach((el) => { el.disabled = false; });
+    // Gescheitert ist ein Schreibvorgang, kein Laden - tasks.loadError („Aufgabe
+    // konnte nicht geladen werden") beschriebe den falschen Vorgang.
+    window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+    return;
+  }
+  task.status = status;
+  await afterConfirmedWrite(ctx, close);
+}
+
+/**
+ * Nach einem BESTAETIGTEN Schreibvorgang: Ansicht abmelden, Umgebung nachladen.
+ *
+ * GETRENNT VOM SCHREIBEN, weil ein Fehler hier etwas anderes heisst. Stand
+ * beides in einem catch, stellte ein gescheitertes Nachladen den alten Status
+ * wieder her und gab die alten Knoepfe frei - in der Spalte, wo `close()` das
+ * DOM nicht entfernt, stand dann nach einem erledigten Serientermin „Starten"
+ * bedienbar da, und der Server haette die Erledigung umgekehrt und die
+ * Folgeinstanz verworfen. Hier bleibt der neue Stand, die alten Aktionen
+ * bleiben gesperrt, und die Umgebung zeichnet neu (`onStale`).
+ */
+async function afterConfirmedWrite(ctx, close) {
+  try {
+    // Der Stand steht bereits beim Server - eine Verwerfen-Frage danach böte
     // an, etwas rückgängig zu machen, was gar nicht mehr aussteht (#625).
     //
     // `close` ist das Schliessen DIESER Ansicht, nicht das globale der
@@ -1105,13 +1137,9 @@ async function advanceTaskStatus(task, status, button, ctx, close = closeDetailV
     // es keinen gegeben - ein Nachfassen setzte den Fokus in einen fremden
     // Zusammenhang; dort fuehrt die Umgebung ihn selbst.
     if (!ctx.inPane) refocusAfterRender();
-  } catch (err) {
-    task.status = previous;
-    stop();
-    siblings.forEach((el) => { el.disabled = false; });
-    // Gescheitert ist ein Schreibvorgang, kein Laden - tasks.loadError („Aufgabe
-    // konnte nicht geladen werden") beschriebe den falschen Vorgang.
-    window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+  } catch {
+    window.yuvomi.showToast(t('tasks.listLoadError'), 'danger');
+    ctx.onStale?.();
   }
 }
 
@@ -1125,15 +1153,16 @@ async function toggleTaskArchive(task, button, ctx, close = closeDetailView) {
   const archived = isArchived(task);
   try {
     await setTaskArchived(task.id, !archived);
-    task.archived_at = archived ? null : new Date().toISOString();
-    await close({ force: true });
-    window.yuvomi.showToast(archived ? t('tasks.unarchivedToast') : t('tasks.archivedToast'), 'success');
-    await ctx.onChanged();
-    if (!ctx.inPane) refocusAfterRender();
   } catch (err) {
     stop();
     window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+    return;
   }
+  task.archived_at = archived ? null : new Date().toISOString();
+  window.yuvomi.showToast(archived ? t('tasks.unarchivedToast') : t('tasks.archivedToast'), 'success');
+  // Derselbe Grund wie beim Status: ein gescheitertes Nachladen gibt den
+  // Ablage-Knopf nicht frei - er zeigte den alten Stand und schaltete zurueck.
+  await afterConfirmedWrite(ctx, close);
 }
 
 /**

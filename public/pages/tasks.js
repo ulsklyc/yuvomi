@@ -4374,6 +4374,9 @@ function openTaskView(task, reminder, container, { pane = null } = {}) {
     onChanged: pane ? () => loadTasks(container, { paneQuiet: true }) : () => loadTasks(container),
     pane,
     onClose: pane ? () => onPaneActionClosed(container) : undefined,
+    // Bestaetigt geschrieben, Nachladen gescheitert: die Spalte neu zeichnen -
+    // frisch vom Server oder als Fehlerzustand mit „Erneut versuchen".
+    onStale: pane ? () => taskMd?.refresh({ repaint: true }) : undefined,
     // Ohne Mounter baut die geteilte Ansicht keinen Bearbeiten-Knopf (#918) -
     // besser als einer, der ins Leere fuehrt. openTaskDetail zieht denselben
     // Schluss ohnehin noch einmal ueber canEditTaskDefinition(); der Verzicht

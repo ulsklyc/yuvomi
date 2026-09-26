@@ -340,3 +340,55 @@ test('Wiederholen nach dem Ladefehler baut mit dem Seiten-Signal neu auf', () =>
     'ein Neuaufbau fuer eine verlassene Seite bricht ab, bevor er die lebende Instanz abraeumt');
   assert.match(head, /pageSignal = signal \?\? null;/, 'render merkt sich das Signal fuer den Wiederholen-Weg');
 });
+
+test('Status in der Spalte bestaetigt, Nachladen scheitert: die alten Knoepfe kommen nie zurueck', async () => {
+  // Bei einer Serie ist das ein Datenrisiko: nach einem bestaetigten Erledigen
+  // stuende „Starten" wieder bedienbar da, und der Server kehrte die
+  // Erledigung um und verwarf die Folgeinstanz.
+  const task = { ...BASIS, status: 'open' };
+  let options = null;
+  globalThis.__openDetailView = (o) => { options = o; };
+  const start = { id: 'task-detail-start', disabled: false };
+  const savedGet = globalThis.document.getElementById;
+  globalThis.document.getElementById = (id) => (id === 'task-detail-start' ? start : null);
+  const toasts = [];
+  const savedToast = globalThis.window.yuvomi.showToast;
+  globalThis.window.yuvomi.showToast = (msg, tone) => toasts.push([msg, tone]);
+  let stale = 0;
+  globalThis.__apiStub = { patch: async () => ({ data: {} }) };
+  try {
+    openTaskDetail({
+      task, currentUserId: 2, categories: [{ key: 'household' }], pane: { isPane: true },
+      onChanged: async () => { throw Object.assign(new Error('offline'), { status: 0 }); },
+      onStale: () => { stale += 1; },
+    });
+    const finish = options.actions.find((a) => a.id === 'task-detail-finish');
+    await finish.onClick({ button: { id: 'task-detail-finish' }, close: async () => {} });
+    assert.equal(task.status, 'done', 'der Server hat erledigt - die Ansicht behauptet nichts anderes');
+    assert.equal(start.disabled, true, '„Starten" bleibt gesperrt');
+    assert.equal(stale, 1, 'die Umgebung erfaehrt, dass die Spalte veraltet ist (neu zeichnen oder Erneut versuchen)');
+    assert.deepEqual(toasts.map(([, tone]) => tone), ['danger'], 'das gescheiterte Nachladen wird gesagt');
+    assert.notEqual(toasts[0][0], 'offline', 'als Ladefehler, nicht als gescheiterter Schreibvorgang');
+
+    // Scheitert der SCHREIBVORGANG, bleibt alles wie vorher bedienbar.
+    toasts.length = 0;
+    const t2 = { ...BASIS, status: 'open' };
+    globalThis.__apiStub = { patch: async () => { throw new Error('Serverfehler'); } };
+    openTaskDetail({ task: t2, currentUserId: 2, categories: [{ key: 'household' }], pane: { isPane: true }, onStale: () => { stale += 1; } });
+    start.disabled = false;
+    await options.actions.find((a) => a.id === 'task-detail-finish').onClick({ button: {}, close: async () => {} });
+    assert.equal(t2.status, 'open');
+    assert.equal(start.disabled, false);
+    assert.equal(stale, 1);
+  } finally {
+    delete globalThis.__openDetailView;
+    delete globalThis.__apiStub;
+    globalThis.document.getElementById = savedGet;
+    globalThis.window.yuvomi.showToast = savedToast;
+  }
+  // Die Aufgaben-Seite gibt der Spalte den Weg zurueck: neu zeichnen (frisch
+  // vom Server oder der Fehlerzustand mit Erneut versuchen, master-detail.js).
+  const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  assert.match(src, /onStale: pane \? \(\) => taskMd\?\.refresh\(\{ repaint: true \}\) : undefined/,
+    'openTaskView reicht onStale fuer die Spalte durch');
+});
