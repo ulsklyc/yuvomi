@@ -1077,6 +1077,13 @@ das Verhaeltnis haelt.
   cubic-bezier(0.34,1.56,0.64,1) fuer Glas-Elemente; die Sidebar-Pille bekommt die sanftere
   Feder `--ease-sidebar-glide`, damit sie nicht ueber das Ziel-Item hinausschiesst.
   prefers-reduced-motion schaltet Signature-Animationen ab.
+- **Seitenwechsel:** Kontinuitaet vor Effekt - Navigation, Kopf und Tab-Leisten STEHEN, nur
+  der Inhalt wechselt. Der Router tauscht per View Transition (`utils/view-transition.js`):
+  Wurzel-Blende 200ms `--ease-out`, Seitenleiste und Kapsel zeigen nur ihr lebendes Bild,
+  `.page-toolbar` blendet an Ort und Stelle, die Kuechen-Leiste ist vorher und nachher derselbe
+  Knoten und ihre Auswahl-Kapsel gleitet zum Ziel. Ohne API eine reine Blende, nie Versatz
+  oder Feder auf Inhalt. Ausgaenge (Sheet, Dialog, Overlay) laufen auf jeder Breite und
+  schlagen ihre Einfahrt per Spezifitaet, nicht per Ladereihenfolge (Guard `test:motion`).
 - **Scroll-Affordanz:** horizontal scrollende Leisten (Chip-Reihen, Filterzeilen) tragen
   eine Fade-Mask an der ueberlaufenden Kante (`has-fade-start`/`has-fade-end`, gesetzt von
   `wireScrollFade`) und 24px `scroll-padding-inline`, damit das erste sichtbare Element nicht
@@ -2563,8 +2570,9 @@ plus Bottom-Inset) und `--glass-sheen` auf der oberen Kapselhaelfte als Material
 am Scroll-Ende liegt per `--fab-safe-zone` leerer Nachlauf unter dem FAB, der Sheen ist dort
 der einzige Beweis, dass die Flaeche Glas ist. Die 78 % sind eine Untergrenze: darunter faellt das
 Plus-Glyph auf hellen Modul-Tints unter 3:1 (gemessen 78 % Tasks-Gruen auf Weiss = 3.4:1).
-Hover geht auf Vollton, der Fallback ist opak. Einblendung als Feder (420ms `--ease-out`
-plus Ring-Pulse), reduced-motion-sicher.
+Hover geht auf Vollton, der Fallback ist opak. Einblendung als Feder (420ms `--ease-out`),
+reduced-motion-sicher. (Der hier bis 2026-09-26 zugesagte Ring-Pulse hing an der toten
+Klasse `.fab` und lief nie; er ist mit ihr entfallen.)
 
 **Er traegt die Stimme, nicht den Modulton - hier stand bis 2026-08-11
 `var(--module-accent, var(--color-accent))`.** Der Wert war ein Rest aus der Zeit vor der
