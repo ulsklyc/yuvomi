@@ -6,8 +6,11 @@
    * PAGE-COMPOSITION.md / .app-page--reading — not from this file. */
   display: flex;
   flex-direction: column;
-  /* Full-bleed root; bottom clearance for nav + FAB. */
-  padding-bottom: calc(var(--nav-bottom-height) + var(--space-6));
+  /* Full-bleed root. Die Luft fuer Tab-Leiste und FAB rechnet die Shell als
+   * Nachlauf (`--shell-tail`, layout.css); hier steht nur der eigene Abstand -
+   * die Leiste zusaetzlich einzurechnen, zahlte sie doppelt, seit die Kapsel
+   * ueber dem Inhalt liegt (Kopfregel mobil, 2026-09-26). */
+  padding-bottom: var(--space-6);
 }
 
 /* Hint copy only — measure/gutter live on .page-section.page-measure. */

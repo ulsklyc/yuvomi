@@ -3040,7 +3040,10 @@
 
 .perm-actions {
   position: sticky;
-  bottom: 0;
+  /* Ueber der Tab-Kapsel, nicht unter ihr: seit der Inhalt bis zur
+   * Unterkante laeuft, klebte `bottom: 0` hinter dem Glas (Kopfregel mobil,
+   * 2026-09-26). `--nav-tail` ist 0, wo keine Leiste steht. */
+  bottom: var(--nav-tail);
   z-index: var(--z-sticky, 10);
   display: flex;
   align-items: center;
