@@ -260,9 +260,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Housekeeping shows the task list first.** Adding a task, with the templates as quick picks
   above the form, sits behind the add button, and templates that already exist as a task are
-  not offered again. Tasks and visits use the list rows of the other modules, so on a phone the list starts at the
-  top of the screen instead of below the templates, and the report month sits in the header like
-  in Budget.
+  not offered again. Tasks and visits use the list rows of the other modules, so on a phone the
+  list starts at the top of the screen instead of below the templates, and the report month sits
+  in the header like in Budget.
 
 - **Settings on a phone are one list.** All settings appear grouped by area on the first screen
   instead of behind an extra level, with search in the header; inside a setting the way back
@@ -273,6 +273,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Undoing a finished housekeeping task restores its previous date.** "Done" now offers Undo for
   five seconds, which puts back the date the task was last done; the old button next to the row
   cleared it instead.
+
+- **Shift types line up on a desktop.** The heading and the empty state of the shift types took
+  the first column of the two-column grid, so the first card stood next to the heading and every
+  row was off by one. Heading and empty state now span both columns, and the first card starts on
+  the left.
+
+- **The schedule comparison fits a phone.** Its week navigation did not wrap and pushed the page
+  41px sideways; the date range was cut off at the edge. Toggle, arrows and range now wrap, and
+  the range stays readable.
+
+- **The pantry no longer scrolls into an empty page.** Hidden "Edit" labels for screen readers
+  escaped the list and stretched the page behind it, so a swipe next to the list moved the header
+  and list away over 1000px of nothing. Every page with its own scrolling list now keeps them
+  inside.
+
+- **Inventory rows name their deadline.** Instead of a tiny shield icon, a row now shows a chip like
+  in Documents: "Warranty until 12.10.2026", "MOT in 12 days", "Warranty expired". An expired
+  warranty, which leaves nothing to do, counts towards "Needs attention" and the menu badge for 30
+  days after it ended and then stops; tracked deadlines such as MOT or service stay until you mark
+  them done.
+
+- **Chart labels have one size on every screen.** The axis text of the health, inventory and budget
+  charts grew and shrank with the chart: about 6px on a phone, 22px on a wide desktop. It is now
+  12px everywhere, and on narrow screens the value axis gets enough room that amounts such as
+  "5.550 €" are no longer cut off.
+
+- **Adding a family member keeps your place.** "Add member" opened its form below the two-factor
+  card and dropped the keyboard focus. The form now opens right under the member list with the
+  first field focused, and Cancel returns to the button; cancelling an invite does the same.
+
+- **The gift icon on reward cards is back.** In the narrow catalog cards on a desktop the icons of
+  "Redeem" and the price shrank to a dot. They keep their size now, and price and buttons move to
+  two lines when the card is too narrow.
+
+- **Name days say today and tomorrow.** The name-day countdown read "in 0 days" and "in 1 days";
+  it now says "Today" and "Tomorrow" like the birthday, and both countdowns use each language's
+  plural forms.
+
+- **No delete button for a photo that is not there.** A new birthday showed a red "Remove photo"
+  button and a question mark as placeholder. The button now appears only with a photo, and the
+  empty avatar shows a camera.
+
+- **Date ranges use a plain hyphen.** Ranges such as "21.09. - 27.09." in the schedule, health,
+  budget and waste modules, lab reference ranges and empty values used an en or em dash; they now
+  use "-" like the rest of the app.
 
 - **Event titles in the week keep their room.** The people assigned to an event sat next to its
   title and never shrank, so on a phone "Dentist - family" showed four letters. They now sit

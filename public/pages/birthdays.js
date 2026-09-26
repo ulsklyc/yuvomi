@@ -289,13 +289,21 @@ function ageMeta(birthday) {
   return `${date} · ${t('birthdays.turnsAge', { age: birthday.next_age })}`;
 }
 
-// Countdown-Chip mit einheitlichem Wort-Register (kein „5d"-Kürzel):
-// Heute / Morgen / in N Tagen. `mod` steuert die visuelle Stufe.
+// Countdown im einheitlichen Wort-Register (kein „5d"-Kürzel): Heute / Morgen
+// / in N Tagen. EINE Weiche fuer Geburtstag UND Namenstag - der Namenstag
+// hatte sie nicht und las „in 0 Tagen" (Critique 2026-09-26). `count` statt
+// `days`, damit t() die Pluralform der Sprache waehlt.
+function countdownLabel(days) {
+  if (days === 0) return t('common.today');
+  if (days === 1) return t('common.tomorrow');
+  return t('birthdays.inDays', { count: days });
+}
+
+// Countdown-Chip; `mod` steuert die visuelle Stufe.
 function countdownChip(birthday) {
-  if (birthday.days_until === 0) return { label: t('common.today'), mod: 'today' };
-  if (birthday.days_until === 1) return { label: t('common.tomorrow'), mod: 'soon' };
-  const mod = birthday.days_until <= 7 ? 'soon' : 'default';
-  return { label: t('birthdays.inDays', { days: birthday.days_until }), mod };
+  const days = birthday.days_until;
+  const mod = days === 0 ? 'today' : days <= 7 ? 'soon' : 'default';
+  return { label: countdownLabel(days), mod };
 }
 
 /**
@@ -376,7 +384,7 @@ export function birthdayItemHtml(birthday) {
   const hasNameDay = birthday.next_name_day && Number.isInteger(birthday.name_day_days_until);
   const nameDayMeta = hasNameDay
     ? `<span class="birthday-item__name-day">`
-      + `${esc(t('birthdays.inDays', { days: birthday.name_day_days_until }))} · `
+      + `${esc(countdownLabel(birthday.name_day_days_until))} · `
       + `${esc(formatDate(birthday.next_name_day))} · ${esc(t('birthdays.celebratesNameDay'))}`
       + '</span>'
     : '';
@@ -674,8 +682,12 @@ async function onListClick(e) {
   }
 }
 
+// Ohne Bild und ohne Namen stand hier das "?" aus initials() - es las sich
+// wie ein Hilfe-Knopf (Critique 2026-09-26). Die Kamera sagt, was ein Tipp
+// auf die Flaeche tut; mit Namen bleiben die Initialen.
 function birthdayPreviewHtml(name, photoData) {
   if (photoData) return `<img class="birthday-preview__image" src="${photoData}" alt="${esc(name || '')}">`;
+  if (!String(name || '').trim()) return '<i data-lucide="camera" class="birthday-preview__glyph" aria-hidden="true"></i>';
   return `<span class="birthday-preview__fallback">${esc(initials(name))}</span>`;
 }
 
@@ -821,7 +833,7 @@ function openBirthdayModal({ mode, birthday = null }) {
               <button type="button" class="birthday-modal__photo-action" id="bd-photo-edit" aria-label="${t('birthdays.photoLabel')}" title="${t('birthdays.photoLabel')}">
                 <i data-lucide="pencil" aria-hidden="true"></i>
               </button>
-              <button type="button" class="birthday-modal__photo-action birthday-modal__photo-action--danger" id="bd-remove-photo" aria-label="${t('birthdays.removePhoto')}" title="${t('birthdays.removePhoto')}">
+              <button type="button" class="birthday-modal__photo-action birthday-modal__photo-action--danger" id="bd-remove-photo" aria-label="${t('birthdays.removePhoto')}" title="${t('birthdays.removePhoto')}"${photoData ? '' : ' hidden'}>
                 <i data-lucide="trash-2" aria-hidden="true"></i>
               </button>
             </div>
@@ -861,9 +873,14 @@ function openBirthdayModal({ mode, birthday = null }) {
       const preview = panel.querySelector('#birthday-preview');
       const fileInput = panel.querySelector('#bd-photo');
       const photoEdit = panel.querySelector('#bd-photo-edit');
+      // Den Entfernen-Knopf gibt es nur mit Bild: ein roter Muelleimer fuer
+      // ein Bild, das es nicht gibt, war eine Handlung ohne Gegenstand.
+      const removePhoto = panel.querySelector('#bd-remove-photo');
       const renderPreview = () => {
         preview.replaceChildren();
         preview.insertAdjacentHTML('beforeend', birthdayPreviewHtml(nameInput.value.trim(), photoData));
+        window.lucide?.createIcons({ el: preview });
+        removePhoto.hidden = !photoData;
       };
       nameInput.addEventListener('input', renderPreview);
       preview.addEventListener('click', () => fileInput?.click());
@@ -887,10 +904,13 @@ function openBirthdayModal({ mode, birthday = null }) {
           window.yuvomi?.showToast(err.message, 'danger');
         }
       });
-      panel.querySelector('#bd-remove-photo').addEventListener('click', () => {
+      removePhoto.addEventListener('click', () => {
         photoData = null;
         if (fileInput) fileInput.value = '';
         renderPreview();
+        // Der Knopf verschwindet unter dem Fokus - der Fokus geht an "Bild
+        // waehlen" daneben, nicht an BODY.
+        photoEdit?.focus();
       });
 
       const reminderOffset = panel.querySelector('#bd-reminder-offset');
@@ -1171,4 +1191,5 @@ export const __test = {
   // Der Weg zur Leseansicht (#1348): wohin ein Tipp fuehrt und welcher Dialog
   // aufgeht, sieht nur, wer `openModal` die Optionen abnimmt.
   onListClick, openBirthdayModal,
+  birthdayPreviewHtml,
 };

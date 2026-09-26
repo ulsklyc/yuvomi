@@ -432,7 +432,7 @@ function renderTrendChart() {
       <p class="sr-only">${view.ctx.esc(summary)}</p>
       <div class="budget-stats__trend-wrap">
         <div class="budget-stats__plot">
-          <svg class="budget-stats__trend" viewBox="0 0 ${CHART.W} ${CHART.H}" aria-hidden="true">
+          <svg class="chart budget-stats__trend" viewBox="0 0 ${CHART.W} ${CHART.H}" aria-hidden="true">
             ${chartGridMarkup(0, max, (val) => formatMoneyAxis(val, view.ctx.currency))}
             ${chartXLabelsMarkup(s.map((p) => periodLabel(p.period)))}
             <polyline fill="none" stroke="var(--color-success)" stroke-width="2"

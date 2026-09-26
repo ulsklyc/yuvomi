@@ -891,7 +891,7 @@ function renderBody() {
       // rohen Grenzen (reportRangeFrom/To) braucht reportShowsToday() für die
       // Containment-Prüfung von „Aktuell" bei Auflösung „Woche".
       onPeriod: ({ from, to }) => {
-        state.reportPeriod = `${formatDate(from)} – ${formatDate(to)}`;
+        state.reportPeriod = `${formatDate(from)} - ${formatDate(to)}`;
         state.reportRangeFrom = from;
         state.reportRangeTo   = to;
         if (state.activeTab === 'reports' && state.range === 'week') {

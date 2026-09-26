@@ -342,19 +342,26 @@
   background: var(--color-fill-well);
   font-size: var(--text-2xl);
 }
-.rw-reward-card__icon i { width: 22px; height: 22px; color: var(--color-text-secondary); }
+/* `svg`, nicht `i`: Lucide ersetzt das <i> - die alte Regel griff nie, und die
+ * Ersatz-Glyphe (Praemie ohne eigenes Zeichen) stand ungemessen in der Kachel. */
+.rw-reward-card__icon svg { width: var(--icon-xl); height: var(--icon-xl); flex-shrink: 0; color: var(--color-text-secondary); }
 .rw-reward-card__body { flex: 1 1 auto; }
 .rw-reward-card__name { margin: 0; font-weight: 600; color: var(--color-text-primary); }
 .rw-reward-card__desc { margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--color-text-secondary); }
 .rw-reward-card__foot {
   display: flex;
+  /* Preis und Aktionen passen in der schmalsten Kachel (235px Innenbreite bei
+   * 1440px) nicht nebeneinander, seit die Glyphen bemessen sind - vorher
+   * schrumpften sie auf 0px und versteckten den Ueberlauf. Die Aktionen
+   * brechen dann in eine eigene Zeile und bleiben rechts. */
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
   margin-top: auto;
   padding-top: var(--space-2);
 }
-.rw-reward-card__actions { display: flex; align-items: center; gap: var(--space-2); }
+.rw-reward-card__actions { display: flex; align-items: center; gap: var(--space-2); margin-inline-start: auto; }
 /* Die Stückzahl steht im Körper unter der Beschreibung, nicht neben dem Preis:
  * `__foot` teilt mit `space-between` in genau zwei Seiten, ein drittes Kind
  * risse die Reihe auseinander. Sie ist eine Auskunft über die Prämie, kein
@@ -372,7 +379,8 @@
   font-size: var(--text-sm);
   color: var(--color-text-primary);
 }
-.rw-cost i { width: 15px; height: 15px; }
+/* Die Muenze traegt `.icon-md` im Markup (Groesse + flex-shrink: 0) - eine
+ * Regel auf `.rw-cost i` griff nie, Lucide ersetzt das <i> (Critique 2026-09-26). */
 
 .rw-tag {
   display: inline-block;

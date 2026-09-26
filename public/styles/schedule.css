@@ -647,7 +647,12 @@
     align-items: start;
   }
 
-  .schedule-library--shifts > h2 {
+  /* Kopf (Ueberschrift + Vorlagen) und Leerzustand ueber beide Spalten -
+   * der Kopf steckt seit dem Vorlagen-Umbau in `.schedule-library__head`;
+   * ein Selektor auf `> h2` griff ins Leere, und die erste Karte rutschte
+   * neben die Ueberschrift. */
+  .schedule-library--shifts > .schedule-library__head,
+  .schedule-library--shifts > .empty-state {
     grid-column: 1 / -1;
   }
 
@@ -709,6 +714,13 @@
 
 /* ---- Uebersicht-Tab: mehrere Personen nebeneinander ---- */
 
+/* Wie `.schedule-page`: die Tab-Sektionen sind Grids, und eine implizite
+ * `auto`-Spur waechst mit dem breitesten Kind - mobil schob die Werkzeugleiste
+ * (441px bei 390) Sektion und Leerzustand ueber den Rand. */
+.schedule-overview {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .schedule-overview__toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -720,8 +732,10 @@
 
 .schedule-overview__week-nav {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .schedule-overview__week-label {

@@ -41,7 +41,8 @@ import { esc } from '/utils/html.js';
  * der Preis dafür, EINE Geometrie zu haben statt einer pro Modul.
  * 600x200 ist ein Seitenverhältnis, kein Pixelmaß: das SVG skaliert
  * proportional (kein `preserveAspectRatio="none"`), die Strichstärken hält
- * `vector-effect="non-scaling-stroke"` konstant.
+ * `vector-effect="non-scaling-stroke"` konstant, die Achsenschrift die Klasse
+ * `.chart` am SVG (panel.css) - jedes SVG dieser Geometrie traegt sie.
  */
 export const CHART = Object.freeze({ W: 600, H: 200, PAD_L: 56, PAD_R: 12, PAD_T: 14, PAD_B: 26 });
 
@@ -72,7 +73,10 @@ export function chartGridMarkup(min, max, formatTick) {
     const gy = top + (k * (bottom - top)) / 4;
     const val = max - (k * (max - min)) / 4;
     out.push(`<line class="chart__grid" x1="${PAD_L}" y1="${gy.toFixed(1)}" x2="${W - PAD_R}" y2="${gy.toFixed(1)}" vector-effect="non-scaling-stroke" />`);
-    out.push(`<text x="${PAD_L - 6}" y="${(gy + 3.5).toFixed(1)}" class="chart__axis chart__axis--y" text-anchor="end">${esc(formatTick(val, wholeTicks))}</text>`);
+    // y = die Gitterlinie selbst: `.chart__axis--y` zentriert per
+    // dominant-baseline. Der fruehere Versatz (+3.5 Einheiten) passte nur zu
+    // einer Schrift, die mit dem Diagramm skaliert (panel.css, `.chart`).
+    out.push(`<text x="${PAD_L - 6}" y="${gy.toFixed(1)}" class="chart__axis chart__axis--y" text-anchor="end">${esc(formatTick(val, wholeTicks))}</text>`);
   }
   return out.join('');
 }
