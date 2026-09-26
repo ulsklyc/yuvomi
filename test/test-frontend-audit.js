@@ -514,6 +514,63 @@ test('runtime locale changes keep language and writing direction synchronized', 
   );
 });
 
+/**
+ * DIE WERKZEUGE DER SEITENLEISTE SPRECHEN DIE NEUE SPRACHE (Codex an #1477,
+ * Thread 4112556723). Suche und Einklappen stehen seit der Critique
+ * 2026-09-26 in der Logo-Zeile - ausserhalb von `.nav-sidebar__items`, das
+ * `rebuildNavigation()` neu baut. Ihre Namen wurden nur beim Aufbau der Shell
+ * gesetzt, nach einem Sprachwechsel las der Screenreader (und der Tooltip)
+ * weiter die alte Sprache. Gefahren wird die echte Funktion aus router.js,
+ * dazu die Zusage, dass der Sprachpfad sie aufruft.
+ */
+test('Suche und Einklappen der Seitenleiste folgen dem Sprachwechsel', async () => {
+  const { createContext, runInContext } = await import('node:vm');
+  const router = read('../public/router.js');
+  const fnSource = (name) => {
+    const start = router.indexOf(`function ${name}(`);
+    assert.ok(start >= 0, `router.js hat keine Funktion ${name}() mehr`);
+    let depth = 0;
+    for (let i = router.indexOf('{', start); i < router.length; i += 1) {
+      if (router[i] === '{') depth += 1;
+      else if (router[i] === '}' && --depth === 0) return router.slice(start, i + 1);
+    }
+    throw new Error(`${name}: keine schliessende Klammer`);
+  };
+  const el = () => {
+    const attrs = new Map();
+    return { attrs, setAttribute: (k, v) => attrs.set(k, String(v)), getAttribute: (k) => attrs.get(k) ?? null };
+  };
+  const search = el();
+  const toggle = el();
+  const root = { querySelector: (sel) => ({ '.nav-sidebar__search': search, '.nav-sidebar__toggle': toggle })[sel] ?? null };
+  let locale = 'de';
+  let collapsed = false;
+  const context = createContext({
+    t: (key) => `${locale}:${key}`,
+    navigator: { platform: 'MacIntel' },
+    document: {
+      querySelector: (sel) => (sel === '.nav-sidebar__logo-actions' ? root : null),
+      documentElement: { classList: { contains: (c) => c === 'sidebar-collapsed' && collapsed } },
+    },
+  });
+  const sync = runInContext(`${['isApplePlatform', 'searchShortcutLabel', 'syncSidebarTools'].map(fnSource).join('\n')}\n;syncSidebarTools`, context);
+
+  sync();
+  assert.equal(search.getAttribute('aria-label'), 'de:nav.search (\u2318K)');
+  assert.equal(toggle.getAttribute('aria-label'), 'de:nav.sidebarCollapse');
+  locale = 'en';
+  collapsed = true;
+  sync();
+  assert.equal(search.getAttribute('aria-label'), 'en:nav.search (\u2318K)', 'die Suche nennt sich nach dem Wechsel in der alten Sprache');
+  assert.equal(search.getAttribute('title'), 'en:nav.search (\u2318K)', 'der Tooltip der Suche bleibt in der alten Sprache');
+  assert.equal(toggle.getAttribute('aria-label'), 'en:nav.sidebarExpand', 'Einklappen nennt sich in der alten Sprache oder im falschen Zustand');
+  assert.equal(toggle.getAttribute('title'), 'en:nav.sidebarExpand');
+
+  const rebuild = /function rebuildNavigation\([\s\S]*?\n\}/.exec(router)?.[0] ?? '';
+  assert.match(rebuild, /if \(updateLabels\) \{[\s\S]*?syncSidebarTools\(\);[\s\S]*?\n  \}/,
+    'der Sprachpfad (rebuildNavigation mit updateLabels) zieht die Namen der Logo-Zeile nicht nach');
+});
+
 test('install prompt waits for initial translations before rendering text', () => {
   const i18n = read('../public/i18n.js');
   const prompt = read('../public/components/yuvomi-install-prompt.js');

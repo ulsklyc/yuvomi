@@ -1079,6 +1079,29 @@ function searchShortcutLabel() {
   return isApplePlatform() ? '\u2318K' : 'Ctrl+K';
 }
 
+/**
+ * Namen der Werkzeuge in der Logo-Zeile der Seitenleiste (Suche, Einklappen).
+ * Sie stehen ausserhalb von `.nav-sidebar__items`, das `rebuildNavigation()`
+ * neu baut - also zieht der Sprachpfad sie hier nach (Codex an #1477).
+ * Einklappen nennt die Handlung, die der Klick ausloest, also haengt sein
+ * Name am Zustand.
+ */
+function syncSidebarTools(root = document.querySelector('.nav-sidebar__logo-actions')) {
+  const search = root?.querySelector('.nav-sidebar__search');
+  if (search) {
+    const searchLabel = `${t('nav.search')} (${searchShortcutLabel()})`;
+    search.setAttribute('aria-label', searchLabel);
+    search.setAttribute('title', searchLabel);
+  }
+  const toggle = root?.querySelector('.nav-sidebar__toggle');
+  if (toggle) {
+    const collapsed = document.documentElement.classList.contains('sidebar-collapsed');
+    const toggleLabel = collapsed ? t('nav.sidebarExpand') : t('nav.sidebarCollapse');
+    toggle.setAttribute('aria-label', toggleLabel);
+    toggle.setAttribute('title', toggleLabel);
+  }
+}
+
 /** Initialen fuer die Avatar-Scheibe ohne Bild (wie in den Einstellungen). */
 function accountInitials(name) {
   return String(name || '').trim().split(/\s+/).map((w) => w[0] ?? '').join('').toUpperCase().slice(0, 2);
@@ -4729,6 +4752,7 @@ function rebuildNavigation({ updateLabels = true } = {}) {
     if (navBottom)    navBottom.setAttribute('aria-label', t('nav.navigation'));
     if (moreBtnLabel) moreBtnLabel.textContent = t('nav.more');
     syncSidebarAccount();
+    syncSidebarTools();
   }
 
   if (navSidebarItems) {
