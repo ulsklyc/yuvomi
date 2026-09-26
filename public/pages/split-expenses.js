@@ -10,6 +10,7 @@ import { openDetailView } from '/components/detail-view.js';
 import { t, formatDate, getLocale, getNumberFormat, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
+import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { stagger } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { formatMoney, amountPlaceholder, toDecimalString, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
@@ -170,13 +171,17 @@ export async function render(container, { user, embedded = false, onAddableChang
               <i data-lucide="plus" aria-hidden="true"></i>
             </button>`}
           </div>
-          <label class="split-search" for="split-group-search">
-            <span class="split-search__label">${t('splitExpenses.searchGroups')}</span>
-            <span class="split-search__control">
-              <i data-lucide="search" aria-hidden="true"></i>
-              <input id="split-group-search" type="search" placeholder="${t('splitExpenses.searchGroups')}" autocomplete="off">
-            </span>
-          </label>
+          <!-- Das geteilte Suchfeld (gefuellte Kapsel) statt eines eigenen mit
+               sichtbarem Label darueber, das nur den Platzhalter wiederholte
+               (Komponenten-Kanon, Critique 2026-09-26 P1). -->
+          ${renderPageSearch({
+    id: 'split-group-search',
+    label: t('splitExpenses.searchGroups'),
+    placeholder: t('splitExpenses.searchGroups'),
+    value: state.query,
+    clearLabel: t('common.searchClear'),
+    className: 'split-search',
+  })}
           <!-- Geteilter Umschalter-Baustein des Budget-Moduls statt eigener
                Pillen-Optik, und role="radiogroup" statt role="group": eine
                Einfachauswahl, die ihren Zustand ansagt und über die geteilte
@@ -382,16 +387,16 @@ function bindShell() {
   _container.querySelector('#split-add-group')?.addEventListener('click', () => openGroupModal());
   _container.querySelector('#split-add-expense')?.addEventListener('click', () => openExpenseModal());
   findPageFab('split-fab')?.addEventListener('click', () => openExpenseModal());
-  let groupSearchTimer;
-  _container.querySelector('#split-group-search')?.addEventListener('input', (e) => {
-    const value = e.target.value.trim();
-    clearTimeout(groupSearchTimer);
-    groupSearchTimer = setTimeout(async () => {
-      state.query = value;
+  // 250ms wie vorher: die Suche laedt die Gruppen vom Server neu.
+  wirePageSearch(_container, {
+    id: 'split-group-search',
+    delay: 250,
+    onQuery: async (value) => {
+      state.query = value.trim();
       await loadGroups();
       await loadGroupData();
       renderAll();
-    }, 250);
+    },
   });
   _statusTablist = wireTablist(_container.querySelector('#split-status-filter'), {
     activeId: state.groupStatus,
@@ -1306,7 +1311,7 @@ async function openGroupModal(group = null) {
         <label>${t('splitExpenses.currency')}<select class="input" name="default_currency">${state.meta.currencies.map((c) => `<option value="${c}" ${c === (group?.default_currency || currency) ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
         ${isEdit ? renderGroupMemberEditor(candidates) : ''}
         ${isEdit ? renderGroupDefaults(group) : ''}
-        <div class="modal-actions">
+        <div class="modal-panel__footer modal-panel__footer--plain">
           <button class="btn btn--secondary" type="button" id="split-cancel-group">${t('common.cancel')}</button>
           <button class="btn btn--primary" type="submit" id="split-save-group">${t('common.save')}</button>
         </div>
@@ -1445,10 +1450,14 @@ function openExpenseModal(expense = null, prefill = null) {
           hint: t('splitExpenses.receiptsHint'),
           icon: 'receipt',
         })}
-        <div class="modal-actions">
-          ${isEdit ? `<button class="btn btn--danger" type="button" id="split-delete-expense">${t('common.delete')}</button>` : ''}
-          <button class="btn btn--secondary" type="button" id="split-cancel-expense">${t('common.cancel')}</button>
-          <button class="btn btn--primary" type="submit" id="split-save-expense">${t('common.save')}</button>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          ${isEdit ? `<button class="btn btn--danger-outline" type="button" id="split-delete-expense" style="margin-inline-end:auto">
+            <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
+          </button>` : ''}
+          <div class="split-form__footer-actions">
+            <button class="btn btn--secondary" type="button" id="split-cancel-expense">${t('common.cancel')}</button>
+            <button class="btn btn--primary" type="submit" id="split-save-expense">${t('common.save')}</button>
+          </div>
         </div>
       </form>
     `,
@@ -1556,7 +1565,7 @@ function openSettlementModal() {
           icon: 'receipt',
           maxItems: 1,
         })}
-        <div class="modal-actions">
+        <div class="modal-panel__footer modal-panel__footer--plain">
           <button class="btn btn--secondary" type="button" id="split-cancel-settlement">${t('common.cancel')}</button>
           <button class="btn btn--primary" type="submit" id="split-save-settlement">${t('splitExpenses.registerPayment')}</button>
         </div>
@@ -1634,10 +1643,12 @@ async function openMemberModal() {
       <form id="split-member-form" class="split-form">
         <label>${t('splitExpenses.member')}<select class="input" name="member_ref">${memberCandidateOptions(candidates)}</select></label>
         <label>${t('splitExpenses.role')}<select class="input" name="role"><option value="guest">${t('splitExpenses.roleGuest')}</option><option value="admin">${t('splitExpenses.roleAdmin')}</option></select></label>
-        <div class="modal-actions">
-          <button class="btn btn--secondary" type="button" id="split-new-guest">${t('splitExpenses.createGuest')}</button>
-          <button class="btn btn--secondary" type="button" id="split-cancel-member">${t('common.cancel')}</button>
-          <button class="btn btn--primary" type="submit" id="split-save-member">${t('common.save')}</button>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button class="btn btn--secondary" type="button" id="split-new-guest" style="margin-inline-end:auto">${t('splitExpenses.createGuest')}</button>
+          <div class="split-form__footer-actions">
+            <button class="btn btn--secondary" type="button" id="split-cancel-member">${t('common.cancel')}</button>
+            <button class="btn btn--primary" type="submit" id="split-save-member">${t('common.save')}</button>
+          </div>
         </div>
       </form>
     `,
@@ -1678,7 +1689,7 @@ function openGuestModal() {
         </div>
         <label>${t('splitExpenses.birthDate')}<input class="input" name="birth_date" type="text" placeholder="${dateInputPlaceholder()}" inputmode="numeric"></label>
         <p class="form-hint">${t('splitExpenses.guestSyncHint')}</p>
-        <div class="modal-actions">
+        <div class="modal-panel__footer modal-panel__footer--plain">
           <button class="btn btn--secondary" type="button" id="split-cancel-guest">${t('common.cancel')}</button>
           <button class="btn btn--primary" type="submit" id="split-save-guest">${t('splitExpenses.createAndAddGuest')}</button>
         </div>

@@ -125,57 +125,10 @@
   font-weight: 800;
 }
 
-.split-search {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.split-search__label {
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-}
-
-.split-search__control {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  border: 1px solid var(--color-border-control);
-  border-radius: var(--radius-md);
-  padding: 0 var(--space-3);
-  background: var(--color-surface-2);
-}
-
-/* Tastaturfokus: das Feld darin ist randlos (outline: 0 unten), also zeigt
- * der TRÄGER den Zustand - dasselbe Rezept wie .input:focus im Feldkanon
- * (layout.css). Ohne diese Regel war das Suchfeld das einzige der App ohne
- * jeden sichtbaren Fokus (WCAG 2.4.7). */
-.split-search:focus-within {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-light);
-}
-
-.split-search input {
-  width: 100%;
-  min-height: 42px;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--color-text-primary);
-  /* Drop WebKit's native type=search magnifier; the explicit leading icon is
-   * the only magnifier this field should show. */
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-.split-search input::-webkit-search-decoration,
-.split-search input::-webkit-search-results-decoration,
-.split-search input::-webkit-search-results-button,
-.split-search input::-webkit-search-cancel-button {
-  -webkit-appearance: none;
-  appearance: none;
-  display: none;
-}
+/* Das Suchfeld ist das geteilte (renderPageSearch, page-search.css). Hier
+ * stand ein eigenes mit sichtbarem Label ueber dem Feld, Kante, 12px-Ecke und
+ * eigenem Fokusring - eine der fuenf Suchfeld-Varianten der Critique
+ * 2026-09-26 (P1). Die Seitenleiste braucht vom Feld nichts Eigenes. */
 
 /* Statusfilter der Gruppenliste (Aktiv/Archiviert, #574). Teilt die
  * .filter-chip-Vokabel mit Aufgaben/Dokumenten. */
@@ -489,6 +442,16 @@ button.split-expense:hover {
 
 .split-form-row > label {
   flex: 1 1 0;
+}
+
+/* Abbrechen und Speichern bleiben ein Paar, wenn der Dialogfuss umbricht
+ * (mobil: Loeschen bzw. „Gast erstellen" oben links, das Paar darunter
+ * rechts) - frei umbrechend stand „Speichern" allein in der zweiten Zeile.
+ * Dieselbe Gruppe wie im Budget und in den Kontakten. */
+.split-form__footer-actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-inline-start: auto;
 }
 
 /* Formular-Gruppen im Sheet: Inset-Well statt Kasten (tokens.css). */

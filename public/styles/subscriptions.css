@@ -90,49 +90,14 @@
   gap: var(--space-3);
 }
 
+/* Das Suchfeld ist das geteilte (renderPageSearch, gefuellte Kapsel aus
+ * page-search.css). Hier steht nur noch, wie es in der Werkzeugzeile waechst:
+ * vorher trug die Datei ein eigenes Feld mit 12px-Ecke, Kante und Flaeche -
+ * eine der fuenf Suchfeld-Varianten der Critique 2026-09-26 (P1). */
 .subscriptions-search {
-  position: relative;
   flex: 1 1 12rem;
   min-width: 0;
   max-width: 28rem;
-}
-
-.subscriptions-search svg {
-  position: absolute;
-  left: var(--space-3);
-  top: 50%;
-  width: 18px;
-  transform: translateY(-50%);
-  color: var(--color-text-secondary);
-}
-
-.subscriptions-search input {
-  width: 100%;
-  min-height: 44px;
-  padding: 0 var(--space-3) 0 calc(var(--space-3) + 26px);
-  border: 1px solid var(--color-border-control);
-  border-radius: var(--radius-md);
-  /* Eingabefelder sind opak: Glass auf einem Feld, in das getippt wird, lässt
-   * den Text über den durchscheinenden Untergrund laufen (DESIGN.md §6). */
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  /* Drop WebKit's native type=search magnifier; the explicit leading icon is
-   * the only magnifier this field should show. */
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-.subscriptions-search input::-webkit-search-decoration,
-.subscriptions-search input::-webkit-search-results-decoration,
-.subscriptions-search input::-webkit-search-results-button,
-.subscriptions-search input::-webkit-search-cancel-button,
-.subscriptions-combobox__control .form-input::-webkit-search-decoration,
-.subscriptions-combobox__control .form-input::-webkit-search-results-decoration,
-.subscriptions-combobox__control .form-input::-webkit-search-results-button,
-.subscriptions-combobox__control .form-input::-webkit-search-cancel-button {
-  -webkit-appearance: none;
-  appearance: none;
-  display: none;
 }
 
 /* Die Kennzahl-Zeile ist .metric-grid (budget.css) mit --summary-cards: 4.
@@ -557,10 +522,9 @@
   white-space: nowrap;
 }
 
-.subscription-card__actions {
-  display: flex;
-  gap: var(--space-1);
-}
+/* Die Knoepfe sind die geteilten Zeilenaktionen (`.row-actions` /
+ * `.row-action`, layout.css) - vorher violett umrandete `btn--secondary
+ * btn--icon`, und Loeschen stand im selben Violett statt im Danger-Ton. */
 
 /* „Ueber Budget" nennt sich im Label und traegt das Warnsymbol davor - im
  * Ton der Ueberschreitung (Danger, wie im Plan). */
@@ -779,10 +743,6 @@
 
 .subscriptions-combobox__control .form-input {
   padding-left: calc(var(--space-3) + 22px);
-  /* Drop WebKit's native type=search magnifier; the explicit leading icon is
-   * the only magnifier this field should show. */
-  -webkit-appearance: none;
-  appearance: none;
 }
 
 .subscriptions-combobox__options {
@@ -1015,9 +975,16 @@
   padding: 2px;
 }
 
-.subscriptions-metadata-row__actions {
-  display: flex;
-  gap: var(--space-1);
+/* Layout der Aktionen kommt aus `.row-actions` (layout.css). Die
+ * Verschiebe-Knoepfe am Listenrand sind aria-disabled (fokussierbar, der Klick
+ * wird verworfen); `.row-action` kennt diesen Zustand noch nicht selbst, also
+ * nimmt ihn die Stelle zurueck, die ihn setzt - wie `.btn[aria-disabled]`. */
+.subscriptions-metadata-row__actions .row-action[aria-disabled="true"],
+.subscriptions-metadata-row__actions .row-action[aria-disabled="true"]:hover {
+  /* Wirklich ohne Wirkung - der eine Fall, fuer den --color-text-disabled da ist. */
+  color: var(--color-text-disabled);
+  background: transparent;
+  cursor: not-allowed;
 }
 
 .subscriptions-metadata-row__view > i {
@@ -1096,10 +1063,6 @@
 
   .subscriptions-notifications li .btn {
     grid-column: span 1;
-  }
-
-  .subscription-card__actions .btn {
-    flex: 1;
   }
 
   .subscriptions-section-head {

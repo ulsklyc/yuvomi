@@ -23,6 +23,8 @@ import { formatMoney, amountPlaceholder, amountStep, applyAmountFormat, amountIs
 import { attachOverlay } from '/utils/overlay-history.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { openDetailView } from '/components/detail-view.js';
+import { rowActionHtml } from '/utils/row-action.js';
+import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 
 // Auslastung, ab der ein Budget „knapp" ist - dieselbe Zahl wie im Plan
 // (budget-plans.js `toneForRatio`), damit beide Tabs dieselbe Grenze ziehen.
@@ -42,6 +44,8 @@ let state = {
   user: null,
 };
 let container = null;
+/** Handle des geteilten Suchfelds (wirePageSearch) - Zuruecksetzen leert es mit. */
+let searchField = null;
 
 // --------------------------------------------------------
 // Nur-lesen (#467, #1265 P7)
@@ -221,11 +225,14 @@ export async function render(target, { user } = {}) {
            Dokumenten und der Buchungsliste). Was gerade einschraenkt, steht
            darunter als abwaehlbarer Chip - nur dann, sonst kostet es nichts. -->
       <div class="subscriptions-toolbar">
-        <label class="subscriptions-search">
-          <i data-lucide="search" aria-hidden="true"></i>
-          <span class="sr-only">${t('subscriptions.searchLabel')}</span>
-          <input id="subscriptions-search" type="search" placeholder="${t('subscriptions.searchPlaceholder')}" autocomplete="off">
-        </label>
+        ${renderPageSearch({
+    id: 'subscriptions-search',
+    label: t('subscriptions.searchLabel'),
+    placeholder: t('subscriptions.searchPlaceholder'),
+    value: state.query,
+    clearLabel: t('common.searchClear'),
+    className: 'subscriptions-search',
+  })}
         <button type="button" class="btn btn--secondary subscriptions-filter-btn" id="subscriptions-filters" aria-haspopup="dialog">
           <i data-lucide="sliders-horizontal" class="icon-md" aria-hidden="true"></i>
           <span class="subscriptions-filter-btn__label">${t('subscriptions.filters')}</span>
@@ -344,8 +351,7 @@ async function resetFilters() {
   state.categoryId = '';
   state.paymentMethodId = '';
   state.status = 'all';
-  const search = container.querySelector('#subscriptions-search');
-  if (search) search.value = '';
+  searchField?.clear();
   syncFilterSheet();
   await reload();
 }
@@ -478,13 +484,14 @@ function syncFilterSheet() {
 }
 
 function bindToolbar() {
-  let searchTimer;
-  container.querySelector('#subscriptions-search').addEventListener('input', (event) => {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(async () => {
-      state.query = event.target.value.trim();
+  // 250ms wie vorher: die Suche ist ein SERVER-Filter (`?q=`), kein Client-Filter.
+  searchField = wirePageSearch(container, {
+    id: 'subscriptions-search',
+    delay: 250,
+    onQuery: async (value) => {
+      state.query = value.trim();
       await reload();
-    }, 250);
+    },
   });
   container.querySelector('#subscriptions-filters')?.addEventListener('click', openFilterSheet);
   container.querySelector('#subscriptions-active-filters')?.addEventListener('click', (event) => {
@@ -867,13 +874,9 @@ function renderCard(subscription) {
         </span>
         ${ro ? '' : `<span class="sr-only">${t('common.edit')}</span>`}
       </button>
-      ${ro ? '' : `<div class="subscription-card__actions">
-        <button class="btn btn--secondary btn--icon" data-action="renew" aria-label="${t('subscriptions.markRenewed')}">
-          <i data-lucide="calendar-check" aria-hidden="true"></i>
-        </button>
-        <button class="btn btn--secondary btn--icon" data-action="delete" aria-label="${t('subscriptions.delete')}">
-          <i data-lucide="trash-2" aria-hidden="true"></i>
-        </button>
+      ${ro ? '' : `<div class="row-actions subscription-card__actions">
+        ${rowActionHtml({ icon: 'calendar-check', action: 'renew', label: t('subscriptions.markRenewedNamed', { name: subscription.name }) })}
+        ${rowActionHtml({ icon: 'trash-2', tone: 'danger', action: 'delete', label: t('common.deleteNamed', { name: subscription.name }) })}
       </div>`}
     </article>
     </div>
@@ -996,6 +999,10 @@ function currencyItems() {
   }));
 }
 
+// Ein Auswahlfeld mit Tippfilter, kein Suchfeld: es steht im Formular neben
+// anderen Feldern, traegt ein sichtbares Label und zeigt den GEWAEHLTEN Wert
+// („EUR · Euro"). Deshalb `type="text"` (die Rolle kommt aus role="combobox")
+// und die Feldform des Formulars, nicht die Suchkapsel (Komponenten-Kanon).
 function comboboxMarkup({ id, label, items, value = '', placeholder }) {
   const selected = items.find((item) => String(item.value) === String(value));
   return `
@@ -1003,7 +1010,7 @@ function comboboxMarkup({ id, label, items, value = '', placeholder }) {
       <label class="form-label" for="${id}-search">${label}</label>
       <div class="subscriptions-combobox__control">
         <i data-lucide="search" aria-hidden="true"></i>
-        <input class="form-input" id="${id}-search" type="search" role="combobox"
+        <input class="form-input" id="${id}-search" type="text" role="combobox"
                aria-autocomplete="list" aria-expanded="false" aria-controls="${id}-options"
                autocomplete="off" placeholder="${esc(placeholder)}" value="${esc(selected?.label || '')}">
         <input id="${id}" type="hidden" value="${esc(selected?.value ?? '')}">
@@ -1716,25 +1723,22 @@ async function openSettingsModal() {
 function metadataRows(items, kind) {
   const isCat = kind === 'categories';
   const editLabel = isCat ? t('subscriptions.editCategory') : t('subscriptions.editPaymentMethod');
-  const deleteLabel = isCat ? t('subscriptions.deleteCategory') : t('subscriptions.deletePaymentMethod');
-  return items.map((item, index) => `
+  return items.map((item, index) => {
+    // Die Zeilenaktionen nennen, WORAN sie wirken: vier Knoepfe je Zeile, die
+    // alle nur „Nach oben" oder „Kategorie loeschen" hiessen, waren fuer einen
+    // Screenreader in jeder Zeile dieselben (Komponenten-Kanon, DESIGN.md).
+    const name = isCat ? categoryLabel(item) : paymentMethodLabel(item);
+    const named = (catKey, methodKey) => t(isCat ? catKey : methodKey, { name });
+    return `
     <li data-id="${item.id}" data-kind="${kind}">
       <div class="subscriptions-metadata-row__view">
         ${isCat ? `<i style="background:${esc(item.color)}"></i>` : '<i data-lucide="credit-card" aria-hidden="true"></i>'}
-        <span>${esc(isCat ? categoryLabel(item) : paymentMethodLabel(item))}</span>
-        <div class="subscriptions-metadata-row__actions">
-          <button class="btn btn--icon" data-move="-1" ${index === 0 ? 'aria-disabled="true"' : ''} aria-label="${t('subscriptions.moveUp')}">
-            <i data-lucide="chevron-up" aria-hidden="true"></i>
-          </button>
-          <button class="btn btn--icon" data-move="1" ${index === items.length - 1 ? 'aria-disabled="true"' : ''} aria-label="${t('subscriptions.moveDown')}">
-            <i data-lucide="chevron-down" aria-hidden="true"></i>
-          </button>
-          <button class="btn btn--icon" data-act="edit" aria-label="${editLabel}">
-            <i data-lucide="pencil" aria-hidden="true"></i>
-          </button>
-          <button class="btn btn--icon" data-act="delete" aria-label="${deleteLabel}">
-            <i data-lucide="trash-2" aria-hidden="true"></i>
-          </button>
+        <span>${esc(name)}</span>
+        <div class="row-actions subscriptions-metadata-row__actions">
+          ${rowActionHtml({ icon: 'chevron-up', label: t('subscriptions.moveUpNamed', { name }), attrs: { 'data-move': '-1', 'aria-disabled': index === 0 ? 'true' : null } })}
+          ${rowActionHtml({ icon: 'chevron-down', label: t('subscriptions.moveDownNamed', { name }), attrs: { 'data-move': '1', 'aria-disabled': index === items.length - 1 ? 'true' : null } })}
+          ${rowActionHtml({ icon: 'pencil', label: named('subscriptions.editCategoryNamed', 'subscriptions.editPaymentMethodNamed'), attrs: { 'data-act': 'edit' } })}
+          ${rowActionHtml({ icon: 'trash-2', tone: 'danger', label: named('subscriptions.deleteCategoryNamed', 'subscriptions.deletePaymentMethodNamed'), attrs: { 'data-act': 'delete' } })}
         </div>
       </div>
       <div class="subscriptions-metadata-row__edit" hidden>
@@ -1750,7 +1754,8 @@ function metadataRows(items, kind) {
         </div>
       </div>
     </li>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function openMetadataModal() {
