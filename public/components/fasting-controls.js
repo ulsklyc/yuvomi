@@ -322,7 +322,9 @@ export function updateFastingClock(root, active, last, settings = {}) {
   const days = root.querySelector('[data-fasting-days]');
   if (days) {
     days.hidden = !active;
-    days.textContent = active ? t('health.fasting.elapsedDays', { days: model.days }) : '';
+    // `model.days` zaehlt VOLLE Tage (0 am ersten Tag); der Satz nennt den
+    // laufenden Tag - die erste Stunde eines Fastens ist "Tag 1", nicht "Tag 0".
+    days.textContent = active ? t('health.fasting.elapsedDays', { days: model.days + 1 }) : '';
   }
   const clockSwitch = root.querySelector('.fasting-clock-switch');
   if (clockSwitch) clockSwitch.hidden = !active;

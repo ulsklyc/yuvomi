@@ -259,6 +259,28 @@ test('a resting fasting clock shows no zeros, no day and no elapsed/remaining sw
   }
 });
 
+test('the fasting day is an ordinal: the first day of a fast reads "day 1", never "day 0"', async () => {
+  // Critique 2026-09-26: eine Stunde nach dem Start stand "Tag 0". Das Modell
+  // zaehlt VOLLE Tage (`days`, 0 am ersten Tag) - die Anzeige nennt den
+  // laufenden Tag und rechnet deshalb eins drauf.
+  const { updateFastingClock } = await import('../public/components/fasting-controls.js');
+  const start = Date.parse('2026-09-26T08:00:00Z');
+  const active = { start_at: new Date(start).toISOString(), goal_minutes: 2880 };
+  const RealNow = Date.now;
+  const dayAt = (hours) => {
+    Date.now = () => start + hours * 3600e3;
+    const root = clockRoot(dialHost());
+    updateFastingClock(root, active, null, {});
+    return root.parts['[data-fasting-days]'].textContent;
+  };
+  try {
+    assert.equal(dayAt(1), 'health.fasting.elapsedDays{"days":1}', 'first hour: day 1');
+    assert.equal(dayAt(23.9), 'health.fasting.elapsedDays{"days":1}', 'still the first day');
+    assert.equal(dayAt(24), 'health.fasting.elapsedDays{"days":2}', 'after 24 h the second day begins');
+    assert.equal(dayAt(49), 'health.fasting.elapsedDays{"days":3}');
+  } finally { Date.now = RealNow; }
+});
+
 test('the fasting ring is a real stroke with round ends whose trace moves by transition', async () => {
   const { readFileSync } = await import('node:fs');
   const { eachRule } = await import('./css-rules.js');
