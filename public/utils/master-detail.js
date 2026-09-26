@@ -192,6 +192,10 @@ function inertHandle() {
  *        hier, damit Markierung und `refresh()` sie finden.
  * @param {boolean} [opts.deepLinkNarrow=false]
  *        `?open=` auch unter der Schwelle einloesen (oeffnet `openNarrow`).
+ * @param {(id: string) => void} [opts.onNarrowSync]
+ *        Unter der Schwelle OHNE `deepLinkNarrow`: Zurueck/Vor auf `?open=`
+ *        hat Auswahl und Adresse bewegt, die Seite zeigt den Eintrag auf ihre
+ *        Art (Rezepte: den Aufklapper aufmachen), ohne dass ein Blatt aufgeht.
  * @param {boolean} [opts.claimInitial=true]
  *        `false`: den `?open=` beim Aufbau NICHT einloesen und die Adresse
  *        stehen lassen - die Seite hat den Link schon selbst eingeloest
@@ -203,7 +207,7 @@ function inertHandle() {
  */
 export function mountMasterDetail({
   root, list, param = 'open', renderDetail, openNarrow, onEnter, onModeChange,
-  deepLinkNarrow = false, claimInitial = true, signal,
+  deepLinkNarrow = false, claimInitial = true, onNarrowSync, signal,
 } = {}) {
   if (!root) throw new TypeError('mountMasterDetail: root fehlt');
   const listEl = list ?? root.querySelector('.split-view__list');
@@ -499,6 +503,7 @@ export function mountMasterDetail({
     // sonst nennt die Adresse einen Eintrag, und zu sehen ist die Liste. Das
     // Zurueck AUS dem Blatt faengt der Router vorher ab (overlay-history).
     if (deepLinkNarrow) callNarrow(id);
+    else onNarrowSync?.(id);
   }
 
   const handle = {

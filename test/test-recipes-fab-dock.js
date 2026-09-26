@@ -746,3 +746,25 @@ test('Liste + Detail: die Kopie eines gespiegelten Rezepts unter dem Quellenfilt
   assert.ok(row.classList.contains('is-selected'), 'die Zeile der Kopie ist nicht markiert');
   assert.equal(__test.state.sourceFilter, 'all', 'der Quellenfilter steht noch');
 });
+
+/*
+ * ZURUECK/VOR UNTER DER SCHWELLE KLAPPT DAS GENANNTE REZEPT AUF (Codex an
+ * #1477, Thread 4112556732). Eintraege mit `?open=` entstehen in der Spalte;
+ * wird das Fenster schmal und geht der Nutzer zurueck, verbraucht der Baustein
+ * die Geste (Auswahl und Adresse wandern) - das Akkordeon blieb zu, die
+ * Adresse nannte ein Rezept, das nirgends zu sehen war. Dieselbe Einloesung
+ * wie beim Laden (openRecipeFromQuery): aufklappen, ins Bild holen.
+ */
+test('Liste + Detail, unter der Schwelle: Zurueck/Vor auf ?open= klappt das Rezept auf', async () => {
+  const doc = await renderFresh(DISHES, { split: false, path: '/recipes' });
+  await settle();
+  assert.equal(doc.querySelector('#recipe-detail-2').hidden, true, 'vorher zu - sonst misst der Test nichts');
+  const { handleMasterDetailPopstate } = await import('../public/utils/master-detail.js');
+  history.pushState(null, '', '/recipes?open=2');
+  assert.equal(handleMasterDetailPopstate(), true, 'die Geste gehoert dem Baustein - sonst misst der Test den Seitenneubau');
+  await settle();
+  assert.equal(doc.querySelector('#recipe-detail-2').hidden, false, 'die Adresse nennt Rezept 2, das Akkordeon blieb zu');
+  assert.equal(toggleOf(doc, 2).getAttribute('aria-expanded'), 'true');
+  assert.equal(doc.querySelector('#recipes-detail [data-md-body] .split-view__detail-title'), null,
+    'unter der Schwelle zeichnet nichts in die unsichtbare Spalte');
+});
