@@ -2684,6 +2684,15 @@ html.fab-anim-done .page-fab {
     --page-measure: 100%;
   }
 
+  /* DIE SPALTEN FLUCHTEN MIT DEM KOPF. Der Kopf zieht seinen Inhalt ueber
+   * `--page-inline-pad` auf die zentrierte Content-Spalte (1280px); ab einer
+   * Modulflaeche ueber 1280 + 2 x Gutter liefe der Baustein sonst voll, und bei
+   * 1920 begann die Liste 178px links vom Siegel und das Detail endete 178px
+   * rechts der Aktionen. Gedeckelt auf Content-Spalte plus die beiden Gutter,
+   * die Liste und Detail selbst als Polster tragen: dann loest
+   * `--page-inline-pad` darin zum Gutter auf, und beide Kanten stehen unter dem
+   * Kopf. Darunter (1440: 1220px Flaeche) greift die Deckelung nicht. Seiten,
+   * deren Koerper schon polstert (Aufgaben), sind schmaler als der Deckel. */
   .split-view {
     display: grid;
     grid-template-columns:
@@ -2691,6 +2700,9 @@ html.fab-anim-done .page-fab {
       minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
     column-gap: var(--space-6);
+    inline-size: 100%;
+    max-inline-size: calc(var(--content-max-width) + 2 * var(--page-gutter));
+    margin-inline: auto;
   }
 
   /* Beide Spalten scrollen fuer sich - das Detail bleibt stehen, waehrend man

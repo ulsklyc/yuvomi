@@ -1096,7 +1096,8 @@ Seitdem steht jede Seite hinter der Shell in **genau einem von drei Regimen**:
   oder Aufklapper). Ab einer Modulflaeche von `--layout-split-threshold` (75rem) steht links
   die Liste auf einer Bahn zwischen `--layout-list-min` und `--layout-list-max` (420-520px),
   rechts das Detail der ausgewaehlten Zeile mit eigenem Kopf (Titel, Aktionen), das fuer sich
-  scrollt. Die Auswahl steht in der Adresse (`?id=`, Zurueck-Taste), Pfeil hoch/runter
+  scrollt. Die Auswahl steht in der Adresse (`?open=<id>`, Zurueck-Taste - derselbe Parameter
+  wie der Deep-Link der globalen Suche und der Essenskarten, auf allen vier Seiten), Pfeil hoch/runter
   bewegt sie, Enter oeffnet, Esc im Detail fuehrt zur Zeile zurueck und in der Liste hebt es
   die Auswahl auf; ohne Auswahl ein ruhiger Leerzustand. Vorbild ist Apples Mail. Umsetzung:
   `.app-page--list-detail` an der Seitenwurzel (Container `module-surface`) plus der Baustein
@@ -1111,6 +1112,9 @@ Seitdem steht jede Seite hinter der Shell in **genau einem von drei Regimen**:
 Seitenleiste hat ein 1440er-Fenster 1220px Hauptspalte (Detailspalte da), ein 1280er 1060px
 (Lesemass), mit eingeklappter Leiste 1224px (Detailspalte da). Bei 1440 nimmt die Listenspur
 488px (40 %, samt Seitenpolster), das Detail 676px bis zur Kopfkante (gemessen 2026-09-26).
+Ueber 1344px Modulflaeche (Content-Spalte 1280 plus zwei Gutter) wird der Baustein nicht
+breiter, sondern steht mittig: Liste und Detail fluchten mit dem Kopf, der seinen Inhalt auf
+die Content-Spalte zieht (1920: beide Kanten bei 430 und 1710 statt 252 und 1888).
 
 **Das vierte Mass ist abgeschafft.** 960px (`data`) war ein Zwischenstand, keine Entscheidung:
 es liess 228px leer, ohne dass die Flaeche etwas trug. Zugeordnet am 2026-09-26:

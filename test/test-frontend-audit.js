@@ -1315,7 +1315,9 @@ test('#936: ein verknuepftes Rezept hat von der Essenskarte aus einen Ausgang', 
   // ist der ersten Fassung passiert. Geprueft wird deshalb der Aufruf innerhalb
   // von render(), nach dem Laden der Liste - vorher gaebe es keine Zeile zum
   // Aufklappen.
-  const renderAt = recipes.indexOf('export async function render(container)');
+  // Ohne schliessende Klammer: render() nimmt seit R4 ein Optionsobjekt
+  // (`{ signal }`) - die Regel ist der Aufruf im Rumpf, nicht die Signatur.
+  const renderAt = recipes.indexOf('export async function render(container');
   assert.ok(renderAt > 0, 'render() existiert');
   const renderBody = recipes.slice(renderAt);
   assert.match(renderBody, /renderRecipeList\(\);\s*(?:\n\s*\/\/[^\n]*)*\n\s*openRecipeFromQuery\(\);/,
@@ -6027,7 +6029,12 @@ test('der Zeilenname bricht in Wörtern, nicht in Zeichen', () => {
   const compact = recipes.slice(query);
   assert.match(compact, /\.recipe-row__inline-actions\s*\{\s*display:\s*none/,
     'die drei Inline-Aktionen müssen in der schmalen Zeile weichen');
-  assert.match(compact, /\.recipe-row__toggle \.list-row__meta\s*\{[\s\S]*?flex:\s*1 0 100%/,
+  // Die Zutatenzahl steht seit R4 im Slot `.recipe-row__sub` (zusammen mit
+  // "Diese Woche geplant"); das Flex-Kind der Zeile ist damit der Slot, und ER
+  // muss schmal die volle zweite Zeile nehmen.
+  assert.match(recipesJs, /sub\.className = 'recipe-row__sub';\s*sub\.appendChild\(meta\)/,
+    'die Zutatenzahl sitzt im Zeilen-Slot');
+  assert.match(compact, /\.recipe-row__sub\s*\{[^}]*display:\s*block[^}]*flex:\s*1 0 100%/,
     'die Zutatenzahl muss unter den Namen rücken - sie ist flex-shrink: 0 und nähme ihm sonst 70px');
 });
 
@@ -9296,7 +9303,8 @@ test('Inventar und Kontakte folgen der Kopfregel mobil: ein Werkzeugmenue, Suche
     'keine losen Werkzeugknoepfe im Kontakte-Kopf');
   // ... und die Kategorie-Chips als erstes Kind IM Port: fest ueber dem Port
   // begann die Liste bei y179 statt 114 (A8).
-  assert.match(contactsPage, /id="contacts-list" class="contacts-list page-scrollport"[^>]*>\s*<div class="contacts-filters page-chip-row"/);
+  // Weitere Klassen am Port (seit R4 `split-view__list`) aendern die Regel nicht.
+  assert.match(contactsPage, /id="contacts-list" class="contacts-list page-scrollport[^"]*"[^>]*>\s*<div class="contacts-filters page-chip-row"/);
   assert.doesNotMatch(contactsCss, /\.contacts-filters\s*\{[^}]*border-bottom/,
     'kein Trennstrich mehr zwischen festem Chrome und Port');
 });
@@ -17007,21 +17015,6 @@ test('PAGE-016: a page whose header runs full width puts nothing on the measure'
 
 const WIDTH_REGIMES = ['Lesemass', 'Liste + Detail', 'Flaeche'];
 
-/**
- * LISTE + DETAIL, NOCH NICHT EINGEHAENGT - DIESE LISTE DARF NUR SCHRUMPFEN.
- *
- * Die Tabelle nennt das Ziel-Regime, der Baustein kommt Modul fuer Modul.
- * Einhaengen heisst: Zeile loeschen. PAGE-017 wird rot, wenn ein Eintrag den
- * Baustein schon traegt (dann haelt eine tote Zeile nichts mehr offen) oder
- * wenn er nicht als Liste + Detail in der Tabelle steht.
- */
-const LIST_DETAIL_PENDING = new Set([
-  'contacts.js',
-  'tasks.js',
-  'recipes.js',
-  'inventory.js',
-]);
-
 /** Die Zuordnungstabelle aus DESIGN.md: Datei -> Regime. */
 function widthRegimeTable() {
   const design = read('../DESIGN.md');
@@ -17086,22 +17079,12 @@ test('PAGE-017: jede Seite steht in genau einem der drei Breitenregime', () => {
           `PAGE-017 ${name}: Lesemass verlangt reading/form, deklariert ist ${modes.join(',') || 'nichts'}`);
       }
     } else if (regime === 'Liste + Detail') {
-      const wired = usesListDetail(src) || modes.includes('split');
-      if (LIST_DETAIL_PENDING.has(name)) {
-        assert.ok(!wired,
-          `PAGE-017 ${name}: der Baustein ist eingehaengt - Zeile aus LIST_DETAIL_PENDING loeschen`);
-      } else {
-        assert.ok(wired,
-          `PAGE-017 ${name}: Liste + Detail verlangt .app-page--list-detail plus utils/master-detail.js (oder split)`);
-      }
+      assert.ok(usesListDetail(src) || modes.includes('split'),
+        `PAGE-017 ${name}: Liste + Detail verlangt .app-page--list-detail plus utils/master-detail.js (oder split)`);
     } else {
       assert.ok(!/app-page--list-detail/.test(src),
         `PAGE-017 ${name}: steht als Flaeche in der Tabelle, traegt aber den Liste-+-Detail-Baustein`);
     }
-  }
-  for (const name of LIST_DETAIL_PENDING) {
-    assert.equal(byFile.get(name), 'Liste + Detail',
-      `PAGE-017 ${name}: steht auf LIST_DETAIL_PENDING, in der Tabelle aber nicht als Liste + Detail`);
   }
 });
 
@@ -17160,6 +17143,15 @@ test('PAGE-019: der Liste-+-Detail-Baustein misst die Modulflaeche an der Schwel
   assert.ok(shownInside, 'PAGE-019: ab der Schwelle muss die Detailspalte stehen');
   assert.ok(gridInside && /--layout-list-min/.test(gridInside) && /--layout-list-max/.test(gridInside),
     'PAGE-019: die Listenbahn muss aus --layout-list-min/-max kommen, nicht aus einer Zahl');
+  // Die Spalten fluchten mit dem Kopf: der zieht seinen Inhalt per
+  // --page-inline-pad auf die Content-Spalte, also endet der Baustein an
+  // derselben Spalte plus den Guttern, die Liste und Detail selbst polstern.
+  // Ohne Deckel lief er bei 1920 voll (Liste 178px links vom Siegel).
+  assert.match(gridInside,
+    /max-inline-size:\s*calc\(\s*var\(--content-max-width\)\s*\+\s*2\s*\*\s*var\(--page-gutter\)\s*\)/,
+    'PAGE-019: .split-view muss ab der Schwelle auf --content-max-width + 2 Gutter gedeckelt sein (Fluchtlinie Kopf)');
+  assert.match(gridInside, /margin-inline:\s*auto/,
+    'PAGE-019: der gedeckelte Baustein steht mittig wie die Content-Spalte des Kopfs');
 });
 
 test('PAGE-010: full-bleed is an explicit --bleed declaration', () => {
