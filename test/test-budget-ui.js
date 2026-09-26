@@ -1294,7 +1294,7 @@ test('die Übersicht hat EINEN Scrollport, und die Liste ist keiner (#904, Criti
   // wahrscheinlichste Rückweg für den inneren Scroller.
   const subjectIs = (selector, cls) => selector.split(',').some((einzel) => {
     const compounds = einzel.trim().split(/[\s>+~]+/).filter(Boolean);
-    return compounds.length > 0 && new RegExp(`${cls.replace(/[.-]/g, '\\$&')}(?![\\w-])`).test(compounds[compounds.length - 1]);
+    return compounds.length > 0 && new RegExp(`${cls.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&')}(?![\\w-])`).test(compounds[compounds.length - 1]);
   });
   const overflowDecls = (body) => [...body.matchAll(/(?:^|;)\s*(overflow(?:-y|-block)?)\s*:\s*([^;]+)/g)];
 
@@ -2311,6 +2311,8 @@ test('Abo-Zeile: Metaangaben brechen um statt unter den Betrag zu laufen', async
   const units = [...due.matchAll(/<span[^>]*>([^<]*)<\/span>/g)].map((m) => m[1].trim());
   assert.equal(units.length, 2, `Datum und Relativangabe sind getrennte Einheiten: ${due}`);
   assert.match(units[1], /overdueDays/, 'die zweite Einheit ist der Ueberfaellig-Hinweis');
-  assert.equal(due.replace(/<span[^>]*>[^<]*<\/span>|<i[^>]*><\/i>/g, '').trim(), '',
-    'ausserhalb der beiden Einheiten steht kein loser Text');
+  // Zerlegen statt Ersetzen: gefragt ist nur, ob zwischen den Einheiten etwas
+  // steht - ein Ersetzen liest sich fuer CodeQL wie eine HTML-Bereinigung.
+  const loose = due.split(/<span[^>]*>[^<]*<\/span>|<i[^>]*><\/i>/).filter((teil) => teil.trim() !== '');
+  assert.deepEqual(loose, [], 'ausserhalb der beiden Einheiten steht kein loser Text');
 });
