@@ -18699,9 +18699,7 @@ test('Praemienkarte: jede Glyphe ist bemessen und schrumpft nicht', () => {
  * AUSNAHME MIT VERFALL: meals.js gehoert in dieser Runde dem Kuechen-Umbau
  * (Runde 1), der seinen Wochenbereich selbst umstellt. Der Eintrag muss fallen,
  * sobald die Datei sauber ist - der Test meldet einen verwaisten Eintrag rot. */
-const DASH_PENDING = new Map([
-  ['../public/pages/meals.js', 'Runde 1 (Kueche) stellt den Wochenbereich um'],
-]);
+const DASH_PENDING = new Map([]);
 test('Seiten geben keinen Em- oder En-Dash als UI-Text aus', () => {
   const funde = [];
   const verwaist = [];
