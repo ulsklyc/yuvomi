@@ -205,12 +205,17 @@ for (const [name, modules] of KEIN_REZEPT_TRANSFER) {
 // -------------------------------------------------------------------------
 
 function listenMenue() {
-  let html = '';
-  const bar = {
-    replaceChildren() { html = ''; },
-    insertAdjacentHTML(_pos, markup) { html += markup; },
+  // Zwei Traeger seit der Kopfregel mobil (2026-09-26): die Kapseln in
+  // #list-tabs-bar, das Listenmenue im Werkzeug-Slot #shopping-tools des Kopfs.
+  const sink = () => {
+    const el = { html: '' };
+    el.replaceChildren = () => { el.html = ''; };
+    el.insertAdjacentHTML = (_pos, markup) => { el.html += markup; };
+    return el;
   };
-  const container = { querySelector: (sel) => (sel === '#list-tabs-bar' ? bar : null) };
+  const bar = sink();
+  const tools = sink();
+  const container = { querySelector: (sel) => ({ '#list-tabs-bar': bar, '#shopping-tools': tools }[sel] ?? null) };
   const zuvor = { lists: shopping.state.lists, activeList: shopping.state.activeList, activeListId: shopping.state.activeListId };
   Object.assign(shopping.state, { lists: [LISTE], activeList: LISTE, activeListId: LISTE.id });
   try {
@@ -218,7 +223,7 @@ function listenMenue() {
   } finally {
     Object.assign(shopping.state, zuvor);
   }
-  return html;
+  return bar.html + tools.html;
 }
 
 async function importOeffnetDialog() {

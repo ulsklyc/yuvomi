@@ -274,12 +274,20 @@ test('Editor: gehen die Rechte verloren, waehrend er offen steht, speichert er n
 // Reiter, Menue, Quick-Add, Leerzustaende
 // -------------------------------------------------------------------------
 
-function leiste(modules) {
+// Zwei Traeger seit der Kopfregel mobil (2026-09-26): die Kapseln stehen in
+// #list-tabs-bar, das Listenmenue im Werkzeug-Slot #shopping-tools des Kopfs.
+function leisteTeile(modules) {
   const bar = new MiniElement('div');
+  const tools = new MiniElement('div');
   return withAccess(modules, () => {
-    shopping.renderTabs(container({ '#list-tabs-bar': bar }));
-    return bar.innerHTML;
+    shopping.renderTabs(container({ '#list-tabs-bar': bar, '#shopping-tools': tools }));
+    return { bar: bar.innerHTML, tools: tools.innerHTML };
   });
+}
+
+async function leiste(modules) {
+  const { bar, tools } = await leisteTeile(modules);
+  return bar + tools;
 }
 
 test('Reiterleiste bei `read`: Listen waehlbar, kein Anlegen, kein Listenmenue', async () => {
@@ -292,6 +300,20 @@ test('Reiterleiste bei `read`: Listen waehlbar, kein Anlegen, kein Listenmenue',
   const gegen = await leiste(SCHREIBEN);
   assert.match(gegen, /data-action="new-list"/);
   assert.match(gegen, /data-action="send-list"/);
+});
+
+// Kuechenkopf (Kopfregel mobil): das Listenmenue ist das EINE Werkzeugmenue
+// des Kopfs und steht im __actions-Slot, nicht mehr klebend am Ende der
+// Kapsel-Leiste - und die Leiste traegt kein dekoratives Listen-Glyph mehr.
+test('Kuechenkopf: Listenmenue im Werkzeug-Slot, Kapseln ohne Menue und ohne Glyph', async () => {
+  zustand();
+  const { bar, tools } = await leisteTeile(SCHREIBEN);
+  assert.match(bar, /data-action="switch-list"/);
+  assert.match(bar, /data-action="new-list"/, 'Neue Liste bleibt die Kapsel am Ende der Leiste');
+  assert.doesNotMatch(bar, /popover-menu|list-tabs-bar__actions|list-tabs-bar__marker/,
+    'die Kapsel-Leiste traegt weder das Menue noch den Listen-Marker');
+  assert.match(tools, /page-tools-btn[^"]*popover-menu__trigger/, 'das Menue ist das geteilte Werkzeugmenue');
+  assert.match(tools, /id="list-actions-menu"/);
 });
 
 test('Listeninhalt bei `read`: kein Quick-Add', async () => {

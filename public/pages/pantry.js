@@ -22,6 +22,7 @@ import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
 import { resolveShoppingTarget, announceTransfer, mayTransferPantryToShopping } from '/utils/kitchen-transfer.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
+import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 // Alias, weil dieses Modul selbst eine `emptyStateEl()`-Funktion hat, die den
 // Renderer mit den Vorrats-Texten füllt.
 import { emptyStateEl as emptyStateComponentEl, mountLoadError } from '/utils/empty-state.js';
@@ -311,15 +312,27 @@ export async function render(container) {
       })}
     </div>
     <div class="page-toolbar__actions">
-      <button class="btn btn--ghost btn--icon" data-action="manage-locations"
-              aria-label="${esc(t('pantry.manageLocations'))}" title="${esc(t('pantry.manageLocations'))}">
-        <i data-lucide="archive" class="icon-md" aria-hidden="true"></i>
-      </button>
+      ${pageToolsMenuHtml({
+        id: 'pantry-tools-menu',
+        label: t('common.moreActions'),
+        // KUECHENKOPF (Kopfregel mobil, 2026-09-26): die Verwaltung steht im
+        // EINEN Werkzeugmenue, nicht als loses Icon im Kopf. Das Zeichen ist
+        // map-pin wie im Inventar - "archive" war dasselbe Zeichen wie der
+        // Vorrat-Tab darueber (A4, P3).
+        items: [{ action: 'manage-locations', label: t('pantry.manageLocations'), icon: 'map-pin' }],
+      })}
     </div>`);
 
+  // DIE CHIPREIHE STEHT IM SCROLLPORT (Kopfregel mobil, Regel 3): als erstes
+  // Kind von #pantry-list scrollt sie mit der Liste weg, statt dauerhaft 60px
+  // ueber dem Port zu belegen (A8: fix bis y181). renderList() ersetzt nur,
+  // was HINTER ihr steht.
   const filters = document.createElement('div');
-  filters.className = 'pantry-filters';
+  filters.className = 'page-chip-row pantry-filters';
   filters.id = 'pantry-filters';
+  filters.setAttribute('role', 'group');
+  filters.setAttribute('aria-label', t('common.filters'));
+  filters.hidden = true;
 
   // Hier stand der Slot für die Sammelaktions-Leiste. Sie ist seit Etappe 5
   // eine Pille in der unteren Shell-Zone (utils/bulk-pill.js) und braucht in
@@ -330,6 +343,7 @@ export async function render(container) {
   list.className = 'list-scroller page-scrollport pantry-list';
   list.id = 'pantry-list';
   list.setAttribute('aria-busy', 'true');
+  list.append(filters);
   list.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 6, lines: 2 }));
 
   const fab = document.createElement('button');
@@ -340,7 +354,7 @@ export async function render(container) {
   fab.dataset.dockLabel = t('newLabel.pantry');
   fab.insertAdjacentHTML('beforeend', '<i data-lucide="plus" aria-hidden="true"></i>');
 
-  page.append(title, live, toolbar, filters, list, fab);
+  page.append(title, live, toolbar, list, fab);
   container.replaceChildren(page);
   renderKitchenTabsBar(container, '/pantry');
 
@@ -362,6 +376,7 @@ export async function render(container) {
     },
   });
 
+  installPopoverMenus(toolbar);
   toolbar.querySelector('[data-action="manage-locations"]').addEventListener('click', openLocationManager);
   fab.addEventListener('click', () => openItemModal('create'));
 
@@ -546,7 +561,9 @@ function renderList() {
   const list = _container?.querySelector('#pantry-list');
   if (!list) return;
   list.removeAttribute('aria-busy');
-  list.replaceChildren();
+  // Die Chipreihe ist das erste Kind des Ports und ueberlebt den Neuaufbau.
+  const chipRow = list.querySelector(':scope > #pantry-filters');
+  list.replaceChildren(...(chipRow ? [chipRow] : []));
   renderBulkBar();
 
   if (!state.items.length) {
@@ -1332,6 +1349,9 @@ async function openLocationManager() {
 export const __test = {
   state,
   adjustQuantity,
+  // Kopfregel mobil: die Chipreihe ist das erste Kind des Ports und muss den
+  // Neuaufbau der Liste ueberleben (test-pantry-ux.js).
+  renderList,
   loadPantry,
   intents,
   quantityOf,

@@ -16,7 +16,7 @@ import { renderKitchenTabsBar, refreshKitchenBadges } from '/utils/kitchen-tabs.
 import { mayImportMealPlan, mayTransferShoppingToPantry } from '/utils/kitchen-transfer.js';
 import { mayWritePath } from '/utils/module-access.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
-import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
+import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import '/components/category-manager.js';
 import { findPageFab } from '/utils/fab.js';
 import { setBulkPill, clearBulkPill, bulkPillLayer } from '/utils/bulk-pill.js';
@@ -763,8 +763,7 @@ function renderTabs(container) {
   // ein Ausloeser ohne Eintraege waere ein Knopf, der nichts oeffnet.
   const ro = readOnly();
   const actionsHtml = state.activeList && !ro ? `
-    <div class="list-tabs-bar__actions">
-      ${popoverMenuHtml({
+      ${pageToolsMenuHtml({
         id: 'list-actions-menu',
         // Der Name muss die Liste nennen: der Trigger steht nicht mehr neben
         // einer Überschrift, die den Bezug herstellt. „Mehr" allein ließe offen,
@@ -784,18 +783,28 @@ function renderTabs(container) {
           { action: 'manage-stores', label: t('shopping.manageStores'), icon: 'store' },
           { action: 'delete-list', label: t('shopping.deleteListLabel'), icon: 'trash', id: state.activeList.id, danger: true },
         ],
-      })}
-    </div>` : '';
+      })}` : '';
 
   bar.insertAdjacentHTML('beforeend', `
-    <i data-lucide="list" class="list-tabs-bar__marker" aria-hidden="true"></i>
     ${tabsHtml}
     ${ro ? '' : `<button class="list-tab__new" data-action="new-list" aria-label="${t('shopping.newListButton')}">
       <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
     </button>`}
-    ${actionsHtml}
   `);
   if (window.lucide) window.lucide.createIcons({ el: bar });
+
+  // KUECHENKOPF (Kopfregel mobil, 2026-09-26): das Menue der gewaehlten Liste
+  // ist das EINE Werkzeugmenue des Kopfs und steht im __actions-Slot - wie im
+  // Essensplan und im Vorrat -, nicht mehr klebend am Ende der Chip-Leiste.
+  // Eigener Traeger im Slot, weil der Router am Desktop den Primaerknopf in
+  // denselben Slot dockt: ein replaceChildren() am Slot warfe ihn hinaus
+  // (dieselbe Lehre wie #recipes-source-filter, test:hidden-cascade).
+  const tools = container.querySelector('#shopping-tools');
+  if (tools) {
+    tools.replaceChildren();
+    tools.insertAdjacentHTML('beforeend', actionsHtml);
+    if (window.lucide) window.lucide.createIcons({ el: tools });
+  }
 }
 
 /**
@@ -3555,7 +3564,19 @@ export async function render(container, { user, signal: routeSignal = null } = {
            KEINE BACKTICKS IN DIESEM KOMMENTAR: er steht INNERHALB des
            Template-Literals, ein Backtick-Paar schliesst es und macht aus dem
            Rest ein Tagged Template ("TypeError: toolbar is not a function"). -->
-      <div class="list-tabs-bar" id="list-tabs-bar"></div>
+      <!-- Seit der Kopfregel mobil (2026-09-26) wieder ein page-toolbar-Kopf,
+           aber OHNE Titel: Zeile 2 des Kuechenkopfs. Kontext sind die
+           Listen-Kapseln (sie nennen die Liste), am Ende das Werkzeugmenue
+           der Liste; am Desktop dockt der Router davor den Primaerknopf an,
+           wie in den drei Geschwister-Tabs. -->
+      <div class="page-toolbar page-toolbar--in-group page-toolbar--narrow shopping-toolbar">
+        <div class="page-toolbar__center">
+          <div class="list-tabs-bar" id="list-tabs-bar" role="group" aria-label="${t('shopping.listsLabel')}"></div>
+        </div>
+        <div class="page-toolbar__actions">
+          <div class="shopping-tools" id="shopping-tools"></div>
+        </div>
+      </div>
       <div id="list-content" style="flex:1;display:flex;flex-direction:column;overflow:hidden"></div>
       ${readOnly() ? '' : `<button class="page-fab" id="fab-new-item" aria-label="${t('shopping.addItemLabel')}" data-dock-label="${t('newLabel.shopping')}">
         <i data-lucide="plus" class="icon-xl" aria-hidden="true"></i>

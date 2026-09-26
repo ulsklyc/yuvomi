@@ -151,10 +151,6 @@
   gap: var(--space-2);
 }
 
-.week-nav__randomize {
-  min-height: var(--target-base);
-}
-
 /* --------------------------------------------------------
  * Wochengitter (scroll horizontal auf Mobil)
  * -------------------------------------------------------- */
@@ -1389,15 +1385,16 @@
  * sie passen alle sieben Spalten in voller Breite, ohne dass die 148px-
  * Mindestbreite angetastet werden muss.
  * -------------------------------------------------------- */
-.week-nav__rail-toggle {
-  display: none;
+/* Der Schalter steht seit der Kopfregel mobil (2026-09-26) als Eintrag im
+ * Werkzeugmenue. Die Spalte gibt es erst ab 1024px (.meals-layout oben),
+ * darunter waere der Haken ein Schalter ohne Wirkung. */
+@media (max-width: 1023px) {
+  .popover-menu__item[data-action="toggle-rail"] {
+    display: none;
+  }
 }
 
 @media (min-width: 1024px) {
-  .week-nav__rail-toggle {
-    display: inline-flex;
-  }
-
   .meals-layout--rail-hidden {
     grid-template-columns: minmax(0, 1fr);
   }

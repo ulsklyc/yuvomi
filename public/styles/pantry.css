@@ -34,58 +34,37 @@
   max-width: 420px;
 }
 
-/* Chip-Zeile: horizontal scrollbar statt umbrechend, damit die Listenhöhe
- * stabil bleibt, wenn Filter erscheinen und verschwinden. */
+/* DIE CHIPREIHE STEHT IM PORT (Kopfregel mobil, 2026-09-26).
+ *
+ * Sie war eine feste Zeile zwischen Kopf und Liste und hielt den Port mobil
+ * bei y181 fest (A8). Jetzt ist sie das erste Kind von `.pantry-list` und
+ * traegt die geteilte Form `.page-chip-row` (layout.css): waagerecht
+ * scrollend, senkrecht mit der Liste weg, kein eigener Seitenrand - die Liste
+ * polstert schon. Damit entfaellt auch die Sonderform der kompakten Hoehe, die
+ * Kopf und Filterzeile per Grid auf eine Zeile legte: ueber dem Port steht nur
+ * noch der Kopf.
+ *
+ * Die Mindesthoehe steht als Zahl, weil der Port ein Grid ist, das hoeher
+ * waechst als er selbst: eine Spur ohne Groesse bekommt dort nur den
+ * Mindestbeitrag ihres Elements, und der ist bei einem Scroll-Container (die
+ * Reihe scrollt waagerecht) NULL. Gemessen stand die Reihe 16px hoch - nur ihr
+ * Polster -, die Chips ragten in die erste Gruppe. `min-content`/`fit-content`
+ * aendern daran in Chrome nichts (gemessen); die Chiphoehe (`--target-lg`,
+ * filter-chip.css) plus das Polster der Reihe schon. Shell-Wunsch: dasselbe an
+ * `.page-chip-row`, samt `flex-shrink: 0` fuer Ports, die Flex-Spalten sind. */
 .pantry-filters {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-shrink: 0;
-  padding-inline: var(--page-inline-pad);
-  padding-top: var(--space-3);
-  overflow-x: auto;
-  scrollbar-width: none;
+  min-height: calc(var(--target-lg) + 2 * var(--space-2));
+  /* Die Reihe gehoert zur ersten Gruppe, nicht zwischen zwei: statt des
+   * Gruppen-Abstands des Ports (--space-5, .list-scroller in list-row.css)
+   * steht unter ihr nur ihr eigenes Polster plus --space-2. */
+  margin-block-end: calc(var(--space-2) - var(--space-5));
 }
 
-.pantry-filters::-webkit-scrollbar {
-  display: none;
-}
-
-/* KOMPAKTE HÖHE: Modulkopf und Filterzeile teilen sich eine Zeile.
- *
- * Der Vorrat trug drei Leisten übereinander - Küchen-Raum, Modulkopf, Filter -
- * und lag damit auf 640x400 bei 173px von 323px Sichtfläche. Nach der
- * Chrome-Regel (DESIGN.md) ist die Küchen-Leiste der Kopf und die Filterzeile
- * die eine erlaubte Bedienzeile; der Modulkopf ist die Zeile zu viel.
- *
- * Er kann sie aber abgeben, ohne etwas zu verlieren, und das ist ein direkter
- * Gewinn aus der Kopf-Regel weiter oben: seine Suche steht in der kompakten
- * Höhe als 48px-Icon da statt als 291px-Feld (layout.css). Was er dann noch
- * belegt, sind zwei Icon-Knöpfe - Platz, den die Filterzeile daneben hat. */
-@media (max-height: 499px) {
-  .pantry-page {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-content: start;
-  }
-
-  .pantry-page > * {
-    grid-column: 1 / -1;
-  }
-
-  .pantry-page > .page-toolbar {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .pantry-page > .pantry-filters {
-    grid-column: 2;
-    grid-row: 1;
-    /* Die Chips tragen ihre eigene Höhe; ohne diese Zeile zöge das Grid sie
-     * auf die volle Zeilenhöhe und die Zeile würde höher als der Kopf. */
-    align-self: center;
-    padding-top: 0;
-  }
+/* Mit Chipreihe traegt die Reihe das obere Polster des Ports selbst - sonst
+ * begaenne die erste Zeile 24px TIEFER als vor dem Umzug (gemessen 245 statt
+ * 221), obwohl darueber eine feste Zeile weniger steht. */
+.pantry-list:has(> .pantry-filters:not([hidden])) {
+  padding-top: 0;
 }
 
 .pantry-filters[hidden] {

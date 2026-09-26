@@ -2297,7 +2297,9 @@ test('Meals page adds a recipe sidebar and randomize planner controls', () => {
   const mealsPage = read('../public/pages/meals.js');
   const mealsCss = read('../public/styles/meals.css');
 
-  assert.match(mealsPage, /id="week-randomize"/);
+  // Seit der Kopfregel mobil (2026-09-26) ein Eintrag im Werkzeugmenue des
+  // Wochenplans statt eines losen Kopfknopfs (Verhalten: test-meals.js).
+  assert.match(mealsPage, /action: 'randomize-plan', label: t\('meals\.randomizePlan'\)/);
   assert.match(mealsPage, /id="recipe-sidebar"/);
   assert.match(mealsPage, /recipes\.dragToMealsHint/);
   assert.match(mealsPage, /function renderRecipeSidebar/);
@@ -2307,7 +2309,6 @@ test('Meals page adds a recipe sidebar and randomize planner controls', () => {
   assert.match(mealsPage, /recipeSupportsMealType/);
   assert.match(mealsCss, /\.meals-layout\s*\{/);
   assert.match(mealsCss, /\.recipe-sidebar\s*\{/);
-  assert.match(mealsCss, /\.week-nav__randomize\s*\{/);
   assertKeysExistInEveryLocale([
     'meals.randomizePlan',
     'meals.randomizeTitle',
@@ -4743,8 +4744,8 @@ test('der Einkaufs-Kopf trägt mobil keine unbeschrifteten Aktionen', () => {
   const layout = read('../public/styles/layout.css');
 
   // Das Menü ist der geteilte Baustein, keine vierte private Kopie.
-  assert.match(page, /import \{ popoverMenuHtml, installPopoverMenus \} from '\/utils\/popover-menu\.js'/,
-    'shopping.js muss das geteilte Überlaufmenü nutzen');
+  assert.match(page, /import \{[^}]*\bpageToolsMenuHtml\b[^}]*\binstallPopoverMenus\b[^}]*\} from '\/utils\/popover-menu\.js'/,
+    'shopping.js muss das geteilte Werkzeugmenü nutzen (Kopfregel mobil: pageToolsMenuHtml)');
   assert.match(layout, /^\.popover-menu \{/m, '.popover-menu muss in layout.css stehen, nicht im Modul-CSS');
   assert.match(layout, /\.popover-menu:popover-open\s*\{\s*display:\s*flex/,
     'das Panel braucht display erst bei :popover-open, sonst schlägt es das UA-display:none');
@@ -4782,12 +4783,15 @@ test('der Einkaufs-Kopf trägt mobil keine unbeschrifteten Aktionen', () => {
   assert.doesNotMatch(page, /list-header__(more|inline-actions)/,
     'die responsive Doppelfassung der Listen-Aktionen ist entfallen - eine Darstellung auf allen Breiten');
 
-  // Der Trigger klebt am Rand, während die Chips durchscrollen: ohne opaken
-  // Grund liefe ein Chip sichtbar durch das Icon.
-  assert.match(cssNoComments, /\.list-tabs-bar__actions\s*\{[^}]*position:\s*sticky/,
-    'die Aktionszone muss am Rand der scrollenden Chip-Leiste stehenbleiben');
-  assert.match(cssNoComments, /\.list-tabs-bar__actions\s*\{[^}]*background-color:/,
-    'die sticky Aktionszone braucht einen opaken Grund, sonst scrollen Chips sichtbar darunter durch');
+  // Seit der Kopfregel mobil (2026-09-26) steht das Menü im __actions-Slot
+  // des Kopfs (#shopping-tools) statt klebend am Ende der Chip-Leiste - dort
+  // scrollt nichts mehr darunter durch, die opake Zone entfällt. Geprüft wird,
+  // dass der Träger im Slot steht und die Kapsel-Leiste ihn nicht mehr trägt
+  // (Verhalten: test-shopping-readonly-ui.js).
+  assert.match(page, /<div class="page-toolbar__actions">\s*<div class="shopping-tools" id="shopping-tools"><\/div>/,
+    'das Listenmenü steht im Aktions-Slot des Kopfs');
+  assert.doesNotMatch(cssNoComments, /\.list-tabs-bar__actions\s*\{/,
+    'keine zweite, klebende Aktionszone in der Kapsel-Leiste');
 
   // Das Icon-only-Import-Label darf nicht zurückkommen: es war der Grund, warum
   // drei unbeschriftete Glyphen nebeneinander standen.
