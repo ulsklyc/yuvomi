@@ -2273,3 +2273,21 @@ test('Compare/Overview tab: the day-head is sticky on the block axis while the w
   assert.match(schedulePage, /data-action="overview-view-mode" data-mode="week"/, 'the week/day density toggle is legitimate mutually-exclusive state and must remain a segmented control');
   assert.match(schedulePage, /class="segmented"[^>]*>\s*\n\s*<button type="button" class="segmented__item\$\{overview\.viewMode === 'week'/);
 });
+
+test('Shift types grid: the section head and the empty state span both desktop columns, so the first card starts in column 1', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const scheduleCss = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
+  // The element the page really renders as the first child of the shifts
+  // section - read from the markup, so a future wrapper change turns this red
+  // instead of leaving the CSS aimed at a child that no longer exists.
+  const head = schedulePage.match(/<section class="schedule-library schedule-library--shifts">\s*<(\w+)(?: class="([^"]+)")?/);
+  assert.ok(head, 'the shifts section markup must be findable');
+  const headSelector = head[2] ? '.' + head[2].split(/\s+/)[0] : head[1];
+  const spanning = [...eachRule(scheduleCss)]
+    .filter((rule) => rule.at.some((a) => /@container schedule-page \(min-width: 720px\)/.test(a)))
+    .filter((rule) => /grid-column:\s*1\s*\/\s*-1/.test(rule.body))
+    .flatMap((rule) => rule.selector.split(',').map((s) => s.trim().replace(/\s+/g, ' ')));
+  assert.ok(spanning.includes('.schedule-library--shifts > ' + headSelector), `the rendered head (${headSelector}) must span the 2-column grid, got: ${spanning.join(' | ')}`);
+  assert.ok(spanning.includes('.schedule-library--shifts > .empty-state'), 'the empty state must span the grid instead of sitting in column 2 next to the heading');
+});
