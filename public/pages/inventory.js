@@ -2188,10 +2188,7 @@ export async function render(container, { signal } = {}) {
         if (!item) return false;
         return openItemDetail(item, { pane: body, signal: ctx.signal });
       },
-      openNarrow: (id) => {
-        const item = state.items.find((i) => String(i.id) === id);
-        if (item) openItemDetail(item);
-      },
+      openNarrow: openItemNarrow,
       onEnter: (id) => {
         const item = state.items.find((i) => String(i.id) === id);
         if (item) openItemModal('edit', item);
@@ -2242,6 +2239,18 @@ function showItemCategory(id) {
 }
 
 /**
+ * Unter der Schwelle: das Blatt eines Gegenstands (utils/master-detail.js,
+ * `openNarrow`). openItemDetail() laedt erst den Verlauf - das Signal des
+ * Bausteins bricht ab, wenn in der Zeit Zurueck gedrueckt, das Fenster breit
+ * oder die Seite verlassen wurde; dann geht kein altes Blatt mehr auf.
+ */
+function openItemNarrow(id, _trigger, { signal } = {}) {
+  const item = state.items.find((i) => String(i.id) === String(id));
+  if (item) return openItemDetail(item, { signal });
+  return undefined;
+}
+
+/**
  * Die Darstellung hat gewechselt (utils/master-detail.js, `onModeChange`).
  *
  * Ein `?open=` vom Telefon laesst die Startseite stehen (kein Blatt beim
@@ -2261,6 +2270,7 @@ export const __test = {
   renderItemRow,
   openDeepLinkedCategory,
   onInventoryModeChange,
+  openItemNarrow,
   categoryLabel,
   itemCategoryLabel,
   categoryOptionsHtml,

@@ -114,3 +114,33 @@ test('eine unbekannte ID laesst die Startseite stehen', () => {
   withEnv({ search: '?open=999', display: 'flex' }, () => inventory.openDeepLinkedCategory(split));
   assert.equal(inventory.state.view, 'browse');
 });
+
+test('unter der Schwelle: das Blatt eines Gegenstands geht nach dem Laden nur auf, solange das Signal steht', async () => {
+  // openItemDetail() laedt erst den Verlauf. Ging der Nutzer dazwischen
+  // zurueck, wurde das Fenster breit oder die Seite verlassen, legte sich das
+  // alte Blatt sonst ueber den neuen Zustand oder die Zielseite.
+  resetState();
+  const opened = [];
+  let release;
+  globalThis.__apiStub = { get: () => new Promise((r) => { release = () => r({ data: { timeline: [] } }); }) };
+  globalThis.__openDetailView = (o) => opened.push(o.title);
+  try {
+    const stale = new AbortController();
+    const first = inventory.openItemNarrow('7', null, { signal: stale.signal });
+    stale.abort();
+    release();
+    await first;
+    assert.deepEqual(opened, [], 'ueberholt: kein Blatt');
+    const second = inventory.openItemNarrow('7', null, { signal: new AbortController().signal });
+    release();
+    await second;
+    assert.equal(opened.length, 1, 'steht das Signal, geht das Blatt auf');
+  } finally {
+    delete globalThis.__apiStub;
+    delete globalThis.__openDetailView;
+  }
+  const src = readFileSync(new URL('../public/pages/inventory.js', import.meta.url), 'utf8');
+  const mount = src.slice(src.indexOf('_md = mountMasterDetail({'));
+  assert.match(mount.slice(0, mount.indexOf('\n    });')), /openNarrow: openItemNarrow,/,
+    'der Baustein ruft den Weg, der sein Signal weiterreicht');
+});
