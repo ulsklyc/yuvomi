@@ -308,6 +308,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The date picker and switches animate again.** Two transitions were written in a form browsers
   ignore, so the date picker popped open and the switch knob jumped.
 
+- **The end of a page stays clear of the tab bar when its labels take two lines.** On narrow
+  phones and in languages with long module names the tab bar grows taller than usual; the room kept
+  for it below the last row now grows with it, so the last row no longer ends under the glass, and
+  toasts and the More sheet sit above the taller bar.
+
+- **Undo on a finished housekeeping task sticks.** Tapping Undo right after "Done" could be
+  overwritten by the list refresh from "Done" arriving late, and the task showed as done again.
+
+- **The arrow keys in the meal plan's tools menu no longer get stuck.** Below desktop width the
+  menu has an entry that is hidden there; End and the arrow keys tried to move to it and stopped.
+
 - **Shift types line up on a desktop.** The heading and the empty state of the shift types took
   the first column of the two-column grid, so the first card stood next to the heading and every
   row was off by one. Heading and empty state now span both columns, and the first card starts on
