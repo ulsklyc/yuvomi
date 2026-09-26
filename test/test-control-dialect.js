@@ -89,9 +89,20 @@ const ROW_VERBS = /(?:^|[-_])(?:edit|delete|remove|rename)(?:[-_]|$)/i;
  * Interpolation zaehlt als Text, sobald sie nach Text aussieht (`t(`, `esc(`,
  * `label`, `name`, `title`) - `${icon}` oder `${cls}` nicht.
  */
+/** Bezeichner aus dem Quelltext, sicher fuer `new RegExp` (Punkte, `$` usw. zaehlen woertlich). */
+function reEsc(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Alle Tags weg - wiederholt, bis nichts mehr faellt (`<<b>b>` hinterliesse sonst `<b>`). */
+function stripTags(s) {
+  let prev;
+  do { prev = s; s = s.replace(/<[^>]*>/g, ''); } while (s !== prev);
+  return s;
+}
+
 function visibleText(body) {
-  return body
-    .replace(/<[^>]*>/g, '')
+  return stripTags(body)
     .replace(/\$\{([^{}]|\{[^{}]*\})*\}/g, (s) => (/\bt\(|esc\(|label|name|title|text/i.test(s) ? 'T' : ''))
     .replace(/&nbsp;/g, '')
     .trim();
@@ -122,9 +133,9 @@ function* domButtons(src) {
     const rest = src.slice(m.index + m[0].length);
     const next = rest.search(/document\.createElement\(\s*['"]button['"]\s*\)/);
     const scope = next === -1 ? rest.slice(0, 1500) : rest.slice(0, Math.min(next, 1500));
-    const cls = (scope.match(new RegExp(`\\b${name}\\.className\\s*=\\s*['"\`]([^'"\`]*)['"\`]`)) || [])[1] ?? '';
+    const cls = (scope.match(new RegExp(`\\b${reEsc(name)}\\.className\\s*=\\s*['"\`]([^'"\`]*)['"\`]`)) || [])[1] ?? '';
     const icon = (scope.match(/(?:dataset\.lucide\s*=\s*|setAttribute\(\s*['"]data-lucide['"]\s*,\s*)['"]([\w-]+)['"]/) || [])[1] ?? '';
-    const hasText = new RegExp(`\\b${name}\\.(?:textContent|append\\(\\s*t\\()`).test(scope);
+    const hasText = new RegExp(`\\b${reEsc(name)}\\.(?:textContent|append\\(\\s*t\\()`).test(scope);
     yield { name, cls, icon, index: m.index, iconOnly: !!icon && !hasText };
   }
 }
@@ -205,7 +216,7 @@ export function scanSearchField(src) {
   while ((m = dom.exec(src))) {
     if (inComment(src, m.index)) continue;
     const name = m[1];
-    const cls = src.match(new RegExp(`\\b${name}\\.className\\s*=\\s*['"\`]([^'"\`]*)['"\`]`));
+    const cls = src.match(new RegExp(`\\b${reEsc(name)}\\.className\\s*=\\s*['"\`]([^'"\`]*)['"\`]`));
     if (!cls || !CANON_SEARCH.test(cls[1])) {
       found.push({ line: lineOf(src, m.index), what: `${name}.type = 'search'${cls ? ` (${cls[1]})` : ''}` });
     }
@@ -296,7 +307,7 @@ export function scanFloatingFab(src) {
   const domRe = /\b(\w+)\.className\s*=\s*['"]page-fab['"]/g;
   while ((m = domRe.exec(src))) {
     if (inComment(src, m.index)) continue;
-    if (!new RegExp(`\\b${m[1]}\\.dataset\\.dockLabel\\s*=`).test(src)) {
+    if (!new RegExp(`\\b${reEsc(m[1])}\\.dataset\\.dockLabel\\s*=`).test(src)) {
       found.push({ line: lineOf(src, m.index), what: `${m[1]}.className = 'page-fab' ohne dataset.dockLabel` });
     }
   }
