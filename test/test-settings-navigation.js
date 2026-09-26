@@ -1537,3 +1537,71 @@ test('all locales contain the settings IA translation foundation', async () => {
     }
   }
 });
+
+/*
+ * KOPFREGEL MOBIL (2026-09-26, Critique A7 P1 + A8). Die Einstellungen hatten
+ * mobil drei Ebenen (vier Bereichszeilen, eine Bereichsseite mit 88px-Zeilen,
+ * das Blatt), keinen geteilten Kopf, keine Suche und einen Rueckweg, der als
+ * Textlink im Inhalt mit wegscrollte. Die drei Tests halten die drei Zusagen.
+ */
+const settingsShellSource = () => readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+const settingsCssRules = async () => [...eachRule(await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8'))];
+const ruleBody = (rules, selector, atPattern = null) => rules
+  .filter((r) => r.selector.split(',').map((s) => s.trim()).includes(selector))
+  .filter((r) => (atPattern ? r.at.some((a) => atPattern.test(a)) : r.at.length === 0))
+  .map((r) => r.body)
+  .join(';');
+
+test('die Wurzel ist in jeder Breite EINE gruppierte Liste, die Bereichsebene gibt es nicht mehr', async () => {
+  const shell = await settingsShellSource();
+  // Keine zweite, mobile Uebersicht und keine Bereichsseite mehr.
+  assert.doesNotMatch(shell, /function renderDomainOverview\b|settings-mobile-overview/,
+    'mobil darf es keine eigene Bereichsebene geben - die Wurzel ist die Liste aller Blaetter');
+  assert.match(shell, /function renderOverview\(content, domains, user\)/);
+  // Jeder Bereich ist ein Abschnitt mit Sprungziel; der Deep-Link landet dort.
+  assert.match(shell, /section\.id = overviewSectionId\(domain\.id\)/);
+  assert.match(shell, /revealOverviewSection\(content, focusDomain\?\.id\)/,
+    '?view=domain&domain=x muss auf den Abschnitt springen, statt eine Zwischenseite zu rendern');
+  // Der Sprung wartet auf den Router, der den Port nach update() zuruecksetzt.
+  assert.match(shell, /function revealOverviewSection[\s\S]*?setTimeout\(/);
+
+  // Mobil: Zeile 44/48px, 32px-Marke, keine Beschreibung.
+  const rules = await settingsCssRules();
+  const mobile = /max-width:\s*767px/;
+  assert.match(ruleBody(rules, '.settings-overview__row', mobile), /min-height:\s*var\(--target-base\)/);
+  assert.match(ruleBody(rules, '.settings-overview__row-mark', mobile), /width:\s*var\(--target-sm\)/);
+  assert.match(ruleBody(rules, '.settings-overview__row-description', mobile), /display:\s*none/);
+  // Der Abschnitt landet unter dem klebenden Kopf, nicht dahinter.
+  assert.match(ruleBody(rules, '.settings-overview__section'), /scroll-margin-block-start:/);
+});
+
+test('der Rueckweg im Blatt steht im klebenden Kopf, nicht im Inhalt', async () => {
+  const shell = await settingsShellSource();
+  assert.doesNotMatch(shell, /settings-leaf-back-link/,
+    'der Textlink im Inhalt scrollte auf langen Blaettern mit weg (A7, Casey)');
+  // Der Kopf ist der geteilte Modulkopf - klebend, verdrahtet vom Router.
+  assert.match(shell, /toolbar\.className = 'page-toolbar settings-shell-header'/);
+  assert.match(shell, /createLink\(settingsOverviewUrl\(domain\.id\), 'settings-toolbar__back'\)/);
+  assert.match(shell, /back\.setAttribute\('aria-label', t\('settings\.backToSettings'\)\)/);
+  // Der Kopf zeigt den Rueckweg, BEVOR das Blatt geladen ist.
+  assert.match(shell, /renderToolbar\(toolbar, content, \{ activeLeaf, domain: leafDomain \}\);\s*await renderLeafContent/);
+
+  // Ausgeblendet wird der Kopf auf Blaettern nur dort, wo der Breadcrumb
+  // zurueckfuehrt (ab 768px) - nie bedingungslos, sonst fehlt mobil jeder Weg.
+  const rules = await settingsCssRules();
+  assert.equal(ruleBody(rules, '.settings-page--leaf .settings-shell-header'), '',
+    'ein bedingungsloses display:none nimmt mobil den einzigen Rueckweg');
+  assert.match(ruleBody(rules, '.settings-page--leaf .settings-shell-header', /min-width:\s*768px/), /display:\s*none/);
+});
+
+test('die Wurzel sucht ueber das Such-Icon im geteilten Kopf, in jeder Breite', async () => {
+  const shell = await settingsShellSource();
+  assert.match(shell, /import \{ renderPageSearch, wirePageSearch \} from '\/utils\/page-search\.js'/);
+  // Als Slot des Kopfes, damit die Shell sie mobil zum Icon macht (Regel 4).
+  assert.match(shell, /className: 'settings-toolbar__search page-toolbar__center'/);
+  // Die Suche filtert die Liste der Wurzel, nicht nur die Desktop-Seitenleiste.
+  assert.match(shell, /onQuery: \(value\) => filterOverview\(content, value\)/);
+  assert.match(shell, /function filterOverview[\s\S]*?searchNormalize\([\s\S]*?section\.hidden = visible === 0/);
+  // Label, Beschreibung und Bereich sind der Suchgrund, wie in der Seitenleiste.
+  assert.match(shell, /link\.dataset\.search = searchNormalize\(`\$\{t\(entry\.labelKey\)\} \$\{t\(entry\.descriptionKey\)\} \$\{domainLabel\}`\)/);
+});

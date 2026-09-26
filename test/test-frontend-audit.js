@@ -2437,9 +2437,12 @@ test('responsive settings shell defines desktop and mobile navigation layouts', 
     source,
     /@media \(min-width:\s*1024px\)[\s\S]*\.settings-shell__navigation\s*\{[\s\S]*position:\s*sticky/,
   );
+  // Mobil ist die Wurzel dieselbe gruppierte Liste wie am Desktop, nur
+  // dichter: die Beschreibung faellt weg, die Zeile schrumpft (Kopfregel mobil,
+  // 2026-09-26). Eine eigene mobile Bereichsebene gibt es nicht mehr.
   assert.match(
     source,
-    /@media \(max-width:\s*1023px\)[\s\S]*\.settings-mobile-overview\s*\{/,
+    /@media \(max-width:\s*767px\)\s*\{[^@]*\.settings-overview__row-description\s*\{\s*display:\s*none;/,
   );
 });
 
@@ -2522,8 +2525,10 @@ test('settings retry focus only moves to a connected replacement button after re
 test('settings shell falls back to the domains overview for orphaned active leaves', () => {
   const source = read('../public/settings/shell.js');
 
-  assert.match(source, /if \(!domain\)\s*\{[\s\S]*console\.error\([\s\S]*renderDomainsOverview\(content,\s*domains(?:,\s*user)?\)/);
-  assert.match(source, /else\s*\{[\s\S]*await renderLeafContent\(content,\s*activeLeaf,\s*domain,\s*user,\s*query\)/);
+  // Ein Blatt ohne verfuegbaren Bereich meldet sich und faellt auf die Wurzel
+  // (die gruppierte Liste) zurueck, statt ein Blatt ohne Rueckweg zu rendern.
+  assert.match(source, /if \(activeLeaf && !leafDomain\)\s*\{[\s\S]*?console\.error\(/);
+  assert.match(source, /if \(activeLeaf && leafDomain\)\s*\{[\s\S]*?await renderLeafContent\(content,\s*activeLeaf,\s*leafDomain,\s*user,\s*query\)[\s\S]*?return;\s*\}\s*renderOverview\(content,\s*domains,\s*user\)/);
 });
 
 test('router hides inactive overlays from keyboard focus', () => {
@@ -6226,13 +6231,15 @@ test('responsive adaptation uses tablet space without crowding module toolbars',
   // Zeile wieder ihren eigenen Rand und waere damit wieder eine Karte pro
   // Zeile. Der Guard haelt jetzt die Zusage „ein Traeger, keine Spalten"
   // statt der abgeloesten Zweispaltigkeit.
+  // Seit 2026-09-26 ist das die EINE Liste der Wurzel in jeder Breite
+  // (`.settings-overview__list`, ein Traeger je Bereich).
   assert.match(
     settings,
-    /\.settings-mobile-overview__links\s*\{[^}]*background:\s*var\(--color-surface-work\)[^}]*overflow:\s*hidden/
+    /\.settings-overview__list\s*\{[^}]*background:\s*var\(--color-surface-work\)[^}]*overflow:\s*hidden/
   );
   assert.doesNotMatch(
     settings,
-    /\.settings-mobile-overview__links\s*\{[^}]*grid-template-columns/
+    /\.settings-overview__list\s*\{[^}]*grid-template-columns/
   );
 });
 
@@ -12669,7 +12676,8 @@ test('der Modulkopf gehoert der Shell - kein Modul setzt seine Richtung oder sei
  *   unter den Large Title in den kanonischen `page-toolbar`-Kopf (Gesundheit,
  *   Budget, Belohnungen, Haushaltshilfe).
  *   Sektionen mit eigener Shell (Einstellungen) fuehren ihren Titel in ihrem
- *   eigenen Kopf.
+ *   eigenen Kopf - seit 2026-09-26 (Kopfregel mobil) ist das der geteilte
+ *   kanonische Kopf, den die Shell selbst baut.
  *
  * DER DRITTE FALL IST EINE REGEL, KEINE AUSNAHME. Die Einstellungen tragen
  * `module: 'settings'` auf allen Blaettern und fielen nach Fall 2 unter „Titel
@@ -12681,7 +12689,12 @@ test('der Modulkopf gehoert der Shell - kein Modul setzt seine Richtung oder sei
  * die Shell ihre eigene Navigation und ihren eigenen Kopf baut. Eine blosse
  * Pfadliste (`HEALTH_ROUTES`) tut das nicht. Der Fall wird deshalb nicht
  * uebersprungen, sondern anders geprueft: die Sektion MUSS einen eigenen
- * sichtbaren Titel fuehren und darf keinen `page-toolbar__title` tragen.
+ * sichtbaren Titel fuehren, und zwar in EINEM Kopf. Traegt sie einen
+ * `page-toolbar__title`, dann im kanonischen Kopf und ohne einen zweiten
+ * Seitenkopf (`page__header`) daneben - das waren die zwei Koepfe fuer einen
+ * Titel, gegen die diese Pruefung stand. Bis 2026-09-26 hiess sie „kein
+ * `page-toolbar__title`"; sie pruefte damit die Schreibweise statt der Regel
+ * und sperrte die Einstellungen aus dem Large Title aller Module aus.
  *
  * WARUM DIE ROUTE UND NICHT DER HELFERNAME: `renderSubTabs` gegen
  * `wireTablist` ist eine Implementierungswahl, keine Regel. Sie faellt bei der
@@ -12832,7 +12845,8 @@ test('ob ein Seitentitel ueber einer Leiste steht, entscheidet der module:-Wert 
       if (!ownTitle) {
         offenders.push(`${mod}: Sektion mit eigener Shell, fuehrt aber keinen eigenen sichtbaren Titel`);
       }
-      if (hasTitle) {
+      const secondHead = sources.some((src) => /\bpage__header\b/.test(stripComments(src)));
+      if (hasTitle && (!hasCanonicalHead || secondHead)) {
         offenders.push(`${mod}: Sektion mit eigener Shell traegt zusaetzlich einen page-toolbar__title - zwei Koepfe fuer einen Titel`);
       }
       continue;
