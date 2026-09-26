@@ -392,3 +392,55 @@ test('Status in der Spalte bestaetigt, Nachladen scheitert: die alten Knoepfe ko
   assert.match(src, /onStale: pane \? \(\) => taskMd\?\.refresh\(\{ repaint: true \}\) : undefined/,
     'openTaskView reicht onStale fuer die Spalte durch');
 });
+
+test('Sammel-Loeschen mit der angezeigten Aufgabe: die Spalte rueckt sofort weiter, Rueckgaengig holt sie zurueck', () => {
+  // Die Zeilen werden nur ausgeblendet, geloescht wird erst nach dem
+  // Rueckgaengig-Fenster. Bis dahin standen Bearbeiten, Status, Ablage und
+  // Loeschen der geloeschten Aufgabe fuenf Sekunden bedienbar in der Spalte.
+  const rows = [1, 2, 3, 4].map((id) => {
+    const row = { dataset: { mdId: String(id) }, hidden: false, style: { display: '' } };
+    row.getClientRects = () => (row.style.display === 'none' ? [] : [{}]);
+    return row;
+  });
+  const list = {
+    querySelectorAll: () => rows,
+    querySelector: (sel) => rows.find((r) => sel === `[data-md-id="${r.dataset.mdId}"]`) ?? null,
+  };
+  const container = {
+    querySelector: (sel) => {
+      if (sel === '#task-list') return list;
+      const m = sel.match(/^\[data-task-id="(\d+)"\]$/);
+      return m ? rows.find((r) => r.dataset.mdId === m[1]) ?? null : null;
+    },
+  };
+  let undo = null;
+  globalThis.__undoStub = (opts) => { undo = opts; };
+  try {
+    withTasks([T(1), T(2), T(3), T(4)], () => {
+      const { md, calls } = fakeMd('2');
+      tasks.useTaskMd(md);
+      tasks.handleBulkDelete(['2', '3'], container);
+      assert.deepEqual(calls.map(([op, id, o]) => [op, id, o?.history]), [['select', '4', 'replace']],
+        'die Spalte zeigt sofort die naechste stehende Aufgabe, nicht die geloeschte');
+      calls.length = 0;
+      undo.restore();
+      assert.deepEqual(calls, [['select', '2', { history: 'replace' }]], 'Rueckgaengig: die Aufgabe steht wieder rechts');
+
+      // Hat der Nutzer inzwischen selbst gewaehlt, bleibt seine Wahl.
+      rows.forEach((r) => { r.style.display = ''; });
+      tasks.handleBulkDelete(['2'], container);
+      md.select('1');
+      calls.length = 0;
+      undo.restore();
+      assert.deepEqual(calls, [], 'Rueckgaengig reisst eine neue Wahl nicht um');
+
+      // Steht die angezeigte Aufgabe nicht in der Loeschung, bleibt die Spalte.
+      rows.forEach((r) => { r.style.display = ''; });
+      calls.length = 0;
+      tasks.handleBulkDelete(['3'], container);
+      assert.deepEqual(calls, []);
+    });
+  } finally {
+    delete globalThis.__undoStub;
+  }
+});
