@@ -8,7 +8,7 @@ import { existsSync, globSync, readFileSync } from 'node:fs';
 import { eachRule } from './css-rules.js';
 
 // Minimales Window/Navigator-Mock für Node
-const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader, collapseOut, expandIn, watchNavCapsuleHeight } = await (async () => {
+const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader, collapseOut, expandIn, watchNavCapsuleHeight, wireScrollFade } = await (async () => {
   global.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
@@ -858,5 +858,65 @@ test('watchNavCapsuleHeight: die gemessene Kapselhoehe steht am Root, eine verbo
     assert.equal(observers[0].disconnected, true, 'und ihr Beobachter endet');
   } finally {
     globalThis.ResizeObserver = saved;
+  }
+});
+
+test('wireScrollFade: eine abgehaengte Leiste haengt ihre Beobachter selbst ab, eine noch lose bekommt ihren Fade (Critique 2026-09-26, Beifang R5)', () => {
+  // sub-tabs.js baut bei jedem Eintritt eine neue Leiste und haelt `destroy`
+  // nicht fest - jede alte liess ihren ResizeObserver am abgehaengten Knoten
+  // (Sonde: vier Kuechen-Eintritte, vier lebende Observer). Der Observer
+  // meldet sich, wenn sein Element das Dokument verlaesst; dort endet er.
+  const savedRO = globalThis.ResizeObserver;
+  const savedMO = globalThis.MutationObserver;
+  const ros = [];
+  const mos = [];
+  globalThis.ResizeObserver = class {
+    constructor(cb) { this.cb = cb; this.disconnected = false; ros.push(this); }
+    observe() {}
+    disconnect() { this.disconnected = true; }
+  };
+  globalThis.MutationObserver = class {
+    constructor(cb) { this.cb = cb; this.disconnected = false; mos.push(this); }
+    observe() {}
+    disconnect() { this.disconnected = true; }
+  };
+  const bar = () => {
+    const classes = new Set();
+    const listeners = new Map();
+    return {
+      isConnected: true, scrollLeft: 0, scrollWidth: 500, clientWidth: 300,
+      classList: {
+        add: (...c) => c.forEach((x) => classes.add(x)),
+        remove: (...c) => c.forEach((x) => classes.delete(x)),
+        toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)),
+        contains: (c) => classes.has(c),
+      },
+      addEventListener: (type, fn) => listeners.set(type, fn),
+      removeEventListener: (type, fn) => { if (listeners.get(type) === fn) listeners.delete(type); },
+      listeners,
+    };
+  };
+  try {
+    const el = bar();
+    wireScrollFade(el);
+    assert.equal(el.classList.contains('has-fade-end'), true, 'ueberlaufende Leiste traegt den End-Fade');
+    assert.equal(el.listeners.has('scroll'), true);
+    el.isConnected = false;
+    ros[0].cb([]);
+    assert.equal(ros[0].disconnected, true, 'ResizeObserver endet mit der Leiste');
+    assert.equal(mos[0].disconnected, true, 'MutationObserver auch');
+    assert.equal(el.listeners.has('scroll'), false, 'und der Scroll-Hoerer');
+
+    // Verdrahtet, BEVOR sie eingefuegt ist: kein Abbau, der Fade kommt mit dem Einhaengen.
+    const loose = bar();
+    loose.isConnected = false;
+    wireScrollFade(loose);
+    assert.equal(ros[1].disconnected, false, 'eine noch lose Leiste wird nicht abgebaut');
+    loose.isConnected = true;
+    ros[1].cb([]);
+    assert.equal(loose.classList.contains('has-fade-end'), true);
+  } finally {
+    globalThis.ResizeObserver = savedRO;
+    globalThis.MutationObserver = savedMO;
   }
 });

@@ -338,7 +338,32 @@ export function wireScrollFade(el, { axis = 'x' } = {}) {
   // Sub-Pixel-Schwelle fuer die POSITION. Sie ist bewusst kleiner als `eps`:
   // siehe die Trennung der beiden Fragen im `update` darunter.
   const posEps = 0.5;
+  let destroyed = false;
+  let wasConnected = false;
+  const destroy = () => {
+    if (destroyed) return;
+    destroyed = true;
+    el.removeEventListener('scroll', update);
+    ro.disconnect();
+    mo.disconnect();
+  };
   const update = () => {
+    // DIE LEISTE RAEUMT SICH SELBST AB, sobald sie aus dem Dokument ist
+    // (Critique 2026-09-26, Beifang R5). Fast kein Aufrufer haelt `destroy`
+    // fest - sub-tabs.js baut bei jedem Eintritt eine neue Leiste, und jede
+    // liess ihren ResizeObserver am abgehaengten Knoten haengen (Sonde: vier
+    // Kuechen-Eintritte, vier lebende Observer). Ein Observer meldet sich, wenn
+    // sein Element das Dokument verlaesst (die Box faellt auf 0x0) - genau dort
+    // haengt er sich ab. Eine Leiste, die schon ausgeblendet (0x0) abgehaengt
+    // wird, meldet sich nicht mehr; dafuer bleibt `destroy` im Rueckgabewert.
+    // NUR NACH DEM ERSTEN EINHAENGEN: wer die Leiste verdrahtet, bevor er sie
+    // einfuegt, bekaeme sonst gar keinen Fade - der erste Aufruf unten laeuft
+    // dann auf einem noch losen Knoten.
+    if (!el.isConnected) {
+      if (wasConnected) destroy();
+      return;
+    }
+    wasConnected = true;
     // `Math.abs` wegen RTL: in `ar` und `fa` setzt die App `dir=rtl`, und dort
     // steht `scrollLeft` nach CSSOM am Anfang auf 0 und laeuft beim Scrollen ins
     // NEGATIVE. Ohne den Betrag waere `pos > eps` nie wahr und `pos < max - eps`
@@ -381,14 +406,7 @@ export function wireScrollFade(el, { axis = 'x' } = {}) {
   const mo = new MutationObserver(update);
   mo.observe(el, { childList: true, subtree: true });
   update();
-  return {
-    update,
-    destroy: () => {
-      el.removeEventListener('scroll', update);
-      ro.disconnect();
-      mo.disconnect();
-    },
-  };
+  return { update, destroy };
 }
 
 /**
