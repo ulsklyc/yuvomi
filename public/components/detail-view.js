@@ -769,12 +769,20 @@ export function openDetailView(opts = {}) {
   // rufen und ein fremdes, offenes Modal schließen.
   // Ohne Fokus-Rueckgabe: die neue Ansicht nimmt den Fokus selbst.
   if (activePopover) closeDetailView({ fokus: false });
-  // In die Spalte befoerdert: das Blatt DIESES Eintrags weicht. Nur solange es
-  // noch die aktive Ansicht ist - sonst hat es schon ein anderes Modal ersetzt,
-  // und closeDetailView() schloesse dieses fremde.
-  if (usePane && opts.key && activeSheet?.key === opts.key && activeViewToken === activeSheet.token) {
-    activeSheet = null;
-    closeDetailView({ fokus: false });
+  // In die Spalte befoerdert: das Blatt DIESES Eintrags weicht. `activeSheet`
+  // steht nur, solange das Blatt offen ist - X, Escape und ein Modal, das es
+  // ersetzt, raeumen es im onClose ab; ein fremdes Modal wird so nie getroffen.
+  //
+  // DAS ERGEBNIS ZAEHLT. closeDetailView() fragt bei ungespeicherten
+  // Aenderungen nach; wer „nicht verwerfen" sagt, behaelt das Blatt (`false`).
+  // Dann bleibt es verfolgt, und die naechste Befoerderung fragt erneut -
+  // vergessen stuende es ungefuehrt ueber der Spalte. Die Spalte darunter wird
+  // trotzdem gefuellt: sie ist, was nach dem Schliessen stehen soll.
+  if (usePane && opts.key && activeSheet?.key === opts.key) {
+    const sheet = activeSheet;
+    Promise.resolve(closeDetailView({ fokus: false })).then((closed) => {
+      if (closed !== false && activeSheet === sheet) activeSheet = null;
+    });
   }
 
   const token = ++viewSeq;
