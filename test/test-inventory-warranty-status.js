@@ -115,12 +115,12 @@ test('countUpcomingDeadlines: 0 bei leerer Liste', () => {
 test('countUpcomingDeadlines: zaehlt nur Items mit hasUpcomingDeadline', () => {
   const items = [
     item({ purchase_date: '2026-07-01', warranty_months: 1 }),   // bald ablaufend
-    item({ purchase_date: '2020-01-01', warranty_months: 12 }),  // laengst abgelaufen
+    item({ purchase_date: '2020-01-01', warranty_months: 12 }),  // laengst abgelaufen - zaehlt nicht mehr (Nachlauf vorbei)
     item({ purchase_date: '2026-01-01', warranty_months: 24 }),  // valid, weit in der Zukunft
     { ...item(), tracked_dates: [{ date: '2026-08-01' }] },      // Frist bald faellig
     item(),                                                       // keine Garantie, keine Fristen
   ];
-  assert.equal(countUpcomingDeadlines(items, TODAY), 3);
+  assert.equal(countUpcomingDeadlines(items, TODAY), 2);
 });
 
 test('countUpcomingDeadlines: 0 wenn alles valid oder leer ist', () => {
@@ -134,4 +134,90 @@ test('countUpcomingDeadlines: alle Items brauchen Aufmerksamkeit', () => {
     { ...item(), tracked_dates: [{ date: '2026-08-01' }] },
   ];
   assert.equal(countUpcomingDeadlines(items, TODAY), 2);
+});
+
+// Critique 2026-09-26: eine abgelaufene Garantie, gegen die man nichts mehr tun
+// kann, hielt "Braucht Aufmerksamkeit" und das Nav-Badge dauerhaft an
+// ("Familienauto", seit 17 Monaten abgelaufen). Sie zaehlt nur noch fuer einen
+// benannten Nachlauf; handelbare Fristen (TUeV, Service) bleiben, bis sie
+// erledigt sind.
+const { WARRANTY_EXPIRED_ATTENTION_DAYS, deadlineChipSpec } = await import('../public/utils/inventory-warranty.js');
+
+test('WARRANTY_EXPIRED_ATTENTION_DAYS ist 30', () => {
+  assert.equal(WARRANTY_EXPIRED_ATTENTION_DAYS, 30);
+});
+
+test('hasUpcomingDeadline: eine abgelaufene Garantie zaehlt nur im Nachlauf, inklusive Grenze', () => {
+  // Ende 2026-06-29 = 30 Tage vor TODAY -> noch im Nachlauf.
+  assert.equal(hasUpcomingDeadline(item({ purchase_date: '2025-06-29', warranty_months: 12 }), TODAY), true);
+  // Ende 2026-06-28 = 31 Tage vor TODAY -> vorbei.
+  assert.equal(hasUpcomingDeadline(item({ purchase_date: '2025-06-28', warranty_months: 12 }), TODAY), false);
+  assert.equal(hasUpcomingDeadline(item({ purchase_date: '2020-01-01', warranty_months: 12 }), TODAY), false);
+});
+
+test('hasUpcomingDeadline: eine ueberfaellige getrackte Frist bleibt ohne Nachlaufgrenze, bis sie erledigt ist', () => {
+  const overdue = { ...item({ purchase_date: '2020-01-01', warranty_months: 12 }), tracked_dates: [{ label: 'TÜV', date: '2024-01-01' }] };
+  assert.equal(hasUpcomingDeadline(overdue, TODAY), true);
+});
+
+test('deadlineChipSpec: null ohne faellige Frist, auch fuer eine laengst abgelaufene Garantie', () => {
+  assert.equal(deadlineChipSpec(item(), TODAY), null);
+  assert.equal(deadlineChipSpec(item({ purchase_date: '2026-01-01', warranty_months: 24 }), TODAY), null);
+  assert.equal(deadlineChipSpec(item({ purchase_date: '2020-01-01', warranty_months: 12 }), TODAY), null);
+});
+
+test('deadlineChipSpec: Garantie bald ab nennt ihr Enddatum, Ton expiring', () => {
+  const spec = deadlineChipSpec(item({ purchase_date: '2026-07-01', warranty_months: 1 }), TODAY);
+  assert.deepEqual(spec, { kind: 'warranty', label: null, state: 'expiring', endDateKey: '2026-08-01', days: 3, tone: 'expiring' });
+});
+
+test('deadlineChipSpec: Garantie im Nachlauf ist expired im Gefahr-Ton', () => {
+  const spec = deadlineChipSpec(item({ purchase_date: '2025-07-20', warranty_months: 12 }), TODAY);
+  assert.equal(spec.kind, 'warranty');
+  assert.equal(spec.state, 'expired');
+  assert.equal(spec.tone, 'unavailable');
+});
+
+test('deadlineChipSpec: die dringendste Frist gewinnt - ueberfaellig und handelbar vor bald faellig vor abgelaufener Garantie', () => {
+  const expiredWarranty = { purchase_date: '2025-07-20', warranty_months: 12 };
+  const soon = { label: 'Service', date: '2026-08-10' };
+  const sooner = { label: 'TÜV', date: '2026-08-05' };
+  const overdue = { label: 'Inspektion', date: '2026-07-01' };
+  assert.equal(deadlineChipSpec({ ...item(expiredWarranty), tracked_dates: [soon, sooner] }, TODAY).label, 'TÜV');
+  assert.equal(deadlineChipSpec({ ...item(expiredWarranty), tracked_dates: [soon, overdue] }, TODAY).label, 'Inspektion');
+  const tracked = deadlineChipSpec({ ...item(), tracked_dates: [sooner] }, TODAY);
+  assert.deepEqual(tracked, { kind: 'tracked', label: 'TÜV', state: 'expiring', endDateKey: '2026-08-05', days: 7, tone: 'expiring' });
+});
+
+test('hasUpcomingDeadline und der Chip sprechen aus derselben Regel', () => {
+  const cases = [
+    item(),
+    item({ purchase_date: '2026-07-01', warranty_months: 1 }),
+    item({ purchase_date: '2025-06-29', warranty_months: 12 }),
+    item({ purchase_date: '2025-06-28', warranty_months: 12 }),
+    { ...item(), tracked_dates: [{ label: 'TÜV', date: '2020-01-01' }] },
+    { ...item(), tracked_dates: [{ label: 'TÜV', date: '2030-01-01' }] },
+  ];
+  for (const c of cases) assert.equal(hasUpcomingDeadline(c, TODAY), deadlineChipSpec(c, TODAY) !== null);
+});
+
+test('die Inventarzeile zeigt die Frist als sichtbaren Chip statt eines stummen 12px-Icons', async () => {
+  const { readFileSync } = await import('node:fs');
+  const page = readFileSync(new URL('../public/pages/inventory.js', import.meta.url), 'utf8');
+  const row = page.slice(page.indexOf('function renderItemRow'), page.indexOf('function renderCategoryRow'));
+  assert.doesNotMatch(row, /shield-alert/, 'das stumme Icon mit sr-only-Satz ohne Frist und Datum ist weg');
+  assert.match(row, /deadlineChipHtml\(item\)/);
+  const chip = page.slice(page.indexOf('function deadlineChipHtml'), page.indexOf('function renderItemRow'));
+  assert.match(chip, /deadlineChipSpec\(item\)/);
+  assert.match(chip, /class="doc-badge doc-badge--\$\{spec\.tone\}"/, 'derselbe Chip wie in Dokumente');
+  // Der Chip muss auf der Inventarseite auch GESTALTET sein: der Router laedt je
+  // Seite genau ein Modul-Stylesheet, documents.css ist dort nicht geladen.
+  const index = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  const { eachRule } = await import('./css-rules.js');
+  const global = [...index.matchAll(/<link rel="stylesheet" href="\/styles\/([\w-]+\.css)"/g)].map((m) => m[1]);
+  const defined = (selector) => global.some((file) => [...eachRule(readFileSync(new URL(`../public/styles/${file}`, import.meta.url), 'utf8'))]
+    .some((rule) => rule.at.length === 0 && rule.selector.split(',').map((x) => x.trim()).includes(selector)));
+  for (const selector of ['.doc-badge', '.doc-badge--expiring', '.doc-badge--unavailable']) {
+    assert.ok(defined(selector), `${selector} muss in einem global geladenen Stylesheet stehen`);
+  }
 });

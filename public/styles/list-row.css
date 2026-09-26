@@ -737,3 +737,45 @@
 .priority-dot--medium { background-color: var(--color-priority-medium); }
 .priority-dot--high   { background-color: var(--color-priority-high); }
 .priority-dot--urgent { background-color: var(--color-priority-urgent); }
+
+/* --------------------------------------------------------
+   Ablauf-Chip (Dokumente, Inventar-Fristen)
+   Aus documents.css hierher (Critique 2026-09-26): die Inventarzeile zeigt
+   ihre Frist mit demselben Chip, und der Router laedt je Seite nur EIN
+   Modul-Stylesheet - list-row.css laedt global. Die Ortsetiketten und die
+   Kurz-/Langform bleiben in documents.css, sie gibt es nur dort.
+   -------------------------------------------------------- */
+
+/* Kapsel wie jeder Chip der App (DESIGN.md, Chips: --radius-full). */
+.doc-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.4;
+}
+
+.doc-badge svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.doc-badge--unavailable {
+  background: var(--color-danger-light);
+  color: var(--color-danger-ink);
+}
+
+/* Ablauf-Chip (dateStatus()): "expiring" bald faellig (Warnung) - "valid" zeigt
+   gar keinen Chip. "expired" (bereits ueberfaellig) teilt sich bewusst die
+   Gefahr-Farbe mit .doc-badge--unavailable statt einer eigenen, identischen
+   Regel (DESIGN.md, Colors: die Skalen-Regel - zwei Modifier duerfen nicht
+   unabsichtlich gleich aussehen, ohne sich eine Regel zu teilen). */
+.doc-badge--expiring {
+  background: var(--color-warning-light);
+  color: var(--color-warning-ink);
+}
