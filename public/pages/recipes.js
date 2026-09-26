@@ -1370,7 +1370,7 @@ async function saveRecipe(panel, mode, recipe) {
     renderRecipeList({ repaint: true });
     // In der Spalte steht das neue Rezept gleich rechts - wie eine neue Notiz
     // in Notizen. Darunter bleibt die Liste, wie sie war.
-    if (createdId != null && _md?.isSplit()) _md.select(createdId);
+    if (createdId != null) selectOwnRecipe(createdId);
     window.yuvomi?.showToast(mode === 'create' ? t('recipes.created') : t('recipes.updated'), 'success');
   } catch (err) {
     saveBtn.disabled = false;
@@ -1563,6 +1563,30 @@ async function removeRecipe(recipe) {
   });
 }
 
+/**
+ * Waehlt in der Spalte ein Rezept aus, das die Seite gerade selbst angelegt
+ * hat (Neu, Duplizieren).
+ *
+ * Ein benanntes Ziel schlaegt einen alten Filter (#936, dort fuer den
+ * Deep-Link). Die Kopie eines Mealie-Rezepts ist nativ und faellt aus dem
+ * Quellenfilter "Mealie"; ein neues Rezept passt nicht zwingend zur Suche.
+ * Unbedingt ausgewaehlt stand rechts ein Rezept ohne Zeile links (Codex an
+ * #1477). Also fallen Suche und Filter weg, BEVOR ausgewaehlt wird - und nur
+ * dann, wenn das Rezept sonst fehlte: wer unter "Suppe" eine Suppe anlegt,
+ * behaelt seine Suche.
+ */
+function selectOwnRecipe(id) {
+  if (!_md?.isSplit()) return;
+  if (!filteredRecipes().some((r) => String(r.id) === String(id))) {
+    state.query = '';
+    state.sourceFilter = 'all';
+    _search?.clear();
+    renderSourceFilter();
+    renderRecipeList();
+  }
+  _md.select(id);
+}
+
 async function duplicateRecipe(recipe) {
   const copySuffix = t('recipes.copySuffix');
   const title = `${recipe.title} (${copySuffix})`;
@@ -1580,7 +1604,7 @@ async function duplicateRecipe(recipe) {
     renderRecipeList();
     // Die Kopie ist das, was man als Naechstes bearbeitet: in der Spalte steht
     // sie deshalb gleich rechts.
-    if (res.data?.id != null && _md?.isSplit()) _md.select(res.data.id);
+    if (res.data?.id != null) selectOwnRecipe(res.data.id);
     window.yuvomi?.showToast(t('recipes.duplicated'), 'success');
   } catch (err) {
     window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');

@@ -686,8 +686,13 @@ test('Liste + Detail, unter der Schwelle: alles wie bisher - ?open= klappt auf, 
   await settle();
   assert.equal(doc.querySelector('#recipe-detail-1').hidden, false, 'der Klick klappt nicht mehr auf');
   assert.equal(toggleOf(doc, 1).getAttribute('aria-expanded'), 'true');
-  assert.equal(location.search, '?open=2', 'unter der Schwelle schreibt ein Aufklappen keine Adresse');
-  assert.equal(history.length, 1);
+  // Seit R4 (#1477, "opening another entry below the threshold moves a
+  // remembered selection and its address along with it"): der Deep-Link hat
+  // eine Auswahl gemerkt, also folgt die Adresse dem geoeffneten Rezept -
+  // sonst stuende beim Verbreitern das alte in der Spalte. ERSETZT, nicht
+  // gestapelt: ein Aufklappen ist kein Schritt fuer die Zurueck-Taste.
+  assert.equal(location.search, '?open=1', 'die Adresse nennt noch das alte Rezept - beim Verbreitern stuende es in der Spalte');
+  assert.equal(history.length, 1, 'unter der Schwelle legt ein Aufklappen keinen History-Schritt an');
 });
 
 test('Liste + Detail: in der schmalen Zeile stehen Zutatenzahl und "Diese Woche geplant" zusammen unter dem Namen', async () => {
@@ -709,4 +714,40 @@ test('Liste + Detail: in der schmalen Zeile stehen Zutatenzahl und "Diese Woche 
   assert.match(base?.body ?? '', /display:\s*contents/, 'breit muss der Slot unsichtbar sein - sonst aendert sich die breite Zeile');
   assert.match(narrow?.body ?? '', /display:\s*block/, 'schmal muss der Slot die Angaben als Text hintereinander setzen');
   assert.match(narrow?.body ?? '', /flex:\s*1 0 100%/, 'schmal muss der Slot eine eigene Zeile unter dem Namen sein');
+});
+
+/*
+ * EIN BENANNTES ZIEL SCHLAEGT EINEN ALTEN FILTER - AUCH DAS EIGENE (Codex an
+ * #1477, Runde 3). Duplizieren und Neu waehlen das neue Rezept in der Spalte
+ * aus. Die Kopie ist immer nativ (duplicateRecipe postet ohne Quelle); steht
+ * der Quellenfilter auf "Mealie", faellt sie aus der Liste - und rechts stand
+ * ein Rezept ohne Zeile links. Dieselbe Regel wie beim Deep-Link (#936): die
+ * Filter fallen weg, bevor ausgewaehlt wird.
+ */
+test('Liste + Detail: die Kopie eines gespiegelten Rezepts unter dem Quellenfilter steht links UND rechts', async () => {
+  const doc = await renderFresh(DISHES, { split: true, path: '/recipes?open=3' });
+  await settle();
+  const { __test } = await import('../public/pages/recipes.js');
+  clickBubbling(doc.querySelector('[data-source-value="mealie"]'));
+  assert.equal(__test.state.sourceFilter, 'mealie');
+  assert.deepEqual(doc.querySelectorAll('.recipe-row-item[data-md-id]').map((r) => r.dataset.mdId), ['3'],
+    'der Quellenfilter greift nicht - der Test misst den Fall nicht');
+
+  globalThis.__apiStub.post = async (url, body) => {
+    assert.equal(url, '/recipes');
+    return { data: { ...dish(4), title: body.title } };
+  };
+  const duplicate = doc.querySelectorAll('#recipes-detail .split-view__detail-actions button')
+    .find((b) => b.getAttribute('aria-label') === 'recipes.duplicate');
+  assert.ok(duplicate, 'kein Duplizieren im Kopf der Spalte');
+  clickBubbling(duplicate);
+  await settle();
+  await settle();
+
+  assert.equal(location.search, '?open=4', 'die Kopie ist nicht ausgewaehlt');
+  assert.equal(paneTitle(doc), 'Gericht 3 (recipes.copySuffix)', 'rechts steht nicht die Kopie');
+  const row = doc.querySelector('.recipe-row-item[data-md-id="4"]');
+  assert.ok(row !== null, 'rechts steht die Kopie, links fehlt ihre Zeile - der alte Filter hat das benannte Ziel geschlagen');
+  assert.ok(row.classList.contains('is-selected'), 'die Zeile der Kopie ist nicht markiert');
+  assert.equal(__test.state.sourceFilter, 'all', 'der Quellenfilter steht noch');
 });
