@@ -170,6 +170,18 @@
   text-decoration: line-through;
 }
 
+/* Das Zeichen vor dem Teilschritt: ruhig, erledigt in Erfolgsfarbe. Bis
+ * 2026-09-26 zielten diese Regeln auf `i` - Lucide ersetzt das `<i>` aber
+ * durch `<svg>`, sie trafen also nie (Komponenten-Kanon, Regel dead-i). */
+.detail-subtask svg {
+  flex-shrink: 0;
+  color: var(--color-text-tertiary);
+}
+
+.detail-subtask--done svg {
+  color: var(--color-success);
+}
+
 /* Der Einstieg steht IN der Liste, nicht daneben: die Karte blendet ihre
    Inline-Aktionen unter 640px aus, und ohne diesen Knopf gab es auf dem
    Telefon keinen Weg zur ersten Teilaufgabe (#925). Gestrichelt und in
@@ -185,6 +197,10 @@
   border-color: var(--color-accent);
   color: var(--color-accent);
   background: none;
+}
+
+.detail-subtask--add:hover svg {
+  color: var(--color-accent);
 }
 
 /* --------------------------------------------------------

@@ -975,18 +975,6 @@
   padding: 2px;
 }
 
-/* Layout der Aktionen kommt aus `.row-actions` (layout.css). Die
- * Verschiebe-Knoepfe am Listenrand sind aria-disabled (fokussierbar, der Klick
- * wird verworfen); `.row-action` kennt diesen Zustand noch nicht selbst, also
- * nimmt ihn die Stelle zurueck, die ihn setzt - wie `.btn[aria-disabled]`. */
-.subscriptions-metadata-row__actions .row-action[aria-disabled="true"],
-.subscriptions-metadata-row__actions .row-action[aria-disabled="true"]:hover {
-  /* Wirklich ohne Wirkung - der eine Fall, fuer den --color-text-disabled da ist. */
-  color: var(--color-text-disabled);
-  background: transparent;
-  cursor: not-allowed;
-}
-
 .subscriptions-metadata-row__view > i {
   width: 16px;
   height: 16px;

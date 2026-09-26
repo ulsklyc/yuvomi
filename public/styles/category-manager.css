@@ -156,15 +156,8 @@
   flex-shrink: 0;
 }
 
-/* Auf/Ab am Listenrand ist gesperrt. `.row-action` (layout.css) kennt keinen
- * gesperrten Zustand - sie ist sonst Bearbeiten/Loeschen, die es immer gibt;
- * hier waere der Pfeil ohne diese Regel von einem wirksamen nicht zu
- * unterscheiden. Dieselbe Antwort wie `.btn:disabled`. */
-.cat-row__actions .row-action:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  pointer-events: none;
-}
+/* Auf/Ab am Listenrand ist gesperrt (`disabled`); die Sperre zeichnet
+ * `.row-action:disabled` in layout.css, wie `.btn:disabled`. */
 
 /* Häufigkeit im Tag-Manager (<yuvomi-tag-manager>). Leiser als der Name: sie
    ordnet die Liste, sie ist nicht ihr Inhalt. */

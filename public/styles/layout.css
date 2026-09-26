@@ -1903,7 +1903,6 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 .segmented__item.is-active svg,
 .cal-toolbar__view-btn--active svg,
 .cal-toolbar__search-btn--active svg,
-.theme-toggle__btn--active svg,
 .perm-modeswitch__btn.is-active svg,
 .perm-seg__opt.is-active svg {
   /* 30 % statt 16 %: auf Tab-Bar-Größe (20px) las die schwächere Füllung
@@ -5836,6 +5835,31 @@ p.field-hint--warn[hidden] {
   height: 18px;
 }
 
+/* Gesperrte Zeilenaktion - dieselben zwei Zustaende wie beim `.btn`, weil
+ * seit dem Komponenten-Kanon (2026-09-26) die Verwalter (Kategorien, Abo-
+ * Kategorien, Zahlungsarten) ihre Pfeile am Listenrand hier sperren und jede
+ * Stelle die Regel sonst selbst mitbrachte (category-manager.css,
+ * subscriptions.css). `disabled` = nicht erreichbar, blass wie `.btn:disabled`;
+ * `aria-disabled` = fokussierbar, der Klick wird im Handler verworfen, also eine
+ * echte gedeckte Farbe statt Opazitaet und kein Hover-Grund, der eine Wirkung
+ * verspricht. */
+.row-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.row-action[aria-disabled='true'],
+.row-action[aria-disabled='true']:hover {
+  color: var(--color-text-disabled);
+  background: transparent;
+  cursor: not-allowed;
+}
+
+.row-action[aria-disabled='true']:active {
+  transform: none;
+}
+
 /* Auch der Icon-Button ist eine Kapsel, hier also ein Kreis - Apples eigene
  * Icon-Buttons sind rund. Die frühere --radius-sm-Ecke war der letzte Rest der
  * zwei Buttonformen: sie überschrieb die Basisregel und stand damit neben der
@@ -6063,35 +6087,6 @@ textarea::placeholder {
   flex: 1.5;
   min-width: 0;
   font-size: var(--type-body);
-}
-
-.ingredient-row__remove {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-full);
-  background: none;
-  border: none;
-  cursor: pointer;
-  /* NICHT --color-text-disabled: der Knopf ist bedienbar, er tritt nur zurueck.
-   * Die Ruhefarbe eines erreichbaren Bedienelements traegt 3:1 (dieselbe Regel
-   * wie bei .meal-slot__add-btn in meals.css). */
-  color: var(--color-text-tertiary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  position: relative;
-  transition: color var(--transition-fast);
-}
-
-.ingredient-row__remove::before {
-  content: '';
-  position: absolute;
-  inset: -8px;
-}
-
-.ingredient-row__remove:hover {
-  color: var(--color-danger);
 }
 
 .meal-type-badge {

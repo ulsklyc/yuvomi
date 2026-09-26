@@ -1034,7 +1034,6 @@ const SHAPE_EXEMPT = new Map([
   ['cal-toolbar__view-btn', 'Zustandsschalter: Segment der Kalender-Ansicht'],
   ['ydp__trigger', 'Griff: Feld-Oeffner des Datepickers, traegt Feldkante'],
   ['more-sheet__search', 'Griff: Suchfeld des More-Sheets, traegt Feldkante'],
-  ['theme-toggle__btn', 'Zustandsschalter: Segment der Farbwelt-Wahl'],
   // Das Kanon-Segment (panel.css, DESIGN.md: konzentrisch eingesetzte
   // .segmented__item im radius-md-Traeger). Es stand bis 2026-09-25 auf keiner
   // gemessenen Route im Bild; seit der Dokumente-Critique traegt der Status
