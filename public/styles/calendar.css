@@ -1170,7 +1170,16 @@
   background-color: var(--module-accent, var(--color-accent));
 }
 
-/* Suchleiste: sitzt zwischen Toolbar und Body, teilt sich als eigene Zeile ab. */
+/* Suchleiste: sitzt zwischen Toolbar und Body, teilt sich als eigene Zeile ab.
+ * Die Leiste bleibt die dokumentierte Ausnahme im VERHALTEN (page-search.js:
+ * erst per Lupe aufgedeckt, die Treffer ersetzen die Ansicht - serverseitige
+ * Volltextsuche, kein Listenfilter). Das FELD darin ist seit dem Komponenten-
+ * Kanon (Runde 5, 2026-09-26) die geteilte Kapsel aus renderPageSearch: die
+ * randlose Eigenform war die fuenfte Variante des einen Suchfelds (Critique
+ * 2026-09-26, P1), und die Begruendung traegt nur das Aufdecken, nicht eine
+ * andere Optik. Der Leeren-Knopf der Kapsel bleibt verborgen (nicht
+ * verdrahtet): das Schliessen-X daneben leert und schliesst, eine zweite
+ * X-Steuerung daneben waere doppelt. */
 .cal-search {
   display: flex;
   align-items: center;
@@ -1178,44 +1187,11 @@
   padding: var(--space-2) var(--space-4);
   border-bottom: var(--space-px) solid var(--color-border);
   background-color: var(--color-surface);
-  box-shadow: inset 0 -1px 0 0 transparent;
 }
 
-.cal-search:focus-within {
-  box-shadow: inset 0 -2px 0 0 var(--module-accent, var(--color-accent));
-}
-
-.cal-search__icon {
-  width: 1.25rem;
-  height: 1.25rem;
-  color: var(--color-text-tertiary);
-  flex-shrink: 0;
-}
-
-.cal-search__input {
+.cal-search__field {
   flex: 1;
   min-width: 0;
-  min-height: var(--target-lg);
-  border: none;
-  background: none;
-  padding: 0;
-  font-size: var(--text-base);
-  color: var(--color-text-primary);
-}
-
-.cal-search__input::placeholder {
-  color: var(--color-text-secondary);
-}
-
-.cal-search__input:focus {
-  outline: none;
-}
-
-/* Nativen „Leeren"-Knopf (WebKit) unterdrücken: der explizite Schließen-Button
- * ist die einzige X-Affordanz, sonst stehen zwei ×-Steuerungen nebeneinander. */
-.cal-search__input::-webkit-search-cancel-button {
-  -webkit-appearance: none;
-  appearance: none;
 }
 
 .cal-search__close {
@@ -1288,7 +1264,7 @@
 }
 
 
-/* Der Kopf fluchtet mit dem Träger der Tageszeilen (.list-rows aus
+/* Der Kopf fluchtet mit dem Träger der Tageszeilen (.row-carrier aus
  * list-row.css, mit dem app-weit einen Lesemaß) - sonst stünde das Datum
  * breiter als die Zeilen, die es benennt. */
 /* Der freie Tag sagt, dass er frei ist.
@@ -1340,12 +1316,13 @@
 }
 
 /* Zeile, keine Karte: KEINE eigene Fläche, KEINE Kante, KEIN Radius, KEIN
- * Schatten, KEIN eigener Abstand. Das leistet der Träger (.list-rows), die
- * Trennung seine Haarlinie `.list-rows > * + *`.
+ * Schatten, KEIN eigener Abstand. Das leistet der Träger (.row-carrier seit
+ * Runde 5, 2026-09-26; vorher .list-rows), die Trennung seine Haarlinie
+ * `.row-carrier > * + *`.
  *
  * Die abgelegte Fläche war `--color-surface-work` - der generische
- * Arbeitsflächen-Token, derselbe, den `.list-rows` jetzt als Trägerfläche
- * trägt. Er trug hier KEINE Semantik (kein Zustand, keine Kalenderfarbe),
+ * Arbeitsflächen-Token, den damals `.list-rows` als Trägerfläche trug. Er
+ * trug hier KEINE Semantik (kein Zustand, keine Kalenderfarbe),
  * deshalb braucht das Entkarten keinen Zweitkanal: die Kalenderfarbe hängt
  * an der Kante des Textes (.agenda-event__body), nicht an der Zeile. */
 /* SIE TRAEGT `.list-row` (Critique 2026-08-13, P2). Hier standen sieben
@@ -1422,7 +1399,7 @@
  * Karte mit eigenem Spine im Tag, Punkt in der Liste). Jetzt spricht die Zeile
  * die Grammatik der Bloecke: die Vollton-Kante an der Inline-Start-Seite des
  * TEXTES, so hoch wie Titel und Metazeile. Die Flaeche bleibt die des Traegers
- * (`.list-rows`, Zeilen-Regel oben) - eine getoente Zeile in einer Liste waere
+ * (`.row-carrier`, Zeilen-Regel oben) - eine getoente Zeile in einer Liste waere
  * eine Karte in der Karte. Die Zugehoerigkeit traegt die Kante, nicht ein Punkt.
  *
  * Craft-Floor-Verbot „farbige Seitenkante an Listenzeilen" bewusst gebrochen:
@@ -1572,9 +1549,9 @@
   padding-right: var(--space-1);
 }
 
+/* Das Feld ist die geteilte Suchkapsel (renderPageSearch); hier nur der Abstand. */
 .event-icon-picker__search {
   margin-bottom: var(--space-1);
-  background: var(--color-surface);
 }
 
 .event-icon-picker__category-label {

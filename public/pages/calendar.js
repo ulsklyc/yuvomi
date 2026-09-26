@@ -51,6 +51,7 @@ import { localizeBirthdayEvent } from '/utils/birthday-event.js';
 import { googleTargetValue, caldavTargetValue, outlookTargetValue, assigneeSyncTarget } from '/utils/sync-target.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { findPageFab } from '/utils/fab.js';
+import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { nowFields, todayKey, zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
@@ -520,8 +521,12 @@ function openIconPickerDialog(selectedIcon, onSelect, onClose = () => {}) {
       </button>
     </div>
     <div class="modal-panel__body event-icon-dialog__body">
-      <input type="search" class="form-input event-icon-picker__search" id="event-icon-dialog-search"
-             placeholder="${esc(t('calendar.iconSearchPlaceholder'))}" autocomplete="off" aria-label="${esc(t('calendar.iconSearchPlaceholder'))}">
+      ${renderPageSearch({
+        id: 'event-icon-dialog-search',
+        label: t('calendar.iconSearchPlaceholder'),
+        clearLabel: t('common.searchClear'),
+        className: 'event-icon-picker__search',
+      })}
       <div class="event-icon-dialog__results" id="event-icon-dialog-results" role="radiogroup" aria-label="${esc(t('calendar.iconLabel'))}">
         ${renderIconPickerResults(selectedIcon)}
       </div>
@@ -542,11 +547,15 @@ function openIconPickerDialog(selectedIcon, onSelect, onClose = () => {}) {
 
   panel.querySelector('.modal-panel__close')?.addEventListener('click', close);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-  panel.querySelector('#event-icon-dialog-search')?.addEventListener('input', (e) => {
-    const results = panel.querySelector('#event-icon-dialog-results');
-    results?.replaceChildren();
-    results?.insertAdjacentHTML('beforeend', renderIconPickerResults(selectedIcon, e.target.value));
-    if (window.lucide) lucide.createIcons({ el: results });
+  wirePageSearch(panel, {
+    id: 'event-icon-dialog-search',
+    delay: 0,
+    onQuery: (query) => {
+      const results = panel.querySelector('#event-icon-dialog-results');
+      results?.replaceChildren();
+      results?.insertAdjacentHTML('beforeend', renderIconPickerResults(selectedIcon, query));
+      if (window.lucide) lucide.createIcons({ el: results });
+    },
   });
   panel.addEventListener('click', (e) => {
     const btn = e.target.closest('.event-icon-picker__option');
@@ -4655,7 +4664,7 @@ function dayGroupHtml({ date, events, tasks, holidays, schedule, waste }) {
       </div>`).join('')}</div>` : ''}
     ${schedule.length ? `<div class="agenda-holidays">${schedule.map((entry) => renderScheduleChip(entry, 'agenda-holiday')).join('')}</div>` : ''}
     ${waste.length ? `<div class="agenda-holidays">${waste.map((occ) => renderWasteChip(occ, { className: 'agenda-holiday', interactive: true })).join('')}</div>` : ''}
-    ${events.length ? `<div class="list-rows">${events.map((ev) => renderAgendaEvent(ev, date)).join('')}</div>` : ''}
+    ${events.length ? `<div class="row-carrier">${events.map((ev) => renderAgendaEvent(ev, date)).join('')}</div>` : ''}
     ${tasks.length ? `<div class="agenda-tasks">${tasks.map((tk) => renderTaskChip(tk)).join('')}</div>` : ''}
   `;
 }
@@ -5178,11 +5187,12 @@ function openCalendarSearch() {
 
   toolbar.insertAdjacentHTML('afterend', `
     <div class="cal-search" id="cal-search-bar" role="search">
-      <i data-lucide="search" class="cal-search__icon" aria-hidden="true"></i>
-      <input type="search" class="cal-search__input" id="cal-search-input"
-             placeholder="${esc(t('calendar.searchPlaceholder'))}"
-             aria-label="${esc(t('calendar.searchPlaceholder'))}"
-             autocomplete="off" enterkeyhint="search" spellcheck="false">
+      ${renderPageSearch({
+        id: 'cal-search-input',
+        label: t('calendar.searchPlaceholder'),
+        clearLabel: t('common.searchClear'),
+        className: 'cal-search__field',
+      })}
       <button class="btn btn--icon cal-search__close" id="cal-search-close"
               aria-label="${esc(t('calendar.searchClose'))}" title="${esc(t('calendar.searchClose'))}">
         <i data-lucide="x" aria-hidden="true"></i>
@@ -5336,7 +5346,7 @@ function renderCalendarSearchResults(body) {
             <span class="agenda-day__date">${formatDate(date, { long: true })}</span>
             <span class="agenda-day__weekday">${DAY_NAMES_LONG()[new Date(date + 'T00:00:00').getDay()]}</span>
           </h2>
-          <div class="list-rows">${events.map((ev) => renderAgendaEvent(ev, date)).join('')}</div>
+          <div class="row-carrier">${events.map((ev) => renderAgendaEvent(ev, date)).join('')}</div>
         </div>
       `).join('')}
     </div>
@@ -7328,7 +7338,7 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
         <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
       </button>` : '<div></div>'}
       <div style="display:flex;gap:var(--space-3)">
-        <button class="btn btn--ghost" id="modal-cancel">${t('common.cancel')}</button>
+        <button type="button" class="btn btn--secondary" id="modal-cancel">${t('common.cancel')}</button>
         <button class="btn btn--primary" id="modal-save">${isEdit ? t('common.save') : t('common.create')}</button>
       </div>
     </div>`;
@@ -7750,7 +7760,7 @@ function renderRecurringScopeChoices(action, event) {
     <div class="modal-actions modal-actions--stack">
       <div class="modal-actions modal-actions--stack" role="group" aria-labelledby="recurring-scope-label" aria-describedby="recurring-scope-occurrence">${choices}
       </div>
-      <button type="button" class="btn btn--ghost" id="recurring-scope-cancel">${esc(t('common.cancel'))}</button>
+      <button type="button" class="btn btn--secondary" id="recurring-scope-cancel">${esc(t('common.cancel'))}</button>
     </div>`;
 }
 
