@@ -14247,7 +14247,10 @@ test('kein var() auf ein Token, das nirgends entsteht', () => {
  * Grafik und wird an 3:1 fuer nicht-textuelle Inhalte gemessen, nicht an 4,5.
  */
 test('die Deaktiviert-Farbe steht an keinem erreichbaren Bedienelement', () => {
-  const DISABLED_SELECTOR = /:disabled\b|\[disabled\]|\[aria-disabled(?:="true")?\]|(?:^|[\s.>+~])[\w-]*(?:--disabled|\.is-disabled)\b/;
+  // Beide Anfuehrungszeichen: `[aria-disabled='true']` ist derselbe Zustand
+  // (layout.css schreibt `.btn` und `.row-action` so) - der Guard prueft die
+  // Regel, nicht die Schreibweise.
+  const DISABLED_SELECTOR = /:disabled\b|\[disabled\]|\[aria-disabled(?:=(["'])true\1)?\]|(?:^|[\s.>+~])[\w-]*(?:--disabled|\.is-disabled)\b/;
   const DIRECT_COLOR = /(?:^|[;{\s])color:\s*var\(--color-text-disabled\s*\)/;
 
   const styleDir = new URL('../public/styles/', import.meta.url);
