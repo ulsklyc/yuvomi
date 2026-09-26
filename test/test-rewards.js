@@ -368,4 +368,21 @@ test('Admin löst stellvertretend ein; ein Mitglied nur für sich selbst (#655)'
   assert.equal(getBalance(db, child2), c2 - 100, 'abgebucht wird beim Aufrufer selbst');
 });
 
+test('Seite: der Kontext-FAB dockt am Desktop an (Aktions-Slot, Nomen je Tab, Nomen bleibt beim Ausblenden), Zeilenaktion nennt die Praemie', async () => {
+  const { readFileSync } = await import('node:fs');
+  const page = readFileSync(new URL('../public/pages/rewards.js', import.meta.url), 'utf8');
+  // Ohne Slot im Kopf dockt der Router (dockFabIntoToolbar) stumm nicht an.
+  assert.match(page, /<h1 class="page-toolbar__title" id="rewards-title">[^\n]*\n\s*<div class="page-toolbar__actions"><\/div>/,
+    'der Belohnungen-Kopf braucht den Aktions-Slot fuer die Kopf-Pille');
+  assert.match(page, /createPageFab\(\{[^}]*dockLabel: t\('newLabel\.rewards'\)/, 'createPageFab ohne Nomen dockt nie an');
+  const fn = page.match(/function updateRewardsFab\(\)[\s\S]*?\n}\n/)?.[0];
+  assert.ok(fn, 'updateRewardsFab() nicht gefunden');
+  const calls = fn.match(/setPageFabAction\(fab, \{[^\n]*\}\)/g) ?? [];
+  assert.ok(calls.length >= 4, `erwartet: Katalog, Buchungen und zwei Ausblend-Zweige, gefunden ${calls.length}`);
+  // Auch ausgeblendet: der Router dockt nur beim Seitenaufbau und nur mit Nomen an.
+  for (const call of calls) assert.match(call, /dockLabel:/, `ohne Nomen: ${call}`);
+  assert.match(page, /rowActionHtml\(\{ icon: 'pencil', label: t\('common\.editNamed', \{ name: item\.name \}\)/,
+    'Bearbeiten an der Praemienkarte: .row-action mit dem Namen der Praemie');
+});
+
 test.after(() => { server.close(); db.close(); });

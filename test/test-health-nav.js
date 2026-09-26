@@ -378,3 +378,58 @@ test('cycleBubbleShell() nimmt einen icon-Parameter, der Schwangerschafts-Zweig 
   assert.match(fn, /return cycleBubbleShell\(line1,\s*'',\s*'baby'\)/,
     'der Schwangerschafts-Zweig muss cycleBubbleShell() mit icon="baby" statt eigener Wrapper-HTML nutzen');
 });
+
+// --------------------------------------------------------
+// Komponenten-Kanon (Runde 5, 2026-09-26): Kopf-Pille, Dialogfuss, Lesemass,
+// Radius-Skala. Der Ratchet in test:control-dialect zaehlt die Abweichler
+// app-weit; diese Guards halten, was er nicht sieht - die Verdrahtung.
+// --------------------------------------------------------
+
+test('Kanon: der Kontext-FAB dockt am Desktop an - Aktions-Slot im Kopf, Nomen je Tab, Nomen bleibt beim Ausblenden', () => {
+  // Ohne `.page-toolbar__actions` im Kopf dockt der Router (dockFabIntoToolbar)
+  // stumm nicht an, und das Nomen waere nur ein Attribut, das niemand zeigt.
+  const render = HEALTH_JS.match(/export async function render\(container[\s\S]*?\n}\n/)?.[0];
+  assert.ok(render, 'render() nicht gefunden');
+  assert.match(render, /<header class="page-toolbar health-toolbar">[\s\S]*?<div class="page-toolbar__actions"><\/div>[\s\S]*?<\/header>/,
+    'der Gesundheitskopf braucht den Aktions-Slot, in den der Router die Kopf-Pille legt');
+  assert.match(render, /createPageFab\(\{[^}]*dockLabel: t\('newLabel\.\w+'\)/, 'createPageFab ohne Nomen dockt nie an');
+
+  const update = functionSource('updateHealthFab');
+  assert.ok(update, 'updateHealthFab() nicht gefunden');
+  const actions = update.match(/setPageFabAction\(_fab, \{[^\n]*\}\)/g) ?? [];
+  assert.ok(actions.length >= 8, `erwartet: ein Aufruf je Tab plus der Ausblend-Zweig, gefunden ${actions.length}`);
+  for (const call of actions) {
+    // Auch der Ausblend-Zweig: der Router dockt nur beim Seitenaufbau an und
+    // nur mit `data-dock-label` - wer auf der Uebersicht einsteigt und das
+    // Nomen hier loeschte, behielte den schwebenden Knopf fuer den ganzen Besuch.
+    assert.match(call, /dockLabel:/, `ohne Nomen: ${call}`);
+  }
+});
+
+test('Kanon: Dialogknoepfe stehen im Fuss (.modal-panel__footer), und der Absende-Handler sucht seinen Knopf am Panel', () => {
+  assert.doesNotMatch(HEALTH_JS, /class="modal-actions"/, 'Knopfzeile im Dialogkoerper statt im Fuss');
+  // mountFooter() (modal.js) hebt den Fuss aus dem <form> ans Panel. Ein
+  // `form.querySelector('[type="submit"]')` findet ihn danach nicht mehr und
+  // liefert null - im Messwert-Dialog warf `submitBtn.disabled` dann beim
+  // ersten Absenden einen TypeError.
+  assert.doesNotMatch(HEALTH_JS, /form\.querySelector\(\s*['"]\[type="submit"\]/,
+    'der Absende-Knopf liegt nach dem Heben nicht mehr im <form> - am Panel suchen');
+  assert.doesNotMatch(HEALTH_JS, /class="btn btn--ghost"[^>]*>\$\{esc\(t\('common\.cancel'\)\)\}/, 'Abbrechen ist btn--secondary, nie ghost');
+  assert.doesNotMatch(HEALTH_JS, /btn--danger btn--ghost/, 'Loeschen im Dialog ist btn--danger-outline mit Icon und Text');
+});
+
+test('Beifang: Karten der Uebersicht auf der Radius-Skala, Disclaimer im Lesemass', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = read('public/styles/health.css');
+  for (const { selector, body } of eachRule(css)) {
+    // calc(--radius-* + Npx) erfindet eine Stufe (14px), die die Skala nicht kennt.
+    // Erlaubt bleibt die Konzentrik-Formel mit MINUS (tokens.css).
+    assert.doesNotMatch(body, /border-radius:\s*calc\(var\(--radius-[a-z0-9]+\)\s*\+/, `${selector}: Radius ausserhalb der Skala`);
+  }
+  const disclaimer = [...eachRule(css)].find((r) => r.selector.trim() === '.health-disclaimer' && !r.at.length);
+  assert.ok(disclaimer, '.health-disclaimer nicht gefunden');
+  const measure = disclaimer.body.match(/max-inline-size:\s*(\d+)ch/);
+  assert.ok(measure, 'der Disclaimer lief am Desktop ueber die volle Breite (~198 Zeichen je Zeile)');
+  const ch = Number(measure[1]);
+  assert.ok(ch >= 45 && ch <= 75, `Lesemass ${ch}ch ausserhalb 45-75ch`);
+});

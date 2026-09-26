@@ -28,6 +28,19 @@
   padding-bottom: var(--space-6);
 }
 
+/* EINE TITELZEILE, EINE HOEHE (wie housekeeping.css). Seit die Primaeraktion
+ * am Desktop mit ihrem Nomen im Kopf andockt, traegt die Titelzeile je Tab
+ * die Kopf-Pille (Vitalwerte, Medikamente ...) oder nichts (Uebersicht,
+ * Fasten) - gemessen 117 / 104px Kopf, der Inhalt ruckte bei jedem Wechsel.
+ * Der Aktions-Slot haelt die Zeile deshalb auch leer auf Bedienhoehe. Nur ab
+ * 1024px (dockFabIntoToolbar in router.js): darunter bleibt der Slot leer und
+ * darf keine Zeile oeffnen. */
+@media (min-width: 1024px) {
+  .health-toolbar > .page-toolbar__actions {
+    min-height: var(--target-base);
+  }
+}
+
 /* Der 3px-Akzentstreifen über der Tabs-Leiste ist mit dem HIG-Rollout entfallen
  * (DESIGN.md: „Don't Akzentstreifen an Toolbars oder Köpfen") - genauso wie bei
  * .kitchen-tabs-bar, dem Muster, dem er nachgebaut war. Die Modul-Identität
@@ -1193,10 +1206,6 @@ button.health-med-card:hover {
   color: var(--color-text-secondary);
 }
 
-.health-activity-row__edit {
-  flex: 0 0 auto;
-}
-
 /* Vorsorge-Zeilen (Review #1256): eigene Klassen statt geliehener
  * health-activity-row*, damit eine Aenderung hier die Aktivitaeten-Zeilen
  * nicht mehr stillschweigend mitzieht. Nur die Regeln, die die Vorsorge-Zeile
@@ -1252,10 +1261,6 @@ button.health-med-card:hover {
 .health-prevention-row__note {
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
-}
-
-.health-prevention-row__edit {
-  flex: 0 0 auto;
 }
 
 /* Intervall-Eingabe (Wert + Einheit nebeneinander) - war inline style="",
@@ -1423,7 +1428,9 @@ button.health-med-card:hover {
   gap: var(--space-3);
   padding: var(--space-4);
   border: 1px solid transparent;
-  border-radius: calc(var(--radius-md) + 2px);
+  /* Kartenradius der Skala (tokens.css: Karte = --radius-lg). Vorher
+   * calc(--radius-md + 2px) = 14px, ein Wert, den es sonst nirgends gab. */
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
   min-width: 0;
@@ -1641,6 +1648,12 @@ button.health-med-card:hover {
   font-size: var(--text-xs);
   line-height: 1.5;
   text-wrap: pretty;
+  /* Lesemass: am Desktop lief der Satz ueber die volle Seitenbreite (1440px:
+   * Platz fuer ~198 Zeichen je Zeile, Critique 2026-09-26). 65ch (ch = Breite
+   * der Null, gemessen ~84 Zeichen Fliesstext) haelt ihn in der Spanne, die ein
+   * Auge ohne Zeilensprung-Suche liest; mobil ist die Box ohnehin schmaler,
+   * dort greift die Grenze nicht. */
+  max-inline-size: 65ch;
 }
 
 .health-disclaimer--modal {
@@ -3220,10 +3233,6 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 .health-nutrition-row__note {
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
-}
-
-.health-nutrition-row__edit {
-  flex: 0 0 auto;
 }
 
 /* 639px ist die gemeinsame Telefon-Grenze der Seite (tokens.css 11c) - eine

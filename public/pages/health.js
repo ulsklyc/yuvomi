@@ -23,6 +23,7 @@ import { nowFields } from '/utils/timezone.js';
 import { trendMarkup } from '/utils/metric-card.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, reportFieldError, advancedSection, refocusAfterRender } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
+import { rowActionHtml } from '/utils/row-action.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import {
   computeVitalSeries, VITAL_METRICS, vitalMetric,
@@ -488,21 +489,25 @@ function updateHealthFab(activeRoute) {
   // von der Betreuung ausgenommen, das Modulrecht gilt aber auch dort (#1265).
   switch (activeRoute) {
     case '/health/vitals':
-      setPageFabAction(_fab, { hidden: !canEditFor(vitals.personId, vitals.meId), label: t('health.vitals.add'), onClick: () => openVitalModal() }); break;
+      setPageFabAction(_fab, { hidden: !canEditFor(vitals.personId, vitals.meId), label: t('health.vitals.add'), dockLabel: t('newLabel.healthVitals'), onClick: () => openVitalModal() }); break;
     case '/health/cycle':
-      setPageFabAction(_fab, { hidden: !cycleCanEdit(), label: t('health.cycle.add'), onClick: () => openPeriodModal(null) }); break;
+      setPageFabAction(_fab, { hidden: !cycleCanEdit(), label: t('health.cycle.add'), dockLabel: t('newLabel.healthCycle'), onClick: () => openPeriodModal(null) }); break;
     case '/health/meds':
-      setPageFabAction(_fab, { hidden: !canEditFor(meds.personId, meds.meId), label: t('health.meds.add'), onClick: () => openMedModal(null) }); break;
+      setPageFabAction(_fab, { hidden: !canEditFor(meds.personId, meds.meId), label: t('health.meds.add'), dockLabel: t('newLabel.healthMeds'), onClick: () => openMedModal(null) }); break;
     case '/health/prevention':
-      setPageFabAction(_fab, { hidden: !canEditFor(prevention.personId, prevention.meId), label: t('health.prevention.add'), onClick: () => openPreventionModal(null) }); break;
+      setPageFabAction(_fab, { hidden: !canEditFor(prevention.personId, prevention.meId), label: t('health.prevention.add'), dockLabel: t('newLabel.healthPrevention'), onClick: () => openPreventionModal(null) }); break;
     case '/health/labs':
-      setPageFabAction(_fab, { hidden: !canEditFor(labs.personId, labs.meId), label: t('health.labs.add'), onClick: () => openLabModal(null) }); break;
+      setPageFabAction(_fab, { hidden: !canEditFor(labs.personId, labs.meId), label: t('health.labs.add'), dockLabel: t('newLabel.healthLabs'), onClick: () => openLabModal(null) }); break;
     case '/health/activity':
-      setPageFabAction(_fab, { hidden: !canEditFor(activity.personId, activity.meId), label: t('health.activity.add'), onClick: () => openActivityModal(null) }); break;
+      setPageFabAction(_fab, { hidden: !canEditFor(activity.personId, activity.meId), label: t('health.activity.add'), dockLabel: t('newLabel.healthActivity'), onClick: () => openActivityModal(null) }); break;
     case '/health/nutrition':
-      setPageFabAction(_fab, { hidden: !canEditFor(nutrition.personId, nutrition.meId), label: t('health.nutrition.add'), onClick: () => openNutritionModal(null) }); break;
+      setPageFabAction(_fab, { hidden: !canEditFor(nutrition.personId, nutrition.meId), label: t('health.nutrition.add'), dockLabel: t('newLabel.healthNutrition'), onClick: () => openNutritionModal(null) }); break;
     default:
-      setPageFabAction(_fab, { hidden: true });
+      // Das Nomen bleibt stehen: der Router dockt den Knopf am Desktop nur beim
+      // Seitenaufbau an und nur mit `data-dock-label`. Wer auf der Uebersicht
+      // (ohne Erstellen-Aktion) einsteigt und es hier loeschte, behielte den
+      // schwebenden Knopf fuer den ganzen Besuch.
+      setPageFabAction(_fab, { hidden: true, dockLabel: _fab.dataset?.dockLabel || t('newLabel.healthVitals') });
   }
 }
 
@@ -552,6 +557,7 @@ export async function render(container, ctx = {}) {
            die Leiste als zweite Zeile in diesen Kopf. -->
       <header class="page-toolbar health-toolbar">
         <h1 class="page-toolbar__title">${esc(t('nav.health'))}</h1>
+        <div class="page-toolbar__actions"></div>
       </header>
       ${panels.map((panel) => panelMarkup(panel, activeRoute)).join('')}
     </div>
@@ -566,7 +572,7 @@ export async function render(container, ctx = {}) {
   const page = container.querySelector('.health-page');
   page.addEventListener('click', readOnlyLatch, true);
 
-  _fab = createPageFab({ id: 'health-fab' });
+  _fab = createPageFab({ id: 'health-fab', dockLabel: t('newLabel.healthVitals') });
   page.appendChild(_fab);
 
   if (window.lucide) window.lucide.createIcons({ el: container });
@@ -1067,11 +1073,15 @@ function recentMeasurementsMarkup(metric) {
           <li class="health-recent__row">
             <span class="health-recent__date">${esc(formatDate(String(r.measured_at).slice(0, 10)))}</span>
             <span class="health-recent__value">${esc(valueText(r))}${vitalUnitText(metric, r) ? ` <small>${esc(vitalUnitText(metric, r))}</small>` : ''}</span>
-            ${own ? `
-            <button type="button" class="row-action row-action--danger" data-delete-vital="${r.id}"
-                    aria-label="${esc(t('health.vitals.deleteMeasurement'))}">
-              <i data-lucide="trash-2" aria-hidden="true"></i>
-            </button>` : ''}
+            ${own ? rowActionHtml({
+              icon: 'trash-2',
+              tone: 'danger',
+              label: t('health.vitals.deleteMeasurement', {
+                value: [valueText(r), vitalUnitText(metric, r)].filter(Boolean).join(' '),
+                date: formatDate(String(r.measured_at).slice(0, 10)),
+              }),
+              attrs: { 'data-delete-vital': r.id },
+            }) : ''}
           </li>`).join('')}
       </ul>
     </div>`;
@@ -1315,8 +1325,8 @@ function openVitalModal(opts = {}) {
           <textarea class="input" id="vital-note" rows="2" maxlength="2000"></textarea>
         </div>
         ${disclaimerMarkup(true)}
-        <div class="modal-actions">
-          <button type="button" class="btn btn--ghost" data-action="cancel">${esc(t('common.cancel'))}</button>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
         </div>
       </form>`,
@@ -1356,7 +1366,7 @@ function openVitalModal(opts = {}) {
 
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const submitBtn = form.querySelector('[type="submit"]');
+        const submitBtn = panel.querySelector('[type="submit"]');
         const body = collectVitalBody(panel, typeSelect.value);
         if (!body) {
           submitBtn.disabled = false;
@@ -2183,9 +2193,9 @@ function openMedLogModal(logId) {
         </div>
         <p class="form-hint">${esc(isScheduled ? t('health.meds.log.scheduledHint') : t('health.meds.log.adhocHint'))}</p>
 
-        <div class="modal-actions">
-          ${isScheduled ? '' : `<button type="button" class="btn btn--danger btn--ghost" data-action="medlog-delete">${esc(t('common.delete'))}</button>`}
-          <button type="button" class="btn btn--ghost" data-action="cancel">${esc(t('common.cancel'))}</button>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          ${isScheduled ? '' : `<button type="button" class="btn btn--danger-outline" data-action="medlog-delete" style="margin-right:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>`}
+          <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
         </div>
       </form>`,
@@ -2491,9 +2501,9 @@ function openMedModal(med) {
           <div id="med-sched-editor"></div>
         </div>
 
-        <div class="modal-actions">
-          ${isEdit ? `<button type="button" class="btn btn--danger btn--ghost" data-action="med-delete">${esc(t('common.delete'))}</button>` : ''}
-          <button type="button" class="btn btn--ghost" data-action="cancel">${esc(t('common.cancel'))}</button>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="med-delete" style="margin-right:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
+          <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
         </div>
       </form>`,
@@ -2641,8 +2651,7 @@ function schedRowMarkup(s) {
     <li class="health-sched-row" data-schedule-id="${esc(s.id)}">
       <span class="health-sched-row__time">${esc(s.time_of_day)}</span>
       <span class="health-sched-row__days">${esc(daysLabel)}${esc(doseText)}</span>
-      <button type="button" class="btn btn--icon btn--sm" data-sched-del="${esc(s.id)}"
-        aria-label="${esc(t('health.meds.schedule.delete'))}"><i data-lucide="trash-2" aria-hidden="true"></i></button>
+      ${rowActionHtml({ icon: 'trash-2', tone: 'danger', label: t('common.deleteNamed', { name: `${s.time_of_day}, ${daysLabel}` }), attrs: { 'data-sched-del': s.id } })}
     </li>`;
 }
 
@@ -3146,9 +3155,9 @@ function openLabModal(report) {
         </div>
 
         ${disclaimerMarkup(true)}
-        <div class="modal-actions">
-          ${isEdit ? `<button type="button" class="btn btn--danger btn--ghost" data-action="lab-delete">${esc(t('common.delete'))}</button>` : ''}
-          <button type="button" class="btn btn--ghost" data-action="cancel">${esc(t('common.cancel'))}</button>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="lab-delete" style="margin-right:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
+          <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
         </div>
       </form>`,
@@ -3281,8 +3290,7 @@ function resultEditRowMarkup(r) {
       <span class="health-results-row__analyte">${esc(r.analyte)}</span>
       <span class="health-results-row__value">${esc(fmtNum(r.value_num))}${unit}</span>
       <span class="health-results-row__flag">${flagIndicatorMarkup(r.flag)}</span>
-      <button type="button" class="btn btn--icon btn--sm" data-result-del="${esc(r.id)}"
-        aria-label="${esc(t('health.labs.results.delete'))}"><i data-lucide="trash-2" aria-hidden="true"></i></button>
+      ${rowActionHtml({ icon: 'trash-2', tone: 'danger', label: t('common.deleteNamed', { name: r.analyte }), attrs: { 'data-result-del': r.id } })}
     </li>`;
 }
 
@@ -3594,8 +3602,7 @@ function activityRowMarkup(row, own) {
     : '';
   const noteHtml = row.note ? `<span class="health-activity-row__note">${esc(row.note)}</span>` : '';
   const editBtn = own
-    ? `<button type="button" class="btn btn--icon btn--sm health-activity-row__edit" data-activity-edit="${esc(row.id)}"
-         aria-label="${esc(t('health.activity.edit'))}"><i data-lucide="pencil" aria-hidden="true"></i></button>`
+    ? rowActionHtml({ icon: 'pencil', label: t('common.editNamed', { name: `${typeLabel}, ${whenLabel}` }), attrs: { 'data-activity-edit': row.id } })
     : '';
 
   return `
@@ -3712,9 +3719,9 @@ function openActivityModal(row, opts = {}) {
           <label class="label" for="activity-note">${esc(t('health.activity.field.note'))}</label>
           <textarea class="input" id="activity-note" rows="2" maxlength="2000">${esc(val(row?.note))}</textarea>
         </div>
-        <div class="modal-actions">
-          ${isEdit ? `<button type="button" class="btn btn--danger btn--ghost" data-action="activity-delete">${esc(t('common.delete'))}</button>` : ''}
-          <button type="button" class="btn btn--ghost" data-action="cancel">${esc(t('common.cancel'))}</button>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="activity-delete" style="margin-right:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
+          <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
         </div>
       </form>`,
@@ -4002,8 +4009,7 @@ function preventionRowMarkup(row, own) {
     : '';
   const noteHtml = row.note ? `<span class="health-prevention-row__note">${esc(row.note)}</span>` : '';
   const editBtn = own
-    ? `<button type="button" class="btn btn--icon btn--sm health-prevention-row__edit" data-prevention-edit="${esc(row.id)}"
-         aria-label="${esc(t('health.prevention.edit'))}"><i data-lucide="pencil" aria-hidden="true"></i></button>`
+    ? rowActionHtml({ icon: 'pencil', label: t('common.editNamed', { name: `${preventionRecordLabel(row)}, ${formatDate(row.given_on)}` }), attrs: { 'data-prevention-edit': row.id } })
     : '';
   return `
     <li class="health-prevention-row" data-record-id="${esc(row.id)}">
@@ -4129,9 +4135,9 @@ function openPreventionModal(row) {
           </select>
         </div>
         ${advancedSection(advancedFieldsHtml, { open: advancedOpen })}
-        <div class="modal-actions">
-          ${isEdit ? `<button type="button" class="btn btn--danger btn--ghost" data-action="prevention-delete">${esc(t('common.delete'))}</button>` : ''}
-          <button type="button" class="btn btn--ghost" data-action="cancel">${esc(t('common.cancel'))}</button>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="prevention-delete" style="margin-right:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
+          <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
         </div>
       </form>`,
@@ -4434,8 +4440,7 @@ function nutritionRowMarkup(row, own) {
     : '';
   const noteHtml = row.note ? `<span class="health-nutrition-row__note">${esc(row.note)}</span>` : '';
   const editBtn = own
-    ? `<button type="button" class="btn btn--icon btn--sm health-nutrition-row__edit" data-nutrition-edit="${esc(row.id)}"
-         aria-label="${esc(t('health.nutrition.edit'))}"><i data-lucide="pencil" aria-hidden="true"></i></button>`
+    ? rowActionHtml({ icon: 'pencil', label: t('common.editNamed', { name: `${row.title}, ${nutritionWhenText(row.consumed_at)}` }), attrs: { 'data-nutrition-edit': row.id } })
     : '';
   return `
     <li class="health-nutrition-row" data-entry-id="${esc(row.id)}">
@@ -4540,8 +4545,8 @@ function openNutritionTargetModal() {
       <form id="nutrition-target-form" class="form-stack">
         <p class="form-hint">${esc(t('health.nutrition.targetHint'))}</p>
         ${nutrientFieldsMarkup('nutrition-target', target)}
-        <div class="modal-actions">
-          <button type="button" class="btn btn--ghost" data-action="cancel">${esc(t('common.cancel'))}</button>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
         </div>
       </form>`,
@@ -4619,9 +4624,9 @@ function openNutritionModal(row) {
             <option value="all" ${visibility === 'all' ? 'selected' : ''}>${esc(t('common.visibility.all'))}</option>
           </select>
         </div>
-        <div class="modal-actions">
-          ${isEdit ? `<button type="button" class="btn btn--danger btn--ghost" data-action="nutrition-delete">${esc(t('common.delete'))}</button>` : ''}
-          <button type="button" class="btn btn--ghost" data-action="cancel">${esc(t('common.cancel'))}</button>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="nutrition-delete" style="margin-right:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
+          <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
         </div>
       </form>`,
@@ -6920,7 +6925,7 @@ function cycleHistoryMarkup(canEdit) {
           meta.push(t('health.cycle.history.flowHeaviest', { value: level ? t(level.labelKey) : flowSummary.heaviest }));
         }
         const editBtn = canEdit
-          ? `<button type="button" class="btn btn--icon btn--sm" data-cycle-edit="${esc(p.id)}" aria-label="${esc(t('health.cycle.period.edit'))}"><i data-lucide="pencil" aria-hidden="true"></i></button>`
+          ? rowActionHtml({ icon: 'pencil', label: t('common.editNamed', { name: `${t('newLabel.healthCycle')} ${rangeLabel}` }), attrs: { 'data-cycle-edit': p.id } })
           : '';
         return `
           <li class="cycle-history__row">
@@ -7074,9 +7079,9 @@ function openPeriodModal(period) {
           <label class="label" for="cycle-note">${esc(t('health.cycle.field.note'))}</label>
           <textarea class="input" id="cycle-note" rows="2" maxlength="2000">${esc(period?.note || '')}</textarea>
         </div>
-        <div class="modal-actions">
-          ${isEdit ? `<button type="button" class="btn btn--danger btn--ghost" data-action="cycle-delete-period">${esc(t('common.delete'))}</button>` : ''}
-          <button type="button" class="btn btn--ghost" data-action="cancel">${esc(t('common.cancel'))}</button>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="cycle-delete-period" style="margin-right:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
+          <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
         </div>
       </form>`,
@@ -7174,8 +7179,8 @@ function openCycleImportModal() {
           <textarea class="input" id="cycle-import-paste" rows="6" placeholder="start_date,end_date"></textarea>
         </div>
         <div id="cycle-import-errors" class="form-error cycle-import-errors" role="alert" hidden></div>
-        <div class="modal-actions">
-          <button type="button" class="btn btn--ghost" data-action="cancel">${esc(t('common.cancel'))}</button>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(t('health.cycle.import.submit'))}</button>
         </div>
       </form>`,
@@ -7422,9 +7427,9 @@ function openDayLogModal(dateKey) {
           <label class="label" for="cycle-log-note">${esc(t('health.cycle.field.note'))}</label>
           <textarea class="input" id="cycle-log-note" rows="2" maxlength="2000">${esc(existing?.note || '')}</textarea>
         </div>
-        <div class="modal-actions">
-          ${existing ? `<button type="button" class="btn btn--danger btn--ghost" data-action="cycle-delete-log">${esc(t('common.delete'))}</button>` : ''}
-          <button type="button" class="btn btn--ghost" data-action="cancel">${esc(t('common.cancel'))}</button>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          ${existing ? `<button type="button" class="btn btn--danger-outline" data-action="cycle-delete-log" style="margin-right:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
+          <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
         </div>
       </form>`,
@@ -7651,7 +7656,7 @@ function openCycleSettingsModal() {
           <div class="cycle-bulk__confirm" data-role="bulk-confirm" role="group" aria-labelledby="cs-bulk-question" hidden>
             <p class="cycle-hint cycle-bulk__question" id="cs-bulk-question" data-role="bulk-confirm-text"></p>
             <div class="cycle-bulk__actions">
-              <button type="button" class="btn btn--ghost" data-action="cycle-apply-cancel">${esc(t('common.cancel'))}</button>
+              <button type="button" class="btn btn--secondary" data-action="cycle-apply-cancel">${esc(t('common.cancel'))}</button>
               <button type="button" class="btn btn--primary" data-action="cycle-apply-run" aria-describedby="cs-bulk-question">${esc(t('common.confirm'))}</button>
             </div>
           </div>
@@ -7666,8 +7671,8 @@ function openCycleSettingsModal() {
           <yuvomi-datepicker id="cs-due" type="date" value="${esc(s.pregnancy_due_date || '')}" min="${esc(dueMin)}" max="${esc(dueMax)}"></yuvomi-datepicker>
         </div>
         <p class="cycle-hint" id="cs-pregnancy-hint">${esc(t('health.cycle.settings.pregnancyHint'))}</p>
-        <div class="modal-actions">
-          <button type="button" class="btn btn--ghost" data-action="cancel">${esc(t('common.cancel'))}</button>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
         </div>
       </form>`,
