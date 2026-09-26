@@ -2306,6 +2306,19 @@ html.fab-anim-done .page-fab {
   min-width: 0;
 }
 
+/* Unter 1024px dockt nichts in den Slot (dockFabIntoToolbar), er bleibt in
+ * Modulen mit Tab-Zeile leer - bricht im umbrechenden Kopf aber auf eine
+ * eigene Null-Zeile und bringt deren row-gap mit: +8px Kopf in Gesundheit und
+ * Belohnungen, gemessen 375px. Das schob "Fasten beenden" unter die
+ * Glas-Tab-Leiste (test:fasting-browser, der Tipp traf den Kalender-Tab).
+ * `:empty` statt `[hidden]`: ein gefuellter Slot bleibt immer sichtbar
+ * (test:hidden-cascade). */
+@media (max-width: 1023px) {
+  .page-toolbar__actions:empty {
+    display: none;
+  }
+}
+
 /* --------------------------------------------------------
  * Tab-Leiste im Modulkopf (Redesign Runde 6, Phase 0)
  *
