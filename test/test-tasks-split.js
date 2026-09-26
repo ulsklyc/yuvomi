@@ -21,6 +21,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { installMiniDom } from './mini-dom.js';
 
 globalThis.HTMLElement = globalThis.HTMLElement ?? class {};
@@ -252,4 +253,41 @@ test('ohne Auswahl raeumt das Neuzeichnen nur die Markierung auf', () => {
     tasks.syncPaneAfterRender(listOf([1]), ['1']);
     assert.deepEqual(calls, [['refresh', {}]]);
   });
+});
+
+// ── Das Blatt unter der Schwelle: erst laden, dann nur oeffnen, wenn es noch gilt ──
+
+test('openTaskSheet oeffnet nach dem Laden nur, solange das Signal des Bausteins steht', async () => {
+  // Zwei Anfragen, dann das Blatt. Ging der Nutzer dazwischen zurueck oder
+  // wurde das Fenster breit (Detail in der Spalte), legte die Fortsetzung
+  // trotzdem das alte Blatt darueber.
+  const opened = [];
+  let release;
+  globalThis.__apiStub = {
+    get: (path) => (String(path).startsWith('/tasks/')
+      ? new Promise((resolve) => { release = () => resolve({ data: { ...BASIS, status: 'open' } }); })
+      : Promise.resolve({ data: null })),
+  };
+  globalThis.__openDetailView = (options) => opened.push(options.title);
+  try {
+    const stale = new AbortController();
+    const first = tasks.openTaskSheet('7', {}, stale.signal);
+    stale.abort();
+    release();
+    await first;
+    assert.deepEqual(opened, [], 'ueberholt: kein Blatt');
+
+    const live = new AbortController();
+    const second = tasks.openTaskSheet('7', {}, live.signal);
+    release();
+    await second;
+    assert.deepEqual(opened, ['Tisch decken'], 'steht das Signal, geht das Blatt auf');
+  } finally {
+    delete globalThis.__apiStub;
+    delete globalThis.__openDetailView;
+  }
+  // Der Aufrufer reicht das Signal des Bausteins durch.
+  const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  assert.match(src, /openNarrow: \(id, _trigger, \{ signal \}\) => openTaskSheet\(id, container, signal\)/,
+    'mountTaskSplit gibt das Signal aus openNarrow an openTaskSheet weiter');
 });

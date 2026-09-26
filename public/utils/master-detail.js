@@ -161,8 +161,11 @@ function writeHistory(mode, param, id) {
  * @param {(id: string, body: HTMLElement, ctx: {signal: AbortSignal}) => (void|false|Promise<void|false>)} opts.renderDetail
  *        Zeichnet das Detail in `body`. `false` heisst: diese ID gibt es nicht
  *        (mehr) - die Auswahl faellt dann auf den Leerzustand zurueck.
- * @param {(id: string, trigger?: HTMLElement) => void} opts.openNarrow
- *        Unter der Schwelle: der bisherige Weg (Modal/Sheet/Aufklapper).
+ * @param {(id: string, trigger?: HTMLElement, ctx: {signal: AbortSignal}) => void} opts.openNarrow
+ *        Unter der Schwelle: der bisherige Weg (Modal/Sheet/Aufklapper). Wer
+ *        erst laedt, prueft danach `ctx.signal`: es bricht ab, sobald ein
+ *        neues Oeffnen, Vor/Zurueck, ein Wechsel der Darstellung oder das
+ *        Verlassen der Seite die Lage geaendert hat.
  * @param {(id: string) => void} [opts.onEnter]
  *        Enter auf der ausgewaehlten Zeile in der Spalte (z.B. Bearbeiten);
  *        ohne Angabe fokussiert Enter das Detail.
@@ -194,6 +197,7 @@ export function mountMasterDetail({
   let renderSeq = 0;
   let renderAbort = null;
   let lastSplit = null;
+  let narrowAbort = null;
   const pathname = location.pathname;
   // Der Rest der Adresse, auf dem diese Seite gezeichnet ist (Aufgaben:
   // `?view=`). Der Baustein schreibt nur `param` - aendert Zurueck/Vor etwas
@@ -299,13 +303,26 @@ export function mountMasterDetail({
     writeHistory(mode, param, null);
   }
 
+  /** Ein laufendes Oeffnen unter der Schwelle ist ueberholt. */
+  function abortNarrow() {
+    narrowAbort?.abort();
+    narrowAbort = null;
+  }
+
+  /** Der bisherige Weg, mit einem Signal fuer den, der erst laedt. */
+  function callNarrow(id, trigger) {
+    abortNarrow();
+    narrowAbort = new AbortController();
+    openNarrow?.(String(id), trigger, { signal: narrowAbort.signal });
+  }
+
   /**
    * Der eine Einstieg fuer einen Klick auf eine Zeile: in der Spalte waehlt er
    * aus, darunter oeffnet er den bisherigen Weg.
    */
   function open(id, trigger) {
     if (isSplit()) select(id, { history: 'push' });
-    else openNarrow?.(String(id), trigger);
+    else callNarrow(id, trigger);
   }
 
   /** Nach einem Neuaufbau der Liste: Markierung neu setzen, Verschwundenes raeumen. */
@@ -380,6 +397,7 @@ export function mountMasterDetail({
       const split = isSplit();
       if (split === lastSplit) return;
       lastSplit = split;
+      abortNarrow();
       onModeChange?.({ split, selectedId: selected });
       if (split && selected != null) {
         markSelection();
@@ -391,6 +409,7 @@ export function mountMasterDetail({
 
   function destroy() {
     teardown.abort();
+    abortNarrow();
     renderAbort?.abort();
     ro?.disconnect();
     if (active === handle) active = null;
@@ -399,6 +418,7 @@ export function mountMasterDetail({
 
   /** Zurueck/Vor innerhalb derselben Seite: Auswahl aus der Adresse. */
   function syncFromUrl() {
+    abortNarrow();
     const id = new URLSearchParams(location.search).get(param);
     if (!id) {
       if (selected != null) clear({ history: 'none' });
@@ -410,7 +430,7 @@ export function mountMasterDetail({
     // einloesen laesst, bekommt auch bei Vor/Zurueck auf `?open=` das Blatt -
     // sonst nennt die Adresse einen Eintrag, und zu sehen ist die Liste. Das
     // Zurueck AUS dem Blatt faengt der Router vorher ab (overlay-history).
-    if (deepLinkNarrow) openNarrow?.(String(id));
+    if (deepLinkNarrow) callNarrow(id);
   }
 
   const handle = {
@@ -441,7 +461,7 @@ export function mountMasterDetail({
       // danach breiter, zeichnet der ResizeObserver genau diesen Eintrag -
       // ohne den Merker stuende neben `?open=` der Leerzustand.
       selected = String(initial);
-      if (deepLinkNarrow) openNarrow?.(selected);
+      if (deepLinkNarrow) callNarrow(selected);
     }
   }
 

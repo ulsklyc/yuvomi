@@ -419,6 +419,41 @@ test('Zurueck/Vor unter der Schwelle: mit deepLinkNarrow oeffnet die Adresse den
   handle.destroy();
 });
 
+test('openNarrow bekommt ein Signal: es bricht ab, sobald die Auswahl, die Darstellung oder die Seite wechselt', () => {
+  // Aufgaben laden das Blatt erst (zwei Anfragen). Geht der Nutzer in der
+  // Zeit zurueck, wird das Fenster breit oder die Seite verlassen, darf die
+  // Fortsetzung kein altes Blatt mehr ueber die neue Lage legen.
+  const observers = [];
+  global.ResizeObserver = class { constructor(cb) { this.cb = cb; observers.push(this); } observe() {} disconnect() {} };
+  try {
+    const p = makePage({ split: false });
+    const signals = [];
+    const handle = p.mount({ deepLinkNarrow: true, openNarrow: (id, _t, ctx) => { p.calls.narrow.push(id); signals.push(ctx?.signal); } });
+    handle.open('1');
+    assert.ok(signals[0] instanceof AbortSignal, 'ein Signal je Oeffnen');
+    handle.open('2');
+    assert.equal(signals[0].aborted, true, 'ein neues Oeffnen ueberholt das alte');
+    assert.equal(signals[1].aborted, false);
+    setUrl('/contacts?open=4');
+    md.handleMasterDetailPopstate();
+    assert.equal(signals[1].aborted, true, 'Vor/Zurueck ueberholt es');
+    setUrl('/contacts');
+    md.handleMasterDetailPopstate();
+    assert.equal(signals[2].aborted, true, 'auch Zurueck ohne neuen Eintrag');
+    handle.open('5');
+    p.setSplit(true);
+    for (const o of observers) o.cb();
+    assert.equal(signals[3].aborted, true, 'breiter gezogen: die Spalte zeigt es, kein Blatt mehr');
+    p.setSplit(false);
+    for (const o of observers) o.cb();
+    handle.open('1');
+    handle.destroy();
+    assert.equal(signals[4].aborted, true, 'die Seite ist weg');
+  } finally {
+    delete global.ResizeObserver;
+  }
+});
+
 test('Deep-Link unter der Schwelle merkt die Auswahl: wird das Fenster breiter, steht das Detail', () => {
   const observers = [];
   global.ResizeObserver = class { constructor(cb) { this.cb = cb; observers.push(this); } observe() {} disconnect() {} };

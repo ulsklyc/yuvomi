@@ -4508,16 +4508,24 @@ function onPaneActionClosed(container) {
   }, 0);
 }
 
-/** Das Sheet bzw. Popover einer Aufgabe - der Weg unter der Schwelle. */
-async function openTaskSheet(id, container) {
+/**
+ * Das Sheet bzw. Popover einer Aufgabe - der Weg unter der Schwelle.
+ *
+ * Erst zwei Anfragen, dann das Blatt. `signal` kommt vom Baustein (openNarrow)
+ * und bricht ab, wenn in der Zwischenzeit Zurueck gedrueckt, das Fenster breit
+ * (Detail in der Spalte) oder die Seite verlassen wurde - dann gilt das
+ * Ergebnis nicht mehr, und ein Blatt legte sich ueber die neue Lage.
+ */
+async function openTaskSheet(id, container, signal = null) {
   try {
     const [task, reminder] = await Promise.all([
       loadTaskForEdit(id),
       loadReminderForTask(id),
     ]);
+    if (signal?.aborted) return;
     openTaskView(task, reminder, container);
   } catch (err) {
-    window.yuvomi.showToast(t('tasks.loadError'), 'danger');
+    if (!signal?.aborted) window.yuvomi.showToast(t('tasks.loadError'), 'danger');
   }
 }
 
@@ -4605,7 +4613,7 @@ function mountTaskSplit(container, signal) {
     signal,
     deepLinkNarrow: true,
     renderDetail: (id, body, ctx) => renderTaskPane(id, body, ctx.signal, container),
-    openNarrow: (id) => openTaskSheet(id, container),
+    openNarrow: (id, _trigger, { signal }) => openTaskSheet(id, container, signal),
     // Enter auf der gewaehlten Zeile: Bearbeiten, wie der Knopf im Kopf der
     // Spalte - ohne Schreibrecht steht dort keiner, dann fuehrt Enter ins
     // Detail.
@@ -5087,6 +5095,9 @@ export const __test = {
   // sieht. `useTaskMd` setzt den Baustein ein, wie mountTaskSplit es tut.
   syncPaneAfterRender, neighborMdId, onPaneActionClosed,
   useTaskMd: (md) => { taskMd = md; paneTaskSig = null; paneRepaintDue = false; },
+  // Das Blatt unter der Schwelle und die Spalte: beide laden erst, dann
+  // entscheidet, ob das Ergebnis noch gilt.
+  openTaskSheet, renderTaskPane,
   // Der Lader steht hier, weil die PRAEMISSE des gesperrten Zweigs an ihm
   // haengt: dass `calendar: read` die Erinnerung wirklich bekommt. War das nur
   // Prosa, liess sich das `none` still zu `!== write` verengen und der ganze
