@@ -59,6 +59,24 @@ test('Deep-Link ?open= in der Spaltenform oeffnet die Kategorie des Gegenstands'
   assert.equal(inventory.state.activeCategory, 'vehicles');
 });
 
+test('der Deep-Link raeumt Suche und Fristen-Filter wie ein Klick auf die Kategorie', () => {
+  // Beide ueberleben den Seitenwechsel. Stuende ein alter davon noch, fehlte
+  // die Zeile des Gegenstands in seiner Kategorie, und rechts stuende ein
+  // Detail ohne Zeile, das der naechste Listenaufbau abraeumt.
+  resetState();
+  inventory.state.query = 'bohrmaschine';
+  inventory.state.filterAttention = true;
+  try {
+    withEnv({ search: '?open=7', display: 'flex' }, () => inventory.openDeepLinkedCategory(split));
+    assert.equal(inventory.state.activeCategory, 'vehicles');
+    assert.equal(inventory.state.query, '', 'die alte Suche faellt weg');
+    assert.equal(inventory.state.filterAttention, false, 'der Fristen-Filter faellt weg');
+  } finally {
+    inventory.state.query = '';
+    inventory.state.filterAttention = false;
+  }
+});
+
 test('unter der Schwelle bleibt die Startseite - kein Link springt beim Laden auf', () => {
   resetState();
   withEnv({ search: '?open=7', display: 'none' }, () => inventory.openDeepLinkedCategory(split));

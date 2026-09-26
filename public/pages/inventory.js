@@ -2219,8 +2219,15 @@ function openDeepLinkedCategory(split) {
   if (!detail || getComputedStyle(detail).display === 'none') return;
   const item = state.items.find((i) => String(i.id) === id);
   if (!item) return;
+  // Wie ein Klick (openCategory): auch Suche und Fristen-Filter fallen weg.
+  // Beide ueberleben den Seitenwechsel; stuende ein alter davon noch, fehlte
+  // die Zeile in der geoeffneten Kategorie, und rechts stuende ein Detail,
+  // das der naechste Listenaufbau samt Adresse abraeumt.
   state.view = 'category';
   state.activeCategory = item.category;
+  state.query = '';
+  state.filterAttention = false;
+  _search?.clear();
 }
 
 export const __test = {

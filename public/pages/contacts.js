@@ -231,10 +231,31 @@ let md = null;
 // Entry Point
 // --------------------------------------------------------
 
+/**
+ * EIN BENANNTES ZIEL SCHLAEGT EINEN ALTEN FILTER - dieselbe Regel wie in den
+ * Rezepten (#936). `state` ueberlebt den Seitenwechsel: wer vorhin nach
+ * "Weber" gesucht oder auf "Aerzte" gefiltert hat und jetzt aus der globalen
+ * Suche per `?open=<id>` kommt, saehe links eine Liste ohne den Kontakt
+ * (oder "keine Treffer") und rechts dessen Detail ohne Zeile - und der
+ * naechste Listenaufbau raeumte die Auswahl samt Adresse ab. Der alte Filter
+ * ist kein Zusammenhang, den jemand fuer diesen Sprung gewaehlt hat.
+ *
+ * Bedingungslos und VOR dem Bau des Suchfelds, wie in den Rezepten: ob der
+ * Kontakt den Filter besteht, steht erst nach dem Laden fest, und bis dahin
+ * zeigte das Feld einen Begriff, nach dem die Liste gleich nicht mehr
+ * filtert. Die Adresse selbst loest weiter nur der Baustein ein.
+ */
+function dropFiltersForDeepLink() {
+  if (!new URLSearchParams(location.search).has('open')) return;
+  state.searchQuery = '';
+  state.activeCategory = null;
+}
+
 export async function render(container, { user, signal } = {}) {
   _container = container;
   state.user = user ?? null;
   md = null;
+  dropFiltersForDeepLink();
   container.replaceChildren();
   // LISTE + DETAIL (Breitenregel, DESIGN.md): die Seite bleibt im Lesemass,
   // bis die Modulflaeche die Schwelle erreicht; dann steht rechts der Kontakt.
@@ -1939,4 +1960,6 @@ export const __test = {
   showImportResult, openBirthdayImport,
   // Liste + Detail: Karte und Zeilen der Detailspalte.
   contactCardEl, renderContactDetail,
+  // Deep-Link gegen gemerkten Filter.
+  dropFiltersForDeepLink,
 };

@@ -126,6 +126,40 @@ test('Deep-Link ?open= (globale Suche): EIN Leser, der Baustein, in beiden Regim
     'contacts.js liest ?open= nicht selbst');
 });
 
+test('Deep-Link gegen gemerkten Filter: ein benanntes Ziel schlaegt Suche und Kategorie, vor dem Suchfeld', () => {
+  // `state` ueberlebt den Seitenwechsel. Kommt die globale Suche mit
+  // `?open=42`, waehrend noch "Weber" gesucht oder eine andere Kategorie
+  // gewaehlt ist, stuende links eine Liste ohne den Kontakt und rechts sein
+  // Detail ohne Zeile - bis der naechste Listenaufbau beides abraeumt.
+  const saved = globalThis.location;
+  try {
+    contacts.state.searchQuery = 'Weber';
+    contacts.state.activeCategory = 'family';
+    globalThis.location = { search: '?open=42' };
+    contacts.dropFiltersForDeepLink();
+    assert.equal(contacts.state.searchQuery, '', 'die alte Suche faellt weg');
+    assert.equal(contacts.state.activeCategory, null, 'die alte Kategorie faellt weg');
+
+    contacts.state.searchQuery = 'Weber';
+    contacts.state.activeCategory = 'family';
+    globalThis.location = { search: '' };
+    contacts.dropFiltersForDeepLink();
+    assert.equal(contacts.state.searchQuery, 'Weber', 'ohne Ziel bleibt der Filter, den man sich gemerkt hat');
+    assert.equal(contacts.state.activeCategory, 'family');
+  } finally {
+    globalThis.location = saved;
+    contacts.state.searchQuery = '';
+    contacts.state.activeCategory = null;
+  }
+  // Der Aufrufer: vor dem Bau des Suchfelds, das `state.searchQuery` als Wert
+  // uebernimmt - sonst zeigte das Feld einen Begriff, nach dem nicht gefiltert wird.
+  const src = read('../public/pages/contacts.js');
+  const render = src.slice(src.indexOf('export async function render('));
+  const call = render.indexOf('dropFiltersForDeepLink();');
+  assert.ok(call > 0, 'render() setzt den Filter bei einem Deep-Link zurueck');
+  assert.ok(call < render.indexOf('renderPageSearch('), 'und zwar vor dem Suchfeld');
+});
+
 test('die Suche nennt dieselbe Schwelle wie layout.css und deckelt auf die Listenbahn', () => {
   const tokens = read('../public/styles/tokens.css');
   const threshold = Number(tokens.match(/--layout-split-threshold:\s*([0-9.]+)rem/)?.[1]);
