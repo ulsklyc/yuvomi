@@ -134,3 +134,28 @@ test('every locale pluralizes birthdays.inDays on {{count}}', () => {
     assert.match(block.inDays_one ?? '', /\{\{count\}\}/, `${file}: inDays_one`);
   }
 });
+
+// Critique 2026-09-26 (P2-2): ein neuer Eintrag ohne Bild zeigte einen roten
+// "Bild entfernen"-Knopf fuer ein Bild, das es nicht gibt, und ein "?" als
+// Platzhalter, das wie eine Hilfe aussah.
+test('photo preview without a name shows the camera glyph, not a question mark', () => {
+  const preview = birthdays.__test.birthdayPreviewHtml;
+  assert.equal(typeof preview, 'function');
+  const empty = preview('', null);
+  assert.match(empty, /data-lucide="camera"/);
+  assert.doesNotMatch(empty, />\?</);
+  assert.match(preview('Anna Berg', null), />AB</, 'a named entry keeps its initials');
+  assert.match(preview('Anna Berg', 'data:image/png;base64,AAAA'), /<img /);
+});
+
+test('the remove-photo button exists only while there is a photo', () => {
+  const src = readFileSync(new URL('../public/pages/birthdays.js', import.meta.url), 'utf8');
+  const modal = src.slice(src.indexOf('function openBirthdayModal('), src.indexOf("const reminderOffset = panel.querySelector('#bd-reminder-offset')"));
+  assert.match(modal, /id="bd-remove-photo"[^>]*\$\{photoData \? '' : ' hidden'\}/, 'rendered hidden without photo');
+  const renderPreview = modal.slice(modal.indexOf('const renderPreview = () => {'), modal.indexOf('nameInput.addEventListener'));
+  assert.match(renderPreview, /removePhoto\.hidden = !photoData/, 'follows the photo state after crop and removal');
+  const onRemove = modal.slice(modal.indexOf("removePhoto.addEventListener('click'"));
+  assert.match(onRemove.slice(0, 400), /photoEdit\?*\.focus\(\)/, 'removing hides the focused button - focus moves to the edit button');
+  const css = readFileSync(new URL('../public/styles/birthdays.css', import.meta.url), 'utf8');
+  assert.match(css, /\.birthday-modal__photo-action\[hidden\]\s*\{\s*display:\s*none;?\s*\}/, 'display: inline-flex would beat the UA [hidden]');
+});

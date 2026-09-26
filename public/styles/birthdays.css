@@ -388,6 +388,12 @@
   object-fit: cover;
 }
 
+.birthday-preview__glyph {
+  width: var(--icon-xl);
+  height: var(--icon-xl);
+  color: var(--color-text-secondary);
+}
+
 .birthday-preview__fallback {
   color: color-mix(in srgb, var(--module-accent) var(--tint-ink), var(--color-text-primary));
   font-size: var(--text-xl);
@@ -411,6 +417,12 @@
   background: var(--color-surface);
   color: var(--color-text-secondary);
   cursor: pointer;
+}
+
+/* `display: inline-flex` schlaegt das UA-`[hidden]` - ohne diese Regel stand
+ * "Bild entfernen" auch ohne Bild da. */
+.birthday-modal__photo-action[hidden] {
+  display: none;
 }
 
 .birthday-modal__photo-action:hover {
