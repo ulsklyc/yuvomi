@@ -126,6 +126,40 @@ test('Deep-Link ?open= (globale Suche): EIN Leser, der Baustein, in beiden Regim
     'contacts.js liest ?open= nicht selbst');
 });
 
+test('Deep-Link gegen gemerkten Filter: ein benanntes Ziel schlaegt Suche und Kategorie, vor dem Suchfeld', () => {
+  // `state` ueberlebt den Seitenwechsel. Kommt die globale Suche mit
+  // `?open=42`, waehrend noch "Weber" gesucht oder eine andere Kategorie
+  // gewaehlt ist, stuende links eine Liste ohne den Kontakt und rechts sein
+  // Detail ohne Zeile - bis der naechste Listenaufbau beides abraeumt.
+  const saved = globalThis.location;
+  try {
+    contacts.state.searchQuery = 'Weber';
+    contacts.state.activeCategory = 'family';
+    globalThis.location = { search: '?open=42' };
+    contacts.dropFiltersForDeepLink();
+    assert.equal(contacts.state.searchQuery, '', 'die alte Suche faellt weg');
+    assert.equal(contacts.state.activeCategory, null, 'die alte Kategorie faellt weg');
+
+    contacts.state.searchQuery = 'Weber';
+    contacts.state.activeCategory = 'family';
+    globalThis.location = { search: '' };
+    contacts.dropFiltersForDeepLink();
+    assert.equal(contacts.state.searchQuery, 'Weber', 'ohne Ziel bleibt der Filter, den man sich gemerkt hat');
+    assert.equal(contacts.state.activeCategory, 'family');
+  } finally {
+    globalThis.location = saved;
+    contacts.state.searchQuery = '';
+    contacts.state.activeCategory = null;
+  }
+  // Der Aufrufer: vor dem Bau des Suchfelds, das `state.searchQuery` als Wert
+  // uebernimmt - sonst zeigte das Feld einen Begriff, nach dem nicht gefiltert wird.
+  const src = read('../public/pages/contacts.js');
+  const render = src.slice(src.indexOf('export async function render('));
+  const call = render.indexOf('dropFiltersForDeepLink();');
+  assert.ok(call > 0, 'render() setzt den Filter bei einem Deep-Link zurueck');
+  assert.ok(call < render.indexOf('renderPageSearch('), 'und zwar vor dem Suchfeld');
+});
+
 test('die Suche nennt dieselbe Schwelle wie layout.css und deckelt auf die Listenbahn', () => {
   const tokens = read('../public/styles/tokens.css');
   const threshold = Number(tokens.match(/--layout-split-threshold:\s*([0-9.]+)rem/)?.[1]);
@@ -144,4 +178,49 @@ test('die Suche nennt dieselbe Schwelle wie layout.css und deckelt auf die Liste
     }
   }
   assert.ok(seen, 'die Suche ist ab der Schwelle nicht gedeckelt - sie liefe quer ueber das Detail');
+});
+
+test('in die Spalte befoerdert: das offene Blatt DIESES Eintrags geht zu, ein fremdes bleibt', async () => {
+  // Deep-Link unter der Schwelle oeffnet das Blatt; wird das Fenster breiter,
+  // zeichnet der Baustein dieselbe Auswahl in die Spalte. Ohne Abgleich stand
+  // das Detail doppelt da, und das Overlay blockierte die breite Ansicht.
+  const dv = await import('../public/components/detail-view.js');
+  let sheet = null;
+  let closes = 0;
+  globalThis.__openModal = (o) => { sheet = o; };
+  globalThis.__closeModal = () => { closes += 1; const s = sheet; sheet = null; s?.onClose?.(); };
+  const pane = () => globalThis.document.createElement('div');
+  try {
+    dv.openDetailView({ title: 'Anna', key: 'contact:42', sections: [] });
+    assert.ok(sheet, 'unter der Schwelle: ein Blatt');
+    dv.openDetailView({ title: 'Anna', key: 'contact:42', sections: [], pane: pane() });
+    assert.equal(closes, 1, 'dieselbe Auswahl in der Spalte: das Blatt geht zu');
+
+    dv.openDetailView({ title: 'Ben', key: 'contact:7', sections: [] });
+    dv.openDetailView({ title: 'Anna', key: 'contact:42', sections: [], pane: pane() });
+    assert.equal(closes, 1, 'ein Blatt eines ANDEREN Eintrags bleibt stehen');
+    globalThis.__closeModal();
+
+    dv.openDetailView({ title: 'Termin', sections: [] });
+    dv.openDetailView({ title: 'Anna', key: 'contact:42', sections: [], pane: pane() });
+    assert.equal(closes, 2, 'ein Blatt ohne Schluessel (fremdes Modul) bleibt stehen');
+    globalThis.__closeModal();
+
+    dv.openDetailView({ title: 'Anna', key: 'contact:42', sections: [] });
+    sheet.onClose(); // X, Escape oder ein fremdes Modal hat es schon ersetzt
+    sheet = { title: 'Fremd' };
+    dv.openDetailView({ title: 'Anna', key: 'contact:42', sections: [], pane: pane() });
+    assert.equal(closes, 3, 'ist das Blatt schon zu, schliesst die Spalte kein fremdes Modal');
+  } finally {
+    delete globalThis.__openModal;
+    delete globalThis.__closeModal;
+  }
+  // Die drei Leseansichten mit Blatt UND Spalte nennen ihren Schluessel.
+  for (const [file, pattern] of [
+    ['../public/pages/contacts.js', /openDetailView\(\{[\s\S]{0,200}?key: `contact:\$\{contact\.id\}`/],
+    ['../public/components/task-detail.js', /openDetailView\(\{[\s\S]{0,200}?key: `task:\$\{task\.id\}`/],
+    ['../public/pages/inventory.js', /openDetailView\(\{[\s\S]{0,200}?key: `inventory:\$\{item\.id\}`/],
+  ]) {
+    assert.match(read(file), pattern, `${file}: die Leseansicht nennt ihren Eintrag (key)`);
+  }
 });

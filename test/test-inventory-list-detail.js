@@ -13,6 +13,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 const { __test: inventory } = await import('../public/pages/inventory.js');
 
@@ -59,11 +60,53 @@ test('Deep-Link ?open= in der Spaltenform oeffnet die Kategorie des Gegenstands'
   assert.equal(inventory.state.activeCategory, 'vehicles');
 });
 
+test('der Deep-Link raeumt Suche und Fristen-Filter wie ein Klick auf die Kategorie', () => {
+  // Beide ueberleben den Seitenwechsel. Stuende ein alter davon noch, fehlte
+  // die Zeile des Gegenstands in seiner Kategorie, und rechts stuende ein
+  // Detail ohne Zeile, das der naechste Listenaufbau abraeumt.
+  resetState();
+  inventory.state.query = 'bohrmaschine';
+  inventory.state.filterAttention = true;
+  try {
+    withEnv({ search: '?open=7', display: 'flex' }, () => inventory.openDeepLinkedCategory(split));
+    assert.equal(inventory.state.activeCategory, 'vehicles');
+    assert.equal(inventory.state.query, '', 'die alte Suche faellt weg');
+    assert.equal(inventory.state.filterAttention, false, 'der Fristen-Filter faellt weg');
+  } finally {
+    inventory.state.query = '';
+    inventory.state.filterAttention = false;
+  }
+});
+
 test('unter der Schwelle bleibt die Startseite - kein Link springt beim Laden auf', () => {
   resetState();
   withEnv({ search: '?open=7', display: 'none' }, () => inventory.openDeepLinkedCategory(split));
   assert.equal(inventory.state.view, 'browse');
   assert.equal(inventory.state.activeCategory, null);
+});
+
+test('breiter gezogen mit ?open= aus dem Telefon: die Kategorie des Gegenstands geht auf', () => {
+  // Unter der Schwelle blieb die Startseite stehen, der Baustein merkte sich
+  // die ID. Wird das Fenster breiter, malt er das Detail - links muss dann die
+  // Zeile stehen, sonst raeumt der naechste Neuaufbau Auswahl und Adresse ab.
+  resetState();
+  inventory.state.query = 'bohrmaschine';
+  try {
+    inventory.onInventoryModeChange({ split: false, selectedId: '7' });
+    assert.equal(inventory.state.view, 'browse', 'schmaler: nichts umschalten');
+    inventory.onInventoryModeChange({ split: true, selectedId: null });
+    assert.equal(inventory.state.view, 'browse', 'ohne Auswahl: nichts umschalten');
+    inventory.onInventoryModeChange({ split: true, selectedId: '7' });
+    assert.equal(inventory.state.view, 'category');
+    assert.equal(inventory.state.activeCategory, 'vehicles');
+    assert.equal(inventory.state.query, '', 'wie ein Klick auf die Kategorie');
+  } finally {
+    inventory.state.query = '';
+  }
+  const src = readFileSync(new URL('../public/pages/inventory.js', import.meta.url), 'utf8');
+  const mount = src.slice(src.indexOf('_md = mountMasterDetail({'));
+  assert.match(mount.slice(0, mount.indexOf('\n    });')), /onModeChange: onInventoryModeChange/,
+    'der Baustein ruft den Haken beim Wechsel der Darstellung');
 });
 
 test('eine unbekannte ID laesst die Startseite stehen', () => {

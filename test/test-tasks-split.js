@@ -21,6 +21,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { installMiniDom } from './mini-dom.js';
 
 globalThis.HTMLElement = globalThis.HTMLElement ?? class {};
@@ -252,4 +253,90 @@ test('ohne Auswahl raeumt das Neuzeichnen nur die Markierung auf', () => {
     tasks.syncPaneAfterRender(listOf([1]), ['1']);
     assert.deepEqual(calls, [['refresh', {}]]);
   });
+});
+
+// ── Das Blatt unter der Schwelle: erst laden, dann nur oeffnen, wenn es noch gilt ──
+
+test('openTaskSheet oeffnet nach dem Laden nur, solange das Signal des Bausteins steht', async () => {
+  // Zwei Anfragen, dann das Blatt. Ging der Nutzer dazwischen zurueck oder
+  // wurde das Fenster breit (Detail in der Spalte), legte die Fortsetzung
+  // trotzdem das alte Blatt darueber.
+  const opened = [];
+  let release;
+  globalThis.__apiStub = {
+    get: (path) => (String(path).startsWith('/tasks/')
+      ? new Promise((resolve) => { release = () => resolve({ data: { ...BASIS, status: 'open' } }); })
+      : Promise.resolve({ data: null })),
+  };
+  globalThis.__openDetailView = (options) => opened.push(options.title);
+  try {
+    const stale = new AbortController();
+    const first = tasks.openTaskSheet('7', {}, stale.signal);
+    stale.abort();
+    release();
+    await first;
+    assert.deepEqual(opened, [], 'ueberholt: kein Blatt');
+
+    const live = new AbortController();
+    const second = tasks.openTaskSheet('7', {}, live.signal);
+    release();
+    await second;
+    assert.deepEqual(opened, ['Tisch decken'], 'steht das Signal, geht das Blatt auf');
+  } finally {
+    delete globalThis.__apiStub;
+    delete globalThis.__openDetailView;
+  }
+  // Der Aufrufer reicht das Signal des Bausteins durch.
+  const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  assert.match(src, /openNarrow: \(id, _trigger, \{ signal \}\) => openTaskSheet\(id, container, signal\)/,
+    'mountTaskSplit gibt das Signal aus openNarrow an openTaskSheet weiter');
+});
+
+test('renderTaskPane: nur 404/403 heisst „gibt es nicht"; ein Netz- oder Serverfehler wirft', async () => {
+  // Im Vertrag des Bausteins raeumt `false` Auswahl und `?open=` ab. Bei einem
+  // 500 oder einer Zeitueberschreitung gibt es die Aufgabe aber noch - die
+  // Spalte zeigt dann einen Fehler mit Erneut versuchen (master-detail.js).
+  const failWith = (status) => {
+    globalThis.__apiStub = { get: () => Promise.reject(Object.assign(new Error('x'), { status })) };
+  };
+  const body = { replaceChildren() {}, insertAdjacentHTML() {} };
+  const signal = new AbortController().signal;
+  try {
+    failWith(404);
+    assert.equal(await tasks.renderTaskPane('7', body, signal, {}), false, '404: weg');
+    failWith(403);
+    assert.equal(await tasks.renderTaskPane('7', body, signal, {}), false, '403: nicht sichtbar');
+    failWith(500);
+    await assert.rejects(tasks.renderTaskPane('7', body, signal, {}), (err) => err.status === 500,
+      '500: voruebergehend - der Baustein haelt die Auswahl');
+    globalThis.__apiStub = { get: () => Promise.reject(new TypeError('Failed to fetch')) };
+    await assert.rejects(tasks.renderTaskPane('7', body, signal, {}), TypeError, 'offline: ebenso');
+  } finally {
+    delete globalThis.__apiStub;
+  }
+});
+
+test('der Rueckfall fuer ?open= auf eine Aufgabe ausserhalb der Liste haengt am Seiten-Signal', () => {
+  // Archiviert oder weggefiltert: das Blatt statt einer Auswahl. Es laedt erst -
+  // verlaesst der Nutzer die Seite vorher, darf es nicht ueber der Zielseite
+  // aufgehen (openTaskSheet prueft das Signal nach dem Laden, Test oben).
+  const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  const mount = src.slice(src.indexOf('function mountTaskSplit('));
+  const body = mount.slice(0, mount.indexOf('\n}\n'));
+  assert.match(body, /if \(sheetFor\) openTaskSheet\(sheetFor, container, signal\)/,
+    'mountTaskSplit reicht das Signal der Seite an den Rueckfall weiter');
+});
+
+test('Wiederholen nach dem Ladefehler baut mit dem Seiten-Signal neu auf', () => {
+  // Ohne Signal haengte ein Wiederholen, dessen Antwort erst nach dem
+  // Wegnavigieren kommt, den Baustein gegen den alten Baum ein - und
+  // raeumte die Instanz der Zielseite ab.
+  const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  assert.match(src, /onRetry: \(\) => render\(container, \{ user: state\.user, signal: pageSignal \}\)/,
+    'der Wiederholen-Weg reicht das Signal der Seite weiter');
+  const render = src.slice(src.indexOf('export async function render('));
+  const head = render.slice(0, render.indexOf('taskMd?.destroy();'));
+  assert.match(head, /if \(signal\?\.aborted\) return;/,
+    'ein Neuaufbau fuer eine verlassene Seite bricht ab, bevor er die lebende Instanz abraeumt');
+  assert.match(head, /pageSignal = signal \?\? null;/, 'render merkt sich das Signal fuer den Wiederholen-Weg');
 });

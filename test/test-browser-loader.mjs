@@ -203,6 +203,9 @@ const STUBS = {
     export const refocusAfterRender = () => {};
     export const renderKeepingFocus = (render) => { render(); return null; };
     export const forgetRestore = () => {};
+    // Die Fokus-Merker der Detailansicht (Popover): ohne Browser nichts zu merken.
+    export const rememberFocus = () => null;
+    export const restoreFocusAfterClose = () => {};
   `,
   '/components/detail-view.js': `
     // Tests, die pruefen wollen, WELCHE Bedienelemente ein Aufrufer anbietet -

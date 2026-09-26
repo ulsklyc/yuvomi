@@ -5,7 +5,7 @@
  *        die Liste, rechts das Detail der AUSGEWAEHLTEN Zeile - wie in Mail,
  *        Erinnerungen und Kontakte. Darunter bleibt alles, wie es ist: die
  *        Zeile oeffnet ihr Modal, Sheet oder ihren Aufklapper.
- * Abhaengigkeiten: utils/empty-state.js, i18n.js
+ * Abhaengigkeiten: utils/empty-state.js, i18n.js (Fehlerzustand der Spalte)
  *
  * WER WAS BESITZT
  *   - Die GEOMETRIE gehoert der Shell (`.split-view` in layout.css): eine
@@ -31,7 +31,8 @@
  */
 
 import { esc } from '/utils/html.js';
-import { emptyStateEl } from '/utils/empty-state.js';
+import { emptyStateEl, mountLoadError } from '/utils/empty-state.js';
+import { t } from '/i18n.js';
 
 /** Die eine lebende Instanz. Es gibt je Seite hoechstens eine Liste + Detail. */
 let active = null;
@@ -117,6 +118,17 @@ function urlWith(param, id) {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+/**
+ * Alles an der Adresse AUSSER der Auswahl: die uebrigen Parameter und der
+ * Anker. Unterscheidet sich das zwischen zwei Eintraegen, ist Zurueck/Vor
+ * keine Auswahl-Geste mehr, sondern ein anderer Zustand der Seite.
+ */
+function addressRest(param) {
+  const params = new URLSearchParams(location.search);
+  params.delete(param);
+  return `${params.toString()}${location.hash}`;
+}
+
 function writeHistory(mode, param, id) {
   if (mode === 'none') return;
   const path = urlWith(param, id);
@@ -124,6 +136,16 @@ function writeHistory(mode, param, id) {
   // `path` im State: der Router liest ihn bei popstate (router.js).
   if (mode === 'push') history.pushState({ path }, '', path);
   else history.replaceState({ ...(history.state ?? {}), path }, '', path);
+}
+
+/** Das Handle eines Aufbaus, der nicht stattfindet: jede Frage „nichts". */
+function inertHandle() {
+  const noop = () => {};
+  return {
+    open: noop, select: noop, clear: noop, refresh: noop, destroy: noop,
+    isSplit: () => false,
+    selectedId: () => null,
+  };
 }
 
 /**
@@ -148,13 +170,26 @@ function writeHistory(mode, param, id) {
  *        Suche und Essenskarten schon setzten - ein zweiter hiesse zwei Adressen
  *        fuer dieselbe Sache.
  * @param {(id: string, body: HTMLElement, ctx: {signal: AbortSignal}) => (void|false|Promise<void|false>)} opts.renderDetail
- *        Zeichnet das Detail in `body`. `false` heisst: diese ID gibt es nicht
- *        (mehr) - die Auswahl faellt dann auf den Leerzustand zurueck.
- * @param {(id: string, trigger?: HTMLElement) => void} opts.openNarrow
- *        Unter der Schwelle: der bisherige Weg (Modal/Sheet/Aufklapper).
+ *        Zeichnet das Detail in `body`. DER RUECKGABE-VERTRAG:
+ *        - `false`: diese ID gibt es nicht (mehr) oder sie ist nicht sichtbar
+ *          (404/403) - die Auswahl faellt auf den Leerzustand, `?open=` geht.
+ *        - Wurf: voruebergehend (Netz, 500, Zeitueberschreitung) - Auswahl
+ *          und Adresse bleiben, die Spalte zeigt einen Fehlerzustand mit
+ *          „Erneut versuchen". Ein Fehler ist nie ein „gibt es nicht".
+ *        - alles andere: gezeichnet.
+ * @param {(id: string, trigger?: HTMLElement, ctx: {signal: AbortSignal}) => void} opts.openNarrow
+ *        Unter der Schwelle: der bisherige Weg (Modal/Sheet/Aufklapper). Wer
+ *        erst laedt, prueft danach `ctx.signal`: es bricht ab, sobald ein
+ *        neues Oeffnen, Vor/Zurueck, ein Wechsel der Darstellung oder das
+ *        Verlassen der Seite die Lage geaendert hat.
  * @param {(id: string) => void} [opts.onEnter]
  *        Enter auf der ausgewaehlten Zeile in der Spalte (z.B. Bearbeiten);
  *        ohne Angabe fokussiert Enter das Detail.
+ * @param {(state: {split: boolean, selectedId: string|null}) => void} [opts.onModeChange]
+ *        Die Darstellung hat gewechselt (Fenster, Seitenleiste). Gerufen BEVOR
+ *        der Baustein eine gemerkte Auswahl in die Spalte zeichnet - ein Modul,
+ *        das die Zeile erst zeigen muss (Inventar: Kategorie oeffnen), tut das
+ *        hier, damit Markierung und `refresh()` sie finden.
  * @param {boolean} [opts.deepLinkNarrow=false]
  *        `?open=` auch unter der Schwelle einloesen (oeffnet `openNarrow`).
  * @param {AbortSignal} [opts.signal]     Router-Signal; Abbruch baut ab.
@@ -162,7 +197,7 @@ function writeHistory(mode, param, id) {
  *   isSplit: Function, refresh: Function, destroy: Function}}
  */
 export function mountMasterDetail({
-  root, list, param = 'open', renderDetail, openNarrow, onEnter,
+  root, list, param = 'open', renderDetail, openNarrow, onEnter, onModeChange,
   deepLinkNarrow = false, signal,
 } = {}) {
   if (!root) throw new TypeError('mountMasterDetail: root fehlt');
@@ -173,12 +208,23 @@ export function mountMasterDetail({
   if (!listEl || !detailEl || !emptyEl || !bodyEl) {
     throw new TypeError('mountMasterDetail: .split-view braucht __list und die Spalte aus splitViewDetailHtml()');
   }
+  // EIN VERSPAETETER AUFBAU HAENGT NICHTS EIN. Es gibt je Seite eine Instanz
+  // (`active`), und jede neue ersetzt die alte. Ein Neuaufbau gegen einen Baum,
+  // den der Router schon weggeraeumt hat (Wiederholen nach Ladefehler, Antwort
+  // nach dem Wegnavigieren), raeumte sonst die Instanz der Seite ab, auf der
+  // der Nutzer jetzt steht - Zurueck und Fensterwechsel liefen ins Leere.
+  if (!root.isConnected || signal?.aborted) return inertHandle();
 
   let selected = null;
   let renderSeq = 0;
   let renderAbort = null;
   let lastSplit = null;
+  let narrowAbort = null;
   const pathname = location.pathname;
+  // Der Rest der Adresse, auf dem diese Seite gezeichnet ist (Aufgaben:
+  // `?view=`). Der Baustein schreibt nur `param` - aendert Zurueck/Vor etwas
+  // anderes, gehoert die Geste dem Router.
+  const rest = addressRest(param);
   const teardown = new AbortController();
 
   const isSplit = () => root.isConnected && getComputedStyle(detailEl).display !== 'none';
@@ -203,9 +249,22 @@ export function mountMasterDetail({
     focusTarget(row)?.setAttribute('aria-current', 'true');
   }
 
+  /**
+   * Waehrend ein Renderer laedt, gehoert die Spalte schon der NEUEN Auswahl.
+   * Der alte Inhalt bleibt stehen (kein Flackern bei schnellen Antworten),
+   * nimmt aber keine Klicks und keinen Fokus mehr: Bearbeiten oder Loeschen
+   * traefe sonst den vorigen Eintrag, waehrend links der neue markiert ist.
+   */
+  function setBusy(on) {
+    bodyEl.inert = on;
+    if (on) bodyEl.setAttribute('aria-busy', 'true');
+    else bodyEl.removeAttribute('aria-busy');
+  }
+
   function showEmpty() {
     renderAbort?.abort();
     renderAbort = null;
+    setBusy(false);
     bodyEl.replaceChildren();
     bodyEl.hidden = true;
     emptyEl.hidden = false;
@@ -218,17 +277,26 @@ export function mountMasterDetail({
     emptyEl.hidden = true;
     bodyEl.hidden = false;
     bodyEl.scrollTop = 0;
+    setBusy(true);
     let result;
+    let failure = null;
     try {
       result = await renderDetail?.(String(id), bodyEl, { signal: renderAbort.signal });
     } catch (err) {
-      // Ein Fehler im Modul-Renderer darf die Liste nicht mitreissen - aber er
-      // darf auch nicht still verschwinden (reference: stilles catch).
-      console.error('[master-detail] renderDetail fehlgeschlagen:', err);
-      result = false;
+      failure = err ?? new Error('renderDetail');
     }
-    // Eine spaetere Auswahl hat diese ueberholt: ihr Ergebnis gilt nicht mehr.
+    // Eine spaetere Auswahl hat diese ueberholt: ihr Ergebnis gilt nicht mehr -
+    // und sie gibt die Spalte auch nicht frei, die gehoert der neueren.
     if (seq !== renderSeq) return;
+    setBusy(false);
+    if (failure) {
+      // Ein Fehler im Modul-Renderer darf die Liste nicht mitreissen - aber er
+      // darf auch nicht still verschwinden (reference: stilles catch). Ohne
+      // HTTP-Status ist es eher ein Programmfehler als ein Netzproblem.
+      if (!Number.isInteger(failure?.status)) console.error('[master-detail] renderDetail fehlgeschlagen:', failure);
+      showLoadError(failure);
+      return;
+    }
     if (result === false) {
       selected = null;
       markSelection();
@@ -237,6 +305,23 @@ export function mountMasterDetail({
       return;
     }
     if (window.lucide) window.lucide.createIcons({ el: bodyEl });
+  }
+
+  /**
+   * Voruebergehender Fehler: die Auswahl bleibt, die Spalte sagt es und bietet
+   * den Weg zurueck. Ein Leerzustand hier behauptete, es gaebe den Eintrag
+   * nicht - und raeumte den Link weg, den ein zweiter Versuch noch fuende.
+   */
+  function showLoadError(error) {
+    emptyEl.hidden = true;
+    bodyEl.hidden = false;
+    mountLoadError(bodyEl, {
+      title: t('common.errorOccurred'),
+      description: t('common.loadErrorDescription'),
+      error,
+      retryLabel: t('common.retry'),
+      onRetry: () => { if (selected != null) paint(selected); },
+    });
   }
 
   /**
@@ -263,13 +348,37 @@ export function mountMasterDetail({
     writeHistory(mode, param, null);
   }
 
+  /** Ein laufendes Oeffnen unter der Schwelle ist ueberholt. */
+  function abortNarrow() {
+    narrowAbort?.abort();
+    narrowAbort = null;
+  }
+
+  /** Der bisherige Weg, mit einem Signal fuer den, der erst laedt. */
+  function callNarrow(id, trigger) {
+    abortNarrow();
+    narrowAbort = new AbortController();
+    openNarrow?.(String(id), trigger, { signal: narrowAbort.signal });
+  }
+
   /**
    * Der eine Einstieg fuer einen Klick auf eine Zeile: in der Spalte waehlt er
    * aus, darunter oeffnet er den bisherigen Weg.
    */
   function open(id, trigger) {
-    if (isSplit()) select(id, { history: 'push' });
-    else openNarrow?.(String(id), trigger);
+    if (isSplit()) { select(id, { history: 'push' }); return; }
+    // Unter der Schwelle waehlt ein Klick nichts aus - AUSSER es gibt schon
+    // eine gemerkte Auswahl (Spalte vor dem Schmalerwerden, Deep-Link). Dann
+    // folgen Auswahl und `?open=` dem geoeffneten Eintrag, sonst nennte die
+    // Adresse den alten, und beim Verbreitern stuende er in der Spalte.
+    // ERSETZT statt gestapelt: das Blatt legt seinen eigenen Zurueck-Schritt
+    // an (overlay-history); ein zweiter fuehrte nach dem Schliessen auf den
+    // alten Eintrag und oeffnete bei `deepLinkNarrow` dessen Blatt erneut.
+    if (selected != null && String(selected) !== String(id)) {
+      selected = String(id);
+      writeHistory('replace', param, selected);
+    }
+    callNarrow(id, trigger);
   }
 
   /** Nach einem Neuaufbau der Liste: Markierung neu setzen, Verschwundenes raeumen. */
@@ -344,6 +453,8 @@ export function mountMasterDetail({
       const split = isSplit();
       if (split === lastSplit) return;
       lastSplit = split;
+      abortNarrow();
+      onModeChange?.({ split, selectedId: selected });
       if (split && selected != null) {
         markSelection();
         paint(selected);
@@ -354,6 +465,7 @@ export function mountMasterDetail({
 
   function destroy() {
     teardown.abort();
+    abortNarrow();
     renderAbort?.abort();
     ro?.disconnect();
     if (active === handle) active = null;
@@ -362,13 +474,19 @@ export function mountMasterDetail({
 
   /** Zurueck/Vor innerhalb derselben Seite: Auswahl aus der Adresse. */
   function syncFromUrl() {
+    abortNarrow();
     const id = new URLSearchParams(location.search).get(param);
     if (!id) {
       if (selected != null) clear({ history: 'none' });
       return;
     }
-    if (isSplit()) select(id, { history: 'none' });
-    else selected = String(id);
+    if (isSplit()) { select(id, { history: 'none' }); return; }
+    selected = String(id);
+    // Unter der Schwelle gilt dieselbe Regel wie beim Laden: wer den Link
+    // einloesen laesst, bekommt auch bei Vor/Zurueck auf `?open=` das Blatt -
+    // sonst nennt die Adresse einen Eintrag, und zu sehen ist die Liste. Das
+    // Zurueck AUS dem Blatt faengt der Router vorher ab (overlay-history).
+    if (deepLinkNarrow) callNarrow(id);
   }
 
   const handle = {
@@ -383,6 +501,7 @@ export function mountMasterDetail({
     _pathname: pathname,
     _root: root,
     _syncFromUrl: syncFromUrl,
+    _ownsAddress: () => addressRest(param) === rest,
   };
   active?.destroy();
   active = handle;
@@ -392,8 +511,14 @@ export function mountMasterDetail({
   const initial = new URLSearchParams(location.search).get(param);
   if (initial) {
     if (lastSplit) select(initial, { history: 'none' });
-    else if (deepLinkNarrow) openNarrow?.(String(initial));
-    else selected = String(initial);
+    else {
+      // ERST merken, dann oeffnen: die Adresse nennt eine Auswahl, auch
+      // wenn sie unter der Schwelle als Blatt erscheint. Wird das Fenster
+      // danach breiter, zeichnet der ResizeObserver genau diesen Eintrag -
+      // ohne den Merker stuende neben `?open=` der Leerzustand.
+      selected = String(initial);
+      if (deepLinkNarrow) callNarrow(selected);
+    }
   }
 
   return handle;
@@ -412,6 +537,10 @@ export function handleMasterDetailPopstate() {
   if (!active) return false;
   if (!active._root.isConnected) { active.destroy(); return false; }
   if (location.pathname !== active._pathname) return false;
+  // NUR die Auswahl. Aufgaben fuehren `?view=list|kanban|history` in der
+  // Adresse; nimmt Zurueck die Ansicht mit, muss die Seite neu zeichnen - ein
+  // verbrauchtes popstate liesse das Brett unter einer Listen-Adresse stehen.
+  if (!active._ownsAddress()) return false;
   active._syncFromUrl();
   return true;
 }

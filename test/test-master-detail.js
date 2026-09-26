@@ -215,6 +215,33 @@ test('unter der Schwelle oeffnet ein Klick den bisherigen Weg und laesst die Adr
   handle.destroy();
 });
 
+test('unter der Schwelle mit gemerkter Auswahl: ein anderer Eintrag uebernimmt Auswahl und Adresse', () => {
+  // Auswahl A (Spalte oder Deep-Link), dann schmal, dann B antippen: das Blatt
+  // zeigt B. Blieben Auswahl und `?open=` bei A, nennte die Adresse den
+  // falschen Eintrag, und beim Verbreitern stuende A in der Spalte.
+  const p = makePage({ path: '/contacts?open=2', split: false });
+  const handle = p.mount();
+  assert.equal(handle.selectedId(), '2');
+  historyLog.length = 0;
+  handle.open('4', p.focusOf(3));
+  assert.deepEqual(p.calls.narrow, ['4']);
+  assert.equal(handle.selectedId(), '4', 'die Auswahl folgt dem geoeffneten Eintrag');
+  assert.equal(location.search, '?open=4', 'die Adresse ebenso');
+  assert.deepEqual(historyLog, [['replace', '/contacts?open=4']],
+    'ersetzt, nicht gestapelt: das Blatt fuehrt seinen eigenen Zurueck-Schritt');
+  handle.open('4', p.focusOf(3));
+  assert.equal(historyLog.length, 1, 'derselbe Eintrag noch einmal schreibt nichts');
+  handle.destroy();
+
+  // Ohne gemerkte Auswahl bleibt es beim bisherigen Weg: die Adresse ruht.
+  const q = makePage({ split: false });
+  const h2 = q.mount();
+  h2.open('4', q.focusOf(3));
+  assert.equal(h2.selectedId(), null);
+  assert.deepEqual(historyLog, []);
+  h2.destroy();
+});
+
 test('andere Adress-Parameter bleiben stehen', () => {
   const p = makePage({ path: '/tasks?view=list' });
   const handle = p.mount();
@@ -304,6 +331,57 @@ test('meldet der Renderer eine unbekannte ID, faellt die Auswahl auf den Leerzus
   handle.destroy();
 });
 
+test('wirft der Renderer (Netz, 500), bleibt die Auswahl und die Spalte bietet Erneut versuchen', async () => {
+  // Vertrag: `false` heisst „gibt es nicht (mehr)" - dann Leerzustand und die
+  // Adresse geht. Ein Fehler ist voruebergehend: eine Zeitueberschreitung darf
+  // weder die Auswahl noch den Link wegwerfen.
+  const saved = global.document;
+  const restore = installMiniDom();
+  const handlers = [];
+  const make = global.document.createElement;
+  global.document.createElement = (tag) => {
+    const el = make(tag);
+    el.addEventListener = (type, h) => handlers.push({ type, h, el });
+    return el;
+  };
+  global.document.activeElement = null;
+  try {
+    const p = makePage();
+    let fail = true;
+    const handle = p.mount({
+      renderDetail: async (id, into) => {
+        p.calls.render.push(id);
+        if (fail) throw Object.assign(new Error('Server'), { status: 500 });
+        into.replaceChildren();
+        into.content = [`detail:${id}`];
+        return undefined;
+      },
+    });
+    handle.open('2');
+    await tick();
+    assert.equal(handle.selectedId(), '2', 'die Auswahl bleibt');
+    assert.equal(location.search, '?open=2', 'der Link bleibt');
+    assert.equal(p.rows[1].classList.contains('is-selected'), true);
+    assert.equal(p.empty.hidden, true, 'kein Leerzustand - der behauptete, es gaebe nichts');
+    assert.equal(p.body.hidden, false);
+    assert.equal(p.body.inert, false, 'der Fehlerzustand ist bedienbar');
+    const box = p.body.children[0];
+    assert.match(box?.outerHTML ?? '', /empty-state--error|variant-error|error/, 'die Spalte zeigt einen Fehlerzustand');
+    assert.match(box.outerHTML, /HTTP 500/, 'mit dem Statuscode als technische Zeile');
+    const retry = handlers.find((x) => x.type === 'click');
+    assert.ok(retry, 'mit einem Weg zurueck: Erneut versuchen');
+    fail = false;
+    retry.h();
+    await tick();
+    assert.deepEqual(p.calls.render, ['2', '2'], 'Erneut versuchen zeichnet dieselbe Auswahl noch einmal');
+    assert.deepEqual(p.body.content, ['detail:2']);
+    handle.destroy();
+  } finally {
+    restore();
+    global.document = saved;
+  }
+});
+
 test('eine ueberholte, langsame Antwort raeumt die neuere Auswahl nicht ab', async () => {
   const p = makePage();
   let release;
@@ -318,6 +396,40 @@ test('eine ueberholte, langsame Antwort raeumt die neuere Auswahl nicht ab', asy
   await tick();
   assert.equal(handle.selectedId(), '2');
   assert.equal(p.empty.hidden, true);
+  handle.destroy();
+});
+
+test('waehrend ein langsamer Renderer laedt, ist der alte Eintrag nicht mehr bedienbar', async () => {
+  // Inventar laedt den Verlauf, bevor es zeichnet. Bis dahin stand der
+  // vorige Gegenstand samt Bearbeiten/Loeschen klickbar neben der neuen
+  // Markierung - ein Klick traf den falschen.
+  const p = makePage();
+  const pending = new Map();
+  const handle = p.mount({
+    renderDetail: (id, into) => new Promise((resolve) => {
+      pending.set(id, () => { into.content = [`detail:${id}`]; resolve(); });
+    }),
+  });
+  handle.open('1');
+  pending.get('1')();
+  await tick();
+  assert.equal(p.body.inert, false, 'fertig gezeichnet: bedienbar');
+  assert.equal(p.body.getAttribute('aria-busy'), null);
+  handle.open('2');
+  assert.deepEqual(p.body.content, ['detail:1'], 'der alte Inhalt steht noch (kein Flackern) ...');
+  assert.equal(p.body.inert, true, '... aber er nimmt keine Klicks und keinen Fokus mehr');
+  assert.equal(p.body.getAttribute('aria-busy'), 'true', 'und der Screenreader hoert, dass geladen wird');
+  handle.open('4');
+  pending.get('2')();
+  await tick();
+  assert.equal(p.body.inert, true, 'eine ueberholte Antwort gibt die Spalte nicht frei');
+  pending.get('4')();
+  await tick();
+  assert.equal(p.body.inert, false);
+  assert.equal(p.body.getAttribute('aria-busy'), null);
+  handle.open('5');
+  handle.clear();
+  assert.equal(p.body.inert, false, 'der Leerzustand ist nie gesperrt');
   handle.destroy();
 });
 
@@ -358,6 +470,142 @@ test('Zurueck/Vor innerhalb der Seite loest der Baustein, nicht der Router', () 
   assert.equal(md.handleMasterDetailPopstate(), false, 'und sie ist danach abgemeldet');
 });
 
+test('Zurueck/Vor unter der Schwelle: mit deepLinkNarrow oeffnet die Adresse den bisherigen Weg', () => {
+  // Deep-Link oeffnet das Blatt, Zurueck schliesst es und verlaesst den
+  // Eintrag, Vor kehrt auf `?open=4` zurueck. Ohne Oeffnen zeigte die Adresse
+  // einen Kontakt, und der Bildschirm zeigte die Liste.
+  let p = makePage({ split: false });
+  let handle = p.mount({ deepLinkNarrow: true });
+  setUrl('/contacts?open=4');
+  assert.equal(md.handleMasterDetailPopstate(), true);
+  assert.deepEqual(p.calls.narrow, ['4'], 'Vor auf einen Eintrag oeffnet ihn wie der Deep-Link beim Laden');
+  assert.deepEqual(historyLog, [], 'die Geste schreibt keine Geschichte');
+  assert.equal(handle.selectedId(), '4');
+  setUrl('/contacts');
+  assert.equal(md.handleMasterDetailPopstate(), true);
+  assert.deepEqual(p.calls.narrow, ['4'], 'ohne ?open= oeffnet nichts');
+  handle.destroy();
+
+  // Ohne den Wunsch bleibt es beim Merken - kein Modal aus einer Geste, die
+  // niemand dafuer gemacht hat.
+  p = makePage({ split: false });
+  handle = p.mount();
+  setUrl('/contacts?open=4');
+  assert.equal(md.handleMasterDetailPopstate(), true);
+  assert.deepEqual(p.calls.narrow, []);
+  assert.equal(handle.selectedId(), '4');
+  handle.destroy();
+});
+
+test('openNarrow bekommt ein Signal: es bricht ab, sobald die Auswahl, die Darstellung oder die Seite wechselt', () => {
+  // Aufgaben laden das Blatt erst (zwei Anfragen). Geht der Nutzer in der
+  // Zeit zurueck, wird das Fenster breit oder die Seite verlassen, darf die
+  // Fortsetzung kein altes Blatt mehr ueber die neue Lage legen.
+  const observers = [];
+  global.ResizeObserver = class { constructor(cb) { this.cb = cb; observers.push(this); } observe() {} disconnect() {} };
+  try {
+    const p = makePage({ split: false });
+    const signals = [];
+    const handle = p.mount({ deepLinkNarrow: true, openNarrow: (id, _t, ctx) => { p.calls.narrow.push(id); signals.push(ctx?.signal); } });
+    handle.open('1');
+    assert.ok(signals[0] instanceof AbortSignal, 'ein Signal je Oeffnen');
+    handle.open('2');
+    assert.equal(signals[0].aborted, true, 'ein neues Oeffnen ueberholt das alte');
+    assert.equal(signals[1].aborted, false);
+    setUrl('/contacts?open=4');
+    md.handleMasterDetailPopstate();
+    assert.equal(signals[1].aborted, true, 'Vor/Zurueck ueberholt es');
+    setUrl('/contacts');
+    md.handleMasterDetailPopstate();
+    assert.equal(signals[2].aborted, true, 'auch Zurueck ohne neuen Eintrag');
+    handle.open('5');
+    p.setSplit(true);
+    for (const o of observers) o.cb();
+    assert.equal(signals[3].aborted, true, 'breiter gezogen: die Spalte zeigt es, kein Blatt mehr');
+    p.setSplit(false);
+    for (const o of observers) o.cb();
+    handle.open('1');
+    handle.destroy();
+    assert.equal(signals[4].aborted, true, 'die Seite ist weg');
+  } finally {
+    delete global.ResizeObserver;
+  }
+});
+
+test('Deep-Link unter der Schwelle merkt die Auswahl: wird das Fenster breiter, steht das Detail', () => {
+  const observers = [];
+  global.ResizeObserver = class { constructor(cb) { this.cb = cb; observers.push(this); } observe() {} disconnect() {} };
+  try {
+    const p = makePage({ path: '/contacts?open=4', split: false });
+    const handle = p.mount({ deepLinkNarrow: true });
+    assert.deepEqual(p.calls.narrow, ['4']);
+    assert.equal(handle.selectedId(), '4', 'die Adresse nennt eine Auswahl, also kennt der Baustein sie');
+    p.setSplit(true);
+    for (const o of observers) o.cb();
+    assert.deepEqual(p.calls.render, ['4'], 'breiter gezogen: die Spalte zeichnet den Eintrag aus der Adresse');
+    assert.equal(p.rows[3].classList.contains('is-selected'), true);
+    assert.equal(p.empty.hidden, true, 'kein Leerzustand neben ?open=4');
+    handle.destroy();
+  } finally {
+    delete global.ResizeObserver;
+  }
+});
+
+test('onModeChange: beim Wechsel der Darstellung fragt der Baustein das Modul, BEVOR er zeichnet', () => {
+  // Inventar: unter der Schwelle steht die Kategorien-Startseite, die Zeile
+  // des Gegenstands aus `?open=` gibt es dort nicht. Beim Breiterwerden muss
+  // das Modul sie erst zeigen koennen - sonst malt die Spalte ein Detail ohne
+  // Zeile, und der naechste refresh() raeumt Auswahl und Adresse ab.
+  const observers = [];
+  global.ResizeObserver = class { constructor(cb) { this.cb = cb; observers.push(this); } observe() {} disconnect() {} };
+  try {
+    const p = makePage({ path: '/inventory?open=6', split: false });
+    const seen = [];
+    const handle = p.mount({
+      onModeChange: ({ split, selectedId }) => {
+        seen.push([split, selectedId, p.calls.render.length]);
+        if (split) {
+          const row = new Node('list-row', { 'data-md-id': '6' });
+          row.append(new Node('list-row__main', { 'data-md-focus': '' }));
+          p.list.append(row);
+        }
+      },
+    });
+    for (const o of observers) o.cb(); // der erste Aufruf nach observe(): kein Wechsel
+    assert.deepEqual(seen, [], 'ohne Wechsel kein Aufruf');
+    p.setSplit(true);
+    for (const o of observers) o.cb();
+    assert.deepEqual(seen, [[true, '6', 0]], 'das Modul hoert den Wechsel samt Auswahl, vor dem Zeichnen');
+    assert.deepEqual(p.calls.render, ['6']);
+    assert.equal(p.list.children.at(-1).classList.contains('is-selected'), true, 'die gezeigte Zeile ist markiert');
+    p.setSplit(false);
+    for (const o of observers) o.cb();
+    assert.deepEqual(seen.at(-1), [false, '6', 1], 'auch schmaler wird gemeldet');
+    handle.destroy();
+  } finally {
+    delete global.ResizeObserver;
+  }
+});
+
+test('Zurueck/Vor mit einem anderen Parameter als der Auswahl gehoert dem Router', () => {
+  // Aufgaben: `?view=list|kanban|history`. Aendert Zurueck die Ansicht, muss
+  // die Seite neu zeichnen - sonst zeigt die Adresse die Liste und der
+  // Bildschirm das Brett.
+  const p = makePage({ path: '/tasks?view=list' });
+  const handle = p.mount();
+  handle.open('2');
+  assert.equal(location.search, '?view=list&open=2');
+  setUrl('/tasks?view=list');
+  assert.equal(md.handleMasterDetailPopstate(), true, 'nur die Auswahl hat sich geaendert: der Baustein');
+  assert.equal(handle.selectedId(), null);
+  setUrl('/tasks?view=kanban&open=2');
+  assert.equal(md.handleMasterDetailPopstate(), false, 'die Ansicht hat sich geaendert: der Router zeichnet neu');
+  assert.equal(handle.selectedId(), null, 'und der Baustein greift der neuen Seite nicht vor');
+  setUrl('/tasks?view=list#x');
+  assert.equal(md.handleMasterDetailPopstate(), false, 'auch ein anderer Anker ist nicht die Auswahl');
+  handle.destroy();
+});
+
 test('refresh(): verschwindet die gewaehlte Zeile (geloescht, weggefiltert), kommt der Leerzustand', () => {
   const p = makePage();
   const handle = p.mount();
@@ -375,6 +623,37 @@ test('das Router-Signal baut ab: danach haelt keine Instanz mehr die Zurueck-Tas
   p.mount({ signal: controller.signal });
   controller.abort();
   assert.equal(md.handleMasterDetailPopstate(), false);
+});
+
+test('abgehaengte Wurzel oder abgebrochenes Signal: kein Einhaengen, die lebende Instanz bleibt', () => {
+  // Ein spaeter Neuaufbau (Wiederholen nach Ladefehler) gegen einen Baum, den
+  // der Router schon weggeraeumt hat, ersetzte sonst die Instanz der Seite,
+  // auf der der Nutzer jetzt steht - Zurueck und Fensterwechsel liefen ins Leere.
+  const live = makePage();
+  const liveHandle = live.mount();
+  liveHandle.open('2');
+
+  const stale = makePage({ path: '/contacts?open=2' });
+  stale.root.isConnected = false;
+  const dead = stale.mount();
+  assert.deepEqual(stale.calls.render, [], 'ein abgehaengter Baum zeichnet nichts');
+  assert.equal(dead.selectedId(), null);
+  assert.equal(dead.isSplit(), false);
+  dead.open('3');
+  assert.deepEqual(stale.calls.narrow, [], 'und oeffnet nichts');
+  setUrl('/contacts');
+  assert.equal(md.handleMasterDetailPopstate(), true, 'die lebende Instanz haelt die Zurueck-Taste weiter');
+  assert.equal(liveHandle.selectedId(), null);
+
+  const aborted = new AbortController();
+  aborted.abort();
+  const late = makePage();
+  late.mount({ signal: aborted.signal }).open('1');
+  assert.deepEqual(late.calls.render, [], 'ein abgebrochenes Signal haengt ebenso nichts ein');
+  setUrl('/contacts?open=4');
+  assert.equal(md.handleMasterDetailPopstate(), true);
+  assert.equal(liveHandle.selectedId(), '4', 'die Geste erreicht weiter die lebende Seite');
+  liveHandle.destroy();
 });
 
 test('der Router fragt den Baustein, BEVOR er bei popstate neu zeichnet', () => {

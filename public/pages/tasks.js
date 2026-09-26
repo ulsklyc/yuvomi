@@ -3187,7 +3187,7 @@ function renderTaskList(container, { paneQuiet = false } = {}) {
         description: t('common.loadErrorDescription'),
         error: state.loadError,
         retryLabel: t('common.retry'),
-        onRetry: () => render(container, { user: state.user }),
+        onRetry: () => render(container, { user: state.user, signal: pageSignal }),
       });
     }
     return;
@@ -4431,6 +4431,8 @@ function openTaskView(task, reminder, container, { pane = null } = {}) {
 
 /** Handle des Bausteins, solange die Seite steht; sonst null. */
 let taskMd = null;
+/** Das Router-Signal der Seite - der Wiederholen-Weg des Ladefehlers baut damit neu auf. */
+let pageSignal = null;
 /** Stand der ausgewaehlten Aufgabe beim letzten Zeichnen des Details. */
 let paneTaskSig = null;
 /** Eine Aktion der Spalte (Status, Ablage) hat sie abgemeldet - neu malen. */
@@ -4529,16 +4531,24 @@ function onPaneActionClosed(container) {
   }, 0);
 }
 
-/** Das Sheet bzw. Popover einer Aufgabe - der Weg unter der Schwelle. */
-async function openTaskSheet(id, container) {
+/**
+ * Das Sheet bzw. Popover einer Aufgabe - der Weg unter der Schwelle.
+ *
+ * Erst zwei Anfragen, dann das Blatt. `signal` kommt vom Baustein (openNarrow)
+ * und bricht ab, wenn in der Zwischenzeit Zurueck gedrueckt, das Fenster breit
+ * (Detail in der Spalte) oder die Seite verlassen wurde - dann gilt das
+ * Ergebnis nicht mehr, und ein Blatt legte sich ueber die neue Lage.
+ */
+async function openTaskSheet(id, container, signal = null) {
   try {
     const [task, reminder] = await Promise.all([
       loadTaskForEdit(id),
       loadReminderForTask(id),
     ]);
+    if (signal?.aborted) return;
     openTaskView(task, reminder, container);
   } catch (err) {
-    window.yuvomi.showToast(t('tasks.loadError'), 'danger');
+    if (!signal?.aborted) window.yuvomi.showToast(t('tasks.loadError'), 'danger');
   }
 }
 
@@ -4567,10 +4577,12 @@ async function renderTaskPane(id, body, signal, container) {
   } catch (err) {
     clearTimeout(slow);
     if (signal.aborted) return undefined;
-    // Weg oder nicht (mehr) sichtbar: still in den Leerzustand. Alles andere
-    // ist ein Ladefehler und wird gesagt.
-    if (err?.status !== 404 && err?.status !== 403) window.yuvomi.showToast(t('tasks.loadError'), 'danger');
-    return false;
+    // Weg oder nicht (mehr) sichtbar: `false`, der Baustein faellt still in
+    // den Leerzustand und nimmt `?open=` weg. Alles andere (Netz, 500) ist
+    // voruebergehend: werfen - die Auswahl bleibt, und die Spalte zeigt den
+    // Fehler mit „Erneut versuchen" (Vertrag in utils/master-detail.js).
+    if (err?.status === 404 || err?.status === 403) return false;
+    throw err;
   }
   clearTimeout(slow);
   if (signal.aborted) return undefined;
@@ -4626,7 +4638,7 @@ function mountTaskSplit(container, signal) {
     signal,
     deepLinkNarrow: true,
     renderDetail: (id, body, ctx) => renderTaskPane(id, body, ctx.signal, container),
-    openNarrow: (id) => openTaskSheet(id, container),
+    openNarrow: (id, _trigger, { signal }) => openTaskSheet(id, container, signal),
     // Enter auf der gewaehlten Zeile: Bearbeiten, wie der Knopf im Kopf der
     // Spalte - ohne Schreibrecht steht dort keiner, dann fuehrt Enter ins
     // Detail.
@@ -4655,7 +4667,9 @@ function mountTaskSplit(container, signal) {
     ? root.querySelector(`[data-md-id="${CSS.escape(taskMd.selectedId())}"]`)
     : null;
   chosen?.scrollIntoView?.({ block: 'nearest' });
-  if (sheetFor) openTaskSheet(sheetFor, container);
+  // Mit dem Signal der Seite: verlaesst der Nutzer sie waehrend der Anfragen,
+  // geht kein Blatt ueber der Zielseite auf.
+  if (sheetFor) openTaskSheet(sheetFor, container, signal);
 }
 
 /**
@@ -4799,6 +4813,11 @@ export async function openTaskById(taskId, { user = null, container = null, onCh
 }
 
 export async function render(container, { user, signal } = {}) {
+  // Ein Wiederholen, das erst nach dem Wegnavigieren ankommt, baut nichts mehr:
+  // es raeumte sonst unten die Instanz ab, die eine NEUE Aufgaben-Seite schon
+  // eingehaengt hat.
+  if (signal?.aborted) return;
+  pageSignal = signal ?? null;
   // Ein Neuaufbau (auch der Wiederholen-Weg des Ladefehlers) haengt die
   // Detailspalte frisch ein; die alte Instanz gehoert zur alten Wurzel.
   taskMd?.destroy();
@@ -5111,6 +5130,9 @@ export const __test = {
   // sieht. `useTaskMd` setzt den Baustein ein, wie mountTaskSplit es tut.
   syncPaneAfterRender, neighborMdId, onPaneActionClosed,
   useTaskMd: (md) => { taskMd = md; paneTaskSig = null; paneRepaintDue = false; },
+  // Das Blatt unter der Schwelle und die Spalte: beide laden erst, dann
+  // entscheidet, ob das Ergebnis noch gilt.
+  openTaskSheet, renderTaskPane,
   // Der Lader steht hier, weil die PRAEMISSE des gesperrten Zweigs an ihm
   // haengt: dass `calendar: read` die Erinnerung wirklich bekommt. War das nur
   // Prosa, liess sich das `none` still zu `!== write` verengen und der ganze
