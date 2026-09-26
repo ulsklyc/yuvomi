@@ -178,9 +178,12 @@ test('das Kontextmenü nutzt die native Popover-API wie die Kontakte', () => {
 });
 
 test('beide Kebab-Auslöser kündigen ihr Menü gleich an', () => {
-  const folderMenu = page.slice(page.indexOf('data-folder-menu='), page.indexOf('data-folder-menu=') + 400);
-  assert.match(folderMenu, /aria-haspopup="menu"/);
-  assert.match(folderMenu, /aria-expanded="false"/);
+  // Beide sind seit Runde 5 die geteilte Zeilenaktion (rowActionHtml, Attribute als Objekt).
+  const folderMenu = page.slice(page.indexOf("'data-folder-menu': item.id"), page.indexOf("'data-folder-menu': item.id") + 400);
+  assert.match(folderMenu, /'aria-haspopup': 'menu'/);
+  assert.match(folderMenu, /'aria-expanded': 'false'/);
+  const docMenu = fnBody('renderActions', 'renderSelectBox');
+  assert.match(docMenu, /action: 'menu'[^\n]*'aria-haspopup': 'menu', 'aria-expanded': 'false'/);
 });
 
 test('die Bearbeiten-Aktion heißt wie überall sonst "Bearbeiten"', () => {
@@ -225,8 +228,14 @@ test('die DMS-Suche unterscheidet Fehler von "keine Treffer"', () => {
 });
 
 test('das DMS-Suchfeld hat ein sichtbares Label', () => {
-  assert.match(page, /searchLabel\.setAttribute\('for', 'dms-search'\)/);
-  assert.ok(page.includes("t('documents.dmsSearchLabel')"));
+  // Seit Runde 5 (2026-09-26) ist das Feld das geteilte Suchfeld: renderPageSearch
+  // benennt es ueber sein eigenes <label>; die sichtbare Zeile darueber traegt
+  // denselben Text und ist aria-hidden, damit der Name nicht doppelt ankommt.
+  const modal = page.slice(page.indexOf('function openDmsLinkModal('), page.indexOf('function renderDmsResults('));
+  assert.match(modal, /searchLabel\.textContent = t\('documents\.dmsSearchLabel'\);/);
+  assert.match(modal, /searchLabel\.setAttribute\('aria-hidden', 'true'\)/);
+  assert.match(modal, /renderPageSearch\(\{\s*id: 'dms-search',\s*label: t\('documents\.dmsSearchLabel'\)/);
+  assert.match(modal, /root\.append\(searchLabel, searchField,/);
 });
 
 test('die DMS-Verknüpfung erbt nicht stillschweigend das aktive Filter-Chip', () => {
@@ -597,7 +606,8 @@ test('Teilen gibt es nur im Viewer, gated ueber die eine Probe, nie ueber "share
   assert.doesNotMatch(page, /'share' in navigator/, 'das ist auch dort wahr, wo nur Links teilbar sind');
   assert.doesNotMatch(page, /navigator\.share\b[^(]/, 'navigator.share wird aufgerufen, nicht abgefragt');
   // Der Knopf existiert nur bei 'ok'; sonst steht die Erklaerung, kein toter Knopf.
-  assert.match(page, /\$\{shareSupport === 'ok' \? `\s*<button type="button"[^>]*data-action="share"/);
+  // Der Knopf ist die geteilte Zeilenaktion (Runde 5): rowActionHtml rendert <button type="button">.
+  assert.match(page, /\$\{shareSupport === 'ok' \? `\s*\$\{rowActionHtml\(\{ icon: 'share-2', action: 'share',/);
   assert.match(page, /shareSupport !== 'ok' \? `<p class="document-viewer__note">\$\{t\(SHARE_NOTE_KEYS\[shareSupport\]\)\}<\/p>`/);
   // Die Zeile bleibt bei Ansehen/Download/Kebab.
   const actions = page.slice(page.indexOf('function renderActions(doc)'), page.indexOf('function renderSelectBox'));
@@ -619,7 +629,7 @@ test('die Datei wird beim Oeffnen geholt, der Klick muendet ohne await in naviga
   assert.match(close, /shareAbort\.abort\(\)/);
   assert.match(close, /shareFile = null/);
   // Der Knopf startet gesperrt und beschaeftigt, bis die Datei da ist.
-  assert.match(page, /data-action="share" disabled aria-busy="true"/);
+  assert.match(page, /action: 'share',[^\n]*attrs: \{ disabled: true, 'aria-busy': 'true'/);
   assert.match(prep, /btn\.disabled = false;\s*btn\.removeAttribute\('aria-busy'\)/);
   for (const key of ['shareAction', 'sharePreparing', 'shareUnsupportedType', 'shareInsecure', 'shareBrowserUnsupported', 'shareFailed']) {
     assert.equal(typeof de.documents[key], 'string', `de.json: documents.${key} fehlt`);
@@ -1350,8 +1360,8 @@ test('ein Dokument ist EIN Tab-Stopp, seine Aktionen bleiben sichtbar und per Pf
   const bar = { querySelectorAll: () => [item('view', true), item('download', false), item('menu', true)] };
   assert.deepEqual(roving.toolbarItems(bar).map((el) => el.name), ['view', 'menu']);
   const actions = fnBody('renderActions', 'renderSelectBox');
-  assert.equal((actions.match(/tabindex="0"/g) || []).length, 1, 'genau ein Einstieg je Dokument');
-  assert.equal((actions.match(/tabindex="-1"/g) || []).length, 2);
+  assert.equal((actions.match(/tabindex: '0'/g) || []).length, 1, 'genau ein Einstieg je Dokument');
+  assert.equal((actions.match(/tabindex: '-1'/g) || []).length, 2);
   for (const cls of ['document-card__actions', 'document-row__actions']) {
     assert.match(page, new RegExp(`<div class="${cls}" role="toolbar" aria-label="\\$\\{esc\\(t\\('documents\\.actionsFor', \\{ name: doc\\.name \\}\\)\\)\\}">`));
   }
@@ -1535,7 +1545,8 @@ test('der Tab-Stopp einer Leiste liegt nie auf einem ausgeblendeten Knopf - auch
 test('der Ordner-Kebab nennt seinen Ordner', () => {
   // Re-Critique P2: sieben Mal "Ordneraktionen" ohne Namen hintereinander.
   const tree = page.slice(page.indexOf('function renderFolderBrowser()'), page.indexOf('// Der Auslöser trägt den Ordner, in dem man steht'));
-  assert.match(tree, /data-folder-menu="\$\{esc\(item\.id\)\}" aria-label="\$\{esc\(t\('documents\.folderActionsFor', \{ name: item\.name \}\)\)\}" title="\$\{esc\(t\('documents\.folderActionsFor', \{ name: item\.name \}\)\)\}"/);
+  // rowActionHtml escaped label und Attribute selbst.
+  assert.match(tree, /rowActionHtml\(\{ icon: 'more-vertical', className: 'documents-folder-item__menu', label: t\('documents\.folderActionsFor', \{ name: item\.name \}\), attrs: \{ 'data-folder-menu': item\.id, title: t\('documents\.folderActionsFor', \{ name: item\.name \}\)/);
   assert.doesNotMatch(page, /t\('documents\.folderActions'\)/);
   for (const file of LOCALES) {
     const docs = localeData(file).documents;
@@ -1578,7 +1589,8 @@ test('der Betrachter bietet Bearbeiten an, schliesst sich dafuer und gibt den Au
   // schliessen, die Zeile wiederfinden und ueber den Kebab gehen.
   const viewer = fnBody('openDocumentViewer', 'renderViewerContent');
   const actions = viewer.slice(viewer.indexOf('<span class="document-viewer__actions">'), viewer.indexOf('document-viewer__note'));
-  assert.match(actions, /\$\{canEditDocuments\(\) \? `\s*<button type="button" class="btn btn--ghost btn--icon btn--icon-sm" data-action="edit-document"\s*title="\$\{t\('common\.edit'\)\}" aria-label="\$\{t\('common\.edit'\)\}">\s*<i data-lucide="pencil" class="icon-md" aria-hidden="true"><\/i>/);
+  // Die geteilte Zeilenaktion (Runde 5): Name mit Objekt, "<Dokument> bearbeiten".
+  assert.match(actions, /\$\{canEditDocuments\(\) \? `\s*\$\{rowActionHtml\(\{ icon: 'pencil', action: 'edit-document', label: t\('common\.editNamed', \{ name: doc\.name \}\)/);
   assert.match(page, /function canEditDocuments\(\) \{\s*return !isNavModuleReadOnly\('documents'\);\s*\}/);
   // Der Ausloeser des Betrachters wird VOR dem Oeffnen gemerkt; beim Wechsel
   // bekommt er den Fokus zurueck, damit der Bearbeiten-Dialog ihn als seinen

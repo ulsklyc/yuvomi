@@ -513,8 +513,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* Traegt seit Runde 5 (2026-09-26) die geteilte .row-action; deren 48px
+   * stehen auch als min-width/min-height da - hier mitziehen, sonst gewinnt
+   * das Minimum ueber die 40px am Zeiger. */
   width: var(--target-md);
   height: var(--target-md);
+  min-width: var(--target-md);
+  min-height: var(--target-md);
   margin-right: var(--space-0h);
   flex-shrink: 0;
   border-radius: var(--radius-full);
@@ -540,6 +545,8 @@
   .documents-folder-item__menu {
     width: var(--target-lg);
     height: var(--target-lg);
+    min-width: var(--target-lg);
+    min-height: var(--target-lg);
   }
 
   .documents-context-menu__item {
@@ -1012,7 +1019,9 @@
  * nicht die Freistehend-Groesse (Zielgroessen-Regel, tokens.css 11b). 40px
  * halten die Leiste bei zwei Spalten auf dem Telefon in einer Zeile - drei
  * 48px-Knoepfe waeren 144px in einer 140px-Karte. Die Zeile behaelt ihre. */
-.document-card__actions .btn--icon-sm {
+.document-card__actions .row-action {
+  width: var(--target-md);
+  height: var(--target-md);
   min-width: var(--target-md);
   min-height: var(--target-md);
 }

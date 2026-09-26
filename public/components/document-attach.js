@@ -49,6 +49,7 @@
 import { api } from '/api.js';
 import { t, formatDate } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { isPreviewable } from '/utils/document-preview.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { attachOverlay } from '/utils/overlay-history.js';
@@ -422,9 +423,12 @@ function openDocumentPicker(panel, { excludeIds = new Set(), single = false } = 
             <i data-lucide="x" aria-hidden="true"></i>
           </button>
         </div>
-        <input class="form-input doc-attach-picker__search" type="search" data-picker-search
-               placeholder="${esc(t('documentAttach.searchPlaceholder'))}"
-               aria-label="${esc(t('documentAttach.searchPlaceholder'))}">
+        ${renderPageSearch({
+          id: 'doc-attach-picker-search',
+          label: t('documentAttach.searchPlaceholder'),
+          clearLabel: t('common.searchClear'),
+          className: 'doc-attach-picker__search',
+        })}
         <div class="doc-attach-picker__list" data-picker-list>
           <p class="doc-attach-picker__status">${esc(t('common.loading'))}</p>
         </div>
@@ -439,7 +443,7 @@ function openDocumentPicker(panel, { excludeIds = new Set(), single = false } = 
     if (window.lucide) window.lucide.createIcons({ el: overlay });
 
     const listEl = overlay.querySelector('[data-picker-list]');
-    const searchEl = overlay.querySelector('[data-picker-search]');
+    const searchEl = overlay.querySelector('#doc-attach-picker-search');
     const confirmEl = overlay.querySelector('[data-picker-confirm]');
     // Der Auslöser bekommt den Fokus zurück - das Overlay liegt über einem
     // offenen Modal, sonst fiele der Fokus auf <body>.
@@ -498,7 +502,7 @@ function openDocumentPicker(panel, { excludeIds = new Set(), single = false } = 
       confirmEl.disabled = selected.size === 0;
     });
 
-    searchEl.addEventListener('input', renderList);
+    wirePageSearch(overlay, { id: 'doc-attach-picker-search', delay: 0, onQuery: renderList });
     overlay.querySelectorAll('[data-picker-close]').forEach((button) => {
       button.addEventListener('click', () => close([]));
     });

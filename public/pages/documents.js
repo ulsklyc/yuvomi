@@ -15,6 +15,7 @@ import { previewKind } from '/utils/document-preview.js';
 import { fileShareSupport } from '/utils/web-share.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { findPageFab } from '/utils/fab.js';
+import { rowActionHtml } from '/utils/row-action.js';
 // Im Solo-Haushalt hat „Wer darf das sehen" genau eine Antwort - gefragt wird
 // dann nicht (utils/household.js). Das Feld bleibt im DOM und behaelt seinen
 // Wert, es ist nur `hidden`: der Absende-Pfad liest es unveraendert, und kommt
@@ -1167,10 +1168,7 @@ function renderFolderBrowser() {
         ${showCounts ? `<span class="documents-folder-item__count">${counts.get(item.id) || 0}</span>` : ''}
       </button>
       ${item.managed ? `
-      <button class="documents-folder-item__menu" type="button" data-folder-menu="${esc(item.id)}" aria-label="${esc(t('documents.folderActionsFor', { name: item.name }))}" title="${esc(t('documents.folderActionsFor', { name: item.name }))}"
-              aria-haspopup="menu" aria-expanded="false">
-        <i data-lucide="more-vertical" aria-hidden="true"></i>
-      </button>` : ''}
+      ${rowActionHtml({ icon: 'more-vertical', className: 'documents-folder-item__menu', label: t('documents.folderActionsFor', { name: item.name }), attrs: { 'data-folder-menu': item.id, title: t('documents.folderActionsFor', { name: item.name }), 'aria-haspopup': 'menu', 'aria-expanded': 'false' } })}` : ''}
     </li>`;
   }).join(''));
   if (window.lucide) lucide.createIcons({ el: browser });
@@ -1442,7 +1440,7 @@ function folderDeleteChoice(folder, impact) {
                   ${impact.can_delete_documents ? '' : 'disabled aria-describedby="documents-folder-delete-unavailable"'}>
             ${esc(t('documents.deleteFolderWithDocuments', { count: documents }))}
           </button>
-          <button type="button" class="btn btn--ghost" id="documents-folder-delete-cancel">${esc(t('common.cancel'))}</button>
+          <button type="button" class="btn btn--secondary" id="documents-folder-delete-cancel">${esc(t('common.cancel'))}</button>
         </div>`,
       onClose: () => finish(null),
       onSave(panel) {
@@ -1810,15 +1808,9 @@ function storageBadgeHtml(doc) {
 // klickbar bleiben alle drei - versteckt wird nichts, nur die Tab-Kette kuerzer.
 function renderActions(doc) {
   return `
-    <button class="btn btn--ghost btn--icon btn--icon-sm" data-action="view" data-id="${doc.id}" tabindex="0" title="${t('documents.viewAction')}" aria-label="${t('documents.viewAction')}">
-      <i data-lucide="eye" class="icon-md" aria-hidden="true"></i>
-    </button>
-    <a class="btn btn--ghost btn--icon btn--icon-sm" href="/api/v1/documents/${doc.id}/download" download tabindex="-1" title="${t('documents.downloadAction')}" aria-label="${t('documents.downloadAction')}">
-      <i data-lucide="download" class="icon-md" aria-hidden="true"></i>
-    </a>
-    <button class="btn btn--ghost btn--icon btn--icon-sm" data-action="menu" data-id="${doc.id}" tabindex="-1" title="${t('nav.more')}" aria-label="${t('nav.more')}" aria-haspopup="menu" aria-expanded="false">
-      <i data-lucide="more-vertical" class="icon-md" aria-hidden="true"></i>
-    </button>
+    ${rowActionHtml({ icon: 'eye', action: 'view', label: t('documents.viewNamed', { name: doc.name }), attrs: { 'data-id': doc.id, tabindex: '0', title: t('documents.viewAction') } })}
+    ${rowActionHtml({ icon: 'download', href: `/api/v1/documents/${doc.id}/download`, label: t('documents.downloadNamed', { name: doc.name }), attrs: { download: true, tabindex: '-1', title: t('documents.downloadAction') } })}
+    ${rowActionHtml({ icon: 'more-vertical', action: 'menu', label: t('common.moreActionsNamed', { name: doc.name }), attrs: { 'data-id': doc.id, tabindex: '-1', title: t('nav.more'), 'aria-haspopup': 'menu', 'aria-expanded': 'false' } })}
   `;
 }
 
@@ -3003,24 +2995,31 @@ function openDmsLinkModal() {
       }
 
       // Sichtbares Label statt Placeholder-only: der Placeholder verschwindet beim
-      // Tippen und ist kein Label-Ersatz für Screenreader.
-      const searchLabel = document.createElement('label');
+      // Tippen und ist kein Label-Ersatz für Screenreader. Das Feld selbst ist
+      // das geteilte Suchfeld (renderPageSearch, Komponenten-Kanon Runde 5); es
+      // traegt den Namen schon als eigenes <label>, die sichtbare Zeile darueber
+      // ist deshalb nur Beschriftung (aria-hidden), sonst hiesse das Feld doppelt.
+      const searchLabel = document.createElement('p');
       searchLabel.className = 'label';
-      searchLabel.setAttribute('for', 'dms-search');
+      searchLabel.setAttribute('aria-hidden', 'true');
       searchLabel.textContent = t('documents.dmsSearchLabel');
 
-      const input = document.createElement('input');
-      input.className = 'input';
-      input.id = 'dms-search';
-      input.type = 'search';
-      input.placeholder = t('documents.dmsSearchPlaceholder');
+      const searchHost = document.createElement('div');
+      searchHost.insertAdjacentHTML('beforeend', renderPageSearch({
+        id: 'dms-search',
+        label: t('documents.dmsSearchLabel'),
+        placeholder: t('documents.dmsSearchPlaceholder'),
+        clearLabel: t('common.searchClear'),
+      }));
+      const searchField = searchHost.firstElementChild;
+      const input = searchField.querySelector('#dms-search');
 
       const results = document.createElement('ul');
       results.id = 'dms-results';
       results.className = 'dms-results';
       results.setAttribute('aria-busy', 'false');
 
-      root.append(searchLabel, input, hint, results);
+      root.append(searchLabel, searchField, hint, results);
       syncHint();
 
       // Ein Netzwerk-/Serverfehler ist kein leeres Suchergebnis: der alte Code
@@ -3059,13 +3058,11 @@ function openDmsLinkModal() {
         }
       };
 
-      let dmsSearchTimer;
-      input.addEventListener('input', () => {
-        clearTimeout(dmsSearchTimer);
-        // Leere Eingabe listet alle Dokumente (statt zu leeren), damit der Nutzer
-        // ohne exakte Suchbegriffe durchblättern kann (Issue #449).
-        dmsSearchTimer = setTimeout(() => runDmsSearch(input.value.trim()), 300);
-      });
+      // Leere Eingabe listet alle Dokumente (statt zu leeren), damit der Nutzer
+      // ohne exakte Suchbegriffe durchblättern kann (Issue #449) - auch nach
+      // dem Leeren-Knopf des Feldes.
+      wirePageSearch(root, { id: 'dms-search', delay: 300, onQuery: (q) => runDmsSearch(q.trim()) });
+      if (window.lucide) lucide.createIcons({ el: root });
 
       // Beim Öffnen bereits die volle Dokumentliste zeigen.
       runDmsSearch('');
@@ -3376,20 +3373,11 @@ function openDocumentViewer(doc) {
               ${t('documents.dmsOpenExternal')}
             </a>` : ''}
             ${previewKind(doc.mime_type) === 'pdf' ? `
-            <a class="btn btn--ghost btn--icon btn--icon-sm" href="${previewUrl}" target="_blank" rel="noopener noreferrer"
-               title="${t('documents.viewerOpenInTab')}" aria-label="${t('documents.viewerOpenInTab')}">
-              <i data-lucide="external-link" class="icon-md" aria-hidden="true"></i>
-            </a>` : ''}
+            ${rowActionHtml({ icon: 'external-link', href: previewUrl, label: t('documents.openInTabNamed', { name: doc.name }), attrs: { target: '_blank', rel: 'noopener noreferrer', title: t('documents.viewerOpenInTab') } })}` : ''}
             ${canEditDocuments() ? `
-            <button type="button" class="btn btn--ghost btn--icon btn--icon-sm" data-action="edit-document"
-               title="${t('common.edit')}" aria-label="${t('common.edit')}">
-              <i data-lucide="pencil" class="icon-md" aria-hidden="true"></i>
-            </button>` : ''}
+            ${rowActionHtml({ icon: 'pencil', action: 'edit-document', label: t('common.editNamed', { name: doc.name }), attrs: { title: t('common.edit') } })}` : ''}
             ${shareSupport === 'ok' ? `
-            <button type="button" class="btn btn--ghost btn--icon btn--icon-sm" data-action="share" disabled aria-busy="true"
-               title="${t('documents.sharePreparing')}" aria-label="${t('documents.sharePreparing')}">
-              <i data-lucide="share-2" class="icon-md" aria-hidden="true"></i>
-            </button>` : ''}
+            ${rowActionHtml({ icon: 'share-2', action: 'share', label: t('documents.shareNamed', { name: doc.name }), attrs: { disabled: true, 'aria-busy': 'true', title: t('documents.sharePreparing') } })}` : ''}
             <a class="btn btn--primary btn--icon btn--icon-sm" href="${downloadUrl}" download
                title="${t('documents.downloadAction')}" aria-label="${t('documents.downloadAction')}">
               <i data-lucide="download" class="icon-md" aria-hidden="true"></i>
@@ -3460,8 +3448,8 @@ function openDocumentViewer(doc) {
         shareFile = new File([blob], doc.original_name || doc.name, { type: doc.mime_type });
         btn.disabled = false;
         btn.removeAttribute('aria-busy');
+        // Der Name ("<Dokument> teilen") steht schon; nur der Hinweis wechselt.
         btn.title = t('documents.shareAction');
-        btn.setAttribute('aria-label', t('documents.shareAction'));
       })
       .catch((err) => {
         if (err?.name === 'AbortError') return;
