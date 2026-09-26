@@ -222,10 +222,12 @@ async function loadStaffVisits(workerId = state.selectedStaffId, monthValue = st
  * derweil auf „Rueckgaengig", startet dessen Neuladen spaeter, kommt aber
  * womoeglich frueher an. Die aeltere Antwort traegt dann den erledigten
  * Stand und schrieb ihn ueber den zurueckgenommenen. Wie beim Bericht (#1174)
- * entscheidet der START des Abrufs: eine Antwort, die frueher gestartet ist
- * als die zuletzt angewandte, wird verworfen. */
+ * entscheidet der START des Abrufs: sobald ein spaeteres Neuladen gestartet
+ * ist, ist jede fruehere Antwort ueberholt - nicht erst, wenn das spaetere
+ * ankommt. Sonst gewann die aeltere, wenn das juengere scheiterte, und zeigte
+ * den erledigten Stand ueber dem erfolgreich zurueckgenommenen (Codex an
+ * #1476). */
 let loadDataSeq = 0;
-let appliedLoadDataSeq = 0;
 
 async function loadData() {
   const loadSeq = ++loadDataSeq;
@@ -248,8 +250,7 @@ async function loadData() {
     api.get(`/housekeeping/workers?${dayParams.toString()}`),
     api.get('/preferences'),
   ]);
-  if (loadSeq < appliedLoadDataSeq) return;
-  appliedLoadDataSeq = loadSeq;
+  if (loadSeq !== loadDataSeq) return;
   state.dashboard = dashboard.data;
   state.tasks = tasks.data || [];
   const currentReport = current.data || { visits: [], totals: {} };
