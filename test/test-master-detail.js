@@ -358,6 +358,33 @@ test('Zurueck/Vor innerhalb der Seite loest der Baustein, nicht der Router', () 
   assert.equal(md.handleMasterDetailPopstate(), false, 'und sie ist danach abgemeldet');
 });
 
+test('Zurueck/Vor unter der Schwelle: mit deepLinkNarrow oeffnet die Adresse den bisherigen Weg', () => {
+  // Deep-Link oeffnet das Blatt, Zurueck schliesst es und verlaesst den
+  // Eintrag, Vor kehrt auf `?open=4` zurueck. Ohne Oeffnen zeigte die Adresse
+  // einen Kontakt, und der Bildschirm zeigte die Liste.
+  let p = makePage({ split: false });
+  let handle = p.mount({ deepLinkNarrow: true });
+  setUrl('/contacts?open=4');
+  assert.equal(md.handleMasterDetailPopstate(), true);
+  assert.deepEqual(p.calls.narrow, ['4'], 'Vor auf einen Eintrag oeffnet ihn wie der Deep-Link beim Laden');
+  assert.deepEqual(historyLog, [], 'die Geste schreibt keine Geschichte');
+  assert.equal(handle.selectedId(), '4');
+  setUrl('/contacts');
+  assert.equal(md.handleMasterDetailPopstate(), true);
+  assert.deepEqual(p.calls.narrow, ['4'], 'ohne ?open= oeffnet nichts');
+  handle.destroy();
+
+  // Ohne den Wunsch bleibt es beim Merken - kein Modal aus einer Geste, die
+  // niemand dafuer gemacht hat.
+  p = makePage({ split: false });
+  handle = p.mount();
+  setUrl('/contacts?open=4');
+  assert.equal(md.handleMasterDetailPopstate(), true);
+  assert.deepEqual(p.calls.narrow, []);
+  assert.equal(handle.selectedId(), '4');
+  handle.destroy();
+});
+
 test('refresh(): verschwindet die gewaehlte Zeile (geloescht, weggefiltert), kommt der Leerzustand', () => {
   const p = makePage();
   const handle = p.mount();

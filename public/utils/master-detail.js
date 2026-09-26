@@ -367,8 +367,13 @@ export function mountMasterDetail({
       if (selected != null) clear({ history: 'none' });
       return;
     }
-    if (isSplit()) select(id, { history: 'none' });
-    else selected = String(id);
+    if (isSplit()) { select(id, { history: 'none' }); return; }
+    selected = String(id);
+    // Unter der Schwelle gilt dieselbe Regel wie beim Laden: wer den Link
+    // einloesen laesst, bekommt auch bei Vor/Zurueck auf `?open=` das Blatt -
+    // sonst nennt die Adresse einen Eintrag, und zu sehen ist die Liste. Das
+    // Zurueck AUS dem Blatt faengt der Router vorher ab (overlay-history).
+    if (deepLinkNarrow) openNarrow?.(String(id));
   }
 
   const handle = {
