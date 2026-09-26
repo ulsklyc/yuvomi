@@ -73,7 +73,12 @@ test('mobile bottom navigation reserves safe-area space without scroll-time root
     /padding(-bottom)?:[^;]*var\(--safe-area-inset-bottom\)/,
     'die Bar muss die Safe-Area selbst reservieren',
   );
-  assert.match(tokensCss, /--nav-bottom-height:\s*calc\(var\(--nav-height-mobile\)[^;]*var\(--safe-area-inset-bottom\)\)/);
+  // Die Zone rechnet mit der gemessenen Kapselhoehe und der Token-Hoehe als
+  // Rueckfall (Review zu #1475, test:mobile-chrome); die Zusage hier ist nur,
+  // dass die Safe-Area in der Zone steckt.
+  const zone = tokensCss.match(/--nav-bottom-height:\s*([^;]+);/)?.[1] ?? '';
+  assert.match(zone, /var\(--nav-height-mobile\)/);
+  assert.match(zone, /var\(--safe-area-inset-bottom\)\)$/);
   assert.equal(rootRule.includes('nav-bottom--hidden'), false);
 });
 
