@@ -304,6 +304,57 @@ test('meldet der Renderer eine unbekannte ID, faellt die Auswahl auf den Leerzus
   handle.destroy();
 });
 
+test('wirft der Renderer (Netz, 500), bleibt die Auswahl und die Spalte bietet Erneut versuchen', async () => {
+  // Vertrag: `false` heisst „gibt es nicht (mehr)" - dann Leerzustand und die
+  // Adresse geht. Ein Fehler ist voruebergehend: eine Zeitueberschreitung darf
+  // weder die Auswahl noch den Link wegwerfen.
+  const saved = global.document;
+  const restore = installMiniDom();
+  const handlers = [];
+  const make = global.document.createElement;
+  global.document.createElement = (tag) => {
+    const el = make(tag);
+    el.addEventListener = (type, h) => handlers.push({ type, h, el });
+    return el;
+  };
+  global.document.activeElement = null;
+  try {
+    const p = makePage();
+    let fail = true;
+    const handle = p.mount({
+      renderDetail: async (id, into) => {
+        p.calls.render.push(id);
+        if (fail) throw Object.assign(new Error('Server'), { status: 500 });
+        into.replaceChildren();
+        into.content = [`detail:${id}`];
+        return undefined;
+      },
+    });
+    handle.open('2');
+    await tick();
+    assert.equal(handle.selectedId(), '2', 'die Auswahl bleibt');
+    assert.equal(location.search, '?open=2', 'der Link bleibt');
+    assert.equal(p.rows[1].classList.contains('is-selected'), true);
+    assert.equal(p.empty.hidden, true, 'kein Leerzustand - der behauptete, es gaebe nichts');
+    assert.equal(p.body.hidden, false);
+    assert.equal(p.body.inert, false, 'der Fehlerzustand ist bedienbar');
+    const box = p.body.children[0];
+    assert.match(box?.outerHTML ?? '', /empty-state--error|variant-error|error/, 'die Spalte zeigt einen Fehlerzustand');
+    assert.match(box.outerHTML, /HTTP 500/, 'mit dem Statuscode als technische Zeile');
+    const retry = handlers.find((x) => x.type === 'click');
+    assert.ok(retry, 'mit einem Weg zurueck: Erneut versuchen');
+    fail = false;
+    retry.h();
+    await tick();
+    assert.deepEqual(p.calls.render, ['2', '2'], 'Erneut versuchen zeichnet dieselbe Auswahl noch einmal');
+    assert.deepEqual(p.body.content, ['detail:2']);
+    handle.destroy();
+  } finally {
+    restore();
+    global.document = saved;
+  }
+});
+
 test('eine ueberholte, langsame Antwort raeumt die neuere Auswahl nicht ab', async () => {
   const p = makePage();
   let release;

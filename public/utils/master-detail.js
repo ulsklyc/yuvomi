@@ -5,7 +5,7 @@
  *        die Liste, rechts das Detail der AUSGEWAEHLTEN Zeile - wie in Mail,
  *        Erinnerungen und Kontakte. Darunter bleibt alles, wie es ist: die
  *        Zeile oeffnet ihr Modal, Sheet oder ihren Aufklapper.
- * Abhaengigkeiten: utils/empty-state.js, i18n.js
+ * Abhaengigkeiten: utils/empty-state.js, i18n.js (Fehlerzustand der Spalte)
  *
  * WER WAS BESITZT
  *   - Die GEOMETRIE gehoert der Shell (`.split-view` in layout.css): eine
@@ -31,7 +31,8 @@
  */
 
 import { esc } from '/utils/html.js';
-import { emptyStateEl } from '/utils/empty-state.js';
+import { emptyStateEl, mountLoadError } from '/utils/empty-state.js';
+import { t } from '/i18n.js';
 
 /** Die eine lebende Instanz. Es gibt je Seite hoechstens eine Liste + Detail. */
 let active = null;
@@ -159,8 +160,13 @@ function writeHistory(mode, param, id) {
  *        Suche und Essenskarten schon setzten - ein zweiter hiesse zwei Adressen
  *        fuer dieselbe Sache.
  * @param {(id: string, body: HTMLElement, ctx: {signal: AbortSignal}) => (void|false|Promise<void|false>)} opts.renderDetail
- *        Zeichnet das Detail in `body`. `false` heisst: diese ID gibt es nicht
- *        (mehr) - die Auswahl faellt dann auf den Leerzustand zurueck.
+ *        Zeichnet das Detail in `body`. DER RUECKGABE-VERTRAG:
+ *        - `false`: diese ID gibt es nicht (mehr) oder sie ist nicht sichtbar
+ *          (404/403) - die Auswahl faellt auf den Leerzustand, `?open=` geht.
+ *        - Wurf: voruebergehend (Netz, 500, Zeitueberschreitung) - Auswahl
+ *          und Adresse bleiben, die Spalte zeigt einen Fehlerzustand mit
+ *          „Erneut versuchen". Ein Fehler ist nie ein „gibt es nicht".
+ *        - alles andere: gezeichnet.
  * @param {(id: string, trigger?: HTMLElement, ctx: {signal: AbortSignal}) => void} opts.openNarrow
  *        Unter der Schwelle: der bisherige Weg (Modal/Sheet/Aufklapper). Wer
  *        erst laedt, prueft danach `ctx.signal`: es bricht ab, sobald ein
@@ -257,18 +263,24 @@ export function mountMasterDetail({
     bodyEl.scrollTop = 0;
     setBusy(true);
     let result;
+    let failure = null;
     try {
       result = await renderDetail?.(String(id), bodyEl, { signal: renderAbort.signal });
     } catch (err) {
-      // Ein Fehler im Modul-Renderer darf die Liste nicht mitreissen - aber er
-      // darf auch nicht still verschwinden (reference: stilles catch).
-      console.error('[master-detail] renderDetail fehlgeschlagen:', err);
-      result = false;
+      failure = err ?? new Error('renderDetail');
     }
     // Eine spaetere Auswahl hat diese ueberholt: ihr Ergebnis gilt nicht mehr -
     // und sie gibt die Spalte auch nicht frei, die gehoert der neueren.
     if (seq !== renderSeq) return;
     setBusy(false);
+    if (failure) {
+      // Ein Fehler im Modul-Renderer darf die Liste nicht mitreissen - aber er
+      // darf auch nicht still verschwinden (reference: stilles catch). Ohne
+      // HTTP-Status ist es eher ein Programmfehler als ein Netzproblem.
+      if (!Number.isInteger(failure?.status)) console.error('[master-detail] renderDetail fehlgeschlagen:', failure);
+      showLoadError(failure);
+      return;
+    }
     if (result === false) {
       selected = null;
       markSelection();
@@ -277,6 +289,23 @@ export function mountMasterDetail({
       return;
     }
     if (window.lucide) window.lucide.createIcons({ el: bodyEl });
+  }
+
+  /**
+   * Voruebergehender Fehler: die Auswahl bleibt, die Spalte sagt es und bietet
+   * den Weg zurueck. Ein Leerzustand hier behauptete, es gaebe den Eintrag
+   * nicht - und raeumte den Link weg, den ein zweiter Versuch noch fuende.
+   */
+  function showLoadError(error) {
+    emptyEl.hidden = true;
+    bodyEl.hidden = false;
+    mountLoadError(bodyEl, {
+      title: t('common.errorOccurred'),
+      description: t('common.loadErrorDescription'),
+      error,
+      retryLabel: t('common.retry'),
+      onRetry: () => { if (selected != null) paint(selected); },
+    });
   }
 
   /**

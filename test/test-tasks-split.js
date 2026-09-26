@@ -291,3 +291,27 @@ test('openTaskSheet oeffnet nach dem Laden nur, solange das Signal des Bausteins
   assert.match(src, /openNarrow: \(id, _trigger, \{ signal \}\) => openTaskSheet\(id, container, signal\)/,
     'mountTaskSplit gibt das Signal aus openNarrow an openTaskSheet weiter');
 });
+
+test('renderTaskPane: nur 404/403 heisst „gibt es nicht"; ein Netz- oder Serverfehler wirft', async () => {
+  // Im Vertrag des Bausteins raeumt `false` Auswahl und `?open=` ab. Bei einem
+  // 500 oder einer Zeitueberschreitung gibt es die Aufgabe aber noch - die
+  // Spalte zeigt dann einen Fehler mit Erneut versuchen (master-detail.js).
+  const failWith = (status) => {
+    globalThis.__apiStub = { get: () => Promise.reject(Object.assign(new Error('x'), { status })) };
+  };
+  const body = { replaceChildren() {}, insertAdjacentHTML() {} };
+  const signal = new AbortController().signal;
+  try {
+    failWith(404);
+    assert.equal(await tasks.renderTaskPane('7', body, signal, {}), false, '404: weg');
+    failWith(403);
+    assert.equal(await tasks.renderTaskPane('7', body, signal, {}), false, '403: nicht sichtbar');
+    failWith(500);
+    await assert.rejects(tasks.renderTaskPane('7', body, signal, {}), (err) => err.status === 500,
+      '500: voruebergehend - der Baustein haelt die Auswahl');
+    globalThis.__apiStub = { get: () => Promise.reject(new TypeError('Failed to fetch')) };
+    await assert.rejects(tasks.renderTaskPane('7', body, signal, {}), TypeError, 'offline: ebenso');
+  } finally {
+    delete globalThis.__apiStub;
+  }
+});

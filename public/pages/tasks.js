@@ -4554,10 +4554,12 @@ async function renderTaskPane(id, body, signal, container) {
   } catch (err) {
     clearTimeout(slow);
     if (signal.aborted) return undefined;
-    // Weg oder nicht (mehr) sichtbar: still in den Leerzustand. Alles andere
-    // ist ein Ladefehler und wird gesagt.
-    if (err?.status !== 404 && err?.status !== 403) window.yuvomi.showToast(t('tasks.loadError'), 'danger');
-    return false;
+    // Weg oder nicht (mehr) sichtbar: `false`, der Baustein faellt still in
+    // den Leerzustand und nimmt `?open=` weg. Alles andere (Netz, 500) ist
+    // voruebergehend: werfen - die Auswahl bleibt, und die Spalte zeigt den
+    // Fehler mit „Erneut versuchen" (Vertrag in utils/master-detail.js).
+    if (err?.status === 404 || err?.status === 403) return false;
+    throw err;
   }
   clearTimeout(slow);
   if (signal.aborted) return undefined;
