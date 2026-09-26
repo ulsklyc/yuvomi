@@ -397,8 +397,14 @@ export function mountMasterDetail({
   const initial = new URLSearchParams(location.search).get(param);
   if (initial) {
     if (lastSplit) select(initial, { history: 'none' });
-    else if (deepLinkNarrow) openNarrow?.(String(initial));
-    else selected = String(initial);
+    else {
+      // ERST merken, dann oeffnen: die Adresse nennt eine Auswahl, auch
+      // wenn sie unter der Schwelle als Blatt erscheint. Wird das Fenster
+      // danach breiter, zeichnet der ResizeObserver genau diesen Eintrag -
+      // ohne den Merker stuende neben `?open=` der Leerzustand.
+      selected = String(initial);
+      if (deepLinkNarrow) openNarrow?.(selected);
+    }
   }
 
   return handle;

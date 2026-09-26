@@ -385,6 +385,25 @@ test('Zurueck/Vor unter der Schwelle: mit deepLinkNarrow oeffnet die Adresse den
   handle.destroy();
 });
 
+test('Deep-Link unter der Schwelle merkt die Auswahl: wird das Fenster breiter, steht das Detail', () => {
+  const observers = [];
+  global.ResizeObserver = class { constructor(cb) { this.cb = cb; observers.push(this); } observe() {} disconnect() {} };
+  try {
+    const p = makePage({ path: '/contacts?open=4', split: false });
+    const handle = p.mount({ deepLinkNarrow: true });
+    assert.deepEqual(p.calls.narrow, ['4']);
+    assert.equal(handle.selectedId(), '4', 'die Adresse nennt eine Auswahl, also kennt der Baustein sie');
+    p.setSplit(true);
+    for (const o of observers) o.cb();
+    assert.deepEqual(p.calls.render, ['4'], 'breiter gezogen: die Spalte zeichnet den Eintrag aus der Adresse');
+    assert.equal(p.rows[3].classList.contains('is-selected'), true);
+    assert.equal(p.empty.hidden, true, 'kein Leerzustand neben ?open=4');
+    handle.destroy();
+  } finally {
+    delete global.ResizeObserver;
+  }
+});
+
 test('refresh(): verschwindet die gewaehlte Zeile (geloescht, weggefiltert), kommt der Leerzustand', () => {
   const p = makePage();
   const handle = p.mount();
