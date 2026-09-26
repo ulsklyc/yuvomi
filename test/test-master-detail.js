@@ -321,6 +321,40 @@ test('eine ueberholte, langsame Antwort raeumt die neuere Auswahl nicht ab', asy
   handle.destroy();
 });
 
+test('waehrend ein langsamer Renderer laedt, ist der alte Eintrag nicht mehr bedienbar', async () => {
+  // Inventar laedt den Verlauf, bevor es zeichnet. Bis dahin stand der
+  // vorige Gegenstand samt Bearbeiten/Loeschen klickbar neben der neuen
+  // Markierung - ein Klick traf den falschen.
+  const p = makePage();
+  const pending = new Map();
+  const handle = p.mount({
+    renderDetail: (id, into) => new Promise((resolve) => {
+      pending.set(id, () => { into.content = [`detail:${id}`]; resolve(); });
+    }),
+  });
+  handle.open('1');
+  pending.get('1')();
+  await tick();
+  assert.equal(p.body.inert, false, 'fertig gezeichnet: bedienbar');
+  assert.equal(p.body.getAttribute('aria-busy'), null);
+  handle.open('2');
+  assert.deepEqual(p.body.content, ['detail:1'], 'der alte Inhalt steht noch (kein Flackern) ...');
+  assert.equal(p.body.inert, true, '... aber er nimmt keine Klicks und keinen Fokus mehr');
+  assert.equal(p.body.getAttribute('aria-busy'), 'true', 'und der Screenreader hoert, dass geladen wird');
+  handle.open('4');
+  pending.get('2')();
+  await tick();
+  assert.equal(p.body.inert, true, 'eine ueberholte Antwort gibt die Spalte nicht frei');
+  pending.get('4')();
+  await tick();
+  assert.equal(p.body.inert, false);
+  assert.equal(p.body.getAttribute('aria-busy'), null);
+  handle.open('5');
+  handle.clear();
+  assert.equal(p.body.inert, false, 'der Leerzustand ist nie gesperrt');
+  handle.destroy();
+});
+
 test('Deep-Link: ?open= waehlt in der Spalte ohne History-Eintrag; darunter nur auf Wunsch', () => {
   let p = makePage({ path: '/contacts?open=4' });
   let handle = p.mount();

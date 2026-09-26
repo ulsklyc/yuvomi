@@ -218,9 +218,22 @@ export function mountMasterDetail({
     focusTarget(row)?.setAttribute('aria-current', 'true');
   }
 
+  /**
+   * Waehrend ein Renderer laedt, gehoert die Spalte schon der NEUEN Auswahl.
+   * Der alte Inhalt bleibt stehen (kein Flackern bei schnellen Antworten),
+   * nimmt aber keine Klicks und keinen Fokus mehr: Bearbeiten oder Loeschen
+   * traefe sonst den vorigen Eintrag, waehrend links der neue markiert ist.
+   */
+  function setBusy(on) {
+    bodyEl.inert = on;
+    if (on) bodyEl.setAttribute('aria-busy', 'true');
+    else bodyEl.removeAttribute('aria-busy');
+  }
+
   function showEmpty() {
     renderAbort?.abort();
     renderAbort = null;
+    setBusy(false);
     bodyEl.replaceChildren();
     bodyEl.hidden = true;
     emptyEl.hidden = false;
@@ -233,6 +246,7 @@ export function mountMasterDetail({
     emptyEl.hidden = true;
     bodyEl.hidden = false;
     bodyEl.scrollTop = 0;
+    setBusy(true);
     let result;
     try {
       result = await renderDetail?.(String(id), bodyEl, { signal: renderAbort.signal });
@@ -242,8 +256,10 @@ export function mountMasterDetail({
       console.error('[master-detail] renderDetail fehlgeschlagen:', err);
       result = false;
     }
-    // Eine spaetere Auswahl hat diese ueberholt: ihr Ergebnis gilt nicht mehr.
+    // Eine spaetere Auswahl hat diese ueberholt: ihr Ergebnis gilt nicht mehr -
+    // und sie gibt die Spalte auch nicht frei, die gehoert der neueren.
     if (seq !== renderSeq) return;
+    setBusy(false);
     if (result === false) {
       selected = null;
       markSelection();
