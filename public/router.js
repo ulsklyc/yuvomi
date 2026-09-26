@@ -13,7 +13,7 @@ import { forgetLayoutHint } from '/utils/dashboard-layout-hint.js';
 import { initI18n, getLocale, t, formatDate, formatTime } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { emptyHintEl, emptyStateEl } from '/utils/empty-state.js';
-import { wireScrollFade, wireCollapsingHeader, wireSwipeToDismiss } from '/utils/ux.js';
+import { wireScrollFade, wireCollapsingHeader, wireSwipeToDismiss, watchNavCapsuleHeight } from '/utils/ux.js';
 import { TOAST_SURFACES, toastSurface } from '/utils/toast-surface.js';
 import { BULK_PILL_LAYER, clearBulkPill } from '/utils/bulk-pill.js';
 import { watchToastPlacement } from '/utils/toast-placement.js';
@@ -4674,6 +4674,9 @@ function observeNavCapsule() {
   if (!items || items.dataset.indicatorObserved === '1') return;
   items.dataset.indicatorObserved = '1';
   new ResizeObserver(() => requestAnimationFrame(() => positionTabIndicator())).observe(items);
+  // Dieselbe Kapsel, ihre HOEHE: umbrechende Labels machen sie hoeher als
+  // --nav-height-mobile, und die Zone darunter muss mitwachsen (Review zu #1475).
+  watchNavCapsuleHeight(items);
 }
 observeNavCapsule();
 

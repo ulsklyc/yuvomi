@@ -362,7 +362,12 @@
  * NUR, WO DIE LEISTE STEHT: unter 1024px und nicht im Wand-Modus, der sie
  * ausblendet (dashboard.css). Die Summanden von Pille und Banner rechnen
  * weiter ab der Oberkante der Leiste - sie haengen ueber ihr, und der
- * Nachlauf addiert jetzt, was darunter liegt, statt es wegzuschneiden. */
+ * Nachlauf addiert jetzt, was darunter liegt, statt es wegzuschneiden.
+ *
+ * `--nav-bottom-height` ist die GEMESSENE Zone, nicht die Token-Hoehe (Review
+ * zu #1475): die Kapsel waechst mit umbrechenden Labels ueber 60px (320px,
+ * lange Sprachen), und eine feste Reserve liess die letzte Zeile 4px unter dem
+ * Glas enden. Die Messung steht in tokens.css an der Variable. */
 @media (max-width: 1023px) {
   .app-shell {
     --nav-tail: var(--nav-bottom-height);

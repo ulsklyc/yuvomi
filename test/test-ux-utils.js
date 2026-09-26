@@ -8,7 +8,7 @@ import { existsSync, globSync, readFileSync } from 'node:fs';
 import { eachRule } from './css-rules.js';
 
 // Minimales Window/Navigator-Mock für Node
-const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader, collapseOut, expandIn } = await (async () => {
+const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader, collapseOut, expandIn, watchNavCapsuleHeight } = await (async () => {
   global.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
@@ -818,4 +818,45 @@ test('wireCollapsingHeader: ein Port, der den Kollaps nicht traegt, klappt auch 
     s.scrollTo(monthRows, 0);
     assert.equal(s.toolbar.classList.contains('is-collapsed'), false);
   } finally { s.restore(); }
+});
+
+test('watchNavCapsuleHeight: die gemessene Kapselhoehe steht am Root, eine verborgene Kapsel raeumt sie (Review zu #1475)', () => {
+  // Die Kapsel waechst mit umbrechenden Labels ueber 60px (lange Sprachen,
+  // 320px). Der Nachlauf rechnete fest mit der Token-Hoehe, und die letzte
+  // Zeile lag teilweise unter dem Glas. Gemessen, nicht gerechnet - wie das
+  // Installationsbanner (`--install-prompt-height`).
+  const saved = globalThis.ResizeObserver;
+  const observers = [];
+  globalThis.ResizeObserver = class {
+    constructor(cb) { this.cb = cb; this.targets = []; this.disconnected = false; observers.push(this); }
+    observe(target) { this.targets.push(target); }
+    disconnect() { this.disconnected = true; }
+  };
+  const props = new Map();
+  const root = { style: {
+    setProperty: (k, v) => props.set(k, v),
+    removeProperty: (k) => props.delete(k),
+  } };
+  const items = { isConnected: true };
+  try {
+    watchNavCapsuleHeight(items, root);
+    assert.equal(observers.length, 1);
+    assert.deepEqual(observers[0].targets, [items], 'beobachtet wird die Kapsel selbst');
+    const fire = (blockSize) => observers[0].cb([{ target: items, borderBoxSize: [{ blockSize }] }]);
+    fire(60);
+    assert.equal(props.get('--nav-capsule-height'), '60px');
+    fire(72.1875);
+    assert.equal(props.get('--nav-capsule-height'), '72.1875px', 'zweizeilige Labels: die echte Hoehe, ungerundet');
+    fire(0);
+    assert.equal(props.has('--nav-capsule-height'), false,
+      'ohne gerenderte Kapsel (Desktop, Wand-Modus) gilt wieder die Token-Hoehe');
+    fire(74);
+    items.isConnected = false;
+    fire(0);
+    assert.equal(props.get('--nav-capsule-height'), '74px',
+      'eine ersetzte, abgehaengte Kapsel raeumt den Wert ihrer Nachfolgerin nicht');
+    assert.equal(observers[0].disconnected, true, 'und ihr Beobachter endet');
+  } finally {
+    globalThis.ResizeObserver = saved;
+  }
 });

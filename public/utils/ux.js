@@ -854,3 +854,44 @@ export function wireSwipeToDismiss(el, { onDismiss, threshold = 40, slop = 10, f
 
   el.addEventListener('pointercancel', settle);
 }
+
+/**
+ * DIE ECHTE HOEHE DER TAB-KAPSEL, NICHT DIE TOKEN-HOEHE (Review zu #1475).
+ *
+ * `.nav-bottom__items` traegt `min-height: var(--nav-height-mobile)` und darf
+ * wachsen: lange Labels brechen auf engen Geraeten und in langen Sprachen auf
+ * zwei Zeilen um, statt zu clippen (layout.css). Die Zone darunter - der
+ * Nachlauf `--nav-tail`, und alles, was ueber der Leiste steht (Mehr-Blatt,
+ * Toast- und Pillenstapel, Installationsbanner) - rechnete fest mit 60px. Die Kapsel wurde
+ * hoeher als ihre Reserve, und die letzte Zeile jeder Seite lag teilweise
+ * unter dem Glas.
+ *
+ * Gemessen, nicht gerechnet, aus demselben Grund wie beim Installationsbanner
+ * (`--install-prompt-height`): ob ein Label umbricht, haengt an Text, Sprache
+ * und Breite. `--nav-bottom-height` (tokens.css) liest den Wert mit der
+ * Token-Hoehe als Rueckfall - ohne Messung (kein ResizeObserver, Kapsel nicht
+ * gerendert) gilt wieder genau die alte Rechnung.
+ *
+ * @param {Element} items              - die Kapsel `.nav-bottom__items`
+ * @param {Element} [root]             - Traeger der Variable
+ * @returns {ResizeObserver|null}
+ */
+export function watchNavCapsuleHeight(items, root = document.documentElement) {
+  if (!items || typeof ResizeObserver !== 'function') return null;
+  const observer = new ResizeObserver(([entry]) => {
+    // Eine ersetzte Kapsel (Neuaufbau der Navigation) meldet beim Abhaengen 0 -
+    // sie darf den Wert ihrer Nachfolgerin nicht raeumen.
+    if (!items.isConnected) {
+      observer.disconnect();
+      return;
+    }
+    const height = entry?.borderBoxSize?.[0]?.blockSize ?? entry?.target?.offsetHeight ?? 0;
+    // 0 heisst: nicht gerendert (Desktop mit Sidebar, Wand-Modus).
+    // Ungerundet: aufgerundet reservierte die Zone bei 60,09px schon 61, und
+    // jede Flaeche ueber der Leiste rueckte auf allen Telefonen 1px hoch.
+    if (height > 0) root.style.setProperty('--nav-capsule-height', `${height}px`);
+    else root.style.removeProperty('--nav-capsule-height');
+  });
+  observer.observe(items);
+  return observer;
+}
