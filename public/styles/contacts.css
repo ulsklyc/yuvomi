@@ -58,6 +58,14 @@
   display: none;
 }
 
+/* Die Reihe endet an der Lesekante wie die Gruppen darunter: im Port ist sie
+ * so breit wie der Port (1156px bei 1440), die Traeger aber kappen aufs
+ * Lesemass (list-row.css). Ohne eigenes Polster rechnet die Kappung nichts
+ * mehr gegen (vgl. die Liste in layout.css, „NICHT in dieser Liste"). */
+.page-measure--narrow .contacts-filters {
+  max-width: var(--page-measure, none);
+}
+
 /* ER TRÄGT `.filter-chip` (Critique 2026-08-13). Hier stand ein Nachbau, der
  * zehn seiner vierzehn Deklarationen zeichengleich mit der geteilten Regel
  * teilte - und in den übrigen vier war er nicht anders, sondern schlechter:
