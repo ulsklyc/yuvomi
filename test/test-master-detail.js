@@ -404,6 +404,25 @@ test('Deep-Link unter der Schwelle merkt die Auswahl: wird das Fenster breiter, 
   }
 });
 
+test('Zurueck/Vor mit einem anderen Parameter als der Auswahl gehoert dem Router', () => {
+  // Aufgaben: `?view=list|kanban|history`. Aendert Zurueck die Ansicht, muss
+  // die Seite neu zeichnen - sonst zeigt die Adresse die Liste und der
+  // Bildschirm das Brett.
+  const p = makePage({ path: '/tasks?view=list' });
+  const handle = p.mount();
+  handle.open('2');
+  assert.equal(location.search, '?view=list&open=2');
+  setUrl('/tasks?view=list');
+  assert.equal(md.handleMasterDetailPopstate(), true, 'nur die Auswahl hat sich geaendert: der Baustein');
+  assert.equal(handle.selectedId(), null);
+  setUrl('/tasks?view=kanban&open=2');
+  assert.equal(md.handleMasterDetailPopstate(), false, 'die Ansicht hat sich geaendert: der Router zeichnet neu');
+  assert.equal(handle.selectedId(), null, 'und der Baustein greift der neuen Seite nicht vor');
+  setUrl('/tasks?view=list#x');
+  assert.equal(md.handleMasterDetailPopstate(), false, 'auch ein anderer Anker ist nicht die Auswahl');
+  handle.destroy();
+});
+
 test('refresh(): verschwindet die gewaehlte Zeile (geloescht, weggefiltert), kommt der Leerzustand', () => {
   const p = makePage();
   const handle = p.mount();

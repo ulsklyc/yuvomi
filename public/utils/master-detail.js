@@ -117,6 +117,17 @@ function urlWith(param, id) {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+/**
+ * Alles an der Adresse AUSSER der Auswahl: die uebrigen Parameter und der
+ * Anker. Unterscheidet sich das zwischen zwei Eintraegen, ist Zurueck/Vor
+ * keine Auswahl-Geste mehr, sondern ein anderer Zustand der Seite.
+ */
+function addressRest(param) {
+  const params = new URLSearchParams(location.search);
+  params.delete(param);
+  return `${params.toString()}${location.hash}`;
+}
+
 function writeHistory(mode, param, id) {
   if (mode === 'none') return;
   const path = urlWith(param, id);
@@ -179,6 +190,10 @@ export function mountMasterDetail({
   let renderAbort = null;
   let lastSplit = null;
   const pathname = location.pathname;
+  // Der Rest der Adresse, auf dem diese Seite gezeichnet ist (Aufgaben:
+  // `?view=`). Der Baustein schreibt nur `param` - aendert Zurueck/Vor etwas
+  // anderes, gehoert die Geste dem Router.
+  const rest = addressRest(param);
   const teardown = new AbortController();
 
   const isSplit = () => root.isConnected && getComputedStyle(detailEl).display !== 'none';
@@ -388,6 +403,7 @@ export function mountMasterDetail({
     _pathname: pathname,
     _root: root,
     _syncFromUrl: syncFromUrl,
+    _ownsAddress: () => addressRest(param) === rest,
   };
   active?.destroy();
   active = handle;
@@ -423,6 +439,10 @@ export function handleMasterDetailPopstate() {
   if (!active) return false;
   if (!active._root.isConnected) { active.destroy(); return false; }
   if (location.pathname !== active._pathname) return false;
+  // NUR die Auswahl. Aufgaben fuehren `?view=list|kanban|history` in der
+  // Adresse; nimmt Zurueck die Ansicht mit, muss die Seite neu zeichnen - ein
+  // verbrauchtes popstate liesse das Brett unter einer Listen-Adresse stehen.
+  if (!active._ownsAddress()) return false;
   active._syncFromUrl();
   return true;
 }
