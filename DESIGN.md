@@ -1909,6 +1909,24 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    nie an `bottom: 0`. FAB, Toasts und Mehr-Blatt rechnen weiter ab `--nav-bottom-height`
    und stehen, wo sie standen.
 
+**Variante: die Tab-Leiste ist der Titel (Kueche).** Wo mehrere Module eine gemeinsame
+Tab-Leiste tragen, die selbst sagt, wo man ist, ersetzt sie den Large Title: Zeile 1 = die
+Leiste, Zeile 2 = EINE Kopfzeile je Tab mit [Kontext] ... [Such-Icon] [EIN „..."] (am Desktop
+dazu die angedockte Primaer-Pille). Such-Icon und Menue wandern in Zeile 2, weil die Leiste
+bei 390px schon ohne sie ueberlaeuft (gemessen scrollWidth 403/390). Die Zwei-Zeilen-Regel
+gilt unveraendert; alle Tabs derselben Leiste sind gleich hoch (Kueche: 121px mobil). Ein Tab
+ohne Werkzeuge traegt kein leeres „..." (Rezepte).
+
+**Benannte Ausnahme: Sub-Tabs + Zeitraum (Budget, Haushaltshilfe-Berichte).** Ein Modul, dessen
+Zeile 2 schon die Sub-Tabs traegt und dessen Tab einen Zeitraum blaettert, bekommt den
+Zeitraum-Stepper als dritte Kopfzeile (Budget 162px, Haushaltshilfe-Berichte 170px). Neben
+den Large Title passt der Stepper nicht (min-content rund 220px), und ein Stepper im Port
+scrollte mit dem Zeitraum weg, den er benennt. Beim Scrollen klappt der Titel als Lead weg,
+es kleben zwei Zeilen. Die Ausnahme gilt nur fuer genau diese Kombination - ein drittes
+Element (Werkzeugzeile, Chipreihe) macht daraus keinen vierten Fall, sondern wandert ins
+Menue oder in den Port. `test:mobile-chrome` zaehlt keine Kopfzeilen (das ist Messarbeit),
+die Ausnahme steht deshalb hier und in der Messmatrix, nicht in einer Ausnahmekarte.
+
 Pruefebene: **Struktur** (`test:mobile-chrome` - Kapsel ausser Fluss, `--nav-tail` im
 Nachlauf, keine klebende Chipreihe, kein `sticky; bottom: 0`, Icon-Form im Wrapper, die
 Bausteine an einer Stelle) plus **Messung** je Modul (Kopfhoehe ausgeklappt, erste Zeile y,
