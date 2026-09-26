@@ -666,7 +666,7 @@
     position: sticky;
     /* Dieselbe Luft unter dem Kopf, ob die Spalte ruht oder klebt. */
     top: calc(var(--inventory-head-block, 0px) + var(--space-3));
-    max-height: calc(100dvh - var(--inventory-head-block, 0px) - var(--space-3) - var(--space-4));
+    max-height: calc(var(--viewport-height) - var(--inventory-head-block, 0px) - var(--space-3) - var(--space-4));
     margin-block-start: var(--space-3);
   }
 }
