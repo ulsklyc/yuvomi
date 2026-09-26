@@ -513,7 +513,7 @@ function renderGrid() {
   grid.replaceChildren();
   grid.insertAdjacentHTML('beforeend', html);
   if (window.lucide) lucide.createIcons({ el: grid });
-  stagger(grid.querySelectorAll('.note-card'));
+  stagger(grid.querySelectorAll('.note-card'), { host: grid });
 }
 
 /**

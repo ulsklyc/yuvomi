@@ -69,7 +69,7 @@
 }
 
 /* --------------------------------------------------------
- * Seiten-Übergangs-Animation (direktional)
+ * Seiten-Übergang (Rückfall-Blende und View Transition)
  * -------------------------------------------------------- */
 /* Basis: unsichtbar vor Animation */
 .page-transition {
@@ -92,40 +92,98 @@
   height: 100%;
 }
 
-/* Nach der In-Animation soll es sichtbar bleiben → direkt auf der Klasse */
-.page-transition--in-right,
-.page-transition--in-left {
+/* RUECKFALL ohne View Transitions: eine reine Blende, kein Versatz, keine
+ * Feder (Critique 2026-09-26, P2-1). Hier stand ein 20px-Slide nach
+ * Nav-Reihenfolge, den glass.css zusaetzlich mit der Glas-Feder ueberschwingen
+ * liess - Feder gehoert dem Glas, nicht dem Inhalt. Wo der Browser View
+ * Transitions kann, sieht man diese Klasse nie; der Wechsel steht unten. */
+.page-transition--in {
   opacity: 1;
-  transform: none;
+  animation: page-fade-in var(--duration-md) var(--ease-out);
 }
 
-/* Keyframes OHNE forwards */
-@keyframes page-slide-in-right {
-  from { opacity: 0; transform: translateX(20px); }
-  to   { opacity: 1; transform: none; }
+@keyframes page-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
-@keyframes page-slide-in-left {
-  from { opacity: 0; transform: translateX(-20px); }
-  to   { opacity: 1; transform: none; }
+
+/* --------------------------------------------------------
+ * Seitenwechsel als View Transition (utils/view-transition.js)
+ *
+ * Grundsatz: Kontinuitaet vor Effekt. Navigation, Kopf und Tab-Leisten
+ * STEHEN, nur der Inhalt wechselt - wie Apples Tab-Wechsel, der gar nicht
+ * gleitet. Das Wurzelbild blendet 200ms mit `--ease-out` ueber; der Browser
+ * haelt dabei das alte Bild, bis das neue steht - der leere Frame zwischen
+ * altem und neuem Inhalt ist damit weg.
+ *
+ * Was steht, traegt einen Namen und faellt aus dem Wurzelbild heraus:
+ *   - `nav-sidebar`, `nav-bottom`: nur das LEBENDE neue Bild, ohne Blende.
+ *     Die Pille der Kapsel gleitet seit dem Tipp (updateNav) - ein
+ *     eingefrorenes altes Bild darueber waere ihr Geist.
+ *   - `kitchen-tabs` (kitchen-tabs.css): derselbe Knoten vorher und nachher,
+ *     ebenso nur lebend - seine Kapsel gleitet dort zum Ziel.
+ *   - `page-toolbar` (per Inline-Stil am ersten Kopf): Kopf steht, sein
+ *     Inhalt blendet mit der Wurzel ueber. Die Gruppe selbst bewegt sich
+ *     nicht (`animation: none`) - kein Kopf gleitet.
+ * Kommt ein Name nur auf EINER Seite vor (Kueche betreten/verlassen), blendet
+ * er wie die Wurzel (`:only-child` laesst die Standard-Blende stehen).
+ * -------------------------------------------------------- */
+/* Die Namen `nav-sidebar` und `nav-bottom` stehen an den Basisregeln der
+ * beiden Leisten (weiter unten) - dort, wo man sie sucht. */
+
+/* Tipps gehen waehrend der 200ms an das echte Dokument darunter, nicht an das
+ * Bild - sonst verpuffte ein schneller zweiter Tipp auf die Leiste. */
+::view-transition {
+  pointer-events: none;
 }
-.page-transition--in-right {
-  animation: page-slide-in-right var(--duration-md) var(--ease-out);
+
+::view-transition-old(root),
+::view-transition-new(root),
+::view-transition-old(page-toolbar),
+::view-transition-new(page-toolbar) {
+  animation-duration: var(--duration-md);
+  animation-timing-function: var(--ease-out);
 }
-.page-transition--in-left {
-  animation: page-slide-in-left var(--duration-md) var(--ease-out);
+
+::view-transition-group(page-toolbar),
+::view-transition-group(nav-sidebar),
+::view-transition-group(nav-bottom),
+::view-transition-group(kitchen-tabs) {
+  animation: none;
 }
-/* Die out-/crossfade-Varianten (--out-left, --out-right, --crossfade) sind mit
- * dem Toter-Selektoren-Aufraeumen 2026-08-31 entfallen: router.js vergibt seit
- * je nur --in-right/--in-left, die Gegenrichtung entstand nie. */
+
+::view-transition-old(nav-sidebar):not(:only-child),
+::view-transition-old(nav-bottom):not(:only-child),
+::view-transition-old(kitchen-tabs):not(:only-child) {
+  display: none;
+}
+
+::view-transition-new(nav-sidebar):not(:only-child),
+::view-transition-new(nav-bottom):not(:only-child),
+::view-transition-new(kitchen-tabs):not(:only-child) {
+  animation: none;
+}
+
+::view-transition-old(kitchen-tabs):only-child,
+::view-transition-new(kitchen-tabs):only-child {
+  animation-duration: var(--duration-md);
+  animation-timing-function: var(--ease-out);
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .page-transition--in-right,
-  .page-transition--in-left {
+  .page-transition--in {
     animation: none;
     opacity: 1;
   }
   #main-content {
     transition: none;
+  }
+  /* utils/view-transition.js startet unter reduzierter Bewegung gar keine
+   * Transition; das hier haelt auch den Fall still, in dem doch eine laeuft. */
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
   }
 }
 
@@ -304,7 +362,12 @@
  * NUR, WO DIE LEISTE STEHT: unter 1024px und nicht im Wand-Modus, der sie
  * ausblendet (dashboard.css). Die Summanden von Pille und Banner rechnen
  * weiter ab der Oberkante der Leiste - sie haengen ueber ihr, und der
- * Nachlauf addiert jetzt, was darunter liegt, statt es wegzuschneiden. */
+ * Nachlauf addiert jetzt, was darunter liegt, statt es wegzuschneiden.
+ *
+ * `--nav-bottom-height` ist die GEMESSENE Zone, nicht die Token-Hoehe (Review
+ * zu #1475): die Kapsel waechst mit umbrechenden Labels ueber 60px (320px,
+ * lange Sprachen), und eine feste Reserve liess die letzte Zeile 4px unter dem
+ * Glas enden. Die Messung steht in tokens.css an der Variable. */
 @media (max-width: 1023px) {
   .app-shell {
     --nav-tail: var(--nav-bottom-height);
@@ -530,6 +593,8 @@
 /* Sidebar auf Mobile verstecken */
 .nav-sidebar {
   display: none;
+  /* Steht beim Seitenwechsel (View Transition, Abschnitt Seiten-Uebergang). */
+  view-transition-name: nav-sidebar;
 }
 
 /* --------------------------------------------------------
@@ -566,6 +631,9 @@
   background: transparent;
   display: flex;
   flex-direction: column;
+  /* Steht beim Seitenwechsel und zeigt dort nur ihr lebendes Bild - die Pille
+   * gleitet seit dem Tipp (View Transition, Abschnitt Seiten-Uebergang). */
+  view-transition-name: nav-bottom;
   /* Der seitliche Rand der ZONE ist auf --space-2 gefallen, als der FAB in die
    * Kapsel zog: sechs Ziele teilen sich jetzt eine Breite, die vorher fuenf
    * trugen, und 8px Rand sehen auf einem 375er-Telefon genauso freistehend aus
@@ -5162,21 +5230,71 @@ p.field-hint--warn[hidden] {
     border-radius: var(--radius-full);
   }
 
-  .modal-panel--closing {
-    animation: sheet-out var(--duration-md) ease forwards;
+}
+
+/* ── Ausgang: Tafel UND Overlay, auf jeder Breite (Critique 2026-09-26, P1-1) ──
+ *
+ * ZWEI KLASSEN IM SELEKTOR, NICHT EINE. Die Einfahrt steht auch in glass.css,
+ * das NACH dieser Datei laedt; mit gleicher Spezifitaet gewann dort
+ * `.modal-panel { animation: glass-sheet-in }`, die Tafel stand 400ms still
+ * und verschwand dann hart. glass.css nimmt seine Einfahrt inzwischen selbst
+ * zurueck (`:not(.modal-panel--closing)`), und diese Regel gewinnt zusaetzlich
+ * aus eigener Kraft - ein Ausgang, der an der Ladereihenfolge haengt, ist
+ * keiner. Guard: test-motion.js rechnet die Kaskade fuer beide Breiten nach.
+ *
+ * Mobil faellt das Blatt 24px (derselbe Hub wie die Einfahrt) und blendet aus.
+ * Nach einer Wischgeste startet es dort, wohin der Finger es gezogen hat:
+ * modal.js legt den Zug als `--sheet-drag` ab, und beide Keyframe-Enden lesen
+ * ihn - sonst spraenge die Tafel beim Loslassen erst nach oben zurueck.
+ *
+ * Desktop hatte gar keinen Ausgang (modal.js raeumte sofort ab): jetzt ein
+ * kurzes Zuruecknehmen, Scale 0.98 + Blende, 150ms.
+ *
+ * Das Overlay blendet mit aus und laesst waehrenddessen Tipps durch - ein
+ * zweiter Tipp traf vorher das noch stehende Overlay und verpuffte. */
+.modal-panel.modal-panel--closing {
+  animation: modal-scale-out var(--duration-sm) var(--ease-out) forwards;
+}
+
+.modal-overlay.modal-overlay--closing {
+  animation: modal-overlay-out var(--duration-sm) var(--ease-out) forwards;
+  pointer-events: none;
+}
+
+@media (max-width: 767px) {
+  .modal-panel.modal-panel--closing {
+    animation: sheet-out var(--duration-md) var(--ease-out) forwards;
+  }
+
+  .modal-overlay.modal-overlay--closing {
+    animation-duration: var(--duration-md);
   }
 }
 
 @keyframes sheet-out {
-  from { transform: translateY(0); }
-  to   { transform: translateY(16px); opacity: 0; }
+  from { transform: translateY(var(--sheet-drag, 0px)); }
+  to   { transform: translateY(calc(var(--sheet-drag, 0px) + 24px)); opacity: 0; }
 }
 
+@keyframes modal-scale-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.98); }
+}
+
+@keyframes modal-overlay-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* Unter reduzierter Bewegung schliesst modal.js ohne Ausgang (sofort); die
+ * Regeln hier halten auch den Fall still, in dem die Klassen doch gesetzt
+ * werden. */
 @media (prefers-reduced-motion: reduce) {
   .modal-panel {
     animation: none;
   }
-  .modal-panel--closing {
+  .modal-panel.modal-panel--closing,
+  .modal-overlay.modal-overlay--closing {
     animation: none;
   }
 }
@@ -5783,7 +5901,11 @@ textarea::placeholder {
   background: var(--color-surface);
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-sm);
-  transition: transform var(--transition-fast) var(--ease-out);
+  /* Dauer UND Kurve einzeln, nicht `var(--transition-fast) var(--ease-out)`:
+   * das Token ist schon „150ms ease", dahinter eine zweite Kurve macht die
+   * ganze Deklaration ungueltig - der Knopf sprang beim Ausschalten zurueck,
+   * waehrend er beim Einschalten federte (Critique 2026-09-26, P2-2). */
+  transition: transform var(--duration-sm) var(--ease-out);
 }
 
 .toggle input:checked + .toggle__track {

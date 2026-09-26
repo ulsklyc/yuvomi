@@ -69,6 +69,22 @@ test('(1) die Zone der Kapsel ist ein Summand des Nachlaufs, und nur dort, wo si
     'ohne --nav-tail im Nachlauf endet jede Seite UNTER der Kapsel');
 });
 
+test('(1) die Kapselzone rechnet mit der GEMESSENEN Kapselhoehe (Review zu #1475)', () => {
+  // `.nav-bottom__items` hat `min-height`, keine feste Hoehe: umbrechende Labels
+  // (lange Sprachen, 320px) lassen sie ueber --nav-height-mobile wachsen. Rechnet
+  // die Zone fest mit dem Token, ist die Kapsel hoeher als ihr Nachlauf, und die
+  // letzte Zeile liegt teilweise unter dem Glas.
+  const tokens = read('../public/styles/tokens.css');
+  const zone = tokens.match(/--nav-bottom-height:\s*([^;]+);/);
+  assert.ok(zone, '--nav-bottom-height fehlt in tokens.css');
+  assert.match(zone[1], /var\(--nav-capsule-height,\s*var\(--nav-height-mobile\)\)/,
+    'die Zone liest die gemessene Kapselhoehe, mit der Token-Hoehe als Rueckfall');
+  const router = read('../public/router.js');
+  const body = router.slice(router.indexOf('function observeNavCapsule('));
+  assert.match(body.slice(0, body.indexOf('\n}\n')), /watchNavCapsuleHeight\(items\)/,
+    'die Shell misst die Kapsel dort, wo sie sie schon fuer den Indikator beobachtet');
+});
+
 test('(1) Fokus und scrollIntoView landen nicht unter der Kapsel', () => {
   const tail = rules(layoutCss).find((r) => /\.page-scrollport:not\(:has\(\.page-scrollport\)\)/.test(r.selector)
     && decl(r.body, 'padding-block-end'));

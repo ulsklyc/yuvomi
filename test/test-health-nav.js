@@ -5,7 +5,7 @@
  * Deckt ab:
  *  - health-tabs.js: HEALTH_ROUTES, HEALTH_TABS(), getLastHealthRoute-Fallback,
  *    isHealthRoute
- *  - Router-Registrierung (Routen, ROUTE_ORDER, topLevelSection, Shortcut, Nav)
+ *  - Router-Registrierung (Routen, topLevelSection, Shortcut, Nav)
  *  - Modul abschaltbar (Server-Allowlist + Settings-Toggle-Definition)
  *  - i18n-Parität der neuen Keys über ALLE Locales
  *  - Zyklus-Tagebuch-Modal (health.js): Quelltext-Guards ohne DOM/Browser fuer
@@ -115,13 +115,6 @@ test('router.js registriert alle Health-Routen auf das Health-Seitenmodul', () =
   const src = read('public/router.js');
   assert.match(src, /HEALTH_ROUTES\.map\(\(path\) => \(\{[\s\S]*page: '\/pages\/health\.js'[\s\S]*module: 'health'/);
   assert.match(src, /ROUTES\.push\(\.\.\.HEALTH_PAGE_ROUTES\)/);
-});
-
-test('router.js: /health in ROUTE_ORDER (vor /settings)', () => {
-  const src = read('public/router.js');
-  const order = src.match(/const ROUTE_ORDER = \[([\s\S]*?)\];/)[1];
-  assert.ok(order.includes("'/health'"), '/health fehlt in ROUTE_ORDER');
-  assert.ok(order.indexOf("'/health'") < order.indexOf("'/settings'"), '/health muss vor /settings stehen');
 });
 
 test('router.js: topLevelSection faltet /health/* auf /health', () => {

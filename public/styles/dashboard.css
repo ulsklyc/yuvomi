@@ -2974,11 +2974,14 @@ svg.weather-forecast__icon {
   height: 16px;
 }
 
+/* Der Modus zeigt sich an der KANTE, nicht an einer Flaeche: die violette
+ * Toenung ueber dem ganzen Raster (Critique 2026-09-26) faerbte jede Kachel
+ * mit ein und machte den Bearbeiten-Zustand lauter als den Inhalt. Die
+ * gestrichelte Kante und die Leiste je Kachel sagen dasselbe leiser. */
 .dashboard__grid--editing {
   padding: var(--space-2);
   border: 1px dashed color-mix(in srgb, var(--module-accent) var(--tint-hint), var(--color-border));
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--module-accent) var(--tint-state), transparent);
 }
 
 .widget-wrapper--editing {

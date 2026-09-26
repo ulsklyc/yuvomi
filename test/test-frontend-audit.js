@@ -663,10 +663,11 @@ test('kein endlos animiertes Element traegt in derselben Regel einen filter', ()
  * Unterschied ist unsichtbar, solange niemand die Kurve aendert - und genau
  * dann faellt er auf, weil zwei Elemente der Aenderung nicht folgen.
  *
- * `tokens.css` ist ausgenommen, weil dort die Kurven DEFINIERT werden. Die drei
- * Namen (`--ease-out`, `--ease-glass`, `--ease-sidebar-glide`) sind die
- * vollstaendige Liste; wer eine vierte braucht, gibt ihr dort einen Namen und
- * einen Grund, statt sie in ein Bauteil zu schreiben.
+ * `tokens.css` ist ausgenommen, weil dort die Kurven DEFINIERT werden. Die vier
+ * Namen (`--ease-out`, `--ease-in-out`, `--ease-glass`, `--ease-sidebar-glide`)
+ * sind die vollstaendige Liste; wer eine fuenfte braucht, gibt ihr dort einen
+ * Namen und einen Grund, statt sie in ein Bauteil zu schreiben. `--ease-in-out`
+ * kam in Runde 3 (2026-09-26) fuer Hoehenwechsel dazu - mit Grund in tokens.css.
  */
 test('keine Bewegungskurve steht ausserhalb von tokens.css als Literal', () => {
   const styleDir = new URL('../public/styles/', import.meta.url);

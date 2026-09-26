@@ -443,7 +443,17 @@ function makeTrigger(log) {
 /** Offenes Modal aus einem vorigen Test abraeumen, dann frisches Dokument. */
 async function freshDocument({ width }) {
   installDocument();
-  await closeModal({ force: true });
+  // Seit auch Desktop einen Ausgang hat (Critique 2026-09-26), raeumt ein
+  // Schliessen auf JEDER Breite erst nach `animationend` ab. Das Aufraeumen
+  // hier laeuft deshalb unter reduzierter Bewegung - dort schliesst modal.js
+  // sofort, und ein offenes Modal aus dem vorigen Test haengt nicht nach.
+  const previousMatchMedia = globalThis.matchMedia;
+  globalThis.matchMedia = () => ({ matches: true });
+  try {
+    await closeModal({ force: true });
+  } finally {
+    globalThis.matchMedia = previousMatchMedia;
+  }
   installDocument();
   window.innerWidth = width;
 }
@@ -458,7 +468,9 @@ async function settled(promise) {
 
 function fireAnimationEnd(overlay) {
   const panel = overlay.querySelector('.modal-panel');
-  for (const l of [...panel._listeners]) if (l.type === 'animationend') l.handler(makeEvent('animationend'));
+  // `target` wie im Browser: modal.js hoert nur auf das Ende der EIGENEN
+  // Ausgangs-Animation, nicht auf ein hochblubberndes eines Kindes.
+  for (const l of [...panel._listeners]) if (l.type === 'animationend') l.handler(makeEvent('animationend', { target: panel }));
 }
 
 test('whenModalClosed: ohne offenes Modal loest es sofort auf', async () => {
@@ -502,4 +514,43 @@ test('whenModalClosed: ein openModal() waehrend des Schliessens haelt das Warten
   await closeModal({ force: true });
   fireAnimationEnd(second.overlay);
   assert.equal(await settled(waitSecond), true);
+});
+
+test('closeModal: ein Fokus, den der Aufrufer nach dem Schliessen setzt, ueberlebt das Ende des Ausgangs', async () => {
+  // Desktop hat seit der Critique 2026-09-26 einen Ausgang; closeModal() loest
+  // mit seinem START auf. Der Fasten-Editor wartet darauf, zeichnet neu und
+  // fokussiert das neue Steuerelement - rund 150 ms spaeter gab _doClose den
+  // Fokus dem alten Ausloeser zurueck und nahm ihn dem Aufrufer wieder weg.
+  await freshDocument({ width: 1024 });
+  const log = [];
+  const trigger = makeTrigger(log);
+  document.activeElement = trigger;
+  const dialog = openDialog({ openedAt: 0 });
+  document.activeElement = null; // der Fokus liegt im Dialog
+  await closeModal({ force: true });
+  assert.equal(dialog.overlay.isConnected, true, 'Vorbedingung: der Ausgang laeuft noch');
+
+  const neu = makeNode('button#neu');
+  neu.tagName = 'BUTTON';
+  neu.focus = () => { document.activeElement = neu; log.push('neu'); };
+  neu.focus();
+  fireAnimationEnd(dialog.overlay);
+  await settled(whenModalClosed());
+
+  assert.equal(document.activeElement, neu, 'das Ende des Ausgangs hat den Fokus des Aufrufers ueberschrieben');
+  assert.deepEqual(log, ['neu']);
+});
+
+test('closeModal: ohne fremden Fokus gibt das Ende des Ausgangs ihn weiter dem Ausloeser zurueck', async () => {
+  await freshDocument({ width: 1024 });
+  const log = [];
+  const trigger = makeTrigger(log);
+  document.activeElement = trigger;
+  const dialog = openDialog({ openedAt: 0 });
+  document.activeElement = null;
+  await closeModal({ force: true });
+  fireAnimationEnd(dialog.overlay);
+  await settled(whenModalClosed());
+  assert.equal(document.activeElement, trigger);
+  assert.deepEqual(log, ['focus']);
 });

@@ -994,7 +994,7 @@ function renderDocuments() {
   repairRovingStops(list);
   wireThumbnails(list);
   wireLocalThumbs(list);
-  stagger(list.querySelectorAll('.document-card, .document-row'));
+  stagger(list.querySelectorAll('.document-card, .document-row'), { host: list });
 }
 
 // Facetten-Zähler: jede Achse zählt unter Berücksichtigung der jeweils ANDEREN

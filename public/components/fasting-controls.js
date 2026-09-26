@@ -6,7 +6,7 @@ import { openModal, closeModal, confirmModal, refocusAfterRender, captureModalCo
 import { FASTING_PRESETS, normalizeGoalHours, fastingDisplayModel, fastingNotificationAvailability, fastingServerDate, fastingServerClock, formatFastingClock } from '/utils/health-fasting.js';
 import { wallTimeValue, wallTimeInstant, wallTimeCandidates } from '/utils/timezone.js';
 import { moduleAccess } from '/permissions.js';
-import { fastingDialMarkup } from '/components/fasting-dial.js';
+import { updateFastingDial } from '/components/fasting-dial.js';
 import { fastingHelpHtml } from '/components/fasting-help.js';
 
 export function fastingError(error) {
@@ -308,12 +308,24 @@ export function fastingClockSwitchHtml() {
 
 export function updateFastingClock(root, active, last, settings = {}) {
   const model = fastingDisplayModel(active, last, settings.clock_mode);
+  // RUHE OHNE NULLEN (A6 P2-3): ohne laufendes Fasten gibt es keinen
+  // Fastentag und nichts umzuschalten, und ohne jedes Fasten auch keine Zeit -
+  // "00:00:00", "Tag 0" und ein Umschalter Verstrichen/Verbleibend behaupteten
+  // einen Zustand, den es nicht gibt. Bleibt: der Satz, dass man starten kann.
   const timer = root.querySelector('[data-fasting-timer]');
-  if (timer) timer.textContent = model.hasAnchor ? formatFastingClock(model.displaySeconds) : '00:00:00';
+  if (timer) {
+    timer.hidden = !model.hasAnchor;
+    timer.textContent = model.hasAnchor ? formatFastingClock(model.displaySeconds) : '';
+  }
   const label = root.querySelector('[data-fasting-clock-label]');
   if (label) label.textContent = t(active ? model.mode === 'remaining' ? 'health.fasting.remaining' : 'health.fasting.elapsed' : last ? 'health.fasting.sinceLast' : 'health.fasting.ready');
   const days = root.querySelector('[data-fasting-days]');
-  if (days) days.textContent = t('health.fasting.elapsedDays', { days: model.days });
+  if (days) {
+    days.hidden = !active;
+    days.textContent = active ? t('health.fasting.elapsedDays', { days: model.days }) : '';
+  }
+  const clockSwitch = root.querySelector('.fasting-clock-switch');
+  if (clockSwitch) clockSwitch.hidden = !active;
   const remaining = root.querySelector('[data-fasting-remaining]');
   if (remaining) remaining.textContent = model.reached ? `${t('health.fasting.goalReached')} · +${formatFastingClock(model.overtime)}` : model.remaining !== null ? `${t(model.mode === 'remaining' ? 'health.fasting.elapsed' : 'health.fasting.remaining')}: ${formatFastingClock(model.mode === 'remaining' ? model.seconds : model.remaining)}` : t('health.fasting.noGoal');
   root.querySelectorAll('[data-fasting-clock-mode]').forEach((button) => {
@@ -323,15 +335,13 @@ export function updateFastingClock(root, active, last, settings = {}) {
   root.querySelector('[data-fasting-progress]')?.style.setProperty('--fasting-progress', `${model.progress}%`);
   const dial = root.querySelector('[data-fasting-segments]');
   const minute = Math.floor(model.seconds / 60);
-  if (dial && dial.dataset.minute !== String(minute)) {
-    dial.dataset.minute = String(minute);
-    dial.replaceChildren();
-    dial.insertAdjacentHTML('beforeend', fastingDialMarkup(active ? minute : 0, active?.goal_minutes, settings.zone_mode));
-  }
+  if (dial) updateFastingDial(dial, active ? minute : 0, active?.goal_minutes, settings.zone_mode);
   const announcement = root.querySelector('[data-fasting-announcement]');
   if (announcement && announcement.dataset.minute !== String(minute)) {
     announcement.dataset.minute = String(minute);
-    announcement.textContent = `${t(active ? 'health.fasting.elapsed' : 'health.fasting.sinceLast')}: ${formatFastingClock(minute * 60)}`;
+    announcement.textContent = model.hasAnchor
+      ? `${t(active ? 'health.fasting.elapsed' : 'health.fasting.sinceLast')}: ${formatFastingClock(minute * 60)}`
+      : '';
   }
 }
 

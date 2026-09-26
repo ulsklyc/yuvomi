@@ -1278,8 +1278,13 @@
    * 12. Layout
    * -------------------------------------------------------- */
   --nav-height-mobile: 60px;
-  /* Schwebende Kapsel (Liquid Glass): Zone = Kapsel + 8px Luft oben und unten. */
-  --nav-bottom-height: calc(var(--nav-height-mobile) + var(--space-4) + var(--safe-area-inset-bottom));
+  /* Schwebende Kapsel (Liquid Glass): Zone = Kapsel + 8px Luft oben und unten.
+   * Die Kapsel ist MINDESTENS --nav-height-mobile hoch und waechst mit
+   * umbrechenden Labels (lange Sprachen, enge Geraete). Ihre echte Hoehe misst
+   * die Shell und setzt sie als --nav-capsule-height an die Wurzel
+   * (watchNavCapsuleHeight() in utils/ux.js, Review zu #1475); ohne Messung
+   * gilt die Token-Hoehe. Guard: test:mobile-chrome. */
+  --nav-bottom-height: calc(var(--nav-capsule-height, var(--nav-height-mobile)) + var(--space-4) + var(--safe-area-inset-bottom));
   /* Sichtbare Fensterhoehe (#1276). `dvh` kennt Chrome erst ab 108 und Safari
    * ab 15.4; aeltere Browser verwerfen jede Deklaration damit. Ein vh-Zwilling
    * davor (`height: 100vh; height: 100dvh`) rettet nur eine Deklaration OHNE
@@ -1446,6 +1451,11 @@
   --duration-2xl: 400ms;   /* = slow (Layout-Umbauten, Sidebar) */
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Symmetrische Kurve fuer Hoehenwechsel (Einklappen/Aufziehen von Zeilen und
+   * Gruppen): `--ease-out` nimmt 80 % der Hoehe in den ersten 60ms und wirkt
+   * dort wie ein Ruck; eine Hoehe, der die Nachbarn folgen, braucht Anlauf
+   * UND Auslauf (Critique 2026-09-26, Runde 3). */
+  --ease-in-out: cubic-bezier(0.42, 0, 0.58, 1);
 
   /* --------------------------------------------------------
    * 15. Z-Indizes

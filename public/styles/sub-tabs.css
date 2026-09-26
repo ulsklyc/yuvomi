@@ -107,13 +107,20 @@
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  /* transform steht mit in der Liste: der Druck unten skalierte bis
+   * 2026-09-26 ohne Transition - die Pille sprang auf 0.96 und zurueck
+   * (Critique 2026-09-26, P3). Hinein kurz (--duration-2xs, Rueckmeldung
+   * unter dem Finger), heraus mit der normalen Dauer. */
+  transition:
+    background-color var(--duration-sm) ease,
+    color var(--duration-sm) ease,
+    transform var(--duration-sm) var(--ease-out);
   -webkit-tap-highlight-color: transparent;
 }
 
 .sub-tab:active {
   transform: scale(0.96);
-  transition-duration: 0.06s;
+  transition-duration: var(--duration-2xs);
 }
 
 /* Aktiv = erhabene Surface-Pille, Modulton nur in der Tinte - die eine
