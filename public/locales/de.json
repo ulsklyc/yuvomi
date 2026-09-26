@@ -3064,6 +3064,7 @@
     "birthdays": {
         "inDays_one": "in {{count}} Tag",
         "inDays": "in {{count}} Tagen",
+        "inDays_few": "in {{count}} Tagen",
         "turnsAge": "wird {{age}}",
         "title": "Geburtstage",
         "addButton": "Geburtstag hinzufügen",
@@ -5565,6 +5566,7 @@
         "trackedDateDueToday": "Heute fällig",
         "deadlineChipInDays_one": "{{label}} in {{count}} Tag",
         "deadlineChipInDays": "{{label}} in {{count}} Tagen",
+        "deadlineChipInDays_few": "{{label}} in {{count}} Tagen",
         "deadlineChipToday": "{{label}} heute fällig",
         "deadlineChipOverdue": "{{label}} überfällig",
         "warrantyChipUntil": "Garantie bis {{date}}",

@@ -3079,6 +3079,7 @@
     "birthdays": {
         "inDays_one": "σε {{count}} ημέρα",
         "inDays": "σε {{count}} ημέρες",
+        "inDays_few": "σε {{count}} ημέρες",
         "turnsAge": "γίνεται {{age}}",
         "title": "Γενέθλια",
         "addButton": "Προσθήκη γενεθλίων",
@@ -5565,6 +5566,7 @@
         "trackedDateDueToday": "Λήγει σήμερα",
         "deadlineChipInDays_one": "{{label}} σε {{count}} ημέρα",
         "deadlineChipInDays": "{{label}} σε {{count}} ημέρες",
+        "deadlineChipInDays_few": "{{label}} σε {{count}} ημέρες",
         "deadlineChipToday": "{{label}} σήμερα",
         "deadlineChipOverdue": "{{label}} εκπρόθεσμο",
         "warrantyChipUntil": "Εγγύηση έως {{date}}",

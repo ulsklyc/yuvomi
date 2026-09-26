@@ -3052,6 +3052,7 @@
     "birthdays": {
         "inDays_one": "over {{count}} dag",
         "inDays": "over {{count}} dagen",
+        "inDays_few": "over {{count}} dagen",
         "turnsAge": "wordt {{age}}",
         "title": "Verjaardagen",
         "addButton": "Verjaardag toevoegen",
@@ -5565,6 +5566,7 @@
         "trackedDateDueToday": "Vandaag verschuldigd",
         "deadlineChipInDays_one": "{{label}} over {{count}} dag",
         "deadlineChipInDays": "{{label}} over {{count}} dagen",
+        "deadlineChipInDays_few": "{{label}} over {{count}} dagen",
         "deadlineChipToday": "{{label}} vandaag",
         "deadlineChipOverdue": "{{label}} te laat",
         "warrantyChipUntil": "Garantie tot {{date}}",

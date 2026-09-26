@@ -3064,6 +3064,7 @@
     "birthdays": {
         "inDays_one": "{{count}} روز دیگر",
         "inDays": "{{count}} روز دیگر",
+        "inDays_few": "{{count}} روز دیگر",
         "turnsAge": "{{age}} ساله می‌شود",
         "title": "تولدها",
         "addButton": "افزودن تولد",
@@ -5565,6 +5566,7 @@
         "trackedDateDueToday": "مهلت امروز است",
         "deadlineChipInDays_one": "{{label}} تا {{count}} روز دیگر",
         "deadlineChipInDays": "{{label}} تا {{count}} روز دیگر",
+        "deadlineChipInDays_few": "{{label}} تا {{count}} روز دیگر",
         "deadlineChipToday": "{{label}} مهلت امروز",
         "deadlineChipOverdue": "{{label}} گذشته",
         "warrantyChipUntil": "گارانتی تا {{date}}",

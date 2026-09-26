@@ -3079,6 +3079,7 @@
     "birthdays": {
         "inDays_one": "om {{count}} dag",
         "inDays": "om {{count}} dagar",
+        "inDays_few": "om {{count}} dagar",
         "turnsAge": "fyller {{age}}",
         "title": "Födelsedagar",
         "addButton": "Lägg till födelsedag",
@@ -5565,6 +5566,7 @@
         "trackedDateDueToday": "Förfaller i dag",
         "deadlineChipInDays_one": "{{label}} om {{count}} dag",
         "deadlineChipInDays": "{{label}} om {{count}} dagar",
+        "deadlineChipInDays_few": "{{label}} om {{count}} dagar",
         "deadlineChipToday": "{{label}} förfaller i dag",
         "deadlineChipOverdue": "{{label}} försenad",
         "warrantyChipUntil": "Garanti till {{date}}",

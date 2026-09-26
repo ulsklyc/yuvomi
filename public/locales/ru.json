@@ -3079,6 +3079,7 @@
     "birthdays": {
         "inDays_one": "через {{count}} день",
         "inDays": "через {{count}} дн.",
+        "inDays_few": "через {{count}} дня",
         "turnsAge": "исполняется {{age}}",
         "title": "Дни рождения",
         "addButton": "Добавить день рождения",
@@ -5565,6 +5566,7 @@
         "trackedDateDueToday": "Срок сегодня",
         "deadlineChipInDays_one": "{{label}} через {{count}} день",
         "deadlineChipInDays": "{{label}} через {{count}} дн.",
+        "deadlineChipInDays_few": "{{label}} через {{count}} дня",
         "deadlineChipToday": "{{label}} сегодня",
         "deadlineChipOverdue": "{{label}}: просрочено",
         "warrantyChipUntil": "Гарантия до {{date}}",

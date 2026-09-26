@@ -3064,6 +3064,7 @@
     "birthdays": {
         "inDays_one": "{{count}}일 후",
         "inDays": "{{count}}일 후",
+        "inDays_few": "{{count}}일 후",
         "turnsAge": "{{age}}세가 됩니다",
         "title": "생일",
         "addButton": "생일 추가",
@@ -5565,6 +5566,7 @@
         "trackedDateDueToday": "오늘이 기한",
         "deadlineChipInDays_one": "{{label}} {{count}}일 후",
         "deadlineChipInDays": "{{label}} {{count}}일 후",
+        "deadlineChipInDays_few": "{{label}} {{count}}일 후",
         "deadlineChipToday": "{{label}} 오늘이 기한",
         "deadlineChipOverdue": "{{label}} 기한 지남",
         "warrantyChipUntil": "{{date}}까지 보증",

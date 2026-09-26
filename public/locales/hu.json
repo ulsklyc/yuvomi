@@ -3052,6 +3052,7 @@
     "birthdays": {
         "inDays_one": "{{count}} nap múlva",
         "inDays": "{{count}} nap múlva",
+        "inDays_few": "{{count}} nap múlva",
         "turnsAge": "betölti a(z) {{age}}. évét",
         "title": "Születésnapok",
         "addButton": "Születésnap hozzáadása",
@@ -5565,6 +5566,7 @@
         "trackedDateDueToday": "Ma esedékes",
         "deadlineChipInDays_one": "{{label}} {{count}} nap múlva",
         "deadlineChipInDays": "{{label}} {{count}} nap múlva",
+        "deadlineChipInDays_few": "{{label}} {{count}} nap múlva",
         "deadlineChipToday": "{{label}} ma esedékes",
         "deadlineChipOverdue": "{{label}} lejárt",
         "warrantyChipUntil": "Garancia eddig: {{date}}",

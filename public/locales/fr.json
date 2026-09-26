@@ -3079,6 +3079,7 @@
     "birthdays": {
         "inDays_one": "dans {{count}} jour",
         "inDays": "dans {{count}} jours",
+        "inDays_few": "dans {{count}} jours",
         "turnsAge": "aura {{age}} ans",
         "title": "Anniversaires",
         "addButton": "Ajouter un anniversaire",
@@ -5565,6 +5566,7 @@
         "trackedDateDueToday": "À échéance aujourd'hui",
         "deadlineChipInDays_one": "{{label}} dans {{count}} jour",
         "deadlineChipInDays": "{{label}} dans {{count}} jours",
+        "deadlineChipInDays_few": "{{label}} dans {{count}} jours",
         "deadlineChipToday": "{{label}} aujourd'hui",
         "deadlineChipOverdue": "{{label}} en retard",
         "warrantyChipUntil": "Garantie jusqu'au {{date}}",

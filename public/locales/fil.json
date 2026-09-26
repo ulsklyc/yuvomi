@@ -3064,6 +3064,7 @@
     "birthdays": {
         "inDays_one": "sa loob ng {{count}} araw",
         "inDays": "sa loob ng {{count}} araw",
+        "inDays_few": "sa loob ng {{count}} araw",
         "turnsAge": "magiging {{age}}",
         "title": "Mga Kaarawan",
         "addButton": "Magdagdag ng kaarawan",
@@ -5565,6 +5566,7 @@
         "trackedDateDueToday": "Takda ngayong araw",
         "deadlineChipInDays_one": "{{label}} sa loob ng {{count}} araw",
         "deadlineChipInDays": "{{label}} sa loob ng {{count}} araw",
+        "deadlineChipInDays_few": "{{label}} sa loob ng {{count}} araw",
         "deadlineChipToday": "{{label}} ngayong araw",
         "deadlineChipOverdue": "{{label}} lampas na",
         "warrantyChipUntil": "Warranty hanggang {{date}}",

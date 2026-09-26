@@ -3079,6 +3079,7 @@
     "birthdays": {
         "inDays_one": "{{count}}天后",
         "inDays": "{{count}}天后",
+        "inDays_few": "{{count}}天后",
         "turnsAge": "即将{{age}}岁",
         "title": "生日",
         "addButton": "添加生日",
@@ -5565,6 +5566,7 @@
         "trackedDateDueToday": "今天到期",
         "deadlineChipInDays_one": "{{label}} {{count}} 天后",
         "deadlineChipInDays": "{{label}} {{count}} 天后",
+        "deadlineChipInDays_few": "{{label}} {{count}} 天后",
         "deadlineChipToday": "{{label}} 今天到期",
         "deadlineChipOverdue": "{{label}} 已逾期",
         "warrantyChipUntil": "保修至 {{date}}",

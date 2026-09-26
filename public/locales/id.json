@@ -3064,6 +3064,7 @@
     "birthdays": {
         "inDays_one": "dalam {{count}} hari",
         "inDays": "dalam {{count}} hari",
+        "inDays_few": "dalam {{count}} hari",
         "turnsAge": "berusia {{age}}",
         "title": "Ulang Tahun",
         "addButton": "Tambah ulang tahun",
@@ -5565,6 +5566,7 @@
         "trackedDateDueToday": "Jatuh tempo hari ini",
         "deadlineChipInDays_one": "{{label}} dalam {{count}} hari",
         "deadlineChipInDays": "{{label}} dalam {{count}} hari",
+        "deadlineChipInDays_few": "{{label}} dalam {{count}} hari",
         "deadlineChipToday": "{{label}} jatuh tempo hari ini",
         "deadlineChipOverdue": "{{label}} terlambat",
         "warrantyChipUntil": "Garansi sampai {{date}}",

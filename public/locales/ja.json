@@ -3079,6 +3079,7 @@
     "birthdays": {
         "inDays_one": "あと{{count}}日",
         "inDays": "あと{{count}}日",
+        "inDays_few": "あと{{count}}日",
         "turnsAge": "{{age}}歳になります",
         "title": "誕生日",
         "addButton": "誕生日を追加",
@@ -5565,6 +5566,7 @@
         "trackedDateDueToday": "今日が期限",
         "deadlineChipInDays_one": "{{label}} あと {{count}} 日",
         "deadlineChipInDays": "{{label}} あと {{count}} 日",
+        "deadlineChipInDays_few": "{{label}} あと {{count}} 日",
         "deadlineChipToday": "{{label}} 今日が期限",
         "deadlineChipOverdue": "{{label}} 期限超過",
         "warrantyChipUntil": "保証 {{date}} まで",

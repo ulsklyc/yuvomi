@@ -3052,6 +3052,7 @@
     "birthdays": {
         "inDays_one": "trong {{count}} ngày",
         "inDays": "trong {{count}} ngày",
+        "inDays_few": "trong {{count}} ngày",
         "turnsAge": "tròn {{age}} tuổi",
         "title": "Sinh nhật",
         "addButton": "Thêm sinh nhật",
@@ -5565,6 +5566,7 @@
         "trackedDateDueToday": "Đến hạn hôm nay",
         "deadlineChipInDays_one": "{{label}} còn {{count}} ngày",
         "deadlineChipInDays": "{{label}} còn {{count}} ngày",
+        "deadlineChipInDays_few": "{{label}} còn {{count}} ngày",
         "deadlineChipToday": "{{label}} đến hạn hôm nay",
         "deadlineChipOverdue": "{{label}} quá hạn",
         "warrantyChipUntil": "Bảo hành đến {{date}}",

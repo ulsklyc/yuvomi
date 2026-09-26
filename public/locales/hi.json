@@ -3079,6 +3079,7 @@
     "birthdays": {
         "inDays_one": "{{count}} दिन में",
         "inDays": "{{count}} दिनों में",
+        "inDays_few": "{{count}} दिनों में",
         "turnsAge": "{{age}} का हो जाता है",
         "title": "जन्मदिन",
         "addButton": "जन्मदिन जोड़ें",
@@ -5565,6 +5566,7 @@
         "trackedDateDueToday": "आज देय",
         "deadlineChipInDays_one": "{{label}} {{count}} दिन में",
         "deadlineChipInDays": "{{label}} {{count}} दिनों में",
+        "deadlineChipInDays_few": "{{label}} {{count}} दिनों में",
         "deadlineChipToday": "{{label}} आज देय",
         "deadlineChipOverdue": "{{label}} देर से",
         "warrantyChipUntil": "{{date}} तक वारंटी",

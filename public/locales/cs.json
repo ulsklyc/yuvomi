@@ -3688,6 +3688,7 @@
     "birthdays": {
         "inDays_one": "za {{count}} den",
         "inDays": "za {{count}} dní",
+        "inDays_few": "za {{count}} dny",
         "turnsAge": "oslaví {{age}}",
         "title": "Narozeniny",
         "addButton": "Přidat narozeniny",
@@ -5565,6 +5566,7 @@
         "trackedDateDueToday": "Splatné dnes",
         "deadlineChipInDays_one": "{{label}} za {{count}} den",
         "deadlineChipInDays": "{{label}} za {{count}} dní",
+        "deadlineChipInDays_few": "{{label}} za {{count}} dny",
         "deadlineChipToday": "{{label}} dnes",
         "deadlineChipOverdue": "{{label}} po lhůtě",
         "warrantyChipUntil": "Záruka do {{date}}",

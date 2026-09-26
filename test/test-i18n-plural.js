@@ -478,3 +478,152 @@ test('tschechische Fastenanzeige dekliniert zusaetzliche Tage', async () => {
   assert.equal(t('health.fasting.extraDays', { count: 2 }), '+2 dny');
   assert.equal(t('health.fasting.extraDays', { count: 5 }), '+5 dní');
 });
+
+// ---------------------------------------------------------------------------
+// Die few-Form in den Sprachen, die sie haben (Codex-Review #1472)
+//
+// cs, pl, ru, uk und ar waehlen fuer ganze Zahlen die CLDR-Kategorie `few`
+// (cs: 2-4, pl/ru/uk: 2-4, 22-24 ...). Fehlt `key_few`, faellt resolvePluralKey
+// auf den Basisschluessel zurueck, und der traegt dort die Form fuer 5+ -
+// "STK za 2 dni" statt "STK za 2 dny". Gemessen wird jeder zaehlende Schluessel,
+// der in de.json eine `_one`-Variante hat: er braucht in jeder Sprache mit
+// `few` auch `_few` (Muster: `dashboard.shoppingOpen_few`, in allen Locales).
+//
+// Der Bestand traegt die Luecke 110-mal. Wie beim Guard darueber friert eine
+// Karte ihn ein, statt den Guard abzuschwaechen: jeder NEUE Schluessel ohne
+// `_few` ist rot, und ein Karteneintrag, der inzwischen erfuellt ist, auch -
+// die Karte darf nur schrumpfen.
+// ---------------------------------------------------------------------------
+const FEW_GAPS_LEGACY = new Set([
+  "budget.pendingSummary",
+  "budget.receiptsAttachedLabel",
+  "calendar.filtersActive",
+  "calendar.monthDayEntries",
+  "calendar.monthDayMoreTitles",
+  "calendar.overrideOrphanConfirmTitle",
+  "changelog.whatsNewMore",
+  "contacts.bulkDeleteConfirm",
+  "dashboard.badgeCount",
+  "dashboard.birthdaysMore",
+  "dashboard.countdownMonths",
+  "dashboard.countdownMore",
+  "dashboard.countdownOverdue",
+  "dashboard.countdownWeeks",
+  "dashboard.countdownYears",
+  "dashboard.daysLeft",
+  "dashboard.eventsEndedMore",
+  "dashboard.housekeepingVisitsMonth",
+  "dashboard.memberOpenTasks",
+  "dashboard.metricDoses",
+  "dashboard.metricItems",
+  "dashboard.metricMeals",
+  "dashboard.metricOnLists",
+  "dashboard.metricOpen",
+  "dashboard.metricOverdue",
+  "dashboard.metricPinned",
+  "dashboard.metricPoints",
+  "dashboard.metricVisitsMonth",
+  "dashboard.notesMore",
+  "dashboard.nutritionEntries",
+  "dashboard.pantryExpiringEmpty",
+  "dashboard.pantryExpiringMore",
+  "dashboard.rewardsOwnPending",
+  "dashboard.shoppingMoreLists",
+  "dashboard.tasksMore",
+  "dashboard.todayDosesOpen",
+  "dashboard.todayMore",
+  "dashboard.wallTimerMinutes",
+  "dashboard.wallWhoCount",
+  "dashboard.wasteMore",
+  "dashboard.weekDayEvents",
+  "documentAttach.limitReached",
+  "documents.deleteFolderKeepDocuments",
+  "documents.deleteFolderWithDocuments",
+  "documents.folderDeletedWithDocumentsToast",
+  "documents.folderUpload.selectedFolder",
+  "documents.folderUpload.uploadAction",
+  "documents.folderUpload.uploadedToast",
+  "health.cycle.bubble.periodOverdue",
+  "health.cycle.stats.source.history",
+  "health.cycle.stats.source.historyOther",
+  "health.cycle.stats.source.insufficientHistory",
+  "health.prevention.dueInDays",
+  "health.prevention.overdueDays",
+  "inventory.trackedDateInDays",
+  "inventory.trackedDateOverdueDays",
+  "inventory.warrantyMonthsValue",
+  "inventory.warrantyStatusExpiringSoon",
+  "nav.moreBadge",
+  "pantry.bulkPillLabel",
+  "rrule.summaryCount",
+  "schedule.cycleDaysHint",
+  "schedule.deleteCustomFieldDetail",
+  "schedule.deletePatternDetail",
+  "schedule.quickStartCreated",
+  "settings.apiTokenScopeSummary",
+  "settings.backupSchedulerCronHourly",
+  "settings.backupSchedulerKeepCount",
+  "settings.calendarImport.success",
+  "settings.calendarImport.successWithSkipped",
+  "settings.enabledReminderListCount",
+  "settings.healthPreventionIntervalMonths",
+  "settings.healthPreventionIntervalYears",
+  "settings.healthVisibilityApplied",
+  "settings.kitchenActiveCount",
+  "settings.rewardsDefaultPointsRebaseTitle",
+  "settings.rewardsDefaultPointsRebased",
+  "settings.searchResults",
+  "settings.sync.backfillDone",
+  "settings.sync.backfillFillCount",
+  "settings.sync.backfillQuestion",
+  "settings.syncCleanup.accountQuestion",
+  "settings.syncCleanup.orphanHint",
+  "settings.syncCleanup.orphanQuestion",
+  "settings.syncCleanup.question",
+  "settings.syncCleanup.removed",
+  "settings.twoFactorRecoveryLeft",
+  "shopping.sendListDescription",
+  "splitExpenses.moreMembers",
+  "splitExpenses.receiptsAttachedLabel",
+  "subscriptions.endsAfter",
+  "subscriptions.filtersActive",
+  "subscriptions.listCount",
+  "subscriptions.overdueDays",
+  "subscriptions.reminderMeta",
+  "tasks.bulkTagHint",
+  "tasks.documentsCount",
+  "tasks.pointsDefaultHint",
+  "tasks.pointsSummary",
+  "tasks.tagDeleteConfirm",
+  "tasks.tagDeleted",
+  "tasks.tagUsageCount",
+  "tasks.tagsSkippedLocked",
+  "tasks.tagsUpdated",
+  "waste.importDiagnosticCancelledExcluded",
+  "waste.importDiagnosticDuplicateInstance",
+  "waste.importDiagnosticMissingUidFallback",
+  "waste.importDiagnosticSkippedUnparsable",
+  "waste.mappingProfileApplicableCount",
+  "waste.upcomingShowMore",
+]);
+
+test("zaehlende Schluessel tragen _few in jeder Sprache mit der CLDR-Kategorie few", () => {
+  const files = readdirSync(LOCALE_DIR).filter((f) => f.endsWith(".json"));
+  const load = (f) => flattenLocale(JSON.parse(readFileSync(new URL(f, LOCALE_DIR), "utf8")));
+  const de = load("de.json");
+  const counting = [...de.keys()]
+    .filter((k) => k.endsWith("_one"))
+    .map((k) => k.slice(0, -4))
+    .filter((b) => typeof de.get(b) === "string" && de.get(b).includes("{{count}}"));
+  const fewLocales = files.filter((f) => new Intl.PluralRules(f.replace(/\.json$/, "")).resolvedOptions().pluralCategories.includes("few"));
+  assert.ok(fewLocales.length >= 5, "cs, pl, ru, uk und ar muessen als few-Sprachen erkannt werden");
+  const missing = new Set();
+  for (const file of fewLocales) {
+    const entries = load(file);
+    for (const base of counting) if (!entries.has(base + "_few")) missing.add(base);
+  }
+  const fresh = [...missing].filter((k) => !FEW_GAPS_LEGACY.has(k));
+  assert.deepEqual(fresh, [], "neue zaehlende Schluessel ohne _few in " + fewLocales.join(", "));
+  const stale = [...FEW_GAPS_LEGACY].filter((k) => !missing.has(k));
+  assert.deepEqual(stale, [], "erfuellte Eintraege aus FEW_GAPS_LEGACY streichen");
+});
