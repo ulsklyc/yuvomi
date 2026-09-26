@@ -94,6 +94,7 @@ function buildConnectionForm() {
     `
     <div class="settings-webdav-toggle-row">
       ${toggleRowHtml({
+        control: 'switch',
         label: t("settings.documentStorageEnabled"),
         attrs: { id: "document-storage-enabled", name: "enabled" },
       })}

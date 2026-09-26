@@ -231,8 +231,14 @@
   color: var(--color-accent);
 }
 
+/* EINE Spalte, die schrumpfen darf. Ohne `minmax(0, 1fr)` war die Spalte
+ * implizit `auto` und so breit wie das laengste Wort: die Sync-Links massen
+ * 226px im 196px-Traeger, und `overflow: hidden` am Panel schnitt
+ * „Kontakt-Synchronisatio" und „Dokumentenmanageme" ab (Critique A7). Das
+ * Silbentrennen uebernimmt der Link darunter. */
 .settings-shell__navigation-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-1);
   margin: 0;
   padding: 0;
@@ -242,6 +248,9 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  hyphens: auto;
   min-height: var(--target-md);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
@@ -1554,52 +1563,26 @@
    in components.js dynamisch zusammengesetzt und bleiben. */
 
 /* --------------------------------------------------------
-   Theme-Toggle
+   Segment in einer Einstellungskarte (Theme, Wochenstart)
+
+   Das Segment der Shell (.segmented, panel.css) - Well, erhabene Pille, Ton
+   nur in der Tinte. Bis 2026-09-26 stand hier ein eigenes `.theme-toggle`:
+   drei getrennte Rahmenknoepfe mit 8px Abstand und transparentem Grund, also
+   keine Leiste, sondern drei Knoepfe (Critique A7, Komponenten-Kanon). Hier
+   steht nur noch die Geometrie: die Leiste nimmt die Kartenbreite bis zu
+   einer lesbaren Grenze, die Segmente teilen sie gleich, wie in Apples
+   Einstellungen.
    -------------------------------------------------------- */
 
-.theme-toggle {
+.settings-segmented {
   display: flex;
-  gap: var(--space-2);
+  width: 100%;
+  max-width: 32rem;
 }
 
-.theme-toggle__btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-sm);
-  border: 1.5px solid var(--color-border);
-  background: transparent;
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  min-height: 44px;
-}
-
-.theme-toggle__btn:hover {
-  border-color: var(--color-text-secondary);
-  color: var(--color-text-primary);
-}
-
-/* Hell / Dunkel / System ist ein Segment, kein Chip: aktiv = erhabene
- * Surface-Pille, Modulton nur in der Tinte (tokens.css, Abschnitt 6c). Die
- * Kante bleibt und nimmt den Ton auf, damit die drei Knöpfe eine Leiste
- * bleiben und die Pille sich trotzdem vom Nachbarn absetzt. */
-.theme-toggle__btn--active,
-.theme-toggle__btn--active:hover {
-  background: var(--seg-active-bg);
-  box-shadow: var(--seg-active-shadow);
-  border-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-hint), var(--color-border));
-  color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
-}
-
-.theme-toggle__btn:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: var(--focus-ring-offset);
+.settings-segmented .segmented__item {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 /* --------------------------------------------------------
@@ -1868,6 +1851,15 @@
 
 .settings-webdav-toggle-row .form-label {
   margin: 0;
+}
+
+/* Die Schalterzeile fuellt ihren Traeger: Label links, Schalter an der
+ * rechten Kante wie jede andere Einstellung (toggleRowHtml, control:
+ * 'switch'). Als einzelnes Flex-Kind war sie nur so breit wie ihr Text, und
+ * der Schalter klebte am Label. */
+.settings-webdav-toggle-row > .toggle-row {
+  flex: 1;
+  min-width: 0;
 }
 
 /* Password-Eingabe mit Reveal-Button nebeneinander */
@@ -2448,6 +2440,16 @@
   container-type: inline-size;
 }
 
+/* Auf `Aktive Module` tragen die Kinder Schalter am Zeilenende (2026-09-26).
+ * Die Kuechenzeile hat dort keine eigene Schalterspalte (sie IST ihre vier
+ * Kinder): der Aufklapper nimmt deren leere Spur samt Rasterluecke mit und
+ * laesst sein rechtes Polster fallen, damit die Kind-Schalter an derselben
+ * Kante enden wie die Schalter der Nachbarzeilen statt 28px davor. */
+.settings-module-row--fixed .settings-module-kitchen__children {
+  padding-inline-end: 0;
+  margin-inline-end: calc(-1 * var(--space-3));
+}
+
 @container (max-width: 260px) {
   .settings-module-kitchen__child-row {
     flex-wrap: wrap;
@@ -2547,17 +2549,9 @@
   font-weight: var(--font-weight-semibold);
 }
 
-/* Der Kontext-Selektor ist kein Zierrat: `.settings-module-row__title span`
-   (0,1,1) schlug die Badge-Modifier (0,1,0), also waren beide Badges grau
-   statt grün und violett - der Statuskanal der Modulliste war farblos, und
-   der gemessene Kontrast lag bei 4,41:1 (Critique 2026-07-27).
-   `--color-success-hover` ist die dunklere Stufe derselben Farbe; auf dem
-   eigenen 14%-Grund ergibt sie 5,90:1, das ungedimmte Grün nur 4,15:1. */
-.settings-module-row__title .settings-module-status--enabled {
-  color: var(--color-success-hover);
-  background: color-mix(in srgb, var(--color-success) var(--tint-surface), transparent);
-}
-
+/* Ein gruenes „Aktiviert" gibt es nicht mehr: das Statuswort steht nur fuer die
+   Abweichung (aus, Fehler, nicht im Menue), der Schalter sagt „an" allein
+   (Komponenten-Kanon 2026-09-26, modules-active.js statusChipHtml). */
 .settings-module-status--disabled {
   color: var(--color-text-secondary);
   background: var(--color-surface);
@@ -2653,15 +2647,6 @@
      Schalter. Eine Regel ohne Traeger ist keine Zusicherung, sondern eine
      Notiz; deshalb steht hier die Notiz und nicht die Regel. */
 
-  /* Der "Aktiviert"-Chip verschwindet hier, weil der Schalter daneben dasselbe
-     sagt. `--disabled` bleibt seit 2026-08-16 STEHEN: auf dem Navigationsblatt
-     gibt es keinen Schalter mehr, der ihn wiederholen koennte, und er ist die
-     einzige Begruendung fuer den gesperrten Ausblenden-Knopf - ohne ihn sah ein
-     Mitglied am Telefon ein totes Auge bei 1,68:1 und null Text. */
-  .settings-module-row--sortable .settings-module-status--enabled {
-    display: none;
-  }
-
   /* Die Kuechenzeile spannte ihren Text hier ueber die Steuerspalten, damit das
      aufgeklappte Feld die volle Breite bekommt - der Gruppen-Knopf lag dadurch
      44px DARAUF, und in der Ausweichposition neben den Pfeilen las er sich als
@@ -2688,8 +2673,12 @@
 
   /* Das aufgeklappte Feld darf die Knopfspalte mitbenutzen: sein Text endet
      sonst nach 118px und die vier Kind-Knoepfe schrumpfen auf 19-24px, also
-     unter jedes Beruehrungsziel. Der Ausbruch ist genau eine Spalte breit. */
-  .settings-module-kitchen__children {
+     unter jedes Beruehrungsziel. Der Ausbruch ist genau eine Spalte breit.
+     NUR auf dem Navigationsblatt (`--kitchen`): auf `Aktive Module` hat die
+     Kuechenzeile keine Knopfspalte, und seit die Kinder Schalter am
+     Zeilenende tragen (2026-09-26), schob der Ausbruch sie 44px ueber den
+     Kartenrand hinaus. */
+  .settings-module-row--kitchen .settings-module-kitchen__children {
     margin-inline-end: calc(-1 * (var(--target-base) + var(--space-3)));
   }
 }

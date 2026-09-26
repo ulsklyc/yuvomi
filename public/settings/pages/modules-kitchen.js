@@ -88,6 +88,7 @@ function renderPage(container, preferences) {
         <p class="form-hint">${t('settings.mealTypesHint')}</p>
         <div class="meal-type-toggles" id="meal-type-toggles">
           ${MEAL_TYPES.map((mealType) => toggleRowHtml({
+            control: 'switch',
             label: builtInMealTypeLabel(mealType),
             checked: visibleMealTypes.includes(mealType),
             attrs: { value: mealType },
@@ -235,8 +236,8 @@ function openProviderLinkModal(account, refresh) {
           <input class="form-input" type="url" id="recipe-provider-link-external-url" placeholder="https://cook.example.com" value="${esc(account.externalUrl ?? '')}" />
         </div>
         <div id="recipe-provider-link-error" class="form-error" role="alert" hidden></div>
-        <div class="modal-actions">
-          <button type="button" class="btn btn--ghost" id="recipe-provider-link-cancel">${t('common.cancel')}</button>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="button" class="btn btn--secondary" id="recipe-provider-link-cancel">${t('common.cancel')}</button>
           <button type="submit" class="btn btn--primary">${t('common.save')}</button>
         </div>
       </form>
@@ -335,8 +336,8 @@ function bindProviderAddButton(container) {
             <small class="form-hint" id="recipe-provider-token-hint">${t('settings.recipeProviderTokenHintMealie')}</small>
           </div>
           <div id="recipe-provider-add-error" class="form-error" role="alert" hidden></div>
-          <div class="modal-actions">
-            <button type="button" class="btn btn--ghost" id="recipe-provider-add-cancel">${t('common.cancel')}</button>
+          <div class="modal-panel__footer modal-panel__footer--plain">
+            <button type="button" class="btn btn--secondary" id="recipe-provider-add-cancel">${t('common.cancel')}</button>
             <button type="submit" class="btn btn--primary">${t('common.save')}</button>
           </div>
         </form>

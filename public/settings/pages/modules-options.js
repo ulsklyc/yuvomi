@@ -68,6 +68,7 @@ function renderPage(container, preferences) {
         <h3 class="settings-card__title">${t('settings.budgetModeTitle')}</h3>
         <p class="form-hint">${t('settings.budgetModeHint')}</p>
         ${toggleRowHtml({
+          control: 'switch',
           label: t('settings.budgetModePersonalLabel'),
           checked: checked.get('budget-mode-personal'),
           attrs: { id: 'budget-mode-personal' },
@@ -85,6 +86,7 @@ function renderPage(container, preferences) {
         <h3 class="settings-card__title">${t('health.tabs.cycle')}</h3>
         <p class="form-hint">${t('settings.healthCycleHint')}</p>
         ${toggleRowHtml({
+          control: 'switch',
           label: t('settings.healthCycleEnableLabel'),
           checked: checked.get('health-cycle-enabled'),
           attrs: { id: 'health-cycle-enabled' },
@@ -98,6 +100,7 @@ function renderPage(container, preferences) {
         <h3 class="settings-card__title">${t('settings.housekeepingPaymentsTitle')}</h3>
         <p class="form-hint">${t('settings.housekeepingPaymentTasksHint')}</p>
         ${toggleRowHtml({
+          control: 'switch',
           label: t('settings.housekeepingPaymentTasksLabel'),
           checked: checked.get('housekeeping-payment-tasks'),
           attrs: { id: 'housekeeping-payment-tasks' },
@@ -111,6 +114,7 @@ function renderPage(container, preferences) {
         <h3 class="settings-card__title">${t('settings.tasksSubtasksExpandedTitle')}</h3>
         <p class="form-hint">${t('settings.tasksSubtasksExpandedHint')}</p>
         ${toggleRowHtml({
+          control: 'switch',
           label: t('settings.tasksSubtasksExpandedLabel'),
           checked: checked.get('tasks-subtasks-expanded'),
           attrs: { id: 'tasks-subtasks-expanded' },
@@ -124,6 +128,7 @@ function renderPage(container, preferences) {
         <h3 class="settings-card__title">${t('settings.scheduleTemplatesTitle')}</h3>
         <p class="form-hint">${t('settings.scheduleTemplatesHint')}</p>
         ${SCHEDULE_TEMPLATES.map(([key, labelKey]) => toggleRowHtml({
+          control: 'switch',
           label: t(labelKey),
           checked: !(preferences.schedule_hidden_templates ?? []).includes(key),
           attrs: { id: `schedule-template-${key}`, 'data-template': key },

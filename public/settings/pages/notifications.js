@@ -83,13 +83,12 @@ function renderPage(container, user) {
           <p class="form-hint">${t('settings.pushDeviceDescription')}</p>
           <p class="form-hint" id="push-ios-hint" hidden>${t('settings.pushIosHomescreenHint')}</p>
           <p class="form-hint" id="push-status" aria-live="polite">${t('settings.pushChecking')}</p>
-          <div class="settings-form-actions">
-            ${toggleRowHtml({
-              label: t('settings.pushToggleLabel'),
-              disabled: true,
-              attrs: { id: 'push-toggle' },
-            })}
-          </div>
+          ${toggleRowHtml({
+            control: 'switch',
+            label: t('settings.pushToggleLabel'),
+            disabled: true,
+            attrs: { id: 'push-toggle' },
+          })}
           <div class="settings-form-actions">
             <button type="button" class="btn btn--secondary" id="push-test-btn" disabled>
               <i data-lucide="bell-ring" aria-hidden="true"></i>
@@ -178,6 +177,7 @@ function renderChannelList(container, channels, providers = DEFAULT_PROVIDERS) {
           <input class="form-input" id="notification-name-${suffix}" name="name" value="${esc(channel.name)}" required>
         </div>
         ${toggleRowHtml({
+          control: 'switch',
           label: t('settings.notificationChannelEnabled'),
           checked: !!channel.enabled,
           attrs: { name: 'enabled' },

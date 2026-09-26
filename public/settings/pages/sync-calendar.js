@@ -274,7 +274,7 @@ function pickMovedCandidates({ count, moved, total, offset, next }) {
               </label>` : ''}
             <div class="backfill-moved__list">${rows}</div>
           </fieldset>
-          <div class="modal-actions">
+          <div class="modal-panel__footer modal-panel__footer--plain">
             <button type="button" class="btn btn--secondary" id="backfill-review-cancel">${esc(t('common.cancel'))}</button>
             ${next ? `<button type="button" class="btn btn--secondary" id="backfill-review-next">${esc(t('settings.sync.backfillMovedNext'))}</button>` : ''}
             <button type="submit" class="btn btn--primary" id="backfill-review-ok">${esc(t('settings.sync.backfillConfirm'))}</button>
@@ -708,8 +708,8 @@ function bindCalDAVAddButton(container, user) {
             <small class="form-hint">${t('settings.caldavPasswordHint')}</small>
           </div>
           <div id="caldav-add-error" class="form-error" role="alert" hidden></div>
-          <div class="modal-actions">
-            <button type="button" class="btn btn--ghost" id="caldav-add-cancel">${t('common.cancel')}</button>
+          <div class="modal-panel__footer modal-panel__footer--plain">
+            <button type="button" class="btn btn--secondary" id="caldav-add-cancel">${t('common.cancel')}</button>
             <button type="submit" class="btn btn--primary">${t('common.save')}</button>
           </div>
         </form>
@@ -1073,6 +1073,7 @@ function buildGoogleReadonlyToggle(googleStatus) {
   group.className = 'form-group';
 
   const row = createToggleRow({
+    control: 'switch',
     label: t('settings.googleReadonly'),
     checked: Boolean(googleStatus.readonly),
   });

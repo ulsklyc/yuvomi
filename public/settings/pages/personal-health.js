@@ -85,6 +85,7 @@ function renderPage(container, preferences, defaults) {
       <div class="settings-card">
         <p class="settings-card-description">${t('settings.healthCyclePersonalHint')}</p>
         ${toggleRowHtml({
+          control: 'switch',
           label: t('settings.healthCyclePersonalLabel'),
           checked: personalEnabled,
           disabled: !householdEnabled,
@@ -98,6 +99,7 @@ function renderPage(container, preferences, defaults) {
       <div class="settings-card">
         <p class="settings-card-description">${t('settings.healthPreventionNotifyCaregiversHint')}</p>
         ${toggleRowHtml({
+          control: 'switch',
           label: t('settings.healthPreventionNotifyCaregiversLabel'),
           checked: preferences.health_prevention_notify_caregivers === true,
           attrs: { id: 'health-prevention-notify-caregivers' },

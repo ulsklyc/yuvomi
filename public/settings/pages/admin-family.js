@@ -209,6 +209,7 @@ function renderPage(container) {
           </div>
           ${ssoAvailable ? `
           ${toggleRowHtml({
+            control: 'switch',
             label: t('settings.memberSsoOnlyLabel'),
             attrs: { id: 'new-member-sso-only' },
           })}
@@ -240,6 +241,7 @@ function renderPage(container) {
             <p class="form-hint">${t('settings.memberContactBirthdayHint')}</p>
           </div>
           ${toggleRowHtml({
+            control: 'switch',
             label: t('settings.systemAdminLabel'),
             attrs: { id: 'new-system-admin' },
           })}
@@ -256,6 +258,7 @@ function renderPage(container) {
         <h3 class="settings-card__title">${t('settings.twoFactorTitle')}</h3>
         <p class="form-hint">${t('settings.twoFactorHouseholdHint')}</p>
         ${toggleRowHtml({
+          control: 'switch',
           label: t('settings.twoFactorRequireLabel'),
           attrs: { id: 'two-factor-require' },
           disabled: true,
@@ -302,10 +305,12 @@ function renderPage(container) {
             <input class="form-input" type="email" id="invite-email" autocomplete="email" />
           </div>
           ${toggleRowHtml({
+            control: 'switch',
             label: t('settings.invites.sendEmail'),
             attrs: { id: 'invite-send-email' },
           })}
           ${toggleRowHtml({
+            control: 'switch',
             label: t('settings.systemAdminLabel'),
             attrs: { id: 'invite-system-admin' },
           })}
@@ -719,6 +724,7 @@ async function openEditMemberModal(member, currentUser, users, container) {
         </div>
         ${ssoAvailable ? `
         ${toggleRowHtml({
+          control: 'switch',
           label: t('settings.memberSsoOnlyLabel'),
           checked: member.sso_only === true,
           attrs: { id: 'edit-member-sso-only' },
@@ -731,6 +737,7 @@ async function openEditMemberModal(member, currentUser, users, container) {
           <p class="form-hint">${t('settings.resetPasswordHint')}</p>
         </div>
         ${toggleRowHtml({
+          control: 'switch',
           label: t('settings.systemAdminLabel'),
           checked: member.role === 'admin',
           attrs: { id: 'edit-member-system-admin' },

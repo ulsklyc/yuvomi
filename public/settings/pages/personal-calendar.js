@@ -118,6 +118,7 @@ function renderPage(container, preferences, syncTargets = null) {
 
         <div class="form-group">
           ${toggleRowHtml({
+            control: 'switch',
             label: t('settings.calendarAssignMeLabel'),
             checked: assignMe,
             attrs: { id: 'calendar-default-assign-me' },

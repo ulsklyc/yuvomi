@@ -88,14 +88,12 @@ function renderPage(container) {
       </div>
 
       <div class="settings-card" id="backup-webdav-card">
-        <h3 class="settings-card__title">
-          <i data-lucide="cloud-upload" class="icon-sm" aria-hidden="true"></i>
-          ${t('settings.backupWebdavTitle')}
-        </h3>
+        <h3 class="settings-card__title">${t('settings.backupWebdavTitle')}</h3>
         <p class="form-hint">${t('settings.backupWebdavHint')}</p>
         <form class="settings-form settings-webdav-form" id="backup-webdav-form" novalidate>
           <div class="settings-webdav-toggle-row">
             ${toggleRowHtml({
+              control: 'switch',
               label: t('settings.backupWebdavEnabled'),
               attrs: { id: 'webdav-enabled', name: 'enabled' },
             })}

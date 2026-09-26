@@ -22,6 +22,7 @@ function renderPage(container, preferences) {
         <h2 class="settings-card__title">${t('settings.rewardsEnableTitle')}</h2>
         <p class="form-hint">${t('settings.rewardsEnableHint')}</p>
         ${toggleRowHtml({
+          control: 'switch',
           label: t('settings.rewardsEnableLabel'),
           checked: isRewardsEnabled(preferences),
           attrs: { id: 'rewards-enabled' },
@@ -31,6 +32,7 @@ function renderPage(container, preferences) {
         <h2 class="settings-card__title">${t('settings.rewardsApprovalTitle')}</h2>
         <p class="form-hint">${t('settings.rewardsApprovalHint')}</p>
         ${toggleRowHtml({
+          control: 'switch',
           label: t('settings.rewardsApprovalLabel'),
           checked: preferences.rewards_require_approval !== false,
           attrs: { id: 'rewards-require-approval' },

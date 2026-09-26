@@ -107,6 +107,7 @@ function renderFeedExportActive(body, data) {
     </div>
     <div class="form-group">
       ${toggleRowHtml({
+        control: 'switch',
         label: t('settings.feedExportShowAssignees'),
         checked: !!data.showAssignees,
         attrs: { id: 'feed-show-assignees', 'aria-describedby': 'feed-show-assignees-hint' },
@@ -499,6 +500,7 @@ function renderWasteFeedInactive(body) {
 
 function wasteFeedTypeRowsHtml(types, selectedIds) {
   return types.map((type) => toggleRowHtml({
+    control: 'switch',
     label: type.name,
     checked: selectedIds === null || selectedIds.includes(type.id),
     swatchColor: type.color,

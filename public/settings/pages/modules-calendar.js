@@ -3,6 +3,7 @@ import { formatDate, formatTime, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { weekStartIndex, weekdayOrder } from '/utils/date.js';
 import { toggleRowHtml } from '/settings/components.js';
+import { wireTablist } from '/utils/tablist.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
 
 // Wochenstart-Optionen; Labels aus dem bestehenden Kalender-i18n (kein neuer
@@ -86,12 +87,17 @@ function renderPage(container, preferences) {
         <h3 class="settings-card__title">${t('settings.weekStartTitle')}</h3>
         <p class="settings-card-description">${t('settings.weekStartDescription')}</p>
 
-        <div class="theme-toggle" id="week-start-toggle" role="group" aria-label="${t('settings.weekStartTitle')}">
-          ${WEEK_START_OPTIONS.map((o) => `
-            <button type="button" class="theme-toggle__btn ${o.value === currentWeekStart ? 'theme-toggle__btn--active' : ''}"
-              data-week-start="${o.value}" aria-pressed="${o.value === currentWeekStart}">
+        <!-- Das Segment der Shell (.segmented, panel.css), wie das Theme -
+             genau einer von drei Werten gilt. -->
+        <div class="segmented settings-segmented" id="week-start-toggle" role="radiogroup" aria-label="${t('settings.weekStartTitle')}">
+          ${WEEK_START_OPTIONS.map((o) => {
+            const on = o.value === currentWeekStart;
+            return `
+            <button type="button" class="segmented__item${on ? ' is-active' : ''}" role="radio"
+              data-tab-id="${o.value}" aria-checked="${on}" tabindex="${on ? '0' : '-1'}">
               ${t(o.labelKey)}
-            </button>`).join('')}
+            </button>`;
+          }).join('')}
         </div>
 
         <div class="week-start-preview" id="week-start-preview" aria-hidden="true">
@@ -131,6 +137,7 @@ function renderPage(container, preferences) {
           </div>
           <div class="form-group">
             ${toggleRowHtml({
+              control: 'switch',
               label: t('settings.holidayPublicLabel'),
               checked: !!preferences.holiday_show_public,
               attrs: { id: 'holiday-show-public' },
@@ -143,6 +150,7 @@ function renderPage(container, preferences) {
           </div>
           <div class="form-group">
             ${toggleRowHtml({
+              control: 'switch',
               label: t('settings.holidaySchoolLabel'),
               checked: !!preferences.holiday_show_school,
               attrs: { id: 'holiday-show-school' },
@@ -494,38 +502,38 @@ function bindWeekStart(container, preferences) {
     ? preferences.week_start
     : 'monday';
 
-  const paint = (value) => {
-    toggle.querySelectorAll('.theme-toggle__btn').forEach((btn) => {
-      const active = btn.dataset.weekStart === value;
-      btn.classList.toggle('theme-toggle__btn--active', active);
-      btn.setAttribute('aria-pressed', String(active));
-    });
-    if (preview) {
-      preview.replaceChildren();
-      preview.insertAdjacentHTML('beforeend', weekStartPreviewHtml(value));
-    }
+  const paintPreview = (value) => {
+    if (!preview) return;
+    preview.replaceChildren();
+    preview.insertAdjacentHTML('beforeend', weekStartPreviewHtml(value));
   };
 
-  toggle.addEventListener('click', async (event) => {
-    const button = event.target.closest('[data-week-start]');
-    if (!button) return;
-    const value = button.dataset.weekStart;
-    if (value === current || !VALID_WEEK_STARTS.includes(value)) return;
-
-    const previous = current;
-    current = value;
-    paint(value); // optimistisch – Klick fühlt sich sofort an
-    try {
-      await savePreferences({ week_start: value });
-      // Parität zu date-format-changed/time-format-changed: erlaubt offenen
-      // Ansichten, den Wochenstart ohne Neuladen zu übernehmen.
-      window.dispatchEvent(new CustomEvent('week-start-changed', { detail: { weekStart: value } }));
-      window.yuvomi?.showToast(t('settings.weekStartSaved'), 'success');
-    } catch (error) {
-      current = previous;
-      paint(previous); // Rollback bei Fehler
-      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
-    }
+  // Rollback per setActive() ruft onChange erneut auf - dieser Merker haelt
+  // den zweiten Aufruf davon ab, den alten Wert gleich wieder zu speichern.
+  let reverting = false;
+  const tablist = wireTablist(toggle, {
+    activeId: current,
+    activeClass: 'is-active',
+    mode: 'select',
+    onChange: async (value) => {
+      paintPreview(value); // optimistisch – Klick fühlt sich sofort an
+      if (reverting || value === current || !VALID_WEEK_STARTS.includes(value)) return;
+      const previous = current;
+      current = value;
+      try {
+        await savePreferences({ week_start: value });
+        // Parität zu date-format-changed/time-format-changed: erlaubt offenen
+        // Ansichten, den Wochenstart ohne Neuladen zu übernehmen.
+        window.dispatchEvent(new CustomEvent('week-start-changed', { detail: { weekStart: value } }));
+        window.yuvomi?.showToast(t('settings.weekStartSaved'), 'success');
+      } catch (error) {
+        current = previous;
+        reverting = true;
+        tablist.setActive(previous); // Rollback bei Fehler
+        reverting = false;
+        window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+      }
+    },
   });
 }
 

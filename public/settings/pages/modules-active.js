@@ -92,16 +92,23 @@ function buildRows(preferences, thirdPartyModules) {
   return rows;
 }
 
+/**
+ * Das Statuswort einer Modulzeile - nur fuer die ABWEICHUNG (Komponenten-Kanon,
+ * 2026-09-26). Bis dahin trug jede eingeschaltete Zeile ein gruenes
+ * „Aktiviert" neben ihrem gehakten Schalter: vierzehnmal dieselbe Aussage in
+ * zwei Formen, und die eine Zeile, die anders war, ging darin unter. Der
+ * Schalter sagt „an"; ein Wort steht nur, wo er etwas nicht sagt - ein
+ * abgeschaltetes Modul (der Schalter allein ist mobil ein kleiner grauer
+ * Strich), ein Fehler oder ein Drittmodul, das an ist, aber nicht im Menue.
+ */
 function statusChipHtml(row) {
   if (row.type === 'third-party') {
-    const cls = row.hasError
-      ? 'settings-module-status--error'
-      : row.enabled ? 'settings-module-status--enabled' : 'settings-module-status--disabled';
-    return `<span class="settings-module-status ${cls}">${esc(row.status)}</span>`;
+    if (row.hasError) return `<span class="settings-module-status settings-module-status--error">${esc(row.status)}</span>`;
+    if (row.enabled && row.status === t('settings.thirdPartyModulesStatusEnabled')) return '';
+    return `<span class="settings-module-status settings-module-status--disabled">${esc(row.status)}</span>`;
   }
-  const label = row.enabled ? t('settings.thirdPartyModulesStatusEnabled') : t('settings.thirdPartyModulesStatusDisabled');
-  const cls = row.enabled ? 'settings-module-status--enabled' : 'settings-module-status--disabled';
-  return `<span class="settings-module-status ${cls}">${esc(label)}</span>`;
+  if (row.enabled) return '';
+  return `<span class="settings-module-status settings-module-status--disabled">${esc(t('settings.thirdPartyModulesStatusDisabled'))}</span>`;
 }
 
 function rowHtml(row) {
@@ -127,6 +134,7 @@ function rowHtml(row) {
     </button>
     <div class="settings-disclosure__panel settings-module-kitchen__children" data-kitchen-children hidden>
       ${row.children.map((child) => toggleRowHtml({
+    control: 'switch',
     label: child.label,
     checked: child.enabled,
     className: 'settings-module-kitchen__child',
@@ -150,6 +158,7 @@ function rowHtml(row) {
         ${kitchenPanel}
       </div>
       ${row.type === 'kitchen' ? '' : toggleRowHtml({
+    control: 'switch',
     label: t('settings.modulesEnableForHousehold', { module: row.label }),
     checked: row.enabled,
     disabled: row.toggleDisabled,

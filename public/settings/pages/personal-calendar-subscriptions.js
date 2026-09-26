@@ -27,6 +27,7 @@ import { esc } from '/utils/html.js';
 import { closeModal, confirmModal, openModal, refocusAfterRender } from '/components/modal.js';
 import { toggleRowHtml } from '/settings/components.js';
 import { loadFamilyUsers } from '/settings/family-users.js';
+import { rowActionEl } from '/utils/row-action.js';
 
 function formatSyncTime(value) {
   if (!value) return null;
@@ -75,6 +76,7 @@ function renderPage(container) {
             </div>
             <div class="form-group">
               ${toggleRowHtml({
+                control: 'switch',
                 label: t('settings.ics.form.shared'),
                 attrs: { id: 'ics-shared' },
               })}
@@ -186,19 +188,14 @@ function renderIcsList(container, subs, user) {
 }
 
 function buildIcsActions(container, sub, subs, user) {
+  // Zeilenaktionen der Shell (Komponenten-Kanon 2026-09-26): `.row-action`,
+  // Loeschen `--danger`, und jeder Name nennt das Abo - drei Abos mit drei
+  // Knoepfen hiessen vorher neunmal „Bearbeiten"/„Loeschen"/„Synchronisieren".
   const actions = document.createElement('div');
-  actions.className = 'cat-row__actions';
+  actions.className = 'cat-row__actions row-actions';
+  const name = sub.name;
 
-  const syncBtn = document.createElement('button');
-  syncBtn.type = 'button';
-  syncBtn.className = 'btn btn--icon btn--ghost';
-  syncBtn.title = t('settings.ics.actions.sync');
-  syncBtn.setAttribute('aria-label', t('settings.ics.actions.sync'));
-  const syncIcon = document.createElement('i');
-  syncIcon.setAttribute('data-lucide', 'refresh-cw');
-  syncIcon.className = 'icon-md';
-  syncIcon.setAttribute('aria-hidden', 'true');
-  syncBtn.appendChild(syncIcon);
+  const syncBtn = rowActionEl({ icon: 'refresh-cw', label: t('settings.ics.actions.syncNamed', { name }) });
   syncBtn.addEventListener('click', async () => {
     syncBtn.disabled = true;
     try {
@@ -214,29 +211,14 @@ function buildIcsActions(container, sub, subs, user) {
   });
   actions.appendChild(syncBtn);
 
-  const editBtn = document.createElement('button');
-  editBtn.type = 'button';
-  editBtn.className = 'btn btn--icon btn--ghost';
-  editBtn.title = t('settings.ics.actions.edit');
-  editBtn.setAttribute('aria-label', t('settings.ics.actions.edit'));
-  const editIcon = document.createElement('i');
-  editIcon.setAttribute('data-lucide', 'pencil');
-  editIcon.className = 'icon-sm';
-  editIcon.setAttribute('aria-hidden', 'true');
-  editBtn.appendChild(editIcon);
-  editBtn.addEventListener('click', () => openIcsEditModal(container, sub, subs, user));
+  const editBtn = rowActionEl({
+    icon: 'pencil',
+    label: t('common.editNamed', { name }),
+    onClick: () => openIcsEditModal(container, sub, subs, user),
+  });
   actions.appendChild(editBtn);
 
-  const delBtn = document.createElement('button');
-  delBtn.type = 'button';
-  delBtn.className = 'btn btn--icon btn--danger-outline';
-  delBtn.title = t('settings.ics.actions.delete');
-  delBtn.setAttribute('aria-label', t('settings.ics.actions.delete'));
-  const delIcon = document.createElement('i');
-  delIcon.setAttribute('data-lucide', 'trash-2');
-  delIcon.className = 'icon-sm';
-  delIcon.setAttribute('aria-hidden', 'true');
-  delBtn.appendChild(delIcon);
+  const delBtn = rowActionEl({ icon: 'trash-2', tone: 'danger', label: t('common.deleteNamed', { name }) });
   delBtn.addEventListener('click', async () => {
     if (!await confirmModal(t('settings.ics.confirm_delete'), {
       danger: true,
@@ -276,6 +258,7 @@ function openIcsEditModal(container, sub, subs, user) {
           </div>
           <div class="form-group settings-color-field">
             ${toggleRowHtml({
+              control: 'switch',
               label: t('settings.ics.form.shared'),
               checked: !!sub.shared,
               attrs: { id: 'ics-edit-shared' },

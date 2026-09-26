@@ -279,9 +279,10 @@ function kitchenRowHtml(row) {
 }
 
 function thirdPartyRowHtml(row) {
-  const statusClass = row.hasError
-    ? 'settings-module-status--error'
-    : row.enabled ? 'settings-module-status--enabled' : 'settings-module-status--disabled';
+  // Statuswort nur fuer die Abweichung, wie auf `modules-active` (Kanon
+  // 2026-09-26): ein laufendes Drittmodul braucht kein gruenes „Aktiviert".
+  const statusClass = row.hasError ? 'settings-module-status--error' : 'settings-module-status--disabled';
+  const showStatus = row.hasError || !row.enabled || row.status !== t('settings.thirdPartyModulesStatusEnabled');
   const stateClass = row.enabled ? 'settings-module-row--enabled' : 'settings-module-row--disabled';
   const errorClass = row.hasError ? ' settings-module-row--error' : '';
   return `
@@ -294,7 +295,7 @@ function thirdPartyRowHtml(row) {
         <div class="settings-module-row__title">
           <strong>${esc(row.label)}</strong>
           <span class="settings-module-origin">${esc(t('settings.modulesExternalBadge'))}</span>
-          <span class="settings-module-status ${statusClass}">${esc(row.status)}</span>
+          ${showStatus ? `<span class="settings-module-status ${statusClass}">${esc(row.status)}</span>` : ''}
         </div>
         ${row.error ? `<p class="form-error" role="alert">${esc(row.error)}</p>` : ''}
       </div>
