@@ -18534,7 +18534,10 @@ test('die Achsenschrift einer CHART-Flaeche skaliert nicht mit dem Diagramm', ()
   assert.match(body(':root'), new RegExp(`--chart-inset:\\s*max\\(0px,\\s*calc\\(\\(var\\(--space-\\d+\\)\\s*\\*\\s*${W}\\s*-\\s*100%\\s*\\*\\s*${PAD_L}\\)\\s*/\\s*${W - PAD_L}\\)\\)`),
     `--chart-inset muss (G * ${W} - 100% * ${PAD_L}) / ${W - PAD_L} rechnen`);
   const svgChart = body('svg.chart');
-  assert.match(svgChart, /padding-inline-start:\s*var\(--chart-inset\)/);
+  // PHYSISCH links, nicht inline-start: die SVG-Geometrie legt die Y-Achse bei PAD_L an die physische
+  // linke Kante, und die Budget-Punkte rechnen `left` - unter RTL laege ein logisches Polster rechts.
+  assert.match(svgChart, /padding-left:\s*var\(--chart-inset\)/, 'das Polster gehoert physisch nach links (Y-Achse bei PAD_L)');
+  assert.doesNotMatch(svgChart, /padding-inline-start/, 'kein logisches Polster: unter RTL laege es rechts');
   assert.match(svgChart, /width:\s*calc\(100%\s*-\s*var\(--chart-inset\)\)/);
   assert.match(svgChart, /box-sizing:\s*content-box/, 'aspect-ratio muss die Zeichenflaeche meinen, nicht das Polster');
   assert.match(svgChart, /overflow:\s*visible/, 'ein SVG clippt an seiner Content-Box - die Werte muessen ins Polster ragen duerfen');

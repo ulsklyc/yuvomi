@@ -618,7 +618,9 @@
 svg.chart {
   box-sizing: content-box;
   width: calc(100% - var(--chart-inset));
-  padding-inline-start: var(--chart-inset);
+  /* Physisch links, auch unter RTL: die Geometrie (CHART.PAD_L) legt die Y-Achse an die physische linke
+   * Kante, und die Budget-Punkte rechnen mit `left` - ein logisches Polster laege bei ar/fa rechts. */
+  padding-left: var(--chart-inset);
   /* Ein SVG clippt an seiner Content-Box - ohne `visible` bliebe das Polster
    * leer und die Werte waeren weiter angeschnitten. */
   overflow: visible;
