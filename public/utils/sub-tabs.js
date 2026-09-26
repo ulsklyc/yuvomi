@@ -186,9 +186,12 @@ export function renderSubTabs(anchorEl, {
     bar.querySelector('.sub-tab--active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
   };
 
-  const activateTab = (tabId, { focus = false } = {}) => {
-    if (!tabId || tabId === current) return;
-
+  // Waehlt einen Tab OHNE onChange - fuer eine Leiste, die ueber einen
+  // Seitenwechsel stehen bleibt und vom Router erfaehrt, wo sie jetzt steht
+  // (selectSubTab, genutzt von der Kuechen-Leiste). Aendert auch `current`:
+  // wer nur die Klassen setzte, hielte hier einen alten Stand, und der naechste
+  // Klick auf genau diesen Tab verpuffte als „schon aktiv".
+  const markTab = (tabId, { focus = false } = {}) => {
     current = tabId;
 
     if (storageKey) {
@@ -209,9 +212,17 @@ export function renderSubTabs(anchorEl, {
     });
     scrollActiveIntoView();
     syncTabPanels(bar, current, panelFor);
+  };
 
+  const activateTab = (tabId, { focus = false } = {}) => {
+    if (!tabId || tabId === current) return;
+    markTab(tabId, { focus });
     onChange(current);
   };
+
+  selectors.set(bar, (tabId) => {
+    if (tabId && tabId !== current) markTab(tabId);
+  });
 
   bar.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-tab-id]');
@@ -265,6 +276,24 @@ export function renderSubTabs(anchorEl, {
   if (window.lucide) window.lucide.createIcons({ el: bar });
 
   return bar;
+}
+
+/** Auswahl je Leiste, ohne onChange - siehe markTab in renderSubTabs. */
+const selectors = new WeakMap();
+
+/**
+ * Setzt den aktiven Tab einer bestehenden Leiste, OHNE `onChange` auszuloesen.
+ *
+ * Fuer eine Leiste, die einen Seitenwechsel ueberlebt: die Kuechen-Leiste ist
+ * vorher und nachher derselbe Knoten (utils/kitchen-tabs.js), und kommt der
+ * Wechsel nicht von ihrem eigenen Klick (Browser-Zurueck, Bottom-Nav), muss
+ * sie nachziehen, ohne selbst noch einmal zu navigieren.
+ *
+ * @param {HTMLElement} bar
+ * @param {string}      tabId
+ */
+export function selectSubTab(bar, tabId) {
+  selectors.get(bar)?.(tabId);
 }
 
 /**

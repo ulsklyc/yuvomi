@@ -23,6 +23,7 @@ import { initPush, stopPush } from '/push.js';
 import { numberLocaleFor } from '/settings/region-presets.js';
 import { setDisplayTimeZone } from '/utils/timezone.js';
 import { isKitchenRoute, getLastKitchenRoute } from '/utils/kitchen-tabs.js';
+import { swapPage } from '/utils/view-transition.js';
 import { moduleAccentToken, moduleAccentVar } from '/utils/module-accent.js';
 import { getLastHealthRoute, HEALTH_ROUTES } from '/utils/health-tabs.js';
 import { SCHEDULE_ROUTES } from '/utils/schedule-tabs.js';
@@ -449,9 +450,6 @@ let _setupRequired = false;
 // Router
 // --------------------------------------------------------
 
-const ROUTE_ORDER = ['/', '/calendar', '/schedule', '/tasks', '/meals', '/recipes', '/shopping', '/pantry',
-                     '/birthdays', '/notes', '/contacts', '/budget', '/inventory', '/documents', '/housekeeping', '/waste', '/health', '/settings'];
-
 const MOBILE_FAVORITE_COUNT = 3;
 
 // Domänen-Gruppierung der Haupt-Navigation. Die Reihenfolge bestimmt die
@@ -472,11 +470,11 @@ const APP_VERSION_STORAGE_KEY = 'yuvomi-app-version';
 
 // Reduziert einen (Sub-)Pfad auf seine Top-Level-Sektion. /settings/* Blätter
 // teilen sich dadurch eine Sektion: ein Wechsel zwischen zwei Settings-Blättern
-// gilt als gleiche Sektion (keine seitliche Seitentransition).
+// gilt als gleiche Sektion (dasselbe aktive Nav-Ziel).
 function topLevelSection(path) {
   if (typeof path === 'string' && path.startsWith('/settings')) return '/settings';
-  // /health/* Sub-Tabs teilen sich eine Sektion (Soft-Nav zwischen Tabs, keine
-  // seitliche Seitentransition) — analog zu den Settings-Blättern.
+  // /health/* Sub-Tabs teilen sich eine Sektion (Soft-Nav zwischen Tabs, ein
+  // aktives Nav-Ziel) - analog zu den Settings-Blättern.
   if (typeof path === 'string' && path.startsWith('/health')) return '/health';
   // /schedule/* Sub-Tabs ebenso (S-10) — derselbe Grund wie bei /health.
   // Exaktes '/schedule' ODER '/schedule/...' (Review zu #1099): ein blosses
@@ -484,15 +482,6 @@ function topLevelSection(path) {
   // wie '/schedules...', der zu keinem echten Schedule-Tab gehoert.
   if (typeof path === 'string' && (path === '/schedule' || path.startsWith('/schedule/'))) return '/schedule';
   return path ?? '/';
-}
-
-function getDirection(fromPath, toPath) {
-  const fromSection = topLevelSection(fromPath ?? '/');
-  const toSection   = topLevelSection(toPath);
-  const fromIdx = ROUTE_ORDER.indexOf(fromSection);
-  const toIdx   = ROUTE_ORDER.indexOf(toSection);
-  if (fromIdx === -1 || toIdx === -1 || fromSection === toSection) return 'right';
-  return toIdx > fromIdx ? 'right' : 'left';
 }
 
 function getAppName() {
@@ -662,7 +651,7 @@ async function navigate(path, userOrPushState = true, pushState = true) {
       pushState = userOrPushState;
     }
 
-    // Alten Pfad merken, bevor currentPath aktualisiert wird - für Richtungsberechnung
+    // Alten Pfad merken, bevor currentPath aktualisiert wird - Kaltstart oder Wechsel
     const previousPath = currentPath;
     const basePath = path.split('?')[0];
     currentPath = basePath;
@@ -675,7 +664,7 @@ async function navigate(path, userOrPushState = true, pushState = true) {
       rememberScrollPosition(previousPath, document.getElementById('main-content')?.scrollTop ?? 0);
     }
     // Vorwärts heißt oben anfangen, Zurück/Vor heißt weitermachen. Details und
-    // die Begründung gegen getDirection() in utils/scroll-restore.js.
+    // die Begründung gegen eine Nav-Reihenfolge in utils/scroll-restore.js.
     const scrollTarget = scrollPositionFor(basePath, { restore: !pushState });
 
     // First-Run-Weiche: Solange kein Account existiert und niemand eingeloggt ist,
@@ -1458,7 +1447,7 @@ function buildMoreSheetBody() {
 /**
  * Lädt und rendert eine Seite dynamisch.
  * @param {{ path: string, page: string }} route
- * @param {string|null} previousPath - Pfad vor der Navigation (für Richtungsberechnung)
+ * @param {string|null} previousPath - Pfad vor der Navigation (null beim Kaltstart)
  * @param {number} scrollTarget - Scrollstand der Zielseite (0 vorwärts, gemerkt bei popstate)
  */
 async function renderPage(route, previousPath = null, scrollTarget = 0) {
@@ -1526,88 +1515,108 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
 
     const content = document.getElementById('main-content') || app;
 
-    // Richtung bestimmen (previousPath ist der alte Pfad vor der Navigation)
-    const direction = getDirection(previousPath, route.path);
-    const inClass   = direction === 'right' ? 'page-transition--in-right' : 'page-transition--in-left';
+    // Seitenwechsel (Critique 2026-09-26, P2-1): der Tausch laeuft als View
+    // Transition, wo der Browser sie kann - alter Inhalt blendet in den neuen,
+    // Navigation, Kopf und Kuechen-Leiste stehen (utils/view-transition.js).
+    // Beim Kaltstart gibt es nichts zu ueberblenden.
     const shouldAnimate = Boolean(previousPath);
 
     // Performance: backdrop-filter während Übergang deaktivieren (Android-Optimierung).
     // glass.css setzt alle backdrop-filter im app-content auf none solange diese Klasse aktiv ist.
     if (shouldAnimate) document.documentElement.classList.add('navigating');
 
-    // Alter Inhalt ist jetzt weg - altes Stylesheet kann entfernt werden
-    const pageWrapper = document.createElement('div');
-    pageWrapper.className = 'page-transition';
-    pageWrapper.style.opacity = '0';
-    content.replaceChildren(pageWrapper);
-    // Scrollport auf Anfang, solange er leer ist. `content` IST der Scrollport
-    // (#main-content == .app-content) und überlebt die Navigation; ohne diese
-    // Zeile öffnet die Zielseite auf dem Scrollstand der Vorseite.
-    //
-    // HIER, NICHT NACH DEM RENDER: Module scrollen beim Aufbau selbst - die
-    // Tagesansicht des Kalenders zur aktuellen Stunde, der Essensplan zum
-    // heutigen Tag. Ein Reset danach würde genau das wieder einkassieren. Die
-    // Wiederherstellung bei popstate darf und soll das dagegen überschreiben,
-    // sie steht deshalb unten hinter dem await.
-    content.scrollTop = 0;
-    // Der FAB der alten Seite lebt in der Shell und fiele sonst nicht mit ihrem
-    // Inhalt weg - er bliebe über der neuen Seite stehen, bis diese adoptiert.
-    // Hier und nicht eine Zeile höher: der Scroll-Reset gehört unmittelbar an
-    // den Inhaltstausch (Guard in test-mobile-scroll-layout.js).
-    clearPageFab();
-    // Dieselbe Begründung, dieselbe Schicht: die Sammelaktions-Pille gehört zur
-    // Teilmenge EINER Liste und darf nicht über der nächsten Seite stehen
-    // bleiben. Sie hat kein Gegenstück zu adoptPageFab() - wer sie braucht,
-    // setzt sie beim Rendern.
-    clearBulkPill();
-    style.cleanup();
-    // Lebenszyklus-Vertrag (#976): der Router besitzt EIN AbortController je
-    // Seitenaufbau und bricht ihn hier ab, wo die Route ersetzt wird. Die
-    // Seite bekommt das Signal als `context.signal` und haengt Timer und
-    // Listener daran (Bruecke: utils/page-lifecycle.js). Bis dahin gab es
-    // keinen Teardown fuer Seiten - das Dashboard brach seinen Controller nur
-    // zu Beginn des NAECHSTEN eigenen render() ab, also nie beim Verlassen:
-    // Uhr, stiller Refresh, Wetter- und Wandtimer liefen gegen einen
-    // abgehaengten Container weiter und starteten Anfragen hinter der
-    // naechsten Seite.
-    _pageController?.abort();
-    _pageController = new AbortController();
+    let pageWrapper = null;
+    let renderPromise = null;
+    // Der SYNCHRONE Teil des Wechsels: Inhalt tauschen, Scrollport zuruecksetzen,
+    // alte Seite abbauen, render() starten. Er ist der Update-Callback der View
+    // Transition - der Browser haelt bis zu seinem Ende das alte Bild, es gibt
+    // also keinen leeren Frame mehr dazwischen. Die Daten wartet er NICHT ab:
+    // das Bild stuende sonst fuer die Dauer eines Abrufs.
+    const swap = () => {
+      // Alter Inhalt ist jetzt weg - altes Stylesheet kann entfernt werden
+      pageWrapper = document.createElement('div');
+      pageWrapper.className = 'page-transition';
+      // Sofort sichtbar: das neue Bild der View Transition wird gleich nach
+      // diesem Callback aufgenommen und darf nicht bei 0 stehen. Die Blende
+      // des Rueckfalls ist eine Animation und schlaegt den Inline-Wert.
+      pageWrapper.style.opacity = '1';
+      content.replaceChildren(pageWrapper);
+      // Scrollport auf Anfang, solange er leer ist. `content` IST der Scrollport
+      // (#main-content == .app-content) und überlebt die Navigation; ohne diese
+      // Zeile öffnet die Zielseite auf dem Scrollstand der Vorseite.
+      //
+      // HIER, NICHT NACH DEM RENDER: Module scrollen beim Aufbau selbst - die
+      // Tagesansicht des Kalenders zur aktuellen Stunde, der Essensplan zum
+      // heutigen Tag. Ein Reset danach würde genau das wieder einkassieren. Die
+      // Wiederherstellung bei popstate darf und soll das dagegen überschreiben,
+      // sie steht deshalb unten hinter dem await.
+      content.scrollTop = 0;
+      // Der FAB der alten Seite lebt in der Shell und fiele sonst nicht mit ihrem
+      // Inhalt weg - er bliebe über der neuen Seite stehen, bis diese adoptiert.
+      // Hier und nicht eine Zeile höher: der Scroll-Reset gehört unmittelbar an
+      // den Inhaltstausch (Guard in test-mobile-scroll-layout.js).
+      clearPageFab();
+      // Dieselbe Begründung, dieselbe Schicht: die Sammelaktions-Pille gehört zur
+      // Teilmenge EINER Liste und darf nicht über der nächsten Seite stehen
+      // bleiben. Sie hat kein Gegenstück zu adoptPageFab() - wer sie braucht,
+      // setzt sie beim Rendern.
+      clearBulkPill();
+      style.cleanup();
+      // Lebenszyklus-Vertrag (#976): der Router besitzt EIN AbortController je
+      // Seitenaufbau und bricht ihn hier ab, wo die Route ersetzt wird. Die
+      // Seite bekommt das Signal als `context.signal` und haengt Timer und
+      // Listener daran (Bruecke: utils/page-lifecycle.js). Bis dahin gab es
+      // keinen Teardown fuer Seiten - das Dashboard brach seinen Controller nur
+      // zu Beginn des NAECHSTEN eigenen render() ab, also nie beim Verlassen:
+      // Uhr, stiller Refresh, Wetter- und Wandtimer liefen gegen einen
+      // abgehaengten Container weiter und starteten Anfragen hinter der
+      // naechsten Seite.
+      _pageController?.abort();
+      _pageController = new AbortController();
 
-    // Teardown abgeschlossen: ein evtl. gemerktes Soft-Update-Ziel ist jetzt
-    // ungültig, bis das neue Modul erfolgreich gerendert hat.
-    _renderedModule = null;
-    _renderedModuleName = null;
+      // Teardown abgeschlossen: ein evtl. gemerktes Soft-Update-Ziel ist jetzt
+      // ungültig, bis das neue Modul erfolgreich gerendert hat.
+      _renderedModule = null;
+      _renderedModuleName = null;
 
-    // render() synchron starten: Der synchrone Teil (Grundgerüst + Lade-Skeleton)
-    // ist danach bereits im DOM. Den Wrapper SOFORT einblenden — so wird das
-    // Skeleton während des Daten-await des Moduls sichtbar (statt leerer Fläche;
-    // der Wrapper war zuvor bis zur vollständigen Auflösung von render() opak-0,
-    // wodurch jedes vor dem Daten-await geseedete Skeleton beim Erstladen nie
-    // erschien). Der Rest von render() (Daten + Verdrahtung) wird danach abgewartet.
-    //
-    // Ein Erweiterungsmodul rendert nicht in den nackten Wrapper, sondern in
-    // die Seitenwurzel seines im Manifest erklaerten Modus (`page.composition`,
-    // `page.width`; docs/PAGE-COMPOSITION.md). Angewandt wird die Erklaerung
-    // HIER, sonst waere sie ein Feld ohne Wirkung: der Server prueft sie, die
-    // Admin-Liste zeigt sie, und die Seite saehe trotzdem aus wie ohne.
-    const target = route.thirdPartyModule
-      ? mountExtensionPage(pageWrapper, route.thirdPartyModule)
-      : pageWrapper;
-    const context = route.thirdPartyModule
-      ? { user: currentUser, page: { ...route.thirdPartyModule.page }, signal: _pageController.signal }
-      : { user: currentUser, signal: _pageController.signal };
-    const renderPromise = module.render(target, context);
+      // render() synchron starten: Der synchrone Teil (Grundgerüst + Lade-Skeleton)
+      // ist danach bereits im DOM. Den Wrapper SOFORT einblenden - so wird das
+      // Skeleton während des Daten-await des Moduls sichtbar (statt leerer Fläche;
+      // der Wrapper war zuvor bis zur vollständigen Auflösung von render() opak-0,
+      // wodurch jedes vor dem Daten-await geseedete Skeleton beim Erstladen nie
+      // erschien). Der Rest von render() (Daten + Verdrahtung) wird danach abgewartet.
+      //
+      // Ein Erweiterungsmodul rendert nicht in den nackten Wrapper, sondern in
+      // die Seitenwurzel seines im Manifest erklaerten Modus (`page.composition`,
+      // `page.width`; docs/PAGE-COMPOSITION.md). Angewandt wird die Erklaerung
+      // HIER, sonst waere sie ein Feld ohne Wirkung: der Server prueft sie, die
+      // Admin-Liste zeigt sie, und die Seite saehe trotzdem aus wie ohne.
+      const target = route.thirdPartyModule
+        ? mountExtensionPage(pageWrapper, route.thirdPartyModule)
+        : pageWrapper;
+      const context = route.thirdPartyModule
+        ? { user: currentUser, page: { ...route.thirdPartyModule.page }, signal: _pageController.signal }
+        : { user: currentUser, signal: _pageController.signal };
+      renderPromise = module.render(target, context);
 
-    // Schon jetzt umziehen, nicht erst nach den Daten: die meisten Seiten legen
-    // ihren FAB im synchronen Teil an, und er soll gar nicht erst im Scrollport
-    // erscheinen. Der zweite Aufruf unten holt die Nachzügler.
-    adoptPageFab();
-    wirePageToolbars();
+      // Schon jetzt umziehen, nicht erst nach den Daten: die meisten Seiten legen
+      // ihren FAB im synchronen Teil an, und er soll gar nicht erst im Scrollport
+      // erscheinen. Der zweite Aufruf unten holt die Nachzügler.
+      adoptPageFab();
+      wirePageToolbars();
+    };
 
-    // Sichtbar machen und Einblend-Animation starten (Skeleton/Grundgerüst).
-    pageWrapper.style.opacity = shouldAnimate ? '' : '1';
-    if (shouldAnimate) {
-      pageWrapper.classList.add(inClass);
+    const { transition, finished } = await swapPage(swap, {
+      content,
+      from: previousPath,
+      animate: shouldAnimate,
+    });
+
+    // Mit View Transition macht der Browser die Blende. Ohne sie (keine API,
+    // reduzierte Bewegung, verdeckter Tab) eine reine Blende ohne Versatz und
+    // ohne Feder: `.page-transition--in`.
+    if (shouldAnimate && !transition) {
+      pageWrapper.classList.add('page-transition--in');
 
       // navigating-Klasse nach Ende der Einblend-Animation entfernen.
       // Fallback-Timeout falls animationend nicht feuert (z.B. prefers-reduced-motion).
@@ -1618,6 +1627,10 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
         clearTimeout(navEndTimeout);
         document.documentElement.classList.remove('navigating');
       }, { once: true });
+    } else if (transition) {
+      // Die Transition haelt das Bild bis zu ihrem Ende; erst dann darf das
+      // Glas im Inhalt zurueck.
+      finished.then(() => document.documentElement.classList.remove('navigating'));
     } else {
       document.documentElement.classList.remove('navigating');
     }

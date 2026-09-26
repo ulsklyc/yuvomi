@@ -14,6 +14,40 @@
    * den zweiten Kopf unter der Leiste flach (Issue #577). */
 }
 
+/* DIE LEISTE STEHT, DIE KAPSEL GLEITET (Critique 2026-09-26, A4 P2).
+ *
+ * Zwischen zwei Kuechen-Tabs ist die Leiste derselbe Knoten
+ * (utils/kitchen-tabs.js), und die View Transition des Seitenwechsels zeigt
+ * von ihr nur das lebende Bild (layout.css, Abschnitt Seiten-Uebergang) - sie
+ * gleitet nicht mehr mit der Seite herein.
+ *
+ * Die Auswahl ist eine eigene Kapsel HINTER den Labels, nicht die Flaeche des
+ * aktiven Tabs: nur so kann sie vom alten zum neuen Tab gleiten, waehrend die
+ * Worte stehen bleiben. `z-index: -1` legt sie ueber den Leistengrund und unter
+ * die Tabs - die Leiste ist als sticky Element mit z-index selbst der
+ * Stapelkontext. Form und Flaeche sind dieselben wie am aktiven `.sub-tab`
+ * (sub-tabs.css); der Tab gibt sie ab, sobald die Kapsel steht
+ * (`.has-indicator`), ohne JS bleibt alles wie vorher. */
+.kitchen-tabs-bar {
+  view-transition-name: kitchen-tabs;
+}
+
+.kitchen-tabs-bar__indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  border-radius: var(--radius-full);
+  background-color: var(--seg-active-bg);
+  box-shadow: var(--seg-active-shadow);
+  pointer-events: none;
+}
+
+.kitchen-tabs-bar.has-indicator .sub-tab--active {
+  background-color: transparent;
+  box-shadow: none;
+}
+
 @media (max-width: 639px) {
   .kitchen-tabs-bar {
     gap: var(--space-0h);

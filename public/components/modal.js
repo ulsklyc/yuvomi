@@ -502,6 +502,14 @@ function _wireSheetSwipe(panel) {
     dragging = false;
     const dy = e.changedTouches[0].clientY - startY;
     if (dy > 80) {
+      // Der Ausgang startet dort, wohin der Finger das Blatt gezogen hat
+      // (`--sheet-drag` in den sheet-out-Keyframes). Ohne das sprang die
+      // Tafel beim Loslassen erst an ihre Ruhelage zurueck und fiel dann.
+      // Nicht bei ungespeicherten Aenderungen: dort steht die Tafel erst an
+      // ihrer Ruhelage unter der Rueckfrage, und ein spaeter Ausgang ab dem
+      // alten Zug waere ein Sprung.
+      const drag = panel.style.transform.match(/translateY\((-?[\d.]+)px\)/)?.[1];
+      if (drag && !isFormDirty(panel)) panel.style.setProperty('--sheet-drag', `${drag}px`);
       panel.style.transform = '';
       closeModal();
     } else {
@@ -1576,24 +1584,47 @@ export async function closeModal({ force = false } = {}) {
     panel.removeEventListener('focusin', panel._onInputFocus);
   }
 
-  // Animation handling
-  const isMobile = window.innerWidth < 768;
-  if (isMobile && panel) {
+  // Ausgang: Tafel und Overlay auf JEDER Breite (Critique 2026-09-26, P1-1).
+  // Bis dahin gab es ihn nur mobil, und auch dort lief er nie - glass.css
+  // schlug die Schliess-Regel, `animationend` kam nicht, und dieser Timer
+  // raeumte nach 400ms eine Tafel ab, die die ganze Zeit reglos stand. Die
+  // Kaskade haelt jetzt test-motion.js; der Timer bleibt als Sicherheitsnetz
+  // fuer den Fall, dass das Ende doch ausbleibt (verdeckter Tab, abgehaengter
+  // Knoten).
+  //
+  // Unter reduzierter Bewegung gibt es keinen Ausgang, also auch kein Warten:
+  // die Regeln setzen die Animation dort auf `none`, und ein `animationend`
+  // kaeme nie.
+  const reduceMotion = typeof matchMedia === 'function'
+    && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (panel && !reduceMotion) {
     panel.classList.add('modal-panel--closing');
+    capturedOverlay.classList.add('modal-overlay--closing');
     // _doClose setzt modalState auf 'idle', sobald der Overlay final entfernt wird.
     const fallback = setTimeout(() => {
+      panel.removeEventListener('animationend', onExitEnd);
       _doClose(capturedOverlay);
-    }, 400); // Slightly longer fallback
-    panel.addEventListener('animationend', () => {
+    }, MODAL_EXIT_FALLBACK_MS);
+    // NUR das Ende der eigenen Ausgangs-Animation. `animationend` blubbert: ein
+    // Kind, das gerade fertig wird (Haken-Pop, Fehler-Wackeln), raeumte die
+    // Tafel sonst mitten im Ausgang ab.
+    function onExitEnd(event) {
+      if (event.target !== panel) return;
+      panel.removeEventListener('animationend', onExitEnd);
       clearTimeout(fallback);
       _doClose(capturedOverlay);
-    }, { once: true });
+    }
+    panel.addEventListener('animationend', onExitEnd);
     return true;
   }
 
   _doClose(capturedOverlay);
   return true;
 }
+
+/* Laenger als der laengste Ausgang (mobil `--duration-md` = 200ms), damit das
+ * Netz nur greift, wenn das Ende wirklich ausbleibt. */
+const MODAL_EXIT_FALLBACK_MS = 400;
 
 // --------------------------------------------------------
 // promptModal

@@ -443,7 +443,17 @@ function makeTrigger(log) {
 /** Offenes Modal aus einem vorigen Test abraeumen, dann frisches Dokument. */
 async function freshDocument({ width }) {
   installDocument();
-  await closeModal({ force: true });
+  // Seit auch Desktop einen Ausgang hat (Critique 2026-09-26), raeumt ein
+  // Schliessen auf JEDER Breite erst nach `animationend` ab. Das Aufraeumen
+  // hier laeuft deshalb unter reduzierter Bewegung - dort schliesst modal.js
+  // sofort, und ein offenes Modal aus dem vorigen Test haengt nicht nach.
+  const previousMatchMedia = globalThis.matchMedia;
+  globalThis.matchMedia = () => ({ matches: true });
+  try {
+    await closeModal({ force: true });
+  } finally {
+    globalThis.matchMedia = previousMatchMedia;
+  }
   installDocument();
   window.innerWidth = width;
 }
@@ -458,7 +468,9 @@ async function settled(promise) {
 
 function fireAnimationEnd(overlay) {
   const panel = overlay.querySelector('.modal-panel');
-  for (const l of [...panel._listeners]) if (l.type === 'animationend') l.handler(makeEvent('animationend'));
+  // `target` wie im Browser: modal.js hoert nur auf das Ende der EIGENEN
+  // Ausgangs-Animation, nicht auf ein hochblubberndes eines Kindes.
+  for (const l of [...panel._listeners]) if (l.type === 'animationend') l.handler(makeEvent('animationend', { target: panel }));
 }
 
 test('whenModalClosed: ohne offenes Modal loest es sofort auf', async () => {

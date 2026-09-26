@@ -16,9 +16,10 @@
 //
 // DIE RICHTUNG ENTSCHEIDET, NICHT DIE SEITENTRANSITION. Ein eigener Aufruf
 // (pushState) heißt „neue Seite, oben anfangen"; Browser-Zurück/-Vor (popstate)
-// heißt „dorthin, wo ich war". getDirection() im Router taugt dafür nicht: das
-// ist die Slide-Richtung nach ROUTE_ORDER und liefert 'left' genauso für einen
-// Vorwärts-Tap auf einen weiter links liegenden Nav-Eintrag. Maßgeblich ist
+// heißt „dorthin, wo ich war". Die Slide-Richtung nach Nav-Reihenfolge, die der
+// Router bis 2026-09-26 fuer seinen Seitenwechsel rechnete, taugte dafür nie: sie
+// lieferte 'left' genauso für einen Vorwärts-Tap auf einen weiter links liegenden
+// Nav-Eintrag (der Wechsel ist seitdem eine Blende ohne Richtung). Maßgeblich ist
 // allein das pushState-Flag von navigate() - false kommt nur vom popstate-
 // Handler und vom Erstladen, und beim Erstladen ist die Map leer.
 //
