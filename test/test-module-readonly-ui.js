@@ -4547,6 +4547,10 @@ test('R8 H14: Kontakt-Auswahl ist ein Knopf mit Auswahlkreis und Objektnamen, ke
 test('R8 H14: Dokument-Auswahl ist ein Auswahlkreis mit Objektnamen, keine native Checkbox', () => {
   const st = documentsPage.state;
   const vorher = { mode: st.selectMode, sel: new Set(st.selected) };
+  // Eigenes document: die Sammelaktions-Pille sucht ihre Schicht - ohne Shell
+  // gibt es keine, und der Test darf nicht vom Rest eines frueheren leben.
+  const echtesDocument = globalThis.document;
+  globalThis.document = { getElementById: () => null };
   try {
     st.selectMode = true;
     st.selected = new Set([4]);
@@ -4571,5 +4575,6 @@ test('R8 H14: Dokument-Auswahl ist ein Auswahlkreis mit Objektnamen, keine nativ
     st.selectMode = vorher.mode;
     st.selected = vorher.sel;
     documentsPage.setContainerForTest(null);
+    globalThis.document = echtesDocument;
   }
 });
