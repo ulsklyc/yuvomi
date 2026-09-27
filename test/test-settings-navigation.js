@@ -1957,6 +1957,43 @@ test('S2: der Controller leitet Alt-Adressen samt Abschnitt und Parametern um', 
   assert.deepEqual(stale, []);
 });
 
+test('S2: kein Link in App, Server oder Uebersetzung zeigt auf eine Adresse von vor R10', async () => {
+  // Die Umleitung ist das Netz fuer Lesezeichen - eigene Links (Dokumente ->
+  // Speicher, Drive-OAuth-Ruecksprung, Hinweis im Zyklus) fuehren direkt ans
+  // neue Blatt, sonst landet jeder Klick ueber einen replaceState-Umweg und
+  // ein spaeteres Aufraeumen der Umleitung braeche sie still.
+  const moved = new Set(RENAMED_SETTINGS_SOURCE_PATHS);
+  const current = new Set(SETTINGS_LEAVES.map((leaf) => leaf.path));
+  const roots = ['../public/', '../server/'];
+  const skip = /\/(vendor|node_modules)\/|\/public\/settings\/registry\.js$|\/public\/sw\.js$/;
+  const withoutComments = (text) => text
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
+  const stale = [];
+  const unknown = [];
+  let scanned = 0;
+  async function walk(url) {
+    for (const entry of await readdir(url, { withFileTypes: true })) {
+      const child = new URL(`${entry.name}${entry.isDirectory() ? '/' : ''}`, url);
+      if (skip.test(child.pathname)) continue;
+      if (entry.isDirectory()) { await walk(child); continue; }
+      if (!/\.(js|json|html)$/.test(entry.name)) continue;
+      let text = await readFile(child, 'utf8');
+      if (entry.name.endsWith('.js')) text = withoutComments(text);
+      scanned += 1;
+      for (const [path] of text.matchAll(/\/settings\/[a-z]+\/[a-z-]+/g)) {
+        const where = child.pathname.replace(/^.*\/(public|server)\//, '$1/');
+        if (moved.has(path)) stale.push(`${where}: ${path}`);
+        else if (!current.has(path)) unknown.push(`${where}: ${path}`);
+      }
+    }
+  }
+  for (const root of roots) await walk(new URL(root, import.meta.url));
+  assert.ok(scanned > 300, `nur ${scanned} Dateien gelesen - der Scan ist blind`);
+  assert.deepEqual(stale, [], 'direkt auf das neue Blatt verlinken (movedSettingsUrl nennt das Ziel)');
+  assert.deepEqual(unknown, [], 'Link auf ein Blatt, das es nicht gibt');
+});
+
 test('S2: die Suche findet jede Option und jedes Blatt von vor R10', async () => {
   const de = JSON.parse(await readFile(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
   const translate = (key) => key.split('.').reduce((value, segment) => value?.[segment], de) ?? key;
