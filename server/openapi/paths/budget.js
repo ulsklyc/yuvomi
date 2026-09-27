@@ -70,6 +70,12 @@ export function budgetPaths() {
           required: false,
           description: "View filter when the household runs in personal budget mode (preference `budget_mode=personal`): `mine` shows entries you own, `household` shows the shared pot. Ignored in shared mode. Entries also carry `owner_id` and `visibility` (`private`|`shared`); private entries are only visible to their owner (no admin bypass). Each entry carries `attachments`: linked documents from the documents module, filtered by document visibility.",
           schema: { type: 'string', enum: ['mine', 'household'], default: 'mine' },
+        }, {
+          name: 'q',
+          in: 'query',
+          required: false,
+          description: 'Search the ledger instead of listing one month: matches the entry title across all months, inside words, ignoring case and accents (`muller` finds `Müller`). `month` and `category` are ignored; `account_id` and `scope` still apply. Newest first, at most 200 hits; `meta.truncated` says whether more matched. An entry whose details are hidden from you (`shared_amount` of someone else) is never a hit. 1-100 characters, otherwise 400.',
+          schema: { type: 'string', minLength: 1, maxLength: 100 },
         }],
       }),
       post: op({ summary: 'Create budget entry (optional `visibility`: private|shared; owner is the creator; optional `attachment_document_ids`: receipts from the documents module)', tag: 'Budget', description: DOCUMENT_LINKS_READ_NOTE, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),

@@ -1663,6 +1663,37 @@
   color: var(--color-text-primary);
 }
 
+/* SUCHE IM HAUPTBUCH (Re-Critique 2026-09-27, C6). Das geteilte Feld
+ * (renderPageSearch, Aussehen aus page-search.css) steht zwischen Listenkopf
+ * und Liste. Es ist keine Kopfsuche - der Budget-Kopf traegt Monat und Tabs,
+ * und die Suche gilt nur diesem Reiter -, aber es liest dieselbe Breite:
+ * `--page-search-width`, am Telefon die volle Spalte. Die Statuszeile nennt die
+ * Trefferzahl; leer nimmt sie keinen Platz. */
+.budget-list-search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-block-end: var(--space-2);
+}
+
+/* Die Breite liest das Feld selbst: page-search.css setzt den Token an
+ * `.page-search`, nicht an diesem Wrapper. */
+@media (min-width: 768px) {
+  .budget-list-search > .page-search {
+    max-width: var(--page-search-width);
+  }
+}
+
+.budget-list-search__status {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+
+.budget-list-search__status:empty {
+  display: none;
+}
+
 /* Kopf-Menue der Buchungsliste (listToolsMenuHtml in budget.js). Die Groesse
  * des Icon-Knopfs gehoert der Shell (.btn--icon); hier steht nur, dass er neben
  * dem Titel nicht schrumpft. Die Eintraege sind das geteilte popover-menu. */

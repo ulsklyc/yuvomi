@@ -2799,3 +2799,49 @@ test('Rot steht im Budget nur an einer Warnung, nie an der Ausgabe selbst', () =
   // Die Richtung bleibt lesbar ohne Farbe: das Vorzeichen kommt aus dem Zahlformat.
   assert.match(budget, /amountByRole\(e\.amount, 'flow'\)/);
 });
+
+// --------------------------------------------------------
+// Suche im Hauptbuch (Re-Critique 2026-09-27, C6)
+// --------------------------------------------------------
+
+test('das Hauptbuch hat eine Suche ueber alle Monate, im geteilten Feld', () => {
+  // Kanon: das geteilte Feld, verdrahtet ueber wirePageSearch, und die Anfrage
+  // geht an den Server (alle Monate), nicht an die Zeilen des Monats.
+  assert.match(budget, /renderPageSearch\(\{\s*id: 'budget-ledger-search'/);
+  assert.match(budget, /wirePageSearch\(body, \{ id: 'budget-ledger-search', delay: 250, onQuery: runLedgerSearch \}\)/);
+  assert.match(budget, /api\.get\(`\/budget\?q=\$\{encodeURIComponent\(query\)\}/);
+  // Nach jedem Schreiben laedt der Monat neu - die Treffer muessen mit.
+  const load = budget.match(/async function loadMonth\(month\) \{[\s\S]*?\n\}/)[0];
+  assert.match(load, /if \(state\.ledgerQuery\) await loadLedgerSearch\(state\.ledgerQuery\)/);
+  // Die Breite ist der Token der Kopfsuche, keine Modulbreite.
+  const rule = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-list-search > .page-search');
+  assert.match(rule?.body ?? '', /max-width:\s*var\(--page-search-width\)/);
+});
+
+test('Treffer der Suche stehen mit vollem Datum, ein leeres Ergebnis nennt die Anfrage', async () => {
+  // Der Leerzustand baut per DOM (emptyStateHTML) - eigene Mini-DOM, kein
+  // Erbe aus frueheren Tests.
+  const { installMiniDom } = await import('./mini-dom.js');
+  const abraeumen = installMiniDom();
+  const s = budgetUi.state;
+  const vorher = { q: s.ledgerQuery, r: s.ledgerResults, e: s.ledgerError, entries: s.entries };
+  try {
+    s.entries = [];
+    s.ledgerQuery = 'arzt';
+    s.ledgerError = null;
+    s.ledgerResults = [{ id: 71, title: 'Zahnarztrechnung', amount: -80, category: 'personal_health', date: '2033-02-03', account_id: null }];
+    const html = budgetUi.renderEntries();
+    assert.match(html, /data-id="71"/, 'der Treffer ist eine Zeile wie jede andere');
+    assert.match(html, /2033/, 'Treffer aus anderen Monaten nennen das Jahr - "03.02." allein waere mehrdeutig');
+    s.ledgerResults = [];
+    const leer = budgetUi.renderEntries();
+    assert.match(leer, /ledgerSearchEmpty|arzt/);
+    assert.doesNotMatch(leer, /budget\.emptyTitle|empty-cta-budget/, 'kein leerer Monat, sondern keine Treffer');
+    s.ledgerQuery = '';
+    s.ledgerResults = null;
+    assert.doesNotMatch(budgetUi.renderEntries(), /ledgerSearchEmpty/);
+  } finally {
+    s.ledgerQuery = vorher.q; s.ledgerResults = vorher.r; s.ledgerError = vorher.e; s.entries = vorher.entries;
+    abraeumen();
+  }
+});

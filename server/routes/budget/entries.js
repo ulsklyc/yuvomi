@@ -9,6 +9,7 @@ import * as db from '../../db.js';
 import { str, oneOf, date as validateDate, num, rrule, collectErrors, MAX_TITLE, MONTH_RE } from '../../middleware/validate.js';
 import { normalizeBudgetVisibility } from '../../services/budget-visibility.js';
 import { todayKey } from '../../utils/timezone.js';
+import { foldSearchText } from '../../services/search.js';
 import { sendDocumentDeletionConflict } from '../../services/document-deletion-lock.js';
 import { assertDocumentLinkTargetsAvailable, documentViewer, sendDocumentLinkRefusal } from '../../services/document-links.js';
 import { attachmentsFor, replaceAttachments, withAttachments } from './attachments.js';
@@ -196,14 +197,32 @@ router.get('/export', (req, res) => {
   }
 });
 
+/* SUCHE IM HAUPTBUCH (Re-Critique 2026-09-27, C6).
+ *
+ * "Wann war die letzte Zahnarztrechnung?" hiess bisher Monate blaettern. `?q=`
+ * sucht ueber ALLE Monate im Titel - im Wortinneren ("arzt" findet die
+ * "Zahnarztrechnung"), ohne Gross-/Kleinschreibung und Akzente ("muller" findet
+ * "Müller"), mit derselben Faltung wie die globale Suche (foldSearchText).
+ *
+ * WARUM IN JS UND NICHT PER LIKE: LIKE faltet in SQLite nur ASCII, und `%`/`_`
+ * waeren Platzhalter, die jeder Aufrufer escapen muesste. Die Zeilen eines
+ * Haushalts sind wenige tausend; die Sichtbarkeit filtert weiter die SQL-Abfrage.
+ *
+ * GESUCHT WIRD IM MASKIERTEN TITEL. Eine fremde "nur Betrag"-Buchung hat fuer
+ * den Betrachter keinen Titel (maskEntries leert ihn) - wuerde die Suche den
+ * echten pruefen, verriete ein Treffer genau den Zweck, den die Stufe schuetzt. */
+const LEDGER_SEARCH_LIMIT = 200;
+const LEDGER_SEARCH_MAX_LENGTH = 100;
+
 /**
  * GET /api/v1/budget
- * Einträge eines Monats abrufen.
- * Query: ?month=YYYY-MM&category=<cat>
- * Response: { data: Entry[] }
+ * Einträge eines Monats abrufen - oder mit `q` die Treffer aller Monate.
+ * Query: ?month=YYYY-MM&category=<cat>  |  ?q=<text>&account_id=&scope=
+ * Response: { data: Entry[] }  |  { data: Entry[], meta: { query, limit, truncated } }
  */
 router.get('/', (req, res) => {
   try {
+    if (req.query.q !== undefined && !req.query.loan_id) return searchEntries(req, res);
     // Haushaltszone, nicht UTC - dieselbe Begruendung wie bei `/summary`
     // darueber. Beide Vorgaben muessen denselben Monat nennen: die Liste und
     // die Zusammenfassung darueber stehen auf einer Seite, und zwei Stunden
@@ -271,6 +290,48 @@ router.get('/', (req, res) => {
     res.status(500).json({ error: 'Internal error', code: 500 });
   }
 });
+
+function searchEntries(req, res) {
+  const raw = String(Array.isArray(req.query.q) ? req.query.q[0] : req.query.q).trim();
+  if (!raw || raw.length > LEDGER_SEARCH_MAX_LENGTH) {
+    return res.status(400).json({ error: `q muss 1-${LEDGER_SEARCH_MAX_LENGTH} Zeichen haben`, code: 400 });
+  }
+  const needle = foldSearchText(raw);
+  let sql = `
+    SELECT b.*, u.display_name AS creator_name,
+           ${RESPONSIBLE_USERS_SQL},
+           p.id AS loan_payment_id,
+           p.loan_id AS loan_id,
+           p.installment_number AS loan_installment_number,
+           l.title AS loan_title,
+           l.borrower AS loan_borrower
+    FROM budget_entries b
+    LEFT JOIN users u ON u.id = b.created_by
+    LEFT JOIN budget_loan_payments p ON p.budget_entry_id = b.id
+    LEFT JOIN budget_loans l ON l.id = p.loan_id
+    WHERE 1 = 1
+  `;
+  const params = [];
+  if (req.query.account_id) {
+    const accountId = parseInt(req.query.account_id, 10);
+    if (Number.isInteger(accountId) && accountId > 0) {
+      sql += ' AND b.account_id = ?';
+      params.push(accountId);
+    }
+  }
+  const filter = budgetFilter(req, 'b');
+  sql += filter.clause;
+  params.push(...filter.params);
+  sql += ' ORDER BY b.date DESC, b.created_at DESC';
+
+  const hits = maskEntries(req, db.get().prepare(sql).all(...params))
+    .filter((row) => row.title && foldSearchText(row.title).includes(needle));
+  const shown = hits.slice(0, LEDGER_SEARCH_LIMIT).map(withResponsibles);
+  res.json({
+    data: withAttachments(shown, documentViewer(req)),
+    meta: { query: raw, limit: LEDGER_SEARCH_LIMIT, truncated: hits.length > LEDGER_SEARCH_LIMIT },
+  });
+}
 
 /**
  * POST /api/v1/budget

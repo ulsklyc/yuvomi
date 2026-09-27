@@ -36,6 +36,7 @@ import { attachOverlay } from '/utils/overlay-history.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
 import { withChosenPeople } from '/utils/people-picker.js';
 import { isNavModuleReadOnly } from '/permissions.js';
+import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -252,7 +253,14 @@ let state = {
   // nicht mehr vergleichbar.
   reportRangeFrom: null,
   reportRangeTo:   null,
+  // Suche im Hauptbuch (C6): die Anfrage und ihre Treffer aus ALLEN Monaten.
+  // `ledgerResults` ist null, solange nicht gesucht wird.
+  ledgerQuery:     '',
+  ledgerResults:   null,
+  ledgerTruncated: false,
+  ledgerError:     null,
 };
+let _ledgerSeq = 0;    // nur die juengste Suchantwort darf die Liste setzen
 let _container = null;
 let _user = null;
 let _tablist = null;   // wireTablist-Handle: erlaubt programmatische Tab-Wechsel (sync)
@@ -502,6 +510,9 @@ async function loadMonth(month) {
     state.loadError   = null;
     state.month       = month;
     state.entries     = entriesRes.data;
+    // Nach jedem Schreiben laedt der Monat neu - die Treffer der Suche mit,
+    // sonst stuende eine geloeschte Buchung weiter in der Trefferliste.
+    if (state.ledgerQuery) await loadLedgerSearch(state.ledgerQuery);
     state.summary     = summaryRes.data;
     state.prevSummary = prevSummaryRes.data;
     state.loans       = loansRes.data;
@@ -519,6 +530,69 @@ async function loadMonth(month) {
     state.prevSummary = null;
     state.loans       = { loans: [], summary: { active_count: 0, remaining_amount: 0, remaining_installments: 0 } };
   }
+}
+
+/* DIE SUCHE IM HAUPTBUCH (Re-Critique 2026-09-27, C6). "Wann war die letzte
+ * Zahnarztrechnung?" hiess Monate blaettern. Der Server sucht ueber alle
+ * Monate (GET /budget?q=), gefaltet wie die globale Suche; Konto-Drilldown und
+ * Mein/Haushalt gelten weiter. Die Antwort setzt nur die Liste, nicht die
+ * Seite - das Feld behaelt den Fokus. */
+async function loadLedgerSearch(query) {
+  const seq = ++_ledgerSeq;
+  const accountQuery = state.accountFilterId ? `&account_id=${state.accountFilterId}` : '';
+  const scopeQuery = state.budgetMode === 'personal' ? `&scope=${state.scope}` : '';
+  try {
+    const res = await api.get(`/budget?q=${encodeURIComponent(query)}${accountQuery}${scopeQuery}`);
+    if (seq !== _ledgerSeq) return false;
+    state.ledgerResults = res.data ?? [];
+    state.ledgerTruncated = !!res.meta?.truncated;
+    state.ledgerError = null;
+  } catch (err) {
+    if (seq !== _ledgerSeq) return false;
+    console.error('[Budget] Suche im Hauptbuch:', err);
+    state.ledgerResults = [];
+    state.ledgerTruncated = false;
+    state.ledgerError = err;
+  }
+  return true;
+}
+
+async function runLedgerSearch(value) {
+  const query = String(value ?? '').trim().slice(0, 100);
+  state.ledgerQuery = query;
+  if (!query) {
+    _ledgerSeq += 1;
+    state.ledgerResults = null;
+    state.ledgerError = null;
+    paintLedger();
+    return;
+  }
+  if (await loadLedgerSearch(query)) paintLedger();
+}
+
+/** Nur die Liste und die Statuszeile neu - Kopf, Bilanz und Suchfeld bleiben stehen. */
+function paintLedger() {
+  const list = _container?.querySelector('#budget-list');
+  if (list) {
+    list.replaceChildren();
+    list.insertAdjacentHTML('beforeend', renderEntries());
+    if (window.lucide) lucide.createIcons({ el: list });
+  }
+  const status = _container?.querySelector('#budget-ledger-status');
+  if (status) status.textContent = ledgerStatusText();
+}
+
+function ledgerStatusText() {
+  if (!state.ledgerQuery || !state.ledgerResults || state.ledgerError) return '';
+  const count = state.ledgerResults.length;
+  if (!count) return '';
+  return state.ledgerTruncated
+    ? t('budget.ledgerSearchTruncated', { limit: count })
+    : t('budget.ledgerSearchCount', { count });
+}
+
+function findEntry(id) {
+  return state.entries.find((e) => e.id === id) ?? state.ledgerResults?.find((e) => e.id === id);
 }
 
 async function loadAccounts() {
@@ -1167,6 +1241,18 @@ function renderBody() {
         </div>
         <div class="budget-list-header__actions">${listToolsMenuHtml()}</div>
       </div>
+      <!-- Suche im Hauptbuch (C6): das geteilte Feld, ueber der Liste, die es
+           filtert. Es sucht in allen Monaten; die Statuszeile sagt, wie viele. -->
+      <div class="budget-list-search">
+        ${renderPageSearch({
+    id: 'budget-ledger-search',
+    label: t('budget.ledgerSearchLabel'),
+    placeholder: t('budget.ledgerSearchPlaceholder'),
+    value: state.ledgerQuery,
+    clearLabel: t('common.searchClear'),
+  })}
+        <p class="budget-list-search__status" id="budget-ledger-status" role="status">${esc(ledgerStatusText())}</p>
+      </div>
       <div class="budget-list" id="budget-list">
         ${renderEntries()}
       </div>
@@ -1177,6 +1263,7 @@ function renderBody() {
 
   if (window.lucide) lucide.createIcons({ el: body });
   watchAsideFit(body.querySelector('.budget-tab-panel--budget'));
+  wirePageSearch(body, { id: 'budget-ledger-search', delay: 250, onQuery: runLedgerSearch });
   _container.querySelector('#empty-cta-budget')?.addEventListener('click', () => {
     document.querySelector('.page-fab')?.click();
   });
@@ -1242,7 +1329,7 @@ function renderBody() {
     // `read` in die Leseansicht, und die ist der Leseweg dieser Zeile.
     const item = e.target.closest('.budget-entry[data-id]');
     if (item && !action) {
-      const entry = state.entries.find((e) => e.id === parseInt(item.dataset.id, 10));
+      const entry = findEntry(parseInt(item.dataset.id, 10));
       if (entry) openBudgetModal({ mode: 'edit', entry });
     }
   });
@@ -1619,6 +1706,16 @@ function visibleEntries() {
 }
 
 function renderEntries() {
+  if (state.ledgerQuery && state.ledgerResults) {
+    if (state.ledgerError) {
+      return emptyStateHTML({ icon: 'cloud-off', title: t('budget.ledgerSearchError') });
+    }
+    if (!state.ledgerResults.length) {
+      return emptyStateHTML({ icon: 'search-x', title: t('budget.ledgerSearchEmpty', { query: state.ledgerQuery }) });
+    }
+    // Treffer aus vielen Monaten: die Zeile nennt das volle Datum.
+    return entryRows(state.ledgerResults, { fullDate: true });
+  }
   if (!state.entries.length) {
     // BEI `budget: read` BLEIBT NUR DER TITEL. Beschreibung und Hinweis sind
     // Anleitungen zum Anlegen („ueber den + Button"), und der CTA klickt den
@@ -1684,7 +1781,7 @@ function statementCreditLimitHtml() {
 }
 
 /** Die Buchungszeilen selbst - einmal gebaut, von Liste und Gruppen benutzt. */
-function entryRows(list) {
+function entryRows(list, { fullDate = false } = {}) {
   const ro = readOnly();
   // In einem Prognose-Monat liegt JEDE Zeile nach heute - dort sagt es der
   // Titel der Bilanz, und ein Symbol in jeder Metazeile waere Wiederholung.
@@ -1711,7 +1808,7 @@ function entryRows(list) {
      *
      * `formatEntryDate` bleibt, wie es ist: die Darlehensraten weiter unten
      * stehen in KEINER Monatsansicht, dort trägt die Zeile das volle Datum. */
-    const date      = formatDayMonth(e.date);
+    const date      = fullDate ? formatEntryDate(e.date) : formatDayMonth(e.date);
     const recurTag  = e.is_recurring
       ? ` <span class="budget-recur-mark" role="img" aria-label="${t('budget.recurringLabel')}"><i data-lucide="repeat" class="icon-sm" aria-hidden="true"></i></span>${e.recurrence_virtual ? ' ' + t('budget.virtualBudgetBadge') : ''}`
       : (e.recurrence_parent_id ? ` <span class="budget-recur-mark" role="img" aria-label="${t('budget.recurringInstanceLabel')}"><i data-lucide="corner-down-left" class="icon-sm" aria-hidden="true"></i></span>` : '');
@@ -4232,7 +4329,10 @@ function listNarrowsSummary() {
 
 async function deleteEntry(id) {
   if (readOnly()) return;
-  const entry = state.entries.find((e) => e.id === id);
+  const entry = findEntry(id);
+  // Aus der Suche heraus kann die Buchung in einem anderen Monat liegen - dann
+  // aendert ihr Loeschen die Bilanz dieses Monats nicht.
+  const inMonth = state.entries.some((e) => e.id === id);
 
   if (entry && (entry.is_recurring || entry.recurrence_parent_id)) {
     const scope = await recurringChoiceModal({
@@ -4246,9 +4346,10 @@ async function deleteEntry(id) {
   }
 
   state.entries = state.entries.filter((e) => e.id !== id);
+  if (state.ledgerResults) state.ledgerResults = state.ledgerResults.filter((e) => e.id !== id);
   // Auch im Konto-Drilldown genau: der Server loescht genau diese eine
   // Buchung, und sie steht in der Liste - anders als die Serie (listNarrowsSummary).
-  if (entry) state.summary = summaryWith(state.summary, [entry], -1);
+  if (entry && inMonth) state.summary = summaryWith(state.summary, [entry], -1);
   renderBody();
   vibrate([30, 50, 30]);
 
@@ -4263,11 +4364,19 @@ async function deleteEntry(id) {
     restore: (err) => {
       // Nur in den Monat zurueck, aus dem sie kam: nach dem Blaettern zeigt
       // die Liste einen anderen Monat, und die Buchung gehoert nicht hinein.
-      if (entry && String(entry.date ?? '').slice(0, 7) === state.month) {
-        state.entries = [...state.entries, entry].sort((a, b) => new Date(b.date) - new Date(a.date));
+      const byDate = (a, b) => new Date(b.date) - new Date(a.date);
+      let back = false;
+      if (entry && inMonth && String(entry.date ?? '').slice(0, 7) === state.month) {
+        state.entries = [...state.entries, entry].sort(byDate);
         state.summary = summaryWith(state.summary, [entry], 1);
-        renderBody();
+        back = true;
       }
+      // Und in die Treffer, falls die Suche noch steht.
+      if (entry && state.ledgerQuery && state.ledgerResults) {
+        state.ledgerResults = [...state.ledgerResults.filter((e) => e.id !== id), entry].sort(byDate);
+        back = true;
+      }
+      if (back) renderBody();
       if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
     },
   });
@@ -4317,11 +4426,12 @@ function recurringChoiceModal({ title, thisLabel, seriesLabel, seriesDanger = fa
 
 async function deleteEntrySeries(id) {
   if (readOnly()) return;
-  const entry = state.entries.find((e) => e.id === id);
+  const entry = findEntry(id);
   const parentId = entry?.recurrence_parent_id ?? (entry?.is_recurring ? entry.id : id);
   const inSeries = (e) => e.id === parentId || e.recurrence_parent_id === parentId;
   const removed = state.entries.filter(inSeries);
   state.entries = state.entries.filter((e) => !inSeries(e));
+  if (state.ledgerResults) state.ledgerResults = state.ledgerResults.filter((e) => !inSeries(e));
   // Das Undo laedt den Monat neu (restore unten) - herausrechnen genuegt hier.
   // Aber nur, wenn die Liste alles zeigt, was die Bilanz zaehlt: im
   // Konto-Drilldown fehlen ihr Vorkommen, die per Einzel-Bearbeitung auf ein

@@ -866,3 +866,58 @@ test('PUT /:id/series: kuenftige Instanzen ziehen nach, bereits gebuchte nicht',
   assert.deepEqual(who(future), [B], 'kuenftige Instanz zieht nach');
   assert.deepEqual(who(past), [A], 'eine gebuchte Vergangenheit bleibt, wie sie war');
 });
+
+// ── GET /?q= - Suche im Hauptbuch (Re-Critique 2026-09-27, C6) ───────────────
+//
+// "Wann war die letzte Zahnarztrechnung?" hiess bisher Monate blaettern: die
+// Liste kannte nur einen Monat. `q` sucht ueber ALLE Monate, im Wortinneren,
+// ohne Ruecksicht auf Gross-/Kleinschreibung und Akzente - und nur in dem, was
+// der Betrachter sehen darf: private Buchungen anderer fehlen, und von einer
+// fremden "nur Betrag"-Buchung ist der Titel verdeckt, also findet er sie nicht.
+
+test('GET /?q=: findet Wortteile ueber alle Monate, neueste zuerst', async () => {
+  insertEntry({ title: 'Zahnarztrechnung Dr. Müller', amount: -80, date: '2033-02-03' });
+  insertEntry({ title: 'ZAHNARZT Kontrolle', amount: -40, date: '2033-07-19' });
+  insertEntry({ title: 'Kieferorthopaede', amount: -99, date: '2033-05-01' });
+  const r = await call('GET', '/?q=arzt');
+  assert.equal(r.status, 200);
+  const titles = r.body.data.map((e) => e.title);
+  assert.deepEqual(titles.filter((t) => /arzt/i.test(t)), ['ZAHNARZT Kontrolle', 'Zahnarztrechnung Dr. Müller']);
+  assert.ok(!titles.includes('Kieferorthopaede'));
+  // Akzente fallen beidseitig weg: "muller" findet "Müller".
+  const umlaut = await call('GET', '/?q=muller');
+  assert.ok(umlaut.body.data.some((e) => e.title === 'Zahnarztrechnung Dr. Müller'));
+});
+
+test('GET /?q=: % und _ sind Zeichen, keine Platzhalter', async () => {
+  insertEntry({ title: 'Rabatt 50% Schuhe', amount: -30, date: '2033-03-03' });
+  insertEntry({ title: 'Rabatt 500 Schuhe', amount: -30, date: '2033-03-04' });
+  insertEntry({ title: 'snake_case Kurs', amount: -12, date: '2033-03-05' });
+  insertEntry({ title: 'snakeXcase Kurs', amount: -12, date: '2033-03-06' });
+  const pct = await call('GET', `/?q=${encodeURIComponent('50%')}`);
+  assert.deepEqual(pct.body.data.map((e) => e.title), ['Rabatt 50% Schuhe']);
+  const under = await call('GET', `/?q=${encodeURIComponent('e_c')}`);
+  assert.deepEqual(under.body.data.map((e) => e.title), ['snake_case Kurs']);
+});
+
+test('GET /?q=: fremde private Buchungen fehlen, verdeckte Titel werden nicht gefunden', async () => {
+  setMode('personal');
+  insertEntry({ title: 'Geheimgeschenk privat', amount: -50, date: '2033-09-01', created_by: B, owner_id: B, visibility: 'private' });
+  insertEntry({ title: 'Geheimgeschenk betrag', amount: -60, date: '2033-09-02', created_by: B, owner_id: B, visibility: 'shared_amount' });
+  insertEntry({ title: 'Geheimgeschenk offen', amount: -70, date: '2033-09-03', created_by: B, owner_id: B, visibility: 'shared' });
+  const r = await call('GET', '/?q=geheim&scope=household', { as: { id: A, role: 'member' } });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.data.map((e) => e.title), ['Geheimgeschenk offen']);
+  const owner = await call('GET', '/?q=geheim&scope=mine', { as: { id: B, role: 'member' } });
+  assert.equal(owner.body.data.length, 3, 'die eigene Buchung findet ihr Besitzer in jeder Stufe');
+});
+
+test('GET /?q=: begrenzt die Treffer und sagt es', async () => {
+  for (let i = 0; i < 205; i += 1) insertEntry({ title: `Kaffeebar ${i}`, amount: -3, date: `2034-01-${String((i % 28) + 1).padStart(2, '0')}` });
+  const r = await call('GET', '/?q=kaffeebar');
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.length, 200);
+  assert.equal(r.body.meta?.truncated, true);
+  const leer = await call('GET', '/?q=%20%20');
+  assert.equal(leer.status, 400, 'eine leere Suche ist keine Monatsliste ohne Monat');
+});
