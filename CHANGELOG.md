@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Vital readings and lab values can be edited.** The edit button on a recent reading in Health
+  opens it with its values, time, visibility and note filled in, where the row used to offer only
+  delete; delete moved to the left of the dialog footer with the usual undo. In a lab report each value has an edit
+  button that corrects the value and recalculates its flag. The API gains
+  `PATCH /api/v1/health/results/:id` for a single lab value.
+
 - **The month on a phone shows the day you pick below the grid.** Tapping a day in the month view
   now selects it instead of jumping to the day view, and its events and tasks appear as a list
   under the grid, in the same rows as the agenda; the date above the list opens the day view. Drag
@@ -378,7 +384,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   before it opens under the pointer, and the kitchen highlight stays on its tab after the sidebar
   is collapsed or expanded.
 
+- **Contacts and documents select with the same circle as tasks.** Select mode shows the round
+  selection circle with the name of the contact or document instead of a browser checkbox, and
+  the whole row still toggles it. The "Open" mark on a document from a connected document system
+  is always visible instead of only under the pointer.
+
+- **Meals and recipes delete from the dialog footer.** Delete sits on the left of the footer with
+  Cancel and Save on the right, as in the other dialogs.
+
+- **Default reward points save like the switches beside them.** The field saves when you leave it
+  or press Enter, checks the value in place and confirms with a message; the separate Save button
+  is gone. Escape restores the saved value.
+
+- **The permission matrix says which role you are editing.** The first role is selected when the
+  page opens, the role and member chips announce their state, and a legend explains the four
+  access icons on wider screens.
+
 ### Fixed
+
+- **A new booking no longer files itself under the first category.** The booking dialog used to
+  preselect the first category (often "Rent") and, after you picked one, its first subcategory,
+  so an entry with only an amount and a title was booked there silently. Category and, when there
+  is more than one, subcategory now start empty and saving asks for them; editing keeps the stored
+  values. The entry type (expense, income, loan) is a segmented control that screen readers
+  announce and the arrow keys move.
+
+- **Budget keeps its tab and its balance honest.** The open tab is part of the address, so a
+  reload or the back button returns to it without adding history entries. Deleting a booking
+  takes it out of the month balance at once, and undo puts it back.
+
+- **Links on the overview land where they say.** "Manage" on the family tile opens the family
+  settings for admins and is hidden for everyone else, and "+N more today" is a link to the tasks,
+  the day in the calendar or the module the hidden rows belong to. Rows in the today list name the
+  item before the person.
+
+- **Leaving customize mode on the overview no longer throws changes away silently.** The close
+  button is gone; Cancel asks before it discards unsaved changes, and Save stays as it was.
+
+- **Rows and tabs say what they do and what is selected.** Tapping a birthday opens it for editing
+  (read-only members see it without a chevron), the list chips in Shopping announce which list is
+  shown, and note titles are real headings, so screen readers can jump between notes.
 
 - **Small things from the component review.** The first day of a fast reads "Day 1", not "Day 0".
   The avatar in the birthday dialog has its colour again. "Add subtask" no longer shows two plus
