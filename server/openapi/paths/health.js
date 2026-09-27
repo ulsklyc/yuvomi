@@ -123,6 +123,7 @@ export function healthPaths() {
       post: op({ summary: 'Add an analyte result to a lab report', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/health/results/{id}': {
+      patch: op({ summary: 'Update an analyte result', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Partial body (analyte, value_num, unit, ref_low, ref_high, flag?). The merged row is validated like a new result; the flag is re-derived from value and reference range unless the body names one.' }),
       delete: op({ summary: 'Delete an analyte result', tag: 'Health', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/health/activities': {

@@ -217,6 +217,53 @@ router.post('/labs/:id/results', (req, res) => {
   }
 });
 
+// PATCH /results/:id  (einen Analyt korrigieren, Critique R8 H9)
+//
+// Bis R8 liess sich ein Laborwert nur loeschen und neu erfassen - ein
+// Tippfehler kostete die Zeile. Der Body darf Teilfelder tragen; validiert
+// wird die ZUSAMMENGEFUEHRTE Zeile mit demselben Validator wie beim Anlegen,
+// damit ein Teil-Update keine Kombination erzeugt, die POST abgelehnt haette.
+// Das Flag wird aus Wert und Referenz neu abgeleitet - ausser der Body nennt
+// es selbst; das alte Flag wandert bewusst NICHT mit, sonst stuende nach einer
+// Wertkorrektur das Urteil ueber den alten Wert da.
+router.patch('/results/:id', (req, res) => {
+  try {
+    const viewer = viewerId(req);
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+
+    const existing = writableChild(`
+      SELECT res.* FROM health_lab_results res
+      JOIN health_lab_reports r ON r.id = res.report_id
+      WHERE res.id = ?
+    `, 'r', id, viewer);
+    if (!existing) return res.status(404).json({ error: 'Analyt nicht gefunden.', code: 404 });
+
+    const b = req.body || {};
+    const pick = (key) => (b[key] !== undefined ? b[key] : existing[key]);
+    const { row, error } = validateResult({
+      analyte: pick('analyte'),
+      value_num: pick('value_num'),
+      unit: pick('unit'),
+      ref_low: pick('ref_low'),
+      ref_high: pick('ref_high'),
+      flag: b.flag,
+    });
+    if (error) return badRequest(res, [error]);
+
+    db.get().prepare(`
+      UPDATE health_lab_results
+         SET analyte = ?, value_num = ?, unit = ?, ref_low = ?, ref_high = ?, flag = ?
+       WHERE id = ?
+    `).run(row.analyte, row.value_num, row.unit, row.ref_low, row.ref_high, row.flag, id);
+
+    res.json({ data: db.get().prepare('SELECT * FROM health_lab_results WHERE id = ?').get(id) });
+  } catch (err) {
+    log.error('Error updating lab result:', err.message);
+    res.status(500).json({ error: 'Internal error.', code: 500 });
+  }
+});
+
 // DELETE /results/:id
 router.delete('/results/:id', (req, res) => {
   try {

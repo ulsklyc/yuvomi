@@ -514,6 +514,30 @@ test('Labs: POST /results fügt Analyt hinzu, DELETE entfernt ihn', async () => 
   assert.equal(del.status, 204);
 });
 
+test('Labs: PATCH /results korrigiert einen Analyt und leitet das Flag neu ab (R8 H9)', async () => {
+  asA();
+  const add = await call('POST', `/labs/${reportId}/results`, {
+    analyte: 'Vitamin B12', value_num: 90, unit: 'pg/mL', ref_low: 200, ref_high: 900,
+  });
+  assert.equal(add.status, 201);
+  assert.equal(add.body.data.flag, 'low');
+  const patch = await call('PATCH', `/results/${add.body.data.id}`, { value_num: 390 });
+  assert.equal(patch.status, 200, 'ein Tippfehler laesst sich korrigieren, statt die Zeile zu loeschen');
+  assert.equal(patch.body.data.value_num, 390);
+  assert.equal(patch.body.data.analyte, 'Vitamin B12', 'nicht genannte Felder bleiben');
+  assert.equal(patch.body.data.unit, 'pg/mL');
+  assert.equal(patch.body.data.flag, 'normal', 'das Urteil folgt dem neuen Wert, nicht dem alten Flag');
+
+  const leer = await call('PATCH', `/results/${add.body.data.id}`, { analyte: '' });
+  assert.equal(leer.status, 400, 'die zusammengefuehrte Zeile wird wie beim Anlegen geprueft');
+
+  asB();
+  const fremd = await call('PATCH', `/results/${add.body.data.id}`, { value_num: 1 });
+  assert.equal(fremd.status, 404, 'fremde Befunde bleiben unbeschreibbar');
+  asA();
+  await call('DELETE', `/results/${add.body.data.id}`);
+});
+
 test('Labs: Bob kann Analyt nicht hinzufügen → 404', async () => {
   asB();
   const res = await call('POST', `/labs/${reportId}/results`, { analyte: 'X', value_num: 1 });

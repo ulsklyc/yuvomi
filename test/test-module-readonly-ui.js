@@ -2575,22 +2575,74 @@ test('canEditFor(): das Modulrecht steht VOR der Betreuungs-Freigabe', () => {
 const messung = (over = {}) => ({ id: 41, type: 'weight', value_num: 72.4, unit: 'kg', measured_at: '2026-06-15T08:00', ...over });
 const gewicht = () => ({ type: 'weight', labelKey: 'health.vitals.metric.weight', units: ['kg'], icon: 'scale', channels: null, decimals: 1 });
 
-test('Vitalwerte-Historie mit `health: read`: die Messung bleibt, ihr Loeschweg geht', () => {
+test('Vitalwerte-Historie mit `health: read`: die Messung bleibt, ihr Bearbeiten-Weg geht', () => {
   mitView('vitals', { meId: 1, personId: 1, rows: [messung()], range: 'month', __reset: { rows: [] } }, () => {
     withAccess({ health: 'write' }, () => {
       const html = health.recentMeasurementsMarkup(gewicht());
-      assert.match(html, /data-delete-vital="41"/);
-      assert.match(html, /health\.vitals\.deleteMeasurement/);
+      // R8 H9: die Zeile oeffnet Bearbeiten (Stift) statt nur zu loeschen.
+      assert.match(html, /data-vital-edit="41"/);
+      assert.match(html, /health\.vitals\.editMeasurement/);
+      assert.doesNotMatch(html, /data-delete-vital/, 'Loeschen steht im Dialogfuss, nicht mehr in der Zeile');
     });
     withAccess({ health: 'read' }, () => {
       const html = health.recentMeasurementsMarkup(gewicht());
-      assert.doesNotMatch(html, /data-delete-vital/);
+      assert.doesNotMatch(html, /data-vital-edit/);
       assert.doesNotMatch(html, /<button/);
       // Der Inhalt, den nur ein wirklich gelaufener Renderer ausgeben kann:
       assert.match(html, /health\.vitals\.recentMeasurements/);
       assert.match(html, /72[.,]4/);
     });
   });
+});
+
+test('R8 H9: eine Messung oeffnet sich mit Bestand, Loeschen steht links im Dialogfuss', () => {
+  const bp = { id: 52, type: 'bp', value_num: 128, value_num2: 84, value_num3: 66, unit: 'mmHg', measured_at: '2026-06-15T08:30', visibility: 'family', note: 'nach dem Laufen' };
+  const offen = withAccess({ health: 'write' }, () => modalOptionen(() => health.openVitalModal({ row: bp })));
+  assert.ok(offen, 'mit Schreibrecht geht der Dialog auf');
+  assert.equal(offen.title, 'health.vitals.edit');
+  assert.match(offen.content, /id="vital-sys"[^>]*value="128"/, 'der Bestand steht im Formular');
+  assert.match(offen.content, /id="vital-dia"[^>]*value="84"/);
+  assert.match(offen.content, /id="vital-pulse"[^>]*value="66"/);
+  assert.match(offen.content, /value="2026-06-15T08:30"/, 'der Messzeitpunkt, nicht jetzt');
+  assert.match(offen.content, /<option value="family" selected/, 'die gespeicherte Sichtbarkeit, nicht die Voreinstellung');
+  assert.match(offen.content, />nach dem Laufen<\/textarea>/);
+  assert.match(offen.content, /id="vital-type" disabled/, 'die Metrik einer Messung steht fest');
+  const fuss = /<div class="modal-panel__footer[^"]*">([\s\S]*?)<\/div>/.exec(offen.content)[1];
+  const loeschen = fuss.indexOf('data-action="vital-delete"');
+  assert.ok(loeschen >= 0, 'Loeschen steht im Dialogfuss');
+  assert.ok(loeschen < fuss.indexOf('data-action="cancel"'), 'links vor Abbrechen und Speichern (Kanon)');
+  assert.match(fuss, /btn--danger-outline" data-action="vital-delete" style="margin-inline-end:auto"/);
+
+  const neu = withAccess({ health: 'write' }, () => modalOptionen(() => health.openVitalModal()));
+  assert.equal(neu.title, 'health.vitals.add');
+  assert.doesNotMatch(neu.content, /vital-delete/, 'ohne Bestand gibt es nichts zu loeschen');
+  assert.doesNotMatch(neu.content, /id="vital-type" disabled/);
+});
+
+test('R8 H9: PATCH einer Messung leert, was der Dialog nicht mehr zeigt', () => {
+  assert.deepEqual(
+    health.vitalPatchBody({ type: 'bp', value_num: 120, value_num2: 80, visibility: 'private', measured_at: '2026-06-15T08:30' }),
+    { type: 'bp', value_num: 120, value_num2: 80, value_num3: null, note: null, visibility: 'private', measured_at: '2026-06-15T08:30' },
+    'ein geleertes Pulsfeld darf den alten Puls nicht stehen lassen',
+  );
+});
+
+test('R8 H9: ein Laborwert laesst sich korrigieren, nicht nur loeschen', () => {
+  const analyt = { id: 3, analyte: 'Ferritin', value_num: 88, unit: 'ng/ml', ref_low: 30, ref_high: 300, flag: 'normal' };
+  const zeile = health.resultEditRowMarkup(analyt);
+  assert.match(zeile, /data-result-edit="3"/, 'die Zeile traegt einen Stift');
+  assert.match(zeile, /common\.editNamed/, 'mit dem Objektnamen');
+  assert.match(zeile, /data-result-del="3"/);
+  const form = health.resultFormMarkup(analyt);
+  assert.match(form, /id="res-analyte"[^>]*value="Ferritin"/, 'das Formular traegt den Bestand');
+  assert.match(form, /id="res-value"[^>]*value="88"/);
+  assert.match(form, /id="res-ref-high"[^>]*value="300"/);
+  assert.match(form, /data-action="res-save"/);
+  assert.match(form, /data-action="res-edit-cancel"/);
+  assert.doesNotMatch(form, /data-action="res-add"/);
+  const leer = health.resultFormMarkup();
+  assert.match(leer, /data-action="res-add"/);
+  assert.doesNotMatch(leer, /value="/, 'ohne Bestand bleibt das Formular leer');
 });
 
 // -------------------------------------------------------------------------
@@ -2936,7 +2988,7 @@ test('WRITE_HOOKS nennt jeden schreibenden Bedienhaken ohne `data-action`', () =
   const erwartet = [
     'data-med-edit', 'data-medlog-edit', 'data-dose-take', 'data-dose-skip',
     'data-ov-dose-take', 'data-ov-dose-skip', 'data-prn-take',
-    'data-activity-edit', 'data-prevention-edit', 'data-delete-vital',
+    'data-activity-edit', 'data-prevention-edit', 'data-vital-edit',
     'data-cycle-day', 'data-cycle-edit',
     'data-nutrition-edit', 'data-nutrition-target',
   ];
@@ -2970,7 +3022,7 @@ test('der Riegel steht in jeder Verdrahtung VOR der ersten Schreib-Aktion', () =
     ['wireMeds', 'data-med-edit'],
     ['wireActivity', 'data-activity-edit'],
     ['wirePrevention', 'data-prevention-edit'],
-    ['renderDetail', 'data-delete-vital'],
+    ['renderDetail', 'data-vital-edit'],
   ];
   for (const [name, ersteAktion] of faelle) {
     const fn = healthFn(name);

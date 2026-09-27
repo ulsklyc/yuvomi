@@ -1054,6 +1054,26 @@ button.health-med-card:hover {
   gap: var(--space-2);
 }
 
+/* Korrigieren eines Analyten (R8 H9): die Zeile, deren Werte gerade im
+ * Formular stehen, traegt eine Inset-Flaeche - so ist sichtbar, WAS das
+ * Formular aendert, ohne dass die Liste springt. Die Aktionen stehen wie im
+ * Dialogfuss am Zeilenende: Abbrechen vor dem Primaerknopf. */
+.health-results-row.is-editing {
+  background: var(--color-fill-well);
+  border-radius: var(--radius-sm);
+  /* Die Flaeche waechst nach aussen, der Inhalt bleibt in seiner Flucht -
+   * sonst rueckten Name, Wert und Stift beim Antippen um 8px ein. */
+  padding-inline: var(--space-2);
+  margin-inline: calc(var(--space-2) * -1);
+}
+
+.health-results-add__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
 .health-results-preview {
   display: inline-flex;
   align-items: center;
