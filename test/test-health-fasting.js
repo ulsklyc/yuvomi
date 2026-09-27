@@ -300,3 +300,49 @@ test('the fasting ring is a real stroke with round ends whose trace moves by tra
     assert.ok(rules.some((r) => r.selector.split(',').map((s) => s.trim()).includes(sel) && /display:\s*none/.test(r.body)), `${sel} hides`);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Kanon D6 (Runde 7, Re-Critique 2026-09-27 A6 P2-5): Fasten spricht die
+// Grammatik der Gesundheit - Personen-Pille, Schalter, kein Doppelname.
+// ---------------------------------------------------------------------------
+
+const { fastingPreferencesHtml } = await import('../public/components/fasting-controls.js');
+const { readFileSync } = await import('node:fs');
+const fastingPage = readFileSync(new URL('../public/pages/health-fasting.js', import.meta.url), 'utf8');
+
+test('fasting reminders are switches (role=switch on the shared .toggle track), not bare checkboxes', () => {
+  const html = fastingPreferencesHtml({ default_goal_minutes: 16 * 60, remind_goal: true, remind_next_start: false });
+  for (const hook of ['data-fasting-remind-goal', 'data-fasting-remind-next']) {
+    const input = html.match(new RegExp(`<input[^>]*${hook}[^>]*>`))?.[0];
+    assert.ok(input, `${hook} fehlt`);
+    assert.match(input, /role="switch"/, `${hook} ist kein Schalter`);
+    const row = html.slice(html.lastIndexOf('<label', html.indexOf(hook)), html.indexOf('</label>', html.indexOf(hook)));
+    assert.match(row, /class="toggle-row toggle-row--switch"/, `${hook} steht nicht in der geteilten Schalterzeile`);
+    assert.match(row, /toggle__track/, `${hook} hat keine .toggle-Bahn`);
+  }
+  assert.match(html.match(/<input[^>]*data-fasting-remind-goal[^>]*>/)[0], /\bchecked\b/);
+  assert.doesNotMatch(html.match(/<input[^>]*data-fasting-remind-next[^>]*>/)[0], /\bchecked\b/);
+});
+
+test('a fasting help button never repeats the heading it explains (no "Your goal, button Your goal")', () => {
+  const html = fastingPreferencesHtml({}) + renderFastingStats({ allTime: {}, year: {}, last30Days: {}, weekly: [] });
+  const headings = [...html.matchAll(/<(h[1-6])\b[^>]*>([\s\S]*?)<\/\1>/g)];
+  assert.ok(headings.length >= 3, 'Ueberschriften nicht gefunden - der Test misst nichts');
+  for (const [, tag, inner] of headings) {
+    assert.doesNotMatch(inner, /<button|yuvomi-fasting-help/, `<${tag}> enthaelt den Infoknopf - sein Name wird Teil der Ueberschrift`);
+  }
+  for (const button of html.matchAll(/<button class="fasting-help__button"[^>]*aria-label="([^"]*)"/g)) {
+    const name = button[1];
+    assert.ok(!headings.some(([, , inner]) => inner.replace(/<[^>]+>/g, '').trim() === name),
+      `der Infoknopf "${name}" heisst wie seine Ueberschrift`);
+  }
+  // Die Presets nennt die Ueberschrift per aria-labelledby, nicht ein zweites Mal als Text.
+  assert.match(html, /class="fasting-presets" role="group" aria-labelledby="[^"]+"/);
+});
+
+test('fasting picks the person with the shared health pill, not a full-width native select', () => {
+  assert.doesNotMatch(fastingPage, /<select[^>]*data-fasting-person/, 'natives Personen-Select ist zurueck');
+  assert.match(fastingPage, /personSwitcherMarkup\(view\.members, view\.subject, view\.self/,
+    'das Fasten nutzt nicht die Pille der Gesundheit');
+  assert.match(fastingPage, /import \{ personSwitcherMarkup \} from '\/utils\/health-person-switcher\.js'/);
+});

@@ -85,6 +85,11 @@ export function renderHealthTabsBar(container, activeRoute, { cycleEnabled = tru
     extraClass: 'health-tabs-bar page-toolbar__bar',
     ariaLabel: t('nav.health'),
     insertPosition: 'beforeend',
+    // Die gleitende Auswahl-Kapsel wie in der Kueche (Kanon, Runde 7 D8).
+    // update() in health.js baut die Leiste bei JEDEM Tabwechsel neu; der
+    // Schluessel laesst die neue Kapsel von der Stelle der alten gleiten,
+    // statt dass sie auf dem neuen Tab einfach auftaucht.
+    indicator: { key: 'health' },
     onChange: (route) => window.yuvomi?.navigate(route),
   });
 }

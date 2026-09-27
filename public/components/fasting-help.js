@@ -1,10 +1,17 @@
 /** Fasting-only tap/focus disclosure, following the repository's info-help pattern. */
+import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 
 let sequence = 0;
+/**
+ * `label` ist das THEMA (die Ueberschrift daneben). Der Knopf heisst nicht wie
+ * sie: stand er in der Ueberschrift und trug ihren Namen, las ein Screenreader
+ * "Dein Ziel, Schalter Dein Ziel" (Re-Critique 2026-09-27, A6). Er steht darum
+ * NEBEN der Ueberschrift und heisst "Erklaerung zu Dein Ziel".
+ */
 export function fastingHelpHtml(label, paragraphs, attrs = '') {
   const id = `fasting-help-${++sequence}`;
-  return `<yuvomi-fasting-help><button class="fasting-help__button" type="button" aria-label="${esc(label)}" aria-describedby="${id}" aria-expanded="false"><i data-lucide="info" aria-hidden="true"></i></button><span class="fasting-help__tooltip" id="${id}" role="tooltip" popover="manual" hidden ${attrs}><strong>${esc(label)}</strong>${paragraphs.map((text) => `<span>${esc(text)}</span>`).join('')}</span></yuvomi-fasting-help>`;
+  return `<yuvomi-fasting-help><button class="fasting-help__button" type="button" aria-label="${esc(t('health.fasting.helpLabel', { topic: label }))}" aria-describedby="${id}" aria-expanded="false"><i data-lucide="info" aria-hidden="true"></i></button><span class="fasting-help__tooltip" id="${id}" role="tooltip" popover="manual" hidden ${attrs}><strong>${esc(label)}</strong>${paragraphs.map((text) => `<span>${esc(text)}</span>`).join('')}</span></yuvomi-fasting-help>`;
 }
 
 // Pure markup is also imported by non-DOM dashboard rendering tests.

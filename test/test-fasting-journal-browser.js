@@ -15,6 +15,21 @@ const call = (page, method, path, body) => page.evaluate(async ({ method, path, 
 const fill = (page, selector, value) => page.$eval(selector, (el, next) => {
   el.value = next; el.dispatchEvent(new Event('change', { bubbles: true }));
 }, value);
+// Die Person waehlt seit Runde 7 die Personen-Pille der Gesundheit (Kanon D6)
+// statt eines nativen Selects: der aktive Menuepunkt traegt aria-checked, die
+// Wahl ist ein Klick. Ein Menuepunkt fuer eine Person, die es im Haushalt nicht
+// gibt (die Proben unten), wird vorher eingehaengt - die Wahl ist am Kopf
+// delegiert und nimmt ihn wie jeden anderen.
+const currentPerson = (page) => page.$eval('[data-fasting-shell] [role="menuitemradio"][aria-checked="true"]', (el) => el.dataset.personId);
+const choosePerson = (page, id) => page.evaluate((next) => {
+  const menu = document.querySelector('[data-fasting-shell] .health-person-switcher .popover-menu');
+  let item = menu.querySelector(`[data-person-id="${next}"]`);
+  if (!item) {
+    menu.insertAdjacentHTML('beforeend', `<button type="button" role="menuitemradio" aria-checked="false" class="popover-menu__item" data-person-id="${next}">${next}</button>`);
+    item = menu.lastElementChild;
+  }
+  item.click();
+}, String(id));
 
 test('history filters name the household calendar used for completion dates', async () => {
   const harness = await startHarness();
@@ -332,7 +347,7 @@ test('denied family views clear private data, retain filters, and discard late s
     await call(page, 'post', '/health/fasting', { start_at: '2025-01-01T00:00Z', end_at: '2025-01-01T01:00Z', start_tzid: 'UTC', note: 'SELF PRIVATE', acknowledge_safety: true });
     await gotoRoute(page, '/health/fasting');
     await page.waitForSelector('[data-fast-edit]');
-    const self = await page.$eval('[data-fasting-person]', (el) => el.value);
+    const self = await currentPerson(page);
     await page.evaluate(async () => {
       const { api } = await import('/api.js');
       const get = api.get;
@@ -346,26 +361,23 @@ test('denied family views clear private data, retain filters, and discard late s
         }
         return get(path, ...args);
       };
-      const select = document.querySelector('[data-fasting-person]');
-      select.add(new Option('Denied', '9999')); select.add(new Option('Delayed', '9998'));
     });
-    await page.select('[data-fasting-person]', '9999');
+    await choosePerson(page, '9999');
     await page.waitForSelector('[data-fasting-retry]');
     assert.equal(await page.$('[data-fast-edit]'), null);
     assert.equal(await page.$('[data-fasting-action]'), null);
     assert.equal(await page.$('a[download]'), null);
     assert.ok(await page.$('[data-fasting-filters]'));
     assert.equal(await page.$eval('[data-fasting-body]', (el) => el.textContent.includes('SELF PRIVATE')), false);
-    await page.select('[data-fasting-person]', self);
+    await choosePerson(page, self);
     await page.waitForSelector('[data-fast-edit]');
-    await page.evaluate(() => document.querySelector('[data-fasting-person]').add(new Option('Delayed', '9998')));
-    await page.select('[data-fasting-person]', '9998');
+    await choosePerson(page, '9998');
     await page.waitForFunction(() => typeof window.fastingReleaseA === 'function');
-    await page.select('[data-fasting-person]', self);
+    await choosePerson(page, self);
     await page.waitForSelector('[data-fast-edit]');
     await page.evaluate(() => { window.fastingReleaseA(); window.fastingRestoreGet(); });
     await settle(page);
-    assert.equal(await page.$eval('[data-fasting-person]', (el) => el.value), self);
+    assert.equal(await currentPerson(page), self);
     assert.ok(await page.$('[data-fasting-action]'));
     await page.evaluate(async () => {
       const { setPermissions } = await import('/permissions.js');
@@ -385,7 +397,7 @@ test('family reading renders API-redacted state and remains read-only even with 
     await harness.reset();
     const page = await openPage(harness, { locale: 'cs' });
     await gotoRoute(page, '/health/fasting'); await page.waitForSelector('[data-fasting-action]');
-    const self = Number(await page.$eval('[data-fasting-person]', (el) => el.value));
+    const self = Number(await currentPerson(page));
     const members = (await call(page, 'get', '/auth/users')).data;
     const member = members.find((entry) => entry.id !== self);
     const login = await fetch(`${harness.baseUrl}/api/v1/auth/login`, {
@@ -401,7 +413,7 @@ test('family reading renders API-redacted state and remains read-only even with 
     assert.equal(acknowledgement.status, 200);
     await call(page, 'put', `/health/caregivers/${member.id}`, { caregiver_ids: [self] });
     await call(page, 'post', '/health/fasting', { user_id: member.id, start_at: '2025-01-01T00:00Z', end_at: '2025-01-01T01:00Z', start_tzid: 'UTC', visibility: 'family', note: 'FAMILY SHARED', acknowledge_safety: false });
-    await page.select('[data-fasting-person]', String(member.id));
+    await choosePerson(page, member.id);
     await page.waitForFunction(() => document.querySelector('[data-fasting-history]')?.textContent.includes('FAMILY SHARED'));
     assert.equal((await call(page, 'get', `/health/fasting/state?user_id=${member.id}`)).data.canWrite, true);
     assert.equal(await page.$('[data-fasting-action]'), null);
@@ -420,7 +432,7 @@ test('family reading renders API-redacted state and remains read-only even with 
     await page.waitForFunction(() => document.querySelector('[data-fasting-history]')?.textContent.includes('FAMILY SHARED'));
     assert.equal((await call(page, 'get', `/health/fasting/state?user_id=${member.id}`)).data.settings, null);
     assert.match(await page.$eval('a[download]', (el) => el.href), new RegExp(`user_id=${member.id}`));
-    await page.select('[data-fasting-person]', String(self)); await page.waitForSelector('[data-fasting-action]');
+    await choosePerson(page, self); await page.waitForSelector('[data-fasting-action]');
   } finally { await harness.close(); }
 });
 
@@ -491,7 +503,7 @@ test('family selector, offline resume and undo deletion survive route remount', 
     const page = await openPage(harness, { device: 'mobile', theme: 'dark', locale: 'cs' });
     await gotoRoute(page, '/health/fasting');
     await page.waitForSelector('[data-fasting-action]');
-    assert.ok(await page.$('[data-fasting-person]'), 'family selector remains available');
+    assert.ok(await page.$('[data-fasting-shell] .health-person-switcher'), 'family selector remains available');
     await call(page, 'post', '/health/fasting', { start_at: '2025-01-01T00:00Z', end_at: '2025-01-01T01:00Z', start_tzid: 'UTC', acknowledge_safety: true });
     await gotoRoute(page, '/health/fasting');
     await page.waitForSelector('[data-fast-delete]');

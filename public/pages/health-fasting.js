@@ -3,6 +3,8 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { installPopoverMenus } from '/utils/popover-menu.js';
+import { personSwitcherMarkup } from '/utils/health-person-switcher.js';
 import { fastingCompletionCalendarHint, fastingHistoryQuery, fastingStatsQuery, formatFastingDuration, shouldLoadFastingStats } from '/utils/health-fasting.js';
 import { openModal, refocusAfterRender } from '/components/modal.js';
 import { moduleAccess } from '/permissions.js';
@@ -29,22 +31,50 @@ export async function mountFasting(root, { userId } = {}) {
   await refresh(view, { refreshStats: true });
 }
 
+/**
+ * Kopf des Fasten-Panels: die Personen-Pille wie auf jedem Gesundheits-Tab
+ * (utils/health-person-switcher.js) statt des nativen Vollbreit-Selects mit
+ * eigenem Label (Re-Critique 2026-09-27, A6 P2-5; Kanon D6). Ein Haushalt mit
+ * nur einer Person bekommt - wie ueberall - keinen Umschalter.
+ *
+ * Die Wahl ist DELEGIERT (einmal je Panel am Kopf-Knoten, der jeden Neubau
+ * ueberlebt), nicht je Menuepunkt: shell() baut den Kopf bei jedem Laden neu.
+ */
 function shell(view) {
   const el = view.root.querySelector('[data-fasting-shell]');
   el.replaceChildren();
-  el.insertAdjacentHTML('beforeend', `<label class="form-label" for="fasting-person">${esc(t('health.fasting.person'))}</label><select id="fasting-person" data-fasting-person class="form-input">${view.members.map((member) => `<option value="${member.id}" ${member.id === view.subject ? 'selected' : ''}>${esc(member.display_name)}</option>`).join('')}</select>`);
+  el.insertAdjacentHTML('beforeend', personSwitcherMarkup(view.members, view.subject, view.self,
+    { menuId: 'health-person-menu-fasting', label: t('health.fasting.person') }));
   if (!view.state) {
     el.insertAdjacentHTML('beforeend', filtersMarkup(view));
     wireFilters(view, el);
   }
-  el.querySelector('select').addEventListener('change', (event) => {
-    view.subject = Number(event.target.value);
+  window.lucide?.createIcons({ el });
+  if (view.shellWired) return;
+  view.shellWired = true;
+  installPopoverMenus(el);
+  el.addEventListener('click', async (event) => {
+    const item = event.target.closest('.health-person-switcher [data-person-id]');
+    if (!item) return;
+    const id = Number(item.dataset.personId);
+    if (id === view.subject) return;
+    view.subject = id;
     view.state = null; view.stats = undefined; view.statsError = false; view.generation++; view.stop?.(); view.stop = null;
     const body = view.root.querySelector('[data-fasting-body]');
     body.replaceChildren();
     body.insertAdjacentHTML('beforeend', `<p role="status">${esc(t('common.loading'))}</p>`);
     shell(view);
-    void refresh(view, { refreshStats: true });
+    // Der Rueckweg: der alte Knopf ist mit dem Kopf verschwunden, der Fokus
+    // fiele auf <body> (dieselbe Regel wie wirePersonSwitcher in health.js).
+    const refocus = () => {
+      const active = document.activeElement;
+      if (!active || active === document.body || !active.isConnected) {
+        el.querySelector('.health-person-switcher__trigger')?.focus({ preventScroll: true });
+      }
+    };
+    refocus();
+    await refresh(view, { refreshStats: true });
+    refocus();
   });
 }
 

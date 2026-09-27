@@ -5,13 +5,23 @@
 .fasting-clock-switch { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); padding: var(--space-1); border-radius: var(--radius-sm); background: var(--color-surface-3); }
 .fasting-clock-switch .btn { flex: 1; color: var(--color-text-secondary); }
 .fasting-clock-switch .btn[aria-pressed="true"] { background: var(--seg-active-bg); box-shadow: var(--seg-active-shadow); color: color-mix(in srgb, var(--module-health) var(--tint-ink), var(--color-text-primary)); }
-.fasting-notifications .form-check:has(input:disabled) { color: var(--color-text-secondary); cursor: not-allowed; }
+/* Erinnerungen sind Schalter (toggleRowHtml, control: 'switch'); ohne Ziel
+ * sind sie gesperrt - die Zeile sagt das mit, nicht nur die Bahn. */
+.fasting-notifications .toggle-row:has(input:disabled) { cursor: not-allowed; }
+.fasting-notifications .toggle-row:has(input:disabled) .toggle-row__label { color: var(--color-text-secondary); }
 .fasting-preferences { display: grid; gap: var(--space-5); }
 .fasting-presets { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-block: var(--space-3); }
 .fasting-custom { margin-block-start: var(--space-4); }
 .fasting-custom[hidden] { display: none; }
 .fasting-notifications { border-top: 1px solid var(--color-border-subtle); padding-block-start: var(--space-4); }
-.fasting-notifications .form-check { display: flex; margin-block: var(--space-3); }
+/* Die Zeile behaelt ihr Polster (Hover-Flaeche), der Text fluchtet mit der
+ * Ueberschrift darueber. */
+.fasting-notifications .toggle-row { margin-block-start: var(--space-2); margin-inline: calc(-1 * var(--space-3)); }
+/* Die Wahlfelder des Fastens stehen im Lesemass statt ueber die ganze
+ * Inhaltsspalte (1156px bei 1440, Re-Critique 2026-09-27 A6 P2-5): ein Select
+ * so breit wie die Seite liest sich wie eine Eingabezeile, nicht wie eine Wahl. */
+.fasting-preferences > .form-group,
+.fasting-notifications { max-inline-size: var(--layout-reading); }
 [data-fasting-edit-error], [data-fasting-widget-error], [data-fasting-error] { font-size: var(--text-sm); color: var(--color-danger-ink); }
 .fasting-editor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
 .fasting-editor-grid .form-group { min-width: 0; }

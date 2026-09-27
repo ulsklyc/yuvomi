@@ -25,6 +25,8 @@ import { openModal, closeModal, confirmModal, confirmOverModal, reportFieldError
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
+import { personSwitcherMarkup } from '/utils/health-person-switcher.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import {
   computeVitalSeries, VITAL_METRICS, vitalMetric,
   MOOD_SCALE, moodStep, splitDuration, durationToHours,
@@ -692,49 +694,19 @@ function renderVitalsShell() {
     <div class="health-vitals__detail" id="health-vitals-detail"></div>
   `);
   if (window.lucide) window.lucide.createIcons({ el: vitals.root });
+  // Die Zeitraum-Leiste entsteht mit jeder Auswahl neu (renderVitalsShell):
+  // der Schluessel laesst die gleitende Kapsel von der alten Stelle kommen
+  // (Kanon, Runde 7 D8).
+  attachSegmentIndicator(vitals.root.querySelector('.health-vitals__ranges'), { key: 'health-vitals-range' });
   wireVitals();
   refreshHealthFab();
   renderCards();
   renderDetail();
 }
 
-// Geteilter Personen-Umschalter: EIN Knopf mit der aktiven Person statt einer
-// Dauer-Pillenzeile (Critique 2026-08-31: 6 Ansichts-Tabs + 4 Personen-Pillen
-// = 10 Wahlmoeglichkeiten vor dem ersten Inhalt, mobil eine volle 48px-Zeile).
-// Die aktive Person bleibt am Knopf sichtbar (Wiedererkennen statt Erinnern);
-// das Menue ist das geteilte popover-menu-Vokabular mit role=menuitemradio -
-// dieselbe Bauart wie der Rezepte-Quellenfilter. Ein Haushalt mit nur einer
-// sichtbaren Person bekommt keinen Umschalter: die eigene Ansicht ist die
-// einzige, und ein Menue mit einem Eintrag waere Chrome ohne Auskunft.
-function personSwitcherMarkup(members, activeId, meId, { menuId, label }) {
-  const list = members || [];
-  if (list.length <= 1) return '';
-  const nameOf = (m) => (m.id === meId
-    ? `${m.display_name} · ${t('health.vitals.you')}`
-    : m.display_name);
-  const dotOf = (m) => `<span class="health-person-chip__dot" aria-hidden="true"
-          style="background:${esc(m.avatar_color) || 'var(--module-health)'}"></span>`;
-  const active = list.find((m) => m.id === activeId) ?? list[0];
-  return `
-    <div class="health-person-switcher">
-      <button type="button" class="health-person-switcher__trigger popover-menu__trigger"
-              popovertarget="${esc(menuId)}" aria-haspopup="menu" aria-expanded="false"
-              aria-label="${esc(label)}: ${esc(nameOf(active))}">
-        ${dotOf(active)}
-        <span class="health-person-switcher__name">${esc(nameOf(active))}</span>
-        <i data-lucide="chevron-down" class="icon-sm health-person-switcher__chevron" aria-hidden="true"></i>
-      </button>
-      <div class="popover-menu" id="${esc(menuId)}" popover role="menu" aria-label="${esc(label)}">
-        ${list.map((m) => `
-          <button type="button" role="menuitemradio" aria-checked="${m.id === activeId}"
-                  class="popover-menu__item" data-person-id="${esc(m.id)}">
-            <i data-lucide="check" class="icon-md popover-menu__item-check${m.id === activeId ? '' : ' popover-menu__item-check--hidden'}" aria-hidden="true"></i>
-            ${dotOf(m)}
-            <span>${esc(nameOf(m))}</span>
-          </button>`).join('')}
-      </div>
-    </div>`;
-}
+// Der Personen-Umschalter (`personSwitcherMarkup`) wohnt seit Runde 7 in
+// utils/health-person-switcher.js: das Fasten (pages/health-fasting.js) nutzt
+// dieselbe Pille statt eines nativen Vollbreit-Selects (Kanon, D6).
 
 /**
  * Verdrahtet den Personen-Umschalter - und gibt den Fokus zurueck.

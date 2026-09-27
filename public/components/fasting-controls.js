@@ -8,6 +8,7 @@ import { wallTimeValue, wallTimeInstant, wallTimeCandidates } from '/utils/timez
 import { moduleAccess } from '/permissions.js';
 import { updateFastingDial } from '/components/fasting-dial.js';
 import { fastingHelpHtml } from '/components/fasting-help.js';
+import { toggleRowHtml } from '/settings/components.js';
 
 export function fastingError(error) {
   if (error?.message === 'FASTING_OFFLINE') return t('health.fasting.offline');
@@ -29,14 +30,16 @@ export function requireFastingWrite() {
   if (moduleAccess('health') !== 'write') throw new Error('FASTING_READ_ONLY');
 }
 
+let preferencesSequence = 0;
 export function fastingPreferencesHtml(settings = {}) {
   const hours = settings.default_goal_minutes ? settings.default_goal_minutes / 60 : null;
   const custom = hours !== null && !FASTING_PRESETS.includes(hours);
   const available = fastingNotificationAvailability(settings.default_goal_minutes);
+  const goalTitleId = `fasting-goal-title-${++preferencesSequence}`;
   const choice = (value, label, selected) => `<button type="button" class="btn ${selected ? 'btn--primary' : 'btn--secondary'} btn--sm" data-fasting-preset="${value}" aria-pressed="${selected}">${esc(label)}</button>`;
   return `<div class="fasting-preferences">
-    <section><h3 class="u-section-title fasting-help-heading">${esc(t('health.fasting.goalTitle'))}${fastingHelpHtml(t('health.fasting.goalTitle'), [t('health.fasting.goalHint'), t('health.fasting.goalNextHint')])}</h3>
-      <div class="fasting-presets" role="group" aria-label="${esc(t('health.fasting.goalTitle'))}">
+    <section><div class="fasting-help-heading"><h3 class="u-section-title" id="${goalTitleId}">${esc(t('health.fasting.goalTitle'))}</h3>${fastingHelpHtml(t('health.fasting.goalTitle'), [t('health.fasting.goalHint'), t('health.fasting.goalNextHint')])}</div>
+      <div class="fasting-presets" role="group" aria-labelledby="${goalTitleId}">
         ${choice('', t('health.fasting.noGoal'), hours === null)}
         ${FASTING_PRESETS.map((h) => choice(String(h), `${h}:${24 - h}`, hours === h)).join('')}
         ${choice('custom', t('health.fasting.custom'), custom)}
@@ -46,9 +49,9 @@ export function fastingPreferencesHtml(settings = {}) {
         <input class="form-input" id="fasting-goal-hours" type="number" min="1" max="336" step="1" value="${custom ? hours : ''}" data-fasting-goal>
       </div>
     </section>
-    <section class="fasting-notifications"><h3 class="u-section-title fasting-help-heading">${esc(t('health.fasting.notifications'))}${fastingHelpHtml(t('health.fasting.notifications'), [t('health.fasting.reminderHint')])}</h3>
-      <label class="form-check"><input type="checkbox" data-fasting-remind-goal ${settings.remind_goal ? 'checked' : ''} ${available.goal ? '' : 'disabled'}>${esc(t('health.fasting.remindGoalToggle'))}</label>
-      <label class="form-check"><input type="checkbox" data-fasting-remind-next ${settings.remind_next_start ? 'checked' : ''} ${available.next ? '' : 'disabled'}>${esc(t('health.fasting.remindNextToggle'))}</label>
+    <section class="fasting-notifications"><div class="fasting-help-heading"><h3 class="u-section-title">${esc(t('health.fasting.notifications'))}</h3>${fastingHelpHtml(t('health.fasting.notifications'), [t('health.fasting.reminderHint')])}</div>
+      ${toggleRowHtml({ label: t('health.fasting.remindGoalToggle'), control: 'switch', checked: !!settings.remind_goal, disabled: !available.goal, attrs: { 'data-fasting-remind-goal': true } })}
+      ${toggleRowHtml({ label: t('health.fasting.remindNextToggle'), control: 'switch', checked: !!settings.remind_next_start, disabled: !available.next, attrs: { 'data-fasting-remind-next': true } })}
     </section>
     <section class="form-group"><label class="form-label" for="fasting-clock-default">${esc(t('health.fasting.clockDefault'))}</label>
       <select class="form-input" id="fasting-clock-default" data-fasting-clock-default>${['auto', 'elapsed', 'remaining'].map((mode) => `<option value="${mode}" ${(settings.clock_mode || 'auto') === mode ? 'selected' : ''}>${esc(t(`health.fasting.clock${mode[0].toUpperCase() + mode.slice(1)}`))}</option>`).join('')}</select>

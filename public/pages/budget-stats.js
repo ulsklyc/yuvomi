@@ -5,6 +5,7 @@
 import { api } from '/api.js';
 import { t, formatDate, getLocale } from '/i18n.js';
 import { wireTablist } from '/utils/tablist.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
 import { CHART, chartX, chartY, chartGridMarkup, chartXLabelsMarkup } from '/utils/chart.js';
@@ -123,6 +124,9 @@ function wire() {
     activeClass: 'is-active',
     onChange: (id) => view.ctx.onRangeChange(id),
   });
+  // Gleitende Auswahl-Kapsel wie jede Segmentleiste (Kanon, Runde 7 D8); das
+  // Panel wird mit dem Berichte-Tab neu gebaut, der Schluessel haelt die Lage.
+  attachSegmentIndicator(view.root.querySelector('.budget-stats__ranges'), { key: 'budget-stats-range' });
 }
 
 function renderBodyContent(body) {
