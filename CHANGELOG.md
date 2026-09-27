@@ -415,8 +415,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Links on the overview land where they say.** "Manage" on the family tile opens the family
   settings for admins and is hidden for everyone else, and "+N more today" is a link to the tasks,
-  the day in the calendar or the module the hidden rows belong to. Rows in the today list name the
-  item before the person.
+  the day in the calendar or the module when that one view shows every hidden row; when the hidden
+  rows come from different places, it unfolds them in place and folds them again on a second tap.
+  Rows in the today list name the item before the person.
 
 - **Leaving customize mode on the overview no longer throws changes away silently.** The close
   button is gone; Cancel asks before it discards unsaved changes, and Save stays as it was.
