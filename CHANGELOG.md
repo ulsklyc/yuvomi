@@ -404,7 +404,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the permissions of a role or member fail to load, the page says so and offers to try again
   instead of showing defaults that cannot be changed.
 
+- **Task rows on a phone give the title the width.** The "Who did it?" picker left the row: it
+  sits next to Complete in the task's detail and in the row's context menu (long press or
+  right-click). Titles use the row's width, and the due date ends with an ellipsis instead of being
+  cut off. The board shows one column per page on a phone - swipe between columns, the dots above
+  show where you are, and cards are as compact as list rows.
+
+- **The calendar header on a phone takes two rows.** Month, week, day and agenda moved into the
+  "..." menu, as in Apple Calendar; filter, search and the menu share the first row, the arrows and
+  the period the second. Event titles in the week wrap to as many lines as the block has room for
+  instead of stopping after one.
+
+- **Notes on a phone open with a tap on the card.** The title reads larger than the text, and the
+  cards are shorter, so about three and a half notes fit on a screen instead of two.
+
+- **A contact on a phone opens with its card**, with the monogram and the quick actions to call,
+  write or show the address, as on a wide screen.
+
+- **Vitals on a phone open a sheet.** Tapping a tile opens the measurement with a tall chart across
+  the full width, the period switch and the list of readings with edit. Metrics without a value
+  share one "More measurements" row instead of a tile each.
+
+- **Budget on a phone starts with the bookings.** The balance is one row with income and expenses
+  inline, the categories wait behind "All categories", and the first booking is on the first screen
+  instead of below it.
+
+- **The meal plan on a phone is one list per day.** Each meal is a row with a dot and the meal type
+  in front of its name, the handle is small at the end of the row, and delete lives in the dialog
+  footer. A week needs about a third less scrolling.
+
+- **Customizing the overview on a phone keeps one bar.** Cancel, the title and Done share one row,
+  the note on who sees the layout moved below the tiles, "Today" folds to its header while you
+  arrange, and each tile offers one size menu with only the sizes that change something there. The
+  first tile now starts on the first screen.
+
+- **The kitchen tabs fit a phone, with search in the same row.** In Recipes and Pantry the search
+  button and "..." sit in the kitchen tab row instead of a row of their own, and the four tabs fit
+  down to 375px without scrolling.
+
+- **The shift plan's statistics period is a menu on narrow screens** instead of a segmented control
+  that scrolled sideways.
+
 ### Fixed
+
+- **Delete in a phone dialog no longer pushes Save to a second row.** Below 640px it is a trash
+  button named after what it deletes, with Cancel and Save beside it in one row.
+
+- **A docked header on a phone always names the page.** When its controls leave no room for the
+  title, they fold into the "..." menu and the title appears.
+
+- **The reminder toast steps aside for dialogs.** It no longer sits over a dialog's buttons, comes
+  back when the dialog closes, and is more compact on a phone.
 
 - **A new booking no longer files itself under the first category.** The booking dialog used to
   preselect the first category (often "Rent") and, after you picked one, its first subcategory,
