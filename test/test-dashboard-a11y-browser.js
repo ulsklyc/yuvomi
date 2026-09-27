@@ -22,7 +22,7 @@
  */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { startHarness, openPage, gotoRoute, settle, DEVICES } from './document-guards-harness.js';
+import { startHarness, openPage, gotoRoute, settle, clickPastDeadTime, DEVICES } from './document-guards-harness.js';
 
 let harness;
 before(async () => { harness = await startHarness(); });
@@ -194,7 +194,8 @@ test('(3) Anpassen per Tastatur: der Fokus bleibt, die Wechsel werden angesagt',
   await page.keyboard.press('Enter');
   await page.waitForSelector('#confirm-modal-ok');
   assert.ok(await page.$('.widget-edit-controls'), 'vor der Antwort ist nichts verworfen');
-  await page.click('#confirm-modal-ok');
+  // Ein Klick in den ersten 350 ms eines Dialogs verpufft (armPointerDeadTime).
+  await clickPastDeadTime(page, '#confirm-modal-ok');
   await page.waitForFunction(() => !document.querySelector('.widget-edit-controls'));
   await page.waitForFunction(() => !document.querySelector('.modal-overlay'));
   a = await active();
