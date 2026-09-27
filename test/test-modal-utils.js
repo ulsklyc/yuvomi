@@ -1095,6 +1095,9 @@ function fakeSheet({ wire = (panel) => modalInternals.wireSheetSwipe(panel), top
     start: (y) => handlers.touchstart(at(y, 0)),
     move: (y, dt) => handlers.touchmove(at(y, dt)),
     end: (y, dt) => handlers.touchend(at(y, dt)),
+    cancel: (y, dt) => handlers.touchcancel(at(y, dt)),
+    // Ein zweiter Finger setzt auf: touchstart meldet zwei Beruehrungen.
+    secondFinger: (y) => { clock += 16; handlers.touchstart({ timeStamp: clock, touches: [{ clientY: y }, { clientY: y + 80 }], changedTouches: [{ clientY: y + 80 }] }); },
   };
 }
 
@@ -1187,6 +1190,43 @@ test('Sheet-Drag: bleibt das Blatt stehen (onDismiss -> false, Rueckfrage), fede
     sheet.move(720);
     sheet.end(720);
     assert.equal(sheet.translate, '');
+  } finally {
+    delete global.requestAnimationFrame;
+  }
+});
+
+test('Sheet-Drag: touchcancel bricht die Geste ab - es schliesst nie, das Blatt federt zurueck', () => {
+  // Ein abgebrochener Touch (Browser uebernimmt die Geste, Unterbrechung) ist
+  // keine Absicht zu schliessen, auch wenn der letzte Stand wie ein Flick aussah.
+  global.requestAnimationFrame = (fn) => fn();
+  try {
+    let dismissed = 0;
+    const sheet = fakeSheet({ wire: (p) => sheetDrag.wireSheetDrag(p, { onDismiss: () => { dismissed += 1; } }) });
+    sheet.start(600);
+    sheet.move(650, 16);
+    sheet.move(720, 16); // 120px schnell: als touchend waere das ein Schliessen
+    sheet.cancel(720, 1);
+    assert.equal(dismissed, 0, 'touchcancel darf onDismiss nie ausloesen');
+    assert.equal(sheet.translate, '', 'der Zug wird zurueckgenommen');
+    assert.equal(sheet.attrs['data-sheet-drag'], undefined, 'ohne Marke federt es per Transition zurueck');
+  } finally {
+    delete global.requestAnimationFrame;
+  }
+});
+
+test('Sheet-Drag: ein zweiter Finger mitten im Zug laesst das Blatt nicht versetzt stehen', () => {
+  global.requestAnimationFrame = (fn) => fn();
+  try {
+    let dismissed = 0;
+    const sheet = fakeSheet({ wire: (p) => sheetDrag.wireSheetDrag(p, { onDismiss: () => { dismissed += 1; } }) });
+    sheet.start(600);
+    sheet.move(660);
+    assert.equal(sheet.translate, '0px 50px');
+    sheet.secondFinger(660);
+    sheet.end(660);
+    assert.equal(dismissed, 0);
+    assert.equal(sheet.translate, '', 'der Versatz faellt zurueck, statt bei 50px zu kleben');
+    assert.equal(sheet.attrs['data-sheet-drag'], undefined, 'die Zieh-Marke (keine Transition) bleibt nicht haengen');
   } finally {
     delete global.requestAnimationFrame;
   }

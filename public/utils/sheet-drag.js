@@ -151,8 +151,23 @@ export function wireSheetDrag(sheet, {
     setTimeout(finish, 600);
   };
 
+  // Zug abbrechen, ohne zu schliessen: der Versatz federt in die Ruhelage.
+  // Per rAF wie in `end` - DOM-Mutationen im Touch-Handler stoeren auf iOS
+  // WebKit die Touch->Click-Konvertierung.
+  const abort = () => {
+    const wasPulled = tracking && pulled;
+    tracking = false;
+    pulled = false;
+    if (!wasPulled) return;
+    const settle = () => { mark(sheet, null); setOffset(sheet, 0); };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(settle);
+    else settle();
+  };
+
   sheet.addEventListener('touchstart', (e) => {
-    if (e.touches.length !== 1) { tracking = false; return; }
+    // Ein zweiter Finger beendet den Zug; ein schon gezogenes Blatt kehrt
+    // zurueck, statt versetzt und ohne Transition-Marke stehen zu bleiben.
+    if (e.touches.length !== 1) { abort(); return; }
     const y = e.touches[0].clientY;
     const top = sheet.getBoundingClientRect().top;
     fromHandle = y - top < handleZone;
@@ -227,7 +242,9 @@ export function wireSheetDrag(sheet, {
     raf(settle);
   };
   sheet.addEventListener('touchend', end);
-  sheet.addEventListener('touchcancel', end);
+  // Ein abgebrochener Touch ist keine Schliessabsicht, auch wenn der letzte
+  // Stand wie ein Flick aussah.
+  sheet.addEventListener('touchcancel', abort);
 
   return { reset };
 }
