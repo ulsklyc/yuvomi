@@ -4032,47 +4032,13 @@ a.popover-menu__item {
   flex-shrink: 0;
 }
 
-/* Toolbar-"Neu"-Buttons: auf dem Handy übernimmt der FAB, auf dem Desktop der
- * Knopf in der Werkzeugleiste.
- *
- * DIE MECHANIK WAR GEBAUT UND ABGESCHALTET. Fünf Module (Aufgaben, Notizen,
- * Kontakte, Budget, Kalender) tragen ihren Toolbar-Knopf seit jeher im Markup;
- * hier stand nur `display: none` für alle. Auf einem Zeigergerät ist ein
- * beschrifteter Knopf im Kopf der bessere Ort als ein schwebender Kreis über
- * dem Inhalt - Platz ist da, und der Kreis verdeckt die letzte Zeile.
- *
- * Gemeinsame Klasse statt ID-Liste (Audit 1.9): neue Module ergänzen nur die
- * Klasse an ihrem Toolbar-Button, statt diesen Selektor erweitern zu müssen. */
-.toolbar-new-btn {
-  display: none !important;
-}
-
+/* Anlegen im Kopf: auf dem Handy schwebt der FAB, auf dem Zeigergerät dockt
+ * die Shell DENSELBEN Knopf in `.page-toolbar__actions` (dockFabIntoToolbar in
+ * router.js). Einen eigenen Kopfknopf je Modul gibt es seit Runde 7 nicht mehr
+ * (D3, `toolbar-new-btn` im Ratchet von test-control-dialect.js steht auf 0):
+ * zwei Wege zur selben Aktion brauchten eine Weiche, die entscheidet, wer
+ * gewinnt, und eine Nur-lesen-Regel für jeden der beiden. */
 @media (min-width: 1024px) {
-  /* `:not([hidden])` ist Pflicht: mehrere Module blenden ihren Kopf samt
-   * Aktionen aus (die Einkaufsliste ohne aktive Liste), und ein
-   * `display !important` schlüge das UA-`[hidden]`. */
-  .toolbar-new-btn:not([hidden]) {
-    display: inline-flex !important;
-  }
-
-  /* Wo ein beschrifteter Knopf steht, schwebt keiner mehr. `:has()` fragt das
-   * am Dokument, weil beide in verschiedenen Teilbäumen leben: der Knopf im
-   * Modulkopf, der FAB seit #634 in der Shell-Layer. */
-  body:has(.toolbar-new-btn:not([hidden])) #fab-layer .page-fab {
-    display: none;
-  }
-
-  /* UND WER IHN VERSTECKT, NIMMT IHM SEINEN NACHLAUF (Etappe 6, 2026-08-13).
-   * Gemessen bei 1440x900: /tasks, /calendar, /contacts, /budget und /notes
-   * reservierten 96px am Scroll-Ende für einen Knopf mit 0x0 Fläche, /shopping
-   * 156 statt 60. Die Nachlauf-Regel oben fragt `.page-fab:not([hidden])` - das
-   * ist ein STELLVERTRETER für „hier schwebt ein Knopf über dem Scrollport",
-   * und er wird falsch, sobald CSS statt der Seite versteckt.
-   * `[hidden]` braucht diese Paarung nicht: das steht schon im Selektor. */
-  body:has(.toolbar-new-btn:not([hidden])) {
-    --fab-safe-zone: 0px;
-  }
-
   /* Der angedockte FAB IST der Toolbar-Knopf (siehe dockFabIntoToolbar in
    * router.js): dieselbe Node, dieselbe Verdrahtung, nur ohne die schwebende
    * Geometrie. Die Kapsel und die Stimme kommen von `.btn--primary`. */
@@ -8025,21 +7991,17 @@ textarea.input { resize: vertical; }
 /* Read-only-Modul-Modus (#467): Bei „Nur lesen"-Rechten die Anlege-Affordance
    ausblenden und einen erklärenden Hinweis oben in der Seite zeigen. Die
    verbindliche Sperre liegt am Server; dies ist die ehrliche UI-Entsprechung. */
-/* BEIDE ANLEGE-WEGE, nicht nur der schwebende. Der angedockte FAB behaelt
- * `.page-fab` und war damit immer erfasst - der HANDGESCHRIEBENE Kopfknopf der
- * fuenf Module, die ihre Primaeraktion selbst mitbringen (Aufgaben, Kalender,
- * Kontakte, Budget, Notizen), war es nie. Ein Nur-lesen-Nutzer sah dort einen
- * aktiven Knopf, dessen Formular am Server im 403 endet. Die Regel stand seit
- * #467 auf einem Weg, und dieser Branch hat den zweiten von einem Modul auf
- * fuenf verbreitert (Codex-Review zu PR #754). */
+/* EIN ANLEGE-WEG, schwebend wie angedockt: der angedockte FAB behaelt
+ * `.page-fab`, also erfasst ihn dieselbe Regel. Bis Runde 7 stand hier ein
+ * zweiter Selektor fuer den handgeschriebenen Kopfknopf der fuenf Module
+ * (#467, Codex-Review zu PR #754) - der Knopf ist weg, der Selektor mit ihm. */
 html[data-module-readonly] .page-fab,
-html[data-module-readonly] .toolbar-new-btn,
 html[data-module-readonly] .notes-manage-categories {
   display: none !important;
 }
 
-/* Und ohne Knopf kein Nachlauf - dieselbe Paarung wie beim angedockten FAB
-   (Etappe 6). Ein „Nur lesen"-Modul reservierte sonst 96px für eine
+/* Und ohne Knopf kein Nachlauf - die Paarung aus Etappe 6 (jede
+   CSS-Ausblendung des FAB nullt --fab-safe-zone). Ein „Nur lesen"-Modul reservierte sonst 96px für eine
    Anlege-Affordance, die es gerade ausdrücklich nicht anbietet. */
 html[data-module-readonly] {
   --fab-safe-zone: 0px;

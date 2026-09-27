@@ -949,61 +949,27 @@ const PENDING = {
   // Leer seit Runde 5, Schritt 1: die 38 Regeln sind entfernt (je belegt,
   // dass dort kein <i> gerendert wird). Ab hier ist jede neue rot.
   'dead-i-rule': {},
-  // --- Runde 7, Bestand 2026-09-27 (Schritt 1, k7). Nur nach UNTEN. ---
-  // D3: fuenf Module bauen den Kopfknopf selbst; Weiche und Regeln der Shell
-  // fallen, wenn sie weg sind (Integration).
-  'toolbar-new-btn': {
-    'public/pages/budget.js': 1,
-    'public/pages/calendar.js': 1,
-    'public/pages/contacts.js': 1,
-    'public/pages/notes.js': 1,
-    'public/pages/tasks.js': 1,
-    'public/router.js': 1,
-    'public/styles/layout.css': 5,
-  },
-  // D7: Notizen (Anheften, Oeffnen, Loeschen), Essensplan (Karte, "mehr"),
-  // Dokumente (DMS-Treffer "oeffnen").
+  // --- Runde 7, Bestand 2026-09-27 (k7), nach der Integration (i7). Nur nach
+  // UNTEN. ---
+  // D3: leer - kein Modul baut den Kopfknopf selbst, die Weiche in
+  // dockFabIntoToolbar (router.js) und die Regeln in layout.css sind weg.
+  'toolbar-new-btn': {},
+  // D7: Notizen und Essensplan zeigen ihre Aktionen dauerhaft. Offen: der
+  // DMS-Treffer "oeffnen" in Dokumenten - ein Schleier ueber der Vorschau,
+  // nicht Teil von D7.
   'hover-reveal': {
     'public/styles/documents.css': 2,
-    'public/styles/meals.css': 4,
-    'public/styles/notes.css': 3,
   },
-  // D5: Aufgaben (Mehrfachauswahl); Kontakte und Dokumente waehlen ebenso
-  // per nativer Checkbox.
+  // D5: Aufgaben waehlen per Auswahlkreis und Pille. Kontakte und Dokumente
+  // waehlen weiter per nativer Checkbox (nicht Teil von D5).
   'row-checkbox': {
     'public/pages/contacts.js': 1,
     'public/pages/documents.js': 1,
-    'public/pages/tasks.js': 1,
   },
-  // D8: jede Leiste ohne geteilten Indikator (Kueche ist angeschlossen).
-  'segment-indicator': {
-    'public/pages/budget-stats.js': 1,
-    'public/pages/budget.js': 3,
-    'public/pages/calendar.js': 1,
-    'public/pages/documents.js': 2,
-    'public/pages/health.js': 1,
-    'public/pages/housekeeping.js': 1,
-    'public/pages/notes.js': 1,
-    'public/pages/rewards.js': 1,
-    'public/pages/schedule.js': 4,
-    'public/pages/split-expenses.js': 1,
-    'public/pages/tasks.js': 3,
-    'public/settings/pages/admin-permissions.js': 1,
-    'public/settings/pages/modules-calendar.js': 1,
-    'public/settings/pages/personal-appearance.js': 1,
-    'public/utils/health-tabs.js': 1,
-  },
-  // D4: seit page-search.css Breite und Lage traegt, laufen diese Regeln ins
-  // Leere (die Shell-Regel ist 0,2,1) - sie fallen mit dem Modul-Umbau.
-  'search-width': {
-    'public/styles/contacts.css': 1,
-    'public/styles/documents.css': 1,
-    'public/styles/notes.css': 1,
-    'public/styles/pantry.css': 1,
-    'public/styles/recipes.css': 1,
-    'public/styles/settings.css': 1,
-    'public/styles/tasks.css': 2,
-  },
+  // D8: leer - jede Segment-/Tab-Leiste gleitet mit dem geteilten Indikator.
+  'segment-indicator': {},
+  // D4: leer - Breite und Lage der Kopfsuche traegt page-search.css allein.
+  'search-width': {},
   // D2: leer seit Runde 7, Schritt 1 - Dialog-Sheet und Mehr-Blatt ziehen
   // ueber utils/sheet-drag.js.
   'sheet-drag': {},

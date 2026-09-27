@@ -768,3 +768,70 @@ test('Liste + Detail, unter der Schwelle: Zurueck/Vor auf ?open= klappt das Reze
   assert.equal(doc.querySelector('#recipes-detail [data-md-body] .split-view__detail-title'), null,
     'unter der Schwelle zeichnet nichts in die unsichtbare Spalte');
 });
+
+/*
+ * DER KOPF KOMMT NACH DEM FAB (w7, Kalender 2026-09-27). Eine Seite legt ihren
+ * FAB im synchronen Teil an, baut den Kopf aber erst nach ihren awaits. Der
+ * erste `adoptPageFab()` findet keinen Slot und hebt den FAB schwebend in die
+ * Shell-Ebene; der zweite suchte bisher nur unter `#main-content` - dort ist
+ * er nicht mehr, also dockte er NIE an (der Kalender tat es seit #754 nicht).
+ * Die Regel: steht nach dem Render ein Slot, dockt der schwebende Knopf der
+ * Seite an, egal in welcher Reihenfolge Kopf und FAB entstanden.
+ */
+test('Router: ein FAB, dessen Kopf erst nach dem ersten Umzug entsteht, dockt beim zweiten an', () => {
+  const doc = new FakeDocument();
+  const win = { matchMedia: () => ({ matches: true, addEventListener() {}, removeEventListener() {} }) };
+  const layer = doc.createElement('div');
+  layer.id = 'fab-layer';
+  const main = doc.createElement('main');
+  main.id = 'main-content';
+  doc.body.append(layer, main);
+  const { adoptPageFab } = routerFabFunctions(doc, win);
+
+  // Synchroner Teil: nur der FAB, noch kein Kopf.
+  const fab = doc.createElement('button');
+  fab.className = 'page-fab';
+  fab.id = 'fab-late-head';
+  fab.dataset.dockLabel = 'Termin';
+  fab.setAttribute('aria-label', 'Termin hinzufuegen');
+  main.append(fab);
+  adoptPageFab();
+  assert.equal(fab.parentElement, layer, 'ohne Slot schwebt er - sonst misst der Test den falschen Fall');
+
+  // Nach den awaits: der Kopf mit seinem Aktions-Slot.
+  const head = doc.createElement('div');
+  head.className = 'page-toolbar';
+  const slot = doc.createElement('div');
+  slot.className = 'page-toolbar__actions';
+  head.append(slot);
+  main.append(head);
+  adoptPageFab();
+  assert.equal(fab.parentElement, slot, 'der schwebende Knopf dockt nicht an, obwohl der Kopf jetzt einen Slot hat');
+  assert.ok(fab.classList.contains('page-fab--docked'));
+  assert.equal(fab.getAttribute('aria-keyshortcuts'), 'n');
+});
+
+/*
+ * DER TITEL MIT DEM KUERZEL FOLGT DER AKTION (g7, 2026-09-27). markFabShortcut
+ * schreibt "<aria-label> (n)" einmal beim Einhaengen; ein Kontext-FAB wechselt
+ * danach je Tab Aktion und `aria-label`, der Tooltip blieb stehen ("Eintrag
+ * hinzufuegen (n)" auf dem Konten-Tab). Budget zog ihn selbst nach, Gesundheit
+ * und Schichtplan nicht - die Stelle gehoert in setPageFabAction.
+ */
+test('setPageFabAction: der Titel mit dem Kuerzel zieht mit dem aria-label mit, ohne Kuerzel entsteht keiner', async () => {
+  const doc = new FakeDocument();
+  globalThis.document = doc;
+  const { setPageFabAction } = await import('../public/utils/fab.js');
+  const fab = doc.createElement('button');
+  fab.setAttribute('aria-label', 'Eintrag hinzufuegen');
+  fab.setAttribute('aria-keyshortcuts', 'n');
+  fab.setAttribute('title', 'Eintrag hinzufuegen (n)');
+  setPageFabAction(fab, { label: 'Konto hinzufuegen', dockLabel: 'Konto' });
+  assert.equal(fab.getAttribute('title'), 'Konto hinzufuegen (n)');
+  setPageFabAction(fab, { hidden: true, dockLabel: 'Konto' });
+  assert.equal(fab.getAttribute('title'), 'Konto hinzufuegen (n)', 'ohne neues Label bleibt der letzte Titel');
+
+  const plain = doc.createElement('button');
+  setPageFabAction(plain, { label: 'Notiz hinzufuegen', dockLabel: 'Notiz' });
+  assert.equal(plain.getAttribute('title'), null, 'ohne angesagtes Kuerzel kein "(n)" im Titel');
+});

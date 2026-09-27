@@ -78,6 +78,10 @@ export function setPageFabAction(fab, { label = '', onClick = null, hidden = fal
   fab.hidden = hidden;
   fab.style.display = hidden ? 'none' : '';
   if (label) fab.setAttribute('aria-label', label);
+  // Der Titel mit dem Kuerzel (markFabShortcut im Router schreibt ihn einmal
+  // beim Einhaengen) folgt der Aktion wie `aria-label` - sonst hiesse der
+  // Tooltip auf dem naechsten Tab weiter wie die Aktion des ersten.
+  if (label && fab.hasAttribute('aria-keyshortcuts')) fab.setAttribute('title', `${label} (n)`);
   // Das Nomen wechselt mit dem Tab wie die Aktion: gesetzt heißt gesetzt,
   // leer heißt entfernt. Ein Nomen des vorigen Tabs stehen zu lassen wäre
   // schlimmer als keines - der Knopf trüge dann einen falschen Namen.

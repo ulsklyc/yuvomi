@@ -4472,7 +4472,10 @@ test('jede CSS-Ausblendung des FAB nullt seinen Nachlauf', () => {
   }
 
   // Reichweite zuerst: ein Guard ueber eine leere Liste ist keine Zusicherung.
-  assert.ok(versteckt.length >= 4,
+  // Drei seit Runde 7 (2026-09-27): die Dock-Weiche
+  // `body:has(.toolbar-new-btn:not([hidden])) #fab-layer .page-fab` fiel mit
+  // dem letzten handgebauten Kopfknopf - samt ihrer Nachlauf-Paarung.
+  assert.ok(versteckt.length >= 3,
     `Reichweite: nur ${versteckt.length} Ausblende-Regeln gefunden - der Scanner greift nicht mehr`);
 
   // Die Bedingung ist der Selektor OHNE sein FAB-Ziel. Statt ihn zu zerlegen
@@ -6110,10 +6113,9 @@ test('phase 3 high-frequency controls use tokenized touch targets', () => {
   const layout = read('../public/styles/layout.css');
 
   assert.match(tasks, /\.task-status-btn::before[\s\S]*var\(--target-base\)/);
-  assert.match(tasks, /\.task-bulk-checkbox[\s\S]*(?:min-width|width):\s*var\(--target-base\)/);
+  assert.match(tasks, /\.task-select-btn\s*\{[^}]*width:\s*var\(--target-base\)/);
   assert.match(tasks, /\.task-card__inline-action[\s\S]*width:\s*var\(--target-base\)/);
   assert.match(tasks, /\.task-card__inline-action[\s\S]*height:\s*var\(--target-base\)/);
-  assert.match(tasks, /\.bulk-actions-bar__actions \.btn[\s\S]*min-height:\s*var\(--target-base\)/);
   assert.match(shopping, /\.item-check[\s\S]*(?:min-width|width):\s*var\(--target-base\)/);
   // Die Zeilenhöhe liegt seit der geteilten Zeilen-Grammatik in
   // list-row.css und ist dort mit --target-lg (48px) strenger als die alte
@@ -6512,7 +6514,7 @@ test('hardening uses logical alignment for RTL-sensitive adapted controls', () =
   const tasks = read('../public/styles/tasks.css');
   const pageSearch = read('../public/styles/page-search.css');
 
-  assert.match(notes, /margin-inline-start:\s*auto/);
+  assert.doesNotMatch(notes, /margin-(left|right):\s*auto/);
   // The shared search control's leading icon uses logical inset for RTL.
   assert.match(pageSearch, /\.page-search__icon\s*\{[\s\S]*inset-inline-start:/);
   assert.match(notes, /\.note-card__pin\s*\{[\s\S]*inset-inline-end:/);
@@ -6568,17 +6570,17 @@ test('Notes keeps user colours off the reading surface', () => {
   );
 });
 
-test('phase 3 Tasks bulk actions stay de-emphasized until tasks are selected', () => {
+test('phase 3 Tasks bulk actions appear only in select mode, in the shell pill (D5)', () => {
   const tasksPage = read('../public/pages/tasks.js');
   const tasksCss = read('../public/styles/tasks.css');
 
-  assert.match(tasksPage, /bar\.hidden\s*=\s*!\(state\.bulkSelectMode && selected > 0\)/);
-  assert.match(tasksPage, /bar\.classList\.toggle\('bulk-actions-bar--active',\s*selected > 0\)/);
+  assert.match(tasksPage, /if \(!state\.bulkSelectMode \|\| readOnly\(\)\) \{ clearBulkPill\(\); return; \}/);
+  assert.match(tasksPage, /setBulkPill\(\{ label: t\('tasks\.bulkSelectedCount'/);
+  assert.doesNotMatch(tasksPage, /bulk-actions-bar/, 'keine eigene Leiste ueber der Liste mehr');
   // Der Schalter steht im Werkzeugmenue und meldet seinen Zustand als Haken
   // (menuitemcheckbox), nicht mehr als aria-pressed eines Kopfknopfs.
   assert.match(tasksPage, /syncPopoverMenuItem\([^;]*'bulk-select',\s*state\.bulkSelectMode\)/);
-  assert.match(tasksCss, /\.bulk-actions-bar\[hidden\]\s*\{[\s\S]*display:\s*none/);
-  assert.match(tasksCss, /\.bulk-actions-bar--active\s*\{/);
+  assert.doesNotMatch(tasksCss, /\.bulk-actions-bar|\.task-bulk-checkbox/);
 });
 
 test('phase 3 mobile Shopping quick-add separates name, quantity, category, and add controls', () => {
@@ -9880,6 +9882,16 @@ test('wer seinen Körper aufs Lesemaß kappt, kappt auch seinen Kopf', () => {
     if (!heads.length) { headless.push(file); continue; }
     for (const classList of heads) {
       headsChecked++;
+      // KUECHE (Re-Critique 2026-09-27, D3): ein GRUPPENKOPF gehoert der Leiste
+      // seiner Gruppe und haelt DEREN Kante - die des breitesten Koerpers der
+      // Gruppe (die Essensplan-Woche), dieselbe Gegenform wie der Kalender
+      // oben. Gedeckelt sprang die angedockte Primaeraktion beim Tabwechsel
+      // zwischen Lesemass und Leistenkante (x 865 gegen 1288 bei 1440, A1 P2-5).
+      if (/\bpage-toolbar--in-group\b/.test(classList)) {
+        assert.doesNotMatch(classList, /\bpage-toolbar--narrow\b/,
+          `${file}: "${classList}" - ein Kuechenkopf endet an der Kuechen-Leiste, nicht am Lesemass (D3)`);
+        continue;
+      }
       assert.ok(
         /\bpage-toolbar--narrow\b/.test(classList),
         `${file}: "${classList}" - der Körper endet bei --content-max-width-narrow, `
@@ -10172,23 +10184,10 @@ test('dashboard and task progress bars animate with transforms instead of widths
   assert.doesNotMatch(tasksPage, /subtask-progress__bar-fill" style="width:/);
 });
 
-test('toolbar "new" buttons are hidden via a shared class, not an ID list (audit 1.9)', () => {
-  const layout = read('../public/styles/layout.css');
-  assert.match(layout, /\.toolbar-new-btn\s*\{\s*display:\s*none\s*!important;/, 'expected .toolbar-new-btn rule');
-  assert.doesNotMatch(layout, /#btn-new-task,\s*\n\s*#notes-add-btn/, 'legacy ID-list selector must be gone');
-
-  const pages = {
-    '../public/pages/tasks.js': 'btn-new-task',
-    '../public/pages/notes.js': 'notes-add-btn',
-    '../public/pages/contacts.js': 'contacts-add-btn',
-    '../public/pages/budget.js': 'budget-add',
-    '../public/pages/calendar.js': 'cal-add',
-  };
-  for (const [file, id] of Object.entries(pages)) {
-    const src = read(file);
-    const btn = src.match(new RegExp(`<button[^>]*id="${id}"[^>]*>`));
-    assert.ok(btn, `${file} must keep #${id}`);
-    assert.match(btn[0], /toolbar-new-btn/, `${file} #${id} must carry the .toolbar-new-btn class`);
+test('no module builds its own header "new" button - the shell docks the FAB (D3)', () => {
+  for (const file of ['tasks', 'notes', 'contacts', 'budget', 'calendar']) {
+    assert.doesNotMatch(read(`../public/pages/${file}.js`), /class="[^"]*\btoolbar-new-btn\b/,
+      `${file}.js: die Primaeraktion ist der FAB mit dockLabel, kein eigener Kopfknopf`);
   }
 });
 
@@ -10239,7 +10238,7 @@ test('every primary "new" control names its noun from newLabel.* (one register)'
   // Reichweite ZUERST festnageln: eine Zusicherung ueber eine leere Liste ist
   // keine. Die Zahlen sind die am 12.08. gezaehlten Vorkommen.
   assert.ok(fabs.length >= 12, `expected at least 12 .page-fab declarations, found ${fabs.length}`);
-  assert.ok(toolbarButtons.length >= 5, `expected at least 5 .toolbar-new-btn, found ${toolbarButtons.length}`);
+  assert.deepEqual(toolbarButtons.map((b) => b.path), [], 'kein Modul baut den Kopfknopf selbst (D3) - die Shell dockt den FAB an');
 
   const keyOf = (text) => text.match(/newLabel\.([A-Za-z]+)/)?.[1];
 

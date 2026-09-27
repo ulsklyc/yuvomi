@@ -2382,6 +2382,13 @@ function adoptPageFab() {
   // nur der Knopf um, bliebe die Mechanik im Scrollport zurück - der halbe
   // Umzug wäre schlimmer als keiner, weil er nach Erledigung aussieht.
   if (fresh) layer.replaceChildren(fresh.closest('.page-fab-group') ?? fresh);
+  // DER KOPF KANN NACH DEM FAB KOMMEN: eine Seite, die ihren Kopf erst nach
+  // ihren awaits baut, hatte beim ersten Aufruf keinen Slot - der FAB schwebt
+  // dann schon in der Ebene, und `#main-content` findet ihn nicht mehr. Die
+  // Ebene gehoert der aktuellen Seite (clearPageFab() beim Routenwechsel),
+  // also darf der schwebende Knopf hier nachdocken.
+  const floating = layer.querySelector('.page-fab');
+  if (floating && dockFabIntoToolbar(floating)) return null;
   return layer.querySelector('.page-fab');
 }
 
@@ -2410,12 +2417,10 @@ function adoptPageFab() {
  * Knopf stehen - sichtbar falsch statt unsichtbar uneinheitlich. Ein Guard in
  * test-frontend-audit hält dazu, dass jeder `.page-fab` das Attribut trägt.
  *
- * DREI SACHEN DOCKEN NICHT AN, jede aus ihrem eigenen Grund:
+ * ZWEI SACHEN DOCKEN NICHT AN, jede aus ihrem eigenen Grund:
  *   - eine .page-fab-group (das Speed-Dial der Übersicht): sie ist ein Menü,
  *     kein Knopf, und ihre Aktionsliste ist fixiert. Ein halber Umzug wäre
  *     schlimmer als keiner.
- *   - Module, die ihren eigenen .toolbar-new-btn mitbringen: sonst stünden
- *     zwei Primärknöpfe nebeneinander.
  *   - Module ohne Aktions-Slot im Kopf: dort bleibt der schwebende Knopf, bis
  *     ihr Kopf einen bekommt. Lieber ein Modul mit dem alten Weg als eines
  *     ohne Primäraktion.
@@ -2424,7 +2429,6 @@ function dockFabIntoToolbar(fab) {
   if (!isDesktopViewport()) return false;
   if (fab.closest('.page-fab-group')) return false;
   const main = document.getElementById('main-content');
-  if (main?.querySelector('.toolbar-new-btn')) return false;
   const slot = main?.querySelector('.page-toolbar__actions');
   if (!slot) return false;
   const label = fab.dataset.dockLabel;
@@ -4887,7 +4891,7 @@ observeNavCapsule();
 // hing an einem einzelnen `resize`, und blieb ein zweites aus, war die
 // Primäraktion des Moduls dauerhaft weg - dieselbe Falle wie beim
 // Scroll-Retract, den #634 entfernt hat. Der FAB ist der einzige Weg zum
-// Anlegen (`.toolbar-new-btn` ist überall ausgeblendet), also kostet ein
+// Anlegen (angedockt wird erst ab 1024px), also kostet ein
 // Falsch-Positiv hier das ganze Modul.
 //
 // Eine Tastatur ist offen, wenn ein Texteingabefeld den Fokus hat. Das ist

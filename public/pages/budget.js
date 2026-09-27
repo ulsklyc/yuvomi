@@ -1262,10 +1262,7 @@ function syncAddAction() {
     label: addLabel,
     dockLabel: add ? t(caps.label) : (fab.dataset.dockLabel || t('newLabel.budget')),
   });
-  // Der Titel mit dem Kuerzel (markFabShortcut im Router) entsteht einmal beim
-  // Einhaengen - er folgt der Aktion wie `aria-label`, sonst hiesse der
-  // Tooltip auf "Konten" weiter "Eintrag hinzufuegen (n)".
-  if (add && fab.hasAttribute('aria-keyshortcuts')) fab.title = `${addLabel} (n)`;
+  // Den Titel mit dem Kuerzel zieht setPageFabAction mit dem aria-label nach.
 }
 
 /* ZWEI SKALEN STATT EINER (Critique 2026-09-25, P2). Einnahmen und Ausgaben
