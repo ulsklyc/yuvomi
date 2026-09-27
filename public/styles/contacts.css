@@ -182,69 +182,11 @@
 }
 
 /* Familien-Kontakte sind einzeln nicht loeschbar und damit nicht waehlbar:
- * der Kreis tritt zurueck, statt eine Wahl anzubieten, die es nicht gibt. */
+ * der Kreis tritt zurueck, statt eine Wahl anzubieten, die es nicht gibt.
+ * Der Kreis selbst (`.select-circle`) ist ein Shell-Baustein in layout.css. */
 .contact-item__select .select-circle:disabled {
   cursor: not-allowed;
   opacity: 0.4;
-}
-
-/* DER AUSWAHLKREIS (R8 H14) - derselbe wie in den Aufgaben seit R7
- * (`.task-select-btn`, tasks.css): ein Knopf mit `aria-pressed` vor dem Avatar;
- * die Zeile drumherum schaltet ueber ihn mit.
- *
- * BRUECKE: der Block steht gleichlautend in documents.css, weil Modul-CSS nur
- * auf seiner Route geladen wird. Er gehoert in die Shell (layout.css) - als
- * Wunsch an die Integration gemeldet; danach entfallen beide Kopien. */
-.select-circle {
-  width: var(--target-base);
-  height: var(--target-base);
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-full);
-  background: none;
-  color: var(--color-ink-on-vivid);
-  cursor: pointer;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-.select-circle::after {
-  content: '';
-  width: var(--space-5);
-  height: var(--space-5);
-  border-radius: var(--radius-full);
-  border: 2px solid var(--color-text-tertiary);
-  box-sizing: border-box;
-  transition: border-color var(--transition-fast), background-color var(--transition-fast);
-}
-
-.select-circle:hover::after {
-  border-color: var(--color-accent);
-}
-
-.select-circle:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: calc(var(--focus-ring-offset) * -1);
-}
-
-.select-circle--on::after {
-  border-color: var(--color-accent);
-  background-color: var(--color-accent);
-}
-
-.select-circle__check {
-  position: absolute;
-  z-index: 1;
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-  display: none;
-}
-
-.select-circle--on .select-circle__check {
-  display: block;
 }
 
 .contact-item--selected {

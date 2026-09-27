@@ -805,7 +805,7 @@ function renderContactItem(c) {
   // deaktiviert, da einzeln nicht löschbar). Aktionen/Öffnen entfallen.
   //
   // DER KREIS DER AUFGABEN STATT EINER NATIVEN CHECKBOX (R8 H14, Muster
-  // `task-select-btn` seit R7): EIN Knopf mit `aria-pressed` und einem Label,
+  // der Aufgaben seit R7, `.select-circle` in layout.css): EIN Knopf mit `aria-pressed` und einem Label,
   // das Person und Handlung nennt (vorher sagte die Checkbox nur den Namen).
   // Die Zeile drumherum bleibt Trefflaeche wie das Label vorher - ein Tipp
   // irgendwo darauf laeuft ueber denselben Knopf (Verdrahtung in `render`).

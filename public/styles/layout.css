@@ -8107,3 +8107,67 @@ p.field-hint--warn svg {
   height: var(--space-4);
   margin-inline-start: calc(-1 * var(--space-1) - 2px);
 }
+
+/* ================================================================
+   DER AUSWAHLKREIS - Mehrfachauswahl in einer Liste (Aufgaben seit R7,
+   Kontakte und Dokumente seit R8 H14). Ein Knopf mit `aria-pressed` und
+   einem Namen mit Objekt ("<Titel> auswaehlen"); er ERSETZT Statuskreis und
+   Zeilen-Picker, die Leiste dazu ist die Bulk-Pille (utils/bulk-pill.js).
+   20px-Ring in der Tertiaerfarbe, gewaehlt gefuellt im App-Akzent mit Haken
+   (NICHT im Modulton: bei den Aufgaben ist der Gruen und vom erledigten Haken
+   nicht zu unterscheiden), Trefflaeche --target-base. Er steht in der Shell,
+   weil Modul-CSS nur auf seiner Route laedt - vorher trugen documents.css und
+   contacts.css je eine gleichlautende Kopie. Wie er in einer Zeile sitzt
+   (Ausgleich, disabled), bleibt Sache des Moduls.
+   ================================================================ */
+.select-circle {
+  width: var(--target-base);
+  height: var(--target-base);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--color-ink-on-vivid);
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.select-circle::after {
+  content: '';
+  width: var(--space-5);
+  height: var(--space-5);
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-text-tertiary);
+  box-sizing: border-box;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.select-circle:hover::after {
+  border-color: var(--color-accent);
+}
+
+.select-circle:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: calc(var(--focus-ring-offset) * -1);
+}
+
+.select-circle--on::after {
+  border-color: var(--color-accent);
+  background-color: var(--color-accent);
+}
+
+.select-circle__check {
+  position: absolute;
+  z-index: 1;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  display: none;
+}
+
+.select-circle--on .select-circle__check {
+  display: block;
+}

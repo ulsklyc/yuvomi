@@ -555,10 +555,10 @@ function renderTaskCard(task, opts = {}) {
              Tipp auf den falschen hakte ab statt auszuwaehlen. Ein Modus, ein
              Kreis, eine Bedeutung - die Zeilenaktionen treten solange ab. */ ''}
         ${selecting ? `
-        <button type="button" class="task-select-btn${selected ? ' task-select-btn--on' : ''}"
+        <button type="button" class="select-circle task-select-btn${selected ? ' select-circle--on' : ''}"
                 data-action="toggle-select" data-id="${task.id}" aria-pressed="${selected}"
                 aria-label="${esc(t('tasks.selectTaskNamed', { title: task.title }))}">
-          <i data-lucide="check" class="task-select-btn__check" aria-hidden="true"></i>
+          <i data-lucide="check" class="select-circle__check" aria-hidden="true"></i>
         </button>
         ` : `
         ${darfAbhaken ? `
@@ -4215,7 +4215,7 @@ function toggleTaskSelection(btn, container) {
   const on = !state.selectedTaskIds.has(taskId);
   if (on) state.selectedTaskIds.add(taskId);
   else state.selectedTaskIds.delete(taskId);
-  btn.classList.toggle('task-select-btn--on', on);
+  btn.classList.toggle('select-circle--on', on);
   btn.setAttribute('aria-pressed', String(on));
   vibrate(10);
   updateBulkActionsBar(container);

@@ -190,66 +190,6 @@
   flex-wrap: wrap;
 }
 
-/* DER AUSWAHLKREIS (R8 H14) - derselbe wie in den Aufgaben seit R7
- * (`.task-select-btn`, tasks.css): 20px-Ring in der Tertiaerfarbe, gewaehlt
- * gefuellt im App-Akzent mit Haken, Trefflaeche --target-base. Vorher stand
- * hier eine native Checkbox auf einer getoenten 42px-Kachel.
- *
- * BRUECKE: der Block steht gleichlautend in contacts.css, weil Modul-CSS nur
- * auf seiner Route geladen wird. Er gehoert in die Shell (layout.css) - als
- * Wunsch an die Integration gemeldet; danach entfallen beide Kopien. */
-.select-circle {
-  width: var(--target-base);
-  height: var(--target-base);
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-full);
-  background: none;
-  color: var(--color-ink-on-vivid);
-  cursor: pointer;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-.select-circle::after {
-  content: '';
-  width: var(--space-5);
-  height: var(--space-5);
-  border-radius: var(--radius-full);
-  border: 2px solid var(--color-text-tertiary);
-  box-sizing: border-box;
-  transition: border-color var(--transition-fast), background-color var(--transition-fast);
-}
-
-.select-circle:hover::after {
-  border-color: var(--color-accent);
-}
-
-.select-circle:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: calc(var(--focus-ring-offset) * -1);
-}
-
-.select-circle--on::after {
-  border-color: var(--color-accent);
-  background-color: var(--color-accent);
-}
-
-.select-circle__check {
-  position: absolute;
-  z-index: 1;
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-  display: none;
-}
-
-.select-circle--on .select-circle__check {
-  display: block;
-}
-
 /* Die RASTERKARTE traegt ihre Auswahl als Ring - sie ist ein eigenes Objekt
  * (randlos seit 2026-09-25, der Ring ist deshalb ein Schatten, keine Kante). Die ZEILE hat beides nicht mehr und traegt sie als getoente
  * Flaeche: dasselbe Vokabular wie jeder andere ausgewaehlte Zustand der App

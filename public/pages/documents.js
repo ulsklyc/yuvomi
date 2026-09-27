@@ -1826,7 +1826,7 @@ function renderActions(doc) {
 // damit Karte und Zeile nicht zwei konkurrierende Klickziele tragen.
 //
 // DER KREIS DER AUFGABEN STATT EINER NATIVEN CHECKBOX (R8 H14, Muster
-// `task-select-btn` seit R7): vorher stand hier ein Browser-Kaestchen auf einer
+// der Aufgaben seit R7, `.select-circle` in layout.css): vorher stand hier ein Browser-Kaestchen auf einer
 // getoenten Kachel - die einzige ungestaltete Auswahl neben den Kontakten.
 // Ein Knopf mit `aria-pressed` und dem Dokumentnamen im Label; der Tipp
 // laeuft wie jeder Tipp auf die Karte durch `handleDocumentAction`.

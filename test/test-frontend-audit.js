@@ -6113,7 +6113,9 @@ test('phase 3 high-frequency controls use tokenized touch targets', () => {
   const layout = read('../public/styles/layout.css');
 
   assert.match(tasks, /\.task-status-btn::before[\s\S]*var\(--target-base\)/);
-  assert.match(tasks, /\.task-select-btn\s*\{[^}]*width:\s*var\(--target-base\)/);
+  // Der Auswahlkreis ist seit R8 ein Shell-Baustein (layout.css), den Aufgaben,
+  // Kontakte und Dokumente teilen.
+  assert.match(layout, /\.select-circle\s*\{[^}]*width:\s*var\(--target-base\)/);
   assert.match(tasks, /\.task-card__inline-action[\s\S]*width:\s*var\(--target-base\)/);
   assert.match(tasks, /\.task-card__inline-action[\s\S]*height:\s*var\(--target-base\)/);
   assert.match(shopping, /\.item-check[\s\S]*(?:min-width|width):\s*var\(--target-base\)/);
@@ -12442,7 +12444,6 @@ test('ein quadratischer Icon-Knopf ist ein Kreis', () => {
     ['.subtask-item__checkbox', 'Zustandsschalter: Checkbox einer Teilaufgabe'],
     ['.rrule-day', 'Zustandsschalter: Wochentagswaehler der Wiederholung'],
     ['.health-weekday', 'Zustandsschalter: Wochentagswaehler der Gesundheit'],
-    ['.document-select', 'Zustandsschalter: Traeger der Auswahl-Checkbox'],
     // 3. Zellen eines Rasters
     ['.ydp-cal__day', 'Rasterzelle: Tag im Datepicker-Monat'],
     ['.cycle-cal__day', 'Rasterzelle: Tag im Zyklus-Monat'],

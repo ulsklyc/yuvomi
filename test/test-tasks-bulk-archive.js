@@ -258,14 +258,14 @@ test('Auswahlkreis: ersetzt Statuskreis und Personenwahl, traegt den Titel im Na
   assert.doesNotMatch(selecting, /type="checkbox"/, 'keine native Checkbox in der Zeile');
   assert.doesNotMatch(selecting, /task-status-btn|task-doer-btn/, 'der Auswahlkreis steht AN der Stelle, nicht daneben');
   assert.doesNotMatch(selecting, /data-action="(?:edit-task|archive-task|add-subtask)"/, 'Zeilenaktionen treten ab');
-  const circle = selecting.match(/<button[^>]*class="task-select-btn[^"]*"[^>]*>/)?.[0] ?? '';
+  const circle = selecting.match(/<button[^>]*class="select-circle[^"]*"[^>]*>/)?.[0] ?? '';
   assert.ok(circle, 'der Auswahlkreis ist ein Knopf');
   assert.match(circle, /aria-pressed="false"/);
   assert.match(circle, /aria-label="tasks\.selectTaskNamed\{&quot;title&quot;:&quot;Muell &lt;raus&gt;&quot;\}"/,
     'der Name nennt die Aufgabe - und maskiert sie');
 
   const on = tasks.renderTaskCard(task, { selecting: true, selected: true });
-  assert.match(on, /class="task-select-btn task-select-btn--on"[^>]*aria-pressed="true"/);
+  assert.match(on, /class="select-circle task-select-btn select-circle--on"[^>]*aria-pressed="true"/);
 });
 
 test('Auswahlmodus: keine Wischgeste - ein Wisch hakt nicht ab und oeffnet nichts', () => {

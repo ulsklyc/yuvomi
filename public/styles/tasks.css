@@ -1502,58 +1502,12 @@
    (`appearance: auto`), die einzige ungestaltete Auswahl der App.
 
    Die Leiste dazu ist die Pille der Shell (utils/bulk-pill.js); eine eigene
-   Leiste ueber der Liste gibt es nicht mehr.
+   Leiste ueber der Liste gibt es nicht mehr. Der Kreis selbst ist seit R8 der
+   Shell-Baustein `.select-circle` (layout.css), den auch Kontakte und
+   Dokumente tragen; hier steht nur der Ausgleich an der Statuskreis-Stelle.
    -------------------------------------------------------- */
 .task-select-btn {
-  width: var(--target-base);
-  height: var(--target-base);
   margin-top: calc((var(--target-base) - var(--space-5)) / -2);
-  border: none;
-  border-radius: var(--radius-full);
-  background: none;
-  color: var(--color-ink-on-vivid);
-  cursor: pointer;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-.task-select-btn::after {
-  content: '';
-  width: var(--space-5);
-  height: var(--space-5);
-  border-radius: var(--radius-full);
-  border: 2px solid var(--color-text-tertiary);
-  box-sizing: border-box;
-  transition: border-color var(--transition-fast), background-color var(--transition-fast);
-}
-
-.task-select-btn:hover::after {
-  border-color: var(--color-accent);
-}
-
-.task-select-btn:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: calc(var(--focus-ring-offset) * -1);
-}
-
-.task-select-btn--on::after {
-  border-color: var(--color-accent);
-  background-color: var(--color-accent);
-}
-
-.task-select-btn__check {
-  position: absolute;
-  z-index: 1;
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-  display: none;
-}
-
-.task-select-btn--on .task-select-btn__check {
-  display: block;
 }
 
 /* Hinweistext unter Formularfeldern im Aufgaben-Modal (z. B. Punkte). */

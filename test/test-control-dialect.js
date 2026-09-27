@@ -954,18 +954,12 @@ const PENDING = {
   // D3: leer - kein Modul baut den Kopfknopf selbst, die Weiche in
   // dockFabIntoToolbar (router.js) und die Regeln in layout.css sind weg.
   'toolbar-new-btn': {},
-  // D7: Notizen und Essensplan zeigen ihre Aktionen dauerhaft. Offen: der
-  // DMS-Treffer "oeffnen" in Dokumenten - ein Schleier ueber der Vorschau,
-  // nicht Teil von D7.
-  'hover-reveal': {
-    'public/styles/documents.css': 2,
-  },
-  // D5: Aufgaben waehlen per Auswahlkreis und Pille. Kontakte und Dokumente
-  // waehlen weiter per nativer Checkbox (nicht Teil von D5).
-  'row-checkbox': {
-    'public/pages/contacts.js': 1,
-    'public/pages/documents.js': 1,
-  },
+  // D7: leer seit Runde 8 (H14) - Notizen, Essensplan und der DMS-Treffer
+  // "oeffnen" in Dokumenten zeigen ihre Aktionen dauerhaft.
+  'hover-reveal': {},
+  // D5: leer seit Runde 8 (H14) - Aufgaben, Kontakte und Dokumente waehlen
+  // per Auswahlkreis und Pille.
+  'row-checkbox': {},
   // D8: leer - jede Segment-/Tab-Leiste gleitet mit dem geteilten Indikator.
   'segment-indicator': {},
   // D4: leer - Breite und Lage der Kopfsuche traegt page-search.css allein.
@@ -1091,4 +1085,24 @@ test('Dialog-Fussleisten schieben mit logischem Rand: kein Inline-Stil setzt mar
   }
   assert.ok(JS.some(({ src }) => /style="[^"]*margin-inline-end\s*:\s*auto/.test(src)), 'Vorbedingung: der Scanner sieht Inline-Stile');
   assert.deepEqual(offenders, []);
+});
+
+test('Auswahlkreis: EIN Baustein in der Shell (layout.css), jede Mehrfachauswahl nutzt ihn (R8 H14)', () => {
+  // Aufgaben (R7), Kontakte und Dokumente (R8) waehlen per `.select-circle`.
+  // Modul-CSS laedt nur auf seiner Route - stuende der Kreis dort, braeuchte
+  // jedes weitere Modul eine Kopie, und die Kopien laufen auseinander (so kam
+  // er in Runde 8 zweimal gleichlautend in documents.css und contacts.css an).
+  // Kontextregeln (`.contact-item__select .select-circle:disabled`) bleiben im
+  // Modul; die Form selbst (Selektor BEGINNT mit dem Kreis) wohnt nur in der Shell.
+  const homes = new Set();
+  for (const { file, src } of CSS) {
+    for (const { selector } of eachRule(src)) {
+      if (selector.split(',').some((part) => /^\.select-circle\b/.test(part.trim()))) homes.add(file);
+    }
+  }
+  assert.deepEqual([...homes], ['public/styles/layout.css']);
+  for (const page of ['tasks', 'contacts', 'documents']) {
+    const src = JS.find(({ file }) => file === `public/pages/${page}.js`)?.src ?? '';
+    assert.match(src, /<button type="button" class="select-circle[^"]*"/, `${page}.js waehlt per Auswahlkreis`);
+  }
 });
