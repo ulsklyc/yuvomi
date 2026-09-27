@@ -345,8 +345,9 @@ test('nicht konfigurierte Upload-Ziele sind nicht auswählbar', () => {
 });
 
 test('die Speicher-Einstellungen sind von der Seite aus verlinkt — nur für Admins', () => {
-  // Blatt liegt seit dem IA-Umbau unter `sync` (Critique 2026-07-27).
-  assert.match(page, /state\.isAdmin \? `<a class="document-storage-target__link" href="\/settings\/sync\/storage"/);
+  // Seit R10 (2026-09-27) ein Abschnitt im Modulblatt Dokumente; der Link
+  // zielt direkt dorthin, nicht ueber die Umleitung der Alt-Adresse.
+  assert.match(page, /state\.isAdmin \? `<a class="document-storage-target__link" href="\/settings\/modules\/documents\?section=documents-storage"/);
   const routes = read('../server/routes/documents.js');
   assert.match(routes, /is_admin: isAdminRequest\(req\)/);
 });
