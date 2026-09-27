@@ -139,6 +139,22 @@ test('health.js leitet die alte Adresse um, BEVOR die Seite die Auswahl liest', 
   assert.ok(mount > redirect, 'der Baustein wird mit healthAddress und NACH der Umleitung eingehaengt');
 });
 
+test('auch die Soft-Navigation (update) loest eine alte ?tab=-Adresse ein, bevor sie auswaehlt', () => {
+  // Ein Zurueck auf einen Verlaufseintrag `/health?tab=labs`, waehrend die
+  // Seite steht, laeuft ueber update() statt render() - gemessen 2026-09-27:
+  // Adresse blieb `/health?tab=labs`, gezeigt wurde die Uebersicht.
+  const src = read('public/pages/health.js');
+  const start = src.indexOf('export async function update(');
+  assert.ok(start > 0, 'update() fehlt');
+  const body = src.slice(start, src.indexOf('\n}\n', start));
+  const redirect = body.search(/const legacy = legacyHealthTabPath\(location\);\s*if \(legacy\) history\.replaceState\(/);
+  const select = body.search(/md\.select\(/);
+  assert.ok(redirect > 0, 'update() muss legacyHealthTabPath per replaceState einloesen');
+  assert.ok(select > redirect, 'erst umleiten, dann auswaehlen');
+  assert.match(body, /normalizeHealthPath\(legacy \? window\.location\.pathname/,
+    'nach der Umleitung zaehlt die neue Adresse, nicht der alte Pfad /health');
+});
+
 test('rememberHealthRoute merkt nur Health-Routen (Kurzbefehl g h)', () => {
   global.sessionStorage._d = {};
   rememberHealthRoute('/health/labs');

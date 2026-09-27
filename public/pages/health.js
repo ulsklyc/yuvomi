@@ -991,7 +991,17 @@ export async function update({ path, user } = {}) {
   if (!_container?.isConnected || !md) return false;
   if (user?.id) healthUser = user;
   if (user?.id) { vitals.meId = user.id; meds.meId = user.id; labs.meId = user.id; activity.meId = user.id; cycle.meId = user.id; overview.meId = user.id; prevention.meId = user.id; nutrition.meId = user.id; }
-  const activeRoute = normalizeHealthPath(path || window.location.pathname);
+  // Die alten Adressen auch hier: ein Zurueck auf einen Verlaufseintrag
+  // `/health?tab=labs` aus der Tab-Zeit (oder ein Link darauf, waehrend die
+  // Seite steht) kommt als Soft-Navigation an, nicht ueber render(). Ohne
+  // diese Stelle zeigte die Seite die Uebersicht, und oben stuende `?tab=`.
+  const legacy = legacyHealthTabPath(location);
+  if (legacy) history.replaceState({ ...(history.state ?? {}), path: legacy }, '', legacy);
+  const activeRoute = normalizeHealthPath(legacy ? window.location.pathname : (path || window.location.pathname));
+  if (activeRoute !== window.location.pathname) {
+    const fixed = `${activeRoute}${location.search}${location.hash}`;
+    history.replaceState({ ...(history.state ?? {}), path: fixed }, '', fixed);
+  }
   const id = healthAreaId(activeRoute) ?? HEALTH_OVERVIEW_ID;
   // Auch schmal ueber den Baustein: er merkt sich die Auswahl, und wird das
   // Fenster breiter, steht rechts genau dieser Bereich.
