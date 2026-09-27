@@ -55,7 +55,7 @@ export function chartScales(geo = CHART) {
 }
 
 /**
- * Fünf horizontale Gitterlinien mit Y-Wert-Beschriftung am linken Rand - eine
+ * Horizontale Gitterlinien (Voreinstellung fuenf) mit Y-Wert-Beschriftung links - eine
  * echte Werteachse statt zweier frei schwebender Min-/Max-Zahlen.
  *
  * @param {number} min  unterster Wert der Skala
@@ -65,15 +65,21 @@ export function chartScales(geo = CHART) {
  *        genug für ganzzahlige Labels ist: bei Spannen ab 4 Einheiten sind
  *        Nachkommastellen Pseudo-Präzision („125,9 mmHg", Audit A2-21), bei
  *        kleinen Spannen (Laborwerte 0,5-1,2) sind sie die eigentliche Auskunft.
+ * @param {number} [steps=4]  Zahl der Schritte, `niceDomain().steps`
  */
-export function chartGridMarkup(min, max, formatTick, geo = CHART) {
+export function chartGridMarkup(min, max, formatTick, geo = CHART, steps = 4) {
   const { W, PAD_L, PAD_R } = geo;
   const { top, bottom } = chartScales(geo);
   const out = [];
-  const wholeTicks = (max - min) >= 4;
-  for (let k = 0; k <= 4; k++) {
-    const gy = top + (k * (bottom - top)) / 4;
-    const val = max - (k * (max - min)) / 4;
+  const step = (max - min) / steps;
+  // Eine runde Skala (niceDomain) zeigt Nachkommastellen genau dann, wenn ihr
+  // Schritt oder ihre Unterkante welche hat - 2,5 bleibt 2,5 und wird nicht 3.
+  // Eine freie Skala (feste Grenzen) behaelt die Spannen-Regel.
+  const whole = (v) => Math.abs(v - Math.round(v)) < 1e-9;
+  const wholeTicks = isNiceStep(step) ? whole(step) && whole(min) : (max - min) >= 4;
+  for (let k = 0; k <= steps; k++) {
+    const gy = top + (k * (bottom - top)) / steps;
+    const val = max - k * step;
     out.push(`<line class="chart__grid" x1="${PAD_L}" y1="${gy.toFixed(1)}" x2="${W - PAD_R}" y2="${gy.toFixed(1)}" vector-effect="non-scaling-stroke" />`);
     // y = die Gitterlinie selbst: `.chart__axis--y` zentriert per
     // dominant-baseline. Der fruehere Versatz (+3.5 Einheiten) passte nur zu
@@ -120,4 +126,113 @@ export function chartX(index, count) {
   const { left, right } = chartScales();
   if (count <= 1) return left;
   return left + (index * (right - left)) / (count - 1);
+}
+
+/* RUNDE ACHSENWERTE (Re-Critique 2026-09-27, C4).
+ *
+ * Das Gitter teilte die rohe Spanne in Viertel: die Blutdruck-Achse stand bei
+ * 126/108/91/73/55, die Budget-Achse bei 5.550/4.163/2.775/1.388. Solche Werte
+ * liest niemand ab - man rechnet sie nach. Die Spanne wird deshalb auf drei
+ * bis sechs Schritte von 1, 2, 2,5 oder 5 mal einer Zehnerpotenz gelegt, und
+ * die Unterkante auf ein Vielfaches davon. Genommen wird die knappste Skala,
+ * die die Daten ganz enthaelt; bei Gleichstand die mit vier Schritten, dann
+ * fuenf, drei, sechs. Der Preis ist etwas Luft ueber und unter der Kurve.
+ *
+ * Wer eine feste Skala hat (Stimmung 1-5, Schweregrad 1-3), ruft das nicht:
+ * dort SIND die Grenzen die Aussage. */
+const NICE_FACTORS = [1, 2, 2.5, 5];
+const STEP_COUNTS = [4, 5, 3, 6];
+
+/** Ist `step` ein runder Schritt (1, 2, 2,5 oder 5 mal 10^n)? */
+function isNiceStep(step) {
+  if (!(step > 0)) return false;
+  const f = step / 10 ** Math.floor(Math.log10(step) + 1e-9);
+  return NICE_FACTORS.some((n) => Math.abs(f - n) < 1e-6);
+}
+
+/**
+ * Legt [min, max] auf eine Skala mit runden Schritten.
+ * @param {number} min  kleinster Datenwert
+ * @param {number} max  groesster Datenwert
+ * @param {{ integer?: boolean }} [opts]  `integer`: nur ganzzahlige Schritte -
+ *        fuer eine Achse, die ohne Nachkommastellen beschriftet (Geldachse:
+ *        2,5 stuende dort als "3 €").
+ * @returns {{ min: number, max: number, step: number, steps: number }}
+ *          `steps` geht an `chartGridMarkup` als Zahl der Schritte.
+ */
+export function niceDomain(min, max, { integer = false } = {}) {
+  let lo = Number(min);
+  let hi = Number(max);
+  if (!Number.isFinite(lo) || !Number.isFinite(hi)) return { min: 0, max: 4, step: 1, steps: 4 };
+  if (lo > hi) [lo, hi] = [hi, lo];
+  if (lo === hi) {
+    // Ein einzelner Wert braucht eine Spanne; unter 0 wird keine erfunden.
+    const pad = lo !== 0 ? Math.abs(lo) * 0.1 : 1;
+    hi += pad;
+    lo = lo >= 0 && lo - pad < 0 ? 0 : lo - pad;
+  }
+  // Gleitkomma-Reste (0.1 + 0.2) bleiben aus den Labels: jeder Wert wird auf
+  // die Stellen seines Schritts gerundet.
+  const fix = (v, step) => Number(v.toFixed(Math.max(0, 2 - Math.floor(Math.log10(step)))));
+  let best = null;
+  for (const steps of STEP_COUNTS) {
+    const mag = 10 ** Math.floor(Math.log10((hi - lo) / steps));
+    const step = [...NICE_FACTORS.map((f) => f * mag), 10 * mag, 20 * mag].find((s) =>
+      (!integer || Math.abs(s - Math.round(s)) < 1e-9)
+      && Math.floor(lo / s + 1e-9) * s + steps * s >= hi - 1e-9);
+    if (step === undefined) continue;
+    const start = fix(Math.floor(lo / step + 1e-9) * step, step);
+    const cand = { min: start, max: fix(start + steps * step, step), step, steps };
+    // STEP_COUNTS steht in Vorzugsreihenfolge: nur eine echt knappere Skala
+    // verdraengt die fruehere.
+    if (!best || cand.max - cand.min < best.max - best.min - 1e-9) best = cand;
+  }
+  return best;
+}
+
+/* EINE ZEITACHSE RECHNET NACH DEM DATUM, NICHT NACH DER NUMMER (C4).
+ *
+ * `chartX(index, count)` setzt Punkte in gleichen Abstaenden - richtig fuer
+ * luekenlose Buckets (jeder Tag des Monats, jeder Monat des Jahres), falsch
+ * fuer Befunde vom Januar, Februar und Dezember: dort stand der Februar in der
+ * Mitte und der Trend war verzerrt. `chartTimeX` rechnet einen Tagesschluessel
+ * auf seine Lage in [from, to]. Reine Schluessel-Arithmetik (UTC-Tage), keine
+ * Zone: die Schluessel sind schon lokale Kalendertage. */
+function dayNumber(dateKey) {
+  const [y, m, d] = String(dateKey).slice(0, 10).split('-').map(Number);
+  return Date.UTC(y, m - 1, d) / 86400000;
+}
+
+/** X-Koordinate eines Tagesschluessels (YYYY-MM-DD) auf der Zeitachse [fromKey, toKey]. */
+export function chartTimeX(dateKey, fromKey, toKey, geo = CHART) {
+  const { left, right } = chartScales(geo);
+  const span = dayNumber(toKey) - dayNumber(fromKey);
+  if (!(span > 0)) return left;
+  return left + ((dayNumber(dateKey) - dayNumber(fromKey)) / span) * (right - left);
+}
+
+/**
+ * Beschriftung einer Zeitachse: Anfang, Mitte und Ende des ZEITRAUMS, jede an
+ * ihrer wahren Stelle. Die Mitte ist ein Datum, kein Datenpunkt - auf einer
+ * Zeitachse steht sie genau dort, wo sie hingehoert.
+ * @param {string} fromKey
+ * @param {string} toKey
+ * @param {(dateKey: string) => string} formatDate
+ */
+export function chartTimeLabelsMarkup(fromKey, toKey, formatDate, geo = CHART) {
+  const { H } = geo;
+  const y = H - 7;
+  const a = dayNumber(fromKey);
+  const b = dayNumber(toKey);
+  const keys = [fromKey];
+  if (b - a >= 2) {
+    const mid = new Date((a + Math.round((b - a) / 2)) * 86400000);
+    keys.push(`${mid.getUTCFullYear()}-${String(mid.getUTCMonth() + 1).padStart(2, '0')}-${String(mid.getUTCDate()).padStart(2, '0')}`);
+  }
+  if (b > a) keys.push(toKey);
+  return keys.map((key, idx) => {
+    const anchor = idx === 0 ? 'start' : idx === keys.length - 1 ? 'end' : 'middle';
+    const px = chartTimeX(key, fromKey, toKey, geo);
+    return `<text x="${px.toFixed(1)}" y="${y}" class="chart__axis" text-anchor="${anchor}">${esc(formatDate(key))}</text>`;
+  }).join('');
 }

@@ -14,7 +14,7 @@
 import { api } from '/api.js';
 import { t, formatDate, formatTime, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { CHART, chartScales, chartGridMarkup, chartXLabelsMarkup, chartX, chartY } from '/utils/chart.js';
+import { CHART, chartScales, chartGridMarkup, chartXLabelsMarkup, chartX, chartY, niceDomain, chartTimeX, chartTimeLabelsMarkup } from '/utils/chart.js';
 import { scheduleUndoableDelete } from '/utils/ux.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays, todayKey} from '/utils/date.js';
 import { zonedDateKey } from '/utils/timezone.js';
@@ -347,7 +347,7 @@ const CHANNEL_COLORS = ['var(--module-health)', 'var(--color-info)', 'var(--colo
 // eigen und je falscher beantwortet (Achse ausserhalb des SVG, verzerrende
 // Skalierung). Was hier bleibt, ist das VOKABULAR: wie ein Achsenwert dieses
 // Moduls aussieht, weiss nur dieses Modul.
-const chartGridFor = (min, max, metric, geo) => chartGridMarkup(min, max, (val, wholeTicks) => axisTickText(metric, val, wholeTicks), geo);
+const chartGridFor = (min, max, metric, geo, steps) => chartGridMarkup(min, max, (val, wholeTicks) => axisTickText(metric, val, wholeTicks), geo, steps);
 
 // Achsen-Tick. Eine Dauer darf hier nicht dezimal stehen: „8,4" neben einer
 // Verlaufszeile mit „8 Std. 24 Min." wäre dieselbe Größe in zwei Zahlensystemen.
@@ -1702,16 +1702,14 @@ function chartMarkup(metric, series, geo = CHART) {
   const allValues = channels.flatMap(({ key }) => pts.map((p) => p[key]).filter((v) => v !== null));
   let min;
   let max;
+  let steps = 4;
   if (metric.domain) {
     // Feste Skala: keine Polsterung, die Grenzen sind die Aussage.
     ({ min, max } = metric.domain);
   } else {
-    min = Math.min(...allValues);
-    max = Math.max(...allValues);
-    if (min === max) { min -= 1; max += 1; }
-    const span = max - min;
-    const pad = span * 0.1;
-    min -= pad; max += pad;
+    // Runde Achsenwerte (C4): 50/75/100/125/150 statt 126/108/91/73/55. Die
+    // Luft, die die 10-%-Polsterung gab, kommt jetzt aus dem runden Schritt.
+    ({ min, max, steps } = niceDomain(Math.min(...allValues), Math.max(...allValues)));
   }
 
   // Die Hoehe kommt aus den Plotgrenzen, die `chartScales(geo)` WIRKLICH
@@ -1719,11 +1717,13 @@ function chartMarkup(metric, series, geo = CHART) {
   const { W } = geo;
   const { left, right, top, bottom } = chartScales(geo);
   const H = bottom + geo.PAD_B;
-  // X-Domäne an die tatsächliche Datenspanne klemmen (erster bis letzter Bucket mit
-  // Wert), damit dünne Daten die volle Breite nutzen statt mittig zusammenzukleben.
-  const firstIdx = dataIdx[0];
-  const lastIdx = dataIdx[dataIdx.length - 1];
-  const x = (i) => left + ((i - firstIdx) * (right - left)) / (lastIdx - firstIdx);
+  /* DIE X-ACHSE IST DER ZEITRAUM, NICHT DIE DATENSPANNE (Re-Critique
+   * 2026-09-27, C4). Hier wurde die Achse auf den ersten und letzten Bucket mit
+   * Wert geklemmt: Messungen vom 09.09. und 20.09. standen an den Plotkanten,
+   * waehrend der Kopf "01.09.2026 - 30.09.2026" sagte - die Kurve behauptete
+   * einen Monat, den sie nicht zeigte. Die Buckets sind luekenlos (jeder Tag,
+   * jeder Monat), ihr Index IST die Zeit; also spannt die Achse alle. */
+  const x = (i) => left + (pts.length <= 1 ? 0 : (i * (right - left)) / (pts.length - 1));
   const y = (v) => bottom - ((v - min) / (max - min)) * (bottom - top);
 
   // Flächenfüllung nur bei Einzelkanal-Metriken (Gewicht, Glukose …). Bei Blutdruck
@@ -1766,7 +1766,7 @@ function chartMarkup(metric, series, geo = CHART) {
         </span>`).join('')}</div>`
     : '';
 
-  const grid = chartGridFor(min, max, metric, geo);
+  const grid = chartGridFor(min, max, metric, geo, steps);
 
   // Screenreader-Datentabelle: nur Buckets mit mindestens einem Wert.
   const chLabel = (idx) => (metric.channelLabelKeys?.[idx] ? t(metric.channelLabelKeys[idx]) : t(metric.labelKey));
@@ -1775,7 +1775,8 @@ function chartMarkup(metric, series, geo = CHART) {
   const tableRows = dataPoints
     .map((p) => [formatDate(p.date), ...channels.map(({ key }) => fmtChannelValue(metric, p[key]))]);
   const table = tableRows.length ? chartTableMarkup(t(metric.labelKey), tableHeaders, tableRows) : '';
-  const xLabels = chartXLabels(dataPoints.map((p) => p.date), geo);
+  // Die Marken benennen den Zeitraum (Anfang, Mitte, Ende) an ihrer Stelle.
+  const xLabels = chartXLabels(pts.map((p) => p.date), geo);
   // `.chart` haelt das 3:1 der geteilten Geometrie (panel.css); eine hoehere
   // Flaeche nennt ihr eigenes Verhaeltnis.
   const ratio = H === CHART.H ? '' : ` style="aspect-ratio: ${W} / ${H}"`;
@@ -3644,14 +3645,20 @@ function labTrendChart(points, analyteName) {
   const domain = points.map((p) => p.value);
   if (refLow != null) domain.push(refLow);
   if (refHigh != null) domain.push(refHigh);
-  let min = Math.min(...domain);
-  let max = Math.max(...domain);
-  if (min === max) { min -= 1; max += 1; }
-  const span = max - min;
-  const pad = span * 0.1;
-  min -= pad; max += pad;
+  // Runde Achsenwerte (C4) - die Luft der frueheren 10-%-Polsterung kommt
+  // aus dem runden Schritt.
+  const { min, max, steps } = niceDomain(Math.min(...domain), Math.max(...domain));
 
-  const x = (i) => left + (n <= 1 ? 0 : (i * (right - left)) / (n - 1));
+  /* BEFUNDE LIEGEN NACH IHREM DATUM, NICHT NACH IHRER NUMMER (C4). Ein Befund
+   * vom Januar, einer vom Februar und einer vom Dezember standen in gleichen
+   * Abstaenden - der Februar in der Mitte, und die Steigung zum Dezember sah
+   * aus wie die zum Februar. Liegen alle am selben Tag, bleibt der Index. */
+  const from = points[0].date;
+  const to = points[n - 1].date;
+  const timed = from !== to;
+  const x = timed
+    ? (i) => chartTimeX(points[i].date, from, to)
+    : (i) => left + (n <= 1 ? 0 : (i * (right - left)) / (n - 1));
   const y = (v) => pBottom - ((v - min) / (max - min)) * (pBottom - pTop);
 
   // Referenzband: gefülltes Rechteck zwischen ref_low und ref_high, sonst eine
@@ -3701,8 +3708,10 @@ function labTrendChart(points, analyteName) {
     tableRows,
   );
 
-  const grid = chartGridFor(min, max);
-  const xLabels = chartXLabels(points.map((p) => p.date));
+  const grid = chartGridFor(min, max, undefined, undefined, steps);
+  const xLabels = timed
+    ? chartTimeLabelsMarkup(from, to, formatDate)
+    : chartXLabels(points.map((p) => p.date));
 
   return `
     <svg class="chart health-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(ariaLabel)}">
@@ -4251,8 +4260,8 @@ function activityStatsMarkup(totals) {
 // Nativer SVG-Balken-Chart: Gesamt-Dauer (Min) je Wochentag Mo–So.
 function activityChartMarkup(summary) {
   const buckets = summary.buckets;
-  const max = Math.max(...buckets.map((b) => b.durationMin), 0);
-  if (max <= 0) {
+  const peak = Math.max(...buckets.map((b) => b.durationMin), 0);
+  if (peak <= 0) {
     return emptyHintHTML(t('health.activity.noData'), { className: 'health-chart-empty' });
   }
 
@@ -4262,6 +4271,8 @@ function activityChartMarkup(summary) {
   const chartH = bottom - top;
   const slot = (right - left) / n;
   const barW = slot * 0.6;
+  // Runde Achse (C4): die Balken messen gegen die gerundete Obergrenze.
+  const { max, steps } = niceDomain(0, peak);
 
   const bars = buckets.map((b, i) => {
     const h = (b.durationMin / max) * chartH;
@@ -4275,7 +4286,7 @@ function activityChartMarkup(summary) {
       <text x="${(x + barW / 2).toFixed(1)}" y="${H - 8}" class="chart__axis" text-anchor="middle">${esc(label)}</text>`;
   }).join('');
 
-  const grid = chartGridFor(0, max);
+  const grid = chartGridFor(0, max, undefined, undefined, steps);
 
   const tableRows = buckets.map((b, i) => [
     t(ACTIVITY_WEEKDAY_LABEL_KEYS[i]),
@@ -7054,15 +7065,13 @@ function simpleLineChartMarkup({ points, titleText, formatPointTooltip, formatTa
   const { top, bottom, left, right } = chartScales();
 
   let min, max;
+  let steps = 4;
   if (yDomain) {
     [min, max] = yDomain;
   } else {
+    // Runde Achsenwerte (C4) statt 10 % Polsterung um die rohe Spanne.
     const values = points.map((p) => p.value);
-    min = Math.min(...values);
-    max = Math.max(...values);
-    if (min === max) { min -= 1; max += 1; }
-    const pad = (max - min) * 0.1;
-    min -= pad; max += pad;
+    ({ min, max, steps } = niceDomain(Math.min(...values), Math.max(...values)));
   }
 
   const firstDate = points[0].date;
@@ -7108,7 +7117,7 @@ function simpleLineChartMarkup({ points, titleText, formatPointTooltip, formatTa
   const dots = points.map((p, i) =>
     `<circle cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="3.5" fill="var(--module-health)"><title>${esc(formatPointTooltip(p))}</title></circle>`).join('');
 
-  const grid = chartGridMarkup(min, max, (val, wholeTicks) => (formatTick ? formatTick(val, wholeTicks) : String(wholeTicks ? Math.round(val) : val.toFixed(1))));
+  const grid = chartGridMarkup(min, max, (val, wholeTicks) => (formatTick ? formatTick(val, wholeTicks) : String(wholeTicks ? Math.round(val) : fmtNum(val))), CHART, steps);
   const xLabels = dateScaled ? dateScaledXLabelsMarkup(points, x) : chartXLabelsMarkup(points.map((p) => formatDate(p.date)));
   const table = chartTableMarkup(titleText, [t('health.cycle.trends.date'), tableHeader],
     points.map((p) => [formatDate(p.date), formatTableValue(p.value)]));
@@ -7142,8 +7151,8 @@ function cycleLengthTrendChartMarkup(trend) {
   const { left, right, bottom } = chartScales();
   const n = trend.length;
 
-  const min = 0;
-  const max = Math.max(...trend.map((e) => e.days), TYPICAL_CYCLE_RANGE.max) * 1.08;
+  // Nullbasiert und rund (C4): 0/10/20/30/40 statt Viertel von max*1,08.
+  const { min, max, steps } = niceDomain(0, Math.max(...trend.map((e) => e.days), TYPICAL_CYCLE_RANGE.max));
   const y = (v) => chartY(v, min, max);
 
   // Referenzband für den allgemein üblichen Bereich - dieselbe Klasse/Optik
@@ -7179,7 +7188,7 @@ function cycleLengthTrendChartMarkup(trend) {
     return `<rect x="${(cx - barW / 2).toFixed(1)}" y="${by.toFixed(1)}" width="${barW.toFixed(1)}" height="${(bottom - by).toFixed(1)}" rx="2" fill="${color}"><title>${esc(label)}</title></rect>`;
   }).join('');
 
-  const grid = chartGridMarkup(min, max, (val) => String(Math.round(val)));
+  const grid = chartGridMarkup(min, max, (val, whole) => (whole ? String(Math.round(val)) : fmtNum(val)), CHART, steps);
   // Eine eigene Beschriftung statt chartXLabelsMarkup() (dessen "erstes/
   // mittleres/letztes"-Auswahl fuer eine LINIE gedacht ist, deren Punkte
   // zwischen den drei Marken nur den Verlauf, keine eigene Kategorie tragen):
@@ -7435,8 +7444,7 @@ function flowLoadTrendChartMarkup(trend) {
   const { left, right, bottom } = chartScales();
   const n = trend.length;
 
-  const min = 0;
-  const max = Math.max(...trend.map((e) => e.load)) * 1.08;
+  const { min, max, steps } = niceDomain(0, Math.max(...trend.map((e) => e.load)));
   const y = (v) => chartY(v, min, max);
 
   const bandWidth = (right - left) / n;
@@ -7455,7 +7463,7 @@ function flowLoadTrendChartMarkup(trend) {
     return `<rect x="${(cx - barW / 2).toFixed(1)}" y="${by.toFixed(1)}" width="${barW.toFixed(1)}" height="${(bottom - by).toFixed(1)}" rx="2" fill="var(--module-health)"><title>${esc(label)}</title></rect>`;
   }).join('');
 
-  const grid = chartGridMarkup(min, max, (val) => String(Math.round(val)));
+  const grid = chartGridMarkup(min, max, (val, whole) => (whole ? String(Math.round(val)) : fmtNum(val)), CHART, steps);
   const MAX_BAR_LABELS = 8;
   const dense = n > MAX_BAR_LABELS;
   const labelStride = dense ? Math.ceil(n / MAX_BAR_LABELS) : 1;
@@ -8540,6 +8548,8 @@ export const __test = {
   cardMarkup,
   moreMetricsMarkup,
   chartMarkup,
+  // C4: Laborbefunde auf der Zeitachse.
+  labTrendChart,
   VITAL_SHEET_CHART,
   backToVitalSheetForTest: (type) => backToVitalSheet(type),
   vitalPatchBody,

@@ -469,3 +469,77 @@ test('M3: unter 640px entfallen Seiten-Umschalter, Detail und leere Kacheln; die
   assert.ok(!rules.some((r) => !phone(r) && /health-vitals__card--empty/.test(r.selector) && /display:\s*none/.test(r.body)),
     'am Desktop bleiben die leeren Kacheln');
 });
+
+// --------------------------------------------------------
+// Achsen, die man ablesen kann (Re-Critique 2026-09-27, C4)
+// --------------------------------------------------------
+//
+// Zwei Befunde an derselben Geometrie: die Y-Achse teilte die rohe Spanne in
+// Viertel (Blutdruck 126/108/91/73/55), und die X-Achse zaehlte Punkte statt
+// Tage - beim Blutdruck auf die Datenspanne geklemmt (09.09. und 20.09. an den
+// Plotkanten unter einem Kopf "01.09. - 30.09."), bei den Laborbefunden nach
+// Nummer (Januar, Februar, Dezember in gleichen Abstaenden).
+
+const { niceDomain } = await import('../public/utils/chart.js');
+
+/** Ist `step` 1, 2, 2,5 oder 5 mal eine Zehnerpotenz? */
+const rund = (step) => {
+  const f = step / 10 ** Math.floor(Math.log10(step) + 1e-9);
+  return [1, 2, 2.5, 5].some((n) => Math.abs(f - n) < 1e-6);
+};
+const yTicks = (svg) => [...svg.matchAll(/class="chart__axis chart__axis--y"[^>]*>([^<]*)</g)]
+  .map((m) => Number(m[1].replace(/\./g, '').replace(',', '.')));
+
+test('niceDomain: die Skala enthaelt die Daten und steht auf runden Schritten', () => {
+  const faelle = [[55, 126], [0, 5550], [0.5, 1.2], [36.1, 37.4], [60, 60], [-3, 7], [1200, 1320], [0, 23.5], [0, 0], [0.001, 0.0042]];
+  for (const [lo, hi] of faelle) {
+    const d = niceDomain(lo, hi);
+    assert.ok(d.min <= lo && d.max >= hi, `${lo}-${hi}: ${d.min}-${d.max} schneidet ab`);
+    assert.ok(d.steps >= 3 && d.steps <= 6, `${lo}-${hi}: ${d.steps} Schritte`);
+    assert.ok(rund(d.step), `${lo}-${hi}: Schritt ${d.step} ist nicht rund`);
+    assert.ok(Math.abs((d.max - d.min) / d.steps - d.step) < 1e-9, `${lo}-${hi}: Schritte passen nicht in die Spanne`);
+    assert.ok(Math.abs(d.min / d.step - Math.round(d.min / d.step)) < 1e-6, `${lo}-${hi}: Unterkante ${d.min} liegt neben dem Raster`);
+    if (lo >= 0) assert.ok(d.min >= 0, `${lo}-${hi}: erfindet eine Unterkante unter 0`);
+  }
+  for (const hi of [1, 3, 7, 13, 5550]) {
+    assert.ok(Number.isInteger(niceDomain(0, hi, { integer: true }).step), `ganzzahlig ${hi}`);
+  }
+});
+
+test('Vitalwerte: runde Achsenwerte und eine X-Achse ueber den ganzen Zeitraum', () => {
+  const rows = [
+    { id: 1, type: 'bp', value_num: 126, value_num2: 82, value_num3: 71, measured_at: '2026-09-09T08:00' },
+    { id: 2, type: 'bp', value_num: 118, value_num2: 76, value_num3: 55, measured_at: '2026-09-20T08:00' },
+  ];
+  const series = computeVitalSeries(rows, { type: 'bp', range: 'month', anchor: '2026-09-15' });
+  const svg = health.chartMarkup(vitalMetric('bp'), series);
+  const ticks = yTicks(svg);
+  assert.ok(ticks.length >= 4, `keine Werteachse gefunden: ${ticks}`);
+  const step = Math.abs(ticks[0] - ticks[1]);
+  assert.ok(rund(step), `Achse ${ticks.join('/')} steht nicht auf runden Schritten`);
+  assert.ok(ticks.every((v) => Math.abs(v / step - Math.round(v / step)) < 1e-6), `Achse ${ticks.join('/')}`);
+
+  const { left, right } = chartScales();
+  const cx = [...svg.matchAll(/<circle cx="([\d.]+)"/g)].map((m) => Number(m[1]));
+  const erster = Math.min(...cx);
+  const letzter = Math.max(...cx);
+  // 09.09. ist Tag 8 von 29 Schritten, 20.09. Tag 19: nicht an den Kanten.
+  assert.ok(Math.abs(erster - (left + (8 / 29) * (right - left))) < 1, `09.09. steht bei ${erster}, nicht an seinem Tag`);
+  assert.ok(Math.abs(letzter - (left + (19 / 29) * (right - left))) < 1, `20.09. steht bei ${letzter}, nicht an seinem Tag`);
+});
+
+test('Laborbefunde liegen nach ihrem Datum, nicht nach ihrer Nummer', () => {
+  const punkte = [
+    { date: '2026-01-01', value: 5.1, unit: 'mmol/l', flag: null, refLow: null, refHigh: null },
+    { date: '2026-02-01', value: 5.4, unit: 'mmol/l', flag: null, refLow: null, refHigh: null },
+    { date: '2026-12-31', value: 6.0, unit: 'mmol/l', flag: null, refLow: null, refHigh: null },
+  ];
+  const svg = health.labTrendChart(punkte, 'HbA1c');
+  const { left, right } = chartScales();
+  const cx = [...svg.matchAll(/<circle cx="([\d.]+)"/g)].map((m) => Number(m[1]));
+  assert.equal(cx.length, 3);
+  const erwartet = left + (31 / 364) * (right - left);
+  assert.ok(Math.abs(cx[1] - erwartet) < 1, `Februar steht bei ${cx[1]}, erwartet ${erwartet.toFixed(1)} (nicht in der Mitte)`);
+  const ticks = yTicks(svg);
+  assert.ok(rund(Math.abs(ticks[0] - ticks[1])), `Achse ${ticks.join('/')}`);
+});
