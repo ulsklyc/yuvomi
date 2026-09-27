@@ -790,7 +790,6 @@ const BREAKS_WITHOUT_HYPHENS = {
   '.document-viewer__text': 'LEGACY',
   '.dms-preview__title': 'LEGACY',
   '.health-dose__name': 'LEGACY',
-  '.health-choice-label': 'LEGACY',
   '.health-nutrition-progress__label': 'LEGACY',
   '.health-nutrition-row__title': 'LEGACY',
   '.search-scope': 'LEGACY',
@@ -812,10 +811,7 @@ const BREAKS_WITHOUT_HYPHENS = {
 /** Die harte Form desselben Fehlers: ausdruecklich `hyphens: manual | none`
  *  neben einem Bruch. Ohne Ausnahme - bis auf die Wunsch-Diffs, die ein anderer
  *  Schritt anwendet (Eintrag wird dann rot und faellt weg). */
-const OPT_OUT_PENDING = {
-  // health.css gehoert in R11 c11; Wunsch-Diff in SP/r11/handoff-w11.md.
-  '.health-choices--scale .health-choice-label': 'health.css',
-};
+const OPT_OUT_PENDING = {};
 
 test('wer ein Wort brechen laesst, schaltet den Strich nicht ab (W1)', () => {
   const rules = wordBreakRules();

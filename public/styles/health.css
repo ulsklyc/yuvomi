@@ -3189,7 +3189,8 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   font-size: var(--text-xs);
   line-height: 1.2;
   overflow-wrap: break-word;
-  hyphens: manual;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
 }
 
 .health-choice {
