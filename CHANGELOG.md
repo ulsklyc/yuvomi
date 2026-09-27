@@ -390,15 +390,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is always visible instead of only under the pointer.
 
 - **Meals and recipes delete from the dialog footer.** Delete sits on the left of the footer with
-  Cancel and Save on the right, as in the other dialogs.
+  Cancel and Save on the right, as in the other dialogs. For a repeating meal the question which
+  occurrences to delete appears over the dialog, and cancelling it keeps the dialog with your
+  changes.
 
 - **Default reward points save like the switches beside them.** The field saves when you leave it
   or press Enter, checks the value in place and confirms with a message; the separate Save button
   is gone. Escape restores the saved value.
 
 - **The permission matrix says which role you are editing.** The first role is selected when the
-  page opens, the role and member chips announce their state, and a legend explains the four
-  access icons on wider screens.
+  page opens, the role and member chips announce their state, and a legend on wider screens
+  explains the access icons with their meaning for modules, widgets and further permissions. If
+  the permissions of a role or member fail to load, the page says so and offers to try again
+  instead of showing defaults that cannot be changed.
 
 ### Fixed
 
