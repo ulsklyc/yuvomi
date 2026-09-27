@@ -2945,9 +2945,14 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
  * cyclePairMarkup in health.js). Gefragt wird die eigene Breite, keine
  * Seiten-Schwelle (tokens.css §11c). Die Schwelle ist die Summe der
  * Mindestmasse: das Kalendergitter in seinem kompakten Ziel (7 x 64 + 6 x 4 =
- * 472px, derselbe Wert wie --cycle-cal-grid-max), der Spaltenabstand und 20rem
- * fuer die Trends - schmaler wuerde ein 600x200-Diagramm unter 107px hoch.
- * 472 + 24 + 320 = 816px = 51rem; die Detailspalte bei 1440px hat 844.
+ * 472px, derselbe Wert wie --cycle-cal-grid-max), der Spaltenabstand und eine
+ * Trendspalte, in der jedes Diagramm mindestens 160px hoch steht. Die Karte
+ * nimmt dem SVG 72px Innenrand, die Trends zeichnen 600x260
+ * (CYCLE_TREND_CHART in health.js): 160px brauchen 370px Zeichenbreite, also
+ * 442px Spalte. 472 + 24 + 448 = 944px = 59rem. Die Detailspalte ist hoechstens
+ * 968px breit (gemessen bei 1920 und 2560px) - dort 173px Diagrammhoehe; bei
+ * 1440px (844) stehen beide untereinander. Die erste Fassung (51rem, 3:1)
+ * stellte das Paar schon bei 1440px mit 92px hohen Diagrammen (R11 C7).
  * Im Paar steht der Kalender in seiner Spalte unter 640px, also mit der
  * Legende UNTER dem Gitter (seine eigene @container-Regel oben). */
 .cycle-pair {
@@ -2955,7 +2960,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   --cycle-pair-cal: calc(var(--space-16) * 7 + var(--space-1) * 6);
 }
 
-@container cycle-pair (min-width: 51rem) {
+@container cycle-pair (min-width: 59rem) {
   .cycle-pair__cols {
     display: grid;
     grid-template-columns: var(--cycle-pair-cal) minmax(0, 1fr);

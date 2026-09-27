@@ -331,6 +331,15 @@ const isPhone = () => typeof window !== 'undefined' && typeof window.matchMedia 
  * Hoehe liest `chartMarkup` aus `chartScales(geo)` zurueck, damit viewBox und
  * Seitenverhaeltnis immer zu dem passen, was die Geometrie wirklich zeichnet. */
 const VITAL_SHEET_CHART = Object.freeze({ ...CHART, H: 440 });
+// Die Zyklus-Trends stehen ab einer breiten Detailspalte NEBEN dem Kalender
+// (cyclePairMarkup, health.css @container cycle-pair) - in einer Spalte von
+// 448-472px. Im 3:1 der geteilten Geometrie war ein Diagramm dort 92px hoch
+// (gemessen, R11 C7); 600x260 haelt es ab der Paar-Schwelle ueber 160px und
+// gibt den gestapelten Diagrammen (mobil ~124px statt ~95px) mehr Hoehe.
+const CYCLE_TREND_CHART = Object.freeze({ ...CHART, H: 260 });
+/** `.chart` haelt das 3:1 der geteilten Geometrie (panel.css); eine andere
+ *  Flaeche nennt ihr eigenes Verhaeltnis am SVG. */
+const chartRatioAttr = ({ W, H }) => (H === CHART.H ? '' : ` style="aspect-ratio: ${W} / ${H}"`);
 
 const RANGE_LABELS = {
   week: 'health.vitals.range.week',
@@ -7038,9 +7047,9 @@ const DATE_SCALE_GAP_BREAK_DAYS = 5;
  * @param {Array<{date: string}>} points
  * @param {(index: number) => number} xFor
  */
-function dateScaledXLabelsMarkup(points, xFor) {
+function dateScaledXLabelsMarkup(points, xFor, geo = CHART) {
   const n = points.length;
-  const y = CHART.H - 7;
+  const y = geo.H - 7;
   const picks = n <= 4
     ? points.map((_, i) => i)
     : [...new Set([0, Math.floor((n - 1) / 3), Math.floor((2 * (n - 1)) / 3), n - 1])];
@@ -7072,10 +7081,10 @@ function dateScaledXLabelsMarkup(points, xFor) {
  * ECHTEN Grenzen, keine geglättete Spanne, die die Randwerte in die Polsterung
  * schiebt).
  */
-function simpleLineChartMarkup({ points, titleText, formatPointTooltip, formatTableValue, tableHeader, formatTick, dateScaled = false, yDomain = null }) {
+function simpleLineChartMarkup({ points, titleText, formatPointTooltip, formatTableValue, tableHeader, formatTick, dateScaled = false, yDomain = null, geo = CYCLE_TREND_CHART }) {
   if (points.length < 2) return '';
-  const { W, H } = CHART;
-  const { top, bottom, left, right } = chartScales();
+  const { W, H } = geo;
+  const { top, bottom, left, right } = chartScales(geo);
 
   let min, max;
   let steps = 4;
@@ -7093,8 +7102,8 @@ function simpleLineChartMarkup({ points, titleText, formatPointTooltip, formatTa
 
   const x = dateScaled
     ? (i) => left + (daysBetween(firstDate, points[i].date) / span) * (right - left)
-    : (i) => chartX(i, points.length);
-  const y = (v) => chartY(v, min, max);
+    : (i) => chartX(i, points.length, geo);
+  const y = (v) => chartY(v, min, max, geo);
 
   // A-7: Segmente an Lücken > DATE_SCALE_GAP_BREAK_DAYS brechen (nur im
   // datumsskalierten Modus - im index-Modus ist jeder Abstand "1", nie eine
@@ -7130,15 +7139,15 @@ function simpleLineChartMarkup({ points, titleText, formatPointTooltip, formatTa
   const dots = points.map((p, i) =>
     `<circle cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="3.5" fill="var(--module-health)"><title>${esc(formatPointTooltip(p))}</title></circle>`).join('');
 
-  const grid = chartGridMarkup(min, max, (val, wholeTicks) => (formatTick ? formatTick(val, wholeTicks) : String(wholeTicks ? Math.round(val) : fmtNum(val))), CHART, steps);
-  const xLabels = dateScaled ? dateScaledXLabelsMarkup(points, x) : chartXLabelsMarkup(points.map((p) => formatDate(p.date)));
+  const grid = chartGridMarkup(min, max, (val, wholeTicks) => (formatTick ? formatTick(val, wholeTicks) : String(wholeTicks ? Math.round(val) : fmtNum(val))), geo, steps);
+  const xLabels = dateScaled ? dateScaledXLabelsMarkup(points, x, geo) : chartXLabelsMarkup(points.map((p) => formatDate(p.date)), geo);
   const table = chartTableMarkup(titleText, [t('health.cycle.trends.date'), tableHeader],
     points.map((p) => [formatDate(p.date), formatTableValue(p.value)]));
 
   return `
     <div class="health-chart-section">
       <div class="health-chart-section__head"><div class="health-chart-section__title">${esc(titleText)}</div></div>
-      <svg class="chart health-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titleText)}">
+      <svg class="chart health-chart" viewBox="0 0 ${W} ${H}" role="img"${chartRatioAttr(geo)} aria-label="${esc(titleText)}">
         ${grid}
         ${area}
         ${polylines}
@@ -7160,13 +7169,14 @@ function simpleLineChartMarkup({ points, titleText, formatPointTooltip, formatTa
  * Dieselbe geteilte Geometrie (chart.js), nur <rect> statt <polyline>+<circle>.
  */
 function cycleLengthTrendChartMarkup(trend) {
-  const { W, H } = CHART;
-  const { left, right, bottom } = chartScales();
+  const geo = CYCLE_TREND_CHART;
+  const { W, H } = geo;
+  const { left, right, bottom } = chartScales(geo);
   const n = trend.length;
 
   // Nullbasiert und rund (C4): 0/10/20/30/40 statt Viertel von max*1,08.
   const { min, max, steps } = niceDomain(0, Math.max(...trend.map((e) => e.days), TYPICAL_CYCLE_RANGE.max));
-  const y = (v) => chartY(v, min, max);
+  const y = (v) => chartY(v, min, max, geo);
 
   // Referenzband für den allgemein üblichen Bereich - dieselbe Klasse/Optik
   // wie das Laborwert-Normband (analyteTrendChartMarkup), keine neue Farbe.
@@ -7201,7 +7211,7 @@ function cycleLengthTrendChartMarkup(trend) {
     return `<rect x="${(cx - barW / 2).toFixed(1)}" y="${by.toFixed(1)}" width="${barW.toFixed(1)}" height="${(bottom - by).toFixed(1)}" rx="2" fill="${color}"><title>${esc(label)}</title></rect>`;
   }).join('');
 
-  const grid = chartGridMarkup(min, max, (val, whole) => (whole ? String(Math.round(val)) : fmtNum(val)), CHART, steps);
+  const grid = chartGridMarkup(min, max, (val, whole) => (whole ? String(Math.round(val)) : fmtNum(val)), geo, steps);
   // Eine eigene Beschriftung statt chartXLabelsMarkup() (dessen "erstes/
   // mittleres/letztes"-Auswahl fuer eine LINIE gedacht ist, deren Punkte
   // zwischen den drei Marken nur den Verlauf, keine eigene Kategorie tragen):
@@ -7240,7 +7250,7 @@ function cycleLengthTrendChartMarkup(trend) {
     <div class="health-chart-section">
       <div class="health-chart-section__head"><div class="health-chart-section__title">${esc(titleText)}</div></div>
       <p class="health-chart-section__caption">${esc(t('health.cycle.trends.typicalRangeLabel', { min: TYPICAL_CYCLE_RANGE.min, max: TYPICAL_CYCLE_RANGE.max }))}</p>
-      <svg class="chart health-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titleText)}">
+      <svg class="chart health-chart" viewBox="0 0 ${W} ${H}" role="img"${chartRatioAttr(geo)} aria-label="${esc(titleText)}">
         ${grid}
         ${band}
         ${bars}
@@ -7453,12 +7463,13 @@ function feelingFrequencyChartMarkup(freq) {
  * (health-cycle.js), nur für Perioden mit mindestens einem Flow-Log.
  */
 function flowLoadTrendChartMarkup(trend) {
-  const { W, H } = CHART;
-  const { left, right, bottom } = chartScales();
+  const geo = CYCLE_TREND_CHART;
+  const { W, H } = geo;
+  const { left, right, bottom } = chartScales(geo);
   const n = trend.length;
 
   const { min, max, steps } = niceDomain(0, Math.max(...trend.map((e) => e.load)));
-  const y = (v) => chartY(v, min, max);
+  const y = (v) => chartY(v, min, max, geo);
 
   const bandWidth = (right - left) / n;
   const barW = Math.max(6, Math.min(28, bandWidth * 0.5));
@@ -7476,7 +7487,7 @@ function flowLoadTrendChartMarkup(trend) {
     return `<rect x="${(cx - barW / 2).toFixed(1)}" y="${by.toFixed(1)}" width="${barW.toFixed(1)}" height="${(bottom - by).toFixed(1)}" rx="2" fill="var(--module-health)"><title>${esc(label)}</title></rect>`;
   }).join('');
 
-  const grid = chartGridMarkup(min, max, (val, whole) => (whole ? String(Math.round(val)) : fmtNum(val)), CHART, steps);
+  const grid = chartGridMarkup(min, max, (val, whole) => (whole ? String(Math.round(val)) : fmtNum(val)), geo, steps);
   const MAX_BAR_LABELS = 8;
   const dense = n > MAX_BAR_LABELS;
   const labelStride = dense ? Math.ceil(n / MAX_BAR_LABELS) : 1;
@@ -7497,7 +7508,7 @@ function flowLoadTrendChartMarkup(trend) {
     <div class="health-chart-section">
       <div class="health-chart-section__head"><div class="health-chart-section__title">${esc(titleText)}</div></div>
       <p class="health-chart-section__caption">${esc(t('health.cycle.trends.flowLoadCaption'))}</p>
-      <svg class="chart health-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titleText)}">
+      <svg class="chart health-chart" viewBox="0 0 ${W} ${H}" role="img"${chartRatioAttr(geo)} aria-label="${esc(titleText)}">
         ${grid}
         ${bars}
         ${xLabels}
@@ -8566,6 +8577,7 @@ export const __test = {
   // C7: Kalender und Trends als Paar.
   cyclePairMarkup,
   VITAL_SHEET_CHART,
+  CYCLE_TREND_CHART,
   backToVitalSheetForTest: (type) => backToVitalSheet(type),
   vitalPatchBody,
   resultEditRowMarkup,

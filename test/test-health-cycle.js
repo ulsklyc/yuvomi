@@ -1956,8 +1956,22 @@ test('Zyklus: Kalender und Trends stehen als Paar, das seine eigene Breite fragt
   assert.ok(cols, 'die Zweispalte steht in einer Container-Regel, nicht an einer Seiten-Schwelle');
   const at = cols.at.find((a) => /@container cycle-pair/.test(a));
   const rem = Number(at.match(/min-width:\s*([\d.]+)rem/)?.[1]);
-  // Mindestmasse: Gitter 472px + Abstand 24px + 20rem Trends = 816px.
-  assert.ok(rem * 16 >= 472 + 24 + 320, `Schwelle ${rem}rem laesst den Trends weniger als 20rem`);
-  assert.ok(rem * 16 <= 844, `Schwelle ${rem}rem - die Detailspalte bei 1440px (844px) bekaeme nie ein Paar`);
+  // Mindestmasse: Gitter 472px + Abstand 24px + eine Trendspalte, in der ein
+  // Diagramm mindestens 160px hoch steht (Karte und SVG nehmen 72px Innenrand,
+  // gemessen). Die erste Fassung (51rem, 3:1) stellte es bei 1440px 92px hoch.
+  const geo = healthUi.CYCLE_TREND_CHART;
+  const chartHeight = (rem * 16 - 472 - 24 - 72) * (geo.H / geo.W);
+  assert.ok(chartHeight >= 160, `Schwelle ${rem}rem: ein Trenddiagramm stuende im Paar ${chartHeight.toFixed(0)}px hoch`);
+  // Die Detailspalte ist hoechstens 968px breit (gemessen bei 1920 und 2560px) -
+  // eine hoehere Schwelle bekaeme nie ein Paar.
+  assert.ok(rem * 16 <= 968, `Schwelle ${rem}rem - die Detailspalte (hoechstens 968px) bekaeme nie ein Paar`);
+  // Die Trends zeichnen alle in dieser Flaeche - ein Diagramm im 3:1 waere im
+  // Paar wieder zu flach.
+  for (const fn of ['simpleLineChartMarkup', 'cycleLengthTrendChartMarkup', 'flowLoadTrendChartMarkup']) {
+    const body = src.slice(src.indexOf(`function ${fn}(`), src.indexOf('\nfunction ', src.indexOf(`function ${fn}(`) + 10));
+    assert.match(body, /CYCLE_TREND_CHART/, `${fn} zeichnet nicht in der Trend-Flaeche`);
+    assert.match(body, /chartRatioAttr\(geo\)/, `${fn}: das SVG nennt sein Seitenverhaeltnis nicht (panel.css haelt sonst 3:1)`);
+    assert.doesNotMatch(body, /chartScales\(\)|chartY\([^)]*max\)/, `${fn}: rechnet noch in der 3:1-Flaeche`);
+  }
   assert.match(cols.body, /grid-template-columns:\s*var\(--cycle-pair-cal\)\s+minmax\(0,\s*1fr\)/);
 });

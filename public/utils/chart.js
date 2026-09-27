@@ -115,15 +115,15 @@ export function chartXLabelsMarkup(labels, geo = CHART) {
  * Rechnet einen Wert auf seine Y-Koordinate im Plot. Steht hier, weil jede
  * Zeitreihe sie braucht und drei Module sie bisher je eigen geschrieben haben.
  */
-export function chartY(value, min, max) {
-  const { top, bottom } = chartScales();
+export function chartY(value, min, max, geo = CHART) {
+  const { top, bottom } = chartScales(geo);
   if (max === min) return (top + bottom) / 2;
   return bottom - ((value - min) / (max - min)) * (bottom - top);
 }
 
 /** Rechnet einen Index auf seine X-Koordinate im Plot. */
-export function chartX(index, count) {
-  const { left, right } = chartScales();
+export function chartX(index, count, geo = CHART) {
+  const { left, right } = chartScales(geo);
   if (count <= 1) return left;
   return left + (index * (right - left)) / (count - 1);
 }
