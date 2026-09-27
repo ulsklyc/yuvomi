@@ -100,12 +100,10 @@ export async function render(container, { user } = {}) {
       await redirectTo(ACCOUNT_LEAF);
       return;
     }
-    // Verschobenes Blatt: aufs heutige Blatt samt Abschnitt (S2); die uebrigen
-    // Parameter (OAuth-Ergebnis, `?option=`) reisen mit.
-    if (leaf.path !== path) {
-      await redirectTo(movedSettingsUrl(path, window.location.search) ?? leaf.path);
-      return;
-    }
+    // Verschobenes Blatt oder ausgemusterte Option: aufs heutige Blatt samt
+    // Abschnitt (S2); die uebrigen Parameter (OAuth-Ergebnis) reisen mit.
+    const moved = movedSettingsUrl(path, window.location.search);
+    if (leaf.path !== path || moved) { await redirectTo(moved ?? leaf.path); return; }
 
     try {
       sessionStorage.setItem(SETTINGS_STORAGE_KEY, leaf.path);
@@ -155,8 +153,8 @@ export async function update({ user, path, query } = {}) {
   }
 
   const leaf = findSettingsLeaf(path, user);
-  // Verschobenes Blatt nicht inkrementell rendern: der reguläre Pfad leitet um.
-  if (!leaf || leaf.path !== path) return false;
+  // Verschoben (Blatt oder Option): nicht inkrementell, der reguläre Pfad leitet um.
+  if (!leaf || leaf.path !== path || movedSettingsUrl(path, search)) return false;
 
   try {
     sessionStorage.setItem(SETTINGS_STORAGE_KEY, leaf.path);

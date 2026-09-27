@@ -646,6 +646,19 @@ const MOVED_SETTINGS_PATHS = Object.freeze({
 });
 
 /**
+ * AUSGEMUSTERTE OPTIONEN. Ein Suchtreffer traegt seine Option in der Adresse
+ * (`?option=<key>`), und Lesezeichen von vor R10 leben weiter (S2). Gibt es
+ * die Option nicht mehr, weil ihr Schalter in einem anderen Blatt aufging,
+ * fuehrt die Adresse dorthin - egal, von welchem Blatt sie kommt. Sonst
+ * landete der Link auf seinem alten Blatt, ohne die Option und ohne Hinweis.
+ */
+const RETIRED_SETTINGS_OPTIONS = Object.freeze({
+  // Der zweite An/Aus neben Aktive Module (A7 P1-3): an und aus geht ein
+  // Modul nur dort.
+  'settings.rewardsEnableLabel': { path: '/settings/modules/active', section: 'modules-active' },
+});
+
+/**
  * Die Sessions-Tabs von vor dem Blatt-Umbau (2026-06). Historisch: Tab-Name ->
  * Blatt von damals; `currentSettingsPath` hebt es aufs heutige Ziel.
  */
@@ -712,18 +725,23 @@ export function movedSettingsSection(path) {
  * Parameter (OAuth-Ergebnis, `?option=`) bleiben. Ein aufgeloestes Blatt
  * (`modules-options`) folgt einer mitgegebenen Option in den Abschnitt, der sie
  * heute fuehrt - der Suchtreffer von gestern landet an der richtigen Stelle.
+ * Eine ausgemusterte Option (RETIRED_SETTINGS_OPTIONS) fuehrt auch von einem
+ * lebenden Blatt weg, an den Ort, der sie heute traegt; sie selbst faellt aus
+ * der Adresse.
  *
  * @param {string} path
  * @param {URLSearchParams|string} [search]
- * @returns {string|null} null, wenn der Pfad nicht verschoben ist
+ * @returns {string|null} null, wenn weder Pfad noch Option verschoben sind
  */
 export function movedSettingsUrl(path, search = '') {
-  const moved = MOVED_SETTINGS_PATHS[path];
-  if (!moved) return null;
   const params = new URLSearchParams(search);
-  let target = moved;
   const option = params.get('option');
-  if (moved.dissolved && option) {
+  const retired = option ? RETIRED_SETTINGS_OPTIONS[option] : null;
+  const moved = MOVED_SETTINGS_PATHS[path];
+  if (!moved && !retired) return null;
+  let target = retired ?? moved;
+  if (retired) params.delete('option');
+  else if (moved.dissolved && option) {
     const owner = SETTINGS_SECTIONS.find((section) => (section.options ?? [])
       .some((entry) => (typeof entry === 'string' ? entry : entry.key) === option));
     const sheet = owner && SETTINGS_LEAVES.find((entry) => entry.id === owner.sheetId);

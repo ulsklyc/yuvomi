@@ -1935,7 +1935,10 @@ test('S2: Mitglieder landen an ihren Abschnitten, Admin-Adressen bleiben zu', ()
 
 test('S2: der Controller leitet Alt-Adressen samt Abschnitt und Parametern um', async () => {
   const source = await readFile(new URL('../public/pages/settings.js', import.meta.url), 'utf8');
-  assert.match(source, /if \(leaf\.path !== path\) \{\s*await redirectTo\(movedSettingsUrl\(path, window\.location\.search\) \?\? leaf\.path\);/);
+  // Am Programm statt an der Schreibweise: der Controller fuehrt die Adresse
+  // samt Parametern ueber movedSettingsUrl weiter.
+  assert.deepEqual((await runSettingsController('/settings/sync/calendar', '?sync_ok=google')).replaced,
+    ['/settings/modules/calendar?section=sync-calendar&sync_ok=google']);
   // Das OAuth-Ergebnis (?sync_ok) gehoert an den Abschnitt Kalender-Synchronisation.
   assert.match(source, /const SYNC_CALENDAR_LEAF = '\/settings\/modules\/calendar';/);
   assert.match(source, /`\$\{SYNC_CALENDAR_LEAF\}\?section=\$\{SYNC_CALENDAR_SECTION\}&\$\{query\.toString\(\)\}`/);
@@ -2029,6 +2032,66 @@ test('S2: die Suche findet jede Option und jedes Blatt von vor R10', async () =>
   const feeds = searchSettings(translate('settings.pageFeeds'), { user: admin, translate }).sections
     .find((hit) => hit.section.id === 'personal-feeds');
   assert.equal(settingsSectionUrl(feeds.leaf, feeds.section.id), '/settings/modules/calendar?section=personal-feeds');
+});
+
+// Codex P2 zu R10: ein Suchtreffer von vor R10
+// (`/settings/modules/rewards?option=settings.rewardsEnableLabel`) landete auf
+// dem Belohnungen-Blatt ohne die Option - das Blatt lebt weiter, nur der
+// Schalter nicht. Die Adresse fuehrt an den Ort, der ihn heute traegt.
+test('S2: eine ausgemusterte Option fuehrt von jedem alten Blatt an ihren heutigen Ort', () => {
+  const oldHomes = Object.entries(PRE_R10_LEAVES).filter(([, old]) => old.options.some((key) => RETIRED_OPTIONS[key]));
+  assert.ok(oldHomes.length > 0, 'das Ledger kennt das Blatt der ausgemusterten Option nicht mehr');
+  for (const [key, home] of Object.entries(RETIRED_OPTIONS)) {
+    for (const path of [...oldHomes.map(([oldPath]) => oldPath), '/settings/modules/options']) {
+      const { sheet, section, params } = landing(path, `option=${key}`);
+      assert.equal(sheet?.id, home, `${path}?option=${key}: landet auf ${sheet?.id}, erwartet ${home}`);
+      assert.ok(settingsSheetSections(sheet, admin).some((entry) => entry.id === section), `${path}: Abschnitt ${section} fehlt im Blatt`);
+      assert.equal(params.get('option'), null, 'die Option, die es nicht mehr gibt, faellt aus der Adresse');
+    }
+  }
+  // Gegenprobe: eine lebende Option auf ihrem lebenden Blatt bleibt, wo sie ist.
+  assert.equal(movedSettingsUrl('/settings/modules/rewards', 'option=settings.rewardsApprovalLabel'), null);
+  assert.equal(movedSettingsUrl('/settings/modules/rewards'), null);
+});
+
+/**
+ * Faehrt den Settings-Controller (pages/settings.js) als Programm fuer eine
+ * Adresse, die umleitet: was landet per replaceState in der Adresse, was
+ * bekommt der Router. Die Globals gehen danach zurueck; `update` misst die
+ * Soft-Navigation auf dieselbe Adresse.
+ */
+async function runSettingsController(pathname, search, { soft = false } = {}) {
+  const { render, update } = await import('/pages/settings.js');
+  const prev = { window: globalThis.window, history: globalThis.history, sessionStorage: globalThis.sessionStorage };
+  const replaced = [];
+  const navigated = [];
+  globalThis.window = {
+    location: { pathname, search },
+    yuvomi: { navigate: (...args) => navigated.push(args) },
+  };
+  globalThis.history = { replaceState: (_state, _title, url) => replaced.push(url) };
+  globalThis.sessionStorage = { getItem: () => null, setItem() {}, removeItem() {} };
+  const container = { isConnected: true, replaceChildren() {}, insertAdjacentHTML() {}, querySelector: () => null };
+  try {
+    await render(container, { user: admin });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const softResult = soft ? await update({ user: admin, path: pathname, query: new URLSearchParams(search) }) : undefined;
+    return { replaced, navigated, softResult };
+  } finally {
+    globalThis.window = prev.window;
+    globalThis.history = prev.history;
+    globalThis.sessionStorage = prev.sessionStorage;
+  }
+}
+
+test('S2: der Controller leitet ein lebendes Blatt mit ausgemusterter Option per replaceState um', async () => {
+  const { replaced, navigated, softResult } = await runSettingsController(
+    '/settings/modules/rewards', '?option=settings.rewardsEnableLabel', { soft: true });
+  assert.deepEqual(replaced, ['/settings/modules/active?section=modules-active'], 'die Adresse zeigt aufs heutige Blatt');
+  assert.deepEqual(navigated, [['/settings/modules/active?section=modules-active', false]], 'und der Router zeichnet es');
+  // Soft-Navigation auf dieselbe Adresse rendert nicht inkrementell, sondern
+  // ueberlaesst sie dem regulaeren Pfad, der umleitet.
+  assert.equal(softResult, false);
 });
 
 test('S1: Admin-Abschnitte bleiben fuer Nicht-Admins verborgen - im Blatt, in der Liste und in der Suche', async () => {
