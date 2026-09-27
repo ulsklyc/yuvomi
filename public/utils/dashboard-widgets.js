@@ -46,7 +46,10 @@ export const WIDGET_IDS = ['tasks', 'calendar', 'meals', 'shopping', 'pantry', '
 // nicht zurückgesetzt, nur die Neu-Auswahl steuert auf diese vier zu.
 export const WIDGET_SIZE_PRESETS = [
   { value: '1x1', labelKey: 'dashboard.widgetSizeTiny'     },
-  { value: '2x1', labelKey: 'dashboard.widgetSizeNarrow'   },
+  // 2 Spalten x 1 Zeile ist BREIT. Der Schluessel hiess `widgetSizeNarrow`
+  // („Schmal (2×1)"), und wer das woertlich nahm, bekam das Gegenteil
+  // (Re-Critique 2026-09-27, W2).
+  { value: '2x1', labelKey: 'dashboard.widgetSizeWide'     },
   { value: '1x2', labelKey: 'dashboard.widgetSizeTall'     },
   { value: '2x2', labelKey: 'dashboard.widgetSizeStandard' },
 ];

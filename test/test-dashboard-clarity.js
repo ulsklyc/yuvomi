@@ -446,3 +446,28 @@ test('Anpassen-Modus: das Raster traegt eine Kante, keine Toenung ueber allen Ka
   assert.deepEqual(rules.filter((r) => /background(-color|-image)?\s*:/.test(r.body)).map((r) => r.selector), [],
     'keine Flaeche ueber dem ganzen Raster');
 });
+
+// --------------------------------------------------------
+// Groessennamen sagen, was passiert (Re-Critique 2026-09-27, W2)
+// --------------------------------------------------------
+// „Schmal (2×1)" hiess die Groesse, die eine Kachel ZWEI Spalten breit macht -
+// wer woertlich liest, bekam das Gegenteil. Im Japanischen hiessen 2×1 und 1×2
+// beide „縦長". Die Regel: 2×1 heisst in de/en „breit", und in keiner Sprache
+// tragen zwei waehlbare Groessen denselben Namen.
+test('die Groessennamen der Uebersicht sagen die Form, in jeder Sprache verschieden', async () => {
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const { WIDGET_SIZE_PRESETS } = await import('../public/utils/dashboard-widgets.js');
+  const dir = new URL('../public/locales/', import.meta.url);
+  const wide = WIDGET_SIZE_PRESETS.find((p) => p.value === '2x1');
+  assert.ok(wide, '2x1 ist keine waehlbare Groesse mehr - der Test prueft dann nichts');
+  assert.doesNotMatch(wide.labelKey, /narrow/i, '2 Spalten x 1 Zeile ist breit, nicht schmal');
+  const label = (locale, key) => key.split('.').reduce((o, k) => o?.[k],
+    JSON.parse(readFileSync(new URL(`${locale}.json`, dir), 'utf8')));
+  assert.match(label('de', wide.labelKey), /^Breit\b/);
+  assert.match(label('en', wide.labelKey), /^Wide\b/);
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const locale = file.slice(0, -5);
+    const names = WIDGET_SIZE_PRESETS.map((p) => label(locale, p.labelKey).replace(/\s*\(.*\)$/, ''));
+    assert.equal(new Set(names).size, names.length, `${locale}: zwei Groessen heissen gleich (${names.join(', ')})`);
+  }
+});
