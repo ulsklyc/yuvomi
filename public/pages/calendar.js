@@ -787,6 +787,23 @@ function validDateParam(value) {
  * Ansicht nur in der Tablist (siehe switchToDayView).
  * @returns {string} der Tag oder '' (kein Tag-Link, ungueltig oder mit `open`)
  */
+/**
+ * Der Termin-Link aus `?open=`: `{ id, date }` oder null.
+ *
+ * Zwei Formen: der Zahl-Link der globalen Suche (`?open=12`, Tag optional aus
+ * `&date=`) und die Auswahl der Agenda-Detailspalte (`?open=12.2026-10-14`,
+ * siehe agendaMdId). Die zweite schreibt die Spalte selbst in die Adresse; las
+ * der Aufbau nur die erste, setzte ein Neuladen oder ein geteilter Link den
+ * Cursor auf heute zurueck, der Tag lag ausserhalb der geladenen Agenda, und
+ * die Auswahl fiel weg. Der Tag der Auswahl gewinnt vor `&date=` - er ist
+ * Teil derselben Adresse, die die Spalte geschrieben hat.
+ */
+function openDeepLink(params) {
+  const m = /^(\d+)(?:\.(\d{4}-\d{2}-\d{2}))?$/.exec(String(params.get('open') ?? ''));
+  if (!m) return null;
+  return { id: m[1], date: validDateParam(m[2]) || validDateParam(params.get('date')) };
+}
+
 function dayDeepLinkDate(params) {
   if (params.get('open')) return '';
   return validDateParam(params.get('date'));
@@ -2057,15 +2074,16 @@ export async function render(container, { user }) {
   bodyEl.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 6, lines: 2 }));
 
   const params    = new URLSearchParams(window.location.search);
-  const openId    = params.get('open');
-  const dateParam = validDateParam(params.get('date'));
+  const openLink  = openDeepLink(params);
+  const openId    = openLink?.id ?? null;
+  const dateParam = openLink ? openLink.date : validDateParam(params.get('date'));
   let initialEvent = null;
   const dayLink = dayDeepLinkDate(params);
   if (dayLink) {
     state.cursor = dayLink;
     state.view = 'day';
   }
-  if (openId && /^\d+$/.test(openId)) {
+  if (openId) {
     try {
       const eventRes = await api.get(`/calendar/${openId}`);
       if (eventRes?.data) {
@@ -2136,6 +2154,9 @@ export async function render(container, { user }) {
 
     const chip =
       container.querySelector(`[data-date="${CSS.escape(targetDate)}"] [data-id="${CSS.escape(openId)}"]`)
+      // Die Agenda-Zeile traegt Termin und Tag an EINEM Knoten; ohne diese
+      // Form fand der Rueckfall die erste Zeile einer Serie, nicht den Tag.
+      ?? container.querySelector(`[data-id="${CSS.escape(openId)}"][data-date="${CSS.escape(targetDate)}"]`)
       ?? container.querySelector(`[data-id="${CSS.escape(openId)}"]`);
 
     if (chip) {
@@ -2143,7 +2164,12 @@ export async function render(container, { user }) {
       // In der Agenda mit Detailspalte: der Link WAEHLT den Termin aus, statt
       // ein Popover neben die Spalte zu setzen - und die Adresse nimmt die
       // Form der Auswahl an (`<id>.<Tag>`), ohne neuen History-Eintrag.
-      if (_agendaMd?.isSplit() && chip.dataset.mdId) _agendaMd.select(chip.dataset.mdId, { history: 'replace' });
+      // Nannte die Adresse die Auswahl schon (`<id>.<Tag>`), hat der Baustein
+      // sie beim Aufbau eingeloest; die steht, auch wenn der Rueckfall unten
+      // eine andere Zeile derselben Serie gefunden hat.
+      if (_agendaMd?.isSplit() && chip.dataset.mdId) {
+        if (_agendaMd.selectedId() == null) _agendaMd.select(chip.dataset.mdId, { history: 'replace' });
+      }
       else openEventDetail(occurrence, chip);
     } else {
       // Kein sichtbarer Chip (Termin außerhalb der aktuellen Ansicht): Der
@@ -5609,6 +5635,7 @@ export const __test = {
   agendaSegmentKind,
   deepLinkTargetDate,
   dayDeepLinkDate,
+  openDeepLink,
   findDeepLinkedOccurrence,
   validDateParam,
   hasAttachment,

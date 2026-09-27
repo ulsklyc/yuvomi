@@ -4311,6 +4311,29 @@ test('Agenda: Liste + Detail nur in der Agenda, mit Detailspalte aus dem Baustei
   assert(/claimInitial: !\(open && \/\^\\d\+\$\/\.test\(open\)\)/.test(src), 'der Baustein beansprucht nur <id>.<Tag>');
 });
 
+// Codex P2 zu R10: die Detailspalte schreibt `?open=<id>.<Tag>`, der Aufbau
+// las nur `^\d+$`. Neuladen oder Teilen setzte den Cursor auf heute, der Tag
+// lag ausserhalb der geladenen Agenda, und die Auswahl fiel weg.
+test('Agenda: ein geteilter Auswahl-Link <id>.<Tag> positioniert Cursor und Termin wie ?open=<id>&date=', () => {
+  assert(typeof calendarHelpers.openDeepLink === 'function', 'openDeepLink fehlt im __test-Export');
+  const p = (qs) => JSON.stringify(calendarHelpers.openDeepLink(new URLSearchParams(qs)));
+  const eq = (qs, want, msg) => assert(p(qs) === JSON.stringify(want), `${msg ?? qs}: ${p(qs)}`);
+  eq('open=12.2026-10-14', { id: '12', date: '2026-10-14' }, 'die Form der Detailspalte');
+  eq('open=12', { id: '12', date: '' }, 'der Zahl-Link der Suche bleibt');
+  eq('open=12&date=2026-06-29', { id: '12', date: '2026-06-29' }, 'mit Vorkommen-Tag');
+  eq('open=12.2026-10-14&date=2026-06-29', { id: '12', date: '2026-10-14' }, 'der Tag der Auswahl gewinnt');
+  eq('open=12.x', null, 'fremde Form: keine Vermutung');
+  eq('open=abc', null);
+  eq('', null);
+  // Der Aufbau liest die Adresse nur ueber diesen Leser: der Termin wird
+  // geladen, der Cursor steht auf seinem Tag (deepLinkTargetDate).
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const page = src.slice(src.indexOf('export async function render('), src.indexOf('// Toolbar\n', src.indexOf('export async function render(')));
+  assert(/const openLink\s*=\s*openDeepLink\(params\)/.test(page), 'render() liest ?open= ueber openDeepLink');
+  assert(!/\/\^\\d\+\$\/\.test\(openId\)/.test(page), 'kein Zahl-Riegel mehr vor dem Laden des Termins');
+  assert(/const dateParam\s*=\s*openLink \? openLink\.date/.test(page), 'der Tag des Links wird der Zieltag');
+});
+
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
