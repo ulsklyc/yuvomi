@@ -359,7 +359,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   place of the status circle and the assignee, and the actions (done or open, delete, finish) sit in
   the floating bar that Shopping, Contacts and the pantry use. Each row is named after its task for
   screen readers, deleting asks with the number of tasks and can be undone, and archiving or tagging
-  the selection is in the tools menu.
+  the selection is in the tools menu. While selecting, a swipe does nothing and subtasks show their
+  state without their own buttons, so a tap cannot complete or change something you meant to select.
 
 - **Fasting speaks the language of the other health tabs.** The person is picked with the same
   pill as on every health tab, reminders are switches, the settings keep a readable width on a
