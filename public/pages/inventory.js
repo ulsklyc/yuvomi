@@ -34,7 +34,7 @@ import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js'
 import { wireScrollFade } from '/utils/ux.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { setNavBadge } from '/utils/nav-badges.js';
-import { CHART, chartScales, chartX, chartY, chartGridMarkup, chartXLabelsMarkup } from '/utils/chart.js';
+import { CHART, chartScales, chartY, chartGridMarkup, niceDomain, chartTimeX, chartTimeLabelsMarkup } from '/utils/chart.js';
 
 let _container = null;
 let _search = null;
@@ -921,22 +921,21 @@ function odometerChartMarkup(points, unit) {
   const { W, H } = CHART;
   const { top, bottom } = chartScales();
 
+  // Runde Achse und Zeitachse nach Datum (C4, utils/chart.js): Wartungen
+  // liegen in ungleichen Abstaenden, der Zaehlerstand je Tag ist die Aussage.
   const values = points.map((p) => p.value);
-  let min = Math.min(...values);
-  let max = Math.max(...values);
-  if (min === max) { min -= 1; max += 1; }
-  const pad = (max - min) * 0.1;
-  min -= pad; max += pad;
-
-  const x = (i) => chartX(i, points.length);
+  const { min, max, steps } = niceDomain(Math.min(...values), Math.max(...values));
+  const from = points[0].date;
+  const to = points[points.length - 1].date;
+  const x = (i) => chartTimeX(points[i].date, from, to);
   const y = (v) => chartY(v, min, max);
 
   const spine = points.map((p, i) => `${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
   const area = `<polygon class="inventory-chart__area" points="${x(0).toFixed(1)},${bottom.toFixed(1)} ${spine} ${x(points.length - 1).toFixed(1)},${bottom.toFixed(1)}" />`;
   const dots = points.map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="3.5" fill="var(--module-inventory)"><title>${esc(`${formatDate(p.date)}: ${formatOdometer(p.value)} ${unit}`)}</title></circle>`).join('');
 
-  const grid = chartGridMarkup(min, max, (val) => formatOdometer(Math.round(val)));
-  const xLabels = chartXLabelsMarkup(points.map((p) => formatDate(p.date)));
+  const grid = chartGridMarkup(min, max, (val) => formatOdometer(Math.round(val)), CHART, steps);
+  const xLabels = chartTimeLabelsMarkup(from, to, formatDate);
   const titleText = t('inventory.odometerChartTitle');
   const table = chartTableMarkup(titleText, [t('inventory.completePerformedOnLabel'), t('inventory.odometerLabel')],
     points.map((p) => [formatDate(p.date), `${formatOdometer(p.value)} ${unit}`]));
