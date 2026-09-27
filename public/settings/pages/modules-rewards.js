@@ -41,19 +41,20 @@ function renderPage(container, preferences) {
       <div class="settings-card">
         <h2 class="settings-card__title">${t('settings.rewardsDefaultPointsTitle')}</h2>
         <p class="form-hint">${t('settings.rewardsDefaultPointsHint')}</p>
+        <!-- EIN SPEICHERMODELL AUF DER SEITE (Re-Critique 2026-09-27, A7 P2-8):
+             die Schalter daneben speichern sofort, also tut es das Zahlenfeld
+             auch - beim Verlassen und mit Enter. Ein eigener Speichern-Knopf nur
+             fuer dieses Feld liess offen, ob die Schalter ihn auch brauchen. -->
         <form class="settings-form settings-form--compact" id="rewards-default-points-form" novalidate autocomplete="off">
           <div class="form-group">
             <label class="form-label" for="rewards-default-points">${t('settings.rewardsDefaultPointsLabel')}</label>
             <input class="form-input" type="number" id="rewards-default-points" inputmode="numeric"
-                   min="0" max="${MAX_TASK_POINTS}" step="1"
+                   min="0" max="${MAX_TASK_POINTS}" step="1" enterkeyhint="done"
                    aria-describedby="rewards-default-points-off-hint rewards-default-points-error"
                    value="${Number(preferences.tasks_default_points) || 0}">
             <p class="settings-card-description" id="rewards-default-points-off-hint">${t('settings.rewardsDefaultPointsOffHint')}</p>
           </div>
           <div id="rewards-default-points-error" class="form-error" role="alert" hidden></div>
-          <div class="settings-form-actions">
-            <button type="submit" class="btn btn--primary">${t('common.save')}</button>
-          </div>
         </form>
       </div>
     </section>
@@ -100,35 +101,55 @@ function bindEvents(container, preferences) {
 }
 
 /**
- * Standard-Punkte für neue Aufgaben (#578). Kein Instant-Save: nach dem
- * Speichern folgt die Rückfrage, ob bestehende Aufgaben mitgezogen werden
- * sollen — dafür braucht es einen bewussten Abschluss der Eingabe.
+ * Standard-Punkte für neue Aufgaben (#578). Speichert wie die Schalter der
+ * Seite ohne eigenen Knopf: beim Verlassen des Feldes und mit Enter
+ * (Re-Critique 2026-09-27, H12). Die Rückfrage, ob bestehende Aufgaben
+ * mitgezogen werden, folgt dem gespeicherten Wert wie bisher - der Abschluss
+ * der Eingabe ist jetzt das Verlassen des Feldes statt eines Klicks.
+ *
+ * Nicht bei jedem `change`: an Zahlenfeldern feuert er auch für jeden
+ * Pfeilschritt, und jeder Zwischenwert wäre ein Schreibzugriff samt Rückfrage.
+ * Escape nimmt eine noch nicht gespeicherte Eingabe zurück.
  */
-function bindDefaultPoints(container, preferences) {
+export function bindDefaultPoints(container, preferences) {
   const form     = container.querySelector('#rewards-default-points-form');
   const input    = container.querySelector('#rewards-default-points');
   const errorEl  = container.querySelector('#rewards-default-points-error');
   if (!form || !input) return;
 
   let persisted = Number(preferences.tasks_default_points) || 0;
+  let saving = false;
 
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
+  const showError = (message) => {
+    errorEl.textContent = message;
+    errorEl.hidden = false;
+    input.setAttribute('aria-invalid', 'true');
+  };
+  const clearError = () => {
     errorEl.hidden = true;
+    input.removeAttribute('aria-invalid');
+  };
 
-    const next = Math.trunc(Number(input.value));
-    if (!Number.isFinite(next) || next < 0 || next > MAX_TASK_POINTS) {
-      errorEl.textContent = t('settings.rewardsDefaultPointsInvalid', { max: MAX_TASK_POINTS });
-      errorEl.hidden = false;
+  async function commit() {
+    if (saving) return;
+    const raw = String(input.value ?? '').trim();
+    const next = Math.trunc(Number(raw));
+    if (raw === '' || !Number.isFinite(next) || next < 0 || next > MAX_TASK_POINTS) {
+      showError(t('settings.rewardsDefaultPointsInvalid', { max: MAX_TASK_POINTS }));
       return;
     }
-    if (next === persisted) return;
+    clearError();
+    if (next === persisted) {
+      input.value = String(next);
+      return;
+    }
 
-    // Feld mitsperren, nicht nur den Button: sonst überschreibt der Erfolgspfad
-    // eine Eingabe, die während des laufenden Requests getippt wurde.
-    const submitBtn = form.querySelector('button[type="submit"]');
-    submitBtn.disabled = true;
-    input.disabled = true;
+    // Feld sperren, solange der Request laeuft - sonst ueberschreibt der
+    // Erfolgspfad eine Eingabe, die waehrenddessen getippt wurde. `readOnly`
+    // statt `disabled`: ein deaktiviertes Feld verliert nach Enter den Fokus.
+    saving = true;
+    input.readOnly = true;
+    input.setAttribute('aria-busy', 'true');
     const previous = persisted;
     try {
       await savePreferences({ tasks_default_points: next });
@@ -138,15 +159,30 @@ function bindDefaultPoints(container, preferences) {
       window.yuvomi?.showToast(t('settings.rewardsDefaultPointsSaved'), 'success');
     } catch (error) {
       input.value = String(previous); // Rollback
-      errorEl.textContent = error.message || t('common.errorGeneric');
-      errorEl.hidden = false;
+      showError(error.message || t('common.errorGeneric'));
       return;
     } finally {
-      if (submitBtn.isConnected) submitBtn.disabled = false;
-      if (input.isConnected) input.disabled = false;
+      saving = false;
+      input.readOnly = false;
+      input.removeAttribute('aria-busy');
     }
 
-    await offerRebase(previous, next);
+    // Wer das Blatt schon verlassen hat, bekommt die Rueckfrage nicht auf der
+    // naechsten Seite: der neue Standard ist gespeichert, das Nachziehen optional.
+    if (input.isConnected) await offerRebase(previous, next);
+  }
+
+  // Die Handler geben das Versprechen zurueck: dem Browser ist es gleich, ein
+  // Test kann so auf den ganzen Speichervorgang warten.
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    return commit();
+  });
+  input.addEventListener('blur', () => commit());
+  input.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || saving) return;
+    input.value = String(persisted);
+    clearError();
   });
 }
 

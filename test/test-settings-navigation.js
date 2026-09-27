@@ -1713,3 +1713,87 @@ test('Theme und Wochenstart sind das Segment der Shell, kein eigener Umschalter'
   const rules = await settingsCssRules();
   assert.deepEqual(rules.filter((rule) => /\.theme-toggle/.test(rule.selector)).map((rule) => rule.selector), []);
 });
+
+// ── Re-Critique 2026-09-27 (R8, H12): ein Speichermodell auf der Belohnungs-Seite ──
+
+/** Das Blatt mit Fake-Flaechen: jedes per Id gefragte Element merkt sich seine Listener. */
+function rewardsSheet() {
+  const els = new Map();
+  const el = (id) => {
+    if (!els.has(id)) {
+      const listeners = {};
+      const attrs = new Map();
+      els.set(id, {
+        id, value: '', checked: false, disabled: false, readOnly: false, hidden: true, textContent: '', isConnected: true,
+        addEventListener(type, fn) { (listeners[type] ??= []).push(fn); },
+        setAttribute(name, value) { attrs.set(name, String(value)); },
+        removeAttribute(name) { attrs.delete(name); },
+        getAttribute(name) { return attrs.get(name) ?? null; },
+        querySelector: () => null,
+        async fire(type, extra = {}) {
+          for (const fn of listeners[type] ?? []) await fn({ type, preventDefault() {}, ...extra });
+        },
+      });
+    }
+    return els.get(id);
+  };
+  let html = '';
+  return {
+    el,
+    get html() { return html; },
+    replaceChildren() { html = ''; },
+    insertAdjacentHTML(_pos, markup) { html += markup; },
+    querySelector: (sel) => (sel.startsWith('#') ? el(sel.slice(1)) : null),
+  };
+}
+
+test('Belohnungen: das Punktefeld speichert wie die Schalter - ohne eigenen Knopf, beim Verlassen (H12)', async () => {
+  const { render } = await import('/settings/pages/modules-rewards.js');
+  const { resetPreferencesCache } = await import('/settings/preferences-cache.js');
+  const puts = [];
+  const toasts = [];
+  const prevWindow = globalThis.window;
+  globalThis.window = { yuvomi: { showToast: (...args) => toasts.push(args) } };
+  globalThis.__apiStub = {
+    get: async (url) => (url === '/preferences' ? { data: { tasks_default_points: 0, disabled_modules: [] } } : { data: { count: 0 } }),
+    put: async (url, body) => { puts.push([url, body]); return { data: body }; },
+  };
+  resetPreferencesCache();
+  try {
+    const sheet = rewardsSheet();
+    await render(sheet, { user: { role: 'admin' } });
+    const form = sheet.html.match(/<form\b[^>]*id="rewards-default-points-form"[\s\S]*?<\/form>/)?.[0] ?? '';
+    assert.match(form, /id="rewards-default-points"/, 'Reichweite: das Punktefeld steht im Formular');
+    assert.doesNotMatch(form, /type="submit"/, 'kein Speichern-Knopf nur fuer dieses Feld');
+
+    const input = sheet.el('rewards-default-points');
+    const error = sheet.el('rewards-default-points-error');
+    input.value = '-3';
+    await input.fire('blur');
+    assert.deepEqual(puts, [], 'ein ungueltiger Wert wird nicht geschrieben');
+    assert.equal(error.hidden, false, 'sondern benannt');
+    assert.equal(input.getAttribute('aria-invalid'), 'true');
+
+    input.value = '5';
+    await input.fire('blur');
+    assert.deepEqual(puts, [['/preferences', { tasks_default_points: 5 }]], 'beim Verlassen gespeichert');
+    assert.equal(error.hidden, true, 'und der Fehler ist weg');
+    assert.equal(input.getAttribute('aria-invalid'), null);
+    assert.ok(toasts.some(([key]) => key === 'settings.rewardsDefaultPointsSaved'), `mit Rueckmeldung: ${JSON.stringify(toasts)}`);
+
+    await input.fire('blur');
+    assert.equal(puts.length, 1, 'derselbe Wert ein zweites Mal ist kein neuer Schreibzugriff');
+
+    input.value = '7';
+    await sheet.el('rewards-default-points-form').fire('submit');
+    assert.deepEqual(puts.at(-1), ['/preferences', { tasks_default_points: 7 }], 'Enter speichert ebenso');
+
+    input.value = '9';
+    await input.fire('keydown', { key: 'Escape' });
+    assert.equal(input.value, '7', 'Escape nimmt die ungespeicherte Eingabe zurueck');
+  } finally {
+    delete globalThis.__apiStub;
+    globalThis.window = prevWindow;
+    resetPreferencesCache();
+  }
+});
