@@ -52,7 +52,10 @@
  * Nutzer: health-tabs.js. Die Küchen-Leiste bleibt eine eigene Rail - sie
  * wechselt das MODUL und steht deshalb über dem Kopf, nicht in ihm. */
 .page-toolbar > .sub-tabs-bar {
-  position: static;
+  /* relative statt static: klebt nicht (das tut der Kopf), bleibt aber der
+   * Bezugsrahmen der Auswahl-Kapsel - static machte den Kopf zum offsetParent,
+   * und in einer gescrollten Leiste stand die Kapsel um scrollLeft daneben. */
+  position: relative;
   z-index: auto;
   height: auto;
   padding: 0;

@@ -176,6 +176,30 @@ test('Indikator: eine fehlende Leiste ist ein No-op wie bei wireTablist/wireScro
   assert.doesNotThrow(() => { handle.place({ glide: true }); handle.destroy(); });
 });
 
+test('Indikator: keine Regel stellt eine Segment-/Tab-Leiste auf position: static - sonst misst die Kapsel gegen den Kopf und steht in gescrollten Leisten daneben', async () => {
+  // Der Bezugsrahmen der Kapsel ist der von `offsetLeft` der Eintraege: die
+  // Leiste selbst, solange sie positioniert ist. `:where(.has-seg-indicator)`
+  // traegt Spezifitaet 0 - jede Regel, die eine Leiste auf `static` setzt,
+  // schlaegt es, offsetParent wird der Kopf, und in einer gescrollten Leiste
+  // (Gesundheit mobil auf "Fasten") steht die Kapsel um scrollLeft daneben.
+  const { eachRule } = await import('./css-rules.js');
+  const { readdirSync } = await import('node:fs');
+  const BAR = /^(?:sub-tabs-bar|segmented|group-toggle|documents-view-toggle|kitchen-tabs-bar|has-seg-indicator|[\w-]+-tabs|[\w-]+-toggle|[\w-]+__views|[\w-]+__ranges|[\w-]*-?mode-?switch|[\w-]+modeswitch)$/;
+  const dir = new URL('../public/styles/', import.meta.url);
+  const hits = [];
+  for (const f of readdirSync(dir).filter((n) => n.endsWith('.css'))) {
+    for (const r of eachRule(readSrc(`../public/styles/${f}`))) {
+      if (!/(?:^|;)\s*position\s*:\s*static\b/.test(r.body)) continue;
+      for (const sel of r.selector.split(',')) {
+        const subject = sel.trim().split(/\s*[>+~]\s*|\s+/).pop().replace(/::?[\w-]+(\([^)]*\))?/g, '');
+        const classes = [...subject.matchAll(/\.([\w-]+)/g)].map((m) => m[1]);
+        if (classes.some((c) => BAR.test(c))) hits.push(`${f}: ${sel.trim()}`);
+      }
+    }
+  }
+  assert.deepEqual(hits, [], 'eine Leiste im Kopf gibt sticky ab, aber nicht den Bezugsrahmen: position: relative statt static');
+});
+
 test('Indikator: glideKeyframes ist die Regel "transform, Groesse nur wenn noetig"', () => {
   const a = { x: 0, y: 0, w: 50, h: 30 };
   assert.deepEqual(seg.glideKeyframes(a, { ...a, x: 60 }).map(Object.keys), [['transform'], ['transform']]);
