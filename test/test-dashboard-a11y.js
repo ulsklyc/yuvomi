@@ -379,3 +379,27 @@ test('R9 M7: einspaltig bietet die Kachel EIN Groessen-Menue mit nur den wirksam
   assert.match(css, /@media \(min-width: 768px\)\s*\{\s*\.dashboard__grid\s*\{\s*grid-template-columns:\s*repeat\(2, 1fr\)/,
     'die Menue-Grenze ist die Grenze des Rasters - wandert sie, muss das Menue mit');
 });
+
+// Hauptsession-Entscheid R9 (i9): mobil klappt "Heute wichtig" beim Anpassen
+// auf seine Kopfzeile zusammen - dort wird nichts angeordnet, und das 613px
+// hohe Band schob das erste Rasterwidget auf y 833 von 844. Die Kopfzeile
+// bleibt stehen, weil sie den Ausblenden-Knopf des Bands traegt (#740).
+test('R9 M7: mobil klappt "Heute wichtig" beim Anpassen auf die Kopfzeile zusammen', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = await readFile(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const urgentTasks = [{ id: 1, title: 'Muell', due_date: '2026-09-27', status: 'open' }];
+  const editing = renderTodayCockpit({ urgentTasks }, [], true);
+  const viewing = renderTodayCockpit({ urgentTasks }, [], false);
+  assert.match(editing, /<section class="today-cockpit today-cockpit--editing"/, 'das Band traegt den Modus');
+  assert.match(editing, /data-glance-hide/, 'die Kopfzeile behaelt den Ausblenden-Knopf');
+  assert.match(viewing, /<section class="today-cockpit"/);
+  assert.doesNotMatch(viewing, /today-cockpit--editing/, 'ausserhalb des Anpassens bleibt das Band offen');
+
+  const rules = [...eachRule(css)];
+  const phone = (r) => r.at.some((a) => /\(max-width:\s*639px\)/.test(a));
+  const hides = rules.filter((r) => phone(r) && /display:\s*none/.test(r.body)
+    && r.selector.split(',').some((s) => s.trim() === '.today-cockpit--editing .today-cockpit__grid'));
+  assert.equal(hides.length, 1, 'unter 640px faellt der Inhalt des Bands im Anpassen-Modus weg');
+  assert.ok(!rules.some((r) => !phone(r) && /today-cockpit--editing/.test(r.selector)),
+    'breit bleibt das Band beim Anpassen offen - dort steht es neben dem Raster nicht im Weg');
+});

@@ -3559,8 +3559,11 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
       <i data-lucide="eye-off" aria-hidden="true"></i>
     </button>` : '';
 
+  // Mobil klappt das Band im Anpassen-Modus auf diese Kopfzeile zusammen
+  // (dashboard.css, `.today-cockpit--editing`): angeordnet wird dort nichts,
+  // und sein Inhalt schob das erste Rasterwidget bis an den Bildschirmrand.
   return `
-    <section class="today-cockpit" aria-labelledby="today-cockpit-title">
+    <section class="today-cockpit${editing ? ' today-cockpit--editing' : ''}" aria-labelledby="today-cockpit-title">
       <div class="today-cockpit__header">
         <h2 id="today-cockpit-title">${esc(t('dashboard.todayTitle'))}</h2>
         ${hideBtn}

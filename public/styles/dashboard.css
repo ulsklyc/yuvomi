@@ -3109,6 +3109,15 @@ button.today-cockpit__more--link {
     gap: var(--space-2);
     margin-top: var(--space-2);
   }
+
+  /* "Heute wichtig" wird beim Anpassen nicht angeordnet - es klappt auf seine
+   * Kopfzeile mit dem Ausblenden-Knopf zusammen. Offen war das Band bei 390px
+   * 613px hoch und schob das erste Rasterwidget auf y 833 von 844; die
+   * Kacheln, um die es in diesem Modus geht, lagen unter dem Bildschirm.
+   * Breit steht das Band neben dem Raster nicht im Weg und bleibt offen. */
+  .today-cockpit--editing .today-cockpit__grid {
+    display: none;
+  }
 }
 
 /* Kein min-height-Override hier: der Basis-.btn ist bereits 48px (mobil) / 40px
