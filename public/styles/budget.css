@@ -1728,41 +1728,25 @@ button.budget-entry__title {
  * Budget-Modal Content-Styles (Overlay/Panel via shared modal.js)
  * -------------------------------------------------------- */
 
-/* Einnahme/Ausgabe-Toggle */
-.amount-type-toggle {
+/* Buchungstyp (Ausgabe/Einnahme/Darlehen) - das Kanon-`.segmented` aus
+ * panel.css (Well + erhabene Pille, Zustand in aria-checked), hier nur ueber
+ * die volle Dialogbreite gleich verteilt: zwei Segmente beim Bearbeiten, drei
+ * beim Anlegen. Bis R8 eine eigene Bauart mit roter/gruener Vollflaeche - der
+ * Zustand stand nur in der Farbe (Re-Critique 2026-09-27, A5 P1-1). */
+.budget-type-toggle {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
-  background-color: var(--color-surface-2);
-  border-radius: var(--radius-sm);
-  padding: var(--space-0h);
-}
-
-.amount-type-toggle--entry-only {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.amount-type-btn {
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-xs);
-  border: none;
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-  background: none;
-  color: var(--color-text-secondary);
-  transition: all var(--transition-fast);
-  min-height: var(--target-lg);
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
 }
 
 /* Rate eines Darlehens (#859): Der Umschalter zeigt die Zuordnung, nimmt sie aber
-   nicht entgegen - die Richtung gehört dem Darlehen. Der aktive Zustand behält
-   deshalb seine volle Farbe, nur die Bedienbarkeit fällt weg. */
-.amount-type-btn:disabled {
+   nicht entgegen - die Richtung gehört dem Darlehen. Das aktive Segment behält
+   seine Pille, nur die Bedienbarkeit fällt weg; das andere tritt zurück. */
+.budget-type-toggle .segmented__item:disabled {
   cursor: default;
 }
 
-.amount-type-btn:disabled:not(.amount-type-btn--active) {
+.budget-type-toggle .segmented__item:disabled:not(.is-active) {
   opacity: 0.5;
 }
 
@@ -1770,21 +1754,6 @@ button.budget-entry__title {
   margin: var(--space-2) 0 0;
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
-}
-
-.amount-type-btn--income.amount-type-btn--active {
-  background-color: var(--color-success);
-  color: var(--color-ink-on-vivid);
-}
-
-.amount-type-btn--expenses.amount-type-btn--active {
-  background-color: var(--color-danger);
-  color: var(--color-ink-on-vivid);
-}
-
-.amount-type-btn--loan.amount-type-btn--active {
-  background-color: var(--module-budget);
-  color: var(--color-ink-on-vivid);
 }
 
 .modal-panel .js-entry-field[hidden],

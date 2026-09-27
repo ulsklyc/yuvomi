@@ -1729,14 +1729,18 @@ test('der Typ-Umschalter nimmt bei einer Darlehensrate keine Eingabe entgegen', 
   // Der Server bucht danach und würde eine hier gewählte Umkehr still zurückdrehen -
   // ein Umschalter, der scheinbar etwas ändert und dann überstimmt wird, ist die
   // schlechtere Hälfte von beidem.
-  const toggle = budget.slice(budget.indexOf('class="amount-type-toggle'), budget.indexOf('id="bm-title"'));
-  const buttons = [...toggle.matchAll(/id="type-(expense|income)"[^>]*/g)].map((m) => m[0]);
+  // Seit R8 (H3) baut eine Schleife die Typ-Segmente: gemessen am ERZEUGTEN
+  // Markup einer Rate, nicht an der Schreibweise im Quelltext.
+  const rate = buchungsDialog({ mode: 'edit', entry: { id: 3, title: 'Rate', amount: -250, category: 'housing', subcategory: 'rent', date: '2026-06-01', loan_id: 9 } }).content;
+  const buttons = [...rate.matchAll(/<button\b[^>]*id="type-(?:expense|income)"[^>]*>/g)].map((m) => m[0]);
   assert.equal(buttons.length, 2, 'die beiden Typ-Schalter sind nicht mehr auffindbar');
   for (const btn of buttons) {
-    assert.match(btn, /isLoanPayment \? 'disabled' : ''/,
-      `${btn.slice(0, 24)} ist bei einer Darlehensrate weiter bedienbar`);
+    assert.match(btn, /\sdisabled[\s>]/, `${btn.slice(0, 60)} ist bei einer Darlehensrate weiter bedienbar`);
   }
-  assert.ok(toggle.includes('budget.loanPaymentTypeLocked'), 'die Sperre bleibt unerklärt');
+  assert.ok(rate.includes('budget.loanPaymentTypeLocked'), 'die Sperre bleibt unerklärt');
+  const frei = buchungsDialog({ mode: 'edit', entry: { id: 4, title: 'REWE', amount: -40, category: 'food', subcategory: 'groceries', date: '2026-06-03' } }).content;
+  assert.doesNotMatch(frei.match(/<div class="segmented budget-type-toggle"[\s\S]*?<\/div>/)?.[0] ?? 'disabled', /\sdisabled[\s>]/,
+    'Gegenprobe: ohne Rate ist der Typ bedienbar');
 });
 
 test('das Bearbeiten-Modal bekommt immer einen echten Eintrag, nie einen nachgebauten', () => {
@@ -2370,4 +2374,172 @@ test('die Statistik steht ab 960px Container auf der Budget-Bahn: Verlauf und Ve
   assert.ok(aside, 'die Ausgaben-Anteile stehen ab 960px nicht in der zweiten Spalte');
   const main = inQuery('.budget-stats__main', /grid-column:\s*1/);
   assert.ok(main, 'Verlauf und Vergleich stehen ab 960px nicht in der ersten Spalte');
+});
+
+// --------------------------------------------------------
+// Runde 8 (Re-Critique 2026-09-27, A5): Zustaende, die luegen oder schweigen
+// --------------------------------------------------------
+
+const budgetCode = budget.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+/** Der Buchungsdialog als Markup - openModal ist im Loader ein Griff (__openModal). */
+function buchungsDialog(opts) {
+  const vorher = globalThis.__openModal;
+  const vorherState = { ...budgetUi.state };
+  let letzte = null;
+  globalThis.__openModal = (o) => { letzte = o; };
+  Object.assign(budgetUi.state, {
+    month: '2026-06', accounts: [], members: [], budgetMode: 'shared',
+    meta: {
+      expenseCategories: [{ key: 'housing', name: 'Wohnen' }, { key: 'food', name: 'Essen' }],
+      incomeCategories: [{ key: 'salary', name: 'Gehalt' }],
+      subcategories: { housing: [{ key: 'rent', name: 'Miete' }], food: [{ key: 'groceries', name: 'Lebensmittel' }] },
+    },
+  });
+  try { budgetUi.openBudgetModal(opts); } finally {
+    Object.assign(budgetUi.state, vorherState);
+    if (vorher === undefined) delete globalThis.__openModal; else globalThis.__openModal = vorher;
+  }
+  assert.ok(letzte?.content, 'der Buchungsdialog geht nicht auf');
+  return letzte;
+}
+
+const typRadios = (content) => {
+  const group = content.match(/<div class="segmented budget-type-toggle"[^>]*>/)?.[0];
+  const radios = [...content.matchAll(/<button\b[^>]*\brole="radio"[^>]*>/g)].map((m) => m[0])
+    .filter((b) => /id="type-/.test(b));
+  const state = Object.fromEntries(radios.map((b) => [b.match(/data-tab-id="([^"]+)"/)?.[1], b.match(/aria-checked="([^"]+)"/)?.[1]]));
+  return { group, radios, state };
+};
+
+test('der Buchungstyp ist ein .segmented mit radiogroup und angesagtem Zustand (R8 H3, A5 P1-1)', () => {
+  const neu = typRadios(buchungsDialog({ mode: 'create' }).content);
+  assert.ok(neu.group, 'die Typwahl ist kein .segmented budget-type-toggle');
+  assert.match(neu.group, /role="radiogroup"/, 'die Typwahl traegt kein role="radiogroup"');
+  assert.match(neu.group, /aria-label="budget\.typeGroupLabel"/, 'die Gruppe hat keinen Namen');
+  assert.deepEqual(neu.state, { expense: 'true', income: 'false', loan: 'false' },
+    'neu: Ausgabe angesagt, die anderen beiden nicht');
+  for (const b of neu.radios) assert.match(b, /class="segmented__item/, `${b.slice(0, 40)} ist kein Kanon-Segment`);
+
+  const darlehen = typRadios(buchungsDialog({ mode: 'create', initialType: 'loan' }).content);
+  assert.deepEqual(darlehen.state, { expense: 'false', income: 'false', loan: 'true' },
+    'vom Darlehens-Leerzustand aus steht der Zustand schon im Markup auf Darlehen');
+
+  const einnahme = typRadios(buchungsDialog({ mode: 'edit', entry: { id: 1, title: 'Lohn', amount: 1200, category: 'salary', subcategory: '', date: '2026-06-03' } }).content);
+  assert.deepEqual(einnahme.state, { expense: 'false', income: 'true' },
+    'beim Bearbeiten einer Einnahme ist Einnahme angesagt, Darlehen gibt es dort nicht');
+  assert.doesNotMatch(budget, /amount-type-btn/, 'die eigene Bauart .amount-type-btn lebt weiter');
+
+  // Verhalten aus der geteilten Schicht: Pfeiltasten, Roving-Tabindex und
+  // aria-checked kommen von wireTablist im select-Modus, die Kapsel vom
+  // geteilten Indikator - keine eigenen Klick-Handler je Knopf.
+  const onSave = budgetCode.slice(budgetCode.indexOf('function openBudgetModal('));
+  const body = onSave.slice(0, onSave.indexOf('\n}\n'));
+  assert.match(body, /wireTablist\(panel\.querySelector\('\.budget-type-toggle'\),\s*\{[\s\S]{0,200}mode:\s*'select'/, 'die Typwahl haengt nicht an wireTablist({ mode: select })');
+  assert.match(body, /attachSegmentIndicator\(panel\.querySelector\('\.budget-type-toggle'\)\)/, 'die Typwahl hat den geteilten Indikator nicht');
+  assert.doesNotMatch(body, /#type-(?:expense|income|loan)'\)\??\.addEventListener\('click'/, 'eigene Klick-Handler je Typ-Knopf');
+});
+
+test('ein neuer Eintrag hat keine vorbelegte Kategorie, und Speichern verlangt eine (R8 H4, A5 P2-4)', () => {
+  const neu = buchungsDialog({ mode: 'create' }).content;
+  const select = neu.match(/<select[^>]*id="bm-category"[^>]*>([\s\S]*?)<\/select>/);
+  assert.ok(select, 'Kategorie-Auswahl fehlt');
+  const options = [...select[1].matchAll(/<option\b([^>]*)>/g)].map((m) => m[1]);
+  assert.match(options[0] ?? '', /value=""/, 'die erste Option ist kein leerer Platzhalter');
+  assert.match(options[0], /\bselected\b/, 'neu steht die Auswahl nicht auf dem Platzhalter');
+  assert.equal(options.slice(1).filter((o) => /\bselected\b/.test(o)).length, 0,
+    'neu ist eine echte Kategorie vorbelegt - wer nur Betrag und Titel tippt, bucht sie still');
+  assert.match(select[0], /\brequired\b/, 'die Kategorie ist nicht als Pflichtfeld markiert');
+  assert.match(neu, /<div class="form-group js-entry-field" id="bm-subcategory-group" hidden>/,
+    'ohne Kategorie steht eine Unterkategorie-Auswahl ohne Sinn im Dialog');
+
+  const bearbeiten = buchungsDialog({ mode: 'edit', entry: { id: 2, title: 'REWE', amount: -40, category: 'food', subcategory: 'groceries', date: '2026-06-03' } }).content;
+  assert.match(bearbeiten, /<option value="food" selected>/, 'beim Bearbeiten bleibt die Kategorie des Bestands vorbelegt');
+  assert.match(bearbeiten, /<option value="groceries" selected>/, 'beim Bearbeiten bleibt die Unterkategorie vorbelegt');
+
+  const onSave = budgetCode.slice(budgetCode.indexOf('function openBudgetModal('));
+  const body = onSave.slice(0, onSave.indexOf('\n}\n'));
+  const save = body.slice(body.indexOf("'#bm-save').addEventListener"));
+  const check = save.search(/if \(!category\) \{\s*reportFieldError\(panel\.querySelector\('#bm-category'\), t\('budget\.categoryRequired'\)\)/);
+  assert.ok(check > 0, 'Speichern prueft die leere Kategorie nicht am Feld');
+  assert.ok(check < save.indexOf("api.post('/budget'"), 'die Pruefung steht erst nach dem Schreibaufruf');
+  // Der Typwechsel darf nicht still die erste Kategorie des anderen Typs setzen.
+  const update = body.slice(body.indexOf('const updateCategoryOptions'), body.indexOf('const updateSubcategoryOptions'));
+  assert.doesNotMatch(update, /cats\[0\]/, 'der Typwechsel faellt still auf die erste Kategorie zurueck');
+});
+
+test('der Budget-Tab steht in der Adresse, ohne neuen Verlaufseintrag (R8 H5, A5 P2-1)', () => {
+  assert.equal(budgetUi.tabSearch('', 'loans'), '?tab=loans');
+  assert.equal(budgetUi.tabSearch('?tab=subscriptions', 'loans'), '?tab=loans',
+    'Einstieg ueber ?tab=subscriptions, Wechsel auf Darlehen: die Adresse zieht nach');
+  assert.equal(budgetUi.tabSearch('?tab=split-expenses&group=4', 'split-expenses'), '?tab=split-expenses&group=4',
+    'fremde Parameter bleiben stehen');
+
+  const vorher = { location: globalThis.location, history: globalThis.history };
+  const calls = [];
+  globalThis.location = { pathname: '/budget', search: '?tab=subscriptions', hash: '' };
+  globalThis.history = {
+    state: { path: '/budget?tab=subscriptions', scroll: 3 },
+    replaceState: (...args) => calls.push(['replace', ...args]),
+    pushState: (...args) => calls.push(['push', ...args]),
+  };
+  try {
+    budgetUi.writeTabToUrl('loans');
+    assert.deepEqual(calls, [['replace', { path: '/budget?tab=loans', scroll: 3 }, '', '/budget?tab=loans']],
+      'Tabwechsel ersetzt die Adresse (replaceState) und traegt den Pfad fuer popstate');
+    calls.length = 0;
+    globalThis.location.search = '?tab=loans';
+    budgetUi.writeTabToUrl('loans');
+    assert.equal(calls.length, 0, 'gleiche Adresse: kein Schreibvorgang');
+  } finally {
+    globalThis.location = vorher.location;
+    globalThis.history = vorher.history;
+  }
+  // Verdrahtung: der Wechsel der Hauptleiste schreibt die Adresse.
+  const wire = budgetCode.slice(budgetCode.indexOf("_tablist = wireTablist(_container.querySelector('.budget-tabs')"));
+  const onChange = wire.slice(0, wire.indexOf('attachSegmentIndicator'));
+  assert.match(onChange, /onChange:\s*async \(id\) => \{[^}]*writeTabToUrl\(id\)/, 'der Tabwechsel schreibt nicht in die Adresse');
+});
+
+test('die Bilanz rechnet eine geloeschte Buchung sofort heraus und beim Undo wieder hinein (R8 H6, A5 P3)', () => {
+  const summary = {
+    month: '2026-06', income: 2000, expenses: -140.3, balance: 1859.7,
+    byCategory: [
+      { category: 'food', income: 0, expenses: -100.2, total: -100.2 },
+      { category: 'leisure', income: 0, expenses: -40.1, total: -40.1 },
+      { category: 'salary', income: 2000, expenses: 0, total: 2000 },
+    ],
+    pending: { count: 1, income: 0, expenses: -15 },
+  };
+  const kino = { id: 7, amount: -40.1, category: 'leisure', date: '2026-06-10', is_pending: 0 };
+  const ohne = budgetUi.summaryWith(summary, [kino], -1);
+  assert.equal(ohne.expenses, -100.2);
+  assert.equal(ohne.balance, 1899.8);
+  assert.equal(ohne.income, 2000);
+  assert.deepEqual(ohne.byCategory.map((c) => c.category), ['food', 'salary'], 'die leere Kategorie faellt aus dem Diagramm');
+  assert.equal(summary.expenses, -140.3, 'die Ausgangsbilanz bleibt unberuehrt (fuer das Undo)');
+
+  const zurueck = budgetUi.summaryWith(ohne, [kino], 1);
+  assert.equal(zurueck.expenses, -140.3);
+  assert.equal(zurueck.balance, 1859.7);
+  assert.deepEqual(zurueck.byCategory.find((c) => c.category === 'leisure'), { category: 'leisure', income: 0, expenses: -40.1, total: -40.1 });
+
+  const offen = { id: 8, amount: -15, category: 'food', date: '2026-06-20', is_pending: 1 };
+  const ohneOffen = budgetUi.summaryWith(summary, [offen], -1);
+  assert.equal(ohneOffen.balance, 1859.7, 'eine offene Buchung zaehlt nicht in die Bilanz');
+  assert.deepEqual(ohneOffen.pending, { count: 0, income: 0, expenses: 0 }, 'sie verlaesst den Offen-Hinweis');
+
+  const andererMonat = budgetUi.summaryWith(summary, [{ ...kino, date: '2026-07-01' }], 1);
+  assert.equal(andererMonat.balance, 1859.7, 'ein Undo nach dem Blaettern rechnet nicht in den falschen Monat');
+
+  // Verdrahtung: Loeschen und Undo rechnen, bevor gezeichnet wird.
+  const del = budgetCode.slice(budgetCode.indexOf('async function deleteEntry('));
+  const delBody = del.slice(0, del.indexOf('\n}\n'));
+  const before = delBody.slice(0, delBody.indexOf('scheduleUndoableDelete'));
+  assert.match(before, /state\.summary = summaryWith\(state\.summary, \[entry\], -1\)[\s\S]*renderBody\(\)/, 'Loeschen zeichnet die alte Bilanz');
+  const restore = delBody.slice(delBody.indexOf('restore:'));
+  assert.match(restore, /state\.summary = summaryWith\(state\.summary, \[entry\], 1\)[\s\S]*renderBody\(\)/, 'Undo rechnet die Buchung nicht zurueck');
+  const series = budgetCode.slice(budgetCode.indexOf('async function deleteEntrySeries('));
+  const seriesBefore = series.slice(0, series.indexOf('scheduleUndoableDelete'));
+  assert.match(seriesBefore, /state\.summary = summaryWith\(state\.summary, removed, -1\)/, 'Serie loeschen zeichnet die alte Bilanz');
 });

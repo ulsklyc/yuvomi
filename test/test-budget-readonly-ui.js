@@ -1115,7 +1115,7 @@ test('Buchung: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs', async (
     subcategory: 'power', account_id: 4, visibility: 'private', attachments: [beleg],
   });
   const werte = {
-    'budget.amountLabel': [[/id="bm-amount"[^>]*value="1014"/, /amount-type-btn--expenses amount-type-btn--active/], /^-1\.014,00\s€$/],
+    'budget.amountLabel': [[/id="bm-amount"[^>]*value="1014"/, /id="type-expense"[^>]*aria-checked="true"/], /^-1\.014,00\s€$/],
     'budget.detailDateLabel': [[/id="bm-date"\s+value="2026-06-03"/], /^2026-06-03$/],
     'budget.categoryLabel': [[/<option value="housing" selected>budget\.categoryHousing</], /^budget\.categoryHousing$/],
     'budget.subcategoryLabel': [[/<option value="power" selected>Strom</], /^Strom$/],
