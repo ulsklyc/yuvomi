@@ -642,3 +642,56 @@ test('Arabisch: die neuen Tageszaehler waehlen Dual und many statt der few-Form'
   }
   await setLocale('de');
 });
+
+// Vorrats-Einheiten flektieren mit der Menge (Re-Critique 2026-09-27, W2):
+// „6 Dose", „3 Packung" standen im Vorrat und in der Uebersicht, weil beide
+// `t('pantry.units.X')` ohne count hinter die Zahl setzten. Geprueft wird der
+// geteilte Helfer MIT der echten t() UND dass beide Aufrufer ihn nehmen - ein
+// Helfer, den niemand ruft, misst nichts.
+test('Vorrat: die Einheit flektiert mit der Menge, auch in Bruchzahlen', async () => {
+  const { pantryQuantityLabel, PANTRY_UNITS } = await import('../public/utils/pantry-units.js');
+  const fmt = (locale) => (n) => new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(n);
+  await setLocale('de');
+  assert.equal(pantryQuantityLabel(6, 'can', { t, formatNumber: fmt('de') }), '6 Dosen');
+  assert.equal(pantryQuantityLabel(1, 'can', { t, formatNumber: fmt('de') }), '1 Dose');
+  assert.equal(pantryQuantityLabel(3, 'jar', { t, formatNumber: fmt('de') }), '3 Gläser');
+  assert.equal(pantryQuantityLabel(1.5, 'pkg', { t, formatNumber: fmt('de') }), '1,5 Packungen');
+  assert.equal(pantryQuantityLabel(250, 'g', { t, formatNumber: fmt('de') }), '250 g');
+  // Der Basisschluessel bleibt der Name der Einheit (Auswahlfeld ohne Menge).
+  assert.equal(t('pantry.units.can'), 'Dose');
+  // Unbekannte Einheit: Rohwert statt Schluessel.
+  assert.equal(pantryQuantityLabel(2, 'Kiste', { t, formatNumber: fmt('de') }), '2 Kiste');
+  await setLocale('en');
+  assert.equal(pantryQuantityLabel(2, 'bottle', { t, formatNumber: fmt('en') }), '2 bottles');
+  await setLocale('pl');
+  assert.equal(pantryQuantityLabel(2, 'can', { t, formatNumber: fmt('pl') }), '2 puszki');
+  assert.equal(pantryQuantityLabel(5, 'can', { t, formatNumber: fmt('pl') }), '5 puszek');
+  await setLocale('de');
+  // Jede Zaehleinheit traegt in de _one und _other (Paritaet ueber test:i18n).
+  // Die metrischen Symbole flektieren nicht („5 g") und brauchen keine Variante.
+  const units = localeFile('de').pantry.units;
+  for (const unit of PANTRY_UNITS.filter((u) => !['g', 'kg', 'ml', 'l'].includes(u))) {
+    assert.ok(units[`${unit}_one`] && units[`${unit}_other`], `pantry.units.${unit}_one/_other fehlt`);
+  }
+});
+
+test('Vorrat und Uebersicht setzen die Menge ueber den flektierenden Helfer', () => {
+  const strip = (src) => {
+    let out = src;
+    for (let prev = ''; prev !== out;) { prev = out; out = out.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''); }
+    return out;
+  };
+  const body = (src, name) => {
+    const at = src.indexOf(`function ${name}(`);
+    assert.ok(at >= 0, `${name} fehlt`);
+    return src.slice(at, src.indexOf('\n}\n', at));
+  };
+  const pantry = strip(readFileSync(new URL('../public/pages/pantry.js', import.meta.url), 'utf8'));
+  const dashboard = strip(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
+  for (const [src, fn, file] of [[pantry, 'quantityText', 'pantry.js'], [pantry, 'shortfallText', 'pantry.js'],
+    [dashboard, 'pantryQuantityText', 'dashboard.js']]) {
+    const own = body(src, fn);
+    assert.match(own, /pantryQuantityLabel\(/, `${file} ${fn}: Menge ohne flektierende Einheit („6 Dose")`);
+    assert.doesNotMatch(own, /pantry\.units\.\$\{|unitLabel\(/, `${file} ${fn}: setzt den Singular selbst hinter die Zahl`);
+  }
+});

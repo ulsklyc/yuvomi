@@ -439,7 +439,10 @@ test('Renderer: Name und Menge werden escaped, die Menge steht knapp', () => {
   const html = renderPantryWidget(slice([row(1, 0, { name: '<img src=x>', quantity: 2.5, unit: 'kg' })]), '1x2');
   assert.doesNotMatch(html, /<img src=x>/);
   assert.match(html, /&lt;img src=x&gt;/);
-  assert.match(html, /2,5 kg/);
+  // Die Einheit bekommt die Menge als count, damit sie flektiert („6 Dosen",
+  // Re-Critique 2026-09-27 W2). Der t()-Stub des Loaders haengt die Parameter
+  // an den Schluessel - sichtbar wird damit genau das: 2,5 geht zur Pluralwahl.
+  assert.match(html, /2,5 pantry\.units\.kg\{&quot;count&quot;:2\.5\}/);
 });
 
 test('Renderer: das Lagerort-Zeichen fällt bei unbekanntem Namen auf package zurück', () => {

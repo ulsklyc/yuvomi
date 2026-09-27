@@ -31,7 +31,7 @@ import { todayKey } from '/utils/date.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { locationLabel } from '/utils/pantry-locations.js';
 import { setBulkPill, clearBulkPill } from '/utils/bulk-pill.js';
-import { PANTRY_UNITS, normalizePantryQuantity, pantryUnitStep } from '/utils/pantry-units.js';
+import { PANTRY_UNITS, normalizePantryQuantity, pantryUnitStep, pantryQuantityLabel } from '/utils/pantry-units.js';
 import {
   PANTRY_FILTERS,
   daysUntil,
@@ -137,8 +137,9 @@ function unitLabel(unit) {
   return label === key ? String(unit ?? '') : label;
 }
 
+/** „6 Dosen", nicht „6 Dose": die Einheit flektiert mit der Menge (W2). */
 function quantityText(item) {
-  return `${formatQuantity(item.quantity)} ${unitLabel(item.unit)}`;
+  return pantryQuantityLabel(item.quantity, item.unit, { t, formatNumber: formatQuantity });
 }
 
 /**
@@ -1183,7 +1184,8 @@ function shortfallText(item) {
   if (item.min_quantity == null) return null;
   const missing = normalizePantryQuantity(Number(item.min_quantity) - Number(item.quantity), { fallback: 0 });
   if (missing <= 0) return null;
-  return `${formatQuantity(missing)} ${unitLabel(item.unit)}`;
+  // Derselbe Helfer wie die Zeile: auch auf dem Einkaufszettel „2 Dosen".
+  return pantryQuantityLabel(missing, item.unit, { t, formatNumber: formatQuantity });
 }
 
 async function sendToShopping(items, btn) {

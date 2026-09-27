@@ -24,6 +24,7 @@ import { localizeBirthdayEvent } from '/utils/birthday-event.js';
 import { countdownPhrase, countdownRank } from '/utils/countdown.js';
 import { EXPIRY_SOON_DAYS, pantryExpiryPhrase, pantryExpiryTone } from '/utils/pantry-status.js';
 import { locationLabel } from '/utils/pantry-locations.js';
+import { pantryQuantityLabel } from '/utils/pantry-units.js';
 import { findPageFab } from '/utils/fab.js';
 import { openModal, closeModal, confirmModal, refocusAfterRender } from '/components/modal.js';
 import { renderAvatarStack } from '/components/user-multi-select.js';
@@ -2949,14 +2950,11 @@ function renderScheduleWidget(schedule, users, size) {
 // Vorrat-Widget „Laeuft bald ab" (Critique 2026-09-23)
 // --------------------------------------------------------
 
-/** Menge knapp: 2 bleibt "2", 2,5 wird lokalisiert - wie auf der Vorratsseite. */
+/** Menge knapp: 2 bleibt "2", 2,5 wird lokalisiert - wie auf der Vorratsseite,
+ *  und ueber denselben Helfer, damit die Einheit mitflektiert („6 Dosen"). */
 function pantryQuantityText(item) {
-  const amount = getNumberFormat({ maximumFractionDigits: 2 }).format(Number(item.quantity) || 0);
-  // Rueckfall auf den Rohwert, wie `unitLabel()` in pages/pantry.js: eine
-  // Einheit ohne Locale-Key stuende sonst als nackter Schluessel in der Zeile.
-  const key = `pantry.units.${item.unit}`;
-  const unit = t(key);
-  return `${amount} ${unit === key ? String(item.unit ?? '') : unit}`;
+  const nf = getNumberFormat({ maximumFractionDigits: 2 });
+  return pantryQuantityLabel(item.quantity, item.unit, { t, formatNumber: (n) => nf.format(n) });
 }
 
 /**
