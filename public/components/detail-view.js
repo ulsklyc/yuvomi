@@ -266,7 +266,17 @@ function detailFooterEl(actions = [], close = closeDetailView) {
       i.setAttribute('aria-hidden', 'true');
       btn.appendChild(i);
     }
-    btn.append(document.createTextNode(action.label ?? ''));
+    // Die Beschriftung in einem eigenen Knoten: in einer schmalen Detailspalte
+    // (1280er-Laptop, 552px) tritt sie bei leisen Knoepfen mit Icon hinter das
+    // Icon zurueck, damit der Fuss EINE Reihe bleibt (layout.css); der Name
+    // bleibt fuer Screenreader und als Tooltip.
+    if (action.label) {
+      const label = document.createElement('span');
+      label.className = 'btn__label';
+      label.textContent = action.label;
+      btn.appendChild(label);
+      if (action.icon) btn.title = action.label;
+    }
     if (typeof action.onClick === 'function') {
       btn.addEventListener('click', () => action.onClick({ close, button: btn }));
     }

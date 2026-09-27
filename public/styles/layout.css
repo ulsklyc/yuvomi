@@ -2958,6 +2958,33 @@ html.fab-anim-done .page-fab {
   flex-shrink: 0;
 }
 
+/* Die Spalte ist ihr eigener Container: ihre Breite, nicht das Fenster,
+ * entscheidet, ob die Fussbeschriftungen passen. */
+.split-view__detail {
+  container: detail-pane / inline-size;
+}
+
+/* Schmale Spalte (1280: 552px; Aufgaben tragen fuenf Aktionen): leise Knoepfe
+ * mit Icon zeigen nur das Icon, die Beschriftung bleibt als zugaenglicher Name
+ * (geclippt wie `.sr-only`) und als Tooltip. Der Fuss bleibt EINE Reihe; die
+ * Hauptaktion (Erledigen) und Loeschen behalten ihr Wort. */
+@container detail-pane (max-width: 40rem) {
+  .split-view__detail-footer > .btn--ghost:has(> svg, > i) > .btn__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .split-view__detail-footer > .btn--ghost:has(> svg, > i):has(> .btn__label) {
+    min-width: var(--target-md);
+    padding-inline: var(--space-2);
+  }
+}
+
 /* --------------------------------------------------------
  * DAS LESEMASS IST EINE EIGENSCHAFT DER SEITE, NICHT DES TRAEGERS
  * (Critique 2026-08-13, zweite Runde)

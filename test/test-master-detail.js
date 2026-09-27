@@ -909,6 +909,17 @@ test('Detailfuss: klebt unten in der Spalte, einreihig, und steht bei kurzem Inh
   // Und die Leseansicht haengt genau diese Klasse an ihren Fuss in der Spalte.
   const js = readFileSync(new URL('../public/components/detail-view.js', import.meta.url), 'utf8');
   assert.match(js, /footer\.className = 'detail-view__footer split-view__detail-footer'/);
+
+  // EINE Reihe auch in der schmalen Spalte (1280: 552px, Aufgaben mit fuenf
+  // Aktionen - gemessen 622px Inhalt): leise Knoepfe mit Icon zeigen dort nur
+  // das Icon. Lucide ersetzt das <i> durch ein <svg> - der Selektor muss beide
+  // kennen, sonst greift er im Browser nie (erste Fassung: nur `> i`).
+  assert.match(body(layout, '.split-view__detail'), /container:\s*detail-pane\s*\/\s*inline-size/);
+  const narrow = [...eachRule(layout)].filter((r) => /@container\s+detail-pane\s*\(max-width:/.test(r.at.join(' ')));
+  const hide = narrow.find((r) => /\.btn--ghost:has\(> svg, > i\) > \.btn__label/.test(r.selector));
+  assert.ok(hide && /clip:\s*rect\(0, 0, 0, 0\)/.test(hide.body), 'die Beschriftung tritt geclippt zurueck (bleibt zugaenglich)');
+  assert.match(js, /label\.className = 'btn__label'/, 'die Beschriftung steht in einem eigenen Knoten');
+  assert.match(js, /if \(action\.icon\) btn\.title = action\.label;/, 'als Tooltip bleibt sie lesbar');
 });
 
 test('splitViewDetailHtml: benannte Spalte mit Leerzustand und leerem Koerper, Nutzertext escaped', () => {
