@@ -684,10 +684,54 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
         + colGap * lastLine.els.length
       : 0;
     // Unter dieser Breite bliebe von jedem Modulnamen nur die Ellipse.
-    const roomForDockTitle = innerWidth - usedWidth >= 88;
+    const roomForDockTitle = innerWidth - usedWidth >= DOCK_TITLE_MIN_WIDTH;
 
     const heading = toolbar.querySelector(':scope > .page-toolbar__title');
-    if (lead > 0 && !capped && heading && roomForDockTitle) {
+
+    // NIE EIN KOPF OHNE ORTSANGABE (Re-Critique 2026-09-27, R9 M9). Die Regel
+    // darueber liess den Titel lieber weg, als den Kopf pendeln zu lassen - in
+    // den Aufgaben hiess das: angedockt standen Lupe, Ansicht, Filter und
+    // „..." da, und kein Wort, wo man ist (A1 P2-4). Wo die Bar-Zeile die
+    // Kontrollen eines Moduls traegt und es ein Werkzeugmenue hat, weichen
+    // angedockt die Kontrollen: sie falten ins „..." (als Eintraege mit
+    // demselben Namen, Ansichten als Einfachauswahl), die Suche bleibt, und
+    // der Titel bekommt den Platz. Die Zeile aendert dabei nur ihre Breite,
+    // nie ihre Hoehe (`--dock-fold-bar-h`) - das negative `top` bleibt gueltig.
+    //
+    // GEFALTET GEMESSEN WIRD NICHT NEU ENTSCHIEDEN: angedockt sind die
+    // Kontrollen weg, die Zeile hat Platz, und eine neue Rechnung hiesse
+    // „nicht mehr falten" - die Kontrollen kaemen zurueck, der Platz ginge,
+    // und das Ganze pendelte. Entschieden wird im ausgeklappten Zustand.
+    const actions = toolbar.querySelector(':scope > .page-toolbar__actions');
+    const docked = toolbar.classList.contains('is-docked');
+    const wasFolded = toolbar.classList.contains('page-toolbar--dock-fold');
+    let fold = false;
+    if (lead > 0 && !capped && heading && actions) {
+      if (wasFolded && docked) {
+        fold = true;
+        // Rendert das Modul seine Aktionen angedockt neu (Ansicht gewechselt,
+        // Filterzahl geaendert), kaemen die neuen Knoepfe ungefaltet dazu und
+        // braechen die Zeile um. Nur ergaenzen: die schon gefalteten sind
+        // unsichtbar und fielen aus `dockFoldables` heraus.
+        for (const el of dockFoldables(actions)) el.setAttribute('data-dock-fold', '');
+      } else if (!roomForDockTitle && lastLine?.els.includes(actions) && dockFoldMenu(actions)) {
+        const foldable = dockFoldables(actions);
+        const actionsGap = parseFloat(getComputedStyle(actions).columnGap) || 0;
+        const freed = foldable.reduce((sum, el) => sum + el.getBoundingClientRect().width + actionsGap, 0);
+        fold = foldable.length > 0 && innerWidth - (usedWidth - freed) >= DOCK_TITLE_MIN_WIDTH;
+        if (fold) {
+          for (const el of actions.children) el.toggleAttribute('data-dock-fold', foldable.includes(el));
+          toolbar.style.setProperty('--dock-fold-bar-h', `${Math.round(actions.getBoundingClientRect().height)}px`);
+        }
+      }
+    }
+    if (!fold && wasFolded) {
+      for (const el of actions?.children ?? []) el.removeAttribute('data-dock-fold');
+      toolbar.style.removeProperty('--dock-fold-bar-h');
+    }
+    toolbar.classList.toggle('page-toolbar--dock-fold', fold);
+
+    if (lead > 0 && !capped && heading && (roomForDockTitle || fold)) {
       if (!dockTitle) {
         dockTitle = document.createElement('span');
         dockTitle.className = 'page-toolbar__dock-title';
@@ -735,6 +779,24 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     io.observe(firstEl);
   };
 
+  // Die gefalteten Kontrollen erscheinen im Werkzeugmenue, solange es offen
+  // ist - gebaut beim Oeffnen aus dem Ist-Zustand (welche Ansicht gewaehlt
+  // ist, wie viele Filter stehen), abgebaut beim Schliessen. `beforetoggle`
+  // steigt nicht auf; am Kopf kommt es nur in der Capture-Phase an.
+  const onMenuToggle = (e) => {
+    const panel = e.target;
+    if (!(panel instanceof Element) || !panel.matches('.popover-menu')) return;
+    const actions = toolbar.querySelector(':scope > .page-toolbar__actions');
+    if (!actions || dockFoldMenu(actions)?.panel !== panel) return;
+    clearDockFoldItems(panel);
+    if (e.newState === 'open'
+      && toolbar.classList.contains('page-toolbar--dock-fold')
+      && toolbar.classList.contains('is-docked')) {
+      fillDockFoldItems(panel, [...actions.querySelectorAll(':scope > [data-dock-fold]')]);
+    }
+  };
+  toolbar.addEventListener('beforetoggle', onMenuToggle, { capture: true });
+
   const ro = new ResizeObserver(update);
   ro.observe(toolbar);
   const mo = new MutationObserver(update);
@@ -755,15 +817,116 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
       capped?.removeEventListener('scroll', onInnerScroll, { capture: true });
       for (const type of GESTURES) capped?.removeEventListener(type, onGesture, { capture: true });
       gestureTarget = null;
+      toolbar.removeEventListener('beforetoggle', onMenuToggle, { capture: true });
+      toolbar.querySelectorAll('[data-dock-fold]').forEach((el) => el.removeAttribute('data-dock-fold'));
+      toolbar.style.removeProperty('--dock-fold-bar-h');
       dockTitle?.remove();
       dockTitle = null;
       headSeal?.remove();
       headSeal = null;
       delete toolbar.dataset.collapsingHeader;
       toolbar.style.removeProperty('--page-toolbar-lead');
-      toolbar.classList.remove('page-toolbar--stacked', 'page-toolbar--capped', 'is-collapsed', 'is-docked');
+      toolbar.classList.remove('page-toolbar--stacked', 'page-toolbar--capped', 'is-collapsed', 'is-docked', 'page-toolbar--dock-fold');
     },
   };
+}
+
+/** Unter dieser Breite bliebe vom angedockten Titel nur die Ellipse. */
+export const DOCK_TITLE_MIN_WIDTH = 88;
+
+/**
+ * Das Werkzeugmenue der Bar-Zeile (`pageToolsMenuHtml`, Kennklasse
+ * `page-tools-btn`) - das „..." , in das angedockt gefaltet wird. Ohne es
+ * faltet nichts: eine Kontrolle, die verschwindet, ohne irgendwo
+ * wiederzukommen, waere eine gestrichene Funktion.
+ *
+ * @param {Element} actions
+ * @returns {{trigger: Element, panel: Element}|null}
+ */
+export function dockFoldMenu(actions) {
+  const trigger = actions?.querySelector?.(':scope > .page-tools-btn[popovertarget]');
+  if (!trigger) return null;
+  const id = trigger.getAttribute('popovertarget');
+  const panel = [...actions.children].find((el) => el.id === id) ?? document.getElementById(id);
+  return panel ? { trigger, panel } : null;
+}
+
+/**
+ * Was angedockt falten darf: jedes sichtbare Kind der Aktionen, das ein Knopf
+ * ist oder Knoepfe traegt (Segment, Filter), ausser dem Menue selbst und der
+ * Suche. `data-dock-keep` nimmt eine Kontrolle heraus, die stehen bleiben muss.
+ *
+ * @param {Element} actions
+ * @returns {Element[]}
+ */
+export function dockFoldables(actions) {
+  const menu = dockFoldMenu(actions);
+  return [...(actions?.children ?? [])].filter((el) => el !== menu?.trigger
+    && el !== menu?.panel
+    && !el.matches('.popover-menu, .page-search, [data-dock-keep]')
+    && el.getClientRects().length > 0
+    && (el.matches('button') || Boolean(el.querySelector('button'))));
+}
+
+function dockFoldLabel(btn) {
+  return (btn.getAttribute('aria-label') || btn.getAttribute('title') || btn.textContent || '')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function clearDockFoldItems(panel) {
+  panel.querySelectorAll(':scope > .page-toolbar__fold-item').forEach((el) => el.remove());
+}
+
+/**
+ * Baut die Stellvertreter der gefalteten Kontrollen oben ins Menue. Ein
+ * Eintrag KLICKT das Original - kein zweiter Weg zur selben Aktion, der
+ * auseinanderlaufen koennte. Ein Segment (Knoepfe mit `aria-pressed`, Radio,
+ * Tab) wird eine Einfachauswahl (`menuitemradio`), wie die Ansichtswahl im
+ * Kalender-Werkzeugmenue.
+ *
+ * @param {Element} panel
+ * @param {Element[]} controls
+ */
+function fillDockFoldItems(panel, controls) {
+  const items = [];
+  for (const control of controls) {
+    const single = control.matches('button');
+    const buttons = single ? [control] : [...control.querySelectorAll('button')];
+    const choice = !single && buttons.some((b) => b.hasAttribute('aria-pressed')
+      || ['radio', 'tab', 'menuitemradio'].includes(b.getAttribute('role')));
+    for (const btn of buttons) {
+      if (btn.disabled || !dockFoldLabel(btn)) continue;
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'popover-menu__item page-toolbar__fold-item';
+      const on = ['aria-pressed', 'aria-checked', 'aria-selected'].some((a) => btn.getAttribute(a) === 'true');
+      item.setAttribute('role', choice ? 'menuitemradio' : 'menuitem');
+      if (choice) item.setAttribute('aria-checked', String(on));
+      const glyph = btn.querySelector('svg')?.cloneNode(true);
+      if (glyph) {
+        glyph.setAttribute('class', 'icon-md');
+        glyph.setAttribute('aria-hidden', 'true');
+        item.append(glyph);
+      }
+      const label = document.createElement('span');
+      label.textContent = dockFoldLabel(btn);
+      item.append(label);
+      const check = choice && on && window.lucide?.icons?.Check
+        ? window.lucide.createElement(window.lucide.icons.Check) : null;
+      if (check) {
+        check.setAttribute('class', 'icon-md popover-menu__item-trail popover-menu__item-check');
+        check.setAttribute('aria-hidden', 'true');
+        item.append(check);
+      }
+      item.addEventListener('click', () => btn.click());
+      items.push(item);
+    }
+  }
+  if (!items.length) return;
+  const sep = document.createElement('div');
+  sep.className = 'popover-menu__separator page-toolbar__fold-item';
+  sep.setAttribute('role', 'separator');
+  panel.prepend(...items, sep);
 }
 
 /**

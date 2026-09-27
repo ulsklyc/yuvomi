@@ -3352,6 +3352,20 @@ html.fab-anim-done .page-fab {
     white-space: nowrap;
   }
 
+  /* NIE EIN KOPF OHNE ORTSANGABE (R9 M9): laesst die Bar-Zeile dem Titel
+   * keine 88px, falten angedockt ihre Kontrollen ins Werkzeugmenue
+   * (`wireCollapsingHeader` markiert sie mit `data-dock-fold` und baut die
+   * Menue-Eintraege). Die Suche und das „..." bleiben stehen. Die Zeile
+   * behaelt ihre ausgeklappte Hoehe - eine niedrigere Bar-Zeile waere die
+   * Hoehenaenderung, gegen die das negative `top` oben gewaehlt ist. */
+  .page-toolbar--stacked.page-toolbar--dock-fold.is-docked > .page-toolbar__actions > [data-dock-fold] {
+    display: none;
+  }
+
+  .page-toolbar--stacked.page-toolbar--dock-fold.is-docked > .page-toolbar__actions {
+    min-block-size: var(--dock-fold-bar-h, auto);
+  }
+
   /* Die Trennlinie erscheint erst, wenn die Leiste angedockt ist - am
    * Scroll-Anfang steht der Large Title nahtlos auf dem Seitengrund.
    * `--stacked` setzt der Helfer nur, wenn es überhaupt eine Lead-Zone gibt;

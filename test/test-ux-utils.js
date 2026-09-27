@@ -920,3 +920,187 @@ test('wireScrollFade: eine abgehaengte Leiste haengt ihre Beobachter selbst ab, 
     globalThis.MutationObserver = savedMO;
   }
 });
+
+/**
+ * NIE EIN KOPF OHNE ORTSANGABE (Re-Critique 2026-09-27, R9 M9, A1 P2-4).
+ *
+ * Die Attrappe baut die SCROLLENDE Architektur der Aufgaben bei 390px nach
+ * (Innenbreite 358px): Titelzeile, darunter Lupe (48) + Aktionen (277) mit
+ * Ansichts-Segment (104), Filter (117) und Werkzeugmenue (48). Gemessen liess
+ * die Bar-Zeile dem angedockten Titel 17px - er fiel weg, angedockt stand kein
+ * Wort, wo man ist.
+ */
+function dockStub({ withMenu = true } = {}) {
+  const matchOne = (el, s) => {
+    const m = s.match(/^([a-z0-9]*)((?:\.[\w-]+)*)((?:\[[\w-]+\])*)$/i);
+    if (!m) throw new Error(`Attrappe kennt den Selektor nicht: ${s}`);
+    const [, tag, cls, attrs] = m;
+    if (tag && el.tag !== tag.toLowerCase()) return false;
+    for (const c of cls.split('.').filter(Boolean)) if (!el.classes.has(c)) return false;
+    for (const a of (attrs.match(/[\w-]+/g) ?? [])) if (!(a in el.attrs)) return false;
+    return true;
+  };
+  const matches = (el, sel) => sel.split(',').map((s) => s.trim()).some((s) => matchOne(el, s));
+  const all = (el) => el.children.flatMap((c) => [c, ...all(c)]);
+  class El {
+    constructor(tag, { cls = [], attrs = {}, rect = null, cs = {} } = {}) {
+      this.tag = tag; this.classes = new Set(cls); this.attrs = { ...attrs }; this.rect = rect;
+      this.children = []; this.parentElement = null; this.dataset = {}; this.handlers = {};
+      this.cs = { overflowY: 'visible', paddingBlockStart: '0', paddingInlineStart: '0', paddingInlineEnd: '0', columnGap: '0', ...cs };
+      this.props = new Map();
+      this.style = { setProperty: (k, v) => this.props.set(k, v), removeProperty: (k) => this.props.delete(k) };
+      this.clientWidth = rect ? rect.width : 0; this.textContent = ''; this.clicks = 0;
+      const set = this.classes;
+      this.classList = {
+        add: (...c) => c.forEach((x) => set.add(x)), remove: (...c) => c.forEach((x) => set.delete(x)),
+        toggle: (c, on) => { if (on === undefined ? !set.has(c) : on) set.add(c); else set.delete(c); },
+        contains: (c) => set.has(c),
+      };
+    }
+    get id() { return this.attrs.id ?? ''; }
+    set className(v) { this.classes.clear(); String(v).split(/\s+/).filter(Boolean).forEach((c) => this.classes.add(c)); }
+    get nextElementSibling() { const s = this.parentElement?.children; return s ? s[s.indexOf(this) + 1] ?? null : null; }
+    get offsetParent() { return this.visible() ? this.parentElement : null; }
+    visible() { return Boolean(this.rect) && !this.attrs.hidden && !this.hiddenByCss?.(); }
+    append(...kids) { for (const k of kids) { k.parentElement = this; this.children.push(k); } }
+    prepend(...kids) { for (const k of kids.reverse()) { k.parentElement = this; this.children.unshift(k); } }
+    insertBefore(k, ref) { k.remove(); k.parentElement = this; const i = ref ? this.children.indexOf(ref) : -1; if (i < 0) this.children.push(k); else this.children.splice(i, 0, k); }
+    remove() { const p = this.parentElement; if (p) p.children.splice(p.children.indexOf(this), 1); this.parentElement = null; }
+    matches(sel) { return matches(this, sel); }
+    querySelectorAll(sel) {
+      const scoped = sel.startsWith(':scope > ');
+      const pool = scoped ? this.children : all(this);
+      return pool.filter((c) => matches(c, scoped ? sel.slice(9) : sel));
+    }
+    querySelector(sel) { return this.querySelectorAll(sel)[0] ?? null; }
+    hasAttribute(n) { return n in this.attrs; }
+    getAttribute(n) { return n in this.attrs ? this.attrs[n] : null; }
+    setAttribute(n, v) { this.attrs[n] = String(v); }
+    removeAttribute(n) { delete this.attrs[n]; }
+    toggleAttribute(n, on) { if (on) this.attrs[n] = ''; else delete this.attrs[n]; }
+    addEventListener(type, fn) { (this.handlers[type] ??= []).push(fn); }
+    removeEventListener(type, fn) { this.handlers[type] = (this.handlers[type] ?? []).filter((f) => f !== fn); }
+    click() { this.clicks += 1; for (const fn of this.handlers.click ?? []) fn({ target: this }); }
+    getClientRects() { return this.visible() ? [this.rect] : []; }
+    getBoundingClientRect() {
+      const r = this.visible() ? this.rect : { top: 0, bottom: 0, left: 0, width: 0 };
+      return { ...r, height: r.bottom - r.top, right: (r.left ?? 0) + r.width };
+    }
+  }
+  const box = (top, bottom, width) => ({ top, bottom, left: 0, width });
+  const scrollport = new El('main', { cs: { overflowY: 'auto' }, rect: box(0, 844, 390) });
+  const toolbar = new El('div', { cls: ['page-toolbar'], rect: box(0, 112, 358) });
+  toolbar.cs.columnGap = '8';
+  const title = new El('h1', { cls: ['page-toolbar__title'], rect: box(8, 49, 322) });
+  title.textContent = 'Aufgaben';
+  const search = new El('label', { cls: ['page-search', 'page-toolbar__center'], rect: box(60, 108, 48) });
+  const actions = new El('div', { cls: ['page-toolbar__actions'], rect: box(57, 111, 277) });
+  actions.cs.columnGap = '8';
+  const seg = new El('div', { cls: ['group-toggle'], attrs: { role: 'group' }, rect: box(57, 111, 104) });
+  const list = new El('button', { attrs: { 'aria-label': 'Listenansicht', 'aria-pressed': 'true' }, rect: box(59, 107, 48) });
+  const kanban = new El('button', { attrs: { 'aria-label': 'Kanban-Ansicht', 'aria-pressed': 'false' }, rect: box(59, 107, 48) });
+  seg.append(list, kanban);
+  const filter = new El('button', { cls: ['btn', 'page-filter-btn'], attrs: { 'aria-label': '1 Filter aktiv' }, rect: box(60, 108, 117) });
+  actions.append(seg, filter);
+  let panel = null;
+  if (withMenu) {
+    const trigger = new El('button', { cls: ['btn', 'page-tools-btn', 'popover-menu__trigger'], attrs: { popovertarget: 'tasks-tools-menu' }, rect: box(60, 108, 48) });
+    panel = new El('div', { cls: ['popover-menu'], attrs: { id: 'tasks-tools-menu', popover: '' } });
+    panel.append(new El('button', { cls: ['popover-menu__item'], attrs: { role: 'menuitem' } }));
+    actions.append(trigger, panel);
+  }
+  toolbar.append(title, search, actions);
+  scrollport.append(toolbar);
+  // Angedockt blendet das CSS die markierten Kontrollen aus.
+  for (const el of [seg, filter]) {
+    el.hiddenByCss = () => toolbar.classList.contains('page-toolbar--dock-fold')
+      && toolbar.classList.contains('is-docked') && 'data-dock-fold' in el.attrs;
+  }
+
+  const saved = {};
+  for (const k of ['Element', 'getComputedStyle', 'ResizeObserver', 'MutationObserver', 'IntersectionObserver', 'document']) saved[k] = global[k];
+  global.Element = El;
+  global.getComputedStyle = (el) => el.cs;
+  global.ResizeObserver = class { observe() {} disconnect() {} };
+  global.MutationObserver = class { observe() {} disconnect() {} };
+  global.IntersectionObserver = class { observe() {} disconnect() {} };
+  global.document = {
+    body: null,
+    createElement: (tag) => new El(tag, { rect: box(60, 108, 0) }),
+    getElementById: () => null,
+  };
+  const restore = () => { for (const [k, v] of Object.entries(saved)) global[k] = v; };
+  const dockTitle = () => toolbar.children.find((c) => c.classes.has('page-toolbar__dock-title')) ?? null;
+  const toggleMenu = (newState) => { for (const fn of toolbar.handlers.beforetoggle ?? []) fn({ target: panel, newState }); };
+  return { toolbar, actions, seg, filter, list, kanban, panel, dockTitle, toggleMenu, restore };
+}
+
+test('M9: laesst die Bar-Zeile dem Titel keine 88px, falten die Kontrollen und der Titel erscheint', () => {
+  const s = dockStub();
+  try {
+    const header = wireCollapsingHeader(s.toolbar);
+    assert.ok(s.toolbar.classList.contains('page-toolbar--stacked'), 'Attrappe muss einen gestapelten Kopf ergeben');
+    assert.ok(s.toolbar.classList.contains('page-toolbar--dock-fold'), 'ohne Faltung stuende angedockt kein Titel');
+    assert.equal(s.dockTitle()?.textContent, 'Aufgaben', 'der angedockte Titel nennt den Ort');
+    assert.equal(s.dockTitle()?.nextElementSibling, s.actions, 'er steht vor den Aktionen, in der Bar-Zeile');
+    assert.ok(s.seg.hasAttribute('data-dock-fold'), 'das Ansichts-Segment faltet');
+    assert.ok(s.filter.hasAttribute('data-dock-fold'), 'der Filter faltet');
+    const trigger = s.actions.querySelector(':scope > .page-tools-btn[popovertarget]');
+    assert.equal(trigger.hasAttribute('data-dock-fold'), false, 'das „..." bleibt - dorthin wird gefaltet');
+    assert.equal(s.toolbar.props.get('--dock-fold-bar-h'), '54px', 'die Bar-Zeile behaelt ihre Hoehe');
+
+    // Angedockt sind die Kontrollen weg; eine neue Messung darf die Faltung
+    // nicht zuruecknehmen, sonst pendelt der Kopf.
+    s.toolbar.classList.add('is-docked');
+    header.update();
+    assert.ok(s.toolbar.classList.contains('page-toolbar--dock-fold'), 'gefaltet gemessen wird nicht neu entschieden');
+    assert.ok(s.seg.hasAttribute('data-dock-fold'));
+    header.destroy();
+    assert.equal(s.seg.hasAttribute('data-dock-fold'), false, 'destroy raeumt die Markierung ab');
+  } finally { s.restore(); }
+});
+
+test('M9: im Werkzeugmenue stehen die gefalteten Kontrollen, ein Eintrag klickt das Original', () => {
+  const s = dockStub();
+  try {
+    wireCollapsingHeader(s.toolbar);
+    s.toolbar.classList.add('is-docked');
+    s.toggleMenu('open');
+    const items = s.panel.children.filter((c) => c.classes.has('page-toolbar__fold-item'));
+    assert.deepEqual(items.map((i) => [i.getAttribute('role'), i.getAttribute('aria-checked'), i.children.at(-1)?.textContent]), [
+      ['menuitemradio', 'true', 'Listenansicht'],
+      ['menuitemradio', 'false', 'Kanban-Ansicht'],
+      ['menuitem', null, '1 Filter aktiv'],
+      ['separator', null, undefined],
+    ], 'Segment als Einfachauswahl mit dem Ist-Zustand, Filter als Eintrag, dann eine Trennlinie');
+    assert.equal(s.panel.children.indexOf(items[0]), 0, 'oben im Menue');
+    items[1].click();
+    assert.equal(s.kanban.clicks, 1, 'der Eintrag loest die Aktion des Originals aus, keine zweite Kopie');
+    s.toggleMenu('closed');
+    assert.equal(s.panel.children.filter((c) => c.classes.has('page-toolbar__fold-item')).length, 0, 'geschlossen: Stellvertreter wieder weg');
+
+    s.toolbar.classList.remove('is-docked');
+    s.toggleMenu('open');
+    assert.equal(s.panel.children.filter((c) => c.classes.has('page-toolbar__fold-item')).length, 0,
+      'ausgeklappt stehen die Kontrollen selbst da - keine Doppelung im Menue');
+  } finally { s.restore(); }
+});
+
+test('M9: ohne Werkzeugmenue faltet nichts (eine Kontrolle verschwindet nie ersatzlos)', () => {
+  const s = dockStub({ withMenu: false });
+  try {
+    wireCollapsingHeader(s.toolbar);
+    assert.equal(s.toolbar.classList.contains('page-toolbar--dock-fold'), false);
+    assert.equal(s.seg.hasAttribute('data-dock-fold'), false);
+  } finally { s.restore(); }
+});
+
+test('M9: das CSS blendet nur angedockt und gefaltet aus und haelt die Zeilenhoehe', () => {
+  const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const compact = [...eachRule(css)].filter((r) => r.at.some((a) => /max-width:\s*1023px/.test(a)));
+  const body = (sel) => compact.find((r) => r.selector.trim() === sel)?.body ?? '';
+  assert.match(body('.page-toolbar--stacked.page-toolbar--dock-fold.is-docked > .page-toolbar__actions > [data-dock-fold]'),
+    /display:\s*none/);
+  assert.match(body('.page-toolbar--stacked.page-toolbar--dock-fold.is-docked > .page-toolbar__actions'),
+    /min-block-size:\s*var\(--dock-fold-bar-h/);
+});
