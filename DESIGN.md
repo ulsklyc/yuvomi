@@ -669,7 +669,12 @@ Inhalt, kein Verlauf ueber eine Karte, kein Text auf einer Flaeche, die nicht ge
   (Amber-Braun, bewusst von Danger-Rot getrennt fuer Farbfehlsicht, 4.9:1), Danger
   (Apple Red, 5.4:1), Info (Apple Blue, 5.4:1, getrennt vom Contacts-Tint). Dark Mode:
   vivide Apple-Dark-Werte (#30D158 / #FF9F0A / #FF6961 / #409CFF) mit dunkler Tinte statt
-  Weiss; die Toast-Textfarben kippen dafuer ueber eigene Tokens mit.
+  Weiss; die Toast-Textfarben kippen dafuer ueber eigene Tokens mit. **Ein Erfolg ist keine
+  Vollflaeche (Re-Critique 2026-09-27, C2):** der Erfolgs-Toast steht auf demselben
+  Shell-Glas wie jeder Toast, gruen ist nur sein Haekchen (`--shell-success-ink`, gegen das
+  komponierte Glas gemessen); Fehler und Warnung bleiben Vollflaechen - sie sollen
+  unterbrechen, eine Bestaetigung nicht. Alle Aufrufe laufen ueber `showToast`, die Regel
+  steht einmal in glass.css (`test:toast-placement`).
 - **Chart-Serien** (`--chart-series-1..7`): eigene Datenreihen-Palette, bewusst KEINE
   geborgten Modul-Tints (Modulfarben tragen Bedeutung, die in einem Ausgaben-Donut falsch
   waere). Sieben Toene, im Dark aufgehellt auf >=3:1 Grafikkontrast; mehr Segmente werden
@@ -724,6 +729,15 @@ Inhalt, kein Verlauf ueber eine Karte, kein Text auf einer Flaeche, die nicht ge
   eigene Grouped-List-Separatoren. Der TEXT-Kontrast ist ueberall ohne Verstoss.
 
 ### Named Rules
+**Rot ist eine Warnung, kein Vorzeichen (Re-Critique 2026-09-27, C1).** Im Budget war jede
+Ausgabe rot - der Normalfall eines Haushaltsbuchs las sich als Dauer-Alarm, und die echte
+Warnung ging darin unter. Ausgaben stehen jetzt in Textfarbe, die Richtung traegt das
+Vorzeichen (`amountByRole(..., 'flow')`), Kategoriebalken und Trendlinie tragen den
+Modulton bzw. die Sekundaerfarbe; Einnahmen duerfen ruhig gruen sein. `--color-danger`
+bleibt fuer das, was wirklich eine Handlung verlangt: ein Konto im Minus, ein negativer
+Saldo, ein ueberschrittener Plan. Ein Zustand steht nie NUR in der Farbe
+(`test:budget-ui`).
+
 **Die Eine-Stimme-Regel (2026-08-10).** Die App hat GENAU EINE Akzentfarbe, und das ist
 das Violett der Bildmarke. Sie traegt alles, was in jedem Modul dasselbe tut: die
 Tab-Leiste und die Sidebar samt Aktiv-Pille, den FAB, den Primaer- und Sekundaerknopf,
@@ -914,6 +928,16 @@ Subheadline 15, Footnote 13, Caption 2 11.
 - Inputs nie unter 16px (`--text-base`, iOS-Zoom-Schwelle).
 
 ### Named Rules
+**Ein Wort bricht an der Silbe, mit Strich (Re-Critique 2026-09-27, W1).** "Tomatensupp/e"
+und "SAUERSTOFFSAETTI/GUNG" kamen aus `overflow-wrap: break-word` neben `hyphens: manual`:
+das Wort brach dort, wo die Zeile endete, ohne Strich. Wer ein Wort brechen laesst, gibt
+seinem Subjekt `hyphens: auto; hyphenate-limit-chars: 6 4 4` (die App setzt `lang`, der
+Browser kennt die Silben); `overflow-wrap: anywhere` bleibt die letzte Stufe fuer
+Zeichenketten ohne Silben (URLs, Codes, Zeitangaben). Versal-Labels, die nicht passen,
+werden kuerzer oder verlieren den Versal-Transform, statt mitten im Wort zu brechen. Der
+Guard (`test:typography`) prueft die Regel am Subjekt, nicht die Schreibweise, und fuehrt
+die Bestandsausnahmen als schrumpfende Karte.
+
 **Die Kopf-Abgrenzungs-Regel.** Zwei Kopfrollen, und was ein Kopf benennt entscheidet
 welche: benennt er einen BEREICH der Seite ("Heute wichtig", "Punktestaende", "Nach
 Kategorie", "Transaktionen"), ist er eine Ueberschrift in Satzschreibung. Wiederholt er
@@ -1316,7 +1340,7 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 |---|---|---|---|
 | Bearbeiten/Loeschen/Mehr an einer Zeile | `.row-action`, Loeschen `.row-action--danger`, dauerhaft sichtbar (ignore.md) | `rowActionHtml()` / `rowActionEl()` (utils/row-action.js); Mehr-Menue: `popoverMenuHtml({ triggerClass: 'row-action' })` | `btn--secondary btn--icon` (violett umrandet), `btn--danger-outline` als Ring, eigene Stiftzellen, `btn--icon btn--sm` |
 | Name der Zeilenaktion | nennt das OBJEKT: "Anna anrufen", "Kategorie Obst loeschen" | `t('common.editNamed' / 'deleteNamed' / 'removeNamed' / 'moreActionsNamed', { name })` oder ein Modul-Key mit `{{name}}` | zwoelfmal "Anrufen", fuenfmal "Loeschen" |
-| Suchen | EIN Suchfeld: gefuellte Kapsel (`--color-fill-field`, `--radius-full`, Kante transparent, Fokus = Akzentkante + Ring), mobil im Kopf die Icon-Form. Am Desktop (ab 1024px) EINE Breite `--page-search-width` (320px, endet in Liste+Detail vor der Listenspur) an EINER Stelle: der Center-Slot direkt hinter dem Titel (Referenz Dokumente) | `renderPageSearch({ className: '... page-toolbar__center' })` + `wirePageSearch()` (utils/page-search.js); Breite und Lage stehen in page-search.css; die globale Suche teilt die Regel per Selektorliste | eigene Felder mit 10/12/16px-Ecke, randlose Leisten, `form-input type=search`; Modulbreiten (neun Breiten 280-830px) und Auto-Rand ans Zeilenende |
+| Suchen | EIN Suchfeld: gefuellte Kapsel (`--color-fill-field`, `--radius-full`, Kante transparent, Fokus = Akzentkante + Ring), mobil im Kopf die Icon-Form. Am Desktop (ab 1024px) EINE Breite `--page-search-width` (320px, endet in Liste+Detail vor der Listenspur) an EINER Stelle: der Center-Slot direkt hinter dem Titel (Referenz Dokumente) | `renderPageSearch({ className: '... page-toolbar__center' })` + `wirePageSearch()` (utils/page-search.js); Breite und Lage stehen in page-search.css; die globale Suche teilt die Regel per Selektorliste; eine Suche nur fuer einen Abschnitt steht in dessen Kopf (`.section-toolbar`, Hauptbuch im Budget) mit derselben Breite und mobil derselben Icon-Form | eigene Felder mit 10/12/16px-Ecke, randlose Leisten, `form-input type=search`; Modulbreiten (neun Breiten 280-830px) und Auto-Rand ans Zeilenende |
 | Folge gleichartiger Zeilen | `.row-carrier` (Surface, `--radius-lg`, `--shadow-sm`, Haarlinien `> * + *`); liegt die Liste schon in einer Karte: `.row-divided` | list-row.css | `.list-rows` (12px, ohne Schatten) - laeuft aus, danach faellt die Regel |
 | Anlegen | `page-fab` MIT Nomen: mobil in der Kapsel, am Desktop angedockt als Kopf-Pille "+ Nomen" (Kuerzel "n" angesagt); ein Kontext-FAB nennt je Tab sein Nomen (ein Nomen, keine Verbphrase) | `createPageFab({ dockLabel })`, `setPageFabAction(fab, { label, dockLabel, onClick })` (utils/fab.js) | schwebender FAB ohne Nomen, dessen Bedeutung mit dem Tab wechselt; Inline-Anlegeformulare ueber der Liste; eigener Kopfknopf `.toolbar-new-btn` |
 | Dialogknoepfe | `.modal-panel__footer`: [Loeschen `btn--danger-outline` MIT Text, links] ... [Abbrechen] [Primaer `btn--primary`]; `mountFooter()` hebt ihn an den Blattrand, mobil ueber die Falz - auch die geteilten Rueckfragen (confirm/prompt/select) | modal.js; Vorbild Kalender-Termin, Aufgabe | `.modal-actions` im scrollenden Koerper, Loeschen als rotes Icon |
