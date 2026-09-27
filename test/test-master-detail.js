@@ -900,7 +900,7 @@ test('Detailfuss: klebt unten in der Spalte, einreihig, und steht bei kurzem Inh
   const body = (css, sel) => [...eachRule(css)].filter((r) => !r.at.length && r.selector.trim() === sel).map((r) => r.body).join(';');
   const foot = body(layout, '.split-view__detail-footer');
   assert.match(foot, /position:\s*sticky/, 'der Fuss klebt');
-  assert.match(foot, /bottom:\s*0/, 'unten');
+  assert.match(foot, /bottom:\s*var\(--nav-tail\)/, 'unten (ueber einer Kapsel, falls je eine steht)');
   assert.match(foot, /flex-wrap:\s*nowrap/, 'einreihig');
   assert.match(foot, /margin-block-start:\s*auto/, 'kurzer Inhalt: Fuss an der Unterkante');
   assert.match(foot, /background-color:\s*var\(--color-surface\)/, 'deckt den Inhalt, der darunter scrollt');

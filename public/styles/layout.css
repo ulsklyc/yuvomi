@@ -2942,7 +2942,9 @@ html.fab-anim-done .page-fab {
  * hierher. */
 .split-view__detail-footer {
   position: sticky;
-  bottom: 0;
+  /* Die Spalte steht nur am Desktop, wo `--nav-tail` 0 ist - der Wert haelt
+   * trotzdem die Regel der Kapsel (test:mobile-chrome, Fall 3). */
+  bottom: var(--nav-tail);
   z-index: 1;
   display: flex;
   flex-wrap: nowrap;
