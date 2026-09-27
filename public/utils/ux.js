@@ -495,6 +495,8 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
   let lead = 0;
   let dockTitle = null;
   let headSeal = null;
+  // Die Kinder der Lead-Zone, die im Band-Modus angedockt ausblenden.
+  let leadMarked = [];
 
   // DAS ABSENDER-SIEGEL: genau eines, unmittelbar vor dem Seitentitel.
   //
@@ -670,9 +672,9 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // sie ganz: der Titel begann dort eine SECHSTE Zeile, und mit ihr sprangen
     // Kopfhöhe und Lead-Zone beim Andocken (Belohnungen 110→145px,
     // Haushaltshilfe 122→157px). Das ist exakt die Oszillation, gegen die das
-    // negative `top` gewählt wurde - also lieber keinen Titel als einen, der
-    // den Kopf um seine eigene Schwelle pendeln lässt. Gemessen statt
-    // aufgezählt, damit die Regel auch beim sechsten Modul noch gilt.
+    // negative `top` gewählt wurde. Gemessen statt aufgezählt, damit die Regel
+    // auch beim sechsten Modul noch gilt. Was dann geschieht, steht unten bei
+    // der Faltung und beim Band.
     const lastLine = lines.length ? lines[lines.length - 1] : null;
     const tbCS = getComputedStyle(toolbar);
     const innerWidth = toolbar.clientWidth
@@ -731,7 +733,27 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     }
     toolbar.classList.toggle('page-toolbar--dock-fold', fold);
 
-    if (lead > 0 && !capped && heading && (roomForDockTitle || fold)) {
+    // DAS BAND: WO NICHTS FALTEN KANN, BLEIBT EIN STREIFEN DES TITELS STEHEN
+    // (Re-Critique 2026-09-27, R11 H1). Schichtplan, Haushaltshilfe und
+    // Belohnungen tragen als Bar-Zeile eine Tab-Leiste ueber die ganze Breite
+    // und kein „..." - dort half die Faltung nicht, und angedockt stand nur
+    // die Leiste da, ohne ein Wort, in welchem Modul sie liegt. Statt einer
+    // eigenen Zeile (die waere die Hoehenaenderung, gegen die das negative
+    // `top` gewaehlt ist) klebt der Kopf um genau die Hoehe des angedockten
+    // Titels TIEFER: der unterste Streifen der Lead-Zone bleibt sichtbar, der
+    // Titel steht absolut darin, und die Lead-Zone blendet angedockt aus.
+    // Die Geometrie haengt damit nicht am Andock-Zustand - der Kopf hat im
+    // Band-Modus immer dieselbe Hoehe und dieselbe Klebekante, angedockt
+    // wechselt nur, was in dem Streifen zu sehen ist. Die Schwelle der
+    // Trennlinie (unten, IntersectionObserver) rueckt um denselben Streifen.
+    const band = lead > 0 && !capped && Boolean(heading) && !roomForDockTitle && !fold;
+    toolbar.classList.toggle('page-toolbar--dock-band', band);
+    const leadEls = band ? lines.slice(0, -1).flatMap((l) => l.els) : [];
+    for (const el of leadMarked) if (!leadEls.includes(el)) el.removeAttribute('data-dock-lead');
+    for (const el of leadEls) if (!leadMarked.includes(el)) el.setAttribute('data-dock-lead', '');
+    leadMarked = leadEls;
+
+    if (lead > 0 && !capped && heading && (roomForDockTitle || fold || band)) {
       if (!dockTitle) {
         dockTitle = document.createElement('span');
         dockTitle.className = 'page-toolbar__dock-title';
@@ -749,6 +771,21 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
       }
     } else if (dockTitle?.parentElement) {
       dockTitle.remove();
+    }
+
+    // Die Hoehe des Streifens ist die des angedockten Titels, gemessen - das
+    // CSS stellt ihn im Band-Modus unsichtbar, aber gerendert hin. Dazu das
+    // obere Polster des Kopfes: mit ihm steht der Titel angedockt so weit
+    // unter der Kante wie der Large Title ausgeklappt.
+    const bandH = band && dockTitle?.parentElement === toolbar
+      ? Math.min(lead, Math.ceil(dockTitle.getBoundingClientRect().height))
+      : 0;
+    if (bandH > 0) {
+      toolbar.style.setProperty('--dock-band-h', `${bandH}px`);
+      toolbar.style.setProperty('--dock-band-pad', `${Math.round(padTop)}px`);
+    } else {
+      toolbar.style.removeProperty('--dock-band-h');
+      toolbar.style.removeProperty('--dock-band-pad');
     }
 
     // Die Trennlinie erscheint, sobald die erste Zeile aus dem Scrollport
@@ -772,9 +809,12 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // Belohnungen, Haushaltshilfe): der Kopf trug mobil NIE eine Trennlinie.
     // Bei drei Zeilen fiel es nicht auf - dort ist `lead` die Höhe von zwei
     // Zeilen und schiebt die erste weit über die Kante hinaus.
+    // Im Band-Modus klebt der Kopf um `bandH` tiefer, und genau so viel der
+    // ersten Zeile bleibt geklebt im Bild - der Rahmen schrumpft um dasselbe
+    // Mass, sonst dockte der Kopf nie an.
     io = new IntersectionObserver(
       ([entry]) => toolbar.classList.toggle('is-docked', !entry.isIntersecting),
-      { root: scrollport, threshold: 0, rootMargin: '-1px 0px 0px 0px' },
+      { root: scrollport, threshold: 0, rootMargin: `-${bandH + 1}px 0px 0px 0px` },
     );
     io.observe(firstEl);
   };
@@ -820,13 +860,17 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
       toolbar.removeEventListener('beforetoggle', onMenuToggle, { capture: true });
       toolbar.querySelectorAll('[data-dock-fold]').forEach((el) => el.removeAttribute('data-dock-fold'));
       toolbar.style.removeProperty('--dock-fold-bar-h');
+      for (const el of leadMarked) el.removeAttribute('data-dock-lead');
+      leadMarked = [];
+      toolbar.style.removeProperty('--dock-band-h');
+      toolbar.style.removeProperty('--dock-band-pad');
       dockTitle?.remove();
       dockTitle = null;
       headSeal?.remove();
       headSeal = null;
       delete toolbar.dataset.collapsingHeader;
       toolbar.style.removeProperty('--page-toolbar-lead');
-      toolbar.classList.remove('page-toolbar--stacked', 'page-toolbar--capped', 'is-collapsed', 'is-docked', 'page-toolbar--dock-fold');
+      toolbar.classList.remove('page-toolbar--stacked', 'page-toolbar--capped', 'is-collapsed', 'is-docked', 'page-toolbar--dock-fold', 'page-toolbar--dock-band');
     },
   };
 }

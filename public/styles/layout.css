@@ -3416,6 +3416,42 @@ html.fab-anim-done .page-fab {
     min-block-size: var(--dock-fold-bar-h, auto);
   }
 
+  /* DAS BAND (R11 H1): wo auch nichts falten kann - die Bar-Zeile ist eine
+   * Tab-Leiste ueber die ganze Breite (Schichtplan, Haushaltshilfe,
+   * Belohnungen) -, klebt der Kopf um die Hoehe des angedockten Titels tiefer
+   * (`--dock-band-h`, gemessen von `wireCollapsingHeader`). Im so sichtbaren
+   * untersten Streifen der Lead-Zone steht angedockt der Titel, absolut und
+   * damit ohne eigene Zeile; die Lead-Zone selbst blendet aus. Hoehe und
+   * Klebekante haengen nicht am Andock-Zustand - nichts kann pendeln.
+   * Ausgeklappt ist der Titel gerendert, aber unsichtbar: nur so ist er
+   * messbar, bevor er gebraucht wird. */
+  .page-toolbar--stacked.page-toolbar--dock-band {
+    top: calc(-1 * (var(--page-toolbar-lead, 0px) - var(--dock-band-h, 0px)));
+  }
+
+  .page-toolbar--stacked.page-toolbar--dock-band > .page-toolbar__dock-title {
+    display: block;
+    position: absolute;
+    inset-block-start: calc(var(--page-toolbar-lead, 0px) - var(--dock-band-h, 0px) + var(--dock-band-pad, 0px));
+    inset-inline: var(--page-inline-pad);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .page-toolbar--stacked.page-toolbar--dock-band.is-docked > .page-toolbar__dock-title {
+    visibility: visible;
+  }
+
+  /* Opazitaet statt `visibility`: der Large Title bleibt die Ueberschrift der
+   * Seite im Baum; er ist angedockt nur nicht zu sehen. */
+  .page-toolbar--stacked.page-toolbar--dock-band.is-docked > [data-dock-lead] {
+    opacity: 0;
+    pointer-events: none;
+  }
+
   /* Die Trennlinie erscheint erst, wenn die Leiste angedockt ist - am
    * Scroll-Anfang steht der Large Title nahtlos auf dem Seitengrund.
    * `--stacked` setzt der Helfer nur, wenn es überhaupt eine Lead-Zone gibt;

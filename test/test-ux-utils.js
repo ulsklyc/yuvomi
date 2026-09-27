@@ -930,7 +930,7 @@ test('wireScrollFade: eine abgehaengte Leiste haengt ihre Beobachter selbst ab, 
  * die Bar-Zeile dem angedockten Titel 17px - er fiel weg, angedockt stand kein
  * Wort, wo man ist.
  */
-function dockStub({ withMenu = true } = {}) {
+function dockStub({ withMenu = true, tabBar = false } = {}) {
   const matchOne = (el, s) => {
     const m = s.match(/^([a-z0-9]*)((?:\.[\w-]+)*)((?:\[[\w-]+\])*)$/i);
     if (!m) throw new Error(`Attrappe kennt den Selektor nicht: ${s}`);
@@ -1009,7 +1009,15 @@ function dockStub({ withMenu = true } = {}) {
     panel.append(new El('button', { cls: ['popover-menu__item'], attrs: { role: 'menuitem' } }));
     actions.append(trigger, panel);
   }
-  toolbar.append(title, search, actions);
+  // Schichtplan, Haushaltshilfe, Belohnungen (R11 H1): die Bar-Zeile ist eine
+  // Tab-Leiste ueber die ganze Innenbreite, kein Werkzeugmenue daneben.
+  const tabs = new El('div', { cls: ['sub-tabs-bar'], attrs: { role: 'tablist' }, rect: box(57, 105, 358) });
+  if (tabBar) {
+    title.textContent = 'Schichtplan';
+    toolbar.append(title, tabs);
+  } else {
+    toolbar.append(title, search, actions);
+  }
   scrollport.append(toolbar);
   // Angedockt blendet das CSS die markierten Kontrollen aus.
   for (const el of [seg, filter]) {
@@ -1023,16 +1031,17 @@ function dockStub({ withMenu = true } = {}) {
   global.getComputedStyle = (el) => el.cs;
   global.ResizeObserver = class { observe() {} disconnect() {} };
   global.MutationObserver = class { observe() {} disconnect() {} };
-  global.IntersectionObserver = class { observe() {} disconnect() {} };
+  const ioOptions = [];
+  global.IntersectionObserver = class { constructor(cb, opts) { ioOptions.push(opts); } observe() {} disconnect() {} };
   global.document = {
     body: null,
-    createElement: (tag) => new El(tag, { rect: box(60, 108, 0) }),
+    createElement: (tag) => new El(tag, { rect: box(60, 87, 0) }),
     getElementById: () => null,
   };
   const restore = () => { for (const [k, v] of Object.entries(saved)) global[k] = v; };
   const dockTitle = () => toolbar.children.find((c) => c.classes.has('page-toolbar__dock-title')) ?? null;
   const toggleMenu = (newState) => { for (const fn of toolbar.handlers.beforetoggle ?? []) fn({ target: panel, newState }); };
-  return { toolbar, actions, seg, filter, list, kanban, panel, dockTitle, toggleMenu, restore };
+  return { toolbar, actions, seg, filter, list, kanban, panel, title, tabs, ioOptions, dockTitle, toggleMenu, restore };
 }
 
 test('M9: laesst die Bar-Zeile dem Titel keine 88px, falten die Kontrollen und der Titel erscheint', () => {
@@ -1093,6 +1102,61 @@ test('M9: ohne Werkzeugmenue faltet nichts (eine Kontrolle verschwindet nie ersa
     assert.equal(s.toolbar.classList.contains('page-toolbar--dock-fold'), false);
     assert.equal(s.seg.hasAttribute('data-dock-fold'), false);
   } finally { s.restore(); }
+});
+
+/**
+ * NIE EIN KOPF OHNE ORTSANGABE, AUCH OHNE „..." (Re-Critique 2026-09-27, R11 H1).
+ *
+ * Schichtplan, Haushaltshilfe und Belohnungen: die Bar-Zeile ist eine
+ * Tab-Leiste ueber die ganze Breite, es gibt kein Werkzeugmenue, in das etwas
+ * falten koennte. Vorher stand angedockt nur die Leiste da - kein Titel, kein
+ * Wort, in welchem Modul. Jetzt klebt der Kopf um die Hoehe des Titels tiefer
+ * (Band), der Titel steht in diesem Streifen, und die Andock-Schwelle rueckt
+ * um denselben Streifen.
+ */
+test('H1: eine Tab-Leiste als Bar-Zeile bekommt angedockt trotzdem ihren Titel (Band)', () => {
+  const s = dockStub({ tabBar: true });
+  try {
+    const header = wireCollapsingHeader(s.toolbar);
+    assert.ok(s.toolbar.classList.contains('page-toolbar--stacked'), 'Attrappe muss einen gestapelten Kopf ergeben');
+    assert.equal(s.toolbar.classList.contains('page-toolbar--dock-fold'), false, 'ohne Menue faltet nichts');
+    assert.equal(s.dockTitle()?.textContent, 'Schichtplan', 'angedockt steht der Ortsname - nie nur die Leiste');
+    assert.ok(s.toolbar.classList.contains('page-toolbar--dock-band'), 'der Titel bekommt den Streifen, keine eigene Zeile');
+    assert.equal(s.toolbar.props.get('--dock-band-h'), '27px', 'der Streifen ist so hoch wie der gemessene Titel');
+    assert.ok(s.title.hasAttribute('data-dock-lead'), 'der Large Title gehoert zur Lead-Zone und blendet angedockt aus');
+    assert.equal(s.tabs.hasAttribute('data-dock-lead'), false, 'die Leiste bleibt');
+    assert.equal(s.ioOptions.at(-1)?.rootMargin, '-28px 0px 0px 0px',
+      'die Schwelle rueckt um den Streifen, sonst dockte der tiefer klebende Kopf nie an');
+    header.destroy();
+    assert.equal(s.title.hasAttribute('data-dock-lead'), false, 'destroy raeumt die Markierung ab');
+    assert.equal(s.toolbar.props.has('--dock-band-h'), false);
+    assert.equal(s.toolbar.classList.contains('page-toolbar--dock-band'), false);
+  } finally { s.restore(); }
+});
+
+test('H1: wo der Titel in die Bar-Zeile passt oder faltet, bleibt es beim alten Kopf ohne Band', () => {
+  const s = dockStub();
+  try {
+    wireCollapsingHeader(s.toolbar);
+    assert.equal(s.toolbar.classList.contains('page-toolbar--dock-band'), false);
+    assert.equal(s.toolbar.props.has('--dock-band-h'), false);
+    assert.equal(s.ioOptions.at(-1)?.rootMargin, '-1px 0px 0px 0px');
+  } finally { s.restore(); }
+});
+
+test('H1: das CSS klebt den Band-Kopf um den Streifen tiefer und blendet nur angedockt um', () => {
+  const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const compact = [...eachRule(css)].filter((r) => r.at.some((a) => /max-width:\s*1023px/.test(a)));
+  const body = (sel) => compact.find((r) => r.selector.trim() === sel)?.body ?? '';
+  assert.match(body('.page-toolbar--stacked.page-toolbar--dock-band'),
+    /top:\s*calc\(-1 \* \(var\(--page-toolbar-lead, 0px\) - var\(--dock-band-h, 0px\)\)\)/);
+  const title = body('.page-toolbar--stacked.page-toolbar--dock-band > .page-toolbar__dock-title');
+  assert.match(title, /position:\s*absolute/, 'der Titel macht keine eigene Zeile auf');
+  assert.match(title, /visibility:\s*hidden/, 'ausgeklappt gerendert, aber unsichtbar');
+  assert.match(body('.page-toolbar--stacked.page-toolbar--dock-band.is-docked > .page-toolbar__dock-title'), /visibility:\s*visible/);
+  const lead = body('.page-toolbar--stacked.page-toolbar--dock-band.is-docked > [data-dock-lead]');
+  assert.match(lead, /opacity:\s*0/);
+  assert.doesNotMatch(lead, /visibility|display/, 'der Large Title bleibt die Ueberschrift im Baum');
 });
 
 test('M9: das CSS blendet nur angedockt und gefaltet aus und haelt die Zeilenhoehe', () => {
