@@ -324,6 +324,15 @@ test('fasting reminders are switches (role=switch on the shared .toggle track), 
   assert.doesNotMatch(html.match(/<input[^>]*data-fasting-remind-next[^>]*>/)[0], /\bchecked\b/);
 });
 
+// Sichtbarer Text einer Ueberschrift: Tags wiederholt entfernen, bis nichts mehr
+// greift - ein einzelner replace-Lauf liesse verschachtelte Reste stehen.
+function textOf(markup) {
+  let text = markup;
+  let prev;
+  do { prev = text; text = text.replace(/<[^<>]*>/g, ''); } while (text !== prev);
+  return text.replace(/[<>]/g, '').trim();
+}
+
 test('a fasting help button never repeats the heading it explains (no "Your goal, button Your goal")', () => {
   const html = fastingPreferencesHtml({}) + renderFastingStats({ allTime: {}, year: {}, last30Days: {}, weekly: [] });
   const headings = [...html.matchAll(/<(h[1-6])\b[^>]*>([\s\S]*?)<\/\1>/g)];
@@ -333,7 +342,7 @@ test('a fasting help button never repeats the heading it explains (no "Your goal
   }
   for (const button of html.matchAll(/<button class="fasting-help__button"[^>]*aria-label="([^"]*)"/g)) {
     const name = button[1];
-    assert.ok(!headings.some(([, , inner]) => inner.replace(/<[^>]+>/g, '').trim() === name),
+    assert.ok(!headings.some(([, , inner]) => textOf(inner) === name),
       `der Infoknopf "${name}" heisst wie seine Ueberschrift`);
   }
   // Die Presets nennt die Ueberschrift per aria-labelledby, nicht ein zweites Mal als Text.
