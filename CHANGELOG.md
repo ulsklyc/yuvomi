@@ -337,6 +337,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   settings search finds individual options, not only pages, and jumps to the option and highlights
   it. The calendar sync page now says what it connects: Google, Apple, Outlook and CalDAV.
 
+- **Sheets on a phone have a grabber you can see and follow your finger.** The handle at the top of
+  a dialog sheet is now visible in light mode too and sits right above the title instead of in an
+  empty strip. Dragging moves the sheet exactly with your finger; a short flick down or a pull of
+  about 80px closes it, anything less springs back smoothly, and pulling up gives a little. The
+  "More" sheet of the tab bar works the same way, with the same grabber, glass and corners, and no
+  longer dims the tab bar it came from. With reduced motion the sheet does not spring.
+
+- **The add button is the same everywhere and says what it adds.** On a desktop, Tasks, Notes,
+  Contacts, Calendar and Budget now show the same labelled add button in the header as the other
+  modules, with the `n` shortcut announced. In the calendar it now appears in the header at all
+  instead of floating over the month. Budget names the thing on every tab (Entry, Budget, Account,
+  Subscription, Loan, Expense), the shift plan says "Shift type" instead of a sentence, and in the
+  kitchen the button stands at the same place on all four tabs, so it no longer jumps when you
+  switch between them.
+
+- **Search sits in one place with one width.** On a desktop every module header shows its search
+  right after the title at the same width, instead of nine different widths on the left or right.
+
+- **Selecting tasks works like selecting elsewhere.** In select mode a selection circle takes the
+  place of the status circle and the assignee, and the actions (done or open, delete, finish) sit in
+  the floating bar that Shopping, Contacts and the pantry use. Each row is named after its task for
+  screen readers, deleting asks with the number of tasks and can be undone, and archiving or tagging
+  the selection is in the tools menu.
+
+- **Fasting speaks the language of the other health tabs.** The person is picked with the same
+  pill as on every health tab, reminders are switches, the settings keep a readable width on a
+  desktop, and the info button next to a heading is announced as "Explanation: Your goal" instead
+  of repeating the heading.
+
+- **Actions on notes and in the meal plan are always visible.** Pin, open and delete on a note
+  card, and edit or add on a meal, no longer appear only when the pointer is over them; they stay
+  in a quiet colour.
+
+- **The highlight slides in every segmented control and tab bar.** The moving highlight of the
+  kitchen tabs now runs in Health, the shift plan, Budget, the calendar views, List and Kanban in
+  Tasks, Documents, Notes, Housekeeping, Rewards and the settings, with one speed and curve; with
+  reduced motion it jumps. The sidebar highlight is quicker, a collapsed sidebar waits a moment
+  before it opens under the pointer, and the kitchen highlight stays on its tab after the sidebar
+  is collapsed or expanded.
+
 ### Fixed
 
 - **Small things from the component review.** The first day of a fast reads "Day 1", not "Day 0".
