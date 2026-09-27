@@ -6974,6 +6974,39 @@ textarea::placeholder {
 .toast--danger  { background-color: var(--color-danger);  color: var(--toast-danger-text); }
 .toast--warning { background-color: var(--color-warning); color: var(--toast-warning-text); }
 
+/* DER DAUERHAFTE TOAST IST AUF DEM TELEFON EINE ZEILE (Re-Critique
+ * 2026-09-27, Casey; R9 M14). Die Erinnerung stand 66px hoch und dreissig
+ * Sekunden lang ueber Raster und Liste - Versal-Kicker „ERINNERUNG" ueber dem
+ * Titel, beides in 12px-Polsterung. Mobil traegt das Siegel die Herkunft und
+ * der Titel die Sache; der Kicker verlaesst das Bild (nicht den Baum, er
+ * bleibt vorgelesen), und die Hoehe ist die Zielgroesse des Textknopfs selbst:
+ * 44/48px statt 66, und der Knopf, der die Erinnerung oeffnet, fuellt sie
+ * ganz. Kompakt passt er bei einem Blatt auch in den Streifen darueber, statt
+ * im Formular zu liegen; wo nicht, weicht er (utils/toast-placement.js). */
+@media (max-width: 767px) {
+  .toast.toast--reminder {
+    padding-block: 0;
+  }
+
+  .toast--reminder .toast__reminder-text {
+    align-self: stretch;
+    justify-content: center;
+    min-height: var(--target-base);
+  }
+
+  .toast--reminder .toast__reminder-text strong {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(6px) scale(0.98); }
   to   { opacity: 1; transform: translateY(0) scale(1); }

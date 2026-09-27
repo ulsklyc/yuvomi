@@ -81,6 +81,8 @@
  * sie liest, steht bei `.shell-bottom-stack[data-dock]` in layout.css.
  */
 
+import { PERSISTENT_TOAST_SELECTOR } from './toast-surface.js';
+
 /** Was als offener Dialog zaehlt: jede Dialogrolle, sichtbar und nicht inert. */
 export const DIALOG_SELECTOR = '[role="dialog"]';
 
@@ -197,6 +199,37 @@ export function chooseToastPlacement({
     }
   }
   return result(best);
+}
+
+/**
+ * MUSS EIN DAUERHAFTER TOAST WEICHEN? (R9 M14) Ja, sobald die gewaehlte Lage
+ * einen offenen Dialog beruehrt - auch dort, wo sie keine Bedienleiste
+ * verdeckt (Lage 4 und 5 oben). Eine Rueckmeldung mit Frist darf dort fuenf
+ * Sekunden stehen; eine Erinnerung stand dort dreissig, ueber dem Formular,
+ * in dem jemand gerade schreibt. Neben dem Dialog (Lage 1 bis 3) bleibt sie
+ * sichtbar. Rein, damit sie ohne Browser pruefbar ist.
+ *
+ * @param {object} input
+ * @param {null|{top:number}} input.decision  Ergebnis von chooseToastPlacement
+ * @param {DOMRect|object} input.stack        Lage am eigenen Platz
+ * @param {number} input.dockedHeight
+ * @param {number} input.dockedWidth
+ * @param {number} input.dockedCenter
+ * @param {Array<DOMRect|object>} input.dialogs
+ * @returns {boolean}
+ */
+export function persistentToastMustYield({
+  decision, stack, dockedHeight, dockedWidth, dockedCenter, dialogs,
+}) {
+  const rect = decision
+    ? {
+      top: decision.top,
+      bottom: decision.top + dockedHeight,
+      left: dockedCenter - dockedWidth / 2,
+      right: dockedCenter + dockedWidth / 2,
+    }
+    : stack;
+  return dialogs.some((d) => intersects(rect, d));
 }
 
 function isOpen(el) {
@@ -353,7 +386,10 @@ function untuck(stack) {
  * etwas geaendert hat.
  */
 function tuckAllButNewest(stack) {
-  const toasts = [...stack.querySelectorAll('.toast')].filter((t) => t.getClientRects().length > 0);
+  // Schon zurueckgenommene (ein dauerhafter Toast, der dem Dialog weicht)
+  // zaehlen nicht mit - sonst bliebe ausgerechnet er als der „juengste" stehen.
+  const toasts = [...stack.querySelectorAll('.toast')]
+    .filter((t) => !t.classList.contains('toast--tucked') && t.getClientRects().length > 0);
   if (toasts.length < 2) return false;
   // Ohne Nummer (vor der Beobachtung eingefuegt) gilt ein Toast als aelter als
   // jeder nummerierte, und unter diesen entscheidet die DOM-Reihenfolge.
@@ -371,6 +407,11 @@ function tuckAllButNewest(stack) {
 
 function undock(stack) {
   untuck(stack);
+  clearDock(stack);
+}
+
+/** Der Stapel steht wieder an seinem Platz; Zurueckgenommenes bleibt es. */
+function clearDock(stack) {
   delete stack.dataset.dock;
   stack.style.removeProperty('--toast-dock-top');
   stack.style.removeProperty('--toast-dock-center');
@@ -442,8 +483,34 @@ export function placeToastStack(stack) {
   if (decision?.covers && tuckAllButNewest(stack)) {
     decision = chooseToastPlacement({ ...input, dockedHeight: stack.getBoundingClientRect().height });
   }
+  // Ein dauerhafter Toast, dessen Lage den Dialog beruehrt, weicht ganz (R9
+  // M14) - zurueckgenommen wie oben, er kommt mit dem Schliessen wieder. Der
+  // Rest des Stapels sucht seine Lage danach ohne ihn, von vorn.
+  const persistent = [...stack.querySelectorAll(PERSISTENT_TOAST_SELECTOR)]
+    .filter((t) => t.getClientRects().length > 0);
+  const yielded = persistent.length > 0 && persistentToastMustYield({
+    ...input, decision, dockedHeight: stack.getBoundingClientRect().height,
+  });
+  if (yielded) {
+    untuck(stack);
+    for (const toast of persistent) {
+      toast.classList.add('toast--tucked');
+      toast.inert = true;
+    }
+    const rest = [...stack.querySelectorAll('.toast')].some((t) => !t.classList.contains('toast--tucked'));
+    if (!rest) {
+      clearDock(stack);
+      return null;
+    }
+    const again = { ...input, stack: stack.getBoundingClientRect(), dockedHeight: stack.getBoundingClientRect().height };
+    decision = chooseToastPlacement(again);
+    if (decision?.covers && tuckAllButNewest(stack)) {
+      decision = chooseToastPlacement({ ...again, dockedHeight: stack.getBoundingClientRect().height });
+    }
+  }
   if (!decision) {
-    undock(stack);
+    if (yielded) clearDock(stack);
+    else undock(stack);
     return null;
   }
   stack.style.setProperty('--toast-dock-top', `${decision.top}px`);

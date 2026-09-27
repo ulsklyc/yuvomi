@@ -24,7 +24,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { chooseToastPlacement } from '../public/utils/toast-placement.js';
+import { chooseToastPlacement, persistentToastMustYield } from '../public/utils/toast-placement.js';
+import { PERSISTENT_TOAST_SELECTOR } from '../public/utils/toast-surface.js';
+import { eachRule } from './css-rules.js';
 
 const box = (top, left, width, height) => ({
   top, left, width, height, right: left + width, bottom: top + height,
@@ -402,4 +404,67 @@ test('jeder Dialog zeichnet genau die Leisten aus, die das Register nennt - nach
     if (DIALOG_REGISTRY[file]) continue;
     assert.equal(countMarks(code(file)), 0, `${file}: traegt data-dialog-actions, baut aber keinen registrierten Dialog`);
   }
+});
+
+// --------------------------------------------------------
+// Dauerhafter Toast (Re-Critique 2026-09-27, Casey; R9 M14)
+// --------------------------------------------------------
+
+/**
+ * Gemessen bei 390x844 im Formular „Aufgabe bearbeiten" (Blatt ab y=89, Fuss
+ * ab y=758): die Erinnerung (66px) passte nicht in den Streifen ueber dem
+ * Blatt und lag nach Lage 5 bei y=621 im Formular - dreissig Sekunden ueber
+ * den Feldern. Sie verdeckte keine Bedienleiste und galt damit als gut
+ * platziert.
+ */
+test('M14: ein dauerhafter Toast weicht, sobald seine Lage den Dialog beruehrt', () => {
+  const viewport = { width: 390, height: 844 };
+  const sheet = box(89, 13, 364, 755);
+  const input = {
+    viewport, gap: 12, stack: box(686, 16, 358, 66), dockedHeight: 66, dockedWidth: 340, dockedCenter: 195,
+    primary: sheet, dialogs: [sheet],
+    // Kopf, Fuss und ein Knopf im Formular (der Datumswaehler) an der Stelle,
+    // an der der Stapel sonst steht - deshalb Lage 5 statt Lage 4.
+    zones: [box(89, 13, 364, 70), box(758, 13, 364, 73), box(690, 29, 332, 48)],
+  };
+  const decision = chooseToastPlacement(input);
+  assert.ok(decision, 'Vorbedingung: der Stapel wird im Dialog platziert');
+  assert.equal(decision.covers, false, 'Vorbedingung: er verdeckt keine Leiste - deshalb blieb er bisher stehen');
+  assert.equal(persistentToastMustYield({ ...input, decision }), true, 'im Blatt, ueber dem Formular: er weicht');
+
+  // Kompakt (48px) passt er in den Streifen ueber dem Blatt - dort bleibt er.
+  const compact = { ...input, stack: box(704, 16, 358, 48), dockedHeight: 48 };
+  const above = chooseToastPlacement(compact);
+  assert.ok(above && above.top + 48 <= sheet.top, 'kompakt liegt er ueber dem Blatt');
+  assert.equal(persistentToastMustYield({ ...compact, decision: above }), false, 'neben dem Dialog bleibt er sichtbar');
+
+  // Am eigenen Platz, ohne den Dialog zu beruehren: nichts zu tun.
+  assert.equal(persistentToastMustYield({ ...input, decision: null, stack: box(10, 16, 358, 48) }), false);
+  // Am eigenen Platz UEBER dem Dialog-Inhalt (Lage 4 liefert null): er weicht.
+  const lage4 = { ...input, zones: input.zones.slice(0, 2) };
+  assert.equal(chooseToastPlacement(lage4), null, 'Vorbedingung: Lage 4, er bleibt stehen');
+  assert.equal(persistentToastMustYield({ ...lage4, decision: null }), true);
+});
+
+test('M14: die Toast-Lage nimmt dauerhafte Toasts zurueck, statt sie ueber dem Dialog stehen zu lassen', () => {
+  const src = readFileSync(new URL('../public/utils/toast-placement.js', import.meta.url), 'utf8');
+  const fn = src.slice(src.indexOf('export function placeToastStack'), src.indexOf('export function watchToastPlacement'));
+  assert.match(fn, /querySelectorAll\(PERSISTENT_TOAST_SELECTOR\)/, 'die Lage kennt die dauerhaften Toasts');
+  assert.match(fn, /persistentToastMustYield\(/, 'und fragt, ob sie weichen muessen');
+  assert.match(fn, /toast\.classList\.add\('toast--tucked'\);\s*toast\.inert = true;/,
+    'zurueckgenommen wie beim Einklappen: unsichtbar und inert, nicht entfernt');
+  assert.ok(PERSISTENT_TOAST_SELECTOR.split(',').map((x) => x.trim()).includes('.toast--reminder'),
+    'die Erinnerung ist ein dauerhafter Toast');
+});
+
+test('M14: mobil ist die Erinnerung eine Zeile in Zielgroesse, der Kicker bleibt vorgelesen', () => {
+  const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const mobile = [...eachRule(css)].filter((r) => r.at.some((a) => /max-width:\s*767px/.test(a)));
+  const body = (sel) => mobile.find((r) => r.selector.trim() === sel)?.body ?? '';
+  assert.match(body('.toast.toast--reminder'), /padding-block:\s*0/);
+  assert.match(body('.toast--reminder .toast__reminder-text'), /min-height:\s*var\(--target-base\)/,
+    'die Hoehe ist die Treffflaeche des Knopfs, der die Erinnerung oeffnet');
+  const kicker = body('.toast--reminder .toast__reminder-text strong');
+  assert.match(kicker, /clip:\s*rect\(0,\s*0,\s*0,\s*0\)/);
+  assert.doesNotMatch(kicker, /display:\s*none/);
 });
