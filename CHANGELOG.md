@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Search finds parts of words and looks in every module with content.** "milch" now finds
+  "Vollmilch", with accents and ß/ss handled as before. Besides tasks, events, notes, contacts,
+  shopping, health and waste, the search now covers recipes, the pantry, inventory, documents,
+  birthdays and budget entries, with the same permissions as the module itself; a module switched
+  off for the household stays out of the results. The start tiles show only the modules you can
+  open, and on a phone the overview has a search button, so the search is one tap away.
+
+- **The budget ledger can be searched across all months.** A search field in the head of the
+  transactions list finds entries by title in every month, shows the full date for hits from other
+  months and says how many it found. On a phone it is a search icon until you tap it, so the list
+  does not move down. Shared amounts are searched in the title you are allowed to see.
+
+- **"Due by today" as a task filter and an address.** `/tasks?due=today` lists the open and
+  started tasks due today or earlier, overdue included, and the filter sheet has a switch for it.
+  The "+N more today" link on the overview now opens exactly that list.
+
 - **Vital readings and lab values can be edited.** The edit button on a recent reading in Health
   opens it with its values, time, visibility and note filled in, where the row used to offer only
   delete; delete moved to the left of the dialog footer with the usual undo. In a lab report each value has an edit
@@ -68,6 +84,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the viewer and opens the edit dialog. It only appears for people who may change documents.
 
 ### Changed
+
+- **Expenses in the budget are no longer red.** Amounts read in the text colour with their sign,
+  category bars use the budget's own tone, the trend line a neutral grey, and income may stay green. Red is
+  left for what needs attention: an account in the minus, a negative balance or a plan that is
+  over its limit.
+
+- **Success messages are calm.** A confirmation sits on the same glass as every message, with a
+  green check mark instead of a full green bar. Errors and warnings stay prominent.
+
+- **Long words break at a syllable with a hyphen.** Recipe names, meal types, health labels and
+  overview labels no longer split mid-word ("Tomatensupp / e"); they break as "Tomaten- / suppe".
+
+- **Plain words where the app was literal-minded.** The tile size that makes a tile two columns wide
+  is called "Wide (2x1)" instead of "Narrow". Pantry units follow the amount ("6 cans", "1 bottle",
+  with proper plural forms in every language). "As needed (PRN)" lost its abbreviation. In the shift
+  schedule "Start date" is "Cycle starts on", every create button says "Add", and "Valid from" and
+  "Valid until" moved behind "More settings", open when a date is set.
+
+- **A recipe shows its sections as headings and asks once about the pantry.** "Ingredients" and
+  "Notes" are real headings. Instead of "Not assigned" under every ingredient, one button below the
+  list assigns the open ingredients to pantry items in a single dialog.
+
+- **Charts use round axis values and a real time axis.** Health vitals, lab results, activity,
+  cycle trends, the budget trend and the odometer chart label their axis with round steps (0, 20,
+  40 ...) and place points by date, so uneven gaps look uneven. Vitals span the whole chosen period.
+
+- **Cycle calendar and trends sit side by side on wide screens.** Where the health detail column
+  is wide enough (about 1920px screens), the trends stand next to the calendar with charts at least
+  160px tall; below that they stay underneath, with taller charts than before.
+
+- **The shift schedule's statistics open on the numbers.** Period, then the figures, then your
+  settings; each tab has one primary button, and holidays and plan blocks show a colour dot instead
+  of a coloured stripe.
+
+- **A docked header over a full-width tab bar keeps its title** in the shift schedule, household
+  help and rewards, so a phone never shows a header without saying where you are.
+
+- **Selecting documents works like selecting tasks.** Move, delete and done sit in the shared pill
+  at the bottom, delete asks in the pill and can be undone for five seconds, and "Select all" and
+  archive are in the tools menu while selecting. Folder names in the side list fit on one line.
+
+- **Shopping columns on a desktop pack short categories** without empty space below them, also in
+  browsers without masonry layout.
+
+- **Tapping a household help task opens it for editing**, as with birthdays; the edit and delete
+  icons stay visible. Members who can only read see the task without an edit promise.
+
+- **Reduced motion keeps the gentle fades.** With reduced motion switched on, sheets and the search
+  no longer slide or scale, but still fade in, so a change of view is not an abrupt cut.
 
 - **Settings have one sheet per module, and a list beside the sheet on a desktop.** Settings are
   grouped into Account, Household (admins) and Modules. Every module has one sheet, as in Apple's
@@ -489,6 +554,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that scrolled sideways.
 
 ### Fixed
+
+- **Hidden menu entries stay hidden.** Menu items that should not apply (for example in task or
+  document menus) could show up because their layout overrode the hidden state.
+
+- **The kitchen tab bar fits a 375px phone with the recipe source filter active**, without
+  scrolling sideways.
 
 - **The "Rewards" step of the rewards setup opens the catalog again.** It looked for a tab
   that did not exist and did nothing.
