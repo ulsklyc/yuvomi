@@ -1903,3 +1903,30 @@ test('G2: der Fuss traegt genau EINEN Hinweis - den zur Fruchtbarkeit, wenn sie 
   assert.doesNotMatch(shell, /fertilityDisclaimer/);
   assert.match(shell, /cycleFooterMarkup\(darf, prediction\)/);
 });
+
+// --------------------------------------------------------
+// Kein Seitenstreifen an einem Traeger (Re-Critique 2026-09-27, C3)
+// --------------------------------------------------------
+//
+// `.cycle-bubble` trug eine 3px-Kante in Modulfarbe an einem abgerundeten
+// Kasten - das Muster, das DESIGN.md fuer Traeger ohne freie Nutzerfarbe
+// ausschliesst und das `impeccable detect` als side-tab meldet. Die Blase
+// zeigt ihren Ton jetzt mit dem Zeichen links und der Waschung. Gehalten wird
+// die Regel fuer das ganze Stylesheet: eine einseitige Kante breiter als die
+// Haarlinie (1px-Trenner zwischen Werten bleiben erlaubt) ist ein Streifen.
+test('health.css: keine farbige Seitenkante als Zeichen an einem Traeger', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/health.css', import.meta.url), 'utf8');
+  const SIDE = /(?:^|;)\s*border-(?:left|right|inline-start|inline-end)(?:-width)?\s*:\s*([^;]+)/g;
+  let seen = 0;
+  for (const rule of eachRule(css)) {
+    for (const m of rule.body.matchAll(SIDE)) {
+      seen += 1;
+      const width = m[1].match(/(\d+(?:\.\d+)?)px/);
+      const hairline = width && Number(width[1]) <= 1;
+      assert.ok(hairline || /^\s*(?:0|none)\b/.test(m[1]),
+        `${rule.selector.trim()}: einseitige Kante "${m[1].trim()}" ist ein Seitenstreifen`);
+    }
+  }
+  assert.ok(seen > 0, 'der Scanner sieht keine einzige Seitenkante mehr - der Trenner in .cycle-stat__pair-item fehlt, der Guard waere blind');
+});
