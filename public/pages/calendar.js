@@ -38,6 +38,7 @@ import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderA
 import { withChosenPeople } from '/utils/people-picker.js';
 import { othersCanRead } from '/utils/household.js';
 import { wireTablist } from '/utils/tablist.js';
+import { installPopoverMenus } from '/utils/popover-menu.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { wirePeriodSwipe } from '/utils/period-swipe.js';
 import { isNavModuleReadOnly } from '/permissions.js';
@@ -2258,9 +2259,57 @@ function toolbarHtml({ filterCount = 0, scheduleWarningHtml = '' } = {}) {
                 aria-expanded="false">
           <i data-lucide="search" aria-hidden="true"></i>
         </button>
+        ${viewMenuHtml()}
       </div>
     </div>
   `;
+}
+
+/**
+ * MOBIL STEHT DIE ANSICHTSWAHL IM WERKZEUGMENUE (R9 M5, A8 P2-3).
+ *
+ * Gemessen 390x844 vorher: der Kopf hatte drei Zeilen und 166px - Titel,
+ * Zeitraum, Ansichts-Segment mit Filter und Suche. Wie in Apples Kalender
+ * waehlt man die Ansicht unter 640px aus einem Menue (calendar.css blendet
+ * dort das Segment aus und dieses Menue ein); darueber bleibt das Segment,
+ * und das Menue ist unsichtbar. Beide steuern dieselbe Tablist
+ * (`viewTabs.setActive`), der Speicher und die Kuerzel m/w/d/a laufen
+ * unveraendert ueber deren `onChange`.
+ *
+ * `menuitemradio`, weil genau eine Ansicht gilt - die geteilte
+ * Popover-Mechanik setzt den Fokus beim Oeffnen auf den gewaehlten Eintrag
+ * (utils/popover-menu.js: Einfachauswahl). Der Haken hinten ist dieselbe
+ * Marke wie in jedem Werkzeugmenue.
+ */
+const VIEW_ICONS = { month: 'calendar-days', week: 'calendar-range', day: 'calendar-1', agenda: 'list' };
+
+function viewMenuHtml(current = state.view) {
+  const label = t('calendar.viewSwitcher');
+  return `
+        <button type="button" class="btn btn--icon cal-toolbar__views-menu popover-menu__trigger" id="cal-views-menu"
+                popovertarget="cal-views-menu-panel" aria-haspopup="menu" aria-expanded="false"
+                aria-label="${esc(label)}" title="${esc(label)}">
+          <i data-lucide="ellipsis" aria-hidden="true"></i>
+        </button>
+        <div class="popover-menu" id="cal-views-menu-panel" popover role="menu">
+          ${VIEWS.map((v) => `
+          <button type="button" role="menuitemradio" aria-checked="${v === current}"
+                  class="popover-menu__item" data-cal-view="${v}"
+                  aria-keyshortcuts="${CAL_SHORTCUT_KEYS.views[v]}">
+            <i data-lucide="${VIEW_ICONS[v]}" class="icon-md" aria-hidden="true"></i>
+            <span>${esc(VIEW_LABELS()[v])}</span>
+            <i data-lucide="check" class="icon-md popover-menu__item-trail popover-menu__item-check${v === current ? '' : ' popover-menu__item-check--hidden'}" aria-hidden="true"></i>
+          </button>`).join('')}
+        </div>`;
+}
+
+/** Den Haken im Ansichtsmenue der aktuellen Ansicht nachziehen. */
+function syncViewMenu(root = _container) {
+  for (const item of root?.querySelectorAll?.('[data-cal-view]') ?? []) {
+    const on = item.dataset.calView === state.view;
+    item.setAttribute('aria-checked', String(on));
+    item.querySelector('.popover-menu__item-check')?.classList.toggle('popover-menu__item-check--hidden', !on);
+  }
 }
 
 function renderToolbar() {
@@ -2308,6 +2357,15 @@ function renderToolbar() {
   bar.querySelector('#cal-today').addEventListener('click', goToday);
   bar.querySelector('#cal-search').addEventListener('click', openCalendarSearch);
   bar.querySelector('#cal-filters').addEventListener('click', openCalendarFilters);
+  installPopoverMenus(bar);
+  bar.querySelector('#cal-views-menu-panel')?.addEventListener('click', (e) => {
+    const item = e.target.closest?.('[data-cal-view]');
+    if (!item) return;
+    // Die Mechanik schliesst das Menue selbst; der Fokus geht an den
+    // Ausloeser zurueck, nicht in einen versteckten Eintrag.
+    bar.querySelector('#cal-views-menu')?.focus();
+    if (item.dataset.calView !== state.view) viewTabs?.setActive(item.dataset.calView);
+  });
 
   // EIN wireScrollFade auf diesem Element, nicht zwei.
   //
@@ -2370,6 +2428,7 @@ function updateLabel() {
   syncPeriodArrows();
   syncTodayButton();
   syncViewPanel();
+  syncViewMenu();
 }
 
 /**

@@ -174,3 +174,54 @@ test('M2: ein Tipp auf einen Punkt blaettert zu dessen Spalte und markiert ihn',
     globalThis.window = vorher;
   }
 });
+
+// --------------------------------------------------------------------------
+// M5 Kalender mobil
+// --------------------------------------------------------------------------
+
+const { __test: calendar } = await import('../public/pages/calendar.js');
+const calendarCss = css('calendar.css');
+
+test('M5: der Kopf traegt ein Ansichtsmenue mit genau einer gewaehlten Ansicht', () => {
+  const vorher = calendar.state.view;
+  calendar.state.view = 'week';
+  try {
+    const html = calendar.toolbarHtml();
+    assert.match(html, /id="cal-views-menu"[^>]*popovertarget="cal-views-menu-panel"[^>]*aria-haspopup="menu"/,
+      'der Ausloeser oeffnet das Menue und kuendigt es an');
+    const items = [...html.matchAll(/role="menuitemradio" aria-checked="(true|false)"[\s\S]*?data-cal-view="(\w+)"\s+aria-keyshortcuts="(\w)"/g)];
+    assert.deepEqual(items.map((m) => m[2]), ['month', 'week', 'day', 'agenda'], 'alle vier Ansichten, Reihenfolge des Segments');
+    assert.deepEqual(items.filter((m) => m[1] === 'true').map((m) => m[2]), ['week'], 'genau die aktuelle ist gewaehlt');
+    assert.deepEqual(items.map((m) => m[3]), ['m', 'w', 'd', 'a'], 'die Eintraege sagen ihre Kuerzel an wie die Tabs');
+    assert.match(html, /role="tablist"/, 'das Segment bleibt fuer breite Schirme im Markup');
+  } finally {
+    calendar.state.view = vorher;
+  }
+});
+
+test('M5: mobil ersetzt das Menue das Segment, und der Kopf hat zwei Zeilen', () => {
+  assert.equal(declarations(calendarCss, '.cal-toolbar__views-menu').display, 'none', 'am Desktop waehlt das Segment');
+  assert.equal(declarations(calendarCss, '.cal-toolbar__views-menu', { media: MOBILE }).display, 'inline-flex');
+  assert.equal(declarations(calendarCss, '.cal-toolbar__views', { media: MOBILE }).display, 'none');
+  const bar = declarations(calendarCss, '.cal-toolbar > .cal-toolbar__bar', { media: MOBILE });
+  assert.equal(bar.display, 'contents', 'die Bar-Zeile loest sich auf - ihre Werkzeuge ruecken in die Titelzeile');
+  const center = declarations(calendarCss, '.page-toolbar.cal-toolbar.page-toolbar--wrap > .page-toolbar__center', { media: MOBILE });
+  assert.equal(center['flex-basis'], '100%', 'der Zeitraum behaelt die zweite Zeile fuer sich (Label nicht angeschnitten)');
+  assert.equal(declarations(calendarCss, '.cal-toolbar__views-menu', { media: MOBILE }).order, '1');
+  assert.equal(center.order, '2', 'Werkzeuge vor dem Zeitraum: sie stehen in Zeile 1');
+});
+
+test('M5: Termintitel der Woche brechen nach Blockhoehe um statt nowrap', () => {
+  const title = declarations(calendarCss, '.week-event__title');
+  assert.notEqual(title['white-space'], 'nowrap', 'nowrap schnitt jeden Titel nach einem Wort ab');
+  const span = declarations(calendarCss, '.week-event__title > span:last-child');
+  assert.match(span['-webkit-line-clamp'] ?? '', /var\(--ev-title-lines, 1\)/, 'ohne Hoehe bleibt es eine Zeile');
+  const stufen = [];
+  for (const rule of eachRule(calendarCss)) {
+    const at = rule.at.find((a) => a.startsWith('@container ev-block'));
+    if (!at || rule.selector.trim() !== '.week-event__title') continue;
+    const lines = /--ev-title-lines:\s*(\d)/.exec(rule.body);
+    if (lines) stufen.push(Number(lines[1]));
+  }
+  assert.deepEqual(stufen, [2, 3, 4], 'zwei bis vier Zeilen, gestaffelt nach der Hoehe des Blocks');
+});

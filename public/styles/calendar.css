@@ -253,6 +253,64 @@
   margin-inline-start: auto;
 }
 
+/* Das Ansichtsmenue gibt es nur mobil (R9 M5) - darueber waehlt das Segment. */
+.cal-toolbar__views-menu {
+  display: none;
+}
+
+/* MOBIL ZWEI KOPFZEILEN STATT DREI (R9 M5, Re-Critique 2026-09-27 A8 P2-3).
+ *
+ * Gemessen 390x844 vorher: Titel 41px, Zeitraum 48px, Ansichts-Segment mit
+ * Filter und Suche 52px - 166px Kopf, der Kalender stand als einziger
+ * Nicht-Ausnahme-Kopf ueber 122px. Wie in Apples Kalender wandert die
+ * Ansichtswahl ins Menue „..." (calendar.js, viewMenuHtml); das Segment
+ * verschwindet, und die Bar-Zeile loest sich auf (`display: contents`): ihre
+ * Werkzeuge - Filter, Suche, Menue - ruecken als Gruppe an das Ende der
+ * Titelzeile, der Zeitraum behaelt die zweite Zeile fuer sich.
+ *
+ * WARUM DER FILTER OBEN STEHT UND NICHT NEBEN DEM STEPPER: gemessen haette
+ * Zeile 2 mit Filter dem Zeitraumlabel 134px gelassen, das mobile Wochenlabel
+ * („26.09. - 28.09.2026") braucht 155px und waere abgeschnitten worden. Oben
+ * steht der Filter bei Suche und Menue - dieselbe Werkzeuggruppe wie am
+ * Desktop am Ende der Bar-Zeile. */
+@media (max-width: 639px) {
+  .cal-toolbar__views {
+    display: none;
+  }
+
+  .cal-toolbar > .cal-toolbar__bar,
+  .cal-toolbar__tools {
+    display: contents;
+  }
+
+  .cal-toolbar__views-menu {
+    display: inline-flex;
+  }
+
+  .page-toolbar.cal-toolbar:not(.page-toolbar--in-group) > .page-toolbar__title {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .cal-toolbar__filter-btn,
+  .cal-toolbar__search-btn,
+  .cal-toolbar__views-menu {
+    order: 1;
+    flex-shrink: 0;
+  }
+
+  /* Eingeklappt ist der Titel nur noch fuer Vorlesehilfen da - die Werkzeuge
+   * rutschen dann an das Zeilenende statt an den Anfang. */
+  .cal-toolbar__filter-btn {
+    margin-inline-start: auto;
+  }
+
+  .page-toolbar.cal-toolbar.page-toolbar--wrap > .page-toolbar__center {
+    order: 2;
+    flex-basis: 100%;
+  }
+}
+
 /* DIE TITELZEILE KLAPPT GANZ EIN - die Regel steht seit der Budget-Critique
  * 2026-09-25 geteilt in layout.css (`.page-toolbar--period`), zusammen mit dem
  * halben Zeilenabstand mobil. Hier stand sie vorher als Kalender-Sonderfall mit
@@ -798,18 +856,48 @@
 
 .week-event__title {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-1);
   /* Titel halbfett, Zeitzeile normal - dieselbe Rangfolge wie am Tagesblock. */
   font-weight: var(--font-weight-semibold);
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
   /* Der Titel bleibt an der SICHTBAREN Oberkante seines Blocks, nicht an
      dessen tatsaechlicher - siehe die Begruendung an `.week-event`. Apple
      Kalender und Fantastical halten es genauso. */
   position: sticky;
   top: 0;
+}
+
+/* DER TITEL BRICHT UM, SOLANGE DER BLOCK HOEHE HAT (R9 M5, A2 P2).
+ *
+ * Hier stand `white-space: nowrap`: ein 151x362px-Block zeigte
+ * „Ausflug ins Naturkun…", mobil (110x82px) „Zahnarzt - …". Apple Kalender und
+ * Fantastical brechen um. Wie viele Zeilen es sind, fragt dieselbe
+ * Container-Abfrage wie die Zeitzeile - die HOEHE des Blocks, nicht die Dauer
+ * des Termins: die Stunde ist in der Woche 56px, im Tag 40px hoch. Unter 30
+ * Minuten (Block unter 2.125rem, die Zeitzeile ist dort schon weg) bleibt eine
+ * Zeile mit Ellipse; darueber zwei bis vier, je nachdem, was neben der
+ * Zeitzeile Platz hat (je Zeile 1lh, Zeitzeile 1lh, Polster). */
+.week-event__title > span:last-child {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--ev-title-lines, 1);
+  line-clamp: var(--ev-title-lines, 1);
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+@container ev-block (height >= 3.25rem) {
+  .week-event__title { --ev-title-lines: 2; }
+}
+
+@container ev-block (height >= 4.25rem) {
+  .week-event__title { --ev-title-lines: 3; }
+}
+
+@container ev-block (height >= 5.25rem) {
+  .week-event__title { --ev-title-lines: 4; }
 }
 
 /* Die Zeitzeile tritt ueber das GEWICHT zurueck wie am Tagesblock, nicht ueber
