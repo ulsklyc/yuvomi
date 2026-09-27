@@ -4298,6 +4298,12 @@ function schalterKnoten(attrs = {}) {
 
 test('R8 H14: Kontakt-Auswahl ist ein Knopf mit Auswahlkreis und Objektnamen, keine native Checkbox', async () => {
   const vorher = { mode: contacts.state.selectMode, sel: new Set(contacts.state.selected) };
+  // Der Tipp malt die Bulk-Pille (utils/bulk-pill.js liest `document`). Ohne
+  // eigenes document hing der Test davon ab, ob ein frueherer Test eines
+  // liegen liess: im vollen Lauf gruen, einzeln und in der CI rot. Ohne
+  // Shell-Schicht (getElementById -> null) malt die Pille nichts.
+  const echtesDocument = globalThis.document;
+  globalThis.document = { getElementById: () => null };
   try {
     contacts.state.selectMode = true;
     contacts.state.selected = new Set([7]);
@@ -4330,6 +4336,7 @@ test('R8 H14: Kontakt-Auswahl ist ein Knopf mit Auswahlkreis und Objektnamen, ke
   } finally {
     contacts.state.selectMode = vorher.mode;
     contacts.state.selected = vorher.sel;
+    globalThis.document = echtesDocument;
   }
 });
 
