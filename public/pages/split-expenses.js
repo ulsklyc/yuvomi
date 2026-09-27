@@ -166,7 +166,7 @@ export async function render(container, { user, embedded = false, onAddableChang
       <div class="split-layout">
         <aside class="split-groups-panel">
           <div class="split-panel-head">
-            <div class="split-panel-title">${t('splitExpenses.groups')}</div>
+            <div class="split-panel-title">${t('splitExpenses.groups')}<span class="list-group__count split-panel-count" id="split-group-count"></span></div>
             ${readOnly() ? '' : `<button class="btn btn--icon" id="split-add-group" aria-label="${t('splitExpenses.addGroup')}" ${isSplitGuest() ? 'hidden' : ''}>
               <i data-lucide="plus" aria-hidden="true"></i>
             </button>`}
@@ -474,6 +474,10 @@ function renderSummary() {
   // (Critique 2026-07-30, P0).
   // Rolle `total`: die Richtung steht im Label („Du bekommst" / „Du schuldest"),
   // nicht im Vorzeichen - deshalb der Ton explizit statt aus der Zahl.
+  // Die Zahl der Gruppen steht auch am Kopf der Liste, die sie zaehlt - mobil
+  // ist sie dort die einzige (split-expenses.css, R10 L11).
+  const count = _container.querySelector('#split-group-count');
+  if (count) count.textContent = String(state.groups.length);
   setHtml(summary, `
     <div class="metric-card metric-card--positive">
       <div class="metric-card__label">${t('splitExpenses.youAreOwed')}</div>
@@ -483,7 +487,7 @@ function renderSummary() {
       <div class="metric-card__label">${t('splitExpenses.youOwe')}</div>
       <div class="metric-card__value">${owing.length ? owing.map((r) => money(r.amount, r.currency)).join(' · ') : money(0, state.meta.default_currency)}</div>
     </div>
-    <div class="metric-card">
+    <div class="metric-card split-summary-groups">
       <div class="metric-card__label">${isArchivedView() ? t('splitExpenses.statusArchived') : t('splitExpenses.activeGroups')}</div>
       <div class="metric-card__value">${state.groups.length}</div>
     </div>
@@ -791,6 +795,29 @@ function restoredDetail(item) {
 }
 
 /**
+ * WELCHE AUSGABE (Re-Critique 2026-09-27, A5 P2-8 / R10 L11). Der Verlauf las
+ * fuenfmal „Ausgabe erstellt - Alex Johnson - 23.09.2026", ohne zu sagen,
+ * welche - daneben nannte „Letzte Ausgaben" das Objekt. Den Titel legt der
+ * Server beim Schreiben in die Metadaten (expense_*, recurring_created); den
+ * Betrag kennt die geladene Ausgabenliste der Gruppe. Eine geloeschte Ausgabe
+ * steht dort nicht mehr - dann bleibt der Titel allein, ein Betrag waere
+ * geraten. Ein Kommentar traegt keinen Titel; er nennt die Ausgabe, an der er
+ * haengt, sofern sie geladen ist.
+ */
+const EXPENSE_ACTIVITY = new Set(['expense_created', 'expense_edited', 'expense_deleted', 'comment_added', 'recurring_created']);
+
+function expenseDetail(item) {
+  if (!EXPENSE_ACTIVITY.has(item.type)) return '';
+  const expense = item.entity_type === 'expense' && item.entity_id != null
+    ? state.expenses.find((e) => e.id === Number(item.entity_id))
+    : null;
+  const title = item.metadata?.title || expense?.title;
+  if (!title) return '';
+  const sum = expense ? ` · ${money(expense.amount, expense.currency)}` : '';
+  return `<span class="split-activity-payment">${esc(`${title}${sum}`)}</span>`;
+}
+
+/**
  * Ein Eintrag des Verlaufs. Nachgeladene Seiten laufen durch dieselbe Funktion
  * und dieselbe Klick-Delegation am Verlauf - ein Storno-Knopf auf Seite drei
  * ist derselbe Knopf wie auf Seite eins.
@@ -804,7 +831,7 @@ function activityItemHtml(item, actionable) {
   const params = settlement ? paymentParams(settlement) : null;
   const detail = settlement
     ? `<span class="split-activity-payment">${esc(t('splitExpenses.paymentDetail', params))}</span>`
-    : restoredDetail(item);
+    : restoredDetail(item) || expenseDetail(item);
   const reversed = settlement?.reversed_at
     ? `<span class="split-activity-reversed">${esc(t('splitExpenses.paymentReversed'))}</span>`
     : '';
@@ -1738,4 +1765,6 @@ export const __test = {
   renderActivity, onActivityClick, loadGroupData, loadMoreActivity, groupFromQuery,
   renderMainForTest(container) { _container = container; renderMain(); },
   renderGroupsForTest(container) { _container = container; renderGroups(); },
+  // R10 L11: die Gruppenzahl steht am Kopf der Liste (test-split-activity-ui.js).
+  renderSummaryForTest(container) { _container = container; renderSummary(); },
 };

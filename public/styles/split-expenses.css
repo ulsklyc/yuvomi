@@ -125,6 +125,12 @@
   font-weight: 800;
 }
 
+/* Der Zaehler der Gruppenliste in der geteilten Zaehler-Tinte
+ * (`.list-group__count`, list-row.css), mit Abstand zum Titel. */
+.split-panel-title .list-group__count {
+  margin-inline-start: var(--space-2);
+}
+
 /* Das Suchfeld ist das geteilte (renderPageSearch, page-search.css). Hier
  * stand ein eigenes mit sichtbarem Label ueber dem Feld, Kante, 12px-Ecke und
  * eigenem Fokusring - eine der fuenf Suchfeld-Varianten der Critique
@@ -525,7 +531,16 @@ button.split-expense:hover {
 
 @container split-page (max-width: 639px) {
   /* Die Kennzahl-Zeile bricht über .metric-grid (budget.css) um; die frühere
-     2+1-Reihe ließ die dritte Karte auf halber Breite mit einem Loch daneben. */
+     2+1-Reihe ließ die dritte Karte auf halber Breite mit einem Loch daneben.
+
+     KEINE VOLLE ZEILE FUER EINE ZIFFER (Re-Critique 2026-09-27, A5 / R10
+     L11): die Waise der Umbruchregel war die Karte „Aktive Gruppen" - 59px
+     Hoehe ueber die ganze Breite fuer „2" (390x844, y225-284). Die Zahl steht
+     jetzt am Kopf der Gruppenliste, die sie zaehlt (`.split-panel-count`);
+     mobil bleiben die beiden Betraege, nebeneinander in einer Zeile. */
+  .split-summary-groups {
+    display: none;
+  }
 
   .split-group-header,
   .split-topbar {

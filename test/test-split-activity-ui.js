@@ -359,3 +359,62 @@ test('Buchung wiederhergestellt: nennt Titel und Betrag, maskiert', () => {
     Object.assign(split.state, vorher);
   }
 });
+
+// ---------------------------------------------------------------------------
+// R10 L11 (Re-Critique 2026-09-27, A5 P2-8 und distill): der Verlauf nennt
+// Objekt und Betrag, und die Gruppenzahl belegt mobil keine volle Zeile.
+// ---------------------------------------------------------------------------
+
+test('der Verlauf nennt die Ausgabe und ihren Betrag - nicht fuenfmal „Ausgabe erstellt"', () => {
+  const vorher = { ...split.state };
+  Object.assign(split.state, {
+    activeGroupId: 9, groupStatus: 'active', user: null,
+    expenses: [{ id: 5, title: 'Wocheneinkauf', amount: '142.30', currency: 'EUR' }],
+    activity: [
+      eintrag(5, { metadata: { title: 'Wocheneinkauf' } }),
+      eintrag(6, { type: 'expense_deleted', entity_id: 77, metadata: { title: 'Kino' } }),
+      eintrag(7, { type: 'comment_added', entity_id: 5 }),
+      eintrag(8, { type: 'group_updated', entity_type: 'group', entity_id: 9 }),
+    ],
+    activityCursor: null,
+  });
+  try {
+    const html = withAccess({ budget: 'write' }, () => split.renderActivity());
+    const items = html.split('split-activity-item').slice(1);
+    assert.equal(items.length, 4);
+    assert.match(items[0], /<span class="split-activity-payment">Wocheneinkauf · [^<]*142[.,]30[^<]*<\/span>/,
+      'erstellt: Titel aus den Metadaten, Betrag aus der geladenen Ausgabe');
+    assert.match(items[1], /<span class="split-activity-payment">Kino<\/span>/,
+      'geloescht: der Titel allein - die Ausgabe ist nicht mehr geladen, ein Betrag waere geraten');
+    assert.match(items[2], /<span class="split-activity-payment">Wocheneinkauf · /,
+      'Kommentar: nennt die Ausgabe, an der er haengt');
+    assert.doesNotMatch(items[3], /split-activity-payment/, 'eine Gruppenaenderung hat kein Ausgabenobjekt');
+  } finally {
+    Object.assign(split.state, vorher);
+  }
+});
+
+test('die Gruppenzahl steht am Kopf der Liste, mobil entfaellt ihre Kennzahlkarte', async () => {
+  const summary = { html: '', replaceChildren() { this.html = ''; }, insertAdjacentHTML(_p, h) { this.html += h; } };
+  const zaehler = { textContent: '' };
+  const vorher = { ...split.state };
+  Object.assign(split.state, {
+    groupStatus: 'active', groups: [{ id: 1 }, { id: 2 }],
+    dashboard: { total_owed: [], total_owing: [] }, meta: { currencies: ['EUR'], default_currency: 'EUR' },
+  });
+  try {
+    split.renderSummaryForTest({ querySelector: (sel) => (sel === '#split-summary' ? summary : sel === '#split-group-count' ? zaehler : null) });
+  } finally {
+    Object.assign(split.state, vorher);
+  }
+  assert.equal(zaehler.textContent, '2', 'der Kopf „Gruppen" traegt die Zahl');
+  assert.match(summary.html, /class="metric-card split-summary-groups"/, 'die Karte ist benennbar, damit mobil nur sie entfaellt');
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/split-expenses.css', import.meta.url), 'utf8');
+  const regel = [...eachRule(css)].find((r) => r.selector.trim() === '.split-summary-groups');
+  assert.ok(regel?.at.includes('@container split-page (max-width: 639px)'), 'nur schmal - am Desktop bleibt die Dreierreihe');
+  assert.match(regel.body, /display:\s*none/, 'keine volle Zeile fuer eine Ziffer (59px fuer „2", 390x844)');
+  const src = readFileSync(new URL('../public/pages/split-expenses.js', import.meta.url), 'utf8');
+  assert.match(src, /class="split-panel-title">\$\{t\('splitExpenses\.groups'\)\}<span class="list-group__count split-panel-count" id="split-group-count">/);
+});

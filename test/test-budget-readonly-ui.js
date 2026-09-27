@@ -1567,4 +1567,40 @@ test('der Darlehensbericht haengt nicht an `.budget-page` - er ist ein Modal (#1
   assert.ok(breit.some((r) => /grid-column:\s*1\s*\/\s*-1/.test(r.body)));
 });
 
+// -------------------------------------------------------------------------
+// R10 L11 (Re-Critique 2026-09-27, A5 distill): EIN Knopf fuer „Budget festlegen"
+// -------------------------------------------------------------------------
+
+test('Plan: kein zweites „+ Budget festlegen" im Koerper - der Budget-FAB ruft den Dialog direkt', () => {
+  assert.doesNotMatch(PLANS_CODE, /budget-plan-add/, 'der Koerper traegt keinen eigenen Anlegen-Knopf mehr');
+  assert.match(BUDGET_CODE, /case 'plan':\s*openAddPlan\(\); return;/,
+    'der FAB-Zweig des Plans ruft openAddPlan() statt einen Knopf im Koerper zu klicken');
+  assert.match(BUDGET_CODE, /import \{ renderPlans, openAddPlan \} from '\/pages\/budget-plans\.js';/);
+  const geoeffnet = [];
+  globalThis.__openModal = (opts) => geoeffnet.push(opts);
+  const { view } = plans;
+  const vorher = { data: view.data, ctx: view.ctx };
+  try {
+    view.data = null;
+    view.ctx = null;
+    withAccess({ budget: 'write' }, () => plans.openAddPlan());
+    assert.equal(geoeffnet.length, 0, 'ohne geladenen Plan gibt es nichts, wogegen die Kategorien zu rechnen waeren');
+    view.data = { plans: [{ category: 'food' }] };
+    view.ctx = {
+      expenseCategories: [{ key: 'food' }, { key: 'home' }],
+      esc: (v) => String(v), categoryLabel: (c) => `L:${c.key}`,
+    };
+    withAccess({ budget: 'read' }, () => plans.openAddPlan());
+    assert.equal(geoeffnet.length, 0, 'bei budget: read oeffnet nichts');
+    withAccess({ budget: 'write' }, () => plans.openAddPlan());
+    assert.equal(geoeffnet.length, 1, 'der FAB oeffnet den Dialog');
+    assert.match(geoeffnet[0].content, /value="home"/, 'angeboten wird die Kategorie ohne Plan');
+    assert.doesNotMatch(geoeffnet[0].content, /value="food"/, 'nicht die, die schon einen hat');
+  } finally {
+    delete globalThis.__openModal;
+    view.data = vorher.data;
+    view.ctx = vorher.ctx;
+  }
+});
+
 test.after(() => miniDomAbraeumen());

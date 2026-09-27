@@ -96,11 +96,12 @@ function renderBody(body) {
       </p>`}
     ${renderSavingsCard(d.savings)}
     <div class="budget-plan__section">
+      <!-- KEIN ZWEITES „+ BUDGET FESTLEGEN" IM KOERPER (Re-Critique
+           2026-09-27, A5 / R10 L11): der Budget-FAB nennt auf diesem Reiter
+           genau diese Handlung (TAB_CAPS.plan in budget.js) und ruft
+           openAddPlan() direkt - ein Knopf fuer eine Handlung. -->
       <div class="budget-plan__section-head">
         <h2 class="budget-plan__section-title u-section-title">${t('budget.planCategoryBudgets')}</h2>
-        ${readOnly() ? '' : `<button class="btn btn--secondary btn--sm" id="budget-plan-add">
-          <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>${t('budget.planAddBudget')}
-        </button>`}
       </div>
       <div id="budget-plan-rows" class="row-carrier">${renderRows(d.plans)}</div>
     </div>
@@ -216,7 +217,6 @@ function wire(body) {
   // mit. Das Markup oben traegt bei `read` ohnehin keinen Haken mehr; dies ist
   // der Riegel fuer einen Knoten aus einem aelteren Render.
   if (readOnly()) return;
-  body.querySelector('#budget-plan-add')?.addEventListener('click', openAddPlan);
   body.querySelector('#budget-plan-savings')?.addEventListener('click', () =>
     openPlanEditor({ category: '__savings__', savings: true }));
   body.querySelectorAll('.budget-plan-row').forEach((row) =>
@@ -224,8 +224,12 @@ function wire(body) {
 }
 
 // Kategorie-Auswahl für einen neuen Plan (nur Kategorien ohne bestehenden Plan).
-function openAddPlan() {
+// Der Weg dorthin ist der Budget-FAB (budget.js addHandler, Reiter „plan").
+// Ohne geladenen Plan (Laden laeuft oder schlug fehl) gibt es nichts, wogegen
+// die freien Kategorien zu rechnen waeren - dann tut der Knopf nichts.
+export function openAddPlan() {
   if (readOnly()) return;
+  if (!view.data || !view.ctx) return;
   const planned = new Set((view.data?.plans || []).map((p) => p.category));
   const options = (view.ctx.expenseCategories || []).filter((c) => !planned.has(c.key));
   if (!options.length) {
@@ -386,4 +390,4 @@ async function deletePlan(category) {
  * Messflaeche fuer die Nur-lesen-Regel (#1265 P7): die drei Renderer sind reine
  * Funktionen ueber `view`, das der Test mit `ctx` fuellt.
  */
-export const __test = { readOnly, renderSavingsCard, renderRows, view };
+export const __test = { readOnly, renderSavingsCard, renderRows, view, openAddPlan };

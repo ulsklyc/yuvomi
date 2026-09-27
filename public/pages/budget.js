@@ -18,7 +18,7 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 import { render as renderSplitExpenses, prefillSplitExpense, canAddSplitExpense, openNewSplitExpense } from '/pages/split-expenses.js';
 import { openSubscriptionModal, render as renderSubscriptions } from '/pages/subscriptions.js';
 import { renderStats } from '/pages/budget-stats.js';
-import { renderPlans } from '/pages/budget-plans.js';
+import { renderPlans, openAddPlan } from '/pages/budget-plans.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays,
          monthPeriodKeys, defaultDateInPeriod,
         todayKey} from '/utils/date.js';
@@ -810,13 +810,14 @@ function wireNav() {
   // Neu-Aktion je Tab - spiegelt TAB_CAPS.add. Tabs ohne Neu-Aktion (Berichte,
   // Aufteilung im Archiv) blenden den FAB aus, der Handler bleibt dort folgenlos.
   // Den FAB blendet CSS aus (html[data-module-readonly]); der Handler
-  // bleibt trotzdem gesperrt - ausgeblendet ist nicht unerreichbar, und der
-  // Plan-Zweig klickt einen Knopf per `.click()`.
+  // bleibt trotzdem gesperrt - ausgeblendet ist nicht unerreichbar. Der
+  // Plan-Zweig ruft openAddPlan() direkt; der Koerper des Plans traegt seit
+  // R10 (L11) keinen eigenen Anlegen-Knopf mehr.
   const addHandler = () => {
     if (readOnly()) return;
     switch (state.activeTab) {
       case 'subscriptions':  openSubscriptionModal(); return;
-      case 'plan':           _container.querySelector('#budget-plan-add')?.click(); return;
+      case 'plan':           openAddPlan(); return;
       case 'accounts':       openAccountModal(); return;
       case 'loans':          openLoanModal(); return;
       case 'split-expenses': openNewSplitExpense(); return;
