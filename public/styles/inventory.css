@@ -649,10 +649,10 @@
  * eine gedeckelte Flex-Spalte umzubauen (das aenderte mobil Kopf-Kollaps und
  * Filterzeile), klebt die Detailspalte unter dem Kopf und scrollt fuer sich.
  * Den Versatz setzt inventory.js (`--inventory-head-block`, gemessene
- * Kopfhoehe). Schwelle = `--layout-split-threshold` (75rem), `@container`
+ * Kopfhoehe). Schwelle = `--layout-split-threshold` (65rem), `@container`
  * kann keine Variable lesen.
  * -------------------------------------------------------- */
-@container module-surface (min-width: 75rem) {
+@container module-surface (min-width: 65rem) {
   .inventory-page .split-view {
     align-items: start;
   }

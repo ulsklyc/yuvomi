@@ -1,7 +1,7 @@
 /**
  * Modul: Liste + Detail (Master/Detail im Mac-Stil)
  * Zweck: Der geteilte Baustein des Breitenregimes „Liste + Detail"
- *        (DESIGN.md, Breitenregel). Ab einer Modulflaeche von 75rem steht links
+ *        (DESIGN.md, Breitenregel). Ab einer Modulflaeche von 65rem steht links
  *        die Liste, rechts das Detail der AUSGEWAEHLTEN Zeile - wie in Mail,
  *        Erinnerungen und Kontakte. Darunter bleibt alles, wie es ist: die
  *        Zeile oeffnet ihr Modal, Sheet oder ihren Aufklapper.
@@ -129,9 +129,9 @@ function addressRest(param) {
   return `${params.toString()}${location.hash}`;
 }
 
-function writeHistory(mode, param, id) {
+function writeHistory(mode, hrefFor, id) {
   if (mode === 'none') return;
-  const path = urlWith(param, id);
+  const path = hrefFor(id);
   if (path === `${location.pathname}${location.search}${location.hash}`) return;
   // `path` im State: der Router liest ihn bei popstate (router.js).
   if (mode === 'push') history.pushState({ path }, '', path);
@@ -206,13 +206,32 @@ function inertHandle() {
  *        stehen lassen - die Seite hat den Link schon selbst eingeloest
  *        (Aufgaben: ein Blatt fuer eine Aufgabe, die in der Liste keine Zeile
  *        hat). Kopieren und Neuladen tragen den Link dann weiter.
+ * @param {boolean|((ids: string[]) => (string|null))} [opts.preselect=true]
+ *        ERSTE ZEILE VORWAEHLEN, wie Mail und Kontakte am Mac: ein Split, der
+ *        beim Einstieg rechts nur „Waehle ..." zeigt, verschenkt die Haelfte
+ *        der Flaeche (Re-Critique 27.09., A8). In der Spalte und solange die
+ *        Adresse keine Auswahl nennt, waehlt der Baustein die erste sichtbare
+ *        Zeile - per `replaceState`, ohne Fokus zu bewegen. Eine Funktion
+ *        bekommt die sichtbaren IDs und nennt die eigene Wahl (`null` = keine).
+ *        Versucht beim Aufbau, bei `refresh()` (Liste kam spaeter) und beim
+ *        Wechsel in die Spalte - aber nur, solange in diesem Aufbau noch nie
+ *        etwas gewaehlt war: wer abwaehlt (Esc), bekommt den Leerzustand.
+ *        Unter der Schwelle nie. `false` schaltet es ab.
+ * @param {{read: (loc: Location) => (string|null|undefined), href: (id: string|null) => string}} [opts.address]
+ *        Eine Auswahl, die als PFAD adressiert ist (`/health/<bereich>`,
+ *        `/settings/<gruppe>/<blatt>`) statt als `?param=`. `read` nennt die
+ *        Auswahl der Adresse (`null` = diese Seite ohne Auswahl, `undefined` =
+ *        die Adresse gehoert nicht zu dieser Seite - Zurueck/Vor dorthin
+ *        zeichnet der Router); `href` baut die Adresse einer Auswahl. Mit
+ *        `address` gilt `param` nicht.
  * @param {AbortSignal} [opts.signal]     Router-Signal; Abbruch baut ab.
  * @returns {{open: Function, select: Function, clear: Function, selectedId: Function,
  *   isSplit: Function, refresh: Function, destroy: Function}}
  */
 export function mountMasterDetail({
   root, list, param = 'open', renderDetail, openNarrow, onEnter, onModeChange,
-  narrow = 'sheet', deepLinkNarrow = false, claimInitial = true, onNarrowSync, signal,
+  narrow = 'sheet', deepLinkNarrow = false, claimInitial = true, onNarrowSync,
+  preselect = true, address = null, signal,
 } = {}) {
   if (!root) throw new TypeError('mountMasterDetail: root fehlt');
   const listEl = list ?? root.querySelector('.split-view__list');
@@ -240,6 +259,18 @@ export function mountMasterDetail({
   // anderes, gehoert die Geste dem Router.
   const rest = addressRest(param);
   const teardown = new AbortController();
+  // Die Adresse der Auswahl: `?param=` (Standard) oder ein Pfad des Moduls.
+  // `readAddress()`: string = diese Auswahl, null = keine, undefined = die
+  // Adresse gehoert nicht (mehr) zu dieser Seite.
+  const readAddress = address
+    ? () => address.read(location)
+    : () => {
+      if (location.pathname !== pathname || addressRest(param) !== rest) return undefined;
+      return new URLSearchParams(location.search).get(param);
+    };
+  const hrefFor = address ? (id) => address.href(id ?? null) : (id) => urlWith(param, id);
+  // Vorwahl scharf, bis in diesem Aufbau zum ersten Mal etwas gewaehlt war.
+  let autoPick = preselect !== false;
 
   const isSplit = () => root.isConnected && getComputedStyle(detailEl).display !== 'none';
 
@@ -315,7 +346,7 @@ export function mountMasterDetail({
       selected = null;
       markSelection();
       showEmpty();
-      writeHistory('replace', param, null);
+      writeHistory('replace', hrefFor, null);
       return;
     }
     if (window.lucide) window.lucide.createIcons({ el: bodyEl });
@@ -347,8 +378,9 @@ export function mountMasterDetail({
     if (id == null || id === '') { clear({ history: mode }); return; }
     const same = selected != null && String(selected) === String(id);
     selected = String(id);
+    autoPick = false;
     markSelection();
-    writeHistory(same ? 'none' : mode, param, selected);
+    writeHistory(same ? 'none' : mode, hrefFor, selected);
     if (!same || bodyEl.hidden) paint(selected);
     if (focus === 'row') focusTarget(rowFor(selected))?.focus();
     else if (focus === 'detail') detailEl.focus();
@@ -359,7 +391,7 @@ export function mountMasterDetail({
     renderSeq += 1;
     markSelection();
     showEmpty();
-    writeHistory(mode, param, null);
+    writeHistory(mode, hrefFor, null);
   }
 
   /** Ein laufendes Oeffnen unter der Schwelle ist ueberholt. */
@@ -393,9 +425,26 @@ export function mountMasterDetail({
     // der Schwelle keine Adresse, dort ist `?open=` nur der Einstieg.
     if (narrow === 'sheet' && selected != null && String(selected) !== String(id)) {
       selected = String(id);
-      writeHistory('replace', param, selected);
+      writeHistory('replace', hrefFor, selected);
     }
     callNarrow(id, trigger);
+  }
+
+  /**
+   * Vorwahl (opts.preselect): in der Spalte, ohne Auswahl in der Adresse, und
+   * nur, solange in diesem Aufbau noch nie etwas gewaehlt war. `replace`: der
+   * Einstieg ist kein Schritt fuer die Zurueck-Taste.
+   */
+  function tryPreselect() {
+    if (!autoPick || selected != null || !isSplit()) return;
+    // Nennt die Adresse eine Auswahl (auch eine, die die Seite selbst
+    // einloest - Aufgaben mit `claimInitial: false`), gilt die.
+    if (readAddress() != null) return;
+    const ids = rows().map((row) => row.dataset.mdId).filter((id) => id != null && id !== '');
+    if (!ids.length) return;
+    const id = typeof preselect === 'function' ? preselect(ids) : ids[0];
+    if (id == null || id === '') return;
+    select(id, { history: 'replace' });
   }
 
   /** Nach einem Neuaufbau der Liste: Markierung neu setzen, Verschwundenes raeumen. */
@@ -406,6 +455,7 @@ export function mountMasterDetail({
     }
     markSelection();
     if (repaint && selected != null && isSplit()) paint(selected);
+    tryPreselect();
   }
 
   function onKeydown(event) {
@@ -479,6 +529,8 @@ export function mountMasterDetail({
       if (split && selected != null) {
         markSelection();
         paint(selected);
+      } else if (split) {
+        tryPreselect();
       }
     })
     : null;
@@ -496,7 +548,7 @@ export function mountMasterDetail({
   /** Zurueck/Vor innerhalb derselben Seite: Auswahl aus der Adresse. */
   function syncFromUrl() {
     abortNarrow();
-    const id = new URLSearchParams(location.search).get(param);
+    const id = readAddress();
     if (!id) {
       if (selected != null) clear({ history: 'none' });
       return;
@@ -523,14 +575,14 @@ export function mountMasterDetail({
     _pathname: pathname,
     _root: root,
     _syncFromUrl: syncFromUrl,
-    _ownsAddress: () => addressRest(param) === rest,
+    _ownsAddress: () => readAddress() !== undefined,
   };
   active?.destroy();
   active = handle;
 
   // Deep-Link: `?open=` beim Aufbau einloesen.
   lastSplit = isSplit();
-  const initial = claimInitial ? new URLSearchParams(location.search).get(param) : null;
+  const initial = claimInitial ? readAddress() : null;
   if (initial) {
     if (lastSplit) select(initial, { history: 'none' });
     else {
@@ -542,6 +594,7 @@ export function mountMasterDetail({
       if (deepLinkNarrow) callNarrow(selected);
     }
   }
+  tryPreselect();
 
   return handle;
 }
@@ -558,8 +611,8 @@ export function mountMasterDetail({
 export function handleMasterDetailPopstate() {
   if (!active) return false;
   if (!active._root.isConnected) { active.destroy(); return false; }
-  if (location.pathname !== active._pathname) return false;
-  // NUR die Auswahl. Aufgaben fuehren `?view=list|kanban|history` in der
+  // NUR die Auswahl - auf derselben Seite (Pfad, bei Pfad-Adressen fragt
+  // `address.read`). Aufgaben fuehren `?view=list|kanban|history` in der
   // Adresse; nimmt Zurueck die Ansicht mit, muss die Seite neu zeichnen - ein
   // verbrauchtes popstate liesse das Brett unter einer Listen-Adresse stehen.
   if (!active._ownsAddress()) return false;

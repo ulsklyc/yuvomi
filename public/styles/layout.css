@@ -2760,7 +2760,7 @@ html.fab-anim-done .page-fab {
  *
  *   Lesemass       `reading` / `form`      eine Spalte, 720px (--layout-reading)
  *   Liste + Detail `.app-page--list-detail` unter der Schwelle wie Lesemass,
- *                  (bzw. `split`)           ab 75rem Modulflaeche Liste links,
+ *                  (bzw. `split`)           ab 65rem Modulflaeche Liste links,
  *                                           Detail der Auswahl rechts
  *   Flaeche        `full` / `dashboard`    die volle Hauptspalte
  *
@@ -2810,7 +2810,7 @@ html.fab-anim-done .page-fab {
   display: none;
 }
 
-@container module-surface (min-width: 75rem) {
+@container module-surface (min-width: 65rem) {
   /* Ab der Schwelle ist die Seite eine zweispaltige Flaeche: ihr Kopf laeuft
    * ueber beide Spalten (wie die Werkzeugleiste in Mail), und alles, was sonst
    * am Lesemass endet, endet jetzt an seiner Spalte. `100%` statt `none` aus

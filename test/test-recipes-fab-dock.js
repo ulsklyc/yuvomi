@@ -216,6 +216,9 @@ class FakeElement {
   }
   scrollIntoView() {}
   getBoundingClientRect() { return { top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 }; }
+  // Der Baustein zaehlt nur SICHTBARE Zeilen (Pfeiltasten, Vorwahl) - wie im
+  // Browser: ein ausgeblendetes Element hat keine Boxen.
+  getClientRects() { return this.hidden ? [] : [{}]; }
 }
 
 class FakeDocument {
@@ -645,6 +648,24 @@ test('Liste + Detail, ab der Schwelle: ?open= waehlt aus, das Rezept steht recht
   assert.equal(history.length, 2, 'ein Klick ist ein Schritt fuer die Zurueck-Taste (pushState)');
   assert.equal(paneTitle(doc), 'Gericht 1');
   assert.equal(doc.querySelector('#recipe-detail-1').hidden, true, 'der Klick klappte auf, statt auszuwaehlen');
+});
+
+test('Liste + Detail, ab der Schwelle ohne ?open=: das erste Rezept steht gleich rechts, ohne History-Eintrag', async () => {
+  // L2 (R10): der Einstieg zeigt rechts einen Eintrag statt „Waehle ein
+  // Rezept" - wie Mail. Die Liste entsteht NACH dem Einhaengen; die Vorwahl
+  // kommt ueber refresh() aus renderRecipeList.
+  const doc = await renderFresh(DISHES, { split: true });
+  await settle();
+  assert.equal(paneTitle(doc), 'Gericht 1', 'die Spalte zeigt beim Einstieg kein Rezept');
+  assert.equal(location.search, '?open=1');
+  assert.equal(history.length, 1, 'die Vorwahl ersetzt, sie stapelt nicht');
+});
+
+test('Liste + Detail, unter der Schwelle: keine Vorwahl, kein Aufklapper', async () => {
+  const doc = await renderFresh(DISHES, { split: false });
+  await settle();
+  assert.equal(location.search, '', 'mobil waehlt der Einstieg nichts');
+  assert.equal(doc.querySelector('#recipe-detail-1').hidden, true);
 });
 
 test('Liste + Detail, ab der Schwelle: der Hauptknopf sagt nicht "eingeklappt", wenn er auswaehlt', async () => {
