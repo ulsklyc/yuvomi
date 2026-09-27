@@ -25,11 +25,8 @@
 
 /* Gerüst (Shell + Titel) jetzt geteilt via .page-toolbar in layout.css.
  * Damit wird der Documents-Kopf wie alle anderen sticky und nutzt --color-bg. */
-/* Layout only — control visual lives in page-search.css (shared). */
-.documents-toolbar__search {
-  flex: 1;
-  min-width: 180px;
-}
+/* .documents-toolbar__search traegt keine Breite (Re-Critique 2026-09-27, D4):
+ * Breite und Stelle der Kopfsuche kommen aus page-search.css. */
 
 .documents-view-toggle {
   display: inline-flex;

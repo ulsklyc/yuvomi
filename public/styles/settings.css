@@ -526,14 +526,10 @@
   .settings-breadcrumb { display: none; }
 }
 
-/* Die Suche der Wurzel: am Zeilenende und gedeckelt, wie in Notizen. Mobil
- * nimmt die Shell beides zurueck und macht sie zum Icon (layout.css,
- * Kopfregel mobil Regel 4). Layout only - das Aussehen gehoert page-search. */
-.settings-toolbar__search {
-  flex: 1 1 0;
-  max-width: 320px;
-  margin-inline-start: auto;
-}
+/* Die Suche der Wurzel traegt keine eigene Breite und Stelle mehr
+ * (Re-Critique 2026-09-27, D4): sie ist der Center-Slot hinter dem Titel,
+ * Breite `--page-search-width` aus page-search.css; mobil macht die Shell sie
+ * zum Icon (layout.css, Kopfregel mobil Regel 4). */
 
 .settings-toolbar__back {
   display: inline-flex;
