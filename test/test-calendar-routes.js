@@ -228,6 +228,13 @@ test('GET /search — findet Termin über FTS-Index (Trigger-befüllt)', async (
   assert.equal(res.body.data[0].title, 'Zahnkontrolle Xyzzykosh');
 });
 
+test('GET /search — findet Wortteile wie die globale Suche (#471, Re-Critique 2026-09-27)', async () => {
+  insertEvent({ title: 'Kinderzahnarzt Vrombel', start_datetime: '2035-05-03T09:00' });
+  const res = await call('GET', '/search?q=zahnarzt', { actor: ADMIN });
+  assert.equal(res.status, 200);
+  assert.ok(res.body.data.some((e) => e.title === 'Kinderzahnarzt Vrombel'), 'zahnarzt -> Kinderzahnarzt');
+});
+
 test('GET /search — respektiert Sichtbarkeit (privat fremd nicht auffindbar)', async () => {
   insertEvent({ title: 'Geheimtermin Qwobbler', start_datetime: '2035-05-02T09:00', created_by: TOM.id, visibility: 'private' });
   const asMaria = await call('GET', '/search?q=Qwobbler', { actor: MARIA });

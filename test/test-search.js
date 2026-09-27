@@ -7,7 +7,9 @@
 
 import { DatabaseSync } from 'node:sqlite';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
-import { runSearch, buildMatchQuery } from '../server/services/search.js';
+import {
+  runSearch, buildMatchQuery, runTableSearch, escapeLike, INFIX_TERM_CAP,
+} from '../server/services/search.js';
 
 let passed = 0;
 let failed = 0;
@@ -346,6 +348,176 @@ test('Leere/kurze Query liefert leere Ergebnisse', () => {
     && r.contacts.length === 0 && r.items.length === 0
     && r.meds.length === 0 && r.activities.length === 0 && r.waste.length === 0, 'Alles leer');
 });
+
+// --------------------------------------------------------------------------
+// WORTTEILE (Re-Critique 2026-09-27, A1 P2-6): "Milch" fand die "Vollmilch"
+// nicht - FTS5 kennt nur Praefixe. Die Abfrage holt sich jetzt aus dem
+// Vokabular des Index die Woerter, die das Suchwort ENTHALTEN. Jeder Test
+// prueft vorher, dass der reine Praefix NICHTS faende - sonst maesse er den
+// alten Weg.
+// --------------------------------------------------------------------------
+db.prepare(`INSERT INTO tasks (title, priority, status, created_by)
+  VALUES ('Vollmilch holen', 'low', 'open', ?)`).run(uid);
+db.prepare(`INSERT INTO tasks (title, priority, status, created_by)
+  VALUES ('Fremde Hafermilch', 'low', 'open', ?)`).run(otherUid);
+db.prepare(`INSERT INTO shopping_items (list_id, name) VALUES (?, 'Tiefkühlerbsen')`).run(list.lastInsertRowid);
+db.prepare(`INSERT INTO shopping_items (list_id, name) VALUES (?, 'Gießkanne')`).run(list.lastInsertRowid);
+
+function prefixOnly(q, entity) {
+  return db.prepare(`SELECT entity_id FROM search_index WHERE entity = ? AND search_index MATCH ?`)
+    .all(entity, buildMatchQuery(q));
+}
+
+test('Wortteil: "milch" findet "Vollmilch" (Praefix allein findet nichts)', () => {
+  assert(prefixOnly('milch', 'task').length === 0, 'Vorbedingung: der reine Praefix trifft nicht');
+  const hits = runSearch(db, 'milch', uid).tasks.map((t) => t.title);
+  assert(hits.includes('Vollmilch holen'), `Vollmilch fehlt: ${JSON.stringify(hits)}`);
+});
+
+test('Wortteil aendert keine Besitzerfilter: fremde "Hafermilch" bleibt verborgen', () => {
+  const hits = runSearch(db, 'milch', uid).tasks.map((t) => t.title);
+  assert(!hits.includes('Fremde Hafermilch'), 'die fremde Aufgabe kam ueber den Wortteil herein');
+});
+
+test('Wortteil faltet Akzente wie der Index: "kuhl" findet "Tiefkühlerbsen"', () => {
+  assert(prefixOnly('kuhl', 'item').length === 0, 'Vorbedingung: der reine Praefix trifft nicht');
+  assert(runSearch(db, 'kuhl', uid).items.some((i) => i.title === 'Tiefkühlerbsen'), 'Tiefkühlerbsen fehlt');
+  assert(runSearch(db, 'KÜHL', uid).items.some((i) => i.title === 'Tiefkühlerbsen'), 'Grossschreibung mit Umlaut');
+});
+
+test('Wortteil kennt ß/ss: "iess" findet "Gießkanne"', () => {
+  assert(prefixOnly('iess', 'item').length === 0, 'Vorbedingung: der reine Praefix trifft nicht');
+  assert(runSearch(db, 'iess', uid).items.some((i) => i.title === 'Gießkanne'), 'Gießkanne fehlt');
+});
+
+test('Wortteil erst ab drei Zeichen: "lc" bleibt beim Praefix', () => {
+  assert(!runSearch(db, 'lc', uid).tasks.some((t) => t.title === 'Vollmilch holen'),
+    'zwei Buchstaben sollen nicht in jedes Wort greifen');
+});
+
+test('LIKE-Steuerzeichen sind Text: "il_h" trifft "Vollmilch" nicht, "%" ist kein Joker', () => {
+  // Ungeflohen hiesse `_` "ein beliebiges Zeichen" - "%il_h%" traefe "milch".
+  assert(!runSearch(db, 'il_h', uid).tasks.some((t) => t.title === 'Vollmilch holen'), '_ wirkte als Joker');
+  assert(!runSearch(db, 'v%h', uid).tasks.some((t) => t.title === 'Vollmilch holen'), '% wirkte als Joker');
+  assert(escapeLike('a_b%c\\') === 'a\\_b\\%c\\\\', `escapeLike: ${escapeLike('a_b%c\\')}`);
+});
+
+test('Wortteil ist gedeckelt: hoechstens INFIX_TERM_CAP zusaetzliche Woerter je Suchwort', () => {
+  const ins = db.prepare(`INSERT INTO notes (title, content, created_by) VALUES (?, 'x', ?)`);
+  for (let i = 0; i < INFIX_TERM_CAP + 10; i++) ins.run(`Zqwort${String(i).padStart(3, '0')}`, uid);
+  const match = buildMatchQuery('qwort', { database: db });
+  const branches = match.split(' OR ').length;
+  assert(branches <= INFIX_TERM_CAP + 3, `${branches} Zweige, Deckel ${INFIX_TERM_CAP} + Praefixvarianten`);
+  db.prepare("DELETE FROM notes WHERE title LIKE 'Zqwort%'").run();
+});
+
+// --------------------------------------------------------------------------
+// TREFFERARTEN OHNE FTS-INDEX (runTableSearch): Rezepte, Vorrat, Inventar,
+// Dokumente, Geburtstage, Budget. Gegen das ECHTE Schema (alle Migrationen),
+// nicht gegen den Auszug in db-schema-test.js - die Sichtbarkeitsspalten von
+// Dokumenten und Budget kamen spaet und stehen dort nicht.
+// --------------------------------------------------------------------------
+process.env.DB_PATH = ':memory:';
+process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'search-test-secret';
+const { MIGRATIONS, get: getModuleDb } = await import('../server/db.js');
+const { default: BetterSqlite } = await import('better-sqlite3-multiple-ciphers');
+getModuleDb().close();
+const full = new BetterSqlite(':memory:');
+full.pragma('foreign_keys = ON');
+full.exec(`CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, description TEXT NOT NULL,
+  applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')))`);
+for (const m of MIGRATIONS) {
+  if (typeof m.up === 'function') m.up(full); else full.exec(m.up);
+  if (typeof m.afterUp === 'function') m.afterUp(full);
+  full.prepare('INSERT INTO schema_migrations (version, description) VALUES (?, ?)').run(m.version, m.description);
+}
+const fa = full.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('fa', 'A', 'x', 'admin')`).run().lastInsertRowid;
+const fb = full.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('fb', 'B', 'x', 'member')`).run().lastInsertRowid;
+
+full.prepare('INSERT INTO recipes (title, notes, created_by) VALUES (?, ?, ?)').run('Omas Apfelkuchen', 'mit Zimt', fb);
+full.prepare('INSERT INTO recipes (title, notes, created_by) VALUES (?, ?, ?)').run('Linsensuppe', 'Vollmilch statt Sahne', fb);
+full.prepare('INSERT INTO pantry_items (name, quantity, unit) VALUES (?, 2, ?)').run('Gemüsebrühe', 'Glas');
+full.prepare("INSERT INTO inventory_items (name, brand, status) VALUES ('Alte Bohrmaschine', 'Bosch', 'sold')").run();
+full.prepare("INSERT INTO inventory_items (name, brand, status) VALUES ('Akku-Bohrmaschine', 'Makita', 'active')").run();
+full.prepare('INSERT INTO birthdays (name, birth_date, created_by) VALUES (?, ?, ?)').run('Onkel Straßer', '1960-05-01', fb);
+const insDoc = full.prepare(`INSERT INTO family_documents
+  (name, original_name, mime_type, file_size, content_data, visibility, status, created_by)
+  VALUES (?, 'a.pdf', 'application/pdf', 1, 'x', ?, ?, ?)`);
+insDoc.run('Steuerbescheid familie', 'family', 'active', fb);
+insDoc.run('Steuerbescheid privat fremd', 'private', 'active', fb);
+const restricted = insDoc.run('Steuerbescheid freigegeben', 'restricted', 'active', fb).lastInsertRowid;
+insDoc.run('Steuerbescheid restricted ohne mich', 'restricted', 'active', fb);
+insDoc.run('Steuerbescheid archiviert', 'family', 'archived', fb);
+full.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(restricted, fa);
+const insEntry = full.prepare(`INSERT INTO budget_entries (title, amount, date, created_by, owner_id, visibility)
+  VALUES (?, -10, '2030-01-15', ?, ?, ?)`);
+insEntry.run('Zahnarztrechnung geteilt', fb, fb, 'shared');
+insEntry.run('Zahnarztrechnung privat fremd', fb, fb, 'private');
+insEntry.run('Zahnarztrechnung betrag fremd', fb, fb, 'shared_amount');
+insEntry.run('Zahnarztrechnung privat meins', fa, fa, 'private');
+
+const titles = (rows) => rows.map((r) => r.title);
+
+test('Tabellensuche: Wortteil im Titel und in der Notiz (Rezepte)', () => {
+  assert(titles(runTableSearch(full, 'kuchen', fa).recipes).includes('Omas Apfelkuchen'), 'kuchen -> Apfelkuchen');
+  assert(titles(runTableSearch(full, 'milch', fa).recipes).includes('Linsensuppe'), 'Notiz traegt den Wortteil');
+  assert(titles(runTableSearch(full, 'omas kuchen', fa).recipes).length === 1, 'mehrere Woerter: UND');
+  assert(runTableSearch(full, 'omas torte', fa).recipes.length === 0, 'ein fehlendes Wort -> kein Treffer');
+});
+
+test('Tabellensuche faltet Akzente und ß/ss wie der Index', () => {
+  assert(titles(runTableSearch(full, 'bruhe', fa).pantry).includes('Gemüsebrühe'), 'bruhe -> Gemüsebrühe');
+  assert(titles(runTableSearch(full, 'strasser', fa).birthdays).includes('Onkel Straßer'), 'strasser -> Straßer');
+  assert(titles(runTableSearch(full, 'STRAß', fa).birthdays).includes('Onkel Straßer'), 'Grossschreibung mit ß');
+});
+
+test('Tabellensuche: LIKE-Zeichen bleiben Text', () => {
+  assert(runTableSearch(full, 'k_chen', fa).recipes.length === 0, '_ ist kein Joker');
+  assert(runTableSearch(full, 'k%n', fa).recipes.length === 0, '% ist kein Joker');
+});
+
+test('Tabellensuche: Inventar mit Marke, aktive Gegenstaende zuerst', () => {
+  const hits = titles(runTableSearch(full, 'bohr', fa).inventory);
+  assert(hits[0] === 'Akku-Bohrmaschine' && hits[1] === 'Alte Bohrmaschine', JSON.stringify(hits));
+  assert(titles(runTableSearch(full, 'makita', fa).inventory).includes('Akku-Bohrmaschine'), 'Marke durchsucht');
+});
+
+test('Tabellensuche: Dokumente mit der Sichtbarkeit der Liste (eigen, Familie, freigegeben; nur aktiv)', () => {
+  const hits = titles(runTableSearch(full, 'steuer', fa).documents).sort();
+  assert(JSON.stringify(hits) === JSON.stringify(['Steuerbescheid familie', 'Steuerbescheid freigegeben']),
+    `Dokumente: ${JSON.stringify(hits)}`);
+});
+
+test('Tabellensuche: Budget im gemeinsamen Modus findet jeden Titel', () => {
+  full.prepare("DELETE FROM sync_config WHERE key = 'budget_mode'").run();
+  assert(runTableSearch(full, 'zahnarzt', fa).budget.length === 4, 'shared-Modus: alle vier');
+});
+
+test('Tabellensuche: Budget im persoenlichen Modus nur, wo der Betrachter den ZWECK sieht', () => {
+  full.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('budget_mode', 'personal')").run();
+  try {
+    const hits = titles(runTableSearch(full, 'zahnarzt', fa).budget).sort();
+    assert(JSON.stringify(hits) === JSON.stringify(['Zahnarztrechnung geteilt', 'Zahnarztrechnung privat meins']),
+      `Budget: ${JSON.stringify(hits)} - fremd privat und fremd "nur Betrag" duerfen nicht ueber den Titel auffindbar sein`);
+  } finally {
+    full.prepare("DELETE FROM sync_config WHERE key = 'budget_mode'").run();
+  }
+});
+
+test('Tabellensuche deckelt bei SEARCH_LIMIT je Trefferart', () => {
+  const ins = full.prepare('INSERT INTO pantry_items (name) VALUES (?)');
+  for (let i = 0; i < 8; i++) ins.run(`Dosentomaten ${i}`);
+  assert(runTableSearch(full, 'tomaten', fa).pantry.length === 5, 'fuenf je Art');
+});
+
+test('Tabellensuche: gesperrte Module und abgeschaltete Eintraege bleiben leer', () => {
+  const r = runTableSearch(full, 'kuchen', fa, { hiddenModules: new Set(['meals']) });
+  assert(r.recipes.length === 0, 'meals gesperrt -> keine Rezepte');
+  const d = runTableSearch(full, 'strasser', fa, { disabledNav: new Set(['birthdays']) });
+  assert(d.birthdays.length === 0, 'Geburtstage abgeschaltet');
+});
+
+full.close();
 
 console.log(`\n[Search-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);
 if (failed > 0) process.exit(1);

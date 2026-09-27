@@ -162,7 +162,10 @@ router.get('/upcoming', (req, res) => {
 // --------------------------------------------------------
 router.get('/search', (req, res) => {
   try {
-    const match = buildMatchQuery(req.query.q ?? '');
+    // Mit der Verbindung, damit Wortteile tragen wie in der globalen Suche
+    // ("zahn" findet die "Kinderzahnarzt"-Kontrolle) - beide Suchen sollen fuers
+    // gleiche Stichwort dieselben Termine liefern (#471).
+    const match = buildMatchQuery(req.query.q ?? '', { database: db.get() });
     if (!match) return res.json({ data: [], total: 0 });
 
     const userId = getUserId(req);
