@@ -295,3 +295,36 @@ test('in die Spalte befoerdert, aber das Verwerfen abgelehnt: das Blatt bleibt v
     delete globalThis.__closeModal;
   }
 });
+
+
+// ── R10 L8: Kontaktfilter am Desktop ──────────────────────────────────────
+
+test('Kontaktfilter: nur belegte Kategorien, die aktive bleibt, und mit einer Kategorie gar keine Reihe (A5 P2-6)', () => {
+  const saved = { categories: contacts.state.categories, contacts: contacts.state.contacts, active: contacts.state.activeCategory };
+  try {
+    contacts.state.categories = ['doctor', 'school', 'authority', 'insurance', 'craftsman', 'emergency', 'other']
+      .map((key) => ({ key, icon: 'tag', name: key }));
+    contacts.state.contacts = [{ id: 1, category: 'doctor' }, { id: 2, category: 'school' }, { id: 3, category: 'doctor' }];
+    contacts.state.activeCategory = null;
+    assert.deepEqual(contacts.filterCategoryKeys(), ['doctor', 'school'], 'leere Kategorien sind Sackgassen');
+    contacts.state.activeCategory = 'insurance';
+    assert.deepEqual(contacts.filterCategoryKeys(), ['doctor', 'school', 'insurance'], 'der aktive Filter bleibt, sonst kein Weg zurueck');
+    contacts.state.activeCategory = null;
+    contacts.state.contacts = [{ id: 1, category: 'doctor' }];
+    assert.deepEqual(contacts.filterCategoryKeys(), [], 'eine Kategorie: nichts zu filtern');
+  } finally {
+    contacts.state.categories = saved.categories;
+    contacts.state.contacts = saved.contacts;
+    contacts.state.activeCategory = saved.active;
+  }
+});
+
+test('Kontaktfilter: die Gruppe heisst nach ihrer Frage, und am Zeigergeraet bricht die Reihe um', () => {
+  const js = read('../public/pages/contacts.js');
+  assert.match(js, /id="contacts-filters" role="group" aria-label="\$\{t\('contacts\.categoryLabel'\)\}"/,
+    'die Gruppe hiess „Alle" - der Name des ersten Chips, nicht der Frage');
+  const css = read('../public/styles/contacts.css');
+  const wrap = [...eachRule(css)].find((r) => r.selector.trim() === '.contacts-filters'
+    && r.at.some((a) => /hover:\s*hover/.test(a) && /pointer:\s*fine/.test(a)));
+  assert.ok(wrap && /flex-wrap:\s*wrap/.test(wrap.body), 'eine Maus hat keine waagerechte Geste');
+});

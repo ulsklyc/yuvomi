@@ -269,7 +269,7 @@ export async function render(container, { user, signal } = {}) {
       <div id="contacts-status" class="sr-only" role="status" aria-live="polite"></div>
       <div class="split-view contacts-split">
         <div id="contacts-list" class="contacts-list page-scrollport split-view__list" aria-busy="true">
-          <div class="contacts-filters page-chip-row" id="contacts-filters" role="group" aria-label="${t('contacts.filterAll')}"></div>
+          <div class="contacts-filters page-chip-row" id="contacts-filters" role="group" aria-label="${t('contacts.categoryLabel')}"></div>
           <div id="contacts-rows" class="contacts-rows">${renderSkeletonList({ rows: 6, lines: 2 })}</div>
         </div>
         ${splitViewDetailHtml({
@@ -489,18 +489,53 @@ export async function render(container, { user, signal } = {}) {
 // Kategorie-Filterleiste (aus state.categories aufgebaut) + Verwaltung (#357)
 // --------------------------------------------------------
 
+/**
+ * Die Kategorien, die einen Chip bekommen: nur BELEGTE (R10 L8, A5 P2-6).
+ * Zehn Chips fuer drei belegte Kategorien liessen am Desktop 65 % der Reihe
+ * hinter einem Querscroller verschwinden, den eine Maus nicht bedienen kann -
+ * und ein Chip, der eine leere Liste liefert, ist eine Sackgasse. Die aktive
+ * Kategorie bleibt stehen, auch wenn sie leer geworden ist: sonst gaebe es
+ * keinen Weg zurueck aus dem Filter. Mit hoechstens einer belegten Kategorie
+ * gibt es nichts zu filtern - die Reihe bleibt leer (CSS blendet sie aus).
+ */
+function filterCategoryKeys() {
+  const used = new Set(state.contacts.map((c) => c.category));
+  const keys = state.categories.map((c) => c.key).filter((k) => used.has(k) || k === state.activeCategory);
+  return keys.length < 2 && !state.activeCategory ? [] : keys;
+}
+
 function renderCategoryFilters() {
   const bar = _container?.querySelector('#contacts-filters');
   if (!bar) return;
   const active = state.activeCategory;
+  const keys = filterCategoryKeys();
+  // Nur neu bauen, wenn sich die Menge der Chips geaendert hat: renderList()
+  // ruft hier bei jedem Tastendruck der Suche, und ein Neubau naehme einem
+  // gerade fokussierten Chip den Fokus.
+  const signature = keys.join(',');
+  const chips = () => bar.querySelectorAll('[data-cat]');
+  if (bar.dataset.chips === signature && (chips().length > 0) === (keys.length > 0)) {
+    for (const chip of chips()) {
+      const on = (chip.dataset.cat || null) === (active || null);
+      chip.classList.toggle('filter-chip--active', on);
+      chip.classList.toggle('contact-filter-chip--active', on);
+      chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+    return;
+  }
+  bar.dataset.chips = signature;
+  // Stand der Fokus auf einem Chip, bekommt ihn derselbe Chip im Neubau.
+  const focusedCat = bar.contains(document.activeElement) ? document.activeElement?.dataset?.cat : undefined;
+  if (!keys.length) { bar.replaceChildren(); return; }
   const allChip = `<button class="filter-chip contact-filter-chip${active ? '' : ' filter-chip--active contact-filter-chip--active'}" data-cat="" aria-pressed="${active ? 'false' : 'true'}">${esc(t('contacts.filterAll'))}</button>`;
-  const catChips = state.categories.map((c) => {
+  const catChips = state.categories.filter((c) => keys.includes(c.key)).map((c) => {
     const on = active === c.key;
     return `<button class="filter-chip contact-filter-chip${on ? ' filter-chip--active contact-filter-chip--active' : ''}" data-cat="${esc(c.key)}" aria-pressed="${on ? 'true' : 'false'}">${categoryIcon(c.key)} ${esc(catLabel(c.key))}</button>`;
   }).join('');
   bar.replaceChildren();
   bar.insertAdjacentHTML('beforeend', allChip + catChips);
   if (window.lucide) lucide.createIcons({ el: bar });
+  if (focusedCat !== undefined) bar.querySelector(`[data-cat="${CSS.escape(focusedCat)}"]`)?.focus();
 }
 
 function openContactCategoryManager() {
@@ -638,6 +673,9 @@ function renderList({ animate = false } = {}) {
   // (`#contacts-list`) bei jedem Render stehen bleibt und mit wegscrollt.
   const container = _container.querySelector('#contacts-rows');
   if (!container) return;
+  // Die Chipreihe folgt den BELEGTEN Kategorien: ein neuer Kontakt in einer
+  // bisher leeren Kategorie bringt ihren Chip mit, der letzte nimmt ihn mit.
+  renderCategoryFilters();
   _container.querySelector('#contacts-list')?.removeAttribute('aria-busy');
 
   const contacts = filterContacts();
@@ -2011,4 +2049,6 @@ export const __test = {
   mountContactCard,
   // Deep-Link gegen gemerkten Filter.
   dropFiltersForDeepLink,
+  // R10 L8: nur belegte Kategorien bekommen einen Chip.
+  filterCategoryKeys,
 };
