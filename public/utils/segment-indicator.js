@@ -131,6 +131,8 @@ export function attachSegmentIndicator(bar, {
   let marked = null;
   let glide = null;
   let box = null;
+  let destroyed = false;
+  let wasConnected = false;
 
   const measure = (el) => (el && el.offsetWidth
     ? { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight }
@@ -146,6 +148,20 @@ export function attachSegmentIndicator(bar, {
   };
 
   function place({ glide: wantGlide = false } = {}) {
+    // DIE LEISTE RAEUMT SICH SELBST AB, sobald sie aus dem Dokument ist
+    // (Codex an #1483; dasselbe Muster wie `wireScrollFade` in utils/ux.js).
+    // Kein Aufrufer mit wiederholtem Rendern haelt den Handle fest -
+    // `schedule.renderPage()`, `renderVitalsShell()`, `wireHistoryPeople()`
+    // bauen die Leiste neu und verwerfen ihn. Der ResizeObserver beobachtet
+    // aber auch den STABILEN Elternknoten: ohne diesen Riegel blieb jede
+    // ersetzte Leiste lebendig, hielt ihren abgehaengten Baum und rechnete bei
+    // jedem Resize weiter - einer mehr je Neuaufbau. Ein Resize des Elternteils
+    // oder der Leiste selbst (sie faellt beim Abhaengen auf 0x0) landet hier.
+    // NUR NACH DEM ERSTEN EINHAENGEN: wer die Leiste vor dem Einfuegen
+    // verdrahtet, bekaeme sonst gar keine Kapsel.
+    if (destroyed) return;
+    if (bar.isConnected) wasConnected = true;
+    else if (wasConnected) { destroy(); return; }
     const el = activeItem();
     if (marked !== el) {
       marked?.removeAttribute('data-seg-active');
@@ -200,18 +216,18 @@ export function attachSegmentIndicator(bar, {
   // von dessen letzter Stelle, eine frische steht sofort.
   place({ glide: !!(key && _lastBoxByKey.has(key)) });
 
-  const handle = {
-    indicator,
-    place,
-    destroy() {
-      mo?.disconnect();
-      ro?.disconnect();
-      glide?.cancel();
-      marked?.removeAttribute('data-seg-active');
-      indicator.remove();
-      bar.classList.remove('has-seg-indicator');
-    },
-  };
+  function destroy() {
+    if (destroyed) return;
+    destroyed = true;
+    mo?.disconnect();
+    ro?.disconnect();
+    glide?.cancel();
+    marked?.removeAttribute('data-seg-active');
+    indicator.remove();
+    bar.classList.remove('has-seg-indicator');
+  }
+
+  const handle = { indicator, place, destroy };
   indicator._segHandle = handle;
   return handle;
 }

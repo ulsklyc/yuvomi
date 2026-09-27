@@ -165,6 +165,61 @@ test('Indikator: reduzierte Bewegung springt', () => {
   }
 });
 
+test('Indikator: eine ersetzte Leiste haengt ihre Observer selbst ab - Neurendern haeuft keine an', () => {
+  // Codex an #1483: Schichtplan, Gesundheit und Verlauf bauen ihre Leiste bei
+  // jedem Wechsel neu und verwerfen den Handle. Der ResizeObserver beobachtet
+  // auch den STABILEN Elternknoten - jede ersetzte Leiste blieb damit
+  // lebendig, hielt ihren abgehaengten Baum und rechnete bei jedem Resize
+  // weiter. Gezaehlt werden die lebenden Observer nach N Neuaufbauten.
+  const live = new Set();
+  global.ResizeObserver = class {
+    constructor(cb) { this.cb = cb; live.add(this); }
+    observe() {}
+    disconnect() { live.delete(this); }
+  };
+  const createElement = global.document.createElement;
+  global.document.createElement = () => ({
+    className: '', style: {}, hidden: false,
+    setAttribute() {}, removeAttribute() {}, remove() { this.removed = true; },
+  });
+  try {
+    const parent = {};
+    const mkBar = () => {
+      const item = {
+        hidden: false, offsetLeft: 10, offsetTop: 4, offsetWidth: 90, offsetHeight: 40,
+        matches: (sel) => sel.includes('.sub-tab--active'),
+        setAttribute() {}, removeAttribute() {},
+      };
+      const children = [item];
+      return {
+        isConnected: true, parentElement: parent, children,
+        classList: { add() {}, remove() {} },
+        querySelector: () => null,
+        querySelectorAll: () => children,
+        prepend(el) { this.indicator = el; },
+      };
+    };
+    const RENDERS = 6;
+    let bar = null;
+    let handle = null;
+    const replaced = [];
+    for (let i = 0; i < RENDERS; i++) {
+      if (bar) { bar.isConnected = false; replaced.push(handle); }
+      bar = mkBar();
+      handle = seg.attachSegmentIndicator(bar, { itemSelector: '.sub-tab' });
+      // Ein Resize des Elternteils: jeder noch lebende Observer meldet sich.
+      for (const ro of [...live]) ro.cb([]);
+    }
+    assert.equal(live.size, 1, `nach ${RENDERS} Neuaufbauten lebt nur der Observer der aktuellen Leiste, waren ${live.size}`);
+    assert.ok(replaced.every((h) => h.indicator.removed), 'die Kapsel einer ersetzten Leiste geht mit');
+    assert.equal(handle.indicator.style.transform, 'translate(10px, 4px)', 'die aktuelle Leiste steht weiter');
+    assert.ok(!handle.indicator.removed);
+  } finally {
+    delete global.ResizeObserver;
+    global.document.createElement = createElement;
+  }
+});
+
 test('Indikator: eine fehlende Leiste ist ein No-op wie bei wireTablist/wireScrollFade - der Aufrufer bleibt heil', () => {
   // Seiten verdrahten ihre Leiste nach dem Rendern in einer Reihe
   // (wireTablist -> attachSegmentIndicator -> wireScrollFade). Die beiden
