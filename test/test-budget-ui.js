@@ -252,9 +252,8 @@ test('syncCurrentButton() rettet den Fokus vor dem eigenen inert-Werden', () => 
 });
 
 // Minimales Fake-Element fuer Knoten, die `updateTabs()` neben dem Reset
-// noch anfasst (#budget-body, #budget-prev/-next/-label, #budget-period-note,
-// #budget-add): `hidden`, `textContent`, `setAttribute`, eine leere
-// `querySelector()` (fuer `addBtn.querySelector('.toolbar-new-btn__label')`).
+// noch anfasst (#budget-body, #budget-prev/-next/-label, #budget-period-note):
+// `hidden`, `textContent`, `setAttribute`, eine leere `querySelector()`.
 function fakeToolbarElement() {
   return {
     hidden: false,
@@ -326,15 +325,37 @@ test('das Modul führt genau eine Zeitachse', () => {
   assert.match(stats, /view\.ctx\.onRangeChange\(id\)/, 'die Auflösung muss ans Modul zurückgemeldet werden');
 });
 
-test('Toolbar-Aktion und FAB teilen sich Sichtbarkeit und Label', () => {
-  // Beide lesen DIESELBE Variable `add` (TAB_CAPS plus Archiv-Sperre der
-  // Aufteilung, syncAddAction) - nicht jeder seine eigene Bedingung.
+test('EIN Anlege-Knopf: der FAB traegt Sichtbarkeit, Aktion und Nomen des Tabs (Kanon D3)', () => {
+  // Seit Runde 7 (Komponenten-Kanon D3) gibt es keinen handgeschriebenen
+  // Kopfknopf (#budget-add, .toolbar-new-btn) mehr: der FAB dockt am
+  // Zeigergeraet selbst in den Kopf. Er liest DIESELBE Variable `add` (TAB_CAPS
+  // plus Archiv-Sperre der Aufteilung) - nicht jeder Tab seine eigene Bedingung.
+  const code = withoutHtmlComments(budget);
+  assert.doesNotMatch(code, /id="budget-add"/, 'der eigene Kopfknopf ist zurueck');
   assert.match(budget, /const add = splitBlocked \? null : caps\.add;/);
   assert.match(budget, /const addLabel = add \? t\(add\) : ''/);
-  assert.match(budget, /addBtn\.hidden = !add;/);
-  assert.match(budget, /fab\.hidden = !add;/);
+  const sync = budget.slice(budget.indexOf('function syncAddAction()'), budget.indexOf('/* ZWEI SKALEN STATT EINER'));
+  assert.match(sync, /setPageFabAction\(fab, \{[\s\S]*?hidden: !add,[\s\S]*?label: addLabel,[\s\S]*?dockLabel: add \? t\(caps\.label\)/,
+    'Sichtbarkeit, aria-label und Nomen laufen gemeinsam ueber setPageFabAction');
   // Kein Rückfall auf die alten Ausschluss-Listen.
   assert.doesNotMatch(budget, /splitActive \|\| subscriptionsActive/);
+});
+
+test('jeder Budget-Tab mit Neu-Aktion nennt ein Nomen aus newLabel.* (kein nacktes "+")', () => {
+  // Vorher trugen nur "Budget" und "Aufteilung" ein Wort; Plan, Konten, Abos
+  // und Darlehen dockten ein nacktes Plus an (Re-Critique 2026-09-27, A8 P2-1).
+  const de = JSON.parse(read('../public/locales/de.json'));
+  const table = budget.match(/const TAB_CAPS = \{([\s\S]*?)\n\};/)?.[1];
+  assert.ok(table, 'TAB_CAPS-Tabelle fehlt');
+  const rows = [...table.matchAll(/^\s*'([\w-]+)':\s*\{([^}]*)\}/gm)];
+  assert.ok(rows.length >= 7, `nur ${rows.length} Tabs gefunden - der Scanner misst nichts`);
+  for (const [, tab, body] of rows) {
+    if (/add:\s*null/.test(body)) continue;
+    const noun = body.match(/label:\s*'newLabel\.(\w+)'/)?.[1];
+    assert.ok(noun, `Tab ${tab}: Neu-Aktion ohne Nomen (label: 'newLabel.*')`);
+    assert.ok(de.newLabel?.[noun], `Tab ${tab}: newLabel.${noun} fehlt in de.json`);
+    assert.ok(de.newLabel[noun].split(/\s+/).length <= 2, `Tab ${tab}: "${de.newLabel[noun]}" ist ein Satz, kein Nomen`);
+  }
 });
 
 test('hidden greift bei geteilten Bedienelementen trotz display-Klasse', () => {

@@ -538,8 +538,8 @@ test('#1160 desktop - Budget-Eintrag: "Weitere Einstellungen" bleibt frei', asyn
     await seedDueReminder(page, { count: 2, refresh: false });
     await gotoRoute(page, '/budget');
     await waitForToasts(page, 2);
-    await page.waitForSelector('#budget-add');
-    await page.$eval('#budget-add', (el) => el.click());
+    await page.waitForSelector('#fab-new-budget.page-fab--docked');
+    await page.$eval('#fab-new-budget', (el) => el.click());
     await page.waitForSelector('#bm-title');
     await settleAnimations(page);
     // Unten im Koerper: erst ins Bild holen, wie ein Mensch es tut.

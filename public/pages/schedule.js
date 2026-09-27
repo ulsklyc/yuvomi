@@ -9,6 +9,7 @@ import { emptyStateHTML } from '/utils/empty-state.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { wireScrollFade } from '/utils/ux.js';
 import { wireTablist } from '/utils/tablist.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { toggleRowHtml } from '/settings/components.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect } from '/components/user-multi-select.js';
 import { isNavModuleReadOnly } from '/permissions.js';
@@ -1781,6 +1782,10 @@ function renderShell() {
     manualActivation: true,
     onChange: (id) => { guardedActivateView(id); },
   });
+  // Gleitende Auswahl-Kapsel (utils/segment-indicator.js), dieselbe Bewegung
+  // wie die Gesundheit auf derselben `.sub-tabs-bar` (Kanon, Runde 7 D8). Die
+  // Leiste wird hier EINMAL gebaut; die Kapsel folgt sync()/Klick selbst.
+  attachSegmentIndicator(root.querySelector('.schedule-tabs'));
   root.addEventListener('submit', submitForm);
   root.addEventListener('click', (event) => {
     // S-03: eine Musterkarte einklappen ist ebenfalls ein "Re-Render" ihrer
@@ -1976,6 +1981,12 @@ function renderPage() {
     bindUserMultiSelect(body, 'overview-people');
     wireScrollFade(body.querySelector('.schedule-overview__scroll'));
   }
+  // Statistik-Zeitraum und Woche/Tag entstehen mit jedem renderPage() neu:
+  // der Schluessel laesst die neue Kapsel von der Stelle der alten gleiten.
+  const statRange = body.querySelector('.schedule-stat-range__choices');
+  if (statRange) attachSegmentIndicator(statRange, { key: 'schedule-stat-range' });
+  const overviewMode = body.querySelector('[data-action="overview-view-mode"]')?.parentElement;
+  if (overviewMode) attachSegmentIndicator(overviewMode, { key: 'schedule-overview-mode' });
   if (scrollPort) scrollPort.scrollTop = scrollTop;
 }
 
@@ -2020,17 +2031,25 @@ function wireShiftTypeFieldSortables(body) {
 }
 function updateScheduleFab() {
   if (!scheduleFab) return;
-  // Sichtbares Dock-Label = aria-label: beide nennen die AKTION ("Add entry",
-  // "Create shift type"), nicht den aktiven Tab (S-09) - vorher stand hier ein
-  // eigenes `dockLabels`-Kurzwort ("Planning"), das am Docking-Ort aussah, als
-  // liesse sich der Tabname selbst antippen statt die Anlege-Aktion dahinter.
+  // `aria-label` nennt die AKTION ("Schichtart erstellen", "Eintrag
+  // hinzufuegen"), das angedockte Wort das NOMEN der Sache ("Schichtart",
+  // "Eintrag") - wie jedes Modul (Komponenten-Kanon, Runde 7 D3; die
+  // Verbphrase war mit 193px der breiteste Kopfknopf der App, Re-Critique
+  // 2026-09-27 A8 P3-3). Nie der Tabname: ein eigenes Kurzwort ("Planning")
+  // sah am Docking-Ort aus, als liesse sich der Tab selbst antippen (S-09).
   const labels = {
     shifts: t('schedule.createShiftType'),
     patterns: t('schedule.addEntry'),
   };
+  const nouns = {
+    shifts: t('newLabel.scheduleShiftType'),
+    patterns: t('newLabel.scheduleEntry'),
+  };
   setPageFabAction(scheduleFab, {
     label: labels[activeView],
-    dockLabel: labels[activeView],
+    // Auf den Lese-Tabs versteckt, aber mit Nomen: ohne `data-dock-label`
+    // dockte der Knopf nach einem Einstieg ueber Statistik/Uebersicht nie an.
+    dockLabel: nouns[activeView] || scheduleFab.dataset.dockLabel || nouns.shifts,
     // Statistics und Overview sind beide reine Leseansichten - kein "Anlegen".
     // Ausgeblendet ist nicht dasselbe wie unerreichbar (siehe readOnly()/
     // action()) - der Handler bleibt trotzdem gesperrt.
@@ -2242,6 +2261,10 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
         const currentMode = form.querySelector('[name="mode"]')?.value;
         saveButton.disabled = currentMode === 'add' && !state.types.length;
       };
+      // Die Kapsel des Umschalters gleitet wie jede Segmentleiste (Kanon,
+      // Runde 7 D8) und folgt dem Klassenwechsel unten selbst.
+      const modeBar = form?.querySelector('.schedule-create-mode');
+      if (modeBar) attachSegmentIndicator(modeBar);
       form?.querySelectorAll('[data-mode]').forEach((button) => {
         button.addEventListener('click', () => {
           const mode = button.dataset.mode;
@@ -2953,7 +2976,7 @@ export async function render(container, { user } = {}) {
   // Geisterzustand ohne zugehoerige ungespeicherte DOM-Aenderung.
   dirtyPatternIds = new Set();
   renderShell();
-  scheduleFab = createPageFab({ id: 'schedule-fab' });
+  scheduleFab = createPageFab({ id: 'schedule-fab', dockLabel: t('newLabel.scheduleShiftType') });
   root.querySelector('.schedule-page')?.appendChild(scheduleFab);
   // activateView() statt eines blossen renderPage(): fuer 'statistics'/
   // 'overview' raeumt sie den obigen Reset ins Bild UND laedt frisch nach

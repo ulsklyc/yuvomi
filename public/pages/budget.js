@@ -11,6 +11,7 @@ import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode
 import { openDetailView } from '/components/detail-view.js';
 import { stagger, vibrate, scheduleUndoableDelete } from '/utils/ux.js';
 import { wireTablist } from '/utils/tablist.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { t, formatDate, formatDayMonth, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -29,7 +30,7 @@ import { rowActionHtml } from '/utils/row-action.js';
 import { intervalUnitLabel } from '/rrule-ui.js';
 import { appendCurrencyOptions } from '/settings/currency.js';
 import '/components/category-manager.js';
-import { findPageFab } from '/utils/fab.js';
+import { findPageFab, setPageFabAction } from '/utils/fab.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
@@ -256,19 +257,19 @@ let _asideFit = null;  // ResizeObserver der Uebersicht-Seitenleiste (watchAside
 // Anker: Budget auf März gestellt, Wechsel auf Berichte zeigte Juli.
 const TAB_CAPS = {
   'budget':         { month: true,  add: 'budget.newEntryFabLabel', label: 'newLabel.budget' },
-  'plan':           { month: true,  add: 'budget.planAddBudget' },
-  'accounts':       { month: false, note: 'budget.periodNoteAccounts',      add: 'budget.addAccount' },
-  'subscriptions':  { month: false, note: 'budget.periodNoteSubscriptions', add: 'subscriptions.add' },
-  'loans':          { month: false, note: 'budget.periodNoteLoans',         add: 'budget.newLoan' },
+  'plan':           { month: true,  add: 'budget.planAddBudget',                                label: 'newLabel.budgetPlan' },
+  'accounts':       { month: false, note: 'budget.periodNoteAccounts',      add: 'budget.addAccount', label: 'newLabel.budgetAccount' },
+  'subscriptions':  { month: false, note: 'budget.periodNoteSubscriptions', add: 'subscriptions.add', label: 'newLabel.subscriptions' },
+  'loans':          { month: false, note: 'budget.periodNoteLoans',         add: 'budget.newLoan',    label: 'newLabel.budgetLoan' },
   'reports':        { month: true,  range: true, add: null },
   // EINE Neu-Aktion, und sie wohnt im Budget-Kopf wie auf jedem anderen Tab
   // (Critique 2026-09-25). Bis dahin stand hier `add: null`, und die Unterseite
   // brachte einen eigenen Sekundaerknopf und einen eigenen FAB mit - der
   // schwebte am Desktop ueber „87,50 €", weil die geteilte Regel „wo ein
-  // beschrifteter Kopfknopf steht, schwebt keiner" (.toolbar-new-btn) ihn nicht
-  // kannte. Jetzt ist es derselbe Weg wie ueberall: Kopfknopf am Desktop, FAB
-  // mobil, beide oeffnen den Ausgaben-Dialog der Unterseite (openNewSplitExpense).
-  // Im Archiv blendet syncAddAction() beide aus - die Regel dafuer fragt die
+  // beschrifteter Kopfknopf steht, schwebt keiner" ihn nicht kannte. Jetzt ist
+  // es derselbe Weg wie ueberall: der Budget-FAB, am Desktop in den Kopf
+  // gedockt, oeffnet den Ausgaben-Dialog der Unterseite (openNewSplitExpense).
+  // Im Archiv blendet syncAddAction() ihn aus - die Regel dafuer fragt die
   // Unterseite selbst (canAddSplitExpense).
   'split-expenses': { month: false, note: 'budget.periodNoteSplit',         add: 'splitExpenses.addExpense', label: 'newLabel.splitExpenses' },
 };
@@ -642,12 +643,11 @@ export async function render(container, { user }) {
             return `<button class="sub-tab${on ? ' sub-tab--active' : ''}" type="button" role="tab" data-tab-id="${id}" aria-selected="${on ? 'true' : 'false'}" tabindex="${on ? '0' : '-1'}"><span class="sub-tab__label">${label}</span></button>`;
           }).join('')}
         </div>` : ''}
-        <div class="page-toolbar__actions">
-          <button class="btn btn--primary toolbar-new-btn" id="budget-add" aria-label="${t('budget.addEntryLabel')}">
-            <i data-lucide="plus" aria-hidden="true"></i>
-            <span class="toolbar-new-btn__label">${t('newLabel.budget')}</span>
-          </button>
-        </div>
+        <!-- Slot fuer die Primaeraktion: am Zeigergeraet dockt der Router den
+             FAB (#fab-new-budget) hier an, mit dem Nomen des aktiven Tabs
+             (TAB_CAPS.label, syncAddAction). Kein eigener Kopfknopf mehr
+             (Komponenten-Kanon, Runde 7 D3). -->
+        <div class="page-toolbar__actions"></div>
         <!-- Bar-Zeile des Kopfs (Werkzeugzeilen-Regel): die 7 Tabs teilten sich
              den Actions-Slot mit dem Primaerknopf und hatten bei 1280px 138px
              fuer 606px Inhalt - 1 von 7 Tabs sichtbar. -->
@@ -753,10 +753,15 @@ function wireNav() {
       renderBody();
     },
   });
-  // Neu-Aktion je Tab — spiegelt TAB_CAPS.add. Tabs ohne Neu-Aktion (Berichte,
-  // Split-Ausgaben - die Unterseite bringt ihren eigenen Kopfknopf/FAB mit)
-  // blenden beide Auslöser aus, der Handler bleibt dort folgenlos.
-  // Kopfknopf und FAB blendet CSS aus (html[data-module-readonly]); der Handler
+  // Die gleitende Auswahl-Kapsel (utils/segment-indicator.js) - dieselbe
+  // Bewegung wie jede Segment- und Tab-Leiste der App (Kanon, Runde 7 D8).
+  // Beide Leisten leben im Kopf und ueberstehen jeden Tabwechsel; die Kapsel
+  // folgt dem Aktiv-Wechsel von wireTablist selbst.
+  const scopeBar = _container.querySelector('.budget-scope');
+  if (scopeBar) attachSegmentIndicator(scopeBar);
+  // Neu-Aktion je Tab - spiegelt TAB_CAPS.add. Tabs ohne Neu-Aktion (Berichte,
+  // Aufteilung im Archiv) blenden den FAB aus, der Handler bleibt dort folgenlos.
+  // Den FAB blendet CSS aus (html[data-module-readonly]); der Handler
   // bleibt trotzdem gesperrt - ausgeblendet ist nicht unerreichbar, und der
   // Plan-Zweig klickt einen Knopf per `.click()`.
   const addHandler = () => {
@@ -771,7 +776,6 @@ function wireNav() {
       default:               openBudgetModal({ mode: 'create' });
     }
   };
-  _container.querySelector('#budget-add').addEventListener('click', addHandler);
   findPageFab('fab-new-budget').addEventListener('click', addHandler);
   // Geteilte Tablist-Verhaltensschicht (Klick + Pfeiltasten/Home/End + Roving-
   // Tabindex + ARIA) — dieselbe Grammatik wie Rewards/Haushaltshilfe statt einer
@@ -801,6 +805,7 @@ function wireNav() {
   });
   // Edge-Fade + Aktiver-Tab-in-Sicht übernimmt jetzt wireTablist zentral
   // (Audit A2-18: gleiche Affordanz für Budget, Haushaltshilfe, Rewards).
+  attachSegmentIndicator(_container.querySelector('.budget-tabs'));
   updateLabel();
 }
 
@@ -1223,49 +1228,44 @@ function updateTabs() {
 }
 
 /**
- * Toolbar-„+" und FAB zeigen dieselbe Aktion mit demselben Label - oder beide
- * gar nichts (Berichte hat keine Neu-Aktion; die Aufteilung im Archiv auch
- * nicht). Eigene Funktion, weil die eingebettete Aufteilung sie bei jedem
- * Archiv-Wechsel erneut ruft (onAddableChange), ohne den ganzen Tab-Abgleich.
+ * EIN Anlege-Knopf je Tab: der FAB (#fab-new-budget), mobil schwebend, am
+ * Zeigergeraet vom Router in den Kopf gedockt. Er zeigt die Aktion des aktiven
+ * Tabs - oder gar nichts (Berichte hat keine Neu-Aktion; die Aufteilung im
+ * Archiv auch nicht). Eigene Funktion, weil die eingebettete Aufteilung sie
+ * bei jedem Archiv-Wechsel erneut ruft (onAddableChange), ohne den ganzen
+ * Tab-Abgleich.
+ *
+ * JEDER TAB NENNT SEIN NOMEN (Komponenten-Kanon, Runde 7 D3). Vorher trug der
+ * handgeschriebene Kopfknopf nur auf zwei Tabs ein Wort ("Eintrag",
+ * "Ausgabe") und auf Plan, Konten, Abos und Darlehen ein nacktes "+", weil
+ * `newLabel` nur Nomen je MODUL kannte. Jetzt hat jeder Tab seins
+ * (`TAB_CAPS.label`), und das sichtbare Wort steht weiter nur dort, wo es zur
+ * Aktion passt: `setPageFabAction` zieht Nomen, `aria-label` und das Wort am
+ * schon angedockten Knopf gemeinsam nach - nie ein Nomen des vorigen Tabs
+ * (WCAG 2.5.3, Codex-Review zu PR #754).
  */
 function syncAddAction() {
   const caps = tabCaps();
   const splitBlocked = caps === TAB_CAPS['split-expenses'] && !canAddSplitExpense();
   const add = splitBlocked ? null : caps.add;
   const addLabel = add ? t(add) : '';
-  const addBtn = _container?.querySelector('#budget-add');
-  if (addBtn) {
-    addBtn.hidden = !add;
-    if (add) {
-      addBtn.setAttribute('aria-label', addLabel);
-      addBtn.setAttribute('title', addLabel);
-      /* DAS SICHTBARE WORT STEHT NUR, WO ES EIN NOMEN GIBT (`label`).
-       *
-       * Der Kopfknopf trug fest `newLabel.budget` ("Eintrag"), waehrend diese
-       * Funktion seine Aktion je Tab umstellt: auf "Konten" stand sichtbar
-       * "Eintrag" und im `aria-label` "Konto hinzufuegen". Das ist zweimal
-       * falsch - es fuehrt den Zeigernutzer in die Irre, und der sichtbare Text
-       * steht nicht im zugaenglichen Namen (WCAG 2.5.3, Sprachsteuerung kann
-       * den Knopf nicht ansprechen; Codex-Review zu PR #754).
-       *
-       * Das Wort faellt dort weg, statt ein falsches zu behalten: `newLabel`
-       * fuehrt Nomen je MODUL, nicht je Untertab. Zwei Tabs haben eins - der
-       * Eintrag (`newLabel.budget`) und die Aufteilung (`newLabel.splitExpenses`,
-       * „Ausgabe"); fuer "Konto", "Abo" und "Darlehen" waeren es drei neue
-       * Schluessel in 24 Sprachen. Ohne Text benennt das `aria-label` den Knopf
-       * allein, und das tut es korrekt. */
-      const labelSpan = addBtn.querySelector('.toolbar-new-btn__label');
-      if (labelSpan) {
-        labelSpan.hidden = !caps.label;
-        if (caps.label) labelSpan.textContent = t(caps.label);
-      }
-    }
-  }
   const fab = findPageFab('fab-new-budget');
-  if (fab) {
-    fab.hidden = !add;
-    if (add) fab.setAttribute('aria-label', addLabel);
-  }
+  if (!fab) return;
+  // Kein `onClick`: der Handler haengt einmal per addEventListener (render()),
+  // setPageFabAction setzt nur `onclick` und laesst ihn stehen.
+  // Ein versteckter Knopf behaelt ein Nomen: ohne `data-dock-label` dockt der
+  // Router ihn nicht an (dockFabIntoToolbar), und wer per `?tab=reports`
+  // einsteigt, saehe ihn nach dem Wechsel auf einen Anlege-Tab schwebend
+  // statt im Kopf - dasselbe Muster wie der Kontext-FAB der Gesundheit.
+  setPageFabAction(fab, {
+    hidden: !add,
+    label: addLabel,
+    dockLabel: add ? t(caps.label) : (fab.dataset.dockLabel || t('newLabel.budget')),
+  });
+  // Der Titel mit dem Kuerzel (markFabShortcut im Router) entsteht einmal beim
+  // Einhaengen - er folgt der Aktion wie `aria-label`, sonst hiesse der
+  // Tooltip auf "Konten" weiter "Eintrag hinzufuegen (n)".
+  if (add && fab.hasAttribute('aria-keyshortcuts')) fab.title = `${addLabel} (n)`;
 }
 
 /* ZWEI SKALEN STATT EINER (Critique 2026-09-25, P2). Einnahmen und Ausgaben
@@ -2253,6 +2253,10 @@ function wireLoansPage() {
       refocusSegmented('.budget-loans__filters');
     },
   });
+  // renderBody() baut die Leiste bei jedem Wechsel neu: der Schluessel laesst
+  // die neue Kapsel von der Stelle der alten gleiten.
+  const loanFilters = _container.querySelector('.budget-loans__filters');
+  if (loanFilters) attachSegmentIndicator(loanFilters, { key: 'budget-loan-filter' });
   _container.querySelectorAll('.budget-loan-card[data-loan-id]').forEach((card) => {
     card.addEventListener('click', (event) => {
       if (event.target.closest('button, a')) return;

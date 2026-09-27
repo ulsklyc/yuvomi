@@ -760,7 +760,7 @@ test('Keine Gruppe mit `budget: read`: der Titel bleibt, „Erstelle eine Gruppe
 
 test('Geteilte Ausgaben: Kopfknopf und Gruppe-Anlegen haengen am Recht', () => {
   const render = fn(SPLIT_CODE, 'render');
-  // Eingebettet steht „Ausgabe hinzufuegen" im Budget-Kopf (#budget-add), den
+  // Eingebettet steht „Ausgabe hinzufuegen" im Budget-FAB (#fab-new-budget), den
   // CSS und addHandler bei `read` sperren; der Kopf fragt canAddSplitExpense().
   // Der Knopf der (heute nicht erreichten) eigenstaendigen Seite haengt weiter
   // am Recht.

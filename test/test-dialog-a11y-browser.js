@@ -156,7 +156,7 @@ const PHOTO_DIALOGS = [
   { name: 'Inventar anlegen', route: '/inventory', open: ['.page-fab'], file: '#inv-photo' },
   { name: 'Haushaltshilfe bearbeiten', route: '/housekeeping', open: ['[data-tab-id="staff"]', '[data-edit-worker]'], file: '#housekeeping-avatar-file' },
   // Das Beleg-Feld (components/document-attach.js): "Hochladen" oeffnet den Input.
-  { name: 'Budget-Eintrag anlegen', route: '/budget', open: ['#budget-add'], file: '[data-doc-attach-input]' },
+  { name: 'Budget-Eintrag anlegen', route: '/budget', open: ['#fab-new-budget'], file: '[data-doc-attach-input]' },
 ];
 
 for (const dialog of PHOTO_DIALOGS) {

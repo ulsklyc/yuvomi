@@ -17,6 +17,7 @@ import { formatMoney, amountPlaceholder, toDecimalString, amountIsSavable, small
 import { todayKey } from '/utils/date.js';
 import { zonedDateKey } from '/utils/timezone.js';
 import { wireTablist } from '/utils/tablist.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { findPageFab } from '/utils/fab.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
 import { isNavModuleReadOnly } from '/permissions.js';
@@ -138,10 +139,9 @@ export async function render(container, { user, embedded = false, onAddableChang
   // „Aufteilung" heisst und der Budget-Kopf die Seite schon benennt. Der Tab-
   // Name bleibt der EINE Begriff; die Ueberschrift steht fuer die Gliederung
   // als sr-only-<h2> (Budget > Aufteilung > Gruppe > Abschnitt), wie Konten und
-  // Darlehen. „Ausgabe hinzufuegen" wohnt im Budget-Kopf (#budget-add, TAB_CAPS)
-  // und mobil in dessen FAB - am Desktop blendet die geteilte
-  // `.toolbar-new-btn`-Regel den FAB aus, statt dass ein eigener #split-fab
-  // ueber „87,50 €" schwebt. Unveraendert bleibt die (heute nicht erreichte)
+  // Darlehen. „Ausgabe hinzufuegen" ist der FAB des Budgets (#fab-new-budget,
+  // TAB_CAPS) - mobil schwebend, am Desktop in den Budget-Kopf gedockt, statt
+  // dass ein eigener #split-fab ueber „87,50 €" schwebt. Unveraendert bleibt die (heute nicht erreichte)
   // eigenstaendige Zukunft: <h1>, Beschreibung, Primaerknopf und eigener FAB.
   const head = embedded
     ? `<h2 class="sr-only">${t('splitExpenses.tabLabel')}</h2>`
@@ -410,6 +410,9 @@ function bindShell() {
       renderAll();
     },
   });
+  // Gleitende Auswahl-Kapsel wie jede Segmentleiste (Kanon, Runde 7 D8).
+  const statusBar = _container.querySelector('#split-status-filter');
+  if (statusBar) attachSegmentIndicator(statusBar);
   _container.querySelector('#split-groups')?.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-group-id]');
     if (!btn) return;
@@ -456,7 +459,7 @@ export function canAddSplitExpense() {
   return !readOnly() && !isArchivedView();
 }
 
-/** Der Anlegen-Weg aus dem Budget-Kopf (#budget-add, #fab-new-budget). */
+/** Der Anlegen-Weg aus dem Budget-FAB (#fab-new-budget, am Desktop im Kopf). */
 export function openNewSplitExpense() {
   if (!canAddSplitExpense()) return;
   openExpenseModal();
