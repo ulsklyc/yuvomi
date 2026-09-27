@@ -423,3 +423,33 @@ test('Haushaltweit abgeschaltet: die Trefferart faellt, auch fuer den Admin, und
     setDisabled([]);
   }
 });
+
+// --------------------------------------------------------------------------
+// Client und Server sprechen ueber dieselben Trefferarten. Die Sektionen der
+// Suchoberflaeche (public/utils/search-sections.js) sind die zweite Stelle,
+// die eine neue Trefferart kennen muss - fehlt sie dort, liefert der Server
+// Treffer, die niemand sieht, und umgekehrt eine Ueberschrift, die nie kommt.
+// So stand die Entsorgung monatelang in der Antwort, aber in keiner Kachel.
+// --------------------------------------------------------------------------
+test('Die Suchoberflaeche kennt genau die Trefferarten der Antwort, jede mit Siegel und Text', async () => {
+  const { SEARCH_SECTIONS, searchScopeModules, searchResultCount } = await import('../public/utils/search-sections.js');
+  const { MODULE_ICON } = await import('../public/nav-icons.js');
+  const { emptySearchResults } = await import('../server/services/search.js');
+  const { readFileSync } = await import('node:fs');
+  const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  const lookup = (key) => key.split('.').reduce((node, part) => node?.[part], de);
+
+  const client = SEARCH_SECTIONS.map((s) => s.bucket).sort();
+  const server = Object.keys(emptySearchResults()).sort();
+  assert.deepEqual(client, server, 'dieselben Trefferarten in Oberflaeche und Antwort');
+  for (const section of SEARCH_SECTIONS) {
+    assert.ok(MODULE_ICON[section.module], `${section.bucket}: Modul ${section.module} hat ein Siegel`);
+    assert.equal(typeof lookup(section.labelKey), 'string', `${section.bucket}: ${section.labelKey} steht in de.json`);
+    assert.match(section.route({ id: 7, list_id: 3 }), /^\/[a-z]/, `${section.bucket}: Ziel ist eine App-Route`);
+  }
+
+  const body = await searchAs(KID);
+  assert.equal(searchResultCount(body), BUCKETS.length, 'jede Trefferart zaehlt mit');
+  assert.ok(searchScopeModules().includes('waste'), 'die Entsorgung hat ihre Kachel');
+  assert.ok(!searchScopeModules((m) => m !== 'budget').includes('budget'), 'ein nicht verfuegbares Modul faellt heraus');
+});
