@@ -3453,6 +3453,7 @@
         "bulkRestoredToast": "{{count}} 件の文書を復元しました。",
         "bulkDeletedToast": "{{count}} 件の文書を削除しました。",
         "bulkDeleteConfirm": "{{count}} 件の文書を削除しますか？",
+        "bulkDeleteConfirmDetail": "ごみ箱はありません。Yuvomiが保管しているファイルは完全に削除されます。",
         "bulkUploadedToast": "{{count}} 件の文書をアップロードしました。",
         "namePlaceholder": "ファイル名から取得",
         "nameHint": "空欄にするとファイル名を使います。",

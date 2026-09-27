@@ -3453,6 +3453,7 @@
         "bulkRestoredToast": "{{count}} दस्तावेज़ पुनर्स्थापित किए गए।",
         "bulkDeletedToast": "{{count}} दस्तावेज़ हटाए गए।",
         "bulkDeleteConfirm": "{{count}} दस्तावेज़ हटाएँ?",
+        "bulkDeleteConfirmDetail": "कोई रीसायकल बिन नहीं है: Yuvomi द्वारा संग्रहीत फ़ाइलें स्थायी रूप से हट जाती हैं।",
         "bulkUploadedToast": "{{count}} दस्तावेज़ अपलोड किए गए।",
         "namePlaceholder": "फ़ाइल नाम से लें",
         "nameHint": "फ़ाइल नाम उपयोग करने के लिए खाली छोड़ें।",

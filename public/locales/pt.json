@@ -3453,6 +3453,7 @@
         "bulkRestoredToast": "{{count}} documentos restaurados.",
         "bulkDeletedToast": "{{count}} documentos eliminados.",
         "bulkDeleteConfirm": "Eliminar {{count}} documentos?",
+        "bulkDeleteConfirmDetail": "Não há reciclagem: os ficheiros guardados pelo Yuvomi são eliminados definitivamente.",
         "bulkUploadedToast": "{{count}} documentos carregados.",
         "namePlaceholder": "Usar o nome do ficheiro",
         "nameHint": "Deixe vazio para usar o nome do ficheiro.",

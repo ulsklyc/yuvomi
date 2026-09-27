@@ -3627,6 +3627,7 @@
         "bulkRestoredToast": "Obnoveno dokumentů: {{count}}.",
         "bulkDeletedToast": "Smazáno dokumentů: {{count}}.",
         "bulkDeleteConfirm": "Smazat dokumenty: {{count}}?",
+        "bulkDeleteConfirmDetail": "Koš neexistuje: soubory uložené Yuvomi se smažou natrvalo.",
         "bulkUploadedToast": "Nahráno dokumentů: {{count}}.",
         "namePlaceholder": "Převzít z názvu souboru",
         "nameHint": "Nechte prázdné, aby se použil název souboru.",

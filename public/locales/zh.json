@@ -3453,6 +3453,7 @@
         "bulkRestoredToast": "已恢复 {{count}} 个文档。",
         "bulkDeletedToast": "已删除 {{count}} 个文档。",
         "bulkDeleteConfirm": "删除 {{count}} 个文档？",
+        "bulkDeleteConfirmDetail": "没有回收站：Yuvomi 保存的文件将被永久删除。",
         "bulkUploadedToast": "已上传 {{count}} 个文档。",
         "namePlaceholder": "取自文件名",
         "nameHint": "留空则使用文件名。",

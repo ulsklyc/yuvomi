@@ -3453,6 +3453,7 @@
         "bulkRestoredToast": "{{count}} dokument återställda.",
         "bulkDeletedToast": "{{count}} dokument raderade.",
         "bulkDeleteConfirm": "Radera {{count}} dokument?",
+        "bulkDeleteConfirmDetail": "Ingen papperskorg: filer som Yuvomi lagrar raderas permanent.",
         "bulkUploadedToast": "{{count}} dokument uppladdade.",
         "namePlaceholder": "Hämta från filnamnet",
         "nameHint": "Lämna tomt för att använda filnamnet.",

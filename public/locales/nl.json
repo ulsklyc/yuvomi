@@ -3513,6 +3513,7 @@
         "bulkRestoredToast": "{{count}} documenten hersteld.",
         "bulkDeletedToast": "{{count}} documenten verwijderd.",
         "bulkDeleteConfirm": "{{count}} documenten verwijderen?",
+        "bulkDeleteConfirmDetail": "Geen prullenbak: door Yuvomi opgeslagen bestanden worden definitief verwijderd.",
         "bulkUploadedToast": "{{count}} documenten geüpload.",
         "namePlaceholder": "Overnemen uit bestandsnaam",
         "nameHint": "Laat leeg om de bestandsnaam te gebruiken.",

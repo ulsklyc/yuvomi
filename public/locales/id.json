@@ -3513,6 +3513,7 @@
         "bulkRestoredToast": "{{count}} dokumen dipulihkan.",
         "bulkDeletedToast": "{{count}} dokumen dihapus.",
         "bulkDeleteConfirm": "Hapus {{count}} dokumen?",
+        "bulkDeleteConfirmDetail": "Tidak ada tempat sampah: berkas yang disimpan Yuvomi dihapus permanen.",
         "bulkUploadedToast": "{{count}} dokumen diunggah.",
         "namePlaceholder": "Ambil dari nama berkas",
         "nameHint": "Biarkan kosong untuk memakai nama berkas.",

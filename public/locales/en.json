@@ -3513,6 +3513,7 @@
         "bulkRestoredToast": "Restored {{count}} documents.",
         "bulkDeletedToast": "Deleted {{count}} documents.",
         "bulkDeleteConfirm": "Delete {{count}} documents?",
+        "bulkDeleteConfirmDetail": "No trash bin: files stored by Yuvomi are deleted permanently.",
         "bulkUploadedToast": "Uploaded {{count}} documents.",
         "namePlaceholder": "Take from file name",
         "nameHint": "Leave empty to use the file name.",

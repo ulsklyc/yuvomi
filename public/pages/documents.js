@@ -2059,7 +2059,9 @@ function exitSelectMode() {
  * Verschieben, Loeschen und „Fertig" als sichtbaren Ausstieg. „Alle auswaehlen"
  * und Archivieren stehen waehrend der Auswahl im Werkzeugmenue (syncToolsMenu).
  * Loeschen fragt in der Pille und bleibt danach fuenf Sekunden rueckgaengig zu
- * machen (deleteDocuments).
+ * machen (deleteDocuments). Die Rueckfrage sagt dazu, dass es keinen Papierkorb
+ * gibt (`confirm.detail`) - der Satz stand in der alten Leiste und fiel beim
+ * Umzug in die Pille zuerst weg.
  */
 function updateSelectUI() {
   syncToolsMenu();
@@ -2077,7 +2079,7 @@ function updateSelectUI() {
         ariaLabel: t('documents.bulkDeleteConfirm', { count: n }),
         count: n,
         danger: true,
-        confirm: { question: t('documents.bulkDeleteConfirm', { count: n }) },
+        confirm: { question: t('documents.bulkDeleteConfirm', { count: n }), detail: t('documents.bulkDeleteConfirmDetail') },
         onClick: () => deleteSelected(),
       },
     );

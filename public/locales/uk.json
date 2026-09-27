@@ -3453,6 +3453,7 @@
         "bulkRestoredToast": "Відновлено документів: {{count}}.",
         "bulkDeletedToast": "Видалено документів: {{count}}.",
         "bulkDeleteConfirm": "Видалити документів: {{count}}?",
+        "bulkDeleteConfirmDetail": "Кошика немає: файли, які зберігає Yuvomi, видаляються остаточно.",
         "bulkUploadedToast": "Завантажено документів: {{count}}.",
         "namePlaceholder": "Узяти з назви файлу",
         "nameHint": "Залиште порожнім, щоб використати назву файлу.",

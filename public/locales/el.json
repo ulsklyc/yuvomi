@@ -3453,6 +3453,7 @@
         "bulkRestoredToast": "Επαναφέρθηκαν {{count}} έγγραφα.",
         "bulkDeletedToast": "Διαγράφηκαν {{count}} έγγραφα.",
         "bulkDeleteConfirm": "Διαγραφή {{count}} εγγράφων;",
+        "bulkDeleteConfirmDetail": "Δεν υπάρχει κάδος: τα αρχεία που αποθηκεύει το Yuvomi διαγράφονται οριστικά.",
         "bulkUploadedToast": "Μεταφορτώθηκαν {{count}} έγγραφα.",
         "namePlaceholder": "Λήψη από το όνομα αρχείου",
         "nameHint": "Αφήστε το κενό για να χρησιμοποιηθεί το όνομα του αρχείου.",

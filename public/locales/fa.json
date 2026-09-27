@@ -3513,6 +3513,7 @@
         "bulkRestoredToast": "{{count}} سند بازیابی شد.",
         "bulkDeletedToast": "{{count}} سند حذف شد.",
         "bulkDeleteConfirm": "{{count}} سند حذف شود؟",
+        "bulkDeleteConfirmDetail": "سطل بازیافتی وجود ندارد: فایل‌هایی که Yuvomi ذخیره کرده برای همیشه حذف می‌شوند.",
         "bulkUploadedToast": "{{count}} سند بارگذاری شد.",
         "namePlaceholder": "برگرفته از نام فایل",
         "nameHint": "برای استفاده از نام فایل، خالی بگذارید.",

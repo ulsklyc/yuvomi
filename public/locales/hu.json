@@ -3513,6 +3513,7 @@
         "bulkRestoredToast": "{{count}} dokumentum visszaállítva.",
         "bulkDeletedToast": "{{count}} dokumentum törölve.",
         "bulkDeleteConfirm": "Törlöd a(z) {{count}} dokumentumot?",
+        "bulkDeleteConfirmDetail": "Lomtár nincs: a Yuvomi által tárolt fájlok véglegesen törlődnek.",
         "bulkUploadedToast": "{{count}} dokumentum feltöltve.",
         "namePlaceholder": "Átvétel a fájlnévből",
         "nameHint": "Hagyd üresen a fájlnév használatához.",

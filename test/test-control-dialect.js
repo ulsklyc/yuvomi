@@ -1106,3 +1106,114 @@ test('Auswahlkreis: EIN Baustein in der Shell (layout.css), jede Mehrfachauswahl
     assert.match(src, /<button type="button" class="select-circle[^"]*"/, `${page}.js waehlt per Auswahlkreis`);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Die Rueckfrage der Sammelaktions-Pille (utils/bulk-pill.js) als Programm
+//
+// ANLASS (R11, 2026-09-27): die Dokumente-Auswahl zog in die Pille, und dabei
+// ging der Satz verloren, der vor dem Sammel-Loeschen stand - einen Papierkorb
+// gibt es nicht. Die Frage selbst kann ihn nicht tragen: gemessen bei 390px
+// passte "12 Dokumente endgueltig loeschen? Kein Papierkorb." in 15 von 24
+// Sprachen nicht in eine Zeile (die Frage bricht bewusst nicht innen um).
+// Also traegt die Rueckfrage eine optionale Detailzeile - eigene Zeile unter
+// Frage und Wahl, im Gruppennamen mitgelesen, und wer sie nicht setzt, bekommt
+// die Pille wie bisher.
+// ---------------------------------------------------------------------------
+
+class PillEl {
+  constructor(tag) {
+    this.tagName = tag.toUpperCase();
+    this.children = [];
+    this.attrs = {};
+    this.classes = new Set();
+    this.listeners = {};
+    this.textContent = '';
+    this.disabled = false;
+    this.id = '';
+    this.classList = { add: (c) => this.classes.add(c), contains: (c) => this.classes.has(c) };
+  }
+  set className(v) { this.classes = new Set(String(v).split(/\s+/).filter(Boolean)); }
+  get className() { return [...this.classes].join(' '); }
+  setAttribute(k, v) { this.attrs[k] = String(v); }
+  getAttribute(k) { return this.attrs[k] ?? null; }
+  appendChild(c) { this.children.push(c); return c; }
+  addEventListener(type, fn) { this.listeners[type] = fn; }
+  all() { return this.children.flatMap((c) => [c, ...c.all()]); }
+  querySelectorAll(sel) { return this.all().filter((c) => c.classes.has(sel.replace(/^\./, ''))); }
+  querySelector(sel) { return this.querySelectorAll(sel)[0] ?? null; }
+  contains() { return false; }
+  focus() {}
+}
+
+async function withPillDom(run) {
+  const layer = { bar: null, replaceChildren(...n) { this.bar = n[0] ?? null; }, querySelector() { return this.bar; } };
+  const saved = globalThis.document;
+  globalThis.document = {
+    activeElement: null,
+    getElementById: (id) => (id === 'bulk-pill-layer' ? layer : null),
+    createElement: (tag) => new PillEl(tag),
+  };
+  try {
+    const { setBulkPill } = await import('../public/utils/bulk-pill.js');
+    await run({ setBulkPill, layer });
+  } finally {
+    globalThis.document = saved;
+  }
+}
+
+/** Oeffnet die Rueckfrage der ersten Kapsel und liefert die Pille danach. */
+function openConfirm(layer) {
+  layer.bar.querySelector('.list-bulkbar__action').listeners.click();
+  return layer.bar;
+}
+
+test('Pillen-Rueckfrage: confirm.detail steht als eigene Zeile unter Frage und Wahl und im Gruppennamen', async () => {
+  await withPillDom(async ({ setBulkPill, layer }) => {
+    setBulkPill({ label: '3 ausgewaehlt', actions: [
+      { label: 'Loeschen', count: 3, danger: true, confirm: { question: '3 Dokumente loeschen?', detail: 'Kein Papierkorb.' }, onClick() {} },
+    ] });
+    // Im Ruhezustand steht die Detailzeile nicht - sie gehoert zur Frage.
+    assert.equal(layer.bar.querySelector('.list-bulkbar__detail'), null);
+
+    const bar = openConfirm(layer);
+    assert.ok(bar.classes.has('list-bulkbar--confirming'));
+    const detail = bar.querySelector('.list-bulkbar__detail');
+    assert.ok(detail, 'die Rueckfrage zeigt ihre Detailzeile');
+    assert.equal(detail.textContent, 'Kein Papierkorb.');
+    // Direktes Kind der Pille NACH dem Paar: eine eigene Zeile unter Frage und
+    // Wahl, nicht zwischen Abbrechen und Bestaetigen.
+    const kinder = bar.children.map((c) => c.className);
+    assert.deepEqual(kinder, ['list-bulkbar__subject', 'list-bulkbar__choices', 'list-bulkbar__detail']);
+    // Der Fokuswechsel in die Gruppe liest ihren Namen - der Satz muss darin
+    // stehen, sonst hoert ihn niemand (die Rueckfrage hat keine Live-Region).
+    const ids = bar.getAttribute('aria-labelledby').split(/\s+/);
+    assert.deepEqual(ids, [bar.children[0].id, detail.id]);
+    assert.ok(detail.id && detail.id !== bar.children[0].id);
+  });
+});
+
+test('Pillen-Rueckfrage: ohne confirm.detail bleibt die Pille, wie sie war', async () => {
+  await withPillDom(async ({ setBulkPill, layer }) => {
+    setBulkPill({ label: '2 ausgewaehlt', actions: [
+      { label: 'Loeschen', danger: true, confirm: { question: '2 Aufgaben loeschen?' }, onClick() {} },
+    ] });
+    const bar = openConfirm(layer);
+    assert.equal(bar.querySelector('.list-bulkbar__detail'), null);
+    assert.deepEqual(bar.children.map((c) => c.className), ['list-bulkbar__subject', 'list-bulkbar__choices']);
+    assert.equal(bar.getAttribute('aria-labelledby'), bar.children[0].id);
+  });
+});
+
+test('Pillen-Rueckfrage: die Detailzeile nimmt eine ganze Zeile und bricht innen um', () => {
+  // Die Frage bricht nicht innen um (sie schiebt die Wahl in die naechste
+  // Zeile, test:frontend-audit) - die Detailzeile schon: sie ist in manchen
+  // Sprachen laenger als die Pille breit ist. Ohne `white-space: normal` erbte
+  // sie nichts Kappendes, aber auch nichts, das sie haelt; ohne die volle Basis
+  // stuende sie neben der Wahl und quetschte das Paar.
+  const layout = readFileSync(join(PUBLIC, 'styles/layout.css'), 'utf8');
+  const rule = [...eachRule(layout)].find((r) => r.selector.trim() === '.list-bulkbar__detail' && !r.at.length);
+  assert.ok(rule, '.list-bulkbar__detail braucht eine Basisregel in layout.css (Shell-Schicht)');
+  assert.match(rule.body, /flex:\s*1\s+0\s+100%|flex-basis:\s*100%/, 'eine eigene Zeile');
+  assert.match(rule.body, /white-space:\s*normal/, 'bricht innen um');
+  assert.match(rule.body, /font-size:\s*var\(--text-/, 'Schriftgroesse aus den Tokens');
+});

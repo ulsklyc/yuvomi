@@ -7203,6 +7203,20 @@ textarea::placeholder {
   margin-inline-start: auto;
 }
 
+/* Die Folge, die die Frage nicht trägt (optional, `confirm.detail` in
+ * utils/bulk-pill.js; Dokumente: kein Papierkorb). Sie steht NACH dem Paar im
+ * DOM und nimmt eine ganze Zeile - so bleiben Frage und Wahl oben beieinander,
+ * und der Satz liegt darunter. Anders als die Frage bricht sie innen um: sie
+ * ist in manchen Sprachen länger als die Pille breit ist (gemessen bei 390px),
+ * und eine gekappte Warnung wäre keine. Auch hier keine Container-Schwelle. */
+.list-bulkbar__detail {
+  flex: 1 0 100%;
+  font-size: var(--text-xs);
+  line-height: var(--line-height-snug);
+  color: var(--neutral-300);
+  white-space: normal;
+}
+
 /* Das einzige Element der Pille, das nachgibt. `min-width: 0` ist die
  * Bedingung dafür, dass die Kürzung überhaupt greift - ohne sie wächst der
  * Text über die Pille hinaus, statt nachzugeben. */

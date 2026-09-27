@@ -3513,6 +3513,7 @@
         "bulkRestoredToast": "Đã khôi phục {{count}} tài liệu.",
         "bulkDeletedToast": "Đã xóa {{count}} tài liệu.",
         "bulkDeleteConfirm": "Xóa {{count}} tài liệu?",
+        "bulkDeleteConfirmDetail": "Không có thùng rác: tệp do Yuvomi lưu sẽ bị xoá vĩnh viễn.",
         "bulkUploadedToast": "Đã tải lên {{count}} tài liệu.",
         "namePlaceholder": "Lấy từ tên tệp",
         "nameHint": "Để trống để dùng tên tệp.",

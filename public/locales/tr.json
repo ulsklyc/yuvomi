@@ -3453,6 +3453,7 @@
         "bulkRestoredToast": "{{count}} belge geri yüklendi.",
         "bulkDeletedToast": "{{count}} belge silindi.",
         "bulkDeleteConfirm": "{{count}} belge silinsin mi?",
+        "bulkDeleteConfirmDetail": "Geri dönüşüm kutusu yok: Yuvomi’nin sakladığı dosyalar kalıcı olarak silinir.",
         "bulkUploadedToast": "{{count}} belge yüklendi.",
         "namePlaceholder": "Dosya adından al",
         "nameHint": "Dosya adını kullanmak için boş bırakın.",

@@ -3453,6 +3453,7 @@
         "bulkRestoredToast": "تمت استعادة {{count}} مستندات.",
         "bulkDeletedToast": "تم حذف {{count}} مستندات.",
         "bulkDeleteConfirm": "حذف {{count}} مستندات؟",
+        "bulkDeleteConfirmDetail": "لا توجد سلة محذوفات: تُحذف الملفات التي يخزّنها Yuvomi نهائيًا.",
         "bulkUploadedToast": "تم رفع {{count}} مستندات.",
         "namePlaceholder": "أخذه من اسم الملف",
         "nameHint": "اتركه فارغًا لاستخدام اسم الملف.",

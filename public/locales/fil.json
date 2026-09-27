@@ -3513,6 +3513,7 @@
         "bulkRestoredToast": "Naibalik ang {{count}} dokumento.",
         "bulkDeletedToast": "Natanggal ang {{count}} dokumento.",
         "bulkDeleteConfirm": "Tanggalin ang {{count}} dokumento?",
+        "bulkDeleteConfirmDetail": "Walang basurahan: permanenteng tinatanggal ang mga file na iniimbak ng Yuvomi.",
         "bulkUploadedToast": "Na-upload ang {{count}} dokumento.",
         "namePlaceholder": "Kunin mula sa pangalan ng file",
         "nameHint": "Iwanang blangko para gamitin ang pangalan ng file.",

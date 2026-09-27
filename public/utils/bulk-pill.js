@@ -202,6 +202,25 @@ function paint(spec, pending) {
     setTimeout(() => { confirmBtn.disabled = false; }, CONFIRM_GRACE_MS);
     choices.appendChild(confirmBtn);
     bar.appendChild(choices);
+    // DIE FOLGE, DIE DIE FRAGE NICHT TRAEGT (R11, 2026-09-27). Die Dokumente
+    // loeschen endgueltig - einen Papierkorb gibt es nicht. In die Frage passt
+    // das nicht: gemessen bei 390px stand "12 Dokumente endgueltig loeschen?
+    // Kein Papierkorb." in 15 von 24 Sprachen ueber den Rand, und die Frage
+    // bricht bewusst nicht innen um. Also eine eigene Zeile NACH dem Paar
+    // (layout.css `.list-bulkbar__detail`: volle Zeile, bricht um), damit die
+    // Frage und ihre Wahl in der ersten Zeile beieinander bleiben.
+    //
+    // Im Gruppennamen, nicht daneben: der Fokuswechsel auf Abbrechen liest den
+    // Namen der Gruppe - das ist die Ansage der Rueckfrage (siehe Kopf). Ein
+    // Satz, der dort fehlt, wird nicht gehoert.
+    if (pending.confirm.detail) {
+      const detail = document.createElement('span');
+      detail.className = 'list-bulkbar__detail';
+      detail.id = 'bulk-pill-detail';
+      detail.textContent = pending.confirm.detail;
+      bar.appendChild(detail);
+      bar.setAttribute('aria-labelledby', `${subject.id} ${detail.id}`);
+    }
     // ESCAPE NIMMT DIE FRAGE ZURÜCK. Ohne das wäre der Rückweg nur mit einem
     // gezielten Treffer zu haben - bei einer Frage, die man versehentlich
     // aufgemacht hat, ist das die falsche Anforderung.
@@ -260,10 +279,12 @@ function paint(spec, pending) {
  *
  * @param {object} spec
  * @param {string} spec.label   Was die Teilmenge IST - führt mit der Zahl.
- * @param {Array<{label: string, ariaLabel?: string, count?: number, danger?: boolean, confirm?: {question: string, confirmLabel?: string}, onClick: (btn: HTMLButtonElement) => void}>} spec.actions
+ * @param {Array<{label: string, ariaLabel?: string, count?: number, danger?: boolean, confirm?: {question: string, detail?: string, confirmLabel?: string}, onClick: (btn: HTMLButtonElement) => void}>} spec.actions
  *   `count` setzt eine Marke an die Kapsel, sichtbar erst dort, wo das Subjekt
  *   wegfällt. `danger` gibt ihr die Tinte der Gefahr, `confirm` die Rückfrage -
  *   beides gehört zusammen und ein Guard prüft das (test-frontend-audit.js).
+ *   `confirm.detail` ist optional: eine Folge, die die Frage nicht trägt
+ *   (Dokumente: kein Papierkorb), als eigene Zeile unter Frage und Wahl.
  */
 export function setBulkPill(spec) {
   return paint({ actions: [], ...spec }, null);

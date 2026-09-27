@@ -3513,6 +3513,7 @@
         "bulkRestoredToast": "Przywrócono dokumenty: {{count}}.",
         "bulkDeletedToast": "Usunięto dokumenty: {{count}}.",
         "bulkDeleteConfirm": "Usunąć dokumenty: {{count}}?",
+        "bulkDeleteConfirmDetail": "Kosza nie ma: pliki przechowywane przez Yuvomi zostaną usunięte na zawsze.",
         "bulkUploadedToast": "Przesłano dokumenty: {{count}}.",
         "namePlaceholder": "Pobierz z nazwy pliku",
         "nameHint": "Zostaw puste, aby użyć nazwy pliku.",

@@ -1709,8 +1709,8 @@ test('die Pille der Auswahl: ohne Dokument nur der Ausstieg, Loeschen fragt in d
   assert.match(update, /if \(!state\.selectMode[^)]*\) \{ clearBulkPill\(\); return; \}/, 'ausserhalb der Auswahl keine Pille');
   const guarded = update.slice(update.indexOf('if (n > 0) {'), update.indexOf("actions.push({ label: t('documents.selectDone')"));
   assert.match(guarded, /t\('documents\.moveAction'\)[\s\S]*onClick: \(\) => moveSelected\(\)/, 'Verschieben nur mit Auswahl');
-  assert.match(guarded, /label: t\('common\.delete'\),[\s\S]*count: n,\s*danger: true,\s*confirm: \{ question: t\('documents\.bulkDeleteConfirm', \{ count: n \}\) \},\s*onClick: \(\) => deleteSelected\(\)/,
-    'Loeschen traegt Zahl, Tinte und Rueckfrage in der Pille');
+  assert.match(guarded, /label: t\('common\.delete'\),[\s\S]*count: n,\s*danger: true,\s*confirm: \{ question: t\('documents\.bulkDeleteConfirm', \{ count: n \}\), detail: t\('documents\.bulkDeleteConfirmDetail'\) \},\s*onClick: \(\) => deleteSelected\(\)/,
+    'Loeschen traegt Zahl, Tinte und Rueckfrage in der Pille - samt dem Satz, dass es keinen Papierkorb gibt');
   assert.match(update, /actions\.push\(\{ label: t\('documents\.selectDone'\), onClick: \(\) => exitSelectMode\(\) \}\);\s*setBulkPill\(\{ label: t\('documents\.selectCount', \{ count: n \}\), actions \}\);/,
     'der sichtbare Ausstieg steht immer, als letzte Kapsel');
   // Die Rueckfrage stellt die Pille - kein zweiter Dialog danach.
@@ -1724,6 +1724,23 @@ test('die Pille der Auswahl: ohne Dokument nur der Ausstieg, Loeschen fragt in d
   assert.match(sync, /all\.hidden = !state\.selectMode/);
   assert.match(sync, /archive\.disabled = !state\.selectMode \|\| state\.selected\.size === 0/);
   assert.match(sync, /t\(archived \? 'documents\.restoreAction' : 'documents\.archiveAction'\)/, 'im Archiv heisst es Wiederherstellen');
+});
+
+test('das Sammel-Loeschen sagt, dass es keinen Papierkorb gibt - in jeder Sprache (R11)', () => {
+  // Mit dem Umzug in die Pille (R11 H4) fiel der Detailsatz der alten Leiste
+  // weg: von Yuvomi gespeicherte Dateien verschwinden aus dem Speicher, einen
+  // Papierkorb gibt es nicht. Die Pille haette danach nur noch "3 Dokumente
+  // loeschen?" gefragt - und das liest sich wie jede andere Rueckfrage.
+  assert.match(de.documents.bulkDeleteConfirmDetail ?? '', /Papierkorb/);
+  assert.match(de.documents.bulkDeleteConfirmDetail ?? '', /endgültig/);
+  const dir = resolve(HERE, '../public/locales');
+  const locales = readdirSync(dir).filter((f) => f.endsWith('.json'));
+  assert.equal(locales.length, 24);
+  for (const file of locales) {
+    const value = JSON.parse(readFileSync(resolve(dir, file), 'utf8')).documents?.bulkDeleteConfirmDetail;
+    assert.ok(typeof value === 'string' && value.trim().length > 0, `${file}: documents.bulkDeleteConfirmDetail fehlt`);
+    assert.doesNotMatch(value, /\{\{count\}\}/, `${file}: die Detailzeile zaehlt nicht, sie hat keine Pluralform`);
+  }
 });
 
 test('im gewaehlten Ordner nennt die Zeile den Ordner nicht noch einmal', () => {

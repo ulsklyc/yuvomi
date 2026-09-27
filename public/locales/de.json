@@ -3513,6 +3513,7 @@
         "bulkRestoredToast": "{{count}} Dokumente wiederhergestellt.",
         "bulkDeletedToast": "{{count}} Dokumente gelöscht.",
         "bulkDeleteConfirm": "{{count}} Dokumente löschen?",
+        "bulkDeleteConfirmDetail": "Kein Papierkorb: von Yuvomi gespeicherte Dateien werden endgültig gelöscht.",
         "bulkUploadedToast": "{{count}} Dokumente hochgeladen.",
         "namePlaceholder": "Aus Dateiname übernehmen",
         "nameHint": "Leer lassen, um den Dateinamen zu verwenden.",

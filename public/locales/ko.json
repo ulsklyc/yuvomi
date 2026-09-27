@@ -3513,6 +3513,7 @@
         "bulkRestoredToast": "문서 {{count}}개를 복원했습니다.",
         "bulkDeletedToast": "문서 {{count}}개를 삭제했습니다.",
         "bulkDeleteConfirm": "문서 {{count}}개를 삭제할까요?",
+        "bulkDeleteConfirmDetail": "휴지통은 없습니다. Yuvomi가 보관한 파일은 영구적으로 삭제됩니다.",
         "bulkUploadedToast": "문서 {{count}}개를 업로드했습니다.",
         "namePlaceholder": "파일 이름에서 가져오기",
         "nameHint": "비워 두면 파일 이름을 사용합니다.",
