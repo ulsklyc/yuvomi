@@ -1175,7 +1175,11 @@ function mountItems(listEl, container) {
   }
 
   listEl.replaceChildren();
-  listEl.insertAdjacentHTML('beforeend', renderItems());
+  // EINE HUELLE UM DIE GRUPPEN (R11 H5): sie ist die Flaeche, die am Desktop
+  // in zwei Spalten packt (shopping.css, `.items-lanes`). Der Scroller selbst
+  // kann das nicht - mit begrenzter Hoehe liefe Multicol seitlich ueber.
+  // Mobil ist sie `display: contents` und aendert nichts.
+  listEl.insertAdjacentHTML('beforeend', `<div class="items-lanes">${renderItems()}</div>`);
 }
 
 function renderItems() {

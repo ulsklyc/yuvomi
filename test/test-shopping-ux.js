@@ -2123,25 +2123,46 @@ test('der Neu-Knopf der Listenleiste baut am Desktop nicht hoeher als die Kapsel
 // Zwei Spalten am Desktop (Re-Critique 2026-09-27, A4 P1 / R10 L4). Gemessen
 // bei 1440x900: die Liste stand auf 252-972, rechts 436px leer, 1576px
 // Scrollhoehe. Ab 60rem EINKAUFSFLAECHE (nicht Viewport) stehen die
-// Kategorien in zwei Spalten, Masonry nur als Fortschritt hinter @supports -
-// das Muster der Notizen. Das Lesemass der Kategorie bleibt die Variable, die
-// hier auf die Spalte zeigt; die Eingabezeile endet mit der ersten Spalte.
-test('ab 60rem Einkaufsflaeche stehen die Kategorien in zwei Spalten', async () => {
+// Kategorien in zwei Spalten. Das Lesemass der Kategorie bleibt die Variable,
+// die hier auf die Spalte zeigt; die Eingabezeile endet mit der ersten Spalte.
+//
+// DICHT OHNE NATIVES MASONRY (R11 H5): die Basis war ein Grid mit zwei
+// Spalten, und Chrome/Firefox liessen unter einer kurzen Kategorie die Luft
+// ihrer Zeile stehen (208px, 1440x900). Jetzt packt Multicol auf einer Huelle
+// ohne feste Hoehe; Masonry bleibt der Fortschritt hinter @supports.
+test('ab 60rem Einkaufsflaeche stehen die Kategorien dicht gepackt in zwei Spalten', async () => {
   const { eachRule } = await import('./css-rules.js');
   const css = readFileSync(new URL('../public/styles/shopping.css', import.meta.url), 'utf8');
+  const js = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
   const rules = [...eachRule(css)];
   const root = rules.find((r) => r.selector.trim() === '.shopping-page' && /container:\s*shopping-surface\s*\/\s*inline-size/.test(r.body));
   assert.ok(root, 'die Seite ist der Container shopping-surface - die Abfrage misst die Seite, nicht den Viewport');
-  const inQuery = (r) => r.at.some((a) => /^@container shopping-surface \(min-width: 60rem\)$/.test(a));
-  const list = rules.find((r) => inQuery(r) && r.at.length === 1 && r.selector.trim() === '.shopping-page .items-list');
-  assert.ok(list, 'keine Zwei-Spalten-Regel fuer die Artikelliste');
-  assert.match(list.body, /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
-  assert.match(list.body, /--page-measure:\s*100%/, 'die Kategorie kappt auf ihre Spalte, ueber dieselbe Variable');
-  assert.match(list.body, /align-items:\s*start/, 'eine kurze Kategorie dehnt ihre Zeile nicht');
-  assert.ok(rules.some((r) => inQuery(r) && r.at.some((a) => /@supports \(grid-template-rows: masonry\)/.test(a))
-    && /grid-template-rows:\s*masonry/.test(r.body)), 'Masonry nur hinter @supports');
-  const quick = rules.find((r) => inQuery(r) && r.selector.trim() === '.shopping-page .quick-add');
+  const QUERY = /^@container shopping-surface \(min-width: 60rem\)$/;
+  const inQuery = (r) => r.at.some((a) => QUERY.test(a));
+  const plain = (r) => inQuery(r) && r.at.length === 1;
+  const find = (sel, pred = plain) => rules.find((r) => pred(r) && r.selector.trim() === sel);
+
+  // Die Huelle steht im Markup UM die Gruppen - der Scroller selbst hat eine
+  // feste Hoehe, und Multicol liefe dort seitlich statt nach unten weiter.
+  assert.match(js, /insertAdjacentHTML\('beforeend', `<div class="items-lanes">\$\{renderItems\(\)\}<\/div>`\)/);
+  const narrow = rules.find((r) => r.at.length === 0 && r.selector.trim() === '.items-lanes');
+  assert.match(narrow?.body ?? '', /display:\s*contents/, 'schmal aendert die Huelle nichts');
+
+  assert.match(find('.shopping-page .items-list')?.body ?? '', /--page-measure:\s*100%/, 'die Kategorie kappt auf ihre Spalte, ueber dieselbe Variable');
+  const lanes = find('.shopping-page .items-lanes')?.body ?? '';
+  assert.match(lanes, /columns:\s*2/, 'die Basis packt ohne Masonry: zwei Spalten im Fluss');
+  assert.match(lanes, /column-gap:\s*var\(--space-5\)/);
+  assert.doesNotMatch(lanes, /grid-template-columns/, 'kein Raster als Basis - dort bliebe Luft unter kurzen Kategorien');
+  assert.match(find('.shopping-page .items-lanes > .list-group')?.body ?? '', /break-inside:\s*avoid/, 'eine Kategorie bricht nie ueber zwei Spalten');
+
+  for (const [cond, decl] of [['grid-template-rows: masonry', /grid-template-rows:\s*masonry/], ['display: grid-lanes', /display:\s*grid-lanes/]]) {
+    const enh = find('.shopping-page .items-lanes', (r) => inQuery(r) && r.at.some((a) => a === `@supports (${cond})`));
+    assert.ok(enh, `natives Masonry (${cond}) nur hinter @supports`);
+    assert.match(enh.body, decl);
+    assert.match(enh.body, /columns:\s*auto/, 'mit Masonry faellt Multicol weg');
+    assert.match(enh.body, /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+  }
+  const quick = find('.shopping-page .quick-add');
   assert.match(quick?.body ?? '', /max-width:\s*calc\(\(100% - var\(--space-5\)\) \/ 2\)/,
     'die Eingabezeile endet mit der ersten Spalte (Spaltenluecke = column-gap)');
-  assert.match(list.body, /column-gap:\s*var\(--space-5\)/);
 });

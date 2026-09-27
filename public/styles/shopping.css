@@ -622,13 +622,20 @@
  * die Liste endet an derselben Kante wie Essensplan und Rezepte - die
  * Kuechen-Tabs teilen eine Fluchtlinie (252 bis 1408 bei 1440).
  *
- * DAS MUSTER DER NOTIZEN: ein getestetes CSS-Grid als Basis, echtes Masonry
- * nur als Fortschritt hinter `@supports` (Safari 26.4 kennt `grid-lanes`,
- * Firefox hinter einem Schalter `grid-template-rows: masonry`). Ohne beides
- * endet eine kurze Kategorie mit Luft unter sich statt die Zeile zu dehnen
- * (`align-items: start`). Kein Multicol: es verschoebe beim Zuklappen einer
- * Gruppe die folgenden in die andere Spalte, und die Lesefolge der Tastatur
- * waere eine andere als die sichtbare.
+ * DICHT GEPACKT OHNE NATIVES MASONRY (Re-Critique 2026-09-27, R11 H5). Bis R11
+ * war die Basis ein Grid mit zwei Spalten, Masonry nur hinter `@supports`.
+ * Chrome und Firefox kennen beides nicht: eine kurze Kategorie endete dort mit
+ * Luft unter sich, weil ihre Zeile so hoch war wie die Nachbarin (gemessen bei
+ * 1440x900: 208px unter einer kurzen Kategorie). Jetzt ist die Basis Multicol - dieselbe
+ * Rezeptur wie im Leitfaden fuer Masonry-Ersatz: `columns` auf einer Huelle
+ * ohne feste Hoehe (`.items-lanes`, shopping.js), `break-inside: avoid` je
+ * Kategorie. Natives Masonry bleibt der Fortschritt hinter `@supports`.
+ *
+ * WAS MULTICOL KOSTET, KOSTET MASONRY AUCH: klappt eine Kategorie zu, kann die
+ * naechste in die andere Spalte wandern - Masonry legt ebenso jede Gruppe in
+ * die gerade kuerzere Bahn. Die Lesefolge folgt der sichtbaren Spalte (erst
+ * links hinab, dann rechts), die Tastatur mit ihr, weil das DOM dieselbe
+ * Reihenfolge hat.
  *
  * DIE ABFRAGE MISST DIE SEITE, NICHT DEN VIEWPORT - dieselbe Regel wie der
  * Liste-+-Detail-Baustein (layout.css, module-surface): neben der
@@ -637,19 +644,28 @@
   container: shopping-surface / inline-size;
 }
 
+/* Schmal traegt die Huelle nichts: die Gruppen stehen wie bisher direkt im
+ * Raster des Scrollers und erben dessen Abstand. */
+.items-lanes {
+  display: contents;
+}
+
 @container shopping-surface (min-width: 60rem) {
   /* Die Kategorie kappt weiter ueber `--page-measure` (list-row.css) - hier
    * ist das Mass die Spalte selbst, wie im Liste-+-Detail-Baustein. */
   .shopping-page .items-list {
     --page-measure: 100%;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: var(--space-5);
-    align-items: start;
   }
 
-  /* Leer- und Fehlerzustaende stehen ueber beide Spalten. */
-  .shopping-page .items-list > :not(.list-group) {
-    grid-column: 1 / -1;
+  .shopping-page .items-lanes {
+    display: block;
+    columns: 2;
+    column-gap: var(--space-5);
+  }
+
+  .shopping-page .items-lanes > .list-group {
+    break-inside: avoid;
+    margin-block-end: var(--space-3);
   }
 
   /* Die Eingabezeile endet mit der ersten Spalte statt mitten in der zweiten. */
@@ -658,14 +674,30 @@
   }
 
   @supports (grid-template-rows: masonry) {
-    .shopping-page .items-list {
+    .shopping-page .items-lanes {
+      display: grid;
+      columns: auto;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       grid-template-rows: masonry;
+      gap: var(--space-3) var(--space-5);
+      align-items: start;
+    }
+
+    .shopping-page .items-lanes > .list-group {
+      margin-block-end: 0;
     }
   }
 
   @supports (display: grid-lanes) {
-    .shopping-page .items-list {
+    .shopping-page .items-lanes {
       display: grid-lanes;
+      columns: auto;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-3) var(--space-5);
+    }
+
+    .shopping-page .items-lanes > .list-group {
+      margin-block-end: 0;
     }
   }
 }
