@@ -16,6 +16,7 @@
  *
  * Nachträglich gemountete Panes (Detailansicht → Formular, detail-view.js)
  *   mountFooter(panel)             → hebt eine neu gerenderte Fußzeile ans Panel
+ *   decorateFooterDelete(footer)   → erkennt Löschen im Fuß (mobil Icon-Knopf)
  *   refreshDirtySnapshot()         → Dirty-Basis auf den jetzigen Stand setzen
  *   focusFirstField(panel)         → Fokus nach dem Pane-Wechsel, touch-bewusst
  *   updateHeaderAction(panel, …)   → Beschriftung/Handler des Kopf-Buttons tauschen
@@ -25,6 +26,7 @@ import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { pushOverlay, dropOverlay, isOverlayOpen } from '/utils/overlay-history.js';
 import { wireSheetDrag } from '/utils/sheet-drag.js';
+import { iconElement } from '/utils/lucide-icons.js';
 
 let activeOverlay = null;
 let previouslyFocused = null;
@@ -1158,7 +1160,95 @@ export function mountFooter(panel) {
     .forEach((el) => el.remove());
 
   panel.appendChild(bodyFooter);
+  decorateFooterDelete(bodyFooter);
   return bodyFooter;
+}
+
+/**
+ * Woran der Fuß sein Löschen erkennt. Die Module schreiben es seit Jahren als
+ * `.btn--danger-outline` (einige als `.btn--danger-ghost`) - die Klasse IST
+ * die Auszeichnung, kein Modul muss etwas nachtragen. `data-footer-delete`
+ * nimmt einen Knopf auf, der anders aussieht; `data-footer-delete="off"` nimmt
+ * einen heraus, bei dem Löschen die Primäraktion des Dialogs ist.
+ */
+export const FOOTER_DELETE_SELECTOR = '.btn--danger-outline, .btn--danger-ghost, [data-footer-delete]';
+
+/**
+ * Der Name des Objekts, das der Knopf löscht: ausdrücklich gesetzt
+ * (`data-delete-name`), sonst das erste Textfeld des Formulars - dort steht bei
+ * jedem Objekt sein Titel -, und in der Detailansicht der Dialogtitel, denn
+ * dort IST er der Objektname (detail-view.js).
+ */
+function footerDeleteObjectName(btn) {
+  const own = btn.dataset?.deleteName?.trim();
+  if (own) return own;
+  const panel = btn.closest?.('.modal-panel');
+  const scope = btn.form ?? panel?.querySelector('.modal-panel__body');
+  const field = scope?.querySelector?.('input[type="text"], input:not([type])');
+  const typed = field?.value?.trim();
+  if (typed) return typed;
+  if (btn.closest?.('.detail-view__footer')) return panel?.querySelector('.modal-panel__title')?.textContent?.trim() || '';
+  return '';
+}
+
+/**
+ * DER DIALOGFUSS MIT LÖSCHEN PASST MOBIL IN EINE ZEILE (Re-Critique
+ * 2026-09-27, R9 M8).
+ *
+ * WAS GEMESSEN WAR: Löschen · Abbrechen · Speichern brauchen bei 390px rund
+ * 345px, der Fuß hat 332. Der Umbruch aus #872 hielt alles im Bild, stellte
+ * aber „Speichern" allein in eine zweite Zeile - die Primäraktion stand unter
+ * der Nebenaktion, in jedem Dialog mit Löschen (Kalender, Medikament,
+ * Mahlzeit ...).
+ *
+ * DIE ANTWORT IST APPLES: Löschen wird auf dem Telefon ein 44px-Papierkorb links,
+ * Abbrechen und Primär bleiben rechts beschriftet. Einmal hier statt je Modul -
+ * deshalb erkennt die Shell den Knopf an seiner Klasse, packt seinen Text in
+ * eine eigene Spanne (die das CSS mobil ausblendet, ohne sie dem Screenreader
+ * zu nehmen), ergänzt ein fehlendes Papierkorb-Symbol und gibt ihm den
+ * Objektnamen: „Einkauf löschen" statt eines nackten „Löschen", sobald das
+ * Wort selbst nicht mehr dasteht. Ein vorhandenes `aria-label` gewinnt immer.
+ *
+ * Idempotent: ein zweiter Umzug derselben Fußzeile (Pane-Wechsel) ändert nichts.
+ *
+ * @param {HTMLElement|null} footer
+ * @returns {HTMLElement[]} die erkannten Löschen-Knöpfe
+ */
+export function decorateFooterDelete(footer) {
+  if (!footer?.querySelectorAll) return [];
+  const found = [...footer.querySelectorAll(FOOTER_DELETE_SELECTOR)]
+    .filter((btn) => btn.tagName === 'BUTTON' && btn.dataset?.footerDelete !== 'off');
+  footer.classList.toggle('modal-panel__footer--has-delete', found.length > 0);
+  // EINE ZEILE NUR FÜR DIE KANONISCHE DREIHEIT (Löschen · Abbrechen · Primär).
+  // Die Detailansicht trägt neben Löschen drei beschriftete Aktionen
+  // (Erledigen, Starten, Aufgabe archivieren) - in eine Zeile gezwungen,
+  // quetschten sie sich auf je ~80px. Dort bleibt der Umbruch aus #872, der
+  // Papierkorb spart trotzdem eine Knopfbreite. Icon-Knöpfe (Archivieren im
+  // Kontodialog) zählen nicht mit: sie brauchen nur ihre 44px.
+  const labelled = [...footer.querySelectorAll('button')]
+    .filter((b) => !found.includes(b) && !b.classList.contains('btn--icon'));
+  footer.classList.toggle('modal-panel__footer--one-row', found.length > 0 && labelled.length <= 2);
+  for (const btn of found) {
+    if (btn.classList.contains('modal-panel__delete')) continue;
+    btn.classList.add('modal-panel__delete');
+    const loose = [...btn.childNodes].filter((n) => n.nodeType === 3 && n.textContent.trim());
+    if (loose.length) {
+      const label = document.createElement('span');
+      label.className = 'modal-panel__delete-label';
+      label.textContent = loose.map((n) => n.textContent.trim()).join(' ');
+      loose.forEach((n) => n.remove());
+      btn.appendChild(label);
+    }
+    if (!btn.querySelector('svg, [data-lucide]')) {
+      const icon = iconElement('trash-2', { class: 'icon-md' });
+      if (icon) btn.prepend(icon);
+    }
+    if (!btn.hasAttribute('aria-label')) {
+      const name = footerDeleteObjectName(btn);
+      if (name) btn.setAttribute('aria-label', t('common.deleteNamed', { name }));
+    }
+  }
+  return found;
 }
 
 // --------------------------------------------------------
