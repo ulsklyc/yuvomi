@@ -665,6 +665,15 @@ async function createTask(payload, content) {
  * „OK" STEHT NICHT IN DER ZEILE. Nur ein faelliger Zustand hat etwas zu sagen
  * (heute, ueberfaellig) - ein Wort an jeder ruhigen Zeile war Rauschen.
  *
+ * DIE ZEILE SELBST OEFFNET DAS BEARBEITEN (Re-Critique 2026-09-27, R11 H6), wie
+ * die Geburtstagszeile seit R8: mit Schreibrecht ist die Hauptspalte ein Knopf
+ * (`.list-row__main--interactive`), ein Tipp auf Name oder Meta oeffnet den
+ * Editor. Vorher tat ein Tipp auf die Zeile nichts, und mobil war der Stift
+ * das einzige Ziel. Stift und Loeschen bleiben sichtbar (ignore.md). Weil ein
+ * Knopf nur Phrasing-Inhalt traegt, ist der Name dort ein `span`; bei
+ * `housekeeping: read` verspricht die Spalte nichts und bleibt die
+ * Ueberschrift.
+ *
  * KEIN ZURUECKNEHMEN-KNOPF MEHR IN DER ZEILE. Er setzte `last_completed` auf
  * leer statt auf den Stand davor und nahm dem Titel mobil 48px. Das Erledigen
  * meldet sich jetzt mit einem Toast samt „Rueckgaengig", der den vorherigen
@@ -673,6 +682,7 @@ async function createTask(payload, content) {
 function taskRowHtml(task) {
   const ro = readOnly();
   const due = task.urgency_status === 'overdue' || task.urgency_status === 'today';
+  const meta = `${due ? `<span class="housekeeping-task__status">${esc(urgencyLabel(task.urgency_status))}</span> · ` : ''}${esc(task.area)} · ${esc(t('housekeeping.everyDays', { days: task.frequency_days }))}`;
   return `
     <article class="list-row housekeeping-task housekeeping-task--${esc(task.urgency_status)}${ro ? ' housekeeping-task--readonly' : ''}">
       ${ro ? '' : `
@@ -680,10 +690,15 @@ function taskRowHtml(task) {
               aria-label="${esc(t('housekeeping.completeTask', { name: task.name }))}">
         <i data-lucide="check" aria-hidden="true"></i>
       </button>`}
+      ${ro ? `
       <div class="list-row__main housekeeping-task__body">
         <h2 class="list-row__name">${esc(task.name)}</h2>
-        <p class="list-row__meta">${due ? `<span class="housekeeping-task__status">${esc(urgencyLabel(task.urgency_status))}</span> · ` : ''}${esc(task.area)} · ${esc(t('housekeeping.everyDays', { days: task.frequency_days }))}</p>
-      </div>
+        <p class="list-row__meta">${meta}</p>
+      </div>` : `
+      <button type="button" class="list-row__main list-row__main--interactive housekeeping-task__body" data-edit-task="${esc(task.id)}">
+        <span class="list-row__name">${esc(task.name)}</span>
+        <span class="list-row__meta">${meta}</span>
+      </button>`}
       ${ro ? '' : `
       <div class="list-row__actions housekeeping-task__actions">
         <button class="row-action" type="button" data-edit-task="${esc(task.id)}"

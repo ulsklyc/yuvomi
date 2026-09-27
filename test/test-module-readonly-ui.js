@@ -3533,6 +3533,30 @@ test('Besuchszeile mit `housekeeping: read`: Bearbeiten und Loeschen weg, der Za
 // Aufgaben
 // -------------------------------------------------------------------------
 
+// Re-Critique 2026-09-27 (R11 H6): ein Tipp auf die Aufgabenzeile tat nichts,
+// mobil war der Stift das einzige Ziel. Wie die Geburtstagszeile (R8) ist die
+// Hauptspalte mit Schreibrecht jetzt der Knopf zum Bearbeiten; die Aktions-Icons
+// bleiben sichtbar. Bei `read` verspricht die Spalte kein Bearbeiten.
+test('H6: die Aufgabenzeile der Haushaltshilfe oeffnet mit Schreibrecht das Bearbeiten - lesend verspricht sie nichts', () => {
+  hkState({
+    tasks: [{ id: 3, name: 'Fenster putzen', area: 'Wohnzimmer', frequency_days: 14, urgency_status: 'today', last_completed: '2026-07-01' }],
+  });
+  const schreiben = hkContainer();
+  withAccess({ housekeeping: 'write' }, () => hk.renderTasks(schreiben));
+  const haupt = schreiben.html.match(/<button type="button" class="list-row__main list-row__main--interactive[^"]*" data-edit-task="3">([\s\S]*?)<\/button>/);
+  assert.ok(haupt, 'die Hauptspalte ist ein Knopf mit dem Bearbeiten-Ziel der Zeile');
+  assert.match(haupt[1], /Fenster putzen/, 'er traegt den Namen');
+  assert.match(haupt[1], /housekeeping\.dueToday/, 'und die Metazeile samt Dringlichkeit');
+  assert.doesNotMatch(haupt[1], /<(?:h\d|p|div)\b/, 'in einem Knopf steht nur Phrasing-Inhalt');
+  assert.match(schreiben.html, /class="row-action" type="button" data-edit-task="3"/, 'der Stift bleibt sichtbar (ignore.md)');
+  assert.ok(schreiben.gefragt.includes('[data-edit-task]'), 'beide Ziele laufen ueber dieselbe Verdrahtung');
+
+  const lesen = hkContainer();
+  withAccess({ housekeeping: 'read' }, () => hk.renderTasks(lesen));
+  assert.doesNotMatch(lesen.html, /list-row__main--interactive|data-edit-task/, 'lesend kein Bearbeiten-Versprechen');
+  assert.match(lesen.html, /<h2 class="list-row__name">Fenster putzen<\/h2>/, 'die Zeile bleibt Auskunft mit Ueberschrift');
+});
+
 test('Aufgaben-Tab mit `housekeeping: read`: kein Anlegen, kein Abhaken, keine Zeilenaktion - die Dringlichkeit bleibt', () => {
   hkState({
     templates: [{ key: 'kitchen', name: 'Kueche', area: 'Kueche', frequency_days: 7 }],
