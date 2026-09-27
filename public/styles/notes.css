@@ -569,18 +569,16 @@
   gap: var(--space-1);
 }
 
-.note-card__open,
 .note-card__delete {
   width: var(--target-base);
   height: var(--target-base);
   /* Loeschen traegt seit Runde 5 die geteilte `.row-action` (48px-Minimum);
-   * auf der Karte gilt fuer beide Knoepfe dasselbe Mass wie fuer die Nadel. */
+   * auf der Karte gilt dasselbe Mass wie fuer die Nadel. */
   min-width: var(--target-base);
   min-height: var(--target-base);
   border-radius: var(--radius-full);
   /* Dauerhaft sichtbar und ruhig wie die Nadel (D7): keine Flaeche, die
-   * Tertiaerfarbe der geteilten `.row-action`. Vorher erschienen Oeffnen und
-   * Loeschen erst beim Ueberfahren der Karte. */
+   * Tertiaerfarbe der geteilten `.row-action`. */
   background: transparent;
   border: none;
   cursor: pointer;
@@ -592,16 +590,10 @@
   transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
-.note-card__open::before,
 .note-card__delete::before {
   content: '';
   position: absolute;
   inset: 0;
-}
-
-.note-card__open:hover {
-  background: var(--note-action-bg-hover);
-  color: inherit;
 }
 
 .note-card__delete:hover {
@@ -609,7 +601,75 @@
   color: var(--color-danger-ink);
 }
 
+/* DIE KARTE IST DER OEFFNEN-KNOPF (R9 M13). Der Knopf liegt unsichtbar ueber
+ * der ganzen Karte - ein Tipp irgendwo darauf oeffnet, und der Fokusring
+ * umrahmt die Karte statt eines 44px-Kreises in der Fusszeile. Was auf der
+ * Karte selbst bedienbar bleibt (Nadel, Loeschen, Checklisten-Haken, Links),
+ * liegt eine Ebene darueber. */
+.note-card__open {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
 
+.note-card__open:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.note-card__pin {
+  z-index: 1;
+}
+
+.note-card__actions,
+.note-card__content .note-md-box,
+.note-card__content a {
+  position: relative;
+  z-index: 1;
+}
+
+/* DER TITEL IST NICHT KLEINER ALS DER TEXT (R9 M13, A6 P2-6). Die geteilte
+ * Kompaktrolle (typography.css) setzte ihn auf 15px ueber 17px Fliesstext -
+ * die Ueberschrift las sich als Nebensatz. Hier traegt er die Rolle, die
+ * `.u-card-title` ueberall sonst traegt; das Gewicht unterscheidet ihn. */
+.note-card .note-card__title {
+  font-size: var(--type-card-title);
+  line-height: var(--line-height-snug);
+}
+
+/* MOBIL PASST MEHR ALS ZWEI NOTIZEN AUF DEN SCHIRM (R9 M13).
+ *
+ * Gemessen 390x844 vorher: Karten 221-276px, rund 2,3 Notizen je Screen - 12
+ * Zeilen Vorschau und eine 57px-Fusszeile mit drei Kreisen. Jetzt: Vorschau
+ * drei Zeilen - weiter in der Bodyrolle (test-typography: Notiz-Fliesstext
+ * bleibt 17px), nur mit dem Zeilenabstand des Fliesstexts statt des weiten -,
+ * und die Fusszeile nur so hoch wie ihre Schrift -
+ * der Loeschen-Knopf behaelt seine volle Trefflaeche und haengt sie per
+ * negativem Rand in die Polsterung, statt die Zeile damit hochzudruecken
+ * („kompakt aussehen, voll treffen", tokens.css). */
+@media (max-width: 639px) {
+  .note-card__content {
+    line-height: var(--line-height-base);
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+
+  .note-card__footer {
+    margin-top: var(--space-1);
+    padding-top: var(--space-1);
+  }
+
+  .note-card__delete {
+    margin-block: calc((var(--space-6) - var(--target-base)) / 2);
+  }
+}
 
 /* --------------------------------------------------------
  * Notes-Modal Content-Styles (Overlay/Panel via shared modal.js)

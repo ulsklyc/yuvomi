@@ -596,6 +596,16 @@ function renderNoteCard(note, { headingLevel = 2 } = {}) {
     <div class="note-card ${note.pinned ? 'note-card--pinned' : ''}"
          data-id="${note.id}"
          style="--note-color:${esc(note.color)};">
+      ${/* DIE KARTE OEFFNET SELBST (R9 M13, A6 P2-6). Der Oeffnen-Knopf sass
+          * als dritter 44px-Kreis in der Fusszeile, neben Nadel und Loeschen -
+          * mobil trug jede Karte damit drei Bedienkreise und war 248px hoch.
+          * Er bleibt der Tastatur- und Vorleseweg (die Karte selbst ist ein
+          * Div), liegt aber jetzt unsichtbar UEBER der ganzen Karte: der
+          * Fokusring umrahmt die Karte, ein Tipp irgendwo darauf trifft ihn,
+          * und Nadel, Loeschen und Checklisten-Haken liegen darueber
+          * (notes.css, z-index). */ ''}
+      <button type="button" class="note-card__open" data-action="open" data-id="${note.id}"
+              aria-label="${esc(t('notes.openNamed', { name: noteName(note) }))}"></button>
       ${pinMarkup(note)}
       ${/* ECHTE UEBERSCHRIFT STATT `div` (R8 H15): die Ueberschriften-
           * Navigation eines Screenreaders fand bis dahin keine einzige Notiz.
@@ -617,14 +627,6 @@ function renderNoteCard(note, { headingLevel = 2 } = {}) {
           <span>${esc(note.creator_name || '')}</span>
         </div>
         <div class="note-card__actions">
-          <!-- Die Karte selbst ist ein Div mit Klick-Handler und daher nicht
-               fokussierbar. Ohne diesen Button gäbe es für Tastatur- und
-               Screenreader-Nutzung keinen Weg, eine Notiz zu öffnen. Analog zur
-               Inline-Aktion auf der Aufgaben-Karte. -->
-          <button type="button" class="note-card__open" data-action="open" data-id="${note.id}"
-                  aria-label="${esc(t('notes.openNamed', { name: noteName(note) }))}">
-            <i data-lucide="maximize-2" class="icon-sm" aria-hidden="true"></i>
-          </button>
           ${readOnly() ? '' : rowActionHtml({ icon: 'trash-2', tone: 'danger', action: 'delete', className: 'note-card__delete', label: t('common.deleteNamed', { name: noteName(note) }), attrs: { 'data-id': note.id } })}
         </div>
       </div>
