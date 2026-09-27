@@ -386,26 +386,33 @@ test('Settings-Blätter wiederholen ihren eigenen Titel nicht als Unterüberschr
   // Er hat nie gesehen, dass ein Blatt seinen EIGENEN Titel direkt darunter als
   // h2 wiederholt - fünf taten es, eines sogar mit demselben i18n-Key. Die Suite
   // war grün und der Defekt drei Critique-Läufe lang vorhanden (2026-07-27).
-  const { SETTINGS_LEAVES } = await import('../public/settings/registry.js');
+  // Seit R10 besteht ein Blatt aus Abschnitten (fruehere Blaetter, je ein
+  // Loader): geprueft wird jeder Abschnitt gegen den Titel SEINES Blatts.
+  const { SETTINGS_LEAVES, settingsSheetSections } = await import('../public/settings/registry.js');
   const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
   const translate = (key) => key.split('.').reduce((value, segment) => value?.[segment], de);
   const normalize = (value) => String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 
   const failures = [];
+  let seen = 0;
   for (const leaf of SETTINGS_LEAVES) {
-    const file = String(leaf.loader).match(/\/settings\/(pages\/[\w-]+\.js)/)?.[1];
-    assert.ok(file, `${leaf.id}: Loader-Pfad nicht erkennbar`);
-    const source = readFileSync(new URL(`../public/settings/${file}`, import.meta.url), 'utf8');
     const label = normalize(translate(leaf.labelKey));
+    for (const section of settingsSheetSections(leaf, null, { all: true })) {
+      const file = String(section.loader).match(/\/settings\/(pages\/[\w-]+\.js)/)?.[1];
+      assert.ok(file, `${section.id}: Loader-Pfad nicht erkennbar`);
+      seen += 1;
+      const source = readFileSync(new URL(`../public/settings/${file}`, import.meta.url), 'utf8');
 
-    // Statische Überschriften im Markup: <h2 …>${t('key')}</h2>, auch via esc().
-    for (const match of source.matchAll(/<h([23])\b[^>]*>\s*\$\{(?:esc\()?\s*t\(\s*['"]([\w.]+)['"]/g)) {
-      const [, level, key] = match;
-      if (normalize(translate(key)) === label) {
-        failures.push(`${leaf.id}: <h${level}> wiederholt den Blatt-Titel "${translate(key)}" (${key})`);
+      // Statische Überschriften im Markup: <h2 …>${t('key')}</h2>, auch via esc().
+      for (const match of source.matchAll(/<h([23])\b[^>]*>\s*\$\{(?:esc\()?\s*t\(\s*['"]([\w.]+)['"]/g)) {
+        const [, level, key] = match;
+        if (normalize(translate(key)) === label) {
+          failures.push(`${leaf.id}/${section.id}: <h${level}> wiederholt den Blatt-Titel "${translate(key)}" (${key})`);
+        }
       }
     }
   }
+  assert.ok(seen >= 30, `nur ${seen} Abschnitte gelesen`);
   assert.deepEqual(failures, []);
 });
 

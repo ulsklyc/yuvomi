@@ -4,19 +4,26 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { createRetryState } from './components.js';
 import { clearLeafEdits, confirmLeafExit, watchLeafForms } from './dirty-guard.js';
+import { KITCHEN_CHILD_IDS } from './module-order.js';
 import { resetPreferencesCache } from './preferences-cache.js';
 import {
-  SETTINGS_LEAVES,
   filterSettingsDomains,
   findSettingsLeaf,
+  firstSettingsSheet,
   searchSettings,
   settingsOptionUrl,
   settingsOverviewUrl,
+  settingsSectionUrl,
+  settingsSheetSections,
+  settingsSheetsForDomain,
 } from './registry.js';
 
 // Unter dieser Schwelle ist ein Blatt gefuehlt sofort da; ein Skelett waere
 // dort nur ein Aufblitzen.
 const SKELETON_DELAY_MS = 120;
+
+// Der eine Ort, an dem ein Modul an- und ausgeht (registry.js, modules-active).
+const ACTIVE_MODULES_PATH = '/settings/modules/active';
 
 function createIcon(name, className) {
   const icon = document.createElement('i');
@@ -30,12 +37,8 @@ function createIcon(name, className) {
  * Das Zeichen eines Blattes in seiner Marke.
  *
  * WER EIN MODUL NENNT, TRAEGT SEINEN TON - die anderen bleiben neutral. Das ist
- * die Vollton-Regel (DESIGN.md, Colors) auf einer Flaeche, die vorher gar keine
- * Farbe hatte: neunundzwanzig Blaetter, neunundzwanzig graue Zeichen, obwohl
- * elf davon von einem Modul handeln, dessen Ton drei Klicks weiter in der
- * Seitenleiste als Legende steht. Die Gegenrichtung ist genauso Teil der Regel
- * und der Grund, warum hier nicht alles bunt wird: „Konto", „Darstellung" oder
- * „Backup" nennen kein Modul, also nennen sie auch keine Farbe.
+ * die Vollton-Regel (DESIGN.md, Colors): „Konto", „Darstellung" oder „Backup"
+ * nennen kein Modul, also nennen sie auch keine Farbe.
  *
  * Die Zuordnung steht im `module`-Feld der Registry, nicht hier - sonst waere
  * es die zwoelfte Liste, die mit der Modulliste driften kann.
@@ -72,7 +75,7 @@ function bindSpaNavigation(link, href) {
     }
     event.preventDefault();
     // Alle Wege aus einem Blatt heraus laufen ueber diese Links: Seitenleiste,
-    // Suchtreffer, Breadcrumb und der Zurueck-Link.
+    // Suchtreffer, Breadcrumb, Statuszeile und der Zurueck-Link.
     if (!(await confirmLeafExit())) return;
     window.yuvomi.navigate(href);
   });
@@ -84,51 +87,6 @@ function createLink(href, className) {
   link.className = className;
   bindSpaNavigation(link, href);
   return link;
-}
-
-function allowedLeavesForDomain(domainId, user) {
-  return SETTINGS_LEAVES.filter((entry) => (
-    entry.domainId === domainId
-    && (!entry.adminOnly || user?.role === 'admin')
-  ));
-}
-
-let navPanelIdCounter = 0;
-
-// Setzt den Auf-/Zu-Zustand einer Domänen-Gruppe konsistent über alle Träger:
-// CSS-Klasse (treibt die Höhen-Animation), aria-expanded am Trigger und `inert`
-// am Panel (nimmt kollabierte Links aus Tab-Reihenfolge und A11y-Baum).
-function setGroupExpanded(group, expanded) {
-  group.classList.toggle('settings-shell__navigation-group--expanded', expanded);
-  const toggle = group.querySelector('.settings-shell__navigation-toggle');
-  const panel = group.querySelector('.settings-shell__navigation-panel');
-  if (toggle) toggle.setAttribute('aria-expanded', String(expanded));
-  if (panel) panel.inert = !expanded;
-}
-
-function collapseAllGroups(navigation) {
-  for (const open of navigation.querySelectorAll('.settings-shell__navigation-group--expanded')) {
-    setGroupExpanded(open, false);
-  }
-}
-
-function createDomainToggle(domain, panelId, expanded) {
-  const toggle = document.createElement('button');
-  toggle.type = 'button';
-  toggle.className = 'settings-shell__navigation-toggle';
-  toggle.setAttribute('aria-controls', panelId);
-  toggle.setAttribute('aria-expanded', String(expanded));
-
-  const label = document.createElement('span');
-  label.className = 'settings-shell__navigation-domain-label';
-  label.textContent = t(domain.labelKey);
-
-  toggle.append(
-    createIcon(domain.icon, 'settings-shell__navigation-domain-icon'),
-    label,
-    createIcon('chevron-down', 'settings-shell__navigation-chevron'),
-  );
-  return toggle;
 }
 
 function createNavigationLink(entry, activeLeaf) {
@@ -147,16 +105,14 @@ function createNavigationLink(entry, activeLeaf) {
 
 /**
  * Ein Treffer der Seitenleisten-Suche: Zeichen des Blatts, der Name und darunter
- * der Ort. Fuer ein Blatt ist der Ort sein Bereich, fuer eine Option ihr Blatt -
- * ohne die Gruppen fehlt sonst, WO der Treffer liegt. Label und Ort stehen in
- * einer Spalte neben dem Icon, damit ein langer Name das Icon nicht in eine
- * eigene Zeile draengt.
+ * der Ort. Fuer ein Blatt ist der Ort sein Bereich, fuer einen Abschnitt oder
+ * eine Option ihr Blatt - ohne die Gruppen fehlt sonst, WO der Treffer liegt.
  */
-function createNavigationResult({ entry, href, label, context, activeLeaf, option = false }) {
+function createNavigationResult({ entry, href, label, context, activeLeaf, exact = true }) {
   const item = document.createElement('li');
   const link = createLink(href, 'settings-shell__navigation-link settings-shell__navigation-result');
   link.dataset.leafId = entry.id;
-  if (!option && entry.id === activeLeaf?.id) {
+  if (exact && entry.id === activeLeaf?.id) {
     link.classList.add('settings-shell__navigation-link--active');
     link.setAttribute('aria-current', 'page');
   }
@@ -174,12 +130,12 @@ function createNavigationResult({ entry, href, label, context, activeLeaf, optio
 }
 
 /**
- * Suchfeld der Seitenleiste (Desktop-Blatt). Bei 32 Blaettern in vier Bereichen
- * ist die Taxonomie sonst der einzige Weg zu einer Einstellung, deren Bereich
- * man nicht kennt (Critique 2026-07-27). Seit 2026-09-26 findet sie auch die
- * EINZELNE Option (registry.js `options`, searchSettings) und ist das geteilte
- * Suchfeld der Shell (renderPageSearch, gefuellte Kapsel) statt eines eigenen
- * `form-input` - dieselbe Suche wie in der Wurzel, in anderer Anordnung.
+ * Suchfeld der Seitenleiste - AN DER LISTENKANTE (S3): am Desktop ist die
+ * Seitenleiste die Liste der Liste-+-Detail-Form, und ihre Suche filtert
+ * genau diese Liste. Seit 2026-09-26 findet sie auch die EINZELNE Option
+ * (registry.js `options`, searchSettings) und seit R10 die frueheren Blaetter,
+ * die heute Abschnitte sind ("Feed-Abos"). Dieselbe Suche wie in der Wurzel,
+ * in anderer Anordnung; das geteilte Suchfeld der Shell (renderPageSearch).
  */
 function createNavigationSearch(navigation, domains, user, activeLeaf) {
   const domainLabels = new Map(domains.map((domain) => [domain.id, t(domain.labelKey)]));
@@ -227,18 +183,26 @@ function createNavigationSearch(navigation, domains, user, activeLeaf) {
         context: domainLabels.get(entry.domainId) ?? '',
         activeLeaf,
       })),
+      ...hits.sections.map(({ leaf, section, label }) => createNavigationResult({
+        entry: leaf,
+        href: settingsSectionUrl(leaf, section.id),
+        label,
+        context: t(leaf.labelKey),
+        activeLeaf,
+        exact: false,
+      })),
       ...hits.options.map(({ leaf, key, label }) => createNavigationResult({
         entry: leaf,
         href: settingsOptionUrl(leaf, key),
         label,
         context: t(leaf.labelKey),
         activeLeaf,
-        option: true,
+        exact: false,
       })),
     );
     hydrateIcons(results);
 
-    const count = hits.leaves.length + hits.options.length;
+    const count = hits.leaves.length + hits.sections.length + hits.options.length;
     status.textContent = count ? t('settings.searchResults', { count }) : t('search.noResults');
   };
 
@@ -246,19 +210,17 @@ function createNavigationSearch(navigation, domains, user, activeLeaf) {
   wirePageSearch(navigation, { id: 'settings-navigation-search', delay: 0, onQuery: applyFilter });
 }
 
+/**
+ * DIE LISTE DER LISTE-+-DETAIL-FORM (S3): alle Blaetter, nach Bereichen
+ * gruppiert, ohne Akkordeon. Bis R10 war die Seitenleiste ein Akkordeon mit
+ * genau einem offenen Bereich - bei drei Bereichen und 26 Blaettern ist die
+ * ganze Liste kuerzer als die Suche nach dem richtigen Aufklapper (Apples
+ * Systemeinstellungen zeigen sie ebenso offen).
+ */
 function createNavigation(domains, user, activeLeaf) {
   const navigation = document.createElement('nav');
   navigation.className = 'settings-shell__navigation';
   navigation.setAttribute('aria-label', t('settings.navigationLabel'));
-
-  // Eine einzelne Domäne (z. B. Familienmitglieder ohne Admin-Bereiche) braucht
-  // kein Akkordeon — sie bleibt dauerhaft offen ohne Collapse-Affordance.
-  const collapsible = domains.length > 1;
-  navigation.classList.toggle('settings-shell__navigation--collapsible', collapsible);
-
-  // Single-Open: genau die aktive Domäne ist offen. Ohne aktives Blatt bleibt
-  // die Root eine echte Übersicht; die lokale Navigation zeigt nur Domänen.
-  const expandedDomainId = activeLeaf?.domainId ?? null;
 
   for (const domain of domains) {
     const group = document.createElement('section');
@@ -268,47 +230,21 @@ function createNavigation(domains, user, activeLeaf) {
       group.classList.add('settings-shell__navigation-group--active');
     }
 
+    const heading = document.createElement('h2');
+    heading.className = 'settings-shell__navigation-heading';
+    heading.id = `settings-navigation-${domain.id}`;
+    heading.textContent = t(domain.labelKey);
+    group.setAttribute('aria-labelledby', heading.id);
+
     const list = document.createElement('ul');
     list.className = 'settings-shell__navigation-list';
-    for (const entry of allowedLeavesForDomain(domain.id, user)) {
+    for (const entry of settingsSheetsForDomain(domain.id, user)) {
       const item = document.createElement('li');
       item.appendChild(createNavigationLink(entry, activeLeaf));
       list.appendChild(item);
     }
 
-    if (collapsible) {
-      const expanded = domain.id === expandedDomainId;
-      group.classList.toggle('settings-shell__navigation-group--expanded', expanded);
-
-      const panelId = `settings-domain-panel-${++navPanelIdCounter}`;
-      const heading = document.createElement('h2');
-      heading.className = 'settings-shell__navigation-heading';
-      const toggle = createDomainToggle(domain, panelId, expanded);
-      heading.appendChild(toggle);
-
-      const panel = document.createElement('div');
-      panel.className = 'settings-shell__navigation-panel';
-      panel.id = panelId;
-      panel.inert = !expanded;
-      panel.appendChild(list);
-
-      toggle.addEventListener('click', () => {
-        const willExpand = toggle.getAttribute('aria-expanded') !== 'true';
-        if (willExpand) collapseAllGroups(navigation);
-        setGroupExpanded(group, willExpand);
-      });
-
-      group.append(heading, panel);
-    } else {
-      const heading = document.createElement('h2');
-      heading.className = 'settings-shell__navigation-heading';
-      heading.append(
-        createIcon(domain.icon, 'settings-shell__navigation-domain-icon'),
-        document.createTextNode(t(domain.labelKey)),
-      );
-      group.append(heading, list);
-    }
-
+    group.append(heading, list);
     navigation.appendChild(group);
   }
 
@@ -316,30 +252,37 @@ function createNavigation(domains, user, activeLeaf) {
   return navigation;
 }
 
+/**
+ * Die Seitenleiste scrollt fuer sich (settings.css): das aktive Blatt muss in
+ * ihr sichtbar sein, sonst zeigte ein Deep-Link auf "Gesundheit" rechts das
+ * Blatt und links nur Konto und Haushalt. Nur die Leiste scrollt, nie die
+ * Seite - `scrollIntoView` zoege den ganzen Port mit.
+ */
+function revealActiveNavigationLink(navigation) {
+  const link = navigation?.querySelector('.settings-shell__navigation-link--active');
+  if (!link || navigation.scrollHeight <= navigation.clientHeight) return;
+  // Die klebende Leiste ist positioniert und damit der offsetParent der Links.
+  const top = link.offsetParent === navigation ? link.offsetTop : link.offsetTop - navigation.offsetTop;
+  const bottom = top + link.offsetHeight;
+  if (top < navigation.scrollTop) navigation.scrollTop = top;
+  else if (bottom > navigation.scrollTop + navigation.clientHeight) {
+    navigation.scrollTop = bottom - navigation.clientHeight;
+  }
+}
+
 // Aktualisiert nur den Aktivzustand der bestehenden Navigation, ohne die Links
-// (und ihre Icons) neu aufzubauen — Grundlage für Soft-Navigation zwischen
-// Settings-Blättern.
+// (und ihre Icons) neu aufzubauen - Grundlage fuer Soft-Navigation zwischen
+// Settings-Blaettern.
 function updateNavigationActiveState(navigation, activeLeaf) {
   if (!navigation) return;
-
-  const collapsible = navigation.classList.contains('settings-shell__navigation--collapsible');
   const activeDomainId = activeLeaf?.domainId ?? null;
 
   for (const group of navigation.querySelectorAll('.settings-shell__navigation-group')) {
-    const isActiveDomain = group.dataset.domainId === activeDomainId;
-    group.classList.toggle('settings-shell__navigation-group--active', isActiveDomain);
-    // Single-Open: die aktive Domäne wird aufgeklappt, alle anderen schließen
-    // mit. Ohne aktives Blatt schliessen alle - sonst stand links die Domäne
-    // des zuletzt besuchten Blatts offen, während rechts die Übersicht begann
-    // (Critique 2026-07-27). Ein Navigationszustand, der dem Inhalt
-    // widerspricht, kostet mehr Vertrauen als er Wege spart.
-    if (collapsible) {
-      setGroupExpanded(group, Boolean(activeDomainId) && isActiveDomain);
-    }
+    group.classList.toggle('settings-shell__navigation-group--active', group.dataset.domainId === activeDomainId);
   }
 
   for (const link of navigation.querySelectorAll('.settings-shell__navigation-link')) {
-    const isActive = link.dataset.leafId === activeLeaf?.id;
+    const isActive = link.dataset.leafId === activeLeaf?.id && !link.classList.contains('settings-shell__navigation-result');
     link.classList.toggle('settings-shell__navigation-link--active', isActive);
     if (isActive) {
       link.setAttribute('aria-current', 'page');
@@ -347,22 +290,18 @@ function updateNavigationActiveState(navigation, activeLeaf) {
       link.removeAttribute('aria-current');
     }
   }
+  revealActiveNavigationLink(navigation);
 }
 
 /**
- * EINE gruppierte Liste aller Blaetter - die Wurzel der Einstellungen in jeder
- * Breite (Kopfregel mobil, 2026-09-26; Critique A7 P1).
- *
- * Mobil gab es drei Ebenen: vier Bereichszeilen, dann die Bereichsseite mit
- * 88px hohen Zeilen und einem Zurueck-Link, dann das Blatt. Inhalt begann bei
- * y=198, sichtbar waren 5,5 Zeilen. Apples Einstellungen zeigen EINE Liste mit
- * Abschnitten, und der Desktop zeigte sie hier schon - nur mobil fehlte sie.
- * Jetzt rendert die Wurzel ueberall dieselbe Liste; was mobil anders ist
- * (Zeilenhoehe, Markengroesse, keine Beschreibung), entscheidet settings.css.
+ * EINE gruppierte Liste aller Blaetter - die Wurzel der Einstellungen UNTER der
+ * Split-Schwelle (Kopfregel mobil, 2026-09-26; Critique A7 P1). Darueber ist
+ * dieselbe Liste die Seitenleiste, und rechts steht ein Blatt (S3).
  *
  * DIE BEREICHSEBENE GIBT ES NICHT MEHR. Ein Deep-Link `?view=domain&domain=x`
  * (Breadcrumb, Rueckweg aus dem Blatt, alte Lesezeichen) landet auf derselben
- * Liste, gescrollt auf den Abschnitt - der Ort bleibt, die Zwischenseite geht.
+ * Liste, gescrollt auf den Abschnitt - am Desktop auf dem ersten Blatt des
+ * Bereichs.
  */
 function createOverviewRow(entry) {
   const link = createLink(entry.path, 'settings-overview__row');
@@ -407,7 +346,7 @@ function renderOverview(content, domains, user) {
   overview.appendChild(status);
 
   for (const domain of domains) {
-    const leaves = allowedLeavesForDomain(domain.id, user);
+    const leaves = settingsSheetsForDomain(domain.id, user);
     if (!leaves.length) continue;
 
     const domainLabel = t(domain.labelKey);
@@ -433,9 +372,10 @@ function renderOverview(content, domains, user) {
     overview.appendChild(section);
   }
 
-  // Treffer auf EINZELNE Optionen (registry.js `options`). Ein eigener
-  // Abschnitt unter den Blaettern, gefuellt nur waehrend der Suche: die Zeile
-  // nennt die Option und darunter ihr Blatt, der Sprung landet an der Stelle.
+  // Treffer auf fruehere Blaetter (heute Abschnitte) und EINZELNE Optionen. Ein
+  // eigener Abschnitt unter den Blaettern, gefuellt nur waehrend der Suche: die
+  // Zeile nennt den Treffer und darunter sein Blatt, der Sprung landet an der
+  // Stelle.
   const optionsSection = document.createElement('section');
   optionsSection.className = 'settings-overview__section settings-overview__section--options';
   optionsSection.hidden = true;
@@ -460,9 +400,9 @@ function renderOverview(content, domains, user) {
 /** Nutzer der gerenderten Wurzel - die Suche filtert nach seinen Rechten. */
 const overviewUsers = new WeakMap();
 
-/** Treffer auf eine Option: ihre Beschriftung, darunter ihr Blatt. */
-function createOptionRow({ leaf, key, label }) {
-  const link = createLink(settingsOptionUrl(leaf, key), 'settings-overview__row settings-overview__row--option');
+/** Treffer auf einen Abschnitt oder eine Option: die Beschriftung, darunter ihr Blatt. */
+function createOptionRow({ leaf, href, label }) {
+  const link = createLink(href, 'settings-overview__row settings-overview__row--option');
   link.dataset.leafId = leaf.id;
   link.appendChild(createLeafMark(leaf, 'settings-overview__row-mark'));
   const copy = document.createElement('span');
@@ -482,8 +422,7 @@ function createOptionRow({ leaf, key, label }) {
  * Filtert die Liste der Wurzel nach der Kopf-Suche. Ein Abschnitt ohne Treffer
  * faellt mit weg, damit keine leeren Ueberschriften stehen bleiben; die Zahl
  * geht in die Live-Region, ein leeres Ergebnis nennt der geteilte Leerzustand.
- * Gesucht wird ueber dieselbe Funktion wie in der Seitenleiste (searchSettings):
- * Blaetter UND einzelne Optionen.
+ * Gesucht wird ueber dieselbe Funktion wie in der Seitenleiste (searchSettings).
  */
 function filterOverview(content, value) {
   const overview = content.querySelector('.settings-overview');
@@ -503,15 +442,19 @@ function filterOverview(content, value) {
   }
 
   const optionsSection = overview.querySelector('.settings-overview__section--options');
+  const extra = [
+    ...hits.sections.map(({ leaf, section, label }) => ({ leaf, label, href: settingsSectionUrl(leaf, section.id) })),
+    ...hits.options.map(({ leaf, key, label }) => ({ leaf, label, href: settingsOptionUrl(leaf, key) })),
+  ];
   if (optionsSection) {
     const list = optionsSection.querySelector('.settings-overview__list');
-    list.replaceChildren(...hits.options.map(createOptionRow));
-    optionsSection.hidden = hits.options.length === 0;
+    list.replaceChildren(...extra.map(createOptionRow));
+    optionsSection.hidden = extra.length === 0;
     hydrateIcons(list);
   }
 
   if (!status) return;
-  const count = hits.leaves.length + hits.options.length;
+  const count = hits.leaves.length + extra.length;
   status.hidden = !query;
   status.textContent = !query
     ? ''
@@ -523,8 +466,7 @@ function filterOverview(content, value) {
  *
  * NACH DEM ROUTER, NICHT IM RENDER: der Router setzt den Scrollport nach einer
  * Soft-Navigation erst NACH `update()` zurueck (router.js, Soft-Update) - ein
- * Sprung im Render waere sofort wieder kassiert. Der Abstand zum klebenden
- * Kopf steht als `scroll-margin` am Abschnitt (settings.css).
+ * Sprung im Render waere sofort wieder kassiert.
  */
 function revealOverviewSection(content, domainId) {
   if (!domainId) return;
@@ -536,18 +478,12 @@ function revealOverviewSection(content, domainId) {
 
 /**
  * Der Seitenkopf der Einstellungen ist der geteilte Modulkopf (`.page-toolbar`,
- * vom Router verdrahtet: Siegel, Large Title, Andocken) - bis 2026-09-26 war er
- * ein eigener `settings-shell-header` ohne Siegel und ohne Suche (Critique A7,
- * Konsistenz). Er kennt zwei Zustaende:
+ * vom Router verdrahtet). Er kennt zwei Zustaende:
  *
- *   WURZEL: Titel + Suche. Die Suche war nur im Desktop-Blatt erreichbar
- *     (Seitenleiste, unter 1024px ausgeblendet); jetzt steht sie mobil als
- *     Such-Icon im Kopf, das zum Feld aufgeht (Kopfregel mobil, Regel 4).
- *   BLATT: nur der Rueckweg. Er lag als Textlink IM Inhalt und scrollte auf
- *     einem 1950px langen Blatt mit weg (A7, Casey). Im klebenden Kopf bleibt
- *     er stehen - Apples Navigationsleiste mit „< Einstellungen". Ab 768px
- *     traegt der Breadcrumb den Rueckweg; dort blendet settings.css den Kopf
- *     auf Blaettern aus.
+ *   WURZEL: Titel + Suche (mobil als Such-Icon, Kopfregel mobil Regel 4).
+ *   BLATT: nur der Rueckweg - Apples Navigationsleiste mit „< Einstellungen".
+ *     Ab 768px traegt der Breadcrumb den Rueckweg, ab der Split-Schwelle die
+ *     Seitenleiste; dort blendet settings.css den Kopf auf Blaettern aus.
  *
  * Neu gebaut wird nur beim Zustandswechsel: eine getippte Suche ueberlebt den
  * Deep-Link-Sprung innerhalb der Wurzel.
@@ -649,6 +585,50 @@ function createLeafHeader(leaf) {
   return header;
 }
 
+/**
+ * Ist das Modul des Blatts fuer den Haushalt an? Die Kueche fasst vier Module
+ * zusammen und ist an, solange eines davon es ist (wie in Aktive Module).
+ * Ohne Router-Zustand (Tests, Frueh-Render) gilt es als an.
+ */
+function moduleEnabled(moduleId) {
+  const disabled = (id) => Boolean(window.yuvomi?.isModuleDisabled?.(id));
+  if (moduleId === 'kitchen') return KITCHEN_CHILD_IDS.some((id) => !disabled(id));
+  return !disabled(moduleId);
+}
+
+/**
+ * DIE STATUSZEILE EINES MODULBLATTS (S1). Ob ein Modul fuer den Haushalt an
+ * ist, entscheidet NUR Aktive Module - bis R10 stand der Schalter fuer
+ * Belohnungen ein zweites Mal im Belohnungsblatt. Hier steht der Zustand als
+ * Zeichen fuer alle (Nur-lesen-Regel: der Zustand bleibt, die Handlung geht),
+ * der Weg zum Schalter nur fuer Admins, die ihn bedienen duerfen.
+ * Uebersicht und Einstellungen sind gesperrt (nie aus) und bekommen keine Zeile.
+ */
+function createModuleStatus(leaf, user) {
+  if (!leaf.module || leaf.module === 'dashboard') return null;
+  const enabled = moduleEnabled(leaf.module);
+  const row = document.createElement('div');
+  row.className = `settings-sheet-status settings-sheet-status--${enabled ? 'on' : 'off'}`;
+
+  const state = document.createElement('p');
+  state.className = 'settings-sheet-status__state';
+  state.append(
+    createIcon(enabled ? 'circle-check' : 'circle-off', 'settings-sheet-status__icon'),
+    document.createTextNode(t(enabled ? 'settings.moduleStatusOn' : 'settings.moduleStatusOff', { module: t(leaf.labelKey) })),
+  );
+  row.appendChild(state);
+
+  if (user?.role === 'admin') {
+    const link = createLink(ACTIVE_MODULES_PATH, 'settings-sheet-status__link');
+    link.append(
+      document.createTextNode(t('settings.pageActiveModules')),
+      createIcon('chevron-right', 'settings-sheet-status__link-icon'),
+    );
+    row.appendChild(link);
+  }
+  return row;
+}
+
 // Wie lange die angesprungene Option markiert bleibt, und wie lange ihre
 // Markierung ausblendet (--transition-slow, settings.css).
 const OPTION_MARK_MS = 2000;
@@ -678,6 +658,12 @@ function findOptionLabel(root, text) {
   return null;
 }
 
+function markTarget(target) {
+  target.classList.add('settings-search-target');
+  setTimeout(() => target.classList.add('settings-search-target--fading'), OPTION_MARK_MS);
+  setTimeout(() => target.classList.remove('settings-search-target', 'settings-search-target--fading'), OPTION_MARK_MS + OPTION_FADE_MS);
+}
+
 /**
  * Zeigt die Option, auf die ein Suchtreffer zeigt (`?option=<key>`, registry.js
  * `options`): scrollt sie in die Mitte, markiert ihren Traeger kurz und legt
@@ -686,9 +672,9 @@ function findOptionLabel(root, text) {
  *
  * Gesucht wird die SICHTBARE Beschriftung (t(key)) im gerenderten Blatt: kein
  * Blatt muss dafuer Anker pflegen, und test:settings-copy haelt, dass die
- * Beschriftung auf ihrem Blatt vorkommt. Laedt das Blatt einen Teil nach,
- * wartet die Suche bis OPTION_WAIT_MS; findet sie nichts, bleibt es bei der
- * Ueberschrift - der Sprung ist dann ein Sprung aufs Blatt, kein Fehler.
+ * Beschriftung in ihrem Abschnitt vorkommt. Laedt ein Abschnitt einen Teil
+ * nach, wartet die Suche bis OPTION_WAIT_MS; findet sie nichts, bleibt es bei
+ * der Ueberschrift - der Sprung ist dann ein Sprung aufs Blatt, kein Fehler.
  *
  * NACH DEM ROUTER, NICHT IM RENDER: derselbe Grund wie bei
  * revealOverviewSection - ein Soft-Update setzt den Scrollport erst danach
@@ -723,9 +709,7 @@ function revealSettingsOption(leafContainer, key) {
       const focusTarget = (typing ? null : control) ?? label;
       if (focusTarget === label && label.tabIndex < 0 && !label.hasAttribute('tabindex')) label.tabIndex = -1;
       focusTarget.focus({ preventScroll: true });
-      target.classList.add('settings-search-target');
-      setTimeout(() => target.classList.add('settings-search-target--fading'), OPTION_MARK_MS);
-      setTimeout(() => target.classList.remove('settings-search-target', 'settings-search-target--fading'), OPTION_MARK_MS + OPTION_FADE_MS);
+      markTarget(target);
     }, 0);
   };
 
@@ -745,15 +729,89 @@ function revealSettingsOption(leafContainer, key) {
   return false;
 }
 
+/** Id des Traegers eines Abschnitts im Blatt - Sprungziel von `?section=`. */
+function sheetSectionId(sectionId) {
+  return `settings-section-${sectionId}`;
+}
+
+/**
+ * Springt an einen Abschnitt (`?section=<id>`): Ziel der Umleitungen von den
+ * Adressen vor R10 (`/settings/sync/calendar` -> Kalender, Abschnitt
+ * Kalender-Synchronisation) und der Suchtreffer auf fruehere Blaetter. Der
+ * Fokus geht auf die erste Ueberschrift des Abschnitts, damit Tastatur und
+ * Screenreader dort weiterlesen, wo das Auge landet.
+ *
+ * @returns {boolean} true, wenn es den Abschnitt in diesem Blatt gibt
+ */
+function revealSheetSection(leafContainer, sectionId) {
+  if (typeof sectionId !== 'string' || !sectionId) return false;
+  const host = leafContainer.querySelector(`#${CSS.escape(sheetSectionId(sectionId))}`);
+  if (!host) return false;
+  setTimeout(() => {
+    if (!host.isConnected) return;
+    host.scrollIntoView({ block: 'start' });
+    const heading = host.querySelector('h2, h3, legend') ?? host;
+    if (heading.tabIndex < 0 && !heading.hasAttribute('tabindex')) heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+    markTarget(host);
+  }, 0);
+  return true;
+}
+
+/**
+ * Rendert EINEN Abschnitt in seinen Traeger. Ein Fehler bleibt im Abschnitt:
+ * scheitert die Kalender-Synchronisation, stehen die Termin-Vorgaben darueber
+ * trotzdem (vorher war ein Blatt ein Abschnitt, und der Fehler nahm das Blatt).
+ */
+async function renderSheetSection(host, section, user, query) {
+  const loadAndRender = async ({ focusRetry = false } = {}) => {
+    try {
+      const module = await section.loader();
+      if (typeof module.render !== 'function') throw new TypeError('Settings leaf must export render()');
+      host.replaceChildren();
+      await module.render(host, { user, query });
+      hydrateIcons(host);
+    } catch (error) {
+      console.error(`[Settings] Failed to render ${section.id}:`, error);
+      const retryState = createRetryState({
+        message: t('settings.loadError'),
+        onRetry: () => loadAndRender({ focusRetry: true }),
+      });
+      host.replaceChildren(retryState);
+      hydrateIcons(host);
+      if (focusRetry) {
+        const retryButton = retryState.querySelector('.settings-retry-state__button');
+        requestAnimationFrame(() => {
+          if (retryButton?.isConnected && host.contains(retryButton)) {
+            retryButton.focus({ preventScroll: true });
+          }
+        });
+      }
+    }
+  };
+  await loadAndRender();
+}
+
+/**
+ * EIN BLATT JE MODUL (S1): Statuszeile, dann die Abschnitte "Fuer mich", dann
+ * "Fuer den Haushalt". Jeder Abschnitt ist ein frueheres Blatt mit seinem
+ * eigenen Loader und rendert in seinen eigenen Traeger - dieselben Endpunkte,
+ * dieselben Schluessel, nur ein anderer Ort. Die Reichweiten-Ueberschriften
+ * stehen nur auf Modulblaettern: im Konto ist alles meins, im Haushalt alles
+ * des Haushalts, und die Ueberschrift saegte dort nur Platz ab.
+ */
 async function renderLeafContent(content, leaf, domain, user, query) {
-  // Der mobile Rueckweg steht nicht mehr hier, sondern im klebenden Kopf
+  // Den Fokus nur nachziehen, wenn er schon in den Einstellungen lag (Klick in
+  // der Seitenleiste, Breadcrumb, Suchtreffer, Vor/Zurueck). Eine Vorwahl ohne
+  // Geste (S3) nimmt ihn niemandem weg.
+  const page = content.closest('.settings-page');
+  const quiet = !page?.contains(document.activeElement);
+  // Der mobile Rueckweg steht nicht hier, sondern im klebenden Kopf
   // (renderToolbar): als Textlink im Inhalt scrollte er mit weg.
   const breadcrumb = createBreadcrumb(domain, leaf);
 
   // Der Leaf-Header wird zentral aus der Registry gerendert (Prio 5/B1): die
-  // Blätter liefern nur noch Content. Der Header liegt als Geschwister *über*
-  // dem Content-Container, damit Leaf-interne Re-Renders (die `leafContainer`
-  // per replaceChildren leeren) ihn nicht entfernen.
+  // Abschnitte liefern nur noch Content.
   const header = createLeafHeader(leaf);
   const heading = header.querySelector('.settings-leaf-header__title');
 
@@ -761,61 +819,118 @@ async function renderLeafContent(content, leaf, domain, user, query) {
   leafContainer.className = 'settings-leaf';
   content.replaceChildren(breadcrumb, header, leafContainer);
 
-  const loadAndRender = async ({ focusRetry = false } = {}) => {
-    leafContainer.replaceChildren();
-    // Der Blattwechsel laedt ein Modul und danach dessen Daten. Bis dahin stand
-    // hier ein leerer Kasten (Critique 2026-07-27). aria-busy gilt sofort; das
-    // Skelett kommt erst nach einer kurzen Frist, damit ein Blatt aus dem
-    // Modul-Cache nicht kurz aufblitzt.
-    leafContainer.setAttribute('aria-busy', 'true');
-    const skeletonTimer = setTimeout(() => {
-      if (leafContainer.isConnected && !leafContainer.firstChild) {
-        leafContainer.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 3, lines: 3 }));
-      }
-    }, SKELETON_DELAY_MS);
+  const sections = settingsSheetSections(leaf, user);
+  const scoped = Boolean(leaf.module);
+  const status = createModuleStatus(leaf, user);
+  if (status) leafContainer.appendChild(status);
 
-    try {
-      const module = await leaf.loader();
-      if (typeof module.render !== 'function') throw new TypeError('Settings leaf must export render()');
-      clearTimeout(skeletonTimer);
-      leafContainer.replaceChildren();
-      await module.render(leafContainer, { user, query });
-      leafContainer.removeAttribute('aria-busy');
-      watchLeafForms(leafContainer);
+  const hosts = [];
+  for (const scope of ['mine', 'household']) {
+    const inScope = sections.filter((section) => section.scope === scope);
+    if (!inScope.length) continue;
+    let parent = leafContainer;
+    if (scoped) {
+      const group = document.createElement('section');
+      group.className = `settings-scope settings-scope--${scope}`;
+      const title = document.createElement('h2');
+      title.className = 'settings-scope__title';
+      title.id = `settings-scope-${leaf.id}-${scope}`;
+      title.textContent = t(scope === 'mine' ? 'settings.scopeMine' : 'settings.scopeHousehold');
+      group.setAttribute('aria-labelledby', title.id);
+      group.appendChild(title);
+      leafContainer.appendChild(group);
+      parent = group;
+    }
+    for (const section of inScope) {
+      const host = document.createElement('div');
+      host.className = 'settings-sheet-section';
+      host.id = sheetSectionId(section.id);
+      host.dataset.sectionId = section.id;
+      if (section.props?.part) host.dataset.part = section.props.part;
+      parent.appendChild(host);
+      hosts.push([host, section]);
+    }
+  }
 
-      hydrateIcons(content);
-      // Ein Suchtreffer auf eine Option endet an der Option, sonst an der
-      // Ueberschrift des Blatts.
-      heading.tabIndex = -1;
-      if (!revealSettingsOption(leafContainer, query?.get?.('option'))) {
-        requestAnimationFrame(() => {
-          if (!leafContainer.contains(document.activeElement)) heading.focus({ preventScroll: true });
-        });
-      }
-    } catch (error) {
-      console.error(`[Settings] Failed to render ${leaf.id}:`, error);
-      clearTimeout(skeletonTimer);
-      leafContainer.removeAttribute('aria-busy');
-      clearLeafEdits();
-      const retryState = createRetryState({
-        message: t('settings.loadError'),
-        onRetry: () => loadAndRender({ focusRetry: true }),
-      });
-      leafContainer.replaceChildren(retryState);
-      hydrateIcons(content);
-
-      if (focusRetry) {
-        const retryButton = retryState.querySelector('.settings-retry-state__button');
-        requestAnimationFrame(() => {
-          if (retryButton?.isConnected && leafContainer.contains(retryButton)) {
-            retryButton.focus({ preventScroll: true });
-          }
-        });
+  // Der Blattwechsel laedt Module und danach deren Daten. aria-busy gilt
+  // sofort; das Skelett kommt erst nach einer kurzen Frist, damit ein Blatt aus
+  // dem Modul-Cache nicht kurz aufblitzt.
+  leafContainer.setAttribute('aria-busy', 'true');
+  const skeletonTimer = setTimeout(() => {
+    for (const [host] of hosts) {
+      if (host.isConnected && !host.firstChild) {
+        host.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 2, lines: 3 }));
       }
     }
-  };
+  }, SKELETON_DELAY_MS);
 
-  await loadAndRender();
+  await Promise.all(hosts.map(([host, section]) => renderSheetSection(host, section, user, query)));
+  clearTimeout(skeletonTimer);
+  leafContainer.removeAttribute('aria-busy');
+  watchLeafForms(leafContainer);
+  hydrateIcons(content);
+
+  // Ein Suchtreffer endet an der Option, eine Umleitung am Abschnitt, sonst die
+  // Ueberschrift des Blatts - ausser das Blatt wurde vorgewaehlt (S3): dann
+  // bleibt der Fokus, wo er war, wie bei jeder Vorwahl ohne Geste.
+  heading.tabIndex = -1;
+  if (revealSettingsOption(leafContainer, query?.get?.('option'))) return;
+  if (revealSheetSection(leafContainer, query?.get?.('section'))) return;
+  if (quiet) return;
+  requestAnimationFrame(() => {
+    if (!leafContainer.contains(document.activeElement)) heading.focus({ preventScroll: true });
+  });
+}
+
+/**
+ * LISTE + DETAIL AB DER SPLIT-SCHWELLE (S3). Ob die Seitenleiste steht,
+ * entscheidet das CSS (settings.css, `@container settings-surface`), nicht
+ * diese Datei - wie beim Baustein (utils/master-detail.js): `matchMedia`
+ * kennt keine Container Queries, und eine zweite Schwelle hier liefe der im
+ * Stylesheet davon. Gefragt wird die gerechnete Darstellung der Seitenleiste.
+ */
+function isSplit(shell) {
+  const navigation = shell?.querySelector(':scope > .settings-shell__navigation');
+  return Boolean(navigation?.isConnected) && getComputedStyle(navigation).display !== 'none';
+}
+
+let splitObserver = null;
+
+/**
+ * DAS ERSTE BLATT VORWAEHLEN (S3, L2): am Desktop gibt es keine Wurzel-Liste
+ * neben der Seitenleiste - die WAERE dieselbe Liste zweimal. Ohne Blatt in der
+ * Adresse zeigt die rechte Spalte deshalb das erste Blatt (des Bereichs aus
+ * `?view=domain&domain=x`, sonst Konto). `replaceState`, kein neuer
+ * History-Eintrag, kein Fokuswechsel; mobil nie - dort IST die Liste die Seite.
+ */
+function preselectSheet(container, { user, domainId }) {
+  const sheet = firstSettingsSheet(user, domainId);
+  if (!sheet) return false;
+  history.replaceState({ ...(history.state ?? {}), path: sheet.path }, '', sheet.path);
+  renderSettingsShell(container, { user, leaf: sheet, incremental: true })
+    .catch((error) => console.error('[Settings] Preselect failed:', error));
+  return true;
+}
+
+/**
+ * Wird das Fenster breiter, waehrend die Wurzel-Liste steht, rutscht sie in
+ * die Seitenleiste - und rechts gehoert ein Blatt hin. Umgekehrt bleibt das
+ * Blatt stehen: mobil ist ein Blatt mit Zurueck genau die Push-Navigation.
+ */
+function watchSplit(container, page, { user, domainId }) {
+  splitObserver?.disconnect();
+  splitObserver = null;
+  if (typeof ResizeObserver !== 'function') return;
+  splitObserver = new ResizeObserver(() => {
+    if (!page.isConnected) {
+      splitObserver?.disconnect();
+      splitObserver = null;
+      return;
+    }
+    if (page.classList.contains('settings-page--leaf')) return;
+    if (isSplit(page.querySelector('.settings-shell'))) preselectSheet(container, { user, domainId });
+  });
+  splitObserver.observe(page);
 }
 
 export async function renderSettingsShell(container, {
@@ -830,7 +945,7 @@ export async function renderSettingsShell(container, {
   const activeLeaf = leaf?.path ? findSettingsLeaf(leaf.path, user) : null;
 
   // Inkrementell: Wenn bereits eine Shell montiert ist, bleiben Seitenkopf und
-  // Sidebar stehen — wir tauschen nur den Aktivzustand und den Detailbereich.
+  // Sidebar stehen - wir tauschen nur den Aktivzustand und den Detailbereich.
   const existingShell = incremental ? container.querySelector('.settings-shell') : null;
   let shell;
   let content;
@@ -843,14 +958,13 @@ export async function renderSettingsShell(container, {
       activeLeaf,
     );
   } else {
-    // Frische Shell: der geteilte Preferences-Cache gilt genau für einen
-    // Settings-Besuch. Alles, was zwischenzeitlich ausserhalb geschrieben
-    // wurde (z. B. die Widget-Konfiguration im Dashboard), ist damit weg.
+    // Frische Shell: der geteilte Preferences-Cache gilt genau fuer einen
+    // Settings-Besuch.
     resetPreferencesCache();
 
     // Kopf und Koerper sind Geschwister: der Kopf ist full-bleed und polstert
     // sich ueber --page-inline-pad selbst (#577), der Koerper traegt dieselbe
-    // Kante. Die Seite selbst polstert nichts - sonst addierten sich die Raender.
+    // Kante. Die Seite ist der Container, an dem die Split-Schwelle misst.
     const page = document.createElement('div');
     page.className = 'settings-page';
 
@@ -872,11 +986,18 @@ export async function renderSettingsShell(container, {
     // Sidebar-Icons einmalig bei der Montage hydrieren; die Detail-Icons werden
     // pro Render separat (nur im Content-Bereich) hydriert.
     hydrateIcons(navigation);
+    requestAnimationFrame(() => revealActiveNavigationLink(navigation));
   }
 
   const page = shell.closest('.settings-page');
   page?.classList.toggle('settings-page--leaf', Boolean(activeLeaf));
   const toolbar = page?.querySelector(':scope > .page-toolbar');
+
+  const focusDomain = view === 'domain'
+    ? domains.find((entry) => entry.id === domainId)
+    : null;
+  // Die Wurzel am Desktop: erstes Blatt statt einer zweiten Liste (S3).
+  if (!activeLeaf && page && isSplit(shell) && preselectSheet(container, { user, domainId: focusDomain?.id ?? null })) return;
 
   const leafDomain = activeLeaf
     ? domains.find((entry) => entry.id === activeLeaf.domainId)
@@ -893,12 +1014,9 @@ export async function renderSettingsShell(container, {
     await renderLeafContent(content, activeLeaf, leafDomain, user, query);
     return;
   }
-
   renderOverview(content, domains, user);
   hydrateIcons(content);
   if (toolbar) renderToolbar(toolbar, content, {});
-  const focusDomain = view === 'domain'
-    ? domains.find((entry) => entry.id === domainId)
-    : null;
   revealOverviewSection(content, focusDomain?.id);
+  if (page) watchSplit(container, page, { user, domainId: focusDomain?.id ?? null });
 }

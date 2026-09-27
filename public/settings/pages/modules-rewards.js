@@ -7,27 +7,15 @@ import { getPreferences, savePreferences } from '/settings/preferences-cache.js'
 // Spiegelt MAX_POINTS in server/routes/tasks.js.
 const MAX_TASK_POINTS = 10000;
 
-// Belohnungen ist kein eigener Boolean-Schalter, sondern Teil der modulweiten
-// Sichtbarkeit (disabled_modules). „Aktiviert" == Modul-Slug NICHT in der Liste.
-function isRewardsEnabled(preferences) {
-  const disabled = Array.isArray(preferences.disabled_modules) ? preferences.disabled_modules : [];
-  return !disabled.includes('rewards');
-}
+// KEIN AN/AUS-SCHALTER MEHR (Re-Critique 2026-09-27, A7 P1-3): "Belohnungen
+// aktivieren" stand hier UND in Aktive Module - zwei Schalter fuer denselben
+// Eintrag in `disabled_modules`. Das Modul geht nur noch dort an und aus; die
+// Statuszeile des Blatts (shell.js) zeigt den Zustand und verlinkt dorthin.
 
 function renderPage(container, preferences) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <section class="settings-section">
-      <div class="settings-card">
-        <h2 class="settings-card__title">${t('settings.rewardsEnableTitle')}</h2>
-        <p class="form-hint">${t('settings.rewardsEnableHint')}</p>
-        ${toggleRowHtml({
-          control: 'switch',
-          label: t('settings.rewardsEnableLabel'),
-          checked: isRewardsEnabled(preferences),
-          attrs: { id: 'rewards-enabled' },
-        })}
-      </div>
       <div class="settings-card">
         <h2 class="settings-card__title">${t('settings.rewardsApprovalTitle')}</h2>
         <p class="form-hint">${t('settings.rewardsApprovalHint')}</p>
@@ -62,27 +50,6 @@ function renderPage(container, preferences) {
 }
 
 function bindEvents(container, preferences) {
-  const enableToggle = container.querySelector('#rewards-enabled');
-  enableToggle?.addEventListener('change', async () => {
-    enableToggle.disabled = true;
-    const current = Array.isArray(preferences.disabled_modules) ? preferences.disabled_modules : [];
-    const next = enableToggle.checked
-      ? current.filter((m) => m !== 'rewards')
-      : [...new Set([...current, 'rewards'])];
-    try {
-      const res = await savePreferences({ disabled_modules: next });
-      const saved = res?.data?.disabled_modules ?? next;
-      preferences.disabled_modules = saved;
-      window.yuvomi?.setDisabledModules?.(saved);
-      window.yuvomi?.showToast(t('settings.rewardsSaved'), 'success');
-    } catch (error) {
-      enableToggle.checked = !enableToggle.checked;
-      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
-    } finally {
-      enableToggle.disabled = false;
-    }
-  });
-
   const approvalToggle = container.querySelector('#rewards-require-approval');
   approvalToggle?.addEventListener('change', async () => {
     approvalToggle.disabled = true;

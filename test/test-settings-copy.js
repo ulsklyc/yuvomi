@@ -25,7 +25,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { SETTINGS_LEAVES } from '../public/settings/registry.js';
+import { SETTINGS_LEAVES, SETTINGS_SECTIONS, settingsSheetSections } from '../public/settings/registry.js';
 
 const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
 const translate = (key) => key.split('.').reduce((value, segment) => value?.[segment], de);
@@ -43,9 +43,10 @@ const stemOf = (word) => word
   .slice(0, Math.min(Math.max(5, word.length - 2), 8))
   .toLowerCase();
 
-function leafSourcePath(leaf) {
-  const match = String(leaf.loader).match(/\/settings\/(pages\/[\w-]+\.js)/);
-  assert.ok(match, `${leaf.id}: Loader-Pfad nicht erkennbar`);
+/** Quelldatei eines Abschnitts (seit R10 traegt der Abschnitt den Loader, nicht das Blatt). */
+function sectionSourcePath(section) {
+  const match = String(section.loader).match(/\/settings\/(pages\/[\w-]+\.js)/);
+  assert.ok(match, `${section.id}: Loader-Pfad nicht erkennbar`);
   return new URL(`../public/settings/${match[1]}`, import.meta.url);
 }
 
@@ -61,12 +62,16 @@ const translationKeysIn = (source) => [...source.matchAll(/\bt\(\s*['"]([\w.]+)[
  * Rekursion - der Guard soll das Blatt prüfen, nicht den halben Baum.
  */
 function renderedVocabulary(leaf) {
-  const source = readFileSync(leafSourcePath(leaf), 'utf8');
-  const keys = translationKeysIn(source);
-
-  for (const match of source.matchAll(/from\s+'\/settings\/([\w/-]+\.js)'/g)) {
-    const shared = new URL(`../public/settings/${match[1]}`, import.meta.url);
-    keys.push(...translationKeysIn(readFileSync(shared, 'utf8')));
+  const keys = [];
+  // Ein Blatt rendert seit R10 ALLE seine Abschnitte (Rolle Admin: alle
+  // sichtbar) - das Vokabular ist ihre Vereinigung.
+  for (const section of settingsSheetSections(leaf, null, { all: true })) {
+    const source = readFileSync(sectionSourcePath(section), 'utf8');
+    keys.push(...translationKeysIn(source));
+    for (const match of source.matchAll(/from\s+'\/settings\/([\w/-]+\.js)'/g)) {
+      const shared = new URL(`../public/settings/${match[1]}`, import.meta.url);
+      keys.push(...translationKeysIn(readFileSync(shared, 'utf8')));
+    }
   }
 
   const values = [leaf.labelKey, ...keys]
@@ -129,8 +134,10 @@ test('jedes Substantiv einer Leaf-Description kommt im Blatt-Inhalt vor', () => 
 test('jede Such-Option einer Leaf wird auf genau dieser Leaf gerendert', () => {
   const failures = [];
   let seen = 0;
-  for (const leaf of SETTINGS_LEAVES) {
-    const source = readFileSync(leafSourcePath(leaf), 'utf8');
+  // Seit R10 haengen die Optionen am Abschnitt, und der Abschnitt ist die
+  // Datei, die sie rendert.
+  for (const leaf of SETTINGS_SECTIONS) {
+    const source = readFileSync(sectionSourcePath(leaf), 'utf8');
     // `t('x')` UND der Schluessel als Literal: Werte-Listen wie das Theme-
     // Segment tragen `labelKey: 'settings.themeDark'` und uebersetzen spaeter.
     const keysIn = (text) => [

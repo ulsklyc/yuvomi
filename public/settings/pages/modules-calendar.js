@@ -49,7 +49,8 @@ function durationOptionLabel(minutes) {
 // `calendar_default_reminders` und `calendar_default_assign_me` schreiben per
 // `cfgUserSet`, hinter diesem adminOnly-Blatt kam kein Mitglied an sie heran
 // (Critique 2026-07-27). Hier bleibt, was haushaltweit gilt.
-const PERSONAL_CALENDAR_PATH = '/settings/personal/calendar';
+// Die Termin-Vorgaben stehen seit R10 im selben Blatt, unter "Fuer mich".
+const PERSONAL_CALENDAR_PATH = '/settings/modules/calendar?section=personal-calendar';
 // #965: ein Verweis auf externe ICS-Feeds (fuer Laender ohne eigene Liste)
 // gehoert bewusst NICHT hierher - dieses Blatt haelt sich per `test-frontend-
 // audit.js` ausdruecklich von jeder Erwaehnung des per-Nutzer-Abo-Blatts frei

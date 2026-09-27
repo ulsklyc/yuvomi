@@ -108,91 +108,6 @@
   color: var(--color-accent);
 }
 
-/* --------------------------------------------------------
-   Akkordeon-Navigation (Desktop, ab 2 Domänen)
-   Single-Open: die aktive Domäne ist offen, die übrigen kollabieren auf ihre
-   Kopfzeile. Die Höhe animiert per grid-template-rows 0fr→1fr (kein JS-Messen).
-   -------------------------------------------------------- */
-
-.settings-shell__navigation--collapsible .settings-shell__navigation-group + .settings-shell__navigation-group {
-  margin-top: var(--space-1);
-}
-
-.settings-shell__navigation--collapsible .settings-shell__navigation-heading {
-  margin: 0;
-}
-
-.settings-shell__navigation-toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  min-height: var(--target-md);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  /* Typo (Größe/Tracking) kommt aus der Rollenebene (typography.css: Nav-
-     Gruppierungslabel, Sentence-Case); der Button erbt nur die Schriftfamilie,
-     die er sonst per UA-Default verlöre. */
-  font-family: inherit;
-  color: var(--color-text-secondary);
-  text-align: left;
-  cursor: pointer;
-  transition:
-    background-color var(--transition-fast),
-    color var(--transition-fast);
-}
-
-.settings-shell__navigation-toggle:hover {
-  background: var(--color-surface-hover);
-  color: var(--color-text-primary);
-}
-
-.settings-shell__navigation-group--active .settings-shell__navigation-toggle {
-  color: var(--color-accent);
-}
-
-.settings-shell__navigation-domain-label {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.settings-shell__navigation-chevron {
-  width: var(--space-4);
-  height: var(--space-4);
-  flex: 0 0 auto;
-  color: var(--color-text-tertiary);
-  transition: transform var(--transition-base);
-}
-
-.settings-shell__navigation-toggle[aria-expanded='true'] .settings-shell__navigation-chevron {
-  transform: rotate(180deg);
-}
-
-/* Bewusste Layout-Transition (Detector layout-transition, geprüft): das
- * Aufklappen ändert eine echte Höhe, und `transform` kann sie nicht - eine
- * skalierte Gruppe verzerrt ihre Beschriftungen und schiebt nichts unter sich
- * weg. `grid-template-rows: 0fr -> 1fr` ist der Weg, der ohne feste Zielhöhe
- * auskommt; `max-height` bräuchte eine geratene Obergrenze und liefe bei kurzen
- * Gruppen sichtbar zu lange nach. Es ist EIN Element je Domäne, einmal pro
- * Klick. Abgeschaltet im prefers-reduced-motion-Block dieser Datei, der
- * `.settings-shell__navigation-panel` namentlich führt. */
-.settings-shell__navigation-panel {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows var(--transition-base);
-}
-
-.settings-shell__navigation-group--expanded .settings-shell__navigation-panel {
-  grid-template-rows: 1fr;
-}
-
-.settings-shell__navigation-panel > .settings-shell__navigation-list {
-  overflow: hidden;
-  min-height: 0;
-  padding-top: var(--space-1);
-}
-
-.settings-shell__navigation-domain-icon,
 /* ── DIE MARKE EINES BLATTES ──
  * Drei Orte zeigen dieselbe Liste (Seitenleiste, mobile Uebersicht,
  * Desktop-Uebersicht), also tragen sie dieselbe Marke - je in ihrer Groesse.
@@ -624,6 +539,105 @@
   .settings-leaf-header { margin-top: 0; }
 }
 
+/* --------------------------------------------------------
+   Ein Blatt je Modul (Re-Critique 2026-09-27, S1)
+
+   Statuszeile oben, dann die Reichweiten "Fuer mich" und "Fuer den Haushalt".
+   Jeder Abschnitt ist ein frueheres Blatt in seinem eigenen Traeger
+   (shell.js, renderLeafContent).
+   -------------------------------------------------------- */
+
+/* Die Reichweite ist ein Gruppenkopf, keine weitere Karte: ruhig, auf dem
+ * Grund, mit Luft darueber - die Abschnitte darunter tragen ihre eigenen
+ * Titel. Der zweite Kopf haelt mehr Abstand, damit "Fuer den Haushalt" als
+ * neue Gruppe liest und nicht als letzte Karte der ersten. */
+.settings-scope + .settings-scope {
+  margin-top: var(--space-8);
+}
+
+.settings-scope__title {
+  margin: 0 0 var(--space-3) var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+}
+
+.settings-sheet-section {
+  min-width: 0;
+  /* Sprungziel von `?section=`: nicht unter den klebenden Kopf. */
+  scroll-margin-block-start: calc(var(--target-base) + var(--space-8));
+}
+
+/* Die letzte Karte eines Abschnitts haelt den Abschnittsabstand der Seite
+ * (.settings-section), nicht zusaetzlich den der Karte. */
+.settings-sheet-section > .settings-section:last-child {
+  margin-bottom: var(--space-6);
+}
+
+/* Zustand des Moduls: ein Zeichen fuer alle, der Weg zum Schalter nur fuer
+ * Admins (Nur-lesen-Regel). Eine Zeile im Traeger wie Apples Kopfzeile in
+ * "Einstellungen > App" - der Schalter selbst lebt in Aktive Module. */
+.settings-sheet-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  min-height: var(--target-lg);
+  margin-bottom: var(--space-6);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-work);
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-sheet-status__state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+}
+
+.settings-sheet-status__icon {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  flex: 0 0 auto;
+}
+
+.settings-sheet-status--on .settings-sheet-status__icon {
+  color: var(--color-success-ink);
+}
+
+.settings-sheet-status--off .settings-sheet-status__icon {
+  color: var(--color-text-tertiary);
+}
+
+.settings-sheet-status__link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--target-md);
+  padding-inline: var(--space-2);
+  margin-inline-end: calc(-1 * var(--space-2));
+  border-radius: var(--radius-full);
+  color: var(--color-accent);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  transition: background-color var(--transition-fast);
+}
+
+.settings-sheet-status__link:hover {
+  background: var(--color-surface-hover);
+}
+
+.settings-sheet-status__link-icon {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
 .settings-setting-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -805,44 +819,92 @@
   border-color: var(--color-danger-ink);
 }
 
+/* --------------------------------------------------------
+   Liste + Detail ab der Split-Schwelle (Re-Critique 2026-09-27, S3)
+
+   Unter der Schwelle ist die Wurzel die gruppierte Liste und ein Blatt steht
+   allein (mobil mit Zurueck im Kopf, ab 768px mit Breadcrumb) - die
+   Push-Navigation. Ab der Schwelle steht die Liste als Seitenleiste links
+   (~320px) und das Blatt rechts im Lesemass; die Wurzel waehlt dann das erste
+   Blatt vor (shell.js, preselectSheet), statt dieselbe Liste ein zweites Mal
+   ueber 1156px zu ziehen (A8 P1-1: Titel und Chevron 1100px auseinander).
+
+   DIE ABFRAGE MISST DIE MODULFLAECHE (`.settings-page`), nicht den Viewport:
+   dieselbe Regel wie der Liste-+-Detail-Baustein (layout.css, module-surface).
+   `@container` kann keine Variable lesen - das Literal ist
+   `--layout-split-threshold` aus tokens.css, und test:settings-navigation
+   haelt beide gleich. Ob die Seitenleiste steht, liest die Shell an ihrer
+   gerechneten Darstellung ab (kein zweites `matchMedia`).
+   -------------------------------------------------------- */
+
+.settings-page {
+  container: settings-surface / inline-size;
+  /* Die Listenspur der Einstellungen: schmaler als die des Bausteins
+   * (--layout-list-min 420px), weil sie nur Namen traegt, keine
+   * zweizeiligen Datensaetze - Apples Systemeinstellungen fuehren ~320px. */
+  --settings-list-width: 20rem;
+}
+
+.settings-shell {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+/* Blatt und Wurzel-Liste lesen im Lesemass (DESIGN.md, Breitenregel):
+ * vorher lief die Wurzel ueber 1156px, ein Blatt ueber 912px. */
+.settings-shell__content {
+  max-inline-size: var(--layout-reading);
+}
+
+.settings-shell__navigation { display: none; }
+
 @media (min-width: 1024px) {
-  /* Eine Navigation je Modus, nicht zwei. Auf der Wurzel standen bisher
-     Sidebar (23 Blätter) und Kachelübersicht (dieselben 23 Blätter)
-     nebeneinander, dazu die globale App-Sidebar: drei parallele
-     Navigationsspalten plus Breadcrumb - genau die Enterprise-SaaS-Referenz,
-     die PRODUCT.md ausschliesst (Critique 2026-07-27).
-
-     Die Übersicht gehört den Kacheln: sie tragen die Beschreibungen und sind
-     der Einstieg. Die Sidebar gehört dem Blatt: sie ist zum Wechseln da. */
-  .settings-shell {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-6);
-    align-items: start;
-  }
-
-  .settings-page--leaf .settings-shell {
-    grid-template-columns: var(--sidebar-width-expanded) minmax(0, 1fr);
-  }
-
-  .settings-shell__navigation { display: none; }
-
-  /* `block`, nicht `flex`: die Basisregel ist ein Block, und die Gruppen
-     stapeln über `margin-top`. Ein Flex-Container legt sie in eine Zeile. */
-  .settings-page--leaf .settings-shell__navigation {
-    display: block;
+  /* Die Grundform der Seitenleiste; sichtbar wird sie erst an der Schwelle. */
+  .settings-shell__navigation {
     position: sticky;
     top: calc(var(--space-4) + var(--safe-area-inset-top));
     align-self: start;
-    max-height: calc(100vh - var(--space-8));
-    overflow-y: auto;
   }
 }
 
-@media (max-width: 1023px) {
-  .settings-shell__navigation {
-    display: none;
+@container settings-surface (min-width: 65rem) {
+  .settings-shell {
+    grid-template-columns: var(--settings-list-width) minmax(0, 1fr);
+    max-inline-size: var(--content-max-width);
+    margin-inline: auto;
   }
 
+  /* `block`, nicht `flex`: die Gruppen stapeln ueber `margin-top`. Die Liste
+   * scrollt fuer sich, wenn sie hoeher ist als das Fenster. */
+  .settings-shell__navigation {
+    display: block;
+    position: sticky;
+    top: calc(var(--space-4) + var(--safe-area-inset-top));
+    max-height: calc(var(--viewport-height) - var(--space-8));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* Die Suche bleibt an der Listenkante stehen, wenn die Liste scrollt: ein
+   * Streifen im Grund der Leiste, ueber den Polsterrand der Leiste gezogen. */
+  .settings-shell__navigation-search {
+    position: sticky;
+    top: calc(-1 * var(--space-3));
+    z-index: 1;
+    margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) var(--space-3);
+    padding: var(--space-3);
+    background: var(--color-surface-raised);
+  }
+
+  /* Der Ort steht links markiert - der Breadcrumb waere derselbe Weg ein
+   * zweites Mal, und der Blatt-Titel beginnt auf der Hoehe der Suche. */
+  .settings-breadcrumb { display: none; }
+
+  .settings-leaf-header { margin-top: 0; }
+}
+
+@media (max-width: 1023px) {
   .settings-setting-row {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -859,9 +921,7 @@
   .settings-module-row,
   .settings-module-move,
   .settings-disclosure__icon,
-  .settings-shell__navigation-panel,
-  .settings-shell__navigation-chevron,
-  .settings-shell__navigation-toggle {
+  .settings-sheet-status__link {
     transition: none;
   }
 }
