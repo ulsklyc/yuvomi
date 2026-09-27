@@ -302,6 +302,19 @@ test('Reiterleiste bei `read`: Listen waehlbar, kein Anlegen, kein Listenmenue',
   assert.match(gegen, /data-action="send-list"/);
 });
 
+test('Listen-Kapseln sagen die gewaehlte Liste an, nicht nur per Farbe (R8 H11)', async () => {
+  const zweite = { ...LISTE, id: LISTE.id + 1, name: 'Drogerie' };
+  zustand({ lists: [LISTE, zweite] });
+  const { bar } = await leisteTeile(LESEN);
+  const kapseln = bar.match(/<button[^>]*data-action="switch-list"[^>]*>/g);
+  assert.equal(kapseln.length, 2);
+  const aktiv = kapseln.filter((k) => /aria-current="true"/.test(k));
+  assert.equal(aktiv.length, 1, 'genau eine Kapsel ist die gezeigte Liste');
+  assert.match(aktiv[0], new RegExp(`data-id="${LISTE.id}"`));
+  assert.match(aktiv[0], /list-tab--active/, 'Klasse und Ansage gehen zusammen');
+  for (const k of kapseln) assert.match(k, /type="button"/);
+});
+
 // Kuechenkopf (Kopfregel mobil): das Listenmenue ist das EINE Werkzeugmenue
 // des Kopfs und steht im __actions-Slot, nicht mehr klebend am Ende der
 // Kapsel-Leiste - und die Leiste traegt kein dekoratives Listen-Glyph mehr.

@@ -753,9 +753,16 @@ function renderTabs(container) {
     // Der Zähler ist aria-hidden, sonst klebt er am Buttonnamen („Einkauf23");
     // die Ansage steht als aria-label auf dem Tab selbst - dasselbe Muster wie
     // setSubTabBadge. „0 offene Artikel" deckt auch den ✓-Zustand ehrlich ab.
+    //
+    // DIE WAHL WIRD ANGESAGT, NICHT NUR GEFAERBT (R8 H11): bis dahin trug nur
+    // `list-tab--active` den Zustand, und ein Screenreader las fuenf gleiche
+    // Knoepfe. Die Leiste ist `role="group"` (sie haelt auch „Neue Liste"),
+    // kein Tablist - `aria-selected` waere dort ungueltig, `aria-current`
+    // sagt genau „das ist die gezeigte Liste".
+    const active = list.id === state.activeListId;
     return `
-      <button class="list-tab ${list.id === state.activeListId ? 'list-tab--active' : ''}"
-              data-action="switch-list" data-id="${list.id}"
+      <button type="button" class="list-tab ${active ? 'list-tab--active' : ''}"
+              data-action="switch-list" data-id="${list.id}"${active ? ' aria-current="true"' : ''}
               ${list.item_total > 0 ? `aria-label="${esc(list.name)}, ${esc(t('nav.shoppingOpen', { count: unchecked }))}"` : ''}>
         ${esc(list.name)}
         ${list.item_total > 0 ? `<span class="list-tab__count" aria-hidden="true">${unchecked > 0 ? unchecked : '✓'}</span>` : ''}
