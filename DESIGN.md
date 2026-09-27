@@ -2057,12 +2057,26 @@ ein Modulkopf unter 768px gebaut ist. Anlass: dieselbe Frage hatte sechs Antwort
 114px in der Mehrheit, 170-176px in Aufgaben und Inventar, feste Filterreihen in Notizen,
 Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie Inhalt.
 
-1. **Hoechstens zwei Kopfzeilen.** Zeile 1: Large Title (34/700), trailing das Such-Icon
-   (wo das Modul sucht) und genau EIN Werkzeugmenue „..." (`pageToolsMenuHtml`,
-   utils/popover-menu.js, Vorbild `documents-tools-btn`). Die Primaeraktion bleibt mobil der
-   FAB in der Kapsel, am Desktop die angedockte Kopf-Pille. Zeile 2, optional und genau
-   eine: die Kontext-Steuerung (Ansichts-Segment, Zeitraum-Stepper, Sub-Tabs,
-   Listen-Kapseln, „Filter (n)"). Ziel ausgeklappt <= 114px, mit Stepper <= 122px.
+1. **Hoechstens zwei Kopfzeilen.** Zeile 1 traegt allein den Large Title (34/700) mit dem
+   Absender-Siegel davor. Zeile 2 ist die Bar-Zeile, die beim Scrollen stehen bleibt: vorn
+   das Such-Icon (wo das Modul sucht), dann die Kontext-Steuerung (Ansichts-Segment,
+   Zeitraum-Stepper, Listen-Kapseln, „Filter (n)"), trailing genau EIN Werkzeugmenue „..."
+   (`pageToolsMenuHtml`, utils/popover-menu.js, Vorbild `documents-tools-btn`). Traegt ein
+   Modul Sub-Tabs, ist die Tab-Leiste die ganze Zeile 2 (Schichtplan, Haushaltshilfe,
+   Belohnungen). Die Primaeraktion bleibt mobil der FAB in der Kapsel, am Desktop die
+   angedockte Kopf-Pille. Ziel ausgeklappt <= 114px, mit Stepper <= 122px. Gemessen
+   2026-09-27 (R11, 390px): Aufgaben, Notizen, Kontakte, Dokumente, Inventar, Geburtstage,
+   Entsorgung, Einstellungen 114-120px, Kalender 117px, Budget 162px (benannte Ausnahme unten).
+   Bis R11 stand hier, Such-Icon und Menue sassen in Zeile 1 neben dem Titel - gebaut war
+   immer Zeile 2 (Re-Critique 2026-09-27, A8 P3-1). Neben dem Large Title haetten sie ihn
+   bei 390px auf rund 220px gekuerzt, und angedockt waeren sie mit ihm aus dem Bild gewandert.
+
+   **Nie ein Kopf ohne Ortsangabe.** Angedockt wandert Zeile 1 aus dem Bild, und der Titel
+   kommt als kleiner Inline-Titel zurueck (`wireCollapsingHeader`, utils/ux.js): in die
+   Bar-Zeile, wo sie ihm 88px laesst; sonst falten ihre Kontrollen ins „..." (R9 M9); und wo
+   nichts falten kann, weil die Bar-Zeile eine Tab-Leiste ist, klebt der Kopf um die Hoehe
+   des Inline-Titels tiefer und zeigt ihn in diesem Streifen ueber der Leiste (Band, R11
+   H1). Kopfhoehe und Klebekante haengen in keinem der drei Wege am Andock-Zustand.
 2. **Keine losen Verwaltungs-Icons oder Textknoepfe im Kopf.** Kategorien, Tags, Lagerorte,
    Mehrfachauswahl, Import, Verlauf stehen im Werkzeugmenue - mit Icon UND Text; ein
    Ansichts-Schalter dort ist ein `menuitemcheckbox` mit Haken.
@@ -2090,8 +2104,13 @@ Tab-Leiste tragen, die selbst sagt, wo man ist, ersetzt sie den Large Title: Zei
 Leiste, Zeile 2 = EINE Kopfzeile je Tab mit [Kontext] ... [Such-Icon] [EIN „..."] (am Desktop
 dazu die angedockte Primaer-Pille). Such-Icon und Menue wandern in Zeile 2, weil die Leiste
 bei 390px schon ohne sie ueberlaeuft (gemessen scrollWidth 403/390). Die Zwei-Zeilen-Regel
-gilt unveraendert; alle Tabs derselben Leiste sind gleich hoch (Kueche: 121px mobil). Ein Tab
-ohne Werkzeuge traegt kein leeres „..." (Rezepte).
+gilt unveraendert. Ein Tab ohne Werkzeuge traegt kein leeres „..." (Rezepte).
+Seit R9 (M10) gilt mobil eine Verdichtung: traegt Zeile 2 KEINEN Kontext, nur Werkzeuge
+(Rezepte: Lupe, mit angebundenem Anbieter dazu der Quellenfilter; Vorrat: Lupe und „..."),
+legen sich die Werkzeuge ans Ende der Leiste, und der Kopf ist eine Zeile (56px statt 121px,
+kitchen-tabs.css). Die Leiste endet vor ihnen; Zaehler werden dort zum Punkt an der Ecke des
+Labels (R11 H2), damit vier Tabs und zwei Werkzeuge bei 375px ohne Scrollen passen.
+Mahlzeiten und Einkauf behalten Zeile 2 fuer ihren Kontext (Woche, Listen) - 121px.
 
 **Benannte Ausnahme: Sub-Tabs + Zeitraum (Budget, Haushaltshilfe-Berichte).** Ein Modul, dessen
 Zeile 2 schon die Sub-Tabs traegt und dessen Tab einen Zeitraum blaettert, bekommt den
