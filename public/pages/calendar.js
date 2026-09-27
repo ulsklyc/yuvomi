@@ -2286,7 +2286,7 @@ const VIEW_ICONS = { month: 'calendar-days', week: 'calendar-range', day: 'calen
 function viewMenuHtml(current = state.view) {
   const label = t('calendar.viewSwitcher');
   return `
-        <button type="button" class="btn btn--icon cal-toolbar__views-menu popover-menu__trigger" id="cal-views-menu"
+        <button type="button" class="btn btn--icon cal-toolbar__tools-btn popover-menu__trigger" id="cal-views-menu"
                 popovertarget="cal-views-menu-panel" aria-haspopup="menu" aria-expanded="false"
                 aria-label="${esc(label)}" title="${esc(label)}">
           <i data-lucide="ellipsis" aria-hidden="true"></i>

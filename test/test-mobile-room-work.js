@@ -200,14 +200,14 @@ test('M5: der Kopf traegt ein Ansichtsmenue mit genau einer gewaehlten Ansicht',
 });
 
 test('M5: mobil ersetzt das Menue das Segment, und der Kopf hat zwei Zeilen', () => {
-  assert.equal(declarations(calendarCss, '.cal-toolbar__views-menu').display, 'none', 'am Desktop waehlt das Segment');
-  assert.equal(declarations(calendarCss, '.cal-toolbar__views-menu', { media: MOBILE }).display, 'inline-flex');
+  assert.equal(declarations(calendarCss, '.cal-toolbar__tools-btn').display, 'none', 'am Desktop waehlt das Segment');
+  assert.equal(declarations(calendarCss, '.cal-toolbar__tools-btn', { media: MOBILE }).display, 'inline-flex');
   assert.equal(declarations(calendarCss, '.cal-toolbar__views', { media: MOBILE }).display, 'none');
   const bar = declarations(calendarCss, '.cal-toolbar > .cal-toolbar__bar', { media: MOBILE });
   assert.equal(bar.display, 'contents', 'die Bar-Zeile loest sich auf - ihre Werkzeuge ruecken in die Titelzeile');
   const center = declarations(calendarCss, '.page-toolbar.cal-toolbar.page-toolbar--wrap > .page-toolbar__center', { media: MOBILE });
   assert.equal(center['flex-basis'], '100%', 'der Zeitraum behaelt die zweite Zeile fuer sich (Label nicht angeschnitten)');
-  assert.equal(declarations(calendarCss, '.cal-toolbar__views-menu', { media: MOBILE }).order, '1');
+  assert.equal(declarations(calendarCss, '.cal-toolbar__tools-btn', { media: MOBILE }).order, '1');
   assert.equal(center.order, '2', 'Werkzeuge vor dem Zeitraum: sie stehen in Zeile 1');
 });
 
@@ -224,4 +224,46 @@ test('M5: Termintitel der Woche brechen nach Blockhoehe um statt nowrap', () => 
     if (lines) stufen.push(Number(lines[1]));
   }
   assert.deepEqual(stufen, [2, 3, 4], 'zwei bis vier Zeilen, gestaffelt nach der Hoehe des Blocks');
+});
+
+// --------------------------------------------------------------------------
+// M13 Notizen mobil
+// --------------------------------------------------------------------------
+
+const { __test: notes } = await import('../public/pages/notes.js');
+const notesCss = css('notes.css');
+
+test('M13: die Karte oeffnet selbst - der Oeffnen-Knopf ist kein Kreis in der Fusszeile mehr', () => {
+  const html = notes.renderNoteCard({ id: 5, title: 'Einkauf', content: 'Milch', color: '#ffcc00', pinned: 0 });
+  const open = /<button type="button" class="note-card__open" data-action="open" data-id="5"\s+aria-label="([^"]+)"><\/button>/.exec(html);
+  assert.ok(open, 'ein leerer Knopf ohne Icon - er traegt nur Namen und Flaeche');
+  assert.ok(open[1].length > 0, 'sein Name nennt die Notiz fuer Tastatur und Vorlesehilfe');
+  const footer = html.slice(html.indexOf('note-card__footer'));
+  assert.doesNotMatch(footer, /note-card__open/, 'in der Fusszeile stehen nur noch Urheber und Loeschen');
+  assert.ok(html.indexOf('note-card__open') < html.indexOf('note-card__pin'),
+    'er kommt vor der Nadel: in der Tab-Folge zuerst die Karte, dann ihre Aktionen');
+
+  const btn = declarations(notesCss, '.note-card__open');
+  assert.equal(btn.position, 'absolute');
+  assert.equal(btn.inset, '0', 'er liegt ueber der ganzen Karte');
+  assert.equal(declarations(notesCss, '.note-card__pin')['z-index'], '1', 'die Nadel liegt darueber');
+  const oben = declarations(notesCss, '.note-card__content .note-md-box');
+  assert.equal(oben['z-index'], '1', 'Checklisten-Haken bleiben antippbar, ohne die Notiz zu oeffnen (#704)');
+});
+
+test('M13: der Titel ist nicht kleiner als der Text, auf keiner Breite', () => {
+  const size = (value) => ({ '--type-card-title': 17, '--type-body': 17, '--type-secondary': 15 })[/var\((--[\w-]+)\)/.exec(value ?? '')?.[1]];
+  const titel = size(declarations(notesCss, '.note-card .note-card__title')['font-size']);
+  assert.ok(titel, 'der Kartentitel setzt eine Rolle');
+  assert.ok(titel >= size(declarations(notesCss, '.note-card__content')['font-size']), 'Desktop: Titel >= Text');
+  assert.ok(titel >= size(declarations(notesCss, '.note-card__content', { media: MOBILE })['font-size'] ?? declarations(notesCss, '.note-card__content')['font-size']),
+    'mobil: Titel >= Text');
+});
+
+test('M13: mobil ist die Karte kompakt - drei Zeilen Vorschau, Fusszeile ohne Kreisflaeche', () => {
+  const content = declarations(notesCss, '.note-card__content', { media: MOBILE });
+  assert.equal(content['-webkit-line-clamp'], '3', 'Vorschau drei Zeilen statt zwoelf');
+  const del = declarations(notesCss, '.note-card__delete', { media: MOBILE });
+  assert.match(del['margin-block'] ?? '', /var\(--target-base\)/,
+    'Loeschen haengt seine volle Trefflaeche in die Polsterung statt die Zeile zu strecken');
 });

@@ -254,7 +254,7 @@
 }
 
 /* Das Ansichtsmenue gibt es nur mobil (R9 M5) - darueber waehlt das Segment. */
-.cal-toolbar__views-menu {
+.cal-toolbar__tools-btn {
   display: none;
 }
 
@@ -283,7 +283,7 @@
     display: contents;
   }
 
-  .cal-toolbar__views-menu {
+  .cal-toolbar__tools-btn {
     display: inline-flex;
   }
 
@@ -294,7 +294,7 @@
 
   .cal-toolbar__filter-btn,
   .cal-toolbar__search-btn,
-  .cal-toolbar__views-menu {
+  .cal-toolbar__tools-btn {
     order: 1;
     flex-shrink: 0;
   }
