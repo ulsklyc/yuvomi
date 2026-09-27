@@ -258,6 +258,18 @@
   }
 }
 
+/* DIE KACHEL VOR EINER FREIEN ZELLE WAECHST IN DEN ZEILENREST (Re-Critique
+ * 2026-09-27, A7 P2-12 / R10 L9). Welche und wie weit, rechnet
+ * `applyRowFill()` (dashboard.js) nach der Packung aus und setzt es als
+ * Darstellung, nicht als Groesse: gespeichert bleibt, was der Nutzer gewaehlt
+ * hat. Gemessen 1440x900: rechts neben Kennzahlen und Notizen blieb je eine
+ * 367px-Spalte leer. Nur ab zwei Spalten - einspaltig gibt es keinen Rest. */
+@media (min-width: 768px) {
+  .dashboard__grid > [data-row-fill] {
+    grid-column: span var(--widget-fill-span);
+  }
+}
+
 /* Kein eigener 1440px-Block mehr: `repeat(auto-fill, minmax(240px, 1fr))` ab 1024px
  * leitet die Spaltenzahl aus der Breite ab und deckt Wide-Screens (4–6 Spalten)
  * stufenlos ab — die frühere feste 3-→4-Spalten-Stufe war die Quelle der starren

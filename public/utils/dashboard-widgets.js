@@ -340,6 +340,59 @@ export function suggestGridHoleFill(items, columns, candidatesFor) {
   return null;
 }
 
+/**
+ * Welche Kachel im NORMALMODUS in den Rest ihrer Zeile waechst (Re-Critique
+ * 2026-09-27, A7 P2-12 / R10 L9). Gemessen bei 1440x900: neben der
+ * Kennzahlreihe (2x1) und neben den Notizen (2x1) blieb je eine Spalte leer,
+ * 367x110 und 367x201px - der Loch-Hinweis steht nur im Anpassen-Modus, und
+ * wer nie anpasst, sieht die Loecher fuer immer.
+ *
+ * Die Regel: nach der dichten Packung waechst jede Kachel nach rechts ueber
+ * die freien Zellen, die in ALLEN ihren Zeilen frei sind, bis zur naechsten
+ * belegten Zelle oder zum Rand. Gespeichert wird nichts - die gewaehlte Groesse
+ * bleibt die des Nutzers, gewachsen wird nur in der Darstellung.
+ *
+ * WARUM DAS DIE PACKUNG NICHT UMWIRFT (Aequivalenz, getestet): gewachsen wird
+ * nur in Zellen, die nach der VOLLEN Packung leer sind. Keine Kachel stand je
+ * dort, also findet bei der Neupackung mit den breiteren Spans jede Kachel
+ * dieselbe erste passende Stelle - die davor passten schon mit der schmaleren
+ * Breite nicht, und die eigene ist weiterhin frei. Der Test packt beide
+ * Fassungen und vergleicht die Positionen.
+ *
+ * @param {{ id: string, cols: number, rows: number }[]} items in Rangfolge
+ * @param {number} columns Spaltenzahl des Rasters
+ * @returns {Map<string, number>} Id -> neue Spaltenbreite, nur fuer Kacheln, die wachsen
+ */
+export function rowFillSpans(items, columns) {
+  const cols = Math.max(1, Math.floor(columns) || 1);
+  const grown = new Map();
+  if (cols < 2) return grown;
+  const cells = packGrid(items, cols);
+  for (const item of items) {
+    // Die Stelle der Kachel: ihre erste Zelle in Lesereihenfolge.
+    let top = -1;
+    let left = -1;
+    for (let r = 0; r < cells.length && top < 0; r += 1) {
+      const c = cells[r].indexOf(item.id);
+      if (c >= 0) { top = r; left = c; }
+    }
+    if (top < 0) continue;
+    const w = Math.min(Math.max(1, item.cols | 0), cols);
+    const h = Math.max(1, item.rows | 0);
+    let end = left + w;
+    const columnFree = (c) => {
+      for (let r = top; r < top + h; r += 1) if (!cells[r] || cells[r][c]) return false;
+      return true;
+    };
+    while (end < cols && columnFree(end)) {
+      for (let r = top; r < top + h; r += 1) cells[r][end] = item.id;
+      end += 1;
+    }
+    if (end > left + w) grown.set(item.id, end - left);
+  }
+  return grown;
+}
+
 export function sameWidgetConfig(a, b) {
   if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
   return a.every((w, i) => w.id === b[i].id && w.visible === b[i].visible

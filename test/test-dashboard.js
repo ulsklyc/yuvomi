@@ -2980,6 +2980,114 @@ test('suggestGridHoleFill: ohne Loch und ohne Ausweg schweigt er', () => {
     'ohne Kandidaten darf kein Vorschlag entstehen');
 });
 
+// --------------------------------------------------------
+// Normalmodus ohne Loecher (Re-Critique 2026-09-27, A7 P2-12 / R10 L9)
+//
+// Gemessen bei 1440x900 im Demo-Haushalt: neben den Kennzahlen (367x110) und
+// neben den Notizen (367x201) blieb je eine Spalte leer, und den Loch-Hinweis
+// gibt es nur im Anpassen-Modus. `rowFillSpans` sagt, welche Kachel in den
+// Rest ihrer Zeile waechst; applyRowFill() setzt es als Darstellung.
+// --------------------------------------------------------
+
+/** Die Positionen einer Packung: Id -> [Zeile, Spalte] der ersten Zelle. */
+function positions(cells) {
+  const pos = {};
+  cells.forEach((row, r) => row.forEach((id, c) => { if (id && !pos[id]) pos[id] = [r, c]; }));
+  return pos;
+}
+
+const DEMO_RASTER = [
+  kachel('family', 1, 2), kachel('budget', 1, 2), kachel('birthdays', 1, 2),
+  kachel('weather', 2, 1), kachel('metrics', 2, 1), kachel('rewards', 1, 1), kachel('notes', 2, 1),
+];
+
+test('rowFillSpans: im Demo-Raster wachsen Kennzahlen und Notizen in ihren Zeilenrest', () => {
+  nodeAssert.equal(typeof widgets.rowFillSpans, 'function', 'rowFillSpans fehlt in utils/dashboard-widgets.js');
+  const grown = widgets.rowFillSpans(DEMO_RASTER, 3);
+  nodeAssert.deepEqual([...grown], [['metrics', 3], ['notes', 3]]);
+  // Einspaltig gibt es keinen Rest, und ein volles Raster laesst alles stehen.
+  nodeAssert.equal(widgets.rowFillSpans(DEMO_RASTER, 1).size, 0);
+  nodeAssert.equal(widgets.rowFillSpans([kachel('a', 1, 1), kachel('b', 1, 1)], 2).size, 0);
+});
+
+test('rowFillSpans: eine hohe Kachel waechst nur, wo BEIDE ihrer Zeilen frei sind', () => {
+  // family 1x2 links, rechts daneben oben notes 1x1, unten nichts: die Zelle
+  // unten rechts ist frei, aber die obere nicht - family darf nicht wachsen,
+  // die einzeilige Kachel daneben schon nicht, weil ihre Zeile voll ist.
+  const grown = widgets.rowFillSpans([kachel('family', 1, 2), kachel('notes', 1, 1)], 2);
+  nodeAssert.deepEqual([...grown], []);
+  // Zwei hohe Kacheln in drei Spalten: die zweite waechst in die dritte Spalte.
+  nodeAssert.deepEqual([...widgets.rowFillSpans([kachel('a', 1, 2), kachel('b', 1, 2)], 3)], [['b', 2]]);
+});
+
+test('rowFillSpans: das Wachstum wirft die Packung nicht um (Aequivalenz)', () => {
+  // Gewachsen wird nur in Zellen, die nach der VOLLEN Packung leer sind - die
+  // Neupackung mit den breiteren Spans muss jede Kachel an ihrer Stelle lassen
+  // und die gewachsenen Zeilen voll machen. Geprueft an mehreren Rastern,
+  // nicht nur am Demo-Haushalt.
+  const raster = [
+    [DEMO_RASTER, 3],
+    [DEMO_RASTER, 4],
+    [DEMO_RASTER, 2],
+    [[kachel('a', 2, 1), kachel('b', 1, 2), kachel('c', 1, 1), kachel('d', 2, 2), kachel('e', 1, 1)], 3],
+    [[kachel('a', 1, 1), kachel('b', 3, 1), kachel('c', 1, 2), kachel('d', 1, 1)], 4],
+  ];
+  for (const [items, cols] of raster) {
+    const before = widgets.packGrid(items, cols);
+    const grown = widgets.rowFillSpans(items, cols);
+    const widened = items.map((it) => (grown.has(it.id) ? { ...it, cols: grown.get(it.id) } : it));
+    const after = widgets.packGrid(widened, cols);
+    nodeAssert.deepEqual(positions(after), positions(before), `Positionen verschoben (${cols} Spalten)`);
+    nodeAssert.ok(after.length <= before.length, 'das Raster wird nicht hoeher');
+    for (const [id] of grown) {
+      const [r] = positions(after)[id];
+      nodeAssert.ok(after[r].every(Boolean), `die Zeile von ${id} ist nach dem Wachsen voll (${cols} Spalten)`);
+    }
+  }
+});
+
+test('applyRowFill: waechst im Normalmodus, im Anpassen-Modus nimmt es alles zurueck', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  nodeAssert.equal(typeof __test.applyRowFill, 'function', 'applyRowFill fehlt im __test-Export');
+  const SPANS = { family: [1, 2], budget: [1, 2], birthdays: [1, 2], weather: [2, 1], metrics: [2, 1], rewards: [1, 1], notes: [2, 1] };
+  const tile = (id) => {
+    const props = new Map();
+    return {
+      dataset: { widgetId: id },
+      style: { setProperty: (k, v) => props.set(k, v), removeProperty: (k) => props.delete(k), props },
+    };
+  };
+  const tiles = Object.keys(SPANS).map(tile);
+  const grid = { children: tiles };
+  const vorher = globalThis.getComputedStyle;
+  globalThis.getComputedStyle = (el) => {
+    if (el === grid) return { gridTemplateColumns: '366px 366px 366px' };
+    const [cols, rows] = SPANS[el.dataset.widgetId];
+    return { display: 'flex', gridColumnStart: 'auto', gridColumnEnd: `span ${cols}`, gridRowStart: 'auto', gridRowEnd: `span ${rows}` };
+  };
+  try {
+    __test.applyRowFill(grid);
+    const gewachsen = tiles.filter((t) => 'rowFill' in t.dataset).map((t) => [t.dataset.widgetId, t.style.props.get('--widget-fill-span')]);
+    nodeAssert.deepEqual(gewachsen, [['metrics', '3'], ['notes', '3']]);
+    __test.applyRowFill(grid, { editing: true });
+    nodeAssert.equal(tiles.filter((t) => 'rowFill' in t.dataset || t.style.props.size).length, 0,
+      'im Anpassen-Modus zeigt das Raster die gewaehlten Groessen');
+  } finally {
+    globalThis.getComputedStyle = vorher;
+  }
+});
+
+test('das Wachstum ist verdrahtet: CSS liest den Span, der Aufbau ruft es nach dem Anpassen-Draht', () => {
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const regel = [...eachRule(css)].find((r) => r.selector.trim() === '.dashboard__grid > [data-row-fill]');
+  nodeAssert.ok(regel, 'keine Regel fuer [data-row-fill] in dashboard.css');
+  nodeAssert.match(regel.body, /grid-column:\s*span var\(--widget-fill-span\)/);
+  nodeAssert.ok(regel.at.some((a) => /min-width:\s*768px/.test(a)), 'nur ab zwei Spalten');
+  const src = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
+  nodeAssert.match(src, /wireDashboardEditMode\(\);\s*wireRowFill\(\);/, 'rebuildDashboard ruft wireRowFill() nach dem Anpassen-Draht');
+  nodeAssert.match(src, /applyRowFill\(grid, \{ editing: isCustomizing \}\)/, 'wireRowFill nimmt das Wachstum im Anpassen-Modus zurueck');
+});
+
 test('isUserOrderedConfig gibt es nicht mehr - das Raster schaltet nach keiner Reihenfolge um', () => {
   // Gegenprobe zur Entscheidung vom 2026-09-23 (immer dicht): ein Aufrufer,
   // der die Unterscheidung zurueckholen wollte, faende sie hier nicht mehr.

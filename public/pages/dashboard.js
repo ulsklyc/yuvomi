@@ -32,7 +32,7 @@ import { findSettingsLeaf } from '/settings/registry.js';
 import {
   WIDGET_SIZE_PRESETS, WIDGET_SIZE_OPTIONS,
   COCKPIT_COVERED_WIDGETS,
-  nearestPreset, sameWidgetConfig, suggestGridHoleFill,
+  nearestPreset, sameWidgetConfig, suggestGridHoleFill, rowFillSpans,
   dashboardQuery,
 } from '/utils/dashboard-widgets.js';
 import {
@@ -5526,6 +5526,39 @@ function gridHoleSuggestion(grid) {
     (item) => WIDGET_SIZE_PRESETS.map((p) => ({ size: p.value, ...spansForSize(item.el, p.value) })));
 }
 
+/**
+ * DAS RASTER HAT IM NORMALMODUS KEINE LOECHER (Re-Critique 2026-09-27, A7
+ * P2-12 / R10 L9). Die Kachel vor einer freien Zelle waechst in den Rest ihrer
+ * Zeile (`rowFillSpans`, utils/dashboard-widgets.js) - als Darstellung, nicht
+ * als gespeicherte Groesse: `data-row-fill` plus `--widget-fill-span`
+ * (dashboard.css). Im Anpassen-Modus waechst nichts; dort zeigt das Raster die
+ * gewaehlten Groessen, und der Loch-Hinweis (`gridHoleSuggestion`) schlaegt die
+ * dauerhafte Korrektur vor.
+ *
+ * Gemessen wird mit abgenommenem Wachstum - die Spans kommen aus den
+ * Groessenklassen, nicht aus der letzten Runde dieser Funktion.
+ */
+function applyRowFill(grid, { editing = false } = {}) {
+  // Nur, was im Raster steht: ein verborgenes Kind belegt keine Zelle.
+  const tiles = [...grid.children].filter((el) => getComputedStyle(el).display !== 'none');
+  for (const el of grid.children) {
+    if (!('rowFill' in el.dataset)) continue;
+    delete el.dataset.rowFill;
+    el.style.removeProperty('--widget-fill-span');
+  }
+  if (editing) return;
+  const columns = gridColumnCount(grid);
+  if (columns < 2) return;
+  const items = tiles.map((el, index) => ({ id: el.dataset.widgetId || `#${index}`, el, ...gridSpans(el) }));
+  const grown = rowFillSpans(items, columns);
+  for (const item of items) {
+    const span = grown.get(item.id);
+    if (!span) continue;
+    item.el.dataset.rowFill = '';
+    item.el.style.setProperty('--widget-fill-span', String(span));
+  }
+}
+
 function renderGridHint(suggestion) {
   const preset = WIDGET_SIZE_PRESETS.find((p) => p.value === suggestion.size);
   const text = t('dashboard.gridHoleHint', {
@@ -6019,6 +6052,29 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // bei drei Spalten bleibt, gibt es bei zwei vielleicht nicht - und umgekehrt.
   let gridHintObserver = null;
   signal.addEventListener('abort', () => gridHintObserver?.disconnect(), { once: true });
+  // Und im Normalmodus dieselbe Beobachtung fuer das Wachstum in den
+  // Zeilenrest: Spaltenzahl und Kachelzahl (Erweiterungs-Widgets haengen sich
+  // spaeter ein) entscheiden, wer waechst. Die Hoehe allein nicht - sonst
+  // loeste das eigene Wachstum die naechste Runde aus.
+  let rowFillObserver = null;
+  signal.addEventListener('abort', () => rowFillObserver?.disconnect(), { once: true });
+
+  function wireRowFill() {
+    rowFillObserver?.disconnect();
+    rowFillObserver = null;
+    const grid = container.querySelector('#dashboard-widget-grid');
+    if (!grid) return;
+    applyRowFill(grid, { editing: isCustomizing });
+    if (isCustomizing || typeof ResizeObserver !== 'function') return;
+    let shape = `${gridColumnCount(grid)}:${grid.childElementCount}`;
+    rowFillObserver = new ResizeObserver(() => {
+      const next = `${gridColumnCount(grid)}:${grid.childElementCount}`;
+      if (next === shape) return;
+      shape = next;
+      applyRowFill(grid);
+    });
+    rowFillObserver.observe(grid);
+  }
 
   function syncGridHint(grid) {
     container.querySelector('.dashboard-grid-hint')?.remove();
@@ -6363,6 +6419,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     container.querySelectorAll('[data-customize-reset]').forEach((btn) => btn.addEventListener('click', resetDashboardConfig, { signal: signal }));
     container.querySelectorAll('[data-customize-publish]').forEach((btn) => btn.addEventListener('click', publishHouseholdDefault, { signal: signal }));
     wireDashboardEditMode();
+    wireRowFill();
     void mountExtensionWidgets(shell, cfg, user);
 
     /* DER FOKUS UEBERLEBT DEN NEUAUFBAU. Jede Geste im Anpassen-Modus baut die
@@ -6614,7 +6671,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, familyManageHref, customizeHasChanges, todayMoreRoute, wireTodayMore, renderWidgetSizeMenu, renderCustomizeFootnote };
+export const __test = { renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, familyManageHref, customizeHasChanges, todayMoreRoute, wireTodayMore, renderWidgetSizeMenu, renderCustomizeFootnote, applyRowFill };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -
