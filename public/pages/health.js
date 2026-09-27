@@ -307,7 +307,25 @@ const vitals = {
   loaded: false,
   error: false,
   root: null,
+  sheetType: null,       // mobil: Metrik des offenen Detailblatts (openVitalSheet), sonst null
+  moreExpanded: false,   // mobil: Zeile „Weitere Messwerte" aufgeklappt
 };
+
+/* MOBIL OEFFNET EINE KACHEL IHR DETAILBLATT (Re-Critique 2026-09-27, M3 /
+ * A6 P1-2). Dieselbe Grenze wie das Zwei-Spalten-Raster der Kacheln
+ * (health.css) und die Telefon-Grenze der App (calendar.js). Gefragt wird
+ * beim Tipp und beim Zeichnen, nicht beim Laden: ein gedrehtes Telefon
+ * wechselt die Seite der Grenze. */
+const PHONE_QUERY = '(max-width: 639px)';
+const isPhone = () => typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+  && window.matchMedia(PHONE_QUERY).matches;
+
+/* Das Diagramm im Blatt steht in voller Breite und MINDESTENS 200px hoch -
+ * mit dem 3:1 der geteilten Geometrie waeren es bei 390px Breite ~110px (auf
+ * der Seite gemessen 324x96). Dieselben Raender, nur eine hoehere Flaeche; die
+ * Hoehe liest `chartMarkup` aus `chartScales(geo)` zurueck, damit viewBox und
+ * Seitenverhaeltnis immer zu dem passen, was die Geometrie wirklich zeichnet. */
+const VITAL_SHEET_CHART = Object.freeze({ ...CHART, H: 440 });
 
 const RANGE_LABELS = {
   week: 'health.vitals.range.week',
@@ -324,7 +342,7 @@ const CHANNEL_COLORS = ['var(--module-health)', 'var(--color-info)', 'var(--colo
 // eigen und je falscher beantwortet (Achse ausserhalb des SVG, verzerrende
 // Skalierung). Was hier bleibt, ist das VOKABULAR: wie ein Achsenwert dieses
 // Moduls aussieht, weiss nur dieses Modul.
-const chartGridFor = (min, max, metric) => chartGridMarkup(min, max, (val, wholeTicks) => axisTickText(metric, val, wholeTicks));
+const chartGridFor = (min, max, metric, geo) => chartGridMarkup(min, max, (val, wholeTicks) => axisTickText(metric, val, wholeTicks), geo);
 
 // Achsen-Tick. Eine Dauer darf hier nicht dezimal stehen: „8,4" neben einer
 // Verlaufszeile mit „8 Std. 24 Min." wäre dieselbe Größe in zwei Zahlensystemen.
@@ -344,7 +362,7 @@ function axisTickText(metric, value, wholeTicks) {
 
 // Die Auswahl der drei Marken und ihre Ausrichtung stehen in `utils/chart.js`;
 // hier steht nur, dass die Beschriftung dieses Moduls ein DATUM ist.
-const chartXLabels = (dates) => chartXLabelsMarkup(dates.map((d) => formatDate(d)));
+const chartXLabels = (dates, geo) => chartXLabelsMarkup(dates.map((d) => formatDate(d)), geo);
 
 // Panel-Definitionen je Route. Icons folgen den Sub-Tab-Icons (health-tabs.js).
 const PANELS = () => [
@@ -691,6 +709,7 @@ function renderVitalsShell() {
       </div>
     </div>
     <div class="health-vitals__cards" id="health-vitals-cards"></div>
+    <div class="health-vitals__more" id="health-vitals-more"></div>
     <div class="health-vitals__detail" id="health-vitals-detail"></div>
   `);
   if (window.lucide) window.lucide.createIcons({ el: vitals.root });
@@ -702,6 +721,9 @@ function renderVitalsShell() {
   refreshHealthFab();
   renderCards();
   renderDetail();
+  // Ein offenes Detailblatt liest dieselben Zeilen: nach Speichern, Loeschen
+  // und Rueckgaengig zieht es mit, statt einen alten Stand zu zeigen.
+  refreshVitalSheet();
 }
 
 // Der Personen-Umschalter (`personSwitcherMarkup`) wohnt seit Runde 7 in
@@ -871,11 +893,15 @@ async function switchPerson() {
 function renderCards() {
   const host = vitals.root.querySelector('#health-vitals-cards');
   if (!host) return;
+  watchPhoneQuery();
+  const phone = isPhone();
+  const empty = [];
   const cards = VITAL_METRICS.map((metric) => {
     const series = computeVitalSeries(vitals.rows, {
       type: metric.type, range: vitals.range, anchor: vitals.anchor,
     });
-    return cardMarkup(metric, series);
+    if (!series.latest) empty.push(metric);
+    return cardMarkup(metric, series, { phone });
   }).join('');
   host.replaceChildren();
   host.insertAdjacentHTML('beforeend', cards);
@@ -883,6 +909,9 @@ function renderCards() {
 
   host.querySelectorAll('.metric-card--select').forEach((card) =>
     card.addEventListener('click', () => {
+      // Mobil liegt das Diagramm nicht mehr 800px unter der Kachel, sondern
+      // im Blatt, das sie oeffnet.
+      if (isPhone()) { openVitalSheet(card.dataset.type); return; }
       vitals.selectedType = card.dataset.type;
       host.querySelectorAll('.metric-card--select').forEach((c) => {
         const on = c.dataset.type === vitals.selectedType;
@@ -893,9 +922,71 @@ function renderCards() {
       });
       renderDetail();
     }));
+
+  renderMoreMetrics(empty);
 }
 
-function cardMarkup(metric, series) {
+/* EINE ZEILE FUER DIE LEEREN METRIKEN (M3). „Groesse" und „Kopfumfang" ohne
+ * Wert belegten mobil je eine volle Kachel (173x122) mit einem Strich. Unter
+ * 640px blendet health.css diese Kacheln aus, und hier steht stattdessen EIN
+ * Aufklapper „Weitere Messwerte", dessen Zeilen das Blatt der Metrik oeffnen -
+ * dort wird der erste Wert erfasst. Ab 640px gibt es die Zeile nicht, die
+ * Kacheln bleiben, wie sie waren. */
+function renderMoreMetrics(empty) {
+  const host = vitals.root?.querySelector('#health-vitals-more');
+  if (!host) return;
+  host.replaceChildren();
+  if (!empty.length) return;
+  host.insertAdjacentHTML('beforeend', moreMetricsMarkup(empty));
+  if (window.lucide) window.lucide.createIcons({ el: host });
+  const toggle = host.querySelector('.health-vitals__more-toggle');
+  const items = host.querySelector('#health-vitals-more-items');
+  toggle?.addEventListener('click', () => {
+    vitals.moreExpanded = !vitals.moreExpanded;
+    toggle.setAttribute('aria-expanded', String(vitals.moreExpanded));
+    items.hidden = !vitals.moreExpanded;
+  });
+  host.querySelectorAll('[data-sheet-type]').forEach((btn) =>
+    btn.addEventListener('click', () => openVitalSheet(btn.dataset.sheetType)));
+}
+
+function moreMetricsMarkup(empty) {
+  const names = empty.map((m) => t(m.labelKey)).join(', ');
+  return `
+    <div class="row-divided health-vitals__more-list">
+      <button type="button" class="health-vitals__more-row health-vitals__more-toggle"
+              aria-expanded="${vitals.moreExpanded ? 'true' : 'false'}" aria-controls="health-vitals-more-items">
+        <span class="health-vitals__more-text">
+          <span class="health-vitals__more-title">${esc(t('health.vitals.moreMetrics'))}</span>
+          <span class="health-vitals__more-names">${esc(names)}</span>
+        </span>
+        <i data-lucide="chevron-down" class="icon-sm health-vitals__more-chevron" aria-hidden="true"></i>
+      </button>
+      <div class="row-divided health-vitals__more-items" id="health-vitals-more-items"${vitals.moreExpanded ? '' : ' hidden'}>
+        ${empty.map((m) => `
+        <button type="button" class="health-vitals__more-row" data-sheet-type="${esc(m.type)}" aria-haspopup="dialog">
+          <i data-lucide="${esc(m.icon)}" class="icon-sm health-vitals__more-icon" aria-hidden="true"></i>
+          <span class="health-vitals__more-title">${esc(t(m.labelKey))}</span>
+          <i data-lucide="chevron-right" class="icon-sm health-vitals__more-chevron" aria-hidden="true"></i>
+        </button>`).join('')}
+      </div>
+    </div>`;
+}
+
+/* Die Kachel sagt mobil „oeffnet ein Blatt" statt „ist gewaehlt". Wechselt
+ * das Fenster die Telefon-Grenze (Drehen), zeichnen die Kacheln neu - EIN
+ * Beobachter fuer die Lebenszeit des Moduls, der nur zeichnet, solange die
+ * Ansicht haengt. */
+let _phoneQuery = null;
+function watchPhoneQuery() {
+  if (_phoneQuery || typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+  _phoneQuery = window.matchMedia(PHONE_QUERY);
+  _phoneQuery.addEventListener?.('change', () => {
+    if (vitals.root?.isConnected && vitals.loaded && !vitals.error) renderCards();
+  });
+}
+
+function cardMarkup(metric, series, { phone = false } = {}) {
   const active = metric.type === vitals.selectedType;
   const latest = series.latest;
   const label = t(metric.labelKey);
@@ -916,9 +1007,13 @@ function cardMarkup(metric, series) {
     valueHtml = '<span class="metric-card__value metric-card__value--empty">-</span>';
   }
 
+  // Mobil oeffnet die Kachel ein Blatt (openVitalSheet) - dann ist sie kein
+  // Umschalter, und `aria-pressed` wuerde einen Zustand behaupten, den es
+  // dort nicht gibt. Die leere Kachel traegt ihre Klasse fuer health.css.
+  const state = phone ? 'aria-haspopup="dialog"' : `aria-pressed="${active}"`;
   return `
-    <button type="button" class="metric-card metric-card--select${active ? ' is-active' : ''}" data-type="${esc(metric.type)}"
-      aria-pressed="${active}">
+    <button type="button" class="metric-card metric-card--select${active && !phone ? ' is-active' : ''}${latest ? '' : ' health-vitals__card--empty'}" data-type="${esc(metric.type)}"
+      ${state}>
       <span class="metric-card__head">
         <i data-lucide="${esc(metric.icon)}" class="metric-card__icon" aria-hidden="true"></i>
         <span class="metric-card__label">${esc(label)}</span>
@@ -1066,6 +1161,136 @@ function recentMeasurementsMarkup(metric) {
     </div>`;
 }
 
+// --------------------------------------------------------
+// Mobil: Detailblatt je Metrik (Re-Critique 2026-09-27, M3 / A6 P1-2)
+// --------------------------------------------------------
+
+/* Bei 390x844 lag das Diagramm unter neun Kacheln (y=1060, 324x96), und der
+ * Umschalter Woche/Monat/Jahr ganz oben wirkte auf etwas 800px tiefer. Mobil
+ * oeffnet der Tipp auf eine Kachel jetzt ein Blatt (Sheet-Grammatik R7 ueber
+ * openModal): Zeitraum-Umschalter und Stepper IM Blatt, darunter das Diagramm
+ * in voller Breite und mindestens 200px hoch, darunter die Messliste mit dem
+ * Bearbeiten-Weg aus R8. Bearbeiten und Erfassen fuehren zurueck ins Blatt.
+ * Am Desktop bleibt es bei Kachel + Detail darunter. */
+function openVitalSheet(type) {
+  const metric = vitalMetric(type) || VITAL_METRICS[0];
+  vitals.selectedType = metric.type;
+  vitals.sheetType = metric.type;
+  const canAdd = !readOnly() && canEditFor(vitals.personId, vitals.meId);
+  openModal({
+    title: t(metric.labelKey),
+    content: '<div class="health-vital-sheet" id="health-vital-sheet"></div>',
+    dirtyGuard: false,
+    headerAction: canAdd
+      ? { id: 'health-vital-sheet-add', label: t('health.vitals.addShort'), onClick: () => {
+        vitals.selectedType = metric.type;
+        openVitalModal({ onClose: () => backToVitalSheet(metric.type) });
+      } }
+      : null,
+    onSave(panel) {
+      renderVitalSheet(panel.querySelector('#health-vital-sheet'));
+    },
+    onClose() {
+      vitals.sheetType = null;
+    },
+  });
+}
+
+/* Nach dem Dialog, den das Blatt geoeffnet hat, geht es dorthin zurueck - wie
+ * in Apple Health von der Messung zurueck in ihre Metrik.
+ *
+ * IM SELBEN ZUG, NICHT NACH DEM AUSGANG. Das Modal-System haelt EINEN
+ * History-Marker, solange irgendein `.modal-overlay` steht (overlay-history.js).
+ * Wartete das Blatt, bis der Dialog ganz weg ist (whenModalClosed), gab der
+ * Abgleich den Marker zurueck (`history.back()`, asynchron) und das Blatt legte
+ * sofort einen neuen - gemessen stand das Blatt danach OHNE Marker da, und sein
+ * X fuehrte eine Seite zurueck. Im Microtask nach `onClose` steht der
+ * schliessende Dialog noch im DOM: netto bleibt ein Overlay offen, die History
+ * bleibt unberuehrt. Hat inzwischen ein ANDERER Dialog uebernommen (ein offenes
+ * Overlay ohne Ausgangsklasse), bleibt es bei ihm. */
+function backToVitalSheet(type) {
+  queueMicrotask(() => {
+    if (!vitals.root?.isConnected) return;
+    if (document.querySelector('.modal-overlay:not(.modal-overlay--closing)')) return;
+    openVitalSheet(type);
+  });
+}
+
+function refreshVitalSheet() {
+  if (!vitals.sheetType) return;
+  const host = typeof document !== 'undefined' ? document.getElementById('health-vital-sheet') : null;
+  if (host?.isConnected) renderVitalSheet(host);
+}
+
+function vitalSheetMarkup(metric) {
+  const series = computeVitalSeries(vitals.rows, {
+    type: metric.type, range: vitals.range, anchor: vitals.anchor,
+  });
+  // Eine Metrik ohne jeden Wert (aus „Weitere Messwerte") hat keinen
+  // Zeitraum, durch den man blaettern koennte - das Blatt sagt nur das, und
+  // „Erfassen" im Kopf ist der Weg zum ersten Wert.
+  if (!series.latest) {
+    return emptyHintHTML(t('health.vitals.noValue'), { className: 'health-chart-empty' });
+  }
+  return `
+    <div class="health-vitals__ranges health-vital-sheet__ranges" role="tablist" aria-label="${esc(t('health.vitals.chartTitle'))}">
+      ${['week', 'month', 'year'].map((r) => `
+        <button type="button" class="health-vitals__range${r === vitals.range ? ' is-active' : ''}"
+          data-sheet-range="${r}" role="tab" aria-selected="${r === vitals.range}">${esc(t(RANGE_LABELS[r]))}</button>`).join('')}
+    </div>
+    <div class="health-vitals__stepper health-vital-sheet__stepper">
+      <button type="button" class="btn btn--icon" data-sheet-step="-1" aria-label="${esc(t('health.vitals.prevPeriod'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
+      <span class="health-vitals__period">${esc(`${formatDate(series.from)} - ${formatDate(series.to)}`)}</span>
+      <button type="button" class="btn btn--icon" data-sheet-step="1" aria-label="${esc(t('health.vitals.nextPeriod'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
+    </div>
+    <div class="health-vital-sheet__chart">
+      ${series.hasData
+    ? chartMarkup(metric, series, VITAL_SHEET_CHART)
+    : emptyHintHTML(t('health.vitals.noData'), { className: 'health-chart-empty' })}
+    </div>
+    ${recentMeasurementsMarkup(metric)}`;
+}
+
+function renderVitalSheet(host) {
+  if (!host) return;
+  const metric = vitalMetric(vitals.sheetType) || VITAL_METRICS[0];
+  // Der Fokus lag auf einem Knopf, den der Neuaufbau ersetzt - er kommt an
+  // denselben Knopf zurueck statt auf <body>.
+  const active = typeof document !== 'undefined' ? document.activeElement : null;
+  const again = host.contains?.(active)
+    ? (active.dataset?.sheetRange ? `[data-sheet-range="${active.dataset.sheetRange}"]`
+      : active.dataset?.sheetStep ? `[data-sheet-step="${active.dataset.sheetStep}"]` : null)
+    : null;
+  host.replaceChildren();
+  host.insertAdjacentHTML('beforeend', vitalSheetMarkup(metric));
+  if (window.lucide) window.lucide.createIcons({ el: host });
+  wireTablistKeys(host);
+  attachSegmentIndicator(host.querySelector('.health-vital-sheet__ranges'), { key: 'health-vital-sheet-range' });
+
+  host.querySelectorAll('[data-sheet-range]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      if (vitals.range === btn.dataset.sheetRange) return;
+      vitals.range = btn.dataset.sheetRange;
+      renderVitalsShell();
+    }));
+  host.querySelectorAll('[data-sheet-step]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      stepAnchor(Number(btn.dataset.sheetStep));
+      renderVitalsShell();
+    }));
+  if (again) host.querySelector(again)?.focus();
+
+  // Derselbe Riegel wie im Detail darunter (#1265): Zeitraum und Stepper
+  // lesen, das Bearbeiten nicht.
+  if (readOnly()) return;
+  host.querySelectorAll('[data-vital-edit]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      const id = Number(btn.dataset.vitalEdit);
+      const row = vitals.rows.find((r) => r.id === id);
+      if (row) openVitalModal({ row, onClose: () => backToVitalSheet(metric.type) });
+    }));
+}
+
 function stepAnchor(dir) {
   if (vitals.range === 'week') {
     vitals.anchor = addLocalDays(vitals.anchor, 7 * dir);
@@ -1077,7 +1302,7 @@ function stepAnchor(dir) {
   vitals.anchor = toLocalDateKey(d);
 }
 
-function chartMarkup(metric, series) {
+function chartMarkup(metric, series, geo = CHART) {
   const pts = series.points;
 
   // Aktive Kanäle: die, die im Zeitraum mindestens einen Wert tragen.
@@ -1113,8 +1338,11 @@ function chartMarkup(metric, series) {
     min -= pad; max += pad;
   }
 
-  const { W, H } = CHART;
-  const { left, right, top, bottom } = chartScales();
+  // Die Hoehe kommt aus den Plotgrenzen, die `chartScales(geo)` WIRKLICH
+  // liefert: Gitter, Achse und Kurve teilen damit immer dieselbe Flaeche.
+  const { W } = geo;
+  const { left, right, top, bottom } = chartScales(geo);
+  const H = bottom + geo.PAD_B;
   // X-Domäne an die tatsächliche Datenspanne klemmen (erster bis letzter Bucket mit
   // Wert), damit dünne Daten die volle Breite nutzen statt mittig zusammenzukleben.
   const firstIdx = dataIdx[0];
@@ -1162,7 +1390,7 @@ function chartMarkup(metric, series) {
         </span>`).join('')}</div>`
     : '';
 
-  const grid = chartGridFor(min, max, metric);
+  const grid = chartGridFor(min, max, metric, geo);
 
   // Screenreader-Datentabelle: nur Buckets mit mindestens einem Wert.
   const chLabel = (idx) => (metric.channelLabelKeys?.[idx] ? t(metric.channelLabelKeys[idx]) : t(metric.labelKey));
@@ -1171,10 +1399,13 @@ function chartMarkup(metric, series) {
   const tableRows = dataPoints
     .map((p) => [formatDate(p.date), ...channels.map(({ key }) => fmtChannelValue(metric, p[key]))]);
   const table = tableRows.length ? chartTableMarkup(t(metric.labelKey), tableHeaders, tableRows) : '';
-  const xLabels = chartXLabels(dataPoints.map((p) => p.date));
+  const xLabels = chartXLabels(dataPoints.map((p) => p.date), geo);
+  // `.chart` haelt das 3:1 der geteilten Geometrie (panel.css); eine hoehere
+  // Flaeche nennt ihr eigenes Verhaeltnis.
+  const ratio = H === CHART.H ? '' : ` style="aspect-ratio: ${W} / ${H}"`;
 
   return `
-    <svg class="chart health-chart" viewBox="0 0 ${W} ${H}" role="img"
+    <svg class="chart health-chart" viewBox="0 0 ${W} ${H}" role="img"${ratio}
          aria-label="${esc(t(metric.labelKey))}">
       ${grid}
       ${area}
@@ -1310,6 +1541,9 @@ function openVitalModal(opts = {}) {
   openModal({
     title: isEdit ? t('health.vitals.edit') : t('health.vitals.add'),
     size: 'md',
+    // Aus dem mobilen Detailblatt geoeffnet, fuehrt das Schliessen dorthin
+    // zurueck (openVitalSheet) - auf jedem Weg: Speichern, Abbrechen, Loeschen.
+    onClose: opts.onClose,
     content: `
       <form id="vital-form" class="form-stack">
         <div class="form-field">
@@ -7904,6 +8138,15 @@ export const __test = {
   recentMeasurementsMarkup,
   // R8 H9: Bearbeiten von Messung und Analyt.
   openVitalModal,
+  // Re-Critique 2026-09-27 (M3): das mobile Detailblatt und die Zeile der
+  // leeren Metriken.
+  openVitalSheet,
+  vitalSheetMarkup,
+  cardMarkup,
+  moreMetricsMarkup,
+  chartMarkup,
+  VITAL_SHEET_CHART,
+  backToVitalSheetForTest: (type) => backToVitalSheet(type),
   vitalPatchBody,
   resultEditRowMarkup,
   resultFormMarkup,

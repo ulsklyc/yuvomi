@@ -182,6 +182,147 @@
  * .metric-card mit --select (wählt eine Metrik) und in der Übersichtskarte
  * zusätzlich --inset (Kasten-in-Kasten). Basisregeln in panel.css. */
 
+/* --------------------------------------------------------
+ * Vitalwerte mobil: Kachel oeffnet ein Blatt (Re-Critique 2026-09-27, M3;
+ * health.js `openVitalSheet`)
+ *
+ * Unter 640px lag das Diagramm unter neun Kacheln (y=1060, 324x96) und der
+ * Zeitraum-Umschalter 800px darueber. Jetzt oeffnet der Tipp auf die Kachel
+ * ein Blatt mit Umschalter, Diagramm und Messliste; Umschalter und Detail der
+ * Seite entfallen dort. Leere Metriken stehen nicht mehr als volle Kachel da,
+ * sondern in EINER Zeile „Weitere Messwerte". Ab 640px bleibt alles, wie es
+ * war - dieselbe Grenze wie `PHONE_QUERY` in health.js.
+ * -------------------------------------------------------- */
+.health-vitals__more {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .health-vitals__toolbar,
+  .health-vitals__detail,
+  .health-vitals__cards > .health-vitals__card--empty {
+    display: none;
+  }
+
+  .health-vitals__more {
+    display: block;
+  }
+
+  /* Ohne Inhalt (jede Metrik hat einen Wert) nimmt der Wirt keine Luecke
+   * aus dem Spaltenabstand der Ansicht. */
+  .health-vitals__more:empty {
+    display: none;
+  }
+}
+
+/* Die Flaeche der Zeile. NICHT `.row-carrier`: der kappt auf --page-measure,
+ * und die Gesundheit laeuft als Dashboard-Seite mit vollem Kopf (PAGE-016,
+ * test-frontend-audit.js) - ein Traeger auf dem Mass waere dort ein Mass, das
+ * der Kopf nicht zeigt. Die Zeile steht nur unter 640px, wo das Mass ohnehin
+ * breiter ist als der Bildschirm; die Haarlinien kommen aus `.row-divided`
+ * (list-row.css), Flaeche, Ecke und Schatten sind die des Traegers. */
+.health-vitals__more-list {
+  overflow: hidden;
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.health-vitals__more-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--target-base);
+  padding: var(--space-2) var(--space-4);
+  background: none;
+  font: inherit;
+  color: var(--color-text-primary);
+  text-align: start;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.health-vitals__more-row:hover {
+  background-color: var(--color-surface-hover);
+}
+
+/* Der Traeger clippt seine Ecken - der Ring steht deshalb innen. */
+.health-vitals__more-row:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset-inset);
+}
+
+.health-vitals__more-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.health-vitals__more-title {
+  font-weight: var(--font-weight-medium);
+}
+
+.health-vitals__more-names {
+  overflow: hidden;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.health-vitals__more-icon {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+
+.health-vitals__more-chevron {
+  flex-shrink: 0;
+  margin-inline-start: auto;
+  color: var(--color-text-tertiary);
+  transition: transform var(--transition-fast);
+}
+
+.health-vitals__more-toggle[aria-expanded="true"] .health-vitals__more-chevron {
+  transform: rotate(180deg);
+}
+
+/* Das Blatt selbst: Umschalter ueber die volle Breite, Stepper darunter,
+ * dann das Diagramm randlos auf der Blattflaeche und die Messliste. */
+.health-vital-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.health-vital-sheet__ranges {
+  display: flex;
+}
+
+.health-vital-sheet__ranges .health-vitals__range {
+  flex: 1 1 0;
+}
+
+.health-vital-sheet__stepper {
+  justify-content: space-between;
+}
+
+.health-vital-sheet__chart .health-chart-empty {
+  padding-block: var(--space-6);
+}
+
+.health-vital-sheet .health-recent {
+  margin-top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .health-vitals__more-row,
+  .health-vitals__more-chevron {
+    transition: none;
+  }
+}
+
 /* Trend-Chart-Sektion */
 .health-chart-section {
   display: flex;

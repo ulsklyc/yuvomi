@@ -286,3 +286,185 @@ test('einzelne Messung → letzter Wert, aber kein Delta', () => {
   assert.equal(s.previous, null);
   assert.equal(s.deltas.value_num, null);
 });
+
+// --------------------------------------------------------
+// Mobil: Detailblatt je Metrik (Re-Critique 2026-09-27, M3 / A6 P1-2)
+// --------------------------------------------------------
+//
+// Bei 390x844 lag das Diagramm unter neun Kacheln (y=1060, 324x96), der
+// Zeitraum-Umschalter 800px darueber, und zwei leere Metriken belegten je eine
+// volle Kachel. Die Tests unten bauen ihre Umgebung selbst (Mini-DOM, Rechte,
+// openModal-Haken) und raeumen sie wieder ab - sie erben nichts von oben.
+
+const { installMiniDom } = await import('./mini-dom.js');
+const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+const { readFileSync } = await import('node:fs');
+const { eachRule } = await import('./css-rules.js');
+const { CHART, chartScales } = await import('../public/utils/chart.js');
+const { __test: health } = await import('../public/pages/health.js');
+
+const HEALTH_CSS = readFileSync(new URL('../public/styles/health.css', import.meta.url), 'utf8');
+
+/** Rechte, Mini-DOM und der openModal-Haken fuer EINEN Test; alles geht zurueck -
+ *  bei einem async `fn` erst, wenn es fertig ist. */
+async function imBlatt(fn, { access = 'write', view = {} } = {}) {
+  const abraeumen = installMiniDom();
+  const vorherModal = globalThis.__openModal;
+  const geoeffnet = [];
+  globalThis.__openModal = (opts) => { geoeffnet.push(opts); };
+  setPermissions({ admin: false, modules: { health: access }, widgets: {}, capabilities: {} });
+  health.setViewStateForTest('vitals', {
+    meId: 1, personId: 1, range: 'month', anchor: '2026-09-27', sheetType: null, moreExpanded: false,
+    rows: [
+      { id: 9, type: 'weight', value_num: 65.2, unit: 'kg', measured_at: '2026-09-22T07:00' },
+      { id: 8, type: 'weight', value_num: 65.4, unit: 'kg', measured_at: '2026-09-10T07:00' },
+    ],
+    ...view,
+  });
+  try {
+    return await fn(geoeffnet);
+  } finally {
+    health.setViewStateForTest('vitals', { rows: [], sheetType: null, moreExpanded: false, root: null, selectedType: 'bp' });
+    clearPermissions();
+    if (vorherModal === undefined) delete globalThis.__openModal; else globalThis.__openModal = vorherModal;
+    abraeumen();
+  }
+}
+
+test('M3: mobil oeffnet die Kachel ein Blatt - sie behauptet keinen Umschalt-Zustand, die leere Kachel ist markiert', async () => {
+  await imBlatt(() => {
+    const weight = vitalMetric('weight');
+    const series = computeVitalSeries([{ id: 1, type: 'weight', value_num: 65, measured_at: '2026-09-22T07:00' }], { type: 'weight', range: 'month', anchor: '2026-09-27' });
+    const telefon = health.cardMarkup(weight, series, { phone: true });
+    assert.match(telefon, /aria-haspopup="dialog"/);
+    assert.doesNotMatch(telefon, /aria-pressed/, 'eine Kachel, die ein Blatt oeffnet, ist kein Umschalter');
+    const desktop = health.cardMarkup(weight, series);
+    assert.match(desktop, /aria-pressed="/, 'am Desktop bleibt sie der Umschalter des Details darunter');
+    assert.doesNotMatch(desktop, /aria-haspopup/);
+    const leer = health.cardMarkup(vitalMetric('height'), computeVitalSeries([], { type: 'height', range: 'month', anchor: '2026-09-27' }), { phone: true });
+    assert.match(leer, /health-vitals__card--empty/);
+    assert.doesNotMatch(telefon, /health-vitals__card--empty/);
+  });
+});
+
+test('M3: leere Metriken stehen in EINER Zeile „Weitere Messwerte", deren Zeilen das Blatt oeffnen', async () => {
+  await imBlatt(() => {
+    const html = health.moreMetricsMarkup([vitalMetric('height'), vitalMetric('head_circumference')]);
+    // `.row-divided` statt `.row-carrier`: die Gesundheit hat einen vollen Kopf,
+    // ein Traeger auf dem Mass waere PAGE-016 (test-frontend-audit.js).
+    assert.match(html, /^\s*<div class="row-divided health-vitals__more-list">/);
+    assert.match(html, /<button type="button" class="health-vitals__more-row health-vitals__more-toggle"\s*aria-expanded="false" aria-controls="health-vitals-more-items">/);
+    assert.match(html, /health\.vitals\.moreMetrics/);
+    assert.match(html, /health\.vitals\.metric\.height, health\.vitals\.metric\.headCircumference/, 'die Namen stehen in der einen Zeile');
+    assert.match(html, /id="health-vitals-more-items" hidden>/, 'eingeklappt');
+    assert.equal((html.match(/data-sheet-type="/g) || []).length, 2);
+    assert.match(html, /data-sheet-type="height" aria-haspopup="dialog"/);
+  });
+  await imBlatt(() => {
+    const auf = health.moreMetricsMarkup([vitalMetric('height')]);
+    assert.match(auf, /aria-expanded="true"/);
+    assert.doesNotMatch(auf, /id="health-vitals-more-items" hidden/);
+  }, { view: { moreExpanded: true } });
+});
+
+test('M3: das Blatt traegt Zeitraum, Stepper, ein hohes Diagramm und die Messliste mit Bearbeiten', async () => {
+  await imBlatt((geoeffnet) => {
+    health.openVitalSheet('weight');
+    assert.equal(geoeffnet.length, 1);
+    const blatt = geoeffnet[0];
+    assert.equal(blatt.title, 'health.vitals.metric.weight');
+    assert.match(blatt.content, /id="health-vital-sheet"/);
+    assert.equal(blatt.headerAction?.label, 'health.vitals.addShort', 'Erfassen steht im Kopf des Blatts');
+
+    const html = health.vitalSheetMarkup(vitalMetric('weight'));
+    assert.match(html, /class="health-vitals__ranges health-vital-sheet__ranges" role="tablist"/);
+    assert.deepEqual([...html.matchAll(/data-sheet-range="(\w+)"/g)].map((m) => m[1]), ['week', 'month', 'year'],
+      'der Zeitraum-Umschalter steht IM Blatt');
+    assert.match(html, /data-sheet-step="-1"[\s\S]*data-sheet-step="1"/);
+    assert.match(html, /data-vital-edit="9"/, 'die Messliste mit dem Bearbeiten-Weg aus R8');
+    // Das Diagramm: dieselben Raender, eine hoehere Flaeche - und viewBox wie
+    // Seitenverhaeltnis folgen dem, was die Geometrie wirklich zeichnet.
+    const geo = health.VITAL_SHEET_CHART;
+    assert.equal(geo.W, CHART.W);
+    assert.equal(geo.PAD_L, CHART.PAD_L);
+    assert.ok(geo.H >= CHART.W * 200 / 290, `H ${geo.H}: bei ~290px Plotbreite (390er Blatt) waeren es unter 200px`);
+    const hoch = chartScales(geo).bottom + geo.PAD_B;
+    const svg = /<svg class="chart health-chart" viewBox="0 0 (\d+) (\d+)" role="img"([^>]*)>/.exec(html);
+    assert.ok(svg, 'das Blatt zeichnet das Diagramm');
+    assert.equal(Number(svg[2]), hoch);
+    if (hoch === CHART.H) assert.doesNotMatch(svg[3], /aspect-ratio/);
+    else assert.match(svg[3], new RegExp(`style="aspect-ratio: ${CHART.W} / ${hoch}"`));
+    // Die Seite selbst behaelt das geteilte 3:1.
+    const seite = health.chartMarkup(vitalMetric('weight'), computeVitalSeries(
+      [{ id: 1, type: 'weight', value_num: 65, measured_at: '2026-09-02T07:00' }, { id: 2, type: 'weight', value_num: 66, measured_at: '2026-09-20T07:00' }],
+      { type: 'weight', range: 'month', anchor: '2026-09-27' }));
+    assert.match(seite, new RegExp(`viewBox="0 0 ${CHART.W} ${CHART.H}" role="img"\\s*aria-label`));
+
+    blatt.onClose();
+  });
+  await imBlatt((geoeffnet) => {
+    health.openVitalSheet('weight');
+    assert.equal(geoeffnet[0].headerAction, null, 'ohne Schreibrecht kein Erfassen');
+    assert.doesNotMatch(health.vitalSheetMarkup(vitalMetric('weight')), /data-vital-edit/);
+  }, { access: 'read' });
+  await imBlatt(() => {
+    const leer = health.vitalSheetMarkup(vitalMetric('height'));
+    assert.match(leer, /health\.vitals\.noValue/);
+    assert.doesNotMatch(leer, /data-sheet-range|data-sheet-step/, 'ohne Wert gibt es keinen Zeitraum zum Blaettern');
+  });
+});
+
+test('M3: Bearbeiten aus dem Blatt fuehrt im selben Zug zurueck ins Blatt - ausser ein anderer Dialog hat uebernommen', async () => {
+  const messung = { id: 9, type: 'weight', value_num: 65.2, unit: 'kg', measured_at: '2026-09-22T07:00' };
+  await imBlatt((geoeffnet) => {
+    const zurueck = () => {};
+    health.openVitalModal({ row: messung, onClose: zurueck });
+    assert.equal(geoeffnet.at(-1).onClose, zurueck, 'der Dialog reicht den Rueckweg an openModal weiter');
+  });
+  // Die Verdrahtung: Bearbeiten und Erfassen aus dem Blatt nehmen den Rueckweg mit.
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  assert.match(src, /openVitalModal\(\{ row, onClose: \(\) => backToVitalSheet\(metric\.type\) \}\)/);
+  assert.match(src, /openVitalModal\(\{ onClose: \(\) => backToVitalSheet\(metric\.type\) \}\)/);
+
+  await imBlatt(async (geoeffnet) => {
+    health.setViewStateForTest('vitals', { root: { isConnected: true } });
+    // Der Dialog schliesst gerade: kein Overlay ohne Ausgangsklasse.
+    globalThis.document.querySelector = () => null;
+    health.backToVitalSheetForTest('weight');
+    assert.equal(geoeffnet.length, 0, 'nicht synchron - erst nach dem Zug, der schliesst');
+    await Promise.resolve();
+    assert.equal(geoeffnet.length, 1, 'das Blatt geht wieder auf, solange der alte Dialog noch steht');
+    assert.equal(geoeffnet[0].title, 'health.vitals.metric.weight');
+    // Ein anderer Dialog hat uebernommen: das Blatt bleibt zu.
+    globalThis.document.querySelector = (sel) => (sel === '.modal-overlay:not(.modal-overlay--closing)' ? {} : null);
+    health.backToVitalSheetForTest('weight');
+    await Promise.resolve();
+    assert.equal(geoeffnet.length, 1);
+    // Die Ansicht ist weg (Navigation): ebenso.
+    globalThis.document.querySelector = () => null;
+    health.setViewStateForTest('vitals', { root: { isConnected: false } });
+    health.backToVitalSheetForTest('weight');
+    await Promise.resolve();
+    assert.equal(geoeffnet.length, 1);
+  });
+  // Und NICHT ueber whenModalClosed: dessen Warten liess den History-Marker
+  // fallen, bevor das Blatt ihn neu legte (gemessen: X fuehrte eine Seite zurueck).
+  const weg = src.slice(src.indexOf('function backToVitalSheet('), src.indexOf('function refreshVitalSheet('));
+  assert.match(weg, /queueMicrotask\(/);
+  assert.doesNotMatch(weg.replace(/\/\*[\s\S]*?\*\//g, ''), /whenModalClosed\(/);
+});
+
+test('M3: unter 640px entfallen Seiten-Umschalter, Detail und leere Kacheln; die Zeile gibt es nur dort', () => {
+  const rules = [...eachRule(HEALTH_CSS)];
+  const phone = (r) => r.at.some((a) => /max-width:\s*639px/.test(a));
+  const hidden = rules.filter((r) => phone(r) && /display:\s*none/.test(r.body)).map((r) => r.selector);
+  for (const sel of ['.health-vitals__toolbar', '.health-vitals__detail', '.health-vitals__cards > .health-vitals__card--empty']) {
+    assert.ok(hidden.some((s) => s.split(',').map((x) => x.trim()).includes(sel)), `${sel} bleibt mobil stehen`);
+  }
+  const base = rules.find((r) => r.at.length === 0 && r.selector.trim() === '.health-vitals__more');
+  assert.ok(base && /display:\s*none/.test(base.body), 'ab 640px gibt es keine Zeile „Weitere Messwerte"');
+  const shown = rules.find((r) => phone(r) && r.selector.trim() === '.health-vitals__more');
+  assert.ok(shown && /display:\s*block/.test(shown.body));
+  assert.ok(!rules.some((r) => !phone(r) && /health-vitals__card--empty/.test(r.selector) && /display:\s*none/.test(r.body)),
+    'am Desktop bleiben die leeren Kacheln');
+});
