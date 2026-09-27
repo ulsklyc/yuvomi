@@ -669,6 +669,16 @@
   .note-card__delete {
     margin-block: calc((var(--space-6) - var(--target-base)) / 2);
   }
+
+  /* Die Nadel einer angepinnten Notiz traegt ihre Flaeche als kleine Scheibe
+   * (32px) in der vollen Trefflaeche - vorher fuellte die Scheibe die ganzen
+   * 48px und war das groesste Zeichen der Karte. Zwei Klassen, weil die
+   * Kurzschrift `background` der angepinnten Nadel (0,2,0) den Clip sonst
+   * zuruecksetzt. */
+  .note-card .note-card__pin {
+    padding: var(--space-2);
+    background-clip: content-box;
+  }
 }
 
 /* --------------------------------------------------------
