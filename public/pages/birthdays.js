@@ -406,7 +406,14 @@ export function birthdayItemHtml(birthday) {
   // das der Editor (Wisch nach vorn, Stift). Bei `read` wird deshalb die
   // Textspalte selbst zum Knopf, und er oeffnet die Leseansicht
   // (`openBirthdayReadModal`) - ohne ihn waere die Notiz auf dem Telefon
-  // unerreichbar, obwohl Lesen genau das ist, was `read` erlaubt. Gebaut wie
+  // unerreichbar, obwohl Lesen genau das ist, was `read` erlaubt.
+  //
+  // SEIT R8 (H8) AUCH MIT SCHREIBRECHT: dort blieb die Spalte ein `div`, ein
+  // Tipp auf die Zeile tat nichts, und der Wisch-Chevron am Zeilenende las
+  // sich nach HIG als Disclosure. Jetzt oeffnet derselbe Knopf den Editor -
+  // `openBirthdayModal` entscheidet nach Recht zwischen Editor und
+  // Leseansicht, wie in Agenda und Kontakten. Nur-Lesende haben ohnehin
+  // `.swipe-row--static` und damit keinen Chevron. Gebaut wie
   // die Kontaktzeile (`.contact-item__open`): `.list-row__main--interactive`
   // bringt Knopf-Reset und Zielgroesse mit. Deshalb ist die Metazeile ein
   // `span` - in einem `button` steht nur Phrasing-Inhalt.
@@ -434,9 +441,7 @@ export function birthdayItemHtml(birthday) {
       </div>`}
     <article class="list-row birthday-item ${isToday ? 'birthday-item--today' : ''}" data-id="${birthday.id}">
       <div class="birthday-item__media">${photoAvatar(birthday)}</div>
-      ${ro
-        ? `<button type="button" class="list-row__main list-row__main--interactive" data-open="${birthday.id}">${hauptspalte}</button>`
-        : `<div class="list-row__main">${hauptspalte}</div>`}
+      <button type="button" class="list-row__main list-row__main--interactive" data-open="${birthday.id}">${hauptspalte}</button>
       ${ro ? '' : `
       <div class="row-actions birthday-item__actions">
         ${rowActionHtml({ icon: 'pencil', action: 'edit', label: t('common.editNamed', { name: birthday.name }), attrs: { 'data-id': birthday.id } })}
@@ -667,8 +672,9 @@ function bindEvents() {
  *
  * `data-open` ist der EINE lesende Weg und steht deshalb VOR dem Riegel: er
  * fuehrt durch `openBirthdayModal`, und das oeffnet bei `read` die
- * Leseansicht statt des Editors. Die Textspalte traegt ihn nur bei `read`
- * (birthdayItemHtml); mit Schreibrecht bleiben Wisch und Stift der Weg.
+ * Leseansicht statt des Editors, mit Schreibrecht den Editor. Die Textspalte
+ * traegt ihn fuer beide (birthdayItemHtml, H8); Wisch und Stift bleiben
+ * zusaetzliche Wege.
  */
 async function onListClick(e) {
   const open = e.target.closest('[data-open]');

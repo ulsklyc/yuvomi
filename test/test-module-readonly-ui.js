@@ -1971,11 +1971,19 @@ function mitGeburtstagen(liste, fn) {
   try { return fn(); } finally { birthdays.state.birthdays = vorher; }
 }
 
-test('Geburtstagszeile mit `calendar: read`: die Textspalte ist der Weg zum Eintrag', () => {
+test('Geburtstagszeile: die Textspalte ist fuer Lesende UND Schreibende der Weg zum Eintrag (H8)', () => {
   withAccess({ calendar: 'write' }, () => {
     const html = birthdays.birthdayItemHtml(geburtstag());
-    assert.doesNotMatch(html, /data-open=/, 'mit Schreibrecht bleiben Wisch und Stift der Weg in den Editor');
-    assert.match(html, /<div class="list-row__main">/);
+    // Bis R8 blieb die Spalte mit Schreibrecht ein `div`: ein Tipp auf die
+    // Zeile tat nichts, waehrend der Wisch-Chevron Navigation versprach.
+    assert.match(html, /<button type="button" class="list-row__main list-row__main--interactive" data-open="9">/,
+      'mit Schreibrecht ist die Hauptspalte ein Knopf, der den Editor oeffnet');
+    assert.doesNotMatch(html, /<div class="list-row__main">/);
+    assert.doesNotMatch(html, /swipe-row--static/, 'Schreibende behalten die Geste und ihren Chevron');
+  });
+  withAccess({ calendar: 'read' }, () => {
+    assert.match(birthdays.birthdayItemHtml(geburtstag()), /class="swipe-row swipe-row--static"/,
+      'Nur-Lesende sehen keinen Chevron, der eine Geste verspricht');
   });
   withAccess({ calendar: 'read' }, () => {
     const html = birthdays.birthdayItemHtml(geburtstag());
@@ -1984,6 +1992,16 @@ test('Geburtstagszeile mit `calendar: read`: die Textspalte ist der Weg zum Eint
     assert.match(knopf[1], /Oma Erna/, 'der Knopf traegt die Zeile selbst, nicht eine leere Flaeche');
     assert.doesNotMatch(knopf[1], /<div/, 'in einem `button` steht nur Phrasing-Inhalt');
   });
+});
+
+test('Ein Tipp auf die Geburtstagszeile mit Schreibrecht oeffnet den Editor mit dem Bestand (H8)', () => {
+  const eintrag = geburtstag();
+  const offen = mitGeburtstagen([eintrag], () => withAccess({ calendar: 'write' }, () => (
+    modalOptionen(() => birthdays.onListClick(klickAuf({ '[data-open]': { dataset: { open: '9' } } })))
+  )));
+  assert.ok(offen, 'der Tipp oeffnet einen Dialog');
+  assert.match(offen.content, /id="bd-save"/, 'der Editor, nicht die Leseansicht');
+  assert.match(offen.content, /id="bd-name"[^>]*value="Oma Erna"/, 'mit dem Bestand vorbelegt');
 });
 
 test('Ein Tipp bei `calendar: read` oeffnet die Leseansicht, und sie zeigt, was der Editor zeigt', () => {
