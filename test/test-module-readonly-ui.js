@@ -1388,6 +1388,28 @@ test('Notizkarte mit Schreibrecht: Nadel, Loeschen und das antippbare Kaestchen'
   }));
 });
 
+test('R8 H15: der Notiztitel ist eine echte Ueberschrift der passenden Ebene, ohne neue Optik', async () => {
+  mitEchtemMarkdown(() => withAccess({ notes: 'read' }, () => {
+    const html = notes.renderNoteCard(notiz({ title: 'Einkauf' }));
+    assert.match(html, /<h2 class="note-card__title">Einkauf<\/h2>/,
+      'ohne Gruppenkoepfe steht die Notiz direkt unter dem Seitentitel (h1)');
+    assert.doesNotMatch(html, /<div class="note-card__title">/, 'ein `div` findet die Ueberschriften-Navigation nicht');
+    assert.match(notes.renderNoteCard(notiz({ title: 'Einkauf' }), { headingLevel: 3 }), /<h3 class="note-card__title">/,
+      'unter "Angeheftet"/"Weitere" (h2) eine Ebene tiefer');
+    assert.doesNotMatch(notes.renderNoteCard(notiz({ title: '' })), /note-card__title/, 'ohne Titel keine leere Ueberschrift');
+  }));
+  // Die Optik haengt an der Klasse, nicht am Element: die Rolle setzt die
+  // Groesse, sonst griffe die UA-Groesse eines h2.
+  const { readFileSync } = await import('node:fs');
+  const typo = readFileSync(new URL('../public/styles/typography.css', import.meta.url), 'utf8');
+  assert.ok([...eachRule(typo)].some((r) => r.selector.split(',').map((x) => x.trim()).includes('.note-card__title')
+    && /font-size\s*:/.test(r.body)), '.note-card__title bringt seine Schriftgroesse selbst mit');
+  // Der Aufruf mit `map()` reichte den Index als zweites Argument durch - die
+  // Ebene kommt deshalb als benanntes Objekt, und das Raster ruft sie so auf.
+  const src = readFileSync(new URL('../public/pages/notes.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /\.map\(renderNoteCard\)/, 'map() darf renderNoteCard keinen Index als Optionen geben');
+});
+
 test('Notizkarte mit `notes: read`: das Kaestchen wird zum Zustandszeichen', () => {
   mitEchtemMarkdown(() => withAccess({ notes: 'read' }, () => {
     const html = notes.renderNoteCard(notiz());

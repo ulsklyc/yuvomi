@@ -507,10 +507,15 @@ function renderGrid() {
   const rest   = visible.filter((n) => !n.pinned);
   const heading = (label) => `<h2 class="notes-group__title u-section-title">${label}</h2>`;
 
-  const html = (pinned.length && rest.length)
-    ? heading(t('notes.groupPinned')) + pinned.map(renderNoteCard).join('')
-      + heading(t('notes.groupOthers')) + rest.map(renderNoteCard).join('')
-    : visible.map(renderNoteCard).join('');
+  // Der Notiztitel ist eine echte Ueberschrift (R8 H15), eine Ebene unter
+  // dem, was darueber steht: unter den Gruppenkoepfen (h2) ein h3, sonst
+  // direkt unter dem Seitentitel (h1) ein h2 - keine uebersprungene Ebene.
+  const grouped = Boolean(pinned.length && rest.length);
+  const card = (n) => renderNoteCard(n, { headingLevel: grouped ? 3 : 2 });
+  const html = grouped
+    ? heading(t('notes.groupPinned')) + pinned.map(card).join('')
+      + heading(t('notes.groupOthers')) + rest.map(card).join('')
+    : visible.map(card).join('');
 
   grid.replaceChildren();
   grid.insertAdjacentHTML('beforeend', html);
@@ -574,7 +579,7 @@ export function noteName(note) {
   return line.length > 40 ? `${line.slice(0, 40).trimEnd()}…` : line;
 }
 
-function renderNoteCard(note) {
+function renderNoteCard(note, { headingLevel = 2 } = {}) {
   // KEINE INITIALEN AUF EINER 16px-SCHEIBE (Initialen-Schwelle-Regel).
   //
   // Hier standen bis zuletzt zwei Buchstaben auf einer 16-%-Waschung - unter der
@@ -592,7 +597,11 @@ function renderNoteCard(note) {
          data-id="${note.id}"
          style="--note-color:${esc(note.color)};">
       ${pinMarkup(note)}
-      ${note.title ? `<div class="note-card__title">${esc(note.title)}</div>` : ''}
+      ${/* ECHTE UEBERSCHRIFT STATT `div` (R8 H15): die Ueberschriften-
+          * Navigation eines Screenreaders fand bis dahin keine einzige Notiz.
+          * Die Optik traegt allein die Klasse (typography.css, notes.css);
+          * `reset.css` nimmt den UA-Rand, die Groesse setzt die Rolle. */ ''}
+      ${note.title ? `<h${headingLevel === 3 ? 3 : 2} class="note-card__title">${esc(note.title)}</h${headingLevel === 3 ? 3 : 2}>` : ''}
       <div class="note-card__content">${renderMarkdownLight(note.content, CHECKLIST_OPTS())}</div>
       ${(note.categories || []).length ? `<div class="note-card__categories" role="group" aria-label="${t('noteCategories.categories')}">
         ${note.categories.map(renderCategoryBadge).join('')}
