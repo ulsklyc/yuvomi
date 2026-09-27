@@ -1570,7 +1570,7 @@ function openVitalModal(opts = {}) {
         </div>
         ${disclaimerMarkup(true)}
         <div class="modal-panel__footer modal-panel__footer--plain">
-          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="vital-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
+          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="vital-delete" data-delete-name="${esc(t(VITAL_METRICS.find((m) => m.type === currentType)?.labelKey ?? 'common.delete'))}" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
         </div>

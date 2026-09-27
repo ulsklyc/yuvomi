@@ -2652,7 +2652,10 @@ test('R8 H9: eine Messung oeffnet sich mit Bestand, Loeschen steht links im Dial
   const loeschen = fuss.indexOf('data-action="vital-delete"');
   assert.ok(loeschen >= 0, 'Loeschen steht im Dialogfuss');
   assert.ok(loeschen < fuss.indexOf('data-action="cancel"'), 'links vor Abbrechen und Speichern (Kanon)');
-  assert.match(fuss, /btn--danger-outline" data-action="vital-delete" style="margin-inline-end:auto"/);
+  assert.match(fuss, /btn--danger-outline" data-action="vital-delete"[^>]* style="margin-inline-end:auto"/);
+  // Mobil ist Loeschen ein Papierkorb ohne Wort (R9 M8, modal.js); sein Name
+  // kommt aus data-delete-name - ohne nahm modal.js das erste Feld ("128").
+  assert.match(fuss, /data-action="vital-delete" data-delete-name="health\.vitals\.metric\.bp"/, 'der Papierkorb nennt die Metrik');
 
   const neu = withAccess({ health: 'write' }, () => modalOptionen(() => health.openVitalModal()));
   assert.equal(neu.title, 'health.vitals.add');
