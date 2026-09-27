@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, askOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { stagger, scheduleUndoableDelete, wireScrollFade } from '/utils/ux.js';
 import { t, formatDate, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc } from '/utils/html.js';
@@ -1674,9 +1674,19 @@ function openMealModal(opts) {
       });
 
       panel.querySelector('#modal-cancel').addEventListener('click', closeModal);
-      panel.querySelector('#modal-delete')?.addEventListener('click', () => {
+      /* EIN ABGEBROCHENES SERIEN-LOESCHEN NAHM DEN EDITOR MIT (Codex an #1485):
+       * der Knopf schloss den Dialog, bevor deleteMeal() nach dem Umfang
+       * fragte - brach man dort ab, war nichts geloescht, aber Editor und
+       * ungespeicherte Aenderungen waren weg. Die Frage steht jetzt ueber dem
+       * geparkten Editor; zu geht er erst, wenn wirklich geloescht wird. */
+      panel.querySelector('#modal-delete')?.addEventListener('click', async () => {
+        let scope;
+        if (meal.recurrence_template_id) {
+          scope = await askOverModal(mealDeleteScopeChoice);
+          if (scope === null || scope === undefined) return;
+        }
         closeModal({ force: true });
-        deleteMeal(meal.id);
+        deleteMeal(meal.id, { scope });
       });
       panel.querySelector('#modal-save').addEventListener('click', () => saveModal(panel));
       // Pflichtfelder melden sich beim Verlassen inline (geteiltes Muster).
@@ -1960,7 +1970,24 @@ function collectModalIngredients(overlay) {
 // Mahlzeit löschen
 // --------------------------------------------------------
 
-async function deleteMeal(mealId) {
+/**
+ * Die Umfangs-Frage einer Serien-Mahlzeit: Einzeltermin, alles ab hier oder
+ * ganze Serie. Liefert den gewaehlten Umfang oder null (abgebrochen).
+ */
+function mealDeleteScopeChoice() {
+  return selectModal(t('meals.deleteRecurringTitle'), [
+    { value: 'single', label: t('meals.deleteScopeSingle') },
+    { value: 'future', label: t('meals.deleteScopeFuture') },
+    { value: 'series', label: t('meals.deleteScopeSeries') },
+  ]);
+}
+
+/**
+ * Loescht eine Mahlzeit. `scope` ist der schon erfragte Umfang einer Serie
+ * (der Editor fragt ihn ueber sich selbst, bevor er schliesst); ohne ihn
+ * fragt die Funktion selbst.
+ */
+async function deleteMeal(mealId, { scope } = {}) {
   const meal = state.meals.find((m) => m.id === mealId);
 
   // Wiederkehrende Mahlzeit: Einzeltermin, alles ab hier oder ganze Serie löschen.
@@ -1968,11 +1995,7 @@ async function deleteMeal(mealId) {
   // nur nach vorn enden soll - ohne ihn blieb nur, jedes künftige Vorkommen
   // einzeln zu löschen, während die nächste Woche schon wieder eines erzeugte (#619).
   if (meal?.recurrence_template_id) {
-    const choice = await selectModal(t('meals.deleteRecurringTitle'), [
-      { value: 'single', label: t('meals.deleteScopeSingle') },
-      { value: 'future', label: t('meals.deleteScopeFuture') },
-      { value: 'series', label: t('meals.deleteScopeSeries') },
-    ]);
+    const choice = scope ?? await mealDeleteScopeChoice();
     if (choice === null) return;
 
     if (choice === 'series' || choice === 'future') {
