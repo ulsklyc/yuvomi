@@ -2,8 +2,9 @@
  * Shared page-toolbar search field (see public/utils/page-search.js).
  * Canonical persistent, leading-icon, labeled search affordance for
  * list/filter modules.
- * Toolbar positioning (flex/max-width/margin) stays a per-module layout
- * class passed via `className`; only the control visual lives here.
+ * Seit der Re-Critique 2026-09-27 (A8 P3-2) gehoert auch Breite und Lage im
+ * Modulkopf hierher (Abschnitt "Eine Breite, eine Stelle" unten) - Module
+ * setzen keine eigenen Breiten oder Auto-Raender mehr.
  * Der Fokus traegt die Stimme, nicht den Modulton: ein Suchfeld tut in jedem
  * Modul dasselbe (Eine-Stimme-Regel, DESIGN.md).
  * -------------------------------------------------------- */
@@ -136,3 +137,57 @@
 }
 
 .page-search__clear[hidden] { display: none; }
+
+/* --------------------------------------------------------
+ * EINE BREITE, EINE STELLE (Re-Critique 2026-09-27, A8 P3-2 / A1 P2-5)
+ *
+ * Am Desktop stand die Suche in neun Breiten (280, 320, 320, 356, 420, 420,
+ * 424, 714, 830px) und mal links hinter dem Titel, mal rechts vor den
+ * Aktionen: jedes Modul gab ihr per `className` eine eigene Breite und zwei
+ * davon einen Auto-Rand. Die Suche ist ein Bedienelement der Shell, also
+ * entscheidet die Shell beides.
+ *
+ * DIE STELLE ist die, die der Kanonkopf dafuer vorsieht: der Center-Slot
+ * direkt HINTER dem Titel (`page-toolbar__center`, Referenz Dokumente:
+ * `renderPageSearch({ className: '... page-toolbar__center' })`); die Aktionen
+ * schiebt ihr eigener Auto-Rand an das Zeilenende (layout.css). Eine Suche
+ * in einem Wrapper-Slot, der nur sie traegt (Rezepte, Vorrat), zaehlt als
+ * dieselbe Stelle.
+ *
+ * DIE BREITE ist `--page-search-width` (320px, Apples Toolbar-Suchfeld). In
+ * Liste+Detail endet sie damit von selbst vor der Listenspur: deren kleinstes
+ * Mass ist `--layout-list-min` (26.25rem = 420px) minus zweimal
+ * `--page-inline-pad`, also mindestens 356px. Sie darf schrumpfen (`flex-shrink`
+ * 1, `min-width: 0`) - in einer vollen Zeile gibt sie vor dem Titel nach.
+ *
+ * `label.page-search` statt `.page-search`: die Wurzel ist immer ein `<label>`
+ * (renderPageSearch), und das Element hebt die Regel auf 0,2,1 - ueber jede
+ * Modulregel der Form `.x-toolbar > .x-search` (0,2,0), gleich in welcher
+ * Reihenfolge die Blaetter laden. Solche Regeln laufen damit ins Leere und
+ * fallen (Ratchet `search-width` in test:control-dialect).
+ *
+ * Nur ab 1024px (Sidebar-Welt): darunter regiert die Large-Title-Zone mit
+ * der Icon-Form (layout.css, "Die Suche wechselt in ihre Icon-Form").
+ * -------------------------------------------------------- */
+/* Am Kopf UND an der Suche: der Wrapper-Slot liest den Wert auch. */
+.page-toolbar,
+.page-search {
+  --page-search-width: 320px;
+}
+
+@media (min-width: 1024px) {
+  .page-toolbar > label.page-search,
+  .page-toolbar > .page-toolbar__center:has(> label.page-search:only-child) {
+    flex: 0 1 var(--page-search-width);
+    min-width: 0;
+    max-width: var(--page-search-width);
+    max-inline-size: var(--page-search-width);
+    margin-inline-start: 0;
+  }
+
+  /* Der Wrapper-Slot traegt die Breite, die Suche darin fuellt ihn. */
+  .page-toolbar > .page-toolbar__center > label.page-search:only-child {
+    flex: 1 1 auto;
+    max-width: none;
+  }
+}
