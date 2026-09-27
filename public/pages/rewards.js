@@ -14,6 +14,7 @@ import { openModal, closeModal, confirmModal, confirmOverModal, refocusAfterRend
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { wireTablist } from '/utils/tablist.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { wireScrollFade } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
@@ -276,6 +277,9 @@ function renderShell(container) {
     activeId: state.tab,
     onChange: (id) => { state.tab = id; renderCurrentTab(container); },
   });
+  // Geteilte gleitende Kapsel (Re-Critique 2026-09-27, D8); `key`, weil die
+  // Seite den Kopf bei jedem Aufruf neu baut.
+  attachSegmentIndicator(container.querySelector('.rewards-tabs'), { key: 'rewards-tabs' });
   // Scroll-Affordanz der Bar-Zeile (geteilter Peek-Fade, .page-toolbar__bar).
   wireScrollFade(container.querySelector('.rewards-tabs'));
   fab = createPageFab({ id: 'rewards-fab', dockLabel: t('newLabel.rewards') });

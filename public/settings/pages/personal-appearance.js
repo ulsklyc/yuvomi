@@ -9,6 +9,7 @@ import { appendCurrencyOptions, persistCurrencySelection } from '/settings/curre
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
 import { toggleRowHtml } from '/settings/components.js';
 import { wireTablist } from '/utils/tablist.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { isWallModeEnabled, setWallModeEnabled } from '/utils/wall-mode.js';
 import { setDisplayTimeZone } from '/utils/timezone.js';
 import {
@@ -473,7 +474,10 @@ async function refreshDataLanguageOptions(container) {
 }
 
 function bindEvents(container, user) {
-  wireTablist(container.querySelector('#theme-toggle'), {
+  // Geteilte gleitende Kapsel (Re-Critique 2026-09-27, D8).
+  const themeToggle = container.querySelector('#theme-toggle');
+  if (themeToggle) attachSegmentIndicator(themeToggle);
+  wireTablist(themeToggle, {
     activeId: currentTheme(),
     activeClass: 'is-active',
     mode: 'select',

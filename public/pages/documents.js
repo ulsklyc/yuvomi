@@ -36,6 +36,7 @@ import {
   documentThumbKind,
 } from '/utils/document-thumbs.js';
 import { wireTablist } from '/utils/tablist.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { firstRovingStop, repairRovingStops, wireRovingToolbars } from '/utils/roving-toolbar.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import {
@@ -634,6 +635,13 @@ function bindPageEvents() {
     mode: 'select',
     onChange: (id) => selectStatus(id),
   });
+  // EINE Auswahl-Bewegung (Re-Critique 2026-09-27, D8): Status-Segment und
+  // Ansichts-Umschalter tragen die geteilte gleitende Kapsel; sie folgt
+  // wireTablist bzw. dem aria-pressed-Wechsel unten von selbst.
+  const statusBar = _container.querySelector('#documents-status');
+  if (statusBar) attachSegmentIndicator(statusBar);
+  const viewToggle = _container.querySelector('.documents-view-toggle');
+  if (viewToggle) attachSegmentIndicator(viewToggle);
   // Kategorie ist eine reine Client-Facette: kein Netzwerk-Roundtrip, keine
   // Skeleton-Zwischenstufe — der Filter greift im selben Frame.
   _container.querySelector('#documents-category')?.addEventListener('click', (e) => {

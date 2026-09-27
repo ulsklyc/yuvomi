@@ -4,6 +4,7 @@ import { esc } from '/utils/html.js';
 import { weekStartIndex, weekdayOrder } from '/utils/date.js';
 import { toggleRowHtml } from '/settings/components.js';
 import { wireTablist } from '/utils/tablist.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
 
 // Wochenstart-Optionen; Labels aus dem bestehenden Kalender-i18n (kein neuer
@@ -511,6 +512,8 @@ function bindWeekStart(container, preferences) {
   // Rollback per setActive() ruft onChange erneut auf - dieser Merker haelt
   // den zweiten Aufruf davon ab, den alten Wert gleich wieder zu speichern.
   let reverting = false;
+  // Geteilte gleitende Kapsel (Re-Critique 2026-09-27, D8).
+  attachSegmentIndicator(toggle);
   const tablist = wireTablist(toggle, {
     activeId: current,
     activeClass: 'is-active',

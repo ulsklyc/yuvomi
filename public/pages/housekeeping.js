@@ -12,6 +12,7 @@ import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { wireTablist } from '/utils/tablist.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { wireScrollFade, vibrate, animationSettled } from '/utils/ux.js';
 import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
@@ -360,6 +361,9 @@ function renderShell(container) {
     activeId: state.tab,
     onChange: (id) => { state.tab = id; renderCurrentTab(container); },
   });
+  // Geteilte gleitende Kapsel (Re-Critique 2026-09-27, D8); `key`, weil die
+  // Seite den Kopf bei jedem Aufruf neu baut.
+  attachSegmentIndicator(container.querySelector('.housekeeping-tabs'), { key: 'housekeeping-tabs' });
   // Scroll-Affordanz der Bar-Zeile: laeuft die Leiste ueber (schmale Geraete,
   // lange Locales), zeigt der geteilte Peek-Fade (.page-toolbar__bar) den
   // Anschnitt statt Tabs stumm zu verstecken.

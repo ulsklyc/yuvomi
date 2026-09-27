@@ -15,6 +15,7 @@ import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { confirmModal } from '/components/modal.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { createRetryState } from '/settings/components.js';
 import { resolveExtensionLabel } from '/utils/extension-i18n.js';
 import {
@@ -566,6 +567,10 @@ async function save(container) {
 // ── Interaktion ──────────────────────────────────────────────────────────────
 
 function bindEvents(container) {
+  // Geteilte gleitende Kapsel (Re-Critique 2026-09-27, D8): sie folgt dem
+  // Klassenwechsel unten von selbst.
+  const modeSwitch = container.querySelector('.perm-modeswitch');
+  if (modeSwitch) attachSegmentIndicator(modeSwitch);
   // Modus umschalten
   container.querySelectorAll('[data-mode]').forEach((btn) => {
     btn.addEventListener('click', async () => {
