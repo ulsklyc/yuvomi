@@ -76,8 +76,112 @@
      * statt als Segment. Die Rechnung der obigen Notiz bleibt gültig, nur mit
      * 64px statt 16px Polster: 234 Label + 42 Badge + 64 + 6 Gap = 346px, passt
      * in 375px. Darunter greift der dort beschriebene Weg - die Leiste scrollt,
-     * statt ein Wort zu kürzen. */
-    padding-inline: var(--space-2);
+     * statt ein Wort zu kürzen.
+     *
+     * 4px SEIT R9 (M10): die Leiste traegt in Rezepte/Vorrat jetzt auch Lupe und
+     * Werkzeugmenue (unten), und 8px je Seite waren genau die 32px, die bei 390px
+     * fehlten - "Vorrat 11" stand angeschnitten am Rand. Die Kapsel bleibt 48px
+     * hoch; sie liest sich weiter als Segment, weil die Labels selbst nie
+     * enger als 4px an ihre Kante ruecken. */
+    padding-inline: var(--space-1);
+  }
+
+  /* DAS SIEGEL WEICHT MOBIL MIT DEM TITEL (R9 M10). Es wiederholte dasselbe
+   * Besteck, das die untere Leiste als aktiven Eintrag „Kueche" fuehrt, und
+   * kostete 26px der 358px, die vier Tabs plus Werkzeuge teilen. Am Desktop
+   * steht es weiter vor dem Titel. */
+  .kitchen-tabs-bar .module-seal {
+    display: none;
+  }
+
+  /* LUPE UND WERKZEUGMENUE STEHEN IN DER KUECHEN-LEISTE (R9 M10).
+   *
+   * In Rezepte und Vorrat trug die eigene Werkzeugzeile mobil nur die Lupe
+   * (Vorrat: dazu "..."), und kostete dafuer 65px unter der 56px-Leiste -
+   * gemessen begann die erste Rezeptzeile bei y=137, der Vorrat bei y=216
+   * (A4 P2). Jetzt legt sich der Kopf der Seite IN die Zeile der Leiste:
+   * die Seite rueckt um die Leistenhoehe nach oben, der Kopf ist nur so breit
+   * wie seine Werkzeuge und steht am Zeilenende, und die Leiste haelt ihnen
+   * mit einem Abstandhalter hinter dem letzten Tab den Platz frei.
+   *
+   * WARUM NICHT DIE KNOTEN UMHAENGEN: die Leiste ist ueber einen Tabwechsel
+   * derselbe Knoten (utils/kitchen-tabs.js), die Werkzeuge gehoeren der Seite.
+   * Umgehaengt muesste jede Seite sie beim Verlassen wieder abholen, und der
+   * Desktop, wo die Zeile mit Suchfeld und angedockter Primaeraktion bleibt,
+   * braeuchte zwei Markups. So bleibt es ein Knoten an einem Ort; nur die
+   * Geometrie wechselt, und ohne `:has()` bleibt schlicht die alte Zeile.
+   *
+   * Die Werkzeuge stehen mit ihrer Trefferflaeche 4px vor der Kante: das
+   * Glyph eines 48px-Icon-Knopfs sitzt 12px weiter innen und fluchtet damit
+   * mit dem Inhalt (16px), wie die Knoepfe einer iOS-Navigationsleiste. */
+  .has-kitchen-tabs:has(> :is(.recipes-page, .pantry-page)) {
+    --kitchen-tools: 1;
+  }
+
+  .has-kitchen-tabs:has(> .pantry-page),
+  .has-kitchen-tabs:has(> .recipes-page .recipes-source-filter:not([hidden])) {
+    --kitchen-tools: 2;
+  }
+
+  /* Der Abstandhalter nimmt den Platz der Werkzeuge, abzueglich des
+   * Leisten-Polsters, das ohnehin dahinter steht. Ein Flex-Kind und kein
+   * Polster: scrollt die Leiste in einer langen Sprache doch, endet ihr
+   * Scrollbereich damit vor den Werkzeugen statt unter ihnen. */
+  .has-kitchen-tabs:has(> :is(.recipes-page, .pantry-page)) > .kitchen-tabs-bar::after {
+    content: '';
+    flex: 0 0 calc(var(--kitchen-tools) * var(--target-base) + var(--space-1) - var(--page-inline-pad));
+  }
+
+  .has-kitchen-tabs:has(> :is(.recipes-page, .pantry-page)) > :is(.recipes-page, .pantry-page) {
+    margin-block-start: calc(-1 * var(--kitchen-tabs-height));
+    height: 100%;
+  }
+
+  .has-kitchen-tabs:has(> :is(.recipes-page, .pantry-page)) > :is(.recipes-page, .pantry-page) > .page-toolbar {
+    align-self: flex-end;
+    block-size: var(--kitchen-tabs-height);
+    padding-block: 0;
+    padding-inline: 0;
+    margin-inline-end: var(--space-1);
+    gap: 0;
+    background-color: transparent;
+    border-bottom-color: transparent;
+  }
+
+  .has-kitchen-tabs:has(> :is(.recipes-page, .pantry-page)) > :is(.recipes-page, .pantry-page) > .page-toolbar .page-toolbar__actions {
+    gap: 0;
+  }
+
+  /* Wer sucht, bekommt die Zeile: das Feld klappt ueber die Tabs auf, wie die
+   * Suchleiste in iOS, und bleibt offen, solange ein Suchbegriff steht. Die
+   * Tabs sind darunter nur verdeckt, nicht fort - Leeren gibt sie zurueck, und
+   * die untere Leiste fuehrt weiter aus der Kueche hinaus. */
+  .has-kitchen-tabs:has(> :is(.recipes-page, .pantry-page)) > :is(.recipes-page, .pantry-page) > .page-toolbar:has(.page-search:focus-within),
+  .has-kitchen-tabs:has(> :is(.recipes-page, .pantry-page)) > :is(.recipes-page, .pantry-page) > .page-toolbar:has(.page-search input:not(:placeholder-shown)) {
+    align-self: stretch;
+    padding-inline: var(--page-inline-pad);
+    margin-inline-end: 0;
+    gap: var(--space-2);
+    background-color: var(--color-bg);
+    border-bottom-color: var(--color-border-subtle);
+  }
+
+  /* ZWEI WERKZEUGE LASSEN DEN ZAEHLERN NUR EINEN PUNKT. Mit Lupe und "..."
+   * bleiben den vier Tabs bei 390px 270px; die Zahl im Zaehler kostet 27px,
+   * ein Punkt 10px. Die Zahl steht weiter im Namen des Tabs (aria-label,
+   * kitchen-tabs.js) und auf der Seite selbst, zu der er fuehrt. */
+  .has-kitchen-tabs:is(:has(> .pantry-page), :has(> .recipes-page .recipes-source-filter:not([hidden]))) > .kitchen-tabs-bar .sub-tab__badge {
+    inline-size: var(--space-2);
+    min-width: 0;
+    block-size: var(--space-2);
+    padding: 0;
+    overflow: hidden;
+    color: transparent;
+    background-color: var(--color-text-tertiary);
+  }
+
+  .has-kitchen-tabs:is(:has(> .pantry-page), :has(> .recipes-page .recipes-source-filter:not([hidden]))) > .kitchen-tabs-bar .sub-tab__badge--warning {
+    background-color: var(--color-warning);
   }
 
   /* Mobil weicht das Icon, nicht das Label. Vier Tabs teilen sich auf 393px

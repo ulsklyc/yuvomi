@@ -300,3 +300,52 @@ test('Seitenleiste: Pille <= 300ms aus Tokens, Hover-Absicht 150-250ms aus einem
   assert.match(layout, /\.nav-sidebar:hover:not\(:focus-within\)\s*\{\s*transition:\s*width var\(--duration-xl\) var\(--ease-out\) var\(--sidebar-hover-intent\)/,
     'das Ausklappen per Zeiger wartet die Absicht ab, mit der Kurve der Shell');
 });
+
+// --------------------------------------------------------
+// R9 M10 (Re-Critique 2026-09-27, A4 P2): mobil gehoert die Zeile dem Inhalt.
+// Die Werkzeugzeile von Rezepte/Vorrat trug nur Lupe (und "...") und kostete
+// 65px unter der Kuechen-Leiste; die Leiste selbst war mit Siegel und 8px-Polster
+// 402px breit und schnitt "Vorrat 11" an. Gemessen nachher (390px, de): Leiste
+// passt in allen vier Tabs ohne Scrollen, erste Rezeptzeile y 137 -> 72,
+// erster Vorrat y 216 -> 151.
+// --------------------------------------------------------
+test('Kueche mobil: Lupe und Werkzeugmenue stehen in der Kuechen-Leiste, die eigene Werkzeugzeile entfaellt (R9 M10)', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(readSrc('../public/styles/kitchen-tabs.css'))];
+  const narrow = (r) => r.at.some((a) => /\(max-width:\s*639px\)/.test(a));
+  const find = (pred) => rules.filter((r) => narrow(r) && pred(r));
+  // Komma nur auf oberster Ebene trennen - `:is(a, b)` ist EIN Selektor.
+  const split = (sel) => {
+    const out = []; let depth = 0; let cur = '';
+    for (const ch of sel) {
+      if (ch === '(') depth += 1;
+      if (ch === ')') depth -= 1;
+      if (ch === ',' && depth === 0) { out.push(cur); cur = ''; } else cur += ch;
+    }
+    return [...out, cur].map((x) => x.trim().replace(/\s+/g, ' '));
+  };
+  const selHas = (r, re) => split(r.selector).some((s) => re.test(s));
+
+  assert.ok(find((r) => selHas(r, /^\.kitchen-tabs-bar \.module-seal$/) && /display:\s*none/.test(r.body)).length,
+    'mobil kostet das Siegel 26px, und die untere Leiste fuehrt dasselbe Besteck als aktiven Eintrag');
+  const tab = find((r) => selHas(r, /^\.kitchen-tabs-bar \.sub-tab$/) && /padding-inline:/.test(r.body));
+  assert.match(tab.at(-1)?.body ?? '', /padding-inline:\s*var\(--space-1\)/, 'Tab-Polster 4px - mit 8px fehlten bei 390px genau die 32px');
+
+  const PAGES = /:is\(\.recipes-page, \.pantry-page\)/;
+  const page = find((r) => selHas(r, new RegExp(`${PAGES.source}\\) > ${PAGES.source}$`)));
+  assert.match(page[0]?.body ?? '', /margin-block-start:\s*calc\(-1 \* var\(--kitchen-tabs-height\)\)/, 'die Seite rueckt um die Leistenhoehe hoch');
+  const bar = find((r) => selHas(r, new RegExp(`${PAGES.source}\\) > ${PAGES.source} > \\.page-toolbar$`)));
+  assert.ok(bar.length, 'kein Kopf-Rumpf fuer Rezepte/Vorrat in der schmalen Fassung');
+  assert.match(bar[0].body, /block-size:\s*var\(--kitchen-tabs-height\)/, 'der Kopf ist genau so hoch wie die Leiste, in der er steht');
+  assert.match(bar[0].body, /align-self:\s*flex-end/, 'der Kopf ist nur so breit wie seine Werkzeuge - sonst deckt er die Tabs');
+  assert.ok(find((r) => /:has\(\.page-search:focus-within\)/.test(r.selector) && /align-self:\s*stretch/.test(r.body)).length,
+    'wer sucht, bekommt die ganze Zeile');
+
+  const spacer = find((r) => selHas(r, /> \.kitchen-tabs-bar::after$/));
+  assert.match(spacer[0]?.body ?? '', /flex:\s*0 0 calc\(var\(--kitchen-tools\) \* var\(--target-base\)/,
+    'die Leiste haelt den Werkzeugen ihren Platz per Flex-Kind frei - ein Polster verstiesse gegen die Fluchtlinie (#577)');
+  const tools = (n) => find((r) => new RegExp(`--kitchen-tools:\\s*${n}\\b`).test(r.body));
+  assert.ok(tools(1).some((r) => selHas(r, PAGES)), 'Rezepte und Vorrat: mindestens die Lupe');
+  assert.ok(tools(2).some((r) => selHas(r, /:has\(> \.pantry-page\)$/)), 'Vorrat: Lupe plus Werkzeugmenue');
+  assert.ok(tools(2).some((r) => selHas(r, /recipes-source-filter:not\(\[hidden\]\)/)), 'Rezepte mit Quellenfilter: zwei Werkzeuge');
+});
