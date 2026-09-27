@@ -48,9 +48,15 @@
  * @param {Function}    [opts.sealIcon]        - nur bei 'nav': Icon-Fabrik (moduleIconEl) für das
  *                                               Absender-Siegel links des Titels. Siehe unten.
  * @param {InsertPosition} [opts.insertPosition='afterbegin']
+ * @param {boolean|{key?: string}} [opts.indicator] - die gleitende Auswahl-Kapsel
+ *                                               (utils/segment-indicator.js). `{ key }`
+ *                                               fuer Module, die die Leiste bei jedem
+ *                                               Wechsel neu bauen: die neue Kapsel gleitet
+ *                                               von der Stelle der alten.
  * @returns {HTMLElement} the rendered bar element
  */
 import { wireScrollFade } from '/utils/ux.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 
 let subTabsCounter = 0;
 
@@ -67,6 +73,7 @@ export function renderSubTabs(anchorEl, {
   title,
   sealIcon,
   insertPosition = 'afterbegin',
+  indicator = false,
 }) {
   if (semantics !== 'nav' && semantics !== 'tabs') {
     throw new Error(`renderSubTabs: semantics muss 'nav' oder 'tabs' sein (bekam: ${semantics}).`);
@@ -274,6 +281,12 @@ export function renderSubTabs(anchorEl, {
   scrollActiveIntoView();
 
   if (window.lucide) window.lucide.createIcons({ el: bar });
+
+  // EINE Auswahl-Bewegung (Re-Critique 2026-09-27): ab hier folgt die Kapsel
+  // jedem Wechsel von `.sub-tab--active` selbst (MutationObserver im Helfer).
+  if (indicator) {
+    attachSegmentIndicator(bar, { itemSelector: '.sub-tab', key: typeof indicator === 'object' ? indicator.key ?? '' : '' });
+  }
 
   return bar;
 }

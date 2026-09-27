@@ -5,6 +5,7 @@ import { navigationFrom } from '/utils/view-transition.js';
 import { MODULE_ICON, moduleIconEl } from '/nav-icons.js';
 import { todayKey } from '/utils/date.js';
 import { KITCHEN_MODULES as KITCHEN_MODULES_SOURCE } from '/utils/module-accent.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 
 // Reihenfolge = Küchen-Kreislauf: planen → kochen → einkaufen → lagern.
 //
@@ -109,8 +110,8 @@ const BADGES = [
 
 /** Aktuelle Leiste; der Zustand wird nachgeladen, nachdem sie schon steht. */
 let _bar = null;
-/** Der ResizeObserver der stehenden Leiste - einer, nie mehr. */
-let _indicatorObserver = null;
+/** Die gleitende Kapsel der stehenden Leiste - eine, nie mehr. */
+let _indicator = null;
 let _activeRoute = null;
 let _refreshTimer = null;
 /**
@@ -194,97 +195,14 @@ export function refreshKitchenBadges() {
  *
  * Die Bewegung beginnt schon beim Tipp (onChange), nicht erst, wenn die neue
  * Seite steht - wie die Pille der unteren Kapsel (updateNav in router.js).
+ *
+ * Die Kapsel selbst ist seit der Re-Critique 2026-09-27 der geteilte Baustein
+ * aller Segment-Leisten (utils/segment-indicator.js): Messen, Gleiten,
+ * Nachziehen bei Groessenwechseln (auch dem Ein-/Ausklappen der Seitenleiste,
+ * A1 P2-1) stehen dort. Hier bleibt, WANN sie gleitet.
  */
-const INDICATOR_CLASS = 'kitchen-tabs-bar__indicator';
-
-function tokenValue(name, fallback) {
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return value || fallback;
-}
-
-function tokenMs(name, fallback) {
-  const value = parseFloat(tokenValue(name, ''));
-  return Number.isFinite(value) ? value : fallback;
-}
-
-function reducedMotion() {
-  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
-function indicatorOf(bar) {
-  return bar?.querySelector(`:scope > .${INDICATOR_CLASS}`) ?? null;
-}
-
-function activeTabBox(bar) {
-  const tab = bar.querySelector('.sub-tab--active');
-  if (!tab || !tab.offsetWidth) return null;
-  return { x: tab.offsetLeft, y: tab.offsetTop, w: tab.offsetWidth, h: tab.offsetHeight };
-}
-
-function writeBox(indicator, box) {
-  indicator.style.transform = `translate(${box.x}px, ${box.y}px)`;
-  indicator.style.width = `${box.w}px`;
-  indicator.style.height = `${box.h}px`;
-}
-
-/** Wo die Kapsel GERADE zu sehen ist - mitten in einer Bewegung nicht ihr Ziel. */
-function visibleBox(indicator) {
-  if (!indicator._box) return null;
-  if (indicator._glide?.playState !== 'running') return indicator._box;
-  const style = getComputedStyle(indicator);
-  const matrix = new DOMMatrixReadOnly(style.transform === 'none' ? undefined : style.transform);
-  return { x: matrix.m41, y: matrix.m42, w: parseFloat(style.width), h: parseFloat(style.height) };
-}
-
-/**
- * Setzt die Kapsel unter den aktiven Tab.
- * @param {HTMLElement} bar
- * @param {{ glide?: boolean }} [opts]  glide: vom sichtbaren Stand aus gleiten
- */
-function placeIndicator(bar, { glide = false } = {}) {
-  const indicator = indicatorOf(bar);
-  if (!indicator) return;
-  const to = activeTabBox(bar);
-  if (!to) return;
-  const current = indicator._box;
-  if (current && current.x === to.x && current.y === to.y && current.w === to.w && current.h === to.h) return;
-
-  const from = visibleBox(indicator);
-  indicator._glide?.cancel();
-  indicator._glide = null;
-  writeBox(indicator, to);
-  indicator._box = to;
-  bar.classList.add('has-indicator');
-
-  if (!glide || !from || reducedMotion() || typeof indicator.animate !== 'function') return;
-  indicator._glide = indicator.animate([
-    { transform: `translate(${from.x}px, ${from.y}px)`, width: `${from.w}px`, height: `${from.h}px` },
-    { transform: `translate(${to.x}px, ${to.y}px)`, width: `${to.w}px`, height: `${to.h}px` },
-  ], {
-    duration: tokenMs('--duration-lg', 250),
-    easing: tokenValue('--ease-out', 'ease-out'),
-  });
-}
-
-function wireIndicator(bar) {
-  const indicator = document.createElement('span');
-  indicator.className = INDICATOR_CLASS;
-  indicator.setAttribute('aria-hidden', 'true');
-  bar.prepend(indicator);
-  // Schrift nachgeladen, Badge dazu, Breakpoint gewechselt: die Tabs aendern
-  // Breite oder Lage, und die Kapsel zieht mit - mitten in einer Bewegung
-  // gleitend, sonst ohne.
-  // Es gibt nur EINE Leiste: der Beobachter der vorigen geht mit ihr, sonst
-  // hielte jeder Eintritt in die Kueche einen weiteren samt abgehaengter Knoten.
-  _indicatorObserver?.disconnect();
-  _indicatorObserver = null;
-  if (typeof ResizeObserver === 'function') {
-    _indicatorObserver = new ResizeObserver(() => {
-      placeIndicator(bar, { glide: indicator._glide?.playState === 'running' });
-    });
-    _indicatorObserver.observe(bar);
-    bar.querySelectorAll('.sub-tab').forEach((tab) => _indicatorObserver.observe(tab));
-  }
+function placeIndicator({ glide = false } = {}) {
+  _indicator?.place({ glide });
 }
 
 /**
@@ -312,14 +230,14 @@ function syncToLocation() {
   _activeRoute = path;
   selectSubTab(_bar, path);
   applyBadges(_lastSummary);
-  placeIndicator(_bar, { glide: true });
+  placeIndicator({ glide: true });
 }
 
 /** Tipp auf einen Tab: Zahlen und Kapsel ziehen sofort, die Seite folgt. */
 function onTabChosen(route) {
   _activeRoute = route;
   applyBadges(_lastSummary);
-  placeIndicator(_bar, { glide: true });
+  placeIndicator({ glide: true });
   // Abgelehnt loest das Promise sofort auf, angenommen nach dem Render - beide
   // Male steht danach fest, wo die App ist.
   Promise.resolve(window.yuvomi?.navigate(route)).finally(syncToLocation);
@@ -339,7 +257,7 @@ export function renderKitchenTabsBar(container, activeRoute) {
     applyBadges(_lastSummary);
     // Das Wiedereinhaengen setzt den waagrechten Scrollstand zurueck.
     scrollActiveSubTabIntoView(_bar);
-    placeIndicator(_bar, { glide: true });
+    placeIndicator({ glide: true });
     refreshKitchenBadges();
     return _bar;
   }
@@ -349,6 +267,9 @@ export function renderKitchenTabsBar(container, activeRoute) {
   // koennte er einem anderen Konto gehoeren (Abmelden, Anmelden ohne Neuladen)
   // und bliebe bei einem gescheiterten Abruf fuer immer stehen.
   _lastSummary = null;
+  // Die Kapsel der vorigen Leiste geht mit ihr - ihre Beobachter auch.
+  _indicator?.destroy();
+  _indicator = null;
   _bar = renderSubTabs(container, {
     // Zielorte, keine Sichten: die vier Küchen-Routen sind vier eigenständige
     // Module (eigener `module:`-Wert in router.js, eigene Seitendatei, einzeln
@@ -371,10 +292,10 @@ export function renderKitchenTabsBar(container, activeRoute) {
     insertPosition: 'afterbegin',
     onChange: onTabChosen,
   });
-  wireIndicator(_bar);
+  _indicator = attachSegmentIndicator(_bar, { itemSelector: '.sub-tab' });
   applyBadges(_lastSummary);
   scrollActiveSubTabIntoView(_bar);
-  placeIndicator(_bar);
+  placeIndicator();
 
   refreshKitchenBadges();
   return _bar;

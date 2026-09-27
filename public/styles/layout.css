@@ -4665,6 +4665,20 @@ p.field-hint--warn[hidden] {
     box-shadow: var(--shadow-lg);
   }
 
+  /* HOVER-ABSICHT (Re-Critique 2026-09-27, A1 P3-1): der Zeiger, der nur auf
+   * dem Weg zum Inhalt ueber die Leiste streicht, klappte sie jedes Mal aus -
+   * 400ms `ease`, ohne Verzoegerung. Jetzt wartet das Aufklappen
+   * `--sidebar-hover-intent` (200ms); verlaesst der Zeiger die Leiste vorher,
+   * beginnt die Transition nie. Die Kurve ist die der Shell (`--ease-out`).
+   * Nur fuer den Zeiger: der Tastaturfokus (`:focus-within`) klappt sofort
+   * auf, dort gibt es keine Durchfahrt. Das Einklappen (Basisregel) wartet
+   * nicht. */
+  html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover:not(:focus-within) {
+    transition:
+      width var(--duration-xl) var(--ease-out) var(--sidebar-hover-intent),
+      box-shadow var(--duration-xl) var(--ease-out) var(--sidebar-hover-intent);
+  }
+
   html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-sidebar__brand-text,
   html.sidebar-collapsed .nav-sidebar:focus-within .nav-sidebar__brand-text {
     display: flex;
@@ -4698,7 +4712,8 @@ p.field-hint--warn[hidden] {
   html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-section-label,
   html.sidebar-collapsed .nav-sidebar:focus-within .nav-section-label {
     opacity: 1;
-    transition: opacity 180ms ease 220ms;
+    /* Nach Absicht UND Breite: erst wenn die Leiste steht, kommt der Text. */
+    transition: opacity var(--duration-sm) var(--ease-out) calc(var(--sidebar-hover-intent) + var(--duration-md));
   }
 
   /* Flyout: die eingeklappt auf null Höhe kollabierten Sektionslabels wieder
@@ -7831,9 +7846,13 @@ textarea.input { resize: vertical; }
   height: var(--sidebar-row-height); /* füllt die Sidebar-Zeile (tokens.css) */
   border-radius: var(--radius-sm);
   pointer-events: none;
+  /* Die Feder bleibt (Glas-Element, ignore.md), aber in der Dauer der
+   * anderen Auswahl-Bewegungen: hier standen 450ms als Literal, und die Pille
+   * lief noch ~250ms, als der Inhalt laengst stand (Re-Critique 2026-09-27,
+   * A1 P2-2). --duration-xl ist die Obergrenze (300ms). */
   transition:
-    transform 450ms var(--ease-sidebar-glide),
-    opacity var(--duration-lg) ease;
+    transform var(--duration-xl) var(--ease-sidebar-glide),
+    opacity var(--duration-lg) var(--ease-out);
   will-change: transform;
   z-index: 0;
 }
@@ -7852,8 +7871,8 @@ textarea.input { resize: vertical; }
   opacity: 0;
   pointer-events: none;
   transition:
-    transform 280ms var(--ease-sidebar-glide),
-    opacity 180ms ease;
+    transform var(--duration-lg) var(--ease-sidebar-glide),
+    opacity var(--duration-sm) var(--ease-out);
   will-change: transform, opacity;
   z-index: 0;
 }

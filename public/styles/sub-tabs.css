@@ -145,6 +145,54 @@
   font-weight: var(--font-weight-semibold);
 }
 
+/* --------------------------------------------------------
+ * DER GLEITENDE AUSWAHL-INDIKATOR (geteilt, utils/segment-indicator.js)
+ *
+ * EINE Auswahl-Bewegung fuer jede Segment- und Tab-Leiste (Re-Critique
+ * 2026-09-27, A1 P2-2): eine Kapsel HINTER den Labels gleitet vom alten zum
+ * neuen Eintrag, die Worte stehen. Form und Flaeche sind die des aktiven
+ * Eintrags (`--seg-active-bg`, `--seg-active-shadow`; den Radius liest der
+ * Helfer vom Eintrag ab); der Eintrag gibt sie ab, sobald die Kapsel steht
+ * (`[data-seg-active]`). Ohne JS bleibt alles wie vorher.
+ *
+ * `z-index: -1` legt sie ueber den Grund der Leiste und unter die Eintraege;
+ * `isolation` macht die Leiste zum Stapelkontext, auch wo sie keinen z-index
+ * traegt. `position: relative` nur per `:where()` (Spezifitaet 0): eine
+ * klebende Leiste (`position: sticky`) bleibt klebend - positioniert ist sie
+ * so oder so, und nur darauf kommt es an (Bezugsrahmen der Kapsel = der von
+ * `offsetLeft` der Eintraege).
+ *
+ * Die Abgabe der Flaeche traegt 0,3,0: `.segmented__item.is-active`
+ * (panel.css, 0,2,0) laedt nach diesem Blatt und gewaenne sonst.
+ * -------------------------------------------------------- */
+:where(.has-seg-indicator) {
+  position: relative;
+}
+
+.has-seg-indicator {
+  isolation: isolate;
+}
+
+.seg-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  border-radius: var(--radius-full);
+  background-color: var(--seg-active-bg);
+  box-shadow: var(--seg-active-shadow);
+  pointer-events: none;
+}
+
+.seg-indicator[hidden] {
+  display: none;
+}
+
+.has-seg-indicator [data-seg-active][data-seg-active] {
+  background-color: transparent;
+  box-shadow: none;
+}
+
 .sub-tab__icon {
   width: 16px;
   height: 16px;

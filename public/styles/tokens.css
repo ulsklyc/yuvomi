@@ -1476,6 +1476,10 @@
   --duration-lg:  250ms;   /* = base (Sheets, Overlays) */
   --duration-xl:  300ms;   /* betonte Einblendungen */
   --duration-2xl: 400ms;   /* = slow (Layout-Umbauten, Sidebar) */
+  /* Hover-Absicht der eingeklappten Seitenleiste: so lange muss der Zeiger
+   * auf ihr ruhen, bevor sie ausklappt (150-250ms, A1 P3-1 der Re-Critique
+   * 2026-09-27). Eine Wartezeit, keine Bewegungsdauer. */
+  --sidebar-hover-intent: 200ms;
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   /* Symmetrische Kurve fuer Hoehenwechsel (Einklappen/Aufziehen von Zeilen und
