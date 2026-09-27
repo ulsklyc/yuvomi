@@ -1906,7 +1906,7 @@ function toggleDocumentSelection(card) {
 }
 
 function handleDocumentAction(e) {
-  // Im Auswahlmodus ist die ganze Karte/Zeile ein Umschalter — der Kreis ist
+  // Im Auswahlmodus ist die ganze Karte/Zeile ein Umschalter - der Kreis ist
   // die sichtbare Anzeige, nicht das einzige Ziel (Fitts' Law auf Touch).
   if (state.selectMode) {
     toggleDocumentSelection(e.target.closest('[data-id]'));
