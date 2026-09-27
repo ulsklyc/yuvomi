@@ -203,8 +203,23 @@
   /* ZWEI WERKZEUGE LASSEN DEN ZAEHLERN NUR EINEN PUNKT. Mit Lupe und "..."
    * bleiben den vier Tabs bei 390px 270px; die Zahl im Zaehler kostet 27px,
    * ein Punkt 8px (6px Punkt, seit R9 fuer 375px statt 8). Die Zahl steht weiter im Namen des Tabs (aria-label,
-   * kitchen-tabs.js) und auf der Seite selbst, zu der er fuehrt. */
+   * kitchen-tabs.js) und auf der Seite selbst, zu der er fuehrt.
+   *
+   * DER PUNKT STEHT AN DER ECKE, NICHT IN DER ZEILE (Re-Critique 2026-09-27,
+   * R11 H2). Auch 8px je Zaehler waren bei 375px zu viel, sobald Rezepte den
+   * Quellenfilter als zweites Werkzeug tragen: gemessen 281 von 275px, die
+   * Leiste scrollte fuer vier Tabs. Als Marke an der oberen Endecke des Labels
+   * (wie Apples Badge an einem Tab) kostet der Punkt keine Breite mehr; er
+   * liegt im Polster des Tabs ueber der Schrift. */
+  .has-kitchen-tabs:is(:has(> .pantry-page), :has(> .recipes-page .recipes-source-filter:not([hidden]))) > .kitchen-tabs-bar .sub-tab {
+    position: relative;
+  }
+
   .has-kitchen-tabs:is(:has(> .pantry-page), :has(> .recipes-page .recipes-source-filter:not([hidden]))) > .kitchen-tabs-bar .sub-tab__badge {
+    position: absolute;
+    inset-block-start: var(--space-3);
+    inset-inline-end: 0;
+    margin: 0;
     inline-size: var(--space-1h);
     min-width: 0;
     block-size: var(--space-1h);

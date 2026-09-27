@@ -410,6 +410,9 @@ test('Kueche mobil: die Leiste passt bei 375px in allen vier Tabs ohne Scrollen 
   const badgeMin = px(decl(base, '.sub-tab__badge', 'min-width'));
   const DOT_SEL = '.has-kitchen-tabs:is(:has(> .pantry-page), :has(> .recipes-page .recipes-source-filter:not([hidden]))) > .kitchen-tabs-bar .sub-tab__badge';
   const dot = px(decl(kitchen, DOT_SEL, 'inline-size'));
+  // Ein absolut gesetzter Punkt (R11 H2) liegt an der Ecke des Labels und
+  // kostet die Zeile nichts; im Fluss kostete er Abstand + Rand + Breite.
+  const dotOutOfFlow = decl(kitchen, DOT_SEL, 'position') === 'absolute';
   const BAR_WITH_TOOLS = '.has-kitchen-tabs:has(> :is(.recipes-page, .pantry-page)) > .kitchen-tabs-bar';
   assert.match(decl(kitchen, BAR_WITH_TOOLS, 'margin-inline-end') ?? '', /^calc\(var\(--kitchen-tools\) \* var\(--target-base\) \+ var\(--space-1\)\)$/,
     'die Rechnung unten bildet das Ende der Leiste nach - aendert es sich, muss sie mit');
@@ -424,7 +427,7 @@ test('Kueche mobil: die Leiste passt bei 375px in allen vier Tabs ohne Scrollen 
   const numeric = Math.max(badgeMin, DIGITS + 2 * badgePad);
   const width = ({ active, badges, badgeW, tools }) => {
     const tabs = Object.keys(WORD).map((id) => WORD[id][id === active ? 1 : 0] + 2 * tabPad
-      + (badges.includes(id) && id !== active ? tabGap + badgeMargin + badgeW : 0));
+      + (badges.includes(id) && id !== active && !(badgeW === dot && dotOutOfFlow) ? tabGap + badgeMargin + badgeW : 0));
     // Ende: mit Werkzeugen der Rand der Leiste (ohne End-Polster), sonst ihr Polster.
     const endW = tools ? tools * TOOL + tok('space-1') : PAGE_PAD;
     return PAGE_PAD + tabs.reduce((a, b) => a + b, 0) + (tabs.length - 1) * barGap + endW;
@@ -435,11 +438,12 @@ test('Kueche mobil: die Leiste passt bei 375px in allen vier Tabs ohne Scrollen 
     recipes: width({ active: 'recipes', badges: ['shopping', 'pantry'], badgeW: numeric, tools: 1 }),
     shopping: width({ active: 'shopping', badges: ['shopping', 'pantry'], badgeW: numeric, tools: 0 }),
     pantry: width({ active: 'pantry', badges: ['shopping', 'pantry'], badgeW: dot, tools: 2 }),
+    // Rezepte MIT Quellenfilter (angebundener Rezeptanbieter): zwei Werkzeuge
+    // und zwei Punkte. Bis R11 brauchte das 380.7px und die Leiste scrollte
+    // bei 375px (Re-Critique 2026-09-27, H2) - seit der Punkt an der Ecke
+    // steht, passt auch dieser Fall.
+    recipesFiltered: width({ active: 'recipes', badges: ['shopping', 'pantry'], badgeW: dot, tools: 2 }),
   };
-  // NICHT in der Zusage: Rezepte MIT Quellenfilter (nur mit angebundenem
-  // Rezeptanbieter) - zwei Werkzeuge und zwei Punkte brauchen 380.7px; dort
-  // bleibt bei 375px der Scroll-Fallback mit Fade wie in langen Locales. Bei
-  // 390px passt auch er.
   for (const [tab, need] of Object.entries(cases)) {
     assert.ok(need <= W, `${tab}: die Leiste braucht ${need.toFixed(1)}px von ${W} - sie scrollt fuer vier Tabs`);
   }
