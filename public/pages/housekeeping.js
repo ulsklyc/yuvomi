@@ -18,6 +18,8 @@ import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel } fro
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { pathAccess, mayWritePath } from '/utils/module-access.js';
+import { todayKey } from '/utils/date.js';
+import { zonedDateKey } from '/utils/timezone.js';
 
 
 
@@ -523,9 +525,13 @@ function renderDashboard(content) {
   // Kennzahlen in EINER Zeile, und „23.09.2026" passt in eine Viertelzeile nicht
   // (gemessen 112px Bedarf gegen 67px). Liegt der letzte Besuch in einem
   // anderen Jahr, bleibt es stehen - dann ist es die Auskunft.
+  // BEIDE JAHRE IN DER ANZEIGEZONE: formatDate/formatDayMonth rechnen in die
+  // Haushaltszone, also muss der Vergleich es auch. Mit dem Jahr des rohen
+  // UTC-Strings und dem der Geraetezone erschien `2026-01-01T00:30Z` in New
+  // York als „31.12." - der Tag aus 2025, das Jahr trotzdem weggelassen.
   const lastVisit = !hasLastVisit
     ? t('housekeeping.noVisits')
-    : String(data.last_visit.check_in).slice(0, 4) === localDate().slice(0, 4)
+    : zonedDateKey(data.last_visit.check_in).slice(0, 4) === todayKey().slice(0, 4)
       ? formatDayMonth(data.last_visit.check_in)
       : formatDate(data.last_visit.check_in);
   const lastVisitTime = hasLastVisit ? formatTime(data.last_visit.check_in) : '';

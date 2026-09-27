@@ -613,6 +613,35 @@ test('Uebersicht: der letzte Besuch nennt im laufenden Jahr kein Jahr, in einem 
   }
 });
 
+// Codex P2 zu R10 L10: die Anzeige rechnet in die Haushaltszone, der
+// Jahresvergleich nahm das Jahr des rohen UTC-Strings und das der Geraetezone.
+// `<Jahr>-01-01T00:30Z` steht in New York am 31.12. des Vorjahrs - und verlor
+// trotzdem sein Jahr; umgekehrt in Tokio.
+test('Uebersicht: ob der letzte Besuch sein Jahr nennt, entscheidet die Haushaltszone wie die Anzeige', async () => {
+  const { setDisplayTimeZone, _resetDisplayTimeZoneCache } = await import('../public/utils/timezone.js');
+  const { todayKey } = await import('../public/utils/date.js');
+  const vorher = globalThis.__formatDayMonth;
+  globalThis.__formatDayMonth = (d) => `KURZ(${d})`;
+  const wert = (html) => /metric-card__label">housekeeping\.lastVisit<\/div>\s*<div class="metric-card__value">([^<]*)</.exec(html)?.[1];
+  try {
+    setDisplayTimeZone('America/New_York');
+    let jahr = Number(todayKey().slice(0, 4));
+    const silvester = `${jahr}-01-01T00:30:00Z`;
+    assert.equal(wert(dashboardHtml({ lastVisit: silvester })), silvester,
+      'New York: der Besuch liegt am 31.12. des Vorjahrs - das Jahr bleibt stehen');
+
+    setDisplayTimeZone('Asia/Tokyo');
+    jahr = Number(todayKey().slice(0, 4));
+    const neujahr = `${jahr - 1}-12-31T20:00:00Z`;
+    assert.equal(wert(dashboardHtml({ lastVisit: neujahr })), `KURZ(${neujahr})`,
+      'Tokio: derselbe Zeitpunkt ist dort schon der 1.1. des laufenden Jahres - Kurzform');
+  } finally {
+    globalThis.__formatDayMonth = vorher;
+    setDisplayTimeZone(null);
+    _resetDisplayTimeZoneCache();
+  }
+});
+
 test('Faelligkeit spricht als Tinte am Wort, nicht als Waesche der Zeile (wie die Aufgaben)', () => {
   const rules = [...eachRule(HK_STYLES)];
   const waesche = rules.filter((r) => /housekeeping-task--(?:today|overdue)/.test(r.selector)
