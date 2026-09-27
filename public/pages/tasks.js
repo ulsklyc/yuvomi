@@ -508,8 +508,17 @@ function renderTaskCard(task, opts = {}) {
                er gar nicht erst erscheint. Jetzt nennt die Beschriftung den
                ZUSTAND statt einer Handlung, und ein `span` verspricht nichts.
                Dass eine Teilaufgabe am Display spaeter eine eigene
-               Personenauswahl bekommt, ist eine Folgeentscheidung. */''}
-          ${darfAbhaken ? `
+               Personenauswahl bekommt, ist eine Folgeentscheidung.
+
+               IM AUSWAHLMODUS GILT DASSELBE (Codex an #1483): dort ersetzte
+               nur der Auswahlkreis den Statuskreis der Elternaufgabe, Haken,
+               Umbenennen, Loeschen und „Teilaufgabe hinzufuegen" darunter
+               blieben bedienbar - ein Tipp in die Karte aenderte eine
+               Teilaufgabe, statt die Aufgabe auszuwaehlen. Wie die
+               Zeilenaktionen treten sie ab; der Zustand bleibt als Zeichen.
+               Der Fortschritts-Umschalter bleibt: er klappt nur auf und zu
+               (READ_SAFE_ACTIONS) und zeigt, was man gerade auswaehlt. */''}
+          ${darfAbhaken && !selecting ? `
           <button class="subtask-item__checkbox ${s.status === 'done' ? 'subtask-item__checkbox--done' : ''}"
                   data-action="toggle-subtask" data-id="${s.id}"
                   data-status="${s.status}" aria-label="${t('tasks.subtaskMarkDone', { title: esc(s.title) })}">
@@ -520,7 +529,7 @@ function renderTaskCard(task, opts = {}) {
             ${s.status === 'done' ? '<i data-lucide="check" class="subtask-item__checkbox-icon" aria-hidden="true"></i>' : ''}
           </span>`}
           <span class="subtask-item__title">${esc(s.title)}</span>
-          ${canEditTaskDefinition(s, task) ? `
+          ${!selecting && canEditTaskDefinition(s, task) ? `
           <div class="subtask-item__actions">
             <button type="button" class="row-action subtask-item__action"
                     data-action="rename-subtask" data-id="${s.id}" data-title="${esc(s.title)}"
@@ -642,7 +651,7 @@ function renderTaskCard(task, opts = {}) {
         <div class="subtask-list ${expandedSubtasks ? 'subtask-list--visible' : ''}"
              id="subtasks-${task.id}">
           ${subtasksHtml}
-          ${canEdit ? `
+          ${!selecting && canEdit ? `
           <button type="button" class="subtask-item__add" data-action="add-subtask" data-parent="${task.id}">
             <i data-lucide="plus" class="icon-sm" aria-hidden="true"></i><span>${t('tasks.subtaskAdd')}</span>
           </button>` : ''}
@@ -3224,7 +3233,8 @@ function renderTaskList(container, { paneQuiet = false } = {}) {
   stagger(listEl.querySelectorAll('.swipe-row, .kanban-card'), { host: listEl });
   updateBulkActionsBar(container);
   wireSwipeGestures(container);
-  maybeShowSwipeHint(container);
+  // Kein Hinweis auf eine Geste, die der Auswahlmodus gerade abschaltet.
+  if (!state.bulkSelectMode) maybeShowSwipeHint(container);
   listEl.querySelector('#empty-cta-tasks')?.addEventListener('click', () => {
     document.querySelector('.page-fab')?.click();
   });
@@ -3843,6 +3853,18 @@ function wireSwipeGestures(container) {
       },
     },
   };
+  // IM AUSWAHLMODUS GAR KEINE WISCHGESTE (Codex an #1483). Die Karten stecken
+  // weiter in `renderSwipeRow()`, und ein Wisch hakte die Aufgabe ab (fuehrend)
+  // oder oeffnete sie (nachlaufend) - mitten in einer Auswahl, die nur
+  // auswaehlen soll. Der Modus nimmt beide Seiten, und die Zeilen bekommen gar
+  // keine Beruehrungs-Hoerer: auch eine Geste ohne Seite schoebe die Karte
+  // sichtbar unter dem Finger weg. Beim Verlassen zeichnet `exitBulkSelect`
+  // die Liste neu, und dieser Aufruf verdrahtet wieder beide Seiten.
+  if (state.bulkSelectMode) {
+    optionen.leading = null;
+    optionen.trailing = null;
+    return optionen;
+  }
   wireSwipeRows(listEl, optionen);
   return optionen;
 }

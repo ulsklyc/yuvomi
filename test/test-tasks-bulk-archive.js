@@ -267,3 +267,70 @@ test('Auswahlkreis: ersetzt Statuskreis und Personenwahl, traegt den Titel im Na
   const on = tasks.renderTaskCard(task, { selecting: true, selected: true });
   assert.match(on, /class="task-select-btn task-select-btn--on"[^>]*aria-pressed="true"/);
 });
+
+test('Auswahlmodus: keine Wischgeste - ein Wisch hakt nicht ab und oeffnet nichts', () => {
+  // Codex an #1483: die Karten stecken im Auswahlmodus weiter in
+  // `renderSwipeRow()`, und `renderTaskList()` verdrahtete die Geste - ein
+  // Wisch nach vorn hakte die Aufgabe ab, statt auszuwaehlen. Gemessen an den
+  // verdrahteten Seiten UND an den Hoerern der Zeile: auch eine Geste ohne
+  // Seite schoebe die Karte unter dem Finger weg.
+  const hoerer = [];
+  const zeile = {
+    dataset: {}, classList: { add() {}, remove() {} },
+    querySelector: () => ({ style: {} }),
+    addEventListener: (type) => hoerer.push(type),
+  };
+  const liste = { querySelectorAll: (sel) => (sel === '.swipe-row' ? [zeile] : []), querySelector: () => null };
+  const container = { querySelector: (sel) => (sel === '#task-list' ? liste : null) };
+  const vorher = tasks.state.user;
+  tasks.state.user = { id: 2 };
+  try {
+    const normal = tasks.wireSwipeGestures(container);
+    assert.ok(normal.leading && normal.trailing, 'Gegenprobe: ausserhalb der Auswahl beide Seiten');
+    assert.ok(hoerer.includes('touchend'), 'Gegenprobe: die Zeile ist verdrahtet');
+
+    hoerer.length = 0;
+    tasks.state.bulkSelectMode = true;
+    const auswahl = tasks.wireSwipeGestures(container);
+    assert.equal(auswahl.leading, null, 'kein Abhaken per Wisch in der Auswahl');
+    assert.equal(auswahl.trailing, null, 'kein Oeffnen per Wisch in der Auswahl');
+    assert.deepEqual(hoerer, [], 'die Zeile bekommt gar keine Beruehrungs-Hoerer');
+  } finally {
+    tasks.state.bulkSelectMode = false;
+    tasks.state.user = vorher;
+  }
+});
+
+test('Auswahlmodus: Teilaufgaben zeigen ihren Zustand, bieten aber nichts an - die Karte waehlt nur aus', () => {
+  // Codex an #1483: der Auswahlkreis ersetzte nur den Statuskreis der
+  // Elternaufgabe; Haken, Umbenennen, Loeschen und „Teilaufgabe hinzufuegen"
+  // blieben bedienbar. ALLOWLIST statt Liste der verbotenen Aktionen: eine
+  // kuenftige Teilaufgaben-Aktion faellt hier auf, ohne dass jemand sie
+  // nachtraegt.
+  const task = {
+    id: 7, title: 'Muell', status: 'open', priority: 'none', subtask_total: 2, subtask_done: 1,
+    subtasks: [
+      { id: 8, title: 'Tonne', status: 'open', parent_task_id: 7 },
+      { id: 9, title: 'Sack', status: 'done', parent_task_id: 7 },
+    ],
+  };
+  const vorher = tasks.state.user;
+  tasks.state.user = { id: 2 };
+  try {
+    const aktionen = (html) => new Set([...html.matchAll(/data-action="([^"]+)"/g)].map((m) => m[1]));
+    const normal = aktionen(tasks.renderTaskCard(task));
+    for (const a of ['toggle-subtask', 'rename-subtask', 'delete-subtask', 'add-subtask']) {
+      assert.ok(normal.has(a), `Gegenprobe: ohne Auswahl bietet die Karte ${a} an`);
+    }
+
+    const html = tasks.renderTaskCard(task, { selecting: true });
+    const ERLAUBT = new Set(['toggle-select', 'open-task', 'toggle-subtasks']);
+    assert.deepEqual([...aktionen(html)].filter((a) => !ERLAUBT.has(a)), [],
+      'in der Auswahl nur auswaehlen, oeffnen (waehlt dort aus) und auf-/zuklappen');
+    assert.equal((html.match(/subtask-item__checkbox--static/g) ?? []).length, 2, 'der Zustand jeder Teilaufgabe bleibt als Zeichen');
+    assert.match(html, /subtask-item__checkbox--done subtask-item__checkbox--static|subtask-item__checkbox--static[^"]*subtask-item__checkbox--done/,
+      'die erledigte Teilaufgabe bleibt als erledigt erkennbar');
+  } finally {
+    tasks.state.user = vorher;
+  }
+});
