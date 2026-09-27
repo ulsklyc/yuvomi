@@ -99,14 +99,40 @@ test('die Rollen-Chips sagen ihren Zustand, und die erste Rolle steht gewaehlt d
 test('die Legende nennt jedes Segment-Icon mit seinem Wort, im Mitglieds-Modus auch „Erben" (H7)', async () => {
   const { permLegendHtml, initialSubject } = await import('../public/settings/pages/admin-permissions.js');
   const items = (html) => [...html.matchAll(/data-lucide="([^"]+)"[^>]*><\/i>([^<]+)</g)].map((m) => [m[1], m[2]]);
-  assert.deepEqual(items(permLegendHtml('role')), [
+  assert.deepEqual(items(permLegendHtml('role', { widgets: false, capabilities: false })), [
     ['eye-off', 'settings.permAccessNone'],
     ['eye', 'settings.permAccessRead'],
     ['pencil', 'settings.permAccessWrite'],
   ]);
   assert.deepEqual(items(permLegendHtml('user'))[0], ['corner-down-right', 'settings.permInherit']);
+  assert.equal(items(permLegendHtml('user')).filter(([icon]) => icon === 'corner-down-right').length, 1,
+    '„Erben" heisst ueberall dasselbe und steht einmal');
   assert.equal(initialSubject('role', CATALOG), 'parent');
   assert.equal(initialSubject('user', CATALOG), null, 'Mitglieder bleiben ohne Vorwahl');
+});
+
+test('Codex an #1485: die Legende nennt je Abschnitt dessen eigene Bedeutung der Icons', async () => {
+  const { permLegendHtml } = await import('../public/settings/pages/admin-permissions.js');
+  // Je Gruppe: Ueberschrift und ihre Icon-Woerter. Das Auge ist am Modul
+  // „Lesen", am Widget „Verfuegbar", an einer Faehigkeit „Erlaubt" - eine
+  // Legende nur aus den Modul-Optionen nannte ueber Widget- und
+  // Faehigkeits-Zeilen die falsche Bedeutung.
+  const groups = (html) => html.split('class="perm-legend__group"').slice(1).map((g) => ({
+    scope: /class="perm-legend__scope">([^<]+)</.exec(g)?.[1] ?? null,
+    items: [...g.matchAll(/data-lucide="([^"]+)"[^>]*><\/i>([^<]+)</g)].map((m) => [m[1], m[2]]),
+  }));
+  assert.deepEqual(groups(permLegendHtml('role')), [
+    { scope: 'settings.permModulesHeading', items: [['eye-off', 'settings.permAccessNone'], ['eye', 'settings.permAccessRead'], ['pencil', 'settings.permAccessWrite']] },
+    { scope: 'settings.permWidgetsHeading', items: [['eye-off', 'settings.permWidgetBlocked'], ['eye', 'settings.permWidgetAllowed']] },
+    { scope: 'settings.permCapabilitiesHeading', items: [['eye-off', 'settings.permCapabilityBlocked'], ['eye', 'settings.permCapabilityAllowed']] },
+  ]);
+  const user = groups(permLegendHtml('user'));
+  assert.deepEqual(user[0], { scope: null, items: [['corner-down-right', 'settings.permInherit']] });
+  assert.deepEqual(user.slice(1).map((g) => g.scope),
+    ['settings.permModulesHeading', 'settings.permWidgetsHeading', 'settings.permCapabilitiesHeading']);
+  // Ein Abschnitt, den die Matrix nicht zeigt, steht auch nicht in der Legende.
+  assert.deepEqual(groups(permLegendHtml('role', { widgets: false, capabilities: false })).map((g) => g.scope),
+    ['settings.permModulesHeading']);
 });
 
 // ── Codex an #1485: scheitert das Laden eines Subjekts, steht keine scheinbar bearbeitbare Matrix da ──

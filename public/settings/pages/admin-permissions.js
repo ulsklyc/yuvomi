@@ -173,12 +173,12 @@ function moduleOptions(mode = state.mode) {
   return base;
 }
 
-function widgetOptions() {
+function widgetOptions(mode = state.mode) {
   const base = [
     { value: 'none', label: t('settings.permWidgetBlocked'), icon: WIDGET_OPT_ICONS.none },
     { value: 'allow', label: t('settings.permWidgetAllowed'), icon: WIDGET_OPT_ICONS.allow },
   ];
-  if (state.mode === 'user') return [{ value: 'inherit', label: t('settings.permInherit'), icon: WIDGET_OPT_ICONS.inherit }, ...base];
+  if (mode === 'user') return [{ value: 'inherit', label: t('settings.permInherit'), icon: WIDGET_OPT_ICONS.inherit }, ...base];
   return base;
 }
 
@@ -379,10 +379,27 @@ function renderSummary(container) {
 // denen die Segmente gebaut sind, damit Legende und Knopf nie auseinanderlaufen.
 // Sie ist ein Bild zum Nachschlagen: jedes Segment traegt seinen Namen selbst
 // (`aria-label`), ein Screenreader hoerte die Liste sonst ein zweites Mal.
-export function permLegendHtml(mode = state.mode) {
-  const items = moduleOptions(mode).map((o) => `
-      <span class="perm-legend__item"><i data-lucide="${esc(o.icon)}" aria-hidden="true"></i>${esc(o.label)}</span>`).join('');
-  return `<p class="perm-legend" aria-hidden="true">${items}</p>`;
+//
+// DIESELBEN ICONS HEISSEN JE ABSCHNITT ETWAS ANDERES (Codex an #1485): das
+// Auge ist am Modul „Lesen", am Widget „Verfuegbar", an einer Faehigkeit
+// „Erlaubt". Eine Legende nur aus den Modul-Optionen stand auch ueber Widget-
+// und Faehigkeits-Zeilen und nannte dort die falsche Bedeutung. Jeder Abschnitt
+// traegt deshalb seine eigenen Woerter unter seiner Ueberschrift; „Erben"
+// bedeutet ueberall dasselbe und steht einmal vorn.
+export function permLegendHtml(mode = state.mode, { widgets = true, capabilities = true } = {}) {
+  const item = (o) => `
+      <span class="perm-legend__item"><i data-lucide="${esc(o.icon)}" aria-hidden="true"></i>${esc(o.label)}</span>`;
+  const own = (options) => options.filter((o) => o.value !== 'inherit');
+  const group = (heading, options) => `
+    <span class="perm-legend__group"><span class="perm-legend__scope">${esc(heading)}</span>${own(options).map(item).join('')}</span>`;
+  const inherit = moduleOptions(mode).find((o) => o.value === 'inherit');
+  const parts = [
+    inherit ? `<span class="perm-legend__group">${item(inherit)}</span>` : '',
+    group(t('settings.permModulesHeading'), moduleOptions(mode)),
+    widgets ? group(t('settings.permWidgetsHeading'), widgetOptions(mode)) : '',
+    capabilities ? group(t('settings.permCapabilitiesHeading'), capabilityOptions(mode)) : '',
+  ];
+  return `<p class="perm-legend" aria-hidden="true">${parts.join('')}</p>`;
 }
 
 // ── Matrix ─────────────────────────────────────────────────────────────────────
@@ -451,7 +468,10 @@ function renderMatrix(container) {
       <p class="perm-matrix__hint">${esc(
         state.mode === 'role' ? t('settings.permRoleLegend') : t('settings.permMemberLegend'),
       )}</p>
-      ${permLegendHtml()}
+      ${permLegendHtml(state.mode, {
+        widgets: state.catalog.widgets.length > 0,
+        capabilities: (state.catalog.capabilities || []).length > 0,
+      })}
     </div>
     <div id="perm-summary"></div>
     <div class="perm-list">${groupsHtml}${generalHtml}</div>

@@ -2878,6 +2878,20 @@
   font-size: var(--text-sm);
 }
 
+/* Je Abschnitt eine Gruppe mit eigener Ueberschrift: dasselbe Icon heisst am
+ * Modul „Lesen", am Widget „Verfuegbar" und an einer Faehigkeit „Erlaubt". */
+.perm-legend__group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+}
+
+.perm-legend__scope {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
 .perm-legend__item {
   display: inline-flex;
   align-items: center;
