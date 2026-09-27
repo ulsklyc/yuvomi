@@ -292,9 +292,28 @@ function content() {
   return document.getElementById('rewards-content');
 }
 
+/**
+ * DIE KOPFAKTION ENDET AN DER KANTE IHRES INHALTS (Re-Critique 2026-09-27,
+ * A3 P2-5 / R10 L7). Uebersicht und Verlauf sind Zeilenlisten auf dem
+ * Lesemass, der Katalog ist ein Raster ueber die volle Breite. Mit einem
+ * festen `--narrow` stand die angedockte Pille im Katalog bei 972, das Raster
+ * endete bei 1408 (1440er Fenster). Der Kopf folgt jetzt dem Reiter: gedeckelt,
+ * wo der Inhalt es ist, voll, wo das Raster es ist.
+ *
+ * EIN MODIFIER, NICHT DAS `--narrow` WEGNEHMEN: ohne `--narrow` passte die auf
+ * 720px gekappte Reiterleiste neben Titel und Pille in die erste Zeile, und der
+ * ganze Inhalt sprang 52px hoch (gemessen). `--wide` (rewards.css) gibt nur der
+ * Aktionszeile die volle Kante zurueck.
+ */
+function syncToolbarMeasure(container) {
+  container.querySelector('.rewards-toolbar')
+    ?.classList.toggle('rewards-toolbar--wide', state.tab === 'catalog');
+}
+
 async function renderCurrentTab(container) {
   const el = content();
   if (!el) return;
+  syncToolbarMeasure(container);
   el.replaceChildren();
   el.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 3 }));
   try {
@@ -515,7 +534,9 @@ function wireOverview(el) {
 function handleSetupStep(action) {
   if (action === 'participants') openParticipantsModal();
   else if (action === 'tasks') location.href = '/tasks';
-  else if (action === 'catalog') document.querySelector('[data-rw-tab="catalog"]')?.click();
+  // `data-tab-id` ist das Attribut der Reiter (tabButton); hier stand
+  // `data-rw-tab`, das es nie gab - der Schritt „Praemien anlegen" tat nichts.
+  else if (action === 'catalog') document.querySelector('.rewards-tabs [data-tab-id="catalog"]')?.click();
 }
 
 // --------------------------------------------------------
@@ -586,7 +607,7 @@ function renderCatalog(el) {
   } else {
     el.insertAdjacentHTML('beforeend', `
       <div class="rewards-content__inner">
-        <section class="rw-section">
+        <section class="rw-section rw-section--wide">
           ${header}
           <div class="rw-reward-grid">${items.map(renderRewardCard).join('')}</div>
         </section>
@@ -1079,6 +1100,8 @@ async function refreshActiveTab() {
 export const __test = {
   renderStandingRow, renderRewardCard, renderPendingPanel, renderSetupHints,
   readOnly, state,
+  // R10 L7: Kopf und Inhalt teilen je Reiter eine Kante (test-dashboard-rewards.js).
+  syncToolbarMeasure, renderCatalog, renderLedger, renderOverview, handleSetupStep,
 };
 
 export async function render(container, { user } = {}) {

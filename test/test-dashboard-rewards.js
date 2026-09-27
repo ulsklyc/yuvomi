@@ -272,3 +272,95 @@ test('Verdrahtung: das Widget bekommt seine Groesse, und das Ziel kommt aus EINE
     assert.ok(/from '\/utils\/reward-goal\.js'/.test(text), `${name} rechnet das naechste Ziel selbst statt ueber utils/reward-goal.js`);
   }
 });
+
+// --------------------------------------------------------
+// Die Seite: Kopf und Inhalt teilen je Reiter eine Kante
+// (Re-Critique 2026-09-27, A3 P2-5 / R10 L7)
+//
+// Gemessen bei 1440x900: Punktestand bis 972, sein Kopfknopf bis 1408; das
+// Ledger 1156px breit mit dem Punktwert 1100px vom Grund; im Katalog endete
+// die Kopfpille bei 972, das Raster bei 1408. Jetzt: Zeilenlisten auf dem
+// Lesemass, das Raster breit, und die Kopfpille an der Kante ihres Inhalts.
+// --------------------------------------------------------
+
+const { __test: rewardsPage } = await import('../public/pages/rewards.js');
+
+/** Ein Inhaltsknoten, der das Markup einsammelt - mehr fassen die Renderer nicht an. */
+function markupEl() {
+  return {
+    html: '',
+    replaceChildren() { this.html = ''; },
+    insertAdjacentHTML(_pos, html) { this.html += html; },
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
+  };
+}
+
+test('Belohnungen: nur der Katalog ist ein breiter Abschnitt, Uebersicht und Verlauf stehen auf dem Lesemass', () => {
+  const s = rewardsPage.state;
+  const vorher = { user: s.user, overview: s.overview, catalog: s.catalog, ledger: s.ledger, redemptions: s.redemptions };
+  try {
+    s.user = { id: 1, role: 'admin' };
+    s.overview = { me: 1, balances: [{ id: 2, display_name: 'Emma', balance: 30 }] };
+    s.catalog = [{ id: 7, name: 'Kinoabend', cost: 100, is_active: 1 }];
+    s.ledger = [{ id: 1, type: 'earn', delta: 5, reason: 'Zimmer', user_name: 'Emma', created_at: '2026-09-20' }];
+    s.redemptions = [];
+    const wide = /class="rw-section rw-section--wide"/g;
+    for (const [name, render] of [['renderOverview', rewardsPage.renderOverview], ['renderLedger', rewardsPage.renderLedger]]) {
+      const el = markupEl();
+      render(el);
+      assert.match(el.html, /class="rw-section"/, `${name}: der Abschnitt steht da`);
+      assert.doesNotMatch(el.html, wide, `${name}: eine Zeilenliste ist kein breiter Abschnitt`);
+    }
+    const katalog = markupEl();
+    rewardsPage.renderCatalog(katalog);
+    assert.equal((katalog.html.match(wide) || []).length, 1, 'das Katalograster ist der eine breite Abschnitt');
+  } finally {
+    Object.assign(s, vorher);
+  }
+});
+
+test('Belohnungen: der Kopf gibt im Katalog der Pille die volle Kante zurueck, sonst nicht', () => {
+  assert.equal(typeof rewardsPage.syncToolbarMeasure, 'function', 'syncToolbarMeasure fehlt im __test-Export');
+  const classes = new Set(['page-toolbar', 'page-toolbar--narrow', 'rewards-toolbar']);
+  const toolbar = { classList: { toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)) } };
+  const container = { querySelector: (sel) => (sel === '.rewards-toolbar' ? toolbar : null) };
+  const s = rewardsPage.state;
+  const tabVorher = s.tab;
+  try {
+    for (const [tab, breit] of [['catalog', true], ['ledger', false], ['overview', false], ['catalog', true]]) {
+      s.tab = tab;
+      rewardsPage.syncToolbarMeasure(container);
+      assert.equal(classes.has('rewards-toolbar--wide'), breit, `${tab}: --wide ${breit ? 'gesetzt' : 'weg'}`);
+      assert.ok(classes.has('page-toolbar--narrow'),
+        `${tab}: --narrow bleibt - ohne passte die gekappte Reiterleiste in die Titelzeile (52px Sprung, gemessen)`);
+    }
+  } finally {
+    s.tab = tabVorher;
+  }
+  const css = readFileSync(new URL('../public/styles/rewards.css', import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.match(css, /\.rewards-page \.rw-section:not\(\.rw-section--wide\)\s*\{[^}]*max-width:\s*var\(--page-measure/,
+    'jeder Abschnitt ausser dem Raster endet am Lesemass - samt Kopf');
+  assert.match(css, /\.rewards-toolbar--wide\s*\{[^}]*padding-inline-end:\s*var\(--page-inline-pad\)/);
+  assert.match(css, /\.rewards-toolbar--wide::after\s*\{[^}]*content:\s*none/, 'kein Rest-Slot, der die Pille zurueckschoebe');
+  assert.match(css, /\.rewards-toolbar--wide > \.rewards-tabs\s*\{[^}]*max-width:\s*none/, 'die Reiterleiste bricht weiter um');
+  const page = readFileSync(new URL('../public/pages/rewards.js', import.meta.url), 'utf8');
+  assert.match(page, /async function renderCurrentTab\(container\) \{[\s\S]{0,120}syncToolbarMeasure\(container\);/,
+    'jeder Reiterwechsel fuehrt den Kopf mit');
+});
+
+test('Belohnungen: der Einrichtungsschritt „Praemien" wechselt wirklich in den Katalog', () => {
+  // Er suchte `[data-rw-tab="catalog"]` - ein Attribut, das es nie gab; die
+  // Reiter tragen `data-tab-id` (tabButton). Der Klick lief ins Leere.
+  let gefragt = null;
+  let geklickt = false;
+  const vorher = globalThis.document;
+  globalThis.document = { querySelector: (sel) => { gefragt = sel; return /data-tab-id="catalog"/.test(sel) ? { click() { geklickt = true; } } : null; } };
+  try {
+    rewardsPage.handleSetupStep('catalog');
+  } finally {
+    globalThis.document = vorher;
+  }
+  assert.ok(geklickt, `gesucht wurde ${gefragt} - der Reiter heisst data-tab-id="catalog"`);
+});
