@@ -2702,3 +2702,70 @@ test('die Bilanz rechnet eine geloeschte Buchung sofort heraus und beim Undo wie
   const seriesBefore = series.slice(0, series.indexOf('scheduleUndoableDelete'));
   assert.match(seriesBefore, /state\.summary = summaryWith\(state\.summary, removed, -1\)/, 'Serie loeschen zeichnet die alte Bilanz');
 });
+
+// Codex an #1485: im Konto-Drilldown zeigt `state.entries` nur die Buchungen
+// EINES Kontos, `state.summary` zaehlt alle. Ein per Einzel-Bearbeitung auf ein
+// anderes Konto verschobenes Vorkommen fehlte der Liste - das Serien-Loeschen
+// rechnete nur das sichtbare heraus, obwohl der Server die ganze Serie loescht.
+// Gefahren wird die echte deleteEntrySeries mit gestubbtem Undo-Fenster und API.
+test('Serie loeschen im Konto-Drilldown rechnet die Bilanz nicht aus der gefilterten Liste (Codex #1485)', async () => {
+  const s = budgetUi.state;
+  const zuvor = {
+    month: s.month, entries: s.entries, summary: s.summary, prevSummary: s.prevSummary,
+    loans: s.loans, accountFilterId: s.accountFilterId, activeTab: s.activeTab, budgetMode: s.budgetMode,
+  };
+  const hier = { id: 11, amount: -50, category: 'food', date: '2026-06-05', is_pending: 0, account_id: 3, recurrence_parent_id: 10 };
+  const bilanz = () => ({
+    month: '2026-06', income: 2000, expenses: -100, balance: 1900,
+    byCategory: [
+      { category: 'food', income: 0, expenses: -100, total: -100 },
+      { category: 'salary', income: 2000, expenses: 0, total: 2000 },
+    ],
+  });
+  const serverDanach = { month: '2026-06', income: 2000, expenses: 0, balance: 2000, byCategory: [{ category: 'salary', income: 2000, expenses: 0, total: 2000 }] };
+  let undo = null;
+  const deletes = [];
+  const gets = [];
+  budgetUi.updateTabsForTest({ classList: { toggle() {} }, querySelector: () => null });
+  globalThis.__undoStub = (opts) => { undo = opts; };
+  globalThis.__apiStub = {
+    delete: async (url) => { deletes.push(url); return { data: null }; },
+    get: async (url) => {
+      gets.push(url);
+      if (url.startsWith('/budget/summary?month=2026-06')) return { data: serverDanach };
+      if (url.startsWith('/budget/loans')) return { data: zuvor.loans };
+      return { data: url.startsWith('/budget?') ? [] : null };
+    },
+  };
+  try {
+    Object.assign(s, { month: '2026-06', activeTab: 'budget', budgetMode: 'shared', accountFilterId: 3, entries: [hier], summary: bilanz() });
+    // Das Schwester-Vorkommen (-50, food) liegt auf Konto 4: in der Bilanz, nicht in der Liste.
+    await budgetUi.deleteEntrySeries(11);
+    assert.deepEqual(s.entries, [], 'die sichtbaren Vorkommen verlassen die Liste sofort');
+    assert.deepEqual(s.summary, bilanz(), 'gefiltert bleibt die Bilanz beim Serverstand statt halb herausgerechnet');
+    assert.ok(undo, 'das Undo-Fenster oeffnet sich');
+    await undo.commit({ keepalive: false });
+    assert.deepEqual(deletes, ['/budget/11/series']);
+    assert.ok(gets.some((u) => u.startsWith('/budget/summary?month=2026-06')), 'nach dem Loeschen kommt die Summary vom Server');
+    assert.deepEqual(s.summary, serverDanach);
+
+    // Undo im Drilldown laedt ebenfalls neu, statt zu rechnen.
+    gets.length = 0;
+    Object.assign(s, { accountFilterId: 3, entries: [hier], summary: bilanz() });
+    undo = null;
+    await budgetUi.deleteEntrySeries(11);
+    await undo.restore();
+    assert.ok(gets.some((u) => u.startsWith('/budget/summary?month=2026-06')), 'das Undo holt die Summary neu');
+
+    // Ungefiltert zeigt die Liste alles, was die Bilanz zaehlt: sofort herausrechnen.
+    const geschwister = { ...hier, id: 12, account_id: 4 };
+    Object.assign(s, { accountFilterId: null, entries: [hier, geschwister], summary: bilanz() });
+    await budgetUi.deleteEntrySeries(11);
+    assert.equal(s.summary.expenses, 0, 'ungefiltert rechnet das Loeschen beide Vorkommen sofort heraus');
+    assert.equal(s.summary.balance, 2000);
+  } finally {
+    delete globalThis.__undoStub;
+    delete globalThis.__apiStub;
+    Object.assign(s, zuvor);
+  }
+});

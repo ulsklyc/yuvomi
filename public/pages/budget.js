@@ -4220,6 +4220,15 @@ function summaryWith(summary, entries, sign) {
   return next;
 }
 
+/* Zeigt `state.entries` weniger Buchungen, als `state.summary` zaehlt? Nur der
+ * Konto-Drilldown: `account_id` geht an `GET /budget`, nicht an
+ * `/budget/summary` (loadMonth). Der Scope geht an beide Abfragen, und der
+ * Zustaendigen-Filter greift erst beim Zeichnen (visibleEntries) -
+ * `state.entries` bleibt dabei vollstaendig. */
+function listNarrowsSummary() {
+  return state.accountFilterId != null;
+}
+
 async function deleteEntry(id) {
   if (readOnly()) return;
   const entry = state.entries.find((e) => e.id === id);
@@ -4236,6 +4245,8 @@ async function deleteEntry(id) {
   }
 
   state.entries = state.entries.filter((e) => e.id !== id);
+  // Auch im Konto-Drilldown genau: der Server loescht genau diese eine
+  // Buchung, und sie steht in der Liste - anders als die Serie (listNarrowsSummary).
   if (entry) state.summary = summaryWith(state.summary, [entry], -1);
   renderBody();
   vibrate([30, 50, 30]);
@@ -4311,7 +4322,13 @@ async function deleteEntrySeries(id) {
   const removed = state.entries.filter(inSeries);
   state.entries = state.entries.filter((e) => !inSeries(e));
   // Das Undo laedt den Monat neu (restore unten) - herausrechnen genuegt hier.
-  state.summary = summaryWith(state.summary, removed, -1);
+  // Aber nur, wenn die Liste alles zeigt, was die Bilanz zaehlt: im
+  // Konto-Drilldown fehlen ihr Vorkommen, die per Einzel-Bearbeitung auf ein
+  // anderes Konto gewandert sind, und `/budget/:id/series` loescht sie mit.
+  // Dann bleibt die Bilanz beim Serverstand, bis der Commit (bzw. das Undo)
+  // den Monat samt Summary neu laedt - ein halb herausgerechneter Saldo waere
+  // eine dritte Zahl, die weder vorher noch nachher stimmt.
+  if (!listNarrowsSummary()) state.summary = summaryWith(state.summary, removed, -1);
   renderBody();
   vibrate([30, 50, 30]);
 
@@ -4356,6 +4373,7 @@ export const __test = {
   tabSearch,
   writeTabToUrl,
   summaryWith,
+  deleteEntrySeries,
   subcategoryChoice,
   currentMonth,
   state,

@@ -415,7 +415,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Budget keeps its tab and its balance honest.** The open tab is part of the address, so a
   reload or the back button returns to it without adding history entries. Deleting a booking
-  takes it out of the month balance at once, and undo puts it back.
+  takes it out of the month balance at once, and undo puts it back. Deleting a whole series
+  while one account is open waits for the month to reload instead, because occurrences moved to
+  another account are not on screen to subtract.
 
 - **Links on the overview land where they say.** "Manage" on the family tile opens the family
   settings for admins and is hidden for everyone else, and "+N more today" is a link to the tasks,
