@@ -1347,6 +1347,14 @@
   --scrollport-pad: var(--space-2);
 }
 
+/* Liste + Detail der Agenda (R10 L5; Baustein utils/master-detail.js). Die
+ * Geometrie gehoert der Shell (layout.css `.split-view`); #cal-body polstert
+ * ab 1024px schon selbst, die Detailspalte braucht deshalb kein zweites
+ * Seitenpolster an ihrer rechten Kante. */
+.calendar-agenda-split {
+  --split-view-end-pad: 0;
+}
+
 .agenda-day {
   margin-bottom: var(--space-4);
 }

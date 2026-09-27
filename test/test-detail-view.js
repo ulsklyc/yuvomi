@@ -312,7 +312,8 @@ test('das alte Termin-Popup ist rückstandslos entfernt', async () => {
 
 test('jeder Weg zu einem Termin führt in die Detailansicht', async () => {
   const src = await calendarJs();
-  assert.match(src, /async function openEventDetail\(ev, anchor = null\)/, 'ein einziger Einstieg');
+  // Seit R10 (L5) mit der Detailspalte der Agenda als drittem Ort - derselbe Einstieg.
+  assert.match(src, /async function openEventDetail\(ev, anchor = null, \{ pane = null \} = \{\}\)/, 'ein einziger Einstieg');
   assert.match(src, /import \{ openDetailView.*\} from '\/components\/detail-view\.js'/);
 
   // Kein Aufrufpfad darf an der Detailansicht vorbei ins Formular führen; der

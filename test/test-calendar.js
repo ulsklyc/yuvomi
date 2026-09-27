@@ -9,6 +9,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, readdirSync } from 'node:fs';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 import { eachRule } from './css-rules.js';
+import { installMiniDom } from './mini-dom.js';
 const { __test: calendarHelpers } = await import('../public/pages/calendar.js');
 const periodSwipe = await import('../public/utils/period-swipe.js');
 
@@ -2779,7 +2780,20 @@ test('renderDayView: der Zeit-Text am zweiten Tag sagt "bis", ein eintaegiger Te
 // eine DOM-Oberflaeche mehr als das Zeitraster.
 function fakeAgendaContainer() {
   const container = fakeContainer();
-  return { ...container, querySelectorAll: () => [], get html() { return container.html; } };
+  // Seit R10 (L5) steht die Agenda in Liste + Detail: `.calendar-agenda-split`
+  // gibt es im Textstub nicht, der Baustein haengt sich dann nicht ein.
+  return {
+    ...container,
+    querySelector: (sel) => (sel === '.calendar-agenda-split' ? null : container.querySelector(sel)),
+    querySelectorAll: () => [],
+    get html() { return container.html; },
+  };
+}
+
+/** Die Detailspalte baut ihren Leerzustand per DOM-API - fuer die Dauer des Aufrufs ein Mini-DOM. */
+function renderAgendaWithDom(agenda) {
+  const restore = installMiniDom();
+  try { calendarHelpers.renderAgendaView(agenda); } finally { restore(); }
 }
 
 test('Zeitraster und Agenda sagen fuer denselben Tag denselben Zeit-Text (PR #1323, Befund 1)', () => {
@@ -2787,7 +2801,7 @@ test('Zeitraster und Agenda sagen fuer denselben Tag denselben Zeit-Text (PR #13
     const raster = fakeContainer();
     calendarHelpers.renderDayView(raster);
     const agenda = fakeAgendaContainer();
-    calendarHelpers.renderAgendaView(agenda);
+    renderAgendaWithDom(agenda);
 
     const rasterText = dayEventTimeText(raster.html, 4131);
     const agendaText = agendaTimeText(agenda.html, 4131, '2026-06-15');
@@ -2996,7 +3010,7 @@ test('Ganztags-Chip und Agenda sagen fuer denselben Tag dieselbe Uhrzeit (#1350)
     let agendaText = '';
     withOvernightState({ cursor: day, events: [longTimedEvent()] }, () => {
       const agenda = fakeAgendaContainer();
-      calendarHelpers.renderAgendaView(agenda);
+      renderAgendaWithDom(agenda);
       agendaText = agendaTimeText(agenda.html, ev.id, day);
     });
     assert(agendaText !== '', `Vorbedingung: die Agenda muss den Termin am ${day} auffuehren`);
@@ -4246,6 +4260,55 @@ test('Monatszelle: ein Band ist kein Chip in seinen Zellen, zaehlt aber mit', ()
   } finally {
     Object.assign(calendarHelpers.state, previous);
   }
+});
+
+// --------------------------------------------------------
+// R10 L5: die Agenda ist Liste + Detail
+// --------------------------------------------------------
+
+test('Agenda: jede Terminzeile ist je Tag eindeutig waehlbar, Haushaltshilfe-Besuche nicht', () => {
+  const ev = { id: 9, title: 'Serie', start_datetime: '2026-10-14T10:00:00', end_datetime: '2026-10-14T11:00:00' };
+  assert(calendarHelpers.agendaMdId(ev, '2026-10-14') === '9.2026-10-14', 'Termin UND Tag - eine Serie steht an mehreren Tagen');
+  const row = calendarHelpers.renderAgendaEvent(ev, '2026-10-14');
+  assert(/data-md-id="9\.2026-10-14"/.test(row), `die Zeile traegt ihre Auswahl-ID: ${row}`);
+  const visit = { ...ev, housekeeping_visit_id: 3 };
+  assert(calendarHelpers.agendaMdId(visit, '2026-10-14') === null, 'ein Besuch oeffnet sein eigenes Modul');
+  assert(!/data-md-id/.test(calendarHelpers.renderAgendaEvent(visit, '2026-10-14')), 'und steht nicht zur (Vor-)Wahl');
+});
+
+test('Agenda: die Auswahl-ID findet das Vorkommen ihres Tages, sonst den Termin', () => {
+  const previous = calendarHelpers.state.events;
+  try {
+    calendarHelpers.state.events = [
+      { id: 9, start_datetime: '2026-10-07T10:00:00' },
+      { id: 9, start_datetime: '2026-10-14T10:00:00' },
+      { id: 4, start_datetime: '2026-10-13T00:00:00' },
+    ];
+    assert(calendarHelpers.eventForAgendaMdId('9.2026-10-14') === calendarHelpers.state.events[1], 'das Vorkommen am Tag');
+    assert(calendarHelpers.eventForAgendaMdId('4.2026-10-14') === calendarHelpers.state.events[2], 'mehrtaegig: Tag 2 zeigt den Termin');
+    assert(calendarHelpers.eventForAgendaMdId('77.2026-10-14') === null, 'unbekannt: kein Termin (Leerzustand)');
+    assert(calendarHelpers.eventForAgendaMdId('9:x') === null, 'fremde Form: keine Vermutung');
+  } finally {
+    calendarHelpers.state.events = previous;
+  }
+});
+
+test('Agenda: Liste + Detail nur in der Agenda, mit Detailspalte aus dem Baustein', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  assert(/page\?\.classList\.toggle\('app-page--list-detail', state\.view === 'agenda'\)/.test(src),
+    'der Container der Schwelle steht nur in der Agenda an der Seitenwurzel');
+  const from = src.indexOf('function renderAgendaView');
+  const agenda = src.slice(from, src.indexOf('\n// Termin-Suche (#471)', from));
+  assert(/<div class="split-view calendar-agenda-split">/.test(agenda), 'die Agenda steht in .split-view');
+  assert(/class="agenda-view page-scrollport split-view__list"/.test(agenda), 'die Liste ist die linke Spalte');
+  assert(/splitViewDetailHtml\(\{/.test(agenda), 'rechts die Spalte aus dem Baustein');
+  assert(/mountAgendaDetail\(container\)/.test(agenda), 'und der Baustein haengt sich ein');
+  // Die Zeile oeffnet ueber den Baustein: Spalte ab der Schwelle, darunter wie bisher.
+  const act = src.slice(src.indexOf('function handleDayRowActivation'), src.indexOf('function agendaMdId'));
+  assert(/if \(_agendaMd && evEl\.dataset\.mdId\) \{ _agendaMd\.open\(evEl\.dataset\.mdId, evEl\); return; \}/.test(act),
+    'der Klick geht durch den Baustein');
+  // Ein Zahl-Link der globalen Suche bleibt beim Kalender (Vorkommen am Zieltag).
+  assert(/claimInitial: !\(open && \/\^\\d\+\$\/\.test\(open\)\)/.test(src), 'der Baustein beansprucht nur <id>.<Tag>');
 });
 
 // --------------------------------------------------------
