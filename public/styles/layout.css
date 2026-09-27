@@ -3656,6 +3656,11 @@ html.fab-anim-done .page-fab {
  * SELBST zum Slot zu machen (`renderPageSearch({ className: '...
  * page-toolbar__center' })`); ein Wrapper, der nur die Suche traegt,
  * schrumpft unten mit ihr.
+ *
+ * `.section-toolbar` ist derselbe Fall eine Ebene tiefer: der Kopf eines
+ * Abschnitts, der eine Suche NUR fuer diesen Abschnitt traegt (das Hauptbuch
+ * im Budget, R11 C6). Er ist kein Seitenkopf (kein Kleben, kein Large
+ * Title), aber sein Feld kostet mobil dieselbe Zeile - also dieselbe Form.
  * -------------------------------------------------------- */
 @media (max-width: 767px), (max-width: 1023px) and (max-height: 499px) {
   /* Die Bauart ist die Label-Verlust-Regel: ein Bedienelement, dem der Platz
@@ -3668,7 +3673,8 @@ html.fab-anim-done .page-fab {
    * die einem beim Scrollen der eigenen Treffer unter den Haenden
    * verschwindet, waere der falsche Gehorsam gegenueber der Regel. Also nur
    * ohne Fokus UND ohne Wert. */
-  .page-toolbar .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))) {
+  .page-toolbar .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))),
+  .section-toolbar .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))) {
     flex: 0 0 auto;
     width: var(--target-base);
     max-width: var(--target-base);
@@ -3682,6 +3688,9 @@ html.fab-anim-done .page-fab {
   }
 
   .page-toolbar
+    .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
+    .page-search__input,
+  .section-toolbar
     .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
     .page-search__input {
     padding-inline: 0;
@@ -3700,6 +3709,9 @@ html.fab-anim-done .page-fab {
 
   .page-toolbar
     .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
+    .page-search__input::placeholder,
+  .section-toolbar
+    .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
     .page-search__input::placeholder {
     color: transparent;
   }
@@ -3714,6 +3726,9 @@ html.fab-anim-done .page-fab {
    * `inset-inline: 0` plus `margin-inline: auto` zentriert in beiden
    * Richtungen und braucht die X-Achse des Translates gar nicht. */
   .page-toolbar
+    .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
+    .page-search__icon,
+  .section-toolbar
     .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
     .page-search__icon {
     inset-inline: 0;
@@ -3735,7 +3750,8 @@ html.fab-anim-done .page-fab {
 
   /* Im aufgeklappten Zustand nimmt die Suche die Zeile, die sie braucht - sie
    * ist dann das, was der Nutzer gerade tut. */
-  .page-toolbar .page-search:focus-within {
+  .page-toolbar .page-search:focus-within,
+  .section-toolbar .page-search:focus-within {
     flex: 1 1 auto;
   }
 }

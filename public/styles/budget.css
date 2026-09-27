@@ -1642,6 +1642,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-2);
   padding-block: var(--space-3) var(--space-2);
   flex-shrink: 0;
 }
@@ -1664,28 +1665,28 @@
 }
 
 /* SUCHE IM HAUPTBUCH (Re-Critique 2026-09-27, C6). Das geteilte Feld
- * (renderPageSearch, Aussehen aus page-search.css) steht zwischen Listenkopf
- * und Liste. Es ist keine Kopfsuche - der Budget-Kopf traegt Monat und Tabs,
- * und die Suche gilt nur diesem Reiter -, aber es liest dieselbe Breite:
- * `--page-search-width`, am Telefon die volle Spalte. Die Statuszeile nennt die
- * Trefferzahl; leer nimmt sie keinen Platz. */
-.budget-list-search {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding-block-end: var(--space-2);
+ * (renderPageSearch, Aussehen aus page-search.css) steht im Kopf der Liste,
+ * zwischen Titel und Menue. Es ist keine Kopfsuche der Seite - der Budget-Kopf
+ * traegt Monat und Tabs, und die Suche gilt nur diesem Reiter -, aber es folgt
+ * derselben Regel: Breite und Lage aus page-search.css (`.section-toolbar`),
+ * unter 768px die Icon-Form (layout.css). Als eigene Zeile ueber der Liste kostete
+ * es mobil 56px: die erste Buchung stand bei 390x844 auf y=398 statt 342.
+ * Die Statuszeile darunter nennt die Trefferzahl; leer nimmt sie keinen Platz. */
+.budget-list-header__lead {
+  min-width: 0;
 }
 
-/* Die Breite liest das Feld selbst: page-search.css setzt den Token an
- * `.page-search`, nicht an diesem Wrapper. */
-@media (min-width: 768px) {
-  .budget-list-search > .page-search {
-    max-width: var(--page-search-width);
-  }
+/* Klappt die Suche auf, nimmt sie die Zeile (layout.css, :focus-within) -
+ * der Titel gibt nach und endet mit Auslassung statt unter dem Feld. */
+.budget-list-header__lead > .budget-list-header__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .budget-list-search__status {
   margin: 0;
+  padding-block-end: var(--space-2);
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
 }

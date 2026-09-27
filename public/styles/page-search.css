@@ -175,6 +175,17 @@
   --page-search-width: 320px;
 }
 
+/* DERSELBE KANON EINE EBENE TIEFER: der Kopf eines Abschnitts, der eine
+ * Suche nur fuer diesen Abschnitt traegt (`.section-toolbar`, das Hauptbuch im
+ * Budget, R11 C6). Das Feld steht vor den Aktionen am Zeilenende und liest
+ * dieselbe Breite; unter 768px nimmt es die Icon-Form (layout.css). */
+.section-toolbar > label.page-search {
+  flex: 0 1 var(--page-search-width);
+  min-width: 0;
+  max-width: var(--page-search-width);
+  margin-inline-start: auto;
+}
+
 @media (min-width: 1024px) {
   .page-toolbar > label.page-search,
   .page-toolbar > .page-toolbar__center:has(> label.page-search:only-child) {

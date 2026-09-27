@@ -2814,8 +2814,26 @@ test('das Hauptbuch hat eine Suche ueber alle Monate, im geteilten Feld', () => 
   const load = budget.match(/async function loadMonth\(month\) \{[\s\S]*?\n\}/)[0];
   assert.match(load, /if \(state\.ledgerQuery\) await loadLedgerSearch\(state\.ledgerQuery\)/);
   // Die Breite ist der Token der Kopfsuche, keine Modulbreite.
-  const rule = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-list-search > .page-search');
+  const searchCss = readFileSync(new URL('../public/styles/page-search.css', import.meta.url), 'utf8');
+  const rule = [...eachRule(searchCss)].find((r) => r.selector.trim() === '.section-toolbar > label.page-search');
   assert.match(rule?.body ?? '', /max-width:\s*var\(--page-search-width\)/);
+});
+
+test('die Hauptbuch-Suche steht im Listenkopf und nimmt mobil die Icon-Form (C6)', () => {
+  // Als eigene Zeile ueber der Liste kostete das Feld mobil 56px: die erste
+  // Buchung stand bei 390x844 auf y=398, der R9-Stand war 342. Im Kopf, neben
+  // Titel und Menue, nimmt es unter 768px die Icon-Form der Kopfsuche.
+  const head = budget.slice(budget.indexOf('<div class="budget-list-header'), budget.indexOf('<div class="budget-list" id="budget-list">'));
+  assert.match(head, /class="budget-list-header section-toolbar"/, 'der Listenkopf ist ein Abschnittskopf mit Suche');
+  const search = head.indexOf("id: 'budget-ledger-search'");
+  const actions = head.indexOf('budget-list-header__actions');
+  assert.ok(search > 0 && search < actions, 'das Feld steht IM Kopf, vor dem Menue');
+  assert.doesNotMatch(head, /class="budget-list-search"/, 'keine eigene Suchzeile ueber der Liste');
+  const layoutCss = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const iconForm = [...eachRule(layoutCss)].find((r) => /\.section-toolbar \.page-search:not\(:focus-within\)/.test(r.selector)
+    && /width:\s*var\(--target-base\)/.test(r.body));
+  assert.ok(iconForm, 'die Icon-Form der Kopfsuche gilt auch im Abschnittskopf');
+  assert.ok(iconForm.at.some((a) => /max-width:\s*767px/.test(a)), 'unter 768px, wie im Seitenkopf');
 });
 
 test('Treffer der Suche stehen mit vollem Datum, ein leeres Ergebnis nennt die Anfrage', async () => {

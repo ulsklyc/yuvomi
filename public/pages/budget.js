@@ -1220,8 +1220,8 @@ function renderBody() {
 
     <!-- Transaktionsliste -->
     <div class="budget-list-section">
-      <div class="budget-list-header">
-        <div>
+      <div class="budget-list-header section-toolbar">
+        <div class="budget-list-header__lead">
           <h2 class="budget-list-header__title u-section-title" >${t('budget.transactions')}</h2>
           ${state.accountFilterId ? `
           <button class="budget-account-chip" id="budget-clear-account-filter" type="button"
@@ -1239,20 +1239,21 @@ function renderBody() {
             <i data-lucide="x" class="icon-sm" aria-hidden="true"></i>
           </button>` : ''}
         </div>
-        <div class="budget-list-header__actions">${listToolsMenuHtml()}</div>
-      </div>
-      <!-- Suche im Hauptbuch (C6): das geteilte Feld, ueber der Liste, die es
-           filtert. Es sucht in allen Monaten; die Statuszeile sagt, wie viele. -->
-      <div class="budget-list-search">
+        <!-- Suche im Hauptbuch (C6): das geteilte Feld im Kopf der Liste, die es
+             filtert - mobil in seiner Icon-Form (layout.css, .section-toolbar),
+             damit die erste Buchung nicht um eine Feldzeile nach unten rutscht.
+             Es sucht in allen Monaten; die Statuszeile darunter sagt, wie viele. -->
         ${renderPageSearch({
     id: 'budget-ledger-search',
     label: t('budget.ledgerSearchLabel'),
     placeholder: t('budget.ledgerSearchPlaceholder'),
     value: state.ledgerQuery,
     clearLabel: t('common.searchClear'),
+    className: 'budget-list-header__search',
   })}
-        <p class="budget-list-search__status" id="budget-ledger-status" role="status">${esc(ledgerStatusText())}</p>
+        <div class="budget-list-header__actions">${listToolsMenuHtml()}</div>
       </div>
+      <p class="budget-list-search__status" id="budget-ledger-status" role="status">${esc(ledgerStatusText())}</p>
       <div class="budget-list" id="budget-list">
         ${renderEntries()}
       </div>
