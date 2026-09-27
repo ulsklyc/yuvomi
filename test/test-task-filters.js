@@ -451,3 +451,87 @@ test('das Werkzeugmenue: Verwalten nur mit Schreibrecht, Auswahl nur in der List
     clearPermissions();
   }
 });
+
+// ---------------------------------------------------------------------------
+// `?due=today` (Re-Critique 2026-09-27, S2): „+n weitere heute" in der
+// Uebersicht zeigt auf die Aufgabenliste, und die Liste muss dann die Zeilen
+// zeigen, die dort verdeckt waren - offen und bis heute faellig, das
+// Ueberfaellige eingeschlossen. Der Filter kommt aus der Adresse, zaehlt am
+// Knopf mit, steht im Blatt als Schalter und nimmt beim Ausschalten auch die
+// Adresse wieder mit - sonst stuende er nach dem Neuladen wieder da.
+// ---------------------------------------------------------------------------
+const { todayKey: dueTodayKey, toLocalDateKey } = await import('../public/utils/date.js');
+
+function dayOffset(days) {
+  const d = new Date(`${dueTodayKey()}T12:00:00`);
+  d.setDate(d.getDate() + days);
+  return toLocalDateKey(d);
+}
+
+test('die Adresse setzt „Bis heute faellig" - nur mit genau diesem Wert', () => {
+  assert.equal(tasks.dueTodayFromSearch('?due=today'), true);
+  assert.equal(tasks.dueTodayFromSearch('?open=4&due=today'), true, 'neben anderen Parametern');
+  assert.equal(tasks.dueTodayFromSearch('?due=tomorrow'), false, 'ein unbekannter Wert filtert nicht still leer');
+  assert.equal(tasks.dueTodayFromSearch(''), false);
+});
+
+test('„Bis heute faellig" zeigt Offenes von heute UND Ueberfaelliges, sonst nichts', () => {
+  baseState();
+  tasks.state.searchQuery = '';
+  tasks.state.tasks = [
+    { id: 1, title: 'gestern', status: 'open', due_date: dayOffset(-1) },
+    { id: 2, title: 'heute', status: 'in_progress', due_date: dueTodayKey() },
+    { id: 3, title: 'morgen', status: 'open', due_date: dayOffset(1) },
+    { id: 4, title: 'ohne', status: 'open', due_date: null },
+    { id: 5, title: 'erledigt', status: 'done', due_date: dueTodayKey() },
+  ];
+  tasks.state.dueToday = false;
+  assert.equal(tasks.filteredTasks().length, 5, 'ohne den Filter alles');
+  tasks.state.dueToday = true;
+  assert.deepEqual(tasks.filteredTasks().map((task) => task.id), [1, 2]);
+  assert.equal(tasks.activeFilterCount(), 2, 'Standard „Offen" plus dieser - die Zahl am Knopf sagt, dass er wirkt');
+  tasks.state.searchQuery = 'gest';
+  assert.deepEqual(tasks.filteredTasks().map((task) => task.id), [1], 'die Suche engt weiter ein');
+  tasks.state.searchQuery = '';
+  tasks.state.dueToday = false;
+});
+
+test('im Blatt ein Schalter; Ausschalten nimmt ihn aus Zustand UND Adresse, Aufheben ebenso', async () => {
+  const replaced = [];
+  const prevLocation = globalThis.location;
+  const prevHistory = globalThis.history;
+  globalThis.location = { pathname: '/tasks', search: '?due=today', hash: '' };
+  globalThis.history = {
+    state: null,
+    replaceState: (_s, _t, path) => {
+      replaced.push(path);
+      const [, search = ''] = path.split('?');
+      globalThis.location.search = search ? `?${search}` : '';
+    },
+  };
+  try {
+    baseState({ dueToday: true });
+    const show = tasks.filterSheetGroups().find((g) => g.heading === 'tasks.filterGroupShow').html;
+    assert.match(show, /type="checkbox"[^>]*checked[^>]*data-filter-due-today|data-filter-due-today[^>]*checked/,
+      'der Schalter steht an, wenn die Adresse ihn gesetzt hat');
+
+    const { container } = mountSheet();
+    const input = new SheetEl({ dataset: { filterDueToday: 'true' }, checked: false });
+    await tasks.onFilterSheetChange(input, container);
+    assert.equal(tasks.state.dueToday, false);
+    assert.deepEqual(replaced, ['/tasks'], 'die Adresse verliert ?due=today');
+
+    input.checked = true;
+    await tasks.onFilterSheetChange(input, container);
+    assert.equal(tasks.state.dueToday, true);
+    assert.equal(replaced.at(-1), '/tasks?due=today', 'und bekommt ihn beim Einschalten zurueck');
+
+    await tasks.resetTaskFilters(container);
+    assert.equal(tasks.state.dueToday, false, '„Alle Filter aufheben" nimmt ihn mit');
+    assert.equal(replaced.at(-1), '/tasks');
+    assert.equal(tasks.activeFilterCount(), 0);
+  } finally {
+    globalThis.location = prevLocation;
+    globalThis.history = prevHistory;
+  }
+});

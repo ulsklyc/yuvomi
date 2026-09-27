@@ -1342,7 +1342,48 @@ let state = {
   bulkSelectMode:  false,
   selectedTaskIds: new Set(),
   searchQuery:     '',
+  // „Bis heute faellig" (Re-Critique 2026-09-27): ein Filter, den die ADRESSE
+  // setzt (`?due=today`, der Link „+n weitere heute" der Uebersicht) und das
+  // Filterblatt wieder nimmt. Bewusst nicht gemerkt: er gehoert zum Besuch,
+  // nicht zum Geraet - wer die Aufgaben spaeter normal oeffnet, sieht alle.
+  dueToday:        false,
 };
+
+/**
+ * `?due=today` in der Adresse? Andere Werte kennt die Seite (noch) nicht und
+ * laesst sie still fallen, statt eine leere Liste zu zeigen.
+ */
+function dueTodayFromSearch(search) {
+  return new URLSearchParams(search || '').get('due') === 'today';
+}
+
+/**
+ * Offen und bis heute faellig - UEBERFAELLIGES eingeschlossen, wie die
+ * Heute-Liste der Uebersicht, auf die der Link verweist, und wie „Heute" in
+ * Apples Erinnerungen. Der Tag kommt aus `todayKey()` (Haushaltszone), der
+ * Vergleich ist ein reiner Schluesselvergleich YYYY-MM-DD.
+ */
+function isDueByToday(task, today = todayKey()) {
+  return task.status !== 'done' && !!task.due_date && String(task.due_date).slice(0, 10) <= today;
+}
+
+/**
+ * Den Filter in die Adresse schreiben bzw. herausnehmen - per replaceState,
+ * wie der Budget-Reiter: ein Filter ist kein Ort, zu dem „Zurueck" einzeln
+ * fuehren soll. `path` im State, weil der Router ihn bei popstate liest.
+ */
+function writeDueTodayToUrl(on) {
+  const loc = globalThis.location;
+  const hist = globalThis.history;
+  if (!loc || typeof hist?.replaceState !== 'function') return;
+  const params = new URLSearchParams(loc.search || '');
+  if (on) params.set('due', 'today');
+  else params.delete('due');
+  const search = params.toString() ? `?${params}` : '';
+  if (search === (loc.search || '')) return;
+  const path = `${loc.pathname}${search}${loc.hash || ''}`;
+  hist.replaceState({ ...(hist.state ?? {}), path }, '', path);
+}
 
 /**
  * Aufgaben nach der Toolbar-Suche gefiltert. Rein clientseitig über Titel und
@@ -1352,8 +1393,11 @@ let state = {
  */
 function filteredTasks() {
   const q = state.searchQuery.trim().toLowerCase();
-  if (!q) return state.tasks;
-  return state.tasks.filter((task) =>
+  const base = state.dueToday
+    ? state.tasks.filter((task) => isDueByToday(task))
+    : state.tasks;
+  if (!q) return base;
+  return base.filter((task) =>
     (task.title       || '').toLowerCase().includes(q) ||
     (task.description || '').toLowerCase().includes(q) ||
     (task.tags ?? []).some((tag) => tag.toLowerCase().includes(q))
@@ -3346,7 +3390,8 @@ function activeFilterCount() {
     + state.filters.assigned_to.length
     + state.filters.category.length
     + state.filters.tags.length
-    + (state.showFuture ? 1 : 0);
+    + (state.showFuture ? 1 : 0)
+    + (state.dueToday ? 1 : 0);
 }
 
 /**
@@ -3450,6 +3495,8 @@ function filterSheetGroups() {
   }
   showRows.push(toggleRowHtml({ label: t('tasks.showFuture'), icon: 'calendar-clock', checked: state.showFuture,
     attrs: { 'data-filter-future': 'true' } }));
+  showRows.push(toggleRowHtml({ label: t('tasks.filterDueToday'), icon: 'calendar-check', checked: state.dueToday,
+    attrs: { 'data-filter-due-today': 'true' } }));
   groups.push({ heading: t('tasks.filterGroupShow'), html: showRows.join('') });
 
   if (state.viewMode === 'list') {
@@ -3510,6 +3557,8 @@ function syncFilterSheet(panel) {
   if (mine) mine.checked = isAssignedToMe();
   const future = panel.querySelector('[data-filter-future]');
   if (future) future.checked = state.showFuture;
+  const dueToday = panel.querySelector('[data-filter-due-today]');
+  if (dueToday) dueToday.checked = state.dueToday;
 }
 
 /**
@@ -3574,6 +3623,15 @@ async function onFilterSheetChange(input, container) {
     try { localStorage.setItem(SHOW_FUTURE_KEY, state.showFuture ? '1' : '0'); } catch {}
     renderFilters(container);
     await loadTasks(container);
+    return;
+  }
+  if (input.matches('[data-filter-due-today]')) {
+    // Rein clientseitig (filteredTasks) - kein Nachladen noetig, aber die
+    // Adresse zieht mit, damit ein Neuladen dasselbe zeigt.
+    state.dueToday = input.checked;
+    writeDueTodayToUrl(state.dueToday);
+    renderFilters(container);
+    renderTaskList(container);
   }
 }
 
@@ -3605,6 +3663,8 @@ async function onFilterSheetClick(e, container) {
 async function resetTaskFilters(container) {
   state.filters = { status: [], priority: [], assigned_to: [], category: [], tags: [] };
   state.showFuture = false;
+  state.dueToday = false;
+  writeDueTodayToUrl(false);
   try { localStorage.setItem(SHOW_FUTURE_KEY, '0'); } catch {}
   renderFilters(container);
   await loadTasks(container);
@@ -5189,6 +5249,8 @@ export async function render(container, { user, signal } = {}) {
 
   // showFuture aus localStorage wiederherstellen
   try { state.showFuture = localStorage.getItem(SHOW_FUTURE_KEY) === '1'; } catch {}
+  // „Bis heute faellig" kommt nur aus der Adresse (siehe state.dueToday).
+  state.dueToday = dueTodayFromSearch(window.location.search);
 
   const isKanban = state.viewMode === 'kanban';
   // Was nur die Aufgabenliste betrifft, blendet `syncViewChrome` gleich nach
@@ -5365,6 +5427,9 @@ export async function render(container, { user, signal } = {}) {
 // Testfläche: nur reine Funktionen, deren Vertrag außerhalb dieser Datei zählt.
 export const __test = {
   groupBy, groupKey, formatDueDate, normalizeFilterSet, taskQuery, state,
+  // `?due=today` (Re-Critique 2026-09-27): was die Adresse setzt, was die
+  // Liste daraus zeigt, und dass das Blatt es wieder nimmt - samt Adresse.
+  dueTodayFromSearch, isDueByToday,
   // Das Brett als Markup plus seine Spaltenliste (#1250). Beides steht hier,
   // weil die Spaltenzahl eine Zusicherung GEGEN das Stylesheet ist: das Raster
   // muss so viele Spalten legen, wie diese Liste fuehrt, und genau dort ist es
