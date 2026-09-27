@@ -12,6 +12,8 @@ import { setNavBadge, BIRTHDAY_BADGE_DAYS } from '/utils/nav-badges.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { moduleAccess, isNavModuleReadOnly } from '/permissions.js';
 import { findPageFab } from '/utils/fab.js';
+import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
+import { openDetailView } from '/components/detail-view.js';
 // Alias: dieses Modul fuehrt selbst eine `emptyStateHtml()`, die den Renderer
 // mit den Geburtstags-Texten fuellt. Zwei Namen, die sich nur in der
 // Gross-Schreibung unterscheiden, waeren im Modul nicht auseinanderzuhalten.
@@ -33,6 +35,9 @@ let state = {
   loading: true,
 };
 let _container = null;
+// Liste + Detail (R10 L5): ab der Schwelle steht rechts der gewaehlte
+// Geburtstag. Ein Aufbau je Seitenaufbau (render), abgebaut mit dem Signal.
+let _md = null;
 
 /**
  * Darf dieser Nutzer Geburtstage schreiben?
@@ -439,9 +444,9 @@ export function birthdayItemHtml(birthday) {
         <i data-lucide="trash-2" class="icon-md"></i>
         <span>${t('common.delete')}</span>
       </div>`}
-    <article class="list-row birthday-item ${isToday ? 'birthday-item--today' : ''}" data-id="${birthday.id}">
+    <article class="list-row birthday-item ${isToday ? 'birthday-item--today' : ''}" data-id="${birthday.id}" data-md-id="${birthday.id}">
       <div class="birthday-item__media">${photoAvatar(birthday)}</div>
-      <button type="button" class="list-row__main list-row__main--interactive" data-open="${birthday.id}">${hauptspalte}</button>
+      <button type="button" class="list-row__main list-row__main--interactive" data-open="${birthday.id}" data-md-focus>${hauptspalte}</button>
       ${ro ? '' : `
       <div class="row-actions birthday-item__actions">
         ${rowActionHtml({ icon: 'pencil', action: 'edit', label: t('common.editNamed', { name: birthday.name }), attrs: { 'data-id': birthday.id } })}
@@ -476,7 +481,11 @@ function emptyStateHtml() {
   });
 }
 
-function renderList() {
+/**
+ * @param {{repaint?: boolean}} [opts] nach einer Datenaenderung (Speichern,
+ *   Import) zeichnet die Detailspalte den gewaehlten Geburtstag neu.
+ */
+function renderList({ repaint = false } = {}) {
   const host = _container.querySelector('#birthdays-list');
   if (!host) return;
   if (state.loading) {
@@ -492,6 +501,7 @@ function renderList() {
     host.insertAdjacentHTML('beforeend', emptyStateHtml());
     host.querySelector('#birthdays-empty-cta')?.addEventListener('click', () => openBirthdayModal({ mode: 'create' }));
     if (window.lucide) window.lucide.createIcons({ el: host });
+    _md?.refresh();
     return;
   }
 
@@ -505,6 +515,9 @@ function renderList() {
   // Bedienung ankuendigen, die es nicht gibt - dazu einen der drei Hinweis-
   // Kredite aus dem localStorage verbrauchen (SWIPE_HINT_MAX in swipe-row.js).
   wireBirthdaySwipe(host);
+  // Markierung neu setzen; ist der gewaehlte Geburtstag weg (geloescht,
+  // weggesucht), faellt die Spalte auf den naechsten Eintrag (master-detail.js).
+  _md?.refresh({ repaint });
 }
 
 /**
@@ -589,7 +602,9 @@ function renderPage() {
   _container.replaceChildren();
   _container.insertAdjacentHTML('beforeend', renderAppPage({
     mode: 'reading',
-    className: 'birthdays-page',
+    // Liste + Detail (R10 L5, A2): am Desktop liessen die Geburtstage rechts
+    // 436px leer. Die Seitenwurzel ist der Container der Schwelle.
+    className: 'birthdays-page app-page--list-detail',
     legacyAlias: false,
     header: renderPageHeader({
       wrap: true,
@@ -617,7 +632,17 @@ function renderPage() {
         }),
         renderListSection({
           className: 'birthdays-list-section',
-          content: `<div class="row-carrier birthdays-list" id="birthdays-list"></div>`,
+          content: `
+            <div class="split-view birthdays-split">
+              <div class="split-view__list birthdays-split__list">
+                <div class="row-carrier birthdays-list" id="birthdays-list"></div>
+              </div>
+              ${splitViewDetailHtml({
+                id: 'birthdays',
+                label: t('birthdays.detailPaneLabel'),
+                empty: { icon: 'cake', title: t('birthdays.pickOne'), hint: t('birthdays.pickOneHint') },
+              })}
+            </div>`,
         }),
       ].join('\n'),
     }),
@@ -679,6 +704,9 @@ function bindEvents() {
 async function onListClick(e) {
   const open = e.target.closest('[data-open]');
   if (open) {
+    // Ab der Schwelle waehlt der Tipp aus (Detailspalte), darunter oeffnet er
+    // wie bisher Editor bzw. Leseansicht - das entscheidet der Baustein.
+    if (_md) { _md.open(open.dataset.open, open); return; }
     const birthday = state.birthdays.find((item) => item.id === Number(open.dataset.open));
     if (birthday) openBirthdayModal({ mode: 'edit', birthday });
     return;
@@ -1036,7 +1064,7 @@ function openBirthdayModal({ mode, birthday = null }) {
             window.yuvomi?.showToast(t('birthdays.createdToast'), 'success');
           }
           await loadData();
-          renderList();
+          renderList({ repaint: true });
           closeModal({ force: true });
         } catch (err) {
           window.yuvomi?.showToast(err.message, 'danger');
@@ -1140,7 +1168,7 @@ async function openImportModal() {
           const res = await api.post('/birthdays/import', { contact_ids: ids });
           window.yuvomi?.showToast(t('birthdays.importSuccess', { count: res.data.imported }), 'success');
           await loadData();
-          renderList();
+          renderList({ repaint: true });
           closeModal({ force: true });
         } catch (err) {
           window.yuvomi?.showToast(err.message, 'danger');
@@ -1186,8 +1214,136 @@ function deleteBirthday(id) {
   });
 }
 
-export async function render(container) {
+// --------------------------------------------------------
+// Liste + Detail (R10 L5)
+// --------------------------------------------------------
+
+/**
+ * Der Geburtstag in der Detailspalte: dieselben Angaben wie die Leseansicht
+ * (birthdayReadHtml), dazu die Auskunft, die die Zeile nur knapp traegt - wann
+ * und wie alt. Gebaut aus den Zeilen der geteilten Leseansicht
+ * (components/detail-view.js), damit die Spalte aussieht wie in Kontakten.
+ */
+function birthdayPaneSections(birthday) {
+  const days = birthday.days_until;
+  let ageNote = '';
+  if (Number.isInteger(days)) {
+    if (days === 0) ageNote = t('birthdays.ageNoteToday', { age: birthday.next_age });
+    else if (days === 1) ageNote = t('birthdays.ageNoteTomorrow', { age: birthday.next_age });
+    else ageNote = t('birthdays.ageNoteDays', { days, age: birthday.next_age });
+  }
+  const hasPhoto = Boolean(birthday.photo_data || (birthday.family_user_id && birthday.family_avatar_data));
+  let photo = null;
+  if (hasPhoto) {
+    photo = document.createElement('div');
+    photo.className = 'birthday-pane__photo';
+    photo.insertAdjacentHTML('beforeend', photoAvatar(birthday, 'birthday-avatar--pane'));
+  }
+  const nameDay = nameDayReadText(birthday.name_day);
+  const nameDayNext = nameDay && Number.isInteger(birthday.name_day_days_until)
+    ? `${nameDay} · ${countdownLabel(birthday.name_day_days_until)}` : nameDay;
+  return [
+    { label: t('birthdays.photoLabel'), node: photo },
+    { icon: 'party-popper', label: birthday.next_birthday ? formatDate(birthday.next_birthday) : '', value: ageNote },
+    { icon: 'cake', label: t('birthdays.birthDateLabel'), value: birthday.birth_date ? formatDate(birthday.birth_date) : '' },
+    { icon: 'calendar-heart', label: t('birthdays.nameDay'), value: nameDayNext },
+    { icon: 'align-left', label: t('birthdays.notesLabel'), value: birthday.notes || '', multiline: true },
+    { icon: 'bell', label: t('reminders.offsetLabel'), value: reminderReadText(birthday) },
+  ];
+}
+
+/** Zeichnet den Geburtstag in die Spalte; `false` = gibt es nicht (mehr). */
+function renderBirthdayPane(id, body) {
+  const birthday = state.birthdays.find((item) => String(item.id) === String(id));
+  if (!birthday) return false;
+  const ro = readOnly();
+  openDetailView({
+    title: birthday.name,
+    key: `birthday:${birthday.id}`,
+    accentColor: 'var(--module-birthdays)',
+    pane: body,
+    sections: birthdayPaneSections(birthday),
+    // Nur-lesen: kein Loeschen, kein Bearbeiten - der Zustand bleibt lesbar.
+    actions: ro ? [] : [{
+      id: 'birthday-detail-delete',
+      label: t('common.delete'),
+      variant: 'danger-ghost',
+      icon: 'trash-2',
+      align: 'start',
+      onClick: () => deleteBirthday(birthday.id),
+    }],
+    edit: ro ? undefined : {
+      label: t('common.edit'),
+      title: t('birthdays.editTitle'),
+      mount: () => {},
+      standalone: () => openBirthdayModal({ mode: 'edit', birthday }),
+    },
+  });
+  return undefined;
+}
+
+/**
+ * Der Kopf klebt in #main-content; die Detailspalte klebt darunter und misst
+ * ihn dafuer (wie Inventar - Geburtstage haben keinen eigenen Scrollport, und
+ * der Kopf bricht in langen Locales um).
+ */
+function syncBirthdaysHeadBlock(page) {
+  const head = page?.querySelector('.birthdays-toolbar');
+  if (!head) return;
+  page.style.setProperty('--birthdays-head-block', `${head.offsetHeight}px`);
+  syncBirthdaysDetailTop(page);
+}
+
+/**
+ * In Ruhe steht der Hinweissatz zwischen Kopf und Spalte, beim Kleben nicht
+ * mehr - die Hoehe rechnet deshalb ab der GEMESSENEN Oberkante (wie Inventar,
+ * syncDetailTop). Eine ausgeblendete Spalte (unter der Schwelle) misst nichts.
+ */
+function syncBirthdaysDetailTop(page) {
+  const detail = page?.querySelector('.split-view__detail');
+  if (!detail || !detail.getClientRects().length) return;
+  page.style.setProperty('--birthdays-detail-top', `${Math.round(detail.getBoundingClientRect().top)}px`);
+}
+
+function mountBirthdaysDetail(signal) {
+  const root = _container?.querySelector('.birthdays-split');
+  if (!root) return;
+  const find = (id) => state.birthdays.find((item) => String(item.id) === String(id));
+  _md = mountMasterDetail({
+    root,
+    signal,
+    renderDetail: (id, body) => renderBirthdayPane(id, body),
+    // Unter der Schwelle der bisherige Weg: Editor, bei Nur-lesen die Leseansicht.
+    openNarrow: (id) => {
+      const birthday = find(id);
+      if (birthday) openBirthdayModal({ mode: 'edit', birthday });
+    },
+    onEnter: (id) => {
+      const birthday = find(id);
+      if (birthday && !readOnly()) openBirthdayModal({ mode: 'edit', birthday });
+    },
+  });
+  const handle = _md;
+  signal?.addEventListener('abort', () => { if (_md === handle) _md = null; }, { once: true });
+  const page = _container.querySelector('.birthdays-page');
+  syncBirthdaysHeadBlock(page);
+  let frame = 0;
+  document.getElementById('main-content')?.addEventListener('scroll', () => {
+    if (frame) return;
+    frame = requestAnimationFrame(() => { frame = 0; syncBirthdaysDetailTop(page); });
+  }, { passive: true, signal });
+  const head = page?.querySelector('.birthdays-toolbar');
+  if (head && typeof ResizeObserver === 'function') {
+    const ro = new ResizeObserver(() => syncBirthdaysHeadBlock(page));
+    ro.observe(head);
+    signal?.addEventListener('abort', () => ro.disconnect(), { once: true });
+  }
+}
+
+export async function render(container, { signal } = {}) {
   _container = container;
+  _md = null;
+
   // Shell zuerst (synchron) bauen, damit das Lade-Skeleton sofort sichtbar ist
   // (der Router blendet den Wrapper bereits vor dem Daten-await ein). Danach
   // Daten laden und mit echtem Inhalt füllen.
@@ -1195,8 +1351,10 @@ export async function render(container) {
   renderPage();
   bindEvents();
   await loadData();
+  if (signal?.aborted) return;
   state.loading = false;
   renderList();
+  mountBirthdaysDetail(signal);
 }
 
 /**
@@ -1212,4 +1370,6 @@ export const __test = {
   // aufgeht, sieht nur, wer `openModal` die Optionen abnimmt.
   onListClick, openBirthdayModal,
   birthdayPreviewHtml,
+  // R10 L5: die Detailspalte.
+  birthdayPaneSections, renderBirthdayPane,
 };

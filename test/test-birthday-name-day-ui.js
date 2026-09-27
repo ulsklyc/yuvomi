@@ -159,3 +159,47 @@ test('the remove-photo button exists only while there is a photo', () => {
   const css = readFileSync(new URL('../public/styles/birthdays.css', import.meta.url), 'utf8');
   assert.match(css, /\.birthday-modal__photo-action\[hidden\]\s*\{\s*display:\s*none;?\s*\}/, 'display: inline-flex would beat the UA [hidden]');
 });
+
+// ── R10 L5: Geburtstage als Liste + Detail ────────────────────────────────
+
+const BD = {
+  id: 4, name: 'Onkel Mike', birth_date: '1985-11-02', next_birthday: '2026-11-02', next_age: 41,
+  days_until: 36, notes: 'Bruder in Hamburg', name_day: null, reminder_offset: null,
+};
+
+test('Liste + Detail: jede Zeile ist fuer den Baustein waehlbar, der Hauptknopf ist ihr Fokusziel', () => {
+  const html = birthdays.birthdayItemHtml(BD);
+  assert.match(html, /<article class="list-row birthday-item [^"]*" data-id="4" data-md-id="4">/);
+  assert.match(html, /<button type="button" class="list-row__main list-row__main--interactive" data-open="4" data-md-focus>/);
+});
+
+test('Liste + Detail: die Spalte nennt wann und wie alt, Datum, Notiz - und ein Bild nur, wenn es eins gibt', async () => {
+  const { installMiniDom } = await import('./mini-dom.js');
+  const restore = installMiniDom();
+  try {
+    const rows = birthdays.__test.birthdayPaneSections(BD);
+    const byLabel = Object.fromEntries(rows.map((r) => [r.label, r]));
+    assert.equal(byLabel['birthdays.photoLabel'].node, null, 'ohne Bild keine Initialen-Scheibe als „Profilbild"');
+    assert.match(rows[1].value, /birthdays\.ageNoteDays/, 'die Auskunft, die die Zeile nur knapp traegt');
+    assert.ok(byLabel['birthdays.birthDateLabel'].value, 'Geburtsdatum');
+    assert.equal(byLabel['birthdays.notesLabel'].value, 'Bruder in Hamburg');
+    const withPhoto = birthdays.__test.birthdayPaneSections({ ...BD, photo_data: 'data:image/png;base64,AA' });
+    assert.ok(withPhoto[0].node, 'mit Bild steht es oben');
+  } finally { restore(); }
+  assert.equal(birthdays.__test.renderBirthdayPane('999', null), false, 'unbekannte ID: Leerzustand (Rueckgabe-Vertrag)');
+});
+
+test('Liste + Detail: Seite, Markup, Klickweg und die klebende Spalte', () => {
+  const src = readFileSync(new URL('../public/pages/birthdays.js', import.meta.url), 'utf8');
+  assert.match(src, /className: 'birthdays-page app-page--list-detail'/, 'die Seitenwurzel ist der Container der Schwelle');
+  assert.match(src, /<div class="split-view birthdays-split">/);
+  assert.match(src, /splitViewDetailHtml\(\{\s*id: 'birthdays'/);
+  assert.match(src, /if \(_md\) \{ _md\.open\(open\.dataset\.open, open\); return; \}/, 'der Tipp geht durch den Baustein');
+  assert.match(src, /mountBirthdaysDetail\(signal\);/);
+  const css = readFileSync(new URL('../public/styles/birthdays.css', import.meta.url), 'utf8');
+  const block = css.slice(css.indexOf('@container module-surface (min-width: 65rem)'));
+  assert.ok(block.length > 0, 'die Spalte gilt ab der Schwelle aus tokens.css');
+  assert.match(block, /position: sticky;/);
+  assert.match(block, /height: calc\(var\(--viewport-height\) - var\(--birthdays-detail-top/,
+    'die Hoehe rechnet ab der gemessenen Oberkante - sonst ragt sie in Ruhe unter den Falz');
+});

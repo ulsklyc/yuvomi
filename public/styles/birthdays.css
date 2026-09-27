@@ -675,3 +675,39 @@
   font-size: var(--text-sm);
 }
 
+
+/* --------------------------------------------------------
+ * Liste + Detail (R10 L5, A2; Baustein utils/master-detail.js)
+ *
+ * Die Geometrie der Spalten gehoert der Shell (layout.css `.split-view`).
+ * Geburtstage haben keinen eigenen Scrollport - die Liste scrollt mit
+ * #main-content wie unter der Schwelle -, deshalb klebt die Detailspalte unter
+ * dem Kopf (dieselbe Bauart wie Inventar). Den Versatz misst birthdays.js
+ * (`--birthdays-head-block`). Schwelle = `--layout-split-threshold` (65rem).
+ * -------------------------------------------------------- */
+@container module-surface (min-width: 65rem) {
+  .birthdays-page .split-view {
+    align-items: start;
+    /* Der Koerper polstert schon (`.app-page__body`); die Spalte endet dort. */
+    --split-view-end-pad: 0;
+  }
+
+  .birthdays-page .split-view__list {
+    overflow: visible;
+  }
+
+  .birthdays-page .split-view__detail {
+    position: sticky;
+    top: calc(var(--birthdays-head-block, 0px) + var(--space-3));
+    /* Von der gemessenen Oberkante bis zur Luft ueber dem Fensterrand
+     * (birthdays.js, syncBirthdaysDetailTop); ohne Messwert der Klebestand. */
+    height: calc(var(--viewport-height) - var(--birthdays-detail-top, calc(var(--birthdays-head-block, 0px) + var(--space-3))) - var(--space-4));
+  }
+}
+
+/* Das Bild in der Detailspalte: gross genug, um die Person zu erkennen. */
+.birthday-pane__photo .birthday-avatar--pane {
+  inline-size: var(--space-16);
+  block-size: var(--space-16);
+  font-size: var(--text-xl);
+}
