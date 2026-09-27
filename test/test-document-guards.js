@@ -3929,11 +3929,14 @@ describe('Sonde 18 - am Scroll-Ende liegt nichts Bedienbares unter dem FAB', () 
          * FAB verliert, faellt trotzdem auf: es fehlt dann in einem der beiden
          * Toepfe hier. */
         /* Einkauf dockt seit der Kopfregel mobil (2026-09-26) an: vorher hatte er am
-         * Desktop gar keine Kopfaktion und zaehlte als eingeklappt. */
-        assert.deepEqual({ angedockt, eingeklappt }, { angedockt: 6, eingeklappt: 5 },
-          'Erwartet auf dem Zeiger: 6 FABs in der Kopfleiste (Vorrat, Mahlzeiten, Rezepte, Einkauf, '
-          + 'Geburtstage, Dokumente) und 5 eingeklappte (dort traegt der Modulkopf seinen eigenen '
-          + `Knopf). Gezaehlt wurden ${angedockt} und ${eingeklappt}, dazu ${ohneFab} Seiten ohne FAB. `
+         * Desktop gar keine Kopfaktion und zaehlte als eingeklappt. Seit #1483
+         * ("one add button") gibt es keinen eigenen Kopfknopf mehr - Aufgaben,
+         * Notizen, Kontakte, Kalender und Budget docken ihren FAB an wie alle
+         * anderen; die fuenf eingeklappten sind damit angedockte. */
+        assert.deepEqual({ angedockt, eingeklappt }, { angedockt: 11, eingeklappt: 0 },
+          'Erwartet auf dem Zeiger: 11 FABs in der Kopfleiste (Vorrat, Mahlzeiten, Rezepte, Einkauf, '
+          + 'Geburtstage, Dokumente, Aufgaben, Notizen, Kontakte, Kalender, Budget) und kein '
+          + `eingeklappter. Gezaehlt wurden ${angedockt} und ${eingeklappt}, dazu ${ohneFab} Seiten ohne FAB. `
           + 'Aendert sich das, aendert sich die Reichweite dieser Sonde.');
       } else {
         // 15 Routen minus die drei ohne FAB.
