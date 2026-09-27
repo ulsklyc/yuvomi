@@ -6320,7 +6320,10 @@ test('responsive adaptation keeps all four Kitchen tabs readable on narrow phone
   );
   assert.doesNotMatch(
     kitchenTabs,
-    /@media \(max-width:\s*639px\)[\s\S]*\.kitchen-tabs-bar\s*\{[^}]*padding-inline/,
+    // Die ANFANGSKANTE ist die Fluchtlinie. `padding-inline-end: 0` ist
+    // erlaubt: in Rezepte/Vorrat endet die Leiste per Rand vor Lupe und
+    // Werkzeugmenue, und der Rand traegt dort schon den Abstand (R9, Sonde 20).
+    /@media \(max-width:\s*639px\)[\s\S]*\.kitchen-tabs-bar\s*\{[^}]*padding-inline(?:-start)?\s*:/,
     'kitchen-tabs-bar darf --page-inline-pad aus .sub-tabs-bar nicht überschreiben',
   );
   // Die Labels werden NICHT gekürzt - die Leiste scrollt lieber.

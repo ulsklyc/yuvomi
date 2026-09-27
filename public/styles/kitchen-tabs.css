@@ -116,8 +116,8 @@
    * gemessen begann die erste Rezeptzeile bei y=137, der Vorrat bei y=216
    * (A4 P2). Jetzt legt sich der Kopf der Seite IN die Zeile der Leiste:
    * die Seite rueckt um die Leistenhoehe nach oben, der Kopf ist nur so breit
-   * wie seine Werkzeuge und steht am Zeilenende, und die Leiste haelt ihnen
-   * mit einem Abstandhalter hinter dem letzten Tab den Platz frei.
+   * wie seine Werkzeuge und steht am Zeilenende, und die Leiste endet vor
+   * ihnen.
    *
    * WARUM NICHT DIE KNOTEN UMHAENGEN: die Leiste ist ueber einen Tabwechsel
    * derselbe Knoten (utils/kitchen-tabs.js), die Werkzeuge gehoeren der Seite.
@@ -138,13 +138,20 @@
     --kitchen-tools: 2;
   }
 
-  /* Der Abstandhalter nimmt den Platz der Werkzeuge, abzueglich des
-   * Leisten-Polsters, das ohnehin dahinter steht. Ein Flex-Kind und kein
-   * Polster: scrollt die Leiste in einer langen Sprache doch, endet ihr
-   * Scrollbereich damit vor den Werkzeugen statt unter ihnen. */
-  .has-kitchen-tabs:has(> :is(.recipes-page, .pantry-page)) > .kitchen-tabs-bar::after {
-    content: '';
-    flex: 0 0 calc(var(--kitchen-tools) * var(--target-base) + var(--space-1) - var(--page-inline-pad));
+  /* DIE LEISTE ENDET VOR DEN WERKZEUGEN - per Rand, ihre Anfangskante bleibt
+   * die Fluchtlinie des Inhalts (#577). Hier stand ein Abstandhalter als
+   * letztes Flex-Kind: er hielt den Platz frei, lag aber IM Scrollbereich.
+   * Scrollte die Leiste in einer langen Sprache (uk, vi, fil), endete sie
+   * unter den Werkzeugen - der Fade am Rand blendete leeren Abstandhalter aus,
+   * und das naechste Label stand unsichtbar unter der Lupe (Sonde 20 der
+   * Dokument-Guards: 35px Leere in Rezepte, 70px im Vorrat). Jetzt ist die
+   * Kante der Leiste die Kante vor der Lupe: dort steht ein uebernaechstes
+   * Label sichtbar angeschnitten unter dem Fade. Ihr End-Polster entfaellt,
+   * weil der Rand den Abstand schon traegt - die Tabs enden genau an der
+   * Trefferflaeche des ersten Werkzeugs, wie vorher am Abstandhalter. */
+  .has-kitchen-tabs:has(> :is(.recipes-page, .pantry-page)) > .kitchen-tabs-bar {
+    margin-inline-end: calc(var(--kitchen-tools) * var(--target-base) + var(--space-1));
+    padding-inline-end: 0;
   }
 
   .has-kitchen-tabs:has(> :is(.recipes-page, .pantry-page)) > :is(.recipes-page, .pantry-page) {
@@ -156,15 +163,20 @@
     align-self: flex-end;
     block-size: var(--kitchen-tabs-height);
     padding-block: 0;
+    /* Der Kopf reicht bis an den Bildschirmrand und fuehrt die Haarlinie der
+     * Leiste unter den Werkzeugen weiter, die jetzt vor ihnen endet. Die 4px
+     * vor der Kante traegt die Aktionsgruppe (unten) - ein Polster am Kopf
+     * verstiesse gegen den Rail-Vertrag (#577: 0 oder --page-inline-pad). */
     padding-inline: 0;
-    margin-inline-end: var(--space-1);
+    margin-inline-end: 0;
     gap: 0;
-    background-color: transparent;
-    border-bottom-color: transparent;
+    background-color: var(--color-bg);
+    border-bottom-color: var(--color-border-subtle);
   }
 
   .has-kitchen-tabs:has(> :is(.recipes-page, .pantry-page)) > :is(.recipes-page, .pantry-page) > .page-toolbar .page-toolbar__actions {
     gap: 0;
+    margin-inline-end: var(--space-1);
   }
 
   /* Wer sucht, bekommt die Zeile: das Feld klappt ueber die Tabs auf, wie die
@@ -179,6 +191,13 @@
     gap: var(--space-2);
     background-color: var(--color-bg);
     border-bottom-color: var(--color-border-subtle);
+  }
+
+  /* In der Suchzeile steht der Kopf wieder mit dem Seitenpolster - die 4px
+   * der Aktionsgruppe (oben) kaemen sonst dazu. */
+  .has-kitchen-tabs:has(> :is(.recipes-page, .pantry-page)) > :is(.recipes-page, .pantry-page) > .page-toolbar:has(.page-search:focus-within) .page-toolbar__actions,
+  .has-kitchen-tabs:has(> :is(.recipes-page, .pantry-page)) > :is(.recipes-page, .pantry-page) > .page-toolbar:has(.page-search input:not(:placeholder-shown)) .page-toolbar__actions {
+    margin-inline-end: 0;
   }
 
   /* ZWEI WERKZEUGE LASSEN DEN ZAEHLERN NUR EINEN PUNKT. Mit Lupe und "..."

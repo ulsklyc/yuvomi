@@ -341,9 +341,16 @@ test('Kueche mobil: Lupe und Werkzeugmenue stehen in der Kuechen-Leiste, die eig
   assert.ok(find((r) => /:has\(\.page-search:focus-within\)/.test(r.selector) && /align-self:\s*stretch/.test(r.body)).length,
     'wer sucht, bekommt die ganze Zeile');
 
-  const spacer = find((r) => selHas(r, /> \.kitchen-tabs-bar::after$/));
-  assert.match(spacer[0]?.body ?? '', /flex:\s*0 0 calc\(var\(--kitchen-tools\) \* var\(--target-base\)/,
-    'die Leiste haelt den Werkzeugen ihren Platz per Flex-Kind frei - ein Polster verstiesse gegen die Fluchtlinie (#577)');
+  // Seit der Integration (Sonde 20): per RAND statt per Flex-Kind im
+  // Scrollbereich - scrollt die Leiste, steht ihr naechstes Label sichtbar
+  // angeschnitten vor der Lupe statt unsichtbar darunter. Die Anfangskante
+  // (Fluchtlinie #577) bleibt unberuehrt.
+  const barEnd = find((r) => selHas(r, new RegExp(`${PAGES.source}\\) > \\.kitchen-tabs-bar$`)));
+  assert.match(barEnd[0]?.body ?? '', /margin-inline-end:\s*calc\(var\(--kitchen-tools\) \* var\(--target-base\) \+ var\(--space-1\)\)/,
+    'die Leiste endet vor den Werkzeugen');
+  assert.doesNotMatch(barEnd[0]?.body ?? '', /padding-inline(?:-start)?\s*:/, 'die Anfangskante bleibt die Fluchtlinie');
+  assert.ok(!find((r) => selHas(r, /> \.kitchen-tabs-bar::after$/)).length,
+    'kein Abstandhalter im Scrollbereich - dort blendete der Fade Leere aus');
   const tools = (n) => find((r) => new RegExp(`--kitchen-tools:\\s*${n}\\b`).test(r.body));
   assert.ok(tools(1).some((r) => selHas(r, PAGES)), 'Rezepte und Vorrat: mindestens die Lupe');
   assert.ok(tools(2).some((r) => selHas(r, /:has\(> \.pantry-page\)$/)), 'Vorrat: Lupe plus Werkzeugmenue');
@@ -403,9 +410,10 @@ test('Kueche mobil: die Leiste passt bei 375px in allen vier Tabs ohne Scrollen 
   const badgeMin = px(decl(base, '.sub-tab__badge', 'min-width'));
   const DOT_SEL = '.has-kitchen-tabs:is(:has(> .pantry-page), :has(> .recipes-page .recipes-source-filter:not([hidden]))) > .kitchen-tabs-bar .sub-tab__badge';
   const dot = px(decl(kitchen, DOT_SEL, 'inline-size'));
-  const spacer = decl(kitchen, '.has-kitchen-tabs:has(> :is(.recipes-page, .pantry-page)) > .kitchen-tabs-bar::after', 'flex');
-  assert.match(spacer ?? '', /calc\(var\(--kitchen-tools\) \* var\(--target-base\) \+ var\(--space-1\) - var\(--page-inline-pad\)\)/,
-    'die Rechnung unten bildet den Abstandhalter nach - aendert er sich, muss sie mit');
+  const BAR_WITH_TOOLS = '.has-kitchen-tabs:has(> :is(.recipes-page, .pantry-page)) > .kitchen-tabs-bar';
+  assert.match(decl(kitchen, BAR_WITH_TOOLS, 'margin-inline-end') ?? '', /^calc\(var\(--kitchen-tools\) \* var\(--target-base\) \+ var\(--space-1\)\)$/,
+    'die Rechnung unten bildet das Ende der Leiste nach - aendert es sich, muss sie mit');
+  assert.equal(px(decl(kitchen, BAR_WITH_TOOLS, 'padding-inline-end')), 0, 'vor den Werkzeugen traegt der Rand den Abstand, kein Polster');
 
   // Gemessene Wortbreiten (inaktiv / aktiv, der aktive Tab ist fetter) und die Zahl im Zaehler.
   const WORD = { meals: [72, 73.7], recipes: [53.9, 55], shopping: [48.8, 50.2], pantry: [40.9, 42] };
@@ -417,9 +425,9 @@ test('Kueche mobil: die Leiste passt bei 375px in allen vier Tabs ohne Scrollen 
   const width = ({ active, badges, badgeW, tools }) => {
     const tabs = Object.keys(WORD).map((id) => WORD[id][id === active ? 1 : 0] + 2 * tabPad
       + (badges.includes(id) && id !== active ? tabGap + badgeMargin + badgeW : 0));
-    const spacerW = tools ? tools * TOOL + tok('space-1') - PAGE_PAD : 0;
-    const children = tabs.length + (tools ? 1 : 0);
-    return PAGE_PAD + tabs.reduce((a, b) => a + b, 0) + (children - 1) * barGap + spacerW + PAGE_PAD;
+    // Ende: mit Werkzeugen der Rand der Leiste (ohne End-Polster), sonst ihr Polster.
+    const endW = tools ? tools * TOOL + tok('space-1') : PAGE_PAD;
+    return PAGE_PAD + tabs.reduce((a, b) => a + b, 0) + (tabs.length - 1) * barGap + endW;
   };
   // Einkauf und Vorrat tragen Zaehler; der aktive Tab zeigt seinen nicht.
   const cases = {
