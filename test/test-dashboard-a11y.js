@@ -183,6 +183,16 @@ test('der Anpassen-Modus hat kein X, das still verwirft - nur Abbrechen und Spei
   assert.match(normal, /id="dashboard-customize-btn"/, 'der Einstieg bleibt');
 });
 
+test('die globale Suche ist von der Uebersicht mit einem Tipp erreichbar, und nicht mitten im Anpassen (R11 S1)', () => {
+  global.window ??= { yuvomi: null };
+  const user = { display_name: 'Linda' };
+  const normal = renderDashboardOverview(user, false, null, { followsDefault: true, canPublish: false });
+  assert.match(normal, /<button class="dashboard-icon-btn" id="dashboard-search"[^>]*aria-label="nav\.search"[^>]*aria-haspopup="dialog"/,
+    'ein benannter Icon-Knopf wie die zwei daneben');
+  const editing = renderDashboardOverview(user, true, null, { followsDefault: true, canPublish: false });
+  assert.doesNotMatch(editing, /id="dashboard-search"/, 'im Anpassen-Modus zaehlt nur Abbrechen oder Speichern');
+});
+
 test('Abbrechen fragt nur, wenn es etwas zu verlieren gibt (H2)', () => {
   const saved = [{ id: 'tasks', visible: true, size: '2x1', order: 0 }, { id: 'notes', visible: true, size: '1x1', order: 1 }];
   const same = saved.map((w) => ({ ...w }));
@@ -199,7 +209,8 @@ test('Abbrechen fragt nur, wenn es etwas zu verlieren gibt (H2)', () => {
 
 test('„+N weitere heute" ist ein Weg dorthin, wo die verdeckten Zeilen stehen (H13)', () => {
   const day = '2026-09-27';
-  assert.equal(todayMoreRoute([{ route: '/tasks' }, { route: '/tasks' }], day), '/tasks');
+  assert.equal(todayMoreRoute([{ route: '/tasks' }, { route: '/tasks' }], day), '/tasks?due=today',
+    'nur Aufgaben: die Liste, gefiltert auf bis heute faellig (S2)');
   assert.equal(todayMoreRoute([{ route: '/calendar?open=4&date=2026-09-27' }, { route: '/calendar?open=5' }], day),
     '/calendar?date=2026-09-27', 'mehrere Termine: der Tag, nicht ein einzelnes Vorkommen');
   assert.equal(todayMoreRoute([{ route: '/tasks' }, { route: '/calendar?open=4' }], day), '/calendar?date=2026-09-27',
@@ -213,7 +224,8 @@ test('„+N weitere heute" ist ein Weg dorthin, wo die verdeckten Zeilen stehen 
     'Termin plus Nicht-Kalender: kein Tag, der beides zeigt');
   assert.equal(todayMoreRoute([{ route: '/tasks', overdue: true }, { route: '/calendar?open=4' }], day), null,
     'eine ueberfaellige Aufgabe steht nicht am heutigen Kalendertag');
-  assert.equal(todayMoreRoute([{ route: '/tasks', overdue: true }, { route: '/tasks' }], day), '/tasks');
+  assert.equal(todayMoreRoute([{ route: '/tasks', overdue: true }, { route: '/tasks' }], day), '/tasks?due=today',
+    'der Filter schliesst Ueberfaelliges ein');
   assert.equal(todayMoreRoute([{ route: '/tasks' }, { route: null }], day), null, 'eine Zeile ohne Ziel hat keine Ansicht');
   assert.equal(todayMoreRoute([{ route: '/budget?tab=a' }, { route: '/budget?tab=b' }], day), null,
     'zwei Filter desselben Moduls sind zwei Ansichten');
@@ -228,8 +240,8 @@ test('„+N weitere heute" ist ein Weg dorthin, wo die verdeckten Zeilen stehen 
   const more = html.match(/<(a|div)\b[^>]*class="today-cockpit__more[^"]*"[^>]*>/);
   assert.ok(more, `Reichweite: acht Aufgaben laufen ueber den Deckel: ${html.slice(0, 200)}`);
   assert.equal(more[1], 'a', 'die Fusszeile ist ein Link, keine Sackgasse');
-  assert.match(more[0], /href="\/tasks"/);
-  assert.match(more[0], /data-route="\/tasks"/, 'wireLinks haengt an data-route');
+  assert.match(more[0], /href="\/tasks\?due=today"/, 'die Liste, gefiltert auf die Zeilen dieses Blatts (S2)');
+  assert.match(more[0], /data-route="\/tasks\?due=today"/, 'wireLinks haengt an data-route');
 });
 
 test('Codex an #1485: gemischte verdeckte Zeilen klappen an Ort und Stelle auf, statt in eine halbe Ansicht zu fuehren', () => {

@@ -3455,7 +3455,8 @@ function buildTodayCockpitModel(data, cfg = [], { cap = PROGRAM_ROW_CAP, now = n
  * #1485). Die erste Fassung waehlte bei gemischten Quellen „das Naechstbeste":
  * Aufgabe plus Dosis fuehrte in die Aufgabenliste, Termin plus Abfuhr an den
  * Kalendertag - der Link versprach „+2 weitere" und zeigte eine davon. Jetzt:
- *   - nur Aufgaben: die Aufgabenliste,
+ *   - nur Aufgaben: die Aufgabenliste mit `?due=today` (offen und bis heute
+ *     faellig, Ueberfaelliges eingeschlossen - genau die Zeilen dieses Blatts),
  *   - Termine und heute faellige Aufgaben: der Kalendertag, der beides zeigt
  *     (eine UEBERFAELLIGE Aufgabe steht dort nicht),
  *   - ein anderes Modul allein, alle Zeilen mit demselben Ziel: dieses Ziel
@@ -3469,7 +3470,7 @@ function todayMoreRoute(hiddenRows, todayKey) {
   const routes = hiddenRows.map((row) => String(row.route));
   const base = (route) => route.split('?')[0];
   const bases = new Set(routes.map(base));
-  if (bases.size === 1 && bases.has('/tasks')) return '/tasks';
+  if (bases.size === 1 && bases.has('/tasks')) return '/tasks?due=today';
   const calendarShowsAll = [...bases].every((b) => b === '/calendar' || b === '/tasks')
     && hiddenRows.every((row) => base(String(row.route)) !== '/tasks' || !row.overdue);
   if (calendarShowsAll) return `/calendar?date=${encodeURIComponent(todayKey)}`;
@@ -3681,6 +3682,17 @@ function renderDashboardOverview(user, editing = false, weather = null, scope = 
                Wege hinaus: Speichern, und Abbrechen mit Rueckfrage, sobald
                etwas zu verlieren ist. -->
           ${editing ? '' : `
+          <!-- DIE SUCHE MIT EINEM TIPP VON DER UEBERSICHT (Re-Critique
+               2026-09-27, A1 P2-6). Mobil lag die globale Suche nur im
+               Mehr-Blatt, zwei Tipps tief. Die Kapsel hat keinen Platz fuer
+               ein sechstes Ziel (gemessen: 52px je Slot, "Übersicht" und
+               "Aufgaben" brechen), also steht sie hier, wo man ankommt - ein
+               Icon-Knopf wie die zwei daneben. -->
+          <button class="dashboard-icon-btn" id="dashboard-search"
+                  aria-label="${t('nav.search')}"
+                  title="${t('nav.search')}" aria-haspopup="dialog">
+            <i data-lucide="search" aria-hidden="true"></i>
+          </button>
           <button class="dashboard-icon-btn" id="dashboard-wall-enter"
                   aria-label="${t('dashboard.wallEnter')}"
                   title="${t('dashboard.wallEnter')}">
@@ -6400,6 +6412,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
       weather = updatedWeather;
       rebuildDashboard(cfg);
     }, signal);
+    container.querySelector('#dashboard-search')?.addEventListener('click', () => {
+      window.yuvomi?.openSearch?.();
+    }, { signal: signal });
     container.querySelector('#dashboard-wall-enter')?.addEventListener('click', () => {
       enterWallMode();
       rerender();
