@@ -38,6 +38,7 @@ import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderA
 import { withChosenPeople } from '/utils/people-picker.js';
 import { othersCanRead } from '/utils/household.js';
 import { wireTablist } from '/utils/tablist.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { wirePeriodSwipe } from '/utils/period-swipe.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 // EINE Schalterform, auch hier. Das Primitiv liegt unter `/settings/`, weil
@@ -2016,7 +2017,17 @@ export async function render(container, { user }) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <div class="calendar-page app-page app-page--full" id="calendar-page" data-composition="full">
-      <div class="page-toolbar page-toolbar--wrap page-toolbar--period cal-toolbar" id="cal-toolbar"></div>
+      ${/* DER KOPF STEHT SCHON VOR DEN DATEN, samt Aktions-Slot: die Shell
+            dockt den FAB direkt nach dem synchronen Teil an (adoptPageFab in
+            router.js) und findet ihn danach nur noch in der Shell-Ebene, nicht
+            mehr in der Seite. Ohne Slot in diesem Moment blieb er am Desktop
+            schwebend (gemessen 2026-09-27: x=1360, unten rechts). Den vollen
+            Kopf baut renderToolbar() nach dem Laden und haengt den
+            angedockten FAB dabei um. */ ''}
+      <div class="page-toolbar page-toolbar--wrap page-toolbar--period cal-toolbar" id="cal-toolbar">
+        <h1 class="page-toolbar__title">${t('calendar.title')}</h1>
+        <div class="page-toolbar__actions"></div>
+      </div>
       <!-- Ansage der Tagesliste im Telefon-Monat (announceMonthDay). Ausserhalb
            von #cal-body, damit sie einen Neuaufbau der Ansicht ueberlebt: eine
            Live-Region, die mit ihrem Inhalt zusammen entsteht, sagt nichts an. -->
@@ -2203,13 +2214,13 @@ function toolbarHtml({ filterCount = 0, scheduleWarningHtml = '' } = {}) {
   return `
     <h1 class="page-toolbar__title">${t('calendar.title')}</h1>
     <div class="page-toolbar__center cal-toolbar__month">${periodNavHtml()}</div>
+    ${/* Der Aktions-Slot traegt die Ueberlappungswarnung und - am
+          Zeigergeraet - den angedockten FAB (#fab-new-event, dockFabIntoToolbar
+          in router.js). Einen eigenen Kopfknopf gibt es nicht mehr
+          (Re-Critique 2026-09-27, D3); renderToolbar() haengt den angedockten
+          FAB beim Neubau des Kopfs wieder ein. */ ''}
     <div class="page-toolbar__actions">
       ${scheduleWarningHtml}
-      ${readOnly() ? '' : `
-      <button class="btn btn--primary toolbar-new-btn" id="cal-add" aria-label="${t('calendar.addEvent')}">
-        <i data-lucide="plus" aria-hidden="true"></i>
-        <span class="toolbar-new-btn__label">${t('newLabel.calendar')}</span>
-      </button>`}
     </div>
     <!-- Bar-Zeile des Kopfs (Werkzeugzeilen-Regel, layout.css): das Ansichts-
          Segment hatte im Actions-Slot bei 1280px 212px fuer 245px Inhalt -
@@ -2278,8 +2289,15 @@ function renderToolbar() {
     </span>
   ` : '';
 
+  // DER ANGEDOCKTE FAB UEBERLEBT DEN NEUBAU. Die Shell hat ihn nach dem
+  // ersten Aufbau in `.page-toolbar__actions` gehaengt (dockFabIntoToolbar);
+  // `replaceChildren()` nahm ihn bei jedem Filterwechsel mit, und der Kopf
+  // stand danach ohne Primaeraktion da. Umgehaengt wird der Knoten selbst -
+  // seine Verdrahtung (findPageFab unten in render) haengt an ihm.
+  const dockedFab = bar.querySelector('.page-fab');
   bar.replaceChildren();
   bar.insertAdjacentHTML('beforeend', toolbarHtml({ filterCount, scheduleWarningHtml }));
+  if (dockedFab) bar.querySelector('.page-toolbar__actions')?.appendChild(dockedFab);
 
   if (window.lucide) lucide.createIcons({ el: bar });
 
@@ -2288,7 +2306,6 @@ function renderToolbar() {
   bar.querySelector('#cal-prev').addEventListener('click', () => navigate(-1));
   bar.querySelector('#cal-next').addEventListener('click', () => navigate(1));
   bar.querySelector('#cal-today').addEventListener('click', goToday);
-  bar.querySelector('#cal-add')?.addEventListener('click', () => openEventModal({ mode: 'create', date: newEventDate() }));
   bar.querySelector('#cal-search').addEventListener('click', openCalendarSearch);
   bar.querySelector('#cal-filters').addEventListener('click', openCalendarFilters);
 
@@ -2314,6 +2331,10 @@ function renderToolbar() {
       renderView();
     },
   });
+  // Die Ansichtswahl gleitet wie jede Segment-Leiste (D8). Der Kopf wird bei
+  // jedem Filterwechsel NEU gebaut - der Schluessel laesst die neue Kapsel
+  // dort ansetzen, wo die alte stand, statt aufzuspringen.
+  attachSegmentIndicator(bar.querySelector('.cal-toolbar__views'), { key: 'calendar-views' });
 }
 
 function updateLabel() {

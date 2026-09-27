@@ -262,8 +262,8 @@
  * Klasse im Markup (calendar.js). Gemessen im Kalender: ausgeklappt 166 statt
  * 230px, eingeklappt 121px (Critique 2026-09-24: Monat 56 -> 65 % Inhalt). */
 @media (max-width: 1023px) {
-  /* Ein leerer Aktions-Slot ist keine Zeile. Unter 1024px wohnt „Neu" im FAB
-   * (.toolbar-new-btn ist dort `display: none`), und ohne
+  /* Ein leerer Aktions-Slot ist keine Zeile. Unter 1024px wohnt „Neu" im
+   * schwebenden FAB (angedockt wird erst ab 1024px), und ohne
    * Ueberlappungswarnung steht nichts mehr darin - der Slot brach trotzdem als
    * hoehenlose Flex-Zeile um und kostete ihren Zeilenabstand (gemessen 8px in
    * der Woche) oder verengte die Zeitraum-Zeile um seinen Gap. */
