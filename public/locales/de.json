@@ -366,6 +366,7 @@
         "todayNothingElse": "Danach steht heute nichts mehr an",
         "todayUntil": "bis {{time}}",
         "todayMore": "+{{count}} weitere heute",
+        "todayLess": "Weniger anzeigen",
         "todayMore_one": "+{{count}} weiterer heute",
         "memberOpenTasks": "{{count}} Aufgaben",
         "memberOpenTasks_one": "{{count}} Aufgabe",

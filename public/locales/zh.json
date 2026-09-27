@@ -354,6 +354,7 @@
         "todayNothingElse": "今天没有其他安排了",
         "todayUntil": "{{time}}前",
         "todayMore": "另有{{count}}项",
+        "todayLess": "收起",
         "todayMore_one": "另有{{count}}项",
         "memberOpenTasks": "{{count}}项任务",
         "memberOpenTasks_one": "{{count}}项任务",

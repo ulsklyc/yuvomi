@@ -354,6 +354,7 @@
         "todayNothingElse": "Больше на сегодня ничего нет",
         "todayUntil": "до {{time}}",
         "todayMore": "+{{count}} ещё сегодня",
+        "todayLess": "Показать меньше",
         "todayMore_one": "+{{count}} ещё сегодня",
         "memberOpenTasks": "{{count}} задач",
         "memberOpenTasks_one": "{{count}} задача",

@@ -354,6 +354,7 @@
         "todayNothingElse": "Dnes už nic dalšího",
         "todayUntil": "do {{time}}",
         "todayMore": "+{{count}} dalších dnes",
+        "todayLess": "Zobrazit méně",
         "todayMore_one": "+{{count}} další dnes",
         "memberOpenTasks": "{{count}} úkolů",
         "memberOpenTasks_one": "{{count}} úkol",

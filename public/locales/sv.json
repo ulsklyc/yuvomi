@@ -354,6 +354,7 @@
         "todayNothingElse": "Inget mer idag",
         "todayUntil": "senast {{time}}",
         "todayMore": "+{{count}} till idag",
+        "todayLess": "Visa färre",
         "todayMore_one": "+{{count}} till idag",
         "memberOpenTasks": "{{count}} uppgifter",
         "memberOpenTasks_one": "{{count}} uppgift",

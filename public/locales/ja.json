@@ -354,6 +354,7 @@
         "todayNothingElse": "今日はこの後予定はありません",
         "todayUntil": "{{time}}まで",
         "todayMore": "他{{count}}件",
+        "todayLess": "表示を減らす",
         "todayMore_one": "他{{count}}件",
         "memberOpenTasks": "タスク{{count}}件",
         "memberOpenTasks_one": "タスク{{count}}件",

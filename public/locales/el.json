@@ -354,6 +354,7 @@
         "todayNothingElse": "Τίποτα άλλο για σήμερα",
         "todayUntil": "έως {{time}}",
         "todayMore": "+{{count}} ακόμη σήμερα",
+        "todayLess": "Εμφάνιση λιγότερων",
         "todayMore_one": "+{{count}} ακόμη σήμερα",
         "memberOpenTasks": "{{count}} εργασίες",
         "memberOpenTasks_one": "{{count}} εργασία",

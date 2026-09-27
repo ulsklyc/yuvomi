@@ -354,6 +354,7 @@
         "todayNothingElse": "Mára nincs több teendő",
         "todayUntil": "{{time}}-ig",
         "todayMore": "+{{count}} további ma",
+        "todayLess": "Kevesebb megjelenítése",
         "todayMore_one": "+{{count}} további ma",
         "memberOpenTasks": "{{count}} feladat",
         "memberOpenTasks_one": "{{count}} feladat",

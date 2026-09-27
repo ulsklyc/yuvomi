@@ -366,6 +366,7 @@
         "todayNothingElse": "Tidak ada lagi hari ini",
         "todayUntil": "sebelum {{time}}",
         "todayMore": "+{{count}} lagi hari ini",
+        "todayLess": "Tampilkan lebih sedikit",
         "todayMore_one": "+{{count}} lagi hari ini",
         "memberOpenTasks": "{{count}} tugas",
         "memberOpenTasks_one": "{{count}} tugas",

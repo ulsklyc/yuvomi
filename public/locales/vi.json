@@ -354,6 +354,7 @@
         "todayNothingElse": "Hôm nay không còn gì khác",
         "todayUntil": "trước {{time}}",
         "todayMore": "+{{count}} mục nữa hôm nay",
+        "todayLess": "Ẩn bớt",
         "todayMore_one": "+{{count}} mục nữa hôm nay",
         "memberOpenTasks": "{{count}} việc",
         "memberOpenTasks_one": "{{count}} việc",

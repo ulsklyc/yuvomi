@@ -354,6 +354,7 @@
         "todayNothingElse": "आज और कुछ नहीं",
         "todayUntil": "{{time}} तक",
         "todayMore": "+{{count}} और आज",
+        "todayLess": "कम दिखाएं",
         "todayMore_one": "+{{count}} और आज",
         "memberOpenTasks": "{{count}} कार्य",
         "memberOpenTasks_one": "{{count}} कार्य",

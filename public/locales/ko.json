@@ -366,6 +366,7 @@
         "todayNothingElse": "오늘은 더 이상 일정이 없습니다",
         "todayUntil": "{{time}}까지",
         "todayMore": "외 {{count}}건",
+        "todayLess": "접기",
         "todayMore_one": "외 {{count}}건",
         "memberOpenTasks": "할 일 {{count}}개",
         "memberOpenTasks_one": "할 일 {{count}}개",

@@ -366,6 +366,7 @@
         "todayNothingElse": "امروز دیگر برنامه‌ای نیست",
         "todayUntil": "تا {{time}}",
         "todayMore": "+{{count}} مورد دیگر امروز",
+        "todayLess": "نمایش کمتر",
         "todayMore_one": "+{{count}} مورد دیگر امروز",
         "memberOpenTasks": "{{count}} وظیفه",
         "memberOpenTasks_one": "{{count}} وظیفه",

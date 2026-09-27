@@ -366,6 +366,7 @@
         "todayNothingElse": "Wala nang iba ngayon",
         "todayUntil": "bago mag-{{time}}",
         "todayMore": "mga {{count}} pa ngayon",
+        "todayLess": "Ipakita ang mas kaunti",
         "todayMore_one": "{{count}} pa ngayon",
         "memberOpenTasks": "{{count}} na gawain",
         "memberOpenTasks_one": "{{count}} na mga gawain",

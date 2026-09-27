@@ -354,6 +354,7 @@
         "todayNothingElse": "Verder niets meer vandaag",
         "todayUntil": "voor {{time}}",
         "todayMore": "+{{count}} meer vandaag",
+        "todayLess": "Toon minder",
         "todayMore_one": "+{{count}} meer vandaag",
         "memberOpenTasks": "{{count}} taken",
         "memberOpenTasks_one": "{{count}} taak",

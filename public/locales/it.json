@@ -354,6 +354,7 @@
         "todayNothingElse": "Nient'altro per oggi",
         "todayUntil": "entro le {{time}}",
         "todayMore": "+{{count}} altri oggi",
+        "todayLess": "Mostra meno",
         "todayMore_one": "+{{count}} altro oggi",
         "memberOpenTasks": "{{count}} attività",
         "memberOpenTasks_one": "{{count}} attività",

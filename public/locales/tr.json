@@ -354,6 +354,7 @@
         "todayNothingElse": "Bugün başka bir şey yok",
         "todayUntil": "en geç {{time}}",
         "todayMore": "+{{count}} tane daha bugün",
+        "todayLess": "Daha az göster",
         "todayMore_one": "+{{count}} tane daha bugün",
         "memberOpenTasks": "{{count}} görev",
         "memberOpenTasks_one": "{{count}} görev",
