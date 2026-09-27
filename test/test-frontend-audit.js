@@ -4023,9 +4023,17 @@ test('wer eine Pille zeigt, markiert seinen Scrollport', () => {
   assert.match(layout, /\.page-scrollport[^{]*\{[^}]*padding-block-end:[^;]*--shell-tail/,
     'die Rolle muss den Nachlauf auch wirklich setzen - sonst prueft der Rest hier eine Klasse ohne Wirkung');
 
+  // STANDARD-PORT: Dokumente hat keinen eigenen Scrollport, es scrollt in
+  // `.app-content`. Dort traegt der Platzhalter `.page-transition::after` den
+  // Nachlauf, und --shell-tail enthaelt --bulk-pill-tail (R11 H4, gemessen 390px:
+  // 156px = Leiste 76 + Pille 80). Die Regel dazu steht hier mit.
+  const STANDARD_PORT = ['/documents.js'];
+  assert.match(layout, /\.app-content:not\(:has\(\.page-scrollport\)\) > \.page-transition::after\s*\{[^}]*block-size:\s*var\(--shell-tail\)/,
+    'der Standard-Port muss den Nachlauf am Platzhalter tragen - sonst deckt die Ausnahme unten nichts');
   for (const page of walkJsFiles('../public/pages/')) {
     const src = read(page);
     if (!/\bsetBulkPill\s*\(/.test(src)) continue;
+    if (STANDARD_PORT.some((name) => page.endsWith(name))) continue;
     assert.match(src, /page-scrollport/,
       `${page}: zeigt eine Sammelaktions-Pille, markiert aber seinen Scrollport nicht - `
       + 'sie verdeckt dann am Listenende die Zeilen, auf die sie sich bezieht');
@@ -7887,7 +7895,6 @@ test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrun
     ['.search-result + .search-result', 'Trennlinie zwischen zwei Treffern'],
     ['.search-scope', 'Bereichs-Chip in der Suche; ein Knopf, kein Feld'],
     ['.search-scope:hover', 'Hover desselben Chips'],
-    ['.documents-selectbar', 'Aktionsleiste der Mehrfachauswahl ("select" als Auswaehlen); Trennlinie'],
     ['.rrule-fields', 'Gruppe der Wiederholungsfelder; Gruppenkante, die Felder darin tragen ihre eigene'],
     ['.schedule-day-row-fields', 'Gruppe der Felder eines Wochentags; linke Gruppenlinie'],
     ['.note-category-selection', 'Chip der gewaehlten Notiz-Kategorie; Knopf, kein Feld'],
