@@ -1547,8 +1547,8 @@
 .task-select-btn__check {
   position: absolute;
   z-index: 1;
-  width: 12px;
-  height: 12px;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
   display: none;
 }
 
