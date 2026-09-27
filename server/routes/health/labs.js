@@ -223,9 +223,13 @@ router.post('/labs/:id/results', (req, res) => {
 // Tippfehler kostete die Zeile. Der Body darf Teilfelder tragen; validiert
 // wird die ZUSAMMENGEFUEHRTE Zeile mit demselben Validator wie beim Anlegen,
 // damit ein Teil-Update keine Kombination erzeugt, die POST abgelehnt haette.
-// Das Flag wird aus Wert und Referenz neu abgeleitet - ausser der Body nennt
-// es selbst; das alte Flag wandert bewusst NICHT mit, sonst stuende nach einer
-// Wertkorrektur das Urteil ueber den alten Wert da.
+// Das Flag: nennt der Body eins, gilt es. Aendert sich Wert oder Referenz,
+// wird es neu abgeleitet - sonst stuende nach einer Wertkorrektur das Urteil
+// ueber den alten Wert da. Bleiben beide, bleibt auch das gespeicherte Flag:
+// ein per POST gesetztes Urteil ohne Referenzbereich ginge sonst bei jeder
+// Einheitenkorrektur verloren (der Dialog hat kein Flag-Feld).
+// Ein vorhandener Messwert laesst sich nicht leeren (null/''): das waere
+// Datenverlust ueber einen Teil-Update. Ein Analyt ohne Wert bleibt ohne.
 router.patch('/results/:id', (req, res) => {
   try {
     const viewer = viewerId(req);
@@ -240,6 +244,9 @@ router.patch('/results/:id', (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Analyt nicht gefunden.', code: 404 });
 
     const b = req.body || {};
+    if ((b.value_num === null || b.value_num === '') && existing.value_num !== null) {
+      return badRequest(res, ['value_num kann nicht geleert werden.']);
+    }
     const pick = (key) => (b[key] !== undefined ? b[key] : existing[key]);
     const { row, error } = validateResult({
       analyte: pick('analyte'),
@@ -250,6 +257,8 @@ router.patch('/results/:id', (req, res) => {
       flag: b.flag,
     });
     if (error) return badRequest(res, [error]);
+    const measured = ['value_num', 'ref_low', 'ref_high'].some((k) => row[k] !== existing[k]);
+    if (b.flag === undefined && !measured) row.flag = existing.flag;
 
     db.get().prepare(`
       UPDATE health_lab_results

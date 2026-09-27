@@ -3408,7 +3408,10 @@ function wireResultEditor(panel, report, editing = null) {
     // auch die, die ein Zahlenfeld als leer meldet (`badInput`).
     const empty = valueRaw === '' || valueRaw == null;
     const notANumber = valueEl?.validity?.badInput || (!empty && !Number.isFinite(Number(valueRaw)));
-    if ((empty && !editing) || notANumber) {
+    // Ein vorhandener Messwert laesst sich nicht leeren (der Server lehnt es
+    // ab); leer bleiben darf nur, was schon leer war.
+    const hadValue = editing && editing.value_num !== null && editing.value_num !== undefined;
+    if ((empty && (!editing || hadValue)) || notANumber) {
       reportFieldError(valueEl, t('health.labs.results.valueRequired'));
       return;
     }
