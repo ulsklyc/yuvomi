@@ -41,8 +41,8 @@ function fakeSheet() {
   const part = (sel) => {
     if (!parts.has(sel)) {
       parts.set(sel, {
-        html: '', disabled: false, hidden: false,
-        replaceChildren() { this.html = ''; },
+        html: '', nodes: [], disabled: false, hidden: false,
+        replaceChildren(...nodes) { this.html = ''; this.nodes = nodes; },
         insertAdjacentHTML(_pos, markup) { this.html += markup; },
         addEventListener() {},
         querySelector: (inner) => part(inner),
@@ -109,6 +109,110 @@ test('die Legende nennt jedes Segment-Icon mit seinem Wort, im Mitglieds-Modus a
   assert.equal(initialSubject('user', CATALOG), null, 'Mitglieder bleiben ohne Vorwahl');
 });
 
+// ── Codex an #1485: scheitert das Laden eines Subjekts, steht keine scheinbar bearbeitbare Matrix da ──
+
+/** Gerade genug `document` fuer createRetryState(): Knoten, die ihre Kinder und Klicks behalten. */
+function fakeDocument() {
+  const node = (tag) => ({
+    tagName: tag.toUpperCase(), className: '', textContent: '', type: '', disabled: false,
+    children: [], attrs: {}, listeners: {},
+    appendChild(child) { this.children.push(child); return child; },
+    setAttribute(k, v) { this.attrs[k] = String(v); },
+    addEventListener(type, fn) { this.listeners[type] = fn; },
+  });
+  return { createElement: node };
+}
+
+test('Codex an #1485: scheitert das Laden der Rechte, zeigt das Blatt Meldung und „Erneut versuchen" statt einer Voreinstellung', async () => {
+  const { render } = await import('../public/settings/pages/admin-permissions.js');
+  const had = { window: 'window' in globalThis, document: 'document' in globalThis };
+  const prev = { window: globalThis.window, document: globalThis.document, confirm: globalThis.__confirmModal };
+  globalThis.window = {};
+  globalThis.document = fakeDocument();
+  const confirms = [];
+  globalThis.__confirmModal = async (...args) => { confirms.push(args); return true; };
+  let fail = true;
+  globalThis.__apiStub = {
+    get: async (url) => {
+      if (url === '/permissions/catalog') return { data: CATALOG };
+      if (url === '/permissions/role/parent' && fail) throw new Error('offline');
+      return { data: { modules: { tasks: 'read' }, widgets: {}, capabilities: {} } };
+    },
+  };
+  const origErr = console.error;
+  console.error = () => {};
+  try {
+    const ui = wiredSheet();
+    await render(ui.sheet, { user: { role: 'admin' } });
+    const matrix = ui.sheet.parts.get('#perm-matrix');
+    assert.doesNotMatch(matrix.html, /perm-seg/, `keine Segmente, die eine Voreinstellung vortaeuschen: ${matrix.html}`);
+    assert.doesNotMatch(matrix.html, /perm-reset|perm-save/, 'kein Zuruecksetzen und kein Speichern ohne geladene Rechte');
+    const [retry] = matrix.nodes;
+    assert.equal(retry?.className, 'settings-retry-state', 'der Fehler-Baustein der Einstellungen steht im Blatt');
+    const [message, button] = retry.children;
+    assert.equal(message.textContent, 'settings.permLoadError');
+    assert.equal(message.attrs.role, 'alert');
+    assert.equal(button.textContent, 'settings.retry');
+
+    // Ein Tipp auf das (alte) Zuruecksetzen fragt nicht und tut nichts.
+    await ui.clickReset();
+    assert.deepEqual(confirms, [], 'ohne geladenen Entwurf gibt es nichts zurueckzusetzen');
+
+    // Erneut versuchen laedt dasselbe Subjekt, danach steht die Matrix bedienbar da.
+    fail = false;
+    await button.listeners.click();
+    assert.match(matrix.html, /class="perm-matrix__subject">settings\.familyRoleParent</);
+    assert.match(matrix.html, /data-group="module:tasks" data-value="read"/);
+    assert.match(matrix.html, /aria-checked="true"[^>]*data-group="module:tasks" data-value="read"/,
+      'der geladene Wert, nicht die Voreinstellung');
+  } finally {
+    console.error = origErr;
+    delete globalThis.__apiStub;
+    if (prev.confirm === undefined) delete globalThis.__confirmModal; else globalThis.__confirmModal = prev.confirm;
+    if (had.window) globalThis.window = prev.window; else delete globalThis.window;
+    if (had.document) globalThis.document = prev.document; else delete globalThis.document;
+  }
+});
+
+test('Codex an #1485: waehrend die Rechte eines Subjekts laden, sind die stehenden Segmente gesperrt', async () => {
+  const { render } = await import('../public/settings/pages/admin-permissions.js');
+  const hadWindow = 'window' in globalThis;
+  const prevWindow = globalThis.window;
+  globalThis.window = {};
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  let release = null;
+  let slow = false;
+  globalThis.__apiStub = {
+    get: async (url) => {
+      if (url === '/permissions/catalog') return { data: CATALOG };
+      if (url === '/permissions/role/child' && slow) {
+        return new Promise((resolve) => { release = () => resolve({ data: { modules: {}, widgets: {}, capabilities: {} } }); });
+      }
+      return { data: { modules: {}, widgets: {}, capabilities: {} } };
+    },
+  };
+  try {
+    const ui = wiredSheet();
+    await render(ui.sheet, { user: { role: 'admin' } });
+    const controls = [{ disabled: false }, { disabled: false }, { disabled: false }];
+    const matrix = ui.sheet.parts.get('#perm-matrix');
+    const asked = [];
+    matrix.querySelectorAll = (sel) => { asked.push(sel); return controls; };
+    slow = true;
+    ui.clickRole('child');
+    await tick();
+    assert.ok(release, 'die Rolle wird geladen');
+    assert.ok(asked.some((sel) => /\.perm-seg__opt/.test(sel)), 'gesucht werden die Segmente');
+    assert.deepEqual(controls.map((c) => c.disabled), [true, true, true], 'bis die Rechte da sind, ist nichts bedienbar');
+    release();
+    await tick();
+  } finally {
+    delete globalThis.__apiStub;
+    if (hadWindow) globalThis.window = prevWindow;
+    else delete globalThis.window;
+  }
+});
+
 // ── Codex an #1485 (P1): eine veraltete Antwort schreibt nicht in das neue Subjekt ──
 
 /**
@@ -139,6 +243,8 @@ function wiredSheet() {
     clickMode: (mode) => modeButtons.find((b) => b.dataset.mode === mode).onclick(),
     clickUser: (id) => listeners.get('#perm-subjects')({ target: target({ '.perm-chip': { dataset: { user: String(id) } } }) }),
     clickSave: () => listeners.get('#perm-matrix')({ target: target({ '#perm-save': {} }) }),
+    clickReset: () => listeners.get('#perm-matrix')({ target: target({ '#perm-reset': {} }) }),
+    clickRole: (role) => listeners.get('#perm-subjects')({ target: target({ '.perm-chip': { dataset: { role } } }) }),
   };
 }
 

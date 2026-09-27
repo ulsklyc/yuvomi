@@ -105,6 +105,7 @@ const state = {
   inherited: { modules: {}, widgets: {}, capabilities: {} },
   dirty: false,
   loadedFor: null,     // subjectKey(), dessen Rechte in draft/inherited stehen
+  loadFailed: false,   // das Laden der Rechte fuer das aktuelle Subjekt scheiterte
 };
 
 /* EINE VERALTETE ANTWORT SCHRIEB IN DAS NEUE SUBJEKT (Codex an #1485, P1).
@@ -404,6 +405,20 @@ function renderMatrix(container) {
     return;
   }
 
+  /* EIN GESCHEITERTES LADEN SAH AUS WIE EINE BEARBEITBARE VOREINSTELLUNG
+   * (Codex an #1485): der Entwurf blieb leer, die Matrix zeigte fuer jedes
+   * Modul „Bearbeiten", Klicks wurden still verworfen und Zuruecksetzen tat
+   * nichts. Ohne geladene Rechte steht keine Matrix da, sondern die Meldung
+   * mit „Erneut versuchen" - derselbe Baustein wie beim Katalog. */
+  if (state.loadFailed) {
+    const { mode, subjectId } = state;
+    panel.replaceChildren(createRetryState({
+      message: t('settings.permLoadError'),
+      onRetry: () => selectSubject(container, mode, subjectId),
+    }));
+    return;
+  }
+
   // Admin-Mitglied: keine Einschränkung möglich.
   if (state.mode === 'user') {
     const member = state.catalog.members.find((m) => String(m.id) === String(state.subjectId));
@@ -558,8 +573,12 @@ async function selectSubject(container, mode, id) {
   state.subjectId = id;
   state.dirty = false;
   state.loadedFor = null;
+  state.loadFailed = false;
   state.draft = { modules: {}, widgets: {}, capabilities: {} };
   state.inherited = { modules: {}, widgets: {}, capabilities: {} };
+  // Bis die Rechte da sind, ist die stehende Matrix nicht bedienbar: sie zeigt
+  // noch das vorige Subjekt, und ein Klick liefe ins Leere.
+  lockMatrix(container);
 
   if (id != null) {
     try {
@@ -583,7 +602,8 @@ async function selectSubject(container, mode, id) {
       state.dirty = false;
     } catch (err) {
       if (generation !== loadGeneration) return;
-      window.yuvomi?.showToast(err.message || t('common.errorGeneric'), 'danger');
+      console.error('[Permissions] subject load failed:', err);
+      state.loadFailed = true;
     }
   } else {
     state.loadedFor = subjectKey();
@@ -591,6 +611,11 @@ async function selectSubject(container, mode, id) {
 
   renderSubjectSelector(container);
   renderMatrix(container);
+}
+
+function lockMatrix(container) {
+  const panel = container.querySelector('#perm-matrix');
+  panel?.querySelectorAll('.perm-seg__opt, #perm-reset, #perm-save').forEach((el) => { el.disabled = true; });
 }
 
 async function save(container) {
@@ -710,6 +735,8 @@ function applySegment(container, opt) {
 }
 
 async function resetSubject(container) {
+  // Ohne geladenen Entwurf gibt es nichts zurueckzusetzen - auch keine Frage.
+  if (!draftIsCurrent()) return;
   // War der einzige Confirm ohne `danger`, obwohl er Zugriffsbeschraenkungen
   // aufhebt - und bei einer Rolle gleich fuer mehrere Personen.
   const ok = await confirmModal(t('settings.permResetConfirm', { name: subjectTitle() }), {
