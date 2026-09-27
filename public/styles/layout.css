@@ -3918,6 +3918,14 @@ html.fab-anim-done .page-fab {
   transition: background-color var(--transition-fast);
 }
 
+/* `display: flex` oben schlaegt das UA-`[hidden]`. Menues blenden Eintraege
+ * nach Zustand aus (Aufgaben: Ablegen und Tags nur waehrend der Auswahl;
+ * Dokumente: „Alle auswaehlen" und Archivieren, R11 H4) - ohne diese Regel
+ * standen sie immer da. */
+.popover-menu__item[hidden] {
+  display: none;
+}
+
 @media (hover: none) {
   .popover-menu__item {
     min-height: var(--target-lg);
