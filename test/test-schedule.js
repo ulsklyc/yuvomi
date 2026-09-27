@@ -2416,3 +2416,29 @@ test('Feiertag und Planblock tragen einen Farbpunkt statt eines Randstreifens', 
   assert.ok(rules.some((r) => /\.schedule-overview__holiday > span::before/.test(r.selector)),
     'der Feiertag ebenso');
 });
+
+test('das Gueltigkeitsfenster eines Musters steht hinter "Weitere Einstellungen", offen sobald gesetzt (W2/A2)', async () => {
+  // "Zyklus beginnt am" und "Gueltig ab" standen als zwei Datumsfelder
+  // untereinander - woertlich gelesen zweimal dasselbe. Das Fenster ist die
+  // seltene Einstellung; gesetzt darf es trotzdem nicht verschwinden.
+  // Der Loader stubt advancedSection - eigener Stub, der Inhalt UND Optionen
+  // sichtbar macht (und hinterher wieder weg ist).
+  const { __test } = await import('../public/pages/schedule.js');
+  const vorher = globalThis.__advancedSection;
+  globalThis.__advancedSection = (inner, options) => `<ADV open=${Boolean(options.open)}>${inner}</ADV>`;
+  try {
+    const leer = __test.patternFields({});
+    const advanced = leer.indexOf('<ADV ');
+    assert.ok(advanced > 0, 'ohne Aufklapper stehen beide Datumsfelder offen im Formular');
+    assert.ok(leer.indexOf('name="anchor_date"') < advanced, 'der Zyklusbeginn bleibt vorn');
+    for (const name of ['valid_from', 'valid_until']) {
+      assert.ok(leer.indexOf(`name="${name}"`) > advanced, `${name} steht hinter dem Aufklapper`);
+    }
+    assert.match(leer, /<ADV open=false>/, 'ohne gesetzte Grenze zugeklappt');
+    const gesetzt = __test.patternFields({ valid_until: '2027-06-30' });
+    assert.match(gesetzt, /<ADV open=true>/, 'eine gesetzte Grenze bleibt sichtbar');
+    assert.match(gesetzt, /name="valid_until"[^>]*value="2027-06-30"/);
+  } finally {
+    if (vorher === undefined) delete globalThis.__advancedSection; else globalThis.__advancedSection = vorher;
+  }
+});
