@@ -28,6 +28,7 @@ import { moduleAccentToken, moduleAccentVar } from '/utils/module-accent.js';
 import { getLastHealthRoute, HEALTH_ROUTES } from '/utils/health-tabs.js';
 import { SCHEDULE_ROUTES } from '/utils/schedule-tabs.js';
 import { activityType } from '/utils/health-activity.js';
+import { SEARCH_SECTIONS, searchScopeModules, searchResultCount } from '/utils/search-sections.js';
 import { buildHelpRows } from '/utils/help.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { triggerPageFab } from '/utils/fab.js';
@@ -3378,17 +3379,13 @@ function initMoreSheet(container, openSearch) {
 /**
  * Initialisiert die Suchfunktion (Overlay + API-Calls).
  */
-// Durchsuchbare Domänen des /search-Endpunkts, in Anzeige-Reihenfolge. Dienen
-// im Leerzustand als Direktsprung-Kacheln (labelKey/icon gespiegelt aus der
-// Haupt-Navigation, damit Suche und Nav dieselbe Sprache sprechen).
-const SEARCH_SCOPES = [
-  { labelKey: 'nav.tasks',    route: '/tasks'    },
-  { labelKey: 'nav.calendar', route: '/calendar' },
-  { labelKey: 'nav.notes',    route: '/notes'    },
-  { labelKey: 'nav.contacts', route: '/contacts' },
-  { labelKey: 'nav.shopping', route: '/shopping' },
-  { labelKey: 'nav.health',   route: '/health'   },
-];
+// Durchsuchbare Domänen des /search-Endpunkts: EINE Liste in
+// utils/search-sections.js (Sektionen UND Direktsprung-Kacheln). Die Kacheln
+// zeigen nur Module, die der Betrachter in der Navigation hat - abgeschaltet
+// oder gesperrt, liefert der Server dort ohnehin nichts.
+function searchScopeAvailable(module) {
+  return !_disabledModules.has(module) && canAccessNavModule(module);
+}
 
 function initSearch(container) {
   const searchClose = container.querySelector('#search-close');
@@ -3426,7 +3423,8 @@ function initSearch(container) {
     scopes.appendChild(scopesHeading);
     const list = document.createElement('div');
     list.className = 'search-scopes__list';
-    SEARCH_SCOPES.forEach((scope) => {
+    searchScopeModules(searchScopeAvailable).forEach((module) => {
+      const scope = { labelKey: `nav.${module}`, route: `/${module}` };
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'search-scope';
@@ -3571,9 +3569,7 @@ function initSearch(container) {
  */
 function renderSearchResults(container, data, onClose) {
   container.replaceChildren();
-  const { tasks = [], events = [], notes = [], contacts = [], items = [], meds = [], activities = [], waste = [] } = data;
-  const total = tasks.length + events.length + notes.length + contacts.length + items.length
-    + meds.length + activities.length + waste.length;
+  const total = searchResultCount(data);
 
   if (total === 0) {
     container.appendChild(emptyHintEl(t('search.noResults')));
@@ -3635,18 +3631,16 @@ function renderSearchResults(container, data, onClose) {
     container.appendChild(section);
   }
 
-  makeSection('nav.tasks',    'tasks',    tasks,    (i) => `/tasks?open=${i.id}`, null,
-    (i) => (i.due_date ? formatDate(i.due_date) : ''));
-  makeSection('nav.calendar', 'calendar', events,   (i) => `/calendar?open=${i.id}`, null,
-    (i) => (i.start_datetime ? `${formatDate(i.start_datetime)}${i.all_day ? '' : ` · ${formatTime(i.start_datetime)}`}` : ''));
-  makeSection('nav.notes',    'notes',    notes,    (i) => `/notes?open=${i.id}`);
-  makeSection('nav.contacts', 'contacts', contacts, (i) => `/contacts?open=${i.id}`);
-  makeSection('nav.shopping', 'shopping', items,    (i) => `/shopping?list=${i.list_id}&highlight=${i.id}`);
-  makeSection('health.tabs.meds',     'health', meds,       () => '/health/meds', null,
-    (i) => i.dosage_text || '');
-  makeSection('health.tabs.activity', 'health', activities, () => '/health/activity', activityLabel,
-    (i) => (i.performed_at ? formatDate(i.performed_at) : ''));
-  makeSection('nav.waste', 'waste', waste, (i) => `/waste?type=${i.id}`);
+  // Reihenfolge, Ueberschrift, Ziel und Zweitzeile je Trefferart:
+  // utils/search-sections.js (test:search-permissions prueft sie gegen die
+  // Antwort des Servers).
+  const fmt = { formatDate, formatTime, activityLabel };
+  SEARCH_SECTIONS.forEach((section) => {
+    const hits = Array.isArray(data?.[section.bucket]) ? data[section.bucket] : [];
+    makeSection(section.labelKey, section.module, hits, section.route,
+      section.label ? (item) => section.label(item, fmt) : null,
+      section.meta ? (item) => section.meta(item, fmt) : null);
+  });
 
   // Die Siegel-Icons kommen als data-lucide-Platzhalter; der Treffer-Pfad
   // rendert sie selbst (der Leerzustands-Pfad tut es bereits genauso).
@@ -5026,6 +5020,10 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
 // Globale Exporte
 window.yuvomi = {
   navigate,
+  // Die globale Suche fuer Seiten, die einen eigenen Einstieg anbieten (die
+  // Uebersicht mobil, Re-Critique 2026-09-27 A1 P2-6) - dasselbe Overlay wie
+  // Seitenleiste, Mehr-Blatt und Cmd-K.
+  openSearch: () => _openSearch?.(),
   showToast,
   friendlyError,
   setThemeColor,
