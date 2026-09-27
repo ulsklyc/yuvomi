@@ -1176,6 +1176,22 @@ async function openPantryMatchModal(recipe, ingredientName, trigger) {
  * sichtbar, bevor man überhaupt aufklappt (siehe sourceBadge() weiter oben).
  */
 
+/**
+ * Fuss des Rezept-Dialogs nach dem Kanon `[Loeschen links] ... [Abbrechen]
+ * [Primaer]` (R8 H10). Loeschen gab es bis dahin nur im Detailkopf und im
+ * Zeilenmenue. Gespiegelte Rezepte bleiben ohne: sie gehoeren dem Provider,
+ * dieselbe Regel wie in `ROW_ACTIONS`.
+ */
+function recipeModalFooterHtml(isEdit, recipe) {
+  const canDelete = isEdit && recipe?.source === 'native';
+  return `
+      <div class="modal-panel__footer modal-panel__footer--plain">
+        ${canDelete ? `<button type="button" class="btn btn--danger-outline" id="recipe-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
+        <button class="btn btn--secondary" id="recipe-cancel">${t('common.cancel')}</button>
+        <button class="btn btn--primary" id="recipe-save">${isEdit ? t('common.save') : t('common.add')}</button>
+      </div>`;
+}
+
 function openRecipeModal(mode, recipe = null) {
   const isEdit = mode === 'edit';
 
@@ -1228,10 +1244,7 @@ function openRecipeModal(mode, recipe = null) {
           <input id="recipe-url" class="form-input" type="url" placeholder="${t('recipes.urlPlaceholder')}">
         </div>`,
         { open: isEdit && (!!recipe.notes || !!recipe.recipe_url) })}
-      <div class="modal-panel__footer modal-panel__footer--plain">
-        <button class="btn btn--secondary" id="recipe-cancel">${t('common.cancel')}</button>
-        <button class="btn btn--primary" id="recipe-save">${isEdit ? t('common.save') : t('common.add')}</button>
-      </div>
+      ${recipeModalFooterHtml(isEdit, recipe)}
     `,
     onSave(panel) {
       panel.querySelector('#recipe-title').value = isEdit ? recipe.title : '';
@@ -1322,6 +1335,10 @@ function openRecipeModal(mode, recipe = null) {
       });
 
       panel.querySelector('#recipe-cancel')?.addEventListener('click', closeModal);
+      panel.querySelector('#recipe-delete')?.addEventListener('click', () => {
+        closeModal({ force: true });
+        removeRecipe(recipe);
+      });
       panel.querySelector('#recipe-save')?.addEventListener('click', () => saveRecipe(panel, mode, recipe));
       // Pflichtfelder melden sich beim Verlassen inline (geteiltes Muster).
       wireBlurValidation(panel);
@@ -1626,4 +1643,6 @@ export const __test = {
   state,
   shoppingTransferButton,
   transferRecipe,
+  // R8 H10: Loeschen links im Dialogfuss.
+  recipeModalFooterHtml,
 };

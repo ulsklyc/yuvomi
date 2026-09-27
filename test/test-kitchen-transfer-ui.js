@@ -343,3 +343,37 @@ test('Import-Dialog im Einkauf: gehen die Rechte verloren, waehrend er offen ste
     shopping.state.activeListId = zuvorId;
   }
 });
+
+// -------------------------------------------------------------------------
+// Dialogfuss nach dem Kanon (R8 H10): [Loeschen links] ... [Abbrechen] [Primaer]
+// -------------------------------------------------------------------------
+
+/** Den Fuss eines Dialog-Markups herausloesen. */
+function fussVon(html) {
+  const treffer = /<div class="modal-panel__footer[^"]*">([\s\S]*?)<\/div>/.exec(html);
+  assert.ok(treffer, 'der Dialog hat einen Fuss');
+  return treffer[1];
+}
+
+function loeschenStehtLinks(fuss, id, abbrechenId) {
+  const loeschen = fuss.indexOf(`id="${id}"`);
+  assert.ok(loeschen >= 0, 'Loeschen steht im Dialogfuss');
+  assert.ok(loeschen < fuss.indexOf(`id="${abbrechenId}"`), 'links vor Abbrechen und Primaer');
+  assert.match(fuss, new RegExp(`class="btn btn--danger-outline" id="${id}" style="margin-inline-end:auto"`),
+    'als danger-outline, das den Rest nach rechts schiebt');
+}
+
+test('Mahlzeit bearbeiten: Loeschen steht links im Dialogfuss, beim Anlegen nicht (R8 H10)', async () => {
+  await withAccess(BEIDE, () => {
+    loeschenStehtLinks(fussVon(dialog()), 'modal-delete', 'modal-cancel');
+    const neu = meals.buildModalContent({ mode: 'create', date: '2026-09-21', mealType: 'lunch', meal: null });
+    assert.doesNotMatch(fussVon(neu), /modal-delete/, 'ohne Bestand gibt es nichts zu loeschen');
+  });
+});
+
+test('Rezept bearbeiten: Loeschen steht links im Dialogfuss - nicht beim Anlegen, nicht beim Spiegel (R8 H10)', () => {
+  loeschenStehtLinks(fussVon(recipes.recipeModalFooterHtml(true, { id: 4, source: 'native' })), 'recipe-delete', 'recipe-cancel');
+  assert.doesNotMatch(recipes.recipeModalFooterHtml(false, null), /recipe-delete/);
+  assert.doesNotMatch(recipes.recipeModalFooterHtml(true, { id: 5, source: 'mealie' }), /recipe-delete/,
+    'gespiegelte Rezepte gehoeren dem Provider - dieselbe Regel wie die Zeilenaktionen');
+});

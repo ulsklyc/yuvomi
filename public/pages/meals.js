@@ -1674,6 +1674,10 @@ function openMealModal(opts) {
       });
 
       panel.querySelector('#modal-cancel').addEventListener('click', closeModal);
+      panel.querySelector('#modal-delete')?.addEventListener('click', () => {
+        closeModal({ force: true });
+        deleteMeal(meal.id);
+      });
       panel.querySelector('#modal-save').addEventListener('click', () => saveModal(panel));
       // Pflichtfelder melden sich beim Verlassen inline (geteiltes Muster).
       wireBlurValidation(panel);
@@ -1836,7 +1840,11 @@ function buildModalContent({ mode, date, mealType, meal }) {
       : '<div id="transfer-missing" class="shopping-transfer__missing"></div>'}
     </div>` : ''}
 
+    ${/* Loeschen links im Dialogfuss (Kanon, R8 H10): am Desktop war eine
+        * Mahlzeit sonst nur ueber den Papierkorb der Karte loeschbar. Es geht
+        * denselben Weg wie dort (`deleteMeal`: Serienabfrage, Rueckgaengig). */ ''}
     <div class="modal-panel__footer modal-panel__footer--plain">
+      ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="modal-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
       <button class="btn btn--secondary" id="modal-cancel">${t('common.cancel')}</button>
       <button class="btn btn--primary" id="modal-save">${isEdit ? t('common.save') : t('common.add')}</button>
     </div>`;
