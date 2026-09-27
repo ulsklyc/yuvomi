@@ -2058,7 +2058,15 @@ test('S1: Admin-Abschnitte bleiben fuer Nicht-Admins verborgen - im Blatt, in de
 });
 
 test('S1: ein Modul geht nur in Aktive Module an und aus - die Modulblaetter zeigen den Zustand', async () => {
-  const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/<!--[\s\S]*?-->/g, '');
+  // Bis nichts mehr faellt: ein einmaliger Durchlauf laesst aus `<!<!---->--` wieder ein `<!--` entstehen.
+  const strip = (src) => {
+    let text = src;
+    for (let prev = null; prev !== text;) {
+      prev = text;
+      text = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/<!--[\s\S]*?-->/g, '');
+    }
+    return text;
+  };
   const pages = (await readdir(new URL('../public/settings/pages/', import.meta.url))).filter((name) => name.endsWith('.js'));
   const writers = [];
   for (const file of pages) {
