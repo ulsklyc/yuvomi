@@ -55,7 +55,12 @@ import {
   sortPeriodsAsc, periodFlowLoad, heavyBleedingSignal, painSummary, peakPainDay, daysBetween,
   CERVIX_MUCUS_TYPES, TEST_RESULT_VALUES, INTIMACY_TYPES, CONTRACEPTION_TYPES,
 } from '/utils/health-cycle.js';
-import { HEALTH_ROUTES, renderHealthTabsBar } from '/utils/health-tabs.js';
+import {
+  HEALTH_ROUTES, HEALTH_AREAS, HEALTH_OVERVIEW_ID, healthAddress, healthAreaId, healthAreaRoute,
+  legacyHealthTabPath, rememberHealthRoute,
+} from '/utils/health-tabs.js';
+import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
+import { formatFastingDuration } from '/utils/health-fasting.js';
 import { canUseFasting, isNavModuleReadOnly } from '/permissions.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
 import { intervalMonthsToInput, intervalInputToMonths } from '/utils/health-prevention.js';
@@ -467,35 +472,25 @@ function panelMarkup(panel, activeRoute) {
     });
 
   // Eigenes data-health-panel-Attribut statt des (per Frontend-Audit gesperrten)
-  // Legacy-„data-panel". Über dieses Attribut reicht health-tabs.js die Panels an
-  // renderSubTabs weiter (`panelFor`); von dort kommen `id`, `aria-labelledby` zum
-  // zugehörigen Tab und der Hidden-Zustand. Rolle und `aria-label` stehen hier
-  // trotzdem: sie tragen das Panel in dem Moment zwischen Markup-Einbau und
-  // Leisten-Render, in dem die Verknüpfung noch nicht steht. Danach ersetzt der
-  // Tabname das Label (zwei Namen wären einer zu viel).
+  // Legacy-„data-panel": über diese Adresse findet die Seite ihr Panel.
+  //
+  // KEIN tabpanel MEHR (R10 G1): die Bereiche sind Orte mit eigener Adresse,
+  // erreicht über die Liste „Alle Bereiche", nicht Tabs einer Leiste. Das Panel
+  // ist ein benannter Abschnitt; sein Name ist die Überschrift darin.
+  //
+  // Die Überschrift bleibt UNSICHTBAR (Keine-sichtbare-Titelwiederholung,
+  // DESIGN.md): am Desktop nennt die markierte Zeile links den Bereich, mobil
+  // der Seitentitel (health-toolbar, syncHealthHeader). Sie hält die
+  // Dokumentgliederung zwischen dem h1 der Seite und den h3 der Abschnitte.
+  const titleId = `health-panel-title-${panel.route.split('/')[2] || HEALTH_OVERVIEW_ID}`;
   return `
     <section class="health-panel" data-health-panel="${esc(panel.route)}"
-             role="tabpanel" aria-label="${esc(t(panel.titleKey))}" ${hidden}>
-      <!-- Der Panel-Titel steht sichtbar schon in der Sub-Tab-Leiste darueber:
-           alle sechs Panels wiederholten ihn wortgleich als h2 direkt darunter
-           ("Uebersicht" ueber "Uebersicht"), also verdoppelte der Kopf
-           Information, statt eine Ebene zu benennen (Finish-Review Runde 4,
-           Befund 6). Dieselbe Regel hat die Einstellungen schon einmal
-           eingeholt - der Guard dazu prueft sie jetzt fuer beide.
-           Als Ueberschrift bleibt er stehen, nur unsichtbar: er haelt die
-           Dokumentgliederung zwischen dem h1 des Moduls und den h3 der
-           Abschnitte, und das tabpanel traegt denselben Namen im aria-label. -->
-      <h2 class="health-panel__title sr-only">${esc(t(panel.titleKey))}</h2>
+             aria-labelledby="${titleId}" ${hidden}>
+      <h2 class="health-panel__title sr-only" id="${titleId}">${esc(t(panel.titleKey))}</h2>
       ${body}
     </section>
   `;
 }
-
-// Kein eigenes showPanel() mehr: Auswahl und Panel-Sichtbarkeit sind EINE
-// Operation (WAI-ARIA APG „Tabs"), und sie gehört dorthin, wo auch
-// `aria-selected` gesetzt wird - in renderSubTabs. Zwei Besitzer für denselben
-// Zustand sind genau die Naht, an der `aria-selected` und `hidden` auseinander
-// laufen können.
 
 // Routen-basierter Kontext-FAB: die Primäraktion folgt der aktiven Health-Route.
 // Auf der Übersicht (keine Erstellen-Aktion) ausgeblendet.
@@ -536,8 +531,330 @@ function refreshHealthFab() {
   updateHealthFab(normalizeHealthPath(window.location.pathname));
 }
 
+// ========================================================
+// NAVIGATION: UEBERSICHT + ALLE BEREICHE (R10 G1)
+// ========================================================
+//
+// Die neun Tabs sind weg. Die Seite ist Liste + Detail (utils/master-detail.js):
+//
+//   - LISTE: „Übersicht" und darunter „Alle Bereiche" - je Zeile Icon, Name und
+//     der letzte Wert/Status des Bereichs (Muster Apple Health „Durchsuchen").
+//   - DETAIL: das Panel des gewählten Bereichs. Die Auswahl IST die Adresse
+//     (`/health/<bereich>`, `/health` = Übersicht; healthAddress in
+//     health-tabs.js), Klick = pushState, Zurück/Vor verbraucht der Baustein.
+//
+// Ab der Split-Schwelle stehen beide nebeneinander. Darunter schiebt ein
+// Bereich die Übersicht weg (Push): das Panel steht allein, der Kopf trägt
+// „‹ Gesundheit" und den Bereichsnamen. Auf der Übersicht steht die Liste
+// über der Zusammenfassung - mobil lagen fünf von neun Tabs unsichtbar hinter
+// einem Querscroll (A6 P1-1), die Bereiche sind jetzt das Erste, was man sieht.
+//
+// WO DIE PANELS WOHNEN: in EINEM Wirt (`.health-panels`), der zwischen zwei
+// Stellen umzieht - im Split in die Detailspalte des Bausteins, darunter in die
+// Bühne (`.health-stage`) im Scrollport. Umziehen statt neu bauen: die Panels
+// halten Zustand (Person, Zeitraum, offene Diagramme), und die Detailspalte ist
+// unter der Schwelle `display: none` (layout.css) - dort kann nichts stehen.
+
+let md = null;
+let _panelsHost = null;
+let _activeArea = null;
+// Scrollstand der Übersicht (schmal): wer aus einem Bereich zurückkommt, steht
+// wieder dort, wo er die Liste verlassen hat - nicht oben.
+let _overviewScroll = 0;
+// Kam der Bereich schmal von der Übersicht (Push)? Dann ist „‹ Gesundheit" ein
+// Schritt zurück in der History - wie Apples Zurück-Knopf - und kein neuer
+// Eintrag, der beim nächsten Zurück wieder im Bereich landet.
+let _pushedFromOverview = false;
+
+function areaRowMarkup(area) {
+  return `
+    <li>
+      <a class="list-row health-area-row" href="${esc(area.route)}" data-md-id="${esc(area.id)}">
+        <span class="health-area-row__icon" aria-hidden="true"><i data-lucide="${esc(area.icon)}"></i></span>
+        <span class="list-row__main health-area-row__main">
+          <span class="list-row__name health-area-row__name">${esc(t(area.labelKey))}</span>
+          <span class="list-row__meta health-area-row__status" data-health-area-status="${esc(area.id)}"></span>
+        </span>
+        <i data-lucide="chevron-right" class="health-area-row__chevron" aria-hidden="true"></i>
+      </a>
+    </li>`;
+}
+
+function areasNavMarkup() {
+  const [overviewArea, ...rest] = HEALTH_AREAS({ cycleEnabled, fastingEnabled });
+  // Die Übersicht als eigene Zeile nur am Desktop (health.css): mobil IST die
+  // Seite, auf der die Liste steht, die Übersicht - eine Zeile zu ihr wäre
+  // ein Link auf sich selbst.
+  return `
+    <nav class="health-areas" aria-label="${esc(t('nav.health'))}">
+      <ul class="row-divided health-areas__group health-areas__overview" role="list">${areaRowMarkup(overviewArea)}</ul>
+      <h2 class="health-areas__title u-section-title" id="health-areas-title">${esc(t('health.overview.areasTitle'))}</h2>
+      <ul class="row-divided health-areas__group health-areas__list" role="list" aria-labelledby="health-areas-title">${rest.map(areaRowMarkup).join('')}</ul>
+    </nav>`;
+}
+
+/** Seitentitel und Rückweg: mobil im Bereich „‹ Gesundheit" + Bereichsname. */
+function syncHealthHeader() {
+  const toolbar = _container?.querySelector('.health-toolbar');
+  if (!toolbar) return;
+  const pushed = Boolean(_activeArea) && _activeArea !== HEALTH_OVERVIEW_ID && !isSplitNow();
+  const area = HEALTH_AREAS({ cycleEnabled, fastingEnabled }).find((a) => a.id === _activeArea);
+  const title = pushed && area ? t(area.labelKey) : t('nav.health');
+  const heading = toolbar.querySelector('.page-toolbar__title');
+  // NUR SCHREIBEN, WENN SICH ETWAS ÄNDERT: der Kopf-Beobachter der Shell
+  // (ux.js) sieht jede Mutation in diesem Teilbaum und misst neu.
+  if (heading && heading.textContent !== title) heading.textContent = title;
+  const back = toolbar.querySelector('.health-toolbar__back');
+  if (back && back.hidden === pushed) back.hidden = !pushed;
+  _container.querySelector('.health-page')?.toggleAttribute('data-health-pushed', pushed);
+}
+
+/**
+ * Steht die Detailspalte? Dieselbe Frage wie `md.isSplit()`, aber ohne das
+ * Handle: der Baustein zeichnet eine Adress-Auswahl schon WÄHREND
+ * mountMasterDetail() (renderDetail), bevor `md` zugewiesen ist.
+ */
+function isSplitNow() {
+  const detail = _container?.querySelector('.health-split > .split-view__detail');
+  return Boolean(detail?.isConnected) && getComputedStyle(detail).display !== 'none';
+}
+
+/** Den Panel-Wirt an die Stelle der aktuellen Darstellung hängen. */
+function placePanels() {
+  if (!_panelsHost || !_container) return;
+  const target = isSplitNow()
+    ? _container.querySelector('.split-view__detail [data-md-body]')
+    : _container.querySelector('[data-health-stage]');
+  if (target && _panelsHost.parentElement !== target) target.replaceChildren(_panelsHost);
+}
+
+/** Welche Panels es gibt, hängt an den Voreinstellungen (Zyklus, Fasten). */
+function isAvailableArea(id) {
+  return HEALTH_AREAS({ cycleEnabled, fastingEnabled }).some((a) => a.id === id);
+}
+
+/**
+ * Einen Bereich zeigen: Panel sichtbar, Inhalt einhängen, FAB, Kopf, Merker.
+ * Die EINE Stelle, die das tut - für Klick, Adresse, Zurück/Vor und
+ * Darstellungswechsel.
+ */
+function activateArea(id) {
+  if (!_container?.isConnected) return;
+  const route = healthAreaRoute(id);
+  const previous = _activeArea;
+  const scroller = _container.querySelector('.health-browse');
+  const narrow = !isSplitNow();
+  if (narrow && scroller && previous === HEALTH_OVERVIEW_ID && id !== HEALTH_OVERVIEW_ID) _overviewScroll = scroller.scrollTop;
+  _activeArea = id;
+  for (const panel of _container.querySelectorAll('[data-health-panel]')) {
+    panel.hidden = panel.dataset.healthPanel !== route;
+  }
+  rememberHealthRoute(route);
+  syncHealthHeader();
+  updateHealthFab(route);
+  maybeMountOverview(route);
+  maybeMountVitals(route);
+  maybeMountCycle(route);
+  // Fasten ist ein eigenes Seitenmodul und baut sich bei jedem Einhängen neu -
+  // dieselbe Auswahl ein zweites Mal ist kein Wechsel.
+  if (previous !== id) maybeMountFasting(route);
+  maybeMountMeds(route);
+  maybeMountPrevention(route);
+  maybeMountLabs(route);
+  maybeMountActivity(route);
+  maybeMountNutrition(route);
+  if (narrow && scroller && previous !== id) {
+    scroller.scrollTop = id === HEALTH_OVERVIEW_ID ? _overviewScroll : 0;
+  }
+  // Die Zeilen laden, sobald die Liste zu sehen ist. Danach zieht nur der
+  // verlassene Bereich nach - er hat womöglich gerade etwas gespeichert.
+  if (!_statusesRequested && (!narrow || id === HEALTH_OVERVIEW_ID)) refreshAllAreaStatuses();
+  else if (_statusesRequested && previous && previous !== id) refreshAreaStatus(previous);
+  if (id === HEALTH_OVERVIEW_ID) _pushedFromOverview = false;
+}
+
+// --------------------------------------------------------
+// Letzter Wert / Status je Bereich (eigene Daten)
+// --------------------------------------------------------
+//
+// Was die Zeile unter dem Namen sagt. Bewusst die EIGENEN Daten des
+// angemeldeten Kontos: die Liste ist Navigation, kein Personen-Umschalter - wer
+// eine andere Person ansieht, tut das im Bereich (Personen-Pille).
+// Jeder Bereich für sich und still: fällt eine Abfrage aus, bleibt die Zeile
+// ohne Status und die Navigation voll bedienbar. Ein Programmfehler (kein
+// HTTP-Status) wird trotzdem gemeldet, statt im catch zu verschwinden.
+
+/** Letzte Messung ueber alle Arten: Name, Wert, Einheit. */
+function vitalsStatusText(rows) {
+  const latest = (rows || []).reduce((best, row) => (!best || String(row.measured_at) > String(best.measured_at) ? row : best), null);
+  const metric = latest ? vitalMetric(latest.type) : null;
+  if (!metric) return '';
+  const unit = vitalUnitText(metric, latest);
+  return `${t(metric.labelKey)} ${vitalValueText(metric, latest)}${unit ? ` ${unit}` : ''}`;
+}
+
+/** Die aktiven Medikamente beim Namen - was man sucht, wenn man hineingeht. */
+function medsStatusText(list) {
+  return (list || []).filter((m) => m.active).map((m) => m.name).filter(Boolean).join(', ');
+}
+
+/** Zyklustag und Phase - dieselbe Vorhersage wie Ring und Uebersicht. */
+function cycleStatusText(periods, settings, logs) {
+  const prediction = predictCycle(periods || [], settings || {}, todayKey(), logs || []);
+  if (prediction.isPregnant) return t('health.cycle.pregnancy.title');
+  if (!prediction.hasData) return '';
+  const phase = t(CYCLE_PHASE_LABEL_KEYS[prediction.phase] || CYCLE_PHASE_LABEL_KEYS[PHASE.FOLLICULAR]);
+  return t('health.cycle.bubble.line1', { day: prediction.cycleDay, phase });
+}
+
+const AREA_STATUS = {
+  async vitals() {
+    return vitalsStatusText((await api.get('/health/vitals')).data);
+  },
+  async cycle() {
+    const [periods, logs] = await Promise.all([
+      api.get('/health/cycle/periods'),
+      api.get('/health/cycle/logs'),
+    ]);
+    let settings = {};
+    try { settings = (await api.get('/health/cycle/settings')).data || {}; } catch { settings = {}; }
+    return cycleStatusText(periods.data, settings, logs.data);
+  },
+  async fasting() {
+    const state = (await api.get('/health/fasting/state')).data;
+    const start = Date.parse(state?.active?.start_at ?? '');
+    if (!Number.isFinite(start)) return '';
+    return `${t('health.fasting.elapsed')}: ${formatFastingDuration((Date.now() - start) / 60000)}`;
+  },
+  async meds() {
+    return medsStatusText((await api.get('/health/medications')).data);
+  },
+  async prevention() {
+    const due = ((await api.get('/health/prevention/due')).data || []).slice().sort((a, b) => a.days_left - b.days_left);
+    const item = due[0];
+    if (!item) return '';
+    const when = item.days_left < 0
+      ? t('health.prevention.overdueDays', { count: Math.abs(item.days_left) })
+      : item.days_left === 0
+        ? t('health.prevention.dueToday')
+        : t('health.prevention.dueInDays', { count: item.days_left });
+    return `${item.type_name} · ${when}`;
+  },
+  async labs() {
+    const reports = (await api.get('/health/labs')).data || [];
+    const latest = reports.reduce((best, r) => (!best || String(r.report_date) > String(best.report_date) ? r : best), null);
+    if (!latest) return '';
+    const sum = summarizeReport(latest);
+    const date = formatDate(String(latest.report_date).slice(0, 10));
+    return sum.hasAbnormal ? `${date} · ${t('health.labs.abnormalBadge', { count: sum.abnormal })}` : date;
+  },
+  async activity() {
+    const rows = (await api.get('/health/activities')).data || [];
+    const latest = rows.reduce((best, r) => (!best || String(r.performed_at) > String(best.performed_at) ? r : best), null);
+    if (!latest) return '';
+    const preset = activityType(latest.type);
+    return `${preset ? t(preset.labelKey) : latest.type} · ${formatDate(String(latest.performed_at).slice(0, 10))}`;
+  },
+  async nutrition() {
+    const summary = (await api.get('/health/nutrition/summary')).data;
+    const kcal = Number(summary?.totals?.energy_kcal ?? 0);
+    if (!(kcal > 0)) return '';
+    return `${t('health.nutrition.todayTitle')}: ${fmtNum(kcal, { maximumFractionDigits: 0 })} ${t('health.nutrition.unit.kcal')}`;
+  },
+};
+
+// DIE UEBERSICHT HAT DIESE DATEN SCHON. Werte, Medikamente und Zyklus laedt sie
+// fuer die eigene Person ohnehin - die Zeilen lesen sie von dort, statt sie
+// ein zweites Mal zu holen. Gemessen: ohne das kostete ein Aufruf der
+// Gesundheit 24 statt 14 API-Anfragen, und eine Folge harter Neuladungen lief
+// ins Anfragelimit des Servers (300/min).
+const OVERVIEW_DERIVED = new Set(['vitals', 'meds', 'cycle']);
+
+// Jeder Seitenaufbau zaehlt weiter: eine Antwort aus einem verlassenen
+// Aufbau schreibt nicht in die Liste des neuen.
+let _statusGen = 0;
+// Die Zeilen laden erst, wenn die Liste zu sehen ist (Split oder Uebersicht):
+// wer mobil direkt in einen Bereich springt, sieht sie nicht.
+let _statusesRequested = false;
+
+function setAreaStatus(id, text) {
+  const el = _container?.querySelector(`[data-health-area-status="${CSS.escape(id)}"]`);
+  if (el && el.textContent !== text) el.textContent = text;
+}
+
+async function refreshAreaStatus(id) {
+  const load = AREA_STATUS[id];
+  if (!load || !isAvailableArea(id)) return;
+  const gen = _statusGen;
+  let text = '';
+  try {
+    text = await load();
+  } catch (err) {
+    if (!Number.isInteger(err?.status)) console.error(`[Health] area status ${id}:`, err);
+    return;
+  }
+  if (gen !== _statusGen) return;
+  setAreaStatus(id, text);
+}
+
+/** Werte, Medikamente, Zyklus aus der geladenen Uebersicht (eigene Person). */
+function applyOverviewStatuses() {
+  if (!_statusesRequested || !overview.loaded || overview.error || overview.personId !== overview.meId) return false;
+  setAreaStatus('vitals', vitalsStatusText(overview.vitals));
+  setAreaStatus('meds', medsStatusText(overview.meds));
+  if (cycleEnabled) setAreaStatus('cycle', cycleStatusText(overview.cyclePeriods, overview.cycleSettings, overview.cycleLogs));
+  return true;
+}
+
+function refreshAllAreaStatuses() {
+  _statusGen += 1;
+  _statusesRequested = true;
+  // Steht die Uebersicht (oder laedt sie gerade fuer die eigene Person),
+  // liefert sie ihre drei Zeilen selbst (renderOverviewShell).
+  const overviewProvides = applyOverviewStatuses()
+    || (_activeArea === HEALTH_OVERVIEW_ID && !overview.loaded);
+  for (const area of HEALTH_AREAS({ cycleEnabled, fastingEnabled })) {
+    if (overviewProvides && OVERVIEW_DERIVED.has(area.id)) continue;
+    refreshAreaStatus(area.id);
+  }
+}
+
+function wireAreasNav(signal) {
+  const nav = _container.querySelector('.health-areas');
+  nav.addEventListener('click', (event) => {
+    const row = event.target.closest('[data-md-id]');
+    if (!row) return;
+    // DER BROWSER BEHÄLT SEINEN KLICK (dashboard.js): Cmd-, Strg-, Umschalt-
+    // und Mittelklick öffnen den Bereich in einem neuen Tab oder Fenster.
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    event.preventDefault();
+    md.open(row.dataset.mdId, row);
+  }, { signal });
+  // Esc hebt in einer Liste + Detail die Auswahl auf. Hier gibt es kein „nichts
+  // gewählt": `/health` IST die Übersicht. Die Geste bleibt deshalb ohne
+  // Wirkung, statt eine Adresse stehen zu lassen, die etwas anderes nennt als
+  // das, was rechts steht.
+  nav.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && event.target.closest?.('[data-md-id]')) event.stopPropagation();
+  }, { capture: true, signal });
+
+  _container.querySelector('.health-toolbar__back')?.addEventListener('click', (event) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    event.preventDefault();
+    if (_pushedFromOverview) history.back();
+    else window.yuvomi?.navigate('/health');
+  }, { signal });
+}
+
 export async function render(container, ctx = {}) {
   _container = container;
+  md = null;
+  _panelsHost = null;
+  _activeArea = null;
+  _overviewScroll = 0;
+  _pushedFromOverview = false;
+  _statusesRequested = false;
+  _statusGen += 1;
   healthUser = ctx.user ?? healthUser;
   vitals.meId = ctx.user?.id ?? vitals.meId;
   vitals.root = null;
@@ -564,24 +881,53 @@ export async function render(container, ctx = {}) {
   nutrition.root = null;
   nutrition.loaded = false;
   await Promise.all([loadHealthPrefs(), loadCareGrants(), loadVisibilityDefaults()]);
+
+  // ALTE ADRESSEN LEBEN WEITER. `/health?tab=<bereich>` (Lesezeichen aus der
+  // Tab-Zeit) und ein Bereich, den es für dieses Konto nicht gibt (Zyklus aus,
+  // Fasten ohne Fähigkeit), landen per replaceState auf ihrer Adresse - die
+  // Zeile links und die Adresse oben nennen danach dasselbe.
+  const legacy = legacyHealthTabPath(location);
+  if (legacy) history.replaceState({ ...(history.state ?? {}), path: legacy }, '', legacy);
   const activeRoute = normalizeHealthPath(window.location.pathname);
+  if (activeRoute !== window.location.pathname) {
+    const fixed = `${activeRoute}${location.search}${location.hash}`;
+    history.replaceState({ ...(history.state ?? {}), path: fixed }, '', fixed);
+  }
   const panels = PANELS().filter((panel) => (cycleEnabled || panel.route !== '/health/cycle') && (fastingEnabled || panel.route !== '/health/fasting'));
 
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <div class="health-page app-page app-page--dashboard" data-composition="dashboard">
-      <!-- Kanonischer Modulkopf: die Sub-Tab-Leiste wechselt eine SICHT
-           innerhalb der Gesundheit (alle Health-Routen tragen module: 'health'),
-           also steht der Modulname als Large Title ueber ihr - dasselbe Muster
-           wie Budget, Belohnungen und Haushaltshilfe. renderHealthTabsBar haengt
-           die Leiste als zweite Zeile in diesen Kopf. -->
+    <div class="health-page app-page app-page--dashboard app-page--list-detail" data-composition="dashboard">
+      <!-- Kanonischer Modulkopf. Am Desktop und auf der Übersicht trägt er den
+           Modulnamen; mobil in einem Bereich den Rückweg und den Bereichsnamen
+           (syncHealthHeader). Die Tab-Leiste darunter ist entfallen (R10 G1). -->
       <header class="page-toolbar health-toolbar">
+        <a class="health-toolbar__back" href="/health" hidden>
+          <i data-lucide="chevron-left" class="health-toolbar__back-icon" aria-hidden="true"></i><span>${esc(t('nav.health'))}</span>
+        </a>
         <h1 class="page-toolbar__title">${esc(t('nav.health'))}</h1>
         <div class="page-toolbar__actions"></div>
       </header>
-      ${panels.map((panel) => panelMarkup(panel, activeRoute)).join('')}
+      <div class="split-view health-split">
+        <div class="split-view__list page-scrollport health-browse">
+          ${areasNavMarkup()}
+          <div class="health-stage" data-health-stage></div>
+        </div>
+        ${splitViewDetailHtml({
+          id: 'health',
+          label: t('nav.health'),
+          empty: { icon: 'heart-pulse', title: t('health.overview.areasPick') },
+        })}
+      </div>
     </div>
   `);
+
+  const page = container.querySelector('.health-page');
+  const panelsHtml = panels.map((panel) => panelMarkup(panel, activeRoute)).join('');
+  _panelsHost = document.createElement('div');
+  _panelsHost.className = 'health-panels';
+  _panelsHost.insertAdjacentHTML('beforeend', panelsHtml);
+  container.querySelector('[data-health-stage]').appendChild(_panelsHost);
 
   // Der Riegel EINMAL je Seitenaufbau, am Seiten-Root: die Panels darunter
   // werden bei jedem Personen-/Tabwechsel neu gebaut, dieser Knoten nicht.
@@ -589,47 +935,67 @@ export async function render(container, ctx = {}) {
   // (adoptPageFab, #634) - dort greifen `setPageFabAction({hidden})` oben, die
   // CSS-Regel an `html[data-module-readonly]` und `triggerPageFab()` fuer den
   // `n`-Kurzbefehl.
-  const page = container.querySelector('.health-page');
   page.addEventListener('click', readOnlyLatch, true);
 
   _fab = createPageFab({ id: 'health-fab', dockLabel: t('newLabel.healthVitals') });
   page.appendChild(_fab);
 
   if (window.lucide) window.lucide.createIcons({ el: container });
-  renderHealthTabsBar(container, activeRoute, { cycleEnabled, fastingEnabled });
-  updateHealthFab(activeRoute);
-  maybeMountOverview(activeRoute);
-  maybeMountVitals(activeRoute);
-  maybeMountCycle(activeRoute);
-  maybeMountFasting(activeRoute);
-  maybeMountMeds(activeRoute);
-  maybeMountPrevention(activeRoute);
-  maybeMountLabs(activeRoute);
-  maybeMountActivity(activeRoute);
-  maybeMountNutrition(activeRoute);
+
+  const signal = ctx.signal;
+  wireAreasNav(signal);
+  md = mountMasterDetail({
+    root: container.querySelector('.health-split'),
+    signal,
+    address: healthAddress,
+    // `/health` wählt die Übersicht - eine Adresse ohne Auswahl gibt es hier
+    // nicht, also auch nichts vorzuwählen.
+    preselect: false,
+    // Schmal ist die Übersicht selbst die Liste: ein Bereich wird eine eigene
+    // Seite (Push über den Router), kein Blatt über ihr.
+    narrow: 'accordion',
+    renderDetail: (id) => {
+      if (!isAvailableArea(id)) return false;
+      placePanels();
+      activateArea(id);
+      return undefined;
+    },
+    openNarrow: (id) => {
+      _pushedFromOverview = _activeArea === HEALTH_OVERVIEW_ID && id !== HEALTH_OVERVIEW_ID;
+      window.yuvomi?.navigate(healthAreaRoute(id));
+    },
+    onNarrowSync: (id) => {
+      placePanels();
+      activateArea(isAvailableArea(id) ? id : HEALTH_OVERVIEW_ID);
+    },
+    onModeChange: ({ selectedId }) => {
+      placePanels();
+      if (selectedId) activateArea(selectedId);
+      syncHealthHeader();
+    },
+  });
+
+  // Schmal zeichnet der Baustein nichts: die Adresse gilt trotzdem.
+  if (!isSplitNow()) {
+    placePanels();
+    activateArea(healthAreaId(activeRoute) ?? HEALTH_OVERVIEW_ID);
+  }
+  syncHealthHeader();
 }
 
-// Soft-Navigation zwischen Health-Tabs (vom Router aufgerufen, wenn das Modul
-// bereits gerendert ist). Tauscht nur die Sub-Tab-Leiste (frischer Aktiv-Zustand
-// + Panel-Sync) aus — kein Full-Reload. Rückgabe false erzwingt volles Rendern.
+// Soft-Navigation zwischen Bereichen (vom Router aufgerufen, wenn das Modul
+// bereits gerendert ist: Links in der Übersicht, „‹ Gesundheit", Kurzbefehle).
+// Die Auswahl läuft über den Baustein, damit Markierung und Adresse eins
+// bleiben. Rückgabe false erzwingt volles Rendern.
 export async function update({ path, user } = {}) {
-  if (!_container?.isConnected) return false;
+  if (!_container?.isConnected || !md) return false;
   if (user?.id) healthUser = user;
   if (user?.id) { vitals.meId = user.id; meds.meId = user.id; labs.meId = user.id; activity.meId = user.id; cycle.meId = user.id; overview.meId = user.id; prevention.meId = user.id; nutrition.meId = user.id; }
   const activeRoute = normalizeHealthPath(path || window.location.pathname);
-
-  _container.querySelector('.sub-tabs-bar')?.remove();
-  renderHealthTabsBar(_container, activeRoute, { cycleEnabled, fastingEnabled });
-  updateHealthFab(activeRoute);
-  maybeMountOverview(activeRoute);
-  maybeMountVitals(activeRoute);
-  maybeMountCycle(activeRoute);
-  maybeMountFasting(activeRoute);
-  maybeMountMeds(activeRoute);
-  maybeMountPrevention(activeRoute);
-  maybeMountLabs(activeRoute);
-  maybeMountActivity(activeRoute);
-  maybeMountNutrition(activeRoute);
+  const id = healthAreaId(activeRoute) ?? HEALTH_OVERVIEW_ID;
+  // Auch schmal ueber den Baustein: er merkt sich die Auswahl, und wird das
+  // Fenster breiter, steht rechts genau dieser Bereich.
+  md.select(id, { history: 'none' });
   return true;
 }
 
@@ -5243,6 +5609,7 @@ function renderOverviewShell() {
   `);
   if (window.lucide) window.lucide.createIcons({ el: overview.root });
   wireOverview();
+  applyOverviewStatuses();
 }
 
 function overviewCard(icon, titleKey, body) {
@@ -5859,12 +6226,11 @@ function renderCycleShell() {
 
   cycle.root.insertAdjacentHTML('beforeend', `
     ${persons}
-    ${own ? cycleBubbleMarkup(prediction, pms, darf) : ''}
+    ${own ? cycleBubbleMarkup(prediction, pms, darf, { withRing: true }) : ''}
     <div class="cycle-hero">
       ${cycleRingMarkup(prediction)}
       <div class="cycle-hero__side">
         ${cycleStatsMarkup(prediction)}
-        ${prediction.trackFertility ? `<p class="health-disclaimer">${esc(t(prediction.ovulationConfirmed ? 'health.cycle.fertilityDisclaimerConfirmed' : 'health.cycle.fertilityDisclaimer'))}</p>` : ''}
       </div>
     </div>
     ${cycleRingLegendMarkup(prediction)}
@@ -5872,7 +6238,7 @@ function renderCycleShell() {
     ${cycleCalendarMarkup(own, pms, darf)}
     ${cycleTrendsMarkup()}
     ${cycleHistoryMarkup(darf)}
-    ${cycleFooterMarkup(darf)}
+    ${cycleFooterMarkup(darf, prediction)}
   `);
   if (window.lucide) window.lucide.createIcons({ el: cycle.root });
   wireCycle();
@@ -5905,11 +6271,13 @@ function cyclePregnancyWeekText(p) {
 // Schwangerschafts-Zweig unten baut sein "baby"-Icon damit ueber DIESELBE
 // Huelle statt einer eigenen, fast identischen Wrapper-Kopie.
 function cycleBubbleShell(line1Text, line2Html, icon = 'sparkles') {
+  // Ohne Zeile 1 (neben dem Ring, siehe cycleBubbleMarkup) ist Zeile 2 die
+  // ganze Aussage - kein leerer Absatz davor.
   return `
     <div class="cycle-bubble" role="region" aria-label="${esc(t('health.cycle.bubble.ariaLabel'))}">
       <div class="cycle-bubble__icon" aria-hidden="true"><i data-lucide="${esc(icon)}"></i></div>
       <div class="cycle-bubble__body">
-        <p class="cycle-bubble__line1">${esc(line1Text)}</p>
+        ${line1Text ? `<p class="cycle-bubble__line1">${esc(line1Text)}</p>` : ''}
         ${line2Html}
       </div>
     </div>`;
@@ -5929,7 +6297,7 @@ function cycleBubbleShell(line1Text, line2Html, icon = 'sparkles') {
  * truege Trefferflaeche und Hover weiter und verspraeche eine Buchung, die
  * nicht stattfindet (dieselbe Begruendung wie am Statushaken, #1209).
  */
-function cycleBubbleMarkup(prediction, pms, canEdit = true) {
+function cycleBubbleMarkup(prediction, pms, canEdit = true, { withRing = false } = {}) {
   const today = todayKey();
 
   // Schwangerschaft: Zeile 1 ist die SSW-Zeile (cyclePregnancyWeekText(), s.o.)
@@ -5942,7 +6310,13 @@ function cycleBubbleMarkup(prediction, pms, canEdit = true) {
   }
 
   const phaseLabel = t(CYCLE_PHASE_LABEL_KEYS[prediction.phase] || CYCLE_PHASE_LABEL_KEYS[PHASE.FOLLICULAR]);
-  const line1 = t('health.cycle.bubble.line1', { day: prediction.cycleDay, phase: phaseLabel });
+  // NEBEN DEM RING SAGT DIE BLASE NUR, WAS DER RING NICHT SAGT (Re-Critique
+  // 2026-09-27, A6 P2-4). Zyklustag und Phase stehen direkt darunter im Ring
+  // (Tagesmarke + Mitte), das fruchtbare Fenster mit Datum in der Kachel
+  // daneben: „Fruchtbares Fenster" stand im ersten Bild viermal. Mit Ring
+  // entfaellt Zeile 1, ebenso Prioritaet 6 (fruchtbares Fenster) - und ohne
+  // eigene Aussage die ganze Blase.
+  const line1 = withRing ? '' : t('health.cycle.bubble.line1', { day: prediction.cycleDay, phase: phaseLabel });
   const settings = cycleSettings();
 
   // Prioritaet 1: Periode heute/ueberfaellig erwartet - derselbe Handlungsaufruf
@@ -6055,12 +6429,14 @@ function cycleBubbleMarkup(prediction, pms, canEdit = true) {
   // Prioritaet 6: fruchtbares Fenster (nur wenn ueberhaupt verfolgt - die
   // Verhuetungs-Einstellung (contraception) schaltet trackFertility unter
   // hormoneller Verhuetung bereits ab).
-  if (prediction.trackFertility && prediction.fertileStart && today >= prediction.fertileStart && today <= prediction.fertileEnd) {
+  if (!withRing && prediction.trackFertility && prediction.fertileStart && today >= prediction.fertileStart && today <= prediction.fertileEnd) {
     const key = prediction.ovulationConfirmed ? 'health.cycle.bubble.fertileConfirmed' : 'health.cycle.bubble.fertile';
     return cycleBubbleShell(line1, `<p class="cycle-bubble__line2">${esc(t(key, { date: formatDate(prediction.fertileEnd) }))}</p>`);
   }
 
-  // Prioritaet 7: nichts Passendes - NIE eine Fuellphrase, nur Zeile 1.
+  // Prioritaet 7: nichts Passendes - NIE eine Fuellphrase, nur Zeile 1. Neben
+  // dem Ring traegt Zeile 1 nichts Neues: dann keine Blase.
+  if (withRing) return '';
   return cycleBubbleShell(line1, '');
 }
 
@@ -7294,8 +7670,17 @@ function cycleHistoryMarkup(canEdit) {
  *   Entdeck-Hinweis (er erklaert das Antippen einer Kalenderzelle, die es bei
  *   `read` nicht mehr gibt) haengen am Schreibrecht (#1265).
  */
-function cycleFooterMarkup(canEdit) {
+/**
+ * EIN Hinweis am Ende, nicht zwei (A6 P2-4). Wird das fruchtbare Fenster
+ * gezeigt, ersetzt sein Hinweis (Kalendermethode, keine Verhuetung, keine
+ * aerztliche Beratung) den allgemeinen - er sagt dasselbe und mehr. Er stand
+ * vorher neben der Statistik, der allgemeine zusaetzlich hier.
+ */
+function cycleFooterMarkup(canEdit, prediction = null) {
   const q = cycle.personId ? `?user_id=${encodeURIComponent(cycle.personId)}` : '';
+  const fertilityNote = prediction?.trackFertility && prediction.hasData && !prediction.isPregnant
+    ? `<p class="health-disclaimer">${esc(t(prediction.ovulationConfirmed ? 'health.cycle.fertilityDisclaimerConfirmed' : 'health.cycle.fertilityDisclaimer'))}</p>`
+    : '';
   return `
     <div class="cycle-footer">
       <a class="btn btn--ghost btn--sm" href="/api/v1/health/export/cycle${q}" download>
@@ -7305,7 +7690,7 @@ function cycleFooterMarkup(canEdit) {
       ${canEdit ? `<button class="btn btn--ghost btn--sm" data-action="cycle-settings"><i data-lucide="settings-2" aria-hidden="true"></i>${esc(t('health.cycle.settings.open'))}</button>` : ''}
     </div>
     ${canEdit ? `<p class="cycle-hint cycle-discovery-hint">${t('health.cycle.discoveryHint')}</p>` : ''}
-    ${disclaimerMarkup()}`;
+    ${fertilityNote || disclaimerMarkup()}`;
 }
 
 // --------------------------------------------------------

@@ -1833,3 +1833,73 @@ test('peakPainDay: null, wenn Schmerz-Symptome nie gradiert wurden', () => {
   ];
   assert.equal(peakPainDay(logs, peakPainHist, {}), null);
 });
+
+// --------------------------------------------------------
+// R10 G2 (Re-Critique 2026-09-27, A6 P2-4): jede Aussage einmal
+// --------------------------------------------------------
+// „Fruchtbares Fenster" stand im ersten Bild viermal (Blase Zeile 1 + 2,
+// Ringmitte, Kachel), der Hinweis zweimal. Die Renderer werden hier als
+// Programm gefahren, nicht als Text gelesen; Mini-DOM und Rechte baut jeder
+// Test selbst und raeumt sie ab.
+const { installMiniDom } = await import('./mini-dom.js');
+const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+const { __test: healthPage } = await import('../public/pages/health.js');
+
+function imZyklus(fn) {
+  const abraeumen = installMiniDom();
+  setPermissions({ admin: false, modules: { health: 'write' }, widgets: {}, capabilities: {} });
+  healthPage.setViewStateForTest('cycle', { meId: 1, personId: 1, periods: [], logs: [], settings: {} });
+  try { return fn(); } finally {
+    healthPage.setViewStateForTest('cycle', { periods: [], logs: [], settings: {} });
+    clearPermissions();
+    abraeumen();
+  }
+}
+
+// Heute mitten im fruchtbaren Fenster, sonst nichts zu sagen (Prioritaet 6).
+const FRUCHTBAR = Object.freeze({
+  isPregnant: false, hasData: true, phase: 'fertile', cycleDay: 11, daysUntilNext: 18,
+  trackFertility: true, ovulationConfirmed: false,
+  fertileStart: '2000-01-01', fertileEnd: '2999-12-31', ovulationDate: '2999-12-30',
+});
+
+test('G2: neben dem Ring sagt die Blase nichts, was der Ring schon sagt', () => {
+  imZyklus(() => {
+    // Ohne Ring (Schwangerschaft, Aufrufer ohne Ring): Zeile 1 und das Fenster wie bisher.
+    const allein = healthPage.cycleBubbleMarkup(FRUCHTBAR, null, true);
+    assert.match(allein, /cycle-bubble__line1/);
+    assert.match(allein, /health\.cycle\.bubble\.fertile\b/);
+    // Mit Ring: Zyklustag/Phase stehen im Ring, das Fenster in der Kachel - keine Blase.
+    assert.equal(healthPage.cycleBubbleMarkup(FRUCHTBAR, null, true, { withRing: true }), '');
+    // Hat sie etwas Eigenes zu sagen, sagt sie NUR das.
+    const faellig = { ...FRUCHTBAR, phase: 'luteal', daysUntilNext: 0 };
+    const mitRing = healthPage.cycleBubbleMarkup(faellig, null, true, { withRing: true });
+    assert.match(mitRing, /health\.cycle\.bubble\.periodToday/);
+    assert.match(mitRing, /data-action="cycle-bubble-start-period"/);
+    assert.doesNotMatch(mitRing, /cycle-bubble__line1/);
+  });
+});
+
+test('G2: der Fuss traegt genau EINEN Hinweis - den zur Fruchtbarkeit, wenn sie gezeigt wird', () => {
+  imZyklus(() => {
+    const count = (html) => (html.match(/class="health-disclaimer/g) || []).length;
+    const mitFenster = healthPage.cycleFooterMarkup(true, FRUCHTBAR);
+    assert.equal(count(mitFenster), 1);
+    assert.match(mitFenster, /health\.cycle\.fertilityDisclaimer/);
+    assert.doesNotMatch(mitFenster, />health\.disclaimer</);
+    const bestaetigt = healthPage.cycleFooterMarkup(true, { ...FRUCHTBAR, ovulationConfirmed: true });
+    assert.match(bestaetigt, /health\.cycle\.fertilityDisclaimerConfirmed/);
+    // Ohne Fruchtbarkeit (Verhuetung, Schwangerschaft, keine Daten): der allgemeine.
+    for (const ohne of [{ ...FRUCHTBAR, trackFertility: false }, { ...FRUCHTBAR, isPregnant: true }, null]) {
+      const fuss = healthPage.cycleFooterMarkup(true, ohne);
+      assert.equal(count(fuss), 1);
+      assert.match(fuss, />health\.disclaimer</);
+    }
+  });
+  // Und die Statistik daneben traegt ihn nicht mehr: der Normalzweig der
+  // Ansicht nennt den Fruchtbarkeits-Hinweis nur noch ueber den Fuss.
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  const shell = src.slice(src.indexOf('function renderCycleShell('), src.indexOf('function cyclePregnancyWeekText('));
+  assert.doesNotMatch(shell, /fertilityDisclaimer/);
+  assert.match(shell, /cycleFooterMarkup\(darf, prediction\)/);
+});

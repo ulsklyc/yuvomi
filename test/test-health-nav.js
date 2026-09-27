@@ -3,8 +3,9 @@
  * Läuft mit: node --loader ./test/test-browser-loader.mjs test/test-health-nav.js
  *
  * Deckt ab:
- *  - health-tabs.js: HEALTH_ROUTES, HEALTH_TABS(), getLastHealthRoute-Fallback,
- *    isHealthRoute
+ *  - health-tabs.js: HEALTH_ROUTES, HEALTH_AREAS(), getLastHealthRoute-Fallback,
+ *    isHealthRoute, die Pfad-Adresse je Bereich und die Umleitung alter
+ *    `?tab=`-Adressen (R10 G1)
  *  - Router-Registrierung (Routen, topLevelSection, Shortcut, Nav)
  *  - Modul abschaltbar (Server-Allowlist + Settings-Toggle-Definition)
  *  - i18n-Parität der neuen Keys über ALLE Locales
@@ -23,7 +24,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
 
 const {
-  HEALTH_ROUTES, HEALTH_STORAGE_KEY, HEALTH_TABS, getLastHealthRoute, isHealthRoute,
+  HEALTH_ROUTES, HEALTH_STORAGE_KEY, HEALTH_AREAS, getLastHealthRoute, isHealthRoute,
+  healthAddress, healthAreaId, healthAreaRoute, legacyHealthTabPath, rememberHealthRoute,
 } = await (async () => {
   global.window = { yuvomi: null };
   global.document = {
@@ -60,27 +62,89 @@ test('HEALTH_STORAGE_KEY ist korrekt', () => {
   assert.equal(HEALTH_STORAGE_KEY, 'yuvomi-health-tab');
 });
 
-test('HEALTH_TABS(): acht Tabs mit passenden Routen, Label-Keys und Icons', () => {
-  const tabs = HEALTH_TABS();
-  assert.equal(tabs.length, 8);
-  assert.deepEqual(tabs.map((tab) => tab.route), HEALTH_ROUTES.filter((route) => route !== '/health/fasting'));
-  assert.deepEqual(tabs.map((tab) => tab.labelKey), [
+test('HEALTH_AREAS(): Uebersicht plus sieben Bereiche mit Kennung, Route, Label-Key und Icon', () => {
+  const areas = HEALTH_AREAS();
+  assert.equal(areas.length, 8);
+  assert.deepEqual(areas.map((a) => a.route), HEALTH_ROUTES.filter((route) => route !== '/health/fasting'));
+  assert.deepEqual(areas.map((a) => a.id), [
+    'overview', 'vitals', 'cycle', 'meds', 'prevention', 'labs', 'activity', 'nutrition',
+  ]);
+  assert.deepEqual(areas.map((a) => a.labelKey), [
     'health.tabs.overview', 'health.tabs.vitals', 'health.tabs.cycle',
     'health.tabs.meds', 'health.tabs.prevention', 'health.tabs.labs', 'health.tabs.activity',
     'health.tabs.nutrition',
   ]);
-  assert.deepEqual(tabs.map((tab) => tab.icon), [
+  assert.deepEqual(areas.map((a) => a.icon), [
     'heart-pulse', 'activity', 'droplet', 'pill', 'syringe', 'flask-conical', 'dumbbell', 'salad',
   ]);
 });
 
-test('HEALTH_TABS({ cycleEnabled: false }): blendet den Zyklus-Tab aus', () => {
-  const tabs = HEALTH_TABS({ cycleEnabled: false });
-  assert.equal(tabs.length, 7);
-  assert.ok(!tabs.some((tab) => tab.route === '/health/cycle'), 'kein Zyklus-Tab');
-  assert.deepEqual(tabs.map((tab) => tab.route), [
+test('HEALTH_AREAS({ cycleEnabled: false }): blendet den Zyklus aus', () => {
+  const areas = HEALTH_AREAS({ cycleEnabled: false });
+  assert.equal(areas.length, 7);
+  assert.ok(!areas.some((a) => a.route === '/health/cycle'), 'kein Zyklus-Bereich');
+  assert.deepEqual(areas.map((a) => a.route), [
     '/health', '/health/vitals', '/health/meds', '/health/prevention', '/health/labs', '/health/activity', '/health/nutrition',
   ]);
+});
+
+// --------------------------------------------------------
+// R10 G1: jeder Bereich hat seine Adresse, alte `?tab=`-Adressen leiten um
+// --------------------------------------------------------
+test('jeder Bereich hat eine eigene, registrierte Adresse - und die Adresse nennt genau ihn', () => {
+  const all = HEALTH_AREAS({ cycleEnabled: true, fastingEnabled: true });
+  assert.equal(all.length, HEALTH_ROUTES.length, 'jede Health-Route ist ein Bereich und umgekehrt');
+  for (const area of all) {
+    assert.ok(HEALTH_ROUTES.includes(area.route), `${area.id}: Route ${area.route} ist nicht registriert`);
+    assert.equal(healthAreaRoute(area.id), area.route, `${area.id}: Adresse`);
+    assert.equal(healthAreaId(area.route), area.id, `${area.route}: Kennung`);
+    // Der Liste-+-Detail-Baustein liest und schreibt die Auswahl ueber diese Adresse.
+    assert.equal(healthAddress.read({ pathname: area.route, search: '', hash: '' }), area.id);
+    assert.equal(healthAddress.href(area.id), area.route);
+  }
+  // Die Uebersicht ist `/health` - eine Seite ohne Auswahl gibt es nicht.
+  assert.equal(healthAddress.href(null), '/health');
+  // Fremde Adressen gehoeren nicht zu dieser Seite: der Router zeichnet neu.
+  assert.equal(healthAddress.read({ pathname: '/tasks', search: '', hash: '' }), undefined);
+  assert.equal(healthAddress.read({ pathname: '/health/unknown', search: '', hash: '' }), undefined);
+  assert.equal(healthAreaRoute('unknown'), '/health');
+});
+
+test('alte /health?tab=<bereich>-Adressen landen auf der Adresse des Bereichs', () => {
+  const loc = (search, hash = '') => ({ pathname: '/health', search, hash });
+  for (const area of HEALTH_AREAS({ cycleEnabled: true, fastingEnabled: true })) {
+    assert.equal(legacyHealthTabPath(loc(`?tab=${area.id}`)), area.route, `?tab=${area.id}`);
+  }
+  // Die Tab-Route als Wert, Grossschreibung, uebrige Parameter und Anker bleiben.
+  assert.equal(legacyHealthTabPath(loc('?tab=/health/meds')), '/health/meds');
+  assert.equal(legacyHealthTabPath(loc('?tab=Labs')), '/health/labs');
+  assert.equal(legacyHealthTabPath(loc('?tab=fasting&x=1', '#history')), '/health/fasting?x=1#history');
+  // Ein Tab, den es nicht gibt, faellt auf die Uebersicht - der Parameter geht.
+  assert.equal(legacyHealthTabPath(loc('?tab=nope')), '/health');
+  // Nichts umzuleiten: keine alte Adresse oder gar keine Gesundheit.
+  assert.equal(legacyHealthTabPath(loc('')), null);
+  assert.equal(legacyHealthTabPath(loc('?x=1')), null);
+  assert.equal(legacyHealthTabPath({ pathname: '/tasks', search: '?tab=meds', hash: '' }), null);
+  assert.equal(legacyHealthTabPath({ pathname: '/health/meds', search: '?tab=labs', hash: '' }), null);
+});
+
+test('health.js leitet die alte Adresse um, BEVOR die Seite die Auswahl liest', () => {
+  // Der Baustein liest die Auswahl beim Einhaengen aus der Adresse
+  // (healthAddress.read). Stuende die Umleitung danach, zeigte die Seite fuer
+  // `/health?tab=meds` die Uebersicht und schriebe erst dann die neue Adresse.
+  const src = read('public/pages/health.js');
+  const redirect = src.search(/const legacy = legacyHealthTabPath\(location\);\s*if \(legacy\) history\.replaceState\(/);
+  const mount = src.search(/mountMasterDetail\(\{[\s\S]{0,200}address: healthAddress/);
+  assert.ok(redirect > 0, 'render() muss legacyHealthTabPath per replaceState einloesen');
+  assert.ok(mount > redirect, 'der Baustein wird mit healthAddress und NACH der Umleitung eingehaengt');
+});
+
+test('rememberHealthRoute merkt nur Health-Routen (Kurzbefehl g h)', () => {
+  global.sessionStorage._d = {};
+  rememberHealthRoute('/health/labs');
+  assert.equal(getLastHealthRoute(), '/health/labs');
+  rememberHealthRoute('/tasks');
+  assert.equal(getLastHealthRoute(), '/health/labs');
 });
 
 // --------------------------------------------------------

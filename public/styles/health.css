@@ -14,18 +14,207 @@
    * Hand da. Die viewBox des SVG bleibt bewusst unabhängig: sie ist ein
    * Koordinatensystem, keine Größe (das SVG skaliert per width: 100%). */
   --cycle-ring-size: 220px;
+  /* LISTE + DETAIL (R10 G1): die Seite ist eine Flex-Spalte mit fester Höhe,
+   * damit Liste und Bereich ab der Split-Schwelle je für sich scrollen
+   * (layout.css, `.split-view`). Darunter scrollt EIN Port - die Liste
+   * `.health-browse`, in der dann auch die Bühne mit dem Bereich steht. Den
+   * Nachlauf für Kapsel und FAB rechnet die Shell an diesem Port
+   * (`.page-scrollport`), nicht mehr ein Bodenpolster hier.
+   * Full-bleed-Root (Issue #577): der Modulkopf ist ein direktes Kind dieses
+   * Roots und sein Chrome - Grund, Trennlinie, Sticky-Fläche - muss bis zur
+   * Shell-Kante laufen. Deshalb trägt der Root KEIN padding-inline; die
+   * Content-Spalte kommt über --page-inline-pad auf den Kindern. */
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  /* overflow:clip in overflow:auto (.app-content) leert auf iOS/WebKit den
+   * Scroll-Container (contacts.css) - hidden clippt gleich, ohne den Fehler. */
+  overflow: hidden;
+}
+
+/* Der Port unter der Schwelle: Bereichsliste, darunter die Bühne. Ab der
+ * Schwelle ist er die linke Spalte (layout.css setzt dort overflow selbst). */
+.health-browse {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  /* Full-bleed-Root (Issue #577): der Modulkopf ist ein direktes Kind dieses
-   * Roots und sein Chrome - Grund, Trennlinie, Sticky-Fläche - muss bis zur
-   * Shell-Kante laufen. Deshalb trägt der Root KEIN padding-inline; die
-   * Content-Spalte kommt über --page-inline-pad auf den Kindern (Kopf aus der
-   * Shell-Regel, Panels hier darunter). Vorher hing die Tab-Leiste außerhalb
-   * des Roots im Router-Wrapper, da war das Padding hier richtig. */
-  /* Nur der eigene Abstand: Tab-Leiste und FAB rechnet die Shell als
-   * Nachlauf (`--shell-tail`, layout.css, Kopfregel mobil 2026-09-26). */
-  padding-bottom: var(--space-6);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-block-start: var(--space-4);
+  /* Das eigene Bodenpolster wird ANGEMELDET, nicht gesetzt: den Nachlauf fuer
+   * Kapsel und FAB rechnet die Shell dazu (layout.css, `.page-scrollport`). */
+  --scrollport-pad: var(--space-6);
+}
+
+.health-stage:empty {
+  display: none;
+}
+
+.health-panels {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ---- Rückweg im Bereich (schmal) ----
+ * Apples Navigationsleiste: „‹ Gesundheit" als eigene Zeile über dem
+ * Bereichsnamen. Nur, wenn ein Bereich die Übersicht weggeschoben hat
+ * (syncHealthHeader); am Desktop steht die Liste links und ist der Rückweg. */
+.health-toolbar:has(> .health-toolbar__back:not([hidden])) {
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+
+.health-toolbar__back {
+  display: inline-flex;
+  flex-basis: 100%;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--target-base);
+  /* Die Treffflaeche reicht bis an die Kante, das Zeichen steht auf der
+   * Fluchtlinie des Inhalts (wie settings-toolbar__back). */
+  margin-inline-start: calc(-1 * var(--space-2));
+  padding-inline: var(--space-2);
+  color: var(--color-accent);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+}
+
+.health-toolbar__back[hidden] {
+  display: none;
+}
+
+.health-toolbar__back-icon {
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+  flex: 0 0 auto;
+}
+
+/* ---- Alle Bereiche ----
+ * Die Liste IST die Navigation (Muster Apple Health „Durchsuchen"): Zeichen in
+ * Modultinte, Name, darunter der letzte Wert oder Status in Sekundärschrift,
+ * rechts der Chevron des Push-Wegs. */
+.health-areas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-inline: var(--page-inline-pad);
+}
+
+.health-page[data-health-pushed] .health-areas {
+  display: none;
+}
+
+/* Die Flaeche der Gruppe. NICHT `.row-carrier`: der kappt auf --page-measure,
+ * und die Gesundheit laeuft als Dashboard-Seite mit vollem Kopf (PAGE-016) -
+ * dieselbe Begruendung wie `.health-vitals__more-list` weiter unten. Die
+ * Haarlinien kommen aus `.row-divided` (list-row.css), Flaeche, Ecke und
+ * Schatten sind die des Traegers. */
+.health-areas__group {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Schmal ist die Seite selbst die Übersicht - eine Zeile zu ihr wäre ein
+ * Link auf sich. Ab der Schwelle steht sie als erste Zeile (unten). */
+.health-areas__overview {
+  display: none;
+}
+
+.health-areas__title {
+  margin: var(--space-2) 0 0;
+}
+
+.health-area-row {
+  color: inherit;
+  text-decoration: none;
+}
+
+.health-area-row__icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+  color: var(--module-accent);
+}
+
+.health-area-row__icon svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+.health-area-row__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0h);
+}
+
+/* Ein Wert ist EINE Zeile: lieber abgekürzt als ein Umbruch, der die Zeile
+ * höher macht als ihre Nachbarn (Medikamentennamen, lange Einheiten). */
+.health-area-row__status {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.health-area-row__status:empty {
+  display: none;
+}
+
+.health-area-row__chevron {
+  flex: 0 0 auto;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  color: var(--color-text-tertiary);
+}
+
+/* ---- Ab der Split-Schwelle: Liste links, Bereich rechts ----
+ * Die Liste nimmt die Breite einer Seitenleiste (5 x 64px = 320px), nicht die
+ * Listenspur der Datenlisten (420-520px): ihre Zeilen sind Ziele, keine
+ * Datensätze, und der Bereich rechts braucht die Breite für Raster und
+ * Diagramme. Die Detailspalte trägt hier KEINE Karte: die Bereiche bringen
+ * ihre eigenen Karten mit, und eine Karte um Karten wäre Kasten-in-Kasten. */
+@container module-surface (min-width: 65rem) {
+  .health-split {
+    grid-template-columns: calc(var(--space-16) * 5) minmax(0, 1fr);
+  }
+
+  .health-split > .split-view__detail {
+    background-color: transparent;
+    box-shadow: none;
+    border-radius: 0;
+  }
+
+  .health-areas__overview {
+    display: block;
+  }
+
+  .health-area-row__chevron {
+    display: none;
+  }
+
+  .health-panels {
+    padding-block: var(--space-4) var(--space-6);
+  }
+
+  /* Die Spalte endet schon am Seitenpolster (layout.css, --split-view-end-pad);
+   * das Panel polstert darin nicht noch einmal. Zwei Klassen, weil die
+   * Grundregel `.health-panel` weiter unten in dieser Datei steht. */
+  .health-panels > .health-panel {
+    padding-inline: 0;
+  }
 }
 
 /* EINE TITELZEILE, EINE HOEHE (wie housekeeping.css). Seit die Primaeraktion
@@ -1986,11 +2175,11 @@ button.health-med-card:hover {
   margin-top: var(--space-4);
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-lg);
-  /* Modulton als Inhalts-Aussage ("wo bin ich"), keine Kartenexplosion: Kante
-   * im Vollton + Waschung in DERSELBEN Regel, damit der Struktur-Audit
-   * (test-frontend-audit.js, Vollton-Regel) die Aussage nicht zweimal blass
-   * zaehlt - die Kante traegt den vollen Ton, die Flaeche nur die Waschung. */
-  border-inline-start: 3px solid var(--module-health);
+  /* Modulton als Inhalts-Aussage ("wo bin ich"), keine Kartenexplosion. Der
+   * 3px-Seitenstreifen ist entfallen (Re-Critique 2026-09-27, A6 P2-4): ein
+   * Streifen an einer Karte ist das Muster, das DESIGN.md fuer Traeger ohne
+   * freie Nutzerfarbe ausschliesst. Den Ton traegt das Zeichen links im
+   * Vollton (.cycle-bubble__icon), die Flaeche nur die Waschung. */
   background: color-mix(in oklab, var(--module-health) var(--tint-wash), var(--color-surface));
 }
 
@@ -2012,6 +2201,13 @@ button.health-med-card:hover {
   margin: 0;
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
+}
+
+/* Neben dem Ring faellt Zeile 1 weg (health.js, cycleBubbleMarkup): dann ist
+ * Zeile 2 die ganze Aussage und spricht in der Primaerrolle. */
+.cycle-bubble__body > .cycle-bubble__line2:first-child,
+.cycle-bubble__body > .cycle-bubble__line2:first-child > span {
+  color: var(--color-text-primary);
 }
 
 .cycle-bubble__line2--row {
@@ -2147,6 +2343,16 @@ button.health-med-card:hover {
   gap: var(--space-2);
 }
 
+/* KEIN LOCH IM RASTER (A6 P2-4). Die Einzelkacheln stehen zu zweit, die
+ * Doppelkachel (Ø Zyklus + Ø Periode) laeuft voll. Ist die Zahl der
+ * Einzelkacheln ungerade (drei mit Fruchtbarkeit, eine ohne), stand neben
+ * der letzten eine leere Zelle von Kachelgroesse - desktop 264x81, mobil
+ * ebenso. Die letzte ungerade Einzelkachel nimmt dann die ganze Zeile. */
+.cycle-stats > .cycle-stat:not(.cycle-stat--dual):nth-child(odd):nth-last-child(2),
+.cycle-stats > .cycle-stat:not(.cycle-stat--dual):nth-child(odd):last-child {
+  grid-column: 1 / -1;
+}
+
 /* Kennzahlkarte auf dem Grouped-Grund: randlose Karte. Die frühere
  * surface-2-Fläche lag im Dark UNTER dem Grund (#050507 auf #0A0A0C) und
  * verschwand dort fast vollständig. */
@@ -2269,23 +2475,29 @@ button.health-med-card:hover {
      380px Breite ohnehin saettigt, damit Mobile und Desktop dieselbe
      Gap-Mathematik teilen): 7*64 + 6*4 = 472px. */
   --cycle-cal-grid-max: calc(var(--space-16) * 7 + var(--space-1) * 6);
-  /* Rail-Untergrenze: 4 Zellbreiten + 1 Gap = 4*64 + 4 = 260px - der Punkt, ab
-     dem Legende/Chips zu schmal wuerden und lieber stapeln sollten (siehe
-     @container-Regel unten). */
-  --cycle-cal-rail-min: calc(var(--space-16) * 4 + var(--space-1));
-  /* Rail-Obergrenze: 5 Zellbreiten = 320px, verhindert, dass die schmale
-     Legenden-/Chip-Spalte bei sehr breiten Containern sinnlos in die Breite
-     gezogen wird. */
-  --cycle-cal-rail-max: calc(var(--space-16) * 5);
+  /* Rail-Untergrenze: 200px - schmaler brechen die Legenden-Eintraege
+     (bis zu elf, je ein Wort) in Einzelzeilen um und die Rail wird hoeher
+     als das Gitter; dann lieber stapeln (siehe @container-Regel unten).
+     Eine Obergrenze gibt es nicht mehr: die Rail fuellt den Rest der Zeile. */
+  --cycle-cal-rail-min: calc(var(--space-16) * 3 + var(--space-2));
 }
 .cycle-section__title { margin: 0 0 var(--space-3); }
 
+/* Der Monatspfeil steht AM TITEL, nicht an der fernen Kante (A6 P2-4: bei
+ * 1440px 600px rechts neben dem Wort, das er blaettert) - wie der Kopf des
+ * Kalendermoduls: „Kalender  < September 2026 >". */
 .cycle-cal__head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  column-gap: var(--space-4);
+  row-gap: var(--space-1);
   margin-bottom: var(--space-2);
+}
+
+.cycle-cal__head > .cycle-section__title {
+  margin: 0;
 }
 
 .cycle-cal__nav { display: flex; align-items: center; gap: var(--space-1); }
@@ -2325,20 +2537,26 @@ button.health-med-card:hover {
 }
 
 /* Ab hier passt eine Zwei-Spalten-Variante (Gitter links, Legende+Chips
-   rechts) hinein, ohne die Rail unter ~260px zu quetschen: Schwelle =
-   Gitter-Max (472px) + Spaltenabstand (--space-6 = 24px) + Rail-Min (260px)
-   = 756px. Unterhalb dessen bleibt es bei der Stapel-Reihenfolge oben. */
-@container cycle-cal (min-width: 756px) {
+   rechts). DIE SPALTEN FUELLEN DIE BREITE (Re-Critique 2026-09-27, A6 P2-4):
+   bis dahin endete die Rail bei 320px, und bei 1440px blieben rechts von ihr
+   340px leer; unter 756px stand das Gitter mit 472px allein und liess den Rest
+   der Zeile frei. Jetzt waechst die Rail in den Rest, und das Gitter darf bis
+   auf 56px-Zellen (7 x 56 + 6 x 4 = 416px, das untere Ende des Zielkorridors)
+   schrumpfen, damit die Legende schon ab 640px daneben steht - der Breite der
+   Detailspalte am 1280er-Laptop (684px). Schwelle = 416 + 24 + 200 (Rail-Min). */
+@container cycle-cal (min-width: 640px) {
   .cycle-cal__body {
     display: flex;
     align-items: flex-start;
     gap: var(--space-6);
   }
-  .cycle-cal__main { flex: 0 1 var(--cycle-cal-grid-max); }
+  .cycle-cal__main {
+    flex: 1 1 var(--cycle-cal-grid-max);
+    min-width: calc((var(--space-12) + var(--space-2)) * 7 + var(--space-1) * 6);
+  }
   .cycle-cal__rail {
     flex: 1 1 var(--cycle-cal-rail-min);
     min-width: var(--cycle-cal-rail-min);
-    max-width: var(--cycle-cal-rail-max);
   }
   /* Die Legende traegt ihren eigenen margin-top (Abstand zum Gitter im
      gestapelten Fall) - daneben statt darunter soll sie stattdessen mit der
