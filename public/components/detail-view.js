@@ -73,10 +73,18 @@ function renderIcons(el) {
  * ungeprüft ein, die Garantie gilt dort also nur so weit, wie der Aufrufer ihn
  * selbst über createElement/textContent gebaut hat.
  *
- * @param {{icon?: string, label: string, value?: string, node?: HTMLElement, multiline?: boolean}} row
+ * FOLGEAKTION (`action`): ein leiser Knopf am Ende der Zeile, der mit genau
+ * diesem Wert weiterarbeitet - „In Maps oeffnen" an der Ort-Zeile, wie Apple
+ * Kalender ihn fuehrt. Er gehoert zur Zeile, nicht in die Fusszeile: dort
+ * stand er als dritte Aktion und brach den Fuss auf drei Reihen (A2 P3). Der
+ * Wert bleibt reiner Text - die Aktion ist ausdruecklich, kein Link auf
+ * Freitext wie „Zoom" (#1110).
+ *
+ * @param {{icon?: string, label: string, value?: string, node?: HTMLElement, multiline?: boolean,
+ *   action?: {id?: string, label: string, icon?: string, onClick: Function}}} row
  * @returns {HTMLElement|null}
  */
-export function detailRowEl({ icon, label, value, node, multiline = false } = {}) {
+export function detailRowEl({ icon, label, value, node, multiline = false, action = null } = {}) {
   const hasContent = node instanceof HTMLElement || (typeof value === 'string' && value.trim().length > 0);
   if (!hasContent) return null;
 
@@ -112,6 +120,23 @@ export function detailRowEl({ icon, label, value, node, multiline = false } = {}
   }
 
   row.appendChild(text);
+
+  if (action && typeof action.onClick === 'function') {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn--ghost btn--sm detail-row__action';
+    if (action.id) btn.id = action.id;
+    if (action.icon) {
+      const i = document.createElement('i');
+      i.className = 'icon-sm';
+      i.dataset.lucide = action.icon;
+      i.setAttribute('aria-hidden', 'true');
+      btn.appendChild(i);
+    }
+    btn.append(document.createTextNode(action.label ?? ''));
+    btn.addEventListener('click', () => action.onClick({ button: btn }));
+    row.appendChild(btn);
+  }
   return row;
 }
 
@@ -179,12 +204,41 @@ function detailBodyEl({ accentColor, sections = [] }) {
   rows.className = 'detail-view__rows';
   sections
     .filter((s) => s && !s.hidden)
-    .map(detailRowEl)
+    .map((s) => (Array.isArray(s.rows) ? detailGroupEl(s) : detailRowEl(s)))
     .filter(Boolean)
     .forEach((row) => rows.appendChild(row));
   view.appendChild(rows);
 
   return view;
+}
+
+/**
+ * Eine benannte Gruppe von Metazeilen (`{ group, rows }`) - wie die
+ * Abschnitte einer Kontaktkarte bei Apple. Dreizehn lose Zeilen lesen sich wie
+ * ein Formular; nach Kauf, Garantie und Zustand gegliedert, findet das Auge
+ * die Frage, die es hat (A6 P3-3). Ohne eine Zeile mit Inhalt faellt die
+ * Gruppe ganz weg, samt Titel.
+ *
+ * @param {{group: string, rows: Array}} section
+ * @returns {HTMLElement|null}
+ */
+function detailGroupEl({ group, rows = [] }) {
+  const built = rows.filter((r) => r && !r.hidden).map(detailRowEl).filter(Boolean);
+  if (!built.length) return null;
+  const box = document.createElement('section');
+  box.className = 'detail-group';
+  if (group) {
+    const title = document.createElement('h3');
+    title.className = 'detail-group__title';
+    title.textContent = group;
+    box.appendChild(title);
+    box.setAttribute('aria-label', group);
+  }
+  const list = document.createElement('div');
+  list.className = 'detail-group__rows';
+  built.forEach((row) => list.appendChild(row));
+  box.appendChild(list);
+  return box;
 }
 
 /**

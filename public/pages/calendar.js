@@ -5800,6 +5800,28 @@ function eventMapUrl(location) {
 }
 
 /**
+ * Ort in einer Karte öffnen (#1110) - als ausdrückliche Aktion, nicht als Link
+ * auf dem Ortstext: `location` ist Freitext, und "Zoom" oder "Raum 3B" sind
+ * keine Adresse. Die Aktion behauptet das nie, der Link wird erst beim Antippen
+ * benutzt. Dieselbe Suche wie die Adresse in Kontakte.
+ *
+ * ALS FOLGEAKTION DER ORT-ZEILE (R10 L6, A2 P3), nicht mehr in der Fusszeile:
+ * dort stand sie neben Loeschen und Bearbeiten und brach den Fuss auf drei
+ * Reihen (mobil 133px). Sie schreibt nichts und gehoert deshalb auch einem
+ * Nur-lesen-Nutzer - kein `readOnly()` hier.
+ */
+function mapRowAction(ev) {
+  const mapUrl = eventMapUrl(ev.location);
+  if (!mapUrl) return null;
+  return {
+    id: 'detail-open-map',
+    label: t('calendar.openInMap'),
+    icon: 'map-pin',
+    onClick: () => window.open(mapUrl, '_blank', 'noopener'),
+  };
+}
+
+/**
  * Die Leseinformationen eines Termins.
  *
  * Wiederholung, Erinnerungen und Sichtbarkeit standen bisher nur im
@@ -5811,7 +5833,7 @@ function renderEventDetail(ev, reminders = []) {
     { icon: 'calendar', label: t('calendar.detailCalendar'), node: calendarChipNode(ev) },
     { icon: 'clock', label: t('calendar.detailWhen'), value: eventWhenText(ev) },
     recurrenceRow(ev.recurrence_rule),
-    { icon: 'map-pin', label: t('calendar.locationLabel'), value: ev.location ? fmtLocation(ev.location) : '' },
+    { icon: 'map-pin', label: t('calendar.locationLabel'), value: ev.location ? fmtLocation(ev.location) : '', action: mapRowAction(ev) },
     assignedRow(ev.assigned_users, t('calendar.assignedLabel'), ev.assigned_name || ''),
     {
       icon: 'bell',
@@ -5877,21 +5899,6 @@ async function openEventDetail(ev, anchor = null) {
       refocusAfterRender();
     },
   }];
-
-  // Ort in einer Karte öffnen (#1110) - als ausdrückliche Aktion, nicht als Link
-  // auf dem Ortstext: `location` ist Freitext, und "Zoom" oder "Raum 3B" sind
-  // keine Adresse. Die Aktion behauptet das nie, der Link wird erst beim Antippen
-  // benutzt. Dieselbe Suche wie die Adresse in Kontakte.
-  const mapUrl = eventMapUrl(ev.location);
-  if (mapUrl) {
-    actions.push({
-      id: 'detail-open-map',
-      label: t('calendar.openInMap'),
-      variant: 'ghost',
-      icon: 'map-pin',
-      onClick: () => window.open(mapUrl, '_blank', 'noopener'),
-    });
-  }
 
   // ICS-Abos: Ein lokal geänderter Termin lässt sich auf das Original
   // zurücksetzen. Die Aktion gehört zum Objekt, also in die Fußzeile.

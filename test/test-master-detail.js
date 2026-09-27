@@ -19,6 +19,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { installMiniDom } from './mini-dom.js';
+import { eachRule } from './css-rules.js';
 
 // ── Kleinstes DOM ─────────────────────────────────────────────────────────
 
@@ -888,6 +889,26 @@ test('Schwelle: ein 1280er-Laptop bekommt Liste + Detail, auch mit klassischer B
   const listMin = px('--layout-list-min', 'rem');
   assert.ok(threshold - listMin - 24 - 2 * 32 >= 480,
     `Schwelle ${threshold}px laesst dem Detail unter 480px - zu schmal zum Lesen`);
+});
+
+test('Detailfuss: klebt unten in der Spalte, einreihig, und steht bei kurzem Inhalt an der Unterkante (L6)', () => {
+  // A3 P2-1: bei 1440x900 stand „Erledigen" einer einfachen Aufgabe unter der
+  // Falz, weil der Fuss mit dem Inhalt scrollte. Regel wie am Blattrand: Kopf
+  // oben, Fuss unten, dazwischen scrollt das Detail.
+  const layout = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const dv = readFileSync(new URL('../public/styles/detail-view.css', import.meta.url), 'utf8');
+  const body = (css, sel) => [...eachRule(css)].filter((r) => !r.at.length && r.selector.trim() === sel).map((r) => r.body).join(';');
+  const foot = body(layout, '.split-view__detail-footer');
+  assert.match(foot, /position:\s*sticky/, 'der Fuss klebt');
+  assert.match(foot, /bottom:\s*0/, 'unten');
+  assert.match(foot, /flex-wrap:\s*nowrap/, 'einreihig');
+  assert.match(foot, /margin-block-start:\s*auto/, 'kurzer Inhalt: Fuss an der Unterkante');
+  assert.match(foot, /background-color:\s*var\(--color-surface\)/, 'deckt den Inhalt, der darunter scrollt');
+  assert.match(body(layout, '.split-view__detail-body'), /flex:\s*1 0 auto/, 'der Koerper fuellt die Spalte');
+  assert.match(body(dv, '.detail-view--in-pane'), /flex:\s*1 0 auto/, 'die Ansicht fuellt den Koerper');
+  // Und die Leseansicht haengt genau diese Klasse an ihren Fuss in der Spalte.
+  const js = readFileSync(new URL('../public/components/detail-view.js', import.meta.url), 'utf8');
+  assert.match(js, /footer\.className = 'detail-view__footer split-view__detail-footer'/);
 });
 
 test('splitViewDetailHtml: benannte Spalte mit Leerzustand und leerem Koerper, Nutzertext escaped', () => {

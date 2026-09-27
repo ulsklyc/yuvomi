@@ -376,20 +376,30 @@ test('die Termin-Detailansicht zeigt, was das alte Popup verschwieg', async () =
 
 test('der Ort öffnet sich als ausdrückliche Aktion in einer Karte, nicht als Link auf dem Text (#1110)', async () => {
   const src = await calendarJs();
-  const fn = src.slice(src.indexOf('async function openEventDetail'), src.indexOf('async function loadReminderForEvent'));
+  const fn = src.slice(src.indexOf('function mapRowAction'), src.indexOf('function renderEventDetail'));
   // Die Aktion hängt an der Karten-URL, und die entsteht nur aus einem Ortstext,
   // der nach fmtLocation etwas übrig lässt. Kodierung und Leerfall misst
   // test:calendar, das Aufräumen der Test gleich darunter.
-  assert.match(fn, /const mapUrl = eventMapUrl\(ev\.location\);\s*if \(mapUrl\) \{\s*actions\.push\(\{/,
+  assert.match(fn, /const mapUrl = eventMapUrl\(ev\.location\);\s*if \(!mapUrl\) return null;/,
     'nur mit Ort gibt es die Aktion');
   assert.match(fn, /id: 'detail-open-map'/);
   assert.match(fn, /label: t\('calendar\.openInMap'\)/);
   assert.match(fn, /window\.open\(mapUrl, '_blank', 'noopener'\)/,
     'neuer Tab ohne Zugriff zurück auf die App - wie der vCard-Export in Kontakte');
 
-  // Die Zeile "Ort" bleibt reiner Text: Freitext wie "Zoom" ist keine Adresse.
+  // R10 L6 (A2 P3): die Aktion ist Folgeaktion der Ort-Zeile, nicht dritte
+  // Fusszeilen-Aktion - der Fuss blieb sonst dreireihig. Der Wert bleibt
+  // reiner Text: Freitext wie "Zoom" ist keine Adresse.
   const detail = src.slice(src.indexOf('function renderEventDetail'), src.indexOf('async function openEventDetail'));
-  assert.match(detail, /\{ icon: 'map-pin', label: t\('calendar\.locationLabel'\), value: ev\.location \? fmtLocation\(ev\.location\) : '' \}/);
+  assert.match(detail, /\{ icon: 'map-pin', label: t\('calendar\.locationLabel'\), value: ev\.location \? fmtLocation\(ev\.location\) : '', action: mapRowAction\(ev\) \}/);
+  const open = src.slice(src.indexOf('async function openEventDetail'), src.indexOf('async function loadReminderForEvent'));
+  assert.doesNotMatch(open, /detail-open-map|eventMapUrl\(/, 'die Karte steht nicht mehr in der Fusszeile');
+
+  // Die geteilte Zeile kennt die Folgeaktion: ein Knopf (keine Verlinkung des Werts).
+  const dv = await detailJs();
+  const row = dv.slice(dv.indexOf('export function detailRowEl'), dv.indexOf('function visibilityRow') > 0 ? dv.indexOf('function visibilityRow') : undefined);
+  assert.match(row, /action && typeof action\.onClick === 'function'/);
+  assert.match(row, /btn\.className = 'btn btn--ghost btn--sm detail-row__action'/);
 });
 
 test('die Kartensuche räumt den Ortstext über das ECHTE fmtLocation auf (#1110)', async () => {

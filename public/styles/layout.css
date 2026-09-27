@@ -2895,6 +2895,8 @@ html.fab-anim-done .page-fab {
 .split-view__detail-body {
   display: flex;
   flex-direction: column;
+  /* Fuellt die Spalte, damit ein kurzes Detail seinen Fuss unten traegt. */
+  flex: 1 0 auto;
   min-height: 0;
 }
 
@@ -2930,11 +2932,30 @@ html.fab-anim-done .page-fab {
   flex-shrink: 0;
 }
 
+/* DER FUSS DER SPALTE KLEBT UNTEN, EINREIHIG (R10 L6, A3 P2-1). Er scrollte
+ * mit dem Inhalt: bei 1440x900 stand „Erledigen" einer einfachen Aufgabe
+ * unter der Falz. Jetzt gilt dieselbe Regel wie am Blattrand: der Kopf klebt
+ * oben, der Fuss unten, dazwischen scrollt das Detail. `margin-block-start:
+ * auto` setzt ihn bei kurzem Inhalt an die Unterkante der Spalte (die Ansicht
+ * fuellt sie, detail-view.css). Einreihig: Loeschen am Anfang, der Rest am
+ * Ende - eine Folgeaktion wie „In Maps oeffnen" gehoert in ihre Zeile, nicht
+ * hierher. */
 .split-view__detail-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: var(--space-2);
-  padding: var(--space-4) var(--space-5) var(--space-5);
+  margin-block-start: auto;
+  padding: var(--space-3) var(--space-5);
+  background-color: var(--color-surface);
+  border-block-start: 1px solid var(--color-border-subtle);
+}
+
+.split-view__detail-footer > .btn {
+  flex-shrink: 0;
 }
 
 /* --------------------------------------------------------

@@ -792,10 +792,12 @@ test('Kalender-Detailansicht: Löschen, Zurücksetzen und Bearbeiten fallen weg,
     'auch das Zurücksetzen eines ICS-Termins ist ein Schreibvorgang');
   assert.match(CAL_CODE, /edit: readOnly\(\) \? undefined : \{/,
     'ohne Mounter baut die geteilte Ansicht keinen Bearbeiten-Knopf');
-  // Und die einzige nicht schreibende Aktion bleibt bedingungslos drin.
+  // Und die einzige nicht schreibende Aktion bleibt bedingungslos drin - seit
+  // R10 als Folgeaktion der Ort-Zeile (mapRowAction), nicht im Fuss.
   assert.match(CAL_CODE, /id: 'detail-open-map'/);
-  const mapBlock = CAL_CODE.slice(CAL_CODE.indexOf('const mapUrl = eventMapUrl(ev.location);'), CAL_CODE.indexOf("id: 'detail-open-map'"));
-  assert.ok(!mapBlock.includes('readOnly()'), '"In Karte öffnen" schreibt nichts und gehört auch einem Nur-lesen-Nutzer');
+  const mapBlock = CAL_CODE.slice(CAL_CODE.indexOf('function mapRowAction'), CAL_CODE.indexOf("id: 'detail-open-map'"));
+  assert.ok(mapBlock.length > 0 && !mapBlock.includes('readOnly()'), '"In Karte öffnen" schreibt nichts und gehört auch einem Nur-lesen-Nutzer');
+  assert.match(CAL_CODE, /action: mapRowAction\(ev\)/, 'die Ort-Zeile traegt die Karte fuer jeden, auch Nur-lesen');
 });
 
 // -------------------------------------------------------------------------

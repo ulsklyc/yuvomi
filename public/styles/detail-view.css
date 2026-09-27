@@ -92,6 +92,43 @@
   text-wrap: pretty;
 }
 
+/* Folgeaktion am Ende einer Zeile („In Maps oeffnen" an der Ort-Zeile,
+ * detail-view.js detailRowEl `action`). Leise und rechts, auf der Hoehe des
+ * Labels - der Wert bleibt Text, die Aktion ist ausdruecklich (#1110). */
+.detail-row__action {
+  flex-shrink: 0;
+  margin-block-start: calc(-1 * var(--space-1));
+  margin-inline-start: auto;
+}
+
+/* Benannte Gruppe von Metazeilen (`{ group, rows }`): Abschnittstitel wie in
+ * einer Kontaktkarte, darunter die Zeilen im selben Takt wie ungegliedert. */
+.detail-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.detail-group + .detail-group,
+.detail-row + .detail-group {
+  padding-block-start: var(--space-3);
+  border-block-start: var(--space-px) solid var(--color-border-subtle);
+}
+
+.detail-group__title {
+  margin: 0;
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+}
+
+.detail-group__rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
 /* Zeilen, die statt Text eine Gruppe tragen (Chips, Badges, Anhang). */
 .detail-chips.detail-row__value {
   display: flex;
@@ -369,6 +406,10 @@
 .detail-view--in-pane {
   display: flex;
   flex-direction: column;
+  /* Die Ansicht fuellt die Spalte, damit ihr Fuss bei kurzem Inhalt unten an
+   * der Spalte steht und bei langem unten klebt (layout.css,
+   * `.split-view__detail-footer`). */
+  flex: 1 0 auto;
 }
 
 .detail-view--in-pane > .detail-view {
