@@ -5457,6 +5457,75 @@ p.field-hint--warn[hidden] {
   flex-shrink: 0;
 }
 
+/* DER FUSS MIT LÖSCHEN AUF DEM TELEFON (Re-Critique 2026-09-27, R9 M8).
+ *
+ * Gemessen bei 390px: Löschen · Abbrechen · Speichern brauchten 345px, der Fuß
+ * hat 332 - der Umbruch oben hielt alles im Bild, stellte aber „Speichern"
+ * allein in eine zweite Zeile, unter die Nebenaktion. Apples Antwort: Löschen
+ * wird ein Papierkorb links, die beiden beschrifteten Knöpfe bleiben rechts.
+ *
+ * Erkannt wird der Knopf EINMAL in modal.js (`decorateFooterDelete`): es setzt
+ * `.modal-panel__delete` an den Knopf, packt sein Wort in
+ * `.modal-panel__delete-label` und `--has-delete`/`--one-row` an den Fuß.
+ * Kein Modul baut das nach.
+ *
+ * Das Wort verlässt nur das BILD (Schreibweise von `.sr-only`), nicht den
+ * Baum; wo modal.js den Objektnamen fand, spricht das `aria-label`
+ * („Einkauf löschen"). Die Optik ist die der Zeilenaktion (`.row-action`):
+ * nackt, rund, Zielgröße der Geräteklasse - nur die Tinte bleibt die Gefahr,
+ * weil der Papierkorb hier allein steht und nicht in einer Reihe von Icons.
+ *
+ * `--one-row` trägt nur die kanonische Dreiheit. Dort bricht die Zeile nicht
+ * mehr; eine lange Beschriftung bricht INNEN (die `white-space`-Rücknahme von
+ * #872 bleibt), und `min-width: 0` plus `overflow-wrap: anywhere` halten auch
+ * das längste Wort im Fuß statt ihn nach links hinauszuschieben.
+ *
+ * Die Grenze ist die kanonische Mobil-Grenze (tokens.css §11c, `--bp-mobile`),
+ * nicht die „~430px" der Critique: jedes Telefon im Hochformat liegt darunter,
+ * und eine eigene Zahl wäre der sechste Breakpoint der App. */
+@media (max-width: 639px) {
+  .modal-panel__footer .btn.modal-panel__delete {
+    flex: none;
+    width: var(--target-base);
+    min-width: var(--target-base);
+    height: var(--target-base);
+    min-height: var(--target-base);
+    padding: 0;
+    gap: 0;
+    border: none;
+    background: transparent;
+    color: var(--color-danger);
+  }
+
+  .modal-panel__footer .btn.modal-panel__delete:hover {
+    background: var(--color-danger-light);
+    color: var(--color-danger-ink);
+  }
+
+  .modal-panel__footer .modal-panel__delete .modal-panel__delete-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .modal-panel__footer.modal-panel__footer--one-row,
+  .modal-panel__footer.modal-panel__footer--one-row > div {
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+
+  .modal-panel__footer.modal-panel__footer--one-row .btn:not(.modal-panel__delete):not(.btn--icon) {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
 @keyframes modal-overlay-in {
   from { opacity: 0; }
   to   { opacity: 1; }
