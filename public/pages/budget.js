@@ -239,6 +239,7 @@ let state = {
   scope:       'mine',        // Ansichts-Filter im personal-Modus: 'mine' | 'household'
   expensesOnly: false,        // Anzeige „Nur Ausgaben" (#504): Einnahmen+Saldo ausblenden
   categoriesExpanded: false,  // Kategorie-Diagramm einspaltig ganz aufgeklappt (sonst Top 3)
+  balanceExpanded: false,     // mobil: Bilanz-Karten unter der Kopfzeile aufgeklappt (balanceGlanceHtml)
   meta:        { expenseCategories: [], incomeCategories: [], subcategories: {} },
   // Zeitachse der Berichte: dieselbe Kopfleiste wie der Monat, nur mit
   // umschaltbarer Auflösung. Der Anker lebt hier statt in budget-stats.js, damit
@@ -1094,6 +1095,8 @@ function renderBody() {
          einspaltig dieselbe bleibt (Bilanz, Kategorien, Buchungen). -->
     <div class="budget-overview">
     ${monthEmpty ? '' : `<div class="budget-overview__aside">
+    ${balanceGlanceHtml(s, { expensesOnly, forecast, balanceTone })}
+    <div class="budget-balance-details${state.balanceExpanded ? ' is-expanded' : ''}" id="budget-balance-details">
     <!-- Kopfzeile der Bilanz: Titel links, "Nur Ausgaben" rechts - der
          Umschalter wirkt nur auf die Karten darunter und steht deshalb in
          deren Kopf statt in einer eigenen Zeile ueber der Seite. -->
@@ -1110,6 +1113,7 @@ function renderBody() {
     <!-- Zusammenfassung -->
     <div class="metric-grid${expensesOnly ? ' metric-grid--expenses-only' : ''}">
       ${expensesOnly ? expensesCard : incomeCard + expensesCard + balanceCard}
+    </div>
     </div>
     ${pendingNote}
 
@@ -1182,6 +1186,8 @@ function renderBody() {
     renderBody();
   });
   _container.querySelector('#budget-chart-more')?.addEventListener('click', toggleCategoryChart);
+  _container.querySelector('#budget-categories-more')?.addEventListener('click', toggleCategoryChart);
+  _container.querySelector('#budget-balance-more')?.addEventListener('click', toggleBalanceDetails);
   _container.querySelector('#budget-manage-categories')?.addEventListener('click', openCategoryManager);
   _container.querySelector('#budget-clear-account-filter')?.addEventListener('click', async () => {
     state.accountFilterId = null;
@@ -1416,16 +1422,74 @@ function chartMoreLabel(count) {
 }
 
 /* Auf- und Zuklappen ohne Neuaufbau: der Knopf behaelt Fokus und Position,
- * nur Klasse, aria-expanded und Beschriftung ziehen nach. */
+ * nur Klasse, aria-expanded und Beschriftung ziehen nach. ZWEI Knoepfe steuern
+ * denselben Zustand - der im Diagrammkopf (einspaltig ab 640px) und die Zeile
+ * der mobilen Kopfzeile (balanceGlanceHtml); je Breite ist nur einer zu sehen,
+ * beide muessen aber dasselbe sagen, wenn die Breite wechselt. Die Zeile
+ * behaelt ihren Namen („Alle Kategorien (N)"), ihr Zustand steht im Chevron
+ * und in aria-expanded - wie jede Gruppenzeile. */
 function toggleCategoryChart() {
   state.categoriesExpanded = !state.categoriesExpanded;
   const section = _container?.querySelector('.budget-chart-section');
-  const btn = _container?.querySelector('#budget-chart-more');
   section?.classList.toggle('is-expanded', state.categoriesExpanded);
-  if (!btn) return;
-  btn.setAttribute('aria-expanded', state.categoriesExpanded ? 'true' : 'false');
-  const label = btn.querySelector('.budget-chart-more__label');
-  if (label) label.textContent = chartMoreLabel(state.summary?.byCategory?.length ?? 0);
+  for (const btn of _container?.querySelectorAll('#budget-chart-more, #budget-categories-more') ?? []) {
+    btn.setAttribute('aria-expanded', state.categoriesExpanded ? 'true' : 'false');
+    const label = btn.querySelector('.budget-chart-more__label');
+    if (label) label.textContent = chartMoreLabel(state.summary?.byCategory?.length ?? 0);
+  }
+}
+
+/* MOBIL GEHOERT DER PLATZ DEM HAUPTBUCH (Re-Critique 2026-09-27, A5 P2-5).
+ * Unter 640px standen Bilanz-Titel, drei Kennzahl-Karten und das Diagramm vor
+ * den Buchungen - die erste Buchung bei y=634 von 844, knapp zwei Zeilen
+ * sichtbar. Jetzt steht dort EINE kompakte Kopfzeile in einem Zeilentraeger:
+ * Saldo mit Ein/Aus daneben, darunter die Zeile „Alle Kategorien (N)". Beide
+ * Zeilen sind Aufklapper: die Bilanz klappt die Kennzahl-Karten samt
+ * Vormonatstrend und „Nur Ausgaben" auf, die Kategorien das volle Diagramm -
+ * nichts faellt weg, es wartet nur hinter einem Tipp.
+ *
+ * Nur Markup: budget.css zeigt den Traeger erst unter 640px und blendet dort
+ * die eingeklappten Bereiche aus. Ab 640px bleibt alles wie es war (Karten,
+ * Top 3, Zweispalter ab 960px Container). Der Traeger ist `.row-carrier`,
+ * keine Kennzahl-Karte: eine Zeile, die zusammenfasst und aufklappt, wie die
+ * Gruppenzeilen in Apple Wallet und Einstellungen. */
+function balanceGlanceHtml(s, { expensesOnly, forecast, balanceTone }) {
+  const tone = forecast ? 'forecast'
+    : balanceTone === 'metric-card--balance-positive' ? 'positive'
+      : balanceTone === 'metric-card--balance-negative' ? 'negative' : 'neutral';
+  const lead = expensesOnly
+    ? { label: t('budget.expenses'), value: amountByRole(s.expenses, 'total').text, tone: 'neutral' }
+    : { label: t(forecast ? 'budget.summaryTitleForecast' : 'budget.balance'), value: amountByRole(s.balance, 'balance').text, tone };
+  const flows = expensesOnly ? '' : `
+        <span class="budget-glance__flows">
+          <span class="budget-glance__flow">${esc(t('budget.income'))} <span class="budget-glance__amount">${amountByRole(s.income, 'total').text}</span></span>
+          <span class="budget-glance__flow">${esc(t('budget.expenses'))} <span class="budget-glance__amount">${amountByRole(s.expenses, 'total').text}</span></span>
+        </span>`;
+  const count = s.byCategory?.length ?? 0;
+  return `
+    <div class="row-carrier budget-glance">
+      <button type="button" class="budget-glance__row budget-glance__balance" id="budget-balance-more"
+              aria-expanded="${state.balanceExpanded ? 'true' : 'false'}" aria-controls="budget-balance-details">
+        <span class="budget-glance__lead">
+          <span class="budget-glance__label">${esc(lead.label)}</span>
+          <span class="budget-glance__value budget-glance__value--${lead.tone}">${lead.value}</span>
+        </span>${flows}
+        <i data-lucide="chevron-down" class="icon-sm budget-glance__chevron" aria-hidden="true"></i>
+      </button>
+      ${count ? `
+      <button type="button" class="budget-glance__row budget-glance__categories" id="budget-categories-more"
+              aria-expanded="${state.categoriesExpanded ? 'true' : 'false'}" aria-controls="budget-chart">
+        <span class="budget-glance__title">${esc(t('budget.showAllCategories', { count }))}</span>
+        <i data-lucide="chevron-down" class="icon-sm budget-glance__chevron" aria-hidden="true"></i>
+      </button>` : ''}
+    </div>`;
+}
+
+/* Wie toggleCategoryChart: ohne Neuaufbau, der Knopf behaelt den Fokus. */
+function toggleBalanceDetails() {
+  state.balanceExpanded = !state.balanceExpanded;
+  _container?.querySelector('#budget-balance-details')?.classList.toggle('is-expanded', state.balanceExpanded);
+  _container?.querySelector('#budget-balance-more')?.setAttribute('aria-expanded', state.balanceExpanded ? 'true' : 'false');
 }
 
 /* EIN WERKZEUG-MENUE FUER DIE BUCHUNGSLISTE (Critique 2026-09-25, P1; Muster
@@ -4282,6 +4346,7 @@ export const __test = {
   chartHasMore,
   chartSummary,
   renderCategoryBars,
+  balanceGlanceHtml,
   listToolsMenuHtml,
   CHART_LEAD,
   syncCurrentButton,
@@ -4337,5 +4402,16 @@ export const __test = {
   renderBodyForTest(container) {
     _container = container;
     renderBody();
+  },
+  // Re-Critique 2026-09-27 (M4): die beiden Aufklapper der mobilen Kopfzeile
+  // gegen einen Test-Container - beide Knoepfe des Diagramms muessen denselben
+  // Zustand melden.
+  toggleCategoryChartForTest(container) {
+    _container = container;
+    toggleCategoryChart();
+  },
+  toggleBalanceDetailsForTest(container) {
+    _container = container;
+    toggleBalanceDetails();
   },
 };

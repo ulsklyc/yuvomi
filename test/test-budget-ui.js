@@ -2067,6 +2067,99 @@ test('Kennzahlen mobil: Saldo als Kopfwert vor Einnahmen/Ausgaben, Trend sichtba
     'ohne auto zoege die geteilte 1fr-Regel den flachen Kopfwert auf Kartenhoehe auf');
 });
 
+/* MOBIL GEHOERT DER PLATZ DEM HAUPTBUCH (Re-Critique 2026-09-27, M4 / A5
+ * P2-5). Bei 390x844 stand die erste Buchung bei y=634: Bilanz-Titel, drei
+ * Karten und das Top-3-Diagramm davor. Jetzt EIN Zeilentraeger (Saldo mit
+ * Ein/Aus, „Alle Kategorien (N)"), dessen Zeilen Karten und Diagramm
+ * aufklappen - gemessen y=342. Ab 640px bleibt alles beim Alten. */
+test('Uebersicht mobil: EINE Kopfzeile, Karten und Diagramm eingeklappt, das Hauptbuch zuerst (M4)', () => {
+  // Der ECHTE Render-Pfad: der Traeger steht vorn in der Seitenleiste, die
+  // Karten stecken im Bereich, den seine Bilanz-Zeile steuert.
+  const html = uebersicht({
+    month: monthKey(0), entries: [zeile()],
+    summary: { ...summe, byCategory: [{ category: 'housing', income: 0, expenses: -950, total: -950 }] },
+  });
+  const aside = html.indexOf('<div class="budget-overview__aside">');
+  const glance = html.indexOf('<div class="row-carrier budget-glance">');
+  const details = html.indexOf('<div class="budget-balance-details" id="budget-balance-details">');
+  assert.ok(aside >= 0 && glance > aside && details > glance, 'Traeger vorn in der Seitenleiste, dahinter der Bilanz-Bereich');
+  const inDetails = html.slice(details, html.indexOf('budget-pending-note') >= 0 ? html.indexOf('budget-pending-note') : html.indexOf('budget-chart-section'));
+  assert.match(inDetails, /class="budget-summary-head"[\s\S]*class="metric-grid/, 'Titel, „Nur Ausgaben" und die Karten samt Trend warten hinter der Zeile');
+  assert.match(html, /<button type="button" class="budget-glance__row budget-glance__balance" id="budget-balance-more"\s*aria-expanded="false" aria-controls="budget-balance-details">/,
+    'die Bilanz-Zeile ist ein Aufklapper mit Zustand');
+  assert.match(html, /budget-glance__value budget-glance__value--positive">[^<]*2\.050,00/, 'Saldo mit dem Ton der Saldo-Karte');
+  assert.match(html, /budget-glance__flow">budget\.income <span class="budget-glance__amount">[^<]*3\.000,00/, 'Einnahmen inline');
+  assert.match(html, /budget-glance__flow">budget\.expenses <span class="budget-glance__amount">[^<]*950,00/, 'Ausgaben inline');
+  assert.match(html, /id="budget-categories-more"\s*aria-expanded="false" aria-controls="budget-chart">\s*<span class="budget-glance__title">budget\.showAllCategories/,
+    'die Kategorien-Zeile steuert das Diagramm');
+
+  // Nur Ausgaben: die Zeile traegt allein die Ausgaben; ohne Kategorien keine
+  // zweite Zeile, die nichts aufklappt.
+  const nur = uebersicht({ month: monthKey(0), entries: [zeile()], summary: summe, expensesOnly: true });
+  assert.match(nur, /budget-glance__label">budget\.expenses</);
+  assert.doesNotMatch(nur, /budget-glance__flows|id="budget-categories-more"/);
+  // Ein Zukunftsmonat heisst auch in der Zeile Prognose und verliert den Ton.
+  const zukunft = uebersicht({ month: monthKey(1), entries: [zeile({ date: `${monthKey(1)}-01` })], summary: summe });
+  assert.match(zukunft, /budget-glance__label">budget\.summaryTitleForecast<\/span>\s*<span class="budget-glance__value budget-glance__value--forecast">/);
+
+  // CSS: den Traeger gibt es nur unter 640px; dort ist eingeklappt nichts
+  // davon zu sehen, der zweite Diagramm-Knopf entfaellt.
+  const rules = [...eachRule(budgetCss)];
+  const phone = (r) => r.at.some((a) => /max-width:\s*639px/.test(a));
+  const base = rules.find((r) => r.at.length === 0 && r.selector.trim() === '.budget-glance');
+  assert(base && /display:\s*none/.test(base.body), 'ab 640px gibt es keinen Traeger');
+  const shown = rules.find((r) => phone(r) && r.selector.trim() === '.budget-glance');
+  assert(shown && /display:\s*block/.test(shown.body), 'unter 640px steht der Traeger');
+  const hidden = rules.find((r) => phone(r) && /display:\s*none/.test(r.body)
+    && /\.budget-balance-details:not\(\.is-expanded\)/.test(r.selector));
+  assert(hidden, 'eingeklappt keine Karten');
+  assert.match(hidden.selector, /\.budget-overview \.budget-chart-section:not\(\.is-expanded\)/, 'eingeklappt kein Diagramm');
+  assert.match(hidden.selector, /\.budget-overview \.budget-chart-more\b/, 'nur EIN sichtbarer Knopf je Breite');
+  assert(!rules.some((r) => !phone(r) && /budget-balance-details:not/.test(r.selector)),
+    'ab 640px bleiben die Karten stehen');
+});
+
+test('Uebersicht mobil: beide Diagramm-Knoepfe melden denselben Zustand, die Bilanz klappt ohne Neuaufbau (M4)', () => {
+  const vorher = { categoriesExpanded: budgetUi.state.categoriesExpanded, balanceExpanded: budgetUi.state.balanceExpanded };
+  const knopf = (label) => {
+    const attrs = {};
+    const text = { textContent: label };
+    return { attrs, text, setAttribute: (k, v) => { attrs[k] = v; }, querySelector: (sel) => (sel === '.budget-chart-more__label' && label ? text : null) };
+  };
+  const kopf = knopf('alt');
+  const zeileKnopf = knopf(null);
+  const bilanz = knopf(null);
+  const klassen = {};
+  const bereich = (name) => ({ classList: { toggle: (c, on) => { klassen[name] = on; } } });
+  const container = {
+    querySelector: (sel) => ({
+      '.budget-chart-section': bereich('chart'),
+      '#budget-balance-details': bereich('details'),
+      '#budget-balance-more': bilanz,
+    })[sel] ?? null,
+    querySelectorAll: (sel) => (sel === '#budget-chart-more, #budget-categories-more' ? [kopf, zeileKnopf] : []),
+  };
+  try {
+    Object.assign(budgetUi.state, { categoriesExpanded: false, balanceExpanded: false, summary: { byCategory: [1, 2] } });
+    budgetUi.toggleCategoryChartForTest(container);
+    assert.equal(klassen.chart, true);
+    assert.equal(kopf.attrs['aria-expanded'], 'true');
+    assert.equal(zeileKnopf.attrs['aria-expanded'], 'true', 'die Zeile im Traeger zieht mit');
+    assert.equal(kopf.text.textContent, 'budget.showFewerCategories');
+    budgetUi.toggleBalanceDetailsForTest(container);
+    assert.equal(klassen.details, true);
+    assert.equal(bilanz.attrs['aria-expanded'], 'true');
+    budgetUi.toggleBalanceDetailsForTest(container);
+    assert.equal(klassen.details, false);
+    assert.equal(bilanz.attrs['aria-expanded'], 'false');
+  } finally {
+    Object.assign(budgetUi.state, vorher);
+  }
+  const src = withoutHtmlComments(budget);
+  assert.match(src, /querySelector\('#budget-categories-more'\)\?\.addEventListener\('click', toggleCategoryChart\)/);
+  assert.match(src, /querySelector\('#budget-balance-more'\)\?\.addEventListener\('click', toggleBalanceDetails\)/);
+});
+
 // --------------------------------------------------------
 // Betraege mit gleich breiten Ziffern (Critique 2026-09-25, Schritt 3)
 // --------------------------------------------------------
