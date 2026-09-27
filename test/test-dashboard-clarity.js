@@ -458,6 +458,11 @@ test('die Groessennamen der Uebersicht sagen die Form, in jeder Sprache verschie
   const { readFileSync, readdirSync } = await import('node:fs');
   const { WIDGET_SIZE_PRESETS } = await import('../public/utils/dashboard-widgets.js');
   const dir = new URL('../public/locales/', import.meta.url);
+  // Umbenannt ist nur der Name, nie der gespeicherte Wert: Nutzer- und
+  // Haushalts-Layouts (DB, Layout-Hinweis im Geraet) tragen '2x1' - wanderte der
+  // Wert mit, verloeren Bestandsinstallationen ihre Kachelgroessen.
+  assert.deepEqual(WIDGET_SIZE_PRESETS.map((p) => p.value), ['1x1', '2x1', '1x2', '2x2'],
+    'die gespeicherten Groessenwerte bleiben, wie sie sind');
   const wide = WIDGET_SIZE_PRESETS.find((p) => p.value === '2x1');
   assert.ok(wide, '2x1 ist keine waehlbare Groesse mehr - der Test prueft dann nichts');
   assert.doesNotMatch(wide.labelKey, /narrow/i, '2 Spalten x 1 Zeile ist breit, nicht schmal');
