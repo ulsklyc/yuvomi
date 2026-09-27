@@ -6215,8 +6215,7 @@ function renderCycleShell() {
       ${own ? cycleBubbleMarkup(prediction, pms, darf) : ''}
       ${cyclePregnancyMarkup(prediction, darf)}
       ${darf ? cycleTodayActionsMarkup(true) : ''}
-      ${cycleCalendarMarkup(own, pms, darf)}
-      ${prediction.hasData ? cycleTrendsMarkup() : ''}
+      ${cyclePairMarkup(cycleCalendarMarkup(own, pms, darf), prediction.hasData ? cycleTrendsMarkup() : '')}
       ${prediction.hasData ? cycleHistoryMarkup(darf) : ''}
       ${cycleFooterMarkup(darf)}
     `);
@@ -6256,14 +6255,28 @@ function renderCycleShell() {
     </div>
     ${cycleRingLegendMarkup(prediction)}
     ${darf ? cycleTodayActionsMarkup() : ''}
-    ${cycleCalendarMarkup(own, pms, darf)}
-    ${cycleTrendsMarkup()}
+    ${cyclePairMarkup(cycleCalendarMarkup(own, pms, darf), cycleTrendsMarkup())}
     ${cycleHistoryMarkup(darf)}
     ${cycleFooterMarkup(darf, prediction)}
   `);
   if (window.lucide) window.lucide.createIcons({ el: cycle.root });
   wireCycle();
   refreshHealthFab();
+}
+
+/* KALENDER UND TRENDS NEBENEINANDER, WO ES PASST (Re-Critique 2026-09-27, C7).
+ * Die Detailspalte ist bei 1440px 844px breit; der Kalender braucht davon 472,
+ * und die Trends standen darunter ueber die volle Breite - der Monat und sein
+ * Verlauf lagen einen Bildschirm auseinander. Ab der Breite, in der beide ihr
+ * Mindestmass haben (health.css, @container cycle-pair), stehen sie
+ * nebeneinander; darunter bleibt es beim Stapel. Ohne Trends (zu wenige
+ * Zyklen) gibt es kein Paar - eine leere Spalte waere Platz ohne Aussage. */
+function cyclePairMarkup(calendarHtml, trendsHtml) {
+  if (!trendsHtml) return calendarHtml;
+  return `
+    <div class="cycle-pair">
+      <div class="cycle-pair__cols">${calendarHtml}${trendsHtml}</div>
+    </div>`;
 }
 
 // --------------------------------------------------------
@@ -8550,6 +8563,8 @@ export const __test = {
   chartMarkup,
   // C4: Laborbefunde auf der Zeitachse.
   labTrendChart,
+  // C7: Kalender und Trends als Paar.
+  cyclePairMarkup,
   VITAL_SHEET_CHART,
   backToVitalSheetForTest: (type) => backToVitalSheet(type),
   vitalPatchBody,

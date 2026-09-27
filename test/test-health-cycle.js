@@ -1930,3 +1930,34 @@ test('health.css: keine farbige Seitenkante als Zeichen an einem Traeger', async
   }
   assert.ok(seen > 0, 'der Scanner sieht keine einzige Seitenkante mehr - der Trenner in .cycle-stat__pair-item fehlt, der Guard waere blind');
 });
+
+// --------------------------------------------------------
+// Kalender und Trends nebeneinander, wo es passt (Re-Critique 2026-09-27, C7)
+// --------------------------------------------------------
+test('Zyklus: Kalender und Trends stehen als Paar, das seine eigene Breite fragt', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const { __test: healthUi } = await import('../public/pages/health.js');
+  const paar = healthUi.cyclePairMarkup('<section class="cycle-cal"></section>', '<section class="cycle-trends"></section>');
+  assert.match(paar, /class="cycle-pair"[\s\S]*class="cycle-pair__cols"><section class="cycle-cal"><\/section><section class="cycle-trends">/);
+  assert.equal(healthUi.cyclePairMarkup('<section class="cycle-cal"></section>', ''), '<section class="cycle-cal"></section>',
+    'ohne Trends kein Paar - eine leere Spalte waere Platz ohne Aussage');
+
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  const shell = src.slice(src.indexOf('function renderCycleShell()'), src.indexOf('function cyclePairMarkup('));
+  assert.equal((shell.match(/cyclePairMarkup\(cycleCalendarMarkup\(own, pms, darf\)/g) ?? []).length, 2,
+    'beide Zweige (Normal und Schwangerschaft) setzen das Paar');
+  assert.doesNotMatch(shell, /\$\{cycleCalendarMarkup\(own, pms, darf\)\}/, 'kein Kalender mehr ausserhalb des Paars');
+
+  const css = readFileSync(new URL('../public/styles/health.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const host = rules.find((r) => r.selector.trim() === '.cycle-pair');
+  assert.match(host?.body ?? '', /container:\s*cycle-pair\s*\/\s*inline-size/);
+  const cols = rules.find((r) => r.selector.trim() === '.cycle-pair__cols' && r.at.some((a) => /@container cycle-pair/.test(a)));
+  assert.ok(cols, 'die Zweispalte steht in einer Container-Regel, nicht an einer Seiten-Schwelle');
+  const at = cols.at.find((a) => /@container cycle-pair/.test(a));
+  const rem = Number(at.match(/min-width:\s*([\d.]+)rem/)?.[1]);
+  // Mindestmasse: Gitter 472px + Abstand 24px + 20rem Trends = 816px.
+  assert.ok(rem * 16 >= 472 + 24 + 320, `Schwelle ${rem}rem laesst den Trends weniger als 20rem`);
+  assert.ok(rem * 16 <= 844, `Schwelle ${rem}rem - die Detailspalte bei 1440px (844px) bekaeme nie ein Paar`);
+  assert.match(cols.body, /grid-template-columns:\s*var\(--cycle-pair-cal\)\s+minmax\(0,\s*1fr\)/);
+});
