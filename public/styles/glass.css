@@ -349,7 +349,7 @@ textarea.form-input {
  * weg, und das ist der Punkt, der den Konflikt mit „Glas gehört der Shell"
  * auflöst: in der Shell-Schicht gilt Shell-Material, nicht Modul-Tinte. */
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  .toast:not(.toast--success):not(.toast--danger):not(.toast--warning),
+  .toast:not(.toast--danger):not(.toast--warning),
   .list-bulkbar {
     background-color: color-mix(in srgb, var(--neutral-800) 90%, transparent);
     backdrop-filter: var(--blur-sm);
@@ -358,7 +358,22 @@ textarea.form-input {
   }
 }
 
-.toast--success,
+/* ERFOLG IST KEINE VOLLFLAECHE (Re-Critique 2026-09-27, C2). „Gespeichert"
+ * stand 118-mal als gruene Flaeche im Bild - Kraft ohne Anlass. Erfolg zeigt
+ * sich im Ergebnis; der Toast bestaetigt nur und steht deshalb auf dem Glas
+ * jedes Toasts, das Gruen traegt allein das Haekchen. Fehler und Warnungen
+ * bleiben Vollflaechen: sie sollen unterbrechen. Die Regel steht hier und
+ * nicht in layout.css, weil hier das Material wohnt; der opake Grund gilt
+ * auch ohne backdrop-filter (dieselben Farben wie die Basis in layout.css). */
+.toast.toast--success {
+  background-color: var(--neutral-800);
+  color: var(--neutral-50);
+}
+
+.toast--success .toast__icon {
+  color: var(--shell-success-ink);
+}
+
 .toast--danger,
 .toast--warning {
   border-radius: var(--radius-glass-card);
@@ -445,7 +460,7 @@ textarea.form-input {
    * Der Fallback, der die Lesbarkeit sichern sollte, hat sie abgeschafft.
    * Sein opaker Grund ist der, den layout.css ohnehin deklariert;
    * hier muss nur das Glas weg. Die Pille teilt Material und damit auch das. */
-  .toast:not(.toast--success):not(.toast--danger):not(.toast--warning),
+  .toast:not(.toast--danger):not(.toast--warning),
   .list-bulkbar {
     background-color: var(--neutral-800);
     border-color: var(--glass-border-overlay);

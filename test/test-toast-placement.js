@@ -468,3 +468,73 @@ test('M14: mobil ist die Erinnerung eine Zeile in Zielgroesse, der Kicker bleibt
   assert.match(kicker, /clip:\s*rect\(0,\s*0,\s*0,\s*0\)/);
   assert.doesNotMatch(kicker, /display:\s*none/);
 });
+
+// --------------------------------------------------------
+// Erfolg steht auf Glas, nicht auf Gruen (Re-Critique 2026-09-27, C2)
+// --------------------------------------------------------
+//
+// 118 Aufrufe von showToast(..., 'success') liefen ueber EINEN Baustein und
+// jeder zeigte eine gruene Vollflaeche. Die Regel, die hier gehalten wird: die
+// Flaeche, die ein Erfolgs-Toast am Ende WIRKLICH bekommt - ueber alle
+// Stylesheets in Ladereihenfolge, mit Spezifitaet, mit und ohne
+// backdrop-filter -, ist das Shell-Material, nie die Erfolgsfarbe; die Farbe
+// sitzt am Icon. Fehler behalten ihre Vollflaeche.
+
+const STYLE_ORDER = ['tokens.css', 'layout.css', 'glass.css'];
+
+/** Passt ein Selektorteil auf <div class="toast toast--{tone}"> (nur die letzte Stufe)? */
+function matchesToast(part, tone) {
+  const last = part.trim().split(/\s+|>|\+|~/).filter(Boolean).pop() ?? '';
+  const nots = [...last.matchAll(/:not\(([^)]*)\)/g)].map((m) => m[1].trim());
+  const base = last.replace(/:not\([^)]*\)/g, '');
+  const classes = [...base.matchAll(/\.([\w-]+)/g)].map((m) => m[1]);
+  if (!classes.length || base.replace(/\.[\w-]+/g, '') !== '') return false;
+  const own = new Set(['toast', `toast--${tone}`]);
+  if (!classes.every((c) => own.has(c))) return false;
+  return !nots.some((n) => own.has(n.replace(/^\./, '')));
+}
+
+const specificity = (part) => {
+  const last = part.trim().split(/\s+|>|\+|~/).filter(Boolean).pop() ?? '';
+  return (last.match(/\.[\w-]+/g) ?? []).length;
+};
+
+/** Der Hintergrund, der fuer einen Toast des Tons gewinnt. */
+function winningBackground(tone, { supportsBlur }) {
+  let best = null;
+  let order = 0;
+  for (const file of STYLE_ORDER) {
+    const css = readFileSync(new URL(`../public/styles/${file}`, import.meta.url), 'utf8');
+    for (const rule of eachRule(css)) {
+      order += 1;
+      if (rule.at.some((a) => /@media/.test(a))) continue; // Nutzervorlieben (Kontrast, Transparenz) sind eigene Faelle
+      if (rule.at.some((a) => /@supports/.test(a)) && !supportsBlur) continue;
+      const decl = rule.body.match(/(?:^|;)\s*background(?:-color)?\s*:\s*([^;]+)/);
+      if (!decl) continue;
+      for (const part of rule.selector.split(',')) {
+        if (!matchesToast(part, tone)) continue;
+        const spec = specificity(part);
+        if (!best || spec > best.spec || (spec === best.spec && order >= best.order)) {
+          best = { spec, order, value: decl[1].trim(), where: `${file}: ${part.trim()}` };
+        }
+      }
+    }
+  }
+  return best;
+}
+
+test('ein Erfolgs-Toast steht auf dem Shell-Material, das Gruen traegt das Icon', () => {
+  for (const supportsBlur of [true, false]) {
+    const success = winningBackground('success', { supportsBlur });
+    assert.ok(success, 'keine Flaeche fuer den Erfolgs-Toast gefunden - der Guard waere blind');
+    assert.doesNotMatch(success.value, /--color-success/, `Vollflaeche (${success.where}, backdrop ${supportsBlur})`);
+    assert.match(success.value, /--neutral-800/, `nicht das Shell-Material (${success.where})`);
+    const danger = winningBackground('danger', { supportsBlur });
+    assert.match(danger?.value ?? '', /--color-danger/, 'ein Fehler bleibt eine deutliche Flaeche');
+  }
+  const glass = readFileSync(new URL('../public/styles/glass.css', import.meta.url), 'utf8');
+  const icon = [...eachRule(glass)].find((r) => r.selector.trim() === '.toast--success .toast__icon');
+  assert.match(icon?.body ?? '', /color:\s*var\(--shell-success-ink\)/, 'das Haekchen traegt die Erfolgsfarbe');
+  const tokens = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+  assert.equal((tokens.match(/--_shell-success-ink:/g) ?? []).length, 3, 'hell, dunkel per Vorliebe, dunkel per Wahl');
+});

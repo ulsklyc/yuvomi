@@ -457,6 +457,17 @@
   --_shell-danger-ink:   #FF9A91;
   --shell-danger-ink:    var(--_shell-danger-ink);
 
+  /* DER ERFOLG AUF SHELL-MATERIAL (Re-Critique 2026-09-27, C2). Der
+   * Erfolgs-Toast war eine gruene Vollflaeche - 118 Aufrufe, jeder ein kleiner
+   * Alarm. Er steht jetzt auf demselben Glas wie jeder Toast; das Gruen
+   * wandert ins Haekchen. Es ist ein Icon, also 3:1 (WCAG 1.4.11), und es
+   * laeuft wie die Gefahr der Themenlage entgegen. Gegen den komponierten
+   * Glasgrund und den opaken Token:
+   *   hell   #6ADE87 auf #413E39 = 6,29:1  |  auf #2D2A25 = 8,45:1
+   *   dunkel #0B6B2B auf #D2CEC6 = 4,25:1  |  auf #E7E2DA = 5,17:1 */
+  --_shell-success-ink:  #6ADE87;
+  --shell-success-ink:   var(--_shell-success-ink);
+
   /* Datenreihen-Palette für Diagramme (Donut, Kategorie-Segmente).
    * Bewusst eigene Tokens statt geborgter Modul-Akzente: Modulfarben tragen
    * eine Bedeutung ("das ist Einkauf"), die in einem Ausgaben-Donut falsch ist.
@@ -1964,6 +1975,7 @@
      * Glasgrund #D2CEC6: 5,58:1. --color-danger-hover (#B80012) hielt dort nur
      * 4,39:1 und ist deshalb NICHT der Wert. */
     --_shell-danger-ink:   #9B000F;
+    --_shell-success-ink:  #0B6B2B;
 
     /* Dunkle Tinte auf den vividen Hell-Füllungen des Dark Mode (FAB, Badges, aktive Chips) */
     --_color-ink-on-vivid: #0A0A0C;
@@ -2203,6 +2215,7 @@
 
     /* Gegendrehung, siehe den Zwilling im prefers-color-scheme-Block. */
     --_shell-danger-ink:   #9B000F;
+    --_shell-success-ink:  #0B6B2B;
 
     /* Dunkle Tinte auf den vividen Hell-Füllungen des Dark Mode (FAB, Badges, aktive Chips) */
     --_color-ink-on-vivid: #0A0A0C;
