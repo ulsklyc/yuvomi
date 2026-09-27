@@ -629,14 +629,14 @@ function renderWeekGrid() {
         <div class="day-header ${todayClass}" style="--day-col: ${dayCol}">
           <span class="day-header__name">${dayNames[dayNameIndex]}</span>
           <span class="day-header__date">${formatDayDate(date)}</span>
+          <button class="day-add" data-action="add-meal" data-date="${date}" data-type="${firstType}" aria-label="${esc(t('meals.addMealOnDay', { day: dayLongName(date) }))}">
+            <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
+            <span class="day-add__label">${t('meals.addMealTitle')}</span>
+          </button>
         </div>
         <div class="day-slots">
           ${visibleTypes.map((type, ti) => renderSlot(date, type, mealsForDay, dayCol, ti + 2)).join('')}
         </div>
-        <button class="day-add" data-action="add-meal" data-date="${date}" data-type="${firstType}" aria-label="${esc(t('meals.addMealOnDay', { day: dayLongName(date) }))}">
-          <i data-lucide="plus" class="icon-sm" aria-hidden="true"></i>
-          <span>${t('meals.addMealTitle')}</span>
-        </button>
       </div>
     `;
   }).join(''));
@@ -872,6 +872,13 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
     // Dialog. Er steht AUSSERHALB von .meal-card__actions, die wireDragDrop
     // ausnimmt. Ausserhalb der schmalen Fassung ist er ausgeblendet: dort
     // greift die Maus weiter die ganze Karte.
+    //
+    // DER TYP STEHT ALS VORSATZ IM TITEL (R9 M6). Mobil ist eine Mahlzeit eine
+    // Zeile im Tagestraeger, und das Typ-Label kostete dort eine eigene
+    // Overline-Zeile ueber jeder Karte. `.meal-card__type` steht deshalb vor
+    // dem Namen und ist nur in der schmalen Fassung sichtbar (meals.css); am
+    // Board und am Tablet traegt weiter das Slot-Label den Typ. Nebenbei nennt
+    // der Oeffnen-Knopf damit mobil auch die Mahlzeit, nicht nur das Gericht.
     return `
       <div class="meal-card" data-meal-id="${meal.id}">
         <button type="button" class="meal-card__open${(meal.recipe_has_own_image || meal.recipe_has_image) ? ' meal-card__open--with-thumb' : ''}"
@@ -883,7 +890,7 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
             hasOwnImage: meal.recipe_has_own_image,
             className: 'meal-card__thumb',
           }) : ''}
-          <span class="meal-card__title"><span class="meal-card__title-text">${esc(meal.title)}</span>${recurrenceBadge}</span>
+          <span class="meal-card__title"><span class="meal-card__type">${esc(type.label)}</span><span class="meal-card__title-text">${esc(meal.title)}</span>${recurrenceBadge}</span>
           ${ingLabel ? `<span class="meal-card__meta">
             <span class="meal-card__ingredients-count">${ingLabel}${esc(ingDoneLabel)}</span>
           </span>` : ''}
@@ -910,7 +917,7 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
             data-meal-id="${meal.id}"
             aria-label="${esc(t('common.toShoppingListNamed', { title: meal.title }))}"
           ><i data-lucide="shopping-cart" class="icon-md" aria-hidden="true"></i></button>` : ''}
-          <button class="meal-card__action-btn"
+          <button class="meal-card__action-btn meal-card__action-btn--delete"
             data-action="delete-meal"
             data-meal-id="${meal.id}"
             aria-label="${esc(t('meals.deleteMealNamed', { title: meal.title }))}"
@@ -1854,7 +1861,7 @@ function buildModalContent({ mode, date, mealType, meal }) {
         * Mahlzeit sonst nur ueber den Papierkorb der Karte loeschbar. Es geht
         * denselben Weg wie dort (`deleteMeal`: Serienabfrage, Rueckgaengig). */ ''}
     <div class="modal-panel__footer modal-panel__footer--plain">
-      ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="modal-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
+      ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="modal-delete" data-delete-name="${esc(meal.title)}" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
       <button class="btn btn--secondary" id="modal-cancel">${t('common.cancel')}</button>
       <button class="btn btn--primary" id="modal-save">${isEdit ? t('common.save') : t('common.add')}</button>
     </div>`;

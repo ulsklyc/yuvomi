@@ -359,7 +359,9 @@ function loeschenStehtLinks(fuss, id, abbrechenId) {
   const loeschen = fuss.indexOf(`id="${id}"`);
   assert.ok(loeschen >= 0, 'Loeschen steht im Dialogfuss');
   assert.ok(loeschen < fuss.indexOf(`id="${abbrechenId}"`), 'links vor Abbrechen und Primaer');
-  assert.match(fuss, new RegExp(`class="btn btn--danger-outline" id="${id}" style="margin-inline-end:auto"`),
+  // Weitere Attribute dazwischen sind erlaubt (R9: `data-delete-name` nennt
+  // dem mobilen Icon-Knopf sein Objekt) - geprueft wird Klasse und Schub.
+  assert.match(fuss, new RegExp(`class="btn btn--danger-outline" id="${id}"[^>]*\\sstyle="margin-inline-end:auto"`),
     'als danger-outline, das den Rest nach rechts schiebt');
 }
 

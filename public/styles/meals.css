@@ -411,10 +411,12 @@
   overflow-wrap: break-word;
 }
 
-.meal-slot[data-type="breakfast"] .meal-slot__type-label { --meal-type-dot: var(--meal-breakfast); }
-.meal-slot[data-type="lunch"]     .meal-slot__type-label { --meal-type-dot: var(--meal-lunch); }
-.meal-slot[data-type="dinner"]    .meal-slot__type-label { --meal-type-dot: var(--meal-dinner); }
-.meal-slot[data-type="snack"]     .meal-slot__type-label { --meal-type-dot: var(--meal-snack); }
+/* Am Slot, nicht am Label: seit R9 (M6) traegt mobil der Typ-Vorsatz der
+ * Karte (`.meal-card__type`) denselben Punkt, und beide erben ihn von hier. */
+.meal-slot[data-type="breakfast"] { --meal-type-dot: var(--meal-breakfast); }
+.meal-slot[data-type="lunch"]     { --meal-type-dot: var(--meal-lunch); }
+.meal-slot[data-type="dinner"]    { --meal-type-dot: var(--meal-dinner); }
+.meal-slot[data-type="snack"]     { --meal-type-dot: var(--meal-snack); }
 
 /* Gutter-Zeilenlabels des Desktop-Boards (≥1024px, siehe unten): mobil und auf
  * Tablets existiert keine Gutter-Spalte — die Slots tragen ihre Labels selbst. */
@@ -530,6 +532,12 @@
   align-items: center;
   gap: var(--space-1);
   min-width: 0;
+}
+
+/* Der Typ-Vorsatz der schmalen Zeile (R9 M6, siehe dort). Am Board und am
+ * Tablet nennt das Slot-Label den Typ; ein zweites stuende daneben. */
+.meal-card__type {
+  display: none;
 }
 
 .meal-card__title-text {
@@ -798,11 +806,158 @@
     cursor: grabbing;
   }
 
-  /* Das Typ-Label ist die Überschrift des Slots, nicht seine erste Zeile: es
-   * trägt nur noch, was es sagt. Vorher lief darüber und darunter das volle
-   * Karten-Padding mit. */
-  .meal-slot__type-label {
-    padding: var(--space-2) var(--space-3) 0;
+  /* EIN TAG, EIN TRAEGER (R9 M6, Re-Critique 2026-09-27 A4 P2).
+   *
+   * Bis hierher war jede Mahlzeit eine eigene Karte mit Overline-Zeile ("●
+   * FRUEHSTUECK") darueber, Griff und Papierkorb daneben: gemessen 74-102px je
+   * Mahlzeit, 27 Mahlzeiten = 3217px Scrollhoehe bei 390px, rund sechs
+   * Mahlzeiten je Bildschirm. Jetzt traegt ein Tag EINE Flaeche mit
+   * Haarlinien-Zeilen, wie jede Liste der Kueche: Typpunkt und Typ als Vorsatz
+   * vor dem Namen, die Aktionen daneben, der Griff klein am Zeilenende. Der
+   * Tagesknopf "+ Mahlzeit" stand als 48px-Kachel unter jedem Tag (7 x 60px
+   * je Woche) und steht jetzt als Icon-Knopf im Tageskopf, neben dem Datum.
+   *
+   * WARUM NICHT DIE KLASSE `.row-carrier`: `.day-slots` ist ab 640px ein 2-
+   * bzw. 4-spaltiges Slot-Raster und am Board `display: contents` - die Klasse
+   * braechte dort Flaeche, Schatten, Lesemass und einen Container mit, die
+   * erst wieder abgeraeumt werden muessten. Und ihre Haarlinie (`> * + *`)
+   * zaehlt die ausgeblendeten leeren Slots mit: stuende der erste belegte Slot
+   * hinter einem leeren Fruehstueck, truege er eine Linie an der Oberkante.
+   * Deshalb hier dieselben Werte (list-row.css, `.row-carrier`) und eine
+   * Haarlinie, die nur belegte Geschwister zaehlt (`~`). */
+  .day-column {
+    border-bottom: none;
+  }
+
+  /* Der Traeger laeuft bis an die Kante der Woche, wie die Listen der drei
+   * Geschwister-Tabs (x 16 bei 390px) - vorher stand der Slot-Stapel mit
+   * eigenem 16px-Einzug bei x 32 und gab den Namen 32px ab. */
+  .day-slots {
+    display: block;
+    margin: 0 0 var(--space-3);
+    padding: 0;
+    background-color: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+
+  .day-slots > .meal-slot--has-meal {
+    min-height: var(--target-lg);
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    background: none;
+  }
+
+  .day-slots > .meal-slot--has-meal ~ .meal-slot--has-meal {
+    border-top: 1px solid var(--color-border-subtle);
+  }
+
+  /* Ein Tag ohne Mahlzeit hat keinen Traeger - nur seinen Kopf mit dem "+".
+   * Sonst stuende eine leere weisse Flaeche da (derselbe Grundsatz wie
+   * `.row-carrier:has(> .empty-state)`). */
+  .day-slots:not(:has(> .meal-slot--has-meal)) {
+    display: none;
+  }
+
+  /* Das Slot-Label weicht dem Vorsatz in der Zeile; den Typ nennt jetzt die
+   * Karte selbst (auch im Namen ihres Oeffnen-Knopfs). */
+  .day-slots > .meal-slot--has-meal > .meal-slot__type-label {
+    display: none;
+  }
+
+  /* Vorsatz: Punkt und Typ in der Label-Rolle (typography.css), im Fluss vor
+   * dem Namen - kein eigenes Zeilenband. Zwei Zeilen fuer Vorsatz plus Name
+   * haelt die Klammer am Titel unten. */
+  .meal-card__type {
+    display: inline;
+    margin-inline-end: var(--space-1h);
+    color: var(--color-text-secondary);
+    font-size: var(--text-xs);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .meal-card__type::before {
+    content: '';
+    display: inline-block;
+    width: var(--space-2);
+    height: var(--space-2);
+    margin-inline-end: var(--space-1h);
+    border-radius: var(--radius-full);
+    background: var(--meal-type-dot, var(--color-text-disabled));
+    vertical-align: 0.1em;
+  }
+
+  .meal-card__title-text {
+    display: inline;
+  }
+
+  .meal-card__title .meal-card__recurrence {
+    display: inline-flex;
+    margin-inline-start: var(--space-1);
+    vertical-align: middle;
+  }
+
+  /* Die Klammer sitzt am Titel, weil Vorsatz und Name EIN Textfluss sind. */
+  .meal-card__title {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  /* DER PAPIERKORB VERLAESST DIE ZEILE. Er stand 48px direkt neben dem Griff:
+   * ein verrutschter Zug war ein Loeschen (A4, Persona Casey). Loeschen lebt
+   * mobil im Dialog der Mahlzeit - links im Fuss seit R8, derselbe Weg
+   * (`deleteMeal`: Serienabfrage, Rueckgaengig) -, und der Dialog ist einen
+   * Tipp auf die Zeile entfernt. */
+  .meal-card__action-btn--delete {
+    display: none;
+  }
+
+  /* DER GRIFF IST KLEIN UND STEHT AM ENDE. Er bleibt der einzige Ort mit
+   * `touch-action: none` (#1317, oben) und nimmt weiter die volle Zeilenhoehe
+   * als Greifzone - nur die Breite gibt er ab, wie `.list-row__drag`: die
+   * Zieh-Achse ist vertikal. */
+  .meal-card__drag {
+    order: 1;
+    min-width: var(--space-8);
+  }
+
+  /* DER TAGESKNOPF STEHT IM TAGESKOPF (R9 M6). Er verliert dort sein Wort
+   * und wird zum Icon-Knopf seiner Familie - mit voller Zielgroesse
+   * (Label-Verlust-Regel, tokens.css 11b); den Namen ("Mahlzeit am Montag
+   * hinzufuegen") traegt er ohnehin als aria-label am Knopf. Der Kopf gibt
+   * dafuer sein Polster nach oben ab, damit er nicht um die 44px waechst. */
+  .day-header {
+    padding: 0 var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .day-header__date {
+    margin-inline-start: auto;
+  }
+
+  .day-header > .day-add {
+    flex: none;
+    width: var(--target-base);
+    min-width: var(--target-base);
+    min-height: var(--target-base);
+    margin: 0;
+    margin-inline-end: calc(-1 * var(--space-2));
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-full);
+    color: var(--module-accent);
+  }
+
+  .day-header > .day-add .day-add__label {
+    display: none;
   }
 }
 

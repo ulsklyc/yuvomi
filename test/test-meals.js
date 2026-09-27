@@ -1672,6 +1672,52 @@ test('D7 Essensplan: Kartenaktionen und "weitere Mahlzeit" sind dauerhaft sichtb
 });
 
 // --------------------------------------------------------
+// R9 M6 (Re-Critique 2026-09-27, A4 P2): mobil ist ein Tag EIN Traeger mit
+// Haarlinien-Zeilen. Gemessen bei 390px: Woche 3217px -> 2014px Scrollhoehe
+// (-37 %), Zeile 74-102px -> 48-78px, ~6 -> ~11 Mahlzeiten je Bildschirm.
+// --------------------------------------------------------
+test('R9 M6: die Mahlzeit-Zeile traegt den Typ als Vorsatz, der Papierkorb ist markiert, "+" steht im Tageskopf', () => {
+  const html = mealsUi.renderSlot('2026-09-21', { key: 'dinner', label: 'Abendessen' },
+    [{ id: 7, date: '2026-09-21', meal_type: 'dinner', title: 'Spaghetti <Bolognese>', ingredients: [] }], 1, 1);
+  const title = html.match(/<span class="meal-card__title">([\s\S]*?)<\/span>\s*(?:<span class="meal-card__meta"|<\/button>)/)?.[1] ?? '';
+  assert(/^<span class="meal-card__type">Abendessen<\/span><span class="meal-card__title-text">Spaghetti &lt;Bolognese&gt;<\/span>/.test(title),
+    `der Typ muss als Vorsatz VOR dem Namen im Titel stehen (ein Textfluss, eine Klammer), gefunden: ${title}`);
+  assert(/class="meal-card__action-btn meal-card__action-btn--delete"\s+data-action="delete-meal"/.test(html),
+    'der Papierkorb braucht seine Kennklasse - mobil verlaesst er die Zeile');
+  const grid = mealsSource.slice(mealsSource.indexOf('function renderWeekGrid('), mealsSource.indexOf('function renderSlot('));
+  const header = grid.match(/<div class="day-header[\s\S]*?<\/div>/)?.[0] ?? '';
+  assert(/<button class="day-add"/.test(header), 'der Tagesknopf steht im Tageskopf, nicht als 48px-Kachel unter dem Tag');
+  assert(/<span class="day-add__label">/.test(header), 'das Wort des Tagesknopfs braucht eine eigene Klasse (mobil faellt es, der Knopf behaelt sein aria-label)');
+  const modal = mealsUi.buildModalContent({ mode: 'edit', date: '2026-09-21', mealType: 'dinner',
+    meal: { id: 7, title: 'Pasta & Co', meal_type: 'dinner', date: '2026-09-21', ingredients: [] } });
+  assert(/id="modal-delete" data-delete-name="Pasta &amp; Co"/.test(modal),
+    'Loeschen lebt mobil im Dialogfuss - dort nennt es seine Mahlzeit (M8, data-delete-name)');
+});
+
+test('R9 M6: meals.css - ein Traeger je Tag, Haarlinie nur zwischen belegten Slots, Griff klein am Ende, Papierkorb weg', () => {
+  const css = readFileSync(new URL('../public/styles/meals.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const narrow = (r) => r.at.some((a) => /max-width:\s*639px/.test(a));
+  const body = (sel, pred = narrow) => rules.filter((r) => pred(r) && r.selector.split(',').some((s) => s.trim() === sel)).map((r) => r.body).join(';');
+  assert(/background-color:\s*var\(--color-surface\)/.test(body('.day-slots')) && /border-radius:\s*var\(--radius-lg\)/.test(body('.day-slots')),
+    '.day-slots ist mobil der Traeger des Tages (Flaeche + Radius wie .row-carrier)');
+  assert(/border-top:\s*1px solid var\(--color-border-subtle\)/.test(body('.day-slots > .meal-slot--has-meal ~ .meal-slot--has-meal')),
+    'Haarlinie ueber `~` zwischen BELEGTEN Slots - `+` zaehlte die ausgeblendeten leeren mit');
+  assert(!rules.some((r) => narrow(r) && /\.day-slots > \*\s*\+\s*\*/.test(r.selector)), 'keine Haarlinie ueber `> * + *` - sie stuende nach einem leeren Slot an der Oberkante');
+  assert(/display:\s*none/.test(body('.day-slots > .meal-slot--has-meal > .meal-slot__type-label')), 'die Overline-Zeile faellt mobil');
+  assert(/display:\s*inline/.test(body('.meal-card__type')), 'der Vorsatz steht mobil im Fluss des Titels');
+  assert(/display:\s*none/.test(body('.meal-card__type', (r) => !r.at.length)), 'ausserhalb der schmalen Fassung nennt das Slot-Label den Typ - kein zweiter');
+  assert(/line-clamp:\s*2/.test(body('.meal-card__title')), 'Vorsatz und Name teilen EINE Zwei-Zeilen-Klammer');
+  assert(/display:\s*none/.test(body('.meal-card__action-btn--delete')), 'der Papierkorb verlaesst mobil die Zeile (nicht neben dem Griff)');
+  const drag = body('.meal-card__drag');
+  assert(/order:\s*1/.test(drag), 'der Griff steht am Zeilenende');
+  assert(/min-width:\s*var\(--space-8\)/.test(drag), 'der Griff ist klein (32px), keine eigene 48px-Flaeche');
+  const add = body('.day-header > .day-add');
+  assert(/min-width:\s*var\(--target-base\)/.test(add) && /min-height:\s*var\(--target-base\)/.test(add),
+    'der Tagesknopf behaelt als Icon-Knopf die volle Zielgroesse');
+});
+
+// --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
 console.log(`\n[Meals-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);
