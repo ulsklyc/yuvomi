@@ -3445,37 +3445,61 @@ function buildTodayCockpitModel(data, cfg = [], { cap = PROGRAM_ROW_CAP, now = n
   // Zeilen hinter dem Deckel liegen.
   const hidden = sheet.allRows.filter((row) => !visibleRows.includes(row));
   const moreRoute = overflow > 0 ? todayMoreRoute(hidden, sheetContext.todayKey) : null;
-  return { rows: visibleRows, allRows: sheet.allRows, overflow, moreRoute, state, shopping, coda };
+  return { rows: visibleRows, allRows: sheet.allRows, hiddenRows: hidden, overflow, moreRoute, state, shopping, coda };
 }
 
 /* „+N WEITERE HEUTE" FUEHRT DORTHIN, WO DIE VERSTECKTEN ZEILEN STEHEN
  * (Re-Critique 2026-09-27, A7 P2-9). Die Fusszeile war ein `<div>`: sie sagte,
- * dass es mehr gibt, und liess keinen Weg dorthin. Das Ziel richtet sich nach
- * dem, was der Deckel verdeckt, nicht nach dem, was zu sehen ist:
+ * dass es mehr gibt, und liess keinen Weg dorthin.
+ *
+ * EIN LINK NUR, WENN DIE ZIELANSICHT ALLE VERDECKTEN ZEILEN ZEIGT (Codex an
+ * #1485). Die erste Fassung waehlte bei gemischten Quellen „das Naechstbeste":
+ * Aufgabe plus Dosis fuehrte in die Aufgabenliste, Termin plus Abfuhr an den
+ * Kalendertag - der Link versprach „+2 weitere" und zeigte eine davon. Jetzt:
  *   - nur Aufgaben: die Aufgabenliste,
- *   - ein anderes Modul allein: dessen Ziel, wie es die erste verdeckte Zeile
- *     nennt (Abfuhr, Vorrat und Co. tragen dort schon ihren Filter),
- *   - gemischt: der Kalender am heutigen Tag, der Termine und faellige
- *     Aufgaben nebeneinander zeigt, sonst die Aufgaben, sonst die erste Zeile.
+ *   - Termine und heute faellige Aufgaben: der Kalendertag, der beides zeigt
+ *     (eine UEBERFAELLIGE Aufgabe steht dort nicht),
+ *   - ein anderes Modul allein, alle Zeilen mit demselben Ziel: dieses Ziel
+ *     samt Filter,
+ *   - sonst `null`: die Fusszeile wird ein Knopf, der die verdeckten Zeilen an
+ *     Ort und Stelle aufklappt (renderTodayCockpit, wireTodayMore).
  * Ein Termin nennt in seiner Zeile genau EIN Vorkommen (`open=`); fuer mehrere
  * ist der Tag das ehrliche Ziel. */
 function todayMoreRoute(hiddenRows, todayKey) {
-  const routes = hiddenRows.map((row) => row?.route).filter(Boolean);
-  if (!routes.length) return null;
-  const base = (route) => String(route).split('?')[0];
+  if (!hiddenRows.length || hiddenRows.some((row) => !row?.route)) return null;
+  const routes = hiddenRows.map((row) => String(row.route));
+  const base = (route) => route.split('?')[0];
   const bases = new Set(routes.map(base));
-  const calendarDay = `/calendar?date=${encodeURIComponent(todayKey)}`;
-  if (bases.size === 1) {
-    const [only] = bases;
-    if (only === '/calendar') return calendarDay;
-    return only === '/tasks' ? '/tasks' : routes[0];
-  }
-  if (bases.has('/calendar')) return calendarDay;
-  if (bases.has('/tasks')) return '/tasks';
-  return routes[0];
+  if (bases.size === 1 && bases.has('/tasks')) return '/tasks';
+  const calendarShowsAll = [...bases].every((b) => b === '/calendar' || b === '/tasks')
+    && hiddenRows.every((row) => base(String(row.route)) !== '/tasks' || !row.overdue);
+  if (calendarShowsAll) return `/calendar?date=${encodeURIComponent(todayKey)}`;
+  return new Set(routes).size === 1 ? routes[0] : null;
 }
 
-function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date() } = {}) {
+/** Aufgeklappt bleibt aufgeklappt, auch wenn ein Refresh das Blatt neu zeichnet. */
+let todayMoreOpen = false;
+
+/**
+ * Der Aufklapp-Knopf des Ueberlaufs: schaltet die verdeckten Zeilen an Ort und
+ * Stelle, ohne das Blatt neu zu zeichnen - so bleibt der Fokus auf dem Knopf,
+ * und ein zweiter Tipp klappt wieder zu.
+ */
+function wireTodayMore(root) {
+  root.querySelectorAll('[data-today-more]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const open = btn.getAttribute('aria-expanded') !== 'true';
+      const region = root.querySelector(`#${btn.getAttribute('aria-controls')}`);
+      if (region) region.hidden = !open;
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      const label = btn.querySelector('span');
+      if (label) label.textContent = open ? btn.dataset.lessLabel : btn.dataset.moreLabel;
+      todayMoreOpen = open;
+    });
+  });
+}
+
+function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(), moreOpen = todayMoreOpen } = {}) {
   const model = buildTodayCockpitModel(data, cfg, { now });
 
   /* DIE BREITE BUEHNE TRAEGT ZWEI SPALTEN ZEILEN (Critique 23.09.2026). Am
@@ -3498,13 +3522,23 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date() 
   if (listRows.length) {
     parts.push(`<div class="today-cockpit__rows${split ? ' today-cockpit__rows--split' : ''}"${split ? ` style="--today-rows-per-column:${perColumn}"` : ''}>${listRows.join('')}</div>`);
   }
-  if (model.overflow > 0) {
+  if (model.overflow > 0 && model.moreRoute) {
     const moreText = esc(t('dashboard.todayMore', { count: model.overflow }));
-    parts.push(model.moreRoute
-      ? `<a href="${esc(model.moreRoute)}" class="today-cockpit__more today-cockpit__more--link" data-route="${esc(model.moreRoute)}">
+    parts.push(`<a href="${esc(model.moreRoute)}" class="today-cockpit__more today-cockpit__more--link" data-route="${esc(model.moreRoute)}">
           <span>${moreText}</span><i data-lucide="chevron-right" class="icon-sm" aria-hidden="true"></i>
-        </a>`
-      : `<div class="today-cockpit__more">${moreText}</div>`);
+        </a>`);
+  } else if (model.overflow > 0) {
+    // Keine Ansicht zeigt alle verdeckten Zeilen (todayMoreRoute): sie stehen
+    // hier, zugeklappt, und der Knopf darunter klappt sie auf.
+    const moreText = t('dashboard.todayMore', { count: model.overflow });
+    const lessText = t('dashboard.todayLess');
+    parts.push(`<div class="today-cockpit__rows today-cockpit__rows--more" id="today-cockpit-more"${moreOpen ? '' : ' hidden'}>${
+      model.hiddenRows.map((row) => renderTodayRow(row)).join('')}</div>`);
+    parts.push(`<button type="button" class="today-cockpit__more today-cockpit__more--link" data-today-more
+          aria-expanded="${moreOpen ? 'true' : 'false'}" aria-controls="today-cockpit-more"
+          data-more-label="${esc(moreText)}" data-less-label="${esc(lessText)}">
+          <span>${esc(moreOpen ? lessText : moreText)}</span><i data-lucide="chevron-down" class="icon-sm today-cockpit__more-icon" aria-hidden="true"></i>
+        </button>`);
   }
   if (model.shopping) parts.push(renderTodayRow(model.shopping));
   if (model.coda) parts.push(`<div class="today-cockpit__coda">${esc(model.coda)}</div>`);
@@ -5267,6 +5301,7 @@ async function openTaskFromOverview(taskId, container, rerender, user) {
 // --------------------------------------------------------
 
 function wireLinks(container, rerender, { editing = false, user = null } = {}) {
+  wireTodayMore(container);
   container.querySelectorAll('[data-route]').forEach((el) => {
     if (el.id === 'fab-main' || el.closest('#fab-actions')) return;
     if (editing && el.closest('.widget-wrapper--editing')) return;
@@ -6492,7 +6527,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, familyManageHref, customizeHasChanges, todayMoreRoute };
+export const __test = { renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, familyManageHref, customizeHasChanges, todayMoreRoute, wireTodayMore };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

@@ -2610,6 +2610,34 @@ svg.weather-forecast__icon {
   outline-offset: var(--focus-ring-offset-inset);
 }
 
+/* Der Aufklapp-Knopf (Codex an #1485): zeigt keine Ansicht alle verdeckten
+ * Zeilen, klappt dieselbe Fusszeile sie an Ort und Stelle auf. Als <button>
+ * braucht sie den Reset auf die Optik des Links; das Chevron zeigt nach unten
+ * und dreht sich im offenen Zustand. */
+button.today-cockpit__more--link {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--color-border-subtle);
+  background: none;
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.today-cockpit__more-icon {
+  transition: transform var(--transition-fast);
+}
+
+.today-cockpit__more[aria-expanded="true"] .today-cockpit__more-icon {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .today-cockpit__more-icon {
+    transition: none;
+  }
+}
+
 .today-cockpit-card--task {
   --today-card-accent: var(--module-tasks);
 }
@@ -2651,6 +2679,17 @@ svg.weather-forecast__icon {
 /* Die Einkaufszeile folgt der Liste, nicht einer Geschwisterzeile - dieselbe
  * Haarlinie wie zwischen den Zeilen. */
 .today-cockpit__rows + .today-cockpit-card {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* Die aufgeklappten verdeckten Zeilen (Codex an #1485) setzen die Liste fort:
+ * dieselbe Haarlinie zur letzten sichtbaren Zeile, und zugeklappt nimmt ihr
+ * `display: grid` dem `hidden` nicht die Wirkung. */
+.today-cockpit__rows--more[hidden] {
+  display: none;
+}
+
+.today-cockpit__rows + .today-cockpit__rows--more {
   border-top: 1px solid var(--color-border-subtle);
 }
 

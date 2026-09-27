@@ -203,10 +203,20 @@ test('„+N weitere heute" ist ein Weg dorthin, wo die verdeckten Zeilen stehen 
   assert.equal(todayMoreRoute([{ route: '/calendar?open=4&date=2026-09-27' }, { route: '/calendar?open=5' }], day),
     '/calendar?date=2026-09-27', 'mehrere Termine: der Tag, nicht ein einzelnes Vorkommen');
   assert.equal(todayMoreRoute([{ route: '/tasks' }, { route: '/calendar?open=4' }], day), '/calendar?date=2026-09-27',
-    'gemischt mit Terminen: der Kalendertag zeigt beides');
-  assert.equal(todayMoreRoute([{ route: '/tasks' }, { route: '/health' }], day), '/tasks');
+    'heute faellige Aufgabe mit Termin: der Kalendertag zeigt beides');
   assert.equal(todayMoreRoute([{ route: '/pantry?filter=soon' }], day), '/pantry?filter=soon', 'ein Modul allein: sein Ziel samt Filter');
   assert.equal(todayMoreRoute([], day), null);
+  // Codex an #1485: ein Link nur, wenn EINE Ansicht ALLE verdeckten Zeilen zeigt.
+  assert.equal(todayMoreRoute([{ route: '/tasks' }, { route: '/health' }], day), null,
+    'Aufgabe plus Dosis: die Aufgabenliste zeigt die Dosis nicht');
+  assert.equal(todayMoreRoute([{ route: '/calendar?open=4' }, { route: '/waste' }], day), null,
+    'Termin plus Nicht-Kalender: kein Tag, der beides zeigt');
+  assert.equal(todayMoreRoute([{ route: '/tasks', overdue: true }, { route: '/calendar?open=4' }], day), null,
+    'eine ueberfaellige Aufgabe steht nicht am heutigen Kalendertag');
+  assert.equal(todayMoreRoute([{ route: '/tasks', overdue: true }, { route: '/tasks' }], day), '/tasks');
+  assert.equal(todayMoreRoute([{ route: '/tasks' }, { route: null }], day), null, 'eine Zeile ohne Ziel hat keine Ansicht');
+  assert.equal(todayMoreRoute([{ route: '/budget?tab=a' }, { route: '/budget?tab=b' }], day), null,
+    'zwei Filter desselben Moduls sind zwei Ansichten');
 
   global.window ??= { yuvomi: null };
   const todayStr = toLocalDateKey(new Date());
@@ -220,6 +230,75 @@ test('„+N weitere heute" ist ein Weg dorthin, wo die verdeckten Zeilen stehen 
   assert.equal(more[1], 'a', 'die Fusszeile ist ein Link, keine Sackgasse');
   assert.match(more[0], /href="\/tasks"/);
   assert.match(more[0], /data-route="\/tasks"/, 'wireLinks haengt an data-route');
+});
+
+test('Codex an #1485: gemischte verdeckte Zeilen klappen an Ort und Stelle auf, statt in eine halbe Ansicht zu fuehren', () => {
+  const hadWindow = 'window' in globalThis;
+  const prevWindow = globalThis.window;
+  globalThis.window = { yuvomi: null };
+  try {
+    const todayStr = toLocalDateKey(new Date());
+    // Sieben ueberfaellige Aufgaben und ein ganztaegiger Termin: der Deckel
+    // behaelt sechs Aufgaben, verdeckt bleiben eine Aufgabe und der Termin -
+    // die Aufgabe steht nicht am heutigen Kalendertag, der Termin nicht in der
+    // Aufgabenliste.
+    const urgentTasks = Array.from({ length: 7 }, (_, i) => ({
+      id: i + 1, title: `Aufgabe ${i + 1}`, due_date: '2000-01-01', status: 'open', assigned_users: [],
+    }));
+    const upcomingEvents = [{ id: 40, title: 'Elternabend', start_datetime: todayStr, all_day: 1 }];
+    const html = renderTodayCockpit({ urgentTasks, upcomingEvents }, [], false, { moreOpen: false });
+    const more = html.match(/<(a|div|button)\b[^>]*class="today-cockpit__more[^"]*"[^>]*>/);
+    assert.ok(more, `Reichweite: die Zeilen laufen ueber den Deckel: ${html.slice(0, 200)}`);
+    assert.equal(more[1], 'button', 'kein Link in eine Ansicht, die nur einen Teil zeigt');
+    assert.match(more[0], /today-cockpit__more--link/, 'dieselbe Optik wie der Link');
+    assert.match(more[0], /aria-expanded="false"/);
+    const controls = more[0].match(/aria-controls="([^"]+)"/)?.[1];
+    assert.ok(controls, 'der Knopf nennt, was er aufklappt');
+    const region = html.match(new RegExp(`<div\\b[^>]*id="${controls}"[^>]*>([\\s\\S]*?)</div>\\s*<button`));
+    assert.ok(region, 'die verdeckten Zeilen stehen im Markup');
+    assert.match(region[0], /\bhidden\b/, 'zugeklappt');
+    assert.match(region[1], /Elternabend/, 'der verdeckte Termin');
+    assert.match(region[1], /Aufgabe 7/, 'die verdeckte Aufgabe');
+    assert.doesNotMatch(html, /<a\b[^>]*today-cockpit__more/);
+  } finally {
+    if (hadWindow) globalThis.window = prevWindow;
+    else delete globalThis.window;
+  }
+});
+
+test('Codex an #1485: der Aufklapp-Knopf schaltet an Ort und Stelle, und ein zweiter Tipp klappt zu', () => {
+  const { wireTodayMore } = __test;
+  assert.equal(typeof wireTodayMore, 'function', 'die Verdrahtung ist erreichbar');
+  const region = { hidden: true };
+  const label = { textContent: 'dashboard.todayMore' };
+  const attrs = { 'aria-expanded': 'false', 'aria-controls': 'today-cockpit-more' };
+  let onClick = null;
+  let focusMoved = false;
+  const button = {
+    dataset: { moreLabel: 'dashboard.todayMore', lessLabel: 'dashboard.todayLess' },
+    getAttribute: (name) => attrs[name] ?? null,
+    setAttribute: (name, value) => { attrs[name] = String(value); },
+    querySelector: (sel) => (sel === 'span' ? label : null),
+    addEventListener: (type, fn) => { if (type === 'click') onClick = fn; },
+    focus: () => { focusMoved = true; },
+  };
+  const root = {
+    querySelectorAll: (sel) => (sel === '[data-today-more]' ? [button] : []),
+    querySelector: (sel) => (sel === '#today-cockpit-more' ? region : null),
+  };
+  wireTodayMore(root);
+  assert.ok(onClick, 'der Knopf hat einen Klick-Handler');
+  onClick({ currentTarget: button });
+  assert.equal(attrs['aria-expanded'], 'true');
+  assert.equal(region.hidden, false, 'die verdeckten Zeilen stehen da');
+  assert.equal(label.textContent, 'dashboard.todayLess');
+  onClick({ currentTarget: button });
+  assert.equal(attrs['aria-expanded'], 'false', 'der zweite Tipp klappt zu');
+  assert.equal(region.hidden, true);
+  assert.equal(label.textContent, 'dashboard.todayMore');
+  assert.equal(focusMoved, false, 'der Fokus bleibt, wo er ist');
+  // Verdrahtung: der echte Seitenweg ruft sie auf.
+  assert.match(dashboardSource, /function wireLinks\([^)]*\) \{[\s\S]{0,400}wireTodayMore\(container\)/);
 });
 
 test('die Heute-Zeile nennt den Titel vor der Person (H13, A7 Sam)', () => {
