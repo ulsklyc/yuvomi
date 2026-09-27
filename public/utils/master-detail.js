@@ -271,6 +271,10 @@ export function mountMasterDetail({
   const hrefFor = address ? (id) => address.href(id ?? null) : (id) => urlWith(param, id);
   // Vorwahl scharf, bis in diesem Aufbau zum ersten Mal etwas gewaehlt war.
   let autoPick = preselect !== false;
+  // Die Auswahl, deren Zeile zuletzt in der Liste stand. Faellt sie weg, hat
+  // die Liste den Zusammenhang gewechselt; eine Auswahl, die NIE eine Zeile
+  // hatte (unbekannter Deep-Link), ist dagegen ein „gibt es nicht".
+  let shownSelection = null;
 
   const isSplit = () => root.isConnected && getComputedStyle(detailEl).display !== 'none';
 
@@ -288,6 +292,7 @@ export function mountMasterDetail({
     if (selected == null) return;
     const row = rowFor(selected);
     if (!row) return;
+    shownSelection = selected;
     row.classList.add('is-selected');
     // `aria-current` statt `aria-selected`: die Zeilen sind Knoepfe in einer
     // Liste, keine Optionen einer Listbox - „aktuell" ist die ehrliche Ansage.
@@ -450,7 +455,16 @@ export function mountMasterDetail({
   /** Nach einem Neuaufbau der Liste: Markierung neu setzen, Verschwundenes raeumen. */
   function refresh({ repaint = false } = {}) {
     if (selected != null && !rowFor(selected)) {
+      const hadRow = shownSelection === selected;
       clear({ history: 'replace' });
+      // Die Liste hat den Zusammenhang gewechselt (andere Kategorie, Filter,
+      // Suche, geloescht): wie Mail beim Ordnerwechsel steht dann wieder der
+      // erste Eintrag rechts. Nur ein Esc des Nutzers laesst die Spalte leer -
+      // und ein Deep-Link auf etwas, das es nicht gibt (Rueckgabe-Vertrag).
+      if (hadRow) {
+        autoPick = preselect !== false;
+        tryPreselect();
+      }
       return;
     }
     markSelection();

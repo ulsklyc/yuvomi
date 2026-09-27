@@ -790,6 +790,28 @@ test('Vorwahl: eigene Wahl per Funktion, spaete Liste per refresh(), Esc bleibt 
   handle.refresh();
   assert.equal(handle.selectedId(), null, 'eine Vorwahl je Aufbau, danach entscheidet der Nutzer');
   handle.destroy();
+
+  // Verschwindet die gewaehlte Zeile (Kategorie gewechselt, weggefiltert), ist
+  // das ein neuer Zusammenhang - wie Mail beim Ordnerwechsel: der erste steht.
+  p = makePage();
+  handle = p.mount({ preselect: true });
+  handle.open('4');
+  p.list.children.splice(0, 1);
+  p.list.children.splice(2, 1);
+  handle.refresh();
+  assert.equal(handle.selectedId(), '2', 'nach dem Wegfall steht die erste verbliebene Zeile');
+  assert.deepEqual(historyLog.at(-1), ['replace', '/contacts?open=2']);
+  handle.destroy();
+
+  // Ein Deep-Link auf etwas, das nie eine Zeile hatte, ist ein „gibt es
+  // nicht" (Rueckgabe-Vertrag): Leerzustand, keine Vorwahl daneben.
+  p = makePage({ path: '/contacts?open=99' });
+  handle = p.mount({ preselect: true });
+  handle.refresh();
+  assert.equal(handle.selectedId(), null);
+  assert.equal(p.empty.hidden, false);
+  assert.equal(location.search, '');
+  handle.destroy();
 });
 
 test('Vorwahl: beim Wechsel schmal -> Spalte, ohne gemerkte Auswahl', () => {
