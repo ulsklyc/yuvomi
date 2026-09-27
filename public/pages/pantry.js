@@ -356,7 +356,22 @@ export async function render(container) {
   fab.dataset.dockLabel = t('newLabel.pantry');
   fab.insertAdjacentHTML('beforeend', '<i data-lucide="plus" aria-hidden="true"></i>');
 
-  page.append(title, live, toolbar, list, fab);
+  // DAS NEBENPANEL „IM BLICK" (Re-Critique 2026-09-27, A4 P1 / R10 L4): am
+  // Desktop steht neben der Liste fest, was bald ablaeuft oder knapp wird -
+  // dieselben drei Fragen wie die Filterchips, nur ohne dass man sie stellen
+  // muss. Unter der Schwelle blendet es CSS aus; dort tragen die Chips die
+  // Frage. Liste und Panel teilen einen Koerper, weil ein Container sich
+  // selbst nicht umstellen kann (die Abfrage steht an `.pantry-page`).
+  const body = document.createElement('div');
+  body.className = 'pantry-body';
+  const watch = document.createElement('aside');
+  watch.className = 'pantry-watch';
+  watch.id = 'pantry-watch';
+  watch.setAttribute('aria-label', t('pantry.watchLabel'));
+  watch.hidden = true;
+  body.append(list, watch);
+
+  page.append(title, live, toolbar, body, fab);
   container.replaceChildren(page);
   renderKitchenTabsBar(container, '/pantry');
 
@@ -391,6 +406,7 @@ export async function render(container) {
   });
 
   list.addEventListener('click', onListClick);
+  watch.addEventListener('click', onWatchClick);
 
   try {
     await loadPantry();
@@ -567,6 +583,7 @@ function renderList() {
   const chipRow = list.querySelector(':scope > #pantry-filters');
   list.replaceChildren(...(chipRow ? [chipRow] : []));
   renderBulkBar();
+  renderWatch();
 
   if (!state.items.length) {
     list.appendChild(emptyStateEl());
@@ -622,6 +639,104 @@ function renderList() {
   }
 
   if (window.lucide) window.lucide.createIcons({ el: list });
+}
+
+// --------------------------------------------------------
+// Nebenpanel „Im Blick" (Desktop)
+// --------------------------------------------------------
+
+const WATCH_SECTIONS = [
+  { key: 'expired', label: 'pantry.filterExpired', icon: 'circle-alert', tone: 'danger' },
+  { key: 'soon', label: 'pantry.filterSoon', icon: 'clock', tone: 'warning' },
+  { key: 'low', label: 'pantry.filterLow', icon: 'package-open', tone: 'warning' },
+];
+
+/**
+ * Die drei Abschnitte des Panels, mit genau der Zuordnung der Filterchips
+ * (`matchesPantryFilter`) - ein Artikel steht im Panel, wenn und weil ihn der
+ * gleichnamige Chip traefe. Unabhaengig von Suche und aktivem Filter: das
+ * Panel beantwortet „was braucht Aufmerksamkeit", nicht „was zeigt die Liste".
+ * Sortiert wie die flache Filterliste: Ablauf nach Datum, Bestand nach Menge.
+ */
+function pantryWatchGroups(items, today) {
+  return WATCH_SECTIONS.map((section) => {
+    const rows = items.filter((item) => matchesPantryFilter(item, section.key, today));
+    if (section.key === 'low') rows.sort((a, b) => Number(a.quantity) - Number(b.quantity));
+    else rows.sort((a, b) => String(a.expires_on).localeCompare(String(b.expires_on)));
+    return { ...section, items: rows };
+  }).filter((section) => section.items.length);
+}
+
+function watchRowEl(item, section) {
+  const li = document.createElement('li');
+  li.className = 'list-row pantry-watch__row';
+  const main = document.createElement('button');
+  main.type = 'button';
+  main.className = 'list-row__main list-row__main--interactive';
+  main.dataset.watchId = String(item.id);
+  const name = document.createElement('span');
+  name.className = 'list-row__name';
+  name.textContent = item.name;
+  const meta = document.createElement('span');
+  meta.className = 'list-row__meta';
+  // Ablauf: der Satz der Zeile („Laeuft morgen ab"), in der Tinte seiner
+  // Dringlichkeit. Bestand: die Menge - „Fast leer" steht schon im Kopf.
+  const expiry = section.key === 'low' ? null : expiryBadge(item);
+  const lead = document.createElement('span');
+  lead.className = `pantry-watch__due pantry-watch__due--${expiry ? expiry.tone : section.tone}`;
+  lead.textContent = expiry ? expiry.text : quantityText(item);
+  meta.appendChild(lead);
+  if (item.location_name) meta.append(` · ${locationLabel(item.location_name)}`);
+  main.append(name, meta);
+  li.appendChild(main);
+  return li;
+}
+
+/** Zeichnet das Panel neu; ohne Artikel bleibt es verborgen. */
+function renderWatch() {
+  const watch = _container?.querySelector('#pantry-watch');
+  if (!watch) return;
+  watch.replaceChildren();
+  if (!state.items.length) {
+    watch.hidden = true;
+    return;
+  }
+  watch.hidden = false;
+  const groups = pantryWatchGroups(state.items.map(withIntent), state.todayKey);
+  if (!groups.length) {
+    const calm = document.createElement('p');
+    calm.className = 'pantry-watch__empty';
+    calm.textContent = t('pantry.watchEmpty');
+    watch.appendChild(calm);
+    return;
+  }
+  for (const section of groups) {
+    const el = document.createElement('section');
+    el.className = 'list-group pantry-watch__group';
+    const heading = document.createElement('h2');
+    heading.className = 'list-group__title';
+    heading.insertAdjacentHTML('beforeend', `<i data-lucide="${esc(section.icon)}" class="icon-sm" aria-hidden="true"></i>`);
+    const label = document.createElement('span');
+    label.textContent = t(section.label);
+    const count = document.createElement('span');
+    count.className = 'list-group__count';
+    count.textContent = String(section.items.length);
+    heading.append(label, count);
+    const rows = document.createElement('ul');
+    rows.className = 'row-carrier';
+    for (const item of section.items) rows.appendChild(watchRowEl(item, section));
+    el.append(heading, rows);
+    watch.appendChild(el);
+  }
+  if (window.lucide) window.lucide.createIcons({ el: watch });
+}
+
+/** Eine Panelzeile oeffnet denselben Dialog wie ihre Zeile in der Liste. */
+function onWatchClick(e) {
+  const btn = e.target.closest('[data-watch-id]');
+  if (!btn) return;
+  const item = state.items.find((i) => i.id === Number(btn.dataset.watchId));
+  if (item) openItemModal('edit', item);
 }
 
 /**
@@ -1051,6 +1166,9 @@ function refreshRowQuantity(row, item) {
   row.querySelector('.pantry-row__cart-slot')?.replaceWith(fresh.querySelector('.pantry-row__cart-slot'));
 
   if (window.lucide) window.lucide.createIcons({ el: row });
+  // Das Panel spricht von denselben Mengen: ein Schritt, der einen Artikel
+  // unter den Mindestbestand bringt, gehoert sofort unter „Fast leer".
+  renderWatch();
 }
 
 // --------------------------------------------------------
@@ -1371,4 +1489,7 @@ export const __test = {
   // (test-shopping-readonly-ui.js).
   rowEl,
   sendToShopping,
+  // R10 L4: das Nebenpanel ordnet wie die Filterchips (test-pantry-ux.js).
+  pantryWatchGroups,
+  renderWatch,
 };

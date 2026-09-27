@@ -2119,3 +2119,29 @@ test('der Neu-Knopf der Listenleiste baut am Desktop nicht hoeher als die Kapsel
   const base = rules.find((r) => r.selector.trim() === '.list-tab__new' && r.at.length === 0);
   assert.equal(minHeight(base), 'var(--target-lg)', 'mobil bleibt der Neu-Knopf auf der Touch-Hoehe');
 });
+
+// Zwei Spalten am Desktop (Re-Critique 2026-09-27, A4 P1 / R10 L4). Gemessen
+// bei 1440x900: die Liste stand auf 252-972, rechts 436px leer, 1576px
+// Scrollhoehe. Ab 60rem EINKAUFSFLAECHE (nicht Viewport) stehen die
+// Kategorien in zwei Spalten, Masonry nur als Fortschritt hinter @supports -
+// das Muster der Notizen. Das Lesemass der Kategorie bleibt die Variable, die
+// hier auf die Spalte zeigt; die Eingabezeile endet mit der ersten Spalte.
+test('ab 60rem Einkaufsflaeche stehen die Kategorien in zwei Spalten', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/shopping.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const root = rules.find((r) => r.selector.trim() === '.shopping-page' && /container:\s*shopping-surface\s*\/\s*inline-size/.test(r.body));
+  assert.ok(root, 'die Seite ist der Container shopping-surface - die Abfrage misst die Seite, nicht den Viewport');
+  const inQuery = (r) => r.at.some((a) => /^@container shopping-surface \(min-width: 60rem\)$/.test(a));
+  const list = rules.find((r) => inQuery(r) && r.at.length === 1 && r.selector.trim() === '.shopping-page .items-list');
+  assert.ok(list, 'keine Zwei-Spalten-Regel fuer die Artikelliste');
+  assert.match(list.body, /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(list.body, /--page-measure:\s*100%/, 'die Kategorie kappt auf ihre Spalte, ueber dieselbe Variable');
+  assert.match(list.body, /align-items:\s*start/, 'eine kurze Kategorie dehnt ihre Zeile nicht');
+  assert.ok(rules.some((r) => inQuery(r) && r.at.some((a) => /@supports \(grid-template-rows: masonry\)/.test(a))
+    && /grid-template-rows:\s*masonry/.test(r.body)), 'Masonry nur hinter @supports');
+  const quick = rules.find((r) => inQuery(r) && r.selector.trim() === '.shopping-page .quick-add');
+  assert.match(quick?.body ?? '', /max-width:\s*calc\(\(100% - var\(--space-5\)\) \/ 2\)/,
+    'die Eingabezeile endet mit der ersten Spalte (Spaltenluecke = column-gap)');
+  assert.match(list.body, /column-gap:\s*var\(--space-5\)/);
+});

@@ -612,6 +612,64 @@
   gap: var(--space-1);
 }
 
+/* ZWEI SPALTEN AM DESKTOP (Re-Critique 2026-09-27, A4 P1 / R10 L4).
+ *
+ * Gemessen bei 1440x900: die Liste stand auf dem Lesemass 252-972, rechts
+ * davon 436px leere Buehne, und 23 Artikel brauchten 1576px Scrollhoehe - im
+ * Tab, den man am Desktop fuer den Wocheneinkauf offen hat. Ab einer
+ * Einkaufsflaeche von 60rem (1280er-Laptop mit Seitenleiste: 1060px; ein
+ * 1200er-Fenster: 980px) stehen die Kategorien deshalb in zwei Spalten, und
+ * die Liste endet an derselben Kante wie Essensplan und Rezepte - die
+ * Kuechen-Tabs teilen eine Fluchtlinie (252 bis 1408 bei 1440).
+ *
+ * DAS MUSTER DER NOTIZEN: ein getestetes CSS-Grid als Basis, echtes Masonry
+ * nur als Fortschritt hinter `@supports` (Safari 26.4 kennt `grid-lanes`,
+ * Firefox hinter einem Schalter `grid-template-rows: masonry`). Ohne beides
+ * endet eine kurze Kategorie mit Luft unter sich statt die Zeile zu dehnen
+ * (`align-items: start`). Kein Multicol: es verschoebe beim Zuklappen einer
+ * Gruppe die folgenden in die andere Spalte, und die Lesefolge der Tastatur
+ * waere eine andere als die sichtbare.
+ *
+ * DIE ABFRAGE MISST DIE SEITE, NICHT DEN VIEWPORT - dieselbe Regel wie der
+ * Liste-+-Detail-Baustein (layout.css, module-surface): neben der
+ * ausgeklappten Seitenleiste ist ein 1200er-Fenster 980px breit. */
+.shopping-page {
+  container: shopping-surface / inline-size;
+}
+
+@container shopping-surface (min-width: 60rem) {
+  /* Die Kategorie kappt weiter ueber `--page-measure` (list-row.css) - hier
+   * ist das Mass die Spalte selbst, wie im Liste-+-Detail-Baustein. */
+  .shopping-page .items-list {
+    --page-measure: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-5);
+    align-items: start;
+  }
+
+  /* Leer- und Fehlerzustaende stehen ueber beide Spalten. */
+  .shopping-page .items-list > :not(.list-group) {
+    grid-column: 1 / -1;
+  }
+
+  /* Die Eingabezeile endet mit der ersten Spalte statt mitten in der zweiten. */
+  .shopping-page .quick-add {
+    max-width: calc((100% - var(--space-5)) / 2);
+  }
+
+  @supports (grid-template-rows: masonry) {
+    .shopping-page .items-list {
+      grid-template-rows: masonry;
+    }
+  }
+
+  @supports (display: grid-lanes) {
+    .shopping-page .items-list {
+      display: grid-lanes;
+    }
+  }
+}
+
 /* --------------------------------------------------------
  * Einkaufsartikel
  * -------------------------------------------------------- */

@@ -14,6 +14,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 global.HTMLElement = class HTMLElement {};
 global.customElements = { define() {}, get() { return undefined; } };
@@ -446,4 +447,92 @@ test('renderList() laesst die Chipreihe als erstes Kind des Ports stehen', () =>
   assert.equal(list.children[0], chipRow, 'die Chipreihe muss den Neuaufbau als erstes Kind ueberleben');
   assert.equal(list.children.filter((c) => c === chipRow).length, 1, 'und genau einmal');
   assert.ok(list.children.length >= 2, 'Gegenprobe: hinter der Reihe steht der neue Inhalt (hier der Leerzustand)');
+});
+
+// --------------------------------------------------------
+// Nebenpanel „Braucht Aufmerksamkeit" (Re-Critique 2026-09-27, A4 P1 / R10 L4)
+// --------------------------------------------------------
+
+// Am Desktop standen die Lagerort-Gruppen auf 252-972, rechts 436px leer. Das
+// Panel fuellt die Flaeche mit den drei Fragen der Filterchips - und muss
+// dieselbe Zuordnung sprechen, sonst stuende ein Artikel im Panel unter
+// „Fast leer", den der gleichnamige Chip nicht findet.
+const WATCH_TODAY = '2026-09-27';
+const watchItems = () => [
+  rice(5, { id: 1, name: 'Reis' }),                                                  // ruhig
+  rice(1, { id: 2, name: 'Milch', expires_on: '2026-09-25', location_name: 'fridge' }), // abgelaufen
+  rice(1, { id: 3, name: 'Joghurt', expires_on: '2026-09-29' }),                       // bald
+  rice(1, { id: 4, name: 'Eier', expires_on: '2026-09-28' }),                          // bald, frueher
+  rice(1, { id: 5, name: 'Mehl', min_quantity: 2 }),                                   // fast leer
+  rice(0, { id: 6, name: 'Zucker' }),                                                  // leer
+];
+
+test('das Panel ordnet wie die Filterchips: abgelaufen, bald, fast leer - sortiert wie die flache Liste', async () => {
+  resetPantry();
+  assert.equal(typeof __test.pantryWatchGroups, 'function', 'pantryWatchGroups fehlt im __test-Export');
+  const { matchesPantryFilter } = await import('../public/utils/pantry-status.js');
+  const groups = __test.pantryWatchGroups(watchItems(), WATCH_TODAY);
+  assert.deepEqual(groups.map((g) => [g.key, g.items.map((i) => i.name)]), [
+    ['expired', ['Milch']],
+    ['soon', ['Eier', 'Joghurt']],
+    ['low', ['Zucker', 'Mehl']],
+  ]);
+  for (const g of groups) {
+    const chip = watchItems().filter((i) => matchesPantryFilter(i, g.key, WATCH_TODAY)).map((i) => i.id).sort();
+    assert.deepEqual(g.items.map((i) => i.id).sort(), chip, `${g.key}: Panel und Chip meinen dieselben Artikel`);
+  }
+  assert.deepEqual(__test.pantryWatchGroups([rice(5)], WATCH_TODAY), [], 'nichts faellig heisst keine Abschnitte');
+});
+
+test('renderList zeichnet das Panel mit - unabhaengig von Suche und aktivem Filter', () => {
+  resetPantry();
+  const list = makeNode();
+  list.replaceChildren = (...kids) => { list.children = [...kids]; };
+  const watch = makeNode();
+  watch.hidden = true;
+  __test.setContainerForTest({
+    querySelector: (sel) => (sel === '#pantry-list' ? list : sel === '#pantry-watch' ? watch : null),
+  });
+  __test.state.todayKey = WATCH_TODAY;
+  __test.state.items = watchItems();
+  __test.state.filter = 'low';
+  __test.state.query = 'mehl';
+  const zuvor = global.document.createTextNode;
+  global.document.createTextNode = () => makeNode();
+  try {
+    __test.renderList();
+  } finally {
+    global.document.createTextNode = zuvor;
+  }
+  assert.equal(watch.hidden, false, 'mit Artikeln steht das Panel');
+  assert.equal(watch.children.length, 3, 'drei Abschnitte, obwohl die Liste nur „Mehl" unter „Fast leer" zeigt');
+  // Ohne jeden Artikel: kein Panel (der Leerzustand der Liste spricht).
+  __test.state.items = [];
+  __test.renderWatch();
+  assert.equal(watch.hidden, true);
+  // Artikel, aber nichts faellig: ein ruhiger Satz statt eines leeren Kastens.
+  __test.state.items = [rice(5)];
+  __test.renderWatch();
+  assert.equal(watch.hidden, false);
+  assert.equal(watch.children.length, 1);
+  assert.equal(watch.children[0].textContent, 'pantry.watchEmpty');
+});
+
+test('das Panel steht nur ab 60rem Vorratsflaeche, und die Liste fuellt die Spalte bis zu ihm', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/pantry.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  assert.ok(rules.some((r) => r.selector.trim() === '.pantry-page' && /container:\s*pantry-surface\s*\/\s*inline-size/.test(r.body)),
+    'die Seite ist der Container - die Abfrage misst die Vorratsflaeche, nicht den Viewport');
+  const base = rules.find((r) => r.selector.trim() === '.pantry-watch' && !r.at.length);
+  assert.match(base?.body ?? '', /display:\s*none/, 'unter der Schwelle tragen die Chips die Frage');
+  const wide = (sel) => rules.find((r) => r.selector.trim() === sel && r.at.includes('@container pantry-surface (min-width: 60rem)'));
+  assert.match(wide('.pantry-watch:not([hidden])')?.body ?? '', /display:\s*grid/);
+  assert.match(wide('.pantry-watch:not([hidden])')?.body ?? '', /overflow-y:\s*auto/, 'ein langes Panel scrollt fuer sich');
+  assert.match(wide('.pantry-body')?.body ?? '', /flex-direction:\s*row/);
+  assert.match(wide('.pantry-body > .pantry-list')?.body ?? '', /--page-measure:\s*100%/,
+    'die Gruppen kappen auf die Spalte, ueber dieselbe Variable wie ueberall');
+  const src = readFileSync(new URL('../public/pages/pantry.js', import.meta.url), 'utf8');
+  assert.match(src, /body\.append\(list, watch\)/, 'Liste und Panel teilen den Koerper');
+  assert.match(src, /watch\.addEventListener\('click', onWatchClick\)/, 'eine Panelzeile oeffnet ihren Artikel');
 });

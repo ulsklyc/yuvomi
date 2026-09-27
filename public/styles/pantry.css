@@ -79,6 +79,83 @@
   padding-top: var(--space-4);
 }
 
+/* LISTE PLUS NEBENPANEL „IM BLICK" (Re-Critique 2026-09-27, A4 P1 / R10 L4).
+ *
+ * Gemessen bei 1440x900: die Lagerort-Gruppen standen auf dem Lesemass
+ * 252-972, rechts 436px leere Buehne, waehrend Essensplan und Rezepte bis
+ * 1408 reichen - beim Tabwechsel sprang der Inhalt. Ab 60rem Vorratsflaeche
+ * (1280er mit Seitenleiste: 1060px) steht rechts ein festes Panel mit dem, was
+ * bald ablaeuft oder knapp wird; die Liste fuellt den Rest bis zu ihm, und das
+ * Panel endet an der Kante der Kuechen-Leiste.
+ *
+ * FEST, NICHT STICKY: das Panel ist ein eigener Block neben dem Scrollport,
+ * kein Kind von ihm - es steht bei jedem Scrollstand der Liste, und ist es
+ * laenger als der Platz, scrollt es fuer sich. Die Breite liegt in der Spanne
+ * der Budget-Seitenleiste (18.75-23.75rem, budget.css), derselben Rolle.
+ *
+ * Der Container ist die Seite, umgestellt wird ihr Koerper: eine
+ * Container-Abfrage kann ihren eigenen Container nicht umbauen. */
+.pantry-page {
+  container: pantry-surface / inline-size;
+  --pantry-watch-width: 20rem;
+}
+
+.pantry-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pantry-watch {
+  display: none;
+}
+
+@container pantry-surface (min-width: 60rem) {
+  .pantry-body {
+    flex-direction: row;
+  }
+
+  /* Die Liste traegt links das Seitenpolster, rechts nur die Spaltenluecke;
+   * ihre Gruppen fuellen die Spalte statt am Lesemass zu enden. */
+  .pantry-body > .pantry-list {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding-inline-end: var(--space-6);
+    --page-measure: 100%;
+  }
+
+  .pantry-watch:not([hidden]) {
+    display: grid;
+    align-content: start;
+    gap: var(--space-5);
+    flex: 0 0 var(--pantry-watch-width);
+    min-height: 0;
+    overflow-y: auto;
+    padding-top: var(--space-4);
+    padding-bottom: var(--space-6);
+    padding-inline-end: var(--page-inline-pad);
+  }
+}
+
+/* Der Satz des Ablaufs in der Tinte seiner Dringlichkeit - dieselbe Sprache
+ * wie `.due-date--overdue/--today` in den Aufgaben: Farbe am Wort, keine
+ * Flaeche an der Zeile. */
+.pantry-watch__due--danger {
+  color: var(--color-danger);
+  font-weight: var(--font-weight-semibold);
+}
+
+.pantry-watch__due--warning {
+  color: var(--color-warning);
+  font-weight: var(--font-weight-semibold);
+}
+
+.pantry-watch__empty {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
 /* KEINE reservierte FAB-Gasse mehr. Sie stand hier und in shopping.css als
  * `padding-inline-end: var(--fab-lane)` und war kollisionsfrei um den Preis von
  * 76px in JEDER Zeile - bei 320px 24% der Viewportbreite. Den Freiraum trägt
