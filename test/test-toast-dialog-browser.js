@@ -478,6 +478,11 @@ for (const size of FAMILY_SIZES) {
       await page.waitForSelector('[data-edit-user]');
       await page.$eval('[data-edit-user]', (el) => el.click());
       await page.waitForSelector('#edit-member-cancel');
+      // Der Dialog laedt nach (Rollen, Konten): erst wenn nichts mehr kommt,
+      // steht sein Ende fest. Mit Erinnerungen wartete die Sonde vorher auf
+      // deren Abgleich und oeffnete den Dialog spaeter; die Probe-Toasts
+      // stehen sofort da (gemessen: einzeln 3/3 rot, Knoepfe unter dem Rand).
+      await page.waitForNetworkIdle({ idleTime: 300, timeout: 5000 }).catch(() => {});
       await settleAnimations(page);
       // Ans Ende des Koerpers scrollen, wie ein Mensch es tut, um zu speichern.
       await page.$eval('#shared-modal-overlay .modal-panel__body', (body) => {
@@ -660,6 +665,7 @@ test('#1160 375x812 - Mitglied bearbeiten: jedes Feld, auf dem der Tab-Fokus lan
     await page.waitForSelector('[data-edit-user]');
     await page.$eval('[data-edit-user]', (el) => el.click());
     await page.waitForSelector('#edit-member-cancel');
+    await page.waitForNetworkIdle({ idleTime: 300, timeout: 5000 }).catch(() => {});
     await settleAnimations(page);
 
     const FIELDS = 'input:not([type="hidden"]), select, textarea';
