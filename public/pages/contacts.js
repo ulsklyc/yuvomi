@@ -986,7 +986,7 @@ const mvSubLabel = (label) => (!label || label === 'other' ? '' : label);
  * hatten in der App bislang überhaupt keine Anzeige - das Formular führt sie
  * nicht. Sie stehen hier als reine Leseinformation.
  */
-function renderContactDetail(contact, { inPane = false } = {}) {
+function renderContactDetail(contact) {
   // Solange der Einzelabruf läuft, speist der Legacy-Einzelwert die Gruppe -
   // besser eine Nummer sofort als drei nach dem Roundtrip.
   const phones = contact.phones?.length
@@ -1030,8 +1030,9 @@ function renderContactDetail(contact, { inPane = false } = {}) {
       icon: 'building-2',
       label: t('contacts.organizationLabel'),
       value: [contact.organization, contact.job_title].filter(Boolean).join(' · '),
-      // In der Spalte steht sie schon in der Karte (contactCardEl).
-      hidden: inPane,
+      // Sie steht in der Karte (contactCardEl) - seit R9 M12 in der Spalte UND
+      // im Blatt, also in keinem Weg ein zweites Mal als Zeile.
+      hidden: true,
     },
     {
       icon: 'cake',
@@ -1081,13 +1082,17 @@ function openContactDetail(contact, { inPane = null } = {}) {
   let card = null;
   const ready = fetchFullContact(contact).then((loaded) => {
     full = loaded;
-    if (!view?.update(renderContactDetail(full, { inPane: Boolean(inPane) }))) return;
-    // Organisation und Zweitnummern kennt erst der Einzelabruf.
+    if (!view?.update(renderContactDetail(full))) return;
+    // Organisation und Zweitnummern kennt erst der Einzelabruf. In der Spalte
+    // steht die Karte ausserhalb der Zeilen und wird getauscht; im Blatt lag
+    // sie in dem Bereich, den update() gerade neu gefuellt hat, und kommt neu.
     if (card?.isConnected) {
       const next = contactCardEl(full);
       card.replaceWith(next);
       card = next;
       if (window.lucide) window.lucide.createIcons({ el: next });
+    } else if (!inPane) {
+      card = mountContactCard(full, null);
     }
     enhanceDetailPhones(inPane);
   });
@@ -1139,7 +1144,7 @@ function openContactDetail(contact, { inPane = null } = {}) {
     key: `contact:${contact.id}`,
     size: 'md',
     pane: inPane ?? undefined,
-    sections: renderContactDetail(full, { inPane: Boolean(inPane) }),
+    sections: renderContactDetail(full),
     actions,
     // OHNE SCHREIBRECHT KEIN „BEARBEITEN" IM KOPF. `openDetailView` setzt die
     // Kopf-Aktion genau dann, wenn dieser Schluessel steht (detail-view.js) -
@@ -1160,13 +1165,37 @@ function openContactDetail(contact, { inPane = null } = {}) {
     },
   });
 
-  if (inPane) {
-    card = contactCardEl(full);
-    inPane.querySelector('.split-view__detail-head')?.after(card);
-    if (window.lucide) window.lucide.createIcons({ el: card });
-  }
+  card = mountContactCard(full, inPane);
   enhanceDetailPhones(inPane);
   return view;
+}
+
+/**
+ * DIE KARTE STEHT IN BEIDEN WEGEN (R9 M12, A5 P2-7).
+ *
+ * Bis R9 bekam nur die Detailspalte Monogramm und Schnellaktionen - gemessen
+ * im mobilen Blatt `hasTiles: false`. Die Begruendung der Karte („will
+ * anrufen, ohne zu suchen, wo die Nummer steht") trifft aber gerade am
+ * Telefon am staerksten: dort liegt die Nummer im Blatt unter dem Daumen,
+ * nicht als Kachel. In der Spalte steht die Karte unter dem Kopf, im Blatt
+ * zuoberst in den Zeilen (`.detail-view__pane`) - dort, wo das Formular sie
+ * beim Wechsel ins Bearbeiten mit den Zeilen zusammen ausblendet.
+ */
+function mountContactCard(contact, inPane, root = document) {
+  const card = contactCardEl(contact);
+  if (inPane) {
+    const head = inPane.querySelector('.split-view__detail-head');
+    if (!head) return null;
+    head.after(card);
+  } else {
+    const pane = root.getElementById?.('shared-modal-overlay')
+      ?.querySelector('.modal-panel__body > .detail-view__pane');
+    if (!pane) return null;
+    card.className = `${card.className} contact-card--sheet`;
+    pane.prepend(card);
+  }
+  if (window.lucide) window.lucide.createIcons({ el: card });
+  return card;
 }
 
 /**
@@ -1978,6 +2007,8 @@ export const __test = {
   showImportResult, openBirthdayImport,
   // Liste + Detail: Karte und Zeilen der Detailspalte.
   contactCardEl, renderContactDetail,
+  // R9 M12: die Karte auch im mobilen Blatt.
+  mountContactCard,
   // Deep-Link gegen gemerkten Filter.
   dropFiltersForDeepLink,
 };

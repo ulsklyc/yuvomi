@@ -803,6 +803,13 @@ html:has(.contacts-page.is-selecting) {
   text-align: center;
 }
 
+/* Im Blatt (R9 M12) traegt der Blattkopf schon den Namen und sein Polster -
+   die Karte beginnt dort ohne eigenen Luftraum darueber, sonst stuende das
+   Monogramm eine halbe Daumenbreite tiefer als in der Spalte. */
+.contact-card--sheet {
+  padding: 0 0 var(--space-4);
+}
+
 .contact-card .contact-item__icon {
   width: calc(var(--target-md) * 2);
   height: calc(var(--target-md) * 2);

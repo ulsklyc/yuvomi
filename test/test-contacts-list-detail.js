@@ -84,12 +84,34 @@ test('die Karte der Spalte bietet nur an, was der Kontakt hat, und setzt Daten a
     'ohne Organisation keine Unterzeile (die Kategorie steht als Zeile darunter)');
 });
 
-test('die Organisation steht in der Spalte einmal (Karte), in der Leseansicht wie bisher als Zeile', () => {
+test('die Organisation steht einmal - in der Karte, in Spalte und Blatt (R9 M12)', () => {
+  // Bis R9 bekam nur die Spalte die Karte, das Blatt fuehrte die Organisation
+  // deshalb als Zeile. Seit die Karte auch im mobilen Blatt steht, waere die
+  // Zeile in beiden Wegen dieselbe Angabe ein zweites Mal.
   const org = (sections) => sections.find((s) => s.icon === 'building-2');
-  assert.equal(org(contacts.renderContactDetail(KONTAKT)).hidden, false,
-    'unter der Schwelle bleibt die Leseansicht, wie sie war');
-  assert.equal(org(contacts.renderContactDetail(KONTAKT, { inPane: true })).hidden, true,
-    'in der Spalte traegt sie die Karte - zweimal dieselbe Zeile waere Rauschen');
+  assert.equal(org(contacts.renderContactDetail(KONTAKT)).hidden, true,
+    'die Karte traegt sie - zweimal dieselbe Zeile waere Rauschen');
+});
+
+test('das mobile Blatt bekommt dieselbe Karte mit Schnellaktionen wie die Spalte (R9 M12)', () => {
+  // Gemessen vorher im Blatt `hasTiles: false`: Anrufen hiess, die Nummer in
+  // den Zeilen zu suchen - genau das, wofuer die Karte da ist.
+  const vorn = [];
+  const pane = { prepend: (node) => vorn.push(node) };
+  const overlay = {
+    querySelector: (sel) => (sel === '.modal-panel__body > .detail-view__pane' ? pane : null),
+  };
+  const root = { getElementById: (id) => (id === 'shared-modal-overlay' ? overlay : null) };
+  const card = contacts.mountContactCard(KONTAKT, null, root);
+  assert.ok(card, 'ohne Spalte haengt die Karte im Blatt');
+  assert.equal(vorn[0], card, 'zuoberst in den Zeilen - dort blendet das Formular sie mit aus');
+  assert.match(card.className, /\bcontact-card\b/);
+  assert.match(card.className, /\bcontact-card--sheet\b/, 'mit der Blatt-Variante (kein eigener Luftraum ueber dem Kopf)');
+  const bar = card.childNodes.find((n) => n.className === 'contact-card__actions');
+  assert.equal(bar?.childNodes.length, 3, 'Anrufen, E-Mail und Karte auch im Blatt');
+
+  assert.equal(contacts.mountContactCard(KONTAKT, null, { getElementById: () => null }), null,
+    'ohne offenes Blatt haengt sie nirgends');
 });
 
 test('die Seite haengt Liste + Detail ein: Klick ueber den Baustein, Signal des Routers, Leerzustand', () => {
