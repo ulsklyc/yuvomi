@@ -977,9 +977,18 @@
     display: contents;
   }
 
+  /* Die Trefferflaeche waechst hier per Polster, nicht per ::before: die
+   * Ellipse (`overflow: hidden`) beschneidet das ::before auf die Textzeile,
+   * und der Titel mass 267x20 bei 8px leerem Zeilenpolster darueber (Sonde 4
+   * der Dokument-Guards). Der Rand hebt das Polster wieder auf - der Text
+   * bleibt, wo er stand; unten endet die Flaeche an der Metazeile. */
   .task-card__main .task-card__title {
     grid-column: 2 / -1;
     grid-row: 1;
+    padding-block-start: var(--list-row-pad, var(--space-3));
+    padding-block-end: var(--space-0h);
+    margin-block-start: calc(-1 * var(--list-row-pad, var(--space-3)));
+    margin-block-end: 0;
   }
 
   .task-card__main .task-card__meta {

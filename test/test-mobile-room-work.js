@@ -87,6 +87,23 @@ test('M1: der Statuskreis wird mobil schmaler, trifft aber weiter voll', () => {
     'die Trefflaeche bleibt --target-base und steht zentriert ueber dem Ring');
 });
 
+// Integration R9 (Sonde 4 der Dokument-Guards, mobil): der Titel mass 267x20
+// und nahm die Spacing-Ausnahme, obwohl ueber ihm 8px Zeilenpolster leer
+// stehen. Sein ::before sollte die Flaeche heben, aber `overflow: hidden` (die
+// Ellipse) beschneidet es auf die Textzeile - im Raster wie vorher im Fluss.
+// Die Flaeche waechst deshalb per Polster und hebt es mit dem Rand wieder auf:
+// der Text bleibt, wo er ist, die Box reicht bis an die Zeilenkante.
+test('M1: mobil reicht die Trefferflaeche des Titels ins Zeilenpolster, trotz Ellipse', () => {
+  const base = declarations(tasksCss, '.task-card__title');
+  assert.equal(base.overflow, 'hidden', 'Voraussetzung: die Ellipse beschneidet ein ::before');
+  const title = declarations(tasksCss, '.task-card__main .task-card__title', { media: MOBILE });
+  const pad = title['padding-block-start'];
+  assert.match(pad ?? '', /var\(--list-row-pad/, 'die Box waechst um das Zeilenpolster nach oben');
+  assert.equal(title['margin-block-start'], `calc(-1 * ${pad})`, 'und der Rand nimmt es wieder zurueck - der Text bleibt stehen');
+  assert.equal(title['padding-block-end'], 'var(--space-0h)', 'unten bis an die Metazeile, keinen Pixel weiter');
+  assert.equal(title['margin-block-end'], '0');
+});
+
 test('M1: die Metazeile endet mit Ellipse statt mit einem Schnitt', () => {
   const card = tasks.renderTaskCard({
     id: 3, title: 'Zahnarzt', status: 'open', priority: 'high', visibility: 'all',
