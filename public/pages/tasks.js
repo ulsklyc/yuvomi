@@ -310,8 +310,11 @@ function renderPriorityBadge(priority) {
 function renderDueDate(dateStr, timeStr, isDone = false) {
   const d = formatDueDate(dateStr, timeStr, isDone);
   if (!d) return '';
+  // Das Label steht in einem eigenen Span, damit es mit Ellipse enden kann
+  // (R9 M1): am Flex-Chip selbst greift `text-overflow` nicht, dort wurde
+  // „Überfällig - 24.09." hart abgeschnitten.
   return `<span class="due-date ${d.cls}">
-    <i data-lucide="clock" class="icon-sm" aria-hidden="true"></i> ${d.label}
+    <i data-lucide="clock" class="icon-sm" aria-hidden="true"></i> <span class="due-date__label">${d.label}</span>
   </span>`;
 }
 
@@ -322,7 +325,7 @@ function renderStartDateBadge(startDateStr) {
   const startDay = new Date(`${startDateStr}T00:00:00`);
   if (startDay <= today) return '';
   return `<span class="due-date">
-    <i data-lucide="calendar-clock" class="icon-sm" aria-hidden="true"></i> ${t('tasks.startsOn', { date: formatDate(startDay) })}
+    <i data-lucide="calendar-clock" class="icon-sm" aria-hidden="true"></i> <span class="due-date__label">${t('tasks.startsOn', { date: formatDate(startDay) })}</span>
   </span>`;
 }
 
@@ -614,7 +617,10 @@ function renderTaskCard(task, opts = {}) {
           </div>
         </div>
 
-        ${renderAvatarStack(task.assigned_users ?? [], { size: 28 })}
+        ${/* 24px STATT 28 (R9 M1): mobil steht der Stapel in der Metazeile
+              (tasks.css, Raster unter 640px), und die ist 25px hoch - eine
+              28er-Scheibe haette jede Zeile um 3px gestreckt. */ ''}
+        ${renderAvatarStack(task.assigned_users ?? [], { size: 24 })}
 
         ${/* Bleibt auch mit vorhandenen Unteraufgaben: bis D#1017 verschwand der
               Einstieg nach der ersten, und der zweite Einstieg lag am Ende der
@@ -2576,13 +2582,93 @@ function renderKanban(container) {
     return;
   }
 
-  const kanbanHtml = kanbanBoardHtml(cols, grouped);
+  const kanbanHtml = kanbanPagerHtml(cols) + kanbanBoardHtml(cols, grouped);
   listEl.replaceChildren();
   listEl.insertAdjacentHTML('beforeend', kanbanHtml);
 
   if (window.lucide) window.lucide.createIcons({ el: listEl });
   wireKanbanSortable(container);
   wireKanbanClicks(container);
+  wireKanbanPager(container);
+}
+
+/**
+ * MOBIL IST DAS BRETT EIN BLAETTERN, KEINE LAENGERE LISTE (R9 M2, A3 P2-7).
+ *
+ * Gemessen 390x844 vorher: die Spalten standen untereinander, „In Bearbeitung"
+ * begann bei y=1561 - zwei Bildschirme Wischen bis zur zweiten Spalte. Unter
+ * 640px legt tasks.css die Spalten nebeneinander in einen Scroll-Snap-Traeger,
+ * eine Spalte je Seite. Die Punkte darueber sagen, wo man ist, und fuehren per
+ * Tipp dorthin - der Spaltenkopf nennt Titel und Zahl, die Punkte nur die Lage.
+ * Ab 640px sind sie ausgeblendet; dort stehen die Spalten ohnehin nebeneinander.
+ *
+ * DIE SEITE UEBERLEBT DAS NEUZEICHNEN. renderKanban() baut das Brett nach
+ * jedem Spaltenwechsel neu, und ohne den Merker spraenge es danach auf die
+ * erste Spalte zurueck - genau dann, wenn man in einer anderen arbeitet.
+ */
+let kanbanPage = null;
+let kanbanPagerObserver = null;
+
+function kanbanPagerHtml(cols) {
+  const current = cols.some((col) => col.status === kanbanPage) ? kanbanPage : cols[0]?.status;
+  return `
+    <div class="kanban-pager" role="group" aria-label="${esc(t('tasks.kanbanView'))}">
+      ${cols.map((col) => `
+      <button type="button" class="kanban-pager__dot" data-kanban-page="${col.status}"
+              aria-label="${esc(col.label)}"${col.status === current ? ' aria-current="true"' : ''}></button>`).join('')}
+    </div>`;
+}
+
+function wireKanbanPager(container) {
+  kanbanPagerObserver?.disconnect();
+  kanbanPagerObserver = null;
+  const board = container.querySelector('.kanban-board');
+  const pager = container.querySelector('.kanban-pager');
+  if (!board || !pager) return;
+
+  const columnOf = (status) => board.querySelector(`.kanban-col[data-status="${status}"]`);
+  const mark = (status) => {
+    if (!status) return;
+    kanbanPage = status;
+    pager.querySelectorAll('[data-kanban-page]').forEach((dot) => {
+      if (dot.dataset.kanbanPage === status) dot.setAttribute('aria-current', 'true');
+      else dot.removeAttribute('aria-current');
+    });
+  };
+  // Relativ zur Lage im Traeger statt ueber offsetLeft: so stimmt es auch in
+  // einer RTL-Sprache, wo die erste Spalte rechts steht.
+  const scrollToColumn = (status, behavior) => {
+    const col = columnOf(status);
+    if (!col) return;
+    const delta = col.getBoundingClientRect().left - board.getBoundingClientRect().left;
+    if (delta) board.scrollBy({ left: delta, behavior });
+  };
+
+  pager.addEventListener('click', (e) => {
+    const dot = e.target.closest?.('[data-kanban-page]');
+    if (!dot) return;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    scrollToColumn(dot.dataset.kanbanPage, reduce ? 'auto' : 'smooth');
+    mark(dot.dataset.kanbanPage);
+  });
+
+  // Nur wenn das Brett wirklich blaettert (mobil) - am Desktop stehen alle
+  // Spalten nebeneinander, und dort gibt es nichts nachzuziehen.
+  if (board.scrollWidth <= board.clientWidth) return;
+  if (kanbanPage) scrollToColumn(kanbanPage, 'auto');
+
+  // `scrollsnapchange` meldet die Spalte, auf der der Traeger zur Ruhe kommt
+  // (Chrome/Edge); Safari und Firefox kennen es nicht, dort zieht ein
+  // IntersectionObserver die Punkte nach - schon waehrend des Wischens.
+  if ('onscrollsnapchange' in window) {
+    board.addEventListener('scrollsnapchange', (e) => mark(e.snapTargetInline?.dataset?.status));
+  } else if (typeof IntersectionObserver === 'function') {
+    kanbanPagerObserver = new IntersectionObserver((entries) => {
+      const seen = entries.find((entry) => entry.isIntersecting);
+      if (seen) mark(seen.target.dataset.status);
+    }, { root: board, threshold: 0.6 });
+    board.querySelectorAll('.kanban-col').forEach((col) => kanbanPagerObserver.observe(col));
+  }
 }
 
 /**
@@ -4356,6 +4442,111 @@ async function completeTaskFor(container, taskId, userId) {
   }
 }
 
+/**
+ * DIE PERSONENWAHL AM KONTEXTMENUE DER ZEILE (R9 M1).
+ *
+ * Mobil steht der Knopf „Wer hat erledigt?" nicht mehr in der Zeile (tasks.css,
+ * Raster unter 640px): er nahm dem Titel 44px, und sein Ziel lag 0px neben dem
+ * Haken - gemessen 7 von 12 Titeln abgeschnitten, Fehlgriff Haken/Picker
+ * (Re-Critique 2026-09-27, A3 P1-1). Die Frage bleibt an drei Stellen offen:
+ * in der Detailansicht (task-detail.js), per Long-Press auf die Zeile und per
+ * Kontextmenue (Rechtsklick, Menue-Taste, Android-Long-Press). Alle drei
+ * oeffnen DASSELBE Panel, das renderDoerPicker schon rendert - kein zweites
+ * Menue mit eigener Liste, das auseinanderlaufen koennte.
+ *
+ * GEOEFFNET WIRD ERST NACH DEM LOSLASSEN, und das ist keine Geschmacksfrage:
+ * das Light-Dismiss der Popover-API schliesst beim `pointerup` jedes Popover,
+ * das nicht schon beim `pointerdown` offen war. Ein Menue, das mitten im
+ * Druck aufgeht, ginge beim Loslassen sofort wieder zu. Waehrend des Drucks
+ * quittiert deshalb nur die Vibration, dass er erkannt ist.
+ */
+const LONG_PRESS_MS = 500;
+const LONG_PRESS_SLOP = 10;
+
+function doerPanelOf(card) {
+  return card?.querySelector?.(`.popover-menu[id^="${DOER_PANEL_PREFIX}"]`) ?? null;
+}
+
+function openDoerMenu(card) {
+  const panel = doerPanelOf(card);
+  if (!panel || typeof panel.showPopover !== 'function') return false;
+  if (!panel.matches(':popover-open')) panel.showPopover();
+  return true;
+}
+
+function wireDoerContextMenu(listEl) {
+  let press = null;
+  let swallowClick = false;
+  const clear = () => {
+    if (press?.timer) clearTimeout(press.timer);
+    press = null;
+  };
+  const openAfterRelease = (card, primary) => {
+    // Der Klick, der dem Loslassen folgt, gehoert zum Druck und nicht zur
+    // Zeile - sonst hakte er ab oder oeffnete das Detail. Nur fuer die
+    // Primaertaste: ein Rechtsklick erzeugt keinen `click`, und ein stehen
+    // gebliebener Riegel schluckte den naechsten echten.
+    if (primary) {
+      swallowClick = true;
+      setTimeout(() => { swallowClick = false; }, LONG_PRESS_MS);
+    }
+    setTimeout(() => openDoerMenu(card), 0);
+  };
+
+  listEl.addEventListener('pointerdown', (e) => {
+    clear();
+    if (state.bulkSelectMode) return;
+    const card = e.target.closest?.('.task-card');
+    if (!doerPanelOf(card) || e.target.closest('.popover-menu')) return;
+    const primary = e.pointerType !== 'mouse' || e.button === 0;
+    press = { card, x: e.clientX, y: e.clientY, armed: false, primary, timer: null };
+    // Die Maus hat ihr Kontextmenue (Rechtsklick) - ein Halten mit der
+    // linken Taste ist dort ein Markieren, keine Frage nach der Person.
+    if (e.pointerType !== 'mouse') {
+      press.timer = setTimeout(() => {
+        if (!press) return;
+        press.timer = null;
+        press.armed = true;
+        vibrate(15);
+      }, LONG_PRESS_MS);
+    }
+  });
+  listEl.addEventListener('pointermove', (e) => {
+    if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > LONG_PRESS_SLOP) clear();
+  });
+  listEl.addEventListener('pointerup', () => {
+    if (press?.armed) openAfterRelease(press.card, press.primary);
+    clear();
+  });
+  // Der Browser uebernimmt die Geste (Scrollen, Systemmenue): war der Druck
+  // schon erkannt, steht die Frage trotzdem - sonst verpuffte er.
+  listEl.addEventListener('pointercancel', () => {
+    if (press?.armed) openAfterRelease(press.card, false);
+    clear();
+  });
+  listEl.addEventListener('contextmenu', (e) => {
+    if (state.bulkSelectMode) return;
+    const card = e.target.closest?.('.task-card');
+    if (!doerPanelOf(card)) return;
+    e.preventDefault();
+    // Waehrend eines Drucks (macOS-Rechtsklick, Android-Long-Press) erst nach
+    // dem Loslassen oeffnen; sonst sofort (Menue-Taste, Windows nach mouseup).
+    if (press && press.card === card) {
+      if (press.timer) clearTimeout(press.timer);
+      press.timer = null;
+      press.armed = true;
+      return;
+    }
+    openDoerMenu(card);
+  });
+  listEl.addEventListener('click', (e) => {
+    if (!swallowClick) return;
+    swallowClick = false;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, { capture: true });
+}
+
 function wireTaskList(container) {
   const listEl = container.querySelector('#task-list');
   if (!listEl) return;
@@ -4365,6 +4556,7 @@ function wireTaskList(container) {
   // `listEl`: `toggle`/`beforetoggle` steigen nicht auf, und die Panels sitzen
   // im Top-Layer - ein Listener an der Liste selbst sieht sie nie.
   installPopoverMenus(container);
+  wireDoerContextMenu(listEl);
 
   listEl.addEventListener('click', async (e) => {
     const target = e.target.closest('[data-action]');
@@ -5179,6 +5371,9 @@ export const __test = {
   // einmal auseinandergelaufen. `toggleKanbanCol` kommt mit, damit der
   // eingeklappte Zustand gesetzt werden kann, ohne in den Speicher zu greifen.
   kanbanBoardHtml, KANBAN_COLS, toggleKanbanCol,
+  // Mobil blaettert das Brett (R9 M2): die Punkte ueber den Spalten und ihr
+  // Tipp, der zur Spalte fuehrt.
+  kanbanPagerHtml, wireKanbanPager,
   // Das Einhaengen des Ziehens einzeln, weil sein Riegel KEIN Markup hat: eine
   // Ablegezone, die gar nicht erst verdrahtet wird, sieht im HTML aus wie jede
   // andere. SortableJS liest keine Sichtbarkeit - eine Instanz auf einem
@@ -5215,6 +5410,7 @@ export const __test = {
   // Die Personenauswahl beim Abhaken (#1205): WANN sie ueberhaupt erscheint,
   // ist die halbe Entscheidung - ein Solo-Haushalt bekommt sie nie zu sehen.
   renderDoerPicker,
+  wireDoerContextMenu,
   // Welche Bedienelemente eine Boardkarte und eine leere Liste ueberhaupt
   // anbieten. Die Nur-lesen-Regel (#467) ist eine Aussage ueber genau dieses
   // Markup: was verschwindet, und was als Zeichen stehen bleibt, das den

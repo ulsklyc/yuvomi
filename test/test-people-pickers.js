@@ -135,6 +135,108 @@ test('tasks: a task that is already done or filed away offers no doer picker', (
   assert.equal(tasks.renderDoerPicker(OPEN_TASK, false, true), '');
 });
 
+// Mobil verlaesst die Personenwahl die Zeile (R9 M1, tasks.css) - sie bleibt
+// ueber Long-Press und Kontextmenue erreichbar (wireDoerContextMenu). Gemessen
+// wird die Geste an einer kleinen Liste mit Listener-Registry: ob das Panel
+// aufgeht, WANN, und ob der Klick danach die Zeile noch erreicht.
+function doerList() {
+  const listeners = {};
+  const panel = {
+    open: false, shown: 0,
+    matches(sel) { return sel === ':popover-open' && this.open; },
+    showPopover() { this.open = true; this.shown += 1; },
+  };
+  const card = { querySelector: (sel) => (sel.startsWith('.popover-menu') ? panel : null) };
+  const target = { closest: (sel) => (sel === '.task-card' ? card : null) };
+  const list = {
+    addEventListener(type, fn, opts) {
+      (listeners[type] ??= []).push({ fn, capture: opts === true || Boolean(opts?.capture) });
+    },
+  };
+  const fire = (type, extra = {}) => {
+    const ev = {
+      type, target, clientX: 10, clientY: 10, pointerType: 'touch', button: 0,
+      defaultPrevented: false, stopped: false,
+      preventDefault() { this.defaultPrevented = true; },
+      stopImmediatePropagation() { this.stopped = true; },
+      ...extra,
+    };
+    for (const { fn } of [...(listeners[type] ?? [])].sort((a, b) => Number(b.capture) - Number(a.capture))) {
+      if (ev.stopped) break;
+      fn(ev);
+    }
+    return ev;
+  };
+  return { list, panel, fire };
+}
+
+test('tasks: a long press on a row opens the doer menu after release and keeps the tap to itself', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  tasks.state.bulkSelectMode = false;
+  const { list, panel, fire } = doerList();
+  tasks.wireDoerContextMenu(list);
+
+  fire('pointerdown');
+  t.mock.timers.tick(600);
+  assert.equal(panel.shown, 0, 'waehrend des Drucks noch nicht - das Light-Dismiss schloesse es beim Loslassen');
+  fire('pointerup');
+  t.mock.timers.tick(1);
+  assert.equal(panel.shown, 1, 'nach dem Loslassen steht die Frage');
+  const click = fire('click');
+  assert.equal(click.defaultPrevented, true, 'der Klick des Drucks hakt nicht ab und oeffnet kein Detail');
+});
+
+test('tasks: a short tap, a scroll or a held mouse button never opens the doer menu', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  tasks.state.bulkSelectMode = false;
+  const { list, panel, fire } = doerList();
+  tasks.wireDoerContextMenu(list);
+
+  fire('pointerdown'); t.mock.timers.tick(200); fire('pointerup'); t.mock.timers.tick(600);
+  assert.equal(panel.shown, 0, 'ein Tipp ist ein Tipp');
+  assert.equal(fire('click').defaultPrevented, false, 'und sein Klick erreicht die Zeile');
+
+  fire('pointerdown'); fire('pointermove', { clientX: 40 }); t.mock.timers.tick(600); fire('pointerup'); t.mock.timers.tick(1);
+  assert.equal(panel.shown, 0, 'wer wischt oder scrollt, fragt nicht nach der Person');
+
+  fire('pointerdown', { pointerType: 'mouse' }); t.mock.timers.tick(600); fire('pointerup', { pointerType: 'mouse' }); t.mock.timers.tick(1);
+  assert.equal(panel.shown, 0, 'mit der Maus ist Halten Markieren - sie hat ihr Kontextmenue');
+});
+
+test('tasks: the context menu (right click, menu key) opens the same doer panel', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  tasks.state.bulkSelectMode = false;
+  const { list, panel, fire } = doerList();
+  tasks.wireDoerContextMenu(list);
+
+  const ev = fire('contextmenu');
+  assert.equal(ev.defaultPrevented, true, 'das Systemmenue weicht');
+  assert.equal(panel.shown, 1, 'ohne laufenden Druck (Menue-Taste) sofort');
+
+  panel.open = false;
+  fire('pointerdown', { pointerType: 'mouse', button: 2 });
+  fire('contextmenu');
+  assert.equal(panel.shown, 1, 'waehrend eines Rechtsklicks erst nach dem Loslassen');
+  fire('pointerup', { pointerType: 'mouse', button: 2 }); t.mock.timers.tick(1);
+  assert.equal(panel.shown, 2);
+  assert.equal(fire('click').defaultPrevented, false,
+    'ein Rechtsklick hinterlaesst keinen Riegel, der den naechsten echten Klick schluckt');
+});
+
+test('tasks: in select mode a long press selects, it does not ask for a person', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  tasks.state.bulkSelectMode = true;
+  try {
+    const { list, panel, fire } = doerList();
+    tasks.wireDoerContextMenu(list);
+    fire('pointerdown'); t.mock.timers.tick(600); fire('pointerup'); t.mock.timers.tick(1);
+    fire('contextmenu');
+    assert.equal(panel.shown, 0);
+  } finally {
+    tasks.state.bulkSelectMode = false;
+  }
+});
+
 // --------------------------------------------------------------------------
 // Dienstplan
 // --------------------------------------------------------------------------

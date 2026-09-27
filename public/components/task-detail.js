@@ -43,6 +43,7 @@ import { refresh as refreshReminders } from '/reminders.js';
 import { parseRemindAtAsUtc } from '/utils/reminder-offset.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { pathAccess } from '/utils/module-access.js';
+import { installPopoverMenus } from '/utils/popover-menu.js';
 import { zonedDateKey } from '/utils/timezone.js';
 import { historyDayLabel } from '/utils/day-label.js';
 import {
@@ -1008,6 +1009,11 @@ export function openTaskDetail({
   // Zustand, den er anzeigen koennte - was die Aufgabe IST, steht zwei Zeilen
   // darueber als "Status: offen". Ein grauer Knopf "Als erledigt markieren"
   // waere nur ein Versprechen, das der Server mit 403 einloest.
+  // Die Schliessfunktion DIESER Ansicht (Sheet oder Spalte). Die Fusszeile
+  // reicht sie nur an `onClick`; das Personenmenue daneben ist ein Popover,
+  // dessen Eintraege spaeter kommen - der Ausloeser merkt sie sich deshalb.
+  let viewClose = closeDetailView;
+  const doers = doerChoices(task, ctx, archived);
   if (!isNavModuleReadOnly('tasks')) {
     statusActions.forEach((step) => {
       actions.push({
@@ -1017,6 +1023,15 @@ export function openTaskDetail({
         icon: step.icon,
         onClick: ({ button, close }) => advanceTaskStatus(task, step.status, button, ctx, close),
       });
+      if (step.id === 'task-detail-finish' && doers.length) {
+        actions.push({
+          id: DOER_BUTTON_ID,
+          label: '',
+          variant: 'ghost',
+          icon: 'user-round-check',
+          onClick: ({ close }) => { viewClose = close; },
+        });
+      }
     });
   }
 
@@ -1051,6 +1066,88 @@ export function openTaskDetail({
       standalone: edit.standalone,
     } : undefined,
   });
+
+  if (doers.length) {
+    wireDetailDoerMenu(task, doers, ctx, (...args) => viewClose(...args), pane);
+  }
+}
+
+/**
+ * „WER HAT ES ERLEDIGT?" IN DER DETAILANSICHT (R9 M1, #1205).
+ *
+ * Mobil hat die Frage ihren Platz in der Zeile abgegeben (tasks.css, Raster
+ * unter 640px): dort nahm sie dem Titel die Breite und stand 0px neben dem
+ * Haken. Das Detail ist der Tastatur- und Vorleseweg zu ihr, der Long-Press
+ * auf die Zeile der schnelle (tasks.js, wireDoerContextMenu).
+ *
+ * DIESELBE SCHWELLE WIE IN DER ZEILE (renderDoerPicker): offen, nicht
+ * abgelegt, und mindestens zwei Menschen zur Auswahl - ein Menue mit einem
+ * Eintrag fragt nichts.
+ */
+const DOER_BUTTON_ID = 'task-detail-done-by';
+
+function doerChoices(task, ctx, archived) {
+  if (archived || task.status === 'done') return [];
+  if (isNavModuleReadOnly('tasks')) return [];
+  const members = (ctx.users ?? []).filter((u) => u && u.id != null);
+  return members.length >= 2 ? members : [];
+}
+
+function wireDetailDoerMenu(task, doers, ctx, close, pane = null) {
+  const root = pane ?? document;
+  const button = root.querySelector?.(`#${DOER_BUTTON_ID}`);
+  if (!button) return;
+  const label = t('tasks.doneByPick', { title: task.title });
+  const panelId = `task-detail-doer-${task.id}`;
+  button.classList.add('btn--icon', 'popover-menu__trigger', 'task-detail__doer');
+  button.setAttribute('aria-label', label);
+  button.setAttribute('title', label);
+  button.setAttribute('aria-haspopup', 'menu');
+  button.setAttribute('aria-expanded', 'false');
+  button.setAttribute('popovertarget', panelId);
+
+  const panel = document.createElement('div');
+  panel.className = 'popover-menu';
+  panel.id = panelId;
+  panel.setAttribute('popover', '');
+  panel.setAttribute('role', 'menu');
+  for (const person of doers) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'popover-menu__item';
+    item.setAttribute('role', 'menuitem');
+    item.dataset.action = 'pick-doer';
+    item.dataset.id = String(person.id);
+    const icon = document.createElement('i');
+    icon.dataset.lucide = 'user-round';
+    icon.className = 'icon-md';
+    icon.setAttribute('aria-hidden', 'true');
+    const name = document.createElement('span');
+    name.textContent = person.display_name ?? '';
+    item.append(icon, name);
+    item.addEventListener('click', () => completeFor(task, person, button, ctx, close));
+    panel.appendChild(item);
+  }
+  button.after(panel);
+  installPopoverMenus(button.parentElement);
+  if (window.lucide) window.lucide.createIcons({ el: panel });
+}
+
+async function completeFor(task, person, button, ctx, close) {
+  const stop = btnLoading(button);
+  const siblings = statusActionButtons().filter((el) => el !== button);
+  siblings.forEach((el) => { el.disabled = true; });
+  try {
+    await api.patch(`/tasks/${task.id}/status`, { status: 'done', done_by_user_id: person.id });
+  } catch (err) {
+    stop();
+    siblings.forEach((el) => { el.disabled = false; });
+    window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+    return;
+  }
+  task.status = 'done';
+  window.yuvomi.showToast(t('tasks.doneByToast', { name: person.display_name ?? '' }));
+  await afterConfirmedWrite(ctx, close);
 }
 
 /**
@@ -1080,7 +1177,9 @@ export function openTaskDetail({
 const STATUS_ACTION_IDS = Object.values(STATUS_ACTIONS).flat().map((step) => step.id);
 
 function statusActionButtons() {
-  return [...new Set(STATUS_ACTION_IDS)]
+  // Die Personenwahl (R9 M1) ist ein dritter Weg nach „erledigt" und wird
+  // mitgesperrt, solange ein anderer laeuft.
+  return [...new Set([...STATUS_ACTION_IDS, DOER_BUTTON_ID])]
     .map((id) => document.getElementById(id))
     .filter(Boolean);
 }
@@ -1231,4 +1330,4 @@ function seriesHistoryNode(task) {
  * der sich die Nur-lesen-Regel (#467) an dieser Ansicht MESSEN laesst - alles
  * andere hier haengt an `openDetailView` und damit am echten DOM.
  */
-export const __test = { subtaskListNode, descriptionNode, documentListNode };
+export const __test = { subtaskListNode, descriptionNode, documentListNode, doerChoices, wireDetailDoerMenu, DOER_BUTTON_ID };

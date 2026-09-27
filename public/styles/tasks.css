@@ -935,6 +935,107 @@
   }
 }
 
+/* MOBIL GEHOERT DIE ZEILE DEM TITEL (R9 M1, Re-Critique 2026-09-27 A3 P1-1).
+ *
+ * Gemessen 390x844 vorher: Titelkoerper 182 von 358px, 7 von 12 Titeln
+ * abgeschnitten. Die Breite ging an vier Dinge, und jedes gibt hier etwas ab:
+ *   - die Personenwahl „Wer hat erledigt?" (44px + Abstand) verlaesst die
+ *     Zeile - sie lebt im Detail und im Kontextmenue/Long-Press
+ *     (tasks.js, wireDoerContextMenu);
+ *   - der Statuskreis zeichnet 20px und hielt dafuer eine 48px-BOX; die Box
+ *     wird 32px, die Trefflaeche bleibt ueber das zentrierte ::before 48px
+ *     (Rezept „kompakt aussehen, voll treffen", tokens.css) und reicht damit
+ *     in die Zeilenpolsterung;
+ *   - der Personenstapel zieht aus der Endspalte in die Metazeile: ein Raster
+ *     statt der Flexzeile, der Koerper wird `display: contents`, und der
+ *     Titel spannt ueber beide Spalten.
+ * Ergebnis: Titel 282 von 358px, Metazeile endet vor dem Stapel mit Ellipse.
+ * Ab 640px bleibt alles, wie es war - dort stoert die Personenwahl nicht. */
+@media (max-width: 639px) {
+  .task-card__main {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    column-gap: var(--space-2);
+    row-gap: 0;
+  }
+
+  .task-card__main > .task-status-btn,
+  .task-card__main > .select-circle {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+
+  .task-card__main > .task-status-btn {
+    width: calc(var(--space-5) + var(--space-3));
+  }
+
+  .task-card__main > .task-status-btn::before {
+    inset-inline-start: calc((100% - var(--target-base)) / 2);
+  }
+
+  .task-card__main > .task-card__body {
+    display: contents;
+  }
+
+  .task-card__main .task-card__title {
+    grid-column: 2 / -1;
+    grid-row: 1;
+  }
+
+  .task-card__main .task-card__meta {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .task-card__main:not(:has(> .avatar-stack)) .task-card__meta {
+    grid-column: 2 / -1;
+  }
+
+  .task-card__main > .avatar-stack {
+    grid-column: 3;
+    grid-row: 2;
+    align-self: center;
+  }
+
+  /* Der Knopf bleibt im DOM, unsichtbar und ohne Flaeche: er ist der Anker,
+   * an dem die geteilte Popover-Mechanik das Menue ausrichtet
+   * (utils/popover-menu.js misst `[popovertarget]`). `display: none` liesse
+   * das Menue an der Ecke des Fensters aufgehen; `visibility: hidden` nimmt
+   * ihn trotzdem aus Tab-Folge und Barrierebaum - der Tastaturweg ist das
+   * Detail. Absolut ohne Versatz steht er an seiner statischen Stelle, am
+   * Zeilenanfang unter dem Haken. */
+  .task-card__main > .task-doer-btn {
+    position: absolute;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  /* Ein Long-Press ist hier eine Frage nach der Person, kein Markieren und
+   * kein Systemmenue fuer den Titeltext. */
+  .task-card__main {
+    -webkit-touch-callout: none;
+    user-select: none;
+  }
+}
+
+/* DIE METAZEILE ENDET MIT ELLIPSE, NICHT MIT EINEM SCHNITT (R9 M1). Gemessen
+ * stand „Überfällig - 24.0" hart abgeschnitten da: die Faelligkeit schrumpfte
+ * nie (`flex-shrink: 0` oben), und `text-overflow` greift am Flex-Chip nicht.
+ * Jetzt gibt sie nach - mit winzigem Gewicht, damit ein Etikett daneben
+ * zuerst bis auf seine Mindestbreite nachgibt (die Rangfolge von oben bleibt)
+ * - und ihr Label traegt die Ellipse. */
+.task-card__meta > .due-date {
+  flex-shrink: 0.01;
+  min-width: 0;
+}
+
+.due-date__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── PRIORITAET: EINE RANGMARKE, KEIN GETOENTES FELD ──
  *
  * Bis 2026-08-18 nannte dieses Etikett seinen Ton DREIMAL blass: als Fuellung
@@ -1441,6 +1542,132 @@
   width: 12px;
   height: 12px;
   pointer-events: none;
+}
+
+/* MOBIL BLAETTERT DAS BRETT (R9 M2, Re-Critique 2026-09-27 A3 P2-7).
+ *
+ * Gemessen 390x844 vorher: vier Spalten untereinander, „In Bearbeitung" bei
+ * y=1561, Karten 106px gegen 63px einer Listenzeile. Jetzt eine Spalte je
+ * Seite, nebeneinander in einem Scroll-Snap-Traeger (`mandatory` ist hier
+ * unschaedlich: jede Seite ist genau so breit wie der Traeger, es gibt keinen
+ * Inhalt zwischen zwei Rastpunkten). `scroll-snap-stop: always` haelt einen
+ * schnellen Wisch auf der naechsten Spalte, statt ueber sie hinwegzurutschen.
+ * Die Punkte (`.kanban-pager`, tasks.js) sagen, welche Spalte gerade steht.
+ * Die Karten werden so flach wie eine Listenzeile: Avatar und Statusknopf
+ * ruecken neben Titel und Metazeile statt in eine eigene Fusszeile. */
+.kanban-pager {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .kanban-board {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    min-height: 0;
+  }
+
+  .kanban-board::-webkit-scrollbar {
+    display: none;
+  }
+
+  .kanban-col {
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+
+  .kanban-pager {
+    display: flex;
+    justify-content: center;
+    margin-block-end: var(--space-1);
+  }
+
+  /* Der Punkt zeichnet 8px, getroffen wird die volle Zielgroesse. */
+  .kanban-pager__dot {
+    display: grid;
+    place-items: center;
+    width: var(--target-base);
+    height: var(--space-6);
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+  }
+
+  .kanban-pager__dot::before {
+    content: '';
+    width: var(--space-2);
+    height: var(--space-2);
+    border-radius: var(--radius-full);
+    background-color: var(--color-text-tertiary);
+    opacity: 0.45;
+    transition: opacity var(--transition-fast), background-color var(--transition-fast);
+  }
+
+  .kanban-pager__dot[aria-current='true']::before {
+    background-color: var(--color-text-primary);
+    opacity: 1;
+  }
+
+  .kanban-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    column-gap: var(--space-2);
+    align-items: center;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .kanban-card__title {
+    grid-column: 1;
+    grid-row: 1;
+    margin-bottom: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .kanban-card__meta {
+    grid-column: 1;
+    grid-row: 2;
+    flex-wrap: nowrap;
+    gap: var(--space-1);
+    min-width: 0;
+    margin-bottom: 0;
+    overflow: hidden;
+  }
+
+  .kanban-card__meta:empty {
+    display: none;
+  }
+
+  /* Die Etiketten gehen wie in der Listenzeile (unter 420px Zeilenbreite):
+   * als Filter-Knopf tragen sie eine Trefferhoehe, die die Metazeile auf 35px
+   * streckte - die Karte waere wieder hoeher als eine Zeile. */
+  .kanban-card__meta > .task-tag {
+    display: none;
+  }
+
+  .kanban-card__footer {
+    display: contents;
+  }
+
+  .kanban-card__footer > .avatar-stack {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .kanban-card__footer > span:empty {
+    display: none;
+  }
+
+  .kanban-card__status-btn {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
 }
 
 /* Leere Spalte: ruhiger Hinweis, dass hier (noch) nichts liegt - statt einer
