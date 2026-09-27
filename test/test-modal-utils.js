@@ -1211,6 +1211,45 @@ test('Sheet-Drag: ein Tipp schreibt nichts (Schwelle), auch nicht beim Loslassen
   assert.deepEqual(sheet.writes, []);
 });
 
+test('Sheet-Griff: sichtbar im hellen Theme, in der Kopfzone statt ueber einem leeren Streifen, gleich an Dialog und Mehr-Blatt (Re-Critique 2026-09-27, P1 #1)', () => {
+  const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
+  const layout = read('../public/styles/layout.css');
+  const glass = read('../public/styles/glass.css');
+  const tokens = read('../public/styles/tokens.css');
+  const mobile = [...eachRule(layout)].filter((r) => r.at.some((a) => /max-width:\s*767px/.test(a)));
+  const body = (rules, sel) => rules.find((r) => r.selector === sel)?.body ?? '';
+  // Vorher: `--modal-handle-color: var(--glass-border)` fuer JEDES Theme -
+  // Glas-Weiss 65 % auf weisser Tafel, gemessen unsichtbar.
+  assert.ok(![...eachRule(glass)].some((r) => /--modal-handle-color|--sheet-grabber/.test(r.body)),
+    'glass.css faerbt den Griff nicht mehr fuer jedes Theme um - das Glas-Weiss gehoert nur dem Dark (Token)');
+  assert.match(tokens, /--_sheet-grabber:\s*var\(--color-border-strong\)/, 'hell: die kraeftigere neutrale Kante');
+  assert.equal((tokens.match(/--_sheet-grabber:\s*var\(--glass-border\)/g) || []).length, 2, 'dunkel (Media + data-theme): Glas-Weiss');
+  const grip = body(mobile, '.modal-panel::before');
+  assert.match(grip, /background-color:\s*var\(--sheet-grabber\)/);
+  assert.match(grip, /width:\s*36px/);
+  assert.match(grip, /height:\s*5px/);
+  // Der leere 36px-Streifen (`--space-4 + 20px`) ist weg; Griff-Oberkante bis
+  // Titel-Oberkante 16px (8px + Kopfpolster 12px + Zentrierung neben dem X).
+  assert.match(body(mobile, '.modal-panel'), /padding-top:\s*0/);
+  assert.match(grip, /top:\s*var\(--space-2\)/);
+  assert.match(body(mobile, '.modal-panel > .modal-panel__header'), /padding-top:\s*var\(--space-3\)/);
+  // Das Mehr-Blatt traegt denselben Griff.
+  const more = body([...eachRule(layout)], '.more-sheet__handle');
+  assert.match(more, /background-color:\s*var\(--sheet-grabber\)/);
+  assert.match(more, /height:\s*5px/);
+});
+
+test('Sheet-Grammatik: das Mehr-Blatt zieht ueber denselben Helfer wie der Dialog und federt per translate zurueck', () => {
+  const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
+  const router = read('../public/router.js');
+  const layout = read('../public/styles/layout.css');
+  assert.match(router, /wireSheetDrag\(sheet, \{[\s\S]{0,200}resetAfterDismiss: true/);
+  assert.doesNotMatch(router, /clientY - _touchStartY > 60/, 'die alte Geste (erst bei touchend, ab 60px) ist weg');
+  const more = [...eachRule(layout)].find((r) => r.selector === '.more-sheet' && !r.at.length)?.body ?? '';
+  assert.match(more, /translate var\(--duration-lg\) var\(--ease-out\)/, 'Rueckfedern mit Token-Dauer und -Kurve');
+  assert.match(more, /border-radius:\s*var\(--radius-lg\)/, 'Radius des Dialog-Sheets');
+});
+
 /* DER ERSTFOKUS NIMMT KEINEN SPAETER GESETZTEN FOKUS WEG (#1156).
  *
  * Gemessen im Browser mit gestrecktem 50-ms-Timer: das Speichern-Tor gab den

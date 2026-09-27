@@ -1083,6 +1083,17 @@ for (const rule of Object.keys(RULES)) {
   });
 }
 
+test('Kopfsuche: EINE Breite als Token und EINE Stelle, beides in page-search.css (Re-Critique 2026-09-27, A8 P3-2)', () => {
+  const css = readFileSync(join(PUBLIC, 'styles/page-search.css'), 'utf8');
+  assert.match(css, /--page-search-width:\s*320px/);
+  const desk = [...eachRule(css)].find((r) => r.at.some((a) => /min-width:\s*1024px/.test(a)) && /\.page-toolbar > label\.page-search/.test(r.selector));
+  assert.ok(desk, 'die Desktop-Regel der Kopfsuche fehlt');
+  assert.match(desk.body, /max-width:\s*var\(--page-search-width\)/);
+  assert.match(desk.body, /flex:\s*0 1 var\(--page-search-width\)/);
+  assert.match(desk.body, /margin-inline-start:\s*0/, 'keine Suche am Zeilenende (Notizen, Einstellungen)');
+  assert.match(desk.selector, /\.page-toolbar__center:has\(> label\.page-search:only-child\)/, 'ein Wrapper-Slot nur mit der Suche ist dieselbe Stelle');
+});
+
 test('jedes Suchfeld aus renderPageSearch ist verdrahtet: wirePageSearch mit derselben id in derselben Datei', () => {
   // Die Kapsel bringt einen Loeschen-Knopf mit, der `hidden` startet; nur
   // wirePageSearch blendet ihn beim Tippen ein und leert damit die Suche.
