@@ -181,14 +181,15 @@
 }
 
 /* ---- Ab der Split-Schwelle: Liste links, Bereich rechts ----
- * Die Liste nimmt die Breite einer Seitenleiste (5 x 64px = 320px), nicht die
+ * Die Liste nimmt die Breite einer Seitenleiste (--layout-nav-list, 320px,
+ * derselbe Wert wie die Einstellungen), nicht die
  * Listenspur der Datenlisten (420-520px): ihre Zeilen sind Ziele, keine
  * Datensätze, und der Bereich rechts braucht die Breite für Raster und
  * Diagramme. Die Detailspalte trägt hier KEINE Karte: die Bereiche bringen
  * ihre eigenen Karten mit, und eine Karte um Karten wäre Kasten-in-Kasten. */
 @container module-surface (min-width: 65rem) {
   .health-split {
-    grid-template-columns: calc(var(--space-16) * 5) minmax(0, 1fr);
+    grid-template-columns: var(--layout-nav-list) minmax(0, 1fr);
   }
 
   .health-split > .split-view__detail {

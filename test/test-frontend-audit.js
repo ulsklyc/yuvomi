@@ -1290,17 +1290,18 @@ test('jede Sub-Tab-Leiste erklärt ihre Semantik, und zwar die, die ihre Routen 
   assert.doesNotMatch(kitchen, /panelFor/,
     'ein Modulwechsel hat kein Panel im selben Dokument');
 
-  // Gesundheit: ein Modul, alle Panels gleichzeitig im DOM -> echte Tabs.
+  // Gesundheit: seit R10 keine Leiste mehr - die Uebersicht ist die
+  // Navigation (Liste "Alle Bereiche"), jeder Bereich hat eine Pfad-Adresse
+  // ueber den Liste-+-Detail-Baustein. Kommt eine Leiste zurueck, muss sie
+  // hier ihre Semantik erklaeren.
   const health = read('../public/utils/health-tabs.js');
-  assert.match(health, /semantics:\s*'tabs'/,
-    'die Gesundheits-Leiste tauscht ein Panel im selben Dokument; das sind Tabs');
-  assert.match(health, /panelFor:\s*\(route\) =>[\s\S]*?data-health-panel/,
-    'die Tabs müssen ihre echten Panels benennen');
-
-  // Und die Panels müssen existieren, sonst zeigt panelFor ins Leere.
+  assert.doesNotMatch(health, /renderSubTabs|semantics:/,
+    'Gesundheit hat seit R10 keine Leiste - die Uebersicht ist die Navigation');
   const healthPage = read('../public/pages/health.js');
   assert.match(healthPage, /data-health-panel="\$\{esc\(panel\.route\)\}"/,
-    'health.js muss die Panels mit genau dem Attribut rendern, das panelFor sucht');
+    'health.js rendert jeden Bereich als eigenes Panel');
+  assert.match(healthPage, /mountMasterDetail\(\{[\s\S]{0,200}address: healthAddress/,
+    'die Bereiche waehlt der Baustein ueber ihre Pfad-Adresse, nicht eine eigene Tab-Logik');
   assert.doesNotMatch(healthPage, /function showPanel\(/,
     'Auswahl und Panel-Sichtbarkeit sind eine Operation - zwei Besitzer laufen auseinander');
 });
@@ -1702,7 +1703,7 @@ test('module-specific settings leaves preserve their required controls and behav
   // Die per-user-Vorgaben sind nach personal-calendar gezogen; hier bleibt nur
   // Haushaltweites plus der Verweis dorthin (Critique 2026-07-27).
   assert.doesNotMatch(calendar, /id="calendar-default-assign-me"|js-default-reminder/);
-  assert.match(calendar, /\/settings\/personal\/calendar/);
+  assert.match(calendar, /\/settings\/modules\/calendar\?section=personal-calendar/);
   assert.doesNotMatch(calendar, /caldav|carddav|google|apple|subscriptions|sync accounts/i);
   assert.doesNotMatch(calendar, /#[0-9a-f]{6}/i);
   assert.match(calendar, /id="holiday-country" disabled/);
@@ -1935,7 +1936,8 @@ test('die Kalender-Abos liegen im persoenlichen Blatt, nicht hinter dem Admin-Ga
   assert.ok(leaf, 'personal-calendar-subscriptions fehlt in der Registry');
   assert.match(leaf[0], /adminOnly: false/,
     'das Blatt der Kalender-Abos darf nicht adminOnly sein - der Server gatet sie nicht');
-  assert.match(leaf[0], /domainId: 'personal'/);
+  // Seit R10 ein Abschnitt "Fuer mich" im Modulblatt Kalender.
+  assert.match(leaf[0], /scope: 'mine'/);
 
   // Und die Gegenrichtung: was an Zugangsdaten des Haushalts haengt, bleibt
   // drueben. Taucht hier ein CalDAV- oder OAuth-Endpunkt auf, ist die Trennung
@@ -17166,6 +17168,17 @@ function declaredCompositionModes(src) {
 const usesListDetail = (src) => /app-page--list-detail/.test(src)
   && /from\s+'\/utils\/master-detail\.js'/.test(src);
 
+/**
+ * Liste + Detail mit eigener Shell statt Baustein. Die Einstellungen (R10, S3)
+ * sind Router-Routen je Blatt mit Dirty-Guard und Soft-Update; der Baustein
+ * schreibt pushState am Router vorbei. Sie stehen deshalb im Regime, aber mit
+ * eigenem Container - der muss an derselben Schwelle umschalten (PAGE-019).
+ * Die Liste schrumpft nur: haengt eine Seite den Baustein ein, faellt sie raus.
+ */
+const OWN_LIST_DETAIL_SHELL = new Map([
+  ['settings.js', { css: 'settings.css', container: 'settings-surface' }],
+]);
+
 test('PAGE-017: jede Seite steht in genau einem der drei Breitenregime', () => {
   const { section, rows } = widthRegimeTable();
   // Die drei Namen sind die Regel - ein viertes Regime in der Tabelle waere
@@ -17194,6 +17207,10 @@ test('PAGE-017: jede Seite steht in genau einem der drei Breitenregime', () => {
     assert.ok(scope.includes(file), `PAGE-017 ${file}: steht in der Tabelle, ist aber keine Seite hinter der Shell`);
   }
 
+  for (const name of OWN_LIST_DETAIL_SHELL.keys()) {
+    assert.equal(byFile.get(name), 'Liste + Detail',
+      `PAGE-017 ${name}: steht als eigene Liste-+-Detail-Shell in der Ausnahmeliste, aber nicht im Regime`);
+  }
   for (const name of scope) {
     const regime = byFile.get(name);
     const src = withoutBlockComments(withoutHtmlComments(read(`../public/pages/${name}`)));
@@ -17206,6 +17223,12 @@ test('PAGE-017: jede Seite steht in genau einem der drei Breitenregime', () => {
         assert.ok(modes.some((m) => m === 'reading' || m === 'form'),
           `PAGE-017 ${name}: Lesemass verlangt reading/form, deklariert ist ${modes.join(',') || 'nichts'}`);
       }
+    } else if (regime === 'Liste + Detail' && OWN_LIST_DETAIL_SHELL.has(name)) {
+      const { css, container } = OWN_LIST_DETAIL_SHELL.get(name);
+      assert.ok(!usesListDetail(src),
+        `PAGE-017 ${name}: haengt den Baustein ein - aus OWN_LIST_DETAIL_SHELL streichen`);
+      assert.match(read(`../public/styles/${css}`), new RegExp(`@container\\s+${container}\\s*\\(min-width:`),
+        `PAGE-017 ${name}: eigene Liste-+-Detail-Shell ohne @container ${container} in ${css}`);
     } else if (regime === 'Liste + Detail') {
       assert.ok(usesListDetail(src) || modes.includes('split'),
         `PAGE-017 ${name}: Liste + Detail verlangt .app-page--list-detail plus utils/master-detail.js (oder split)`);
@@ -17265,6 +17288,29 @@ test('PAGE-019: der Liste-+-Detail-Baustein misst die Modulflaeche an der Schwel
     if (sel === '.split-view__detail' && /display\s*:\s*flex/.test(body)) shownInside = true;
     if (sel === '.split-view') gridInside = body;
   }
+  // Jede weitere Split-Abfrage (Modul-CSS nur im Split, eigene Shells aus
+  // OWN_LIST_DETAIL_SHELL) steht an derselben Zahl: eine Stelle, die bei einem
+  // Schwellenwechsel stehen bliebe, schaltete ihr Modul an einer anderen
+  // Breite um als den Baustein - Liste und Detail kaemen auseinander.
+  const splitContainers = ['module-surface', ...[...OWN_LIST_DETAIL_SHELL.values()].map((entry) => entry.container)];
+  const splitQuery = new RegExp(`@container\\s+(${splitContainers.join('|')})\\s*\\(min-width:\\s*([0-9.]+)(\\w+)\\)`, 'g');
+  let splitQueries = 0;
+  for (const file of readdirSync(new URL('../public/styles/', import.meta.url)).filter((name) => name.endsWith('.css'))) {
+    for (const m of read(`../public/styles/${file}`).matchAll(splitQuery)) {
+      splitQueries += 1;
+      assert.equal(`${m[2]}${m[3]}`, `${threshold}rem`,
+        `PAGE-019: ${file} schaltet @container ${m[1]} bei ${m[2]}${m[3]}, tokens.css --layout-split-threshold steht bei ${threshold}rem`);
+    }
+  }
+  assert.ok(splitQueries >= 3, `PAGE-019: nur ${splitQueries} Split-Abfragen gefunden - der Scan ist blind`);
+  // Die Navigationslisten im Split (Einstellungen, Gesundheit) teilen EINE
+  // Breite aus tokens.css - zwei Schreibweisen derselben 320px liefen sonst
+  // beim ersten Nachjustieren auseinander.
+  assert.match(tokens, /--layout-nav-list:\s*[0-9.]+rem/, 'tokens.css: --layout-nav-list fehlt');
+  assert.match(read('../public/styles/settings.css'), /--settings-list-width:\s*var\(--layout-nav-list\)/,
+    'PAGE-019: die Einstellungs-Liste nimmt --layout-nav-list');
+  assert.match(read('../public/styles/health.css'), /\.health-split\s*\{\s*grid-template-columns:\s*var\(--layout-nav-list\)/,
+    'PAGE-019: die Gesundheits-Liste nimmt --layout-nav-list');
   assert.ok(containerRule && /container\s*:\s*module-surface\s*\/\s*inline-size/.test(containerRule),
     'PAGE-019: .app-page--list-detail muss der benannte Container module-surface sein - die Abfrage misst die Seitenwurzel');
   assert.ok(hiddenOutside, 'PAGE-019: unter der Schwelle muss die Detailspalte fehlen (display: none)');

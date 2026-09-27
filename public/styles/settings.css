@@ -842,7 +842,7 @@
   /* Die Listenspur der Einstellungen: schmaler als die des Bausteins
    * (--layout-list-min 420px), weil sie nur Namen traegt, keine
    * zweizeiligen Datensaetze - Apples Systemeinstellungen fuehren ~320px. */
-  --settings-list-width: 20rem;
+  --settings-list-width: var(--layout-nav-list);
 }
 
 .settings-shell {

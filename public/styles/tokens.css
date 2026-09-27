@@ -1334,6 +1334,11 @@
   --layout-list-min: 26.25rem;
   --layout-list-max: 32.5rem;
   --layout-split-threshold: 65rem;
+  /* Navigationsliste im Split (Einstellungen, Gesundheit): ihre Zeilen sind
+   * Ziele, keine zweizeiligen Datensaetze - sie nimmt die Breite einer
+   * Seitenleiste (320px, Apples Systemeinstellungen), nicht die Listenbahn
+   * oben. EIN Wert fuer beide, damit sie nicht auseinanderlaufen (R10). */
+  --layout-nav-list: 20rem;
   /* Kanonisches horizontales Seiten-Padding. Ein Wert für den Gutter aller
    * Modul-Roots. Ab 1024px auf --space-8 angehoben (siehe Media-Query unter
    * :root), damit Kopf und Inhalt dieselbe Fluchtlinie haben (Issue #577). */

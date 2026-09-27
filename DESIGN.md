@@ -926,7 +926,7 @@ entscheidet, sondern das Benannte. Ausgeschrieben in typography.css.
 Kopf-Navigation und traegt keinen Titel ueber sich - der Tab-Name IST der Modulname (Kueche:
 vier eigenstaendige Module unter einer Leiste). Wechselt sie ihn nicht, oder wechselt sie gar
 keine Route, gehoert sie unter den Large Title in den kanonischen `page-toolbar`-Kopf
-(Gesundheit, Budget, Belohnungen, Haushaltshilfe). Sektionen mit eigener Shell
+(Budget, Belohnungen, Haushaltshilfe). Sektionen mit eigener Shell
 (Einstellungen) fuehren ihren Titel in ihrem eigenen Kopf; das ist der dritte Fall der Regel,
 keine Ausnahme von ihr - als Ausnahme stuende er beim achtzehnten Modul wieder offen.
 
@@ -936,10 +936,11 @@ Routen und tragen trotzdem alle `module: 'health'`. Sie war deshalb bis Runde 6 
 Modul mit Sichtwechsel ohne Seitentitel. An der Stelle, die das haette beantworten muessen,
 stand „aus Layout-Gruenden": eine Beobachtung, kein Kriterium. Liegt die Leiste IM Kopf, gibt
 sie dessen Rail-Verhalten ab (Sticky, Grund, Trennlinie, Hoehe) - derselbe Satz wie beim
-Well: der Traeger entscheidet.
+Well: der Traeger entscheidet. Seit R10 (2026-09-27) hat die Gesundheit gar keine Leiste mehr:
+neun Tabs passten auf keinem Telefon, die Uebersicht ist jetzt ihre Navigation (Breitenregel).
 
 **Die Keine-sichtbare-Titelwiederholung-Regel.** Traegt eine Leiste den Namen eines Panels
-bereits - Sub-Tabs in Gesundheit, die Navigation in den Einstellungen -, dann benennt eine
+bereits - Sub-Tabs im Budget, die Navigation in den Einstellungen -, dann benennt eine
 Ueberschrift direkt darunter keine Ebene, sondern verdoppelt Information. Alle sechs
 Gesundheits-Panels taten das wortgleich ("Uebersicht" ueber "Uebersicht"), fuenf
 Settings-Blaetter zuvor ebenso. Unsichtbar (`.sr-only`) darf und soll die Ueberschrift
@@ -1103,13 +1104,17 @@ Seitdem steht jede Seite hinter der Shell in **genau einem von drei Regimen**:
   Listenkante. Fuer reine Listen und Formulare ohne Detail, das daneben stehen koennte.
   Umsetzung: Kompositionsmodus `reading` oder `form`.
 - **Liste + Detail** - unter der Schwelle exakt wie Lesemass (die Zeile oeffnet Modal, Sheet
-  oder Aufklapper). Ab einer Modulflaeche von `--layout-split-threshold` (75rem) steht links
+  oder Aufklapper). Ab einer Modulflaeche von `--layout-split-threshold` (65rem) steht links
   die Liste auf einer Bahn zwischen `--layout-list-min` und `--layout-list-max` (420-520px),
   rechts das Detail der ausgewaehlten Zeile mit eigenem Kopf (Titel, Aktionen), das fuer sich
   scrollt. Die Auswahl steht in der Adresse (`?open=<id>`, Zurueck-Taste - derselbe Parameter
   wie der Deep-Link der globalen Suche und der Essenskarten, auf allen vier Seiten), Pfeil hoch/runter
   bewegt sie, Enter oeffnet, Esc im Detail fuehrt zur Zeile zurueck und in der Liste hebt es
-  die Auswahl auf; ohne Auswahl ein ruhiger Leerzustand. Vorbild ist Apples Mail. Umsetzung:
+  die Auswahl auf. Nennt die Adresse keine Auswahl, ist am Desktop die erste Zeile gewaehlt
+  (`replaceState`, kein History-Eintrag, kein Fokuswechsel), mobil nie; ein unbekannter
+  Deep-Link bleibt ein ruhiger Leerzustand. Einstellungen und Gesundheit fuehren die Auswahl
+  als Pfad (`/settings/<bereich>/<blatt>`, `/health/<bereich>`, Option `address` des
+  Bausteins) statt als `?open=`. Vorbild ist Apples Mail. Umsetzung:
   `.app-page--list-detail` an der Seitenwurzel (Container `module-surface`) plus der Baustein
   `utils/master-detail.js` (`.split-view` in layout.css); die Aufteilung (`split`) war das
   erste Modul dieser Art und fuehrt ihre eigene Geometrie.
@@ -1120,7 +1125,10 @@ Seitdem steht jede Seite hinter der Shell in **genau einem von drei Regimen**:
 
 **Die Schwelle misst die Modulflaeche, nicht den Viewport.** Neben der ausgeklappten
 Seitenleiste hat ein 1440er-Fenster 1220px Hauptspalte (Detailspalte da), ein 1280er 1060px
-(Lesemass), mit eingeklappter Leiste 1224px (Detailspalte da). Bei 1440 nimmt die Listenspur
+(Detailspalte da), mit eingeklappter Leiste 1224px (Detailspalte da). Bis R10 (2026-09-27)
+stand die Schwelle bei 75rem, und der 1280er-Laptop fiel auf Einspalter plus Modal zurueck;
+65rem = 1040px laesst dort auch mit einer klassischen 17px-Bildlaufleiste Liste und Detail
+nebeneinander (420 + 24 + ~560). Bei 1440 nimmt die Listenspur
 488px (40 %, samt Seitenpolster), das Detail 676px bis zur Kopfkante (gemessen 2026-09-26).
 Ueber 1344px Modulflaeche (Content-Spalte 1280 plus zwei Gutter) wird der Baustein nicht
 breiter, sondern steht mittig: Liste und Detail fluchten mit dem Kopf, der seinen Inhalt auf
@@ -1141,35 +1149,56 @@ Kernseite fuehrt es. Die Zuordnung aller Seiten:
 
 | Seite | Regime | Umsetzung |
 |---|---|---|
-| `birthdays.js` Geburtstage | Lesemass | `reading` |
-| `rewards.js` Belohnungen | Lesemass | `reading` |
-| `pantry.js` Vorrat | Lesemass | `reading` |
+| `rewards.js` Belohnungen | Lesemass | `reading`; der Katalog darf als Raster breit (`rw-section--wide`) |
 | `waste.js` Entsorgung | Lesemass | `reading` |
-| `shopping.js` Einkauf | Lesemass | `page-measure--narrow` (Kompositions-Ausnahme) |
 | `housekeeping.js` Haushaltshilfe | Lesemass | `reading` (vorher `data`) |
-| `settings.js` Einstellungen | Lesemass | eigene Shell (Kompositions-Ausnahme) |
+| `birthdays.js` Geburtstage | Liste + Detail | `reading` + `list-detail` |
 | `contacts.js` Kontakte | Liste + Detail | `reading` + `list-detail` |
 | `tasks.js` Aufgaben | Liste + Detail | `full` + `list-detail` in der Liste; Kanban ist Flaeche |
 | `recipes.js` Rezepte | Liste + Detail | `reading` + `list-detail` |
 | `inventory.js` Inventar | Liste + Detail | `reading` + `list-detail` (vorher `data`) |
+| `calendar.js` Kalender | Liste + Detail | `full` + `list-detail` in der Agenda; Monat, Woche, Tag sind Flaeche |
+| `health.js` Gesundheit | Liste + Detail | `dashboard` + `list-detail` (Uebersicht + Bereiche links, Pfad-Adresse) |
+| `settings.js` Einstellungen | Liste + Detail | eigene Shell: Liste + Blatt ab der Split-Schwelle (`settings-surface`, Kompositions-Ausnahme) |
 | `split-expenses.js` Aufteilung | Liste + Detail | `split`, eigene Geometrie |
 | `dashboard.js` Uebersicht | Flaeche | `dashboard` |
-| `calendar.js` Kalender | Flaeche | `full` |
 | `notes.js` Notizen | Flaeche | `full` |
+| `shopping.js` Einkauf | Flaeche | `page-measure--narrow` unter 60rem, darueber Kategorien in zwei Spalten (Notizen-Muster, Kompositions-Ausnahme) |
+| `pantry.js` Vorrat | Flaeche | `reading` mit eigener Bahn: Liste plus festes Nebenpanel ab 60rem (wie das Budget) |
 | `meals.js` Mahlzeiten | Flaeche | Wochenraster (Kompositions-Ausnahme) |
 | `documents.js` Dokumente | Flaeche | `full` |
-| `health.js` Gesundheit | Flaeche | `dashboard` |
-| `health-fasting.js` Fasten | Flaeche | Reiter der Gesundheit |
+| `health-fasting.js` Fasten | Flaeche | Bereich der Gesundheit |
 | `schedule.js` Schichtplan | Flaeche | `full` |
 | `budget.js` Budget | Flaeche | `reading` mit eigener Bahn |
 | `budget-stats.js` Budget-Statistik | Flaeche | Reiter des Budgets |
 | `budget-plans.js` Budget-Plan | Flaeche | Reiter des Budgets |
 | `subscriptions.js` Abos | Flaeche | `full` |
 
+**Einstellungen (R10, 2026-09-27).** Drei Bereiche: Konto (fuer alle), Haushalt (Admin) und
+Module. Je Modul EIN Blatt wie Apples "Einstellungen > App": oben eine Statuszeile (Zustand
+fuer alle, Verweis auf "Aktive Module" nur fuer Admins - ein Modul geht NUR dort an und aus),
+darunter die Abschnitte "Fuer mich" und "Fuer den Haushalt" (Admin). Die Sammelschublade
+"Modul-Optionen" und der Bereich "Synchronisation" sind aufgeloest: Kalender-Sync, Abos, Feeds
+und Termin-Vorgaben stehen im Blatt Kalender, Kontakte-Sync bei Kontakten, Erinnerungen-Sync
+bei Aufgaben, Zyklus und persoenliche Vorgaben bei Gesundheit, Speicher und DMS bei Dokumenten.
+Jede Adresse von vor R10 leitet per `replaceState` auf Blatt plus `?section=<abschnitt>` um;
+eigene Links zeigen direkt auf das neue Blatt (test:settings-navigation). Ab der Split-Schwelle
+steht links die Liste (`--layout-nav-list`, 320px, Suche klebt an ihrer Kante), rechts das
+Blatt im Lesemass, das erste Blatt vorgewaehlt. Eigene Shell statt Baustein, weil jedes Blatt
+eine Router-Route mit Dirty-Guard ist - PAGE-017 fuehrt sie in `OWN_LIST_DETAIL_SHELL`.
+
+**Gesundheit (R10, 2026-09-27).** Keine Tab-Leiste mehr: die Uebersicht ist die Navigation -
+Zusammenfassung plus eine Liste "Alle Bereiche" (Icon, Name, letzter Wert oder Status, Muster
+Apple Health "Durchsuchen"). Jeder Bereich hat eine Pfad-Adresse `/health/<bereich>`, alte
+`?tab=`-Adressen leiten um. Mobil schiebt ein Bereich sich mit "< Gesundheit" und dem
+Bereichsnamen als Titel auf; ab der Split-Schwelle stehen links Uebersicht und Bereiche
+(`--layout-nav-list`), rechts der Bereich (Baustein mit `address`).
+
 Guard: PAGE-017 bis PAGE-019 in `test/test-frontend-audit.js` - jede Seite steht genau einmal in
 dieser Tabelle, keine Kernseite fuehrt `data`, eine Lesemass-Seite fuehrt `reading`/`form`, eine
 Liste-+-Detail-Seite haengt den Baustein ein (Ausnahmeliste, die nur schrumpft, bis die Module
-ihn eingehaengt haben), und die Schwelle in layout.css ist die aus tokens.css.
+ihn eingehaengt haben), und jede Split-Abfrage in `public/styles/` steht an der Schwelle aus
+tokens.css.
 
 ## Elevation & Depth
 
