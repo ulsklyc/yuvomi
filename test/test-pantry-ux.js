@@ -536,3 +536,47 @@ test('das Panel steht nur ab 60rem Vorratsflaeche, und die Liste fuellt die Spal
   assert.match(src, /body\.append\(list, watch\)/, 'Liste und Panel teilen den Koerper');
   assert.match(src, /watch\.addEventListener\('click', onWatchClick\)/, 'eine Panelzeile oeffnet ihren Artikel');
 });
+
+// Codex P2 zu R10 L4: das Panel zeichnete aus `withIntent`, der Klick holte den
+// Artikel aber aus dem nackten Serverstand. Stepper-Schritt, Zeile im Panel
+// oeffnen, anderes Feld speichern - und der PUT schrieb die alte Menge zurueck.
+// Gemessen am Feld, das der Dialog wirklich fuellt, fuer BEIDE Einstiege.
+test('der Bearbeiten-Dialog zeigt die Menge eines noch entprellten Schritts - aus Panel und Liste', () => {
+  resetPantry();
+  __test.state.items = [rice(1, { id: 2, name: 'Milch' })];
+  __test.intents.set(2, { quantity: 4, seq: 1, timer: null, flush: () => {} });
+
+  const fieldsOf = (open) => {
+    const fields = {};
+    const panel = {
+      querySelector: (sel) => {
+        fields[sel] ??= { value: '', addEventListener() {} };
+        return fields[sel];
+      },
+    };
+    open.onSave(panel);
+    return fields;
+  };
+  const opened = [];
+  globalThis.__openModal = (opts) => { opened.push(opts); };
+  try {
+    const watchBtn = { dataset: { watchId: '2' } };
+    __test.onWatchClick({ target: { closest: (sel) => (sel === '[data-watch-id]' ? watchBtn : null) } });
+    assert.equal(opened.length, 1, 'die Panelzeile oeffnet den Dialog');
+    assert.equal(fieldsOf(opened[0])['#pantry-quantity'].value, '4', 'Panel: die Menge der Absicht, nicht der Serverstand 1');
+
+    const row = { dataset: { id: '2' } };
+    const editBtn = { dataset: { action: 'edit' }, closest: (sel) => (sel === '.pantry-row[data-id]' ? row : null) };
+    __test.onListClick({ target: { closest: (sel) => (sel === '[data-action]' ? editBtn : null) } });
+    assert.equal(opened.length, 2, 'die Listenzeile oeffnet den Dialog');
+    assert.equal(fieldsOf(opened[1])['#pantry-quantity'].value, '4', 'Liste: dieselbe Menge wie die Zeile');
+
+    // Gegenprobe ohne Absicht: der Serverstand.
+    __test.intents.clear();
+    __test.onWatchClick({ target: { closest: (sel) => (sel === '[data-watch-id]' ? watchBtn : null) } });
+    assert.equal(fieldsOf(opened[2])['#pantry-quantity'].value, '1');
+  } finally {
+    delete globalThis.__openModal;
+    resetPantry();
+  }
+});

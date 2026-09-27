@@ -1251,6 +1251,13 @@ async function sendToShopping(items, btn) {
 
 function openItemModal(mode, item = null) {
   const isEdit = mode === 'edit';
+  // Der Dialog zeigt den Artikel, wie ihn die Zeile zeigt: mit der Absicht
+  // eines Stepper-Schritts, dessen PATCH noch im Entprell-Fenster steht. Aus
+  // dem nackten Serverstand gefuellt stuende dort die alte Menge, und wer dann
+  // ein anderes Feld speichert, schriebe sie per PUT zurueck - der Schritt
+  // waere still verloren. Hier statt beim Aufrufer, weil Liste und Nebenpanel
+  // denselben Weg nehmen.
+  if (isEdit) item = withIntent(item);
   const locations = state.locations;
   const categories = state.categories;
 
@@ -1492,4 +1499,7 @@ export const __test = {
   // R10 L4: das Nebenpanel ordnet wie die Filterchips (test-pantry-ux.js).
   pantryWatchGroups,
   renderWatch,
+  // Beide Wege in den Bearbeiten-Dialog (test-pantry-ux.js).
+  onListClick,
+  onWatchClick,
 };
