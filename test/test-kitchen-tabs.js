@@ -165,6 +165,17 @@ test('Indikator: reduzierte Bewegung springt', () => {
   }
 });
 
+test('Indikator: eine fehlende Leiste ist ein No-op wie bei wireTablist/wireScrollFade - der Aufrufer bleibt heil', () => {
+  // Seiten verdrahten ihre Leiste nach dem Rendern in einer Reihe
+  // (wireTablist -> attachSegmentIndicator -> wireScrollFade). Die beiden
+  // Nachbarn schlucken ein null; warf der Indikator, riss er alles hinter sich
+  // mit (Haushaltshilfe: Riegel, Scroll-Fade, Inhalt).
+  const handle = seg.attachSegmentIndicator(null, { key: 'probe' });
+  assert.equal(typeof handle.place, 'function');
+  assert.equal(typeof handle.destroy, 'function');
+  assert.doesNotThrow(() => { handle.place({ glide: true }); handle.destroy(); });
+});
+
 test('Indikator: glideKeyframes ist die Regel "transform, Groesse nur wenn noetig"', () => {
   const a = { x: 0, y: 0, w: 50, h: 30 };
   assert.deepEqual(seg.glideKeyframes(a, { ...a, x: 60 }).map(Object.keys), [['transform'], ['transform']]);

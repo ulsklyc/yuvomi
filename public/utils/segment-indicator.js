@@ -108,6 +108,9 @@ export function attachSegmentIndicator(bar, {
   className = '',
   key = '',
 } = {}) {
+  // Wie wireTablist/wireScrollFade: eine fehlende Leiste ist ein No-op, damit
+  // die Verdrahtung dahinter (Riegel, Scroll-Fade, Inhalt) nicht mitreisst.
+  if (!bar) return { place() {}, destroy() {}, indicator: null };
   const existing = bar.querySelector(`:scope > .${SEGMENT_INDICATOR_CLASS}`);
   if (existing?._segHandle) return existing._segHandle;
 
