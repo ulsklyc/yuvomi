@@ -14,9 +14,18 @@
  *          footer-icon-delete  Loeschen im Dialog = Textknopf `btn--danger-outline`
  *          settings-checkbox   Boolean in den Einstellungen = Schalter
  *          dead-i-rule         keine CSS-Regel zielt nur auf `<i>` (Lucide ersetzt es)
+ *        Runde 7 (Re-Critique 2026-09-27, P1 #2 "Kanon halb verteilt"):
+ *          toolbar-new-btn     Anlegen = angedockter `page-fab`, kein eigener Kopfknopf
+ *          hover-reveal        Aktionen stehen dauerhaft, kein Einblenden per :hover
+ *          row-checkbox        Auswahl in Listenzeilen ohne native Checkbox
+ *          segment-indicator   jede Segment-/Tab-Leiste gleitet mit dem geteilten Indikator
+ *          search-width        Breite und Lage der Kopfsuche gehoeren page-search.css
+ *          sheet-drag          ein Blatt zieht ueber utils/sheet-drag.js, nicht per Eigenbau
  *
  * DAS IST EIN RATCHET, KEINE ALLOWLIST. `PENDING` ist der Bestand vom
- * 2026-09-26 (Datei -> Anzahl). Zwei Tests je Regel:
+ * 2026-09-26 (Datei -> Anzahl), fuer die sechs Regeln der Runde 7 der vom
+ * 2026-09-27 - je Regel gegen einen eingefuegten Abweichler rot gesehen.
+ * Zwei Tests je Regel:
  *   1. "kein neuer Abweichler": eine Datei darf nicht MEHR Funde haben als ihr
  *      Eintrag (eine nicht gelistete Datei: null). Rot = jemand hat einen neuen
  *      Dialekt gebaut. Das ist der Test, der gruen bleiben muss.
@@ -426,6 +435,196 @@ export function scanDeadIRules(css) {
 }
 
 // ---------------------------------------------------------------------------
+// Scanner der Runde 7 (Re-Critique 2026-09-27, P1 #2 "Kanon halb verteilt")
+// ---------------------------------------------------------------------------
+
+/** Zeilen ausserhalb von Kommentaren, mit Nummer. */
+function codeLines(src) {
+  const out = [];
+  let inBlock = false;
+  src.split('\n').forEach((text, i) => {
+    let t = text;
+    if (inBlock) {
+      const end = t.indexOf('*/');
+      if (end === -1) return;
+      t = t.slice(end + 2);
+      inBlock = false;
+    }
+    t = t.replace(/\/\*[\s\S]*?\*\//g, '');
+    const open = t.indexOf('/*');
+    if (open !== -1) { t = t.slice(0, open); inBlock = true; }
+    if (/^\s*(?:\/\/|\*)/.test(t)) return;
+    out.push({ line: i + 1, text: t.replace(/(?:^|[^:'"`])\/\/.*$/, '') });
+  });
+  return out;
+}
+
+/**
+ * Punkt D3: der eigene Kopfknopf `.toolbar-new-btn` (Klasse im Markup, als
+ * Selektor im JS oder im CSS). `toolbar-new-btn__label` ist die Beschriftung
+ * des ANGEDOCKTEN FAB (router.js `dockFabIntoToolbar`) und zaehlt nicht.
+ * Kanon: `createPageFab({ dockLabel })` - die Shell dockt ihn am Desktop an.
+ */
+export function scanToolbarNewBtn(src) {
+  const found = [];
+  for (const { line, text } of codeLines(src)) {
+    const hits = text.match(/toolbar-new-btn(?![\w-])/g);
+    if (hits) for (let k = 0; k < hits.length; k += 1) found.push({ line, what: text.trim().slice(0, 90) });
+  }
+  return found;
+}
+
+/**
+ * Punkt D7: eine Aktion, die erst beim Ueberfahren erscheint - eine Regel,
+ * die ein Aktions-Element unter `:hover`/`:focus-within` eines VORFAHREN auf
+ * `opacity: 1` bzw. `visibility: visible` stellt. ignore.md (2026-08-17):
+ * Zeilenaktionen sind dauerhaft sichtbar; Tablet und Trackpad haben kein
+ * verlaessliches hover. Aktion heisst: das Ziel traegt eine Klasse mit
+ * `action`, `-btn`, `__open`, `__delete`, `__pin` oder `add-more`.
+ * Nicht gemeint: Beschriftungen (die ausklappende Seitenleiste zeigt ihre
+ * Labels, keine Aktionen).
+ */
+const REVEALED_ACTION = /(?:action|-btn\b|__open\b|__delete\b|__pin\b|add-more)/;
+export function scanHoverReveal(css) {
+  const found = [];
+  for (const rule of eachRule(css)) {
+    if (!/(?:^|[;\s{])(?:opacity\s*:\s*1(?![.\d])|visibility\s*:\s*visible)/.test(rule.body)) continue;
+    for (const part of rule.selector.split(',').map((x) => x.trim().replace(/\s+/g, ' '))) {
+      const m = part.match(/:(?:hover|focus-within)\)?\s*(?:>\s*)?(.+)$/);
+      if (!m) continue;
+      const target = m[1].trim().split(/\s|>/).filter(Boolean).pop() ?? '';
+      if (!target || !REVEALED_ACTION.test(target)) continue;
+      found.push({ line: 0, what: part });
+    }
+  }
+  return found;
+}
+
+/**
+ * Punkt D5: eine native Checkbox als Auswahl in einer Listenzeile
+ * (Mehrfachauswahl). Erkannt am Zweck, nicht an der Form: die Checkbox oder
+ * ihr Label traegt `bulk`/`select` in der Klasse oder `data-select(-id)`.
+ * Formularfelder ("Wiederkehrend", "Gesperrt") und Auswahllisten in Dialogen
+ * sind keine Listenzeilen und zaehlen nicht; ein Schalter (`role="switch"`)
+ * auch nicht. Kanon: Auswahlkreis statt Statuskreis + `utils/bulk-pill.js`.
+ */
+export function scanRowCheckbox(src) {
+  const found = [];
+  const re = /<input\b[^>]*\btype="checkbox"[^>]*>/g;
+  let m;
+  while ((m = re.exec(src))) {
+    if (inComment(src, m.index) || /role="switch"/.test(m[0])) continue;
+    const before = src.slice(Math.max(0, m.index - 200), m.index);
+    const label = (before.match(/<label\b[^>]*class="([^"]*)"[^<]*$/) || [])[1] ?? '';
+    const cls = (m[0].match(/\bclass="([^"]*)"/) || [])[1] ?? '';
+    if (/bulk|select/i.test(cls) || /\bdata-select(?:-id)?=/.test(m[0]) || /bulk|select/i.test(label)) {
+      found.push({ line: lineOf(src, m.index), what: (m[0].match(/\b(?:class|data-select(?:-id)?)="[^"]*"/) || ['<input type=checkbox>'])[0] });
+    }
+  }
+  return found;
+}
+
+/**
+ * Punkt D8: eine Segment- oder Tab-Leiste ohne den geteilten Indikator.
+ * Gezaehlt wird je Datei: Leisten (oeffnende Tags mit `role="tablist"` oder
+ * der Klasse `segmented`, `sub-tabs-bar`, `group-toggle`,
+ * `documents-view-toggle`; dazu `renderSubTabs(`-Aufrufe) minus
+ * Anschluesse (`attachSegmentIndicator(` und `renderSubTabs(` mit
+ * `indicator`). Die Bausteine selbst (sub-tabs.js, tablist.js, der Indikator)
+ * zaehlen nicht. Kanon: utils/segment-indicator.js.
+ */
+const SEGMENT_KIT = new Set(['public/utils/sub-tabs.js', 'public/utils/tablist.js', 'public/utils/segment-indicator.js']);
+const SEGMENT_CLASS = /(?:^|\s)(?:segmented|sub-tabs-bar|group-toggle|documents-view-toggle)(?=\s|$)/;
+export function scanSegmentIndicator(src, file = '') {
+  if (SEGMENT_KIT.has(file)) return [];
+  const bars = [];
+  const tagRe = /<(?:div|nav|ul|section|span)\b([^>]*)>/g;
+  let m;
+  while ((m = tagRe.exec(src))) {
+    if (inComment(src, m.index)) continue;
+    const cls = (m[1].match(/\bclass="([^"]*)"/) || [])[1] ?? '';
+    if (/\brole="tablist"/.test(m[1]) || SEGMENT_CLASS.test(cls)) {
+      bars.push({ line: lineOf(src, m.index), what: cls ? `class="${cls.trim()}"` : 'role="tablist"' });
+    }
+  }
+  let attached = 0;
+  const subRe = /\brenderSubTabs\s*\(/g;
+  while ((m = subRe.exec(src))) {
+    if (inComment(src, m.index) || /import\s*\{/.test(src.slice(src.lastIndexOf('\n', m.index) + 1, m.index))) continue;
+    const args = callArgs(src, m.index + m[0].length - 1);
+    if (/\bindicator\s*:/.test(args)) attached += 1;
+    else bars.push({ line: lineOf(src, m.index), what: 'renderSubTabs ohne indicator' });
+  }
+  const attRe = /\battachSegmentIndicator\s*\(/g;
+  while ((m = attRe.exec(src))) {
+    const before = src.slice(src.lastIndexOf('\n', m.index) + 1, m.index);
+    if (inComment(src, m.index) || /import\s*\{|export\s+function\s*$/.test(before)) continue;
+    attached += 1;
+  }
+  return bars.slice(0, Math.max(0, bars.length - attached));
+}
+
+/**
+ * Punkt D4: eine Modulregel, die der Kopfsuche Breite oder Lage gibt. Die
+ * Klassen stammen aus den `className`-Argumenten von `renderPageSearch()`;
+ * Suchen, die NICHT im Modulkopf stehen, sind mit Grund ausgenommen (eine
+ * neue, unbekannte Klasse zaehlt also - die sichere Richtung). Kanon:
+ * `--page-search-width` und der Center-Slot in page-search.css.
+ */
+const NOT_HEAD_SEARCH = new Map([
+  ['subscriptions-search', 'eigene Werkzeugzeile der Abos, kein .page-toolbar'],
+  ['split-search', 'Gruppen-Seitenpanel des Ausgleichs'],
+  ['cal-search__field', 'Suchzeile unter dem Kalenderkopf (eigene Ergebnisansicht)'],
+  ['event-icon-picker__search', 'Icon-Dialog im Kalender'],
+  ['doc-attach-picker__search', 'Dokument-Auswahldialog'],
+  ['settings-shell__navigation-search', 'Seitenleiste der Einstellungen'],
+  ['page-toolbar__center', 'der Slot der Shell selbst'],
+]);
+export function headSearchClasses(jsFiles) {
+  const out = new Set();
+  for (const { src } of jsFiles) {
+    for (const m of src.matchAll(/renderPageSearch\(\{([\s\S]*?)\}\)/g)) {
+      const cls = (m[1].match(/\bclassName:\s*['"`]([^'"`]*)['"`]/) || [])[1];
+      if (!cls) continue;
+      for (const c of cls.split(/\s+/).filter(Boolean)) if (!NOT_HEAD_SEARCH.has(c)) out.add(c);
+    }
+  }
+  return out;
+}
+const SEARCH_GEOMETRY = /(?:^|[;\s{])(?:width|max-width|min-width|inline-size|max-inline-size|min-inline-size|flex|flex-basis|flex-grow|flex-shrink|margin-inline-start|margin-left)\s*:/;
+export function scanSearchWidth(css, classes) {
+  const found = [];
+  for (const rule of eachRule(css)) {
+    if (!SEARCH_GEOMETRY.test(rule.body)) continue;
+    for (const part of rule.selector.split(',').map((x) => x.trim())) {
+      const last = part.split(/\s|>|\+|~/).filter(Boolean).pop() ?? '';
+      const hit = [...classes].find((c) => new RegExp(`\\.${reEsc(c)}(?![\\w-])`).test(last));
+      if (hit) found.push({ line: 0, what: `${part}${rule.at.length ? `  [${rule.at.join(' ')}]` : ''}` });
+    }
+  }
+  return found;
+}
+
+/**
+ * Punkt D2: ein Blatt mit eigener Zieh-Geste - Touch-Listener an einem
+ * Element, das `sheet` oder `panel` heisst, ausserhalb des geteilten Helfers.
+ * Vorher gab es zwei Grammatiken (Mehr-Blatt: erst bei touchend ab 60px;
+ * Dialog: Faktor 0.6, ohne Tempo). Kanon: `wireSheetDrag()` aus
+ * utils/sheet-drag.js.
+ */
+export function scanSheetDrag(src, file = '') {
+  if (file === 'public/utils/sheet-drag.js') return [];
+  const found = [];
+  const re = /\b(\w*(?:[Ss]heet|[Pp]anel))\.addEventListener\(\s*['"](touch(?:start|move|end|cancel))['"]/g;
+  let m;
+  while ((m = re.exec(src))) {
+    if (inComment(src, m.index)) continue;
+    found.push({ line: lineOf(src, m.index), what: `${m[1]} ${m[2]}` });
+  }
+  return found;
+}
+
+// ---------------------------------------------------------------------------
 // Scanner-Proben: jede Regel faengt ihr Beispiel und laesst die Kanonform durch
 // ---------------------------------------------------------------------------
 
@@ -553,6 +752,93 @@ test('Scanner: dead-i-rule faengt die reine i-Regel und laesst den svg-Zweig und
   assert.deepEqual(scanDeadIRules(css).map((f) => f.what), ['.a i', '.b > i', '.e i[data-lucide]']);
 });
 
+test('Scanner: toolbar-new-btn faengt Markup, Selektor und CSS, nicht Kommentar und nicht die Dock-Beschriftung', () => {
+  const bad = `
+    <button class="btn btn--primary toolbar-new-btn" id="x-add">\${t('newLabel.x')}</button>
+    if (main?.querySelector('.toolbar-new-btn')) return false;`;
+  assert.equal(scanToolbarNewBtn(bad).length, 2);
+  assert.equal(scanToolbarNewBtn('.toolbar-new-btn { display: none; }\n/* .toolbar-new-btn stand hier */').length, 1);
+  const good = `
+    // .toolbar-new-btn gab es bis Runde 7
+    label.className = 'toolbar-new-btn__label';
+    fab = createPageFab({ id: 'x-fab', dockLabel: t('newLabel.x') });`;
+  assert.deepEqual(scanToolbarNewBtn(good), []);
+});
+
+test('Scanner: hover-reveal faengt die Aktion, die ein Vorfahr per :hover einblendet, und laesst Labels und Eigen-Hover durch', () => {
+  const bad = `
+    .note-card__delete { opacity: 0; }
+    .note-card:hover .note-card__delete, .note-card:focus-within .note-card__open { opacity: 1; }
+    .meal-slot:hover .meal-card__actions { opacity: 1; pointer-events: auto; }
+    .row:hover > .row__edit-btn { visibility: visible; }`;
+  assert.deepEqual(scanHoverReveal(bad).map((f) => f.what), [
+    '.note-card:hover .note-card__delete', '.note-card:focus-within .note-card__open',
+    '.meal-slot:hover .meal-card__actions', '.row:hover > .row__edit-btn']);
+  const good = `
+    .nav-sidebar:hover .nav-item__label { opacity: 1; }
+    .row-action:hover { color: red; }
+    .note-card:hover .note-card__title { opacity: 1; }
+    .meal-card__actions { opacity: 1; }`;
+  assert.deepEqual(scanHoverReveal(good), []);
+});
+
+test('Scanner: row-checkbox faengt die Auswahl-Checkbox in Zeilen und laesst Formularfelder und Schalter durch', () => {
+  const bad = `
+    <input type="checkbox" class="task-bulk-checkbox" data-task-id="1">
+    <label class="contact-item__select"><input type="checkbox" class="contact-item__checkbox"></label>
+    <label class="document-select"><input type="checkbox" data-select-id="7"></label>`;
+  assert.equal(scanRowCheckbox(bad).length, 3);
+  const good = `
+    <input type="checkbox" id="bm-recurring" checked>
+    <label class="form-check"><input type="checkbox" id="task-locked"></label>
+    <input type="checkbox" role="switch" class="select-all-switch">`;
+  assert.deepEqual(scanRowCheckbox(good), []);
+});
+
+test('Scanner: segment-indicator zaehlt Leisten minus Anschluesse und laesst die Bausteine aus', () => {
+  const bad = `
+    <div class="segmented x-filter" role="radiogroup"></div>
+    <div class="budget-tabs page-toolbar__bar" role="tablist"></div>
+    <div class="group-toggle group-toggle--icons"></div>
+    renderSubTabs(toolbar, { semantics: 'tabs', tabs });`;
+  assert.equal(scanSegmentIndicator(bad, 'public/pages/x.js').length, 4);
+  const partly = `${bad}
+    attachSegmentIndicator(el.querySelector('.budget-tabs'));`;
+  assert.equal(scanSegmentIndicator(partly, 'public/pages/x.js').length, 3, 'jeder Anschluss nimmt eine Leiste');
+  const good = `
+    <div class="segmented__item is-active"></div>
+    <div class="fasting-dial fasting-dial--segmented"></div>
+    renderSubTabs(container, { semantics: 'nav', tabs, indicator: { key: 'health' } });
+    import { attachSegmentIndicator } from '/utils/segment-indicator.js';`;
+  assert.deepEqual(scanSegmentIndicator(good, 'public/pages/x.js'), []);
+  assert.deepEqual(scanSegmentIndicator(bad, 'public/utils/sub-tabs.js'), [], 'der Baustein selbst zaehlt nicht');
+});
+
+test('Scanner: search-width faengt Modulbreiten der Kopfsuche, nicht Aussehen und nicht Suchen ausserhalb des Kopfes', () => {
+  const classes = headSearchClasses([{ src: `
+    renderPageSearch({ id: 'a', className: 'x-toolbar__search page-toolbar__center' })
+    renderPageSearch({ id: 'b', className: 'subscriptions-search' })` }]);
+  assert.deepEqual([...classes], ['x-toolbar__search'], 'Center-Slot und die benannten Nicht-Kopf-Suchen fallen weg');
+  const bad = `
+    .x-toolbar__search { flex: 1 1 0; max-width: 280px; margin-inline-start: auto; }
+    @media (min-width: 1024px) { .x-toolbar > .x-toolbar__search { flex-basis: 0; } }`;
+  assert.equal(scanSearchWidth(bad, classes).length, 2);
+  const good = `
+    .x-toolbar__search .page-search__input { color: red; }
+    .x-toolbar__search[hidden] { display: none; }
+    .subscriptions-search { max-width: 28rem; }`;
+  assert.deepEqual(scanSearchWidth(good, classes), []);
+});
+
+test('Scanner: sheet-drag faengt Touch-Gesten an Blatt und Tafel ausserhalb des Helfers', () => {
+  const bad = `
+    panel.addEventListener('touchstart', (e) => {}, { passive: true });
+    sheet.addEventListener("touchend", (e) => {});`;
+  assert.equal(scanSheetDrag(bad, 'public/router.js').length, 2);
+  assert.deepEqual(scanSheetDrag(bad, 'public/utils/sheet-drag.js'), [], 'der Helfer selbst zaehlt nicht');
+  assert.deepEqual(scanSheetDrag(`rows.addEventListener('touchstart', f);\n// panel.addEventListener('touchmove', g)`, 'public/pages/x.js'), []);
+});
+
 // ---------------------------------------------------------------------------
 // Der Helfer der Zeilenaktion (utils/row-action.js)
 // ---------------------------------------------------------------------------
@@ -663,7 +949,67 @@ const PENDING = {
   // Leer seit Runde 5, Schritt 1: die 38 Regeln sind entfernt (je belegt,
   // dass dort kein <i> gerendert wird). Ab hier ist jede neue rot.
   'dead-i-rule': {},
+  // --- Runde 7, Bestand 2026-09-27 (Schritt 1, k7). Nur nach UNTEN. ---
+  // D3: fuenf Module bauen den Kopfknopf selbst; Weiche und Regeln der Shell
+  // fallen, wenn sie weg sind (Integration).
+  'toolbar-new-btn': {
+    'public/pages/budget.js': 1,
+    'public/pages/calendar.js': 1,
+    'public/pages/contacts.js': 1,
+    'public/pages/notes.js': 1,
+    'public/pages/tasks.js': 1,
+    'public/router.js': 1,
+    'public/styles/layout.css': 5,
+  },
+  // D7: Notizen (Anheften, Oeffnen, Loeschen), Essensplan (Karte, "mehr"),
+  // Dokumente (DMS-Treffer "oeffnen").
+  'hover-reveal': {
+    'public/styles/documents.css': 2,
+    'public/styles/meals.css': 4,
+    'public/styles/notes.css': 3,
+  },
+  // D5: Aufgaben (Mehrfachauswahl); Kontakte und Dokumente waehlen ebenso
+  // per nativer Checkbox.
+  'row-checkbox': {
+    'public/pages/contacts.js': 1,
+    'public/pages/documents.js': 1,
+    'public/pages/tasks.js': 1,
+  },
+  // D8: jede Leiste ohne geteilten Indikator (Kueche ist angeschlossen).
+  'segment-indicator': {
+    'public/pages/budget-stats.js': 1,
+    'public/pages/budget.js': 3,
+    'public/pages/calendar.js': 1,
+    'public/pages/documents.js': 2,
+    'public/pages/health.js': 1,
+    'public/pages/housekeeping.js': 1,
+    'public/pages/notes.js': 1,
+    'public/pages/rewards.js': 1,
+    'public/pages/schedule.js': 4,
+    'public/pages/split-expenses.js': 1,
+    'public/pages/tasks.js': 3,
+    'public/settings/pages/admin-permissions.js': 1,
+    'public/settings/pages/modules-calendar.js': 1,
+    'public/settings/pages/personal-appearance.js': 1,
+    'public/utils/health-tabs.js': 1,
+  },
+  // D4: seit page-search.css Breite und Lage traegt, laufen diese Regeln ins
+  // Leere (die Shell-Regel ist 0,2,1) - sie fallen mit dem Modul-Umbau.
+  'search-width': {
+    'public/styles/contacts.css': 1,
+    'public/styles/documents.css': 1,
+    'public/styles/notes.css': 1,
+    'public/styles/pantry.css': 1,
+    'public/styles/recipes.css': 1,
+    'public/styles/settings.css': 1,
+    'public/styles/tasks.css': 2,
+  },
+  // D2: leer seit Runde 7, Schritt 1 - Dialog-Sheet und Mehr-Blatt ziehen
+  // ueber utils/sheet-drag.js.
+  'sheet-drag': {},
 };
+
+const HEAD_SEARCH = headSearchClasses(JS);
 
 const RULES = {
   'row-action': { files: JS, scan: (s) => scanRowAction(s), canon: '`.row-action` / `.row-action--danger` (utils/row-action.js `rowActionHtml`)' },
@@ -676,6 +1022,12 @@ const RULES = {
   'footer-icon-delete': { files: JS, scan: (s) => scanFooterIconDelete(s), canon: 'Loeschen im Dialogfuss = `btn btn--danger-outline` mit Text, links' },
   'settings-checkbox': { files: JS, scan: (s, f) => scanSettingsCheckbox(s, f), canon: '`toggleRowHtml({ ..., control: \'switch\' })`' },
   'dead-i-rule': { files: CSS, scan: (s) => scanDeadIRules(s), canon: 'keine Regel auf `<i>` - Lucide rendert `<svg>`; auf `svg` zielen' },
+  'toolbar-new-btn': { files: [...JS, ...CSS], scan: (s) => scanToolbarNewBtn(s), canon: '`createPageFab({ dockLabel })` (utils/fab.js) - die Shell dockt ihn an' },
+  'hover-reveal': { files: CSS, scan: (s) => scanHoverReveal(s), canon: 'Aktionen dauerhaft sichtbar, ruhig per Tertiaerfarbe (ignore.md)' },
+  'row-checkbox': { files: JS, scan: (s) => scanRowCheckbox(s), canon: 'Auswahlkreis ersetzt den Statuskreis, Leiste = `setBulkPill()` (utils/bulk-pill.js)' },
+  'segment-indicator': { files: JS, scan: (s, f) => scanSegmentIndicator(s, f), canon: '`attachSegmentIndicator(bar)` bzw. `renderSubTabs({ indicator })` (utils/segment-indicator.js)' },
+  'search-width': { files: CSS.filter((f) => f.file !== 'public/styles/page-search.css'), scan: (s) => scanSearchWidth(s, HEAD_SEARCH), canon: '`--page-search-width` + Center-Slot (page-search.css), keine Modulbreite' },
+  'sheet-drag': { files: JS, scan: (s, f) => scanSheetDrag(s, f), canon: '`wireSheetDrag()` (utils/sheet-drag.js)' },
 };
 
 function census(rule) {
