@@ -1682,7 +1682,7 @@ function openMealModal(opts) {
       panel.querySelector('#modal-delete')?.addEventListener('click', async () => {
         let scope;
         if (meal.recurrence_template_id) {
-          scope = await askOverModal(mealDeleteScopeChoice);
+          scope = await askOverModal(() => selectModal(...mealDeleteScopeQuestion()));
           if (scope === null || scope === undefined) return;
         }
         closeModal({ force: true });
@@ -1971,15 +1971,16 @@ function collectModalIngredients(overlay) {
 // --------------------------------------------------------
 
 /**
- * Die Umfangs-Frage einer Serien-Mahlzeit: Einzeltermin, alles ab hier oder
- * ganze Serie. Liefert den gewaehlten Umfang oder null (abgebrochen).
+ * Die Umfangs-Frage einer Serien-Mahlzeit als Argumente fuer selectModal():
+ * Einzeltermin, alles ab hier oder ganze Serie. Der Editor stellt sie ueber
+ * sich selbst (askOverModal), die Karte direkt.
  */
-function mealDeleteScopeChoice() {
-  return selectModal(t('meals.deleteRecurringTitle'), [
+function mealDeleteScopeQuestion() {
+  return [t('meals.deleteRecurringTitle'), [
     { value: 'single', label: t('meals.deleteScopeSingle') },
     { value: 'future', label: t('meals.deleteScopeFuture') },
     { value: 'series', label: t('meals.deleteScopeSeries') },
-  ]);
+  ]];
 }
 
 /**
@@ -1995,7 +1996,7 @@ async function deleteMeal(mealId, { scope } = {}) {
   // nur nach vorn enden soll - ohne ihn blieb nur, jedes künftige Vorkommen
   // einzeln zu löschen, während die nächste Woche schon wieder eines erzeugte (#619).
   if (meal?.recurrence_template_id) {
-    const choice = scope ?? await mealDeleteScopeChoice();
+    const choice = scope ?? await selectModal(...mealDeleteScopeQuestion());
     if (choice === null) return;
 
     if (choice === 'series' || choice === 'future') {
