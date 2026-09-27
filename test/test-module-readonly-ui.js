@@ -2678,8 +2678,19 @@ async function vitalwertSpeichern(row, bedienen = () => {}) {
   const optionen = withAccess({ health: 'write' }, () => modalOptionen(() => health.openVitalModal({ row })));
   assert.ok(optionen, 'mit Schreibrecht geht der Dialog auf');
   const html = optionen.content;
-  const wert = /id="vital-value"[^>]*value="([^"]*)"/.exec(html);
-  assert.ok(wert, 'das Wertefeld traegt den Bestand');
+  // Die Wertefelder so, wie das Markup der Metrik sie stellt: der einfache
+  // Wert, das Paar (Blutdruck) oder die Dauer - jedes mit seinem Bestand.
+  const wertefelder = {};
+  for (const id of ['vital-value', 'vital-sys', 'vital-dia', 'vital-pulse', 'vital-hours', 'vital-minutes']) {
+    const feld = new RegExp(`<input[^>]*id="${id}"[^>]*>`).exec(html);
+    if (feld) wertefelder[`#${id}`] = editorElement({ value: /value="([^"]*)"/.exec(feld[0])?.[1] ?? '' });
+  }
+  assert.ok(Object.keys(wertefelder).length, 'das Markup traegt Wertefelder mit Bestand');
+  // Die Einheit, wie sie im Markup steht: Auswahl, verstecktes Feld - oder
+  // gar keins (das Paar). Ein erfundenes Feld wuerde den Fehler verdecken.
+  const versteckt = /<input type="hidden" id="vital-unit" value="([^"]*)">/.exec(html);
+  const einheit = /<select[^>]*id="vital-unit"/.test(html) ? editorAuswahl(html, 'vital-unit')
+    : versteckt ? editorElement({ value: versteckt[1] }) : null;
   const form = editorElement();
   const el = {
     '#vital-form': form,
@@ -2688,8 +2699,8 @@ async function vitalwertSpeichern(row, bedienen = () => {}) {
     '#vital-visibility': editorElement({ value: row.visibility || 'private' }),
     '#vital-measured-at': editorElement({ value: row.measured_at }),
     '#vital-note': editorElement({ value: row.note ?? '' }),
-    '#vital-value': editorElement({ value: wert[1] }),
-    '#vital-unit': editorAuswahl(html, 'vital-unit'),
+    ...wertefelder,
+    '#vital-unit': einheit,
     '[type="submit"]': editorElement(),
   };
   optionen.onSave({ querySelector: (sel) => el[sel] ?? null });
@@ -2731,6 +2742,27 @@ test('Codex an #1485: eine Einheit ausserhalb der Liste bleibt beim Bearbeiten s
   // Eine gelistete Einheit bleibt, wie sie war, ohne verwaiste Zusatzoption.
   const kg = await vitalwertSpeichern({ ...stone, unit: 'kg' });
   assert.deepEqual(auswahlAusMarkup(kg.html, 'vital-unit').optionen.map((o) => o.value), ['kg', 'lb']);
+});
+
+test('Codex an #1485: ein Blutdruck in kPa bleibt beim Speichern einer Notiz kPa', async () => {
+  // Das Paar hat kein Einheitenfeld; collectVitalBody() setzt fest mmHg. Ohne
+  // Feld gab es nichts zu vergleichen, und ein per API in kPa erfasster Wert
+  // wurde beim Speichern einer Notiz still zu mmHg umbeschriftet.
+  const kpa = { id: 71, type: 'bp', value_num: 16, value_num2: 10.5, value_num3: 62, unit: 'kPa', measured_at: '2026-06-15T08:30', visibility: 'private', note: '' };
+  const { gesendet, html } = await vitalwertSpeichern(kpa, (el) => { el['#vital-note'].value = 'nach dem Laufen'; });
+  assert.doesNotMatch(html, /id="vital-unit"/, 'Voraussetzung: das Paar-Markup traegt kein Einheitenfeld');
+  assert.equal(gesendet.length, 1, 'genau ein Schreibaufruf');
+  assert.equal(gesendet[0].method, 'patch');
+  assert.equal(gesendet[0].body.note, 'nach dem Laufen');
+  assert.equal(gesendet[0].body.value_num, 16, 'der Wert selbst geht mit');
+  assert.ok(!('unit' in gesendet[0].body),
+    `ohne Einheitenfeld geht keine Einheit mit (aus kPa wurde mmHg): ${JSON.stringify(gesendet[0].body)}`);
+
+  // Auch die Dauer mit ihrem versteckten Feld schreibt die Einheit nie um.
+  const schlaf = { id: 72, type: 'sleep', value_num: 7.5, unit: 'min', measured_at: '2026-06-15T08:30', visibility: 'private', note: '' };
+  const dauer = await vitalwertSpeichern(schlaf, (el) => { el['#vital-note'].value = 'unruhig'; });
+  assert.ok(!('unit' in dauer.gesendet[0].body),
+    `ein verstecktes Einheitenfeld schreibt keine Einheit um: ${JSON.stringify(dauer.gesendet[0].body)}`);
 });
 
 test('R8 H9: ein Laborwert laesst sich korrigieren, nicht nur loeschen', () => {

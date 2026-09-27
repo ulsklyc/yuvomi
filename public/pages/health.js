@@ -1264,7 +1264,7 @@ function valueFieldsMarkup(type, row = null) {
    * Einheit steht deshalb als eigene Option da und ist gewaehlt. */
   const orphanUnit = row?.unit && !metric.units.includes(row.unit) ? row.unit : null;
   const unitOptions = orphanUnit ? [orphanUnit, ...metric.units] : metric.units;
-  const unitField = metric.units.length > 1
+  const unitField = vitalUnitEditable(metric)
     ? `
       <div class="form-field">
         <label class="label" for="vital-unit">${esc(t('health.vitals.field.unit'))}</label>
@@ -1377,7 +1377,13 @@ function openVitalModal(opts = {}) {
       // Die Einheit geht beim Bearbeiten nur mit, wenn jemand sie umstellt:
       // sonst koennte ein Feld, das den Bestand nicht abbildet (ein verstecktes
       // Einheitenfeld traegt immer die Standardeinheit), ihn still ueberschreiben.
-      const unitBefore = panel.querySelector('#vital-unit')?.value;
+      /* EIN BLUTDRUCK IN kPa WURDE BEIM SPEICHERN EINER NOTIZ ZU mmHg (Codex an
+       * #1485): das Paar-Markup hat gar kein Einheitenfeld, `unitBefore` war
+       * undefined, und collectVitalBody() setzt fuer Paare fest mmHg - der
+       * Vergleich griff nie. Umstellen kann die Einheit nur eine Auswahl; ohne
+       * sie geht beim Bearbeiten nie eine Einheit mit. */
+      const unitEditable = isEdit && vitalUnitEditable(vitalMetric(row.type));
+      const unitBefore = unitEditable ? panel.querySelector('#vital-unit')?.value : undefined;
 
       panel.querySelector('[data-action="cancel"]')?.addEventListener('click', () => closeModal({ force: true }));
       panel.querySelector('[data-action="vital-delete"]')?.addEventListener('click', () => {
@@ -1408,7 +1414,7 @@ function openVitalModal(opts = {}) {
             // PATCH liest nur genannte Felder. Ein geleertes Puls- oder
             // Notizfeld muss deshalb als null mitgehen, sonst bliebe der
             // alte Wert stehen, obwohl der Dialog ihn nicht mehr zeigt.
-            await api.patch(`/health/vitals/${row.id}`, vitalPatchBody(body, { unitBefore }));
+            await api.patch(`/health/vitals/${row.id}`, vitalPatchBody(body, { unitEditable, unitBefore }));
           } else {
             await api.post('/health/vitals', { ...body, ...ownerField(vitals.personId, vitals.meId) });
           }
@@ -1429,18 +1435,29 @@ function openVitalModal(opts = {}) {
 
 /**
  * Der PATCH-Body einer bearbeiteten Messung: nicht erfasste Kanaele als null.
- * Eine unveraenderte Einheit (`unitBefore`) bleibt weg - PATCH laesst sie dann
- * stehen, wie sie gespeichert ist.
+ * Die Einheit geht nur mit, wenn der Dialog sie waehlen laesst
+ * (`unitEditable`) und sie sich gegen `unitBefore` geaendert hat - sonst
+ * bleibt sie weg, und PATCH laesst sie stehen, wie sie gespeichert ist.
  */
-function vitalPatchBody(body, { unitBefore } = {}) {
+function vitalPatchBody(body, { unitEditable = false, unitBefore } = {}) {
   const out = {
     ...body,
     value_num2: body.value_num2 ?? null,
     value_num3: body.value_num3 ?? null,
     note: body.note ?? null,
   };
-  if (unitBefore !== undefined && (out.unit ?? '') === unitBefore) delete out.unit;
+  if (!unitEditable || (out.unit ?? '') === (unitBefore ?? '')) delete out.unit;
   return out;
+}
+
+/**
+ * Laesst der Dialog die Einheit dieser Metrik waehlen? Nur der einfache Wert
+ * mit mehr als einer Einheit traegt eine Auswahl; Dauer, Skala und Paar haben
+ * kein sichtbares Einheitenfeld.
+ */
+function vitalUnitEditable(metric) {
+  if (!metric || ['duration', 'scale', 'pair'].includes(metric.format)) return false;
+  return (metric.units?.length ?? 0) > 1;
 }
 
 function numOrNull(input) {
