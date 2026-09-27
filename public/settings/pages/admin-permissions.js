@@ -104,7 +104,20 @@ const state = {
   draft: { modules: {}, widgets: {}, capabilities: {} },
   inherited: { modules: {}, widgets: {}, capabilities: {} },
   dirty: false,
+  loadedFor: null,     // subjectKey(), dessen Rechte in draft/inherited stehen
 };
+
+/* EINE VERALTETE ANTWORT SCHRIEB IN DAS NEUE SUBJEKT (Codex an #1485, P1).
+ * Mitglieder -> Rollen startet das Laden der ersten Rolle, die Mitglieds-Chips
+ * standen bis zur Antwort noch klickbar da. Kam die Rollen-Antwort NACH der
+ * eines inzwischen gewaehlten Mitglieds, landete sie in dessen Entwurf, und der
+ * naechste Tipp auf Speichern schrieb sie ueber seine Overrides. Jede Ladung
+ * traegt deshalb eine Generation, nur die juengste darf schreiben; und
+ * Speichern/Bearbeiten gelten nur fuer einen Entwurf, der zum aktuellen
+ * Subjekt geladen ist. */
+let loadGeneration = 0;
+const subjectKey = () => `${state.mode}:${state.subjectId}`;
+const draftIsCurrent = () => state.loadedFor === subjectKey();
 
 const moduleLabel = (key) => {
   const m = state.catalog?.modules.find((x) => x.key === key);
@@ -540,9 +553,11 @@ export function initialSubject(mode, catalog) {
 }
 
 async function selectSubject(container, mode, id) {
+  const generation = ++loadGeneration;
   state.mode = mode;
   state.subjectId = id;
   state.dirty = false;
+  state.loadedFor = null;
   state.draft = { modules: {}, widgets: {}, capabilities: {} };
   state.inherited = { modules: {}, widgets: {}, capabilities: {} };
 
@@ -550,6 +565,7 @@ async function selectSubject(container, mode, id) {
     try {
       if (mode === 'role') {
         const res = await api.get(`/permissions/role/${encodeURIComponent(id)}`);
+        if (generation !== loadGeneration) return;
         state.draft = { modules: { ...res.data.modules }, widgets: { ...res.data.widgets }, capabilities: { ...res.data.capabilities } };
       } else {
         const member = state.catalog.members.find((m) => String(m.id) === String(id));
@@ -559,12 +575,18 @@ async function selectSubject(container, mode, id) {
             ? api.get(`/permissions/role/${encodeURIComponent(member.family_role)}`)
             : Promise.resolve({ data: { modules: {}, widgets: {}, capabilities: {} } }),
         ]);
+        if (generation !== loadGeneration) return;
         state.draft = { modules: { ...ov.data.modules }, widgets: { ...ov.data.widgets }, capabilities: { ...ov.data.capabilities } };
         state.inherited = { modules: { ...roleRes.data.modules }, widgets: { ...roleRes.data.widgets }, capabilities: { ...roleRes.data.capabilities } };
       }
+      state.loadedFor = subjectKey();
+      state.dirty = false;
     } catch (err) {
+      if (generation !== loadGeneration) return;
       window.yuvomi?.showToast(err.message || t('common.errorGeneric'), 'danger');
     }
+  } else {
+    state.loadedFor = subjectKey();
   }
 
   renderSubjectSelector(container);
@@ -572,6 +594,9 @@ async function selectSubject(container, mode, id) {
 }
 
 async function save(container) {
+  if (!draftIsCurrent()) return;
+  const generation = loadGeneration;
+  const title = subjectTitle();
   const payload = { modules: {}, widgets: {}, capabilities: {} };
   for (const [k, v] of Object.entries(state.draft.modules)) if (v && v !== 'inherit') payload.modules[k] = v;
   for (const [k, v] of Object.entries(state.draft.widgets)) if (v && v !== 'inherit') payload.widgets[k] = v;
@@ -588,13 +613,17 @@ async function save(container) {
     // Neue Rechte koennen neue Mitleser eines Moduls schaffen: `othersCanRead`
     // neu holen, damit die Schutzfelder in derselben Sitzung stimmen.
     await auth.me().catch(() => {});
-    state.draft = { modules: { ...res.data.modules }, widgets: { ...res.data.widgets }, capabilities: { ...res.data.capabilities } };
-    state.dirty = false;
-    renderMatrix(container);
-    window.yuvomi?.showToast(t('settings.permSaved', { name: subjectTitle() }), 'success');
+    // Inzwischen ein anderes Subjekt gewaehlt: die Antwort gehoert nicht in
+    // dessen Entwurf.
+    if (generation === loadGeneration) {
+      state.draft = { modules: { ...res.data.modules }, widgets: { ...res.data.widgets }, capabilities: { ...res.data.capabilities } };
+      state.dirty = false;
+      renderMatrix(container);
+    }
+    window.yuvomi?.showToast(t('settings.permSaved', { name: title }), 'success');
   } catch (err) {
     window.yuvomi?.showToast(err.message || t('common.errorGeneric'), 'danger');
-    if (saveBtn) saveBtn.disabled = false;
+    if (saveBtn && generation === loadGeneration) saveBtn.disabled = false;
   }
 }
 
@@ -663,7 +692,7 @@ function applySegment(container, opt) {
   // `<modulId>:<widgetId>`. Ein destrukturierendes split(':') behielt davon nur
   // `ext` bzw. die Modul-Id, und der Server wies das zu Recht ab.
   const { type, key } = parsePermissionGroup(opt.dataset.group);
-  if (!key) return;
+  if (!key || !draftIsCurrent()) return;
   const value = opt.dataset.value;
   if (type === 'module') state.draft.modules[key] = value;
   else if (type === 'widget') state.draft.widgets[key] = value;
@@ -688,7 +717,7 @@ async function resetSubject(container) {
     confirmLabel: t('settings.permResetSubject'),
     detail: t('settings.permResetConfirmDetail'),
   });
-  if (!ok) return;
+  if (!ok || !draftIsCurrent()) return;
   state.draft = { modules: {}, widgets: {}, capabilities: {} };
   state.dirty = true;
   renderMatrix(container);

@@ -108,3 +108,150 @@ test('die Legende nennt jedes Segment-Icon mit seinem Wort, im Mitglieds-Modus a
   assert.equal(initialSubject('role', CATALOG), 'parent');
   assert.equal(initialSubject('user', CATALOG), null, 'Mitglieder bleiben ohne Vorwahl');
 });
+
+// ── Codex an #1485 (P1): eine veraltete Antwort schreibt nicht in das neue Subjekt ──
+
+/**
+ * Wie `fakeSheet()`, aber die Klick-Handler werden mitgeschrieben, damit der
+ * Test die echte Bedienfolge faehrt: Umschaltung, Mitglieds-Chip, Speichern.
+ */
+function wiredSheet() {
+  const sheet = fakeSheet();
+  const listeners = new Map();
+  const baseQuery = sheet.querySelector;
+  sheet.querySelector = (sel) => {
+    const found = baseQuery(sel);
+    if (found && sel.startsWith('#')) {
+      found.addEventListener = (type, fn) => { if (type === 'click') listeners.set(sel, fn); };
+    }
+    return found;
+  };
+  const modeButtons = ['role', 'user'].map((mode) => ({
+    dataset: { mode },
+    classList: { toggle() {} },
+    setAttribute() {},
+    addEventListener(type, fn) { if (type === 'click') this.onclick = fn; },
+  }));
+  sheet.querySelectorAll = (sel) => (sel === '[data-mode]' ? modeButtons : []);
+  const target = (matches) => ({ closest: (sel) => matches[sel] ?? null });
+  return {
+    sheet,
+    clickMode: (mode) => modeButtons.find((b) => b.dataset.mode === mode).onclick(),
+    clickUser: (id) => listeners.get('#perm-subjects')({ target: target({ '.perm-chip': { dataset: { user: String(id) } } }) }),
+    clickSave: () => listeners.get('#perm-matrix')({ target: target({ '#perm-save': {} }) }),
+  };
+}
+
+test('eine spaet eintreffende Rollen-Antwort landet nicht in den Overrides des inzwischen gewaehlten Mitglieds', async () => {
+  const { render } = await import('../public/settings/pages/admin-permissions.js');
+  const hadWindow = 'window' in globalThis;
+  const prevWindow = globalThis.window;
+  globalThis.window = {};
+  const catalog = {
+    ...CATALOG,
+    members: [{ id: 7, display_name: 'Lina', role: 'member', family_role: 'child', access_scope: 'full' }],
+  };
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  let releaseRole = null;
+  let slowRole = false;
+  const puts = [];
+  globalThis.__apiStub = {
+    get: async (url) => {
+      if (url === '/permissions/catalog') return { data: catalog };
+      if (url === '/permissions/user/7') return { data: { modules: { tasks: 'read' }, widgets: {}, capabilities: {} } };
+      if (url === '/permissions/role/parent' && slowRole) {
+        return new Promise((resolve) => {
+          releaseRole = () => resolve({ data: { modules: { tasks: 'none' }, widgets: { secret: 'none' }, capabilities: {} } });
+        });
+      }
+      return { data: { modules: {}, widgets: {}, capabilities: {} } };
+    },
+    put: async (url, payload) => {
+      puts.push({ url, payload });
+      return { data: payload };
+    },
+  };
+  try {
+    const ui = wiredSheet();
+    await render(ui.sheet, { user: { role: 'admin' } });
+    await ui.clickMode('user');
+    await tick();
+    // Mitglieder -> Rollen: das Laden der ersten Rolle haengt ...
+    slowRole = true;
+    ui.clickMode('role');
+    await tick();
+    assert.ok(releaseRole, 'die Rolle wird geladen');
+    // ... die alten Mitglieds-Chips stehen noch, eines wird gewaehlt und laedt schnell.
+    ui.clickUser(7);
+    await tick();
+    await tick();
+    // Die Rollen-Antwort kommt zuletzt.
+    releaseRole();
+    await tick();
+    await tick();
+    await ui.clickSave();
+    await tick();
+    for (const put of puts) {
+      if (put.url === '/permissions/user/7') {
+        assert.deepEqual(put.payload, { modules: { tasks: 'read' }, widgets: {}, capabilities: {} },
+          'gespeichert werden die Overrides des Mitglieds, nicht die Rechte der Rolle');
+      }
+    }
+    assert.deepEqual(puts.map((p) => p.url), ['/permissions/user/7'], 'es speichert das aktuelle Subjekt');
+  } finally {
+    delete globalThis.__apiStub;
+    if (hadWindow) globalThis.window = prevWindow;
+    else delete globalThis.window;
+  }
+});
+
+test('solange die Rechte des Subjekts laden, speichert der Knopf nichts', async () => {
+  const { render } = await import('../public/settings/pages/admin-permissions.js');
+  const hadWindow = 'window' in globalThis;
+  const prevWindow = globalThis.window;
+  globalThis.window = {};
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  let releaseRole = null;
+  let slowRole = false;
+  const puts = [];
+  globalThis.__apiStub = {
+    get: async (url) => {
+      if (url === '/permissions/catalog') return { data: CATALOG };
+      if (url === '/permissions/role/parent' && slowRole) {
+        return new Promise((resolve) => {
+          releaseRole = () => resolve({ data: { modules: { tasks: 'read' }, widgets: {}, capabilities: {} } });
+        });
+      }
+      return { data: { modules: {}, widgets: {}, capabilities: {} } };
+    },
+    put: async (url, payload) => {
+      puts.push({ url, payload });
+      return { data: payload };
+    },
+  };
+  try {
+    const ui = wiredSheet();
+    await render(ui.sheet, { user: { role: 'admin' } });
+    await ui.clickMode('user');
+    await tick();
+    slowRole = true;
+    ui.clickMode('role');
+    await tick();
+    assert.ok(releaseRole, 'die Rolle wird geladen');
+    // Der alte Speichern-Knopf ist noch da: ein Tipp darf die Rolle nicht mit
+    // dem leeren Platzhalter-Entwurf ueberschreiben.
+    await ui.clickSave();
+    await tick();
+    assert.deepEqual(puts, [], 'kein PUT mit einem Entwurf, der nicht geladen ist');
+    releaseRole();
+    await tick();
+    await tick();
+    await ui.clickSave();
+    await tick();
+    assert.deepEqual(puts, [{ url: '/permissions/role/parent', payload: { modules: { tasks: 'read' }, widgets: {}, capabilities: {} } }]);
+  } finally {
+    delete globalThis.__apiStub;
+    if (hadWindow) globalThis.window = prevWindow;
+    else delete globalThis.window;
+  }
+});
