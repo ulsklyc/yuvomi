@@ -1817,7 +1817,13 @@ test('switching the statistics range outdates any request in flight, matching th
   // right above the code (added alongside the fix) uses the words
   // "++overviewRequestId" and "error: false" in prose, which would otherwise
   // satisfy the regexes below even if the real code regressed.
-  const rangeCode = rangeBranch.replace(/^\s*\/\/.*$/gm, '');
+  // R9 M11: the segment and the narrow <select> share ONE setter, so the
+  // guarantees are checked on it - and both entry points must go through it.
+  assert.match(rangeBranch.replace(/^\s*\/\/.*$/gm, ''), /setStatisticsRange\(button\.dataset\.range\)/, 'the segment must switch through setStatisticsRange()');
+  const changeBranch = schedulePage.slice(schedulePage.indexOf("event.target.matches('.schedule-stat-range__select')"));
+  assert.match(changeBranch.slice(0, 300), /setStatisticsRange\(event\.target\.value\)/, 'the narrow select must switch through the same setter');
+  const setter = schedulePage.slice(schedulePage.indexOf('function setStatisticsRange('), schedulePage.indexOf('function renderStatistics('));
+  const rangeCode = setter.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*\*[\s\S]*?\*\//g, '');
   assert.match(rangeCode, /\+\+statisticsRequestId/, 'the range switch must bump the request generation counter, exactly like overview-week bumps ++overviewRequestId');
   assert.match(rangeCode, /error:\s*false/, 'a stale error state from before the switch must not survive it');
 
@@ -2306,4 +2312,30 @@ test('Compare tab on phones: the section track and the week nav may shrink below
   const nav = bodyOf('.schedule-overview__week-nav');
   assert.match(nav, /flex-wrap:\s*wrap/, 'toggle, arrows and the range label must wrap instead of running off screen');
   assert.match(nav, /min-width:\s*0/, 'the nav must be allowed to shrink inside the wrapping toolbar');
+});
+
+// R9 M11 (Re-Critique 2026-09-27, A2 P2): the statistics range scrolled
+// sideways below 400px (scrollWidth 387 in a 324px field, "Eigener Zeitraum"
+// ended at x=418). Below the width the segment needs, the same three choices
+// stand as a native <select>; the field itself is the container, not the window.
+test('statistics range: a narrow field shows a select with the same choices instead of a scrolling segment (R9 M11)', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const scheduleCss = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(scheduleCss)];
+  const sel = (r, s) => r.selector.split(',').some((x) => x.trim() === s);
+
+  assert.ok(!rules.some((r) => sel(r, '.schedule-stat-range__choices') && /overflow-x\s*:\s*(auto|scroll)/.test(r.body)),
+    'the range segment must not scroll sideways - a hidden third choice is found only by swiping');
+  assert.ok(rules.some((r) => sel(r, '.schedule-stat-range') && !r.at.length && /container\s*:\s*schedule-stat-range\s*\/\s*inline-size/.test(r.body)),
+    'the range field must be the query container');
+  const narrow = (r) => r.at.some((a) => /@container\s+schedule-stat-range\s*\(max-width:\s*399px\)/.test(a));
+  assert.ok(rules.some((r) => narrow(r) && sel(r, '.schedule-stat-range__choices') && /display\s*:\s*none/.test(r.body)), 'narrow: the segment goes');
+  assert.ok(rules.some((r) => narrow(r) && sel(r, '.schedule-stat-range__select') && /display\s*:\s*block/.test(r.body)), 'narrow: the select comes');
+  assert.ok(rules.some((r) => !r.at.length && sel(r, '.schedule-stat-range__select') && /display\s*:\s*none/.test(r.body)), 'wide: the select stays hidden');
+
+  // Both forms render from ONE list and switch through ONE setter.
+  const render = schedulePage.slice(schedulePage.indexOf('function renderStatistics('), schedulePage.indexOf('function emptyPatternState('));
+  assert.match(render, /class="input schedule-stat-range__select"[^>]*aria-label="' \+ esc\(t\('schedule\.statisticsRange'\)\)/);
+  assert.equal((render.match(/STATISTICS_RANGES\.map\(/g) ?? []).length, 2, 'segment and select must both be built from STATISTICS_RANGES');
 });

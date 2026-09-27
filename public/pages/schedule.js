@@ -43,6 +43,9 @@ let initialViewDecided = false;
 // Restlichkeit falsch beeinflusst werden.
 let dirtyPatternIds = new Set();
 let state = { users: [], types: [], customFields: [], patterns: [], overrides: [], extras: [], entries: [], warnings: [], reminderOffsetMinutes: null, weeklyHours: null, overtimeEnabled: true, hiddenTemplates: [] };
+// Die drei Berichtszeitraeume der Auswertung - EINE Liste fuer Segment und
+// Auswahlfeld (R9 M11), damit beide nie verschiedene Wahlen anbieten.
+const STATISTICS_RANGES = [['current', 'schedule.currentMonth'], ['months', 'schedule.selectedMonths'], ['custom', 'schedule.customRange']];
 let statistics = { userId: null, range: 'current', monthFrom: '', monthTo: '', from: '', to: '', entries: [], bounds: null, loading: false, error: false };
 // Generationszaehler gegen ein Wettrennen zweier ueberlappender Ladevorgaenge
 // (schnelles Tab-Wechseln/Woche-Vor-Zurueck/erneutes Absenden des Filters):
@@ -1198,6 +1201,25 @@ function extraRows() {
   }).join('') + '</div>';
 }
 
+/**
+ * Wechselt den Berichtszeitraum der Auswertung - aus dem Segment wie aus dem
+ * schmalen Auswahlfeld (R9 M11).
+ *
+ * Review zu #1099: ++statisticsRequestId hier, aus demselben Grund wie beim
+ * Wochenwechsel in Overview (++overviewRequestId) - ohne den Zaehler
+ * weiterzudrehen, besteht eine noch laufende Anfrage von VOR dem Range-Wechsel
+ * ihren statisticsRequest === statisticsRequestId-Vergleich weiterhin und
+ * zeichnet die Zahlen des ALTEN Bereichs unter der neu gewaehlten Spanne.
+ * `error: false` daneben, sonst ueberlebt ein Fehlerzustand vom vorigen
+ * Bereich den Wechsel.
+ */
+function setStatisticsRange(range) {
+  if (!STATISTICS_RANGES.some(([value]) => value === range)) return;
+  statistics = { ...statistics, range, entries: [], bounds: null, loading: false, error: false };
+  ++statisticsRequestId;
+  renderPage();
+}
+
 function renderStatistics() {
   const bounds = statistics.bounds || statisticBounds();
   const summary = statisticsSummary();
@@ -1261,8 +1283,17 @@ function renderStatistics() {
     // Zusammenfassung fuer fremde Konten, sie sperrt keine Rohdaten.
     + formField(t('schedule.owner'), '<select class="input" required name="user_id">' + userOptions(canManageOthers ? selectedUser : currentUserId) + '</select>')
     + '<div class="form-field schedule-stat-range"><span class="label">' + esc(t('schedule.statisticsRange')) + '</span><div class="segmented schedule-stat-range__choices" role="group" aria-label="' + esc(t('schedule.statisticsRange')) + '">'
-    + [['current', 'schedule.currentMonth'], ['months', 'schedule.selectedMonths'], ['custom', 'schedule.customRange']].map(([value, label]) => '<button type="button" class="segmented__item' + (range === value ? ' is-active' : '') + '" data-action="statistics-range" data-range="' + value + '" aria-pressed="' + (range === value ? 'true' : 'false') + '">' + esc(t(label)) + '</button>').join('')
-    + '</div></div>' + (controls ? '<div class="schedule-stat-dates">' + controls + '</div>' : '')
+    + STATISTICS_RANGES.map(([value, label]) => '<button type="button" class="segmented__item' + (range === value ? ' is-active' : '') + '" data-action="statistics-range" data-range="' + value + '" aria-pressed="' + (range === value ? 'true' : 'false') + '">' + esc(t(label)) + '</button>').join('')
+    + '</div>'
+    // R9 M11: dieselbe Wahl als Auswahlfeld fuer ein schmales Feld. Drei
+    // Segmente brauchen gemessen 387px; bei 390px stand das Feld auf 324px und
+    // scrollte seitlich ("Eigener Zeitraum" endete bei x=418). Welche der beiden
+    // Formen sichtbar ist, entscheidet die Breite des Felds (schedule.css,
+    // Container `schedule-stat-range`), nicht das Fenster - die unsichtbare ist
+    // `display: none` und damit auch fuer Screenreader weg.
+    + '<select class="input schedule-stat-range__select" name="statistics_range" aria-label="' + esc(t('schedule.statisticsRange')) + '">'
+    + STATISTICS_RANGES.map(([value, label]) => '<option value="' + value + '"' + (range === value ? ' selected' : '') + '>' + esc(t(label)) + '</option>').join('')
+    + '</select></div>' + (controls ? '<div class="schedule-stat-dates">' + controls + '</div>' : '')
     + '<div class="schedule-stat-filter-actions"><button class="btn btn--primary">' + esc(t('schedule.applyStatistics')) + '</button>'
     + '<button type="button" class="btn btn--secondary" data-action="print-statistics"><i data-lucide="printer" aria-hidden="true"></i>' + esc(t('schedule.print')) + '</button></div></form>'
     + results + '</section>';
@@ -1852,6 +1883,9 @@ function renderShell() {
       const hoursInput = root.querySelector('#schedule-weekly-hours');
       if (hoursInput) hoursInput.disabled = !event.target.checked;
       savePreference({ overtimeEnabled: event.target.checked });
+    } else if (event.target.matches('.schedule-stat-range__select')) {
+      // Das schmale Gegenstueck zum Segment (R9 M11) - derselbe Wechsel.
+      setStatisticsRange(event.target.value);
     } else if (event.target.closest('[data-ms-input="overview-people"]')) {
       // Auswahl ist rein clientseitig - kein Fetch, nur eine Neuzeichnung
       // (siehe Kommentar an overview weiter oben).
@@ -2689,16 +2723,8 @@ async function action(event) {
       return;
     }
     if (button.dataset.action === 'statistics-range') {
-      // Review zu #1099: ++statisticsRequestId hier, aus demselben Grund wie
-      // beim Wochenwechsel in Overview (++overviewRequestId) - ohne den
-      // Zaehler weiterzudrehen, besteht eine noch laufende Anfrage von VOR
-      // dem Range-Wechsel ihren statisticsRequest === statisticsRequestId-
-      // Vergleich weiterhin und zeichnet die Zahlen des ALTEN Bereichs unter
-      // der neu gewaehlten Spanne. `error: false` daneben, sonst ueberlebt ein
-      // Fehlerzustand vom vorigen Bereich den Wechsel.
-      statistics = { ...statistics, range: button.dataset.range, entries: [], bounds: null, loading: false, error: false };
-      ++statisticsRequestId;
-      renderPage();
+      // Zaehler und Zuruecksetzen stehen in setStatisticsRange() (Review zu #1099).
+      setStatisticsRange(button.dataset.range);
       return;
     }
     // Wiederholen-CTA des Fehlerzustands (renderStatistics()/renderOverview()) -

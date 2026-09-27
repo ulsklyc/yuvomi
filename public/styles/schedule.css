@@ -487,15 +487,46 @@
   gap: var(--space-2);
 }
 
+/* DER ZEITRAUM WIRD SCHMAL ZUR AUSWAHL, NICHT ZUM SCROLLER (R9 M11).
+ *
+ * Hier stand `overflow-x: auto`: bei 390px war das Feld 324px breit, die drei
+ * Segmente brauchten 387px, und "Eigener Zeitraum" endete bei x=418 hinter
+ * dem Rand - eine Wahl, die man erst durch Wischen findet (A2 P2). Das Segment
+ * umbrechen zu lassen hiesse zwei Zeilen fuer drei Worte. Unter der Breite,
+ * die es braucht, steht deshalb das native Auswahlfeld mit denselben drei
+ * Eintraegen (schedule.js, STATISTICS_RANGES).
+ *
+ * Der Container ist das Feld selbst, nicht das Fenster: ob drei Labels
+ * passen, haengt an der Breite der Karte (und der Sprache), und dieselbe
+ * Karte steht am Desktop in einer Spalte. Die Schwelle ist die gemessene
+ * Segmentbreite in Deutsch plus Polster. */
+.schedule-stat-range {
+  container: schedule-stat-range / inline-size;
+}
+
 .schedule-stat-range__choices {
   display: flex;
   inline-size: 100%;
   max-inline-size: 100%;
-  overflow-x: auto;
 }
 
 .schedule-stat-range__choices .segmented__item {
   flex: 1 0 auto;
+}
+
+.schedule-stat-range__select {
+  display: none;
+}
+
+@container schedule-stat-range (max-width: 399px) {
+  .schedule-stat-range__choices {
+    display: none;
+  }
+
+  .schedule-stat-range__select {
+    display: block;
+    inline-size: 100%;
+  }
 }
 
 .schedule-stat-period,
