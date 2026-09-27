@@ -57,15 +57,10 @@
 /* --------------------------------------------------------
  * Header / Toolbar
  * -------------------------------------------------------- */
-/* Gerüst (Shell + Titel) jetzt geteilt via .page-toolbar in layout.css.
- * margin-inline-start:auto drängt die Suche ans logische Zeilenende (ersetzt das frühere
- * justify-content:space-between des bespoke Toolbars). */
-/* Layout only — control visual lives in page-search.css (shared). */
-.notes-toolbar__search {
-  flex: 1 1 0;
-  max-width: 280px;
-  margin-inline-start: auto;
-}
+/* Gerüst (Shell + Titel + Aktions-Slot) geteilt via .page-toolbar in
+ * layout.css. Die Suche steht im Center-Slot hinter dem Titel und bekommt
+ * Breite und Stelle aus page-search.css (Re-Critique 2026-09-27, D4) - hier
+ * stand eine eigene 280px-Breite mit Auto-Rand, die sie ans Zeilenende schob. */
 
 .notes-toolbar .page-toolbar__title {
   flex: 0 0 auto;
@@ -269,13 +264,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0;
-  /* Unsichtbar heisst auch unklickbar: ohne pointer-events bleibt hier ein
-   * volles Trefferziel stehen, das niemand sieht (Guard
-   * `verborgene Reveal-Aktionen sind nicht klickbar` in test-frontend-audit.js). */
-  pointer-events: none;
-  transition: opacity var(--transition-fast), background-color var(--transition-fast);
-  color: inherit;
+  /* DAUERHAFT SICHTBAR, RUHIG (Re-Critique 2026-09-27, D7; ignore.md): die
+   * Nadel erschien vorher erst beim Ueberfahren der Karte - am Tablet und am
+   * Trackpad gibt es dieses Ueberfahren nicht verlaesslich. Ohne Flaeche und
+   * in der Tertiaerfarbe steht sie still da; angepinnt traegt sie Flaeche und
+   * volle Tinte (Regel darunter), das ist der Zustand. */
+  background: transparent;
+  color: var(--color-text-tertiary);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .note-card__pin::before {
@@ -285,21 +281,15 @@
 }
 
 .note-card--pinned .note-card__pin {
-  opacity: 1;
   pointer-events: auto;
   background: var(--note-action-bg);
-}
-
-.note-card:hover .note-card__pin {
-  opacity: 1;
-  pointer-events: auto;
+  color: inherit;
 }
 
 .note-card__pin:not(.note-card__pin--static):hover,
 .note-card__pin:not(.note-card__pin--static):focus-visible {
-  opacity: 1;
-  pointer-events: auto;
   background: var(--note-action-bg-hover);
+  color: inherit;
 }
 
 /* ZUSTANDSZEICHEN STATT KNOPF (#1265 P1, dieselbe Bauart wie
@@ -313,11 +303,10 @@
  * nur gewirkt, solange keine Farbe dazwischenkommt).
  *
  * ZWEI SELEKTOREN, WEIL DIE KASKADE ES VERLANGT. `.note-card--pinned
- * .note-card__pin` (zwei Klassen) und der @media-Block (pointer: coarse) weiter
- * unten setzen `pointer-events: auto`; eine einzelne Klasse verliert gegen die
- * eine und gegen die andere durch Quellreihenfolge. Die zweite Zeile hat
- * dieselbe Spezifitaet wie die Ueberschreibung und steht DANACH - ohne sie
- * finge das Zeichen die Klicks ab, mit denen die Karte sich oeffnet. */
+ * .note-card__pin` (zwei Klassen) setzt `pointer-events: auto`; eine einzelne
+ * Klasse verliert dagegen. Die zweite Zeile hat dieselbe Spezifitaet wie die
+ * Ueberschreibung und steht DANACH - ohne sie finge das Zeichen die Klicks ab,
+ * mit denen die Karte sich oeffnet. */
 .note-card__pin--static,
 .note-card--pinned .note-card__pin--static {
   cursor: default;
@@ -589,20 +578,18 @@
   min-width: var(--target-base);
   min-height: var(--target-base);
   border-radius: var(--radius-full);
-  background: var(--note-action-bg);
+  /* Dauerhaft sichtbar und ruhig wie die Nadel (D7): keine Flaeche, die
+   * Tertiaerfarbe der geteilten `.row-action`. Vorher erschienen Oeffnen und
+   * Loeschen erst beim Ueberfahren der Karte. */
+  background: transparent;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  color: inherit;
-  opacity: 0;
-  /* Unsichtbar heisst auch unklickbar: ohne pointer-events bleibt hier ein
-   * volles Trefferziel stehen, das niemand sieht (Guard
-   * `verborgene Reveal-Aktionen bleiben nicht klickbar`, test-frontend-audit.js). */
-  pointer-events: none;
-  transition: opacity var(--transition-fast), background-color var(--transition-fast);
+  color: var(--color-text-tertiary);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .note-card__open::before,
@@ -612,16 +599,9 @@
   inset: 0;
 }
 
-.note-card:hover .note-card__open,
-.note-card:hover .note-card__delete,
-.note-card__open:focus-visible,
-.note-card__delete:focus-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
 .note-card__open:hover {
   background: var(--note-action-bg-hover);
+  color: inherit;
 }
 
 .note-card__delete:hover {
@@ -629,14 +609,6 @@
   color: var(--color-danger-ink);
 }
 
-@media (pointer: coarse) {
-  .note-card__pin,
-  .note-card__open,
-  .note-card__delete {
-    opacity: 1;
-  pointer-events: auto;
-  }
-}
 
 
 /* --------------------------------------------------------
