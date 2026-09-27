@@ -392,6 +392,7 @@ test('M3: das Blatt traegt Zeitraum, Stepper, ein hohes Diagramm und die Messlis
     const svg = /<svg class="chart health-chart" viewBox="0 0 (\d+) (\d+)" role="img"([^>]*)>/.exec(html);
     assert.ok(svg, 'das Blatt zeichnet das Diagramm');
     assert.equal(Number(svg[2]), hoch);
+    assert.equal(hoch, health.VITAL_SHEET_CHART.H, 'chart.js zeichnet die hohe Flaeche (Wunsch g9 angewandt)');
     if (hoch === CHART.H) assert.doesNotMatch(svg[3], /aspect-ratio/);
     else assert.match(svg[3], new RegExp(`style="aspect-ratio: ${CHART.W} / ${hoch}"`));
     // Die Seite selbst behaelt das geteilte 3:1.

@@ -46,9 +46,11 @@ import { esc } from '/utils/html.js';
  */
 export const CHART = Object.freeze({ W: 600, H: 200, PAD_L: 56, PAD_R: 12, PAD_T: 14, PAD_B: 26 });
 
-/** Die vier Plotgrenzen im viewBox-Koordinatensystem. */
-export function chartScales() {
-  const { W, H, PAD_L, PAD_R, PAD_T, PAD_B } = CHART;
+/** Die vier Plotgrenzen im viewBox-Koordinatensystem.
+ *  `geo` ist eine andere Flaeche mit DENSELBEN Raendern (`{ ...CHART, H }`),
+ *  etwa das hoehere Diagramm im mobilen Vitalwerte-Blatt (health.js). */
+export function chartScales(geo = CHART) {
+  const { W, H, PAD_L, PAD_R, PAD_T, PAD_B } = geo;
   return { left: PAD_L, right: W - PAD_R, top: PAD_T, bottom: H - PAD_B };
 }
 
@@ -64,9 +66,9 @@ export function chartScales() {
  *        Nachkommastellen Pseudo-Präzision („125,9 mmHg", Audit A2-21), bei
  *        kleinen Spannen (Laborwerte 0,5-1,2) sind sie die eigentliche Auskunft.
  */
-export function chartGridMarkup(min, max, formatTick) {
-  const { W, PAD_L, PAD_R } = CHART;
-  const { top, bottom } = chartScales();
+export function chartGridMarkup(min, max, formatTick, geo = CHART) {
+  const { W, PAD_L, PAD_R } = geo;
+  const { top, bottom } = chartScales(geo);
   const out = [];
   const wholeTicks = (max - min) >= 4;
   for (let k = 0; k <= 4; k++) {
@@ -89,9 +91,9 @@ export function chartGridMarkup(min, max, formatTick) {
  *
  * @param {string[]} labels  bereits formatierte Beschriftungen
  */
-export function chartXLabelsMarkup(labels) {
+export function chartXLabelsMarkup(labels, geo = CHART) {
   if (!labels.length) return '';
-  const { H, W, PAD_L, PAD_R } = CHART;
+  const { H, W, PAD_L, PAD_R } = geo;
   const y = H - 7;
   const picks = labels.length <= 2
     ? labels.slice()
