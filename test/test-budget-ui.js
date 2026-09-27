@@ -2468,6 +2468,72 @@ test('ein neuer Eintrag hat keine vorbelegte Kategorie, und Speichern verlangt e
   assert.doesNotMatch(update, /cats\[0\]/, 'der Typwechsel faellt still auf die erste Kategorie zurueck');
 });
 
+test('die Unterkategorie steht nach der Kategoriewahl leer, ausser es gibt genau eine (R8 H4-Rest)', () => {
+  // Nach Wahl von "Essen" stand die Unterkategorie still auf ihrem ersten
+  // Eintrag - dieselbe Klasse wie die vorbelegte Kategorie (H4): wer sie nicht
+  // ansieht, bucht sie. Neu: Platzhalter, Pflicht, Pruefung am Feld. Hat die
+  // Kategorie genau eine Unterkategorie, gibt es nichts zu entscheiden - sie
+  // steht vorgewaehlt. Ohne Unterkategorie gibt es auch keine Pflicht.
+  const vorher = budgetUi.state.meta;
+  const vorherModal = globalThis.__openModal;
+  let letzte = null;
+  const meta = {
+    expenseCategories: [{ key: 'food', name: 'Essen' }, { key: 'housing', name: 'Wohnen' }, { key: 'misc', name: 'Sonstiges' }],
+    incomeCategories: [],
+    subcategories: {
+      food: [{ key: 'groceries', name: 'Lebensmittel' }, { key: 'restaurant', name: 'Restaurant' }],
+      housing: [{ key: 'rent', name: 'Miete' }],
+    },
+  };
+  const dialog = (entry) => {
+    const vorherState = { ...budgetUi.state };
+    globalThis.__openModal = (o) => { letzte = o; };
+    Object.assign(budgetUi.state, { month: '2026-06', accounts: [], members: [], budgetMode: 'shared', meta });
+    try { budgetUi.openBudgetModal({ mode: 'edit', entry }); } finally { Object.assign(budgetUi.state, vorherState); }
+    return letzte.content.match(/<select[^>]*id="bm-subcategory"[^>]*>([\s\S]*?)<\/select>/);
+  };
+  try {
+    budgetUi.state.meta = meta;
+    assert.deepEqual(budgetUi.subcategoryChoice('food', ''), { value: '', required: true, placeholder: true },
+      'zwei Unterkategorien: keine steht vorgewaehlt, die Wahl ist Pflicht');
+    assert.deepEqual(budgetUi.subcategoryChoice('housing', ''), { value: 'rent', required: false, placeholder: false },
+      'genau eine Unterkategorie: sie steht vorgewaehlt, ohne Platzhalter');
+    assert.deepEqual(budgetUi.subcategoryChoice('misc', ''), { value: '', required: false, placeholder: false },
+      'ohne Unterkategorie gibt es nichts zu verlangen');
+    assert.deepEqual(budgetUi.subcategoryChoice('food', 'restaurant'), { value: 'restaurant', required: true, placeholder: true },
+      'eine gewaehlte Unterkategorie bleibt stehen');
+    assert.equal(budgetUi.subcategoryChoice('food', 'rent').value, '', 'eine fremde Unterkategorie faellt auf den Platzhalter');
+
+    // Bearbeiten: der Bestand bleibt vorbelegt; ein Bestand ohne Unterkategorie
+    // in einer Kategorie mit mehreren zeigt den Platzhalter statt still der ersten.
+    const bestand = dialog({ id: 3, title: 'Pizza', amount: -20, category: 'food', subcategory: 'restaurant', date: '2026-06-03' });
+    assert.match(bestand[1], /<option value="restaurant" selected>/, 'beim Bearbeiten bleibt die Unterkategorie des Bestands');
+    assert.match(bestand[0], /\brequired\b/, 'bei mehreren Unterkategorien ist die Wahl Pflicht');
+    const ohne = dialog({ id: 4, title: 'REWE', amount: -40, category: 'food', subcategory: '', date: '2026-06-03' });
+    const opts = [...ohne[1].matchAll(/<option\b([^>]*)>/g)].map((m) => m[1]);
+    assert.match(opts[0] ?? '', /value="" disabled selected/, 'ohne Bestandswert steht der Platzhalter, nicht die erste Unterkategorie');
+    assert.equal(opts.filter((o) => /\bselected\b/.test(o)).length, 1);
+    const eine = dialog({ id: 5, title: 'Miete', amount: -900, category: 'housing', subcategory: '', date: '2026-06-03' });
+    assert.match(eine[1], /^<option value="rent" selected>/, 'genau eine Unterkategorie: ohne Platzhalter vorgewaehlt');
+    assert.doesNotMatch(eine[0], /\brequired\b/);
+  } finally {
+    budgetUi.state.meta = vorher;
+    if (vorherModal === undefined) delete globalThis.__openModal; else globalThis.__openModal = vorherModal;
+  }
+
+  // Die Kategoriewahl im offenen Dialog laeuft durch dieselbe Regel, und
+  // Speichern prueft die leere Pflicht-Unterkategorie vor jedem Schreibaufruf.
+  const onSave = budgetCode.slice(budgetCode.indexOf('function openBudgetModal('));
+  const body = onSave.slice(0, onSave.indexOf('\n}\n'));
+  const update = body.slice(body.indexOf('const updateSubcategoryOptions'), body.indexOf('const addCategory'));
+  assert.match(update, /subcategoryChoice\(catSelect\.value/, 'die Kategoriewahl umgeht die Regel');
+  assert.doesNotMatch(update, /subcategories\[0\]/, 'die Kategoriewahl setzt still die erste Unterkategorie');
+  const save = body.slice(body.indexOf("'#bm-save').addEventListener"));
+  const check = save.search(/reportFieldError\(panel\.querySelector\('#bm-subcategory'\), t\('budget\.subcategoryRequired'\)\)/);
+  assert.ok(check > 0, 'Speichern prueft die leere Pflicht-Unterkategorie nicht am Feld');
+  assert.ok(check < save.indexOf("api.post('/budget'"), 'die Pruefung steht erst nach dem Schreibaufruf');
+});
+
 test('der Budget-Tab steht in der Adresse, ohne neuen Verlaufseintrag (R8 H5, A5 P2-1)', () => {
   assert.equal(budgetUi.tabSearch('', 'loans'), '?tab=loans');
   assert.equal(budgetUi.tabSearch('?tab=subscriptions', 'loans'), '?tab=loans',

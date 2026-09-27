@@ -134,8 +134,23 @@ function getSubcategories(category) {
   return state.meta.subcategories?.[category] || [];
 }
 
-function defaultSubcategory(category) {
-  return getSubcategories(category)[0]?.key || '';
+/* DIE UNTERKATEGORIE WIRD GEWAEHLT, NICHT GESETZT (Re-Critique 2026-09-27,
+ * R8 H4-Rest). Nach Wahl von "Essen" stand sie still auf ihrem ersten Eintrag -
+ * dieselbe Klasse wie die vorbelegte Kategorie: wer sie nicht ansieht, bucht
+ * sie. Bei mehreren steht ein Platzhalter und die Wahl ist Pflicht; bei genau
+ * einer gibt es nichts zu entscheiden, sie steht vorgewaehlt; ohne keine gibt
+ * es auch keine Pflicht (der Server laesst sie dann leer). Ein Bestandswert,
+ * der zur Kategorie gehoert, bleibt stehen. Markup und Kategoriewahl im
+ * offenen Dialog lesen beide diese eine Regel. */
+function subcategoryChoice(category, selected = '') {
+  const subs = getSubcategories(category);
+  const several = subs.length > 1;
+  const value = subs.some((s) => s.key === selected) ? selected : (subs.length === 1 ? subs[0].key : '');
+  return { value, required: several, placeholder: several };
+}
+
+function subcategoryPlaceholderOption(selected) {
+  return `<option value="" disabled${selected ? ' selected' : ''}>${esc(t('budget.subcategoryPlaceholder'))}</option>`;
 }
 
 /* Leerer Platzhalter der Kategorie-Auswahl im Buchungsdialog (A5 P2-4). Hier
@@ -2822,10 +2837,11 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
   const catOpts     = categoryPlaceholderOption(!initialCategory) + initialCats.map((c) =>
     `<option value="${esc(c.key)}" ${initialCategory === c.key ? 'selected' : ''}>${esc(categoryLabel(c))}</option>`
   ).join('');
-  const initialSubcategory = isEdit ? entry.subcategory : defaultSubcategory(initialCategory);
-  const subcatOpts = getSubcategories(initialCategory).map((s) =>
-    `<option value="${esc(s.key)}" ${initialSubcategory === s.key ? 'selected' : ''}>${esc(subcategoryLabel(s))}</option>`
-  ).join('');
+  const initialSub = subcategoryChoice(initialCategory, isEdit ? entry.subcategory : '');
+  const subcatOpts = (initialSub.placeholder ? subcategoryPlaceholderOption(!initialSub.value) : '')
+    + getSubcategories(initialCategory).map((s) =>
+      `<option value="${esc(s.key)}" ${initialSub.value === s.key ? 'selected' : ''}>${esc(subcategoryLabel(s))}</option>`
+    ).join('');
 
   const hasAccounts = (state.accounts?.length ?? 0) > 0;
   const accountOpts = `<option value="">${t('budget.noAccount')}</option>` + (state.accounts ?? []).map((a) =>
@@ -2890,10 +2906,10 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
 
     <div class="form-group js-entry-field" id="bm-subcategory-group"${initialCategory ? '' : ' hidden'}>
       <div class="budget-field-header">
-        <label class="form-label" for="bm-subcategory">${t('budget.subcategoryLabel')}</label>
+        <label class="form-label" for="bm-subcategory">${t('budget.subcategoryLabel')}<span class="required-marker" aria-hidden="true"${initialSub.required ? '' : ' hidden'}> *</span></label>
         <button class="btn btn--secondary budget-inline-add" type="button" id="bm-add-subcategory">${t('budget.addSubcategory')}</button>
       </div>
-      <select class="form-input" id="bm-subcategory">${subcatOpts}</select>
+      <select class="form-input" id="bm-subcategory"${initialSub.required ? ' required aria-required="true"' : ''}>${subcatOpts}</select>
     </div>
 
     <div class="form-group js-entry-field">
@@ -3093,20 +3109,29 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
         const subcatGroup = panel.querySelector('#bm-subcategory-group');
         const subcatSelect = panel.querySelector('#bm-subcategory');
         const subcategories = getSubcategories(catSelect.value);
-        const currentValue = preferredSubcategory || subcatSelect.value;
+        const choice = subcategoryChoice(catSelect.value, preferredSubcategory || subcatSelect.value);
 
         // Ohne Kategorie gibt es keine Unterkategorie zu waehlen.
         subcatGroup.hidden = !catSelect.value;
-        subcatSelect.replaceChildren(...subcategories.map((s) => {
+        const options = subcategories.map((s) => {
           const opt = document.createElement('option');
           opt.value = s.key;
           opt.textContent = subcategoryLabel(s);
-          opt.selected = currentValue === s.key;
           return opt;
-        }));
-        if (subcategories.length && !subcategories.some((s) => s.key === subcatSelect.value)) {
-          subcatSelect.value = subcategories[0].key;
+        });
+        if (choice.placeholder) {
+          const placeholder = document.createElement('option');
+          placeholder.value = '';
+          placeholder.disabled = true;
+          placeholder.textContent = t('budget.subcategoryPlaceholder');
+          options.unshift(placeholder);
         }
+        subcatSelect.replaceChildren(...options);
+        subcatSelect.value = choice.value;
+        subcatSelect.required = choice.required;
+        if (choice.required) subcatSelect.setAttribute('aria-required', 'true');
+        else subcatSelect.removeAttribute('aria-required');
+        subcatGroup.querySelector('.required-marker').hidden = !choice.required;
       };
 
       const addCategory = async () => {
@@ -3250,6 +3275,10 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
         }
         if (!category) {
           reportFieldError(panel.querySelector('#bm-category'), t('budget.categoryRequired'));
+          return;
+        }
+        if (!subcategory && subcategoryChoice(category).required) {
+          reportFieldError(panel.querySelector('#bm-subcategory'), t('budget.subcategoryRequired'));
           return;
         }
         if (rejectOffGridAmount(panel.querySelector('#bm-amount'), absVal, state.currency, {
@@ -4262,6 +4291,7 @@ export const __test = {
   tabSearch,
   writeTabToUrl,
   summaryWith,
+  subcategoryChoice,
   currentMonth,
   state,
   // #1228: Zustaendigen-Picker fuer test:people-pickers.
