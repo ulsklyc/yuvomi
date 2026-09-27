@@ -2121,7 +2121,8 @@ test('a read-only Schedule member can still save their own reminder offset and w
   const fnBody = schedulePage.slice(fnStart, schedulePage.indexOf('\n}\n', fnStart));
   assert.ok(!fnBody.includes('readOnly()'), 'renderReminderSettings() must not call the module read-only check anymore');
   assert.ok(!fnBody.includes('const locked'), 'the old client-side lock variable must be fully removed, not just unused');
-  assert.match(fnBody, /toggleRowHtml\(\{ label: t\('schedule\.reminderToggle'\), checked: active, attrs: \{ id: 'schedule-reminder-toggle' \} \}\)/, 'the toggle must no longer pass a disabled flag');
+  // R11 S3: der Schalter (`control: 'switch'`) ist Kanon und kein Sperr-Flag.
+  assert.match(fnBody, /toggleRowHtml\(\{ label: t\('schedule\.reminderToggle'\), checked: active,(?: control: 'switch',)? attrs: \{ id: 'schedule-reminder-toggle' \} \}\)/, 'the toggle must no longer pass a disabled flag');
 
   // Server side: the blanket module read-only/denied gate must lower the
   // REQUIRED ACCESS LEVEL to 'read' for exactly this path (review of #1099:
@@ -2193,7 +2194,7 @@ test('an "overtime tracking" toggle exists separate from the weekly-hours number
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
 
   const settingsFn = schedulePage.slice(schedulePage.indexOf('function renderReminderSettings()'), schedulePage.indexOf('async function savePreference'));
-  assert.match(settingsFn, /toggleRowHtml\(\{ label: t\('schedule\.overtimeTrackingToggle'\), checked: state\.overtimeEnabled, attrs: \{ id: 'schedule-overtime-toggle' \} \}\)/);
+  assert.match(settingsFn, /toggleRowHtml\(\{ label: t\('schedule\.overtimeTrackingToggle'\), checked: state\.overtimeEnabled,(?: control: 'switch',)? attrs: \{ id: 'schedule-overtime-toggle' \} \}\)/);
   assert.match(settingsFn, /id="schedule-weekly-hours" value="' \+ esc\(String\(weeklyHours\)\) \+ '"' \+ \(state\.overtimeEnabled \? '' : ' disabled'\)/, 'the weekly-hours input must disable itself when overtime tracking is off, not just visually decorate around it');
 
   const statsFn = schedulePage.slice(schedulePage.indexOf('function renderStatistics()'), schedulePage.indexOf('function renderStatistics()') + 800);
@@ -2338,4 +2339,80 @@ test('statistics range: a narrow field shows a select with the same choices inst
   const render = schedulePage.slice(schedulePage.indexOf('function renderStatistics('), schedulePage.indexOf('function emptyPatternState('));
   assert.match(render, /class="input schedule-stat-range__select"[^>]*aria-label="' \+ esc\(t\('schedule\.statisticsRange'\)\)/);
   assert.equal((render.match(/STATISTICS_RANGES\.map\(/g) ?? []).length, 2, 'segment and select must both be built from STATISTICS_RANGES');
+});
+
+// ---------------------------------------------------------------------------
+// Re-Critique 2026-09-27 (A2 P1/P2, Detektor side-tab), Runde 11 S3.
+// ---------------------------------------------------------------------------
+
+test('Auswertung oeffnet mit den Zahlen: Zeitraum, Kennzahlen, und "Meine Einstellungen" dahinter', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const html = __test.renderStatistics();
+  const at = (needle) => html.indexOf(needle);
+  assert.ok(at('schedule-stat-metrics') > 0, 'Vorbedingung: die Kennzahlen stehen im Markup');
+  assert.ok(at('schedule-reminder-settings') > 0, 'Vorbedingung: die Einstellungen stehen noch auf dem Tab');
+  assert.ok(at('schedule-stat-filters') < at('schedule-stat-metrics'), 'der Zeitraum steht ueber den Zahlen');
+  assert.ok(at('schedule-stat-metrics') < at('schedule-reminder-settings'),
+    'die Einstellungen stehen HINTER den Zahlen - mobil lag die erste Kennzahl bei y=994');
+  assert.match(html, /role="switch"[^>]*id="schedule-reminder-toggle"|id="schedule-reminder-toggle"[^>]*role="switch"/,
+    'eine Einstellung ist ein Schalter (Komponenten-Kanon)');
+});
+
+test('ein Primaerknopf je Tab: jeder Schichtplan-Leerzustand bietet seine Wege im Sekundaerton an', async () => {
+  const { installMiniDom } = await import('./mini-dom.js');
+  installMiniDom();
+  const { __test } = await import('../public/pages/schedule.js');
+  const states = {
+    shiftTypes: __test.emptyShiftTypesState(),
+    patterns: __test.emptyPatternState(),
+    overrides: __test.emptyOverrideState(),
+    extras: __test.emptyExtraShiftsState(),
+    customFields: __test.emptyCustomFieldsState(),
+  };
+  for (const [name, html] of Object.entries(states)) {
+    assert.match(html, /empty-state__cta/, `Vorbedingung: ${name} bietet einen Weg an (der Stub rendert Knoepfe)`);
+    assert.doesNotMatch(html, /btn--primary/, `${name}: der Primaerknopf des Tabs ist der FAB, nicht der Leerzustand`);
+  }
+});
+
+test('eigene Felder erscheinen erst, wenn es eine Schichtart gibt', async () => {
+  const { installMiniDom } = await import('./mini-dom.js');
+  installMiniDom();
+  const { __test } = await import('../public/pages/schedule.js');
+  const st = __test.scheduleState();
+  const before = st.types;
+  try {
+    st.types = [];
+    assert.equal(__test.customFieldsSection(), '', 'ohne Schichtart kein zweiter Leerzustand mit eigenem Anlege-Knopf');
+    st.types = [{ id: 1, name: 'Frueh', color: '#000', fields: [] }];
+    assert.match(__test.customFieldsSection(), /schedule-library--custom-fields/);
+  } finally {
+    st.types = before;
+  }
+});
+
+test('ein Anlege-Verb im Schichtplan: jedes Anlegen heisst "hinzufuegen"', () => {
+  const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8')).schedule;
+  const en = JSON.parse(readFileSync(new URL('../public/locales/en.json', import.meta.url), 'utf8')).schedule;
+  for (const key of ['createShiftType', 'createCustomField', 'createOverride', 'addPattern', 'addExtraShift', 'addEntry']) {
+    assert.match(de[key], /hinzufügen$/, `de ${key}: "${de[key]}" - vorher fuenf Verben (erstellen, anlegen, hinzufuegen)`);
+    assert.match(en[key], /^Add /, `en ${key}: "${en[key]}"`);
+  }
+});
+
+test('Feiertag und Planblock tragen einen Farbpunkt statt eines Randstreifens', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const scheduleCss = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(scheduleCss)];
+  const stripe = /border-(?:inline-start|left)\s*:\s*(?:[2-9]|\d{2,})px/;
+  for (const selector of ['.schedule-overview__holiday', '.schedule-overview__block']) {
+    const own = rules.filter((r) => r.selector.split(',').some((part) => part.trim().startsWith(selector)));
+    assert.ok(own.length > 0, `Vorbedingung: ${selector} hat Regeln`);
+    assert.ok(!own.some((r) => stripe.test(r.body) || /border-inline-start\s*:[^;]*var\(--(?:holi|schedule)-color\)/.test(r.body)),
+      `${selector}: kein farbiger Streifen an der Startkante (Detektor side-tab)`);
+  }
+  assert.ok(rules.some((r) => /\.schedule-overview__block-title::before/.test(r.selector) && /background\s*:\s*var\(--dot-color\)/.test(r.body)),
+    'der Planblock zeigt seine Farbe als Punkt vor dem Titel');
+  assert.ok(rules.some((r) => /\.schedule-overview__holiday > span::before/.test(r.selector)),
+    'der Feiertag ebenso');
 });

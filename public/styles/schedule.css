@@ -588,6 +588,13 @@
   flex: 0 0 auto;
 }
 
+/* Eine Stundenzahl ist drei Ziffern breit, nicht die ganze Karte: das Feld
+ * lief am Desktop 1116px weit (Re-Critique 2026-09-27, A2 P1). */
+.schedule-reminder-settings__row--hours .input {
+  inline-size: 10ch;
+  flex: 0 0 auto;
+}
+
 .schedule-stat-list {
   display: grid;
   gap: var(--space-2);
@@ -869,10 +876,32 @@
   display: none;
 }
 
+/* PUNKT STATT RANDSTREIFEN (Re-Critique 2026-09-27, Detektor side-tab).
+ * Feiertag und Planblock trugen eine 3px-Vollton-Kante an der Startseite -
+ * das Muster, das der Detektor als Kartenstreifen meldet. Die Farbe steckt
+ * schon in der Toenung der Flaeche; das Vollton-Signal traegt jetzt ein Punkt
+ * vor dem Namen, wie in Apples Kalender die Farbe eines Termins im Monat.
+ * Er ist Zeichen, nicht Inhalt: der Name steht daneben, die Farbe sagt nichts,
+ * was der Text nicht auch sagt. Mit dem Vollton im Punkt ist die Schrift
+ * NEUTRAL (DESIGN.md, Skalen-Regel "Rangmarke -> Vollton-Punkt, Schrift
+ * neutral"): getoente Flaeche plus gemischte Schrift derselben Farbe hiesse
+ * den Ton zweimal blass nennen, und die Kante, die das vorher auffing, ist weg. */
+.schedule-overview__holiday > span::before,
+.schedule-overview__block-title::before {
+  content: '';
+  display: inline-block;
+  inline-size: var(--space-1h);
+  block-size: var(--space-1h);
+  margin-inline-end: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--dot-color);
+  vertical-align: middle;
+}
+
 .schedule-overview__holiday {
+  --dot-color: var(--holi-color);
   background: color-mix(in srgb, var(--holi-color) var(--tint-surface), var(--color-surface-work));
-  color: color-mix(in srgb, var(--holi-color) 38%, var(--color-text-primary));
-  border-inline-start: 3px solid var(--holi-color);
+  color: var(--color-text-primary);
   border-radius: var(--radius-xs);
   padding: var(--space-0h) var(--space-1);
   font-size: var(--text-xs);
@@ -960,9 +989,9 @@
   border-radius: var(--radius-xs);
   padding: var(--space-0h) var(--space-1);
   font-size: var(--text-xs);
+  --dot-color: var(--schedule-color);
   background: color-mix(in srgb, var(--schedule-color) var(--tint-surface), var(--color-surface-work));
-  color: color-mix(in srgb, var(--schedule-color) 38%, var(--color-text-primary));
-  border-inline-start: 3px solid var(--schedule-color);
+  color: var(--color-text-primary);
   overflow: clip;
   line-height: 1.3;
   z-index: 1;

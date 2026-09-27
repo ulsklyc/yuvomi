@@ -573,7 +573,7 @@ function renderReminderSettings() {
   return '<div class="card card--padded schedule-reminder-settings">'
     + '<h2 class="u-section-title">' + esc(t('schedule.mySettings')) + '</h2>'
     + '<div class="schedule-reminder-settings__row">'
-    + toggleRowHtml({ label: t('schedule.reminderToggle'), checked: active, attrs: { id: 'schedule-reminder-toggle' } })
+    + toggleRowHtml({ label: t('schedule.reminderToggle'), checked: active, control: 'switch', attrs: { id: 'schedule-reminder-toggle' } })
     + '<select class="input" id="schedule-reminder-offset" data-previous-value="' + esc(String(state.reminderOffsetMinutes ?? 15)) + '"' + (active ? '' : ' disabled') + '>' + options + '</select>'
     + '</div><p class="form-hint">' + esc(t('schedule.reminderHint')) + '</p>'
     // S-24 (UX-Audit, Entscheidung D-C): ein eigener Schalter statt eines
@@ -583,7 +583,7 @@ function renderReminderSettings() {
     // Statistik gleichermassen ab (renderStatistics()/overtimeInfo() lesen
     // state.overtimeEnabled), statt nur eine der beiden Stellen zu vergessen.
     + '<div class="schedule-reminder-settings__row schedule-reminder-settings__row--overtime-toggle">'
-    + toggleRowHtml({ label: t('schedule.overtimeTrackingToggle'), checked: state.overtimeEnabled, attrs: { id: 'schedule-overtime-toggle' } })
+    + toggleRowHtml({ label: t('schedule.overtimeTrackingToggle'), checked: state.overtimeEnabled, control: 'switch', attrs: { id: 'schedule-overtime-toggle' } })
     + '</div><p class="form-hint">' + esc(t('schedule.overtimeTrackingHint')) + '</p>'
     + '<div class="schedule-reminder-settings__row schedule-reminder-settings__row--hours">'
     + '<label class="label" for="schedule-weekly-hours">' + esc(t('schedule.weeklyHoursLabel')) + '</label>'
@@ -963,11 +963,15 @@ function emptyCustomFieldsState() {
     icon: 'list-plus',
     title: t('schedule.emptyCustomFieldsTitle'),
     description: t('schedule.emptyCustomFieldsDescription'),
-    actions: readOnly() ? [] : [{ label: t('schedule.createCustomField'), icon: 'plus', attrs: { 'data-action': 'open-create-custom-field' } }],
+    actions: readOnly() ? [] : [{ label: t('schedule.createCustomField'), icon: 'plus', tone: 'secondary', attrs: { 'data-action': 'open-create-custom-field' } }],
   });
 }
 
+// Eigene Felder haengen an Schichtarten - ohne eine gibt es nichts, woran ein
+// Feld stuende, und der Abschnitt war nur ein zweiter Leerzustand mit eigenem
+// Anlege-Knopf unter dem ersten (A2 P2).
 function customFieldsSection() {
+  if (!state.types.length) return '';
   return '<section class="schedule-library schedule-library--custom-fields"><div class="schedule-library__head"><h2 class="u-section-title">' + esc(t('schedule.customFields')) + '</h2>'
     + (state.customFields.length && !readOnly() ? '<button type="button" class="btn btn--secondary" data-action="open-create-custom-field"><i data-lucide="plus" aria-hidden="true"></i>' + esc(t('schedule.createCustomField')) + '</button>' : '') + '</div>'
     + (state.customFields.length ? '<div class="row-carrier">' + state.customFields.map(customFieldRow).join('') + '</div>' : emptyCustomFieldsState())
@@ -1111,7 +1115,7 @@ function emptyOverrideState() {
     icon: 'calendar-clock',
     title: t('schedule.emptyOverridesTitle'),
     description: t('schedule.emptyOverridesDescription'),
-    action: readOnly() ? null : { label: t('schedule.createOverride'), icon: 'plus', attrs: { 'data-action': 'open-create-override' } },
+    action: readOnly() ? null : { label: t('schedule.createOverride'), icon: 'plus', tone: 'secondary', attrs: { 'data-action': 'open-create-override' } },
   });
 }
 
@@ -1146,7 +1150,7 @@ function emptyExtraShiftsState() {
     icon: 'calendar-clock',
     title: t('schedule.emptyExtraShiftsTitle'),
     description: t('schedule.emptyExtraShiftsDescription'),
-    action: readOnly() ? null : { label: t('schedule.addExtraShift'), icon: 'plus', attrs: { 'data-action': 'open-create-extra' } },
+    action: readOnly() ? null : { label: t('schedule.addExtraShift'), icon: 'plus', tone: 'secondary', attrs: { 'data-action': 'open-create-extra' } },
   });
 }
 
@@ -1270,8 +1274,13 @@ function renderStatistics() {
       + '<section class="card card--padded schedule-stat-card"><div><h2 class="u-section-title">' + esc(t('schedule.shiftCounts')) + '</h2><p class="u-meta">' + esc(t('schedule.shiftCountsDescription')) + '</p></div>' + statisticsRows(countItems, (item) => String(item.count), (item) => item.count, t('schedule.noStatistics')) + '<div class="schedule-stat-total"><span>' + esc(t('schedule.total')) + '</span><strong>' + esc(String(summary.totalCount)) + '</strong></div></section>'
       + '<section class="card card--padded schedule-stat-card"><div><h2 class="u-section-title">' + esc(t('schedule.workedHours')) + '</h2><p class="u-meta">' + esc(t('schedule.workedHoursDescription')) + '</p></div>' + statisticsRows(hourItems, (item) => formatHours(item.minutes), (item) => item.minutes, t('schedule.noStatistics')) + '<div class="schedule-stat-total"><span>' + esc(t('schedule.total')) + '</span><strong>' + esc(formatHours(summary.totalMinutes)) + '</strong></div></section>'
       + '</div>';
+  // DIE AUSWERTUNG OEFFNET MIT DEN ZAHLEN (Re-Critique 2026-09-27, A2 P1).
+  // "Meine Einstellungen" stand als erste Karte ueber allem: mobil 525px hoch,
+  // die erste Kennzahl bei y=994 unter einem 844er-Fenster - wer "Auswertung"
+  // antippte, sah Einstellungen. Jetzt: Zeitraum, Zahlen, und die
+  // Einstellungen dahinter. Sie bleiben auf diesem Tab, weil sie die Zahlen
+  // betreffen (Wochenstunden -> Ueberstunden-Kachel).
   return '<section class="schedule-statistics">'
-    + renderReminderSettings()
     + '<form class="card card--padded schedule-stat-filters" data-form="statistics">'
     // S-13 (UX-Audit, Entscheidung D-B): userOptions() statt der vollen
     // state.users-Liste - ein Nicht-Admin sieht hier nur sich selbst, ein
@@ -1296,7 +1305,7 @@ function renderStatistics() {
     + '</select></div>' + (controls ? '<div class="schedule-stat-dates">' + controls + '</div>' : '')
     + '<div class="schedule-stat-filter-actions"><button class="btn btn--primary">' + esc(t('schedule.applyStatistics')) + '</button>'
     + '<button type="button" class="btn btn--secondary" data-action="print-statistics"><i data-lucide="printer" aria-hidden="true"></i>' + esc(t('schedule.print')) + '</button></div></form>'
-    + results + '</section>';
+    + results + renderReminderSettings() + '</section>';
 }
 // S-07: ohne einen einzigen Schichttyp fuehrt "Schichtplan hinzufuegen" in
 // dasselbe Anlege-Formular, dessen Muster-Modus dann nichts zum Waehlen hat
@@ -1311,7 +1320,7 @@ function emptyPatternState() {
     icon: 'calendar-clock',
     title: t('schedule.emptyPatternsTitle'),
     description,
-    action: readOnly() ? null : { label: t('schedule.addPattern'), icon: 'plus', attrs: { 'data-action': 'open-create', 'data-view': 'patterns' } },
+    action: readOnly() ? null : { label: t('schedule.addPattern'), icon: 'plus', tone: 'secondary', attrs: { 'data-action': 'open-create', 'data-view': 'patterns' } },
   });
 }
 
@@ -1327,8 +1336,12 @@ function emptyShiftTypesState() {
     icon: 'calendar-clock',
     title: t('schedule.emptyShiftTypesTitle'),
     description: t('schedule.emptyShiftTypesDescription'),
+    // EIN PRIMAERKNOPF JE TAB (Re-Critique 2026-09-27, A2 P2): das ist der FAB
+    // mit seinem Nomen. Die Vorlagen und der Leerzustand-Weg sind Angebote
+    // daneben und tragen den Sekundaerton - vorher standen hier drei violette
+    // Knoepfe gleichzeitig (Kopf-FAB, "Arbeit", "Feld anlegen").
     actions: readOnly() ? [] : [
-      ...visibleQuickstartTemplates().map(([key, labelKey]) => ({ label: t(labelKey), icon: 'sparkles', attrs: { 'data-action': 'quick-start-shifts', 'data-template': key } })),
+      ...visibleQuickstartTemplates().map(([key, labelKey]) => ({ label: t(labelKey), icon: 'sparkles', tone: 'secondary', attrs: { 'data-action': 'quick-start-shifts', 'data-template': key } })),
       { label: t('schedule.createShiftType'), icon: 'plus', attrs: { 'data-action': 'open-create', 'data-view': 'shifts' } },
     ],
   });
@@ -3052,4 +3065,4 @@ export async function update({ path } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { userOptions, setOwnerContext, overrideGroups, extraGroups, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };
+export const __test = { renderStatistics, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };
