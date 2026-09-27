@@ -2864,6 +2864,32 @@
 
 .perm-empty { padding: var(--space-6) 0; }
 
+/* Legende der Icon-Segmente (Re-Critique 2026-09-27, A7 P2-13): am breiten
+ * Zeiger-Viewport tragen die Segmente nur ihr Icon, der Klartext stand allein
+ * im Tooltip. Wo die Segmente ihr Wort selbst zeigen (schmal oder Finger,
+ * Media-Query unten), faellt die Legende weg - sie waere dort die zweite
+ * Beschriftung derselben Knoepfe. */
+.perm-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.perm-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.perm-legend__item svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  flex: none;
+}
+
 /* Fokussierte Spalte: Label und Control nah beieinander statt breit gestreckt. */
 .perm-matrix { max-width: 640px; }
 
@@ -3120,6 +3146,8 @@
    `pointer: coarse` deckt zusätzlich das Tablet im Querformat, wo der
    Viewport breiter als Desktop ist, der Finger aber derselbe bleibt. */
 @media (max-width: 1023px), (pointer: coarse) {
+  .perm-legend { display: none; }
+
   .perm-modgroup__widgets { padding-inline-start: var(--space-4); }
   .perm-modgroup__capabilities { margin-inline-start: var(--space-4); }
 

@@ -149,13 +149,13 @@ function effectiveCapabilityAccess(item, view = {}) {
 
 // ── Zugriffs-Optionen ────────────────────────────────────────────────────────
 
-function moduleOptions() {
+function moduleOptions(mode = state.mode) {
   const base = [
     { value: 'none', label: t('settings.permAccessNone'), icon: MODULE_OPT_ICONS.none },
     { value: 'read', label: t('settings.permAccessRead'), icon: MODULE_OPT_ICONS.read },
     { value: 'write', label: t('settings.permAccessWrite'), icon: MODULE_OPT_ICONS.write },
   ];
-  if (state.mode === 'user') return [{ value: 'inherit', label: t('settings.permInherit'), icon: MODULE_OPT_ICONS.inherit }, ...base];
+  if (mode === 'user') return [{ value: 'inherit', label: t('settings.permInherit'), icon: MODULE_OPT_ICONS.inherit }, ...base];
   return base;
 }
 
@@ -357,6 +357,20 @@ function renderSummary(container) {
   window.lucide?.createIcons({ el: host });
 }
 
+// ── Legende der Icon-Segmente ────────────────────────────────────────────────
+//
+// Am breiten Zeiger-Viewport tragen die Segmente nur ihr Icon; der Klartext
+// stand allein im `title` (Re-Critique 2026-09-27, A7 P2-13). Die Legende sagt
+// einmal ueber der Liste, was die Zeichen heissen - aus DENSELBEN Optionen, aus
+// denen die Segmente gebaut sind, damit Legende und Knopf nie auseinanderlaufen.
+// Sie ist ein Bild zum Nachschlagen: jedes Segment traegt seinen Namen selbst
+// (`aria-label`), ein Screenreader hoerte die Liste sonst ein zweites Mal.
+export function permLegendHtml(mode = state.mode) {
+  const items = moduleOptions(mode).map((o) => `
+      <span class="perm-legend__item"><i data-lucide="${esc(o.icon)}" aria-hidden="true"></i>${esc(o.label)}</span>`).join('');
+  return `<p class="perm-legend" aria-hidden="true">${items}</p>`;
+}
+
 // ── Matrix ─────────────────────────────────────────────────────────────────────
 
 function subjectTitle() {
@@ -409,6 +423,7 @@ function renderMatrix(container) {
       <p class="perm-matrix__hint">${esc(
         state.mode === 'role' ? t('settings.permRoleLegend') : t('settings.permMemberLegend'),
       )}</p>
+      ${permLegendHtml()}
     </div>
     <div id="perm-summary"></div>
     <div class="perm-list">${groupsHtml}${generalHtml}</div>
@@ -470,10 +485,16 @@ function renderSubjectSelector(container) {
   host.replaceChildren();
 
   if (state.mode === 'role') {
-    const chips = state.catalog.roles.map((role) => `
-      <button type="button" class="perm-chip${String(role) === String(state.subjectId) ? ' is-active' : ''}"
+    // DER GEWAEHLTE CHIP SAGT ES AUCH OHNE FARBE (Re-Critique 2026-09-27,
+    // A7 P2-13): `is-active` war nur ein Farbwechsel, ein Screenreader hoerte
+    // fuenf gleiche Knoepfe und keinen Hinweis, wessen Rechte darunter stehen.
+    const chips = state.catalog.roles.map((role) => {
+      const active = String(role) === String(state.subjectId);
+      return `
+      <button type="button" class="perm-chip${active ? ' is-active' : ''}" aria-pressed="${active ? 'true' : 'false'}"
         data-role="${esc(role)}">${esc(familyRoleLabel(role))}</button>
-    `).join('');
+    `;
+    }).join('');
     host.insertAdjacentHTML('beforeend', chips);
   } else {
     const members = state.catalog.members.filter((m) => !['split_guest', 'display'].includes(m.access_scope));
@@ -483,8 +504,9 @@ function renderSubjectSelector(container) {
     }
     const chips = members.map((m) => {
       const badge = m.role === 'admin' ? `<span class="perm-chip__badge">${esc(t('settings.systemAdminBadge'))}</span>` : '';
+      const active = String(m.id) === String(state.subjectId);
       return `
-        <button type="button" class="perm-chip${String(m.id) === String(state.subjectId) ? ' is-active' : ''}"
+        <button type="button" class="perm-chip${active ? ' is-active' : ''}" aria-pressed="${active ? 'true' : 'false'}"
           data-user="${esc(m.id)}">
           <span class="perm-chip__avatar${prefersInkText(m.avatar_color) ? ' perm-chip__avatar--ink' : ''}"
             style="background:${esc(m.avatar_color) || 'var(--color-accent)'}">${
@@ -504,6 +526,18 @@ function initials(name) {
 }
 
 // ── Laden ────────────────────────────────────────────────────────────────────
+
+/* OHNE VORWAHL STAND UNTER DEN ROLLEN EINE LEERE FLAECHE (Re-Critique
+ * 2026-09-27, A7 P2-13). Die Rollen sind eine feste, kurze Liste, und jede ist
+ * eine sinnvolle erste Antwort - also steht die erste gewaehlt da, wie ein
+ * Segment immer einen Wert hat. Die Mitglieder bleiben ohne Vorwahl: dort ist
+ * das erste in der Liste oft die Admin-Person selbst, deren Rechte gar nicht
+ * einschraenkbar sind. */
+export function initialSubject(mode, catalog) {
+  if (mode !== 'role') return null;
+  const [first] = catalog?.roles ?? [];
+  return first ?? null;
+}
 
 async function selectSubject(container, mode, id) {
   state.mode = mode;
@@ -582,7 +616,7 @@ function bindEvents(container) {
         b.classList.toggle('is-active', active);
         b.setAttribute('aria-selected', active ? 'true' : 'false');
       });
-      selectSubject(container, next, null);
+      selectSubject(container, next, initialSubject(next, state.catalog));
     });
   });
 
@@ -707,8 +741,7 @@ export async function render(container, { user } = {}) {
   state.inherited = { modules: {}, widgets: {}, capabilities: {} };
   state.dirty = false;
 
-  renderSubjectSelector(container);
-  renderMatrix(container);
   bindEvents(container);
+  await selectSubject(container, 'role', initialSubject('role', catalog));
   window.lucide?.createIcons({ el: container });
 }
