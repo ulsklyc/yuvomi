@@ -295,7 +295,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Changing pages keeps the navigation still.** The content cross-fades while the sidebar, the
   tab bar on a phone, the header toolbar and the kitchen tabs stay where they are, and the old
   page stays in view until the new one is ready, so there is no empty frame in between. Browsers
-  without view transitions get a plain fade instead of the sliding, springy entrance.
+  without view transitions get a plain fade instead of the sliding, springy entrance. Tapping
+  during the fade ends it at once, so the next tap already reaches the new page.
 
 - **The kitchen tabs stay put when you switch between them.** The highlight slides to the tab you
   tapped, and the counts show at once in the room kept for them.
