@@ -1518,6 +1518,13 @@
   --_glass-border-subtle: rgba(255, 255, 255, 0.38);
   --glass-border-subtle:  var(--_glass-border-subtle);
   --glass-border-overlay: rgba(255, 255, 255, 0.10);  /* immer-dunkle Surfaces (Toasts, Overlays) */
+  /* Griff jedes mobilen Blatts (Dialog-Sheet, Mehr-Blatt; Re-Critique
+   * 2026-09-27 P1 #1). Hell: die kraeftigere Kante, neutral und leise wie
+   * Apples Grabber (gemessen 1,6:1 gegen die Kopfflaeche des Blatts) - vorher
+   * Glas-Weiss 65 % auf weisser Tafel, also unsichtbar. Dunkel bleibt das
+   * Glas-Weiss (Dark-Bloecke unten). */
+  --_sheet-grabber:     var(--color-border-strong);
+  --sheet-grabber:      var(--_sheet-grabber);
 
   /* a2) Glass-Hintergründe: Vibrancy-Stufe (transparenter, mehr Durchschein) */
   --_glass-bg-card:       var(--_color-surface-glass);
@@ -2053,6 +2060,7 @@
      * Glas-Fassung der eigenen Surface (#2D2A27-Basis), gleiche Deckung. */
     --_glass-bg-elevated:      rgba(45, 42, 39, 0.88);
     --_glass-border:           rgba(255, 255, 255, 0.12);
+    --_sheet-grabber:         var(--glass-border);
     --_glass-border-subtle:    rgba(255, 255, 255, 0.14);
     --_glass-highlight:        rgba(255, 255, 255, 0.09);
     --_glass-highlight-subtle: rgba(255, 255, 255, 0.05);
@@ -2268,6 +2276,7 @@
     /* Glass — warm statt iOS-Neutralgrau (Media-Block oben) */
     --_glass-bg-elevated:     rgba(45, 42, 39, 0.88);
     --_glass-border:          rgba(255, 255, 255, 0.12);
+    --_sheet-grabber:         var(--glass-border);
     --_glass-border-subtle:   rgba(255, 255, 255, 0.14);
     --_glass-highlight:       rgba(255, 255, 255, 0.09);
     --_glass-highlight-subtle: rgba(255, 255, 255, 0.05);

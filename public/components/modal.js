@@ -24,6 +24,7 @@
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { pushOverlay, dropOverlay, isOverlayOpen } from '/utils/overlay-history.js';
+import { wireSheetDrag } from '/utils/sheet-drag.js';
 
 let activeOverlay = null;
 let previouslyFocused = null;
@@ -435,89 +436,23 @@ function onEscape(e) {
 // Swipe-to-Close (Mobile)
 // --------------------------------------------------------
 
-// Beruehrungs-Schlupf der Wischgeste, in BEIDE Richtungen derselbe: unterhalb
-// davon entscheidet sie weder "Sheet ziehen" noch "Inhalt scrollen".
-const SHEET_SWIPE_SLOP_PX = 10;
-
+// EINE Sheet-Grammatik fuer Dialog und Mehr-Blatt (utils/sheet-drag.js,
+// Re-Critique 2026-09-27): 1:1 mitgehen, schliessen ab 80px Weg ODER
+// Flick-Tempo > 0.5px/ms, sonst zurueckfedern (`--duration-lg` + `--ease-out`),
+// nach oben ein Gummiband. Richtungssperre (#981) und das Aufraeumen per rAF
+// (iOS-Click-Konvertierung) stehen dort.
+//
+// Bei ungespeicherten Aenderungen schliesst `closeModal()` nicht, sondern
+// fragt nach - dann federt die Tafel in ihre Ruhelage unter die Rueckfrage,
+// statt am alten Zug stehen zu bleiben.
 function _wireSheetSwipe(panel) {
-  let startY = 0;
-  let dragging = false;
-  // Hat dieser Finger das Sheet schon nach unten gezogen? Erst dann gehört eine
-  // Aufwärtsbewegung zum Zug; davor ist sie Scrollen des Inhalts (#981).
-  let pulled = false;
-
-  // Scroll position is now on the body, not the panel itself
-  const scrollBody = panel.querySelector('.modal-panel__body');
-
-  panel.addEventListener('touchstart', (e) => {
-    // Nur von der Handle-Zone (obere 48px) oder wenn Panel ganz oben → Swipe erlauben
-    const touchY = e.touches[0].clientY;
-    const rect = panel.getBoundingClientRect();
-    const isHandleZone = touchY - rect.top < 48;
-    const isScrolledToTop = (scrollBody ? scrollBody.scrollTop : panel.scrollTop) <= 0;
-    if (!isHandleZone && !isScrolledToTop) return;
-    startY = touchY;
-    dragging = true;
-    pulled = false;
-  }, { passive: true });
-
-  panel.addEventListener('touchmove', (e) => {
-    if (!dragging) return;
-    const dy = e.touches[0].clientY - startY;
-    if (dy < 0) {
-      // RICHTUNGSSPERRE (#981). Ein frisch geöffneter Dialog steht oben, also
-      // begann JEDE Wischgeste im Inhalt als verfolgter Zug, und der schrieb
-      // bei jedem Aufwärts-Frame `translateY(0)` ans Panel. Solange die
-      // Einfahranimation das Panel hält (`forwards`), aendert das nichts; mit
-      // "Bewegung reduzieren" gibt es keine Animation, das Inline-transform
-      // wirkt, und iOS bricht das Scrollen des Inhalts ab - gemessen im
-      // Simulator: 0 bis 30 px statt 500 bis 675 px fuer dieselbe Geste.
-      // Aufwärts, bevor das Sheet gezogen wurde, ist deshalb kein Zug: die
-      // Geste gibt ab und fasst das Panel nicht an.
-      //
-      // Aber erst jenseits derselben Schwelle, die abwärts gilt: ein Finger
-      // zittert beim Aufsetzen, und ein einzelner Pixel nach oben durfte eine
-      // gewollte Schliessgeste nicht verwerfen. Innerhalb der Schwelle
-      // passiert nichts - kein Abbruch, kein Schreibzugriff.
-      if (!pulled) {
-        if (dy < -SHEET_SWIPE_SLOP_PX) dragging = false;
-        return;
-      }
-      // Ein begonnener Zug bleibt verfolgt, wenn der Finger zurückkehrt - sonst
-      // endete touchend ohne Rücksetzen und das Panel stünde verschoben
-      // (b7c0312c). Zurückgesetzt wird einmal, nicht in jedem Frame.
-      if (panel.style.transform) panel.style.transform = '';
-      return;
-    }
-    // Erst ab der Schwelle animieren: Verhindert winzige Transforms durch
-    // normale Taps, die danach zurückgesetzt werden müssten.
-    if (dy > SHEET_SWIPE_SLOP_PX) {
-      pulled = true;
-      panel.style.transform = `translateY(${(dy - SHEET_SWIPE_SLOP_PX) * 0.6}px)`;
-    }
-  }, { passive: true });
-
-  panel.addEventListener('touchend', (e) => {
-    if (!dragging) return;
-    dragging = false;
-    const dy = e.changedTouches[0].clientY - startY;
-    if (dy > 80) {
-      // Der Ausgang startet dort, wohin der Finger das Blatt gezogen hat
-      // (`--sheet-drag` in den sheet-out-Keyframes). Ohne das sprang die
-      // Tafel beim Loslassen erst an ihre Ruhelage zurueck und fiel dann.
-      // Nicht bei ungespeicherten Aenderungen: dort steht die Tafel erst an
-      // ihrer Ruhelage unter der Rueckfrage, und ein spaeter Ausgang ab dem
-      // alten Zug waere ein Sprung.
-      const drag = panel.style.transform.match(/translateY\((-?[\d.]+)px\)/)?.[1];
-      if (drag && !isFormDirty(panel)) panel.style.setProperty('--sheet-drag', `${drag}px`);
-      panel.style.transform = '';
+  return wireSheetDrag(panel, {
+    scroller: () => panel.querySelector('.modal-panel__body') ?? panel,
+    onDismiss: () => {
+      const dirty = isFormDirty(panel);
       closeModal();
-    } else {
-      // Transform-Reset per rAF verzögern: DOM-Mutationen direkt in touchend
-      // unterbrechen auf iOS WebKit die Touch→Click-Konvertierung - der click-Event
-      // auf Child-Elementen (Buttons) wird gecancelt → Buttons reagieren nicht.
-      requestAnimationFrame(() => { panel.style.transform = ''; });
-    }
+      return !dirty;
+    },
   });
 }
 

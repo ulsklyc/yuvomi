@@ -755,6 +755,22 @@
   animation: fade-in var(--duration-sm) ease;
 }
 
+/* DIE KAPSEL BLEIBT HELL, SOLANGE IHR EIGENES BLATT OFFEN IST (A1, Kleinkram
+ * der Re-Critique 2026-09-27). Der Backdrop lag ueber der Leiste und dimmte
+ * den Mehr-Knopf mit, der das Blatt gerade traegt. Leiste und FAB heben sich
+ * ueber ihn; ein Tipp daneben trifft weiter den Backdrop (die Zone ist
+ * `pointer-events: none`, nur die Kapsel nimmt Treffer), ein Tipp auf einen
+ * anderen Tab navigiert, und `navigate()` schliesst das Blatt. */
+html:has(.more-sheet[aria-hidden="false"]) .nav-bottom {
+  z-index: calc(var(--z-nav) + 2);
+}
+
+/* Der FAB liegt IN der Kapsel und darum eine Stufe ueber ihr - dieselbe
+ * Ordnung wie sonst (--z-nav + 1 ueber --z-nav), nur beide gehoben. */
+html:has(.more-sheet[aria-hidden="false"]) :is(.page-fab, .page-fab-group) {
+  z-index: calc(var(--z-nav) + 3);
+}
+
 @keyframes fade-in {
   from { opacity: 0; }
   to   { opacity: 1; }
@@ -818,18 +834,23 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
    * eigene Leiste. Ein Sicherheitsabstand als padding-bottom haette dieselben
    * 76px gekostet und den Fehler nur eine Zeile weiter geschoben. */
   bottom: var(--nav-bottom-height);
-  left: 0;
-  right: 0;
+  /* EIN BLATT, EINE FORM (Re-Critique 2026-09-27, A1 P2-3): Einrueckung,
+   * Material und Radius wie das Dialog-Sheet (`.modal-overlay`-Polster,
+   * `.modal-panel` + glass.css) - vorher randlos, oben 26px, nur eine
+   * Oberkante. Die Unterkante bleibt ueber der Leiste (Absatz darueber). */
+  left: max(var(--space-3), env(safe-area-inset-left));
+  right: max(var(--space-3), env(safe-area-inset-right));
   background-color: var(--color-surface);
-  border-top: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow-lg);
   /* DER SEITENRAND IST HIER SPALTENBREITE, KEIN LUXUS. Seit das Raster vier
    * statt drei Spalten fuehrt, entscheidet jeder Pixel Innenabstand darueber,
    * ob ein deutscher Modulname einzeilig steht: die 4px, die von --space-4 auf
    * --space-3 fallen, gehen zur Haelfte in jede Zelle. Unten bleibt der volle
    * Wert - dort schliesst das Blatt gegen die Tab-Leiste ab, und die Fuge
    * zwischen zwei schwebenden Flaechen ist der einzige Rand, den man sieht. */
-  padding: var(--space-3) var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-3) var(--space-4);
   z-index: calc(var(--z-nav) + 2);
   display: flex;
   flex-direction: column;
@@ -850,7 +871,11 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
    * sichtbar - ein Streifen fremdes Blatt unter jeder Seite. Gefunden hat das
    * der Screenshot, nicht die Sonde: die Sonde mass das OFFENE Blatt. */
   transform: translateY(calc(100% + var(--nav-bottom-height)));
-  transition: transform var(--duration-lg) var(--ease-out);
+  /* `translate` traegt den Zug des Fingers (utils/sheet-drag.js) und federt
+   * mit derselben Kurve zurueck; `transform` bleibt dem Ein-/Ausfahren. */
+  transition:
+    transform var(--duration-lg) var(--ease-out),
+    translate var(--duration-lg) var(--ease-out);
 }
 
 /* Der Deckel gehoert dem Blatt, das Scrollen dem Koerper: Griff und Suche
@@ -910,10 +935,12 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   /* flex-shrink: 0, weil das Blatt seit der Obergrenze ein schrumpfender
    * Flex-Container ist: bei 320px war der Griff auf 2,3px zusammengedrueckt. */
   flex-shrink: 0;
+  /* Derselbe Griff wie am Dialog-Sheet (layout.css, Mobile-Block der
+   * `.modal-panel`): 36x5, 8px unter der Oberkante, Farbe `--sheet-grabber`. */
   width: 36px;
-  height: 4px;
+  height: 5px;
   border-radius: var(--radius-full);
-  background-color: var(--color-border);
+  background-color: var(--sheet-grabber);
   margin: 0 auto var(--space-2);
 }
 
@@ -5478,37 +5505,55 @@ p.field-hint--warn[hidden] {
     align-items: flex-end;
   }
 
+  /* DER GRIFF SITZT IN DER KOPFZONE, NICHT DARUEBER (Re-Critique 2026-09-27,
+   * P1 #1). Hier stand ein 36px-Polster (`--space-4 + 20px`) fuer einen 44px
+   * hohen Griff-Streifen, und der Griff darin war im hellen Theme Glas-Weiss
+   * auf weisser Tafel: uebrig blieb ein leerer Streifen ueber jedem Dialog,
+   * der wie ein Renderfehler wirkte. Jetzt liegt der Griff (36x5, Apples
+   * Grabber) im oberen Polster des Kopfes: Griff-Oberkante bis Titel-
+   * Oberkante 16px (8px Luft, 5px Griff, der Rest ist die Zentrierung des
+   * Titels neben dem 48px-Schliessen-X). Ein Blatt ohne Kopf behaelt ein
+   * kleines Polster, damit der Griff nicht auf dem Inhalt liegt.
+   * Die Farbe ist ein Token (`--sheet-grabber`): hell die kraeftigere Kante,
+   * dunkel das Glas-Weiss. Die Zugflaeche ist keine Frage der Zeichnung - sie
+   * steht als Griffzone (48px) in utils/sheet-drag.js. */
   .modal-panel {
-    /* Extra top padding for the drag handle. position:relative steht seit #805
-     * in der Basisregel und gilt auf jeder Breite - hier stand es frueher. */
-    padding-top: calc(var(--space-4) + 20px);
+    padding-top: 0;
+    /* Rueckfedern nach einem Zug (utils/sheet-drag.js schreibt `translate`,
+     * nicht `transform` - die Einfahrt haelt `transform` per `forwards`). */
+    transition: translate var(--duration-lg) var(--ease-out);
+  }
+
+  .modal-panel:not(:has(> .modal-panel__header)) {
+    padding-top: var(--space-5);
+  }
+
+  .modal-panel > .modal-panel__header {
+    padding-top: var(--space-3);
   }
 
   .modal-panel::before {
     content: '';
     position: absolute;
-    top: 0;
+    top: var(--space-2);
     left: 50%;
     transform: translateX(-50%);
-    /* Visuelle Linie bleibt klein, Hit-Area ist 44px hoch */
     width: 36px;
-    height: 44px;
-    background-color: transparent;
-    /* Nur die dünne Griff-Linie ist sichtbar; oben/unten transparent. Die
-       Linienfarbe läuft über --modal-handle-color, damit der Glass-Modus sie
-       (in glass.css) umfärben kann, OHNE das background-Shorthand zu benutzen —
-       das hatte das Gradient gelöscht und den Griff zum vollen 36×44-Block
-       gemacht (#569). */
-    background-image: linear-gradient(
-      to bottom,
-      transparent calc(50% - 2px),
-      var(--modal-handle-color, var(--color-border)) calc(50% - 2px),
-      var(--modal-handle-color, var(--color-border)) calc(50% + 2px),
-      transparent calc(50% + 2px)
-    );
+    height: 5px;
     border-radius: var(--radius-full);
+    background-color: var(--sheet-grabber);
+    pointer-events: none;
+    z-index: 1;
   }
 
+}
+
+/* Waehrend der Finger zieht, fuehrt er - keine Transition. Ohne die Marke
+ * federt `translate` zurueck (Dialog-Sheet oben, Mehr-Blatt an `.more-sheet`).
+ * Geteilte Grammatik: utils/sheet-drag.js. */
+.modal-panel[data-sheet-drag="drag"],
+.more-sheet[data-sheet-drag="drag"] {
+  transition: none;
 }
 
 /* ── Ausgang: Tafel UND Overlay, auf jeder Breite (Critique 2026-09-26, P1-1) ──
@@ -5522,9 +5567,10 @@ p.field-hint--warn[hidden] {
  * keiner. Guard: test-motion.js rechnet die Kaskade fuer beide Breiten nach.
  *
  * Mobil faellt das Blatt 24px (derselbe Hub wie die Einfahrt) und blendet aus.
- * Nach einer Wischgeste startet es dort, wohin der Finger es gezogen hat:
- * modal.js legt den Zug als `--sheet-drag` ab, und beide Keyframe-Enden lesen
- * ihn - sonst spraenge die Tafel beim Loslassen erst nach oben zurueck.
+ * Nach einer Wischgeste startet es dort, wohin der Finger es gezogen hat: der
+ * Zug liegt als `translate` auf der Tafel (utils/sheet-drag.js) und setzt sich
+ * mit dem `transform` der Keyframes zusammen - sonst spraenge die Tafel beim
+ * Loslassen erst nach oben zurueck.
  *
  * Desktop hatte gar keinen Ausgang (modal.js raeumte sofort ab): jetzt ein
  * kurzes Zuruecknehmen, Scale 0.98 + Blende, 150ms.
@@ -5551,8 +5597,8 @@ p.field-hint--warn[hidden] {
 }
 
 @keyframes sheet-out {
-  from { transform: translateY(var(--sheet-drag, 0px)); }
-  to   { transform: translateY(calc(var(--sheet-drag, 0px) + 24px)); opacity: 0; }
+  from { transform: translateY(0); }
+  to   { transform: translateY(24px); opacity: 0; }
 }
 
 @keyframes modal-scale-out {

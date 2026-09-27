@@ -31,6 +31,7 @@ import { activityType } from '/utils/health-activity.js';
 import { buildHelpRows } from '/utils/help.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { triggerPageFab } from '/utils/fab.js';
+import { wireSheetDrag } from '/utils/sheet-drag.js';
 import {
   handleBackNavigation, closeAllOverlays, consumeOverlayMarker,
   pushOverlay, dropOverlay, attachOverlay,
@@ -3330,28 +3331,24 @@ function initMoreSheet(container, openSearch) {
     }
   });
 
-  /* WISCHEN SCHLIESST NUR VOM ANFANG DER LISTE AUS.
+  /* WISCHEN SCHLIESST NUR VOM ANFANG DER LISTE AUS - ODER VOM GRIFF.
    *
    * Vorher schloss jede Abwaertsbewegung ueber 60px das Blatt, egal wo sie
    * begann. Seit `.more-sheet__body` scrollt (die Obergrenze gegen den
    * Blattueberstand bei 320px), IST diese Geste auch das Zurueckscrollen in den
    * Gruppen: wer unten steht und nach oben zurueckwischt, bewegt den Finger
-   * abwaerts und schloss damit das Blatt (PR-Review #754).
+   * abwaerts und schloss damit das Blatt (PR-Review #754). Der Stand wird beim
+   * BEGINN der Geste gemerkt, nicht am Ende.
    *
-   * Der Stand wird beim BEGINN der Geste gemerkt, nicht am Ende: bis dahin hat
-   * der Scroller laengst reagiert und stuende auch nach einem echten
-   * Zieh-zum-Schliessen auf 0. */
-  let _touchStartY = 0;
-  let _touchStartAtTop = true;
-  sheet.addEventListener('touchstart', (e) => {
-    _touchStartY = e.touches[0].clientY;
-    const body = sheet.querySelector('.more-sheet__body');
-    _touchStartAtTop = !body || body.scrollTop <= 0;
-  }, { passive: true });
-  sheet.addEventListener('touchend', (e) => {
-    if (!_touchStartAtTop) return;
-    if (e.changedTouches[0].clientY - _touchStartY > 60) closeSheet();
-  }, { passive: true });
+   * Die Geste selbst ist seit der Re-Critique 2026-09-27 dieselbe wie am
+   * Dialog-Sheet (utils/sheet-drag.js): das Blatt geht 1:1 mit, schliesst ab
+   * 80px ODER bei einem Flick, federt sonst zurueck. Vorher entschied erst
+   * `touchend` ab 60px, und das Blatt stand waehrenddessen still. */
+  wireSheetDrag(sheet, {
+    scroller: () => sheet.querySelector('.more-sheet__body'),
+    onDismiss: () => closeSheet(),
+    resetAfterDismiss: true,
+  });
 
   sheet.addEventListener('click', (e) => {
     if (e.target.closest('[data-route]')) closeSheet({ restoreFocus: false });

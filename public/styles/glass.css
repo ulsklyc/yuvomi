@@ -192,16 +192,12 @@
   }
 }
 
-/* Bottom-Sheet Handle: im Glass-Modus nur die Linienfarbe umfärben. NICHT das
-   background-Shorthand setzen — das löschte das Griff-Linien-Gradient aus
-   layout.css und machte aus der dünnen Linie einen vollen 36×44-Block (#569). */
-@media (max-width: 767px) {
-  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-    .modal-panel::before {
-      --modal-handle-color: var(--glass-border);
-    }
-  }
-}
+/* Bottom-Sheet-Griff: hier stand `--modal-handle-color: var(--glass-border)`
+ * fuer JEDES Theme - Glas-Weiss 65 % auf der weissen Tafel, im hellen Theme
+ * also unsichtbar (Re-Critique 2026-09-27, P1 #1). Die Farbe ist jetzt ein
+ * Token mit zwei Werten (`--sheet-grabber`, tokens.css): hell die kraeftigere
+ * Kante, dunkel weiter das Glas-Weiss. Gezeichnet wird der Griff in
+ * layout.css (Dialog-Sheet) und an `.more-sheet__handle`. */
 
 /* ================================================================
  * 4. Buttons — Specular Highlight
