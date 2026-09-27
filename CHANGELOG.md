@@ -69,10 +69,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **On wide screens, contacts, tasks, recipes and inventory show the selected entry next to the
-  list.** From a main column of about 1200px (1440px windows with the sidebar open, or smaller
-  ones with it collapsed) the list stays on the left and the entry you pick opens on the right,
-  with its own title and actions, and scrolls on its own - as in Apple Mail. The arrow keys move
+- **Settings have one sheet per module, and a list beside the sheet on a desktop.** Settings are
+  grouped into Account, Household (admins) and Modules. Every module has one sheet, as in Apple's
+  "Settings > App": a line at the top says whether the module is on (it is switched on and off
+  only under Active modules), followed by what you set "For me" and, for admins, "For the
+  household". Calendar sync, calendar and feed subscriptions and event defaults are on the
+  Calendar sheet, contact sync on Contacts, reminder sync on Tasks, the cycle options on Health,
+  document storage and DMS on Documents; Immich and the household weather source are under
+  Household - Integrations. "Module options" and the Sync area are gone. On a desktop the areas
+  and sheets stand as a list on the left with the search at its edge and the open sheet on the
+  right in a readable width, with the first sheet already open; on a phone you still tap in and
+  go back. Old settings addresses and bookmarks still work: they lead to the matching sheet and
+  section, and the search still finds every option and every former page name.
+
+- **Health opens on an overview that is also its navigation.** The row of nine tabs is gone. The
+  overview lists all areas with their latest value or status, as in Apple Health - on a phone
+  above the summary, on a desktop as a list on the left next to the summary or the chosen area.
+  Each area has its own address (`/health/vitals` and so on, old `?tab=` links still work); on a
+  phone an area slides in with "< Health" and its name as the title, and going back returns to
+  where you were on the overview. The person pill, adding with "n" and editing readings work as
+  before. The cycle fills its column on a desktop: calendar and legend side by side, statistics
+  without gaps, the month arrows next to the month name, and the fertile window and the tip
+  mentioned once each.
+
+- **Shopping and the pantry use the width of a desktop.** From a main column of about 960px the
+  shopping list shows its categories in two columns, and the pantry keeps a side panel with what
+  is expired, expiring soon or running low next to the list; tapping an entry there opens it. All
+  four kitchen tabs now end at the same edge.
+
+- **Smaller desktop tidy-ups.** The rewards ledger and lists keep a readable width while the
+  catalog grid may use the full width, and its header button lines up with the grid. On the
+  overview, a tile next to a gap grows into the rest of its row, so rows have no holes (nothing
+  is saved; the customize mode still shows the chosen sizes). Contact filters show only categories
+  that are in use and wrap on a desktop instead of scrolling sideways. Household help shows one
+  visit row everywhere (date first, then person, amount and payment), marks due and overdue tasks
+  by the word instead of tinting the row, keeps its figures in one row on a phone and puts the
+  chart below the list. The budget plan has one add button (in the header), the history of a
+  shared expense names the expense and its amount, and the "Active groups" figure no longer takes
+  a full row on a phone.
+
+- **On wide screens, contacts, tasks, recipes, inventory, birthdays and the calendar agenda show
+  the selected entry next to the list.** From a main column of about 1040px (1280px laptops with
+  the sidebar open and everything wider) the list stays on the left and the entry you pick opens
+  on the right, with its own title and actions, and scrolls on its own - as in Apple Mail. Without
+  a selection the first entry is shown, so the right half is never empty; on a phone nothing is
+  picked for you. The actions at the foot of the entry stay in view in one row while you scroll,
+  and "Open in Maps" sits in the location row. Inventory shows the details grouped (purchase,
+  warranty, condition and records) at full height, and its figures as rows above the list. The arrow keys move
   the selection, Enter edits, Escape goes back to the list, and the back button returns to the
   previous entry. Every selection has an address (`?open=<id>`), the same one global search and
   the meal cards already used, so a link opens the entry beside the list on a desktop and as
@@ -446,6 +489,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that scrolled sideways.
 
 ### Fixed
+
+- **The "Rewards" step of the rewards setup opens the catalog again.** It looked for a tab
+  that did not exist and did nothing.
 
 - **Delete in a phone dialog no longer pushes Save to a second row.** Below 640px it is a trash
   button named after what it deletes, with Cancel and Save beside it in one row.
