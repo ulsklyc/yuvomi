@@ -26,13 +26,9 @@
  * Padding- und Flex-Regeln, die der Kopf schon mitbringt. Der Lagerort-Button
  * sitzt im __actions-Slot und braucht kein eigenes flex-shrink mehr. */
 
-/* Nur Positionierung: das Bedienelement selbst liegt in page-search.css, die
- * Klasse kommt über den `className`-Parameter von renderPageSearch() an den
- * geteilten Baustein. `min-width: 0` steht dort und muss hier nicht doppelt. */
-.pantry-search {
-  flex: 1;
-  max-width: 420px;
-}
+/* .pantry-search traegt keine eigene Breite mehr (Re-Critique 2026-09-27,
+ * D4): sie ist der Center-Slot, Breite und Stelle kommen aus page-search.css
+ * (`--page-search-width`). */
 
 /* DIE CHIPREIHE STEHT IM PORT (Kopfregel mobil, 2026-09-26).
  *
@@ -92,11 +88,9 @@
 /* `.pantry-empty-hint` ist entfallen (Block 2): ohne Fundstelle im Markup -
  * der Vorrat rendert seine Leerzustände über mountEmptyState. */
 
-/* Kopf-Inhalt auf dasselbe Lesemaß wie der Körper: `.page-toolbar--narrow`
- * (layout.css), gesetzt im Markup neben `--in-group`. Hier stand dieselbe
- * Absicht als `> * { max-width: ... }` - sie kappte die Slot-Breiten und ließ
- * den Lagerort-Knopf trotzdem an der äußeren Kante stehen; die Begründung steht
- * am geteilten Selektor. */
+/* Der Kopf endet an der Kuechen-Leiste, nicht am Lesemass (Re-Critique
+ * 2026-09-27, D3): die Primaeraktion steht in allen vier Kuechen-Tabs an
+ * derselben Stelle. Kein `--narrow` im Markup mehr. */
 .pantry-page .page-toolbar--in-group {
   flex-wrap: wrap;
 }

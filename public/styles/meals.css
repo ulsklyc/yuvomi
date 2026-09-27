@@ -469,43 +469,16 @@
   /* 28px lagen unter --target-md; der Button ist auf Desktop der Weg, eine
    * zweite Mahlzeit in denselben Slot zu legen (Critique 2026-07-29). */
   min-height: var(--target-md);
-  opacity: 0;
-  /* Unsichtbar heisst auch unklickbar: ohne pointer-events bleibt hier ein
-   * volles Trefferziel stehen, das niemand sieht (Guard
-   * `verborgene Reveal-Aktionen bleiben nicht klickbar`, test-frontend-audit.js). */
-  pointer-events: none;
-  transition: color var(--transition-fast), background-color var(--transition-fast), opacity var(--transition-fast);
-}
-
-.meal-slot:hover .meal-slot__add-more-btn,
-.meal-slot:focus-within .meal-slot__add-more-btn {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* Ohne Zeigergerät gibt es kein Hover: dauerhaft sichtbar und bedienbar. Das
- * Muster ist dasselbe wie bei .meal-card__actions und .recipe-card__icon-actions
- * - dieser Button war beim Umbau übersehen worden (Critique 2026-07-30). */
-@media (hover: none) {
-  .meal-slot__add-more-btn {
-    opacity: 1;
-    pointer-events: auto;
-  }
+  /* Dauerhaft sichtbar, auch mit Zeiger (Re-Critique 2026-09-27, D7): eine
+   * Aktion, die erst beim Ueberfahren erscheint, findet auf Tablet und
+   * Trackpad niemand (ignore.md sanktioniert sichtbare Zeilenaktionen). Ruhig
+   * haelt sie die Tertiaerfarbe und die gestrichelte Kante, keine Flaeche. */
+  transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
 .meal-slot__add-more-btn:hover {
   color: var(--module-accent);
   background-color: color-mix(in srgb, var(--module-accent) var(--tint-state), transparent);
-}
-
-/* Touch-Geräte kennen kein Hover: Button dauerhaft sichtbar und auf
- * vollwertiges Touch-Target heben, sonst bleibt er unerreichbar. */
-@media (hover: none) {
-  .meal-slot__add-more-btn {
-    opacity: 1;
-  pointer-events: auto;
-    min-height: var(--target-md);
-  }
 }
 
 /* --------------------------------------------------------
@@ -600,17 +573,13 @@
  * unsichtbaren Trefferflächen. Bei --space-1 taten sie das um 20px: wer auf
  * dem Desktop den Warenkorb anvisierte, landete im Papierkorb daneben
  * (Critique 2026-07-29). */
-/* Sichtbar per Default, nur auf Zeigergeräten eingeblendet.
+/* Dauerhaft sichtbar, auf jedem Geraet (Re-Critique 2026-09-27, D7).
  *
- * Vorher stand `opacity: 0` unbedingt hier und wurde erst per
- * `@media (max-width: 639px)` zurückgenommen. Zwei Folgen, beide gemessen:
- * Ein Tablet ohne Hover und über 640px bekam die Aktionen nie zu sehen (sie
- * waren dort nicht entdeckbar, nur zufällig treffbar), und im ausgeblendeten
- * Zustand blieb ein 114px breites, unsichtbares aber klickbares Band stehen,
- * weil `pointer-events` mitzuziehen vergessen wurde (Critique 2026-07-29).
- *
- * Die Umschaltung hängt jetzt an der Geräte-Fähigkeit, nicht an der
- * Viewport-Breite - dasselbe Muster, das .meal-slot__add-more-btn schon nutzt. */
+ * Bis dahin blendeten Zeigergeraete die Leiste erst beim Ueberfahren des
+ * Slots ein. Die Aktionen einer Karte (Einkaufsliste, Rezept, Loeschen) waren
+ * so auf dem Desktop unentdeckbar; ignore.md sanktioniert dauerhaft sichtbare
+ * Zeilenaktionen. Ruhig bleiben sie ueber die Tertiaerfarbe der Knoepfe
+ * (.meal-card__action-btn), nicht ueber Unsichtbarkeit. */
 .meal-card__actions {
   display: flex;
   gap: var(--space-4);
@@ -619,21 +588,6 @@
    * (siehe .meal-card__open). */
   padding: 0 var(--space-4) var(--space-4);
   align-self: stretch;
-  transition: opacity var(--transition-fast);
-}
-
-@media (hover: hover) {
-  .meal-card__actions {
-    opacity: 0;
-    /* Unsichtbar heißt auch unklickbar. */
-    pointer-events: none;
-  }
-
-  .meal-slot:hover .meal-card__actions,
-  .meal-slot:focus-within .meal-card__actions {
-    opacity: 1;
-    pointer-events: auto;
-  }
 }
 
 /* Bewusst NICHT .row-action, als einziger der vier Küchen-Tabs.

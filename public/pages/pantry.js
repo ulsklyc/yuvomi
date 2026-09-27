@@ -294,23 +294,25 @@ export async function render(container) {
   // layout.css): Suche im __center-Slot, Lagerort-Verwaltung im __actions-Slot -
   // dieselbe Slot-Ordnung wie in den drei Geschwister-Tabs.
   const toolbar = document.createElement('div');
-  // --narrow: der Kopf endet beim Lesemaß der Liste darunter (.list-scroller),
-  // nicht an der Content-Spalte. Siehe layout.css.
-  toolbar.className = 'page-toolbar page-toolbar--in-group page-toolbar--narrow';
+  // Kein --narrow (Re-Critique 2026-09-27, D3): der Kuechenkopf gehoert der
+  // Kuechen-Leiste und endet an ihrer Kante wie in den drei Geschwister-Tabs -
+  // sonst sprang die angedockte Primaeraktion beim Tabwechsel zwischen
+  // Lesemass (x 865) und Leistenkante (x 1288). Test: test-meals.js (D3).
+  toolbar.className = 'page-toolbar page-toolbar--in-group';
+  // Die Suche IST der Center-Slot (Re-Critique 2026-09-27, D4): Breite und
+  // Stelle traegt page-search.css, wie in Dokumenten - kein Wrapper.
   toolbar.insertAdjacentHTML('beforeend', `
-    <div class="page-toolbar__center">
-      ${renderPageSearch({
-        id: 'pantry-search',
-        // Label und Placeholder aus demselben Key: „Vorrat durchsuchen" benennt
-        // das Feld vollständig, wie in notes/contacts/documents. Ein eigener
-        // Label-Key wäre ein Schlüssel über 23 Locales ohne zusätzliche Aussage.
-        label: t('pantry.searchPlaceholder'),
-        placeholder: t('pantry.searchPlaceholder'),
-        value: state.query,
-        clearLabel: t('common.searchClear'),
-        className: 'pantry-search',
-      })}
-    </div>
+    ${renderPageSearch({
+      id: 'pantry-search',
+      // Label und Placeholder aus demselben Key: „Vorrat durchsuchen" benennt
+      // das Feld vollständig, wie in notes/contacts/documents. Ein eigener
+      // Label-Key wäre ein Schlüssel über 23 Locales ohne zusätzliche Aussage.
+      label: t('pantry.searchPlaceholder'),
+      placeholder: t('pantry.searchPlaceholder'),
+      value: state.query,
+      clearLabel: t('common.searchClear'),
+      className: 'pantry-search page-toolbar__center',
+    })}
     <div class="page-toolbar__actions">
       ${pageToolsMenuHtml({
         id: 'pantry-tools-menu',

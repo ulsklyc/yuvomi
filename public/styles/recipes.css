@@ -429,14 +429,9 @@ button.recipe-detail__ingredient-match:hover {
  * .page-toolbar--in-group (layout.css); die frühere eigene .recipes-toolbar
  * entfällt samt Padding-Regeln, die der Kopf schon mitbringt. */
 
-/* Nur Positionierung, wie .pantry-search: das Bedienelement liegt in
- * page-search.css. Der frühere Nachbau hier trug kein `min-width: 0` und konnte
- * damit nicht unter die Mindestbreite des Inputs schrumpfen; der geteilte
- * Baustein bringt es mit. */
-.recipes-search {
-  flex: 1;
-  max-width: 420px;
-}
+/* .recipes-search traegt keine eigene Breite mehr (Re-Critique 2026-09-27,
+ * D4): sie ist der Center-Slot, Breite und Stelle kommen aus page-search.css
+ * (`--page-search-width`). */
 
 /* Herkunfts-Filter (Alle/Nativ/Mealie): Trigger im __actions-Slot des Kopfs
  * (nur sichtbar, wenn Mirror-Rezepte existieren, siehe renderSourceFilter()),

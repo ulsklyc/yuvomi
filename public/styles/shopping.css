@@ -589,10 +589,9 @@
  * .items-list. Einen Listenkopf gibt es seit 2026-08-11 gar nicht mehr - die
  * Chip-Leiste trägt Name und Aktionen (siehe „Liste-Header" oben). */
 /* Die Desktop-Kappung der Leiste (#758) ist mit dem Kopf-Umbau entfallen: die
- * Leiste steht im __center-Slot einer `.page-toolbar--narrow`, und deren
- * Lesemass-Slot beendet die Zeile an derselben Kante wie `.quick-add` und die
- * Zeilentraeger - fuer alle vier Kuechen-Koepfe dieselbe Regel statt einer
- * eigenen Rechnung hier. */
+ * Leiste steht im __center-Slot des Kuechenkopfs. Seit der Re-Critique
+ * 2026-09-27 (D3) endet dieser Kopf an der Kuechen-Leiste, nicht am Lesemass:
+ * die Primaeraktion steht in allen vier Tabs an derselben Stelle. */
 
 /* Gruppenkopf und Gruppenfläche kommen aus .list-group__title /
  * .row-carrier. Das eigene .item-category__icon entfällt: der Kopf nutzt jetzt

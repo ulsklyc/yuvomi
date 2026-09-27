@@ -3595,8 +3595,10 @@ export async function render(container, { user, signal: routeSignal = null } = {
            aber OHNE Titel: Zeile 2 des Kuechenkopfs. Kontext sind die
            Listen-Kapseln (sie nennen die Liste), am Ende das Werkzeugmenue
            der Liste; am Desktop dockt der Router davor den Primaerknopf an,
-           wie in den drei Geschwister-Tabs. -->
-      <div class="page-toolbar page-toolbar--in-group page-toolbar--narrow shopping-toolbar">
+           wie in den drei Geschwister-Tabs. Kein --narrow (Re-Critique
+           2026-09-27, D3): der Kopf endet an der Kuechen-Leiste, damit die
+           Primaeraktion in allen vier Tabs an derselben Stelle steht. -->
+      <div class="page-toolbar page-toolbar--in-group shopping-toolbar">
         <div class="page-toolbar__center">
           <div class="list-tabs-bar" id="list-tabs-bar" role="group" aria-label="${t('shopping.listsLabel')}"></div>
         </div>

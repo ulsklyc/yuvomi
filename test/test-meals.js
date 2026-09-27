@@ -1639,6 +1639,38 @@ test('A4 P1: bei 1440px passen sieben Tage ohne Querscroll (116 Gutter + 7 Spalt
   assert(need <= 1156, `Bedarf ${need}px > 1156px - bei 1440 laeuft die Woche ueber, der Montag wird angeschnitten`);
 });
 
+test('D3 Kueche: alle vier Tab-Koepfe halten die Kante der Kuechen-Leiste, keiner das Lesemass (Re-Critique 2026-09-27, A1 P2-5)', () => {
+  // Die Primaeraktion dockt am Ende des Kopfes an. Trugen Rezepte, Vorrat und
+  // Einkauf `--narrow`, endete ihr Kopf am Lesemass (FAB x 865 bei 1440),
+  // der Essensplan an der Leistenkante (x 1288): der Knopf sprang beim
+  // Tabwechsel um 420px. Ein Gruppenkopf gehoert der Leiste seiner Gruppe.
+  const pages = ['meals', 'recipes', 'pantry', 'shopping'];
+  let heads = 0;
+  for (const name of pages) {
+    const src = readFileSync(new URL(`../public/pages/${name}.js`, import.meta.url), 'utf8');
+    const lists = [
+      ...src.matchAll(/class="([^"]*\bpage-toolbar--in-group\b[^"]*)"/g),
+      ...src.matchAll(/className\s*=\s*'([^']*\bpage-toolbar--in-group\b[^']*)'/g),
+    ].map((m) => m[1]);
+    assert(lists.length === 1, `${name}.js: genau ein Gruppenkopf erwartet, gefunden ${lists.length} - der Test liest den Kopf nicht mehr`);
+    for (const cls of lists) {
+      heads += 1;
+      assert(!/\bpage-toolbar--narrow\b/.test(cls), `${name}.js: "${cls}" - der Kuechenkopf endet an der Leistenkante, nicht am Lesemass`);
+    }
+    assert(/data-dock-label|dataset\.dockLabel\s*=/.test(src), `${name}.js: die Primaeraktion traegt kein Nomen zum Andocken (data-dock-label)`);
+  }
+  assert(heads === 4, `nur ${heads} Kuechenkoepfe gelesen`);
+});
+
+test('D7 Essensplan: Kartenaktionen und "weitere Mahlzeit" sind dauerhaft sichtbar, auch mit Zeiger', () => {
+  const css = readFileSync(new URL('../public/styles/meals.css', import.meta.url), 'utf8');
+  const hidden = [...eachRule(css)].filter((r) => /(^|,)\s*\.(?:meal-card__actions|meal-slot__add-more-btn)\s*(,|$)/.test(r.selector)
+    && /(?:^|[;\s{])opacity\s*:\s*0(?![.\d])/.test(r.body));
+  assert(hidden.length === 0, `Aktion erst beim Ueberfahren sichtbar: ${hidden.map((r) => `${r.selector.trim()} [${(r.at || []).join(' ')}]`).join('; ')}`);
+  const base = [...eachRule(css)].find((r) => r.selector.trim() === '.meal-card__actions' && !(r.at || []).length);
+  assert(base, 'keine Basisregel .meal-card__actions gefunden - der Test liest meals.css nicht mehr');
+});
+
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
