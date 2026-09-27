@@ -397,3 +397,71 @@ test('jede Kuechen-Seite setzt ihre Leiste vor dem ersten await ein', () => {
   }
   assert.deepEqual(offenders, [], offenders.join('\n'));
 });
+
+/*
+ * 7. DIE ERSATZ-BLENDEN LEBEN AUCH BEI REDUZIERTER BEWEGUNG (Re-Critique
+ *    2026-09-27, C5). reset.css setzte dort `transition-duration: 0s
+ *    !important` auf JEDES Element - auch auf die Opacity-Blenden, die als
+ *    bewegungsfreier Ersatz fuer Slides gebaut waren (Mehr-Blatt, Such-
+ *    Overlay). Sie liefen nie; aus der Blende wurde ein harter Schnitt. Apple
+ *    ersetzt Bewegung durch Ueberblenden, es schaltet sie nicht ab.
+ *    Die Regel: Bewegung bleibt global aus, eine Blende meldet sich per
+ *    `--motion-fade` davon ab - und NUR eine Blende darf das.
+ */
+function reducedMotionRules() {
+  const out = [];
+  for (const file of readdirSync(stylesDir).filter((f) => f.endsWith('.css'))) {
+    const css = readFileSync(new URL(file, stylesDir), 'utf8');
+    for (const rule of eachRule(css)) {
+      if (!rule.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a))) continue;
+      out.push({ file, selectors: rule.selector.split(',').map((s) => s.trim()), body: rule.body });
+    }
+  }
+  return out;
+}
+
+/** `opacity 150ms, opacity .2s` -> nur Opacity? Dauer unter 1ms zaehlt als Schnitt. */
+function opacityFade(value) {
+  const parts = value.split(/,(?![^(]*\))/).map((p) => p.trim()).filter(Boolean);
+  if (!parts.length || !parts.every((p) => /^opacity\b/.test(p))) return false;
+  return !parts.every((p) => /\b0?\.0\dms\b|\b0s\b/.test(p));
+}
+
+test('reduzierte Bewegung: die globale Sperre laesst Blenden durch, Bewegung nicht', () => {
+  const reset = readFileSync(new URL('reset.css', stylesDir), 'utf8');
+  const globalRule = [...eachRule(reset)].find((r) =>
+    r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a)) && /^\*\s*,/.test(r.selector.trim()));
+  assert.ok(globalRule, 'die globale Regel fuer reduzierte Bewegung fehlt');
+  assert.match(globalRule.body, /--motion-fade:\s*0s/, 'ohne Abmeldung bleibt jede Transition bei 0s');
+  assert.match(globalRule.body, /transition-duration:\s*var\(--motion-fade\)\s*!important/);
+  assert.match(globalRule.body, /animation-duration:\s*0s\s*!important/, 'Animationen bleiben aus');
+
+  const rules = reducedMotionRules();
+  const fades = new Set();
+  for (const r of rules) {
+    const m = r.body.match(/(?:^|;)\s*transition\s*:\s*([^;]+)/);
+    if (m && opacityFade(m[1])) r.selectors.forEach((s) => fades.add(s));
+  }
+  assert.ok(fades.size >= 2, `der Scanner findet die Ersatz-Blenden nicht (${[...fades]}) - der Guard waere blind`);
+  const optedIn = new Map();
+  for (const r of rules) {
+    const m = r.body.match(/(?:^|;)\s*--motion-fade\s*:\s*([^;]+)/);
+    if (!m || /^0s$/.test(m[1].trim())) continue;
+    r.selectors.forEach((s) => optedIn.set(s, `${r.file}: ${m[1].trim()}`));
+  }
+  for (const sel of fades) {
+    assert.ok(optedIn.has(sel), `${sel}: Ersatz-Blende ohne --motion-fade - die globale Sperre schneidet sie ab`);
+  }
+  for (const [sel, where] of optedIn) {
+    if (sel === '*' || sel.startsWith('*')) continue;
+    assert.ok(fades.has(sel), `${sel} (${where}): meldet sich von der Sperre ab, blendet aber nicht nur - Bewegung kaeme zurueck`);
+  }
+  // Ausserhalb reduzierter Bewegung hat die Abmeldung nichts zu suchen.
+  for (const file of readdirSync(stylesDir).filter((f) => f.endsWith('.css'))) {
+    const css = readFileSync(new URL(file, stylesDir), 'utf8');
+    for (const rule of eachRule(css)) {
+      if (!/--motion-fade\s*:/.test(rule.body)) continue;
+      assert.ok(rule.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a)), `${file}: ${rule.selector} setzt --motion-fade ausserhalb reduzierter Bewegung`);
+    }
+  }
+});
