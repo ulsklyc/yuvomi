@@ -606,6 +606,8 @@
 }
 
 .inventory-history-entry__label {
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
   overflow-wrap: anywhere;
 }
 

@@ -1224,6 +1224,9 @@
   max-width: min(var(--content-max-width-narrow), 100vw);
   max-height: 50vh;
   overflow: auto;
+  /* Kategorienamen trennen statt brechen (W1, test:typography). */
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
   overflow-wrap: anywhere;
   color: var(--color-text-primary);
   background: var(--color-surface);
@@ -4275,6 +4278,8 @@ button.today-cockpit__more--link {
   color: var(--color-text-secondary);
   font-size: var(--type-caption);
   line-height: var(--line-height-snug);
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
   overflow-wrap: anywhere;
 }
 
@@ -6284,7 +6289,7 @@ button.today-cockpit__more--link {
 .nutrition-widget { display: grid; gap: var(--space-3); padding: var(--space-4); }
 .nutrition-widget__rows { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
 .nutrition-widget__row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--space-2) var(--space-3); }
-.nutrition-widget__label { font-size: var(--text-sm); color: var(--color-text-secondary); min-width: 0; overflow-wrap: anywhere; }
+.nutrition-widget__label { font-size: var(--text-sm); color: var(--color-text-secondary); min-width: 0; hyphens: auto; hyphenate-limit-chars: 6 4 4; overflow-wrap: anywhere; }
 .nutrition-widget__bar { grid-column: 1 / -1; grid-row: 2; display: block; block-size: var(--space-2); border-radius: var(--radius-full); background: var(--color-fill-well); overflow: hidden; }
 .nutrition-widget__fill { display: block; block-size: 100%; inline-size: 100%; transform: scaleX(var(--nutrition-scale, 0)); transform-origin: left center; border-radius: inherit; background: var(--module-health); }
 .nutrition-widget__bar--over .nutrition-widget__fill { background: var(--color-warning); }

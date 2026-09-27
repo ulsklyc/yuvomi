@@ -398,16 +398,24 @@
   flex-shrink: 0;
 }
 
-/* Labels werden nie silbengetrennt: die früheren Notlösungen (Ellipse in F-04,
- * hyphens:auto in A1-09) kurierten nur Symptome der 7-Spalten-Quetsche und
- * zerhackten „MITTAG-ESSEN" in jeder Karte (Critique P1). Das Desktop-Board
- * gibt den Spalten jetzt eine Mindestbreite (Scroll-Fenster unter 1440px) und
- * trägt die Typ-Labels in einer Gutter-Spalte — hier bleibt nur der Backstop
- * für unhyphenierbare Langwörter. Eigener Span, weil die Umbruch-Regeln nicht
- * auf anonyme Flex-Textknoten wirken. */
+/* EIN WORT BRICHT NUR MIT STRICH (Re-Critique 2026-09-27, W1).
+ *
+ * Hier stand `hyphens: manual` neben `overflow-wrap: break-word`, mit der
+ * Begruendung, die Labels wuerden sonst „MITTAG-ESSEN" zeigen. Die Kombination
+ * verbietet aber nicht den Bruch, sondern nur den STRICH: passt ein Wort nicht,
+ * bricht break-word es trotzdem, und zwar an einer beliebigen Stelle. Die
+ * Mindestbreite der Spalten (Scroll-Fenster unter 1440px, Typ-Label in der
+ * Gutter-Spalte) sorgt dafuer, dass das im Normalfall gar nicht passiert; wo es
+ * doch passiert, trennt das Silbenwoerterbuch der Dokumentsprache, und
+ * `hyphenate-limit-chars` haelt mindestens vier Zeichen auf jeder Seite
+ * (dieselbe Untergrenze wie `.more-item__label`, layout.css). break-word bleibt
+ * die letzte Stufe fuer Woerter ohne Trennstelle. Eigener Span, weil die
+ * Umbruch-Regeln nicht auf anonyme Flex-Textknoten wirken. Die Regel haelt
+ * test:typography („wer ein Wort brechen laesst, schaltet den Strich nicht ab"). */
 .meal-slot__type-text {
   min-width: 0;
-  hyphens: manual;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
   overflow-wrap: break-word;
 }
 
@@ -540,11 +548,17 @@
   display: none;
 }
 
+/* Die Trennregel steht an der BASIS, nicht an den Umbruch-Varianten: mobil
+ * (Zeilenkarte) und am Board (2-Zeilen-Clamp) bricht der Titel, und beide
+ * erben sie von hier. Solange die Basis einzeilig ellipsiert, ist sie
+ * wirkungslos. Warum Trennung statt Bruch: siehe das Board weiter unten. */
 .meal-card__title-text {
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
 }
 
 .meal-card__recurrence {
@@ -1458,9 +1472,11 @@
     margin-top: var(--space-1);
   }
 
+  /* Dieselbe Umbruchregel wie `.meal-slot__type-text` oben. */
   .week-gutter-label__text {
     min-width: 0;
-    hyphens: manual;
+    hyphens: auto;
+    hyphenate-limit-chars: 6 4 4;
     overflow-wrap: break-word;
   }
 
@@ -1477,17 +1493,23 @@
   }
 
   /* Karten-Titel im Board: zwei Zeilen statt Einzeiler-Ellipse nach ~5
-   * Zeichen ("Tomat…") — Wiedererkennung vor Kompaktheit. Keine
-   * Auto-Silbentrennung mehr: die Mindest-Spaltenbreite (140px) lässt
-   * Gerichtenamen an Wortgrenzen umbrechen; break-word bleibt Backstop
-   * für Einzelwörter jenseits der Spaltenbreite (Critique P1). */
+   * Zeichen ("Tomat…") - Wiedererkennung vor Kompaktheit.
+   *
+   * MIT SILBENTRENNUNG, WEIL DIE SPALTE SCHMALER IST ALS EIN KOMPOSITUM. Hier
+   * stand, die Mindest-Spaltenbreite (140px) lasse Gerichtenamen an
+   * Wortgrenzen umbrechen. Gemessen bei 1440 und 1280: 105,6px Textbreite
+   * (Karte minus Polster), und „Tomatensuppe" oder „Lammkoteletts" passen
+   * nicht hinein. `hyphens: manual` machte daraus „Tomatensupp / e" und
+   * „Lammkotelett / s" (Re-Critique 2026-09-27, A4). Mit `hyphens: auto` und
+   * der Untergrenze von vier Zeichen je Seite steht dort „Tomaten- / suppe",
+   * „Lammkote- / letts"; break-word bleibt die letzte Stufe. Die Trennung
+   * selbst erbt die Regel von der Basis (`.meal-card__title-text` oben). */
   .meal-card__title-text {
     white-space: normal;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     line-clamp: 2;
-    hyphens: manual;
     overflow-wrap: break-word;
   }
 }

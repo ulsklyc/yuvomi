@@ -687,3 +687,177 @@ test('Such- und Schnellformular-Eingaben bleiben bei 16px', () => {
     );
   }
 });
+
+// ---------------------------------------------------------------------------
+// EIN WORT BRICHT NUR MIT STRICH (Re-Critique 2026-09-27, W1)
+//
+// `overflow-wrap: break-word | anywhere` (und `word-break: break-word |
+// break-all`) erlauben dem Browser, ein Wort zu brechen, das nicht in die Zeile
+// passt - und zwar an JEDER Stelle, ohne Zeichen. Gemessen: „Tomatensupp / e"
+// im Essensplan, „SAUERSTOFFSÄTTI / GUNG" in der Gesundheit, „AUFMERKSAMKE / IT"
+// im Inventar. `hyphens: auto` fragt vorher das Silbenwoerterbuch der
+// Dokumentsprache (lang folgt der Locale, i18n.js) und setzt den Strich an eine
+// Silbengrenze; break-word bleibt dann die letzte Stufe fuer Woerter ohne
+// Trennstelle.
+//
+// Die Regel, nicht die Schreibweise: gefragt wird, ob eine Regel, die ein Wort
+// brechen LAESST, fuer ihr Subjekt (die letzte Klasse des Selektors) auch die
+// Silbentrennung hat - in derselben Regel, in einer Basisregel desselben
+// Subjekts oder in einer Regel im selben @media-Kontext. Kommentare zaehlen
+// nicht (eachRule entfernt sie), und ein `hyphens: auto` in einer Media-Query
+// deckt die Basis NICHT - mobil bricht sonst, was am Desktop trennt.
+// ---------------------------------------------------------------------------
+
+/** Letzter Wert einer Eigenschaft im Rumpf einer Regel (die spaetere gewinnt). */
+function lastDeclaration(body, prop) {
+  const all = [...body.matchAll(new RegExp(`(?:^|[;{\\s])${prop}\\s*:\\s*([^;]+)`, 'g'))];
+  return all.length ? all[all.length - 1][1].trim() : '';
+}
+
+/**
+ * Jede Regel je Komma-Teil mit ihrem Subjekt: der letzten Klasse des letzten
+ * Compounds. Argumente von Pseudoklassen zaehlen nicht - in
+ * `.btn:not(.btn--icon)` ist das Subjekt `.btn`, nicht die ausgeschlossene
+ * Klasse.
+ */
+function wordBreakRules() {
+  const out = [];
+  for (const file of cssFiles) {
+    const css = readFileSync(new URL(file, STYLES_DIR), 'utf8');
+    for (const { selector, body, at } of eachRule(css)) {
+      const overflowWrap = lastDeclaration(body, 'overflow-wrap');
+      const wordBreak = lastDeclaration(body, 'word-break');
+      const hyphens = lastDeclaration(body, 'hyphens');
+      const whiteSpace = lastDeclaration(body, 'white-space');
+      for (const part of selector.split(',')) {
+        const sel = part.trim().replace(/\s+/g, ' ');
+        let compound = sel.split(/[\s>+~]+/).pop();
+        // Pseudoklassen-Argumente bis zur Stabilitaet entfernen (verschachtelt).
+        for (let prev = ''; prev !== compound;) {
+          prev = compound;
+          compound = compound.replace(/:[\w-]+\([^()]*\)/g, '');
+        }
+        const subject = (compound.match(/\.[\w-]+/g) ?? []).pop();
+        if (!subject) continue;
+        out.push({
+          file, selector: sel, subject, context: at.join(' | '),
+          breaks: /break-word|anywhere/.test(overflowWrap) || /break-word|break-all/.test(wordBreak),
+          hyphens,
+          // Eine Regel, die gar nicht umbricht, braucht keinen Strich.
+          keepsWhole: /nowrap/.test(whiteSpace) || overflowWrap === 'normal',
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Brechende Regeln OHNE Silbentrennung - der eingefrorene Bestand. Die Karte darf
+ * nur schrumpfen: ein neuer Eintrag ist rot, ein erfuellter auch.
+ *
+ * NO_SYLLABLES  Der Inhalt hat keine Silben: Adresse, Link, Datei- oder
+ *               Pfadname, Zahl. Ein Trennstrich darin waere eine Falschauskunft
+ *               (ein „-" mitten in einer URL gehoert zur URL). Dauerhaft.
+ * DELIBERATE    Am Ort begruendete Asymmetrie (Datei nennen, Kommentar dort).
+ * LEGACY        Text mit Silben, der noch ohne Trennung bricht. Wer die Datei
+ *               anfasst, zieht `hyphens: auto; hyphenate-limit-chars: 6 4 4`
+ *               nach und streicht den Eintrag.
+ */
+const BREAKS_WITHOUT_HYPHENS = {
+  '.contact-detail__link': 'NO_SYLLABLES',
+  '.document-dropzone__file': 'NO_SYLLABLES',
+  '.folder-upload-preview': 'NO_SYLLABLES',
+  '.folder-upload-tree__name': 'NO_SYLLABLES',
+  '.fasting-widget__timer': 'NO_SYLLABLES',
+  '.fasting-hero__timer': 'NO_SYLLABLES',
+  '.inventory-detail-list__link': 'NO_SYLLABLES',
+  '.caldav-calendar-source': 'NO_SYLLABLES',
+  '.item-details__link': 'NO_SYLLABLES',
+  '.note-md-link': 'NO_SYLLABLES',
+  // list-row.css: „NUR HIER, NICHT AN DER METAZEILE" - hyphens: auto wuerde dort
+  // auch trennen, wo ein Umbruch an einer Leerstelle moeglich ist.
+  '.list-row__meta': 'DELIBERATE',
+  '.btn': 'LEGACY',
+  '.calendar-all-day-label': 'LEGACY',
+  '.contact-card__sub': 'LEGACY',
+  '.detail-row__value': 'LEGACY',
+  '.document-dropzone__hint': 'LEGACY',
+  '.documents-folder-browser__toggle-label': 'LEGACY',
+  '.documents-folder-item__name': 'LEGACY',
+  '.document-row__title': 'LEGACY',
+  '.folder-upload-tree__status': 'LEGACY',
+  '.document-viewer__text': 'LEGACY',
+  '.dms-preview__title': 'LEGACY',
+  '.health-dose__name': 'LEGACY',
+  '.health-choice-label': 'LEGACY',
+  '.health-nutrition-progress__label': 'LEGACY',
+  '.health-nutrition-row__title': 'LEGACY',
+  '.search-scope': 'LEGACY',
+  '.split-view__detail-title': 'LEGACY',
+  '.note-card__title': 'LEGACY',
+  '.note-category-badge__name': 'LEGACY',
+  '.note-card__content': 'LEGACY',
+  '.note-read__body': 'LEGACY',
+  '.settings-shell__navigation-result-text': 'LEGACY',
+  '.settings-info-value--danger': 'LEGACY',
+  '.settings-document-storage-error': 'LEGACY',
+  '.caldav-calendar-name': 'LEGACY',
+  '.caldav-calendar-error': 'LEGACY',
+  '.backfill-moved__title': 'LEGACY',
+  '.split-group-meta': 'LEGACY',
+  '.task-comment__text': 'LEGACY',
+};
+
+/** Die harte Form desselben Fehlers: ausdruecklich `hyphens: manual | none`
+ *  neben einem Bruch. Ohne Ausnahme - bis auf die Wunsch-Diffs, die ein anderer
+ *  Schritt anwendet (Eintrag wird dann rot und faellt weg). */
+const OPT_OUT_PENDING = {
+  // health.css gehoert in R11 c11; Wunsch-Diff in SP/r11/handoff-w11.md.
+  '.health-choices--scale .health-choice-label': 'health.css',
+};
+
+test('wer ein Wort brechen laesst, schaltet den Strich nicht ab (W1)', () => {
+  const rules = wordBreakRules();
+  assert.ok(rules.filter((r) => r.breaks).length > 40,
+    'kaum brechende Regeln gefunden - misst der Scanner noch?');
+  const optOut = rules
+    .filter((r) => /^(manual|none)\b/.test(r.hyphens) && !r.keepsWhole)
+    .filter((r) => rules.some((o) => o.subject === r.subject && o.breaks))
+    .map((r) => r.selector);
+  const fresh = [...new Set(optOut)].filter((s) => !(s in OPT_OUT_PENDING));
+  assert.deepEqual(fresh, [],
+    'hyphens: manual/none neben overflow-wrap: break-word/anywhere bricht Woerter OHNE Strich '
+    + '(„Tomatensupp / e"). Stattdessen hyphens: auto; hyphenate-limit-chars: 6 4 4.');
+  const stale = Object.keys(OPT_OUT_PENDING).filter((s) => !optOut.includes(s));
+  assert.deepEqual(stale, [], 'erfuellte Eintraege aus OPT_OUT_PENDING streichen');
+});
+
+test('ein brechendes Wort wird silbengetrennt, nicht zerhackt (W1)', () => {
+  const rules = wordBreakRules();
+  const hyphenated = (r) => rules.some((o) => o.subject === r.subject && /^auto\b/.test(o.hyphens)
+    && (o.context === '' || o.context === r.context));
+  const missing = new Map();
+  for (const r of rules.filter((x) => x.breaks && !hyphenated(x))) {
+    missing.set(r.subject, [...(missing.get(r.subject) ?? []), `${r.file}: ${r.selector}`]);
+  }
+  const fresh = [...missing.keys()].filter((s) => !(s in BREAKS_WITHOUT_HYPHENS));
+  assert.deepEqual(fresh.map((s) => `${s} (${missing.get(s).join('; ')})`), [],
+    'diese Regeln lassen ein Wort brechen, ohne dass das Subjekt Silbentrennung hat - '
+    + 'hyphens: auto; hyphenate-limit-chars: 6 4 4 ergaenzen (Basisregel oder derselbe @media-Kontext)');
+  const stale = Object.keys(BREAKS_WITHOUT_HYPHENS).filter((s) => !missing.has(s));
+  assert.deepEqual(stale, [], 'erfuellte Eintraege aus BREAKS_WITHOUT_HYPHENS streichen');
+});
+
+test('die Messwoerter der Re-Critique trennen an der Basis ihres Subjekts (W1)', () => {
+  // Die drei gemessenen Brueche als Ankerfaelle: ihr Subjekt muss existieren und
+  // ohne Media-Query `hyphens: auto` tragen. Ein Guard ueber verschwundene
+  // Klassen waere vakuum-wahr.
+  const rules = wordBreakRules();
+  for (const subject of ['.meal-card__title-text', '.metric-card__label', '.meal-slot__type-text']) {
+    const own = rules.filter((r) => r.subject === subject);
+    assert.ok(own.length, `${subject} kommt in keinem Stylesheet mehr vor`);
+    assert.ok(own.some((r) => /^auto\b/.test(r.hyphens) && r.context === ''),
+      `${subject}: hyphens: auto fehlt an der Basisregel`);
+  }
+});

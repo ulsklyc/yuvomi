@@ -289,8 +289,18 @@
 .metric-card__label {
   color: var(--color-text-secondary);
   /* min-width:0 + Umbruch: „Nächstes Fälligkeitsdatum" und die längeren
-   * Übersetzungen sprengen sonst die schmalste Spalte der Vierer-Zeile. */
+   * Übersetzungen sprengen sonst die schmalste Spalte der Vierer-Zeile.
+   *
+   * GETRENNT, NICHT GEBROCHEN (Re-Critique 2026-09-27, W1). Ohne `hyphens`
+   * erbte das Label `manual`, und break-word brach ein Versal-Kompositum, das
+   * nicht in die Kachel passt, an beliebiger Stelle: „SAUERSTOFFSÄTTI / GUNG"
+   * (133px, Gesundheit, Desktop und mobil). Mit `hyphens: auto` trennt das
+   * Silbenwoerterbuch der Dokumentsprache („…SÄTTI- / GUNG"), die Untergrenze
+   * haelt mindestens vier Zeichen auf jeder Seite des Strichs; break-word
+   * bleibt die letzte Stufe fuer Woerter ohne Trennstelle. */
   min-width: 0;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
   overflow-wrap: break-word;
 }
 
@@ -384,6 +394,8 @@
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
   min-width: 0;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
   overflow-wrap: break-word;
 }
 
@@ -495,13 +507,12 @@
  * Meta-Zeile (Trend + Datum) tragen - alles optional, die Signatur bleibt
  * Zahl + Label + optionaler Trend.
  * -------------------------------------------------------- */
-/* Flex mit Umbruch: passt das Label nicht mehr NEBEN das Icon, wrappt es als
- * ganzes Flex-Item auf eine eigene, volle Kartenzeile - erst dort darf der
- * break-word-Backstop überhaupt greifen. (Ein Float-Ansatz scheitert:
- * break-word füllt sonst die neben dem Icon verkürzte Zeile und chopt
- * „Sauerstoffsättigu|ng" wortmittig. Deshalb auch hyphens: manual - mit auto
- * ist die min-content-Breite des Labels eine SILBE, das Item unterschreitet
- * nie seine Mindestbreite und wrappt nie; es trennt stattdessen.) */
+/* (Hier stand die Begruendung fuer `hyphens: manual`: mit `auto` sei die
+ * min-content-Breite des Labels eine Silbe, das Flex-Item wrappe dann nie auf
+ * eine eigene Zeile, sondern trenne. Das galt fuer `flex-wrap: wrap`. Seit der
+ * Kopf `nowrap` ist - Absatz darunter - bricht das Label ohnehin in SICH um, und
+ * `manual` bewirkte nur noch, dass es dabei ohne Strich mitten im Wort brach:
+ * „SAUERSTOFFSÄTTI / GUNG". Die Trennregel steht jetzt an `.metric-card__label`.) */
 /* EIN ZEICHEN BLEIBT BEI SEINEM WORT. `flex-wrap: wrap` liess das Icon allein
  * auf einer ersten Zeile stehen, sobald sein Label die Spalte nicht in einer
  * Zeile fuellte - gemessen in der Aktivitaets-Reihe der Gesundheit
@@ -519,7 +530,6 @@
 
 .metric-card__head .metric-card__label {
   flex: 1 1 auto;
-  hyphens: manual;
 }
 
 /* DER GLYPH GEHOERT ZU SEINEM LABEL, NICHT ZU SEINEM MODUL.
