@@ -7064,7 +7064,6 @@ textarea::placeholder {
   transform: none;
 }
 
-.toast--success { background-color: var(--color-success); color: var(--toast-success-text); }
 .toast--danger  { background-color: var(--color-danger);  color: var(--toast-danger-text); }
 .toast--warning { background-color: var(--color-warning); color: var(--toast-warning-text); }
 

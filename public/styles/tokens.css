@@ -419,10 +419,9 @@
   --color-info-ink:       var(--_color-info-ink);
 
   /* Toast-Textfarben: weiß auf dunklen semantischen Bg (light mode).
-   * Dark mode überschreibt auf dunkel, weil --color-success/warning/danger
-   * dort vivid/hell sind und weißen Text unleserlich machen würden. */
-  --_toast-success-text: var(--color-text-on-accent);
-  --toast-success-text:  var(--_toast-success-text);
+   * Dark mode überschreibt auf dunkel, weil --color-warning/danger dort
+   * vivid/hell sind und weißen Text unleserlich machen würden. Erfolg steht
+   * seit R11 auf dem Shell-Glas (glass.css, --shell-success-ink). */
   --_toast-warning-text: var(--color-text-on-accent);
   --toast-warning-text:  var(--_toast-warning-text);
   --_toast-danger-text:  var(--color-text-on-accent);
@@ -1966,7 +1965,6 @@
     --_color-info-ink:      #60ACFF;
 
     /* Toast: dunkler Text auf vividen Farben */
-    --_toast-success-text: #04200D;   /* auf #30D158 */
     --_toast-warning-text: #2B1A00;   /* auf #FF9F0A */
     --_toast-danger-text:  #330606;   /* auf #FF6961 */
 
@@ -2209,7 +2207,6 @@
     --_color-info-ink:      #60ACFF;
 
     /* Toast: dunkler Text auf vividen Farben */
-    --_toast-success-text: #04200D;
     --_toast-warning-text: #2B1A00;
     --_toast-danger-text:  #330606;
 
