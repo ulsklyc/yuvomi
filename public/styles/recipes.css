@@ -582,7 +582,7 @@ button.recipe-detail__ingredient-match:hover {
  * der Liste weg.
  *
  * KEINE EIGENE `@container`-ABFRAGE. Die Schwelle steht einmal in layout.css
- * (PAGE-019 haelt sie am Token); ein zweites `75rem` hier liefe ihr bei der
+ * (PAGE-019 haelt sie am Token); ein zweites `65rem` hier liefe ihr bei der
  * naechsten Aenderung still davon. `.recipes-list--split` setzt recipes.js
  * nach der gerechneten Darstellung der Spalte (syncRowMode).
  * -------------------------------------------------------- */

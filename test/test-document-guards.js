@@ -1114,7 +1114,6 @@ const SHAPE_EXEMPT = new Map([
   ['allday-event', 'Rasterzelle: Ganztags-Balken der Woche/des Tages, gleiche Bar wie .month-day__event'],
   // 4. Zeilen einer Zeilenliste
   ['nav-item', 'Zeile: Eintrag der Sidebar-Navigation'],
-  ['settings-shell__navigation-toggle', 'Zeile: Domaenenkopf der Settings-Navigation (Akkordeon)'],
   ['note-item', 'Zeile: Notiz im Dashboard-Widget'],
   ['rw-standing__id', 'Zeile: Oeffner einer Mitglieds-Zeile'],
   ['documents-folder-item__select', 'Zeile: Ordner in der Dokumentenliste'],

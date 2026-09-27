@@ -3114,7 +3114,7 @@ html.fab-anim-done .page-fab {
  * (gemessen 2026-07-29). Innerhalb eines nicht scrollenden Roots ist `top: 0`
  * korrekt, und die Leiste darüber kann den Kopf ohnehin nicht überlaufen.
  *
- * Nutzer: die vier Küchen-Tabs. Für health-tabs.js ebenso verwendbar. */
+ * Nutzer: die vier Küchen-Tabs. */
 .page-toolbar--in-group {
   border-top: none;
 }

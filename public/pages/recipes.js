@@ -209,7 +209,7 @@ export async function render(container, { signal } = {}) {
 
   const page = document.createElement('div');
   // `app-page--list-detail`: Regime „Liste + Detail" der Breitenregel
-  // (DESIGN.md). Unter der Schwelle bleibt es Lesemass, ab 75rem Modulflaeche
+  // (DESIGN.md). Unter der Schwelle bleibt es Lesemass, ab 65rem Modulflaeche
   // steht rechts das ausgewaehlte Rezept (utils/master-detail.js).
   page.className = 'recipes-page app-page app-page--reading app-page--list-detail page-measure--narrow';
   page.dataset.composition = 'reading';
@@ -488,7 +488,7 @@ function renderRecipeList({ repaint = false } = {}) {
 
 /* LISTE + DETAIL (Breitenregel, Regime 2 - DESIGN.md)
  *
- * Ab 75rem Modulflaeche steht links die Liste, rechts das ausgewaehlte Rezept
+ * Ab 65rem Modulflaeche steht links die Liste, rechts das ausgewaehlte Rezept
  * mit eigenem Kopf (Titel, Bearbeiten, Duplizieren, Loeschen) und dem
  * Aufklapper-Inhalt darunter - wie Notizen und Erinnerungen auf dem Mac.
  * Darunter bleibt alles, wie es war: die Zeile klappt auf, und ein Rezept

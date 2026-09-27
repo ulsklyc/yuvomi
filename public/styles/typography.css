@@ -219,7 +219,6 @@
  * ------------------------------------------------------------------------ */
 .nav-section-label,
 .settings-shell__navigation-heading,
-.settings-shell__navigation-toggle,
 .kanban-col__title {
   font-size: var(--text-xs);
   font-weight: var(--font-weight-semibold);

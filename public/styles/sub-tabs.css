@@ -13,8 +13,9 @@
    * zentrierten Content-Spalte und fluchtet mit dem Seiten-Body darunter.
    * Das gilt für die Leiste ALS EIGENE RAIL: kitchen-tabs.js hängt sie als
    * GESCHWISTER des Modul-Roots in den Router-Wrapper, womit das `100%` die
-   * volle Shell-Breite trifft. Liegt sie dagegen IM Modulkopf (health-tabs.js),
-   * gibt sie das Rail-Verhalten ab - siehe die Trägerregel unten. (Settings
+   * volle Shell-Breite trifft. Liegt sie dagegen IM Modulkopf (bis R10 die
+   * Gesundheit, heute kein Kernmodul), gibt sie das Rail-Verhalten ab -
+   * siehe die Trägerregel unten. (Settings
    * nutzt eine andere Tab-Mechanik, utils/tablist.js, und rendert keine
    * .sub-tabs-bar.) */
   padding-inline: var(--page-inline-pad);
@@ -49,7 +50,9 @@
  * Modulkopf" (layout.css) auf, die jeder `[role="tablist"]` im Kopf eine eigene
  * Zeile gibt.
  *
- * Nutzer: health-tabs.js. Die Küchen-Leiste bleibt eine eigene Rail - sie
+ * Nutzer: seit R10 (2026-09-27) keiner - die Gesundheit hat ihre Leiste gegen
+ * die Übersicht als Navigation getauscht. Die Regel bleibt für die nächste
+ * Leiste im Kopf. Die Küchen-Leiste bleibt eine eigene Rail - sie
  * wechselt das MODUL und steht deshalb über dem Kopf, nicht in ihm. */
 .page-toolbar > .sub-tabs-bar {
   /* relative statt static: klebt nicht (das tut der Kopf), bleibt aber der
