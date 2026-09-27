@@ -325,14 +325,11 @@ export async function render(container, { user, signal } = {}) {
   listEl.addEventListener('beforetoggle', onPanelBeforeToggle, true);
   listEl.addEventListener('toggle', onPanelToggle, true);
 
-  // Auswahl-Modus: Checkbox-Änderungen sammeln.
-  listEl.addEventListener('change', (e) => {
-    const cb = e.target.closest('[data-select]');
-    if (!cb) return;
-    const id = parseInt(cb.dataset.select, 10);
-    if (cb.checked) state.selected.add(id); else state.selected.delete(id);
-    cb.closest('.contact-item')?.classList.toggle('contact-item--selected', cb.checked);
-    updateSelectUI();
+  // Auswahl-Modus: ein Tipp auf die Zeile waehlt oder waehlt ab - immer ueber
+  // ihren Kreis, damit Zeile und Knopf nicht zweimal umschalten.
+  listEl.addEventListener('click', (e) => {
+    const row = e.target.closest('.contact-item--select');
+    if (row) toggleContactSelection(row.querySelector('[data-select]'));
   });
 
   const [res, catRes, metaRes, prefsRes] = await Promise.all([
@@ -804,20 +801,31 @@ function renderMeta(c) {
 function renderContactItem(c) {
   const menuId  = `contact-more-${c.id}`;
 
-  // Auswahl-Modus: Zeile wird zur Checkbox (Familien-Kontakte deaktiviert,
-  // da einzeln nicht löschbar). Aktionen/Öffnen entfallen.
+  // Auswahl-Modus: die Zeile wird zum Umschalter (Familien-Kontakte
+  // deaktiviert, da einzeln nicht löschbar). Aktionen/Öffnen entfallen.
+  //
+  // DER KREIS DER AUFGABEN STATT EINER NATIVEN CHECKBOX (R8 H14, Muster
+  // `task-select-btn` seit R7): EIN Knopf mit `aria-pressed` und einem Label,
+  // das Person und Handlung nennt (vorher sagte die Checkbox nur den Namen).
+  // Die Zeile drumherum bleibt Trefflaeche wie das Label vorher - ein Tipp
+  // irgendwo darauf laeuft ueber denselben Knopf (Verdrahtung in `render`).
+  // Sie selbst ist KEIN Knopf: ein Zeilenkoerper mit aria-label verschluckte
+  // Name und Telefonnummer fuer Hilfsmittel.
   if (state.selectMode) {
     const selected = state.selected.has(c.id);
     return `
       <div class="list-row list-row--tight contact-item contact-item--select${selected ? ' contact-item--selected' : ''}" data-id="${c.id}" data-md-id="${c.id}">
-        <label class="contact-item__open list-row__main--interactive contact-item__select">
-          <input type="checkbox" class="contact-item__checkbox" data-select="${c.id}"${selected ? ' checked' : ''}${c.family_user_id ? ' disabled' : ''} aria-label="${esc(c.name)}">
+        <div class="contact-item__open list-row__main--interactive contact-item__select">
+          <button type="button" class="select-circle${selected ? ' select-circle--on' : ''}" data-select="${c.id}"
+                  aria-pressed="${selected}" aria-label="${esc(t('contacts.selectNamed', { name: c.name }))}"${c.family_user_id ? ' disabled' : ''}>
+            <i data-lucide="check" class="select-circle__check" aria-hidden="true"></i>
+          </button>
           ${contactAvatar(c)}
           <span class="contact-item__body">
             <span class="contact-item__name">${esc(c.name)}</span>
             ${renderMeta(c)}
           </span>
-        </label>
+        </div>
       </div>
     `;
   }
@@ -1644,6 +1652,18 @@ function updateSelectUI() {
   setBulkPill({ label: t('contacts.selectCount', { count: n }), actions });
 }
 
+/** Ein Tipp im Auswahlmodus: den Kontakt in die Auswahl oder heraus. */
+function toggleContactSelection(btn) {
+  if (!btn || btn.disabled) return;
+  const id = parseInt(btn.dataset.select, 10);
+  const on = !state.selected.has(id);
+  if (on) state.selected.add(id); else state.selected.delete(id);
+  btn.setAttribute('aria-pressed', String(on));
+  btn.classList.toggle('select-circle--on', on);
+  btn.closest('.contact-item')?.classList.toggle('contact-item--selected', on);
+  updateSelectUI();
+}
+
 // Nur nicht-verknüpfte Kontakte sind wählbar (Familien-Kontakte lassen sich
 // einzeln nicht löschen). „Alle" schaltet zwischen komplett aus/an um.
 function toggleSelectAll() {
@@ -1950,6 +1970,8 @@ function showImportResult({ imported, withBirthday, failedList, lastName, lastEr
  */
 export const __test = {
   renderContactItem, contactsEmptyStateHtml, toolbarActionsHtml,
+  // R8 H14: der Auswahlkreis als Programm.
+  toggleContactSelection,
   openContactDetail, readOnly, state, buildContactForm,
   // Der Import-Toast und sein Sprung (#1348): die Aussage ist ein Aufruf von
   // `showToast` und ein Flag in der sessionStorage, kein Markup.

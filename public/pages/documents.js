@@ -1822,16 +1822,23 @@ function renderActions(doc) {
   `;
 }
 
-// Auswahl-Kachel im Icon-Slot: im Auswahlmodus ersetzt die Checkbox die
-// Einzelaktionen, damit Karte und Zeile nicht zwei konkurrierende Klickziele tragen.
+// Auswahlkreis im Icon-Slot: im Auswahlmodus ersetzt er die Einzelaktionen,
+// damit Karte und Zeile nicht zwei konkurrierende Klickziele tragen.
+//
+// DER KREIS DER AUFGABEN STATT EINER NATIVEN CHECKBOX (R8 H14, Muster
+// `task-select-btn` seit R7): vorher stand hier ein Browser-Kaestchen auf einer
+// getoenten Kachel - die einzige ungestaltete Auswahl neben den Kontakten.
+// Ein Knopf mit `aria-pressed` und dem Dokumentnamen im Label; der Tipp
+// laeuft wie jeder Tipp auf die Karte durch `handleDocumentAction`.
 function renderSelectBox(doc) {
   if (!state.selectMode) return '';
-  const checked = state.selected.has(doc.id);
+  const on = state.selected.has(doc.id);
   return `
-    <label class="document-select">
-      <input type="checkbox" data-select-id="${doc.id}" ${checked ? 'checked' : ''}
-             aria-label="${esc(t('documents.selectDocument', { name: doc.name }))}">
-    </label>`;
+    <button type="button" class="select-circle${on ? ' select-circle--on' : ''}"
+            data-select-id="${doc.id}" aria-pressed="${on}"
+            aria-label="${esc(t('documents.selectDocument', { name: doc.name }))}">
+      <i data-lucide="check" class="select-circle__check" aria-hidden="true"></i>
+    </button>`;
 }
 
 /* DIE KARTE IST VORSCHAU, NAME, EINE META-ZEILE UND DIE LEISTE (Critique
@@ -1882,21 +1889,27 @@ function renderListItem(doc) {
   `;
 }
 
+/** Ein Tipp im Auswahlmodus: das Dokument in die Auswahl oder heraus. */
+function toggleDocumentSelection(card) {
+  if (!card) return;
+  const id = Number(card.dataset.id);
+  const next = !state.selected.has(id);
+  if (next) state.selected.add(id);
+  else state.selected.delete(id);
+  const box = card.querySelector('[data-select-id]');
+  if (box) {
+    box.classList.toggle('select-circle--on', next);
+    box.setAttribute('aria-pressed', String(next));
+  }
+  card.classList.toggle('is-selected', next);
+  updateSelectUI();
+}
+
 function handleDocumentAction(e) {
-  // Im Auswahlmodus ist die ganze Karte/Zeile ein Umschalter — die Checkbox ist
+  // Im Auswahlmodus ist die ganze Karte/Zeile ein Umschalter — der Kreis ist
   // die sichtbare Anzeige, nicht das einzige Ziel (Fitts' Law auf Touch).
   if (state.selectMode) {
-    const card = e.target.closest('[data-id]');
-    if (!card) return;
-    const id = Number(card.dataset.id);
-    const box = card.querySelector('[data-select-id]');
-    // Ein direkter Checkbox-Klick hat den Zustand schon umgeschaltet.
-    const next = e.target === box ? box.checked : !state.selected.has(id);
-    if (next) state.selected.add(id);
-    else state.selected.delete(id);
-    if (box) box.checked = next;
-    card.classList.toggle('is-selected', next);
-    updateSelectUI();
+    toggleDocumentSelection(e.target.closest('[data-id]'));
     return;
   }
   const menuBtn = e.target.closest('[data-action="menu"]');
@@ -2152,7 +2165,12 @@ function documentVisibilityFieldHtml(doc) {
           </div>`;
 }
 
-export const __test = { memberOptions, loadMembers, documentVisibilityFieldHtml, openDocumentViewer };
+export const __test = {
+  memberOptions, loadMembers, documentVisibilityFieldHtml, openDocumentViewer,
+  // R8 H14: der Auswahlkreis als Programm (Markup und Tipp).
+  state, renderSelectBox, toggleDocumentSelection,
+  setContainerForTest(container) { _container = container; },
+};
 
 function openDocumentModal(doc = null) {
   const isEdit = !!doc;
@@ -3149,7 +3167,8 @@ function renderDmsResults(container, items, accountId) {
       media.appendChild(img);
     }
     if (supportsThumb || canOpen) {
-      // Hover-Verrät: ein Lupen- bzw. Öffnen-Symbol taucht über der Vorschau auf.
+      // Ein Lupen- bzw. Oeffnen-Symbol in der Ecke der Vorschau, dauerhaft
+      // sichtbar (R8 H14) - bis dahin tauchte es nur beim Ueberfahren auf.
       const glyph = supportsThumb ? 'zoom-in' : 'external-link';
       media.insertAdjacentHTML('beforeend', `<span class="dms-result__open" aria-hidden="true"><i data-lucide="${glyph}"></i></span>`);
     }

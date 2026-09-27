@@ -4238,3 +4238,87 @@ test('Kanon R5: der Kanban-Statusknopf trifft auf --target-base, obwohl er 24px 
   assert.match(flaeche.body, /position:\s*absolute/);
   assert.match(flaeche.body, /inset:\s*calc\(\(100% - var\(--target-base\)\) \/ 2\)/);
 });
+
+// -------------------------------------------------------------------------
+// R8 H14: Kontakte und Dokumente waehlen per Auswahlkreis, nicht per Checkbox
+// -------------------------------------------------------------------------
+
+/** Ein Knoten mit Klassenliste und Attributen, genug fuer die Umschalter. */
+function schalterKnoten(attrs = {}) {
+  const klassen = new Set();
+  const knoten = {
+    dataset: {}, disabled: false, attrs: { ...attrs },
+    classList: { toggle: (k, an) => { if (an) klassen.add(k); else klassen.delete(k); }, contains: (k) => klassen.has(k) },
+    setAttribute(k, v) { this.attrs[k] = String(v); },
+    getAttribute(k) { return this.attrs[k] ?? null; },
+  };
+  knoten.klassen = klassen;
+  return knoten;
+}
+
+test('R8 H14: Kontakt-Auswahl ist ein Knopf mit Auswahlkreis und Objektnamen, keine native Checkbox', async () => {
+  const vorher = { mode: contacts.state.selectMode, sel: new Set(contacts.state.selected) };
+  try {
+    contacts.state.selectMode = true;
+    contacts.state.selected = new Set([7]);
+    const an = contacts.renderContactItem({ id: 7, name: 'Ada Lovelace' });
+    assert.doesNotMatch(an, /type="checkbox"/, 'die native Checkbox ist weg');
+    assert.match(an, /<button type="button" class="select-circle select-circle--on" data-select="7"\s+aria-pressed="true" aria-label="contacts\.selectNamed\{&quot;name&quot;:&quot;Ada Lovelace&quot;\}"/);
+    assert.match(an, /<div class="contact-item__open list-row__main--interactive contact-item__select">/,
+      'die Zeile bleibt Trefflaeche, ist aber kein Knopf mit aria-label, der Name und Nummer verschluckt');
+    const aus = contacts.renderContactItem({ id: 8, name: 'Grace' });
+    assert.match(aus, /<button type="button" class="select-circle" data-select="8"\s+aria-pressed="false"/);
+    assert.match(contacts.renderContactItem({ id: 9, name: 'Papa', family_user_id: 3 }), /data-select="9"[^>]*disabled>/,
+      'Familien-Kontakte sind einzeln nicht loeschbar und damit nicht waehlbar');
+
+    // Der Tipp als Programm: Menge, aria-pressed, Kreis und Zeile gehen zusammen.
+    const zeile = schalterKnoten();
+    const knopf = schalterKnoten({ 'aria-pressed': 'false' });
+    knopf.dataset.select = '8';
+    knopf.closest = (sel) => (sel === '.contact-item' ? zeile : null);
+    contacts.toggleContactSelection(knopf);
+    assert.ok(contacts.state.selected.has(8));
+    assert.equal(knopf.attrs['aria-pressed'], 'true');
+    assert.ok(knopf.klassen.has('select-circle--on'));
+    assert.ok(zeile.klassen.has('contact-item--selected'));
+    contacts.toggleContactSelection(knopf);
+    assert.ok(!contacts.state.selected.has(8));
+    assert.equal(knopf.attrs['aria-pressed'], 'false');
+    knopf.disabled = true;
+    contacts.toggleContactSelection(knopf);
+    assert.ok(!contacts.state.selected.has(8), 'ein gesperrter Knopf waehlt nicht');
+  } finally {
+    contacts.state.selectMode = vorher.mode;
+    contacts.state.selected = vorher.sel;
+  }
+});
+
+test('R8 H14: Dokument-Auswahl ist ein Auswahlkreis mit Objektnamen, keine native Checkbox', () => {
+  const st = documentsPage.state;
+  const vorher = { mode: st.selectMode, sel: new Set(st.selected) };
+  try {
+    st.selectMode = true;
+    st.selected = new Set([4]);
+    const an = documentsPage.renderSelectBox({ id: 4, name: 'Mietvertrag.pdf' });
+    assert.doesNotMatch(an, /type="checkbox"/);
+    assert.match(an, /<button type="button" class="select-circle select-circle--on"/);
+    assert.match(an, /data-select-id="4" aria-pressed="true"/);
+    assert.match(an, /aria-label="documents\.selectDocument\{&quot;name&quot;:&quot;Mietvertrag\.pdf&quot;\}"/);
+    assert.match(documentsPage.renderSelectBox({ id: 5, name: 'x' }), /aria-pressed="false"/);
+
+    documentsPage.setContainerForTest({ querySelector: () => null, querySelectorAll: () => [] });
+    const kreis = schalterKnoten({ 'aria-pressed': 'false' });
+    const karte = schalterKnoten();
+    karte.dataset.id = '5';
+    karte.querySelector = (sel) => (sel === '[data-select-id]' ? kreis : null);
+    documentsPage.toggleDocumentSelection(karte);
+    assert.ok(st.selected.has(5));
+    assert.equal(kreis.attrs['aria-pressed'], 'true');
+    assert.ok(kreis.klassen.has('select-circle--on'));
+    assert.ok(karte.klassen.has('is-selected'));
+  } finally {
+    st.selectMode = vorher.mode;
+    st.selected = vorher.sel;
+    documentsPage.setContainerForTest(null);
+  }
+});
