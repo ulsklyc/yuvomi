@@ -102,9 +102,19 @@ export async function swapPage(update, { content, from = null, animate = true } 
   // Name, verdeckter Tab) - das ist kein Fehler des Wechsels, der Tausch
   // selbst laeuft trotzdem.
   transition.ready.catch(() => {});
+  // Ein Tipp beendet die Blende. Solange eine Wurzel-Transition laeuft, trifft
+  // Chromium jeden Zeiger nur auf <html> - `::view-transition { pointer-events:
+  // none }` aendert daran nichts (gemessen 2026-09-27: Seitenleisten-Tipps 30
+  // und 110ms nach dem Wechsel verpufften alle). Der Tipp, der hier abbricht,
+  // hat sein Ziel schon als <html> getroffen und bleibt verloren; jeder weitere
+  // erreicht die neue Seite, statt bis zum Ende der Blende (~250-470ms) ins
+  // Leere zu gehen.
+  const skipOnTap = () => transition.skipTransition();
+  document.addEventListener?.('pointerdown', skipOnTap, { capture: true, once: true });
   const finished = transition.finished
     .catch(() => {})
     .finally(() => {
+      document.removeEventListener?.('pointerdown', skipOnTap, { capture: true });
       // Temporaer: ein stehengebliebener Name kollidierte beim naechsten
       // Wechsel mit einem zweiten Kopf derselben Seite. Nur der juengste
       // Wechsel raeumt auf: verwirft ein zweiter Tipp diese Transition, loest

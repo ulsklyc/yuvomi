@@ -131,8 +131,11 @@
 /* Die Namen `nav-sidebar` und `nav-bottom` stehen an den Basisregeln der
  * beiden Leisten (weiter unten) - dort, wo man sie sucht. */
 
-/* Tipps gehen waehrend der 200ms an das echte Dokument darunter, nicht an das
- * Bild - sonst verpuffte ein schneller zweiter Tipp auf die Leiste. */
+/* Gedacht war: Tipps gehen waehrend der Blende an das echte Dokument darunter.
+ * Chromium trifft waehrend einer Wurzel-Transition aber nur <html>, trotz
+ * dieser Regel (gemessen 2026-09-27). Deshalb bricht swapPage
+ * (utils/view-transition.js) die Blende beim ersten Tipp ab - der naechste
+ * Tipp erreicht die Seite. Die Regel bleibt fuer Engines, die sie ehren. */
 ::view-transition {
   pointer-events: none;
 }

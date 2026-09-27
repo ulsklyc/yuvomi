@@ -398,6 +398,36 @@ test('save confirmations preserve the same editor across repeated gates and keep
 // Speichern-Knopf ins erste Feld. Unter Last war das Zufall; hier wird der Timer
 // fuer das eine Oeffnen auf 1500 ms gestreckt, damit er SICHER hinter dem
 // Fortsetzen liegt und die Sonde bei jedem Lauf misst, was vorher nur manchmal kam.
+// EIN TIPP BEENDET DIE BLENDE (2026-09-27). Solange die Wurzel-Transition eines
+// Seitenwechsels laeuft (~250-470ms), trifft Chromium jeden Zeiger nur auf
+// <html>, trotz `::view-transition { pointer-events: none }` - gemessen verpufften
+// Seitenleisten-Tipps 30 und 110ms nach dem Wechsel alle. swapPage bricht die
+// Blende beim ersten pointerdown ab: der erste Tipp bleibt verloren (sein Ziel
+// war schon <html>), der zweite erreicht die neue Seite.
+test('ein zweiter Tipp waehrend des Seitenwechsels erreicht die Seitenleiste', async () => {
+  const page = await openPage(harness, { device: 'desktop', locale: 'de' });
+  try {
+    const tapNotes = async () => {
+      const box = await (await page.$('.nav-sidebar [data-route="/notes"]')).boundingBox();
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    };
+    await page.evaluate(() => window.yuvomi.navigate('/calendar'));
+    await page.waitForFunction(() => location.pathname === '/calendar' && !document.documentElement.classList.contains('navigating'));
+    await page.evaluate(() => window.yuvomi.navigate('/tasks'));
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(await page.evaluate(() => document.documentElement.classList.contains('navigating')), true,
+      'Vorbedingung: der Wechsel laeuft noch als View Transition - sonst misst die Sonde nichts');
+    await tapNotes();
+    await new Promise((r) => setTimeout(r, 80));
+    await tapNotes();
+    await page.waitForFunction(() => location.pathname === '/notes', { timeout: 3000 }).catch(() => {});
+    assert.equal(await page.evaluate(() => location.pathname), '/notes',
+      'der zweite Tipp auf "Notizen" verpuffte waehrend der Blende');
+  } finally {
+    await page.close();
+  }
+});
+
 test('der verspaetete Erstfokus nimmt dem fortgesetzten Speichern-Tor den Fokus nicht weg (#1156)', async () => {
   const page = await openPage(harness, { device: 'desktop', locale: 'de' });
   try {

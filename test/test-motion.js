@@ -236,9 +236,15 @@ function stubDocument({ api = true, visibility = 'visible' } = {}) {
   const toolbarNew = { style: {} };
   const content = { current: toolbarOld, querySelector: () => content.current };
   const log = [];
+  const listeners = [];
   let resolveFinished;
   const doc = {
     visibilityState: visibility,
+    addEventListener: (type, fn, opts) => listeners.push({ type, fn, capture: Boolean(opts?.capture) }),
+    removeEventListener: (type, fn, opts) => {
+      const i = listeners.findIndex((l) => l.type === type && l.fn === fn && l.capture === Boolean(opts?.capture));
+      if (i >= 0) listeners.splice(i, 1);
+    },
     startViewTransition: api
       ? (callback) => {
         log.push(`start old=${toolbarOld.style.viewTransitionName ?? ''}`);
@@ -247,11 +253,12 @@ function stubDocument({ api = true, visibility = 'visible' } = {}) {
           updateCallbackDone,
           ready: updateCallbackDone,
           finished: new Promise((r) => { resolveFinished = r; }),
+          skipTransition: () => { log.push('skip'); resolveFinished(); },
         };
       }
       : undefined,
   };
-  return { doc, content, toolbarOld, toolbarNew, log, finish: () => resolveFinished() };
+  return { doc, content, toolbarOld, toolbarNew, log, listeners, finish: () => resolveFinished() };
 }
 
 test('swapPage: tauscht im Callback der View Transition und benennt den Kopf nur fuer die Dauer', async () => {
@@ -275,6 +282,36 @@ test('swapPage: tauscht im Callback der View Transition und benennt den Kopf nur
     env.finish();
     await finished;
     assert.equal(env.toolbarNew.style.viewTransitionName, '', 'danach ist der Name frei - er kollidierte sonst beim naechsten Wechsel');
+  } finally {
+    delete globalThis.document;
+    delete globalThis.matchMedia;
+  }
+});
+
+test('swapPage: der erste Tipp waehrend der Blende bricht sie ab, danach haengt kein Zuhoerer mehr', async () => {
+  // Chromium trifft waehrend einer Wurzel-Transition jeden Zeiger nur auf <html>
+  // (gemessen 2026-09-27, trotz `::view-transition { pointer-events: none }`):
+  // Tipps bis zum Ende der Blende verpufften alle. Ein pointerdown in der
+  // Capture-Phase beendet sie, damit der naechste Tipp die neue Seite erreicht.
+  const { swapPage } = await import('../public/utils/view-transition.js');
+  const env = stubDocument();
+  globalThis.document = env.doc;
+  globalThis.matchMedia = () => ({ matches: false });
+  try {
+    const { finished } = await swapPage(() => { env.content.current = env.toolbarNew; }, { content: env.content, from: '/tasks', animate: true });
+    const taps = env.listeners.filter((l) => l.type === 'pointerdown' && l.capture);
+    assert.equal(taps.length, 1, 'waehrend der Blende wartet genau ein pointerdown-Zuhoerer in der Capture-Phase');
+    taps[0].fn();
+    assert.deepEqual(env.log.filter((e) => e === 'skip'), ['skip'], 'der Tipp bricht die Blende ab');
+    await finished;
+    assert.equal(env.listeners.filter((l) => l.type === 'pointerdown').length, 0, 'nach der Blende ist der Zuhoerer weg');
+
+    // Ohne Tipp: endet die Blende von selbst, geht der Zuhoerer mit.
+    const second = await swapPage(() => {}, { content: env.content, from: '/notes', animate: true });
+    assert.equal(env.listeners.filter((l) => l.type === 'pointerdown').length, 1);
+    env.finish();
+    await second.finished;
+    assert.equal(env.listeners.filter((l) => l.type === 'pointerdown').length, 0, 'ein Zuhoerer ueberlebte die Blende und braeche die naechste beim ersten Klick ab');
   } finally {
     delete globalThis.document;
     delete globalThis.matchMedia;
