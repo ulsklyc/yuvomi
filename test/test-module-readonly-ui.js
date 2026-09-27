@@ -772,10 +772,12 @@ test('requestDeleteEvent() riegelt alle drei Serien-Löschwege ab', () => {
   assert.ok(fn.indexOf('if (readOnly()) return;') > -1 && fn.indexOf('if (readOnly()) return;') < 200);
 });
 
-test('Kalender: FAB, Kopfknopf und beide Leerzustands-CTAs hängen an readOnly()', () => {
+test('Kalender: FAB und beide Leerzustands-CTAs hängen an readOnly()', () => {
+  // Einen eigenen Kopfknopf gibt es nicht mehr (Re-Critique 2026-09-27, D3):
+  // am Zeigergeraet dockt die Shell den FAB in den Kopf.
+  assert.doesNotMatch(CAL_CODE, /toolbar-new-btn(?![\w-])/, 'kein zweiter Primaerknopf neben dem FAB');
   for (const [name, muster] of [
     ['der FAB', /\$\{readOnly\(\) \? '' : `\s*<button class="page-fab" id="fab-new-event"/],
-    ['der Kopfknopf', /\$\{readOnly\(\) \? '' : `\s*<button class="btn btn--primary toolbar-new-btn" id="cal-add"/],
     ['der Agenda-CTA', /action: readOnly\(\) \? undefined : \{ label: t\('calendar\.newEvent'\), attrs: \{ id: 'agenda-empty-cta' \} \}/],
     ['der Such-CTA', /\$\{readOnly\(\) \? '' : `<button class="btn btn--secondary" id="cal-search-empty-cta">/],
   ]) {
@@ -1604,10 +1606,11 @@ test('Kontakte-Kopf mit `contacts: read`: Kategorien, Auswahl und Import fallen 
       'und der Import legt Kontakte an');
     assert.doesNotMatch(html, /page-tools-btn/,
       'ein Werkzeugmenue ohne Eintraege waere ein Knopf, der ins Leere oeffnet');
-    // Der Primaerknopf bleibt im Markup: ihn blendet `html[data-module-readonly]`
-    // schon per `.toolbar-new-btn` aus (layout.css). Waere er hier weg, prueften
-    // die Zeilen darueber eine leere Zeichenkette.
-    assert.match(html, /toolbar-new-btn/);
+    // Der Slot bleibt LEER: die Primaeraktion ist seit der Re-Critique
+    // 2026-09-27 (D3) der FAB, den die Shell andockt und den
+    // `html[data-module-readonly]` ausblendet (layout.css). Die Zeilen darueber
+    // pruefen damit eine leere Zeichenkette - genau das ist die Zusage.
+    assert.equal(html.trim(), '', 'bei Nur-lesen steht im Kopf-Slot nichts, das schreibt');
   });
 });
 

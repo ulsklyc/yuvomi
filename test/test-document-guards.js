@@ -691,7 +691,7 @@ test('PR2 #975 - das zusammengesetzte Kalenderformular und seine Seriennamen ble
   const title = 'PR2 Serienprobe 975';
   try {
     await gotoRoute(page, '/calendar');
-    await page.click('#cal-add');
+    await page.click('#fab-new-event');
     await page.waitForSelector('#modal-title');
 
     const hints = await page.evaluate((eventTitle) => {
@@ -4427,7 +4427,7 @@ function holdNextNoteSave(page, { method = 'POST', noteId = null } = {}) {
 }
 
 async function openReadyNoteModal(page) {
-  await page.click('#notes-add-btn');
+  await page.click('#fab-new-note');
   await page.waitForSelector('#note-content');
   // Shared-modal initialization applies its first focus after 50 ms and takes
   // the dirty baseline after 150 ms. The 300 ms barrier includes both timers
