@@ -364,9 +364,25 @@
   gap: var(--space-1);
 }
 
+/* Ein Abschnitt des Details: Kopf + Inhalt (Zutaten, Notizen). Die Koepfe
+ * tragen die Bereichsrolle aus typography.css; hier stehen nur Abstand und
+ * Rand, damit der erste Kopf nicht auf dem Detailrand klebt. */
+.recipe-detail__section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.recipe-detail__section-title {
+  margin: 0;
+  color: var(--color-text-primary);
+}
+
+/* ZUTATEN IN PRIMAERTEXT: sie sind der Inhalt des Rezepts, nicht seine
+ * Fussnote. Grau standen sie gleichrangig mit den Notizen und leiser als die
+ * Zuordnungs-Knoepfe daneben (Re-Critique 2026-09-27, A4). */
 .recipe-detail__ingredient {
   font-size: var(--type-body);
-  color: var(--color-text-secondary);
+  color: var(--color-text-primary);
   font-variant-numeric: tabular-nums;
   /* Zutat links, Vorrats-Zuordnung rechts, und bei 320px untereinander statt
    * abgeschnitten: ein Vorratsname ist so lang, wie der Haushalt ihn getippt
@@ -401,11 +417,12 @@ button.recipe-detail__ingredient-match:hover {
   color: var(--color-text-secondary);
 }
 
-/* Nicht zugeordnet ist ein ZUSTAND, kein Mangel: dieselbe stille Farbe wie eine
- * gesetzte Zuordnung, nur kursiv. Ein Warnton haette aus „unbekannt" ein
- * „fehlt" gemacht, und genau diesen Unterschied haelt #1314 fest. */
-.recipe-detail__ingredient-match--unset {
-  font-style: italic;
+/* (Hier stand `.recipe-detail__ingredient-match--unset` fuer das kursive „Nicht
+ * zugeordnet" an jeder offenen Zutat. Das Wort steht nicht mehr an der Zeile -
+ * recipes.js `pantryMatchEl` -, der Weg zu den offenen Zuordnungen ist EIN
+ * Knopf unter der Liste.) */
+.recipe-detail__match-open {
+  justify-self: start;
 }
 
 .recipe-detail__notes {

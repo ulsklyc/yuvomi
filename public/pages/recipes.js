@@ -6,7 +6,7 @@
 import { api } from '/api.js';
 import { t, formatDate, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { openModal as openSharedModal, closeModal as closeSharedModal, advancedSection, wireBlurValidation, reportFieldError } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal as closeSharedModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME } from '/utils/shopping-categories.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
 import { resolveShoppingTarget, announceTransfer, mayTransferRecipeToShopping } from '/utils/kitchen-transfer.js';
@@ -382,7 +382,12 @@ export async function render(container, { signal } = {}) {
     }
 
     if (actionBtn.dataset.action === 'match-ingredient') {
-      await openPantryMatchModal(recipe, actionBtn.dataset.ingredient, actionBtn);
+      await openPantryMatchModal(recipe, actionBtn.dataset.ingredient);
+      return;
+    }
+
+    if (actionBtn.dataset.action === 'match-ingredients') {
+      await openPantryBulkMatchModal(recipe);
       return;
     }
 
@@ -953,27 +958,15 @@ function fillRecipeDetail(detail, recipe) {
   // VOLLSTÄNDIGE Zutatenliste, nicht die ersten vier: das Kürzen war nur
   // nötig, um die Kartenhöhe zu bändigen. Ein Detail, das sich öffnet, hat
   // keinen Grund, etwas zu verschweigen.
-  if (ingredients.length) {
-    const ul = document.createElement('ul');
-    ul.className = 'recipe-detail__ingredients';
-    for (const ing of ingredients) {
-      const item = document.createElement('li');
-      item.className = 'recipe-detail__ingredient';
-      const label = document.createElement('span');
-      label.className = 'recipe-detail__ingredient-name';
-      label.textContent = ing.quantity ? `${ing.quantity} · ${ing.name}` : ing.name;
-      item.appendChild(label);
-      item.appendChild(pantryMatchEl(recipe, ing));
-      ul.appendChild(item);
-    }
-    detail.appendChild(ul);
-  }
+  if (ingredients.length) detail.appendChild(ingredientsSectionEl(recipe));
 
   if (recipe.notes) {
+    const section = detailSectionEl(t('recipes.notesLabel'));
     const notes = document.createElement('p');
     notes.className = 'recipe-detail__notes';
     notes.textContent = recipe.notes;
-    detail.appendChild(notes);
+    section.appendChild(notes);
+    detail.appendChild(section);
   }
 
   // Die beiden Kreislauf-Ausgänge stehen im Detail, nicht in der Zeile, und
@@ -1014,6 +1007,62 @@ function fillRecipeDetail(detail, recipe) {
   detail.appendChild(detailActions);
 }
 
+/* ABSCHNITTSKOEPFE, DIE MAN ANSPRINGEN KANN (Re-Critique 2026-09-27, W2).
+ *
+ * Zutaten und Notizen standen als zwei gleich graue 17px-Bloecke untereinander,
+ * ohne Wort dafuer, was sie sind - das Detail las sich wie ein Formular-Nachdruck,
+ * nicht wie ein Rezept, und die Ueberschriften-Navigation eines Screenreaders
+ * fand darin nichts. Jetzt traegt jeder Abschnitt eine echte Ueberschrift in der
+ * Bereichsrolle (`u-section-title u-compact`, typography.css). Eine Stufe unter
+ * dem Rezepttitel: der ist im Aufklapper wie in der Detailspalte ein <h2>
+ * (`recipe-row__heading`, `detailPaneHeaderEl`). Die Worte sind die Feldnamen
+ * des Formulars - dieselbe Sache heisst an beiden Stellen gleich. */
+function detailSectionEl(title) {
+  const section = document.createElement('section');
+  section.className = 'recipe-detail__section';
+  const heading = document.createElement('h3');
+  heading.className = 'recipe-detail__section-title u-section-title u-compact';
+  heading.textContent = title;
+  section.appendChild(heading);
+  return section;
+}
+
+/**
+ * Der Zutaten-Abschnitt als EIN Element mit Rezept-ID, damit eine geaenderte
+ * Zuordnung ihn an beiden Orten (Aufklapper und Detailspalte) als Ganzes neu
+ * bauen kann - samt Sammelknopf, dessen Zahl sich mitaendert.
+ */
+function ingredientsSectionEl(recipe) {
+  const ingredients = recipe.ingredients ?? [];
+  const section = detailSectionEl(t('recipes.ingredientsLabel'));
+  section.classList.add('recipe-detail__ingredients-section');
+  section.dataset.recipeId = String(recipe.id);
+  const ul = document.createElement('ul');
+  ul.className = 'recipe-detail__ingredients';
+  for (const ing of ingredients) {
+    const item = document.createElement('li');
+    item.className = 'recipe-detail__ingredient';
+    const label = document.createElement('span');
+    label.className = 'recipe-detail__ingredient-name';
+    label.textContent = ing.quantity ? `${ing.quantity} · ${ing.name}` : ing.name;
+    item.appendChild(label);
+    item.appendChild(pantryMatchEl(recipe, ing));
+    ul.appendChild(item);
+  }
+  section.appendChild(ul);
+  const bulk = pantryMatchBulkEl(recipe);
+  if (bulk) section.appendChild(bulk);
+  return section;
+}
+
+/** Baut jeden Zutaten-Abschnitt dieses Rezepts neu (Aufklapper + Spalte). */
+function renderIngredientSections(recipe) {
+  const sections = _container?.querySelectorAll(
+    `.recipe-detail__ingredients-section[data-recipe-id="${CSS.escape(String(recipe.id))}"]`) ?? [];
+  for (const el of sections) el.replaceWith(ingredientsSectionEl(recipe));
+  if (sections.length && window.lucide) window.lucide.createIcons({ el: _container });
+}
+
 /* DIE BESTAETIGTE ZUORDNUNG ZU EINER VORRATSZEILE (#1314, Stufe 1).
  *
  * Sie steht im Rezeptdetail, neben der Zutat, und nirgends sonst: eine eigene
@@ -1042,24 +1091,33 @@ function pantryAccess() {
  * #467): ein Mitglied, das den Vorrat nur ansehen darf, sieht die Zuordnung,
  * kann sie aber nicht aendern. Bei `none` steht hier gar nichts - wer den
  * Vorrat nicht sehen darf, erfaehrt auch nicht, dass es dort eine Zeile gibt.
+ *
+ * NUR DIE BESTEHENDE ZUORDNUNG STEHT AN DER ZEILE (Re-Critique 2026-09-27, W2).
+ * Hier stand an jeder offenen Zutat „Nicht zugeordnet" - sechsmal je Rezept,
+ * unterstrichen, lauter als die Menge. Die Zuordnung ist ein Werkzeug fuer den
+ * Vorrat, kein Zustand des Rezepts; ihr Fehlen ist der Normalfall und braucht
+ * kein Wort je Zeile. Der Weg dorthin steht EINMAL unter der Liste
+ * (`pantryMatchBulkEl`). Das Wort „fehlt" bleibt weiter ausgeschlossen (Kopf
+ * dieses Abschnitts): wo nichts steht, behauptet die Zeile auch nichts.
  */
 function pantryMatchEl(recipe, ing) {
   const access = pantryAccess();
   if (access === 'none') return document.createDocumentFragment();
 
   const matched = Boolean(ing.pantry_item_id);
-  const text = matched ? ing.pantry_item_name : t('recipes.ingredientMatchNone');
+  if (!matched) return document.createDocumentFragment();
+  const text = ing.pantry_item_name;
 
   if (access !== 'write') {
     const span = document.createElement('span');
-    span.className = `recipe-detail__ingredient-match${matched ? '' : ' recipe-detail__ingredient-match--unset'}`;
+    span.className = 'recipe-detail__ingredient-match';
     span.textContent = text;
     return span;
   }
 
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = `recipe-detail__ingredient-match${matched ? '' : ' recipe-detail__ingredient-match--unset'}`;
+  btn.className = 'recipe-detail__ingredient-match';
   btn.dataset.action = 'match-ingredient';
   btn.dataset.id = String(recipe.id);
   btn.dataset.ingredient = ing.name;
@@ -1071,6 +1129,29 @@ function pantryMatchEl(recipe, ing) {
   return btn;
 }
 
+/**
+ * DER EINE WEG ZU DEN OFFENEN ZUORDNUNGEN: ein stiller Knopf unter der Liste,
+ * der sagt, wie viele Zutaten noch keine Vorratszeile haben, und sie in EINEM
+ * Dialog zuordnen laesst. Nur fuer Konten, die den Vorrat schreiben duerfen -
+ * Nur-Lesende sehen die bestehenden Zuordnungen und keine Handlung (#467).
+ * `null`, wenn es nichts zu tun gibt.
+ */
+function pantryMatchBulkEl(recipe) {
+  if (pantryAccess() !== 'write') return null;
+  const open = (recipe.ingredients ?? []).filter((ing) => !ing.pantry_item_id);
+  if (!open.length) return null;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn btn--ghost recipe-detail__match-open';
+  btn.dataset.action = 'match-ingredients';
+  btn.dataset.id = String(recipe.id);
+  btn.insertAdjacentHTML('beforeend', '<i data-lucide="link" class="icon-sm" aria-hidden="true"></i>');
+  const label = document.createElement('span');
+  label.textContent = t('recipes.ingredientMatchOpen', { count: open.length });
+  btn.appendChild(label);
+  return btn;
+}
+
 /** Eine Vorratszeile im Auswahlfeld: Name, Ort und MHD unterscheiden Chargen. */
 function pantryOptionLabel(item) {
   const teile = [item.name];
@@ -1079,7 +1160,7 @@ function pantryOptionLabel(item) {
   return teile.join(' · ');
 }
 
-async function openPantryMatchModal(recipe, ingredientName, trigger) {
+async function openPantryMatchModal(recipe, ingredientName) {
   const ing = (recipe.ingredients ?? []).find((i) => i.name === ingredientName);
   if (!ing) return;
 
@@ -1137,25 +1218,104 @@ async function openPantryMatchModal(recipe, ingredientName, trigger) {
           // force: der Schreibvorgang ist durch, eine Verwerfen-Frage waere
           // eine Frage nach etwas, das schon gespeichert ist.
           closeSharedModal({ force: true });
-          // NUR DIESE EINE STELLE NEU BAUEN, kein renderRecipeList(): das
+          // NUR DEN ZUTATEN-ABSCHNITT NEU BAUEN, kein renderRecipeList(): das
           // Zutaten-Detail ist gerade aufgeklappt, und ein Neuaufbau der Liste
           // klappte es zu - der Nutzer stuende nach dem Speichern vor der
           // geschlossenen Zeile, aus der er kam.
           //
           // Die Zutat steht an ZWEI Stellen - im Aufklapper der Zeile und in
           // der Detailspalte. Beide ziehen nach, sonst zeigte der Aufklapper
-          // nach dem naechsten Schmalerziehen den alten Stand.
-          const same = [..._container?.querySelectorAll(
-            `[data-action="match-ingredient"][data-id="${recipe.id}"]`) ?? []]
-            .filter((el) => el.dataset.ingredient === ingredientName);
-          for (const el of new Set([trigger, ...same].filter(Boolean))) {
-            el.replaceWith(pantryMatchEl(recipe, ing));
-          }
+          // nach dem naechsten Schmalerziehen den alten Stand. Als ganzer
+          // Abschnitt, weil der Sammelknopf darunter seine Zahl mitaendert.
+          renderIngredientSections(recipe);
+          // Der Ausloeser ist mit dem Abschnitt ersetzt: den Fokus auf seinen
+          // Nachfolger tragen (gleiches data-action/data-id).
+          refocusAfterRender();
           window.yuvomi?.showToast(
             pantryItemId === null ? t('recipes.ingredientMatchCleared') : t('recipes.ingredientMatchSaved'),
             'success',
           );
         } catch (err) {
+          window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+        }
+      });
+    },
+  });
+}
+
+/**
+ * Alle offenen Zuordnungen eines Rezepts in EINEM Dialog: je Zutat ein
+ * Auswahlfeld, beschriftet mit der Zutat. Gespeichert wird nur, was sich
+ * geaendert hat, Zutat fuer Zutat ueber denselben Endpunkt wie der
+ * Einzeldialog - er kennt keine Sammelform, und eine eigene waere eine zweite
+ * Fassung derselben Regel (Yuvomi raet nichts, es gilt nur Bestaetigtes).
+ */
+async function openPantryBulkMatchModal(recipe) {
+  const open = (recipe.ingredients ?? []).filter((ing) => !ing.pantry_item_id);
+  if (!open.length) return;
+
+  let items = [];
+  try {
+    const res = await api.get('/pantry');
+    items = res.data ?? [];
+  } catch (err) {
+    window.yuvomi?.showToast(err.data?.error ?? t('recipes.ingredientMatchLoadError'), 'danger');
+    return;
+  }
+
+  const options = items.map((item) => `<option value="${esc(String(item.id))}">${esc(pantryOptionLabel(item))}</option>`).join('');
+  const fields = open.map((ing, i) => `
+        <div class="form-group">
+          <label class="form-label" for="pantry-bulk-match-${i}">${esc(ing.quantity ? `${ing.quantity} · ${ing.name}` : ing.name)}</label>
+          <select id="pantry-bulk-match-${i}" class="form-input" data-ingredient-index="${i}">
+            <option value="">${esc(t('recipes.ingredientMatchNone'))}</option>
+            ${options}
+          </select>
+        </div>`).join('');
+
+  openSharedModal({
+    title: t('recipes.ingredientMatchBulkTitle'),
+    size: 'sm',
+    content: `
+      <p class="form-hint">${t('recipes.ingredientMatchBulkHint')}</p>
+      ${items.length ? `${fields}
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button class="btn btn--secondary" id="pantry-bulk-match-cancel" type="button">${t('common.cancel')}</button>
+          <button class="btn btn--primary" id="pantry-bulk-match-save" type="button">${t('common.save')}</button>
+        </div>
+      ` : `
+        <p class="form-hint">${t('recipes.ingredientMatchEmpty')}</p>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button class="btn btn--secondary" id="pantry-bulk-match-cancel" type="button">${t('common.close')}</button>
+        </div>
+      `}
+    `,
+    onSave(panel) {
+      panel.querySelector('#pantry-bulk-match-cancel')?.addEventListener('click', () => closeSharedModal());
+      const save = panel.querySelector('#pantry-bulk-match-save');
+      save?.addEventListener('click', async () => {
+        const chosen = [...panel.querySelectorAll('select[data-ingredient-index]')]
+          .filter((sel) => sel.value !== '')
+          .map((sel) => ({ ing: open[Number(sel.dataset.ingredientIndex)], pantryItemId: Number(sel.value) }));
+        if (!chosen.length) { closeSharedModal({ force: true }); return; }
+        save.disabled = true;
+        let saved = 0;
+        try {
+          for (const { ing, pantryItemId } of chosen) {
+            const res = await api.put(`/recipes/${recipe.id}/ingredient-match`, { name: ing.name, pantryItemId });
+            ing.pantry_item_id = res.data.pantry_item_id;
+            ing.pantry_item_name = res.data.pantry_item_name;
+            saved += 1;
+          }
+          closeSharedModal({ force: true });
+          renderIngredientSections(recipe);
+          refocusAfterRender();
+          window.yuvomi?.showToast(t('recipes.ingredientMatchSaved'), 'success');
+        } catch (err) {
+          // Was bis zum Fehler gespeichert ist, bleibt gespeichert und steht
+          // gleich in der Liste; der Dialog bleibt fuer den Rest offen.
+          if (saved) renderIngredientSections(recipe);
+          save.disabled = false;
           window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
         }
       });
