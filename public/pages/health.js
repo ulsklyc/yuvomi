@@ -1257,12 +1257,19 @@ function valueFieldsMarkup(type, row = null) {
         </div>
       </div>`;
   }
+  /* EINE UNBEKANNTE EINHEIT WURDE STILL ZUR ERSTEN (Codex an #1485): stand
+   * die gespeicherte Einheit nicht in der Liste (per API oder Import erfasst,
+   * etwa "stone"), war keine Option gewaehlt, der Browser nahm die erste, und
+   * das Speichern einer Notiz machte aus 12 stone 12 kg. Die gespeicherte
+   * Einheit steht deshalb als eigene Option da und ist gewaehlt. */
+  const orphanUnit = row?.unit && !metric.units.includes(row.unit) ? row.unit : null;
+  const unitOptions = orphanUnit ? [orphanUnit, ...metric.units] : metric.units;
   const unitField = metric.units.length > 1
     ? `
       <div class="form-field">
         <label class="label" for="vital-unit">${esc(t('health.vitals.field.unit'))}</label>
         <select class="input" id="vital-unit">
-          ${metric.units.map((u) => `<option value="${esc(u)}"${row?.unit === u ? ' selected' : ''}>${esc(u)}</option>`).join('')}
+          ${unitOptions.map((u) => `<option value="${esc(u)}"${row?.unit === u ? ' selected' : ''}>${esc(u)}</option>`).join('')}
         </select>
       </div>`
     : `<input type="hidden" id="vital-unit" value="${esc(metric.units[0])}">`;
@@ -1367,6 +1374,11 @@ function openVitalModal(opts = {}) {
         }
       });
 
+      // Die Einheit geht beim Bearbeiten nur mit, wenn jemand sie umstellt:
+      // sonst koennte ein Feld, das den Bestand nicht abbildet (ein verstecktes
+      // Einheitenfeld traegt immer die Standardeinheit), ihn still ueberschreiben.
+      const unitBefore = panel.querySelector('#vital-unit')?.value;
+
       panel.querySelector('[data-action="cancel"]')?.addEventListener('click', () => closeModal({ force: true }));
       panel.querySelector('[data-action="vital-delete"]')?.addEventListener('click', () => {
         closeModal({ force: true });
@@ -1396,7 +1408,7 @@ function openVitalModal(opts = {}) {
             // PATCH liest nur genannte Felder. Ein geleertes Puls- oder
             // Notizfeld muss deshalb als null mitgehen, sonst bliebe der
             // alte Wert stehen, obwohl der Dialog ihn nicht mehr zeigt.
-            await api.patch(`/health/vitals/${row.id}`, vitalPatchBody(body));
+            await api.patch(`/health/vitals/${row.id}`, vitalPatchBody(body, { unitBefore }));
           } else {
             await api.post('/health/vitals', { ...body, ...ownerField(vitals.personId, vitals.meId) });
           }
@@ -1415,14 +1427,20 @@ function openVitalModal(opts = {}) {
   });
 }
 
-/** Der PATCH-Body einer bearbeiteten Messung: nicht erfasste Kanaele als null. */
-function vitalPatchBody(body) {
-  return {
+/**
+ * Der PATCH-Body einer bearbeiteten Messung: nicht erfasste Kanaele als null.
+ * Eine unveraenderte Einheit (`unitBefore`) bleibt weg - PATCH laesst sie dann
+ * stehen, wie sie gespeichert ist.
+ */
+function vitalPatchBody(body, { unitBefore } = {}) {
+  const out = {
     ...body,
     value_num2: body.value_num2 ?? null,
     value_num3: body.value_num3 ?? null,
     note: body.note ?? null,
   };
+  if (unitBefore !== undefined && (out.unit ?? '') === unitBefore) delete out.unit;
+  return out;
 }
 
 function numOrNull(input) {
@@ -3382,12 +3400,20 @@ function wireResultEditor(panel, report, editing = null) {
       reportFieldError(host.querySelector('#res-analyte'), t('health.labs.results.analyteRequired'));
       return;
     }
-    if (valueRaw === '' || valueRaw == null || !Number.isFinite(Number(valueRaw))) {
+    // BEARBEITEN ERFAND EINE PFLICHT (Codex an #1485): `value_num` ist
+    // nullable - ein Analyt ohne Zahl (per API oder Import erfasst) liess
+    // sich sonst nur korrigieren, wenn man ihm einen Wert ausdachte. Beim
+    // Bearbeiten darf das Feld deshalb leer bleiben, null bleibt null; beim
+    // Anlegen bleibt der Wert Pflicht. Keine Zahl ist in beiden Faellen falsch,
+    // auch die, die ein Zahlenfeld als leer meldet (`badInput`).
+    const empty = valueRaw === '' || valueRaw == null;
+    const notANumber = valueEl?.validity?.badInput || (!empty && !Number.isFinite(Number(valueRaw)));
+    if ((empty && !editing) || notANumber) {
       reportFieldError(valueEl, t('health.labs.results.valueRequired'));
       return;
     }
 
-    const body = { analyte, value_num: Number(valueRaw) };
+    const body = { analyte, value_num: empty ? null : Number(valueRaw) };
     const unit = host.querySelector('#res-unit')?.value.trim();
     if (unit) body.unit = unit;
     if (lowEl?.value !== '' && lowEl?.value != null) body.ref_low = Number(lowEl.value);
@@ -7861,6 +7887,7 @@ export const __test = {
   vitalPatchBody,
   resultEditRowMarkup,
   resultFormMarkup,
+  renderResultEditor,
   dueRowMarkup,
   prnRowMarkup,
   medCardMarkup,

@@ -2116,6 +2116,7 @@ function editorElement(felder = {}) {
   const handler = {};
   return {
     value: '', hidden: false, disabled: false, ...felder,
+    handlers: handler,
     addEventListener(type, fn) { (handler[type] ??= []).push(fn); },
     async feuern(type) { for (const fn of handler[type] ?? []) await fn({ target: this }); },
     click() {}, focus() {}, replaceChildren() {}, insertAdjacentHTML() {},
@@ -2667,6 +2668,71 @@ test('R8 H9: PATCH einer Messung leert, was der Dialog nicht mehr zeigt', () => 
   );
 });
 
+/**
+ * Oeffnet den Vitalwert-Dialog im Bearbeiten-Modus, verdrahtet ihn gegen eine
+ * Attrappe aus seinem eigenen Markup (die Einheit als Auswahl mit
+ * Browser-Verhalten), laesst `bedienen` daran drehen und schickt das Formular
+ * ab. Zurueck kommen die Schreibaufrufe, durch JSON wie in api.js.
+ */
+async function vitalwertSpeichern(row, bedienen = () => {}) {
+  const optionen = withAccess({ health: 'write' }, () => modalOptionen(() => health.openVitalModal({ row })));
+  assert.ok(optionen, 'mit Schreibrecht geht der Dialog auf');
+  const html = optionen.content;
+  const wert = /id="vital-value"[^>]*value="([^"]*)"/.exec(html);
+  assert.ok(wert, 'das Wertefeld traegt den Bestand');
+  const form = editorElement();
+  const el = {
+    '#vital-form': form,
+    '#vital-type': editorElement({ value: row.type }),
+    '#vital-value-fields': editorElement({ querySelector: () => null }),
+    '#vital-visibility': editorElement({ value: row.visibility || 'private' }),
+    '#vital-measured-at': editorElement({ value: row.measured_at }),
+    '#vital-note': editorElement({ value: row.note ?? '' }),
+    '#vital-value': editorElement({ value: wert[1] }),
+    '#vital-unit': editorAuswahl(html, 'vital-unit'),
+    '[type="submit"]': editorElement(),
+  };
+  optionen.onSave({ querySelector: (sel) => el[sel] ?? null });
+  bedienen(el);
+  const gesendet = [];
+  const vorher = { api: globalThis.__apiStub, window: globalThis.window, hatteWindow: 'window' in globalThis };
+  const mitschreiben = (method) => async (path, body) => {
+    gesendet.push({ method, path, body: JSON.parse(JSON.stringify(body)) });
+    return { data: { id: row.id } };
+  };
+  globalThis.__apiStub = { get: async () => ({ data: [] }), patch: mitschreiben('patch'), post: mitschreiben('post') };
+  globalThis.window = { yuvomi: { showToast() {} } };
+  try {
+    await withAccess({ health: 'write' }, async () => {
+      for (const fn of form.handlers?.submit ?? []) await fn({ preventDefault() {}, target: form });
+    });
+  } finally {
+    globalThis.__apiStub = vorher.api;
+    if (vorher.hatteWindow) globalThis.window = vorher.window;
+    else delete globalThis.window;
+  }
+  return { gesendet, html };
+}
+
+test('Codex an #1485: eine Einheit ausserhalb der Liste bleibt beim Bearbeiten stehen', async () => {
+  const stone = { id: 61, type: 'weight', value_num: 12, unit: 'stone', measured_at: '2026-06-15T08:00', visibility: 'private', note: '' };
+  const { gesendet, html } = await vitalwertSpeichern(stone, (el) => { el['#vital-note'].value = 'nach dem Fruehstueck'; });
+  const { gewaehlt } = auswahlAusMarkup(html, 'vital-unit');
+  assert.equal(gewaehlt.value, 'stone', 'die gespeicherte Einheit steht gewaehlt da, nicht still die erste der Liste');
+  assert.equal(gesendet.length, 1, 'genau ein Schreibaufruf');
+  assert.equal(gesendet[0].method, 'patch');
+  assert.equal(gesendet[0].body.note, 'nach dem Fruehstueck');
+  assert.ok(!('unit' in gesendet[0].body),
+    `eine Notiz-Korrektur fasst die Einheit nicht an (aus 12 stone wurden 12 kg): ${JSON.stringify(gesendet[0].body)}`);
+
+  // Waehlt der Mensch die Einheit selbst, geht sie mit.
+  const umgestellt = await vitalwertSpeichern(stone, (el) => { el['#vital-unit'].value = 'lb'; });
+  assert.equal(umgestellt.gesendet[0].body.unit, 'lb');
+  // Eine gelistete Einheit bleibt, wie sie war, ohne verwaiste Zusatzoption.
+  const kg = await vitalwertSpeichern({ ...stone, unit: 'kg' });
+  assert.deepEqual(auswahlAusMarkup(kg.html, 'vital-unit').optionen.map((o) => o.value), ['kg', 'lb']);
+});
+
 test('R8 H9: ein Laborwert laesst sich korrigieren, nicht nur loeschen', () => {
   const analyt = { id: 3, analyte: 'Ferritin', value_num: 88, unit: 'ng/ml', ref_low: 30, ref_high: 300, flag: 'normal' };
   const zeile = health.resultEditRowMarkup(analyt);
@@ -2683,6 +2749,81 @@ test('R8 H9: ein Laborwert laesst sich korrigieren, nicht nur loeschen', () => {
   const leer = health.resultFormMarkup();
   assert.match(leer, /data-action="res-add"/);
   assert.doesNotMatch(leer, /value="/, 'ohne Bestand bleibt das Formular leer');
+});
+
+/**
+ * Faehrt den Analyt-Editor eines Befunds gegen eine Attrappe: `felder` setzt
+ * die Eingaben, dann ein Klick auf Hinzufuegen bzw. Uebernehmen. Zurueck
+ * kommen Schreibaufrufe und gemeldete Feldfehler.
+ */
+async function analytSpeichern(report, { editId = null, felder = {}, badInput = false } = {}) {
+  const elemente = new Map();
+  const element = (sel) => {
+    if (!elemente.has(sel)) elemente.set(sel, editorElement({ querySelector: () => null }));
+    return elemente.get(sel);
+  };
+  let markup = '';
+  const host = {
+    replaceChildren() { markup = ''; elemente.clear(); },
+    insertAdjacentHTML(_pos, html) { markup += html; },
+    querySelector: (sel) => element(sel),
+    querySelectorAll: () => [],
+  };
+  const panel = { querySelector: (sel) => (sel === '#lab-results-editor' ? host : null) };
+  const gesendet = [];
+  const fehler = [];
+  const vorher = { api: globalThis.__apiStub, fehler: globalThis.__reportFieldError, window: globalThis.window, hatteWindow: 'window' in globalThis };
+  const mitschreiben = (method) => async (path, body) => {
+    gesendet.push({ method, path, body: JSON.parse(JSON.stringify(body)) });
+    return { data: { id: editId ?? 99, ...body } };
+  };
+  globalThis.__apiStub = { get: async () => ({ data: [] }), patch: mitschreiben('patch'), post: mitschreiben('post') };
+  globalThis.__reportFieldError = (el, text) => { fehler.push(text); };
+  globalThis.window = { yuvomi: { showToast() {} } };
+  try {
+    health.renderResultEditor(panel, report, { editId });
+    const knopf = editId != null ? 'res-save' : 'res-add';
+    assert.match(markup, new RegExp(`data-action="${knopf}"`), 'der Editor steht im erwarteten Modus');
+    for (const [sel, wert] of Object.entries(felder)) element(sel).value = wert;
+    element('#res-value').validity = { badInput };
+    const klick = element('[data-action="res-add"], [data-action="res-save"]');
+    for (const fn of klick.handlers.click ?? []) await fn({ currentTarget: klick, target: klick });
+  } finally {
+    globalThis.__apiStub = vorher.api;
+    if (vorher.fehler === undefined) delete globalThis.__reportFieldError;
+    else globalThis.__reportFieldError = vorher.fehler;
+    if (vorher.hatteWindow) globalThis.window = vorher.window;
+    else delete globalThis.window;
+  }
+  return { gesendet, fehler };
+}
+
+test('Codex an #1485: ein Laborwert ohne Zahl laesst sich bearbeiten, ohne eine erfinden zu muessen', async () => {
+  const ohneWert = { id: 5, analyte: 'Befundtext', value_num: null, unit: null, ref_low: null, ref_high: null, flag: null };
+  const report = { id: 2, results: [ohneWert] };
+  const bearbeitet = await analytSpeichern(report, {
+    editId: 5,
+    felder: { '#res-analyte': 'Befundtext Urin', '#res-value': '' },
+  });
+  assert.deepEqual(bearbeitet.fehler, [], 'kein Pflichtfeld-Fehler: value_num ist nullable');
+  assert.equal(bearbeitet.gesendet.length, 1, 'genau ein Schreibaufruf');
+  assert.equal(bearbeitet.gesendet[0].method, 'patch');
+  assert.equal(bearbeitet.gesendet[0].body.analyte, 'Befundtext Urin');
+  assert.equal(bearbeitet.gesendet[0].body.value_num, null, 'null bleibt null');
+
+  // Eine Eingabe, die keine Zahl ist, bleibt ein Fehler.
+  const kaputt = await analytSpeichern(report, { editId: 5, felder: { '#res-analyte': 'X', '#res-value': 'abc' } });
+  assert.deepEqual(kaputt.gesendet, []);
+  assert.deepEqual(kaputt.fehler, ['health.labs.results.valueRequired']);
+  // Ein Zahlenfeld meldet eine halbe Eingabe ("1e") als leer - sie wird nicht still zu null.
+  const halb = await analytSpeichern(report, { editId: 5, felder: { '#res-analyte': 'X', '#res-value': '' }, badInput: true });
+  assert.deepEqual(halb.gesendet, []);
+  assert.deepEqual(halb.fehler, ['health.labs.results.valueRequired']);
+
+  // Anlegen bleibt, wie es ist: der Wert ist dort Pflicht.
+  const neu = await analytSpeichern({ id: 2, results: [] }, { felder: { '#res-analyte': 'Ferritin', '#res-value': '' } });
+  assert.deepEqual(neu.gesendet, []);
+  assert.deepEqual(neu.fehler, ['health.labs.results.valueRequired']);
 });
 
 // -------------------------------------------------------------------------
