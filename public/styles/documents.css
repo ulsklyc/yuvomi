@@ -156,38 +156,17 @@
 
 /* --------------------------------------------------------
  * Auswahl-Modus (Bulk)
+ *
+ * Die Sammelaktionen stehen seit R11 (H4) in der Pille der Shell
+ * (utils/bulk-pill.js), nicht mehr in einer eigenen Leiste ueber der Liste.
+ * Hier bleibt nur, wie eine gewaehlte Karte oder Zeile aussieht.
  * -------------------------------------------------------- */
-.documents-selectbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding-block: var(--space-2);
-  padding-inline: var(--page-inline-pad);
-  border-bottom: 1px solid var(--color-border);
-  background: color-mix(in srgb, var(--module-accent) var(--tint-wash), var(--color-bg));
-  flex-wrap: wrap;
-}
 
-/* `.btn`/`.documents-selectbar` setzen ein eigenes display und schlagen damit
- * das UA-`[hidden] { display: none }`. Ohne diesen Guard blieb der DMS-Button
- * sichtbar, obwohl gar kein DMS-Konto konfiguriert ist. */
-.documents-selectbar[hidden],
+/* `.btn` setzt ein eigenes display und schlaegt damit das UA-`[hidden]
+ * { display: none }`. Ohne diesen Guard blieb der DMS-Button sichtbar, obwohl
+ * gar kein DMS-Konto konfiguriert ist. */
 .documents-dms-link-btn[hidden] {
   display: none;
-}
-
-.documents-selectbar__count {
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  font-variant-numeric: tabular-nums;
-}
-
-.documents-selectbar__actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-inline-start: auto;
-  flex-wrap: wrap;
 }
 
 /* Die RASTERKARTE traegt ihre Auswahl als Ring - sie ist ein eigenes Objekt
@@ -203,9 +182,16 @@
   background-color: color-mix(in srgb, var(--module-accent) var(--tint-surface), var(--color-surface));
 }
 
+/* DIE LEISTE BIS 280px (Re-Critique 2026-09-27, R11 H4 / A6 P2-7). Bei 240px
+ * blieben dem Ordnernamen neben Pfeil, Symbol, Zaehler und dem immer
+ * sichtbaren Kebab 73px - aus „Gesundheit" wurde „Gesund-heit", aus
+ * „Versicherungen" „Versiche-rungen", auch bei 1440px. Mit 280px und dem
+ * engeren Zeilenabstand unten sind es 121px: die mitgelieferten Namen stehen
+ * auf einer Zeile, und nur wirklich lange eigene Namen trennen noch - nach
+ * Silben (`hyphens: auto` der Namensrolle), nie mitten im Wort. */
 .documents-browser-layout {
   display: grid;
-  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);
   align-items: start;
   gap: var(--space-4);
   padding-inline: var(--page-inline-pad);
@@ -327,9 +313,12 @@
 }
 
 /* `.list-row` stellt display, Polsterung, Hoehe und Hover. Hier bleibt der
- * Positionsanker fuer das Kebab-Menue. */
+ * Positionsanker fuer das Kebab-Menue - und ein engerer Abstand: die Zeile
+ * traegt Pfeil, Ziel und Kebab nebeneinander, und die 12px der Listenzeile
+ * gingen zweimal vom Namen ab (R11 H4). */
 .documents-folder-item {
   position: relative;
+  column-gap: var(--space-2);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1465,11 +1454,6 @@
    * nicht mehr umbricht, ist er wortgleich mit seinem Elternblock. Sein
    * Geltungsbereich war ohnehin derselbe: er lag INNERHALB von
    * (max-width: 767px). */
-
-  .documents-selectbar__actions {
-    margin-inline-start: 0;
-    width: 100%;
-  }
 
   /* „Aus DMS verknüpfen" fällt mobil zum kompakten Icon-Button zusammen
    * (Text via aria-label/title erhalten), damit er die Kopfzeile nicht

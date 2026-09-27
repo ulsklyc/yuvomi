@@ -305,15 +305,18 @@ test('die DMS-Vorschau ist groß genug zum Erkennen und lässt sich vergrößern
   assert.match(page, /async function linkDmsDocument\(/);
 });
 
-test('Mehrfachauswahl ist opt-in und standardmäßig verborgen', () => {
-  assert.match(page, /id="documents-selectbar"[^>]*hidden>/);
-  // `.btn` und die Selectbar setzen ein eigenes display und schlagen sonst das
-  // UA-`[hidden] { display: none }` — der DMS-Button blieb dadurch sichtbar,
-  // obwohl kein DMS-Konto existierte.
-  assert.match(
-    css,
-    /\.documents-selectbar\[hidden\],\s*\.documents-dms-link-btn\[hidden\]\s*\{[^}]*display:\s*none/,
-  );
+test('Mehrfachauswahl ist opt-in, und ihre Leiste ist die Pille der Shell (R11 H4)', () => {
+  // Re-Critique 2026-09-27 (H4): die eigene Leiste ueber der Liste - vier
+  // `.btn`-Knoepfe und ein gefuelltes rotes Loeschen auf getoenter Flaeche,
+  // mobil zweizeilig - wich der Sammelaktions-Pille wie in Aufgaben,
+  // Kontakten, Einkauf und Vorrat.
+  assert.doesNotMatch(page, /documents-selectbar/, 'keine eigene Auswahlleiste mehr im Markup');
+  assert.doesNotMatch(css, /\.documents-selectbar/, 'und keine Regel fuer sie');
+  assert.match(page, /import \{ setBulkPill, clearBulkPill \} from '\/utils\/bulk-pill\.js';/);
+  // `.btn` setzt ein eigenes display und schlaegt sonst das UA-`[hidden]
+  // { display: none }` - der DMS-Button blieb dadurch sichtbar, obwohl kein
+  // DMS-Konto existierte.
+  assert.match(css, /\.documents-dms-link-btn\[hidden\]\s*\{[^}]*display:\s*none/);
   for (const fn of ['enterSelectMode', 'exitSelectMode', 'toggleSelectAll', 'moveSelected', 'archiveSelected', 'deleteSelected']) {
     assert.ok(page.includes(`function ${fn}`), `${fn} fehlt`);
   }
@@ -729,7 +732,7 @@ test('die Filterzeile traegt keine Werkzeuge mehr - Sortierung und Auswahl stehe
   assert.doesNotMatch(row, /documents-select-btn|documents-filters__end/, 'kein Auswahl-Knopf in der Filterzeile');
   assert.doesNotMatch(row, /class="btn\b/, 'kein Knopf ausser Segment und Chips');
 
-  const toolbar = page.slice(page.indexOf('<div class="page-toolbar'), page.indexOf('<div class="documents-selectbar"'));
+  const toolbar = page.slice(page.indexOf('<div class="page-toolbar'), page.indexOf('<div class="documents-filters">'));
   assert.match(toolbar, /documentsToolsMenuHtml\(\)/, 'das Menue sitzt im Kopf');
   const menu = page.slice(page.indexOf('function documentsToolsMenuHtml'), page.indexOf('function bindPageEvents'));
   assert.match(menu, /class="popover-menu documents-tools-menu" id="documents-tools-menu" popover role="menu"/);
@@ -1696,21 +1699,31 @@ test('der Dokument-Dialog fuehrt das Ablaufdatum offen und hat ein Abbrechen im 
   assert.match(modal, /<button type="button" class="btn btn--secondary" data-action="close-modal">\$\{t\('common\.cancel'\)\}<\/button>\s*<button type="submit" class="btn btn--primary" id="document-submit">/);
 });
 
-test('gesperrte Sammelaktionen treten zurueck, statt zu warnen', () => {
-  // Re-Critique 2026-09-25: `disabled` auf .btn--danger ergab ueber
-  // `.btn:disabled { opacity: 0.4 }` eine laute rosa Flaeche, solange nichts
-  // gewaehlt war. Das Projektmuster "inaktiv, aber erreichbar"
-  // (`.btn[aria-disabled='true']`, layout.css) deckt die Farbe ab und laesst
-  // den Knopf in der Tab-Ordnung.
+test('die Pille der Auswahl: ohne Dokument nur der Ausstieg, Loeschen fragt in der Pille (R11 H4)', () => {
+  // Kanon wie in den Aufgaben (updateBulkActionsBar): drei Kapseln, weil die
+  // Pille einzeilig ist - Verschieben, Loeschen, Fertig. Ohne gewaehltes
+  // Dokument gibt es nichts zu verschieben oder zu loeschen; statt gesperrter
+  // Knoepfe (bis R11 `aria-disabled` an der eigenen Leiste) steht dann nur der
+  // Ausstieg da.
   const update = fnBody('updateSelectUI', 'selectedDocuments');
-  assert.match(update, /btn\.setAttribute\('aria-disabled', String\(n === 0\)\)/);
-  assert.doesNotMatch(update, /btn\.disabled\s*=/, 'kein natives disabled mehr an den Sammelaktionen');
-  // Ein gesperrter Knopf nimmt Klicks an - der Verteiler muss sie verwerfen.
-  const bar = page.slice(page.indexOf("_container.querySelector('#documents-selectbar')?.addEventListener('click'"), page.indexOf("if (action === 'select-cancel') exitSelectMode();"));
-  assert.match(bar, /if \(button\?\.getAttribute\('aria-disabled'\) === 'true'\) return;/);
-  const layout = read('../public/styles/layout.css');
-  const muted = [...eachRule(layout)].find((r) => r.at.length === 0 && r.selector === ".btn[aria-disabled='true']");
-  assert.ok(muted && /background-color:\s*transparent/.test(muted.body), 'das gedeckte Rezept deckt auch die Gefahrfarbe ab');
+  assert.match(update, /if \(!state\.selectMode[^)]*\) \{ clearBulkPill\(\); return; \}/, 'ausserhalb der Auswahl keine Pille');
+  const guarded = update.slice(update.indexOf('if (n > 0) {'), update.indexOf("actions.push({ label: t('documents.selectDone')"));
+  assert.match(guarded, /t\('documents\.moveAction'\)[\s\S]*onClick: \(\) => moveSelected\(\)/, 'Verschieben nur mit Auswahl');
+  assert.match(guarded, /label: t\('common\.delete'\),[\s\S]*count: n,\s*danger: true,\s*confirm: \{ question: t\('documents\.bulkDeleteConfirm', \{ count: n \}\) \},\s*onClick: \(\) => deleteSelected\(\)/,
+    'Loeschen traegt Zahl, Tinte und Rueckfrage in der Pille');
+  assert.match(update, /actions\.push\(\{ label: t\('documents\.selectDone'\), onClick: \(\) => exitSelectMode\(\) \}\);\s*setBulkPill\(\{ label: t\('documents\.selectCount', \{ count: n \}\), actions \}\);/,
+    'der sichtbare Ausstieg steht immer, als letzte Kapsel');
+  // Die Rueckfrage stellt die Pille - kein zweiter Dialog danach.
+  assert.doesNotMatch(fnBody('deleteSelected', 'memberOptions'), /confirmModal/);
+  // Was nicht in die Pille passt, steht waehrend der Auswahl im Werkzeugmenue.
+  const menu = fnBody('documentsToolsMenuHtml', 'syncToolsMenu');
+  for (const action of ['select-all', 'select-archive']) {
+    assert.match(menu, new RegExp(`role="menuitem" class="popover-menu__item" data-action="${action}" hidden>`), `${action} im Menue, ausserhalb der Auswahl verborgen`);
+  }
+  const sync = fnBody('syncToolsMenu', 'setSort');
+  assert.match(sync, /all\.hidden = !state\.selectMode/);
+  assert.match(sync, /archive\.disabled = !state\.selectMode \|\| state\.selected\.size === 0/);
+  assert.match(sync, /t\(archived \? 'documents\.restoreAction' : 'documents\.archiveAction'\)/, 'im Archiv heisst es Wiederherstellen');
 });
 
 test('im gewaehlten Ordner nennt die Zeile den Ordner nicht noch einmal', () => {
@@ -1769,4 +1782,58 @@ test('eine leere Suche bietet die andere Ansicht an - aber nur, wenn sie dort et
       assert.equal(typeof locale.documents?.[key], 'string', `${file}: documents.${key} fehlt`);
     }
   }
+});
+
+// Re-Critique 2026-09-27 (R11 H4, A6 P2-7): im Ordner-Rail stand „Gesund-heit"
+// und „Versiche-rungen", auch bei 1440px - dem Namen blieben 73px. Die Regel:
+// ein mitgelieferter Ordnername steht bei voller Leistenbreite auf EINER Zeile.
+// Die Rechnung liest jede Laenge aus documents.css, list-row.css und
+// tokens.css; nur die Wortbreite ist gemessen (de, 15px/600, Pane 2026-09-27:
+// „Versicherungen" 113px, der laengste Name der deutschen Vorlage).
+test('der Ordnername bekommt im Rail genug Breite fuer eine Zeile (R11 H4)', () => {
+  const tokens = read('../public/styles/tokens.css');
+  const tok = (name) => {
+    const m = tokens.match(new RegExp(`--${name}:\\s*([\\d.]+)px`));
+    assert.ok(m, `Token --${name} nicht gefunden`);
+    return Number(m[1]);
+  };
+  const len = (v) => {
+    const s = String(v ?? '').trim();
+    const px = s.match(/^([\d.]+)px$/);
+    if (px) return Number(px[1]);
+    const m = s.match(/^var\(--([\w-]+)\)$/);
+    assert.ok(m, `Laenge nicht lesbar: "${s}"`);
+    return tok(m[1]);
+  };
+  const base = (file) => [...eachRule(read(file))].filter((r) => r.at.length === 0);
+  const decl = (rules, sel, prop) => {
+    let out;
+    for (const r of rules) {
+      if (r.selector.trim() !== sel) continue;
+      const m = r.body.match(new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`));
+      if (m) out = m[1].trim();
+    }
+    return out;
+  };
+  const docs = base('../public/styles/documents.css');
+  const rows = base('../public/styles/list-row.css');
+
+  const track = decl(docs, '.documents-browser-layout', 'grid-template-columns') ?? '';
+  const rail = Number(track.match(/^minmax\(\s*[\d.]+px\s*,\s*([\d.]+)px\s*\)/)?.[1]);
+  assert.ok(rail > 0, `Leistenbreite nicht lesbar: "${track}"`);
+  const padStart = len(decl(docs, '.documents-folder-item', 'padding-inline-start')?.match(/calc\(var\(--([\w-]+)\)/)?.[0].replace('calc(', '') ?? '');
+  const padEnd = len(decl(rows, '.list-row', 'padding')?.split(/\s+/)[1]);
+  const rowGap = len(decl(docs, '.documents-folder-item', 'column-gap') ?? decl(rows, '.list-row', 'gap'));
+  const twisty = len(decl(docs, '.documents-folder-item__twisty', 'inline-size'));
+  const menu = len(decl(docs, '.documents-folder-item__menu', 'width'));
+  const menuMargin = len(decl(docs, '.documents-folder-item__menu', 'margin-right'));
+  const selectGap = len(decl(docs, '.documents-folder-item__select', 'gap'));
+  const icon = len(decl(docs, '.documents-folder-item__icon svg', 'width'));
+  const count = len(decl(docs, '.documents-folder-item__count', 'min-width'));
+
+  // Zeile auf Tiefe 0: Polster | Pfeil | Abstand | Ziel (Symbol | Name | Zaehler) | Abstand | Kebab + Rand | Polster
+  const select = rail - padStart - twisty - rowGap - rowGap - menu - menuMargin - padEnd;
+  const name = select - icon - count - 2 * selectGap;
+  const WORD = 113; // „Versicherungen"
+  assert.ok(name >= WORD, `dem Ordnernamen bleiben ${name}px, „Versicherungen" braucht ${WORD}px - er bricht um`);
 });

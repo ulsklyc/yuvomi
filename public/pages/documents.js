@@ -28,6 +28,7 @@ import { subtreeIds, folderPath, flattenFolderTree } from '/utils/folder-tree.js
 import { dateStatus } from '/utils/date-status.js';
 import { expiryChipSpec, expiryViewerSpec } from '/utils/document-expiry.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
+import { setBulkPill, clearBulkPill } from '/utils/bulk-pill.js';
 import { createPageController } from '/utils/page-lifecycle.js';
 import {
   browserThumbRenderers,
@@ -239,16 +240,6 @@ export async function render(container, context = {}) {
             </button>
           </div>
           ${documentsToolsMenuHtml()}
-        </div>
-      </div>
-      <div class="documents-selectbar" id="documents-selectbar" role="toolbar" aria-label="${t('documents.selectLabel')}" hidden>
-        <button class="btn btn--secondary" type="button" data-action="select-cancel">${t('common.cancel')}</button>
-        <span class="documents-selectbar__count" id="documents-select-count" aria-live="polite"></span>
-        <div class="documents-selectbar__actions">
-          <button class="btn btn--secondary" type="button" data-action="select-all">${t('documents.selectAll')}</button>
-          <button class="btn btn--secondary" type="button" data-action="select-move">${t('documents.moveAction')}</button>
-          <button class="btn btn--secondary" type="button" data-action="select-archive">${t('documents.archiveAction')}</button>
-          <button class="btn btn--danger" type="button" data-action="select-delete">${t('common.delete')}</button>
         </div>
       </div>
       ${/* ZWEI FILTERSPRACHEN WAREN EINE ZU VIEL (Critique 2026-09-25, P1/P2).
@@ -559,6 +550,14 @@ function documentsToolsMenuHtml() {
       <button type="button" role="menuitem" class="popover-menu__item" data-action="enter-select">
         <i data-lucide="list-checks" class="icon-md" aria-hidden="true"></i><span>${esc(t('documents.selectLabel'))}</span>
       </button>
+      ${/* Waehrend der Auswahl: was nicht in die einzeilige Pille passt
+           (syncToolsMenu blendet es ein, wie Ablegen in den Aufgaben). */ ''}
+      <button type="button" role="menuitem" class="popover-menu__item" data-action="select-all" hidden>
+        <i data-lucide="check-check" class="icon-md" aria-hidden="true"></i><span>${esc(t('documents.selectAll'))}</span>
+      </button>
+      <button type="button" role="menuitem" class="popover-menu__item" data-action="select-archive" hidden>
+        <i data-lucide="archive" class="icon-md" aria-hidden="true"></i><span>${esc(t('documents.archiveAction'))}</span>
+      </button>
     </div>`;
 }
 
@@ -574,6 +573,19 @@ function syncToolsMenu() {
   menu.querySelectorAll('[data-sort-direction]').forEach((item) => paint(item, item.dataset.sortDirection === state.sortDirection));
   const select = menu.querySelector('[data-action="enter-select"]');
   if (select) select.disabled = state.selectMode;
+  // Die Sammel-Eintraege gibt es nur waehrend der Auswahl; Archivieren erst
+  // mit einem Dokument darin, und im Archiv heisst es Wiederherstellen.
+  const all = menu.querySelector('[data-action="select-all"]');
+  if (all) all.hidden = !state.selectMode;
+  const archive = menu.querySelector('[data-action="select-archive"]');
+  if (archive) {
+    archive.hidden = !state.selectMode;
+    archive.disabled = !state.selectMode || state.selected.size === 0;
+    const archived = state.status === 'archived';
+    const text = t(archived ? 'documents.restoreAction' : 'documents.archiveAction');
+    const span = archive.querySelector('span');
+    if (span && span.textContent !== text) span.textContent = text;
+  }
 }
 
 function setSort(sort, direction) {
@@ -603,6 +615,10 @@ function bindToolsMenu() {
       if (item.dataset.sortDirection !== state.sortDirection) setSort(state.sort, item.dataset.sortDirection);
     } else if (item.dataset.action === 'enter-select') {
       enterSelectMode();
+    } else if (item.dataset.action === 'select-all') {
+      toggleSelectAll();
+    } else if (item.dataset.action === 'select-archive') {
+      archiveSelected();
     }
   });
 }
@@ -668,16 +684,6 @@ function bindPageEvents() {
   // stehen, scrollt ueberall nur die Spur aus Kategorie- und Ablauf-Chips;
   // das Segment davor bleibt stehen.
   wireScrollFade(_container.querySelector('.documents-filters__chips'));
-  _container.querySelector('#documents-selectbar')?.addEventListener('click', (e) => {
-    const button = e.target.closest('[data-action]');
-    if (button?.getAttribute('aria-disabled') === 'true') return;
-    const action = button?.dataset.action;
-    if (action === 'select-cancel') exitSelectMode();
-    else if (action === 'select-all') toggleSelectAll();
-    else if (action === 'select-move') moveSelected();
-    else if (action === 'select-archive') archiveSelected();
-    else if (action === 'select-delete') deleteSelected();
-  });
   /* DIESE SEITE BEKOMMT DAS LESEMASS NICHT, und das ist eine Entscheidung.
    *
    * Sie ist als einzige ZWEISPALTIG: der Ordner-Browser steht links, die
@@ -2025,8 +2031,6 @@ function enterSelectMode() {
   state.selectMode = true;
   state.selected.clear();
   syncToolsMenu();
-  const bar = _container.querySelector('#documents-selectbar');
-  if (bar) bar.hidden = false;
   renderDocuments();
   updateSelectUI();
 }
@@ -2036,28 +2040,50 @@ function exitSelectMode() {
   state.selectMode = false;
   state.selected.clear();
   syncToolsMenu();
-  const bar = _container.querySelector('#documents-selectbar');
-  // Der Fokus stand auf "Abbrechen", das gleich verschwindet: zurueck an den
+  // Der Fokus stand in der Pille, die gleich verschwindet: zurueck an den
   // Menue-Knopf, ueber den man hineingekommen ist - sonst faellt er auf <body>.
-  const refocus = bar?.contains(document.activeElement);
-  if (bar) bar.hidden = true;
+  const refocus = Boolean(document.activeElement?.closest?.('.list-bulkbar'));
+  clearBulkPill();
   renderDocuments();
   if (refocus) _container.querySelector('.documents-tools-btn')?.focus();
 }
 
+/**
+ * Die Sammelaktionen der Auswahl - in der Pille der Shell (utils/bulk-pill.js)
+ * wie Aufgaben, Kontakte, Einkauf und Vorrat (Re-Critique 2026-09-27, R11 H4).
+ * Vorher stand hier eine eigene Leiste ueber der Liste: vier `.btn`-Knoepfe
+ * und ein gefuelltes rotes „Loeschen" auf einer getoenten Flaeche, die mobil
+ * auf zwei Zeilen umbrach und die Liste nach unten schob.
+ *
+ * DIE PILLE IST EINZEILIG, also traegt sie drei Kapseln wie in den Aufgaben:
+ * Verschieben, Loeschen und „Fertig" als sichtbaren Ausstieg. „Alle auswaehlen"
+ * und Archivieren stehen waehrend der Auswahl im Werkzeugmenue (syncToolsMenu).
+ * Loeschen fragt in der Pille und bleibt danach fuenf Sekunden rueckgaengig zu
+ * machen (deleteDocuments).
+ */
 function updateSelectUI() {
+  syncToolsMenu();
+  if (!state.selectMode || _container?.isConnected === false) { clearBulkPill(); return; }
   const n = state.selected.size;
-  const countEl = _container.querySelector('#documents-select-count');
-  if (countEl) countEl.textContent = t('documents.selectCount', { count: n });
-  _container.querySelectorAll('#documents-selectbar [data-action^="select-"]').forEach((btn) => {
-    if (btn.dataset.action === 'select-cancel' || btn.dataset.action === 'select-all') return;
-    // `aria-disabled` statt `disabled` (Re-Critique 2026-09-25): das native
-    // disabled machte das rote Loeschen per Opazitaet zur rosa Flaeche. Das
-    // Projektmuster `.btn[aria-disabled='true']` (layout.css) deckt die Farbe
-    // ab, und der Knopf bleibt in der Tab-Ordnung; den Klick verwirft der
-    // Verteiler der Leiste.
-    btn.setAttribute('aria-disabled', String(n === 0));
-  });
+  const actions = [];
+  if (n > 0) {
+    actions.push(
+      {
+        label: t('documents.moveAction'),
+        onClick: () => moveSelected(),
+      },
+      {
+        label: t('common.delete'),
+        ariaLabel: t('documents.bulkDeleteConfirm', { count: n }),
+        count: n,
+        danger: true,
+        confirm: { question: t('documents.bulkDeleteConfirm', { count: n }) },
+        onClick: () => deleteSelected(),
+      },
+    );
+  }
+  actions.push({ label: t('documents.selectDone'), onClick: () => exitSelectMode() });
+  setBulkPill({ label: t('documents.selectCount', { count: n }), actions });
 }
 
 function selectedDocuments() {
@@ -2122,14 +2148,10 @@ async function moveSelected() {
   }
 }
 
-async function deleteSelected() {
+/** Die Rueckfrage stellt die Pille (updateSelectUI); hier nur noch die Tat. */
+function deleteSelected() {
   const docs = selectedDocuments();
   if (!docs.length) return;
-  const confirmed = await confirmModal(
-    t('documents.bulkDeleteConfirm', { count: docs.length }),
-    { danger: true, confirmLabel: t('common.delete'), detail: t('documents.bulkDeleteConfirmDetail') },
-  );
-  if (!confirmed) return;
   exitSelectMode();
   deleteDocuments(docs);
 }
