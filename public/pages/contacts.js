@@ -162,9 +162,10 @@ function emailsLockedFor(contact) {
  * DREI VON VIER SCHREIBEN NUR, UND KEINE DAVON HING AN EINER CSS-REGEL. Der
  * Kategorie-Verwalter legt an und loescht, der Auswahlmodus hat als einzige
  * Aktion „Loeschen" (seine Pille zeigt sonst nur „Alle auswaehlen"), und der
- * Import legt Kontakte an. Nur der Primaerknopf traegt `.toolbar-new-btn`, und
- * genau der ist der einzige, den `html[data-module-readonly]` schon erfasst hat
- * (layout.css) - er bleibt deshalb im Markup stehen.
+ * Import legt Kontakte an. Die Primaeraktion steht hier NICHT: sie ist der FAB
+ * (#fab-new-contact), den die Shell am Zeigergeraet in diesen Slot dockt
+ * (Re-Critique 2026-09-27, D3), und `html[data-module-readonly]` blendet ihn
+ * aus (layout.css).
  *
  * DIE DREI STEHEN IM EINEN WERKZEUGMENUE (Kopfregel mobil, DESIGN.md,
  * 2026-09-26). Als Kategorien-Icon, „Auswaehlen" (130px) und „Import" (103px)
@@ -191,11 +192,7 @@ function toolbarActionsHtml() {
               { action: 'manage-categories', label: t('contacts.manageCategories'), icon: 'tags' },
             ],
           })}
-          <input type="file" id="contacts-import-input" accept=".vcf,text/vcard" hidden>`}
-          <button class="btn btn--primary toolbar-new-btn" id="contacts-add-btn" aria-label="${t('contacts.newContactLabel')}">
-            <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
-            <span class="toolbar-new-btn__label">${t('newLabel.contacts')}</span>
-          </button>`;
+          <input type="file" id="contacts-import-input" accept=".vcf,text/vcard" hidden>`}`;
 }
 
 // --------------------------------------------------------
@@ -433,10 +430,9 @@ export async function render(container, { user, signal } = {}) {
   });
 
   // Neu
-  // Beide Anlegewege blendet CSS aus (html[data-module-readonly]); der Handler
+  // Den Anlegeweg blendet CSS aus (html[data-module-readonly]); der Handler
   // bleibt trotzdem gesperrt - ausgeblendet ist nicht unerreichbar.
   const addHandler = () => { if (!readOnly()) openContactModal({ mode: 'create' }); };
-  _container.querySelector('#contacts-add-btn').addEventListener('click', addHandler);
   findPageFab('fab-new-contact').addEventListener('click', addHandler);
 
   // Auswahl-Modus (opt-in): Einstieg im Werkzeugmenue, Ausstieg per
@@ -467,7 +463,10 @@ export async function render(container, { user, signal } = {}) {
     openImportSelectionModal(named, skipped);
   });
 
-  // Tastatur-Shortcuts (Power-User): „/" fokussiert die Suche, „n" legt neu an.
+  // Tastatur-Shortcuts (Power-User): „/" fokussiert die Suche, Escape verlaesst
+  // die Auswahl. „n" legt NICHT hier an: das tut der Kurzbefehl der Shell ueber
+  // den FAB (triggerPageFab, router.js), der Nur-lesen schon abfaengt - ein
+  // zweiter Handler hier oeffnete den Dialog ein zweites Mal.
   // document-Level, weil sie auch ohne Fokus in der Liste greifen sollen. Der
   // Router bietet keinen Page-Teardown — daher meldet sich der Listener selbst ab,
   // sobald sein Seiten-Container (Closure) aus dem DOM entfernt wurde.
@@ -484,12 +483,6 @@ export async function render(container, { user, signal } = {}) {
     if (e.key === '/') {
       e.preventDefault();
       pageRoot.querySelector('#contacts-search')?.focus();
-    } else if (e.key === 'n' || e.key === 'N') {
-      // EIN WEG OHNE MARKUP, und deshalb der, den jede CSS-Regel auslaesst:
-      // „n" legte auch dann an, wenn Kopfknopf und FAB schon weg waren.
-      if (readOnly()) return;
-      e.preventDefault();
-      openContactModal({ mode: 'create' });
     }
   };
   document.addEventListener('keydown', onKey);

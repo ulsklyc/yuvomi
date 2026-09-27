@@ -160,24 +160,37 @@ test('Deep-Link gegen gemerkten Filter: ein benanntes Ziel schlaegt Suche und Ka
   assert.ok(call < render.indexOf('renderPageSearch('), 'und zwar vor dem Suchfeld');
 });
 
-test('die Suche nennt dieselbe Schwelle wie layout.css und deckelt auf die Listenbahn', () => {
+/*
+ * DIE SUCHE LAEUFT NICHT QUER UEBER DAS DETAIL - seit der Re-Critique
+ * 2026-09-27 (D4) haelt das die EINE Kopfbreite der Shell (page-search.css,
+ * `--page-search-width`), nicht mehr eine Kappung der Kontakte. Geprueft wird
+ * die Regel dahinter: die Kopfsuche ist hoechstens so breit wie die
+ * schmalste Listenbahn (`--layout-list-min` minus zweimal das Seitenpolster
+ * von 32px), und die Kontakte geben ihr keine eigene Breite mehr.
+ */
+test('die Suche bleibt in der Listenbahn: Shell-Breite <= schmalste Bahn, keine Modulbreite', () => {
   const tokens = read('../public/styles/tokens.css');
   const threshold = Number(tokens.match(/--layout-split-threshold:\s*([0-9.]+)rem/)?.[1]);
   assert.ok(threshold > 0, 'tokens.css: --layout-split-threshold fehlt');
-  let seen = false;
+  const listMinRem = Number(tokens.match(/--layout-list-min:\s*([0-9.]+)rem/)?.[1]);
+  assert.ok(listMinRem > 0, 'tokens.css: --layout-list-min fehlt');
+  const search = Number(read('../public/styles/page-search.css').match(/--page-search-width:\s*([0-9.]+)px/)?.[1]);
+  assert.ok(search > 0, 'page-search.css: --page-search-width fehlt');
+  assert.ok(search <= listMinRem * 16 - 2 * 32,
+    `Kopfsuche ${search}px ist breiter als die schmalste Listenbahn (${listMinRem * 16 - 64}px) - sie liefe ueber das Detail`);
+
   for (const { selector, body, at } of eachRule(read('../public/styles/contacts.css'))) {
     const chain = at.join(' ');
-    if (!/@container\s+module-surface/.test(chain)) continue;
-    const width = Number(chain.match(/min-width:\s*([0-9.]+)rem/)?.[1]);
-    assert.equal(width, threshold,
-      `contacts.css: @container module-surface ${width}rem, tokens.css ${threshold}rem - @container kann keine Variable lesen`);
-    if (selector.trim() === '.contacts-toolbar__search') {
-      seen = true;
-      assert.match(body, /max-inline-size:[\s\S]*--layout-list-min[\s\S]*--layout-list-max/,
-        'die Kappung kommt aus der Formel der Listenbahn, nicht aus einer Zahl');
+    if (/@container\s+module-surface/.test(chain)) {
+      const width = Number(chain.match(/min-width:\s*([0-9.]+)rem/)?.[1]);
+      assert.equal(width, threshold,
+        `contacts.css: @container module-surface ${width}rem, tokens.css ${threshold}rem - @container kann keine Variable lesen`);
+    }
+    if (/\.contacts-toolbar__search(?![\w-])/.test(selector)) {
+      assert.doesNotMatch(body, /(?:^|[;\s])(?:max-)?(?:width|inline-size|flex(?:-basis)?)\s*:/,
+        `contacts.css: ${selector.trim()} gibt der Kopfsuche wieder eine eigene Breite`);
     }
   }
-  assert.ok(seen, 'die Suche ist ab der Schwelle nicht gedeckelt - sie liefe quer ueber das Detail');
 });
 
 test('in die Spalte befoerdert: das offene Blatt DIESES Eintrags geht zu, ein fremdes bleibt', async () => {

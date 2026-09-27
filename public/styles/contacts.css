@@ -879,24 +879,10 @@ html:has(.contacts-page.is-selecting) {
   background-color: transparent;
 }
 
-/* DIE SUCHE BLEIBT SO BREIT WIE DIE LISTE, DIE SIE FILTERT. Ab der Schwelle
-   laeuft der Kopf ueber beide Spalten (layout.css), und der Center-Slot wuchs
-   mit: bei 1440 auf 859px, ein Feld quer ueber das Detail. Gedeckelt auf die
-   Breite der Zeilen darunter - Listenbahn (dieselbe clamp()-Formel wie
-   `.split-view`; `cqi` misst dieselbe Modulflaeche) minus ihr Polster. Das
-   sind bei 1440 424px, praktisch das Mass von heute unter der Schwelle (423):
-   das Feld behaelt seine Groesse ueber die Schwelle hinweg. Es beginnt hinter
-   dem Titel und endet deshalb um dessen Breite rechts der Bahn - eine Kante,
-   die genau an der Bahn endet, braeuchte die Titelbreite, und die kennt CSS
-   nicht.
-   Die Schwelle ist `--layout-split-threshold` (tokens.css); `@container` kann
-   keine Variable lesen, test-contacts-list-detail.js haelt beide gleich.
-   Unter der Schwelle greift nichts: dort traegt der Kopf das Lesemass. */
-@container module-surface (min-width: 75rem) {
-  .contacts-toolbar__search {
-    max-inline-size: calc(
-      clamp(var(--layout-list-min), 40cqi, var(--layout-list-max))
-      - 2 * var(--page-inline-pad)
-    );
-  }
-}
+/* DIE SUCHE BLEIBT SCHMALER ALS DIE LISTE, DIE SIE FILTERT - seit der
+   Re-Critique 2026-09-27 (D4) ohne eigene Regel: page-search.css gibt jeder
+   Kopfsuche `--page-search-width` (320px), und die Listenbahn ist nie
+   schmaler als `--layout-list-min` minus ihr Polster (356px). Hier stand eine
+   @container-Kappung auf die Bahnbreite (424px bei 1440), die gegen die
+   Shell-Regel (0,2,1) ohnehin nicht mehr ankam. test-contacts-list-detail.js
+   haelt die Ungleichung. */
