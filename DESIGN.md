@@ -1287,12 +1287,16 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 |---|---|---|---|
 | Bearbeiten/Loeschen/Mehr an einer Zeile | `.row-action`, Loeschen `.row-action--danger`, dauerhaft sichtbar (ignore.md) | `rowActionHtml()` / `rowActionEl()` (utils/row-action.js); Mehr-Menue: `popoverMenuHtml({ triggerClass: 'row-action' })` | `btn--secondary btn--icon` (violett umrandet), `btn--danger-outline` als Ring, eigene Stiftzellen, `btn--icon btn--sm` |
 | Name der Zeilenaktion | nennt das OBJEKT: "Anna anrufen", "Kategorie Obst loeschen" | `t('common.editNamed' / 'deleteNamed' / 'removeNamed' / 'moreActionsNamed', { name })` oder ein Modul-Key mit `{{name}}` | zwoelfmal "Anrufen", fuenfmal "Loeschen" |
-| Suchen | EIN Suchfeld: gefuellte Kapsel (`--color-fill-field`, `--radius-full`, Kante transparent, Fokus = Akzentkante + Ring), mobil im Kopf die Icon-Form | `renderPageSearch()` + `wirePageSearch()` (utils/page-search.js); die globale Suche teilt die Regel per Selektorliste | eigene Felder mit 10/12/16px-Ecke, randlose Leisten, `form-input type=search` |
+| Suchen | EIN Suchfeld: gefuellte Kapsel (`--color-fill-field`, `--radius-full`, Kante transparent, Fokus = Akzentkante + Ring), mobil im Kopf die Icon-Form. Am Desktop (ab 1024px) EINE Breite `--page-search-width` (320px, endet in Liste+Detail vor der Listenspur) an EINER Stelle: der Center-Slot direkt hinter dem Titel (Referenz Dokumente) | `renderPageSearch({ className: '... page-toolbar__center' })` + `wirePageSearch()` (utils/page-search.js); Breite und Lage stehen in page-search.css; die globale Suche teilt die Regel per Selektorliste | eigene Felder mit 10/12/16px-Ecke, randlose Leisten, `form-input type=search`; Modulbreiten (neun Breiten 280-830px) und Auto-Rand ans Zeilenende |
 | Folge gleichartiger Zeilen | `.row-carrier` (Surface, `--radius-lg`, `--shadow-sm`, Haarlinien `> * + *`); liegt die Liste schon in einer Karte: `.row-divided` | list-row.css | `.list-rows` (12px, ohne Schatten) - laeuft aus, danach faellt die Regel |
-| Anlegen | `page-fab` MIT Nomen: mobil in der Kapsel, am Desktop angedockt als Kopf-Pille "+ Nomen"; ein Kontext-FAB nennt je Tab sein Nomen | `createPageFab({ dockLabel })`, `setPageFabAction(fab, { label, dockLabel, onClick })` (utils/fab.js) | schwebender FAB ohne Nomen, dessen Bedeutung mit dem Tab wechselt; Inline-Anlegeformulare ueber der Liste |
+| Anlegen | `page-fab` MIT Nomen: mobil in der Kapsel, am Desktop angedockt als Kopf-Pille "+ Nomen" (Kuerzel "n" angesagt); ein Kontext-FAB nennt je Tab sein Nomen (ein Nomen, keine Verbphrase) | `createPageFab({ dockLabel })`, `setPageFabAction(fab, { label, dockLabel, onClick })` (utils/fab.js) | schwebender FAB ohne Nomen, dessen Bedeutung mit dem Tab wechselt; Inline-Anlegeformulare ueber der Liste; eigener Kopfknopf `.toolbar-new-btn` |
 | Dialogknoepfe | `.modal-panel__footer`: [Loeschen `btn--danger-outline` MIT Text, links] ... [Abbrechen] [Primaer `btn--primary`]; `mountFooter()` hebt ihn an den Blattrand, mobil ueber die Falz - auch die geteilten Rueckfragen (confirm/prompt/select) | modal.js; Vorbild Kalender-Termin, Aufgabe | `.modal-actions` im scrollenden Koerper, Loeschen als rotes Icon |
 | Boolean in den Einstellungen | Schalter (`.toggle`-Bahn, `role="switch"`), Label links, Zustand rechts | `toggleRowHtml({ ..., control: 'switch' })` (settings/components.js) | native 18px-Checkbox, "Aktiviert"-Badge neben dem Haken |
 | Auswahl aus 2-4 Werten (Theme) | `.segmented` im Well (Abschnitt "Segmented Controls") | panel.css | drei getrennte Rahmenknoepfe |
+| Auswahl in einer Segment-/Tab-Leiste zeigen | EINE Bewegung: eine Kapsel hinter den Labels gleitet (`--duration-lg` + `--ease-out`, nur `transform`, Breite nur wenn sie sich aendert; reduzierte Bewegung springt); die Sidebar-Pille behaelt ihre Feder, hoechstens `--duration-xl` | `attachSegmentIndicator(bar)` (utils/segment-indicator.js; folgt jedem Wechsel des aktiven Eintrags selbst), `renderSubTabs({ indicator })`, `{ key }` fuer Leisten, die neu gebaut werden | springende Flaeche am aktiven Tab; eigene WAAPI-Kapseln; Literal-Dauern (450ms) |
+| Mobiles Blatt (Dialog, Mehr) | EINE Grammatik: Griff 36x5 in der Kopfzone (`--sheet-grabber`: hell `--color-border-strong`, dunkel Glas-Weiss), Griff-Oberkante bis Titel 16px; 1:1 mitgehen, schliessen ab 80px Weg ODER Flick > 0.5px/ms, sonst zurueckfedern (`--duration-lg` + `--ease-out`), nach oben Gummiband; der Zug liegt auf `translate` | `wireSheetDrag(sheet, { scroller, onDismiss })` (utils/sheet-drag.js) | leerer Griff-Streifen, Glas-Weiss auf weisser Tafel, Faktor 0.6, Schliessen erst bei `touchend`, Zurueckspringen ohne Transition |
+| Mehrfachauswahl in einer Liste | Auswahlkreis ERSETZT Statuskreis und Zeilen-Picker (Apple Erinnerungen); Leiste = Bulk-Pille mit "Fertig"; Name je Zeile mit Objekt ("<Titel> auswaehlen"); Loeschen im Pillen-Stil | `setBulkPill({ label, actions })` / `clearBulkPill()` (utils/bulk-pill.js) | native blaue Checkbox neben dem Statuskreis, eigene Aktionsleiste, gefuellte rote Loeschen-Kapsel |
+| Aktionen an Karte oder Zeile | dauerhaft sichtbar, ruhig per Tertiaerfarbe (ignore.md) | `.row-action` | Einblenden erst per `:hover`/`:focus-within` |
 | Icon stylen | auf `svg` (oder eine Klasse) zielen - Lucide ersetzt `<i data-lucide>` durch `<svg>` | - | Regeln auf `... i`: sie trafen nie (38 entfernt) |
 
 **Benannte Ausnahmen, je mit Grund an der Stelle:** die Essenskarte (`.meal-card__action-btn`,
@@ -1309,10 +1313,12 @@ Rueckfragen das Gegenteil fest (`btn--secondary`, "im Loeschen-Confirm, wo Abbre
 wichtigsten ist, am unauffaelligsten"), und 61 Seiten-Dialoge folgen ihm, 27 dem Kalender. Bis
 das entschieden ist, zaehlt `cancel-ghost` nur.
 
-**Gehalten als Ratchet** (`test:control-dialect`): zehn Scanner zaehlen je Datei die
-Abweichler; die Ausnahmeliste `PENDING` (Stand 2026-09-26) darf nur sinken. Ein NEUER
-Abweichler ist rot, ebenso eine Zahl, die gesunken ist, ohne dass die Liste nachzieht - so
-bleibt die Liste ein Arbeitsvorrat und wird keine Allowlist.
+**Gehalten als Ratchet** (`test:control-dialect`): sechzehn Scanner zaehlen je Datei die
+Abweichler; die Ausnahmeliste `PENDING` (Stand 2026-09-26, fuer die sechs Regeln der Runde 7
+2026-09-27: `toolbar-new-btn`, `hover-reveal`, `row-checkbox`, `segment-indicator`,
+`search-width`, `sheet-drag`) darf nur sinken. Ein NEUER Abweichler ist rot, ebenso eine
+Zahl, die gesunken ist, ohne dass die Liste nachzieht - so bleibt die Liste ein Arbeitsvorrat
+und wird keine Allowlist.
 
 ### Buttons
 - **Shape:** die Kapsel (`--radius-full`) in der `.btn`-Basisregel, min-height 48px, Padding
