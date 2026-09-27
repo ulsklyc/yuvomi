@@ -881,7 +881,9 @@
     display: block;
     position: sticky;
     top: calc(var(--space-4) + var(--safe-area-inset-top));
-    max-height: calc(var(--viewport-height) - var(--space-8));
+    /* Minus `--shell-tail`: die klebende Liste endet ueber dem, was unten
+     * fest steht (Installationsbanner), wie jede klebende Spalte. */
+    max-height: calc(var(--viewport-height) - var(--space-8) - var(--shell-tail, 0px));
     overflow-y: auto;
     overscroll-behavior: contain;
   }

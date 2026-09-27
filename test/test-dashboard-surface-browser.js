@@ -88,7 +88,16 @@ async function tailAtEnd(page) {
       if (!painted) continue;
       const r = el.getBoundingClientRect();
       if (!r.width || !r.height) continue;
-      if (r.bottom > last) { last = r.bottom; who = String(el.className || el.tagName).slice(0, 60); }
+      // Sichtbar ist nur, was kein innerer Scroller wegschneidet: die klebende
+      // Einstellungs-Liste (R10) scrollt fuer sich, ihre letzten Zeilen liegen
+      // rechnerisch 300px unter dem Fenster, zu sehen ist ihre Kante. Deren
+      // Unterkante misst die Sonde weiter - sie ist selbst Inhalt.
+      let seenBottom = r.bottom;
+      for (let a = el.parentElement; a && a !== ac; a = a.parentElement) {
+        if (getComputedStyle(a).overflowY !== 'visible') seenBottom = Math.min(seenBottom, a.getBoundingClientRect().bottom);
+      }
+      if (seenBottom <= r.top) continue;
+      if (seenBottom > last) { last = seenBottom; who = String(el.className || el.tagName).slice(0, 60); }
     }
     return {
       path: location.pathname,
@@ -407,6 +416,7 @@ async function gridCells(page) {
       flow: cs.gridAutoFlow,
       order,
       inner,
+      cells: occ,
       map: occ.map((row) => row.map((v) => (v || '.').slice(0, 8)).join(' | ')).join('\n'),
     };
   });
@@ -441,7 +451,18 @@ test('Raster: eine eigene Reihenfolge laesst keine Loecher, in Ansicht UND Bearb
   assert.deepEqual(view.order, ['calendar', 'tasks', 'notes'], 'Die gespeicherte Reihenfolge bleibt die Rangfolge im Dokument');
   assert.deepEqual(view.inner, [], `Loch in der Ansicht:\n${view.map}`);
   assert.deepEqual(edit.inner, [], `Loch im Bearbeiten-Modus:\n${edit.map}`);
-  assert.equal(edit.map, view.map, 'Beim Umschalten springen Karten');
+  // Keine Karte springt: jede Zelle, die im Bearbeiten-Modus belegt ist, traegt
+  // in der Ansicht dieselbe Kachel. Die Ansicht darf nur LEERE Zellen fuellen -
+  // seit R10 (L9) waechst die Kachel vor einer Luecke in den Rest ihrer Reihe,
+  // der Bearbeiten-Modus zeigt die gewaehlte Groesse und damit das Loch samt
+  // Hinweis. Ein Vergleich der ganzen Karte hielt dieses Wachsen fuer Springen.
+  const moved = [];
+  edit.cells.forEach((row, ri) => row.forEach((id, ci) => {
+    const shown = view.cells[ri]?.[ci] ?? null;
+    if (id && shown !== id) moved.push(`${ri}/${ci}: ${id} -> ${shown}`);
+  }));
+  assert.deepEqual(moved, [], `Beim Umschalten springen Karten:\nAnsicht\n${view.map}\nBearbeiten\n${edit.map}`);
+  assert.deepEqual(view.order, edit.order, 'Die Reihenfolge ist in beiden Modi dieselbe');
 });
 
 test('Raster: Ziehen und Ablegen ordnet im dichten Raster weiter um', async () => {

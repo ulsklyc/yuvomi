@@ -162,7 +162,10 @@ test('die Hoehe der klebenden Spalte rechnet ab ihrer gemessenen Oberkante bis z
   assert.doesNotMatch(rule.body, /margin-block-start\s*:/, 'die Spalte beginnt buendig mit der Liste');
   const maxHeight = rule.body.match(/(?:^|;|\s)height:\s*([^;]+);/)?.[1] ?? '';
   // Die Oberkante ist der Messwert; ohne ihn (erster Frame) der Klebestand.
-  assert.match(maxHeight, /^calc\(var\(--viewport-height\) - var\(--inventory-detail-top, calc\(var\(--inventory-head-block, 0px\) \+ var\(--space-3\)\)\) - var\(--space-4\)\)$/);
+  // Und sie endet ueber dem Nachlauf der Shell (Installationsbanner, FAB):
+  // eine klebende Spalte bis an den Fensterrand liegt sonst mit ihrem Fuss
+  // darunter (R10, test:dashboard-surface-browser).
+  assert.match(maxHeight, /^calc\(var\(--viewport-height\) - var\(--inventory-detail-top, calc\(var\(--inventory-head-block, 0px\) \+ var\(--space-3\)\)\) - var\(--space-4\) - var\(--shell-tail, 0px\)\)$/);
   // Rechnung am gemessenen Fall: 900 - 133 - 16 = 751, Unterkante 884 < 900.
   const top = 133; const vh = 900; const space4 = 16;
   assert.ok(top + (vh - top - space4) <= vh);

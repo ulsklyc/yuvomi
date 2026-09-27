@@ -677,7 +677,7 @@
      * Kopf und Spalte, beim Kleben nicht mehr. Ohne Messwert (erster Frame)
      * gilt der Klebestand. Volle Hoehe statt Hoechstmass: die Spalte ist ein
      * Ort, keine Karte, die mit ihrem Inhalt waechst. */
-    height: calc(var(--viewport-height) - var(--inventory-detail-top, calc(var(--inventory-head-block, 0px) + var(--space-3))) - var(--space-4));
+    height: calc(var(--viewport-height) - var(--inventory-detail-top, calc(var(--inventory-head-block, 0px) + var(--space-3))) - var(--space-4) - var(--shell-tail, 0px));
   }
 
   /* KENNZAHLEN ALS ZEILEN, NICHT ALS DREI KACHELN IN 424PX. Drei Kacheln je

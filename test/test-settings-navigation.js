@@ -2104,6 +2104,10 @@ test('S3: Liste + Detail ab der Split-Schwelle aus tokens.css, erstes Blatt per 
   assert.match(nav, /display:\s*block/);
   assert.match(nav, /position:\s*sticky/);
   assert.match(nav, /overflow-y:\s*auto/);
+  // Die klebende Liste endet ueber dem Nachlauf der Shell (Installationsbanner):
+  // bis an den Fensterrand gerechnet laegen ihre letzten Zeilen darunter und
+  // waeren auch mit dem eigenen Bildlauf nicht zu erreichen.
+  assert.match(nav, /max-height:\s*calc\([^;]*var\(--shell-tail/, 'die Liste zieht --shell-tail ab');
   assert.match(ruleBody(rules, '.settings-shell', containerQuery), /grid-template-columns:\s*var\(--settings-list-width\)\s+minmax\(0,\s*1fr\)/);
   // Das Blatt liest im Lesemass.
   assert.match(ruleBody(rules, '.settings-shell__content'), /max-inline-size:\s*var\(--layout-reading\)/);

@@ -700,8 +700,11 @@
     position: sticky;
     top: calc(var(--birthdays-head-block, 0px) + var(--space-3));
     /* Von der gemessenen Oberkante bis zur Luft ueber dem Fensterrand
-     * (birthdays.js, syncBirthdaysDetailTop); ohne Messwert der Klebestand. */
-    height: calc(var(--viewport-height) - var(--birthdays-detail-top, calc(var(--birthdays-head-block, 0px) + var(--space-3))) - var(--space-4));
+     * (birthdays.js, syncBirthdaysDetailTop); ohne Messwert der Klebestand.
+     * Minus `--shell-tail`: was unten fest steht (Installationsbanner, FAB),
+     * verlangt seinen Nachlauf auch von einer klebenden Spalte - sonst endet
+     * ihr Fuss darunter (test:dashboard-surface-browser, Nachlauf). */
+    height: calc(var(--viewport-height) - var(--birthdays-detail-top, calc(var(--birthdays-head-block, 0px) + var(--space-3))) - var(--space-4) - var(--shell-tail, 0px));
   }
 }
 
