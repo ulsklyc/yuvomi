@@ -1226,8 +1226,12 @@
   transition: transform var(--transition-slow);
 }
 
+/* AUSGABEN TRAGEN DEN MODULTON, NICHT DAS ROT (Re-Critique 2026-09-27, C1).
+ * Rot ist in der Grammatik Gefahr - sieben rote Balken fuer ein normales
+ * Einkaufen liessen den echten Alarm (Plan ueberschritten) untergehen. Die
+ * Richtung benennt der Blocktitel, nicht der Farbton. */
 .budget-bar-row__fill--income   { background-color: var(--color-success); }
-.budget-bar-row__fill--expenses { background-color: var(--color-danger);  }
+.budget-bar-row__fill--expenses { background-color: var(--module-accent); }
 
 /* Die Richtung steht im Namen des Blocks, nicht in der Achse. Bis 2026-09-25
  * spiegelten Einnahmen und Ausgaben um eine gemeinsame Mittelachse (Critique
@@ -1240,7 +1244,7 @@
  * in der Farbe des Blocks (der Fuell-Balken skaliert per transform und kennt
  * keine Mindestbreite). Er stand bis 2026-08-13 als `Math.max(6, …)` im JS
  * und machte vier Kategorien mit dem 9,4-Fachen Abstand gleich lang. */
-.budget-chart-block--expenses { --bar-stub-color: var(--color-danger); }
+.budget-chart-block--expenses { --bar-stub-color: var(--module-accent); }
 .budget-chart-block--income   { --bar-stub-color: var(--color-success); }
 
 /* `--bar-visible` setzt das JS am Track: 0 fuer eine Kategorie ohne Betrag
@@ -1763,8 +1767,11 @@
   flex-shrink: 0;
 }
 
+/* Einnahmen duerfen gruen leuchten, Ausgaben sind der Normalfall und stehen
+ * neutral (C1). Der Punkt ist Zweitkanal - das Vorzeichen am Betrag sagt die
+ * Richtung auch ohne Farbe. */
 .budget-entry__indicator--income   { background-color: var(--color-success); }
-.budget-entry__indicator--expenses { background-color: var(--color-danger);  }
+.budget-entry__indicator--expenses { background-color: var(--color-text-tertiary); }
 
 /* Noch nicht passiert (Datum nach heute): der Punkt wird zum Ring - Form statt
  * Farbe, der Betrag behaelt seinen Ton (#1230 fuer erwartete Buchungen). */
@@ -1774,7 +1781,7 @@
 }
 
 .budget-entry--upcoming .budget-entry__indicator--income   { color: var(--color-success); }
-.budget-entry--upcoming .budget-entry__indicator--expenses { color: var(--color-danger);  }
+.budget-entry--upcoming .budget-entry__indicator--expenses { color: var(--color-text-tertiary); }
 
 /* Siehe Abweichung 1 über `.budget-entry`. */
 .budget-entry__title {
@@ -1860,7 +1867,7 @@ button.budget-entry__title {
 }
 
 .budget-entry__amount--income   { color: var(--color-success); }
-.budget-entry__amount--expenses { color: var(--color-danger);  }
+.budget-entry__amount--expenses { color: var(--color-text-primary); }
 
 /* Zeilen-Aktionen (Bearbeiten/Löschen) nutzen die geteilte .row-action-
  * Grammatik aus layout.css (Audit F1) — immer sichtbar (auch Desktop), 48px
@@ -2070,7 +2077,7 @@ button.budget-entry__title {
  * Einnahmen solide, Ausgaben gestrichelte Mini-Linie - nicht nur Farbe. */
 .budget-stats__swatch { display:inline-block; width:16px; height:0; border-top:2px solid transparent; margin-right:var(--space-1); vertical-align:middle; }
 .budget-stats__swatch--income { border-top-color:var(--color-success); }
-.budget-stats__swatch--expense { border-top-style:dashed; border-top-color:var(--color-danger); }
+.budget-stats__swatch--expense { border-top-style:dashed; border-top-color:var(--color-text-secondary); }
 /* Die Veraenderung gegenueber dem Vorzeitraum steht in der Zeile ihres
  * Betrags - die geteilte Trend-Zeile ist sonst ein Block. */
 .budget-stats__legend .metric-card__trend { display:inline-flex; margin-inline-start:var(--space-1); }

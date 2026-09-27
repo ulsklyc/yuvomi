@@ -695,7 +695,11 @@ test('die Trendkurve beschriftet Skala und Zeitraum - IM Bild', () => {
   // Seit der Extraktion nach `utils/chart.js` bringt die geteilte Geometrie
   // ihren linken Gutter mit. Geprueft wird deshalb: die Achse kommt aus der
   // geteilten Quelle, und das Streckungs-Attribut ist weg.
-  assert.match(stats, /chartGridMarkup\(0, max,/, 'die Werteachse kommt aus der geteilten Geometrie');
+  assert.match(stats, /chartGridMarkup\(0, axis\.max,/, 'die Werteachse kommt aus der geteilten Geometrie');
+  // Seit C4 (Re-Critique 2026-09-27) auf runder Skala: Gitter und Kurve lesen
+  // DIESELBE gerundete Obergrenze, sonst stuende die Kurve neben ihrer Achse.
+  assert.match(stats, /const axis = niceDomain\(0, max, \{ integer: true \}\);/);
+  assert.match(stats, /chartY\(v, 0, axis\.max\)/);
   assert.match(stats, /chartXLabelsMarkup\(/, 'die Zeitachse kommt aus der geteilten Geometrie');
   assert.doesNotMatch(stats, /preserveAspectRatio="none"/, 'eine Kurve mit Achse darf nicht gestreckt werden - der Text im Bild verzerrt mit');
   assert.doesNotMatch(stats, /budget-stats__axis-(max|mid|x)/, 'die Achse steht im SVG, nicht als HTML daneben');
@@ -2768,4 +2772,30 @@ test('Serie loeschen im Konto-Drilldown rechnet die Bilanz nicht aus der gefilte
     delete globalThis.__apiStub;
     Object.assign(s, zuvor);
   }
+});
+
+// --------------------------------------------------------
+// Rot ist Warnung, nicht Grundton (Re-Critique 2026-09-27, C1)
+// --------------------------------------------------------
+
+/* ROT HIESS JEDE AUSGABE. Punkt, Betrag und jeder Kategoriebalken standen in
+ * --color-danger - auf der Uebersicht 23 rote Punkte, 23 rote Betraege und 7
+ * rote Balken, und der echte Alarm (Plan ueberschritten, Konto im Minus) hob
+ * sich davon nicht mehr ab. Die Regel, die der Guard haelt: Rot steht nur an
+ * einem Zustand, der warnt; eine Ausgabe ist kein Zustand. Die Richtung traegt
+ * das Vorzeichen aus dem Zahlformat, nicht die Farbe. */
+test('Rot steht im Budget nur an einer Warnung, nie an der Ausgabe selbst', () => {
+  const WARNING = /(?:negative|over|overdue|danger|error)\b/;
+  const red = [...eachRule(budgetCss)].filter((r) => /var\(--color-danger\)/.test(r.body));
+  assert.ok(red.length > 0, 'der Scanner findet die Warnregeln nicht mehr - der Guard waere blind');
+  for (const r of red) {
+    const sel = r.selector.replace(/\s+/g, ' ').trim();
+    assert.doesNotMatch(sel, /expense/, `${sel}: eine Ausgabe ist keine Warnung`);
+    assert.match(sel, WARNING, `${sel}: Rot ohne Warnzustand im Selektor`);
+  }
+  const trend = stats.match(/<svg class="chart budget-stats__trend"[\s\S]*?<\/svg>/);
+  assert.ok(trend, 'Trend-Diagramm nicht gefunden');
+  assert.doesNotMatch(trend[0], /--color-danger/, 'die Ausgabenlinie ist kein Alarm');
+  // Die Richtung bleibt lesbar ohne Farbe: das Vorzeichen kommt aus dem Zahlformat.
+  assert.match(budget, /amountByRole\(e\.amount, 'flow'\)/);
 });

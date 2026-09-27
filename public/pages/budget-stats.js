@@ -8,7 +8,7 @@ import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
-import { CHART, chartX, chartY, chartGridMarkup, chartXLabelsMarkup } from '/utils/chart.js';
+import { CHART, chartX, chartY, chartGridMarkup, chartXLabelsMarkup, niceDomain } from '/utils/chart.js';
 import { formatMoneyAxis, formatSignedAmount } from '/utils/money.js';
 import { addLocalDays } from '/utils/date.js';
 import { trendMarkup } from '/utils/metric-card.js';
@@ -396,7 +396,11 @@ function renderTrendChart() {
   const expenses = cumulative ? running(rawExpenses) : rawExpenses;
   const shown = s.map((p, i) => ({ period: p.period, income: incomes[i], expenses: expenses[i] }));
   const max = Math.max(1, ...incomes, ...expenses);
-  const points = (arr) => arr.map((v, i) => `${chartX(i, s.length).toFixed(1)},${chartY(v, 0, max).toFixed(1)}`).join(' ');
+  // Runde Achse (C4): 0 / 2.000 / 4.000 / 6.000 statt Vierteln des Hoechstwerts
+  // (5.550 / 4.163 / 2.775 / 1.388). `max` bleibt der echte Spitzenwert fuer
+  // die Zusammenfassung, die Kurve misst gegen die gerundete Obergrenze.
+  const axis = niceDomain(0, max, { integer: true });
+  const points = (arr) => arr.map((v, i) => `${chartX(i, s.length).toFixed(1)},${chartY(v, 0, axis.max).toFixed(1)}`).join(' ');
   const sum = (arr) => arr.reduce((a, b) => a + b, 0);
   const pointKey = cumulative ? 'budget.statsPointLabelCumulative' : 'budget.statsPointLabel';
 
@@ -447,11 +451,11 @@ function renderTrendChart() {
       <div class="budget-stats__trend-wrap">
         <div class="budget-stats__plot">
           <svg class="chart budget-stats__trend" viewBox="0 0 ${CHART.W} ${CHART.H}" aria-hidden="true">
-            ${chartGridMarkup(0, max, (val) => formatMoneyAxis(val, view.ctx.currency))}
+            ${chartGridMarkup(0, axis.max, (val) => formatMoneyAxis(val, view.ctx.currency), CHART, axis.steps)}
             ${chartXLabelsMarkup(s.map((p) => periodLabel(p.period)))}
             <polyline fill="none" stroke="var(--color-success)" stroke-width="2"
                       vector-effect="non-scaling-stroke" points="${points(incomes)}" />
-            <polyline fill="none" stroke="var(--color-danger)" stroke-width="2" stroke-dasharray="6 4"
+            <polyline fill="none" stroke="var(--color-text-secondary)" stroke-width="2" stroke-dasharray="6 4"
                       vector-effect="non-scaling-stroke" points="${points(expenses)}" />
           </svg>
           <div class="budget-stats__points" role="group" aria-label="${t('budget.statsPointsLabel')}">${hotspots}</div>
