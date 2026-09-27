@@ -31,8 +31,23 @@
 }
 
 @media (max-width: 639px) {
+  /* KEIN ABSTAND ZWISCHEN DEN TABS (R9, 375px). Die Tabs tragen je 4px
+   * Polster, zwischen zwei Labels stehen damit 8px - der Leisten-Abstand
+   * legte 2px darauf, viermal (drei Tabs, dazu der Abstandhalter der
+   * Werkzeuge). Genau diese 8px fehlten bei 375px: Rezepte lief 3px, Vorrat
+   * 9px ueber, und die Leiste scrollte fuer vier Tabs. */
   .kitchen-tabs-bar {
-    gap: var(--space-0h);
+    gap: 0;
+  }
+
+  /* Der Zaehler ruckt ans Wort: 2px Innenpolster statt 4 und kein eigener
+   * Aussenrand - der Abstand zum Label kommt vom Tab (gap unten). Er bleibt
+   * eine Pille (min-width aus sub-tabs.css), nur ohne Luft, die die Zahl
+   * nicht braucht. Zusammen mit dem Abstand oben passt die Leiste bei 375px
+   * in allen vier Tabs; gerechnet in test-kitchen-tabs.js. */
+  .kitchen-tabs-bar .sub-tab__badge {
+    margin-inline-start: 0;
+    padding-inline: var(--space-0h);
   }
 
   /* Der Modultitel „Küche" entfällt mobil: die Bottom-Nav zeigt dasselbe Wort
@@ -168,12 +183,12 @@
 
   /* ZWEI WERKZEUGE LASSEN DEN ZAEHLERN NUR EINEN PUNKT. Mit Lupe und "..."
    * bleiben den vier Tabs bei 390px 270px; die Zahl im Zaehler kostet 27px,
-   * ein Punkt 10px. Die Zahl steht weiter im Namen des Tabs (aria-label,
+   * ein Punkt 8px (6px Punkt, seit R9 fuer 375px statt 8). Die Zahl steht weiter im Namen des Tabs (aria-label,
    * kitchen-tabs.js) und auf der Seite selbst, zu der er fuehrt. */
   .has-kitchen-tabs:is(:has(> .pantry-page), :has(> .recipes-page .recipes-source-filter:not([hidden]))) > .kitchen-tabs-bar .sub-tab__badge {
-    inline-size: var(--space-2);
+    inline-size: var(--space-1h);
     min-width: 0;
-    block-size: var(--space-2);
+    block-size: var(--space-1h);
     padding: 0;
     overflow: hidden;
     color: transparent;

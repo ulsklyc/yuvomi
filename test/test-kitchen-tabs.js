@@ -349,3 +349,92 @@ test('Kueche mobil: Lupe und Werkzeugmenue stehen in der Kuechen-Leiste, die eig
   assert.ok(tools(2).some((r) => selHas(r, /:has\(> \.pantry-page\)$/)), 'Vorrat: Lupe plus Werkzeugmenue');
   assert.ok(tools(2).some((r) => selHas(r, /recipes-source-filter:not\(\[hidden\]\)/)), 'Rezepte mit Quellenfilter: zwei Werkzeuge');
 });
+
+// --------------------------------------------------------
+// R9 (Hauptsession-Entscheid nach k9): die Leiste passt auch bei 375px ohne
+// Scrollen. Gemessen vorher (375x812, de): Rezepte 3px, Vorrat 9px Ueberlauf.
+// Die Rechnung liest jede Laenge aus den Stylesheets und tokens.css; nur die
+// Wortbreiten sind gemessen (de, --text-sm, Pane 2026-09-27) - Deutsch ist
+// die laengste Locale, fuer die die Leiste ausgelegt ist (siehe Kopf von
+// kitchen-tabs.css). Werkzeuge mit --target-lg (Finger), wie auf dem Telefon.
+// --------------------------------------------------------
+test('Kueche mobil: die Leiste passt bei 375px in allen vier Tabs ohne Scrollen (R9)', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const tokens = readSrc('../public/styles/tokens.css');
+  const tok = (name) => {
+    const m = tokens.match(new RegExp(`--${name}:\\s*([\\d.]+)px`));
+    assert.ok(m, `Token --${name} nicht gefunden`);
+    return Number(m[1]);
+  };
+  const px = (v) => {
+    const s = String(v ?? '').trim();
+    if (s === '0') return 0;
+    const m = s.match(/^var\(--([\w-]+)\)$/);
+    assert.ok(m, `Laenge nicht lesbar: "${s}"`);
+    return tok(m[1]);
+  };
+  const narrow = (r) => r.at.some((a) => /\(max-width:\s*639px\)/.test(a));
+  const kitchen = [...eachRule(readSrc('../public/styles/kitchen-tabs.css'))].filter(narrow);
+  const base = [...eachRule(readSrc('../public/styles/sub-tabs.css'))].filter((r) => !r.at.length);
+  // Komma nur auf oberster Ebene trennen - `:is(a, b)` ist EIN Selektor.
+  const topLevel = (sel) => {
+    const out = []; let depth = 0; let cur = '';
+    for (const ch of sel) {
+      if (ch === '(') depth += 1;
+      if (ch === ')') depth -= 1;
+      if (ch === ',' && depth === 0) { out.push(cur); cur = ''; } else cur += ch;
+    }
+    return [...out, cur].map((x) => x.trim().replace(/\s+/g, ' '));
+  };
+  const decl = (rules, sel, prop) => {
+    let out;
+    for (const r of rules) {
+      if (!topLevel(r.selector).includes(sel)) continue;
+      const m = r.body.match(new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`));
+      if (m) out = m[1].trim();
+    }
+    return out;
+  };
+  const barGap = px(decl(kitchen, '.kitchen-tabs-bar', 'gap'));
+  const tabPad = px(decl(kitchen, '.kitchen-tabs-bar .sub-tab', 'padding-inline'));
+  const tabGap = px(decl(kitchen, '.kitchen-tabs-bar .sub-tab', 'gap'));
+  const badgeMargin = px(decl(kitchen, '.kitchen-tabs-bar .sub-tab__badge', 'margin-inline-start') ?? decl(base, '.sub-tab__badge', 'margin-inline-start'));
+  const badgePad = px(decl(kitchen, '.kitchen-tabs-bar .sub-tab__badge', 'padding-inline') ?? decl(base, '.sub-tab__badge', 'padding').split(/\s+/)[1]);
+  const badgeMin = px(decl(base, '.sub-tab__badge', 'min-width'));
+  const DOT_SEL = '.has-kitchen-tabs:is(:has(> .pantry-page), :has(> .recipes-page .recipes-source-filter:not([hidden]))) > .kitchen-tabs-bar .sub-tab__badge';
+  const dot = px(decl(kitchen, DOT_SEL, 'inline-size'));
+  const spacer = decl(kitchen, '.has-kitchen-tabs:has(> :is(.recipes-page, .pantry-page)) > .kitchen-tabs-bar::after', 'flex');
+  assert.match(spacer ?? '', /calc\(var\(--kitchen-tools\) \* var\(--target-base\) \+ var\(--space-1\) - var\(--page-inline-pad\)\)/,
+    'die Rechnung unten bildet den Abstandhalter nach - aendert er sich, muss sie mit');
+
+  // Gemessene Wortbreiten (inaktiv / aktiv, der aktive Tab ist fetter) und die Zahl im Zaehler.
+  const WORD = { meals: [72, 73.7], recipes: [53.9, 55], shopping: [48.8, 50.2], pantry: [40.9, 42] };
+  const DIGITS = 15.8;
+  const PAGE_PAD = tok('space-4');
+  const TOOL = tok('target-lg');
+  const W = 375;
+  const numeric = Math.max(badgeMin, DIGITS + 2 * badgePad);
+  const width = ({ active, badges, badgeW, tools }) => {
+    const tabs = Object.keys(WORD).map((id) => WORD[id][id === active ? 1 : 0] + 2 * tabPad
+      + (badges.includes(id) && id !== active ? tabGap + badgeMargin + badgeW : 0));
+    const spacerW = tools ? tools * TOOL + tok('space-1') - PAGE_PAD : 0;
+    const children = tabs.length + (tools ? 1 : 0);
+    return PAGE_PAD + tabs.reduce((a, b) => a + b, 0) + (children - 1) * barGap + spacerW + PAGE_PAD;
+  };
+  // Einkauf und Vorrat tragen Zaehler; der aktive Tab zeigt seinen nicht.
+  const cases = {
+    meals: width({ active: 'meals', badges: ['shopping', 'pantry'], badgeW: numeric, tools: 0 }),
+    recipes: width({ active: 'recipes', badges: ['shopping', 'pantry'], badgeW: numeric, tools: 1 }),
+    shopping: width({ active: 'shopping', badges: ['shopping', 'pantry'], badgeW: numeric, tools: 0 }),
+    pantry: width({ active: 'pantry', badges: ['shopping', 'pantry'], badgeW: dot, tools: 2 }),
+  };
+  // NICHT in der Zusage: Rezepte MIT Quellenfilter (nur mit angebundenem
+  // Rezeptanbieter) - zwei Werkzeuge und zwei Punkte brauchen 380.7px; dort
+  // bleibt bei 375px der Scroll-Fallback mit Fade wie in langen Locales. Bei
+  // 390px passt auch er.
+  for (const [tab, need] of Object.entries(cases)) {
+    assert.ok(need <= W, `${tab}: die Leiste braucht ${need.toFixed(1)}px von ${W} - sie scrollt fuer vier Tabs`);
+  }
+  assert.ok(numeric >= badgeMin && dot > 0, 'der Zaehler bleibt eine Pille, der Punkt bleibt sichtbar');
+  assert.ok(tabPad >= tok('space-1'), 'die Kapsel des aktiven Tabs laesst dem Wort weiter 4px je Seite');
+});
