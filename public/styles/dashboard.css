@@ -2585,6 +2585,31 @@ svg.weather-forecast__icon {
   font-size: var(--type-caption);
 }
 
+/* „+N weitere heute" ist ein Weg (Re-Critique 2026-09-27, A7 P2-9): dieselbe
+ * Fusszeile, aber als Zeile mit Ziel - volle Breite, Zielhoehe der Geraetewelt,
+ * Chevron am Ende wie jede navigierende Zeile, und der Text eine Stufe kraeftiger
+ * als die stille Coda, weil man ihn antippen soll. */
+.today-cockpit__more--link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--target-base);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.today-cockpit__more--link:hover,
+.today-cockpit__more--link:focus-visible {
+  background: color-mix(in srgb, var(--color-text-primary) var(--tint-state), var(--color-surface));
+  color: var(--color-text-primary);
+}
+
+.today-cockpit__more--link:focus-visible {
+  outline-offset: var(--focus-ring-offset-inset);
+}
+
 .today-cockpit-card--task {
   --today-card-accent: var(--module-tasks);
 }

@@ -160,7 +160,9 @@ test('(3) Anpassen per Tastatur: der Fokus bleibt, die Wechsel werden angesagt',
   await page.keyboard.press('Enter');
   await page.waitForSelector('.widget-edit-controls');
   let a = await active();
-  assert.equal(a.id, 'dashboard-customize-btn', `nach „Anpassen" liegt der Fokus auf ${JSON.stringify(a)}`);
+  // Seit R8 (H2) gibt es im Anpassen-Modus kein X mehr: der Einstieg weicht der
+  // Leiste, und der Fokus geht an ihren ersten Ausgang.
+  assert.equal(a.id, 'dashboard-customize-cancel', `nach „Anpassen" liegt der Fokus auf ${JSON.stringify(a)}`);
 
   // Eine Groesse, die die Geburtstagskachel gerade NICHT hat.
   const target = await page.$eval('.widget-wrapper[data-widget-id="birthdays"]',
@@ -187,9 +189,14 @@ test('(3) Anpassen per Tastatur: der Fokus bleibt, die Wechsel werden angesagt',
   assert.equal(a.body, false, 'nach dem Einblenden faellt der Fokus nicht auf <body>');
   assert.match(await announced(page), /Geburtstage eingeblendet/);
 
+  // Die Groesse der Geburtstagskachel ist geaendert: Abbrechen fragt erst nach (H2).
   await page.focus('#dashboard-customize-cancel');
   await page.keyboard.press('Enter');
+  await page.waitForSelector('#confirm-modal-ok');
+  assert.ok(await page.$('.widget-edit-controls'), 'vor der Antwort ist nichts verworfen');
+  await page.click('#confirm-modal-ok');
   await page.waitForFunction(() => !document.querySelector('.widget-edit-controls'));
+  await page.waitForFunction(() => !document.querySelector('.modal-overlay'));
   a = await active();
   assert.equal(a.id, 'dashboard-customize-btn', `nach „Abbrechen" liegt der Fokus auf ${JSON.stringify(a)}`);
   await page.close();
