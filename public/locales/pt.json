@@ -2521,6 +2521,7 @@
         "permWidgetWeather": "Meteorologia",
         "permSelectRolePrompt": "Selecione acima uma função familiar para editar as suas permissões.",
         "permSelectMemberPrompt": "Selecione acima um membro para editar as suas permissões.",
+        "permLoadError": "Não foi possível carregar as permissões.",
         "permNoMembers": "Ainda não há membros.",
         "permReadOnlyBanner": "Tem acesso apenas de leitura a este módulo - não é possível fazer alterações.",
         "permDiscardConfirm": "Descartar as alterações não guardadas?",

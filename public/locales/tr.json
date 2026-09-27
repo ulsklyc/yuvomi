@@ -2521,6 +2521,7 @@
         "permWidgetWeather": "Hava durumu",
         "permSelectRolePrompt": "İzinlerini düzenlemek için yukarıdan bir aile rolü seçin.",
         "permSelectMemberPrompt": "İzinlerini düzenlemek için yukarıdan bir üye seçin.",
+        "permLoadError": "İzinler yüklenemedi.",
         "permNoMembers": "Henüz üye yok.",
         "permReadOnlyBanner": "Bu modüle salt okunur erişiminiz var - değişiklik yapılamaz.",
         "permDiscardConfirm": "Kaydedilmemiş değişiklikler atılsın mı?",

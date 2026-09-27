@@ -2556,6 +2556,7 @@
         "permWidgetWeather": "Panahon",
         "permSelectRolePrompt": "Pumili ng papel sa pamilya sa itaas para i-edit ang mga pahintulot nito.",
         "permSelectMemberPrompt": "Pumili ng miyembro sa itaas para i-edit ang kanilang mga pahintulot.",
+        "permLoadError": "Hindi ma-load ang mga pahintulot.",
         "permNoMembers": "Wala pang miyembro.",
         "permReadOnlyBanner": "Babasahin lamang ang iyong access sa modyul na ito - hindi posible ang mga pagbabago.",
         "permDiscardConfirm": "Itapon ang mga hindi naka-save na pagbabago?",

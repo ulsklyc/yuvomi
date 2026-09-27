@@ -2521,6 +2521,7 @@
         "permWidgetWeather": "Väder",
         "permSelectRolePrompt": "Välj en familjeroll ovan för att redigera dess behörigheter.",
         "permSelectMemberPrompt": "Välj en medlem ovan för att redigera dess behörigheter.",
+        "permLoadError": "Behörigheterna kunde inte läsas in.",
         "permNoMembers": "Inga medlemmar än.",
         "permReadOnlyBanner": "Du har skrivskyddad åtkomst till denna modul - ändringar är inte möjliga.",
         "permDiscardConfirm": "Kasta osparade ändringar?",

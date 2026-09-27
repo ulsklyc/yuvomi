@@ -2521,6 +2521,7 @@
         "permWidgetWeather": "Weer",
         "permSelectRolePrompt": "Selecteer hierboven een gezinsrol om de rechten te bewerken.",
         "permSelectMemberPrompt": "Selecteer hierboven een lid om de rechten te bewerken.",
+        "permLoadError": "De rechten konden niet worden geladen.",
         "permNoMembers": "Nog geen leden.",
         "permReadOnlyBanner": "Je hebt alleen-lezentoegang tot deze module - wijzigen is niet mogelijk.",
         "permDiscardConfirm": "Niet-opgeslagen wijzigingen negeren?",

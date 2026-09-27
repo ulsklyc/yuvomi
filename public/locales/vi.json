@@ -2521,6 +2521,7 @@
         "permWidgetWeather": "Thời tiết",
         "permSelectRolePrompt": "Chọn một vai trò gia đình ở trên để chỉnh sửa quyền của nó.",
         "permSelectMemberPrompt": "Chọn một thành viên ở trên để chỉnh sửa quyền của họ.",
+        "permLoadError": "Không thể tải quyền.",
         "permNoMembers": "Chưa có thành viên.",
         "permReadOnlyBanner": "Bạn có quyền chỉ đọc với mô-đun này - không thể thay đổi.",
         "permDiscardConfirm": "Bỏ các thay đổi chưa lưu?",

@@ -2521,6 +2521,7 @@
         "permWidgetWeather": "Időjárás",
         "permSelectRolePrompt": "Válassz fent egy családi szerepet a jogosultságai szerkesztéséhez.",
         "permSelectMemberPrompt": "Válassz fent egy tagot a jogosultságai szerkesztéséhez.",
+        "permLoadError": "A jogosultságok betöltése sikertelen.",
         "permNoMembers": "Még nincsenek tagok.",
         "permReadOnlyBanner": "Csak olvasási hozzáférésed van ehhez a modulhoz - módosítás nem lehetséges.",
         "permDiscardConfirm": "Elveted a nem mentett módosításokat?",

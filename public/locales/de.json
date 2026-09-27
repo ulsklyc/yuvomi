@@ -2556,6 +2556,7 @@
         "permWidgetWeather": "Wetter",
         "permSelectRolePrompt": "Wähle oben eine Familienrolle, um ihre Rechte zu bearbeiten.",
         "permSelectMemberPrompt": "Wähle oben ein Mitglied, um seine Rechte zu bearbeiten.",
+        "permLoadError": "Die Rechte konnten nicht geladen werden.",
         "permNoMembers": "Keine Mitglieder vorhanden.",
         "permReadOnlyBanner": "Du hast nur Lesezugriff auf dieses Modul - Änderungen sind nicht möglich.",
         "permDiscardConfirm": "Ungespeicherte Änderungen verwerfen?",

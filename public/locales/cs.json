@@ -2521,6 +2521,7 @@
         "permWidgetWeather": "Počasí",
         "permSelectRolePrompt": "Vyberte výše rodinnou roli pro úpravu jejích oprávnění.",
         "permSelectMemberPrompt": "Vyberte výše člena pro úpravu jeho oprávnění.",
+        "permLoadError": "Oprávnění se nepodařilo načíst.",
         "permNoMembers": "Zatím žádní členové.",
         "permReadOnlyBanner": "K tomuto modulu máte přístup jen ke čtení - změny nejsou možné.",
         "permDiscardConfirm": "Zahodit neuložené změny?",

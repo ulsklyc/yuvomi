@@ -2544,6 +2544,7 @@
         "permWidgetWeather": "Weather",
         "permSelectRolePrompt": "Select a family role above to edit its permissions.",
         "permSelectMemberPrompt": "Select a member above to edit their permissions.",
+        "permLoadError": "The permissions could not be loaded.",
         "permNoMembers": "No members yet.",
         "permReadOnlyBanner": "You have read-only access to this module - changes aren't possible.",
         "permDiscardConfirm": "Discard unsaved changes?",

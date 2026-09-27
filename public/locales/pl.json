@@ -2533,6 +2533,7 @@
         "permWidgetWeather": "Pogoda",
         "permSelectRolePrompt": "Wybierz powyżej rolę rodzinną, aby edytować jej uprawnienia.",
         "permSelectMemberPrompt": "Wybierz powyżej członka, aby edytować jego uprawnienia.",
+        "permLoadError": "Nie udało się wczytać uprawnień.",
         "permNoMembers": "Brak członków.",
         "permReadOnlyBanner": "Masz dostęp tylko do odczytu do tego modułu - zmiany nie są możliwe.",
         "permDiscardConfirm": "Odrzucić niezapisane zmiany?",

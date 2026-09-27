@@ -2521,6 +2521,7 @@
         "permWidgetWeather": "天気",
         "permSelectRolePrompt": "権限を編集するには、上で家族の役割を選択してください。",
         "permSelectMemberPrompt": "権限を編集するには、上でメンバーを選択してください。",
+        "permLoadError": "権限を読み込めませんでした。",
         "permNoMembers": "メンバーはまだいません。",
         "permReadOnlyBanner": "このモジュールには読み取り専用でアクセスしています。変更はできません。",
         "permDiscardConfirm": "保存していない変更を破棄しますか？",

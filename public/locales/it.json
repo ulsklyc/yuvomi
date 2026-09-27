@@ -2521,6 +2521,7 @@
         "permWidgetWeather": "Meteo",
         "permSelectRolePrompt": "Seleziona sopra un ruolo familiare per modificarne le autorizzazioni.",
         "permSelectMemberPrompt": "Seleziona sopra un membro per modificarne le autorizzazioni.",
+        "permLoadError": "Impossibile caricare i permessi.",
         "permNoMembers": "Ancora nessun membro.",
         "permReadOnlyBanner": "Hai accesso in sola lettura a questo modulo: non è possibile apportare modifiche.",
         "permDiscardConfirm": "Annullare le modifiche non salvate?",

@@ -2521,6 +2521,7 @@
         "permWidgetWeather": "Погода",
         "permSelectRolePrompt": "Виберіть сімейну роль вище, щоб змінити її права.",
         "permSelectMemberPrompt": "Виберіть учасника вище, щоб змінити його права.",
+        "permLoadError": "Не вдалося завантажити права доступу.",
         "permNoMembers": "Ще немає учасників.",
         "permReadOnlyBanner": "У вас доступ лише для читання до цього модуля - зміни неможливі.",
         "permDiscardConfirm": "Відхилити незбережені зміни?",

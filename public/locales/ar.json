@@ -2521,6 +2521,7 @@
         "permWidgetWeather": "الطقس",
         "permSelectRolePrompt": "اختر دورًا عائليًا أعلاه لتحرير أذوناته.",
         "permSelectMemberPrompt": "اختر عضوًا أعلاه لتحرير أذوناته.",
+        "permLoadError": "تعذر تحميل الصلاحيات.",
         "permNoMembers": "لا يوجد أعضاء بعد.",
         "permReadOnlyBanner": "لديك وصول للقراءة فقط إلى هذه الوحدة - لا يمكن إجراء تغييرات.",
         "permDiscardConfirm": "تجاهل التغييرات غير المحفوظة؟",

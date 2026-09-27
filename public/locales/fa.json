@@ -2533,6 +2533,7 @@
         "permWidgetWeather": "آب‌وهوا",
         "permSelectRolePrompt": "برای ویرایش دسترسی‌ها، بالا یک نقش خانوادگی انتخاب کنید.",
         "permSelectMemberPrompt": "برای ویرایش دسترسی‌ها، بالا یک عضو انتخاب کنید.",
+        "permLoadError": "مجوزها بارگذاری نشد.",
         "permNoMembers": "هنوز عضوی وجود ندارد.",
         "permReadOnlyBanner": "شما به این ماژول دسترسی فقط‌خواندنی دارید - تغییر ممکن نیست.",
         "permDiscardConfirm": "تغییرات ذخیره‌نشده نادیده گرفته شود؟",

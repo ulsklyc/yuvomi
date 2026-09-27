@@ -2533,6 +2533,7 @@
         "permWidgetWeather": "Cuaca",
         "permSelectRolePrompt": "Pilih peran keluarga di atas untuk mengedit izinnya.",
         "permSelectMemberPrompt": "Pilih anggota di atas untuk mengedit izinnya.",
+        "permLoadError": "Izin tidak dapat dimuat.",
         "permNoMembers": "Belum ada anggota.",
         "permReadOnlyBanner": "Anda memiliki akses hanya-baca ke modul ini - perubahan tidak dapat dilakukan.",
         "permDiscardConfirm": "Buang perubahan yang belum disimpan?",

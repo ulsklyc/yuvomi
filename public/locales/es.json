@@ -2521,6 +2521,7 @@
         "permWidgetWeather": "Tiempo",
         "permSelectRolePrompt": "Selecciona arriba un rol familiar para editar sus permisos.",
         "permSelectMemberPrompt": "Selecciona arriba un miembro para editar sus permisos.",
+        "permLoadError": "No se pudieron cargar los permisos.",
         "permNoMembers": "Aún no hay miembros.",
         "permReadOnlyBanner": "Tienes acceso de solo lectura a este módulo: no se pueden hacer cambios.",
         "permDiscardConfirm": "¿Descartar los cambios sin guardar?",

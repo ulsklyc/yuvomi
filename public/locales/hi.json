@@ -2521,6 +2521,7 @@
         "permWidgetWeather": "मौसम",
         "permSelectRolePrompt": "अनुमतियाँ संपादित करने के लिए ऊपर एक पारिवारिक भूमिका चुनें।",
         "permSelectMemberPrompt": "अनुमतियाँ संपादित करने के लिए ऊपर एक सदस्य चुनें।",
+        "permLoadError": "अनुमतियाँ लोड नहीं हो सकीं।",
         "permNoMembers": "अभी तक कोई सदस्य नहीं।",
         "permReadOnlyBanner": "आपके पास इस मॉड्यूल तक केवल-पढ़ने की पहुँच है - बदलाव संभव नहीं हैं।",
         "permDiscardConfirm": "बिना सहेजे बदलाव छोड़ें?",

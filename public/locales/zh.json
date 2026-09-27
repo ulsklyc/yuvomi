@@ -2521,6 +2521,7 @@
         "permWidgetWeather": "天气",
         "permSelectRolePrompt": "在上方选择一个家庭角色以编辑其权限。",
         "permSelectMemberPrompt": "在上方选择一个成员以编辑其权限。",
+        "permLoadError": "无法加载权限。",
         "permNoMembers": "还没有成员。",
         "permReadOnlyBanner": "您对此模块只有只读访问权限——无法进行更改。",
         "permDiscardConfirm": "放弃未保存的更改吗？",
