@@ -519,7 +519,15 @@ function renderDashboard(content) {
   // Aussage, die Praezisierung darunter gehoert in `.metric-card__note`
   // (dieselbe Rolle wie „7 aktiv" bei den Abos).
   const hasLastVisit = Boolean(data.last_visit?.check_in);
-  const lastVisit = hasLastVisit ? formatDate(data.last_visit.check_in) : t('housekeeping.noVisits');
+  // OHNE JAHR, WENN ES DAS LAUFENDE IST (R10 L10): mobil stehen die vier
+  // Kennzahlen in EINER Zeile, und „23.09.2026" passt in eine Viertelzeile nicht
+  // (gemessen 112px Bedarf gegen 67px). Liegt der letzte Besuch in einem
+  // anderen Jahr, bleibt es stehen - dann ist es die Auskunft.
+  const lastVisit = !hasLastVisit
+    ? t('housekeeping.noVisits')
+    : String(data.last_visit.check_in).slice(0, 4) === localDate().slice(0, 4)
+      ? formatDayMonth(data.last_visit.check_in)
+      : formatDate(data.last_visit.check_in);
   const lastVisitTime = hasLastVisit ? formatTime(data.last_visit.check_in) : '';
   const maxPayment = Math.max(1, ...(data.monthly_payments || []).map((row) => row.total));
   const bars = (data.monthly_payments || []).map((row) => {
@@ -544,17 +552,11 @@ function renderDashboard(content) {
   }).join('');
 
   const recentVisits = (state.recentVisits || []).slice(0, 5);
-  const recentRows = recentVisits.map((visit) => `
-    <article class="list-row housekeeping-staff-log-row">
-      <div class="list-row__main">
-        <div class="list-row__name">${esc(formatDate(visit.check_in))}</div>
-        <div class="list-row__meta">${esc(visit.worker_name || t('housekeeping.staff'))} · ${esc(money(visit.total_amount))} · ${esc(visitPaymentMeta(visit))}</div>
-      </div>
-      <div class="list-row__actions">
-        ${visitEditActionHtml(visit, formatDate(visit.check_in))}
-      </div>
-    </article>
-  `).join('');
+  const recentRows = recentVisits.map((visit) => visitRowHtml(visit, {
+    dateText: formatDate(visit.check_in),
+    actionsHtml: `${visitEditActionHtml(visit, formatDate(visit.check_in))}`,
+    className: 'housekeeping-staff-log-row',
+  })).join('');
 
   content.insertAdjacentHTML('beforeend', `
     ${renderWorkerSummary()}
@@ -577,6 +579,18 @@ function renderDashboard(content) {
         <div class="metric-card__value">${esc(data.finished_tasks_this_month ?? 0)}</div>
       </article>
     </section>
+    <!-- DIE LISTE VOR DEM DIAGRAMM (R10 L10, A3 P2-10): mobil begannen die
+         letzten Besuche bei y=760 von 844, hinter Personal, Kennzahlen und dem
+         252px hohen Zahlungsdiagramm. Die Besuche sind, was man hier nachsieht;
+         der Verlauf der Zahlungen ist die Einordnung darunter. -->
+    <section class="housekeeping-card">
+      <div class="housekeeping-section-heading">
+        <h2>${esc(t('housekeeping.recentVisits'))}</h2>
+      </div>
+      <div class="housekeeping-staff-log-list">
+        ${recentRows || `<p class="housekeeping-muted">${esc(t('housekeeping.noVisits'))}</p>`}
+      </div>
+    </section>
     <section class="housekeeping-card">
       <div class="housekeeping-section-heading">
         <h2>${esc(t('housekeeping.payments'))}</h2>
@@ -584,14 +598,6 @@ function renderDashboard(content) {
       </div>
       <div class="housekeeping-chart" aria-label="${esc(t('housekeeping.monthlyPayments'))}">
         ${bars || `<p class="housekeeping-muted">${esc(t('housekeeping.noPaymentData'))}</p>`}
-      </div>
-    </section>
-    <section class="housekeeping-card">
-      <div class="housekeeping-section-heading">
-        <h2>${esc(t('housekeeping.recentVisits'))}</h2>
-      </div>
-      <div class="housekeeping-staff-log-list">
-        ${recentRows || `<p class="housekeeping-muted">${esc(t('housekeeping.noVisits'))}</p>`}
       </div>
     </section>
   `);
@@ -958,6 +964,39 @@ async function unpayVisit(visit, onUnpaid) {
  * `readOnly()` steht ZUSAETZLICH da (#1265 P6). Der Server rechnet das
  * Modulrecht schon in die Felder ein, aber die Felder sind so alt wie die
  * letzte Antwort, und ein Rechtewechsel kommt ohne Neuladen an. */
+/**
+ * DIE EINE BESUCHSZEILE (Re-Critique 2026-09-27, A3 P2-4 / R10 L10).
+ *
+ * Derselbe Besuch stand in zwei Grammatiken: in der Uebersicht mit dem Datum
+ * als Titel, in den Berichten mit Avatar und Namen als Titel - zehnmal „Maria
+ * Silva" untereinander, das Datum klein im Meta. Ein Besuch ist ein Ereignis
+ * an einem Tag; das Datum fuehrt, die Person steht im Meta (entfaellt, wo die
+ * Liste schon einer Person gehoert: Personal-Protokoll). Uebersicht, Berichte
+ * und Protokoll bauen die Zeile hier; nur die Aktionen und die Datumsform
+ * (ohne Jahr, wo der Monat im Kopf steht) geben die Aufrufer.
+ *
+ * @param {object} visit
+ * @param {{ dateText: string, actionsHtml?: string, showWorker?: boolean,
+ *           paymentText?: string, className?: string }} opts
+ */
+function visitRowHtml(visit, { dateText, actionsHtml = '', showWorker = true, paymentText, className = '' } = {}) {
+  const meta = [
+    showWorker ? (visit.worker_name || t('housekeeping.staff')) : null,
+    money(visit.total_amount),
+    paymentText ?? visitPaymentMeta(visit),
+  ].filter(Boolean).join(' · ');
+  return `
+    <article class="list-row housekeeping-visit-row${className ? ` ${className}` : ''}">
+      <div class="list-row__main">
+        <div class="list-row__name">${esc(dateText)}</div>
+        <div class="list-row__meta">${esc(meta)}</div>
+      </div>
+      <div class="list-row__actions">
+        ${actionsHtml}
+      </div>
+    </article>`;
+}
+
 function visitEditActionHtml(visit, visitDate) {
   if (visit.can_edit && !readOnly()) {
     return `<button class="row-action" type="button" data-edit-visit="${esc(visit.id)}"
@@ -1173,17 +1212,13 @@ function renderReports(content) {
   const rows = visits.map((visit) => {
     const paid = !!visit.paid_at;
     const visitDate = formatDate(visit.check_in);
-    return `
-    <article class="list-row list-row--tight housekeeping-report-item housekeeping-report-item--visit">
-      <div class="housekeeping-avatar housekeeping-avatar--row" style="background:${esc(visit.worker_avatar_color) || 'var(--module-housekeeping)'}">
-        ${visit.worker_avatar_data ? `<img src="${esc(visit.worker_avatar_data)}" alt="${esc(visit.worker_name || '')}">` : esc(initials(visit.worker_name || 'HK'))}
-      </div>
-      <div class="list-row__main">
-        <div class="list-row__name">${esc(visit.worker_name || t('housekeeping.staff'))}</div>
-        <div class="list-row__meta">${esc(formatDayMonth(visit.check_in))} · ${esc(money(visit.total_amount))} · ${esc(paid ? t('housekeeping.paymentPaid') : t('housekeeping.paymentPending'))}</div>
-      </div>
-      <div class="list-row__actions">
-        ${!visit.can_mark_paid || readOnly() ? '' : `
+    // Ohne Jahr: den Monat samt Jahr nennt der Stepper im Kopf. Das
+    // `aria-label` der Aktionen behaelt das volle Datum.
+    return visitRowHtml(visit, {
+      dateText: formatDayMonth(visit.check_in),
+      paymentText: paid ? t('housekeeping.paymentPaid') : t('housekeeping.paymentPending'),
+      className: 'list-row--tight housekeeping-report-item housekeeping-report-item--visit',
+      actionsHtml: `${!visit.can_mark_paid || readOnly() ? '' : `
         <button class="row-action" type="button" data-pay-report="${visit.id}"
                 aria-label="${esc(t('housekeeping.markPaid'))}: ${esc(visitDate)}">
           <i data-lucide="badge-dollar-sign" class="icon-md" aria-hidden="true"></i>
@@ -1191,10 +1226,8 @@ function renderReports(content) {
         <button class="row-action" type="button" data-visit-report="${visit.id}"
                 aria-label="${esc(t('housekeeping.openVisitReport'))}: ${esc(visitDate)}">
           <i data-lucide="file-text" class="icon-md" aria-hidden="true"></i>
-        </button>
-      </div>
-    </article>
-  `;
+        </button>`,
+    });
   }).join('');
 
   content.insertAdjacentHTML('beforeend', `
@@ -1526,19 +1559,14 @@ function renderStaffVisitLog() {
      * in der Metazeile, wo er die Zeile beschreibt, statt nur als Beschriftung
      * eines Knopfs, der ausgegraut ist. */
     const visitDate = formatDate(visit.check_in);
-    return `
-      <article class="list-row housekeeping-staff-log-row">
-        <div class="list-row__main">
-          <div class="list-row__name">${esc(visitDate)}</div>
-          <div class="list-row__meta">${esc(money(visit.total_amount))} · ${esc(visitPaymentMeta(visit))}</div>
-        </div>
-        <div class="list-row__actions">
-          ${staffLogPayHtml(visit, visitDate)}
+    return visitRowHtml(visit, {
+      dateText: visitDate,
+      showWorker: false,
+      className: 'housekeeping-staff-log-row',
+      actionsHtml: `${staffLogPayHtml(visit, visitDate)}
           ${visitEditActionHtml(visit, visitDate)}
-          ${visitDeleteActionHtml(visit, visitDate)}
-        </div>
-      </article>
-    `;
+          ${visitDeleteActionHtml(visit, visitDate)}`,
+    });
   }).join('');
   return `
     <section class="housekeeping-card housekeeping-staff-log">

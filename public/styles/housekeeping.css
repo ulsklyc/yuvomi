@@ -96,11 +96,15 @@
   container: housekeeping-page / inline-size;
 }
 
-/* Kompaktstufe der geteilten Kennzahl-Zeile, wie in budget.css: vier Karten
- * passen auf schmalen Containern nicht nebeneinander - zwei mal zwei statt
- * einer gequetschten Zeile. */
-@container housekeeping-page (max-width: 719px) {
-  .metric-grid--quad { --summary-cards: 2; }
+/* DIE VIER KENNZAHLEN STEHEN IN EINER ZEILE, auch mobil (Re-Critique
+ * 2026-09-27, A3 P2-10 / R10 L10). Hier stand die Kompaktstufe „zwei mal
+ * zwei": gemessen bei 390x844 belegte sie 189px (y287-476), und die letzten
+ * Besuche begannen erst bei y760. Eine Zeile sind 117px - moeglich, weil der
+ * Wert „Letzter Besuch" im laufenden Jahr ohne Jahreszahl steht
+ * (housekeeping.js) und die Labels unten in Satzschreibung umbrechen. Die
+ * panel.css-Stufe fuer Telefone (`auto-fit`, 150px) gilt deshalb hier nicht. */
+.housekeeping-content .metric-grid--quad {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 @container housekeeping-page (max-width: 479px) {
@@ -111,6 +115,15 @@
    * gebaut wurde. Die Polsterung bleibt: sie ist eine Platzfrage, keine
    * Typo-Entscheidung. */
   .metric-card { padding: var(--space-2); }
+
+  /* In der Viertelzeile bricht das Versal-Label mitten im Wort („ERLEDIGT/E",
+   * gemessen 4 Zeilen in 69px). In Satzschreibung und mit Silbentrennung der
+   * Dokumentsprache stehen alle vier Labels auf zwei Zeilen, an Wortgrenzen. */
+  .metric-grid--quad .metric-card__label {
+    text-transform: none;
+    letter-spacing: normal;
+    hyphens: auto;
+  }
 }
 
 /* HIG-Karte: randlos auf dem Grouped-Grund, opake Fläche, shadow-sm - dieselbe
@@ -504,20 +517,12 @@
   margin-inline-end: calc(-1 * var(--space-2));
 }
 
-/* BEIDE Zustände tragen ihre Tönung allein. Die früher zusätzliche
- * `border-color` ist mit der Kante der Zeile entfallen - und sie war nicht nur
- * wirkungslos geworden, sondern schädlich: die einzige Kante, die eine Zeile in
- * einer Zeilenliste noch hat, ist die TRENNLINIE des Trägers
- * (`.row-carrier > * + *`, list-row.css, gleiche Spezifität, später geladen).
- * `border-color` hätte also die Trennlinie eingefärbt - gemessen im Dokument
- * als orange Linie zwischen zwei Aufgaben. */
-.housekeeping-task--today {
-  background-color: color-mix(in srgb, var(--color-warning) var(--tint-wash), transparent);
-}
-
-.housekeeping-task--overdue {
-  background-color: color-mix(in srgb, var(--color-danger) var(--tint-wash), transparent);
-}
+/* KEINE ZEILENWAESCHE FUER „FAELLIG" (Re-Critique 2026-09-27, A3 P2-3 /
+ * R10 L10). Hier stand je Zustand eine 8-%-Toenung der ganzen Zeile - und
+ * dazu der Zustand als Farbwort im Meta (`.housekeeping-task__status`, unten).
+ * Zwei Kanaele fuer eine Aussage, und die Aufgaben sagen dieselbe mit einem:
+ * `.due-date--overdue/--today` ist Tinte am Wort, die Zeile bleibt ruhig. Die
+ * Klassen `--today/--overdue` bleiben am Markup - sie faerben das Wort. */
 
 /* DER KREIS: ein LEERER Ring in 48px Trefferflaeche (Bauart `.item-check`,
  * shopping.css). Der gefuellte Kreis mit Haken las sich an jeder Zeile wie
@@ -661,28 +666,15 @@
   border: 1px solid var(--color-border-subtle);
 }
 
-/* Die Besuchszeile im Berichte-Tab ist eine `.list-row` (renderReports());
- * hier steht nur der Avatar in Zeilengroesse. Vorher trug sie ein eigenes Grid
- * mit 56px-Bildspalte, und der Bericht-Knopf brach in eine eigene Zeile. */
-.housekeeping-avatar--row {
-  width: var(--target-sm);
-  height: var(--target-sm);
-  font-size: var(--text-xs);
-}
+/* Die Besuchszeile ist EINE Zeile fuer Uebersicht, Berichte und Protokoll
+ * (visitRowHtml(), R10 L10): Datum als Name, Person im Meta. Der Avatar in
+ * Zeilengroesse (`.housekeeping-avatar--row`) ist damit entfallen - zehnmal
+ * dasselbe Gesicht untereinander sagte nichts, was das Meta nicht sagt. */
 
-/* Die Metazeile „23.09. · 45,00 € · Ausstehend" braucht mobil 191px; mit
- * 40px-Avatar und vollen Abstaenden blieben 186, und jede offene Zeile brach
- * auf 84px um. Die Aktionen ruecken deshalb wie in der Aufgabenzeile naeher -
- * ihre 48px-Flaechen tragen die Luft selbst. */
+/* Die Aktionen ruecken wie in der Aufgabenzeile naeher - ihre 48px-Flaechen
+ * tragen die Luft selbst. */
 .housekeeping-report-item > .list-row__actions {
   margin-inline-start: calc(-1 * var(--space-1));
-}
-
-.housekeeping-report-item--visit .housekeeping-avatar img {
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
-  background: transparent;
 }
 
 .housekeeping-report-modal {

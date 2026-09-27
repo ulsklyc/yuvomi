@@ -535,3 +535,105 @@ test('scheitert das Neuladen nach dem Rueckgaengig, schreibt die davor gestartet
     'die vor dem Rueckgaengig gestartete Antwort ist ueberholt, auch wenn das juengere Neuladen scheitert');
   delete globalThis.__apiStub;
 });
+
+// ---------------------------------------------------------------------------
+// R10 L10 (Re-Critique 2026-09-27, A3 P2-3, P2-4, P2-10): eine Besuchszeile,
+// eine Faelligkeits-Grammatik, mobil Kennzahlen in einer Zeile und die Liste
+// vor dem Diagramm.
+// ---------------------------------------------------------------------------
+
+const { readFileSync } = await import('node:fs');
+const { eachRule } = await import('./css-rules.js');
+const HK_STYLES = readFileSync(new URL('../public/styles/housekeeping.css', import.meta.url), 'utf8');
+
+/** Name und Meta jeder Besuchszeile im Markup. */
+function visitRows(html) {
+  return html.split('<article').slice(1).filter((row) => /housekeeping-visit-row/.test(row)).map((row) => ({
+    row,
+    name: /list-row__name">([^<]*)</.exec(row)?.[1],
+    meta: /list-row__meta">([^<]*)</.exec(row)?.[1],
+  }));
+}
+
+function dashboardHtml({ lastVisit } = {}) {
+  const state = hk.state();
+  state.tab = 'dashboard';
+  state.workers = [{ id: 7, display_name: 'Maria Silva', rate_type: 'daily', daily_rate: 45, payment_schedule: 'weekly' }];
+  state.dashboard = { visits_this_month: 3, last_visit: lastVisit ? { check_in: lastVisit } : null, pending_tasks: 1, finished_tasks_this_month: 2, monthly_payments: [{ month: '2026-09', total: 90 }], pending_payments: 45 };
+  state.recentVisits = [asAdmin({ ...openVisit, worker_name: 'Maria Silva' })];
+  const content = fakeContainer();
+  hk.renderDashboard(content);
+  return content.html;
+}
+
+test('ein Besuch, eine Zeile: das Datum fuehrt, die Person steht im Meta - in Uebersicht, Berichten und Protokoll', async () => {
+  const uebersicht = visitRows(dashboardHtml());
+  assert.equal(uebersicht.length, 1, 'die Uebersicht zeigt ihren Besuch als Besuchszeile');
+  assert.equal(uebersicht[0].name, openVisit.check_in, 'Uebersicht: das Datum ist der Name');
+  assert.match(uebersicht[0].meta, /^Maria Silva · /, 'Uebersicht: die Person steht im Meta');
+
+  installApi();
+  const content = await freshReports();
+  await hk.stepReportMonth(content, -1);
+  const berichte = visitRows(content.html);
+  assert.equal(berichte.length, 2, 'die Berichte bauen dieselbe Zeile');
+  for (const { row, name, meta } of berichte) {
+    assert.doesNotMatch(row, /housekeeping-avatar/, 'kein Avatar - zehnmal dasselbe Gesicht sagte nichts');
+    assert.doesNotMatch(name, /Ana|Maria|housekeeping\.staff/, `Berichte: der Name ist das Datum, nicht die Person (${name})`);
+    assert.match(meta, / · /, 'Berichte: Person, Betrag und Status im Meta');
+    assert.match(row, /housekeeping-report-item--visit/, 'die Berichte-Klasse bleibt (Aktionsabstand, Zaehlung)');
+  }
+
+  const protokoll = visitRows(staffLogHtml([asAdmin(openVisit)]));
+  assert.equal(protokoll.length, 1, 'das Personal-Protokoll baut dieselbe Zeile');
+  assert.equal(protokoll[0].name, openVisit.check_in);
+  assert.doesNotMatch(protokoll[0].meta, /Ana/, 'im Protokoll einer Person steht ihr Name nicht in jeder Zeile');
+});
+
+test('Uebersicht: die letzten Besuche stehen vor dem Zahlungsdiagramm', () => {
+  const html = dashboardHtml();
+  const liste = html.indexOf('housekeeping-staff-log-list');
+  const diagramm = html.indexOf('class="housekeeping-chart"');
+  assert.ok(liste > 0 && diagramm > 0, 'beide Abschnitte stehen da');
+  assert.ok(liste < diagramm, 'mobil begannen die Besuche bei y760 hinter dem 252px-Diagramm');
+});
+
+test('Uebersicht: der letzte Besuch nennt im laufenden Jahr kein Jahr, in einem anderen schon', () => {
+  const jahr = new Date().getFullYear();
+  const vorher = globalThis.__formatDayMonth;
+  globalThis.__formatDayMonth = (d) => `KURZ(${d})`;
+  try {
+    const wert = (html) => /metric-card__label">housekeeping\.lastVisit<\/div>\s*<div class="metric-card__value">([^<]*)</.exec(html)?.[1];
+    assert.equal(wert(dashboardHtml({ lastVisit: `${jahr}-01-15T08:30:00Z` })), `KURZ(${jahr}-01-15T08:30:00Z)`,
+      'im laufenden Jahr die Kurzform - sie passt in die Viertelzeile');
+    assert.equal(wert(dashboardHtml({ lastVisit: `${jahr - 1}-12-20T08:30:00Z` })), `${jahr - 1}-12-20T08:30:00Z`,
+      'aus einem anderen Jahr bleibt das volle Datum - dann ist das Jahr die Auskunft');
+  } finally {
+    globalThis.__formatDayMonth = vorher;
+  }
+});
+
+test('Faelligkeit spricht als Tinte am Wort, nicht als Waesche der Zeile (wie die Aufgaben)', () => {
+  const rules = [...eachRule(HK_STYLES)];
+  const waesche = rules.filter((r) => /housekeeping-task--(?:today|overdue)/.test(r.selector)
+    && /background(?:-color)?\s*:/.test(r.body));
+  assert.deepEqual(waesche.map((r) => r.selector.trim()), [], 'keine Zeilentoenung fuer heute/ueberfaellig');
+  for (const [zustand, farbe] of [['overdue', 'danger'], ['today', 'warning']]) {
+    const tinte = rules.find((r) => r.selector.trim() === `.housekeeping-task--${zustand} .housekeeping-task__status`);
+    assert.match(tinte?.body ?? '', new RegExp(`color:\\s*var\\(--color-${farbe}\\)`), `${zustand}: das Wort traegt die Farbe`);
+  }
+});
+
+test('die vier Kennzahlen stehen auf jeder Breite in einer Zeile, schmal mit Labels an Wortgrenzen', () => {
+  const rules = [...eachRule(HK_STYLES)];
+  const quad = rules.filter((r) => /metric-grid--quad/.test(r.selector));
+  const zeile = quad.find((r) => !r.at.length && r.selector.trim() === '.housekeeping-content .metric-grid--quad');
+  assert.match(zeile?.body ?? '', /grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/,
+    'vier Spalten, unbedingt - und spezifischer als die Telefonstufe in panel.css');
+  assert.deepEqual(quad.filter((r) => /--summary-cards:\s*2/.test(r.body)).map((r) => r.at.join(' ')), [],
+    'keine Zwei-mal-zwei-Stufe mehr (189px mobil)');
+  const label = rules.find((r) => r.selector.trim() === '.metric-grid--quad .metric-card__label'
+    && r.at.includes('@container housekeeping-page (max-width: 479px)'));
+  assert.match(label?.body ?? '', /text-transform:\s*none/, 'Versal brach in der Viertelzeile mitten im Wort');
+  assert.match(label?.body ?? '', /hyphens:\s*auto/);
+});
