@@ -27,10 +27,10 @@
 // bewahrt nicht die Position der Zielseite, sondern die der Seite, von der man
 // gerade kommt - dass das gelegentlich gleich aussieht, ist Zufall.
 //
-// REICHWEITE: Das Merken hängt am Scrollstand von `#main-content`. Acht
-// Modul-Roots (.budget-page, .calendar-page, .contacts-page, .meals-page,
-// .notes-page, .pantry-page, .recipes-page, .shopping-page) sind `overflow:
-// hidden` auf voller Höhe und scrollen einen inneren Container; dort steht
+// REICHWEITE: Das Merken hängt am Scrollstand von `#main-content`. Neun
+// Modul-Roots (.budget-page, .calendar-page, .contacts-page, .health-page,
+// .meals-page, .notes-page, .pantry-page, .recipes-page, .shopping-page) sind
+// `overflow: hidden` auf voller Höhe und scrollen einen inneren Container; dort steht
 // `#main-content` immer auf 0, es gibt also nichts zu merken und ein Zurück
 // landet oben. Das OBEN-ANFANGEN stimmt trotzdem überall - jene inneren
 // Container entstehen bei jeder Navigation neu und starten zwangsläufig bei 0.

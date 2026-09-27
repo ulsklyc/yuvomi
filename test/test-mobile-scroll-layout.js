@@ -221,13 +221,13 @@ test('the router resets the surviving scrollport on every navigation', () => {
  * Grenze (siehe utils/scroll-restore.js und SPEC, Responsive Composition), keine
  * versehentliche.
  *
- * Dieser Guard hält die Liste ehrlich: kommt ein neuntes Modul dazu oder
+ * Dieser Guard hält die Liste ehrlich: kommt ein zehntes Modul dazu oder
  * verliert eines seinen inneren Scroller, verschiebt sich die Reichweite der
  * Zusage - und Kommentar wie Spezifikation müssen mitziehen, statt still falsch
  * zu werden. Geprüft wird die REGEL über alle Modul-Stylesheets, nicht eine
  * Handvoll bekannter Dateien.
  */
-test('the modules with an inner scroll container are the documented eight', () => {
+test('the modules with an inner scroll container are the documented nine', () => {
   const styleDir = new URL('../public/styles/', import.meta.url);
   const found = [];
 
@@ -243,7 +243,10 @@ test('the modules with an inner scroll container are the documented eight', () =
   assert.deepEqual(
     [...new Set(found)].sort(),
     [
-      '.budget-page', '.calendar-page', '.contacts-page', '.meals-page',
+      // .health-page seit R10: Liste + Detail wie Kontakte und Rezepte - ab der
+      // Split-Schwelle scrollen Liste und Bereich je fuer sich, darunter EIN
+      // Port (.health-browse, ein .page-scrollport mit Nachlauf).
+      '.budget-page', '.calendar-page', '.contacts-page', '.health-page', '.meals-page',
       '.notes-page', '.pantry-page', '.recipes-page', '.shopping-page',
     ],
     'Die Module mit innerem Scroller haben sich geändert. Sie sind genau die, in '
