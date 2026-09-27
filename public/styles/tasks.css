@@ -120,23 +120,10 @@
  * mobil 54px unter einem 176px-Kopf, und die erste Aufgabe stand bei y=287
  * (A3 P1-2). Am Desktop lief ihr Panel 1156px breit ueber einer 720px-Liste
  * (A3 P2-8). */
-.tasks-toolbar__search {
-  max-width: 320px;
-}
-
-/* AB 1024px STEHT DER KOPF IN EINER ZEILE, und die Suche gibt zuerst nach.
- *
- * Mit Basis `auto` meldete das Feld seine volle Breite (234px bei 1024) und
- * schrumpfte nur anteilig mit den Aktionen - die schrumpften mit, ihre
- * Knoepfe aber nicht: der Primaerknopf ragte 21px ueber die Kopfkante in den
- * Seitenrand. Mit Basis 0 bleibt das Feld hypothetisch klein und waechst per
- * flex-grow in den Rest der Zeile; die Aktionen behalten ihre Breite. Dieselbe
- * Antwort gibt die Shell dem Center-Slot eines Bar-Kopfs (layout.css). */
-@media (min-width: 1024px) {
-  .tasks-toolbar > .tasks-toolbar__search {
-    flex-basis: 0;
-  }
-}
+/* DIE SUCHE HAT KEINE MODULBREITE MEHR: Breite (`--page-search-width`) und
+ * Stelle (Center-Slot hinter dem Titel) traegt page-search.css fuer jeden
+ * Kopf (Re-Critique 2026-09-27, D4). Hier standen `max-width: 320px` und ab
+ * 1024px `flex-basis: 0` - beides lief seit der Shell-Regel ins Leere. */
 
 /* Sichtbarkeit wird per [hidden] geschaltet (der Verlauf blendet Suche und
  * Filterknopf aus). Ohne diese Regel gewinnt display:flex/inline-flex der
@@ -1502,65 +1489,71 @@
 }
 
 /* --------------------------------------------------------
-   Bulk selection
-   -------------------------------------------------------- */
+   Mehrfachauswahl: der Auswahlkreis (Re-Critique 2026-09-27, D5)
 
-.task-bulk-checkbox {
+   Er STEHT AN DER STELLE des Statuskreises, nicht daneben, und traegt dessen
+   Geometrie: dieselbe Trefflaeche im ::before, derselbe Ausgleich, der die
+   Zeilenhoehe nicht mitbestimmen laesst, derselbe 20px-Ring. Nur die Bedeutung
+   wechselt - gefuellt im App-Akzent heisst "gewaehlt". NICHT im Modulton: der
+   ist bei den Aufgaben Gruen (#157F3D) und damit vom erledigten Haken
+   (--color-success, #1E7B35) nicht zu unterscheiden - gemessen im Browser,
+   2026-09-27. Der Akzent ist auch die Farbe des Fokusrings, also die Farbe
+   von "hier bin ich dran". Vorher stand hier eine native Checkbox im Browser-Blau
+   (`appearance: auto`), die einzige ungestaltete Auswahl der App.
+
+   Die Leiste dazu ist die Pille der Shell (utils/bulk-pill.js); eine eigene
+   Leiste ueber der Liste gibt es nicht mehr.
+   -------------------------------------------------------- */
+.task-select-btn {
   width: var(--target-base);
   height: var(--target-base);
-  min-width: var(--target-base);
-  min-height: var(--target-base);
-  margin-right: var(--space-2);
+  margin-top: calc((var(--target-base) - var(--space-5)) / -2);
+  border: none;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--color-ink-on-vivid);
   cursor: pointer;
   flex-shrink: 0;
-}
-
-.bulk-actions-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  margin-bottom: var(--space-3);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  justify-content: center;
+  position: relative;
 }
 
-.bulk-actions-bar[hidden] {
+.task-select-btn::after {
+  content: '';
+  width: var(--space-5);
+  height: var(--space-5);
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-text-tertiary);
+  box-sizing: border-box;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.task-select-btn:hover::after {
+  border-color: var(--color-accent);
+}
+
+.task-select-btn:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: calc(var(--focus-ring-offset) * -1);
+}
+
+.task-select-btn--on::after {
+  border-color: var(--color-accent);
+  background-color: var(--color-accent);
+}
+
+.task-select-btn__check {
+  position: absolute;
+  z-index: 1;
+  width: 12px;
+  height: 12px;
   display: none;
 }
 
-.bulk-actions-bar--active {
-  border-color: var(--module-accent);
-  box-shadow: var(--shadow-sm);
-}
-
-.bulk-actions-bar__count {
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-}
-
-.bulk-actions-bar__actions {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.bulk-actions-bar__actions .btn {
-  min-height: var(--target-base);
-}
-
-@media (max-width: 639px) {
-  .bulk-actions-bar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .bulk-actions-bar__actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+.task-select-btn--on .task-select-btn__check {
+  display: block;
 }
 
 /* Hinweistext unter Formularfeldern im Aufgaben-Modal (z. B. Punkte). */

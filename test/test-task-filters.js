@@ -428,9 +428,14 @@ test('„Alle Filter aufheben" laesst keine Zahl am Knopf stehen', async () => {
 test('das Werkzeugmenue: Verwalten nur mit Schreibrecht, Auswahl nur in der Liste', () => {
   baseState();
   const byAction = () => Object.fromEntries(tasks.toolsMenuItems().filter((i) => i.action).map((i) => [i.action, i]));
-  assert.deepEqual(Object.keys(byAction()), ['bulk-select', 'toggle-history', 'manage-categories', 'manage-tags'],
+  assert.deepEqual(Object.keys(byAction()), ['bulk-select', 'bulk-archive', 'bulk-tag-add', 'bulk-tag-remove', 'toggle-history', 'manage-categories', 'manage-tags'],
     'alles, was vorher als loses Icon im Kopf stand, steht beschriftet im Menue');
   assert.equal(byAction()['bulk-select'].disabled, false);
+  // Ablegen und die Tag-Sammelaktionen passen nicht in die einzeilige Pille
+  // (D5): sie stehen im Menue, gesperrt, bis eine Auswahl sie freigibt.
+  assert.equal(byAction()['bulk-archive'].disabled, true);
+  assert.equal(byAction()['bulk-tag-add'].disabled, true);
+  assert.equal(byAction()['bulk-tag-remove'].disabled, true);
   assert.equal(byAction()['toggle-history'].checked, false);
 
   tasks.state.viewMode = 'kanban';

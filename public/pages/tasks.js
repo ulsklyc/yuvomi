@@ -23,12 +23,14 @@ import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import '/components/category-manager.js';
 import '/components/tag-manager.js';
 import { findPageFab } from '/utils/fab.js';
+import { setBulkPill, clearBulkPill } from '/utils/bulk-pill.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { isSoloHousehold, hidesPrivacyControls } from '/utils/household.js';
 import { popoverMenuHtml, installPopoverMenus, pageToolsMenuHtml, syncPopoverMenuItem } from '/utils/popover-menu.js';
 import { filterButtonHtml, syncFilterButton, openFilterSheet } from '/utils/filter-sheet.js';
 import { toggleRowHtml } from '/settings/components.js';
 import { wireTablist } from '/utils/tablist.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { todayKey, parseLocalDateKey } from '/utils/date.js';
 import { makeSortable } from '/utils/sortable.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
@@ -461,7 +463,7 @@ async function wireSyncTarget(panel, task) {
  * Zeile, an der eine Anzahl OHNE ihren Gegenstand stand.
  */
 function renderTaskCard(task, opts = {}) {
-  const { expandedSubtasks = false, showCheckbox = false, isChecked = false, showCategory = true } = opts;
+  const { expandedSubtasks = false, selecting = false, selected = false, showCategory = true } = opts;
   const isDone = task.status === 'done';
   const archived = isArchived(task);
   // Gesperrte Aufgabe (#830): abhaken bleibt, umschreiben nicht. Die Knoepfe,
@@ -537,10 +539,19 @@ function renderTaskCard(task, opts = {}) {
   return `
     <div class="task-card ${isDone ? 'task-card--done' : ''} ${archived ? 'task-card--archived' : ''}" data-task-id="${task.id}" data-md-id="${task.id}">
       <div class="list-row list-row--roomy task-card__main">
-        ${showCheckbox ? `
-        <input type="checkbox" class="task-bulk-checkbox" data-task-id="${task.id}"
-               ${isChecked ? 'checked' : ''} aria-label="${t('tasks.selectTask')}">
-        ` : ''}
+        ${/* IM AUSWAHLMODUS ERSETZT DER AUSWAHLKREIS DEN STATUSKREIS - er
+             steht nicht daneben (Re-Critique 2026-09-27, D5; Muster: Apples
+             Erinnerungen). Vorher sass eine native Checkbox im Browser-Blau
+             VOR Haken und Personenwahl: drei Kreise in einer Zeile, und der
+             Tipp auf den falschen hakte ab statt auszuwaehlen. Ein Modus, ein
+             Kreis, eine Bedeutung - die Zeilenaktionen treten solange ab. */ ''}
+        ${selecting ? `
+        <button type="button" class="task-select-btn${selected ? ' task-select-btn--on' : ''}"
+                data-action="toggle-select" data-id="${task.id}" aria-pressed="${selected}"
+                aria-label="${esc(t('tasks.selectTaskNamed', { title: task.title }))}">
+          <i data-lucide="check" class="task-select-btn__check" aria-hidden="true"></i>
+        </button>
+        ` : `
         ${darfAbhaken ? `
         <button class="task-status-btn task-status-btn--${task.status}"
                 data-action="toggle-status" data-id="${task.id}" data-status="${task.status}"
@@ -568,6 +579,7 @@ function renderTaskCard(task, opts = {}) {
              am Display also gar keinen Knopf, und der Picker darunter zeichnet
              sich fuer sie ohnehin nicht. */''}
         ${renderDoerPicker(task, isDone, archived)}
+        `}
 
         <div class="task-card__body">
           <button type="button" class="task-card__title u-card-title u-compact" data-action="open-task" data-id="${task.id}" data-md-focus>
@@ -598,12 +610,12 @@ function renderTaskCard(task, opts = {}) {
         ${/* Bleibt auch mit vorhandenen Unteraufgaben: bis D#1017 verschwand der
               Einstieg nach der ersten, und der zweite Einstieg lag am Ende der
               eingeklappten Liste - gelesen als "nur eine Unteraufgabe je Aufgabe". */ ''}
-        ${canEdit && !archived && !task.parent_task_id ? `
+        ${!selecting && canEdit && !archived && !task.parent_task_id ? `
         <button type="button" class="row-action task-card__inline-action" data-action="add-subtask" data-parent="${task.id}"
                 aria-label="${esc(t('tasks.subtaskAddNamed', { title: task.title }))}" title="${t('tasks.subtaskAdd')}">
           <i data-lucide="list-plus" class="icon-md" aria-hidden="true"></i>
         </button>` : ''}
-        ${canEdit ? `
+        ${!selecting && canEdit ? `
         <button type="button" class="row-action task-card__inline-action" data-action="edit-task" data-id="${task.id}"
                 aria-label="${esc(t('common.editNamed', { name: task.title }))}">
           <i data-lucide="pencil" class="icon-md" aria-hidden="true"></i>
@@ -720,8 +732,8 @@ function renderTaskGroups(tasks, groupMode) {
       </h2>
       ${collapsed ? '' : `<div class="row-carrier">
         ${sorted.map((t) => renderSwipeRow(t, renderTaskCard(t, {
-          showCheckbox: state.bulkSelectMode,
-          isChecked: state.selectedTaskIds.has(t.id),
+          selecting: state.bulkSelectMode,
+          selected: state.bulkSelectMode && state.selectedTaskIds.has(t.id),
           expandedSubtasks: state.subtasksExpandedByDefault,
           showCategory: groupMode !== 'category',
         }))).join('')}
@@ -3027,6 +3039,10 @@ function renderHistoryPeople() {
 
 /** Die Personen-Chips verdrahten - beide Zweige von renderHistory zeigen sie. */
 function wireHistoryPeople(root, container) {
+  // Die Leiste entsteht bei jedem Laden neu - der Schluessel laesst die neue
+  // Kapsel von der Stelle der alten gleiten.
+  const people = root.querySelector('.history-people');
+  if (people) attachSegmentIndicator(people, { key: 'tasks-history-people' });
   root.querySelectorAll('[data-history-user]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const raw = btn.dataset.historyUser;
@@ -3251,6 +3267,13 @@ function toolsMenuItems() {
   if (!readOnly()) {
     items.push({ action: 'bulk-select', label: t('tasks.bulkSelect'), icon: 'list-checks',
       checked: state.bulkSelectMode, disabled: !isList });
+    // Nur waehrend der Auswahl sichtbar (syncBulkMenu): die drei Sammelaktionen,
+    // die in der einzeiligen Pille keinen Platz haben.
+    items.push(
+      { action: 'bulk-archive', label: t('tasks.bulkArchive'), icon: 'archive', disabled: true },
+      { action: 'bulk-tag-add', label: t('tasks.bulkTagAdd'), icon: 'tag', disabled: true },
+      { action: 'bulk-tag-remove', label: t('tasks.bulkTagRemove'), icon: 'eraser', disabled: true },
+    );
   }
   items.push({ action: 'toggle-history', label: t('tasks.historyView'), icon: 'history',
     checked: state.viewMode === 'history' });
@@ -3436,6 +3459,7 @@ function openTaskFilters(container) {
         renderTaskList(container);
       },
     });
+    attachSegmentIndicator(groupMode);
   }
   return panel;
 }
@@ -3894,10 +3918,10 @@ function syncViewChrome(container) {
   syncPopoverMenuItem(menu, 'bulk-select', state.bulkSelectMode);
   const bulkItem = menu?.querySelector('.popover-menu__item[data-action="bulk-select"]');
   if (bulkItem) bulkItem.disabled = !isList;
-  // Die Auswahl zu LEEREN raeumt die Leiste nicht weg: sie haengt an
-  // `bar.hidden`, das nur updateBulkActionsBar setzt. Ohne diesen Aufruf blieb
-  // „Als erledigt markieren / Ablegen / Loeschen" ueber dem Verlauf stehen -
-  // mit leerer Auswahl, also Knoepfe ohne Gegenstand.
+  // Die Auswahl zu LEEREN raeumt die Pille nicht weg: sie steht, bis
+  // updateBulkActionsBar sie abraeumt. Ohne diesen Aufruf blieb
+  // „Erledigt / Archivieren / Loeschen" ueber dem Verlauf stehen - mit leerer
+  // Auswahl, also Kapseln ohne Gegenstand.
   updateBulkActionsBar(container);
 }
 
@@ -3913,6 +3937,10 @@ function wireViewToggle(container) {
   toggle.querySelectorAll('[data-view]').forEach((btn) => {
     btn.addEventListener('click', () => setViewMode(container, btn.dataset.view));
   });
+  // Die Kapsel gleitet zwischen Liste und Kanban (utils/segment-indicator.js,
+  // D8) und folgt `aria-pressed` aus syncViewChrome selbst; im Verlauf ist
+  // keines gedrueckt, dann steht sie nicht da.
+  attachSegmentIndicator(toggle);
 }
 
 /**
@@ -3980,6 +4008,15 @@ function wireToolbar(container) {
       case 'bulk-select':
         toggleBulkSelect(container);
         break;
+      case 'bulk-archive':
+        runBulkAction('archive', container);
+        break;
+      case 'bulk-tag-add':
+        runBulkAction('tag-add', container);
+        break;
+      case 'bulk-tag-remove':
+        runBulkAction('tag-remove', container);
+        break;
       case 'manage-categories':
         if (!readOnly()) openTaskCategoryManager(container);
         break;
@@ -3993,119 +4030,173 @@ function wireToolbar(container) {
 
 function wireNewTaskBtn(container) {
   const handler = () => {
-    // Der FAB liegt in der Shell-Layer und wird ueber html[data-module-readonly]
-    // per CSS ausgeblendet (layout.css), der Kopfknopf traegt `.toolbar-new-btn`
-    // und faellt derselben Regel zu. Der Riegel bleibt trotzdem: eine
-    // CSS-Regel ist keine Sperre.
+    // Der FAB liegt in der Shell-Layer (am Zeigergeraet im Kopf angedockt) und
+    // wird ueber html[data-module-readonly] per CSS ausgeblendet (layout.css).
+    // Der Riegel bleibt trotzdem: eine CSS-Regel ist keine Sperre.
     if (readOnly()) return;
     openTaskModal({ users: state.users }, container);
   };
-  container.querySelector('#btn-new-task')?.addEventListener('click', handler);
   findPageFab('fab-new-task')?.addEventListener('click', handler);
 }
 
+/**
+ * Die Sammelaktionen der Mehrfachauswahl - in der Pille der Shell
+ * (utils/bulk-pill.js), wie Einkauf, Kontakte und Vorrat (Re-Critique
+ * 2026-09-27, D5). Vorher stand hier eine eigene Leiste ueber der Liste mit
+ * sechs `.btn`-Knoepfen und einem gefuellten roten „Loeschen", ohne Weg
+ * zurueck ausser ueber das Menue.
+ *
+ * DIE PILLE IST EINZEILIG, und ihre Kapseln schrumpfen nie - also traegt sie
+ * drei: den Status, Loeschen und „Fertig", den sichtbaren Ausstieg. Der Status
+ * ist EINE Kapsel, die dem Bestand folgt: sind alle gewaehlten Aufgaben
+ * erledigt, heisst sie „Offen", sonst „Erledigt". Ablegen und die beiden
+ * Tag-Aktionen stehen waehrend der Auswahl beschriftet im Werkzeugmenue
+ * (syncBulkMenu). Gemessen bei 390px (2026-09-27): mit „Archivieren" als
+ * vierter Kapsel blieben dem Subjekt auf Deutsch 30 von 86px („3 …"), und
+ * Ungarisch („Befejezettként jelölés") liefe ueber die Pille hinaus.
+ *
+ * Loeschen fragt in der Pille (`confirm`) und bleibt danach fuenf Sekunden
+ * rueckgaengig zu machen (handleBulkDelete) - die Frage schuetzt vor dem
+ * Fehltipp neben „Fertig", das Rueckgaengig vor dem Irrtum.
+ */
 function updateBulkActionsBar(container) {
-  const bar = container.querySelector('#bulk-actions-bar');
-  const count = container.querySelector('#bulk-count');
-  if (!bar) return;
+  // Ein spaet ankommender Neuaufbau einer verlassenen Seite darf die Pille
+  // eines anderen Moduls nicht abraeumen.
+  if (container && container.isConnected === false) return;
+  syncBulkMenu(container);
+  if (!state.bulkSelectMode || readOnly()) { clearBulkPill(); return; }
+  const n = state.selectedTaskIds.size;
+  const actions = [];
+  if (n > 0) {
+    const chosen = state.tasks.filter((task) => state.selectedTaskIds.has(task.id));
+    const allDone = chosen.length > 0 && chosen.every((task) => task.status === 'done');
+    actions.push(
+      {
+        label: t(allDone ? 'tasks.bulkMarkOpen' : 'tasks.bulkMarkDone'),
+        onClick: () => runBulkAction(allDone ? 'mark-open' : 'mark-done', container),
+      },
+      {
+        label: t('tasks.bulkDelete'),
+        ariaLabel: t('tasks.bulkDeleteAsk', { count: n }),
+        count: n,
+        danger: true,
+        confirm: { question: t('tasks.bulkDeleteAsk', { count: n }) },
+        onClick: () => runBulkAction('delete', container),
+      },
+    );
+  }
+  actions.push({ label: t('tasks.bulkFinish'), onClick: () => exitBulkSelect(container) });
+  setBulkPill({ label: t('tasks.bulkSelectedCount', { count: n }), actions });
+}
 
-  const selected = state.selectedTaskIds.size;
-  const buttons = bar.querySelectorAll('button[id^="bulk-"]');
-
-  bar.hidden = !(state.bulkSelectMode && selected > 0);
-  bar.classList.toggle('bulk-actions-bar--active', selected > 0);
-  buttons.forEach((button) => {
-    button.disabled = selected === 0;
+/**
+ * Ablegen und die Tag-Eintraege des Werkzeugmenues gibt es nur waehrend der
+ * Auswahl, und erst mit einer Aufgabe darin sind sie bedienbar.
+ */
+function syncBulkMenu(container) {
+  const menu = container?.querySelector?.('#tasks-tools-menu');
+  if (!menu) return;
+  const on = state.bulkSelectMode && !readOnly();
+  menu.querySelectorAll('.popover-menu__item[data-action="bulk-archive"], .popover-menu__item[data-action^="bulk-tag-"]').forEach((item) => {
+    item.hidden = !on;
+    item.disabled = !on || state.selectedTaskIds.size === 0;
   });
+}
 
-  if (count) {
-    count.textContent = t('tasks.bulkSelectedCount', { count: selected });
+/** Eine Sammelaktion auf die aktuelle Auswahl. */
+async function runBulkAction(action, container) {
+  if (readOnly()) return;
+  const taskIds = [...state.selectedTaskIds];
+  if (taskIds.length === 0) return;
+
+  // Löschen läuft über dasselbe Optimistic-Undo-Muster wie der Einzel-Delete.
+  if (action === 'delete') {
+    handleBulkDelete(taskIds, container);
+    return;
+  }
+
+  if (action === 'tag-add' || action === 'tag-remove') {
+    openBulkTagDialog(taskIds, action === 'tag-add' ? 'add' : 'remove', container);
+    return;
+  }
+
+  if (action === 'archive') {
+    state.selectedTaskIds.clear();
+    updateBulkActionsBar(container);
+    await archiveTaskIds(taskIds, container);
+    return;
+  }
+
+  try {
+    if (action === 'mark-done' || action === 'mark-open') {
+      const status = action === 'mark-done' ? 'done' : 'open';
+      await Promise.all(taskIds.map(id => api.patch(`/tasks/${id}/status`, { status })));
+      window.yuvomi.showToast(t('tasks.bulkStatusChanged'), 'success');
+    }
+
+    state.selectedTaskIds.clear();
+    updateBulkActionsBar(container);
+    await loadTasks(container);
+  } catch (err) {
+    window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
   }
 }
 
 /**
- * Mehrfachauswahl an/aus - ein Schalter im Werkzeugmenue (menuitemcheckbox),
- * vorher ein loser Kopfknopf mit aria-pressed. Den Zustand traegt der Haken im
- * Menue; sichtbar ist er ausserdem an den Auswahlkaestchen jeder Zeile.
+ * Mehrfachauswahl an/aus - ein Schalter im Werkzeugmenue (menuitemcheckbox).
+ * Den Zustand traegt der Haken im Menue; sichtbar ist er ausserdem an den
+ * Auswahlkreisen jeder Zeile und an der Pille.
  */
 function toggleBulkSelect(container) {
-  // Die Mehrfachauswahl existiert nur fuer die Sammelaktionsleiste, und die
-  // schreibt in jeder ihrer sechs Spalten. Ohne sie waere sie eine Auswahl
-  // ohne Verb.
+  if (state.bulkSelectMode) { exitBulkSelect(container); return; }
+  // Die Mehrfachauswahl existiert nur fuer die Sammelaktionen, und die
+  // schreiben alle. Ohne sie waere sie eine Auswahl ohne Verb.
   if (readOnly() || state.viewMode !== 'list') return;
-  state.bulkSelectMode = !state.bulkSelectMode;
-  if (!state.bulkSelectMode) {
-    state.selectedTaskIds.clear();
-  }
-  syncPopoverMenuItem(container.querySelector('#tasks-tools-menu'), 'bulk-select', state.bulkSelectMode);
-  loadTasks(container);
+  state.bulkSelectMode = true;
+  state.selectedTaskIds.clear();
+  syncPopoverMenuItem(container.querySelector('#tasks-tools-menu'), 'bulk-select', true);
+  renderTaskList(container);
 }
 
-function wireBulkCheckboxes(container) {
-  const listEl = container.querySelector('#task-list');
-  if (!listEl) return;
-
-  listEl.addEventListener('change', (e) => {
-    const checkbox = e.target.closest('.task-bulk-checkbox');
-    if (!checkbox) return;
-
-    const taskId = Number(checkbox.dataset.taskId);
-    if (checkbox.checked) {
-      state.selectedTaskIds.add(taskId);
-    } else {
-      state.selectedTaskIds.delete(taskId);
-    }
-    updateBulkActionsBar(container);
-  });
+/**
+ * Der Ausstieg - aus „Fertig" in der Pille, dem Menue-Haken oder Escape.
+ * Stand der Fokus in der Pille, die gleich verschwindet, geht er an den
+ * Menueknopf, ueber den man hineingekommen ist - sonst fiele er auf <body>.
+ */
+function exitBulkSelect(container) {
+  if (!state.bulkSelectMode) return;
+  const pillHadFocus = !!document.activeElement?.closest?.('.list-bulkbar');
+  state.bulkSelectMode = false;
+  state.selectedTaskIds.clear();
+  syncPopoverMenuItem(container.querySelector('#tasks-tools-menu'), 'bulk-select', false);
+  renderTaskList(container);
+  if (pillHadFocus) container.querySelector('.tasks-toolbar .page-tools-btn')?.focus();
 }
 
-function wireBulkActions(container) {
-  const bar = container.querySelector('#bulk-actions-bar');
-  if (!bar) return;
-  if (readOnly()) return;
+/** Escape beendet die Auswahl - ein Modus, den nur das Menue verlaesst, waere eine Falle. */
+function wireBulkEscape(container) {
+  const onKey = (e) => {
+    if (e.key !== 'Escape' || !state.bulkSelectMode || e.defaultPrevented) return;
+    if (!container.isConnected) { document.removeEventListener('keydown', onKey); return; }
+    // Ein offener Dialog oder ein offenes Menue schliesst zuerst selbst.
+    if (document.querySelector('.modal-overlay')) return;
+    try { if (document.querySelector(':popover-open')) return; } catch { /* alter Browser */ }
+    exitBulkSelect(container);
+  };
+  document.addEventListener('keydown', onKey, pageSignal ? { signal: pageSignal } : undefined);
+}
 
-  bar.addEventListener('click', async (e) => {
-    const btn = e.target.closest('button[id^="bulk-"]');
-    if (!btn) return;
-
-    const taskIds = [...state.selectedTaskIds];
-    if (taskIds.length === 0) return;
-
-    const action = btn.id;
-
-    // Löschen läuft über dasselbe Optimistic-Undo-Muster wie der Einzel-Delete
-    // (kein ungestylter window.confirm, immer rückgängig machbar — Critique P1).
-    if (action === 'bulk-delete') {
-      handleBulkDelete(taskIds, container);
-      return;
-    }
-
-    if (action === 'bulk-tag-add' || action === 'bulk-tag-remove') {
-      openBulkTagDialog(taskIds, action === 'bulk-tag-add' ? 'add' : 'remove', container);
-      return;
-    }
-
-    if (action === 'bulk-archive') {
-      state.selectedTaskIds.clear();
-      updateBulkActionsBar(container);
-      await archiveTaskIds(taskIds, container);
-      return;
-    }
-
-    try {
-      if (action === 'bulk-mark-done' || action === 'bulk-mark-open') {
-        const status = btn.dataset.status;
-        await Promise.all(taskIds.map(id => api.patch(`/tasks/${id}/status`, { status })));
-        window.yuvomi.showToast(t('tasks.bulkStatusChanged'), 'success');
-      }
-
-      state.selectedTaskIds.clear();
-      updateBulkActionsBar(container);
-      await loadTasks(container);
-    } catch (err) {
-      window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
-    }
-  });
+/** Ein Tipp auf den Auswahlkreis: in die Auswahl oder heraus. */
+function toggleTaskSelection(btn, container) {
+  const taskId = Number(btn.dataset.id);
+  if (!Number.isInteger(taskId)) return;
+  const on = !state.selectedTaskIds.has(taskId);
+  if (on) state.selectedTaskIds.add(taskId);
+  else state.selectedTaskIds.delete(taskId);
+  btn.classList.toggle('task-select-btn--on', on);
+  btn.setAttribute('aria-pressed', String(on));
+  vibrate(10);
+  updateBulkActionsBar(container);
 }
 
 // Server-Obergrenze von POST /tasks/archive (MAX_BULK_TASKS in
@@ -4266,6 +4357,18 @@ function wireTaskList(container) {
     const erlaubt = READ_SAFE_ACTIONS.has(action)
       || (actingAsDisplay() && DISPLAY_WRITE_ACTIONS.has(action));
     if (readOnly() && !erlaubt) return;
+
+    if (action === 'toggle-select') {
+      toggleTaskSelection(target, container);
+      return;
+    }
+    // Im Auswahlmodus waehlt auch der Titel aus, statt zu oeffnen - die ganze
+    // Zeile ist dann Auswahlflaeche, wie in Apples Erinnerungen.
+    if (action === 'open-task' && state.bulkSelectMode) {
+      const circle = target.closest('.task-card')?.querySelector('[data-action="toggle-select"]');
+      if (circle) toggleTaskSelection(circle, container);
+      return;
+    }
 
     if (action === 'toggle-status') {
       const status = target.dataset.status;
@@ -4843,6 +4946,10 @@ export async function render(container, { user, signal } = {}) {
   paneRepaintDue = false;
   state.user = user ?? null;
   state.currentUserId = user?.id ?? null;
+  // Die Auswahl gehoert zum Besuch, nicht zum Modul: die Shell raeumt die
+  // Pille beim Seitenwechsel ab (router.js), also faengt auch der Modus neu an.
+  state.bulkSelectMode = false;
+  state.selectedTaskIds.clear();
   loadCollapsedGroups();
   loadCollapsedKanbanCols();
   // Die Rolle entscheidet nur darüber, ob ein fremder Kommentar entfernt werden
@@ -4918,50 +5025,19 @@ export async function render(container, { user, signal } = {}) {
                 im Menue (documents-tools-btn). Die schreibenden Eintraege
                 fehlen bei Nur-lesen (#467), der Verlauf bleibt: er zeigt nur. */ ''}
           ${pageToolsMenuHtml({ id: 'tasks-tools-menu', label: t('common.moreActions'), items: toolsMenuItems() })}
-          ${readOnly() ? '' : `
-          <button class="btn btn--primary toolbar-new-btn" id="btn-new-task" style="gap:var(--space-1)"
-                  aria-label="${t('tasks.newTask')}">
-            <i data-lucide="plus" class="icon-lg" aria-hidden="true"></i> <span class="toolbar-new-btn__label">${t('newLabel.tasks')}</span>
-          </button>`}
+          ${/* DIE PRIMAERAKTION IST DER FAB (#fab-new-task, unten): die Shell
+                dockt ihn am Zeigergeraet mit seinem Nomen hier an
+                (dockFabIntoToolbar), wie in jedem Modul. Ein eigener Kopfknopf
+                war die zweite Bauart derselben Handlung (Re-Critique
+                2026-09-27, D3). */ ''}
         </div>
       </div>
 
       <div class="tasks-body">
-        ${readOnly() ? '' : `
-        <div class="bulk-actions-bar" id="bulk-actions-bar" hidden>
-          <span class="bulk-actions-bar__count" id="bulk-count"></span>
-          <div class="bulk-actions-bar__actions">
-            <button class="btn btn--secondary btn--sm" id="bulk-mark-done" data-status="done">
-              <i data-lucide="check" class="icon-md" aria-hidden="true"></i>
-              ${t('tasks.bulkMarkDone')}
-            </button>
-            <button class="btn btn--secondary btn--sm" id="bulk-mark-open" data-status="open">
-              <i data-lucide="rotate-ccw" class="icon-md" aria-hidden="true"></i>
-              ${t('tasks.bulkMarkOpen')}
-            </button>
-            <button class="btn btn--secondary btn--sm" id="bulk-archive">
-              <i data-lucide="archive" class="icon-md" aria-hidden="true"></i>
-              ${t('tasks.bulkArchive')}
-            </button>
-            <button class="btn btn--secondary btn--sm" id="bulk-tag-add">
-              <i data-lucide="tag" class="icon-md" aria-hidden="true"></i>
-              ${t('tasks.bulkTagAdd')}
-            </button>
-            <button class="btn btn--secondary btn--sm" id="bulk-tag-remove">
-              <!-- Nicht "tag-off": das Icon gibt es im gebuendelten Lucide nicht,
-                   der Knopf stand deshalb leer da. "eraser" traegt das Wegnehmen
-                   und laesst sich vom "tag" des Nachbarknopfs unterscheiden -
-                   zweimal dasselbe Icon nebeneinander waere keine Wahl. -->
-              <i data-lucide="eraser" class="icon-md" aria-hidden="true"></i>
-              ${t('tasks.bulkTagRemove')}
-            </button>
-            <button class="btn btn--danger btn--sm" id="bulk-delete">
-              <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
-              ${t('tasks.bulkDelete')}
-            </button>
-          </div>
-        </div>`}
-
+        ${/* DIE SAMMELAKTIONEN STEHEN IN DER PILLE DER SHELL
+              (utils/bulk-pill.js, updateBulkActionsBar), wie in Einkauf,
+              Kontakten und Vorrat - nicht mehr als eigene Leiste ueber der
+              Liste (Re-Critique 2026-09-27, D5). */ ''}
         <div class="split-view tasks-split">
         <div id="task-list" class="split-view__list">
           ${[1,2,3].map(() => `
@@ -5051,8 +5127,7 @@ export async function render(container, { user, signal } = {}) {
   wireToolbar(container);
   wireNewTaskBtn(container);
   wireTaskList(container);
-  wireBulkCheckboxes(container);
-  wireBulkActions(container);
+  wireBulkEscape(container);
   wireTagBadgeFilter(container);
   renderFilters(container);
   // Im Verlauf holt renderTaskList den Bestand selbst nach - er steckt nicht in
@@ -5091,7 +5166,7 @@ export const __test = {
   // Sammel-Ablage (#1250): die Mehrfachauswahl und der Kopf der Erledigt-
   // Spalte, beide mit dem Aufruf, den sie absetzen - gezaehlt wird, WIE OFT
   // sie den Server fragen, und das sieht kein Textguard.
-  wireBulkActions, archiveDoneColumn, filteredTasks,
+  runBulkAction, updateBulkActionsBar, toggleTaskSelection, archiveDoneColumn, filteredTasks,
   // Was ein Wandtablett zu sehen und zu fassen bekommt (#1209). Die Karte
   // traegt drei Wege zum selben Statuswechsel - Haken, Wisch, Teilaufgabe -,
   // und am Display darf nur der erste erscheinen, weil nur er nach der Person

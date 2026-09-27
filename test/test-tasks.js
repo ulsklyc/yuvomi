@@ -39,11 +39,13 @@ const in3days  = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
 
 console.log('\n[Tasks-Test] CRUD + Filter + Subtasks\n');
 
-test('Bulk-Aktionsleiste ist standardmäßig verborgen und zeigt Nullauswahl nur im Bulk-Modus', () => {
+test('Sammelaktionen: Pille der Shell statt eigener Leiste, nur im Auswahlmodus (D5)', () => {
   const source = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
-  assert(source.includes('id="bulk-actions-bar" hidden'), 'Bulk-Leiste muss initial hidden gerendert werden');
-  assert(/bar\.hidden\s*=\s*!\(state\.bulkSelectMode && selected > 0\)/.test(source), 'Bulk-Leiste darf erst bei aktiver Auswahl sichtbar werden');
-  assert(/button\.disabled\s*=\s*selected\s*===\s*0/.test(source), 'Bulk-Buttons müssen bei 0 Auswahl deaktiviert sein');
+  assert(!source.includes('id="bulk-actions-bar"'), 'keine eigene Sammelaktionsleiste mehr ueber der Liste');
+  assert(/import \{ setBulkPill, clearBulkPill \} from '\/utils\/bulk-pill\.js'/.test(source), 'die Pille kommt aus utils/bulk-pill.js');
+  assert(/if \(!state\.bulkSelectMode \|\| readOnly\(\)\) \{ clearBulkPill\(\); return; \}/.test(source),
+    'ausserhalb des Auswahlmodus (und bei Nur-lesen) steht keine Pille');
+  assert(/if \(n > 0\) \{/.test(source), 'Aktionen mit Gegenstand erst ab einer gewaehlten Aufgabe');
 });
 
 // --------------------------------------------------------
