@@ -3025,6 +3025,92 @@ button.today-cockpit__more--link {
   color: var(--color-text-tertiary);
 }
 
+/* DER ANPASSEN-KOPF MOBIL: EINE ZEILE [Abbrechen] Titel [Fertig] (R9 M7).
+ *
+ * Gemessen vorher bei 390px: Reichweiten-Satz, "Als Vorgabe fuer alle",
+ * Abbrechen und Speichern brachen rechtsbuendig in drei Zeilen um (y 123-284),
+ * der Kopf war 248px hoch, und das erste Widget begann bei y 946 von 844
+ * (A7 P1-2). Das iOS-Muster fuer einen Bearbeiten-Modus ist die Leiste mit
+ * Abbrechen links, Titel in der Mitte und "Fertig" rechts - sie steht jetzt
+ * ueber Datum und Gruss. Der Reichweiten-Satz und die zwei Knoepfe, die die
+ * Reichweite aendern, stehen als Fussnote unter dem Raster
+ * (`.dashboard-customize-footnote`, dashboard.js).
+ *
+ * 639px am Fenster, nicht am Kopf-Container: die Fussnote steht ausserhalb
+ * des Kopfes, und beide muessen dieselbe Frage gleich beantworten. Zwischen
+ * 640px Fenster und 640px Kopfbreite bleibt die bisherige schmale Fassung
+ * stehen (Leiste unter dem Gruss) - mit allen Knoepfen an ihrem Ort. */
+.dashboard-customize-toolbar__title,
+.dashboard-customize-footnote {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .dashboard-overview__header--editing {
+    grid-template-areas:
+      "tools   tools"
+      "date    date"
+      "title   title"
+      "weather weather";
+  }
+
+  .dashboard-overview__header--editing .dashboard-customize-scope,
+  .dashboard-overview__header--editing .dashboard-customize-scope-action {
+    display: none;
+  }
+
+  .dashboard-overview__header--editing > .dashboard-overview__tools {
+    display: block;
+  }
+
+  .dashboard-customize-toolbar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  /* Abbrechen links, auch wenn es im Markup hinter dem Titel steht: die
+   * Reihenfolge der Leiste bleibt fuer die breite Buehne, wo der Titel fehlt. */
+  .dashboard-customize-toolbar > .btn--secondary {
+    order: -1;
+  }
+
+  .dashboard-customize-toolbar__title {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
+  }
+
+  .dashboard-customize-footnote {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-4) 0;
+    text-align: center;
+    color: var(--color-text-secondary);
+    font-size: var(--text-sm);
+  }
+
+  .dashboard-customize-footnote p {
+    margin: 0;
+  }
+
+  .dashboard-customize-footnote__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+  }
+}
+
 /* Kein min-height-Override hier: der Basis-.btn ist bereits 48px (mobil) / 40px
  * (Desktop). Der frühere Override auf --target-md (40px) schrumpfte die Toolbar-
  * Buttons auch mobil unter das 44px-iOS-Minimum (Assessment B). */
@@ -3153,6 +3239,46 @@ button.today-cockpit__more--link {
   flex-wrap: wrap;
 }
 
+/* DAS GROESSEN-MENUE DER EINSPALTIGEN BUEHNE (R9 M7, dashboard.js
+ * `renderWidgetSizeMenu`). Dieselbe Grenze wie das Raster: unter 768px ist es
+ * eine Spalte, und dort wirkt nur die Hoehe. Der Knopf zeigt die aktuelle
+ * Form und hat die Gestalt seiner Nachbarn (Ausblenden, Verschieben). Mit ihm
+ * passt die Leiste einer Kachel in EINE Zeile. */
+.widget-edit-controls__size-menu {
+  display: none;
+}
+
+.widget-edit-controls__size-trigger {
+  width: var(--target-md);
+  height: var(--target-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.widget-edit-controls__size-trigger .widget-size-mini,
+.widget-size-menu__item .widget-size-mini {
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+@media (max-width: 767px) {
+  .widget-edit-controls__size {
+    display: none;
+  }
+
+  .widget-edit-controls__size-menu {
+    display: inline-flex;
+    margin-inline-start: auto;
+  }
+}
+
 /* Segmentierter Größen-Button: ein klickbares Mini-Grid pro Preset. Ersetzt das
  * frühere Mini-Grid+Select+Label-Trio — eine Kontrolle, glanzbar, platzsparend. */
 .widget-size-btn {
@@ -3191,6 +3317,7 @@ button.today-cockpit__more--link {
 
   .widget-size-btn,
   .widget-edit-controls__hide,
+  .widget-edit-controls__size-trigger,
   .widget-edit-controls__move-btn {
     min-width: var(--target-base);
     min-height: var(--target-base);

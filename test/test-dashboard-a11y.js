@@ -320,3 +320,62 @@ test('die Heute-Zeile nennt den Titel vor der Person (H13, A7 Sam)', () => {
       `der Titel kommt vor dem Namen: ${spoken}`);
   }
 });
+
+// ── R9 M7 (Re-Critique 2026-09-27, A7 P1-2): Anpassen-Modus mobil ─────────────
+// Gemessen bei 390px vorher: Kopf 248px (Leiste in drei Zeilen), erstes
+// Widget y 946, Bedienleiste je Kachel 114px (zwei Zeilen). Nachher: Kopf
+// 135px, "Heute wichtig" y 199, erstes Rasterwidget y 833, Leiste 58px.
+
+test('R9 M7: mobil eine Kopfzeile [Abbrechen] Titel [Fertig], Reichweite als Fussnote', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = await readFile(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const editing = renderDashboardOverview({ display_name: 'Linda' }, true, null, { followsDefault: false, canPublish: true });
+  const bar = editing.slice(editing.indexOf('dashboard-customize-toolbar'));
+  const order = ['dashboard-customize-toolbar__title', 'id="dashboard-customize-cancel"', 'id="dashboard-customize-save"'].map((s) => bar.indexOf(s));
+  assert.ok(order.every((i) => i > 0), `Titel, Abbrechen und Fertig stehen in der Leiste: ${order}`);
+  assert.match(bar, /id="dashboard-customize-save">dashboard\.customizeDone</, 'der Primaerknopf heisst wie in iOS "Fertig"');
+  assert.match(bar, /data-customize-publish id="dashboard-customize-publish"/, 'breit bleiben Vorgabe und Zuruecksetzen in der Leiste');
+
+  const foot = __test.renderCustomizeFootnote({ followsDefault: false, canPublish: true });
+  assert.match(foot, /dashboard\.customizeScopeHint/, 'der Reichweiten-Satz steht in der Fussnote');
+  assert.match(foot, /data-customize-publish/);
+  assert.match(foot, /data-customize-reset/);
+  assert.doesNotMatch(foot, /\bid="/, 'eine Id gibt es einmal - die Fussnote verdrahtet ueber Datenattribute');
+  assert.match(dashboardSource, /\$\{isCustomizing \? renderCustomizeFootnote\(\{ followsDefault, canPublish \}\) : ''\}/, 'die Fussnote steht unter dem Raster, nur im Anpassen-Modus');
+  assert.match(dashboardSource, /querySelectorAll\('\[data-customize-publish\]'\)\.forEach/, 'beide Orte laufen durch denselben Handler');
+
+  const rules = [...eachRule(css)];
+  const phone = (r) => r.at.some((a) => /\(max-width:\s*639px\)/.test(a));
+  const body = (sel, pred) => rules.filter((r) => pred(r) && r.selector.split(',').some((s) => s.trim() === sel)).map((r) => r.body).join(';');
+  assert.match(body('.dashboard-overview__header--editing', phone), /grid-template-areas:\s*"tools\s+tools"/, 'die Leiste steht mobil ueber Datum und Gruss');
+  assert.match(body('.dashboard-overview__header--editing .dashboard-customize-scope', phone), /display:\s*none/, 'kein Reichweiten-Satz im mobilen Kopf');
+  assert.match(body('.dashboard-customize-toolbar', phone), /grid-template-columns:\s*auto minmax\(0, 1fr\) auto/, 'drei Spalten: Abbrechen, Titel, Fertig');
+  assert.match(body('.dashboard-customize-footnote', phone), /display:\s*flex/);
+  assert.match(body('.dashboard-customize-footnote', (r) => !r.at.length), /display:\s*none/, 'breit steht die Reichweite im Kopf, nicht doppelt');
+});
+
+test('R9 M7: einspaltig bietet die Kachel EIN Groessen-Menue mit nur den wirksamen Hoehen', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = await readFile(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const menu = __test.renderWidgetSizeMenu('tasks', '2x1');
+  const items = [...menu.matchAll(/role="menuitemradio" aria-checked="(true|false)"[^>]*data-widget-size-preset="([\dx]+)" data-widget-id="tasks"/g)].map((m) => `${m[2]}:${m[1]}`);
+  assert.deepEqual(items, ['2x1:true', '2x2:false'], 'nur die Hoehen bei gleicher Breite - die Breite wirkt einspaltig nicht');
+  const trigger = menu.match(/data-widget-size-menu="tasks"\s+popovertarget="([^"]+)"/);
+  assert.ok(trigger, 'der Knopf traegt seine Kachel (Fokus nach dem Neuaufbau) und oeffnet sein Panel');
+  assert.match(menu, new RegExp(`id="${trigger[1]}" popover role="menu"`));
+  assert.deepEqual([...__test.renderWidgetSizeMenu('notes', '1x2').matchAll(/data-widget-size-preset="([\dx]+)"/g)].map((m) => m[1]), ['1x1', '1x2']);
+
+  assert.match(dashboardSource, /'data-widget-size-preset', 'data-widget-size-menu'/, 'der Menue-Knopf ist eine Fokus-Identitaet');
+  assert.match(dashboardSource, /installPopoverMenus\(container\)/, 'Position, Pfeiltasten und Schliessen kommen vom geteilten Menue');
+  const handler = dashboardSource.slice(dashboardSource.indexOf("grid.querySelectorAll('[data-widget-size-preset]')"));
+  assert.match(handler.slice(0, 900), /menu\.hidePopover\?\.\(\);\s*grid\.querySelector\(`\[popovertarget=/, 'nach der Wahl gehoert der Fokus dem Menue-Knopf');
+
+  const rules = [...eachRule(css)];
+  const oneCol = (r) => r.at.some((a) => /\(max-width:\s*767px\)/.test(a));
+  const body = (sel, pred) => rules.filter((r) => pred(r) && r.selector.split(',').some((s) => s.trim() === sel)).map((r) => r.body).join(';');
+  assert.match(body('.widget-edit-controls__size', oneCol), /display:\s*none/, 'einspaltig keine vier Knoepfe');
+  assert.match(body('.widget-edit-controls__size-menu', oneCol), /display:\s*inline-flex/, 'einspaltig das Menue');
+  assert.match(body('.widget-edit-controls__size-menu', (r) => !r.at.length), /display:\s*none/, 'mehrspaltig bleiben die vier Knoepfe');
+  assert.match(css, /@media \(min-width: 768px\)\s*\{\s*\.dashboard__grid\s*\{\s*grid-template-columns:\s*repeat\(2, 1fr\)/,
+    'die Menue-Grenze ist die Grenze des Rasters - wandert sie, muss das Menue mit');
+});

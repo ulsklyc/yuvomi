@@ -57,6 +57,7 @@ import { attachOverlay } from '/utils/overlay-history.js';
 import { mealTypeList, primeMealTypeNames } from '/utils/meal-types.js';
 import { recipeThumbHtml, wireRecipeThumbs } from '/utils/recipe-thumb.js';
 import { wireNoteCategoryOverflow } from '/utils/note-category-overflow.js';
+import { installPopoverMenus } from '/utils/popover-menu.js';
 import { nextRewardGoal } from '/utils/reward-goal.js';
 
 // Hält den AbortController des aktuellen FAB-Listeners - wird bei jedem render() erneuert.
@@ -3572,6 +3573,39 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
 }
 
 
+/* Vorgabe setzen und Zuruecksetzen - die zwei Knoepfe, die die REICHWEITE
+ * einer Anordnung aendern. Sie stehen am Desktop in der Anpassen-Leiste und
+ * mobil in der Fussnote (R9 M7); beide Stellen verdrahtet derselbe
+ * Datenattribut-Handler (`[data-customize-publish]`/`[data-customize-reset]`).
+ * Die Ids tragen nur die Knoepfe der Leiste - eine Id gibt es einmal. */
+function renderCustomizeScopeActions({ followsDefault = true, canPublish = false, id = false } = {}) {
+  return `${canPublish ? `
+            <button class="btn btn--ghost dashboard-customize-scope-action" data-customize-publish${id ? ' id="dashboard-customize-publish"' : ''}>
+              <i data-lucide="users" class="icon-sm" aria-hidden="true"></i>
+              ${t('dashboard.customizeSetDefault')}
+            </button>` : ''}${followsDefault ? '' : `
+            <button class="btn btn--ghost dashboard-customize-scope-action" data-customize-reset${id ? ' id="dashboard-customize-reset"' : ''}>
+              <i data-lucide="rotate-ccw" class="icon-sm" aria-hidden="true"></i>
+              ${t('dashboard.customizeReset')}
+            </button>`}`;
+}
+
+/* DER REICHWEITEN-SATZ ALS FUSSNOTE (R9 M7, A7 P1-2). Mobil stand er mit
+ * Vorgabe, Zuruecksetzen, Abbrechen und Speichern ueber dem Gruss und brach in
+ * drei Zeilen um (y 180-340); das erste Widget begann erst bei y 946 von 844.
+ * Unter dem Raster beantwortet er dieselbe Frage ("gilt das fuer alle?") vor
+ * dem Tipp auf "Fertig", ohne das Bearbeitete wegzuschieben. Sichtbar nur auf
+ * schmaler Buehne (dashboard.css) - breit steht er im Kopf. */
+function renderCustomizeFootnote({ followsDefault = true, canPublish = false } = {}) {
+  const actions = renderCustomizeScopeActions({ followsDefault, canPublish });
+  return `
+    <section class="dashboard-customize-footnote" aria-label="${esc(t('dashboard.customizeTitle'))}">
+      <p>${t('dashboard.customizeScopeHint')}</p>
+      ${followsDefault ? `<p class="dashboard-customize-scope__state">${t('dashboard.customizeFollowsDefault')}</p>` : ''}
+      ${actions.trim() ? `<div class="dashboard-customize-footnote__actions">${actions}</div>` : ''}
+    </section>`;
+}
+
 /* DER KOPF DER UEBERSICHT: Datumszeile mit Werkzeugen, darunter der Large
  * Title ueber die volle Breite (Critique 2026-09-23, P1).
  *
@@ -3611,19 +3645,17 @@ function renderDashboardOverview(user, editing = false, weather = null, scope = 
             <p>${t('dashboard.customizeScopeHint')}</p>
             ${followsDefault ? `<p class="dashboard-customize-scope__state">${t('dashboard.customizeFollowsDefault')}</p>` : ''}
           </div>
+          <!-- MOBIL EINE ZEILE: [Abbrechen] Titel [Fertig] (R9 M7, iOS-Muster).
+               Der Titel ist nur dort sichtbar (dashboard.css); am Desktop steht
+               die Leiste wie bisher neben dem Gruss. Vorgabe und Zuruecksetzen
+               stehen mobil mit dem Reichweiten-Satz als Fussnote unter dem
+               Raster (renderCustomizeFootnote) - hier bleiben sie fuer die
+               breite Buehne. -->
           <div class="dashboard-customize-toolbar" role="toolbar" aria-label="${t('dashboard.customizeTitle')}">
-            ${canPublish ? `
-            <button class="btn btn--ghost" id="dashboard-customize-publish">
-              <i data-lucide="users" class="icon-sm" aria-hidden="true"></i>
-              ${t('dashboard.customizeSetDefault')}
-            </button>` : ''}
-            ${followsDefault ? '' : `
-            <button class="btn btn--ghost" id="dashboard-customize-reset">
-              <i data-lucide="rotate-ccw" class="icon-sm" aria-hidden="true"></i>
-              ${t('dashboard.customizeReset')}
-            </button>`}
+            ${renderCustomizeScopeActions({ followsDefault, canPublish, id: true })}
+            <span class="dashboard-customize-toolbar__title" aria-hidden="true">${esc(t('dashboard.customizeTitle'))}</span>
             <button class="btn btn--secondary" id="dashboard-customize-cancel">${t('common.cancel')}</button>
-            <button class="btn btn--primary" id="dashboard-customize-save">${t('common.save')}</button>
+            <button class="btn btn--primary" id="dashboard-customize-save">${esc(t('dashboard.customizeDone'))}</button>
           </div>` : ''}
           <!-- DER EINSTIEG SITZT DA, WO DER AUSSTIEG SITZT (#915). Der Wandmodus
                liess sich nur unter Einstellungen -> Persoenlich -> Darstellung
@@ -3680,7 +3712,7 @@ function customizeHasChanges({ widgetConfig, savedWidgetConfig, glanceVisible, s
  * die umgebende Kachel es ein.
  */
 const FOCUS_IDENTITY_ATTRS = [
-  'data-widget-size-preset', 'data-widget-move', 'data-widget-drag-handle',
+  'data-widget-size-preset', 'data-widget-size-menu', 'data-widget-move', 'data-widget-drag-handle',
   'data-widget-hide', 'data-widget-show', 'data-widget-options',
   'data-glance-hide', 'data-glance-show',
 ];
@@ -4120,6 +4152,7 @@ function renderWidgetCustomizeControls(w, index = 0, total = 1) {
       <div class="widget-edit-controls__size" role="group" aria-label="${t('dashboard.customizeSizeFor', { widget: widgetLabel(w.id) })}">
         ${sizeButtons}
       </div>
+      ${renderWidgetSizeMenu(w.id, activeSize)}
       ${widgetHasOptions(w.id) ? `
       <button type="button" class="widget-edit-controls__options" data-widget-options="${esc(w.id)}"
               aria-label="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}"
@@ -4131,6 +4164,44 @@ function renderWidgetCustomizeControls(w, index = 0, total = 1) {
       </button>
     </div>
   `;
+}
+
+/* EIN GROESSEN-MENUE MIT NUR WIRKSAMEN GROESSEN (R9 M7, A7 P1-2).
+ *
+ * Unter 768px ist das Raster EINE Spalte (dashboard.css, `.dashboard__grid`),
+ * und dort aendert die Breite einer Kachel nichts: 1x1 und 2x1 sehen gleich
+ * aus, 1x2 und 2x2 auch. Die vier Groessenknoepfe boten mobil also zwei
+ * Wahlen doppelt an und kosteten dafuer eine zweite Zeile je Kachel (114px
+ * Bedienleiste). Dort steht deshalb dieses Menue: ein Knopf mit der aktuellen
+ * Form, darin die zwei Hoehen bei gleicher Breite - die Breite bleibt, wie sie
+ * am Desktop gewaehlt wurde, weil sie nur dort wirkt. Welche der beiden Formen
+ * sichtbar ist, entscheidet dieselbe Grenze wie das Raster (dashboard.css).
+ * Die Eintraege tragen `data-widget-size-preset` wie die Knoepfe und laufen
+ * durch denselben Handler. */
+function renderWidgetSizeMenu(id, activeSize) {
+  const width = activeSize.split('x')[0] === '2' ? '2' : '1';
+  const panelId = `widget-size-menu-${id}`;
+  const label = t('dashboard.customizeSizeFor', { widget: widgetLabel(id) });
+  const items = WIDGET_SIZE_PRESETS.filter((p) => p.value.startsWith(`${width}x`)).map((p) => {
+    const checked = p.value === activeSize;
+    return `
+        <button type="button" role="menuitemradio" aria-checked="${checked}" class="popover-menu__item widget-size-menu__item"
+                data-widget-size-preset="${p.value}" data-widget-id="${esc(id)}">
+          ${renderSizeMiniGrid(p.value)}
+          <span>${esc(t(p.labelKey))}</span>
+          <i data-lucide="check" class="icon-md popover-menu__item-trail popover-menu__item-check${checked ? '' : ' popover-menu__item-check--hidden'}" aria-hidden="true"></i>
+        </button>`;
+  }).join('');
+  return `
+      <div class="widget-edit-controls__size-menu">
+        <button type="button" class="widget-edit-controls__size-trigger popover-menu__trigger" data-widget-size-menu="${esc(id)}"
+                popovertarget="${esc(panelId)}" aria-haspopup="menu" aria-expanded="false"
+                aria-label="${esc(label)}" title="${esc(label)}">
+          ${renderSizeMiniGrid(activeSize)}
+        </button>
+        <div class="popover-menu" id="${esc(panelId)}" popover role="menu">${items}
+        </div>
+      </div>`;
 }
 
 // Wieder-Einblenden-Leiste: schließt die Einbahnstraße des Inline-Modus. Ein im
@@ -5965,6 +6036,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
     if (!isCustomizing) return;
     const grid = container.querySelector('#dashboard-widget-grid');
     if (!grid) return;
+    // Groessen-Menue (R9 M7): Position, Pfeiltasten, Schliessen - einmal an der
+    // stabilen Seitenwurzel, idempotent ueber sein data-Attribut.
+    installPopoverMenus(container);
     let draggedId = '';
     let currentDrop = null;
 
@@ -6038,6 +6112,14 @@ export async function render(container, { user, signal: routeSignal = null } = {
       btn.addEventListener('click', () => {
         const size = btn.dataset.widgetSizePreset;
         if (!WIDGET_SIZE_OPTIONS.includes(size)) return;
+        // Aus dem Groessen-Menue (R9 M7): der Fokus gehoert danach dem Knopf,
+        // der das Menue oeffnete - der Eintrag steht nach dem Neuaufbau in
+        // einem geschlossenen Panel und naehme ihn nicht an.
+        const menu = btn.closest('.popover-menu');
+        if (menu) {
+          menu.hidePopover?.();
+          grid.querySelector(`[popovertarget="${CSS.escape(menu.id)}"]`)?.focus();
+        }
         widgetConfig = updateWidgetConfig(widgetConfig, btn.dataset.widgetId, { size });
         // Der Fokus bleibt auf demselben Knopf (rebuildDashboard traegt ihn
         // hinueber), und der traegt jetzt aria-pressed - gesagt wird trotzdem,
@@ -6240,6 +6322,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
         ${cockpitHtml}
       </section>
       ${renderDashboardLayout(cfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes, glanceHidden: !glanceVisible, familyManage: familyManageHref(user) })}
+      ${isCustomizing ? renderCustomizeFootnote({ followsDefault, canPublish }) : ''}
     `);
     wireLinks(container, rerender, { editing: isCustomizing, user });
     disposeFastingClock = wireFastingWidget(container, rerender, refreshDashboardData, data.fasting, signal);
@@ -6273,8 +6356,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
     }, { signal: signal });
     container.querySelector('#dashboard-customize-save')?.addEventListener('click', saveDashboardConfig, { signal: signal });
     container.querySelector('#dashboard-customize-cancel')?.addEventListener('click', requestCancelDashboardConfig, { signal: signal });
-    container.querySelector('#dashboard-customize-reset')?.addEventListener('click', resetDashboardConfig, { signal: signal });
-    container.querySelector('#dashboard-customize-publish')?.addEventListener('click', publishHouseholdDefault, { signal: signal });
+    // Zwei Orte je Knopf (Leiste breit, Fussnote schmal), ein Handler.
+    container.querySelectorAll('[data-customize-reset]').forEach((btn) => btn.addEventListener('click', resetDashboardConfig, { signal: signal }));
+    container.querySelectorAll('[data-customize-publish]').forEach((btn) => btn.addEventListener('click', publishHouseholdDefault, { signal: signal }));
     wireDashboardEditMode();
     void mountExtensionWidgets(shell, cfg, user);
 
@@ -6527,7 +6611,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, familyManageHref, customizeHasChanges, todayMoreRoute, wireTodayMore };
+export const __test = { renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, familyManageHref, customizeHasChanges, todayMoreRoute, wireTodayMore, renderWidgetSizeMenu, renderCustomizeFootnote };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -
