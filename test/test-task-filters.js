@@ -535,3 +535,22 @@ test('im Blatt ein Schalter; Ausschalten nimmt ihn aus Zustand UND Adresse, Aufh
     globalThis.history = prevHistory;
   }
 });
+
+test('?due=today weitet den Standard-Status auf „In Bearbeitung" - einen eigenen laesst es stehen', () => {
+  baseState();
+  tasks.applyDueTodayFromAddress('?due=today');
+  assert.equal(tasks.state.dueToday, true);
+  assert.deepEqual(tasks.state.filters.status, ['open', 'in_progress'],
+    'die Heute-Liste der Uebersicht zeigt begonnene Aufgaben mit - der Link muss sie auch zeigen');
+  assert.match(tasks.taskQuery(), /status=open&status=in_progress/, 'und der Server bekommt beide');
+
+  baseState({ filters: { status: ['done'], priority: [], assigned_to: [], category: [], tags: [] } });
+  tasks.applyDueTodayFromAddress('?due=today');
+  assert.deepEqual(tasks.state.filters.status, ['done'], 'ein bewusst gesetzter Status bleibt');
+
+  baseState();
+  tasks.applyDueTodayFromAddress('');
+  assert.equal(tasks.state.dueToday, false);
+  assert.deepEqual(tasks.state.filters.status, ['open'], 'ohne die Adresse aendert sich nichts');
+  tasks.state.dueToday = false;
+});

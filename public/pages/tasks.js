@@ -1358,6 +1358,22 @@ function dueTodayFromSearch(search) {
 }
 
 /**
+ * Die Adresse beim Betreten lesen. Kommt `?due=today`, weitet der Status-
+ * filter sich vom Standard „Offen" auf „Offen" + „In Bearbeitung": die
+ * Heute-Liste der Uebersicht zeigt begonnene Aufgaben mit, und der Link
+ * verspricht genau diese Zeilen. Die zwei Chips stehen sichtbar im Blatt, die
+ * Zahl am Knopf zaehlt sie - nichts wird still umgestellt. Einen vom Nutzer
+ * gesetzten Statusfilter laesst die Adresse stehen.
+ */
+function applyDueTodayFromAddress(search) {
+  state.dueToday = dueTodayFromSearch(search);
+  const status = state.filters.status;
+  if (state.dueToday && status.length === 1 && status[0] === 'open') {
+    state.filters.status = ['open', 'in_progress'];
+  }
+}
+
+/**
  * Offen und bis heute faellig - UEBERFAELLIGES eingeschlossen, wie die
  * Heute-Liste der Uebersicht, auf die der Link verweist, und wie „Heute" in
  * Apples Erinnerungen. Der Tag kommt aus `todayKey()` (Haushaltszone), der
@@ -5250,7 +5266,7 @@ export async function render(container, { user, signal } = {}) {
   // showFuture aus localStorage wiederherstellen
   try { state.showFuture = localStorage.getItem(SHOW_FUTURE_KEY) === '1'; } catch {}
   // „Bis heute faellig" kommt nur aus der Adresse (siehe state.dueToday).
-  state.dueToday = dueTodayFromSearch(window.location.search);
+  applyDueTodayFromAddress(window.location.search);
 
   const isKanban = state.viewMode === 'kanban';
   // Was nur die Aufgabenliste betrifft, blendet `syncViewChrome` gleich nach
@@ -5429,7 +5445,7 @@ export const __test = {
   groupBy, groupKey, formatDueDate, normalizeFilterSet, taskQuery, state,
   // `?due=today` (Re-Critique 2026-09-27): was die Adresse setzt, was die
   // Liste daraus zeigt, und dass das Blatt es wieder nimmt - samt Adresse.
-  dueTodayFromSearch, isDueByToday,
+  dueTodayFromSearch, isDueByToday, applyDueTodayFromAddress,
   // Das Brett als Markup plus seine Spaltenliste (#1250). Beides steht hier,
   // weil die Spaltenzahl eine Zusicherung GEGEN das Stylesheet ist: das Raster
   // muss so viele Spalten legen, wie diese Liste fuehrt, und genau dort ist es
