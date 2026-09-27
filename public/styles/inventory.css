@@ -651,6 +651,11 @@
  * Den Versatz setzt inventory.js (`--inventory-head-block`, gemessene
  * Kopfhoehe). Schwelle = `--layout-split-threshold` (65rem), `@container`
  * kann keine Variable lesen.
+ *
+ * R10 L3 (A8 P1-2): die Spalte war eine 301px-Karte, 12px unter der Liste.
+ * Jetzt steht sie BUENDIG mit der Liste (kein `margin-block-start`) und reicht
+ * bis zur Luft ueber dem Fensterrand (`height` statt `max-height`) - wie in
+ * Kontakten, Rezepten und Aufgaben.
  * -------------------------------------------------------- */
 @container module-surface (min-width: 65rem) {
   .inventory-page .split-view {
@@ -669,10 +674,72 @@
     top: calc(var(--inventory-head-block, 0px) + var(--space-3));
     /* Von der GEMESSENEN Oberkante bis zur Luft ueber dem Fensterrand
      * (inventory.js, syncDetailTop): in Ruhe steht die Filterzeile zwischen
-     * Kopf und Spalte, beim Kleben nicht mehr - die alte Rechnung ab dem Kopf
-     * liess die Spalte in Ruhe um die Filterzeile unter den Falz ragen. Ohne
-     * Messwert (erster Frame) gilt der Klebestand. */
-    max-height: calc(var(--viewport-height) - var(--inventory-detail-top, calc(var(--inventory-head-block, 0px) + var(--space-3))) - var(--space-4));
-    margin-block-start: var(--space-3);
+     * Kopf und Spalte, beim Kleben nicht mehr. Ohne Messwert (erster Frame)
+     * gilt der Klebestand. Volle Hoehe statt Hoechstmass: die Spalte ist ein
+     * Ort, keine Karte, die mit ihrem Inhalt waechst. */
+    height: calc(var(--viewport-height) - var(--inventory-detail-top, calc(var(--inventory-head-block, 0px) + var(--space-3))) - var(--space-4));
+  }
+
+  /* KENNZAHLEN ALS ZEILEN, NICHT ALS DREI KACHELN IN 424PX. Drei Kacheln je
+   * 136px brachen „Braucht Aufmerksamkeit" auf drei Zeilen und mitten im Wort
+   * („AUFMERKSAMKE/IT", A8). In der Listenspur stehen sie wie eine gruppierte
+   * Liste bei Apple: ein Traeger, je Kennzahl eine Zeile, Wort links, Zahl
+   * rechts; die waehlbare Zeile (Fristen-Filter) traegt einen Chevron und
+   * liest sich damit als Knopf, nicht als dritte statische Kachel (A6). */
+  .inventory-list .metric-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: auto;
+    gap: 0;
+    padding: 0;
+    margin-block: var(--space-3);
+    background-color: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+
+  .inventory-list .metric-grid > .metric-card {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: var(--target-md);
+    padding: var(--space-2) var(--space-4);
+    background-color: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    text-align: start;
+  }
+
+  .inventory-list .metric-grid > .metric-card + .metric-card {
+    border-block-start: var(--space-px) solid var(--color-border-subtle);
+  }
+
+  .inventory-list .metric-grid .metric-card__label {
+    overflow-wrap: normal;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .inventory-list .metric-grid .metric-card__value {
+    font-size: var(--text-lg);
+    flex-shrink: 0;
+  }
+
+  /* Die waehlbare Zeile (Fristen-Filter) spricht in Akzenttinte wie eine
+   * Aktionszeile bei Apple - sie ist ein Knopf, keine dritte Kennzahl. */
+  .inventory-list .metric-grid > .metric-card--select .metric-card__label {
+    color: var(--color-accent);
+  }
+
+  .inventory-list .metric-grid > .metric-card--select:hover {
+    background-color: var(--color-surface-elevated-hover);
+  }
+
+  /* Gedrueckt (Filter an): dieselbe Flaeche wie eine ausgewaehlte Zeile. */
+  .inventory-list .metric-grid > .metric-card--select.is-active {
+    background-color: color-mix(in srgb, var(--color-accent) var(--tint-state), var(--color-surface));
   }
 }

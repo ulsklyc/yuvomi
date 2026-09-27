@@ -156,7 +156,11 @@ test('die Hoehe der klebenden Spalte rechnet ab ihrer gemessenen Oberkante bis z
     && r.at.some((a) => /module-surface/.test(a)));
   assert.ok(rule, 'Regel der klebenden Detailspalte fehlt');
   assert.match(rule.body, /position:\s*sticky/);
-  const maxHeight = rule.body.match(/max-height:\s*([^;]+);/)?.[1] ?? '';
+  // R10 L3 (A8 P1-2): VOLLE Hoehe (`height`, nicht `max-height` - sonst eine
+  // 301px-Karte) und buendig mit der Liste (kein Versatz nach unten).
+  assert.doesNotMatch(rule.body, /max-height\s*:/, 'die Spalte ist ein Ort, keine mit dem Inhalt wachsende Karte');
+  assert.doesNotMatch(rule.body, /margin-block-start\s*:/, 'die Spalte beginnt buendig mit der Liste');
+  const maxHeight = rule.body.match(/(?:^|;|\s)height:\s*([^;]+);/)?.[1] ?? '';
   // Die Oberkante ist der Messwert; ohne ihn (erster Frame) der Klebestand.
   assert.match(maxHeight, /^calc\(var\(--viewport-height\) - var\(--inventory-detail-top, calc\(var\(--inventory-head-block, 0px\) \+ var\(--space-3\)\)\) - var\(--space-4\)\)$/);
   // Rechnung am gemessenen Fall: 900 - 133 - 16 = 751, Unterkante 884 < 900.
@@ -192,4 +196,77 @@ test('unter der Schwelle: das Blatt eines Gegenstands geht nach dem Laden nur au
   const mount = src.slice(src.indexOf('_md = mountMasterDetail({'));
   assert.match(mount.slice(0, mount.indexOf('\n    });')), /openNarrow: openItemNarrow,/,
     'der Baustein ruft den Weg, der sein Signal weiterreicht');
+});
+
+
+// ── R10 L3: Detail gegliedert, Status nur als Ausnahme, Kennzahlen als Zeilen ──
+
+test('die Zeile nennt den Status nur, wenn er vom Normalfall abweicht (A6 P3-3)', () => {
+  assert.doesNotMatch(inventory.renderItemRow({ ...ITEM, status: 'active' }), /inventory-status-badge/,
+    '„Vorhanden" in jeder Zeile ist Rauschen');
+  assert.match(inventory.renderItemRow({ ...ITEM, status: 'sold' }), /inventory-status-badge--sold/,
+    'die Ausnahme bleibt sichtbar');
+});
+
+test('das Detail ist gegliedert: Kopfzeilen, dann Kauf / Garantie / Zustand / Belege statt dreizehn loser Zeilen', async () => {
+  const { installMiniDom } = await import('./mini-dom.js');
+  const restore = installMiniDom();
+  let sections;
+  try {
+    sections = inventory.renderItemDetail({ ...ITEM, condition: 'good' }, { timeline: [] }, () => {}, false);
+  } finally { restore(); }
+  const groups = sections.filter((s) => Array.isArray(s.rows)).map((s) => s.group);
+  assert.deepEqual(groups, [
+    'inventory.detailGroupPurchase', 'inventory.detailGroupWarranty',
+    'inventory.detailGroupCondition', 'inventory.detailGroupRecords',
+  ]);
+  assert.ok(sections.length <= 7, `oberste Ebene ${sections.length} Eintraege - wieder eine lose Liste`);
+  const labels = (g) => sections.find((s) => s.group === g).rows.map((r) => r.label);
+  assert.ok(labels('inventory.detailGroupPurchase').includes('inventory.purchasePriceLabel'));
+  assert.ok(labels('inventory.detailGroupWarranty').includes('inventory.warrantyMonthsLabel'));
+  assert.ok(labels('inventory.detailGroupCondition').includes('inventory.statusLabel'), 'das Detail nennt den Status immer');
+  // Keine Zeile ging beim Gliedern verloren.
+  const all = sections.flatMap((s) => (Array.isArray(s.rows) ? s.rows : [s])).map((r) => r.label);
+  assert.equal(all.length, 19, 'alle Angaben des Gegenstands stehen weiter im Detail');
+});
+
+test('die geteilte Leseansicht zeichnet Gruppen mit Titel und laesst leere ganz weg', async () => {
+  const { installMiniDom, MiniElement } = await import('./mini-dom.js');
+  const restore = installMiniDom();
+  const hadHtmlElement = 'HTMLElement' in globalThis;
+  const savedHtmlElement = globalThis.HTMLElement;
+  globalThis.HTMLElement = MiniElement;
+  try {
+    const dv = await import('../public/components/detail-view.js');
+    const pane = globalThis.document.createElement('div');
+    dv.openDetailView({
+      title: 'Fernseher',
+      pane,
+      sections: [
+        { icon: 'map-pin', label: 'Ort', value: 'Wohnzimmer' },
+        { group: 'Kauf', rows: [{ icon: 'banknote', label: 'Preis', value: '999 EUR' }, { label: 'Haendler', value: '' }] },
+        { group: 'Leer', rows: [{ label: 'Nichts', value: '' }] },
+      ],
+    });
+    const html = pane.outerHTML;
+    assert.equal(html.match(/class="detail-group"/g)?.length, 1, 'eine Gruppe ohne Inhalt faellt samt Titel weg');
+    assert.match(html, /<section class="detail-group" aria-label="Kauf"><h3 class="detail-group__title">Kauf<\/h3>/);
+    assert.doesNotMatch(html, /Leer|Haendler/, 'leere Zeilen und Gruppen stehen nicht da');
+    assert.match(html, /999 EUR/);
+  } finally {
+    restore();
+    if (hadHtmlElement) globalThis.HTMLElement = savedHtmlElement; else delete globalThis.HTMLElement;
+  }
+});
+
+test('in der Spalte: Kennzahlen als Zeilen ohne Wortbruch, nicht als drei 136px-Kacheln (A8 P1-2)', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/inventory.css', import.meta.url), 'utf8');
+  const inSplit = [...eachRule(css)].filter((r) => r.at.some((a) => /module-surface/.test(a)));
+  const body = (sel) => inSplit.filter((r) => r.selector.trim() === sel).map((r) => r.body).join(';');
+  assert.match(body('.inventory-list .metric-grid'), /grid-template-columns:\s*minmax\(0, 1fr\)/, 'eine Kennzahl je Zeile');
+  assert.match(body('.inventory-list .metric-grid > .metric-card'), /flex-direction:\s*row/, 'Wort links, Zahl rechts');
+  const label = body('.inventory-list .metric-grid .metric-card__label');
+  assert.match(label, /overflow-wrap:\s*normal/, 'kein Bruch mitten im Wort („AUFMERKSAMKE/IT")');
+  assert.match(label, /white-space:\s*nowrap/);
 });

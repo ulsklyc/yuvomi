@@ -440,6 +440,10 @@ function deadlineChipHtml(item) {
  * abweicht (Groesse, Abstand, Trennlinie sind app-weit EIN Wert, nicht
  * modulweise nachgebaut). Nur Statusbadge und Kaufpreis sind Inventar-eigen
  * (Vorrat hat kein Aequivalent zu beidem).
+ *
+ * Der Status steht nur, wenn er vom Normalfall abweicht: „Vorhanden" in jeder
+ * Zeile war Rauschen, das die Ausnahmen (Verkauft, Verloren) verdeckte (R10 L3,
+ * A6 P3-3). Die Detailansicht nennt ihn weiter immer.
  */
 function renderItemRow(item) {
   const hasAttachments = (item.attachments?.length ?? 0) > 0;
@@ -451,7 +455,7 @@ function renderItemRow(item) {
           <span class="list-row__name">${esc(item.name)}</span>
           ${hasAttachments ? `<i data-lucide="paperclip" class="icon-sm" aria-hidden="true"></i><span class="sr-only">${esc(t('inventory.hasAttachmentsLabel'))}</span>` : ''}
           ${hasBookings ? `<i data-lucide="receipt" class="icon-sm" aria-hidden="true"></i><span class="sr-only">${esc(t('inventory.hasBookingsLabel'))}</span>` : ''}
-          <span class="inventory-status-badge inventory-status-badge--${esc(item.status)}">${esc(statusLabel(item.status))}</span>
+          ${item.status !== 'active' ? `<span class="inventory-status-badge inventory-status-badge--${esc(item.status)}">${esc(statusLabel(item.status))}</span>` : ''}
           ${deadlineChipHtml(item)}
         </span>
         ${item.location_path ? `<span class="list-row__meta">${esc(item.location_path)}</span>` : ''}
@@ -1047,30 +1051,54 @@ function renderItemDetail(item, history, onDoneTrackedDate, historyLoadFailed) {
   }));
   const attachmentEntries = attachmentDetailEntries(item.attachments);
 
+  // GEGLIEDERT STATT DREIZEHN LOSER ZEILEN (R10 L3, A6 P3-3). Oben, was das
+  // Ding ist und wo es steht; darunter benannte Gruppen wie die Abschnitte
+  // einer Kontaktkarte - Kauf, Garantie und Fristen, Zustand, Belege. Eine
+  // Gruppe ohne Inhalt faellt samt Titel weg (detail-view.js, detailGroupEl).
   return [
     { icon: 'image', label: t('inventory.photoLabel'), node: photoDetailNode(item.photo_data) },
     { icon: item.category_icon, label: t('inventory.categoryLabel'), value: itemCategoryLabel(item) },
     { icon: 'map-pin', label: t('inventory.locationLabel'), value: item.location_path || '' },
-    { icon: 'building-2', label: t('inventory.brandLabel'), value: item.brand || '' },
-    { icon: 'package', label: t('inventory.modelLabel'), value: item.model || '' },
-    { icon: 'hash', label: t('inventory.serialNumberLabel'), value: item.serial_number || '' },
-    { icon: 'calendar', label: t('inventory.purchaseDateLabel'), value: item.purchase_date ? formatDate(item.purchase_date) : '' },
-    { icon: 'banknote', label: t('inventory.purchasePriceLabel'), value: item.purchase_price != null ? formatMoney(item.purchase_price, item.currency) : '' },
-    { icon: 'store', label: t('inventory.vendorLabel'), value: item.vendor || '' },
-    // Konto, unter dem das Geraet registriert ist (#1004) - eine Adresse oder ein
-    // Benutzername, nie ein Passwort. Steht bei den uebrigen Herkunftsangaben,
-    // weil es dieselbe Art Frage beantwortet: woher kommt das Ding, und unter
-    // wessen Namen laeuft es.
-    { icon: 'at-sign', label: t('inventory.accountUsernameLabel'), value: item.account_username || '' },
-    { icon: 'shield', label: t('inventory.warrantyMonthsLabel'), value: warrantyDetailValue(item) },
-    { icon: 'gauge', label: t('inventory.odometerLabel'), value: odometerDetailValue(item) },
-    { icon: 'sparkles', label: t('inventory.conditionLabel'), value: t(`inventory.condition${item.condition.charAt(0).toUpperCase()}${item.condition.slice(1)}`) },
-    { icon: 'info', label: t('inventory.statusLabel'), value: statusLabel(item.status) },
-    { icon: 'align-left', label: t('inventory.notesLabel'), value: item.notes || '', multiline: true },
-    { icon: 'calendar-clock', label: t('inventory.trackedDatesLabel'), node: trackedDatesDetailNode(item, onDoneTrackedDate) },
-    { icon: 'receipt', label: t('inventory.linkedBookingsLabel'), node: inventoryDetailListNode(bookingEntries) },
-    { icon: 'paperclip', label: t('inventory.attachmentsLabel'), node: inventoryDetailListNode(attachmentEntries) },
-    { icon: 'history', label: t('inventory.historyLabel'), node: historyDetailNode(history, item, historyLoadFailed) },
+    {
+      group: t('inventory.detailGroupPurchase'),
+      rows: [
+        { icon: 'building-2', label: t('inventory.brandLabel'), value: item.brand || '' },
+        { icon: 'package', label: t('inventory.modelLabel'), value: item.model || '' },
+        { icon: 'hash', label: t('inventory.serialNumberLabel'), value: item.serial_number || '' },
+        { icon: 'calendar', label: t('inventory.purchaseDateLabel'), value: item.purchase_date ? formatDate(item.purchase_date) : '' },
+        { icon: 'banknote', label: t('inventory.purchasePriceLabel'), value: item.purchase_price != null ? formatMoney(item.purchase_price, item.currency) : '' },
+        { icon: 'store', label: t('inventory.vendorLabel'), value: item.vendor || '' },
+        // Konto, unter dem das Geraet registriert ist (#1004) - eine Adresse oder ein
+        // Benutzername, nie ein Passwort. Steht bei den uebrigen Herkunftsangaben,
+        // weil es dieselbe Art Frage beantwortet: woher kommt das Ding, und unter
+        // wessen Namen laeuft es.
+        { icon: 'at-sign', label: t('inventory.accountUsernameLabel'), value: item.account_username || '' },
+      ],
+    },
+    {
+      group: t('inventory.detailGroupWarranty'),
+      rows: [
+        { icon: 'shield', label: t('inventory.warrantyMonthsLabel'), value: warrantyDetailValue(item) },
+        { icon: 'calendar-clock', label: t('inventory.trackedDatesLabel'), node: trackedDatesDetailNode(item, onDoneTrackedDate) },
+      ],
+    },
+    {
+      group: t('inventory.detailGroupCondition'),
+      rows: [
+        { icon: 'sparkles', label: t('inventory.conditionLabel'), value: t(`inventory.condition${item.condition.charAt(0).toUpperCase()}${item.condition.slice(1)}`) },
+        { icon: 'info', label: t('inventory.statusLabel'), value: statusLabel(item.status) },
+        { icon: 'gauge', label: t('inventory.odometerLabel'), value: odometerDetailValue(item) },
+        { icon: 'align-left', label: t('inventory.notesLabel'), value: item.notes || '', multiline: true },
+      ],
+    },
+    {
+      group: t('inventory.detailGroupRecords'),
+      rows: [
+        { icon: 'receipt', label: t('inventory.linkedBookingsLabel'), node: inventoryDetailListNode(bookingEntries) },
+        { icon: 'paperclip', label: t('inventory.attachmentsLabel'), node: inventoryDetailListNode(attachmentEntries) },
+        { icon: 'history', label: t('inventory.historyLabel'), node: historyDetailNode(history, item, historyLoadFailed) },
+      ],
+    },
   ];
 }
 
@@ -2305,6 +2333,7 @@ function onInventoryModeChange({ split, selectedId }) {
 export const __test = {
   state,
   renderItemRow,
+  renderItemDetail,
   openDeepLinkedCategory,
   syncDetailTop,
   onInventoryModeChange,
