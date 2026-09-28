@@ -467,16 +467,38 @@ export async function render(container, { user } = {}) {
       else status.textContent = st.subscribed ? t('settings.pushEnabled') : t('settings.pushDisabled');
     };
 
-    applyState(await pushStatus());
+    // Ohne aktiven Service Worker (Registrierung gescheitert, Proxy ohne SW)
+    // meldet pushStatus nach einer Frist "nicht verfuegbar" - vorher stand hier
+    // "Status wird geprueft ..." fuer immer, und das Blatt hielt die Shell fest
+    // (Re-Critique 2026-09-28, A7 P1-2). Wird der Worker spaeter doch bereit,
+    // holt das Blatt den echten Stand nach.
+    const applyAvailability = (st) => {
+      if (st.available !== false) {
+        applyState(st);
+        return true;
+      }
+      toggle.checked = false;
+      toggle.disabled = true;
+      testBtn.disabled = true;
+      status.textContent = t('settings.pushUnavailable');
+      return false;
+    };
+    if (!applyAvailability(await pushStatus())) {
+      navigator.serviceWorker.ready.then(async () => {
+        if (container.isConnected) applyAvailability(await pushStatus());
+      }).catch(() => {});
+    }
 
     toggle.addEventListener('change', async () => {
       toggle.disabled = true;
       try {
         const st = toggle.checked ? await enablePush() : await disablePush();
-        applyState({ ...await pushStatus(), ...st });
+        applyAvailability({ ...await pushStatus(), ...st });
       } catch {
-        status.textContent = t('settings.pushError');
-        applyState(await pushStatus());
+        // Erst den Stand, dann die Meldung - umgekehrt ueberschrieb applyState
+        // den Fehler sofort wieder.
+        const st = await pushStatus();
+        if (applyAvailability(st)) status.textContent = t('settings.pushError');
       }
     });
 

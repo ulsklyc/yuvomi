@@ -21,6 +21,30 @@ import {
 // Unter dieser Schwelle ist ein Blatt gefuehlt sofort da; ein Skelett waere
 // dort nur ein Aufblitzen.
 const SKELETON_DELAY_MS = 120;
+/**
+ * So lange wartet die Shell hoechstens auf die Abschnitte eines Blatts, bevor
+ * sie zurueckkehrt. Der Router haelt waehrend eines Soft-Updates seine
+ * Navigationssperre, bis renderSettingsShell aufloest: ein haengender Abschnitt
+ * (Push ohne Service Worker, Re-Critique 2026-09-28, A7 P1-2) nahm damit JEDER
+ * weiteren Navigation den Weg. Das Blatt wird trotzdem fertig, nur im
+ * Hintergrund.
+ */
+const SECTION_WAIT_MS = 4000;
+
+/**
+ * Wartet auf alle Abschnitte, aber hoechstens SECTION_WAIT_MS. `onSettled`
+ * laeuft genau einmal, sobald ALLE stehen - ohne Haenger also noch vor der
+ * Rueckkehr, wie bisher.
+ * @param {Promise<unknown>[]} pending
+ * @param {() => void} onSettled
+ * @returns {Promise<void>}
+ */
+function awaitSections(pending, onSettled) {
+  const settled = Promise.allSettled(pending).then(() => onSettled());
+  let timer;
+  const cap = new Promise((resolve) => { timer = setTimeout(resolve, SECTION_WAIT_MS); });
+  return Promise.race([settled, cap]).finally(() => clearTimeout(timer));
+}
 
 // Der eine Ort, an dem ein Modul an- und ausgeht (registry.js, modules-active).
 const ACTIVE_MODULES_PATH = '/settings/modules/active';
@@ -864,22 +888,32 @@ async function renderLeafContent(content, leaf, domain, user, query) {
     }
   }, SKELETON_DELAY_MS);
 
-  await Promise.all(hosts.map(([host, section]) => renderSheetSection(host, section, user, query)));
-  clearTimeout(skeletonTimer);
-  leafContainer.removeAttribute('aria-busy');
-  watchLeafForms(leafContainer);
-  hydrateIcons(content);
+  const finishLeaf = () => {
+    clearTimeout(skeletonTimer);
+    // Kam das Blatt erst nach einem Wechsel zu Ende, steht schon ein anderes:
+    // dann weder Fokus noch Formularwache fuer ein abgehaengtes Blatt.
+    if (!leafContainer.isConnected) return;
+    leafContainer.removeAttribute('aria-busy');
+    watchLeafForms(leafContainer);
+    hydrateIcons(content);
 
-  // Ein Suchtreffer endet an der Option, eine Umleitung am Abschnitt, sonst die
-  // Ueberschrift des Blatts - ausser das Blatt wurde vorgewaehlt (S3): dann
-  // bleibt der Fokus, wo er war, wie bei jeder Vorwahl ohne Geste.
-  heading.tabIndex = -1;
-  if (revealSettingsOption(leafContainer, query?.get?.('option'))) return;
-  if (revealSheetSection(leafContainer, query?.get?.('section'))) return;
-  if (quiet) return;
-  requestAnimationFrame(() => {
-    if (!leafContainer.contains(document.activeElement)) heading.focus({ preventScroll: true });
-  });
+    // Ein Suchtreffer endet an der Option, eine Umleitung am Abschnitt, sonst die
+    // Ueberschrift des Blatts - ausser das Blatt wurde vorgewaehlt (S3): dann
+    // bleibt der Fokus, wo er war, wie bei jeder Vorwahl ohne Geste.
+    heading.tabIndex = -1;
+    if (revealSettingsOption(leafContainer, query?.get?.('option'))) return;
+    if (revealSheetSection(leafContainer, query?.get?.('section'))) return;
+    if (quiet) return;
+    requestAnimationFrame(() => {
+      if (!leafContainer.contains(document.activeElement)) heading.focus({ preventScroll: true });
+    });
+  };
+  // Nicht blockierend: ein haengender Abschnitt haelt weder die Shell noch die
+  // Navigationssperre des Routers (siehe SECTION_WAIT_MS).
+  await awaitSections(
+    hosts.map(([host, section]) => renderSheetSection(host, section, user, query)),
+    finishLeaf,
+  );
 }
 
 /**
@@ -1020,3 +1054,6 @@ export async function renderSettingsShell(container, {
   revealOverviewSection(content, focusDomain?.id);
   if (page) watchSplit(container, page, { user, domainId: focusDomain?.id ?? null });
 }
+
+/** Nur fuer Tests (test-settings-navigation.js). */
+export const __test = { awaitSections, SECTION_WAIT_MS };

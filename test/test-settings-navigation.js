@@ -806,8 +806,14 @@ test('der Blattwechsel zeigt einen Ladezustand statt eines leeren Kastens', asyn
   // Abschnitt (renderSheetSection faengt ihn). aria-busy faellt deshalb genau
   // einmal - NACH allen Abschnitten, egal ob einer scheiterte.
   const body = source.slice(source.indexOf('async function renderLeafContent'), source.indexOf('function isSplit('));
-  assert.match(body, /await Promise\.all\(hosts\.map\(\(\[host, section\]\) => renderSheetSection\([^)]*\)\)\);\s*clearTimeout\(skeletonTimer\);\s*leafContainer\.removeAttribute\('aria-busy'\);/,
+  // Seit 2026-09-28 wartet die Shell hoechstens SECTION_WAIT_MS (A7 P1-2); das
+  // Fertig-Stueck `finishLeaf` laeuft trotzdem genau einmal nach ALLEN.
+  assert.match(body, /await awaitSections\(\s*hosts\.map\(\(\[host, section\]\) => renderSheetSection\([^)]*\)\),\s*finishLeaf,\s*\)/,
+    'die Abschnitte laufen durch awaitSections, das Fertig-Stueck haengt daran');
+  assert.match(body, /const finishLeaf = \(\) => \{\s*clearTimeout\(skeletonTimer\);[\s\S]*?leafContainer\.removeAttribute\('aria-busy'\);/,
     'aria-busy muss nach allen Abschnitten entfernt werden, auch wenn einer scheitert');
+  assert.match(source, /Promise\.allSettled\(pending\)\.then\(\(\) => onSettled\(\)\)/,
+    'auch ein scheiternder Abschnitt zaehlt als fertig');
   const section = source.slice(source.indexOf('async function renderSheetSection'), source.indexOf('async function renderLeafContent'));
   assert.match(section, /catch \(error\)[\s\S]*createRetryState\(/, 'ein scheiternder Abschnitt zeigt seinen eigenen Wiederholen-Zustand');
   assert.match(source, /clearTimeout\(skeletonTimer\)/, 'der verzoegerte Einsatz muss abbrechbar sein');
@@ -2198,4 +2204,95 @@ test('S3: Liste + Detail ab der Split-Schwelle aus tokens.css, erstes Blatt per 
   assert.match(shell, /if \(page\.classList\.contains\('settings-page--leaf'\)\) return;\s*if \(isSplit\(/);
   // Die Suche steht an der Listenkante (Seitenleiste), dieselbe wie in der Wurzel.
   assert.match(shell, /createNavigationSearch\(navigation, domains, user, activeLeaf\)/);
+});
+
+/*
+ * OHNE SERVICE WORKER HAENGT NICHTS (Re-Critique 2026-09-28, A7 P1-2).
+ * `navigator.serviceWorker.ready` loest nie auf, solange keine Registrierung
+ * aktiv ist (No-SW-Proxy, blockierte Registrierung). pushStatus() wartete
+ * darauf ohne Frist, das Blatt Benachrichtigungen damit auch, die Shell per
+ * Promise.all auf alle Abschnitte - und der Router haelt waehrend eines
+ * Soft-Updates seine Navigationssperre: danach wechselte KEIN Klick mehr das
+ * Blatt. Zwei Riegel: push.js gibt nach einer Frist "nicht verfuegbar" zurueck,
+ * und die Shell wartet hoechstens eine Frist auf ihre Abschnitte.
+ */
+function stubPushGlobals(ready) {
+  const saved = {};
+  for (const key of ['navigator', 'window', 'Notification']) {
+    saved[key] = Object.getOwnPropertyDescriptor(globalThis, key);
+  }
+  const define = (key, value) => Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
+  const Notification = { permission: 'default' };
+  define('navigator', { serviceWorker: { ready } });
+  define('window', { PushManager: function PushManager() {}, Notification });
+  define('Notification', Notification);
+  return () => {
+    for (const [key, desc] of Object.entries(saved)) {
+      if (desc) Object.defineProperty(globalThis, key, desc);
+      else delete globalThis[key];
+    }
+  };
+}
+
+/** Loest das Versprechen auf, oder 'haengt', wenn es nach allen Mikro-Schritten noch offen ist. */
+const settledOrHang = (promise) => Promise.race([promise, new Promise((r) => setImmediate(() => r('haengt')))]);
+
+test('pushStatus: ein nie bereiter Service Worker meldet "nicht verfuegbar" statt zu haengen', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const restore = stubPushGlobals(new Promise(() => {}));
+  try {
+    const { pushStatus, SW_READY_TIMEOUT_MS } = await import('/push.js');
+    const pending = pushStatus();
+    // 5s sind die Obergrenze, die sich noch nicht wie ein Haenger anfuehlt.
+    t.mock.timers.tick(5000);
+    const status = await settledOrHang(pending);
+    assert.notEqual(status, 'haengt', 'pushStatus wartet ohne Frist auf serviceWorker.ready');
+    assert.ok(SW_READY_TIMEOUT_MS > 0 && SW_READY_TIMEOUT_MS <= 5000);
+    assert.deepEqual(
+      { supported: status.supported, available: status.available, subscribed: status.subscribed },
+      { supported: true, available: false, subscribed: false },
+    );
+  } finally {
+    restore();
+  }
+});
+
+test('pushStatus: ein bereiter Service Worker bleibt verfuegbar', async () => {
+  const restore = stubPushGlobals(Promise.resolve({ pushManager: { getSubscription: async () => ({ endpoint: 'x' }) } }));
+  try {
+    const { pushStatus } = await import('/push.js');
+    const status = await pushStatus();
+    assert.equal(status.available, true);
+    assert.equal(status.subscribed, true);
+  } finally {
+    restore();
+  }
+});
+
+test('das Blatt Benachrichtigungen nennt "nicht verfuegbar" und sperrt Schalter und Test', async () => {
+  const source = await readFile(new URL('../public/settings/pages/notifications.js', import.meta.url), 'utf8');
+  assert.match(source, /st\.available !== false[\s\S]{0,300}toggle\.disabled = true;\s*testBtn\.disabled = true;\s*status\.textContent = t\('settings\.pushUnavailable'\)/,
+    'ohne Service Worker stuende "Status wird geprueft ..." fuer immer da');
+});
+
+test('die Shell wartet hoechstens eine Frist auf ihre Abschnitte', async (t) => {
+  const { __test } = await import('/settings/shell.js');
+  assert.equal(typeof __test?.awaitSections, 'function', 'settings/shell.js exportiert awaitSections nicht');
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let finished = false;
+  const pending = __test.awaitSections([Promise.resolve(), new Promise(() => {})], () => { finished = true; });
+  t.mock.timers.tick(__test.SECTION_WAIT_MS);
+  assert.notEqual(await settledOrHang(pending), 'haengt', 'ein haengender Abschnitt haelt die Shell - und mit ihr die Navigationssperre des Routers');
+  assert.equal(finished, false, 'das Blatt ist erst fertig, wenn alle Abschnitte stehen');
+
+  // Alle da: das Fertig-Stueck laeuft, bevor die Shell zurueckkehrt.
+  let done = false;
+  await __test.awaitSections([Promise.resolve(), Promise.resolve()], () => { done = true; });
+  assert.equal(done, true, 'ohne Haenger bleibt alles wie bisher: erst fertig, dann zurueck');
+
+  // Die Shell nutzt genau diesen Weg, nicht mehr das nackte Promise.all.
+  const shell = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  const leaf = shell.slice(shell.indexOf('async function renderLeafContent('), shell.indexOf('function isSplit('));
+  assert.match(leaf, /await awaitSections\(/);
+  assert.doesNotMatch(leaf, /await Promise\.all\(hosts/, 'renderLeafContent wartet wieder ohne Frist auf alle Abschnitte');
 });

@@ -20,6 +20,26 @@ function pushSupported() {
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 }
 
+/**
+ * So lange wartet Push hoechstens auf einen aktiven Service Worker.
+ *
+ * `navigator.serviceWorker.ready` loest NIE auf, solange keine Registrierung
+ * aktiv ist (Registrierung gescheitert oder blockiert, Proxy ohne SW). Ohne
+ * Frist hing daran das Blatt Benachrichtigungen, an ihm die Einstellungs-Shell
+ * und an der die Navigationssperre des Routers: danach wechselte kein Klick
+ * mehr das Blatt (Re-Critique 2026-09-28, A7 P1-2).
+ */
+const SW_READY_TIMEOUT_MS = 3000;
+
+/** `serviceWorker.ready` mit Frist; lehnt nach SW_READY_TIMEOUT_MS ab. */
+function serviceWorkerReady() {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('service-worker-unavailable')), SW_READY_TIMEOUT_MS);
+  });
+  return Promise.race([navigator.serviceWorker.ready, timeout]).finally(() => clearTimeout(timer));
+}
+
 /** Synchron gecachter Status (für reminders.js). */
 function isPushSubscribed() {
   return _subscribedCache;
@@ -30,15 +50,23 @@ async function pushStatus() {
     _subscribedCache = false;
     return { supported: false, permission: 'unsupported', subscribed: false };
   }
+  let reg;
+  try {
+    reg = await serviceWorkerReady();
+  } catch {
+    // Der Browser kann Push, aber hier laeuft kein Service Worker: "nicht
+    // verfuegbar" ist etwas anderes als "nicht unterstuetzt".
+    _subscribedCache = false;
+    return { supported: true, available: false, permission: Notification.permission, subscribed: false };
+  }
   let subscribed = false;
   try {
-    const reg = await navigator.serviceWorker.ready;
     subscribed = Boolean(await reg.pushManager.getSubscription());
   } catch {
     subscribed = false;
   }
   _subscribedCache = subscribed;
-  return { supported: true, permission: Notification.permission, subscribed };
+  return { supported: true, available: true, permission: Notification.permission, subscribed };
 }
 
 async function enablePush() {
@@ -48,7 +76,7 @@ async function enablePush() {
     _subscribedCache = false;
     return { subscribed: false, permission };
   }
-  const reg = await navigator.serviceWorker.ready;
+  const reg = await serviceWorkerReady();
   const { data } = await api.get('/push/vapid-public-key');
   const sub = await reg.pushManager.subscribe({
     userVisibleOnly: true,
@@ -61,7 +89,7 @@ async function enablePush() {
 
 async function disablePush() {
   if (!pushSupported()) return { subscribed: false };
-  const reg = await navigator.serviceWorker.ready;
+  const reg = await serviceWorkerReady();
   const sub = await reg.pushManager.getSubscription();
   if (sub) {
     await api.post('/push/unsubscribe', { endpoint: sub.endpoint });
@@ -88,7 +116,7 @@ function matchesServerKey(sub, serverKey) {
  */
 async function resyncSubscription() {
   if (!pushSupported() || Notification.permission !== 'granted') return false;
-  const reg = await navigator.serviceWorker.ready;
+  const reg = await serviceWorkerReady();
   const sub = await reg.pushManager.getSubscription();
   if (!sub) {
     _subscribedCache = false;
@@ -107,7 +135,7 @@ async function resyncSubscription() {
  */
 async function repairPush() {
   if (!pushSupported() || Notification.permission !== 'granted') return false;
-  const reg = await navigator.serviceWorker.ready;
+  const reg = await serviceWorkerReady();
   const { data } = await api.get('/push/vapid-public-key');
   const serverKey = urlBase64ToUint8Array(data.key);
 
@@ -139,6 +167,7 @@ function stopPush() {
 }
 
 export {
+  SW_READY_TIMEOUT_MS,
   pushSupported, pushStatus, isPushSubscribed, enablePush, disablePush,
   resyncSubscription, repairPush, initPush, stopPush,
 };
