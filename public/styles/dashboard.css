@@ -3333,8 +3333,25 @@ button.today-cockpit__more--link {
  * Anpassen-Modus; angeordnet wird die Reihenfolge, und die liest man an den
  * Namen, nicht an den Inhalten. */
 @media (max-width: 639px) {
-  .widget-wrapper--editing > .widget {
+  /* Alles ausser der Leiste: auch die Kennzahlreihe, die kein `.widget` ist. */
+  .widget-wrapper--editing > :not(.widget-edit-controls) {
     display: none;
+  }
+
+  /* Der Vorrat oben ist EINE wischbare Zeile, keine Wand aus 14 Chips
+   * (gemessen 503px hoch) - sonst stuende er dort, wo er die Liste verdeckt. */
+  .widget-restore__chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    margin-inline: calc(var(--space-4) * -1);
+    padding-inline: var(--space-4);
+  }
+
+  .widget-restore-chip,
+  .widget-restore-chip-group {
+    flex: 0 0 auto;
   }
 
   .widget-wrapper--editing {

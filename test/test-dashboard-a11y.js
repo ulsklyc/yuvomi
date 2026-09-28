@@ -674,7 +674,8 @@ test('R14 P2: Anpassen mobil ist eine kompakte Liste - Name, Griff, Auge - und d
   const rules = [...eachRule(css)];
   const phone = (r) => r.at.some((a) => /\(max-width:\s*639px\)/.test(a));
   const body = (sel, pred) => rules.filter((r) => pred(r) && r.selector.split(',').some((s) => s.trim() === sel)).map((r) => r.body).join(';');
-  assert.match(body('.widget-wrapper--editing > .widget', phone), /display:\s*none/, 'mobil keine Kachel-Inhalte beim Anordnen');
+  assert.match(body('.widget-wrapper--editing > :not(.widget-edit-controls)', phone), /display:\s*none/, 'mobil keine Kachel-Inhalte beim Anordnen');
+  assert.match(body('.widget-restore__chips', phone), /flex-wrap:\s*nowrap/, 'der Vorrat oben ist eine Zeile, keine Wand');
   assert.match(body('.widget-edit-controls__caption', phone), /display:\s*block/, 'mobil steht der Name in der Zeile');
   assert.match(body('.widget-edit-controls__caption', (r) => !r.at.length), /display:\s*none/, 'breit traegt der Kachelkopf den Namen');
 });
