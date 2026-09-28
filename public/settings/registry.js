@@ -382,6 +382,24 @@ export const SETTINGS_SECTIONS = freezeEntries([
     loader: () => import('/settings/pages/sync-calendar.js'),
   },
   {
+    // Vorlauf, Ueberstunden und Wochenstunden haengen an der eigenen users-
+    // Zeile (server/routes/schedule-preferences.js), die Route traegt keinen
+    // Admin-Check. Bis R14 stand das als Karte im Tab "Auswertung"
+    // (Re-Critique 2026-09-28, A2 P2-3).
+    id: 'personal-schedule',
+    sheetId: 'module-schedule',
+    scope: 'mine',
+    labelKey: 'schedule.mySettings',
+    descriptionKey: 'settings.pageScheduleMineDescription',
+    options: [
+      'schedule.reminderToggle',
+      'schedule.overtimeTrackingToggle',
+      'schedule.weeklyHoursLabel',
+    ],
+    adminOnly: false,
+    loader: () => import('/settings/pages/personal-schedule.js'),
+  },
+  {
     id: 'options-schedule',
     sheetId: 'module-schedule',
     scope: 'household',

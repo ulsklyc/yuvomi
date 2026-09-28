@@ -2444,3 +2444,23 @@ test('R14: der Modus der Rechte ist der Kanon-Umschalter .segmented', async () =
   const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
   assert.doesNotMatch(css, /perm-modeswitch/, 'kein zweiter Dialekt im Stylesheet');
 });
+
+// R14 P12 (Re-Critique 2026-09-28, A2 P2-3): die eigenen Schichtplan-
+// Einstellungen (Vorlauf, Ueberstunden, Wochenstunden) standen als Karte im
+// Tab "Auswertung". Sie gehoeren ins Modulblatt - und ein Mitglied muss sie
+// dort finden: die Route traegt keinen Admin-Check, das Blatt darf keinen
+// erfinden. Ohne den Registry-Eintrag war personal-schedule.js unerreichbar.
+test('R14: "Meine Einstellungen" des Schichtplans stehen im Modulblatt, auch fuer Mitglieder', async () => {
+  const member = { role: 'member' };
+  const sheet = SETTINGS_LEAVES.find((leaf) => leaf.id === 'module-schedule');
+  assert.ok(sheet, 'das Modulblatt Schichtplan existiert');
+  const sections = settingsSheetSections(sheet, member);
+  const mine = sections.find((section) => section.id === 'personal-schedule');
+  assert.ok(mine, 'der Abschnitt steht im Blatt und ist fuer ein Mitglied sichtbar');
+  assert.equal(mine.scope, 'mine');
+  assert.equal(mine.adminOnly, false);
+  assert.match(String(mine.loader), /import\('\/settings\/pages\/personal-schedule\.js'\)/,
+    'der Abschnitt laedt die Seite, die z14 aus der Auswertung geholt hat');
+  const src = await readFile(new URL('../public/settings/pages/personal-schedule.js', import.meta.url), 'utf8');
+  assert.match(src, /export async function render\(container, \{ user \}\)/, 'die Shell ruft render() des Moduls');
+});
