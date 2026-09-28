@@ -986,7 +986,15 @@ test('das Popover gibt den Fokus nur zurueck, wo niemand woanders hin wollte (#1
   const fn = src.match(/export function closeDetailView\([\s\S]*?\n\}/)?.[0] ?? '';
   assert.match(fn, /if \(fokus && merker\) restoreFocusAfterClose\(merker\);\s*else forgetRestore\(\);/,
     'Rueckgabe mit eigenem Merker, sonst verwerfen - nie einen fremden stehen lassen');
-  assert.match(src, /!popover\.contains\(e\.target\)\) closeDetailView\(\{ fokus: false \}\)/,
+  // Die Regel am Klick-daneben-Handler selbst, nicht an einer Zeile: seit er
+  // den Klick schluckt (Re-Kritik 2026-09-28, E2), steht die Pruefung auf
+  // "im Popover" als eigene Frueh-Rueckkehr davor - geschlossen wird danach
+  // weiterhin ohne Fokus-Rueckgabe, und nirgends im Handler mit.
+  const outside = src.match(/const onOutsideClick = \(e\) => \{[\s\S]*?\n {2}\};/)?.[0] ?? '';
+  assert.ok(outside, 'der Klick-daneben-Handler des Popovers ist auffindbar');
+  const schliesst = [...outside.matchAll(/closeDetailView\(([^)]*)\)/g)].map((m) => m[1].trim());
+  assert.ok(schliesst.length > 0, 'ein Klick daneben schliesst das Popover');
+  assert.deepEqual([...new Set(schliesst)], ['{ fokus: false }'],
     'ein Klick daneben wollte woanders hin - der Fokus springt nicht zurueck');
   assert.match(src, /if \(activePopover\) closeDetailView\(\{ fokus: false \}\)/,
     'eine neue Ansicht nimmt den Fokus selbst');

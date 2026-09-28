@@ -319,13 +319,16 @@ const DIALOG_REGISTRY = {
 
 const MARK = /data-dialog-actions|dataset\.dialogActions\s*=/g;
 const MODAL_PANEL_ZONE = /modal-panel__header|modal-panel__footer|modal-actions/;
-const DIALOG_ROLE = /role="dialog"|setAttribute\(\s*'role'\s*,\s*'dialog'\s*\)/g;
+// Ein Attribut-Selektor (`[role="dialog"]`) FRAGT nach Dialogen, er baut
+// keinen: das Popover der Leseansicht laesst so Klicks in einer anderen Ebene
+// durch (Re-Kritik 2026-09-28, E2) und zaehlte sonst als zweiter Dialog.
+const DIALOG_ROLE = /(?<!\[)role="dialog"|setAttribute\(\s*'role'\s*,\s*'dialog'\s*\)/g;
 
 const ROOT = new URL('..', import.meta.url).pathname;
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
-    // toast-placement.js nennt die Rolle als Selektor, es baut keinen Dialog.
+    // toast-placement.js liest Rolle und Auszeichnung als Selektoren, es baut keinen Dialog.
     if (name === 'vendor' || name === 'locales' || name === 'toast-placement.js') continue;
     const path = join(dir, name);
     if (statSync(path).isDirectory()) walk(path, out);
