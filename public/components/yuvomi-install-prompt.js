@@ -301,7 +301,7 @@ class YuvomiInstallPrompt extends HTMLElement {
         vertical-align: -0.1em;
       }
 
-      /* Touch-Maß an (hover: none) statt an der Viewport-Breite — dieselbe
+      /* Touch-Maß an (hover: none) statt an der Viewport-Breite - dieselbe
        * Konvention wie bei .filter-chip--sm: das Banner erscheint vor allem auf
        * Mobil und Tablet, wo 32px/36px unter dem 44pt-Minimum lagen. Desktop
        * (Maus) bleibt bei der kompakteren Größe. */

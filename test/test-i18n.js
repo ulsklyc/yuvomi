@@ -492,3 +492,24 @@ test('jede Gedankenstrich-Ausnahme trifft einen Wert, der den Strich wirklich tr
     }
   }
 });
+
+// Dasselbe fuer Texte, die NICHT aus einer Locale kommen: Template- und
+// String-Literale im Frontend-JS (Re-Critique 2026-09-28, F7). Gefunden: der
+// Halbgeviertstrich zwischen "Ueberfaellig" und Datum sowie zwischen "Heute"
+// und Uhrzeit in task-fields.js und als Leerwert im Dokumentspeicher-Blatt. Kommentare zaehlen hier nicht (die
+// liest kein Nutzer); was nach dem Schnitt bleibt, ist Code und Literal.
+test('kein String im Frontend-JS traegt einen Gedankenstrich', async () => {
+  const { withoutCommentsKeepingLines } = await import('./source-text.js');
+  const root = new URL('../public/', import.meta.url);
+  const files = readdirSync(root, { recursive: true })
+    .filter((f) => f.endsWith('.js') && !f.startsWith('vendor/'));
+  assert.ok(files.length > 100, `zu wenige Dateien gelesen: ${files.length}`);
+  const hits = [];
+  for (const file of files) {
+    const code = withoutCommentsKeepingLines(readFileSync(new URL(file, root), 'utf8'));
+    code.split('\n').forEach((line, i) => {
+      if (/[\u2013\u2014]/.test(line)) hits.push(`public/${file}:${i + 1}: ${line.trim().slice(0, 100)}`);
+    });
+  }
+  assert.deepEqual(hits, []);
+});

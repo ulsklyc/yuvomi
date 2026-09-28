@@ -220,11 +220,11 @@ export function formatDueDate(dateStr, timeStr, isDone = false) {
     (parseLocalDateKey(dayKey) - parseLocalDateKey(todayDay)) / (1000 * 60 * 60 * 24),
   );
 
-  const timeLabel = dueTime ? ` – ${formatTime(dueStamp)}` : '';
+  const timeLabel = dueTime ? `, ${formatTime(dueStamp)}` : '';
 
   /* DAS JAHR STEHT NUR DA, WO ES ETWAS UNTERSCHEIDET.
    *
-   * Gemessen bei 390px: die Metazeile hat 228px, und „Überfällig – 11.08.2026"
+   * Gemessen bei 390px: die Metazeile hat 228px, und „Überfällig · 11.08.2026"
    * allein belegte 154px davon - mit dem Prioritäts-Chip davor lief die Zeile
    * über und schnitt sich selbst an („11.08.202|6"). Das Jahr war dabei die
    * einzige Angabe, die nichts beitrug: eine Aufgabe, die dieses Jahr fällig
@@ -245,7 +245,7 @@ export function formatDueDate(dateStr, timeStr, isDone = false) {
 
   // Beide Seiten sind Wanduhrzeit DERSELBEN Zone und damit als Text vergleichbar.
   if (dueStamp < nowStamp) {
-    return { label: `${t('tasks.overdue')} – ${fullLabel}`, cls: 'due-date--overdue' };
+    return { label: `${t('tasks.overdue')} · ${fullLabel}`, cls: 'due-date--overdue' };
   }
   if (calDayDiff === 0) {
     return { label: `${t('tasks.dueToday')}${timeLabel}`, cls: 'due-date--today' };
