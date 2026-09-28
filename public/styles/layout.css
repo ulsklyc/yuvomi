@@ -3595,6 +3595,60 @@ html.fab-anim-done .page-fab {
   }
 }
 
+/* DIE FALTZEILE (R17 K1, Re-Critique 2026-09-28 A4 P2-4 / A8 P3-2).
+ *
+ * Unter der Kuechen-Leiste traegt der Kopf von Rezepte und Vorrat mobil nur
+ * Werkzeuge - Lupe, "..." -, und kostete dafuer 65px ueber der Liste.
+ * `wireCollapsingHeader` (utils/ux.js) erkennt eine solche Zeile
+ * (`--fold-row`: Gruppen-Variante, einzeilig, ohne Titel, im Center-Slot
+ * nur die Suche) und haengt sie an dieselbe Schwelle und Klasse wie den Kopf
+ * der gedeckelten Module: angedockt (`is-collapsed`) gibt sie ihre Hoehe
+ * frei, zurueck oben kommt sie wieder. Mahlzeiten und Einkauf benennen in
+ * ihrer Zeile etwas (Woche, Liste) und falten nicht.
+ *
+ * WIE SIE FALTET: nicht ueber ihre Hoehe. Eine Hoehe, die nach `auto`
+ * zurueckgleiten soll, braucht `interpolate-size`, und das kann Safari nicht -
+ * auf dem iPhone waere es ein Sprung. Stattdessen bleibt die Box gleich
+ * gross: der negative Rand unten zieht die Liste um die gemessene Hoehe
+ * (`--fold-row-h`, ohne die Linie) nach oben, und dieselbe Strecke schiebt
+ * die Zeile hinter die Leiste, wo die Seite (overflow hidden) sie abschneidet.
+ * Beides sind Laengen und gleiten ueberall. Uebrig bleibt ihre Linie, genau
+ * unter der Leiste - die Kante des angedockten Kopfes. Der ResizeObserver des
+ * Kopfes sieht keinen Groessenwechsel, also auch keine neue Messung.
+ *
+ * WANN SIE STEHEN BLEIBT: mit Fokus darin (wer per Tab hineinkommt, bekommt
+ * die Zeile zurueck), mit einem Suchbegriff und mit offenem Werkzeugmenue -
+ * dieselben Ausnahmen wie die Suche der gedeckelten Koepfe oben. */
+@media (max-width: 1023px) {
+  .page-toolbar--fold-row {
+    transition:
+      margin-block-end var(--duration-lg) var(--ease-in-out),
+      translate var(--duration-lg) var(--ease-in-out);
+  }
+
+  .page-toolbar--fold-row > * {
+    transition: opacity var(--duration-md) var(--ease-out);
+  }
+
+  .page-toolbar--fold-row.is-collapsed:not(:focus-within):not(:has(input:not(:placeholder-shown))):not(:has(:popover-open)) {
+    margin-block-end: calc(-1 * var(--fold-row-h, 0px));
+    translate: 0 calc(-1 * var(--fold-row-h, 0px));
+    pointer-events: none;
+  }
+
+  /* Die Blende gehoert dem Inhalt, nicht der Zeile: deren Linie bleibt. */
+  .page-toolbar--fold-row.is-collapsed:not(:focus-within):not(:has(input:not(:placeholder-shown))):not(:has(:popover-open)) > * {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 1023px) and (prefers-reduced-motion: reduce) {
+  .page-toolbar--fold-row,
+  .page-toolbar--fold-row > * {
+    transition: none;
+  }
+}
+
 /* Mobil liegen Titel, Zeitraum und Bar-Zeile mit halbem Zeilenabstand
  * uebereinander: Zeitraum und Tab-Leiste bringen ihre Luft in 48px-
  * Trefferflaechen mit, der Large Title in seiner Zeilenhoehe. Selektorform der

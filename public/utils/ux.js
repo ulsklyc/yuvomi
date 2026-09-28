@@ -493,6 +493,8 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
 
   let io = null;
   let lead = 0;
+  // Hoehe einer Faltzeile (siehe `foldRow` in update), ohne ihre Linie.
+  let foldH = 0;
   let dockTitle = null;
   let headSeal = null;
   // Die Kinder der Lead-Zone, die im Band-Modus angedockt ausblenden.
@@ -575,16 +577,33 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // unvermessenen Kopf - und `update()` misst einen eingeklappten Kopf nie
     // (siehe dort). Der Kopf blieb dann ausgeklappt sichtbar, aber als
     // eingeklappt markiert, ohne Lead-Zone, bis zum Neuladen.
-    if (!toolbar.classList.contains('page-toolbar--capped')) return;
+    // Eine Faltzeile (siehe `foldRow` in update) hat keine Lead-Zone, aber
+    // eine vermessene Hoehe - sie ist ihre ganze Lead-Zone. Ihre Linie bleibt
+    // in beiden Zustaenden: sie ist die Kante des angedockten Kopfes.
+    const fold = toolbar.classList.contains('page-toolbar--fold-row') && foldH > 0;
+    if (!fold && !toolbar.classList.contains('page-toolbar--capped')) return;
+    const states = fold ? ['is-collapsed'] : ['is-collapsed', 'is-docked'];
     // Nur kollabieren, wenn der Port das Ausklappen danach auch verkraftet -
     // sonst schiebt die zurückkehrende Kopfhöhe den Scroll auf 0, der Kopf
     // klappt wieder aus und beides pendelt gegeneinander.
-    if (reserve < lead + 48) { toolbar.classList.remove('is-collapsed', 'is-docked'); return; }
+    // Die Faltzeile misst die Reserve AUSGEKLAPPT: gefaltet ist der Port um
+    // ihren negativen Rand laenger und die Reserve um genau so viel kuerzer.
+    // Gegen die gefaltete Reserve gemessen, klappte eine knappe Liste (Rezepte
+    // mit einem aufgeklappten Rezept: 166px ausgeklappt, 102px gefaltet) beim
+    // naechsten Scroll-Ereignis wieder aus - und dann wieder ein. Der
+    // berechnete Rand gilt auch mitten in der Bewegung.
+    const unfolded = fold
+      ? reserve - Math.min(0, parseFloat(getComputedStyle(toolbar).marginBlockEnd) || 0)
+      : reserve;
+    if (unfolded < (fold ? foldH : lead) + 48) {
+      toolbar.classList.remove(...states);
+      return;
+    }
     // Ab hier nur noch der Nutzer (siehe `gestureTarget` oben).
     if (!gestureTarget || !port.contains(gestureTarget)) return;
     const top = port.scrollTop;
-    if (top > 24) toolbar.classList.add('is-collapsed', 'is-docked');
-    else if (top < 8) toolbar.classList.remove('is-collapsed', 'is-docked');
+    if (top > 24) toolbar.classList.add(...states);
+    else if (top < 8) toolbar.classList.remove(...states);
   };
   const update = () => {
     // VOR der Messung: das Siegel steht in der Titelzeile und zählt zu ihr.
@@ -695,6 +714,35 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     const roomForDockTitle = innerWidth - usedWidth >= DOCK_TITLE_MIN_WIDTH;
 
     const heading = toolbar.querySelector(':scope > .page-toolbar__title');
+
+    // DIE FALTZEILE (R17 K1, Re-Critique 2026-09-28 A4 P2-4 / A8 P3-2). Unter
+    // einer Gruppen-Leiste (Kueche) steht der Kopf der Seite als EINE Zeile
+    // ohne Titel - in Rezepte und Vorrat traegt sie mobil nur Werkzeuge (Lupe,
+    // "...") und kostet 65px fuer ein bis zwei Icons. Angedockt gibt sie diese
+    // Hoehe frei, an derselben Schwelle und mit derselben Klasse wie der Kopf
+    // der gedeckelten Module (`is-collapsed`, onInnerScroll); zurueck oben
+    // kommt sie wieder. Das ist Apples `hidesSearchBarWhenScrolling` fuer eine
+    // Zeile, deren Inhalt die Suche IST.
+    //
+    // NUR EINE ZEILE, DIE NICHTS BENENNT: steht im Center-Slot etwas anderes
+    // als die Suche (Wochenstepper im Essensplan, Listen-Kapseln im Einkauf),
+    // beantwortet die Zeile beim Scrollen weiter „wo bin ich" und bleibt -
+    // dieselbe Abgrenzung wie der Zeitraum im Kalender. Gezaehlt wird ueber
+    // `classList`, nicht per Selektor: die Regel ist eine Aussage ueber den
+    // Inhalt des Slots.
+    //
+    // KEINE LEAD-ZONE: die Zeile ist einzeilig, und eine Lead-Zone auf einem
+    // einzeiligen Kopf verbirgt seine Linie (Sonde 8). Die Hoehe steht deshalb
+    // in einer eigenen Variablen, gemessen OHNE die Linie - die bleibt
+    // gefaltet als Kante unter der Leiste stehen.
+    const center = [...toolbar.children].find((c) => c.classList.contains('page-toolbar__center'));
+    const foldRow = Boolean(capped) && lines.length === 1 && !heading
+      && toolbar.classList.contains('page-toolbar--in-group')
+      && (!center || center.classList.contains('page-search'));
+    toolbar.classList.toggle('page-toolbar--fold-row', foldRow);
+    foldH = foldRow ? Math.round(tb.height - (parseFloat(getComputedStyle(toolbar).borderBottomWidth) || 0)) : 0;
+    if (foldH > 0) toolbar.style.setProperty('--fold-row-h', `${foldH}px`);
+    else toolbar.style.removeProperty('--fold-row-h');
 
     // NIE EIN KOPF OHNE ORTSANGABE (Re-Critique 2026-09-27, R9 M9). Die Regel
     // darueber liess den Titel lieber weg, als den Kopf pendeln zu lassen - in
@@ -889,7 +937,9 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
       headSeal = null;
       delete toolbar.dataset.collapsingHeader;
       toolbar.style.removeProperty('--page-toolbar-lead');
-      toolbar.classList.remove('page-toolbar--stacked', 'page-toolbar--capped', 'is-collapsed', 'is-docked', 'page-toolbar--dock-fold', 'page-toolbar--dock-band');
+      toolbar.style.removeProperty('--fold-row-h');
+      foldH = 0;
+      toolbar.classList.remove('page-toolbar--stacked', 'page-toolbar--capped', 'is-collapsed', 'is-docked', 'page-toolbar--dock-fold', 'page-toolbar--dock-band', 'page-toolbar--fold-row');
     },
   };
 }
