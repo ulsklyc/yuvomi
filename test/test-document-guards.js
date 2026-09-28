@@ -1786,6 +1786,15 @@ async function metricRowHeights(page) {
   return page.evaluate(() => {
     const carriers = new Map();
     for (const card of document.querySelectorAll('.metric-card')) {
+      // EINE KARTE OHNE KASTEN IST KEINE KACHEL DER REIHE. `display: none`
+      // (selbst oder an einem Vorfahren) erzeugt kein Rasterelement und keine
+      // Zelle - die Reihe hat dann eine Karte weniger, keine leere. Gemessen
+      // lieferte so eine Karte `top 0, Hoehe 0`, galt damit als eigene
+      // Rasterzeile und als Kachel der Hoehe 0: die Abrechnung blendet ihre
+      // Gruppen-Kachel mobil per Container-Query aus (R10 L11), und die Sonde
+      // meldete „Hoehen 59, 59, 0". Gefiltert wird NUR, was gar keinen Kasten
+      // hat; eine gerenderte Karte der Hoehe 0 bleibt ein Befund.
+      if (!card.getClientRects().length) continue;
       const parent = card.parentElement;
       if (!parent) continue;
       if (!carriers.has(parent)) carriers.set(parent, []);
