@@ -5310,15 +5310,16 @@ function renderFab() {
  * eine Stelle, an der der Ort steht.
  */
 /**
- * Den Speed-Dial im Anpassen-Modus ausblenden (A7 P2-1). `hidden` fuer die
- * Zugaenglichkeit, `display` weil `.page-fab-group` eine eigene Anzeige setzt,
- * die das Attribut sonst sticht (dieselbe Bauart wie setPageFabAction).
+ * Den Speed-Dial im Anpassen-Modus ausblenden (A7 P2-1). Ausgeblendet wird der
+ * KNOPF, nicht die Gruppe: `.page-fab[hidden]` (layout.css) nimmt ihn aus der
+ * Anzeige, und nur an `.page-fab:not([hidden])` haengen Kapselreserve und
+ * `--fab-safe-zone` - eine versteckte Gruppe liesse beide stehen und die Seite
+ * einen Nachlauf fuer einen Knopf freihalten, den es nicht gibt.
  */
 function setCustomizeFabHidden(hidden) {
-  const group = findPageFab('fab-main')?.closest('.page-fab-group');
-  if (!group) return;
-  group.hidden = hidden;
-  group.style.display = hidden ? 'none' : '';
+  const fab = findPageFab('fab-main');
+  if (!fab) return;
+  fab.hidden = hidden;
 }
 
 function initFab(signal) {
@@ -5356,7 +5357,7 @@ function initFab(signal) {
     e.stopPropagation();
     // Der Kurzbefehl `n` klickt den Knopf auch, wenn er ausgeblendet ist
     // (triggerPageFab) - im Anpassen-Modus oeffnet er nichts.
-    if (fabGroup?.hidden) return;
+    if (fabMain.hidden) return;
     toggleFab();
   });
 

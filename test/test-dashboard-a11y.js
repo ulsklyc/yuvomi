@@ -470,17 +470,19 @@ test('Anpassen: Verlassen fragt wie Abbrechen - nur mit Aenderung, ein Nein blei
 });
 
 test('Anpassen: der Speed-Dial ist ausgeblendet, und der Neuaufbau meldet den Schutz an', async () => {
+  // Der KNOPF wird versteckt, nicht die Gruppe: an `.page-fab:not([hidden])`
+  // haengen Kapselreserve und --fab-safe-zone (layout.css), und
+  // `.page-fab[hidden]` blendet ihn aus - test:hidden-cascade haelt die Regel.
   const gruppe = { hidden: false, style: {} };
-  const fab = { closest: (sel) => (sel === '.page-fab-group' ? gruppe : null) };
+  const fab = { hidden: false, style: {}, closest: (sel) => (sel === '.page-fab-group' ? gruppe : null) };
   const vorher = globalThis.document;
   globalThis.document = { ...(vorher ?? {}), getElementById: (id) => (id === 'fab-main' ? fab : null) };
   try {
     __test.setCustomizeFabHidden(true);
-    assert.equal(gruppe.hidden, true);
-    assert.equal(gruppe.style.display, 'none', 'display sticht sonst das hidden-Attribut');
+    assert.equal(fab.hidden, true, 'der Knopf ist aus - und mit ihm die Reserve fuer ihn');
+    assert.equal(gruppe.hidden, false, 'die Gruppe bleibt: eine versteckte Gruppe hielte die Reserve');
     __test.setCustomizeFabHidden(false);
-    assert.equal(gruppe.hidden, false);
-    assert.equal(gruppe.style.display, '');
+    assert.equal(fab.hidden, false);
   } finally {
     globalThis.document = vorher;
   }
