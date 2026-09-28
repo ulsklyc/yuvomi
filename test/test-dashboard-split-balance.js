@@ -7,9 +7,8 @@
  *
  * DIE EINE ZUSAGE, AN DER ALLES HAENGT: die Kachel rechnet NICHT selbst. Sie
  * liest dieselben Saldenzeilen wie die Ausgleichs-Ansicht des Moduls
- * (`groupBalanceRows()` + `simplifyDebts()`), damit ein spaeterer Fix an den
- * Salden (etwa #1445, Buchungszeilen geloeschter Ausgaben) beide Stellen
- * zugleich heilt - und bis dahin beide denselben Fehler zeigen, statt dass die
+ * (`groupBalanceRows()` + `simplifyDebts()`), damit ein Fehler in den Salden
+ * beide Stellen gleich trifft und ein Fix beide zugleich heilt, statt dass die
  * Uebersicht eine zweite Zahl erfindet.
  */
 import test from 'node:test';
@@ -208,10 +207,11 @@ test('dieselbe Quelle: jede Position steht genauso in der Ausgleichs-Ansicht des
   assert.deepEqual(tile, module);
 });
 
-test('#1445 (offen): eine verwaiste Buchungszeile verschiebt Kachel und Modul GLEICH', async () => {
-  // Der Bug wird hier NICHT behoben (geplant mit #1416/#1444). Zugesagt ist nur,
-  // dass die Kachel denselben Stand zeigt wie das Modul - heilt der Fix die
-  // Saldenquelle, heilt er beide. Gemessen wird die Gleichheit, nicht der Betrag.
+test('eine Buchungszeile ohne Ausgabe verschiebt Kachel und Modul GLEICH', async () => {
+  // Die Saldenquelle zaehlt jede Ledger-Zeile. Den Altbestand solcher Zeilen
+  // (#1445) hat Migration v227 einmal entfernt (test:split-orphan-ledger-
+  // migration); hier zugesagt ist nur, dass die Kachel denselben Stand zeigt
+  // wie das Modul. Gemessen wird die Gleichheit, nicht der Betrag.
   const orphan = database.prepare(`
     INSERT INTO expense_ledger_entries (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
     VALUES (?, 'expense', 999999, ?, ?, -500, 'EUR', 'geloeschte Ausgabe', ?)
@@ -224,7 +224,7 @@ test('#1445 (offen): eine verwaiste Buchungszeile verschiebt Kachel und Modul GL
     const tile = comparable((await splitBalanceOf(ME)).positions);
     const module = comparable(await modulePositionsOf(ME, [TRIP, FLAT]));
     assert.deepEqual(tile, module, 'die Kachel darf keine zweite Wahrheit neben dem Modul fuehren');
-    assert.equal(tile.find((p) => p.groupId === TRIP).amountMinor, 1800, 'beide zaehlen die Waise heute mit (#1445)');
+    assert.equal(tile.find((p) => p.groupId === TRIP).amountMinor, 1800, 'beide zaehlen dieselbe Zeile');
   } finally {
     database.prepare('DELETE FROM expense_ledger_entries WHERE id IN (?, ?)').run(orphan, orphanPayer);
   }

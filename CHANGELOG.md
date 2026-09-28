@@ -731,6 +731,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Bookings of a shared expense that no longer exists stop counting in balances.** Before 2.69.0,
+  editing a shared expense stamped its bookings with the person who edited it. If the account of
+  the person who created the expense was deleted afterwards, the expense and its shares went with
+  it, but its bookings stayed and kept moving the group's balances, while no list showed an expense
+  that explained them. They also kept the members they named from being deleted. The update
+  removes these bookings once; expenses that still exist, including deleted ones, and payments stay
+  as they are. The group's activity shows "Booking removed" once for each such expense, with its
+  title and amount, so the changed balance has a visible reason. (#1445)
+
 - **The glass tab bar blurs again.** Text scrolling under the tab bar on a phone and under the
   sidebar indicator was readable through the glass because the page transition cut the glass off
   from the content; the blur now works outside the short moment of a page change.

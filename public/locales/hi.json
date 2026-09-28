@@ -3876,7 +3876,8 @@
             "recurring_resumed": "दोहराया खर्च फिर शुरू हुआ",
             "recurring_generated": "दोहराया खर्च बनाया गया",
             "payment_reversed": "भुगतान रद्द किया गया",
-            "ledger_restored": "प्रविष्टि बहाल की गई"
+            "ledger_restored": "प्रविष्टि बहाल की गई",
+            "ledger_removed": "प्रविष्टि हटाई गई"
         },
         "splitPercentage": "प्रतिशत",
         "splitExact": "सटीक राशि",
