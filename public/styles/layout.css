@@ -4432,14 +4432,6 @@ p.field-hint--warn[hidden] {
     text-overflow: ellipsis;
   }
 
-  .nav-sidebar__version {
-    margin-top: var(--space-0h);
-    font-size: var(--text-xs);
-    font-weight: var(--font-weight-medium);
-    letter-spacing: var(--tracking-label);
-    color: var(--color-text-tertiary);
-  }
-
   /* ── Nav-Items Container ── */
   .nav-sidebar__items {
     display: flex;

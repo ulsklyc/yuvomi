@@ -2296,3 +2296,14 @@ test('die Shell wartet hoechstens eine Frist auf ihre Abschnitte', async (t) => 
   assert.match(leaf, /await awaitSections\(/);
   assert.doesNotMatch(leaf, /await Promise\.all\(hosts/, 'renderLeafContent wartet wieder ohne Frist auf alle Abschnitte');
 });
+
+// R14 P12 (Re-Critique 2026-09-28, A1 P3-7): "v2.69.1" stand dauerhaft unter
+// der Wortmarke - Chrome-Rauschen. Die Version steht, wo man sie sucht: im
+// Blatt "Neuigkeiten" (aktuelle Version) und im Blatt "System".
+test('R14: die Versionsnummer steht nicht mehr unter der Wortmarke', async () => {
+  const router = await readFile(new URL('../public/router.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(router, /className = 'nav-sidebar__version'/, 'keine Versionszeile in der Seitenleiste');
+  assert.match(router, /changelog\.currentVersion/, 'die Neuigkeiten nennen die installierte Version');
+  const system = await readFile(new URL('../public/settings/pages/admin-system.js', import.meta.url), 'utf8');
+  assert.match(system, /settings\.systemVersionValue/, 'das Blatt System nennt sie ebenfalls');
+});

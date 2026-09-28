@@ -547,12 +547,6 @@ function updateBranding(path = currentPath) {
   const appName = getAppName();
   const sidebarLogoName = document.querySelector('.nav-sidebar__brand-name');
   if (sidebarLogoName) sidebarLogoName.textContent = appName;
-  const sidebarVersion = document.querySelector('.nav-sidebar__version');
-  if (sidebarVersion) {
-    const version = getAppVersion();
-    sidebarVersion.textContent = version ? t('login.version', { version }) : '';
-    sidebarVersion.hidden = !version;
-  }
 
   const loginTitle = document.querySelector('.auth-hero__title');
   if ((path === '/login' || path === '/setup') && loginTitle) loginTitle.textContent = appName;
@@ -1959,12 +1953,10 @@ function renderAppShell(container) {
   const sidebarLogoSpan = document.createElement('span');
   sidebarLogoSpan.className = 'nav-sidebar__brand-name';
   sidebarLogoSpan.textContent = getAppName();
-  const sidebarVersion = document.createElement('small');
-  sidebarVersion.className = 'nav-sidebar__version';
-  const cachedVersion = getAppVersion();
-  sidebarVersion.textContent = cachedVersion ? t('login.version', { version: cachedVersion }) : '';
-  sidebarVersion.hidden = !cachedVersion;
-  sidebarBrandText.append(sidebarLogoSpan, sidebarVersion);
+  // KEINE VERSION UNTER DER WORTMARKE (R14, A1 P3-7): sie stand dauerhaft da
+  // und sagte in jeder Sitzung dasselbe. Wer sie sucht, findet sie in den
+  // Neuigkeiten (aktuelle Version) und im Blatt System.
+  sidebarBrandText.append(sidebarLogoSpan);
   sidebarLogo.appendChild(sidebarBrandText);
 
   const sidebarToggle = document.createElement('button');
