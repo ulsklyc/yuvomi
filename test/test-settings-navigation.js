@@ -2403,3 +2403,32 @@ test('R14: ein Blattwechsel blendet das neue Blatt ein', async () => {
   assert.match(enter.body, /animation:\s*settings-sheet-enter var\(--duration-md\) var\(--ease-out\)/);
   assert.match(css, /@keyframes settings-sheet-enter\s*\{\s*from\s*\{\s*opacity:\s*0;?\s*\}\s*\}/, 'nur Deckkraft - nichts bewegt sich');
 });
+
+// R14 P8 (Re-Critique 2026-09-28, A7 P2-4): Familie brach den Kanon - violetter
+// Balken "+ Mitglied hinzufuegen" ueber 720px, 850px Inline-Formular mit
+// [Erstellen][Abbrechen], Zeilen ohne Haarlinien, Namen per Verkettung
+// ("Alex Johnson Loeschen"). Jetzt: Blatt-Dialog mit Kanon-Fuss, geteilte Liste,
+// Objektnamen aus common.*Named.
+test('R14: Familie legt im Blatt-Dialog an, Fuss [Abbrechen][Primaer], Zeilen mit Haarlinien', async () => {
+  const src = await readFile(new URL('../public/settings/pages/admin-family.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /settings-card--hidden/, 'kein Inline-Formular, das auf- und zugeklappt wird');
+  for (const [fn, cancel, submit] of [
+    ['addMemberFormHtml', 'cancel-add-member', "t('settings.createMember')"],
+    ['addInviteFormHtml', 'cancel-add-invite', "t('settings.invites.submit')"],
+  ]) {
+    const body = src.slice(src.indexOf(`function ${fn}(`), src.indexOf('\n}\n', src.indexOf(`function ${fn}(`)));
+    const foot = body.slice(body.indexOf('modal-panel__footer'));
+    assert.ok(body.includes('modal-panel__footer'), `${fn}: der Fuss ist .modal-panel__footer`);
+    assert.ok(foot.indexOf(cancel) >= 0 && foot.indexOf(cancel) < foot.indexOf(submit), `${fn}: [Abbrechen] vor [Primaer]`);
+  }
+  assert.match(src, /addMemberBtn\.addEventListener\('click', \(\) => openAddMemberModal\(/, 'der Knopf oeffnet den Dialog');
+  assert.match(src, /addBtn\.addEventListener\('click', \(\) => openInviteModal\(\)\)/);
+  assert.match(src, /content: addMemberFormHtml\(\)/);
+  assert.match(src, /content: addInviteFormHtml\(\)/);
+  assert.match(src, /<ul class="settings-members row-divided" id="members-list">/, 'Haarlinien zwischen den Mitgliedern');
+  assert.doesNotMatch(src, /btn--primary settings-add-btn/, 'kein violetter Balken ueber die volle Breite');
+  assert.match(src, /t\('common\.deleteNamed', \{ name: u\.display_name \}\)/, 'der Loeschknopf nennt sein Objekt');
+  assert.match(src, /t\('common\.editNamed', \{ name: u\.display_name \}\)/);
+  const editFoot = src.slice(src.indexOf('id="edit-member-error"'), src.indexOf("settings.saveMember')}</button>"));
+  assert.match(editFoot, /modal-panel__footer/, 'auch Bearbeiten traegt den Kanon-Fuss');
+});

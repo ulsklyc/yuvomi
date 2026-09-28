@@ -1444,19 +1444,22 @@
    Familienmitglieder
    -------------------------------------------------------- */
 
+/* Die Liste liegt in der Karte und traegt deshalb `.row-divided` (list-row.css):
+ * Haarlinien zwischen den Zeilen, keine zweite Flaeche (R14, A7 P2-4 - die
+ * Zeilen standen vorher mit 12px Luft und ohne Trennung untereinander). */
 .settings-members {
   list-style: none;
   margin: 0 0 var(--space-4);
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
 }
 
 .settings-member {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  padding-block: var(--space-2);
 }
 
 .settings-member__info {
@@ -1479,8 +1482,10 @@
   margin-top: 1px;
 }
 
+/* Anlegen ist ein ruhiger Knopf unter der Liste, kein violetter Balken ueber
+ * die volle Breite (R14, A7 P2-4); das Formular kommt als Blatt-Dialog. */
 .settings-add-btn {
-  width: 100%;
+  align-self: flex-start;
 }
 
 .settings-token-output {
