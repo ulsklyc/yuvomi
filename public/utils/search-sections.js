@@ -197,12 +197,17 @@ export function markSegments(text, query) {
  *        Treffer aus der Einstellungssuche (settings/registry.js searchSettings)
  * @param {Array<{ label: string, route: string, module: string, context?: string }>} [input.actions]
  *        die Anlege-Aktionen, die der Betrachter ausfuehren darf
+ * @param {Array<{ label: string, run: Function }>} [input.commands]
+ *        Befehle ohne eigene Seite - Hilfe, Tastenkombinationen, Neuigkeiten
+ *        (R14, A1 P3-6: am Desktop lagen sie nur hinter dem Avatar). Sie
+ *        stehen mit den Orten unter "Gehe zu", weil sie wie ein Ort an EINE
+ *        Stelle fuehren; `run` statt `route`.
  * @param {number} [input.cap=6] hoechstens so viele je Abschnitt
  * @returns {{ places: object[], actions: object[] }}
  */
-export function paletteCommands(query, { places = [], settings = [], actions = [], cap = 6 } = {}) {
+export function paletteCommands(query, { places = [], settings = [], actions = [], commands = [], cap = 6 } = {}) {
   if (!paletteTokens(query).length) return { places: [], actions: [] };
-  const hitPlaces = places.filter((p) => paletteMatches(query, p.label));
+  const hitPlaces = [...places, ...commands].filter((p) => paletteMatches(query, p.label));
   // Nur Einstellungen, deren NAME passt: die Einstellungssuche trifft auch
   // Beschreibungen, und ein Treffer ohne sichtbaren Grund ("sch" -> "Budget")
   // ist genau das, was die Markierung abschaffen soll.

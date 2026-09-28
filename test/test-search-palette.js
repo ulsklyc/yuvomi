@@ -131,3 +131,32 @@ test('der Hinweis verspricht, was die Palette haelt', () => {
   assert.equal(typeof de.search.goTo, 'string');
   assert.equal(typeof de.search.newSection, 'string');
 });
+
+// R14 P12 (Re-Critique 2026-09-28, A1 P3-3/P3-6): Hilfe stand am Desktop nur
+// hinter dem Avatar, und im Palettenfeld standen zwei X nebeneinander.
+test('R14: Hilfe, Tastenkombinationen und Neuigkeiten sind Befehle der Palette', () => {
+  const run = () => 'ran';
+  const hit = paletteCommands('hilf', {
+    places: [], commands: [{ label: 'Hilfe', run }, { label: 'Tastenkombinationen', run }, { label: 'Neuigkeiten', run }],
+  });
+  assert.deepEqual(hit.places.map((p) => p.label), ['Hilfe'], 'ein Befehl steht unter "Gehe zu", wenn sein Name passt');
+  assert.deepEqual(paletteCommands('tasten', { commands: [{ label: 'Tastenkombinationen', run }] }).places.map((p) => p.label),
+    ['Tastenkombinationen']);
+  const local = body('function paletteLocal(', '\n}\n');
+  assert.match(local, /label: t\('nav\.help'\), run: \(\) => showHelpModal\(\)/, 'Hilfe oeffnet das Hilfeblatt');
+  assert.match(local, /label: t\('shortcuts\.help'\), run: \(\) => showHelpModal\(\)/, 'die Tastenkombinationen stehen darin');
+  assert.match(local, /label: t\('nav\.changelog'\), run: \(\) => showChangelogModal\(\)/);
+  assert.match(local, /paletteCommands\(q, \{ places, settings, actions, commands \}\)/);
+  const render = body('function renderSearchResults(', '\n}\n');
+  assert.match(render, /go: \(item\) => \(item\.run \? item\.run\(\) : navigate\(item\.route\)\)/,
+    'ein Befehl laeuft, ein Ort wird angesteuert');
+  assert.equal(de.nav.changelog, 'Neuigkeiten', '"Aenderungen" versprach Aenderungen an den eigenen Daten');
+});
+
+test('R14: im Palettenfeld steht EIN X - das native Leeren ist aus', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = read('../public/styles/layout.css');
+  const rule = [...eachRule(css)].find((r) => r.selector.split(',').some((s) => s.trim() === '.search-overlay__input::-webkit-search-cancel-button'));
+  assert.ok(rule, 'die Regel fuer das native Leeren fehlt');
+  assert.match(rule.body, /display:\s*none/);
+});

@@ -1512,6 +1512,15 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   font-size: var(--text-base);
 }
 
+/* EIN X IM PALETTENKOPF (R14, A1 P3-3): das native Leeren des Suchfelds stand
+ * direkt neben dem Schliessen-Knopf, zwei gleiche Zeichen fuer zwei Folgen.
+ * Geleert wird per Escape im Feld (Browser-Standard) oder Auswahl. */
+.search-overlay__input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
 .search-overlay__close {
   /* Liegt im DOM hinter den Treffern (Tab-Weg: Suchfeld -> Ergebnisse,
    * Audit A1-14), visuell aber weiterhin oben rechts im Kopfbereich. */

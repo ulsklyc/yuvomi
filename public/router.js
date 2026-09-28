@@ -3438,7 +3438,14 @@ function paletteLocal(q) {
       label: t(action.labelKey), route: action.route, module: action.module,
       context: t(`nav.${action.module}`), verb, create: true,
     }));
-  return paletteCommands(q, { places, settings, actions });
+  // Hilfe hat keine Seite, nur ein Blatt - am Desktop lag sie hinter dem
+  // Avatar (R14, A1 P3-6). Die Tastenkombinationen stehen im Hilfeblatt.
+  const commands = [
+    { label: t('nav.help'), run: () => showHelpModal() },
+    { label: t('shortcuts.help'), run: () => showHelpModal() },
+    { label: t('nav.changelog'), run: () => showChangelogModal() },
+  ];
+  return paletteCommands(q, { places, settings, actions, commands });
 }
 
 function initSearch(container) {
@@ -3734,9 +3741,9 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
 
   // 1. GEHE ZU - Navigationsziele und Einstellungsblaetter.
   makeSection(t('search.goTo'), null, local.places, {
-    route: (item) => item.route,
     title: (item) => item.label,
     meta: (item) => item.context || '',
+    go: (item) => (item.run ? item.run() : navigate(item.route)),
   });
   // 2. NEU ANLEGEN - die Seite oeffnen und ihre Primaeraktion ausloesen, genau
   //    wie der Kurzbefehl `n` (triggerPageFab: nichts, wo kein FAB zu sehen ist).
