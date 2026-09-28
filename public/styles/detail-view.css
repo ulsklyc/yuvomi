@@ -257,13 +257,15 @@
 /* Die Eingabezeile, in die sich „Teilaufgabe hinzufuegen" verwandelt (A3
  * P1-1, task-detail.js `subtaskComposer`): ein kanonisches Feld ueber die
  * Breite der Liste, so hoch wie eine Teilaufgaben-Zeile. Enter legt an, der
- * Fokus bleibt fuer die naechste. `[hidden]` braucht die eigene Regel, weil
- * `display: flex` das Browser-`hidden` sonst sticht. */
+ * Fokus bleibt fuer die naechste. `[hidden]` braucht fuer Feld UND Knopf die
+ * eigene Regel, weil `display: flex` das Browser-`hidden` sonst sticht
+ * (gemessen: der Knopf stand ueber dem offenen Feld). */
 .detail-subtask-compose {
   display: flex;
 }
 
-.detail-subtask-compose[hidden] {
+.detail-subtask-compose[hidden],
+.detail-subtask--add[hidden] {
   display: none;
 }
 
