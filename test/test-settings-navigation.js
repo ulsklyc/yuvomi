@@ -712,9 +712,223 @@ test('ungespeicherte Eingaben gehen beim Blattwechsel nicht still verloren', asy
   // Wiederverwendete Texte statt eigener Keys - der Modal-Dirty-Schutz sagt dasselbe.
   assert.match(guard, /modal\.unsavedChanges/);
 
-  assert.match(shell, /import\s*\{[^}]*confirmLeafExit[^}]*\}\s*from\s*'\.\/dirty-guard\.js'/);
-  assert.match(shell, /await confirmLeafExit\(\)/, 'jede Navigation aus einem Blatt muss durch den Guard');
+  // Seit R15 A7 P1-1 fragt nicht mehr jeder Link selbst, sondern der Router
+  // fuer JEDEN Weg: der Guard meldet sich beim Verlassen-Schutz an (Programm-
+  // Test unten). Ein zweites Fragen im Link waere eine zweite Buchfuehrung.
+  assert.match(guard, /import \{ setLeaveGuard \} from '\/utils\/leave-guard\.js';/);
+  assert.doesNotMatch(shell, /confirmLeafExit/, 'der Link fragt nicht selbst - navigate() fragt fuer alle Wege');
   assert.match(shell, /watchLeafForms\(leafContainer\)/, 'das Tracking haengt am fertig gerenderten Blatt');
+});
+
+/* EINSTELLUNGEN VERLIEREN NICHTS STILL (Re-Critique 2026-09-28 R15, A7 P1-1).
+ * Der Blatt-Guard fragte nur in den Links der Shell; Browser-Zurueck, die
+ * Befehlspalette, Tab-Leiste und Mehr-Blatt liefen an ihm vorbei in
+ * navigate() und warfen den offenen Stand weg. Die Rechte-Matrix (kein
+ * <form>) sah er gar nicht. Gemessen als Programm: Formular-Stubs, echte
+ * Listener des Guards, der echte Verlassen-Schutz, den der Router fragt. */
+function guardFakes() {
+  const container = {
+    isConnected: true,
+    on: {},
+    addEventListener(type, fn) { (this.on[type] ??= []).push(fn); },
+  };
+  const form = {
+    isConnected: true,
+    querySelector: (sel) => (/type="submit"/.test(sel) ? {} : null),
+  };
+  const field = (instant = false) => ({
+    closest: (sel) => (sel === 'form' ? form : (sel === '[data-instant-save]' && instant ? {} : null)),
+  });
+  const fire = (type, target, isTrusted = true) => {
+    for (const fn of container.on[type] ?? []) fn({ type, target, isTrusted });
+  };
+  return { container, form, field, fire };
+}
+
+async function withGuardEnv(fn) {
+  const prev = { window: globalThis.window, confirm: globalThis.__confirmModal };
+  globalThis.window = { ...(prev.window ?? {}), addEventListener() {}, removeEventListener() {} };
+  const gefragt = [];
+  let antwort = false;
+  globalThis.__confirmModal = async (title, options) => { gefragt.push({ title, options }); return antwort; };
+  const guard = await import('/settings/dirty-guard.js');
+  const leave = await import('/utils/leave-guard.js');
+  try {
+    await fn({ guard, leave, gefragt, antworte: (a) => { antwort = a; } });
+  } finally {
+    guard.clearLeafEdits?.();
+    globalThis.window = prev.window;
+    globalThis.__confirmModal = prev.confirm;
+  }
+}
+
+test('Einstellungen: ein offenes Formular fragt vor JEDEM Wechsel ueber den Router - nur solange etwas offen ist (R15 A7 P1-1)', async () => {
+  await withGuardEnv(async ({ guard, leave, gefragt, antworte }) => {
+    const { container, form, field, fire } = guardFakes();
+    guard.watchLeafForms(container);
+    assert.equal(leave.hasLeaveGuard(), false, 'sauberes Blatt: kein Waechter, die Navigation bleibt ohne await');
+
+    fire('change', field(), false);
+    assert.equal(leave.hasLeaveGuard(), false, 'programmatische Werte sind keine Nutzerarbeit');
+
+    fire('input', field());
+    assert.equal(leave.hasLeaveGuard(), true, 'eine echte Eingabe meldet den Schutz beim Router an');
+    antworte(false);
+    assert.equal(await leave.mayLeave('/tasks'), false, 'Palette, Zurueck, Tab-Leiste: ein Nein haelt das Blatt');
+    assert.equal(gefragt.length, 1);
+    assert.equal(gefragt[0].title, 'modal.unsavedChanges', 'dieselbe Rueckfrage wie Dialog und Anpassen-Modus');
+    assert.equal(gefragt[0].options.danger, true, 'Verwerfen ist rot wie im Dialog-Schutz');
+    assert.equal(gefragt[0].options.confirmLabel, 'modal.discardChanges');
+    assert.equal(gefragt[0].options.detail, 'settings.leaveDiscardDetail', 'der rote Dialog nennt seine Folgen');
+
+    antworte(true);
+    assert.equal(await leave.mayLeave('/tasks'), true, 'Verwerfen laesst gehen');
+    assert.equal(leave.hasLeaveGuard(), false, 'danach ist nichts mehr offen');
+
+    fire('change', field());
+    assert.equal(leave.hasLeaveGuard(), true);
+    fire('submit', field());
+    assert.equal(leave.hasLeaveGuard(), false, 'gespeichert = sauber, der Waechter geht');
+
+    fire('change', field());
+    form.isConnected = false;
+    const vorher = gefragt.length;
+    assert.equal(await leave.mayLeave('/tasks'), true, 'ein abgehaengtes Formular haelt niemanden');
+    assert.equal(gefragt.length, vorher, 'und fragt auch nicht');
+  });
+});
+
+test('Einstellungen: ein Sofort-Schalter im Formular hinterlaesst keinen offenen Stand (R15 A7 P1-1)', async () => {
+  await withGuardEnv(async ({ guard, leave }) => {
+    const { container, field, fire } = guardFakes();
+    guard.watchLeafForms(container);
+    fire('change', field(true));
+    assert.equal(leave.hasLeaveGuard(), false, 'data-instant-save: gespeichert beim Umlegen, nichts zu verlieren');
+    fire('change', field(false));
+    assert.equal(leave.hasLeaveGuard(), true, 'Gegenprobe: ein Feld ohne die Marke zaehlt');
+  });
+});
+
+test('Einstellungen: ein Blatt ohne Formular (Rechte-Matrix) meldet seinen Entwurf selbst an (R15 A7 P1-1)', async () => {
+  await withGuardEnv(async ({ guard, leave, gefragt }) => {
+    const { container } = guardFakes();
+    guard.watchLeafForms(container);
+    let dirty = false;
+    const knoten = { isConnected: true };
+    const abmelden = guard.trackLeafEdits(knoten, () => dirty);
+    assert.equal(leave.hasLeaveGuard(), false, 'sauberer Entwurf: kein Waechter');
+    dirty = true;
+    guard.syncLeafEdits();
+    assert.equal(leave.hasLeaveGuard(), true, 'offener Entwurf: angemeldet');
+    assert.equal(await leave.mayLeave('/calendar'), false, 'und gefragt');
+    assert.equal(gefragt.length, 1);
+    guard.watchLeafForms(container);
+    assert.equal(leave.hasLeaveGuard(), true, 'ein Neuaufbau der Formularwache wirft die Quelle des Blatts nicht weg');
+    dirty = false;
+    guard.syncLeafEdits();
+    assert.equal(leave.hasLeaveGuard(), false, 'gespeichert: abgemeldet');
+    abmelden();
+  });
+  const src = await readFile(new URL('../public/settings/pages/admin-permissions.js', import.meta.url), 'utf8');
+  assert.match(src, /trackLeafEdits\(container, \(\) => state\.dirty\)/, 'die Matrix meldet ihren Entwurf an');
+  const update = src.slice(src.indexOf('function updateSaveState('), src.indexOf('\n}\n', src.indexOf('function updateSaveState(')));
+  assert.match(update, /syncLeafEdits\(\)/, 'jede Aenderung des Entwurfs gleicht die Anmeldung ab');
+});
+
+test('Feiertage: die Ebenen-Schalter speichern sofort, ein Fehler legt zurueck (R15 A7 P1-1)', async () => {
+  const cal = await import('../public/settings/pages/modules-calendar.js');
+  assert.equal(typeof cal.bindHolidayLayerSwitches, 'function');
+  const prevWindow = globalThis.window;
+  const toasts = [];
+  globalThis.window = { ...(prevWindow ?? {}), yuvomi: { showToast: (...a) => toasts.push(a) } };
+  const schalter = (checked) => ({
+    checked, disabled: false, isConnected: true, on: {},
+    addEventListener(type, fn) { (this.on[type] ??= []).push(fn); },
+    async fire() { for (const fn of this.on.change ?? []) await fn(); },
+  });
+  try {
+    const showPublic = schalter(false);
+    const showSchool = schalter(true);
+    const publicColorGroup = { hidden: true };
+    const schoolColorGroup = { hidden: false };
+    const gespeichert = [];
+    let fehler = null;
+    cal.bindHolidayLayerSwitches({
+      showPublic, showSchool, publicColorGroup, schoolColorGroup,
+      save: async (patch) => { if (fehler) throw fehler; gespeichert.push(patch); },
+    });
+    showPublic.checked = true;
+    await showPublic.fire();
+    assert.deepEqual(gespeichert, [{ holiday_show_public: true }], 'nur der eigene Wert, ohne Land und Farben');
+    assert.equal(toasts.at(-1)?.[1], 'success');
+    assert.equal(showPublic.disabled, false, 'nach dem Speichern wieder bedienbar');
+
+    fehler = new Error('offline');
+    showSchool.checked = false;
+    schoolColorGroup.hidden = true;
+    await showSchool.fire();
+    assert.equal(showSchool.checked, true, 'Fehler: der Schalter legt sich zurueck');
+    assert.equal(schoolColorGroup.hidden, false, 'und die Farbe folgt ihm');
+    assert.equal(toasts.at(-1)?.[1], 'danger');
+  } finally {
+    globalThis.window = prevWindow;
+  }
+});
+
+/* KEIN SCHALTER IM FORMULAR OHNE ANTWORT (R15 A7 P1-1). Ein `role=switch` in
+ * einem Formular mit Speichern-Knopf ist entweder ein Sofort-Schalter
+ * (`data-instant-save`, eigener Speicherweg) oder steht in einem Formular,
+ * dessen Felder aneinander haengen - dann haelt ihn der Blatt-Guard (oben
+ * als Programm gemessen), und das Formular steht hier mit Grund. Ein neues
+ * Formular mit Schalter muss sich fuer eine der beiden Antworten entscheiden. */
+const GUARDED_SWITCH_FORMS = new Map([
+  ['admin-api.js#api-token-form', 'Anlegen: der Schalter ist ein Merkmal des neuen Tokens'],
+  ['admin-backup.js#backup-webdav-form', 'Aktivieren ohne Adresse und Zugang waere ein Sicherungsauftrag ins Leere'],
+  ['admin-family.js#add-member-form', 'Anlegen eines Mitglieds'],
+  ['admin-family.js#edit-member-form', 'Dialog mit eigenem Dirty-Schutz (components/modal.js)'],
+  ['admin-weather.js#weather-form', 'Automatisch orten fuellt die Koordinaten desselben Formulars'],
+  ['personal-weather.js#pweather-form', 'Automatisch orten fuellt die Koordinaten desselben Formulars'],
+  ['notifications.js#${esc(channel.id ?? \'\')}', 'Kanal: Aktiv haengt an Adresse und Zugang des Kanals'],
+  ['personal-calendar-subscriptions.js#ics-add-form', 'Anlegen eines Abos'],
+  ['personal-calendar-subscriptions.js#ics-edit-form', 'Dialog mit eigenem Dirty-Schutz (components/modal.js)'],
+]);
+
+test('Einstellungen: jeder Schalter in einem Formular mit Speichern speichert sofort oder steht im Guard mit Grund (R15 A7 P1-1)', async () => {
+  const dir = new URL('../public/settings/', import.meta.url);
+  const files = [
+    ...(await readdir(new URL('pages/', dir))).map((f) => `pages/${f}`),
+    'weather-location.js',
+  ];
+  const sources = Object.fromEntries(await Promise.all(files.map(async (f) => [f, await readFile(new URL(f, dir), 'utf8')])));
+  const gefunden = [];
+  for (const [file, src] of Object.entries(sources)) {
+    for (const m of src.matchAll(/<form\b[\s\S]*?<\/form>/g)) {
+      const body = m[0];
+      if (!/type="submit"/.test(body)) continue;
+      const id = body.match(/id="([^"]+)"/)?.[1] ?? '?';
+      const key = `${file.replace(/^pages\//, '')}#${id}`;
+      // Der Standort-Baustein bringt seinen Schalter von aussen mit.
+      const calls = [...body.matchAll(/toggleRowHtml\(\{[\s\S]*?\}\)\}/g)].map((c) => c[0])
+        .concat(/weatherLocationFieldsHtml\(/.test(body) ? [sources['weather-location.js']] : []);
+      for (const call of calls) {
+        if (!/control: 'switch'/.test(call)) continue;
+        gefunden.push(key);
+        if (/'data-instant-save': true/.test(call)) continue;
+        assert.ok(GUARDED_SWITCH_FORMS.has(key),
+          `${key}: Schalter ohne data-instant-save in einem Formular mit Speichern - sofort speichern oder mit Grund in GUARDED_SWITCH_FORMS`);
+      }
+    }
+  }
+  assert.ok(gefunden.includes('modules-calendar.js#holidays-form'), 'der Leser findet die Feiertags-Schalter');
+  for (const key of GUARDED_SWITCH_FORMS.keys()) {
+    assert.ok(gefunden.includes(key), `${key}: steht in der Ausnahmeliste, hat aber keinen Schalter (mehr) - Eintrag streichen`);
+  }
+  const cal = sources['pages/modules-calendar.js'];
+  for (const id of ['holiday-show-public', 'holiday-show-school']) {
+    assert.match(cal, new RegExp(`attrs: \\{ id: '${id}', 'data-instant-save': true \\}`), `${id} ist ein Sofort-Schalter`);
+  }
+  assert.match(cal, /bindHolidayLayerSwitches\(\{ showPublic, showSchool, publicColorGroup, schoolColorGroup \}\);/,
+    'die Seite verdrahtet die Sofort-Speicherung wirklich');
 });
 
 test('die Navigation laesst sich ueber alle Blaetter durchsuchen', async () => {
