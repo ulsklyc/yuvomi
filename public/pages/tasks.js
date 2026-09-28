@@ -44,7 +44,7 @@ import {
   canEditTaskDefinition as canEditTaskDefinitionFor,
 } from '/utils/task-fields.js';
 import {
-  openTaskDetail, deleteTaskWithUndo, addSubtask,
+  openTaskDetail, deleteTaskWithUndo,
   setTaskArchived, toggleSubtaskStatus,
 } from '/components/task-detail.js';
 
@@ -965,6 +965,27 @@ function wireTagBadgeFilter(container) {
   });
 }
 
+/**
+ * Was hinter „Weitere Einstellungen" des Aufgabendialogs liegt, als Hinweis
+ * unter dem Aufklapper (DESIGN.md: „Weitere Einstellungen nennt, was dahinter
+ * liegt"; A3 P1-2). Dieselbe Bauart wie eventAdvancedTopics() im Kalender.
+ */
+function taskAdvancedTopics({ privacy = true } = {}) {
+  const topics = [
+    t('tasks.startDateLabel'),
+    t('tasks.pointsLabel'),
+    t('tasks.tagsLabel'),
+    t('tasks.statusLabel'),
+    privacy ? t('common.visibility.label') : null,
+    t('tasks.documentsLabel'),
+  ].filter(Boolean);
+  try {
+    return new Intl.ListFormat(getLocale(), { style: 'long', type: 'conjunction' }).format(topics);
+  } catch {
+    return topics.join(', ');
+  }
+}
+
 function renderModalContent({ task = null, users = [], reminder = null } = {}) {
   const isEdit = !!task;
 
@@ -1020,13 +1041,9 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
   // Zusammenfassung noch den alten Wert nannte.
   const statusValue = STATUSES().find((s) => s.value === task?.status)?.value ?? STATUSES()[0].value;
 
+  // Prioritaet und Kategorie stehen nicht mehr in der Zusammenfassung: sie
+  // stehen offen im Hauptteil (A3 P1-2, siehe unten).
   const advancedSummary = [];
-  if (isEdit && task.priority && task.priority !== 'none') {
-    advancedSummary.push(PRIORITY_LABELS()[task.priority] ?? task.priority);
-  }
-  if (isEdit && task.category && task.category !== FALLBACK_CATEGORY) {
-    advancedSummary.push(catLabel(task.category));
-  }
   if (isEdit && task.start_date) advancedSummary.push(formatDate(task.start_date));
   const summaryPoints = isEdit ? Number(task.points) : prefillPoints;
   if (summaryPoints > 0) advancedSummary.push(t('tasks.pointsSummary', { count: summaryPoints }));
@@ -1047,24 +1064,10 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
   const advancedLabel = advancedSummary.length
     ? `${t('modal.moreSettings')} · ${advancedSummary.join(' · ')}`
     : undefined;
+  const advancedHint = taskAdvancedTopics({ privacy: !hidesPrivacyControls('tasks') });
 
   const advancedFieldsHtml = `
       <div class="modal-grid modal-grid--2">
-        <div class="form-group">
-          <label class="label" for="task-priority">${t('tasks.priorityLabel')}</label>
-          <select class="input" id="task-priority" name="priority">
-            ${priorityOptions}
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="label" for="task-category">${t('tasks.categoryLabel')}</label>
-          <select class="input" id="task-category" name="category">
-            ${categoryOptions}
-          </select>
-        </div>
-      </div>
-
-      <div class="modal-grid modal-grid--2" style="margin-top:var(--space-4)">
         <div class="form-group">
           <label class="label" for="task-start-date">${t('tasks.startDateLabel')}</label>
           <yuvomi-datepicker type="date" id="task-start-date" name="start_date"
@@ -1234,7 +1237,26 @@ ${syncTargetFieldHtml(task)}
         <p class="task-field-hint field-hint--warn" id="task-countdown-warning" role="status" hidden><i data-lucide="alert-triangle" aria-hidden="true"></i><span>${t('tasks.countdownNeedsDue')}</span></p>
       </div>
 
-      ${advancedSection(advancedFieldsHtml, { label: advancedLabel })}
+      ${/* PRIORITAET UND KATEGORIE IM HAUPTTEIL, als kompakte Zeile (A3 P1-2).
+          * Die Liste ist standardmaessig nach Kategorie gruppiert; wer sie
+          * hinter „Weitere Einstellungen" nicht fand, landete unter
+          * „Sonstiges", und „Wichtig" suchte man dort gar nicht erst. */ ''}
+      <div class="modal-grid modal-grid--2 task-form__prio-cat" style="margin-top:var(--space-4)">
+        <div class="form-group">
+          <label class="label" for="task-priority">${t('tasks.priorityLabel')}</label>
+          <select class="input" id="task-priority" name="priority">
+            ${priorityOptions}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="label" for="task-category">${t('tasks.categoryLabel')}</label>
+          <select class="input" id="task-category" name="category">
+            ${categoryOptions}
+          </select>
+        </div>
+      </div>
+
+      ${advancedSection(advancedFieldsHtml, { label: advancedLabel, hint: advancedHint })}
 
       ${renderRRuleFields('task', task?.recurrence_rule, {
         allowFromCompletion: true,
@@ -4800,8 +4822,22 @@ function wireTaskList(container) {
       }
     }
 
+    // TEILAUFGABE AUS DER LISTE: die Leseansicht der Aufgabe oeffnet sich mit
+    // der Eingabezeile (A3 P1-1) - dort legt Enter an und laesst den Fokus fuer
+    // die naechste stehen. Frueher fragte hier ein modaler Prompt je Punkt.
+    // Steht die Aufgabe schon rechts in der Spalte, geht nur das Feld dort auf.
     if (action === 'add-subtask') {
-      await addSubtask(target.dataset.parent, { onChanged: () => loadTasks(container) });
+      const parentId = String(target.dataset.parent);
+      const paneComposer = taskMd?.isSplit() && String(taskMd.selectedId()) === parentId
+        ? container.querySelector('.detail-subtask--add')
+        : null;
+      if (paneComposer) {
+        paneComposer.click();
+      } else {
+        composeSubtaskFor = parentId;
+        if (taskMd) taskMd.open(parentId, target);
+        else await openTaskSheet(parentId, container);
+      }
     }
 
     if (action === 'rename-subtask') {
@@ -4826,9 +4862,17 @@ function wireTaskList(container) {
  * sie ohne Mounter oeffnet, bekommt eine ohne Bearbeiten-Knopf statt einen,
  * der ins Leere fuehrt.
  */
+// Die Aufgabe, deren Leseansicht mit offener Teilaufgaben-Zeile aufgehen soll
+// (Aktion `add-subtask` der Liste). Einmal gelesen, dann verbraucht - sonst
+// oeffnete jede spaetere Ansicht derselben Aufgabe das Feld mit.
+let composeSubtaskFor = null;
+
 function openTaskView(task, reminder, container, { pane = null } = {}) {
+  const composeSubtask = composeSubtaskFor != null && composeSubtaskFor === String(task.id);
+  composeSubtaskFor = null;
   openTaskDetail({
     task,
+    composeSubtask,
     reminder,
     users: state.users,
     currentUserId: state.currentUserId,
@@ -5486,7 +5530,7 @@ export const __test = {
   // muss so viele Spalten legen, wie diese Liste fuehrt, und genau dort ist es
   // einmal auseinandergelaufen. `toggleKanbanCol` kommt mit, damit der
   // eingeklappte Zustand gesetzt werden kann, ohne in den Speicher zu greifen.
-  kanbanBoardHtml, KANBAN_COLS, toggleKanbanCol,
+  kanbanBoardHtml, KANBAN_COLS, toggleKanbanCol, taskAdvancedTopics,
   // Mobil blaettert das Brett (R9 M2): die Punkte ueber den Spalten und ihr
   // Tipp, der zur Spalte fuehrt.
   kanbanPagerHtml, wireKanbanPager,

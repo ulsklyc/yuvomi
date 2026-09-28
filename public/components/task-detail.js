@@ -12,7 +12,7 @@
  *   openTaskDetail({ task, reminder, users, currentUserId, isAdmin,
  *                    categories, container, onChanged, edit, pane, onClose })
  *   deleteTaskWithUndo(id, { container, onChanged })
- *   addSubtask(parentId, { onChanged })
+ *   addSubtask(parentId, title, { onChanged })
  *
  * WARUM DIESE DATEI EXISTIERT (#918). Die Ansicht lag in `pages/tasks.js` und
  * war damit nur von dort zu öffnen. Jede andere Stelle, die eine Aufgabe zeigt -
@@ -32,7 +32,7 @@
 import { api } from '/api.js';
 import { t, formatDate, formatTime } from '/i18n.js';
 import { openDetailView, closeDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
-import { closeModal, promptModal, btnLoading, refocusAfterRender } from '/components/modal.js';
+import { closeModal, btnLoading, refocusAfterRender } from '/components/modal.js';
 import { recurrenceRow } from '/rrule-ui.js';
 import { scheduleUndoableDelete } from '/utils/ux.js';
 import { rowActionEl } from '/utils/row-action.js';
@@ -125,21 +125,23 @@ export async function deleteTaskWithUndo(id, { container = null, onChanged = () 
 }
 
 /**
- * Teilaufgabe anlegen - der eine Weg für Liste und Leseansicht.
+ * Teilaufgabe anlegen - der eine Schreibweg für die Eingabezeile der
+ * Leseansicht (`subtaskComposer`).
  *
- * Gibt die angelegte Teilaufgabe zurück (oder null bei Abbruch und Fehler):
- * die Leseansicht hängt sie sich damit selbst an, statt sich zum Nachladen
- * schließen zu müssen (#925).
+ * Gibt die angelegte Teilaufgabe zurück (oder null bei leerem Titel und
+ * Fehler): die Leseansicht hängt sie sich damit selbst an, statt sich zum
+ * Nachladen schließen zu müssen (#925). Bis zur Re-Critique 2026-09-28 fragte
+ * diese Funktion den Titel selbst per `promptModal` ab - ein Dialog je
+ * Teilschritt, fünf Punkte kosteten fünfzehn Gesten (A3 P1-1).
  */
-export async function addSubtask(parentId, { onChanged = () => {} } = {}) {
-  const title = await promptModal(t('tasks.subtaskPrompt'));
-  if (!title) return null;
+export async function addSubtask(parentId, title, { onChanged = () => {} } = {}) {
+  const clean = String(title ?? '').trim();
+  if (!clean) return null;
   try {
-    const res = await api.post('/tasks', { title, parent_task_id: parentId });
+    const res = await api.post('/tasks', { title: clean, parent_task_id: parentId });
     // Wie beim Abhaken daneben: die Umgebung trägt den Fortschrittsbalken der
     // Elternkarte, aber sie muss nichts davon zeigen.
     await onChanged();
-    refocusAfterRender();
     return res.data ?? null;
   } catch (err) {
     window.yuvomi.showToast(err.message, 'danger');
@@ -314,37 +316,116 @@ function subtaskListNode(task, ctx) {
   (task.subtasks ?? []).forEach(appendRow);
 
   if (mayAdd) {
-    const add = document.createElement('button');
-    add.type = 'button';
-    add.className = 'detail-subtask detail-subtask--add';
-    const icon = document.createElement('i');
-    icon.dataset.lucide = 'plus';
-    icon.className = 'icon-sm';
-    icon.setAttribute('aria-hidden', 'true');
-    const label = document.createElement('span');
-    label.textContent = t('tasks.subtaskAdd');
-    add.replaceChildren(icon, label);
-    if (window.lucide) window.lucide.createIcons({ el: add });
-
-    add.addEventListener('click', async () => {
-      add.disabled = true;
-      try {
-        // Derselbe Weg wie in der Liste, nicht ein zweiter: addSubtask stellt
-        // die Frage, legt an und meldet die Änderung an die Umgebung. Sie gibt
-        // die angelegte Teilaufgabe zurück - ohne die müsste diese Ansicht sich
-        // schließen, um den neuen Schritt zu zeigen.
-        const created = await addSubtask(task.id, ctx);
-        if (!created) return;
+    // Derselbe Weg wie in der Liste, nicht ein zweiter: addSubtask legt an und
+    // meldet die Änderung an die Umgebung, die Zeile hängt sich die neue
+    // Teilaufgabe selbst an - ohne das müsste diese Ansicht sich schließen, um
+    // den neuen Schritt zu zeigen.
+    const composer = subtaskComposer(task, ctx, {
+      onCreated: (created) => {
         task.subtasks = [...(task.subtasks ?? []), created];
-        wrap.insertBefore(appendRow(created), add);
-      } finally {
-        add.disabled = false;
-      }
+        wrap.insertBefore(appendRow(created), composer.add);
+      },
     });
-
-    wrap.appendChild(add);
+    wrap.append(composer.add, composer.form);
+    // Aus der Liste gekommen („Teilaufgabe hinzufügen" an der Karte): das Feld
+    // steht offen, sobald die Ansicht im Dokument haengt.
+    // Nach dem Einhaengen und NACH dem Anfangsfokus des Blatts (detail-view.js
+    // setzt ihn synchron auf "Bearbeiten"), sonst naehme der ihn wieder weg.
+    if (ctx.composeSubtask) {
+      const tryOpen = (left) => {
+        if (composer.form.isConnected) composer.open();
+        else if (left > 0) setTimeout(() => tryOpen(left - 1), 50);
+      };
+      setTimeout(() => tryOpen(10), 0);
+    }
   }
   return wrap;
+}
+
+/**
+ * Die Eingabezeile „Teilaufgabe hinzufügen" an Ort und Stelle (A3 P1-1).
+ *
+ * Wie in Erinnerungen und Things: der Knopf wird zum Feld, Enter legt an und
+ * lässt den Fokus für die nächste Zeile stehen, Escape schließt und gibt den
+ * Fokus an den Knopf zurück. Enter auf leerem Feld schließt ebenfalls, ein
+ * leeres Feld schließt auch, wenn der Fokus es verlässt. Escape bleibt hier:
+ * das Blatt, in dem das Feld steht, schließt sonst mit (modal.js hört auf
+ * `document`).
+ *
+ * `onCreated(sub)` hängt die neue Zeile an; der Anlegeweg ist `addSubtask`.
+ */
+function subtaskComposer(task, ctx, { onCreated }) {
+  const add = document.createElement('button');
+  add.type = 'button';
+  add.className = 'detail-subtask detail-subtask--add';
+  const icon = document.createElement('i');
+  icon.dataset.lucide = 'plus';
+  icon.className = 'icon-sm';
+  icon.setAttribute('aria-hidden', 'true');
+  const label = document.createElement('span');
+  label.textContent = t('tasks.subtaskAdd');
+  add.replaceChildren(icon, label);
+  if (window.lucide) window.lucide.createIcons({ el: add });
+
+  const form = document.createElement('form');
+  form.className = 'detail-subtask-compose';
+  form.hidden = true;
+  form.noValidate = true;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'form-input detail-subtask-compose__input';
+  input.maxLength = 500;
+  input.autocomplete = 'off';
+  input.enterKeyHint = 'done';
+  input.placeholder = t('tasks.subtaskAdd');
+  input.setAttribute('aria-label', t('tasks.subtaskAddNamed', { title: task.title }));
+  form.appendChild(input);
+
+  let pending = false;
+  const open = () => {
+    add.hidden = true;
+    form.hidden = false;
+    input.focus();
+  };
+  const close = ({ refocus = true } = {}) => {
+    input.value = '';
+    form.hidden = true;
+    add.hidden = false;
+    if (refocus) add.focus();
+  };
+
+  add.addEventListener('click', open);
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (pending) return;
+    const title = input.value.trim();
+    if (!title) { close(); return; }
+    pending = true;
+    form.setAttribute('aria-busy', 'true');
+    try {
+      const created = await addSubtask(task.id, title, ctx);
+      if (!created) return;
+      onCreated(created);
+      // Nur leeren, was angelegt ist: ein Fehler laesst den Titel stehen.
+      if (input.value.trim() === title) input.value = '';
+    } finally {
+      pending = false;
+      form.removeAttribute('aria-busy');
+      if (!form.hidden) input.focus();
+    }
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    e.stopPropagation();
+    close();
+  });
+  form.addEventListener('focusout', (e) => {
+    if (pending || form.contains(e.relatedTarget)) return;
+    if (!input.value.trim()) close({ refocus: false });
+  });
+
+  return { add, form, open };
 }
 
 /**
@@ -953,6 +1034,7 @@ async function toggleDescriptionCheck(task, box) {
  *   pane?: HTMLElement|null,
  *   onClose?: () => void,
  *   onStale?: () => void,
+ *   composeSubtask?: boolean,
  * }} options
  *
  * `pane` ist der Koerper der Detailspalte (Liste + Detail). Dort schliesst die
@@ -978,8 +1060,9 @@ export function openTaskDetail({
   pane = null,
   onClose = null,
   onStale = null,
+  composeSubtask = false,
 }) {
-  const ctx = { users, currentUserId, isAdmin, categories, container, onChanged, onStale, inPane: Boolean(pane) };
+  const ctx = { users, currentUserId, isAdmin, categories, container, onChanged, onStale, inPane: Boolean(pane), composeSubtask };
   const archived = isArchived(task);
   const statusActions = archived ? [] : (STATUS_ACTIONS[task.status] ?? []);
   // Gesperrte Aufgabe (#830): der Weiterschalt-Knopf bleibt, Loeschen, Ablegen

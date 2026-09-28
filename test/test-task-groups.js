@@ -257,3 +257,137 @@ test('taskQuery sendet jede gewaehlte Kategorie als eigenen Parameter, auch im K
     Object.assign(tasks.state, before);
   }
 });
+
+// -------------------------------------------------------------------------
+// Teilaufgaben als Eingabezeile (Re-Critique 2026-09-28, A3 P1-1)
+//
+// "Teilaufgabe hinzufuegen" oeffnete einen modalen Prompt je Punkt; fuenf
+// Punkte kosteten fuenfzehn Gesten. Jetzt wird der Knopf an Ort und Stelle
+// zum Feld: Enter legt an und laesst den Fokus stehen, Escape schliesst.
+// Gefahren wird der echte Knoten aus subtaskListNode() gegen einen kleinen
+// DOM mit Ereignissen (mini-dom kennt keine) und einen eigenen api-Stub.
+// -------------------------------------------------------------------------
+
+function eventDom() {
+  let active = null;
+  const make = (tag) => {
+    const el = {
+      tagName: tag.toUpperCase(), attrs: new Map(), dataset: {}, children: [], handlers: {},
+      hidden: false, value: '', disabled: false, parent: null, isConnected: true,
+      setAttribute(k, v) { this.attrs.set(k, String(v)); },
+      getAttribute(k) { return this.attrs.get(k) ?? null; },
+      removeAttribute(k) { this.attrs.delete(k); },
+      appendChild(n) { n.parent = this; this.children.push(n); return n; },
+      append(...ns) { ns.forEach((n) => this.appendChild(n)); },
+      replaceChildren(...ns) { this.children = []; this.append(...ns); },
+      // Wie im echten DOM: ein schon eingehaengter Knoten WANDERT.
+      insertBefore(n, ref) {
+        if (n.parent) n.parent.children = n.parent.children.filter((c) => c !== n);
+        n.parent = this;
+        const i = this.children.indexOf(ref);
+        this.children.splice(i < 0 ? this.children.length : i, 0, n);
+        return n;
+      },
+      contains(n) { for (let x = n; x; x = x.parent) if (x === this) return true; return false; },
+      addEventListener(type, fn) { (this.handlers[type] ??= []).push(fn); },
+      focus() { active = this; },
+      fire(type, extra = {}) {
+        const ev = { type, target: this, defaultPrevented: false, propagationStopped: false,
+          preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.propagationStopped = true; }, ...extra };
+        return Promise.all((this.handlers[type] ?? []).map((fn) => fn(ev))).then(() => ev);
+      },
+    };
+    return el;
+  };
+  return { document: { createElement: make }, active: () => active };
+}
+
+test('Teilaufgabe: der Knopf wird zur Eingabezeile, Enter legt an und behaelt den Fokus, Escape schliesst', async () => {
+  const dom = eventDom();
+  const vorher = { document: globalThis.document, window: globalThis.window, api: globalThis.__apiStub };
+  globalThis.document = dom.document;
+  globalThis.window = { yuvomi: { showToast() {} } };
+  const posts = [];
+  globalThis.__apiStub = { post: async (url, body) => { posts.push([url, body]); return { data: { id: 90 + posts.length, title: body.title, status: 'open' } }; } };
+  try {
+    const { __test: detail } = await import('../public/components/task-detail.js');
+    let changed = 0;
+    const task = { id: 7, title: 'Umzug', status: 'open', subtasks: [] };
+    const wrap = detail.subtaskListNode(task, { onChanged: () => { changed += 1; } });
+    const add = wrap.children.find((n) => /detail-subtask--add/.test(n.className));
+    const form = wrap.children.find((n) => n.tagName === 'FORM');
+    const input = form.children[0];
+    assert.ok(add && form && input, 'Knopf und Eingabezeile stehen in der Liste');
+    assert.equal(form.hidden, true, 'die Zeile ist zu, bis sie gebraucht wird');
+    assert.match(input.getAttribute('aria-label') ?? '', /tasks\.subtaskAddNamed/, 'das Feld hat einen Namen');
+
+    await add.fire('click');
+    assert.equal(form.hidden, false, 'ein Klick oeffnet das Feld an Ort und Stelle');
+    assert.equal(add.hidden, true);
+    assert.equal(dom.active(), input, 'der Fokus steht im Feld');
+
+    for (const title of ['Kartons', 'Transporter']) {
+      input.value = title;
+      const ev = await form.fire('submit');
+      assert.ok(ev.defaultPrevented, 'kein Seitenwechsel durch das Formular');
+      assert.equal(input.value, '', 'nach dem Anlegen ist das Feld leer fuer die naechste');
+      assert.equal(form.hidden, false, 'und bleibt offen');
+      assert.equal(dom.active(), input, 'mit dem Fokus darin');
+    }
+    assert.deepEqual(posts.map(([url, body]) => [url, body.title, body.parent_task_id]),
+      [['/tasks', 'Kartons', 7], ['/tasks', 'Transporter', 7]]);
+    assert.equal(changed, 2, 'die Umgebung erfaehrt jede Anlage');
+    const rows = wrap.children.filter((n) => n.dataset.subtaskId);
+    assert.deepEqual(rows.map((r) => r.dataset.subtaskId), ['91', '92'], 'die neuen Zeilen stehen vor dem Feld');
+    assert.ok(wrap.children.indexOf(rows[1]) < wrap.children.indexOf(add));
+
+    const esc = await input.fire('keydown', { key: 'Escape' });
+    assert.ok(esc.propagationStopped, 'Escape schliesst nur das Feld, nicht das Blatt darum');
+    assert.equal(form.hidden, true);
+    assert.equal(add.hidden, false);
+    assert.equal(dom.active(), add, 'der Fokus kehrt auf den Knopf zurueck');
+
+    await add.fire('click');
+    input.value = '   ';
+    await form.fire('submit');
+    assert.equal(form.hidden, true, 'Enter auf leerem Feld schliesst');
+    assert.equal(posts.length, 2, 'und legt nichts an');
+  } finally {
+    globalThis.document = vorher.document;
+    globalThis.window = vorher.window;
+    if (vorher.api === undefined) delete globalThis.__apiStub; else globalThis.__apiStub = vorher.api;
+  }
+});
+
+test('Teilaufgabe: kein modaler Prompt mehr, weder in der Leseansicht noch aus der Liste', () => {
+  const detail = readFileSync(new URL('../public/components/task-detail.js', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  assert.ok(!/promptModal\(/.test(detail), 'task-detail.js fragt den Titel nicht mehr per Dialog ab');
+  const handler = page.slice(page.indexOf("if (action === 'add-subtask') {"));
+  assert.ok(handler.length > 0 && !/promptModal\(|addSubtask\(/.test(handler.slice(0, 800)),
+    'die Aktion der Liste oeffnet die Leseansicht mit der Eingabezeile');
+  assert.match(handler.slice(0, 800), /composeSubtaskFor = parentId/);
+});
+
+test('Aufgabendialog: Prioritaet und Kategorie offen im Hauptteil, der Aufklapper nennt, was dahinter liegt (A3 P1-2)', () => {
+  const vorher = globalThis.__advancedSection;
+  const optionen = [];
+  globalThis.__advancedSection = (inner, options) => { optionen.push(options); return `<ADV>${inner}</ADV>`; };
+  try {
+    const html = tasks.renderModalContent({ task: null, users: [], reminder: null });
+    const adv = html.indexOf('<ADV>');
+    assert.ok(adv > 0, 'der Aufklapper steht im Dialog');
+    for (const id of ['task-priority', 'task-category']) {
+      const at = html.indexOf(`id="${id}"`);
+      assert.ok(at > 0 && at < adv, `${id} steht vor dem Aufklapper, nicht dahinter`);
+    }
+    const hint = optionen.at(-1)?.hint ?? '';
+    assert.ok(hint.length > 0, 'ohne hint sagt "Weitere Einstellungen" nicht, was dahinter liegt');
+    for (const key of ['tasks.startDateLabel', 'tasks.pointsLabel', 'tasks.tagsLabel']) {
+      assert.ok(hint.includes(key), `der Hinweis nennt ${key}: ${hint}`);
+    }
+    assert.ok(!hint.includes('tasks.priorityLabel'), 'was offen steht, nennt der Hinweis nicht');
+  } finally {
+    if (vorher === undefined) delete globalThis.__advancedSection; else globalThis.__advancedSection = vorher;
+  }
+});
