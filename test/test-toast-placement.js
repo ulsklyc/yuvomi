@@ -24,7 +24,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { chooseToastPlacement, persistentToastMustYield } from '../public/utils/toast-placement.js';
+import { chooseToastPlacement, persistentToastMustYield, placeToastStack } from '../public/utils/toast-placement.js';
 import { PERSISTENT_TOAST_SELECTOR } from '../public/utils/toast-surface.js';
 import { eachRule } from './css-rules.js';
 
@@ -543,4 +543,155 @@ test('ein Erfolgs-Toast steht auf dem Shell-Material, das Gruen traegt das Icon'
   assert.match(icon?.body ?? '', /color:\s*var\(--shell-success-ink\)/, 'das Haekchen traegt die Erfolgsfarbe');
   const tokens = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
   assert.equal((tokens.match(/--_shell-success-ink:/g) ?? []).length, 3, 'hell, dunkel per Vorliebe, dunkel per Wahl');
+});
+
+// --------------------------------------------------------
+// Liste+Detail: der Fuss der Detailspalte (Re-Critique 2026-09-28, A3 P1-1)
+// --------------------------------------------------------
+
+/*
+ * Gemessen bei 1280x800 in den Aufgaben: der Toast lag bei 560-940/710-776,
+ * "Loeschen" im Fuss der Detailspalte bei 716-828/730-770; `elementFromPoint`
+ * auf der Knopfmitte lieferte den Toast. Die Platzierung kannte nur Dialoge,
+ * die Spalte ist keiner. Gefahren wird hier das ECHTE `placeToastStack` gegen
+ * einen kleinsten DOM-Stub - die reine Wahl der Lage haette die Spalte schon
+ * immer richtig behandelt, sie wurde ihr nur nie gezeigt.
+ */
+function parseSelector(selector) {
+  return selector.split(',').map((part) => {
+    const s = part.trim();
+    const tag = s.match(/^[a-z][\w-]*/)?.[0] ?? null;
+    const classes = [...s.matchAll(/\.([\w-]+)/g)].map((m) => m[1]);
+    const attrs = [...s.matchAll(/\[([\w-]+)(?:="([^"]*)")?\]/g)].map((m) => [m[1], m[2]]);
+    return { tag, classes, attrs, unsupported: s.includes(':') };
+  });
+}
+
+class FakeEl {
+  constructor(tag, { cls = '', attrs = {}, rect = null, overflow = 'visible' } = {}) {
+    this.tagName = tag.toUpperCase();
+    this.cls = new Set(cls.split(' ').filter(Boolean));
+    this.attrs = new Map(Object.entries(attrs));
+    this.rectBox = rect;
+    this.overflow = overflow;
+    this.children = [];
+    this.parentElement = null;
+    this.dataset = {};
+    this.inert = false;
+    this.props = new Map();
+    this.style = {
+      setProperty: (k, v) => this.props.set(k, v),
+      removeProperty: (k) => this.props.delete(k),
+    };
+    this.classList = {
+      contains: (c) => this.cls.has(c),
+      add: (c) => this.cls.add(c),
+      remove: (c) => this.cls.delete(c),
+    };
+  }
+
+  add(...kids) {
+    for (const kid of kids) { kid.parentElement = this; this.children.push(kid); }
+    return this;
+  }
+
+  matchesOne({ tag, classes, attrs, unsupported }) {
+    if (unsupported) return false;
+    if (tag && this.tagName !== tag.toUpperCase()) return false;
+    if (!classes.every((c) => this.cls.has(c))) return false;
+    return attrs.every(([k, v]) => this.attrs.has(k) && (v === undefined || this.attrs.get(k) === v));
+  }
+
+  matches(selector) { return parseSelector(selector).some((p) => this.matchesOne(p)); }
+  closest(selector) {
+    for (let n = this; n; n = n.parentElement) if (n.matches?.(selector)) return n;
+    return null;
+  }
+
+  descendants() { return this.children.flatMap((c) => [c, ...c.descendants()]); }
+  querySelectorAll(selector) { return this.descendants().filter((n) => n.matches(selector)); }
+  querySelector(selector) { return this.querySelectorAll(selector)[0] ?? null; }
+  contains(other) { return other === this || this.descendants().includes(other); }
+  getAttribute(k) { return this.attrs.has(k) ? this.attrs.get(k) : null; }
+  getBoundingClientRect() { return this.rectBox ?? box(0, 0, 0, 0); }
+  getClientRects() { return this.rectBox ? [this.rectBox] : []; }
+  checkVisibility() { return Boolean(this.rectBox); }
+}
+
+/** Aufgaben bei 1280x800: Liste links, Detailspalte rechts, Toast am Platz. */
+function splitViewScene({ reminder = false } = {}) {
+  const body = new FakeEl('body');
+  const pane = new FakeEl('section', { cls: 'split-view__detail', rect: box(140, 680, 576, 644), overflow: 'auto' });
+  const head = new FakeEl('header', { cls: 'split-view__detail-head', rect: box(140, 680, 576, 72) })
+    .add(new FakeEl('button', { rect: box(152, 1150, 96, 44) }));
+  const content = new FakeEl('div', { cls: 'detail-view', rect: box(212, 680, 576, 498) })
+    .add(new FakeEl('button', { rect: box(300, 700, 200, 40) }));
+  const deleteBtn = new FakeEl('button', { cls: 'btn btn--danger-outline', rect: box(730, 716, 112, 40) });
+  const footer = new FakeEl('div', { cls: 'detail-view__footer split-view__detail-footer', rect: box(710, 680, 576, 64) })
+    .add(deleteBtn, new FakeEl('button', { cls: 'btn btn--primary', rect: box(730, 1100, 120, 40) }));
+  pane.add(head, content, footer);
+  const list = new FakeEl('div', { cls: 'split-view__list', rect: box(140, 280, 376, 644) });
+  body.add(list, pane);
+
+  const toast = new FakeEl('div', { cls: reminder ? 'toast toast--reminder' : 'toast', rect: box(710, 560, 380, 66) });
+  const stack = new FakeEl('div', { cls: 'shell-bottom-stack', rect: box(710, 560, 380, 66) }).add(toast);
+  body.add(stack);
+  return { body, pane, footer, deleteBtn, stack, toast };
+}
+
+function withDom(scene, fn) {
+  const saved = { document: global.document, getComputedStyle: global.getComputedStyle };
+  global.document = {
+    body: scene.body,
+    activeElement: scene.body,
+    documentElement: { clientWidth: 1280, clientHeight: 800 },
+    querySelectorAll: (sel) => scene.body.querySelectorAll(sel),
+    querySelector: (sel) => scene.body.querySelector(sel),
+    elementFromPoint: () => null,
+  };
+  global.getComputedStyle = (el) => ({
+    overflowX: el.overflow ?? 'visible',
+    overflowY: el.overflow ?? 'visible',
+    getPropertyValue: (name) => (name === '--toast-dock-gap' ? '12px' : ''),
+  });
+  try {
+    return fn();
+  } finally {
+    global.document = saved.document;
+    global.getComputedStyle = saved.getComputedStyle;
+  }
+}
+
+test('A3 P1-1: in Liste+Detail weicht der Stapel dem Fuss der Detailspalte (1280x800)', () => {
+  const scene = splitViewScene();
+  const decision = withDom(scene, () => placeToastStack(scene.stack));
+  assert.ok(decision, 'der Stapel blieb auf "Loeschen" stehen - die Detailspalte zaehlte nicht als Flaeche');
+  assert.equal(scene.stack.dataset.dock, 'placed');
+  const width = parseFloat(scene.stack.props.get('--toast-dock-width'));
+  const center = parseFloat(scene.stack.props.get('--toast-dock-center'));
+  const placed = box(decision.top, center - width / 2, width, 66);
+  const footer = scene.footer.getBoundingClientRect();
+  assert.ok(!intersects(placed, footer), `der Stapel ${placed.top}..${placed.bottom} liegt auf dem Fuss ab ${footer.top}`);
+  assert.ok(!intersects(placed, scene.deleteBtn.getBoundingClientRect()), '"Loeschen" bleibt frei');
+  assert.ok(placed.bottom <= footer.top && placed.top >= 212,
+    'er steht in der Spalte ueber ihrem Fuss, nicht ueber dem Seitenkopf');
+  assert.ok(placed.left >= 680 && placed.right <= 1256, 'ausgerichtet an der Detailspalte');
+});
+
+test('A3 P1-1: die Erinnerung weicht der Detailspalte nicht ganz - nur ihrem Fuss', () => {
+  const scene = splitViewScene({ reminder: true });
+  const decision = withDom(scene, () => placeToastStack(scene.stack));
+  assert.ok(decision, 'die Erinnerung blieb auf dem Fuss');
+  assert.equal(scene.toast.classList.contains('toast--tucked'), false,
+    'eine Erinnerung verschwaende sonst, solange rechts ein Detail offen ist - also fast immer');
+  assert.equal(scene.toast.inert, false);
+});
+
+test('A3 P1-1: ohne Detailspalte (unter der Schwelle) bleibt der Stapel, wo er steht', () => {
+  const scene = splitViewScene();
+  scene.pane.rectBox = null;
+  for (const n of scene.pane.descendants()) n.rectBox = null;
+  const decision = withDom(scene, () => placeToastStack(scene.stack));
+  assert.equal(decision, null);
+  assert.equal(scene.stack.dataset.dock, undefined);
 });
