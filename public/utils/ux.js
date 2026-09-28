@@ -826,8 +826,10 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // Haushaltshilfe (8px Polster, 4px Luecke, R11-Band) liess ihren 41px-Titel
     // so 31px tief stehen - 3px unter dem 28px-Rahmen, und der Kopf dockte nie
     // an (Sonde 8). Gemessen statt aus Polster und Luecke gerechnet, damit auch
-    // ein hoeherer Nachbar in der ersten Zeile mitzaehlt.
-    const firstBottom = firstEl.getBoundingClientRect().bottom - tb.top;
+    // ein hoeherer Nachbar in der ersten Zeile mitzaehlt - und an der Kante
+    // von JETZT: `tb` stammt von vor dem Schreiben von Lead-Zone und Streifen,
+    // und der klebende Kopf rueckt mit beiden.
+    const firstBottom = firstEl.getBoundingClientRect().bottom - toolbar.getBoundingClientRect().top;
     const overhang = Math.max(0, Math.ceil(firstBottom - lead));
     io = new IntersectionObserver(
       ([entry]) => toolbar.classList.toggle('is-docked', !entry.isIntersecting),

@@ -1165,6 +1165,36 @@ test('H1: ragt die erste Zeile unter die Lead-Zone, rueckt die Andock-Schwelle m
 });
 
 /**
+ * DER UEBERHANG WIRD AN DER KANTE GEMESSEN, AUF DER DER KOPF JETZT STEHT.
+ * Der Kopf klebt mit einem `top` aus `--page-toolbar-lead` und `--dock-band-h`,
+ * und `update` schreibt beide, bevor es den Ueberhang misst. Aendert sich der
+ * Streifen, waehrend der Kopf klebt (Neuaufbau, andere Schrift), rueckt der
+ * ganze Kopf mit - eine Oberkante von VOR dem Schreiben verschiebt den
+ * Ueberhang um genau diesen Weg (claude-review an #1491).
+ */
+test('H1: rueckt der klebende Kopf beim Schreiben des Streifens, misst der Ueberhang die neue Kante', () => {
+  const s = dockStub({ tabBar: true, padTop: 8, barTop: 53 });
+  try {
+    // Geklebt mit einem alten Streifen von 22px; die Messung ergibt 27px, und
+    // mit dem Schreiben rueckt der Kopf samt Inhalt um 5px tiefer.
+    const moved = [s.toolbar, ...s.toolbar.children];
+    s.toolbar.props.set('--dock-band-h', '22px');
+    const set = s.toolbar.style.setProperty;
+    s.toolbar.style.setProperty = (k, v) => {
+      if (k === '--dock-band-h') {
+        const delta = parseFloat(v) - parseFloat(s.toolbar.props.get(k) ?? '0');
+        for (const el of moved) el.rect = { ...el.rect, top: el.rect.top + delta, bottom: el.rect.bottom + delta };
+      }
+      set(k, v);
+    };
+    wireCollapsingHeader(s.toolbar);
+    assert.equal(s.toolbar.props.get('--dock-band-h'), '27px', 'Attrappe muss den neuen Streifen ergeben');
+    assert.equal(s.ioOptions.at(-1)?.rootMargin, '-32px 0px 0px 0px',
+      'dieselbe Schwelle wie ohne Verschiebung: der Kopf ist mitgerueckt, der Titel ragt weiter 4px unter die Lead-Zone');
+  } finally { s.restore(); }
+});
+
+/**
  * EINE ZEILE HAT KEINE LEAD-ZONE (Dokument-Guards, Sonde 8, nach R9 M10).
  * Rezepte und Vorrat legen ihren Kopf mobil in die 56px-Zeile der
  * Kuechen-Leiste, ohne Polster; die 48px-Lupe sitzt mittig, also 4px tief.
