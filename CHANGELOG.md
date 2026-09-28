@@ -443,7 +443,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are no longer below the fold on a phone; Delete is a text button on the left, and Cancel always
   looks like the safe way out. In Health and Rewards the add button names what it adds on each tab
   and docks in the header on a desktop. A note opens with Edit as its main action instead of
-  Delete alone, and the birthday import moved into the tools menu.
+  Delete alone, and the birthday import moved into the tools menu. The dashed "Add subtask" buttons
+  in a task are capsules like every other button.
 
 - **Settings use switches and find single options.** Every on/off setting is a switch with the
   label on the left, theme and week start are a segmented control, and the module list only marks
