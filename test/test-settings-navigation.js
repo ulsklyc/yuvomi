@@ -2330,3 +2330,15 @@ test('R14: Modulblaetter stehen in der Reihenfolge der Seitenleiste', async () =
   const router = await readFile(new URL('../public/router.js', import.meta.url), 'utf8');
   assert.match(router, /moduleOrder: \(\) => _moduleOrder\.slice\(\)/, 'die Einstellungen lesen dieselbe Reihenfolge wie die Seitenleiste');
 });
+
+// R14 P10 (Re-Critique 2026-09-28, A8 P2-4): zwei mobile Unterseiten-
+// Grammatiken - Gesundheit-Bereich mit Large Title (34px), Einstellungs-Blatt
+// mit 22px-Titel direkt ueber einem 20px-Abschnitt. EINE Regel: eine Ebene
+// tiefer heisst mobil Zurueck-Leiste plus Large Title.
+test('R14: mobil traegt das Einstellungs-Blatt den Large Title wie jede Unterseite', async () => {
+  const css = await readFile(new URL('../public/styles/typography.css', import.meta.url), 'utf8');
+  const phone = [...eachRule(css)].filter((r) => r.at.some((a) => /\(max-width:\s*767px\)/.test(a))
+    && r.selector.split(',').some((s) => s.trim() === '.settings-leaf-header__title'));
+  assert.equal(phone.length, 1, 'eine Regel fuer den mobilen Blatt-Titel');
+  assert.match(phone[0].body, /font-size:\s*var\(--type-page-title-mobile\)/, 'Large Title (34px), dieselbe Stufe wie der Modulkopf');
+});

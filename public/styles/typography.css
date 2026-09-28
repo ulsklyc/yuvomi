@@ -98,6 +98,17 @@
   }
 }
 
+/* DAS EINSTELLUNGS-BLATT MOBIL: EINE EBENE TIEFER, EINE GRAMMATIK (R14,
+ * A8 P2-4). Unter 768px steht ueber dem Blatt die Zurueck-Leiste, der Titel
+ * steht im Inhalt - bisher im Inline-Schnitt (22px), direkt ueber einem
+ * 20px-Abschnitt ("Design"), kaum eine Stufe. Ein Gesundheit-Bereich zeigt
+ * dieselbe Geste mit Zurueck plus Large Title. Jetzt beide so. */
+@media (max-width: 767px) {
+  .settings-leaf-header__title {
+    font-size: var(--type-page-title-mobile);
+  }
+}
+
 /* In der kompakten HÖHENKLASSE gibt es den Large-Title-Zustand nicht: dort
  * steht der Titel inline, wie ihn iOS im Querformat führt. Den Umbruch dazu
  * macht layout.css; hier steht, dass er dabei auf den Inline-Schnitt
