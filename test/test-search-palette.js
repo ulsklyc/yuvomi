@@ -107,6 +107,24 @@ test('Palette: Kacheln aus allen sichtbaren Zielen, Orte und Aktionen vor den Da
     'eine Anlege-Aktion oeffnet die Seite und loest ihren FAB aus - wie der Kurzbefehl n');
 });
 
+/**
+ * EIN ZEICHEN OHNE ORT LAESST DIE PALETTE NICHT LEER (claude-review an #1492).
+ * Unter zwei Zeichen fragt die Palette den Server nicht; findet `paletteLocal`
+ * nichts (`?`, `5`, ein Buchstabe ohne Ort), leerte `renderSearchResults` die
+ * Flaeche und schrieb nichts hinein - `data` ist dort null, das "Keine
+ * Ergebnisse" gehoert der Serverantwort. Dann bleibt der Hinweis mit den
+ * Kacheln stehen, bis ein zweites Zeichen die Daten fragt.
+ */
+test('ein Zeichen ohne lokalen Treffer zeigt weiter den Hinweis statt einer leeren Flaeche', () => {
+  const input = body("input.addEventListener('input'", 'return openSearch;');
+  const short = input.slice(input.indexOf('if (q.length < 2)'), input.indexOf('searchTimer = setTimeout'));
+  assert.ok(short.length > 0, 'Zweig unter zwei Zeichen nicht gefunden');
+  assert.match(short, /if \(localCount === 0\) \{\s*renderSearchHint\(\);\s*return;/,
+    'ohne Ort und ohne Aktion bleibt der Hinweis stehen');
+  assert.ok(short.indexOf('renderSearchHint()') < short.indexOf('announceCount(localCount)'),
+    'der Hinweis kommt vor der Ansage - sonst hoert Sam "Keine Ergebnisse" ueber einem Hinweis');
+});
+
 test('der Hinweis verspricht, was die Palette haelt', () => {
   const hint = de.search.emptyHint;
   assert.doesNotMatch(hint, /alle Bereiche/, 'die Palette durchsucht Eintraege, sie findet Bereiche - "alle Bereiche durchsuchen" war falsch');

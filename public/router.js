@@ -3600,12 +3600,21 @@ function initSearch(container) {
     // kennt der Client selbst. Die Daten kommen ab zwei Zeichen dazu.
     const local = paletteLocal(q);
     const onClose = () => closeSearch({ restoreFocus: false });
-    const localCount = renderSearchResults(results, null, onClose, { local, query: q });
     if (q.length < 2) {
+      // Ohne Ort und ohne Aktion bliebe die Flaeche leer: der Server wird
+      // unter zwei Zeichen nicht gefragt, sein "Keine Ergebnisse" kommt nie.
+      // Dann steht weiter der Hinweis mit den Kacheln.
+      const localCount = local.places.length + local.actions.length;
+      if (localCount === 0) {
+        renderSearchHint();
+        return;
+      }
+      renderSearchResults(results, null, onClose, { local, query: q });
       results.setAttribute('aria-busy', 'false');
       announceCount(localCount);
       return;
     }
+    renderSearchResults(results, null, onClose, { local, query: q });
     searchTimer = setTimeout(async () => {
       // Ladezustand erst wenn der Fetch wirklich startet (nach dem Debounce):
       // Skeletons + „Suche läuft…" unter den Orten statt einer eingefroren
