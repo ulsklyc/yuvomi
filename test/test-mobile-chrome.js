@@ -199,3 +199,16 @@ test('(5) die geteilten Bausteine existieren an einer Stelle', async () => {
     assert.equal(topLevel(layoutCss, cls).length >= 1, true, `${cls} gehoert in layout.css (global geladen)`);
   }
 });
+
+// R14 P12 (Re-Critique 2026-09-28, A1 P3-2): im Desktop-Kopf standen zwei
+// Hoehen - Suche und "..." 44px, Segment, Filter und angedockte Pille 40px,
+// gemessen in 12 Modulen bei 1440. Am Zeiger ist 40px die Regel (ignore.md,
+// Hit-Test); die zwei Ausreisser folgen ihr jetzt im Kopf.
+test('R14: der Desktop-Kopf hat EINE Steuerhoehe', () => {
+  const desk = [...eachRule(layoutCss)].filter((r) => r.at.some((a) => /\(min-width:\s*1024px\)/.test(a)));
+  const body = (sel) => desk.filter((r) => r.selector.split(',').some((s) => s.trim() === sel)).map((r) => r.body).join(';');
+  for (const sel of ['.page-toolbar .btn--icon', '.page-toolbar .page-search__input']) {
+    assert.match(body(sel), /min-height:\s*var\(--target-md\)/, `${sel}: dieselbe Hoehe wie .btn am Desktop`);
+  }
+  assert.match(body('.page-toolbar .btn--icon'), /min-width:\s*var\(--target-md\)/, 'das Werkzeugmenue bleibt quadratisch');
+});

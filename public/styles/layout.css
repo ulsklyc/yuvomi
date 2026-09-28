@@ -6151,6 +6151,24 @@ p.field-hint--warn[hidden] {
   min-width: var(--target-base);
 }
 
+/* EINE STEUERHOEHE IM DESKTOP-KOPF (R14, A1 P3-2). Suche und Werkzeugmenue
+ * standen mit --target-base (44px) neben Segment, Filter und angedockter
+ * Pille mit --target-md (40px, die `.btn`-Regel oben) - zwei Kanten in einer
+ * Zeile, gemessen in 12 Modulen bei 1440. Am Zeiger ist 40px die Regel
+ * (Hit-Test, ignore.md); dieselbe Grenze wie `.btn`. */
+@media (min-width: 1024px) {
+  .page-toolbar .btn--icon {
+    min-height: var(--target-md);
+    min-width: var(--target-md);
+  }
+
+  /* `height` dazu: Polster plus Zeilenhoehe ergaben 43px ueber der Untergrenze. */
+  .page-toolbar .page-search__input {
+    min-height: var(--target-md);
+    height: var(--target-md);
+  }
+}
+
 
 /* FAB und page-fab ausblenden wenn virtuelle Tastatur offen (nur Mobile) */
 @media (max-width: 1023px) {
