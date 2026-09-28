@@ -3870,15 +3870,19 @@ describe('Sonde 18 - am Scroll-Ende liegt nichts Bedienbares unter dem FAB', () 
       const page = await openPage(harness, { device, theme: 'light', locale: 'de' });
       const findings = [];
       let seen = 0;
-      let angedockt = 0;
-      let eingeklappt = 0;
+      const angedockt = [];
+      const eingeklappt = [];
+      const schwebend = [];
       let ohneFab = 0;
 
       for (const name of sweep('Sonde 18')) {
         await gotoRoute(page, ALL_ROUTES[name]);
         const m = await fabAtScrollEnd(page);
-        if (m.angedockt) angedockt += 1;
-        if (m.eingeklappt) eingeklappt += 1;
+        if (m.angedockt) angedockt.push(name);
+        if (m.eingeklappt) eingeklappt.push(name);
+        // Unabhaengig vom Scrollstand: ob ein Knopf schwebt, ist eine Frage
+        // der Seite, nicht davon, ob die Messung ihr Ende erreicht hat.
+        if (!m.keinFab) schwebend.push(name);
 
         /* Der Nachlauf darf den Scrollport nicht verkuerzen: das war die Marge,
          * und ihr Preis war die abgeschnittene Widget-Reihe.
@@ -3909,11 +3913,11 @@ describe('Sonde 18 - am Scroll-Ende liegt nichts Bedienbares unter dem FAB', () 
       }
       await page.close();
 
-      /* AM ZEIGER SCHWEBT SEIT ETAPPE 2 FAST KEIN FAB MEHR, und damit hat die
-       * Frage dieser Sonde dort kaum noch einen Gegenstand. Sie prueft deshalb
-       * zuerst die AUFTEILUNG - wer andockt, wer einklappt, wer keinen hat -
-       * und misst die Ueberlappung nur noch fuer den einen, der wirklich
-       * schwebt.
+      /* AM ZEIGER SCHWEBT SEIT R14 KEIN FAB MEHR (seit Etappe 2 nur noch das
+       * Speed-Dial der Uebersicht), und damit hat die Frage dieser Sonde dort
+       * keinen Gegenstand. Sie prueft deshalb zuerst die AUFTEILUNG - wer
+       * andockt, wer einklappt, wer keinen hat - und misst die Ueberlappung
+       * fuer jeden, der wieder schwebt.
        *
        * WARUM DAS KEIN NACHGEBEN IST: die alte Fassung hat auf dem Zeiger nicht
        * etwa nichts gefunden, sie hat FALSCH gefunden. Sie mass die
@@ -3929,38 +3933,47 @@ describe('Sonde 18 - am Scroll-Ende liegt nichts Bedienbares unter dem FAB', () 
        * Inhalt - dass am Scroll-Ende trotzdem nichts Bedienbares unter ihm
        * liegt, ist genau die Zusage, die zu pruefen bleibt. */
       if (device === 'desktop') {
-        /* GENAU EINER SCHWEBT DORT NOCH, und das ist eine Entscheidung, keine
-         * Luecke: das Speed-Dial des Dashboards dockt bewusst nicht an, weil es
-         * ein MENUE ist und ein halber Umzug schlechter waere als keiner
-         * (dc23972f). Fuer ihn gilt die Frage dieser Sonde weiter, und er ist
-         * der einzige Fall, in dem sie auf dem Zeiger ueberhaupt etwas misst. */
-        assert.equal(seen, 1,
-          `Auf dem Zeigergeraet schwebt genau ein FAB ueber dem Inhalt (das Dashboard-Speed-Dial), `
-          + `gemessen wurden ${seen}. Entweder dockt ein Modul nicht mehr an, oder die Einklapp-Regel greift nicht.`);
-        // Die Aufteilung wird MITGEPRUEFT, nicht nur abgezogen: sonst verschwiege
-        // die Sonde still, dass ein Modul seinen FAB ganz verloren hat.
-        /* NUR die beiden Zahlen, die dieser Sonde gehoeren. `ohneFab` waere die
-         * dritte, aber der Sweep faehrt ausser den 15 Modulrouten auch jedes
-         * Einstellungs-Blatt an - gemessen 29 statt 3, und diese Zahl haengt an
+        /* AM ZEIGER SCHWEBT KEINER MEHR - DAS IST DIE REGEL, NICHT EINE ZAHL.
+         *
+         * Bis R14 schwebte genau einer, das Speed-Dial der Uebersicht, und die
+         * Sonde fragte nach `seen === 1`. Seit R14 (A8 P3-2, #1493) traegt die
+         * Uebersicht am Desktop „+ Neu" als angedockte Pille im Kopf mit
+         * demselben Menue; die Zahl 1 wurde damit zu 0 und die Sonde rot, ohne
+         * dass sich an der Zusage etwas geaendert haette. Gefragt wird deshalb
+         * die Regel selbst: auf dem Zeigergeraet schwebt KEIN Knopf ueber dem
+         * Inhalt, jeder dockt an. Wer wieder schwebt, steht hier mit Namen -
+         * und die Ueberlappungsfrage oben misst ihn trotzdem weiter.
+         *
+         * Gegengeprueft: mit einem Riegel in `dockFabIntoToolbar` (router.js),
+         * der /tasks nicht andocken laesst, wird diese Zeile rot und nennt
+         * `tasks`. */
+        assert.deepEqual(schwebend, [],
+          'Auf dem Zeigergeraet schwebt kein FAB ueber dem Inhalt - jede Primaeraktion dockt im Kopf an '
+          + '(seit R14 auch die Uebersicht als Pille "+ Neu"). Es schweben: ' + schwebend.join(', '));
+        /* Die Aufteilung wird MITGEPRUEFT, nicht nur abgezogen: sonst verschwiege
+         * die Sonde still, dass ein Modul seinen FAB ganz verloren hat. Mit
+         * NAMEN, nicht als Zahl - die Meldung sagt dann, wer fehlt.
+         *
+         * `ohneFab` gehoert nicht hierher: der Sweep faehrt ausser den
+         * Modulrouten auch jedes Einstellungs-Blatt an, und diese Zahl haengt an
          * der Zahl der Einstellungsseiten, nicht am FAB. Ein Modul, das seinen
-         * FAB verliert, faellt trotzdem auf: es fehlt dann in einem der beiden
-         * Toepfe hier. */
-        /* Einkauf dockt seit der Kopfregel mobil (2026-09-26) an: vorher hatte er am
-         * Desktop gar keine Kopfaktion und zaehlte als eingeklappt. Seit #1483
-         * ("one add button") gibt es keinen eigenen Kopfknopf mehr - Aufgaben,
-         * Notizen, Kontakte, Kalender und Budget docken ihren FAB an wie alle
-         * anderen; die fuenf eingeklappten sind damit angedockte. */
-        assert.deepEqual({ angedockt, eingeklappt }, { angedockt: 11, eingeklappt: 0 },
-          'Erwartet auf dem Zeiger: 11 FABs in der Kopfleiste (Vorrat, Mahlzeiten, Rezepte, Einkauf, '
-          + 'Geburtstage, Dokumente, Aufgaben, Notizen, Kontakte, Kalender, Budget) und kein '
-          + `eingeklappter. Gezaehlt wurden ${angedockt} und ${eingeklappt}, dazu ${ohneFab} Seiten ohne FAB. `
-          + 'Aendert sich das, aendert sich die Reichweite dieser Sonde.');
+         * FAB verliert, faellt trotzdem auf: es fehlt dann in der Liste hier.
+         *
+         * Einkauf dockt seit der Kopfregel mobil (2026-09-26) an, Aufgaben,
+         * Notizen, Kontakte, Kalender und Budget seit #1483 ("one add button"),
+         * die Uebersicht seit R14. Eingeklappt ist keiner mehr. */
+        const ANGEDOCKT_AM_ZEIGER = ['dashboard', 'tasks', 'calendar', 'shopping', 'meals', 'recipes',
+          'pantry', 'notes', 'contacts', 'birthdays', 'budget', 'documents'];
+        assert.deepEqual({ angedockt: [...angedockt].sort(), eingeklappt },
+          { angedockt: [...ANGEDOCKT_AM_ZEIGER].sort(), eingeklappt: [] },
+          `Erwartet auf dem Zeiger: ${ANGEDOCKT_AM_ZEIGER.length} FABs in der Kopfleiste und kein eingeklappter, `
+          + `dazu ${ohneFab} Seiten ohne FAB. Aendert sich das, aendert sich die Reichweite dieser Sonde.`);
       } else {
         // 15 Routen minus die drei ohne FAB.
         assert.ok(seen >= 12,
           `Nur ${seen} Zustaende am Scroll-Ende gemessen - erwartet sind mindestens 12. Entweder `
           + 'fehlt Modulen ihr FAB, oder keine Seite kam an ihr Scroll-Ende.');
-        assert.equal(angedockt, 0, 'am Finger dockt kein FAB an - der Platz dafuer ist die Nav-Kapsel');
+        assert.deepEqual(angedockt, [], 'am Finger dockt kein FAB an - der Platz dafuer ist die Nav-Kapsel');
       }
 
       assert.deepEqual(findings, [],
