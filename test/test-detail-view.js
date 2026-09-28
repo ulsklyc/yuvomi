@@ -841,7 +841,11 @@ test('detail-view.css deckt beide Präsentationen und Bewegungsreduktion ab', as
 
 test('detail-view.css nutzt ausschließlich Tokens', async () => {
   const css = await detailCss();
-  const body = css.replace(/\/\*[\s\S]*?\*\//g, ''); // Kommentare erklären Werte, sie setzen keine
+  const body = css.replace(/\/\*[\s\S]*?\*\//g, '') // Kommentare erklären Werte, sie setzen keine
+    // Eine Bruchstelle kann kein Token sein (var() gilt in @media nicht); seit
+    // R14 traegt die Datei die mobile Fussregel der Aufgaben-Detailansicht.
+    // Geprueft werden die Deklarationen, nicht die Praeambel.
+    .replace(/@media[^{]*\{/g, '@media {');
   assert.doesNotMatch(body, /#[0-9a-fA-F]{3,8}\b/, 'kein rohes Hex');
   assert.doesNotMatch(body, /:\s*-?\d+(\.\d+)?(px|rem|em)\b/, 'keine rohen Längen');
   assert.doesNotMatch(body, /rgba?\(/, 'keine rohen Farben');
