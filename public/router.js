@@ -39,7 +39,7 @@ import { hasLeaveGuard, mayLeave } from '/utils/leave-guard.js';
 import { wireSheetDrag } from '/utils/sheet-drag.js';
 import {
   handleBackNavigation, closeAllOverlays, consumeOverlayMarker,
-  pushOverlay, dropOverlay, attachOverlay,
+  pushOverlay, dropOverlay, attachOverlay, whenHistorySettled,
 } from '/utils/overlay-history.js';
 import {
   applyNavBadges, setNavBadge, resetNavBadges, navBadgeRoutes,
@@ -647,7 +647,14 @@ async function navigate(path, userOrPushState = true, pushState = true) {
   if (currentUser && typeof userOrPushState !== 'object' && hasLeaveGuard() && !(await mayLeave(path))) {
     // Ein Zurueck hat die Adresse schon gewechselt - sie gehoert wieder der
     // Seite, die stehen bleibt.
-    if (userOrPushState === false && currentPath) history.pushState({ path: currentPath }, '', currentPath);
+    // Erst wenn die Rueckfrage ihren History-Eintrag zurueckgegeben hat
+    // (whenHistorySettled in utils/overlay-history.js) - sonst truege deren
+    // spaetes back() die Adresse gleich wieder weg.
+    if (userOrPushState === false && currentPath) {
+      const stay = currentPath;
+      await whenHistorySettled();
+      history.pushState({ path: stay }, '', stay);
+    }
     return;
   }
   isNavigating = true;

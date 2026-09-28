@@ -501,7 +501,7 @@ test('Router: jeder Wechsel einer angemeldeten Sitzung fragt den Verlassen-Schut
   const head = router.slice(router.indexOf('async function navigate('), router.indexOf('isNavigating = true;', router.indexOf('async function navigate(')));
   assert.match(head, /if \(currentUser && typeof userOrPushState !== 'object' &&[^\n]*!\(await mayLeave\(path\)\)\)/,
     'der Schutz steht VOR isNavigating = true - sonst blockierte die offene Rueckfrage jede weitere Navigation');
-  assert.match(head, /userOrPushState === false && currentPath\) history\.pushState\(\{ path: currentPath \}/,
+  assert.match(head, /userOrPushState === false && currentPath\)[\s\S]*history\.pushState\(\{ path: /,
     'ein abgelehntes Zurueck legt die Adresse zurueck');
 });
 
@@ -523,4 +523,15 @@ test('Router: ohne angemeldeten Waechter bleibt der Wechsel ohne Yield - zwei Kl
   const head = router.slice(start, router.indexOf('isNavigating = true;', start));
   assert.match(head, /hasLeaveGuard\(\) && !\(await mayLeave\(path\)\)/,
     'erst der synchrone Blick auf den Waechter, dann das await');
+});
+
+test('Router: ein abgelehntes Zurueck legt die Adresse erst zurueck, wenn der Dialog seinen Marker zurueckgab', async () => {
+  const { readFileSync } = await import('node:fs');
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  const start = router.indexOf('async function navigate(');
+  const head = router.slice(start, router.indexOf('isNavigating = true;', start));
+  // Im Browser gemessen: ohne das Warten stand nach "Abbrechen" /calendar in der
+  // Adresse, waehrend die Uebersicht zu sehen war (test:overlay-history haelt den Mechanismus).
+  assert.match(head, /await whenHistorySettled\(\);\s*\n\s*history\.pushState\(\{ path: stay \}/,
+    'erst das back() der Rueckfrage, dann der eigene Eintrag');
 });

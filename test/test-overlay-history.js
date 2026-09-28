@@ -528,3 +528,36 @@ test('ein herausgenommener Eintrag gilt nicht mehr als angemeldet', async () => 
     + 'meldet sich nie wieder an');
   assert.equal(isOverlayOpen(token), false);
 });
+
+test('whenHistorySettled: wer nach einer Rueckfrage die Adresse zuruecklegt, wartet auf deren back()', async () => {
+  // Der Verlassen-Schutz des Routers (A7 P2-1): Zurueck von "/" nach "/calendar"
+  // fragt per Dialog, der Nutzer sagt "Abbrechen", und die Adresse soll wieder
+  // "/" zeigen. Der Dialog gibt beim Schliessen seinen Marker per back() zurueck
+  // - asynchron. Legte der Router "/" SOFORT per pushState zurueck, liefe das
+  // back() danach gegen den neuen Eintrag und die Adresse stuende auf dem Marker.
+  const run = async (wait) => {
+    const { pushOverlay, dropOverlay, whenHistorySettled, history } = await freshModule();
+    history.pushState({ path: '/calendar' }, '', '/calendar');
+    const token = pushOverlay(() => {});
+    await settle();
+    // Der Router wartet ab dem Moment, in dem die Antwort feststeht - der
+    // Dialog blendet dann noch aus und meldet sich erst DANACH ab (im Browser
+    // gemessen: 220ms zwischen Antwort und back()).
+    const settled = wait ? whenHistorySettled() : null;
+    await settle();
+    dropOverlay(token);
+    if (wait) await settled;
+    history.pushState({ path: '/' }, '', '/');
+    await settle();
+    return history.href;
+  };
+  assert.equal(await run(false), '/calendar', 'ohne Warten verliert die Adresse (Nachweis der Falle)');
+  assert.equal(await run(true), '/', 'mit Warten steht die Adresse der Seite, die stehen blieb');
+
+  const { whenHistorySettled } = await freshModule();
+  let done = false;
+  whenHistorySettled().then(() => { done = true; });
+  await settle();
+  await settle();
+  assert.equal(done, true, 'ohne offenes Overlay loest es sofort auf');
+});
