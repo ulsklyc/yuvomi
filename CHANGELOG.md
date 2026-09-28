@@ -736,6 +736,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   edit or delete a series a parent had locked. The next occurrence now keeps the lock, and so does a
   subtask that was locked on its own.
 
+- **A recurring task sent to a reminder list keeps going there** (#1515). A recurring task created
+  here with a CalDAV reminder list as its destination was uploaded for its first occurrence only;
+  every later occurrence stayed in Yuvomi. Each new occurrence now goes to the same list as a new
+  reminder, as long as the list is still enabled for tasks. Recurring tasks that came from the
+  server are unchanged.
+
 - **The glass tab bar blurs again.** Text scrolling under the tab bar on a phone and under the
   sidebar indicator was readable through the glass because the page transition cut the glass off
   from the content; the blur now works outside the short moment of a page change.
