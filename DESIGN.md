@@ -2592,6 +2592,19 @@ Panel sie aufdeckt - **ob eine Liste ueberhaupt verdrahtet ist, sieht nur diese 
 Der Einkauf verdrahtete seine Gesten nur im Nachlade-Pfad und antwortete beim ersten
 Oeffnen der Seite auf gar nichts; im Quelltext stand alles richtig da.
 
+**Anlegen im Zeitraster nach Apple-Muster** (Re-Critique 2026-09-28, R17). In Woche und Tag
+legt ein Einzelklick oder Tipp auf leere Zeit NICHTS an - er schliesst nur Offenes; daneben
+klicken ist der natuerlichste Weg aus einer Leseansicht und oeffnete vorher „Neuer Termin".
+Angelegt wird mit der Maus per **Doppelklick**, mit Finger oder Stift per **langem Druck**
+(500ms, Abbruch bei mehr als 10px Bewegung, Raster-Scroll oder `pointercancel`); welche Geste
+gilt, entscheidet der Zeiger des Kontakts, nicht eine Media Query. Waehrend des Drucks steht an
+der Druckstelle ein **Platzhalter der kommenden Startzeit** (`.cal-press-ghost`): er blendet
+ueber die Haltezeit ein, wird an der Schwelle deckend und faellt mit jedem Abbruch weg - iOS
+vibriert fuer Webseiten nicht, ohne ihn sah man bis zum Loslassen nichts. Nur Deckkraft, unter
+reduzierter Bewegung ohne Einblenden. Der sichtbare Weg bleibt „+ Termin" und das Kuerzel n;
+der Leerzustand des Tages nennt die Geste des Zeigers. Die Monatsansicht legt per Einzelklick
+nie an und blieb, wie sie war. Umsetzung: `wireTimeGridCreate` in `pages/calendar.js`.
+
 ### Das Markensiegel (Signature Component)
 Yuvomis eigene Ausweisform und die Antwort auf "Health hat die Ringe, was hat Yuvomi?" - die
 eine Stelle, an der die Marke etwas kann, was keine Systemapp braucht: **Yuvomi ist der
