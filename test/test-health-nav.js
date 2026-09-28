@@ -650,3 +650,18 @@ test('R14 P11: der Bereichswechsel schmal blendet ein', async () => {
   assert.ok(regel, '.health-panel--entering fehlt');
   assert.match(regel.body, /animation:\s*fade-in var\(--duration-[a-z0-9]+\) var\(--ease-[a-z-]+\)/);
 });
+
+// R14 P6 (A8 P2-2, A6 §5): die angedockte Pille hiess in Vorsorge und
+// Naehrwerte „Eintrag", in Aktivitaet „Einheit" - kein Nomen des Objekts
+// (Kanon DESIGN.md: die Pille nennt, was entsteht). Jeder Bereich traegt sein
+// eigenes Nomen, in jeder Sprache verschieden von den anderen.
+test('R14 P6: die Kopf-Pille nennt je Bereich ihr Objekt', () => {
+  const keys = ['healthVitals', 'healthCycle', 'healthMeds', 'healthPrevention', 'healthLabs', 'healthActivity', 'healthNutrition'];
+  for (const file of readdirSync(join(ROOT, 'public/locales')).filter((f) => f.endsWith('.json'))) {
+    const labels = JSON.parse(read(`public/locales/${file}`)).newLabel;
+    const values = keys.map((k) => labels[k]);
+    assert.equal(new Set(values).size, values.length, `${file}: zwei Bereiche teilen ein Nomen (${values.join(' / ')})`);
+  }
+  const de = JSON.parse(read('public/locales/de.json')).newLabel;
+  for (const k of keys) assert.ok(!['Eintrag', 'Einheit'].includes(de[k]), `de ${k}: „${de[k]}" ist kein Objekt`);
+});
