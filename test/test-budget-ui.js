@@ -3069,3 +3069,62 @@ test('Budget-Listen: die Zeile oeffnet, Loeschen steht im Blatt, hoechstens eine
   assert.match(card, /action: 'renew'/, 'Abos: Verlaengern bleibt als Folgeaktion');
   assert.match(abosCode, /id="subscription-delete"/, 'Abos: Loeschen steht im Bearbeiten-Blatt');
 });
+
+/* DARLEHEN PER TASTATUR (Re-Critique 2026-09-28 R15 A5 P1-1). Die Karte
+ * oeffnete ihren Bericht nur ueber einen Klick-Listener am <article> - ohne
+ * tabindex und ohne Rolle. Bearbeiten und Loeschen stehen seit R14 P8 allein
+ * in diesem Bericht, also kam Sam per Tastatur und Screenreader an beides nie
+ * heran (WCAG 2.1.1). Jetzt ist der Titel ein <button> (Muster
+ * `budget-account__main`) mit Chevron, der den Bericht oeffnet; die Karte
+ * bleibt per Klick bedienbar. Gemessen am Markup UND an der Verdrahtung, als
+ * Programm mit einem Stub-Wurzelknoten statt als Quelltext. */
+test('Darlehenskarte: ein fokussierbarer Knopf oeffnet den Bericht, die Karte bleibt klickbar (R15 A5 P1-1)', () => {
+  const darlehen = {
+    id: 9, title: 'Autokredit <&>', borrower: 'Bank', direction: 'borrowed', status: 'active',
+    total_amount: 6000, remaining_amount: 4000, paid_amount: 2000, paid_installments: 4,
+    installment_count: 12, next_due_month: '2026-07', is_settled: 0, payments: [],
+  };
+  const karte = budgetUi.renderLoanCard(darlehen);
+  const knopf = karte.match(/<button\b[^>]*class="budget-loan-card__open"[^>]*>([\s\S]*?)<\/button>/);
+  assert.ok(knopf, 'der Titel ist ein <button class="budget-loan-card__open">');
+  assert.match(knopf[0], /type="button"/);
+  assert.match(knopf[0], /data-loan-id="9"/);
+  assert.match(knopf[0], /aria-haspopup="dialog"/, 'der Knopf sagt an, dass er ein Blatt oeffnet');
+  assert.match(knopf[1], /Autokredit &lt;&amp;&gt;/, 'der sichtbare Titel ist der Name des Knopfs, escaped');
+  assert.match(knopf[1], /data-lucide="chevron-right"[^>]*aria-hidden="true"/, 'Chevron als sichtbare Affordanz');
+  assert.doesNotMatch(karte, /<div class="budget-loan-card__title">/, 'kein toter Titel neben dem Knopf');
+
+  // Verdrahtung als Programm: ein Stub-Wurzelknoten gibt Knopf und Karte
+  // heraus, der Test loest ihre Listener aus und zaehlt, was geoeffnet wird.
+  const listener = (el) => (type, fn) => { (el.on[type] ??= []).push(fn); };
+  const btn = { dataset: { loanId: '9' }, on: {} };
+  btn.addEventListener = listener(btn);
+  const card = { dataset: { loanId: '9' }, on: {} };
+  card.addEventListener = listener(card);
+  const wurzel = {
+    querySelectorAll(sel) {
+      if (sel === '.budget-loan-card__open[data-loan-id]') return [btn];
+      if (sel === '.budget-loan-card[data-loan-id]') return [card];
+      return [];
+    },
+  };
+  const vorher = budgetUi.state.loans;
+  try {
+    budgetUi.state.loans = { loans: [darlehen] };
+    const geoeffnet = [];
+    budgetUi.wireLoanCards(wurzel, (loan) => geoeffnet.push(loan.id));
+    assert.equal(btn.on.click?.length, 1, 'der Knopf hat seinen eigenen Klick (Enter/Leertaste loesen ihn aus)');
+    btn.on.click[0]({ target: btn });
+    assert.deepEqual(geoeffnet, [9], 'Knopf oeffnet den Bericht');
+    const fremderKnopf = { closest: (s) => (/button/.test(s) ? {} : null) };
+    const flaeche = { closest: () => null };
+    for (const fn of card.on.click ?? []) fn({ target: fremderKnopf });
+    assert.deepEqual(geoeffnet, [9], '"Rate buchen" oeffnet den Bericht nicht mit');
+    for (const fn of card.on.click ?? []) fn({ target: flaeche });
+    assert.deepEqual(geoeffnet, [9, 9], 'die Kartenflaeche bleibt per Klick bedienbar');
+  } finally { budgetUi.state.loans = vorher; }
+
+  const code = withoutHtmlComments(budget);
+  const wire = code.slice(code.indexOf('function wireLoansPage('), code.indexOf('\n}\n', code.indexOf('function wireLoansPage(')));
+  assert.match(wire, /wireLoanCards\(_container\)/, 'die Seite ruft die Verdrahtung wirklich auf');
+});

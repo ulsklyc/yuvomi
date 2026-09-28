@@ -2470,6 +2470,32 @@ function renderLoansPage() {
   </div>`;
 }
 
+/**
+ * Oeffnet den Bericht eines Darlehens - ueber den Titelknopf (Tastatur,
+ * Screenreader) und ueber die Kartenflaeche (Zeiger). Bearbeiten und Loeschen
+ * stehen allein im Bericht (R14 P8); ohne den Knopf kam die Tastatur nie
+ * dorthin (Re-Critique 2026-09-28 R15 A5 P1-1, WCAG 2.1.1).
+ * @param {ParentNode} root
+ * @param {(loan: object) => void} [open]
+ */
+function wireLoanCards(root, open = openLoanReport) {
+  const openById = (id) => {
+    const loan = state.loans?.loans?.find((item) => item.id === parseInt(id, 10));
+    if (loan) open(loan);
+  };
+  root.querySelectorAll('.budget-loan-card__open[data-loan-id]').forEach((btn) => {
+    btn.addEventListener('click', () => openById(btn.dataset.loanId));
+  });
+  root.querySelectorAll('.budget-loan-card[data-loan-id]').forEach((card) => {
+    card.addEventListener('click', (event) => {
+      // Knoepfe tragen ihre eigene Handlung - der Titelknopf oeffnet schon
+      // selbst, "Rate buchen" und der Filter sollen den Bericht nicht mitoeffnen.
+      if (event.target.closest('button, a')) return;
+      openById(card.dataset.loanId);
+    });
+  });
+}
+
 function wireLoansPage() {
   wireMetricGlance(_container, 'budget-loans-more', (on) => { state.loansExpanded = on; });
   _container.querySelector('#budget-empty-loan')?.addEventListener('click', () => openBudgetModal({ mode: 'create', initialType: 'loan' }));
@@ -2493,13 +2519,7 @@ function wireLoansPage() {
   // die neue Kapsel von der Stelle der alten gleiten.
   const loanFilters = _container.querySelector('.budget-loans__filters');
   if (loanFilters) attachSegmentIndicator(loanFilters, { key: 'budget-loan-filter' });
-  _container.querySelectorAll('.budget-loan-card[data-loan-id]').forEach((card) => {
-    card.addEventListener('click', (event) => {
-      if (event.target.closest('button, a')) return;
-      const loan = state.loans.loans.find((item) => item.id === parseInt(card.dataset.loanId, 10));
-      if (loan) openLoanReport(loan);
-    });
-  });
+  wireLoanCards(_container);
   _container.querySelectorAll('[data-action="loan-pay"]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       await markLoanPayment(parseInt(btn.dataset.id, 10));
@@ -2727,7 +2747,12 @@ function renderLoanCard(loan) {
     <article class="budget-loan-card" data-loan-id="${loan.id}">
       <div class="budget-loan-card__main">
         <div class="budget-loan-card__title-row">
-          <div class="budget-loan-card__title">${esc(loan.title)}</div>
+          ${/* Der Titel IST der Weg in den Bericht (Muster budget-account__main):
+              * ein echter Knopf, damit Tastatur und Screenreader ihn erreichen. */ ''}
+          <button type="button" class="budget-loan-card__open" data-loan-id="${loan.id}" aria-haspopup="dialog">
+            <span class="budget-loan-card__title">${esc(loan.title)}</span>
+            <i data-lucide="chevron-right" class="budget-loan-card__chevron icon-sm" aria-hidden="true"></i>
+          </button>
           ${rowActionHtml({
     icon: 'filter', action: 'loan-filter', className: 'budget-loan-card__filter',
     label: t('budget.filterLoanNamed', { name: loan.title }),
@@ -4549,6 +4574,8 @@ export const __test = {
   renderAccountsPage,
   renderLoansPage,
   renderLoanCard,
+  // R15 A5 P1-1: der Titelknopf oeffnet den Bericht - gemessen als Programm.
+  wireLoanCards,
   renderLoanPaymentEntry,
   renderLoanTransactions,
   // Die Leseansichten (#1265 P7): die Zeilen als reine Funktionen, und der

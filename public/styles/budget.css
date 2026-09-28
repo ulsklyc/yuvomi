@@ -1427,6 +1427,42 @@
   white-space: nowrap;
 }
 
+/* DER TITEL IST DER WEG IN DEN BERICHT (Re-Critique 2026-09-28 R15 A5 P1-1).
+ * Muster `budget-account__main`: ein echter Knopf, damit Tastatur und
+ * Screenreader Bearbeiten und Loeschen im Bericht erreichen. Er fuellt die
+ * Titelzeile bis zum Raten-Filter und hat die Zielhoehe der Geraetewelt; der
+ * Chevron sagt dem Zeiger, dass hier etwas aufgeht. */
+.budget-loan-card__open {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--target-base);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.budget-loan-card__open:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.budget-loan-card__chevron {
+  flex-shrink: 0;
+  color: var(--color-text-tertiary);
+}
+
+[dir="rtl"] .budget-loan-card__chevron {
+  transform: scaleX(-1);
+}
+
 .budget-loan-card__title-row {
   display: flex;
   align-items: center;
