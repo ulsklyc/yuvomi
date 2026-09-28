@@ -35,6 +35,7 @@ import {
 import { buildHelpRows } from '/utils/help.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { triggerPageFab } from '/utils/fab.js';
+import { mayLeave } from '/utils/leave-guard.js';
 import { wireSheetDrag } from '/utils/sheet-drag.js';
 import {
   handleBackNavigation, closeAllOverlays, consumeOverlayMarker,
@@ -636,6 +637,18 @@ function createFocusTrap(container) {
  */
 async function navigate(path, userOrPushState = true, pushState = true) {
   if (isNavigating) return;
+  // VERLASSEN-SCHUTZ (utils/leave-guard.js, Re-Critique 2026-09-28 A7 P2-1):
+  // eine Seite mit ungespeicherter Arbeit - der Anpassen-Modus der Uebersicht -
+  // fragt, bevor sie verschwindet. Jeder Weg endet hier: Seitenleiste,
+  // Tab-Leiste, Mehr-Blatt, Befehlspalette, Zurueck (popstate). Nur fuer
+  // Wechsel einer angemeldeten Sitzung: das Anmelden (Objekt) und ein
+  // Sitzungsablauf fragen nicht.
+  if (currentUser && typeof userOrPushState !== 'object' && !(await mayLeave(path))) {
+    // Ein Zurueck hat die Adresse schon gewechselt - sie gehoert wieder der
+    // Seite, die stehen bleibt.
+    if (userOrPushState === false && currentPath) history.pushState({ path: currentPath }, '', currentPath);
+    return;
+  }
   isNavigating = true;
 
   // Offenes „Mehr“-Sheet beim Navigieren immer schließen — robust und

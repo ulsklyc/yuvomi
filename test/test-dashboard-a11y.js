@@ -491,3 +491,14 @@ test('Anpassen: der Speed-Dial ist ausgeblendet, und der Neuaufbau meldet den Sc
   assert.ok(/setCustomizeFabHidden\(isCustomizing\);/.test(rebuild), 'und blendet den Speed-Dial mit dem Modus');
   assert.ok(/setLeaveGuard\(\(\) => customizeLeaveAllowed\(/.test(src), 'der Schutz ist die Rueckfrage von Abbrechen');
 });
+
+test('Router: jeder Wechsel einer angemeldeten Sitzung fragt den Verlassen-Schutz, bevor er navigiert (A7 P2-1)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  assert.match(router, /import \{ mayLeave \} from '\/utils\/leave-guard\.js';/);
+  const head = router.slice(router.indexOf('async function navigate('), router.indexOf('isNavigating = true;', router.indexOf('async function navigate(')));
+  assert.match(head, /if \(currentUser && typeof userOrPushState !== 'object' && !\(await mayLeave\(path\)\)\)/,
+    'der Schutz steht VOR isNavigating = true - sonst blockierte die offene Rueckfrage jede weitere Navigation');
+  assert.match(head, /userOrPushState === false && currentPath\) history\.pushState\(\{ path: currentPath \}/,
+    'ein abgelehntes Zurueck legt die Adresse zurueck');
+});
