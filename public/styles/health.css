@@ -3188,6 +3188,24 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 
 .cycle-history { margin-top: var(--space-6); }
 
+/* VERLAUFSLISTEN STEHEN AUF EINEM TRAEGER (R14 P8, A6 P2-6). Zyklus-Verlauf
+ * und Trainings-Liste lagen nackt auf der Buehne, waehrend „Letzte Messungen"
+ * und Labor in Karten stehen. Die Flaeche ist die der Bereichsliste
+ * (.health-areas__group) - nicht `.row-carrier`, der auf --page-measure kappt;
+ * die Zeilen bekommen ihr Innenpolster, die Haarlinien bleiben. */
+.cycle-history__list,
+.health-activity-list {
+  overflow: hidden;
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.cycle-history__list > .cycle-history__row,
+.health-activity-list > .health-activity-row {
+  padding-inline: var(--space-4);
+}
+
 /* Haarlinien-Liste: der Trenner ersetzt den Abstand (siehe tokens.css). */
 .cycle-history__list {
   list-style: none;

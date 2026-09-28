@@ -624,3 +624,16 @@ test('R14 P8: kein natives Datumsfeld in der Gesundheit', () => {
   assert.match(HEALTH_JS, /<yuvomi-datepicker id="prevention-given-on" type="date"/);
   assert.match(HEALTH_JS, /<yuvomi-datepicker id="prevention-next-due" type="date"/);
 });
+
+// R14 P8 (A6 P2-6): Zyklus-Verlauf und Trainings-Liste lagen nackt auf der
+// Buehne, waehrend „Letzte Messungen" und Labor in Karten stehen. Jede
+// Verlaufsliste traegt jetzt die Flaeche eines Zeilentraegers.
+test('R14 P8: Verlaufslisten der Gesundheit stehen auf einem Traeger', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(read('public/styles/health.css'))].filter((r) => !r.at.length);
+  for (const list of ['.cycle-history__list', '.health-activity-list']) {
+    const own = rules.filter((r) => r.selector.split(',').map((x) => x.trim()).includes(list));
+    assert.ok(own.some((r) => /background(?:-color)?:\s*var\(--color-surface\)/.test(r.body)), `${list}: keine Flaeche`);
+    assert.ok(own.some((r) => /border-radius:\s*var\(--radius-lg\)/.test(r.body)), `${list}: kein Kartenradius`);
+  }
+});
