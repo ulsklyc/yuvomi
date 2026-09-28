@@ -7070,8 +7070,8 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  background-color: var(--neutral-800);
-  color: var(--neutral-50);
+  background-color: var(--toast-bg);
+  color: var(--toast-text);
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
@@ -7121,10 +7121,11 @@ textarea::placeholder {
  * dem dunklen Shell-Material mit heller. Genau die Verwechslung, die den Toast
  * im Reduced-Transparency-Fallback des Filter-Chips auf 1,08:1 gebracht hat -
  * zwei Selektoren in einer Regel behaupten denselben Grund darunter.
- * `currentColor 15%` rechnet hier deshalb gegen die Schrift der Kapsel, und die
- * dreht sich mit dem Thema: --neutral-800 ist dunkel im hellen Modus und hell
- * im dunklen, --neutral-50 umgekehrt. Am gerenderten Pixel gemessen (320px,
- * die einzige Breite, auf der die Marke steht): 10,04:1 hell, 12,54:1 dunkel. */
+ * `currentColor 15%` rechnet hier deshalb gegen die Schrift der Kapsel
+ * (--toast-text, hell auf dem in beiden Themes dunklen --toast-bg). Am
+ * gerenderten Pixel gemessen (320px, die einzige Breite, auf der die Marke
+ * steht): 10,04:1 hell; dunkel gemessen vor R16, als das Material dort noch
+ * hell war (12,54:1). */
 .list-bulkbar__action-count {
   display: none;
   margin-inline-start: var(--space-1);
@@ -7146,9 +7147,8 @@ textarea::placeholder {
  * die Tinte, und mit `currentColor` an der Kante wechselt die Kante mit.
  *
  * --shell-danger-ink und nicht --color-danger: der Grund unter dieser Kapsel
- * dreht sich mit dem Thema (--neutral-800 ist hell im Dunkelmodus), die
- * semantischen Farben drehen in dieselbe Richtung. Begründung und Messwerte am
- * Token in tokens.css.
+ * (--toast-bg) ist in beiden Themes dunkel, die semantischen Farben drehen
+ * sich aber mit dem Thema. Begründung und Messwerte am Token in tokens.css.
  *
  * SIE IST DER ZWEITE KANAL, NICHT DER ERSTE. Der erste ist das Wort auf der
  * Kapsel, der dritte die Rückfrage dahinter - Farbe allein trägt hier keine
@@ -7269,8 +7269,8 @@ textarea::placeholder {
    * Scroll-Ende rechnet mit diesem Wert, also muss die Pille ihn halten. */
   min-height: var(--bulk-pill-height);
   box-sizing: border-box;
-  background-color: var(--neutral-800);
-  color: var(--neutral-50);
+  background-color: var(--toast-bg);
+  color: var(--toast-text);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-lg);
   pointer-events: auto;
@@ -7330,7 +7330,7 @@ textarea::placeholder {
   flex: 1 0 100%;
   font-size: var(--text-xs);
   line-height: var(--line-height-snug);
-  color: var(--neutral-300);
+  color: var(--toast-text-secondary);
   white-space: normal;
 }
 

@@ -534,7 +534,7 @@ test('ein Erfolgs-Toast steht auf dem Shell-Material, das Gruen traegt das Icon'
     const success = winningBackground('success', { supportsBlur });
     assert.ok(success, 'keine Flaeche fuer den Erfolgs-Toast gefunden - der Guard waere blind');
     assert.doesNotMatch(success.value, /--color-success/, `Vollflaeche (${success.where}, backdrop ${supportsBlur})`);
-    assert.match(success.value, /--neutral-800/, `nicht das Shell-Material (${success.where})`);
+    assert.match(success.value, /--toast-bg/, `nicht das Shell-Material (${success.where})`);
     const danger = winningBackground('danger', { supportsBlur });
     assert.match(danger?.value ?? '', /--color-danger/, 'ein Fehler bleibt eine deutliche Flaeche');
   }
@@ -542,7 +542,9 @@ test('ein Erfolgs-Toast steht auf dem Shell-Material, das Gruen traegt das Icon'
   const icon = [...eachRule(glass)].find((r) => r.selector.trim() === '.toast--success .toast__icon');
   assert.match(icon?.body ?? '', /color:\s*var\(--shell-success-ink\)/, 'das Haekchen traegt die Erfolgsfarbe');
   const tokens = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
-  assert.equal((tokens.match(/--_shell-success-ink:/g) ?? []).length, 3, 'hell, dunkel per Vorliebe, dunkel per Wahl');
+  // Seit R16 ist das Material in beiden Themes dunkel: EINE Tinte fuer beide
+  // (die Gegendrehung #0B6B2B fuer den hellen Dunkelmodus-Grund ist entfallen).
+  assert.equal((tokens.match(/--_shell-success-ink:/g) ?? []).length, 1, 'eine Erfolgstinte fuer beide Themes');
 });
 
 // --------------------------------------------------------
@@ -694,4 +696,88 @@ test('A3 P1-1: ohne Detailspalte (unter der Schwelle) bleibt der Stapel, wo er s
   const decision = withDom(scene, () => placeToastStack(scene.stack));
   assert.equal(decision, null);
   assert.equal(scene.stack.dataset.dock, undefined);
+});
+
+// --------------------------------------------------------
+// Das Shell-Material im Dunkeln (Re-Critique 2026-09-28, A1 P2-2)
+// --------------------------------------------------------
+
+/*
+ * Toast und Sammelaktions-Pille standen auf --neutral-800, und das wird im
+ * Dunkelmodus hell (#E7E2DA): "Gespeichert" war die hellste Flaeche im Bild.
+ * Gerechnet wird aus tokens.css selbst - je Thema die Kette der Variablen bis
+ * zum Hexwert, Dunkel per Vorliebe UND per Wahl. Die Zusage: dunkel ist der
+ * Grund nie heller als --color-surface-raised, und Schrift und Tinten halten
+ * ihren Kontrast gegen den opaken Token UND gegen die 90-%-Glasmischung ueber
+ * der Buehne und ueber reinem Weiss (einem Foto darunter).
+ */
+function tokenScopes() {
+  const css = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+  const decls = (rule) => Object.fromEntries([...rule.body.matchAll(/(--[\w-]+)\s*:\s*([^;]+);?/g)].map((m) => [m[1], m[2].trim()]));
+  const rules = [...eachRule(css)];
+  const root = Object.assign({}, ...rules.filter((r) => r.selector.trim() === ':root' && !r.at.length).map(decls));
+  const darkPref = rules.filter((r) => r.selector.trim() === ':root:not([data-theme="light"])'
+    && r.at.some((a) => /prefers-color-scheme:\s*dark/.test(a))).map(decls);
+  const darkPick = rules.filter((r) => r.selector.trim() === '[data-theme="dark"]').map(decls);
+  assert.ok(darkPref.length && darkPick.length, 'die beiden Dunkel-Bloecke nicht gefunden - der Guard waere blind');
+  return {
+    light: root,
+    'dunkel per Vorliebe': { ...root, ...Object.assign({}, ...darkPref) },
+    'dunkel per Wahl': { ...root, ...Object.assign({}, ...darkPick) },
+  };
+}
+
+function resolveHex(scope, name, depth = 0) {
+  const value = scope[name];
+  assert.ok(value, `${name} fehlt`);
+  assert.ok(depth < 10, `${name}: Kette zu tief`);
+  const ref = value.match(/^var\((--[\w-]+)\)$/);
+  if (ref) return resolveHex(scope, ref[1], depth + 1);
+  assert.match(value, /^#[0-9a-f]{6}$/i, `${name} = ${value} ist kein Hexwert`);
+  return value;
+}
+
+const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+const luminance = (c) => {
+  const [r, g, b] = c.map((v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a, b) => {
+  const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m);
+  return (x + 0.05) / (y + 0.05);
+};
+const over = (top, under, alpha) => top.map((v, i) => Math.round(v * alpha + under[i] * (1 - alpha)));
+
+test('A1 P2-2: der Toast ist im Dunkeln nicht die hellste Flaeche, und alles darauf bleibt lesbar', () => {
+  for (const [theme, scope] of Object.entries(tokenScopes())) {
+    const bg = rgb(resolveHex(scope, '--_toast-bg'));
+    if (theme !== 'light') {
+      const raised = rgb(resolveHex(scope, '--_color-surface-raised'));
+      assert.ok(luminance(bg) <= luminance(raised) + 1e-9,
+        `${theme}: der Toast (${resolveHex(scope, '--_toast-bg')}) ist heller als --color-surface-raised`);
+    }
+    const stage = rgb(resolveHex(scope, '--_neutral-100'));
+    const grounds = { opak: bg, 'Glas ueber der Buehne': over(bg, stage, 0.9), 'Glas ueber Weiss': over(bg, [255, 255, 255], 0.9) };
+    for (const [where, ground] of Object.entries(grounds)) {
+      const need = [['--_toast-text', 4.5], ['--_toast-text-secondary', 4.5], ['--_shell-danger-ink', 4.5], ['--_shell-success-ink', 3]];
+      for (const [token, min] of need) {
+        const ratio = contrast(rgb(resolveHex(scope, token)), ground);
+        assert.ok(ratio >= min, `${theme}, ${where}: ${token} nur ${ratio.toFixed(2)}:1`);
+      }
+    }
+  }
+  // Und die Flaechen lesen es: Toast und Pille, mit und ohne Glas.
+  const layout = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const glass = readFileSync(new URL('../public/styles/glass.css', import.meta.url), 'utf8');
+  for (const [css, sel] of [[layout, '.toast'], [layout, '.list-bulkbar'], [glass, '.toast.toast--success']]) {
+    const body = [...eachRule(css)].filter((r) => !r.at.length && r.selector.trim() === sel).map((r) => r.body).join(';');
+    assert.match(body, /background-color:\s*var\(--toast-bg\)/, `${sel}: nicht auf dem Shell-Material`);
+    assert.match(body, /(?:^|;|\s)color:\s*var\(--toast-text\)/, `${sel}: nicht mit der Shell-Schrift`);
+  }
+  const shell = [...eachRule(glass)].filter((r) => /\.toast:not\(\.toast--danger\)/.test(r.selector));
+  assert.ok(shell.length >= 2, 'Glas und Reduced-Transparency-Fallback');
+  for (const rule of shell) assert.match(rule.body, /var\(--toast-bg\)/, `${rule.at.join(' ')}: nicht auf --toast-bg`);
 });
