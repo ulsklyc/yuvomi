@@ -100,6 +100,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **On a phone the overview starts with what is due today.** Two or more overdue items collapse
+  into one line ("5 overdue") with the avatars of the people involved, and a tap opens the list.
+  Widgets show fewer rows on a phone and their titles stay on one line. Customizing on a phone is a
+  compact list of names with a handle and an eye, with the hidden tiles at the top; on a desktop
+  new items start from a "+ New" pill in the head instead of a floating button.
+
+- **Subscriptions, loans and split start with one glance line on a phone.** The wall of figures
+  above the list is one line that opens the details on tap, as on the budget overview, so the first
+  entry moves up by about a third of the screen. Loans lose the summary line that repeated the
+  remaining debt, and the budget head keeps its height when you switch tabs.
+
+- **Every budget list is operated the same way.** A row opens its sheet, and delete lives in the
+  sheet footer for transactions, loans and subscriptions; the one action that moves money on
+  (book, pay instalment, renew) stays on the row. The subscription search sits in the head of the
+  list, and the statistics show each category once, with the bars in the colour of their slice of
+  the donut and its share next to them.
+
+- **Health on a phone puts today before the list of areas.** The person switcher moves into the
+  head bar as a pill, and "Due today" and "Quick add" come before "All categories". On a desktop the
+  detail column has a head with the area's seal and name, and the add button names its object
+  ("New checkup", "New workout", "New meal") instead of "New entry". Empty checkup and nutrition
+  lists show one empty state with an add button.
+
+- **Fasting shows one empty state until the first fast.** Statistics appear once a fast is
+  recorded instead of nine zeros and seven empty days. Goal, clock and reminders moved from the
+  middle of the page into a settings sheet behind the gear in the timer card; the goal is a
+  segmented control. History rows carry named edit and delete buttons, and the date range uses the
+  app's date picker and applies as soon as a date changes, without the time zone sentence.
+
+- **Waste collection starts with one block until the first waste type.** Tapping a template (paper,
+  residual waste and so on) creates the type directly, and a calendar file can be imported from the
+  same place; the add button says "Waste type" until then. Without shift types the shift plan shows
+  one way forward, "Go to shift types", instead of three empty sections.
+
+- **New colours come from one palette that reads in both themes.** Shift presets, new waste types
+  and new housekeeping helpers start from ten tones that keep 3:1 contrast on light and dark
+  surfaces and stay clear of the app's violet; a new helper starts in cyan. Colour swatches get an
+  edge in dark mode. Colours you already chose stay as they are.
+
+- **Your shift plan settings moved to Settings.** Reminder lead time, overtime tracking and weekly
+  hours are in "My settings" of the shift plan sheet, open to every member, instead of a card in
+  the evaluation tab; the evaluation shows the total hours once as a tile. The comparison fits a
+  week of one person into the desktop width.
+
+- **Housekeeping has one name and uses a wide screen.** Labels say "Housekeeping" throughout, the
+  first tab is "Overview" with "Due" and "Done this month", and on a wide screen visits and
+  payments stand side by side. Rewards on a phone show one row per person with the points in a
+  capsule.
+
+- **The kitchen head on a phone follows one rule.** The tab bar carries the tabs with their counts,
+  and the tools of recipes and pantry sit in a context row of their own. The shopping list has one
+  plus at the input and a return key to add, swiped rows lose the detail chevron, and rows glide to
+  their new place when the list redraws. The pantry side rail shows only items with a deadline.
+
+- **Recipe and meal dialogs are easier to fill in.** Meal types are toggle chips instead of
+  checkboxes with colour badges, an ingredient row gives the name its own line so the category is
+  no longer cut off, "Add ingredient" and delete look the same in both dialogs, and adding a meal
+  from an empty slot asks for the name first. A recipe's details open and close with motion.
+
+- **The task detail footer is one row on a phone.** Start and archive moved into the "More" menu,
+  and the assignee picker no longer sits beside every open row.
+
+- **Family members and invites are added in a dialog.** "Add member" and "Invite" open a sheet with
+  Cancel and the primary button in the footer instead of a form that appeared further down the
+  page, and focus returns to the button afterwards. The permission mode switch is the same
+  segmented control as elsewhere in Settings.
+
+- **Calendar feeds are switches in the sheet of their module.** Shift plan, cycle, inventory and
+  waste feeds each have a switch in their module's sheet (inventory and waste have a sheet of their
+  own now) instead of five primary buttons in one place. Module sheets follow the order of the
+  sidebar, on a phone every settings sheet opens with a large title, and switching sheets fades
+  the new one in. Several hints were rewritten to match where things are now.
+
+- **Menus grow from the control that opens them.** Pop-up menus scale in from their button and
+  only fade with reduced motion; budget tabs, health areas and calendar views fade in when you
+  switch. On a desktop the calendar filters open as a popover at their button instead of a sheet.
+
+- **Search and the desktop head are tidier.** The command palette offers help, keyboard shortcuts
+  and "What's new" (formerly "Changes"), and has a single clear button. The version number left
+  the sidebar and is shown in "What's new" and in the system settings. Buttons and search in a
+  desktop head share one height.
+
+- **Date fields speak your language.** The expiry date of a document, the checkup dates and the
+  fasting range use the app's date picker, and typed dates show their placeholder in the interface
+  language ("TT.MM.JJJJ" in German) in the order of your date format.
+
 - **Subtasks are added in a line of their own.** "Add subtask" opens a field in place in the task
   view, the detail column and the sheet on a phone. Enter adds the subtask and leaves the cursor in
   the field for the next one, Escape closes it; there is no dialog in between any more. The task
