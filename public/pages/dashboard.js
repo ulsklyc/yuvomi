@@ -3748,7 +3748,9 @@ function renderCustomizeFootnote({ followsDefault = true, canPublish = false } =
 function renderDashboardOverview(user, editing = false, weather = null, scope = {}) {
   // Wer der Vorgabe des Haushalts folgt, hat nichts zurueckzusetzen; wer sie
   // setzen darf, ist Admin (#827).
-  const { followsDefault = true, canPublish = false } = scope;
+  // `offerNew: false` im Fehlerzustand: wie der Speed-Dial dort (#634-Kommentar
+  // bei initFab) kein Anlegen in Module, deren Daten nicht geladen sind.
+  const { followsDefault = true, canPublish = false, offerNew = true } = scope;
   const dateLabel = mastheadDateLabel();
 
   return `
@@ -3823,7 +3825,8 @@ function renderDashboardOverview(user, editing = false, weather = null, scope = 
                   aria-label="${t('dashboard.customize')}"
                   title="${t('dashboard.customize')}">
             <i data-lucide="settings-2" aria-hidden="true"></i>
-          </button>`}
+          </button>
+          ${offerNew && onDesktopStage() ? renderNewPill() : ''}`}
         </div>
       </div>
     </section>
@@ -5391,7 +5394,69 @@ const FAB_ACTIONS = () => [
   { route: '/notes',    label: t('dashboard.fabNote'),     icon: 'sticky-note'    },
 ].filter((a) => navModuleAccess(a.route.slice(1)) === 'write');
 
+/* AM DESKTOP IST ANLEGEN EINE ANGEDOCKTE PILLE (R14, A8 P3-2). Die Uebersicht
+ * war der einzige schwebende FAB am Desktop - 48x48 unten rechts, nur
+ * "Schnellaktionen" als Name -, waehrend jedes andere Modul "+ Nomen" im Kopf
+ * traegt. Dieselbe Grenze wie das Andocken der Shell (router.js,
+ * isDesktopViewport); dieselbe Form (`page-fab--docked`, schon so gerendert,
+ * damit ein Neuaufbau des Kopfs nicht auf das Andocken warten muss), dasselbe
+ * Menue als Popover. Der Kurzbefehl `n` klickt den `.page-fab` und oeffnet es. */
+const DESKTOP_STAGE_QUERY = '(min-width: 1024px)';
+
+function onDesktopStage() {
+  try {
+    return Boolean(globalThis.window?.matchMedia?.(DESKTOP_STAGE_QUERY)?.matches);
+  } catch {
+    return false;
+  }
+}
+
+function renderNewPill() {
+  const actions = FAB_ACTIONS();
+  if (!actions.length) return '';
+  const items = actions.map((a) => `
+          <button type="button" role="menuitem" class="popover-menu__item" data-new-route="${esc(a.route)}">
+            <i data-lucide="${esc(a.icon)}" class="icon-md" aria-hidden="true"></i>
+            <span>${esc(a.label)}</span>
+          </button>`).join('');
+  const label = t('dashboard.fabNew');
+  return `
+        <div class="page-toolbar__actions dashboard-overview__new">
+          <button type="button" class="page-fab btn btn--primary page-fab--docked popover-menu__trigger" id="fab-main"
+                  data-dock-label="${esc(label)}" aria-label="${esc(t('nav.quickActions'))}" title="${esc(t('nav.quickActions'))} (n)"
+                  aria-keyshortcuts="n" aria-haspopup="menu" aria-expanded="false" popovertarget="dashboard-new-menu">
+            <i data-lucide="plus" aria-hidden="true"></i><span class="toolbar-new-btn__label">${esc(label)}</span>
+          </button>
+          <div class="popover-menu" id="dashboard-new-menu" popover role="menu">${items}
+          </div>
+        </div>`;
+}
+
+/** Die Menuepunkte der Pille: dieselben Wege wie der Speed-Dial (FAB_NEW_BTN). */
+function wireNewMenu(container, signal) {
+  installPopoverMenus(container);
+  container.addEventListener('click', async (event) => {
+    const item = event.target.closest?.('[data-new-route]');
+    if (!item) return;
+    item.closest('[popover]')?.hidePopover?.();
+    const route = item.dataset.newRoute;
+    await window.yuvomi.navigate(route);
+    const btnSelector = FAB_NEW_BTN[route];
+    if (btnSelector) document.querySelector(btnSelector)?.click();
+  }, { signal });
+}
+
+// "Neu"-Button-Selector auf der jeweiligen Zielseite
+const FAB_NEW_BTN = {
+  '/tasks':    '#btn-new-task',
+  '/calendar': '#fab-new-event',
+  '/shopping': '#fab-new-item',
+  '/notes':    '#fab-new-note',
+};
+
 function renderFab() {
+  // Am Desktop steht Anlegen als Pille im Kopf (renderNewPill).
+  if (onDesktopStage()) return '';
   const actions = FAB_ACTIONS();
   // Kein Eintrag, kein Knopf. Ein Speed-Dial, der sich auf eine leere Liste
   // oeffnet, waere die schlechtere Haelfte des Fehlers, den der Filter behebt.
@@ -5452,14 +5517,6 @@ function initFab(signal) {
   const fabActions  = fabGroup?.querySelector('#fab-actions');
   const fabBackdrop = fabGroup?.querySelector('#fab-backdrop');
   if (!fabMain || !fabActions) return;
-
-  // "Neu"-Button-Selector auf der jeweiligen Zielseite
-  const FAB_NEW_BTN = {
-    '/tasks':    '#btn-new-task',
-    '/calendar': '#fab-new-event',
-    '/shopping': '#fab-new-item',
-    '/notes':    '#fab-new-note',
-  };
 
   let open = false;
 
@@ -6552,7 +6609,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     }
     if (loadFailed) {
       setHtml(shell, `
-        ${renderDashboardOverview(user, false)}
+        ${renderDashboardOverview(user, false, null, { offerNew: false })}
         ${renderDashboardError(loadErrorStatus)}
       `);
       if (window.lucide) window.lucide.createIcons({ el: shell });
@@ -6681,6 +6738,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     findPageFab('fab-main')?.closest('.page-fab-group')?.remove();
   } else {
     initFab(signal);
+    wireNewMenu(container, signal);
   }
 
   // SELBSTHEILUNG STATT RETRY-KNOPF. Am Wandtablet drueckt niemand auf
@@ -6886,7 +6944,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, familyManageHref, customizeHasChanges, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderCustomizeFootnote, applyRowFill };
+export const __test = { customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, familyManageHref, customizeHasChanges, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -
