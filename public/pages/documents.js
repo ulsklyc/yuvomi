@@ -2235,7 +2235,10 @@ function openDocumentModal(doc = null) {
         <div class="modal-grid modal-grid--2 document-expiry-grid">
           <div class="form-group">
             <label class="label" for="document-expires-at">${t('documents.expiresAtLabel')}</label>
-            <input class="input" id="document-expires-at" type="date" value="${esc(doc?.expires_at || '')}">
+            <!-- Kanon-Datepicker statt eines nativen Datumsfelds (Re-Critique
+                 2026-09-28, A6 P2-5): .value liefert denselben ISO-Schluessel,
+                 das input-Ereignis feuert wie vorher. -->
+            <yuvomi-datepicker id="document-expires-at" type="date" label="${esc(t('documents.expiresAtLabel'))}" value="${esc(doc?.expires_at || '')}"></yuvomi-datepicker>
           </div>
           <div class="document-expiry-reminder" id="document-expiry-reminder" ${doc?.expires_at ? '' : 'hidden'}>
             <div class="form-group">

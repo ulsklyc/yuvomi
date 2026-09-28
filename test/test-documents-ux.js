@@ -1854,3 +1854,18 @@ test('der Ordnername bekommt im Rail genug Breite fuer eine Zeile (R11 H4)', () 
   const WORD = 113; // „Versicherungen"
   assert.ok(name >= WORD, `dem Ordnernamen bleiben ${name}px, „Versicherungen" braucht ${WORD}px - er bricht um`);
 });
+
+// Re-Critique 2026-09-28 (A6 P2-5, R14 P8): das Ablaufdatum war eines von fuenf
+// nativen Datumsfeldern der App - im Dokument-Dialog direkt neben Feldern, die
+// den eigenen Picker (`yuvomi-datepicker`) tragen. Ein Datum, ein Baustein.
+test('das Ablaufdatum nutzt den Kanon-Datepicker statt eines nativen Datumsfelds', () => {
+  assert.doesNotMatch(page, /<input[^>]*type="date"/, 'kein natives Datumsfeld im Dokumente-Modul');
+  const picker = /<yuvomi-datepicker\b[^>]*\bid="document-expires-at"[^>]*>/.exec(page)?.[0] ?? '';
+  assert.ok(picker, 'das Ablaufdatum ist ein yuvomi-datepicker');
+  assert.match(picker, /\btype="date"/);
+  assert.match(picker, /\blabel="\$\{esc\(t\('documents\.expiresAtLabel'\)\)\}"/, 'der Picker benennt sein inneres Feld selbst');
+  // Beide Leser bleiben: das Einblenden der Erinnerungstage haengt am
+  // input-Ereignis, das Speichern liest `.value` (ISO-Schluessel).
+  assert.match(page, /expiresInput\.addEventListener\('input', \(\) => \{ reminderGroup\.hidden = !expiresInput\.value; \}\)/);
+  assert.match(page, /form\.querySelector\('#document-expires-at'\)\.value \|\| null/);
+});
