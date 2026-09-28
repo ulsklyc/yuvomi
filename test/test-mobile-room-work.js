@@ -71,8 +71,12 @@ test('M1: mobil spannt der Aufgabentitel ueber Text- und Personenspalte', () => 
     'der Personenstapel steht in der Metazeile, nicht neben dem Titel');
 });
 
-test('M1: mobil nimmt die Personenwahl der Zeile keine Breite, bleibt aber Anker ihres Menues', () => {
-  const doer = declarations(tasksCss, '.task-card__main > .task-doer-btn', { media: MOBILE });
+// Re-Critique 2026-09-28 (P8 / A3 P2-2): am Desktop stand die Personenwahl
+// als zweites Leading-Control neben jedem Statuskreis - "wer hat erledigt"
+// ist erst NACH dem Erledigen eine Frage. Die Regel gilt jetzt auf jeder
+// Breite; der Weg bleibt Detail-Fuss, Kontextmenue und Long-Press.
+test('M1/P8: auf keiner Breite nimmt die Personenwahl der Zeile Platz, bleibt aber Anker ihres Menues', () => {
+  const doer = declarations(tasksCss, '.task-card__main > .task-doer-btn');
   assert.equal(doer.position, 'absolute', 'aus dem Fluss - der Titel bekommt ihre 44px');
   assert.equal(doer.visibility, 'hidden', 'unsichtbar und aus der Tab-Folge; der Tastaturweg ist das Detail');
   assert.notEqual(doer.display, 'none',

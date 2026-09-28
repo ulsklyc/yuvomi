@@ -519,6 +519,27 @@
   color: var(--color-text-secondary);
 }
 
+/* KEIN ZWEITES LEADING-CONTROL IN DER ZEILE - AUF KEINER BREITE (R9 M1 mobil,
+ * Re-Critique 2026-09-28 P8 / A3 P2-2 auch am Desktop). Dort stand der Knopf
+ * neben jedem Statuskreis und fragte vor jeder OFFENEN Aufgabe "wer hat das
+ * erledigt?" - eine Frage, die erst nach dem Erledigen eine ist, und die Zeile
+ * sah am Desktop anders aus als am Handy. Die Frage bleibt offen im
+ * Detail-Fuss (task-detail.js), per Kontextmenue (Rechtsklick, Menue-Taste)
+ * und per Long-Press - alle drei oeffnen dasselbe Panel.
+ *
+ * Der Knopf bleibt im DOM, unsichtbar und ohne Flaeche: er ist der Anker,
+ * an dem die geteilte Popover-Mechanik das Menue ausrichtet
+ * (utils/popover-menu.js misst `[popovertarget]`). `display: none` liesse
+ * das Menue an der Ecke des Fensters aufgehen; `visibility: hidden` nimmt
+ * ihn trotzdem aus Tab-Folge und Barrierebaum - der Tastaturweg ist das
+ * Detail. Absolut ohne Versatz steht er an seiner statischen Stelle, am
+ * Zeilenanfang unter dem Haken. */
+.task-card__main > .task-doer-btn {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .task-status-btn::before {
   content: '';
   position: absolute;
@@ -1004,19 +1025,6 @@
     grid-column: 3;
     grid-row: 2;
     align-self: center;
-  }
-
-  /* Der Knopf bleibt im DOM, unsichtbar und ohne Flaeche: er ist der Anker,
-   * an dem die geteilte Popover-Mechanik das Menue ausrichtet
-   * (utils/popover-menu.js misst `[popovertarget]`). `display: none` liesse
-   * das Menue an der Ecke des Fensters aufgehen; `visibility: hidden` nimmt
-   * ihn trotzdem aus Tab-Folge und Barrierebaum - der Tastaturweg ist das
-   * Detail. Absolut ohne Versatz steht er an seiner statischen Stelle, am
-   * Zeilenanfang unter dem Haken. */
-  .task-card__main > .task-doer-btn {
-    position: absolute;
-    visibility: hidden;
-    pointer-events: none;
   }
 
   /* Ein Long-Press ist hier eine Frage nach der Person, kein Markieren und
