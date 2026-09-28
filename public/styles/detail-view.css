@@ -444,3 +444,24 @@
 .detail-view--in-pane > .detail-view {
   padding: var(--space-4) var(--space-5) 0;
 }
+
+/* MOBIL EINE REIHE IM AUFGABEN-FUSS (Re-Critique 2026-09-28, P8 / A3 P3-2).
+ * Der Fuss einer offenen Aufgabe brach auf dem Telefon auf zwei Reihen
+ * (gemessen 133px; "Aufgabe archivieren" allein 188px). Starten und
+ * Archivieren treten dort in EIN Mehr-Menue (task-detail.js,
+ * wireDetailDoerMenu-Muster); ihre Knoepfe bleiben verborgen im Fuss, weil
+ * das Menue sie ausloest. Am Desktop passen alle Aktionen - dort gibt es den
+ * Mehr-Knopf nicht. */
+.detail-view__footer > .task-detail__more {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .detail-view__footer:has(> .task-detail__more) > .task-detail__overflow {
+    display: none;
+  }
+
+  .detail-view__footer > .task-detail__more {
+    display: inline-flex;
+  }
+}

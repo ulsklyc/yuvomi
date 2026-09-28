@@ -1130,6 +1130,14 @@ export function openTaskDetail({
     });
   }
 
+  // MOBIL EINE REIHE (Re-Critique 2026-09-28, P8 / A3 P3-2): Starten und
+  // Archivieren treten auf dem Telefon in EIN Mehr-Menue (detail-view.css);
+  // am Desktop stehen sie weiter im Fuss, und dort gibt es den Knopf nicht.
+  const overflowIds = ['task-detail-start', 'task-detail-archive'];
+  if (actions.some((a) => overflowIds.includes(a.id))) {
+    actions.push({ id: MORE_BUTTON_ID, label: '', variant: 'ghost', icon: 'more-horizontal' });
+  }
+
   openDetailView({
     title: task.title,
     key: `task:${task.id}`,
@@ -1153,6 +1161,60 @@ export function openTaskDetail({
   if (doers.length) {
     wireDetailDoerMenu(task, doers, ctx, (...args) => viewClose(...args), pane);
   }
+  wireDetailMoreMenu(task, overflowIds, pane);
+}
+
+const MORE_BUTTON_ID = 'task-detail-more';
+
+/**
+ * Das Mehr-Menue des Detail-Fusses (mobil). Seine Eintraege LOESEN DIE ECHTEN
+ * KNOEPFE AUS, statt eigene Handler zu tragen: Starten und Archivieren bleiben
+ * (verborgen) im Fuss, damit statusActionButtons() sie weiter mitsperrt und
+ * btnLoading() seinen Knopf findet - ein Handler, eine Sperrlogik.
+ */
+function wireDetailMoreMenu(task, overflowIds, pane = null) {
+  const root = pane ?? document;
+  const button = root.querySelector?.(`#${MORE_BUTTON_ID}`);
+  if (!button) return;
+  const targets = overflowIds.map((id) => root.querySelector?.(`#${id}`)).filter(Boolean);
+  if (!targets.length) { button.remove(); return; }
+  const label = t('common.moreActionsNamed', { name: task.title });
+  const panelId = `task-detail-more-${task.id}`;
+  button.classList.add('btn--icon', 'popover-menu__trigger', 'task-detail__more');
+  button.setAttribute('aria-label', label);
+  button.setAttribute('title', label);
+  button.setAttribute('aria-haspopup', 'menu');
+  button.setAttribute('aria-expanded', 'false');
+  button.setAttribute('popovertarget', panelId);
+
+  const panel = document.createElement('div');
+  panel.className = 'popover-menu';
+  panel.id = panelId;
+  panel.setAttribute('popover', '');
+  panel.setAttribute('role', 'menu');
+  for (const target of targets) {
+    target.classList.add('task-detail__overflow');
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'popover-menu__item';
+    item.setAttribute('role', 'menuitem');
+    const icon = document.createElement('i');
+    icon.dataset.lucide = target.querySelector('[data-lucide]')?.dataset.lucide
+      ?? target.querySelector('svg[data-lucide]')?.getAttribute('data-lucide') ?? 'circle';
+    icon.className = 'icon-md';
+    icon.setAttribute('aria-hidden', 'true');
+    const name = document.createElement('span');
+    name.textContent = target.querySelector('.btn__label')?.textContent ?? target.textContent.trim();
+    item.append(icon, name);
+    item.addEventListener('click', () => {
+      panel.hidePopover?.();
+      if (!target.disabled) target.click();
+    });
+    panel.appendChild(item);
+  }
+  button.after(panel);
+  installPopoverMenus(button.parentElement);
+  if (window.lucide) window.lucide.createIcons({ el: panel });
 }
 
 /**
