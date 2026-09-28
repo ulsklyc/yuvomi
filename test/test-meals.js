@@ -1807,6 +1807,29 @@ test('Rezeptformular: Mahlzeit-Typen sind Umschalt-Chips mit aria-pressed, ohne 
   assert(/#recipe-meal-types \[aria-pressed="true"\]/.test(recipesSrc), 'gespeichert wird, was gedrueckt ist');
 });
 
+// Re-Critique 2026-09-28 (P7 / A4 P2-7): die Zutatenzeile teilte drei Felder
+// in EINER Flex-Reihe - im 520px-Dialog las sich die Kategorie als
+// "Fleisch &...", mobil blieben ihr rund 100px. Regel: der Name steht allein
+// in der ersten Zeile (mit dem Entfernen-Knopf), Menge und Kategorie teilen
+// sich die zweite; kein Feld der Zeile wird per Flex-Anteil gekappt.
+test('Zutatenzeile: Name allein in Zeile eins, Menge und Kategorie teilen Zeile zwei', () => {
+  const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)].filter((r) => /(^|,)\s*\.ingredient-row(\b|__)/.test(r.selector));
+  const row = rules.find((r) => r.selector.trim() === '.ingredient-row' && !r.at.length);
+  assert(row && /display:\s*grid/.test(row.body), '.ingredient-row ist ein Raster');
+  const areas = (row.body.match(/grid-template-areas:\s*([^;]+);/) || [])[1] || '';
+  const lines = [...areas.matchAll(/"([^"]+)"/g)].map((m) => m[1].trim().split(/\s+/));
+  assert(lines.length === 2, 'zwei Zeilen');
+  assert(lines[0].includes('name') && !lines[0].includes('qty') && !lines[0].includes('cat'), 'Zeile eins traegt nur den Namen');
+  assert(lines[1].includes('qty') && lines[1].includes('cat'), 'Zeile zwei traegt Menge und Kategorie');
+  for (const r of rules) {
+    assert(!/(^|[;\s])flex:/.test(r.body), `${r.selector.trim()}: kein Flex-Anteil kappt ein Feld`);
+    assert(!/(?:^|[;\s])(?:max-)?width:\s*\d+px/.test(r.body), `${r.selector.trim()}: keine feste Pixelbreite`);
+  }
+  assert(rules.some((r) => r.selector.trim() === '.ingredient-row > .row-action' && /grid-area:\s*remove/.test(r.body)),
+    'der Entfernen-Knopf steht in Zeile eins neben dem Namen');
+});
+
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------

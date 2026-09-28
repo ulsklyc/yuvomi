@@ -6356,26 +6356,37 @@ textarea::placeholder {
  * Global statt modul-scoped, weil Modals im geteilten Overlay rendern und der
  * Router immer nur EIN Modul-Stylesheet aktiv hält. Markup: ingredient-row.js.
  * -------------------------------------------------------- */
+/* ZWEI ZEILEN STATT DREI GEKAPPTER FELDER (Re-Critique 2026-09-28, A4 P2-7):
+ * im 520px-Dialog zeigte die Kategorie "Fleisch &...", "Milchpro...", mobil
+ * blieben ihr 100px. Der Name bekommt die volle Zeile (mit dem Entfernen-Knopf),
+ * Menge und Kategorie teilen sich die zweite. */
 .ingredient-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto;
+  grid-template-areas: "name name remove" "qty cat .";
   align-items: center;
   gap: var(--space-2);
   border-radius: var(--radius-glass-inner);
 }
 
 .ingredient-row__name {
-  flex: 2;
+  grid-area: name;
+  min-width: 0;
 }
 
 .ingredient-row__qty {
-  flex: 1;
+  grid-area: qty;
   min-width: 0;
 }
 
 .ingredient-row__cat {
-  flex: 1.5;
+  grid-area: cat;
   min-width: 0;
   font-size: var(--type-body);
+}
+
+.ingredient-row > .row-action {
+  grid-area: remove;
 }
 
 .meal-type-badge {
