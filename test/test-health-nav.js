@@ -583,16 +583,46 @@ test('R14 P3/P6: der Umzug haengt verdrahtete Knoten um und bringt sie zurueck o
 
 test('R14 P3/P6: Kopf, Streifen und Detailkopf stehen im Markup, die Karten sind benannt', async () => {
   assert.match(HEALTH_JS, /class="health-toolbar__person" data-health-person-slot/, 'Slot in der Zeile „‹ Gesundheit"');
-  assert.match(HEALTH_JS, /class="health-priority" data-health-priority><\/div>\s*\$\{areasNavMarkup\(\)\}/, 'Streifen VOR der Bereichsliste');
+  assert.match(HEALTH_JS, /class="health-priority" data-health-priority><\/div>\s*<\/section>\s*\$\{areasNavMarkup\(\)\}/, 'Streifen VOR der Bereichsliste');
   assert.match(HEALTH_JS, /overviewCard\('calendar-check', 'health\.overview\.dueToday\.title', overviewDueMarkup\(\), 'due'\)/);
   assert.match(HEALTH_JS, /overviewCard\('plus-circle', 'health\.overview\.quick\.title', quickCaptureMarkup\(\), 'quick'\)/);
   assert.match(HEALTH_JS, /class="split-view__detail-head health-detail-head"/, 'Detailkopf wie die anderen Split-Views (A8 P2-2)');
   const { eachRule } = await import('./css-rules.js');
   const css = read('public/styles/health.css');
   const rules = [...eachRule(css)];
-  assert.ok(rules.some((r) => /\.health-page\[data-health-pushed\] \.health-priority/.test(r.selector) && /display:\s*none/.test(r.body)),
+  assert.ok(rules.some((r) => /\.health-page\[data-health-pushed\] \.health-priority-region/.test(r.selector) && /display:\s*none/.test(r.body)),
     'in einem Bereich gibt es den Streifen nicht');
-  assert.ok(rules.some((r) => /\.health-priority:empty/.test(r.selector) && /display:\s*none/.test(r.body)), 'leer kostet er nichts');
+  assert.ok(rules.some((r) => /\.health-priority-region:not\(:has\(> \.health-priority > \*\)\)/.test(r.selector) && /display:\s*none/.test(r.body)), 'leer kostet er nichts');
+});
+
+// Sonde 10 (document-guards) nach R14 P3: mobil stand „Heute faellig" (h3) als
+// erste Ueberschrift nach dem Seitentitel (h1) - ein Sprung h1 -> h3 fuer jeden
+// Screenreader, der die Seite nach Ueberschriften abgeht. Die Karten tragen im
+// Raster ihre h3 unter der Panel-h2; im Streifen vor der Bereichsliste fehlte
+// die Ebene dazwischen. Gemessen wird die Regel, nicht die Schreibweise: die
+// letzte Ueberschrift VOR dem Umzugsziel liegt hoechstens eine Ebene ueber der
+// Kartenueberschrift, und sie steht AUSSERHALB des Ziels (applyHoistPlan raeumt
+// dort alles weg, was es nicht selbst umgehaengt hat).
+test('R14 P3: vor den hochgezogenen Karten steht eine Ueberschrift eine Ebene darueber', async () => {
+  const shellStart = HEALTH_JS.indexOf('<div class="health-page app-page');
+  assert.ok(shellStart >= 0, 'Seitenrahmen nicht gefunden');
+  const slotAt = HEALTH_JS.indexOf('data-health-priority>', shellStart);
+  assert.ok(slotAt > shellStart, 'Umzugsziel data-health-priority nicht im Seitenrahmen');
+  const before = [...HEALTH_JS.slice(shellStart, slotAt).matchAll(/<h([1-6])\b/g)].map((m) => Number(m[1]));
+  assert.ok(before.length, 'keine Ueberschrift vor dem Streifen');
+  const lead = before.at(-1);
+  const cardStart = HEALTH_JS.indexOf('function overviewCard(');
+  const card = HEALTH_JS.slice(cardStart, HEALTH_JS.indexOf('\n}\n', cardStart)).match(/<h([1-6]) class="health-overview__card-title/);
+  assert.ok(card, 'Kartenueberschrift in overviewCard nicht gefunden');
+  assert.ok(Number(card[1]) <= lead + 1,
+    `hochgezogene Karte h${card[1]} folgt auf h${lead} - Ueberschriftensprung (Sonde 10, mobile/health)`);
+  // Die Ueberschrift des Streifens gibt es nur, wenn er etwas traegt: leer
+  // (Desktop, Tablet) oder in einem Bereich faellt die ganze Region weg.
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(read('public/styles/health.css'))];
+  const hides = (re) => rules.some((r) => re.test(r.selector) && /display:\s*none/.test(r.body));
+  assert.ok(hides(/\.health-priority-region:not\(:has\(> \.health-priority > \*\)\)/), 'leere Region mit Ueberschrift bliebe stehen');
+  assert.ok(hides(/\.health-page\[data-health-pushed\] \.health-priority-region/), 'in einem Bereich bliebe die Region stehen');
 });
 
 // R14 P4 (A6 P2-7): „Noch keine Eintraege." zentriert oben, ohne Weg - in der

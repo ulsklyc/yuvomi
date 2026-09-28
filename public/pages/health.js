@@ -1014,8 +1014,13 @@ export async function render(container, ctx = {}) {
       <div class="split-view health-split">
         <div class="split-view__list page-scrollport health-browse">
           <!-- Telefon-Uebersicht: Person, Heute faellig und Schnell erfassen
-               VOR der Bereichsliste (health-hoist.js, R14 P3). -->
-          <div class="health-priority" data-health-priority></div>
+               VOR der Bereichsliste (health-hoist.js, R14 P3). Die h2 steht
+               vor dem Umzugsziel, nicht darin: die Karten bringen ihre h3 mit,
+               ohne sie folgten sie direkt auf das h1. -->
+          <section class="health-priority-region" aria-labelledby="health-priority-title">
+            <h2 class="sr-only" id="health-priority-title">${esc(t('common.today'))}</h2>
+            <div class="health-priority" data-health-priority></div>
+          </section>
           ${areasNavMarkup()}
           <div class="health-stage" data-health-stage></div>
         </div>

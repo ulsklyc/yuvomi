@@ -146,8 +146,15 @@
   padding-inline: var(--page-inline-pad);
 }
 
-.health-priority:empty,
-.health-page[data-health-pushed] .health-priority {
+/* Leer (Tablet, Desktop) oder in einem Bereich faellt die ganze Region weg,
+ * samt ihrer h2 - sonst stuende eine leere „Heute"-Landmarke im Dokument.
+ * Zwei Regeln, nicht eine Liste: ein Browser ohne :has() verwirft sonst auch
+ * die Bereichs-Regel mit. */
+.health-page[data-health-pushed] .health-priority-region {
+  display: none;
+}
+
+.health-priority-region:not(:has(> .health-priority > *)) {
   display: none;
 }
 
