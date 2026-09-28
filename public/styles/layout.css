@@ -1633,6 +1633,29 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   outline-offset: var(--focus-ring-offset-inset);
 }
 
+/* DIE MARKIERTE ZEILE DER COMBOBOX (Re-Critique 2026-09-28, A1 P1-1). Der
+ * Fokus bleibt im Suchfeld; welche Zeile Enter oeffnet, zeigt
+ * `aria-selected` (utils/palette-combobox.js). Dieselbe Flaeche wie die
+ * ausgewaehlte Zeile von Liste+Detail und die Aktiv-Pille der Seitenleiste -
+ * "das ist gemeint". Im Kontrastmodus traegt ein Rahmen die Markierung, weil
+ * dort keine Hintergrundfarbe durchkommt. */
+.search-result[aria-selected="true"],
+.search-scope[aria-selected="true"] {
+  background-color: color-mix(in srgb, var(--color-accent) var(--tint-state), var(--color-surface));
+}
+
+.search-scope[aria-selected="true"] {
+  border-color: var(--color-accent);
+}
+
+@media (forced-colors: active) {
+  .search-result[aria-selected="true"],
+  .search-scope[aria-selected="true"] {
+    outline: var(--focus-ring-width) solid Highlight;
+    outline-offset: var(--focus-ring-offset-inset);
+  }
+}
+
 /* Scope-Launcher im Leerzustand: „Direkt öffnen"-Kacheln, die zugleich zeigen,
  * was durchsucht wird, und ins jeweilige Modul springen (Critique P1). */
 .search-scopes {

@@ -160,3 +160,129 @@ test('R14: im Palettenfeld steht EIN X - das native Leeren ist aus', async () =>
   assert.ok(rule, 'die Regel fuer das native Leeren fehlt');
   assert.match(rule.body, /display:\s*none/);
 });
+
+/*
+ * ENTER OEFFNET DEN ERSTEN TREFFER (Re-Critique 2026-09-28, A1 P1-1).
+ * ⌘K, "kal", Enter: der Pfad blieb `/`, die Palette offen - der Tastenhandler
+ * kannte nur Pfeiltasten, und die schoben den Fokus aus dem Feld. Gefahren
+ * wird der echte Handler aus utils/palette-combobox.js gegen einen kleinsten
+ * Stub (`querySelectorAll`, `setAttribute`, `click`, mehr fasst er nicht an);
+ * der Textteil haelt die Verdrahtung in router.js, denn ein Handler, den
+ * niemand aufruft, waere sonst gruen.
+ */
+class Stub {
+  constructor(classes = '', { id = '' } = {}) {
+    this.classes = new Set(classes.split(' ').filter(Boolean));
+    this.attrs = new Map();
+    this.id = id;
+    this.children = [];
+    this.listeners = {};
+    this.clicks = 0;
+    this.tabIndex = 0;
+  }
+
+  append(...kids) { this.children.push(...kids); return this; }
+  setAttribute(k, v) { this.attrs.set(k, String(v)); }
+  getAttribute(k) { return this.attrs.has(k) ? this.attrs.get(k) : null; }
+  removeAttribute(k) { this.attrs.delete(k); }
+  addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); }
+  click() { this.clicks += 1; }
+  matches(sel) { return sel.split(',').some((s) => this.classes.has(s.trim().replace(/^\./, ''))); }
+  all() { return this.children.flatMap((c) => [c, ...c.all()]); }
+  querySelectorAll(sel) { return this.all().filter((n) => n.matches(sel)); }
+  querySelector(sel) { return this.querySelectorAll(sel)[0] ?? null; }
+  closest(sel) { return this.matches(sel) ? this : null; }
+  key(key) {
+    let prevented = false;
+    const e = { key, isComposing: false, preventDefault: () => { prevented = true; } };
+    (this.listeners.keydown ?? []).forEach((fn) => fn(e));
+    return prevented;
+  }
+}
+
+function palette() {
+  const input = new Stub('search-overlay__input', { id: 'search-input' });
+  const results = new Stub('search-overlay__results', { id: 'search-results' });
+  const goTo = new Stub('search-section').append(
+    new Stub('search-section__heading'),
+    new Stub('search-section__rows').append(new Stub('search-result'), new Stub('search-result')),
+  );
+  const data = new Stub('search-section').append(
+    new Stub('search-section__heading'),
+    new Stub('search-section__rows').append(new Stub('search-result')),
+  );
+  results.append(goTo, data);
+  const hits = results.querySelectorAll('.search-result');
+  return { input, results, hits };
+}
+
+test('A1 P1-1: Enter im Feld oeffnet den ersten Treffer, Pfeile bewegen nur die Markierung', async () => {
+  const { wirePaletteCombobox } = await import('../public/utils/palette-combobox.js');
+  const { input, results, hits } = palette();
+  const combo = wirePaletteCombobox({ input, listbox: results });
+  assert.equal(input.getAttribute('role'), 'combobox');
+  assert.equal(input.getAttribute('aria-controls'), 'search-results');
+
+  combo.refresh();
+  assert.equal(input.getAttribute('aria-expanded'), 'true');
+  assert.equal(results.getAttribute('role'), 'listbox');
+  assert.ok(hits.every((h) => h.getAttribute('role') === 'option' && h.tabIndex === -1),
+    'die Zeilen sind Optionen und stehen nicht in der Tab-Folge');
+  assert.equal(input.getAttribute('aria-activedescendant'), hits[0].id, 'der erste Treffer ist vorgewaehlt');
+  assert.equal(hits[0].getAttribute('aria-selected'), 'true');
+  assert.ok(results.querySelectorAll('.search-section').every((g) => g.getAttribute('role') === 'group'
+    && g.getAttribute('aria-labelledby')), 'jede Gruppe ist nach ihrer Ueberschrift benannt');
+
+  assert.equal(input.key('Enter'), true, 'Enter wird vom Feld genommen');
+  assert.deepEqual(hits.map((h) => h.clicks), [1, 0, 0], 'Enter oeffnet den ersten Treffer - ueber seinen Klick');
+
+  assert.equal(input.key('ArrowDown'), true);
+  assert.equal(input.key('ArrowDown'), true);
+  assert.equal(input.getAttribute('aria-activedescendant'), hits[2].id, 'der Pfeil erreicht auch die Datentreffer');
+  input.key('ArrowDown');
+  assert.equal(input.getAttribute('aria-activedescendant'), hits[2].id, 'am Ende bleibt die Markierung stehen');
+  input.key('Enter');
+  assert.deepEqual(hits.map((h) => h.clicks), [1, 0, 1]);
+  input.key('ArrowUp');
+  assert.equal(input.getAttribute('aria-activedescendant'), hits[1].id);
+  combo.refresh({ keep: true });
+  assert.equal(input.getAttribute('aria-activedescendant'), hits[1].id, 'nachkommende Daten verschieben die Markierung nicht');
+
+  combo.clear();
+  assert.equal(input.getAttribute('aria-expanded'), 'false');
+  assert.equal(input.getAttribute('aria-activedescendant'), null);
+  assert.equal(input.key('Enter'), false, 'ohne Zeile bleibt Enter beim Feld');
+});
+
+test('A1 P1-1: im Leerzustand ist nichts vorgewaehlt, die Kacheln erreicht der Pfeil', async () => {
+  const { wirePaletteCombobox } = await import('../public/utils/palette-combobox.js');
+  const input = new Stub('', { id: 'search-input' });
+  const results = new Stub('', { id: 'search-results' });
+  const hint = new Stub('empty-state');
+  const tiles = [new Stub('search-scope'), new Stub('search-scope')];
+  results.append(hint, new Stub('search-scopes').append(new Stub('search-section__heading'), new Stub('search-scopes__list').append(...tiles)));
+  const combo = wirePaletteCombobox({ input, listbox: results });
+  combo.refresh({ preselect: false });
+  assert.equal(input.getAttribute('aria-activedescendant'), null, 'Enter auf ein leeres Feld oeffnet keine Kachel');
+  assert.equal(input.key('Enter'), false);
+  assert.equal(hint.getAttribute('role'), 'none', 'eine Listbox besitzt nur Gruppen und Optionen');
+  input.key('ArrowDown');
+  assert.equal(input.getAttribute('aria-activedescendant'), tiles[0].id, '"Direkt oeffnen" ist per Pfeil erreichbar');
+  input.key('Enter');
+  assert.equal(tiles[0].clicks, 1);
+});
+
+test('A1 P1-1: router.js verdrahtet die Combobox nach jedem Rendern der Palette', () => {
+  const init = body('function initSearch(', 'return openSearch;');
+  assert.match(init, /wirePaletteCombobox\(\{ input, listbox: results \}\)/, 'das Suchfeld wird zur Combobox');
+  const hint = body('function renderSearchHint(', '// Der Marker der Zurueck-Geste');
+  assert.match(hint, /combo\.refresh\(\{ preselect: false \}\)/, 'die Kacheln zaehlen als Zeilen, ohne Vorwahl');
+  const input = body("input.addEventListener('input'", 'return openSearch;');
+  const renders = input.match(/renderSearchResults\(/g).length;
+  const refreshes = input.match(/combo\.refresh\(/g)?.length ?? 0;
+  assert.equal(refreshes, renders, 'jedes Rendern liest die Zeilen neu ein - sonst zeigt die Markierung ins Leere');
+  const close = body('function closeSearch(', "if (searchClose)");
+  assert.match(close, /combo\.clear\(\)/);
+  assert.doesNotMatch(init, /hits\[[^\]]*\]\.focus\(\)|\.focus\(\);\s*\} else if \(idx/,
+    'die Pfeile schieben den Fokus nicht mehr aus dem Feld');
+});
