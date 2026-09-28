@@ -535,3 +535,146 @@ test('Router: ein abgelehntes Zurueck legt die Adresse erst zurueck, wenn der Di
   assert.match(head, /await whenHistorySettled\(\);\s*\n\s*history\.pushState\(\{ path: stay \}/,
     'erst das back() der Rueckfrage, dann der eigene Eintrag');
 });
+
+// -------------------------------------------------------------------------
+// R14 P2 (Re-Critique 2026-09-28, A7 P2-2): Uebersicht mobil - Orientierung
+// statt Buehne. Gemessen vorher bei 390x844: "Heute wichtig" y157-748 (591px),
+// fuenfmal "Ueberfaellig", zwei Zeilen 87px durch Umbruch neben dem Label,
+// erstes Widget y760, Seite 3192px.
+// -------------------------------------------------------------------------
+
+/** Ein Fenster, das auf die Telefon-Frage `matches` antwortet - eigener Stub je Test. */
+async function withStage(phone, fn) {
+  const hadWindow = 'window' in globalThis;
+  const prevWindow = globalThis.window;
+  globalThis.window = {
+    yuvomi: null,
+    matchMedia: (q) => ({ matches: phone && /max-width:\s*639px/.test(q), media: q, addEventListener() {}, removeEventListener() {} }),
+  };
+  try {
+    return await fn();
+  } finally {
+    if (hadWindow) globalThis.window = prevWindow;
+    else delete globalThis.window;
+  }
+}
+
+function overdueDay() {
+  return '2000-01-01';
+}
+
+function fiveOverdue() {
+  const who = [
+    { id: 3, display_name: 'Linda Johnson', avatar_color: '#6a5acd' },
+    { id: 4, display_name: 'Emma Johnson', avatar_color: '#c2185b' },
+    { id: 5, display_name: 'Alex Johnson', avatar_color: '#1565c0' },
+  ];
+  return Array.from({ length: 5 }, (_, i) => ({
+    id: i + 1, title: `Rueckstand ${i + 1}`, due_date: overdueDay(), status: 'open', assigned_users: [who[i % 3]],
+  }));
+}
+
+test('R14 P2: mobil stehen mehrere Ueberfaellige als EINE Sammelzeile, die an Ort und Stelle aufklappt', () => withStage(true, () => {
+  const todayStr = toLocalDateKey(new Date());
+  const html = renderTodayCockpit({
+    urgentTasks: fiveOverdue(),
+    upcomingEvents: [{ id: 40, title: 'Elternabend', start_datetime: todayStr, all_day: 1 }],
+  }, [], false, { overdueOpen: false });
+  const group = html.match(/<button\b[^>]*data-today-overdue[^>]*>[\s\S]*?<\/button>/)?.[0];
+  assert.ok(group, `eine Sammelzeile steht im Blatt: ${html.slice(0, 300)}`);
+  assert.match(group, /today-cockpit-card/, 'sie hat die Anatomie einer Heute-Zeile');
+  assert.match(group, /aria-expanded="false"/);
+  assert.match(group, /dashboard\.todayOverdueCount\{(?:"|&quot;)count(?:"|&quot;):5\}/, 'sie nennt die Zahl, nicht fuenf Zeilen');
+  // renderAvatarStack ist im Loader ein Stub - gemessen wird, wen die Zeile nennt.
+  assert.match(accessibleText(group), /Linda Johnson, Emma Johnson, Alex Johnson/, 'wen es angeht, jede Person einmal');
+  assert.match(group, /today-cockpit-card__trail/, 'die Avatare stehen am Ende, wo sonst die Zeit steht');
+  const controls = group.match(/aria-controls="([^"]+)"/)?.[1];
+  assert.ok(controls, 'der Knopf nennt, was er aufklappt');
+  const region = html.match(new RegExp(`<div\\b[^>]*id="${controls}"[^>]*>`))?.[0];
+  assert.ok(region, 'die fuenf Zeilen stehen im Markup');
+  assert.match(region, /\bhidden\b/, 'zugeklappt');
+  for (let i = 1; i <= 5; i += 1) assert.match(html, new RegExp(`Rueckstand ${i}`));
+  assert.equal((html.match(/today-cockpit-card__time--overdue/g) ?? []).length, 0,
+    'kein fuenffaches rotes "Ueberfaellig" - die Sammelzeile sagt es einmal');
+  assert.match(html, /Elternabend/, 'der Rest des Tages bleibt');
+}));
+
+test('R14 P2: am Desktop bleiben die Zeilen einzeln, und eine einzelne Ueberfaellige wird nie gesammelt', async () => {
+  await withStage(false, () => {
+    const html = renderTodayCockpit({ urgentTasks: fiveOverdue() }, []);
+    assert.doesNotMatch(html, /data-today-overdue/, 'breit ist Platz fuer die Zeilen');
+  });
+  await withStage(true, () => {
+    const html = renderTodayCockpit({ urgentTasks: fiveOverdue().slice(0, 1) }, []);
+    assert.doesNotMatch(html, /data-today-overdue/, 'eine Zeile braucht keine Sammlung');
+    assert.match(html, /Rueckstand 1/);
+  });
+});
+
+test('R14 P2: mobil deckelt das Blatt bei zwei Zeilen, die Sammelzeile zaehlt als eine, Einkauf klappt mit', () => withStage(true, () => {
+  const todayStr = toLocalDateKey(new Date());
+  const upcomingEvents = [1, 2, 3].map((i) => ({ id: 40 + i, title: `Termin ${i}`, start_datetime: `${todayStr}T2${i}:00:00` }));
+  const model = __test.buildTodayCockpitModel({ urgentTasks: fiveOverdue(), upcomingEvents }, []);
+  assert.equal(model.rows.length, 2, `zwei Zeilen auf dem Telefon, erhalten: ${model.rows.map((r) => r.title)}`);
+  assert.equal(model.rows[0].kind, 'overdue', 'das Offene bleibt unter dem Deckel');
+  assert.equal(model.overflow, 2, 'der Rest steht hinter "+N weitere"');
+  // Termine plus Essen: keine Ansicht zeigt beides, also klappt die Fusszeile auf.
+  const shop = { urgentTasks: fiveOverdue(), upcomingEvents, todayMeals: [{ id: 9, meal_type: 'dinner', title: 'Pasta' }],
+    shoppingLists: [{ id: 1, name: 'Wocheneinkauf', open_count: 7 }] };
+  const withShop = renderTodayCockpit(shop, [], false, { moreOpen: false });
+  assert.match(withShop, /dashboard\.todayShopping</, 'Reichweite: die Einkaufszeile steht im Blatt');
+  const regionStart = withShop.indexOf('id="today-cockpit-more"');
+  const button = withShop.indexOf('data-today-more');
+  const shopAt = withShop.indexOf('dashboard.todayShopping<');
+  assert.ok(regionStart > 0 && regionStart < shopAt && shopAt < button,
+    'auf dem Telefon steht der Einkauf hinter dem Knopf, nicht als eigene Zeile darunter');
+  assert.match(withShop, /dashboard\.todayMore\{(?:"|&quot;)count(?:"|&quot;):4\}/, 'und der Knopf zaehlt ihn mit (zwei Termine, Essen, Einkauf)');
+  const wall = __test.buildTodayCockpitModel({ urgentTasks: fiveOverdue() }, [], { cap: 8, groupOverdue: false });
+  assert.equal(wall.rows.filter((r) => r.overdue).length, 5, 'die Wand bekommt ihre Zeilen, wenn sie es sagt');
+}));
+
+test('R14 P2: die Sammelzeile ist verdrahtet, und der Wand-Aufruf sammelt nicht', () => {
+  assert.equal(typeof __test.wireTodayOverdue, 'function');
+  assert.match(dashboardSource, /function wireLinks\([^)]*\) \{[\s\S]{0,200}wireTodayOverdue\(container\)/);
+  assert.match(dashboardSource, /buildTodayCockpitModel\(data, \[\], \{ cap, now, groupOverdue: false \}\)/,
+    'die Wand ist eine Anzeige ohne Bedienung - dort klappt nichts auf');
+});
+
+test('R14 P2: mobil bricht die Heute-Zeile nicht neben ihrem Label um, und die violette Haarlinie ist weg', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = await readFile(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const phone = (r) => r.at.some((a) => /\(max-width:\s*639px\)/.test(a));
+  const body = (sel, pred) => rules.filter((r) => pred(r) && r.selector.split(',').some((s) => s.trim() === sel)).map((r) => r.body).join(';');
+  assert.match(body('.today-cockpit-card__value', phone), /-webkit-line-clamp:\s*1/, 'eine Zeile Titel auf dem Telefon');
+  assert.doesNotMatch(body('.today-cockpit', (r) => !r.at.length), /border-top/, 'keine Deko-Linie zwischen Gruss und Blatt (A7 P3)');
+});
+
+test('R14 P2: Listenkacheln zeigen auf dem Telefon die kurze Fassung', () => withStage(true, () => {
+  assert.equal(__test.listRowCap('1x2'), 3, 'hoch heisst auf dem Telefon nicht fuenf Zeilen');
+  return withStage(false, () => assert.equal(__test.listRowCap('1x2'), 5, 'am Desktop traegt die hohe Kachel fuenf'));
+}));
+
+test('R14 P2: Anpassen mobil ist eine kompakte Liste - Name, Griff, Auge - und der Vorrat steht oben', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = await readFile(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const cfg = [
+    { id: 'notes', visible: true, size: '1x2' },
+    { id: 'budget', visible: true, size: '1x1' },
+    { id: 'weather', visible: false, size: '1x1' },
+  ];
+  global.window ??= { yuvomi: null };
+  const html = renderDashboardLayout(cfg, {}, null, 'EUR', { editing: true });
+  assert.match(html, /class="widget-edit-controls__caption"[^>]*>[^<]*\S/, 'jede Leiste traegt den Namen ihrer Kachel');
+  const tray = html.indexOf('class="widget-restore"');
+  const grid = html.indexOf('id="dashboard-widget-grid"');
+  assert.ok(tray > 0 && grid > 0, 'Reichweite: Vorrat und Raster stehen da');
+  assert.ok(tray < grid, 'der Wieder-Einblenden-Vorrat steht ueber dem Raster');
+
+  const rules = [...eachRule(css)];
+  const phone = (r) => r.at.some((a) => /\(max-width:\s*639px\)/.test(a));
+  const body = (sel, pred) => rules.filter((r) => pred(r) && r.selector.split(',').some((s) => s.trim() === sel)).map((r) => r.body).join(';');
+  assert.match(body('.widget-wrapper--editing > .widget', phone), /display:\s*none/, 'mobil keine Kachel-Inhalte beim Anordnen');
+  assert.match(body('.widget-edit-controls__caption', phone), /display:\s*block/, 'mobil steht der Name in der Zeile');
+  assert.match(body('.widget-edit-controls__caption', (r) => !r.at.length), /display:\s*none/, 'breit traegt der Kachelkopf den Namen');
+});

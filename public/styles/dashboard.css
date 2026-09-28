@@ -2160,7 +2160,7 @@ svg.weather-forecast__icon {
  * zugleich das entfernte zweite Editor-Modal.
  * -------------------------------------------------------- */
 .widget-restore {
-  margin-top: var(--space-4);
+  margin-bottom: var(--space-4);
   padding: var(--space-4);
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-md);
@@ -2437,8 +2437,9 @@ svg.weather-forecast__icon {
   gap: var(--space-3);
   /* Teil des Masthead-Bands: kein eigener Rahmen, nur ein feiner Divider trennt
    * die Glance-Zeile von der Begrüßung darüber. */
+  /* Die violette Haarlinie ueber dem Blatt ist weg (R14, A7 P3): Deko ohne
+   * Aussage, und der Gruss trennt sich vom Blatt schon durch dessen Flaeche. */
   padding-top: var(--space-4);
-  border-top: 1px solid color-mix(in srgb, var(--module-accent) var(--tint-hint), var(--color-border));
   /* Container bleibt deklariert: der Schmal-Fallback unten fragt den EIGENEN
    * Platz ab (sidebar-bewusst, nicht Viewport). Siehe tokens.css §11c. */
   container: today-cockpit / inline-size;
@@ -2643,8 +2644,35 @@ button.today-cockpit__more--link {
   transition: transform var(--transition-fast);
 }
 
-.today-cockpit__more[aria-expanded="true"] .today-cockpit__more-icon {
+.today-cockpit__more[aria-expanded="true"] .today-cockpit__more-icon,
+.today-cockpit-card--group[aria-expanded="true"] .today-cockpit__more-icon {
   transform: rotate(180deg);
+}
+
+/* DIE SAMMELZEILE DER UEBERFAELLIGEN (R14, dashboard.js groupOverdueRows).
+ * Sie ist ein Aufklapp-Knopf ohne Route, zeigt aber dieselbe Beruehrung wie
+ * jede Zeile mit Ziel - im Ton ihres Raums. Am Ende stehen die gestapelten
+ * Avatare und das Chevron, wo sonst die Zeit steht. */
+.today-cockpit-card--group:hover,
+.today-cockpit-card--group:focus-visible {
+  background: color-mix(in srgb, var(--today-card-accent) var(--tint-state), var(--color-surface));
+}
+
+.today-cockpit-card--group:focus-visible {
+  outline-offset: var(--focus-ring-offset-inset);
+}
+
+.today-cockpit-card__trail {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+}
+
+/* Die aufgeklappten Zeilen setzen die Liste mit derselben Haarlinie fort. */
+.today-cockpit__rows--group > .today-cockpit-card:first-child,
+.today-cockpit__rows--group + .today-cockpit-card {
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3290,6 +3318,52 @@ button.today-cockpit__more--link {
   border: none;
   background: none;
   padding: 0;
+}
+
+/* Der Name in der Leiste gilt nur fuer die kompakte Liste auf dem Telefon
+ * (unten); breit traegt der Kachelkopf darunter den Namen. Fuer den
+ * Screenreader nennt ihn die Gruppe (`aria-label`) - der Text ist Bild. */
+.widget-edit-controls__caption {
+  display: none;
+}
+
+/* ANPASSEN AUF DEM TELEFON IST EINE LISTE (R14, A7 P2-2), wie „Widgets
+ * bearbeiten" in iOS: je Kachel eine Zeile mit Name, Verschieben, Groesse,
+ * Optionen und Auge - ohne den Kachelinhalt. Gemessen vorher 3924px Seite im
+ * Anpassen-Modus; angeordnet wird die Reihenfolge, und die liest man an den
+ * Namen, nicht an den Inhalten. */
+@media (max-width: 639px) {
+  .widget-wrapper--editing > .widget {
+    display: none;
+  }
+
+  .widget-wrapper--editing {
+    padding: 0;
+    outline: none;
+  }
+
+  .dashboard__grid--editing {
+    gap: var(--space-2);
+  }
+
+  .widget-wrapper--editing > .widget-edit-controls {
+    flex-wrap: nowrap;
+    min-height: var(--target-base);
+    padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+  }
+
+  .widget-edit-controls__caption {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
+  }
 }
 
 @media (max-width: 767px) {
@@ -5120,6 +5194,15 @@ button.today-cockpit__more--link {
   .today-cockpit-card {
     padding: var(--space-3);
     gap: var(--space-3);
+  }
+
+  /* EINE ZEILE TITEL NEBEN DEM LABEL (R14, A7 P2-2). Neben „Ueberfaellig"
+   * brach der Titel in zwei Zeilen um, die Zeile wuchs von 64 auf 87px. Der
+   * Titel kuerzt sich jetzt wie in den Erinnerungen-Widgets; ganz lesen ihn
+   * der Screenreader und die Aufgabe hinter dem Tipp. */
+  .today-cockpit-card__value {
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
   }
 }
 
