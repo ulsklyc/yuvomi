@@ -938,3 +938,24 @@ test('splitViewDetailHtml: benannte Spalte mit Leerzustand und leerem Koerper, N
     global.document = saved;
   }
 });
+
+test('A6 P1-1: kein Inhalt mit z-index malt ueber den klebenden Detailkopf - in jeder Split-Spalte', () => {
+  // Gemessen in der Gesundheit bei 1440x900: `elementFromPoint` im Kopfband
+  // lieferte `.metric-card__value` bzw. `.cycle-cal__num` - beide
+  // `position: relative; z-index: 1` wie der Kopf, und spaeter im DOM.
+  const layout = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(layout)].filter((r) => !r.at.length);
+  const head = rules.filter((r) => r.selector.trim() === '.split-view__detail-head').map((r) => r.body).join(';');
+  assert.match(head, /position:\s*sticky/, 'der Kopf klebt');
+  const z = Number(head.match(/z-index:\s*(-?\d+)/)?.[1]);
+  assert.ok(z > 0, 'der Kopf steht ueber Ebene 0');
+  // JEDES Geschwister nach dem Kopf, nicht eine Modulklasse: die Gesundheit
+  // setzt ihre Panels, die Rezepte ihr Detail, die Leseansicht Koerper und
+  // Fuss dahinter - eine Aufzaehlung vergaesse die naechste Spalte.
+  const iso = rules.filter((r) => r.selector.split(',').some((s) => /^\.split-view__detail-head\s*~\s*\*$/.test(s.trim())));
+  assert.ok(iso.some((r) => /isolation:\s*isolate/.test(r.body)),
+    'der Inhalt hinter dem Kopf ist keine eigene Stapelung - ein z-index darin schlaegt den Kopf');
+  // Und niemand nimmt sie einem Geschwister wieder weg.
+  const undo = [...eachRule(layout)].filter((r) => /isolation:\s*auto/.test(r.body));
+  assert.deepEqual(undo.map((r) => r.selector), [], 'isolation: auto hebt die Ebene wieder auf');
+});

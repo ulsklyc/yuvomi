@@ -2967,6 +2967,22 @@ html.fab-anim-done .page-fab {
   border-block-end: 1px solid var(--color-border-subtle);
 }
 
+/* DER INHALT UNTER DEM KOPF IST EINE EIGENE EBENE (Re-Critique 2026-09-28,
+ * A6 P1-1). Der Kopf klebt mit `z-index: 1`, und Kennzahlkarten
+ * (`.metric-card__value`, panel.css) oder die Ziffern des Zykluskalenders
+ * (`.cycle-cal__num`, health.css) heben sich mit demselben `z-index: 1` ueber
+ * ihre eigene Flaeche. Weil sie spaeter im DOM stehen, gewannen sie: beim
+ * Scrollen standen "ST" und "Gut" im Kopf "Vitalwerte", die Ziffern 14-20
+ * ueber "Zyklus". Ein hoeherer Wert am Kopf verschoebe den Streit nur zur
+ * naechsten Zahl. `isolation: isolate` an jedem Geschwister NACH dem Kopf
+ * schliesst jede Ebene darin in ihre eigene Stapelung ein - die ganze
+ * Stapelung liegt dann auf Ebene 0 unter dem Kopf, gleich welche Zahl ein
+ * Modul darin setzt. Fuer jede Split-Detailspalte, nicht nur die Gesundheit:
+ * Aufgaben, Kontakte und Rezepte setzen denselben Kopf vor ihren Inhalt. */
+.split-view__detail-head ~ * {
+  isolation: isolate;
+}
+
 .split-view__detail-title {
   flex: 1 1 auto;
   min-width: 0;
