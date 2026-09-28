@@ -4973,7 +4973,7 @@ function openPreventionModal(row) {
       </div>
       <div class="form-field">
         <label class="label" for="prevention-next-due">${esc(t('health.prevention.field.nextDueOn'))}</label>
-        <input class="input" id="prevention-next-due" type="date" value="${esc(val(row?.next_due_on))}">
+        <yuvomi-datepicker id="prevention-next-due" type="date" value="${esc(val(row?.next_due_on))}"></yuvomi-datepicker>
       </div>
     </div>
     <div class="form-field">
@@ -5000,7 +5000,7 @@ function openPreventionModal(row) {
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
             <label class="label" for="prevention-given-on">${esc(t('health.prevention.field.givenOn'))}</label>
-            <input class="input" id="prevention-given-on" type="date" required value="${esc(row?.given_on || todayKey())}">
+            <yuvomi-datepicker id="prevention-given-on" type="date" value="${esc(row?.given_on || todayKey())}"></yuvomi-datepicker>
           </div>
           <div class="form-field">
             <label class="label" for="prevention-dose">${esc(t('health.prevention.field.doseNumber'))}</label>

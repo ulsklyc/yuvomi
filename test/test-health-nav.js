@@ -614,3 +614,13 @@ test('R14 P4: Vorsorge und Naehrwerte leer = EIN Leerzustand mit Aktion statt ei
   assert.match(nut, /emptyStateHTML\(\{[\s\S]*?title: t\('health\.nutrition\.emptyTitle'\)[\s\S]*?id: 'health-nutrition-empty-add'/);
   assert.match(fnBody('wireNutrition'), /#health-nutrition-empty-add'\)\?\.addEventListener\('click', \(\) => openNutritionModal\(null\)\)/);
 });
+
+// R14 P8 (A6 P2-5): die Vorsorge trug zwei native Datumsfelder, direkt neben
+// dem Export mit dem Kanon-Picker. Jedes Datumsfeld der Gesundheit ist jetzt
+// `yuvomi-datepicker`.
+test('R14 P8: kein natives Datumsfeld in der Gesundheit', () => {
+  const nativ = [...HEALTH_JS.matchAll(/<input[^>]*type="date"[^>]*>/g)].map((m) => m[0]);
+  assert.deepEqual(nativ, [], 'native Datumsfelder statt yuvomi-datepicker');
+  assert.match(HEALTH_JS, /<yuvomi-datepicker id="prevention-given-on" type="date"/);
+  assert.match(HEALTH_JS, /<yuvomi-datepicker id="prevention-next-due" type="date"/);
+});
