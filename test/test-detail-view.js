@@ -906,3 +906,172 @@ test('die abgelösten Schlüssel sind überall entfernt', async () => {
     }
   }
 });
+
+/**
+ * DER KLICK NEBEN DAS POPOVER SCHLIESST NUR (Re-Kritik 2026-09-28, P1).
+ *
+ * Im Kalender lief der Klick, der die Leseansicht schloss, weiter zur leeren
+ * Wochenspalte darunter - und die oeffnete "Neuer Termin". Die Regel gilt fuer
+ * JEDES Popover der Leseansicht, nicht nur im Kalender, also wird sie hier am
+ * laufenden openDetailView() gemessen und nicht am Quelltext: das echte Modul,
+ * ein Klick, der den Ablauf des Browsers nachgeht (Capture am Dokument, dann
+ * das Ziel, dann Bubbling zurueck zum Dokument), und ein Seiten-Handler am
+ * Ziel, der mitzaehlt. Der Loader leitet nur i18n und modal.js auf Stubs um;
+ * detail-view.js und overlay-history.js laufen wie im Browser.
+ */
+test('Klick neben das Popover schliesst es und loest darunter nichts aus', async () => {
+  const { register } = await import('node:module');
+  register('./test-browser-loader.mjs', import.meta.url);
+
+  const saved = {};
+  for (const k of ['window', 'document', 'history', 'location', 'matchMedia', 'HTMLElement']) {
+    saved[k] = Object.getOwnPropertyDescriptor(globalThis, k);
+  }
+
+  // Ein Dokument mit echter Ereignisreihenfolge: Capture-Listener am Dokument,
+  // Listener am Ziel, Bubble-Listener am Dokument - mit stopPropagation und
+  // stopImmediatePropagation wie im DOM. Mehr braucht das Popover nicht.
+  const docListeners = [];
+  class FakeEl {
+    constructor(tag) {
+      this.tagName = tag.toUpperCase();
+      this.children = [];
+      this.parent = null;
+      this.attrs = {};
+      this.dataset = {};
+      this.style = { setProperty() {} };
+      this.classList = { add() {}, remove() {}, contains: () => false, toggle() {} };
+      this.listeners = [];
+      this.className = '';
+      this.id = '';
+      this.textContent = '';
+    }
+    get isConnected() {
+      let n = this;
+      while (n.parent) n = n.parent;
+      return n === body;
+    }
+    setAttribute(k, v) { this.attrs[k] = String(v); }
+    getAttribute(k) { return this.attrs[k] ?? null; }
+    appendChild(c) { if (c && typeof c === 'object') c.parent = this; this.children.push(c); return c; }
+    append(...cs) { cs.forEach((c) => this.appendChild(c)); }
+    replaceChild(next, prev) { const i = this.children.indexOf(prev); this.children[i] = next; next.parent = this; }
+    remove() { if (this.parent) this.parent.children = this.parent.children.filter((c) => c !== this); this.parent = null; }
+    contains(n) { for (let c = n; c; c = c.parent) if (c === this) return true; return false; }
+    closest(sel) {
+      for (let c = this; c; c = c.parent) {
+        if (sel.split(',').some((s) => {
+          const t = s.trim();
+          if (t.startsWith('.')) return String(c.className).split(/\s+/).includes(t.slice(1));
+          const m = t.match(/^\[role="(.+)"\]$/);
+          return m ? c.attrs?.role === m[1] : false;
+        })) return c;
+      }
+      return null;
+    }
+    addEventListener(type, fn) { this.listeners.push({ type, fn }); }
+    removeEventListener(type, fn) { this.listeners = this.listeners.filter((l) => l.fn !== fn); }
+    querySelectorAll() { return []; }
+    focus() {}
+    getBoundingClientRect() { return { top: 100, bottom: 120, left: 100, right: 200, width: 100, height: 20 }; }
+  }
+  const body = new FakeEl('body');
+  const doc = {
+    body,
+    documentElement: { clientWidth: 1440, clientHeight: 900 },
+    activeElement: null,
+    createElement: (tag) => new FakeEl(tag),
+    createTextNode: (text) => ({ nodeType: 3, textContent: String(text) }),
+    addEventListener(type, fn, opts) {
+      const capture = opts === true || Boolean(opts?.capture);
+      docListeners.push({ type, fn, capture });
+    },
+    removeEventListener(type, fn, opts) {
+      const capture = opts === true || Boolean(opts?.capture);
+      const i = docListeners.findIndex((l) => l.type === type && l.fn === fn && l.capture === capture);
+      if (i !== -1) docListeners.splice(i, 1);
+    },
+  };
+
+  function click(target) {
+    const ev = {
+      type: 'click', target, isTrusted: true, defaultPrevented: false,
+      stopped: false, stoppedNow: false,
+      preventDefault() { this.defaultPrevented = true; },
+      stopPropagation() { this.stopped = true; },
+      stopImmediatePropagation() { this.stopped = true; this.stoppedNow = true; },
+    };
+    const run = (list) => {
+      for (const l of [...list]) {
+        if (ev.stoppedNow) return;
+        l.fn(ev);
+      }
+    };
+    run(docListeners.filter((l) => l.type === 'click' && l.capture));
+    if (!ev.stopped) run(target.listeners.filter((l) => l.type === 'click'));
+    if (!ev.stopped) run(docListeners.filter((l) => l.type === 'click' && !l.capture));
+    return ev;
+  }
+
+  Object.assign(globalThis, {
+    window: { innerWidth: 1440, lucide: undefined },
+    document: doc,
+    history: { state: null, pushState() {}, back() {} },
+    location: { href: 'http://localhost/calendar' },
+    matchMedia: () => ({ matches: false }),
+    HTMLElement: FakeEl,
+  });
+
+  try {
+    const { openDetailView } = await import('../public/components/detail-view.js');
+
+    // Die leere Wochenspalte: ihr Klick-Handler legt einen Termin an.
+    const column = new FakeEl('div');
+    body.appendChild(column);
+    let angelegt = 0;
+    column.addEventListener('click', () => { angelegt += 1; });
+    const anchor = new FakeEl('button');
+    column.appendChild(anchor);
+
+    const view = openDetailView({ title: 'Emmas Geburtstagsfeier', anchor, sections: [] });
+    assert.ok(body.children.some((c) => c.id === 'detail-view-popover'), 'die Weiche hat ein Popover gebaut');
+    // Der Listener bindet erst im naechsten Tick (sonst schloesse der oeffnende Klick).
+    await new Promise((r) => setTimeout(r, 0));
+
+    const outside = docListeners.find((l) => l.type === 'click');
+    assert.ok(outside, 'das Popover hoert auf Klicks daneben');
+    assert.equal(outside.capture, true,
+      'der Klick daneben muss VOR den Handlern der Seite ankommen (Capture), sonst hat die Spalte schon angelegt');
+
+    const erster = click(column);
+    assert.equal(view.isOpen(), false, 'der Klick daneben schliesst das Popover');
+    assert.equal(angelegt, 0, 'der Klick, der das Popover schliesst, darf darunter nichts anlegen');
+    assert.equal(erster.defaultPrevented, true, 'auch die Standardaktion (ein Link darunter) bleibt aus');
+    assert.equal(docListeners.filter((l) => l.type === 'click').length, 0, 'der Listener ist mit dem Popover weg');
+
+    click(column);
+    assert.equal(angelegt, 1, 'der ZWEITE Klick legt wie gewohnt an');
+
+    // Gegenfall: ein Knopf in einer anderen Ebene (Rueckfrage ueber dem Popover)
+    // muss tun, was er sagt - er schliesst das Popover, wird aber nicht geschluckt.
+    const view2 = openDetailView({ title: 'Termin', anchor, sections: [] });
+    await new Promise((r) => setTimeout(r, 0));
+    const overlay = new FakeEl('div');
+    overlay.className = 'modal-overlay';
+    body.appendChild(overlay);
+    const confirmBtn = new FakeEl('button');
+    overlay.appendChild(confirmBtn);
+    let bestaetigt = 0;
+    confirmBtn.addEventListener('click', () => { bestaetigt += 1; });
+    click(confirmBtn);
+    assert.equal(bestaetigt, 1, 'ein Knopf in einem Dialog ueber dem Popover bleibt bedienbar');
+    assert.equal(view2.isOpen(), false);
+    // Das Overlay-Register gleicht die History im Microtask ab - erst danach
+    // duerfen die Attrappen weg, sonst stolpert es nach dem Test ins Leere.
+    await new Promise((r) => setTimeout(r, 0));
+  } finally {
+    for (const [k, d] of Object.entries(saved)) {
+      if (d) Object.defineProperty(globalThis, k, d); else delete globalThis[k];
+    }
+  }
+});
