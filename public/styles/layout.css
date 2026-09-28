@@ -3944,12 +3944,11 @@ html.fab-anim-done .page-fab {
  * darunter „Liste löschen" für die Liste des ganzen Haushalts (Critique
  * 2026-07-30).
  *
- * Diese Grammatik existiert im Repo bereits zweimal privat:
- * `.contact-more-menu__panel` + `.contact-menu-item` (contacts.css) und
- * `.documents-context-menu` + `__item` (documents.css). Beide sind bis auf die
- * Klassennamen deckungsgleich mit dem hier. Sie sind bewusst nicht mitmigriert -
- * der Auftrag war die Küche, und zwei fremde Module umzustellen ist ein eigener
- * Schritt. Wer ihn geht, löscht dort rund 60 Zeilen und ändert hier nichts.
+ * Diese Grammatik existierte im Repo zweimal privat. Das Zeilenmenü der
+ * Kontakte ist seit R16 (Re-Critique 2026-09-28) hierher umgezogen; übrig ist
+ * `.documents-context-menu` + `__item` (documents.css), bis auf die
+ * Klassennamen deckungsgleich mit dem hier. Wer es nachzieht, löscht dort die
+ * private Kopie und ändert hier nichts.
  * -------------------------------------------------------- */
 
 /* `display: none` als Grundzustand, `flex` erst bei :popover-open: das UA-Blatt
