@@ -204,7 +204,12 @@ test('Abbrechen fragt nur, wenn es etwas zu verlieren gibt (H2)', () => {
   // Verdrahtung: Abbrechen laeuft ueber die Rueckfrage, nicht direkt ins Verwerfen.
   assert.match(dashboardSource, /'#dashboard-customize-cancel'\)\?\.addEventListener\('click', requestCancelDashboardConfig/);
   const body = dashboardSource.match(/async function requestCancelDashboardConfig\(\) \{([\s\S]*?)\n {2}\}/)?.[1] ?? '';
-  assert.match(body, /if \(customizeHasChanges\([\s\S]*?confirmModal\(/, 'die Rueckfrage haengt an der Aenderung');
+  // Die Rueckfrage ist seit A7 P2-1 (2026-09-28) EINE Funktion fuer Abbrechen
+  // und Verlassen - gemessen wird, dass sie an der Aenderung haengt und die
+  // Verwerfen-Frage ist, nicht wie sie heisst.
+  assert.match(body, /if \(customizeHasChanges\([\s\S]*?confirmDiscardCustomize\(/, 'die Rueckfrage haengt an der Aenderung');
+  assert.match(dashboardSource, /const confirmDiscardCustomize = \(\) => confirmModal\(t\('modal\.unsavedChanges'\)/,
+    'und sie ist die Verwerfen-Frage');
 });
 
 test('„+N weitere heute" ist ein Weg dorthin, wo die verdeckten Zeilen stehen (H13)', () => {
@@ -414,4 +419,75 @@ test('R9 M7: mobil klappt "Heute wichtig" beim Anpassen auf die Kopfzeile zusamm
   assert.equal(hides.length, 1, 'unter 640px faellt der Inhalt des Bands im Anpassen-Modus weg');
   assert.ok(!rules.some((r) => !phone(r) && /today-cockpit--editing/.test(r.selector)),
     'breit bleibt das Band beim Anpassen offen - dort steht es neben dem Raster nicht im Weg');
+});
+
+// -------------------------------------------------------------------------
+// Anpassen-Modus verliert nichts still (Re-Critique 2026-09-28, A7 P2-1)
+// -------------------------------------------------------------------------
+
+test('Verlassen-Schutz: ohne Waechter frei, ein Nein haelt, ein Fehler sperrt nicht, Abmelden trifft nur den eigenen', async () => {
+  const { setLeaveGuard, mayLeave } = await import('../public/utils/leave-guard.js');
+  assert.equal(await mayLeave('/calendar'), true, 'ohne Waechter geht jeder Wechsel');
+  const gefragt = [];
+  const abmelden = setLeaveGuard(async (to) => { gefragt.push(to); return false; });
+  assert.equal(await mayLeave('/calendar'), false, 'ein Nein haelt die Seite');
+  assert.deepEqual(gefragt, ['/calendar'], 'der Waechter erfaehrt das Ziel');
+  const zweiter = setLeaveGuard(() => { throw new Error('kaputt'); });
+  const fehler = console.error;
+  console.error = () => {};
+  try {
+    assert.equal(await mayLeave('/tasks'), true, 'ein werfender Waechter sperrt die Navigation nicht');
+  } finally {
+    console.error = fehler;
+  }
+  abmelden();
+  assert.equal(await mayLeave('/tasks'), true, 'ist aber noch der aktive - die alte Abmeldung nimmt ihn nicht weg');
+  zweiter();
+  assert.equal(await mayLeave('/tasks'), true);
+});
+
+test('Anpassen: Verlassen fragt wie Abbrechen - nur mit Aenderung, ein Nein bleibt', async () => {
+  const lauf = async ({ customizing = true, changed = false, answer = true, saveDuringDialog = false } = {}) => {
+    let modus = customizing;
+    const log = [];
+    const ok = await __test.customizeLeaveAllowed({
+      customizing: () => modus,
+      changed: () => changed,
+      askDiscard: async () => { log.push('confirm'); if (saveDuringDialog) modus = false; return answer; },
+      discard: () => { log.push('discard'); modus = false; },
+    });
+    return { ok, log, modus };
+  };
+  assert.deepEqual(await lauf({ customizing: false }), { ok: true, log: [], modus: false }, 'ausserhalb des Modus fragt nichts');
+  assert.deepEqual(await lauf({ changed: false }), { ok: true, log: ['discard'], modus: false },
+    'ohne Aenderung kein Dialog, der Modus endet mit dem Wechsel');
+  assert.deepEqual(await lauf({ changed: true, answer: false }), { ok: false, log: ['confirm'], modus: true },
+    'mit Aenderung und Nein: die Anordnung bleibt, die Seite auch');
+  assert.deepEqual(await lauf({ changed: true, answer: true }), { ok: true, log: ['confirm', 'discard'], modus: false },
+    'mit Aenderung und Ja: verworfen und weiter');
+  assert.equal((await lauf({ changed: true, answer: false, saveDuringDialog: true })).ok, true,
+    'wurde im Dialog schon beendet, gibt es nichts mehr zu halten');
+});
+
+test('Anpassen: der Speed-Dial ist ausgeblendet, und der Neuaufbau meldet den Schutz an', async () => {
+  const gruppe = { hidden: false, style: {} };
+  const fab = { closest: (sel) => (sel === '.page-fab-group' ? gruppe : null) };
+  const vorher = globalThis.document;
+  globalThis.document = { ...(vorher ?? {}), getElementById: (id) => (id === 'fab-main' ? fab : null) };
+  try {
+    __test.setCustomizeFabHidden(true);
+    assert.equal(gruppe.hidden, true);
+    assert.equal(gruppe.style.display, 'none', 'display sticht sonst das hidden-Attribut');
+    __test.setCustomizeFabHidden(false);
+    assert.equal(gruppe.hidden, false);
+    assert.equal(gruppe.style.display, '');
+  } finally {
+    globalThis.document = vorher;
+  }
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const rebuild = src.slice(src.indexOf('function rebuildDashboard('), src.indexOf('setHtml(shell, `\n      <section class="dashboard-masthead'));
+  assert.ok(/syncLeaveGuard\(\);/.test(rebuild), 'jeder Neuaufbau gleicht den Verlassen-Schutz mit dem Modus ab');
+  assert.ok(/setCustomizeFabHidden\(isCustomizing\);/.test(rebuild), 'und blendet den Speed-Dial mit dem Modus');
+  assert.ok(/setLeaveGuard\(\(\) => customizeLeaveAllowed\(/.test(src), 'der Schutz ist die Rueckfrage von Abbrechen');
 });

@@ -26,6 +26,7 @@ import { EXPIRY_SOON_DAYS, pantryExpiryPhrase, pantryExpiryTone } from '/utils/p
 import { locationLabel } from '/utils/pantry-locations.js';
 import { pantryQuantityLabel } from '/utils/pantry-units.js';
 import { findPageFab } from '/utils/fab.js';
+import { setLeaveGuard } from '/utils/leave-guard.js';
 import { openModal, closeModal, confirmModal, refocusAfterRender } from '/components/modal.js';
 import { renderAvatarStack } from '/components/user-multi-select.js';
 import { isSoloHousehold } from '/utils/household.js';
@@ -3710,6 +3711,31 @@ function renderDashboardOverview(user, editing = false, weather = null, scope = 
 }
 
 /** Hat der Anpassen-Modus etwas, das „Abbrechen" wegwerfen wuerde? */
+/**
+ * DER ANPASSEN-MODUS VERLIERT NICHTS STILL (Re-Critique 2026-09-28, A7 P2-1).
+ *
+ * Abbrechen fragte seit 2026-09-27 nach, sobald es etwas zu verlieren gab -
+ * aber ein Tipp auf "Kalender" in der Tab-Leiste, die Seitenleiste, die
+ * Befehlspalette oder Zurueck warfen dieselbe Anordnung wortlos weg. Diese
+ * Rueckfrage haengt als Verlassen-Schutz am Router (utils/leave-guard.js) und
+ * ist DIESELBE wie beim Abbrechen: ohne Aenderung kein Dialog, mit Aenderung
+ * "Verwerfen?" - und ein Nein bleibt auf der Seite.
+ *
+ * Rein und mit gereichten Abhaengigkeiten, damit ein Test sie fahren kann.
+ * @returns {Promise<boolean>} ob der Wechsel weitergehen darf
+ */
+async function customizeLeaveAllowed({ customizing, changed, askDiscard, discard }) {
+  if (!customizing()) return true;
+  if (changed()) {
+    const confirmed = await askDiscard();
+    // Im Dialog kann der Modus schon beendet worden sein (gespeichert):
+    // dann gibt es nichts mehr zu verlieren, und der Wechsel darf.
+    if (!confirmed && customizing()) return false;
+  }
+  discard();
+  return true;
+}
+
 function customizeHasChanges({ widgetConfig, savedWidgetConfig, glanceVisible, savedGlanceVisible }) {
   return !sameWidgetConfig(savedWidgetConfig, widgetConfig)
     || Boolean(glanceVisible) !== Boolean(savedGlanceVisible);
@@ -5283,6 +5309,18 @@ function renderFab() {
  * sichtbar und täte nichts - genau der Bug hinter #634. `findPageFab()` ist die
  * eine Stelle, an der der Ort steht.
  */
+/**
+ * Den Speed-Dial im Anpassen-Modus ausblenden (A7 P2-1). `hidden` fuer die
+ * Zugaenglichkeit, `display` weil `.page-fab-group` eine eigene Anzeige setzt,
+ * die das Attribut sonst sticht (dieselbe Bauart wie setPageFabAction).
+ */
+function setCustomizeFabHidden(hidden) {
+  const group = findPageFab('fab-main')?.closest('.page-fab-group');
+  if (!group) return;
+  group.hidden = hidden;
+  group.style.display = hidden ? 'none' : '';
+}
+
 function initFab(signal) {
   const fabMain     = findPageFab('fab-main');
   const fabGroup    = fabMain?.closest('.page-fab-group');
@@ -5314,7 +5352,13 @@ function initFab(signal) {
     if (window.lucide) window.lucide.createIcons({ el: fabGroup });
   }
 
-  fabMain.addEventListener('click', (e) => { e.stopPropagation(); toggleFab(); });
+  fabMain.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // Der Kurzbefehl `n` klickt den Knopf auch, wenn er ausgeblendet ist
+    // (triggerPageFab) - im Anpassen-Modus oeffnet er nichts.
+    if (fabGroup?.hidden) return;
+    toggleFab();
+  });
 
   fabActions.querySelectorAll('[data-route]').forEach((el) => {
     const go = async () => {
@@ -5937,18 +5981,45 @@ export async function render(container, { user, signal: routeSignal = null } = {
    * Anordnung wortlos weg. Ohne Aenderung bleibt der Ausgang ein Tipp - eine
    * Rueckfrage ohne Folge waere nur Reibung. Nach dem Verwerfen steht der Fokus
    * wieder auf „Anpassen", wie nach jedem Moduswechsel. */
+  // Die eine Rueckfrage fuer Abbrechen UND Verlassen.
+  const confirmDiscardCustomize = () => confirmModal(t('modal.unsavedChanges'), {
+    danger: true,
+    confirmLabel: t('modal.discardChanges'),
+    detail: t('dashboard.customizeDiscardDetail'),
+  });
+
   async function requestCancelDashboardConfig() {
     if (customizeHasChanges({ widgetConfig, savedWidgetConfig, glanceVisible, savedGlanceVisible })) {
-      const confirmed = await confirmModal(t('modal.unsavedChanges'), {
-        danger: true,
-        confirmLabel: t('modal.discardChanges'),
-        detail: t('dashboard.customizeDiscardDetail'),
-      });
+      const confirmed = await confirmDiscardCustomize();
       if (!confirmed || !isCustomizing) return;
     }
     focusAfterRebuild = ['#dashboard-customize-btn'];
     cancelDashboardConfig();
   }
+
+  // Verlassen-Schutz, solange angepasst wird (siehe customizeLeaveAllowed).
+  // Beim Verlassen wird nicht neu gezeichnet - die Seite geht ohnehin; nur der
+  // Modus endet, damit ein spaeter Neuaufbau nicht im Anpassen landet.
+  let releaseLeaveGuard = null;
+  const syncLeaveGuard = () => {
+    if (isCustomizing && !releaseLeaveGuard) {
+      releaseLeaveGuard = setLeaveGuard(() => customizeLeaveAllowed({
+        customizing: () => isCustomizing,
+        changed: () => customizeHasChanges({ widgetConfig, savedWidgetConfig, glanceVisible, savedGlanceVisible }),
+        askDiscard: confirmDiscardCustomize,
+        discard: () => {
+          widgetConfig = savedWidgetConfig.map((w) => ({ ...w }));
+          glanceVisible = savedGlanceVisible;
+          isCustomizing = false;
+          syncLeaveGuard();
+        },
+      }));
+    } else if (!isCustomizing && releaseLeaveGuard) {
+      releaseLeaveGuard();
+      releaseLeaveGuard = null;
+    }
+  };
+  signal.addEventListener('abort', () => { releaseLeaveGuard?.(); releaseLeaveGuard = null; }, { once: true });
 
   /* „ZURÜCKSETZEN" HATTE SEIT #585 ZWEI PLAUSIBLE BEDEUTUNGEN und lieferte eine
    * dritte (Critique 2026-08-16). Solange die Anordnung dem Haushalt gehörte,
@@ -6385,6 +6456,11 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // da waere jede Bewegung nur Unruhe.
     const tileRectsBefore = isCustomizing && renderedCustomizing === true ? captureTileRects(shell) : null;
     renderedCustomizing = isCustomizing;
+    syncLeaveGuard();
+    // Im Anpassen-Modus ist die Seite ein Editor: der Speed-Dial ("Neue
+    // Aufgabe", "Neuer Termin" ...) fuehrte mitten aus der Anordnung hinaus
+    // und stand ueber den Bearbeiten-Leisten der unteren Kacheln (A7 P2-1).
+    setCustomizeFabHidden(isCustomizing);
     setHtml(shell, `
       <section class="dashboard-masthead dashboard-masthead--${greetingPeriod()}${mastheadSlim}">
         ${renderDashboardOverview(user, isCustomizing, weatherCardShown ? null : weather, { followsDefault, canPublish })}
@@ -6684,7 +6760,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, familyManageHref, customizeHasChanges, todayMoreRoute, wireTodayMore, renderWidgetSizeMenu, renderCustomizeFootnote, applyRowFill };
+export const __test = { customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, familyManageHref, customizeHasChanges, todayMoreRoute, wireTodayMore, renderWidgetSizeMenu, renderCustomizeFootnote, applyRowFill };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -
