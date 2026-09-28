@@ -296,8 +296,12 @@
     display: none;
   }
 
-  .cal-toolbar > .cal-toolbar__bar,
-  .cal-toolbar__tools {
+  /* NUR IM MARKIERTEN ZEITRAUM-KOPF (R17 Z1, DESIGN.md „Variante: Zeitraum-
+   * Kopf"): Werkzeuge in Zeile 1 sind die eine benannte Abweichung von der
+   * Kopfregel, und die Kennklasse im Markup ist ihre Erlaubnis
+   * (test:mobile-chrome prueft jede Regel, die eine Bar-Zeile aufloest). */
+  .page-toolbar--period-title.cal-toolbar > .cal-toolbar__bar,
+  .page-toolbar--period-title.cal-toolbar .cal-toolbar__tools {
     display: contents;
   }
 
@@ -1270,13 +1274,11 @@
  * Termin-Suche (#471)
  * -------------------------------------------------------- */
 
+/* Ruhend traegt die Lupe die Kopf-Icon-Form (`.btn--secondary.btn--icon`)
+ * samt ihrer Tinte, wie Filter und „..." daneben (R17 Z1) - hier stand eine
+ * eigene graue Tinte, und eine der drei Knoepfe las sich wie deaktiviert. */
 .cal-toolbar__search-btn {
-  color: var(--color-text-secondary);
   transition: color var(--transition-fast), background-color var(--transition-fast);
-}
-
-.cal-toolbar__search-btn:hover {
-  color: var(--color-text-primary);
 }
 
 .cal-toolbar__search-btn--active {
@@ -2955,44 +2957,17 @@
  *      der Ruhezustand und war damit ein No-op - der Kommentar daneben
  *      behauptete das Gegenteil.
  *
- * Was bleibt, ist ein Knopf in der EINEN Buttonform der App (`.btn--icon`,
- * Kapsel aus der Basisregel) mit einer Zahl. Der Zustand ist damit kein
+ * Was bleibt, ist ein Knopf in der Kopf-Icon-Form (`.btn--secondary.btn--icon`,
+ * wie Lupe und „...") mit einer Zahl. Der Zustand ist damit kein
  * Farbunterschied mehr, sondern ein Zaehler - lesbar auch dort, wo eine
  * Waschung keine Farbe tragen kann.
  * -------------------------------------------------------- */
 
-/* Der aktive Knopf traegt den MODULTON als Tinte, nicht als Flaeche: eine
- * Zahl darauf braucht eine Tinte, und der Zaehler steht schon fuer den
- * Zustand. Die Skalen-Regel („ein Etikett nennt seinen Ton EINMAL") - hier
- * ist es der Zaehler. */
-.cal-toolbar__filter-btn--active {
-  color: var(--module-accent, var(--color-accent));
-}
-
-.cal-toolbar__filter-btn {
-  position: relative;
-}
-
-.cal-toolbar__filter-count {
-  position: absolute;
-  top: var(--space-1);
-  inset-inline-end: var(--space-1);
-  min-width: var(--space-4);
-  height: var(--space-4);
-  padding-inline: var(--space-0h);
-  border-radius: var(--radius-full);
-  /* VOLLTON, kein getoentes Feld: die Zahl steht darauf und braucht eine
-     Tinte. Der Modulton ist ein KURATIERTER Ton, also gilt der erste Zweig
-     der Vollton-Regel - die Farbe IST die Flaeche, die Tinte ist
-     --color-ink-on-vivid. */
-  background: var(--module-accent, var(--color-accent));
-  color: var(--color-ink-on-vivid);
-  font-size: var(--text-2xs);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--space-4);
-  text-align: center;
-  pointer-events: none;
-}
+/* Der Knopf selbst ist seit R17 (Z1) der geteilte `filterButtonHtml`
+ * (utils/filter-sheet.js, Regeln `.page-filter-btn*` in layout.css): Zahl als
+ * Badge, Modulton als Tinte, dieselbe Kopf-Icon-Form wie Lupe und „...". Hier
+ * stand bis dahin eine Kopie mit eigener Badge-Klasse - das Vorbild, von dem
+ * der Baustein abgeschrieben war, lief neben ihm her. */
 
 /* --- Das Blatt ------------------------------------------------------- */
 

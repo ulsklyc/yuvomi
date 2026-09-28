@@ -4468,6 +4468,56 @@ test('Filter am Desktop: verankertes Popover ohne Abdunkeln statt Blatt (A2 P2-7
 });
 
 // --------------------------------------------------------
+// R17 Z1 (Re-Critique 2026-09-28, A1 P2-3/P3-7): der Zeitraum-Kopf
+// --------------------------------------------------------
+
+/** Das oeffnende Tag des Knopfs mit `id` aus einem Kopf-Markup. */
+function buttonTag(html, id) {
+  const at = html.indexOf(`id="${id}"`);
+  assert(at >= 0, `Knopf #${id} fehlt im Kopf`);
+  const open = html.lastIndexOf('<button', at);
+  const close = html.indexOf('</button>', at);
+  return { tag: html.slice(open, html.indexOf('>', at) + 1), whole: html.slice(open, close) };
+}
+
+test('Zeitraum-Kopf (R17 Z1): Filter, Lupe und „..." tragen EINE Icon-Knopfform - die der Kopfregel', () => {
+  const html = calendarHelpers.toolbarHtml({ filterCount: 0 });
+  const forms = ['cal-filters', 'cal-search', 'cal-views-menu'].map((id) => {
+    const cls = buttonTag(html, id).tag.match(/class="([^"]*)"/)[1].split(/\s+/);
+    // Die Form ist die Kapsel mit Ring des Werkzeugmenues (pageToolsMenuHtml,
+    // Vorbild documents-tools-btn) - nicht der nackte Kreis, den die Lupe und
+    // das Menue hier trugen, waehrend jedes andere Modul den Ring zeigt.
+    return { id, secondary: cls.includes('btn--secondary'), icon: cls.includes('btn--icon') };
+  });
+  for (const f of forms) {
+    assert(f.icon, `#${f.id}: ein Icon-Knopf`);
+    assert(f.secondary, `#${f.id}: dieselbe Kopf-Icon-Form wie „..." der Kopfregel (btn--secondary btn--icon)`);
+  }
+  // Dieselbe Form heisst auch dieselbe Tinte: eine Ruheregel, die einem der
+  // drei Knoepfe eine eigene Farbe gibt, macht aus ihm wieder einen zweiten
+  // Stil (die Lupe stand grau neben zwei getoenten Knoepfen).
+  const own = [...eachRule(calendarCss)].filter((r) => r.selector.split(',').some((s) =>
+    /^\.cal-toolbar__(?:filter|search|tools)-btn$/.test(s.trim())) && /(?:^|[;{\s])(?:color|background(?:-color)?|border(?:-color)?)\s*:/.test(r.body));
+  assert(own.length === 0, `keine eigene Ruhe-Tinte fuer einen Kopfknopf: ${own.map((r) => r.selector.trim()).join(' | ')}`);
+});
+
+test('Zeitraum-Kopf (R17 Z1): der Filterknopf traegt den geteilten Zaehler und nennt ihn', () => {
+  const two = buttonTag(calendarHelpers.toolbarHtml({ filterCount: 2 }), 'cal-filters');
+  assert(/\bpage-filter-btn\b/.test(two.tag), 'derselbe Baustein wie jeder Filterknopf (utils/filter-sheet.js)');
+  assert(/\bpage-filter-btn--active\b/.test(two.tag), 'aktiv, sobald ein Filter etwas wegnimmt');
+  const badge = two.whole.match(/<span class="page-filter-btn__count"([^>]*)>([^<]*)<\/span>/);
+  assert(badge, 'die Zahl steht als Badge am Knopf');
+  assert(badge[2] === '2' && !/(?<![-\w])hidden\b/.test(badge[1]), `Badge zeigt 2, gerendert: ${badge[2]}`);
+  const name = two.tag.match(/aria-label="([^"]*)"/)[1];
+  assert(/calendar\.filtersActive|2/.test(name), `zugaenglicher Name nennt die Zahl, gerendert: ${name}`);
+
+  const none = buttonTag(calendarHelpers.toolbarHtml({ filterCount: 0 }), 'cal-filters');
+  assert(!/\bpage-filter-btn--active\b/.test(none.tag), 'ohne Filter nicht aktiv');
+  assert(/<span class="page-filter-btn__count"[^>]*(?<![-\w])hidden\b/.test(none.whole), 'ohne Filter steht keine 0 am Knopf');
+  assert(/calendar\.filtersOpen|Filter/.test(none.tag.match(/aria-label="([^"]*)"/)[1]), 'ohne Filter heisst er „Filter oeffnen"');
+});
+
+// --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
 console.log(`\n[Calendar-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);

@@ -2183,6 +2183,24 @@ Element (Werkzeugzeile, Chipreihe) macht daraus keinen vierten Fall, sondern wan
 Menue oder in den Port. `test:mobile-chrome` zaehlt keine Kopfzeilen (das ist Messarbeit),
 die Ausnahme steht deshalb hier und in der Messmatrix, nicht in einer Ausnahmekarte.
 
+**Variante: Zeitraum-Kopf (Kalender).** (R17 Z1, 2026-09-28, A1 P2-3/P3-7.) Wo der Titel
+ein navigierbarer Zeitraum ist - heute nur im Kalender -, stehen mobil die Werkzeuge in
+Zeile 1: Large Title, dahinter trailing Filter, Lupe und EIN „..." (dort die Ansichtswahl
+als `menuitemradio`, das Segment ist unter 640px ausgeblendet). Zeile 2 gehoert allein
+dem Zeitraum-Stepper (zurueck, Wert, vor, dahinter „Heute"). Begruendung: Apples Kalender
+stellt seine Werkzeuge ebenso neben den Zeitraum-Titel, und kein Modul hat einen so
+geringen Inhaltsanteil zu verteilen - das Raster braucht jede Zeile, eine dritte kostete
+48px, und neben dem Stepper blieben dem mobilen Wochenlabel („26.09. - 28.09.2026",
+155px) nur 134px. Innen gilt die Kopfregel unveraendert: Filter, Lupe und „..." tragen
+EINE Form, die Kopf-Icon-Form `.btn--secondary.btn--icon` (48px Ziel), und der Filter ist
+der geteilte `filterButtonHtml` mit der Zahl als Badge und im Namen („2 Filter aktiv").
+Die Variante ist markiert, nicht geraten: der Kopf traegt `page-toolbar--period-title`,
+und nur unter dieser Klasse loest calendar.css die Bar-Zeile auf (`display: contents`).
+`test:mobile-chrome` findet jede Regel, die eine Bar- oder Werkzeugzeile eines Kopfs
+aufloest, und laesst sie nur mit der Klasse durch; die Klasse selbst nur in den Modulen,
+die dieser Absatz nennt. Ein zweites Modul mit Zeitraum-Titel kommt hier dazu, nicht in
+eine Ausnahmekarte.
+
 Pruefebene: **Struktur** (`test:mobile-chrome` - Kapsel ausser Fluss, `--nav-tail` im
 Nachlauf, keine klebende Chipreihe, kein `sticky; bottom: 0`, Icon-Form im Wrapper, die
 Bausteine an einer Stelle) plus **Messung** je Modul (Kopfhoehe ausgeklappt, erste Zeile y,

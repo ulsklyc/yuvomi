@@ -40,6 +40,7 @@ import { withChosenPeople } from '/utils/people-picker.js';
 import { othersCanRead } from '/utils/household.js';
 import { wireTablist } from '/utils/tablist.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
+import { filterButtonHtml } from '/utils/filter-sheet.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { wirePeriodSwipe } from '/utils/period-swipe.js';
 import { isNavModuleReadOnly } from '/permissions.js';
@@ -2047,7 +2048,11 @@ export async function render(container, { user }) {
             schwebend (gemessen 2026-09-27: x=1360, unten rechts). Den vollen
             Kopf baut renderToolbar() nach dem Laden und haengt den
             angedockten FAB dabei um. */ ''}
-      <div class="page-toolbar page-toolbar--wrap page-toolbar--period cal-toolbar" id="cal-toolbar">
+      ${/* `page-toolbar--period-title`: die benannte Variante „Zeitraum-Kopf"
+            (DESIGN.md, Kopfregel mobil) - der Titel ist ein navigierbarer
+            Zeitraum, und nur ein so markierter Kopf darf seine Werkzeuge mobil
+            in Zeile 1 neben den Titel stellen (calendar.css, test:mobile-chrome). */ ''}
+      <div class="page-toolbar page-toolbar--wrap page-toolbar--period page-toolbar--period-title cal-toolbar" id="cal-toolbar">
         <h1 class="page-toolbar__title">${t('calendar.title')}</h1>
         <div class="page-toolbar__actions"></div>
       </div>
@@ -2277,22 +2282,30 @@ function toolbarHtml({ filterCount = 0, scheduleWarningHtml = '' } = {}) {
         `).join('')}
       </div>
       <div class="cal-toolbar__tools">
-        <button class="btn btn--icon cal-toolbar__filter-btn ${filterCount ? 'cal-toolbar__filter-btn--active' : ''}"
-                id="cal-filters" aria-label="${filterCount ? esc(t('calendar.filtersActive', { count: filterCount })) : t('calendar.filtersOpen')}"
-                title="${t('calendar.filters')}" aria-haspopup="dialog">
-          <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
-          ${filterCount ? `<span class="cal-toolbar__filter-count" aria-hidden="true">${filterCount}</span>` : ''}
-        </button>
+        ${/* DER GETEILTE FILTERKNOPF (R17 Z1, A1 P2-3): Zahl als Badge wie in
+              jedem Modul (utils/filter-sheet.js), der Name nennt sie. Hier stand
+              eine Kopie mit eigener Badge-Klasse - das Vorbild, von dem der
+              Baustein abgeschrieben war, lief seitdem neben ihm her. */ ''}
+        ${filterButtonHtml({
+          id: 'cal-filters',
+          count: filterCount,
+          labels: {
+            title: t('calendar.filters'),
+            open: t('calendar.filtersOpen'),
+            active: (count) => t('calendar.filtersActive', { count }),
+          },
+          className: 'cal-toolbar__filter-btn',
+        })}
         <!-- KEIN aria-controls im geschlossenen Zustand: die Suchleiste entsteht
              erst beim Öffnen (openCalendarSearch), und ein Verweis auf eine ID, die
              es noch nicht gibt, kündigt einem Screenreader ein Ziel an, das nicht
              existiert. Gesetzt wird es dort, wo die Leiste entsteht, und beim
              Schließen wieder entfernt - dieselbe Regel wie in utils/sub-tabs.js:
              ohne aufgelöstes Ziel bleibt das Attribut weg. -->
-        <button class="btn btn--icon cal-toolbar__search-btn" id="cal-search"
+        <button type="button" class="btn btn--secondary btn--icon cal-toolbar__search-btn" id="cal-search"
                 aria-label="${t('calendar.searchOpen')}" title="${t('calendar.searchOpen')}"
                 aria-expanded="false">
-          <i data-lucide="search" aria-hidden="true"></i>
+          <i data-lucide="search" class="icon-md" aria-hidden="true"></i>
         </button>
         ${viewMenuHtml()}
       </div>
@@ -2321,10 +2334,10 @@ const VIEW_ICONS = { month: 'calendar-days', week: 'calendar-range', day: 'calen
 function viewMenuHtml(current = state.view) {
   const label = t('calendar.viewSwitcher');
   return `
-        <button type="button" class="btn btn--icon cal-toolbar__tools-btn popover-menu__trigger" id="cal-views-menu"
+        <button type="button" class="btn btn--secondary btn--icon cal-toolbar__tools-btn popover-menu__trigger" id="cal-views-menu"
                 popovertarget="cal-views-menu-panel" aria-haspopup="menu" aria-expanded="false"
                 aria-label="${esc(label)}" title="${esc(label)}">
-          <i data-lucide="ellipsis" aria-hidden="true"></i>
+          <i data-lucide="ellipsis" class="icon-md" aria-hidden="true"></i>
         </button>
         <div class="popover-menu" id="cal-views-menu-panel" popover role="menu">
           ${VIEWS.map((v) => `

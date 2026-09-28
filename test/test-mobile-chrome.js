@@ -212,3 +212,48 @@ test('R14: der Desktop-Kopf hat EINE Steuerhoehe', () => {
   }
   assert.match(body('.page-toolbar .btn--icon'), /min-width:\s*var\(--target-md\)/, 'das Werkzeugmenue bleibt quadratisch');
 });
+
+// R17 Z1 (Re-Critique 2026-09-28, A1 P2-3): die benannte Variante „Zeitraum-Kopf"
+// (DESIGN.md, Kopfregel mobil). Ein Modul, dessen Titel ein navigierbarer
+// Zeitraum ist, darf seine Werkzeuge in Zeile 1 neben den Titel stellen - der
+// Kalender tut das, indem er seine Bar-Zeile mobil aufloest (`display:
+// contents`), und die Werkzeuge ruecken ans Ende der Titelzeile. Das ist die
+// EINE Stelle, an der die Regel „Zeile 1 traegt allein den Titel" bricht; sie
+// gilt nur, wo der Kopf die Variante im Markup traegt, und das Markup nur dort,
+// wo DESIGN.md sie nennt. Regel statt Schreibweise: gesucht wird jede Regel,
+// die eine Bar- oder Werkzeugzeile eines Kopfs aufloest, egal wie sie heisst.
+const PERIOD_TITLE = 'page-toolbar--period-title';
+const PERIOD_TITLE_MODULES = ['pages/calendar.js'];
+
+test('R17 Z1: nur der markierte Zeitraum-Kopf loest seine Bar-Zeile in die Titelzeile auf', () => {
+  const dissolving = [];
+  for (const { file, css } of sheets) {
+    for (const r of rules(css)) {
+      if (decl(r.body, 'display') !== 'contents') continue;
+      for (const part of r.selector.split(',').map((s) => s.trim())) {
+        // Die Bar-Zeile (`*__bar`) oder ihre Werkzeuggruppe (`*__tools`) eines Kopfs.
+        if (!/(?:toolbar|head|header)[\w-]*__(?:bar|tools)\b/.test(part)) continue;
+        dissolving.push({ file, part });
+      }
+    }
+  }
+  assert.ok(dissolving.length >= 1, 'der Kalender loest seine Bar-Zeile mobil auf - findet der Guard ihn nicht, ist er blind');
+  const unmarked = dissolving.filter((d) => !d.part.includes(`.${PERIOD_TITLE}`));
+  assert.deepEqual(unmarked, [],
+    `Werkzeuge in Zeile 1 nur im markierten Zeitraum-Kopf (.${PERIOD_TITLE}, DESIGN.md „Variante: Zeitraum-Kopf")`);
+});
+
+test('R17 Z1: die Variante steht nur im Markup der Module, die DESIGN.md nennt', () => {
+  const pub = new URL('../public/', import.meta.url);
+  const carriers = [];
+  for (const dir of ['pages', 'utils', 'components']) {
+    for (const f of readdirSync(new URL(`${dir}/`, pub)).filter((n) => n.endsWith('.js'))) {
+      if (readFileSync(new URL(`${dir}/${f}`, pub), 'utf8').includes(PERIOD_TITLE)) carriers.push(`${dir}/${f}`);
+    }
+  }
+  assert.deepEqual(carriers.sort(), [...PERIOD_TITLE_MODULES].sort(),
+    'wer den Zeitraum-Kopf traegt, steht in DESIGN.md und in PERIOD_TITLE_MODULES');
+  const design = read('../DESIGN.md');
+  assert.match(design, /\*\*Variante: Zeitraum-Kopf \(Kalender\)\.\*\*/, 'DESIGN.md benennt die Variante');
+  assert.ok(design.includes(PERIOD_TITLE), 'und nennt ihre Kennklasse');
+});
