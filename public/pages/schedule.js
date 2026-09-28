@@ -13,6 +13,7 @@ import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { toggleRowHtml } from '/settings/components.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect } from '/components/user-multi-select.js';
 import { isNavModuleReadOnly } from '/permissions.js';
+import { USER_COLOR_DEFAULT } from '/utils/color.js';
 import { scheduleViewFromPath, scheduleRouteForView } from '/utils/schedule-tabs.js';
 
 // ZWEISPALTIG: Schedule is a full-width responsive library and statistics view;
@@ -106,6 +107,12 @@ function saveOverviewSelection(ids) {
 // liest sich im Kalender als Systemzustand statt als Inhalt (Eine-Stimme-Regel;
 // Critique 2026-08-27 + Detektor design-system-color). Jetzt Magenta fuer die
 // Abendschicht, und neue Typen starten auf dem Fruehschicht-Cyan.
+// SEIT R14 (Re-Critique 2026-09-28, P9) stammt JEDER Preset-Ton aus der EINEN
+// Startpalette `USER_COLORS` (utils/color.js), die in Light UND Dark >= 3:1 auf
+// der Kartenflaeche haelt - die alten 700-900er Toene waren nur gegen Weiss
+// gewaehlt und fielen im Dark unter 2:1 (Nacht, Pruefung, Urlaub und Labor
+// sahen gleich aus). Nur Startwerte: angelegte Schichtarten behalten ihre Farbe.
+// test-schedule.js prueft jedes Farbliteral dieser Datei gegen die Palette.
 // `vacation`/`sick` tragen bewusst KEINE Uhrzeiten (start_time/end_time bleiben
 // beide NULL - der CHECK der Tabelle verlangt genau das paarweise): sie sind
 // keine Arbeitsschicht, sondern ein Tages-ETIKETT ohne Dauer. Das Datenmodell
@@ -119,8 +126,8 @@ function saveOverviewSelection(ids) {
 // einen Weg, einen Tag als "nicht da" zu kennzeichnen. Deshalb an jede
 // Vorlage angehaengt statt dreifach dupliziert.
 const SHARED_PRESETS = Object.freeze([
-  { key: 'vacation', shortCode: 'V', startTime: null, endTime: null, color: '#475569', icon: 'tree-palm' },
-  { key: 'sick', shortCode: 'S', startTime: null, endTime: null, color: '#B91C1C', icon: 'thermometer' },
+  { key: 'vacation', shortCode: 'V', startTime: null, endTime: null, color: '#78808C', icon: 'tree-palm' },
+  { key: 'sick', shortCode: 'S', startTime: null, endTime: null, color: '#EF4444', icon: 'thermometer' },
 ]);
 // Drei Vorlagen statt einer einzigen festen Liste - derselbe Quickstart-Weg
 // (vormals nur Arbeitsschichten) deckt jetzt auch Schule und Universitaet ab.
@@ -129,26 +136,26 @@ const SHARED_PRESETS = Object.freeze([
 // immer hatten ("Fruehschicht" 06-14 Uhr passt auch nicht jedem Betrieb).
 const PRESET_TEMPLATES = Object.freeze({
   work: Object.freeze([
-    { key: 'early', shortCode: 'E', startTime: '06:00', endTime: '14:00', color: '#0E7490', icon: 'sunrise' },
-    { key: 'late', shortCode: 'L', startTime: '14:00', endTime: '22:00', color: '#A21CAF', icon: 'sunset' },
-    { key: 'night', shortCode: 'N', startTime: '22:00', endTime: '06:00', color: '#4338CA', icon: 'moon' },
-    { key: 'day', shortCode: 'D', startTime: '08:00', endTime: '16:00', color: '#15803D', icon: 'sun' },
-    { key: 'fullDay', shortCode: '24', startTime: '10:00', endTime: '10:00', color: '#A16207', icon: 'clock' },
+    { key: 'early', shortCode: 'E', startTime: '06:00', endTime: '14:00', color: '#0891B2', icon: 'sunrise' },
+    { key: 'late', shortCode: 'L', startTime: '14:00', endTime: '22:00', color: '#D946EF', icon: 'sunset' },
+    { key: 'night', shortCode: 'N', startTime: '22:00', endTime: '06:00', color: '#3B82F6', icon: 'moon' },
+    { key: 'day', shortCode: 'D', startTime: '08:00', endTime: '16:00', color: '#16A34A', icon: 'sun' },
+    { key: 'fullDay', shortCode: '24', startTime: '10:00', endTime: '10:00', color: '#D97706', icon: 'clock' },
     ...SHARED_PRESETS,
   ]),
   school: Object.freeze([
-    { key: 'period1', shortCode: 'P1', startTime: '08:00', endTime: '08:45', color: '#0369A1', icon: 'book-open' },
-    { key: 'period2', shortCode: 'P2', startTime: '08:55', endTime: '09:40', color: '#0D9488', icon: 'book-open' },
-    { key: 'period3', shortCode: 'P3', startTime: '09:55', endTime: '10:40', color: '#B45309', icon: 'book-open' },
-    { key: 'period4', shortCode: 'P4', startTime: '10:50', endTime: '11:35', color: '#BE185D', icon: 'book-open' },
-    { key: 'exam', shortCode: 'EX', startTime: '09:00', endTime: '11:00', color: '#7C2D12', icon: 'file-text' },
+    { key: 'period1', shortCode: 'P1', startTime: '08:00', endTime: '08:45', color: '#3B82F6', icon: 'book-open' },
+    { key: 'period2', shortCode: 'P2', startTime: '08:55', endTime: '09:40', color: '#059669', icon: 'book-open' },
+    { key: 'period3', shortCode: 'P3', startTime: '09:55', endTime: '10:40', color: '#EA580C', icon: 'book-open' },
+    { key: 'period4', shortCode: 'P4', startTime: '10:50', endTime: '11:35', color: '#EC4899', icon: 'book-open' },
+    { key: 'exam', shortCode: 'EX', startTime: '09:00', endTime: '11:00', color: '#D97706', icon: 'file-text' },
     ...SHARED_PRESETS,
   ]),
   university: Object.freeze([
-    { key: 'lecture', shortCode: 'VL', startTime: '09:00', endTime: '10:30', color: '#1D4ED8', icon: 'presentation' },
-    { key: 'seminar', shortCode: 'SE', startTime: '10:45', endTime: '12:15', color: '#0F766E', icon: 'users' },
-    { key: 'lab', shortCode: 'LAB', startTime: '13:00', endTime: '15:00', color: '#166534', icon: 'flask-conical' },
-    { key: 'exam', shortCode: 'EX', startTime: '09:00', endTime: '11:00', color: '#7C2D12', icon: 'file-text' },
+    { key: 'lecture', shortCode: 'VL', startTime: '09:00', endTime: '10:30', color: '#3B82F6', icon: 'presentation' },
+    { key: 'seminar', shortCode: 'SE', startTime: '10:45', endTime: '12:15', color: '#059669', icon: 'users' },
+    { key: 'lab', shortCode: 'LAB', startTime: '13:00', endTime: '15:00', color: '#16A34A', icon: 'flask-conical' },
+    { key: 'exam', shortCode: 'EX', startTime: '09:00', endTime: '11:00', color: '#D97706', icon: 'file-text' },
     ...SHARED_PRESETS,
   ]),
 });
@@ -160,7 +167,7 @@ const PRESET_TEMPLATES = Object.freeze({
 const ALL_PRESETS = Object.freeze([...new Map(
   [...PRESET_TEMPLATES.work, ...PRESET_TEMPLATES.school, ...PRESET_TEMPLATES.university].map((preset) => [preset.key, preset]),
 ).values()]);
-const SHIFT_COLOR_FALLBACK = PRESET_TEMPLATES.work[0].color;
+const SHIFT_COLOR_FALLBACK = USER_COLOR_DEFAULT;
 
 // Welche Vorlagen ueberhaupt als Knopf angeboten werden, ist selbst haushalt-
 // weit konfigurierbar (server/routes/preferences.js#schedule_hidden_templates,

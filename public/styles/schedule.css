@@ -295,6 +295,15 @@
   flex: 0 0 auto;
 }
 
+/* Swatches im Dark mit Kante (Re-Critique 2026-09-28, P9): die Presets halten
+ * dort jetzt >= 3:1, eine BESTANDSFARBE aus der Zeit davor (700-900er Toene,
+ * keine Migration) faellt aber unter 2:1 und verschwaende in der Karte. Die
+ * Kante aus dem Kanten-Token traegt den Punkt unabhaengig von seinem Ton. */
+@media screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .schedule-swatch { box-shadow: inset 0 0 0 1px var(--color-border-strong); }
+}
+:root[data-theme="dark"] .schedule-swatch { box-shadow: inset 0 0 0 1px var(--color-border-strong); }
+
 .schedule-entry-row,
 .schedule-override {
   align-items: center;

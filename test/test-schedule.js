@@ -2482,3 +2482,46 @@ test('jedes Feld der Schichtplan-Dialoge hat einen zugaenglichen Namen (A2 P1-1)
     if (vorher === undefined) delete globalThis.__advancedSection; else globalThis.__advancedSection = vorher;
   }
 });
+
+// P9 (Re-Critique 2026-09-28, Detektor-Bericht B): die Schicht-Presets waren
+// 700-900er Toene, nur gegen Weiss gewaehlt - im Dark lagen 14 von 15 unter
+// 3:1 (Nacht, Pruefung, Urlaub, Labor sahen gleich aus). Jetzt ziehen sie aus
+// der EINEN, in beiden Themes gemessenen Startpalette (public/utils/color.js).
+// Die Regel, nicht die Schreibweise: JEDES Farbliteral der Seite muss in der
+// Palette stehen - ein neues Preset mit eigenem Hex faellt hier auf.
+test('P9: every shift preset colour comes from the shared user palette, none in the brand voice', async () => {
+  const { USER_COLORS, USER_COLOR_DEFAULT } = await import('../public/utils/color.js');
+  const palette = new Set(USER_COLORS.map((hex) => hex.toUpperCase()));
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const literals = [...schedulePage.matchAll(/color:\s*'(#[0-9A-Fa-f]{6})'/g)].map((m) => m[1].toUpperCase());
+  assert.ok(literals.length >= 10, 'die Presets tragen weiter ihre Startfarben');
+  for (const hex of literals) {
+    assert.ok(palette.has(hex), `${hex} steht nicht in USER_COLORS`);
+    assert.ok(!['#6C3AED', '#7C3AED'].includes(hex), `${hex} ist die Stimme`);
+  }
+  const { __test } = await import('../public/pages/schedule.js');
+  const fresh = /name="color" type="color" value="(#[0-9A-Fa-f]{6})"/.exec(__test.shiftFields({}))?.[1];
+  assert.equal(fresh?.toUpperCase(), USER_COLOR_DEFAULT.toUpperCase(), 'eine neue Schichtart startet auf der Palettenvorgabe');
+});
+
+// Server-Seite derselben Regel: POST ohne Farbe schrieb bisher '#6C3AED' -
+// die Marke selbst - in einen NEUEN Datensatz. Bestand bleibt unberuehrt.
+test('P9: a shift type created without a colour starts on the palette default, not the brand', async () => {
+  const { USER_COLOR_DEFAULT } = await import('../public/utils/color.js');
+  const created = await call('POST', '/shift-types', { as: ALICE, body: { name: 'Ohne Farbe' } });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.data.color.toUpperCase(), USER_COLOR_DEFAULT.toUpperCase());
+  await call('DELETE', `/shift-types/${created.body.data.id}`, { as: ADMIN });
+});
+
+// Swatches im Dark mit Kante: ein Farbpunkt von 0,7rem traegt die Glance-
+// Information des Moduls; im Dark bekommt er eine Kante aus einem Token, damit
+// auch eine BESTANDSFARBE (die keine Migration anfasst) nicht in der Flaeche
+// verschwindet. Beide Dark-Wege (System-Dark und erzwungenes Dark).
+test('P9: the shift swatch carries an edge in both dark paths', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)].filter((r) => /\.schedule-swatch\b/.test(r.selector) && /box-shadow:\s*inset 0 0 0 1px var\(--/.test(r.body));
+  assert.ok(rules.some((r) => /:root\[data-theme="dark"\]/.test(r.selector)), 'erzwungenes Dark');
+  assert.ok(rules.some((r) => /prefers-color-scheme: dark/.test(r.at.join(' ')) && /:root:not\(\[data-theme="light"\]\)/.test(r.selector)), 'System-Dark');
+});
