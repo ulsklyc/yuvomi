@@ -10,7 +10,7 @@ import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModa
 import { attachOverlay } from '/utils/overlay-history.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
-import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
+import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate } from '/utils/ux.js';
 import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation } from '/utils/html.js';
 import { shiftEndDateKey, isEndBeforeStart, weekStartIndex, weekdayOrder,
@@ -4154,11 +4154,13 @@ function renderWeekView(container) {
     if (header) switchToDayView(header.dataset.date);
   });
 
-  container.querySelector('#week-cols').addEventListener('click', (e) => {
+  const weekCols = container.querySelector('#week-cols');
+  weekCols.addEventListener('click', (e) => {
     // S-17: ein Klick GENAU auf den sichtbaren Text eines Schichtblocks
     // (pointer-events:auto, siehe calendar.css) oeffnet die Detailansicht;
-    // der Rest der Spalte (pointer-events:none auf dem Block selbst) bleibt
-    // unveraendert klickbar fuer "neuen Termin anlegen".
+    // der Rest der Spalte (pointer-events:none auf dem Block selbst) gehoert
+    // der leeren Zeit - und die legt per Doppelklick oder langem Druck an
+    // (wireTimeGridCreate), nicht per Einzelklick.
     const blockEl = e.target.closest('.schedule-time-block');
     if (blockEl) {
       const entry = findScheduleEntryByKey(blockEl.dataset.scheduleKey);
@@ -4169,13 +4171,15 @@ function renderWeekView(container) {
     if (evEl) {
       const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
       if (ev) openEventDetail(ev, evEl);
-      return;
     }
-    const col = e.target.closest('[data-date]');
-    if (col) {
-      const time = clickedTime(e, col);
-      openEventModal({ mode: 'create', date: col.dataset.date, time });
-    }
+  });
+  wireTimeGridCreate(weekCols, {
+    scroller: container.querySelector('#week-scroll'),
+    slotAt: (e) => {
+      if (e.target?.closest?.('.schedule-time-block, .week-event')) return null;
+      const col = e.target?.closest?.('[data-date]');
+      return col ? { date: col.dataset.date, time: clickedTime(e, col) } : null;
+    },
   });
 
   container.querySelector('.allday-row').addEventListener('click', (e) => {
@@ -4251,6 +4255,118 @@ function handleGridKeydown(e) {
     const ev = state.events.find((x) => x.id === parseInt(target.dataset.id, 10));
     if (ev) openEventDetail(ev, target);
   }
+}
+
+/**
+ * Der Hinweis im leeren Tag nennt die Geste, die hier anlegt (Z2): am
+ * primaeren Grobzeiger das lange Druecken, sonst den Doppelklick. Hier stand
+ * „Tippe auf eine Uhrzeit" - das Versprechen des Einzeltipps, der seit R17
+ * nichts mehr anlegt.
+ */
+function dayEmptyHintText() {
+  const coarse = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    && window.matchMedia('(pointer: coarse)').matches;
+  return t(coarse ? 'calendar.dayEmptyHintTouch' : 'calendar.dayEmptyHintPointer');
+}
+
+const GRID_PRESS_MS = 500;
+const GRID_PRESS_SLOP = 10;
+
+/**
+ * ANLEGEN IM ZEITRASTER NACH APPLE-MUSTER (R17 Z2, Re-Critique 2026-09-28,
+ * A2 P1-1 und die Frage dahinter).
+ *
+ * Bis hier legte JEDER Klick auf leere Zeit einen Termin an. Gemessen oeffnete
+ * damit der natuerlichste Weg, eine Leseansicht zu schliessen - daneben
+ * klicken -, das Formular „Neuer Termin" (R16 fing das nur fuer den offenen
+ * Popover ab, detail-view.js). Apples Kalender trennt Lesen und Anlegen: am
+ * Mac legt ein DOPPELKLICK auf leere Zeit an, am iPhone ein LANGES DRUECKEN.
+ * Ein Einzelklick oder Tipp tut nichts, ausser Offenes zu schliessen. Der
+ * sichtbare Weg bleibt „+ Termin" (FAB bzw. angedockte Pille) und das Kuerzel n.
+ *
+ * WELCHE GESTE, ENTSCHEIDET DER ZEIGER DES KONTAKTS, nicht eine Media Query:
+ * ein Touch-Laptop hat beide, und wer mit der Maus doppelklickt, meint etwas
+ * anderes als wer mit dem Finger doppeltippt. Maus -> `dblclick`; Finger und
+ * Stift -> 500ms Halten (dieselbe Schwelle und derselbe 10px-Spielraum wie der
+ * Long-Press der Aufgabenzeilen, tasks.js). Der Doppeltipp legt nicht an: er
+ * ist auf dem Telefon Zoom oder Versehen, und zwei Gesten fuer eine Absicht
+ * lernt niemand.
+ *
+ * ABBRUCH, WENN DIE FLAECHE ETWAS ANDERES WILL: mehr als 10px Bewegung (das
+ * waagerechte Wischen zwischen Zeitraeumen, utils/period-swipe.js), ein
+ * Scroll des Rasters oder `pointercancel` (der Browser hat die Geste als
+ * Scrollen uebernommen) beenden den Druck. Waehrend des Drucks unterdrueckt
+ * die Flaeche das Kontextmenue; Textauswahl und iOS-Callout nimmt ihr
+ * calendar.css.
+ *
+ * ANGELEGT WIRD BEIM LOSLASSEN, und das `touchend` wird verworfen: das
+ * Formular geht sonst unter dem Finger auf, und der Klick, den der Browser dem
+ * Loslassen nachschickt, landete auf dem Hintergrund des neuen Blatts - der
+ * schliesst es (components/modal.js). Waehrend des Drucks quittiert nur die
+ * Vibration, dass er erkannt ist.
+ *
+ * @param {HTMLElement} surface  Spalten-Traeger (Woche) bzw. Tagesspalte
+ * @param {object} opts
+ * @param {(e: Event) => ({date: string, time: string}|null)} opts.slotAt
+ *   leere Zeit unter dem Ereignis, `null` auf einem Termin oder Block
+ * @param {HTMLElement|null} [opts.scroller]  der Scrollport des Rasters
+ * @param {(slot: {date: string, time: string}) => void} [opts.onCreate]
+ */
+
+function wireTimeGridCreate(surface, {
+  slotAt,
+  scroller = null,
+  onCreate = (slot) => openEventModal({ mode: 'create', date: slot.date, time: slot.time }),
+} = {}) {
+  if (!surface) return;
+  let press = null;
+  let lastPointer = 'mouse';
+  let released = false;
+  const clear = () => {
+    if (press?.timer) clearTimeout(press.timer);
+    press = null;
+  };
+
+  surface.addEventListener('pointerdown', (e) => {
+    clear();
+    released = false;
+    lastPointer = e.pointerType || 'mouse';
+    if (lastPointer === 'mouse' || e.isPrimary === false) return;
+    const slot = slotAt(e);
+    if (!slot) return;
+    press = { slot, x: e.clientX, y: e.clientY, armed: false, timer: null };
+    press.timer = setTimeout(() => {
+      if (!press) return;
+      press.timer = null;
+      press.armed = true;
+      vibrate(15);
+    }, GRID_PRESS_MS);
+  });
+  surface.addEventListener('pointermove', (e) => {
+    if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > GRID_PRESS_SLOP) clear();
+  });
+  surface.addEventListener('pointerup', () => {
+    const slot = press?.armed ? press.slot : null;
+    clear();
+    if (!slot) return;
+    released = true;
+    onCreate(slot);
+  });
+  surface.addEventListener('touchend', (e) => {
+    if (!released) return;
+    released = false;
+    if (e.cancelable !== false) e.preventDefault();
+  }, { passive: false });
+  surface.addEventListener('pointercancel', clear);
+  scroller?.addEventListener('scroll', clear, { passive: true });
+  surface.addEventListener('contextmenu', (e) => {
+    if (press) e.preventDefault();
+  });
+  surface.addEventListener('dblclick', (e) => {
+    if (lastPointer !== 'mouse') return;
+    const slot = slotAt(e);
+    if (slot) onCreate(slot);
+  });
 }
 
 /**
@@ -4672,7 +4788,7 @@ function renderDayView(container) {
               ...scheduleBlocks.map((entry) => ({ range: scheduleBlockTimeRange(entry), html: () => renderScheduleTimeBlock(entry, 'day-event', scheduleLayout.get(entry)) })),
               ...timed.map((ev) => ({ range: timeRangeForEvent(ev, state.cursor), html: () => renderDayEvent(ev, layout.get(ev), state.cursor) })),
             ])}
-            ${dayEvs.length === 0 && schedule.length === 0 ? `<div class="day-view__empty-hint" style="top:calc(${hourOffset(state.cursor === state.today ? nowMinutes() : 9 * 60)} + 16px)">${t('calendar.dayEmptyHint')}</div>` : ''}
+            ${dayEvs.length === 0 && schedule.length === 0 ? `<div class="day-view__empty-hint" style="top:calc(${hourOffset(state.cursor === state.today ? nowMinutes() : 9 * 60)} + 16px)">${dayEmptyHintText()}</div>` : ''}
           </div>
           ${state.cursor === state.today ? `
             <div class="day-view__now-line" aria-hidden="true" style="top:${hourOffset(nowMinutes())};"></div>
@@ -4709,7 +4825,8 @@ function renderDayView(container) {
     }
   });
 
-  container.querySelector('#day-col').addEventListener('click', (e) => {
+  const dayCol = container.querySelector('#day-col');
+  dayCol.addEventListener('click', (e) => {
     // S-17: ein Klick GENAU auf den sichtbaren Text eines Schichtblocks
     // oeffnet die Detailansicht - siehe der gleiche Kommentar in renderWeekView().
     const blockEl = e.target.closest('.schedule-time-block');
@@ -4722,10 +4839,15 @@ function renderDayView(container) {
     if (evEl) {
       const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
       if (ev) openEventDetail(ev, evEl);
-      return;
     }
-    const time = clickedTime(e, e.currentTarget);
-    openEventModal({ mode: 'create', date: state.cursor, time });
+  });
+  const day = state.cursor;
+  wireTimeGridCreate(dayCol, {
+    scroller: container.querySelector('#day-scroll'),
+    slotAt: (e) => {
+      if (e.target?.closest?.('.schedule-time-block, .day-event')) return null;
+      return { date: day, time: clickedTime(e, dayCol) };
+    },
   });
 
   container.querySelector('.day-view').addEventListener('keydown', handleGridKeydown);
@@ -6909,8 +7031,9 @@ function wireVisibilityWarning(panel, selectSel, msName, warnSel) {
 
 function openEventModal({ mode, event = null, date = null, reminder = null, time = null }) {
   // DER LETZTE RIEGEL VOR DEM FORMULAR. Es gibt sieben Wege hierher - Kopfknopf,
-  // FAB, Klick in eine leere Stunde der Wochen- und der Tagesansicht, zwei
-  // Leerzustands-CTAs und der Bearbeiten-Weg der Detailansicht. Sie alle
+  // FAB, Doppelklick oder langer Druck in eine leere Stunde der Wochen- und der
+  // Tagesansicht (wireTimeGridCreate), zwei Leerzustands-CTAs und der
+  // Bearbeiten-Weg der Detailansicht. Sie alle
   // einzeln zu sperren waere sechs Chancen, eine zu vergessen; der siebte Weg,
   // der morgen dazukommt, findet den Riegel hier ohnehin.
   if (readOnly()) return;

@@ -4518,6 +4518,194 @@ test('Zeitraum-Kopf (R17 Z1): der Filterknopf traegt den geteilten Zaehler und n
 });
 
 // --------------------------------------------------------
+// R17 Z2 (Re-Critique 2026-09-28, A2 P1-1 + Frage): Anlegen im Zeitraster
+// nach Apple-Muster. Gemessen am AUFRUFER - renderWeekView()/renderDayView()
+// verdrahten die Geste, und der Test feuert Ereignisse auf genau die Knoten,
+// an die sie ihre Listener haengen. Ob angelegt wird, sagt das Formular, das
+// geoeffnet wird (globalThis.__openModal, Loader-Stub von components/modal.js).
+// --------------------------------------------------------
+
+const HOUR_PX = 60; // Raster 1440px hoch -> 60px je Stunde
+
+function gridHarness(render) {
+  const els = new Map();
+  const el = (sel) => {
+    if (!els.has(sel)) {
+      els.set(sel, {
+        sel,
+        listeners: [],
+        addEventListener(type, fn, opts) { this.listeners.push({ type, fn, capture: opts === true || Boolean(opts?.capture) }); },
+        getBoundingClientRect: () => ({ top: 0, height: 24 * HOUR_PX }),
+        scrollTop: 0,
+        dataset: {},
+        closest: () => null,
+      });
+    }
+    return els.get(sel);
+  };
+  const container = { replaceChildren() {}, insertAdjacentHTML() {}, querySelector: (sel) => el(sel) };
+  const pending = [];
+  const opened = [];
+  const saved = { st: globalThis.setTimeout, ct: globalThis.clearTimeout, om: globalThis.__openModal };
+  globalThis.setTimeout = (fn, ms) => { const h = { fn, ms, done: false }; pending.push(h); return h; };
+  globalThis.clearTimeout = (h) => { if (h) h.done = true; };
+  globalThis.__openModal = (opts) => { opened.push(opts); };
+  const restore = () => {
+    globalThis.setTimeout = saved.st;
+    globalThis.clearTimeout = saved.ct;
+    if (saved.om === undefined) delete globalThis.__openModal; else globalThis.__openModal = saved.om;
+  };
+  try { render(container); } catch (err) { restore(); throw err; }
+
+  /** Ein leerer Punkt in der Spalte `date` auf Hoehe `y`. */
+  const emptyAt = (sel, date) => {
+    const col = { dataset: { date }, getBoundingClientRect: () => ({ top: 0, height: 24 * HOUR_PX }) };
+    col.closest = (s) => (s.includes('data-date') ? col : null);
+    return col;
+  };
+  /** Ein Termin-Block: alles, was ihn sucht, findet ihn. */
+  const eventTarget = () => {
+    const ev = { dataset: { id: '999999' } };
+    ev.closest = (s) => (/week-event|day-event/.test(s) ? ev : null);
+    return ev;
+  };
+  const fire = (sel, type, props = {}) => {
+    const node = el(sel);
+    const e = {
+      type, defaultPrevented: false, stopped: false, currentTarget: node,
+      preventDefault() { this.defaultPrevented = true; },
+      stopPropagation() { this.stopped = true; },
+      stopImmediatePropagation() { this.stopped = true; },
+      ...props,
+    };
+    const ls = node.listeners.filter((l) => l.type === type);
+    for (const l of [...ls.filter((x) => x.capture), ...ls.filter((x) => !x.capture)]) {
+      if (e.stopped) break;
+      l.fn.call(node, e);
+    }
+    return e;
+  };
+  const runTimers = (upTo = Infinity) => {
+    for (const h of [...pending]) if (!h.done && h.ms <= upTo) { h.done = true; h.fn(); }
+  };
+  return { el, fire, runTimers, opened, restore, emptyAt, eventTarget };
+}
+
+function withGrid(view, fn) {
+  withOvernightState({ events: [], view }, () => {
+    const h = gridHarness((c) => (view === 'day' ? calendarHelpers.renderDayView(c) : calendarHelpers.renderWeekView(c)));
+    try { fn(h); } finally { h.restore(); }
+  });
+}
+
+const GRID = { week: '#week-cols', day: '#day-col' };
+const SCROLLER = { week: '#week-scroll', day: '#day-scroll' };
+
+for (const view of ['week', 'day']) {
+  const sel = GRID[view];
+  const touch = (h, type, y, extra = {}) => h.fire(sel, type, {
+    pointerType: 'touch', isPrimary: true, button: 0, clientX: 100, clientY: y,
+    target: h.emptyAt(sel, '2026-06-15'), ...extra,
+  });
+
+  test(`Z2 ${view}: ein Einzelklick auf leere Zeit legt NICHT an`, () => {
+    withGrid(view, (h) => {
+      h.fire(sel, 'pointerdown', { pointerType: 'mouse', isPrimary: true, button: 0, clientX: 100, clientY: 10 * HOUR_PX, target: h.emptyAt(sel, '2026-06-15') });
+      h.fire(sel, 'pointerup', { pointerType: 'mouse', clientX: 100, clientY: 10 * HOUR_PX });
+      h.fire(sel, 'click', { clientX: 100, clientY: 10 * HOUR_PX, target: h.emptyAt(sel, '2026-06-15') });
+      h.runTimers();
+      assert(h.opened.length === 0, `Einzelklick oeffnete ${h.opened.length} Formular(e)`);
+    });
+  });
+
+  test(`Z2 ${view}: ein Doppelklick mit der Maus legt an, Uhrzeit aus der Position`, () => {
+    withGrid(view, (h) => {
+      h.fire(sel, 'pointerdown', { pointerType: 'mouse', isPrimary: true, button: 0, clientX: 100, clientY: 14 * HOUR_PX, target: h.emptyAt(sel, '2026-06-15') });
+      h.fire(sel, 'dblclick', { clientX: 100, clientY: 14 * HOUR_PX + 29, target: h.emptyAt(sel, '2026-06-15') });
+      assert(h.opened.length === 1, `Doppelklick oeffnete ${h.opened.length} Formular(e)`);
+      const html = String(h.opened[0].content ?? '');
+      assert(/14:30/.test(html), 'die Startzeit kommt aus der Position (14:29 -> 14:30, 30-Minuten-Raster)');
+      assert(/2026-06-15/.test(html), 'und der Tag aus der Spalte');
+    });
+  });
+
+  test(`Z2 ${view}: ein Doppelklick auf einen Termin legt nichts an`, () => {
+    withGrid(view, (h) => {
+      h.fire(sel, 'dblclick', { clientX: 100, clientY: 9 * HOUR_PX, target: h.eventTarget() });
+      assert(h.opened.length === 0, 'der Termin gehoert dem Klick, der ihn oeffnet');
+    });
+  });
+
+  test(`Z2 ${view}: langes Druecken (Touch) legt nach dem Loslassen an, der Folgeklick verpufft`, () => {
+    withGrid(view, (h) => {
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      assert(touch(h, 'contextmenu', 8 * HOUR_PX).defaultPrevented, 'kein Systemmenue waehrend des Drucks');
+      h.runTimers(500);
+      assert(h.opened.length === 0, 'waehrend des Drucks noch kein Formular - erst beim Loslassen');
+      touch(h, 'pointerup', 8 * HOUR_PX);
+      const end = touch(h, 'touchend', 8 * HOUR_PX);
+      assert(h.opened.length === 1, `langes Druecken oeffnete ${h.opened.length} Formular(e)`);
+      assert(/08:00/.test(String(h.opened[0].content ?? '')), 'Startzeit aus der Druckstelle');
+      assert(end.defaultPrevented, 'das touchend schluckt den Klick, der sonst auf dem neuen Blatt landete');
+      touch(h, 'click', 8 * HOUR_PX);
+      assert(h.opened.length === 1, 'kein zweites Formular aus dem Folgeklick');
+    });
+  });
+
+  test(`Z2 ${view}: ein kurzer Tipp legt nicht an, Bewegung und Scrollen brechen den Druck ab`, () => {
+    withGrid(view, (h) => {
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      touch(h, 'pointerup', 8 * HOUR_PX);
+      touch(h, 'click', 8 * HOUR_PX);
+      h.runTimers();
+      assert(h.opened.length === 0, 'Tipp');
+
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      touch(h, 'pointermove', 8 * HOUR_PX, { clientX: 111 });
+      h.runTimers(500);
+      touch(h, 'pointerup', 8 * HOUR_PX, { clientX: 111 });
+      assert(h.opened.length === 0, 'Bewegung > 10px (Wischen zwischen Zeitraeumen)');
+
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      touch(h, 'pointermove', 8 * HOUR_PX + 6, { clientX: 104 });
+      h.fire(SCROLLER[view], 'scroll');
+      h.runTimers(500);
+      touch(h, 'pointerup', 8 * HOUR_PX + 6);
+      assert(h.opened.length === 0, 'Scrollen des Rasters');
+
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      touch(h, 'pointercancel', 8 * HOUR_PX);
+      h.runTimers(500);
+      touch(h, 'pointerup', 8 * HOUR_PX);
+      assert(h.opened.length === 0, 'der Browser uebernimmt die Geste (pointercancel)');
+
+      h.fire(sel, 'pointerdown', { pointerType: 'touch', isPrimary: true, clientX: 100, clientY: 9 * HOUR_PX, target: h.eventTarget() });
+      h.runTimers(500);
+      h.fire(sel, 'pointerup', { pointerType: 'touch', clientX: 100, clientY: 9 * HOUR_PX });
+      assert(h.opened.length === 0, 'ein Druck auf einen Termin legt nichts an');
+    });
+  });
+
+  test(`Z2 ${view}: ein Doppeltipp (Touch) legt nicht an - dort gilt das lange Druecken`, () => {
+    withGrid(view, (h) => {
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      touch(h, 'pointerup', 8 * HOUR_PX);
+      touch(h, 'dblclick', 8 * HOUR_PX);
+      assert(h.opened.length === 0, 'Doppeltipp');
+    });
+  });
+}
+
+test('Z2: Hinweis im leeren Tag nennt die Geste des Zeigers, nicht den Einzelklick', () => {
+  const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  for (const [key, value] of Object.entries(de.calendar)) {
+    if (!/^dayEmptyHint/.test(key)) continue;
+    assert(!/Tippe auf eine Uhrzeit|Klicke auf eine Uhrzeit/.test(value), `${key}: „${value}" verspricht den Einzeltipp`);
+  }
+  assert(de.calendar.dayEmptyHintPointer && de.calendar.dayEmptyHintTouch, 'je ein Hinweis fuer Maus (Doppelklick) und Touch (langes Druecken)');
+});
+
+// --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
 console.log(`\n[Calendar-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);

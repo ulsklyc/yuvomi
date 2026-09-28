@@ -703,8 +703,10 @@ function openAsPopover(opts) {
     // Wochenspalte, und wer die Leseansicht wegklickte, bekam das Formular
     // "Neuer Termin". Der Listener sitzt deshalb in der CAPTURE-Phase am
     // Dokument, also vor jedem Handler der Seite, und schluckt den Klick -
-    // samt Standardaktion, sonst folgte ein Link darunter trotzdem. Erst der
-    // zweite Klick legt an, wie bei Apple Kalender. Ausgenommen sind nur
+    // samt Standardaktion, sonst folgte ein Link darunter trotzdem. Angelegt
+    // wird im Kalender seit R17 (Z2) ohnehin nur per Doppelklick oder langem
+    // Druck, wie bei Apple Kalender (wireTimeGridCreate) - der Riegel hier
+    // bleibt fuer jede andere Flaeche unter dem Popover. Ausgenommen sind nur
     // Klicks in einer ANDEREN Ebene (Dialog, Rueckfrage, Toast): sie liegen
     // ueber dem Popover, und ihr Knopf muss tun, was er sagt. Ebenso
     // Klicks aus Code (`el.click()`), die niemand "daneben" gesetzt hat.

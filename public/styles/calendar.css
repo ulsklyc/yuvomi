@@ -772,11 +772,23 @@
   position: relative;
 }
 
-/* Dezenter Slot-Hover macht den „Klick-zum-Anlegen"-Affordance im Zeitraster
- * sichtbar; die getönten Event-Blöcke liegen deckend darüber und bleiben lesbar. */
+/* Dezenter Slot-Hover zeigt die leere Zeit als Flaeche, auf der man anlegen
+ * kann (seit R17 Z2 per Doppelklick bzw. langem Druck, wireTimeGridCreate in
+ * calendar.js); die getönten Event-Blöcke liegen deckend darüber und bleiben
+ * lesbar. */
 .week-view__col:hover,
 .day-view__col:hover {
   background-color: color-mix(in srgb, var(--module-accent) var(--tint-state), transparent);
+}
+
+/* Ein Doppelklick markiert kein Wort und ein langer Druck ruft weder die
+ * Textauswahl noch das iOS-Callout: beide Gesten gehoeren dem Anlegen (R17 Z2).
+ * Das Kontextmenue waehrend des Drucks unterdrueckt calendar.js. */
+.week-view__col,
+.day-view__col {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .week-view__hour-line {
