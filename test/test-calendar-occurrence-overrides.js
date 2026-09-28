@@ -2745,17 +2745,19 @@ test('confirmed split gives every inherited orphan an independent attachment ACL
     childOwnedDocumentId,
   ]).size, 5);
 
+  // The copies keep their source's rights (#1443): detaching does not change who
+  // sees the orphans, so no copy is opened wider than the private source.
   assert.deepEqual(database.prepare(`
     SELECT id, visibility FROM family_documents
     WHERE id IN (?, ?, ?) ORDER BY id
   `).all(sourceDocumentId, familyDocumentId, restrictedDocumentId).map((row) => ({ ...row })), [
     { id: sourceDocumentId, visibility: 'private' },
-    { id: familyDocumentId, visibility: 'family' },
-    { id: restrictedDocumentId, visibility: 'restricted' },
+    { id: familyDocumentId, visibility: 'private' },
+    { id: restrictedDocumentId, visibility: 'private' },
   ]);
   assert.deepEqual(database.prepare(`
     SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id
-  `).all(restrictedDocumentId).map((row) => Number(row.user_id)), [3]);
+  `).all(restrictedDocumentId).map((row) => Number(row.user_id)), []);
 
   database.prepare('DELETE FROM family_documents WHERE id = ?').run(familyDocumentId);
   assert.equal(database.prepare('SELECT id FROM family_documents WHERE id = ?')
@@ -4175,4 +4177,63 @@ test('whole-series refresh leaves an occurrence attachment untouched without the
     });
     assert.deepEqual(state(), owned, `${eventVisibility} ${assignments}: the owner's rights stay`);
   }
+});
+
+test('whole-series refresh re-syncs an owner\'s occurrence attachment only when its audience changes (#1443)', () => {
+  // Auch mit Verwaltungsrecht: ein Speichern, das nur Titel oder Zeit aendert,
+  // laesst die Freigaben stehen, die die Besitzerin im Dokumente-Modul gesetzt hat.
+  const database = createDatabase();
+  const seriesId = Number(insertSeries(database, {
+    title: 'Attachment audience',
+    start_datetime: '2026-10-01T09:00:00',
+    recurrence_rule: 'FREQ=DAILY',
+    assigned_to: 2,
+    visibility: 'assignees',
+  }));
+  database.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, 2)').run(seriesId);
+  const documentId = Number(database.prepare(`
+    INSERT INTO family_documents
+      (name, visibility, original_name, mime_type, file_size, content_data, created_by)
+    VALUES ('Audience doc', 'family', 'audience.txt', 'text/plain', 4, 'body', 1)
+  `).run().lastInsertRowid);
+  const owner = () => true;
+  upsertOccurrenceOverride(database, {
+    mayWidenAttachment: owner,
+    seriesId,
+    recurrenceId: '2026-10-02',
+    actorId: 1,
+    changes: { title: 'Attachment-owning occurrence' },
+    attachment: {
+      attachment_name: 'audience.txt',
+      attachment_mime: 'text/plain',
+      attachment_size: 4,
+      attachment_data: null,
+      attachment_document_id: documentId,
+    },
+  });
+  const state = () => ({
+    visibility: database.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(documentId).visibility,
+    access: database.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id')
+      .all(documentId).map((row) => Number(row.user_id)),
+  });
+  assert.deepEqual(state(), { visibility: 'restricted', access: [2] });
+  database.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, 3)').run(documentId);
+
+  const update = (changes, assignments) => updateSeriesWithOverrides(database, {
+    mayWidenAttachment: owner, seriesId, actorId: 1, changes, assignments,
+  });
+  update({ title: 'Renamed series' });
+  assert.deepEqual(state(), { visibility: 'restricted', access: [2, 3] }, 'a title change keeps the share');
+  update({ start_datetime: '2026-10-01T10:00:00' });
+  assert.deepEqual(state(), { visibility: 'restricted', access: [2, 3] }, 'a time change keeps the share');
+  upsertOccurrenceOverride(database, {
+    mayWidenAttachment: owner,
+    seriesId,
+    recurrenceId: '2026-10-02',
+    actorId: 1,
+    changes: { title: 'Renamed occurrence' },
+  });
+  assert.deepEqual(state(), { visibility: 'restricted', access: [2, 3] }, 'an occurrence title change keeps the share');
+  update({}, [2, 1]);
+  assert.deepEqual(state(), { visibility: 'restricted', access: [1, 2] }, 'new assignees: the document follows');
 });

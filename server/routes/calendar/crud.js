@@ -590,6 +590,7 @@ router.post('/', async (req, res) => {
       );
       setEventAssignments(db.get(), result.lastInsertRowid, userIds, {
         mayWidenAttachment: rights.mayWidenAttachment,
+        previous: null, // neuer Termin: das Dokument bekommt seine Rechte hier
       });
       return result.lastInsertRowid;
     })();
@@ -960,9 +961,11 @@ router.put('/:id', async (req, res) => {
     const outlookCalendarId = vOutlook ? vOutlook.value.calendarId : event.target_outlook_calendar_id;
 
     const applyUpdate = () => {
-      // Der Anhang gegen den Stand, den dieses Schreiben vorfindet (#1358).
-      assertAttachmentStillChangeable(req, db.get(),
-        db.get().prepare('SELECT attachment_document_id FROM calendar_events WHERE id = ?').get(id)?.attachment_document_id,
+      // Der Anhang gegen den Stand, den dieses Schreiben vorfindet (#1358) -
+      // und die Sichtbarkeit davor, gegen die setEventAssignments() prueft, ob
+      // sich das Publikum des Anhangs aendert (#1443).
+      const stored = db.get().prepare('SELECT attachment_document_id, visibility FROM calendar_events WHERE id = ?').get(id);
+      assertAttachmentStillChangeable(req, db.get(), stored?.attachment_document_id,
         { replacementRequested, removalRequested });
       // Neu nur Haushaltsmitglieder (#1207), gegen den Stand, den dieses Schreiben vorfindet.
       if (assignedTouched) assertNoNewNonMembers(db.get(), userIds, storedEventAssignees(db.get(), id));
@@ -1068,7 +1071,11 @@ router.put('/:id', async (req, res) => {
       // keiner Altlast der Farb-Heilung mehr (#1270), auch wenn er spaeter
       // wieder die alte Farbe bekommt oder die Wahl den Server nie erreicht.
       if (colorChanged && event.external_source === 'caldav') recordLocalColorChoice(db.get(), [id]);
-      setEventAssignments(db.get(), id, userIds, { mayWidenAttachment: rights.mayWidenAttachment });
+      setEventAssignments(db.get(), id, userIds, {
+        mayWidenAttachment: rights.mayWidenAttachment,
+        previous: { visibility: stored?.visibility },
+        attachmentSet: replacementRequested,
+      });
     };
 
     const linkedOverrideCount = db.get().prepare(`

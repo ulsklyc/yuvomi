@@ -151,6 +151,33 @@ export function applyDocumentAccess(database, documentId, {
 }
 
 /**
+ * Hat sich in diesem Speichern geaendert, wer einen Termin sieht (#1443)? Nur
+ * dann gleicht der Kalender das Anhang-Dokument ab - auch fuer die Besitzerin.
+ * Bis dahin lief jedes Speichern (auch nur des Titels oder der Zeit) ueber das
+ * Dokument und loeschte die Freigaben, die die Besitzerin im Dokumente-Modul an
+ * Personen ausserhalb des Termins vergeben hatte.
+ *
+ * Verglichen wird das Publikum, auf das das Dokument abgeglichen wuerde: die
+ * Sichtbarkeit, und die Zugewiesenen nur an einem Termin fuer Zugewiesene - an
+ * einem Termin fuer alle oder einem privaten bestimmen sie nichts.
+ * `before === null` heisst: es gab keinen Vorzustand (neuer Termin), also
+ * abgleichen.
+ * @param {{ visibility: string, userIds: number[] } | null} before
+ * @param {{ visibility: string, userIds: number[] }} after
+ * @returns {boolean}
+ */
+export function eventAudienceChanged(before, after) {
+  if (!before) return true;
+  const visibility = before.visibility ?? 'all';
+  if (visibility !== (after.visibility ?? 'all')) return true;
+  if (visibility !== 'assignees') return false;
+  const ids = (list) => new Set((list || []).map(Number).filter((id) => Number.isInteger(id) && id > 0));
+  const was = ids(before.userIds);
+  const is = ids(after.userIds);
+  return was.size !== is.size || [...was].some((id) => !is.has(id));
+}
+
+/**
  * Das Urteil eines `mayWiden`-Praedikats fuer einen Anhang, den der Aufrufer in
  * diesem Schreiben selbst hochgeladen hat, ohne ihn zu verwalten (#1443): ein
  * neues Anhang-Dokument entsteht als `family` und gehoert der Terminerstellerin;

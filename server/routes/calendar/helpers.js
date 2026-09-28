@@ -6,7 +6,9 @@
 
 import { StorageError } from '../../services/document-storage.js';
 import { ensureModuleFolder } from '../../services/document-folders.js';
-import { applyDocumentAccess, attachmentAccessMode, filterVisibleDocumentIds } from '../../services/document-access.js';
+import {
+  applyDocumentAccess, attachmentAccessMode, eventAudienceChanged, filterVisibleDocumentIds,
+} from '../../services/document-access.js';
 import { documentViewer } from '../../services/document-links.js';
 import { mayWriteModule } from '../../permissions.js';
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../../utils/upload-limit.js';
@@ -304,11 +306,18 @@ export function parseAssignedTo(val) {
  * (in diesem Schreiben neu hochgeladen) verengt nur. Sonst bleibt das Dokument,
  * wie die Besitzerin es gesetzt hat (#1443): `applyDocumentAccess()` in
  * services/document-access.js.
+ *
+ * UND NUR, WENN SICH DAS PUBLIKUM AENDERT (#1443): `before` ist, wer den Termin
+ * vor diesem Speichern sah (`{ visibility, userIds }`, `null` fuer einen neuen
+ * Termin). Bleibt es gleich, bleibt auch das Dokument - ausser der Anhang ist
+ * in diesem Speichern neu gesetzt (`attachmentSet`), denn ein neues Anhang-
+ * Dokument entsteht als `family` und bekommt seine Rechte erst hier.
  */
 export function syncAttachmentDocumentAccess(d, documentId, eventVisibility, userIds, {
-  mayWiden = () => false, grantAssignees = false,
+  mayWiden = () => false, grantAssignees = false, before = null, attachmentSet = false,
 } = {}) {
   if (!documentId) return;
+  if (!attachmentSet && !eventAudienceChanged(before, { visibility: eventVisibility, userIds })) return;
   const visibility = eventVisibility === 'private'
     ? 'private'
     : eventVisibility === 'assignees'
@@ -327,8 +336,18 @@ export function syncAttachmentDocumentAccess(d, documentId, eventVisibility, use
  * Zugewiesene ein schon eingeschraenktes Dokument die Zugewiesenen als
  * Freigabe dazubekommt - nichts wird `family`, nichts Privates geht auf,
  * nichts wird enger, keine Freigabe faellt weg.
+ *
+ * Das Dokument wird nur abgeglichen, wenn sich in diesem Speichern aendert, wer
+ * den Termin sieht (#1443). Die Zugewiesenen davor liest diese Funktion selbst;
+ * die Sichtbarkeit davor kennt nur der Aufrufer, der sie schreibt:
+ *   - `options.previous: { visibility }` - der Stand vor dem UPDATE;
+ *   - `options.previous: null` - ein neuer Termin, immer abgleichen;
+ *   - ohne `previous` - der Aufrufer aendert die Sichtbarkeit nicht (Syncs).
+ * `options.attachmentSet`: der Anhang ist in diesem Speichern neu gesetzt.
  */
-export function setEventAssignments(d, eventId, userIds, { mayWidenAttachment, grantAssigneesOnly = false } = {}) {
+export function setEventAssignments(d, eventId, userIds, {
+  mayWidenAttachment, grantAssigneesOnly = false, previous, attachmentSet = false,
+} = {}) {
   // Wer VORHER dranstand - gebraucht wird das eine Zeile weiter unten, um die
   // Erinnerungen derer abzuraeumen, die nicht mehr dranstehen (#921). Deshalb
   // hier und nicht erst nach dem DELETE, das die Auskunft vernichtet.
@@ -365,7 +384,12 @@ export function setEventAssignments(d, eventId, userIds, { mayWidenAttachment, g
     event?.attachment_document_id,
     event?.visibility,
     userIds,
-    { mayWiden: mayWidenAttachment, grantAssignees: grantAssigneesOnly },
+    {
+      mayWiden: mayWidenAttachment,
+      grantAssignees: grantAssigneesOnly,
+      before: previous === null ? null : { visibility: previous?.visibility ?? event?.visibility, userIds: before },
+      attachmentSet,
+    },
   );
 }
 
