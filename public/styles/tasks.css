@@ -1279,11 +1279,14 @@
 .subtask-item__add {
   width: 100%;
   padding: var(--space-2);
+  padding-inline: var(--space-3);
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
   background: none;
   border: 1.5px dashed var(--color-border);
-  border-radius: var(--radius-sm);
+  /* Kapsel wie sein Gegenstueck `.detail-subtask--add` (detail-view.css):
+   * EINE Buttonform, auch fuer die gestrichelte Einladung. */
+  border-radius: var(--radius-full);
   cursor: pointer;
   text-align: left;
   margin-top: var(--space-2);

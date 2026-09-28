@@ -231,6 +231,14 @@
    * hinzufuegen" brach auf 60px Hoehe um (Sichtpruefung 2026-09-26). */
   width: auto;
   margin-inline: 0;
+  /* EINE BUTTONFORM: die Kapsel (tokens.css, Sonde 3 der Dokument-Guards).
+   * Er ist kein Teilschritt, also keine Zeile der Liste, sondern ein Knopf
+   * nach Inhalt breit - wie die gestrichelte Kapsel `.list-tab__new` im
+   * Einkauf. Mit dem 10px-Radius der Zeilen stand er seit der Detailspalte
+   * ab 1280px (R10) als zweite Form im Dokument. Das Polster rueckt den Text
+   * aus der Rundung. */
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-full);
   color: var(--color-text-secondary);
   border: var(--space-px) dashed var(--color-border);
   transition: border-color var(--transition-fast), color var(--transition-fast);
