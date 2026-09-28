@@ -646,7 +646,13 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     const firstEl = lines.length
       ? lines[0].els.reduce((a, b) => (b.getBoundingClientRect().height > a.getBoundingClientRect().height ? b : a))
       : null;
-    lead = Math.max(0, Math.round(lastTop - padTop));
+    // EINE ZEILE HAT KEINE LEAD-ZONE, auch wenn sie nicht auf dem Polster
+    // beginnt. Die Kuechen-Koepfe von Rezepten und Vorrat stehen mobil seit
+    // R9 M10 IN der Zeile der Kuechen-Leiste: 56px hoch, ohne Polster, die
+    // 48px-Lupe mittig darin - ihre Oberkante liegt 4px tief. `lastTop -
+    // padTop` machte daraus 4px Lead-Zone und ein `--stacked`, das die
+    // Trennlinie dauerhaft verbarg (Sonde 8 der Dokument-Guards).
+    lead = lines.length > 1 ? Math.max(0, Math.round(lastTop - padTop)) : 0;
     toolbar.style.setProperty('--page-toolbar-lead', `${lead}px`);
     toolbar.classList.toggle('page-toolbar--stacked', lead > 0);
     toolbar.classList.toggle('page-toolbar--capped', Boolean(capped) && lead > 0);
@@ -812,9 +818,20 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // Im Band-Modus klebt der Kopf um `bandH` tiefer, und genau so viel der
     // ersten Zeile bleibt geklebt im Bild - der Rahmen schrumpft um dasselbe
     // Mass, sonst dockte der Kopf nie an.
+    //
+    // UND UM DAS, WAS DIE ERSTE ZEILE UNTER DIE LEAD-ZONE REICHT. `lead` ist
+    // die Oberkante der letzten Zeile minus dem oberen Polster; die erste
+    // Zeile endet aber `row-gap` vor der letzten, und ist das Polster groesser
+    // als die Luecke, ragt sie geklebt um die Differenz ins Bild. Die
+    // Haushaltshilfe (8px Polster, 4px Luecke, R11-Band) liess ihren 41px-Titel
+    // so 31px tief stehen - 3px unter dem 28px-Rahmen, und der Kopf dockte nie
+    // an (Sonde 8). Gemessen statt aus Polster und Luecke gerechnet, damit auch
+    // ein hoeherer Nachbar in der ersten Zeile mitzaehlt.
+    const firstBottom = firstEl.getBoundingClientRect().bottom - tb.top;
+    const overhang = Math.max(0, Math.ceil(firstBottom - lead));
     io = new IntersectionObserver(
       ([entry]) => toolbar.classList.toggle('is-docked', !entry.isIntersecting),
-      { root: scrollport, threshold: 0, rootMargin: `-${bandH + 1}px 0px 0px 0px` },
+      { root: scrollport, threshold: 0, rootMargin: `-${bandH + overhang + 1}px 0px 0px 0px` },
     );
     io.observe(firstEl);
   };

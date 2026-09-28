@@ -930,7 +930,7 @@ test('wireScrollFade: eine abgehaengte Leiste haengt ihre Beobachter selbst ab, 
  * die Bar-Zeile dem angedockten Titel 17px - er fiel weg, angedockt stand kein
  * Wort, wo man ist.
  */
-function dockStub({ withMenu = true, tabBar = false } = {}) {
+function dockStub({ withMenu = true, tabBar = false, padTop = 0, barTop = 57 } = {}) {
   const matchOne = (el, s) => {
     const m = s.match(/^([a-z0-9]*)((?:\.[\w-]+)*)((?:\[[\w-]+\])*)$/i);
     if (!m) throw new Error(`Attrappe kennt den Selektor nicht: ${s}`);
@@ -991,6 +991,7 @@ function dockStub({ withMenu = true, tabBar = false } = {}) {
   const scrollport = new El('main', { cs: { overflowY: 'auto' }, rect: box(0, 844, 390) });
   const toolbar = new El('div', { cls: ['page-toolbar'], rect: box(0, 112, 358) });
   toolbar.cs.columnGap = '8';
+  toolbar.cs.paddingBlockStart = String(padTop);
   const title = new El('h1', { cls: ['page-toolbar__title'], rect: box(8, 49, 322) });
   title.textContent = 'Aufgaben';
   const search = new El('label', { cls: ['page-search', 'page-toolbar__center'], rect: box(60, 108, 48) });
@@ -1011,7 +1012,7 @@ function dockStub({ withMenu = true, tabBar = false } = {}) {
   }
   // Schichtplan, Haushaltshilfe, Belohnungen (R11 H1): die Bar-Zeile ist eine
   // Tab-Leiste ueber die ganze Innenbreite, kein Werkzeugmenue daneben.
-  const tabs = new El('div', { cls: ['sub-tabs-bar'], attrs: { role: 'tablist' }, rect: box(57, 105, 358) });
+  const tabs = new El('div', { cls: ['sub-tabs-bar'], attrs: { role: 'tablist' }, rect: box(barTop, barTop + 48, 358) });
   if (tabBar) {
     title.textContent = 'Schichtplan';
     toolbar.append(title, tabs);
@@ -1141,6 +1142,47 @@ test('H1: wo der Titel in die Bar-Zeile passt oder faltet, bleibt es beim alten 
     assert.equal(s.toolbar.classList.contains('page-toolbar--dock-band'), false);
     assert.equal(s.toolbar.props.has('--dock-band-h'), false);
     assert.equal(s.ioOptions.at(-1)?.rootMargin, '-1px 0px 0px 0px');
+  } finally { s.restore(); }
+});
+
+/**
+ * DIE ERSTE ZEILE RAGT UM DIE DIFFERENZ AUS POLSTER UND LUECKE UNTER DIE
+ * LEAD-ZONE (Dokument-Guards, Sonde 8, nach R11 H1). Die Attrappe oben hat
+ * kein Polster; die Haushaltshilfe hat 8px oben und 4px Zeilenluecke: Titel
+ * 8-49, Leiste ab 53, Lead-Zone 53 - 8 = 45. Geklebt steht der Kopf bei
+ * -(45 - 27) = -18, der Titel reicht bis 31 - unter den alten 28px-Rahmen,
+ * und der Kopf dockte nie an. Der Rahmen schrumpft um die 4px mit.
+ */
+test('H1: ragt die erste Zeile unter die Lead-Zone, rueckt die Andock-Schwelle mit', () => {
+  const s = dockStub({ tabBar: true, padTop: 8, barTop: 53 });
+  try {
+    wireCollapsingHeader(s.toolbar);
+    assert.equal(s.toolbar.props.get('--page-toolbar-lead'), '45px', 'Attrappe muss die gemessene Lead-Zone ergeben');
+    assert.ok(s.toolbar.classList.contains('page-toolbar--dock-band'), 'Attrappe muss den Band-Modus ergeben');
+    assert.equal(s.ioOptions.at(-1)?.rootMargin, '-32px 0px 0px 0px',
+      'Streifen (27) + Ueberhang des Titels (49 - 45) + 1: erst dann hat die erste Zeile den Port verlassen');
+  } finally { s.restore(); }
+});
+
+/**
+ * EINE ZEILE HAT KEINE LEAD-ZONE (Dokument-Guards, Sonde 8, nach R9 M10).
+ * Rezepte und Vorrat legen ihren Kopf mobil in die 56px-Zeile der
+ * Kuechen-Leiste, ohne Polster; die 48px-Lupe sitzt mittig, also 4px tief.
+ * Die Rechnung „Oberkante der letzten Zeile minus Polster" machte daraus 4px
+ * Lead-Zone und ein `--stacked`, das die Trennlinie dauerhaft verbarg.
+ */
+test('wireCollapsingHeader: ein einzeiliger Kopf mit mittig versetztem Inhalt bekommt keine Lead-Zone', () => {
+  const s = dockStub({ withMenu: false });
+  try {
+    // Nur die Lupe, 4px unter der Kopfkante - Titel und Aktionen tragen keine Hoehe.
+    s.toolbar.children.splice(0, s.toolbar.children.length);
+    const search = new s.title.constructor('label', { cls: ['page-search', 'page-toolbar__center'], rect: { top: 4, bottom: 52, left: 0, width: 48 } });
+    s.toolbar.append(search);
+    wireCollapsingHeader(s.toolbar);
+    assert.equal(s.toolbar.props.get('--page-toolbar-lead'), '0px');
+    assert.equal(s.toolbar.classList.contains('page-toolbar--stacked'), false,
+      'ohne zweite Zeile kein --stacked: es verbirgt die Trennlinie, und nichts holt sie zurueck');
+    assert.equal(s.toolbar.classList.contains('is-docked'), true, 'ohne Lead-Zone steht die Linie durchgehend');
   } finally { s.restore(); }
 });
 
