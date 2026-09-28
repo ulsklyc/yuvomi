@@ -302,59 +302,25 @@ test('Seitenleiste: Pille <= 300ms aus Tokens, Hover-Absicht 150-250ms aus einem
 });
 
 // --------------------------------------------------------
-// R9 M10 (Re-Critique 2026-09-27, A4 P2): mobil gehoert die Zeile dem Inhalt.
-// Die Werkzeugzeile von Rezepte/Vorrat trug nur Lupe (und "...") und kostete
-// 65px unter der Kuechen-Leiste; die Leiste selbst war mit Siegel und 8px-Polster
-// 402px breit und schnitt "Vorrat 11" an. Gemessen nachher (390px, de): Leiste
-// passt in allen vier Tabs ohne Scrollen, erste Rezeptzeile y 137 -> 72,
-// erster Vorrat y 216 -> 151.
+// EINE REGEL FUER DEN KUECHENKOPF MOBIL (Re-Critique 2026-09-28, P7 / A4 P2-3).
+// R9 M10 hatte Lupe und "..." von Rezepte/Vorrat IN die Kuechen-Leiste gelegt;
+// dafuer schrumpften dort die Zaehler zu Punkten, waehrend Mahlzeiten und
+// Einkauf ihre Werkzeuge in einer eigenen Kontextzeile trugen. Vier Tabs, vier
+// Kopfbauarten: die Leiste sprang beim Tabwechsel. Jetzt traegt die Leiste nur
+// Tabs mit Zahlen, und jedes Werkzeug steht in der Kontextzeile seines Tabs.
 // --------------------------------------------------------
-test('Kueche mobil: Lupe und Werkzeugmenue stehen in der Kuechen-Leiste, die eigene Werkzeugzeile entfaellt (R9 M10)', async () => {
+test('Kueche mobil: die Leiste traegt nur Tabs mit Zahlen, Werkzeuge stehen in der Kontextzeile', async () => {
   const { eachRule } = await import('./css-rules.js');
   const rules = [...eachRule(readSrc('../public/styles/kitchen-tabs.css'))];
-  const narrow = (r) => r.at.some((a) => /\(max-width:\s*639px\)/.test(a));
-  const find = (pred) => rules.filter((r) => narrow(r) && pred(r));
-  // Komma nur auf oberster Ebene trennen - `:is(a, b)` ist EIN Selektor.
-  const split = (sel) => {
-    const out = []; let depth = 0; let cur = '';
-    for (const ch of sel) {
-      if (ch === '(') depth += 1;
-      if (ch === ')') depth -= 1;
-      if (ch === ',' && depth === 0) { out.push(cur); cur = ''; } else cur += ch;
-    }
-    return [...out, cur].map((x) => x.trim().replace(/\s+/g, ' '));
-  };
-  const selHas = (r, re) => split(r.selector).some((s) => re.test(s));
-
-  assert.ok(find((r) => selHas(r, /^\.kitchen-tabs-bar \.module-seal$/) && /display:\s*none/.test(r.body)).length,
+  const narrow = rules.filter((r) => r.at.some((a) => /\(max-width:\s*639px\)/.test(a)));
+  assert.ok(narrow.some((r) => /\.kitchen-tabs-bar \.module-seal/.test(r.selector) && /display:\s*none/.test(r.body)),
     'mobil kostet das Siegel 26px, und die untere Leiste fuehrt dasselbe Besteck als aktiven Eintrag');
-  const tab = find((r) => selHas(r, /^\.kitchen-tabs-bar \.sub-tab$/) && /padding-inline:/.test(r.body));
-  assert.match(tab.at(-1)?.body ?? '', /padding-inline:\s*var\(--space-1\)/, 'Tab-Polster 4px - mit 8px fehlten bei 390px genau die 32px');
-
-  const PAGES = /:is\(\.recipes-page, \.pantry-page\)/;
-  const page = find((r) => selHas(r, new RegExp(`${PAGES.source}\\) > ${PAGES.source}$`)));
-  assert.match(page[0]?.body ?? '', /margin-block-start:\s*calc\(-1 \* var\(--kitchen-tabs-height\)\)/, 'die Seite rueckt um die Leistenhoehe hoch');
-  const bar = find((r) => selHas(r, new RegExp(`${PAGES.source}\\) > ${PAGES.source} > \\.page-toolbar$`)));
-  assert.ok(bar.length, 'kein Kopf-Rumpf fuer Rezepte/Vorrat in der schmalen Fassung');
-  assert.match(bar[0].body, /block-size:\s*var\(--kitchen-tabs-height\)/, 'der Kopf ist genau so hoch wie die Leiste, in der er steht');
-  assert.match(bar[0].body, /align-self:\s*flex-end/, 'der Kopf ist nur so breit wie seine Werkzeuge - sonst deckt er die Tabs');
-  assert.ok(find((r) => /:has\(\.page-search:focus-within\)/.test(r.selector) && /align-self:\s*stretch/.test(r.body)).length,
-    'wer sucht, bekommt die ganze Zeile');
-
-  // Seit der Integration (Sonde 20): per RAND statt per Flex-Kind im
-  // Scrollbereich - scrollt die Leiste, steht ihr naechstes Label sichtbar
-  // angeschnitten vor der Lupe statt unsichtbar darunter. Die Anfangskante
-  // (Fluchtlinie #577) bleibt unberuehrt.
-  const barEnd = find((r) => selHas(r, new RegExp(`${PAGES.source}\\) > \\.kitchen-tabs-bar$`)));
-  assert.match(barEnd[0]?.body ?? '', /margin-inline-end:\s*calc\(var\(--kitchen-tools\) \* var\(--target-base\) \+ var\(--space-1\)\)/,
-    'die Leiste endet vor den Werkzeugen');
-  assert.doesNotMatch(barEnd[0]?.body ?? '', /padding-inline(?:-start)?\s*:/, 'die Anfangskante bleibt die Fluchtlinie');
-  assert.ok(!find((r) => selHas(r, /> \.kitchen-tabs-bar::after$/)).length,
-    'kein Abstandhalter im Scrollbereich - dort blendete der Fade Leere aus');
-  const tools = (n) => find((r) => new RegExp(`--kitchen-tools:\\s*${n}\\b`).test(r.body));
-  assert.ok(tools(1).some((r) => selHas(r, PAGES)), 'Rezepte und Vorrat: mindestens die Lupe');
-  assert.ok(tools(2).some((r) => selHas(r, /:has\(> \.pantry-page\)$/)), 'Vorrat: Lupe plus Werkzeugmenue');
-  assert.ok(tools(2).some((r) => selHas(r, /recipes-source-filter:not\(\[hidden\]\)/)), 'Rezepte mit Quellenfilter: zwei Werkzeuge');
+  assert.deepEqual(narrow.filter((r) => /--kitchen-tools/.test(r.body) || /--kitchen-tools/.test(r.selector)).map((r) => r.selector), [],
+    'keine Werkzeuge mehr in der Leiste');
+  assert.deepEqual(narrow.filter((r) => /margin-block-start:\s*calc\(-1 \* var\(--kitchen-tabs-height\)\)/.test(r.body)).map((r) => r.selector), [],
+    'keine Seite rueckt mehr in die Zeile der Leiste - ihr Kopf ist die Kontextzeile darunter');
+  assert.deepEqual(narrow.filter((r) => /\.sub-tab__badge/.test(r.selector) && /color:\s*transparent/.test(r.body)).map((r) => r.selector), [],
+    'kein Zaehler schrumpft je Tab zum Punkt - die Zahl bleibt in allen vier Tabs');
 });
 
 // --------------------------------------------------------
@@ -408,45 +374,25 @@ test('Kueche mobil: die Leiste passt bei 375px in allen vier Tabs ohne Scrollen 
   const badgeMargin = px(decl(kitchen, '.kitchen-tabs-bar .sub-tab__badge', 'margin-inline-start') ?? decl(base, '.sub-tab__badge', 'margin-inline-start'));
   const badgePad = px(decl(kitchen, '.kitchen-tabs-bar .sub-tab__badge', 'padding-inline') ?? decl(base, '.sub-tab__badge', 'padding').split(/\s+/)[1]);
   const badgeMin = px(decl(base, '.sub-tab__badge', 'min-width'));
-  const DOT_SEL = '.has-kitchen-tabs:is(:has(> .pantry-page), :has(> .recipes-page .recipes-source-filter:not([hidden]))) > .kitchen-tabs-bar .sub-tab__badge';
-  const dot = px(decl(kitchen, DOT_SEL, 'inline-size'));
-  // Ein absolut gesetzter Punkt (R11 H2) liegt an der Ecke des Labels und
-  // kostet die Zeile nichts; im Fluss kostete er Abstand + Rand + Breite.
-  const dotOutOfFlow = decl(kitchen, DOT_SEL, 'position') === 'absolute';
-  const BAR_WITH_TOOLS = '.has-kitchen-tabs:has(> :is(.recipes-page, .pantry-page)) > .kitchen-tabs-bar';
-  assert.match(decl(kitchen, BAR_WITH_TOOLS, 'margin-inline-end') ?? '', /^calc\(var\(--kitchen-tools\) \* var\(--target-base\) \+ var\(--space-1\)\)$/,
-    'die Rechnung unten bildet das Ende der Leiste nach - aendert es sich, muss sie mit');
-  assert.equal(px(decl(kitchen, BAR_WITH_TOOLS, 'padding-inline-end')), 0, 'vor den Werkzeugen traegt der Rand den Abstand, kein Polster');
-
+  // Seit der Re-Critique 2026-09-28 (P7) stehen keine Werkzeuge mehr in der
+  // Leiste und kein Zaehler wird zum Punkt - die Rechnung hat vier Tabs mit
+  // Zahlen und das Seitenpolster an beiden Enden.
   // Gemessene Wortbreiten (inaktiv / aktiv, der aktive Tab ist fetter) und die Zahl im Zaehler.
   const WORD = { meals: [72, 73.7], recipes: [53.9, 55], shopping: [48.8, 50.2], pantry: [40.9, 42] };
   const DIGITS = 15.8;
   const PAGE_PAD = tok('space-4');
-  const TOOL = tok('target-lg');
   const W = 375;
   const numeric = Math.max(badgeMin, DIGITS + 2 * badgePad);
-  const width = ({ active, badges, badgeW, tools }) => {
+  const width = ({ active, badges }) => {
     const tabs = Object.keys(WORD).map((id) => WORD[id][id === active ? 1 : 0] + 2 * tabPad
-      + (badges.includes(id) && id !== active && !(badgeW === dot && dotOutOfFlow) ? tabGap + badgeMargin + badgeW : 0));
-    // Ende: mit Werkzeugen der Rand der Leiste (ohne End-Polster), sonst ihr Polster.
-    const endW = tools ? tools * TOOL + tok('space-1') : PAGE_PAD;
-    return PAGE_PAD + tabs.reduce((a, b) => a + b, 0) + (tabs.length - 1) * barGap + endW;
+      + (badges.includes(id) && id !== active ? tabGap + badgeMargin + numeric : 0));
+    return PAGE_PAD + tabs.reduce((a, b) => a + b, 0) + (tabs.length - 1) * barGap + PAGE_PAD;
   };
   // Einkauf und Vorrat tragen Zaehler; der aktive Tab zeigt seinen nicht.
-  const cases = {
-    meals: width({ active: 'meals', badges: ['shopping', 'pantry'], badgeW: numeric, tools: 0 }),
-    recipes: width({ active: 'recipes', badges: ['shopping', 'pantry'], badgeW: numeric, tools: 1 }),
-    shopping: width({ active: 'shopping', badges: ['shopping', 'pantry'], badgeW: numeric, tools: 0 }),
-    pantry: width({ active: 'pantry', badges: ['shopping', 'pantry'], badgeW: dot, tools: 2 }),
-    // Rezepte MIT Quellenfilter (angebundener Rezeptanbieter): zwei Werkzeuge
-    // und zwei Punkte. Bis R11 brauchte das 380.7px und die Leiste scrollte
-    // bei 375px (Re-Critique 2026-09-27, H2) - seit der Punkt an der Ecke
-    // steht, passt auch dieser Fall.
-    recipesFiltered: width({ active: 'recipes', badges: ['shopping', 'pantry'], badgeW: dot, tools: 2 }),
-  };
-  for (const [tab, need] of Object.entries(cases)) {
+  for (const tab of Object.keys(WORD)) {
+    const need = width({ active: tab, badges: ['shopping', 'pantry'] });
     assert.ok(need <= W, `${tab}: die Leiste braucht ${need.toFixed(1)}px von ${W} - sie scrollt fuer vier Tabs`);
   }
-  assert.ok(numeric >= badgeMin && dot > 0, 'der Zaehler bleibt eine Pille, der Punkt bleibt sichtbar');
+  assert.ok(numeric >= badgeMin, 'der Zaehler bleibt eine Pille');
   assert.ok(tabPad >= tok('space-1'), 'die Kapsel des aktiven Tabs laesst dem Wort weiter 4px je Seite');
 });
