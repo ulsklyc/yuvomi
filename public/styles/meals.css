@@ -1439,14 +1439,17 @@
    * Kartenflaeche und das tertiaere Plus; die Kante - die Griff- und
    * Ablage-Affordanz - kommt erst, wenn er gemeint ist: Zeiger darueber,
    * Tastaturfokus auf dem Plus oder ein Rezept, das darueber gezogen wird
-   * (`--drop-target` darunter traegt dafuer seinen eigenen Rahmen). */
-  .meal-slot--empty {
+   * (`--drop-target` darunter traegt dafuer seinen eigenen Rahmen).
+   * Unter `.week-grid`, weil glass.css die Slotflaeche mit
+   * `.meals-page .meal-slot` (zwei Klassen) setzt - eine Klasse allein verlor
+   * dagegen (gemessen: weiss geblieben). */
+  .week-grid .meal-slot--empty {
     border-color: transparent;
-    background-color: color-mix(in srgb, var(--color-surface) var(--tint-hint), transparent);
+    background-color: transparent;
   }
 
-  .meal-slot--empty:hover,
-  .meal-slot--empty:focus-within {
+  .week-grid .meal-slot--empty:hover,
+  .week-grid .meal-slot--empty:focus-within {
     border-color: var(--color-border);
   }
 

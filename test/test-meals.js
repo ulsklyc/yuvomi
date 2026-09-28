@@ -1727,9 +1727,12 @@ test('Essensplan-Board am Desktop: Woche oben, Kopf einzeilig, leere Slots ohne 
   const find = (sel) => rules.find((r) => r.selector.split(',').some((s) => s.trim() === sel));
   assert(/align-content:\s*start/.test(find('.week-grid')?.body ?? ''), 'die Woche dehnt ihre Zeilen nicht auf die Hoehe');
   assert(/justify-content:\s*flex-start/.test(find('.day-header')?.body ?? ''), 'Wochentag und Datum stehen beieinander');
-  const empty = find('.meal-slot--empty');
+  // Zwei Klassen: glass.css setzt die Slotflaeche mit `.meals-page .meal-slot`,
+  // eine Klasse allein verlor dagegen still (im Browser gemessen: weiss).
+  const empty = find('.week-grid .meal-slot--empty');
   assert(/border-color:\s*transparent/.test(empty?.body ?? ''), `der leere Slot traegt keine Kante: ${empty?.body}`);
-  const meant = rules.find((r) => /\.meal-slot--empty:focus-within/.test(r.selector));
+  assert(/background-color:\s*transparent/.test(empty?.body ?? ''), `und keine Kartenflaeche: ${empty?.body}`);
+  const meant = rules.find((r) => /\.week-grid \.meal-slot--empty:focus-within/.test(r.selector));
   assert(meant && /border-color:\s*var\(--color-border\)/.test(meant.body), 'bei Fokus kommt die Kante zurueck');
   assert(/:hover/.test(meant.selector), 'und beim Zeiger darueber');
   const drop = [...eachRule(css)].find((r) => r.selector.trim() === '.meal-slot--drop-target');
