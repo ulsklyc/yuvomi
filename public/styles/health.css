@@ -86,6 +86,90 @@
   display: none;
 }
 
+/* DIE PERSONENWAHL TEILT DIE ZEILE DES RUECKWEGS (R14 P3, A8 P3-3). Auf
+ * jeder Bereichsseite kostete sie eine eigene Zeile vor der ersten Karte
+ * (y122-170 bei 390x844). Jetzt steht sie rechts neben „‹ Gesundheit" wie
+ * die Aktion in Apples Navigationsleiste; der Bereichsname bleibt der Large
+ * Title darunter. Leer (ein Haushalt mit einer Person) kostet der Slot nichts.
+ * health-hoist.js haengt die Pille ein. */
+.health-toolbar__person {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-inline-start: auto;
+}
+
+.health-toolbar__person:empty {
+  display: none;
+}
+
+.health-toolbar:has(> .health-toolbar__back:not([hidden])) > .health-toolbar__back {
+  flex: 1 0 auto;
+  flex-basis: auto;
+}
+
+/* Der Zeilenumbruch nach Rueckweg und Pille: Siegel und Bereichsname stehen
+ * gemeinsam darunter, wie ohne Pille. */
+.health-toolbar__break {
+  display: none;
+}
+
+.health-toolbar:has(> .health-toolbar__back:not([hidden])) > .health-toolbar__break {
+  display: block;
+  flex-basis: 100%;
+  height: 0;
+}
+
+/* Im Kopf ist die Pille eine Kapsel ohne Kante: gefuellt aus der Well-Flaeche
+ * wie die Listen-Kapseln im Einkauf, der Name kappt statt umzubrechen. */
+.health-toolbar__person .health-person-switcher__trigger,
+.health-priority .health-person-switcher__trigger {
+  max-width: 100%;
+  border-color: transparent;
+  background: var(--color-fill-well);
+}
+
+.health-toolbar__person .health-person-switcher__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Heute vor der Bereichsliste (Telefon-Uebersicht, R14 P3, A6 P2-2) ----
+ * Person, Hinweis auf die fremde Ansicht, „Heute faellig" und „Schnell
+ * erfassen" stehen VOR der Liste - was man heute tut, vor dem, wohin man
+ * geht. Die Karten bringen ihre eigene Form mit (.health-overview__card). */
+.health-priority {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-inline: var(--page-inline-pad);
+}
+
+.health-priority:empty,
+.health-page[data-health-pushed] .health-priority {
+  display: none;
+}
+
+.health-priority > .health-overview__card {
+  margin-bottom: 0;
+}
+
+.health-priority > .health-person-switcher {
+  align-self: flex-start;
+}
+
+/* ---- Detailkopf (Desktop, R14 P6, A8 P2-2) ----
+ * Siegel des Bereichs und sein Name wie in den anderen Split-Views; rechts
+ * die Personenwahl. */
+.health-detail-head__seal {
+  flex: 0 0 auto;
+}
+
+.health-detail-head__title {
+  font-size: var(--text-lg);
+}
+
 .health-toolbar__back-icon {
   width: var(--icon-lg);
   height: var(--icon-lg);

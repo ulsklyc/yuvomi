@@ -60,6 +60,7 @@ import {
   legacyHealthTabPath, rememberHealthRoute,
 } from '/utils/health-tabs.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
+import { hoistPlan, applyHoistPlan } from '/utils/health-hoist.js';
 import { formatFastingDuration } from '/utils/health-fasting.js';
 import { canUseFasting, isNavModuleReadOnly } from '/permissions.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
@@ -631,10 +632,84 @@ function isSplitNow() {
 /** Den Panel-Wirt an die Stelle der aktuellen Darstellung hängen. */
 function placePanels() {
   if (!_panelsHost || !_container) return;
-  const target = isSplitNow()
+  const split = isSplitNow();
+  const target = split
     ? _container.querySelector('.split-view__detail [data-md-body]')
     : _container.querySelector('[data-health-stage]');
-  if (target && _panelsHost.parentElement !== target) target.replaceChildren(_panelsHost);
+  if (!target || _panelsHost.parentElement === target) return;
+  // Der Detailkopf gehoert nur der Detailspalte (R14 P6, A8 P2-2).
+  if (split && _detailHead) target.replaceChildren(_detailHead, _panelsHost);
+  else target.replaceChildren(_panelsHost);
+}
+
+/* DER DETAILKOPF NENNT DEN BEREICH (R14 P6, A8 P2-2). Am Desktop stand
+ * rechts nur das Panel, sein Titel sr-only - nur die Markierung links sagte,
+ * wo man ist. Jetzt traegt die Spalte den Kopf der anderen Split-Views
+ * (Aufgaben, Kontakte, Rezepte): Siegel des Bereichs, Name, rechts die
+ * Personenwahl. Der sichtbare Name ist fuer Screenreader stumm - das Panel
+ * darunter traegt dieselbe Ueberschrift als sr-only-h2, die Gliederung
+ * bleibt eine. */
+let _detailHead = null;
+function detailHeadEl() {
+  const wrap = document.createElement('div');
+  wrap.insertAdjacentHTML('beforeend', `
+    <header class="split-view__detail-head health-detail-head">
+      <span class="health-area-row__icon health-detail-head__seal" aria-hidden="true" data-health-detail-seal></span>
+      <p class="split-view__detail-title health-detail-head__title" aria-hidden="true" data-health-detail-title></p>
+      <div class="split-view__detail-actions" data-health-person-detail></div>
+    </header>`);
+  return wrap.firstElementChild;
+}
+
+function syncDetailHead() {
+  if (!_detailHead) return;
+  const area = HEALTH_AREAS({ cycleEnabled, fastingEnabled }).find((a) => a.id === _activeArea);
+  if (!area) return;
+  const title = _detailHead.querySelector('[data-health-detail-title]');
+  if (title && title.textContent !== t(area.labelKey)) title.textContent = t(area.labelKey);
+  const seal = _detailHead.querySelector('[data-health-detail-seal]');
+  if (seal && seal.dataset.icon !== area.icon) {
+    seal.dataset.icon = area.icon;
+    seal.replaceChildren();
+    seal.insertAdjacentHTML('beforeend', `<i data-lucide="${esc(area.icon)}"></i>`);
+    if (window.lucide) window.lucide.createIcons({ el: seal });
+  }
+}
+
+/* Personenwahl und „Heute" an ihren Ort je Darstellung (health-hoist.js). */
+function syncHoists() {
+  if (!_container?.isConnected || !_panelsHost) return;
+  const split = isSplitNow();
+  const overviewActive = (_activeArea ?? HEALTH_OVERVIEW_ID) === HEALTH_OVERVIEW_ID;
+  const route = healthAreaRoute(_activeArea ?? HEALTH_OVERVIEW_ID);
+  const panel = [..._panelsHost.querySelectorAll('[data-health-panel]')].find((p) => p.dataset.healthPanel === route) ?? null;
+  applyHoistPlan(hoistPlan({ split, overview: overviewActive, phone: isPhone() }), {
+    panel,
+    slots: {
+      detail: _detailHead?.querySelector('[data-health-person-detail]') ?? null,
+      toolbar: _container.querySelector('[data-health-person-slot]'),
+      priority: _container.querySelector('[data-health-priority]'),
+    },
+  });
+  // Die eigenen Umzuege sind keine Neubauten der Panels.
+  _hoistObserver?.takeRecords();
+}
+
+/* Baut ein Panel neu (Personenwechsel, Speichern), steht seine frische Pille
+ * wieder im Panel - EIN Beobachter holt sie an ihren Ort, statt dass jede der
+ * neun Ansichten daran denken muss. */
+let _hoistObserver = null;
+let _hoistQueued = false;
+function watchHoists() {
+  _hoistObserver?.disconnect();
+  _hoistObserver = null;
+  if (typeof MutationObserver !== 'function' || !_panelsHost) return;
+  _hoistObserver = new MutationObserver(() => {
+    if (_hoistQueued) return;
+    _hoistQueued = true;
+    queueMicrotask(() => { _hoistQueued = false; syncHoists(); });
+  });
+  _hoistObserver.observe(_panelsHost, { childList: true, subtree: true });
 }
 
 /** Welche Panels es gibt, hängt an den Voreinstellungen (Zyklus, Fasten). */
@@ -680,6 +755,8 @@ function activateArea(id) {
   if (!_statusesRequested && (!narrow || id === HEALTH_OVERVIEW_ID)) refreshAllAreaStatuses();
   else if (_statusesRequested && previous && previous !== id) refreshAreaStatus(previous);
   if (id === HEALTH_OVERVIEW_ID) _pushedFromOverview = false;
+  syncDetailHead();
+  syncHoists();
 }
 
 // --------------------------------------------------------
@@ -914,11 +991,19 @@ export async function render(container, ctx = {}) {
         <a class="health-toolbar__back" href="/health" hidden>
           <i data-lucide="chevron-left" class="health-toolbar__back-icon" aria-hidden="true"></i><span>${esc(t('nav.health'))}</span>
         </a>
+        <!-- Die Personenwahl eines Bereichs (schmal): in der Zeile des
+             Rueckwegs, rechts - keine eigene Zeile vor der ersten Karte
+             (health-hoist.js, R14 P3). -->
+        <div class="health-toolbar__person" data-health-person-slot></div>
+        <span class="health-toolbar__break" aria-hidden="true"></span>
         <h1 class="page-toolbar__title">${esc(t('nav.health'))}</h1>
         <div class="page-toolbar__actions"></div>
       </header>
       <div class="split-view health-split">
         <div class="split-view__list page-scrollport health-browse">
+          <!-- Telefon-Uebersicht: Person, Heute faellig und Schnell erfassen
+               VOR der Bereichsliste (health-hoist.js, R14 P3). -->
+          <div class="health-priority" data-health-priority></div>
           ${areasNavMarkup()}
           <div class="health-stage" data-health-stage></div>
         </div>
@@ -937,6 +1022,9 @@ export async function render(container, ctx = {}) {
   _panelsHost.className = 'health-panels';
   _panelsHost.insertAdjacentHTML('beforeend', panelsHtml);
   container.querySelector('[data-health-stage]').appendChild(_panelsHost);
+  _detailHead = detailHeadEl();
+  watchHoists();
+  watchPhoneQuery();
 
   // Der Riegel EINMAL je Seitenaufbau, am Seiten-Root: die Panels darunter
   // werden bei jedem Personen-/Tabwechsel neu gebaut, dieser Knoten nicht.
@@ -981,6 +1069,7 @@ export async function render(container, ctx = {}) {
       placePanels();
       if (selectedId) activateArea(selectedId);
       syncHealthHeader();
+      syncHoists();
     },
   });
 
@@ -1131,13 +1220,17 @@ function renderVitalsShell() {
  * Nachzuegler-Muster gemessen hat.
  */
 function wirePersonSwitcher(view, onSwitch) {
+  const menuId = view.root.querySelector('.health-person-switcher__trigger')?.getAttribute('popovertarget');
   view.root.querySelectorAll('.health-person-switcher [data-person-id]').forEach((item) =>
     item.addEventListener('click', async () => {
       const id = Number(item.dataset.personId);
       if (id === view.personId) return;
       view.personId = id;
       await onSwitch();
-      view.root.querySelector('.health-person-switcher__trigger')?.focus();
+      // Die neue Pille steht womoeglich schon im Kopf (health-hoist.js):
+      // ueber ihr Menue finden, nicht nur im Panel.
+      (view.root.querySelector('.health-person-switcher__trigger')
+        ?? (menuId ? document.querySelector(`[popovertarget="${menuId}"]`) : null))?.focus();
     }));
 }
 
@@ -1368,6 +1461,7 @@ function watchPhoneQuery() {
   _phoneQuery = window.matchMedia(PHONE_QUERY);
   _phoneQuery.addEventListener?.('change', () => {
     if (vitals.root?.isConnected && vitals.loaded && !vitals.error) renderCards();
+    syncHoists();
   });
 }
 
@@ -4731,7 +4825,14 @@ function renderPreventionShell() {
     ${preventionDueSectionMarkup()}
     ${groups.length
       ? `<div class="health-prevention__records">${groups.map((rows) => preventionGroupMarkup(rows, own)).join('')}</div>`
-      : emptyHintHTML(t('health.prevention.noRecords'))}
+      // EIN LEERZUSTAND MIT WEG (R14 P4, A6 P2-7): vorher „Noch keine
+      // Eintraege." als Zeile, ohne Weg und ohne zu sagen, was hier erscheint.
+      : emptyStateHTML({
+        icon: 'syringe',
+        title: t('health.prevention.emptyTitle'),
+        description: t('health.prevention.emptyDesc'),
+        action: own && !readOnly() ? { label: t('health.prevention.add'), icon: 'plus', attrs: { id: 'health-prevention-empty-add' } } : null,
+      })}
   `);
   if (window.lucide) window.lucide.createIcons({ el: prevention.root });
   wirePrevention();
@@ -4816,6 +4917,7 @@ function wirePrevention() {
   // Der Riegel vor der einen schreibenden Verdrahtung dieses Tabs (#1265).
   if (readOnly()) return;
 
+  prevention.root.querySelector('#health-prevention-empty-add')?.addEventListener('click', () => openPreventionModal(null));
   prevention.root.querySelectorAll('[data-prevention-edit]').forEach((btn) =>
     btn.addEventListener('click', () => {
       const id = Number(btn.dataset.preventionEdit);
@@ -5144,10 +5246,16 @@ function renderNutritionShell() {
       { menuId: 'health-person-menu-nutrition', label: t('health.nutrition.personsLabel') })}
     ${readOnlyBannerMarkup(nutrition.members, nutrition.personId, own, nutrition.meId)}
     ${nutritionTodaySectionMarkup(own)}
-    <h3 class="health-nutrition__entries-title u-section-title">${esc(t('health.nutrition.entriesTitle'))}</h3>
     ${entries.length
-      ? `<ul class="health-nutrition-row-list">${entries.map((row) => nutritionRowMarkup(row, own)).join('')}</ul>`
-      : emptyHintHTML(t('health.nutrition.noEntries'))}
+      ? `<h3 class="health-nutrition__entries-title u-section-title">${esc(t('health.nutrition.entriesTitle'))}</h3>
+      <ul class="health-nutrition-row-list">${entries.map((row) => nutritionRowMarkup(row, own)).join('')}</ul>`
+      // EIN LEERZUSTAND MIT WEG (R14 P4, A6 P2-7) statt Titel plus Hinweiszeile.
+      : emptyStateHTML({
+        icon: 'salad',
+        title: t('health.nutrition.emptyTitle'),
+        description: t('health.nutrition.emptyDesc'),
+        action: own && !readOnly() ? { label: t('health.nutrition.add'), icon: 'plus', attrs: { id: 'health-nutrition-empty-add' } } : null,
+      })}
   `);
   if (window.lucide) window.lucide.createIcons({ el: nutrition.root });
   wireNutrition();
@@ -5264,6 +5372,7 @@ function wireNutrition() {
   if (readOnly()) return;
 
   nutrition.root.querySelector('[data-nutrition-target]')?.addEventListener('click', () => openNutritionTargetModal());
+  nutrition.root.querySelector('#health-nutrition-empty-add')?.addEventListener('click', () => openNutritionModal(null));
 
   nutrition.root.querySelectorAll('[data-nutrition-edit]').forEach((btn) =>
     btn.addEventListener('click', () => {
@@ -5667,12 +5776,12 @@ function renderOverviewShell() {
       { menuId: 'health-person-menu-overview', label: t('health.overview.personsLabel') })}
     ${readOnlyBannerMarkup(overview.members, overview.personId, canEditFor(overview.personId, overview.meId), overview.meId)}
     <div class="health-overview__grid">
-      ${overviewCard('calendar-check', 'health.overview.dueToday.title', overviewDueMarkup())}
+      ${overviewCard('calendar-check', 'health.overview.dueToday.title', overviewDueMarkup(), 'due')}
       ${prnMeds('overview').length ? overviewCard('pill', 'health.meds.prn.title', prnListMarkup('overview')) : ''}
       ${overviewCard('trending-up', 'health.overview.adherence.title', overviewAdherenceMarkup())}
       ${overviewCard('activity', 'health.overview.vitals.title', overviewVitalsMarkup())}
       ${overviewCycleTileMarkup()}
-      ${canEditFor(overview.personId, overview.meId) ? overviewCard('plus-circle', 'health.overview.quick.title', quickCaptureMarkup()) : ''}
+      ${canEditFor(overview.personId, overview.meId) ? overviewCard('plus-circle', 'health.overview.quick.title', quickCaptureMarkup(), 'quick') : ''}
       ${overviewCard('bell', 'health.overview.reminders.title', overviewUpcomingMarkup())}
       ${overviewCard('download', 'health.export.title', overviewExportMarkup())}
     </div>
@@ -5681,11 +5790,12 @@ function renderOverviewShell() {
   if (window.lucide) window.lucide.createIcons({ el: overview.root });
   wireOverview();
   applyOverviewStatuses();
+  syncHoists();
 }
 
-function overviewCard(icon, titleKey, body) {
+function overviewCard(icon, titleKey, body, part = '') {
   return `
-    <section class="health-overview__card">
+    <section class="health-overview__card${part ? ` health-overview__card--${part}` : ''}">
       <header class="health-overview__card-head">
         <i data-lucide="${esc(icon)}" class="health-overview__card-icon" aria-hidden="true"></i>
         <h3 class="health-overview__card-title u-section-title">${esc(t(titleKey))}</h3>

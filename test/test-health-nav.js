@@ -513,3 +513,104 @@ test('Beifang: Karten der Uebersicht auf der Radius-Skala, Disclaimer im Lesemas
   const ch = Number(measure[1]);
   assert.ok(ch >= 45 && ch <= 75, `Lesemass ${ch}ch ausserhalb 45-75ch`);
 });
+
+// --------------------------------------------------------
+// R14 P3/P6: Personenwahl in den Kopf, Heute vor die Bereichsliste
+// --------------------------------------------------------
+//
+// Gemessen 390x844: auf jeder Bereichsseite stand die Personenwahl als eigene
+// Zeile (y122-170, erste Karte y186); auf der Uebersicht bei y=594 HINTER der
+// Bereichsliste, „Heute faellig" bei y=658, „Schnell erfassen" bei y=1916. Am
+// Desktop fehlte der Detailspalte ein Kopf mit dem Bereichsnamen (nur sr-only).
+
+test('R14 P3/P6: der Umzugsplan - Desktop Detailkopf, Bereich schmal Kopfzeile, Telefon-Uebersicht vor die Liste', async () => {
+  const { hoistPlan } = await import('../public/utils/health-hoist.js');
+  assert.deepEqual(hoistPlan({ split: true, overview: false, phone: false }), [{ part: 'person', slot: 'detail' }]);
+  assert.deepEqual(hoistPlan({ split: true, overview: true, phone: false }), [{ part: 'person', slot: 'detail' }]);
+  assert.deepEqual(hoistPlan({ split: false, overview: false, phone: true }), [{ part: 'person', slot: 'toolbar' }],
+    'Bereichsseite: die Pille teilt die Zeile mit „‹ Gesundheit" statt eine eigene zu kosten');
+  assert.deepEqual(hoistPlan({ split: false, overview: true, phone: true }).map((p) => `${p.part}>${p.slot}`),
+    ['person>priority', 'banner>priority', 'due>priority', 'quick>priority'],
+    'Telefon-Uebersicht: Person, Hinweis, Heute faellig, Schnell erfassen stehen VOR der Bereichsliste');
+  assert.deepEqual(hoistPlan({ split: false, overview: true, phone: false }), [], 'Tablet: das Raster bleibt, wie es ist');
+});
+
+test('R14 P3/P6: der Umzug haengt verdrahtete Knoten um und bringt sie zurueck oder verwirft sie', async () => {
+  const { applyHoistPlan, hoistPlan } = await import('../public/utils/health-hoist.js');
+  // Kleines DOM-Doppel: genug Baum fuer matches/querySelector/insertBefore.
+  class El {
+    constructor(cls) { this.cls = cls; this.children = []; this.parentElement = null; this.connected = true; }
+    get isConnected() { let n = this; while (n.parentElement) n = n.parentElement; return n.connected; }
+    get firstChild() { return this.children[0] ?? null; }
+    get nextSibling() { const p = this.parentElement; return p ? p.children[p.children.indexOf(this) + 1] ?? null : null; }
+    matches(sel) { return sel.split(',').some((s) => s.trim() === `.${this.cls}`); }
+    contains(n) { for (let x = n; x; x = x.parentElement) if (x === this) return true; return false; }
+    querySelector(sel) { for (const c of this.children) { if (c.matches(sel)) return c; const d = c.querySelector(sel); if (d) return d; } return null; }
+    remove() { if (this.parentElement) { const p = this.parentElement; p.children.splice(p.children.indexOf(this), 1); this.parentElement = null; } }
+    appendChild(n) { n.remove(); this.children.push(n); n.parentElement = this; return n; }
+    insertBefore(n, ref) { n.remove(); const i = ref ? this.children.indexOf(ref) : -1; if (i < 0) this.children.push(n); else this.children.splice(i, 0, n); n.parentElement = this; return n; }
+  }
+  const page = new El('page');
+  const mk = (cls, parent) => parent.appendChild(new El(cls));
+  const toolbar = mk('slot-toolbar', page);
+  const detail = mk('slot-detail', page);
+  const priority = mk('slot-priority', page);
+  const panel = mk('health-panel', page);
+  const root = mk('root', panel);
+  const person = mk('health-person-switcher', root);
+  const grid = mk('health-overview__grid', root);
+  const due = mk('health-overview__card--due', grid);
+  mk('health-overview__card--other', grid);
+  const quick = mk('health-overview__card--quick', grid);
+  const slots = { toolbar, detail, priority };
+
+  applyHoistPlan(hoistPlan({ split: false, overview: true, phone: true }), { panel, slots });
+  assert.deepEqual(priority.children, [person, due, quick], 'in Planreihenfolge vor der Liste');
+  applyHoistPlan(hoistPlan({ split: true, overview: true, phone: false }), { panel, slots });
+  assert.deepEqual(detail.children, [person], 'Desktop: die Pille steht im Detailkopf');
+  assert.equal(priority.children.length, 0);
+  assert.deepEqual(grid.children.map((c) => c.cls), ['health-overview__card--due', 'health-overview__card--other', 'health-overview__card--quick'],
+    'die Karten stehen wieder an ihrem Platz im Raster');
+  // Das Panel baut neu (Personenwechsel): die umgezogene alte Pille ist veraltet.
+  root.children.splice(0, 1, new El('health-person-switcher'));
+  root.children[0].parentElement = root;
+  const frisch = root.children[0];
+  applyHoistPlan(hoistPlan({ split: false, overview: false, phone: true }), { panel, slots });
+  assert.deepEqual(toolbar.children, [frisch], 'die FRISCHE Pille zieht um');
+  assert.equal(detail.children.length, 0, 'die alte ist weg, nicht doppelt zurueck im Panel');
+  assert.equal(root.children.filter((c) => c.cls === 'health-person-switcher').length, 0);
+});
+
+test('R14 P3/P6: Kopf, Streifen und Detailkopf stehen im Markup, die Karten sind benannt', async () => {
+  assert.match(HEALTH_JS, /class="health-toolbar__person" data-health-person-slot/, 'Slot in der Zeile „‹ Gesundheit"');
+  assert.match(HEALTH_JS, /class="health-priority" data-health-priority><\/div>\s*\$\{areasNavMarkup\(\)\}/, 'Streifen VOR der Bereichsliste');
+  assert.match(HEALTH_JS, /overviewCard\('calendar-check', 'health\.overview\.dueToday\.title', overviewDueMarkup\(\), 'due'\)/);
+  assert.match(HEALTH_JS, /overviewCard\('plus-circle', 'health\.overview\.quick\.title', quickCaptureMarkup\(\), 'quick'\)/);
+  assert.match(HEALTH_JS, /class="split-view__detail-head health-detail-head"/, 'Detailkopf wie die anderen Split-Views (A8 P2-2)');
+  const { eachRule } = await import('./css-rules.js');
+  const css = read('public/styles/health.css');
+  const rules = [...eachRule(css)];
+  assert.ok(rules.some((r) => /\.health-page\[data-health-pushed\] \.health-priority/.test(r.selector) && /display:\s*none/.test(r.body)),
+    'in einem Bereich gibt es den Streifen nicht');
+  assert.ok(rules.some((r) => /\.health-priority:empty/.test(r.selector) && /display:\s*none/.test(r.body)), 'leer kostet er nichts');
+});
+
+// R14 P4 (A6 P2-7): „Noch keine Eintraege." zentriert oben, ohne Weg - in der
+// 676px-Detailspalte 21 % genutzt. Jetzt der geteilte Leerzustand mit Titel,
+// Satz und dem Anlege-Weg (nur mit Schreibrecht).
+test('R14 P4: Vorsorge und Naehrwerte leer = EIN Leerzustand mit Aktion statt einer Hinweiszeile', () => {
+  const fnBody = (name) => {
+    const start = HEALTH_JS.indexOf(`function ${name}(`);
+    assert.ok(start >= 0, `${name} fehlt`);
+    return HEALTH_JS.slice(start, HEALTH_JS.indexOf('\n}\n', start));
+  };
+  const prev = fnBody('renderPreventionShell');
+  assert.doesNotMatch(prev, /emptyHintHTML\(t\('health\.prevention\.noRecords'\)\)/, 'Vorsorge: keine nackte Hinweiszeile mehr');
+  assert.match(prev, /emptyStateHTML\(\{[\s\S]*?title: t\('health\.prevention\.emptyTitle'\)[\s\S]*?id: 'health-prevention-empty-add'/,
+    'Vorsorge: Leerzustand mit Titel und Anlege-Knopf');
+  assert.match(fnBody('wirePrevention'), /#health-prevention-empty-add'\)\?\.addEventListener\('click', \(\) => openPreventionModal\(null\)\)/);
+  const nut = fnBody('renderNutritionShell');
+  assert.doesNotMatch(nut, /emptyHintHTML\(t\('health\.nutrition\.noEntries'\)\)/, 'Naehrwerte: keine nackte Hinweiszeile mehr');
+  assert.match(nut, /emptyStateHTML\(\{[\s\S]*?title: t\('health\.nutrition\.emptyTitle'\)[\s\S]*?id: 'health-nutrition-empty-add'/);
+  assert.match(fnBody('wireNutrition'), /#health-nutrition-empty-add'\)\?\.addEventListener\('click', \(\) => openNutritionModal\(null\)\)/);
+});
