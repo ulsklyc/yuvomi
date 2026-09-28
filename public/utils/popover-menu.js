@@ -145,7 +145,7 @@ function onToggle(event) {
   const trigger = document.querySelector(`[popovertarget="${panel.id}"]`);
   trigger?.setAttribute('aria-expanded', String(event.newState === 'open'));
 
-  if (event.newState !== 'open') { panel.style.opacity = ''; return; }
+  if (event.newState !== 'open') { panel.style.opacity = ''; panel.style.transform = ''; return; }
 
   if (trigger) {
     const rect = trigger.getBoundingClientRect();
@@ -167,8 +167,15 @@ function onToggle(event) {
     else if (!topStart && top + height > window.innerHeight - 8) top = rect.top - height - gap;
     panel.style.left = `${Math.round(left)}px`;
     panel.style.top = `${Math.round(Math.max(8, top))}px`;
+    // DAS MENUE WAECHST VOM AUSLOESER AUS (R14, A1 P3-4): der Ursprung der
+    // Skalierung ist die Ecke, die am Ausloeser liegt - oben, wenn es darunter
+    // steht, unten, wenn es darueber steht; rechts beim rechtsbuendigen, links
+    // bei `top-start`. Nur diese Rechnung kennt die Ecke (layout.css `.popover-menu`).
+    const above = top < rect.top;
+    panel.style.transformOrigin = `${above ? 'bottom' : 'top'} ${topStart ? 'left' : 'right'}`;
   }
   panel.style.opacity = '1';
+  panel.style.transform = 'none';
 
   // DER FOKUS ZIEHT MIT INS MENUE. `role="menu"` sagt der assistiven Technik
   // eine Menue-Bedienung zu, und die Popover-API haelt davon nichts: sie

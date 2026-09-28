@@ -153,7 +153,8 @@ h1, h2, h3, h4, h5, h6 {
 
   /* Ersatz-Blenden (die Opacity-Transition steht in layout.css). */
   .more-sheet,
-  .search-overlay {
+  .search-overlay,
+  .popover-menu {
     --motion-fade: var(--duration-sm);
   }
 }

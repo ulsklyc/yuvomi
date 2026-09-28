@@ -3924,9 +3924,18 @@ html.fab-anim-done .page-fab {
   background-color: var(--color-surface);
   box-shadow: var(--shadow-md);
   /* Die Position rechnet JS erst im `toggle`-Ereignis; ohne die Startopazität
-   * blitzt das Panel eine Frame lang oben links auf. */
-  opacity: 0;
-  transition: opacity var(--transition-fast);
+   * blitzt das Panel eine Frame lang oben links auf.
+   *
+   * DAS MENUE WAECHST VOM AUSLOESER AUS (R14, A1 P3-4), statt nur
+   * einzublenden: Startgroesse 96 % und Blende, der Ursprung ist die Ecke am
+   * Ausloeser (utils/popover-menu.js setzt `transform-origin` mit der
+   * Position und `transform: none` beim Oeffnen). Kein @starting-style: das
+   * Oeffnen laeuft ohnehin ueber die zwei Werte, die JS nach der Rechnung
+   * setzt, und so wirkt es auch dort, wo @starting-style fehlt. */
+  transform: scale(0.96);
+  transition:
+    opacity var(--duration-md) var(--ease-out),
+    transform var(--duration-md) var(--ease-out);
 }
 
 .popover-menu:popover-open {
@@ -4036,8 +4045,13 @@ a.popover-menu__item {
   margin-inline-start: auto;
 }
 
+/* Reduzierte Bewegung: kein Wachsen, nur die Blende - sie bewegt nichts. */
 @media (prefers-reduced-motion: reduce) {
-  .popover-menu,
+  .popover-menu {
+    transform: none;
+    transition: opacity var(--duration-md) var(--ease-out);
+  }
+
   .popover-menu__item {
     transition: none;
   }

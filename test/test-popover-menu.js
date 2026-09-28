@@ -278,3 +278,48 @@ test('top-start: ein Menue am Fuss einer linken Leiste oeffnet ueber dem Ausloes
   assert.equal(plain.style.left, '100px');
   assert.equal(plain.style.top, '144px');
 });
+
+// R14 P11 (Re-Critique 2026-09-28, A1 P3-4): Menues erschienen nur als Blende.
+// Sie wachsen jetzt vom Ausloeser aus - der Ursprung der Skalierung ist die
+// Ecke am Ausloeser, und die kennt nur die Rechnung, die das Panel setzt.
+test('R14: das Menue waechst von der Ecke am Ausloeser aus', () => {
+  const root = makeRoot();
+  const below = makeMenu();
+  open(root, below);
+  assert.equal(below.style.transformOrigin, 'top right', 'rechtsbuendig darunter: von oben rechts');
+  assert.equal(below.style.transform, 'none', 'offen steht es in voller Groesse');
+
+  const up = makeMenu();
+  up.dataset = { placement: 'top-start' };
+  open(root, up);
+  assert.equal(up.style.transformOrigin, 'bottom left', 'ueber dem Ausloeser an seiner linken Kante: von unten links');
+
+  const prevHeight = global.window.innerHeight;
+  global.window.innerHeight = 150;
+  try {
+    const flipped = makeMenu();
+    open(root, flipped);
+    assert.equal(flipped.style.transformOrigin, 'bottom right', 'unten kein Platz, nach oben gekippt: von unten rechts');
+  } finally {
+    global.window.innerHeight = prevHeight;
+  }
+
+  root.fire('toggle', { target: below, newState: 'closed' });
+  assert.equal(below.style.transform, '', 'geschlossen faellt es in die Startgroesse zurueck');
+});
+
+test('R14: Wachsen mit Token-Kurve, bei reduzierter Bewegung nur die Blende', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { eachRule } = await import('./css-rules.js');
+  const css = await readFile(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const reduce = (r) => r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a));
+  const body = (pred) => rules.filter((r) => pred(r) && r.selector.split(',').some((s) => s.trim() === '.popover-menu')).map((r) => r.body).join(';');
+  const base = body((r) => !r.at.length);
+  assert.match(base, /transform:\s*scale\(0?\.96\)/, 'die Startgroesse');
+  assert.match(base, /transition:[^;]*transform var\(--duration-md\) var\(--ease-out\)/, 'Dauer und Kurve aus den Tokens');
+  assert.match(base, /transition:[^;]*opacity var\(--duration-md\) var\(--ease-out\)/);
+  const still = body(reduce);
+  assert.match(still, /transform:\s*none/, 'reduzierte Bewegung: kein Wachsen');
+  assert.match(still, /transition:\s*opacity/, 'aber die Blende bleibt');
+});
