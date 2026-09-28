@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The search opens places and actions, not only entries.** Typing "Schedule" or "new" now
+  offers a "Go to" section with every module in your navigation and every settings sheet, and a
+  "Create new" section that opens the page and starts its add action, both above the entries found.
+  The start tiles list every module you can open, including Schedule, Housekeeping, Rewards and
+  Meals. The matched part of a word is highlighted, and an entry found in its description, note or
+  location shows the passage that matched.
+
+- **Inventory categories have their own address.** Opening a category changes the address to
+  `/inventory?category=...`, so the back gesture returns to the category list and a link or reload
+  lands in the same category. The head shows "‹ Inventory" and the category name. On a desktop the
+  category list fills the page instead of leaving an empty "select an item" column beside it.
+
+- **A shopping item can be deleted from its dialog.** Delete sits on the left of the item dialog's
+  footer, with the same undo as the swipe, so removing an item no longer needs a swipe gesture.
+
 - **Search finds parts of words and looks in every module with content.** "milch" now finds
   "Vollmilch", with accents and ß/ss handled as before. Besides tasks, events, notes, contacts,
   shopping, health and waste, the search now covers recipes, the pantry, inventory, documents,
@@ -84,6 +99,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the viewer and opens the edit dialog. It only appears for people who may change documents.
 
 ### Changed
+
+- **Subtasks are added in a line of their own.** "Add subtask" opens a field in place in the task
+  view, the detail column and the sheet on a phone. Enter adds the subtask and leaves the cursor in
+  the field for the next one, Escape closes it; there is no dialog in between any more. The task
+  dialog shows priority and category next to each other in the main part, and "More settings" says
+  what it holds (start date, points, tags, status, visibility and documents).
+
+- **Customizing the overview no longer loses changes silently.** Leaving customize mode through the
+  sidebar, the tab bar, the search or the back gesture asks the same question as "Cancel" when
+  something was changed. The add button is hidden while you customize.
+
+- **Toasts wait while you read them.** A message stays as long as the pointer or keyboard focus is
+  on it and then keeps at least two seconds, so "Undo" no longer disappears under the cursor. After
+  many confirmations only the visible message is left out; screen readers still hear every one.
+
+- **The permission matrix shows the chosen level at a glance.** The selected segment has a tinted
+  surface with an accent edge in light and dark mode. On a phone the save bar only sticks to the
+  bottom once something was changed.
+
+- **Dose buttons name the medication.** Screen readers hear "Take Vitamin D3" and "Skip Vitamin D3"
+  instead of a list of identical buttons, and on a phone the take button is a small capsule with
+  its word rather than a check circle that read as already done.
+
+- **Loans stand on a surface.** Loan cards in the budget use the same surface as the other cards,
+  their transactions sit in a grouped list, and hovering a card no longer shifts it.
+
+- **The meal plan week is calmer on a desktop.** The week starts at the top, day heads are one line
+  ("Mon 28.09."), and empty slots are quiet wells whose edge only appears on hover, focus or while
+  dragging.
+
+- **Kanban column heads line up.** All column heads have the same height; the archive action in the
+  "Done" column is a row action like elsewhere.
+
+- **Due labels and short texts use a middle dot instead of a dash** ("Overdue · 24.09.").
+
+- **A new contact starts in the category you are looking at.** It no longer defaults to "Doctor":
+  with a category filter active that category is preselected, otherwise "Other".
 
 - **Expenses in the budget are no longer red.** Amounts read in the text colour with their sign,
   category bars use the budget's own tone, the trend line a neutral grey, and income may stay green. Red is
@@ -555,6 +607,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that scrolled sideways.
 
 ### Fixed
+
+- **The glass tab bar blurs again.** Text scrolling under the tab bar on a phone and under the
+  sidebar indicator was readable through the glass because the page transition cut the glass off
+  from the content; the blur now works outside the short moment of a page change.
+
+- **Every field in the shift plan dialogs has a name.** Screen readers announce the label of each
+  field in the shift type and schedule dialogs, including the "Active" and reminder switches.
+
+- **Calendar events in the week and day grid say their day.** Screen readers hear "Title, time,
+  Monday, 28.09.2026" instead of only title and time, and long titles in a week block break at a
+  syllable instead of anywhere.
+
+- **Settings no longer hang without a service worker.** When the browser's service worker never
+  becomes ready, the notification settings say after a few seconds that push
+  is not available right now, and the other settings sheets keep opening from the sidebar.
+
+- **Delete fits its button in detail sheets on a phone.** The delete button in contact and other
+  detail sheets is an icon button like in dialog footers, with the item's name for screen readers.
+
+- **Account balances no longer overlap long account names.** The balance keeps its width and the
+  name is shortened with an ellipsis.
+
+- **Sleep and other durations fit their card.** Cards show "7:30 h" instead of "7 h 30 min", which
+  ran out of the card on a phone; the history keeps the full wording.
+
+- **Reward history filters say which person is shown.** The person chips are the usual filter chips
+  and tell screen readers which one is pressed.
 
 - **Hidden menu entries stay hidden.** Menu items that should not apply (for example in task or
   document menus) could show up because their layout overrode the hidden state.
