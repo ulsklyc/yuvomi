@@ -1347,6 +1347,9 @@ let state = {
   // Filterblatt wieder nimmt. Bewusst nicht gemerkt: er gehoert zum Besuch,
   // nicht zum Geraet - wer die Aufgaben spaeter normal oeffnet, sieht alle.
   dueToday:        false,
+  // Hat „Bis heute faellig" den Standard-Status selbst geweitet? Nur dann nimmt
+  // das Ausschalten die Weitung zurueck - ein bewusst gewaehlter Status bleibt.
+  dueTodayWidened: false,
 };
 
 /**
@@ -1358,19 +1361,43 @@ function dueTodayFromSearch(search) {
 }
 
 /**
- * Die Adresse beim Betreten lesen. Kommt `?due=today`, weitet der Status-
- * filter sich vom Standard „Offen" auf „Offen" + „In Bearbeitung": die
- * Heute-Liste der Uebersicht zeigt begonnene Aufgaben mit, und der Link
+ * „Bis heute faellig" an- oder ausschalten - der EINE Weg fuer beide Einstiege,
+ * die Adresse beim Betreten und den Schalter im Blatt. Beim Einschalten weitet
+ * der Statusfilter sich vom Standard „Offen" auf „Offen" + „In Bearbeitung":
+ * die Heute-Liste der Uebersicht zeigt begonnene Aufgaben mit, und der Link
  * verspricht genau diese Zeilen. Die zwei Chips stehen sichtbar im Blatt, die
  * Zahl am Knopf zaehlt sie - nichts wird still umgestellt. Einen vom Nutzer
- * gesetzten Statusfilter laesst die Adresse stehen.
+ * gesetzten Statusfilter laesst der Filter stehen. Beim Ausschalten nimmt er
+ * nur die EIGENE Weitung zurueck, und nur, solange niemand den Status seither
+ * geaendert hat.
+ *
+ * Vorher weitete nur die Adresse; der Schalter im Blatt filterte bloss die
+ * geladene Liste. Derselbe Filter zeigte dann je Einstieg andere Zeilen, und
+ * ein Neuladen der geschriebenen Adresse vergroesserte die Liste (Review R11).
+ * Nachladen muss der Aufrufer: der Seitenaufbau laedt ohnehin gleich danach.
  */
-function applyDueTodayFromAddress(search) {
-  state.dueToday = dueTodayFromSearch(search);
+function setDueToday(on) {
+  state.dueToday = !!on;
   const status = state.filters.status;
-  if (state.dueToday && status.length === 1 && status[0] === 'open') {
-    state.filters.status = ['open', 'in_progress'];
+  if (state.dueToday) {
+    if (status.length === 1 && status[0] === 'open') {
+      state.filters.status = ['open', 'in_progress'];
+      state.dueTodayWidened = true;
+    }
+    // Sonst bleibt die Marke, wie sie ist: aus dem Aus-Zustand kommend ist sie
+    // schon false, und ein zweites Einschalten ueber einer eigenen Weitung
+    // (erneuter Besuch mit ?due=today) behaelt sie.
+    return;
   }
+  if (state.dueTodayWidened && status.length === 2 && status[0] === 'open' && status[1] === 'in_progress') {
+    state.filters.status = ['open'];
+  }
+  state.dueTodayWidened = false;
+}
+
+/** Die Adresse beim Betreten lesen - ueber denselben Weg wie das Blatt. */
+function applyDueTodayFromAddress(search) {
+  setDueToday(dueTodayFromSearch(search));
 }
 
 /**
@@ -3642,12 +3669,13 @@ async function onFilterSheetChange(input, container) {
     return;
   }
   if (input.matches('[data-filter-due-today]')) {
-    // Rein clientseitig (filteredTasks) - kein Nachladen noetig, aber die
-    // Adresse zieht mit, damit ein Neuladen dasselbe zeigt.
-    state.dueToday = input.checked;
+    // Derselbe Weg wie die Adresse (setDueToday): die Statusweitung laeuft mit,
+    // also muss der Bestand nachgeladen werden - wie bei „Geplante anzeigen".
+    // Die Adresse zieht mit, damit ein Neuladen dasselbe zeigt.
+    setDueToday(input.checked);
     writeDueTodayToUrl(state.dueToday);
     renderFilters(container);
-    renderTaskList(container);
+    await loadTasks(container);
   }
 }
 
@@ -3680,6 +3708,7 @@ async function resetTaskFilters(container) {
   state.filters = { status: [], priority: [], assigned_to: [], category: [], tags: [] };
   state.showFuture = false;
   state.dueToday = false;
+  state.dueTodayWidened = false;
   writeDueTodayToUrl(false);
   try { localStorage.setItem(SHOW_FUTURE_KEY, '0'); } catch {}
   renderFilters(container);

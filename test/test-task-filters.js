@@ -554,3 +554,78 @@ test('?due=today weitet den Standard-Status auf „In Bearbeitung" - einen eigen
   assert.deepEqual(tasks.state.filters.status, ['open'], 'ohne die Adresse aendert sich nichts');
   tasks.state.dueToday = false;
 });
+
+// Review R11: der Schalter im Blatt filterte nur die geladene Liste, die
+// Adresse weitete dazu den Status und lud nach. Derselbe Filter zeigte je
+// Einstieg andere Zeilen, und das Neuladen der vom Blatt geschriebenen Adresse
+// vergroesserte die Liste. Beide Einstiege muessen denselben Zustand UND
+// dieselbe Abfrage ergeben; Ausschalten nimmt die eigene Weitung zurueck.
+// Der Test bringt Adresse, Verlauf und Server-Stub selbst mit und raeumt ab.
+test('„Bis heute faellig": Blatt und Adresse ergeben denselben Status und dieselbe Abfrage', async () => {
+  const prevLocation = globalThis.location;
+  const prevHistory = globalThis.history;
+  const prevStub = globalThis.__apiStub;
+  const abfragen = [];
+  globalThis.location = { pathname: '/tasks', search: '', hash: '' };
+  globalThis.history = {
+    state: null,
+    replaceState: (_s, _t, path) => {
+      const [, search = ''] = path.split('?');
+      globalThis.location.search = search ? `?${search}` : '';
+    },
+  };
+  globalThis.__apiStub = { get: async (url) => { abfragen.push(url); return { data: [] }; } };
+  try {
+    // Einstieg ueber die Adresse: der Massstab.
+    baseState({ dueToday: false, dueTodayWidened: false });
+    tasks.applyDueTodayFromAddress('?due=today');
+    const perAdresse = { status: [...tasks.state.filters.status], query: tasks.taskQuery() };
+
+    // Einstieg ueber das Blatt, vom selben Ausgangszustand.
+    baseState({ dueToday: false, dueTodayWidened: false });
+    const { container } = mountSheet();
+    const input = new SheetEl({ dataset: { filterDueToday: 'true' }, checked: true });
+    await tasks.onFilterSheetChange(input, container);
+    assert.equal(tasks.state.dueToday, true);
+    assert.deepEqual(tasks.state.filters.status, perAdresse.status,
+      'das Blatt weitet den Status wie die Adresse - sonst zeigt derselbe Filter andere Zeilen');
+    assert.equal(abfragen.at(-1), `/tasks${perAdresse.query}`, 'und laedt mit derselben Abfrage nach');
+
+    // Neuladen der geschriebenen Adresse aendert nichts mehr.
+    const vorReload = [...tasks.state.filters.status];
+    tasks.applyDueTodayFromAddress(globalThis.location.search);
+    assert.deepEqual(tasks.state.filters.status, vorReload, 'ein Neuladen der Adresse vergroessert die Liste nicht');
+
+    // Ausschalten nimmt die eigene Weitung zurueck und laedt wieder.
+    const vorAus = abfragen.length;
+    input.checked = false;
+    await tasks.onFilterSheetChange(input, container);
+    assert.equal(tasks.state.dueToday, false);
+    assert.deepEqual(tasks.state.filters.status, ['open'], 'zurueck auf den Standard');
+    assert.ok(abfragen.length > vorAus, 'und laedt ohne „In Bearbeitung" nach');
+    assert.equal(abfragen.at(-1), '/tasks?status=open');
+
+    // Ueber die Adresse eingeschaltet, im Blatt ausgeschaltet: ebenso zurueck.
+    baseState({ dueToday: false, dueTodayWidened: false });
+    tasks.applyDueTodayFromAddress('?due=today');
+    await tasks.onFilterSheetChange(input, container);
+    assert.deepEqual(tasks.state.filters.status, ['open']);
+
+    // Ein bewusst gesetzter Status bleibt in beide Richtungen stehen.
+    baseState({ dueToday: false, dueTodayWidened: false,
+      filters: { status: ['open', 'in_progress'], priority: [], assigned_to: [], category: [], tags: [] } });
+    input.checked = true;
+    await tasks.onFilterSheetChange(input, container);
+    input.checked = false;
+    await tasks.onFilterSheetChange(input, container);
+    assert.deepEqual(tasks.state.filters.status, ['open', 'in_progress'],
+      'eine selbst gewaehlte Auswahl ist keine Weitung des Filters');
+  } finally {
+    globalThis.location = prevLocation;
+    globalThis.history = prevHistory;
+    if (prevStub === undefined) delete globalThis.__apiStub; else globalThis.__apiStub = prevStub;
+    tasks.state.dueToday = false;
+    tasks.state.dueTodayWidened = false;
+    tasks.state.filterSheet = null;
+  }
+});
