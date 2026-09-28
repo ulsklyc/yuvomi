@@ -1760,6 +1760,22 @@ test('Kueche: "Zutat hinzufuegen" ist in beiden Editoren derselbe Knopf, Dialog-
   assert(/class="btn btn--danger-outline pantry-form__delete"/.test(pantrySrc), 'Vorrat: btn--danger-outline');
 });
 
+// Re-Critique 2026-09-28 (P7 / A4 P2-9): "Mahlzeit hinzufuegen" aus einem
+// Slot fragte zuerst Datum und Mahlzeit - genau das, was der Slot schon weiss;
+// der Name lag bei 427px Hoehe unter dem Falz.
+test('Mahlzeit aus dem Slot: Name zuerst, Tag und Mahlzeit als Zusammenfassung darunter', () => {
+  const at = (html, id) => html.indexOf(`id="${id}"`);
+  const slot = mealsUi.buildModalContent({ mode: 'create', date: '2026-09-28', mealType: 'lunch', fromSlot: true });
+  assert(at(slot, 'modal-title') > -1 && at(slot, 'modal-date') > -1, 'beide Felder stehen da');
+  assert(at(slot, 'modal-title') < at(slot, 'modal-date'), 'aus dem Slot steht der Name vor dem Datum');
+  assert(at(slot, 'modal-title') < at(slot, 'modal-type'), 'und vor der Mahlzeit');
+  assert(/class="[^"]*\bmeal-modal__when\b/.test(slot), 'Tag und Mahlzeit stehen als eigene, ruhige Zeile');
+  const plain = mealsUi.buildModalContent({ mode: 'create', date: '2026-09-28', mealType: 'lunch' });
+  assert(at(plain, 'modal-date') < at(plain, 'modal-title'), 'ohne Slot (FAB) bleibt die Reihenfolge: erst wann, dann was');
+  assert(/openMealModal\(\{ mode: 'create', date: btn\.dataset\.date, mealType: btn\.dataset\.type, fromSlot: true \}\)/.test(mealsSource),
+    'der Slot-Knopf sagt, dass er aus dem Slot kommt');
+});
+
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------

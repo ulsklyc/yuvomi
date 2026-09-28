@@ -991,7 +991,7 @@ function wireGrid(grid) {
     const action = btn.dataset.action;
 
     if (action === 'add-meal') {
-      openMealModal({ mode: 'create', date: btn.dataset.date, mealType: btn.dataset.type });
+      openMealModal({ mode: 'create', date: btn.dataset.date, mealType: btn.dataset.type, fromSlot: true });
       return;
     }
 
@@ -1702,7 +1702,7 @@ function openMealModal(opts) {
   });
 }
 
-function buildModalContent({ mode, date, mealType, meal }) {
+function buildModalContent({ mode, date, mealType, meal, fromSlot = false }) {
   const isEdit   = mode === 'edit';
   const isRecurring = isEdit && meal.recurrence_template_id;
   const typeOpts = MEAL_TYPES().map((mt) =>
@@ -1805,8 +1805,8 @@ function buildModalContent({ mode, date, mealType, meal }) {
       </div>
     </div>`}`;
 
-  return `
-    <div class="modal-grid modal-grid--2">
+  const whenHtml = `
+    <div class="modal-grid modal-grid--2${fromSlot && !isEdit ? ' meal-modal__when' : ''}">
       <div class="form-group">
         <label class="form-label" for="modal-date">${t('meals.dateLabel')}</label>
         <yuvomi-datepicker type="date" id="modal-date" value="${formatDateInput(date)}"></yuvomi-datepicker>
@@ -1816,7 +1816,8 @@ function buildModalContent({ mode, date, mealType, meal }) {
         <select class="form-input" id="modal-type">${typeOpts}</select>
       </div>
     </div>
-
+`;
+  const nameHtml = `
     <div class="form-group" style="position:relative;">
       <label class="form-label" for="modal-title">${t('common.nameLabel')}</label>
       <input type="text" class="form-input" id="modal-title" required
@@ -1825,6 +1826,15 @@ function buildModalContent({ mode, date, mealType, meal }) {
              autocomplete="off">
       <div id="modal-autocomplete" class="meal-modal__autocomplete" hidden></div>
     </div>
+`;
+  // AUS DEM SLOT: NAME ZUERST (Re-Critique 2026-09-28, A4 P2-9). Der Slot
+  // weiss Tag und Mahlzeit schon; oben standen trotzdem genau diese zwei
+  // Felder, und der Name lag bei 427px Hoehe unter dem Falz. Aus dem Slot
+  // fuehrt jetzt der Name (mit den Rezeptvorschlaegen des Autocompletes), Tag
+  // und Mahlzeit stehen als ruhige, weiter editierbare Zeile darunter. Ohne
+  // Slot (FAB, Kurzbefehl) bleibt "erst wann, dann was".
+  return `
+    ${fromSlot && !isEdit ? nameHtml + whenHtml : whenHtml + nameHtml}
 
     <div class="form-group">
       <label class="form-label">${t('meals.ingredientsLabel')}</label>

@@ -1615,3 +1615,10 @@
   background-color: var(--color-surface-2);
   color: var(--color-text-tertiary);
 }
+
+/* Aus dem Slot fuehrt der Name (Re-Critique 2026-09-28, A4 P2-9); Tag und
+ * Mahlzeit stehen darunter als ruhige Zusammenfassung - weiter editierbar,
+ * aber nicht mehr die erste Frage. */
+.meal-modal__when .form-label {
+  color: var(--color-text-secondary);
+}
