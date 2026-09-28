@@ -513,3 +513,47 @@ test('kein String im Frontend-JS traegt einen Gedankenstrich', async () => {
   }
   assert.deepEqual(hits, []);
 });
+
+// Re-Critique 2026-09-28 (A2 P3, R14 P12): das Datumsfeld zeigte im deutschen
+// UI "DD.MM.YYYY" - englische Buchstaben fuer Tag/Monat/Jahr. Die REIHENFOLGE
+// und die Trenner folgen weiter der Datumsformat-Einstellung (Region), die
+// BUCHSTABEN jetzt der UI-Sprache ("TT.MM.JJJJ" wie in Apples Systemfeldern).
+// Gefahren wird die echte i18n.js mit den echten Locale-Dateien.
+test('dateInputPlaceholder spricht die UI-Sprache, die Reihenfolge bleibt die der Einstellung', async () => {
+  const GLOBALS = ['localStorage', 'fetch', 'document', 'window', 'navigator', 'CustomEvent'];
+  const saved = new Map(GLOBALS.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
+  const store = new Map();
+  const define = (name, value) => Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
+  define('localStorage', {
+    getItem: (key) => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => { store.set(key, String(value)); },
+    removeItem: (key) => { store.delete(key); },
+  });
+  define('fetch', async (url) => {
+    const file = String(url).replace(/^\/locales\//, '');
+    return { ok: true, json: async () => JSON.parse(readFileSync(new URL(`../public/locales/${file}`, import.meta.url), 'utf8')) };
+  });
+  define('document', { documentElement: { lang: '', dir: '' } });
+  define('window', { dispatchEvent: () => true });
+  define('navigator', { languages: ['de'], language: 'de' });
+  define('CustomEvent', class { constructor(type, init) { this.type = type; this.detail = init?.detail; } });
+  const i18n = await import('../public/i18n.js');
+  try {
+    store.set('yuvomi-locale', 'de');
+    await i18n.initI18n();
+    assert.equal(i18n.dateInputPlaceholder(), 'TT.MM.JJJJ', 'de, Einstellung dmy');
+    store.set('yuvomi-date-format', 'ymd');
+    assert.equal(i18n.dateInputPlaceholder(), 'JJJJ-MM-TT', 'de, Einstellung ymd: Reihenfolge aus der Einstellung');
+    store.set('yuvomi-date-format', 'dmy');
+    await i18n.setLocale('en');
+    assert.equal(i18n.dateInputPlaceholder(), 'DD.MM.YYYY', 'en behaelt seine Buchstaben');
+    await i18n.setLocale('fr');
+    assert.equal(i18n.dateInputPlaceholder(), 'JJ.MM.AAAA', 'fr: jour, mois, annee');
+  } finally {
+    await i18n.setLocale('de');
+    for (const [name, descriptor] of saved) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else delete globalThis[name];
+    }
+  }
+});

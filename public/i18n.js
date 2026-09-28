@@ -514,16 +514,26 @@ export function formatDayMonth(date) {
   }
 }
 
+/**
+ * Platzhalter eines getippten Datumsfelds. REIHENFOLGE und Trenner folgen der
+ * Datumsformat-Einstellung (Region), die BUCHSTABEN der UI-Sprache - im
+ * deutschen UI stand vorher "DD.MM.YYYY" (Re-Critique 2026-09-28, A2 P3);
+ * Apples Systemfelder sagen "TT.MM.JJJJ". Fehlt ein Wort in einer Locale,
+ * greift wie ueberall die Referenz-Locale.
+ */
 export function dateInputPlaceholder() {
+  const d = t('common.datePlaceholderDay');
+  const m = t('common.datePlaceholderMonth');
+  const y = t('common.datePlaceholderYear');
   switch (getDateFormatPreference()) {
-    case 'dmy': return 'DD.MM.YYYY';
-    case 'mdy_dot': return 'MM.DD.YYYY';
-    case 'dmy_dot': return 'DD.MM.YYYY';
-    case 'dmy_slash': return 'DD/MM/YYYY';
-    case 'ymd': return 'YYYY-MM-DD';
-    case 'ymd_dot': return 'YYYY.MM.DD';
-    case 'ymd_slash': return 'YYYY/MM/DD';
-    default: return 'MM/DD/YYYY';
+    case 'dmy': return `${d}.${m}.${y}`;
+    case 'mdy_dot': return `${m}.${d}.${y}`;
+    case 'dmy_dot': return `${d}.${m}.${y}`;
+    case 'dmy_slash': return `${d}/${m}/${y}`;
+    case 'ymd': return `${y}-${m}-${d}`;
+    case 'ymd_dot': return `${y}.${m}.${d}`;
+    case 'ymd_slash': return `${y}/${m}/${d}`;
+    default: return `${m}/${d}/${y}`;
   }
 }
 
