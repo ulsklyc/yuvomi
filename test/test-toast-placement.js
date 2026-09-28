@@ -299,7 +299,13 @@ const DIALOG_REGISTRY = {
   'public/components/document-attach.js': [{ bars: ['doc-attach-picker__header', 'doc-attach-picker__footer'] }],
   'public/components/datepicker.js': [{ none: true, why: 'Monatsraster ohne Leiste; jeder Tag ist ein Knopf und damit selbst Leiste' }],
   'public/pages/budget.js': [{ bars: ['budget-inline-modal__header', 'budget-inline-modal__footer'] }],
-  'public/pages/calendar.js': [{ panel: ['modal-panel__header'] }],
+  'public/pages/calendar.js': [
+    { panel: ['modal-panel__header'] },
+    // R14 (Re-Critique 2026-09-28, A2 P2-7): die Filter am Desktop als natives
+    // Popover am Knopf. Den Inhalt samt Fuss (Aufheben) baut das Filterblatt
+    // vor der Rolle; die Platzierung nimmt jeden sichtbaren Knopf ohnehin dazu.
+    { none: true, why: 'Filter-Popover: Haken und Fuss kommen fertig aus dem Filterblatt, ausgezeichnet wird nichts eigenes' },
+  ],
   'public/pages/dashboard.js': [{ bars: ['onboarding-actions'] }],
   'public/pages/documents.js': [{ bars: ['dms-preview__header', 'dms-preview__actions'] }],
   'public/pages/inventory.js': [{ bars: ['inventory-booking-picker__header', 'inventory-booking-picker__nav', 'inventory-booking-picker__role-footer'] }],
