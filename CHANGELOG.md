@@ -731,6 +731,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A locked recurring task stays locked after it is checked off** (#1488). Checking off one
+  occurrence created the next one without the lock, so from the second occurrence on a child could
+  edit or delete a series a parent had locked. The next occurrence now keeps the lock, and so does a
+  subtask that was locked on its own.
+
 - **Bookings of a shared expense that no longer exists stop counting in balances.** Before 2.69.0,
   editing a shared expense stamped its bookings with the person who edited it. If the account of
   the person who created the expense was deleted afterwards, the expense and its shares went with
