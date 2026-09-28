@@ -116,7 +116,10 @@
    * in einer eigenen Kontextzeile trugen. Vier Tabs, vier Kopfbauarten, und
    * "Einkauf 23" war je nach Tab eine Zahl oder ein 6px-Punkt. Jetzt gilt EINE
    * Regel: die Leiste traegt nur Tabs mit ihren Zahlen, jedes Werkzeug steht
-   * in der Kontextzeile seines Tabs (der Kopf der Seite unter der Leiste). */
+   * in der Kontextzeile seines Tabs (der Kopf der Seite unter der Leiste).
+   * Traegt diese Zeile NUR Werkzeuge (Rezepte, Vorrat), faltet sie angedockt
+   * ein und kommt oben wieder (R17 K1) - erkannt von wireCollapsingHeader
+   * (utils/ux.js), gefaltet in layout.css ("DIE FALTZEILE"), nicht hier. */
   /* Mobil weicht das Icon, nicht das Label. Vier Tabs teilen sich auf 393px
    * ~90px pro Stück; „Mahlzeiten" allein braucht 73px Label + 16px Icon + die
    * Abstände, also ~95px - beides passt nicht nebeneinander. Das Wort ist der

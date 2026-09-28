@@ -1942,8 +1942,9 @@ gewachsen. Gemessen ueber alle zehn Koepfe: Kopfhoehe und Lead-Zone sind mit und
 identisch, es kostet also keine Zeile.
 
 **Die Kuechen-Leiste fuehrt ihren Absender selbst.** Nach der Leisten-Regel IST sie die
-Kopf-Navigation; ihr Siegel steht vor dem Titel "Kueche" und bleibt auch mobil stehen, wo der
-Titel selbst ausgeblendet ist - das Wort fuehrt dort die Bottom-Nav, das Zeichen den Raum.
+Kopf-Navigation; ihr Siegel steht am Desktop vor dem Titel "Kueche". Mobil weichen Titel und
+Siegel gemeinsam (R9 M10, kitchen-tabs.css): die Bottom-Nav fuehrt dort Wort und Besteck als
+aktiven Eintrag, und die 26px des Siegels fehlten den vier Tabs mit ihren Zaehlern.
 Die vier Kuechen-Koepfe bleiben siegellos: sie teilen einen Tint, weil sie ein Raum sind, und
 zwei von ihnen tragen gar keinen Seitentitel. `renderSubTabs` weist ein Siegel deshalb
 zurueck, wenn die Leiste das Modul nicht wechselt (`semantics: 'tabs'`, Gesundheit) - dort
@@ -1956,10 +1957,12 @@ Seite: ohne wegscrollende Zeile gibt es kein Andocken zu zeigen. Gemessen trifft
 Lagen - die regulaere Groessenklasse ab 1024px (Inline-Titel; seit der Werkzeugzeilen-Regel
 traegt ein Kopf dort zwar zusaetzlich seine Bar-Zeile, aber die gehoert nicht zur Lead-Zone -
 sie ist die Bedienzeile, die beim Andocken stuende, und Andocken bleibt ohnehin der kompakten
-Klasse) und mobil die drei einzeiligen Kuechen-Koepfe (Einkauf, Rezepte, Vorrat), wo die
-Kuechen-Leiste den Modulnamen traegt, also kein Seitentitel darueber steht und der Kopf
-allein seinen Center-Slot fuehrt. Der Essensplan ist unter den vieren die Ausnahme: seine
-Zeitraum-Navigation und seine Aktionen brauchen zwei Zeilen, also hat er eine Lead-Zone.
+Klasse) und mobil die vier einzeiligen Kuechen-Koepfe, wo die Kuechen-Leiste den
+Modulnamen traegt, also kein Seitentitel darueber steht und der Kopf allein seinen
+Center-Slot und EIN Werkzeugmenue fuehrt (seit R14 auch der Essensplan: Wochenstepper und
+„..." in einer 65px-Zeile). Traegt diese Zeile nur Werkzeuge (Rezepte, Vorrat), faltet sie
+angedockt trotzdem ein - ohne Lead-Zone, als Faltzeile (siehe „Variante: die Tab-Leiste ist
+der Titel").
 
 Und **was als Zeile zaehlt, entscheidet die UEBERLAPPUNG der vertikalen Intervalle, nicht
 die Oberkante.** Flex-Items unterschiedlicher Hoehe stehen mittig ausgerichtet nebeneinander
@@ -2141,12 +2144,34 @@ Leiste, Zeile 2 = EINE Kopfzeile je Tab mit [Kontext] ... [Such-Icon] [EIN „..
 dazu die angedockte Primaer-Pille). Such-Icon und Menue wandern in Zeile 2, weil die Leiste
 bei 390px schon ohne sie ueberlaeuft (gemessen scrollWidth 403/390). Die Zwei-Zeilen-Regel
 gilt unveraendert. Ein Tab ohne Werkzeuge traegt kein leeres „..." (Rezepte).
-Seit R9 (M10) gilt mobil eine Verdichtung: traegt Zeile 2 KEINEN Kontext, nur Werkzeuge
-(Rezepte: Lupe, mit angebundenem Anbieter dazu der Quellenfilter; Vorrat: Lupe und „..."),
-legen sich die Werkzeuge ans Ende der Leiste, und der Kopf ist eine Zeile (56px statt 121px,
-kitchen-tabs.css). Die Leiste endet vor ihnen; Zaehler werden dort zum Punkt an der Ecke des
-Labels (R11 H2), damit vier Tabs und zwei Werkzeuge bei 375px ohne Scrollen passen.
-Mahlzeiten und Einkauf behalten Zeile 2 fuer ihren Kontext (Woche, Listen) - 121px.
+EINE Regel fuer alle vier Tabs (R14, Re-Critique 2026-09-28 P7): die Leiste traegt nur Tabs
+mit ihren Zahlen, jedes Werkzeug steht in Zeile 2 seines Tabs. Die R9-Verdichtung (Werkzeuge
+am Ende der Leiste, Zaehler als Punkt an der Ecke) ist zurueckgenommen - sie gab vier Tabs
+vier Kopfbauarten, und „Einkauf 23" war je nach Tab eine Zahl oder ein Punkt. Ausgeklappt
+misst der Kuechenkopf in allen vier Tabs 121px (Leiste 56 + Zeile 2 65, 390px).
+
+**Zeile 2 faltet angedockt, wenn sie nur Werkzeuge traegt** (R17 K1, A4 P2-4 / A8 P3-2).
+Rezepte (Lupe, mit Anbieter dazu der Quellenfilter) und Vorrat (Lupe, „...") zahlten 65px
+fuer ein bis zwei Icons. `wireCollapsingHeader` (utils/ux.js) erkennt die Zeile selbst
+(`page-toolbar--fold-row`: Gruppen-Variante, einzeilig, ohne Titel, im Center-Slot nur die
+Suche) und haengt sie an dieselbe Schwelle und Klasse wie den Kopf der gedeckelten Module:
+ein Nutzer-Scroll im Port setzt `is-collapsed` (ab 24px, zurueck unter 8px), und nur, wenn
+der Port die Zeile ausgeklappt traegt (Reserve >= Zeile + 48px, ausgeklappt gemessen, sonst
+pendelt eine knappe Liste). Angedockt steht nur die Leiste mit der Linie der Zeile darunter;
+ungescrollt ist der Kopf unveraendert. Gemessen 390x844: Vorrat-Port 723 → 787px, erste
+Zeile y 121 → 57; Rezepte ebenso, sobald die Liste die Reserve hat. Mahlzeiten und Einkauf
+falten nicht - ihre Zeile benennt etwas (Woche, Liste) und beantwortet beim Scrollen weiter
+„wo bin ich", wie der Zeitraum im Kalender. Am Desktop (ab 1024px) faltet nichts: dort traegt
+die Zeile Suchfeld und angedockte Primaer-Pille.
+Gefaltet wird ueber Rand und Verschiebung, nicht ueber die Hoehe: der negative Rand
+(`--fold-row-h`, ohne Linie) zieht die Liste hoch, dieselbe Strecke schiebt die Zeile hinter
+die Leiste, wo die Seite sie abschneidet. Beides gleitet in Safari (eine Hoehe nach `auto`
+braeuchte `interpolate-size`), der Inhalt blendet; reduzierte Bewegung faltet ohne
+Bewegung. Die Zeile bleibt offen, solange sie Fokus, einen Suchbegriff oder ein offenes Menue
+traegt - wer per Tab hineinkommt, bekommt sie zurueck. Die Werkzeuge erreicht man angedockt
+ueber den Rueckweg nach oben, wie die Suche der gedeckelten Koepfe (Kontakte); in der Leiste
+selbst ist fuer sie kein Platz (390px, de: 65-87px frei, zwei 48px-Ziele passen nicht, ohne
+die Zaehler wieder zu Punkten zu machen).
 
 **Benannte Ausnahme: Sub-Tabs + Zeitraum (Budget, Haushaltshilfe-Berichte).** Ein Modul, dessen
 Zeile 2 schon die Sub-Tabs traegt und dessen Tab einen Zeitraum blaettert, bekommt den
