@@ -562,13 +562,16 @@
   min-width: 0;
 }
 
+/* Die Saldo-Spalte schrumpft NIE (Re-Critique 2026-09-28 P1-2): mit
+ * `flex: 0 1 auto; min-width: 0` lief sie bei 390px unter den `nowrap`-Betrag,
+ * und der lief nach links in den Namen ("Gemeinsames Gi.8.544,47 €"). Gekuerzt
+ * wird der Name (`.budget-account__name-text` ellipsiert). */
 .budget-account__figures {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: var(--space-0h);
-  flex: 0 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
 }
 
 .budget-account__balance {
@@ -1370,20 +1373,17 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-2) var(--space-3);
   padding: var(--space-3);
-  /* Randlose Karte auf dem Grouped-Grund. */
+  /* Randlose Karte auf dem Grouped-Grund - MIT Flaeche, wie .metric-card
+   * (Re-Critique 2026-09-28 P1-1). Vorher fehlte der Grund ganz: gemessen
+   * rgba(0,0,0,0) bis #main-content, die Karte lag als Schatten auf der Buehne,
+   * und erst :hover machte sie opak - ein Sprung beim Ueberfahren, in Dark
+   * kaum sichtbare Kanten. Kein Hover-Umfaerben mehr: die Karte ist schon opak,
+   * das Oeffnen zeigt der Zeiger. */
+  background-color: var(--color-surface);
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   cursor: pointer;
-  transition: border-color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
-}
-
-.budget-loan-card:hover {
-  border-color: var(--module-accent, var(--color-accent));
-  /* Opak wie jede Arbeitsfläche im Modul - dieselbe Regel, die
-   * .tasks-page .task-card:hover und .contacts-page .contact-item:hover in
-   * glass.css schon länger befolgen. */
-  background-color: var(--color-surface-raised);
 }
 
 .budget-loan-card__main {
@@ -1459,10 +1459,10 @@
   gap: var(--space-2);
 }
 
+/* Keine Haarlinie ueber dem Abschnitt: die Raten stehen seit der Re-Critique
+ * 2026-09-28 in einem eigenen Traeger (.row-carrier), der sich selbst abgrenzt. */
 .budget-loan-transactions {
   margin-top: var(--space-4);
-  border-top: 1px solid var(--color-border);
-  padding-top: var(--space-3);
 }
 
 .budget-loan-transactions__title,

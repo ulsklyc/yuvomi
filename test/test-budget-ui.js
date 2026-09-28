@@ -2863,3 +2863,43 @@ test('Treffer der Suche stehen mit vollem Datum, ein leeres Ergebnis nennt die A
     abraeumen();
   }
 });
+
+test('Kontosaldo schrumpft nie unter seinen Betrag - der Name ellipsiert (Re-Critique 2026-09-28 P1-2)', () => {
+  // 390px: die Saldo-Spalte lief mit `flex: 0 1 auto; min-width: 0` unter den
+  // `nowrap`-Betrag, der nach links in den Namen auslief ("Gemeinsames
+  // Gi.8.544,47 €", 11px Ueberlappung). Die Spalte darf nicht schrumpfen; die
+  // Kuerzung gehoert dem Namen.
+  const regeln = [...eachRule(budgetCss)].filter(({ selector }) => selector.split(',').some((s) => s.trim() === '.budget-account__figures'));
+  assert.ok(regeln.length > 0, '.budget-account__figures fehlt');
+  for (const { body, at } of regeln) {
+    const flex = body.match(/(?:^|;|\s)flex:\s*([^;]+)/);
+    const shrink = body.match(/flex-shrink:\s*([^;]+)/);
+    if (flex) assert.match(flex[1].trim(), /^0 0 auto$|^none$/, `${at.join(' ')} .budget-account__figures: flex ${flex[1].trim()} laesst die Spalte schrumpfen`);
+    if (shrink) assert.equal(shrink[1].trim(), '0');
+  }
+  assert.ok(regeln.some(({ body }) => /flex:\s*(?:0 0 auto|none)|flex-shrink:\s*0/.test(body)), 'die Saldo-Spalte muss ausdruecklich unschrumpfbar sein');
+  const nameText = [...eachRule(budgetCss)].find(({ selector }) => selector.trim() === '.budget-account__name-text');
+  assert.match(nameText.body, /text-overflow:\s*ellipsis/);
+  const body = [...eachRule(budgetCss)].find(({ selector }) => selector.trim() === '.budget-account__body');
+  assert.match(body.body, /min-width:\s*0/, 'ohne min-width:0 kann der Name nicht ellipsieren');
+});
+
+test('Darlehen tragen eine Flaeche wie jede Karte, ohne Hover-Sprung (Re-Critique 2026-09-28 P1-1)', () => {
+  // Gemessen: `.budget-loan-card` rgba(0,0,0,0) bis #main-content - die Karte
+  // lag als Schatten auf der Buehne, erst :hover machte sie opak.
+  const alle = [...eachRule(budgetCss)];
+  const karte = alle.find(({ selector, at }) => selector.trim() === '.budget-loan-card' && at.length === 0);
+  assert.match(karte.body, /background(?:-color)?:\s*var\(--color-surface\)/, 'Kartenflaeche wie .metric-card');
+  assert.match(karte.body, /border-radius:\s*var\(--radius-lg\)/, 'Radius wie .metric-card');
+  for (const { selector, body } of alle) {
+    if (!/\.budget-loan-card:hover/.test(selector)) continue;
+    assert.doesNotMatch(body, /background|transform|border-color/, `${selector}: Hover darf die Karte nicht umfaerben oder bewegen`);
+  }
+  assert.doesNotMatch(karte.body, /transition:[^;]*border-color/, 'tote border-color-Transition');
+  // Die Raten liegen in einem Traeger, nicht nackt auf der Buehne.
+  const loan = { id: 1, title: 'Auto', borrower: 'Bank', installment_count: 12, currency: 'EUR', direction: 'borrowed',
+    payments: [{ id: 5, installment_number: 1, paid_date: '2033-01-01', amount: 100 }] };
+  const html = budgetUi.renderLoanTransactions([loan]);
+  assert.match(html, /class="[^"]*\brow-carrier\b[^"]*budget-loan-transactions__list|class="budget-loan-transactions__list[^"]*\brow-carrier\b/,
+    'die Ratenliste traegt .row-carrier');
+});

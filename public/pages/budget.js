@@ -2341,7 +2341,9 @@ function renderLoanTransactions(loans) {
 
   return `<div class="budget-loan-transactions">
     <div class="budget-loan-transactions__title">${t('budget.loanTransactions')}</div>
-    <div class="budget-loan-transactions__list">
+    ${/* Traeger wie das Hauptbuch (Re-Critique 2026-09-28 P1-1): vorher lagen
+        * die Raten nackt auf der Buehne, der einzige Tab ohne Flaeche. */ ''}
+    <div class="row-carrier budget-loan-transactions__list">
       ${payments.map(({ loan, ...payment }) => renderLoanPaymentEntry(loan, payment)).join('')}
     </div>
   </div>`;
@@ -4516,6 +4518,7 @@ export const __test = {
   renderLoansPage,
   renderLoanCard,
   renderLoanPaymentEntry,
+  renderLoanTransactions,
   // Die Leseansichten (#1265 P7): die Zeilen als reine Funktionen, und der
   // Einstieg, dessen Aussage KEIN Markup ist - welche Optionen er
   // `openDetailView` uebergibt, sieht nur, wer sie ihm abnimmt.
