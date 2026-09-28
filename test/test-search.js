@@ -8,7 +8,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 import {
-  runSearch, buildMatchQuery, runTableSearch, escapeLike, INFIX_TERM_CAP,
+  runSearch, buildMatchQuery, runTableSearch, escapeLike, INFIX_TERM_CAP, searchExcerpt,
 } from '../server/services/search.js';
 
 let passed = 0;
@@ -151,6 +151,40 @@ test('Suche deckt alle Entitäten ab', () => {
   assert(r.contacts.some((c) => c.title === 'Cake Bakery'), 'Kontakt gefunden');
   assert(r.events.some((e) => e.title === 'Cake tasting'), 'Termin gefunden');
   assert(r.waste.some((w) => w.title === 'Cake-day recycling'), 'Abfall-Typ gefunden');
+});
+
+// AUSSCHNITT (Re-Critique 2026-09-28, A1 P2-2): ein Treffer, dessen Wort nicht
+// im Titel steht, zeigte in der Palette nur Titel und Datum - "sch" fand
+// "Klavier ueben" ohne Grund. Solche Zeilen tragen `excerpt`.
+test('Treffer ausserhalb des Titels tragen einen Ausschnitt, Titeltreffer nicht', () => {
+  const r = runSearch(db, 'sponge', uid);
+  const cake = r.tasks.find((t) => t.title === 'Buy birthday cake');
+  assert(cake, 'Aufgabe ueber die Beschreibung gefunden');
+  assert(cake.excerpt === 'chocolate sponge', `Ausschnitt aus der Beschreibung erwartet, erhalten ${JSON.stringify(cake.excerpt)}`);
+  assert(!('_body' in cake), 'das interne Feld _body darf nicht in die Antwort');
+  const byTitle = runSearch(db, 'birthday', uid).tasks[0];
+  assert(!('excerpt' in byTitle), 'ein Titeltreffer braucht keinen Ausschnitt');
+  const note = runSearch(db, 'early', uid).notes.find((n) => n.title === 'Party');
+  assert(note?.excerpt === 'order the cake early', `Notiz: ${JSON.stringify(note?.excerpt)}`);
+  const ev = runSearch(db, 'flavor', uid).events.find((e) => e.title === 'Cake tasting');
+  assert(ev?.excerpt === 'pick a flavor', `Termin: ${JSON.stringify(ev?.excerpt)}`);
+  const act = runSearch(db, 'jog', uid).activities.find((a) => a.title === 'running');
+  assert(act?.excerpt === 'morning jog', `Aktivitaet: ${JSON.stringify(act?.excerpt)}`);
+});
+
+test('searchExcerpt schneidet um die Fundstelle, an Wortgrenzen, mit Auslassung', () => {
+  const long = 'Am Montag bringen wir die Noten fuer die Schule mit und danach geht es direkt weiter zum Klavierunterricht bei Frau Weber';
+  const ex = searchExcerpt('schul', 'Klavier ueben', [long]);
+  assert(ex && ex.includes('Schule'), `Fundstelle fehlt: ${ex}`);
+  assert(ex.startsWith('\u2026') && ex.endsWith('\u2026'), `Auslassung an beiden Enden erwartet: ${ex}`);
+  assert(!/^\u2026\S*[a-z]\S* /.test(ex) || long.includes(ex.slice(1, ex.indexOf(' '))), 'kein angeschnittenes Wort');
+  // Akzente und ss wie der Index, der Ausschnitt zeigt den Originaltext.
+  assert(searchExcerpt('grosse', 'Einkauf', ['eine große Tüte']) === 'eine große Tüte');
+  assert(searchExcerpt('mull', 'Kontakt', ['Frau Müller']) === 'Frau Müller');
+  // Steht alles im Titel, gibt es keinen Ausschnitt; fehlt ein Wort im Titel, zeigt der Ausschnitt dieses.
+  assert(searchExcerpt('cake', 'Buy birthday cake', ['cake chocolate']) === null);
+  assert(searchExcerpt('cake choc', 'Buy birthday cake', ['cake chocolate']) === 'cake chocolate');
+  assert(searchExcerpt('xyz', 'Titel', ['nichts davon', null, '']) === null, 'kein Feld passt');
 });
 
 test('Suche findet Abfall-Typ über Namen, verbirgt archivierte Typen', () => {

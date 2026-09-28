@@ -58,6 +58,69 @@ function queryTokens(q) {
     .filter(Boolean);
 }
 
+/* AUSSCHNITT FUER TREFFER AUSSERHALB DES TITELS (Re-Critique 2026-09-28, A1
+ * P2-2). "sch" fand "Klavier ueben" ohne jeden Grund im Bild: das Wort stand in
+ * der Beschreibung, und die Palette zeigte nur Titel und Datum. Steht die
+ * Eingabe nicht vollstaendig im Titel, bekommt der Treffer `excerpt` - ein
+ * Stueck des ersten Felds, das ein Suchwort enthaelt, um die Fundstelle herum.
+ * Nur Felder, die der Betrachter auf der Zielseite ohnehin sieht; die Zeilen
+ * sind zu diesem Zeitpunkt schon durch ihre Sichtbarkeitsfilter gelaufen. */
+export const EXCERPT_RADIUS = 36;
+
+/** Faltung je Zeichen samt Rueckweg: folded[i] stammt aus original[map[i]]. */
+function foldWithMap(text) {
+  const chars = [...String(text ?? '')];
+  let folded = '';
+  const map = [];
+  let offset = 0;
+  for (const ch of chars) {
+    const f = foldSearchText(ch);
+    for (let i = 0; i < f.length; i += 1) map.push(offset);
+    folded += f;
+    offset += ch.length;
+  }
+  map.push(offset);
+  return { folded, map };
+}
+
+/**
+ * @param {string} q        die Eingabe
+ * @param {string} title    was die Palette als Titel zeigt
+ * @param {Array<string|null|undefined>} texts  weitere sichtbare Felder, in Vorrang
+ * @returns {string|null}
+ */
+export function searchExcerpt(q, title, texts) {
+  const tokens = queryTokens(q).map(foldSearchText).filter(Boolean);
+  if (!tokens.length) return null;
+  const inTitle = foldSearchText(title);
+  const missing = tokens.filter((tok) => !inTitle.includes(tok));
+  if (!missing.length) return null;
+  for (const raw of texts) {
+    if (raw == null || raw === '') continue;
+    const text = String(raw).replace(/\s+/g, ' ').trim();
+    const { folded, map } = foldWithMap(text);
+    const at = missing.map((tok) => ({ i: folded.indexOf(tok), len: tok.length })).filter((m) => m.i >= 0)
+      .sort((a, b) => a.i - b.i)[0];
+    if (!at) continue;
+    const from = map[at.i];
+    const to = map[at.i + at.len];
+    let start = Math.max(0, from - EXCERPT_RADIUS);
+    let end = Math.min(text.length, to + EXCERPT_RADIUS);
+    // An Wortgrenzen schneiden, nicht mitten im Wort.
+    if (start > 0) { const sp = text.indexOf(' ', start); if (sp >= 0 && sp < from) start = sp + 1; }
+    if (end < text.length) { const sp = text.lastIndexOf(' ', end); if (sp > to) end = sp; }
+    return `${start > 0 ? '\u2026' : ''}${text.slice(start, end).trim()}${end < text.length ? '\u2026' : ''}`;
+  }
+  return null;
+}
+
+/** Zeile mit Ausschnitt (falls einer faellt), ohne interne Hilfsfelder (`_body`). */
+function withExcerpt(row, q, texts) {
+  const { _body, ...rest } = row;
+  const excerpt = searchExcerpt(q, rest.title, texts);
+  return excerpt ? { ...rest, excerpt } : rest;
+}
+
 /* WORTTEILE (Re-Critique 2026-09-27, A1 P2-6): "Milch" fand die "Vollmilch"
  * nicht. FTS5 sucht Praefixe - ein Wort, das mitten im Wort steht, erreicht der
  * Index nie. Zwei Wege standen offen, beide ohne Umbau der Tabelle waere keiner:
@@ -281,7 +344,7 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
   const allows = bucketFilter({ hiddenModules, disabledNav });
 
   if (allows('tasks')) results.tasks = database.prepare(`
-    SELECT t.id, t.title, t.status, t.priority, t.due_date
+    SELECT t.id, t.title, t.status, t.priority, t.due_date, s.body AS _body
     FROM search_index s
     JOIN tasks t ON t.id = s.entity_id
     WHERE s.entity = 'task' AND s.search_index MATCH @match
@@ -290,7 +353,7 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
     ORDER BY CASE t.status WHEN 'done' THEN 1 ELSE 0 END,
              t.due_date ASC NULLS LAST
     LIMIT @limit
-  `).all({ match, userId, limit });
+  `).all({ match, userId, limit }).map((row) => withExcerpt(row, q, [row._body]));
 
   // Termine sind Familienbesitz (die Kalenderliste zeigt alle Termine, nicht nur
   // eigene) - daher KEIN created_by-Filter, konsistent mit GET /calendar und der
@@ -322,7 +385,7 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
     // Preserve the compact global-search payload. The resolver-capable
     // projection supplies linked inheritance without loading attachment bodies
     // or unrelated sync metadata into this result bucket.
-    results.events = eventRows.map((event) => ({
+    results.events = eventRows.map((event) => withExcerpt({
       id: event.id,
       title: event.title,
       start_datetime: event.start_datetime,
@@ -336,7 +399,7 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
         reminder_owner_id: event.reminder_owner_id,
         reminder_anchor_start: event.reminder_anchor_start,
       } : {}),
-    }));
+    }, q, [event.description, event.location]));
   }
 
   if (allows('notes')) results.notes = database.prepare(`
@@ -347,25 +410,25 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
       AND n.created_by = @userId
     ORDER BY n.pinned DESC, n.updated_at DESC
     LIMIT @limit
-  `).all({ match, userId, limit });
+  `).all({ match, userId, limit }).map((row) => withExcerpt(row, q, [row.content]));
 
   if (allows('contacts')) results.contacts = database.prepare(`
-    SELECT c.id, c.name AS title
+    SELECT c.id, c.name AS title, s.body AS _body
     FROM search_index s
     JOIN contacts c ON c.id = s.entity_id
     WHERE s.entity = 'contact' AND s.search_index MATCH @match
     ORDER BY c.name ASC
     LIMIT @limit
-  `).all({ match, limit });
+  `).all({ match, limit }).map((row) => withExcerpt(row, q, [row._body]));
 
   if (allows('items')) results.items = database.prepare(`
-    SELECT i.id, i.name AS title, i.list_id
+    SELECT i.id, i.name AS title, i.list_id, s.body AS _body
     FROM search_index s
     JOIN shopping_items i ON i.id = s.entity_id
     WHERE s.entity = 'item' AND s.search_index MATCH @match
     ORDER BY i.name ASC
     LIMIT @limit
-  `).all({ match, limit });
+  `).all({ match, limit }).map((row) => withExcerpt(row, q, [row._body]));
 
   // Health: Medikamente — Treffer auf Name/Dosistext, Sichtbarkeits-Scoping.
   if (allows('meds')) results.meds = database.prepare(`
@@ -387,7 +450,7 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
       AND (a.user_id = @userId OR a.visibility = 'family')
     ORDER BY a.performed_at DESC
     LIMIT @limit
-  `).all({ match, userId, limit });
+  `).all({ match, userId, limit }).map((row) => withExcerpt(row, q, [row.note]));
 
   // Waste: nur der Typ-Katalog ist indiziert (Migration 206) - nie die von
   // waste-domain.js berechneten, potenziell unbegrenzten Termine (siehe dortige
@@ -460,7 +523,8 @@ export function runTableSearch(database, q, userId, { hiddenModules = null, disa
     results.recipes = firstMatches(database.prepare(`
       SELECT r.id, r.title, r.notes FROM recipes r
       ORDER BY r.title COLLATE NOCASE ASC, r.id DESC
-    `).all(), matches, (r) => [r.title, r.notes], limit).map((r) => pick(r, ['id', 'title']));
+    `).all(), matches, (r) => [r.title, r.notes], limit)
+      .map((r) => withExcerpt(pick(r, ['id', 'title']), q, [r.notes]));
   }
 
   if (allows('pantry')) {
@@ -469,7 +533,7 @@ export function runTableSearch(database, q, userId, { hiddenModules = null, disa
       FROM pantry_items p
       ORDER BY p.name COLLATE NOCASE ASC, p.id ASC
     `).all(), matches, (p) => [p.title, p.notes], limit)
-      .map((p) => pick(p, ['id', 'title', 'quantity', 'unit', 'expires_on']));
+      .map((p) => withExcerpt(pick(p, ['id', 'title', 'quantity', 'unit', 'expires_on']), q, [p.notes]));
   }
 
   // Inventar: aktive Gegenstaende zuerst, verkaufte/entsorgte bleiben
@@ -480,7 +544,7 @@ export function runTableSearch(database, q, userId, { hiddenModules = null, disa
       FROM inventory_items i
       ORDER BY CASE i.status WHEN 'active' THEN 0 ELSE 1 END, i.name COLLATE NOCASE ASC
     `).all(), matches, (i) => [i.title, i.brand, i.model, i.notes], limit)
-      .map((i) => pick(i, ['id', 'title', 'brand', 'model', 'status']));
+      .map((i) => withExcerpt(pick(i, ['id', 'title', 'brand', 'model', 'status']), q, [i.brand, i.model, i.notes]));
   }
 
   // Dokumente: dieselbe Sichtbarkeit wie GET /documents (eigen, Familie oder
@@ -492,7 +556,7 @@ export function runTableSearch(database, q, userId, { hiddenModules = null, disa
       WHERE ${documentVisibleSql('d', 'userId')} AND d.status = 'active'
       ORDER BY d.updated_at DESC, d.id DESC
     `).all({ userId }), matches, (d) => [d.title, d.description], limit)
-      .map((d) => pick(d, ['id', 'title', 'category']));
+      .map((d) => withExcerpt(pick(d, ['id', 'title', 'category']), q, [d.description]));
   }
 
   // Geburtstage: Haushaltsbesitz, Rechte-Modul `calendar` (siehe BUCKET_MODULE).
@@ -502,7 +566,7 @@ export function runTableSearch(database, q, userId, { hiddenModules = null, disa
       FROM birthdays b
       ORDER BY b.name COLLATE NOCASE ASC, b.id ASC
     `).all(), matches, (b) => [b.title, b.notes], limit)
-      .map((b) => pick(b, ['id', 'title', 'birth_date']));
+      .map((b) => withExcerpt(pick(b, ['id', 'title', 'birth_date']), q, [b.notes]));
   }
 
   // Budget: gesucht wird im TITEL, also nur dort, wo der Betrachter den Titel
