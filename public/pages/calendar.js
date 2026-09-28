@@ -2422,6 +2422,7 @@ function renderToolbar() {
       await reloadForView();
       updateLabel();
       renderView();
+      playViewSwap(_container.querySelector('#cal-body'));
     },
   });
   // Die Ansichtswahl gleitet wie jede Segment-Leiste (D8). Der Kopf wird bei
@@ -2859,6 +2860,25 @@ function scheduleMonthFit(grid) {
     _monthFitRaf = 0;
     fitMonthDayCells(grid);
   });
+}
+
+/**
+ * Der Wechsel Monat/Woche/Tag/Agenda blendet die neue Ansicht kurz ein
+ * (Re-Critique 2026-09-28, A2 P3): vorher ein harter Schnitt nach dem Fetch.
+ * Ohne Versatz - anders als der Periodenwechsel (period-swipe.js) antwortet
+ * er auf einen Tipp, nicht auf eine Wischrichtung. Die Blende setzt bei 0,4
+ * Deckkraft an, nie bei 0: ein leerer Frame dazwischen saehe aus wie ein
+ * Neuladen. Unter reduzierter Bewegung bleibt es beim Schnitt (die CSS-Regel
+ * in calendar.css ist das Netz dafuer).
+ */
+function playViewSwap(body) {
+  if (!body) return;
+  if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  body.classList.remove('cal-view-swap-in');
+  // Reflow, damit ein zweiter Wechsel waehrend der Blende sie neu startet.
+  void body.offsetWidth;
+  body.classList.add('cal-view-swap-in');
+  body.addEventListener('animationend', () => body.classList.remove('cal-view-swap-in'), { once: true });
 }
 
 function renderView() {
@@ -5188,9 +5208,25 @@ function openCalendarFilters() {
   // nichts, was ein „Aenderungen verwerfen?" beim Schliessen verwerfen koennte.
   // Der Standard-Waechter fragte trotzdem, sobald man eine Ebene ein- oder
   // ausblendete, und sein „Verwerfen" nahm die Ebene dann nicht zurueck.
-  openSharedModal({ title: t('calendar.filters'), content, size: 'sm', initialFocus: 'none', dirtyGuard: false });
-
-  const panel = document.querySelector('#shared-modal-overlay .modal-panel');
+  // AM DESKTOP EIN POPOVER AM KNOPF (Re-Critique 2026-09-28, A2 P2-7): das
+  // zentrierte Blatt mit Blur-Backdrop verdeckte genau den Kalender, dessen
+  // Aenderung ein Haken live ausloest. Ab 1024px haengen die Filter ohne
+  // Abdunkeln am Filterknopf (Apple Kalender); schmaler bleibt das Blatt.
+  const asPopover = filtersAsPopover();
+  // Ein Klick auf den Knopf bei offenem Popover schliesst es zuerst per
+  // Light-Dismiss (pointerdown) - derselbe Klick oeffnete es sonst sofort
+  // wieder. So wirkt der Knopf wie ein Umschalter.
+  if (asPopover && Date.now() - filtersPopoverClosedAt < 300) return;
+  let panel;
+  let closeFilters;
+  if (asPopover) {
+    panel = openFiltersPopover(content);
+    closeFilters = () => panel.hidePopover?.();
+  } else {
+    openSharedModal({ title: t('calendar.filters'), content, size: 'sm', initialFocus: 'none', dirtyGuard: false });
+    panel = document.querySelector('#shared-modal-overlay .modal-panel');
+    closeFilters = () => closeModal({ force: true });
+  }
   if (!panel) return;
 
   const LAYER_STATE = {
@@ -5269,6 +5305,7 @@ function openCalendarFilters() {
     }
 
     renderToolbar();
+    if (asPopover) _container?.querySelector('#cal-filters')?.setAttribute('aria-expanded', 'true');
     renderView();
   });
 
@@ -5295,10 +5332,70 @@ function openCalendarFilters() {
       localStorage.setItem(ASSIGNED_TO_ME_KEY, '0');
     } catch {}
     persistPeopleFilter();
-    closeModal({ force: true });
+    closeFilters();
     renderToolbar();
     renderView();
   });
+}
+
+const FILTERS_POPOVER_QUERY = '(min-width: 1024px)';
+let filtersPopoverClosedAt = 0;
+
+function filtersAsPopover() {
+  if (typeof HTMLElement === 'undefined' || !('popover' in HTMLElement.prototype)) return false;
+  return window.matchMedia?.(FILTERS_POPOVER_QUERY)?.matches === true;
+}
+
+/**
+ * Die Filter als natives Popover (Top-Layer, Light-Dismiss und Esc vom
+ * Browser) am Filterknopf. Die Position rechnet JS - dieselbe Rechnung wie
+ * utils/popover-menu.js (rechtsbuendig unter dem Ausloeser, im Fenster
+ * gehalten); CSS-Anchor-Positioning fehlt noch in zu vielen Browsern. Der
+ * Knopf wird bei jedem Haken NEU gebaut (renderToolbar()), deshalb sucht jede
+ * Stelle ihn frisch statt eine alte Referenz zu halten.
+ */
+function openFiltersPopover(content) {
+  document.getElementById('cal-filters-popover')?.remove();
+  const trigger = () => _container?.querySelector('#cal-filters') ?? null;
+  const pop = document.createElement('div');
+  pop.id = 'cal-filters-popover';
+  pop.className = 'cal-filters-popover';
+  pop.setAttribute('popover', 'auto');
+  pop.setAttribute('role', 'dialog');
+  pop.setAttribute('aria-labelledby', 'cal-filters-popover-title');
+  pop.insertAdjacentHTML('beforeend', `<h2 class="cal-filters-popover__title" id="cal-filters-popover-title">${esc(t('calendar.filters'))}</h2>${content}`);
+  document.body.appendChild(pop);
+  window.lucide?.createIcons({ el: pop });
+  pop.addEventListener('toggle', (event) => {
+    const open = event.newState === 'open';
+    trigger()?.setAttribute('aria-expanded', String(open));
+    if (open) return;
+    filtersPopoverClosedAt = Date.now();
+    // Esc laesst den Fokus sonst auf <body> fallen; ein Klick daneben wollte
+    // woanders hin und behaelt sein Ziel.
+    const active = document.activeElement;
+    const giveBack = !active || active === document.body || pop.contains(active);
+    pop.remove();
+    if (giveBack) trigger()?.focus();
+  });
+  pop.showPopover();
+  positionFiltersPopover(pop, trigger());
+  trigger()?.setAttribute('aria-expanded', 'true');
+  pop.querySelector('input, button')?.focus();
+  return pop;
+}
+
+function positionFiltersPopover(pop, anchor) {
+  if (!anchor) return;
+  const rect = anchor.getBoundingClientRect();
+  const gap = 4;
+  const margin = 8;
+  const width = pop.offsetWidth || 360;
+  const left = Math.min(Math.max(margin, rect.right - width), window.innerWidth - width - margin);
+  const top = rect.bottom + gap;
+  pop.style.left = `${Math.round(left)}px`;
+  pop.style.top = `${Math.round(top)}px`;
+  pop.style.maxHeight = `${Math.round(window.innerHeight - top - margin)}px`;
 }
 
 /**
@@ -5598,6 +5695,7 @@ async function openFoundEvent(ev) {
 }
 
 export const __test = {
+  playViewSwap,
   eventBlockAttrs,
   // R10 L5: Liste + Detail der Agenda - Auswahl-ID und ihr Termin.
   agendaMdId, eventForAgendaMdId,

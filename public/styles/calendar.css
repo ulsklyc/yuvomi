@@ -85,6 +85,24 @@
   }
 }
 
+/* Ansichtswechsel Monat/Woche/Tag/Agenda (Re-Critique 2026-09-28, A2 P3):
+ * die neue Ansicht blendet ein statt hart zu schneiden - kurz, ohne Versatz,
+ * ab 0,4 Deckkraft (kein leerer Frame). Gesetzt von playViewSwap()
+ * (calendar.js), das unter reduzierter Bewegung gar nicht erst ansetzt. */
+.cal-view-swap-in {
+  animation: cal-view-swap-in var(--duration-md) var(--ease-out);
+}
+
+@keyframes cal-view-swap-in {
+  from { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cal-view-swap-in {
+    animation: none;
+  }
+}
+
 /* Mobil liegt unter dem Raster die schwebende Tab-Kapsel mit ihrer eigenen
  * Luft (8px ueber dem Glas); ein zweiter Abstand von 16px darueber war totes
  * Band zwischen der letzten Rasterzeile und der Kapsel. */
@@ -3109,4 +3127,51 @@
   margin: 0;
   min-width: 0;
   text-align: end;
+}
+
+/* Filter am Desktop als Popover am Knopf (Re-Critique 2026-09-28, A2 P2-7):
+ * vorher ein zentriertes Blatt mit Blur-Backdrop, das den Kalender verdeckte,
+ * dessen Aenderung ein Haken live ausloest. Ab 1024px (calendar.js,
+ * filtersAsPopover()) haengt dasselbe Blatt ohne Abdunkeln am Filterknopf;
+ * die Position rechnet openFiltersPopover(). Flaeche, Kante, Schatten und
+ * Radius wie .popover-menu (layout.css) - dasselbe Material fuer alles, was
+ * an einem Knopf aufgeht. */
+.cal-filters-popover {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  z-index: var(--z-dropdown);
+  inline-size: min(360px, calc(100vw - 2 * var(--space-2)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-3) var(--space-3) 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.cal-filters-popover::backdrop {
+  background: transparent;
+}
+
+.cal-filters-popover__title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Das Aufheben bleibt ohne Scrollen im Blick - wie mountFooter() es im Blatt
+ * an den Rand hebt, klebt es hier am unteren Rand des Popovers. */
+.cal-filters-popover .modal-panel__footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-inline: calc(-1 * var(--space-3));
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-top: 1px solid var(--color-border-subtle);
+  background-color: var(--color-surface);
 }

@@ -4357,6 +4357,116 @@ test('Wochenblock-Titel trennen mit Strich statt mitten im Wort (A2 P2-1)', () =
   assert(/(?:^|[\s;])hyphens:\s*auto/.test(rule.body), `ohne hyphens: auto bricht "Betriebsversam|mlung": ${rule.body}`);
 });
 
+// Re-Critique 2026-09-28 (A2 P3, R14 P11): der Wechsel Monat/Woche/Tag/Agenda
+// war ein harter Schnitt nach dem Fetch. Die neue Ansicht blendet jetzt kurz
+// ein (Tokens, ohne Versatz - sie antwortet auf einen Tipp, nicht auf eine
+// Geste); unter reduzierter Bewegung bleibt es beim Schnitt.
+test('Ansichtswechsel blendet die neue Ansicht ein, reduzierte Bewegung schneidet (A2 P3)', () => {
+  const play = calendarHelpers.playViewSwap;
+  assert(typeof play === 'function', 'playViewSwap() ist die EINE Stelle fuer den Ansichtswechsel');
+  const fakeBody = () => {
+    const classes = new Set();
+    const listeners = {};
+    return {
+      classes,
+      listeners,
+      classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c) },
+      addEventListener: (type, fn) => { listeners[type] = fn; },
+    };
+  };
+  const savedMatch = globalThis.matchMedia;
+  try {
+    globalThis.matchMedia = () => ({ matches: false });
+    const body = fakeBody();
+    play(body);
+    assert(body.classes.has('cal-view-swap-in'), 'die neue Ansicht traegt die Einblende-Klasse');
+    body.listeners.animationend?.();
+    assert(!body.classes.has('cal-view-swap-in'), 'nach der Animation raeumt sie ab');
+    globalThis.matchMedia = () => ({ matches: true });
+    const still = fakeBody();
+    play(still);
+    assert(!still.classes.has('cal-view-swap-in'), 'reduzierte Bewegung: kein Einblenden');
+  } finally {
+    if (savedMatch === undefined) delete globalThis.matchMedia; else globalThis.matchMedia = savedMatch;
+  }
+  const rules = [...eachRule(calendarCss)];
+  const swap = rules.find((r) => r.selector.trim() === '.cal-view-swap-in' && !r.at.length);
+  assert(swap && /animation:\s*cal-view-swap-in var\(--duration-[a-z]+\) var\(--ease-[a-z-]+\)/.test(swap.body), `Einblenden mit Tokens: ${swap?.body}`);
+  assert(rules.some((r) => r.selector.trim() === '.cal-view-swap-in' && r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a)) && /animation:\s*none/.test(r.body)),
+    'das Netz unter reduzierter Bewegung');
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const onChange = src.slice(src.indexOf("activeClass: 'cal-toolbar__view-btn--active'"), src.indexOf("attachSegmentIndicator(bar.querySelector('.cal-toolbar__views')"));
+  assert(/renderView\(\);\s*\n\s*playViewSwap\(/.test(onChange), 'der Tab-Wechsel spielt die Einblende nach dem Neuaufbau');
+});
+
+// Re-Critique 2026-09-28 (A2 P2-7, R14 P12): am Desktop oeffneten die Filter
+// ein zentriertes 400x805-Blatt mit Blur-Backdrop - die Wirkung eines Hakens
+// war live, aber unsichtbar dahinter. Ab 1024px haengen sie jetzt als
+// Popover am Filterknopf, ohne Abdunkeln (Apple Kalender); schmaler bleibt
+// es das Blatt.
+test('Filter am Desktop: verankertes Popover ohne Abdunkeln statt Blatt (A2 P2-7)', () => {
+  const made = [];
+  const fakeEl = (tag) => {
+    const attrs = new Map();
+    const el = {
+      tagName: tag, html: '', style: {}, listeners: {}, shown: false, dataset: {},
+      setAttribute: (k, v) => attrs.set(k, String(v)),
+      getAttribute: (k) => (attrs.has(k) ? attrs.get(k) : null),
+      insertAdjacentHTML: (_pos, h) => { el.html += h; },
+      addEventListener: (type, fn) => { el.listeners[type] = fn; },
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      showPopover: () => { el.shown = true; },
+      hidePopover: () => { el.shown = false; },
+      remove: () => {},
+      contains: () => false,
+      focus: () => {},
+      getBoundingClientRect: () => ({ top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 }),
+      offsetWidth: 360, offsetHeight: 400,
+      attrs,
+    };
+    made.push(el);
+    return el;
+  };
+  let opened = null;
+  const saved = { open: globalThis.__openModal, doc: globalThis.document, win: globalThis.window, he: globalThis.HTMLElement, mm: globalThis.matchMedia };
+  const hadWindow = 'window' in globalThis;
+  globalThis.__openModal = (opts) => { opened = opts; };
+  globalThis.HTMLElement = class { get popover() { return null; } };
+  const wide = (q) => ({ matches: /min-width:\s*1024px/.test(q) });
+  globalThis.window = { matchMedia: wide, innerWidth: 1440, innerHeight: 900 };
+  globalThis.matchMedia = wide;
+  const appended = [];
+  globalThis.document = {
+    ...(saved.doc ?? {}),
+    querySelector: () => null,
+    getElementById: () => null,
+    createElement: fakeEl,
+    body: { appendChild: (el) => { appended.push(el); return el; } },
+    documentElement: { clientWidth: 1440, clientHeight: 900 },
+    activeElement: null,
+  };
+  try {
+    calendarHelpers.openCalendarFilters();
+  } finally {
+    globalThis.__openModal = saved.open;
+    globalThis.document = saved.doc;
+    if (hadWindow) globalThis.window = saved.win; else delete globalThis.window;
+    if (saved.he === undefined) delete globalThis.HTMLElement; else globalThis.HTMLElement = saved.he;
+    if (saved.mm === undefined) delete globalThis.matchMedia; else globalThis.matchMedia = saved.mm;
+  }
+  assert(!opened, 'am Desktop oeffnet kein Blatt mit Backdrop');
+  const pop = appended.find((el) => el.getAttribute('popover') === 'auto');
+  assert(pop, 'ein natives Popover (Light-Dismiss, Esc, Top-Layer) haengt im Dokument');
+  assert(pop.shown, 'und ist offen');
+  assert(pop.getAttribute('role') === 'dialog' && pop.getAttribute('aria-labelledby'), 'ein benannter Dialog');
+  assert(/id="cal-filters-reset"/.test(pop.html), 'das Aufheben reist mit');
+  assert(/calendar\.filters/.test(pop.html), 'der Titel steht im Popover');
+  const rules = [...eachRule(calendarCss)].filter((r) => r.selector.includes('.cal-filters-popover'));
+  assert(rules.some((r) => /position:\s*fixed/.test(r.body) && /inset:\s*auto/.test(r.body)), 'am Knopf positioniert, nicht zentriert');
+  assert(!rules.some((r) => /::backdrop/.test(r.selector) && !/transparent|none/.test(r.body)), 'kein abdunkelnder Hintergrund');
+});
+
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
