@@ -2307,3 +2307,26 @@ test('R14: die Versionsnummer steht nicht mehr unter der Wortmarke', async () =>
   const system = await readFile(new URL('../public/settings/pages/admin-system.js', import.meta.url), 'utf8');
   assert.match(system, /settings\.systemVersionValue/, 'das Blatt System nennt sie ebenfalls');
 });
+
+// R14 P10 (Re-Critique 2026-09-28, A7 P3): die Modulblaetter standen in einer
+// anderen Reihenfolge als die Seitenleiste - Budget vor Gesundheit, Kontakte
+// vor Dokumenten. Jetzt folgen sie ihr: Gruppen der Seitenleiste, darin die
+// Reihenfolge, die der Haushalt gewaehlt hat.
+test('R14: Modulblaetter stehen in der Reihenfolge der Seitenleiste', async () => {
+  const { settingsSheetsForDomain } = await import('../public/settings/registry.js');
+  const admin = { role: 'admin' };
+  const ids = (order) => settingsSheetsForDomain('modules', admin, { moduleOrder: order }).map((s) => s.module ?? s.id);
+  const plain = ids([]);
+  assert.deepEqual(plain.slice(0, 2), ['modules-active', 'modules-navigation'], 'die zwei allgemeinen Blaetter zuerst');
+  const mods = plain.slice(2);
+  const pos = (id) => mods.indexOf(id);
+  assert.equal(mods[0], 'dashboard', 'die Uebersicht fuehrt wie in der Seitenleiste');
+  assert.ok(pos('tasks') < pos('kitchen') && pos('kitchen') < pos('contacts') && pos('contacts') < pos('budget'),
+    `Planen, Haushalt, Menschen, Finanzen: ${mods}`);
+  assert.ok(pos('health') < pos('budget'), 'Gesundheit (Menschen) vor Budget (Finanzen)');
+  const custom = ids(['tasks', 'schedule', 'calendar', 'rewards', 'kitchen']).slice(2);
+  assert.ok(custom.indexOf('tasks') < custom.indexOf('calendar'), 'die eigene Reihenfolge des Haushalts zaehlt');
+  assert.ok(custom.indexOf('rewards') < custom.indexOf('kitchen'));
+  const router = await readFile(new URL('../public/router.js', import.meta.url), 'utf8');
+  assert.match(router, /moduleOrder: \(\) => _moduleOrder\.slice\(\)/, 'die Einstellungen lesen dieselbe Reihenfolge wie die Seitenleiste');
+});

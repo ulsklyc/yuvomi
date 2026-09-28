@@ -1,3 +1,5 @@
+import { sortNavigationItems } from './module-order.js';
+
 export const SETTINGS_STORAGE_KEY = 'yuvomi:settings:path';
 export const LEGACY_SETTINGS_STORAGE_KEY = 'yuvomi:settings:tab';
 
@@ -694,8 +696,28 @@ function sheetVisible(sheet, user) {
 }
 
 /** Die Blaetter eines Bereichs, die diese Rolle sieht. */
-export function settingsSheetsForDomain(domainId, user) {
-  return SETTINGS_LEAVES.filter((sheet) => sheet.domainId === domainId && sheetVisible(sheet, user));
+/* DIE MODULBLAETTER FOLGEN DER SEITENLEISTE (R14, A7 P3). Sie standen in
+ * der Reihenfolge dieser Datei - Budget vor Gesundheit, Kontakte vor
+ * Dokumenten -, waehrend die Seitenleiste daneben Gruppen und die Anordnung
+ * des Haushalts zeigt. Dieselbe Sortierung wie dort (sortNavigationItems:
+ * Gruppe, dann die gewaehlte Reihenfolge), dieselbe Quelle (der Router haelt
+ * sie, `window.yuvomi.moduleOrder`). Ohne Router (Tests) gilt die Reihenfolge
+ * dieser Datei innerhalb der Gruppen. */
+function currentModuleOrder() {
+  try {
+    return globalThis.window?.yuvomi?.moduleOrder?.() ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export function settingsSheetsForDomain(domainId, user, { moduleOrder = currentModuleOrder() } = {}) {
+  const sheets = SETTINGS_LEAVES.filter((sheet) => sheet.domainId === domainId && sheetVisible(sheet, user));
+  if (!sheets.some((sheet) => sheet.module)) return sheets;
+  return [
+    ...sheets.filter((sheet) => !sheet.module),
+    ...sortNavigationItems(sheets.filter((sheet) => sheet.module), moduleOrder),
+  ];
 }
 
 export function filterSettingsDomains(user) {

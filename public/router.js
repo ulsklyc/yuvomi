@@ -5055,6 +5055,9 @@ window.yuvomi = {
   setDisabledModules,
   setHiddenModules,
   setModuleOrder,
+  // Die Anordnung der Seitenleiste, fuer die Modulblaetter der Einstellungen
+  // (settings/registry.js, settingsSheetsForDomain) - eine Reihenfolge, zwei Orte.
+  moduleOrder: () => _moduleOrder.slice(),
   setMobileNavOrder,
   refreshThirdPartyModules,
   isModuleDisabled,
