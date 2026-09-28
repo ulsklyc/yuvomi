@@ -1138,11 +1138,11 @@
         "removeAction": "Usuń kategorię {{name}}",
         "createAction": "Utwórz i przypisz „{{name}}”",
         "scopeLabel": "Typ kategorii",
-        "scopeHelp": "Kategorie osobiste widzisz i zarządzasz nimi tylko Ty. Z kategorii domowych mogą korzystać wszyscy domownicy; uprawnienia określają, kto może nimi zarządzać.",
+        "scopeHelp": "Kategorie osobiste widzisz i zarządzasz nimi tylko Ty. Notatki w nich pozostają widoczne dla wszystkich domowników. Z kategorii domowych mogą korzystać wszyscy domownicy; uprawnienia określają, kto może nimi zarządzać.",
         "moreAction": "{{count}} dodatkowych kategorii",
         "moreAction_one": "{{count}} dodatkowa kategoria",
         "moreAction_few": "{{count}} dodatkowe kategorie",
-        "personalManagementHint": "Tutaj możesz zarządzać swoimi kategoriami osobistymi. Kategorie domowe pozostają dostępne w edytorze notatek, ale nie masz uprawnień do zarządzania nimi."
+        "personalManagementHint": "Tutaj możesz zarządzać swoimi kategoriami osobistymi. Widzisz je tylko Ty; notatki w nich są widoczne dla wszystkich domowników. Kategorie domowe pozostają dostępne w edytorze notatek, ale nie masz uprawnień do zarządzania nimi."
     },
     "notes": {
         "title": "Notatki",

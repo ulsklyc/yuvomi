@@ -731,6 +731,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The note category hints no longer suggest that notes are private** (#1514). A personal
+  category is only visible to you, but a note filed under it is still visible to every household
+  member, just without that category. The hint next to the category type and the hint in the
+  category manager now say so.
+
 - **The glass tab bar blurs again.** Text scrolling under the tab bar on a phone and under the
   sidebar indicator was readable through the glass because the page transition cut the glass off
   from the content; the blur now works outside the short moment of a page change.

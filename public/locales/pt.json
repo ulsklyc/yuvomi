@@ -1124,11 +1124,11 @@
         "removeAction": "Remover a categoria {{name}}",
         "createAction": "Criar e atribuir “{{name}}”",
         "scopeLabel": "Tipo de categoria",
-        "scopeHelp": "Só você pode ver e gerir categorias pessoais. Todos os membros do agregado podem usar categorias do agregado; as permissões controlam quem pode geri-las.",
+        "scopeHelp": "Só você pode ver e gerir categorias pessoais. As notas nelas continuam visíveis para todo o agregado. Todos os membros do agregado podem usar categorias do agregado; as permissões controlam quem pode geri-las.",
         "moreAction": "{{count}} categorias adicionais",
         "moreAction_one": "{{count}} categoria adicional",
         "moreAction_few": "{{count}} categorias adicionais",
-        "personalManagementHint": "Pode gerir aqui as suas categorias pessoais. As categorias do agregado continuam disponíveis no editor de notas, mas não tem permissão para as gerir."
+        "personalManagementHint": "Pode gerir aqui as suas categorias pessoais. Só você as vê; as notas nelas são visíveis para todo o agregado. As categorias do agregado continuam disponíveis no editor de notas, mas não tem permissão para as gerir."
     },
     "notes": {
         "title": "Quadro de notas",

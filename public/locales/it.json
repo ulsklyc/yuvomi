@@ -1124,11 +1124,11 @@
         "removeAction": "Rimuovi la categoria {{name}}",
         "createAction": "Crea e assegna “{{name}}”",
         "scopeLabel": "Tipo di categoria",
-        "scopeHelp": "Solo tu puoi vedere e gestire le categorie personali. Tutti i membri della famiglia possono usare le categorie domestiche; le autorizzazioni stabiliscono chi può gestirle.",
+        "scopeHelp": "Solo tu puoi vedere e gestire le categorie personali. Le note al loro interno restano visibili a tutta la famiglia. Tutti i membri della famiglia possono usare le categorie domestiche; le autorizzazioni stabiliscono chi può gestirle.",
         "moreAction": "{{count}} categorie in più",
         "moreAction_one": "{{count}} categoria in più",
         "moreAction_few": "{{count}} categorie in più",
-        "personalManagementHint": "Qui puoi gestire le tue categorie personali. Le categorie domestiche restano disponibili nell’editor delle note, ma non hai il permesso di gestirle."
+        "personalManagementHint": "Qui puoi gestire le tue categorie personali. Solo tu le vedi; le note al loro interno sono visibili a tutta la famiglia. Le categorie domestiche restano disponibili nell’editor delle note, ma non hai il permesso di gestirle."
     },
     "notes": {
         "title": "Bacheca",

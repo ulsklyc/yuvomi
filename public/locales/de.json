@@ -1138,11 +1138,11 @@
         "removeAction": "Kategorie {{name}} entfernen",
         "createAction": "„{{name}}“ erstellen und zuweisen",
         "scopeLabel": "Kategorietyp",
-        "scopeHelp": "Persönliche Kategorien siehst und verwaltest nur du. Haushaltskategorien können alle Mitglieder verwenden; ihre Verwaltung wird über Berechtigungen gesteuert.",
+        "scopeHelp": "Persönliche Kategorien siehst und verwaltest nur du. Notizen darin bleiben für den ganzen Haushalt sichtbar. Haushaltskategorien können alle Mitglieder verwenden; ihre Verwaltung wird über Berechtigungen gesteuert.",
         "moreAction": "{{count}} weitere Kategorien",
         "moreAction_one": "{{count}} weitere Kategorie",
         "moreAction_few": "{{count}} weitere Kategorien",
-        "personalManagementHint": "Hier kannst du deine persönlichen Kategorien verwalten. Haushaltskategorien bleiben im Notizeditor verfügbar, aber du darfst sie nicht verwalten."
+        "personalManagementHint": "Hier kannst du deine persönlichen Kategorien verwalten. Nur du siehst sie; Notizen darin sind für den ganzen Haushalt sichtbar. Haushaltskategorien bleiben im Notizeditor verfügbar, aber du darfst sie nicht verwalten."
     },
     "notes": {
         "title": "Notizen",

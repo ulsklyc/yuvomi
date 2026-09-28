@@ -1124,11 +1124,11 @@
         "removeAction": "Odebrat kategorii {{name}}",
         "createAction": "Vytvořit a přiřadit „{{name}}“",
         "scopeLabel": "Typ kategorie",
-        "scopeHelp": "Osobní kategorie vidíte a spravujete jen vy. Domácí kategorie mohou používat všichni členové; jejich správu řídí oprávnění.",
+        "scopeHelp": "Osobní kategorie vidíte a spravujete jen vy. Poznámky v nich zůstávají viditelné pro celou domácnost. Domácí kategorie mohou používat všichni členové; jejich správu řídí oprávnění.",
         "moreAction": "{{count}} dalších kategorií",
         "moreAction_one": "{{count}} další kategorie",
         "moreAction_few": "{{count}} další kategorie",
-        "personalManagementHint": "Zde můžete spravovat své osobní kategorie. Domácí kategorie zůstávají dostupné v editoru poznámek, ale nemáte oprávnění je spravovat."
+        "personalManagementHint": "Zde můžete spravovat své osobní kategorie. Vidíte je jen vy; poznámky v nich jsou viditelné pro celou domácnost. Domácí kategorie zůstávají dostupné v editoru poznámek, ale nemáte oprávnění je spravovat."
     },
     "notes": {
         "title": "Nástěnka",

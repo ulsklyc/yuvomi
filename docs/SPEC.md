@@ -1373,7 +1373,10 @@ hand.
 #### Note Categories (migration v176)
 
 The catalog starts empty. A personal category belongs to one user and is visible only to that
-user; a household category is visible to everyone. Every member may manage their own personal
+user; a household category is visible to everyone. Only the category is private: a note filed
+under a personal category stays visible to every member, just without that category, and the
+category hints (`noteCategories.scopeHelp`, `noteCategories.personalManagementHint`) say so
+(#1514). Every member may manage their own personal
 catalog. Managing the household catalog requires admin access or the
 `notes_manage_household_categories` capability. Category responses use `id` as their identifier
 and `scope` (`personal` or `household`) as the single catalog discriminator.

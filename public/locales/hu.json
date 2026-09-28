@@ -1124,11 +1124,11 @@
         "removeAction": "{{name}} kategória eltávolítása",
         "createAction": "„{{name}}” létrehozása és hozzárendelése",
         "scopeLabel": "Kategória típusa",
-        "scopeHelp": "A személyes kategóriákat csak Ön látja és kezeli. A háztartási kategóriákat minden tag használhatja; a jogosultságok szabályozzák, ki kezelheti őket.",
+        "scopeHelp": "A személyes kategóriákat csak Ön látja és kezeli. A bennük lévő jegyzeteket továbbra is az egész háztartás látja. A háztartási kategóriákat minden tag használhatja; a jogosultságok szabályozzák, ki kezelheti őket.",
         "moreAction": "További {{count}} kategória",
         "moreAction_one": "További {{count}} kategória",
         "moreAction_few": "További {{count}} kategória",
-        "personalManagementHint": "Itt kezelheti személyes kategóriáit. A háztartási kategóriák továbbra is elérhetők a jegyzetszerkesztőben, de Önnek nincs jogosultsága a kezelésükhöz."
+        "personalManagementHint": "Itt kezelheti személyes kategóriáit. Csak Ön látja őket; a bennük lévő jegyzeteket az egész háztartás látja. A háztartási kategóriák továbbra is elérhetők a jegyzetszerkesztőben, de Önnek nincs jogosultsága a kezelésükhöz."
     },
     "notes": {
         "title": "Tábla",

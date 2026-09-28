@@ -1124,11 +1124,11 @@
         "removeAction": "Ta bort kategorin {{name}}",
         "createAction": "Skapa och tilldela ”{{name}}”",
         "scopeLabel": "Kategorityp",
-        "scopeHelp": "Bara du kan se och hantera personliga kategorier. Alla hushållsmedlemmar kan använda hushållskategorier; behörigheter styr vem som får hantera dem.",
+        "scopeHelp": "Bara du kan se och hantera personliga kategorier. Anteckningar i dem är fortfarande synliga för hela hushållet. Alla hushållsmedlemmar kan använda hushållskategorier; behörigheter styr vem som får hantera dem.",
         "moreAction": "{{count}} kategorier till",
         "moreAction_one": "{{count}} kategori till",
         "moreAction_few": "{{count}} kategorier till",
-        "personalManagementHint": "Här kan du hantera dina personliga kategorier. Hushållskategorierna är fortfarande tillgängliga i anteckningsredigeraren, men du har inte behörighet att hantera dem."
+        "personalManagementHint": "Här kan du hantera dina personliga kategorier. Bara du ser dem; anteckningar i dem är synliga för hela hushållet. Hushållskategorierna är fortfarande tillgängliga i anteckningsredigeraren, men du har inte behörighet att hantera dem."
     },
     "notes": {
         "title": "Anteckningar",
