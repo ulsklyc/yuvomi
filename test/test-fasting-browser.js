@@ -10,6 +10,21 @@ async function clickFasting(page, selector) {
   assert.equal(exposed, true, `${selector} is not covered by the sticky toolbar`);
   await page.click(selector);
 }
+// Die Fasten-Einstellungen (Ziel, Uhr, Erinnerungen) stehen seit R14 (Re-Critique
+// 2026-09-28, A6 P2-1) in einem Blatt hinter dem Zahnrad im Hero, nicht mehr
+// mitten im Inhalt; das Ziel ist die Kanon-Segmentleiste (role=radio,
+// aria-checked, "Ohne Ziel" = `none`). Die Proben oeffnen das Blatt, pruefen
+// dort dieselbe Regel wie vorher und schliessen es wieder.
+async function openFastingSettings(page) {
+  if (await page.$('.modal-panel [data-fasting-preferences]')) return;
+  await clickFasting(page, '[data-fasting-settings]');
+  await page.waitForSelector('.modal-panel [data-fasting-preferences] [data-fasting-preset]');
+  await settle(page);
+}
+async function closeFastingSettings(page) {
+  await page.click('.modal-panel [data-action="close-modal"]');
+  await page.waitForFunction(() => !document.querySelector('.modal-panel'));
+}
 import { mkdirSync } from 'node:fs';
 import { startHarness, openPage, gotoRoute, settle } from './document-guards-harness.js';
 import { measureFasting } from './fasting-visual-harness.js';
@@ -66,25 +81,28 @@ test('fasting acceptance: desktop and mobile journal controls preserve data and 
         return api[method](path, body);
       }, { method, path, body });
       await gotoRoute(page, '/health/fasting');
-      await page.waitForSelector('[data-fasting-preset="16"]');
+      await page.waitForSelector('[data-fasting-settings]');
+      assert.equal(await page.$('[data-fasting-body] [data-fasting-preferences]'), null, 'die Einstellungen stehen nicht im Inhalt');
+      await openFastingSettings(page);
       assert.equal(await page.$eval('[data-fasting-custom]', (el) => el.hidden), true);
       await clickFasting(page, '[data-fasting-preset="15"]');
-      await page.waitForFunction(() => document.querySelector('[data-fasting-preset="15"]').getAttribute('aria-pressed') === 'true');
+      await page.waitForFunction(() => (() => { const el = document.querySelector('[data-fasting-preset="15"]'); return el?.getAttribute('aria-checked') === 'true' && !el.disabled; })());
       assert.equal((await call('get', '/health/fasting/state')).data.settings.default_goal_minutes, 900);
       assert.equal(await page.$eval('[data-fasting-preset="15"]', (el) => el === document.activeElement), true);
       assert.equal(await page.$eval('[data-fasting-preferences-status]', (el) => el.textContent), 'Uloženo');
       await clickFasting(page, '[data-fasting-preset="custom"]');
       assert.equal(await page.$eval('[data-fasting-custom]', (el) => el.hidden), false);
-      assert.equal(await page.$eval('[data-fasting-preset="custom"]', (el) => el.getAttribute('aria-pressed')), 'true');
+      assert.equal(await page.$eval('[data-fasting-preset="custom"]', (el) => el.getAttribute('aria-checked')), 'true');
       await page.type('[data-fasting-goal]', '36');
       await page.$eval('[data-fasting-goal]', (el) => el.dispatchEvent(new Event('change', { bubbles: true })));
       await page.waitForFunction(() => !document.querySelector('[data-fasting-goal]').disabled);
       assert.equal((await call('get', '/health/fasting/state')).data.settings.default_goal_minutes, 2160);
-      await clickFasting(page, '[data-fasting-preset=""]');
-      await page.waitForFunction(() => document.querySelector('[data-fasting-preset=""]').getAttribute('aria-pressed') === 'true');
+      await clickFasting(page, '[data-fasting-preset="none"]');
+      await page.waitForFunction(() => (() => { const el = document.querySelector('[data-fasting-preset="none"]'); return el?.getAttribute('aria-checked') === 'true' && !el.disabled; })());
       await clickFasting(page, '[data-fasting-preset="16"]');
-      await page.waitForFunction(() => document.querySelector('[data-fasting-preset="16"]').getAttribute('aria-pressed') === 'true');
+      await page.waitForFunction(() => (() => { const el = document.querySelector('[data-fasting-preset="16"]'); return el?.getAttribute('aria-checked') === 'true' && !el.disabled; })());
       assert.equal(await page.$eval('[data-fasting-custom]', (el) => el.hidden), true);
+      await closeFastingSettings(page);
       assert.equal(await page.$eval('.fasting-panel', (el) => el.lastElementChild.id), 'history');
       assert.equal(await page.$eval('.fasting-hero', (el) => el.querySelectorAll('a').length), 0);
       const button = await page.$eval('[data-fasting-action]', (el) => {
@@ -104,9 +122,11 @@ test('fasting acceptance: desktop and mobile journal controls preserve data and 
       await page.waitForFunction(() => !document.querySelector('.modal-panel'));
       await page.waitForFunction(() => document.querySelector('[data-fasting-action]')?.textContent === 'Ukončit půst');
       assert.equal((await call('get', '/health/fasting/state')).data.active.goal_minutes, 960, 'selected default becomes the running goal');
+      await openFastingSettings(page);
       await clickFasting(page, '[data-fasting-preset="20"]');
-      await page.waitForFunction(() => document.querySelector('[data-fasting-preset="20"]').getAttribute('aria-pressed') === 'true');
+      await page.waitForFunction(() => (() => { const el = document.querySelector('[data-fasting-preset="20"]'); return el?.getAttribute('aria-checked') === 'true' && !el.disabled; })());
       assert.equal((await call('get', '/health/fasting/state')).data.active.goal_minutes, 1200);
+      await closeFastingSettings(page);
       await clickFasting(page, '[data-fasting-clock-mode="elapsed"]');
       await page.waitForFunction(() => document.querySelector('[data-fasting-clock-mode="elapsed"]').getAttribute('aria-pressed') === 'true');
       assert.equal((await call('get', '/health/fasting/state')).data.settings.clock_mode, 'elapsed');
