@@ -2350,7 +2350,7 @@ test('Recipes expose meal-type suitability controls for planner integrations', (
   assert.match(recipesPage, /normalizeRecipeMealTypes/);
   assertKeysExistInEveryLocale(['recipes.dragToMealsHint']);
   assert.match(recipesPage, /id="recipe-meal-types"/);
-  assert.match(recipesPage, /input type="checkbox" value="\$\{option\.key\}" checked/);
+  assert.match(recipesPage, /class="filter-chip recipe-meal-types__chip" data-meal-type="\$\{option\.key\}" aria-pressed=/);
   assert.match(recipesPage, /meal_types/);
   assert.match(recipesCss, /\.recipe-meal-types\s*\{/);
   assert.match(recipesCss, /\.recipe-card__meal-types\s*\{/);
@@ -5881,10 +5881,13 @@ test('die beiden Küchen-Editoren sind derselbe Dialog', () => {
     'die Checkbox muss eingekleidet sein und die Stimme tragen, auch im Modal');
   assert.match(shopping, /class="form-check pantry-transfer__clear"/,
     'die folgenreichste Checkbox des Moduls („Artikel von der Einkaufsliste löschen", standardmäßig aktiv) war die unauffälligste');
-  assert.match(read('../public/pages/recipes.js'), /class="form-check recipe-meal-types__option"/,
-    'die Mahlzeit-Typen im Rezept-Formular waren die zweite nackte System-Checkbox');
+  // Die Mahlzeit-Typen im Rezept-Formular waren die zweite nackte System-
+  // Checkbox; seit der Re-Critique 2026-09-28 (A4 P2-7) sind sie Umschalt-Chips
+  // (filter-chip, aria-pressed) statt Checkbox plus Farbbadge.
+  assert.match(read('../public/pages/recipes.js'), /class="filter-chip recipe-meal-types__chip"/,
+    'die Mahlzeit-Typen im Rezept-Formular sind Umschalt-Chips');
   // Die Modul-CSS dürfen die Geometrie nicht zurückholen.
-  for (const [file, selector] of [['shopping.css', '.pantry-transfer__clear'], ['recipes.css', '.recipe-meal-types__option']]) {
+  for (const [file, selector] of [['shopping.css', '.pantry-transfer__clear']]) {
     const block = read(`../public/styles/${file}`).match(new RegExp(`\\${selector}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
     assert.doesNotMatch(block, /display:|align-items:|cursor:/,
       `${file}: ${selector} darf Geometrie und Zielgröße nicht doppelt pflegen - das leistet .form-check`);
@@ -10885,9 +10888,11 @@ test('Rechtevergabe ist auf dem Telefon beschriftet und mit dem Finger bedienbar
   // à 34x30px). `pointer: coarse` deckt das Tablet im Querformat.
   const touchQuery = '@media (max-width: 1023px), (pointer: coarse)';
   assert.ok(css.includes(touchQuery), 'Touch endet nicht bei 767px');
-  const mobile = css.slice(css.indexOf(touchQuery, css.indexOf('.perm-modeswitch {')));
+  // Seit R14 ist der Modus-Umschalter der Kanon `.segmented` (Touch-Mass aus
+  // --target-base in panel.css); hier bleiben die Chips der Subjekt-Auswahl.
+  const mobile = css.slice(css.indexOf(touchQuery, css.indexOf('.perm-mode {')));
   assert.ok(mobile.includes('.perm-seg__label'), 'Der Touch-Block muss das Label sichtbar schalten');
-  assert.match(mobile, /\.perm-modeswitch__btn,\s*\.perm-chip \{ min-height: var\(--target-base\); \}/);
+  assert.match(mobile, /\.perm-chip \{ min-height: var\(--target-base\); \}/);
   assert.match(mobile, /\.perm-seg__opt \{[^}]*min-height: var\(--target-base\);/s);
   // Gestapelt statt segmentiert: vier Stufen mit Wort passen bei 390px nicht
   // neben den Modulnamen.
@@ -19066,35 +19071,18 @@ test('die Achsenschrift einer CHART-Flaeche skaliert nicht mit dem Diagramm', ()
 
 /* "Mitglied hinzufuegen" verlor den Fokus (Critique 2026-09-26): der Knopf
  * verschwand, das Formular erschien UNTER der Zwei-Faktor-Karte, der Fokus
- * fiel auf BODY. Die Einladung derselben Seite macht es richtig - Formular am
- * Ort, erstes Feld fokussiert. Geprueft wird Ort UND Fokusweg in beide
- * Richtungen, fuer beide Formulare der Seite. */
-test('Familie: Mitglied- und Einladungsformular erscheinen am Knopf und geben den Fokus zurueck', () => {
+ * fiel auf BODY. Seit R14 (A7 P2-4) sind Mitglied und Einladung Blatt-Dialoge
+ * mit Kanon-Fuss: der Knopf bleibt stehen, der Dialog gibt den Fokus beim
+ * Schliessen an ihn zurueck (modal.js), und nach dem Anlegen schliesst er mit
+ * force, statt ein Formular wegzublenden. Die Form haelt
+ * test-settings-navigation.js ("R14: Familie legt im Blatt-Dialog an"). */
+test('Familie: Mitglied und Einladung oeffnen einen Dialog, der Knopf bleibt Fokusziel', () => {
   const src = read('../public/settings/pages/admin-family.js');
-  const at = (needle) => {
-    const i = src.indexOf(needle);
-    assert.ok(i >= 0, `${needle} fehlt`);
-    return i;
-  };
-  const membersCard = at('id="members-card"');
-  const formCard = at('id="add-member-form-card"');
-  const twoFactor = at('id="two-factor-household-card"');
-  assert.ok(membersCard < formCard && formCard < twoFactor,
-    'das Formular steht direkt unter der Mitgliederliste, nicht hinter der Zwei-Faktor-Karte');
-
-  const handler = (openNeedle) => {
-    const start = at(openNeedle);
-    return src.slice(start, src.indexOf('});', start) + 3);
-  };
-  assert.match(handler("addMemberBtn.addEventListener('click'"), /#new-username'\)\??\.focus\(/,
-    'Oeffnen setzt den Fokus ins erste Feld');
-  assert.match(handler("cancelAddMember.addEventListener('click'"), /#add-member-btn'\)\??\.focus\(\)|addMemberBtn\??\.focus\(\)/,
-    'Abbrechen gibt den Fokus an den wieder sichtbaren Knopf zurueck');
-  const submit = src.slice(at("addMemberForm.addEventListener('submit'"), at('bindDeleteButtons(container);\n  bindEditButtons(container, currentUser, users);\n}'));
-  assert.match(submit, /#add-member-btn'\)\??\.focus\(\)|addMemberBtn\??\.focus\(\)/,
-    'nach dem Anlegen verschwindet das Formular - der Fokus geht an den Knopf, nicht an BODY');
-  assert.match(handler("container.querySelector('#cancel-add-invite')?.addEventListener('click'"), /addBtn\.focus\(\)/,
-    'auch das Einladungsformular gibt beim Abbrechen den Fokus zurueck');
+  assert.doesNotMatch(src, /id="add-member-form-card"|id="add-invite-form-card"/, 'kein Inline-Formular mehr');
+  assert.match(src, /addMemberBtn\.addEventListener\('click', \(\) => openAddMemberModal\(/);
+  assert.doesNotMatch(src, /addMemberBtn\.hidden = true|addBtn\.hidden = true/, 'der Knopf verschwindet nicht - er ist das Ziel der Fokus-Rueckgabe');
+  const submit = src.slice(src.indexOf('function openAddMemberModal('), src.indexOf('function bindEvents('));
+  assert.match(submit, /closeModal\(\{ force: true \}\)/, 'nach dem Anlegen schliesst der Dialog und gibt den Fokus zurueck');
 });
 
 /* Lucide ersetzt `<i data-lucide>` durch ein `<svg>` - eine Regel auf `… i`
