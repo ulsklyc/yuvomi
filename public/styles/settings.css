@@ -3119,11 +3119,23 @@
   left: 2px;
   width: calc((100% - 4px) / var(--seg-count, 3));
   border-radius: var(--radius-full);
-  /* Der gleitende Daumen IST das aktive Segment - er trägt deshalb die
-   * Segment-Sprache der Shell: erhabene Surface-Pille, Modulton in der Tinte
-   * des Glyphs darauf (tokens.css, Abschnitt 6c; siehe .perm-seg__opt.is-active). */
-  background: var(--seg-active-bg);
-  box-shadow: var(--seg-active-shadow);
+  /* Der gleitende Daumen IST das aktive Segment. Er trug bis zur Re-Critique
+   * 2026-09-28 die Segment-Sprache der Shell (erhabene Surface-Pille, Modulton
+   * in der Tinte) - und war damit praktisch unsichtbar: gemessen weiss auf
+   * rgb(251,251,253) = 1,03:1, in Dark sogar DUNKLER als das Segment, und der
+   * Modulton der Einstellungen ist neutral, also trug auch die Tinte nichts
+   * (1,2:1 gegen das inaktive Glyph). Die Matrix ist die Aufgabe mit den
+   * groessten sozialen Folgen (was darf das Kind) und steht am Zeiger nur als
+   * Icon - die Label-Verlust-Regel verlangt getoente Flaeche PLUS gefuelltes
+   * Glyph (layout.css, Filled Variant), beides im App-Akzent.
+   *
+   * Die KANTE traegt den Kontrast: eine Toenung allein erreicht die 3:1 gegen
+   * das Segment nie (24 %: 1,41 hell / 1,28 dunkel), der Akzent als Kante
+   * 5,86 hell / 4,61 dunkel (nachgerechnet in test-permission-sheet-ui.js). Als
+   * inset-Schatten, damit sie den Daumen nicht vergroessert. Nie die Kante
+   * allein - Flaeche und Glyph sagen den Zustand mit. */
+  background: color-mix(in srgb, var(--color-accent) var(--tint-surface), var(--color-surface));
+  box-shadow: inset 0 0 0 1.5px var(--color-accent);
   transform: translateX(calc(var(--seg-index, 0) * 100%));
   transition: transform var(--duration-lg) var(--ease-out);
   pointer-events: none;
@@ -3151,10 +3163,12 @@
 }
 
 .perm-seg__opt:disabled { cursor: not-allowed; }
-/* Die Fläche liefert der gleitende Daumen; das Glyph darauf trägt den Modulton
- * als Tinte - dieselbe Mischung wie jedes andere aktive Segment. */
+/* Die Fläche liefert der gleitende Daumen; das Glyph darauf trägt die Tinte -
+ * dieselbe Mischung wie jedes andere aktive Segment, aber im APP-Akzent statt
+ * im Modulton: der der Einstellungen ist neutral und hob das aktive Glyph nur
+ * 1,2:1 vom inaktiven ab (Re-Critique 2026-09-28, A7 P1-1). */
 .perm-seg__opt.is-active {
-  color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
+  color: color-mix(in srgb, var(--color-accent) var(--tint-ink), var(--color-text-primary));
 }
 
 /* Am Zeiger traegt der Tooltip den Klartext; unter 768px wird er sichtbar. */
@@ -3276,6 +3290,16 @@
   .perm-actions__status {
     flex-basis: 100%;
     margin-right: 0;
+  }
+
+  /* Klebend nur, solange etwas ungespeichert ist (Re-Critique 2026-09-28,
+   * A7 P2-5): vorher 73px dauerhaft ueber der 76px-Kapsel, auch mit gesperrtem
+   * „Speichern", und im ersten Bild lag er auf dem Rollen-Hinweis. Ohne
+   * Aenderung steht der Fuss am Ende der Liste - „Zuruecksetzen" bleibt dort
+   * erreichbar. `is-dirty` setzt updateSaveState(), derselbe Weg, der
+   * „Speichern" freigibt. */
+  .perm-actions:not(.is-dirty) {
+    position: static;
   }
 }
 

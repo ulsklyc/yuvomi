@@ -495,6 +495,8 @@ function updateSaveState(panel) {
   if (save) save.disabled = !state.dirty;
   const dirty = panel.querySelector('#perm-dirty');
   if (dirty) dirty.hidden = !state.dirty;
+  // Am Telefon klebt der Fuss nur mit ungespeicherten Aenderungen (settings.css).
+  panel.querySelector('.perm-actions')?.classList?.toggle('is-dirty', state.dirty);
 }
 
 // Widgets eines Moduls neu rendern (nach Modul-Änderung: Sperr-Zustände hängen daran).

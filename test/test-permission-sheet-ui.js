@@ -392,3 +392,89 @@ test('solange die Rechte des Subjekts laden, speichert der Knopf nichts', async 
     else delete globalThis.window;
   }
 });
+
+// ── Re-Critique 2026-09-28 (A7 P1-1, P2-5): die gewaehlte Stufe ist sichtbar, der Fuss klebt nur bei Aenderung ──
+
+test('Rechte-Matrix: das aktive Segment traegt getoente Flaeche, eine Kante >= 3:1 und ein gefuelltes Glyph - hell UND dunkel', async () => {
+  // Gemessen: Daumen rgb(255,255,255) auf Segment rgb(251,251,253) = 1,03:1,
+  // in Dark sogar DUNKLER als das Segment; das Glyph 1,2:1 gegen das inaktive.
+  // Ursache: der Modulton der Einstellungen ist neutral. Eine Toenung allein
+  // erreicht die 3:1 nicht (24 %: 1,41 hell / 1,28 dunkel) - die Kante traegt
+  // den Kontrast, Flaeche und gefuelltes Glyph den Zustand (Label-Verlust-Regel).
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const layout = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const tokens = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const base = (sel) => rules.find(({ selector, at }) => selector.trim() === sel && at.length === 0);
+
+  const thumb = base('.perm-seg__thumb');
+  assert.match(thumb.body, /background(?:-color)?:\s*color-mix\(in srgb, var\(--color-accent\) var\(--tint-[a-z]+\), var\(--color-surface\)\)/,
+    'getoente Flaeche im App-Akzent, nicht die neutrale Surface-Pille');
+  const edge = thumb.body.match(/box-shadow:\s*inset 0 0 0 ([\d.]+)px var\(--color-accent\)/);
+  assert.ok(edge, 'eine Kante im App-Akzent traegt die 3:1');
+  assert.ok(Number(edge[1]) >= 1.5, 'mindestens 1,5px - eine Haarlinie liest niemand als Zustand');
+
+  const active = base('.perm-seg__opt.is-active');
+  assert.match(active.body, /color:\s*color-mix\(in srgb, var\(--color-accent\) var\(--tint-ink\), var\(--color-text-primary\)\)/,
+    'das Glyph in der Akzent-Tinte - der neutrale Modulton der Einstellungen trug keinen Unterschied');
+  assert.match(layout, /\.perm-seg__opt\.is-active svg\s*\{[^}]*fill:\s*color-mix\(in srgb, currentColor 30%, transparent\)/,
+    'gefuelltes Glyph (Filled Variant, layout.css)');
+
+  // Die 3:1 NACHGERECHNET, aus den Token-Werten beider Themes.
+  const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const lum = (rgb) => {
+    const [r, g, b] = rgb.map((c) => { const s = c / 255; return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  const darkStart = tokens.indexOf('@media screen and (prefers-color-scheme: dark)');
+  assert.ok(darkStart > 0);
+  const pick = (name, from, to) => {
+    const m = tokens.slice(from, to).match(new RegExp(`${name}:\\s*(#[0-9A-Fa-f]{6})`));
+    assert.ok(m, `${name} nicht gefunden`);
+    return hex(m[1]);
+  };
+  for (const [theme, from, to] of [['hell', 0, darkStart], ['dunkel', darkStart, tokens.length]]) {
+    const accent = pick('--_color-accent', from, to);
+    const track = pick('--_color-surface-raised', from, to);
+    const r = ratio(accent, track);
+    assert.ok(r >= 3, `${theme}: Kante gegen das Segment ${r.toFixed(2)}:1, verlangt 3:1`);
+  }
+});
+
+test('Rechte-Matrix: der Fuss klebt am Telefon nur, solange etwas ungespeichert ist (A7 P2-5)', async () => {
+  // 73px dauerhaft klebend ueber der 76px-Kapsel, auch mit gesperrtem
+  // „Speichern" - im ersten Bild verdeckte er den Rollen-Hinweis.
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const narrow = [...eachRule(css)].filter(({ at }) => at.some((a) => /max-width:\s*1023px/.test(a)));
+  const ruhig = narrow.find(({ selector }) => selector.trim() === '.perm-actions:not(.is-dirty)');
+  assert.ok(ruhig && /position:\s*static/.test(ruhig.body), 'ohne Aenderung steht der Fuss am Ende, nicht klebend');
+
+  const { render } = await import('../public/settings/pages/admin-permissions.js');
+  const hadWindow = 'window' in globalThis;
+  const prevWindow = globalThis.window;
+  globalThis.window = {};
+  globalThis.__apiStub = {
+    get: async (url) => (url === '/permissions/catalog'
+      ? { data: CATALOG }
+      : { data: { modules: {}, widgets: {}, capabilities: {} } }),
+  };
+  try {
+    const sheet = fakeSheet();
+    const classes = new Set(['perm-actions', 'is-dirty']); // ein alter Zustand, den render() abraeumen muss
+    const actions = sheet.querySelector('#perm-matrix').querySelector('.perm-actions');
+    actions.classList = { toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)) };
+    await render(sheet, { user: { role: 'admin' } });
+    assert.equal(classes.has('is-dirty'), false, 'frisch geladen: nichts ungespeichert');
+  } finally {
+    delete globalThis.__apiStub;
+    if (hadWindow) globalThis.window = prevWindow; else delete globalThis.window;
+  }
+  const src = readFileSync(new URL('../public/settings/pages/admin-permissions.js', import.meta.url), 'utf8');
+  const fn = src.slice(src.indexOf('function updateSaveState('), src.indexOf('\n}\n', src.indexOf('function updateSaveState(')));
+  assert.match(fn, /classList\??\.toggle\('is-dirty', state\.dirty\)/, 'derselbe Weg, der Speichern freigibt, schaltet den Fuss');
+});
