@@ -1374,10 +1374,17 @@
   text-align: start;
 }
 
+/* ALLE KOEPFE GLEICH HOCH (A3 P2-1). Der Erledigt-Kopf traegt als einziger
+ * eine Aktion; als 44px-Knopf stand er 70 statt 50px hoch, Titel und erste
+ * Karte rutschten 20px unter die Flucht der Nachbarn. Jetzt haelt jeder Kopf
+ * die Hoehe der kompakten Aktion (--target-sm) plus Polster, ob er sie
+ * traegt oder nicht - die Flucht haengt nicht mehr am Inhalt. */
 .kanban-col__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  box-sizing: border-box;
+  min-height: calc(var(--target-sm) + 2 * var(--space-3) + 1.5px);
   padding: var(--space-3) var(--space-4);
   border-bottom: 1.5px solid var(--color-border);
 }
@@ -1385,10 +1392,24 @@
 /* .kanban-col__title — Typografie via .nav-section-label-Schicht (Sentence-Case, Critique P2); Farbe inline (Spalten-Accent) */
 
 /* „Alles Erledigte archivieren" (#1250): steht hinter dem Zaehler und darf
-   weder schrumpfen noch den Titel verdraengen - der Titelknopf traegt flex: 1. */
-.kanban-col__action {
+   weder schrumpfen noch den Titel verdraengen - der Titelknopf traegt flex: 1.
+   Sichtbar kompakt (--target-sm), getroffen voll: `::before` waechst auf
+   --target-base und bleibt im Polster des Kopfs (A3 P2-1). */
+.row-action.kanban-col__action {
+  position: relative;
   flex-shrink: 0;
+  width: var(--target-sm);
+  height: var(--target-sm);
+  min-width: var(--target-sm);
+  min-height: var(--target-sm);
   margin-inline-start: var(--space-1);
+}
+
+.row-action.kanban-col__action::before {
+  content: '';
+  position: absolute;
+  inset: calc((var(--target-sm) - var(--target-base)) / 2);
+  border-radius: var(--radius-full);
 }
 
 .kanban-col__count {

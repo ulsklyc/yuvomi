@@ -209,3 +209,21 @@ test('beide Beschriftungen liegen in allen Locales und sind nicht leer', async (
       `${datei}: Zu- und Aufklappen tragen denselben Text`);
   }
 });
+
+test('alle Spaltenkoepfe gleich hoch: die Archiv-Aktion ist eine kompakte Zeilenaktion (A3 P2-1)', () => {
+  // Gemessen 50/50/70/50px: der 44px-Knopf "Alles Erledigte archivieren"
+  // hob nur den Erledigt-Kopf. Jetzt Kanon-Zeilenaktion, sichtbar so hoch wie
+  // --target-sm, und JEDER Kopf haelt diese Hoehe als Mindesthoehe.
+  const html = brett();
+  const knopf = /<button[^>]*data-kanban-archive-done[^>]*>/.exec(html)?.[0] ?? '';
+  assert.match(knopf, /class="row-action kanban-col__action"/, `Kanon row-action statt btn: ${knopf}`);
+  assert.match(knopf, /aria-label="[^"]+"/, 'die Aktion hat einen Namen');
+
+  const regeln = [...eachRule(tasksCss)];
+  const kopf = regeln.find((r) => r.selector.trim() === '.kanban-col__header' && !r.at.length);
+  assert.match(kopf?.body ?? '', /min-height:\s*calc\(var\(--target-sm\)/, `jeder Kopf haelt die Aktionshoehe: ${kopf?.body}`);
+  const aktion = regeln.find((r) => r.selector.trim() === '.row-action.kanban-col__action' && !r.at.length);
+  assert.match(aktion?.body ?? '', /(?:^|[\s;])height:\s*var\(--target-sm\)/, `die Aktion ist sichtbar kompakt: ${aktion?.body}`);
+  const treffer = regeln.find((r) => r.selector.trim() === '.row-action.kanban-col__action::before');
+  assert.match(treffer?.body ?? '', /--target-base/, 'die Treffflaeche waechst auf die Zielgroesse');
+});

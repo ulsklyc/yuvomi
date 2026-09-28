@@ -11,6 +11,7 @@ import { stagger, vibrate, scheduleUndoableDelete, animationSettled, collapseOut
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { t, getLocale, formatDate, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { rowActionHtml } from '/utils/row-action.js';
 import { renderMarkdownToolbar, wireMarkdownToolbar } from '/utils/markdown-toolbar.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
@@ -2828,11 +2829,16 @@ function kanbanBoardHtml(cols, grouped) {
               </span>
             </button>
             <span class="kanban-col__count">${grouped[col.status].length}</span>
-            ${col.status === 'done' && grouped.done.length && !readOnly() ? `
-            <button type="button" class="btn btn--ghost btn--icon btn--icon-sm kanban-col__action" data-kanban-archive-done
-                    aria-label="${t('tasks.kanbanArchiveDone')}" title="${t('tasks.kanbanArchiveDone')}">
-              <i data-lucide="archive" class="icon-sm" aria-hidden="true"></i>
-            </button>` : ''}
+            ${/* Die Archiv-Aktion ist eine Zeilenaktion (Kanon), kein 44px-Knopf:
+                * der hob den Erledigt-Kopf 20px ueber seine Nachbarn (A3 P2-1). */ ''}
+            ${col.status === 'done' && grouped.done.length && !readOnly()
+              ? rowActionHtml({
+                icon: 'archive',
+                label: t('tasks.kanbanArchiveDone'),
+                className: 'kanban-col__action',
+                attrs: { 'data-kanban-archive-done': true, title: t('tasks.kanbanArchiveDone') },
+              })
+              : ''}
           </div>
           <div class="kanban-col__body" id="${bodyId}" data-drop-zone="${col.status}"${collapsed ? ' hidden' : ''}>
             ${grouped[col.status].length
