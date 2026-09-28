@@ -57,7 +57,6 @@ test('Abos: „1 Tag überfällig", nicht „1 Tage" (Critique 2026-09-25)', asy
   await setLocale('de');
   assert.equal(t('subscriptions.overdueDays', { count: 1 }), '1 Tag überfällig');
   assert.equal(t('subscriptions.overdueDays', { count: 3 }), '3 Tage überfällig');
-  assert.equal(t('subscriptions.listCount', { count: 1 }), '1 Abonnement');
   assert.equal(t('subscriptions.reminderMeta', { count: 1 }), '1 Tag vorher');
   await setLocale('en');
   assert.equal(t('subscriptions.overdueDays', { count: 1 }), '1 day overdue');
@@ -275,7 +274,6 @@ const PLURAL_EXCEPTIONS = {
   'dashboard.healthRefill': 'NO_NOUN',
   'health.labs.abnormalBadge': 'NO_NOUN',
   'subscriptions.activeCount': 'NO_NOUN',
-  'budget.loansSummary': 'NO_NOUN',
 
   // --- Zahl in Klammern / hinter Doppelpunkt ------------------------------
   'category.errorInUse': 'PARENTHETICAL',
@@ -587,7 +585,6 @@ const FEW_GAPS_LEGACY = new Set([
   "splitExpenses.receiptsAttachedLabel",
   "subscriptions.endsAfter",
   "subscriptions.filtersActive",
-  "subscriptions.listCount",
   "subscriptions.overdueDays",
   "subscriptions.reminderMeta",
   "tasks.bulkTagHint",
