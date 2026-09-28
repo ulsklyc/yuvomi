@@ -439,7 +439,6 @@
         "createdToast": "Tâche créée.",
         "deletedToast": "Tâche supprimée.",
         "loadError": "La tâche n'a pas pu être chargée.",
-        "subtaskPrompt": "Sous-tâche :",
         "kanbanOpen": "Ouvert",
         "kanbanInProgress": "En cours",
         "kanbanDone": "Terminé",
@@ -2607,6 +2606,7 @@
         "pushDisabled": "Les notifications push sont désactivées sur cet appareil.",
         "pushDenied": "Les notifications ont été bloquées dans le navigateur. Veuillez les autoriser dans les paramètres du navigateur.",
         "pushUnsupported": "Ce navigateur ne prend pas en charge les notifications push.",
+        "pushUnavailable": "Les notifications push ne sont pas disponibles pour le moment sur cet appareil. Veuillez recharger la page.",
         "pushError": "Échec de l’action. Veuillez réessayer.",
         "pushTestButton": "Envoyer une notification de test",
         "pushTestSent": "Notification de test envoyée.",
@@ -3128,7 +3128,7 @@
         "ingredientMatchLoadError": "La réserve n’a pas pu être chargée."
     },
     "search": {
-        "emptyHint": "Saisis au moins 2 caractères pour chercher dans toutes les rubriques, même avec une partie d’un mot.",
+        "emptyHint": "Tape pour aller à une rubrique ou créer quelque chose. Dès 2 caractères, tu trouves aussi tes entrées, même avec une partie d’un mot.",
         "title": "Recherche",
         "open": "Ouvrir la recherche",
         "placeholder": "Rechercher…",
@@ -3137,7 +3137,9 @@
         "scopesLabel": "Aller à",
         "loading": "Recherche…",
         "resultCountOne": "{{count}} résultat",
-        "resultCountMany": "{{count}} résultats"
+        "resultCountMany": "{{count}} résultats",
+        "goTo": "Aller à",
+        "newSection": "Créer"
     },
     "birthdays": {
         "inDays_one": "dans {{count}} jour",
@@ -4483,6 +4485,8 @@
             "personsLabel": "Personne",
             "take": "Pris",
             "skip": "Ignorer",
+            "takeNamed": "Prendre {{name}}",
+            "skipNamed": "Ignorer {{name}}",
             "dueToday": {
                 "title": "À faire aujourd'hui",
                 "empty": "Rien à faire aujourd'hui."
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",
             "h": "{{hours}} h",
-            "m": "{{minutes}} min"
+            "m": "{{minutes}} min",
+            "unitH": "h"
         },
         "careBanner": "Vous saisissez pour {{name}}.",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} mois",
         "filterGroupLabel": "Filtrer les objets",
         "photoLabel": "Photo",
-        "backToInventory": "Retour à l'inventaire",
         "searchInCategoryPlaceholder": "Rechercher dans {{category}}",
         "removePhoto": "Retirer la photo",
         "trackedDatesLabel": "Échéances suivies",

@@ -135,7 +135,7 @@
         "schedule": "Jadwal shift"
     },
     "search": {
-        "emptyHint": "Ketik minimal 2 karakter untuk mencari di semua bagian, potongan kata juga bisa.",
+        "emptyHint": "Ketik untuk membuka bagian atau membuat sesuatu. Mulai 2 karakter, entri kamu juga ditemukan, bahkan dengan potongan kata.",
         "title": "Cari",
         "placeholder": "Cari…",
         "noResults": "Tidak ada hasil ditemukan.",
@@ -144,7 +144,9 @@
         "scopesLabel": "Buka langsung",
         "loading": "Mencari…",
         "resultCountOne": "{{count}} hasil",
-        "resultCountMany": "{{count}} hasil"
+        "resultCountMany": "{{count}} hasil",
+        "goTo": "Buka",
+        "newSection": "Buat baru"
     },
     "dashboard": {
         "title": "Ringkasan",
@@ -452,7 +454,6 @@
         "createdToast": "Tugas dibuat.",
         "deletedToast": "Tugas dihapus.",
         "loadError": "Tugas tidak dapat dimuat.",
-        "subtaskPrompt": "Subtugas:",
         "kanbanOpen": "Terbuka",
         "kanbanInProgress": "Sedang dikerjakan",
         "kanbanDone": "Selesai",
@@ -2619,6 +2620,7 @@
         "pushDisabled": "Notifikasi push dinonaktifkan di perangkat ini.",
         "pushDenied": "Notifikasi diblokir di browser. Harap izinkan di pengaturan browser.",
         "pushUnsupported": "Browser ini tidak mendukung notifikasi push.",
+        "pushUnavailable": "Notifikasi push saat ini tidak tersedia di perangkat ini. Silakan muat ulang halaman.",
         "pushError": "Tindakan gagal. Silakan coba lagi.",
         "pushTestButton": "Kirim notifikasi uji",
         "pushTestSent": "Notifikasi uji dikirim.",
@@ -4483,6 +4485,8 @@
             "personsLabel": "Orang",
             "take": "Diminum",
             "skip": "Lewati",
+            "takeNamed": "Minum {{name}}",
+            "skipNamed": "Lewati {{name}}",
             "dueToday": {
                 "title": "Jatuh tempo hari ini",
                 "empty": "Tidak ada yang jatuh tempo hari ini."
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} j {{minutes}} mnt",
             "h": "{{hours}} j",
-            "m": "{{minutes}} mnt"
+            "m": "{{minutes}} mnt",
+            "unitH": "j"
         },
         "careBanner": "Kamu mencatat untuk {{name}}.",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} bulan",
         "filterGroupLabel": "Filter barang",
         "photoLabel": "Foto",
-        "backToInventory": "Kembali ke inventaris",
         "searchInCategoryPlaceholder": "Cari di {{category}}",
         "removePhoto": "Hapus foto",
         "trackedDatesLabel": "Tanggal yang dilacak",

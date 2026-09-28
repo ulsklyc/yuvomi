@@ -462,7 +462,6 @@
         "bulkArchived": "Feladatok archiválva.",
         "bulkDeleted": "Feladatok törölve.",
         "loadError": "A feladatot nem sikerült betölteni.",
-        "subtaskPrompt": "Alfeladat:",
         "kanbanOpen": "Nyitott",
         "kanbanInProgress": "Folyamatban",
         "kanbanDone": "Befejezett",
@@ -2607,6 +2606,7 @@
         "pushDisabled": "A push értesítések le vannak tiltva ezen az eszközön.",
         "pushDenied": "Az értesítéseket a böngészőben blokkolták. Kérjük, engedélyezze őket a böngésző beállításaiban.",
         "pushUnsupported": "Ez a böngésző nem támogatja a push értesítéseket.",
+        "pushUnavailable": "A push értesítések most nem érhetők el ezen az eszközön. Töltsd újra az oldalt.",
         "pushError": "A művelet sikertelen. Kérjük, próbálja újra.",
         "pushTestButton": "Teszt értesítés küldése",
         "pushTestSent": "Teszt értesítés elküldve.",
@@ -3236,7 +3236,7 @@
         "ingredientMatchLoadError": "A készletet nem sikerült betölteni."
     },
     "search": {
-        "emptyHint": "Írj be legalább 2 karaktert, hogy minden területen keress, szórészlet is elég.",
+        "emptyHint": "Gépelj, hogy egy területre ugorj vagy létrehozz valamit. 2 karaktertől a bejegyzéseidet is megtalálod, akár szórészlettel is.",
         "title": "Keresés",
         "open": "Keresés megnyitása",
         "placeholder": "Keresés…",
@@ -3245,7 +3245,9 @@
         "scopesLabel": "Ugrás ide",
         "loading": "Keresés…",
         "resultCountOne": "{{count}} találat",
-        "resultCountMany": "{{count}} találat"
+        "resultCountMany": "{{count}} találat",
+        "goTo": "Ugrás ide",
+        "newSection": "Új létrehozása"
     },
     "onboarding": {
         "step1Title": "Üdvözöljük a {{name}} alkalmazásban",
@@ -4483,6 +4485,8 @@
             "personsLabel": "Személy",
             "take": "Bevéve",
             "skip": "Kihagyás",
+            "takeNamed": "{{name}} bevétele",
+            "skipNamed": "{{name}} kihagyása",
             "dueToday": {
                 "title": "Mai teendők",
                 "empty": "Ma nincs teendő."
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} ó {{minutes}} p",
             "h": "{{hours}} ó",
-            "m": "{{minutes}} p"
+            "m": "{{minutes}} p",
+            "unitH": "ó"
         },
         "careBanner": "{{name}} nevében rögzítesz.",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} hónap",
         "filterGroupLabel": "Tárgyak szűrése",
         "photoLabel": "Fotó",
-        "backToInventory": "Vissza a leltárhoz",
         "searchInCategoryPlaceholder": "Keresés itt: {{category}}",
         "removePhoto": "Fotó eltávolítása",
         "trackedDatesLabel": "Követett határidők",

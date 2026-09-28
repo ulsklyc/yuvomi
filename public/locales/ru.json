@@ -439,7 +439,6 @@
         "createdToast": "Задача создана.",
         "deletedToast": "Задача удалена.",
         "loadError": "Не удалось загрузить задачу.",
-        "subtaskPrompt": "Подзадача:",
         "kanbanOpen": "Открыто",
         "kanbanInProgress": "В процессе",
         "kanbanDone": "Выполнено",
@@ -2607,6 +2606,7 @@
         "pushDisabled": "Push-уведомления отключены на этом устройстве.",
         "pushDenied": "Уведомления заблокированы в браузере. Разрешите их в настройках браузера.",
         "pushUnsupported": "Этот браузер не поддерживает push-уведомления.",
+        "pushUnavailable": "Push-уведомления сейчас недоступны на этом устройстве. Перезагрузите страницу.",
         "pushError": "Не удалось выполнить действие. Попробуйте ещё раз.",
         "pushTestButton": "Отправить тестовое уведомление",
         "pushTestSent": "Тестовое уведомление отправлено.",
@@ -3128,7 +3128,7 @@
         "ingredientMatchLoadError": "Не удалось загрузить запасы."
     },
     "search": {
-        "emptyHint": "Введите минимум 2 символа для поиска по всем разделам, подойдёт и часть слова.",
+        "emptyHint": "Печатайте, чтобы перейти в раздел или что-то создать. С 2 символов находятся и ваши записи, даже по части слова.",
         "title": "Поиск",
         "open": "Открыть поиск",
         "placeholder": "Поиск…",
@@ -3137,7 +3137,9 @@
         "scopesLabel": "Перейти к",
         "loading": "Поиск…",
         "resultCountOne": "{{count}} результат",
-        "resultCountMany": "{{count}} результатов"
+        "resultCountMany": "{{count}} результатов",
+        "goTo": "Перейти к",
+        "newSection": "Создать"
     },
     "birthdays": {
         "inDays_one": "через {{count}} день",
@@ -4483,6 +4485,8 @@
             "personsLabel": "Человек",
             "take": "Принято",
             "skip": "Пропустить",
+            "takeNamed": "Принять {{name}}",
+            "skipNamed": "Пропустить {{name}}",
             "dueToday": {
                 "title": "На сегодня",
                 "empty": "На сегодня ничего нет."
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} ч {{minutes}} мин",
             "h": "{{hours}} ч",
-            "m": "{{minutes}} мин"
+            "m": "{{minutes}} мин",
+            "unitH": "ч"
         },
         "careBanner": "Вы вносите данные за {{name}}.",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} мес.",
         "filterGroupLabel": "Фильтр предметов",
         "photoLabel": "Фото",
-        "backToInventory": "Назад к инвентарю",
         "searchInCategoryPlaceholder": "Поиск в {{category}}",
         "removePhoto": "Убрать фото",
         "trackedDatesLabel": "Отслеживаемые сроки",

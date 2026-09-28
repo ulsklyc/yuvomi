@@ -462,7 +462,6 @@
         "bulkArchived": "Taken gearchiveerd.",
         "bulkDeleted": "Taken verwijderd.",
         "loadError": "Taak kon niet worden geladen.",
-        "subtaskPrompt": "Subtaak:",
         "kanbanOpen": "Open",
         "kanbanInProgress": "In uitvoering",
         "kanbanDone": "Klaar",
@@ -2607,6 +2606,7 @@
         "pushDisabled": "Pushmeldingen zijn uitgeschakeld op dit apparaat.",
         "pushDenied": "Meldingen zijn geblokkeerd in de browser. Sta ze toe in je browserinstellingen.",
         "pushUnsupported": "Deze browser ondersteunt geen pushmeldingen.",
+        "pushUnavailable": "Pushmeldingen zijn op dit apparaat nu niet beschikbaar. Laad de pagina opnieuw.",
         "pushError": "Actie mislukt. Probeer het opnieuw.",
         "pushTestButton": "Testmelding verzenden",
         "pushTestSent": "Testmelding verzonden.",
@@ -3236,7 +3236,7 @@
         "ingredientMatchLoadError": "De voorraad kon niet worden geladen."
     },
     "search": {
-        "emptyHint": "Typ minstens 2 tekens om in alle onderdelen te zoeken, ook op delen van woorden.",
+        "emptyHint": "Typ om naar een onderdeel te gaan of iets aan te maken. Vanaf 2 tekens vind je ook je items, zelfs op delen van woorden.",
         "title": "Zoeken",
         "open": "Zoeken openen",
         "placeholder": "Zoeken…",
@@ -3245,7 +3245,9 @@
         "scopesLabel": "Ga naar",
         "loading": "Zoeken…",
         "resultCountOne": "{{count}} resultaat",
-        "resultCountMany": "{{count}} resultaten"
+        "resultCountMany": "{{count}} resultaten",
+        "goTo": "Ga naar",
+        "newSection": "Nieuw aanmaken"
     },
     "onboarding": {
         "step1Title": "Welkom bij {{name}}",
@@ -4483,6 +4485,8 @@
             "personsLabel": "Persoon",
             "take": "Ingenomen",
             "skip": "Overslaan",
+            "takeNamed": "{{name}} innemen",
+            "skipNamed": "{{name}} overslaan",
             "dueToday": {
                 "title": "Vandaag te doen",
                 "empty": "Vandaag is er niets te doen."
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} u {{minutes}} min",
             "h": "{{hours}} u",
-            "m": "{{minutes}} min"
+            "m": "{{minutes}} min",
+            "unitH": "u"
         },
         "careBanner": "Je noteert voor {{name}}.",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} maanden",
         "filterGroupLabel": "Voorwerpen filteren",
         "photoLabel": "Foto",
-        "backToInventory": "Terug naar inventaris",
         "searchInCategoryPlaceholder": "Zoeken in {{category}}",
         "removePhoto": "Foto verwijderen",
         "trackedDatesLabel": "Gevolgde termijnen",

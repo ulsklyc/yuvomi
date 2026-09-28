@@ -439,7 +439,6 @@
         "createdToast": "タスクを作成しました。",
         "deletedToast": "タスクを削除しました。",
         "loadError": "タスクの読み込みに失敗しました。",
-        "subtaskPrompt": "サブタスク：",
         "kanbanOpen": "未着手",
         "kanbanInProgress": "進行中",
         "kanbanDone": "完了",
@@ -2607,6 +2606,7 @@
         "pushDisabled": "このデバイスでプッシュ通知は無効です。",
         "pushDenied": "ブラウザで通知がブロックされています。ブラウザの設定で許可してください。",
         "pushUnsupported": "このブラウザはプッシュ通知に対応していません。",
+        "pushUnavailable": "このデバイスでは現在プッシュ通知を利用できません。ページを再読み込みしてください。",
         "pushError": "操作に失敗しました。もう一度お試しください。",
         "pushTestButton": "テスト通知を送信",
         "pushTestSent": "テスト通知を送信しました。",
@@ -3128,7 +3128,7 @@
         "ingredientMatchLoadError": "在庫を読み込めませんでした。"
     },
     "search": {
-        "emptyHint": "2文字以上入力すると、すべての項目を検索できます。単語の一部でも見つかります。",
+        "emptyHint": "入力すると項目へ移動したり、新しく作成したりできます。2文字以上で登録内容も検索でき、単語の一部でも見つかります。",
         "title": "検索",
         "open": "検索を開く",
         "placeholder": "検索…",
@@ -3137,7 +3137,9 @@
         "scopesLabel": "直接開く",
         "loading": "検索中…",
         "resultCountOne": "{{count}} 件の結果",
-        "resultCountMany": "{{count}} 件の結果"
+        "resultCountMany": "{{count}} 件の結果",
+        "goTo": "移動",
+        "newSection": "新規作成"
     },
     "birthdays": {
         "inDays_one": "あと{{count}}日",
@@ -4483,6 +4485,8 @@
             "personsLabel": "人",
             "take": "服用済み",
             "skip": "スキップ",
+            "takeNamed": "{{name}} を服用",
+            "skipNamed": "{{name}} をスキップ",
             "dueToday": {
                 "title": "今日の予定",
                 "empty": "今日の予定はありません。"
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}}時間{{minutes}}分",
             "h": "{{hours}}時間",
-            "m": "{{minutes}}分"
+            "m": "{{minutes}}分",
+            "unitH": "時間"
         },
         "careBanner": "{{name}} さんの記録を入力しています。",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} か月",
         "filterGroupLabel": "持ち物を絞り込む",
         "photoLabel": "写真",
-        "backToInventory": "持ち物に戻る",
         "searchInCategoryPlaceholder": "{{category}} 内を検索",
         "removePhoto": "写真を削除",
         "trackedDatesLabel": "追跡中の期限",

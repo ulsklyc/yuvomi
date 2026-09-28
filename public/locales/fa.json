@@ -135,7 +135,7 @@
         "schedule": "برنامه شیفت"
     },
     "search": {
-        "emptyHint": "برای جستجو در همه بخش‌ها دست‌کم ۲ نویسه بنویس، بخشی از واژه هم کافی است.",
+        "emptyHint": "بنویس تا به یک بخش بروی یا چیزی بسازی. از ۲ نویسه به بعد ورودی‌هایت را هم پیدا می‌کنی، حتی با بخشی از واژه.",
         "title": "جستجو",
         "placeholder": "جستجو…",
         "noResults": "نتیجه‌ای یافت نشد.",
@@ -144,7 +144,9 @@
         "scopesLabel": "رفتن به",
         "loading": "در حال جستجو…",
         "resultCountOne": "{{count}} نتیجه",
-        "resultCountMany": "{{count}} نتیجه"
+        "resultCountMany": "{{count}} نتیجه",
+        "goTo": "رفتن به",
+        "newSection": "ساختن مورد تازه"
     },
     "dashboard": {
         "title": "نمای کلی",
@@ -452,7 +454,6 @@
         "createdToast": "کار ایجاد شد.",
         "deletedToast": "کار حذف شد.",
         "loadError": "کار بارگذاری نشد.",
-        "subtaskPrompt": "زیرکار:",
         "kanbanOpen": "باز",
         "kanbanInProgress": "در حال انجام",
         "kanbanDone": "انجام‌شده",
@@ -2619,6 +2620,7 @@
         "pushDisabled": "اعلان‌های Push روی این دستگاه غیرفعال است.",
         "pushDenied": "اعلان‌ها در مرورگر مسدود شده‌اند. لطفاً در تنظیمات مرورگر اجازه دهید.",
         "pushUnsupported": "این مرورگر از اعلان‌های Push پشتیبانی نمی‌کند.",
+        "pushUnavailable": "اعلان‌های Push در حال حاضر روی این دستگاه در دسترس نیستند. لطفاً صفحه را دوباره بارگیری کنید.",
         "pushError": "اقدام ناموفق بود. لطفاً دوباره تلاش کنید.",
         "pushTestButton": "ارسال اعلان آزمایشی",
         "pushTestSent": "اعلان آزمایشی ارسال شد.",
@@ -4483,6 +4485,8 @@
             "personsLabel": "شخص",
             "take": "مصرف‌شده",
             "skip": "رد کردن",
+            "takeNamed": "مصرف {{name}}",
+            "skipNamed": "رد کردن {{name}}",
             "dueToday": {
                 "title": "موعد امروز",
                 "empty": "امروز چیزی موعد ندارد."
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} ساعت {{minutes}} دقیقه",
             "h": "{{hours}} ساعت",
-            "m": "{{minutes}} دقیقه"
+            "m": "{{minutes}} دقیقه",
+            "unitH": "ساعت"
         },
         "careBanner": "شما برای {{name}} ثبت می‌کنید.",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} ماه",
         "filterGroupLabel": "فیلتر وسایل",
         "photoLabel": "عکس",
-        "backToInventory": "بازگشت به اموال",
         "searchInCategoryPlaceholder": "جستجو در {{category}}",
         "removePhoto": "حذف عکس",
         "trackedDatesLabel": "مهلت‌های پیگیری‌شده",

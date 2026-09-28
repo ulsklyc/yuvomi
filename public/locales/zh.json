@@ -439,7 +439,6 @@
         "createdToast": "任务已创建。",
         "deletedToast": "任务已删除。",
         "loadError": "任务加载失败。",
-        "subtaskPrompt": "子任务：",
         "kanbanOpen": "待处理",
         "kanbanInProgress": "进行中",
         "kanbanDone": "已完成",
@@ -2607,6 +2606,7 @@
         "pushDisabled": "此设备已停用推送通知。",
         "pushDenied": "通知已在浏览器中被屏蔽。请在浏览器设置中允许通知。",
         "pushUnsupported": "此浏览器不支持推送通知。",
+        "pushUnavailable": "此设备当前无法使用推送通知。请重新加载页面。",
         "pushError": "操作失败。请重试。",
         "pushTestButton": "发送测试通知",
         "pushTestSent": "测试通知已发送。",
@@ -3128,7 +3128,7 @@
         "ingredientMatchLoadError": "无法加载库存。"
     },
     "search": {
-        "emptyHint": "输入至少 2 个字符即可搜索所有模块，词的一部分也能找到。",
+        "emptyHint": "输入即可跳转到某个模块或新建内容。输入 2 个字符起还能搜索你的条目，词的一部分也能找到。",
         "title": "搜索",
         "open": "打开搜索",
         "placeholder": "搜索…",
@@ -3137,7 +3137,9 @@
         "scopesLabel": "直接打开",
         "loading": "搜索中…",
         "resultCountOne": "{{count}} 个结果",
-        "resultCountMany": "{{count}} 个结果"
+        "resultCountMany": "{{count}} 个结果",
+        "goTo": "前往",
+        "newSection": "新建"
     },
     "birthdays": {
         "inDays_one": "{{count}}天后",
@@ -4483,6 +4485,8 @@
             "personsLabel": "成员",
             "take": "已服用",
             "skip": "跳过",
+            "takeNamed": "服用 {{name}}",
+            "skipNamed": "跳过 {{name}}",
             "dueToday": {
                 "title": "今日待办",
                 "empty": "今日无待办。"
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} 小时 {{minutes}} 分钟",
             "h": "{{hours}} 小时",
-            "m": "{{minutes}} 分钟"
+            "m": "{{minutes}} 分钟",
+            "unitH": "小时"
         },
         "careBanner": "你正在为 {{name}} 记录。",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} 个月",
         "filterGroupLabel": "筛选物品",
         "photoLabel": "照片",
-        "backToInventory": "返回物品",
         "searchInCategoryPlaceholder": "在 {{category}} 中搜索",
         "removePhoto": "移除照片",
         "trackedDatesLabel": "跟踪的到期日",

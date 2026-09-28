@@ -439,7 +439,6 @@
         "createdToast": "Tarea creada.",
         "deletedToast": "Tarea eliminada.",
         "loadError": "No se pudo cargar la tarea.",
-        "subtaskPrompt": "Subtarea:",
         "kanbanOpen": "Abierta",
         "kanbanInProgress": "En progreso",
         "kanbanDone": "Completada",
@@ -2607,6 +2606,7 @@
         "pushDisabled": "Las notificaciones push están desactivadas en este dispositivo.",
         "pushDenied": "Las notificaciones se han bloqueado en el navegador. Permítelas en la configuración del navegador.",
         "pushUnsupported": "Este navegador no admite notificaciones push.",
+        "pushUnavailable": "Las notificaciones push no están disponibles ahora en este dispositivo. Vuelve a cargar la página.",
         "pushError": "La acción ha fallado. Inténtalo de nuevo.",
         "pushTestButton": "Enviar notificación de prueba",
         "pushTestSent": "Notificación de prueba enviada.",
@@ -3128,7 +3128,7 @@
         "ingredientMatchLoadError": "No se pudo cargar la despensa."
     },
     "search": {
-        "emptyHint": "Escribe al menos 2 caracteres para buscar en todas las secciones, también por partes de palabras.",
+        "emptyHint": "Escribe para ir a una sección o crear algo. Desde 2 caracteres también encuentras tus entradas, incluso por partes de palabras.",
         "title": "Búsqueda",
         "open": "Abrir búsqueda",
         "placeholder": "Buscar…",
@@ -3137,7 +3137,9 @@
         "scopesLabel": "Ir a",
         "loading": "Buscando…",
         "resultCountOne": "{{count}} resultado",
-        "resultCountMany": "{{count}} resultados"
+        "resultCountMany": "{{count}} resultados",
+        "goTo": "Ir a",
+        "newSection": "Crear nuevo"
     },
     "birthdays": {
         "inDays_one": "en {{count}} día",
@@ -4483,6 +4485,8 @@
             "personsLabel": "Persona",
             "take": "Tomado",
             "skip": "Omitir",
+            "takeNamed": "Tomar {{name}}",
+            "skipNamed": "Omitir {{name}}",
             "dueToday": {
                 "title": "Para hoy",
                 "empty": "Hoy no hay nada pendiente."
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",
             "h": "{{hours}} h",
-            "m": "{{minutes}} min"
+            "m": "{{minutes}} min",
+            "unitH": "h"
         },
         "careBanner": "Estás registrando para {{name}}.",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} meses",
         "filterGroupLabel": "Filtrar objetos",
         "photoLabel": "Foto",
-        "backToInventory": "Volver al inventario",
         "searchInCategoryPlaceholder": "Buscar en {{category}}",
         "removePhoto": "Quitar foto",
         "trackedDatesLabel": "Fechas en seguimiento",

@@ -462,7 +462,6 @@
         "bulkArchived": "Các nhiệm vụ đã được lưu trữ.",
         "bulkDeleted": "Các nhiệm vụ đã bị xóa.",
         "loadError": "Không thể tải nhiệm vụ.",
-        "subtaskPrompt": "Nhiệm vụ phụ:",
         "kanbanOpen": "Mở",
         "kanbanInProgress": "Đang tiến hành",
         "kanbanDone": "Hoàn thành",
@@ -2607,6 +2606,7 @@
         "pushDisabled": "Thông báo đẩy đang tắt trên thiết bị này.",
         "pushDenied": "Thông báo đã bị chặn trong trình duyệt. Vui lòng cho phép trong cài đặt trình duyệt.",
         "pushUnsupported": "Trình duyệt này không hỗ trợ thông báo đẩy.",
+        "pushUnavailable": "Thông báo đẩy hiện không khả dụng trên thiết bị này. Vui lòng tải lại trang.",
         "pushError": "Thao tác thất bại. Vui lòng thử lại.",
         "pushTestButton": "Gửi thông báo thử",
         "pushTestSent": "Đã gửi thông báo thử.",
@@ -3236,7 +3236,7 @@
         "ingredientMatchLoadError": "Không tải được kho dự trữ."
     },
     "search": {
-        "emptyHint": "Nhập ít nhất 2 ký tự để tìm trong mọi mục, một phần của từ cũng được.",
+        "emptyHint": "Nhập để chuyển đến một mục hoặc tạo mới. Từ 2 ký tự, bạn cũng tìm được các mục của mình, kể cả bằng một phần của từ.",
         "title": "Tìm kiếm",
         "open": "Mở tìm kiếm",
         "placeholder": "Tìm kiếm…",
@@ -3245,7 +3245,9 @@
         "scopesLabel": "Mở nhanh",
         "loading": "Đang tìm…",
         "resultCountOne": "{{count}} kết quả",
-        "resultCountMany": "{{count}} kết quả"
+        "resultCountMany": "{{count}} kết quả",
+        "goTo": "Đi tới",
+        "newSection": "Tạo mới"
     },
     "onboarding": {
         "step1Title": "Chào mừng đến với {{name}}",
@@ -4483,6 +4485,8 @@
             "personsLabel": "Người",
             "take": "Đã dùng",
             "skip": "Bỏ qua",
+            "takeNamed": "Uống {{name}}",
+            "skipNamed": "Bỏ qua {{name}}",
             "dueToday": {
                 "title": "Cần làm hôm nay",
                 "empty": "Hôm nay không có gì cần làm."
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} giờ {{minutes}} phút",
             "h": "{{hours}} giờ",
-            "m": "{{minutes}} phút"
+            "m": "{{minutes}} phút",
+            "unitH": "giờ"
         },
         "careBanner": "Bạn đang ghi cho {{name}}.",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} tháng",
         "filterGroupLabel": "Lọc món đồ",
         "photoLabel": "Ảnh",
-        "backToInventory": "Quay lại tài sản",
         "searchInCategoryPlaceholder": "Tìm trong {{category}}",
         "removePhoto": "Gỡ ảnh",
         "trackedDatesLabel": "Thời hạn đang theo dõi",

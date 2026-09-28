@@ -447,7 +447,6 @@
         "unarchivedToast": "Tarefa restaurada.",
         "archivedLabel": "Arquivada em",
         "loadError": "Falha ao carregar a tarefa.",
-        "subtaskPrompt": "Subtarefa:",
         "kanbanOpen": "Aberto",
         "kanbanInProgress": "Em andamento",
         "kanbanDone": "Concluído",
@@ -2607,6 +2606,7 @@
         "pushDisabled": "As notificações push estão desativadas neste dispositivo.",
         "pushDenied": "As notificações foram bloqueadas no navegador. Permita-as nas definições do navegador.",
         "pushUnsupported": "Este navegador não suporta notificações push.",
+        "pushUnavailable": "As notificações push não estão disponíveis neste dispositivo no momento. Recarregue a página.",
         "pushError": "A ação falhou. Tente novamente.",
         "pushTestButton": "Enviar notificação de teste",
         "pushTestSent": "Notificação de teste enviada.",
@@ -3128,7 +3128,7 @@
         "ingredientMatchLoadError": "Não foi possível carregar a despensa."
     },
     "search": {
-        "emptyHint": "Digita pelo menos 2 caracteres para pesquisar em todas as áreas, também por partes de palavras.",
+        "emptyHint": "Digita para ir a uma área ou criar algo. A partir de 2 caracteres também encontras os teus registos, até por partes de palavras.",
         "title": "Pesquisa",
         "open": "Abrir pesquisa",
         "placeholder": "Pesquisar…",
@@ -3137,7 +3137,9 @@
         "scopesLabel": "Ir para",
         "loading": "Pesquisando…",
         "resultCountOne": "{{count}} resultado",
-        "resultCountMany": "{{count}} resultados"
+        "resultCountMany": "{{count}} resultados",
+        "goTo": "Ir para",
+        "newSection": "Criar novo"
     },
     "birthdays": {
         "inDays_one": "em {{count}} dia",
@@ -4483,6 +4485,8 @@
             "personsLabel": "Pessoa",
             "take": "Tomado",
             "skip": "Ignorar",
+            "takeNamed": "Tomar {{name}}",
+            "skipNamed": "Ignorar {{name}}",
             "dueToday": {
                 "title": "Para hoje",
                 "empty": "Não há nada para hoje."
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",
             "h": "{{hours}} h",
-            "m": "{{minutes}} min"
+            "m": "{{minutes}} min",
+            "unitH": "h"
         },
         "careBanner": "Está a registar para {{name}}.",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} meses",
         "filterGroupLabel": "Filtrar objetos",
         "photoLabel": "Fotografia",
-        "backToInventory": "Voltar ao inventário",
         "searchInCategoryPlaceholder": "Pesquisar em {{category}}",
         "removePhoto": "Remover fotografia",
         "trackedDatesLabel": "Prazos seguidos",

@@ -135,7 +135,7 @@
         "schedule": "Iskedyul ng shift"
     },
     "search": {
-        "emptyHint": "Mag-type ng hindi bababa sa 2 karakter para maghanap sa lahat ng bahagi, pati sa bahagi ng salita.",
+        "emptyHint": "Mag-type para pumunta sa isang bahagi o gumawa ng bago. Mula 2 karakter, makikita mo rin ang iyong mga entry, pati sa bahagi ng salita.",
         "title": "Maghanap",
         "placeholder": "Maghanap…",
         "noResults": "Walang natagpuang resulta.",
@@ -144,7 +144,9 @@
         "scopesLabel": "Tumalon sa",
         "loading": "Naghahanap…",
         "resultCountOne": "{{count}} na resulta",
-        "resultCountMany": "{{count}} na mga resulta"
+        "resultCountMany": "{{count}} na mga resulta",
+        "goTo": "Pumunta sa",
+        "newSection": "Gumawa ng bago"
     },
     "dashboard": {
         "title": "Pangkalahatang-tanaw",
@@ -452,7 +454,6 @@
         "createdToast": "Nagawa ang gawain.",
         "deletedToast": "Natanggal ang gawain.",
         "loadError": "Hindi ma-load ang gawain.",
-        "subtaskPrompt": "Subtask:",
         "kanbanOpen": "Bukas",
         "kanbanInProgress": "Ginagawa",
         "kanbanDone": "Tapos",
@@ -2642,6 +2643,7 @@
         "pushDisabled": "Naka-disable ang mga push na abiso sa device na ito.",
         "pushDenied": "Naka-block ang mga abiso sa browser. Pakipayagan sila sa mga setting ng iyong browser.",
         "pushUnsupported": "Hindi suportado ng browser na ito ang mga push na abiso.",
+        "pushUnavailable": "Hindi available ngayon ang push sa device na ito. Paki-reload ang page.",
         "pushError": "Nabigo ang aksyon. Pakisubukang muli.",
         "pushTestButton": "Magpadala ng pansubok na abiso",
         "pushTestSent": "Naipadala ang pansubok na abiso.",
@@ -4483,6 +4485,8 @@
             "personsLabel": "Tao",
             "take": "Nainom",
             "skip": "Laktawan",
+            "takeNamed": "Inumin ang {{name}}",
+            "skipNamed": "Laktawan ang {{name}}",
             "dueToday": {
                 "title": "Nakatakda ngayon",
                 "empty": "Walang nakatakda ngayong araw."
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} oras {{minutes}} min",
             "h": "{{hours}} oras",
-            "m": "{{minutes}} min"
+            "m": "{{minutes}} min",
+            "unitH": "oras"
         },
         "careBanner": "Nagtatala ka para kay {{name}}.",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} buwan",
         "filterGroupLabel": "I-filter ang mga gamit",
         "photoLabel": "Larawan",
-        "backToInventory": "Bumalik sa imbentaryo",
         "searchInCategoryPlaceholder": "Maghanap sa {{category}}",
         "removePhoto": "Alisin ang larawan",
         "trackedDatesLabel": "Mga sinusubaybayang petsa",

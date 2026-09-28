@@ -462,7 +462,6 @@
         "bulkArchived": "Úkoly archivovány.",
         "bulkDeleted": "Úkoly smazány.",
         "loadError": "Úkol se nepodařilo načíst.",
-        "subtaskPrompt": "Podúkol:",
         "kanbanOpen": "Otevřeno",
         "kanbanInProgress": "V řešení",
         "kanbanDone": "Hotovo",
@@ -2607,6 +2606,7 @@
         "pushDisabled": "Push oznámení jsou na tomto zařízení vypnutá.",
         "pushDenied": "Oznámení byla v prohlížeči zablokována. Povolte je v nastavení prohlížeče.",
         "pushUnsupported": "Tento prohlížeč nepodporuje push oznámení.",
+        "pushUnavailable": "Push oznámení teď na tomto zařízení nejsou k dispozici. Načtěte prosím stránku znovu.",
         "pushError": "Akce se nezdařila. Zkuste to znovu.",
         "pushTestButton": "Odeslat testovací oznámení",
         "pushTestSent": "Testovací oznámení odesláno.",
@@ -3018,7 +3018,7 @@
         "moreSettings": "Další nastavení"
     },
     "search": {
-        "emptyHint": "Zadej alespoň 2 znaky pro hledání ve všech oblastech, stačí i část slova.",
+        "emptyHint": "Piš a přejdi do oblasti nebo něco vytvoř. Od 2 znaků najdeš i své záznamy, dokonce podle části slova.",
         "title": "Hledat",
         "placeholder": "Hledat…",
         "noResults": "Žádné výsledky nenalezeny.",
@@ -3027,7 +3027,9 @@
         "scopesLabel": "Přejít na",
         "loading": "Vyhledávání…",
         "resultCountOne": "{{count}} výsledek",
-        "resultCountMany": "{{count}} výsledků"
+        "resultCountMany": "{{count}} výsledků",
+        "goTo": "Přejít na",
+        "newSection": "Vytvořit nové"
     },
     "shortcuts": {
         "search": "Otevřít vyhledávání",
@@ -4483,6 +4485,8 @@
             "personsLabel": "Osoba",
             "take": "Užito",
             "skip": "Přeskočit",
+            "takeNamed": "Užít {{name}}",
+            "skipNamed": "Přeskočit {{name}}",
             "dueToday": {
                 "title": "Dnes k vyřízení",
                 "empty": "Dnes není nic k vyřízení."
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",
             "h": "{{hours}} h",
-            "m": "{{minutes}} min"
+            "m": "{{minutes}} min",
+            "unitH": "h"
         },
         "careBanner": "Zapisuješ za {{name}}.",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} měsíců",
         "filterGroupLabel": "Filtrovat věci",
         "photoLabel": "Fotografie",
-        "backToInventory": "Zpět na inventář",
         "searchInCategoryPlaceholder": "Hledat v {{category}}",
         "removePhoto": "Odebrat fotografii",
         "trackedDatesLabel": "Sledované lhůty",

@@ -439,7 +439,6 @@
         "createdToast": "Завдання створено.",
         "deletedToast": "Завдання видалено.",
         "loadError": "Не вдалося завантажити завдання.",
-        "subtaskPrompt": "Підзавдання:",
         "kanbanOpen": "Відкрито",
         "kanbanInProgress": "В процесі",
         "kanbanDone": "Виконано",
@@ -2607,6 +2606,7 @@
         "pushDisabled": "Push-сповіщення вимкнені на цьому пристрої.",
         "pushDenied": "Сповіщення заблоковано в браузері. Дозвольте їх у налаштуваннях браузера.",
         "pushUnsupported": "Цей браузер не підтримує push-сповіщення.",
+        "pushUnavailable": "Push-сповіщення зараз недоступні на цьому пристрої. Перезавантажте сторінку.",
         "pushError": "Не вдалося виконати дію. Спробуйте ще раз.",
         "pushTestButton": "Надіслати тестове сповіщення",
         "pushTestSent": "Тестове сповіщення надіслано.",
@@ -3169,7 +3169,7 @@
         "ingredientMatchLoadError": "Не вдалося завантажити запаси."
     },
     "search": {
-        "emptyHint": "Введіть щонайменше 2 символи для пошуку в усіх розділах, підійде й частина слова.",
+        "emptyHint": "Друкуйте, щоб перейти до розділу або щось створити. Від 2 символів знаходяться й ваші записи, навіть за частиною слова.",
         "title": "Пошук",
         "open": "Відкрити пошук",
         "placeholder": "Пошук…",
@@ -3178,7 +3178,9 @@
         "scopesLabel": "Перейти до",
         "loading": "Пошук…",
         "resultCountOne": "{{count}} результат",
-        "resultCountMany": "{{count}} результатів"
+        "resultCountMany": "{{count}} результатів",
+        "goTo": "Перейти до",
+        "newSection": "Створити"
     },
     "birthdays": {
         "inDays_one": "через {{count}} день",
@@ -4483,6 +4485,8 @@
             "personsLabel": "Людина",
             "take": "Прийнято",
             "skip": "Пропустити",
+            "takeNamed": "Прийняти {{name}}",
+            "skipNamed": "Пропустити {{name}}",
             "dueToday": {
                 "title": "На сьогодні",
                 "empty": "На сьогодні нічого немає."
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} год {{minutes}} хв",
             "h": "{{hours}} год",
-            "m": "{{minutes}} хв"
+            "m": "{{minutes}} хв",
+            "unitH": "год"
         },
         "careBanner": "Ви вносите дані за {{name}}.",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} міс.",
         "filterGroupLabel": "Фільтр предметів",
         "photoLabel": "Фото",
-        "backToInventory": "Назад до інвентарю",
         "searchInCategoryPlaceholder": "Пошук у {{category}}",
         "removePhoto": "Прибрати фото",
         "trackedDatesLabel": "Відстежувані терміни",

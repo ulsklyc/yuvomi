@@ -439,7 +439,6 @@
         "createdToast": "कार्य बनाया गया।",
         "deletedToast": "कार्य हटाया गया।",
         "loadError": "कार्य लोड नहीं हो सका।",
-        "subtaskPrompt": "उपकार्य:",
         "kanbanOpen": "खुला",
         "kanbanInProgress": "प्रगति में",
         "kanbanDone": "पूर्ण",
@@ -2607,6 +2606,7 @@
         "pushDisabled": "इस डिवाइस पर पुश सूचनाएँ अक्षम हैं.",
         "pushDenied": "ब्राउज़र में सूचनाएँ अवरुद्ध कर दी गई हैं. कृपया ब्राउज़र सेटिंग्स में उन्हें अनुमति दें.",
         "pushUnsupported": "यह ब्राउज़र पुश सूचनाओं का समर्थन नहीं करता.",
+        "pushUnavailable": "इस डिवाइस पर पुश सूचनाएँ अभी उपलब्ध नहीं हैं. कृपया पेज फिर से लोड करें.",
         "pushError": "कार्रवाई विफल रही. कृपया पुनः प्रयास करें.",
         "pushTestButton": "परीक्षण सूचना भेजें",
         "pushTestSent": "परीक्षण सूचना भेजी गई.",
@@ -3128,7 +3128,7 @@
         "ingredientMatchLoadError": "भंडार लोड नहीं हो सका।"
     },
     "search": {
-        "emptyHint": "सभी हिस्सों में खोजने के लिए कम से कम 2 अक्षर लिखें, शब्द का हिस्सा भी काफ़ी है।",
+        "emptyHint": "किसी हिस्से पर जाने या कुछ नया बनाने के लिए लिखें। 2 अक्षरों से आपकी प्रविष्टियाँ भी मिलती हैं, शब्द के हिस्से से भी।",
         "title": "खोज",
         "open": "खोज खोलें",
         "placeholder": "खोजें…",
@@ -3137,7 +3137,9 @@
         "scopesLabel": "यहाँ जाएँ",
         "loading": "खोज जारी…",
         "resultCountOne": "{{count}} परिणाम",
-        "resultCountMany": "{{count}} परिणाम"
+        "resultCountMany": "{{count}} परिणाम",
+        "goTo": "यहाँ जाएँ",
+        "newSection": "नया बनाएँ"
     },
     "birthdays": {
         "inDays_one": "{{count}} दिन में",
@@ -4483,6 +4485,8 @@
             "personsLabel": "व्यक्ति",
             "take": "ली गई",
             "skip": "छोड़ें",
+            "takeNamed": "{{name}} लें",
+            "skipNamed": "{{name}} छोड़ें",
             "dueToday": {
                 "title": "आज देय",
                 "empty": "आज कुछ भी देय नहीं है।"
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} घं {{minutes}} मि",
             "h": "{{hours}} घं",
-            "m": "{{minutes}} मि"
+            "m": "{{minutes}} मि",
+            "unitH": "घं"
         },
         "careBanner": "आप {{name}} के लिए दर्ज कर रहे हैं।",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} महीने",
         "filterGroupLabel": "चीज़ें फ़िल्टर करें",
         "photoLabel": "फ़ोटो",
-        "backToInventory": "इन्वेंटरी पर वापस जाएँ",
         "searchInCategoryPlaceholder": "{{category}} में खोजें",
         "removePhoto": "फ़ोटो हटाएँ",
         "trackedDatesLabel": "ट्रैक की गई समय-सीमाएँ",

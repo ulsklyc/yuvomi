@@ -462,7 +462,6 @@
         "bulkArchived": "Tasks archived.",
         "bulkDeleted": "Tasks deleted.",
         "loadError": "Task could not be loaded.",
-        "subtaskPrompt": "Subtask:",
         "kanbanOpen": "Open",
         "kanbanInProgress": "In Progress",
         "kanbanDone": "Done",
@@ -2630,6 +2629,7 @@
         "pushDisabled": "Push notifications are disabled on this device.",
         "pushDenied": "Notifications were blocked in the browser. Please allow them in your browser settings.",
         "pushUnsupported": "This browser does not support push notifications.",
+        "pushUnavailable": "Push is not available on this device right now. Please reload the page.",
         "pushError": "Action failed. Please try again.",
         "pushTestButton": "Send test notification",
         "pushTestSent": "Test notification sent.",
@@ -3236,7 +3236,7 @@
         "ingredientMatchLoadError": "The pantry could not be loaded."
     },
     "search": {
-        "emptyHint": "Type at least 2 characters to search every area, parts of words included.",
+        "emptyHint": "Type to jump to an area or create something. From 2 characters you also find your entries, even by parts of words.",
         "title": "Search",
         "open": "Open search",
         "placeholder": "Search…",
@@ -3245,7 +3245,9 @@
         "scopesLabel": "Jump to",
         "loading": "Searching…",
         "resultCountOne": "{{count}} result",
-        "resultCountMany": "{{count}} results"
+        "resultCountMany": "{{count}} results",
+        "goTo": "Go to",
+        "newSection": "Create new"
     },
     "onboarding": {
         "step1Title": "Welcome to {{name}}",
@@ -4483,6 +4485,8 @@
             "personsLabel": "Person",
             "take": "Taken",
             "skip": "Skip",
+            "takeNamed": "Take {{name}}",
+            "skipNamed": "Skip {{name}}",
             "dueToday": {
                 "title": "Due today",
                 "empty": "Nothing due today."
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",
             "h": "{{hours}} h",
-            "m": "{{minutes}} min"
+            "m": "{{minutes}} min",
+            "unitH": "h"
         },
         "careBanner": "You are recording for {{name}}.",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} months",
         "filterGroupLabel": "Filter items",
         "photoLabel": "Photo",
-        "backToInventory": "Back to Inventory",
         "searchInCategoryPlaceholder": "Search in {{category}}",
         "removePhoto": "Remove photo",
         "trackedDatesLabel": "Tracked dates",

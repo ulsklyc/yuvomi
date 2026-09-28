@@ -439,7 +439,6 @@
         "createdToast": "تم إنشاء المهمة.",
         "deletedToast": "تم حذف المهمة.",
         "loadError": "فشل تحميل المهمة.",
-        "subtaskPrompt": "المهمة الفرعية:",
         "kanbanOpen": "مفتوح",
         "kanbanInProgress": "قيد التنفيذ",
         "kanbanDone": "منجز",
@@ -2607,6 +2606,7 @@
         "pushDisabled": "إشعارات الدفع معطّلة على هذا الجهاز.",
         "pushDenied": "تم حظر الإشعارات في المتصفح. يُرجى السماح بها في إعدادات المتصفح.",
         "pushUnsupported": "هذا المتصفح لا يدعم إشعارات الدفع.",
+        "pushUnavailable": "إشعارات الدفع غير متاحة على هذا الجهاز حاليًا. يرجى إعادة تحميل الصفحة.",
         "pushError": "فشل الإجراء. يُرجى المحاولة مرة أخرى.",
         "pushTestButton": "إرسال إشعار تجريبي",
         "pushTestSent": "تم إرسال الإشعار التجريبي.",
@@ -3128,7 +3128,7 @@
         "ingredientMatchLoadError": "تعذّر تحميل المؤن."
     },
     "search": {
-        "emptyHint": "اكتب حرفين على الأقل للبحث في كل الأقسام، وتكفي أجزاء الكلمات أيضًا.",
+        "emptyHint": "اكتب للانتقال إلى قسم أو لإنشاء شيء جديد. من حرفين تجد أيضًا إدخالاتك، حتى بأجزاء الكلمات.",
         "title": "بحث",
         "open": "فتح البحث",
         "placeholder": "بحث…",
@@ -3137,7 +3137,9 @@
         "scopesLabel": "الانتقال إلى",
         "loading": "جارٍ البحث…",
         "resultCountOne": "{{count}} نتيجة",
-        "resultCountMany": "{{count}} نتائج"
+        "resultCountMany": "{{count}} نتائج",
+        "goTo": "انتقل إلى",
+        "newSection": "إنشاء جديد"
     },
     "birthdays": {
         "inDays_one": "خلال {{count}} يوم",
@@ -4483,6 +4485,8 @@
             "personsLabel": "الشخص",
             "take": "تم التناول",
             "skip": "تخطّي",
+            "takeNamed": "تناول {{name}}",
+            "skipNamed": "تخطّي {{name}}",
             "dueToday": {
                 "title": "مستحق اليوم",
                 "empty": "لا شيء مستحق اليوم."
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} س {{minutes}} د",
             "h": "{{hours}} س",
-            "m": "{{minutes}} د"
+            "m": "{{minutes}} د",
+            "unitH": "س"
         },
         "careBanner": "أنت تسجّل نيابةً عن {{name}}.",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} أشهر",
         "filterGroupLabel": "تصفية الأغراض",
         "photoLabel": "صورة",
-        "backToInventory": "العودة إلى المقتنيات",
         "searchInCategoryPlaceholder": "البحث في {{category}}",
         "removePhoto": "إزالة الصورة",
         "trackedDatesLabel": "المواعيد المتابَعة",

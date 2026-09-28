@@ -439,7 +439,6 @@
         "createdToast": "Compito creato.",
         "deletedToast": "Compito eliminato.",
         "loadError": "Impossibile caricare il compito.",
-        "subtaskPrompt": "Sotto-compito:",
         "kanbanOpen": "Da fare",
         "kanbanInProgress": "In corso",
         "kanbanDone": "Completato",
@@ -2607,6 +2606,7 @@
         "pushDisabled": "Le notifiche push sono disattivate su questo dispositivo.",
         "pushDenied": "Le notifiche sono state bloccate nel browser. Consentile nelle impostazioni del browser.",
         "pushUnsupported": "Questo browser non supporta le notifiche push.",
+        "pushUnavailable": "Le notifiche push non sono disponibili al momento su questo dispositivo. Ricarica la pagina.",
         "pushError": "Azione non riuscita. Riprova.",
         "pushTestButton": "Invia notifica di prova",
         "pushTestSent": "Notifica di prova inviata.",
@@ -3128,7 +3128,7 @@
         "ingredientMatchLoadError": "Non è stato possibile caricare la dispensa."
     },
     "search": {
-        "emptyHint": "Digita almeno 2 caratteri per cercare in tutte le sezioni, anche per parti di parola.",
+        "emptyHint": "Digita per andare a una sezione o creare qualcosa. Da 2 caratteri trovi anche le tue voci, pure per parti di parola.",
         "title": "Ricerca",
         "open": "Apri ricerca",
         "placeholder": "Cerca…",
@@ -3137,7 +3137,9 @@
         "scopesLabel": "Vai a",
         "loading": "Ricerca…",
         "resultCountOne": "{{count}} risultato",
-        "resultCountMany": "{{count}} risultati"
+        "resultCountMany": "{{count}} risultati",
+        "goTo": "Vai a",
+        "newSection": "Crea nuovo"
     },
     "birthdays": {
         "inDays_one": "tra {{count}} giorno",
@@ -4483,6 +4485,8 @@
             "personsLabel": "Persona",
             "take": "Assunto",
             "skip": "Salta",
+            "takeNamed": "Prendi {{name}}",
+            "skipNamed": "Salta {{name}}",
             "dueToday": {
                 "title": "In scadenza oggi",
                 "empty": "Oggi non c'è nulla in scadenza."
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",
             "h": "{{hours}} h",
-            "m": "{{minutes}} min"
+            "m": "{{minutes}} min",
+            "unitH": "h"
         },
         "careBanner": "Stai registrando per {{name}}.",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} mesi",
         "filterGroupLabel": "Filtra oggetti",
         "photoLabel": "Foto",
-        "backToInventory": "Torna all'inventario",
         "searchInCategoryPlaceholder": "Cerca in {{category}}",
         "removePhoto": "Rimuovi foto",
         "trackedDatesLabel": "Scadenze seguite",

@@ -135,7 +135,7 @@
         "schedule": "근무표"
     },
     "search": {
-        "emptyHint": "2자 이상 입력하면 모든 영역을 검색합니다. 단어의 일부로도 찾을 수 있습니다.",
+        "emptyHint": "입력해서 영역으로 이동하거나 새로 만드세요. 2자부터는 내 항목도 찾을 수 있고, 단어의 일부로도 됩니다.",
         "title": "검색",
         "placeholder": "검색…",
         "noResults": "결과를 찾을 수 없습니다.",
@@ -144,7 +144,9 @@
         "scopesLabel": "바로 열기",
         "loading": "검색 중…",
         "resultCountOne": "결과 {{count}}개",
-        "resultCountMany": "결과 {{count}}개"
+        "resultCountMany": "결과 {{count}}개",
+        "goTo": "이동",
+        "newSection": "새로 만들기"
     },
     "dashboard": {
         "title": "개요",
@@ -452,7 +454,6 @@
         "createdToast": "할 일이 생성되었습니다.",
         "deletedToast": "할 일이 삭제되었습니다.",
         "loadError": "할 일을 불러오지 못했습니다.",
-        "subtaskPrompt": "하위 작업:",
         "kanbanOpen": "미완료",
         "kanbanInProgress": "진행 중",
         "kanbanDone": "완료",
@@ -2619,6 +2620,7 @@
         "pushDisabled": "이 기기에서 푸시 알림이 비활성화되어 있습니다.",
         "pushDenied": "브라우저에서 알림이 차단되었습니다. 브라우저 설정에서 허용해 주세요.",
         "pushUnsupported": "이 브라우저는 푸시 알림을 지원하지 않습니다.",
+        "pushUnavailable": "지금 이 기기에서는 푸시 알림을 사용할 수 없습니다. 페이지를 새로고침하세요.",
         "pushError": "작업에 실패했습니다. 다시 시도해 주세요.",
         "pushTestButton": "테스트 알림 보내기",
         "pushTestSent": "테스트 알림을 보냈습니다.",
@@ -4483,6 +4485,8 @@
             "personsLabel": "사람",
             "take": "복용함",
             "skip": "건너뛰기",
+            "takeNamed": "{{name}} 복용",
+            "skipNamed": "{{name}} 건너뛰기",
             "dueToday": {
                 "title": "오늘 예정",
                 "empty": "오늘 예정된 것이 없습니다."
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}}시간 {{minutes}}분",
             "h": "{{hours}}시간",
-            "m": "{{minutes}}분"
+            "m": "{{minutes}}분",
+            "unitH": "시간"
         },
         "careBanner": "{{name}} 님의 기록을 입력하고 있습니다.",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}}개월",
         "filterGroupLabel": "물건 필터",
         "photoLabel": "사진",
-        "backToInventory": "소지품으로 돌아가기",
         "searchInCategoryPlaceholder": "{{category}}에서 검색",
         "removePhoto": "사진 제거",
         "trackedDatesLabel": "추적 중인 기한",

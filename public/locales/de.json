@@ -135,7 +135,7 @@
         "schedule": "Schichtplan"
     },
     "search": {
-        "emptyHint": "Ab 2 Zeichen durchsuchst du alle Bereiche, auch nach Wortteilen.",
+        "emptyHint": "Tippe, um zu einem Bereich zu springen oder etwas anzulegen. Ab 2 Zeichen findest du auch deine Einträge, sogar über Wortteile.",
         "title": "Suche",
         "placeholder": "Suchen…",
         "noResults": "Keine Ergebnisse gefunden.",
@@ -144,7 +144,9 @@
         "scopesLabel": "Direkt öffnen",
         "loading": "Suche läuft…",
         "resultCountOne": "{{count}} Ergebnis",
-        "resultCountMany": "{{count}} Ergebnisse"
+        "resultCountMany": "{{count}} Ergebnisse",
+        "goTo": "Gehe zu",
+        "newSection": "Neu anlegen"
     },
     "dashboard": {
         "title": "Übersicht",
@@ -452,7 +454,6 @@
         "createdToast": "Aufgabe erstellt.",
         "deletedToast": "Aufgabe gelöscht.",
         "loadError": "Aufgabe konnte nicht geladen werden.",
-        "subtaskPrompt": "Teilaufgabe:",
         "kanbanOpen": "Offen",
         "kanbanInProgress": "In Bearbeitung",
         "kanbanDone": "Erledigt",
@@ -2642,6 +2643,7 @@
         "pushDisabled": "Push-Benachrichtigungen sind auf diesem Gerät deaktiviert.",
         "pushDenied": "Benachrichtigungen wurden im Browser blockiert. Bitte in den Browser-Einstellungen erlauben.",
         "pushUnsupported": "Dieser Browser unterstützt keine Push-Benachrichtigungen.",
+        "pushUnavailable": "Push ist auf diesem Gerät gerade nicht verfügbar. Bitte die Seite neu laden.",
         "pushError": "Aktion fehlgeschlagen. Bitte erneut versuchen.",
         "pushTestButton": "Testbenachrichtigung senden",
         "pushTestSent": "Testbenachrichtigung gesendet.",
@@ -4483,6 +4485,8 @@
             "personsLabel": "Person",
             "take": "Einnehmen",
             "skip": "Überspringen",
+            "takeNamed": "{{name}} einnehmen",
+            "skipNamed": "{{name}} überspringen",
             "dueToday": {
                 "title": "Heute fällig",
                 "empty": "Heute ist nichts fällig."
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} Std. {{minutes}} Min.",
             "h": "{{hours}} Std.",
-            "m": "{{minutes}} Min."
+            "m": "{{minutes}} Min.",
+            "unitH": "Std."
         },
         "careBanner": "Du trägst für {{name}} ein.",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} Monate",
         "filterGroupLabel": "Filtern",
         "photoLabel": "Foto",
-        "backToInventory": "Zurück zum Inventar",
         "searchInCategoryPlaceholder": "In {{category}} suchen",
         "removePhoto": "Foto entfernen",
         "trackedDatesLabel": "Verfolgte Fristen",

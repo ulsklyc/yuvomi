@@ -439,7 +439,6 @@
         "createdToast": "Uppgift skapad.",
         "deletedToast": "Uppgiften raderad.",
         "loadError": "Uppgiften kunde inte laddas.",
-        "subtaskPrompt": "Deluppgift:",
         "kanbanOpen": "Öppna",
         "kanbanInProgress": "Pågår",
         "kanbanDone": "Slutfört",
@@ -2607,6 +2606,7 @@
         "pushDisabled": "Push-aviseringar är inaktiverade på den här enheten.",
         "pushDenied": "Aviseringar har blockerats i webbläsaren. Tillåt dem i webbläsarens inställningar.",
         "pushUnsupported": "Den här webbläsaren stöder inte push-aviseringar.",
+        "pushUnavailable": "Push-aviseringar är inte tillgängliga på den här enheten just nu. Ladda om sidan.",
         "pushError": "Åtgärden misslyckades. Försök igen.",
         "pushTestButton": "Skicka testavisering",
         "pushTestSent": "Testavisering skickad.",
@@ -3128,7 +3128,7 @@
         "ingredientMatchLoadError": "Skafferiet kunde inte läsas in."
     },
     "search": {
-        "emptyHint": "Skriv minst 2 tecken för att söka i alla delar, även på delar av ord.",
+        "emptyHint": "Skriv för att gå till en del eller skapa något. Från 2 tecken hittar du även dina poster, också på delar av ord.",
         "title": "Sök",
         "open": "Öppna sökning",
         "placeholder": "Sök…",
@@ -3137,7 +3137,9 @@
         "scopesLabel": "Gå till",
         "loading": "Söker…",
         "resultCountOne": "{{count}} resultat",
-        "resultCountMany": "{{count}} resultat"
+        "resultCountMany": "{{count}} resultat",
+        "goTo": "Gå till",
+        "newSection": "Skapa ny"
     },
     "birthdays": {
         "inDays_one": "om {{count}} dag",
@@ -4483,6 +4485,8 @@
             "personsLabel": "Person",
             "take": "Taget",
             "skip": "Hoppa över",
+            "takeNamed": "Ta {{name}}",
+            "skipNamed": "Hoppa över {{name}}",
             "dueToday": {
                 "title": "Att göra idag",
                 "empty": "Inget att göra idag."
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} tim {{minutes}} min",
             "h": "{{hours}} tim",
-            "m": "{{minutes}} min"
+            "m": "{{minutes}} min",
+            "unitH": "tim"
         },
         "careBanner": "Du registrerar åt {{name}}.",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} månader",
         "filterGroupLabel": "Filtrera föremål",
         "photoLabel": "Foto",
-        "backToInventory": "Tillbaka till inventarier",
         "searchInCategoryPlaceholder": "Sök i {{category}}",
         "removePhoto": "Ta bort foto",
         "trackedDatesLabel": "Bevakade datum",

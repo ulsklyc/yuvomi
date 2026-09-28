@@ -135,7 +135,7 @@
         "schedule": "Grafik"
     },
     "search": {
-        "emptyHint": "Wpisz co najmniej 2 znaki, aby szukać we wszystkich obszarach, także po fragmentach słów.",
+        "emptyHint": "Pisz, aby przejść do obszaru lub coś utworzyć. Od 2 znaków znajdziesz też swoje wpisy, nawet po fragmentach słów.",
         "title": "Szukaj",
         "placeholder": "Szukaj…",
         "noResults": "Nie znaleziono wyników.",
@@ -144,7 +144,9 @@
         "scopesLabel": "Przejdź do",
         "loading": "Wyszukiwanie…",
         "resultCountOne": "{{count}} wynik",
-        "resultCountMany": "{{count}} wyników"
+        "resultCountMany": "{{count}} wyników",
+        "goTo": "Przejdź do",
+        "newSection": "Utwórz nowe"
     },
     "dashboard": {
         "title": "Pulpit",
@@ -452,7 +454,6 @@
         "createdToast": "Zadanie utworzone.",
         "deletedToast": "Zadanie usunięte.",
         "loadError": "Nie udało się załadować zadania.",
-        "subtaskPrompt": "Podzadanie:",
         "kanbanOpen": "Otwarte",
         "kanbanInProgress": "W toku",
         "kanbanDone": "Zrobione",
@@ -2619,6 +2620,7 @@
         "pushDisabled": "Powiadomienia push są wyłączone na tym urządzeniu.",
         "pushDenied": "Powiadomienia zostały zablokowane w przeglądarce. Zezwól na nie w ustawieniach przeglądarki.",
         "pushUnsupported": "Ta przeglądarka nie obsługuje powiadomień push.",
+        "pushUnavailable": "Powiadomienia push są teraz niedostępne na tym urządzeniu. Odśwież stronę.",
         "pushError": "Akcja nie powiodła się. Spróbuj ponownie.",
         "pushTestButton": "Wyślij powiadomienie testowe",
         "pushTestSent": "Powiadomienie testowe wysłane.",
@@ -4483,6 +4485,8 @@
             "personsLabel": "Osoba",
             "take": "Przyjęto",
             "skip": "Pomiń",
+            "takeNamed": "Przyjmij {{name}}",
+            "skipNamed": "Pomiń {{name}}",
             "dueToday": {
                 "title": "Na dziś",
                 "empty": "Nic na dziś."
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} godz. {{minutes}} min",
             "h": "{{hours}} godz.",
-            "m": "{{minutes}} min"
+            "m": "{{minutes}} min",
+            "unitH": "godz."
         },
         "careBanner": "Wpisujesz dane dla {{name}}.",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} mies.",
         "filterGroupLabel": "Filtruj przedmioty",
         "photoLabel": "Zdjęcie",
-        "backToInventory": "Wróć do inwentarza",
         "searchInCategoryPlaceholder": "Szukaj w {{category}}",
         "removePhoto": "Usuń zdjęcie",
         "trackedDatesLabel": "Śledzone terminy",

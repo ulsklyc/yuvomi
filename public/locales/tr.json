@@ -439,7 +439,6 @@
         "createdToast": "Görev oluşturuldu.",
         "deletedToast": "Görev silindi.",
         "loadError": "Görev yüklenemedi.",
-        "subtaskPrompt": "Alt görev:",
         "kanbanOpen": "Açık",
         "kanbanInProgress": "Devam Ediyor",
         "kanbanDone": "Tamamlandı",
@@ -2607,6 +2606,7 @@
         "pushDisabled": "Anlık bildirimler bu cihazda devre dışı.",
         "pushDenied": "Bildirimler tarayıcıda engellendi. Lütfen tarayıcı ayarlarından izin verin.",
         "pushUnsupported": "Bu tarayıcı anlık bildirimleri desteklemiyor.",
+        "pushUnavailable": "Anlık bildirimler şu anda bu cihazda kullanılamıyor. Lütfen sayfayı yeniden yükleyin.",
         "pushError": "İşlem başarısız oldu. Lütfen tekrar deneyin.",
         "pushTestButton": "Test bildirimi gönder",
         "pushTestSent": "Test bildirimi gönderildi.",
@@ -3128,7 +3128,7 @@
         "ingredientMatchLoadError": "Kiler yüklenemedi."
     },
     "search": {
-        "emptyHint": "Tüm bölümlerde aramak için en az 2 karakter yaz, kelimenin bir kısmı da yeter.",
+        "emptyHint": "Bir bölüme gitmek ya da yeni bir şey oluşturmak için yaz. 2 karakterden itibaren kayıtlarını da bulursun, kelimenin bir kısmıyla bile.",
         "title": "Arama",
         "open": "Aramayı aç",
         "placeholder": "Ara…",
@@ -3137,7 +3137,9 @@
         "scopesLabel": "Doğrudan aç",
         "loading": "Aranıyor…",
         "resultCountOne": "{{count}} sonuç",
-        "resultCountMany": "{{count}} sonuç"
+        "resultCountMany": "{{count}} sonuç",
+        "goTo": "Git",
+        "newSection": "Yeni oluştur"
     },
     "birthdays": {
         "inDays_one": "{{count}} gün sonra",
@@ -4483,6 +4485,8 @@
             "personsLabel": "Kişi",
             "take": "Alındı",
             "skip": "Atla",
+            "takeNamed": "{{name}} al",
+            "skipNamed": "{{name}} atla",
             "dueToday": {
                 "title": "Bugün yapılacak",
                 "empty": "Bugün yapılacak bir şey yok."
@@ -5124,7 +5128,8 @@
         "duration": {
             "hm": "{{hours}} sa {{minutes}} dk",
             "h": "{{hours}} sa",
-            "m": "{{minutes}} dk"
+            "m": "{{minutes}} dk",
+            "unitH": "sa"
         },
         "careBanner": "{{name}} için kayıt giriyorsun.",
         "nutrition": {
@@ -5674,7 +5679,6 @@
         "warrantyMonthsValue": "{{count}} ay",
         "filterGroupLabel": "Eşyaları filtrele",
         "photoLabel": "Fotoğraf",
-        "backToInventory": "Envantere dön",
         "searchInCategoryPlaceholder": "{{category}} içinde ara",
         "removePhoto": "Fotoğrafı kaldır",
         "trackedDatesLabel": "Takip edilen tarihler",
