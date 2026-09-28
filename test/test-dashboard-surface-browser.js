@@ -126,9 +126,14 @@ for (const device of ['desktop', 'mobile']) {
     const seen = [];
     for (const path of PAGE_SCROLL_ROUTES) {
       await gotoRoute(page, path);
-      // Die Uebersicht bringt ihren FAB am Zeiger selbst mit; dort wird der
-      // echte Summand gemessen, nicht der gesetzte.
-      if (path !== '/' || device === 'mobile') {
+      // Die Uebersicht bringt mobil ihren FAB am Zeiger selbst mit; dort wird
+      // der echte Summand gemessen, nicht der gesetzte. Am Desktop dockt er
+      // seit R14 (Re-Critique 2026-09-28, A8 P3-2) als Pille "+ Neu" im Kopf
+      // - dann schwebt nichts, und die Uebersicht misst wie jede Route den
+      // Summanden des Install-Banners.
+      const floatingFab = await page.evaluate(() => [...document.querySelectorAll('.page-fab:not([hidden])')]
+        .some((el) => getComputedStyle(el).position === 'fixed'));
+      if (path !== '/' || device === 'mobile' || !floatingFab) {
         await page.evaluate(() => document.documentElement.style.setProperty('--install-prompt-tail', '96px'));
       }
       const m = await tailAtEnd(page);
@@ -149,6 +154,10 @@ for (const device of ['desktop', 'mobile']) {
   });
 }
 
+// Seit R14 (A8 P3-2) schwebt am Desktop kein FAB mehr ueber der Uebersicht:
+// "Neu" ist eine Pille im Kopf. Die Regel dahinter - am Seitenende liegt keine
+// schwebende Flaeche auf einem Widget - gilt weiter; gemessen wird ein
+// schwebender FAB, und steht keiner da, muss die Pille im Kopf stehen.
 test('Nachlauf: am Seitenende der Uebersicht liegt der FAB auf keinem Widget (desktop)', async () => {
   const page = await openPage(harness, { device: 'desktop' });
   // Die rechte Spalte reicht bis ans Ende - der Anlassfall der Critique. Endet
@@ -164,8 +173,11 @@ test('Nachlauf: am Seitenende der Uebersicht liegt der FAB auf keinem Widget (de
   await gotoRoute(page, '/');
   await tailAtEnd(page);
   const hits = await page.evaluate(() => {
-    const fab = document.querySelector('.page-fab:not([hidden])');
-    if (!fab) return null;
+    const fab = [...document.querySelectorAll('.page-fab:not([hidden])')].find((el) => getComputedStyle(el).position === 'fixed');
+    if (!fab) {
+      const pill = document.querySelector('.page-fab--docked:not([hidden])');
+      return pill ? { docked: true, reach: true, ids: [] } : null;
+    }
     const f = fab.getBoundingClientRect();
     const wrappers = [...document.querySelectorAll('.widget-wrapper')];
     const lowest = wrappers.reduce((a, w) => (w.getBoundingClientRect().bottom > (a?.getBoundingClientRect().bottom ?? -1) ? w : a), null);
@@ -180,7 +192,7 @@ test('Nachlauf: am Seitenende der Uebersicht liegt der FAB auf keinem Widget (de
     };
   });
   await page.close();
-  assert.ok(hits, 'Reichweite: auf der Uebersicht am Zeiger schwebt kein FAB');
+  assert.ok(hits, 'Reichweite: weder ein schwebender FAB noch die Pille "Neu" im Kopf');
   assert.ok(hits.reach, 'Reichweite: das Raster endet nicht unter dem Knopf');
   assert.deepEqual(hits.ids, [], `Am Seitenende liegt der FAB auf: ${hits.ids.join(', ')}`);
 });
