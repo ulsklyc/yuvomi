@@ -467,7 +467,11 @@ const watchItems = () => [
   rice(0, { id: 6, name: 'Zucker' }),                                                  // leer
 ];
 
-test('das Panel ordnet wie die Filterchips: abgelaufen, bald, fast leer - sortiert wie die flache Liste', async () => {
+// NUR ZEITKRITISCHES (Re-Critique 2026-09-28, P7 / A4 P2-6): "Fast leer"
+// stand dreifach da - Zeilen-Badge, Chip mit Zaehler und hier; 14 von 21
+// Artikeln standen rechts ein zweites Mal. Die Frist ist die Frage, die nicht
+// warten kann; "Fast leer" bleibt Chip und Warenkorb an der Zeile.
+test('das Panel ordnet wie die Filterchips, aber nur, was eine Frist hat: abgelaufen, bald', async () => {
   resetPantry();
   assert.equal(typeof __test.pantryWatchGroups, 'function', 'pantryWatchGroups fehlt im __test-Export');
   const { matchesPantryFilter } = await import('../public/utils/pantry-status.js');
@@ -475,7 +479,6 @@ test('das Panel ordnet wie die Filterchips: abgelaufen, bald, fast leer - sortie
   assert.deepEqual(groups.map((g) => [g.key, g.items.map((i) => i.name)]), [
     ['expired', ['Milch']],
     ['soon', ['Eier', 'Joghurt']],
-    ['low', ['Zucker', 'Mehl']],
   ]);
   for (const g of groups) {
     const chip = watchItems().filter((i) => matchesPantryFilter(i, g.key, WATCH_TODAY)).map((i) => i.id).sort();
@@ -505,7 +508,7 @@ test('renderList zeichnet das Panel mit - unabhaengig von Suche und aktivem Filt
     global.document.createTextNode = zuvor;
   }
   assert.equal(watch.hidden, false, 'mit Artikeln steht das Panel');
-  assert.equal(watch.children.length, 3, 'drei Abschnitte, obwohl die Liste nur „Mehl" unter „Fast leer" zeigt');
+  assert.equal(watch.children.length, 2, 'zwei Abschnitte (abgelaufen, bald), obwohl die Liste nur „Mehl" unter „Fast leer" zeigt');
   // Ohne jeden Artikel: kein Panel (der Leerzustand der Liste spricht).
   __test.state.items = [];
   __test.renderWatch();
@@ -579,4 +582,17 @@ test('der Bearbeiten-Dialog zeigt die Menge eines noch entprellten Schritts - au
     delete globalThis.__openModal;
     resetPantry();
   }
+});
+
+// Re-Critique 2026-09-28 (P7 / A4 P3-11): im 364px-Sheet passte
+// `minmax(11rem, 1fr)` nie zweispaltig - "1,5" und "kg" belegten je eine volle
+// Zeile, der Koerper lief 1053px bei 591px sichtbar.
+test('Vorrats-Sheet: Menge und Einheit stehen mobil nebeneinander', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/pantry.css', import.meta.url), 'utf8');
+  const row = [...eachRule(css)].find((r) => r.selector.trim() === '.pantry-form-row' && !r.at.length);
+  const min = /minmax\((\d+(?:\.\d+)?)rem,\s*1fr\)/.exec(row?.body ?? '');
+  assert.ok(min, 'die Zeile bleibt ein auto-fit-Raster mit rem-Untergrenze');
+  // Sheet 364px, Innenabstand 2x16, Luecke 12: zwei Spalten brauchen 2*min*16 + 12 <= 332.
+  assert.ok(2 * Number(min[1]) * 16 + 12 <= 332, `minmax(${min[1]}rem) passt im 364px-Sheet nicht zweispaltig`);
 });

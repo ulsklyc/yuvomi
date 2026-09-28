@@ -646,10 +646,14 @@ function renderList() {
 // Nebenpanel „Im Blick" (Desktop)
 // --------------------------------------------------------
 
+// NUR ZEITKRITISCHES (Re-Critique 2026-09-28, P7 / A4 P2-6). Hier stand auch
+// "Fast leer": dieselbe Aussage stand damit dreimal da (Zeilen-Badge, Chip mit
+// Zaehler, Panel), 14 von 21 Artikeln rechts ein zweites Mal, und "Fast leer
+// 10" uebertoente die Fristen. Das Panel beantwortet jetzt nur, was nicht
+// warten kann; "Fast leer" bleibt Chip plus Warenkorb an der Zeile.
 const WATCH_SECTIONS = [
   { key: 'expired', label: 'pantry.filterExpired', icon: 'circle-alert', tone: 'danger' },
   { key: 'soon', label: 'pantry.filterSoon', icon: 'clock', tone: 'warning' },
-  { key: 'low', label: 'pantry.filterLow', icon: 'package-open', tone: 'warning' },
 ];
 
 /**
@@ -662,8 +666,7 @@ const WATCH_SECTIONS = [
 function pantryWatchGroups(items, today) {
   return WATCH_SECTIONS.map((section) => {
     const rows = items.filter((item) => matchesPantryFilter(item, section.key, today));
-    if (section.key === 'low') rows.sort((a, b) => Number(a.quantity) - Number(b.quantity));
-    else rows.sort((a, b) => String(a.expires_on).localeCompare(String(b.expires_on)));
+    rows.sort((a, b) => String(a.expires_on).localeCompare(String(b.expires_on)));
     return { ...section, items: rows };
   }).filter((section) => section.items.length);
 }
@@ -680,9 +683,8 @@ function watchRowEl(item, section) {
   name.textContent = item.name;
   const meta = document.createElement('span');
   meta.className = 'list-row__meta';
-  // Ablauf: der Satz der Zeile („Laeuft morgen ab"), in der Tinte seiner
-  // Dringlichkeit. Bestand: die Menge - „Fast leer" steht schon im Kopf.
-  const expiry = section.key === 'low' ? null : expiryBadge(item);
+  // Der Satz der Zeile („Laeuft morgen ab"), in der Tinte seiner Dringlichkeit.
+  const expiry = expiryBadge(item);
   const lead = document.createElement('span');
   lead.className = `pantry-watch__due pantry-watch__due--${expiry ? expiry.tone : section.tone}`;
   lead.textContent = expiry ? expiry.text : quantityText(item);

@@ -486,9 +486,11 @@
  * 11rem pro Spalte nicht mehr passen. auto-fit misst das Modal, nicht den
  * Viewport - und das Modal ist bei size="md" auf 520px gedeckelt, folgt der
  * Fensterbreite also gar nicht. */
+/* 8rem statt 11rem (Re-Critique 2026-09-28, A4 P3-11): im 364px-Sheet passte
+ * die Zeile nie zweispaltig - "1,5" und "kg" belegten je eine volle Zeile. */
 .pantry-form-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
   gap: var(--space-3);
 }
 
