@@ -1231,8 +1231,17 @@ export function decorateFooterDelete(footer) {
   for (const btn of found) {
     if (btn.classList.contains('modal-panel__delete')) continue;
     btn.classList.add('modal-panel__delete');
+    // DIE DETAILANSICHT TRAEGT IHR WORT SCHON IN EINER SPANNE (`.btn__label`,
+    // components/detail-view.js), nicht als losen Text. Die blieb sichtbar und
+    // ragte mobil aus dem 48px-Quadrat (Re-Critique 2026-09-28, A5 P2-4) - sie
+    // wird deshalb selbst die Wortspanne, statt eine zweite zu bekommen.
+    const ownLabel = [...btn.childNodes].find((n) => n.nodeType === 1 && n.classList?.contains('btn__label'));
+    if (ownLabel) ownLabel.classList.add('modal-panel__delete-label');
     const loose = [...btn.childNodes].filter((n) => n.nodeType === 3 && n.textContent.trim());
-    if (loose.length) {
+    if (loose.length && ownLabel) {
+      ownLabel.textContent = [ownLabel.textContent.trim(), ...loose.map((n) => n.textContent.trim())].join(' ');
+      loose.forEach((n) => n.remove());
+    } else if (loose.length) {
       const label = document.createElement('span');
       label.className = 'modal-panel__delete-label';
       label.textContent = loose.map((n) => n.textContent.trim()).join(' ');

@@ -1628,3 +1628,66 @@ test('M8: mobil ist Loeschen ein Icon-Knopf der Zielgroesse, das Wort nur fuer d
   assert.match(rule('.modal-panel__footer.modal-panel__footer--one-row .btn:not(.modal-panel__delete):not(.btn--icon)'),
     /overflow-wrap:\s*anywhere/, 'eine lange Beschriftung bricht innen statt den Fuss nach links hinauszuschieben (#872)');
 });
+
+/*
+ * F3 (Re-Critique 2026-09-28, A5 P2-4): IN JEDEM FUSS PASST LOESCHEN IN SEINEN
+ * KNOPF. Die Detailansicht (components/detail-view.js) baut ihre Knoepfe mit
+ * Symbol und einer `.btn__label`-Spanne, nicht mit losem Text. decorateFooterDelete
+ * packte nur losen Text in `.modal-panel__delete-label`; das Wort blieb sichtbar
+ * und ragte bei 390px aus dem 48px-Quadrat (Kontakt-Detail: Inhalt 72px, der
+ * Papierkorb 5px vom Blattrand). Die Regel, die jeder Fuss erfuellen muss: kein
+ * sichtbares Wort im Loeschen-Knopf ausserhalb der ausgeblendeten Spanne.
+ */
+function visibleWordsOutsideLabel(btn) {
+  const out = [];
+  const walk = (node, hidden) => {
+    for (const c of node.childNodes) {
+      if (c.nodeType === 3) { if (!hidden && c.textContent.trim()) out.push(c.textContent.trim()); continue; }
+      if (c.tagName === 'SVG' || c.tagName === 'I') continue;
+      const inLabel = hidden || c.classList.contains('modal-panel__delete-label');
+      if (!inLabel && !c.childNodes.length && c.textContent.trim()) out.push(c.textContent.trim());
+      walk(c, inLabel);
+    }
+  };
+  walk(btn, false);
+  return out;
+}
+
+test('F3: in jedem Fuss liegt das Wort des Loeschen-Knopfs in der ausgeblendeten Spanne - auch mit .btn__label', async () => {
+  const { decorateFooterDelete } = await import('../public/components/modal.js');
+  const { el, withText } = fussAttrappe();
+  const savedCreate = global.document.createElement;
+  const savedWindow = globalThis.window;
+  global.document.createElement = (tag) => el(tag);
+  globalThis.window = {};
+  try {
+    const cases = {
+      // Die Form aus detail-view.js: Symbol + .btn__label.
+      detailansicht: () => el('button', { cls: ['btn', 'btn--danger-ghost'], kids: [
+        el('i', { data: { lucide: 'trash-2' } }),
+        el('span', { cls: ['btn__label'], text: 'Loeschen' }),
+      ] }),
+      // Die Form der Formular-Dialoge: loser Text.
+      formular: () => withText(el('button', { cls: ['btn', 'btn--danger-outline'] }), 'Loeschen'),
+      // Symbol und loser Text gemischt.
+      gemischt: () => withText(el('button', { cls: ['btn', 'btn--danger-outline'], kids: [el('i', { data: { lucide: 'trash-2' } })] }), 'Loeschen'),
+    };
+    for (const [name, make] of Object.entries(cases)) {
+      const del = make();
+      const footer = el('div', { cls: ['modal-panel__footer', 'detail-view__footer'], kids: [del, withText(el('button', { cls: ['btn', 'btn--primary'] }), 'Bearbeiten')] });
+      el('div', { cls: ['modal-panel'], kids: [el('h2', { cls: ['modal-panel__title'], text: 'Dr. Anna Weber' }), footer] });
+      decorateFooterDelete(footer);
+      assert.ok(del.classList.contains('modal-panel__delete'), `${name}: nicht erkannt`);
+      assert.deepEqual(visibleWordsOutsideLabel(del), [],
+        `${name}: das Wort bleibt sichtbar und sprengt mobil das 48px-Quadrat`);
+      const labels = del.querySelectorAll('.modal-panel__delete-label');
+      assert.equal(labels.length, 1, `${name}: genau eine Wortspanne`);
+      assert.equal(labels[0].textContent, 'Loeschen', `${name}: das Wort bleibt fuer den Screenreader im Baum`);
+      decorateFooterDelete(footer);
+      assert.equal(del.querySelectorAll('.modal-panel__delete-label').length, 1, `${name}: idempotent`);
+    }
+  } finally {
+    global.document.createElement = savedCreate;
+    globalThis.window = savedWindow;
+  }
+});
