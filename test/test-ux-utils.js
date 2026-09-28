@@ -675,15 +675,22 @@ test('der Toast überlässt die waagerechte Geste dem Script', () => {
 test('showToast verdrahtet die Geste über den geteilten Helfer', () => {
   // Der Inline-Zwilling im Router war die Fassung mit den zwei Fallen. Bleibt
   // er weg, kann er sie nicht ein zweites Mal einsammeln.
+  // showToast lebt seit 2026-09-28 in utils/toast-show.js (Frist mit Pause);
+  // der Router reicht sie nur weiter. Beide duerfen keinen Zwilling halten.
   const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  const toastShow = readFileSync(new URL('../public/utils/toast-show.js', import.meta.url), 'utf8');
+  assert.match(router, /import \{ showToast \} from '\/utils\/toast-show\.js'/,
+    'der Router muss showToast aus utils/toast-show.js beziehen, sonst lebt ein Zwilling');
   assert.ok(
-    router.includes('wireSwipeToDismiss(toast'),
+    toastShow.includes('wireSwipeToDismiss(toast'),
     'der Toast muss die Geste aus utils/ux.js beziehen',
   );
-  assert.ok(
-    !router.includes('setPointerCapture'),
-    'die Shell darf keinen eigenen Wisch-Zwilling mit Pointer-Capture halten',
-  );
+  for (const [name, src] of [['router.js', router], ['utils/toast-show.js', toastShow]]) {
+    assert.ok(
+      !src.includes('setPointerCapture'),
+      `${name} darf keinen eigenen Wisch-Zwilling mit Pointer-Capture halten`,
+    );
+  }
 });
 
 /* DER KOPF KLAPPT NUR AUF EINEN SCROLL, DEN DER NUTZER FUEHRT (Re-Kritik

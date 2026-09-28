@@ -13,8 +13,9 @@ import { forgetLayoutHint } from '/utils/dashboard-layout-hint.js';
 import { initI18n, getLocale, t, formatDate, formatTime } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { emptyHintEl, emptyStateEl } from '/utils/empty-state.js';
-import { wireScrollFade, wireCollapsingHeader, wireSwipeToDismiss, watchNavCapsuleHeight } from '/utils/ux.js';
-import { TOAST_SURFACES, toastSurface } from '/utils/toast-surface.js';
+import { wireScrollFade, wireCollapsingHeader, watchNavCapsuleHeight } from '/utils/ux.js';
+import { TOAST_SURFACES } from '/utils/toast-surface.js';
+import { showToast } from '/utils/toast-show.js';
 import { BULK_PILL_LAYER, clearBulkPill } from '/utils/bulk-pill.js';
 import { watchToastPlacement } from '/utils/toast-placement.js';
 import { COMPOSITION_MODES } from '/utils/page-layout.js';
@@ -4455,104 +4456,8 @@ function errorDetails(err) {
 // Toast-Benachrichtigungen (global)
 // --------------------------------------------------------
 
-/**
- * Zeigt eine Toast-Benachrichtigung an.
- * @param {string} message
- * @param {'default'|'success'|'danger'|'warning'} type
- * @param {number} duration - ms
- */
-const TOAST_SUCCESS_KEY = 'yuvomi:toastSuccessCount';
-const TOAST_SUCCESS_MAX = 50;
-
-function _toastSvg(children) {
-  const NS = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(NS, 'svg');
-  svg.setAttribute('class', 'toast__icon');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('fill', 'none');
-  svg.setAttribute('stroke', 'currentColor');
-  svg.setAttribute('stroke-width', '2.5');
-  svg.setAttribute('aria-hidden', 'true');
-  for (const [tag, attrs] of children) {
-    const el = document.createElementNS(NS, tag);
-    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
-    svg.appendChild(el);
-  }
-  return svg;
-}
-
-const TOAST_ICONS = {
-  success: () => _toastSvg([['polyline', { points: '20 6 9 17 4 12' }]]),
-  danger:  () => _toastSvg([
-    ['circle', { cx: '12', cy: '12', r: '10' }],
-    ['line',   { x1: '12', y1: '8',  x2: '12',   y2: '12' }],
-    ['line',   { x1: '12', y1: '16', x2: '12.01', y2: '16' }],
-  ]),
-  warning: () => _toastSvg([
-    ['path', { d: 'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z' }],
-    ['line', { x1: '12', y1: '9',  x2: '12',   y2: '13' }],
-    ['line', { x1: '12', y1: '17', x2: '12.01', y2: '17' }],
-  ]),
-};
-
-function showToast(message, type = 'default', duration = 3000, onUndo = null) {
-  const container = toastSurface((type === 'danger' || type === 'warning') ? 'assertive' : 'polite');
-  if (!container) return;
-
-  // Aktions-Button: Legacy-Undo (Funktion) oder benannte Aktion ({ label, onClick }).
-  const action = typeof onUndo === 'function'
-    ? { label: t('common.undo'), onClick: onUndo }
-    : (onUndo && typeof onUndo.onClick === 'function' ? onUndo : null);
-
-  // Long Loop: Success-Toasts nach TOAST_SUCCESS_MAX Aufrufen unterdrücken.
-  // Aktions-Toasts (Undo oder benannte Aktion) sind wichtig → nie unterdrücken.
-  if (type === 'success' && !action) {
-    const successCount = parseInt(localStorage.getItem(TOAST_SUCCESS_KEY) ?? '0', 10) + 1;
-    localStorage.setItem(TOAST_SUCCESS_KEY, String(successCount));
-    if (successCount > TOAST_SUCCESS_MAX) return;
-  }
-
-  // Max. 3 gleichzeitige Toasts (global): ältesten entfernen falls Limit erreicht
-  const existing = document.querySelectorAll('.toast-container .toast');
-  if (existing.length >= 3) existing[0].remove();
-
-  const toast = document.createElement('div');
-  toast.className = `toast ${type !== 'default' ? `toast--${type}` : ''}`;
-  // Keine eigene Live-Rolle: die Region (hoeflich oder bestimmt) sagt an.
-  // `role="alert"` machte jeden Toast bestimmt, auch in der hoeflichen Region,
-  // und liess ihn je nach Screenreader doppelt ansagen.
-
-  const iconEl = TOAST_ICONS[type]?.();
-  if (iconEl) toast.appendChild(iconEl);
-  const span = document.createElement('span');
-  span.textContent = message;
-  toast.appendChild(span);
-
-  if (action) {
-    const actionBtn = document.createElement('button');
-    actionBtn.className = 'toast__undo';
-    actionBtn.textContent = action.label;
-    actionBtn.addEventListener('click', () => {
-      clearTimeout(dismissTimer);
-      toast.remove();
-      action.onClick();
-    });
-    toast.appendChild(actionBtn);
-  }
-
-  container.appendChild(toast);
-  const dismiss = () => {
-    clearTimeout(dismissTimer);
-    toast.classList.add('toast--out');
-    toast.addEventListener('animationend', () => toast.remove(), { once: true });
-  };
-  const dismissTimer = setTimeout(dismiss, duration);
-
-  // Wischen zum Verwerfen: die Geste samt ihrer zwei Fallen liegt in
-  // `wireSwipeToDismiss` (utils/ux.js), das CSS-Gegenstück ist das
-  // `touch-action: pan-y` auf `.toast`.
-  wireSwipeToDismiss(toast, { onDismiss: dismiss });
-}
+// showToast lebt in utils/toast-show.js (Frist mit Pause, Ansage trotz
+// Erfolgs-Zaehler); window.yuvomi.showToast unten reicht sie weiter.
 
 // --------------------------------------------------------
 // Event-Listener
