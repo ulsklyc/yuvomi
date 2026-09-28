@@ -670,17 +670,17 @@ test('die vier Kennzahlen stehen auf jeder Breite in einer Zeile, schmal mit Lab
 // Re-Critique 2026-09-28 (P5, A3 P2-3 / A8 P2-3): die Uebersicht mit
 // Kennzahlen, Besuchen und Zahlungen stand im 720px-Lesemass einer Textseite
 // und liess bei 1440 rund 470px leer - Besuche und Zahlungen untereinander.
-test('Uebersicht am Desktop: Besuche | Zahlungen nebeneinander ab 1280, ausserhalb des Lesemasses', () => {
+test('Uebersicht am Desktop: Besuche | Zahlungen nebeneinander, sobald die Spalte reicht, ausserhalb des Lesemasses', () => {
   const html = dashboardHtml({ lastVisit: '2026-09-20T08:30:00Z' });
   const cols = /<div class="housekeeping-dashboard-columns">([\s\S]*)<\/div>\s*$/.exec(html.trim());
   assert.ok(cols, 'die beiden Karten stehen in EINEM Spaltentraeger');
   assert.match(cols[1], /housekeeping\.recentVisits[\s\S]*housekeeping\.payments/, 'Besuche links, Zahlungen rechts');
   const rules = [...eachRule(HK_STYLES)];
-  const wide = rules.find((r) => r.selector.trim() === '.housekeeping-page[data-tab="dashboard"]'
-    && r.at.some((a) => /min-width:\s*1280px/.test(a)));
-  assert.match(wide?.body ?? '', /--page-measure:\s*var\(--layout-wide\)/, 'die Uebersicht bekommt ab 1280 das breite Mass');
+  const wide = rules.find((r) => r.selector.trim() === '.housekeeping-page[data-tab="dashboard"]' && !r.at.length);
+  assert.match(wide?.body ?? '', /--page-measure:\s*var\(--layout-wide\)/, 'die Uebersicht bekommt das breite Mass');
+  // Zwei Spalten am Container der Seite, nicht am Viewport (PAGE-005).
   const grid = rules.find((r) => r.selector.trim() === '.housekeeping-dashboard-columns'
-    && r.at.some((a) => /min-width:\s*1280px/.test(a)));
+    && r.at.some((a) => /@container housekeeping-page \(min-width:\s*60rem\)/.test(a)));
   assert.match(grid?.body ?? '', /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
   const HK_SRC = readFileSync(new URL('../public/pages/housekeeping.js', import.meta.url), 'utf8');
   assert.match(HK_SRC, /page\.dataset\.tab = state\.tab/, 'der Reiter steht an der Seite, damit das Mass ihm folgt');
