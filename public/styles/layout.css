@@ -1963,7 +1963,6 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 .segmented__item.is-active svg,
 .cal-toolbar__view-btn--active svg,
 .cal-toolbar__search-btn--active svg,
-.perm-modeswitch__btn.is-active svg,
 .perm-seg__opt.is-active svg {
   /* 30 % statt 16 %: auf Tab-Bar-Größe (20px) las die schwächere Füllung
    * weiter als Outline (Finish-Verdict Fundament-Phase, Fix 8). */

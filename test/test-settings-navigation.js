@@ -2432,3 +2432,15 @@ test('R14: Familie legt im Blatt-Dialog an, Fuss [Abbrechen][Primaer], Zeilen mi
   const editFoot = src.slice(src.indexOf('id="edit-member-error"'), src.indexOf("settings.saveMember')}</button>"));
   assert.match(editFoot, /modal-panel__footer/, 'auch Bearbeiten traegt den Kanon-Fuss');
 });
+
+// R14 P8 (Re-Critique 2026-09-28, A7 Konsistenz): die Rechte trugen einen
+// eigenen Modus-Umschalter (.perm-modeswitch) neben dem Kanon-Umschalter, den
+// Design und Wochenstart zeigen.
+test('R14: der Modus der Rechte ist der Kanon-Umschalter .segmented', async () => {
+  const src = await readFile(new URL('../public/settings/pages/admin-permissions.js', import.meta.url), 'utf8');
+  assert.match(src, /<div class="segmented settings-segmented perm-mode" role="tablist"/);
+  assert.match(src, /class="segmented__item is-active" role="tab" aria-selected="true" data-mode="role"/);
+  assert.match(src, /attachSegmentIndicator\(modeSwitch\)/, 'die gleitende Kapsel bleibt');
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(css, /perm-modeswitch/, 'kein zweiter Dialekt im Stylesheet');
+});

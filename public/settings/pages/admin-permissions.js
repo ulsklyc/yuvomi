@@ -681,7 +681,7 @@ async function save(container) {
 function bindEvents(container) {
   // Geteilte gleitende Kapsel (Re-Critique 2026-09-27, D8): sie folgt dem
   // Klassenwechsel unten von selbst.
-  const modeSwitch = container.querySelector('.perm-modeswitch');
+  const modeSwitch = container.querySelector('.perm-mode');
   if (modeSwitch) attachSegmentIndicator(modeSwitch);
   // Modus umschalten
   container.querySelectorAll('[data-mode]').forEach((btn) => {
@@ -784,11 +784,13 @@ function renderShell(container) {
 
       <!-- Trug bis zum Copy-Durchgang den Seitentitel als Label: der beschreibt
            die Seite, nicht die Umschaltung (Critique 2026-07-27). -->
-      <div class="perm-modeswitch" role="tablist" aria-label="${esc(t('settings.permModeLabel'))}">
-        <button type="button" class="perm-modeswitch__btn is-active" role="tab" aria-selected="true" data-mode="role">
+      <!-- DER KANON-UMSCHALTER (R14, A7 P2-4/Konsistenz): segmented wie Design
+           und Wochenstart, statt einer eigenen Pille mit eigenem Daumen. -->
+      <div class="segmented settings-segmented perm-mode" role="tablist" aria-label="${esc(t('settings.permModeLabel'))}">
+        <button type="button" class="segmented__item is-active" role="tab" aria-selected="true" data-mode="role">
           <i data-lucide="users-round" aria-hidden="true"></i>${esc(t('settings.permByRole'))}
         </button>
-        <button type="button" class="perm-modeswitch__btn" role="tab" aria-selected="false" data-mode="user">
+        <button type="button" class="segmented__item" role="tab" aria-selected="false" data-mode="user">
           <i data-lucide="user" aria-hidden="true"></i>${esc(t('settings.permByMember'))}
         </button>
       </div>

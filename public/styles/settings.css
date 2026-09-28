@@ -2830,41 +2830,11 @@
   line-height: 1.5;
 }
 
-/* Modus-Umschalter (Rolle / Mitglied) — segmentierte Pille */
-.perm-modeswitch {
-  display: inline-flex;
-  gap: var(--space-1);
-  padding: var(--space-1);
+/* Modus-Umschalter (Rolle / Mitglied): der Kanon-Umschalter `.segmented`
+ * (panel.css) samt `.settings-segmented`; hier steht nur sein Abstand zur
+ * Subjekt-Auswahl darunter (R14). */
+.perm-mode {
   margin-bottom: var(--space-4);
-  background: var(--color-surface-raised);
-  border: var(--space-px) solid var(--color-border-subtle);
-  border-radius: var(--radius-full);
-}
-
-.perm-modeswitch__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--target-md);
-  padding: 0 var(--space-4);
-  border: none;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--color-text-secondary);
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
-}
-
-/* Aktiv: gefülltes Segment statt erhabener Kachel (DESIGN.md „Segmented
- * Controls"). */
-/* Aktiv = erhabene Surface-Pille, Ton in der Tinte (tokens.css, Abschnitt 6c). */
-.perm-modeswitch__btn.is-active {
-  background: var(--seg-active-bg);
-  box-shadow: var(--seg-active-shadow);
-  color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
 }
 
 /* Subjekt-Auswahl (Rollen-/Mitglieder-Chips) */
@@ -3257,7 +3227,6 @@
   .perm-modgroup__widgets { padding-inline-start: var(--space-4); }
   .perm-modgroup__capabilities { margin-inline-start: var(--space-4); }
 
-  .perm-modeswitch__btn,
   .perm-chip { min-height: var(--target-base); }
 
   .perm-row {
@@ -3320,7 +3289,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .perm-modeswitch__btn,
   .perm-chip,
   .perm-seg__opt,
   .perm-seg__thumb { transition: none; }
