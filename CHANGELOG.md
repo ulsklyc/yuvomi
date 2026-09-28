@@ -98,6 +98,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A document can be edited from the viewer.** A pencil button next to Share and Download closes
   the viewer and opens the edit dialog. It only appears for people who may change documents.
 
+- **A recipe goes into the meal plan with a tap or the keyboard.** Each recipe in the side column of
+  the week plan is a button: a tap, a click or Enter opens "Add meal" with the recipe and its
+  ingredients filled in, on today or the next free day of the visible week, and the meal chosen by
+  the time of day. Dragging still works. Typing a meal name now also suggests your saved recipes,
+  marked "Recipe", before earlier meals; picking one fills in its ingredients and links the recipe.
+  The suggestions can be read and chosen with a screen reader and the arrow keys, and Enter picks
+  a suggestion without saving the dialog.
+
 ### Changed
 
 - **On a phone the overview starts with what is due today.** Two or more overdue items collapse
@@ -692,6 +700,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The shift plan's statistics period is a menu on narrow screens** instead of a segmented control
   that scrolled sideways.
 
+- **Delete sits at the start of every dialog footer.** In every dialog with a delete button, Delete
+  stands on the left and Cancel and Save on the right (mirrored in right-to-left languages), in
+  the calendar, budget, contacts, health, inventory and pantry alike.
+
+- **Messages stay dark in dark mode.** Toasts and the selection pill used to turn light in dark
+  mode and were the brightest thing on the page. They are now dark glass with light text in both
+  themes, readable at 4.5:1 or more.
+
+- **Holiday switches in the calendar settings save right away.** "Show public holidays" and "Show
+  school holidays" save when you flip them, like the other switches, and confirm with a message.
+
 ### Fixed
 
 - **The glass tab bar blurs again.** Text scrolling under the tab bar on a phone and under the
@@ -959,6 +978,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Texts in every language use a hyphen where a dash stood**, except where a language needs its
   own dash; Chinese sets it without spaces.
+
+- **Enter in the search opens the highlighted result.** The first result is highlighted as you
+  type and Enter opens it, also with the "Go" key of a phone keyboard. The arrow keys move the
+  highlight while the cursor stays in the field, and reach the start tiles when the field is empty.
+
+- **A click beside an event popover only closes it.** Clicking an empty spot in the week or day
+  view to dismiss an open event used to start a new event at the same time. The first click now
+  just closes the popover, a second click adds an event. This holds for every popover of the
+  detail view.
+
+- **Messages no longer cover the buttons of a detail column.** With list and detail side by side
+  on a desktop, a message sat over Delete at the foot of the detail column. It now moves out of the
+  way as it does for dialogs.
+
+- **Settings ask before throwing away unsaved changes.** Leaving a settings sheet with unsaved edits
+  (weather location, backup access, the permission matrix and others) through the sidebar, the
+  back gesture or the search now asks first, the same way customize mode on the overview does.
+
+- **A loan's report opens from the keyboard.** The title of each loan card is a button with an
+  arrow that opens the report; clicking anywhere on the card still works.
+
+- **The contact row menu works like the other menus.** "More" on a contact row opens the shared
+  menu with arrow keys, and screen readers hear whether it is open. Email, map and export sit in it
+  as entries, delete below a divider.
+
+- **The sticky head of a detail column stays on top.** In health and other list and detail views,
+  numbers in cards and in the cycle calendar scrolled over the head of the detail column.
+
+- **The request panel in rewards has its inner spacing again.** Pending requests no longer sit
+  against the edge of their tinted panel.
 
 ### Security
 
