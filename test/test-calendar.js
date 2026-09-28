@@ -4334,6 +4334,29 @@ test('Agenda: ein geteilter Auswahl-Link <id>.<Tag> positioniert Cursor und Term
   assert(/const dateParam\s*=\s*openLink \? openLink\.date/.test(page), 'der Tag des Links wird der Zieltag');
 });
 
+test('Rasterbloecke nennen im Namen den Tag ihrer Spalte, die Agenda nicht (A2 P2-2)', () => {
+  // Im Wochen- und Tagesraster tragen die Spalten kein Label: "Fussball,
+  // 14:00" sagte nicht, an welchem der sieben Tage. Die Agenda-Zeile steht
+  // unter ihrer Tagesueberschrift und bleibt ohne Wiederholung.
+  const views = everyEventView(glyphEvent({ title: 'Fussball' }));
+  const label = (html) => /aria-label="([^"]*)"/.exec(html)?.[1] ?? '';
+  for (const name of ['Woche', 'Tag', 'Ganztag']) {
+    assert(/calendar\.dayLongThursday, 2026-09-24/.test(label(views[name])),
+      `${name}: der Name nennt Wochentag und Datum der Spalte: ${label(views[name])}`);
+  }
+  assert(!/calendar\.dayLong/.test(label(views.Agenda)), `die Agenda wiederholt ihre Tagesueberschrift nicht: ${label(views.Agenda)}`);
+  // "Titel, Zeit" beginnt in jeder Ansicht gleich; der Tag folgt der Zeit.
+  const week = label(views.Woche);
+  assert(week.startsWith('Fussball, calendar.dayRangeLabel') && week.indexOf('dayRangeLabel') < week.indexOf('calendar.dayLong'),
+    `Titel und Zeit vor dem Tag: ${week}`);
+});
+
+test('Wochenblock-Titel trennen mit Strich statt mitten im Wort (A2 P2-1)', () => {
+  const rule = [...eachRule(calendarCss)].find((r) => r.selector.trim() === '.week-event__title > span:last-child');
+  assert(rule, 'die Titelregel des Wochenblocks fehlt');
+  assert(/(?:^|[\s;])hyphens:\s*auto/.test(rule.body), `ohne hyphens: auto bricht "Betriebsversam|mlung": ${rule.body}`);
+});
+
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------

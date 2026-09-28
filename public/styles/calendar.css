@@ -886,6 +886,14 @@
   min-width: 0;
   overflow: hidden;
   overflow-wrap: anywhere;
+  /* MIT TRENNSTRICH, NICHT MITTEN IM WORT (A2 P2-1): `anywhere` allein brach
+   * mobil „Betriebsversam / mlung", „Fussballtraini / ng" - deutsche
+   * Komposita treffen es staendig. `hyphens: auto` trennt sprachrichtig
+   * (`lang` folgt dem Locale), `anywhere` bleibt Rueckfall fuer ein Wort ohne
+   * Trennstelle. Mindestens sechs Zeichen je Wort, drei vor und nach dem
+   * Strich - wie in der Liste (list-row.css, `.list-row__name`). */
+  hyphens: auto;
+  hyphenate-limit-chars: 6 3 3;
 }
 
 @container ev-block (height >= 3.25rem) {
