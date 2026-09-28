@@ -231,6 +231,19 @@ function previousPeriodLabel(prev) {
  * mehr Einnahmen besser) - dieselbe Trend-Sprache wie die Kennzahl-Karten.
  * Eine Kategorie, die nur im Vorzeitraum vorkam, steht mit null da: ihr
  * Wegfall ist genau die Veraenderung, nach der man hier sucht. */
+/* EINE FARBE JE KATEGORIE IN BEIDEN DIAGRAMMEN (R14 P8, A5 P2-8). Die
+ * Ausgabenbalken standen alle im Modulton, der Donut daneben in sieben
+ * Serienfarben - dieselben Betraege in zwei Farbsystemen. Jetzt nimmt jeder
+ * Balken die Farbe seines Donut-Segments (dieselbe Reihenfolge wie
+ * donutSlices: groesste Ausgabe zuerst, jenseits der Palette die Farbe der
+ * Sammelscheibe). */
+function categoryColorIndex(byCategory) {
+  const order = (byCategory ?? [])
+    .filter((c) => c.expenses < 0)
+    .sort((a, b) => Math.abs(b.expenses) - Math.abs(a.expenses));
+  return new Map(order.map((c, i) => [c.category, Math.min(i, DONUT_SEGMENTS - 1)]));
+}
+
 function renderCatBars() {
   const host = view.root.querySelector('#budget-stats-cat');
   if (!host) return;
@@ -251,10 +264,12 @@ function renderCatBars() {
   }).filter((b) => b.rows.some((r) => r.amount !== 0));
   if (!blocks.length) return;
 
+  const colors = categoryColorIndex(view.data.byCategory);
   const html = blocks.map(({ kind, labelKey, betterWhen, rows }) => {
     // DAS EIGENE MAXIMUM DES BLOCKS, wie im Monats-Diagramm.
     const max = Math.max(...rows.map((r) => Math.abs(r.amount)), 1);
     const total = rows.reduce((sum, r) => sum + r.amount, 0);
+    const absTotal = rows.reduce((sum, r) => sum + Math.abs(r.amount), 0);
     const titleId = `budget-stats-${kind}-title`;
     const body = rows.map((r) => {
       // Der Anteil ist der Anteil: kein Boden (Critique 2026-08-13, Guard in
@@ -273,14 +288,21 @@ function renderCatBars() {
       const deltaHtml = hasPrev
         ? trendMarkup({ delta, betterWhen, text: view.ctx.esc(signed(delta)) })
         : '';
+      // Ausgaben: Farbe des Donut-Segments und der Anteil als Text - die Farbe
+      // ist Zuordnung, der Anteil die Aussage (auch ohne Farbsehen lesbar).
+      const colorIndex = kind === 'expenses' ? colors.get(r.category) : undefined;
+      const fillColor = colorIndex != null ? `;--bar-fill:${DONUT_COLORS[colorIndex]}` : '';
+      const share = kind === 'expenses' && absTotal > 0 && r.amount !== 0
+        ? ` <span class="budget-bar-row__share">${Math.round((Math.abs(r.amount) / absTotal) * 100)}%</span>`
+        : '';
       return `
         <div class="budget-bar-row budget-bar-row--compare">
           <div class="budget-bar-row__label" title="${catLabel}">${catLabel}</div>
           <div class="budget-bar-row__track" style="--bar-visible:${r.amount !== 0 ? 1 : 0}">
-            <div class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}"></div>
+            <div class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}${fillColor}"></div>
             ${targetMarker}
           </div>
-          <div class="budget-bar-row__amount">${view.ctx.esc(signed(r.amount))}</div>
+          <div class="budget-bar-row__amount">${view.ctx.esc(signed(r.amount))}${share}</div>
           ${deltaHtml ? `<div class="budget-bar-row__delta">${deltaHtml}</div>` : ''}
         </div>`;
     }).join('');
@@ -339,13 +361,10 @@ function renderDonut() {
     offset += frac * C;
     return seg;
   }).join('');
-  // Die Legende trägt Betrag und Anteil als Text — die Farbe ist Beiwerk, nicht
-  // der einzige Träger der Information (gilt auch für Farbfehlsichtigkeit).
-  const legend = exp.map((e, i) => `
-    <span class="budget-stats__legend-item">
-      <i class="budget-stats__swatch" style="background:${DONUT_COLORS[i]};"></i>
-      ${view.ctx.esc(e.label)} · ${fmtAmount(e.value)} · ${pctOf(e.value)}%
-    </span>`).join('');
+  // KEINE ZWEITE LEGENDE (R14 P8): Betrag und Anteil je Kategorie stehen an
+  // den Balken daneben, die dieselbe Farbe tragen (categoryColorIndex). Die
+  // Donut-Legende zaehlte alles ein zweites Mal auf. Fuer Screenreader bleibt
+  // die Zusammenfassung unten.
   const summary = t('budget.statsDonutSummary', {
     count: exp.length,
     top: exp[0].label,
@@ -360,7 +379,6 @@ function renderDonut() {
       <p class="sr-only">${view.ctx.esc(summary)}</p>
       <div class="budget-stats__donut-wrap">
         <svg viewBox="0 0 160 160" class="budget-stats__donut" aria-hidden="true">${segs}</svg>
-        <div class="budget-stats__legend budget-stats__legend--wrap">${legend}</div>
       </div>
     </div>`);
 }
@@ -563,3 +581,6 @@ function wireTrendPoints(host, series, labelKey, raw = series) {
 function updatePeriodLabel() {
   if (view.data) view.ctx.onPeriod({ from: view.data.from, to: view.data.to });
 }
+
+// Nur fuer Tests: die Farbzuordnung von Balken und Donut (R14 P8).
+export const __test = { categoryColorIndex, DONUT_SEGMENTS };

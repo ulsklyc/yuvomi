@@ -3021,3 +3021,26 @@ test('Budget-Untertabs blenden beim Wechsel ein, mit Tokens (R14 P11)', () => {
   assert.ok(regel, '.budget-tab-panel--entering fehlt');
   assert.match(regel.body, /animation:\s*fade-in var\(--duration-[a-z0-9]+\) var\(--ease-[a-z-]+\)/, 'Blende aus Tokens');
 });
+
+/* STATISTIK OHNE DOPPELUNG (R14 P8, A5 P2-8). „Nach Kategorie" (Balken, alle
+ * Modulton) und „Ausgaben-Anteile" (Donut, sieben Serienfarben) nannten
+ * dieselben Betraege nebeneinander in zwei Farbsystemen. Jetzt traegt jeder
+ * Ausgabenbalken die Farbe SEINES Donut-Segments und seinen Anteil; die
+ * Donut-Legende, die alles ein zweites Mal aufzaehlte, entfaellt. */
+test('Statistik: Ausgabenbalken tragen Donut-Farbe und Anteil, keine zweite Legende (R14 P8)', async () => {
+  const { __test: st } = await import('../public/pages/budget-stats.js');
+  const farben = st.categoryColorIndex([
+    { category: 'a', expenses: -100 }, { category: 'b', expenses: -300 }, { category: 'c', expenses: 0, income: 50 },
+    ...Array.from({ length: 8 }, (_, i) => ({ category: `x${i}`, expenses: -(10 - i) })),
+  ]);
+  assert.equal(farben.get('b'), 0, 'die groesste Ausgabe nimmt die erste Serienfarbe - wie ihr Donut-Segment');
+  assert.equal(farben.get('a'), 1);
+  assert.equal(farben.has('c'), false, 'ohne Ausgabe kein Segment');
+  assert.equal(farben.get('x7'), st.DONUT_SEGMENTS - 1, 'jenseits der Palette: die Farbe der Sammelscheibe');
+  const code = withoutHtmlComments(stats);
+  assert.match(code, /--bar-fill:\$\{DONUT_COLORS\[/, 'der Balken nimmt die Segmentfarbe');
+  assert.match(code, /budget-bar-row__share/, 'der Balken nennt seinen Anteil');
+  assert.doesNotMatch(code, /budget-stats__legend budget-stats__legend--wrap/, 'die Donut-Legende zaehlt nicht alles ein zweites Mal auf');
+  const fill = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-bar-row__fill--expenses');
+  assert.match(fill.body, /background-color:\s*var\(--bar-fill,\s*var\(--module-accent\)\)/);
+});
