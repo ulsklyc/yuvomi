@@ -911,10 +911,11 @@ async function openSendListDialog(container) {
         try {
           await api.post(`/shopping/${listId}/send`, { userId });
           closeModal({ force: true });
-          // BEWUSST KEIN success-Toast. Die Erfolgsmeldungen der App sind nach
-          // 50 Bestaetigungen dauerhaft stummgeschaltet (`TOAST_SUCCESS_MAX` in
-          // router.js) - richtig fuer Handlungen, deren Ergebnis auf dem
-          // Bildschirm steht und die man taeglich wiederholt. Ein Mailversand
+          // BEWUSST KEIN success-Toast. Die Erfolgsmeldungen der App zeigen
+          // nach 50 Bestaetigungen keine Flaeche mehr (`TOAST_SUCCESS_MAX` in
+          // utils/toast-show.js; angesagt werden sie weiter) - richtig fuer
+          // Handlungen, deren Ergebnis auf dem Bildschirm steht und die man
+          // taeglich wiederholt. Ein Mailversand
           // ist das Gegenteil: er passiert selten, laesst sich nicht
           // zuruecknehmen, und sein Ergebnis liegt in einem fremden Postfach.
           // Wer hier nichts sieht, weiss nicht, ob die Liste unterwegs ist.
