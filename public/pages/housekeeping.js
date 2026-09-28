@@ -20,6 +20,7 @@ import { isNavModuleReadOnly } from '/permissions.js';
 import { pathAccess, mayWritePath } from '/utils/module-access.js';
 import { todayKey } from '/utils/date.js';
 import { zonedDateKey } from '/utils/timezone.js';
+import { USER_COLOR_DEFAULT } from '/utils/color.js';
 
 
 
@@ -1985,7 +1986,7 @@ function openStaffModal(worker, content, options = {}) {
           </label>
           <label class="housekeeping-field housekeeping-field--color">
             <span>${esc(t('housekeeping.calendarColor'))}</span>
-            <input name="calendar_color" type="color" value="${esc(item.calendar_color || '#7C3AED')}">
+            <input name="calendar_color" type="color" value="${esc(item.calendar_color || USER_COLOR_DEFAULT)}">
           </label>
           <label class="housekeeping-field">
             <span>${esc(t('housekeeping.paymentSchedule'))}</span>
@@ -1997,7 +1998,7 @@ function openStaffModal(worker, content, options = {}) {
           </label>
           <label class="housekeeping-field housekeeping-field--color">
             <span>${esc(t('housekeeping.profileColor'))}</span>
-            <input name="avatar_color" type="color" value="${esc(item.avatar_color || '#7C3AED')}">
+            <input name="avatar_color" type="color" value="${esc(item.avatar_color || USER_COLOR_DEFAULT)}">
           </label>
         </div>
         <label class="housekeeping-field">

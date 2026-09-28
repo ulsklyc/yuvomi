@@ -18,6 +18,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { eachRule } from './css-rules.js';
 
 global.HTMLElement = class HTMLElement {};
 global.customElements = { define() {}, get() { return undefined; } };
@@ -507,6 +508,65 @@ test('WASTE_TYPE_COLORS: eine kuratierte Auswahl ohne Dubletten und ohne Extremw
 });
 
 // -------------------------------------------------------------------------
+// EINE Startpalette fuer Nutzerfarben (Re-Critique 2026-09-28, P9)
+// -------------------------------------------------------------------------
+
+// Die Flaechen, auf denen ein Farbsymbol oder Swatch landet, gerechnet aus
+// tokens.css selbst - Light UND Dark, Grundflaeche UND gehobene Karte. Kein
+// abgeschriebener Hex hier: aendert sich ein Flaechenton, misst der Test mit.
+const TOKENS_CSS = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+const SURFACES = [...new Set([...TOKENS_CSS.matchAll(/--_color-surface(?:-raised)?:\s*(#[0-9A-Fa-f]{6})/g)].map((m) => m[1].toUpperCase()))];
+function relLum(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+function contrast(a, b) {
+  const [x, y] = [relLum(a), relLum(b)];
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+function hueOf(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const mx = Math.max(r, g, b); const d = mx - Math.min(r, g, b);
+  if (!d) return null;
+  const h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return (h * 60 + 360) % 360;
+}
+
+test('USER_COLORS: eine Startpalette, die auf jeder Flaeche beider Themes >= 3:1 haelt', async () => {
+  const { USER_COLORS } = await import('../public/utils/color.js');
+  assert.ok(Array.isArray(USER_COLORS) && USER_COLORS.length >= 8, 'geteilte Palette fehlt in utils/color.js');
+  assert.ok(SURFACES.length >= 4, `Flaechen aus tokens.css nicht gefunden: ${SURFACES}`);
+  for (const hex of USER_COLORS) {
+    for (const surface of SURFACES) {
+      assert.ok(contrast(hex, surface) >= 3, `${hex} auf ${surface}: ${contrast(hex, surface).toFixed(2)}:1 < 3:1`);
+    }
+  }
+});
+
+test('USER_COLORS: kein Ton im Markenband (#6C3AED/#7C3AED), der Primaerknopf bleibt die eine Stimme', async () => {
+  const { USER_COLORS, USER_COLOR_DEFAULT } = await import('../public/utils/color.js');
+  for (const hex of USER_COLORS) {
+    const hue = hueOf(hex);
+    assert.ok(hue === null || hue < 245 || hue > 275, `${hex} (Hue ${hue?.toFixed(0)}) liegt im Markenband`);
+  }
+  assert.ok(USER_COLORS.includes(USER_COLOR_DEFAULT), 'die Vorgabe fuer neue Datensaetze ist ein Palettenmitglied');
+});
+
+test('Farb-Swatch traegt eine Innenkante, damit er im Dark nicht in den Kartengrund laeuft', () => {
+  const css = readFileSync(new URL('../public/styles/waste.css', import.meta.url), 'utf8');
+  const base = [...eachRule(css)].find((r) => r.selector.trim() === '.waste-color-swatch' && !r.at.length);
+  assert.ok(base, '.waste-color-swatch fehlt');
+  assert.match(base.body, /box-shadow:\s*inset 0 0 0 1px var\(--color-border[a-z-]*\)/);
+});
+
+test('WASTE_TYPE_COLORS ist die geteilte Palette, und Sperrmuell traegt nicht mehr die Stimme', async () => {
+  const { USER_COLORS } = await import('../public/utils/color.js');
+  assert.deepEqual(WASTE_TYPE_COLORS, USER_COLORS);
+  assert.ok(!TYPE_PRESETS.some((p) => /^#7C3AED$/i.test(p.color)), 'kein Preset in #7C3AED');
+});
+
+// -------------------------------------------------------------------------
 // Quelltext-Zusicherungen (Audit UX, 2026-09-12).
 //
 // Die folgenden Zusagen haengen an `renderPage()`/`bindEvents()` und am
@@ -619,7 +679,7 @@ test('resolveSwatchColors: eine Farbe ausserhalb der Palette bekommt weiterhin g
 });
 
 test('resolveSwatchColors: bereits grossgeschriebene Palettenfarben verhalten sich unveraendert', () => {
-  const { swatchColors } = resolveSwatchColors('#2563EB');
+  const { swatchColors } = resolveSwatchColors('#3B82F6');
   assert.deepEqual(swatchColors, WASTE_TYPE_COLORS);
 });
 

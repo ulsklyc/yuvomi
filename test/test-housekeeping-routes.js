@@ -99,6 +99,35 @@ test('POST /worker: Admin legt Tages-Worker an -> 201 und erscheint in /workers'
   assert.equal(staff.role, 'member');
 });
 
+// Re-Critique 2026-09-28 (P9): ein neues Profil ohne eigene Farbwahl bekommt
+// die Vorgabe der geteilten Startpalette (utils/color.js USER_COLOR_DEFAULT),
+// nicht mehr #7C3AED - im Dark exakt die Flaeche des Primaerknopfs. Ein
+// bestehendes Profil behaelt beim Speichern ohne Farbfeld seine Farbe.
+test('POST /worker: neues Profil ohne Farbwahl -> Startpalette statt Markenviolett; Bestand bleibt', async () => {
+  const r = await call('POST', '/worker', { as: ADM, body: { display_name: 'Farbprobe', daily_rate: 40, rate_type: 'daily' } });
+  assert.equal(r.status, 201);
+  const row = db.prepare(`SELECT hw.id, hw.calendar_color, u.avatar_color FROM housekeeping_workers hw
+    JOIN users u ON u.id = hw.user_id WHERE u.display_name = 'Farbprobe'`).get();
+  assert.equal(row.calendar_color.toUpperCase(), '#0891B2');
+  assert.equal(row.avatar_color.toUpperCase(), '#0891B2');
+  db.prepare('UPDATE housekeeping_workers SET calendar_color = ? WHERE id = ?').run('#123456', row.id);
+  db.prepare('UPDATE users SET avatar_color = ? WHERE id = (SELECT user_id FROM housekeeping_workers WHERE id = ?)').run('#654321', row.id);
+  const u = await call('POST', '/worker', { as: ADM, body: { id: row.id, display_name: 'Farbprobe', daily_rate: 40, rate_type: 'daily' } });
+  assert.ok(u.status === 200 || u.status === 201, `status ${u.status}`);
+  const after = db.prepare(`SELECT hw.calendar_color, u.avatar_color FROM housekeeping_workers hw
+    JOIN users u ON u.id = hw.user_id WHERE hw.id = ?`).get(row.id);
+  assert.equal(after.calendar_color, '#123456', 'Kalenderfarbe des Bestands bleibt');
+  assert.equal(after.avatar_color, '#654321', 'Profilfarbe des Bestands bleibt');
+  // Kein DELETE-Weg fuer Profile: die Probe raeumt direkt ab, damit die
+  // Folgetests (ein Profil) unveraendert zaehlen.
+  const uid = db.prepare('SELECT user_id FROM housekeeping_workers WHERE id = ?').get(row.id).user_id;
+  db.prepare('DELETE FROM housekeeping_workers WHERE id = ?').run(row.id);
+  db.pragma('foreign_keys = OFF');
+  for (const tbl of ['contacts', 'birthdays']) db.prepare(`DELETE FROM ${tbl} WHERE family_user_id = ?`).run(uid);
+  db.prepare('DELETE FROM users WHERE id = ?').run(uid);
+  db.pragma('foreign_keys = ON');
+});
+
 // --------------------------------------------------------------------------
 // Check-in / Check-out-Lifecycle
 // --------------------------------------------------------------------------

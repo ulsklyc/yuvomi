@@ -20,6 +20,32 @@ export const AVATAR_FALLBACK_COLOR = '#8E8E93';
 export const AVATAR_COLORS = ['#007AFF', '#34C759', '#FF9500', '#FF3B30', '#AF52DE', '#FF2D55'];
 
 /**
+ * DIE EINE STARTPALETTE FUER NUTZERFARBEN (Re-Critique 2026-09-28, P9).
+ *
+ * Schichtplan-Presets, Abfallarten, der Haushaltshilfe-Default und neue
+ * Budget-Kategorien zogen ihre Startwerte aus vier eigenen Listen nach zwei
+ * Regeln: die Abfall-Palette gegen beide Themes gewaehlt, die Schicht-Presets
+ * nur gegen Weiss (im Dark lagen 14 von 15 unter 3:1), und zwei davon trugen
+ * #7C3AED - im Dark exakt die Flaeche des Primaerknopfs.
+ *
+ * Jede Farbe hier haelt >= 3:1 (Nicht-Text-Kontrast, WCAG 1.4.11) auf
+ * `--color-surface` UND `--color-surface-raised`, Light (#FFFFFF/#FBFBFD) wie
+ * Dark (#2B2825/#37332E); keine liegt im Markenband (Hue 245-275). Der Test
+ * in test-waste-ui.js rechnet das gegen tokens.css nach.
+ *
+ * NUR STARTWERTE: Bestandsdaten behalten ihre Farbe (keine Migration); ein
+ * Farbwaehler zeigt eine fremde Bestandsfarbe als eigenen Swatch.
+ * Reihenfolge = Reihenfolge im Raster; die Namen fuehrt jeder Aufrufer.
+ */
+export const USER_COLORS = [
+  '#78808C', '#3B82F6', '#16A34A', '#D97706', '#059669',
+  '#D946EF', '#EF4444', '#0891B2', '#EA580C', '#EC4899',
+];
+
+/** Vorgabe fuer einen neuen Datensatz ohne eigene Wahl (Cyan, wie der Schichtplan-Default). */
+export const USER_COLOR_DEFAULT = '#0891B2';
+
+/**
  * Returns the design-system text token with the stronger WCAG contrast
  * against an arbitrary six-digit hex background.
  */

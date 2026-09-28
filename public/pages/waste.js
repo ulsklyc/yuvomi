@@ -26,6 +26,7 @@ import { findPageFab } from '/utils/fab.js';
 import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { createPageController } from '/utils/page-lifecycle.js';
+import { USER_COLORS } from '/utils/color.js';
 
 const UPCOMING_WINDOW_DAYS = 90;
 const WEEKDAY_CODES = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
@@ -79,13 +80,18 @@ function nearestOrdinalAnchorDateKey(ordinal, weekdayCode, todayKeyValue = today
     : nthWeekdayOfMonthLocal(today.getFullYear(), today.getMonth() + 1, weekday, ordinal);
   return toLocalDateKey(target);
 }
+// Die Vorlagen ziehen ihre Farbe aus der geteilten Startpalette
+// (utils/color.js, Re-Critique 2026-09-28): Sperrmuell trug vorher #7C3AED -
+// im Dark exakt die Flaeche des Primaerknopfs -, Restmuell und Wertstoff
+// lagen auf der gehobenen Dark-Karte unter 3:1. Bestehende Abfallarten
+// behalten ihre Farbe; das Raster zeigt sie dann als „Aktuelle Farbe".
 const TYPE_PRESETS = [
-  { key: 'general', icon: 'trash-2', color: '#64748B' },
-  { key: 'recycling', icon: 'recycle', color: '#2563EB' },
+  { key: 'general', icon: 'trash-2', color: '#78808C' },
+  { key: 'recycling', icon: 'recycle', color: '#3B82F6' },
   { key: 'organic', icon: 'leaf', color: '#16A34A' },
   { key: 'paper', icon: 'newspaper', color: '#D97706' },
   { key: 'glass', icon: 'wine', color: '#059669' },
-  { key: 'bulky', icon: 'armchair', color: '#7C3AED' },
+  { key: 'bulky', icon: 'armchair', color: '#D946EF' },
 ];
 
 /**
@@ -98,15 +104,15 @@ const TYPE_PRESETS = [
  *
  * Dieselbe Antwort, die Notizen, Kalender, Budget und der
  * Kategorie-Verwalter auf dieselbe Frage schon geben: eine kleine feste
- * Auswahl statt eines Regenbogens. Die Werte sind bewusst die Tailwind-600er
- * -Familie - also exakt das Helligkeitsband, in dem die sechs
- * `TYPE_PRESETS`-Farben oben ohnehin schon liegen. Dadurch traegt jede Farbe
- * auf `--color-surface-*` UND auf dem dunklen Kartengrund genug Eigenhelligkeit,
- * ohne in einem der beiden Themen auszubrennen.
+ * Auswahl statt eines Regenbogens. Seit der Re-Critique 2026-09-28 ist es die
+ * geteilte Startpalette `USER_COLORS` (utils/color.js): jede Farbe dort haelt
+ * >= 3:1 auf `--color-surface` und `--color-surface-raised` in BEIDEN Themes
+ * - der fruehere Kommentar versprach das, #7C3AED (2.57) und #2563EB (2.84)
+ * hielten es auf dem dunklen Kartengrund nicht.
  *
- * Die ersten sechs Eintraege SIND die Preset-Farben, in Preset-Reihenfolge:
- * nur so kann die Preset-Auswahl im Dialog ihre Farbe als aktiven Swatch
- * zeigen, statt einen Wert zu setzen, den das Raster gar nicht kennt.
+ * Jede Preset-Farbe steht im Raster: nur so kann die Preset-Auswahl im
+ * Dialog ihre Farbe als aktiven Swatch zeigen, statt einen Wert zu setzen,
+ * den das Raster gar nicht kennt.
  *
  * KEIN `getReadableTextColor()`. Diese Farbe wird nirgends als TEXTfarbe auf
  * einem freien Grund gesetzt - waste.js faerbt damit ausschliesslich das
@@ -115,22 +121,19 @@ const TYPE_PRESETS = [
  * braucht keine gerechnete Tinte - wohl aber die Untergrenze, die diese
  * Palette ist.
  */
-const WASTE_TYPE_COLORS = [
-  '#64748B', '#2563EB', '#16A34A', '#D97706', '#059669',
-  '#7C3AED', '#DC2626', '#0891B2', '#EA580C', '#DB2777',
-];
+const WASTE_TYPE_COLORS = USER_COLORS;
 
 const WASTE_TYPE_COLOR_NAMES = () => ({
-  '#64748B': t('waste.colorGray'),
-  '#2563EB': t('waste.colorBlue'),
+  '#78808C': t('waste.colorGray'),
+  '#3B82F6': t('waste.colorBlue'),
   '#16A34A': t('waste.colorGreen'),
   '#D97706': t('waste.colorOcher'),
   '#059669': t('waste.colorTeal'),
-  '#7C3AED': t('waste.colorViolet'),
-  '#DC2626': t('waste.colorRed'),
+  '#D946EF': t('waste.colorViolet'),
+  '#EF4444': t('waste.colorRed'),
   '#0891B2': t('waste.colorCyan'),
   '#EA580C': t('waste.colorOrange'),
-  '#DB2777': t('waste.colorMagenta'),
+  '#EC4899': t('waste.colorMagenta'),
 });
 
 let _container = null;

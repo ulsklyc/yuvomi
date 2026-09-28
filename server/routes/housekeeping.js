@@ -50,7 +50,14 @@ const router = express.Router();
 const MAX_PHOTO_DATA_LENGTH = 6 * 1024 * 1024;
 const IMAGE_DATA_RE = /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i;
 const PAYMENT_SCHEDULES = ['daily', 'twice_monthly', 'monthly'];
+// Lese-Rueckfall fuer eine Zeile ohne Farbe - Bestand, deshalb unveraendert.
 const DEFAULT_CALENDAR_COLOR = '#7C3AED';
+// Startfarbe eines NEUEN Profils ohne eigene Wahl: die Vorgabe der geteilten
+// Nutzerfarben-Palette (public/utils/color.js USER_COLOR_DEFAULT, Cyan),
+// nicht mehr #7C3AED - das ist im Dark exakt die Flaeche des Primaerknopfs
+// (Re-Critique 2026-09-28, P9). Ein bestehendes Profil behaelt beim
+// Speichern ohne Farbfeld seine gespeicherte Farbe; keine Migration.
+const NEW_WORKER_COLOR = '#0891B2';
 const HOUSEKEEPING_EVENT_ICON = 'paintbrush';
 const PAYMENT_TASKS_PREF = 'housekeeping_payment_tasks';
 
@@ -716,7 +723,7 @@ async function createWorkerUser({ username, displayName, avatarColor, avatarData
   const result = db.get().prepare(`
     INSERT INTO users (username, display_name, password_hash, avatar_color, avatar_data, role, family_role)
     VALUES (?, ?, ?, ?, ?, 'member', 'other')
-  `).run(finalUsername, displayName, hash, avatarColor || '#7C3AED', avatarData ?? null);
+  `).run(finalUsername, displayName, hash, avatarColor || NEW_WORKER_COLOR, avatarData ?? null);
   syncFamilyMemberArtifacts(db.get(), result.lastInsertRowid, {
     displayName,
     avatarData: avatarData ?? null,
@@ -805,7 +812,7 @@ router.post('/worker', async (req, res) => {
     const vBirthDate = date(req.body.birth_date, 'birth_date');
     const vDailyRate = num(req.body.daily_rate, 'daily_rate', { required: true });
     const vSchedule = oneOf(req.body.payment_schedule || 'monthly', PAYMENT_SCHEDULES, 'payment_schedule');
-    const vCalendarColor = color(req.body.calendar_color || DEFAULT_CALENDAR_COLOR, 'calendar_color');
+    const vCalendarColor = color(req.body.calendar_color || existing?.calendar_color || NEW_WORKER_COLOR, 'calendar_color');
     const vNotes = str(req.body.notes, 'notes', { max: MAX_TEXT, required: false });
     const vRateType = oneOf(req.body.rate_type || 'daily', ['daily', 'hourly'], 'rate_type');
     const vHourlyRate = num(req.body.hourly_rate, 'hourly_rate');
@@ -820,7 +827,7 @@ router.post('/worker', async (req, res) => {
     if ((vHourlyRate.value ?? 0) < 0) {
       return res.status(400).json({ error: 'hourly_rate must be greater than or equal to zero.', code: 400 });
     }
-    const avatarColor = String(req.body.avatar_color || '#7C3AED').trim();
+    const avatarColor = String(req.body.avatar_color || existing?.avatar_color || NEW_WORKER_COLOR).trim();
     const avatarData = req.body.avatar_data !== undefined
       ? normalizeAvatarData(req.body.avatar_data)
       : existing?.avatar_data ?? null;
@@ -845,7 +852,7 @@ router.post('/worker', async (req, res) => {
       `).run(
         vUsername.value || existing?.username || `housekeeper_${targetUserId}`,
         vDisplayName.value,
-        avatarColor || '#7C3AED',
+        avatarColor || NEW_WORKER_COLOR,
         avatarData ?? null,
         targetUserId,
       );
