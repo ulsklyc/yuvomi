@@ -343,6 +343,8 @@ test('Belohnungen: der Kopf gibt im Katalog der Pille die volle Kante zurueck, s
   assert.match(css, /\.rewards-page \.rw-section:not\(\.rw-section--wide\)\s*\{[^}]*max-width:\s*var\(--page-measure/,
     'jeder Abschnitt ausser dem Raster endet am Lesemass - samt Kopf');
   assert.match(css, /\.rewards-toolbar--wide\s*\{[^}]*padding-inline-end:\s*var\(--page-inline-pad\)/);
+  assert.match(css, /\.rewards-toolbar--wide\s*\{[^}]*--page-measure:\s*100%/,
+    'der breite Kopf erklaert sein Mass als Spalte - sonst behauptet er das Lesemass der Seite, an dem er nicht endet (Sonde 19)');
   assert.match(css, /\.rewards-toolbar--wide::after\s*\{[^}]*content:\s*none/, 'kein Rest-Slot, der die Pille zurueckschoebe');
   assert.match(css, /\.rewards-toolbar--wide > \.rewards-tabs\s*\{[^}]*max-width:\s*none/, 'die Reiterleiste bricht weiter um');
   const page = readFileSync(new URL('../public/pages/rewards.js', import.meta.url), 'utf8');

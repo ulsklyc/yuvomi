@@ -40,8 +40,17 @@
  * Titel und Pille in die erste Zeile -, gibt aber im Katalog der Aktionszeile
  * die regulaere Kante zurueck: Polster wie jeder Kopf, kein Rest-Slot
  * (`::after`, layout.css), und die Reiterleiste darf ihre volle Zeile nehmen,
- * damit sie weiter umbricht. Gemessen 1440: Pille endet 1408 wie das Raster. */
+ * damit sie weiter umbricht. Gemessen 1440: Pille endet 1408 wie das Raster.
+ *
+ * DAS MASS DIESES KOPFS IST DIE SPALTE, UND DAS SAGT ER AUCH. Ohne die
+ * Angabe erbte er `--page-measure` der Seite (720px) und behauptete damit ein
+ * Lesemass, an dem er bewusst nicht endet - die Kanten-Pruefung der
+ * gedeckelten Koepfe (Sonde 19 der Dokument-Guards) las 996px statt 720px bei
+ * 1280. `100%` ist der Wert der Kompositionen ohne Mass (`full`/`split`):
+ * die Deckel-Formeln in layout.css fallen damit von selbst auf den
+ * regulaeren Abstand, den die beiden Regeln hier ausdruecklich setzen. */
 .rewards-page > .rewards-toolbar.page-toolbar--narrow.rewards-toolbar--wide {
+  --page-measure: 100%;
   padding-inline-end: var(--page-inline-pad);
 }
 
