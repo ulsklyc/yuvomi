@@ -2593,3 +2593,30 @@ test('P12: statistics show each total once, and the hours tile is named for the 
   assert.ok(labels.includes('schedule.totalHours'), `die Stunden-Kachel heisst "Stunden gesamt" (${labels.join(', ')})`);
   assert.ok(!labels.includes('schedule.workedHours'), 'nicht "je Schichtart" ueber einer Summe');
 });
+
+// P12 (Re-Critique 2026-09-28, A2 P2-5): der Vergleich passte am Desktop nicht
+// in die Breite - `.schedule-overview__lane { min-width: 220px }` und die Tage
+// als `flex: 0 0 auto` ergaben mit EINER Person 1676px Inhalt in 1156px, Sa/So
+// hinter einem Seitwaerts-Scroll. Das Kalender-Wochenraster fasst 7 Tage in
+// dieselbe Breite. Jetzt: eine Spur braucht mindestens 8rem, die Tage teilen
+// sich den Rest; gescrollt wird erst, wenn mehrere Personen das Minimum
+// ueberschreiten.
+test('P12: the comparison fits seven days of one person into the desktop width', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)].filter((r) => !r.at.length);
+  const sel = (r, s) => r.selector.split(',').some((x) => x.trim() === s);
+  const overview = schedulePage.slice(schedulePage.indexOf('function renderOverview()'), schedulePage.indexOf('function renderScheduleWarnings()'));
+  assert.doesNotMatch(overview, /minmax\(220px/, 'keine feste 220px-Spur im Markup');
+  assert.match(overview, /minmax\(var\(--schedule-lane-min\),1fr\)/, 'die Spurbreite kommt aus EINER Variable');
+  const minRule = rules.find((r) => sel(r, '.schedule-overview') && /--schedule-lane-min\s*:/.test(r.body));
+  const rem = Number(/--schedule-lane-min\s*:\s*([\d.]+)rem/.exec(minRule?.body ?? '')?.[1]);
+  assert.ok(rem > 0, 'die Mindestbreite ist in rem gesetzt');
+  // 1440 abzueglich Seitenleiste und Rand: 1156px Inhaltsbreite (A2-Messung).
+  const oneLaneWeek = 44 + 8 + 7 * rem * 16 + 6 * 12;
+  assert.ok(oneLaneWeek <= 1156, `eine Person, 7 Tage: ${oneLaneWeek}px passen in 1156px`);
+  assert.ok(!rules.some((r) => sel(r, '.schedule-overview__lane') && /min-width\s*:\s*220px/.test(r.body)), 'keine 220px-Spur im CSS');
+  assert.ok(rules.some((r) => sel(r, '.schedule-overview__day:not(.schedule-overview__gutter)') && /flex\s*:\s*1 1 0/.test(r.body)),
+    'die Tage teilen sich die Breite statt auf ihrer Mindestbreite zu stehen');
+});

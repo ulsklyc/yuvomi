@@ -1723,7 +1723,7 @@ function renderOverview() {
     return `<div class="schedule-overview__day" data-date="${dateKey}">
       <div class="schedule-overview__day-head">${esc(t(`calendar.dayShort${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][parseLocalDateKey(dateKey).getDay()]}`))} ${esc(formatDayMonth(dateKey))}</div>
       <div class="schedule-overview__holidays">${holidayHtml}</div>
-      <div class="schedule-overview__lanes" style="grid-template-columns:repeat(${laneCount},minmax(220px,1fr))">${laneHtml}</div>
+      <div class="schedule-overview__lanes" style="grid-template-columns:repeat(${laneCount},minmax(var(--schedule-lane-min),1fr))">${laneHtml}</div>
     </div>`;
   }).join('');
 

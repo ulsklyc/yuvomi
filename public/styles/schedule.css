@@ -755,6 +755,14 @@
  * (441px bei 390) Sektion und Leerzustand ueber den Rand. */
 .schedule-overview {
   grid-template-columns: minmax(0, 1fr);
+  /* Mindestbreite EINER Personenspur je Tag (Re-Critique 2026-09-28, A2
+   * P2-5). Vorher 220px fest: mit einer Person 1676px Inhalt in 1156px, Sa/So
+   * hinter einem Seitwaerts-Scroll. 8rem reichen fuer Titel + Uhrzeit (die
+   * Kalenderwoche fasst ihre Tage bei 1440 in 151px); die Tage teilen sich
+   * den Rest (.schedule-overview__day unten). Gescrollt wird erst, wenn
+   * mehrere Personen zusammen das Minimum ueberschreiten. Die Spurspalten im
+   * Markup (renderOverview()) lesen denselben Wert. */
+  --schedule-lane-min: 8rem;
 }
 
 .schedule-overview__toolbar {
@@ -798,6 +806,14 @@
 
 .schedule-overview__day {
   flex: 0 0 auto;
+}
+
+/* Die sieben Tage teilen sich die Breite; ihre Mindestbreite ist die Summe
+ * ihrer Spuren (min-content), darunter scrollt der Container. Die Zeitspalte
+ * bleibt auf ihrer festen Breite. */
+.schedule-overview__day:not(.schedule-overview__gutter) {
+  flex: 1 1 0;
+  min-width: min-content;
 }
 
 .schedule-overview__day + .schedule-overview__day {
@@ -913,7 +929,7 @@
 }
 
 .schedule-overview__lane {
-  min-width: 220px;
+  min-width: 0;
 }
 
 .schedule-overview__lane-head {
