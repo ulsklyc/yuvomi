@@ -470,16 +470,14 @@
   width: var(--target-base);
   height: var(--target-base);
   border-radius: var(--radius-full);
-  /* DIE EINE STIMME (Critique 2026-08-13). Hier stand der Modulton, begründet
-   * mit „wie FAB und Fokus-Ringe daneben (Audit F-05)" - und beide tragen ihn
-   * seit v2.2.0 nicht mehr, weil die Eine-Stimme-Regel ihn zurückgenommen hat.
-   * Die Ausnahme blieb stehen, ihr Anlass war drei Versionen weg. Genau die
-   * Form von Drift, gegen die HIG-Session 27 den Satz aufgeschrieben hat: eine
-   * Ausnahme braucht ein Verfallsdatum an BEIDEN Enden, dem Anlass und dem
-   * Verstoß. Der Guard sah sie nicht, weil er das Chrome aus Selektorformen
-   * ableitet und dieser Knopf keine davon trägt. */
-  background-color: var(--color-accent);
-  color: var(--color-ink-on-vivid);
+  /* EIN PLUS, UND ES GEHOERT DER PILLE (Re-Critique 2026-09-28, A4 P2-4).
+   * Hier stand ein gefuellter Kreis in der Stimme mit "+" - am Zeiger direkt
+   * unter der angedockten Kopf-Pille "+ Artikel", die dasselbe tut (sie
+   * fokussiert dieses Feld). Zwei violette Plus fuer eine Absicht. Der
+   * Absender ist jetzt die ruhige Return-Glyphe wie in Erinnerungen: wer
+   * tippt, drueckt Enter; der Knopf bleibt fuer Maus und Touch da. */
+  background-color: transparent;
+  color: var(--color-text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -490,7 +488,7 @@
   min-height: var(--target-lg);
 }
 
-.quick-add__btn:hover { background-color: var(--color-accent-hover); }
+.quick-add__btn:hover { background-color: var(--color-surface-2); color: var(--color-text-primary); }
 
 /* Autocomplete-Dropdown */
 .autocomplete-dropdown {

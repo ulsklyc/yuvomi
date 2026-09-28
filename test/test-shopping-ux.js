@@ -2222,3 +2222,19 @@ test('Einkauf: kein Wisch-Chevron an der Zeile, keine Reserve dafuer', async () 
     && /padding-inline-end:\s*calc\(var\(--space-2\) \+ var\(--space-3\) \+ var\(--space-2\)\)/.test(r.body));
   assert.deepEqual(reserve.map((r) => r.at.join(' ')), [], 'die Reserve fuer den Pfeil ist mit ihm gegangen');
 });
+
+// Re-Critique 2026-09-28 (P7 / A4 P2-4): am Zeiger standen zwei violette "+"
+// fuer dieselbe Absicht - die angedockte Kopf-Pille "+ Artikel" und der
+// Absender des Schnellfelds. Das "+" bleibt der Pille; der Absender ist die
+// ruhige Return-Glyphe wie in Erinnerungen (tippen, Enter).
+test('Einkauf: EIN Plus - der Absender des Schnellfelds ist eine ruhige Return-Glyphe', async () => {
+  const src = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
+  const btn = /<button class="quick-add__btn"[^>]*>\s*<i data-lucide="([^"]+)"/.exec(src);
+  assert.ok(btn, 'der Absender bleibt ein echter Submit-Knopf');
+  assert.equal(btn[1], 'corner-down-left', 'kein zweites Plus neben der Kopf-Pille');
+  const { eachRule } = await import('./css-rules.js');
+  const rule = [...eachRule(readFileSync(new URL('../public/styles/shopping.css', import.meta.url), 'utf8'))]
+    .find((r) => r.selector.trim() === '.quick-add__btn' && !r.at.length);
+  assert.doesNotMatch(rule?.body ?? '', /background-color:\s*var\(--color-accent\)/, 'keine zweite gefuellte Stimme');
+  assert.match(rule?.body ?? '', /color:\s*var\(--color-text-(?:secondary|tertiary)\)/);
+});

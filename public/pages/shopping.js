@@ -1085,8 +1085,10 @@ function renderListContent(container) {
         <select class="quick-add__cat" id="item-cat-select" aria-label="${t('shopping.categoryLabel')}">
           ${state.categories.map((c) => `<option value="${esc(c.name)}" ${c.name === DEFAULT_CATEGORY_NAME ? 'selected' : ''}>${esc(categoryLabel(c.name))}</option>`).join('')}
         </select>
+        <!-- Return-Glyphe statt eines zweiten "+" (Re-Critique 2026-09-28,
+             A4 P2-4): das Plus gehoert der Kopf-Pille bzw. dem FAB. -->
         <button class="quick-add__btn" type="submit" aria-label="${t('shopping.addItemLabel')}">
-          <i data-lucide="plus" class="icon-lg" aria-hidden="true"></i>
+          <i data-lucide="corner-down-left" class="icon-lg" aria-hidden="true"></i>
         </button>
       </form>
     </div>`}
