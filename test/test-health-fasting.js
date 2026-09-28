@@ -346,7 +346,8 @@ test('a fasting help button never repeats the heading it explains (no "Your goal
       `der Infoknopf "${name}" heisst wie seine Ueberschrift`);
   }
   // Die Presets nennt die Ueberschrift per aria-labelledby, nicht ein zweites Mal als Text.
-  assert.match(html, /class="fasting-presets" role="group" aria-labelledby="[^"]+"/);
+  // Seit R14 P3 eine .segmented-Leiste (radiogroup) statt einer Knopfgruppe.
+  assert.match(html, /class="segmented fasting-presets" role="radiogroup" aria-labelledby="[^"]+"/);
 });
 
 test('fasting picks the person with the shared health pill, not a full-width native select', () => {
@@ -354,4 +355,47 @@ test('fasting picks the person with the shared health pill, not a full-width nat
   assert.match(fastingPage, /personSwitcherMarkup\(view\.members, view\.subject, view\.self/,
     'das Fasten nutzt nicht die Pille der Gesundheit');
   assert.match(fastingPage, /import \{ personSwitcherMarkup \} from '\/utils\/health-person-switcher\.js'/);
+});
+
+/* R14 P3 (A6 P2-1): FASTEN SPRICHT DEN DIALEKT DER GESUNDHEIT. Ohne je gefastet
+ * zu haben zeigte die Seite 9 Nullwerte und 7 „Kein Eintrag"-Kaesten; die
+ * Einstellungen (2 Schalter, 2 Selects) standen mitten im Inhalt, die Ziel-Chips
+ * toggelten btn--primary/secondary, der Verlauf trug Textknoepfe ohne Objekt
+ * und den rohen tzid je Zeile, der Filter zwei native Datumsfelder und den
+ * Hinweis „Zeitzone des Haushalts - Europe/Berlin". */
+test('R14 P3: ohne ein einziges Fasten EIN Leerzustand - keine Statistik, kein Filter', async () => {
+  const { fastingSections } = await import('../public/utils/health-fasting.js');
+  const leer = fastingSections({ active: null, stats: { allTime: { count: 0 } }, statsError: false, rows: [], filtered: false });
+  assert.deepEqual(leer, { stats: false, history: false, empty: true });
+  const laeuft = fastingSections({ active: { id: 1 }, stats: { allTime: { count: 0 } }, statsError: false, rows: [], filtered: false });
+  assert.equal(laeuft.stats, false, 'ein laufendes erstes Fasten hat noch keine Statistik');
+  assert.deepEqual(fastingSections({ active: null, stats: { allTime: { count: 1 } }, statsError: false, rows: [{ id: 1 }], filtered: false }),
+    { stats: true, history: true, empty: false });
+  assert.deepEqual(fastingSections({ active: null, stats: { allTime: { count: 3 } }, statsError: false, rows: [], filtered: true }),
+    { stats: true, history: true, empty: false }, 'ein Filter ohne Treffer behaelt seinen Filter');
+  assert.equal(fastingSections({ active: null, stats: null, statsError: true, rows: [{ id: 1 }], filtered: false }).stats, true,
+    'ein Ladefehler bleibt als Hinweis sichtbar');
+});
+
+test('R14 P3: Ziel als .segmented, Einstellungen im Blatt, Verlauf mit row-action, Kanon-Datumsfeld, kein tzid', () => {
+  const html = fastingPreferencesHtml({ default_goal_minutes: 16 * 60 });
+  const bar = html.match(/<div class="segmented fasting-presets" role="radiogroup" aria-labelledby="[^"]+">([\s\S]*?)<\/div>/);
+  assert.ok(bar, 'die Ziel-Wahl ist eine .segmented-Leiste mit radiogroup');
+  const items = [...bar[1].matchAll(/<button type="button" class="segmented__item([^"]*)" role="radio" aria-checked="(true|false)"[^>]*data-tab-id="([^"]*)"/g)];
+  assert.ok(items.length >= 3, 'Segmente mit role=radio und data-tab-id');
+  assert.deepEqual(items.filter((m) => m[2] === 'true').map((m) => m[3]), ['16'], 'genau das gewaehlte Ziel ist gecheckt');
+  assert.doesNotMatch(html, /btn--primary|aria-pressed/, 'kein Knopf-Umfaerben als Auswahl');
+  const controls = readFileSync(new URL('../public/components/fasting-controls.js', import.meta.url), 'utf8');
+  assert.match(controls, /attachSegmentIndicator\(/, 'die gleitende Kapsel wie jede Segmentleiste');
+  assert.doesNotMatch(controls, /classList\.toggle\('btn--primary'/);
+
+  assert.doesNotMatch(fastingPage, /<input[^>]*type="date"/, 'native Datumsfelder');
+  assert.match(fastingPage, /<yuvomi-datepicker[^>]*data-fasting-from/);
+  assert.doesNotMatch(fastingPage, /fastingCompletionCalendarHint\(/, 'kein „Europe/Berlin"-Hinweis');
+  assert.doesNotMatch(fastingPage, /esc\(row\.start_tzid\)/, 'kein roher tzid je Zeile');
+  assert.match(fastingPage, /rowActionHtml\(\{[^}]*label: t\('common\.editNamed'/, 'Bearbeiten als row-action mit Objektname');
+  assert.match(fastingPage, /rowActionHtml\(\{[^}]*label: t\('common\.deleteNamed'/, 'Loeschen als row-action mit Objektname');
+  assert.doesNotMatch(fastingPage, /<div class="fasting-card" data-fasting-preferences>\$\{fastingPreferencesHtml/,
+    'die Einstellungen stehen nicht mehr mitten im Inhalt');
+  assert.match(fastingPage, /data-fasting-settings/, 'ein Weg ins Einstellungsblatt');
 });

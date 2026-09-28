@@ -9,8 +9,9 @@
  * sind sie gesperrt - die Zeile sagt das mit, nicht nur die Bahn. */
 .fasting-notifications .toggle-row:has(input:disabled) { cursor: not-allowed; }
 .fasting-notifications .toggle-row:has(input:disabled) .toggle-row__label { color: var(--color-text-secondary); }
-.fasting-preferences { display: grid; gap: var(--space-5); }
-.fasting-presets { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-block: var(--space-3); }
+.fasting-preferences { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
+/* Die Ziel-Wahl ist eine .segmented-Leiste (R14 P3); schmal scrollt sie quer statt umzubrechen. */
+.fasting-presets { max-width: 100%; overflow-x: auto; margin-block: var(--space-3); }
 .fasting-custom { margin-block-start: var(--space-4); }
 .fasting-custom[hidden] { display: none; }
 .fasting-notifications { border-top: 1px solid var(--color-border-subtle); padding-block-start: var(--space-4); }

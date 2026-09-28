@@ -164,3 +164,25 @@ export function formatFastingDuration(rawMinutes) {
   if (minutes || parts.length === 0) parts.push(unit(minutes, 'minute'));
   return parts.join(' ');
 }
+
+/**
+ * Was die Fasten-Seite zeigt (R14 P3, A6 P2-1). Ohne ein einziges
+ * abgeschlossenes Fasten stand eine Statistik aus neun Nullen und sieben
+ * leeren Wochenkaesten da, darunter Filter und Export fuer eine leere Liste.
+ * Jetzt: Statistik erst ab dem ersten Fasten (oder als Fehlerhinweis), Verlauf
+ * mit Filter nur, wenn es etwas zu filtern gibt - sonst EIN Leerzustand.
+ *
+ * @param {{ active: object|null, stats: object|null|undefined, statsError: boolean,
+ *           rows: object[], filtered: boolean }} s
+ * @returns {{ stats: boolean, history: boolean, empty: boolean }}
+ */
+export function fastingSections({ stats, statsError, rows, filtered }) {
+  const count = Number(stats?.allTime?.count ?? 0);
+  const ever = count > 0 || (rows?.length ?? 0) > 0;
+  const history = ever || Boolean(filtered);
+  return {
+    stats: statsError === true || count > 0,
+    history,
+    empty: !history,
+  };
+}

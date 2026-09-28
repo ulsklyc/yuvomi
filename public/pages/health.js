@@ -1023,6 +1023,13 @@ export async function render(container, ctx = {}) {
   _panelsHost.insertAdjacentHTML('beforeend', panelsHtml);
   container.querySelector('[data-health-stage]').appendChild(_panelsHost);
   _detailHead = detailHeadEl();
+  // Die Menue-Verdrahtung haengt DELEGIERT an einer Wurzel (popover-menu.js):
+  // eine umgezogene Pille braucht sie an ihrem neuen Ort (health-hoist.js).
+  for (const slot of [
+    container.querySelector('[data-health-person-slot]'),
+    container.querySelector('[data-health-priority]'),
+    _detailHead.querySelector('[data-health-person-detail]'),
+  ]) installPopoverMenus(slot);
   watchHoists();
   watchPhoneQuery();
 

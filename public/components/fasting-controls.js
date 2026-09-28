@@ -9,6 +9,8 @@ import { moduleAccess } from '/permissions.js';
 import { updateFastingDial } from '/components/fasting-dial.js';
 import { fastingHelpHtml } from '/components/fasting-help.js';
 import { toggleRowHtml } from '/settings/components.js';
+import { wireTablist } from '/utils/tablist.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 
 export function fastingError(error) {
   if (error?.message === 'FASTING_OFFLINE') return t('health.fasting.offline');
@@ -36,11 +38,14 @@ export function fastingPreferencesHtml(settings = {}) {
   const custom = hours !== null && !FASTING_PRESETS.includes(hours);
   const available = fastingNotificationAvailability(settings.default_goal_minutes);
   const goalTitleId = `fasting-goal-title-${++preferencesSequence}`;
-  const choice = (value, label, selected) => `<button type="button" class="btn ${selected ? 'btn--primary' : 'btn--secondary'} btn--sm" data-fasting-preset="${value}" aria-pressed="${selected}">${esc(label)}</button>`;
+  // DIE ZIEL-WAHL IST EINE SEGMENTLEISTE (R14 P3, A6 P2-1): eine Einfachauswahl
+  // wie jede andere der App (.segmented, role=radio, gleitende Kapsel), nicht
+  // Knoepfe, die sich zwischen Primaer und Sekundaer umfaerben.
+  const choice = (value, label, selected) => `<button type="button" class="segmented__item${selected ? ' is-active' : ''}" role="radio" aria-checked="${selected}" tabindex="${selected ? '0' : '-1'}" data-tab-id="${value}" data-fasting-preset="${value}">${esc(label)}</button>`;
   return `<div class="fasting-preferences">
     <section><div class="fasting-help-heading"><h3 class="u-section-title" id="${goalTitleId}">${esc(t('health.fasting.goalTitle'))}</h3>${fastingHelpHtml(t('health.fasting.goalTitle'), [t('health.fasting.goalHint'), t('health.fasting.goalNextHint')])}</div>
-      <div class="fasting-presets" role="group" aria-labelledby="${goalTitleId}">
-        ${choice('', t('health.fasting.noGoal'), hours === null)}
+      <div class="segmented fasting-presets" role="radiogroup" aria-labelledby="${goalTitleId}">
+        ${choice('none', t('health.fasting.noGoal'), hours === null)}
         ${FASTING_PRESETS.map((h) => choice(String(h), `${h}:${24 - h}`, hours === h)).join('')}
         ${choice('custom', t('health.fasting.custom'), custom)}
       </div>
@@ -93,31 +98,32 @@ export function wireFastingPreferences(root, initial, onSaved = () => {}, active
       root.querySelector('[data-fasting-remind-goal]').checked = !!settings.remind_goal;
       root.querySelector('[data-fasting-remind-next]').checked = !!settings.remind_next_start;
       const hours = settings.default_goal_minutes ? settings.default_goal_minutes / 60 : null;
-      const selected = hours === null ? '' : FASTING_PRESETS.includes(hours) ? String(hours) : 'custom';
-      root.querySelectorAll('[data-fasting-preset]').forEach((button) => {
-        const active = button.dataset.fastingPreset === selected;
-        button.setAttribute('aria-pressed', String(active));
-        button.classList.toggle('btn--primary', active);
-        button.classList.toggle('btn--secondary', !active);
-      });
+      const selected = hours === null ? 'none' : FASTING_PRESETS.includes(hours) ? String(hours) : 'custom';
+      presets.sync(selected);
       root.querySelector('[data-fasting-custom]').hidden = selected !== 'custom';
       root.querySelector('[data-fasting-goal]').value = selected === 'custom' ? hours : '';
     }
   }
-  root.querySelectorAll('[data-fasting-preset]').forEach((button) => button.addEventListener('click', () => {
-    if (button.dataset.fastingPreset === 'custom') {
-      root.querySelectorAll('[data-fasting-preset]').forEach((choice) => {
-        const active = choice === button;
-        choice.setAttribute('aria-pressed', String(active));
-        choice.classList.toggle('btn--primary', active);
-        choice.classList.toggle('btn--secondary', !active);
-      });
-      root.querySelector('[data-fasting-custom]').hidden = false;
-      root.querySelector('[data-fasting-goal]').focus();
-      return;
-    }
-    void save({ default_goal_minutes: normalizeGoalHours(button.dataset.fastingPreset) });
-  }));
+  // Die geteilte Verhaltensschicht (Pfeiltasten, rovierendes tabindex) im
+  // select-Modus; Pfeiltasten waehlen erst mit Enter/Leertaste - jeder
+  // Wechsel speichert.
+  const bar = root.querySelector('.fasting-presets');
+  const presets = wireTablist(bar, {
+    activeId: bar?.querySelector('[aria-checked="true"]')?.dataset.tabId ?? '',
+    activeClass: 'is-active',
+    mode: 'select',
+    manualActivation: true,
+    onChange: (id) => {
+      if (id === 'custom') {
+        root.querySelector('[data-fasting-custom]').hidden = false;
+        root.querySelector('[data-fasting-goal]').focus();
+        return;
+      }
+      // „Ohne Ziel" traegt die Kennung `none` - die Leiste kennt keine leere.
+      void save({ default_goal_minutes: normalizeGoalHours(id === 'none' ? '' : id) });
+    },
+  });
+  if (bar) attachSegmentIndicator(bar, { key: 'fasting-goal' });
   root.querySelector('[data-fasting-goal]').addEventListener('change', (event) => {
     if (!event.target.value || !event.target.reportValidity()) return;
     void save({ default_goal_minutes: normalizeGoalHours(event.target.value) });
