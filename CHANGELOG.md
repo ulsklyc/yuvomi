@@ -108,6 +108,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **New events in the calendar's week and day come from a double-click or a long press, not a
+  click.** A single click or tap on empty time now only closes what is open, such as an event's
+  popover, so clicking beside an event to put it away no longer opens "New event". With a mouse,
+  double-click an empty time; on a touch screen, touch and hold it for half a second - a
+  placeholder with the coming start time fades in under your finger, and the form opens with that
+  time when you lift it. Moving or scrolling cancels. "+ Event" and the `n` key add as before, and
+  an empty day names the gesture that works on your device. The month view is unchanged.
+
+- **The kitchen's tools row folds away while you scroll on a phone.** In recipes and the pantry the
+  row with search and tools slides out of the way once the head docks and comes back when you
+  scroll up again or move focus into it, leaving about 64px more for the list. Meals and shopping
+  keep their row, because it names the week or the list you are in.
+
+- **The calendar's head buttons share one shape, and the filter shows its count.** Search, filter
+  and "More" are the same icon buttons with a 48px target on a phone, and the filter button carries
+  the number of active filters like the filter buttons elsewhere; screen readers hear "2 filters
+  active".
+
 - **On a phone the overview starts with what is due today.** Two or more overdue items collapse
   into one line ("5 overdue") with the avatars of the people involved, and a tap opens the list.
   Widgets show fewer rows on a phone and their titles stay on one line. Customizing on a phone is a
