@@ -20,6 +20,7 @@ import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { findPageFab } from '/utils/fab.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
+import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 
 let state = {
@@ -162,19 +163,21 @@ export async function render(container, { user, embedded = false, onAddableChang
   setHtml(container, `
     <div class="split-page app-page app-page--split" data-composition="split">
       ${head}
-      <section class="metric-grid" id="split-summary"></section>
+      <!-- Mobil EINE Zeile statt drei Karten (R14 P1): die Glance-Zeile
+           klappt die Kennzahl-Zeile auf (metric-glance.js, budget.css). -->
+      <div id="split-glance"></div>
+      <section class="metric-grid budget-glance-details" id="split-summary"></section>
       <div class="split-layout">
         <aside class="split-groups-panel">
-          <div class="split-panel-head">
-            <div class="split-panel-title">${t('splitExpenses.groups')}<span class="list-group__count split-panel-count" id="split-group-count"></span></div>
-            ${readOnly() ? '' : `<button class="btn btn--icon" id="split-add-group" aria-label="${t('splitExpenses.addGroup')}" ${isSplitGuest() ? 'hidden' : ''}>
-              <i data-lucide="plus" aria-hidden="true"></i>
-            </button>`}
-          </div>
           <!-- Das geteilte Suchfeld (gefuellte Kapsel) statt eines eigenen mit
                sichtbarem Label darueber, das nur den Platzhalter wiederholte
-               (Komponenten-Kanon, Critique 2026-09-26 P1). -->
-          ${renderPageSearch({
+               (Komponenten-Kanon, Critique 2026-09-26 P1). Es steht IM Kopf
+               der Liste, die es filtert (.section-toolbar wie das Hauptbuch,
+               R14 P1): mobil in seiner Icon-Form statt einer eigenen 48px-Zeile
+               vor der ersten Gruppe. -->
+          <div class="split-panel-head section-toolbar">
+            <div class="split-panel-title">${t('splitExpenses.groups')}<span class="list-group__count split-panel-count" id="split-group-count"></span></div>
+            ${renderPageSearch({
     id: 'split-group-search',
     label: t('splitExpenses.searchGroups'),
     placeholder: t('splitExpenses.searchGroups'),
@@ -182,6 +185,10 @@ export async function render(container, { user, embedded = false, onAddableChang
     clearLabel: t('common.searchClear'),
     className: 'split-search',
   })}
+            ${readOnly() ? '' : `<button class="btn btn--icon" id="split-add-group" aria-label="${t('splitExpenses.addGroup')}" ${isSplitGuest() ? 'hidden' : ''}>
+              <i data-lucide="plus" aria-hidden="true"></i>
+            </button>`}
+          </div>
           <!-- Geteilter Umschalter-Baustein des Budget-Moduls statt eigener
                Pillen-Optik, und role="radiogroup" statt role="group": eine
                Einfachauswahl, die ihren Zustand ansagt und über die geteilte
@@ -478,14 +485,30 @@ function renderSummary() {
   // ist sie dort die einzige (split-expenses.css, R10 L11).
   const count = _container.querySelector('#split-group-count');
   if (count) count.textContent = String(state.groups.length);
+  const owedText = owed.length ? owed.map((r) => money(r.amount, r.currency)).join(' · ') : money(0, state.meta.default_currency);
+  const owingText = owing.length ? owing.map((r) => money(r.amount, r.currency)).join(' · ') : money(0, state.meta.default_currency);
+  const glance = _container.querySelector('#split-glance');
+  if (glance) {
+    const expanded = summary?.classList?.contains('is-expanded') ?? false;
+    setHtml(glance, metricGlanceHtml({
+      id: 'split-glance-more',
+      controls: 'split-summary',
+      expanded,
+      label: t('splitExpenses.youAreOwed'),
+      value: owedText,
+      tone: owed.length ? 'positive' : 'neutral',
+      flows: [{ label: t('splitExpenses.youOwe'), amount: owingText, tone: owing.length ? 'negative' : '' }],
+    }));
+    wireMetricGlance(glance, 'split-glance-more');
+  }
   setHtml(summary, `
     <div class="metric-card metric-card--positive">
       <div class="metric-card__label">${t('splitExpenses.youAreOwed')}</div>
-      <div class="metric-card__value">${owed.length ? owed.map((r) => money(r.amount, r.currency)).join(' · ') : money(0, state.meta.default_currency)}</div>
+      <div class="metric-card__value">${owedText}</div>
     </div>
     <div class="metric-card metric-card--negative">
       <div class="metric-card__label">${t('splitExpenses.youOwe')}</div>
-      <div class="metric-card__value">${owing.length ? owing.map((r) => money(r.amount, r.currency)).join(' · ') : money(0, state.meta.default_currency)}</div>
+      <div class="metric-card__value">${owingText}</div>
     </div>
     <div class="metric-card split-summary-groups">
       <div class="metric-card__label">${isArchivedView() ? t('splitExpenses.statusArchived') : t('splitExpenses.activeGroups')}</div>

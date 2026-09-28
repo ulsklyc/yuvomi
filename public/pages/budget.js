@@ -27,6 +27,7 @@ import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { trendMarkup } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { rowActionHtml } from '/utils/row-action.js';
+import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import { intervalUnitLabel } from '/rrule-ui.js';
 import { appendCurrencyOptions } from '/settings/currency.js';
 import '/components/category-manager.js';
@@ -241,6 +242,7 @@ let state = {
   expensesOnly: false,        // Anzeige „Nur Ausgaben" (#504): Einnahmen+Saldo ausblenden
   categoriesExpanded: false,  // Kategorie-Diagramm einspaltig ganz aufgeklappt (sonst Top 3)
   balanceExpanded: false,     // mobil: Bilanz-Karten unter der Kopfzeile aufgeklappt (balanceGlanceHtml)
+  loansExpanded: false,       // mobil: Darlehens-Karten unter der Glance-Zeile aufgeklappt (metricGlanceHtml)
   meta:        { expenseCategories: [], incomeCategories: [], subcategories: {} },
   // Zeitachse der Berichte: dieselbe Kopfleiste wie der Monat, nur mit
   // umschaltbarer Auflösung. Der Anker lebt hier statt in budget-stats.js, damit
@@ -2253,16 +2255,26 @@ function renderLoansDashboard() {
   const summary = state.loans?.summary ?? {};
   const visibleLoans = filteredLoans();
 
+  const remainingLabel = t(summary.has_interest ? 'budget.loanRemainingPrincipal' : 'budget.loanRemainingAmount');
   return `
     <section class="budget-loans">
+      ${metricGlanceHtml({
+    id: 'budget-loans-more',
+    controls: 'budget-loans-details',
+    expanded: state.loansExpanded,
+    label: remainingLabel,
+    value: amountByRole(summary.remaining_principal ?? summary.remaining_amount ?? 0, 'total').text,
+    flows: [
+      { label: t('budget.loanRemainingInstallments'), amount: String(summary.remaining_installments ?? 0) },
+      { label: t('budget.loanPaidAmount'), amount: amountByRole(summary.paid_amount ?? 0, 'total').text },
+    ],
+  })}
       <div class="panel-head budget-loans__header">
         <div>
           <!-- Unsichtbar wie bei den Konten: sichtbar wiederholte der Titel nur den Tab. -->
           <h2 class="panel-head__title sr-only">${t('budget.loansTitle')}</h2>
-          <div class="budget-loans__summary">${t('budget.loansSummary', {
-            count: summary.active_count ?? 0,
-            amount: formatAmount(summary.remaining_principal ?? summary.remaining_amount ?? 0),
-          })}</div>
+          <!-- Die Summenzeile („2 aktiv · 175.444,93 € offen") ist entfallen:
+               sie wiederholte die Karte RESTSCHULD direkt darunter (R14 P1). -->
           ${state.loanFilterId ? `<div class="budget-list-header__filter">${esc(activeLoanLabel())}</div>` : ''}
         </div>
         <div class="panel-head__actions">
@@ -2286,10 +2298,11 @@ function renderLoansDashboard() {
       </div>
       <!-- Geteilte Kennzahl-Zeile statt der früheren eigenen budget-loans__stats
            (fünfte Kartenbauart des Moduls, Critique 2026-07-30, P0). Rolle
-           total: die Richtung steht im Label, nicht im Vorzeichen. -->
-      <div class="metric-grid">
+           total: die Richtung steht im Label, nicht im Vorzeichen.
+           Mobil wartet sie hinter EINER Zeile (metricGlanceHtml, R14 P1). -->
+      <div class="metric-grid budget-glance-details${state.loansExpanded ? ' is-expanded' : ''}" id="budget-loans-details">
         <div class="metric-card">
-          <div class="metric-card__label">${t(summary.has_interest ? 'budget.loanRemainingPrincipal' : 'budget.loanRemainingAmount')}</div>
+          <div class="metric-card__label">${remainingLabel}</div>
           <div class="metric-card__value">${amountByRole(summary.remaining_principal ?? summary.remaining_amount ?? 0, 'total').text}</div>
         </div>
         <div class="metric-card">
@@ -2447,6 +2460,7 @@ function renderLoansPage() {
 }
 
 function wireLoansPage() {
+  wireMetricGlance(_container, 'budget-loans-more', (on) => { state.loansExpanded = on; });
   _container.querySelector('#budget-empty-loan')?.addEventListener('click', () => openBudgetModal({ mode: 'create', initialType: 'loan' }));
   _container.querySelector('#budget-clear-loan-filter')?.addEventListener('click', () => {
     state.loanFilterId = null;

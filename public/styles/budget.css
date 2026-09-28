@@ -130,6 +130,15 @@
   flex: 1 1 0;
 }
 
+/* DER KOPF SPRINGT NICHT (Re-Critique 2026-09-28, A5 P2-9). Die Notiz ist 21px
+ * hoch, der Stepper 48px: mobil sprang die Tab-Leiste darunter beim Wechsel
+ * zwischen Monats- und Notiz-Reitern um 27px (Kopf 162 <-> 135px). Der Slot
+ * haelt die Stepper-Hoehe, gleich was er traegt; die Notiz steht mittig. */
+.budget-nav__month {
+  min-block-size: var(--target-base);
+  align-items: center;
+}
+
 /* Die Tab-Leiste ist die Bar-Zeile des Kopfs (.page-toolbar__bar, layout.css,
  * Werkzeugzeilen-Regel 2026-08-27): volle Zeile unter Titel/Monat/Aktionen.
  * Layout, Scrollen, Snap und Scroll-Affordanz kommen komplett aus der Shell
@@ -1042,12 +1051,14 @@
    * ohnehin auf). Den Knopf im Diagrammkopf braucht es dann nicht - die
    * Zeile im Traeger steuert denselben Zustand. */
   .budget-balance-details:not(.is-expanded),
+  .budget-glance-details:not(.is-expanded),
   .budget-overview .budget-chart-section:not(.is-expanded),
   .budget-overview .budget-chart-more {
     display: none;
   }
 
-  .budget-balance-details.is-expanded {
+  .budget-balance-details.is-expanded,
+  .budget-glance-details.is-expanded {
     margin-block-end: var(--space-2);
   }
 }
@@ -1126,6 +1137,12 @@
 .budget-glance__amount {
   font-variant-numeric: tabular-nums;
   color: var(--color-text-primary);
+}
+
+/* Ein Nebenwert, der eine Tatsache meldet (Abos ueber Budget, Aufteilung
+ * „Du schuldest"), traegt den Ton der Karte, die er vertritt. */
+.budget-glance__flow--negative .budget-glance__amount {
+  color: var(--color-danger);
 }
 
 .budget-glance__title {

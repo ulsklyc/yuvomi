@@ -29,22 +29,11 @@
   min-height: 0;
 }
 
-/* EINE ZEILE: Suche, Filterknopf, Werkzeug-Menue (Critique 2026-09-25, P2).
- * Vorher ein Raster aus Suche, vier beschrifteten Selects, Zuruecksetzen und
- * zwei Icon-Knoepfen - mobil 213px hoch. Die Suche waechst, aber nicht ueber
- * eine Lesebreite hinaus; das Menue steht am Zeilenende, wie in der
- * Buchungsliste und den Dokumenten. */
-.subscriptions-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-3);
-}
-
-.subscriptions-toolbar .subscriptions-tools {
-  margin-inline-start: auto;
-}
-
+/* Suche, Filterknopf und Werkzeug-Menue stehen im Kopf der Abo-Liste
+ * (`.subscriptions-section-head.section-toolbar`, R14 P8): die Suche liest
+ * Breite und Lage aus page-search.css (`--page-search-width`, mobil Icon-Form
+ * aus layout.css), keine eigene Modulbreite mehr. Vorher eine eigene Zeile
+ * ueber allem, die Suche 448px und mobil ein volles Feld. */
 .subscriptions-filter-btn {
   flex: 0 0 auto;
   min-height: var(--target-base);
@@ -90,15 +79,6 @@
   gap: var(--space-3);
 }
 
-/* Das Suchfeld ist das geteilte (renderPageSearch, gefuellte Kapsel aus
- * page-search.css). Hier steht nur noch, wie es in der Werkzeugzeile waechst:
- * vorher trug die Datei ein eigenes Feld mit 12px-Ecke, Kante und Flaeche -
- * eine der fuenf Suchfeld-Varianten der Critique 2026-09-26 (P1). */
-.subscriptions-search {
-  flex: 1 1 12rem;
-  min-width: 0;
-  max-width: 28rem;
-}
 
 /* Die Kennzahl-Zeile ist .metric-grid (budget.css) mit --summary-cards: 4.
  * Die frühere eigene .subscriptions-summary-card war die zweite von fünf
@@ -284,23 +264,44 @@
   margin-bottom: var(--space-3);
 }
 
+/* Die Kennzahlen stehen in einem eigenen Slot vor der Liste (R14 P8) und
+ * bringen deren Abstand mit. */
+.subscriptions-summary > .metric-grid {
+  margin-bottom: var(--space-3);
+}
+
 .subscriptions-section-head {
   display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-2);
   align-items: center;
   margin-bottom: var(--space-2);
 }
 
-.subscriptions-section-head > div {
+.subscriptions-section-head__lead {
   display: flex;
   gap: var(--space-2);
   align-items: baseline;
+  min-width: 0;
 }
 
-.subscriptions-section-head span {
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
+.subscriptions-rates-slot:empty {
+  display: none;
+}
+
+/* LABEL-VERLUST-REGEL: wo die Suche ihre Icon-Form nimmt (unter 768px,
+ * layout.css), gibt auch der Filterknopf seine Beschriftung ab - Titel, drei
+ * Knoepfe und die Zahl passen dann in EINE Zeile. Der Name bleibt als
+ * aria-label (subscriptions.js `renderFilters`). */
+@media (max-width: 767px) {
+  .subscriptions-filter-btn__label {
+    display: none;
+  }
+
+  .subscriptions-filter-btn {
+    min-width: var(--target-base);
+    min-height: var(--target-base);
+    padding-inline: var(--space-2);
+  }
 }
 
 /* `--color-warning-text` gab es nie (Audit 2026-08-08, P2-3). Ein var() ohne
@@ -1051,10 +1052,6 @@
 
   .subscriptions-notifications li .btn {
     grid-column: span 1;
-  }
-
-  .subscriptions-section-head {
-    align-items: flex-start;
   }
 
   .subscription-form__identity,

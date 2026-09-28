@@ -118,7 +118,22 @@
 
 .split-panel-head {
   justify-content: space-between;
+  flex-wrap: wrap;
   padding: 0 var(--space-1) var(--space-2);
+}
+
+/* Die Gruppensuche steht im Kopf der Liste (.section-toolbar, R14 P1): mobil
+ * als Icon neben „+", damit die erste Gruppe eine Zeile hoeher steht. Erst wo
+ * die Gruppen eine eigene schmale Spalte bekommen (zweispaltig ab 976px
+ * Container, unten), bliebe ihr neben Titel und „+" nur ~80px - dort nimmt
+ * sie die eigene Zeile darunter. */
+@container split-page (min-width: 976px) {
+  .split-panel-head.section-toolbar > label.split-search {
+    order: 3;
+    flex: 1 0 100%;
+    max-width: none;
+    margin-inline-start: 0;
+  }
 }
 
 .split-panel-title {

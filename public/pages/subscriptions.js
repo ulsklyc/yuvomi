@@ -25,6 +25,7 @@ import { isNavModuleReadOnly } from '/permissions.js';
 import { openDetailView } from '/components/detail-view.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
+import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 
 // Auslastung, ab der ein Budget „knapp" ist - dieselbe Zahl wie im Plan
 // (budget-plans.js `toneForRatio`), damit beide Tabs dieselbe Grenze ziehen.
@@ -42,6 +43,7 @@ let state = {
   status: 'all',
   sort: 'due',
   user: null,
+  summaryExpanded: false, // mobil: Kennzahl-Karten unter der Glance-Zeile aufgeklappt (R14 P1)
 };
 let container = null;
 /** Handle des geteilten Suchfelds (wirePageSearch) - Zuruecksetzen leert es mit. */
@@ -223,9 +225,24 @@ export async function render(target, { user } = {}) {
            EIN Filterknopf mit der Zahl der aktiven Filter (Blatt wie im
            Kalender), EIN Werkzeug-Menue (Sortierung + Verwaltung wie in den
            Dokumenten und der Buchungsliste). Was gerade einschraenkt, steht
-           darunter als abwaehlbarer Chip - nur dann, sonst kostet es nichts. -->
-      <div class="subscriptions-toolbar">
-        ${renderPageSearch({
+           darunter als abwaehlbarer Chip - nur dann, sonst kostet es nichts.
+
+           IM KOPF DER LISTE, DIE SIE FILTERT (R14 P8, A5 P2-7): die Zeile
+           stand als eigene Werkzeugzeile ueber allem, die Suche 448px breit
+           und mobil als volles Feld. Jetzt ist sie der Abschnittskopf wie im
+           Hauptbuch (.section-toolbar): Titel links, Suche mit
+           --page-search-width, mobil in der Icon-Form. Kennzahlen stehen
+           davor, damit Kopf und Liste zusammen bleiben; der Kopf wird nie neu
+           gebaut, sonst verloere die Suche beim Tippen ihren Fokus. -->
+      <div class="subscriptions-summary" id="subscriptions-summary"></div>
+      <section class="subscriptions-list-section" aria-labelledby="subscriptions-list-title">
+        <div class="subscriptions-section-head section-toolbar">
+          <div class="subscriptions-section-head__lead">
+            <h2 id="subscriptions-list-title" tabindex="-1">${t('subscriptions.listTitle')}</h2>
+            <span class="list-group__count" id="subscriptions-list-count"></span>
+          </div>
+          <span class="subscriptions-rates-slot" id="subscriptions-rates-slot"></span>
+          ${renderPageSearch({
     id: 'subscriptions-search',
     label: t('subscriptions.searchLabel'),
     placeholder: t('subscriptions.searchPlaceholder'),
@@ -233,15 +250,17 @@ export async function render(target, { user } = {}) {
     clearLabel: t('common.searchClear'),
     className: 'subscriptions-search',
   })}
-        <button type="button" class="btn btn--secondary subscriptions-filter-btn" id="subscriptions-filters" aria-haspopup="dialog">
-          <i data-lucide="sliders-horizontal" class="icon-md" aria-hidden="true"></i>
-          <span class="subscriptions-filter-btn__label">${t('subscriptions.filters')}</span>
-          <span class="subscriptions-filter-btn__count" aria-hidden="true" hidden></span>
-        </button>
-        ${toolsMenuHtml()}
-      </div>
-      <div class="subscriptions-active-filters" id="subscriptions-active-filters" role="group" aria-label="${t('subscriptions.activeFiltersLabel')}" hidden></div>
-      <div id="subscriptions-content">${renderSkeletonList({ rows: 5, lines: 2 })}</div>
+          <button type="button" class="btn btn--secondary subscriptions-filter-btn" id="subscriptions-filters" aria-haspopup="dialog" aria-label="${esc(t('subscriptions.filters'))}">
+            <i data-lucide="sliders-horizontal" class="icon-md" aria-hidden="true"></i>
+            <span class="subscriptions-filter-btn__label">${t('subscriptions.filters')}</span>
+            <span class="subscriptions-filter-btn__count" aria-hidden="true" hidden></span>
+          </button>
+          ${toolsMenuHtml()}
+        </div>
+        <div class="subscriptions-active-filters" id="subscriptions-active-filters" role="group" aria-label="${t('subscriptions.activeFiltersLabel')}" hidden></div>
+        <div id="subscriptions-content">${renderSkeletonList({ rows: 5, lines: 2 })}</div>
+      </section>
+      <div id="subscriptions-analytics"></div>
     </div>
   `);
   if (window.lucide) window.lucide.createIcons({ el: container });
@@ -318,8 +337,9 @@ function renderFilters() {
       count.hidden = filters.length === 0;
       count.textContent = String(filters.length);
     }
-    if (filters.length) button.setAttribute('aria-label', t('subscriptions.filtersActive', { count: filters.length }));
-    else button.removeAttribute('aria-label');
+    // Der Name steht immer als aria-label: mobil faellt die Beschriftung weg
+    // (Label-Verlust-Regel), der Knopf ist dann nur noch sein Icon.
+    button.setAttribute('aria-label', filters.length ? t('subscriptions.filtersActive', { count: filters.length }) : t('subscriptions.filters'));
   }
   const row = container.querySelector('#subscriptions-active-filters');
   if (row) {
@@ -539,29 +559,28 @@ function renderContent() {
   // Liste ist, woran man handelt (verlaengern, bearbeiten); die Diagramme sind
   // die Auswertung dazu und folgen ihr - auf jeder Breite in derselben
   // Reihenfolge, damit Fokus- und Lesereihenfolge dem Bild entsprechen.
+  const summary = container.querySelector('#subscriptions-summary');
+  if (summary) setHtml(summary, renderSummary());
+  const count = container.querySelector('#subscriptions-list-count');
+  if (count) count.textContent = String(rows.length);
+  const rates = container.querySelector('#subscriptions-rates-slot');
+  if (rates) {
+    setHtml(rates, !hasForeignCurrency ? ''
+      : state.rates?.source === 'unavailable'
+        ? `<span class="subscriptions-rate-status subscriptions-rate-status--warning">${t('subscriptions.ratesUnavailable')}</span>`
+        : `<button class="btn btn--secondary" id="subscriptions-refresh-rates">
+          <i data-lucide="refresh-cw" aria-hidden="true"></i>${t('subscriptions.refreshRates')}
+        </button>`);
+  }
   setHtml(content, `
-    ${renderSummary()}
-    <section class="subscriptions-list-section" aria-labelledby="subscriptions-list-title">
-      <div class="subscriptions-section-head">
-        <div>
-          <h2 id="subscriptions-list-title" tabindex="-1">${t('subscriptions.listTitle')}</h2>
-          <span>${t('subscriptions.listCount', { count: rows.length })}</span>
-        </div>
-        ${!hasForeignCurrency ? ''
-          : state.rates?.source === 'unavailable'
-            ? `<span class="subscriptions-rate-status subscriptions-rate-status--warning">${t('subscriptions.ratesUnavailable')}</span>`
-            : `<button class="btn btn--secondary" id="subscriptions-refresh-rates">
-              <i data-lucide="refresh-cw" aria-hidden="true"></i>${t('subscriptions.refreshRates')}
-            </button>`}
-      </div>
       <div class="subscriptions-list row-divided" id="subscriptions-list">
         ${rows.length ? rows.map(renderCard).join('') : renderEmpty()}
       </div>
-    </section>
-    ${renderAnalytics()}
   `);
+  const analytics = container.querySelector('#subscriptions-analytics');
+  if (analytics) setHtml(analytics, renderAnalytics());
   bindContent();
-  if (window.lucide) window.lucide.createIcons({ el: content });
+  if (window.lucide) window.lucide.createIcons({ el: container.querySelector('.subscriptions-page') ?? content });
 }
 
 function renderSummary() {
@@ -596,8 +615,24 @@ function renderSummary() {
   //
   // DIE WAEHRUNG STEHT EINMAL: die Jahresprognose trug unter „1.363,20 €"
   // noch „EUR". Die Fussnote sagt jetzt, woraus die Zahl entsteht.
+  // MOBIL EINE ZEILE (R14 P1, A5 P1-3): vier Karten (2x2, 200px) standen vor
+  // der ersten Abo-Zeile (y=478 bei 390x844). Unter 640px nennt eine Zeile die
+  // Monatskosten und daneben Zahl und Budgetstand; ein Tipp klappt die Karten
+  // auf (metric-glance.js, dieselbe Form wie die Budget-Uebersicht).
+  const budgetFlow = hasBudget
+    ? { label: t(isOverBudget ? 'subscriptions.overBudget' : 'subscriptions.remainingBudget'),
+      amount: money(Math.abs(summary.remaining_budget)), tone: isOverBudget ? 'negative' : '' }
+    : null;
   return `
-    <section class="metric-grid metric-grid--quad">
+    ${metricGlanceHtml({
+    id: 'subscriptions-glance-more',
+    controls: 'subscriptions-summary-details',
+    expanded: state.summaryExpanded,
+    label: t('subscriptions.monthlyCost'),
+    value: money(used),
+    flows: [{ label: t('subscriptions.activeCount', { count: summary.active_count }) }, budgetFlow],
+  })}
+    <section class="metric-grid metric-grid--quad budget-glance-details${state.summaryExpanded ? ' is-expanded' : ''}" id="subscriptions-summary-details">
       <article class="metric-card">
         <div class="metric-card__label">${t('subscriptions.monthlyCost')}</div>
         <div class="metric-card__value">${money(used)}</div>
@@ -951,6 +986,7 @@ function renderEmpty() {
 }
 
 function bindContent() {
+  wireMetricGlance(container, 'subscriptions-glance-more', (on) => { state.summaryExpanded = on; });
   container.querySelector('#subscriptions-refresh-rates')?.addEventListener('click', () => reload({ refreshRates: true }));
   container.querySelector('#subscriptions-empty-add')?.addEventListener('click', () => openSubscriptionModal());
   container.querySelector('#subscriptions-empty-reset')?.addEventListener('click', resetFilters);
