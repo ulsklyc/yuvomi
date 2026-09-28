@@ -2385,3 +2385,21 @@ test('R14: ein Feed ist ein Schalter, kein Primaerknopf', async () => {
   assert.match(src, /container\.dataset\?\.part/, 'der Abschnitt sagt, welcher Feed');
   assert.match(src, /!next && !await feed\.confirmDisable\(\)/, 'Ausschalten fragt nach wie der fruehere Knopf');
 });
+
+// R14 P11 (Re-Critique 2026-09-28, A7 P3/A1): der Blattwechsel schnitt hart,
+// waehrend der Rest der App mit Blenden wechselt. Das neue Blatt blendet ein -
+// nur beim WECHSEL (nicht beim ersten Aufbau), nur Deckkraft, Dauer und
+// Kurve aus den Tokens.
+test('R14: ein Blattwechsel blendet das neue Blatt ein', async () => {
+  const shell = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  const leaf = shell.slice(shell.indexOf('async function renderLeafContent('), shell.indexOf('function isSplit('));
+  assert.match(leaf, /const swapping = Boolean\(content\.querySelector\(':scope > \.settings-leaf'\)\);[\s\S]*content\.replaceChildren\(breadcrumb, header, leafContainer\);/,
+    'gefragt wird VOR dem Tausch, ob schon ein Blatt stand');
+  assert.match(leaf, /if \(swapping\) \{[^}]*classList\.add\('settings-sheet-enter'\)/, 'nur ein Wechsel blendet');
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const enter = rules.find((r) => r.selector.trim() === '.settings-sheet-enter');
+  assert.ok(enter, 'die Regel fuer das einblendende Blatt fehlt');
+  assert.match(enter.body, /animation:\s*settings-sheet-enter var\(--duration-md\) var\(--ease-out\)/);
+  assert.match(css, /@keyframes settings-sheet-enter\s*\{\s*from\s*\{\s*opacity:\s*0;?\s*\}\s*\}/, 'nur Deckkraft - nichts bewegt sich');
+});

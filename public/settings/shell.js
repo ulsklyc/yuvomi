@@ -841,7 +841,15 @@ async function renderLeafContent(content, leaf, domain, user, query) {
 
   const leafContainer = document.createElement('div');
   leafContainer.className = 'settings-leaf';
+  // DER BLATTWECHSEL BLENDET (R14, A7 P3): er schnitt hart, waehrend jeder
+  // andere Wechsel der App ueberblendet. Nur ein WECHSEL - der erste Aufbau
+  // kommt schon mit der Seitenblende des Routers. Die neuen Knoten tragen die
+  // Klasse, also laeuft die Animation je Wechsel neu (settings.css).
+  const swapping = Boolean(content.querySelector(':scope > .settings-leaf'));
   content.replaceChildren(breadcrumb, header, leafContainer);
+  if (swapping) {
+    for (const node of [header, leafContainer]) node.classList.add('settings-sheet-enter');
+  }
 
   const sections = settingsSheetSections(leaf, user);
   const scoped = Boolean(leaf.module);

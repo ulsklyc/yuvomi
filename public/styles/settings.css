@@ -526,6 +526,17 @@
   min-width: 0;
 }
 
+/* DER BLATTWECHSEL BLENDET (R14, A7 P3; shell.js renderLeafContent). Nur
+ * Deckkraft - das Blatt steht, wo es stehen wird; unter reduzierter Bewegung
+ * nimmt die globale Sperre (reset.css) die Dauer auf 0. */
+@keyframes settings-sheet-enter {
+  from { opacity: 0; }
+}
+
+.settings-sheet-enter {
+  animation: settings-sheet-enter var(--duration-md) var(--ease-out);
+}
+
 .settings-leaf-header {
   display: grid;
   gap: var(--space-2);
