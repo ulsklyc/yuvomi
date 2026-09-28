@@ -90,6 +90,11 @@ test('die Rollen-Chips sagen ihren Zustand, und die erste Rolle steht gewaehlt d
     const matrix = sheet.parts.get('#perm-matrix')?.html ?? '';
     assert.doesNotMatch(matrix, /settings\.permSelectRolePrompt/, 'keine leere Flaeche mit Aufforderung');
     assert.match(matrix, /class="perm-matrix__subject">settings\.familyRoleParent</, 'die Matrix der ersten Rolle steht');
+    // Unter dem h1 des Blatts (`.settings-leaf-header__title`) ist das die
+    // erste Ueberschrift: h2, nicht h3. Die h2 der Settings-Navigation standen
+    // bis R10 sichtbar davor und verdeckten den Sprung; seit dem Blatt je
+    // Modul sind sie dort nicht mehr im Bild (Sonde 10 der Dokument-Guards).
+    assert.match(matrix, /<h2 class="perm-matrix__subject">/, 'die Matrix-Ueberschrift folgt dem h1 ohne Sprung');
     assert.match(matrix, /class="perm-legend"/, 'mit sichtbarer Legende der Icon-Segmente');
   } finally {
     delete globalThis.__apiStub;

@@ -462,9 +462,11 @@ function renderMatrix(container) {
     : '';
 
   panel.replaceChildren();
+  // Die Matrix-Ueberschrift ist die erste unter dem h1 des Blatts, also h2 -
+  // als h3 stand sie seit dem Blatt je Modul (R10) ohne sichtbares h2 davor.
   panel.insertAdjacentHTML('beforeend', `
     <div class="perm-matrix__head">
-      <h3 class="perm-matrix__subject">${esc(subjectTitle())}</h3>
+      <h2 class="perm-matrix__subject">${esc(subjectTitle())}</h2>
       <p class="perm-matrix__hint">${esc(
         state.mode === 'role' ? t('settings.permRoleLegend') : t('settings.permMemberLegend'),
       )}</p>
