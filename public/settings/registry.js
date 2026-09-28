@@ -339,16 +339,16 @@ export const SETTINGS_SECTIONS = freezeEntries([
     scope: 'mine',
     labelKey: 'settings.pageFeeds',
     descriptionKey: 'settings.pageFeedsDescription',
+    // Nur noch der Kalender-Feed (R14, A7 P2-3): die Exporte der anderen
+    // Module stehen im Blatt ihres Moduls (`feed-*` unten), dieselbe Datei
+    // rendert je Abschnitt einen Feed (`props.part`).
     options: [
       { key: 'settings.feedExportTitle', terms: ['ICS', 'iCal'] },
       'settings.feedExportShowAssignees',
-      'settings.inventoryFeedTitle',
-      'settings.cycleFeedTitle',
-      'settings.scheduleFeedTitle',
-      'settings.wasteFeedTitle',
     ],
     adminOnly: false,
     loader: () => import('/settings/pages/personal-feeds.js'),
+    props: { part: 'calendar' },
   },
   {
     id: 'modules-calendar',
@@ -570,6 +570,55 @@ export const SETTINGS_SECTIONS = freezeEntries([
     adminOnly: true,
     loader: () => import('/settings/pages/modules-health.js'),
   },
+  // DIE EXPORTE STEHEN IM BLATT IHRES MODULS (R14, A7 P2-3). Oma Ingrid sucht
+  // den Schichtplan-Export im Blatt Schichtplan, nicht unter Kalender. Jeder
+  // Token haengt an der eigenen users-Zeile, keine Route traegt einen
+  // Admin-Check (#770) - deshalb "Fuer mich". Inventar und Entsorgung hatten
+  // kein Blatt; ihr Feed ist ihr erster Abschnitt.
+  {
+    id: 'feed-schedule',
+    sheetId: 'module-schedule',
+    scope: 'mine',
+    labelKey: 'settings.scheduleFeedTitle',
+    descriptionKey: 'settings.scheduleFeedDescription',
+    options: [{ key: 'settings.scheduleFeedTitle', terms: ['ICS', 'iCal'] }],
+    adminOnly: false,
+    loader: () => import('/settings/pages/personal-feeds.js'),
+    props: { part: 'schedule' },
+  },
+  {
+    id: 'feed-cycle',
+    sheetId: 'module-health',
+    scope: 'mine',
+    labelKey: 'settings.cycleFeedTitle',
+    descriptionKey: 'settings.cycleFeedDescription',
+    options: [{ key: 'settings.cycleFeedTitle', terms: ['ICS', 'iCal'] }],
+    adminOnly: false,
+    loader: () => import('/settings/pages/personal-feeds.js'),
+    props: { part: 'cycle' },
+  },
+  {
+    id: 'feed-inventory',
+    sheetId: 'module-inventory',
+    scope: 'mine',
+    labelKey: 'settings.inventoryFeedTitle',
+    descriptionKey: 'settings.inventoryFeedDescription',
+    options: [{ key: 'settings.inventoryFeedTitle', terms: ['ICS', 'iCal'] }],
+    adminOnly: false,
+    loader: () => import('/settings/pages/personal-feeds.js'),
+    props: { part: 'inventory' },
+  },
+  {
+    id: 'feed-waste',
+    sheetId: 'module-waste',
+    scope: 'mine',
+    labelKey: 'settings.wasteFeedTitle',
+    descriptionKey: 'settings.wasteFeedDescription',
+    options: [{ key: 'settings.wasteFeedTitle', terms: ['ICS', 'iCal'] }],
+    adminOnly: false,
+    loader: () => import('/settings/pages/personal-feeds.js'),
+    props: { part: 'waste' },
+  },
 ]);
 
 /**
@@ -598,7 +647,8 @@ export const SETTINGS_LEAVES = freezeEntries([
   { id: 'admin-system', domainId: 'admin', path: '/settings/admin/system', labelKey: 'settings.pageSystem', descriptionKey: 'settings.pageSystemDescription', icon: 'info' },
   { id: 'admin-api', domainId: 'admin', path: '/settings/admin/api', labelKey: 'settings.pageApiAccess', descriptionKey: 'settings.pageApiAccessDescription', icon: 'key-round' },
   { id: 'admin-integrations', domainId: 'admin', path: '/settings/admin/integrations', labelKey: 'settings.pageIntegrations', descriptionKey: 'settings.pageIntegrationsDescription', icon: 'plug' },
-  // Module
+  // Module - in der Reihenfolge der Seitenleiste ohne eigene Anordnung
+  // (settingsSheetsForDomain sortiert nach Gruppe und Haushalts-Reihenfolge).
   { id: 'modules-active', domainId: 'modules', path: '/settings/modules/active', labelKey: 'settings.pageActiveModules', descriptionKey: 'settings.pageActiveModulesDescription', icon: 'toggle-right' },
   { id: 'modules-navigation', domainId: 'modules', path: '/settings/modules/navigation', labelKey: 'settings.pageNavigation', descriptionKey: 'settings.pageNavigationDescription', icon: 'panel-left' },
   { id: 'module-dashboard', domainId: 'modules', path: '/settings/modules/overview', labelKey: 'nav.dashboard', descriptionKey: 'settings.sheetDashboardDescription', icon: 'layout-dashboard', module: 'dashboard' },
@@ -606,12 +656,14 @@ export const SETTINGS_LEAVES = freezeEntries([
   { id: 'module-schedule', domainId: 'modules', path: '/settings/modules/schedule', labelKey: 'nav.schedule', descriptionKey: 'settings.sheetScheduleDescription', icon: 'calendar-clock', module: 'schedule' },
   { id: 'module-tasks', domainId: 'modules', path: '/settings/modules/tasks', labelKey: 'nav.tasks', descriptionKey: 'settings.sheetTasksDescription', icon: 'check-square', module: 'tasks' },
   { id: 'module-kitchen', domainId: 'modules', path: '/settings/modules/kitchen', labelKey: 'nav.kitchen', descriptionKey: 'settings.pageKitchenDescription', icon: 'utensils', module: 'kitchen' },
-  { id: 'module-contacts', domainId: 'modules', path: '/settings/modules/contacts', labelKey: 'nav.contacts', descriptionKey: 'settings.pageSyncContactsDescription', icon: 'book-user', module: 'contacts' },
-  { id: 'module-budget', domainId: 'modules', path: '/settings/modules/budget', labelKey: 'nav.budget', descriptionKey: 'settings.sheetBudgetDescription', icon: 'wallet', module: 'budget' },
-  { id: 'module-documents', domainId: 'modules', path: '/settings/modules/documents', labelKey: 'nav.documents', descriptionKey: 'settings.sheetDocumentsDescription', icon: 'folder-lock', module: 'documents' },
   { id: 'module-housekeeping', domainId: 'modules', path: '/settings/modules/housekeeping', labelKey: 'nav.housekeeping', descriptionKey: 'settings.sheetHousekeepingDescription', icon: 'paintbrush', module: 'housekeeping' },
+  { id: 'module-waste', domainId: 'modules', path: '/settings/modules/waste', labelKey: 'nav.waste', descriptionKey: 'settings.sheetWasteDescription', icon: 'trash-2', module: 'waste' },
+  { id: 'module-documents', domainId: 'modules', path: '/settings/modules/documents', labelKey: 'nav.documents', descriptionKey: 'settings.sheetDocumentsDescription', icon: 'folder-lock', module: 'documents' },
+  { id: 'module-inventory', domainId: 'modules', path: '/settings/modules/inventory', labelKey: 'nav.inventory', descriptionKey: 'settings.sheetInventoryDescription', icon: 'package', module: 'inventory' },
   { id: 'module-rewards', domainId: 'modules', path: '/settings/modules/rewards', labelKey: 'nav.rewards', descriptionKey: 'settings.sheetRewardsDescription', icon: 'award', module: 'rewards' },
+  { id: 'module-contacts', domainId: 'modules', path: '/settings/modules/contacts', labelKey: 'nav.contacts', descriptionKey: 'settings.pageSyncContactsDescription', icon: 'book-user', module: 'contacts' },
   { id: 'module-health', domainId: 'modules', path: '/settings/modules/health', labelKey: 'nav.health', descriptionKey: 'settings.sheetHealthDescription', icon: 'heart-pulse', module: 'health' },
+  { id: 'module-budget', domainId: 'modules', path: '/settings/modules/budget', labelKey: 'nav.budget', descriptionKey: 'settings.sheetBudgetDescription', icon: 'wallet', module: 'budget' },
 ]);
 
 /**
@@ -628,7 +680,9 @@ export const SETTINGS_LEAVES = freezeEntries([
 const MOVED_SETTINGS_PATHS = Object.freeze({
   '/settings/personal/calendar': { path: '/settings/modules/calendar', section: 'personal-calendar' },
   '/settings/personal/calendar-subscriptions': { path: '/settings/modules/calendar', section: 'personal-calendar-subscriptions' },
-  '/settings/personal/feeds': { path: '/settings/modules/calendar', section: 'personal-feeds' },
+  // Seit R14 aufgeteilt (A7 P2-3): eine mitgegebene Option folgt ihrem Feed
+  // in das Blatt seines Moduls (`dissolved`, movedSettingsUrl).
+  '/settings/personal/feeds': { path: '/settings/modules/calendar', section: 'personal-feeds', dissolved: true },
   '/settings/personal/tasks': { path: '/settings/modules/tasks', section: 'personal-tasks' },
   '/settings/personal/health': { path: '/settings/modules/health', section: 'personal-health' },
   '/settings/personal/navigation': { path: '/settings/modules/navigation', section: 'modules-navigation' },
@@ -695,7 +749,6 @@ function sheetVisible(sheet, user) {
   return settingsSheetSections(sheet, user).length > 0;
 }
 
-/** Die Blaetter eines Bereichs, die diese Rolle sieht. */
 /* DIE MODULBLAETTER FOLGEN DER SEITENLEISTE (R14, A7 P3). Sie standen in
  * der Reihenfolge dieser Datei - Budget vor Gesundheit, Kontakte vor
  * Dokumenten -, waehrend die Seitenleiste daneben Gruppen und die Anordnung
@@ -711,6 +764,7 @@ function currentModuleOrder() {
   }
 }
 
+/** Die Blaetter eines Bereichs, die diese Rolle sieht. */
 export function settingsSheetsForDomain(domainId, user, { moduleOrder = currentModuleOrder() } = {}) {
   const sheets = SETTINGS_LEAVES.filter((sheet) => sheet.domainId === domainId && sheetVisible(sheet, user));
   if (!sheets.some((sheet) => sheet.module)) return sheets;
