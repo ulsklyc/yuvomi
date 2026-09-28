@@ -920,6 +920,7 @@ function wireNav() {
         state.reportAnchor = anchorForMonth(state.month);
       }
       renderBody();
+      markTabEntering();
       if (prev === 'reports' && id !== 'reports') {
         const ym = state.reportAnchor.slice(0, 7);
         if (ym !== state.month) {
@@ -977,6 +978,18 @@ function watchAsideFit(panel) {
 // --------------------------------------------------------
 // Body
 // --------------------------------------------------------
+
+/* DER NEUE REITER BLENDET EIN (R14 P11, A5 P3). Die Untertabs wechselten per
+ * hartem Schnitt, waehrend jeder Seitenwechsel blendet. Nur der Wechsel selbst
+ * blendet - ein Neuaufbau desselben Reiters (Filter, Monat, Speichern) nicht;
+ * die Klasse faellt nach der Blende. Unter reduzierter Bewegung schneidet die
+ * globale Sperre (reset.css) die Animation ab. */
+function markTabEntering() {
+  const panel = _container?.querySelector('#budget-body > .budget-tab-panel');
+  if (!panel) return;
+  panel.classList.add('budget-tab-panel--entering');
+  panel.addEventListener('animationend', () => panel.classList.remove('budget-tab-panel--entering'), { once: true });
+}
 
 function renderBody() {
   const body = _container.querySelector('#budget-body');
@@ -4560,5 +4573,9 @@ export const __test = {
   toggleBalanceDetailsForTest(container) {
     _container = container;
     toggleBalanceDetails();
+  },
+  markTabEnteringForTest(container) {
+    _container = container;
+    markTabEntering();
   },
 };

@@ -3003,3 +3003,21 @@ test('Abos- und Gruppensuche stehen im Listenkopf (.section-toolbar), ohne eigen
   assert.ok(gruppen, 'Aufteilung: der Gruppenkopf ist .section-toolbar');
   assert.match(gruppen[1].split('class="segmented')[0], /renderPageSearch\(\{\s*id: 'split-group-search'/, 'Aufteilung: die Suche steht im Gruppenkopf, vor dem Statusfilter');
 });
+
+/* R14 P11 (A5 P3): die Budget-Untertabs wechselten per hartem Schnitt, die
+ * Seiten per View Transition. Der neue Reiter blendet jetzt ein - nur beim
+ * Reiterwechsel, nicht bei jedem Neuaufbau (Filter, Monat). */
+test('Budget-Untertabs blenden beim Wechsel ein, mit Tokens (R14 P11)', () => {
+  const klassen = new Set();
+  let ende = null;
+  const panel = { classList: { add: (c) => klassen.add(c), remove: (c) => klassen.delete(c) }, addEventListener: (typ, fn) => { if (typ === 'animationend') ende = fn; } };
+  budgetUi.markTabEnteringForTest({ querySelector: (sel) => (sel === '#budget-body > .budget-tab-panel' ? panel : null) });
+  assert.ok(klassen.has('budget-tab-panel--entering'), 'der neue Reiter traegt die Einblendung');
+  ende?.();
+  assert.ok(!klassen.has('budget-tab-panel--entering'), 'nach der Blende faellt die Klasse, ein Neuaufbau blendet nicht erneut');
+  const onChange = budget.slice(budget.indexOf('_tablist = wireTablist('), budget.indexOf('_tablist = wireTablist(') + 1500);
+  assert.match(onChange, /renderBody\(\);\s*markTabEntering\(\);/, 'nur der Reiterwechsel blendet');
+  const regel = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-tab-panel--entering' && !r.at.length);
+  assert.ok(regel, '.budget-tab-panel--entering fehlt');
+  assert.match(regel.body, /animation:\s*fade-in var\(--duration-[a-z0-9]+\) var\(--ease-[a-z-]+\)/, 'Blende aus Tokens');
+});

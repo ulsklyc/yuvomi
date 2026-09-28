@@ -637,3 +637,16 @@ test('R14 P8: Verlaufslisten der Gesundheit stehen auf einem Traeger', async () 
     assert.ok(own.some((r) => /border-radius:\s*var\(--radius-lg\)/.test(r.body)), `${list}: kein Kartenradius`);
   }
 });
+
+// R14 P11 (A6 P2-9): schmal schaltete der Bereichswechsel `hidden` um - die
+// einzige Tiefennavigation im Modul sprang. Jetzt blendet der neue Bereich
+// ein (nur schmal, nur beim Wechsel), mit Tokens.
+test('R14 P11: der Bereichswechsel schmal blendet ein', async () => {
+  const start = HEALTH_JS.indexOf('function activateArea(');
+  const body = HEALTH_JS.slice(start, HEALTH_JS.indexOf('\n}\n', start));
+  assert.match(body, /if \(narrow && previous && previous !== id\) markAreaEntering\(route\);/);
+  const { eachRule } = await import('./css-rules.js');
+  const regel = [...eachRule(read('public/styles/health.css'))].find((r) => r.selector.trim() === '.health-panel--entering' && !r.at.length);
+  assert.ok(regel, '.health-panel--entering fehlt');
+  assert.match(regel.body, /animation:\s*fade-in var\(--duration-[a-z0-9]+\) var\(--ease-[a-z-]+\)/);
+});

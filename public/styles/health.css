@@ -332,6 +332,11 @@
   display: none;
 }
 
+/* Schmal blendet ein neuer Bereich ein (R14 P11, health.js markAreaEntering). */
+.health-panel--entering {
+  animation: fade-in var(--duration-md) var(--ease-out);
+}
+
 /* Hier stand `.health-panel__head` - der Traeger des Panel-Titels, den die
  * Sub-Tab-Leiste darueber bereits wortgleich fuehrt. Der Titel ist jetzt
  * .sr-only und braucht keinen sichtbaren Kopf mehr (Finish-Review Runde 4,

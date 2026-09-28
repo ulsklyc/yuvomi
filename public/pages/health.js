@@ -676,6 +676,17 @@ function syncDetailHead() {
   }
 }
 
+/* DER NEUE BEREICH BLENDET EIN (R14 P11, A6 P2-9). Schmal schaltete der
+ * Wechsel nur `hidden` um - die einzige Tiefennavigation im Modul sprang. Nur
+ * Deckkraft, kein Versatz (wie der Seitenwechsel); die Klasse faellt nach der
+ * Blende, unter reduzierter Bewegung schneidet die globale Sperre sie ab. */
+function markAreaEntering(route) {
+  const panel = [..._container.querySelectorAll('[data-health-panel]')].find((p) => p.dataset.healthPanel === route);
+  if (!panel) return;
+  panel.classList.add('health-panel--entering');
+  panel.addEventListener('animationend', () => panel.classList.remove('health-panel--entering'), { once: true });
+}
+
 /* Personenwahl und „Heute" an ihren Ort je Darstellung (health-hoist.js). */
 function syncHoists() {
   if (!_container?.isConnected || !_panelsHost) return;
@@ -733,6 +744,7 @@ function activateArea(id) {
   for (const panel of _container.querySelectorAll('[data-health-panel]')) {
     panel.hidden = panel.dataset.healthPanel !== route;
   }
+  if (narrow && previous && previous !== id) markAreaEntering(route);
   rememberHealthRoute(route);
   syncHealthHeader();
   updateHealthFab(route);
