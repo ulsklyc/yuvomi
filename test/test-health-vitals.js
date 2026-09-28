@@ -561,3 +561,21 @@ test('Befunde am selben Tag: die Zeitachse verteilt nach dem Index statt auf die
   assert.equal(cx.length, 2);
   assert.notEqual(cx[0], cx[1], 'zwei Befunde vom selben Tag sind zwei Punkte');
 });
+
+test('Schlaf auf der Karte: kurze Form „7:30" plus Einheit, der lange Satz bleibt Verlauf und Tooltip (Re-Critique 2026-09-28 A6 P2-4)', async () => {
+  // Gemessen bei 390px: „7 Std. 30 Min." scrollWidth 173 > clientWidth 147 -
+  // der Wert lief 13px ueber die Kartenkante. panel.css sagt selbst: zu lange
+  // Werte werden geteilt, nicht weiter verkleinert.
+  await imBlatt(() => {
+    const sleep = vitalMetric('sleep');
+    const series = computeVitalSeries([{ id: 1, type: 'sleep', value_num: 7.5, measured_at: '2026-09-22T07:00' }], { type: 'sleep', range: 'month', anchor: '2026-09-27' });
+    for (const [wo, html] of [['Karte', health.cardMarkup(sleep, series, { phone: true })], ['Uebersicht', health.overviewVitalCardMarkup(sleep, series)]]) {
+      const wert = html.match(/<span class="metric-card__value">([^<]*)<\/span>/)?.[1];
+      assert.equal(wert, '7:30', `${wo}: der Wert ist die kurze Form`);
+      assert.match(html, /<span class="metric-card__unit">[^<]+<\/span>/, `${wo}: die Einheit steht daneben`);
+      assert.doesNotMatch(html, /health\.duration\.hm/, `${wo}: kein Satz „7 Std. 30 Min." auf der Karte`);
+    }
+    const kurz = computeVitalSeries([{ id: 2, type: 'sleep', value_num: 6 + 5 / 60, measured_at: '2026-09-22T07:00' }], { type: 'sleep', range: 'month', anchor: '2026-09-27' });
+    assert.match(health.cardMarkup(sleep, kurz), /<span class="metric-card__value">6:05<\/span>/, 'Minuten zweistellig');
+  });
+});

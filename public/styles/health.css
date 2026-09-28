@@ -706,12 +706,27 @@
 
 }
 
-/* 21rem = 336px, und die Zahl ist gerechnet, nicht gegriffen: mit beschriftetem
- * Take braucht die Zeile 32 Polsterung + 46 Uhrzeit + 24 Luecken + 56 Namensboden
- * + 177 Aktionen = 335px. Darunter faellt auch sein Wort. Der erste Anlauf stand
- * auf 20rem (320px) - der Container misst auf einem 390px-Telefon aber 324px,
- * also feuerte die Stufe genau dort nicht, wo sie gebraucht wurde. */
-@container list-rows (max-width: 21rem) {
+/* EINNEHMEN BEHAELT SEIN WORT (Re-Critique 2026-09-28, A6 P2-3). Hier fiel es
+ * bis dahin schon unter 21rem - also auf jedem 390px-Telefon (Container 324px) -,
+ * und was blieb, war ein gefuellter violetter Kreis mit Haken: die Grammatik der
+ * Erinnerungen fuer ERLEDIGT, auf einem Knopf, der erst etwas tun soll. Jetzt
+ * gibt der Knopf zuerst sein Icon ab und bleibt eine Kapsel mit Wort; die
+ * Rechnung geht auf, weil das Wort ohne Icon 24px schmaler ist und der Name
+ * seinen Boden schon in der Stufe darueber abgegeben hat.
+ *
+ * Erst unter 17rem (272px Container, also Telefone unter ~340px) faellt auch
+ * das Wort - dann traegt die Tablette, nicht ein Haken. */
+@container list-rows (max-width: 26rem) {
+  .health-dose__take-icon {
+    display: none;
+  }
+}
+
+@container list-rows (max-width: 17rem) {
+  .health-dose__take-icon {
+    display: inline-block;
+  }
+
   .health-dose__take-label {
     display: none;
   }

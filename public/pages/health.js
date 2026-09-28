@@ -1380,9 +1380,9 @@ function cardMarkup(metric, series, { phone = false } = {}) {
   let metaHtml = `<span class="metric-card__note">${esc(t('health.vitals.noValue'))}</span>`;
 
   if (latest) {
-    const unit = esc(vitalUnitText(metric, latest));
-    const valueText = vitalValueText(metric, latest);
-    valueHtml = `<span class="metric-card__value">${esc(valueText)}</span>${unit ? ` <span class="metric-card__unit">${unit}</span>` : ''}`;
+    const card = vitalCardValue(metric, latest);
+    const unit = esc(card.unit);
+    valueHtml = `<span class="metric-card__value">${esc(card.value)}</span>${unit ? ` <span class="metric-card__unit">${unit}</span>` : ''}`;
     metaHtml = `
       <span class="metric-card__meta">
         ${deltaMarkup(series.deltas.value_num, metric)}
@@ -2203,6 +2203,26 @@ function vitalUnitText(metric, row) {
   return row?.unit || '';
 }
 
+/**
+ * Wert und Einheit einer KARTE (Vitalwerte-Tab und Uebersicht).
+ *
+ * Eine Dauer steht dort als „7:30" mit der Einheit daneben, nicht als der Satz
+ * „7 Std. 30 Min.": gemessen bei 390px lief der Satz 13px aus der Karte
+ * (scrollWidth 173 > clientWidth 147, Re-Critique 2026-09-28 A6 P2-4). Verlauf,
+ * Tooltip und Screenreader-Tabelle behalten den Satz (vitalValueText) - dort
+ * ist Platz, und dort wird gelesen statt ueberflogen.
+ */
+function vitalCardValue(metric, row) {
+  if (metric?.format === 'duration') {
+    const parts = splitDuration(row?.value_num);
+    if (!parts) return { value: '-', unit: '' };
+    const hours = fmtNum(parts.hours, { maximumFractionDigits: 0 });
+    const minutes = getNumberFormat({ minimumIntegerDigits: 2, maximumFractionDigits: 0, useGrouping: false }).format(parts.minutes);
+    return { value: `${hours}:${minutes}`, unit: t('health.duration.unitH') };
+  }
+  return { value: vitalValueText(metric, row), unit: vitalUnitText(metric, row) };
+}
+
 /** Delta zum Vorwert. Bei Schlaf in Minuten, weil „+0,5" niemand als Zeit liest. */
 function fmtVitalDelta(metric, delta) {
   if (delta === null || delta === undefined) return '';
@@ -2379,33 +2399,54 @@ function dueTodayMarkup() {
   return `<ul class="health-meds__due-list">${rows}</ul>`;
 }
 
+/**
+ * Rechte Seite einer faelligen Dosis: Zustand oder die zwei Handlungen.
+ *
+ * EIN Renderer fuer beide Zeilen (`dueRowMarkup`, `overviewDueRowMarkup`) -
+ * zweimal ist eine Korrektur hier nur in einer der beiden gelandet. `hooks`
+ * trennt nur die Verdrahtung (`data-dose-take` gegen `data-ov-dose-take`).
+ *
+ * Die Knoepfe nennen das Medikament (Re-Critique 2026-09-28, A6 P2-3): zwei
+ * Zeilen mit zweimal „Einnehmen" waren fuer den Screenreader ununterscheidbar.
+ * Und der Einnehmen-Knopf traegt keinen Haken mehr: mobil fiel sein Wort weg,
+ * und der gefuellte Haken-Kreis las sich als „erledigt" - die Grammatik der
+ * Erinnerungen fuer den ZUSTAND danach, den `health-dose__status--taken` zeigt.
+ * Die Tablette sagt, was der Knopf tut.
+ */
+const DOSE_HOOKS = { take: 'data-dose-take', skip: 'data-dose-skip' };
+const OVERVIEW_DOSE_HOOKS = { take: 'data-ov-dose-take', skip: 'data-ov-dose-skip' };
+
+function doseActionsMarkup(dose, log, name, own, hooks = DOSE_HOOKS) {
+  const status = log?.status;
+  if (status === 'taken') {
+    return `<span class="health-dose__status health-dose__status--taken"><i data-lucide="check" aria-hidden="true"></i>${esc(t('health.meds.status.taken'))}</span>`;
+  }
+  if (status === 'skipped') {
+    return `<span class="health-dose__status health-dose__status--skipped"><i data-lucide="x" aria-hidden="true"></i>${esc(t('health.meds.status.skipped'))}</span>`;
+  }
+  if (!own) {
+    return `<span class="health-dose__status">${esc(t('health.meds.status.pending'))}</span>`;
+  }
+  const data = `data-med-id="${esc(dose.medicationId)}" data-schedule-id="${esc(dose.scheduleId ?? '')}" data-scheduled-at="${esc(dose.scheduledAt)}" data-log-id="${esc(log?.id ?? '')}" data-dose="${esc(dose.dose_qty ?? '')}"`;
+  // Das `aria-label` traegt den ganzen Satz weiter, wenn der sichtbare Text
+  // nach der Containerbreite faellt (health.css).
+  return `
+      <div class="health-dose__actions">
+        <button type="button" class="btn btn--sm btn--primary health-dose__take" ${hooks.take} ${data} aria-label="${esc(t('health.meds.takeNamed', { name }))}"><i data-lucide="pill" class="icon-sm health-dose__take-icon" aria-hidden="true"></i><span class="health-dose__take-label">${esc(t('health.meds.take'))}</span></button>
+        <button type="button" class="btn btn--sm btn--ghost health-dose__skip" ${hooks.skip} ${data} aria-label="${esc(t('health.meds.skipNamed', { name }))}"><i data-lucide="skip-forward" class="icon-sm" aria-hidden="true"></i><span class="health-dose__skip-label">${esc(t('health.meds.skip'))}</span></button>
+      </div>`;
+}
+
 function dueRowMarkup(dose, med, log) {
   const name = med ? med.name : '';
-  const status = log?.status;
   const own = canEditFor(meds.personId, meds.meId);
   const doseText = dose.dose_qty != null ? ` · ${t('health.meds.doseQty', { count: fmtNum(dose.dose_qty) })}` : '';
-
-  let actions;
-  if (status === 'taken') {
-    actions = `<span class="health-dose__status health-dose__status--taken"><i data-lucide="check" aria-hidden="true"></i>${esc(t('health.meds.status.taken'))}</span>`;
-  } else if (status === 'skipped') {
-    actions = `<span class="health-dose__status health-dose__status--skipped"><i data-lucide="x" aria-hidden="true"></i>${esc(t('health.meds.status.skipped'))}</span>`;
-  } else if (own) {
-    const data = `data-med-id="${esc(dose.medicationId)}" data-schedule-id="${esc(dose.scheduleId ?? '')}" data-scheduled-at="${esc(dose.scheduledAt)}" data-log-id="${esc(log?.id ?? '')}" data-dose="${esc(dose.dose_qty ?? '')}"`;
-    actions = `
-      <div class="health-dose__actions">
-        <button type="button" class="btn btn--sm btn--primary health-dose__take" data-dose-take ${data} aria-label="${esc(t('health.meds.take'))}"><i data-lucide="check" class="icon-sm" aria-hidden="true"></i><span class="health-dose__take-label">${esc(t('health.meds.take'))}</span></button>
-        <button type="button" class="btn btn--sm btn--ghost health-dose__skip" data-dose-skip ${data} aria-label="${esc(t('health.meds.skip'))}"><i data-lucide="skip-forward" class="icon-sm" aria-hidden="true"></i><span class="health-dose__skip-label">${esc(t('health.meds.skip'))}</span></button>
-      </div>`;
-  } else {
-    actions = `<span class="health-dose__status">${esc(t('health.meds.status.pending'))}</span>`;
-  }
 
   return `
     <li class="list-row health-dose">
       <span class="health-dose__time">${esc(dose.time)}</span>
       <span class="list-row__name health-dose__name">${esc(name)}${esc(doseText)}</span>
-      ${actions}
+      ${doseActionsMarkup(dose, log, name, own)}
     </li>`;
 }
 
@@ -5731,40 +5772,15 @@ function overviewDueMarkup() {
 
 function overviewDueRowMarkup(dose, med, log, own) {
   const name = med ? med.name : '';
-  const status = log?.status;
   const doseText = dose.dose_qty != null ? ` · ${t('health.meds.doseQty', { count: fmtNum(dose.dose_qty) })}` : '';
-
-  let actions;
-  if (status === 'taken') {
-    actions = `<span class="health-dose__status health-dose__status--taken"><i data-lucide="check" aria-hidden="true"></i>${esc(t('health.meds.status.taken'))}</span>`;
-  } else if (status === 'skipped') {
-    actions = `<span class="health-dose__status health-dose__status--skipped"><i data-lucide="x" aria-hidden="true"></i>${esc(t('health.meds.status.skipped'))}</span>`;
-  } else if (own) {
-    const data = `data-med-id="${esc(dose.medicationId)}" data-schedule-id="${esc(dose.scheduleId ?? '')}" data-scheduled-at="${esc(dose.scheduledAt)}" data-log-id="${esc(log?.id ?? '')}" data-dose="${esc(dose.dose_qty ?? '')}"`;
-    /* DIESELBE FORM WIE IN `dueRowMarkup` - hier fehlte sie, und der Fix von
-     * dort erreichte diese Zeile deshalb nicht. Der Knopf trug weder
-     * `health-dose__skip` noch den Label-Span, also hatte die Container-Query
-     * `@container list-rows (max-width: 26rem)` nichts zu verbergen: gemessen
-     * bei 390px lag "Ueberspringen" bei left=360 und damit zu 92 von 122px
-     * ausserhalb des Bildes, geclippt und ohne Scrollweg dorthin (Critique
-     * 2026-08-13, offen geblieben). Zwei Renderer fuer dieselbe Zeile, und die
-     * Korrektur landete in einem - dasselbe Muster, das dieser Branch schon
-     * dreimal produziert hat.
-     * Das `aria-label` traegt den ganzen Satz weiter, wenn der Text faellt. */
-    actions = `
-      <div class="health-dose__actions">
-        <button type="button" class="btn btn--sm btn--primary health-dose__take" data-ov-dose-take ${data} aria-label="${esc(t('health.meds.take'))}"><i data-lucide="check" class="icon-sm" aria-hidden="true"></i><span class="health-dose__take-label">${esc(t('health.meds.take'))}</span></button>
-        <button type="button" class="btn btn--sm btn--ghost health-dose__skip" data-ov-dose-skip ${data} aria-label="${esc(t('health.meds.skip'))}"><i data-lucide="skip-forward" class="icon-sm" aria-hidden="true"></i><span class="health-dose__skip-label">${esc(t('health.meds.skip'))}</span></button>
-      </div>`;
-  } else {
-    actions = `<span class="health-dose__status">${esc(t('health.meds.status.pending'))}</span>`;
-  }
-
+  // Dieselbe rechte Seite wie im Medikamente-Tab, aus DEMSELBEN Renderer:
+  // hier fehlten einmal Klasse und Label-Span, und der Fix von dort erreichte
+  // diese Zeile nicht (Critique 2026-08-13).
   return `
     <li class="list-row health-dose">
       <span class="health-dose__time">${esc(dose.time)}</span>
       <span class="list-row__name health-dose__name">${esc(name)}${esc(doseText)}</span>
-      ${actions}
+      ${doseActionsMarkup(dose, log, name, own, OVERVIEW_DOSE_HOOKS)}
     </li>`;
 }
 
@@ -5873,9 +5889,9 @@ function overviewVitalCardMarkup(metric, series) {
   let valueHtml;
   let metaHtml = `<span class="metric-card__note">${esc(t('health.vitals.noValue'))}</span>`;
   if (latest) {
-    const unit = esc(vitalUnitText(metric, latest));
-    const valueText = vitalValueText(metric, latest);
-    valueHtml = `<span class="metric-card__value">${esc(valueText)}</span>${unit ? ` <span class="metric-card__unit">${unit}</span>` : ''}`;
+    const card = vitalCardValue(metric, latest);
+    const unit = esc(card.unit);
+    valueHtml = `<span class="metric-card__value">${esc(card.value)}</span>${unit ? ` <span class="metric-card__unit">${unit}</span>` : ''}`;
     metaHtml = `
       <span class="metric-card__meta">
         ${deltaMarkup(series.deltas.value_num, metric)}
@@ -8597,6 +8613,7 @@ export const __test = {
   nutritionRowMarkup,
   nutritionProgressRowMarkup,
   overviewDueRowMarkup,
+  overviewVitalCardMarkup,
   quickCaptureMarkup,
   cycleBubbleMarkup,
   cyclePregnancyMarkup,

@@ -366,3 +366,50 @@ test('canEditFor: eigene Daten, betreute Person und unbeteiligtes Mitglied (#103
     healthHelpers.setCareForForTest([]);
   }
 });
+
+// --------------------------------------------------------
+// Dosis-Knoepfe nennen das Medikament (Re-Critique 2026-09-28, A6 P2-3)
+// --------------------------------------------------------
+
+test('Dosis-Knoepfe: Name nennt das Medikament, kein Haken-Kreis, beide Renderer gleich', async () => {
+  // Vorher: aria-label nur „Einnehmen"/„Ueberspringen", zweimal identisch in
+  // einer Liste mit zwei Medikamenten; mobil ein gefuellter Haken-Kreis, der
+  // sich als „erledigt" liest (Erinnerungen-Grammatik).
+  const { eachRule } = await import('./css-rules.js');
+  const dosis = (medicationId) => ({ medicationId, scheduleId: 2, scheduledAt: '2026-06-15T08:00', time: '08:00', dose_qty: 1 });
+  const med = (id, name) => ({ id, name, active: 1, prn: 0 });
+  const knoepfe = (html) => ({
+    take: html.match(/<button[^>]*health-dose__take[^>]*>[\s\S]*?<\/button>/)?.[0],
+    skip: html.match(/<button[^>]*health-dose__skip[^>]*>[\s\S]*?<\/button>/)?.[0],
+  });
+  const label = (tag) => tag.match(/aria-label="([^"]*)"/)?.[1] ?? '';
+  healthHelpers.setViewStateForTest('meds', { meId: 1, personId: 1 });
+  try {
+    const renderers = [
+      ['Medikamente', (d, m) => healthHelpers.dueRowMarkup(d, m, null)],
+      ['Uebersicht', (d, m) => healthHelpers.overviewDueRowMarkup(d, m, null, true)],
+    ];
+    for (const [wo, render] of renderers) {
+      const a = knoepfe(render(dosis(1), med(1, 'Vitamin D3')));
+      const b = knoepfe(render(dosis(2), med(2, 'Eisen')));
+      assert.ok(a.take && a.skip, `${wo}: beide Knoepfe gerendert`);
+      assert.match(label(a.take), /Vitamin D3/, `${wo}: Einnehmen nennt das Medikament`);
+      assert.match(label(a.skip), /Vitamin D3/, `${wo}: Ueberspringen nennt das Medikament`);
+      assert.notEqual(label(a.take), label(a.skip), `${wo}: zwei Knoepfe, zwei Namen`);
+      assert.notEqual(label(a.take), label(b.take), `${wo}: zwei Medikamente, zwei Namen`);
+      assert.doesNotMatch(a.take, /data-lucide="check"/, `${wo}: kein Haken auf der Handlung - der Haken ist der Zustand danach`);
+      assert.match(a.take, /health-dose__take-label/, `${wo}: der Knopf traegt sein Wort`);
+    }
+  } finally {
+    healthHelpers.setViewStateForTest('meds', { meId: null, personId: null });
+  }
+  // Mobil (Container 324px bei 390, also unter 21rem) bleibt das Wort am
+  // Einnehmen-Knopf: eine Kapsel mit Kurzlabel statt eines Icon-Kreises.
+  const css = readFileSync(new URL('../public/styles/health.css', import.meta.url), 'utf8');
+  for (const { selector, body, at } of eachRule(css)) {
+    if (!/\.health-dose__take-label/.test(selector) || !/display:\s*none/.test(body)) continue;
+    const grenze = at.join(' ').match(/max-width:\s*([\d.]+)rem/);
+    assert.ok(grenze, `${selector}: das Wort faellt nur unter einer Containergrenze`);
+    assert.ok(Number(grenze[1]) * 16 < 324, `${at.join(' ')}: bei 390px (Container 324px) muss „Einnehmen" stehen bleiben`);
+  }
+});
