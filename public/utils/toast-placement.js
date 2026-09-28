@@ -86,9 +86,32 @@ import { PERSISTENT_TOAST_SELECTOR } from './toast-surface.js';
 /** Was als offener Dialog zaehlt: jede Dialogrolle, sichtbar und nicht inert. */
 export const DIALOG_SELECTOR = '[role="dialog"]';
 
-/** Die ausgezeichneten Bedienleisten eines Dialogs. */
+/**
+ * DIE DETAILSPALTE VON LISTE+DETAIL ZAEHLT WIE EIN DIALOG (Re-Critique
+ * 2026-09-28, A3 P1-1). Sie ist keiner - kein Hintergrund, keine Fokusfalle -,
+ * aber ihr Fuss ist eine Bedienleiste wie der eines Dialogs: bei 1280x800
+ * lag der Erinnerungs-Toast auf "Loeschen" im Fuss der Aufgabe, und
+ * `elementFromPoint` auf der Knopfmitte lieferte den Toast. Ein Klick dort
+ * verwarf die Erinnerung, statt zu loeschen - #1160, nur ohne Dialog.
+ *
+ * Unter der Split-Schwelle ist die Spalte `display: none` und faellt von
+ * selbst heraus. Ueber einem MODALEN Dialog zaehlt sie nicht: dann liegt sie
+ * unter seinem Hintergrund und ist ohnehin nicht zu erreichen.
+ *
+ * WAS SIE NICHT ERBT: das Weichen des dauerhaften Toasts (R9 M14). Die
+ * Erinnerung weicht einem Dialog, weil sie dort ueber einem Formular stuende,
+ * in dem gerade jemand schreibt. Die Spalte steht, solange eine Zeile gewaehlt
+ * ist - wiche die Erinnerung ihr, saehe man sie am Desktop fast nie.
+ */
+export const PANE_SELECTOR = '.split-view__detail';
+
+/** Dialog oder Detailspalte: jede Flaeche, deren Leisten der Stapel frei haelt. */
+const SURFACE_SELECTOR = `${DIALOG_SELECTOR}, ${PANE_SELECTOR}`;
+
+/** Die ausgezeichneten Bedienleisten eines Dialogs (und der Detailspalte). */
 export const ACTION_ZONE_SELECTOR =
-  '.modal-panel__header, .modal-panel__footer, .modal-actions, [data-dialog-actions]';
+  '.modal-panel__header, .modal-panel__footer, .modal-actions, [data-dialog-actions], '
+  + '.split-view__detail-head, .split-view__detail-footer';
 
 /**
  * Immer dazu: die Bedienelemente selbst. `summary` ist der Ausloeser einer
@@ -129,13 +152,16 @@ function overlapArea(a, b) {
  *        bleiben muessen, solange daneben Platz ist (die sichtbare untere Navigation)
  * @param {DOMRect|object|null} [input.focused=null] das fokussierte Element im
  *        Dialog; es zaehlt wie eine Bedienleiste (WCAG 2.4.11)
+ * @param {boolean} [input.beside=true] Lage 2 und 3 (ueber und unter dem
+ *        Dialog) erlaubt. Nicht an der Detailspalte: ueber ihr steht der
+ *        Seitenkopf mit seinen Werkzeugen, unter ihr nichts.
  * @returns {null | {top: number, covers: boolean}} null = der Stapel bleibt,
  *          wo er steht; `covers` = auch diese Lage beruehrt eine Leiste
  */
 export function chooseToastPlacement({
   viewport, gap, safeTop = 0, safeBottom = 0,
   stack, dockedHeight, dockedWidth, dockedCenter,
-  primary, dialogs, zones: marked, keepClear = [], focused = null,
+  primary, dialogs, zones: marked, keepClear = [], focused = null, beside = true,
 }) {
   if (!dialogs.some((d) => intersects(stack, d))) return null;
   const zones = focused ? [...marked, focused] : marked;
@@ -157,7 +183,7 @@ export function chooseToastPlacement({
   const result = (top) => ({ top, covers: !clear(top, zones) });
 
   // 2. und 3.: neben dem Dialog, ohne ihn zu beruehren.
-  for (const top of [primary.top - gap - h, primary.bottom + gap]) {
+  for (const top of beside ? [primary.top - gap - h, primary.bottom + gap] : []) {
     if (inView(top) && clear(top, dialogs)) return result(top);
   }
 
@@ -252,6 +278,23 @@ function openDialogs() {
   return [...document.querySelectorAll(DIALOG_SELECTOR)].filter(isOpen);
 }
 
+const isModal = (d) => d.getAttribute('aria-modal') === 'true' || d.classList.contains('modal-panel');
+
+/**
+ * Die offenen Detailspalten - nur, solange kein modaler Dialog offen ist
+ * (dessen Hintergrund deckt sie ab). Siehe PANE_SELECTOR.
+ */
+function openPanes(dialogEls) {
+  if (dialogEls.some(isModal)) return [];
+  return [...document.querySelectorAll(PANE_SELECTOR)].filter(isOpen);
+}
+
+/** Dialoge und Detailspalten - alles, dessen Leisten der Stapel frei haelt. */
+function openSurfaces() {
+  const dialogs = openDialogs();
+  return [...dialogs, ...openPanes(dialogs)];
+}
+
 /**
  * Das sichtbare Rechteck eines Elements: beschnitten auf jeden scrollenden oder
  * schneidenden Vorfahren bis zum Dialog. Ein weggescrollter Knopf ist keine
@@ -293,7 +336,7 @@ function clippedRect(el, dialog) {
 function focusedRect(dialogEls) {
   const active = document.activeElement;
   if (!active || active === document.body || active === document.documentElement) return null;
-  const dialog = active.closest(DIALOG_SELECTOR);
+  const dialog = active.closest(SURFACE_SELECTOR);
   if (!dialog || active === dialog || !dialogEls.includes(dialog)) return null;
   if (active.getClientRects().length === 0) return null;
   return clippedRect(visibleFocusTarget(active), dialog);
@@ -319,7 +362,7 @@ function visibleRects(elements, dialog) {
  */
 function dialogZones(dialog) {
   const own = (selector) => [...dialog.querySelectorAll(selector)]
-    .filter((el) => el.closest(DIALOG_SELECTOR) === dialog);
+    .filter((el) => el.closest(SURFACE_SELECTOR) === dialog);
   const zones = [
     ...visibleRects(own(ACTION_ZONE_SELECTOR), dialog),
     ...visibleRects(own(CONTROL_SELECTOR), dialog),
@@ -428,13 +471,14 @@ export function placeToastStack(stack) {
   const rect = stack.getBoundingClientRect();
   if (rect.height === 0) return null;
 
-  const dialogEls = openDialogs();
+  const realDialogs = openDialogs();
+  const dialogEls = [...realDialogs, ...openPanes(realDialogs)];
   if (!dialogEls.length) return null;
   // Ausgerichtet wird am obersten MODALEN Dialog; eine Datumswahl oder ein
   // Popover in ihm bekommt keine eigene Lage, zaehlt aber als Bedienflaeche.
-  const modal = dialogEls.filter((d) => d.getAttribute('aria-modal') === 'true'
-    || d.classList.contains('modal-panel'));
-  const candidates = modal.length ? modal : dialogEls;
+  // Ohne Dialog richtet sich der Stapel an der Detailspalte aus.
+  const modal = realDialogs.filter(isModal);
+  const candidates = modal.length ? modal : (realDialogs.length ? realDialogs : dialogEls);
   const primaryEl = candidates[candidates.length - 1];
 
   const dialogs = dialogEls.map((d) => d.getBoundingClientRect());
@@ -477,6 +521,7 @@ export function placeToastStack(stack) {
     zones,
     keepClear: uncoveredChrome(),
     focused: focusedRect(dialogEls),
+    beside: realDialogs.length > 0,
   };
   let decision = chooseToastPlacement(input);
   // Kein freier Platz fuer den ganzen Stapel: nur der letzte Toast bleibt sichtbar.
@@ -488,8 +533,12 @@ export function placeToastStack(stack) {
   // Rest des Stapels sucht seine Lage danach ohne ihn, von vorn.
   const persistent = [...stack.querySelectorAll(PERSISTENT_TOAST_SELECTOR)]
     .filter((t) => t.getClientRects().length > 0);
-  const yielded = persistent.length > 0 && persistentToastMustYield({
-    ...input, decision, dockedHeight: stack.getBoundingClientRect().height,
+  // Nur ein echter Dialog laesst ihn weichen, nicht die Detailspalte.
+  const yielded = persistent.length > 0 && realDialogs.length > 0 && persistentToastMustYield({
+    ...input,
+    decision,
+    dockedHeight: stack.getBoundingClientRect().height,
+    dialogs: realDialogs.map((d) => d.getBoundingClientRect()),
   });
   if (yielded) {
     untuck(stack);
@@ -536,7 +585,7 @@ export function watchToastPlacement(stack) {
   const occupied = () => Boolean(stack.querySelector(':scope > :not(:empty)'));
 
   function observeDialogs() {
-    const current = occupied() ? openDialogs() : [];
+    const current = occupied() ? openSurfaces() : [];
     if (current.length === observedDialogs.length && current.every((d, i) => d === observedDialogs[i])) return;
     observedDialogs = current;
     dialogMutations.disconnect();

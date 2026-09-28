@@ -10,7 +10,7 @@ import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModa
 import { attachOverlay } from '/utils/overlay-history.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
-import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
+import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate } from '/utils/ux.js';
 import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation } from '/utils/html.js';
 import { shiftEndDateKey, isEndBeforeStart, weekStartIndex, weekdayOrder,
@@ -40,6 +40,7 @@ import { withChosenPeople } from '/utils/people-picker.js';
 import { othersCanRead } from '/utils/household.js';
 import { wireTablist } from '/utils/tablist.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
+import { filterButtonHtml } from '/utils/filter-sheet.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { wirePeriodSwipe } from '/utils/period-swipe.js';
 import { isNavModuleReadOnly } from '/permissions.js';
@@ -2047,7 +2048,11 @@ export async function render(container, { user }) {
             schwebend (gemessen 2026-09-27: x=1360, unten rechts). Den vollen
             Kopf baut renderToolbar() nach dem Laden und haengt den
             angedockten FAB dabei um. */ ''}
-      <div class="page-toolbar page-toolbar--wrap page-toolbar--period cal-toolbar" id="cal-toolbar">
+      ${/* `page-toolbar--period-title`: die benannte Variante „Zeitraum-Kopf"
+            (DESIGN.md, Kopfregel mobil) - der Titel ist ein navigierbarer
+            Zeitraum, und nur ein so markierter Kopf darf seine Werkzeuge mobil
+            in Zeile 1 neben den Titel stellen (calendar.css, test:mobile-chrome). */ ''}
+      <div class="page-toolbar page-toolbar--wrap page-toolbar--period page-toolbar--period-title cal-toolbar" id="cal-toolbar">
         <h1 class="page-toolbar__title">${t('calendar.title')}</h1>
         <div class="page-toolbar__actions"></div>
       </div>
@@ -2277,22 +2282,30 @@ function toolbarHtml({ filterCount = 0, scheduleWarningHtml = '' } = {}) {
         `).join('')}
       </div>
       <div class="cal-toolbar__tools">
-        <button class="btn btn--icon cal-toolbar__filter-btn ${filterCount ? 'cal-toolbar__filter-btn--active' : ''}"
-                id="cal-filters" aria-label="${filterCount ? esc(t('calendar.filtersActive', { count: filterCount })) : t('calendar.filtersOpen')}"
-                title="${t('calendar.filters')}" aria-haspopup="dialog">
-          <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
-          ${filterCount ? `<span class="cal-toolbar__filter-count" aria-hidden="true">${filterCount}</span>` : ''}
-        </button>
+        ${/* DER GETEILTE FILTERKNOPF (R17 Z1, A1 P2-3): Zahl als Badge wie in
+              jedem Modul (utils/filter-sheet.js), der Name nennt sie. Hier stand
+              eine Kopie mit eigener Badge-Klasse - das Vorbild, von dem der
+              Baustein abgeschrieben war, lief seitdem neben ihm her. */ ''}
+        ${filterButtonHtml({
+          id: 'cal-filters',
+          count: filterCount,
+          labels: {
+            title: t('calendar.filters'),
+            open: t('calendar.filtersOpen'),
+            active: (count) => t('calendar.filtersActive', { count }),
+          },
+          className: 'cal-toolbar__filter-btn',
+        })}
         <!-- KEIN aria-controls im geschlossenen Zustand: die Suchleiste entsteht
              erst beim Öffnen (openCalendarSearch), und ein Verweis auf eine ID, die
              es noch nicht gibt, kündigt einem Screenreader ein Ziel an, das nicht
              existiert. Gesetzt wird es dort, wo die Leiste entsteht, und beim
              Schließen wieder entfernt - dieselbe Regel wie in utils/sub-tabs.js:
              ohne aufgelöstes Ziel bleibt das Attribut weg. -->
-        <button class="btn btn--icon cal-toolbar__search-btn" id="cal-search"
+        <button type="button" class="btn btn--secondary btn--icon cal-toolbar__search-btn" id="cal-search"
                 aria-label="${t('calendar.searchOpen')}" title="${t('calendar.searchOpen')}"
                 aria-expanded="false">
-          <i data-lucide="search" aria-hidden="true"></i>
+          <i data-lucide="search" class="icon-md" aria-hidden="true"></i>
         </button>
         ${viewMenuHtml()}
       </div>
@@ -2321,10 +2334,10 @@ const VIEW_ICONS = { month: 'calendar-days', week: 'calendar-range', day: 'calen
 function viewMenuHtml(current = state.view) {
   const label = t('calendar.viewSwitcher');
   return `
-        <button type="button" class="btn btn--icon cal-toolbar__tools-btn popover-menu__trigger" id="cal-views-menu"
+        <button type="button" class="btn btn--secondary btn--icon cal-toolbar__tools-btn popover-menu__trigger" id="cal-views-menu"
                 popovertarget="cal-views-menu-panel" aria-haspopup="menu" aria-expanded="false"
                 aria-label="${esc(label)}" title="${esc(label)}">
-          <i data-lucide="ellipsis" aria-hidden="true"></i>
+          <i data-lucide="ellipsis" class="icon-md" aria-hidden="true"></i>
         </button>
         <div class="popover-menu" id="cal-views-menu-panel" popover role="menu">
           ${VIEWS.map((v) => `
@@ -4141,11 +4154,13 @@ function renderWeekView(container) {
     if (header) switchToDayView(header.dataset.date);
   });
 
-  container.querySelector('#week-cols').addEventListener('click', (e) => {
+  const weekCols = container.querySelector('#week-cols');
+  weekCols.addEventListener('click', (e) => {
     // S-17: ein Klick GENAU auf den sichtbaren Text eines Schichtblocks
     // (pointer-events:auto, siehe calendar.css) oeffnet die Detailansicht;
-    // der Rest der Spalte (pointer-events:none auf dem Block selbst) bleibt
-    // unveraendert klickbar fuer "neuen Termin anlegen".
+    // der Rest der Spalte (pointer-events:none auf dem Block selbst) gehoert
+    // der leeren Zeit - und die legt per Doppelklick oder langem Druck an
+    // (wireTimeGridCreate), nicht per Einzelklick.
     const blockEl = e.target.closest('.schedule-time-block');
     if (blockEl) {
       const entry = findScheduleEntryByKey(blockEl.dataset.scheduleKey);
@@ -4156,13 +4171,15 @@ function renderWeekView(container) {
     if (evEl) {
       const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
       if (ev) openEventDetail(ev, evEl);
-      return;
     }
-    const col = e.target.closest('[data-date]');
-    if (col) {
-      const time = clickedTime(e, col);
-      openEventModal({ mode: 'create', date: col.dataset.date, time });
-    }
+  });
+  wireTimeGridCreate(weekCols, {
+    scroller: container.querySelector('#week-scroll'),
+    slotAt: (e) => {
+      if (e.target?.closest?.('.schedule-time-block, .week-event')) return null;
+      const col = e.target?.closest?.('[data-date]');
+      return col ? { date: col.dataset.date, time: clickedTime(e, col), col } : null;
+    },
   });
 
   container.querySelector('.allday-row').addEventListener('click', (e) => {
@@ -4238,6 +4255,140 @@ function handleGridKeydown(e) {
     const ev = state.events.find((x) => x.id === parseInt(target.dataset.id, 10));
     if (ev) openEventDetail(ev, target);
   }
+}
+
+/**
+ * Der Hinweis im leeren Tag nennt die Geste, die hier anlegt (Z2): am
+ * primaeren Grobzeiger das lange Druecken, sonst den Doppelklick. Hier stand
+ * „Tippe auf eine Uhrzeit" - das Versprechen des Einzeltipps, der seit R17
+ * nichts mehr anlegt.
+ */
+function dayEmptyHintText() {
+  const coarse = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    && window.matchMedia('(pointer: coarse)').matches;
+  return t(coarse ? 'calendar.dayEmptyHintTouch' : 'calendar.dayEmptyHintPointer');
+}
+
+const GRID_PRESS_MS = 500;
+const GRID_PRESS_SLOP = 10;
+
+/**
+ * ANLEGEN IM ZEITRASTER NACH APPLE-MUSTER (R17 Z2, Re-Critique 2026-09-28,
+ * A2 P1-1 und die Frage dahinter).
+ *
+ * Bis hier legte JEDER Klick auf leere Zeit einen Termin an. Gemessen oeffnete
+ * damit der natuerlichste Weg, eine Leseansicht zu schliessen - daneben
+ * klicken -, das Formular „Neuer Termin" (R16 fing das nur fuer den offenen
+ * Popover ab, detail-view.js). Apples Kalender trennt Lesen und Anlegen: am
+ * Mac legt ein DOPPELKLICK auf leere Zeit an, am iPhone ein LANGES DRUECKEN.
+ * Ein Einzelklick oder Tipp tut nichts, ausser Offenes zu schliessen. Der
+ * sichtbare Weg bleibt „+ Termin" (FAB bzw. angedockte Pille) und das Kuerzel n.
+ *
+ * WELCHE GESTE, ENTSCHEIDET DER ZEIGER DES KONTAKTS, nicht eine Media Query:
+ * ein Touch-Laptop hat beide, und wer mit der Maus doppelklickt, meint etwas
+ * anderes als wer mit dem Finger doppeltippt. Maus -> `dblclick`; Finger und
+ * Stift -> 500ms Halten (dieselbe Schwelle und derselbe 10px-Spielraum wie der
+ * Long-Press der Aufgabenzeilen, tasks.js). Der Doppeltipp legt nicht an: er
+ * ist auf dem Telefon Zoom oder Versehen, und zwei Gesten fuer eine Absicht
+ * lernt niemand.
+ *
+ * ABBRUCH, WENN DIE FLAECHE ETWAS ANDERES WILL: mehr als 10px Bewegung (das
+ * waagerechte Wischen zwischen Zeitraeumen, utils/period-swipe.js), ein
+ * Scroll des Rasters oder `pointercancel` (der Browser hat die Geste als
+ * Scrollen uebernommen) beenden den Druck. Waehrend des Drucks unterdrueckt
+ * die Flaeche das Kontextmenue; Textauswahl und iOS-Callout nimmt ihr
+ * calendar.css.
+ *
+ * ANGELEGT WIRD BEIM LOSLASSEN, und das `touchend` wird verworfen: das
+ * Formular geht sonst unter dem Finger auf, und der Klick, den der Browser dem
+ * Loslassen nachschickt, landete auf dem Hintergrund des neuen Blatts - der
+ * schliesst es (components/modal.js).
+ *
+ * WAEHREND DES DRUCKS STEHT EIN PLATZHALTER DER KOMMENDEN STARTZEIT in der
+ * Spalte (`.cal-press-ghost`, calendar.css): er blendet ueber die Haltezeit
+ * ein, wird an der Schwelle scharf (`is-armed`) und verschwindet mit jedem
+ * Abbruch und beim Anlegen. Die Vibration allein war kein Signal - iOS
+ * vibriert fuer Webseiten nicht, dort sah man bis zum Loslassen nichts.
+ *
+ * @param {HTMLElement} surface  Spalten-Traeger (Woche) bzw. Tagesspalte
+ * @param {object} opts
+ * @param {(e: Event) => ({date: string, time: string, col?: HTMLElement}|null)} opts.slotAt
+ *   leere Zeit unter dem Ereignis, `null` auf einem Termin oder Block; `col`
+ *   ist die Spalte, in die der Platzhalter des Drucks gehoert
+ * @param {HTMLElement|null} [opts.scroller]  der Scrollport des Rasters
+ * @param {(slot: {date: string, time: string}) => void} [opts.onCreate]
+ */
+
+function wireTimeGridCreate(surface, {
+  slotAt,
+  scroller = null,
+  onCreate = (slot) => openEventModal({ mode: 'create', date: slot.date, time: slot.time }),
+} = {}) {
+  if (!surface) return;
+  let press = null;
+  let lastPointer = 'mouse';
+  let released = false;
+  const clear = () => {
+    if (press?.timer) clearTimeout(press.timer);
+    press?.ghost?.remove();
+    press = null;
+  };
+  const ghostFor = (slot) => {
+    const col = slot.col || surface;
+    if (typeof document === 'undefined' || typeof col?.append !== 'function') return null;
+    const [hour, minute] = slot.time.split(':').map(Number);
+    const ghost = document.createElement('div');
+    ghost.className = 'cal-press-ghost';
+    ghost.setAttribute('aria-hidden', 'true');
+    ghost.style.top = hourOffset(hour * 60 + minute);
+    ghost.style.height = hourOffset(60);
+    ghost.style.setProperty('--cal-press-ms', `${GRID_PRESS_MS}ms`);
+    ghost.textContent = formatTime(slot.time);
+    col.append(ghost);
+    return ghost;
+  };
+
+  surface.addEventListener('pointerdown', (e) => {
+    clear();
+    released = false;
+    lastPointer = e.pointerType || 'mouse';
+    if (lastPointer === 'mouse' || e.isPrimary === false) return;
+    const slot = slotAt(e);
+    if (!slot) return;
+    press = { slot, x: e.clientX, y: e.clientY, armed: false, timer: null, ghost: ghostFor(slot) };
+    press.timer = setTimeout(() => {
+      if (!press) return;
+      press.timer = null;
+      press.armed = true;
+      press.ghost?.classList.add('is-armed');
+      vibrate(15);
+    }, GRID_PRESS_MS);
+  });
+  surface.addEventListener('pointermove', (e) => {
+    if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > GRID_PRESS_SLOP) clear();
+  });
+  surface.addEventListener('pointerup', () => {
+    const slot = press?.armed ? press.slot : null;
+    clear();
+    if (!slot) return;
+    released = true;
+    onCreate(slot);
+  });
+  surface.addEventListener('touchend', (e) => {
+    if (!released) return;
+    released = false;
+    if (e.cancelable !== false) e.preventDefault();
+  }, { passive: false });
+  surface.addEventListener('pointercancel', clear);
+  scroller?.addEventListener('scroll', clear, { passive: true });
+  surface.addEventListener('contextmenu', (e) => {
+    if (press) e.preventDefault();
+  });
+  surface.addEventListener('dblclick', (e) => {
+    if (lastPointer !== 'mouse') return;
+    const slot = slotAt(e);
+    if (slot) onCreate(slot);
+  });
 }
 
 /**
@@ -4659,7 +4810,7 @@ function renderDayView(container) {
               ...scheduleBlocks.map((entry) => ({ range: scheduleBlockTimeRange(entry), html: () => renderScheduleTimeBlock(entry, 'day-event', scheduleLayout.get(entry)) })),
               ...timed.map((ev) => ({ range: timeRangeForEvent(ev, state.cursor), html: () => renderDayEvent(ev, layout.get(ev), state.cursor) })),
             ])}
-            ${dayEvs.length === 0 && schedule.length === 0 ? `<div class="day-view__empty-hint" style="top:calc(${hourOffset(state.cursor === state.today ? nowMinutes() : 9 * 60)} + 16px)">${t('calendar.dayEmptyHint')}</div>` : ''}
+            ${dayEvs.length === 0 && schedule.length === 0 ? `<div class="day-view__empty-hint" style="top:calc(${hourOffset(state.cursor === state.today ? nowMinutes() : 9 * 60)} + 16px)">${dayEmptyHintText()}</div>` : ''}
           </div>
           ${state.cursor === state.today ? `
             <div class="day-view__now-line" aria-hidden="true" style="top:${hourOffset(nowMinutes())};"></div>
@@ -4696,7 +4847,8 @@ function renderDayView(container) {
     }
   });
 
-  container.querySelector('#day-col').addEventListener('click', (e) => {
+  const dayCol = container.querySelector('#day-col');
+  dayCol.addEventListener('click', (e) => {
     // S-17: ein Klick GENAU auf den sichtbaren Text eines Schichtblocks
     // oeffnet die Detailansicht - siehe der gleiche Kommentar in renderWeekView().
     const blockEl = e.target.closest('.schedule-time-block');
@@ -4709,10 +4861,15 @@ function renderDayView(container) {
     if (evEl) {
       const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
       if (ev) openEventDetail(ev, evEl);
-      return;
     }
-    const time = clickedTime(e, e.currentTarget);
-    openEventModal({ mode: 'create', date: state.cursor, time });
+  });
+  const day = state.cursor;
+  wireTimeGridCreate(dayCol, {
+    scroller: container.querySelector('#day-scroll'),
+    slotAt: (e) => {
+      if (e.target?.closest?.('.schedule-time-block, .day-event')) return null;
+      return { date: day, time: clickedTime(e, dayCol), col: dayCol };
+    },
   });
 
   container.querySelector('.day-view').addEventListener('keydown', handleGridKeydown);
@@ -6896,8 +7053,9 @@ function wireVisibilityWarning(panel, selectSel, msName, warnSel) {
 
 function openEventModal({ mode, event = null, date = null, reminder = null, time = null }) {
   // DER LETZTE RIEGEL VOR DEM FORMULAR. Es gibt sieben Wege hierher - Kopfknopf,
-  // FAB, Klick in eine leere Stunde der Wochen- und der Tagesansicht, zwei
-  // Leerzustands-CTAs und der Bearbeiten-Weg der Detailansicht. Sie alle
+  // FAB, Doppelklick oder langer Druck in eine leere Stunde der Wochen- und der
+  // Tagesansicht (wireTimeGridCreate), zwei Leerzustands-CTAs und der
+  // Bearbeiten-Weg der Detailansicht. Sie alle
   // einzeln zu sperren waere sechs Chancen, eine zu vergessen; der siebte Weg,
   // der morgen dazukommt, findet den Riegel hier ohnehin.
   if (readOnly()) return;

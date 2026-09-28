@@ -427,32 +427,60 @@
   --_toast-danger-text:  var(--color-text-on-accent);
   --toast-danger-text:   var(--_toast-danger-text);
 
-  /* DIE GEFAHR AUF SHELL-MATERIAL - und sie läuft der Themenlage ENTGEGEN.
+  /* DAS SHELL-MATERIAL: Toast und Sammelaktions-Pille (eine Schicht, ein
+   * Material - Entscheidung vom 2026-08-12, glass.css Abschnitt 9).
    *
-   * Der Toast und die Sammelaktions-Pille stehen auf --neutral-800 mit
-   * --neutral-50 als Schrift, und dieses Paar dreht sich mit dem Thema: im
-   * hellen Modus ist --neutral-800 dunkelbraun (#2D2A25), im dunklen ist es
-   * hell (#E7E2DA). Ein `var(--color-danger)` als Tinte wäre deshalb genau
-   * falschherum - gerechnet #D70015 auf #2D2A25 = 2,69:1.
+   * ES IST IN BEIDEN THEMES DUNKEL (Re-Critique 2026-09-28, A1 P2-2). Bis
+   * dahin stand es auf --neutral-800 mit --neutral-50 als Schrift, und dieses
+   * Paar dreht sich mit dem Thema: im Dunkelmodus wurde --neutral-800 hell
+   * (#E7E2DA). Der leiseste Hinweis der App ("Gespeichert") war dort die
+   * hellste Flaeche im Bild, gemessen rgba(231,226,218,.9) auf rgb(25,24,22).
+   * Apple fuehrt Toasts und HUDs im Dunkeln als gehobenes dunkles Material mit
+   * heller Schrift. Dunkel steht es deshalb auf --color-surface-raised (#37332E,
+   * die hoechste Flaechenstufe - nie heller, test:toast-placement), hell
+   * bleibt es, was es war.
    *
-   * UND DER GRUND IST NICHT --neutral-800, SONDERN DAS, WAS DARAUS WIRD.
+   * Gerechnet mit der 90-%-Deckung aus glass.css, also gegen den ECHTEN Grund
+   * (Buehne / Karte / reines Weiss darunter) und gegen den opaken Token:
+   *   hell   #FBFAF7 auf #413E39 = 10,2:1  |  auf #2D2A25 = 13,7:1
+   *   dunkel #F5F3ED auf #34302C = 11,8:1  |  auf #36322D = 11,5:1
+   *          auf #4B4743 (Weiss darunter) = 8,3:1  |  opak #37332E = 11,3:1
+   * Die Zweitschrift der Pille (`.list-bulkbar__detail`) dunkel #CBC5BC:
+   *   7,6 / 7,4 / 5,4 / 7,3:1. */
+  --_toast-bg:             var(--_neutral-800);
+  --toast-bg:              var(--_toast-bg);
+  --_toast-text:           var(--_neutral-50);
+  --toast-text:            var(--_toast-text);
+  --_toast-text-secondary: var(--_neutral-300);
+  --toast-text-secondary:  var(--_toast-text-secondary);
+
+  /* DIE GEFAHR AUF SHELL-MATERIAL.
+   *
+   * Das Material ist in beiden Themes dunkel (oben), die semantischen Farben
+   * drehen sich aber mit dem Thema: `var(--color-danger)` waere als Tinte hier
+   * falsch - gerechnet #D70015 auf #2D2A25 = 2,69:1. Die Gefahr bekommt
+   * deshalb eine eigene, helle Tinte, die in BEIDEN Themes gilt. Bis R16 lief
+   * sie der Themenlage entgegen (dunkel #9B000F auf dem damals hellen Grund);
+   * mit dem dunklen Material ist diese Gegendrehung entfallen.
+   *
+   * UND DER GRUND IST NICHT DER TOKEN, SONDERN DAS, WAS DARAUS WIRD.
    * glass.css mischt die Fläche mit 90 % Deckung (`color-mix(… 90%,
    * transparent)` plus backdrop-filter), also scheint ein Zehntel der Seite
-   * durch: komponiert steht dort #413E39 hell und #D2CEC6 dunkel. Gegen den
-   * puren Token gerechnet hielt #FF6961 mit 5,13:1 - gegen den echten Grund
-   * sind es 3,78:1. Genau diese Differenz ist der Grund, aus dem die
-   * Pro-Hintergrund-Regel den ECHTEN Hintergrund meint und nicht den
+   * durch. Gegen den puren Token gerechnet hielt #FF6961 mit 5,13:1 - gegen
+   * den echten Grund sind es 3,78:1. Genau diese Differenz ist der Grund, aus
+   * dem die Pro-Hintergrund-Regel den ECHTEN Hintergrund meint und nicht den
    * deklarierten.
    *
    * Gerechnet gegen beide Fassungen, weil beide vorkommen (ohne
    * backdrop-filter-Unterstützung bleibt der opake Token stehen):
-   *   hell   #FF8A80 auf #413E39 = 4,67:1  |  auf #2D2A25 = 6,35:1
-   *   dunkel #9B000F auf #D2CEC6 = 5,58:1  |  auf #E7E2DA = 6,79:1
+   *   hell   #FF9A91 auf #413E39 = 4,67:1  |  auf #2D2A25 = 6,35:1
+   *   dunkel #FF9A91 auf #34302C = 6,41:1  |  auf #4B4743 = 4,51:1
+   *          opak #37332E = 6,14:1
    *
    * WARUM NICHT ÜBER --color-danger-ink: das ist die Tinte auf der eigenen
-   * hellen Füllung (--color-danger-light) und dreht in dieselbe Richtung wie
-   * der Rest. Zwei Tokens, die im hellen Modus verwandt aussehen, sind hier
-   * kein Duplikat, sondern zwei Aussagen, die im dunklen auseinanderlaufen. */
+   * hellen Füllung (--color-danger-light) und dreht mit dem Thema. Zwei
+   * Tokens, die im hellen Modus verwandt aussehen, sind hier kein Duplikat,
+   * sondern zwei Aussagen, die im dunklen auseinanderlaufen. */
   --_shell-danger-ink:   #FF9A91;
   --shell-danger-ink:    var(--_shell-danger-ink);
 
@@ -460,10 +488,11 @@
    * Erfolgs-Toast war eine gruene Vollflaeche - 118 Aufrufe, jeder ein kleiner
    * Alarm. Er steht jetzt auf demselben Glas wie jeder Toast; das Gruen
    * wandert ins Haekchen. Es ist ein Icon, also 3:1 (WCAG 1.4.11), und es
-   * laeuft wie die Gefahr der Themenlage entgegen. Gegen den komponierten
-   * Glasgrund und den opaken Token:
+   * gilt wie die Gefahr in beiden Themes, weil das Material in beiden dunkel
+   * ist. Gegen den komponierten Glasgrund und den opaken Token:
    *   hell   #6ADE87 auf #413E39 = 6,29:1  |  auf #2D2A25 = 8,45:1
-   *   dunkel #0B6B2B auf #D2CEC6 = 4,25:1  |  auf #E7E2DA = 5,17:1 */
+   *   dunkel #6ADE87 auf #34302C = 7,73:1  |  auf #4B4743 = 5,44:1
+   *          opak #37332E = 7,41:1 */
   --_shell-success-ink:  #6ADE87;
   --shell-success-ink:   var(--_shell-success-ink);
 
@@ -1968,12 +1997,12 @@
     --_toast-warning-text: #2B1A00;   /* auf #FF9F0A */
     --_toast-danger-text:  #330606;   /* auf #FF6961 */
 
-    /* Gegendrehung: --neutral-800 ist hier HELL (#E7E2DA), also braucht die
-     * Gefahr darauf das tiefe Rot statt des vividen. Gegen den komponierten
-     * Glasgrund #D2CEC6: 5,58:1. --color-danger-hover (#B80012) hielt dort nur
-     * 4,39:1 und ist deshalb NICHT der Wert. */
-    --_shell-danger-ink:   #9B000F;
-    --_shell-success-ink:  #0B6B2B;
+    /* Shell-Material: gehobenes dunkles Glas statt des hellen --neutral-800
+     * (Begruendung und Messwerte im :root-Block). Die Shell-Tinten brauchen
+     * hier keinen eigenen Wert mehr - das Material dreht sich nicht mit. */
+    --_toast-bg:             var(--_color-surface-raised);
+    --_toast-text:           var(--_neutral-900);
+    --_toast-text-secondary: var(--_neutral-700);
 
     /* Dunkle Tinte auf den vividen Hell-Füllungen des Dark Mode (FAB, Badges, aktive Chips) */
     --_color-ink-on-vivid: #0A0A0C;
@@ -2210,9 +2239,10 @@
     --_toast-warning-text: #2B1A00;
     --_toast-danger-text:  #330606;
 
-    /* Gegendrehung, siehe den Zwilling im prefers-color-scheme-Block. */
-    --_shell-danger-ink:   #9B000F;
-    --_shell-success-ink:  #0B6B2B;
+    /* Shell-Material, siehe den Zwilling im prefers-color-scheme-Block. */
+    --_toast-bg:             var(--_color-surface-raised);
+    --_toast-text:           var(--_neutral-900);
+    --_toast-text-secondary: var(--_neutral-700);
 
     /* Dunkle Tinte auf den vividen Hell-Füllungen des Dark Mode (FAB, Badges, aktive Chips) */
     --_color-ink-on-vivid: #0A0A0C;

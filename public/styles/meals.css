@@ -996,10 +996,22 @@
 }
 
 .meal-modal__autocomplete-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   cursor: pointer;
   font-size: var(--text-sm);
   transition: background-color var(--transition-fast);
+}
+
+/* Ein gespeichertes Rezept traegt seine Art als Wort am Ende: es bringt
+ * Zutaten mit, ein frueherer Mahlzeitname nicht (Re-Kritik 2026-09-28). */
+.meal-modal__autocomplete-kind {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
 }
 
 .meal-modal__autocomplete-item:hover,
@@ -1379,9 +1391,37 @@
 
   .recipe-sidebar__card {
     display: grid;
-    gap: var(--space-2);
-    padding: var(--space-3);
     cursor: grab;
+  }
+
+  /* Der Knopf fuellt die Karte (Re-Kritik 2026-09-28, A4 P1-1): Klick, Tipp
+   * oder Enter plant das Rezept ein, Ziehen am `article` darum bleibt. Das
+   * Polster wandert deshalb von der Karte in den Knopf - sonst laege ein
+   * toter Rand um die Trefferflaeche. */
+  .recipe-sidebar__card-open {
+    display: grid;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: var(--target-md);
+    padding: var(--space-3);
+    border: none;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: start;
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+  }
+
+  @media (hover: hover) {
+    .recipe-sidebar__card-open:hover {
+      background-color: var(--color-surface-2);
+    }
+  }
+
+  .recipe-sidebar__card-open:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset-inset);
   }
 
   /* Die Trennlinie gehoert der ZWEITEN Zeile, nicht jeder: so hat die erste

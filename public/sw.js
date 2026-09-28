@@ -187,6 +187,7 @@ const APP_SHELL = [
   '/utils/page-lifecycle.js',
   '/utils/page-search.js',
   '/utils/search-sections.js',
+  '/utils/palette-combobox.js',
   '/utils/pantry-locations.js',
   '/utils/pantry-status.js',
   '/utils/pantry-units.js',

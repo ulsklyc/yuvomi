@@ -3,7 +3,7 @@ import { moduleAccentVar } from '/utils/module-accent.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { createRetryState } from './components.js';
-import { clearLeafEdits, confirmLeafExit, watchLeafForms } from './dirty-guard.js';
+import { watchLeafForms } from './dirty-guard.js';
 import { KITCHEN_CHILD_IDS } from './module-order.js';
 import { resetPreferencesCache } from './preferences-cache.js';
 import {
@@ -85,7 +85,7 @@ function hydrateIcons(container) {
 }
 
 function bindSpaNavigation(link, href) {
-  link.addEventListener('click', async (event) => {
+  link.addEventListener('click', (event) => {
     if (
       event.defaultPrevented
       || event.button !== 0
@@ -98,9 +98,11 @@ function bindSpaNavigation(link, href) {
       return;
     }
     event.preventDefault();
-    // Alle Wege aus einem Blatt heraus laufen ueber diese Links: Seitenleiste,
-    // Suchtreffer, Breadcrumb, Statuszeile und der Zurueck-Link.
-    if (!(await confirmLeafExit())) return;
+    // Seitenleiste, Suchtreffer, Breadcrumb, Statuszeile und der Zurueck-Link
+    // enden in navigate() - und dort fragt der Verlassen-Schutz, bei dem sich
+    // der Blatt-Guard anmeldet, solange etwas offen ist (dirty-guard.js). EINE
+    // Stelle fuer alle Wege, auch Browser-Zurueck und Befehlspalette, die an
+    // diesen Links nie vorbeikamen (R15 A7 P1-1).
     window.yuvomi.navigate(href);
   });
 }

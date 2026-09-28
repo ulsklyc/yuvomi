@@ -1633,6 +1633,29 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   outline-offset: var(--focus-ring-offset-inset);
 }
 
+/* DIE MARKIERTE ZEILE DER COMBOBOX (Re-Critique 2026-09-28, A1 P1-1). Der
+ * Fokus bleibt im Suchfeld; welche Zeile Enter oeffnet, zeigt
+ * `aria-selected` (utils/palette-combobox.js). Dieselbe Flaeche wie die
+ * ausgewaehlte Zeile von Liste+Detail und die Aktiv-Pille der Seitenleiste -
+ * "das ist gemeint". Im Kontrastmodus traegt ein Rahmen die Markierung, weil
+ * dort keine Hintergrundfarbe durchkommt. */
+.search-result[aria-selected="true"],
+.search-scope[aria-selected="true"] {
+  background-color: color-mix(in srgb, var(--color-accent) var(--tint-state), var(--color-surface));
+}
+
+.search-scope[aria-selected="true"] {
+  border-color: var(--color-accent);
+}
+
+@media (forced-colors: active) {
+  .search-result[aria-selected="true"],
+  .search-scope[aria-selected="true"] {
+    outline: var(--focus-ring-width) solid Highlight;
+    outline-offset: var(--focus-ring-offset-inset);
+  }
+}
+
 /* Scope-Launcher im Leerzustand: „Direkt öffnen"-Kacheln, die zugleich zeigen,
  * was durchsucht wird, und ins jeweilige Modul springen (Critique P1). */
 .search-scopes {
@@ -2944,6 +2967,22 @@ html.fab-anim-done .page-fab {
   border-block-end: 1px solid var(--color-border-subtle);
 }
 
+/* DER INHALT UNTER DEM KOPF IST EINE EIGENE EBENE (Re-Critique 2026-09-28,
+ * A6 P1-1). Der Kopf klebt mit `z-index: 1`, und Kennzahlkarten
+ * (`.metric-card__value`, panel.css) oder die Ziffern des Zykluskalenders
+ * (`.cycle-cal__num`, health.css) heben sich mit demselben `z-index: 1` ueber
+ * ihre eigene Flaeche. Weil sie spaeter im DOM stehen, gewannen sie: beim
+ * Scrollen standen "ST" und "Gut" im Kopf "Vitalwerte", die Ziffern 14-20
+ * ueber "Zyklus". Ein hoeherer Wert am Kopf verschoebe den Streit nur zur
+ * naechsten Zahl. `isolation: isolate` an jedem Geschwister NACH dem Kopf
+ * schliesst jede Ebene darin in ihre eigene Stapelung ein - die ganze
+ * Stapelung liegt dann auf Ebene 0 unter dem Kopf, gleich welche Zahl ein
+ * Modul darin setzt. Fuer jede Split-Detailspalte, nicht nur die Gesundheit:
+ * Aufgaben, Kontakte und Rezepte setzen denselben Kopf vor ihren Inhalt. */
+.split-view__detail-head ~ * {
+  isolation: isolate;
+}
+
 .split-view__detail-title {
   flex: 1 1 auto;
   min-width: 0;
@@ -3556,6 +3595,60 @@ html.fab-anim-done .page-fab {
   }
 }
 
+/* DIE FALTZEILE (R17 K1, Re-Critique 2026-09-28 A4 P2-4 / A8 P3-2).
+ *
+ * Unter der Kuechen-Leiste traegt der Kopf von Rezepte und Vorrat mobil nur
+ * Werkzeuge - Lupe, "..." -, und kostete dafuer 65px ueber der Liste.
+ * `wireCollapsingHeader` (utils/ux.js) erkennt eine solche Zeile
+ * (`--fold-row`: Gruppen-Variante, einzeilig, ohne Titel, im Center-Slot
+ * nur die Suche) und haengt sie an dieselbe Schwelle und Klasse wie den Kopf
+ * der gedeckelten Module: angedockt (`is-collapsed`) gibt sie ihre Hoehe
+ * frei, zurueck oben kommt sie wieder. Mahlzeiten und Einkauf benennen in
+ * ihrer Zeile etwas (Woche, Liste) und falten nicht.
+ *
+ * WIE SIE FALTET: nicht ueber ihre Hoehe. Eine Hoehe, die nach `auto`
+ * zurueckgleiten soll, braucht `interpolate-size`, und das kann Safari nicht -
+ * auf dem iPhone waere es ein Sprung. Stattdessen bleibt die Box gleich
+ * gross: der negative Rand unten zieht die Liste um die gemessene Hoehe
+ * (`--fold-row-h`, ohne die Linie) nach oben, und dieselbe Strecke schiebt
+ * die Zeile hinter die Leiste, wo die Seite (overflow hidden) sie abschneidet.
+ * Beides sind Laengen und gleiten ueberall. Uebrig bleibt ihre Linie, genau
+ * unter der Leiste - die Kante des angedockten Kopfes. Der ResizeObserver des
+ * Kopfes sieht keinen Groessenwechsel, also auch keine neue Messung.
+ *
+ * WANN SIE STEHEN BLEIBT: mit Fokus darin (wer per Tab hineinkommt, bekommt
+ * die Zeile zurueck), mit einem Suchbegriff und mit offenem Werkzeugmenue -
+ * dieselben Ausnahmen wie die Suche der gedeckelten Koepfe oben. */
+@media (max-width: 1023px) {
+  .page-toolbar--fold-row {
+    transition:
+      margin-block-end var(--duration-lg) var(--ease-in-out),
+      translate var(--duration-lg) var(--ease-in-out);
+  }
+
+  .page-toolbar--fold-row > * {
+    transition: opacity var(--duration-md) var(--ease-out);
+  }
+
+  .page-toolbar--fold-row.is-collapsed:not(:focus-within):not(:has(input:not(:placeholder-shown))):not(:has(:popover-open)) {
+    margin-block-end: calc(-1 * var(--fold-row-h, 0px));
+    translate: 0 calc(-1 * var(--fold-row-h, 0px));
+    pointer-events: none;
+  }
+
+  /* Die Blende gehoert dem Inhalt, nicht der Zeile: deren Linie bleibt. */
+  .page-toolbar--fold-row.is-collapsed:not(:focus-within):not(:has(input:not(:placeholder-shown))):not(:has(:popover-open)) > * {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 1023px) and (prefers-reduced-motion: reduce) {
+  .page-toolbar--fold-row,
+  .page-toolbar--fold-row > * {
+    transition: none;
+  }
+}
+
 /* Mobil liegen Titel, Zeitraum und Bar-Zeile mit halbem Zeilenabstand
  * uebereinander: Zeitraum und Tab-Leiste bringen ihre Luft in 48px-
  * Trefferflaechen mit, der Large Title in seiner Zeilenhoehe. Selektorform der
@@ -3905,12 +3998,11 @@ html.fab-anim-done .page-fab {
  * darunter „Liste löschen" für die Liste des ganzen Haushalts (Critique
  * 2026-07-30).
  *
- * Diese Grammatik existiert im Repo bereits zweimal privat:
- * `.contact-more-menu__panel` + `.contact-menu-item` (contacts.css) und
- * `.documents-context-menu` + `__item` (documents.css). Beide sind bis auf die
- * Klassennamen deckungsgleich mit dem hier. Sie sind bewusst nicht mitmigriert -
- * der Auftrag war die Küche, und zwei fremde Module umzustellen ist ein eigener
- * Schritt. Wer ihn geht, löscht dort rund 60 Zeilen und ändert hier nichts.
+ * Diese Grammatik existierte im Repo zweimal privat. Das Zeilenmenü der
+ * Kontakte ist seit R16 (Re-Critique 2026-09-28) hierher umgezogen; übrig ist
+ * `.documents-context-menu` + `__item` (documents.css), bis auf die
+ * Klassennamen deckungsgleich mit dem hier. Wer es nachzieht, löscht dort die
+ * private Kopie und ändert hier nichts.
  * -------------------------------------------------------- */
 
 /* `display: none` als Grundzustand, `flex` erst bei :popover-open: das UA-Blatt
@@ -5593,6 +5685,20 @@ p.field-hint--warn[hidden] {
   flex-wrap: wrap;
 }
 
+/* LOESCHEN STEHT AM ANFANG, ABBRECHEN UND PRIMAER AM ENDE (Re-Critique
+ * 2026-09-28, A2 P1-2). Der Fuss ist rechtsbuendig; wer Loeschen nicht selbst
+ * wegschob, stand mit ihm neben Abbrechen - im Termindialog, dem Vorbild des
+ * Kanons ("[Loeschen links] ... [Abbrechen] [Primaer]", DESIGN.md), 12px
+ * daneben (1440: x=157 und 284). Zwanzig Module schrieben dafuer je ein
+ * `style="margin-inline-end:auto"` an ihren Knopf, drei vergassen es. Jetzt
+ * EINE Regel am Knopf, den modal.js ohnehin erkennt (`decorateFooterDelete`
+ * setzt `.modal-panel__delete`), und an der Gruppe, in der er steht (Konto:
+ * Loeschen plus Archivieren). `inline-end` spiegelt sich in RTL von selbst. */
+.modal-panel__footer > .modal-panel__delete,
+.modal-panel__footer > :has(> .modal-panel__delete) {
+  margin-inline-end: auto;
+}
+
 /* Fußzeile INNERHALB des scrollenden Bodys (kein direktes Panel-Kind): dort
  * trägt der Modal-Rahmen die Trennlinie schon, eine zweite säße mitten im
  * Inhalt. Ersetzt 20 gleichlautende Inline-Styles, die diese Neutralisierung
@@ -7017,8 +7123,8 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  background-color: var(--neutral-800);
-  color: var(--neutral-50);
+  background-color: var(--toast-bg);
+  color: var(--toast-text);
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
@@ -7068,10 +7174,11 @@ textarea::placeholder {
  * dem dunklen Shell-Material mit heller. Genau die Verwechslung, die den Toast
  * im Reduced-Transparency-Fallback des Filter-Chips auf 1,08:1 gebracht hat -
  * zwei Selektoren in einer Regel behaupten denselben Grund darunter.
- * `currentColor 15%` rechnet hier deshalb gegen die Schrift der Kapsel, und die
- * dreht sich mit dem Thema: --neutral-800 ist dunkel im hellen Modus und hell
- * im dunklen, --neutral-50 umgekehrt. Am gerenderten Pixel gemessen (320px,
- * die einzige Breite, auf der die Marke steht): 10,04:1 hell, 12,54:1 dunkel. */
+ * `currentColor 15%` rechnet hier deshalb gegen die Schrift der Kapsel
+ * (--toast-text, hell auf dem in beiden Themes dunklen --toast-bg). Am
+ * gerenderten Pixel gemessen (320px, die einzige Breite, auf der die Marke
+ * steht): 10,04:1 hell; dunkel gemessen vor R16, als das Material dort noch
+ * hell war (12,54:1). */
 .list-bulkbar__action-count {
   display: none;
   margin-inline-start: var(--space-1);
@@ -7093,9 +7200,8 @@ textarea::placeholder {
  * die Tinte, und mit `currentColor` an der Kante wechselt die Kante mit.
  *
  * --shell-danger-ink und nicht --color-danger: der Grund unter dieser Kapsel
- * dreht sich mit dem Thema (--neutral-800 ist hell im Dunkelmodus), die
- * semantischen Farben drehen in dieselbe Richtung. Begründung und Messwerte am
- * Token in tokens.css.
+ * (--toast-bg) ist in beiden Themes dunkel, die semantischen Farben drehen
+ * sich aber mit dem Thema. Begründung und Messwerte am Token in tokens.css.
  *
  * SIE IST DER ZWEITE KANAL, NICHT DER ERSTE. Der erste ist das Wort auf der
  * Kapsel, der dritte die Rückfrage dahinter - Farbe allein trägt hier keine
@@ -7216,8 +7322,8 @@ textarea::placeholder {
    * Scroll-Ende rechnet mit diesem Wert, also muss die Pille ihn halten. */
   min-height: var(--bulk-pill-height);
   box-sizing: border-box;
-  background-color: var(--neutral-800);
-  color: var(--neutral-50);
+  background-color: var(--toast-bg);
+  color: var(--toast-text);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-lg);
   pointer-events: auto;
@@ -7277,7 +7383,7 @@ textarea::placeholder {
   flex: 1 0 100%;
   font-size: var(--text-xs);
   line-height: var(--line-height-snug);
-  color: var(--neutral-300);
+  color: var(--toast-text-secondary);
   white-space: normal;
 }
 

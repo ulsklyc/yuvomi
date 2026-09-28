@@ -697,9 +697,29 @@ function openAsPopover(opts) {
   };
 
   const onOutsideClick = (e) => {
+    if (popover.isConnected && popover.contains(e.target)) return;
+    // DER KLICK DANEBEN SCHLIESST NUR (Re-Kritik 2026-09-28, P1). Er lief
+    // weiter zu dem, was darunter lag: im Kalender war das die leere
+    // Wochenspalte, und wer die Leseansicht wegklickte, bekam das Formular
+    // "Neuer Termin". Der Listener sitzt deshalb in der CAPTURE-Phase am
+    // Dokument, also vor jedem Handler der Seite, und schluckt den Klick -
+    // samt Standardaktion, sonst folgte ein Link darunter trotzdem. Angelegt
+    // wird im Kalender seit R17 (Z2) ohnehin nur per Doppelklick oder langem
+    // Druck, wie bei Apple Kalender (wireTimeGridCreate) - der Riegel hier
+    // bleibt fuer jede andere Flaeche unter dem Popover. Ausgenommen sind nur
+    // Klicks in einer ANDEREN Ebene (Dialog, Rueckfrage, Toast): sie liegen
+    // ueber dem Popover, und ihr Knopf muss tun, was er sagt. Ebenso
+    // Klicks aus Code (`el.click()`), die niemand "daneben" gesetzt hat.
+    const inOtherLayer = typeof e.target?.closest === 'function' && Boolean(e.target.closest(
+      '.modal-overlay, .toast-container, [role="dialog"], [role="alertdialog"]',
+    ));
+    if (popover.isConnected && e.isTrusted && !inOtherLayer) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
     // Ohne Fokus-Rueckgabe: wer daneben klickt, wollte woanders hin, und ein
     // Sprung zurueck zum Ausloeser naehme ihm das Ziel weg.
-    if (!popover.isConnected || !popover.contains(e.target)) closeDetailView({ fokus: false });
+    closeDetailView({ fokus: false });
   };
 
   activePopover = {
@@ -716,14 +736,15 @@ function openAsPopover(opts) {
     overlayToken: pushOverlay(() => { closeDetailView(); }),
     teardown() {
       document.removeEventListener('keydown', onKeydown);
-      document.removeEventListener('click', onOutsideClick);
+      document.removeEventListener('click', onOutsideClick, true);
     },
   };
 
   document.addEventListener('keydown', onKeydown);
   // Erst im nächsten Tick binden, sonst schließt der Klick, der das Popover
   // geöffnet hat, es sofort wieder.
-  setTimeout(() => document.addEventListener('click', onOutsideClick), 0);
+  // Capture: siehe onOutsideClick - nur so kommt er VOR den Handlern der Seite.
+  setTimeout(() => document.addEventListener('click', onOutsideClick, true), 0);
   popover.focus();
 
   return (sections) => {

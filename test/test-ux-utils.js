@@ -1247,3 +1247,162 @@ test('M9: das CSS blendet nur angedockt und gefaltet aus und haelt die Zeilenhoe
   assert.match(body('.page-toolbar--stacked.page-toolbar--dock-fold.is-docked > .page-toolbar__actions'),
     /min-block-size:\s*var\(--dock-fold-bar-h/);
 });
+
+/* DIE KUECHEN-KONTEXTZEILE FALTET BEIM ANDOCKEN (R17 K1, A4 P2-4 / A8 P3-2).
+ * Rezepte und Vorrat tragen unter der Kuechen-Leiste eine eigene Zeile, die
+ * mobil nur Werkzeuge haelt (Lupe, "..."): 65px fuer ein bis zwei Icons. Sie
+ * haengt jetzt an derselben Schwelle und Klasse wie der Kopf der gedeckelten
+ * Module: ein Nutzer-Scroll im Port klappt sie ein (`is-collapsed`), zurueck
+ * oben kommt sie wieder. Eine Kontextzeile, die etwas BENENNT (Wochenstepper
+ * im Essensplan, Listen-Kapseln im Einkauf), bleibt stehen - wie der Zeitraum
+ * im Kalender. Die Attrappe baut Shell > Seite (overflow hidden) > Kopf in
+ * EINER Zeile + innerer Port. */
+function kitchenFoldStub({ centerCls = ['page-search', 'page-toolbar__center'] } = {}) {
+  class FakeEl {
+    constructor(name, { overflowY = 'visible', rect = null, cls = [] } = {}) {
+      this.name = name;
+      this.cs = { overflowY, paddingBlockStart: '8', paddingInlineStart: '16', paddingInlineEnd: '16', columnGap: '8', borderBottomWidth: '1px' };
+      this.rect = rect;
+      this.children = [];
+      this.parentElement = null;
+      this.dataset = {};
+      this.props = new Map();
+      this.style = { setProperty: (k, v) => this.props.set(k, v), removeProperty: (k) => this.props.delete(k) };
+      this.handlers = {};
+      this.scrollTop = 0;
+      this.scrollHeight = 0;
+      this.clientHeight = 0;
+      this.scrollWidth = 0;
+      this.clientWidth = 390;
+      const set = new Set(cls);
+      this.classList = {
+        add: (...c) => c.forEach((x) => set.add(x)),
+        remove: (...c) => c.forEach((x) => set.delete(x)),
+        toggle: (c, on) => { if (on === undefined ? !set.has(c) : on) set.add(c); else set.delete(c); },
+        contains: (c) => set.has(c),
+      };
+    }
+    append(...kids) { for (const k of kids) { k.parentElement = this; this.children.push(k); } return this; }
+    contains(n) { for (let x = n; x; x = x.parentElement) if (x === this) return true; return false; }
+    querySelector() { return null; }
+    querySelectorAll() { return []; }
+    addEventListener(type, fn) { (this.handlers[type] ??= []).push(fn); }
+    removeEventListener() {}
+    getBoundingClientRect() { const r = this.rect ?? { top: 0, bottom: 0 }; return { ...r, height: r.bottom - r.top, width: 48 }; }
+    getClientRects() { return this.rect ? [this.rect] : []; }
+    get offsetParent() { return this.rect ? this.parentElement : null; }
+  }
+  const saved = {};
+  for (const k of ['Element', 'getComputedStyle', 'ResizeObserver', 'MutationObserver', 'IntersectionObserver']) saved[k] = global[k];
+  global.Element = FakeEl;
+  global.getComputedStyle = (el) => el.cs;
+  global.ResizeObserver = class { observe() {} disconnect() {} };
+  global.MutationObserver = class { observe() {} disconnect() {} };
+  global.IntersectionObserver = class { observe() {} disconnect() {} };
+  const restore = () => { for (const [k, v] of Object.entries(saved)) global[k] = v; };
+
+  const shell = new FakeEl('shell', { overflowY: 'auto' });
+  const page = new FakeEl('page', { overflowY: 'hidden' });
+  // 8 Polster + 48 Lupe + 8 Polster + 1 Linie = 65px, wie gemessen (390x844).
+  const toolbar = new FakeEl('toolbar', { rect: { top: 0, bottom: 65 }, cls: ['page-toolbar', 'page-toolbar--in-group'] });
+  const center = new FakeEl('center', { rect: { top: 8, bottom: 56 }, cls: centerCls });
+  const actions = new FakeEl('actions', { rect: { top: 8, bottom: 56 }, cls: ['page-toolbar__actions'] });
+  toolbar.append(center, actions);
+  const port = new FakeEl('port', { overflowY: 'auto' });
+  const row = new FakeEl('row');
+  port.append(row);
+  port.scrollHeight = 2400;
+  port.clientHeight = 723;
+  shell.append(page);
+  page.append(toolbar, port);
+  const fire = (type, target) => { for (const fn of page.handlers[type] ?? []) fn({ target }); };
+  const scrollTo = (top) => { port.scrollTop = top; fire('scroll', port); };
+  return { toolbar, port, row, fire, scrollTo, restore };
+}
+
+test('K1: die Kuechen-Kontextzeile aus reinen Werkzeugen klappt beim Andocken ein und oben wieder aus', () => {
+  const s = kitchenFoldStub();
+  try {
+    wireCollapsingHeader(s.toolbar);
+    assert.equal(s.toolbar.classList.contains('page-toolbar--fold-row'), true, 'eine Werkzeugzeile unter der Leiste ist eine Faltzeile');
+    assert.equal(s.toolbar.props.get('--fold-row-h'), '64px', 'gefaltet wird die Zeile ohne ihre Linie - die bleibt als Kante unter der Leiste');
+    assert.equal(s.toolbar.props.get('--page-toolbar-lead') ?? '0px', '0px', 'keine Lead-Zone: der Kopf ist einzeilig (Sonde 8)');
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), false, 'ungescrollt steht die Zeile wie bisher');
+    // Ohne Geste (die Seite stellt etwas ein) klappt nichts.
+    s.scrollTo(200);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), false, 'nur ein Scroll des Nutzers faltet');
+    s.fire('touchstart', s.row);
+    s.scrollTo(120);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), true, 'angedockt faltet die Zeile ein');
+    assert.equal(s.toolbar.classList.contains('is-docked'), true, 'die Linie bleibt - sie ist die Kante des angedockten Kopfes');
+    s.scrollTo(0);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), false, 'zurueck oben kommt sie wieder');
+  } finally { s.restore(); }
+});
+
+test('K1: eine Kontextzeile, die etwas benennt, und ein kurzer Port falten nicht', () => {
+  const named = kitchenFoldStub({ centerCls: ['page-toolbar__center', 'week-nav'] });
+  try {
+    wireCollapsingHeader(named.toolbar);
+    assert.equal(named.toolbar.classList.contains('page-toolbar--fold-row'), false, 'Wochenstepper und Listen-Kapseln bleiben stehen');
+    named.fire('touchstart', named.row);
+    named.scrollTo(120);
+    assert.equal(named.toolbar.classList.contains('is-collapsed'), false);
+  } finally { named.restore(); }
+  const short = kitchenFoldStub();
+  try {
+    short.port.scrollHeight = short.port.clientHeight + 90;
+    wireCollapsingHeader(short.toolbar);
+    short.fire('touchstart', short.row);
+    short.scrollTo(60);
+    assert.equal(short.toolbar.classList.contains('is-collapsed'), false,
+      'ein Port, der die zurueckkehrende Zeile nicht traegt, faltet nicht - sonst pendelt beides');
+  } finally { short.restore(); }
+});
+
+test('K1: das CSS faltet die Zeile nur eingeklappt, nie mit Fokus, Suchbegriff oder offenem Menue, und ohne Bewegung bei reduced motion', () => {
+  const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const compact = rules.filter((r) => r.at.some((a) => /max-width:\s*1023px/.test(a)) && !r.at.some((a) => /reduce/.test(a)));
+  const folded = compact.filter((r) => /\.page-toolbar--fold-row\.is-collapsed/.test(r.selector));
+  assert.ok(folded.length, 'die Faltung haengt an der Dock-Klasse is-collapsed');
+  const body = folded.map((r) => r.body).join(';');
+  assert.match(body, /margin-block-end:\s*calc\(-1 \* var\(--fold-row-h/, 'die Zeile gibt ihre Hoehe frei');
+  assert.match(body, /opacity:\s*0/, 'mit Blende');
+  assert.match(body, /pointer-events:\s*none/);
+  for (const r of folded) {
+    assert.match(r.selector, /:not\(:focus-within\)/, `${r.selector}: wer darin steht, behaelt die Zeile`);
+    assert.match(r.selector, /:not\(:has\(input:not\(:placeholder-shown\)\)\)/, `${r.selector}: ein Suchbegriff haelt die Zeile offen`);
+    assert.match(r.selector, /:not\(:has\(:popover-open\)\)/, `${r.selector}: ein offenes Menue haelt seinen Knopf`);
+  }
+  assert.doesNotMatch(folded.filter((r) => !/>\s*\*\s*$/.test(r.selector)).map((r) => r.body).join(';'), /opacity/,
+    'die Zeile selbst blendet nicht aus - ihre Linie bleibt die Kante unter der Leiste');
+  const base = compact.find((r) => r.selector.trim() === '.page-toolbar--fold-row');
+  assert.ok(base && /transition:[^;]*margin-block-end/.test(base.body) && /translate/.test(base.body), 'die freiwerdende Hoehe gleitet');
+  const kids = compact.find((r) => r.selector.trim() === '.page-toolbar--fold-row > *');
+  assert.ok(kids && /transition:\s*opacity/.test(kids.body), 'der Inhalt blendet');
+  const reduced = rules.filter((r) => r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a))
+    && /\.page-toolbar--fold-row/.test(r.selector));
+  assert.ok(reduced.some((r) => /\.page-toolbar--fold-row\s*,|^\.page-toolbar--fold-row$/.test(r.selector.trim()) && /transition:\s*none/.test(r.body)),
+    'reduzierte Bewegung: ohne Bewegung');
+});
+
+test('K1: die gefaltete Zeile misst die Reserve ausgeklappt - sonst pendelt sie bei knappen Listen', () => {
+  // Gemessen an den Rezepten (390x844, ein Rezept aufgeklappt): 166px Reserve
+  // ausgeklappt, 102px gefaltet. Gegen die gefaltete Reserve gemessen, fiele
+  // die Zeile beim naechsten Scroll-Ereignis unter 64 + 48 und klappte aus -
+  // und mit ihr wieder ein.
+  const s = kitchenFoldStub();
+  try {
+    s.port.scrollHeight = s.port.clientHeight + 166;
+    wireCollapsingHeader(s.toolbar);
+    s.fire('touchstart', s.row);
+    s.scrollTo(100);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), true);
+    // Gefaltet: der Port waechst um die Zeile, die Zeile traegt ihren negativen Rand.
+    s.port.clientHeight += 64;
+    s.toolbar.cs.marginBlockEnd = '-64px';
+    s.scrollTo(101);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), true, 'die Zeile bleibt gefaltet');
+  } finally { s.restore(); }
+});

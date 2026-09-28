@@ -986,7 +986,15 @@ test('das Popover gibt den Fokus nur zurueck, wo niemand woanders hin wollte (#1
   const fn = src.match(/export function closeDetailView\([\s\S]*?\n\}/)?.[0] ?? '';
   assert.match(fn, /if \(fokus && merker\) restoreFocusAfterClose\(merker\);\s*else forgetRestore\(\);/,
     'Rueckgabe mit eigenem Merker, sonst verwerfen - nie einen fremden stehen lassen');
-  assert.match(src, /!popover\.contains\(e\.target\)\) closeDetailView\(\{ fokus: false \}\)/,
+  // Die Regel am Klick-daneben-Handler selbst, nicht an einer Zeile: seit er
+  // den Klick schluckt (Re-Kritik 2026-09-28, E2), steht die Pruefung auf
+  // "im Popover" als eigene Frueh-Rueckkehr davor - geschlossen wird danach
+  // weiterhin ohne Fokus-Rueckgabe, und nirgends im Handler mit.
+  const outside = src.match(/const onOutsideClick = \(e\) => \{[\s\S]*?\n {2}\};/)?.[0] ?? '';
+  assert.ok(outside, 'der Klick-daneben-Handler des Popovers ist auffindbar');
+  const schliesst = [...outside.matchAll(/closeDetailView\(([^)]*)\)/g)].map((m) => m[1].trim());
+  assert.ok(schliesst.length > 0, 'ein Klick daneben schliesst das Popover');
+  assert.deepEqual([...new Set(schliesst)], ['{ fokus: false }'],
     'ein Klick daneben wollte woanders hin - der Fokus springt nicht zurueck');
   assert.match(src, /if \(activePopover\) closeDetailView\(\{ fokus: false \}\)/,
     'eine neue Ansicht nimmt den Fokus selbst');
@@ -1690,4 +1698,74 @@ test('F3: in jedem Fuss liegt das Wort des Loeschen-Knopfs in der ausgeblendeten
     global.document.createElement = savedCreate;
     globalThis.window = savedWindow;
   }
+});
+
+/*
+ * LOESCHEN STEHT IM DIALOGFUSS AM ANFANG (Re-Critique 2026-09-28, A2 P1-2).
+ * Der Termindialog - das Vorbild des Kanons - stellte "Loeschen" 12px neben
+ * "Abbrechen" an den rechten Rand, weil der Fuss rechtsbuendig ist und nur
+ * wer den Knopf selbst wegschob (`style="margin-inline-end:auto"`, zwanzig
+ * Module), ihn links hatte. Die Zusage gilt fuer JEDEN Fuss mit Loeschen:
+ * (1) EINE Regel in layout.css schiebt den erkannten Knopf (und seine Gruppe)
+ * an den Anfang, (2) in jedem Fuss-Markup ist Loeschen der erste Knopf -
+ * sonst schoebe die Regel Abbrechen mit nach links.
+ */
+function footerChunks(source) {
+  const chunks = [];
+  for (const m of source.matchAll(/<div class="modal-panel__footer[^"]*"[^>]*>/g)) {
+    let depth = 0;
+    let end = source.length;
+    const tokens = /<div\b|<\/div>/g;
+    tokens.lastIndex = m.index;
+    for (let t = tokens.exec(source); t; t = tokens.exec(source)) {
+      depth += t[0] === '</div>' ? -1 : 1;
+      if (depth === 0) { end = t.index; break; }
+    }
+    chunks.push(source.slice(m.index, end));
+  }
+  return chunks;
+}
+
+const DELETE_BUTTON = /class="[^"]*\bbtn--danger-(?:outline|ghost)\b|data-footer-delete(?!="off")/;
+
+test('A2 P1-2: in jedem Dialogfuss steht Loeschen am Anfang, Abbrechen und Primaer am Ende', async () => {
+  const { readdirSync, statSync } = await import('node:fs');
+  const { join, relative } = await import('node:path');
+  const root = new URL('..', import.meta.url).pathname;
+  const files = [];
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      if (name === 'vendor' || name === 'locales') continue;
+      const path = join(dir, name);
+      if (statSync(path).isDirectory()) walk(path);
+      else if (name.endsWith('.js')) files.push(path);
+    }
+  };
+  walk(join(root, 'public'));
+
+  const rules = [...eachRule(layoutCss)].filter((r) => !r.at.length && /margin-inline-end:\s*auto/.test(r.body));
+  const selectors = rules.flatMap((r) => r.selector.split(',').map((s) => s.trim().replace(/\s+/g, ' ')));
+  const globalRule = selectors.includes('.modal-panel__footer > .modal-panel__delete')
+    && selectors.includes('.modal-panel__footer > :has(> .modal-panel__delete)');
+
+  let seen = 0;
+  const notFirst = [];
+  const notStart = [];
+  for (const path of files) {
+    const file = relative(root, path);
+    for (const chunk of footerChunks(readFileSync(path, 'utf8'))) {
+      const buttons = [...chunk.matchAll(/<button\b[^>]*>/g)].map((b) => b[0]);
+      const del = buttons.findIndex((b) => DELETE_BUTTON.test(b));
+      if (del < 0) continue;
+      seen += 1;
+      if (del !== 0) notFirst.push(file);
+      const own = /margin-inline-end:\s*auto/.test(buttons[del])
+        || /<div[^>]*margin-inline-end:\s*auto[^>]*>\s*(?:\$\{[^`]*`)?\s*<button[^>]*btn--danger/.test(chunk);
+      if (!globalRule && !own) notStart.push(file);
+    }
+  }
+  assert.ok(seen >= 15, `nur ${seen} Fuesse mit Loeschen gefunden - der Guard waere blind`);
+  assert.deepEqual(notFirst, [], 'Loeschen ist nicht der erste Knopf im Fuss - die Regel schoebe Abbrechen mit nach links');
+  assert.deepEqual(notStart, [], 'hier steht Loeschen neben Abbrechen am Ende statt am Anfang');
+  assert.ok(globalRule, 'die eine Regel in layout.css fehlt - jeder neue Fuss muesste wieder selbst schieben');
 });

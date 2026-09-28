@@ -304,10 +304,17 @@
 /* --------------------------------------------------------
    Offene Anfragen
    -------------------------------------------------------- */
+/* Der Listen-Reset steht VOR dem Panel: beide Klassen sitzen am selben `ul`
+ * und haben dieselbe Spezifitaet, also gewinnt die spaetere Regel. Stand er
+ * dahinter, nahm sein `padding: 0` dem Panel das Polster, und der Avatar klebte
+ * an der Kante der getoenten Flaeche (Re-Kritik 2026-09-28, P1). Guard:
+ * test/test-rewards-ui.js rechnet die Kaskade fuer die Klassenliste nach. */
+.rw-pending-list { list-style: none; margin: 0; padding: 0; }
 /* Randlose Karte wie jede andere: die getönte Fläche MIT getönter Kante war
  * dasselbe Muster, das Runde 1 in der Haushaltshilfe entfernt hat. Die Tönung
  * bleibt als Dringlichkeitssignal, die Kante geht - sie sagte nichts, was die
  * Fläche nicht schon sagt. */
+
 /* DIE ALTE BEGRUENDUNG MASS GEGEN DIE FALSCHE FLAECHE.
  * Hier stand "16 %, nicht 8: gemessen 1.25:1 light / 1.29:1 dark" - beide Werte
  * gegen `--color-surface`, also gegen WEISS. Nachgemessen am Dokument ist die
@@ -332,7 +339,6 @@
   background: color-mix(in srgb, var(--module-accent) var(--tint-wash), var(--color-bg));
   box-shadow: var(--shadow-sm);
 }
-.rw-pending-list { list-style: none; margin: 0; padding: 0; }
 .rw-pending {
   display: flex;
   align-items: center;

@@ -351,7 +351,7 @@ textarea.form-input {
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
   .toast:not(.toast--danger):not(.toast--warning),
   .list-bulkbar {
-    background-color: color-mix(in srgb, var(--neutral-800) 90%, transparent);
+    background-color: color-mix(in srgb, var(--toast-bg) 90%, transparent);
     backdrop-filter: var(--blur-sm);
     -webkit-backdrop-filter: var(--blur-sm);
     border: 1px solid var(--glass-border-overlay);
@@ -366,8 +366,8 @@ textarea.form-input {
  * nicht in layout.css, weil hier das Material wohnt; der opake Grund gilt
  * auch ohne backdrop-filter (dieselben Farben wie die Basis in layout.css). */
 .toast.toast--success {
-  background-color: var(--neutral-800);
-  color: var(--neutral-50);
+  background-color: var(--toast-bg);
+  color: var(--toast-text);
 }
 
 .toast--success .toast__icon {
@@ -453,8 +453,10 @@ textarea.form-input {
 
   /* DER TOAST STAND IN DER REGEL DES CHIPS UND HAT IHN NICHT ÜBERLEBT. Beide
    * verlieren hier ihr Glas, aber sie haben nicht denselben Grund darunter:
-   * der Chip ist ein helles Element mit dunkler Schrift, der Toast ist die
-   * dunkle Fläche der Shell und trägt `color: var(--neutral-50)`. Auf
+   * der Chip ist ein helles Element mit dunkler Schrift, der Toast steht auf
+   * dem Shell-Material (`--toast-bg`, seit R16 in BEIDEN Themes dunkel - bis
+   * dahin wurde es im Dunkelmodus hell, und dieser Satz stimmte nur halb)
+   * und trägt `color: var(--toast-text)`. Auf
    * --color-accent-light (#F3EFFE) stand damit Weiss auf Fast-Weiss: gemessen
    * im gerenderten Dokument mit emulierter Medienabfrage 1.08:1, jetzt 13.69:1.
    * Der Fallback, der die Lesbarkeit sichern sollte, hat sie abgeschafft.
@@ -462,7 +464,7 @@ textarea.form-input {
    * hier muss nur das Glas weg. Die Pille teilt Material und damit auch das. */
   .toast:not(.toast--danger):not(.toast--warning),
   .list-bulkbar {
-    background-color: var(--neutral-800);
+    background-color: var(--toast-bg);
     border-color: var(--glass-border-overlay);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;

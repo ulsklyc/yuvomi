@@ -137,6 +137,39 @@ export function toggleRowHtml({
     + '</label>';
 }
 
+/**
+ * EIN SCHALTER WIRKT SOFORT (Komponenten-Kanon "Schalter in Einstellungen",
+ * Re-Critique 2026-09-28 R15 A7 P1-1). Auch wenn er in einem Formular mit
+ * "Speichern" steht: umlegen speichert, ein Fehler legt ihn zurueck. Das
+ * Element traegt dazu `data-instant-save` im Markup - daran erkennt der
+ * Verlassen-Schutz (settings/dirty-guard.js), dass er keinen offenen Stand
+ * hinterlaesst. Dasselbe Muster wie die Sofort-Speicherer in
+ * modules-options.js, nur einmal statt je Blatt.
+ *
+ * @param {HTMLInputElement|null} input
+ * @param {object} options
+ * @param {(checked: boolean) => Promise<unknown>} options.save
+ * @param {string} options.savedMessage  Toast nach dem Speichern
+ * @param {(checked: boolean) => void} [options.onRevert]  Folgezustand nach dem Zuruecklegen nachziehen
+ */
+export function bindInstantSwitch(input, { save, savedMessage, onRevert = () => {} }) {
+  if (!input) return;
+  input.addEventListener('change', async () => {
+    const value = input.checked;
+    input.disabled = true;
+    try {
+      await save(value);
+      window.yuvomi?.showToast(savedMessage, 'success');
+    } catch (error) {
+      input.checked = !value;
+      onRevert(!value);
+      window.yuvomi?.showToast(error?.message || t('common.errorGeneric'), 'danger');
+    } finally {
+      if (input.isConnected) input.disabled = false;
+    }
+  });
+}
+
 export function createToggleRow(options) {
   const host = document.createElement('div');
   host.insertAdjacentHTML('afterbegin', toggleRowHtml(options));

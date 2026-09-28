@@ -296,8 +296,12 @@
     display: none;
   }
 
-  .cal-toolbar > .cal-toolbar__bar,
-  .cal-toolbar__tools {
+  /* NUR IM MARKIERTEN ZEITRAUM-KOPF (R17 Z1, DESIGN.md „Variante: Zeitraum-
+   * Kopf"): Werkzeuge in Zeile 1 sind die eine benannte Abweichung von der
+   * Kopfregel, und die Kennklasse im Markup ist ihre Erlaubnis
+   * (test:mobile-chrome prueft jede Regel, die eine Bar-Zeile aufloest). */
+  .page-toolbar--period-title.cal-toolbar > .cal-toolbar__bar,
+  .page-toolbar--period-title.cal-toolbar .cal-toolbar__tools {
     display: contents;
   }
 
@@ -768,11 +772,65 @@
   position: relative;
 }
 
-/* Dezenter Slot-Hover macht den „Klick-zum-Anlegen"-Affordance im Zeitraster
- * sichtbar; die getönten Event-Blöcke liegen deckend darüber und bleiben lesbar. */
+/* Dezenter Slot-Hover zeigt die leere Zeit als Flaeche, auf der man anlegen
+ * kann (seit R17 Z2 per Doppelklick bzw. langem Druck, wireTimeGridCreate in
+ * calendar.js); die getönten Event-Blöcke liegen deckend darüber und bleiben
+ * lesbar. */
 .week-view__col:hover,
 .day-view__col:hover {
   background-color: color-mix(in srgb, var(--module-accent) var(--tint-state), transparent);
+}
+
+/* Ein Doppelklick markiert kein Wort und ein langer Druck ruft weder die
+ * Textauswahl noch das iOS-Callout: beide Gesten gehoeren dem Anlegen (R17 Z2).
+ * Das Kontextmenue waehrend des Drucks unterdrueckt calendar.js. */
+.week-view__col,
+.day-view__col {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* DER PLATZHALTER DES LANGEN DRUCKS (R17 Z2): ein Block der kommenden
+ * Startzeit an der Druckstelle, gesetzt von wireTimeGridCreate (calendar.js).
+ * Er blendet ueber die Haltezeit ein (`--cal-press-ms` kommt aus derselben
+ * Konstante wie die Schwelle), wird an der Schwelle scharf und faellt mit
+ * jedem Abbruch weg. Die Vibration allein ist auf iOS kein Signal. Nur
+ * Deckkraft, kein Versatz - auch unter reduzierter Bewegung bleibt es dabei;
+ * dort steht er ohne Einblenden sofort halb da. Er nimmt keine Zeiger an, damit
+ * er weder die Druckstelle noch den Klick darunter verdeckt. */
+.cal-press-ghost {
+  position: absolute;
+  inset-inline: var(--space-0h);
+  z-index: 1;
+  padding: var(--space-0h) var(--space-1);
+  border-radius: var(--radius-xs);
+  border-inline-start: var(--cal-event-edge) solid var(--module-accent);
+  background: color-mix(in srgb, var(--module-accent) var(--tint-surface), var(--color-surface-work));
+  color: color-mix(in srgb, var(--module-accent) var(--tint-ink), var(--color-text-primary));
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--line-height-tight);
+  pointer-events: none;
+  animation: cal-press-ghost-in var(--cal-press-ms) linear both;
+}
+
+.cal-press-ghost.is-armed {
+  animation: none;
+  opacity: 1;
+}
+
+@keyframes cal-press-ghost-in {
+  from, 30% { opacity: 0; }
+  to { opacity: 0.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cal-press-ghost {
+    animation: none;
+    opacity: 0.6;
+  }
 }
 
 .week-view__hour-line {
@@ -1270,13 +1328,11 @@
  * Termin-Suche (#471)
  * -------------------------------------------------------- */
 
+/* Ruhend traegt die Lupe die Kopf-Icon-Form (`.btn--secondary.btn--icon`)
+ * samt ihrer Tinte, wie Filter und „..." daneben (R17 Z1) - hier stand eine
+ * eigene graue Tinte, und eine der drei Knoepfe las sich wie deaktiviert. */
 .cal-toolbar__search-btn {
-  color: var(--color-text-secondary);
   transition: color var(--transition-fast), background-color var(--transition-fast);
-}
-
-.cal-toolbar__search-btn:hover {
-  color: var(--color-text-primary);
 }
 
 .cal-toolbar__search-btn--active {
@@ -2955,44 +3011,17 @@
  *      der Ruhezustand und war damit ein No-op - der Kommentar daneben
  *      behauptete das Gegenteil.
  *
- * Was bleibt, ist ein Knopf in der EINEN Buttonform der App (`.btn--icon`,
- * Kapsel aus der Basisregel) mit einer Zahl. Der Zustand ist damit kein
+ * Was bleibt, ist ein Knopf in der Kopf-Icon-Form (`.btn--secondary.btn--icon`,
+ * wie Lupe und „...") mit einer Zahl. Der Zustand ist damit kein
  * Farbunterschied mehr, sondern ein Zaehler - lesbar auch dort, wo eine
  * Waschung keine Farbe tragen kann.
  * -------------------------------------------------------- */
 
-/* Der aktive Knopf traegt den MODULTON als Tinte, nicht als Flaeche: eine
- * Zahl darauf braucht eine Tinte, und der Zaehler steht schon fuer den
- * Zustand. Die Skalen-Regel („ein Etikett nennt seinen Ton EINMAL") - hier
- * ist es der Zaehler. */
-.cal-toolbar__filter-btn--active {
-  color: var(--module-accent, var(--color-accent));
-}
-
-.cal-toolbar__filter-btn {
-  position: relative;
-}
-
-.cal-toolbar__filter-count {
-  position: absolute;
-  top: var(--space-1);
-  inset-inline-end: var(--space-1);
-  min-width: var(--space-4);
-  height: var(--space-4);
-  padding-inline: var(--space-0h);
-  border-radius: var(--radius-full);
-  /* VOLLTON, kein getoentes Feld: die Zahl steht darauf und braucht eine
-     Tinte. Der Modulton ist ein KURATIERTER Ton, also gilt der erste Zweig
-     der Vollton-Regel - die Farbe IST die Flaeche, die Tinte ist
-     --color-ink-on-vivid. */
-  background: var(--module-accent, var(--color-accent));
-  color: var(--color-ink-on-vivid);
-  font-size: var(--text-2xs);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--space-4);
-  text-align: center;
-  pointer-events: none;
-}
+/* Der Knopf selbst ist seit R17 (Z1) der geteilte `filterButtonHtml`
+ * (utils/filter-sheet.js, Regeln `.page-filter-btn*` in layout.css): Zahl als
+ * Badge, Modulton als Tinte, dieselbe Kopf-Icon-Form wie Lupe und „...". Hier
+ * stand bis dahin eine Kopie mit eigener Badge-Klasse - das Vorbild, von dem
+ * der Baustein abgeschrieben war, lief neben ihm her. */
 
 /* --- Das Blatt ------------------------------------------------------- */
 

@@ -24,7 +24,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { chooseToastPlacement, persistentToastMustYield } from '../public/utils/toast-placement.js';
+import { chooseToastPlacement, persistentToastMustYield, placeToastStack } from '../public/utils/toast-placement.js';
 import { PERSISTENT_TOAST_SELECTOR } from '../public/utils/toast-surface.js';
 import { eachRule } from './css-rules.js';
 
@@ -319,13 +319,16 @@ const DIALOG_REGISTRY = {
 
 const MARK = /data-dialog-actions|dataset\.dialogActions\s*=/g;
 const MODAL_PANEL_ZONE = /modal-panel__header|modal-panel__footer|modal-actions/;
-const DIALOG_ROLE = /role="dialog"|setAttribute\(\s*'role'\s*,\s*'dialog'\s*\)/g;
+// Ein Attribut-Selektor (`[role="dialog"]`) FRAGT nach Dialogen, er baut
+// keinen: das Popover der Leseansicht laesst so Klicks in einer anderen Ebene
+// durch (Re-Kritik 2026-09-28, E2) und zaehlte sonst als zweiter Dialog.
+const DIALOG_ROLE = /(?<!\[)role="dialog"|setAttribute\(\s*'role'\s*,\s*'dialog'\s*\)/g;
 
 const ROOT = new URL('..', import.meta.url).pathname;
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
-    // toast-placement.js nennt die Rolle als Selektor, es baut keinen Dialog.
+    // toast-placement.js liest Rolle und Auszeichnung als Selektoren, es baut keinen Dialog.
     if (name === 'vendor' || name === 'locales' || name === 'toast-placement.js') continue;
     const path = join(dir, name);
     if (statSync(path).isDirectory()) walk(path, out);
@@ -534,7 +537,7 @@ test('ein Erfolgs-Toast steht auf dem Shell-Material, das Gruen traegt das Icon'
     const success = winningBackground('success', { supportsBlur });
     assert.ok(success, 'keine Flaeche fuer den Erfolgs-Toast gefunden - der Guard waere blind');
     assert.doesNotMatch(success.value, /--color-success/, `Vollflaeche (${success.where}, backdrop ${supportsBlur})`);
-    assert.match(success.value, /--neutral-800/, `nicht das Shell-Material (${success.where})`);
+    assert.match(success.value, /--toast-bg/, `nicht das Shell-Material (${success.where})`);
     const danger = winningBackground('danger', { supportsBlur });
     assert.match(danger?.value ?? '', /--color-danger/, 'ein Fehler bleibt eine deutliche Flaeche');
   }
@@ -542,5 +545,242 @@ test('ein Erfolgs-Toast steht auf dem Shell-Material, das Gruen traegt das Icon'
   const icon = [...eachRule(glass)].find((r) => r.selector.trim() === '.toast--success .toast__icon');
   assert.match(icon?.body ?? '', /color:\s*var\(--shell-success-ink\)/, 'das Haekchen traegt die Erfolgsfarbe');
   const tokens = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
-  assert.equal((tokens.match(/--_shell-success-ink:/g) ?? []).length, 3, 'hell, dunkel per Vorliebe, dunkel per Wahl');
+  // Seit R16 ist das Material in beiden Themes dunkel: EINE Tinte fuer beide
+  // (die Gegendrehung #0B6B2B fuer den hellen Dunkelmodus-Grund ist entfallen).
+  assert.equal((tokens.match(/--_shell-success-ink:/g) ?? []).length, 1, 'eine Erfolgstinte fuer beide Themes');
+});
+
+// --------------------------------------------------------
+// Liste+Detail: der Fuss der Detailspalte (Re-Critique 2026-09-28, A3 P1-1)
+// --------------------------------------------------------
+
+/*
+ * Gemessen bei 1280x800 in den Aufgaben: der Toast lag bei 560-940/710-776,
+ * "Loeschen" im Fuss der Detailspalte bei 716-828/730-770; `elementFromPoint`
+ * auf der Knopfmitte lieferte den Toast. Die Platzierung kannte nur Dialoge,
+ * die Spalte ist keiner. Gefahren wird hier das ECHTE `placeToastStack` gegen
+ * einen kleinsten DOM-Stub - die reine Wahl der Lage haette die Spalte schon
+ * immer richtig behandelt, sie wurde ihr nur nie gezeigt.
+ */
+function parseSelector(selector) {
+  return selector.split(',').map((part) => {
+    const s = part.trim();
+    const tag = s.match(/^[a-z][\w-]*/)?.[0] ?? null;
+    const classes = [...s.matchAll(/\.([\w-]+)/g)].map((m) => m[1]);
+    const attrs = [...s.matchAll(/\[([\w-]+)(?:="([^"]*)")?\]/g)].map((m) => [m[1], m[2]]);
+    return { tag, classes, attrs, unsupported: s.includes(':') };
+  });
+}
+
+class FakeEl {
+  constructor(tag, { cls = '', attrs = {}, rect = null, overflow = 'visible' } = {}) {
+    this.tagName = tag.toUpperCase();
+    this.cls = new Set(cls.split(' ').filter(Boolean));
+    this.attrs = new Map(Object.entries(attrs));
+    this.rectBox = rect;
+    this.overflow = overflow;
+    this.children = [];
+    this.parentElement = null;
+    this.dataset = {};
+    this.inert = false;
+    this.props = new Map();
+    this.style = {
+      setProperty: (k, v) => this.props.set(k, v),
+      removeProperty: (k) => this.props.delete(k),
+    };
+    this.classList = {
+      contains: (c) => this.cls.has(c),
+      add: (c) => this.cls.add(c),
+      remove: (c) => this.cls.delete(c),
+    };
+  }
+
+  add(...kids) {
+    for (const kid of kids) { kid.parentElement = this; this.children.push(kid); }
+    return this;
+  }
+
+  matchesOne({ tag, classes, attrs, unsupported }) {
+    if (unsupported) return false;
+    if (tag && this.tagName !== tag.toUpperCase()) return false;
+    if (!classes.every((c) => this.cls.has(c))) return false;
+    return attrs.every(([k, v]) => this.attrs.has(k) && (v === undefined || this.attrs.get(k) === v));
+  }
+
+  matches(selector) { return parseSelector(selector).some((p) => this.matchesOne(p)); }
+  closest(selector) {
+    for (let n = this; n; n = n.parentElement) if (n.matches?.(selector)) return n;
+    return null;
+  }
+
+  descendants() { return this.children.flatMap((c) => [c, ...c.descendants()]); }
+  querySelectorAll(selector) { return this.descendants().filter((n) => n.matches(selector)); }
+  querySelector(selector) { return this.querySelectorAll(selector)[0] ?? null; }
+  contains(other) { return other === this || this.descendants().includes(other); }
+  getAttribute(k) { return this.attrs.has(k) ? this.attrs.get(k) : null; }
+  getBoundingClientRect() { return this.rectBox ?? box(0, 0, 0, 0); }
+  getClientRects() { return this.rectBox ? [this.rectBox] : []; }
+  checkVisibility() { return Boolean(this.rectBox); }
+}
+
+/** Aufgaben bei 1280x800: Liste links, Detailspalte rechts, Toast am Platz. */
+function splitViewScene({ reminder = false } = {}) {
+  const body = new FakeEl('body');
+  const pane = new FakeEl('section', { cls: 'split-view__detail', rect: box(140, 680, 576, 644), overflow: 'auto' });
+  const head = new FakeEl('header', { cls: 'split-view__detail-head', rect: box(140, 680, 576, 72) })
+    .add(new FakeEl('button', { rect: box(152, 1150, 96, 44) }));
+  const content = new FakeEl('div', { cls: 'detail-view', rect: box(212, 680, 576, 498) })
+    .add(new FakeEl('button', { rect: box(300, 700, 200, 40) }));
+  const deleteBtn = new FakeEl('button', { cls: 'btn btn--danger-outline', rect: box(730, 716, 112, 40) });
+  const footer = new FakeEl('div', { cls: 'detail-view__footer split-view__detail-footer', rect: box(710, 680, 576, 64) })
+    .add(deleteBtn, new FakeEl('button', { cls: 'btn btn--primary', rect: box(730, 1100, 120, 40) }));
+  pane.add(head, content, footer);
+  const list = new FakeEl('div', { cls: 'split-view__list', rect: box(140, 280, 376, 644) });
+  body.add(list, pane);
+
+  const toast = new FakeEl('div', { cls: reminder ? 'toast toast--reminder' : 'toast', rect: box(710, 560, 380, 66) });
+  const stack = new FakeEl('div', { cls: 'shell-bottom-stack', rect: box(710, 560, 380, 66) }).add(toast);
+  body.add(stack);
+  return { body, pane, footer, deleteBtn, stack, toast };
+}
+
+function withDom(scene, fn) {
+  const saved = { document: global.document, getComputedStyle: global.getComputedStyle };
+  global.document = {
+    body: scene.body,
+    activeElement: scene.body,
+    documentElement: { clientWidth: 1280, clientHeight: 800 },
+    querySelectorAll: (sel) => scene.body.querySelectorAll(sel),
+    querySelector: (sel) => scene.body.querySelector(sel),
+    elementFromPoint: () => null,
+  };
+  global.getComputedStyle = (el) => ({
+    overflowX: el.overflow ?? 'visible',
+    overflowY: el.overflow ?? 'visible',
+    getPropertyValue: (name) => (name === '--toast-dock-gap' ? '12px' : ''),
+  });
+  try {
+    return fn();
+  } finally {
+    global.document = saved.document;
+    global.getComputedStyle = saved.getComputedStyle;
+  }
+}
+
+test('A3 P1-1: in Liste+Detail weicht der Stapel dem Fuss der Detailspalte (1280x800)', () => {
+  const scene = splitViewScene();
+  const decision = withDom(scene, () => placeToastStack(scene.stack));
+  assert.ok(decision, 'der Stapel blieb auf "Loeschen" stehen - die Detailspalte zaehlte nicht als Flaeche');
+  assert.equal(scene.stack.dataset.dock, 'placed');
+  const width = parseFloat(scene.stack.props.get('--toast-dock-width'));
+  const center = parseFloat(scene.stack.props.get('--toast-dock-center'));
+  const placed = box(decision.top, center - width / 2, width, 66);
+  const footer = scene.footer.getBoundingClientRect();
+  assert.ok(!intersects(placed, footer), `der Stapel ${placed.top}..${placed.bottom} liegt auf dem Fuss ab ${footer.top}`);
+  assert.ok(!intersects(placed, scene.deleteBtn.getBoundingClientRect()), '"Loeschen" bleibt frei');
+  assert.ok(placed.bottom <= footer.top && placed.top >= 212,
+    'er steht in der Spalte ueber ihrem Fuss, nicht ueber dem Seitenkopf');
+  assert.ok(placed.left >= 680 && placed.right <= 1256, 'ausgerichtet an der Detailspalte');
+});
+
+test('A3 P1-1: die Erinnerung weicht der Detailspalte nicht ganz - nur ihrem Fuss', () => {
+  const scene = splitViewScene({ reminder: true });
+  const decision = withDom(scene, () => placeToastStack(scene.stack));
+  assert.ok(decision, 'die Erinnerung blieb auf dem Fuss');
+  assert.equal(scene.toast.classList.contains('toast--tucked'), false,
+    'eine Erinnerung verschwaende sonst, solange rechts ein Detail offen ist - also fast immer');
+  assert.equal(scene.toast.inert, false);
+});
+
+test('A3 P1-1: ohne Detailspalte (unter der Schwelle) bleibt der Stapel, wo er steht', () => {
+  const scene = splitViewScene();
+  scene.pane.rectBox = null;
+  for (const n of scene.pane.descendants()) n.rectBox = null;
+  const decision = withDom(scene, () => placeToastStack(scene.stack));
+  assert.equal(decision, null);
+  assert.equal(scene.stack.dataset.dock, undefined);
+});
+
+// --------------------------------------------------------
+// Das Shell-Material im Dunkeln (Re-Critique 2026-09-28, A1 P2-2)
+// --------------------------------------------------------
+
+/*
+ * Toast und Sammelaktions-Pille standen auf --neutral-800, und das wird im
+ * Dunkelmodus hell (#E7E2DA): "Gespeichert" war die hellste Flaeche im Bild.
+ * Gerechnet wird aus tokens.css selbst - je Thema die Kette der Variablen bis
+ * zum Hexwert, Dunkel per Vorliebe UND per Wahl. Die Zusage: dunkel ist der
+ * Grund nie heller als --color-surface-raised, und Schrift und Tinten halten
+ * ihren Kontrast gegen den opaken Token UND gegen die 90-%-Glasmischung ueber
+ * der Buehne und ueber reinem Weiss (einem Foto darunter).
+ */
+function tokenScopes() {
+  const css = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+  const decls = (rule) => Object.fromEntries([...rule.body.matchAll(/(--[\w-]+)\s*:\s*([^;]+);?/g)].map((m) => [m[1], m[2].trim()]));
+  const rules = [...eachRule(css)];
+  const root = Object.assign({}, ...rules.filter((r) => r.selector.trim() === ':root' && !r.at.length).map(decls));
+  const darkPref = rules.filter((r) => r.selector.trim() === ':root:not([data-theme="light"])'
+    && r.at.some((a) => /prefers-color-scheme:\s*dark/.test(a))).map(decls);
+  const darkPick = rules.filter((r) => r.selector.trim() === '[data-theme="dark"]').map(decls);
+  assert.ok(darkPref.length && darkPick.length, 'die beiden Dunkel-Bloecke nicht gefunden - der Guard waere blind');
+  return {
+    light: root,
+    'dunkel per Vorliebe': { ...root, ...Object.assign({}, ...darkPref) },
+    'dunkel per Wahl': { ...root, ...Object.assign({}, ...darkPick) },
+  };
+}
+
+function resolveHex(scope, name, depth = 0) {
+  const value = scope[name];
+  assert.ok(value, `${name} fehlt`);
+  assert.ok(depth < 10, `${name}: Kette zu tief`);
+  const ref = value.match(/^var\((--[\w-]+)\)$/);
+  if (ref) return resolveHex(scope, ref[1], depth + 1);
+  assert.match(value, /^#[0-9a-f]{6}$/i, `${name} = ${value} ist kein Hexwert`);
+  return value;
+}
+
+const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+const luminance = (c) => {
+  const [r, g, b] = c.map((v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a, b) => {
+  const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m);
+  return (x + 0.05) / (y + 0.05);
+};
+const over = (top, under, alpha) => top.map((v, i) => Math.round(v * alpha + under[i] * (1 - alpha)));
+
+test('A1 P2-2: der Toast ist im Dunkeln nicht die hellste Flaeche, und alles darauf bleibt lesbar', () => {
+  for (const [theme, scope] of Object.entries(tokenScopes())) {
+    const bg = rgb(resolveHex(scope, '--_toast-bg'));
+    if (theme !== 'light') {
+      const raised = rgb(resolveHex(scope, '--_color-surface-raised'));
+      assert.ok(luminance(bg) <= luminance(raised) + 1e-9,
+        `${theme}: der Toast (${resolveHex(scope, '--_toast-bg')}) ist heller als --color-surface-raised`);
+    }
+    const stage = rgb(resolveHex(scope, '--_neutral-100'));
+    const grounds = { opak: bg, 'Glas ueber der Buehne': over(bg, stage, 0.9), 'Glas ueber Weiss': over(bg, [255, 255, 255], 0.9) };
+    for (const [where, ground] of Object.entries(grounds)) {
+      const need = [['--_toast-text', 4.5], ['--_toast-text-secondary', 4.5], ['--_shell-danger-ink', 4.5], ['--_shell-success-ink', 3]];
+      for (const [token, min] of need) {
+        const ratio = contrast(rgb(resolveHex(scope, token)), ground);
+        assert.ok(ratio >= min, `${theme}, ${where}: ${token} nur ${ratio.toFixed(2)}:1`);
+      }
+    }
+  }
+  // Und die Flaechen lesen es: Toast und Pille, mit und ohne Glas.
+  const layout = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const glass = readFileSync(new URL('../public/styles/glass.css', import.meta.url), 'utf8');
+  for (const [css, sel] of [[layout, '.toast'], [layout, '.list-bulkbar'], [glass, '.toast.toast--success']]) {
+    const body = [...eachRule(css)].filter((r) => !r.at.length && r.selector.trim() === sel).map((r) => r.body).join(';');
+    assert.match(body, /background-color:\s*var\(--toast-bg\)/, `${sel}: nicht auf dem Shell-Material`);
+    assert.match(body, /(?:^|;|\s)color:\s*var\(--toast-text\)/, `${sel}: nicht mit der Shell-Schrift`);
+  }
+  const shell = [...eachRule(glass)].filter((r) => /\.toast:not\(\.toast--danger\)/.test(r.selector));
+  assert.ok(shell.length >= 2, 'Glas und Reduced-Transparency-Fallback');
+  for (const rule of shell) assert.match(rule.body, /var\(--toast-bg\)/, `${rule.at.join(' ')}: nicht auf --toast-bg`);
 });

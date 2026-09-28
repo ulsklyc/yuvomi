@@ -1541,6 +1541,53 @@ const kontakt = (over = {}) => ({
   ...over,
 });
 
+/**
+ * KONTAKT-ZEILENMENUE NACH KANON (Re-Kritik 2026-09-28, A5 P2-5 im P1 "Sam
+ * erreicht ... nicht"). Das Menue war ein Eigenbau: `role="menu"` ohne
+ * `aria-haspopup`/`aria-expanded` am Ausloeser und ohne Pfeiltasten - Sam
+ * hoerte "Menue", und nichts davon hielt. Der Kanon-Baustein
+ * (utils/popover-menu.js) bringt Semantik UND Bedienung mit; hier wird
+ * gemessen, dass die Zeile ihn nimmt, und dass die lesenden Eintraege als
+ * Aktionen weiter an ihrem Ziel ankommen.
+ */
+test('Kontaktzeile: das Mehr-Menue ist der Kanon-Baustein mit Menue-Semantik', () => {
+  withAccess({ contacts: 'write' }, () => {
+    const html = contacts.renderContactItem(kontakt());
+    assert.match(html, /popovertarget="[^"]+" aria-haspopup="menu" aria-expanded="false"/,
+      'der Ausloeser sagt, dass er ein Menue oeffnet, und ob es offen ist');
+    assert.match(html, /class="popover-menu" id="[^"]+" popover role="menu"/,
+      'das Panel ist das geteilte popover-menu (Pfeiltasten, Fokus, aria-expanded aus popover-menu.js)');
+    for (const action of ['contact-email', 'contact-maps', 'contact-export', 'delete']) {
+      assert.match(html, new RegExp(`class="popover-menu__item[^"]*"\\s+data-action="${action}" data-id="4"`),
+        `Eintrag ${action} ist ein Kanon-Eintrag`);
+    }
+    assert.doesNotMatch(html, /contact-more-menu__panel|contact-menu-item/, 'kein Eigenbau mehr daneben');
+  });
+});
+
+test('Kontaktzeile: die lesenden Menue-Eintraege kommen an ihrem Ziel an', () => {
+  const opened = [];
+  const savedOpen = globalThis.window?.open;
+  const savedLocation = globalThis.window?.location;
+  globalThis.window = globalThis.window ?? {};
+  globalThis.window.open = (...args) => { opened.push(args); return null; };
+  const loc = { href: '' };
+  globalThis.window.location = loc;
+  try {
+    const c = kontakt();
+    contacts.runContactMenuAction('contact-email', c);
+    assert.equal(loc.href, 'mailto:praxis@example.org');
+    contacts.runContactMenuAction('contact-maps', c);
+    assert.deepEqual(opened.at(-1), ['https://www.openstreetmap.org/search?query=Hauptstr.%201', '_blank', 'noopener']);
+    contacts.runContactMenuAction('contact-export', c);
+    assert.deepEqual(opened.at(-1), ['/api/v1/contacts/4/vcard', '_blank', 'noopener']);
+    assert.equal(contacts.runContactMenuAction('delete', c), false, 'Loeschen bleibt beim Schreib-Zweig der Liste');
+  } finally {
+    globalThis.window.open = savedOpen;
+    globalThis.window.location = savedLocation;
+  }
+});
+
 test('Kontaktzeile mit Schreibrecht: das Menue fuehrt auch Loeschen', () => {
   withAccess({ contacts: 'write' }, () => {
     const html = contacts.renderContactItem(kontakt());
@@ -1599,10 +1646,13 @@ test('Kontaktzeile mit `contacts: read`: Loeschen weg, jeder Leseweg bleibt', ()
     // Die vier lesenden bleiben - und das Menue ist damit nie leer, es entsteht
     // hier also kein Knopf ohne Inhalt (der Befund aus waste.js).
     assert.match(html, /href="tel:/);
-    assert.match(html, /href="mailto:/);
-    assert.match(html, /openstreetmap\.org/);
-    assert.match(html, /\/api\/v1\/contacts\/4\/vcard/);
-    assert.match(html, /contact-more-menu__panel/);
+    // Seit dem Kanon-Menue (Re-Kritik 2026-09-28) sind Mail, Karte und Export
+    // Menue-Aktionen statt Links; wohin sie fuehren, misst der Test
+    // "die lesenden Menue-Eintraege kommen an ihrem Ziel an".
+    assert.match(html, /data-action="contact-email"/);
+    assert.match(html, /data-action="contact-maps"/);
+    assert.match(html, /data-action="contact-export"/);
+    assert.match(html, /class="popover-menu"/);
     // Und die Zeile fuehrt weiter in die Detailansicht, mit ihrem Inhalt.
     assert.match(html, /data-open="4"/);
     assert.match(html, /Dr\. Meier/);
@@ -4334,7 +4384,7 @@ test('Kanon R5: Kontaktzeile nennt die Person an Anrufen und am Mehr-Menue', () 
     const html = contacts.renderContactItem(kontakt());
     assert.match(html, /href="tel:[^"]*"[^>]*aria-label="contacts\.callNamed\{&quot;name&quot;:&quot;Dr\. Meier&quot;\}"/,
       'zwoelf Zeilen, die alle "Anrufen" heissen, sind fuer den Screenreader eine');
-    assert.match(html, /contact-more-menu__trigger"[^>]*aria-label="common\.moreActionsNamed\{&quot;name&quot;:&quot;Dr\. Meier&quot;\}"/);
+    assert.match(html, /contact-more-menu__trigger popover-menu__trigger"[^>]*aria-label="common\.moreActionsNamed\{&quot;name&quot;:&quot;Dr\. Meier&quot;\}"/);
   });
 });
 

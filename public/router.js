@@ -34,6 +34,7 @@ import {
 } from '/utils/search-sections.js';
 import { buildHelpRows } from '/utils/help.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
+import { wirePaletteCombobox } from '/utils/palette-combobox.js';
 import { triggerPageFab } from '/utils/fab.js';
 import { hasLeaveGuard, mayLeave } from '/utils/leave-guard.js';
 import { wireSheetDrag } from '/utils/sheet-drag.js';
@@ -2244,9 +2245,10 @@ function renderAppShell(container) {
   searchStatus.setAttribute('role', 'status');
   searchStatus.setAttribute('aria-live', 'polite');
   searchPanel.appendChild(searchStatus);
-  // Schließen NACH den Treffern im DOM (visuell absolut oben rechts): Tab aus
-  // dem Suchfeld erreicht so direkt das erste Ergebnis statt erst den
-  // Schließen-Button (Audit A1-14); Esc bleibt der schnelle Ausstieg.
+  // Schließen NACH den Treffern im DOM (visuell absolut oben rechts). Die
+  // Treffer selbst stehen nicht mehr in der Tab-Folge: das Feld ist eine
+  // Combobox, Pfeile markieren und Enter oeffnet (utils/palette-combobox.js);
+  // Tab fuehrt vom Feld zum Schliessen, Esc bleibt der schnelle Ausstieg.
   searchPanel.appendChild(searchClose);
   searchOverlay.appendChild(searchPanel);
 
@@ -3448,6 +3450,12 @@ function initSearch(container) {
   const status       = container.querySelector('#search-status');
   if (!overlay || !input || !results) return null;
 
+  // Das Feld ist eine Combobox ueber der Trefferliste (Re-Critique
+  // 2026-09-28, A1 P1-1): Enter oeffnet die markierte Zeile, Pfeiltasten
+  // bewegen nur die Markierung, der Fokus bleibt im Feld. Nach jedem Rendern
+  // liest `combo.refresh()` die Zeilen neu ein (utils/palette-combobox.js).
+  const combo = wirePaletteCombobox({ input, listbox: results });
+
   function setStatus(text) {
     if (status) status.textContent = text || '';
   }
@@ -3503,6 +3511,9 @@ function initSearch(container) {
     });
     scopes.appendChild(list);
     results.appendChild(scopes);
+    // Die Kacheln sind per Pfeil erreichbar, aber nichts ist vorgewaehlt:
+    // Enter auf ein leeres Feld oeffnet keine Kachel.
+    combo.refresh({ preselect: false });
     // Auch aus dem input-Handler (< 2 Zeichen) aufgerufen, wo openSearch die
     // Icons nicht nachzieht — daher hier selbst rendern.
     window.lucide?.createIcons({ el: results });
@@ -3552,6 +3563,7 @@ function initSearch(container) {
     input.value = '';
     results.replaceChildren();
     results.removeAttribute('aria-busy');
+    combo.clear();
     setStatus('');
     if (restoreFocus) returnFocus(lastFocusedBeforeSearch);
   }
@@ -3564,22 +3576,9 @@ function initSearch(container) {
     }
   });
 
-  // Pfeiltasten führen vom Suchfeld durch die Treffer (Audit A1-14): Enter
-  // aktiviert den fokussierten Treffer nativ (Buttons), Esc schließt.
-  overlay.addEventListener('keydown', (e) => {
-    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-    const hits = [...results.querySelectorAll('.search-result')];
-    if (!hits.length) return;
-    e.preventDefault();
-    const idx = hits.indexOf(document.activeElement);
-    if (e.key === 'ArrowDown') {
-      (idx < 0 ? hits[0] : hits[Math.min(idx + 1, hits.length - 1)]).focus();
-    } else if (idx > 0) {
-      hits[idx - 1].focus();
-    } else if (idx === 0) {
-      input.focus();
-    }
-  });
+  // Pfeiltasten und Enter gehoeren dem Feld selbst (Combobox oben): die
+  // Pfeile schoben frueher den Fokus in die Treffer, und Enter im Feld tat
+  // nichts (A1 P1-1).
 
   const announceCount = (count) => setStatus(
     count === 0 ? t('search.noResults')
@@ -3609,11 +3608,13 @@ function initSearch(container) {
         return;
       }
       renderSearchResults(results, null, onClose, { local, query: q });
+      combo.refresh();
       results.setAttribute('aria-busy', 'false');
       announceCount(localCount);
       return;
     }
     renderSearchResults(results, null, onClose, { local, query: q });
+    combo.refresh();
     searchTimer = setTimeout(async () => {
       // Ladezustand erst wenn der Fetch wirklich startet (nach dem Debounce):
       // Skeletons + „Suche läuft…" unter den Orten statt einer eingefroren
@@ -3624,6 +3625,9 @@ function initSearch(container) {
       try {
         const data = await api.get(`/search?q=${encodeURIComponent(q)}`);
         const count = renderSearchResults(results, data, onClose, { local, query: q });
+        // Die Daten kommen UNTER die Orte: eine schon bewegte Markierung
+        // bleibt, wo sie ist; war noch keine gesetzt, steht sie jetzt oben.
+        combo.refresh({ keep: true });
         results.setAttribute('aria-busy', 'false');
         announceCount(count);
       } catch {
@@ -3634,6 +3638,7 @@ function initSearch(container) {
         renderSearchResults(results, null, onClose, { local, query: q, silent: true });
         results.setAttribute('aria-busy', 'false');
         results.appendChild(emptyHintEl(t('search.error')));
+        combo.refresh({ keep: true });
         setStatus(t('search.error'));
       }
     }, 300);

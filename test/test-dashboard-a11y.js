@@ -613,15 +613,18 @@ test('R14 P2: am Desktop bleiben die Zeilen einzeln, und eine einzelne Ueberfael
 
 test('R14 P2: mobil deckelt das Blatt bei zwei Zeilen, die Sammelzeile zaehlt als eine, Einkauf klappt mit', () => withStage(true, () => {
   const todayStr = toLocalDateKey(new Date());
+  // Die Uhr steht fest auf dem Morgen: die Termine liegen am Abend und waren
+  // nach 21 Uhr schon vorbei - dann fiel der Test je nach Tageszeit.
+  const now = new Date(`${todayStr}T08:00:00`);
   const upcomingEvents = [1, 2, 3].map((i) => ({ id: 40 + i, title: `Termin ${i}`, start_datetime: `${todayStr}T2${i}:00:00` }));
-  const model = __test.buildTodayCockpitModel({ urgentTasks: fiveOverdue(), upcomingEvents }, []);
+  const model = __test.buildTodayCockpitModel({ urgentTasks: fiveOverdue(), upcomingEvents }, [], { now });
   assert.equal(model.rows.length, 2, `zwei Zeilen auf dem Telefon, erhalten: ${model.rows.map((r) => r.title)}`);
   assert.equal(model.rows[0].kind, 'overdue', 'das Offene bleibt unter dem Deckel');
   assert.equal(model.overflow, 2, 'der Rest steht hinter "+N weitere"');
   // Termine plus Essen: keine Ansicht zeigt beides, also klappt die Fusszeile auf.
   const shop = { urgentTasks: fiveOverdue(), upcomingEvents, todayMeals: [{ id: 9, meal_type: 'dinner', title: 'Pasta' }],
     shoppingLists: [{ id: 1, name: 'Wocheneinkauf', open_count: 7 }] };
-  const withShop = renderTodayCockpit(shop, [], false, { moreOpen: false });
+  const withShop = renderTodayCockpit(shop, [], false, { now, moreOpen: false });
   assert.match(withShop, /dashboard\.todayShopping</, 'Reichweite: die Einkaufszeile steht im Blatt');
   const regionStart = withShop.indexOf('id="today-cockpit-more"');
   const button = withShop.indexOf('data-today-more');

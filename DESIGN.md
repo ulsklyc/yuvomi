@@ -669,7 +669,9 @@ Inhalt, kein Verlauf ueber eine Karte, kein Text auf einer Flaeche, die nicht ge
   (Amber-Braun, bewusst von Danger-Rot getrennt fuer Farbfehlsicht, 4.9:1), Danger
   (Apple Red, 5.4:1), Info (Apple Blue, 5.4:1, getrennt vom Contacts-Tint). Dark Mode:
   vivide Apple-Dark-Werte (#30D158 / #FF9F0A / #FF6961 / #409CFF) mit dunkler Tinte statt
-  Weiss; die Toast-Textfarben kippen dafuer ueber eigene Tokens mit. **Ein Erfolg ist keine
+  Weiss. Der Toast kippt nicht mit: sein Shell-Glas ist in BEIDEN Themes dunkel
+  (`--toast-bg`/`--toast-text`, dunkel `--color-surface-raised` mit hellem Text; R16,
+  2026-09-28 - vorher war er im Dark die hellste Flaeche der Seite). **Ein Erfolg ist keine
   Vollflaeche (Re-Critique 2026-09-27, C2):** der Erfolgs-Toast steht auf demselben
   Shell-Glas wie jeder Toast, gruen ist nur sein Haekchen (`--shell-success-ink`, gegen das
   komponierte Glas gemessen); Fehler und Warnung bleiben Vollflaechen - sie sollen
@@ -1158,6 +1160,13 @@ Ueber 1344px Modulflaeche (Content-Spalte 1280 plus zwei Gutter) wird der Bauste
 breiter, sondern steht mittig: Liste und Detail fluchten mit dem Kopf, der seinen Inhalt auf
 die Content-Spalte zieht (1920: beide Kanten bei 430 und 1710 statt 252 und 1888).
 
+**Der klebende Kopf der Detailspalte bleibt oben** (R16, 2026-09-28). Im Zyklus-Kalender der
+Gesundheit und bei den Vitalwerten schoben sich Ziffern und Kennzahlen mit eigenem `z-index`
+beim Scrollen ueber den Kopf. Statt
+eines z-index-Wettlaufs bekommt alles hinter `.split-view__detail-head` einen eigenen
+Stapelkontext (`isolation: isolate`, layout.css) - fuer jede Split-Detailspalte
+(`test:master-detail`).
+
 **Das vierte Mass ist abgeschafft.** 960px (`data`) war ein Zwischenstand, keine Entscheidung:
 es liess 228px leer, ohne dass die Flaeche etwas trug. Zugeordnet am 2026-09-26:
 
@@ -1305,7 +1314,10 @@ waehlt deshalb die erste passende Lage: dort, wo er steht; ueber dem Dialog; dar
 seinem Platz ueber reinem Inhalt; im Dialog direkt ueber der unteren Leiste; die naechste
 freie Kante. Als Leiste zaehlen `.modal-panel__header/__footer`, `.modal-actions`,
 `[data-dialog-actions]` UND jeder sichtbare Knopf und Link des Dialogs, dazu das gerade
-fokussierte Feld (WCAG 2.4.11). Findet sich kein Platz, zeigt der Stapel nur den juengsten
+fokussierte Feld (WCAG 2.4.11). Als Flaeche zaehlt ausserdem die Detailspalte von
+Liste+Detail (`.split-view__detail`, ihr Kopf und Fuss als Leiste; R16, 2026-09-28 - der Toast
+lag bei 1280x800 auf "Loeschen"), aber nur ohne offenen Dialog; die Erinnerung weicht ihr nicht
+ganz, nur ihrem Fuss. Findet sich kein Platz, zeigt der Stapel nur den juengsten
 Toast, die uebrigen stehen `inert` als `.toast--tucked` bereit. Ein Dialog mit eigener
 Kopf- oder Fusszeile zeichnet sie mit `data-dialog-actions` aus; das Register dazu fuehrt
 `test:toast-placement`.
@@ -1340,10 +1352,10 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 |---|---|---|---|
 | Bearbeiten/Loeschen/Mehr an einer Zeile | `.row-action`, Loeschen `.row-action--danger`, dauerhaft sichtbar (ignore.md) | `rowActionHtml()` / `rowActionEl()` (utils/row-action.js); Mehr-Menue: `popoverMenuHtml({ triggerClass: 'row-action' })` | `btn--secondary btn--icon` (violett umrandet), `btn--danger-outline` als Ring, eigene Stiftzellen, `btn--icon btn--sm` |
 | Name der Zeilenaktion | nennt das OBJEKT: "Anna anrufen", "Kategorie Obst loeschen" | `t('common.editNamed' / 'deleteNamed' / 'removeNamed' / 'moreActionsNamed', { name })` oder ein Modul-Key mit `{{name}}` | zwoelfmal "Anrufen", fuenfmal "Loeschen" |
-| Suchen | EIN Suchfeld: gefuellte Kapsel (`--color-fill-field`, `--radius-full`, Kante transparent, Fokus = Akzentkante + Ring), mobil im Kopf die Icon-Form. Am Desktop (ab 1024px) EINE Breite `--page-search-width` (320px, endet in Liste+Detail vor der Listenspur) an EINER Stelle: der Center-Slot direkt hinter dem Titel (Referenz Dokumente) | `renderPageSearch({ className: '... page-toolbar__center' })` + `wirePageSearch()` (utils/page-search.js); Breite und Lage stehen in page-search.css; die globale Suche teilt die Regel per Selektorliste; eine Suche nur fuer einen Abschnitt steht in dessen Kopf (`.section-toolbar`, Hauptbuch im Budget) mit derselben Breite und mobil derselben Icon-Form | eigene Felder mit 10/12/16px-Ecke, randlose Leisten, `form-input type=search`; Modulbreiten (neun Breiten 280-830px) und Auto-Rand ans Zeilenende |
+| Suchen | EIN Suchfeld: gefuellte Kapsel (`--color-fill-field`, `--radius-full`, Kante transparent, Fokus = Akzentkante + Ring), mobil im Kopf die Icon-Form. Am Desktop (ab 1024px) EINE Breite `--page-search-width` (320px, endet in Liste+Detail vor der Listenspur) an EINER Stelle: der Center-Slot direkt hinter dem Titel (Referenz Dokumente) | `renderPageSearch({ className: '... page-toolbar__center' })` + `wirePageSearch()` (utils/page-search.js); Breite und Lage stehen in page-search.css; die globale Suche teilt die Regel per Selektorliste; eine Suche nur fuer einen Abschnitt steht in dessen Kopf (`.section-toolbar`, Hauptbuch im Budget) mit derselben Breite und mobil derselben Icon-Form. Die globale Suche (⌘K) ist eine ARIA-1.2-Combobox: der erste Treffer ist vorgewaehlt, Pfeile bewegen nur die Markierung (der Fokus bleibt im Feld), Enter oeffnet sie (`utils/palette-combobox.js`, R16) | eigene Felder mit 10/12/16px-Ecke, randlose Leisten, `form-input type=search`; Modulbreiten (neun Breiten 280-830px) und Auto-Rand ans Zeilenende |
 | Folge gleichartiger Zeilen | `.row-carrier` (Surface, `--radius-lg`, `--shadow-sm`, Haarlinien `> * + *`); liegt die Liste schon in einer Karte: `.row-divided` | list-row.css | `.list-rows` (12px, ohne Schatten) - laeuft aus, danach faellt die Regel |
 | Anlegen | `page-fab` MIT Nomen: mobil in der Kapsel, am Desktop angedockt als Kopf-Pille "+ Nomen" (Kuerzel "n" angesagt); ein Kontext-FAB nennt je Tab sein Nomen (ein Nomen, keine Verbphrase) | `createPageFab({ dockLabel })`, `setPageFabAction(fab, { label, dockLabel, onClick })` (utils/fab.js) | schwebender FAB ohne Nomen, dessen Bedeutung mit dem Tab wechselt; Inline-Anlegeformulare ueber der Liste; eigener Kopfknopf `.toolbar-new-btn` |
-| Dialogknoepfe | `.modal-panel__footer`: [Loeschen `btn--danger-outline` MIT Text, links] ... [Abbrechen] [Primaer `btn--primary`]; `mountFooter()` hebt ihn an den Blattrand, mobil ueber die Falz - auch die geteilten Rueckfragen (confirm/prompt/select) | modal.js; Vorbild Kalender-Termin, Aufgabe | `.modal-actions` im scrollenden Koerper, Loeschen als rotes Icon |
+| Dialogknoepfe | `.modal-panel__footer`: [Loeschen `btn--danger-outline` MIT Text, am Anfangsrand] ... [Abbrechen] [Primaer `btn--primary`]; `mountFooter()` hebt ihn an den Blattrand, mobil ueber die Falz - auch die geteilten Rueckfragen (confirm/prompt/select). Den Anfangsrand haelt EINE Regel in layout.css an `.modal-panel__delete` (setzt `decorateFooterDelete`, RTL gespiegelt), kein `margin` je Modul (R16) | modal.js; Vorbild Kalender-Termin, Aufgabe | `.modal-actions` im scrollenden Koerper, Loeschen als rotes Icon |
 | Boolean in den Einstellungen | Schalter (`.toggle`-Bahn, `role="switch"`), Label links, Zustand rechts | `toggleRowHtml({ ..., control: 'switch' })` (settings/components.js) | native 18px-Checkbox, "Aktiviert"-Badge neben dem Haken |
 | Auswahl aus 2-4 Werten (Theme) | `.segmented` im Well (Abschnitt "Segmented Controls") | panel.css | drei getrennte Rahmenknoepfe |
 | Auswahl in einer Segment-/Tab-Leiste zeigen | EINE Bewegung: eine Kapsel hinter den Labels gleitet (`--duration-lg` + `--ease-out`, nur `transform`, Breite nur wenn sie sich aendert; reduzierte Bewegung springt); die Sidebar-Pille behaelt ihre Feder, hoechstens `--duration-xl` | `attachSegmentIndicator(bar)` (utils/segment-indicator.js; folgt jedem Wechsel des aktiven Eintrags selbst), `renderSubTabs({ indicator })`, `{ key }` fuer Leisten, die neu gebaut werden | springende Flaeche am aktiven Tab; eigene WAAPI-Kapseln; Literal-Dauern (450ms) |
@@ -1930,8 +1942,9 @@ gewachsen. Gemessen ueber alle zehn Koepfe: Kopfhoehe und Lead-Zone sind mit und
 identisch, es kostet also keine Zeile.
 
 **Die Kuechen-Leiste fuehrt ihren Absender selbst.** Nach der Leisten-Regel IST sie die
-Kopf-Navigation; ihr Siegel steht vor dem Titel "Kueche" und bleibt auch mobil stehen, wo der
-Titel selbst ausgeblendet ist - das Wort fuehrt dort die Bottom-Nav, das Zeichen den Raum.
+Kopf-Navigation; ihr Siegel steht am Desktop vor dem Titel "Kueche". Mobil weichen Titel und
+Siegel gemeinsam (R9 M10, kitchen-tabs.css): die Bottom-Nav fuehrt dort Wort und Besteck als
+aktiven Eintrag, und die 26px des Siegels fehlten den vier Tabs mit ihren Zaehlern.
 Die vier Kuechen-Koepfe bleiben siegellos: sie teilen einen Tint, weil sie ein Raum sind, und
 zwei von ihnen tragen gar keinen Seitentitel. `renderSubTabs` weist ein Siegel deshalb
 zurueck, wenn die Leiste das Modul nicht wechselt (`semantics: 'tabs'`, Gesundheit) - dort
@@ -1944,10 +1957,12 @@ Seite: ohne wegscrollende Zeile gibt es kein Andocken zu zeigen. Gemessen trifft
 Lagen - die regulaere Groessenklasse ab 1024px (Inline-Titel; seit der Werkzeugzeilen-Regel
 traegt ein Kopf dort zwar zusaetzlich seine Bar-Zeile, aber die gehoert nicht zur Lead-Zone -
 sie ist die Bedienzeile, die beim Andocken stuende, und Andocken bleibt ohnehin der kompakten
-Klasse) und mobil die drei einzeiligen Kuechen-Koepfe (Einkauf, Rezepte, Vorrat), wo die
-Kuechen-Leiste den Modulnamen traegt, also kein Seitentitel darueber steht und der Kopf
-allein seinen Center-Slot fuehrt. Der Essensplan ist unter den vieren die Ausnahme: seine
-Zeitraum-Navigation und seine Aktionen brauchen zwei Zeilen, also hat er eine Lead-Zone.
+Klasse) und mobil die vier einzeiligen Kuechen-Koepfe, wo die Kuechen-Leiste den
+Modulnamen traegt, also kein Seitentitel darueber steht und der Kopf allein seinen
+Center-Slot und EIN Werkzeugmenue fuehrt (seit R14 auch der Essensplan: Wochenstepper und
+„..." in einer 65px-Zeile). Traegt diese Zeile nur Werkzeuge (Rezepte, Vorrat), faltet sie
+angedockt trotzdem ein - ohne Lead-Zone, als Faltzeile (siehe „Variante: die Tab-Leiste ist
+der Titel").
 
 Und **was als Zeile zaehlt, entscheidet die UEBERLAPPUNG der vertikalen Intervalle, nicht
 die Oberkante.** Flex-Items unterschiedlicher Hoehe stehen mittig ausgerichtet nebeneinander
@@ -2129,12 +2144,34 @@ Leiste, Zeile 2 = EINE Kopfzeile je Tab mit [Kontext] ... [Such-Icon] [EIN „..
 dazu die angedockte Primaer-Pille). Such-Icon und Menue wandern in Zeile 2, weil die Leiste
 bei 390px schon ohne sie ueberlaeuft (gemessen scrollWidth 403/390). Die Zwei-Zeilen-Regel
 gilt unveraendert. Ein Tab ohne Werkzeuge traegt kein leeres „..." (Rezepte).
-Seit R9 (M10) gilt mobil eine Verdichtung: traegt Zeile 2 KEINEN Kontext, nur Werkzeuge
-(Rezepte: Lupe, mit angebundenem Anbieter dazu der Quellenfilter; Vorrat: Lupe und „..."),
-legen sich die Werkzeuge ans Ende der Leiste, und der Kopf ist eine Zeile (56px statt 121px,
-kitchen-tabs.css). Die Leiste endet vor ihnen; Zaehler werden dort zum Punkt an der Ecke des
-Labels (R11 H2), damit vier Tabs und zwei Werkzeuge bei 375px ohne Scrollen passen.
-Mahlzeiten und Einkauf behalten Zeile 2 fuer ihren Kontext (Woche, Listen) - 121px.
+EINE Regel fuer alle vier Tabs (R14, Re-Critique 2026-09-28 P7): die Leiste traegt nur Tabs
+mit ihren Zahlen, jedes Werkzeug steht in Zeile 2 seines Tabs. Die R9-Verdichtung (Werkzeuge
+am Ende der Leiste, Zaehler als Punkt an der Ecke) ist zurueckgenommen - sie gab vier Tabs
+vier Kopfbauarten, und „Einkauf 23" war je nach Tab eine Zahl oder ein Punkt. Ausgeklappt
+misst der Kuechenkopf in allen vier Tabs 121px (Leiste 56 + Zeile 2 65, 390px).
+
+**Zeile 2 faltet angedockt, wenn sie nur Werkzeuge traegt** (R17 K1, A4 P2-4 / A8 P3-2).
+Rezepte (Lupe, mit Anbieter dazu der Quellenfilter) und Vorrat (Lupe, „...") zahlten 65px
+fuer ein bis zwei Icons. `wireCollapsingHeader` (utils/ux.js) erkennt die Zeile selbst
+(`page-toolbar--fold-row`: Gruppen-Variante, einzeilig, ohne Titel, im Center-Slot nur die
+Suche) und haengt sie an dieselbe Schwelle und Klasse wie den Kopf der gedeckelten Module:
+ein Nutzer-Scroll im Port setzt `is-collapsed` (ab 24px, zurueck unter 8px), und nur, wenn
+der Port die Zeile ausgeklappt traegt (Reserve >= Zeile + 48px, ausgeklappt gemessen, sonst
+pendelt eine knappe Liste). Angedockt steht nur die Leiste mit der Linie der Zeile darunter;
+ungescrollt ist der Kopf unveraendert. Gemessen 390x844: Vorrat-Port 723 → 787px, erste
+Zeile y 121 → 57; Rezepte ebenso, sobald die Liste die Reserve hat. Mahlzeiten und Einkauf
+falten nicht - ihre Zeile benennt etwas (Woche, Liste) und beantwortet beim Scrollen weiter
+„wo bin ich", wie der Zeitraum im Kalender. Am Desktop (ab 1024px) faltet nichts: dort traegt
+die Zeile Suchfeld und angedockte Primaer-Pille.
+Gefaltet wird ueber Rand und Verschiebung, nicht ueber die Hoehe: der negative Rand
+(`--fold-row-h`, ohne Linie) zieht die Liste hoch, dieselbe Strecke schiebt die Zeile hinter
+die Leiste, wo die Seite sie abschneidet. Beides gleitet in Safari (eine Hoehe nach `auto`
+braeuchte `interpolate-size`), der Inhalt blendet; reduzierte Bewegung faltet ohne
+Bewegung. Die Zeile bleibt offen, solange sie Fokus, einen Suchbegriff oder ein offenes Menue
+traegt - wer per Tab hineinkommt, bekommt sie zurueck. Die Werkzeuge erreicht man angedockt
+ueber den Rueckweg nach oben, wie die Suche der gedeckelten Koepfe (Kontakte); in der Leiste
+selbst ist fuer sie kein Platz (390px, de: 65-87px frei, zwei 48px-Ziele passen nicht, ohne
+die Zaehler wieder zu Punkten zu machen).
 
 **Benannte Ausnahme: Sub-Tabs + Zeitraum (Budget, Haushaltshilfe-Berichte).** Ein Modul, dessen
 Zeile 2 schon die Sub-Tabs traegt und dessen Tab einen Zeitraum blaettert, bekommt den
@@ -2145,6 +2182,24 @@ es kleben zwei Zeilen. Die Ausnahme gilt nur fuer genau diese Kombination - ein 
 Element (Werkzeugzeile, Chipreihe) macht daraus keinen vierten Fall, sondern wandert ins
 Menue oder in den Port. `test:mobile-chrome` zaehlt keine Kopfzeilen (das ist Messarbeit),
 die Ausnahme steht deshalb hier und in der Messmatrix, nicht in einer Ausnahmekarte.
+
+**Variante: Zeitraum-Kopf (Kalender).** (R17 Z1, 2026-09-28, A1 P2-3/P3-7.) Wo der Titel
+ein navigierbarer Zeitraum ist - heute nur im Kalender -, stehen mobil die Werkzeuge in
+Zeile 1: Large Title, dahinter trailing Filter, Lupe und EIN „..." (dort die Ansichtswahl
+als `menuitemradio`, das Segment ist unter 640px ausgeblendet). Zeile 2 gehoert allein
+dem Zeitraum-Stepper (zurueck, Wert, vor, dahinter „Heute"). Begruendung: Apples Kalender
+stellt seine Werkzeuge ebenso neben den Zeitraum-Titel, und kein Modul hat einen so
+geringen Inhaltsanteil zu verteilen - das Raster braucht jede Zeile, eine dritte kostete
+48px, und neben dem Stepper blieben dem mobilen Wochenlabel („26.09. - 28.09.2026",
+155px) nur 134px. Innen gilt die Kopfregel unveraendert: Filter, Lupe und „..." tragen
+EINE Form, die Kopf-Icon-Form `.btn--secondary.btn--icon` (48px Ziel), und der Filter ist
+der geteilte `filterButtonHtml` mit der Zahl als Badge und im Namen („2 Filter aktiv").
+Die Variante ist markiert, nicht geraten: der Kopf traegt `page-toolbar--period-title`,
+und nur unter dieser Klasse loest calendar.css die Bar-Zeile auf (`display: contents`).
+`test:mobile-chrome` findet jede Regel, die eine Bar- oder Werkzeugzeile eines Kopfs
+aufloest, und laesst sie nur mit der Klasse durch; die Klasse selbst nur in den Modulen,
+die dieser Absatz nennt. Ein zweites Modul mit Zeitraum-Titel kommt hier dazu, nicht in
+eine Ausnahmekarte.
 
 Pruefebene: **Struktur** (`test:mobile-chrome` - Kapsel ausser Fluss, `--nav-tail` im
 Nachlauf, keine klebende Chipreihe, kein `sticky; bottom: 0`, Icon-Form im Wrapper, die
@@ -2536,6 +2591,19 @@ Sonde 5) faehrt die Geste im gerenderten Dokument in `de` und `ar` und misst, we
 Panel sie aufdeckt - **ob eine Liste ueberhaupt verdrahtet ist, sieht nur diese Ebene.**
 Der Einkauf verdrahtete seine Gesten nur im Nachlade-Pfad und antwortete beim ersten
 Oeffnen der Seite auf gar nichts; im Quelltext stand alles richtig da.
+
+**Anlegen im Zeitraster nach Apple-Muster** (Re-Critique 2026-09-28, R17). In Woche und Tag
+legt ein Einzelklick oder Tipp auf leere Zeit NICHTS an - er schliesst nur Offenes; daneben
+klicken ist der natuerlichste Weg aus einer Leseansicht und oeffnete vorher „Neuer Termin".
+Angelegt wird mit der Maus per **Doppelklick**, mit Finger oder Stift per **langem Druck**
+(500ms, Abbruch bei mehr als 10px Bewegung, Raster-Scroll oder `pointercancel`); welche Geste
+gilt, entscheidet der Zeiger des Kontakts, nicht eine Media Query. Waehrend des Drucks steht an
+der Druckstelle ein **Platzhalter der kommenden Startzeit** (`.cal-press-ghost`): er blendet
+ueber die Haltezeit ein, wird an der Schwelle deckend und faellt mit jedem Abbruch weg - iOS
+vibriert fuer Webseiten nicht, ohne ihn sah man bis zum Loslassen nichts. Nur Deckkraft, unter
+reduzierter Bewegung ohne Einblenden. Der sichtbare Weg bleibt „+ Termin" und das Kuerzel n;
+der Leerzustand des Tages nennt die Geste des Zeigers. Die Monatsansicht legt per Einzelklick
+nie an und blieb, wie sie war. Umsetzung: `wireTimeGridCreate` in `pages/calendar.js`.
 
 ### Das Markensiegel (Signature Component)
 Yuvomis eigene Ausweisform und die Antwort auf "Health hat die Ringe, was hat Yuvomi?" - die

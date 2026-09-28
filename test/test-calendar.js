@@ -4468,6 +4468,326 @@ test('Filter am Desktop: verankertes Popover ohne Abdunkeln statt Blatt (A2 P2-7
 });
 
 // --------------------------------------------------------
+// R17 Z1 (Re-Critique 2026-09-28, A1 P2-3/P3-7): der Zeitraum-Kopf
+// --------------------------------------------------------
+
+/** Das oeffnende Tag des Knopfs mit `id` aus einem Kopf-Markup. */
+function buttonTag(html, id) {
+  const at = html.indexOf(`id="${id}"`);
+  assert(at >= 0, `Knopf #${id} fehlt im Kopf`);
+  const open = html.lastIndexOf('<button', at);
+  const close = html.indexOf('</button>', at);
+  return { tag: html.slice(open, html.indexOf('>', at) + 1), whole: html.slice(open, close) };
+}
+
+test('Zeitraum-Kopf (R17 Z1): Filter, Lupe und „..." tragen EINE Icon-Knopfform - die der Kopfregel', () => {
+  const html = calendarHelpers.toolbarHtml({ filterCount: 0 });
+  const forms = ['cal-filters', 'cal-search', 'cal-views-menu'].map((id) => {
+    const cls = buttonTag(html, id).tag.match(/class="([^"]*)"/)[1].split(/\s+/);
+    // Die Form ist die Kapsel mit Ring des Werkzeugmenues (pageToolsMenuHtml,
+    // Vorbild documents-tools-btn) - nicht der nackte Kreis, den die Lupe und
+    // das Menue hier trugen, waehrend jedes andere Modul den Ring zeigt.
+    return { id, secondary: cls.includes('btn--secondary'), icon: cls.includes('btn--icon') };
+  });
+  for (const f of forms) {
+    assert(f.icon, `#${f.id}: ein Icon-Knopf`);
+    assert(f.secondary, `#${f.id}: dieselbe Kopf-Icon-Form wie „..." der Kopfregel (btn--secondary btn--icon)`);
+  }
+  // Dieselbe Form heisst auch dieselbe Tinte: eine Ruheregel, die einem der
+  // drei Knoepfe eine eigene Farbe gibt, macht aus ihm wieder einen zweiten
+  // Stil (die Lupe stand grau neben zwei getoenten Knoepfen).
+  const own = [...eachRule(calendarCss)].filter((r) => r.selector.split(',').some((s) =>
+    /^\.cal-toolbar__(?:filter|search|tools)-btn$/.test(s.trim())) && /(?:^|[;{\s])(?:color|background(?:-color)?|border(?:-color)?)\s*:/.test(r.body));
+  assert(own.length === 0, `keine eigene Ruhe-Tinte fuer einen Kopfknopf: ${own.map((r) => r.selector.trim()).join(' | ')}`);
+});
+
+test('Zeitraum-Kopf (R17 Z1): der Filterknopf traegt den geteilten Zaehler und nennt ihn', () => {
+  const two = buttonTag(calendarHelpers.toolbarHtml({ filterCount: 2 }), 'cal-filters');
+  assert(/\bpage-filter-btn\b/.test(two.tag), 'derselbe Baustein wie jeder Filterknopf (utils/filter-sheet.js)');
+  assert(/\bpage-filter-btn--active\b/.test(two.tag), 'aktiv, sobald ein Filter etwas wegnimmt');
+  const badge = two.whole.match(/<span class="page-filter-btn__count"([^>]*)>([^<]*)<\/span>/);
+  assert(badge, 'die Zahl steht als Badge am Knopf');
+  assert(badge[2] === '2' && !/(?<![-\w])hidden\b/.test(badge[1]), `Badge zeigt 2, gerendert: ${badge[2]}`);
+  const name = two.tag.match(/aria-label="([^"]*)"/)[1];
+  assert(/calendar\.filtersActive|2/.test(name), `zugaenglicher Name nennt die Zahl, gerendert: ${name}`);
+
+  const none = buttonTag(calendarHelpers.toolbarHtml({ filterCount: 0 }), 'cal-filters');
+  assert(!/\bpage-filter-btn--active\b/.test(none.tag), 'ohne Filter nicht aktiv');
+  assert(/<span class="page-filter-btn__count"[^>]*(?<![-\w])hidden\b/.test(none.whole), 'ohne Filter steht keine 0 am Knopf');
+  assert(/calendar\.filtersOpen|Filter/.test(none.tag.match(/aria-label="([^"]*)"/)[1]), 'ohne Filter heisst er „Filter oeffnen"');
+});
+
+// --------------------------------------------------------
+// R17 Z2 (Re-Critique 2026-09-28, A2 P1-1 + Frage): Anlegen im Zeitraster
+// nach Apple-Muster. Gemessen am AUFRUFER - renderWeekView()/renderDayView()
+// verdrahten die Geste, und der Test feuert Ereignisse auf genau die Knoten,
+// an die sie ihre Listener haengen. Ob angelegt wird, sagt das Formular, das
+// geoeffnet wird (globalThis.__openModal, Loader-Stub von components/modal.js).
+// --------------------------------------------------------
+
+const HOUR_PX = 60; // Raster 1440px hoch -> 60px je Stunde
+
+function gridHarness(render) {
+  const els = new Map();
+  const el = (sel) => {
+    if (!els.has(sel)) {
+      els.set(sel, {
+        sel,
+        listeners: [],
+        addEventListener(type, fn, opts) { this.listeners.push({ type, fn, capture: opts === true || Boolean(opts?.capture) }); },
+        getBoundingClientRect: () => ({ top: 0, height: 24 * HOUR_PX }),
+        scrollTop: 0,
+        dataset: {},
+        closest: () => null,
+        children: [],
+        append(node) { node.parentNode = this; this.children.push(node); },
+      });
+    }
+    return els.get(sel);
+  };
+  const container = { replaceChildren() {}, insertAdjacentHTML() {}, querySelector: (sel) => el(sel) };
+  const pending = [];
+  const opened = [];
+  const saved = { st: globalThis.setTimeout, ct: globalThis.clearTimeout, om: globalThis.__openModal, doc: globalThis.document };
+  globalThis.setTimeout = (fn, ms) => { const h = { fn, ms, done: false }; pending.push(h); return h; };
+  globalThis.clearTimeout = (h) => { if (h) h.done = true; };
+  globalThis.__openModal = (opts) => { opened.push(opts); };
+  // Eigener Knoten-Stub fuer den Druck-Platzhalter (kein Rest eines frueheren Tests).
+  globalThis.document = {
+    createElement: (tag) => {
+      const classes = new Set();
+      const node = {
+        tagName: tag.toUpperCase(), attrs: {}, textContent: '', parentNode: null,
+        style: { setProperty(k, v) { this[k] = v; } },
+        classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c) },
+        setAttribute(k, v) { this.attrs[k] = String(v); },
+        remove() { const p = this.parentNode; if (p) p.children.splice(p.children.indexOf(this), 1); this.parentNode = null; },
+      };
+      Object.defineProperty(node, 'className', {
+        get: () => [...classes].join(' '),
+        set: (v) => { classes.clear(); String(v).split(/\s+/).filter(Boolean).forEach((c) => classes.add(c)); },
+      });
+      return node;
+    },
+  };
+  const restore = () => {
+    globalThis.setTimeout = saved.st;
+    globalThis.clearTimeout = saved.ct;
+    if (saved.om === undefined) delete globalThis.__openModal; else globalThis.__openModal = saved.om;
+    if (saved.doc === undefined) delete globalThis.document; else globalThis.document = saved.doc;
+  };
+  try { render(container); } catch (err) { restore(); throw err; }
+
+  /** Ein leerer Punkt in der Spalte `date` auf Hoehe `y`. */
+  const cols = new Map();
+  const emptyAt = (sel, date) => {
+    if (cols.has(date)) return cols.get(date);
+    const col = {
+      dataset: { date }, children: [],
+      getBoundingClientRect: () => ({ top: 0, height: 24 * HOUR_PX }),
+      append(node) { node.parentNode = this; this.children.push(node); },
+    };
+    col.closest = (s) => (s.includes('data-date') ? col : null);
+    cols.set(date, col);
+    return col;
+  };
+  /** Ein Termin-Block: alles, was ihn sucht, findet ihn. */
+  const eventTarget = () => {
+    const ev = { dataset: { id: '999999' } };
+    ev.closest = (s) => (/week-event|day-event/.test(s) ? ev : null);
+    return ev;
+  };
+  const fire = (sel, type, props = {}) => {
+    const node = el(sel);
+    const e = {
+      type, defaultPrevented: false, stopped: false, currentTarget: node,
+      preventDefault() { this.defaultPrevented = true; },
+      stopPropagation() { this.stopped = true; },
+      stopImmediatePropagation() { this.stopped = true; },
+      ...props,
+    };
+    const ls = node.listeners.filter((l) => l.type === type);
+    for (const l of [...ls.filter((x) => x.capture), ...ls.filter((x) => !x.capture)]) {
+      if (e.stopped) break;
+      l.fn.call(node, e);
+    }
+    return e;
+  };
+  const runTimers = (upTo = Infinity) => {
+    for (const h of [...pending]) if (!h.done && h.ms <= upTo) { h.done = true; h.fn(); }
+  };
+  return { el, fire, runTimers, opened, restore, emptyAt, eventTarget };
+}
+
+function withGrid(view, fn) {
+  withOvernightState({ events: [], view }, () => {
+    const h = gridHarness((c) => (view === 'day' ? calendarHelpers.renderDayView(c) : calendarHelpers.renderWeekView(c)));
+    try { fn(h); } finally { h.restore(); }
+  });
+}
+
+const GRID = { week: '#week-cols', day: '#day-col' };
+const SCROLLER = { week: '#week-scroll', day: '#day-scroll' };
+
+for (const view of ['week', 'day']) {
+  const sel = GRID[view];
+  const touch = (h, type, y, extra = {}) => h.fire(sel, type, {
+    pointerType: 'touch', isPrimary: true, button: 0, clientX: 100, clientY: y,
+    target: h.emptyAt(sel, '2026-06-15'), ...extra,
+  });
+
+  test(`Z2 ${view}: ein Einzelklick auf leere Zeit legt NICHT an`, () => {
+    withGrid(view, (h) => {
+      h.fire(sel, 'pointerdown', { pointerType: 'mouse', isPrimary: true, button: 0, clientX: 100, clientY: 10 * HOUR_PX, target: h.emptyAt(sel, '2026-06-15') });
+      h.fire(sel, 'pointerup', { pointerType: 'mouse', clientX: 100, clientY: 10 * HOUR_PX });
+      h.fire(sel, 'click', { clientX: 100, clientY: 10 * HOUR_PX, target: h.emptyAt(sel, '2026-06-15') });
+      h.runTimers();
+      assert(h.opened.length === 0, `Einzelklick oeffnete ${h.opened.length} Formular(e)`);
+    });
+  });
+
+  test(`Z2 ${view}: ein Doppelklick mit der Maus legt an, Uhrzeit aus der Position`, () => {
+    withGrid(view, (h) => {
+      h.fire(sel, 'pointerdown', { pointerType: 'mouse', isPrimary: true, button: 0, clientX: 100, clientY: 14 * HOUR_PX, target: h.emptyAt(sel, '2026-06-15') });
+      h.fire(sel, 'dblclick', { clientX: 100, clientY: 14 * HOUR_PX + 29, target: h.emptyAt(sel, '2026-06-15') });
+      assert(h.opened.length === 1, `Doppelklick oeffnete ${h.opened.length} Formular(e)`);
+      const html = String(h.opened[0].content ?? '');
+      assert(/14:30/.test(html), 'die Startzeit kommt aus der Position (14:29 -> 14:30, 30-Minuten-Raster)');
+      assert(/2026-06-15/.test(html), 'und der Tag aus der Spalte');
+    });
+  });
+
+  test(`Z2 ${view}: ein Doppelklick auf einen Termin legt nichts an`, () => {
+    withGrid(view, (h) => {
+      h.fire(sel, 'dblclick', { clientX: 100, clientY: 9 * HOUR_PX, target: h.eventTarget() });
+      assert(h.opened.length === 0, 'der Termin gehoert dem Klick, der ihn oeffnet');
+    });
+  });
+
+  test(`Z2 ${view}: langes Druecken (Touch) legt nach dem Loslassen an, der Folgeklick verpufft`, () => {
+    withGrid(view, (h) => {
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      assert(touch(h, 'contextmenu', 8 * HOUR_PX).defaultPrevented, 'kein Systemmenue waehrend des Drucks');
+      h.runTimers(500);
+      assert(h.opened.length === 0, 'waehrend des Drucks noch kein Formular - erst beim Loslassen');
+      touch(h, 'pointerup', 8 * HOUR_PX);
+      const end = touch(h, 'touchend', 8 * HOUR_PX);
+      assert(h.opened.length === 1, `langes Druecken oeffnete ${h.opened.length} Formular(e)`);
+      assert(/08:00/.test(String(h.opened[0].content ?? '')), 'Startzeit aus der Druckstelle');
+      assert(end.defaultPrevented, 'das touchend schluckt den Klick, der sonst auf dem neuen Blatt landete');
+      touch(h, 'click', 8 * HOUR_PX);
+      assert(h.opened.length === 1, 'kein zweites Formular aus dem Folgeklick');
+    });
+  });
+
+  test(`Z2 ${view}: ein kurzer Tipp legt nicht an, Bewegung und Scrollen brechen den Druck ab`, () => {
+    withGrid(view, (h) => {
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      touch(h, 'pointerup', 8 * HOUR_PX);
+      touch(h, 'click', 8 * HOUR_PX);
+      h.runTimers();
+      assert(h.opened.length === 0, 'Tipp');
+
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      touch(h, 'pointermove', 8 * HOUR_PX, { clientX: 111 });
+      h.runTimers(500);
+      touch(h, 'pointerup', 8 * HOUR_PX, { clientX: 111 });
+      assert(h.opened.length === 0, 'Bewegung > 10px (Wischen zwischen Zeitraeumen)');
+
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      touch(h, 'pointermove', 8 * HOUR_PX + 6, { clientX: 104 });
+      h.fire(SCROLLER[view], 'scroll');
+      h.runTimers(500);
+      touch(h, 'pointerup', 8 * HOUR_PX + 6);
+      assert(h.opened.length === 0, 'Scrollen des Rasters');
+
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      touch(h, 'pointercancel', 8 * HOUR_PX);
+      h.runTimers(500);
+      touch(h, 'pointerup', 8 * HOUR_PX);
+      assert(h.opened.length === 0, 'der Browser uebernimmt die Geste (pointercancel)');
+
+      h.fire(sel, 'pointerdown', { pointerType: 'touch', isPrimary: true, clientX: 100, clientY: 9 * HOUR_PX, target: h.eventTarget() });
+      h.runTimers(500);
+      h.fire(sel, 'pointerup', { pointerType: 'touch', clientX: 100, clientY: 9 * HOUR_PX });
+      assert(h.opened.length === 0, 'ein Druck auf einen Termin legt nichts an');
+    });
+  });
+
+  test(`Z2 ${view}: waehrend des Drucks steht ein Platzhalter der Startzeit, Abbruch und Loslassen nehmen ihn weg`, () => {
+    withGrid(view, (h) => {
+      // Die Spalte, in die der Platzhalter gehoert: in der Woche die Tagesspalte
+      // unter dem Finger, im Tag die eine Spalte.
+      const col = view === 'day' ? h.el(sel) : h.emptyAt(sel, '2026-06-15');
+      const ghosts = () => col.children.filter((n) => /\bcal-press-ghost\b/.test(n.className));
+
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      assert(ghosts().length === 1, `waehrend des Drucks ${ghosts().length} Platzhalter - iOS vibriert nicht, das Auge braucht ein Signal`);
+      const g = ghosts()[0];
+      assert(g.attrs['aria-hidden'] === 'true', 'der Platzhalter ist Zierde, kein Inhalt');
+      assert(/08:00/.test(g.textContent), `er nennt die kommende Startzeit (${g.textContent})`);
+      assert(/\*\s*8\)/.test(g.style.top), `er steht an der Druckstelle (top ${g.style.top})`);
+      assert(!g.classList.contains('is-armed'), 'vor der Schwelle noch nicht scharf');
+      h.runTimers(500);
+      assert(ghosts().length === 1 && g.classList.contains('is-armed'), 'nach 500ms ist er scharf');
+      touch(h, 'pointerup', 8 * HOUR_PX);
+      assert(ghosts().length === 0, 'nach dem Anlegen verschwindet er');
+      assert(h.opened.length === 1, 'und das Formular ist offen');
+
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      touch(h, 'pointermove', 8 * HOUR_PX, { clientX: 111 });
+      assert(ghosts().length === 0, 'Bewegung > 10px nimmt ihn weg');
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      h.fire(SCROLLER[view], 'scroll');
+      assert(ghosts().length === 0, 'Scrollen nimmt ihn weg');
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      touch(h, 'pointercancel', 8 * HOUR_PX);
+      assert(ghosts().length === 0, 'pointercancel nimmt ihn weg');
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      touch(h, 'pointerup', 8 * HOUR_PX);
+      assert(ghosts().length === 0, 'ein kurzer Tipp laesst nichts stehen');
+
+      h.fire(sel, 'pointerdown', { pointerType: 'mouse', isPrimary: true, button: 0, clientX: 100, clientY: 8 * HOUR_PX, target: h.emptyAt(sel, '2026-06-15') });
+      assert(ghosts().length === 0, 'die Maus hat den Doppelklick, keinen Druck');
+      h.fire(sel, 'pointerdown', { pointerType: 'touch', isPrimary: true, clientX: 100, clientY: 9 * HOUR_PX, target: h.eventTarget() });
+      assert(ghosts().length === 0, 'ein Druck auf einen Termin zeigt keinen Platzhalter');
+      assert(h.opened.length === 1, 'kein weiteres Formular');
+    });
+  });
+
+  test(`Z2 ${view}: ein Doppeltipp (Touch) legt nicht an - dort gilt das lange Druecken`, () => {
+    withGrid(view, (h) => {
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      touch(h, 'pointerup', 8 * HOUR_PX);
+      touch(h, 'dblclick', 8 * HOUR_PX);
+      assert(h.opened.length === 0, 'Doppeltipp');
+    });
+  });
+}
+
+test('Z2: der Druck-Platzhalter blendet nur, nimmt keine Zeiger an und steht unter reduzierter Bewegung still', () => {
+  const rules = [...eachRule(calendarCss)].filter((r) => /(^|,)\s*\.cal-press-ghost\s*($|,)/.test(r.selector.trim()));
+  const base = rules.find((r) => r.at.length === 0);
+  assert(base, '.cal-press-ghost hat eine Grundregel');
+  assert(/pointer-events\s*:\s*none/.test(base.body), 'er verdeckt weder die Druckstelle noch den Klick darunter');
+  const anim = base.body.match(/animation\s*:\s*([\w-]+)/)?.[1];
+  assert(anim, 'er blendet ueber die Haltezeit ein');
+  const kf = calendarCss.match(new RegExp(`@keyframes\\s+${anim}\\s*\\{([\\s\\S]*?)\\n\\}`))?.[1] ?? '';
+  assert(kf && /opacity/.test(kf) && !/transform|translate|scale/.test(kf), `@keyframes ${anim}: nur Deckkraft, kein Versatz`);
+  const reduced = rules.find((r) => r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a)));
+  assert(reduced && /animation\s*:\s*none/.test(reduced.body), 'unter reduzierter Bewegung ohne Einblenden');
+});
+
+test('Z2: Hinweis im leeren Tag nennt die Geste des Zeigers, nicht den Einzelklick', () => {
+  const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  for (const [key, value] of Object.entries(de.calendar)) {
+    if (!/^dayEmptyHint/.test(key)) continue;
+    assert(!/Tippe auf eine Uhrzeit|Klicke auf eine Uhrzeit/.test(value), `${key}: „${value}" verspricht den Einzeltipp`);
+  }
+  assert(de.calendar.dayEmptyHintPointer && de.calendar.dayEmptyHintTouch, 'je ein Hinweis fuer Maus (Doppelklick) und Touch (langes Druecken)');
+});
+
+// --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
 console.log(`\n[Calendar-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);

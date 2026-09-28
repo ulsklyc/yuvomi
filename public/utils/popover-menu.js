@@ -6,14 +6,14 @@
  * Liste des ganzen Haushalts (Critique 2026-07-30). Ein Überlaufmenü löst beides
  * auf einmal: eine Zeile Chrome statt drei, und jeder Eintrag trägt sein Label.
  *
- * WARUM HIER UND NICHT IN shopping.js: Kontakte (`.contact-more-menu__panel`)
- * und Dokumente (`.documents-context-menu`) haben je eine private Kopie derselben
- * Sache - gleiche Popover-Mechanik, gleiche Positionierungsrechnung, gleiche
+ * WARUM HIER UND NICHT IN shopping.js: Kontakte und Dokumente
+ * (`.documents-context-menu`) hatten je eine private Kopie derselben Sache -
+ * gleiche Popover-Mechanik, gleiche Positionierungsrechnung, gleiche
  * Eintrags-Geometrie, drei Klassennamen. Eine dritte Kopie in der Küche wäre
  * genau der Befund, den dieser Umbau abstellt („inkonsistentes
- * Komponenten-Vokabular"). Die beiden Bestandskopien sind hier bewusst NICHT
- * mitmigriert: das sind zwei fremde Module, und der Auftrag ist die Küche. Wer
- * sie nachzieht, löscht rund 60 Zeilen CSS und diese Datei bleibt unverändert.
+ * Komponenten-Vokabular"). Die Kontakte nutzen seit R16 (Re-Critique
+ * 2026-09-28) dieses Menü; die Kopie der Dokumente steht noch. Wer sie
+ * nachzieht, löscht dort das CSS, und diese Datei bleibt unverändert.
  *
  * WARUM NATIVE POPOVER UND KEIN EIGENES OVERLAY: Top-Layer, Light-Dismiss (Klick
  * daneben) und Esc kommen vom Browser, inklusive Fokusrückgabe an den Trigger.
