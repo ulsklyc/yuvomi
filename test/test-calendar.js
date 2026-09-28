@@ -4539,6 +4539,8 @@ function gridHarness(render) {
         scrollTop: 0,
         dataset: {},
         closest: () => null,
+        children: [],
+        append(node) { node.parentNode = this; this.children.push(node); },
       });
     }
     return els.get(sel);
@@ -4546,21 +4548,47 @@ function gridHarness(render) {
   const container = { replaceChildren() {}, insertAdjacentHTML() {}, querySelector: (sel) => el(sel) };
   const pending = [];
   const opened = [];
-  const saved = { st: globalThis.setTimeout, ct: globalThis.clearTimeout, om: globalThis.__openModal };
+  const saved = { st: globalThis.setTimeout, ct: globalThis.clearTimeout, om: globalThis.__openModal, doc: globalThis.document };
   globalThis.setTimeout = (fn, ms) => { const h = { fn, ms, done: false }; pending.push(h); return h; };
   globalThis.clearTimeout = (h) => { if (h) h.done = true; };
   globalThis.__openModal = (opts) => { opened.push(opts); };
+  // Eigener Knoten-Stub fuer den Druck-Platzhalter (kein Rest eines frueheren Tests).
+  globalThis.document = {
+    createElement: (tag) => {
+      const classes = new Set();
+      const node = {
+        tagName: tag.toUpperCase(), attrs: {}, textContent: '', parentNode: null,
+        style: { setProperty(k, v) { this[k] = v; } },
+        classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c) },
+        setAttribute(k, v) { this.attrs[k] = String(v); },
+        remove() { const p = this.parentNode; if (p) p.children.splice(p.children.indexOf(this), 1); this.parentNode = null; },
+      };
+      Object.defineProperty(node, 'className', {
+        get: () => [...classes].join(' '),
+        set: (v) => { classes.clear(); String(v).split(/\s+/).filter(Boolean).forEach((c) => classes.add(c)); },
+      });
+      return node;
+    },
+  };
   const restore = () => {
     globalThis.setTimeout = saved.st;
     globalThis.clearTimeout = saved.ct;
     if (saved.om === undefined) delete globalThis.__openModal; else globalThis.__openModal = saved.om;
+    if (saved.doc === undefined) delete globalThis.document; else globalThis.document = saved.doc;
   };
   try { render(container); } catch (err) { restore(); throw err; }
 
   /** Ein leerer Punkt in der Spalte `date` auf Hoehe `y`. */
+  const cols = new Map();
   const emptyAt = (sel, date) => {
-    const col = { dataset: { date }, getBoundingClientRect: () => ({ top: 0, height: 24 * HOUR_PX }) };
+    if (cols.has(date)) return cols.get(date);
+    const col = {
+      dataset: { date }, children: [],
+      getBoundingClientRect: () => ({ top: 0, height: 24 * HOUR_PX }),
+      append(node) { node.parentNode = this; this.children.push(node); },
+    };
     col.closest = (s) => (s.includes('data-date') ? col : null);
+    cols.set(date, col);
     return col;
   };
   /** Ein Termin-Block: alles, was ihn sucht, findet ihn. */
@@ -4686,6 +4714,47 @@ for (const view of ['week', 'day']) {
     });
   });
 
+  test(`Z2 ${view}: waehrend des Drucks steht ein Platzhalter der Startzeit, Abbruch und Loslassen nehmen ihn weg`, () => {
+    withGrid(view, (h) => {
+      // Die Spalte, in die der Platzhalter gehoert: in der Woche die Tagesspalte
+      // unter dem Finger, im Tag die eine Spalte.
+      const col = view === 'day' ? h.el(sel) : h.emptyAt(sel, '2026-06-15');
+      const ghosts = () => col.children.filter((n) => /\bcal-press-ghost\b/.test(n.className));
+
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      assert(ghosts().length === 1, `waehrend des Drucks ${ghosts().length} Platzhalter - iOS vibriert nicht, das Auge braucht ein Signal`);
+      const g = ghosts()[0];
+      assert(g.attrs['aria-hidden'] === 'true', 'der Platzhalter ist Zierde, kein Inhalt');
+      assert(/08:00/.test(g.textContent), `er nennt die kommende Startzeit (${g.textContent})`);
+      assert(/\*\s*8\)/.test(g.style.top), `er steht an der Druckstelle (top ${g.style.top})`);
+      assert(!g.classList.contains('is-armed'), 'vor der Schwelle noch nicht scharf');
+      h.runTimers(500);
+      assert(ghosts().length === 1 && g.classList.contains('is-armed'), 'nach 500ms ist er scharf');
+      touch(h, 'pointerup', 8 * HOUR_PX);
+      assert(ghosts().length === 0, 'nach dem Anlegen verschwindet er');
+      assert(h.opened.length === 1, 'und das Formular ist offen');
+
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      touch(h, 'pointermove', 8 * HOUR_PX, { clientX: 111 });
+      assert(ghosts().length === 0, 'Bewegung > 10px nimmt ihn weg');
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      h.fire(SCROLLER[view], 'scroll');
+      assert(ghosts().length === 0, 'Scrollen nimmt ihn weg');
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      touch(h, 'pointercancel', 8 * HOUR_PX);
+      assert(ghosts().length === 0, 'pointercancel nimmt ihn weg');
+      touch(h, 'pointerdown', 8 * HOUR_PX);
+      touch(h, 'pointerup', 8 * HOUR_PX);
+      assert(ghosts().length === 0, 'ein kurzer Tipp laesst nichts stehen');
+
+      h.fire(sel, 'pointerdown', { pointerType: 'mouse', isPrimary: true, button: 0, clientX: 100, clientY: 8 * HOUR_PX, target: h.emptyAt(sel, '2026-06-15') });
+      assert(ghosts().length === 0, 'die Maus hat den Doppelklick, keinen Druck');
+      h.fire(sel, 'pointerdown', { pointerType: 'touch', isPrimary: true, clientX: 100, clientY: 9 * HOUR_PX, target: h.eventTarget() });
+      assert(ghosts().length === 0, 'ein Druck auf einen Termin zeigt keinen Platzhalter');
+      assert(h.opened.length === 1, 'kein weiteres Formular');
+    });
+  });
+
   test(`Z2 ${view}: ein Doppeltipp (Touch) legt nicht an - dort gilt das lange Druecken`, () => {
     withGrid(view, (h) => {
       touch(h, 'pointerdown', 8 * HOUR_PX);
@@ -4695,6 +4764,19 @@ for (const view of ['week', 'day']) {
     });
   });
 }
+
+test('Z2: der Druck-Platzhalter blendet nur, nimmt keine Zeiger an und steht unter reduzierter Bewegung still', () => {
+  const rules = [...eachRule(calendarCss)].filter((r) => /(^|,)\s*\.cal-press-ghost\s*($|,)/.test(r.selector.trim()));
+  const base = rules.find((r) => r.at.length === 0);
+  assert(base, '.cal-press-ghost hat eine Grundregel');
+  assert(/pointer-events\s*:\s*none/.test(base.body), 'er verdeckt weder die Druckstelle noch den Klick darunter');
+  const anim = base.body.match(/animation\s*:\s*([\w-]+)/)?.[1];
+  assert(anim, 'er blendet ueber die Haltezeit ein');
+  const kf = calendarCss.match(new RegExp(`@keyframes\\s+${anim}\\s*\\{([\\s\\S]*?)\\n\\}`))?.[1] ?? '';
+  assert(kf && /opacity/.test(kf) && !/transform|translate|scale/.test(kf), `@keyframes ${anim}: nur Deckkraft, kein Versatz`);
+  const reduced = rules.find((r) => r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a)));
+  assert(reduced && /animation\s*:\s*none/.test(reduced.body), 'unter reduzierter Bewegung ohne Einblenden');
+});
 
 test('Z2: Hinweis im leeren Tag nennt die Geste des Zeigers, nicht den Einzelklick', () => {
   const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));

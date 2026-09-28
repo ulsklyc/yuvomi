@@ -4178,7 +4178,7 @@ function renderWeekView(container) {
     slotAt: (e) => {
       if (e.target?.closest?.('.schedule-time-block, .week-event')) return null;
       const col = e.target?.closest?.('[data-date]');
-      return col ? { date: col.dataset.date, time: clickedTime(e, col) } : null;
+      return col ? { date: col.dataset.date, time: clickedTime(e, col), col } : null;
     },
   });
 
@@ -4302,13 +4302,19 @@ const GRID_PRESS_SLOP = 10;
  * ANGELEGT WIRD BEIM LOSLASSEN, und das `touchend` wird verworfen: das
  * Formular geht sonst unter dem Finger auf, und der Klick, den der Browser dem
  * Loslassen nachschickt, landete auf dem Hintergrund des neuen Blatts - der
- * schliesst es (components/modal.js). Waehrend des Drucks quittiert nur die
- * Vibration, dass er erkannt ist.
+ * schliesst es (components/modal.js).
+ *
+ * WAEHREND DES DRUCKS STEHT EIN PLATZHALTER DER KOMMENDEN STARTZEIT in der
+ * Spalte (`.cal-press-ghost`, calendar.css): er blendet ueber die Haltezeit
+ * ein, wird an der Schwelle scharf (`is-armed`) und verschwindet mit jedem
+ * Abbruch und beim Anlegen. Die Vibration allein war kein Signal - iOS
+ * vibriert fuer Webseiten nicht, dort sah man bis zum Loslassen nichts.
  *
  * @param {HTMLElement} surface  Spalten-Traeger (Woche) bzw. Tagesspalte
  * @param {object} opts
- * @param {(e: Event) => ({date: string, time: string}|null)} opts.slotAt
- *   leere Zeit unter dem Ereignis, `null` auf einem Termin oder Block
+ * @param {(e: Event) => ({date: string, time: string, col?: HTMLElement}|null)} opts.slotAt
+ *   leere Zeit unter dem Ereignis, `null` auf einem Termin oder Block; `col`
+ *   ist die Spalte, in die der Platzhalter des Drucks gehoert
  * @param {HTMLElement|null} [opts.scroller]  der Scrollport des Rasters
  * @param {(slot: {date: string, time: string}) => void} [opts.onCreate]
  */
@@ -4324,7 +4330,22 @@ function wireTimeGridCreate(surface, {
   let released = false;
   const clear = () => {
     if (press?.timer) clearTimeout(press.timer);
+    press?.ghost?.remove();
     press = null;
+  };
+  const ghostFor = (slot) => {
+    const col = slot.col || surface;
+    if (typeof document === 'undefined' || typeof col?.append !== 'function') return null;
+    const [hour, minute] = slot.time.split(':').map(Number);
+    const ghost = document.createElement('div');
+    ghost.className = 'cal-press-ghost';
+    ghost.setAttribute('aria-hidden', 'true');
+    ghost.style.top = hourOffset(hour * 60 + minute);
+    ghost.style.height = hourOffset(60);
+    ghost.style.setProperty('--cal-press-ms', `${GRID_PRESS_MS}ms`);
+    ghost.textContent = formatTime(slot.time);
+    col.append(ghost);
+    return ghost;
   };
 
   surface.addEventListener('pointerdown', (e) => {
@@ -4334,11 +4355,12 @@ function wireTimeGridCreate(surface, {
     if (lastPointer === 'mouse' || e.isPrimary === false) return;
     const slot = slotAt(e);
     if (!slot) return;
-    press = { slot, x: e.clientX, y: e.clientY, armed: false, timer: null };
+    press = { slot, x: e.clientX, y: e.clientY, armed: false, timer: null, ghost: ghostFor(slot) };
     press.timer = setTimeout(() => {
       if (!press) return;
       press.timer = null;
       press.armed = true;
+      press.ghost?.classList.add('is-armed');
       vibrate(15);
     }, GRID_PRESS_MS);
   });
@@ -4846,7 +4868,7 @@ function renderDayView(container) {
     scroller: container.querySelector('#day-scroll'),
     slotAt: (e) => {
       if (e.target?.closest?.('.schedule-time-block, .day-event')) return null;
-      return { date: day, time: clickedTime(e, dayCol) };
+      return { date: day, time: clickedTime(e, dayCol), col: dayCol };
     },
   });
 
