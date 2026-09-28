@@ -396,3 +396,22 @@ test('Belohnungen: Verlaufs-Chips sind Kanon-Filterchips mit aria-pressed (Re-Cr
   const css = readFileSync(new URL('../public/styles/rewards.css', import.meta.url), 'utf8');
   assert.doesNotMatch(css.replace(/\/\*[\s\S]*?\*\//g, ''), /\.rw-chip\b/, 'rewards.css baut keinen eigenen Chip mehr');
 });
+
+// Re-Critique 2026-09-28 (P5, A3 P2-5): mobil fiel die Punktestandzeile auf
+// eine Spalte mit voller Einloesen-Kapsel - eine Person pro Bildschirm (Leo
+// 455-623, ca. 180px). Jetzt wie die Apple-Health-Zusammenfassung: Person und
+// Punkte links, Einloesen als kompakte Kapsel rechts, die duenne Leiste
+// darunter ueber die volle Zeile. Die offene Anfrage stapelt ihren Avatar
+// nicht mehr allein ueber dem Titel.
+test('Belohnungen mobil: Punktestand als Zeile mit Trailing-Kapsel, Anfrage mit Avatar in der Zeile', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(readFileSync(new URL('../public/styles/rewards.css', import.meta.url), 'utf8'))];
+  const mobil = (sel) => rules.filter((r) => r.selector.trim() === sel && r.at.some((a) => /max-width:\s*639px/.test(a)))
+    .map((r) => r.body).join(';');
+  assert.match(mobil('.rw-standing'), /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/, 'Person | Kapsel');
+  assert.match(mobil('.rw-standing'), /grid-template-areas:\s*"id actions"\s*"progress progress"/);
+  assert.doesNotMatch(mobil('.rw-standing__actions .btn'), /flex:\s*1 1 auto/, 'keine volle Kapselbreite mehr');
+  assert.match(mobil('.rw-standing__progress'), /grid-area:\s*progress/);
+  assert.match(mobil('.rw-pending'), /grid-template-columns:\s*auto\s+minmax\(0,\s*1fr\)/, 'Avatar und Titel in einer Zeile');
+  assert.match(mobil('.rw-pending__actions'), /grid-column:\s*2/, 'die Knoepfe stehen unter dem Titel, nicht unter dem Avatar');
+});

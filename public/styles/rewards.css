@@ -605,15 +605,29 @@
   .rw-reward-grid { grid-template-columns: 1fr; }
   /* Schmaler Viewport ⇒ mit hoher Wahrscheinlichkeit Touch: 44-pt-Ziele. */
   .rw-setup-step__go { min-height: var(--target-base); }
-  /* Nur die Spaltenzahl: der Abstand ist seit dem Umzug auf `.list-row`
-   * derselbe Wert wie dort, und ihn hier zu wiederholen wäre ein Nachbau. */
+  /* EINE ZEILE JE PERSON (Re-Critique 2026-09-28, P5 / A3 P2-5). Hier fiel
+   * die Zeile auf eine Spalte mit voller Einloesen-Kapsel: gemessen ca. 180px
+   * je Person, die zweite endete unter dem Toast. Jetzt wie die
+   * Zusammenfassung in Apple Health: Person und Punkte links, Einloesen als
+   * kompakte Kapsel rechts, die duenne Leiste darunter ueber die volle Zeile.
+   * Der Abstand kommt weiter aus `.list-row`. */
   .rw-standing {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "id actions" "progress progress";
+    row-gap: var(--space-2);
   }
-  .rw-standing__actions { justify-content: stretch; }
-  .rw-standing__actions .btn { flex: 1 1 auto; }
-  .rw-pending { flex-wrap: wrap; }
-  .rw-pending__actions { flex-shrink: 0; }
+  .rw-standing__id { grid-area: id; }
+  .rw-standing__actions { grid-area: actions; }
+  .rw-standing__progress { grid-area: progress; }
+  /* Die offene Anfrage: Avatar und Titel in EINER Zeile, die Knoepfe darunter
+   * auf der Textkante - `flex-wrap` stellte den Avatar allein ueber den Titel. */
+  .rw-pending {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: var(--space-3);
+    row-gap: var(--space-2);
+  }
+  .rw-pending__actions { grid-column: 2; }
 }
 
 @media (prefers-reduced-motion: reduce) {
