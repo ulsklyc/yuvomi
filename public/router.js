@@ -29,7 +29,9 @@ import { moduleAccentToken, moduleAccentVar } from '/utils/module-accent.js';
 import { getLastHealthRoute, HEALTH_ROUTES } from '/utils/health-tabs.js';
 import { SCHEDULE_ROUTES } from '/utils/schedule-tabs.js';
 import { activityType } from '/utils/health-activity.js';
-import { SEARCH_SECTIONS, searchScopeModules, searchResultCount } from '/utils/search-sections.js';
+import {
+  SEARCH_SECTIONS, NEW_ACTIONS, searchResultCount, markSegments, paletteCommands,
+} from '/utils/search-sections.js';
 import { buildHelpRows } from '/utils/help.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { triggerPageFab } from '/utils/fab.js';
@@ -56,7 +58,9 @@ import { prefersInkText } from '/utils/contrast.js';
 import { handleMasterDetailPopstate } from '/utils/master-detail.js';
 import '/components/datepicker.js';
 import { NAV_ICONS, MODULE_ICON, moduleIconEl } from '/nav-icons.js';
-import { RENAMED_SETTINGS_SOURCE_PATHS, SETTINGS_LEAVES } from '/settings/registry.js';
+import {
+  RENAMED_SETTINGS_SOURCE_PATHS, SETTINGS_LEAVES, searchSettings, settingsOptionUrl, settingsSectionUrl,
+} from '/settings/registry.js';
 import {
   NAV_SECTION,
   resolveMobileNavOrder,
@@ -3380,12 +3384,40 @@ function initMoreSheet(container, openSearch) {
 /**
  * Initialisiert die Suchfunktion (Overlay + API-Calls).
  */
-// Durchsuchbare Domänen des /search-Endpunkts: EINE Liste in
-// utils/search-sections.js (Sektionen UND Direktsprung-Kacheln). Die Kacheln
-// zeigen nur Module, die der Betrachter in der Navigation hat - abgeschaltet
-// oder gesperrt, liefert der Server dort ohnehin nichts.
-function searchScopeAvailable(module) {
-  return !_disabledModules.has(module) && canAccessNavModule(module);
+// Die Palette hinter ⌘K (Re-Critique 2026-09-28, A1 P2-1): zuerst ORTE und
+// HANDLUNGEN, dann Daten. Die Orte sind genau die Ziele der Navigation
+// (navItems - abgeschaltet, gesperrt oder ausgeblendet faellt heraus), dazu die
+// Einstellungsblaetter aus derselben Suche wie in den Einstellungen; die
+// Handlungen sind die Anlege-Aktionen (utils/search-sections.js NEW_ACTIONS),
+// nur wo der Betrachter schreiben darf.
+function paletteLocal(q) {
+  const targets = navItems();
+  const places = targets.map((item) => ({
+    label: item.label, route: item.navHref ?? item.path, module: item.module, icon: item.icon,
+  }));
+  const settings = [];
+  if (currentUser && targets.some((item) => item.module === 'settings')) {
+    const found = searchSettings(q, { user: currentUser, translate: t });
+    const settingsLabel = t('nav.settings');
+    found.leaves.forEach((leaf) => settings.push({
+      label: t(leaf.labelKey), route: leaf.path, context: settingsLabel, module: 'settings',
+    }));
+    found.sections.forEach(({ leaf, section, label }) => settings.push({
+      label, route: settingsSectionUrl(leaf, section.id), context: t(leaf.labelKey), module: 'settings',
+    }));
+    found.options.forEach(({ leaf, key, label }) => settings.push({
+      label, route: settingsOptionUrl(leaf, key), context: t(leaf.labelKey), module: 'settings',
+    }));
+  }
+  const visible = new Set(targets.map((item) => item.module));
+  const verb = t('search.newSection');
+  const actions = NEW_ACTIONS
+    .filter((action) => visible.has(action.module) && navModuleAccess(action.module) === 'write')
+    .map((action) => ({
+      label: t(action.labelKey), route: action.route, module: action.module,
+      context: t(`nav.${action.module}`), verb, create: true,
+    }));
+  return paletteCommands(q, { places, settings, actions });
 }
 
 function initSearch(container) {
@@ -3424,20 +3456,24 @@ function initSearch(container) {
     scopes.appendChild(scopesHeading);
     const list = document.createElement('div');
     list.className = 'search-scopes__list';
-    searchScopeModules(searchScopeAvailable).forEach((module) => {
-      const scope = { labelKey: `nav.${module}`, route: `/${module}` };
+    // ALLE SICHTBAREN ZIELE, nicht die durchsuchten Module: "Direkt oeffnen"
+    // kannte Schichtplan, Haushaltshilfe, Belohnungen und Mahlzeiten nicht,
+    // weil die Suche dort keine Daten hat (Re-Critique 2026-09-28, A1 P2-1).
+    navItems().forEach((item) => {
+      const scope = { label: item.label, route: item.navHref ?? item.path };
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'search-scope';
       // Markensiegel (Herkunfts-Regel, Block 2): die Kachel benennt ihr
-      // Zielmodul ueber Familienton + Icon; der Slug ist die Route selbst.
+      // Zielmodul ueber Familienton + Icon.
       const seal = document.createElement('span');
       seal.className = 'module-seal module-seal--sm search-scope__seal';
       seal.setAttribute('aria-hidden', 'true');
-      seal.style.setProperty('--seal-accent', moduleAccentVar(scope.route.slice(1)));
-      seal.appendChild(moduleIconEl(MODULE_ICON[scope.route.slice(1)]));
+      const accent = item.accent ? `var(--${item.accent}, var(--color-accent))` : moduleAccentVar(item.module);
+      if (accent) seal.style.setProperty('--seal-accent', accent);
+      seal.appendChild(moduleIconEl(item.icon));
       const label = document.createElement('span');
-      label.textContent = t(scope.labelKey);
+      label.textContent = scope.label;
       btn.append(seal, label);
       btn.addEventListener('click', () => {
         closeSearch({ restoreFocus: false });
@@ -3525,36 +3561,48 @@ function initSearch(container) {
     }
   });
 
+  const announceCount = (count) => setStatus(
+    count === 0 ? t('search.noResults')
+      : count === 1 ? t('search.resultCountOne', { count })
+      : t('search.resultCountMany', { count }),
+  );
+
   let searchTimer = null;
   input.addEventListener('input', () => {
     clearTimeout(searchTimer);
     const q = input.value.trim();
-    if (q.length < 2) {
+    if (q.length < 1) {
       renderSearchHint();
+      return;
+    }
+    // ORTE UND HANDLUNGEN SOFORT, ohne Server und ab dem ersten Zeichen: sie
+    // kennt der Client selbst. Die Daten kommen ab zwei Zeichen dazu.
+    const local = paletteLocal(q);
+    const onClose = () => closeSearch({ restoreFocus: false });
+    const localCount = renderSearchResults(results, null, onClose, { local, query: q });
+    if (q.length < 2) {
+      results.setAttribute('aria-busy', 'false');
+      announceCount(localCount);
       return;
     }
     searchTimer = setTimeout(async () => {
       // Ladezustand erst wenn der Fetch wirklich startet (nach dem Debounce):
-      // Skeletons + „Suche läuft…" statt einer eingefroren wirkenden Fläche auf
-      // langsamem Home-Server (Critique P1). Kein Flackern bei schnellem Tippen.
-      results.replaceChildren();
+      // Skeletons + „Suche läuft…" unter den Orten statt einer eingefroren
+      // wirkenden Fläche auf langsamem Home-Server (Critique P1).
       results.setAttribute('aria-busy', 'true');
       results.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 4, lines: 2 }));
       setStatus(t('search.loading'));
       try {
         const data = await api.get(`/search?q=${encodeURIComponent(q)}`);
-        const count = renderSearchResults(results, data, () => closeSearch({ restoreFocus: false }));
+        const count = renderSearchResults(results, data, onClose, { local, query: q });
         results.setAttribute('aria-busy', 'false');
-        setStatus(
-          count === 0 ? t('search.noResults')
-            : count === 1 ? t('search.resultCountOne', { count })
-            : t('search.resultCountMany', { count }),
-        );
+        announceCount(count);
       } catch {
         // Fehler nicht verschlucken: sichtbare Meldung statt „wirkt wie 0 Treffer".
-        // Die Ansage besitzt jetzt #search-status; der sichtbare Text bleibt rein
+        // Die Ansage besitzt #search-status; der sichtbare Text bleibt rein
         // visuell (kein role=status), sonst läse der Screenreader ihn doppelt.
-        results.replaceChildren();
+        // Die Orte bleiben stehen - sie brauchen den Server nicht.
+        renderSearchResults(results, null, onClose, { local, query: q, silent: true });
         results.setAttribute('aria-busy', 'false');
         results.appendChild(emptyHintEl(t('search.error')));
         setStatus(t('search.error'));
@@ -3565,15 +3613,33 @@ function initSearch(container) {
   return openSearch;
 }
 
+/** Text mit markierten Fundstellen als Knoten (`<mark>`), ohne innerHTML. */
+function appendMarked(el, text, query) {
+  for (const seg of markSegments(text, query)) {
+    if (seg.mark) {
+      const mark = document.createElement('mark');
+      mark.className = 'search-result__hit';
+      mark.textContent = seg.text;
+      el.appendChild(mark);
+    } else {
+      el.appendChild(document.createTextNode(seg.text));
+    }
+  }
+}
+
 /**
- * Rendert Suchergebnisse in den Ergebnis-Container.
+ * Rendert die Palette: Orte und Aktionen (lokal) vor den Datentreffern.
+ * `data` ist null, solange der Server nicht geantwortet hat (oder unter zwei
+ * Zeichen gar nicht gefragt wird).
+ * @returns {number} Zahl aller Zeilen - fuer die Ansage
  */
-function renderSearchResults(container, data, onClose) {
+function renderSearchResults(container, data, onClose, { local = { places: [], actions: [] }, query = '', silent = false } = {}) {
   container.replaceChildren();
-  const total = searchResultCount(data);
+  const localCount = local.places.length + local.actions.length;
+  const total = localCount + (data ? searchResultCount(data) : 0);
 
   if (total === 0) {
-    container.appendChild(emptyHintEl(t('search.noResults')));
+    if (data && !silent) container.appendChild(emptyHintEl(t('search.noResults')));
     return 0;
   }
 
@@ -3588,7 +3654,7 @@ function renderSearchResults(container, data, onClose) {
   // der Sektion ist die Herkunft damit selbstverstaendlich, die Zeilen
   // bleiben siegelfrei. Die Zeilen selbst liegen in GENAU EINEM Traeger
   // (Zeilenlisten-Regel) statt als Karte pro Treffer.
-  function makeSection(labelKey, sealModule, items, routeFn, labelFn, metaFn) {
+  function makeSection(label, sealModule, items, { route, title, meta, go }) {
     if (!items.length) return;
     const section = document.createElement('div');
     section.className = 'search-section';
@@ -3602,29 +3668,33 @@ function renderSearchResults(container, data, onClose) {
       sealEl.appendChild(moduleIconEl(MODULE_ICON[sealModule]));
       heading.appendChild(sealEl);
     }
-    heading.appendChild(document.createTextNode(t(labelKey)));
+    heading.appendChild(document.createTextNode(label));
     section.appendChild(heading);
     const rows = document.createElement('div');
     rows.className = 'search-section__rows';
     items.forEach((item) => {
       const btn = document.createElement('button');
+      btn.type = 'button';
       btn.className = 'search-result';
-      const title = document.createElement('span');
-      title.className = 'search-result__title';
-      title.textContent = labelFn ? labelFn(item) : item.title;
-      btn.appendChild(title);
-      // Zweitzeile mit Datum/Detail: Treffer ohne jeden Kontext waren nicht
-      // unterscheidbar (Audit A1-14).
-      const metaText = metaFn?.(item);
-      if (metaText) {
-        const meta = document.createElement('span');
-        meta.className = 'search-result__meta';
-        meta.textContent = metaText;
-        btn.appendChild(meta);
+      const titleEl = document.createElement('span');
+      titleEl.className = 'search-result__title';
+      appendMarked(titleEl, title(item), query);
+      btn.appendChild(titleEl);
+      // Zweitzeile: Datum/Detail (Audit A1-14) und - steht das Suchwort nicht
+      // im Titel - der Ausschnitt, in dem es steht (A1 P2-2). Ohne ihn las sich
+      // "sch" -> "Klavier üben" wie ein Zufall.
+      const metaText = meta?.(item) || '';
+      const excerpt = item.excerpt || '';
+      if (metaText || excerpt) {
+        const metaEl = document.createElement('span');
+        metaEl.className = 'search-result__meta';
+        appendMarked(metaEl, [metaText, excerpt].filter(Boolean).join(' · '), query);
+        btn.appendChild(metaEl);
       }
       btn.addEventListener('click', () => {
         onClose();
-        navigate(routeFn(item));
+        if (go) go(item);
+        else navigate(route(item));
       });
       rows.appendChild(btn);
     });
@@ -3632,16 +3702,37 @@ function renderSearchResults(container, data, onClose) {
     container.appendChild(section);
   }
 
-  // Reihenfolge, Ueberschrift, Ziel und Zweitzeile je Trefferart:
+  // 1. GEHE ZU - Navigationsziele und Einstellungsblaetter.
+  makeSection(t('search.goTo'), null, local.places, {
+    route: (item) => item.route,
+    title: (item) => item.label,
+    meta: (item) => item.context || '',
+  });
+  // 2. NEU ANLEGEN - die Seite oeffnen und ihre Primaeraktion ausloesen, genau
+  //    wie der Kurzbefehl `n` (triggerPageFab: nichts, wo kein FAB zu sehen ist).
+  makeSection(t('search.newSection'), null, local.actions, {
+    title: (item) => item.label,
+    meta: (item) => item.context || '',
+    go: async (item) => {
+      await navigate(item.route);
+      triggerPageFab();
+    },
+  });
+
+  // 3. DATEN - Reihenfolge, Ueberschrift, Ziel und Zweitzeile je Trefferart:
   // utils/search-sections.js (test:search-permissions prueft sie gegen die
   // Antwort des Servers).
   const fmt = { formatDate, formatTime, activityLabel };
-  SEARCH_SECTIONS.forEach((section) => {
-    const hits = Array.isArray(data?.[section.bucket]) ? data[section.bucket] : [];
-    makeSection(section.labelKey, section.module, hits, section.route,
-      section.label ? (item) => section.label(item, fmt) : null,
-      section.meta ? (item) => section.meta(item, fmt) : null);
-  });
+  if (data) {
+    SEARCH_SECTIONS.forEach((section) => {
+      const hits = Array.isArray(data?.[section.bucket]) ? data[section.bucket] : [];
+      makeSection(t(section.labelKey), section.module, hits, {
+        route: section.route,
+        title: (item) => (section.label ? section.label(item, fmt) : item.title),
+        meta: section.meta ? (item) => section.meta(item, fmt) : null,
+      });
+    });
+  }
 
   // Die Siegel-Icons kommen als data-lucide-Platzhalter; der Treffer-Pfad
   // rendert sie selbst (der Leerzustands-Pfad tut es bereits genauso).

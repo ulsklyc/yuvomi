@@ -1561,6 +1561,16 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   color: var(--color-text-secondary);
 }
 
+/* Der getroffene Wortteil (Re-Critique 2026-09-28, A1 P2-2): wie Spotlight
+ * fett in der Primaertinte statt als gelber Marker - er zeigt den Grund des
+ * Treffers, ohne die Liste zu einer Textmarker-Seite zu machen. In der
+ * Zweitzeile hebt die Primaertinte ihn zusaetzlich vom Sekundaertext ab. */
+.search-result__hit {
+  background: transparent;
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
 /* Sektionskopf einer Mischstelle (Herkunfts-Regel, Block 2): das Siegel
  * benennt das Herkunftsmodul der Gruppe, der Text bleibt das
  * Navigations-Gruppierungslabel. Er steht UEBER dem Traeger auf dem
