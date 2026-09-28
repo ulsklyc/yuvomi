@@ -669,7 +669,9 @@ Inhalt, kein Verlauf ueber eine Karte, kein Text auf einer Flaeche, die nicht ge
   (Amber-Braun, bewusst von Danger-Rot getrennt fuer Farbfehlsicht, 4.9:1), Danger
   (Apple Red, 5.4:1), Info (Apple Blue, 5.4:1, getrennt vom Contacts-Tint). Dark Mode:
   vivide Apple-Dark-Werte (#30D158 / #FF9F0A / #FF6961 / #409CFF) mit dunkler Tinte statt
-  Weiss; die Toast-Textfarben kippen dafuer ueber eigene Tokens mit. **Ein Erfolg ist keine
+  Weiss. Der Toast kippt nicht mit: sein Shell-Glas ist in BEIDEN Themes dunkel
+  (`--toast-bg`/`--toast-text`, dunkel `--color-surface-raised` mit hellem Text; R16,
+  2026-09-28 - vorher war er im Dark die hellste Flaeche der Seite). **Ein Erfolg ist keine
   Vollflaeche (Re-Critique 2026-09-27, C2):** der Erfolgs-Toast steht auf demselben
   Shell-Glas wie jeder Toast, gruen ist nur sein Haekchen (`--shell-success-ink`, gegen das
   komponierte Glas gemessen); Fehler und Warnung bleiben Vollflaechen - sie sollen
@@ -1158,6 +1160,13 @@ Ueber 1344px Modulflaeche (Content-Spalte 1280 plus zwei Gutter) wird der Bauste
 breiter, sondern steht mittig: Liste und Detail fluchten mit dem Kopf, der seinen Inhalt auf
 die Content-Spalte zieht (1920: beide Kanten bei 430 und 1710 statt 252 und 1888).
 
+**Der klebende Kopf der Detailspalte bleibt oben** (R16, 2026-09-28). Im Zyklus-Kalender der
+Gesundheit und bei den Vitalwerten schoben sich Ziffern und Kennzahlen mit eigenem `z-index`
+beim Scrollen ueber den Kopf. Statt
+eines z-index-Wettlaufs bekommt alles hinter `.split-view__detail-head` einen eigenen
+Stapelkontext (`isolation: isolate`, layout.css) - fuer jede Split-Detailspalte
+(`test:master-detail`).
+
 **Das vierte Mass ist abgeschafft.** 960px (`data`) war ein Zwischenstand, keine Entscheidung:
 es liess 228px leer, ohne dass die Flaeche etwas trug. Zugeordnet am 2026-09-26:
 
@@ -1305,7 +1314,10 @@ waehlt deshalb die erste passende Lage: dort, wo er steht; ueber dem Dialog; dar
 seinem Platz ueber reinem Inhalt; im Dialog direkt ueber der unteren Leiste; die naechste
 freie Kante. Als Leiste zaehlen `.modal-panel__header/__footer`, `.modal-actions`,
 `[data-dialog-actions]` UND jeder sichtbare Knopf und Link des Dialogs, dazu das gerade
-fokussierte Feld (WCAG 2.4.11). Findet sich kein Platz, zeigt der Stapel nur den juengsten
+fokussierte Feld (WCAG 2.4.11). Als Flaeche zaehlt ausserdem die Detailspalte von
+Liste+Detail (`.split-view__detail`, ihr Kopf und Fuss als Leiste; R16, 2026-09-28 - der Toast
+lag bei 1280x800 auf "Loeschen"), aber nur ohne offenen Dialog; die Erinnerung weicht ihr nicht
+ganz, nur ihrem Fuss. Findet sich kein Platz, zeigt der Stapel nur den juengsten
 Toast, die uebrigen stehen `inert` als `.toast--tucked` bereit. Ein Dialog mit eigener
 Kopf- oder Fusszeile zeichnet sie mit `data-dialog-actions` aus; das Register dazu fuehrt
 `test:toast-placement`.
@@ -1340,10 +1352,10 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 |---|---|---|---|
 | Bearbeiten/Loeschen/Mehr an einer Zeile | `.row-action`, Loeschen `.row-action--danger`, dauerhaft sichtbar (ignore.md) | `rowActionHtml()` / `rowActionEl()` (utils/row-action.js); Mehr-Menue: `popoverMenuHtml({ triggerClass: 'row-action' })` | `btn--secondary btn--icon` (violett umrandet), `btn--danger-outline` als Ring, eigene Stiftzellen, `btn--icon btn--sm` |
 | Name der Zeilenaktion | nennt das OBJEKT: "Anna anrufen", "Kategorie Obst loeschen" | `t('common.editNamed' / 'deleteNamed' / 'removeNamed' / 'moreActionsNamed', { name })` oder ein Modul-Key mit `{{name}}` | zwoelfmal "Anrufen", fuenfmal "Loeschen" |
-| Suchen | EIN Suchfeld: gefuellte Kapsel (`--color-fill-field`, `--radius-full`, Kante transparent, Fokus = Akzentkante + Ring), mobil im Kopf die Icon-Form. Am Desktop (ab 1024px) EINE Breite `--page-search-width` (320px, endet in Liste+Detail vor der Listenspur) an EINER Stelle: der Center-Slot direkt hinter dem Titel (Referenz Dokumente) | `renderPageSearch({ className: '... page-toolbar__center' })` + `wirePageSearch()` (utils/page-search.js); Breite und Lage stehen in page-search.css; die globale Suche teilt die Regel per Selektorliste; eine Suche nur fuer einen Abschnitt steht in dessen Kopf (`.section-toolbar`, Hauptbuch im Budget) mit derselben Breite und mobil derselben Icon-Form | eigene Felder mit 10/12/16px-Ecke, randlose Leisten, `form-input type=search`; Modulbreiten (neun Breiten 280-830px) und Auto-Rand ans Zeilenende |
+| Suchen | EIN Suchfeld: gefuellte Kapsel (`--color-fill-field`, `--radius-full`, Kante transparent, Fokus = Akzentkante + Ring), mobil im Kopf die Icon-Form. Am Desktop (ab 1024px) EINE Breite `--page-search-width` (320px, endet in Liste+Detail vor der Listenspur) an EINER Stelle: der Center-Slot direkt hinter dem Titel (Referenz Dokumente) | `renderPageSearch({ className: '... page-toolbar__center' })` + `wirePageSearch()` (utils/page-search.js); Breite und Lage stehen in page-search.css; die globale Suche teilt die Regel per Selektorliste; eine Suche nur fuer einen Abschnitt steht in dessen Kopf (`.section-toolbar`, Hauptbuch im Budget) mit derselben Breite und mobil derselben Icon-Form. Die globale Suche (⌘K) ist eine ARIA-1.2-Combobox: der erste Treffer ist vorgewaehlt, Pfeile bewegen nur die Markierung (der Fokus bleibt im Feld), Enter oeffnet sie (`utils/palette-combobox.js`, R16) | eigene Felder mit 10/12/16px-Ecke, randlose Leisten, `form-input type=search`; Modulbreiten (neun Breiten 280-830px) und Auto-Rand ans Zeilenende |
 | Folge gleichartiger Zeilen | `.row-carrier` (Surface, `--radius-lg`, `--shadow-sm`, Haarlinien `> * + *`); liegt die Liste schon in einer Karte: `.row-divided` | list-row.css | `.list-rows` (12px, ohne Schatten) - laeuft aus, danach faellt die Regel |
 | Anlegen | `page-fab` MIT Nomen: mobil in der Kapsel, am Desktop angedockt als Kopf-Pille "+ Nomen" (Kuerzel "n" angesagt); ein Kontext-FAB nennt je Tab sein Nomen (ein Nomen, keine Verbphrase) | `createPageFab({ dockLabel })`, `setPageFabAction(fab, { label, dockLabel, onClick })` (utils/fab.js) | schwebender FAB ohne Nomen, dessen Bedeutung mit dem Tab wechselt; Inline-Anlegeformulare ueber der Liste; eigener Kopfknopf `.toolbar-new-btn` |
-| Dialogknoepfe | `.modal-panel__footer`: [Loeschen `btn--danger-outline` MIT Text, links] ... [Abbrechen] [Primaer `btn--primary`]; `mountFooter()` hebt ihn an den Blattrand, mobil ueber die Falz - auch die geteilten Rueckfragen (confirm/prompt/select) | modal.js; Vorbild Kalender-Termin, Aufgabe | `.modal-actions` im scrollenden Koerper, Loeschen als rotes Icon |
+| Dialogknoepfe | `.modal-panel__footer`: [Loeschen `btn--danger-outline` MIT Text, am Anfangsrand] ... [Abbrechen] [Primaer `btn--primary`]; `mountFooter()` hebt ihn an den Blattrand, mobil ueber die Falz - auch die geteilten Rueckfragen (confirm/prompt/select). Den Anfangsrand haelt EINE Regel in layout.css an `.modal-panel__delete` (setzt `decorateFooterDelete`, RTL gespiegelt), kein `margin` je Modul (R16) | modal.js; Vorbild Kalender-Termin, Aufgabe | `.modal-actions` im scrollenden Koerper, Loeschen als rotes Icon |
 | Boolean in den Einstellungen | Schalter (`.toggle`-Bahn, `role="switch"`), Label links, Zustand rechts | `toggleRowHtml({ ..., control: 'switch' })` (settings/components.js) | native 18px-Checkbox, "Aktiviert"-Badge neben dem Haken |
 | Auswahl aus 2-4 Werten (Theme) | `.segmented` im Well (Abschnitt "Segmented Controls") | panel.css | drei getrennte Rahmenknoepfe |
 | Auswahl in einer Segment-/Tab-Leiste zeigen | EINE Bewegung: eine Kapsel hinter den Labels gleitet (`--duration-lg` + `--ease-out`, nur `transform`, Breite nur wenn sie sich aendert; reduzierte Bewegung springt); die Sidebar-Pille behaelt ihre Feder, hoechstens `--duration-xl` | `attachSegmentIndicator(bar)` (utils/segment-indicator.js; folgt jedem Wechsel des aktiven Eintrags selbst), `renderSubTabs({ indicator })`, `{ key }` fuer Leisten, die neu gebaut werden | springende Flaeche am aktiven Tab; eigene WAAPI-Kapseln; Literal-Dauern (450ms) |
