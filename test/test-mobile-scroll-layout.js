@@ -20,10 +20,15 @@ const layoutCss = readFileSync(new URL('../public/styles/layout.css', import.met
 const glassCss = readFileSync(new URL('../public/styles/glass.css', import.meta.url), 'utf8');
 const tokensCss = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
 
+/* Der Rumpf der ersten Regel, deren Selektorliste GENAU diesen Selektor
+ * fuehrt. Frueher ein Regex auf `<selektor> {` - das fand auch das Ende eines
+ * laengeren Selektors: seit `html.page-swapping .nav-bottom` (Re-Critique
+ * 2026-09-28, G1) las der Safe-Area-Guard den Uebergangsnamen statt der Bar. */
 function cssRuleBody(css, selector) {
-  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = css.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`, 'm'));
-  return match?.[1] ?? '';
+  for (const rule of eachRule(css)) {
+    if (rule.selector.split(',').some((part) => part.trim() === selector)) return rule.body;
+  }
+  return '';
 }
 
 test('mobile scrolling keeps navigation and fixed layers stable', () => {
