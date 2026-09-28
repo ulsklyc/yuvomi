@@ -731,6 +731,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The reminder list for new tasks says why it is empty.** Without a CalDAV reminder list enabled
+  for tasks, the section under Settings → Modules → Tasks now explains what a reminder list is and
+  that an admin enables it, and admins get a link to Reminder sync. If the lists cannot be loaded,
+  the section shows an error with "Try again" instead of claiming that no list is enabled. The
+  section is now called "Reminder list for new tasks" (#1516).
+
 - **The glass tab bar blurs again.** Text scrolling under the tab bar on a phone and under the
   sidebar indicator was readable through the glass because the page transition cut the glass off
   from the content; the blur now works outside the short moment of a page change.
