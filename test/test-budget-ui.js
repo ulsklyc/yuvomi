@@ -2309,15 +2309,9 @@ test('Kennzahlen: Einnahmen und Ausgaben in Label-Farbe, Farbe nur am Saldo und 
 });
 
 test('Loeschknoepfe nennen, WAS sie loeschen', () => {
-  const vorher = { ...budgetUi.state };
-  try {
-    Object.assign(budgetUi.state, { entries: [zeile(), zeile({ id: 42, title: 'Strom' })], responsibleFilterId: null, groupByResponsible: false });
-    const html = budgetUi.renderEntries();
-    const names = [...html.matchAll(/data-action="delete"[^>]*aria-label="([^"]*)"/g)].map((m) => m[1]);
-    assert.equal(names.length, 2);
-    assert.notEqual(names[0], names[1], '23 gleichnamige „Eintrag loeschen" waren nicht unterscheidbar');
-  } finally { Object.assign(budgetUi.state, vorher); }
-  assert.match(budget, /data-action="delete" data-id="\$\{e\.id\}" aria-label="\$\{esc\(t\('budget\.deleteLabel', \{ title: e\.title \}\)\)\}"/);
+  // Seit R14 P8 steht Loeschen einer Buchung nur noch in ihrem Blatt (die
+  // Zeile traegt keinen Papierkorb mehr, siehe „EINE Zeilenbedienung" unten);
+  // der Name mit Objekt gilt dort.
   assert.match(budget, /id="bm-delete" aria-label="\$\{esc\(t\('budget\.deleteLabel', \{ title: entry\.title \}\)\)\}"/);
   const de = JSON.parse(read('../public/locales/de.json'));
   assert.match(de.budget.deleteLabel, /\{\{title\}\}/);
@@ -3043,4 +3037,35 @@ test('Statistik: Ausgabenbalken tragen Donut-Farbe und Anteil, keine zweite Lege
   assert.doesNotMatch(code, /budget-stats__legend budget-stats__legend--wrap/, 'die Donut-Legende zaehlt nicht alles ein zweites Mal auf');
   const fill = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-bar-row__fill--expenses');
   assert.match(fill.body, /background-color:\s*var\(--bar-fill,\s*var\(--module-accent\)\)/);
+});
+
+/* EINE ZEILENBEDIENUNG FUER ALLE BUDGET-LISTEN (R14 P8, A5 P2-6). Drei
+ * Bedienungen im selben Modul: das Hauptbuch mit dauerhaftem Papierkorb neben
+ * dem Betrag, die Abos mit Papierkorb (und Wischen), die Darlehen mit Stift,
+ * Papierkorb und Pille. Die EINE Regel jetzt: die Zeile oeffnet ihr Objekt,
+ * Loeschen (und Bearbeiten) steht in dessen Blatt, an der Zeile bleibt
+ * hoechstens die eine positive Folgeaktion (Verbuchen, Verlaengern, Rate
+ * buchen) - die Aktionszahl sinkt, die Sichtbarkeit bleibt (ignore.md). */
+test('Budget-Listen: die Zeile oeffnet, Loeschen steht im Blatt, hoechstens eine Folgeaktion (R14 P8)', () => {
+  const vorher = { ...budgetUi.state };
+  try {
+    Object.assign(budgetUi.state, { entries: [zeile()], responsibleFilterId: null, groupByResponsible: false });
+    assert.doesNotMatch(budgetUi.renderEntries(), /data-action="delete"/, 'Hauptbuch: kein Papierkorb an der Zeile');
+  } finally { Object.assign(budgetUi.state, vorher); }
+  const karte = budgetUi.renderLoanCard({
+    id: 9, title: 'Autokredit', borrower: 'Bank', direction: 'borrowed', status: 'active',
+    total_amount: 6000, remaining_amount: 4000, paid_amount: 2000, paid_installments: 4,
+    installment_count: 12, next_due_month: '2026-07', is_settled: 0, payments: [],
+  });
+  assert.doesNotMatch(karte, /loan-edit|loan-delete/, 'Darlehen: weder Stift noch Papierkorb an der Karte');
+  assert.match(karte, /data-action="loan-pay"/, 'die eine Folgeaktion bleibt');
+  const code = withoutHtmlComments(budget);
+  const bericht = code.slice(code.indexOf('function openLoanReport('), code.indexOf('function loanReportDetails('));
+  assert.match(bericht, /id="loan-report-delete"/, 'Loeschen steht im Bericht (dem Blatt des Darlehens)');
+  assert.match(bericht, /id="loan-report-edit"/, 'Bearbeiten steht im Bericht');
+  const abosCode = withoutHtmlComments(subscriptions);
+  const card = abosCode.slice(abosCode.indexOf('function renderCard('), abosCode.indexOf('function wireSubscriptionSwipe('));
+  assert.doesNotMatch(card, /rowActionHtml\(\{ icon: 'trash-2'/, 'Abos: kein Papierkorb an der Zeile');
+  assert.match(card, /action: 'renew'/, 'Abos: Verlaengern bleibt als Folgeaktion');
+  assert.match(abosCode, /id="subscription-delete"/, 'Abos: Loeschen steht im Bearbeiten-Blatt');
 });

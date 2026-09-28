@@ -154,13 +154,14 @@ function buchungsTab(entries, extra = {}) {
   return html;
 }
 
-test('Buchungszeile mit Schreibrecht: Bearbeiten, Verbuchen und Loeschen stehen da', () => {
+test('Buchungszeile mit Schreibrecht: Bearbeiten und Verbuchen stehen da, Loeschen im Blatt', () => {
   withAccess({ budget: 'write' }, () => {
     const html = buchungsTab([buchung()]);
     assert.match(html, /data-id="17"/);
     assert.match(html, /<button class="list-row__name budget-entry__title"/);
     assert.match(html, /data-action="confirm"/);
-    assert.match(html, /data-action="delete"/);
+    // R14 P8: EINE Zeilenbedienung - Loeschen steht im Blatt (#bm-delete).
+    assert.doesNotMatch(html, /data-action="delete"/);
     assert.match(html, /id="budget-manage-categories"/);
     assert.match(html, /aria-label="budget\.editEntry: Stromabschlag, /);
   });
@@ -284,7 +285,9 @@ const rate = { id: 31, installment_number: 4, amount: 500, paid_date: '2026-06-0
 test('Darlehenskarte mit `budget: read`: Bearbeiten, Loeschen und Rate buchen weg, Stand bleibt', () => {
   withAccess({ budget: 'write' }, () => {
     const html = budget.renderLoanCard(darlehen());
-    for (const a of ['loan-edit', 'loan-delete', 'loan-pay']) assert.match(html, new RegExp(`data-action="${a}"`));
+    // R14 P8: Bearbeiten und Loeschen stehen im Bericht, an der Karte bleibt „Rate buchen".
+    assert.match(html, /data-action="loan-pay"/);
+    assert.doesNotMatch(html, /loan-edit|loan-delete/);
   });
   withAccess({ budget: 'read' }, () => {
     const html = budget.renderLoanCard(darlehen());
@@ -421,7 +424,8 @@ test('Abo-Karte mit `budget: read`: der Koerper oeffnet die Leseansicht, Verlaen
     const html = abos.renderCard(abo());
     assert.match(html, /<button type="button" class="subscription-card__main list-row__main--interactive"\s+data-action="edit">/);
     assert.match(html, /data-action="renew"/);
-    assert.match(html, /data-action="delete"/);
+    // R14 P8: Loeschen steht im Bearbeiten-Blatt (#subscription-delete), nicht an der Zeile.
+    assert.doesNotMatch(html, /data-action="delete"/);
     assert.match(html, /swipe-reveal--done/);
     assert.match(html, /common\.edit/);
     assert.doesNotMatch(html, /swipe-row--static/, 'mit Geste bleibt der Wisch-Chevron');
@@ -783,8 +787,12 @@ test('READ_SAFE_ACTIONS ist eine Positivliste und enthaelt nur lesende Aktionen'
   assert.deepEqual([...budget.READ_SAFE_ACTIONS], ['loan-filter'],
     'der Raten-Filter ist die einzige lesende `data-action` dieser Seite');
   const alle = new Set([...BUDGET_CODE.matchAll(/data-action="([a-z-]+)"/g)].map((m) => m[1]));
-  assert.ok(alle.size >= 8, `nur ${alle.size} Aktionen gefunden - der Scanner misst nichts`);
-  for (const schreibend of ['delete', 'confirm', 'loan-pay', 'loan-edit', 'loan-delete',
+  // Untergrenze nur als Blindheits-Probe: seit R14 P8 stehen Loeschen und
+  // Bearbeiten in den Blaettern, die Seite traegt 7 Aktionsnamen.
+  assert.ok(alle.size >= 5, `nur ${alle.size} Aktionen gefunden - der Scanner misst nichts`);
+  // R14 P8: 'delete', 'loan-edit' und 'loan-delete' stehen nicht mehr an den
+  // Zeilen - Loeschen und Bearbeiten wohnen in den Blaettern.
+  for (const schreibend of ['confirm', 'loan-pay',
     'loan-payment-edit', 'loan-payment-delete']) {
     assert.ok(alle.has(schreibend), `${schreibend} steht nicht mehr im Markup`);
     assert.ok(!budget.READ_SAFE_ACTIONS.has(schreibend));
@@ -888,8 +896,8 @@ test('der delegierte Listen-Handler fragt VOR der ersten Aktion, und der Zeilen-
   // Die GANZE Anweisung, nicht nur ihr Ende: ein `false &&` davor liesse ein
   // Teilstueck stehen und den Riegel tot (die Gegenprobe hat es so gestellt).
   const riegel = handler.indexOf('if (action && readOnly() && !READ_SAFE_ACTIONS.has(action.dataset.action)) return;');
-  const ersteAktion = handler.indexOf('[data-action="delete"]');
-  assert.ok(riegel > 0 && ersteAktion > 0 && riegel < ersteAktion, 'der Riegel steht hinter dem Loeschen');
+  const ersteAktion = handler.indexOf('[data-action="confirm"]');
+  assert.ok(riegel > 0 && ersteAktion > 0 && riegel < ersteAktion, 'der Riegel steht hinter dem Verbuchen');
   // Der Zeilen-Klick geht an openBudgetModal - und DER verzweigt bei `read`
   // in die Leseansicht (Test unten), wie openNoteModal in P1.
   assert.match(handler, /if \(item && !action\) \{\n[^\n]*\n\s*if \(entry\) openBudgetModal\(\{ mode: 'edit', entry \}\);/);

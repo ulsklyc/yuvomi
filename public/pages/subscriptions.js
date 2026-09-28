@@ -911,7 +911,6 @@ function renderCard(subscription) {
       </button>
       ${ro ? '' : `<div class="row-actions subscription-card__actions">
         ${rowActionHtml({ icon: 'calendar-check', action: 'renew', label: t('subscriptions.markRenewedNamed', { name: subscription.name }) })}
-        ${rowActionHtml({ icon: 'trash-2', tone: 'danger', action: 'delete', label: t('common.deleteNamed', { name: subscription.name }) })}
       </div>`}
     </article>
     </div>
@@ -1376,6 +1375,10 @@ export function openSubscriptionModal(subscription = null) {
 
       ${advancedSection(advancedFieldsHtml, { open: advancedOpen })}
       <div class="modal-panel__footer subscriptions-modal-footer">
+        ${edit ? `<button type="button" class="btn btn--danger-outline" id="subscription-delete"
+                aria-label="${esc(t('common.deleteNamed', { name: subscription.name }))}" style="margin-inline-end:auto">
+          <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i><span>${esc(t('common.delete'))}</span>
+        </button>` : ''}
         <button class="btn btn--secondary" type="button" id="subscription-cancel">${t('common.cancel')}</button>
         <button class="btn btn--primary" type="submit">${edit ? t('common.save') : t('common.add')}</button>
       </div>
@@ -1416,6 +1419,13 @@ export function openSubscriptionModal(subscription = null) {
       endTypeSelect.addEventListener('change', syncEndFields);
       syncEndFields();
       panel.querySelector('#subscription-cancel').addEventListener('click', closeModal);
+      // EINE ZEILENBEDIENUNG (R14 P8): Loeschen steht hier im Fuss, nicht mehr
+      // als Papierkorb an der Zeile. Erst schliessen, dann fragen - die
+      // Rueckfrage steht dann nicht ueber einem offenen Formular.
+      panel.querySelector('#subscription-delete')?.addEventListener('click', () => {
+        closeModal({ force: true });
+        void deleteSubscription(subscription);
+      });
       panel.querySelector('#subscription-logo').addEventListener('change', async (event) => {
         const file = event.target.files[0];
         if (!file) return;

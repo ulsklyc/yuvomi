@@ -1324,9 +1324,6 @@ function renderBody() {
     const action = e.target.closest('[data-action]');
     if (action && readOnly() && !READ_SAFE_ACTIONS.has(action.dataset.action)) return;
 
-    const delBtn = e.target.closest('[data-action="delete"]');
-    if (delBtn) { await deleteEntry(parseInt(delBtn.dataset.id, 10)); return; }
-
     const confirmBtn = e.target.closest('[data-action="confirm"]');
     if (confirmBtn) { await openConfirmBookingModal(parseInt(confirmBtn.dataset.id, 10)); return; }
 
@@ -1917,11 +1914,12 @@ function entryRows(list, { fullDate = false } = {}) {
              aria-label="${esc(t('budget.responsibleFilterTo', { name: e.responsible_users[0].display_name ?? '' }))}"
            >${renderAvatarStack(e.responsible_users, { size: 16, maxVisible: 3 })}</button>`
       : '';
+    // EINE ZEILENBEDIENUNG (R14 P8, A5 P2-6): die Zeile oeffnet die Buchung,
+    // Loeschen steht in deren Blatt (#bm-delete) - an der Zeile bleibt nur die
+    // Folgeaktion „Verbuchen". Der dauerhafte Papierkorb neben dem Betrag war
+    // eine von drei Bedienungen im Modul und kappte den Titel.
     const rowActions = (masked || ro) ? '' : `
-          ${confirmBtn}
-          <button class="row-action row-action--danger" data-action="delete" data-id="${e.id}" aria-label="${esc(t('budget.deleteLabel', { title: e.title }))}">
-            <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
-          </button>`;
+          ${confirmBtn}`;
 
     return `
       <div class="list-row budget-entry${pending ? ' budget-entry--pending' : ''}${upcoming ? ' budget-entry--upcoming' : ''}${masked ? ' budget-entry--masked' : ''}" ${rowInteraction}>
@@ -2507,17 +2505,6 @@ function wireLoansPage() {
       await markLoanPayment(parseInt(btn.dataset.id, 10));
     });
   });
-  _container.querySelectorAll('[data-action="loan-edit"]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const loan = state.loans.loans.find((item) => item.id === parseInt(btn.dataset.id, 10));
-      if (loan) openLoanModal(loan);
-    });
-  });
-  _container.querySelectorAll('[data-action="loan-delete"]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      await deleteLoan(parseInt(btn.dataset.id, 10));
-    });
-  });
   _container.querySelectorAll('[data-action="loan-filter"]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const id = parseInt(btn.dataset.id, 10);
@@ -2633,10 +2620,17 @@ function openLoanReport(loan) {
         </div>
       ` : `<div class="budget-loans__empty">${t('budget.loanNoTransactions')}</div>`}
     </div>
-    <div class="modal-panel__footer modal-panel__footer--plain">
+    ${readOnly() ? `<div class="modal-panel__footer modal-panel__footer--plain">
       <div></div>
       <button class="btn btn--primary" id="loan-report-close">${t('common.close')}</button>
-    </div>`;
+    </div>` : `<div class="modal-panel__footer">
+      <button type="button" class="btn btn--danger-outline" id="loan-report-delete"
+              aria-label="${esc(t('common.deleteNamed', { name: loan.title }))}" style="margin-inline-end:auto">
+        <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i><span>${esc(t('common.delete'))}</span>
+      </button>
+      <button type="button" class="btn btn--secondary" id="loan-report-close">${t('common.close')}</button>
+      <button type="button" class="btn btn--primary" id="loan-report-edit">${esc(t('common.edit'))}</button>
+    </div>`}`;
 
   openSharedModal({
     title: t('budget.loanReportTitle'),
@@ -2644,6 +2638,18 @@ function openLoanReport(loan) {
     size: 'md',
     onSave(panel) {
       panel.querySelector('#loan-report-close')?.addEventListener('click', closeModal);
+      // EINE ZEILENBEDIENUNG (R14 P8): Bearbeiten und Loeschen wohnen hier,
+      // nicht mehr an der Karte. Bearbeiten ersetzt das Blatt; Loeschen fragt
+      // wie bisher (deleteLoan) und schliesst den Bericht vorher.
+      panel.querySelector('#loan-report-edit')?.addEventListener('click', () => {
+        closeModal({ force: true });
+        openLoanModal(loan);
+      });
+      panel.querySelector('#loan-report-delete')?.addEventListener('click', async () => {
+        closeModal({ force: true });
+        await deleteLoan(loan.id);
+        refocusAfterRender();
+      });
     },
   });
 }
@@ -2754,11 +2760,10 @@ function renderLoanCard(loan) {
         ${/* Bei `budget: read` gehen alle drei: Bearbeiten, Loeschen und das
             * Buchen einer Rate schreiben. Faelligkeit, Fortschritt und der
             * Bericht hinter der Karte bleiben - sie sind die Auskunft. */ ''}
+        ${/* EINE ZEILENBEDIENUNG (R14 P8): Bearbeiten und Loeschen stehen im
+            * Bericht, den die Karte oeffnet (openLoanReport) - an der Karte
+            * bleibt nur „Rate buchen". */ ''}
         ${readOnly() ? '' : `<div class="budget-loan-card__actions">
-          <div class="row-actions">
-            ${rowActionHtml({ icon: 'pencil', action: 'loan-edit', label: t('common.editNamed', { name: loan.title }), attrs: { 'data-id': loan.id } })}
-            ${rowActionHtml({ icon: 'trash-2', tone: 'danger', action: 'loan-delete', label: t('common.deleteNamed', { name: loan.title }), attrs: { 'data-id': loan.id } })}
-          </div>
           ${/* Sekundaer, nicht primaer (Critique 2026-09-25): drei Darlehen
               * zeigten drei violette Primaerknoepfe nebeneinander, und keiner
               * war der Weg der Seite. Der steht im Kopf („+ Darlehen"). */ ''}
