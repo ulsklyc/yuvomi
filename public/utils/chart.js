@@ -203,12 +203,33 @@ function dayNumber(dateKey) {
   return Date.UTC(y, m - 1, d) / 86400000;
 }
 
-/** X-Koordinate eines Tagesschluessels (YYYY-MM-DD) auf der Zeitachse [fromKey, toKey]. */
-export function chartTimeX(dateKey, fromKey, toKey, geo = CHART) {
+/** X-Koordinate eines Tagesschluessels (YYYY-MM-DD) auf der Zeitachse [fromKey, toKey].
+ *  Bewusst nicht exportiert: bei Nullspanne liefert sie fuer JEDEN Punkt die
+ *  linke Kante - Datenreihen gehen ueber `chartTimePositions`. */
+function chartTimeX(dateKey, fromKey, toKey, geo = CHART) {
   const { left, right } = chartScales(geo);
   const span = dayNumber(toKey) - dayNumber(fromKey);
   if (!(span > 0)) return left;
   return left + ((dayNumber(dateKey) - dayNumber(fromKey)) / span) * (right - left);
+}
+
+/**
+ * X-Koordinaten einer nach Datum sortierten Reihe auf der Zeitachse
+ * [erster, letzter Tag]. Liegen ALLE Punkte am selben Tag, hat die Achse keine
+ * Spanne - dann verteilt der Index sie gleichmaessig (`chartX`), statt sie
+ * uebereinander auf die linke Kante zu legen: zwei Wartungen oder zwei
+ * Laborbefunde vom selben Tag waren sonst ein einziger Punkt ohne Linie
+ * (Review R11). Die Regel steht hier, damit kein Aufrufer sie vergessen kann.
+ * @param {string[]} dateKeys  YYYY-MM-DD, aufsteigend
+ * @returns {number[]}
+ */
+export function chartTimePositions(dateKeys, geo = CHART) {
+  const n = dateKeys.length;
+  if (!n) return [];
+  const from = dateKeys[0];
+  const to = dateKeys[n - 1];
+  if (!(dayNumber(to) - dayNumber(from) > 0)) return dateKeys.map((_, i) => chartX(i, n, geo));
+  return dateKeys.map((key) => chartTimeX(key, from, to, geo));
 }
 
 /**

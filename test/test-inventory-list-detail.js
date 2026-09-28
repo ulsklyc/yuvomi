@@ -273,3 +273,31 @@ test('in der Spalte: Kennzahlen als Zeilen ohne Wortbruch, nicht als drei 136px-
   assert.match(label, /overflow-wrap:\s*normal/, 'kein Bruch mitten im Wort („AUFMERKSAMKE/IT")');
   assert.match(label, /white-space:\s*nowrap/);
 });
+
+// Review R11: der Kilometerstand-Trend rechnet X nach dem Datum. Zwei
+// Wartungen am selben Tag gaben der Achse keine Spanne, und jeder Punkt fiel
+// auf die linke Kante - ein Punkt, keine Linie. Die geteilte Geometrie
+// (utils/chart.js#chartTimePositions) verteilt dann nach dem Index.
+test('Kilometerstand: Wartungen am selben Tag fallen nicht auf einen Punkt', async () => {
+  const { chartScales } = await import('../public/utils/chart.js');
+  const { left, right } = chartScales();
+  const cxOf = (svg) => [...svg.matchAll(/<circle cx="([\d.]+)"/g)].map((m) => Number(m[1]));
+
+  const gleicherTag = inventory.odometerChartMarkup([
+    { date: '2026-05-01', value: 12000 },
+    { date: '2026-05-01', value: 12040 },
+  ], 'km');
+  const cx = cxOf(gleicherTag);
+  assert.equal(cx.length, 2, 'zwei Messpunkte - der Test liest das Markup nicht mehr');
+  assert.ok(Math.abs(cx[0] - left) < 0.5, `erster Punkt bei ${cx[0]}, erwartet ${left}`);
+  assert.ok(Math.abs(cx[1] - right) < 0.5, `zweiter Punkt bei ${cx[1]}, erwartet ${right} - nicht auf dem ersten`);
+
+  // Mit Spanne bleibt es die Zeitachse: der Februar steht bei seinem Tag.
+  const verteilt = cxOf(inventory.odometerChartMarkup([
+    { date: '2026-01-01', value: 1000 },
+    { date: '2026-02-01', value: 1500 },
+    { date: '2026-12-31', value: 9000 },
+  ], 'km'));
+  const erwartet = left + (31 / 364) * (right - left);
+  assert.ok(Math.abs(verteilt[1] - erwartet) < 1, `Februar bei ${verteilt[1]}, erwartet ${erwartet.toFixed(1)}`);
+});

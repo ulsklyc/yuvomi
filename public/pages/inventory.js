@@ -34,7 +34,7 @@ import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js'
 import { wireScrollFade } from '/utils/ux.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { setNavBadge } from '/utils/nav-badges.js';
-import { CHART, chartScales, chartY, chartGridMarkup, niceDomain, chartTimeX, chartTimeLabelsMarkup } from '/utils/chart.js';
+import { CHART, chartScales, chartY, chartGridMarkup, niceDomain, chartTimePositions, chartTimeLabelsMarkup } from '/utils/chart.js';
 
 let _container = null;
 let _search = null;
@@ -927,7 +927,10 @@ function odometerChartMarkup(points, unit) {
   const { min, max, steps } = niceDomain(Math.min(...values), Math.max(...values));
   const from = points[0].date;
   const to = points[points.length - 1].date;
-  const x = (i) => chartTimeX(points[i].date, from, to);
+  // Zwei Wartungen am selben Tag: chartTimePositions verteilt sie, statt sie
+  // auf die linke Kante zu legen.
+  const xs = chartTimePositions(points.map((p) => p.date));
+  const x = (i) => xs[i];
   const y = (v) => chartY(v, min, max);
 
   const spine = points.map((p, i) => `${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
@@ -2342,4 +2345,6 @@ export const __test = {
   categoryOptionsHtml,
   attachmentDetailEntries,
   buildItemForm,
+  // Review R11: Kilometerstand-Trend auf der Zeitachse, auch am selben Tag.
+  odometerChartMarkup,
 };

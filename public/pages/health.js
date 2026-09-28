@@ -14,7 +14,7 @@
 import { api } from '/api.js';
 import { t, formatDate, formatTime, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { CHART, chartScales, chartGridMarkup, chartXLabelsMarkup, chartX, chartY, niceDomain, chartTimeX, chartTimeLabelsMarkup } from '/utils/chart.js';
+import { CHART, chartScales, chartGridMarkup, chartXLabelsMarkup, chartX, chartY, niceDomain, chartTimePositions, chartTimeLabelsMarkup } from '/utils/chart.js';
 import { scheduleUndoableDelete } from '/utils/ux.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays, todayKey} from '/utils/date.js';
 import { zonedDateKey } from '/utils/timezone.js';
@@ -3661,13 +3661,13 @@ function labTrendChart(points, analyteName) {
   /* BEFUNDE LIEGEN NACH IHREM DATUM, NICHT NACH IHRER NUMMER (C4). Ein Befund
    * vom Januar, einer vom Februar und einer vom Dezember standen in gleichen
    * Abstaenden - der Februar in der Mitte, und die Steigung zum Dezember sah
-   * aus wie die zum Februar. Liegen alle am selben Tag, bleibt der Index. */
+   * aus wie die zum Februar. Liegen alle am selben Tag, bleibt der Index
+   * (chartTimePositions). */
   const from = points[0].date;
   const to = points[n - 1].date;
   const timed = from !== to;
-  const x = timed
-    ? (i) => chartTimeX(points[i].date, from, to)
-    : (i) => left + (n <= 1 ? 0 : (i * (right - left)) / (n - 1));
+  const xs = chartTimePositions(points.map((p) => p.date));
+  const x = (i) => xs[i];
   const y = (v) => pBottom - ((v - min) / (max - min)) * (pBottom - pTop);
 
   // Referenzband: gefülltes Rechteck zwischen ref_low und ref_high, sonst eine

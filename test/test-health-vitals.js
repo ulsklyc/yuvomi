@@ -543,3 +543,21 @@ test('Laborbefunde liegen nach ihrem Datum, nicht nach ihrer Nummer', () => {
   const ticks = yTicks(svg);
   assert.ok(rund(Math.abs(ticks[0] - ticks[1])), `Achse ${ticks.join('/')}`);
 });
+
+// Review R11: die Nullspannen-Regel steht zentral in chartTimePositions - der
+// Laborverlauf hatte sie selbst, der Kilometerstand im Inventar nicht.
+test('Befunde am selben Tag: die Zeitachse verteilt nach dem Index statt auf die linke Kante', async () => {
+  const { chartTimePositions } = await import('../public/utils/chart.js');
+  const { left, right } = chartScales();
+  assert.deepEqual(chartTimePositions([]), []);
+  assert.deepEqual(chartTimePositions(['2026-03-01']), [left]);
+  const gleich = chartTimePositions(['2026-03-01', '2026-03-01', '2026-03-01']);
+  assert.deepEqual(gleich.map((x) => Math.round(x)), [left, (left + right) / 2, right].map(Math.round));
+  const punkte = [
+    { date: '2026-03-01', value: 5.1, unit: 'mmol/l', flag: null, refLow: null, refHigh: null },
+    { date: '2026-03-01', value: 5.4, unit: 'mmol/l', flag: null, refLow: null, refHigh: null },
+  ];
+  const cx = [...health.labTrendChart(punkte, 'HbA1c').matchAll(/<circle cx="([\d.]+)"/g)].map((m) => Number(m[1]));
+  assert.equal(cx.length, 2);
+  assert.notEqual(cx[0], cx[1], 'zwei Befunde vom selben Tag sind zwei Punkte');
+});
