@@ -1776,6 +1776,22 @@ test('Mahlzeit aus dem Slot: Name zuerst, Tag und Mahlzeit als Zusammenfassung d
     'der Slot-Knopf sagt, dass er aus dem Slot kommt');
 });
 
+// Re-Critique 2026-09-28 (P11 / A4 P2-8): der Rezept-Aufklapper oeffnete
+// hart. Der Zustand bleibt `hidden` (sichtbarer Default, auch headless), die
+// Bewegung kommt aus dem geteilten Paar expandIn/collapseOut (utils/ux.js) -
+// Oeffnen zieht auf, Schliessen klappt erst ein und versteckt dann.
+test('Rezepte mobil: der Aufklapper zieht auf und klappt ein, statt zu springen', () => {
+  const recipesSrc = readFileSync(new URL('../public/pages/recipes.js', import.meta.url), 'utf8');
+  assert(/import \{[^}]*\bexpandIn\b[^}]*\bcollapseOut\b[^}]*\} from '\/utils\/ux\.js'|import \{[^}]*\bcollapseOut\b[^}]*\bexpandIn\b[^}]*\} from '\/utils\/ux\.js'/.test(recipesSrc),
+    'das geteilte Paar aus utils/ux.js');
+  const branch = recipesSrc.slice(recipesSrc.indexOf("if (btn.dataset.action === 'toggle-detail') {"),
+    recipesSrc.indexOf("if (btn.dataset.action === 'edit') {"));
+  assert(/panel\.hidden = false;[\s\S]*expandIn\(panel\)/.test(branch), 'Oeffnen: sichtbar machen, dann aufziehen');
+  assert(/collapseOut\(panel\)\.then\([\s\S]*panel\.hidden = true/.test(branch), 'Schliessen: erst einklappen, dann verstecken');
+  assert(/getAnimations(?:\?\.)?\(\)\.forEach\(\(a\) => a\.cancel\(\)\)/.test(branch),
+    'die gehaltene Einklapp-Animation (fill: forwards) wird danach verworfen - sonst oeffnete das Panel beim naechsten Mal auf Hoehe 0');
+});
+
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------

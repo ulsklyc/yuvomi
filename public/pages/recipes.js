@@ -12,7 +12,7 @@ import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
 import { resolveShoppingTarget, announceTransfer, mayTransferRecipeToShopping } from '/utils/kitchen-transfer.js';
 import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { ingredientRowHTML } from '/utils/ingredient-row.js';
-import { scheduleUndoableDelete } from '/utils/ux.js';
+import { scheduleUndoableDelete, expandIn, collapseOut } from '/utils/ux.js';
 import { normalizeRecipeMealTypes, RECIPE_MEAL_TYPE_KEYS } from '/utils/recipe-meal-types.js';
 import { mealPayloadFromRecipe } from '/utils/recipe-to-meal.js';
 import { todayKey } from '/utils/date.js';
@@ -588,12 +588,30 @@ function openRecipeNarrow(id, trigger) {
   // versteckter Inhalt in headless-Renderern und auf inaktiven Tabs nie
   // erscheint - der Reveal muss einen sichtbaren Default verbessern, nicht
   // Sichtbarkeit an eine Animation binden.
+  // BEWEGUNG OBENDRAUF (Re-Critique 2026-09-28, A4 P2-8): der Aufklapper
+  // oeffnete hart. Der Zustand bleibt `hidden` (siehe oben), die Bewegung kommt
+  // aus dem geteilten Paar expandIn/collapseOut (utils/ux.js, reduzierte
+  // Bewegung springt): Oeffnen macht sichtbar und zieht auf, Schliessen klappt
+  // erst ein und versteckt dann.
   if (btn.dataset.action === 'toggle-detail') {
     const panel = _container?.querySelector(`#recipe-detail-${btn.dataset.id}`);
     if (!panel) return;
     const open = btn.getAttribute('aria-expanded') === 'true';
     btn.setAttribute('aria-expanded', String(!open));
-    panel.hidden = open;
+    if (!open) {
+      panel.getAnimations?.().forEach((a) => a.cancel());
+      panel.hidden = false;
+      expandIn(panel);
+      return;
+    }
+    collapseOut(panel).then(() => {
+      // Nur verstecken, wenn inzwischen niemand wieder aufgeklappt hat.
+      if (btn.getAttribute('aria-expanded') !== 'true') panel.hidden = true;
+      // collapseOut haelt die Hoehe 0 (fill: forwards) - verwerfen, sonst
+      // oeffnete das Panel beim naechsten Mal auf Hoehe 0.
+      panel.getAnimations?.().forEach((a) => a.cancel());
+      panel.style.overflow = '';
+    });
     return;
   }
 
