@@ -13,10 +13,14 @@
  *
  * WAS STEHT, bekommt einen `view-transition-name` und wird damit aus dem
  * Wurzelbild herausgeloest (Regeln in layout.css, Abschnitt Seiten-Uebergang):
- *   - Seitenleiste und untere Kapsel: per CSS, sie sind je einmal da. Sie
- *     zeigen waehrend des Wechsels nur ihr LEBENDES neues Bild - die Pille der
- *     Kapsel gleitet dort schon seit dem Tipp (updateNav in router.js), ein
- *     eingefrorenes altes Bild darueber waere ein Geisterbild.
+ *   - Seitenleiste und untere Kapsel: per CSS unter `html.page-swapping`, und
+ *     NUR fuer die Dauer des Wechsels. Sie zeigen dort nur ihr LEBENDES neues
+ *     Bild - die Pille der Kapsel gleitet schon seit dem Tipp (updateNav in
+ *     router.js), ein eingefrorenes altes Bild darueber waere ein Geisterbild.
+ *     Dauerhaft darf der Name nicht stehen (Re-Critique 2026-09-28, A1 P1-1):
+ *     er macht die Leiste zur Backdrop Root, und der `backdrop-filter` der
+ *     Kapsel darin sah nur noch den transparenten Elternknoten - Schrift lief
+ *     scharf zwischen den Tab-Labels durch. Guard: test-motion.js (8).
  *   - Die Kuechen-Leiste: per CSS (kitchen-tabs.css); sie ist sogar derselbe
  *     Knoten vorher und nachher (utils/kitchen-tabs.js), ihre Kapsel gleitet
  *     live.
@@ -32,6 +36,8 @@
  */
 
 const TOOLBAR_NAME = 'page-toolbar';
+/** Klasse an <html>, unter der Seitenleiste und Kapsel ihren Namen tragen. */
+const SWAPPING_CLASS = 'page-swapping';
 
 /** Pfad, von dem der laufende Seitenwechsel kommt - null beim Kaltstart. */
 let _from = null;
@@ -89,6 +95,9 @@ export async function swapPage(update, { content, from = null, animate = true } 
   }
 
   const generation = ++_generation;
+  // VOR startViewTransition: der Browser nimmt das alte Bild gleich danach auf,
+  // und ohne Namen blendete die Leiste dort mit der Wurzel.
+  document.documentElement?.classList.add(SWAPPING_CLASS);
   const oldToolbar = nameToolbar(content);
   let newToolbar = null;
   const transition = document.startViewTransition(() => {
@@ -120,7 +129,10 @@ export async function swapPage(update, { content, from = null, animate = true } 
       // Wechsel raeumt auf: verwirft ein zweiter Tipp diese Transition, loest
       // `finished` auf, bevor der zweite sein altes Bild aufnimmt - und derselbe
       // Kopf-Knoten traegt dann schon dessen Namen.
-      if (newToolbar && generation === _generation) newToolbar.style.viewTransitionName = '';
+      if (generation !== _generation) return;
+      if (newToolbar) newToolbar.style.viewTransitionName = '';
+      // Erst jetzt ist die Leiste keine Backdrop Root mehr - das Glas blurrt.
+      document.documentElement?.classList.remove(SWAPPING_CLASS);
     });
   // Wirft, wenn `update` wirft - der Router faengt es in seinem catch.
   await transition.updateCallbackDone;

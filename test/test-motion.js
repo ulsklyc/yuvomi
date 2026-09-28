@@ -465,3 +465,171 @@ test('reduzierte Bewegung: die globale Sperre laesst Blenden durch, Bewegung nic
     }
   }
 });
+
+/*
+ * 8. GLAS SIEHT NUR BIS ZUR NAECHSTEN BACKDROP ROOT (Re-Critique 2026-09-28,
+ *    A1 P1-1). `view-transition-name: nav-bottom` stand dauerhaft an
+ *    `.nav-bottom` und machte die Zone zur Backdrop Root: der `backdrop-filter`
+ *    der Kapsel `.nav-bottom__items` sah nur den transparenten Elternknoten,
+ *    Schrift lief scharf zwischen den Tab-Labels durch. Dieselbe Falle stand an
+ *    `.nav-sidebar` ueber `.nav-sidebar__indicator`. Backdrop Root wird ein
+ *    Element mit `view-transition-name`, `opacity < 1`, `filter` oder `mask`.
+ *    Der Guard sucht jedes Glas-Element (Regel mit `backdrop-filter`), leitet
+ *    seine Vorfahren ab (Shell-Wurzeln, BEM-Block, Nachfahren-Selektor und die
+ *    Schichten, in die router.js es haengt) und verlangt: keine dauerhafte Regel
+ *    gibt einem Vorfahren eine dieser Eigenschaften. Waehrend eines
+ *    Seitenwechsels (`html.page-swapping`, gesetzt von swapPage) ist der Name
+ *    erlaubt - dort steht die Kapsel als eigenes Bild ohnehin still.
+ *    `opacity: 0` ist ein versteckter Zustand und kein Befund.
+ */
+const SHELL_ROOTS = ['html', 'body', 'app', 'app-shell'];
+// Schichten, in die router.js (und dashboard.js fuer den Speed-Dial) die
+// Glas-Elemente haengt - nicht aus dem Klassennamen ablesbar.
+const SHELL_PARENTS = {
+  'page-fab': ['fab-layer', 'page-fab-group'],
+  'fab-action': ['fab-actions', 'page-fab-group', 'fab-layer'],
+  'fab-backdrop': ['page-fab-group', 'fab-layer'],
+  'list-bulkbar': ['bulk-pill-layer'],
+  toast: ['toast-container'],
+};
+const TRANSIENT_GATE = /\.page-swapping\b/;
+
+function splitTop(src, isSep) {
+  const out = [];
+  let depth = 0;
+  let cur = '';
+  for (const ch of src) {
+    if (ch === '(' || ch === '[') depth += 1;
+    if (ch === ')' || ch === ']') depth -= 1;
+    if (depth === 0 && isSep(ch)) {
+      if (cur.trim()) out.push(cur.trim());
+      cur = '';
+    } else cur += ch;
+  }
+  if (cur.trim()) out.push(cur.trim());
+  return out;
+}
+const selectorList = (sel) => splitTop(sel, (ch) => ch === ',');
+const compoundsOf = (sel) => splitTop(sel, (ch) => /[\s>+~]/.test(ch));
+/** Kennung eines Compounds: erste Klasse, sonst ID, sonst Tag (`:root` = html). */
+function compoundKey(compound) {
+  const c = compound.replace(/::[\w-]+(\([^)]*\))?/g, '');
+  if (/^:root\b/.test(c)) return 'html';
+  const cls = c.match(/[.#]([\w-]+)/);
+  if (cls) return cls[1];
+  const tag = c.match(/^([a-z][\w-]*)/i);
+  return tag ? tag[1].toLowerCase() : null;
+}
+function declValue(body, prop) {
+  const m = body.match(new RegExp(`(?:^|[;{\\s])${prop}\\s*:\\s*([^;]+)`));
+  return m ? m[1].replace(/!important/, '').trim() : null;
+}
+
+function glassAncestors() {
+  const glass = new Map();
+  for (const file of allSheets) {
+    for (const rule of eachRule(css(file))) {
+      const v = declValue(rule.body, 'backdrop-filter') ?? declValue(rule.body, '-webkit-backdrop-filter');
+      if (!v || v === 'none') continue;
+      for (const sel of selectorList(rule.selector)) {
+        const parts = compoundsOf(sel);
+        const subject = parts.at(-1);
+        const own = compoundKey(subject);
+        const ancestors = new Set(SHELL_ROOTS);
+        parts.slice(0, -1).map(compoundKey).filter(Boolean).forEach((k) => ancestors.add(k));
+        // Ein Pseudo-Element (body::after) hat seinen Wirt als Vorfahren.
+        if (/::/.test(subject) && own) ancestors.add(own);
+        const block = own?.includes('__') ? own.split('__')[0] : null;
+        if (block) ancestors.add(block);
+        for (const k of [own, block]) (SHELL_PARENTS[k] ?? []).forEach((p) => ancestors.add(p));
+        if (!/::/.test(subject)) ancestors.delete(own);
+        glass.set(`${file}: ${sel}`, ancestors);
+      }
+    }
+  }
+  return glass;
+}
+
+/** Was eine Regel am Element zur Backdrop Root macht (null = nichts). */
+function backdropRootCause(body) {
+  const vtn = declValue(body, 'view-transition-name');
+  if (vtn && vtn !== 'none') return `view-transition-name: ${vtn}`;
+  const filter = declValue(body, 'filter');
+  if (filter && filter !== 'none') return `filter: ${filter}`;
+  for (const prop of ['mask', '-webkit-mask', 'mask-image', '-webkit-mask-image']) {
+    const v = declValue(body, prop);
+    if (v && v !== 'none') return `${prop}: ${v}`;
+  }
+  const opacity = declValue(body, 'opacity');
+  if (opacity && /^[\d.]+%?$/.test(opacity)) {
+    const n = opacity.endsWith('%') ? parseFloat(opacity) / 100 : parseFloat(opacity);
+    if (n > 0 && n < 1) return `opacity: ${opacity}`;
+  }
+  return null;
+}
+
+test('Glas: kein Vorfahre eines backdrop-filter-Elements ist dauerhaft eine Backdrop Root', () => {
+  const glass = glassAncestors();
+  assert.ok(glass.size >= 8, `der Scanner findet die Glas-Elemente nicht (${glass.size}) - der Guard waere blind`);
+  const kapsel = [...glass].find(([k]) => k.endsWith('.nav-bottom__items'));
+  assert.ok(kapsel && kapsel[1].has('nav-bottom'), 'die Kapsel und ihr Vorfahre .nav-bottom muessen erkannt sein');
+
+  const offenders = [];
+  for (const file of allSheets) {
+    for (const rule of eachRule(css(file))) {
+      const cause = backdropRootCause(rule.body);
+      if (!cause) continue;
+      for (const sel of selectorList(rule.selector)) {
+        if (sel.includes('::view-transition') || TRANSIENT_GATE.test(sel)) continue;
+        const subject = compoundsOf(sel).at(-1);
+        if (/::/.test(subject)) continue;
+        const key = compoundKey(subject);
+        for (const [glassSel, ancestors] of glass) {
+          if (ancestors.has(key)) offenders.push(`${file}: ${sel} { ${cause} } nimmt ${glassSel} den Hintergrund`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], offenders.join('\n'));
+});
+
+test('swapPage: die Chrome-Namen stehen nur waehrend des Wechsels (html.page-swapping)', async () => {
+  // Der Name macht die Leiste zur Backdrop Root (Guard oben). Er muss schon beim
+  // Aufnehmen des alten Bildes stehen - also VOR startViewTransition - und nach
+  // dem letzten Wechsel wieder weg sein, sonst blurrt die Kapsel nie.
+  const { swapPage } = await import('../public/utils/view-transition.js');
+  const env = stubDocument();
+  const classes = new Set();
+  env.doc.documentElement = {
+    classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c) },
+  };
+  const finishers = [];
+  const start = env.doc.startViewTransition;
+  env.doc.startViewTransition = (callback) => {
+    env.log.push(`class=${classes.has('page-swapping')}`);
+    const tr = start(callback);
+    let resolve;
+    tr.finished = new Promise((r) => { resolve = r; });
+    finishers.push(resolve);
+    return tr;
+  };
+  globalThis.document = env.doc;
+  globalThis.matchMedia = () => ({ matches: false });
+  try {
+    const first = await swapPage(() => {}, { content: env.content, from: '/tasks', animate: true });
+    assert.equal(env.log[0], 'class=true', 'beim Aufnehmen des alten Bildes fehlte der Name - die Leiste blendete mit');
+    const second = await swapPage(() => {}, { content: env.content, from: '/notes', animate: true });
+    finishers[0]();
+    await first.finished;
+    assert.equal(classes.has('page-swapping'), true, 'das Ende des ersten Wechsels nimmt dem laufenden zweiten die Namen');
+    finishers[1]();
+    await second.finished;
+    assert.equal(classes.has('page-swapping'), false, 'nach dem Wechsel bleibt die Leiste Backdrop Root - das Glas blurrt nie');
+
+    await swapPage(() => {}, { content: env.content, animate: false });
+    assert.equal(classes.has('page-swapping'), false, 'ohne Transition gibt es keinen Namen');
+  } finally {
+    delete globalThis.document;
+    delete globalThis.matchMedia;
+  }
+});

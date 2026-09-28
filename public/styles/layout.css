@@ -128,8 +128,21 @@
  * Kommt ein Name nur auf EINER Seite vor (Kueche betreten/verlassen), blendet
  * er wie die Wurzel (`:only-child` laesst die Standard-Blende stehen).
  * -------------------------------------------------------- */
-/* Die Namen `nav-sidebar` und `nav-bottom` stehen an den Basisregeln der
- * beiden Leisten (weiter unten) - dort, wo man sie sucht. */
+/* Die Namen `nav-sidebar` und `nav-bottom` stehen NUR waehrend des Wechsels:
+ * swapPage setzt `html.page-swapping` vor startViewTransition und nimmt es nach
+ * dem letzten Wechsel wieder ab. Dauerhaft gesetzt macht ein Name die Leiste
+ * zur Backdrop Root - der `backdrop-filter` der Kapsel `.nav-bottom__items` und
+ * des Seitenleisten-Indikators sah dann nur den transparenten Elternknoten, und
+ * Schrift lief scharf durchs Glas (Re-Critique 2026-09-28, A1 P1-1). Waehrend
+ * des Wechsels ist das egal: dort steht die Leiste als eigenes Bild still.
+ * Guard: test-motion.js (8). */
+html.page-swapping .nav-sidebar {
+  view-transition-name: nav-sidebar;
+}
+
+html.page-swapping .nav-bottom {
+  view-transition-name: nav-bottom;
+}
 
 /* Gedacht war: Tipps gehen waehrend der Blende an das echte Dokument darunter.
  * Chromium trifft waehrend einer Wurzel-Transition aber nur <html>, trotz
@@ -629,8 +642,6 @@
 /* Sidebar auf Mobile verstecken */
 .nav-sidebar {
   display: none;
-  /* Steht beim Seitenwechsel (View Transition, Abschnitt Seiten-Uebergang). */
-  view-transition-name: nav-sidebar;
 }
 
 /* --------------------------------------------------------
@@ -667,9 +678,9 @@
   background: transparent;
   display: flex;
   flex-direction: column;
-  /* Steht beim Seitenwechsel und zeigt dort nur ihr lebendes Bild - die Pille
-   * gleitet seit dem Tipp (View Transition, Abschnitt Seiten-Uebergang). */
-  view-transition-name: nav-bottom;
+  /* Kein `view-transition-name` hier: der Name steht nur waehrend des
+   * Seitenwechsels (`html.page-swapping`, Abschnitt Seiten-Uebergang). Dauerhaft
+   * machte er die Zone zur Backdrop Root, und die Kapsel darin blurrte nichts. */
   /* Der seitliche Rand der ZONE ist auf --space-2 gefallen, als der FAB in die
    * Kapsel zog: sechs Ziele teilen sich jetzt eine Breite, die vorher fuenf
    * trugen, und 8px Rand sehen auf einem 375er-Telefon genauso freistehend aus
