@@ -301,3 +301,154 @@ test('Kilometerstand: Wartungen am selben Tag fallen nicht auf einen Punkt', asy
   const erwartet = left + (31 / 364) * (right - left);
   assert.ok(Math.abs(verteilt[1] - erwartet) < 1, `Februar bei ${verteilt[1]}, erwartet ${erwartet.toFixed(1)}`);
 });
+
+// ---------------------------------------------------------------------------
+// Die Kategorie hat eine Adresse (Re-Critique 2026-09-28, A6 P1-1 / A8 P2-1)
+// ---------------------------------------------------------------------------
+// `openCategory()` setzte nur `state.view`; die URL blieb `/inventory`. Casey
+// wischte zurueck und landete im vorigen Modul statt in der Kategorienliste.
+// Jetzt: `/inventory?category=<key>` per pushState, Zurueck/Vor stellt die
+// Ebene aus der Adresse wieder her, und oben steht „‹ Inventar".
+
+/** Eine History, die mitschreibt, und eine Adresse, die ihr folgt. */
+function withHistory(start, fn) {
+  const saved = { history: globalThis.history, location: globalThis.location };
+  const entries = [{ state: null, url: start }];
+  let index = 0;
+  const loc = { pathname: '', search: '' };
+  const setUrl = (url) => { const [p, q = ''] = url.split('?'); loc.pathname = p; loc.search = q ? `?${q}` : ''; };
+  setUrl(start);
+  const hist = {
+    get state() { return entries[index].state; },
+    pushState(state, _t, url) { entries.splice(index + 1); entries.push({ state, url }); index += 1; setUrl(url); },
+    replaceState(state, _t, url) { entries[index] = { state, url }; setUrl(url); },
+    back() { index -= 1; setUrl(entries[index].url); hist.backs += 1; },
+    backs: 0,
+  };
+  globalThis.history = hist;
+  globalThis.location = loc;
+  try { return fn({ hist, entries: () => entries.map((e) => e.url), loc }); } finally {
+    globalThis.history = saved.history;
+    globalThis.location = saved.location;
+  }
+}
+
+async function withInventoryState(fn) {
+  const { installMiniDom } = await import('./mini-dom.js');
+  const abraeumen = installMiniDom();
+  const vorher = { items: inventory.state.items, categories: inventory.state.categories, view: inventory.state.view, active: inventory.state.activeCategory };
+  inventory.state.items = [ITEM, { ...ITEM, id: 7, category: 'vehicles' }];
+  inventory.state.categories = [{ key: 'electronics', name: 'Elektronik' }, { key: 'vehicles', name: 'Fahrzeuge' }];
+  inventory.state.view = 'browse';
+  inventory.state.activeCategory = null;
+  try { return await fn(); } finally {
+    Object.assign(inventory.state, { items: vorher.items, categories: vorher.categories, view: vorher.view, activeCategory: vorher.active });
+    abraeumen();
+  }
+}
+
+test('W1: eine Kategorie oeffnen legt einen History-Eintrag mit ihrer Adresse an', async () => {
+  await withInventoryState(() => withHistory('/inventory', ({ entries, hist }) => {
+    inventory.openCategory('vehicles');
+    assert.equal(inventory.state.view, 'category');
+    assert.deepEqual(entries(), ['/inventory', '/inventory?category=vehicles'], 'pushState, nicht nur ein Zustandswechsel');
+    assert.equal(hist.state?.path, '/inventory?category=vehicles', 'der Router liest `path` bei popstate');
+  }));
+});
+
+test('W1: Zurueck/Vor stellt die Ebene aus der Adresse wieder her', async () => {
+  await withInventoryState(() => withHistory('/inventory', ({ loc }) => {
+    inventory.openCategory('vehicles');
+    // Zurueck: die Adresse ist wieder die Kategorienliste.
+    loc.search = '';
+    inventory.syncLevelFromAddress();
+    assert.equal(inventory.state.view, 'browse', 'Zurueck fuehrt zur Kategorienliste, nicht aus dem Modul');
+    assert.equal(inventory.state.activeCategory, null);
+    // Vor: die Kategorie steht wieder da.
+    loc.search = '?category=electronics';
+    inventory.syncLevelFromAddress();
+    assert.equal(inventory.state.view, 'category');
+    assert.equal(inventory.state.activeCategory, 'electronics');
+    // Eine Adresse mit einer Kategorie, die es nicht (mehr) gibt: Startseite.
+    loc.search = '?category=weg';
+    inventory.syncLevelFromAddress();
+    assert.equal(inventory.state.view, 'browse');
+  }));
+});
+
+test('W1: „‹ Inventar" geht den Schritt zurueck, den das Oeffnen angelegt hat - sonst ein neuer Eintrag', async () => {
+  await withInventoryState(() => withHistory('/inventory', ({ hist, entries }) => {
+    inventory.openCategory('vehicles');
+    inventory.backToBrowse();
+    assert.equal(hist.backs, 1, 'direkt aus der Liste geoeffnet: history.back() wie Apples Zurueck-Knopf');
+  }));
+  await withInventoryState(() => withHistory('/inventory?category=vehicles', ({ hist, entries }) => {
+    // Per Link hereingekommen: kein Eintrag, zu dem es zurueckginge.
+    inventory.syncLevelFromAddress();
+    inventory.backToBrowse();
+    assert.equal(hist.backs, 0);
+    assert.deepEqual(entries(), ['/inventory?category=vehicles', '/inventory']);
+    assert.equal(inventory.state.view, 'browse');
+  }));
+});
+
+test('W1: der Deep-Link auf einen Gegenstand schreibt auch seine Kategorie in die Adresse', async () => {
+  await withInventoryState(() => withHistory('/inventory?open=7', ({ entries }) => {
+    const saved = globalThis.getComputedStyle;
+    globalThis.getComputedStyle = () => ({ display: 'flex' });
+    try { inventory.openDeepLinkedCategory(split); } finally { globalThis.getComputedStyle = saved; }
+    assert.deepEqual(entries(), ['/inventory?category=vehicles&open=7'], 'ersetzt, nicht gestapelt');
+  }));
+});
+
+test('W1: die Adresse einer Auswahl behaelt die Kategorie (master-detail `address`)', async () => {
+  await withInventoryState(() => withHistory('/inventory', ({ loc }) => {
+    inventory.openCategory('vehicles');
+    assert.equal(inventory.mdAddress.href('7'), '/inventory?category=vehicles&open=7');
+    assert.equal(inventory.mdAddress.href(null), '/inventory?category=vehicles');
+    assert.equal(inventory.mdAddress.read({ pathname: '/inventory', search: '?category=vehicles&open=7' }), '7');
+    assert.equal(inventory.mdAddress.read({ pathname: '/inventory', search: '?category=vehicles' }), null,
+      'eine andere Ebene ist dieselbe Seite - Zurueck/Vor zeichnet sie nicht neu');
+    assert.equal(inventory.mdAddress.read({ pathname: '/tasks', search: '' }), undefined);
+  }));
+  const src = readFileSync(new URL('../public/pages/inventory.js', import.meta.url), 'utf8');
+  const mount = src.slice(src.indexOf('_md = mountMasterDetail({'));
+  assert.match(mount.slice(0, mount.indexOf('\n    });')), /address: mdAddress/, 'der Baustein liest die Adresse ueber mdAddress');
+});
+
+test('W1: im Kategorie-Kopf steht „‹ Inventar" oben und der Kategoriename als Titel', async () => {
+  await withInventoryState(() => withHistory('/inventory', () => {
+    const title = { textContent: 'Inventar' };
+    const back = { hidden: true };
+    const page = { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; } };
+    const container = { querySelector: (sel) => ({ '.inventory-toolbar .page-toolbar__title': title, '.inventory-toolbar__back': back, '.inventory-page': page }[sel] ?? null) };
+    inventory.syncInventoryHeader(container);
+    assert.equal(back.hidden, true, 'auf der Startseite kein Rueckweg');
+    assert.equal(page.attrs['data-inventory-level'], 'categories');
+    inventory.state.view = 'category';
+    inventory.state.activeCategory = 'vehicles';
+    inventory.syncInventoryHeader(container);
+    assert.equal(back.hidden, false);
+    assert.equal(title.textContent, 'Fahrzeuge');
+    assert.equal(page.attrs['data-inventory-level'], 'category');
+    inventory.state.view = 'browse';
+    inventory.state.query = 'bohr';
+    try {
+      inventory.syncInventoryHeader(container);
+      assert.equal(page.attrs['data-inventory-level'], 'search', 'Treffer sind Gegenstaende - dort steht die Spalte');
+    } finally { inventory.state.query = ''; }
+  }));
+  const src = readFileSync(new URL('../public/pages/inventory.js', import.meta.url), 'utf8');
+  assert.match(src, /class="inventory-toolbar__back" href="\/inventory" hidden/, 'der Rueckweg steht im Kopf, nicht als Textlink unter den Chips');
+  assert.doesNotMatch(src, /class="inventory-back-link"/);
+});
+
+test('W1: am Desktop fuellen die Kategorien die Flaeche - keine Spalte, die „Waehle einen Gegenstand" fordert', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/inventory.css', import.meta.url), 'utf8');
+  const split = [...eachRule(css)].filter(({ at }) => at.some((a) => /module-surface \(min-width: 65rem\)/.test(a)));
+  const detail = split.find(({ selector }) => selector.trim() === '.inventory-page[data-inventory-level="categories"] .split-view__detail');
+  assert.ok(detail && /display:\s*none/.test(detail.body), 'auf der Kategorie-Ebene keine Detailspalte');
+  const grid = split.find(({ selector }) => selector.trim() === '.inventory-page[data-inventory-level="categories"] .split-view');
+  assert.ok(grid && /grid-template-columns:\s*minmax\(0,\s*1fr\)/.test(grid.body), 'die Liste nimmt die ganze Breite');
+});

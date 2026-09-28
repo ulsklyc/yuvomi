@@ -211,31 +211,161 @@ function matchesAttentionFilter(item) {
   return !state.filterAttention || hasUpcomingDeadline(item);
 }
 
-function openCategory(key) {
+// --------------------------------------------------------
+// DIE EBENE HAT EINE ADRESSE (Re-Critique 2026-09-28, A6 P1-1 / A8 P2-1)
+//
+// `/inventory` ist die Kategorienliste, `/inventory?category=<key>` eine
+// Kategorie. Vorher setzte `openCategory()` nur `state.view`, die URL blieb
+// `/inventory` - wer zurueckwischte, landete im vorigen Modul statt in der
+// Kategorienliste. Jetzt legt das Oeffnen einen History-Eintrag an, und
+// Zurueck/Vor stellt die Ebene aus der Adresse wieder her
+// (`syncLevelFromAddress`, am popstate der Seite).
+//
+// Die Auswahl eines Gegenstands (`?open=`) bleibt Sache des Bausteins
+// (utils/master-detail.js). Er bekommt ueber `mdAddress` gesagt, dass jede
+// Ebene dieselbe Seite ist - sonst hielte er eine andere Kategorie fuer eine
+// fremde Adresse, und der Router zeichnete bei jedem Zurueck die ganze Seite
+// neu (Skelett, Seitenuebergang).
+// --------------------------------------------------------
+
+const INVENTORY_PATH = '/inventory';
+
+/** Die Kategorie, die die Adresse nennt (`null` = Kategorienliste). */
+function categoryFromAddress(loc = globalThis.location) {
+  return new URLSearchParams(loc?.search ?? '').get('category');
+}
+
+function inventoryHref({ category = null, open = null } = {}) {
+  const params = new URLSearchParams();
+  if (category) params.set('category', category);
+  if (open != null && open !== '') params.set('open', String(open));
+  const query = params.toString();
+  return query ? `${INVENTORY_PATH}?${query}` : INVENTORY_PATH;
+}
+
+/** Die Kategorie, die gerade steht - `null` auf der Kategorienliste und in Treffern. */
+function shownCategory() {
+  return state.view === 'category' ? state.activeCategory : null;
+}
+
+/**
+ * Die Ebene in die Adresse schreiben. `path` im State, weil der Router ihn bei
+ * popstate liest; `inventoryFromBrowse` merkt, dass dieser Eintrag direkt aus
+ * der Kategorienliste kam - dann ist „‹ Inventar" ein Schritt zurueck.
+ */
+function writeLevelAddress(mode, { category = shownCategory(), open = null, fromBrowse = false } = {}) {
+  const hist = globalThis.history;
+  if (typeof hist?.pushState !== 'function') return;
+  const path = inventoryHref({ category, open });
+  if (mode === 'push') hist.pushState(fromBrowse ? { path, inventoryFromBrowse: true } : { path }, '', path);
+  else hist.replaceState({ ...(hist.state ?? {}), path }, '', path);
+}
+
+/** Adresse der Auswahl fuer den Baustein: `?open=` neben der Ebene. */
+const mdAddress = {
+  read: (loc) => (loc?.pathname === INVENTORY_PATH ? new URLSearchParams(loc.search ?? '').get('open') : undefined),
+  href: (id) => inventoryHref({ category: shownCategory(), open: id }),
+};
+
+function setCategoryState(key) {
   state.view = 'category';
   state.activeCategory = key;
   state.query = '';
   state.filterAttention = false;
   _search?.clear();
-  renderList();
-  scrollListToTop();
 }
 
-function backToBrowse() {
+function setBrowseState() {
   state.view = 'browse';
   state.activeCategory = null;
   state.query = '';
   state.filterAttention = false;
   _search?.clear();
+}
+
+function isKnownCategory(key) {
+  return Boolean(key) && state.categories.some((c) => c.key === key);
+}
+
+function openCategory(key) {
+  setCategoryState(key);
+  // ERST der Eintrag, dann die Liste: der Neuaufbau waehlt in der Spalte die
+  // erste Zeile vor (`replaceState`) - das gehoert auf den NEUEN Eintrag.
+  writeLevelAddress('push', { category: key, fromBrowse: true });
   renderList();
   scrollListToTop();
+}
+
+/**
+ * Zur Kategorienliste. Als Geste des Nutzers („‹ Inventar"): kam die Kategorie
+ * direkt aus der Liste, ist das ein Schritt zurueck wie Apples Zurueck-Knopf
+ * (popstate stellt die Ebene her), sonst ein neuer Eintrag. Als Folge
+ * (Kategorie verschwunden, Inventar leer) ersetzt sie die Adresse.
+ */
+function backToBrowse({ history: mode = 'push' } = {}) {
+  const hist = globalThis.history;
+  if (mode === 'push' && hist?.state?.inventoryFromBrowse
+    && categoryFromAddress() === state.activeCategory && typeof hist.back === 'function') {
+    hist.back();
+    return;
+  }
+  setBrowseState();
+  writeLevelAddress(mode, { category: null });
+  renderList();
+  scrollListToTop();
+}
+
+/**
+ * Zurueck/Vor: die Ebene folgt der Adresse. Laeuft am popstate der Seite,
+ * VOR dem Baustein (der Router fragt ihn erst nach den Dialogen) - die Liste
+ * muss stehen, bevor er die Auswahl aus `?open=` markiert. Deshalb ohne
+ * `_md.refresh()`: der raeumte eine Auswahl ab, die die Adresse gleich nennt.
+ * @returns {boolean} ob sich die Ebene geaendert hat
+ */
+function syncLevelFromAddress() {
+  const key = categoryFromAddress();
+  if (isKnownCategory(key)) {
+    if (state.view === 'category' && state.activeCategory === key) return false;
+    setCategoryState(key);
+    return true;
+  }
+  if (state.view !== 'category') return false;
+  setBrowseState();
+  return true;
+}
+
+/** Welche Ebene steht: Kategorienliste, Treffer (Suche/Fristen) oder eine Kategorie. */
+function inventoryLevel() {
+  if (state.view === 'category') return 'category';
+  return state.query || state.filterAttention ? 'search' : 'categories';
+}
+
+/**
+ * Kopf der Ebene: in einer Kategorie „‹ Inventar" oben und ihr Name als Titel
+ * (Muster Gesundheit), sonst der Modulname. Die Ebene steht als
+ * `data-inventory-level` an der Seite - auf der Kategorienliste gibt es am
+ * Desktop keine Detailspalte (inventory.css): sie forderte „Waehle einen
+ * Gegenstand" neben einer Liste ohne Gegenstaende.
+ */
+function syncInventoryHeader(container = _container) {
+  if (!container) return;
+  const level = inventoryLevel();
+  const category = level === 'category' ? state.categories.find((c) => c.key === state.activeCategory) : null;
+  const title = category ? categoryLabel(category) : t('nav.inventory');
+  // Nur schreiben, wenn sich etwas aendert: der Kopf-Beobachter der Shell
+  // (ux.js) misst bei jeder Mutation in diesem Teilbaum neu.
+  const heading = container.querySelector('.inventory-toolbar .page-toolbar__title');
+  if (heading && heading.textContent !== title) heading.textContent = title;
+  const back = container.querySelector('.inventory-toolbar__back');
+  if (back && back.hidden !== !category) back.hidden = !category;
+  container.querySelector('.inventory-page')?.setAttribute('data-inventory-level', level);
 }
 
 /** Gleicher Scroll-Container wie router.js bei echten Routenwechseln
  *  (#main-content) - ein Ebenenwechsel hier fuehlt sich sonst wie eine neue
  *  Seite an, springt aber nicht wie eine. */
 function scrollListToTop() {
-  const main = document.getElementById('main-content');
+  const main = globalThis.document?.getElementById('main-content');
   if (main) main.scrollTop = 0;
 }
 
@@ -594,8 +724,11 @@ function renderListBody() {
   if (!state.items.length) {
     // Sonst wuerde ein spaeter neu angelegtes Item (in JEDER Kategorie) diese
     // Detailansicht wiederbeleben, statt auf der Startseite zu landen.
+    const hadCategory = state.view === 'category' || categoryFromAddress();
     state.view = 'browse';
     state.activeCategory = null;
+    if (hadCategory) writeLevelAddress('replace', { category: null });
+    syncInventoryHeader();
     const filtersHost = _container?.querySelector('#inventory-filters');
     if (filtersHost) filtersHost.hidden = true;
     list.replaceChildren(emptyStateEl({
@@ -611,6 +744,7 @@ function renderListBody() {
   } else {
     renderBrowse(list);
   }
+  syncInventoryHeader();
 }
 
 /**
@@ -683,20 +817,16 @@ function renderCategoryDetail(list) {
   // war (ueber manage-categories geloescht - der Server haengt ihre Items auf
   // 'other' um). Kein Geister-Detail fuer eine Kategorie, die es nicht mehr
   // gibt: zurueck zur Startseite statt den rohen Key als Titel zu zeigen.
-  if (!category) { backToBrowse(); return; }
+  if (!category) { backToBrowse({ history: 'replace' }); return; }
   const categoryItems = state.items.filter((item) => item.category === state.activeCategory);
 
   updateFilterChips(categoryItems);
   updateSearchScope(t('inventory.searchInCategoryPlaceholder', { category: categoryLabel(category) }));
 
+  // Rueckweg und Kategoriename stehen im Kopf (syncInventoryHeader) - hier
+  // stand bis zur Re-Critique 2026-09-28 ein Textlink „Zurueck zum Inventar"
+  // unter den Chips und ein zweiter Titel.
   list.replaceChildren();
-  list.insertAdjacentHTML('beforeend', `
-    <button type="button" class="inventory-back-link" id="inventory-back-link">
-      <i data-lucide="arrow-left" class="inventory-back-link__icon" aria-hidden="true"></i>
-      ${esc(t('inventory.backToInventory'))}
-    </button>
-    <h2 class="inventory-category-title u-section-title">${esc(category ? categoryLabel(category) : state.activeCategory)}</h2>`);
-  list.querySelector('#inventory-back-link').addEventListener('click', backToBrowse);
 
   const filtered = categoryItems.filter((item) => matchesQuery(item) && matchesAttentionFilter(item));
   if (!filtered.length) {
@@ -2119,7 +2249,7 @@ export async function render(container, { signal } = {}) {
   // headSealIcon), das jedes andere Modul schon automatisch zeigt - Icon +
   // Name, direkt vor dem Titel, aus derselben Quelle wie der Sidebar-Eintrag.
   const toolbar = document.createElement('div');
-  toolbar.className = 'page-toolbar page-toolbar--narrow page-toolbar--wrap';
+  toolbar.className = 'page-toolbar page-toolbar--narrow page-toolbar--wrap inventory-toolbar';
   // Kopfregel mobil (DESIGN.md, 2026-09-26): Lagerorte und Kategorien sind
   // Verwaltung, nicht Ansicht - sie stehen im EINEN Werkzeugmenue mit Icon UND
   // Text statt als zwei unbeschriftete Icons in einer eigenen Kopfzeile. Die
@@ -2145,6 +2275,12 @@ export async function render(container, { signal } = {}) {
       })}
     </div>`);
   toolbar.insertAdjacentHTML('afterbegin', `<h1 class="page-toolbar__title">${esc(t('nav.inventory'))}</h1>`);
+  // Rueckweg aus einer Kategorie, oben wie Apples Navigationsleiste und wie
+  // „‹ Gesundheit" (syncInventoryHeader blendet ihn ein).
+  toolbar.insertAdjacentHTML('afterbegin', `
+    <a class="inventory-toolbar__back" href="/inventory" hidden>
+      <i data-lucide="chevron-left" class="inventory-toolbar__back-icon" aria-hidden="true"></i><span>${esc(t('nav.inventory'))}</span>
+    </a>`);
 
   const filters = document.createElement('div');
   filters.className = 'inventory-filters';
@@ -2188,6 +2324,32 @@ export async function render(container, { signal } = {}) {
   if (window.lucide) window.lucide.createIcons({ el: container });
 
   installPopoverMenus(container);
+  toolbar.querySelector('.inventory-toolbar__back')?.addEventListener('click', (event) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    event.preventDefault();
+    backToBrowse();
+  }, { signal });
+  // Zurueck/Vor zwischen den Ebenen. Der Router fragt danach den Baustein
+  // (`handleMasterDetailPopstate`), der dank `mdAddress` jede Ebene als
+  // dieselbe Seite erkennt und nur die Auswahl aus `?open=` nachzieht.
+  //
+  // DIE REIHENFOLGE ZWISCHEN DIESEM HOERER UND DEM BAUSTEIN IST NICHT FEST:
+  // der Router fragt den Baustein in einem `.then`, und der Browser leert die
+  // Microtasks nach JEDEM Hoerer - gemessen lief der Baustein ZUERST, noch auf
+  // der alten Ebene (Detailspalte verborgen), merkte sich `?open=` und malte
+  // nichts. Deshalb zieht die Seite die Auswahl nach dem Neuaufbau selbst aus
+  // der Adresse nach - dasselbe Ziel, in welcher Reihenfolge auch immer.
+  window.addEventListener('popstate', () => {
+    if (location.pathname !== INVENTORY_PATH || !state.categories.length) return;
+    if (!syncLevelFromAddress()) return;
+    renderListBody();
+    syncDetailTop(page, split.querySelector('.split-view__detail'));
+    scrollListToTop();
+    if (!_md?.isSplit()) return;
+    const open = mdAddress.read(location);
+    if (open) _md.select(open, { history: 'none' });
+    else _md.clear({ history: 'none' });
+  }, { signal });
   toolbar.addEventListener('click', (e) => {
     const item = e.target.closest('.popover-menu__item[data-action]');
     if (!item || item.disabled) return;
@@ -2245,11 +2407,21 @@ export async function render(container, { signal } = {}) {
       api.get('/preferences').then((res) => { _householdCurrency = res.data?.currency ?? 'EUR'; }).catch(() => {}),
     ]);
     if (signal?.aborted) return;
+    // Die Ebene steht in der Adresse, nicht im Modulzustand vom letzten Besuch.
+    if (isKnownCategory(categoryFromAddress())) {
+      state.view = 'category';
+      state.activeCategory = categoryFromAddress();
+    } else {
+      if (categoryFromAddress()) writeLevelAddress('replace', { category: null, open: new URLSearchParams(location.search).get('open') });
+      state.view = 'browse';
+      state.activeCategory = null;
+    }
     openDeepLinkedCategory(split);
     renderList();
     _md = mountMasterDetail({
       root: split,
       signal,
+      address: mdAddress,
       renderDetail: (id, body, ctx) => {
         const item = state.items.find((i) => String(i.id) === id);
         if (!item) return false;
@@ -2297,11 +2469,10 @@ function openDeepLinkedCategory(split) {
 function showItemCategory(id) {
   const item = state.items.find((i) => String(i.id) === String(id));
   if (!item) return false;
-  state.view = 'category';
-  state.activeCategory = item.category;
-  state.query = '';
-  state.filterAttention = false;
-  _search?.clear();
+  setCategoryState(item.category);
+  // Die Adresse nennt die Ebene mit (ersetzt: ein Deep-Link oder ein breiter
+  // gezogenes Fenster ist kein Schritt fuer die Zurueck-Taste).
+  writeLevelAddress('replace', { category: item.category, open: id });
   return true;
 }
 
@@ -2334,6 +2505,12 @@ function onInventoryModeChange({ split, selectedId }) {
 
 export const __test = {
   state,
+  // Re-Critique 2026-09-28 (W1): die Ebene hat eine Adresse.
+  openCategory,
+  backToBrowse,
+  syncLevelFromAddress,
+  syncInventoryHeader,
+  mdAddress,
   renderItemRow,
   renderItemDetail,
   openDeepLinkedCategory,

@@ -81,48 +81,46 @@
 }
 
 /* --------------------------------------------------------
- * Zurueck-Link + Titel der Kategorie-Detailansicht - abgeleitet von
- * dem frueheren Zurueck-Link der Einstellungen, aber als Button statt Link (kein
- * echter Routenwechsel, siehe Global Constraints) und ohne dessen
- * responsive Ausblendung: Inventar hat keine parallele Desktop-Sidebar, die
- * den Zurueck-Weg sonst schon anbietet.
+ * Rueckweg aus einer Kategorie (Re-Critique 2026-09-28, A6 P1-1)
+ *
+ * Apples Navigationsleiste: „‹ Inventar" als eigene Zeile ueber dem
+ * Kategorienamen, der als Titel im Kopf steht (inventory.js,
+ * syncInventoryHeader). Dieselbe Form wie „‹ Gesundheit" (health.css). Bis
+ * dahin stand hier ein grauer Textlink „Zurueck zum Inventar" UNTER den
+ * Filterchips samt zweitem Titel, und die Ebene hatte keine Adresse - die
+ * Zurueck-Geste verliess das Modul. In jeder Breite: auch am Desktop ersetzt
+ * die Kategorie die Liste, es gibt keine Seitenspalte, die den Rueckweg traegt.
  * -------------------------------------------------------- */
 
-.inventory-back-link {
+.inventory-toolbar:has(> .inventory-toolbar__back:not([hidden])) {
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+
+.inventory-toolbar__back {
   display: inline-flex;
+  flex-basis: 100%;
   align-items: center;
-  gap: var(--space-2);
-  width: fit-content;
+  gap: var(--space-1);
   min-height: var(--target-base);
-  margin-bottom: var(--space-2);
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--color-text-secondary);
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-}
-
-.inventory-back-link:hover {
+  /* Die Treffflaeche reicht bis an die Kante, das Zeichen steht auf der
+   * Fluchtlinie des Inhalts (wie health-toolbar__back). */
+  margin-inline-start: calc(-1 * var(--space-2));
+  padding-inline: var(--space-2);
   color: var(--color-accent);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
 }
 
-.inventory-back-link__icon {
-  width: var(--space-4);
-  height: var(--space-4);
+.inventory-toolbar__back[hidden] {
+  display: none;
+}
+
+.inventory-toolbar__back-icon {
+  width: var(--icon-lg);
+  height: var(--icon-lg);
   flex: 0 0 auto;
-}
-
-/* Der Kommentar hier behauptete "Groesse/Rolle kommt vom semantischen <h2>
- * selbst" - falsch: reset.css setzt fuer h1-h6 nur font-weight/line-height
- * zurueck, nie font-size, also rendierte dieser Kopf am UA-Default (~24px),
- * keiner Design-Stufe (Polish-Audit, PLAN.md #7). Traegt jetzt u-section-title
- * im Markup, hier bleibt nur Abstand/Farbe. */
-.inventory-category-title {
-  margin: 0 0 var(--space-3);
-  color: var(--color-text-primary);
 }
 
 /* --------------------------------------------------------
@@ -668,6 +666,34 @@
    * feste Hoehe wirkungslos und finge nur die klebenden Gruppentitel ein. */
   .inventory-page .split-view__list {
     overflow: visible;
+  }
+
+  /* DIE KATEGORIENLISTE HAT KEINE DETAILSPALTE (Re-Critique 2026-09-28,
+   * A8 P2-1). Gemessen bei 1440: 4 Kategorien links in 424px, rechts 676px
+   * „Waehle einen Gegenstand" - neben einer Liste, die keinen Gegenstand
+   * zeigt. Auf dieser Ebene nimmt die Liste die volle Flaeche: Kennzahlen als
+   * schmale Spalte vorn, die Kategorien daneben breit (DOM-Reihenfolge =
+   * Lesereihenfolge, kein Sprung der Tabulatortaste). Treffer der Suche und
+   * eine geoeffnete Kategorie zeigen Gegenstaende - dort steht die Spalte
+   * wieder. `data-inventory-level` setzt inventory.js (syncInventoryHeader). */
+  .inventory-page[data-inventory-level="categories"] .split-view {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .inventory-page[data-inventory-level="categories"] .split-view__detail {
+    display: none;
+  }
+
+  .inventory-page[data-inventory-level="categories"] .inventory-list:has(> .metric-grid + .row-carrier) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    column-gap: var(--space-6);
+    align-items: start;
+  }
+
+  /* Beide Spalten beginnen auf derselben Hoehe: die Kennzahlen tragen hier
+   * ihren Blockabstand (unten), die Kategorien bekommen denselben. */
+  .inventory-page[data-inventory-level="categories"] .inventory-list > .metric-grid + .row-carrier {
+    margin-block-start: var(--space-3);
   }
 
   .inventory-page .split-view__detail {
