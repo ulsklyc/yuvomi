@@ -113,7 +113,7 @@ function wireFilters(view, container) {
  * zwei Wahlfelder standen mitten im Inhalt zwischen Timer und Statistik. Sie
  * gelten fuer das eigene Fasten und aendern sich selten - ein Knopf oeffnet
  * sie als Blatt, die Seite zeigt, was man tut. */
-function openFastingSettings(view, active, reload) {
+function openFastingSettings(view, reload) {
   openModal({
     title: `${t('health.fasting.title')} - ${t('nav.settings')}`,
     content: `<div data-fasting-preferences>${fastingPreferencesHtml(view.state?.settings || {})}</div>`,
@@ -121,7 +121,7 @@ function openFastingSettings(view, active, reload) {
     initialFocus: 'none',
     onSave: (panel) => {
       const host = panel.querySelector('[data-fasting-preferences]');
-      wireFastingPreferences(host, view.state?.settings || {}, async () => { await reload(); return host; }, active);
+      wireFastingPreferences(host, view.state?.settings || {}, async () => { await reload(); return host; }, () => view.state?.active ?? null);
     },
   });
 }
@@ -206,7 +206,7 @@ function renderBody(view, stats, statsError = false) {
   const reload = () => refresh(view);
   const reloadStats = () => refresh(view, { refreshStats: true });
   if (writable) {
-    root.querySelector('[data-fasting-settings]')?.addEventListener('click', () => openFastingSettings(view, active, reload));
+    root.querySelector('[data-fasting-settings]')?.addEventListener('click', () => openFastingSettings(view, reload));
     root.querySelector('[data-fasting-action]').addEventListener('click', async (event) => {
       const button = event.currentTarget; button.disabled = true;
       try {

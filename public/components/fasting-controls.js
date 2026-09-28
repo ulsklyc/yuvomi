@@ -74,17 +74,27 @@ export function wireFastingPreferences(root, initial, onSaved = () => {}, active
     const context = captureModalContext();
     const focusSelector = focused?.id ? `#${CSS.escape(focused.id)}` : focused?.hasAttribute('data-fasting-preset') ? `[data-fasting-preset="${CSS.escape(focused.dataset.fastingPreset)}"]` : focused?.hasAttribute('data-fasting-remind-goal') ? '[data-fasting-remind-goal]' : focused?.hasAttribute('data-fasting-remind-next') ? '[data-fasting-remind-next]' : null;
     pending = true;
+    // Den Fokus erst NACH dem Freigeben zurueckgeben: ein gesperrter Knopf
+    // nimmt keinen Fokus an. Seit die Einstellungen im Blatt stehen (R14),
+    // ist savedRoot derselbe Knoten wie root und bis `finally` gesperrt - der
+    // Fokus fiel nach jeder Zielwahl auf <body>.
+    let refocus = null;
     root.querySelectorAll('input, button, select').forEach((el) => { el.disabled = true; });
     try {
       requireFastingWrite();
-      if (Object.hasOwn(patch, 'default_goal_minutes')) Object.assign(patch, { active_id: active?.id ?? null, expected_revision: active?.revision });
+      // `active` darf ein Getter sein: das Blatt (R14) bleibt ueber mehrere
+      // Wahlen offen, und jede Zielwahl hebt die Revision des laufenden
+      // Fastens - mit der beim Oeffnen gemerkten scheiterte die zweite Wahl
+      // am Revisionsvergleich.
+      const running = typeof active === 'function' ? active() : active;
+      if (Object.hasOwn(patch, 'default_goal_minutes')) Object.assign(patch, { active_id: running?.id ?? null, expected_revision: running?.revision });
       settings = (await api.put('/health/fasting/settings', patch)).data;
       const restoreFocus = document.activeElement === focused || document.activeElement === document.body;
       const savedRoot = await onSaved(settings) || root;
       if (savedRoot.isConnected) {
         savedRoot.querySelector('[data-fasting-preferences-status]').textContent = t('settings.feedExportSaved');
         const focusUnchanged = document.activeElement === focused || document.activeElement === document.body;
-        if (restoreFocus && focusUnchanged && focusSelector && isModalContextCurrent(context)) savedRoot.querySelector(focusSelector)?.focus({ preventScroll: true });
+        if (restoreFocus && focusUnchanged && focusSelector && isModalContextCurrent(context)) refocus = savedRoot.querySelector(focusSelector);
       }
     } catch (error) {
       status.textContent = fastingError(error);
@@ -102,6 +112,7 @@ export function wireFastingPreferences(root, initial, onSaved = () => {}, active
       presets.sync(selected);
       root.querySelector('[data-fasting-custom]').hidden = selected !== 'custom';
       root.querySelector('[data-fasting-goal]').value = selected === 'custom' ? hours : '';
+      if (refocus?.isConnected && (document.activeElement === document.body || document.activeElement === focused)) refocus.focus({ preventScroll: true });
     }
   }
   // Die geteilte Verhaltensschicht (Pfeiltasten, rovierendes tabindex) im
