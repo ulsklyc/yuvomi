@@ -368,98 +368,10 @@ html:has(.contacts-page.is-selecting) {
   text-decoration: none;
 }
 
-/* --------------------------------------------------------
- * „Mehr"-Menü (beschriftete Aktionsliste, beide Breakpoints)
- * -------------------------------------------------------- */
-/* Panel als Popover: rendert im Top-Layer → kein Clipping durch den Scroll-
- * Container, freies Light-Dismiss + Esc. Position setzt JS (onPanelToggle);
- * inset/margin überschreiben die UA-Zentrierung. */
-.contact-more-menu__panel {
-  position: fixed;
-  margin: 0;
-  inset: auto;
-  z-index: var(--z-dropdown);
-  min-width: 200px;
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--space-0h);
-  padding: var(--space-1);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-md);
-  opacity: 0;
-  transition: opacity var(--transition-fast);
-}
-
-.contact-more-menu__panel:popover-open {
-  display: flex;
-}
-
-/* Menü-Eintrag: Icon + Textlabel (behebt das „nackte Icons"-Problem). */
-.contact-menu-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: none;
-  border-radius: var(--radius-sm);
-  background: none;
-  font: inherit;
-  font-size: var(--text-sm);
-  color: var(--color-text-primary);
-  text-align: left;
-  text-decoration: none;
-  cursor: pointer;
-  min-height: var(--target-md);
-  transition: background-color var(--transition-fast);
-}
-
-.contact-menu-item:hover {
-  background-color: var(--color-surface-2);
-}
-
-/* Tastatur-Fokus mit Inset-Ring statt nur Flächenfarbe (Audit F-16). */
-.contact-menu-item:focus-visible {
-  background-color: var(--color-surface-2);
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: var(--focus-ring-offset-inset);
-}
-
-.contact-menu-item__icon {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  color: var(--color-text-secondary);
-}
-
-/* Löschen abgesetzt: eigener Ton + dünner Trenner darüber (kein Seitenstreifen). */
-.contact-menu-item--danger {
-  color: var(--color-danger);
-  border-top: 1px solid var(--color-border-subtle);
-  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-  margin-top: var(--space-0h);
-  padding-top: var(--space-2);
-}
-
-.contact-menu-item--danger .contact-menu-item__icon {
-  color: var(--color-danger);
-}
-
-/* Auf der Tönung trägt --color-danger nur 4,45:1 - deshalb hier der Ink-Ton
- * (5,69:1), wie auf jeder anderen -light-Fläche der App. Das Symbol wandert
- * mit, sonst steht die Zeile im Hover zweifarbig da. */
-.contact-menu-item--danger:hover,
-.contact-menu-item--danger:focus-visible {
-  background-color: var(--color-danger-light);
-  color: var(--color-danger-ink);
-}
-
-.contact-menu-item--danger:hover .contact-menu-item__icon,
-.contact-menu-item--danger:focus-visible .contact-menu-item__icon {
-  color: var(--color-danger-ink);
-}
+/* Das „Mehr"-Menue der Zeile ist seit der Re-Kritik 2026-09-28 der geteilte
+ * Baustein `.popover-menu` (utils/popover-menu.js, Stil in layout.css): der
+ * Eigenbau hier - Panel, Eintrag, Danger-Eintrag - trug `role="menu"` ohne
+ * Menue-Bedienung. Nichts davon braucht noch eine eigene Regel. */
 
 /* --------------------------------------------------------
  * Modal: Kategorie-Vorschau + Footer

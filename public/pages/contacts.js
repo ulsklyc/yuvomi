@@ -12,7 +12,7 @@ import { t, formatDate } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
-import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
+import { pageToolsMenuHtml, popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { setBulkPill, clearBulkPill } from '/utils/bulk-pill.js';
 import { parseVCards } from '/utils/vcard.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
@@ -295,6 +295,9 @@ export async function render(container, { user, signal } = {}) {
     // einem aelteren Render findet denselben Riegel.
     if (readOnly() && e.target.closest('[data-action="delete"], [data-action="empty-cta"]')) return;
 
+    const menuItem = e.target.closest('.popover-menu__item[data-action^="contact-"]');
+    if (menuItem) { runContactMenuAction(menuItem.dataset.action, contactById(menuItem.dataset.id)); return; }
+
     const del = e.target.closest('[data-action="delete"]');
     if (del) { await deleteContact(parseInt(del.dataset.id, 10)); return; }
     if (e.target.closest('[data-action="empty-cta"]')) {
@@ -322,8 +325,8 @@ export async function render(container, { user, signal } = {}) {
       else openContactById(open.dataset.open);
     }
   });
-  listEl.addEventListener('beforetoggle', onPanelBeforeToggle, true);
-  listEl.addEventListener('toggle', onPanelToggle, true);
+  // Positionierung, aria-expanded, Fokus und Pfeiltasten der Zeilenmenues
+  // kommen aus installPopoverMenus(_container) weiter unten (Kanon-Baustein).
 
   // Auswahl-Modus: ein Tipp auf die Zeile waehlt oder waehlt ab - immer ueber
   // ihren Kreis, damit Zeile und Knopf nicht zweimal umschalten.
@@ -879,25 +882,28 @@ function renderContactItem(c) {
 
   // Sekundäre Aktionen als beschriftetes Menü (Icon + Textlabel), identisch auf
   // Desktop und Mobile. Export ist immer verfügbar → das Menü ist nie leer.
-  const mapsUrl = c.address ? `https://www.openstreetmap.org/search?query=${encodeURIComponent(c.address)}` : '';
+  //
+  // DER KANON-BAUSTEIN STATT DES EIGENBAUS (Re-Kritik 2026-09-28, A5 P2-5).
+  // Hier stand ein eigenes Popover mit `role="menu"`, aber ohne
+  // `aria-haspopup`/`aria-expanded` am Ausloeser und ohne Pfeiltasten: der
+  // Screenreader kuendigte ein Menue an, das sich nicht wie eines bedienen
+  // liess. popover-menu.js bringt beides mit (und den Fokus ins Menue). Seine
+  // Eintraege sind Knoepfe mit `data-action` - Mail, Karte und Export laufen
+  // deshalb ueber runContactMenuAction() im delegierten Klick der Liste, mit
+  // denselben Zielen wie die Detailansicht (dort oeffnet auch der Export per
+  // window.open).
   const menuItems = [
-    c.email ? `<a href="mailto:${esc(c.email)}" class="contact-menu-item" role="menuitem">
-        <i data-lucide="mail" class="contact-menu-item__icon" aria-hidden="true"></i><span>${t('contacts.emailActionLabel')}</span>
-      </a>` : '',
-    c.address ? `<a href="${mapsUrl}" target="_blank" rel="noopener" class="contact-menu-item" role="menuitem">
-        <i data-lucide="map-pin" class="contact-menu-item__icon" aria-hidden="true"></i><span>${t('contacts.mapsLabel')}</span>
-      </a>` : '',
-    `<a href="/api/v1/contacts/${c.id}/vcard" download="${esc(c.name)}.vcf" class="contact-menu-item" role="menuitem">
-        <i data-lucide="download" class="contact-menu-item__icon" aria-hidden="true"></i><span>${t('contacts.exportLabel')}</span>
-      </a>`,
+    c.email ? { action: 'contact-email', id: c.id, icon: 'mail', label: t('contacts.emailActionLabel') } : null,
+    c.address ? { action: 'contact-maps', id: c.id, icon: 'map-pin', label: t('contacts.mapsLabel') } : null,
+    { action: 'contact-export', id: c.id, icon: 'download', label: t('contacts.exportLabel') },
     // Der EINE schreibende Eintrag dieses Menues. Die vier anderen - anrufen,
     // mailen, Karte, Export - sind reines Lesen und bleiben; das Menue ist
     // deshalb auch bei `contacts: read` nie leer, und ein Knopf ohne Inhalt
     // entsteht hier nicht (anders als an der Abholzeile in waste.js).
-    (!c.family_user_id && !readOnly()) ? `<button type="button" class="contact-menu-item contact-menu-item--danger" data-action="delete" data-id="${c.id}" role="menuitem">
-        <i data-lucide="trash-2" class="contact-menu-item__icon" aria-hidden="true"></i><span>${t('common.delete')}</span>
-      </button>` : '',
-  ].join('');
+    ...((!c.family_user_id && !readOnly())
+      ? [{ separator: true }, { action: 'delete', id: c.id, icon: 'trash-2', label: t('common.delete'), danger: true }]
+      : []),
+  ].filter(Boolean);
 
   return `
     <div class="list-row list-row--tight contact-item" data-id="${c.id}" data-md-id="${c.id}">
@@ -910,45 +916,44 @@ function renderContactItem(c) {
       </button>
       <div class="row-actions contact-item__actions">
         ${callBtn}
-        <button type="button" class="row-action contact-more-menu__trigger"
-                popovertarget="${menuId}" aria-label="${esc(t('common.moreActionsNamed', { name: c.name }))}">
-          <i data-lucide="more-horizontal" aria-hidden="true"></i>
-        </button>
-        <div class="contact-more-menu__panel" id="${menuId}" popover role="menu">
-          ${menuItems}
-        </div>
+        ${popoverMenuHtml({
+          id: menuId,
+          label: t('common.moreActionsNamed', { name: c.name }),
+          items: menuItems,
+          triggerClass: 'row-action contact-more-menu__trigger',
+        })}
       </div>
     </div>
   `;
 }
 
-// Popover (mobiles „Mehr"-Menü) im Top-Layer positionieren — nahe dem Trigger,
-// nach oben gekippt, wenn unten kein Platz ist. beforetoggle/toggle bubbeln nicht,
-// daher werden die Listener in render() mit { capture:true } am Listen-Container
-// registriert (Capture-Phase erreicht auch nicht-bubbelnde Events).
-function onPanelBeforeToggle(e) {
-  const panel = e.target;
-  if (!(panel instanceof HTMLElement) || !panel.matches('.contact-more-menu__panel')) return;
-  if (e.newState === 'open') panel.style.opacity = '0'; // Flash vor Positionierung vermeiden
-}
-
-function onPanelToggle(e) {
-  const panel = e.target;
-  if (!(panel instanceof HTMLElement) || !panel.matches('.contact-more-menu__panel')) return;
-  if (e.newState !== 'open') { panel.style.opacity = ''; return; }
-  const trigger = _container?.querySelector(`[popovertarget="${panel.id}"]`);
-  if (trigger) {
-    const r    = trigger.getBoundingClientRect();
-    const pw   = panel.offsetWidth  || 200;
-    const ph   = panel.offsetHeight || 48;
-    const gap  = 4;
-    let left = Math.min(Math.max(8, r.right - pw), window.innerWidth  - pw - 8);
-    let top  = r.bottom + gap;
-    if (top + ph > window.innerHeight - 8) top = r.top - ph - gap; // nach oben kippen
-    panel.style.left = `${Math.round(left)}px`;
-    panel.style.top  = `${Math.round(Math.max(8, top))}px`;
+/**
+ * Die lesenden Eintraege des Zeilenmenues (Mail, Karte, Export).
+ *
+ * Kanon-Eintraege sind Knoepfe, keine Links (utils/popover-menu.js); die Ziele
+ * sind dieselben wie in der Detailansicht. Liefert `false` fuer alles, was
+ * nicht hierher gehoert - Loeschen bleibt im Schreib-Zweig der Liste, hinter
+ * dem Riegel fuer `contacts: read`.
+ *
+ * @param {string} action
+ * @param {object|null} c
+ * @returns {boolean} ob die Aktion hier behandelt wurde
+ */
+function runContactMenuAction(action, c) {
+  if (!c) return false;
+  if (action === 'contact-email' && c.email) {
+    window.location.href = `mailto:${c.email}`;
+    return true;
   }
-  panel.style.opacity = '1';
+  if (action === 'contact-maps' && c.address) {
+    window.open(`https://www.openstreetmap.org/search?query=${encodeURIComponent(c.address)}`, '_blank', 'noopener');
+    return true;
+  }
+  if (action === 'contact-export') {
+    window.open(`/api/v1/contacts/${c.id}/vcard`, '_blank', 'noopener');
+    return true;
+  }
+  return false;
 }
 
 // --------------------------------------------------------
@@ -2044,6 +2049,8 @@ function showImportResult({ imported, withBirthday, failedList, lastName, lastEr
  */
 export const __test = {
   renderContactItem, contactsEmptyStateHtml, toolbarActionsHtml,
+  // Re-Kritik 2026-09-28: die lesenden Eintraege des Kanon-Zeilenmenues.
+  runContactMenuAction,
   // R8 H14: der Auswahlkreis als Programm.
   toggleContactSelection,
   openContactDetail, readOnly, state, buildContactForm,
