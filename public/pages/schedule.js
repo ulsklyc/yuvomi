@@ -1860,7 +1860,7 @@ function renderShell() {
   root.addEventListener('change', async (event) => {
     if (activeView === 'patterns') markPatternDirty(event.target);
     if (activeView === 'patterns') updateCycleDayHeadersFor(event.target);
-    if (event.target.matches('.schedule-stat-range__select')) {    } else if (event.target.matches('.schedule-stat-range__select')) {
+    if (event.target.matches('.schedule-stat-range__select')) {
       // Das schmale Gegenstueck zum Segment (R9 M11) - derselbe Wechsel.
       setStatisticsRange(event.target.value);
     } else if (event.target.closest('[data-ms-input="overview-people"]')) {

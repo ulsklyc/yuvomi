@@ -1828,6 +1828,15 @@ test('switching the statistics range outdates any request in flight, matching th
   assert.match(rangeBranch.replace(/^\s*\/\/.*$/gm, ''), /setStatisticsRange\(button\.dataset\.range\)/, 'the segment must switch through setStatisticsRange()');
   const changeBranch = schedulePage.slice(schedulePage.indexOf("event.target.matches('.schedule-stat-range__select')"));
   assert.match(changeBranch.slice(0, 300), /setStatisticsRange\(event\.target\.value\)/, 'the narrow select must switch through the same setter');
+  // Review on #1493: moving "My settings" out of this handler left
+  // `if (select) {} else if (select) { setStatisticsRange(...) }` - the call
+  // stood within 300 characters but in a branch that can never run, so on a
+  // phone the range select did nothing. The FIRST branch on the select must
+  // carry the call, and the handler tests the select once.
+  assert.match(changeBranch.replace(/^\s*\/\/.*$/gm, ''), /^event\.target\.matches\('\.schedule-stat-range__select'\)\)\s*\{\s*setStatisticsRange\(event\.target\.value\)/,
+    'the first branch on the narrow select must switch the range, not an empty body');
+  assert.equal(schedulePage.split("event.target.matches('.schedule-stat-range__select')").length - 1, 1,
+    'the change handler tests the narrow select once - a second test is a dead branch');
   const setter = schedulePage.slice(schedulePage.indexOf('function setStatisticsRange('), schedulePage.indexOf('function renderStatistics('));
   const rangeCode = setter.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*\*[\s\S]*?\*\//g, '');
   assert.match(rangeCode, /\+\+statisticsRequestId/, 'the range switch must bump the request generation counter, exactly like overview-week bumps ++overviewRequestId');
