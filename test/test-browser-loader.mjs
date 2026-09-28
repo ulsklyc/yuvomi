@@ -241,6 +241,9 @@ const STUBS = {
     // zu bewegen, der Aufrufer wartet nur auf das Ende.
     export const collapseOut = () => Promise.resolve();
     export const expandIn = () => Promise.resolve();
+    // Token-Leser ohne Stylesheet: der Rueckfall ist der Wert (utils/flip.js).
+    export const durationToken = (name, fallback) => fallback;
+    export const easingToken = (name, fallback = 'ease-out') => fallback;
   `,
   '/utils/html.js': `
     export const esc = (value) => String(value ?? '')
