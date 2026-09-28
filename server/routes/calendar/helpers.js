@@ -6,7 +6,7 @@
 
 import { StorageError } from '../../services/document-storage.js';
 import { ensureModuleFolder } from '../../services/document-folders.js';
-import { applyDocumentAccess, filterVisibleDocumentIds } from '../../services/document-access.js';
+import { applyDocumentAccess, attachmentAccessMode, filterVisibleDocumentIds } from '../../services/document-access.js';
 import { documentViewer } from '../../services/document-links.js';
 import { mayWriteModule } from '../../permissions.js';
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../../utils/upload-limit.js';
@@ -298,10 +298,12 @@ export function parseAssignedTo(val) {
 }
 
 /**
- * Das Anhang-Dokument folgt Sichtbarkeit und Zuweisung des Termins - weiter
- * oeffnen darf es aber nur, wem `mayWiden(documentId)` das zugesteht
- * (Dokumente schreiben UND das Dokument sehen, #1358). Ohne Urteil wird nur
- * verengt: `applyDocumentAccess()` in services/document-access.js.
+ * Das Anhang-Dokument folgt Sichtbarkeit und Zuweisung des Termins - aber nur,
+ * wenn `mayWiden(documentId)` das zugesteht: `true` (Dokumente schreiben, das
+ * Dokument sehen UND verwalten, #1358) gleicht voll ab, `ATTACHMENT_NARROW_ONLY`
+ * (in diesem Schreiben neu hochgeladen) verengt nur. Sonst bleibt das Dokument,
+ * wie die Besitzerin es gesetzt hat (#1443): `applyDocumentAccess()` in
+ * services/document-access.js.
  */
 export function syncAttachmentDocumentAccess(d, documentId, eventVisibility, userIds, {
   mayWiden = () => false, grantAssignees = false,
@@ -313,13 +315,13 @@ export function syncAttachmentDocumentAccess(d, documentId, eventVisibility, use
       ? 'restricted'
       : 'family';
   applyDocumentAccess(d, documentId, {
-    visibility, userIds, mayWiden: mayWiden(documentId) === true, grantAssignees,
+    visibility, userIds, ...attachmentAccessMode(mayWiden(documentId)), grantAssignees,
   });
 }
 
 /**
- * `options.mayWidenAttachment` kommt vom Aufrufer (`documentWidenPredicate()`);
- * ohne ihn wird das Anhang-Dokument nur verengt, nie weiter geoeffnet.
+ * `options.mayWidenAttachment` kommt vom Aufrufer (`attachmentRights()` in
+ * crud.js); ohne ihn bleibt das Anhang-Dokument unangetastet (#1443).
  * `options.grantAssigneesOnly` (Standard-Zuweisung der Kalender-Syncs): der
  * Sync aendert Dokumentrechte nie, ausser dass an einem Termin fuer
  * Zugewiesene ein schon eingeschraenktes Dokument die Zugewiesenen als

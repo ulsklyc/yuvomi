@@ -21,7 +21,9 @@ import { queueEventDeletion, markEventOutbound, flushOutbound } from '../../serv
 import { SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN } from '../../services/calendar-events.js';
 import { newNonMembers, nonMemberMessage } from '../../services/household-members.js';
 import { documentViewer } from '../../services/document-links.js';
-import { documentClonePredicate, documentWidenPredicate } from '../../services/document-access.js';
+import {
+  ATTACHMENT_NARROW_ONLY, documentClonePredicate, documentWidenPredicate,
+} from '../../services/document-access.js';
 import { mayWriteModule } from '../../permissions.js';
 import { recordLocalColorChoice } from '../../services/legacy-color-snapshot.js';
 import {
@@ -61,12 +63,19 @@ const log = createLogger('Calendar');
 const router = express.Router();
 
 /**
- * Was dieser Aufrufer mit Anhang-Dokumenten tun darf (#1358): weiter oeffnen
- * (Sichtbarkeit des Termins aufs Dokument uebertragen) nur mit Dokumente-
- * Schreibrecht, Sicht UND Verwaltungsrecht (Erstellerin oder Admin); kopieren
- * (Split, Abloesen) mit Schreibrecht und Sicht auf die Quelle. Sonst
- * wird nur verengt, und ein Nachfolger bekommt keine Kopie - ohne 403, damit
- * der Termin bearbeitbar bleibt; der Anhang bleibt an der alten Serie.
+ * Was dieser Aufrufer mit Anhang-Dokumenten tun darf (#1358): die Sichtbarkeit
+ * des Termins aufs Dokument uebertragen nur mit Dokumente-Schreibrecht, Sicht
+ * UND Verwaltungsrecht (Erstellerin oder Admin); kopieren (Split, Abloesen) mit
+ * Schreibrecht und Sicht auf die Quelle. Sonst bleiben die Rechte des Dokuments,
+ * wie die Besitzerin sie gesetzt hat (#1443), und ein Nachfolger bekommt keine
+ * Kopie - ohne 403, damit der Termin bearbeitbar bleibt; der Anhang bleibt an
+ * der alten Serie.
+ *
+ * EIN OBJEKT JE REQUEST: `createAttachmentDocument` merkt sich, welches Dokument
+ * dieses Schreiben selbst angelegt hat. Ein neuer Anhang entsteht als `family`
+ * und gehoert der Terminerstellerin; laedt eine Zugewiesene ihn hoch, darf der
+ * Abgleich ihn trotzdem auf den Termin verengen (`ATTACHMENT_NARROW_ONLY`) -
+ * sonst saehe die ganze Familie den Anhang eines Termins fuer Zugewiesene.
  */
 function attachmentRights(req) {
   const actor = {
@@ -74,11 +83,22 @@ function attachmentRights(req) {
     isAdmin: isAdminUser(req),
     documentsWritable: mayWriteModule(req, 'documents'),
   };
+  const mayManage = documentWidenPredicate(db.get(), actor);
+  const createdHere = new Set();
   return {
-    // Weiter oeffnen: nur wer das Dokument auch verwalten darf.
-    mayWidenAttachment: documentWidenPredicate(db.get(), actor),
+    // Voll abgleichen: nur wer das Dokument auch verwalten darf; ein hier neu
+    // angelegtes nur verengen; alles andere bleibt unangetastet.
+    mayWidenAttachment: (documentId) => {
+      if (mayManage(documentId)) return true;
+      return createdHere.has(Number(documentId)) ? ATTACHMENT_NARROW_ONLY : false;
+    },
     // Kopieren: wer es sieht und Dokumente schreiben darf.
     mayCloneAttachment: documentClonePredicate(db.get(), actor),
+    createAttachmentDocument: (...args) => {
+      const documentId = createAttachmentDocument(...args);
+      if (documentId) createdHere.add(Number(documentId));
+      return documentId;
+    },
   };
 }
 
@@ -531,8 +551,9 @@ router.post('/', async (req, res) => {
       });
     }
 
+    const rights = attachmentRights(req);
     const eventId = db.get().transaction(() => {
-      const documentId = createAttachmentDocument(
+      const documentId = rights.createAttachmentDocument(
         db.get(),
         attachment,
         stagedUpload,
@@ -568,7 +589,7 @@ router.post('/', async (req, res) => {
         req.body.countdown ? 1 : 0
       );
       setEventAssignments(db.get(), result.lastInsertRowid, userIds, {
-        mayWidenAttachment: attachmentRights(req).mayWidenAttachment,
+        mayWidenAttachment: rights.mayWidenAttachment,
       });
       return result.lastInsertRowid;
     })();
@@ -946,7 +967,7 @@ router.put('/:id', async (req, res) => {
       // Neu nur Haushaltsmitglieder (#1207), gegen den Stand, den dieses Schreiben vorfindet.
       if (assignedTouched) assertNoNewNonMembers(db.get(), userIds, storedEventAssignees(db.get(), id));
       const documentId = replacementRequested
-        ? createAttachmentDocument(
+        ? rights.createAttachmentDocument(
             db.get(),
             attachment,
             stagedUpload,
@@ -1291,8 +1312,9 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
     assertAttachmentStillChangeable(req, db.get(),
       storedOccurrenceAttachmentDocument(db.get(), loadVisibleEvent(seriesId, req) ?? master, req.params.recurrenceId),
       { replacementRequested, removalRequested });
+    const rights = attachmentRights(req);
     const result = upsertOccurrenceOverride(db.get(), {
-      mayWidenAttachment: attachmentRights(req).mayWidenAttachment,
+      mayWidenAttachment: rights.mayWidenAttachment,
       seriesId,
       recurrenceId: req.params.recurrenceId,
       actorId,
@@ -1306,7 +1328,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
             attachment_mime: parsedAttachment.mime,
             attachment_size: parsedAttachment.size,
             attachment_data: null,
-            attachment_document_id: createAttachmentDocument(
+            attachment_document_id: rights.createAttachmentDocument(
               db.get(),
               parsedAttachment,
               stagedUpload,
@@ -1495,7 +1517,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
             attachment_mime: parsedAttachment.mime,
             attachment_size: parsedAttachment.size,
             attachment_data: null,
-            attachment_document_id: createAttachmentDocument(
+            attachment_document_id: rights.createAttachmentDocument(
               db.get(),
               parsedAttachment,
               stagedUpload,

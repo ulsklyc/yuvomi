@@ -2722,7 +2722,7 @@ test('confirmed split gives every inherited orphan an independent attachment ACL
     cloneAttachment: (sourceId) => cloneDocument('successor', sourceId),
     cloneDetachedAttachment: (childId, sourceId) => cloneDocument(`orphan-${childId}`, sourceId),
     // Die Route reicht das nur mit Dokumente-Schreibrecht und Sicht auf das
-    // Dokument herein (#1358); ohne es wird nur verengt (Test unten).
+    // Dokument herein (#1358); ohne es bleibt das Dokument unangetastet (#1443).
     mayWidenAttachment: () => true,
   });
 
@@ -4117,4 +4117,62 @@ test('whole-series projection refresh synchronizes occurrence-owned attachment A
   update('assignees', [3]);
   assert.equal(visibility(), 'restricted');
   assert.deepEqual(access(), [3]);
+});
+
+test('whole-series refresh leaves an occurrence attachment untouched without the right to manage it (#1443)', () => {
+  // Ohne `mayWidenAttachment` (kein Dokumente-Schreibrecht, keine Sicht oder
+  // nicht die Besitzerin) aendert das Speichern die Rechte des Dokuments nicht:
+  // weder Sichtbarkeit noch die Freigaben, die die Besitzerin gesetzt hat.
+  const database = createDatabase();
+  const seriesId = Number(insertSeries(database, {
+    title: 'Attachment ACL keeper',
+    start_datetime: '2026-10-01T09:00:00',
+    recurrence_rule: 'FREQ=DAILY',
+    assigned_to: 1,
+    visibility: 'assignees',
+  }));
+  database.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, 1)')
+    .run(seriesId);
+  const documentId = Number(database.prepare(`
+    INSERT INTO family_documents
+      (name, visibility, original_name, mime_type, file_size, content_data, created_by)
+    VALUES ('Owner shares', 'restricted', 'owner.txt', 'text/plain', 4, 'body', 1)
+  `).run().lastInsertRowid);
+  upsertOccurrenceOverride(database, {
+    mayWidenAttachment: () => true, // die Besitzerin haengt an
+    seriesId,
+    recurrenceId: '2026-10-02',
+    actorId: 1,
+    changes: { title: 'Attachment-owning occurrence' },
+    attachment: {
+      attachment_name: 'owner.txt',
+      attachment_mime: 'text/plain',
+      attachment_size: 4,
+      attachment_data: null,
+      attachment_document_id: documentId,
+    },
+  });
+  // Danach setzt die Besitzerin im Dokumente-Modul ihre eigenen Freigaben: 2 und 3.
+  database.prepare("UPDATE family_documents SET visibility = 'restricted' WHERE id = ?").run(documentId);
+  database.prepare('DELETE FROM family_document_access WHERE document_id = ?').run(documentId);
+  const grant = database.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)');
+  grant.run(documentId, 2);
+  grant.run(documentId, 3);
+  const state = () => ({
+    visibility: database.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(documentId).visibility,
+    access: database.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id')
+      .all(documentId).map((row) => Number(row.user_id)),
+  });
+  const owned = state();
+  assert.deepEqual(owned, { visibility: 'restricted', access: [2, 3] });
+
+  for (const [eventVisibility, assignments] of [['assignees', [2]], ['private', [2]], ['assignees', [1]]]) {
+    updateSeriesWithOverrides(database, {
+      seriesId,
+      actorId: 1,
+      changes: { visibility: eventVisibility },
+      assignments,
+    });
+    assert.deepEqual(state(), owned, `${eventVisibility} ${assignments}: the owner's rights stay`);
+  }
 });

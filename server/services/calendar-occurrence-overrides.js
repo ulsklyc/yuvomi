@@ -16,7 +16,7 @@ import {
   hasExplicitZone, householdTimeZone, shiftDateKey, storedToInstantMsPrecise, utcToWall,
 } from '../utils/timezone.js';
 import { createLogger } from '../logger.js';
-import { applyDocumentAccess } from './document-access.js';
+import { applyDocumentAccess, attachmentAccessMode } from './document-access.js';
 
 const log = createLogger('CalendarOccurrenceOverrides');
 
@@ -790,10 +790,11 @@ function independentAttachmentValues(database, cloned, sourceDocumentId, claimed
 }
 
 /**
- * Das Anhang-Dokument folgt dem Termin. Weiter oeffnen darf es nur, wem
- * `mayWiden(documentId)` das zugesteht - der Aufrufer reicht es als
- * `mayWidenAttachment` herein (Dokumente schreiben UND das Dokument sehen,
- * #1358). Ohne ihn wird nur verengt: `applyDocumentAccess()`.
+ * Das Anhang-Dokument folgt dem Termin, soweit `mayWiden(documentId)` das
+ * zugesteht - der Aufrufer reicht es als `mayWidenAttachment` herein: `true`
+ * (Dokumente schreiben, das Dokument sehen UND verwalten, #1358) gleicht voll
+ * ab, `ATTACHMENT_NARROW_ONLY` (in diesem Schreiben neu hochgeladen) verengt
+ * nur. Ohne Urteil bleibt das Dokument unangetastet (#1443): `applyDocumentAccess()`.
  */
 function syncOwnedAttachmentAccess(database, documentId, visibility, userIds, mayWiden = () => false) {
   if (!documentId
@@ -808,7 +809,7 @@ function syncOwnedAttachmentAccess(database, documentId, visibility, userIds, ma
   applyDocumentAccess(database, documentId, {
     visibility: documentVisibility,
     userIds,
-    mayWiden: mayWiden(documentId) === true,
+    ...attachmentAccessMode(mayWiden(documentId)),
   });
 }
 

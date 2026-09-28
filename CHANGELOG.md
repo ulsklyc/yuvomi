@@ -731,6 +731,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Saving someone else's event no longer removes the shares on its attachment.** A member who may
+  not manage an event's attachment document - no access to documents, no sight of the document,
+  or neither its owner nor an admin - removed the owner's shares on every save, even one that only
+  changed the title, and making the event private made the document private. The document's
+  visibility and shares now stay as the owner set them; a new attachment uploaded to someone
+  else's event is still limited to the event's people. (#1443)
+
 - **The glass tab bar blurs again.** Text scrolling under the tab bar on a phone and under the
   sidebar indicator was readable through the glass because the page transition cut the glass off
   from the content; the blur now works outside the short moment of a page change.
