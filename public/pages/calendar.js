@@ -5366,17 +5366,21 @@ function openFiltersPopover(content) {
   pop.insertAdjacentHTML('beforeend', `<h2 class="cal-filters-popover__title" id="cal-filters-popover-title">${esc(t('calendar.filters'))}</h2>${content}`);
   document.body.appendChild(pop);
   window.lucide?.createIcons({ el: pop });
+  // DER FOKUS GEHT AN DEN KNOPF ZURUECK, und zwar VOR dem Schliessen: nach
+  // Esc fiel er sonst aus dem verschwindenden Popover auf den Scrollport
+  // (gemessen: #main-content), bevor `toggle` ueberhaupt lief. Ein Klick
+  // daneben auf ein anderes Bedienelement setzt seinen Fokus danach trotzdem
+  // selbst - der Light-Dismiss laeuft auf pointerdown, der Fokus erst mit
+  // mousedown.
+  pop.addEventListener('beforetoggle', (event) => {
+    if (event.newState === 'closed' && pop.contains(document.activeElement)) trigger()?.focus();
+  });
   pop.addEventListener('toggle', (event) => {
     const open = event.newState === 'open';
     trigger()?.setAttribute('aria-expanded', String(open));
     if (open) return;
     filtersPopoverClosedAt = Date.now();
-    // Esc laesst den Fokus sonst auf <body> fallen; ein Klick daneben wollte
-    // woanders hin und behaelt sein Ziel.
-    const active = document.activeElement;
-    const giveBack = !active || active === document.body || pop.contains(active);
     pop.remove();
-    if (giveBack) trigger()?.focus();
   });
   pop.showPopover();
   positionFiltersPopover(pop, trigger());
