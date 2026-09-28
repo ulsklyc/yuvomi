@@ -377,6 +377,10 @@ function renderShell(container) {
 function renderCurrentTab(container) {
   const content = container.querySelector('#housekeeping-content');
   if (!content) return;
+  // Der Reiter steht an der Seite: das Mass folgt ihm (die Uebersicht ist ab
+  // 1280px breit, die Listenreiter bleiben im Lesemass - housekeeping.css).
+  const page = container.querySelector('.housekeeping-page');
+  if (page) page.dataset.tab = state.tab;
   content.replaceChildren();
   if (state.tab === 'tasks') renderTasks(content);
   else if (state.tab === 'reports') renderReports(content);
@@ -590,6 +594,12 @@ function renderDashboard(content) {
          letzten Besuche bei y=760 von 844, hinter Personal, Kennzahlen und dem
          252px hohen Zahlungsdiagramm. Die Besuche sind, was man hier nachsieht;
          der Verlauf der Zahlungen ist die Einordnung darunter. -->
+    <!-- BESUCHE | ZAHLUNGEN (Re-Critique 2026-09-28, P5): ab 1280px stehen
+         beide Karten nebeneinander, und die Uebersicht bekommt das breite Mass
+         (housekeeping.css, [data-tab="dashboard"]) - im Lesemass einer
+         Textseite blieben bei 1440 rund 470px leer. Darunter bleibt die
+         Reihenfolge Liste vor Diagramm. -->
+    <div class="housekeeping-dashboard-columns">
     <section class="housekeeping-card">
       <div class="housekeeping-section-heading">
         <h2>${esc(t('housekeeping.recentVisits'))}</h2>
@@ -607,6 +617,7 @@ function renderDashboard(content) {
         ${bars || `<p class="housekeeping-muted">${esc(t('housekeeping.noPaymentData'))}</p>`}
       </div>
     </section>
+    </div>
   `);
   if (window.lucide) window.lucide.createIcons({ el: content });
   // `if (!readOnly())` statt `return`: die lesende Verdrahtung (Bericht
@@ -1220,7 +1231,7 @@ function stepReportMonth(content, dir) {
  * Name + Datum, Betrag, Status | Aktionen. Vorher stand „Als bezahlt
  * markieren" als beschrifteter Knopf in der Zeile und der Bericht-Knopf
  * darunter in einer eigenen - mobil 197px pro Besuch. Bezahlen ist jetzt
- * dieselbe `.row-action` wie im Protokoll (`badge-dollar-sign`), beschriftet
+ * dieselbe `.row-action` wie im Protokoll (`banknote`), beschriftet
  * per `aria-label` mit dem Datum der Zeile. Sichtbar steht das Datum ohne
  * Jahr: den Monat samt Jahr nennt der Stepper im Kopf, und mit Jahr brach die
  * Metazeile mobil um. Das `aria-label` behaelt das volle Datum.
@@ -1243,7 +1254,7 @@ function renderReports(content) {
       actionsHtml: `${!visit.can_mark_paid || readOnly() ? '' : `
         <button class="row-action" type="button" data-pay-report="${visit.id}"
                 aria-label="${esc(t('housekeeping.markPaid'))}: ${esc(visitDate)}">
-          <i data-lucide="badge-dollar-sign" class="icon-md" aria-hidden="true"></i>
+          <i data-lucide="banknote" class="icon-md" aria-hidden="true"></i>
         </button>`}
         <button class="row-action" type="button" data-visit-report="${visit.id}"
                 aria-label="${esc(t('housekeeping.openVisitReport'))}: ${esc(visitDate)}">
@@ -1567,7 +1578,7 @@ function staffLogPayHtml(visit, visitDate) {
   if (readOnly() || (!paid && !visit.can_mark_paid)) return '';
   return `<button class="row-action" type="button" data-pay-visit="${visit.id}" ${visit.can_mark_paid ? '' : 'disabled'}
                   aria-label="${esc(paid ? t('housekeeping.paymentPaid') : t('housekeeping.markPaid'))}: ${esc(visitDate)}">
-            <i data-lucide="badge-dollar-sign" class="icon-md" aria-hidden="true"></i>
+            <i data-lucide="banknote" class="icon-md" aria-hidden="true"></i>
           </button>`;
 }
 

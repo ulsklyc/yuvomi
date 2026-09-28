@@ -666,3 +666,39 @@ test('die vier Kennzahlen stehen auf jeder Breite in einer Zeile, schmal mit Lab
   assert.match(label?.body ?? '', /text-transform:\s*none/, 'Versal brach in der Viertelzeile mitten im Wort');
   assert.match(label?.body ?? '', /hyphens:\s*auto/);
 });
+
+// Re-Critique 2026-09-28 (P5, A3 P2-3 / A8 P2-3): die Uebersicht mit
+// Kennzahlen, Besuchen und Zahlungen stand im 720px-Lesemass einer Textseite
+// und liess bei 1440 rund 470px leer - Besuche und Zahlungen untereinander.
+test('Uebersicht am Desktop: Besuche | Zahlungen nebeneinander ab 1280, ausserhalb des Lesemasses', () => {
+  const html = dashboardHtml({ lastVisit: '2026-09-20T08:30:00Z' });
+  const cols = /<div class="housekeeping-dashboard-columns">([\s\S]*)<\/div>\s*$/.exec(html.trim());
+  assert.ok(cols, 'die beiden Karten stehen in EINEM Spaltentraeger');
+  assert.match(cols[1], /housekeeping\.recentVisits[\s\S]*housekeeping\.payments/, 'Besuche links, Zahlungen rechts');
+  const rules = [...eachRule(HK_STYLES)];
+  const wide = rules.find((r) => r.selector.trim() === '.housekeeping-page[data-tab="dashboard"]'
+    && r.at.some((a) => /min-width:\s*1280px/.test(a)));
+  assert.match(wide?.body ?? '', /--page-measure:\s*var\(--layout-wide\)/, 'die Uebersicht bekommt ab 1280 das breite Mass');
+  const grid = rules.find((r) => r.selector.trim() === '.housekeeping-dashboard-columns'
+    && r.at.some((a) => /min-width:\s*1280px/.test(a)));
+  assert.match(grid?.body ?? '', /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+  const HK_SRC = readFileSync(new URL('../public/pages/housekeeping.js', import.meta.url), 'utf8');
+  assert.match(HK_SRC, /page\.dataset\.tab = state\.tab/, 'der Reiter steht an der Seite, damit das Mass ihm folgt');
+});
+
+test('Haushaltshilfe spricht EINEN Namen: Reiter "Uebersicht", Kennzahlen mit Zeitbezug, Geldschein statt Dollar', () => {
+  const HK_SRC = readFileSync(new URL('../public/pages/housekeeping.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(HK_SRC, /badge-dollar-sign/, 'Dollar-Icon bei Euro-Betraegen');
+  assert.match(HK_SRC, /data-lucide="banknote"/);
+  const localeDir = new URL('../public/locales/', import.meta.url);
+  const { readdirSync } = globalThis.process.getBuiltinModule('node:fs');
+  for (const file of readdirSync(localeDir).filter((f) => f.endsWith('.json'))) {
+    const loc = JSON.parse(readFileSync(new URL(file, localeDir), 'utf8'));
+    assert.equal(loc.housekeeping.dashboard, loc.rewards.tabOverview, `${file}: der Reiter heisst wie jede Uebersicht der App`);
+  }
+  const de = JSON.parse(readFileSync(new URL('de.json', localeDir), 'utf8')).housekeeping;
+  assert.equal(de.pendingChores, 'Fällig');
+  assert.equal(de.finishedChores, 'Erledigt im Monat');
+  assert.deepEqual(Object.entries(de).filter(([, v]) => typeof v === 'string' && /Hauspflege/.test(v)).map(([k]) => k), [],
+    'kein zweiter Name neben "Haushaltshilfe"');
+});
