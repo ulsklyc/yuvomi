@@ -216,6 +216,7 @@ const APP_SHELL = [
   '/utils/task-fields.js',
   '/utils/timezone.js',
   '/utils/toast-placement.js',
+  '/utils/toast-show.js',
   '/utils/toast-surface.js',
   '/utils/today-sheet.js',
   '/utils/ux.js',
