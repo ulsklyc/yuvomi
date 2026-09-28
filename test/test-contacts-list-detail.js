@@ -328,3 +328,31 @@ test('Kontaktfilter: die Gruppe heisst nach ihrer Frage, und am Zeigergeraet bri
     && r.at.some((a) => /hover:\s*hover/.test(a) && /pointer:\s*fine/.test(a)));
   assert.ok(wrap && /flex-wrap:\s*wrap/.test(wrap.body), 'eine Maus hat keine waagerechte Geste');
 });
+
+test('Neuer Kontakt ist nicht als „Arzt" vorbelegt: aktive Filterkategorie, sonst misc (Re-Critique 2026-09-28 P2-5)', () => {
+  // `state.categories[0]` war die Vorbelegung - das Formular oeffnete auch
+  // unter „Alle" mit Arzt samt Stethoskop, und der Nachbar wurde zum Arzt.
+  const saved = { categories: contacts.state.categories, active: contacts.state.activeCategory, user: contacts.state.user };
+  const gewaehlt = (html) => {
+    const select = html.match(/<select[^>]*id="cm-category"[^>]*>([\s\S]*?)<\/select>/)?.[1];
+    assert.ok(select, 'Kategorie-Select nicht gefunden');
+    return [...select.matchAll(/<option value="([^"]*)"([^>]*)>/g)].filter(([, , attrs]) => /\bselected\b/.test(attrs)).map(([, v]) => v);
+  };
+  try {
+    contacts.state.user = { id: 1, role: 'admin' };
+    contacts.state.categories = [
+      { key: 'doctor', icon: 'stethoscope' }, { key: 'school', icon: 'school' }, { key: 'misc', icon: 'tag' },
+    ];
+    contacts.state.activeCategory = null;
+    assert.deepEqual(gewaehlt(contacts.buildContactForm({ mode: 'create' }).content), ['misc'], 'unter „Alle": misc');
+    contacts.state.activeCategory = 'school';
+    assert.deepEqual(gewaehlt(contacts.buildContactForm({ mode: 'create' }).content), ['school'], 'unter einem Filter: dessen Kategorie');
+    contacts.state.activeCategory = null;
+    const edit = contacts.buildContactForm({ mode: 'edit', contact: { ...KONTAKT, emails: [], phones: [] } }).content;
+    assert.deepEqual(gewaehlt(edit), ['doctor'], 'Bearbeiten behaelt die Ist-Kategorie');
+  } finally {
+    contacts.state.categories = saved.categories;
+    contacts.state.activeCategory = saved.active;
+    contacts.state.user = saved.user;
+  }
+});

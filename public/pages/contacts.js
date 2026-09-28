@@ -1412,7 +1412,14 @@ function buildContactForm({ mode, contact = null }) {
         : ''}
     </div>`;
 
-  const defaultCat = state.categories[0]?.key ?? FALLBACK_CATEGORY;
+  // Vorbelegung eines NEUEN Kontakts (Re-Critique 2026-09-28 P2-5): die aktive
+  // Filterkategorie, sonst „Sonstiges" (misc). Vorher `state.categories[0]` -
+  // das Formular oeffnete auch unter „Alle" als „Arzt", und der Nachbar wurde
+  // still zum Arzt. Nur wenn misc nicht (mehr) verwaltet wird, bleibt die erste.
+  const known = (key) => key && state.categories.some((c) => c.key === key);
+  const defaultCat = known(state.activeCategory) ? state.activeCategory
+    : known(FALLBACK_CATEGORY) ? FALLBACK_CATEGORY
+      : (state.categories[0]?.key ?? FALLBACK_CATEGORY);
 
   // Ein Kontakt kann eine Kategorie tragen, die nicht (mehr) in der verwalteten
   // Liste steht - z. B. aus einem Fremd-Import direkt in die DB. Ohne passende
@@ -1426,7 +1433,7 @@ function buildContactForm({ mode, contact = null }) {
   const catOpts = [
     ...(orphanCat ? [`<option value="${esc(orphanCat)}" selected>${esc(orphanCat)}</option>`] : []),
     ...state.categories.map((c) =>
-      `<option value="${esc(c.key)}" ${isEdit && contact.category === c.key ? 'selected' : ''}>${esc(catLabel(c.key))}</option>`
+      `<option value="${esc(c.key)}" ${(isEdit ? contact.category : defaultCat) === c.key ? 'selected' : ''}>${esc(catLabel(c.key))}</option>`
     ),
   ].join('');
 
