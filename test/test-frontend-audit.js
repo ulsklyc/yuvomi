@@ -2348,7 +2348,7 @@ test('Recipes expose meal-type suitability controls for planner integrations', (
   const recipesCss = read('../public/styles/recipes.css');
 
   assert.match(recipesPage, /normalizeRecipeMealTypes/);
-  assertKeysExistInEveryLocale(['recipes.dragToMealsHint']);
+  assertKeysExistInEveryLocale(['recipes.railHint']);
   assert.match(recipesPage, /id="recipe-meal-types"/);
   assert.match(recipesPage, /class="filter-chip recipe-meal-types__chip" data-meal-type="\$\{option\.key\}" aria-pressed=/);
   assert.match(recipesPage, /meal_types/);
@@ -2364,7 +2364,7 @@ test('Meals page adds a recipe sidebar and randomize planner controls', () => {
   // Wochenplans statt eines losen Kopfknopfs (Verhalten: test-meals.js).
   assert.match(mealsPage, /action: 'randomize-plan', label: t\('meals\.randomizePlan'\)/);
   assert.match(mealsPage, /id="recipe-sidebar"/);
-  assert.match(mealsPage, /recipes\.dragToMealsHint/);
+  assert.match(mealsPage, /recipes\.railHint/);
   assert.match(mealsPage, /function renderRecipeSidebar/);
   assert.match(mealsPage, /function openRandomizeModal/);
   assert.match(mealsPage, /function wireRecipeSidebar/);
@@ -5563,9 +5563,9 @@ test('das Shell-Material behält im Reduced-Transparency-Fallback seinen dunklen
     seen += 1;
     const bg = rule.body.match(/background-color:\s*([^;]+)/)?.[1]?.trim();
     assert.ok(bg, `${rule.selector} muss im Fallback einen opaken Grund setzen`);
-    assert.match(bg, /--neutral-800/,
+    assert.match(bg, /--toast-bg/,
       `${rule.selector} braucht seinen EIGENEN dunklen Grund - der helle Akzent gehört dem Chip, `
-      + 'und die Schrift auf diesem Material ist --neutral-50');
+      + 'und die Schrift auf diesem Material ist --toast-text');
   }
 
   assert.ok(seen >= 1,
@@ -6881,6 +6881,7 @@ test('⌘K bei offener Suche: kein zweiter Focus-Trap, und Schliessen gibt den F
     setStatus: () => {},
     createFocusTrap: () => () => {},
     returnFocus: (el) => returned.push(el),
+    combo: { clear() {}, refresh() {} },
   };
   const make = new Function(...Object.keys(env), `
     let _searchTrapHandler = null;
@@ -8546,8 +8547,8 @@ test('--color-ink-on-vivid traegt auf jedem Modulakzent, --color-text-on-accent 
  * getoenten Flaechen (`--color-*-light`) werden aber fast immer im Zustand
  * gesetzt und die Textfarbe in der Basis:
  *
- *     .contact-menu-item--danger        { color: var(--color-danger); }
- *     .contact-menu-item--danger:hover  { background: var(--color-danger-light); }
+ *     .popover-menu__item--danger        { color: var(--color-danger); }
+ *     .popover-menu__item--danger:hover  { background: var(--color-danger-light); }
  *
  * Zwei Bloecke, ein Bauteil - der Blockguard sah nie beide zusammen. Genau so
  * sind in Runde 8 zwei Stellen davongedriftet: `--color-danger` wanderte von
@@ -9364,17 +9365,14 @@ test('contacts keep one primary call action and disclose the rest through a labe
   // (grün) über row-action--success (Audit F1).
   assert.match(contactsPage, /href="tel:[\s\S]*class="row-action row-action--success"/);
   // Sekundäraktionen leben im „Mehr"-Menü als BESCHRIFTETE Einträge (Icon + Text),
-  // identisch auf Desktop und Mobile — behebt das „nackte Icons"-Problem.
-  assert.match(contactsPage, /class="contact-menu-item"[\s\S]*contact-menu-item__icon[\s\S]*<span>/);
+  // identisch auf Desktop und Mobile. Seit R16 (Re-Critique 2026-09-28) ist es
+  // das geteilte Menü aus utils/popover-menu.js - Popover, Pfeiltasten und
+  // aria-expanded baut es dort; Verhalten: test-module-readonly-ui.js.
+  assert.match(contactsPage, /popoverMenuHtml\(\{[\s\S]*triggerClass: 'row-action contact-more-menu__trigger'/);
   // Löschen ist ein abgesetzter Danger-Eintrag im selben Menü.
-  assert.match(contactsPage, /contact-menu-item contact-menu-item--danger[\s\S]*data-action="delete"/);
-  // Menü-Eintrag trägt Textlabel (kein reines Icon mehr).
-  assert.match(contactsCss, /\.contact-menu-item\s*\{[\s\S]*min-height:\s*var\(--target-md\)/);
-  // Das Panel ist ein Popover (Top-Layer) statt eines absolut positionierten
-  // Menüs im Scroll-Container.
-  assert.match(contactsCss, /\.contact-more-menu__panel\s*\{[\s\S]*position:\s*fixed/);
-  assert.match(contactsPage, /popovertarget="\$\{menuId\}"/);
-  assert.match(contactsPage, /id="\$\{menuId\}" popover/);
+  assert.match(contactsPage, /action: 'delete'[\s\S]*danger: true/);
+  // Keine private Panel-Kopie mehr neben dem geteilten Menü.
+  assert.doesNotMatch(contactsCss, /\.contact-more-menu__panel|\.contact-menu-item/);
 });
 
 test('contacts keyboard shortcut and aria-live result count are wired', () => {
