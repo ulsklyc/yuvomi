@@ -1924,6 +1924,48 @@ test('Speichern im Artikeldialog: ist der Artikel inzwischen weg, wirft das Spei
   delete globalThis.__openModal;
 });
 
+test('Artikeldialog: Loeschen steht links im Fuss und geht den Weg mit Rueckgaengig (A4 P1-1)', () => {
+  // Am Touchgeraet war die Wischgeste der einzige Weg, EINEN Artikel zu
+  // loeschen (WCAG 2.5.1) - VoiceOver faengt sie ab. Der Dialogfuss traegt
+  // jetzt Loeschen wie Mahlzeit und Rezept, und es loescht widerrufbar.
+  resetShoppingState();
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [milk(0), bread(0)];
+  __test.state.categories = [{ id: 1, name: 'Sonstiges' }];
+  let opts = null;
+  let undo = null;
+  const closed = [];
+  globalThis.__openModal = (o) => { opts = o; };
+  globalThis.__undoStub = (o) => { undo = o; };
+  globalThis.__closeModal = (...args) => { closed.push(args[0] ?? {}); };
+  try {
+    __test.openItemDetails(10, makeNullContainer());
+    const footer = /<div class="modal-panel__footer[^"]*">([\s\S]*?)<\/div>/.exec(opts.content)?.[1] ?? '';
+    const del = footer.indexOf('id="item-details-delete"');
+    assert.ok(del >= 0, 'der Fuss traegt einen Loeschen-Knopf');
+    assert.match(footer, /class="btn btn--danger-outline" id="item-details-delete"/, 'Kanon: btn--danger-outline wie Mahlzeit');
+    assert.ok(del < footer.indexOf('id="item-details-cancel"'), 'Loeschen steht links vor Abbrechen');
+
+    const clicks = {};
+    const panel = makeDialogPanel(dialogFields('Milch'));
+    const base = panel.querySelector;
+    panel.querySelector = (sel) => (sel === '#item-details-delete'
+      ? { addEventListener(type, fn) { clicks[type] = fn; } }
+      : base(sel));
+    opts.onSave(panel);
+    assert.equal(typeof clicks.click, 'function', 'der Knopf ist verdrahtet');
+    clicks.click();
+    assert.deepEqual(closed, [{ force: true }], 'der Dialog schliesst ohne Verwerfen-Rueckfrage');
+    assert.ok(!__test.state.items.some((i) => i.id === 10), 'die Zeile geht sofort');
+    assert.equal(typeof undo?.restore, 'function', 'mit Rueckgaengig wie der Wisch-Pfad');
+    assert.match(undo.message, /Milch|itemDeletedToast/, 'der Toast nennt den Artikel');
+  } finally {
+    delete globalThis.__openModal;
+    delete globalThis.__undoStub;
+    delete globalThis.__closeModal;
+  }
+});
+
 /** Zwei Makrotasks reichen, damit die Warteschlange Stub-Antworten verarbeitet hat. */
 const settle = async () => { for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0)); };
 
