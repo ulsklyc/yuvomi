@@ -731,6 +731,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A locked recurring task stays locked after it is checked off** (#1488). Checking off one
+  occurrence created the next one without the lock, so from the second occurrence on a child could
+  edit or delete a series a parent had locked. The next occurrence now keeps the lock, and so does a
+  subtask that was locked on its own.
+
 - **The glass tab bar blurs again.** Text scrolling under the tab bar on a phone and under the
   sidebar indicator was readable through the glass because the page transition cut the glass off
   from the content; the blur now works outside the short moment of a page change.
