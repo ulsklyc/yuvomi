@@ -1264,6 +1264,11 @@
      * Shell-Flächen DARAUF und überschriebe ein direktes Padding hier. */
     --scrollport-pad: var(--space-3);
     min-width: 0;
+    /* DIE WOCHE STEHT OBEN, SIE WIRD NICHT GEDEHNT (A4 P1-2). Mit dem
+     * Vorgabewert `normal` streckte das Raster seine Zeilen auf die Hoehe des
+     * Scrollports: gemessen 96px Tageskopf fuer 21px Text und 128px je leerem
+     * Slot statt seiner 72px Mindesthoehe. */
+    align-content: start;
     overflow-x: auto;
     scroll-snap-type: x proximity;
     scroll-padding-left: calc(var(--meal-gutter-width) + var(--space-2));
@@ -1417,12 +1422,32 @@
     padding: var(--space-3) var(--space-1) var(--space-2);
     gap: var(--space-1);
     min-width: 0;
+    /* Einzeilig beieinander („Mo 28.09.") statt an die Kanten der Spalte
+     * gedrueckt: Wochentag und Datum sind EINE Angabe (A8 P3-1). */
+    justify-content: flex-start;
   }
 
   /* Slots in Grid-Zellen heben: Zeile = Mahlzeit-Typ, Spalte = Wochentag. */
   .meal-slot {
     grid-column: var(--day-col);
     grid-row: var(--type-row);
+  }
+
+  /* DER LEERE SLOT IST EINE RUHIGE MULDE (A4 P1-2). 27 weisse Karten mit
+   * gestrichelter Kante und je einem „+" waren die lauteste Flaeche fuer den
+   * Zustand „nichts geplant". Am Board traegt er nur eine Andeutung der
+   * Kartenflaeche und das tertiaere Plus; die Kante - die Griff- und
+   * Ablage-Affordanz - kommt erst, wenn er gemeint ist: Zeiger darueber,
+   * Tastaturfokus auf dem Plus oder ein Rezept, das darueber gezogen wird
+   * (`--drop-target` darunter traegt dafuer seinen eigenen Rahmen). */
+  .meal-slot--empty {
+    border-color: transparent;
+    background-color: color-mix(in srgb, var(--color-surface) var(--tint-hint), transparent);
+  }
+
+  .meal-slot--empty:hover,
+  .meal-slot--empty:focus-within {
+    border-color: var(--color-border);
   }
 
   /* Slot-eigene Typ-Labels: visuell übernimmt sie die Gutter-Spalte, im

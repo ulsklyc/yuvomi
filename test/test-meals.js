@@ -1717,6 +1717,25 @@ test('R9 M6: meals.css - ein Traeger je Tag, Haarlinie nur zwischen belegten Slo
     'der Tagesknopf behaelt als Icon-Knopf die volle Zielgroesse');
 });
 
+test('Essensplan-Board am Desktop: Woche oben, Kopf einzeilig, leere Slots ohne Kante bis sie gemeint sind (A4 P1-2)', () => {
+  // Gemessen bei 1440: Zeilen 96/128/128/219/128px - das Raster dehnte sich auf
+  // die Scrollport-Hoehe, 27 gestrichelte Leerkarten, Wochentag und Datum an
+  // entgegengesetzten Kanten des Kopfs.
+  const css = readFileSync(new URL('../public/styles/meals.css', import.meta.url), 'utf8');
+  const desktop = (r) => r.at.some((a) => /min-width:\s*1024px/.test(a));
+  const rules = [...eachRule(css)].filter(desktop);
+  const find = (sel) => rules.find((r) => r.selector.split(',').some((s) => s.trim() === sel));
+  assert(/align-content:\s*start/.test(find('.week-grid')?.body ?? ''), 'die Woche dehnt ihre Zeilen nicht auf die Hoehe');
+  assert(/justify-content:\s*flex-start/.test(find('.day-header')?.body ?? ''), 'Wochentag und Datum stehen beieinander');
+  const empty = find('.meal-slot--empty');
+  assert(/border-color:\s*transparent/.test(empty?.body ?? ''), `der leere Slot traegt keine Kante: ${empty?.body}`);
+  const meant = rules.find((r) => /\.meal-slot--empty:focus-within/.test(r.selector));
+  assert(meant && /border-color:\s*var\(--color-border\)/.test(meant.body), 'bei Fokus kommt die Kante zurueck');
+  assert(/:hover/.test(meant.selector), 'und beim Zeiger darueber');
+  const drop = [...eachRule(css)].find((r) => r.selector.trim() === '.meal-slot--drop-target');
+  assert(drop && /outline:/.test(drop.body), 'die Ablage-Markierung bleibt');
+});
+
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
