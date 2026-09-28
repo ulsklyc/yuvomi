@@ -1829,8 +1829,8 @@ function buildModalContent({ mode, date, mealType, meal }) {
     <div class="form-group">
       <label class="form-label">${t('meals.ingredientsLabel')}</label>
       <div class="ingredient-list" id="ingredient-list">${ingRows}</div>
-      <button class="add-ingredient-btn" id="add-ingredient-btn" type="button">
-        <i data-lucide="plus" class="icon-sm" aria-hidden="true"></i>
+      <button class="btn btn--secondary add-ingredient-btn" id="add-ingredient-btn" type="button">
+        <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
         ${t('meals.addIngredient')}
       </button>
     </div>

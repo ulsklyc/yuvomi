@@ -1019,17 +1019,12 @@
  * das im modul-fremden Overlay rendert). Hier bleibt nur der meals-eigene
  * Container .ingredient-list und der Add-Button. */
 
+/* EIN DIALEKT FUER "ZUTAT HINZUFUEGEN" (Re-Critique 2026-09-28, A4 P2-10):
+ * hier stand ein orangefarbener Textlink, im Rezeptdialog eine violette
+ * Kapsel - beide vor derselben Zeile (ingredientRowHTML). Beide sind jetzt
+ * `btn btn--secondary` mit Plus; hier bleibt nur die Lage. */
 .add-ingredient-btn {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--module-accent);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: var(--space-1) 0;
-  min-height: var(--target-lg);
+  align-self: flex-start;
 }
 
 /* Einkaufsliste-Auswahl im Modal */

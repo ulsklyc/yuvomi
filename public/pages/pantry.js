@@ -1324,7 +1324,7 @@ function openItemModal(mode, item = null) {
         </div>`,
       { open: isEdit && (item.min_quantity != null || !!item.notes) })}
       <div class="modal-panel__footer modal-panel__footer--plain">
-        ${isEdit ? `<button type="button" class="btn btn--danger-ghost pantry-form__delete" id="pantry-delete">${esc(t('common.delete'))}</button>` : ''}
+        ${isEdit ? `<button type="button" class="btn btn--danger-outline pantry-form__delete" id="pantry-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
         <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
         <button type="button" class="btn btn--primary" id="pantry-save">${esc(isEdit ? t('common.save') : t('common.add'))}</button>
       </div>`,

@@ -1739,6 +1739,27 @@ test('Essensplan-Board am Desktop: Woche oben, Kopf einzeilig, leere Slots ohne 
   assert(drop && /outline:/.test(drop.body), 'die Ablage-Markierung bleibt');
 });
 
+// Re-Critique 2026-09-28 (P7 / A4 P2-10): "Zutat hinzufuegen" sprach zwei
+// Dialekte (Mahlzeit = orangefarbener Textlink, Rezept = violette Kapsel),
+// beide auf ingredientRowHTML; der Loeschen-Knopf im Dialogfuss zwei Stile
+// (Vorrat ghost, Mahlzeit/Rezept outline).
+test('Kueche: "Zutat hinzufuegen" ist in beiden Editoren derselbe Knopf, Dialog-Loeschen ein Stil', () => {
+  const recipesSrc = readFileSync(new URL('../public/pages/recipes.js', import.meta.url), 'utf8');
+  const pantrySrc = readFileSync(new URL('../public/pages/pantry.js', import.meta.url), 'utf8');
+  const btn = (src, id) => new RegExp(`<button class="([^"]*)"[^>]*id="${id}"[^>]*>\\s*<i data-lucide="plus"`).exec(src);
+  const meal = btn(mealsSource, 'add-ingredient-btn');
+  const recipe = btn(recipesSrc, 'recipe-add-ingredient');
+  assert(meal && recipe, 'beide Knoepfe tragen das Plus als erstes Kind');
+  const dialect = (cls) => cls.split(/\s+/).filter((c) => c.startsWith('btn')).join(' ');
+  assert(dialect(meal[1]) === 'btn btn--secondary', `Mahlzeit: ${meal[1]}`);
+  assert(dialect(recipe[1]) === dialect(meal[1]), `Rezept (${recipe[1]}) und Mahlzeit (${meal[1]}) sprechen verschieden`);
+  const mealsCss = readFileSync(new URL('../public/styles/meals.css', import.meta.url), 'utf8');
+  const own = [...eachRule(mealsCss)].find((r) => r.selector.trim() === '.add-ingredient-btn');
+  assert(!/color:\s*var\(--module-accent\)/.test(own?.body ?? ''), 'kein Modulton-Textlink mehr');
+  assert(!/btn--danger-ghost/.test(pantrySrc), 'Vorrat: Loeschen im Dialogfuss wie Mahlzeit und Rezept (btn--danger-outline)');
+  assert(/class="btn btn--danger-outline pantry-form__delete"/.test(pantrySrc), 'Vorrat: btn--danger-outline');
+});
+
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
