@@ -495,10 +495,30 @@ test('Anpassen: der Speed-Dial ist ausgeblendet, und der Neuaufbau meldet den Sc
 test('Router: jeder Wechsel einer angemeldeten Sitzung fragt den Verlassen-Schutz, bevor er navigiert (A7 P2-1)', async () => {
   const { readFileSync } = await import('node:fs');
   const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
-  assert.match(router, /import \{ mayLeave \} from '\/utils\/leave-guard\.js';/);
+  assert.match(router, /import \{[^}]*\bmayLeave\b[^}]*\} from '\/utils\/leave-guard\.js';/);
   const head = router.slice(router.indexOf('async function navigate('), router.indexOf('isNavigating = true;', router.indexOf('async function navigate(')));
-  assert.match(head, /if \(currentUser && typeof userOrPushState !== 'object' && !\(await mayLeave\(path\)\)\)/,
+  assert.match(head, /if \(currentUser && typeof userOrPushState !== 'object' &&[^\n]*!\(await mayLeave\(path\)\)\)/,
     'der Schutz steht VOR isNavigating = true - sonst blockierte die offene Rueckfrage jede weitere Navigation');
   assert.match(head, /userOrPushState === false && currentPath\) history\.pushState\(\{ path: currentPath \}/,
     'ein abgelehntes Zurueck legt die Adresse zurueck');
+});
+
+test('Router: ohne angemeldeten Waechter bleibt der Wechsel ohne Yield - zwei Klicks starten keine zwei Navigationen', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { setLeaveGuard, hasLeaveGuard } = await import('../public/utils/leave-guard.js');
+  assert.equal(hasLeaveGuard(), false, 'ohne Anmeldung kein Waechter');
+  const abmelden = setLeaveGuard(() => true);
+  assert.equal(hasLeaveGuard(), true);
+  abmelden();
+  assert.equal(hasLeaveGuard(), false, 'die Abmeldung nimmt ihn weg');
+  // `if (isNavigating) return; isNavigating = true;` war ein Paar ohne Luecke.
+  // Ein `await` dazwischen oeffnet eine: ein zweiter synchroner Aufruf (Doppelklick,
+  // popstate waehrend eines Klicks) saehe noch `isNavigating === false`. Gefragt
+  // und gewartet wird daher nur, wenn eine Seite wirklich etwas zu verlieren hat.
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  assert.match(router, /import \{ hasLeaveGuard, mayLeave \} from '\/utils\/leave-guard\.js';/);
+  const start = router.indexOf('async function navigate(');
+  const head = router.slice(start, router.indexOf('isNavigating = true;', start));
+  assert.match(head, /hasLeaveGuard\(\) && !\(await mayLeave\(path\)\)/,
+    'erst der synchrone Blick auf den Waechter, dann das await');
 });

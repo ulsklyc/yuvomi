@@ -34,6 +34,17 @@ export function setLeaveGuard(fn) {
 }
 
 /**
+ * Hat die sichtbare Seite gerade etwas zu verlieren? Synchron, damit der
+ * Router ohne Waechter gar nicht erst wartet: jedes `await` vor
+ * `isNavigating = true` waere eine Luecke, in der ein zweiter Aufruf noch
+ * durchkaeme.
+ * @returns {boolean}
+ */
+export function hasLeaveGuard() {
+  return guard !== null;
+}
+
+/**
  * Darf die sichtbare Seite verlassen werden? Ohne Waechter sofort ja.
  *
  * Ein Waechter, der WIRFT, haelt niemanden fest: ein Programmierfehler in der
