@@ -5632,6 +5632,20 @@ p.field-hint--warn[hidden] {
   flex-wrap: wrap;
 }
 
+/* LOESCHEN STEHT AM ANFANG, ABBRECHEN UND PRIMAER AM ENDE (Re-Critique
+ * 2026-09-28, A2 P1-2). Der Fuss ist rechtsbuendig; wer Loeschen nicht selbst
+ * wegschob, stand mit ihm neben Abbrechen - im Termindialog, dem Vorbild des
+ * Kanons ("[Loeschen links] ... [Abbrechen] [Primaer]", DESIGN.md), 12px
+ * daneben (1440: x=157 und 284). Zwanzig Module schrieben dafuer je ein
+ * `style="margin-inline-end:auto"` an ihren Knopf, drei vergassen es. Jetzt
+ * EINE Regel am Knopf, den modal.js ohnehin erkennt (`decorateFooterDelete`
+ * setzt `.modal-panel__delete`), und an der Gruppe, in der er steht (Konto:
+ * Loeschen plus Archivieren). `inline-end` spiegelt sich in RTL von selbst. */
+.modal-panel__footer > .modal-panel__delete,
+.modal-panel__footer > :has(> .modal-panel__delete) {
+  margin-inline-end: auto;
+}
+
 /* Fußzeile INNERHALB des scrollenden Bodys (kein direktes Panel-Kind): dort
  * trägt der Modal-Rahmen die Trennlinie schon, eine zweite säße mitten im
  * Inhalt. Ersetzt 20 gleichlautende Inline-Styles, die diese Neutralisierung
