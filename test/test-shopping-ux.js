@@ -2208,3 +2208,17 @@ test('ab 60rem Einkaufsflaeche stehen die Kategorien dicht gepackt in zwei Spalt
   assert.match(quick?.body ?? '', /max-width:\s*calc\(\(100% - var\(--space-5\)\) \/ 2\)/,
     'die Eingabezeile endet mit der ersten Spalte (Spaltenluecke = column-gap)');
 });
+
+// Re-Critique 2026-09-28 (P7 / A4 P2-5): der Wisch-Chevron ">" an jeder
+// Einkaufszeile sagt in iOS "tippe fuer Detail" - hier hiess er "wische", und
+// Tippen hakt ab. Die Geste lehrt der vorhandene Nudge (swipe-row--hint); der
+// Chevron und seine Polster-Reserve fallen in der Einkaufsliste weg.
+test('Einkauf: kein Wisch-Chevron an der Zeile, keine Reserve dafuer', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(readFileSync(new URL('../public/styles/shopping.css', import.meta.url), 'utf8'))];
+  const off = rules.find((r) => r.selector.trim() === '.swipe-row:has(> .shopping-item)::after' && !r.at.length);
+  assert.match(off?.body ?? '', /content:\s*none/, 'der Chevron der geteilten Zeile faellt in der Einkaufsliste weg');
+  const reserve = rules.filter((r) => r.selector.trim() === '.shopping-item' && r.at.some((a) => /hover:\s*none/.test(a))
+    && /padding-inline-end:\s*calc\(var\(--space-2\) \+ var\(--space-3\) \+ var\(--space-2\)\)/.test(r.body));
+  assert.deepEqual(reserve.map((r) => r.at.join(' ')), [], 'die Reserve fuer den Pfeil ist mit ihm gegangen');
+});
