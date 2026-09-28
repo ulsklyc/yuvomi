@@ -1792,6 +1792,21 @@ test('Rezepte mobil: der Aufklapper zieht auf und klappt ein, statt zu springen'
     'die gehaltene Einklapp-Animation (fill: forwards) wird danach verworfen - sonst oeffnete das Panel beim naechsten Mal auf Hoehe 0');
 });
 
+// Re-Critique 2026-09-28 (P7 / A4 P2-7): die Mahlzeit-Typen im
+// Rezeptformular waren native Checkbox PLUS Farbbadge je Option -
+// Doppelkodierung, und der Kanon nennt die native Checkbox fuer Mehrfachauswahl
+// unter "Nicht mehr". Jetzt Umschalt-Chips (`filter-chip`, aria-pressed).
+test('Rezeptformular: Mahlzeit-Typen sind Umschalt-Chips mit aria-pressed, ohne Checkbox und Badge', () => {
+  const recipesSrc = readFileSync(new URL('../public/pages/recipes.js', import.meta.url), 'utf8');
+  const group = recipesSrc.slice(recipesSrc.indexOf('id="recipe-meal-types"'), recipesSrc.indexOf('id="recipe-meal-types"') + 700);
+  assert(/<button type="button" class="filter-chip recipe-meal-types__chip"[^>]*data-meal-type="\$\{option\.key\}"[^>]*aria-pressed=/.test(group),
+    'jede Option ist ein Umschalt-Chip');
+  assert(!/type="checkbox"/.test(group), 'keine native Checkbox mehr');
+  assert(!/meal-type-badge/.test(group), 'kein zweites Farbzeichen je Option');
+  assert(/role="group" aria-labelledby="recipe-meal-types-label"/.test(recipesSrc), 'die Chips sind eine benannte Gruppe');
+  assert(/#recipe-meal-types \[aria-pressed="true"\]/.test(recipesSrc), 'gespeichert wird, was gedrueckt ist');
+});
+
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------

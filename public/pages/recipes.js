@@ -1382,14 +1382,16 @@ function openRecipeModal(mode, recipe = null) {
         <input id="recipe-title" class="form-input" type="text" required placeholder="${t('recipes.titlePlaceholder')}">
       </div>
       <div class="form-group">
-        <label class="form-label">${t('meals.mealTypeLabel')}</label>
-        <div class="recipe-meal-types" id="recipe-meal-types">
+        <span class="form-label" id="recipe-meal-types-label">${t('meals.mealTypeLabel')}</span>
+        <!-- UMSCHALT-CHIPS STATT CHECKBOX PLUS BADGE (Re-Critique 2026-09-28,
+             A4 P2-7): jede Option trug eine native Checkbox UND ein Farbbadge -
+             zwei Zeichen fuer eine Wahl; der Kanon fuehrt die native Checkbox
+             fuer Mehrfachauswahl unter "Nicht mehr". -->
+        <div class="recipe-meal-types" id="recipe-meal-types" role="group" aria-labelledby="recipe-meal-types-label">
           ${mealTypeOptions().map((option) => `
-            <label class="form-check recipe-meal-types__option">
-              <input type="checkbox" value="${option.key}" checked>
-              <span class="meal-type-badge meal-type-badge--${option.key}">${option.label}</span>
-            </label>
+            <button type="button" class="filter-chip recipe-meal-types__chip" data-meal-type="${option.key}" aria-pressed="false">${esc(option.label)}</button>
           `).join('')}
+          <input type="hidden" id="recipe-meal-types-value" value="">
         </div>
       </div>
       <div class="form-group">
@@ -1487,9 +1489,26 @@ function openRecipeModal(mode, recipe = null) {
       panel.dataset.bildGesetzt = '';
       panel._bildStand = () => bildStand;
       const selectedMealTypes = normalizeRecipeMealTypes(isEdit ? recipe.meal_types : RECIPE_MEAL_TYPE_KEYS);
-      panel.querySelectorAll('#recipe-meal-types input[type="checkbox"]').forEach((input) => {
-        input.checked = selectedMealTypes.includes(input.value);
+      // Der Dialog vergleicht fuer "Aenderungen verwerfen?" die Werte seiner
+      // Felder (modal.js); ein Knopf hat keinen. Das versteckte Feld traegt die
+      // Auswahl als Wert - ohne es verwarf Schliessen eine geaenderte Auswahl still.
+      const typesValue = panel.querySelector('#recipe-meal-types-value');
+      const syncTypesValue = () => {
+        typesValue.value = [...panel.querySelectorAll('#recipe-meal-types [aria-pressed="true"]')]
+          .map((chip) => chip.dataset.mealType).join(',');
+      };
+      panel.querySelectorAll('#recipe-meal-types [data-meal-type]').forEach((chip) => {
+        const setPressed = (on) => {
+          chip.setAttribute('aria-pressed', String(on));
+          chip.classList.toggle('filter-chip--active', on);
+        };
+        setPressed(selectedMealTypes.includes(chip.dataset.mealType));
+        chip.addEventListener('click', () => {
+          setPressed(chip.getAttribute('aria-pressed') !== 'true');
+          syncTypesValue();
+        });
       });
+      syncTypesValue();
 
       const ingList = panel.querySelector('#recipe-ingredient-list');
       if (isEdit && recipe.ingredients?.length) {
@@ -1535,7 +1554,7 @@ async function saveRecipe(panel, mode, recipe) {
   const title = panel.querySelector('#recipe-title')?.value.trim() || '';
   const notes = panel.querySelector('#recipe-notes')?.value.trim() || null;
   const recipe_url = panel.querySelector('#recipe-url')?.value.trim() || null;
-  const meal_types = [...panel.querySelectorAll('#recipe-meal-types input[type="checkbox"]:checked')].map((input) => input.value);
+  const meal_types = [...panel.querySelectorAll('#recipe-meal-types [aria-pressed="true"]')].map((chip) => chip.dataset.mealType);
 
   if (!title) {
     // Fehler am Feld statt als ortloser Toast (geteiltes Muster, Critique P1).

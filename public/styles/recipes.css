@@ -544,14 +544,8 @@ button.recipe-detail__ingredient-match:hover {
   gap: var(--space-2);
 }
 
-/* Geometrie, Zielgröße und das eingekleidete Control kommen aus dem geteilten
- * .form-check (layout.css) - vorher war das eine nackte System-Checkbox in
- * System-Größe, während sechs andere Module ihre schon einkleiden (Critique
- * 2026-07-30, P2). Der engere Abstand bleibt: hier stehen vier Optionen in einer
- * Zeile, nicht eine Zeile mit einem Satz. */
-.recipe-meal-types__option {
-  gap: var(--space-1);
-}
+/* Die Optionen sind Umschalt-Chips (`.filter-chip`, Re-Critique 2026-09-28,
+ * A4 P2-7) - Form, Zielgroesse und Aktivton kommen aus filter-chip.css. */
 
 /* Eigenes Rezeptbild im Formular (#1059, Schritt 2) - dieselbe Bauart wie der
    Foto-Editor im Inventar: eine quadratische Vorschau, die selbst der Ausloeser
