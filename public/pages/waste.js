@@ -22,7 +22,7 @@ import {
   renderAppPage, renderPageHeader, renderPageTitle, renderPageBody,
   renderPageActions, renderListSection,
 } from '/utils/page-layout.js';
-import { findPageFab } from '/utils/fab.js';
+import { findPageFab, setPageFabAction } from '/utils/fab.js';
 import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { createPageController } from '/utils/page-lifecycle.js';
@@ -487,6 +487,117 @@ function typeCardHtml(type, index, total) {
     </div>`;
 }
 
+// -------------------------------------------------------------------------
+// EIN Leerzustand statt drei (Re-Critique 2026-09-28, P4)
+// -------------------------------------------------------------------------
+
+/**
+ * Pure: steht die Seite im Onboarding? Nur ohne JEDE Abfallart - eine nur
+ * archivierte muss wiederherstellbar bleiben, und das geht nur in der vollen
+ * Ansicht mit ihrer Karte. Beim Laden steht das Skelett, bei einem Ladefehler
+ * der Fehler; beides ist kein "noch nichts".
+ */
+function isOnboarding(s) {
+  return !s.loading && !s.error && s.types.length === 0;
+}
+
+/**
+ * Pure: was die Seite im jeweiligen Zustand zeigt. Ohne Abfallart standen
+ * drei "Noch nichts"-Bloecke untereinander (Abholungen, Abfallarten,
+ * Quellen), der erste Weg lag mobil bei y683 unter dem Erinnerungs-Toast.
+ * Abholungen und Quellen haben ohne Abfallart nichts zu sagen - sie kommen
+ * mit den Daten. Der Kopfknopf "Abfallart hinzufuegen" faellt dann ebenfalls
+ * weg: der FAB traegt in diesem Zustand genau diese Aktion (fabIntent).
+ */
+function sectionVisibility(s) {
+  const onboarding = isOnboarding(s);
+  return { upcoming: !onboarding, sources: !onboarding, addTypeButton: !onboarding };
+}
+
+/**
+ * Pure: was der FAB anlegt. Ohne aktive Abfallart laesst sich keine Abholung
+ * eintragen - der FAB hiess trotzdem "Abholung" und leitete per Toast in den
+ * Abfallart-Dialog um (der Toast legte sich dabei ueber dessen Namensfeld).
+ * Jetzt nennt er, was er tut.
+ */
+function fabIntent(s) {
+  const hasActiveType = s.types.some((type) => !type.archived);
+  return hasActiveType
+    ? { creates: 'pickup', labelKey: 'waste.addPickup', dockLabelKey: 'newLabel.waste' }
+    : { creates: 'type', labelKey: 'waste.addType', dockLabelKey: 'newLabel.wasteType' };
+}
+
+function presetLabel(preset) {
+  return t(`waste.preset${preset.key.charAt(0).toUpperCase()}${preset.key.slice(1)}`);
+}
+
+/**
+ * Pure: der EINE Onboarding-Block. Die Vorlagen stehen als Chips da und legen
+ * mit einem Tipp an (Name, Symbol und Farbe der Vorlage) - vorher lagen sie
+ * zwei Schritte tief im Dialog hinter "Mit einer Vorlage starten". Darunter
+ * der zweite Weg, den viele Kommunen anbieten: der ICS-Import, der Arten
+ * gleich mitbringt. Nur-lesen bekommt denselben Leerzustand ohne Schreibweg.
+ */
+function onboardingHtml({ readOnly: ro, emptyHtml = null }) {
+  // `emptyHtml` nur fuer den Test (die DOM-Attrappe dort baut keinen
+  // Leerzustand); die Seite laesst ihn weg.
+  const empty = emptyHtml ?? emptyStateHTML({
+    icon: 'trash-2',
+    title: t('waste.emptyTypesTitle'),
+    description: t('waste.emptyTypesDescription'),
+  });
+  if (ro) return `<div class="waste-onboarding">${empty}</div>`;
+  const chips = TYPE_PRESETS.map((preset) => `
+      <button type="button" class="filter-chip waste-onboarding__preset" data-action="create-preset-type" data-preset="${preset.key}">
+        <i data-lucide="${esc(preset.icon)}" style="color:${esc(preset.color)}" aria-hidden="true"></i>
+        <span>${esc(presetLabel(preset))}</span>
+      </button>`).join('');
+  return `
+    <div class="waste-onboarding">
+      ${empty}
+      <div class="waste-onboarding__presets" role="group" aria-label="${esc(t('waste.typePresetLabel'))}">${chips}
+      </div>
+      <button type="button" class="btn btn--ghost waste-onboarding__import" data-action="open-import">
+        <i data-lucide="upload" class="icon-md" aria-hidden="true"></i>
+        <span>${esc(t('waste.importFileAction'))}</span>
+      </button>
+    </div>`;
+}
+
+/** Legt eine Abfallart aus einer Vorlage an - derselbe POST wie der Dialog. */
+async function createPresetType(key, button) {
+  const preset = TYPE_PRESETS.find((p) => p.key === key);
+  if (!preset) return;
+  if (button) button.disabled = true;
+  try {
+    await api.post('/waste/types', { name: presetLabel(preset), icon: preset.icon, color: preset.color });
+    await reloadAndRender();
+    window.yuvomi?.showToast(t('waste.typeSavedToast'), 'success');
+  } catch (err) {
+    if (button) button.disabled = false;
+    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+  }
+}
+
+/** Zieht Abschnitte, Kopfknopf und FAB auf den Zustand nach. */
+function applyPageMode() {
+  const page = _container.querySelector('.waste-page');
+  page?.classList.toggle('waste-page--onboarding', isOnboarding(state));
+  const intent = fabIntent(state);
+  const fab = findPageFab('waste-fab-new-pickup');
+  if (fab) {
+    setPageFabAction(fab, {
+      label: t(intent.labelKey),
+      dockLabel: t(intent.dockLabelKey),
+      onClick: () => {
+        if (readOnly()) return;
+        if (fabIntent(state).creates === 'type') openTypeModal();
+        else openPickupModal();
+      },
+    });
+  }
+}
+
 function renderTypes() {
   const host = _container.querySelector('#waste-types-list');
   if (!host) return;
@@ -496,15 +607,10 @@ function renderTypes() {
     return;
   }
   if (!state.types.length) {
+    // Der EINE Onboarding-Block (onboardingHtml) - auch der Leerzustand
+    // bietet einem Nur-lesen-Nutzer keinen Anlegeweg an.
     host.replaceChildren();
-    host.insertAdjacentHTML('beforeend', emptyStateHTML({
-      title: t('waste.emptyTypesTitle'),
-      description: t('waste.emptyTypesDescription'),
-      // Auch der Leerzustand darf einem Nur-lesen-Nutzer keinen Anlege-Knopf
-      // anbieten - er ist derselbe Weg wie der Kopfknopf, nur an anderer Stelle.
-      action: readOnly() ? null : { label: t('waste.addType'), icon: 'plus', attrs: { id: 'waste-empty-add-type' } },
-    }));
-    host.querySelector('#waste-empty-add-type')?.addEventListener('click', () => openTypeModal());
+    host.insertAdjacentHTML('beforeend', onboardingHtml({ readOnly: readOnly() }));
     if (window.lucide) window.lucide.createIcons({ el: host });
     return;
   }
@@ -613,6 +719,7 @@ async function reloadAndRender() {
   renderUpcoming();
   renderTypes();
   renderSources();
+  applyPageMode();
 }
 
 /**
@@ -1971,26 +2078,15 @@ function bindEvents() {
   // Der FAB liegt in der Shell-Layer, nicht in `_container`; CSS blendet ihn
   // ueber html[data-module-readonly] aus (layout.css). Der Handler bleibt
   // trotzdem gesperrt - ausgeblendet ist nicht dasselbe wie unerreichbar.
-  findPageFab('waste-fab-new-pickup').addEventListener('click', () => {
-    if (readOnly()) return;
-    // SACKGASSE BEHOBEN (Audit UX, 2026-09-12). Ohne Abfallart liess sich keine
-    // Abholung anlegen - der FAB sagte das auch, tat dann aber NICHTS weiter.
-    // Auf einer frischen Installation war er damit der prominenteste Knopf der
-    // Seite und zugleich der einzige, der garantiert nirgendwohin fuehrte: der
-    // Nutzer musste selbst erraten, dass „Abfallart" hinter dem „..." im Kopf
-    // liegt. Jetzt fuehrt er dorthin, wo er hinweist.
-    // Der Hinweis bleibt BESTEHEN und wird nicht durch das stille Oeffnen
-    // ersetzt: der FAB ist mit „Abholung" beschriftet, und ein Dialog, der
-    // unangekuendigt nach einer ABFALLART fragt, ist ein Themenwechsel, den der
-    // Satz erklaeren muss. Toast und Dialog zusammen sind der vollstaendige
-    // Weg - der Satz sagt warum, der Dialog macht es moeglich.
-    if (!state.types.filter((t2) => !t2.archived).length) {
-      window.yuvomi?.showToast(t('waste.addTypeFirstHint'), 'default');
-      openTypeModal();
-      return;
-    }
-    openPickupModal();
-  });
+  // Die Aktion des FAB haengt am Zustand (fabIntent) und wird deshalb nach
+  // jedem Laden in applyPageMode() gesetzt - ueber setPageFabAction(), damit
+  // der am Desktop angedockte Knopf sein Nomen mitzieht. Bis dahin (Skelett)
+  // legt er an, was der Stand hergibt. SACKGASSE BEHOBEN (Audit UX,
+  // 2026-09-12), jetzt ohne Umleitungs-Toast (Re-Critique 2026-09-28): ohne
+  // Abfallart heisst der FAB "Abfallart" und oeffnet genau diesen Dialog;
+  // vorher hiess er "Abholung", und der erklaerende Toast legte sich ueber das
+  // Namensfeld des Dialogs.
+  applyPageMode();
 
   // The three `role="button" tabindex="0"` rows (edit-type, edit-schedule,
   // open-source) are a div, not a real <button> - unlike the app's own
@@ -2073,6 +2169,8 @@ function bindEvents() {
       openReminderSettingsModal();
     } else if (kind === 'add-type') {
       openTypeModal();
+    } else if (kind === 'create-preset-type') {
+      createPresetType(action.dataset.preset, action);
     }
   });
 }
@@ -2179,6 +2277,7 @@ export async function render(container, { signal: routeSignal = null } = {}) {
   renderUpcoming();
   renderTypes();
   renderSources();
+  applyPageMode();
   applyDeepLink();
 }
 
@@ -2192,4 +2291,5 @@ export const __test = {
   // im Menue steht, und dass die Preset-Farben allesamt im Raster liegen.
   typeCardHtml, scheduleRowHtml, sourceRowHtml, TYPE_PRESETS, WASTE_TYPE_COLORS,
   activeSwatchColor, resolveSwatchColors,
+  isOnboarding, onboardingHtml, sectionVisibility, fabIntent,
 };

@@ -40,6 +40,7 @@ const {
   splitUpcomingByType, deepLinkNeedsExpand, nearestOrdinalAnchorDateKey,
   typeCardHtml, scheduleRowHtml, sourceRowHtml, TYPE_PRESETS, WASTE_TYPE_COLORS,
   activeSwatchColor, resolveSwatchColors,
+  isOnboarding, onboardingHtml, sectionVisibility, fabIntent,
 } = __test;
 
 // Quelltext-Schnappschuss fuer die Zusicherungen weiter unten. Er steht VOR dem
@@ -614,19 +615,26 @@ test('der neue Kopfknopf traegt bewusst KEIN toolbar-new-btn', () => {
 
 test('der FAB fuehrt ohne Abfallart nicht mehr ins Leere', () => {
   // Vorher: Toast, `return`, Ende - der prominenteste Knopf einer frischen
-  // Installation war der einzige, der garantiert nirgendwohin fuehrte.
-  const branch = WASTE_SRC.match(/if \(!state\.types\.filter\([\s\S]{0,400}?\n {4}\}/);
-  assert.ok(branch, 'der Zweig ohne Abfallart muss auffindbar bleiben');
-  assert.match(branch[0], /openTypeModal\(\)/, 'der Hinweis muss jetzt auch den Weg oeffnen');
-  // Der Satz bleibt: der FAB ist mit "Abholung" beschriftet, und ein Dialog,
-  // der unangekuendigt nach einer Abfallart fragt, braucht seine Erklaerung.
-  assert.match(branch[0], /waste\.addTypeFirstHint/);
+  // Installation war der einzige, der garantiert nirgendwohin fuehrte. Seit
+  // der Re-Critique 2026-09-28 nennt er in diesem Zustand selbst "Abfallart"
+  // (fabIntent, oben geprueft) und oeffnet genau diesen Dialog - der
+  // erklaerende Toast entfiel, er legte sich ueber das Namensfeld.
+  const handler = WASTE_SRC.match(/onClick: \(\) => \{[\s\S]{0,300}?\n {6}\}/);
+  assert.ok(handler, 'der FAB-Handler in applyPageMode muss auffindbar bleiben');
+  assert.match(handler[0], /if \(readOnly\(\)\) return;/);
+  assert.match(handler[0], /creates === 'type'\) openTypeModal\(\)/);
+  assert.match(handler[0], /else openPickupModal\(\)/);
+  assert.doesNotMatch(WASTE_CODE, /addTypeFirstHint/, 'kein Umleitungs-Toast mehr');
+  assert.match(WASTE_CODE, /setPageFabAction\(fab, \{[\s\S]{0,120}dockLabel: t\(intent\.dockLabelKey\)/,
+    'der angedockte Knopf zieht sein Nomen mit');
 });
 
 test('beide Leerzustaende bieten ihren Weg an - und beide nur dem, der schreiben darf', () => {
   // Der Quellen-Leerzustand nannte den Weg in seiner Beschreibung, ohne ihn
   // anzubieten ("Importiere eine ICS-Datei deiner Kommune...").
-  assert.match(WASTE_SRC, /action: readOnly\(\) \? null : \{ label: t\('waste\.addType'\)/);
+  // Abfallarten: der EINE Onboarding-Block (Re-Critique 2026-09-28), dessen
+  // Schreibwege am Nur-lesen-Schalter haengen (onboardingHtml, oben geprueft).
+  assert.match(WASTE_SRC, /onboardingHtml\(\{ readOnly: readOnly\(\) \}\)/);
   assert.match(WASTE_SRC, /action: readOnly\(\) \? null : \{ label: t\('waste\.importFileAction'\)/);
   assert.match(WASTE_SRC, /#waste-empty-add-source'\)\?\.addEventListener\('click', \(\) => openImportWizard\(\)\)/);
 });
@@ -711,4 +719,68 @@ test('activeSwatchColor: liest die Farbe des aktiven Swatch, nicht die Oeffnungs
 test('activeSwatchColor: faellt ohne aktiven Swatch auf die uebergebene Oeffnungsfarbe zurueck', () => {
   const panel = stubSwatchPanel(null);
   assert.equal(activeSwatchColor(panel, '#16A34A'), '#16A34A');
+});
+
+// -------------------------------------------------------------------------
+// EIN Leerzustand statt drei (Re-Critique 2026-09-28, P4). Ohne Abfallart
+// standen drei "Noch nichts"-Bloecke untereinander, der erste Weg lag bei
+// y683 unter dem Toast, und der FAB hiess "Abholung", fuehrte aber in den
+// Abfallart-Dialog.
+// -------------------------------------------------------------------------
+
+test('isOnboarding: nur ohne jede Abfallart, nicht beim Laden, nicht bei nur archivierten', () => {
+  assert.equal(isOnboarding({ types: [], loading: false, error: null }), true);
+  assert.equal(isOnboarding({ types: [], loading: true, error: null }), false, 'Skelett statt Onboarding');
+  assert.equal(isOnboarding({ types: [], loading: false, error: new Error('x') }), false, 'Ladefehler bleibt Ladefehler');
+  assert.equal(isOnboarding({ types: [{ id: 1, archived: true }], loading: false, error: null }), false,
+    'eine archivierte Art muss wiederherstellbar bleiben - sie steht nur in der vollen Ansicht');
+});
+
+test('sectionVisibility: im Onboarding nur EIN Block, Abholungen und Quellen erst mit Daten', () => {
+  const on = sectionVisibility({ types: [], loading: false, error: null });
+  assert.deepEqual(on, { upcoming: false, sources: false, addTypeButton: false });
+  const full = sectionVisibility({ types: [{ id: 1, archived: false }], loading: false, error: null });
+  assert.deepEqual(full, { upcoming: true, sources: true, addTypeButton: true });
+});
+
+test('onboardingHtml: Vorlagen als direkt anlegbare Chips plus ICS-Import, ein Leerzustand', () => {
+  const html = onboardingHtml({ readOnly: false, emptyHtml: '<div class="empty-state">E</div>' });
+  for (const preset of TYPE_PRESETS) {
+    assert.match(html, new RegExp(`data-action="create-preset-type"[^>]*data-preset="${preset.key}"`), `Chip ${preset.key} fehlt`);
+  }
+  assert.equal((html.match(/class="empty-state/g) || []).length, 1, 'genau ein Leerzustand');
+  assert.match(html, /data-action="open-import"/, 'ICS-Import als zweiter Weg');
+  assert.match(html, /role="group"[^>]*aria-label="waste\.typePresetLabel"/);
+});
+
+test('onboardingHtml: Nur-lesen bekommt den Leerzustand ohne jeden Schreibweg', () => {
+  const html = onboardingHtml({ readOnly: true, emptyHtml: '<div class="empty-state">E</div>' });
+  assert.doesNotMatch(html, /create-preset-type|open-import/);
+  assert.equal((html.match(/class="empty-state/g) || []).length, 1);
+});
+
+test('fabIntent: ohne Abfallart nennt der FAB "Abfallart" und legt sie an', () => {
+  assert.deepEqual(fabIntent({ types: [] }), { creates: 'type', labelKey: 'waste.addType', dockLabelKey: 'newLabel.wasteType' });
+  assert.deepEqual(fabIntent({ types: [{ id: 1, archived: true }] }),
+    { creates: 'type', labelKey: 'waste.addType', dockLabelKey: 'newLabel.wasteType' }, 'nur archivierte: keine Abholung moeglich');
+  assert.deepEqual(fabIntent({ types: [{ id: 1, archived: false }] }),
+    { creates: 'pickup', labelKey: 'waste.addPickup', dockLabelKey: 'newLabel.waste' });
+});
+
+test('create-preset-type schreibt und steht deshalb NICHT in READ_SAFE_ACTIONS', () => {
+  assert.match(WASTE_CODE, /const READ_SAFE_ACTIONS = new Set\(\['open-source', 'toggle-upcoming-rest'\]\)/);
+  assert.match(WASTE_CODE, /kind === 'create-preset-type'/);
+});
+
+test('Onboarding-CSS: Abholungen, Quellen, Abschnittstitel und Kopfknopf treten zurueck', () => {
+  const css = readFileSync(new URL('../public/styles/waste.css', import.meta.url), 'utf8');
+  const hidden = [...eachRule(css)].filter((r) => /display:\s*none/.test(r.body))
+    .flatMap((r) => r.selector.split(',').map((x) => x.trim()));
+  for (const sel of [
+    '.waste-page--onboarding .waste-upcoming-section',
+    '.waste-page--onboarding .waste-sources-section',
+    '.waste-page--onboarding .waste-types-section .waste-section-title',
+    '.waste-page--onboarding #waste-add-type-btn',
+  ]) assert.ok(hidden.includes(sel), `${sel} fehlt`);
+  assert.match(WASTE_CODE, /classList\.toggle\('waste-page--onboarding', isOnboarding\(state\)\)/);
 });
