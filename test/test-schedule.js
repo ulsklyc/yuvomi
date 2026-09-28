@@ -1476,7 +1476,10 @@ test('the Patterns tab folds patterns, overrides, and extras into one tab and on
   assert.match(tabsBlock, /'patterns'/);
   assert.match(tabsBlock, /'statistics'/);
 
-  const patternsBranch = schedulePage.slice(schedulePage.indexOf("activeView === 'patterns'"), schedulePage.indexOf(': renderStatistics()'));
+  // Seit R14 (P4) rendert der Planung-Zweig ueber planningPanel() - die Regel
+  // (drei Abschnitte in EINEM Tab) gilt fuer dessen Rumpf.
+  assert.match(schedulePage.slice(schedulePage.indexOf("activeView === 'patterns'"), schedulePage.indexOf(': renderStatistics()')), /planningPanel\(\)/);
+  const patternsBranch = schedulePage.slice(schedulePage.indexOf('function planningPanel()'), schedulePage.indexOf('// S-07: ohne einen einzigen Schichttyp'));
   assert.match(patternsBranch, /schedule-library--patterns/);
   assert.match(patternsBranch, /schedule-library--overrides/, 'the overrides list must render inside the patterns branch, not a separate view');
   assert.match(patternsBranch, /schedule-library--extras/, 'the extras list must render inside the patterns branch, not a separate view');
@@ -1661,9 +1664,12 @@ test('overtimeInfo() counts a 22:00-06:00 shift as a full 8 hours (480 min), not
 
 test('the weekly-hours target is a per-user preference, fetched and saved through /schedule/preferences', () => {
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
-  assert.match(schedulePage, /api\.get\('\/schedule\/preferences'\)/);
-  assert.match(schedulePage, /savePreference\(\{ weeklyHours: hours \}\)/);
-  assert.match(schedulePage, /id="schedule-weekly-hours"/);
+  assert.match(schedulePage, /api\.get\('\/schedule\/preferences'\)/, 'die Auswertung liest die Wochenstunden weiter');
+  // Seit R14 (A2 P2-3) steht das Feld im Modulblatt, nicht mehr im Tab.
+  const settingsPage = readFileSync(new URL('../public/settings/pages/personal-schedule.js', import.meta.url), 'utf8');
+  assert.match(settingsPage, /api\.get\('\/schedule\/preferences'\)/);
+  assert.match(settingsPage, /save\(\{ weeklyHours: hours \}\)/);
+  assert.match(settingsPage, /id="schedule-weekly-hours"/);
 });
 
 test('the Statistics tab offers a print action that leaves nav/tabs/filters off the page', () => {
@@ -2116,10 +2122,12 @@ test('a read-only Schedule member can still save their own reminder offset and w
   // Client side: "My settings" must no longer disable the toggle/select/input
   // based on readOnly() - this is a personal preference (own reminder lead
   // time / own overtime target), not a write to shared schedule data.
-  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
-  const fnStart = schedulePage.indexOf('function renderReminderSettings() {');
-  const fnBody = schedulePage.slice(fnStart, schedulePage.indexOf('\n}\n', fnStart));
-  assert.ok(!fnBody.includes('readOnly()'), 'renderReminderSettings() must not call the module read-only check anymore');
+  // Seit R14 (A2 P2-3) im Modulblatt: settings/pages/personal-schedule.js.
+  const settingsPage = readFileSync(new URL('../public/settings/pages/personal-schedule.js', import.meta.url), 'utf8');
+  const fnStart = settingsPage.indexOf('export function scheduleSettingsHtml(');
+  const fnBody = settingsPage.slice(fnStart, settingsPage.indexOf('\n}\n', fnStart));
+  assert.ok(fnStart > 0, 'the settings renderer exists');
+  assert.ok(!settingsPage.includes('readOnly') && !settingsPage.includes('isNavModuleReadOnly'), 'the settings sheet must not call the module read-only check');
   assert.ok(!fnBody.includes('const locked'), 'the old client-side lock variable must be fully removed, not just unused');
   // R11 S3: der Schalter (`control: 'switch'`) ist Kanon und kein Sperr-Flag.
   assert.match(fnBody, /toggleRowHtml\(\{ label: t\('schedule\.reminderToggle'\), checked: active,(?: control: 'switch',)? attrs: \{ id: 'schedule-reminder-toggle' \} \}\)/, 'the toggle must no longer pass a disabled flag');
@@ -2172,14 +2180,15 @@ test('the shift-type preset picker groups presets by template, respecting the ho
 });
 
 test('the reminder-offset select accepts a custom value beyond the fixed presets, matching the server\'s 0-1440 range (S-23)', () => {
-  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  // Seit R14 geteilt zwischen Zusatzschicht-Formular und Modulblatt.
+  const schedulePage = readFileSync(new URL('../public/utils/schedule-reminder-offset.js', import.meta.url), 'utf8');
   assert.match(schedulePage, /async function pickCustomReminderOffset\(select, onResolved\)/);
   const fnBody = schedulePage.slice(schedulePage.indexOf('async function pickCustomReminderOffset'), schedulePage.indexOf('async function pickCustomReminderOffset') + 1200);
   assert.match(fnBody, /minutes < 0 \|\| minutes > 1440/, 'must mirror the server\'s own MAX_OFFSET_MINUTES range, not invent a narrower one');
   assert.match(fnBody, /select\.value = previous;/, 'cancelling or an invalid value must revert the select, not leave "custom" selected');
   // The options builder must offer the escape hatch and must render an already-
   // stored out-of-preset value as a real selected option, not silently as nothing selected.
-  const optionsFn = schedulePage.slice(schedulePage.indexOf('function reminderOffsetOptions('), schedulePage.indexOf('/**\n * S-23: "Custom...'));
+  const optionsFn = schedulePage.slice(schedulePage.indexOf('export function reminderOffsetOptions('), schedulePage.indexOf('/**\n * S-23: "Custom...'));
   assert.match(optionsFn, /!REMINDER_OFFSET_PRESETS\.includes\(effective\)/);
   assert.match(optionsFn, /<option value="custom">/);
 });
@@ -2193,17 +2202,18 @@ test('an overnight shift\'s continuation fragment in Overview names its end time
 test('an "overtime tracking" toggle exists separate from the weekly-hours number, and turning it off suppresses the overtime card entirely (S-24)', () => {
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
 
-  const settingsFn = schedulePage.slice(schedulePage.indexOf('function renderReminderSettings()'), schedulePage.indexOf('async function savePreference'));
-  assert.match(settingsFn, /toggleRowHtml\(\{ label: t\('schedule\.overtimeTrackingToggle'\), checked: state\.overtimeEnabled,(?: control: 'switch',)? attrs: \{ id: 'schedule-overtime-toggle' \} \}\)/);
-  assert.match(settingsFn, /id="schedule-weekly-hours" value="' \+ esc\(String\(weeklyHours\)\) \+ '"' \+ \(state\.overtimeEnabled \? '' : ' disabled'\)/, 'the weekly-hours input must disable itself when overtime tracking is off, not just visually decorate around it');
+  // Seit R14 (A2 P2-3) im Modulblatt: settings/pages/personal-schedule.js.
+  const settingsFn = readFileSync(new URL('../public/settings/pages/personal-schedule.js', import.meta.url), 'utf8');
+  assert.match(settingsFn, /toggleRowHtml\(\{ label: t\('schedule\.overtimeTrackingToggle'\), checked: overtimeEnabled, control: 'switch', attrs: \{ id: 'schedule-overtime-toggle' \} \}\)/);
+  assert.match(settingsFn, /id="schedule-weekly-hours" value="\$\{esc\(String\(weeklyHours\)\)\}"\$\{overtimeEnabled \? '' : ' disabled'\}/, 'the weekly-hours input must disable itself when overtime tracking is off, not just visually decorate around it');
 
   const statsFn = schedulePage.slice(schedulePage.indexOf('function renderStatistics()'), schedulePage.indexOf('function renderStatistics()') + 800);
   assert.match(statsFn, /const overtime = state\.overtimeEnabled \? overtimeInfo\(statistics\.entries, weeklyHours\) : null;/, 'the overtime card must not just hide visually - it must not compute at all when the toggle is off');
 
   // The toggle change handler must save overtimeEnabled and immediately (dis)able the hours input,
   // the same immediate-lock pattern the reminder toggle (S-25) already established.
-  assert.match(schedulePage, /event\.target\.id === 'schedule-overtime-toggle'/);
-  assert.match(schedulePage, /savePreference\(\{ overtimeEnabled: event\.target\.checked \}\)/);
+  assert.match(settingsFn, /if \(hoursInput\) hoursInput\.disabled = !overtimeToggle\.checked;/);
+  assert.match(settingsFn, /save\(\{ overtimeEnabled: overtimeToggle\.checked \}\)/);
 });
 
 test('weeklyHours: 0 stays rejected server-side - S-24 was answered with a separate toggle, not a repurposed sentinel (D-C)', () => {
@@ -2240,7 +2250,9 @@ test('the Today card lives in its own slot above `.schedule-body` and no longer 
 
 test('Planning tab: Override/Extra no longer duplicate their "add" affordance in the section head (consolidated add affordances)', () => {
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
-  const renderPageFn = schedulePage.slice(schedulePage.indexOf('function renderPage()'), schedulePage.indexOf('function renderTodayCard()'));
+  // Seit R14 (P4) steht die Planung in planningPanel() statt inline in renderPage().
+  const renderPageFn = schedulePage.slice(schedulePage.indexOf('function planningPanel()'), schedulePage.indexOf('// S-07: ohne einen einzigen Schichttyp'))
+    + schedulePage.slice(schedulePage.indexOf('function renderPage()'), schedulePage.indexOf('function renderTodayCard()'));
   // The section head must be a bare title (same shape as the Patterns section
   // right above it) - no unconditional header button competing with the
   // section's own empty-state CTA and with the page FAB.
@@ -2345,17 +2357,26 @@ test('statistics range: a narrow field shows a select with the same choices inst
 // Re-Critique 2026-09-27 (A2 P1/P2, Detektor side-tab), Runde 11 S3.
 // ---------------------------------------------------------------------------
 
-test('Auswertung oeffnet mit den Zahlen: Zeitraum, Kennzahlen, und "Meine Einstellungen" dahinter', async () => {
+// R11 stellte "Meine Einstellungen" HINTER die Zahlen; R14 (Re-Critique
+// 2026-09-28, A2 P2-3) nimmt sie ganz aus der Leseansicht ins Modulblatt
+// (settings/pages/personal-schedule.js) - zwei Orte fuer Schichtplan-
+// Einstellungen waren einer zu viel, und der eine war versteckt.
+test('Auswertung oeffnet mit den Zahlen, und "Meine Einstellungen" stehen im Modulblatt statt im Tab', async () => {
   const { __test } = await import('../public/pages/schedule.js');
   const html = __test.renderStatistics();
   const at = (needle) => html.indexOf(needle);
   assert.ok(at('schedule-stat-metrics') > 0, 'Vorbedingung: die Kennzahlen stehen im Markup');
-  assert.ok(at('schedule-reminder-settings') > 0, 'Vorbedingung: die Einstellungen stehen noch auf dem Tab');
   assert.ok(at('schedule-stat-filters') < at('schedule-stat-metrics'), 'der Zeitraum steht ueber den Zahlen');
-  assert.ok(at('schedule-stat-metrics') < at('schedule-reminder-settings'),
-    'die Einstellungen stehen HINTER den Zahlen - mobil lag die erste Kennzahl bei y=994');
-  assert.match(html, /role="switch"[^>]*id="schedule-reminder-toggle"|id="schedule-reminder-toggle"[^>]*role="switch"/,
+  assert.equal(at('schedule-reminder-settings'), -1, 'keine Einstellungen in der Leseansicht');
+  assert.doesNotMatch(html, /id="schedule-(?:reminder-toggle|overtime-toggle|weekly-hours)"/);
+
+  const { scheduleSettingsHtml } = await import('../public/settings/pages/personal-schedule.js');
+  const sheet = scheduleSettingsHtml({ reminderOffsetMinutes: null, weeklyHours: null, overtimeEnabled: false });
+  assert.match(sheet, /role="switch"[^>]*id="schedule-reminder-toggle"|id="schedule-reminder-toggle"[^>]*role="switch"/,
     'eine Einstellung ist ein Schalter (Komponenten-Kanon)');
+  assert.match(sheet, /<label class="form-label" for="schedule-reminder-offset">/, 'die Vorlauf-Auswahl traegt einen Namen');
+  assert.match(sheet, /<select[^>]*id="schedule-reminder-offset"[^>]*disabled/, 'Erinnerung aus: der Vorlauf ist gesperrt');
+  assert.match(sheet, /id="schedule-weekly-hours" value="40" disabled/, 'Ueberstunden aus: das Feld ist gesperrt, Vorgabe 40');
 });
 
 test('ein Primaerknopf je Tab: jeder Schichtplan-Leerzustand bietet seine Wege im Sekundaerton an', async () => {
@@ -2524,4 +2545,51 @@ test('P9: the shift swatch carries an edge in both dark paths', async () => {
   const rules = [...eachRule(css)].filter((r) => /\.schedule-swatch\b/.test(r.selector) && /box-shadow:\s*inset 0 0 0 1px var\(--/.test(r.body));
   assert.ok(rules.some((r) => /:root\[data-theme="dark"\]/.test(r.selector)), 'erzwungenes Dark');
   assert.ok(rules.some((r) => /prefers-color-scheme: dark/.test(r.at.join(' ')) && /:root:not\(\[data-theme="light"\]\)/.test(r.selector)), 'System-Dark');
+});
+
+// P4 (Re-Critique 2026-09-28, A2 P2-6): Planung ohne Schichtart stapelte DREI
+// Leerzustaende (Schichtplaene, Ausnahmen, Zusatzschichten) mit je einem
+// Anlege-Knopf - drei Sackgassen, nur der erste nannte die Vorbedingung. Ein
+// leerer Haushalt sieht jetzt EINEN Leerzustand mit EINEM Weg, "Zu den
+// Schichtarten", und der FAB nennt dort das Nomen, das fehlt.
+test('P4: planning without any shift type is ONE empty state that leads to the shift types', async () => {
+  const { installMiniDom } = await import('./mini-dom.js');
+  installMiniDom();
+  const { __test } = await import('../public/pages/schedule.js');
+  assert.equal(typeof __test.planningPanel, 'function', 'die Planung rendert ueber planningPanel()');
+  const st = __test.scheduleState();
+  const before = { types: st.types, patterns: st.patterns, overrides: st.overrides, extras: st.extras };
+  try {
+    Object.assign(st, { types: [], patterns: [], overrides: [], extras: [] });
+    const html = __test.planningPanel();
+    assert.equal((html.match(/class="empty-state[\s"]/g) || []).length, 1, 'genau ein Leerzustand');
+    assert.match(html, /data-action="go-to-shift-types"/, 'der eine Weg fuehrt zu den Schichtarten');
+    assert.doesNotMatch(html, /data-action="open-create(?:-override|-extra)?"/, 'keine Anlege-Sackgasse ohne Schichtart');
+    assert.equal(__test.scheduleFabIntent('patterns').view, 'shifts', 'der FAB legt dann die fehlende Schichtart an');
+
+    st.types = [{ id: 1, name: 'Frueh', color: '#0891B2', fields: [] }];
+    const withType = __test.planningPanel();
+    assert.match(withType, /schedule-library--overrides/, 'mit Schichtart kommen die drei Abschnitte zurueck');
+    assert.doesNotMatch(withType, /go-to-shift-types/);
+    assert.equal(__test.scheduleFabIntent('patterns').view, 'patterns');
+  } finally {
+    Object.assign(st, before);
+  }
+});
+
+// P12 (Re-Critique 2026-09-28, A2 P2-4): die Auswertung doppelte ihre Zahlen -
+// Kachel "Schichtanzahl" und Kachel "STUNDEN JE SCHICHTART 0 h Gesamt" oben,
+// darunter dieselben Summen als "Gesamt"-Zeile jeder Karte; die zweite Kachel
+// hiess "je Schichtart", zeigte aber eine Summe. Jetzt: die Summe steht EINMAL
+// (Kachel), die Kachel heisst, was sie zeigt ("Stunden gesamt").
+test('P12: statistics show each total once, and the hours tile is named for the sum it shows', async () => {
+  const { installMiniDom } = await import('./mini-dom.js');
+  installMiniDom();
+  const { __test } = await import('../public/pages/schedule.js');
+  const html = __test.renderStatistics();
+  assert.match(html, /schedule-stat-metrics/, 'Vorbedingung: die Kennzahlen stehen im Markup');
+  assert.doesNotMatch(html, /schedule-stat-total/, 'keine zweite Summenzeile unter den Karten');
+  const labels = [...html.matchAll(/class="metric-card__label">([^<]+)</g)].map((m) => m[1]);
+  assert.ok(labels.includes('schedule.totalHours'), `die Stunden-Kachel heisst "Stunden gesamt" (${labels.join(', ')})`);
+  assert.ok(!labels.includes('schedule.workedHours'), 'nicht "je Schichtart" ueber einer Summe');
 });

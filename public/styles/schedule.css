@@ -617,12 +617,6 @@
   gap: var(--space-1);
 }
 
-.schedule-stat-total {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
 .schedule-stat-row__head {
   display: flex;
   align-items: center;
@@ -634,8 +628,7 @@
   flex: 1;
 }
 
-.schedule-stat-row strong,
-.schedule-stat-total strong {
+.schedule-stat-row strong {
   font-variant-numeric: tabular-nums;
 }
 
@@ -669,12 +662,6 @@
   .schedule-stat-row__fill {
     transition: none;
   }
-}
-
-.schedule-stat-total {
-  justify-content: space-between;
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--color-border);
 }
 
 @media screen and (prefers-color-scheme: dark) {
