@@ -554,8 +554,9 @@ async function pickCustomReminderOffset(select, onResolved) {
 // Formular statt einer Karte lebt.
 function reminderOffsetField(selectedMinutes) {
   const active = selectedMinutes != null;
-  return '<div class="form-field schedule-active-field"><span class="label">' + esc(t('schedule.extraReminderOffset')) + '</span><label class="toggle"><input name="reminder_enabled" type="checkbox"' + (active ? ' checked' : '') + '><span class="toggle__track"></span></label></div>'
-    + '<select class="input" name="reminder_offset_minutes"' + (active ? '' : ' disabled') + '>' + reminderOffsetOptions(selectedMinutes) + '</select>';
+  const nameId = toggleNameId();
+  return '<div class="form-field schedule-active-field"><span class="label" id="' + nameId + '">' + esc(t('schedule.extraReminderOffset')) + '</span><label class="toggle"><input name="reminder_enabled" type="checkbox" aria-labelledby="' + nameId + '"' + (active ? ' checked' : '') + '><span class="toggle__track"></span></label></div>'
+    + '<select class="input" name="reminder_offset_minutes" aria-labelledby="' + nameId + '"' + (active ? '' : ' disabled') + '>' + reminderOffsetOptions(selectedMinutes) + '</select>';
 }
 
 function renderReminderSettings() {
@@ -845,8 +846,31 @@ function setOwnerContext({ users = [], people = [], patterns = [], overrides = [
   canManageOthers = mayManageOthers;
 }
 
+// Label und Feld gehoeren zusammen: ohne `for`/`id` hoerte ein Screenreader
+// in beiden Schichtplan-Dialogen nur "Eingabefeld" (A2 P1-1). Das erste
+// beschriftbare Feld des Controls (input ausser hidden, select, textarea)
+// bekommt eine fortlaufende id, sofern es keine eigene traegt; die
+// Datumsauswahl benennt ihr inneres Feld selbst ueber ihr `label`-Attribut,
+// der Symbol-Knopf ueber seinen Text.
+let formFieldSeq = 0;
+const LABELABLE_CONTROL = /<(input|select|textarea)\b(?![^>]*\stype="hidden")([^>]*)>/;
 function formField(label, control, className = '') {
-  return '<div class="form-field ' + className + '"><label class="label">' + esc(label) + '</label>' + control + '</div>';
+  let html = control;
+  let forAttr = '';
+  const match = LABELABLE_CONTROL.exec(control);
+  if (match) {
+    const own = /\sid="([^"]+)"/.exec(match[2]);
+    const id = own ? own[1] : 'schedule-field-' + (++formFieldSeq);
+    if (!own) html = control.slice(0, match.index) + '<' + match[1] + ' id="' + id + '"' + control.slice(match.index + 1 + match[1].length);
+    forAttr = ' for="' + id + '"';
+  }
+  return '<div class="form-field ' + className + '"><label class="label"' + forAttr + '>' + esc(label) + '</label>' + html + '</div>';
+}
+
+// Ein Schalter, dessen sichtbarer Name NEBEN seinem <label class="toggle">
+// steht (das Label umschliesst nur die Spur), hat ohne Verweis keinen Namen.
+function toggleNameId() {
+  return 'schedule-field-' + (++formFieldSeq);
 }
 
 function shiftFields(type = {}) {
@@ -892,11 +916,12 @@ async function pickShiftIcon(button) {
 function patternFields(pattern = {}) {
   const active = pattern.is_active === false || pattern.is_active === 0 ? '' : ' checked';
   const hasWindow = Boolean(pattern.valid_from || pattern.valid_until);
+  const activeNameId = toggleNameId();
   return [
     formField(t('schedule.name'), '<input class="input" required name="name" maxlength="200" value="' + esc(pattern.name ?? '') + '">'),
     formField(t('schedule.anchorDate'), '<yuvomi-datepicker required name="anchor_date" type="date" label="' + esc(t('schedule.anchorDate')) + '" value="' + esc(pattern.anchor_date ?? todayKey()) + '"></yuvomi-datepicker>'),
     formField(t('schedule.cycleLength'), '<input class="input" required name="cycle_length" type="number" min="1" max="366" value="' + esc(String(pattern.cycle_length ?? 7)) + '">'),
-    '<div class="form-field schedule-active-field"><span class="label">' + esc(t('schedule.active')) + '</span><label class="toggle"><input name="is_active" type="checkbox"' + active + '><span class="toggle__track"></span></label></div>',
+    '<div class="form-field schedule-active-field"><span class="label" id="' + activeNameId + '">' + esc(t('schedule.active')) + '</span><label class="toggle"><input name="is_active" type="checkbox" aria-labelledby="' + activeNameId + '"' + active + '><span class="toggle__track"></span></label></div>',
     advancedSection([
       formField(t('schedule.validFrom'), '<yuvomi-datepicker name="valid_from" type="date" label="' + esc(t('schedule.validFrom')) + '" value="' + esc(pattern.valid_from ?? '') + '"></yuvomi-datepicker>'),
       formField(t('schedule.validUntil'), '<yuvomi-datepicker name="valid_until" type="date" label="' + esc(t('schedule.validUntil')) + '" value="' + esc(pattern.valid_until ?? '') + '"></yuvomi-datepicker>'),
@@ -3075,4 +3100,4 @@ export async function update({ path } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { renderStatistics, patternFields, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };
+export const __test = { renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };

@@ -2442,3 +2442,43 @@ test('das Gueltigkeitsfenster eines Musters steht hinter "Weitere Einstellungen"
     if (vorher === undefined) delete globalThis.__advancedSection; else globalThis.__advancedSection = vorher;
   }
 });
+
+test('jedes Feld der Schichtplan-Dialoge hat einen zugaenglichen Namen (A2 P1-1)', async () => {
+  // formField() schrieb ein <label> ohne for und ohne Verschachtelung - im
+  // Schichtart- und im Eintrag-Dialog hoerte ein Screenreader nur
+  // "Eingabefeld"; die Schalter "Aktiv" und "Erinnerung" standen neben einem
+  // Label, das nur die Spur umschloss. Gemessen wird das gebaute Markup:
+  // jedes beschriftbare Feld braucht ein <label for>, aria-label oder
+  // aria-labelledby auf eine vorhandene id; die Datumsauswahl ihr label-Attribut.
+  const { __test } = await import('../public/pages/schedule.js');
+  const vorher = globalThis.__advancedSection;
+  globalThis.__advancedSection = (inner) => inner;
+  try {
+    const html = [
+      __test.formField('Vorlage', '<select class="input" name="shift_preset"><option>x</option></select>'),
+      __test.shiftFields({}),
+      __test.patternFields({}),
+      __test.reminderOffsetField(null),
+      __test.formField('Raum', '<input class="input" data-field-value="3" data-id="9" maxlength="500" value="">'),
+      __test.formField('Notiz', '<textarea class="input" name="note"></textarea>'),
+    ].join('');
+    const ids = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
+    const labelled = new Set([...html.matchAll(/<label\b[^>]*\sfor="([^"]+)"/g)].map((m) => m[1]));
+    const controls = [...html.matchAll(/<(input|select|textarea)\b([^>]*)>/g)].filter((m) => !/\stype="hidden"/.test(m[2]));
+    assert.ok(controls.length >= 10, 'die Stichprobe deckt die Dialogfelder ab');
+    for (const [tag, , attrs] of controls) {
+      const id = /\sid="([^"]+)"/.exec(attrs)?.[1];
+      const byFor = id && labelled.has(id);
+      const byAria = /\saria-label="[^"]+"/.test(attrs);
+      const refs = /\saria-labelledby="([^"]+)"/.exec(attrs)?.[1]?.split(/\s+/) ?? [];
+      const byRef = refs.length > 0 && refs.every((ref) => ids.has(ref));
+      assert.ok(byFor || byAria || byRef, `ohne Namen: ${tag.slice(0, 80)}`);
+    }
+    for (const [picker] of html.matchAll(/<yuvomi-datepicker\b[^>]*>/g)) {
+      assert.match(picker, /\slabel="[^"]+"/, 'die Datumsauswahl benennt ihr inneres Feld selbst');
+    }
+    assert.equal(ids.size, [...html.matchAll(/\sid="([^"]+)"/g)].length, 'keine id doppelt');
+  } finally {
+    if (vorher === undefined) delete globalThis.__advancedSection; else globalThis.__advancedSection = vorher;
+  }
+});
