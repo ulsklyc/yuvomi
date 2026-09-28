@@ -1112,6 +1112,15 @@ const SHAPE_EXEMPT = new Map([
   ['week-event', 'Rasterzelle: Terminblock im Zeitraster der Woche, Hoehe = Dauer'],
   ['day-event', 'Rasterzelle: Terminblock im Zeitraster des Tages, Hoehe = Dauer'],
   ['allday-event', 'Rasterzelle: Ganztags-Balken der Woche/des Tages, gleiche Bar wie .month-day__event'],
+  // Seit R9 M13 (Re-Critique 2026-09-27) oeffnet die Notizkarte als GANZE
+  // Karte: der Oeffnen-Knopf liegt unsichtbar ueber ihr (notes.css, keine
+  // Flaeche, keine Kante) und erbt ihren Radius nur, damit der Fokusring die
+  // Karte umrahmt. Die Form, die man sieht und tippt, ist die der Karte - und
+  // die Notizen sind laut DESIGN.md („Drei Flaechen sind AUSDRUECKLICH keine
+  // Zeilenliste") ein Raster, keine Zeilenliste. Dieselbe Begruendung wie bei
+  // `.health-overview__card--link`: eine Kapsel waere hier eine zweite Form
+  // neben den gleichen Karten des Rasters.
+  ['note-card__open', 'Rasterzelle: ganze Notizkarte als Oeffner im Notizraster (Masonry, DESIGN.md)'],
   // 4. Zeilen einer Zeilenliste
   ['nav-item', 'Zeile: Eintrag der Sidebar-Navigation'],
   ['note-item', 'Zeile: Notiz im Dashboard-Widget'],
