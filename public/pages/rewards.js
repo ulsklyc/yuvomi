@@ -640,7 +640,12 @@ function renderLedger(el) {
   el.replaceChildren();
   const filterChips = [{ id: null, label: t('rewards.all') }]
     .concat(balances().map((b) => ({ id: b.id, label: b.display_name })))
-    .map((c) => `<button class="rw-chip${(state.ledgerFilter ?? null) === c.id ? ' rw-chip--active' : ''}" type="button" data-filter="${c.id ?? ''}">${esc(c.label)}</button>`)
+    // Kanon-Filterchip (Re-Critique 2026-09-28 P2-6): vorher `.rw-chip`, 31px
+    // hoch und ohne aria-pressed - der Screenreader hoerte nicht, wer gefiltert ist.
+    .map((c) => {
+      const on = (state.ledgerFilter ?? null) === c.id;
+      return `<button class="filter-chip filter-chip--sm${on ? ' filter-chip--active' : ''}" type="button" data-filter="${c.id ?? ''}" aria-pressed="${on}">${esc(c.label)}</button>`;
+    })
     .join('');
   // Bonus vergeben läuft über den Kontext-FAB (Ledger-Tab, Admin); kein Inline-Button.
   const adminBar = '';

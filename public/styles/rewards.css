@@ -443,25 +443,9 @@
    Verlauf (Ledger)
    -------------------------------------------------------- */
 .rw-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.rw-chip {
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
-}
-.rw-chip:hover { border-color: var(--color-border-strong); }
-/* Ein Filter-Chip, kein Segment: er trägt den Ton als getönte Fläche, nicht
- * deckend gefüllt (Rezept: tokens.css, Abschnitt 6c). Deckend war er die eine
- * Stelle, an der ein Chip wie ein Segment aussah. */
-.rw-chip--active {
-  background: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), transparent);
-  border-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-hint), transparent);
-  color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
-}
+/* Die Chips selbst sind `.filter-chip filter-chip--sm` (filter-chip.css) -
+ * hier stand bis zur Re-Critique 2026-09-28 ein eigener `.rw-chip` mit 31px
+ * Hoehe und ohne Zustand fuer den Screenreader. */
 
 /* Verlaufsliste: EIN Träger (Zeilenlisten-Regel, tokens.css). Der Träger endet
  * mit der Liste, deshalb trennt der +-Kombinator statt border-bottom je Zeile. */
@@ -633,5 +617,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rw-progress__fill, .rw-chip, .rw-standing__name { transition: none; }
+  .rw-progress__fill, .rw-standing__name { transition: none; }
 }

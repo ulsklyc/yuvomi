@@ -366,3 +366,33 @@ test('Belohnungen: der Einrichtungsschritt „Praemien" wechselt wirklich in den
   }
   assert.ok(geklickt, `gesucht wurde ${gefragt} - der Reiter heisst data-tab-id="catalog"`);
 });
+
+test('Belohnungen: Verlaufs-Chips sind Kanon-Filterchips mit aria-pressed (Re-Critique 2026-09-28 P2-6)', () => {
+  // `.rw-chip` war ein eigener Dialekt: 31px hoch, kein Zustand fuer den
+  // Screenreader (aria-pressed fehlte). Kanon ist `.filter-chip` (40/48px,
+  // Tonrezept) plus aria-pressed.
+  const s = rewardsPage.state;
+  const vorher = { user: s.user, overview: s.overview, ledger: s.ledger, ledgerFilter: s.ledgerFilter };
+  try {
+    s.user = { id: 1, role: 'admin' };
+    s.overview = { me: 1, balances: [{ id: 2, display_name: 'Emma', balance: 30 }, { id: 3, display_name: 'Leo', balance: 10 }] };
+    s.ledger = [{ id: 1, type: 'earn', delta: 5, reason: 'Zimmer', user_name: 'Leo', created_at: '2026-09-20' }];
+    s.ledgerFilter = 3;
+    const el = markupEl();
+    rewardsPage.renderLedger(el);
+    const chips = [...el.html.matchAll(/<button[^>]*data-filter="([^"]*)"[^>]*>/g)];
+    assert.equal(chips.length, 3, 'Alle + zwei Personen');
+    for (const [tag, id] of chips) {
+      assert.match(tag, /class="[^"]*\bfilter-chip\b/, `Chip ${id}: .filter-chip`);
+      assert.doesNotMatch(tag, /rw-chip/, `Chip ${id}: kein eigener Dialekt`);
+      const pressed = tag.match(/aria-pressed="(true|false)"/);
+      assert.ok(pressed, `Chip ${id}: aria-pressed fehlt`);
+      assert.equal(pressed[1], String(id === '3'), `Chip ${id}: aria-pressed folgt dem Filter`);
+      assert.equal(/filter-chip--active/.test(tag), id === '3', `Chip ${id}: Aktivklasse folgt dem Filter`);
+    }
+  } finally {
+    Object.assign(s, vorher);
+  }
+  const css = readFileSync(new URL('../public/styles/rewards.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(css.replace(/\/\*[\s\S]*?\*\//g, ''), /\.rw-chip\b/, 'rewards.css baut keinen eigenen Chip mehr');
+});
