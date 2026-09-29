@@ -43,6 +43,7 @@ import {
 } from '../utils/timezone.js';
 import { addMonthsClamped } from '../utils/interval-date.js';
 import { recordLocalColorChoice } from '../services/legacy-color-snapshot.js';
+import { householdMonthOf as householdMonthOfIn, householdMonthRange as householdMonthRangeIn } from '../services/housekeeping-month.js';
 
 const log = createLogger('Housekeeping');
 const router = express.Router();
@@ -90,31 +91,16 @@ function currentMonth() {
 }
 
 /**
- * Der Monat (YYYY-MM), in dem ein gespeicherter Zeitpunkt im Haushalt liegt.
- * `check_in` ist ein UTC-Instant, `last_completed` fuehrt daneben zonenlose
- * Wanduhrzeit (#1364) - `storedToInstantMs()` liest beide Formen.
+ * Monat eines Besuchs und Monatsgrenzen in der Haushaltszone - die Regel steht
+ * in services/housekeeping-month.js, weil die Uebersicht dieselbe Frage stellt
+ * (#1451). Hier nur mit der Zone des Haushalts als Vorgabe.
  */
 function householdMonthOf(value, tz = householdTimeZone(db.get())) {
-  const ms = storedToInstantMs(value, tz);
-  if (ms === null) return null;
-  return utcToWall(new Date(ms).toISOString(), tz)?.date.slice(0, 7) ?? null;
+  return householdMonthOfIn(value, tz);
 }
 
-/**
- * Ein Monat des Haushalts als halboffenes Intervall [start, end) in UTC, in
- * der Schreibweise von `check_in` (`toISOString()`), damit der Textvergleich
- * in SQL dem Zeitvergleich entspricht. `substr(check_in, 1, 7)` war der
- * UTC-Monat: ein Besuch am Ersten um 00:30 Berliner Zeit stand im Vormonat.
- */
 function householdMonthRange(monthValue, tz = householdTimeZone(db.get())) {
-  const toInstant = (key) => new Date(localToUTCPrecise(`${key}-01T00:00:00`, tz)).toISOString();
-  const next = addMonthsClamped(`${monthValue}-01`, 1).slice(0, 7);
-  return {
-    start: toInstant(monthValue),
-    // Nach 9999-12 gibt es keinen vierstelligen Monat mehr, den ein
-    // gespeicherter Besuch tragen koennte.
-    end: /^\d{4}-\d{2}$/.test(next) ? toInstant(next) : '9999-12-31T23:59:59.999Z',
-  };
+  return householdMonthRangeIn(monthValue, tz);
 }
 
 function localDateString(dateValue = new Date()) {

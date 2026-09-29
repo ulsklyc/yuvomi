@@ -22,6 +22,7 @@ import { FastingError, getFastingDashboardState } from '../services/fasting.js';
 import { openBalancesForUser } from '../services/split-expenses.js';
 import { NUTRIENT_KEYS, nutritionSummaryFor } from '../services/health-nutrition.js';
 import { emptyPantryExpiring, pantryExpiringSlice } from '../services/pantry-expiring.js';
+import { finishedVisitsInMonth } from '../services/housekeeping-month.js';
 import { householdTimeZone, utcToWall, todayKey, shiftDateKey } from '../utils/timezone.js';
 import { isAdminUser, serializeEvents } from './calendar/helpers.js';
 import { getOccurrences as getWasteOccurrences } from '../services/waste-store.js';
@@ -897,12 +898,10 @@ router.get('/', (req, res) => {
       WHERE hws.check_out IS NULL
       ORDER BY hws.check_in DESC LIMIT 1
     `).get();
-    const monthRow = d.prepare(`
-      SELECT COUNT(*) AS visits,
-             COALESCE(SUM(CASE WHEN paid_at IS NULL THEN daily_rate + COALESCE(extras, 0) ELSE 0 END), 0) AS unpaid
-      FROM housekeeping_work_sessions
-      WHERE substr(check_in, 1, 7) = ? AND check_out IS NOT NULL
-    `).get(currentMonth);
+    // Der Monat des HAUSHALTS, nicht der UTC-Monat von `check_in` (#1451):
+    // `substr(check_in, 1, 7)` zaehlte einen Besuch am Ersten um 00:30 in
+    // Berlin in den Vormonat - dieselbe Regel wie im Modul (#1387).
+    const month = finishedVisitsInMonth(d, currentMonth, householdTimeZone(d));
     const lastRow = d.prepare(`
       SELECT check_in FROM housekeeping_work_sessions
       WHERE check_out IS NOT NULL ORDER BY check_in DESC LIMIT 1
@@ -914,8 +913,8 @@ router.get('/', (req, res) => {
       present: Boolean(openSession),
       presentSince: openSession?.check_in || null,
       workerName: openSession?.worker_name || null,
-      visitsThisMonth: monthRow?.visits || 0,
-      unpaidAmount: monthRow?.unpaid || 0,
+      visitsThisMonth: month.visits,
+      unpaidAmount: month.unpaid,
       lastVisit: lastRow?.check_in || null,
     };
   } catch (err) {

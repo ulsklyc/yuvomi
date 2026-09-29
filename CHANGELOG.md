@@ -731,6 +731,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The overview counts housekeeping visits in the household's month** (#1451). Visits and the
+  unpaid amount in the metric tile and the Housekeeping widget went by the UTC month of the check-in:
+  in Berlin a visit on the 1st at 00:30 counted in the previous month, west of UTC a visit on the
+  evening of the last day in the next one. The overview now uses the same month boundaries as the
+  Housekeeping module, so both show the same number.
+
 - **The wall display stays dark after a reload at night** (#1453). Reloading the wall between 22:00
   and 06:00 with the theme set to Automatic or Light left the dimmed night surface in the light
   theme until the morning. The wall now forces the dark theme on every check during the night and
