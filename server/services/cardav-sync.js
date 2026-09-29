@@ -12,6 +12,7 @@ import * as db from '../db.js';
 import { composeDisplayName, normalizeNameParts } from '../../public/utils/contact-name.js';
 import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
 import { mayChangeContactEmails } from './contact-identity.js';
+import { sameCredentialOrigin } from '../utils/credential-origin.js';
 
 // --------------------------------------------------------
 // Helper Functions
@@ -511,25 +512,6 @@ function getAllAccounts() {
     log.error('Failed to get accounts:', err.message);
     throw err;
   }
-}
-
-/**
- * Ob zwei Konto-Adressen denselben Empfaenger fuer die Zugangsdaten meinen:
- * Schema, Host und Port, normalisiert ueber `URL` (Host in Kleinschrift,
- * Standardport entfaellt). Der Pfad zaehlt nicht - er waehlt auf demselben
- * Server nur eine andere Sammlung. Eine Adresse, die `URL` nicht versteht,
- * zaehlt nur bei woertlicher Gleichheit als dieselbe.
- */
-function sameCredentialOrigin(a, b) {
-  const origin = (raw) => {
-    try { return new URL(String(raw).trim()).origin; } catch { return null; }
-  };
-  const oa = origin(a);
-  const ob = origin(b);
-  if (oa === null || ob === null || oa === 'null' || ob === 'null') {
-    return String(a).trim() === String(b).trim();
-  }
-  return oa === ob;
 }
 
 /**

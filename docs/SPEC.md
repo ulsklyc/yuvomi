@@ -1035,6 +1035,8 @@ Multi-account CalDAV integration. Stores credentials for CalDAV servers (iCloud,
 | reminders_discovered_at | TEXT | ISO 8601, nullable (migration v125) - `NULL` means no reminder-list discovery has run for this account yet |
 | UNIQUE | | (caldav_url, username) |
 
+**Editing an account (`PUT /api/v1/calendar/caldav/accounts/:id`, admin-only):** an omitted or empty password keeps the stored one only while the server (scheme, host, port) and the username stay the same. A different server or username without a new password is refused with `400 password_required` before any connection test runs, and nothing is saved - the same rule as for CardDAV accounts, from the same helper (`server/utils/credential-origin.js`). Until then the connection test ran against the new address with the stored password, so a stored password could travel to a server it was not entered for. A different path on the same server needs no password.
+
 `reminders_discovered_at` exists because an empty selection is ambiguous on its own: a server with no
 `VTODO` collections leaves the table empty forever, so "no rows" cannot distinguish "never looked"
 from "looked, found nothing" and every settings-page load would query the server again.
