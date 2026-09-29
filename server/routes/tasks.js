@@ -1519,8 +1519,8 @@ function spawnRecurrenceFollowup(task) {
     const newTask = db.get().prepare(`
       INSERT INTO tasks (title, description, category, priority, status,
         start_date, due_date, due_time, assigned_to, created_by, is_recurring, recurrence_rule,
-        points, visibility, recurrence_from_completion, countdown, recurrence_origin_id)
-      VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
+        points, visibility, recurrence_from_completion, countdown, locked, recurrence_origin_id)
+      VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       task.title, task.description, task.category, task.priority,
       shiftedStartDate(task.start_date, task.due_date, nextDate),
@@ -1536,6 +1536,13 @@ function spawnRecurrenceFollowup(task) {
       // Erledigung rechnet - der Countdown, der genau davon lebt, dürfte beim
       // ersten Zurücksetzen nicht verschwinden.
       task.countdown ? 1 : 0,
+      // Und die Sperre (#1488). Sie ist an einer Serie gerade der Zweck: das
+      // Kind hakt das erste Vorkommen ab, und genau dieses Abhaken legt das
+      // zweite an. Fiel sie hier weg, war die Serie ab dem zweiten Vorkommen
+      // wieder frei umschreib- und loeschbar - von der Person, fuer die sie
+      // gesperrt wurde. created_by wandert oben mit, also bleiben Ersteller:in
+      // und Admins auch an der Folgeinstanz berechtigt.
+      task.locked ? 1 : 0,
       task.id
     );
     setAssignments(db.get(), newTask.lastInsertRowid, existingAssignments);
@@ -1552,14 +1559,17 @@ function spawnRecurrenceFollowup(task) {
       const newSub = db.get().prepare(`
         INSERT INTO tasks (title, description, category, priority, status,
           start_date, due_date, due_time, assigned_to, created_by, parent_task_id,
-          is_recurring, recurrence_rule, points, visibility, recurrence_origin_id)
-        VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?)
+          is_recurring, recurrence_rule, points, visibility, locked, recurrence_origin_id)
+        VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?)
       `).run(
         sub.title, sub.description, sub.category, sub.priority,
         shiftedStartDate(sub.start_date, subAnchorDate, nextDate) ?? sub.start_date,
         sub.due_date ? (shiftedStartDate(sub.due_date, subAnchorDate, nextDate) ?? nextDate) : null,
         sub.due_time, sub.assigned_to, sub.created_by, newTask.lastInsertRowid,
-        sub.points, sub.visibility, sub.id
+        // Eine Unteraufgabe kann eine eigene Sperre tragen (POST nimmt `locked`
+        // auch dort an) - die geerbte der Elternaufgabe kommt ueber
+        // lockingTask(), die eigene muss mitkopiert werden (#1488).
+        sub.points, sub.visibility, sub.locked ? 1 : 0, sub.id
       );
       setAssignments(db.get(), newSub.lastInsertRowid, subAssignments);
       setTags(db.get(), newSub.lastInsertRowid, subTags);
