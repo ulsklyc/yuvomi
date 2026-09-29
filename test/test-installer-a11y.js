@@ -696,3 +696,153 @@ test('kein Wizard-Schritt sammelt wieder alle Entscheidungen auf einem Bildschir
     `Diese Schritte stellen beim Betreten mehr als ${LIMIT} Entscheidungen auf einmal: ${oversized.join(', ')}. `
     + 'Entweder hinter Akkordeons legen oder entlang einer Frage in zwei Schritte teilen.');
 });
+
+/* Die Ruhekante jedes Formularfelds ist --color-border-control (3:1).
+ *
+ * Felder und Selects trugen --color-border, die Kartenkante: gemessen rund
+ * 1,3:1 auf der Feldflaeche (Critique 2026-09-29). Ein leeres Feld war damit
+ * kaum als Feld zu erkennen - WCAG 1.4.11 verlangt fuer die Kante eines
+ * Bedienelements 3:1. Lighthouse meldete 100, weil es Nicht-Text-Kontrast
+ * nicht misst. Die App hat dafuer seit langem ein eigenes Token.
+ *
+ * Geprueft wird jede Regel, die ein Feld im RUHEZUSTAND faerbt (kein :focus,
+ * kein aria-invalid): ein neues Feld mit eigener Regel faellt so mit auf. Dazu
+ * der Kontrast des Tokens selbst in beiden Quellen und beiden Themes - ein
+ * Textmatch allein bliebe gruen, wenn jemand den Wert daneben aendert.
+ * Checkboxen zeichnet der Browser (accent-color, color-scheme), sie tragen
+ * keine eigene Kante und stehen deshalb nicht in der Liste. */
+test('Formularfelder tragen im Ruhezustand die 3:1-Kante --color-border-control', () => {
+  const FIELD = /(?:^|[\s>+~])(?:input(?:\[type=(?!checkbox)[\w-]+\])?|select|textarea)$/;
+  const STATE = /:|\[aria-invalid/;
+  const checked = [];
+  const offenders = [];
+  for (const rule of RULES) {
+    if (!FIELD.test(rule.selector) || STATE.test(rule.selector)) continue;
+    const decl = rule.body.match(/(?:^|;)\s*border(?:-color)?\s*:\s*([^;]+)/i);
+    if (!decl) continue;
+    checked.push(rule.selector);
+    if (!/var\(--color-border-control\)/.test(decl[1]) && !/^(?:none|0)$/.test(decl[1].trim())) {
+      offenders.push(`${rule.selector} { ${decl[0].trim().replace(/^;\s*/, '')} }`);
+    }
+  }
+  // Die beiden bekannten Traeger muessen dabei sein - sonst greift der Scanner nicht.
+  for (const must of ['input[type=text]', '.lang-switch select']) {
+    assert.ok(checked.includes(must), `${must} setzt keine eigene Kante - der Scanner greift nicht oder die Regel fehlt`);
+  }
+  assert.deepEqual(offenders, [],
+    `Feldkanten unter 3:1 (Kartenkante statt --color-border-control): ${offenders.join(' | ')}`);
+
+  // Das Token zeigt in beiden Quellen auf dieselbe Rampenstufe ...
+  assert.match(html, /--color-border-control:\s*var\(--neutral-500\)/, 'Fallback: --color-border-control fehlt');
+  assert.match(tokensCss, /--color-border-control:\s*var\(--neutral-500\)/, 'tokens.css: --color-border-control zeigt nicht mehr auf --neutral-500');
+
+  // ... und diese Stufe haelt 3:1 auf der Feldflaeche, hell und dunkel.
+  const htmlDark = html.indexOf('@media (prefers-color-scheme: dark)');
+  const tokensDark = tokensCss.indexOf('@media (prefers-color-scheme: dark)');
+  const paare = [
+    ['Inline-Fallback hell', cssVar(html, '--neutral-500'), cssVar(html, '--color-surface')],
+    ['Inline-Fallback dunkel', cssVar(html, '--neutral-500', htmlDark), cssVar(html, '--color-surface', htmlDark)],
+    ['tokens.css hell', cssVar(tokensCss, '--_neutral-500'), cssVar(tokensCss, '--_color-surface')],
+    ['tokens.css dunkel', cssVar(tokensCss, '--_neutral-500', tokensDark), cssVar(tokensCss, '--_color-surface', tokensDark)],
+  ];
+  for (const [label, edge, field] of paare) {
+    const ratio = contrastRatio(edge, field);
+    assert.ok(ratio >= 3, `${label}: Feldkante ${edge} auf ${field} = ${ratio.toFixed(2)}:1, WCAG 1.4.11 verlangt 3:1`);
+  }
+});
+
+// ── Kanten der Aktionen (Critique 2026-09-29) ──────────────────────────────────
+
+/* Die Fussleiste ist in JEDER Breite sticky. Sie war es nur in der Mobil-Query,
+ * und bei 1440x900 lag sie in Schritt 1 bei y=901 - die Primaeraktion stand auf
+ * dem Desktop unter dem Falz. Geprueft wird die Basisregel ausserhalb jeder
+ * Media-Query, denn genau dort fehlte sie. */
+test('die Fussleiste mit der Primaeraktion ist in jeder Breite sticky', () => {
+  const base = media => media === null;
+  assert.equal(declared(sel => sel === '.card-foot', 'position', base), 'sticky',
+    '.card-foot ist ausserhalb der Mobil-Query nicht sticky - auf dem Desktop rutscht die Primaeraktion unter den Falz');
+  assert.match(declared(sel => sel === '.card-foot', 'bottom', base) ?? '', /^0(?:px)?$/, '.card-foot braucht bottom: 0');
+  // Eine sticky Leiste ohne eigene Flaeche laesst den Inhalt durch die Knoepfe laufen.
+  assert.ok(declared(sel => sel === '.card-foot', 'background', base), '.card-foot hat keine opake Grundflaeche');
+});
+
+/* 48px wie .btn der App (DESIGN.md), und der Abschluss-CTA spricht dieselbe
+ * Sprache wie jeder Primaerknopf davor: gleiche Hoehe, gleiches Gewicht,
+ * gleiche Flaeche. Er trug 700/16px auf reinem Akzent. */
+test('Buttons stehen auf 48px, und .open-link gleicht .btn-primary', () => {
+  const base = media => media === null;
+  for (const sel of ['.btn', '.open-link']) {
+    const h = toPx(declared(s => s === sel, 'min-height', base));
+    assert.ok(h >= 48, `${sel} ist ${h}px hoch, DESIGN.md verlangt 48px`);
+  }
+  assert.equal(declared(s => s === '.open-link', 'font-weight', base), declared(s => s === '.btn', 'font-weight', base),
+    '.open-link und .btn tragen verschiedene Schriftgewichte');
+  assert.equal(declared(s => s === '.open-link', 'font-size', base), declared(s => s === '.btn', 'font-size', base),
+    '.open-link und .btn tragen verschiedene Schriftgroessen - der Download-Tausch springt');
+  assert.equal(declared(s => s === '.open-link', 'background', base), declared(s => s === '.btn-primary', 'background', base),
+    '.open-link hat eine andere Primaerflaeche als .btn-primary');
+});
+
+/* Der Klassentausch am Abschluss animierte die Flaeche, die Schriftfarbe sprang
+ * sofort: 120ms Violett auf Violett. setDoneEmphasis() muss die Transition fuer
+ * den Tausch abschalten, den Stil festschreiben und sie danach zurueckgeben -
+ * in dieser Reihenfolge, sonst wirkt einer der drei Schritte nicht. */
+test('der Tausch der Abschlussknoepfe blendet keine Farbe ueber', () => {
+  const fn = html.match(/function setDoneEmphasis\(\) \{([\s\S]*?)\n\}/);
+  assert.ok(fn, 'setDoneEmphasis nicht gefunden');
+  const body = fn[1];
+  const off = body.indexOf("style.transition = 'none'");
+  const swap = body.indexOf('dl.className');
+  const reflow = body.search(/void \w+\.offsetWidth/);
+  const back = body.indexOf("style.transition = ''");
+  assert.ok(off !== -1 && swap !== -1 && reflow !== -1 && back !== -1,
+    'setDoneEmphasis schaltet die Transition fuer den Klassentausch nicht ab und wieder an');
+  assert.ok(off < swap && swap < reflow && reflow < back,
+    'Reihenfolge muss sein: Transition aus, Klassen tauschen, Reflow, Transition zurueck');
+});
+
+/* Der Zurueck-Knopf stand auf --color-surface-2, das im Dark Mode TIEFER liegt
+ * als die Karte (#0F0E0D auf #2B2825) - er sah aus wie ein Loch in der Leiste.
+ * Die App fuehrt ihre sekundaeren Knoepfe transparent mit Kante (.btn--secondary). */
+test('der Ghost-Button ist transparent wie .btn--secondary der App, kein Loch im Dark Mode', () => {
+  const base = media => media === null;
+  assert.equal(declared(s => s === '.btn-ghost', 'background', base), 'transparent',
+    '.btn-ghost braucht die Flaeche von .btn--secondary (transparent), nicht --color-surface-2');
+  const hover = declared(s => s === '.btn-ghost:hover:not(:disabled)', 'background', base);
+  assert.doesNotMatch(hover, /--color-surface-2|--color-border\)/, `.btn-ghost:hover faerbt wieder mit ${hover}`);
+});
+
+/* Ein Fehler-Banner, das fail() unter ein Feld zieht, klebte ohne Abstand am
+ * naechsten Label. */
+test('das Fehler-Banner haelt Abstand zum naechsten Feld', () => {
+  const mb = toPx(declared(s => s === '.error-banner', 'margin-bottom'));
+  assert.ok(mb >= 12, `.error-banner hat margin-bottom ${mb}px - es klebt am naechsten Feld`);
+});
+
+/* aria-invalid klebte bis zum naechsten Absenden: wer das Feld korrigierte,
+ * sah weiter den roten Rahmen und hoerte weiter "ungueltig". Die Funktion wird
+ * hier AUSGEFUEHRT, nicht nur gesucht - und ihre Verdrahtung an input UND
+ * change (Selects feuern kein input in jedem Browser) gleich mit. */
+test('die Feldmarkierung faellt, sobald der Nutzer das Feld korrigiert', () => {
+  const src = html.match(/function clearFieldInvalid\(e\) \{[\s\S]*?\n\}/);
+  assert.ok(src, 'clearFieldInvalid nicht gefunden');
+  assert.match(html, /document\.addEventListener\('input', clearFieldInvalid\)/, 'input-Ereignis nicht verdrahtet');
+  assert.match(html, /document\.addEventListener\('change', clearFieldInvalid\)/, 'change-Ereignis nicht verdrahtet');
+
+  const clearFieldInvalid = new Function(`${src[0]}; return clearFieldInvalid;`)();
+  const fakeField = (attrs) => ({
+    attrs: { ...attrs },
+    getAttribute(n) { return n in this.attrs ? this.attrs[n] : null; },
+    removeAttribute(n) { delete this.attrs[n]; },
+  });
+
+  const marked = fakeField({ 'aria-invalid': 'true', 'aria-describedby': 'cfg-err' });
+  clearFieldInvalid({ target: marked });
+  assert.equal(marked.getAttribute('aria-invalid'), null, 'aria-invalid bleibt nach der Eingabe stehen');
+  assert.equal(marked.getAttribute('aria-describedby'), null, 'die Bindung an das Banner bleibt nach der Eingabe stehen');
+
+  // Ein unmarkiertes Feld behaelt seine eigene Beschreibung.
+  const clean = fakeField({ 'aria-describedby': 'own-hint' });
+  clearFieldInvalid({ target: clean });
+  assert.equal(clean.getAttribute('aria-describedby'), 'own-hint', 'ein unmarkiertes Feld verliert seine Beschreibung');
+});

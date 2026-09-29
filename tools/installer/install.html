@@ -25,6 +25,12 @@
       --color-surface: #FFFFFF;
       --color-surface-2: #FBFAF7;
       --color-border: #E4E0D7;
+      /* Ruhekante der Eingabefelder, wie in tokens.css eine Stufe der Neutral-
+         Rampe. --color-border (Karten, Gruppen) liegt auf der Feldflaeche bei
+         rund 1,3:1 - ein leeres Feld war damit kaum als Feld zu erkennen, und
+         WCAG 1.4.11 verlangt fuer die Kante eines Bedienelements 3:1. */
+      --neutral-500: #8C8880;
+      --color-border-control: var(--neutral-500);
       --color-text-primary: #1D1B17;
       --color-text-secondary: #63615B;
       /* tokens.css leitet dieses Token aus --color-text-tertiary ab; hier steht
@@ -75,7 +81,7 @@
         --color-border: #47423B; --color-text-primary: #F5F3ED; --color-text-secondary: #B4AEA5;
         --color-text-placeholder: #A9A39A;
         --color-accent: #A78BFA; --color-accent-hover: #BCA6FC; --color-ink-on-vivid: #0A0A0C;
-        --neutral-950: #FBFAF7;
+        --neutral-950: #FBFAF7; --neutral-500: #948E85;
         --color-success: #30D158; --color-warning: #FF9F0A; --color-danger: #FF6961;
         /* Inkl. des 1px-Kantenrings aus tokens.css (Dark-Kur 2026-08-17): ein
            reiner Schwarz-Wurf ist auf der Kohle-Buehne unsichtbar, die Karte
@@ -153,7 +159,7 @@
     .lang-switch select {
       appearance: none; -webkit-appearance: none;
       padding: 6px 26px 6px 10px; font-size: var(--text-sm); font-weight: 600;
-      border: 1.5px solid var(--color-border); border-radius: var(--radius-sm);
+      border: 1.5px solid var(--color-border-control); border-radius: var(--radius-sm);
       background: var(--color-surface); color: var(--color-text-primary);
       font-family: var(--font-sans); cursor: pointer; min-height: 36px;
     }
@@ -257,7 +263,34 @@
     .vh { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
     .card-head p  { font-size: var(--text-sm); color: var(--color-text-secondary); margin-top: 7px; line-height: 1.55; }
     .card-body { padding: 24px 32px; }
-    .card-foot { padding: 16px 32px; border-top: 1px solid var(--color-border); display: flex; justify-content: flex-end; gap: 10px; }
+    /* Sticky in JEDER Breite, nicht nur mobil: bei 1440x900 lag die Fussleiste
+       von Schritt 1 bei y=901, also einen Pixel unter dem Falz - die
+       Primaeraktion war auf dem Desktop erst nach dem Scrollen zu sehen. Die
+       Leiste schwebt wie das Chrome der App: opak als Grundfall, Glas nur mit
+       backdrop-filter (gleiche @supports-Weiche wie glass.css). Die unteren
+       Ecken folgen der Karte, damit die ruhende Leiste die Rundung nicht kappt. */
+    .card-foot {
+      padding: 16px 32px; border-top: 1px solid var(--color-border);
+      display: flex; justify-content: flex-end; gap: 10px;
+      position: sticky; bottom: 0; z-index: 10;
+      background: var(--color-surface);
+      border-radius: 0 0 var(--radius-md) var(--radius-md);
+    }
+    @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+      .card-foot {
+        /* 82 % Deckung: der Inhalt darunter ist als Bewegung zu ahnen, aber
+           nicht lesbar - Text hinter Text waere Rauschen neben der Primaeraktion.
+           Die Blur-Tokens kommen aus tokens.css; der Fallback steht im var(). */
+        background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+        backdrop-filter: var(--blur-md, blur(20px)) saturate(var(--lg-glass-saturate, 200%));
+        -webkit-backdrop-filter: var(--blur-md, blur(20px)) saturate(var(--lg-glass-saturate, 200%));
+      }
+    }
+    /* Ohne Unschaerfe (tokens.css setzt --blur-* hier auf 0) waere die
+       Teiltransparenz nur noch durchscheinender Text - dann lieber opak. */
+    @media (prefers-reduced-transparency: reduce) {
+      .card-foot { background: var(--color-surface); }
+    }
     .field { margin-bottom: 18px; }
     .field label { display: block; font-size: var(--text-sm); font-weight: 600; margin-bottom: 6px; }
     /* Die Kästchen waren 13x13 neben einem 16px hohen Label und verfehlten damit
@@ -292,7 +325,9 @@
        hervorgehobenen Sicherheits-Select. */
     select { padding-inline-end: 40px; text-overflow: ellipsis; }
     input[type=text], input[type=password], input[type=email], input[type=number], select {
-      width: 100%; padding: 10px 12px; border: 1.5px solid var(--color-border); border-radius: var(--radius-sm);
+      /* Kante --color-border-control (3:1, WCAG 1.4.11), nicht --color-border:
+         die Kartenkante verschwand auf der Feldflaeche fast ganz. */
+      width: 100%; padding: 10px 12px; border: 1.5px solid var(--color-border-control); border-radius: var(--radius-sm);
       background: var(--color-surface); color: var(--color-text-primary); font-family: var(--font-sans);
       font-size: var(--text-base);
       outline: none; transition: border-color .15s;
@@ -331,15 +366,20 @@
        eine fremde Grammatik. --radius-full lag ungenutzt im Dokument. */
     .btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-      min-height: 44px; padding: 10px 20px;
+      /* 48px wie .btn der App (DESIGN.md, --target-lg); 44px ist das
+         Minimum, kein Ziel. */
+      min-height: 48px; padding: 10px 20px;
       border-radius: var(--radius-full); font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600;
       cursor: pointer; border: none; transition: background .12s, opacity .12s;
     }
     /* Dieselbe Mischung wie .btn--primary der App (layout.css:3957): der reine
        Akzent war ein messbar anderes Violett als jeder Primaerbutton der App -
        direkt neben einem Marken-Tile, das die App-Farbe korrekt traegt. */
-    .btn-primary { background: color-mix(in srgb, var(--color-accent) 88%, var(--neutral-950)); color: var(--color-ink-on-vivid); }
-    .btn-primary:hover:not(:disabled) { background: var(--color-accent-hover); }
+    /* .open-link teilt die Flaeche: der Abschluss-CTA trug den reinen Akzent
+       und war damit das einzige Violett der Reise, das von allen Primaerknoepfen
+       davor abwich - ausgerechnet im letzten Schritt. */
+    .btn-primary, .open-link { background: color-mix(in srgb, var(--color-accent) 88%, var(--neutral-950)); color: var(--color-ink-on-vivid); }
+    .btn-primary:hover:not(:disabled), .open-link:hover { background: var(--color-accent-hover); }
     /* Scharfgestellte Zwei-Klick-Bestaetigung (Speichern & Starten): der Zustand
        muss SICHTBAR sein, nicht nur im Buttontext - ein Doppelklicker liest das
        Label nie, ein Zoegerer haelt den ersten Klick sonst fuer wirkungslos.
@@ -348,17 +388,28 @@
       background: var(--color-accent-hover);
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 28%, transparent);
     }
-    .btn-ghost   { background: var(--color-surface-2); color: var(--color-text-primary); border: 1.5px solid var(--color-border); }
-    .btn-ghost:hover:not(:disabled) { background: var(--color-border); }
+    /* Flaeche wie .btn--secondary der App (layout.css): transparent mit Kante.
+       --color-surface-2 liegt im Dark Mode TIEFER als die Karte (#0F0E0D auf
+       #2B2825) - der Zurueck-Knopf sah dort aus wie ein Loch in der Leiste.
+       Hover toent wie in der App mit --tint-state statt eine Kante zu fuellen. */
+    .btn-ghost   { background: transparent; color: var(--color-text-primary); border: 1.5px solid var(--color-border); }
+    .btn-ghost:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--color-accent) var(--tint-state, 12%), transparent);
+      border-color: var(--color-accent);
+    }
     .btn-sm      { min-height: 40px; padding: 6px 12px; font-size: var(--text-xs); }
     .btn:disabled { opacity: .45; cursor: not-allowed; }
     .btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+    /* margin-bottom: fail() zieht das Banner unter das schuldige Feld, und dort
+       klebte es ohne Abstand am naechsten Label. Am Ende des card-body traegt
+       das Padding den Abstand, deshalb dort 0. */
     .error-banner {
-      display: none; margin-top: 12px; padding: 10px 14px; border-radius: var(--radius-sm);
+      display: none; margin-top: 12px; margin-bottom: 18px; padding: 10px 14px; border-radius: var(--radius-sm);
       background: color-mix(in srgb, var(--color-danger) 8%, transparent);
       border: 1.5px solid color-mix(in srgb, var(--color-danger) 25%, transparent);
       color: var(--color-danger); font-size: var(--text-sm);
     }
+    .error-banner:last-child { margin-bottom: 0; }
     .info-banner {
       margin-bottom: 18px; padding: 10px 14px; border-radius: var(--radius-sm);
       background: color-mix(in srgb, var(--color-accent) 8%, transparent);
@@ -424,14 +475,16 @@
     .done-mark svg { width: 40px; height: 40px; }
     .done-wrap h2 { font-size: var(--text-2xl); font-weight: 700; letter-spacing: -.02em; }
     .done-wrap p  { color: var(--color-text-secondary); margin: 8px 0 28px; font-size: var(--text-base); }
+    /* Geometrie und Schrift wie .btn: setDoneEmphasis() tauscht den Download
+       zwischen .open-link und .btn-ghost, und mit 700/16px gegen 600/14px
+       sprang der Knopf beim Tausch in Hoehe und Gewicht. Flaeche siehe .btn-primary. */
     .open-link {
-      display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 32px;
-      background: var(--color-accent); color: var(--color-ink-on-vivid); text-decoration: none;
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 48px; padding: 10px 20px; text-decoration: none;
       border: none; cursor: pointer; font-family: var(--font-sans);
-      border-radius: var(--radius-full); font-weight: 700; font-size: var(--text-base);
+      border-radius: var(--radius-full); font-weight: 600; font-size: var(--text-sm);
       transition: background .12s;
     }
-    .open-link:hover { background: var(--color-accent-hover); }
     .open-link:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
     /* Sekundäre Variante: gleiche Größe/Prominenz, aber ohne Vollfläche -
        wird dem sicherheitskritischen Download untergeordnet, nicht winzig. */
@@ -439,7 +492,7 @@
       background: transparent; color: var(--color-accent);
       box-shadow: inset 0 0 0 1.5px var(--color-border);
     }
-    .open-link--muted:hover { background: var(--color-surface-2); }
+    .open-link--muted:hover { background: color-mix(in srgb, var(--color-accent) var(--tint-state, 12%), transparent); }
     .done-actions { display: flex; flex-direction: column; align-items: center; gap: 14px; }
     .done-actions .open-link, .done-actions .btn { width: 100%; max-width: 300px; }
     .done-check { color: var(--color-success); }
@@ -520,7 +573,8 @@
     [data-eye][aria-pressed="true"] .icon-off { display: inline; }
     .copied-note { font-size: var(--text-xs); color: var(--color-success); }
 
-    /* Touch-Ziele ≥44px und erreichbarer Footer auf Mobilgeräten. */
+    /* Touch-Ziele ≥44px auf Mobilgeräten. Die Fussleiste ist in jeder Breite
+       sticky (siehe .card-foot) und steht deshalb nicht mehr hier. */
     @media (max-width: 640px) {
       /* Der Sprachumschalter sitzt absolut oben rechts und ist auf 44px
          Zielgroesse gewachsen: er reichte damit bis 56px herunter, waehrend der
@@ -536,11 +590,6 @@
          Spezifität nicht an - die Zeile darüber hat ihn deshalb nie erreicht, er
          blieb bei seinen 36px. Gleiche Spezifität, spätere Regel, sie gewinnt. */
       .lang-switch select { min-height: 44px; }
-      .card-foot {
-        position: sticky; bottom: 0; z-index: 10;
-        background: var(--color-surface);
-        box-shadow: 0 -1px 0 var(--color-border);
-      }
     }
 
     /* Reduced-Motion: alle Bewegungen zu sofortigen Zustandswechseln herabstufen. */
@@ -2101,8 +2150,12 @@ function onEnterStep(name) {
     // an DIESEM Schritt haengen und nicht an dem einen Weg dorthin.
     const appUrl = S.BASE_URL || deriveBaseUrl();
     $('done-link').href = appUrl;
+    // Nur echte Blaetter aus public/settings/registry.js, keine Alt-Pfade:
+    // /settings/modules/options leitet seit #1489 ins Budget-Blatt weiter, der
+    // Link "Module waehlen" landete damit bei den Budget-Optionen. Der Guard in
+    // test-installer-static.js prueft jedes Ziel gegen die Registry.
     $('next-invite').href = `${appUrl}/settings/admin/family`;
-    $('next-modules').href = `${appUrl}/settings/modules/options`;
+    $('next-modules').href = `${appUrl}/settings/modules/active`;
     if (savedEnvPath) {
       const p = $('done-path');
       p.textContent = t('done.savedTo', { path: savedEnvPath });
@@ -2118,8 +2171,15 @@ function setDoneEmphasis() {
   const dl = $('done-download');
   const open = $('done-link');
   const downloadLeads = mode === 'simple' && !keysDownloaded;
+  // Der Tausch ist ein Zustandswechsel, keine Hover-Geste, und darf nicht
+  // animieren: die Flaeche blendete in 120ms, die Schriftfarbe sprang sofort -
+  // beim Abstufen stand Violett auf Violett, beim Aufstufen Weiss auf Weiss.
+  // Transition kurz aus, Stil per Reflow festschreiben, Transition zurueck.
+  for (const el of [dl, open]) el.style.transition = 'none';
   dl.className = downloadLeads ? 'open-link' : 'btn btn-ghost';
   open.className = downloadLeads ? 'open-link open-link--muted' : 'open-link';
+  void dl.offsetWidth;
+  for (const el of [dl, open]) el.style.transition = '';
 }
 
 // „Fertig": eine Kopie der geschriebenen .env herunterladen, damit Nicht-Techniker
@@ -2250,6 +2310,20 @@ function clearInvalid(root = document) {
     el.removeAttribute('aria-describedby');
   });
 }
+
+// Die Markierung geht, sobald der Nutzer das Feld anfasst, nicht erst beim
+// naechsten Absenden: ein rot umrandetes Feld, in dem gerade korrigiert wird,
+// meldet einen Fehler, der vielleicht schon behoben ist - und der Screenreader
+// sagt weiter "ungueltig". Das Banner bleibt stehen, bis erneut geprueft wird;
+// ob die Korrektur stimmt, weiss erst die Pruefung beim Absenden.
+function clearFieldInvalid(e) {
+  const el = e.target;
+  if (el.getAttribute?.('aria-invalid') !== 'true') return;
+  el.removeAttribute('aria-invalid');
+  el.removeAttribute('aria-describedby');
+}
+document.addEventListener('input', clearFieldInvalid);
+document.addEventListener('change', clearFieldInvalid);
 
 /** Banner-Fehler zeigen UND das schuldige Feld markieren + fokussieren (WCAG 3.3.1). */
 function fail(bannerId, msg, inputId) {

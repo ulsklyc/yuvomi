@@ -86,3 +86,44 @@ test('install.html enthält keine alten Hardcode-Tokens mehr', () => {
     assert.ok(!src.includes(needle), `Alter Token "${needle}" noch in install.html vorhanden`);
   }
 });
+
+// ── "Als Naechstes": jedes Ziel ist ein echtes Einstellungsblatt ──────────────
+//
+// Der Link "Module waehlen" zeigte auf /settings/modules/options. Das war bis
+// #1489 ein Blatt und ist seither ein Alt-Pfad, den die App ins Budget-Blatt
+// weiterleitet - wer nach der Installation Module waehlen wollte, landete bei
+// den Budget-Optionen. Nichts hat es bemerkt: die Adresse lebte als Text in
+// install.html, die Wahrheit in public/settings/registry.js, ohne Naht.
+//
+// Die Allowlist kommt aus der Registry selbst (SETTINGS_LEAVES), die Sperrliste
+// aus ihren Weiterleitungen (RENAMED_SETTINGS_SOURCE_PATHS). Ein kuenftiger
+// Umbau der Einstellungen macht diesen Guard rot, nicht die Nutzer ratlos.
+test('die Ziele der naechsten Schritte sind echte Einstellungsblaetter, keine Weiterleitungen', async () => {
+  const { SETTINGS_LEAVES, RENAMED_SETTINGS_SOURCE_PATHS } = await import('../public/settings/registry.js');
+  const src = readFileSync(new URL('../tools/installer/install.html', import.meta.url), 'utf8');
+
+  const leaves = new Set(SETTINGS_LEAVES.map(leaf => leaf.path));
+  const redirects = new Set(RENAMED_SETTINGS_SOURCE_PATHS);
+  assert.ok(leaves.size > 0 && redirects.size > 0, 'Registry liefert keine Pfade - der Import greift nicht');
+
+  // Aus dem Markup gezaehlt, nicht angenommen: jeder verlinkte naechste Schritt.
+  const anchors = [...src.matchAll(/<a\b[^>]*\bid="(next-[\w-]+)"/g)].map(m => m[1]);
+  assert.ok(anchors.length > 0, 'keine next-*-Links im Markup gefunden - der Scanner greift nicht');
+
+  const targets = new Map();
+  for (const [, id, path] of src.matchAll(/\$\('(next-[\w-]+)'\)\.href\s*=\s*`\$\{appUrl\}([^`]*)`/g)) {
+    targets.set(id, path);
+  }
+
+  const problems = [];
+  for (const id of anchors) {
+    if (!targets.has(id)) {
+      problems.push(`${id}: keine lesbare href-Zuweisung (\`\${appUrl}/pfad\`) gefunden`);
+      continue;
+    }
+    const path = targets.get(id).split(/[?#]/)[0];
+    if (redirects.has(path)) problems.push(`${id}: ${path} ist eine Weiterleitung, kein Blatt`);
+    else if (!leaves.has(path)) problems.push(`${id}: ${path} ist kein Blatt aus SETTINGS_LEAVES`);
+  }
+  assert.deepEqual(problems, [], problems.join(' | '));
+});
