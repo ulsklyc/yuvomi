@@ -34,8 +34,8 @@
   <link rel="canonical" href="https://yuvomi.cloud/">
   <link rel="icon" type="image/svg+xml" href="logo.svg">
 
-  <!-- Geteiltes Token-System der vier Seiten. Frueher stand es hier viermal.
-       Der Rest dieses <style> ist seitenspezifisch und bleibt lokal. -->
+  <!-- Geteilte Tokens und Bauteile aller fuenf Seiten (Knoepfe, Fokusring,
+       Codeplatte, Reveal). Der Rest des Style-Blocks ist seitenspezifisch. -->
   <link rel="stylesheet" href="assets/site.css">
   <style>
     /* Seiteneigene Masse: die Landing-Page ist 1200px breit, die Rechtstexte
@@ -85,20 +85,8 @@
     a { color: var(--accent); text-decoration: none; }
     img { max-width: 100%; height: auto; display: block; }
     ::selection { background: var(--accent-soft); color: var(--accent-deep); }
-    :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; border-radius: var(--r-xs); }
-    /* SC 2.4.11 wants 3:1 between the ring and what it sits on. --accent clears
-       that everywhere except the code plate, which is a fixed near-black in both
-       themes: the light accent measured 2.85:1 there. The plate carries its own
-       ring colour instead of the page's. */
-    .code-wrap, .code-block { --focus-ring: var(--code-accent); }
-
-    /* Skip link: index and install put 26 focusable nodes between the top of the
-       page and the content, so keyboard users need a way past the nav. */
-    .skip-link { position: absolute; left: -9999px; top: 0; z-index: 200; }
-    .skip-link:focus { left: 8px; top: 8px; padding: 12px 18px; display: inline-flex; align-items: center; min-height: 44px;
-      background: var(--surface); color: var(--text-1);
-      border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow-md); font-weight: 600; }
-
+    /* Fokusring, Skip-Link, Knoepfe, Codeplatte und Reveal stehen in
+       assets/site.css - dieselben Regeln fuer alle Seiten. */
 
     .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
 
@@ -127,7 +115,7 @@
        die Escape-Taste kommen vom Browser, und ohne JS bleibt es bedienbar. */
     .nav-jump { position: relative; margin-left: auto; margin-right: 14px; }
     .nav-jump summary { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 0 12px;
-      border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface);
+      border-radius: var(--r-full); border: 1px solid var(--border); background: var(--surface);
       color: var(--text-2); font-size: 0.84rem; font-weight: 600; cursor: pointer; list-style: none; }
     .nav-jump summary::-webkit-details-marker { display: none; }
     .nav-jump summary:hover { border-color: var(--border-strong); color: var(--text-1); }
@@ -170,18 +158,10 @@
     @media (max-width: 400px) {
       .topbar .nav-logo { font-size: 0; gap: 0; margin-right: 8px; min-width: 44px; }
     }
-    .nav-btn {
-      background: none; border: 1px solid var(--border); color: var(--text-2);
-      cursor: pointer; padding: 8px 12px; border-radius: var(--r-sm); font-size: 0.82rem; font-weight: 600;
-      font-family: var(--ff); display: flex; align-items: center; justify-content: center; gap: 6px;
-      min-height: 44px; min-width: 44px; /* WCAG touch target (both axes) */
-      transition: background .18s, color .18s, border-color .18s, transform .18s var(--ease-out);
-    }
-    .nav-install { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: 0 3px 12px var(--accent-glow); }
-    .nav-install:hover { background: var(--accent-hover); color: var(--accent-ink); border-color: var(--accent-hover); }
-    .nav-btn:hover { background: var(--surface); color: var(--text-1); border-color: var(--border-strong); }
-    .nav-btn:active { transform: scale(0.95); }
-    .nav-btn svg { width: 16px; height: 16px; }
+    /* .nav-btn steht in site.css. Der Installieren-Knopf der Leiste ist ein
+       Primaerknopf in Leistengroesse: dieselbe flache Akzentflaeche, kein Glow. */
+    .nav-install { background: var(--accent-fill); color: var(--accent-ink); border-color: transparent; }
+    .nav-install:hover { background: var(--accent-fill-hover); color: var(--accent-ink); border-color: transparent; }
     .nav-gh { background: var(--text-1); color: var(--bg); border-color: var(--text-1); }
     .nav-gh:hover { background: var(--text-1); color: var(--bg); opacity: 0.86; }
     #gh-stars-nav:not(:empty) { font-variant-numeric: tabular-nums; }
@@ -191,21 +171,6 @@
        Sprache bleibt die englische Dokumentfassung. Gleiches Muster wie der
        .reveal-No-JS-Fallback. */
     html:not(.js) #langBtn, html:not(.js) #themeBtn { display: none; }
-
-    /* ===== Buttons ===== */
-    .btn {
-      display: inline-flex; align-items: center; gap: 9px; font-family: var(--ff);
-      font-weight: 600; font-size: 1rem; cursor: pointer; border: 1px solid transparent;
-      padding: 14px 26px; border-radius: var(--r-md); transition: transform .2s var(--ease-out), box-shadow .2s, background .2s, border-color .2s, color .2s;
-      white-space: nowrap;
-    }
-    .btn svg { width: 18px; height: 18px; }
-    .btn-primary { background: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 16px var(--accent-glow); }
-    .btn-primary:hover { background: var(--accent-hover); transform: translateY(-2px); box-shadow: 0 10px 28px var(--accent-glow); color: var(--accent-ink); }
-    .btn-primary:active { transform: translateY(0) scale(0.98); }
-    .btn-secondary { background: var(--surface); color: var(--text-1); border-color: var(--border); box-shadow: var(--shadow-sm); }
-    .btn-secondary:hover { border-color: var(--border-strong); transform: translateY(-2px); box-shadow: var(--shadow-md); }
-    .btn-secondary:active { transform: translateY(0) scale(0.98); }
 
     /* ===== Section primitives ===== */
     section { position: relative; }
@@ -320,7 +285,7 @@
     .gal-kicker {
       display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0;
       font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-      color: var(--m); padding: 5px 11px; border-radius: var(--r-full);
+      color: color-mix(in srgb, var(--m) var(--tint-ink), var(--text-1)); padding: 5px 11px; border-radius: var(--r-full);
       background: color-mix(in srgb, var(--m) 12%, transparent);
     }
     .gal-cap p { font-size: 1.02rem; color: var(--text-2); line-height: 1.5; margin: 0; }
@@ -398,7 +363,7 @@
       border: 1px solid color-mix(in srgb, var(--m) 26%, transparent); }
     .ho-ico svg { width: 21px; height: 21px; }
     .ho-label { font-size: 1.05rem; font-weight: 650; letter-spacing: -0.015em;
-      color: color-mix(in srgb, var(--m) 84%, var(--text-1)); text-wrap: balance; }
+      color: color-mix(in srgb, var(--m) var(--tint-ink), var(--text-1)); text-wrap: balance; }
     .ho-arrow { color: var(--text-3, var(--text-2)); flex-shrink: 0; opacity: 0.55; }
     .ho-arrow svg { width: 26px; height: 26px; display: block; }
     .ho-note { margin-top: 14px; margin-left: 54px; font-size: 0.97rem; color: var(--text-2); line-height: 1.6; max-width: 62ch; }
@@ -507,13 +472,14 @@
     .feat-row { display: grid; grid-template-columns: minmax(0, 1fr) 200px; gap: 24px; align-items: center;
       padding: 26px; border-radius: var(--r-lg); background: var(--surface);
       border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
-    /* The kicker keeps its module accent - that is the one place on this page
-       where the app's colour vocabulary is semantically correct. But at 12.5px
-       bold the raw tokens missed AA on the lightest two (--m-shopping 4.40:1,
-       --m-split 4.48:1), so the label darkens the hue slightly while the icon
-       plate, which is not text, keeps the pure accent. */
+    /* Module labels (.feat-kicker, .gal-kicker, .ho-label) follow the app's
+       convention for accent text on an accent-tinted ground: the hue mixed
+       toward the text colour at --tint-ink, because the raw family tone is
+       tuned for 4.5:1 on white and misses it on its own tint (the light
+       kitchen orange measured 4.2:1 on the gallery chip). Icons keep the pure
+       accent - they need 3:1, not 4.5:1. */
     .feat-kicker { display: inline-flex; align-items: center; gap: 8px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-      color: color-mix(in srgb, var(--m) 84%, var(--text-1)); margin-bottom: 14px; }
+      color: color-mix(in srgb, var(--m) var(--tint-ink), var(--text-1)); margin-bottom: 14px; }
     .feat-kicker .k-ico { width: 26px; height: 26px; border-radius: var(--r-sm); display: grid; place-items: center;
       color: var(--m); background: color-mix(in srgb, var(--m) 13%, transparent); }
     .feat-kicker .k-ico svg { width: 15px; height: 15px; }
@@ -642,7 +608,7 @@
        recommendation - while the command block directly below belongs to one of
        the three without a badge. One card now says which one that is. Same
        hue-darkening as .feat-kicker: the raw accent misses AA on the tint. */
-    .plat-badge--start { color: color-mix(in srgb, var(--accent) 84%, var(--text-1));
+    .plat-badge--start { color: color-mix(in srgb, var(--accent) var(--tint-ink), var(--text-1));
       background: color-mix(in srgb, var(--accent) 13%, transparent); }
     /* Label uses the theme accent (AA-contrast on --surface in both themes); the
        platform brand colour (--pc) stays on the logo tint only. */
@@ -654,22 +620,7 @@
        rechts vom wichtigsten Block der Seite stehen, waehrend das Plattformraster
        darueber die volle Breite nutzte. Drei Laeufe lang gemeldet. */
     .quick-docker { margin-top: 44px; }
-    .code-block { background: var(--code-bg); color: var(--code-text); border-radius: var(--r-lg); padding: 22px 26px;
-      font-family: var(--ff-mono); font-size: 0.84rem; line-height: 1.9; overflow-x: auto; box-shadow: var(--shadow-lg); border: 1px solid rgba(255,255,255,0.06);
-      white-space: pre; tab-size: 2; }
-    .code-block .c { color: var(--code-comment); }
-    .code-block .h { color: var(--code-accent); }
-    /* Copy button, mirrored from install.html - the landing page asked people to
-       select four shell lines by hand while the install page had twelve of these. */
-    .code-wrap { position: relative; }
-    /* The button gets its own band at the top of the plate instead of a
-       padding-right gutter. `padding-right` only protects the first screenful:
-       the button is absolutely positioned, so any line longer than the plate
-       scrolls straight underneath it. Measured on the German page, where the
-       label reads "Kopieren" at 94px against a 62px gutter, that hid 17% of the
-       readable width at 390px and 23% at 320px, on every block. A reserved row
-       costs 32px of height and cannot be scrolled under. */
-    .code-wrap:has(> .copy-btn) .code-block { padding-top: 54px; }
+    /* Codeplatte und Kopierknopf: site.css. */
     /* Der Einzeiler (`docker compose up -d`) braucht das reservierte Band
        nicht: sein Befehl ist auf jedem Viewport kuerzer als die Platte minus
        Knopf, kann also nie unter den Knopf scrollen - das Band liess die
@@ -678,19 +629,8 @@
        eintraegt, entfernt die Klasse am Wrapper und bekommt das Band zurueck.
        Gleiche Spezifitaet wie die Regel darueber; die Quellreihenfolge
        entscheidet, deshalb steht sie danach. */
-    .code-wrap--single:has(> .copy-btn) .code-block { padding-top: 22px; }
+    .code-wrap--single:has(> .copy-btn) .code-block { padding-top: 20px; }
     .code-wrap--single .copy-btn { top: 50%; transform: translateY(-50%); }
-    .copy-btn { position: absolute; top: 10px; right: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); color: var(--code-text); cursor: pointer;
-      padding: 7px 11px; min-height: 44px; border-radius: var(--r-sm); font-family: var(--ff); font-size: 0.75rem; font-weight: 600; transition: all .15s; }
-    .copy-btn:hover { background: rgba(255,255,255,0.18); color: #fff; }
-    /* Zwei gefuellte Zustands-Chips, bewusst themenunabhaengig: sie erscheinen
-       fuer zwei Sekunden nach einem Klick, und weisse Tinte auf diesen Tiefen
-       traegt auf jedem Grund (5.33:1 / 4.98:1). Die Werte sind --color-success
-       und --color-warning der App; hier standen die der abgeloesten Palette. */
-    .copy-btn.copied { background: #1E7B35; border-color: #1E7B35; color: #fff; }
-    .copy-btn.failed { background: #A85D00; border-color: #A85D00; color: #fff; }
-    .copy-btn svg { width: 13px; height: 13px; }
     /* What the reader is actually deciding at the moment they paste a curl into
        the machine that will hold their family's health records: what runs, how
        big it is, what it opens, and whether it talks to anyone. All of it lived
@@ -858,13 +798,6 @@
       transition: opacity .3s var(--ease-out), visibility .3s var(--ease-out); }
     html.js .mobile-cta.show { opacity: 1; visibility: visible; pointer-events: auto; }
 
-    /* ===== Reveal ===== */
-    .reveal { opacity: 0; transform: translateY(26px); transition: opacity .7s var(--ease-out), transform .7s var(--ease-out); }
-    .reveal.vis { opacity: 1; transform: none; }
-    .d1 { transition-delay: .08s; } .d2 { transition-delay: .16s; } .d3 { transition-delay: .24s; }
-    /* No-JS fallback: reveal-gated content must never ship hidden (privacy visitors often disable JS). */
-    html:not(.js) .reveal { opacity: 1; transform: none; }
-
     /* ===== Responsive ===== */
     @media (max-width: 1024px) {
       .hero .wrap { grid-template-columns: 1fr; gap: 56px; text-align: center; }
@@ -918,9 +851,12 @@
         position: fixed; left: 50%; transform: translateX(-50%);
         bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 90;
         padding: 14px 26px; border-radius: var(--r-full);
-        background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 0.95rem;
-        box-shadow: 0 10px 30px var(--accent-glow), 0 4px 14px rgba(0,0,0,0.20);
-        border: 1px solid color-mix(in srgb, var(--accent) 55%, #000 12%);
+        /* Dieselbe flache Akzentflaeche wie .btn-primary. Sie schwebt ueber dem
+           Inhalt und braucht deshalb einen Schatten, aber einen neutralen:
+           der violette Glow war ein Knopfstil, den die App nicht kennt. */
+        background: var(--accent-fill); color: var(--accent-ink); font-weight: 700; font-size: 0.95rem;
+        box-shadow: var(--shadow-lg);
+        border: 0;
       }
       .mobile-cta svg { width: 18px; height: 18px; }
       .mobile-cta:active { transform: translateX(-50%) scale(0.97); }
@@ -956,7 +892,6 @@
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
       }
-      .reveal { opacity: 1; transform: none; }
       .plat-card:hover { transform: none; }
       /* Die Handoff-Bewegung ist Ortswechsel, also genau das, was hier
          wegfaellt: kein Wandern, kein Ankommen. Die Zeilen stehen statisch. */
@@ -970,14 +905,13 @@
     @media print {
       html { scroll-behavior: auto; }
       body { background: #fff; color: #000; padding-bottom: 0; }
-      .skip-link, .site-bar, .copy-btn, .hero-glow, .to-top, .ho-token, .mod-toggle { display: none !important; }
+      .site-bar, .hero-glow, .to-top, .ho-token, .mod-toggle { display: none !important; }
       /* Papier hat keinen Aufklapp-Knopf: jede Modulbeschreibung steht da. */
       .mod-card p { display: block !important; }
       /* The CTA stays on paper: it used to be hidden entirely, so a printed copy
          ended on the footer with no closing line and no GitHub address - and the
          external-href rule below is what puts that address on the sheet. */
       .cta-box { box-shadow: none; padding: 28px 24px; }
-      .reveal { opacity: 1 !important; transform: none !important; }
       .hero-frame { box-shadow: none !important; }
       .hero, section { padding: 20px 0 !important; }
       .gal-item, .feat-row, .mod-card, .swap-row, .plat-card, .ho-row, .fam-item { break-inside: avoid; }
@@ -1503,19 +1437,19 @@
       <div class="mod-group reveal mod-group--flat">
         <h3 class="mod-group-head" data-t="grp_settings">Settings</h3>
         <div class="mod-group-body">
-          <div class="mod-card" style="--m: var(--m-contacts)">
+          <div class="mod-card" style="--m: var(--m-settings)">
             <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
             <h4 data-t="m_family_t">Family</h4><p data-t="m_family_d">Member profiles with roles, photos and contact details, kept in sync with Contacts and Birthdays.</p>
           </div>
-          <div class="mod-card" style="--m: var(--m-calendar)">
+          <div class="mod-card" style="--m: var(--m-reminders)">
             <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
             <h4 data-t="m_rem_t">Reminders</h4><p data-t="m_rem_d">Reminders on tasks, events, shifts, subscription renewals, warranties, best-before dates and waste pickups, with an in-app badge, opt-in push notifications and household Gotify, ntfy, webhook or email channels.</p>
           </div>
-          <div class="mod-card" style="--m: var(--m-infra)">
+          <div class="mod-card" style="--m: var(--m-settings)">
             <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
             <h4 data-t="m_api_t">API tokens</h4><p data-t="m_api_d">Bearer and X-API-Key tokens against a documented OpenAPI 3.1 spec, plus an MCP endpoint at <code>/mcp</code> that lets a client like Claude Desktop drive the API in plain language.</p>
           </div>
-          <div class="mod-card" style="--m: var(--m-infra)">
+          <div class="mod-card" style="--m: var(--m-settings)">
             <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div>
             <h4 data-t="m_backup_t">Backup</h4><p data-t="m_backup_d">Scheduled backups with optional WebDAV upload (Nextcloud, ownCloud, Hetzner, etc.). Every restore saves the current state first, and a backup from another installation restores in the browser, no shell needed.</p>
           </div>
@@ -1630,11 +1564,11 @@
         <li class="tb-wide"><b data-t="tb_data_k">Your data</b> <span><span data-t="tb_data_v">One SQLite file at</span> <code>/data/yuvomi.db</code>. <span data-t="tb_data_v2">Copying it is the whole export, unless documents live outside the database.</span></span></li>
         <li class="tb-wide"><b data-t="tb_out_k">Outbound</b> <span><span data-t="tb_out_v">Out of the box, one update check against the GitHub releases API. Everything else reaches out only when you use or switch on a feature that needs it.</span> <details class="tb-more"><summary><span data-t="tb_out_more">Which features</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary><span data-t="tb_out_list">Opening the calendar settings loads the list of holiday countries from openholidaysapi.org, finding a logo for a subscription looks up the service’s website, and weather, public holidays, exchange rates, calendar and contact sync, recipe mirrors, Immich, Paperless or Papra, push and notification channels, cloud storage and backup connect once you switch them on.</span></details></span> <a class="tb-proof" href="privacy.html" data-href-en="privacy.html" data-href-de="datenschutz.html" data-t="tb_out_proof">What the site itself stores</a><span class="tb-sep" aria-hidden="true"> · </span><a class="tb-proof" href="https://github.com/ulsklyc/yuvomi/blob/main/server/routes/changelog.js" data-t="tb_out_code">Read the server source</a></span></li>
       </ul>
-      <div class="code-wrap"><div class="code-block"><span class="c" data-t="qs_c1"># Pre-built image - Docker</span>
+      <div class="code-wrap"><div class="code-block"><span class="comment" data-t="qs_c1"># Pre-built image - Docker</span>
 curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml
 curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example
 cp .env.example .env
-<span class="c" data-t="qs_c2"># two values: one for SESSION_SECRET, one for DB_ENCRYPTION_KEY</span>
+<span class="comment" data-t="qs_c2"># two values: one for SESSION_SECRET, one for DB_ENCRYPTION_KEY</span>
 openssl rand -hex 32
 openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml&#10;curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example&#10;cp .env.example .env&#10;openssl rand -hex 32&#10;openssl rand -hex 32"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
       <!-- The .env edit sits BETWEEN the two copy blocks on purpose. It used to be a
@@ -1647,7 +1581,7 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
         <span data-t="quick_env"><b>Now open <code>.env</code> and replace both <code>REPLACE_WITH_…</code> placeholders</b> with the two values you just generated. Yuvomi does not start while a placeholder is still in there. Keep a copy of the key with your other passwords. To run without encryption, clear the <code>DB_ENCRYPTION_KEY</code> line instead.</span>
       </p>
-      <div class="code-wrap code-wrap--single"><div class="code-block"><span class="h">docker compose up -d</span></div><button class="copy-btn" type="button" data-copy="docker compose up -d"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
+      <div class="code-wrap code-wrap--single"><div class="code-block"><span class="cmd">docker compose up -d</span></div><button class="copy-btn" type="button" data-copy="docker compose up -d"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
       <p class="quick-note" data-t="quick_note">Then open <code>http://localhost:3000</code>. The first visit walks you through creating your admin account. Prefer a guided setup? The <a href="install.html#installer">step-by-step installer</a> handles HTTPS, SSO and backups for you.</p>
     </div>
   </div>

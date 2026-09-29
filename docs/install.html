@@ -29,7 +29,9 @@
   <link rel="canonical" href="https://yuvomi.cloud/install.html">
   <link rel="icon" type="image/svg+xml" href="logo.svg">
 
-  <!-- Geteiltes Token-System der vier Seiten. Frueher stand es hier viermal. -->
+  <!-- Geteilte Tokens und Bauteile aller fuenf Seiten (Knoepfe, Fokusring,
+       Codeplatte, Reveal, Semantikfarben). Der Rest des Style-Blocks ist
+       seitenspezifisch. -->
   <link rel="stylesheet" href="assets/site.css">
   <!-- Set before first paint. The `js` class used to be added at the end of the
        body script, so every tab panel, scope and no-JS label rendered for a
@@ -41,39 +43,6 @@
     if (/^#podman$/i.test(location.hash)) document.documentElement.setAttribute('data-engine', 'podman');
   </script>
   <style>
-    /* Seiteneigen: die Semantikfarben des Installationsleitfadens. Nur diese
-       Seite kennt Erfolg, Warnung, Gefahr und Hinweis - die drei anderen nicht,
-       deshalb stehen sie hier und nicht im geteilten Stylesheet. Die Werte
-       kommen aus den gleichnamigen App-Tokens: `--success` aus
-       --color-success, `--*-soft` aus --color-*-light.
-
-       `--danger` fehlte hier ganz: die einzige Fundstelle ruft
-       `var(--danger, #B91C1C)` und lief seit jeher in den Fallback - ein Rot
-       aus der abgeloesten Palette, das kein Theme je mitnahm. */
-    :root {
-      --success: #1E7B35; --success-soft: #DFF6E4;
-      --warning: #A85D00; --warning-soft: #FFF0D9;
-      --danger:  #D70015; --danger-soft:  #FFE3E3;
-      --danger-label: #B91C1C;
-      --info:    #0663C7; --info-soft:    #E0EFFF;
-    }
-    [data-theme="dark"] {
-      --success: #30D158; --success-soft: #0E2E17;
-      --warning: #FF9F0A; --warning-soft: #33230A;
-      --danger:  #FF6961; --danger-soft:  #3A1210;
-      --danger-label: #FCA5A5;
-      --info:    #409CFF; --info-soft:    #10263E;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root:not([data-theme="light"]) {
-        --success: #30D158; --success-soft: #0E2E17;
-        --warning: #FF9F0A; --warning-soft: #33230A;
-        --danger:  #FF6961; --danger-soft:  #3A1210;
-        --danger-label: #FCA5A5;
-        --info:    #409CFF; --info-soft:    #10263E;
-      }
-    }
-
     html { scroll-behavior: smooth; scroll-padding-top: 80px; -webkit-text-size-adjust: 100%; }
     body {
       font-family: var(--ff); background: var(--bg); color: var(--text-1);
@@ -85,19 +54,8 @@
     img { max-width: 100%; height: auto; display: block; }
     code { font-family: var(--ff-mono); }
     ::selection { background: var(--accent-soft); color: var(--accent-deep); }
-    :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; border-radius: var(--r-xs); }
-    /* SC 2.4.11 wants 3:1 between the ring and what it sits on. --accent clears
-       that on every paper surface but not on the code plate, which is a fixed
-       near-black in both themes: the light accent measured 2.85:1 there. */
-    .code-wrap, .code-block { --focus-ring: var(--code-accent); }
-
-    /* Skip link: index and install put 26 focusable nodes between the top of the
-       page and the content, so keyboard users need a way past the nav. */
-    .skip-link { position: absolute; left: -9999px; top: 0; z-index: 200; }
-    .skip-link:focus { left: 8px; top: 8px; padding: 12px 18px; display: inline-flex; align-items: center; min-height: 44px;
-      background: var(--surface); color: var(--text-1);
-      border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow-md); font-weight: 600; }
-
+    /* Fokusring, Skip-Link, Knoepfe, Codeplatte und Reveal stehen in
+       assets/site.css - dieselben Regeln fuer alle Seiten. */
 
     .container { max-width: 860px; margin: 0 auto; padding: 0 22px; }
     .container-wide { max-width: 1160px; margin: 0 auto; padding: 0 22px; }
@@ -114,27 +72,6 @@
     .nav-logo:hover { text-decoration: none; }
     .nav-logo svg { width: 34px; height: 34px; filter: drop-shadow(0 3px 8px var(--accent-glow)); }
     .nav-controls { display: flex; align-items: center; gap: 8px; }
-    .nav-btn {
-      background: none; border: 1px solid var(--border); color: var(--text-2); cursor: pointer;
-      padding: 8px 12px; border-radius: var(--r-sm); font-size: 0.82rem; font-weight: 600; font-family: var(--ff);
-      display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; min-width: 44px; /* WCAG touch target (both axes) */
-      transition: background .18s, color .18s, border-color .18s, transform .18s var(--ease-out); text-decoration: none;
-    }
-    .nav-btn:hover { background: var(--surface); color: var(--text-1); border-color: var(--border-strong); text-decoration: none; }
-    .nav-btn:active { transform: scale(0.95); }
-    .nav-btn svg { width: 16px; height: 16px; }
-
-    /* Buttons */
-    .btn { display: inline-flex; align-items: center; gap: 9px; font-family: var(--ff); font-weight: 600; font-size: 0.98rem;
-      cursor: pointer; border: 1px solid transparent; padding: 13px 24px; border-radius: var(--r-md);
-      transition: transform .2s var(--ease-out), box-shadow .2s, background .2s, border-color .2s, color .2s; text-decoration: none; }
-    .btn:hover { text-decoration: none; }
-    .btn svg { width: 17px; height: 17px; }
-    .btn-primary { background: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 16px var(--accent-glow); }
-    .btn-primary:hover { background: var(--accent-hover); transform: translateY(-2px); box-shadow: 0 10px 28px var(--accent-glow); color: var(--accent-ink); }
-    .btn-secondary { background: var(--surface); color: var(--text-1); border-color: var(--border); box-shadow: var(--shadow-sm); }
-    .btn-secondary:hover { border-color: var(--border-strong); transform: translateY(-2px); box-shadow: var(--shadow-md); }
-
     /* Section primitives */
     section { padding: 80px 0; }
     .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
@@ -191,20 +128,20 @@
     .tab-btn { display: inline-flex; align-items: center; gap: 9px; background: var(--surface); border: 1px solid var(--border);
       color: var(--text-2); font-family: var(--ff); font-size: 0.85rem; font-weight: 600; cursor: pointer;
       padding: 10px 15px; min-height: 44px; border-radius: var(--r-full); transition: all .18s var(--ease-out); box-shadow: var(--shadow-sm); }
-    .tab-btn:hover { border-color: var(--border-strong); color: var(--text-1); transform: translateY(-1px); }
+    .tab-btn:hover { border-color: var(--border-strong); color: var(--text-1); }
     .tab-btn .tb-logo { width: 18px; height: 18px; display: grid; place-items: center; color: var(--pc, var(--accent)); }
     .tab-btn .tb-logo svg { width: 18px; height: 18px; fill: currentColor; }
-    .tab-btn.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 14px var(--accent-glow); }
+    /* Der gewaehlte Tab traegt die Flaeche des Primaerknopfs: flach, ohne Glow. */
+    .tab-btn.active { background: var(--accent-fill); border-color: transparent; color: var(--accent-ink); box-shadow: var(--shadow-sm); }
     .tab-btn.active .tb-logo { color: var(--accent-ink); }
     .tab-btn .tb-one { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 6px; border-radius: var(--r-full);
       background: color-mix(in srgb, var(--success) 16%, transparent); color: var(--success-ink); }
-    /* On the active (accent-filled) tab this was white on light violet: 2.13:1
-       in dark mode. The badge keeps its shape but takes readable ink.
-       A literal, not var(--accent-deep): the plate under it is a fixed
-       near-white in BOTH themes, so its ink has to be dark in both - the shared
-       token follows the theme and would go pale here. The value is
-       --color-accent-hover's light step (7.88:1 on the plate). */
-    .tab-btn.active .tb-one { background: rgba(255,255,255,0.92); color: #4340B8; }
+    /* On the active (accent-filled) tab the green badge would sit on violet.
+       It inverts instead: the tab's ink becomes its plate and the tab's fill its
+       ink - the one pair on this page that is measured as readable in both
+       themes by construction. (Here stood a fixed near-white plate with a
+       literal indigo from the retired palette.) */
+    .tab-btn.active .tb-one { background: var(--accent-ink); color: var(--accent-fill); }
 
     .tab-panel { display: none; }
     .tab-panel.active { display: block; animation: fade .35s var(--ease-out); }
@@ -277,31 +214,9 @@
     html:not(.js) .eng-head, html:not(.js) .scope-head { display: block; }
 
     /* Code */
-    .code-wrap { position: relative; margin-bottom: 14px; }
-    .code-block { background: var(--code-bg); color: var(--code-text); border-radius: var(--r-md); padding: 18px 20px;
-      font-family: var(--ff-mono); font-size: 0.84rem; line-height: 1.8; overflow-x: auto; white-space: pre; tab-size: 2;
-      box-shadow: var(--shadow-md); border: 1px solid rgba(255,255,255,0.06); }
-    /* The copy button gets a reserved row at the top of the plate instead of a
-       right-hand gutter. `padding-right: 56px` only protected the first
-       screenful: the button is absolutely positioned, so any line longer than
-       the plate scrolled straight underneath it. On the German page the label
-       reads "Kopieren" at 94px against that 56px gutter, which covered 17% of
-       the readable width at 390px and 23% at 320px, on every block.
-
-       Keyed on :has() rather than on .code-wrap, because five of the nineteen
-       blocks have no button at all and a blanket padding would open 52px of
-       empty plate above them. */
-    .code-wrap:has(> .copy-btn) .code-block { padding-top: 52px; }
-    .code-block .cmd { color: var(--code-accent); font-weight: 600; }
-    .code-block .val { color: var(--code-val); }
-    .code-block .comment { color: var(--code-comment); }
-    .copy-btn { position: absolute; top: 10px; right: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: var(--code-text); cursor: pointer;
-      padding: 7px 11px; min-height: 44px; border-radius: var(--r-sm); font-family: var(--ff); font-size: 0.75rem; font-weight: 600; transition: all .15s; }
-    .copy-btn:hover { background: rgba(255,255,255,0.16); color: #fff; }
-    .copy-btn.copied { background: var(--success); border-color: var(--success); color: #fff; }
-    .copy-btn.failed { background: var(--warning); border-color: var(--warning); color: #fff; }
-    .copy-btn svg { width: 13px; height: 13px; }
+    /* Codeplatte und Kopierknopf: site.css. Hier nur der Abstand zwischen
+       aufeinanderfolgenden Platten eines Schritts. */
+    .code-wrap { margin-bottom: 14px; }
 
     /* The seven tabs scope the steps per platform and then everything below
        #install ignored the choice: "navigate to http://localhost:3000" is wrong
@@ -363,16 +278,11 @@
     .env-name { font-family: var(--ff-mono); font-size: 0.92rem; font-weight: 600; color: var(--accent); margin-bottom: 10px; word-break: break-all; }
     .env-label { font-size: 0.95rem; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .env-req { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--r-full);
-      /* Beide Kanaele aus DEMSELBEN Token, und zwar aus --danger-label statt
-         --danger: die Signalfarbe der Seite (#D70015) misst auf dieser hellen
-         Flaeche nur 3.89:1 und faellt fuer 0.7rem-Versalien unter AA - gemessen,
-         nachdem genau diese Umstellung hier zuerst falsch gemacht wurde. Der
-         Etikettenton ist die dunklere Stufe. Weil das Token selbst
-         themengeschaltet ist, ersetzt diese eine Zeile die zwei gespiegelten
-         Dark-Regeln, die es dafuer brauchte. */
-      background: color-mix(in srgb, var(--danger-label) 14%, transparent); color: var(--danger-label); }
-    @media (prefers-color-scheme: dark) {
-    }
+      /* Beide Kanaele aus DEMSELBEN Token, und zwar aus der lesbaren Stufe
+         (--danger-ink = --color-danger-ink der App) statt der Signalfarbe: die
+         misst auf dieser hellen Flaeche nur 3.89:1 und faellt fuer
+         0.7rem-Versalien unter AA. Das Token ist themengeschaltet (site.css). */
+      background: color-mix(in srgb, var(--danger-ink) 14%, transparent); color: var(--danger-ink); }
     /* DB_ENCRYPTION_KEY is optional in fact - server/db.js runs an unencrypted
        SQLite file when the value is empty - but irreversible once set. Wearing the
        same red "Required" badge as SESSION_SECRET said the wrong thing twice:
@@ -416,7 +326,9 @@
        den Fokusring des <summary> weg. Die Summary sitzt 1px innerhalb des
        details (der Rahmen), der Ring liegt bei `outline-offset: 3px` also 2px
        AUSSERHALB der Klammer und wurde vollstaendig geklippt: tastaturbedient
-       war nicht zu sehen, welches der fuenf Akkordeons den Fokus hat.
+       war nicht zu sehen, welches der fuenf Akkordeons den Fokus hat. (Der
+       Offset ist heute 2px wie in der App; der Ring liegt damit 1px ausserhalb
+       und wuerde weiter geklippt.)
        Gemessen 0 geaenderte Pixel gegen 3.561 ohne die Klammer.
        Die Ausnahme gilt nur, solange der Fokus sichtbar ist; im Ruhezustand
        klippt es weiter wie zuvor. WCAG 2.4.7 und 2.4.11. */
@@ -454,12 +366,6 @@
     .to-top.show { opacity: 1; visibility: visible; transform: none; }
     .to-top:hover { text-decoration: none; border-color: var(--border-strong); }
     .to-top svg { width: 15px; height: 15px; }
-
-    /* Reveal */
-    .reveal { opacity: 0; transform: translateY(22px); transition: opacity .6s var(--ease-out), transform .6s var(--ease-out); }
-    .reveal.visible { opacity: 1; transform: none; }
-    .reveal-delay-1 { transition-delay: .08s; } .reveal-delay-2 { transition-delay: .16s; }
-    html:not(.js) .reveal { opacity: 1; transform: none; }
 
     @media (max-width: 760px) {
       /* On a phone the first command sat at 2798px, three screens down, behind
@@ -507,7 +413,6 @@
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
       }
-      .reveal { opacity: 1; transform: none; }
       .opt-card:hover, .prereq-card:hover { transform: none; }
     }
 
@@ -520,12 +425,11 @@
       html { scroll-behavior: auto; }
       body { background: #fff; color: #000; }
       .hero::before { display: none; }
-      .skip-link, .site-bar, .copy-btn, .tab-bar, .to-top, .path-now, .engine-row { display: none !important; }
+      .site-bar, .tab-bar, .to-top, .path-now, .engine-row { display: none !important; }
       /* Every variant on paper, each labelled: a printout has no tab or engine
          state to follow. */
       .scope, .eng-docker, .eng-podman { display: block !important; }
       .eng-head, .scope-head { display: block !important; }
-      .reveal { opacity: 1 !important; transform: none !important; }
       .hero, section { padding: 20px 0 !important; }
       .tab-panel { display: block !important; }
       .tab-panel + .tab-panel { margin-top: 30px; padding-top: 26px; border-top: 1px solid var(--border); }
@@ -608,13 +512,13 @@
             <a href="https://podman.io/docs/installation" target="_blank" rel="noopener" class="prereq-link">Podman</a>
           </div>
         </div>
-        <div class="prereq-card reveal reveal-delay-1">
+        <div class="prereq-card reveal d1">
           <div class="prereq-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></div>
           <h3 data-t="prereq_terminal_title">Terminal</h3>
           <p data-t="prereq_terminal_desc">A command-line interface to type a few commands. Built into every OS - no extra install needed.</p>
           <p class="prereq-hint" data-t="prereq_terminal_hint">macOS: Terminal · Windows: PowerShell · Linux: bash</p>
         </div>
-        <div class="prereq-card reveal reveal-delay-2">
+        <div class="prereq-card reveal d2">
           <div class="prereq-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="2" y1="20" x2="22" y2="20"/></svg></div>
           <h3 data-t="prereq_sys_title">System</h3>
           <p data-t="prereq_sys_desc">256 MB RAM minimum. Runs on a Raspberry Pi, NAS, home server, or any desktop machine.</p>
@@ -931,7 +835,7 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
           <div class="env-label"><span data-t="env_session_label">Session Secret</span> <span class="env-req" data-t="env_required">Required</span></div>
           <div class="env-desc" data-t="env_session_desc">Signs and verifies login cookies. Use <code>openssl rand -hex 32</code> to generate a secure value.</div>
         </div>
-        <div class="env-card reveal reveal-delay-1">
+        <div class="env-card reveal d1">
           <div class="env-name">DB_ENCRYPTION_KEY</div>
           <div class="env-label"><span data-t="env_db_label">Database Key</span> <span class="env-irrev" data-t="env_irreversible">Irreversible</span></div>
           <div class="env-desc" data-t="env_db_desc">Optional, and strongly recommended if the household will keep health or financial records. Encrypts the whole database with AES-256; generate with <code>openssl rand -hex 32</code>. Leave it empty and the database stays unencrypted. Set it and there is no way back: lose the value and the data can never be opened again, not by you and not by us.</div>
@@ -1601,9 +1505,9 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
 
     /* Reveal. The `js` class is set in <head> now, before first paint. */
     if ('IntersectionObserver' in window) {
-      var obs = new IntersectionObserver(function(entries){ entries.forEach(function(e){ if (e.isIntersecting){ e.target.classList.add('visible'); obs.unobserve(e.target); } }); }, { threshold: 0.1, rootMargin: '0px 0px -30px 0px' });
+      var obs = new IntersectionObserver(function(entries){ entries.forEach(function(e){ if (e.isIntersecting){ e.target.classList.add('vis'); obs.unobserve(e.target); } }); }, { threshold: 0.1, rootMargin: '0px 0px -30px 0px' });
       document.querySelectorAll('.reveal').forEach(function(el){ obs.observe(el); });
-    } else { document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('visible'); }); }
+    } else { document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('vis'); }); }
 
     (function(){
       var b = document.getElementById('toTop'); if (!b) return;

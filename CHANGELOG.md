@@ -118,6 +118,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of a repeat of the hero, and the page ends on the family call to action rather than on
   the key warning, which stays in full on the install page.
 
+- **The website wears the app's colours and buttons.** Module colours follow the app's areas of
+  life (kitchen orange for meals, recipes, shopping and pantry; one green for tasks, housekeeping
+  and rewards), dark mode uses the app's warmer card and border tones, and every button is a flat
+  capsule like in the app instead of a lifted, glowing rectangle. The copy button on the install
+  page no longer shows white text on bright green in dark mode, and the legal pages keep their
+  header on one line on a phone.
+
 - **New events in the calendar's week and day come from a double-click or a long press, not a
   click.** A single click or tap on empty time now only closes what is open, such as an event's
   popover, so clicking beside an event to put it away no longer opens "New event". With a mouse,

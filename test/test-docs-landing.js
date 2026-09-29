@@ -78,6 +78,13 @@
  *
  *       (11) Jedes Ziel des Sprungmenues ist eine Sektion der Seite.
  *
+ *       (12) Die Farben der Seite folgen der App, und geteilte Regeln stehen
+ *            einmal: die Familientoene in `docs/assets/site.css` gegen
+ *            `public/styles/tokens.css`, die Modulzuordnung gegen deren
+ *            `--module-*`, die beiden Dark-Listen gegeneinander; die
+ *            Rechtsseiten ohne eigene Kopie von `docs/assets/legal.css`
+ *            (2026-09-29).
+ *
  * Ausführen: node --test test/test-docs-landing.js   (bzw. npm run test:docs-landing)
  */
 
@@ -1053,9 +1060,10 @@ function mobileShotFiles() {
   return files;
 }
 
-/** Alle Stylesheet-Quellen der Doku-Seiten: die `<style>`-Bloecke plus site.css. */
+/** Alle Stylesheet-Quellen der Doku-Seiten: die `<style>`-Bloecke plus jedes Blatt unter assets/. */
 function docsStylesheets() {
-  const sheets = [{ where: 'assets/site.css', css: read('assets/site.css') }];
+  const sheets = readdirSync(resolve(DOCS, 'assets')).filter((f) => f.endsWith('.css')).sort()
+    .map((f) => ({ where: `assets/${f}`, css: read(`assets/${f}`) }));
   for (const page of PAGES) {
     const html = read(page);
     const blocks = html.match(/<style\b[^>]*>[\s\S]*?<\/style>/gi) || [];
@@ -1609,4 +1617,222 @@ test('index.html: jedes Ziel des Sprungmenues ist eine Sektion, und die Familie 
     'die Familien-Sektion fehlt im Sprungmenue');
   // Gegenprobe: ein Ziel ohne ID faellt auf.
   assert.deepEqual(deadJumpTargets(html.replace('id="family"', 'id="familie"')), ['family']);
+});
+
+// ── (12) Die Farben der Seite folgen der App; geteilte Regeln stehen einmal ──
+/**
+ * Anlass (Critique 2026-09-29): sechs der Modultoene der Seite stammten aus der
+ * Zeit, als jedes Modul der App seinen eigenen Ton hatte (Rezepte Teal,
+ * Einkauf Pink, Notizen Bernstein ...). Die App ist seit Block 2 auf neun
+ * Familientoene umgezogen, die Seite nicht - "gleiche Farbe, gleicher
+ * Lebensbereich" sagte dort etwas, das die App nicht mehr sagt. Dazu standen
+ * die Dark-Flaechen noch auf dem Stand vor der Dark-Kur der App, und die
+ * Rechtsseiten trugen denselben Style-Block zweimal byteweise und ein drittes
+ * Mal abgewandelt.
+ *
+ * Geprueft wird deshalb die QUELLE, nicht ein Abschrieb: beide Dateien werden
+ * gelesen und verglichen. Wer tokens.css aendert und die Seite nicht, faellt
+ * hier auf - und umgekehrt.
+ */
+const APP_TOKENS = () => readFileSync(resolve(ROOT, 'public/styles/tokens.css'), 'utf8');
+
+/** Die Deklarationen eines Blocks als geordnete Liste [name, wert] (Kommentare entfernt). */
+function declarations(body) {
+  return body.replace(/\/\*[\s\S]*?\*\//g, '').split(';')
+    .map((d) => d.trim()).filter(Boolean)
+    .map((d) => { const i = d.indexOf(':'); return [d.slice(0, i).trim(), d.slice(i + 1).trim().replace(/\s+/g, ' ')]; });
+}
+
+/** Die drei Token-Bloecke von site.css: :root, [data-theme="dark"] und der Media-Zwilling. */
+function siteTokenBlocks(css) {
+  const blocks = { light: null, darkToggle: null, darkMedia: null };
+  for (const rule of eachRule(css)) {
+    if (rule.selector === ':root' && !rule.at.length && !blocks.light) blocks.light = declarations(rule.body);
+    else if (rule.selector === '[data-theme="dark"]' && !rule.at.length) blocks.darkToggle = declarations(rule.body);
+    else if (rule.selector === ':root:not([data-theme="light"])' && rule.at.some((a) => /prefers-color-scheme:\s*dark/.test(a))) blocks.darkMedia = declarations(rule.body);
+  }
+  return blocks;
+}
+
+/** Werte der App: `--_family-*` hell (erster Treffer) und dunkel (alle weiteren, muessen gleich sein). */
+function appFamilies(tokens) {
+  const fam = {};
+  for (const m of tokens.matchAll(/--_family-([a-z]+):\s*(#[0-9A-Fa-f]{6})\b/g)) {
+    (fam[m[1]] ||= []).push(m[2].toUpperCase());
+  }
+  const out = {};
+  for (const [name, values] of Object.entries(fam)) {
+    const dark = [...new Set(values.slice(1))];
+    assert.equal(dark.length, 1, `tokens.css: --_family-${name} hat in den Dark-Bloecken verschiedene Werte (${dark.join(', ')})`);
+    out[name] = { light: values[0], dark: dark[0] };
+  }
+  return out;
+}
+
+/** `--module-<name>: var(--_family-<fam>)` aus tokens.css. */
+function appModuleFamilies(tokens) {
+  return Object.fromEntries([...tokens.matchAll(/--module-([a-z-]+):\s*var\(--_family-([a-z]+)\)/g)].map((m) => [m[1], m[2]]));
+}
+
+/** Abweichungen der Seitenfarben von der App, als lesbare Liste. */
+function colourDrift(siteCss, tokens) {
+  const found = [];
+  const app = appFamilies(tokens);
+  const blocks = siteTokenBlocks(siteCss);
+  for (const [k, v] of Object.entries(blocks)) if (!v) found.push(`site.css: Block ${k} nicht gefunden`);
+  if (found.length) return found;
+  const get = (list, name) => list.find(([n]) => n === name)?.[1];
+  const hex = (v) => (v || '').toUpperCase();
+
+  // Acht Familien als --f-*; die neunte (overview) IST der Akzent.
+  const families = Object.keys(app).filter((f) => f !== 'overview');
+  if (families.length !== 8) found.push(`tokens.css fuehrt ${families.length + 1} Familien statt neun - Guard und Kommentar nachziehen`);
+  for (const f of families) {
+    if (hex(get(blocks.light, `--f-${f}`)) !== app[f].light) found.push(`--f-${f} (light): Seite ${get(blocks.light, `--f-${f}`)}, App ${app[f].light}`);
+    for (const k of ['darkToggle', 'darkMedia']) {
+      if (hex(get(blocks[k], `--f-${f}`)) !== app[f].dark) found.push(`--f-${f} (${k}): Seite ${get(blocks[k], `--f-${f}`)}, App ${app[f].dark}`);
+    }
+  }
+  if (hex(get(blocks.light, '--accent')) !== app.overview.light) found.push(`--accent (light) ist nicht --_family-overview ${app.overview.light}`);
+  if (hex(get(blocks.darkToggle, '--accent')) !== app.overview.dark) found.push(`--accent (dark) ist nicht --_family-overview ${app.overview.dark}`);
+
+  // Jedes Modul-Token ist ein Alias auf die Familie, die die App ihm gibt.
+  const appModules = appModuleFamilies(tokens);
+  const mods = blocks.light.filter(([n]) => n.startsWith('--m-'));
+  if (mods.length < 10) found.push(`nur ${mods.length} --m-* in site.css gefunden - Regex veraltet?`);
+  for (const [name, value] of mods) {
+    const m = value.match(/^var\(--f-([a-z]+)\)$/);
+    const mod = name.slice(4);
+    if (!m) { found.push(`${name}: ${value} ist kein Alias auf ein --f-*`); continue; }
+    if (!appModules[mod]) { found.push(`${name}: die App kennt kein --module-${mod}`); continue; }
+    if (appModules[mod] !== m[1]) found.push(`${name}: Seite --f-${m[1]}, App --_family-${appModules[mod]}`);
+  }
+  // Die Dark-Listen setzen nur Familien, nie Module - sonst laufen sie wieder auseinander.
+  for (const k of ['darkToggle', 'darkMedia']) {
+    for (const [n] of blocks[k]) if (n.startsWith('--m-')) found.push(`${n} steht im Dark-Block ${k} - dort gehoeren nur die --f-*`);
+  }
+  // Die beiden Dark-Listen sind Zwillinge: gleiche Deklarationen, gleiche Werte, gleiche Reihenfolge.
+  const a = blocks.darkToggle.map((d) => d.join(': '));
+  const b = blocks.darkMedia.map((d) => d.join(': '));
+  if (a.join('\n') !== b.join('\n')) {
+    const onlyA = a.filter((x) => !b.includes(x));
+    const onlyB = b.filter((x) => !a.includes(x));
+    found.push(`Dark-Zwillinge weichen ab - nur [data-theme]: ${onlyA.join(' | ') || '(Reihenfolge)'}; nur Media: ${onlyB.join(' | ') || '(Reihenfolge)'}`);
+  }
+  return found;
+}
+
+test('site.css: Familientoene und Modulzuordnung folgen tokens.css, die Dark-Zwillinge sind gleich', () => {
+  assert.deepEqual(colourDrift(read('assets/site.css'), APP_TOKENS()), []);
+});
+
+test('site.css: jede Modulfarbe, die eine Seite benutzt, gibt es', () => {
+  const defined = new Set(siteTokenBlocks(read('assets/site.css')).light.map(([n]) => n));
+  const missing = [];
+  for (const page of PAGES) {
+    for (const m of read(page).matchAll(/var\((--m-[a-z]+)\)/g)) {
+      // --m-prose/--m-read/--m-list/--m-narrow sind Massstufen von index.html, keine Farben.
+      if (/^--m-(prose|read|list|narrow)$/.test(m[1])) continue;
+      if (!defined.has(m[1])) missing.push(`${page}: ${m[1]}`);
+    }
+  }
+  assert.deepEqual([...new Set(missing)], [], 'eine leere Modulfarbe laesst die Zeile ohne Farbe - so fehlte --m-pantry schon einmal');
+});
+
+test('der Farb-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const css = read('assets/site.css');
+  const tokens = APP_TOKENS();
+  assert.deepEqual(colourDrift(css, tokens), [], 'Vorbedingung: der echte Stand ist sauber');
+  // Der Anlass: ein Einzelton aus der Zeit vor den Familien.
+  assert.match(colourDrift(css.replace('--m-shopping: var(--f-kitchen);', '--m-shopping: #CF236F;'), tokens).join('\n'),
+    /--m-shopping: #CF236F ist kein Alias/);
+  // Ein Modul in der falschen Familie.
+  assert.match(colourDrift(css.replace('--m-notes: var(--f-records);', '--m-notes: var(--f-work);'), tokens).join('\n'),
+    /--m-notes: Seite --f-work, App --_family-records/);
+  // Die App zieht einen Familienton um, die Seite nicht.
+  assert.match(colourDrift(css, tokens.replace('--_family-kitchen:  #C2410C', '--_family-kitchen:  #C2410D')).join('\n'),
+    /--f-kitchen \(light\)/);
+  // Nur EINER der beiden Dark-Zwillinge wird nachgezogen.
+  const i = css.indexOf('@media (prefers-color-scheme: dark)');
+  const oneTwin = css.slice(0, i) + css.slice(i).replace('--f-people: #FB7185;', '--f-people: #F472B6;');
+  const drift = colourDrift(oneTwin, tokens).join('\n');
+  assert.match(drift, /--f-people \(darkMedia\)/);
+  assert.match(drift, /Dark-Zwillinge weichen ab/);
+});
+
+/** Selektoren, die eine Seite in ihrem eigenen Style-Block neu anlegt, obwohl ein geteiltes Blatt sie fuehrt. */
+const SHARED_SELECTORS = ['.btn', '.btn-primary', '.btn-secondary', '.nav-btn', '.code-block', '.copy-btn', '.reveal', '.reveal.vis', ':focus-visible', '.skip-link'];
+
+function inlineStyles(html) {
+  const body = stripComments(html.split(/<\/head>/)[0]);
+  return (body.match(/<style\b[^>]*>[\s\S]*?<\/style>/gi) || []).map((b) => b.replace(/^<style\b[^>]*>/i, '').replace(/<\/style>$/i, ''));
+}
+
+function sharedRuleCopies(pages) {
+  const found = [];
+  for (const [page, html] of pages) {
+    for (const css of inlineStyles(html)) {
+      for (const rule of eachRule(css)) {
+        for (const sel of rule.selector.split(',').map((s) => s.trim())) {
+          if (SHARED_SELECTORS.includes(sel) && !rule.at.length) found.push(`${page}: ${sel}`);
+        }
+      }
+    }
+  }
+  return found;
+}
+
+test('geteilte Bauteile stehen nur in site.css, und der Knopf ist eine Kapsel', () => {
+  const pages = PAGES.map((p) => [p, read(p)]);
+  assert.deepEqual(sharedRuleCopies(pages), [],
+    'eine Seite legt ein geteiltes Bauteil neu an - genau so liefen .btn, .code-block und .reveal zwischen index und install auseinander');
+  const btn = [...eachRule(read('assets/site.css'))].find((r) => r.selector === '.btn');
+  assert.ok(btn, '.btn fehlt in site.css');
+  assert.match(btn.body, /border-radius:\s*var\(--r-full\)/, 'die Buttonform der App ist die Kapsel (DESIGN.md, Eine-Buttonform-Regel)');
+  // Gegenprobe: die alte Kopie in install.html faellt auf.
+  const copy = pages.map(([p, h]) => [p, p === 'install.html' ? h.replace('</style>', '.btn { padding: 13px 24px; }\n</style>') : h]);
+  assert.deepEqual(sharedRuleCopies(copy), ['install.html: .btn']);
+});
+
+/** Befunde gegen die Rechtsseiten: Zwillinge ohne eigenen Block, Impressum ohne Doppel. */
+function legalSheetFindings(files, legalCss) {
+  const found = [];
+  const legalRules = new Map();
+  for (const r of eachRule(legalCss)) {
+    const key = `${r.at.join(' ')}|${r.selector}`;
+    for (const [n, v] of declarations(r.body)) legalRules.set(`${key}|${n}`, v);
+  }
+  for (const [page, html] of Object.entries(files)) {
+    if (!/<link rel="stylesheet" href="assets\/legal\.css">/.test(html)) found.push(`${page}: laedt assets/legal.css nicht`);
+    const styles = inlineStyles(html);
+    if (TWINS.includes(page) && styles.length) found.push(`${page}: traegt wieder einen eigenen Style-Block`);
+    for (const css of styles) {
+      for (const r of eachRule(css)) {
+        const key = `${r.at.join(' ')}|${r.selector}`;
+        for (const [n, v] of declarations(r.body)) {
+          if (legalRules.get(`${key}|${n}`) === v) found.push(`${page}: ${r.selector} { ${n}: ${v} } steht schon in legal.css`);
+        }
+      }
+    }
+  }
+  return found;
+}
+
+test('die Rechtsseiten teilen legal.css; die Zwillinge tragen keine eigene Kopie', () => {
+  const files = Object.fromEntries(['privacy.html', 'datenschutz.html', 'impressum.html'].map((p) => [p, read(p)]));
+  assert.deepEqual(legalSheetFindings(files, read('assets/legal.css')), []);
+});
+
+test('der legal.css-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const files = Object.fromEntries(['privacy.html', 'datenschutz.html', 'impressum.html'].map((p) => [p, read(p)]));
+  const legal = read('assets/legal.css');
+  // Der Anlass: ein Zwilling bekommt seinen Block zurueck.
+  const back = { ...files, 'privacy.html': files['privacy.html'].replace('</head>', '<style>.toc { padding: 0; }</style>\n</head>') };
+  assert.match(legalSheetFindings(back, legal).join('\n'), /privacy\.html: traegt wieder einen eigenen Style-Block/);
+  // Das Impressum kopiert eine geteilte Regel zurueck.
+  const dup = { ...files, 'impressum.html': files['impressum.html'].replace('</style>', 'h2 { font-size: 20px; }\n</style>') };
+  assert.match(legalSheetFindings(dup, legal).join('\n'), /impressum\.html: h2 \{ font-size: 20px \}/);
+  // Ein Rechtstext laedt das geteilte Blatt nicht mehr.
+  const unlinked = { ...files, 'datenschutz.html': files['datenschutz.html'].replace('<link rel="stylesheet" href="assets/legal.css">', '') };
+  assert.match(legalSheetFindings(unlinked, legal).join('\n'), /datenschutz\.html: laedt assets\/legal\.css nicht/);
 });
