@@ -15,6 +15,7 @@ import {
   resolveRenewal,
 } from '../services/subscriptions.js';
 import { getRates } from '../services/subscription-rates.js';
+import { refuseWhileRestoring } from '../middleware/restore-gate.js';
 import { findLogoOptions } from '../services/subscription-logo.js';
 import { normalizeObjectVisibility, budgetVisibilityWhere, canEditEntry, resolveBudgetMode } from '../services/budget-visibility.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
@@ -514,7 +515,10 @@ router.post('/logo-search', async (req, res) => {
   }
 });
 
-router.get('/', async (req, res) => {
+// Ein veralteter Wechselkurs wird bei Fixer geholt und danach im Cache
+// gespeichert: waehrend eines Restores 503, sonst festgehalten wie eine
+// schreibende Anfrage (#1551).
+router.get('/', refuseWhileRestoring, async (req, res) => {
   try {
     const clauses = [];
     const params = [];

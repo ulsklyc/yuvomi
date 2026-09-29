@@ -731,6 +731,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A restore waits for pages that save something after asking another service** (#1551). Some
+  pages that only show data still save something once an answer comes back: a renewed Google token
+  when the calendar list, the sync targets of the event dialog or a Google Drive document are
+  loaded, the calendar list of an Outlook or CalDAV account when it is refreshed or loaded for the
+  first time, and the exchange rates on the subscriptions page. A restore did not wait for them, so
+  this could land in the restored database or fail on the closed one. A restore now waits for them,
+  and while it runs these pages answer "try again" instead of starting. A new page that waits for
+  another service now fails a test until it is covered or marked as only reading.
+
 - **Counts read correctly in Czech, Polish, Russian, Ukrainian and Arabic** (#1473). These
   languages need more than a singular and a plural: Czech, Polish, Russian and Ukrainian have their
   own form for 2 to 4 (and 22 to 24), Arabic has a dual for 2 and a separate form from 11 to 99.
