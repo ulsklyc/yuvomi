@@ -24,6 +24,7 @@ import { eventDateTimeFields } from '../utils/ics-datetime.js';
 import { vtimezoneFor } from '../utils/vtimezone.js';
 import { householdTimeZone } from '../utils/timezone.js';
 import { createCalDAVClient, supportsComponent } from '../utils/caldav-client.js';
+import { sameCredentialOrigin } from '../utils/credential-origin.js';
 import { rruleLine } from './recurrence.js';
 import { nearestIcalColorName } from '../utils/ical-color.js';
 import { outboundEvent } from './outbound-dtstart.js';
@@ -504,10 +505,31 @@ function listAccounts() {
   }));
 }
 
+/**
+ * Zugangsdaten eines Kontos aendern; ein leeres Feld laesst den gespeicherten
+ * Wert stehen.
+ *
+ * DAS GESPEICHERTE PASSWORT GEHOERT ZU EINEM SERVER UND EINEM BENUTZER, wie bei
+ * CardDAV (server/utils/credential-origin.js). Wer den Server (Schema, Host,
+ * Port) oder den Benutzernamen wechselt, muss es neu eingeben; sonst wirft die
+ * Funktion mit `code = 'password_required'`, bevor irgendetwas gesendet oder
+ * geschrieben ist. Ohne diese Regel testete der Verbindungstest unten die neue
+ * Adresse mit dem gespeicherten Passwort - ein PUT mit fremder Adresse schickte
+ * die Zugangsdaten des Haushalts sofort per Basic Auth dorthin. Ein anderer Pfad
+ * auf demselben Server bleibt ohne Passwort moeglich.
+ */
 async function updateAccount(accountId, { name, caldavUrl, username, password, createClient }) {
   const account = getAccountById(accountId);
   if (!account) {
     throw new Error(`Account ${accountId} not found.`);
+  }
+
+  if (!password
+      && ((caldavUrl && !sameCredentialOrigin(caldavUrl, account.caldav_url))
+        || (username && username !== account.username))) {
+    const err = new Error('A new server or username needs the password again.');
+    err.code = 'password_required';
+    throw err;
   }
 
   // If credentials changed, test connection

@@ -52,6 +52,11 @@ router.put('/caldav/accounts/:id', requireAdmin, async (req, res) => {
     const result = await caldavSync.updateAccount(accountId, { name, caldavUrl, username, password });
     res.json({ data: result });
   } catch (err) {
+    // Neuer Server oder Benutzer ohne neues Passwort - keine Stoerung, sondern
+    // eine Eingabe, die fehlt (siehe updateAccount).
+    if (err.code === 'password_required') {
+      return res.status(400).json({ error: err.message, errorCode: 'password_required', code: 400 });
+    }
     log.error('CalDAV account update failed:', err);
     res.status(500).json({ error: err.message || 'Failed to update CalDAV account.', code: 500 });
   }

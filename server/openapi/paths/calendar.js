@@ -114,7 +114,15 @@ export function calendarPaths() {
       post: op({ summary: 'Create CalDAV account', tag: 'Calendar', admin: true, stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/calendar/caldav/accounts/{id}': {
-      put: op({ summary: 'Update CalDAV account', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      put: op({
+        summary: 'Update CalDAV account',
+        tag: 'Calendar',
+        admin: true,
+        description: 'An omitted or empty `password` keeps the stored one, but only while the server (scheme, host and port) and the `username` stay the same. A different server or username without a new password is refused with 400 and `errorCode: password_required` before any connection is made, and nothing is saved. A different path on the same server needs no password.',
+        params: [idParam()],
+        stateChanging: true,
+        requestBody: jsonBody(null),
+      }),
       delete: op({ summary: 'Delete CalDAV account', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true }),
     },
     '/api/v1/calendar/caldav/accounts/{id}/calendars': {

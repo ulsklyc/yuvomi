@@ -731,6 +731,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The API documentation page answers "restore in progress" during a restore** (#1531). Outside
+  production, `/docs` checks the API token or session, and while a restore had the database closed
+  a request with a token ended in an internal error instead of the "restore in progress" answer
+  every other page that needs the database gives. The same happened to `/openapi.json/` with a
+  trailing slash, which reaches the same route. A new test now reads every top-level route from
+  the running app and fails when one is neither covered by the restore gate nor listed with a reason.
+
 - **The family card no longer misses an evening appointment on a busy day** (#1449). The card took
   its appointments from the calendar tile, which stops at five coming ones and follows its "Only
   mine" option: a child's evening appointment could be cut off, and with "Only mine" every other
@@ -772,6 +779,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   zone, a reminder "1 hour before" was saved hours off, and opening it again showed a different
   lead or "after the start". Both dialogs now read the time in the household zone, including on
   the days the clocks change, the same way the server does.
+
+- **"Due today until" shows the time you entered on a device in another time zone** (#1534).
+  The today sheet on the overview read a task's due time in the zone of the device and then
+  converted it into the household's, so with a household time zone set and a device elsewhere a
+  task due at 18:00 could read "until 00:00". It now shows the due time as entered, like the task
+  list does.
 
 - **The note category hints no longer suggest that notes are private** (#1514). A personal
   category is only visible to you, but a note filed under it is still visible to every household
@@ -1145,6 +1158,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   against the edge of their tinted panel.
 
 ### Security
+
+- **A CalDAV account moved to another server or username needs its password again.** Editing an
+  account through the API with a new server address but without a password tested the connection
+  with the stored password, so the household's CalDAV credentials went to that server before
+  anything was saved. The route is admin-only. It now follows the rule CardDAV accounts got in
+  2.69.1: an empty password keeps the stored one only while the server (scheme, host and port) and
+  the username stay the same; otherwise the change is refused with `400` and the error code
+  `password_required`, no connection is made and nothing is saved. A different path on the same
+  server keeps working without the password.
 
 - **Documents and images are no longer kept in the browser's cache.** A document opened in the
   viewer stayed there for five minutes, and document thumbnails, Paperless thumbnails, recipe

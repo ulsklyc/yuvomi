@@ -186,8 +186,9 @@ app.use(createRestoreWriteGate(db.isRestoreRunning, db.isDatabaseOpen));
 app.use(express.json({ limit: BODY_LIMIT }));
 app.use(express.urlencoded({ extended: true, limit: BODY_LIMIT }));
 
-// JSON-Parse-Fehler abfangen (gibt sonst HTML zurück)
-app.use((err, req, res, next) => {
+// JSON-Parse-Fehler abfangen (gibt sonst HTML zurück). Benannt, weil
+// test/test-restore-gate-routes.js globale Middleware am Namen erkennt (#1531).
+app.use(function bodyParseErrorHandler(err, req, res, next) {
   if (err.type === 'entity.parse.failed') {
     return res.status(400).json({ error: 'Invalid JSON in request body.', code: 400 });
   }
