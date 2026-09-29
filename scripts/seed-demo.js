@@ -9,7 +9,7 @@
  *   - Users: alex (admin/dad), linda (admin/mom), emma & leo (children), maria (housekeeper)
  *   - Tasks (categories, priorities, statuses, start/due dates, multi-assignment, tags, points)
  *   - Calendar events (appointments, activities, recurring, assignments)
- *   - Meals (full week, all slots - today only dinner + snack) linked to recipes,
+ *   - Meals (full week, all slots incl. today) linked to recipes,
  *     plus a recurring meal template with this week's occurrence
  *   - Recipes with ingredients
  *   - Shopping list with items and tags
@@ -130,6 +130,23 @@ function firstInMonthKey(weekdays) {
   d.setHours(0, 0, 0, 0);
   d.setDate(1);
   while (!weekdays.includes(d.getDay())) d.setDate(d.getDate() + 1);
+  return dateKey(d);
+}
+
+/**
+ * Ein Tag DIESES Monats fuer die ueber den Monat verteilten Einzeltermine.
+ * Nur Tage bis 28, damit es jeden Monat gibt (auch den Februar). Faellt der
+ * Tag auf heute, weicht der Termin auf den Vortag aus: das Tagesblatt der
+ * Uebersicht bleibt dann bei dem, was die Saat dort bewusst hinstellt, statt
+ * je nach Kalendertag eine Zeile mehr zu tragen. Die Tage der Liste liegen
+ * deshalb mindestens zwei auseinander, der Vortag kollidiert nie. Lokaler Tag
+ * wie dateKey(), kein UTC.
+ */
+function spreadInMonthKey(day) {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  const today = d.getDate();
+  d.setDate(day === today ? day - 1 : day);
   return dateKey(d);
 }
 
@@ -420,7 +437,21 @@ const insertEventAssign = db.prepare('INSERT OR IGNORE INTO event_assignments (e
 // Beendete Termine verlassen das Blatt (#1449) - ein Vormittagstermin waere
 // bei einem Lauf am Nachmittag schon wieder weg. Dazu ein Termin am Ersten,
 // damit die erste Zeile der Monatsansicht nicht leer ist.
+//
+// Die Einzeltermine unter „Ueber den Monat verteilt" liegen auf festen Tagen
+// DIESES Monats, also auch VOR heute: alles andere ist relativ zu heute
+// geplant, und am Monatsletzten stand die Monatsansicht bis auf die
+// Wochenserien leer. Die Zukunftstermine darunter bleiben fuer die
+// Wochenvorschau.
 const events = [
+  // Ueber den Monat verteilt (spreadInMonthKey: nie heute, siehe dort)
+  [L('Haircut - Emma',            'Friseur - Emma'),           L('Just a trim this time',              'Diesmal nur Spitzen schneiden'),        spreadInMonthKey(4) + 'T15:30',  spreadInMonthKey(4) + 'T16:15',  0, L('Salon Anna', 'Salon Anna'),                    '#EC4899', 'scissors', null,                      emmaId, lindaId, [emmaId, lindaId]],
+  [L('School Photo Day',          'Fototag in der Schule'),    L('Leo - the blue shirt, not the hoodie', 'Leo - das blaue Hemd, nicht den Hoodie'), spreadInMonthKey(8) + 'T00:00', spreadInMonthKey(8) + 'T00:00', 1, L('Westpark Primary School', 'Grundschule Westpark'), '#8B5CF6', 'camera', null,              leoId, lindaId, [leoId]],
+  [L('Recycling Centre Run',      'Fahrt zum Wertstoffhof'),   L('Old bike, paint tins, cardboard',    'Altes Fahrrad, Farbeimer, Kartons'),    spreadInMonthKey(13) + 'T10:00', spreadInMonthKey(13) + 'T11:00', 0, L('Recycling Centre North', 'Wertstoffhof Nord'), '#6B7280', 'car',      null,                      alexId, alexId, [alexId]],
+  [L('Eye Test - Emma',           'Augenarzt - Emma'),         L('Bring the old glasses',              'Alte Brille mitnehmen'),                spreadInMonthKey(17) + 'T14:00', spreadInMonthKey(17) + 'T14:45', 0, L('Dr. Hoffmann - Eye Clinic', 'Dr. Hoffmann - Augenpraxis'), '#EF4444', 'stethoscope', null,   emmaId, lindaId, [emmaId, lindaId]],
+  [L('Dinner with the Schmidts',  'Abendessen bei Schmidts'),  L('We bring dessert',                   'Wir bringen den Nachtisch mit'),        spreadInMonthKey(21) + 'T19:00', spreadInMonthKey(21) + 'T22:00', 0, L("The Schmidts' place", 'Bei Schmidts'),        '#14B8A6', 'utensils', null,                      alexId, lindaId, [alexId, lindaId, emmaId, leoId]],
+  [L("Finn's Birthday Party",     'Kindergeburtstag bei Finn'), L('Leo - present is in the hall cupboard', 'Leo - das Geschenk liegt im Flurschrank'), spreadInMonthKey(26) + 'T14:30', spreadInMonthKey(26) + 'T17:30', 0, L("Finn's house", 'Bei Finn'), '#F59E0B', 'party-popper', null,          leoId, lindaId, [leoId]],
+  // Relativ zu heute
   [L('Sports Day - Leo',          'Sportfest - Leo'),          L('Trainers, cap and a packed lunch',   'Turnschuhe, Kappe und Lunchpaket'),     daysFromNow(0) + 'T00:00',  daysFromNow(0) + 'T00:00',  1, L('Sports Ground West', 'Sportplatz West'),      '#F97316', 'calendar', null,                      leoId, lindaId, [leoId, lindaId]],
   [L('Family Movie Night',        'Filmabend'),                L('Emma picks the film this time',      'Diesmal sucht Emma den Film aus'),      daysFromNow(0) + 'T20:00',  daysFromNow(0) + 'T22:00',  0, L('Home', 'Zu Hause'),                           '#14B8A6', 'calendar', null,                      lindaId, lindaId, [alexId, lindaId, emmaId, leoId]],
   [L('Book Club',                 'Lesekreis'),                L("At Sarah's - bring the novel",       'Bei Sarah - Roman mitbringen'),         thisMonthDate(1) + 'T19:30', thisMonthDate(1) + 'T21:30', 0, L("Sarah's place", 'Bei Sarah'),               '#EC4899', 'calendar', null,                      lindaId, lindaId, [lindaId]],
@@ -527,14 +558,14 @@ const mealPlan = [
   [ 6, 'dinner',    L('Lamb chops & couscous',       'Lammkoteletts mit Couscous'),  L('Mint yoghurt dressing',     'Minzjoghurt-Dressing')],
   [ 6, 'snack',     L('Fruit salad',                 'Obstsalat'),                   ''],
 ];
-// HEUTE STEHT NUR DAS ABENDESSEN (plus Snack) im Plan. Die Uebersicht zeigt
-// die Mahlzeit zur Tageszeit (selectTodayMeal in public/pages/dashboard.js:
-// vor 12 Uhr Fruehstueck, bis 18 Uhr Mittag) und faellt auf die naechste
-// geplante zurueck - ohne Fruehstueck und Mittag heute ist das zu jeder
-// Uhrzeit des Screenshot-Laufs das Abendessen.
-const todayWeekday = -mondayOffset();
+// Auch HEUTE ist jeder Slot belegt: ein Essensplan, in dem ausgerechnet der
+// heutige Tag Fruehstueck und Mittag frei hat, sieht wie ein Loch aus. Welche
+// Mahlzeit die Uebersicht zeigt, waehlt sie nach der Tageszeit
+// (selectTodayMeal in public/pages/dashboard.js: vor 12 Uhr Fruehstueck, bis
+// 18 Uhr Mittag, danach Abendessen). Dass es das Abendessen ist, sichert der
+// Screenshot-Lauf mit seiner gestellten Browser-Uhr (SHOT_CLOCK in
+// scripts/take-screenshots.mjs), nicht mehr diese Saat.
 for (const [weekday, type, title, notes] of mealPlan) {
-  if (weekday === todayWeekday && (type === 'breakfast' || type === 'lunch')) continue;
   const recipeId = recipeIdByTitle[title] ?? null;
   const mid = insertMeal.run(weekDayKey(weekday), type, title, notes, recipeId, alexId).lastInsertRowid;
   // A couple of upcoming dinners get a few ingredients to populate the kitchen view
