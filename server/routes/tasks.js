@@ -30,6 +30,7 @@ import { householdMemberSql, isHouseholdMember, newNonMembers, nonMemberMessage 
 import { displayActingPerson, isDisplayRequest } from '../services/display-acting.js';
 import { pushService } from '../services/push.js';
 import { todayKey } from '../utils/timezone.js';
+import { runExternalJob } from '../utils/restore-state.js';
 import {
   allTags, applyTagChanges, loadTags, loadTagsFor, normalizeTags,
   removeTagEverywhere, renameTag, setTags, tagKey, tagsKey, taskIdsWithTag,
@@ -2102,12 +2103,17 @@ function notifyMentions(task, comment, authorId, previousComment = '') {
     if (!target) continue;
     const perms = resolvePermissions(db.get(), target);
     if (!perms.admin && perms.modules?.tasks === 'none') continue;
-    pushService.sendPushToUser(id, {
+    // Als Job (#1532): der Versand schreibt nach dem await `last_used_at` oder
+    // loescht eine erloschene Subscription. Ohne Job saehe ein Restore ihn nicht
+    // und die Zeile landete in der eingespielten Datenbank. Waehrend eines
+    // Restores beginnt er nicht - der Kommentar liegt dann in der Datenbank, die
+    // der Restore gerade ersetzt.
+    runExternalJob(() => pushService.sendPushToUser(id, {
       title: task.title,
       body: `${author}: ${comment}`.slice(0, 300),
       url: `/tasks?open=${task.id}`,
       tag: `task-comment-${task.id}`,
-    }).catch((err) => log.warn('Erwähnungs-Push fehlgeschlagen:', err?.message || err));
+    })).catch((err) => log.warn('Erwähnungs-Push fehlgeschlagen:', err?.message || err));
   }
 }
 

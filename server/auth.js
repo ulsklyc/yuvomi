@@ -13,6 +13,7 @@ import * as db from './db.js';
 import { generateToken, csrfMiddleware } from './middleware/csrf.js';
 import { refuseWhileRestoring } from './middleware/restore-gate.js';
 import { restoreInProgressError } from './utils/restore-messages.js';
+import { runExternalJob } from './utils/restore-state.js';
 import { SESSION_MAX_AGE_MS, sessionCookieRefreshDue } from './utils/session-lifetime.js';
 import { collectErrors, date as validateDate, str, MAX_SHORT, MAX_TITLE } from './middleware/validate.js';
 import { createLogger } from './logger.js';
@@ -1736,7 +1737,11 @@ export function buildResetRoutes(targetRouter, {
       // Erst antworten, dann arbeiten: dieselbe Antwort, dieselbe Zeit, fuer ein
       // bekanntes wie fuer ein unbekanntes Konto.
       res.json({ data: { ok: true } });
-      defer(() => sendResetLinkFor(identifier).catch((err) => {
+      // Als Job (#1532): der Versand legt das Token an, ein zweiter Antrag erst
+      // nach dem await auf den ersten Versand. Die Anfrage ist da schon
+      // freigegeben - ohne Job liefe ein Restore darueber hinweg, und das Token
+      // landete in der eingespielten Datenbank.
+      defer(() => runExternalJob(() => sendResetLinkFor(identifier)).catch((err) => {
         log.error('forgot-password error:', err.message);
       }));
     } catch (err) {
