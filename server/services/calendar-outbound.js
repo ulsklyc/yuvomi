@@ -22,6 +22,7 @@
 
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
+import { runExternalJob } from '../utils/restore-state.js';
 
 const log = createLogger('CalendarOutbound');
 
@@ -470,8 +471,19 @@ export function markEventOutbound(before, after) {
  * try/catch: ein nicht erreichbarer Server darf die anderen nicht blockieren.
  * Die Provider-Module werden dynamisch geladen, damit diese Datei importfrei
  * bleibt und synchron aus dem Route-Handler heraus nutzbar ist.
+ *
+ * Als Job (#1532): der Sofortversuch laeuft nach der Antwort weiter und liest
+ * zwischen den Anbietern die offene Arbeit - nach einem await, also womoeglich
+ * mitten in einem Restore bei geschlossener Verbindung. Waehrend eines Restores
+ * beginnt er deshalb nicht, und ein laufender wird abgewartet. Die Vormerkung
+ * bleibt dabei stehen; der naechste Sync-Lauf holt sie nach, falls es sie im
+ * eingespielten Stand gibt.
  */
-export async function flushOutbound() {
+export function flushOutbound() {
+  return runExternalJob(() => flushOutboundUntracked());
+}
+
+async function flushOutboundUntracked() {
   const total = { deleted: 0, updated: 0 };
 
   const providers = [
