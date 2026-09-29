@@ -12,6 +12,7 @@ import { t, formatDate, formatDayMonth, formatTime, timeSuffix, getLocale, getNu
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { resolveEventColor } from '/utils/event-color.js';
 import { buildWeekStrip } from '/utils/week-strip.js';
+import { relativeDateLabel, housekeepingSinceLabel } from '/utils/day-label.js';
 import { esc, fmtLocation, renderMarkdownLight } from '/utils/html.js';
 // `todayKey` heisst hier schon ein Parameter (bzw. eine lokale Bindung), der den
 // Bezugstag traegt - der Import kommt deshalb unter eigenem Namen herein.
@@ -575,69 +576,8 @@ function mastheadDateLabel(now = new Date()) {
   }).format(zonedUTCProxy(now));
 }
 
-// Relatives Datumslabel: „Heute"/„Morgen", sonst das locale-formatierte Datum.
-// Eigene Funktion, damit Aufrufer nur den Datumsteil brauchen, ohne ein
-// zusammengesetztes „Datum, Zeit" per Komma zu zerschneiden (locale-fragil:
-// manche Locales setzen selbst ein Komma ins Datum).
-/**
- * „Heute"/„Morgen", sonst das Datum in Locale-Schreibweise.
- *
- * NIMMT EINEN DATUMS-KEY ODER EINEN ZEITPUNKT, und der Unterschied ist genau
- * der, den utils/timezone.js fuehrt: ein Key ('2026-08-25') ist zonenlos und
- * wird GELESEN, ein Zeitpunkt traegt seine Zone und wird UMGERECHNET.
- *
- * DIE PFLICHT LIEGT BEIM AUFRUFER. Ein `Date`, das jemand aus einem Key gebaut
- * hat, ist die gefaehrliche Mitte: `parseLocalDateKey('2026-08-25')` ist
- * Mitternacht der BROWSER-Zone und sieht damit aus wie ein Zeitpunkt, meint aber
- * einen Kalendertag. Durch die Anzeigezone gerechnet ist es einen Tag daneben -
- * derselbe Fehler, gegen den dieser Fix angetreten ist, nur ueber einen anderen
- * Weg. Wer einen Key hat, gibt den KEY her und baut kein Date daraus (#851).
- *
- * `zonedDateKey` unterscheidet die beiden Formen selbst: einen zonenlosen String
- * liest es, einen Zeitpunkt rechnet es um. Ein zweiter Zweig hier waere ein
- * Duplikat dieser Regel und wuerde beim naechsten Mal auseinanderlaufen.
- *
- * Vorher stand hier `d.toDateString() === new Date().toDateString()` - beide
- * Seiten in der Browser-Zone, also fuer jeden Betrachter ein anderes „heute".
- */
-/*
- * NACH „MORGEN" KOMMT DER WOCHENTAG, NICHT DAS JAHR. Hier sprang das Label
- * direkt auf „26.09.2026" - drei Tage voraus mit Jahreszahl, wo ein Mensch
- * „Sa." sagt (Critique 2026-09-23). Die Stufen: heute, morgen, bis sechs Tage
- * voraus der kurze Wochentag (ab sieben waere er mehrdeutig: „Mi." hiesse
- * heute oder in einer Woche), danach Tag und Monat, das Jahr nur, wenn es
- * nicht das laufende ist. Vergangenes bekommt nie einen Wochentag - „Mo." fuer
- * letzten Montag liest sich als der naechste.
- *
- * Gerechnet wird auf den KEYS der Haushaltszone, nie auf einem `Date`: der
- * Abstand kommt aus `Date.UTC` ueber Jahr/Monat/Tag (zonenfrei und
- * sommerzeitfest), der Name aus demselben UTC-Mittag mit `timeZone: 'UTC'` -
- * die Technik von `zonedUTCProxy`. Der Name folgt der App-Sprache
- * (`getLocale`), Tag und Monat der Datumsschreibweise der Region.
- */
-const WEEKDAY_LABEL_DAYS = 6;
-
-function dayKeyNoonUtc(key) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
-  return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12) : NaN;
-}
-
-function relativeDateLabel(value) {
-  if (value === null || value === undefined || value === '') return '';
-  const day = zonedDateKey(value);
-  if (!day) return formatDate(value);
-  const today = householdToday();
-  if (day === today) return t('common.today');
-  if (day === addLocalDays(today, 1)) return t('common.tomorrow');
-  const dayNoon = dayKeyNoonUtc(day);
-  const ahead = Math.round((dayNoon - dayKeyNoonUtc(today)) / 86400000);
-  if (ahead > 1 && ahead <= WEEKDAY_LABEL_DAYS) {
-    return new Intl.DateTimeFormat(getLocale(), { weekday: 'short', timeZone: 'UTC' }).format(new Date(dayNoon));
-  }
-  // Der KEY geht an die Formatierer, nicht `value`: ein Zeitpunkt ist oben
-  // schon in die Anzeigezone umgerechnet, ein zweites Mal waere doppelt.
-  return day.slice(0, 4) === today.slice(0, 4) ? formatDayMonth(day) : formatDate(day);
-}
+// `relativeDateLabel` wohnt in utils/day-label.js: das Heute-Blatt braucht
+// dieselbe Stufung (#1452), und eine zweite Fassung liefe auseinander.
 
 function formatDateTime(isoString) {
   if (!isoString) return '';
@@ -3174,14 +3114,6 @@ function renderWasteWidget(waste, size) {
 // --------------------------------------------------------
 // Haushaltshilfe-Widget (Anwesenheit + offene Zahlung)
 // --------------------------------------------------------
-
-/** „08:00" fuer einen Beginn heute, „22.09., 08:00" fuer einen aelteren -
- * eine offene Sitzung von gestern ist eine vergessene Abmeldung, keine
- * Anwesenheit, und die blosse Uhrzeit verschwiege genau das. */
-function housekeepingSinceLabel(since) {
-  const time = formatTime(since);
-  return zonedDateKey(since) === householdToday() ? time : `${relativeDateLabel(since)}, ${time}`;
-}
 
 function renderHousekeepingWidget(hk, currency) {
   if (!hk?.configured) {

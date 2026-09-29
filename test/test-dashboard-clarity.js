@@ -610,3 +610,68 @@ test('#1454: der naechste Zyklusbeginn sagt den Wochentag', () => {
     assert.equal(date, wd('2026-09-26'), `Wochentag statt Datum mit Jahr, bekam ${date}`);
   });
 });
+
+// --------------------------------------------------------
+// Heute-Blatt: ein Check-in von gestern nennt sein Datum (#1452)
+// --------------------------------------------------------
+// Die Kennzahl-Kachel sagte „23.09., 08:30", das Heute-Blatt fuer dieselbe
+// offene Sitzung nur „seit 08:30" und sortierte sie zwischen die heutigen
+// 08:00- und 09:00-Zeilen - als waere die Hilfe heute frueh gekommen. Beide
+// lesen jetzt EINEN Helfer (utils/day-label.js), und ein Beginn vor heute
+// steht oben bei den ganztaegigen Zeilen.
+async function withSheet(fn) {
+  const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+  const prevWindow = global.window;
+  global.window = { yuvomi: { isModuleDisabled: () => false } };
+  setPermissions({ admin: true, modules: {}, widgets: {}, capabilities: {} });
+  try {
+    return fn();
+  } finally {
+    clearPermissions();
+    global.window = prevWindow;
+  }
+}
+
+const SINCE_YESTERDAY = '2026-09-23T06:30:00.000Z'; // 08:30 in Berlin
+const hkRow = (now) => __test.buildTodayCockpitModel({
+  housekeeping: { configured: true, present: true, presentSince: SINCE_YESTERDAY, workerName: 'Maria', visitsThisMonth: 9 },
+}, [], { now }).rows.find((row) => row.kind === 'housekeeping');
+const tileNote = () => __test.selectMetricTiles({
+  health: { hasMeds: true, dosesTotal: 1, dosesTaken: 0, dosesSkipped: 0, lowStockCount: 0, nextDose: { time: '22:00', name: 'X' } },
+  housekeeping: { configured: true, present: true, presentSince: SINCE_YESTERDAY, visitsThisMonth: 9 },
+}, 'EUR').find((tile) => tile.id === 'housekeeping').note;
+const timeParam = (text) => JSON.parse(String(text).replace(/^[^{]*/, '')).time;
+
+test('#1452: der Check-in von gestern steht im Heute-Blatt mit Datum und oben', () => withSheet(() => {
+  at('2026-09-24T19:18:00Z', 'Europe/Berlin', () => {
+    const row = hkRow(new Date());
+    assert.ok(row, 'Reichweite: die Haushaltshilfe steht im Blatt');
+    assert.match(row.timeLabel, /DM:2026-09-23, /, `das Datum steht da, bekam ${row.timeLabel}`);
+    assert.equal(timeParam(row.timeLabel), timeParam(tileNote()), 'dieselbe Angabe wie die Kennzahl-Kachel');
+    assert.equal(row.sortKey, '00:01', 'ein Beginn vor heute sortiert nicht auf 08:30 in den heutigen Tag');
+  });
+}));
+
+test('#1452: am selben Tag bleibt es bei der Uhrzeit', () => withSheet(() => {
+  at('2026-09-23T19:18:00Z', 'Europe/Berlin', () => {
+    const row = hkRow(new Date());
+    assert.equal(timeParam(row.timeLabel), SINCE_YESTERDAY, 'nur die Uhrzeit (Formatierer-Stub: der Wert selbst)');
+    assert.equal(row.sortKey, '08:30');
+  });
+}));
+
+test('#1452: ob der Check-in von heute ist, entscheidet die Haushaltszone', () => withSheet(() => {
+  // Derselbe Zeitpunkt, 2026-09-23T20:00Z, und derselbe Check-in (06:30Z):
+  // in Berlin ist beides der 23. (08:30 und 22:00) - heute, nur die Uhrzeit;
+  // in Honolulu begann die Sitzung am 22. um 20:30, und jetzt ist der 23.
+  at('2026-09-23T20:00:00Z', 'Europe/Berlin', () => {
+    const row = hkRow(new Date());
+    assert.equal(timeParam(row.timeLabel), SINCE_YESTERDAY, 'Berlin: heute, nur die Uhrzeit');
+    assert.equal(row.sortKey, '08:30');
+  });
+  at('2026-09-23T20:00:00Z', 'Pacific/Honolulu', () => {
+    const row = hkRow(new Date());
+    assert.match(row.timeLabel, /DM:2026-09-22, /, `Honolulu: gestern, mit Datum - bekam ${row.timeLabel}`);
+    assert.equal(row.sortKey, '00:01');
+  });
+}));

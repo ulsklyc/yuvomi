@@ -731,6 +731,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The today sheet dates a check-in from an earlier day** (#1452). A household help who checked
+  in yesterday and was never checked out read as "since 08:30" and sat between today's 08:00 and
+  09:00 rows, as if they had arrived this morning. The row now names the date, the same way the
+  metric tile does, and stands at the top with the all-day rows.
+
 - **Birthdays, countdowns and the next cycle start on the overview drop the year** (#1454). They
   read like the other dates there: the weekday up to six days ahead, then day and month, the year
   only when it is a different one. When the row already says "Today" or "Tomorrow", the word
