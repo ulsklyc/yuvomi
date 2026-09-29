@@ -976,6 +976,8 @@ test('#1546: ein ueber ein Vorkommen geaenderter Betrag einer virtuellen Serie i
   assert.equal(def.full_amount, -1320, 'Periodenbetrag 12 x 110');
   assert.equal(def.amount, -110, 'Vorlage fuer kuenftige Monate: der Anteil');
   assert.equal(entryRow1546(anchor).recurrence_full_amount, -1200, 'die gebuchte erste Buchung bleibt');
+  assert.ok(def.updated_at >= def.created_at && /T.*Z$/.test(def.updated_at),
+    'die Serien-Aenderung fuehrt updated_at der Definition nach');
   assert.equal(entryRow1546(anchor).recurrence_virtual, 1);
 });
 

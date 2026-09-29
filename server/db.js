@@ -9836,6 +9836,9 @@ const MIGRATIONS = [
     // loest sie nicht aus. EIN KUENFTIGER REBUILD von budget_entries (wie v156)
     // verliert Trigger mit der Tabelle und muss diese drei neu anlegen.
     //
+    // Zeitstempel wie jede Entitaetstabelle (CONTRIBUTING.md); updated_at
+    // fuehrt PUT /budget/:id/series nach, der einzige Schreiber danach.
+    //
     // Die Zustaendigen des Ankers wandern als Vorlage mit; ihre Zeilen am Anker
     // bleiben, sie beschreiben die erste Buchung. Idempotent: IF NOT EXISTS,
     // und gefuellt wird nur fuer Anker ohne Definition - ein zweiter Lauf
@@ -9850,7 +9853,9 @@ const MIGRATIONS = [
         subcategory TEXT    NOT NULL DEFAULT '',
         account_id  INTEGER REFERENCES budget_accounts(id) ON DELETE SET NULL,
         visibility  TEXT    NOT NULL DEFAULT 'shared'
-                            CHECK (visibility IN ('private', 'shared', 'shared_amount'))
+                            CHECK (visibility IN ('private', 'shared', 'shared_amount')),
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
       );
       CREATE INDEX IF NOT EXISTS idx_budget_series_account ON budget_series(account_id);
 

@@ -1650,6 +1650,8 @@ Recurring entries are materialised on demand for the month being viewed. **Non-v
 | subcategory | TEXT | NOT NULL DEFAULT '' |
 | account_id | INTEGER | FK → Budget Accounts (ON DELETE SET NULL); virtual series still pass no account to their instances |
 | visibility | TEXT | `private` \| `shared` \| `shared_amount` |
+| created_at | TEXT | NOT NULL, ISO 8601 (UTC) |
+| updated_at | TEXT | NOT NULL, ISO 8601 (UTC); set by `PUT /api/v1/budget/:id/series` |
 
 `budget_series_responsibles` (`anchor_id` → `budget_series`, `user_id` → Users, both ON DELETE CASCADE) holds the responsible members of the series; those on the anchor describe the first booking only. The rhythm (`recurrence_interval`, `_interval_count`, `_virtual`, `_confirm`, `recurrence_rule`), the start day (`date`), `is_recurring` and the owner stay on the anchor, because they have only one meaning. A definition exists exactly while its anchor is a running series: triggers create it from the entry's values when an entry becomes recurring (on insert or when `is_recurring` turns 1, whoever writes the row) and remove it when the series ends; deleting the anchor removes it by cascade, as before. The migration fills it from every running series without changing any entry.
 

@@ -92,7 +92,8 @@ test('jede laufende Serie bekommt genau eine Definition mit den Werten ihres Ori
 
   const count = db.prepare('SELECT COUNT(*) AS c FROM budget_series').get().c;
   assert.equal(count, 3, 'Miete, Police, Fitness - sonst nichts');
-  assert.deepEqual(definition(db, ids.rent), {
+  const { created_at: _c, updated_at: _u, ...rent } = definition(db, ids.rent);
+  assert.deepEqual(rent, {
     anchor_id: ids.rent, title: 'Miete', amount: -900, full_amount: null,
     category: 'housing', subcategory: 'rent_mortgage', account_id: giro, visibility: 'shared',
   });
@@ -104,6 +105,23 @@ test('jede laufende Serie bekommt genau eine Definition mit den Werten ihres Ori
   for (const none of ['rentFeb', 'ended', 'endedInst', 'plain']) {
     assert.equal(definition(db, ids[none]), undefined, `${none} ist keine laufende Serie`);
   }
+  db.close();
+});
+
+test('eine Definition traegt created_at und updated_at (ISO 8601), wie jede Entitaetstabelle', () => {
+  // CONTRIBUTING.md, Backend: neue Entitaetstabellen fuehren beide Zeitstempel.
+  // budget_series ist keine Join-Tabelle - sie traegt Werte und wird geaendert.
+  const { db, ids, users } = legacyDb();
+  migrate(db, MIGRATIONS);
+  const iso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+  const backfilled = definition(db, ids.rent);
+  assert.match(String(backfilled.created_at), iso, 'aus dem Backfill');
+  assert.match(String(backfilled.updated_at), iso);
+  const id = db.prepare(`
+    INSERT INTO budget_entries (title, amount, category, subcategory, date, is_recurring, created_by)
+    VALUES ('Seed', -5, 'housing', 'utilities', '2024-01-01', 1, ?)
+  `).run(users.a).lastInsertRowid;
+  assert.match(String(definition(db, id).created_at), iso, 'aus dem Trigger');
   db.close();
 });
 

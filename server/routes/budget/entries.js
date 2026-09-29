@@ -624,7 +624,8 @@ router.put('/:id/series', (req, res) => {
           category    = ?,
           subcategory = ?,
           visibility  = COALESCE(?, visibility),
-          account_id  = CASE WHEN ? = 1 THEN ? ELSE account_id END
+          account_id  = CASE WHEN ? = 1 THEN ? ELSE account_id END,
+          updated_at  = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
         WHERE anchor_id = ?
       `).run(finalTitle, storeAmount, finalFull, finalCategory, finalSubcat, nextVisibility,
              accountProvided ? 1 : 0, accountValue, parentId);
