@@ -342,7 +342,7 @@
 
 /* Skip link: index and install put two dozen focusable nodes between the top
    of the page and the content, so keyboard users need a way past the nav. */
-.skip-link { position: absolute; left: -9999px; top: 0; z-index: 200; }
+.skip-link { position: absolute; left: -9999px; top: 0; z-index: 200; text-decoration: none; }
 .skip-link:focus { left: 8px; top: 8px; padding: 12px 18px; display: inline-flex; align-items: center; min-height: 44px;
   background: var(--surface); color: var(--text-1);
   border: 1px solid var(--border); border-radius: var(--r-full); box-shadow: var(--shadow-md); font-weight: 600; }

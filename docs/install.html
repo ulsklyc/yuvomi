@@ -43,14 +43,27 @@
     if (/^#podman$/i.test(location.hash)) document.documentElement.setAttribute('data-engine', 'podman');
   </script>
   <style>
-    html { scroll-behavior: smooth; scroll-padding-top: 80px; -webkit-text-size-adjust: 100%; }
+    /* scroll-padding-bottom: ein per Tab fokussierter Fusslink landete mobil
+       unter dem Nach-oben-Knopf (gemessen "Mitmachen", SC 2.4.11). */
+    html { scroll-behavior: smooth; scroll-padding-top: 80px; scroll-padding-bottom: 72px; -webkit-text-size-adjust: 100%; }
     body {
       font-family: var(--ff); background: var(--bg); color: var(--text-1);
       line-height: 1.65; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
       overflow-x: hidden;
     }
-    a { color: var(--accent); text-decoration: none; }
-    a:hover { text-decoration: underline; }
+    /* Textlinks sind unterstrichen, als Grundregel (axe link-in-text-block:
+       "web installer" und "troubleshooting" unterschieden sich nur durch die
+       Farbe vom Satz). Bedienung, die schon als Knopf, Pille, Leiste oder
+       Kartenaktion erkennbar ist, nimmt den Strich ausdruecklich weg - ein
+       neuer Link in einem Absatz ist so ohne eigene Regel richtig. Gleiche
+       Regel wie index.html. */
+    a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    a:hover { text-decoration-thickness: 2px; }
+    .nav-logo, .prereq-link, .path-now a, .footer-links a, .to-top { text-decoration: none; }
+    /* Trefferflaeche der Textlinks: 16-17px Zeile, SC 2.5.8 will 24. Das
+       senkrechte Polster eines Inline-Elements nimmt Klicks an, ohne die
+       Zeilenhoehe anzufassen. */
+    .step-desc a, .step-note a, .callout a { padding-block: 4px; }
     img { max-width: 100%; height: auto; display: block; }
     code { font-family: var(--ff-mono); }
     ::selection { background: var(--accent-soft); color: var(--accent-deep); }
@@ -107,7 +120,9 @@
        they did not read as links at all. Now: accent-coloured, 44px tall. */
     .prereq-link { display: inline-flex; align-items: center; min-height: 44px; font-size: 0.8rem; font-weight: 600;
       padding: 4px 14px; border-radius: var(--r-full); background: var(--bg-alt); border: 1px solid var(--border); color: var(--accent); }
-    .prereq-link:hover { border-color: var(--accent); background: var(--accent-soft); text-decoration: none; }
+    /* Auf der Akzenttoenung traegt der Text --accent-on-soft: --accent darauf
+       stand im Dark bei 4.38:1. */
+    .prereq-link:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-on-soft); }
     /* Scoped to the card, or it loses to `.prereq-card p` (class + element beats
        a lone class) and the hint renders at the body's 0.88rem / --text-2 - the
        rule has been inert since it was written, so the quiet aside read exactly
@@ -127,7 +142,8 @@
     .tab-group::after { content: ''; flex: 1; height: 1px; background: var(--border); }
     .tab-btn { display: inline-flex; align-items: center; gap: 9px; background: var(--surface); border: 1px solid var(--border);
       color: var(--text-2); font-family: var(--ff); font-size: 0.85rem; font-weight: 600; cursor: pointer;
-      padding: 10px 15px; min-height: 44px; border-radius: var(--r-full); transition: all .18s var(--ease-out); box-shadow: var(--shadow-sm); }
+      padding: 10px 15px; min-height: 44px; border-radius: var(--r-full); box-shadow: var(--shadow-sm);
+      transition: background-color .18s var(--ease-out), border-color .18s var(--ease-out), color .18s var(--ease-out), box-shadow .18s var(--ease-out); }
     .tab-btn:hover { border-color: var(--border-strong); color: var(--text-1); }
     .tab-btn .tb-logo { width: 18px; height: 18px; display: grid; place-items: center; color: var(--pc, var(--accent)); }
     .tab-btn .tb-logo svg { width: 18px; height: 18px; fill: currentColor; }
@@ -182,6 +198,11 @@
       font-weight: 700; font-size: 1.02rem; color: var(--accent-on-soft); background: var(--accent-soft); font-variant-numeric: tabular-nums; }
     .step-content { flex: 1; min-width: 0; padding-top: 4px; }
     .step-title { font-size: 1.08rem; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 6px; }
+    /* Die Schrittspalte ist bei 860px Container rund 760px breit, der Text lief
+       darin bis 110 Zeichen. 53ch ergeben gemessen hoechstens ~75. `ch` ist
+       die Breite der Null und in dieser Schrift deutlich breiter als ein
+       Durchschnittszeichen: 64ch ergaben noch 88. Nachmessen, nicht rechnen. */
+    .step-desc, .step-note { max-width: 53ch; }
     .step-desc { font-size: 0.94rem; color: var(--text-2); line-height: 1.6; margin-bottom: 12px; }
     /* Inert code chips are neutral. Violet on this page already means "token
        name" in .env-name and "activate me" on every link and tab button; a
@@ -317,7 +338,7 @@
        ragged card heights still line their actions up, and tall enough to tap. */
     .opt-guide { align-self: flex-start; margin-top: 14px; display: inline-flex; align-items: center; min-height: 44px;
       font-size: 0.87rem; font-weight: 600; color: var(--accent); text-decoration: none; }
-    .opt-guide:hover { text-decoration: underline; }
+    .opt-guide:hover { text-decoration: underline; text-decoration-thickness: 1px; }
 
     /* Troubleshooting */
     .trouble-list { margin-top: 32px; display: flex; flex-direction: column; gap: 10px; }

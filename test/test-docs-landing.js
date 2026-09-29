@@ -85,6 +85,12 @@
  *            Rechtsseiten ohne eigene Kopie von `docs/assets/legal.css`
  *            (2026-09-29).
  *
+ *       (13) Bedienung und Laden: Transitionen nennen ihre Eigenschaften und
+ *            bewegen kein Layout, Textlinks sind unterstrichen, jedes Tag ist
+ *            geschlossen, das Sprungmenue schliesst per Escape und
+ *            Fokusverlust, das LCP-Bild hat Vorrang und reservierten Platz,
+ *            und das Woerterbuch steht vor dem Rest der Seite (2026-09-29).
+ *
  * Ausführen: node --test test/test-docs-landing.js   (bzw. npm run test:docs-landing)
  */
 
@@ -505,9 +511,18 @@ function dictKeys(block) {
   return new Set([...block.matchAll(/(?:^|[{,]\s*)\s*([a-z][a-z0-9_]*)\s*:\s*['"]/gm)].map((m) => m[1]));
 }
 
-/** Alle über `data-t`/`data-alt-t`/`data-t-aria` verlangten Schlüssel im Markup. */
+/**
+ * Alle über `data-t`/`data-alt-t`/`data-t-aria` verlangten Schlüssel im Markup.
+ *
+ * Skripte werden herausgeschnitten, nicht das Dokument an der Woerterbuch-
+ * Definition abgeschnitten. Bis 2026-09-29 galt "alles vor `var T =`" als
+ * Markup - richtig, solange das Woerterbuch am Dateiende stand. Seit es in
+ * index.html hinter der Proof-Leiste steht (fruehe Uebersetzung gegen den
+ * Sprung beim Sprachtausch), haette derselbe Schnitt jeden Schluessel danach -
+ * Galerie bis Fusszeile - ungeprueft gelassen, und die Suite blieb dabei gruen.
+ */
 function usedKeys(html) {
-  const body = html.split(/\n\s*(?:var |const )?(?:DICT|T)\s*=/)[0];
+  const body = html.replace(/<script\b[^>]*>[\s\S]*?<\/script\b[^>]*>/gi, '');
   const keys = new Set();
   for (const attr of ['data-t', 'data-alt-t', 'data-t-aria']) {
     for (const m of body.matchAll(new RegExp(`${attr}="([^"]+)"`, 'g'))) keys.add(m[1]);
@@ -1835,4 +1850,262 @@ test('der legal.css-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   // Ein Rechtstext laedt das geteilte Blatt nicht mehr.
   const unlinked = { ...files, 'datenschutz.html': files['datenschutz.html'].replace('<link rel="stylesheet" href="assets/legal.css">', '') };
   assert.match(legalSheetFindings(unlinked, legal).join('\n'), /datenschutz\.html: laedt assets\/legal\.css nicht/);
+});
+
+
+// ── (13) Bedienung und Laden ─────────────────────────────────────────────────
+
+/**
+ * Transitionen nennen, was sie bewegen, und das ist nie Layout.
+ *
+ * `transition: all` animiert jede Eigenschaft, die sich je aendert - auch die,
+ * die spaeter jemand dazuschreibt, und auch `width`/`padding` beim Hover, was
+ * pro Bild ein Layout kostet. Stand bis 2026-09-29 an den Tab-Knoepfen von
+ * install.html (in den Rechtsseiten war es schon weg). Eine Kurzform ohne
+ * Eigenschaft (`transition: .2s`) ist dasselbe `all`, nur unsichtbar, und
+ * zaehlt deshalb mit. Dazu die Layout-Eigenschaften selbst: die
+ * Fortschrittslinie der Landing animierte `width` bei jedem Scrollereignis.
+ */
+const LAYOUT_PROPS = /^(?:width|height|min-width|max-width|min-height|max-height|top|right|bottom|left|inset|margin(?:-\w+)?|padding(?:-\w+)?|font-size|line-height|flex-basis|grid-template-\w+)$/;
+
+function transitionFindings(sheets) {
+  const found = [];
+  for (const { where, css } of sheets) {
+    for (const rule of eachRule(css)) {
+      for (const [name, value] of declarations(rule.body)) {
+        if (name !== 'transition' && name !== 'transition-property') continue;
+        if (value === 'none') continue;
+        for (const seg of value.split(/,(?![^(]*\))/)) {
+          const first = seg.trim().split(/\s+/)[0];
+          const prop = name === 'transition-property' ? seg.trim() : first;
+          if (prop === 'all' || /^[\d.]+m?s$/.test(prop) || /^(?:ease|linear|cubic-bezier|var)\b/.test(prop)) {
+            found.push(`${where}: ${rule.selector} { ${name}: ${value} } - ohne benannte Eigenschaft`);
+          } else if (LAYOUT_PROPS.test(prop)) {
+            found.push(`${where}: ${rule.selector} { ${name}: ${value} } - animiert Layout (${prop})`);
+          }
+        }
+      }
+    }
+  }
+  return found;
+}
+
+test('docs: jede Transition nennt ihre Eigenschaften, und keine davon ist Layout', () => {
+  assert.deepEqual(transitionFindings(docsStylesheets()), []);
+});
+
+test('der Transitions-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const sheet = (css) => [{ where: 'probe', css }];
+  assert.equal(transitionFindings(sheet('.tab-btn { transition: all .18s var(--ease-out); }')).length, 1);
+  assert.equal(transitionFindings(sheet('.x { transition: .2s ease; }')).length, 1);
+  assert.equal(transitionFindings(sheet('.x { transition-property: all; }')).length, 1);
+  assert.equal(transitionFindings(sheet('.nav-progress span { transition: width .1s linear; }')).length, 1);
+  assert.equal(transitionFindings(sheet('.x { transition: opacity .2s, margin-top .2s; }')).length, 1);
+  // Erlaubt: benannte, nicht-layoutende Eigenschaften, auch mit cubic-bezier(…, …).
+  assert.deepEqual(transitionFindings(sheet('.x { transition: transform .2s cubic-bezier(0.2, 0, 0, 1), opacity .2s; } .y { transition: none; }')), []);
+});
+
+/**
+ * Ein Link im Satz ist unterstrichen - als Grundregel der Seite, nicht als
+ * Ausnahme je Absatz. axe `link-in-text-block` (SC 1.4.1) meldete bis
+ * 2026-09-29 drei Links, die sich nur durch die Farbe vom Satz abhoben, weil
+ * index.html und install.html `a { text-decoration: none }` setzten und sich
+ * jeder Textlink den Strich selbst holen musste. Die Rechtsseiten hatten die
+ * richtige Grundregel schon.
+ */
+function baseLinkDecoration(css) {
+  const rule = [...eachRule(css)].find((r) => r.selector === 'a' && !r.at.length);
+  return rule ? (declarations(rule.body).find(([n]) => n === 'text-decoration') || [])[1] || '' : null;
+}
+
+test('docs: die Grundregel fuer Links unterstreicht', () => {
+  const bases = {
+    'index.html': inlineStyles(read('index.html')).map(baseLinkDecoration).find((v) => v !== null),
+    'install.html': inlineStyles(read('install.html')).map(baseLinkDecoration).find((v) => v !== null),
+    'assets/legal.css': baseLinkDecoration(read('assets/legal.css')),
+  };
+  for (const [where, deco] of Object.entries(bases)) {
+    assert.ok(deco !== undefined && deco !== null, `${where}: keine Grundregel \`a { … }\` gefunden - Muster veraltet?`);
+    assert.match(deco, /underline/, `${where}: \`a\` ist nicht unterstrichen - Textlinks unterscheiden sich dann nur durch die Farbe (SC 1.4.1)`);
+  }
+  // Gegenprobe: die alte Grundregel faellt auf.
+  assert.equal(baseLinkDecoration('a { color: var(--accent); text-decoration: none; }'), 'none');
+});
+
+/**
+ * Jedes Tag, das aufgeht, geht wieder zu - nicht nur `div` (dafuer steht (6)).
+ * Anlass: in der Outbound-Zeile schloss ein `</span>` hinter `</details>` die
+ * Klammer um Text UND Belegslinks zu frueh. Die beiden Links wurden dadurch
+ * eigene Flex-Kinder der Zeile, und mobil lief der Satz daneben in einer
+ * 66px-Spalte, ein Wort pro Zeile - im Markup ein einziges Zeichenpaar, im
+ * Browser klaglos repariert und von keiner Ueberlauf- oder Konsolenpruefung
+ * gesehen. Gezaehlt wird im maskierten Markup (ohne Kommentare, Skripte,
+ * Stile), damit die Woerterbuecher mit ihrem `<code>`/`<a>` nicht mitzaehlen.
+ */
+const BALANCED_TAGS = ['span', 'a', 'p', 'b', 'em', 'code', 'li', 'ul', 'ol', 'details', 'summary', 'nav', 'header', 'main', 'footer', 'figure', 'figcaption', 'button', 'dl', 'dt', 'dd', 'table', 'tr', 'td', 'th'];
+
+function tagBalance(html) {
+  const masked = maskNonMarkup(html);
+  const off = {};
+  for (const t of BALANCED_TAGS) {
+    const open = (masked.match(new RegExp(`<${t}\\b`, 'gi')) || []).length;
+    const close = (masked.match(new RegExp(`</${t}\\s*>`, 'gi')) || []).length;
+    if (open !== close) off[t] = `${open} auf, ${close} zu`;
+  }
+  return off;
+}
+
+for (const page of PAGES) {
+  test(`${page}: jedes Tag, das aufgeht, geht wieder zu`, () => {
+    assert.deepEqual(tagBalance(read(page)), {});
+  });
+}
+
+test('der Tag-Bilanz-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  const damaged = html.replace('</details> <a class="tb-proof"', '</details></span> <a class="tb-proof"');
+  assert.notEqual(damaged, html, 'Anlass-Stelle nicht gefunden - Gegenprobe veraltet?');
+  assert.deepEqual(tagBalance(damaged), { span: tagBalance(damaged).span });
+  assert.match(tagBalance(damaged).span, /auf/);
+  // Ein </span> in einem Woerterbuchwert zaehlt nicht: Skripte sind maskiert.
+  assert.deepEqual(tagBalance(html.replace("cta_install:'Install Yuvomi'", "cta_install:'</span>Install Yuvomi'")), {});
+});
+
+/**
+ * Das Sprungmenue schliesst per Escape und wenn der Fokus es verlaesst.
+ * <details> kann beides NICHT von sich aus; der Kommentar im Skript behauptete
+ * es fuer Escape bis 2026-09-29, gemessen blieb das Menue offen. Geprueft wird
+ * der Block, der am Menue haengt - nicht irgendein 'Escape' in der Datei.
+ */
+function navJumpBlock(html) {
+  const i = html.indexOf("getElementById('navJump'); if (!d) return;");
+  if (i < 0) return '';
+  return html.slice(i, html.indexOf('})();', i));
+}
+
+function navJumpFindings(html) {
+  const block = navJumpBlock(html);
+  if (!block) return ['kein Skriptblock am #navJump gefunden'];
+  const found = [];
+  const esc = block.match(/addEventListener\('keydown',[\s\S]*?\n {4}\}\);/);
+  if (!esc || !/'Escape'/.test(esc[0])) found.push('kein keydown-Handler mit Escape am Menue');
+  else {
+    if (!/removeAttribute\('open'\)|\.open\s*=\s*false/.test(esc[0])) found.push('Escape schliesst das Menue nicht');
+    if (!/\.focus\(\)/.test(esc[0])) found.push('Escape gibt den Fokus nicht an das summary zurueck');
+  }
+  const out = block.match(/addEventListener\('focusout',[\s\S]*?\n {4}\}\);/);
+  if (!out || !/relatedTarget/.test(out[0]) || !/removeAttribute\('open'\)/.test(out[0])) found.push('kein focusout-Handler, der beim Wegfokussieren schliesst');
+  return found;
+}
+
+test('index.html: das Sprungmenue schliesst per Escape und beim Wegfokussieren', () => {
+  assert.deepEqual(navJumpFindings(read('index.html')), []);
+});
+
+test('der Sprungmenue-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  const noEsc = html.replace(/ {4}d\.addEventListener\('keydown',[\s\S]*?\n {4}\}\);\n/, '');
+  assert.notEqual(noEsc, html);
+  assert.deepEqual(navJumpFindings(noEsc), ['kein keydown-Handler mit Escape am Menue']);
+  const noBlur = html.replace(/ {4}d\.addEventListener\('focusout',[\s\S]*?\n {4}\}\);\n/, '');
+  assert.notEqual(noBlur, html);
+  assert.deepEqual(navJumpFindings(noBlur), ['kein focusout-Handler, der beim Wegfokussieren schliesst']);
+  // Ein Escape anderswo in der Datei rettet das Menue nicht.
+  assert.deepEqual(navJumpFindings(noEsc + "\n<script>addEventListener('keydown', function(e){ if (e.key === 'Escape') x.focus(); });</script>"),
+    ['kein keydown-Handler mit Escape am Menue']);
+});
+
+/**
+ * Das LCP-Bild: Vorrang beim Laden und Platz, bevor es da ist.
+ *
+ * Es hat kein `src` im Markup (das Inline-Skript waehlt Theme, Sprache und
+ * Breite), der Preload-Scanner sieht es also nicht - `fetchpriority="high"` ist
+ * das Einzige, was ihm den Vorrang vor den Galerie-Aufnahmen gibt. Den Platz
+ * reservieren die Attribute fuer die Desktopaufnahme und unter der Schwelle,
+ * an der das Skript auf die Hochformat-Aufnahme tauscht, --ar-phone. Bis
+ * 2026-09-29 standen 900x675 fuer beide, und das Telefon rechnete bis zum
+ * Laden mit einem Querformat.
+ */
+function heroFindings(html) {
+  const found = [];
+  const img = (html.match(/<img\b[^>]*\bid="heroShot"[^>]*>/) || [])[0];
+  if (!img) return ['kein <img id="heroShot">'];
+  if (!/\bfetchpriority="high"/.test(img)) found.push('heroShot ohne fetchpriority="high"');
+  if (/\bloading="lazy"/.test(img)) found.push('heroShot ist lazy');
+  const w = +(img.match(/\bwidth="(\d+)"/) || [])[1];
+  const h = +(img.match(/\bheight="(\d+)"/) || [])[1];
+  const web = (img.match(/\bdata-light="([^"]+)"/) || [])[1];
+  if (!w || !h || !web) found.push('heroShot ohne width/height/data-light');
+  else {
+    const src = pngSize(resolve(DOCS, web));
+    if (Math.abs(w / h - src.w / src.h) > 0.01) found.push(`heroShot ${w}x${h} passt nicht zur Desktopaufnahme ${src.w}x${src.h}`);
+  }
+  const bp = (html.match(/id="heroShot">\s*<script>[\s\S]*?matchMedia\('\(max-width:(\d+)px\)'\)/) || [])[1];
+  if (!bp) found.push('Bildtausch-Schwelle im Inline-Skript nicht gefunden');
+  const rule = inlineStyles(html).flatMap((css) => [...eachRule(css)])
+    .find((r) => r.selector === '.hero-frame img' && r.at.some((a) => a.replace(/\s+/g, '') === `@media(max-width:${bp}px)`));
+  if (!rule || !/aspect-ratio:\s*var\(--ar-phone\)/.test(rule.body)) found.push(`kein .hero-frame img { aspect-ratio: var(--ar-phone) } unter max-width:${bp}px`);
+  return found;
+}
+
+test('index.html: das LCP-Bild hat Vorrang und reservierten Platz in beiden Formaten', () => {
+  assert.deepEqual(heroFindings(read('index.html')), []);
+});
+
+test('der LCP-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  assert.deepEqual(heroFindings(html.replace(' fetchpriority="high"', '')), ['heroShot ohne fetchpriority="high"']);
+  assert.deepEqual(heroFindings(html.replace('id="heroShot">', 'id="heroShot">'.replace('>', '>')).replace('width="1400" height="1050" loading="eager"', 'width="1050" height="1400" loading="eager"')),
+    ['heroShot 1050x1400 passt nicht zur Desktopaufnahme 2752x2064']);
+  const noPhone = html.replace('.hero-frame img { aspect-ratio: var(--ar-phone);', '.hero-frame img {');
+  assert.notEqual(noPhone, html);
+  assert.deepEqual(heroFindings(noPhone), ['kein .hero-frame img { aspect-ratio: var(--ar-phone) } unter max-width:860px']);
+});
+
+/**
+ * Deutsch vor dem ersten Bild. Das Woerterbuch stand bis 2026-09-29 im Skript
+ * am Dateiende; auf einer langsamen Leitung malte die Seite bis dahin englisch
+ * und sprang beim Tausch (CLS 0.068 mobil). Jetzt: das Kopfskript markiert eine
+ * deutsche Sitzung (`i18n-wait`), das Woerterbuch steht hinter dem ersten
+ * Bildschirm und VOR der ersten Sektion, uebersetzt dort und nimmt die Marke
+ * wieder ab; die CSS-Regel dazu hat einen Notausgang (Animation auf
+ * `visibility`), falls das Skript ausfaellt.
+ */
+function earlyLangFindings(html) {
+  const found = [];
+  const head = html.split('</head>')[0];
+  const headScripts = (head.match(/<script>[\s\S]*?<\/script>/g) || []).join('\n');
+  if (!/classList\.add\('i18n-wait'\)/.test(headScripts)) found.push('Kopfskript setzt i18n-wait nicht');
+  if (!/classList\.add\('js'\)/.test(headScripts)) found.push('Kopfskript setzt js nicht');
+  const dict = html.search(/\n\s*var T = \{\n/);
+  const proof = html.indexOf('<div class="proof">');
+  const firstSection = html.indexOf('<section');
+  if (dict < 0) found.push('Woerterbuch nicht gefunden');
+  else if (!(proof > 0 && dict > proof && dict < firstSection)) found.push('Woerterbuch steht nicht zwischen Proof-Leiste und erster Sektion');
+  if ((html.match(/\n\s*var T = \{\n/g) || []).length > 1) found.push('Woerterbuch doppelt');
+  const early = html.slice(dict, html.indexOf('</script>', dict));
+  if (!/classList\.remove\('i18n-wait'\)/.test(early)) found.push('fruehes Skript nimmt i18n-wait nicht ab');
+  const waitRule = inlineStyles(html).flatMap((css) => [...eachRule(css)]).find((r) => /html\.i18n-wait/.test(r.selector));
+  if (!waitRule || !/visibility:\s*hidden/.test(waitRule.body) || !/animation:/.test(waitRule.body)) found.push('i18n-wait-Regel ohne Notausgang');
+  return found;
+}
+
+test('index.html: die deutsche Fassung steht vor dem ersten Bild', () => {
+  assert.deepEqual(earlyLangFindings(read('index.html')), []);
+});
+
+test('der Frueh-Sprache-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  // Das Woerterbuch wandert zurueck ans Dateiende.
+  const start = html.search(/\n\s*var T = \{\n/);
+  const end = html.indexOf('\n  };\n', start) + 5;
+  const dict = html.slice(start, end);
+  const moved = html.replace(dict, '').replace("<script>\n(function(){\n  'use strict';", `<script>\n(function(){\n  'use strict';${dict}`);
+  assert.notEqual(moved, html);
+  // Beide Befunde: die Lage, und dass die Marke dort niemand mehr abnimmt.
+  assert.deepEqual(earlyLangFindings(moved), ['Woerterbuch steht nicht zwischen Proof-Leiste und erster Sektion', 'fruehes Skript nimmt i18n-wait nicht ab']);
+  // Der Notausgang faellt weg.
+  const noExit = html.replace(/visibility: hidden; animation: i18n-failsafe 0s 3s forwards;/, 'visibility: hidden;');
+  assert.notEqual(noExit, html);
+  assert.deepEqual(earlyLangFindings(noExit), ['i18n-wait-Regel ohne Notausgang']);
 });

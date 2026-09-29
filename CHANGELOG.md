@@ -764,6 +764,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Windows get a note each, the Proxmox link opens the Docker steps again, and the last step shows
   the right address for Proxmox and the web installer.
 
+- **The website is easier to use on a phone and with a keyboard.** The Install button at the
+  bottom of the phone screen stays while you read and only steps aside over the command blocks and
+  the closing buttons; it used to vanish on every downward scroll. The section menu no longer hangs
+  off the left edge on a phone, fits its longest entry on one line and closes with Escape or when
+  focus moves on. Links inside sentences are underlined and easier to tap, long captions and legal
+  text wrap at a readable width, and the German page no longer shows English first and then jumps
+  on a slow connection. The legal pages share the install page's header and footer links.
+
 - **Wall mode can be left on a phone** (#1559). "Leave wall mode" was below the bottom edge on
   phones and showed only a grey icon until the screen was touched, and the back button closed the
   app instead of leaving wall mode, which was still on at the next start. The exit now stays at the

@@ -32,9 +32,11 @@ body {
 
 .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; width: 100%; }
 
-/* Header: logo, then language switch (privacy/datenschutz only), theme
-   toggle and the way back. Every control is a capsule, as in the app - a
-   square icon button is a circle. */
+/* Header: logo, then the way back ("Overview"/"Übersicht"), the language
+   switch (privacy/datenschutz only) and the theme toggle - the order, labels
+   and 34px logo of install.html's bar, so the site has one header, not two.
+   Every control is a capsule, as in the app - a square icon button is a
+   circle. */
 header.top {
   border-bottom: 1px solid var(--border);
   background: var(--surface);
@@ -55,7 +57,7 @@ header.top .wrap {
   color: var(--text-1);
   text-decoration: none;
 }
-.nav-logo svg { width: 28px; height: 28px; }
+.nav-logo svg { width: 34px; height: 34px; }
 .top-actions { display: flex; align-items: center; gap: 14px; }
 /* Bis zur Re-Kritik hatten die Rechtsseiten als einzige keinen
    Theme-Umschalter. Sie uebernahmen zwar die Wahl von den Hauptseiten, aber
@@ -73,7 +75,7 @@ header.top .wrap {
   border-radius: var(--r-full); border: 1px solid var(--border); background: var(--bg);
   color: var(--text-2); font-size: 14px; font-weight: 600; text-decoration: none;
   transition: border-color .15s, color .15s; }
-.lang-link:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.lang-link:hover { color: var(--accent-on-soft); border-color: var(--accent); background: var(--accent-soft); }
 .back-link {
   display: inline-flex;
   align-items: center;
@@ -87,8 +89,11 @@ header.top .wrap {
   border: 1px solid var(--border);
   transition: color .15s, border-color .15s, background-color .15s;
 }
+.back-link svg { width: 16px; height: 16px; margin-right: 6px; flex-shrink: 0; }
+/* Auf der Akzenttoenung --accent-on-soft, nicht --accent: das stand im Dark
+   bei 4.38:1 (Critique 2026-09-29), bei beiden Kapseln. */
 .back-link:hover {
-  color: var(--accent);
+  color: var(--accent-on-soft);
   border-color: var(--accent);
   background: var(--accent-soft);
 }
@@ -137,12 +142,23 @@ h3 {
 }
 
 p { margin-bottom: 12px; color: var(--text-1); }
+/* Zeilenlaenge: die 820px-Spalte liess den Rechtstext bis 129 Zeichen laufen
+   (gemessen 1440px). Die Spalte bleibt so breit - Tabellen und das
+   Inhaltsverzeichnis brauchen sie -, der Fliesstext endet bei 54ch, gemessen
+   im Schnitt ~68 und hoechstens ~78 Zeichen. `ch` ist die Breite der Null,
+   in dieser Schrift deutlich breiter als ein Durchschnittszeichen: 62ch
+   ergaben 78 im Schnitt. Nachmessen, nicht rechnen. */
+main p, main li { max-width: 54ch; }
 ul { margin: 0 0 12px 22px; }
 li { margin-bottom: 4px; }
 address { font-style: normal; }
 code { font-family: var(--ff-mono); font-size: 13px; background: var(--bg-alt); padding: 1px 5px; border-radius: var(--r-xs); }
 
 a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; word-break: break-word; }
+/* Trefferflaeche der Links im Satz (Adressen, Aufsichtsbehoerde, Verweise):
+   18px Zeile, SC 2.5.8 will 24. Senkrechtes Polster an einem Inline-Element
+   nimmt Klicks an, ohne die Zeilenhoehe zu aendern. */
+main :is(p, address, li, dd, small) > a, .legal-disclaimer a { padding-block: 4px; }
 a:hover { color: var(--accent-hover); }
 
 .legal-disclaimer {
@@ -228,10 +244,10 @@ footer.bot nav a { padding: 6px 2px; min-height: 44px; display: inline-flex; ali
 .to-top { position: fixed; right: 16px; bottom: 16px; z-index: 90;
   display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px;
   background: var(--surface); color: var(--text-1); border: 1px solid var(--border);
-  border-radius: var(--r-full); box-shadow: var(--shadow-md); font-size: 0.85rem; font-weight: 600;
+  border-radius: var(--r-full); box-shadow: var(--shadow-md); font-size: 0.85rem; font-weight: 600; text-decoration: none;
   opacity: 0; visibility: hidden; transform: translateY(8px); transition: opacity .2s, transform .2s, visibility .2s; }
 .to-top.show { opacity: 1; visibility: visible; transform: none; }
-.to-top:hover { text-decoration: none; border-color: var(--border-strong); }
+.to-top:hover { border-color: var(--border-strong); }
 .to-top svg { width: 15px; height: 15px; }
 
 @media (prefers-reduced-motion: reduce) {
