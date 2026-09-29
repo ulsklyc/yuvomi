@@ -476,3 +476,47 @@ test('die Groessennamen der Uebersicht sagen die Form, in jeder Sprache verschie
     assert.equal(new Set(names).size, names.length, `${locale}: zwei Groessen heissen gleich (${names.join(', ')})`);
   }
 });
+
+// --------------------------------------------------------
+// Ein einfacher Bindestrich in Faelligkeit und Leerwerten (#1455)
+// --------------------------------------------------------
+// `formatDueDate` verband seine vier beschrifteten Zweige mit einem Halbgeviert
+// (U+2013), der leere Mahlzeiten-Slot trug einen Geviertstrich (U+2014) und die
+// Sparquote ohne Einnahmen wieder einen Halbgeviert. Erledigt hat es #1472 mit
+// einem Textwaechter ueber die Seiten (test-frontend-audit.js); dieser Test
+// misst die AUSGABE unter fester Uhr, Zweig fuer Zweig.
+const TYPO_DASH = /[–—]/;
+
+test('#1455: formatDueDate verbindet jeden beschrifteten Zweig mit "-"', () => {
+  const branches = [];
+  at('2026-09-24T08:00:00Z', 'Europe/Berlin', () => {
+    // 10:00 in Berlin.
+    branches.push(['ueberfaellig', __test.formatDueDate('2026-09-23', '18:00')]);
+    branches.push(['heute mit Uhrzeit', __test.formatDueDate('2026-09-24', '18:00')]);
+    branches.push(['morgen mit Uhrzeit', __test.formatDueDate('2026-09-25', '09:00')]);
+  });
+  at('2026-09-24T21:00:00Z', 'Europe/Berlin', () => {
+    // 23:00 in Berlin: morgen 22:30 liegt unter 24 Stunden voraus.
+    branches.push(['bald (morgen spaet)', __test.formatDueDate('2026-09-25', '22:30')]);
+  });
+  const keys = ['dashboard.overdue', 'dashboard.dueToday', 'dashboard.dueTomorrow', 'dashboard.dueSoon'];
+  for (const [name, label] of branches) {
+    assert.ok(label?.text, `${name}: kein Label`);
+    assert.doesNotMatch(label.text, TYPO_DASH, `${name}: ${label.text}`);
+    // Welches Bindezeichen, legt dieser Test nicht fest - die Aufgabenseite
+    // verbindet inzwischen mit „·" (#1492); hier zaehlt nur: kein Gedankenstrich.
+    assert.ok(keys.some((key) => label.text.startsWith(key) && label.text.length > key.length),
+      `${name}: "<Zustand> <Bindezeichen> <Wann>" erwartet, bekam ${label.text}`);
+  }
+  assert.equal(branches.length, 4, 'Reichweite: vier Zweige gemessen');
+});
+
+test('#1455: leerer Mahlzeiten-Slot und Sparquote ohne Einnahmen zeigen "-"', () => {
+  const meals = __test.renderTodayMeals([], ['breakfast']);
+  const empty = /meal-slot__title--empty">([^<]*)</.exec(meals)?.[1];
+  assert.equal(empty, '-', `leerer Slot: ${empty}`);
+
+  const budget = __test.renderBudgetWidget({ income: 0, expenses: 120, balance: -120, entryCount: 3 }, 'EUR');
+  assert.doesNotMatch(budget, TYPO_DASH, 'die Budget-Kachel traegt keinen Halbgeviert');
+  assert.match(budget, /<strong>-<\/strong>/, 'die Sparquote ohne Einnahmen ist ein einfacher Bindestrich');
+});

@@ -7011,3 +7011,6 @@ function wireWeatherRefresh(container, onUpdated = null, signal) {
 // Zeile statt Verlaengerung der langen `__test`-Liste oben, damit parallele
 // Aenderungen an beiden nicht in derselben Zeile kollidieren.
 Object.assign(__test, { renderUpcomingEvents, renderShoppingLists, renderDashboardLayout });
+
+// Test-Tor fuer die Uebersichts-Bugs vom 2026-09-29 (#1449, #1451-#1457).
+Object.assign(__test, { renderBudgetWidget });
