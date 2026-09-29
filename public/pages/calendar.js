@@ -56,7 +56,7 @@ import { googleTargetValue, caldavTargetValue, outlookTargetValue, assigneeSyncT
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { findPageFab } from '/utils/fab.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
-import { nowFields, todayKey, zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
+import { nowFields, todayKey, wallTimeToInstantMs, zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
 import { moduleAccess } from '/permissions.js';
@@ -6420,9 +6420,18 @@ function reminderAnchorStart(event) {
   return event?.reminder_anchor_start ?? event?.start_datetime;
 }
 
-/** Ein Termin-Start als Millisekunden; ein reines Datum gilt als 09:00. */
+/**
+ * Ein Termin-Start als Zeitpunkt in Millisekunden; ein reines Datum gilt als
+ * 09:00.
+ *
+ * Der Beginn ist Wanduhrzeit der HAUSHALTSZONE, `remind_at` ein Zeitpunkt.
+ * `new Date(start)` las die Ziffern in der Zone des Geraets, und auf einem
+ * Geraet ausserhalb des Haushalts lag jede Erinnerung um den Zonenabstand
+ * daneben (#1522). Dieselbe Lesart wie `reminderAnchorInstantMs()` auf dem
+ * Server, damit Dialog und Server denselben Anker haben.
+ */
 function reminderStartMs(startDatetime) {
-  return new Date(reminderStartValue(startDatetime)).getTime();
+  return wallTimeToInstantMs(reminderStartValue(startDatetime)) ?? NaN;
 }
 
 /** Vorlauf in ganzen Minuten - positiv heisst „vor dem Beginn". */

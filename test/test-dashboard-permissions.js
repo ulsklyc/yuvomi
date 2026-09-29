@@ -312,6 +312,7 @@ test('Kalender auf `none`: kein Termintitel und kein Geburtstag mehr in der Antw
   const wire = JSON.stringify(body);
 
   assert.deepEqual(body.upcomingEvents, [], 'gesperrter Kalender liefert keine Termine');
+  assert.deepEqual(body.familyEvents, [], 'auch die Termine der Familienkarte (#1449) nicht');
   assert.deepEqual(body.birthdays, [], 'Geburtstage hängen am Kalender-Modul (PERMISSION_MODULES navIds)');
   assert.equal(body.birthdayCount, 0, 'auch die Zahl daneben, sonst verrät sie den Bestand');
   assert.ok(!wire.includes('Elterngespräch Schule'), 'der Titel darf nirgendwo in der Antwort stehen');
@@ -340,7 +341,7 @@ test('Aufgaben auf `none`: weder Liste noch Zählstände noch die Pro-Mitglied-L
 // Je Modul eine Zahl, die nur dann größer null ist, wenn sein Teil der Antwort
 // etwas trägt. Geteilt von der Rollen- und der Token-Achse weiter unten.
 const MODULE_PROBES = {
-  calendar: (b) => b.upcomingEvents.length + b.birthdays.length + b.birthdayCount + b.birthdayTotal,
+  calendar: (b) => b.upcomingEvents.length + b.familyEvents.length + b.birthdays.length + b.birthdayCount + b.birthdayTotal,
   tasks: (b) => b.urgentTasks.length + b.openTaskCount + b.overdueTaskCount + b.tasksDoneToday,
   meals: (b) => b.todayMeals.length,
   notes: (b) => b.pinnedNotes.length + b.pinnedNotesCount + b.notesTotal,

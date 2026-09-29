@@ -37,7 +37,8 @@
 import { t, formatTime } from '/i18n.js';
 import { canSeeWidget as canSeeWidgetDefault, isPermAdmin, moduleAccess } from '/permissions.js';
 import { MODULE_ICON } from '/nav-icons.js';
-import { zonedTimeKey } from '/utils/timezone.js';
+import { zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
+import { housekeepingSinceLabel } from '/utils/day-label.js';
 import { pantryExpiryPhrase } from '/utils/pantry-status.js';
 
 /** Zeitlose Plaetze im Tag - dieselben drei Stufen, die das Programm schon kennt. */
@@ -333,18 +334,25 @@ export const TODAY_SHEET_SOURCES = [
     id: 'housekeeping',
     module: 'housekeeping',
     widget: 'housekeeping',
-    collect(data) {
+    collect(data, ctx) {
       const hk = data?.housekeeping;
       if (!hk?.present) return [];
       const since = hk.presentSince ? String(hk.presentSince) : '';
       // Der Check-in ist ein Zeitpunkt (oft UTC, 'Z'): sein Platz im Tag ist die
       // Wanduhr des Haushalts, dieselbe, die die Beschriftung rechts zeigt.
       const sinceTime = since ? (zonedTimeKey(since) || null) : null;
+      // EIN BEGINN VOR HEUTE ist eine vergessene Abmeldung (#1452). Die Zeile
+      // sagte „seit 08:30" und stand zwischen den heutigen 08:00 und 09:00 -
+      // als waere die Hilfe heute frueh gekommen. Sie nennt jetzt das Datum,
+      // mit demselben Helfer wie die Kennzahl-Kachel, und steht oben bei den
+      // ganztaegigen Zeilen: ihr Platz im Tag ist nicht heute.
+      const sinceDay = since ? zonedDateKey(since) : '';
+      const earlier = Boolean(sinceDay && ctx?.todayKey && sinceDay < ctx.todayKey);
       return [{
         kind: 'housekeeping',
         objectId: null,
-        sortKey: sinceTime ?? SORT_ALL_DAY,
-        timeLabel: sinceTime ? t('dashboard.housekeepingSince', { time: formatTime(since) }) : '',
+        sortKey: sinceTime && !earlier ? sinceTime : SORT_ALL_DAY,
+        timeLabel: sinceTime ? t('dashboard.housekeepingSince', { time: housekeepingSinceLabel(since) }) : '',
         title: hk.workerName || t('dashboard.housekeepingPresent'),
         sub: hk.workerName ? t('dashboard.housekeepingPresent') : t('nav.housekeeping'),
         icon: MODULE_ICON.housekeeping,

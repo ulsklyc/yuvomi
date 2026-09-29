@@ -162,6 +162,19 @@ export function getUpcomingEvents(d, {
   // heraus, die exakt auf `nowDate` sitzt. Geklammert wird danach exakt, über
   // den Instant-Vergleich unten, deshalb blendet der Rand nichts Zusätzliches ein.
   const sqlFrom = shiftDateKey(nowDate, -1);
+  /* WAS GESTERN BEGANN UND HEUTE NOCH LAEUFT (#1457). Mit `fromToday` fragt die
+   * Uebersicht „was ist heute", nicht „was beginnt ab heute": eine Reise von
+   * gestern 18:00 bis morgen 12:00 laeuft heute, fiel aber durch, weil nur der
+   * Beginn mit Mitternacht verglichen wurde. Einzeltermine kommen deshalb ueber
+   * ihr ENDE herein (dieselbe Ueberlappung wie `getEventsOverlappingDays`),
+   * und Serien werden eine Woche frueher expandiert, damit ein mehrtaegiges
+   * Vorkommen, das vorher begann, noch hineinreicht. Ohne `fromToday`
+   * (/calendar/upcoming, MCP) bleibt es bei „ab jetzt". */
+  const singleWhere = fromToday
+    ? 'DATE(e.start_datetime) <= ? AND DATE(COALESCE(e.end_datetime, e.start_datetime)) >= ?'
+    : 'DATE(e.start_datetime) BETWEEN ? AND ?';
+  const singleParams = fromToday ? [future, sqlFrom] : [sqlFrom, future];
+  const expandFrom = fromToday ? shiftDateKey(nowDate, -7) : sqlFrom;
 
   const rawEvents = d.prepare(`
     SELECT ${eventProjectionSql(d, 'e', BODY_FREE_EVENT_COLUMNS)},
@@ -188,7 +201,7 @@ export function getUpcomingEvents(d, {
     LEFT JOIN birthdays bd ON bd.calendar_event_id = e.id
     LEFT JOIN birthdays nd ON nd.name_day_calendar_event_id = e.id
     WHERE (
-      (e.recurrence_rule IS NULL AND DATE(e.start_datetime) BETWEEN ? AND ?)
+      (e.recurrence_rule IS NULL AND ${singleWhere})
       OR
       (e.recurrence_rule IS NOT NULL AND DATE(e.start_datetime) <= ?)
     )
@@ -200,12 +213,24 @@ export function getUpcomingEvents(d, {
     )
     AND ${visibilityWhere('e', 'event_assignments', 'event_id')}
     ORDER BY e.start_datetime ASC
-  `).all(sqlFrom, future, future, userId, userId, userId);
+  `).all(...singleParams, future, userId, userId, userId);
 
   const startInstant = (event) => storedToInstantMs(
     event.all_day ? event.start_datetime.slice(0, 10) : event.start_datetime,
     tz,
   );
+  // Bis wann ein Termin reicht, als Zeitpunkt: ganztaegig bis zur Mitternacht
+  // NACH seinem letzten Tag (inklusives Ende, wie `getEventsOverlappingDays`),
+  // sonst sein Ende - ohne Ende sein Beginn.
+  const reachMs = (event) => {
+    const start = String(event.start_datetime || '');
+    if (event.all_day || !start.includes('T')) {
+      const startKey = start.slice(0, 10);
+      const endKey = event.end_datetime ? String(event.end_datetime).slice(0, 10) : startKey;
+      return storedToInstantMs(shiftDateKey(endKey > startKey ? endKey : startKey, 1), tz);
+    }
+    return storedToInstantMs(event.end_datetime || start, tz);
+  };
   const isUpcoming = (event) => {
     // Verglichen werden ZEITPUNKTE, nicht Strings. In start_datetime liegen
     // zwei Formen nebeneinander - zonenlose Wanduhrzeit (lokal angelegt) und
@@ -215,7 +240,13 @@ export function getUpcomingEvents(d, {
     // von UTC die Abendtermine aus dem Übersichts-Widget (#829).
     // Ganztägige Termine beginnen um Mitternacht der Haushaltszone.
     const startMs = startInstant(event);
-    return startMs !== null && startMs >= filterFromMs;
+    if (startMs === null) return false;
+    if (startMs >= filterFromMs) return true;
+    // Begann vorher: zaehlt mit `fromToday`, solange es ueber die Mitternacht
+    // von heute hinausreicht (#1457). Ganztaegig endet inklusiv, wie im Kalender.
+    if (!fromToday) return false;
+    const endMs = reachMs(event);
+    return endMs !== null && endMs > filterFromMs;
   };
   const matchesAssignment = (event) => {
     // „NUR MEINE" HEISST HIER DASSELBE WIE IM KALENDERMODUL (#814): zugewiesen,
@@ -263,7 +294,7 @@ export function getUpcomingEvents(d, {
     const endMs = storedToInstantMs(event.end_datetime || event.start_datetime, tz);
     return endMs !== null && endMs <= nowMs;
   };
-  const sorted = expandAndResolveEventRows(d, candidates, sqlFrom, future, {
+  const sorted = expandAndResolveEventRows(d, candidates, expandFrom, future, {
     lightweight: true,
     expansion: {
       maxOccurrencesPerSeries: limit + keepEnded,

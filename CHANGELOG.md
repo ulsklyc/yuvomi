@@ -731,6 +731,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The family card no longer misses an evening appointment on a busy day** (#1449). The card took
+  its appointments from the calendar tile, which stops at five coming ones and follows its "Only
+  mine" option: a child's evening appointment could be cut off, and with "Only mine" every other
+  member read as free. The card now loads each member's appointments of the day on its own, ignores
+  "Only mine", and switches to the next appointment or to "Done for today" when one ends, without a
+  reload.
+
+- **A trip that began yesterday shows on today's overview** (#1457). Appointments were picked by
+  their start, so a trip, a hospital stay or a school camp that started yesterday and runs until
+  tomorrow was missing from the calendar tile, the today sheet, the wall display and the family
+  card, although the week strip showed it. They now appear as today's, marked all-day while they
+  continue and "until 12:00" on the day they end, never with yesterday's start time. The time of an
+  appointment in the today sheet also follows the household's clock instead of the device's.
+
+- **The overview counts housekeeping visits in the household's month** (#1451). Visits and the
+  unpaid amount in the metric tile and the Housekeeping widget went by the UTC month of the check-in:
+  in Berlin a visit on the 1st at 00:30 counted in the previous month, west of UTC a visit on the
+  evening of the last day in the next one. The overview now uses the same month boundaries as the
+  Housekeeping module, so both show the same number.
+
+- **The wall display stays dark after a reload at night** (#1453). Reloading the wall between 22:00
+  and 06:00 with the theme set to Automatic or Light left the dimmed night surface in the light
+  theme until the morning. The wall now forces the dark theme on every check during the night and
+  restores your theme at 06:00; the theme you chose is not changed.
+
+- **The today sheet dates a check-in from an earlier day** (#1452). A household help who checked
+  in yesterday and was never checked out read as "since 08:30" and sat between today's 08:00 and
+  09:00 rows, as if they had arrived this morning. The row now names the date, the same way the
+  metric tile does, and stands at the top with the all-day rows.
+
+- **Birthdays, countdowns and the next cycle start on the overview drop the year** (#1454). They
+  read like the other dates there: the weekday up to six days ahead, then day and month, the year
+  only when it is a different one. When the row already says "Today" or "Tomorrow", the word
+  appears once. The last visit of the household help reads backwards ("Yesterday", "10.09.").
+
+- **Reminders of events and tasks keep their lead on a device in another time zone** (#1522).
+  With a household time zone set, the event dialog and the task dialog read the start or due
+  time in the zone of the device instead of the household's. On a phone or laptop set to another
+  zone, a reminder "1 hour before" was saved hours off, and opening it again showed a different
+  lead or "after the start". Both dialogs now read the time in the household zone, including on
+  the days the clocks change, the same way the server does.
+
 - **The note category hints no longer suggest that notes are private** (#1514). A personal
   category is only visible to you, but a note filed under it is still visible to every household
   member, just without that category. The hint next to the category type and the hint in the

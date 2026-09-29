@@ -798,3 +798,106 @@ test('die Vorkommens-Anfrage laesst reminder_offsets bei null weg, bei [] nicht'
   assert.deepEqual(sent, [{ title: 'x' }, { title: 'x', reminder_offsets: [] }],
     'null heisst „nicht anfassen", ein leeres Array weiterhin „alle entfernen"');
 });
+
+// --------------------------------------------------------------------------
+// Haushaltszone und Geraetezone liegen auseinander (#1522)
+//
+// Der Beginn eines Termins ist Wanduhrzeit der HAUSHALTSZONE, `remind_at` ein
+// Zeitpunkt. Der Dialog las den Beginn per `new Date('YYYY-MM-DDTHH:MM')` in
+// der Zone des Geraets: auf einem Geraet ausserhalb des Haushalts lag jede
+// Erinnerung um den Zonenabstand daneben, und eine Stunde Vorlauf kam beim
+// Wiederoeffnen als „nach dem Terminbeginn" zurueck. Der Prozess laeuft in
+// Europe/Berlin (siehe oben), der Haushalt hier in America/New_York - 09:00
+// dort ist 13:00 UTC, in Berlin waere es 07:00 UTC.
+//
+// Dazu EIN Fall, in dem beide Zonen dieselbe sind: er haelt fest, dass die
+// Umrechnung in der Haushaltszone dort genau das bisherige Ergebnis liefert.
+// --------------------------------------------------------------------------
+
+const { setDisplayTimeZone } = await import('../public/utils/timezone.js');
+
+async function inHouseholdZone(zone, fn) {
+  setDisplayTimeZone(zone);
+  try { return await fn(); } finally { setDisplayTimeZone(null); }
+}
+
+const NY_HOUR_BEFORE = { remind_at: '2026-09-18T12:00:00' }; // 08:00 in New York, 60 Minuten vor 09:00
+const NY_DAY_BEFORE = { remind_at: '2026-09-17T13:00:00' };  // 17.09. 09:00 in New York
+
+test('#1522: die Vorbedingung - Geraet und Haushalt stehen in verschiedenen Zonen', () => {
+  assert.equal(process.env.TZ, 'Europe/Berlin');
+});
+
+test('#1522: Wiederoeffnen zeigt den Vorlauf in der Haushaltszone, nicht in der des Geraets', async () => {
+  await inHouseholdZone('America/New_York', () => {
+    const [hour] = rowsOf(openDialog({ reminders: [NY_HOUR_BEFORE] }));
+    assert.equal(offsetOf(hour).value, '60', 'eine Stunde vorher, nicht „nach dem Terminbeginn"');
+    assert.equal(hintOf(hour), null, 'kein Warnton');
+    const [day] = rowsOf(openDialog({ reminders: [NY_DAY_BEFORE] }));
+    assert.equal(offsetOf(day).value, '1440', 'ein Tag vorher, nicht 18 Stunden');
+  });
+});
+
+test('#1522: Speichern rechnet den Vorlauf vom Beginn in der Haushaltszone', async () => {
+  await inHouseholdZone('America/New_York', async () => {
+    const reminders = [NY_DAY_BEFORE];
+    const panel = openDialog({ reminders });
+    const [row] = rowsOf(panel);
+    userSets(offsetOf(row), '60');
+    const { calls } = await save(panel, { reminders });
+    assert.deepEqual(reminderPut(calls)?.body, { remind_ats: ['2026-09-18T12:00:00'] },
+      '09:00 New York minus 60 Minuten = 12:00 UTC, nicht 06:00 UTC');
+  });
+});
+
+test('#1522: Speichern und Wiederoeffnen - 60 Minuten bleiben 60 Minuten', async () => {
+  await inHouseholdZone('America/New_York', async () => {
+    let reminders = [NY_DAY_BEFORE];
+    let panel = openDialog({ reminders });
+    userSets(offsetOf(rowsOf(panel)[0]), '60');
+    for (let round = 0; round < 3; round++) {
+      const { calls } = await save(panel, { reminders });
+      const [remindAt] = reminderPut(calls)?.body.remind_ats ?? [];
+      assert.equal(remindAt, '2026-09-18T12:00:00', `Runde ${round + 1}: der Zeitpunkt wandert nicht`);
+      reminders = [{ remind_at: remindAt }];
+      panel = openDialog({ reminders });
+      assert.equal(offsetOf(rowsOf(panel)[0]).value, '60', `Runde ${round + 1}: der Vorlauf bleibt`);
+    }
+  });
+});
+
+test('#1522: an der Sommerzeitgrenze des Haushalts zaehlt der Vorlauf in echter Zeit', async () => {
+  await inHouseholdZone('America/New_York', async () => {
+    // 01.11.2026: New York stellt um 02:00 EDT auf 01:00 EST zurueck, Berlin
+    // hat das schon am 25.10. getan. 09:00 EST = 14:00 UTC; ein Tag Vorlauf
+    // ist 24 Stunden davor, 31.10. 14:00 UTC (10:00 EDT).
+    const event = { ...EVENT, start_datetime: '2026-11-01T09:00', end_datetime: '2026-11-01T10:00' };
+    const reminders = [{ remind_at: '2026-10-31T14:00:00' }];
+    const panel = openDialog({ event, reminders });
+    assert.equal(offsetOf(rowsOf(panel)[0]).value, '1440', 'Wiederoeffnen nennt einen Tag');
+    userSets(offsetOf(rowsOf(panel)[0]), '60');
+    const { calls } = await save(panel, { event, reminders });
+    assert.deepEqual(reminderPut(calls)?.body, { remind_ats: ['2026-11-01T13:00:00'] });
+
+    // 08.03.2026: 02:30 gibt es in New York nicht (02:00 EST -> 03:00 EDT).
+    // Der Server schiebt eine solche Uhrzeit um die Luecke vor (03:30 EDT =
+    // 07:30 UTC, `localToUTCPrecise`), der Dialog muss denselben Anker nehmen.
+    const gap = { ...EVENT, start_datetime: '2026-03-08T02:30', end_datetime: '2026-03-08T04:00' };
+    const gapReminders = [{ remind_at: '2026-03-07T07:30:00' }]; // 24 Stunden vor 07:30 UTC
+    const gapPanel = openDialog({ event: gap, reminders: gapReminders });
+    assert.equal(offsetOf(rowsOf(gapPanel)[0]).value, '1440', 'Wiederoeffnen nennt einen Tag');
+    userSets(offsetOf(rowsOf(gapPanel)[0]), '60');
+    const gapSave = await save(gapPanel, { event: gap, reminders: gapReminders });
+    assert.deepEqual(reminderPut(gapSave.calls)?.body, { remind_ats: ['2026-03-08T06:30:00'] });
+  });
+});
+
+test('#1522: steht der Haushalt in der Zone des Geraets, bleibt alles, wie es war', async () => {
+  await inHouseholdZone('Europe/Berlin', async () => {
+    const [row] = rowsOf(openDialog({ reminders: [HOUR_BEFORE] }));
+    assert.equal(offsetOf(row).value, '60');
+    const reminders = [DAY_BEFORE];
+    const { calls } = await save(openDialog({ reminders }), { reminders });
+    assert.deepEqual(reminderPut(calls)?.body, { remind_ats: ['2026-09-17T07:00:00'] });
+  });
+});
