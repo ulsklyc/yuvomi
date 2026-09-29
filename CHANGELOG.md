@@ -731,6 +731,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The wall display stays dark after a reload at night** (#1453). Reloading the wall between 22:00
+  and 06:00 with the theme set to Automatic or Light left the dimmed night surface in the light
+  theme until the morning. The wall now forces the dark theme on every check during the night and
+  restores your theme at 06:00; the theme you chose is not changed.
+
 - **The today sheet dates a check-in from an earlier day** (#1452). A household help who checked
   in yesterday and was never checked out read as "since 08:30" and sat between today's 08:00 and
   09:00 rows, as if they had arrived this morning. The row now names the date, the same way the

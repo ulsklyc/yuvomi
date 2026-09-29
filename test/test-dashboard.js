@@ -2768,6 +2768,110 @@ test('Wand-Modus: das Nachtfenster läuft über Mitternacht (22:00 bis 06:00)', 
   nodeAssert.deepEqual(['/tasks', '/settings', '/calendar'].filter(isWallRoute), []);
 });
 
+/* #1453: NACH EINEM RELOAD IN DER NACHT BLIEB DIE WAND HELL.
+ *
+ * Drei Stellen fassen beim Laden die Wurzel an: theme-init.js setzt nachts
+ * `data-wall-night` und erzwingt `data-theme="dark"`, die Router-Init stellt
+ * das gespeicherte Theme wieder her („Automatisch" entfernt `data-theme`,
+ * „Hell" setzt `light`), und `syncWallMode` las `wasNight` aus dem Attribut -
+ * Nacht und schon Nacht, also kein Zweig, und die helle Flaeche blieb bis
+ * 06:00. Nachgespielt wird die Reihenfolge mit einer Stub-Wurzel: theme-init
+ * als echtes Skript, die Router-Init als ihre Drei-Wege-Logik (router.js,
+ * Initialisierung), dann der echte `syncWallMode` samt Minutentakt.
+ */
+test('Wand-Modus: nach einem Reload in der Nacht ist die Wand dunkel (#1453)', async () => {
+  const wall = await import('../public/utils/wall-mode.js');
+  const tz = await import('/utils/timezone.js');
+  const themeInit = readFileSync(new URL('../public/theme-init.js', import.meta.url), 'utf8');
+
+  function makeStorage(entries) {
+    const map = new Map(Object.entries(entries));
+    return {
+      get length() { return map.size; },
+      key: (i) => [...map.keys()][i] ?? null,
+      getItem: (k) => (map.has(k) ? map.get(k) : null),
+      setItem: (k, v) => { map.set(k, String(v)); },
+      removeItem: (k) => { map.delete(k); },
+    };
+  }
+  function makeRoot() {
+    const attrs = new Map();
+    return {
+      attrs,
+      setAttribute: (k, v) => { attrs.set(k, String(v)); },
+      getAttribute: (k) => (attrs.has(k) ? attrs.get(k) : null),
+      removeAttribute: (k) => { attrs.delete(k); },
+      hasAttribute: (k) => attrs.has(k),
+      toggleAttribute: (k, force) => {
+        const on = force === undefined ? !attrs.has(k) : Boolean(force);
+        if (on) attrs.set(k, ''); else attrs.delete(k);
+        return on;
+      },
+    };
+  }
+  const RealDate = Date;
+  function atInstant(iso, fn) {
+    const fixed = RealDate.parse(iso);
+    class FixedDate extends RealDate {
+      constructor(...args) { if (args.length === 0) super(fixed); else super(...args); }
+      static now() { return fixed; }
+    }
+    globalThis.Date = FixedDate;
+    try { return fn(); } finally { globalThis.Date = RealDate; }
+  }
+
+  // Die Nacht: 23:00 in Berlin (Haushalt) - und auf der Geraeteuhr, die
+  // theme-init liest, ebenfalls Nacht, damit alle drei Stellen dasselbe sehen.
+  const NIGHT = '2026-09-23T21:00:00Z';
+  const MORNING = '2026-09-24T04:00:00Z'; // 06:00 in Berlin
+  const deviceNight = class extends RealDate { getHours() { return 23; } };
+
+  const results = [];
+  for (const stored of [null, 'light', 'dark']) {
+    const root = makeRoot();
+    const storage = makeStorage({ 'yuvomi-wall-mode': '1', ...(stored ? { 'yuvomi-theme': stored } : {}) });
+    const prev = { document: globalThis.document, localStorage: globalThis.localStorage, location: globalThis.location, window: globalThis.window };
+    globalThis.document = { documentElement: root, querySelectorAll: () => [] };
+    globalThis.localStorage = storage;
+    globalThis.location = { pathname: '/' };
+    globalThis.window = { yuvomi: { restoreThemeColor: () => {} } };
+    tz.setDisplayTimeZone('Europe/Berlin');
+    try {
+      // 1. theme-init.js, das echte Skript
+      new Function('localStorage', 'sessionStorage', 'document', 'location', 'Date', themeInit)(
+        storage, makeStorage({}), globalThis.document, globalThis.location, deviceNight,
+      );
+      nodeAssert.ok(root.hasAttribute('data-wall-night'), 'Vorbedingung: theme-init setzt nachts data-wall-night');
+      // 2. Router-Init: das gespeicherte Theme noch einmal (router.js, Initialisierung)
+      if (stored === 'dark' || stored === 'light') root.setAttribute('data-theme', stored);
+      else root.removeAttribute('data-theme');
+      // 3. syncWallMode aus der Navigation, danach ein Minutentakt in der Nacht
+      atInstant(NIGHT, () => wall.syncWallMode('/'));
+      const afterLoad = root.getAttribute('data-theme');
+      atInstant(NIGHT, () => wall.syncWallMode('/'));
+      const afterTick = root.getAttribute('data-theme');
+      const night = root.hasAttribute('data-wall-night');
+      // 4. der Takt um 06:00 stellt die Wahl des Nutzers zurueck
+      atInstant(MORNING, () => wall.syncWallMode('/'));
+      results.push({
+        stored,
+        afterLoad, afterTick, night,
+        morning: root.getAttribute('data-theme'),
+        morningNight: root.hasAttribute('data-wall-night'),
+        kept: storage.getItem('yuvomi-theme'),
+      });
+    } finally {
+      tz.setDisplayTimeZone(null);
+      Object.assign(globalThis, prev);
+    }
+  }
+  nodeAssert.deepEqual(results, [
+    { stored: null, afterLoad: 'dark', afterTick: 'dark', night: true, morning: null, morningNight: false, kept: null },
+    { stored: 'light', afterLoad: 'dark', afterTick: 'dark', night: true, morning: 'light', morningNight: false, kept: 'light' },
+    { stored: 'dark', afterLoad: 'dark', afterTick: 'dark', night: true, morning: 'dark', morningNight: false, kept: 'dark' },
+  ], `nachts dunkel nach dem Laden und im Takt, morgens die Wahl des Nutzers, yuvomi-theme unberuehrt - bekam ${JSON.stringify(results)}`);
+});
+
 // --------------------------------------------------------
 // Widget-Konfiguration (public/utils/dashboard-widgets.js)
 //
