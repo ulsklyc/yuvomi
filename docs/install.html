@@ -27,7 +27,9 @@
   <meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#191816" media="(prefers-color-scheme: dark)">
   <link rel="canonical" href="https://yuvomi.cloud/install.html">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/svg+xml" href="logo.svg">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
   <!-- Geteilte Tokens und Bauteile aller fuenf Seiten (Knoepfe, Fokusring,
        Codeplatte, Reveal, Semantikfarben). Der Rest des Style-Blocks ist
@@ -996,7 +998,7 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
         <a href="impressum.html" data-t="footer_impressum">Imprint (DE)</a>
         <a href="privacy.html" data-href-en="privacy.html" data-href-de="datenschutz.html" data-t="footer_privacy">Privacy</a>
       </nav>
-      <p class="footer-meta"><span id="gh-stars-install" data-gh-stars>★ 1.5k · </span><b>v2.69.1</b> · <span id="install-released" data-released="2026-09-23">23 September 2026</span></p>
+      <p class="footer-meta"><span id="gh-stars-install" data-gh-stars>★ 1.6k · </span><b>v2.69.1</b> · <span id="install-released" data-released="2026-09-23">23 September 2026</span></p>
     </div>
   </footer>
 
@@ -1105,6 +1107,7 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
         trouble_nginx_port:'Ensure the <code>proxy_pass</code> port in your Nginx config matches <code>OIKOS_HTTP_PORT</code> in your <code>.env</code> (default: 3000).',
         footer_home:'Home', footer_heart:'Built with care for families who value privacy and simplicity.', footer_contrib:'Contributing', footer_impressum:'Imprint (DE)', footer_privacy:'Privacy',
         to_top:'Back to top',
+        meta_desc:'Step-by-step installation guide for Yuvomi. Docker, Podman, TrueNAS, Umbrel or Unraid - get your self-hosted family planner running in minutes.',
         skip_link:'Skip to content', backLabel:'Overview', copy:'Copy', copied:'Copied!', copyfail:'Copy failed'
       },
       de: {
@@ -1206,6 +1209,7 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
         trouble_nginx_port:'Sicherstellen, dass der <code>proxy_pass</code>-Port in der Nginx-Konfiguration mit <code>OIKOS_HTTP_PORT</code> in eurer <code>.env</code> übereinstimmt (Standard: 3000).',
         footer_home:'Startseite', footer_heart:'Mit Sorgfalt gebaut für Familien, die Privatsphäre und Einfachheit schätzen.', footer_contrib:'Mitmachen', footer_impressum:'Impressum', footer_privacy:'Datenschutz',
         to_top:'Nach oben',
+        meta_desc:'Schritt-für-Schritt-Anleitung zur Installation von Yuvomi. Docker, Podman, TrueNAS, Umbrel oder Unraid - euer selbstgehosteter Familienplaner läuft in wenigen Minuten.',
         skip_link:'Zum Inhalt springen', backLabel:'Übersicht', copy:'Kopieren', copied:'Kopiert!', copyfail:'Nicht kopiert'
       }
     };
@@ -1320,6 +1324,8 @@ docker compose logs | grep "Server running"</div></div><p data-t="trouble_nginx_
       lt.setAttribute('aria-label', lang === 'en' ? 'Auf Deutsch umschalten' : 'Switch to English');
       lt.setAttribute('title', lang === 'en' ? 'Auf Deutsch umschalten' : 'Switch to English');
       document.getElementById('backLabel').textContent = s.backLabel;
+      /* Die Beschreibung folgt der Sprache wie der Titel (seit 2026-09-29). */
+      document.querySelector('meta[name="description"]').setAttribute('content', s.meta_desc);
       document.title = lang === 'en' ? 'Install Yuvomi - Self-Hosted Family Planner' : 'Yuvomi installieren - Selbstgehosteter Familienplaner';
       /* Day-precise on purpose: a month-only stamp makes a page touched today
          look identical to one last touched four weeks ago, which is the opposite

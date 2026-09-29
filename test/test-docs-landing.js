@@ -91,6 +91,13 @@
  *            Fokusverlust, das LCP-Bild hat Vorrang und reservierten Platz,
  *            und das Woerterbuch steht vor dem Rest der Seite (2026-09-29).
  *
+ *       (14) Suchmaschinen, Symbole und Belege: JSON-LD gegen LICENSE, Build-
+ *            Workflow und canonical, Sitemap gegen die Seitenliste, robots.txt,
+ *            Favicons und apple-touch-icon vorhanden, meta description in beiden
+ *            Sprachen, Beleg-Links auf Ziele, die die Aussage belegen, und die
+ *            englische Zusammenfassung im Impressum auf die englische
+ *            Datenschutzerklaerung (2026-09-29).
+ *
  * Ausführen: node --test test/test-docs-landing.js   (bzw. npm run test:docs-landing)
  */
 
@@ -2108,4 +2115,272 @@ test('der Frueh-Sprache-Guard erkennt den Schaden, gegen den er gebaut ist', () 
   const noExit = html.replace(/visibility: hidden; animation: i18n-failsafe 0s 3s forwards;/, 'visibility: hidden;');
   assert.notEqual(noExit, html);
   assert.deepEqual(earlyLangFindings(noExit), ['i18n-wait-Regel ohne Notausgang']);
+});
+
+/* ---------------------------------------------------------------------------
+ * (14) Suchmaschinen, Symbole und Belege (2026-09-29).
+ *
+ * Was die Seite Maschinen und Lesern ueber sich sagt, haengt an einer Quelle:
+ * die strukturierten Daten an LICENSE, dem Build-Workflow und dem canonical,
+ * die Sitemap an der Seitenliste, jedes Symbol an einer Datei, die es gibt,
+ * die Beschreibung an beiden Sprachen, und jeder Beleg-Link an einem Ziel, das
+ * die Aussage wirklich belegt. Anlass: "0 trackers" verlinkte die
+ * Datenschutzerklaerung der WEBSITE (belegt nichts ueber die App), "Read the
+ * server source" eine Einzeldatei ohne zu sagen, welche, und die deutsche
+ * Seite trug die englische meta description.
+ * ------------------------------------------------------------------------- */
+
+const SITE = 'https://yuvomi.cloud/';
+const REPO_BLOB = 'https://github.com/ulsklyc/yuvomi/blob/main/';
+
+function canonicalOf(html) {
+  return (html.match(/<link rel="canonical" href="([^"]+)">/) || [])[1] || null;
+}
+
+/** Alle ld+json-Bloecke einer Seite, geparst (ein Parse-Fehler ist ein Befund). */
+function jsonLdBlocks(html) {
+  return [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => {
+    try { return JSON.parse(m[1]); } catch (e) { return { parseError: e.message }; }
+  });
+}
+
+/** Architekturen, fuer die der Build-Workflow das Image baut (`linux/amd64` -> `amd64`). */
+function builtArchitectures() {
+  const wf = repo('.github/workflows/docker-publish.yml');
+  const line = (wf.match(/^\s*platforms:\s*(.+)$/m) || [])[1] || '';
+  return new Set(line.split(',').map((p) => p.trim().replace(/^linux\//, '')).filter(Boolean));
+}
+
+const ARCH_WORDS = /\b(amd64|arm64|armv6|armv7|arm\/v7|386|ppc64le|s390x|riscv64|x86_64|aarch64)\b/g;
+
+/** Architekturnamen in einem Text, die der Workflow nicht baut. */
+function unbuiltArchitectures(text, built) {
+  return [...new Set([...text.matchAll(ARCH_WORDS)].map((m) => m[1]))].filter((a) => !built.has(a));
+}
+
+function jsonLdFindings(html, meta) {
+  const found = [];
+  const blocks = jsonLdBlocks(html);
+  if (blocks.length !== 1) return [`${blocks.length} ld+json-Bloecke statt einem`];
+  const ld = blocks[0];
+  if (ld.parseError) return [`ld+json nicht parsebar: ${ld.parseError}`];
+  if (ld['@context'] !== 'https://schema.org' || ld['@type'] !== 'SoftwareApplication') found.push('kein schema.org SoftwareApplication');
+  if (ld.url !== canonicalOf(html)) found.push(`url ${ld.url} ist nicht das canonical ${canonicalOf(html)}`);
+  const desc = (html.match(/<meta name="description" content="([^"]+)">/) || [])[1];
+  if (ld.description !== decode(desc || '')) found.push('description weicht von der meta description ab');
+  if (!ld.image?.startsWith(SITE) || !existsSync(resolve(DOCS, ld.image.slice(SITE.length)))) found.push(`image ${ld.image} ist keine Datei in docs/`);
+  if (!ld.license?.startsWith(REPO_BLOB)) found.push(`license ${ld.license} zeigt nicht ins Repository`);
+  else {
+    const lic = resolve(ROOT, ld.license.slice(REPO_BLOB.length));
+    if (!existsSync(lic)) found.push(`license ${ld.license}: Datei fehlt`);
+    else if (!/^MIT License/.test(readFileSync(lic, 'utf8')) || !/MIT/.test(html.split('</head>')[1] || '')) found.push('Lizenz ist nicht die MIT-Lizenz, die die Seite nennt');
+  }
+  if (ld.offers?.price !== '0' || !ld.offers?.priceCurrency) found.push('offers ohne Preis 0 samt Waehrung');
+  const archs = [...(ld.operatingSystem || '').matchAll(ARCH_WORDS)].map((m) => m[1]);
+  if (!archs.length) found.push('operatingSystem nennt keine Architektur');
+  const unbuilt = unbuiltArchitectures(ld.operatingSystem || '', meta.built);
+  if (unbuilt.length) found.push(`operatingSystem nennt ungebaute Architektur: ${unbuilt.join(', ')}`);
+  const missing = [...meta.built].filter((a) => !archs.includes(a));
+  if (missing.length) found.push(`operatingSystem verschweigt gebaute Architektur: ${missing.join(', ')}`);
+  return found;
+}
+
+test('index.html: die strukturierten Daten sind gueltiges JSON und haengen an ihren Quellen', () => {
+  const built = builtArchitectures();
+  assert.ok(built.size >= 1, 'platforms in docker-publish.yml nicht gefunden - Muster veraltet?');
+  assert.deepEqual(jsonLdFindings(read('index.html'), { built }), []);
+});
+
+test('index.html: jede Architektur im Image-Eintrag baut der Workflow', () => {
+  const html = read('index.html');
+  const built = builtArchitectures();
+  for (const [lang, text] of bothLangs(html, 'tb_image_v')) {
+    assert.deepEqual(unbuiltArchitectures(text, built), [], `tb_image_v (${lang}) nennt eine Architektur, die kein Image hat`);
+  }
+});
+
+/** Symbol-Links eines Kopfs: [rel, href, type/sizes] plus ob die Datei existiert. */
+function iconFindings(html) {
+  const found = [];
+  const links = [...html.matchAll(/<link rel="(icon|apple-touch-icon)"([^>]*)>/g)].map((m) => ({
+    rel: m[1], href: (m[2].match(/href="([^"]+)"/) || [])[1], attrs: m[2],
+  }));
+  const want = [
+    ['icon', /type="image\/png"/, 'PNG-Favicon'],
+    ['icon', /type="image\/svg\+xml"/, 'SVG-Favicon'],
+    ['apple-touch-icon', /./, 'apple-touch-icon'],
+  ];
+  for (const [rel, attr, name] of want) {
+    if (!links.some((l) => l.rel === rel && attr.test(l.attrs))) found.push(`${name} fehlt`);
+  }
+  for (const l of links) if (!l.href || !existsSync(resolve(DOCS, l.href))) found.push(`${l.href}: Datei fehlt in docs/`);
+  return found;
+}
+
+for (const page of PAGES) {
+  test(`${page}: Favicon (PNG, SVG) und apple-touch-icon sind verlinkt und existieren`, () => {
+    assert.deepEqual(iconFindings(read(page)), []);
+  });
+}
+
+test('docs: die Symbol-PNGs haben die Groesse, die ihr Name und ihre Rolle verlangen', () => {
+  assert.deepEqual(pngSize(resolve(DOCS, 'apple-touch-icon.png')), { w: 180, h: 180 });
+  const sized = read('index.html').match(/<link rel="icon" type="image\/png" sizes="(\d+)x(\d+)" href="([^"]+)">/);
+  assert.ok(sized, 'PNG-Favicon ohne sizes-Angabe');
+  assert.deepEqual(pngSize(resolve(DOCS, sized[3])), { w: Number(sized[1]), h: Number(sized[2]) });
+});
+
+/** Differenz zwischen Sitemap und den Seiten (je canonical), plus robots.txt. */
+function sitemapFindings(sitemap, robots, pages) {
+  const found = [];
+  if (!/^<\?xml version="1\.0" encoding="UTF-8"\?>/.test(sitemap)) found.push('Sitemap ohne XML-Deklaration');
+  if (!/<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">[\s\S]*<\/urlset>\s*$/.test(sitemap)) found.push('Sitemap ohne urlset');
+  const opened = (sitemap.match(/<url>/g) || []).length;
+  const closed = (sitemap.match(/<\/url>/g) || []).length;
+  if (opened !== closed) found.push(`<url> ${opened}x geoeffnet, ${closed}x geschlossen`);
+  const locs = [...stripComments(sitemap).matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  const canon = pages.map(([p, html]) => [p, canonicalOf(html)]);
+  for (const [p, c] of canon) if (!locs.includes(c)) found.push(`${p} (${c}) fehlt in der Sitemap`);
+  for (const l of locs) if (!canon.some(([, c]) => c === l)) found.push(`${l} steht in der Sitemap, ist aber keine Seite`);
+  if (!robots.split('\n').some((line) => line.trim() === `Sitemap: ${SITE}sitemap.xml`)) found.push('robots.txt ohne Sitemap-Zeile');
+  return found;
+}
+
+test('docs: die Sitemap nennt jede Seite unter ihrem canonical, robots.txt nennt die Sitemap', () => {
+  const htmlFiles = readdirSync(DOCS).filter((f) => f.endsWith('.html')).sort();
+  assert.deepEqual(htmlFiles, [...PAGES].sort(), 'eine HTML-Seite in docs/, die PAGES (und damit die Sitemap-Pruefung) nicht kennt');
+  assert.deepEqual(sitemapFindings(read('sitemap.xml'), read('robots.txt'), PAGES.map((p) => [p, read(p)])), []);
+});
+
+/** Die meta description: Markup == T.en, T.de vorhanden und anders, und das Skript setzt sie. */
+function metaDescFindings(html) {
+  const found = [];
+  const markup = decode((html.match(/<meta name="description" content="([^"]+)">/) || [])[1] || '');
+  const en = dictValue(dictBlock(html, 'en'), 'meta_desc');
+  const de = dictValue(dictBlock(html, 'de'), 'meta_desc');
+  if (en === null || de === null) return ['meta_desc fehlt in einem Woerterbuch'];
+  if (unescapeJs(en) !== markup) found.push('meta description im Markup ist nicht T.en.meta_desc');
+  if (unescapeJs(de) === unescapeJs(en)) found.push('T.de.meta_desc ist die englische Fassung');
+  if (!/querySelector\('meta\[name="description"\]'\)\.setAttribute\('content', s\.meta_desc\)/.test(html)) found.push('kein Skript setzt die meta description');
+  return found;
+}
+
+for (const page of ['index.html', 'install.html']) {
+  test(`${page}: die meta description folgt der Sprache`, () => {
+    assert.deepEqual(metaDescFindings(read(page)), []);
+  });
+}
+
+/**
+ * Beleg-Links: "0 trackers" fuehrt auf die vollstaendige Outbound-Liste der
+ * README (je Sprache), der Quelltext-Link auf die Datei, die die
+ * Versionspruefung wirklich macht.
+ */
+function proofLinkFindings(html) {
+  const found = [];
+  const proof = html.match(/<a class="pi proof-link"([^>]*)>/);
+  if (!proof) return ['"0 trackers"-Link nicht gefunden'];
+  const readmes = { en: ['README.md', /\*\*Outbound\*\*/], de: ['README.de.md', /\*\*Nach außen\*\*/] };
+  for (const [lang, [file, item]] of Object.entries(readmes)) {
+    const href = (proof[1].match(new RegExp(`data-href-${lang}="([^"]+)"`)) || [])[1] || '';
+    const m = href.match(/^https:\/\/github\.com\/ulsklyc\/yuvomi(?:\/blob\/main\/([\w.-]+))?#([\w-]+)$/);
+    if (!m) { found.push(`${lang}: ${href || 'kein data-href'} zeigt nicht in eine README`); continue; }
+    if ((m[1] || 'README.md') !== file) { found.push(`${lang}: ${href} ist nicht ${file}`); continue; }
+    const md = repo(file);
+    if (!markdownAnchors(md).has(m[2])) { found.push(`${lang}: Anker #${m[2]} fehlt in ${file}`); continue; }
+    const section = md.split(/^## /m).find((s) => githubSlug(s.split('\n')[0]) === m[2]) || '';
+    if (!item.test(section)) found.push(`${lang}: Abschnitt #${m[2]} in ${file} fuehrt die Outbound-Liste nicht`);
+  }
+  const code = html.match(/<a class="tb-proof" href="([^"]+)" data-t="tb_out_code">/);
+  if (!code) found.push('Quelltext-Link nicht gefunden');
+  else if (!code[1].startsWith(REPO_BLOB)) found.push(`${code[1]} zeigt nicht ins Repository`);
+  else {
+    const file = resolve(ROOT, code[1].slice(REPO_BLOB.length));
+    if (!existsSync(file) || !/api\.github\.com\/repos\/ulsklyc\/yuvomi\/releases/.test(readFileSync(file, 'utf8'))) {
+      found.push(`${code[1]} enthaelt die Versionspruefung nicht`);
+    }
+  }
+  return found;
+}
+
+test('index.html: jeder Beleg-Link fuehrt auf das, was die Aussage belegt', () => {
+  const html = read('index.html');
+  assert.deepEqual(proofLinkFindings(html), []);
+  for (const [lang, text] of bothLangs(html, 'tb_out_code')) {
+    assert.match(text, lang === 'en' ? /update check/i : /Versionsprüfung/, `tb_out_code (${lang}) sagt nicht, was hinter dem Link steht`);
+  }
+});
+
+/** Trennpunkte der Proof-Leiste stehen nicht als Text im Markup und nicht im Sternskript. */
+function proofSeparatorFindings(html, starScript) {
+  const found = [];
+  const bar = (stripComments(html).match(/<div class="proof">([\s\S]*?)\n<\/div>/) || [])[1];
+  if (!bar) return ['Proof-Leiste nicht gefunden'];
+  if (/·/.test(stripTags(bar))) found.push('Trennpunkt als Text in der Proof-Leiste (bleibt beim Umbruch am Zeilenende stehen)');
+  const rule = (starScript.match(/gh-stars-proof[\s\S]*?replacement:\s*`([^`]*)`/) || [])[1];
+  if (rule === undefined) found.push('Proof-Muster in update-gh-stars.mjs nicht gefunden');
+  else if (/·/.test(rule)) found.push('update-gh-stars.mjs schreibt den Trennpunkt zurueck in die Proof-Leiste');
+  return found;
+}
+
+/** Die englische Zusammenfassung im Impressum verlinkt die englische Datenschutzerklaerung. */
+function enSummaryLinks(html) {
+  const summary = (html.match(/<p lang="en" class="en-summary">([\s\S]*?)<\/p>/) || [])[1];
+  return summary === undefined ? null : [...summary.matchAll(/href="([^"]+)"/g)].map((m) => m[1]);
+}
+
+test('impressum.html: die englische Zusammenfassung verlinkt die englische Datenschutzerklaerung', () => {
+  const links = enSummaryLinks(read('impressum.html'));
+  assert.ok(links && links.length, 'en-summary nicht gefunden - Muster veraltet?');
+  assert.deepEqual(links.filter((h) => h === 'datenschutz.html'), [], 'englischer Text verlinkt den deutschen Rechtstext');
+  assert.ok(links.includes('privacy.html'), 'en-summary verlinkt privacy.html nicht');
+});
+
+test('index.html: die Proof-Leiste traegt ihre Trennpunkte im CSS, nicht im Text', () => {
+  assert.deepEqual(proofSeparatorFindings(read('index.html'), repo('scripts/update-gh-stars.mjs')), []);
+});
+
+test('die Such-, Symbol- und Beleg-Guards erkennen den Schaden, gegen den sie gebaut sind', () => {
+  const html = read('index.html');
+  const built = builtArchitectures();
+  // JSON-LD: kaputtes JSON, falsche url, ungebaute Architektur.
+  const brokenJson = html.replace('"@type": "SoftwareApplication",', '"@type": "SoftwareApplication"');
+  assert.notEqual(brokenJson, html);
+  assert.match(jsonLdFindings(brokenJson, { built }).join(), /nicht parsebar/);
+  const wrongUrl = html.replace('"url": "https://yuvomi.cloud/"', '"url": "https://yuvomi.cloud/de/"');
+  assert.notEqual(wrongUrl, html);
+  assert.match(jsonLdFindings(wrongUrl, { built }).join(), /nicht das canonical/);
+  assert.match(jsonLdFindings(html, { built: new Set(['amd64']) }).join(), /ungebaute Architektur: arm64/);
+  assert.match(unbuiltArchitectures('about 500 MB, for amd64, arm64 and armv7', built).join(), /armv7/);
+  // Symbole: Link entfernt, Datei falsch benannt.
+  assert.deepEqual(iconFindings(html.replace(/\s*<link rel="apple-touch-icon"[^>]*>/, '')), ['apple-touch-icon fehlt']);
+  assert.deepEqual(iconFindings(html.replace('href="favicon-32.png"', 'href="favicon.png"')), ['favicon.png: Datei fehlt in docs/']);
+  // Sitemap: eine Seite fehlt, robots ohne Zeile.
+  const pages = PAGES.map((p) => [p, read(p)]);
+  const lessMap = read('sitemap.xml').replace(/\s*<url><loc>https:\/\/yuvomi\.cloud\/impressum\.html<\/loc><\/url>/, '');
+  assert.deepEqual(sitemapFindings(lessMap, read('robots.txt'), pages), ['impressum.html (https://yuvomi.cloud/impressum.html) fehlt in der Sitemap']);
+  assert.deepEqual(sitemapFindings(read('sitemap.xml'), 'User-agent: *\nAllow: /\n', pages), ['robots.txt ohne Sitemap-Zeile']);
+  // meta description: das Skript setzt sie nicht mehr.
+  const noSwitch = html.replace(/document\.querySelector\('meta\[name="description"\]'\)\.setAttribute\('content', s\.meta_desc\);/, '');
+  assert.notEqual(noSwitch, html);
+  assert.deepEqual(metaDescFindings(noSwitch), ['kein Skript setzt die meta description']);
+  // Beleg-Links: der Anlassfall (Datenschutzerklaerung der Website) und eine Einzeldatei ohne Pruefung.
+  const oldProof = html.replace(/(<a class="pi proof-link"[^>]*?)data-href-en="[^"]+"/, '$1data-href-en="privacy.html"');
+  assert.notEqual(oldProof, html);
+  assert.match(proofLinkFindings(oldProof).join(), /en: privacy\.html zeigt nicht in eine README/);
+  const otherFile = html.replace(/server\/routes\/changelog\.js" data-t="tb_out_code"/, 'server/routes/weather.js" data-t="tb_out_code"');
+  assert.notEqual(otherFile, html);
+  assert.match(proofLinkFindings(otherFile).join(), /enthaelt die Versionspruefung nicht/);
+  // Trennpunkte: als Text zurueck, und das Sternskript schreibt ihn wieder.
+  const textSep = html.replace('<span class="pi"><b>24</b>', '<span class="sep">·</span>\n    <span class="pi"><b>24</b>');
+  assert.notEqual(textSep, html);
+  assert.equal(proofSeparatorFindings(textSep, repo('scripts/update-gh-stars.mjs')).length, 1);
+  const oldScript = repo('scripts/update-gh-stars.mjs').replace(/(gh-stars-proof[\s\S]*?replacement:\s*`)\$1\$\{stars\}\$2`/, '$1$1${stars} ·$2`');
+  assert.notEqual(oldScript, repo('scripts/update-gh-stars.mjs'));
+  assert.deepEqual(proofSeparatorFindings(html, oldScript), ['update-gh-stars.mjs schreibt den Trennpunkt zurueck in die Proof-Leiste']);
+  // Impressum: der Anlassfall.
+  const imp = read('impressum.html');
+  const oldImp = imp.replace(/(<p lang="en" class="en-summary">[\s\S]*?)href="privacy\.html"/, '$1href="datenschutz.html"');
+  assert.notEqual(oldImp, imp);
+  assert.ok(enSummaryLinks(oldImp).includes('datenschutz.html') && !enSummaryLinks(oldImp).includes('privacy.html'));
 });

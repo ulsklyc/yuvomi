@@ -32,7 +32,31 @@
   <meta name="twitter:description" content="Tasks, shopping, meals, calendar, budget - for families, couples and one-person households. All self-hosted, no cloud dependency.">
   <meta name="twitter:image" content="https://yuvomi.cloud/twitter-image.png">
   <link rel="canonical" href="https://yuvomi.cloud/">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/svg+xml" href="logo.svg">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <!-- Strukturierte Daten fuer Suchmaschinen. Jede Angabe hat eine Quelle im
+       Repository, und test:docs-landing prueft sie dagegen: Lizenz = LICENSE,
+       Architekturen = platforms in .github/workflows/docker-publish.yml,
+       url = canonical, image = eine Datei in docs/. Keine softwareVersion:
+       die veraltete mit jedem Release, ohne dass jemand hierher schaut.
+       Ein ld+json-Block ist Daten, kein Skript - die CSP greift nicht. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Yuvomi",
+    "description": "Self-hosted, privacy-first planner for families, couples and one-person households. Tasks, meals, calendar sync, budget - one private home, no subscriptions.",
+    "url": "https://yuvomi.cloud/",
+    "image": "https://yuvomi.cloud/og-image.png",
+    "applicationCategory": "HomeApplication",
+    "operatingSystem": "Linux container (Docker or Podman) on amd64 or arm64; used in any modern browser",
+    "license": "https://github.com/ulsklyc/yuvomi/blob/main/LICENSE",
+    "isAccessibleForFree": true,
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+    "sameAs": ["https://github.com/ulsklyc/yuvomi"]
+  }
+  </script>
   <!-- Vor dem ersten Bild: `js`, Sprache und gespeichertes Theme. Die drei
        standen bis 2026-09-29 erst im Skript am Dateiende, also nach dem
        letzten Byte. Bis dahin malte die Seite ohne `js` (Sprach- und
@@ -77,8 +101,12 @@
        ACHTUNG bei der Zahl: `ch` ist die Breite der NULL, nicht die des
        Durchschnittszeichens - in dieser Schrift rund 18 % zu breit. 72ch ergab
        gemessen 85 bis 91 Zeichen pro Zeile, also genau die Sorte Kommentar, die
-       eine Zahl behauptet, die das Bauteil nicht liefert. 60ch trifft die
-       gemeinten ~72. Wer den Wert anfasst, misst nach, statt zu rechnen. */
+       eine Zahl behauptet, die das Bauteil nicht liefert. 60ch traf ~72 nur
+       an .gal-cap; .long-item dd lief damit 85 Zeichen, .fam-text p mobil 88
+       und .sec-desc (damals 56ch als Literal) 83. Seit 2026-09-29 gilt 52ch
+       fuer alle, auch .sec-desc: gemessen 62 bis 78 Zeichen, Schnitt 64-71
+       (1440 und 1024px, EN und DE). Wer den Wert anfasst, misst nach, statt
+       zu rechnen. */
     :root {
       /* Die Rasterstufe (1152px) fuehrt .wrap selbst: --maxw minus zweimal
          24px Polster. Sie steht hier bewusst NICHT als eigenes Token - zwei
@@ -86,7 +114,7 @@
       --m-list: 900px;    /* zweispaltige Zeilen (.ho-list): mehr als Lesetext, weniger als Raster */
       --m-read: 780px;    /* Sektionskopf mit Fliesstextkoerper */
       --m-narrow: 640px;  /* zentrierter Kopf ohne Koerper */
-      --m-prose: 60ch;    /* jeder Fliesstextabsatz - gemessen ~72 Zeichen, s.o. */
+      --m-prose: 52ch;    /* jeder Fliesstextabsatz - gemessen hoechstens 78 Zeichen, s.o. */
     }
 
     /* scroll-padding-bottom: was per Tab fokussiert wird, scrollt der Browser
@@ -253,7 +281,7 @@
       letter-spacing: -0.035em; margin: 16px 0 14px; text-wrap: balance;
     }
     .sec-title em { font-style: italic; font-weight: 600; color: var(--accent); }
-    .sec-desc { font-size: 1.075rem; color: var(--text-2); line-height: 1.65; max-width: 56ch; }
+    .sec-desc { font-size: 1.075rem; color: var(--text-2); line-height: 1.65; max-width: var(--m-prose); }
     .sec-head.center .sec-desc { margin-left: auto; margin-right: auto; }
     /* Four heads sit flush left under an eyebrow - see it (gallery), this is
        what it replaces (swap), it fits together (handoffs), it outlives us
@@ -289,7 +317,9 @@
       background: var(--glass-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
       border: 1px solid var(--border); box-shadow: var(--shadow-sm); margin-bottom: 26px;
     }
-    .hero-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--m-tasks); box-shadow: 0 0 0 3px color-mix(in srgb, var(--m-tasks) 22%, transparent); }
+    /* Akzent statt --m-tasks: der Punkt markiert einen Status (frei, offen),
+       kein Modul - dieselbe Vokabelregel wie an .plat-badge unten. */
+    .hero-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
     .hero h1 {
       font-size: clamp(2.7rem, 6vw, 4.4rem); font-weight: 700; line-height: 1.03;
       letter-spacing: -0.04em; margin-bottom: 22px; text-wrap: balance;
@@ -327,12 +357,19 @@
 
     /* ===== Proof bar ===== */
     .proof { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--bg-alt); }
-    .proof .wrap { display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
-      gap: 10px 18px; padding: 16px 24px; font-size: 0.84rem; font-weight: 600; color: var(--text-2); }
+    .proof .wrap { --proof-gap: 36px; display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+      gap: 10px var(--proof-gap); padding: 16px 24px; font-size: 0.84rem; font-weight: 600; color: var(--text-2); }
     .proof b { color: var(--text-1); font-variant-numeric: tabular-nums; }
-    /* Decorative, but still a text node a screen reader can reach and a sighted
-       user squints at: lift it to the same tone as the surrounding labels. */
-    .proof .sep { color: var(--text-3); }
+    /* Der Trennpunkt sitzt absolut in der Spaltenluecke vor seinem Eintrag und
+       nimmt keinen Platz ein. Deshalb kann das Skript ihn am Zeilenanfang
+       ausblenden (.line-start), ohne dass sich der Umbruch dadurch verschiebt.
+       `/ ''` haelt ihn aus der Sprachausgabe; die erste Zeile ist der Rueckfall
+       fuer Browser ohne Alternativtext im content. Ohne Skript steht er am
+       Zeilenanfang - wie vorher am Zeilenende, nur nicht schlimmer. */
+    .proof .pi { position: relative; }
+    .proof .pi + .pi::before { content: '·'; content: '·' / ''; position: absolute; top: 50%;
+      left: calc(var(--proof-gap) / -2); transform: translate(-50%, -50%); color: var(--text-3); }
+    .proof .pi.line-start::before { visibility: hidden; }
     /* Die staerkste Behauptung der Seite verlinkte drei Laeufe lang auf nichts. */
     .proof-link { color: inherit; text-decoration: underline; text-underline-offset: 3px;
       text-decoration-color: var(--border-strong); min-height: 44px; display: inline-flex; align-items: center; gap: 4px; }
@@ -362,7 +399,7 @@
     }
     /* Neben dem Kicker lief die Unterschrift bis 2026-09-29 ueber die ganze
        Spalte: 131 Zeichen (EN) bzw. 150 (DE) in EINER Zeile bei 1440px.
-       --m-prose ist die Fliesstextstufe der Seite (gemessen ~72 Zeichen). */
+       --m-prose ist die Fliesstextstufe der Seite (gemessen hoechstens 78 Zeichen). */
     .gal-cap p { font-size: 1.02rem; color: var(--text-2); line-height: 1.5; margin: 0; max-width: var(--m-prose); }
     .gal-cap b { color: var(--text-1); font-weight: 600; }
     .gal-frame { position: relative; border-radius: var(--r-xl); }
@@ -1053,7 +1090,7 @@
       <button class="nav-btn" id="langBtn" type="button" aria-label="Switch language"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z"/></svg><span id="langLbl">DE</span></button>
       <button class="nav-btn" id="themeBtn" type="button" aria-label="Toggle theme" aria-pressed="false"><svg aria-hidden="true" id="sunIco" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><svg aria-hidden="true" id="moonIco" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
       <a href="install.html" class="nav-btn nav-install"><span data-t="nav_install">Install</span></a>
-      <a href="https://github.com/ulsklyc/yuvomi" class="nav-btn nav-gh" target="_blank" rel="noopener"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg><span data-t="nav_gh">GitHub</span><span id="gh-stars-nav" data-gh-stars>&nbsp;★ 1.5k</span></a>
+      <a href="https://github.com/ulsklyc/yuvomi" class="nav-btn nav-gh" target="_blank" rel="noopener"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg><span data-t="nav_gh">GitHub</span><span id="gh-stars-nav" data-gh-stars>&nbsp;★ 1.6k</span></a>
     </div>
   </div>
 </nav>
@@ -1125,19 +1162,22 @@
 
 <!-- PROOF -->
 <div class="proof">
+  <!-- Die Trennpunkte sind kein Markup mehr, sondern ::before an jedem
+       Eintrag ausser dem ersten (Regel .proof .pi). Als eigene Elemente
+       blieben sie beim Umbruch am Zeilenende stehen - mobil "★ 1.6k ·" allein
+       in der ersten Zeile. Das Skript unter der Leiste blendet den Punkt am
+       Anfang jeder Zeile aus. -->
   <div class="wrap">
-    <span id="gh-stars-proof" data-gh-stars>★ 1.5k ·</span>
-    <span><b>20</b> <span data-t="proof_modules">modules</span></span>
-    <span class="sep">·</span>
-    <span><b>24</b> <span data-t="proof_langs">languages</span></span>
-    <span class="sep">·</span>
+    <span class="pi"><span id="gh-stars-proof" data-gh-stars>★ 1.6k</span></span>
+    <span class="pi"><b>20</b> <span data-t="proof_modules">modules</span></span>
+    <span class="pi"><b>24</b> <span data-t="proof_langs">languages</span></span>
     <!-- "0 trackers" is the strongest claim on the page for a privacy product and
-         stays on phones, where it used to be the one that got dropped. -->
-    <a class="proof-link" href="privacy.html" data-href-en="privacy.html" data-href-de="datenschutz.html"><b>0</b> <span data-t="proof_telemetry">trackers</span></a>
-    <span class="sep">·</span>
-    <span data-t="proof_mit">MIT licensed</span>
-    <span class="sep ver">·</span>
-    <span class="ver"><b>v2.69.1</b></span>
+         stays on phones, where it used to be the one that got dropped. It links
+         the app's full list of outbound connections (README, "Outbound"), not
+         the website's privacy policy: the claim is about the app. -->
+    <a class="pi proof-link" href="https://github.com/ulsklyc/yuvomi#install" data-href-en="https://github.com/ulsklyc/yuvomi#install" data-href-de="https://github.com/ulsklyc/yuvomi/blob/main/README.de.md#installieren"><b>0</b> <span data-t="proof_telemetry">trackers</span></a>
+    <span class="pi" data-t="proof_mit">MIT licensed</span>
+    <span class="pi ver"><b>v2.69.1</b></span>
   </div>
 </div>
 
@@ -1211,10 +1251,11 @@
       nav_main:'Main', foot_nav:'Footer', code_label:'Command block',
       copy:'Copy', copied:'Copied!', copyfail:'Copy failed',
       nav_gh:'GitHub', nav_install:'Install',
+      meta_desc:'Self-hosted, privacy-first planner for families, couples and one-person households. Tasks, meals, calendar sync, budget - one private home, no subscriptions.',
       hero_badge:'Open source · free · no subscriptions',
       hero_h1_pre:'One home', hero_h1_em:'instead of many subscriptions.',
       hero_sub:'The self-hosted family planner: tasks, calendar, budget and shopping on a server you own. For a family, a couple, or just you.',
-      long_eyebrow:'Before you commit', tb_image_k:'Image', tb_image_v:'about 500 MB',
+      long_eyebrow:'Before you commit', tb_image_k:'Image', tb_image_v:'about 500 MB, for amd64 and arm64 - Raspberry\u00a0Pi\u00a04\u00a0and\u00a05 included',
       tb_needs_k:'Needs', tb_needs_v:'256 MB RAM and one port, 3000 by default.',
       tb_writes_k:'Writes', tb_writes_v:'Four volumes you own: data, backups, modules, documents.',
       tb_out_k:'Outbound', tb_out_v:'Out of the box, one update check against the GitHub releases API. Everything else reaches out only when you use or switch on a feature that needs it.',
@@ -1256,7 +1297,7 @@
       m_backup_t:'Backup', m_backup_d:'Scheduled backups with optional WebDAV upload (Nextcloud, ownCloud, Hetzner, etc.). Every restore saves the current state first, and a backup from another installation restores in the browser, no shell needed.', plat_title:'Runs on <em>your</em> hardware',
       plat_desc:"A Docker or Podman container that drops onto any home server or NAS. Or install it in a couple of clicks from your platform's app store.",
       plat_docker:'Pre-built image, one <code>compose</code> command - or rootless with Podman on RHEL, Fedora and CentOS Stream.',
-      tb_out_proof:'What the site itself stores', tb_out_code:'Read the server source',
+      tb_out_proof:'What the site itself stores', tb_out_code:'The update check in the source',
       plat_more:'Two more routes need no platform of their own: the <a href="install.html#installer">guided web installer</a> and <a href="install.html#source">installing from source</a>.',
       plat_proxmox:'A Debian LXC with <code>nesting=1</code>, or a plain VM, running the Docker path.',
       plat_truenas:'In the SCALE Community Apps catalog: install from the web UI, no terminal.',
@@ -1333,10 +1374,11 @@
       nav_main:'Hauptnavigation', foot_nav:'Fußzeile', code_label:'Befehlsblock',
       copy:'Kopieren', copied:'Kopiert!', copyfail:'Nicht kopiert',
       nav_gh:'GitHub', nav_install:'Installieren',
+      meta_desc:'Selbstgehosteter Planer mit Datenschutz zuerst, für Familien, Paare und Ein-Personen-Haushalte. Aufgaben, Essen, Kalender-Sync, Budget - ein privates Zuhause, keine Abos.',
       hero_badge:'Open Source · kostenlos · keine Abos',
       hero_h1_pre:'Ein Zuhause', hero_h1_em:'statt vieler Abos.',
       hero_sub:'Der selbstgehostete Familienplaner: Aufgaben, Kalender, Budget und Einkauf auf einem Server, der euch gehört. Für eine Familie, ein Paar oder euch allein.',
-      long_eyebrow:'Bevor ihr euch festlegt', tb_image_k:'Image', tb_image_v:'rund 500 MB',
+      long_eyebrow:'Bevor ihr euch festlegt', tb_image_k:'Image', tb_image_v:'rund 500 MB, für amd64 und arm64 - auch Raspberry\u00a0Pi\u00a04\u00a0und\u00a05',
       tb_needs_k:'Braucht', tb_needs_v:'256 MB RAM und einen Port, standardmäßig 3000.',
       tb_writes_k:'Legt an', tb_writes_v:'Vier Volumes, die euch gehören: Daten, Backups, Module, Dokumente.',
       tb_out_k:'Nach außen', tb_out_v:'Ab Werk eine Update-Abfrage an die GitHub-Releases-API. Alles andere geht erst nach außen, wenn ihr eine Funktion nutzt oder einschaltet, die es braucht.',
@@ -1375,7 +1417,7 @@
       m_backup_t:'Backup', m_backup_d:'Geplante Backups mit optionalem WebDAV-Upload (Nextcloud, ownCloud, Hetzner\xa0usw.). Vor jeder Wiederherstellung wird der aktuelle Stand gesichert, und ein Backup einer anderen Installation spielt ihr ohne Shell im Browser ein.', plat_title:'Läuft auf <em>eurer</em> Hardware',
       plat_desc:'Ein Docker- oder Podman-Container, der auf jeden Heimserver oder jedes NAS passt. Oder in wenigen Klicks aus dem App-Store eurer Plattform.',
       plat_docker:'Fertiges Image, ein <code>compose</code>-Befehl - oder rootless mit Podman auf RHEL, Fedora und CentOS Stream.',
-      tb_out_proof:'Was die Website selbst speichert', tb_out_code:'Serverquelltext lesen',
+      tb_out_proof:'Was die Website selbst speichert', tb_out_code:'Die Versionsprüfung im Quelltext',
       plat_more:'Zwei weitere Wege brauchen keine eigene Plattform: der <a href="install.html#installer">geführte Web-Installer</a> und die <a href="install.html#source">Installation aus dem Quelltext</a>.',
       plat_proxmox:'Ein Debian-LXC mit <code>nesting=1</code> oder eine schlichte VM, in der der Docker-Weg läuft.',
       plat_truenas:'Im SCALE Community Apps Catalog: Installation über die Web-UI, kein Terminal.',
@@ -1435,10 +1477,10 @@
      ersten Bildschirm und von applyLang() fuer die ganze Seite. Mehrfach
      aufgerufen ist es harmlos: derselbe Schluessel setzt denselben Text. */
   function applyTexts(lang){
-    /* Die Datenschutzerklaerung gibt es in zwei Fassungen. Der Link muss der
-       Sprache folgen, sonst schickt die englische Seite ihren einzigen Beleg
-       fuer "0 trackers" auf einen deutschen Rechtstext - vier Laeufe lang der
-       Fall, weil es die englische Fassung nicht gab. */
+    /* Links mit zwei Fassungen (Datenschutzerklaerung, README) folgen der
+       Sprache. Sonst schickt die englische Seite ihre Belege auf einen
+       deutschen Text - vier Laeufe lang der Fall, weil es die englische
+       Datenschutzerklaerung nicht gab. */
     document.querySelectorAll('[data-href-' + lang + ']').forEach(function(a){
       a.setAttribute('href', a.getAttribute('data-href-' + lang));
     });
@@ -1448,6 +1490,11 @@
     var lb = document.getElementById('langBtn');
     lb.setAttribute('aria-label', lang === 'en' ? 'Auf Deutsch umschalten' : 'Switch to English');
     lb.setAttribute('title', lang === 'en' ? 'Auf Deutsch umschalten' : 'Switch to English');
+    /* Die Beschreibung folgt der Sprache wie der Titel; bis 2026-09-29 blieb
+       sie englisch, waehrend der Rest der Seite deutsch sprach. Der Wert im
+       Markup ist der englische Eintrag (test:docs-landing), weil Vorschauen
+       beim Teilen kein Skript ausfuehren. */
+    document.querySelector('meta[name="description"]').setAttribute('content', s.meta_desc);
     /* Alt text is content, not chrome: it stayed English on a de-labelled page,
        so German screen-reader users got English image descriptions. */
     document.querySelectorAll('[data-alt-t]').forEach(function(img){ var k = img.getAttribute('data-alt-t'); if (s[k] !== undefined) img.alt = s[k]; });
@@ -1466,6 +1513,33 @@
     if (!h.classList.contains('i18n-wait')) return;
     try { applyTexts(h.lang === 'de' ? 'de' : 'en'); } finally { h.classList.remove('i18n-wait'); }
   })(document.documentElement);
+  /* Proof-Leiste: der Eintrag, der eine neue Zeile beginnt, zeigt keinen
+     Trennpunkt. Neue Zeile heisst: sein oberer Rand liegt unter dem unteren
+     des Vorgaengers - mittig ausgerichtete Eintraege verschiedener Hoehe (der
+     Link ist 44px hoch) stehen auf derselben Zeile nie so. Der Punkt nimmt
+     keinen Platz ein, das Umschalten verschiebt also keinen Umbruch. Die
+     Beobachtung faengt Breite, Sprache (Eintragsbreite) und das Ausblenden der
+     Version unter 560px. */
+  (function(){
+    var wrap = document.querySelector('.proof .wrap');
+    if (!wrap) return;
+    var items = [].slice.call(wrap.querySelectorAll('.pi'));
+    function mark(){
+      var prev = null;
+      items.forEach(function(el){
+        if (!el.offsetParent) return;
+        var r = el.getBoundingClientRect();
+        el.classList.toggle('line-start', !!prev && r.top >= prev.bottom);
+        prev = r;
+      });
+    }
+    mark();
+    if ('ResizeObserver' in window) {
+      var ro = new ResizeObserver(mark);
+      ro.observe(wrap);
+      items.forEach(function(el){ ro.observe(el); });
+    }
+  })();
 </script>
 
 <!-- GALLERY - show before telling. This sits at position 2 because the first
@@ -1980,11 +2054,14 @@
 
     <div class="quick-docker reveal">
       <ul class="trust-bar">
-        <li><b data-t="tb_image_k">Image</b> <span><code>ghcr.io/ulsklyc/<wbr>yuvomi:latest</code>, <span data-t="tb_image_v">about 500 MB</span></span></li>
+        <!-- Architekturen: `platforms` in .github/workflows/docker-publish.yml
+             (test:docs-landing haelt beide Seiten gleich), Raspberry Pi 4/5:
+             docs/installation.md, "System Requirements". -->
+        <li><b data-t="tb_image_k">Image</b> <span><code>ghcr.io/ulsklyc/<wbr>yuvomi:latest</code>, <span data-t="tb_image_v">about 500 MB, for amd64 and arm64 - Raspberry&nbsp;Pi&nbsp;4&nbsp;and&nbsp;5 included</span></span></li>
         <li><b data-t="tb_needs_k">Needs</b> <span data-t="tb_needs_v">256 MB RAM and one port, 3000 by default.</span></li>
         <li><b data-t="tb_writes_k">Writes</b> <span data-t="tb_writes_v">Four volumes you own: data, backups, modules, documents.</span></li>
         <li class="tb-wide"><b data-t="tb_data_k">Your data</b> <span><span data-t="tb_data_v">One SQLite file at</span> <code>/data/yuvomi.db</code>. <span data-t="tb_data_v2">Copying it is the whole export, unless documents live outside the database.</span></span></li>
-        <li class="tb-wide"><b data-t="tb_out_k">Outbound</b> <span><span data-t="tb_out_v">Out of the box, one update check against the GitHub releases API. Everything else reaches out only when you use or switch on a feature that needs it.</span> <details class="tb-more"><summary><span data-t="tb_out_more">Which features</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary><span data-t="tb_out_list">Opening the calendar settings loads the list of holiday countries from openholidaysapi.org, finding a logo for a subscription looks up the service’s website, and weather, public holidays, exchange rates, calendar and contact sync, recipe mirrors, Immich, Paperless or Papra, push and notification channels, cloud storage and backup connect once you switch them on.</span></details> <a class="tb-proof" href="privacy.html" data-href-en="privacy.html" data-href-de="datenschutz.html" data-t="tb_out_proof">What the site itself stores</a><span class="tb-sep" aria-hidden="true"> · </span><a class="tb-proof" href="https://github.com/ulsklyc/yuvomi/blob/main/server/routes/changelog.js" data-t="tb_out_code">Read the server source</a></span></li>
+        <li class="tb-wide"><b data-t="tb_out_k">Outbound</b> <span><span data-t="tb_out_v">Out of the box, one update check against the GitHub releases API. Everything else reaches out only when you use or switch on a feature that needs it.</span> <details class="tb-more"><summary><span data-t="tb_out_more">Which features</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary><span data-t="tb_out_list">Opening the calendar settings loads the list of holiday countries from openholidaysapi.org, finding a logo for a subscription looks up the service’s website, and weather, public holidays, exchange rates, calendar and contact sync, recipe mirrors, Immich, Paperless or Papra, push and notification channels, cloud storage and backup connect once you switch them on.</span></details> <a class="tb-proof" href="privacy.html" data-href-en="privacy.html" data-href-de="datenschutz.html" data-t="tb_out_proof">What the site itself stores</a><span class="tb-sep" aria-hidden="true"> · </span><a class="tb-proof" href="https://github.com/ulsklyc/yuvomi/blob/main/server/routes/changelog.js" data-t="tb_out_code">The update check in the source</a></span></li>
       </ul>
       <div class="code-wrap"><div class="code-block"><span class="comment" data-t="qs_c1"># Pre-built image - Docker</span>
 curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml
@@ -2072,7 +2149,7 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       </nav>
     </div>
     <div class="foot-bottom">
-      <span><span id="gh-stars-footer" data-gh-stars>★ 1.5k · </span><b>v2.69.1</b> · <span id="foot-released" data-released="2026-09-23">23 September 2026</span></span>
+      <span><span id="gh-stars-footer" data-gh-stars>★ 1.6k · </span><b>v2.69.1</b> · <span id="foot-released" data-released="2026-09-23">23 September 2026</span></span>
       <span data-t="foot_madewith">Self-hosted · Privacy-first · Open source</span>
     </div>
   </div>

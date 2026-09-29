@@ -772,6 +772,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   text wrap at a readable width, and the German page no longer shows English first and then jumps
   on a slow connection. The legal pages share the install page's header and footer links.
 
+- **The website's evidence links show what they claim.** "0 trackers" now opens the README's
+  full list of outbound connections instead of the website's own privacy policy, and the source
+  link says it leads to the update check. The quick start names the image's architectures, amd64
+  and arm64 including Raspberry Pi 4 and 5. Every page has a home-screen and PNG icon, search
+  engines get a sitemap and a description of the app, the German page carries a German
+  description, and on a phone no separator dot is left hanging at the end of the stats line. The
+  English note on the imprint links the English privacy policy.
+
 - **Wall mode can be left on a phone** (#1559). "Leave wall mode" was below the bottom edge on
   phones and showed only a grey icon until the screen was touched, and the back button closed the
   app instead of leaving wall mode, which was still on at the next start. The exit now stays at the
