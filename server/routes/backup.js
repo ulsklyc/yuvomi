@@ -222,7 +222,7 @@ router.post('/webdav/test', requireAdmin, async (req, res) => {
     const overrides = {};
     if (url)        overrides.url        = url;
     if (username)   overrides.username   = username;
-    if (password && password !== '****') overrides.password = password;
+    if (password && password !== webdavBackup.PASSWORD_MASK) overrides.password = password;
     if (remotePath) overrides.remotePath = remotePath;
 
     const result = await webdavBackup.testConnection(overrides);

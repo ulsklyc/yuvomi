@@ -1167,7 +1167,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the stored password is kept only while the server (scheme, host and port) and the username stay
   the same. Otherwise the test and the save are refused with `400` and the error code
   `password_required`, no connection is made and nothing is saved, and the form asks for the
-  password again. A different path on the same server keeps working without it.
+  password again. A different path on the same server keeps working without it. The mask `****`
+  the API shows in place of the password now counts as "unchanged" when it is sent back; until
+  then saving it through the API replaced the stored password with the mask itself.
 
 - **A CalDAV account moved to another server or username needs its password again.** Editing an
   account through the API with a new server address but without a password tested the connection

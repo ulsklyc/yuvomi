@@ -102,6 +102,14 @@ function envValue(raw) {
   return raw !== undefined && String(raw).trim() !== '' ? String(raw) : undefined;
 }
 
+/**
+ * Die Maske, mit der `getStatus()` ein gespeichertes Passwort ausliefert. Sie
+ * ist nie ein Passwort: ein Client, der das Formular unveraendert zurueckschickt,
+ * sendet genau diesen Wert, und er darf das gespeicherte weder ueberschreiben
+ * noch als neues Passwort fuer einen neuen Server gelten (`passwordRequired`).
+ */
+export const PASSWORD_MASK = '****';
+
 export function getConfig() {
   const envEnabled = envValue(ENV_ENABLED);
   const enabled = envEnabled !== undefined
@@ -130,13 +138,13 @@ export function getConfig() {
  * Passwort: sonst schickte der Verbindungstest das gespeicherte Passwort per
  * Basic Auth an die neue Adresse, und ein gespeicherter Wechsel taete es beim
  * naechsten Backup. Ein anderer Pfad auf demselben Server braucht nichts.
- * `****` ist die Maske aus `getStatus()` und zaehlt nicht als Passwort.
+ * Die Maske aus `getStatus()` (`PASSWORD_MASK`) zaehlt nicht als Passwort.
  *
  * @param {{ url?: string|null, username?: string|null, password?: string|null }} next
  * @returns {boolean}
  */
 export function passwordRequired({ url, username, password } = {}) {
-  if (typeof password === 'string' && password !== '' && password !== '****') return false;
+  if (typeof password === 'string' && password !== '' && password !== PASSWORD_MASK) return false;
   const cfg = getConfig();
   if (!cfg.password) return false;
   const nextUrl = typeof url === 'string' ? url.trim() : '';
@@ -167,8 +175,9 @@ export function saveConfig(data) {
     if (data.username) cfgSet('webdav_backup_username', data.username.trim());
     else cfgDelete('webdav_backup_username');
   }
-  // Only overwrite password when a non-empty value is sent
-  if (data.password !== undefined && data.password !== '') {
+  // Nur ein echtes neues Passwort ueberschreibt: leer oder die Maske aus
+  // getStatus() heisst "unveraendert" (bis dahin wurde die Maske gespeichert).
+  if (data.password !== undefined && data.password !== '' && data.password !== PASSWORD_MASK) {
     cfgSet('webdav_backup_password', data.password);
   }
   if (data.remotePath !== undefined) {
@@ -491,7 +500,7 @@ export function getStatus() {
     configured:    Boolean(cfg.url && cfg.username && cfg.password),
     url:           cfg.url,
     username:      cfg.username,
-    password:      cfg.password ? '****' : null,
+    password:      cfg.password ? PASSWORD_MASK : null,
     remotePath:    cfg.remotePath,
     keep:          cfg.keep,
     lastUpload:    cfgGet('webdav_backup_last_upload') ?? null,

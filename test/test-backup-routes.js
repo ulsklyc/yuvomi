@@ -354,6 +354,22 @@ test('PUT /webdav/config: derselbe Server mit anderem Pfad braucht kein Passwort
   assert.equal(back.status, 200);
 });
 
+test('PUT /webdav/config: die Maske aus GET ist kein neues Passwort', async () => {
+  // GET liefert das Passwort als Maske. Ein Client, der das Formular unveraendert
+  // zurueckschickt, sendet genau diesen Wert - er darf das gespeicherte Passwort
+  // weder ueberschreiben noch als neues Passwort fuer einen neuen Server gelten.
+  const storedPassword = () => database().prepare("SELECT value FROM sync_config WHERE key = 'webdav_backup_password'").get()?.value;
+  const mask = (await call('GET', '/webdav/config', { actor: ADM })).body.data.password;
+  assert.equal(storedPassword(), 's3cret', 'Vorbedingung');
+  const same = await call('PUT', '/webdav/config', { actor: ADM, body: { url: davBase, username: 'dav', password: mask } });
+  assert.equal(same.status, 200);
+  assert.equal(storedPassword(), 's3cret', 'die Maske ueberschreibt das gespeicherte Passwort nicht');
+  const moved = await call('PUT', '/webdav/config', { actor: ADM, body: { url: foreignBase, password: mask } });
+  assert.equal(moved.status, 400);
+  assert.equal(moved.body.errorCode, 'password_required');
+  assert.equal(storedPassword(), 's3cret');
+});
+
 test('PUT /webdav/config: neuer Server MIT neuem Passwort wird gespeichert', async () => {
   const r = await call('PUT', '/webdav/config', { actor: ADM, body: { url: foreignBase, password: 'other-secret' } });
   assert.equal(r.status, 200);
