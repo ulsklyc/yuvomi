@@ -3876,7 +3876,8 @@
             "recurring_resumed": "هزینه تکرارشونده از سر گرفته شد",
             "recurring_generated": "هزینه تکرارشونده تولید شد",
             "payment_reversed": "پرداخت برگشت خورد",
-            "ledger_restored": "ثبت بازیابی شد"
+            "ledger_restored": "ثبت بازیابی شد",
+            "ledger_removed": "ثبت حذف شد"
         },
         "splitPercentage": "درصد",
         "splitExact": "مبلغ دقیق",

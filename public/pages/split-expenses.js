@@ -805,13 +805,17 @@ function renderActivity() {
 }
 
 /**
- * Welche Ausgabe Migration v226 wiederhergestellt hat (#1382): Titel und
- * gebuchter Betrag, damit mehrere Eintraege "Buchung wiederhergestellt"
- * unterscheidbar sind. Den Betrag rechnet der Server in `amount` um - er
- * kennt die Nachkommastellen je Waehrung (ISO 4217), der Browser nicht.
+ * Welche Ausgabe Migration v226 wiederhergestellt (#1382) oder v227 entfernt
+ * hat (#1445): Titel und gebuchter Betrag, damit mehrere solcher Eintraege
+ * unterscheidbar sind. Eine entfernte Ausgabe steht in keiner Liste mehr -
+ * was der Eintrag nennt, kommt allein aus seinen Metadaten. Den Betrag
+ * rechnet der Server in `amount` um - er kennt die Nachkommastellen je
+ * Waehrung (ISO 4217), der Browser nicht.
  */
+const LEDGER_REPAIR_ACTIVITY = new Set(['ledger_restored', 'ledger_removed']);
+
 function restoredDetail(item) {
-  if (item.type !== 'ledger_restored' || !item.metadata?.title) return '';
+  if (!LEDGER_REPAIR_ACTIVITY.has(item.type) || !item.metadata?.title) return '';
   const { title, amount, currency } = item.metadata;
   const sum = amount != null && currency ? ` · ${money(amount, currency)}` : '';
   return `<span class="split-activity-payment">${esc(`${title}${sum}`)}</span>`;

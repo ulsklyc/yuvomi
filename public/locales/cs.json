@@ -3406,7 +3406,8 @@
             "recurring_resumed": "Opakující se výdaj obnoven",
             "recurring_generated": "Opakující se výdaj vygenerován",
             "payment_reversed": "Platba stornována",
-            "ledger_restored": "Zaúčtování obnoveno"
+            "ledger_restored": "Zaúčtování obnoveno",
+            "ledger_removed": "Zaúčtování odstraněno"
         },
         "splitPercentage": "Procenta",
         "splitExact": "Přesná částka",
