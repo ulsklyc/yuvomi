@@ -184,7 +184,13 @@ test('#1531 bei geschlossener Verbindung: gedeckte Routen 503, freigestellte ohn
   for (const entry of topLevelLayers()) {
     if (isGlobal(entry)) continue;
     for (const path of entry.paths) {
-      probes.push({ path, url: concretePath(path), covered: needsDatabase(path) });
+      const url = concretePath(path);
+      // Express 5 nimmt einen angehaengten Schraegstrich mehr noch als dieselbe
+      // Route (`/docs/` trifft auch `/docs//`) - das Gate muss dieselbe
+      // Schreibweise sehen wie der Router (Review #1537).
+      for (const variant of [url, `${url}/`]) {
+        probes.push({ path, url: variant, covered: needsDatabase(path) });
+      }
     }
   }
   const restore = await restoreHeldWithDatabaseClosed();

@@ -49,11 +49,14 @@ function isRestorePath(pathOnly) {
  */
 export function needsDatabase(rawPath) {
   const pathOnly = rawPath.toLowerCase();
-  return pathOnly.startsWith('/api/') || pathOnly === '/mcp' || pathOnly.startsWith('/mcp/')
+  // Express 5 nimmt angehaengte Schraegstriche mit (`/openapi.json/`, `/docs//`
+  // erreichen dieselbe Route) - exakte Vergleiche also ohne sie (Review #1537).
+  const bare = pathOnly.replace(/\/+$/, '');
+  return pathOnly.startsWith('/api/') || bare === '/mcp' || pathOnly.startsWith('/mcp/')
     // ICS-Abos lesen Termine, das OpenAPI-Dokument prueft die Sitzung (Review #1431).
-    || pathOnly.startsWith('/feed/') || pathOnly === '/openapi.json'
+    || pathOnly.startsWith('/feed/') || bare === '/openapi.json'
     // Ausserhalb von production prueft /docs Token und Sitzung (#1531).
-    || pathOnly === '/docs' || pathOnly === '/docs/';
+    || bare === '/docs';
 }
 
 function refuse(res, status, error) {
