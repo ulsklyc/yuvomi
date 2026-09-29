@@ -3599,13 +3599,13 @@ function openBudgetModal({ mode, entry = null, initialType = '' }) {
               if (seriesBody.account_id === null && entry.account_id == null) {
                 delete seriesBody.account_id;
               }
-              // Nur ein VORKOMMEN geht durch occurrenceSeriesBody() (#1546): sein
-              // Formular ist mit Spalten-Defaults statt dem Rhythmus der Serie
-              // vorbelegt. Die erste Buchung trägt den Rhythmus wirklich - von
-              // hier aus wird er geändert, und er muss mit.
+              // Ein VORKOMMEN schickt keinen Rhythmus (#1546): sein Formular ist
+              // mit Spalten-Defaults statt dem Rhythmus der Serie vorbelegt. Die
+              // erste Buchung trägt ihn wirklich und schickt ihn mit. Werte gehen
+              // von beiden nur mit, wenn sie hier geändert wurden (#1035).
               await api.put(`/budget/${entry.id}/series`, entry.recurrence_parent_id
                 ? occurrenceSeriesBody(seriesBody, entry)
-                : seriesBody);
+                : anchorSeriesBody(seriesBody, entry));
               window.yuvomi?.showToast(t('budget.recurringSeriesSaved'), 'success');
             } else {
               const res = await api.put(`/budget/${entry.id}`, await withReceipts());
@@ -4499,9 +4499,43 @@ const SERIES_RHYTHM_FIELDS = new Set([
  * @returns {object}
  */
 function occurrenceSeriesBody(body, entry) {
+  return changedSeriesBody(body, entry, { amount: Number(entry.amount), keepRhythm: false });
+}
+
+/**
+ * Der Body fuer "Alle zukuenftigen" von der ERSTEN Buchung aus (#1035).
+ *
+ * Die erste Buchung traegt den Rhythmus der Serie wirklich - er geht mit, von
+ * hier aus wird er geaendert. Ihre WERTE dagegen sind seit #1035 die einer
+ * gebuchten Buchung: nach einem "alle kuenftigen" an einem Vorkommen haelt die
+ * Definition den neuen Titel und Betrag, der Anker weiter den alten, und mit
+ * genau dem ist das Formular vorbelegt. Schickte der Dialog sie alle mit,
+ * schriebe "nur den Rhythmus aendern" die alten Werte still zurueck in die
+ * Serie und in jede Buchung ab heute. Es geht deshalb nur mit, was der Nutzer
+ * hier geaendert hat - wie an einem Vorkommen.
+ *
+ * Verglichen wird mit dem, was das Formular zeigt: bei einer virtuellen Serie
+ * ist das der Periodenbetrag, nicht der Monatsanteil in `amount`.
+ *
+ * @param {object} body   der Body, den der Dialog gebaut hat
+ * @param {object} entry  die erste Buchung der Serie
+ * @returns {object}
+ */
+function anchorSeriesBody(body, entry) {
+  const shown = entry.recurrence_virtual && entry.recurrence_full_amount != null
+    ? entry.recurrence_full_amount
+    : entry.amount;
+  return changedSeriesBody(body, entry, { amount: Number(shown), keepRhythm: true });
+}
+
+/**
+ * Nur die Werte, die im Formular von `entry` abweichen; Datum und Belege nie
+ * (sie gehoeren der einzelnen Buchung), den Rhythmus nur mit `keepRhythm`.
+ */
+function changedSeriesBody(body, entry, { amount, keepRhythm }) {
   const before = {
     title: entry.title ?? '',
-    amount: Number(entry.amount),
+    amount,
     category: entry.category ?? '',
     subcategory: entry.subcategory ?? '',
     account_id: entry.account_id ?? null,
@@ -4513,7 +4547,11 @@ function occurrenceSeriesBody(body, entry) {
     : a === b);
   const out = {};
   for (const [key, value] of Object.entries(body)) {
-    if (SERIES_RHYTHM_FIELDS.has(key) || key === 'date' || key === 'attachment_document_ids') continue;
+    if (key === 'date' || key === 'attachment_document_ids') continue;
+    if (SERIES_RHYTHM_FIELDS.has(key)) {
+      if (keepRhythm) out[key] = value;
+      continue;
+    }
     if (key in before && same(key === 'amount' ? Number(value) : value, before[key])) continue;
     out[key] = value;
   }
@@ -4604,6 +4642,8 @@ export const __test = {
   monthNavHtml,
   // #1546: was "alle kuenftigen" aus einem Vorkommen an die Serie schickt.
   occurrenceSeriesBody,
+  // #1035: dasselbe von der ersten Buchung aus - mit Rhythmus, Werte nur geaendert.
+  anchorSeriesBody,
   // Critique 2026-09-25, Mobil: Top-3-Auswahl des Diagramms und das EINE
   // Werkzeug-Menue der Buchungsliste, als Programm statt als Quelltext.
   categoryBlocks,

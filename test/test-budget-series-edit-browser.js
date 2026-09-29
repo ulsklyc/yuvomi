@@ -184,7 +184,7 @@ test('eine virtuelle Serie behaelt ihr virtual-Flag und ihren Periodenbetrag', a
 // keinen Sinn), und "alle kuenftigen" schickt von hier den Rhythmus mit.
 
 /** Oeffnet die erste Buchung (letzter Monat, also gebucht), wendet `edit` an und speichert. */
-async function editAnchor(seriesFields, edit, choice = 'series') {
+async function editAnchor(seriesFields, edit, { choice = 'series', prepare } = {}) {
   const today = todayKey(db);
   const created = await api('POST', '', {
     title: 'Strom', category: 'housing', subcategory: 'rent_mortgage', amount: -80, is_recurring: 1,
@@ -192,6 +192,7 @@ async function editAnchor(seriesFields, edit, choice = 'series') {
   });
   const anchor = created.data.id;
   for (let i = -1; i <= 2; i++) await api('GET', `?month=${monthOf(today, i)}`);
+  if (prepare) await prepare(anchor, today);
 
   writes.length = 0;
   const page = await browser.newPage();
@@ -261,4 +262,38 @@ test('"alle kuenftigen" an der ersten Buchung schickt den Rhythmus mit; die gebu
   ).all(anchor, today);
   assert.ok(future.every((r) => r.date.slice(5, 7) === a.date.slice(5, 7)),
     'kuenftige Monatsvorkommen sind weg, es bleibt nur der Jahrestermin');
+});
+
+test('"alle kuenftigen" an der ersten Buchung dreht eine fruehere Serien-Aenderung nicht zurueck', async () => {
+  // Nach "alle kuenftigen" an einem Vorkommen traegt die Definition 95 auf
+  // "Strom neu", die gebuchte erste Buchung weiter 80 auf "Strom" - so will es
+  // #1035. Ihr Formular ist mit IHREN Werten vorbelegt. Wer dort nur den
+  // Rhythmus aendert und "alle kuenftigen" waehlt, darf die alten Werte nicht
+  // zurueck in die Serie schreiben (claude-review auf #1541).
+  const { anchor, asked, sent } = await editAnchor({}, () => {
+    const sel = document.querySelector('#bm-interval');
+    sel.value = 'yearly';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  }, {
+    prepare: async (id, day) => {
+      const occurrence = db.prepare(
+        'SELECT id FROM budget_entries WHERE recurrence_parent_id = ? AND date >= ? ORDER BY date LIMIT 1'
+      ).get(id, day);
+      const r = await api('PUT', `/${occurrence.id}/series`, { title: 'Strom neu', amount: -95 });
+      assert.equal(r.data.series.title, 'Strom neu', 'Vorbedingung: die Serie wurde geaendert');
+    },
+  });
+  assert.equal(asked, true);
+  const series = sent.filter((w) => w.path.endsWith('/series'));
+  assert.equal(series.length, 1);
+  assert.equal(series[0].body.recurrence_interval, 'yearly', 'der geaenderte Rhythmus geht mit');
+  for (const key of ['title', 'amount', 'category', 'subcategory', 'date']) {
+    assert.ok(!(key in series[0].body), `${key} blieb unveraendert und geht nicht mit`);
+  }
+  const def = seriesRow(anchor);
+  assert.equal(def.title, 'Strom neu', 'die fruehere Serien-Aenderung bleibt');
+  assert.equal(def.amount, -95);
+  const a = db.prepare('SELECT * FROM budget_entries WHERE id = ?').get(anchor);
+  assert.equal(a.recurrence_interval, 'yearly');
+  assert.equal(a.title, 'Strom', 'die gebuchte erste Buchung bleibt');
 });

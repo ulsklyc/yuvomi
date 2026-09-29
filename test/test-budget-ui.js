@@ -1787,7 +1787,7 @@ test('das Bearbeiten-Modal bekommt immer einen echten Eintrag, nie einen nachgeb
 test('Serien-Speichern reicht ein leeres Konto einer kontolosen Instanz nicht weiter (#973)', () => {
   const start = budget.indexOf("if (scope === 'series')");
   assert.ok(start >= 0, 'der Serien-Zweig muss auffindbar sein');
-  const zweig = budget.slice(start, start + 1400);
+  const zweig = budget.slice(start, start + 1800);
 
   assert.match(zweig, /const seriesBody = \{ \.\.\.body \}/,
     'der Serien-Aufruf braucht einen eigenen Body, sonst wirkt jede Korrektur auch auf den Einzel-PUT');
@@ -1797,8 +1797,8 @@ test('Serien-Speichern reicht ein leeres Konto einer kontolosen Instanz nicht we
     'sonst muss das Feld ungesendet bleiben - weglassen heißt serverseitig "unverändert"');
   // Seit #1546 geht der bereinigte Body eines VORKOMMENS noch durch
   // occurrenceSeriesBody(), das den Rhythmus und Unveraendertes herausnimmt
-  // (Test darunter); die erste Buchung schickt ihn so, wie er ist (#1035).
-  assert.match(zweig, /api\.put\(`\/budget\/\$\{entry\.id\}\/series`, entry\.recurrence_parent_id\s*\?\s*occurrenceSeriesBody\(seriesBody, entry\)\s*:\s*seriesBody\)/,
+  // (Test darunter); die erste Buchung durch anchorSeriesBody() (#1035).
+  assert.match(zweig, /api\.put\(`\/budget\/\$\{entry\.id\}\/series`, entry\.recurrence_parent_id\s*\?\s*occurrenceSeriesBody\(seriesBody, entry\)\s*:\s*anchorSeriesBody\(seriesBody, entry\)\)/,
     'gesendet wird der bereinigte Body, nicht der ursprüngliche');
 });
 
@@ -1850,6 +1850,30 @@ test('occurrenceSeriesBody: kein Rhythmus, kein Datum, nur Geaendertes (#1546)',
   for (const key of ['is_recurring', 'recurrence_interval', 'recurrence_interval_count', 'recurrence_virtual', 'recurrence_confirm', 'date']) {
     assert.ok(!(key in changed), `${key} darf nie mit`);
   }
+});
+
+test('anchorSeriesBody: Rhythmus mit, Werte nur geaendert, Betrag gegen den gezeigten (#1035)', () => {
+  // Nach "alle kuenftigen" an einem Vorkommen haelt die Definition andere
+  // Werte als die gebuchte erste Buchung, mit deren Werten das Formular
+  // vorbelegt ist. Unveraendert mitgeschickt, drehten sie die Serie zurueck.
+  const anchor = {
+    id: 1, recurrence_parent_id: null, is_recurring: 1, title: 'Versicherung', amount: -100,
+    recurrence_virtual: 1, recurrence_full_amount: -1200, category: 'housing', subcategory: 'insurance',
+    account_id: 7, visibility: 'shared', responsible_users: [{ id: 2 }],
+  };
+  const dialogBody = {
+    title: 'Versicherung', amount: -1200, category: 'housing', subcategory: 'insurance', date: '2026-01-15',
+    is_recurring: 1, recurrence_interval: 'yearly', recurrence_interval_count: 1,
+    recurrence_virtual: 1, recurrence_confirm: 0, account_id: 7, responsible_user_ids: [2],
+  };
+  assert.deepEqual(budgetUi.anchorSeriesBody(dialogBody, anchor), {
+    is_recurring: 1, recurrence_interval: 'yearly', recurrence_interval_count: 1,
+    recurrence_virtual: 1, recurrence_confirm: 0,
+  }, 'der Periodenbetrag im Formular ist unveraendert, obwohl amount den Monatsanteil haelt');
+  const changed = budgetUi.anchorSeriesBody({ ...dialogBody, title: 'Haftpflicht', amount: -1320 }, anchor);
+  assert.equal(changed.title, 'Haftpflicht');
+  assert.equal(changed.amount, -1320);
+  assert.ok(!('date' in changed), 'das Datum gehoert der Buchung');
 });
 
 test('Bearbeiten eines Vorkommens zeigt den Wiederholungs-Schalter nicht (#1546)', () => {
