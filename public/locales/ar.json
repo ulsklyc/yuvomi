@@ -1566,6 +1566,7 @@
         "recurringEditSeries": "تغيير جميع الدفعات المستقبلية",
         "recurringSeriesDeleted": "تم حذف السلسلة",
         "recurringSeriesSaved": "تم حفظ السلسلة",
+        "recurringDeleteFirstHint": "هذه أول دفعة في السلسلة. هنا ينهي خيار «هذه الدفعة فقط» السلسلة أيضًا: لن تُضاف دفعات جديدة، وتبقى الدفعات المنشأة مسبقًا دفعات منفردة.",
         "deleteLabel": "حذف الإدخال „{{title}}“",
         "deleteConfirm": "هل تريد حذف الإدخال؟",
         "deletePersonConfirm": "هل تريد حذف \"{{title}}\"؟",

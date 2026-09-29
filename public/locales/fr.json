@@ -1347,6 +1347,7 @@
         "recurringEditSeries": "Modifier toutes les occurrences futures",
         "recurringSeriesDeleted": "Série supprimée",
         "recurringSeriesSaved": "Série enregistrée",
+        "recurringDeleteFirstHint": "C'est la première écriture de la série. Ici, « Cette occurrence seulement » met aussi fin à la série : aucune nouvelle écriture n'est ajoutée, et celles déjà créées restent des écritures isolées.",
         "deleteLabel": "Supprimer l’entrée « {{title}} »",
         "deleteConfirm": "Supprimer cette entrée ?",
         "deletePersonConfirm": "Supprimer « {{title}} » ?",

@@ -1420,6 +1420,7 @@
         "recurringEditSeries": "Změnit všechny budoucí záznamy",
         "recurringSeriesDeleted": "Série smazána",
         "recurringSeriesSaved": "Série uložena",
+        "recurringDeleteFirstHint": "Toto je první záznam série. Zde „Pouze tato platba“ ukončí i celou sérii: nepřibudou žádné nové záznamy a již vytvořené zůstanou jako samostatné platby.",
         "deleteLabel": "Smazat záznam „{{title}}“",
         "deleteConfirm": "Opravdu smazat tento záznam?",
         "deletePersonConfirm": "Opravdu smazat \"{{title}}\"?",

@@ -1362,6 +1362,7 @@
         "recurringEditSeries": "تغییر همه مدخل‌های آینده",
         "recurringSeriesDeleted": "سری حذف شد",
         "recurringSeriesSaved": "سری ذخیره شد",
+        "recurringDeleteFirstHint": "این نخستین مدخل مجموعه است. اینجا «فقط این مدخل» مجموعه را هم پایان می‌دهد: مدخل تازه‌ای افزوده نمی‌شود و مدخل‌های ساخته‌شده به‌صورت مدخل‌های جداگانه می‌مانند.",
         "deleteLabel": "حذف مدخل «{{title}}»",
         "deleteConfirm": "آیا واقعاً مدخل حذف شود؟",
         "deletePersonConfirm": "آیا واقعاً «{{title}}» حذف شود؟",

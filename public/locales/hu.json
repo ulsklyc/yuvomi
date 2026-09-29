@@ -1347,6 +1347,7 @@
         "recurringEditSeries": "Az összes jövőbeli előfordulás módosítása",
         "recurringSeriesDeleted": "Sorozat törölve",
         "recurringSeriesSaved": "Sorozat mentve",
+        "recurringDeleteFirstHint": "Ez a sorozat első tétele. Itt a „Csak ez az előfordulás” a sorozatot is lezárja: új tételek nem jönnek létre, a már létrehozottak önálló tételként megmaradnak.",
         "deleteLabel": "„{{title}}” bejegyzés törlése",
         "deleteConfirm": "Valóban törölni szeretné ezt a bejegyzést?",
         "deletePersonConfirm": "Valóban törölni szeretné \"{{title}}\"?",

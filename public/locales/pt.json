@@ -1347,6 +1347,7 @@
         "recurringEditSeries": "Alterar todas as ocorrências futuras",
         "recurringSeriesDeleted": "Série excluída",
         "recurringSeriesSaved": "Série salva",
+        "recurringDeleteFirstHint": "Este é o primeiro lançamento da série. Aqui, “Apenas esta ocorrência” também encerra a série: nenhum lançamento novo é adicionado, e os já criados ficam como lançamentos avulsos.",
         "deleteLabel": "Excluir a entrada “{{title}}”",
         "deleteConfirm": "Excluir entrada?",
         "deletePersonConfirm": "Excluir \"{{title}}\"?",

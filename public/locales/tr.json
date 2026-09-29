@@ -1347,6 +1347,7 @@
         "recurringEditSeries": "Gelecekteki tüm kayıtları değiştir",
         "recurringSeriesDeleted": "Seri silindi",
         "recurringSeriesSaved": "Seri kaydedildi",
+        "recurringDeleteFirstHint": "Bu, serinin ilk kaydı. Burada “Sadece bu kayıt” seriyi de sonlandırır: yeni kayıt eklenmez, önceden oluşturulanlar tek tek kayıtlar olarak kalır.",
         "deleteLabel": "“{{title}}” kaydını sil",
         "deleteConfirm": "Bu kayıt silinsin mi?",
         "deletePersonConfirm": "\"{{title}}\" silinsin mi?",

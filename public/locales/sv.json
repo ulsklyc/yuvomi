@@ -1347,6 +1347,7 @@
         "recurringEditSeries": "Ändra alla framtida förekomster",
         "recurringSeriesDeleted": "Serien borttagen",
         "recurringSeriesSaved": "Serien sparad",
+        "recurringDeleteFirstHint": "Det här är seriens första post. Här avslutar ”Bara denna förekomst” även serien: inga nya poster läggs till, och de som redan skapats finns kvar som enskilda poster.",
         "deleteLabel": "Ta bort posten ”{{title}}”",
         "deleteConfirm": "Vill du verkligen ta bort den här posten?",
         "deletePersonConfirm": "Vill du verkligen ta bort \"{{title}}\"?",
