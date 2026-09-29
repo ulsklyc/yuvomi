@@ -731,6 +731,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The API documentation page answers "restore in progress" during a restore** (#1531). Outside
+  production, `/docs` checks the API token or session, and while a restore had the database closed
+  a request with a token ended in an internal error instead of the "restore in progress" answer
+  every other page that needs the database gives. The same happened to `/openapi.json/` with a
+  trailing slash, which reaches the same route. A new test now reads every top-level route from
+  the running app and fails when one is neither covered by the restore gate nor listed with a reason.
+
 - **The family card no longer misses an evening appointment on a busy day** (#1449). The card took
   its appointments from the calendar tile, which stops at five coming ones and follows its "Only
   mine" option: a child's evening appointment could be cut off, and with "Only mine" every other
@@ -773,6 +780,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lead or "after the start". Both dialogs now read the time in the household zone, including on
   the days the clocks change, the same way the server does.
 
+- **"Due today until" shows the time you entered on a device in another time zone** (#1534).
+  The today sheet on the overview read a task's due time in the zone of the device and then
+  converted it into the household's, so with a household time zone set and a device elsewhere a
+  task due at 18:00 could read "until 00:00". It now shows the due time as entered, like the task
+  list does.
+
 - **Medication reminders come at the household's time** (#1539). The scheduler read the day and
   the time on the server's clock. With a household time zone set and the server running in
   another zone, such as UTC in a container, a dose planned for 08:00 in Berlin was due at 10:00,
@@ -805,6 +818,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the new one from the guide or from Settings, Administration, Backup and restore. A restore on
   Node running natively on Windows no longer stops with `EPERM` while writing the restored copy to
   disk; Docker installs were not affected. (#1441)
+
+- **A restore waits for work that continues after an answer.** A few actions keep working after
+  they have answered: the push to someone mentioned in a task comment, the password reset mail,
+  and the immediate push of a changed or deleted appointment to Google, CalDAV or iCloud. A restore
+  did not see this work, so a mention push or a second reset request could write into the restored
+  database afterwards. The restore now waits for it, and while a restore runs this work does not
+  start. The automatic calendar sync no longer stops the server when its timer fires in the moment
+  a restore has the database closed. (#1532)
 - **Confirming a long list of moved events no longer holds up the server** (#1440). When an admin
   confirmed a page of moved events under Settings > Sync, every picked entry was checked with a
   query prepared anew for it, and a full page of up to 5,000 ran without a pause, so other requests
