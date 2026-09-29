@@ -413,6 +413,79 @@ test('jede _one-Variante traegt in JEDER Locale einen brauchbaren Wert (#1010)',
 });
 
 // ---------------------------------------------------------------------------
+// `_one` ist nicht „genau eins" (#1549)
+//
+// CLDR `one` deckt in vielen Sprachen mehr als die 1: in ru/uk auch 21, 31,
+// 101 ..., in fr/pt/hi/fa auch die 0, im Filipino sogar 2, 3, 5, 7, 8, 10 ...
+// Ein `_one` mit fest geschriebener Eins ("1 событие", "Каждый месяц", "1 kaganapan")
+// stand deshalb bei 21 Terminen als "1 событие" und bei 5 Terminen im Filipino
+// als "1 kaganapan" in der Oberflaeche. In solchen Sprachen muss `_one` den
+// `{{count}}` tragen.
+//
+// Ausnahme nur, wenn der AUFRUFER die Zahl so begrenzt, dass `one` dort nur noch
+// die 1 trifft. Die Karte nennt den Bereich (`min`/`max` oder feste `counts`) und
+// die Belegstelle; welche Sprachen er deckt, rechnet der Test selbst aus
+// Intl.PluralRules nach - "fr ja, ru nein" steht nirgends von Hand.
+// ---------------------------------------------------------------------------
+const ONE_WITHOUT_COUNT = {
+  // calendar.js periodArrowLabels/periodStepOf: 'days' ist 3 (Telefon-Woche) oder
+  // 30 (Agenda); die Eins geht an calendar.prevDay/nextDay.
+  'calendar.prevDays': { counts: [3, 30], where: 'public/pages/calendar.js periodStepOf' },
+  'calendar.nextDays': { counts: [3, 30], where: 'public/pages/calendar.js periodStepOf' },
+  // dashboard.js: count ist die Konstante EXPIRY_SOON_DAYS = 7 (utils/pantry-status.js).
+  'dashboard.pantryExpiringEmpty': { counts: [7], where: 'public/utils/pantry-status.js EXPIRY_SOON_DAYS' },
+  // cron-label.js formatCronSchedule: `count < 1 || count > 23` -> null.
+  'settings.backupSchedulerCronHourly': { min: 1, max: 23, where: 'public/settings/cron-label.js formatCronSchedule' },
+  // modules-health.js typeIntervalLabel: 0/leer -> healthPreventionOneOff, sonst >= 1.
+  'settings.healthPreventionIntervalMonths': { min: 1, where: 'public/settings/pages/modules-health.js typeIntervalLabel' },
+  'settings.healthPreventionIntervalYears': { min: 1, where: 'public/settings/pages/modules-health.js typeIntervalLabel' },
+  // health-cycle.js: source 'history' erst ab MIN_HISTORY_GAPS Luecken, count = Perioden >= 2.
+  'health.cycle.stats.source.history': { min: 2, where: 'public/utils/health-cycle.js source/count' },
+  'health.cycle.stats.source.historyOther': { min: 2, where: 'public/utils/health-cycle.js source/count' },
+  // server/db.js: cycle_length INTEGER NOT NULL CHECK (cycle_length BETWEEN 1 AND 366).
+  'schedule.cycleDaysHint': { min: 1, max: 366, where: 'server/db.js shift_patterns.cycle_length CHECK' },
+};
+
+/** Zahlen ausser der 1, fuer die `locale` im Bereich der Ausnahme `one` waehlt. */
+const oneBeyondOne = (locale, range) => {
+  const rules = new Intl.PluralRules(locale);
+  const counts = range?.counts
+    ?? Array.from({ length: Math.min(range?.max ?? 1000, 1000) - (range?.min ?? 0) + 1 }, (_, i) => (range?.min ?? 0) + i);
+  return counts.filter((n) => n !== 1 && rules.select(n) === 'one');
+};
+
+test('in Sprachen, deren one mehr als die 1 deckt, traegt _one den {{count}} (#1549)', () => {
+  const de = flattenLocale(localeFile('de'));
+  const counting = [...de.keys()]
+    .filter((k) => k.endsWith('_one'))
+    .map((k) => k.slice(0, -4))
+    .filter((b) => typeof de.get(b) === 'string' && de.get(b).includes('{{count}}'));
+  const betroffen = readdirSync(LOCALE_DIR).filter((f) => f.endsWith('.json'))
+    .map((f) => f.replace(/\.json$/, ''))
+    .filter((l) => oneBeyondOne(l).length > 0);
+  // Ohne diese Probe liefe der Test gruen, wenn oneBeyondOne() nie etwas findet.
+  for (const l of ['ru', 'uk', 'fr', 'pt', 'fil']) assert.ok(betroffen.includes(l), `${l} muss als betroffen erkannt werden`);
+  assert.ok(!betroffen.includes('de') && !betroffen.includes('pl'), 'de und pl waehlen one nur fuer die 1');
+
+  const falsch = [];
+  const genutzt = new Set();
+  for (const locale of betroffen) {
+    const entries = flattenLocale(localeFile(locale));
+    for (const base of counting) {
+      const wert = entries.get(`${base}_one`);
+      if (typeof wert !== 'string' || wert.includes('{{count}}')) continue;
+      const ausnahme = ONE_WITHOUT_COUNT[base];
+      const treffer = oneBeyondOne(locale, ausnahme ?? {});
+      if (ausnahme && treffer.length === 0) { genutzt.add(base); continue; }
+      falsch.push(`${locale}: ${base}_one = ${JSON.stringify(wert)} (one auch bei ${treffer.slice(0, 3).join(', ')})`);
+    }
+  }
+  assert.deepEqual(falsch, [], `${falsch.length} _one-Werte ohne {{count}} in Sprachen, deren one mehr als die 1 deckt`);
+  const veraltet = Object.keys(ONE_WITHOUT_COUNT).filter((k) => !genutzt.has(k));
+  assert.deepEqual(veraltet, [], 'ONE_WITHOUT_COUNT: diese Ausnahmen braucht keine Sprache mehr - streichen');
+});
+
+// ---------------------------------------------------------------------------
 // Platzhalter-Ersetzung
 //
 // Die Werte kommen aus Nutzereingaben (Namen, Titel, Notizen). Sie werden
