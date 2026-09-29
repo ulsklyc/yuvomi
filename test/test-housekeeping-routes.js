@@ -1555,6 +1555,7 @@ test('#1556 ohne eingestellte Haushaltszone: die Zone der Oberflaeche entscheide
     const workerId = await freshWorker('OhnezoneHerbst');
     const early = seedLinkedVisit(workerId, '2026-10-24T22:30:00.000Z', '2026-10-25');
     assert.equal(await todaySessionId('/workers?timezone=Europe%2FBerlin', workerId), early);
+    assert.equal(await todaySessionId('/dashboard?timezone=Europe%2FBerlin', workerId), early, 'die Uebersicht liest dieselbe Angabe (Review)');
     // Eine unbekannte Zone wirft nicht, sie faellt auf die Uhr des Servers.
     assert.equal(await todaySessionId('/workers?timezone=Mars%2FOlympus', workerId), null);
   });

@@ -566,12 +566,13 @@ function monthlySummary(monthValue = currentMonth()) {
   };
 }
 
-function housekeepingDashboard(receipts = MASKED_RECEIPTS) {
+// `daySource` ist req.query: dieselbe Angabe zur Zone wie bei `/workers` (#1556).
+function housekeepingDashboard(receipts = MASKED_RECEIPTS, daySource = {}) {
   reconcilePaymentTasks();
   const tz = householdTimeZone(db.get());
   const monthValue = currentMonth();
   const monthRange = householdMonthRange(monthValue, tz);
-  const context = localDayContext();
+  const context = localDayContext(daySource);
   const workers = loadWorkers().map((row) => publicWorker(row, context, receipts));
   const worker = workers[0] ?? null;
   const summary = monthlySummary(monthValue);
@@ -795,7 +796,7 @@ function defaultShoppingList(actorId) {
 
 router.get('/dashboard', (req, res) => {
   try {
-    res.json({ data: housekeepingDashboard(receiptAccess(req)) });
+    res.json({ data: housekeepingDashboard(receiptAccess(req), req.query) });
   } catch (err) {
     log.error('GET /dashboard error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

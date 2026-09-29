@@ -248,7 +248,7 @@ async function loadData() {
   const reportSeq = ++reportFetchSeq;
   const reportMonth = state.reportMonth;
   const [dashboard, tasks, current, report, templates, workers, prefs] = await Promise.all([
-    api.get('/housekeeping/dashboard'),
+    api.get(`/housekeeping/dashboard?${dayParams.toString()}`),
     api.get('/housekeeping/decay-tasks'),
     api.get('/housekeeping/visits'),
     // Der Berichte-Tab behaelt seinen Monat ueber jedes Neuladen (#1137). Jede

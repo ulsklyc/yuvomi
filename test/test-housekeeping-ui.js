@@ -738,11 +738,16 @@ test('#1556 Tagesabfrage und Check-in lesen den Tag des Haushalts, nicht Tag und
   const workersUrl = gets.find((url) => url.startsWith('/housekeeping/workers?'));
   assert.ok(workersUrl, 'die Tagesabfrage laeuft');
   const query = new URLSearchParams(workersUrl.split('?')[1]);
+  // Die Uebersicht fragt nach demselben Tag (Review): sonst rechnete der Server
+  // ihn ohne Haushaltszone in seiner eigenen.
+  const dashboardUrl = gets.find((url) => url.startsWith('/housekeeping/dashboard'));
+  const dashboardQuery = new URLSearchParams(dashboardUrl?.split('?')[1] ?? '');
   const checkIn = posts.find((p) => p.url === '/housekeeping/work-sessions/check-in')?.body;
   assert.ok(checkIn, 'der Check-in laeuft');
   const sent = [
     ['Tagesabfrage', query.get('local_date'), query.get('timezone_offset_minutes'), query.get('timezone')],
     ['Check-in', checkIn.local_date, checkIn.timezone_offset_minutes, checkIn.timezone],
+    ['Uebersicht', dashboardQuery.get('local_date'), dashboardQuery.get('timezone_offset_minutes'), dashboardQuery.get('timezone')],
   ];
   for (const [where, day, offset, zone] of sent) {
     // Ohne `timezone` nimmt der Server Tag und Offset als Angabe eines alten Clients.
