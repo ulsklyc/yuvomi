@@ -1138,6 +1138,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **A CalDAV account moved to another server or username needs its password again.** Editing an
+  account through the API with a new server address but without a password tested the connection
+  with the stored password, so the household's CalDAV credentials went to that server before
+  anything was saved. The route is admin-only. It now follows the rule CardDAV accounts got in
+  2.69.1: an empty password keeps the stored one only while the server (scheme, host and port) and
+  the username stay the same; otherwise the change is refused with `400` and the error code
+  `password_required`, no connection is made and nothing is saved. A different path on the same
+  server keeps working without the password.
+
 - **Documents and images are no longer kept in the browser's cache.** A document opened in the
   viewer stayed there for five minutes, and document thumbnails, Paperless thumbnails, recipe
   images, screensaver photos and weather icons were marked as cacheable, so signing out left copies
